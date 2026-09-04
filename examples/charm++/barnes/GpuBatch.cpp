@@ -634,6 +634,80 @@ void GpuParticleStore::gatherExternal(const int *offs, const int *cnts,
   std::memcpy(out, hGather, sizeof(float4)*total);
 }
 
+static void ensureF4(CkVec<float4 *> &bufs, CkVec<int> &caps, int idx, int want){
+  while(bufs.length() <= idx){ bufs.push_back(NULL); caps.push_back(0); }
+  if(caps[idx] >= want) return;
+  if(bufs[idx] != NULL) hapiCheck(hapiFree(bufs[idx]));
+  caps[idx] = want + want/4 + 1024;
+  hapiCheck(hapiMalloc((void **)&bufs[idx], sizeof(float4)*caps[idx]));
+}
+
+float4 *GpuParticleStore::stageLetSend(int dest, const int *offs,
+                                       const int *cnts, int nranges, int total){
+  if(total <= 0) return NULL;
+  ensureF4(dLetSend, letSendCap, dest, total);
+  float4 *base = dLetSend[dest];
+  int at = 0;
+  for(int r = 0; r < nranges; r++){
+    if(cnts[r] <= 0) continue;
+    hapiCheck(cudaMemcpyAsync(base + at, dPos + offs[r], sizeof(float4)*cnts[r],
+                              cudaMemcpyDeviceToDevice, stream));
+    at += cnts[r];
+  }
+  // The transport reads this asynchronously, so it has to be settled first.
+  hapiCheck(cudaStreamSynchronize(stream));
+  return base;
+}
+
+float4 *GpuParticleStore::letRecvSlot(int src, int n){
+  ensureF4(dLetRecv, letRecvCap, src, (n > 0 ? n : 1));
+  return dLetRecv[src];
+}
+
+int GpuParticleStore::appendRemote(int src, int n){
+  if(n <= 0) return remoteUsed;
+  if(remoteUsed + n > remoteCap){
+    const int want = (remoteUsed + n) * 2 + 4096;
+    float4 *grown = NULL;
+    hapiCheck(hapiMalloc((void **)&grown, sizeof(float4)*want));
+    if(dRemote != NULL && remoteUsed > 0)
+      hapiCheck(cudaMemcpyAsync(grown, dRemote, sizeof(float4)*remoteUsed,
+                                cudaMemcpyDeviceToDevice, stream));
+    if(dRemote != NULL){
+      hapiCheck(cudaStreamSynchronize(stream));
+      hapiCheck(hapiFree(dRemote));
+    }
+    dRemote = grown;
+    remoteCap = want;
+  }
+  hapiCheck(cudaMemcpyAsync(dRemote + remoteUsed, dLetRecv[src],
+                            sizeof(float4)*n, cudaMemcpyDeviceToDevice, stream));
+  const int at = remoteUsed;
+  remoteUsed += n;
+  return at;
+}
+
+int GpuParticleStore::insertLet(const GpuLetNode *nodes, int n){
+  if(n <= 0 || dtree.nodes == NULL) return 0;
+  if(n > letCap){
+    if(hLet != NULL){ hapiCheck(hapiFreeHost(hLet)); hapiCheck(hapiFree(dLet)); }
+    letCap = n + n/4 + 256;
+    hapiCheck(hapiMallocHost((void **)&hLet, sizeof(GpuLetNode)*letCap));
+    hapiCheck(hapiMalloc((void **)&dLet, sizeof(GpuLetNode)*letCap));
+  }
+  std::memcpy(hLet, nodes, sizeof(GpuLetNode)*n);
+  hapiCheck(cudaMemcpyAsync(dLet, hLet, sizeof(GpuLetNode)*n,
+                            cudaMemcpyHostToDevice, stream));
+  hapiCheck(cudaMemsetAsync(dtree.activeNextCount, 0, sizeof(int), stream));
+  invokeInsertLet(dtree, dLet, n, dtree.activeNextCount, stream);
+  int failed = 0;
+  hapiCheck(cudaMemcpyAsync(&failed, dtree.activeNextCount, sizeof(int),
+                            cudaMemcpyDeviceToHost, stream));
+  hapiCheck(cudaEventRecord(treeBuilt, stream));
+  hapiCheck(cudaStreamSynchronize(stream));
+  return failed;
+}
+
 void GpuParticleStore::release(){
   if (stream != NULL) cudaStreamSynchronize(stream);
   if (hPos != NULL){ hapiFreeHost(hPos); hPos = NULL; }
@@ -661,6 +735,15 @@ void GpuParticleStore::release(){
   sendCap.length() = 0; recvCap.length() = 0;
   if (hStage != NULL){ hapiFreeHost(hStage); hStage = NULL; }
   hStageCap = 0;
+  for(int i = 0; i < dLetSend.length(); i++) if(dLetSend[i]) hapiFree(dLetSend[i]);
+  for(int i = 0; i < dLetRecv.length(); i++) if(dLetRecv[i]) hapiFree(dLetRecv[i]);
+  dLetSend.length() = 0; dLetRecv.length() = 0;
+  letSendCap.length() = 0; letRecvCap.length() = 0;
+  if (dRemote != NULL){ hapiFree(dRemote); dRemote = NULL; }
+  remoteCap = remoteUsed = 0;
+  if (hLet != NULL){ hapiFreeHost(hLet); hLet = NULL; }
+  if (dLet != NULL){ hapiFree(dLet); dLet = NULL; }
+  letCap = 0;
   if (dGather != NULL){ hapiFree(dGather); dGather = NULL; }
   if (hGather != NULL){ hapiFreeHost(hGather); hGather = NULL; }
   gatherCap = 0;

@@ -184,6 +184,8 @@ public:
         hPatch(NULL), dPatch(NULL), patchCap(0),
         hStage(NULL), hStageCap(0),
         dGather(NULL), hGather(NULL), gatherCap(0),
+        dRemote(NULL), remoteCap(0), remoteUsed(0),
+        hLet(NULL), dLet(NULL), letCap(0),
         hBinKey(NULL), dBinKey(NULL), hBinFirst(NULL), dBinFirst(NULL),
         hBinLast(NULL), dBinLast(NULL), hBinDepth(NULL), dBinDepth(NULL),
         hBinStart(NULL), dBinStart(NULL), hBinCount(NULL), dBinCount(NULL),
@@ -300,6 +302,21 @@ public:
   // array, which is the last thing keeping it alive.
   void gatherExternal(const int *offs, const int *cnts, int nranges,
                       int total, void *out);
+
+  // --- pushed trees, device resident ---------------------------------------
+  // Gather one destination's payload and leave it on the device for the
+  // transport to read; the send must not be rebuilt until its callback fires.
+  float4 *stageLetSend(int dest, const int *offs, const int *cnts,
+                       int nranges, int total);
+  // Where an incoming payload should land, and where it ends up afterwards:
+  // everything received is concatenated into one block, because a spliced node
+  // indexes that block and not a per-sender one.
+  float4 *letRecvSlot(int src, int n);
+  int appendRemote(int src, int n);      // returns the offset it landed at
+  void resetRemote(){ remoteUsed = 0; }
+  const float4 *deviceRemote() const { return dRemote; }
+  // Splice the pushed cells into the tree and re-record treeBuilt.
+  int insertLet(const struct GpuLetNode *nodes, int n);
   cudaStream_t deviceStream() const { return stream; }
 
 
@@ -359,6 +376,12 @@ private:
   int hStageCap;
   float4 *dGather, *hGather;
   int gatherCap;
+  CkVec<float4 *> dLetSend, dLetRecv;
+  CkVec<int> letSendCap, letRecvCap;
+  float4 *dRemote;
+  int remoteCap, remoteUsed;
+  struct GpuLetNode *hLet, *dLet;
+  int letCap;
   GpuKdkReduction *dPartials;  // REDUCE_BLOCKS entries
   GpuKdkReduction *dRed;
 

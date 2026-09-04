@@ -193,12 +193,19 @@ struct DeviceNode {
   float  qxx, qxy, qxz, qyy, qyz; // reduced quadrupole, as MultipoleMoments
   float3 boxMin, boxMax;          // bounding box; the opening criterion's target side
   int    firstChild;              // index of child 0, or -1 for a leaf
-  int    partStart, partCount;    // contiguous range of the sorted particles
+  int    partStart, partCount;    // contiguous range of particles
+  // Which array partStart indexes: the PE's own particles, or the block of
+  // pushed ones. A cell that arrived in a locally essential tree is otherwise
+  // an ordinary node, which is the point -- one walk covers both halves.
+  int    partSrc;                 // DNODE_PART_LOCAL or DNODE_PART_REMOTE
   int    type;
   int    depth;
   int    ownerStart, ownerEnd;    // tree-piece range, as the host's owner span
   unsigned long long key;
 };
+
+#define DNODE_PART_LOCAL  0
+#define DNODE_PART_REMOTE 1
 
 // The most levels the build will descend. TREE_KEY_BITS/LOG_BRANCH_FACTOR is
 // the hard limit; this is the practical one, and the build asserts it was not
@@ -260,10 +267,28 @@ struct GpuTargetBucket {
 
 // accel[] is accumulated into, exactly as the gravity kernel does, so the
 // device walk and any remaining host work can both contribute.
+// d_remote holds the particles that arrived in pushes, indexed by the nodes
+// whose partSrc says so. Pass NULL when there are none.
 void invokeLocalWalk(const DeviceNode* d_nodes, const float4* d_posm,
+                     const float4* d_remote,
                      const GpuTargetBucket* d_buckets, int numBuckets,
                      float4* d_accel, float epssq, float tolsq,
                      cudaStream_t stream);
+
+// Splice one push into the tree: each entry names a node by SFC key, and the
+// path to it is created where the tree does not already reach. Entries must be
+// ordered parents before children, which the sender's preorder walk gives.
+struct GpuLetNode {
+  float4 cmMass;
+  float rsq, qxx, qxy, qxz, qyy, qyz;
+  float3 boxMin, boxMax;
+  int partStart, partCount;   // into the remote particle block
+  int type;
+  unsigned long long key;
+};
+
+void invokeInsertLet(DeviceTreeScratch sc, const GpuLetNode* d_let, int n,
+                     int* d_failed, cudaStream_t stream);
 
 // A completed moment for one device node, pushed down from the host.
 //

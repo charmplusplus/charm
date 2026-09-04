@@ -99,6 +99,13 @@ class DataManager : public CBase_DataManager {
   Node<ForceData> *root;
 
   Key *keyRanges;
+  // How many tree pieces keyRanges actually describes. keyRanges used to
+  // alias the RangeMsg body, so a PE that ran ahead could have it repointed
+  // by the next iteration's broadcast while its own tree build was still in
+  // flight -- numTreePieces and the ranges then disagreed and the frontier
+  // came out the wrong length. The ranges are copied now and this travels
+  // with them so the disagreement is caught where it happens.
+  int keyRangeCount;
   bool haveRanges;
   RangeMsg *rangeMsg;
   CkVec<Node<ForceData>*> myBuckets;
@@ -114,6 +121,13 @@ class DataManager : public CBase_DataManager {
   // before anything is, so it takes the host route and the device array is
   // still empty when ensureDevice() first succeeds.
   bool assembledOnDevice;
+  // BARNES_TP_DRIFT: does a tree piece index keep covering the same region?
+  // A tree piece is the i-th leaf of the sorting tree in key order, so if the
+  // decomposition splits a bin at low key everything above it renumbers. The
+  // balancer's per-element history is keyed on that index, so if the region
+  // behind it moves, the history describes work that has gone elsewhere.
+  map<int, Key> prevTpKey;
+  void reportTreePieceDrift();
   // Whether anything on this PE will read a particle's contents this
   // iteration. False means the array never has to cross the bus.
   bool hostNeedsParticles() const;
@@ -317,11 +331,25 @@ class DataManager : public CBase_DataManager {
   Node<ForceData> *descendToKey(Key k);
   int letsExpected, letsRecvd;
   bool letsDone;
+  // The device splice is one-shot per iteration: it ends in treeReady(),
+  // and a stray late call would fire that a second time.
+  bool letSpliceDone;
   // A push can arrive before this PE's own frontier callback has run, and the
   // splice needs the frontier types to know what it may grow into. Hold them
   // until it has.
   bool frontierReady;
   CkVec<LetMsg *> pendingLets;
+  // Device LET: how many pushed payloads have landed, and where each sender's
+  // block sits in the concatenated remote array.
+  int letPayloads;
+  CkVec<int> letBase;
+  CkVec<int> letCount;
+  // Pushed cells wait here until their particles have landed too.
+  CkVec<LetMsg *> heldLets;
+  void maybeSpliceLets();
+  bool deviceLetActive() const;
+  public: bool deviceCoversRemote() const { return deviceLetActive(); }
+  private:
   void spliceLet(LetMsg *msg);
   void flushMomentRequests();
   void respondToMomentsRequest(Node<ForceData> *,CkVec<int>&);
@@ -358,6 +386,9 @@ class DataManager : public CBase_DataManager {
   void exchangeSendDone();
   void recvFrontierMoments(CkReductionMsg *msg);
   void recvLet(LetMsg *msg);
+  void recvLetDevice(int fromPe, int n, float4 *buf);
+  void recvLetDevice(int fromPe, int &n, float4 *&buf,
+                     CkDeviceBufferPost *devicePost);
   void receiveParticleBlock(ParticleBlockMsg *msg);
   // Stage 5b. The block message carries the bookkeeping; the particles come
   // straight from the sender's device memory into ours.
@@ -403,11 +434,18 @@ class DataManager : public CBase_DataManager {
   // Take a stream and the device arrays. Called from an entry method, never
   // from the constructor: HAPI has not picked this PE's device at that point.
   void ensureDevice();
-  int particleOffset(Particle *p){ return (int)(p - myParticles.getVec()); }
+
   const float4 *devicePositions() const { return gpuParticles.positions(); }
   // The flat device tree the local walk traverses; NULL until it is built.
   const DeviceNode *deviceNodes() const { return gpuParticles.deviceNodes(); }
   cudaEvent_t treeEvent() const { return gpuParticles.treeEvent(); }
+  const float4 *deviceRemote() const { return gpuParticles.deviceRemote(); }
+#endif
+  // Where a node's particles sit in the array, as an index. Pointer arithmetic
+  // only -- it never reads one, which is what lets the exchange and the pushes
+  // name ranges without the host holding the particles.
+  int particleOffset(Particle *p){ return (int)(p - myParticles.getVec()); }
+#ifdef GPU_GRAVITY
   float4 *deviceAccel() const { return gpuParticles.accel(); }
   cudaEvent_t uploadEvent() const { return gpuParticles.uploadEvent(); }
   void forcesReady();

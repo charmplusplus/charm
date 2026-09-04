@@ -60,6 +60,9 @@ struct Parameters {
   // Send the decomposition's particles straight from device memory instead of
   // copying them through the host on both ends.
   int deviceExchange;
+  // Splice pushed trees into the device tree and let one device walk cover
+  // both halves, instead of walking the remote half on the host.
+  int deviceLet;
   // Initial tree piece placement. 0 = the default round-robin map, 1 = a block
   // map, which is what makes this benchmark imbalanced; see BlockMap.
   int blockMap;
@@ -102,6 +105,7 @@ struct Parameters {
     p | deviceWalk;
     p | useLet;
     p | deviceExchange;
+    p | deviceLet;
     p | blockMap;
     p | mapChunk;
     p | mapCyclic;

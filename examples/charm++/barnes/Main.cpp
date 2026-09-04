@@ -122,6 +122,8 @@ void Main::setParameters(CkArgMsg *m){
   else if(!globalParams.blockMap)
     CkPrintf("map: Charm++ default\n");
   if(globalParams.blockMap) CkPrintf("blockMap: contiguous key ranges per PE\n");
+  globalParams.deviceLet = params.getiparam("devlet", 0, table);
+  if(globalParams.deviceLet) CkPrintf("device LET: one walk covers both halves\n");
   globalParams.deviceExchange = params.getiparam("devexch", 0, table);
   if(globalParams.deviceExchange) CkPrintf("device particle exchange\n");
   globalParams.useLet = params.getiparam("let", 0, table);
@@ -242,6 +244,7 @@ void Main::usage(){
   usage["in"] = "input file";
   usage["ppc"] = "particles per chare";
   usage["b"] = "particles per bucket (leaf)";
+  usage["devlet"] = "splice pushed trees into the device tree";
   usage["devexch"] = "exchange decomposition particles device to device";
   usage["let"] = "push locally essential trees instead of pulling remote nodes";
   usage["devwalk"] = "run the local traversal on the device";

@@ -202,6 +202,12 @@ void TreePiece::doRemoteGravity(RescheduleMsg *msg){
   for(i = 0; i < globalParams.yieldPeriod &&
                  remoteTraversalState.current < myNumBuckets;
                  i++){
+#ifdef GPU_GRAVITY
+    // The pushed tree is in the device tree and the device walk covered it, so
+    // there is no remote half left to do here -- and nothing to ship, which is
+    // what takes the interaction list off the bus.
+    if(!(deviceWalkRunning && myDM->deviceCoversRemote()))
+#endif
     trav.topDownTraversal(root,&remoteTraversalWorker,&remoteTraversalState);
     remoteTraversalState.current++;
     remoteTraversalState.currentBucketPtr++;
@@ -328,8 +334,8 @@ bool TreePiece::launchDeviceWalk(){
     // Same work class the gravity kernel is tagged with, so the estimator sees
     // one family of launches rather than two.
     hapiCuptiKernelTagScope workTag(walkWorkClass(n));
-    invokeLocalWalk(nodes, myDM->devicePositions(), dTargets, n,
-                    myDM->deviceAccel(), globalParams.epssq,
+    invokeLocalWalk(nodes, myDM->devicePositions(), myDM->deviceRemote(),
+                    dTargets, n, myDM->deviceAccel(), globalParams.epssq,
                     globalParams.tolsq, stream);
   }
 

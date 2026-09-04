@@ -405,6 +405,7 @@ __global__ void treeInitKernel(DeviceTreeScratch sc, int n, int numTreePieces){
   r.depth = 0;
   r.partStart = 0;
   r.partCount = n;
+  r.partSrc = DNODE_PART_LOCAL;
   r.firstChild = -1;
   r.type = DNODE_INTERNAL;
   r.ownerStart = 0;
@@ -454,6 +455,7 @@ __global__ void treeLevelKernel(const unsigned long long* __restrict__ key,
       ch.depth = nd.depth + 1;
       ch.partStart = (c == 0) ? lo : split;
       ch.partCount = (c == 0) ? (split - lo) : (hi - split);
+      ch.partSrc = DNODE_PART_LOCAL;
       ch.firstChild = -1;
 
       if (c == 0){
@@ -728,6 +730,7 @@ __device__ __forceinline__ void accumulate(float sx, float sy, float sz, float s
 
 __global__ void localWalkKernel(const DeviceNode* __restrict__ nodes,
                                 const float4* __restrict__ posm,
+                                const float4* __restrict__ remote,
                                 const GpuTargetBucket* __restrict__ buckets,
                                 int numBuckets, float4* __restrict__ accel,
                                 float epssq, float tolsq){
@@ -785,12 +788,14 @@ __global__ void localWalkKernel(const DeviceNode* __restrict__ nodes,
           // in tiles, the way the gravity kernel does it. Every thread then
           // reads each source once from shared instead of once from global.
           if (nd.type == DNODE_BUCKET){
+            // Local particles or pushed ones; the node says which.
+            const float4* src = (nd.partSrc == DNODE_PART_REMOTE) ? remote : posm;
             const int s0 = nd.partStart, n = nd.partCount;
             for (int t = 0; t < n; t += GRAV_BLOCK_SIZE){
               // Uniform bounds, so the barriers stay collective.
               __syncthreads();
               const int g = t + threadIdx.x;
-              if (g < n) srcTile[threadIdx.x] = posm[s0 + g];
+              if (g < n) srcTile[threadIdx.x] = src[s0 + g];
               __syncthreads();
               const int m = min(GRAV_BLOCK_SIZE, n - t);
               if (active){
@@ -837,13 +842,93 @@ __global__ void localWalkKernel(const DeviceNode* __restrict__ nodes,
 }
 
 void invokeLocalWalk(const DeviceNode* d_nodes, const float4* d_posm,
+                     const float4* d_remote,
                      const GpuTargetBucket* d_buckets, int numBuckets,
                      float4* d_accel, float epssq, float tolsq,
                      cudaStream_t stream){
   if (numBuckets <= 0) return;
   const int blocks = (numBuckets < 1024) ? numBuckets : 1024;
   localWalkKernel<<<blocks, GRAV_BLOCK_SIZE, 0, stream>>>(
-      d_nodes, d_posm, d_buckets, numBuckets, d_accel, epssq, tolsq);
+      d_nodes, d_posm, d_remote, d_buckets, numBuckets, d_accel, epssq, tolsq);
+}
+
+// Splice a push into the tree. One thread per entry, and the entries arrive
+// parents first, so the path above a node exists by the time it is reached --
+// except where two entries share a missing ancestor, which is why the descent
+// creates children under a lock rather than assuming.
+__global__ void insertLetKernel(DeviceTreeScratch sc,
+                                const GpuLetNode* __restrict__ let,
+                                int n, int* failed){
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < n;
+       i += gridDim.x * blockDim.x){
+    const GpuLetNode e = let[i];
+
+    int depth = 0;
+    unsigned long long k = e.key;
+    while (k > 1ULL){ k >>= 1; depth++; }
+
+    int cur = 0;
+    bool ok = true;
+    for (int level = depth - 1; level >= 0; level--){
+      int fc = sc.nodes[cur].firstChild;
+      if (fc < 0){
+        // Claim the right to grow here. -2 marks the slot as being filled so a
+        // second thread waits rather than allocating a second pair.
+        const int prev = atomicCAS(&sc.nodes[cur].firstChild, -1, -2);
+        if (prev == -1){
+          const int base = atomicAdd(sc.nodeCount, 2);
+          if (base + 1 >= sc.capacity){ ok = false; atomicExch(&sc.nodes[cur].firstChild, -1); break; }
+          const DeviceNode p = sc.nodes[cur];
+          for (int c = 0; c < 2; c++){
+            DeviceNode &ch = sc.nodes[base + c];
+            ch.key = (p.key << 1) | (unsigned long long)c;
+            ch.depth = p.depth + 1;
+            ch.firstChild = -1;
+            ch.partStart = 0; ch.partCount = 0;
+            ch.partSrc = DNODE_PART_LOCAL;
+            ch.type = DNODE_EMPTYBUCKET;
+            ch.ownerStart = p.ownerStart; ch.ownerEnd = p.ownerEnd;
+            ch.cmMass = make_float4(0.f, 0.f, 0.f, 0.f);
+            ch.rsq = 0.f;
+            ch.qxx = ch.qxy = ch.qxz = ch.qyy = ch.qyz = 0.f;
+            ch.boxMin = make_float3( INFINITY,  INFINITY,  INFINITY);
+            ch.boxMax = make_float3(-INFINITY, -INFINITY, -INFINITY);
+          }
+          __threadfence();
+          atomicExch(&sc.nodes[cur].firstChild, base);
+          fc = base;
+        }
+        else{
+          // Someone else is creating them; spin until the link is published.
+          while ((fc = atomicAdd(&sc.nodes[cur].firstChild, 0)) < 0){
+            if (fc == -1){ ok = false; break; }
+          }
+          if (!ok) break;
+        }
+      }
+      cur = fc + (int)((e.key >> level) & 1ULL);
+    }
+    if (!ok){ if (failed) atomicAdd(failed, 1); continue; }
+
+    DeviceNode &d = sc.nodes[cur];
+    d.cmMass = e.cmMass;
+    d.rsq = e.rsq;
+    d.qxx = e.qxx; d.qxy = e.qxy; d.qxz = e.qxz; d.qyy = e.qyy; d.qyz = e.qyz;
+    d.boxMin = e.boxMin; d.boxMax = e.boxMax;
+    d.type = e.type;
+    if (e.partCount > 0){
+      d.partStart = e.partStart;
+      d.partCount = e.partCount;
+      d.partSrc = DNODE_PART_REMOTE;
+    }
+  }
+}
+
+void invokeInsertLet(DeviceTreeScratch sc, const GpuLetNode* d_let, int n,
+                     int* d_failed, cudaStream_t stream){
+  if (n <= 0) return;
+  const int blocks = (n + REDUCE_BLOCK_SIZE - 1) / REDUCE_BLOCK_SIZE;
+  insertLetKernel<<<blocks, REDUCE_BLOCK_SIZE, 0, stream>>>(sc, d_let, n, d_failed);
 }
 
 // Descend from the root following the key's bits. Bit 63 is the leading one

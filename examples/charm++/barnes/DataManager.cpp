@@ -40,6 +40,7 @@ DataManager::DataManager() :
   haveRanges(false),
   keyRanges(NULL),
   rangeMsg(NULL),
+  keyRangeCount(0),
   numLocalTreePieces(-1),
   doneTreeBuild(false),
   treeMomentsReady(false),
@@ -60,7 +61,9 @@ DataManager::DataManager() :
   outstandingExchangeSends(0),
   letsExpected(0),
   letsRecvd(0),
+  letPayloads(0),
   letsDone(false),
+  letSpliceDone(false),
   frontierReady(false)
 {
 #ifdef STATISTICS
@@ -672,6 +675,7 @@ void DataManager::recvSenderCounts(CkReductionMsg *msg){
 
 // The staging region a push lands in. Sized from the count the block message
 // carries, which is why the two are matched by sender.
+#ifdef GPU_GRAVITY
 void DataManager::recvParticleDevice(int fromPe, int &nbytes, char *&buf,
                                      CkDeviceBufferPost *devicePost){
   buf = gpuParticles.recvSlot(fromPe,
@@ -691,6 +695,11 @@ void DataManager::recvParticleDevice(int fromPe, int nbytes, char *buf){
 void DataManager::exchangeSendDone(){
   outstandingExchangeSends--;
 }
+#else
+void DataManager::recvParticleDevice(int, int&, char*&, CkDeviceBufferPost*){}
+void DataManager::recvParticleDevice(int, int, char*){}
+void DataManager::exchangeSendDone(){}
+#endif
 
 void DataManager::receiveParticleBlock(ParticleBlockMsg *msg){
   recvdBlocks.push_back(msg);
@@ -826,7 +835,34 @@ void DataManager::assembleReceivedBlocks(){
   payloadsRecvd = 0;
   for(int i = 0; i < srcPayloadIn.length(); i++) srcPayloadIn[i] = 0;
 
+  reportTreePieceDrift();
   processSubmittedParticles();
+}
+
+void DataManager::reportTreePieceDrift(){
+  if(getenv("BARNES_TP_DRIFT") == NULL) return;
+  if(CkMyPe() != 0) return;
+
+  int moved = 0, held = 0;
+  double worst = 0.0;
+  const double span = (double)(~Key(0));
+  for(int i = 0; i < submittedParticles.length(); i++){
+    const int idx = submittedParticles[i].index;
+    const Key k = submittedParticles[i].smallestKey;
+    if(k == ~Key(0)) continue;               // empty piece
+    map<int,Key>::iterator it = prevTpKey.find(idx);
+    if(it != prevTpKey.end()){
+      const double d = (k > it->second) ? (double)(k - it->second)
+                                        : (double)(it->second - k);
+      if(d > 0.0){ moved++; if(d/span > worst) worst = d/span; }
+      else held++;
+    }
+    prevTpKey[idx] = k;
+  }
+  if(moved + held > 0)
+    CkPrintf("[TPDRIFT] iter %d: %d of %d local tree pieces cover a different "
+             "key range than last iteration; largest shift %.3g of the key "
+             "space\n", iteration, moved, moved+held, worst);
 }
 
 void DataManager::receiveSplitters(SplitterMsg *msg){
@@ -854,9 +890,15 @@ void DataManager::sendParticles(RangeMsg *msg){
   if(CkMyPe() != 0){
     // The ranges, which only PE 0 can compute. The blocks may already be here
     // or may still be coming; whichever completes second starts the assembly.
+    // Copied, not aliased: the message is freed here rather than surviving
+    // to the end of the iteration where a later broadcast could replace it.
+    const int nk = msg->numTreePieces*2;
+    if(keyRanges != NULL){ delete[] keyRanges; keyRanges = NULL; }
+    keyRanges = new Key[nk];
+    memcpy(keyRanges, msg->keys, sizeof(Key)*nk);
     numTreePieces = msg->numTreePieces;
-    keyRanges = msg->keys;
-    rangeMsg = msg;
+    keyRangeCount = numTreePieces;
+    delete msg;
     haveRanges = true;
     maybeAssemble();
   }
@@ -897,6 +939,7 @@ void DataManager::processSubmittedParticles(){
   myParticles.quickSort();
   prof.end(PhaseProfile::SORT_POST);
 
+#ifdef GPU_GRAVITY
   ensureDevice();
   prof.begin(PhaseProfile::UPLOAD);
   // Only when the host assembled them. With the device exchange the array was
@@ -910,6 +953,7 @@ void DataManager::processSubmittedParticles(){
   // from the wrong array.
   gpuParticles.buildDeviceTree(keyRanges, numTreePieces,
                                (int)((Real)globalParams.ppb*BUCKET_TOLERANCE));
+#endif
 
   prof.begin(PhaseProfile::BUILD);
   const bool mirrored = buildTreeFromDevice();
@@ -1164,9 +1208,12 @@ void DataManager::buildTree(){
   root = new Node<ForceData>(Key(1),rootDepth,myParticles.getVec(),myNumParticles);
   root->setOwners(0,numTreePieces-1);
   nodeTable[Key(1)] = root;
-  if(myNumParticles == 0){
-    return;
-  }
+  // No early return for an empty PE. The loop below refines on ownership --
+  // (ownerEnd > ownerStart) -- which comes from keyRanges and is the same on
+  // every PE, so a PE holding no particles still has to walk it and produce
+  // the identical frontier. Returning here left its root childless, its
+  // frontier one entry long, and its count landing in the wrong slot of the
+  // element-wise frontier reduction, which then failed its own tripwire.
 
   OwnershipActiveBinInfo<ForceData> abi(keyRanges);
   abi.addNewNode(root);
@@ -1243,8 +1290,57 @@ void DataManager::collectFrontier(Node<ForceData> *n, CkVec<Node<ForceData>*> &o
 // a round trip per level had completed. That chain is the part that scales
 // badly: its length is the tree depth and every link is a network hop.
 void DataManager::contributeFrontierMoments(){
+  // The LET receive state is cleared here rather than in the reduction
+  // callback. A push is only sent after the reduction completes, and the
+  // reduction only completes once every PE has contributed, so clearing at
+  // the contribution is the one point guaranteed to precede every arrival.
+  // Clearing in the callback raced: a payload from a faster PE landed first,
+  // resetRemote() threw it away, and maybeSpliceLets then waited on a
+  // payload that would never be resent.
+  if(globalParams.useLet){
+    letsRecvd = 0;
+    letsDone = false;
+    letSpliceDone = false;
+    letPayloads = 0;
+    heldLets.length() = 0;
+    letBase.length() = 0;
+    letCount.length() = 0;
+#ifdef GPU_GRAVITY
+    if(deviceLetActive()) gpuParticles.resetRemote();
+#endif
+  }
+
   frontier.length() = 0;
+  // A PE with no particles has no moments to contribute -- its entries would
+  // be zeros either way -- so it takes the length from the ranges instead of
+  // from its tree. Deriving it from the tree made it the one PE whose
+  // contribution could be built from a stale decomposition, which is the only
+  // way the element-wise reduction can go wrong. It keeps frontier empty, so
+  // the write-back below and sendLets() both no-op for it.
+  if(myNumParticles == 0){
+    const int n0 = keyRangeCount;
+    const int total0 = n0*FRONTIER_W + 1 + 6*CkNumPes();
+    CkVec<Real> zero;
+    zero.resize(total0);
+    for(int i = 0; i < total0; i++) zero[i] = 0.0;
+    zero[n0*FRONTIER_W] = (Real)n0;
+    CkCallback cb(CkIndex_DataManager::recvFrontierMoments(NULL), thisProxy);
+    contribute(sizeof(Real)*total0, zero.getVec(), CkReduction::sum_float, cb);
+    return;
+  }
   collectFrontier(root, frontier);
+
+  // The frontier has exactly one entry per tree piece, so a length that
+  // disagrees with the ranges it was built from means this PE is working off
+  // a different decomposition than its peers. Caught here it names the PE and
+  // the numbers; left to the reduction it surfaces as a length mismatch on
+  // every OTHER PE and says nothing about which one diverged.
+  if(frontier.length() != keyRangeCount || keyRangeCount != numTreePieces){
+    CkPrintf("[FRONTIER] pe %d DIVERGED: frontier %d, ranges describe %d, "
+             "numTreePieces %d, myParts %d\n", CkMyPe(), frontier.length(),
+             keyRangeCount, numTreePieces, myNumParticles);
+    CkAbort("frontier built from a stale decomposition");
+  }
 
   const int n = frontier.length();
   // The bounding box travels too. getMomentsFromChildren derives rsq from the
@@ -1262,6 +1358,23 @@ void DataManager::contributeFrontierMoments(){
   // enumerates the same frontier in the same order. If the lengths ever
   // diverge the sum below is meaningless, so carry the count and check it.
   mine[n*FRONTIER_W] = (Real)n;
+
+  // collectFrontier stops for two reasons: the owner range narrowed to one
+  // tree piece (global, identical on every PE) or the node simply had no
+  // children (local, and the only way the lists can diverge). Splitting the
+  // count says which one is responsible when the tripwire fires.
+  {
+    int termOwner = 0, termLeaf = 0;
+    for(int i = 0; i < n; i++){
+      Node<ForceData> *f = frontier[i];
+      if(f->getOwnerStart() == f->getOwnerEnd()) termOwner++;
+      else termLeaf++;
+    }
+    CkPrintf("[FRONTIER] pe %d n=%d owner-term=%d leaf-term=%d tps=%d "
+             "myParts=%d rootChildren=%d\n", CkMyPe(), n, termOwner, termLeaf,
+             numTreePieces, myNumParticles,
+             root ? root->getNumChildren() : -1);
+  }
 
   for(int i = 0; i < n; i++){
     Node<ForceData> *f = frontier[i];
@@ -1469,8 +1582,75 @@ void DataManager::collectLet(Node<ForceData> *n, const OrientedBox<Real> &dest,
   }
 }
 
+// Every piece has to be in place for one walk to cover both halves: the tree
+// on the device, the push spliced into it, and the walk running there.
+bool DataManager::deviceLetActive() const {
+#ifdef GPU_GRAVITY
+  return globalParams.deviceLet && globalParams.useLet &&
+         globalParams.deviceWalk && globalParams.deviceExchange;
+#else
+  return false;
+#endif
+}
+
+// Both halves of every push have to be in before the tree can be walked: the
+// cells say where the particles go, and the particles are what a leaf holds.
+void DataManager::maybeSpliceLets(){
+#ifdef GPU_GRAVITY
+  if(!deviceLetActive()) return;
+  if(!letsDone || letSpliceDone) return;
+  int payloadsWanted = 0;
+  for(int b = 0; b < heldLets.length(); b++)
+    if(heldLets[b]->numParts > 0) payloadsWanted++;
+  if(letPayloads < payloadsWanted) return;
+
+  CkVec<GpuLetNode> nodes;
+  for(int b = 0; b < heldLets.length(); b++){
+    LetMsg *m = heldLets[b];
+    const int base = (m->fromPe < letBase.length()) ? letBase[m->fromPe] : 0;
+    int po = 0;
+    for(int i = 0; i < m->numNodes; i++){
+      const Real *o = m->mom + (size_t)i*LET_W;
+      GpuLetNode g;
+      g.key = (unsigned long long)m->keys[i];
+      g.cmMass = make_float4(o[1], o[2], o[3], o[0]);
+      g.rsq = o[4];
+      g.qxx = o[5]; g.qxy = o[6]; g.qxz = o[7]; g.qyy = o[8]; g.qyz = o[9];
+      g.boxMin = make_float3(o[10], o[11], o[12]);
+      g.boxMax = make_float3(o[13], o[14], o[15]);
+      const int np = m->npart[i];
+      g.partStart = (np > 0) ? (base + po) : 0;
+      g.partCount = np;
+      g.type = (np > 0) ? DNODE_BUCKET : DNODE_INTERNAL;
+      po += np;
+      nodes.push_back(g);
+    }
+    delete m;
+  }
+  heldLets.length() = 0;
+  letSpliceDone = true;
+
+  const int failed = gpuParticles.insertLet(nodes.getVec(), nodes.length());
+  if(failed > 0)
+    CkPrintf("[LET] pe %d: %d of %d pushed cells could not be spliced -- the "
+             "device tree ran out of room\n", CkMyPe(), failed, nodes.length());
+  treeReady();
+#endif
+}
+
 void DataManager::sendLets(){
   letsExpected = 0;
+  // A PE holding no particles has no domain box, so every other PE skips it
+  // when deciding whom to push to. It has to skip itself by the same rule:
+  // it has nothing worth sending and nothing will be sent to it, so counting
+  // the other PEs as senders would leave it waiting on pushes that never
+  // come and hang the iteration for everyone.
+  if(myNumParticles == 0){
+    letsDone = true;
+    letSpliceDone = true;
+    treeReady();
+    return;
+  }
   for(int q = 0; q < CkNumPes(); q++)
     if(q != CkMyPe() && peBoxes[q].initialized()) letsExpected++;
 
@@ -1501,12 +1681,29 @@ void DataManager::sendLets(){
       memcpy(m->mom, mom.getVec(), sizeof(Real)*nn*LET_W);
       memcpy(m->npart, npart.getVec(), sizeof(int)*nn);
     }
-    if(np > 0)
-      gpuParticles.gatherExternal(offs.getVec(), cnts.getVec(), offs.length(),
-                                  np, m->parts);
+    if(np > 0){
+#ifdef GPU_GRAVITY
+      if(deviceLetActive()){
+        // Stays on the device: the receiver splices it into its own tree and
+        // one walk covers both halves, so nothing here crosses to the host.
+        float4 *buf = gpuParticles.stageLetSend(q, offs.getVec(), cnts.getVec(),
+                                                offs.length(), np);
+        thisProxy[q].recvLetDevice(CkMyPe(), np,
+            CkDeviceBuffer(buf,
+                CkCallback(CkIndex_DataManager::exchangeSendDone(), CkMyPe(),
+                           thisgroup),
+                gpuParticles.deviceStream()));
+        outstandingExchangeSends++;
+      }
+      else{
+        gpuParticles.gatherExternal(offs.getVec(), cnts.getVec(), offs.length(),
+                                    np, m->parts);
+      }
+#endif
+    }
     thisProxy[q].recvLet(m);
   }
-  if(letsExpected == 0){ letsDone = true; treeReady(); }
+  if(letsExpected == 0){ letsDone = true; letSpliceDone = true; treeReady(); }
 }
 
 // Find the node with this key, creating it if the local tree does not go that
@@ -1536,6 +1733,27 @@ Node<ForceData> *DataManager::descendToKey(Key k){
   return cur;
 }
 
+#ifdef GPU_GRAVITY
+void DataManager::recvLetDevice(int fromPe, int &n, float4 *&buf,
+                                CkDeviceBufferPost *devicePost){
+  buf = gpuParticles.letRecvSlot(fromPe, n);
+  devicePost[0].hapi_stream = gpuParticles.deviceStream();
+}
+
+void DataManager::recvLetDevice(int fromPe, int n, float4 *buf){
+  while(letBase.length() <= fromPe){ letBase.push_back(-1); letCount.push_back(0); }
+  // Everything received goes into one block, because a spliced node indexes
+  // that block rather than a per-sender one.
+  letBase[fromPe] = gpuParticles.appendRemote(fromPe, n);
+  letCount[fromPe] = n;
+  letPayloads++;
+  maybeSpliceLets();
+}
+#else
+void DataManager::recvLetDevice(int, int&, float4*&, CkDeviceBufferPost*){}
+void DataManager::recvLetDevice(int, int, float4*){}
+#endif
+
 void DataManager::recvLet(LetMsg *msg){
   // The reduction callback and a push from a faster PE are two queued
   // messages with no order between them. Splicing before the frontier types
@@ -1543,6 +1761,13 @@ void DataManager::recvLet(LetMsg *msg){
   // drop the payload.
   if(!frontierReady){
     pendingLets.push_back(msg);
+    return;
+  }
+  if(deviceLetActive()){
+    // Held rather than spliced here: the cells go into the device tree, and
+    // only once their particles have arrived as well.
+    heldLets.push_back(msg);
+    if(++letsRecvd == letsExpected){ letsDone = true; maybeSpliceLets(); }
     return;
   }
   spliceLet(msg);
@@ -1583,7 +1808,10 @@ void DataManager::spliceLet(LetMsg *msg){
       n->setType(RemoteBucket);
     }
     else{
-      n->setType(Node<ForceData>::makeRemote((NodeType)(int)o[16]));
+      // Same unclaimed-range case as in recvFrontierMoments.
+      const NodeType ot = (NodeType)(int)o[16];
+      n->setType(ot == Invalid ? RemoteEmptyBucket
+                               : Node<ForceData>::makeRemote(ot));
     }
     n->setCached();
     po += np;
@@ -1598,27 +1826,33 @@ void DataManager::spliceLet(LetMsg *msg){
 
   if(++letsRecvd == letsExpected){
     letsDone = true;
-    treeReady();
+    if(!deviceLetActive()) treeReady();
+    else maybeSpliceLets();
   }
 }
 
 void DataManager::recvFrontierMoments(CkReductionMsg *msg){
   const Real *all = (const Real *)msg->getData();
   const int n = frontier.length();
+  // A PE with no particles contributed keyRangeCount zero entries while
+  // keeping frontier empty, so the message has to be measured against what it
+  // actually sent. Its write-back loops below run zero times, which is right:
+  // it has no nodes to fill in.
+  const int nSent = (myNumParticles == 0) ? keyRangeCount : n;
 
   // Every PE contributed its own count, so the sum must be n per PE. Check the
   // message size first: if the frontiers diverged the contributions had
   // different lengths and indexing by our own n would read past the end.
   const int got = msg->getSize()/(int)sizeof(Real);
-  const int want = n*FRONTIER_W + 1 + 6*CkNumPes();
+  const int want = nSent*FRONTIER_W + 1 + 6*CkNumPes();
   if(got != want){
     CkPrintf("[FRONTIER] pe %d: reduced %d reals, expected %d (frontier %d) -- "
              "the PEs did not enumerate the same frontier\n",
              CkMyPe(), got, want, n);
     CkAbort("frontier mismatch");
   }
-  const Real counted = all[n*FRONTIER_W];
-  if(counted != (Real)(n*CkNumPes())){
+  const Real counted = all[nSent*FRONTIER_W];
+  if(counted != (Real)(nSent*CkNumPes())){
     CkPrintf("[FRONTIER] pe %d: counts summed to %g, expected %g\n",
              CkMyPe(), (double)counted, (double)(n*CkNumPes()));
     CkAbort("frontier count mismatch");
@@ -1643,7 +1877,13 @@ void DataManager::recvFrontierMoments(CkReductionMsg *msg){
       f->data.box.reset();
     }
     // What copyMomentsToNode did: the owner's type, seen from here.
-    f->setType(Node<ForceData>::makeRemote((NodeType)(int)o[16]));
+    // A summed type of Invalid means NO PE claimed this node -- every one of
+    // them skipped it as Remote, because its key range holds no particles
+    // anywhere. Clustered inputs produce these in bulk. It carries no mass,
+    // so it is an empty remote bucket, not a corrupt type.
+    const NodeType ot = (NodeType)(int)o[16];
+    f->setType(ot == Invalid ? RemoteEmptyBucket
+                             : Node<ForceData>::makeRemote(ot));
   }
   delete msg;
 
@@ -1652,7 +1892,7 @@ void DataManager::recvFrontierMoments(CkReductionMsg *msg){
   // Unpack every PE's domain box before anything uses it.
   peBoxes.resize(CkNumPes());
   for(int q = 0; q < CkNumPes(); q++){
-    const Real *b = all + (n*FRONTIER_W + 1) + 6*q;
+    const Real *b = all + (nSent*FRONTIER_W + 1) + 6*q;
     if(b[0] == 0.0 && b[3] == 0.0 && b[1] == 0.0 && b[4] == 0.0){
       peBoxes[q].reset();   // that PE holds nothing
     }
@@ -1667,14 +1907,25 @@ void DataManager::recvFrontierMoments(CkReductionMsg *msg){
                    CkMyPe(), root?(double)root->data.moments.totalMass:-1.0); fflush(stderr); }
   reportLetSizes();
   if(globalParams.useLet){
-    letsRecvd = 0;
-    letsDone = false;
+    // The receive state was already cleared in contributeFrontierMoments;
+    // clearing it here would discard pushes that arrived ahead of this
+    // callback.
     frontierReady = true;
-    // Anything that arrived early can be spliced now.
+    // Anything that arrived early can be handled now.
     CkVec<LetMsg *> held = pendingLets;
     pendingLets.length() = 0;
     sendLets();
-    for(int i = 0; i < held.length(); i++) spliceLet(held[i]);
+    for(int i = 0; i < held.length(); i++){
+      // Same routing recvLet would have used. Splicing an early message
+      // straight into the host tree under -devlet would leave its cells out
+      // of the device tree and silently drop those remote interactions.
+      if(deviceLetActive()){
+        heldLets.push_back(held[i]);
+        if(++letsRecvd == letsExpected) letsDone = true;
+      }
+      else spliceLet(held[i]);
+    }
+    if(deviceLetActive()) maybeSpliceLets();
   }
   else treeReady();
   if(dbg){ fprintf(stderr,"[FRONTIER] pe %d treeReady returned\n",CkMyPe()); fflush(stderr); }
@@ -2274,8 +2525,9 @@ void DataManager::advanceTail(){
 
   CkAssert(activeBins.getNumCounts() == 0);
 
-  if(CkMyPe() == 0) delete[] keyRanges;
-  else delete rangeMsg;
+  delete[] keyRanges;
+  keyRanges = NULL;
+  keyRangeCount = 0;
 
   iteration++;
   updateLbInstrumentation();
@@ -2380,7 +2632,9 @@ void DataManager::distributeParticles(){
 
   senseTreePieces();
   if(CkMyPe() == 0){
+    if(keyRanges != NULL){ delete[] keyRanges; keyRanges = NULL; }
     keyRanges = new Key[numTreePieces*2];
+    keyRangeCount = numTreePieces;
   }
   // Records the leaves and, on PE 0, fills the key ranges. Nothing goes on the
   // wire until the map arrives.
