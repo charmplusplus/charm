@@ -433,6 +433,17 @@ void DiffusionLB::WithinNodeLB()
           // smaller -- the common case. With a typical overLoad well under 0.1s the
           // test then fails for every object on every step, and within-node balancing
           // silently does nothing while reporting that it ran.
+          // An object carrying no measured load cannot relieve the donor's
+          // overload, and moving it changes neither PE's load -- so overLoad
+          // never shrinks and this loop hands over EVERY object on the PE.
+          // On a GPU-resident application, where host time per object is
+          // ~0, that is nearly all of them: the donor is stripped to a
+          // handful while the receiver piles them up (measured: an even
+          // 43-44 objects/PE became 1 vs 98 after one round, and the load
+          // spread it was minimising got worse, not better). Require a
+          // positive contribution, and stop once the budget is spent.
+          if (overLoad <= 0.0) break;
+          if (objs[j].getCompLoad() <= 0.0) continue;
           if (objs[j].isMigratable() && objs[j].getCurrPe() != -1 && objs[j].getCompLoad() <= overLoad)
           {
             objectSizes.push_back(objs[j].getCompLoad());
@@ -449,8 +460,12 @@ void DiffusionLB::WithinNodeLB()
           }
         }
         if(rank==0) {
-          //Objects migrating in
+          // Objects migrating in. They land here because across-node migration
+          // addresses rank0PE, not because rank0PE should keep them; now that
+          // an arrival actually raises pe_load[0] (see the mean-floor in
+          // BuildStats) this branch is reachable and hands them on.
           for(int i=0;i<objectLoads.size();i++) {
+            if(overLoad <= 0.0) break;
             if(objectLoads[i] <= overLoad) {
               objectSizes.push_back(objectLoads[i]);
               objectIds.push_back(objectSrcIds[i]); // this is pe local id

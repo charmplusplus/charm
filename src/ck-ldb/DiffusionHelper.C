@@ -141,6 +141,49 @@ void DiffusionLB::BuildStats()
     delete msg;
     statsList[pe] = 0;
   }
+  // Charge an unmeasured object the node's mean, in both dimensions.
+  //
+  // Every budget in this balancer is retired by subtraction --
+  // my_loadAfterTransfer -= shedLoad across nodes, overLoad -= compLoad within
+  // one -- and subtracting zero never retires anything, so a loop guarded by
+  // "while budget > 0" hands over EVERY object on the PE. On a GPU-resident
+  // application most objects report ~0 host time, which is how an even 43-44
+  // objects/PE became 1 vs 95 in a single round while the spread being
+  // minimised got worse.
+  //
+  // A fixed floor cannot work: getVertexLoad()'s MAX(compLoad, 0.1) is ~100x
+  // larger than any real per-object load here, which makes every object look
+  // identical and equally huge, while a floor small enough to be harmless
+  // leaves the budget effectively un-retired. Scaling to the node's own mean
+  // makes shedding k of n objects retire k/n of the budget -- proportional,
+  // and self-cancelling when the loads are real. If a dimension is genuinely
+  // all zero its mean is zero, the floor vanishes, and nothing moves: correct,
+  // because there is no load to balance.
+  if (nobj > 0)
+  {
+    const double gpuFloor = my_load / (double)nobj;
+    double cpuTotal = 0.0;
+    for (int r = 0; r < nodeSize; r++) cpuTotal += pe_load[r];
+    const double cpuFloor = cpuTotal / (double)nobj;
+
+    my_load = 0.0;
+    for (int r = 0; r < nodeSize; r++) pe_load[r] = 0;
+    int at = 0;
+    for (int pe = 0; pe < statsReceived; pe++)
+    {
+      if (numObjects[pe] == 0) continue;
+      for (int k = 0; k < numObjects[pe]; k++, at++)
+      {
+        const LDObjData& od = nodeStats->objData[at];
+        const double g = std::max(diffusionObjLoad(od), gpuFloor);
+        const double c = std::max(diffusionObjCpuLoad(od), cpuFloor);
+        objs[at].setCompLoad(c);
+        my_load += g;
+        pe_load[pe] += c;
+      }
+    }
+  }
+
   my_loadAfterTransfer = my_load;
   nodeStats->n_migrateobjs = nmigobj;
   // Generate a hash with key object id, value index in objs vector
