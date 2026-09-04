@@ -491,9 +491,36 @@ int MetricCentroid::popBestObject(int nbor)
   if(_lb_args.debug() == 3)
     CkPrintf("Node %d: popBestObject for neighbor %d with capacity %.6f\n", myNodeId, nbor, nborCapacity);
 
+  // With a one-dimensional position the application is handing us an ORDERING
+  // key, not a point in space -- an SFC index, say -- and asking that this
+  // node keep one contiguous interval of it. Only the two ends of the interval
+  // may leave.
+  //
+  // The distance rule alone is a preference, and it is not enough: the cost
+  // this is really minimising is each PE's bounding box, which is set by
+  // extremes, so a few objects left far from the centre inflate it as much as
+  // a fully scattered set would. Shaving only the ends keeps the remaining set
+  // an interval by construction, so its extent shrinks monotonically instead
+  // of merely tending to.
+  int loEnd = -1, hiEnd = -1;
+  if (position_dim == 1)
+  {
+    double loKey = 0, hiKey = 0;
+    for (int i = 0; i < n_objs; i++)
+    {
+      if (!objAvailable[i] || !nodeStats->objData[i].migratable) continue;
+      if (nodeStats->objData[i].position.size() != 1) continue;
+      const double k = nodeStats->objData[i].position[0];
+      if (loEnd == -1 || k < loKey) { loEnd = i; loKey = k; }
+      if (hiEnd == -1 || k > hiKey) { hiEnd = i; hiKey = k; }
+    }
+  }
+
   for (int i = 0; i < n_objs; i++)
   {
     double objLoad = diffusionObjLoad(nodeStats->objData[i]);
+
+    if (position_dim == 1 && i != loEnd && i != hiEnd) continue;
 
     if (objNborDistances[i].size() <= nbor)
     {

@@ -110,6 +110,11 @@ using std::vector;
 
 DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
 {
+  // Zero until an application registers a position and initializeCentroid (or
+  // the first centroid to arrive) establishes the width. Left uninitialised it
+  // read as 3, and every non-3 width -- a 1-D ordering key, say -- was
+  // rejected as a size mismatch.
+  position_dim = 0;
   // Once per process: every branch shares one table, and the loader prints on
   // PE 0 only. Left uncalibrated when no +LBCostConfig was given, in which case
   // the across-node phase behaves exactly as it did before the model existed.

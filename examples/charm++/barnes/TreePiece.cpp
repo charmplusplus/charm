@@ -127,35 +127,22 @@ void TreePiece::startTraversal(){
   deviceWalkRunning = launchDeviceWalk();
 #endif
 
-  // Where this element sits, for geometric balancers (DiffusionLB's centroid
-  // metric, i.e. running without +LBDiffusionCommOn). A tree piece is a
-  // contiguous SFC key range, so the centre of its particles summarises it
-  // faithfully in one point. Weighted by particle count so an almost-empty
-  // bucket does not pull the centre off the mass.
+  // Where this element sits in the SFC ordering, for geometric balancers
+  // (DiffusionLB's centroid metric, i.e. without +LBDiffusionCommOn).
   //
-  // A piece holding nothing registers no position at all rather than claiming
-  // the origin, which is a real point in the domain and would drag the node
-  // centroid toward it.
+  // One dimension, not three, and the array index rather than a centroid:
+  // tree pieces are numbered in key order, so thisIndex IS the position on the
+  // space-filling curve -- exact, not a projection of it. A one-dimensional
+  // position also tells DiffusionLB to treat this as an ordering and keep each
+  // node on a contiguous interval of it, which is what bounds the domain box
+  // that sendLets prunes against.
+  //
+  // Registered here rather than in finishIteration because this is where the
+  // element's state is live; by the LB hook every element reports zero
+  // buckets, so a registration there silently sets nothing.
   {
-    std::vector<LBRealType> pos(3, 0.0);
-    long long tot = 0;
-    for(int i = 0; i < myNumBuckets; i++){
-      Node<ForceData> *b = myBuckets[i];
-      const int np = b->getNumParticles();
-      if(np <= 0) continue;
-      const OrientedBox<Real> &box = b->data.box;
-      pos[0] += (LBRealType)np * (LBRealType)0.5 *
-                (box.lesser_corner.x + box.greater_corner.x);
-      pos[1] += (LBRealType)np * (LBRealType)0.5 *
-                (box.lesser_corner.y + box.greater_corner.y);
-      pos[2] += (LBRealType)np * (LBRealType)0.5 *
-                (box.lesser_corner.z + box.greater_corner.z);
-      tot += np;
-    }
-    if(tot > 0){
-      for(int i = 0; i < 3; i++) pos[i] /= (LBRealType)tot;
-      setObjPosition(pos);
-    }
+    std::vector<LBRealType> pos(1, (LBRealType)thisIndex);
+    setObjPosition(pos);
   }
 
   if(myNumBuckets == 0){

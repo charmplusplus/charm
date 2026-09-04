@@ -605,7 +605,12 @@ void DiffusionLB::initializeCentroid()
 }
 void DiffusionLB::processReceiveCentroid(int node, std::vector<LBRealType> centroid, int objCount)
 {
-    position_dim = 3;
+    // The dimension is whatever the application registered, established in
+    // initializeCentroid; hardcoding 3 here rejected every other width. A
+    // one-dimensional position is a legitimate and useful case: it is an
+    // ordering key rather than a point, and MetricCentroid keeps each node on
+    // a contiguous interval of it.
+    if (position_dim == 0) position_dim = centroid.size();
     // CkPrintf(
     //     "Node %d received centroid from %d with length %d, dest has size %d, "
     //     "mycentroid has size %d, allnode sitances has size %d\n",
