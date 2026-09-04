@@ -122,6 +122,10 @@ void TraversalWorker::cacheBucketRange(){
 // to the universe mass. More than that is double counting.
 thread_local double _srcMass = 0.0;
 thread_local const void *_srcBucket = NULL;
+// Split by the type of the node that supplied it, so a source arriving twice
+// shows up as which kind of node handed it over.
+thread_local double _srcMassByType[8] = {0,0,0,0,0,0,0,0};
+thread_local long _srcCntByType[8] = {0,0,0,0,0,0,0,0};
 
 int TraversalWorker::work(Node<ForceData> *node){
   NodeType type = node->getType();
@@ -141,6 +145,13 @@ int TraversalWorker::work(Node<ForceData> *node){
     return 1;
   }
 
+  // Accepted. A Boundary node is the one case where two walks could both take
+  // it, so only the local one does.
+  if(type == Boundary && !takesAcceptedBoundary()){
+    state->nodeDiscarded(currentBucket->getKey(),node);
+    return 0;
+  }
+
 #ifdef GPU_GRAVITY
   // The whole expansion, not just the point mass: the kernel evaluates the
   // quadrupole term too unless it was built -DMONOPOLE_ONLY.
@@ -151,14 +162,25 @@ int TraversalWorker::work(Node<ForceData> *node){
 #else
   int computed = nodeBucketForce(node,currentBucket);
 #endif
-  if(currentBucket == _srcBucket) _srcMass += node->data.moments.totalMass;
+  if(currentBucket == _srcBucket){
+    _srcMass += node->data.moments.totalMass;
+    const int ti = (int)type;
+    if(ti >= 0 && ti < 8){
+      _srcMassByType[ti] += node->data.moments.totalMass;
+      _srcCntByType[ti]++;
+    }
+  }
   state->nodeComputed(currentBucket,node->getKey());
   state->incrPartNodeInteractions(currentBucket->getKey(),computed);
   return 0;
 }
 
 void TraversalWorker::work(ExternalParticle *particle){
-  if(currentBucket == _srcBucket) _srcMass += particle->mass;
+  if(currentBucket == _srcBucket){
+    _srcMass += particle->mass;
+    _srcMassByType[0] += particle->mass;   // slot 0: loose particles
+    _srcCntByType[0]++;
+  }
 #ifdef GPU_GRAVITY
   ownerTreePiece->getBatch().addSource(currentBucket,
                                        bucketPartStart, bucketPartCount,

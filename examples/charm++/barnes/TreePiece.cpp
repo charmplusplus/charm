@@ -106,6 +106,8 @@ void TreePiece::prepare(Node<ForceData> *_root, Node<ForceData> **buckets, int b
 
 extern thread_local double _srcMass;
 extern thread_local const void *_srcBucket;
+extern thread_local double _srcMassByType[8];
+extern thread_local long _srcCntByType[8];
 
 void TreePiece::startTraversal(){
   if(getenv("BARNES_MASS_CHECK") != NULL && CkMyPe() == 0 &&
@@ -408,8 +410,16 @@ void TreePiece::finishIteration(){
     static thread_local bool _massPrinted = false;
     if(!_massPrinted){
       _massPrinted = true;
+      static const char *tn[8] = {"particles","Internal","Bucket",
+                                  "EmptyBucket","Boundary","Remote",
+                                  "RemoteBucket","RemoteEmpty"};
       CkPrintf("[MASSCHK] pe %d bucket sources total mass %.9f "
                "(universe mass is 1)\n", CkMyPe(), _srcMass);
+      for(int t = 0; t < 8; t++){
+        if(_srcCntByType[t] == 0) continue;
+        CkPrintf("[MASSCHK]   %-12s mass %.9f from %ld sources\n",
+                 tn[t], _srcMassByType[t], _srcCntByType[t]);
+      }
     }
   }
   if(iteration >= globalParams.iterations){

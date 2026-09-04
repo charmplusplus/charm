@@ -131,6 +131,13 @@ class TraversalWorker : public CutoffWorker<ForceData> {
   
   virtual void done() {}
   virtual bool getKeep(NodeType type) = 0;
+
+  // A Boundary node's moments are complete: they already include the mass held
+  // on other PEs, gathered by the moment exchange. Both walks keep Boundary
+  // nodes, because both have to be able to descend through them, but only one
+  // of them may take the multipole when the criterion accepts one -- otherwise
+  // that node's whole subtree is counted twice. The local walk takes it.
+  virtual bool takesAcceptedBoundary() const { return true; }
 };
 
 class LocalTraversalWorker : public TraversalWorker {
@@ -146,6 +153,7 @@ class RemoteTraversalWorker : public TraversalWorker {
   RemoteTraversalWorker() : TraversalWorker() {}
   void done();
   bool getKeep(NodeType type);
+  bool takesAcceptedBoundary() const { return false; }
 };
 
 class TreeSizeWorker : public CutoffWorker<ForceData> {
