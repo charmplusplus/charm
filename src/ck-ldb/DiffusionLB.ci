@@ -37,6 +37,7 @@ module DiffusionLB
     entry void roundsDone();
     entry[expedited] void migMsgAck();
     entry void acrossDone();
+    entry void nbrAcrossDone();
     entry void withinDone();
 
     entry void ReceiveFinalStats(

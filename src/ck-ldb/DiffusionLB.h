@@ -124,7 +124,16 @@ public:
   void migMsgAck();
   void migMaybeDone();
   void acrossDone();
+  void nbrAcrossDone();
   int acrossDoneCount;
+  // Across-node completion, tracked against this node's own neighbours instead
+  // of the whole job. Load only ever moves between neighbours, so a node needs
+  // to know that ITS neighbours have stopped sending to it -- not that every
+  // node everywhere has finished. acrossSelfDone is this node's own handoffs
+  // acked; acrossNbrDoneCount counts the neighbours that told us the same.
+  int acrossNbrDoneCount;
+  bool acrossSelfDone;
+  void maybeStartWithin();
   void withinDone();
   int withinDoneCount;
   void withinNodeReport();

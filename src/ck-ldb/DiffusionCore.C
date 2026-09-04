@@ -222,7 +222,16 @@ void DiffusionLB::migMaybeDone()
   if (across_owed)
   {
     across_owed = false;
-    thisProxy[0].acrossDone();
+    // Neighbour-local, not a rendezvous on PE 0. This node's across-node
+    // handoffs are all acked, so it will send nothing further this phase --
+    // tell the only nodes that could have been waiting on it. Diffusion moves
+    // load between neighbours and nowhere else, so a node that has heard this
+    // from every neighbour knows nothing more can arrive, which is the whole
+    // property the job-wide barrier was buying.
+    acrossSelfDone = true;
+    for (size_t i = 0; i < sendToNeighbors.size(); i++)
+      thisProxy[sendToNeighbors[i] * nodeSize].nbrAcrossDone();
+    maybeStartWithin();
   }
   if (within_owed)
   {
@@ -231,7 +240,28 @@ void DiffusionLB::migMaybeDone()
   }
 }
 
-// PE 0: every node's across-node handoffs are applied.
+// A neighbour has finished its across-node handoffs.
+void DiffusionLB::nbrAcrossDone()
+{
+  acrossNbrDoneCount++;
+  maybeStartWithin();
+}
+
+// Start within-node once this node is done sending and every neighbour has
+// said the same. Both halves are needed and either can arrive first, so this
+// is checked from both. Within-node is purely intra-node work, so it starts on
+// this node's PEs alone -- no other node is involved and none is waited for.
+void DiffusionLB::maybeStartWithin()
+{
+  if (!acrossSelfDone) return;
+  if (acrossNbrDoneCount < (int)sendToNeighbors.size()) return;
+  acrossSelfDone = false;
+  acrossNbrDoneCount = 0;
+  const int first = myNodeId * nodeSize;
+  for (int r = 0; r < nodeSize; r++) thisProxy[first + r].WithinNodeLB();
+}
+
+// Retained for the job-wide path; no longer on the critical path.
 void DiffusionLB::acrossDone()
 {
   if (++acrossDoneCount < numNodes) return;

@@ -141,6 +141,8 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   within_owed = false;
   acrossDoneCount = 0;
   withinDoneCount = 0;
+  acrossNbrDoneCount = 0;
+  acrossSelfDone = false;
   round = 0;
   hs_asksOut = 0;
   hs_confirmOut = 0;
@@ -153,6 +155,8 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   within_owed = false;
   acrossDoneCount = 0;
   withinDoneCount = 0;
+  acrossNbrDoneCount = 0;
+  acrossSelfDone = false;
   statsReceived = 0;
   rank0_barrier_counter = 0;
 
@@ -240,6 +244,8 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   within_owed = false;
   acrossDoneCount = 0;
   withinDoneCount = 0;
+  acrossNbrDoneCount = 0;
+  acrossSelfDone = false;
   rank0_barrier_counter = 0;
   pseudo_done = true;
 
