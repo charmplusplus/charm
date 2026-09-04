@@ -110,6 +110,15 @@ extern thread_local double _srcMassByType[8];
 extern thread_local long _srcCntByType[8];
 
 void TreePiece::startTraversal(){
+  // Closes this element's safe-to-pack window for the rest of the iteration.
+  // pup() carries only `iteration` and `lbState` -- everything else is
+  // reconstructed by initIterationState() on the destination -- which is only
+  // true once the interaction list has been consumed and the per-iteration
+  // counters reset, i.e. at finishIteration(). Under +LBAsync a move can be
+  // taken at any device-quiet moment, so the window has to be stated rather
+  // than assumed: moved from here the element would land mid-walk with its
+  // buckets and counters gone.
+  ReadyMigrate(false);
   if(getenv("BARNES_MASS_CHECK") != NULL && CkMyPe() == 0 &&
      _srcBucket == NULL && myNumBuckets > 0){
     _srcBucket = myBuckets[0];
@@ -475,6 +484,12 @@ void TreePiece::finishIteration(){
   // so advance() lands after this point, and the strategy would read a window
   // that stayed open across its own decision.
   if(globalParams.lbWindow > 0) LBTurnInstrumentOff();
+
+  // Safe to pack again: the interaction list is consumed and every
+  // per-iteration counter is reset, which is exactly what pup() assumes. The
+  // runtime takes any move decided for this element the moment this entry
+  // method returns.
+  ReadyMigrate(true);
 
   // Flushes this element's GPU counters and feeds MetaBalancer's sample
   // stream. A no-op when MetaBalancer is off, so it is safe to call on this
