@@ -554,7 +554,10 @@ void DataManager::sendParticleBlocks(){
     if(nTps[q] <= 0){ delete out[q]; continue; }
     thisProxy[q].receiveParticleBlock(out[q]);
 #ifdef GPU_GRAVITY
-    if(globalParams.deviceExchange && gpuParticles.attached()){
+    // Only when there is something to send: a destination can hold tree
+    // pieces whose buckets are all empty, and staging nothing hands
+    // CkDeviceBuffer a null pointer.
+    if(globalParams.deviceExchange && gpuParticles.attached() && nParts[q] > 0){
       char *buf = gpuParticles.stageSend(q, sendOffs[q].getVec(),
                                          sendCnts[q].getVec(),
                                          sendOffs[q].length(), nParts[q]);
