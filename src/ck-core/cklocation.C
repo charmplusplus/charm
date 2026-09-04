@@ -2137,58 +2137,23 @@ void CkMigratable::ckFinishConstruction(int epoch)
   barrierRegistered = true;
 }
 
+// The unsplit call: the two halves, back to back. That is all "stop here until
+// the step is over" means, and there is no separate mechanism behind it any
+// more. There used to be -- a parallel forty-line implementation with its own
+// MetaBalancer state machine -- which meant two ways to join a balancing step,
+// and every fix had to be made twice or, in practice, only to the one being
+// worked on.
+//
+// New code should call the halves directly and put its own work between them.
+// Written that way it is correct with or without +LBAsync; the flag only
+// decides whether the work in between actually overlaps the step.
 void CkMigratable::AtSync(int waitForMigration)
 {
-  if (!usesAtSync)
-    CkAbort(
-        "You must set usesAtSync=true in your array element constructor to use "
-        "AtSync!\n");
-  // Only actually call AtSync when a receiver exists, otherwise skip it and
-  // directly call ResumeFromSync
-  if (!myRec->getSyncBarrier()->hasReceivers())
-  {
-    ResumeFromSync();
-    return;
-  }
-  myRec->AsyncMigrate(!waitForMigration);
-  if (waitForMigration)
-    ReadyMigrate(true);
-  ckFinishConstruction();
-  DEBL((AA "Element %s going to sync\n" AB, idx2str(thisIndexMax)));
-  recordLBSizes(true);
-
-  if (!_lb_args.metaLbOn())
-  {
-    myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
-    return;
-  }
-
-  // When MetaBalancer is turned on
-
-  sampleMetaLBLoad();
-
-  bool is_tentative;
-  if (atsync_iteration < myRec->getMetaBalancer()->getPredictedLBPeriod(is_tentative))
-  {
-    ResumeFromSync();
-  }
-  else if (is_tentative)
-  {
-    local_state = PAUSE;
-  }
-  else if (local_state == DECIDED)
-  {
-    DEBAD(("[%d:%s] Went to load balance iter %d\n", CkMyPe(), idx2str(thisIndexMax),
-           atsync_iteration));
-    local_state = LOAD_BALANCE;
-    can_reset = true;
-  }
-  else
-  {
-    DEBAD(("[%d:%s] Went to pause state iter %d\n", CkMyPe(), idx2str(thisIndexMax),
-           atsync_iteration));
-    local_state = PAUSE;
-  }
+  // Blocked means the element is stopped and must not run -- so it must not
+  // wait either. It is handed back through ResumeFromSync, which is exactly
+  // what an unsplit caller is already waiting for.
+  if (AtSyncStart(waitForMigration) == AtSyncStatus::Blocked) return;
+  AtSyncWait();
 }
 
 // Measure what the load balancer needs to know about this chare: its load, its
@@ -2367,13 +2332,10 @@ CkMigratable::AtSyncStatus CkMigratable::AtSyncStart(int waitForMigration)
     CkAbort(
         "You must set usesAtSync=true in your array element constructor to use "
         "AtSyncStart!\n");
-  const bool async = _lb_args.lbAsync();
-
-  if (!myRec->getSyncBarrier()->hasReceivers())
-  {
-    if (!async) ResumeFromSync();
-    return AtSyncStatus::Continue;
-  }
+  // Nothing resumes the element from this half, in either mode: AtSyncWait() is
+  // the single point a step is handed back, and it resumes inline when there
+  // was no step to wait for. That is what lets one code path serve both.
+  if (!myRec->getSyncBarrier()->hasReceivers()) return AtSyncStatus::Continue;
 
   // One step at a time, per element. Joining again would pass the barrier
   // twice for one element and could fire the next step's barrier before this
@@ -2383,6 +2345,37 @@ CkMigratable::AtSyncStatus CkMigratable::AtSyncStart(int waitForMigration)
         "AtSyncStart() called while the load balancing step this element started "
         "is still in flight. Every AtSyncStart() must be followed by an "
         "AtSyncWait() before the next one.\n");
+
+  // MetaBalancer's wall-time path. It picks a step from a predicted period
+  // rather than an agreed count, and it joins the barrier separately through
+  // metaLBCallLB() once the decision reaches the element -- so this half only
+  // records where the element is, never joins, and the element is stopped until
+  // that decision arrives. Kept verbatim from the unsplit AtSync, which was the
+  // only caller that ever ran it.
+  if (_lb_args.metaLbOn() && !_lb_args.metaLbGpuTrigger())
+  {
+    myRec->AsyncMigrate(!waitForMigration);
+    if (waitForMigration) ReadyMigrate(true);
+    ckFinishConstruction();
+    recordLBSizes(true);
+    sampleMetaLBLoad();
+
+    bool is_tentative;
+    if (atsync_iteration <
+        myRec->getMetaBalancer()->getPredictedLBPeriod(is_tentative))
+      return AtSyncStatus::Continue;
+
+    if (!is_tentative && local_state == DECIDED)
+    {
+      local_state = LOAD_BALANCE;
+      can_reset = true;
+    }
+    else
+    {
+      local_state = PAUSE;
+    }
+    return AtSyncStatus::Blocked;
+  }
 
   // With MetaBalancer off there is nothing to decide for us, so every call
   // starts a step and the application's own cadence is the trigger.
@@ -2396,8 +2389,7 @@ CkMigratable::AtSyncStatus CkMigratable::AtSyncStart(int waitForMigration)
 
     if (CkpvAccess(_lbStepRequested) <= lbStepSeen)
     {
-      if (!async) ResumeFromSync();
-      return AtSyncStatus::Continue;
+        return AtSyncStatus::Continue;
     }
 
     const int agreed = CkpvAccess(_lbStepPeriod);
@@ -2410,8 +2402,7 @@ CkMigratable::AtSyncStatus CkMigratable::AtSyncStart(int waitForMigration)
       // broadcast outrunning the application would make correctness a race.
       if (lbIterNo < CkpvAccess(_lbStepTentative))
       {
-        if (!async) ResumeFromSync();
-        return AtSyncStatus::Continue;
+            return AtSyncStatus::Continue;
       }
       lbStepBlocked = true;
       if (migDbg())
@@ -2422,8 +2413,7 @@ CkMigratable::AtSyncStatus CkMigratable::AtSyncStart(int waitForMigration)
 
     if (lbIterNo < agreed)
     {
-      if (!async) ResumeFromSync();
-      return AtSyncStatus::Continue;
+        return AtSyncStatus::Continue;
     }
   }
 
@@ -2468,10 +2458,6 @@ void CkMigratable::AtSyncWait()
     CkAbort(
         "You must set usesAtSync=true in your array element constructor to use "
         "AtSyncWait!\n");
-  // Without +LBAsync the element is already stopped waiting for the barrier's
-  // resume, and adding one here would resume it twice.
-  if (!_lb_args.lbAsync()) return;
-
   if (!lbStepPending)
   {
     // The step already finished, so the wait is where the window opens.
@@ -2556,14 +2542,17 @@ void CkMigratable::ResumeFromSyncHelper()
              idx2str(thisIndexMax), lbStepSeen, myRec->getLBMgr()->resumeEpoch());
   lbStepPending = false;
 
-  if (_lb_args.lbAsync())
+  if (waitParked)
   {
-    // Starting the step never stopped the element, so there is nothing to
-    // resume unless it went on to park in AtSyncWait().
-    if (!waitParked) return;
     waitParked = false;
     myRec->deviceRecvParked = false;
     CkDeviceRecvAdmissionReplay(myRec->getID());
+  }
+  else if (_lb_args.lbAsync())
+  {
+    // Async, and it never parked: the element kept running, so there is nothing
+    // to hand back here. It finds the step already over in AtSyncWait().
+    return;
   }
   // Released from the wait -- open the measurement window. Under +LBAsync this
   // is AtSyncWait() returning, which the application places a few iterations
