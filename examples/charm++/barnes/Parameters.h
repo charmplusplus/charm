@@ -57,6 +57,9 @@ struct Parameters {
   // Push a locally essential tree to every other PE before the traversal,
   // instead of pulling remote nodes one round trip at a time.
   int useLet;
+  // Send the decomposition's particles straight from device memory instead of
+  // copying them through the host on both ends.
+  int deviceExchange;
   // Initial tree piece placement. 0 = the default round-robin map, 1 = a block
   // map, which is what makes this benchmark imbalanced; see BlockMap.
   int blockMap;
@@ -98,6 +101,7 @@ struct Parameters {
     p | decompLevels;
     p | deviceWalk;
     p | useLet;
+    p | deviceExchange;
     p | blockMap;
     p | mapChunk;
     p | mapCyclic;

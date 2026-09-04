@@ -230,6 +230,12 @@ class DataManager : public CBase_DataManager {
   // and a block map send a PE's particles to only a handful of neighbours.
   int expectedBlocks;
   bool haveExpected;
+  // Per source: how many particles its block says are coming, and whether the
+  // device payload has landed. Assembly waits for both halves.
+  CkVec<int> srcParts;
+  CkVec<char> srcPayloadIn;
+  int payloadsRecvd;
+  int outstandingExchangeSends;
   void publishTreePieceMap();
   void freeSortingTree();
   void maybeAssemble();
@@ -321,9 +327,15 @@ class DataManager : public CBase_DataManager {
   void beginDistribute();
   void recvTreePieceMap(CkReductionMsg *msg);
   void recvSenderCounts(CkReductionMsg *msg);
+  void exchangeSendDone();
   void recvFrontierMoments(CkReductionMsg *msg);
   void recvLet(LetMsg *msg);
   void receiveParticleBlock(ParticleBlockMsg *msg);
+  // Stage 5b. The block message carries the bookkeeping; the particles come
+  // straight from the sender's device memory into ours.
+  void recvParticleDevice(int fromPe, int nbytes, char *buf);
+  void recvParticleDevice(int fromPe, int &nbytes, char *&buf,
+                          CkDeviceBufferPost *devicePost);
 
   void receiveMoments(MomentsMsg *msg);
   

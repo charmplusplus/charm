@@ -182,6 +182,7 @@ public:
         dPartials(NULL), dRed(NULL),
         dOwners(NULL), ownerCap(0),
         hPatch(NULL), dPatch(NULL), patchCap(0),
+        hStage(NULL), hStageCap(0),
         nParts(0), cap(0)
   {
     clearTreeHandles();
@@ -259,6 +260,20 @@ public:
   // and re-record treeBuilt, so a walk waiting on it sees them.
   void patchMoments(const GpuMomentPatch *patches, int n);
 
+  // --- Stage 5b -----------------------------------------------------------
+  // Gather the particles bound for one destination into a contiguous device
+  // staging region, laid out as [pos][vel][key]. The ranges come from the
+  // sorting tree's leaves and are already contiguous per tree piece, so this
+  // is a handful of device-to-device copies and no packing kernel.
+  char *stageSend(int dest, const int *offs, const int *cnts, int nranges,
+                  int total);
+  // Where an incoming push should land.
+  char *recvSlot(int src, int total);
+  // Pull one arrived block back to the host as Particles.
+  void unstageRecv(int src, int total, struct Particle *out);
+  static size_t stageBytes(int n){ return (size_t)n*(sizeof(float4)*2 + sizeof(unsigned long long)); }
+  cudaStream_t deviceStream() const { return stream; }
+
 
   // Read the tree back for the self-check. Blocking, and only used under
   // BARNES_TREE_CHECK.
@@ -304,6 +319,11 @@ private:
   GpuMomentPatch *hPatch;
   GpuMomentPatch *dPatch;
   int patchCap;
+  // One send and one receive region per PE, grown on demand.
+  CkVec<char *> dSend, dRecv;
+  CkVec<int> sendCap, recvCap;
+  char *hStage;
+  int hStageCap;
   GpuKdkReduction *dPartials;  // REDUCE_BLOCKS entries
   GpuKdkReduction *dRed;
 

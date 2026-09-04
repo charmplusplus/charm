@@ -107,6 +107,11 @@ mainmodule barnes {
     entry void recvFrontierMoments(CkReductionMsg *msg);
     entry void recvLet(LetMsg *msg);
     entry void receiveParticleBlock(ParticleBlockMsg *msg);
+    // Stage 5b: the particles themselves, straight from device memory. The
+    // block message above carries only the per-tree-piece bookkeeping now.
+    entry void recvParticleDevice(int fromPe, int nbytes,
+                                  nocopydevice char buf[nbytes]);
+    entry void exchangeSendDone();
     entry void receiveMoments(MomentsMsg *msg);
 
     entry void recvParticles(ParticleReplyMsg *msg);

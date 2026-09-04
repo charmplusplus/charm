@@ -405,6 +405,80 @@ void GpuParticleStore::applyAccel(Particle *parts, int n) const {
   }
 }
 
+// --- Stage 5b: device-resident particle exchange ---------------------------
+
+static void ensureRegion(CkVec<char *> &bufs, CkVec<int> &caps, int idx,
+                         size_t want){
+  while(bufs.length() <= idx){ bufs.push_back(NULL); caps.push_back(0); }
+  if((size_t)caps[idx] >= want) return;
+  if(bufs[idx] != NULL) hapiCheck(hapiFree(bufs[idx]));
+  caps[idx] = (int)(want + want/4 + 4096);
+  hapiCheck(hapiMalloc((void **)&bufs[idx], caps[idx]));
+}
+
+char *GpuParticleStore::stageSend(int dest, const int *offs, const int *cnts,
+                                  int nranges, int total){
+  if(total <= 0) return NULL;
+  ensureRegion(dSend, sendCap, dest, stageBytes(total));
+  char *base = dSend[dest];
+
+  // [pos][vel][key], each block contiguous, so the receiver splits it with
+  // three copies and no per-particle work on the device. The ranges come from
+  // the sorting tree's leaves and are already contiguous per tree piece.
+  float4 *dp = (float4 *)base;
+  float4 *dv = (float4 *)(base + (size_t)total*sizeof(float4));
+  unsigned long long *dk =
+      (unsigned long long *)(base + (size_t)total*sizeof(float4)*2);
+
+  int at = 0;
+  for(int r = 0; r < nranges; r++){
+    const int o = offs[r], c = cnts[r];
+    if(c <= 0) continue;
+    hapiCheck(cudaMemcpyAsync(dp + at, dPos + o, sizeof(float4)*c,
+                              cudaMemcpyDeviceToDevice, stream));
+    hapiCheck(cudaMemcpyAsync(dv + at, dVel + o, sizeof(float4)*c,
+                              cudaMemcpyDeviceToDevice, stream));
+    hapiCheck(cudaMemcpyAsync(dk + at, dKey + o,
+                              sizeof(unsigned long long)*c,
+                              cudaMemcpyDeviceToDevice, stream));
+    at += c;
+  }
+  // The send reads this region asynchronously, so it must be settled first.
+  hapiCheck(cudaStreamSynchronize(stream));
+  return base;
+}
+
+char *GpuParticleStore::recvSlot(int src, int total){
+  ensureRegion(dRecv, recvCap, src, stageBytes(total > 0 ? total : 1));
+  return dRecv[src];
+}
+
+void GpuParticleStore::unstageRecv(int src, int total, Particle *out){
+  if(total <= 0) return;
+  const size_t bytes = stageBytes(total);
+  if((int)bytes > hStageCap){
+    if(hStage != NULL) hapiCheck(hapiFreeHost(hStage));
+    hStageCap = (int)(bytes + bytes/4 + 4096);
+    hapiCheck(hapiMallocHost((void **)&hStage, hStageCap));
+  }
+  hapiCheck(cudaMemcpyAsync(hStage, dRecv[src], bytes,
+                            cudaMemcpyDeviceToHost, stream));
+  hapiCheck(cudaStreamSynchronize(stream));
+
+  const float4 *p = (const float4 *)hStage;
+  const float4 *v = (const float4 *)(hStage + (size_t)total*sizeof(float4));
+  const unsigned long long *k =
+      (const unsigned long long *)(hStage + (size_t)total*sizeof(float4)*2);
+  for(int i = 0; i < total; i++){
+    out[i].position = Vector3D<Real>(p[i].x, p[i].y, p[i].z);
+    out[i].mass = p[i].w;
+    out[i].velocity = Vector3D<Real>(v[i].x, v[i].y, v[i].z);
+    out[i].key = (Key)k[i];
+    out[i].acceleration = Vector3D<Real>(0.0);
+    out[i].potential = 0.0;
+  }
+}
+
 void GpuParticleStore::release(){
   if (stream != NULL) cudaStreamSynchronize(stream);
   if (hPos != NULL){ hapiFreeHost(hPos); hPos = NULL; }
@@ -426,6 +500,12 @@ void GpuParticleStore::release(){
   if (hPatch != NULL){ hapiFreeHost(hPatch); hPatch = NULL; }
   if (dPatch != NULL){ hapiFree(dPatch); dPatch = NULL; }
   patchCap = 0;
+  for(int i = 0; i < dSend.length(); i++) if(dSend[i]) hapiFree(dSend[i]);
+  for(int i = 0; i < dRecv.length(); i++) if(dRecv[i]) hapiFree(dRecv[i]);
+  dSend.length() = 0; dRecv.length() = 0;
+  sendCap.length() = 0; recvCap.length() = 0;
+  if (hStage != NULL){ hapiFreeHost(hStage); hStage = NULL; }
+  hStageCap = 0;
   ownerCap = 0;
   if (dtree.nodes != NULL){
     hapiFree(dtree.nodes);

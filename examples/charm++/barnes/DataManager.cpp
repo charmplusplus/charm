@@ -55,6 +55,8 @@ DataManager::DataManager() :
   numBlocksRecvd(0),
   expectedBlocks(0),
   haveExpected(false),
+  payloadsRecvd(0),
+  outstandingExchangeSends(0),
   letsExpected(0),
   letsRecvd(0),
   letsDone(false),
@@ -494,6 +496,9 @@ void DataManager::sendParticleBlocks(){
   out.resize(npes);
   CkVec<int> tpFill, partFill;
   tpFill.resize(npes); partFill.resize(npes);
+  CkVec<CkVec<int> > sendOffs, sendCnts;
+  sendOffs.resize(npes); sendCnts.resize(npes);
+  for(int q = 0; q < npes; q++){ sendOffs[q].length()=0; sendCnts[q].length()=0; }
   for(int q = 0; q < npes; q++){
     const int t = nTps[q] > 0 ? nTps[q] : 1;
     const int pcount = nParts[q] > 0 ? nParts[q] : 1;
@@ -519,6 +524,14 @@ void DataManager::sendParticleBlocks(){
       Particle *src = nd->getParticles();
       m->tpKeys[2*k]   = src[0].key;
       m->tpKeys[2*k+1] = src[np-1].key;
+#ifdef GPU_GRAVITY
+      if(globalParams.deviceExchange && gpuParticles.attached()){
+        // Record the device range instead of copying through the host.
+        sendOffs[q].push_back(particleOffset(src));
+        sendCnts[q].push_back(np);
+      }
+      else
+#endif
       memcpy(m->parts + partFill[q], src, sizeof(Particle)*np);
       partFill[q] += np;
     }
@@ -538,8 +551,21 @@ void DataManager::sendParticleBlocks(){
   contribute(sizeof(int)*npes, willSend.getVec(), CkReduction::sum_int, cb);
 
   for(int q = 0; q < npes; q++){
-    if(nTps[q] > 0) thisProxy[q].receiveParticleBlock(out[q]);
-    else            delete out[q];
+    if(nTps[q] <= 0){ delete out[q]; continue; }
+    thisProxy[q].receiveParticleBlock(out[q]);
+#ifdef GPU_GRAVITY
+    if(globalParams.deviceExchange && gpuParticles.attached()){
+      char *buf = gpuParticles.stageSend(q, sendOffs[q].getVec(),
+                                         sendCnts[q].getVec(),
+                                         sendOffs[q].length(), nParts[q]);
+      const int nbytes = (int)GpuParticleStore::stageBytes(nParts[q]);
+      thisProxy[q].recvParticleDevice(CkMyPe(), nbytes,
+          CkDeviceBuffer(buf, CkCallback(CkIndex_DataManager::exchangeSendDone(),
+                                         CkMyPe(), thisgroup),
+                         gpuParticles.deviceStream()));
+      outstandingExchangeSends++;
+    }
+#endif
   }
 
   // The leaves point into myParticles and have been copied out, so the sorting
@@ -555,6 +581,28 @@ void DataManager::recvSenderCounts(CkReductionMsg *msg){
   maybeAssemble();
 }
 
+// The staging region a push lands in. Sized from the count the block message
+// carries, which is why the two are matched by sender.
+void DataManager::recvParticleDevice(int fromPe, int &nbytes, char *&buf,
+                                     CkDeviceBufferPost *devicePost){
+  buf = gpuParticles.recvSlot(fromPe,
+          nbytes / (int)(sizeof(float4)*2 + sizeof(unsigned long long)));
+  devicePost[0].hapi_stream = gpuParticles.deviceStream();
+}
+
+void DataManager::recvParticleDevice(int fromPe, int nbytes, char *buf){
+  while(srcPayloadIn.length() <= fromPe) srcPayloadIn.push_back(0);
+  srcPayloadIn[fromPe] = 1;
+  payloadsRecvd++;
+  maybeAssemble();
+}
+
+// The staging region is read asynchronously by the transport, so it may not be
+// rebuilt until every send out of it has drained.
+void DataManager::exchangeSendDone(){
+  outstandingExchangeSends--;
+}
+
 void DataManager::receiveParticleBlock(ParticleBlockMsg *msg){
   recvdBlocks.push_back(msg);
   numBlocksRecvd++;
@@ -565,6 +613,15 @@ void DataManager::maybeAssemble(){
   if(!haveRanges) return;
   if(!haveExpected) return;
   if(numBlocksRecvd != expectedBlocks) return;
+#ifdef GPU_GRAVITY
+  // Both halves: the bookkeeping and the particles it describes.
+  if(globalParams.deviceExchange && gpuParticles.attached()){
+    int need = 0;
+    for(int b = 0; b < recvdBlocks.length(); b++)
+      if(recvdBlocks[b]->numParticles > 0) need++;
+    if(payloadsRecvd < need) return;
+  }
+#endif
   assembleReceivedBlocks();
 }
 
@@ -618,15 +675,27 @@ void DataManager::assembleReceivedBlocks(){
   }
 
   myParticles.resize(myNumParticles);
+  CkVec<Particle> staged;
   for(int b = 0; b < recvdBlocks.length(); b++){
     ParticleBlockMsg *m = recvdBlocks[b];
+    const Particle *src = m->parts;
+#ifdef GPU_GRAVITY
+    // Pull this sender's block back from the device, in the order its
+    // bookkeeping lists the tree pieces.
+    if(globalParams.deviceExchange && gpuParticles.attached() &&
+       m->numParticles > 0){
+      staged.resize(m->numParticles);
+      gpuParticles.unstageRecv(m->fromPe, m->numParticles, staged.getVec());
+      src = staged.getVec();
+    }
+#endif
     int p = 0;
     for(int k = 0; k < m->numTps; k++){
       const int tp = m->tpIndex[k];
       const int np = m->tpCount[k];
       if(np == 0) continue;
       CkAssert(offset[tp] >= 0);
-      memcpy(myParticles.getVec()+offset[tp], m->parts + p, sizeof(Particle)*np);
+      memcpy(myParticles.getVec()+offset[tp], src + p, sizeof(Particle)*np);
       offset[tp] += np;
       p += np;
     }
@@ -636,6 +705,8 @@ void DataManager::assembleReceivedBlocks(){
   numBlocksRecvd = 0;
   haveExpected = false;
   expectedBlocks = 0;
+  payloadsRecvd = 0;
+  for(int i = 0; i < srcPayloadIn.length(); i++) srcPayloadIn[i] = 0;
 
   processSubmittedParticles();
 }
