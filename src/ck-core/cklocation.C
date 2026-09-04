@@ -4458,13 +4458,22 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   // Create the new elements as we unpack the message
   pupElementsFor(p, rec, CkElementCreation_migrate);
 #if CMK_CUDA
-  // Those copies may still be in flight and the element must not run until its
-  // device state is complete, but wait on the one stream that carried them
-  // rather than the whole device: as a device-wide barrier this ran once per
-  // arriving object and was the bulk of the cost of the first step after load
-  // balancing. It also gates the free of gpuMsg below.
-  if (gpuMsg != nullptr)
-    cudaDeviceSynchronize();
+  // The unpack's copies must complete before the element runs, and the wait
+  // also gates the free of gpuMsg below. But it does not need to be a
+  // device-wide barrier, which is what the note here has always said and what
+  // the code did anyway: once per arriving object, and with ~750 arriving at
+  // leanmd's first balancing step that was the bulk of the first step after it.
+  //
+  // Two cases, neither of which needs one. In arena mode pup_buffer_device
+  // rebinds the pointers instead of copying, so the unpack enqueued no device
+  // work at all -- and the payload's own arrival was already synchronized in
+  // immigrateGPU -- so there is nothing to wait for and the arena is retained
+  // rather than freed. Otherwise the copies are plain cudaMemcpy on the
+  // default stream, so waiting on that stream is exactly the wait that was
+  // wanted.
+  const bool deviceRebound = gpuMsgIsArena && p.deviceReboundCount > 0;
+  if (gpuMsg != nullptr && !deviceRebound)
+    hapiCheck(cudaStreamSynchronize((cudaStream_t)0));
 #endif
 
 #if CMK_CUDA
