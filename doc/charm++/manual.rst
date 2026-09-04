@@ -9368,6 +9368,74 @@ where the data transfer will be enqueued (only used in the device memcpy and IPC
 As with the host-side Zero Copy API, the regular entry method is executed by the runtime
 system after the GPU buffer has arrived at the destination.
 
+Registration of device buffers, and when a source buffer may be reused
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+In reconverse builds (for example ``reconverse-linux-x86_64-amd``), a message
+whose source and destination are in different processes is transferred as a
+device-to-device RDMA get through the network backend, and both the source
+and the destination buffers have to be registered with the network for the
+duration of the transfer. The runtime registers each buffer per message and
+releases both registrations when the get completes; the release of the
+source registration is carried back to the sender inside the next device
+message the receiver sends to it, so no extra message is normally needed.
+
+There is no application call to hold a registration across messages. A
+buffer that is sent from, or received into, many times is registered again
+on each message, and the cost of repeating that registration on the same
+address range is absorbed by the network layer's own registration cache;
+the runtime does not keep a second cache of its own. The one exception is
+memory the runtime itself owns, which is what the device pool below is for.
+
+Registration and buffer reuse are separate questions. The callback given to
+``CkDeviceBuffer`` is invoked when the receiver's transfer out of the source
+buffer has completed, and it is the only signal a sender gets that the buffer
+may be written again. An application that overwrites a send buffer every
+iteration must either wait for that callback before writing, or alternate
+between two send buffers: a neighbour that has sent its message for
+iteration ``i+1`` has already finished reading the buffer it received for
+iteration ``i``, so with two buffers no callback is needed. Overwriting a
+buffer the receiver may still be reading is a silent data race; where the
+buffer came from does not change this. The callback, when requested, is sent
+as soon as the receiver's transfer completes, in an acknowledgement of its
+own: it is what the sender is waiting on, so it is never held back for the
+receiver's next message the way the registration release is, and it cannot be
+delayed behind a receiver's compute phase. That costs a few percent of a
+small chare-iteration, which double-buffering avoids entirely by not asking
+for a callback at all. A callback with no message is
+delivered as an empty message: to match it by reference number in SDAG,
+declare the target entry method to take a message (for example
+``entry void ack(AckMsg*)``) and set the reference number with
+``CkCallback::setRefnum``; a zero-argument entry method cannot be matched by
+reference number.
+
+A registered device pool
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Device buffers can also be taken from a pool the runtime registers for you:
+
+.. code-block:: c++
+
+   double* buf = (double*)CkDeviceMalloc(bytes);
+   ...
+   CkDeviceFree(buf);
+
+The pool hands out buffers from arenas, large device allocations grown on
+demand (``CK_GPU_ARENA_MB`` in the environment sets the arena size, default
+256). An arena is registered with the network the first time a buffer in it
+is sent or received into, whole, and stays registered; arenas whose buffers
+never cross the network are never registered. Arenas are per device: a
+request is served from arenas on the calling PE's current device, so a
+process that drives several GPUs gets one arena set per device. Buffers from
+the pool need no release per message, and a process sending from many such
+buffers holds one registration per arena rather than one per buffer. The
+pool owns the arena, so freeing and reallocating pool buffers is safe with
+respect to registration.
+
+The pool answers the registration question only. When a send buffer may be
+overwritten is still decided by the callback on ``CkDeviceBuffer`` or by
+alternating between two buffers, as described above.
+
 For non-UCX builds, a more optimized mechanism for inter-process communication using CUDA IPC, POSIX shared memory,
 and pre-allocated GPU communication buffers are available through runtime flags.
 This significantly reduces the overhead from creating and opening device IPC handles,

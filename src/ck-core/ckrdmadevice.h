@@ -65,6 +65,8 @@ struct CkDevicePersistent {
   CkDeviceStatus put(CkDevicePersistent& dst);
 };
 
+#define CK_DEVICE_ACK_CAP 8
+
 struct CkDeviceBufferPost {
   // CUDA stream for device transfers
   hapiStream_t hapi_stream;
@@ -77,6 +79,18 @@ class CkDeviceBuffer : public CmiDeviceBuffer {
 public:
   // Callback to be invoked on the sender/receiver
   CkCallback cb;
+
+  // Piggybacked acknowledgements (reconverse RDMA path).  ack_id is the id
+  // the sender minted for THIS buffer (0: nothing to acknowledge); the
+  // receiver returns it, and the sender resolves it locally to a release
+  // of a per-message registration and/or the source callback.  Its top bit
+  // says the id carries a source callback, which the receiver returns at
+  // once rather than holding for the piggyback.  acks[] is the block of ids
+  // this MESSAGE carries back to its destination PE; only the first buffer
+  // of a message carries any, the rest pup one zero byte.
+  uint64_t ack_id = 0;
+  unsigned char ack_count = 0;
+  uint64_t acks[CK_DEVICE_ACK_CAP];
 
   CkDeviceBuffer() : CmiDeviceBuffer() {
     cb = CkCallback(CkCallback::ignore);
@@ -121,6 +135,9 @@ public:
   void pup(PUP::er &p) {
     CmiDeviceBuffer::pup(p);
     p|cb;
+    p|ack_id;
+    p|ack_count;
+    PUParray(p, acks, ack_count);
   }
 
   friend void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
@@ -136,7 +153,20 @@ extern "C" {
    * the init.C registration site is gated to match */
   void* loopback_bridge(void* arg);
   extern int loopback_handler;
+  void* device_dereg_bridge(void* arg);
+  extern int device_dereg_handler;
+  void* device_ack_bridge(void* arg);
+  extern int device_ack_handler;
 }
+
+// Device pool: arenas registered lazily, whole, on first network use.
+// Every other device buffer is registered per message and released on
+// completion; holding registrations across messages is the network layer's
+// registration cache to do.
+void* CkDeviceMalloc(size_t size);
+void CkDeviceFree(void* ptr);
+// Per-PE init of the device zerocopy path (idle-time ack flush).
+void CkRdmaDeviceInit();
 
 #endif // CMK_CUDA
 
