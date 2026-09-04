@@ -379,12 +379,36 @@ void Compute::pup(PUP::er &p) {
   // The scratch travels. Unpacking rebinds these pointers into the arena the
   // payload landed in, so they are released through hapiFreeMigratable (see
   // mdMigFree) rather than by the allocator that first produced them.
+  // Carry the occupied part of each buffer, not its capacity. cap is sized with
+  // headroom (1314 for 1000 atoms) and everything past nPart is untouched
+  // memory that the destination has no use for. The destination's capacity
+  // becomes exactly what arrived, and ensureSlot grows it again if a later
+  // step needs more -- which is what it does for a freshly built chare anyway.
+  //
+  // The obvious next step -- skipping the buffers entirely on a move that lands
+  // between steps, where nothing in them is live -- is NOT done here, and the
+  // reason is worth keeping. It needs a predicate for "is anything live", and a
+  // flag maintained from SDAG serial blocks is not one: the flag and the SDAG's
+  // own pupped resume point disagree across a migration, and a chare arrived
+  // claiming nothing was live while its continuation sat in the middle of a
+  // step (measured: live=0, cap=0, nPart=840, resuming at sendForces). Any
+  // future attempt has to derive liveness from the resume point itself.
+  // cap must not change while it is still deciding what gets pupped: the
+  // energy partials below are sized from cap[0], and updating it inside the
+  // loop made the two sides disagree ("device buffer 3 is 6720 bytes on unpack
+  // but the sender packed 8912"). Decide every count from the sender's cap,
+  // then adopt the new capacities once the walk is done.
+  const int sentCap[2] = {cap[0], cap[1]};
+  int newCap[2] = {cap[0], cap[1]};
   for (int s = 0; s < 2; s++) {
-    if (cap[s] <= 0) continue;
-    p.pup_buffer_device(d_pos[s], (size_t)cap[s]);
-    p.pup_buffer_device(d_force[s], (size_t)cap[s]);
+    if (sentCap[s] <= 0) continue;
+    const size_t live = (nPart[s] > 0) ? (size_t)nPart[s] : (size_t)sentCap[s];
+    p.pup_buffer_device(d_pos[s], live);
+    p.pup_buffer_device(d_force[s], live);
+    newCap[s] = (int)live;
   }
-  if (cap[0] > 0) p.pup_buffer_device(d_energyPartial, (size_t)cap[0]);
+  if (sentCap[0] > 0) p.pup_buffer_device(d_energyPartial, (size_t)sentCap[0]);
+  if (p.isUnpacking()) { cap[0] = newCap[0]; cap[1] = newCap[1]; }
 
   // d_energyScalar and h_energy deliberately do not travel: both are written
   // and read within one launchForces, and ensureDevice takes them again on the
