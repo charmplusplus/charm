@@ -441,6 +441,18 @@ __global__ void treeLevelKernel(const unsigned long long* __restrict__ key,
     const int split = lowerBound(key, lo, hi, sk);
 
     const int base = atomicAdd(sc.nodeCount, 2);
+    // Count the demand either way, but only write what fits: the host sizes
+    // its retry from *sc.nodeCount, so an overflowing level has to report how
+    // much room it actually wanted. Without this the kernel wrote past the
+    // allocation -- readTree then asked cudaMemcpyAsync for more than the
+    // buffer holds and it came back "invalid argument", which is how a
+    // clustered input (a far deeper tree than 4*(nParts/8+1)+1024 assumes)
+    // presented.
+    if (base + 1 >= sc.capacity){
+      sc.nodes[ni].firstChild = -1;
+      sc.nodes[ni].type = DNODE_BUCKET;
+      continue;
+    }
     sc.nodes[ni].firstChild = base;
     sc.nodes[ni].type = DNODE_INTERNAL;
 

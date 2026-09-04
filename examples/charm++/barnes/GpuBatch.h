@@ -390,6 +390,7 @@ private:
   unsigned long long *dOwners;
   int ownerCap;
   void ensureTree(int n);
+  void ensureTreeCapacity(int want);
   int nParts;
   int cap;
 };

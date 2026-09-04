@@ -162,6 +162,13 @@ class Node {
         allChildrenExternal = false;
       }
       if(i == 0) continue;
+      // A child covering a key range that no tree piece owns carries
+      // ownerStart == ownerEnd == -1, and an unowned range says nothing about
+      // whether its neighbours are contiguous. Clustered inputs produce these
+      // in bulk -- most of the key space is empty -- so comparing against one
+      // made diff wildly negative and tripped this assert.
+      if(children[i].getOwnerStart() < 0 || children[i-1].getOwnerEnd() < 0)
+        continue;
       int diff = children[i].getOwnerStart()
         - children[i-1].getOwnerEnd(); 
       CkAssert(diff >= 0 && diff <= 1);

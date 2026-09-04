@@ -201,7 +201,10 @@ void GpuParticleStore::ensure(int n){
 // node count is bounded by a small multiple of the bucket count. Sizing from
 // the capacity keeps it stable across a resize.
 void GpuParticleStore::ensureTree(int n){
-  const int want = 4 * (n / 8 + 1) + 1024;
+  ensureTreeCapacity(4 * (n / 8 + 1) + 1024);
+}
+
+void GpuParticleStore::ensureTreeCapacity(int want){
   if (dtree.nodes != NULL && dtree.capacity >= want) return;
   if (dtree.nodes != NULL){
     hapiCheck(hapiFree(dtree.nodes));
@@ -237,7 +240,15 @@ void GpuParticleStore::buildDeviceTree(const Key *owners, int numTreePieces,
                             sizeof(unsigned long long) * nOwners,
                             cudaMemcpyHostToDevice, stream));
 
-  invokeBuildTree(dKey, nParts, dOwners, numTreePieces, ppbLimit, dtree, stream);
+  // The capacity estimate assumes a roughly balanced tree; a clustered input
+  // is far deeper and overruns it. The kernel now reports the demand instead
+  // of writing past the end, so grow to what it asked for and build again.
+  for (int attempt = 0; attempt < 4; attempt++){
+    invokeBuildTree(dKey, nParts, dOwners, numTreePieces, ppbLimit, dtree, stream);
+    const int want = treeNodeCount();
+    if (want <= dtree.capacity) break;
+    ensureTreeCapacity(want + want / 4 + 1024);
+  }
   invokeTreeMoments(dPos, dtree, stream);
   hapiCheck(cudaEventRecord(treeBuilt, stream));
 }
