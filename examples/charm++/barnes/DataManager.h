@@ -220,6 +220,7 @@ class DataManager : public CBase_DataManager {
   // the device. Replaces walking a host copy of the particles to answer the
   // same three questions per bin.
   bool fillBinCounts();
+  map<Key, std::pair<Key,Key> > localBinKeys;
   
   void senseTreePieces();
 
@@ -231,8 +232,15 @@ class DataManager : public CBase_DataManager {
   struct LeafRef {
     Node<NodeDescriptor> *node;
     int tp;
-    LeafRef() : node(NULL), tp(-1) {}
-    LeafRef(Node<NodeDescriptor> *n, int t) : node(n), tp(t) {}
+    // This PE's own first and last key in the bin. Not the bin's descriptor:
+    // fillBinCounts writes the counts array that gets reduced, never the node,
+    // so off PE 0 the descriptor is default-constructed and on PE 0 it holds
+    // the globally reduced keys. The exchange needs each sender's local
+    // extremes, because the receiver takes a min and max across senders.
+    Key kfirst, klast;
+    LeafRef() : node(NULL), tp(-1), kfirst(~Key(0)), klast(Key(0)) {}
+    LeafRef(Node<NodeDescriptor> *n, int t, Key kf, Key kl)
+      : node(n), tp(t), kfirst(kf), klast(kl) {}
   };
   CkVec<LeafRef> leafList;
 

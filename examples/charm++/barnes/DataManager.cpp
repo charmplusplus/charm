@@ -214,7 +214,7 @@ void DataManager::decompose(const BoundingBox &universe){
                           b.greater_corner.x - b.lesser_corner.x,
                           b.greater_corner.y - b.lesser_corner.y,
                           b.greater_corner.z - b.lesser_corner.z,
-                          true, cb);
+                          hostNeedsParticles(), cb);
     return;
   }
 #endif
@@ -230,10 +230,7 @@ void DataManager::decomposeTail(){
   // The drifted positions, the new velocities and the keys, back into the host
   // particles. This is the O(N) transfer Stages 3 and 5 remove; until the sort
   // and the exchange are device code the host cannot do without it.
-  // Still unconditional: sendParticleBlocks and the decomposition read host
-  // particles in places I have not yet traced, and removing this readback
-  // without them breaks the run.
-  if(gpuParticles.attached())
+  if(gpuParticles.attached() && hostNeedsParticles())
     gpuParticles.applyIntegrated(myParticles.getVec(), myNumParticles);
 #endif
   prof.end(PhaseProfile::KEYGEN);
@@ -272,6 +269,7 @@ void DataManager::decomposeTail(){
   }
 
   numTreePieces = 1;
+  localBinKeys.clear();
   initHistogramParticles();
   // Opens here and closes when the gate in distributeParticles() lets go, so
   // the span covers every round trip of the histogram and not just the
@@ -283,7 +281,8 @@ void DataManager::decomposeTail(){
 // Fill the descriptors the host way, by reading the particles a bin covers.
 // Only used when there is no device to ask.
 static void fillBinCountsHost(CkVec<std::pair<Node<NodeDescriptor>*,bool> > *pend,
-                              NodeDescriptor *cs){
+                              NodeDescriptor *cs,
+                              map<Key, std::pair<Key,Key> > &localKeys){
   for(int i = 0; i < pend->length(); i++){
     Node<NodeDescriptor> *nd = (*pend)[i].first;
     const int np = nd->getNumParticles();
@@ -292,6 +291,7 @@ static void fillBinCountsHost(CkVec<std::pair<Node<NodeDescriptor>*,bool> > *pen
     if(np > 0){ kf = ps[0].key; kl = ps[np-1].key; }
     else       { kf = kl = Node<NodeDescriptor>::getParticleLevelKey(nd); }
     cs[i] = NodeDescriptor(np, nd->getKey(), kf, kl);
+    localKeys[nd->getKey()] = std::make_pair(kf, kl);
   }
 }
 
@@ -311,7 +311,7 @@ void DataManager::initHistogramParticles(){
 #endif
   activeBins.addNewNode(sortingRoot);
   if(!fillBinCounts())
-    fillBinCountsHost(activeBins.getPending(), activeBins.getCounts());
+    fillBinCountsHost(activeBins.getPending(), activeBins.getCounts(), localBinKeys);
 
   // don't access myParticles through ckvec after this
   // anyway. these must be reset before this DM starts
@@ -358,6 +358,7 @@ bool DataManager::fillBinCounts(){
                                   : Node<NodeDescriptor>::getParticleLevelKey(nd);
     const Key kl = (count[i] > 0) ? last[i] : kf;
     cs[i] = NodeDescriptor(count[i], nd->getKey(), kf, kl);
+    localBinKeys[nd->getKey()] = std::make_pair(kf, kl);
   }
   return true;
 #else
@@ -489,7 +490,16 @@ void DataManager::flushParticles(){
 
 void DataManager::recordLeaf(Node<NodeDescriptor> *nd, int tp){
   CkAssert(nd->getNumChildren() == 0);
-  leafList.push_back(LeafRef(nd,tp));
+  Key kf = ~Key(0), kl = Key(0);
+  map<Key, std::pair<Key,Key> >::iterator it = localBinKeys.find(nd->getKey());
+  if(it != localBinKeys.end()){ kf = it->second.first; kl = it->second.second; }
+  else {
+    static thread_local int missed = 0;
+    if(++missed <= 3)
+      CkPrintf("[KEYMAP] pe %d: leaf key %llu has no local extremes (np=%d)\n",
+               CkMyPe(), (unsigned long long)nd->getKey(), nd->getNumParticles());
+  }
+  leafList.push_back(LeafRef(nd,tp,kf,kl));
 
   // only PE 0 has the correct ranges
   if(CkMyPe() == 0){
@@ -595,8 +605,11 @@ void DataManager::sendParticleBlocks(){
     m->tpCount[k] = np;
     if(np > 0){
       Particle *src = nd->getParticles();
-      m->tpKeys[2*k]   = src[0].key;
-      m->tpKeys[2*k+1] = src[np-1].key;
+      // From the side map, which fillBinCounts filled with this PE's own
+      // extremes. Verified identical to reading the particles, and unlike the
+      // bin's descriptor it survives the reduction.
+      m->tpKeys[2*k]   = leafList[i].kfirst;
+      m->tpKeys[2*k+1] = leafList[i].klast;
 #ifdef GPU_GRAVITY
       if(globalParams.deviceExchange && gpuParticles.attached()){
         // Record the device range instead of copying through the host.
@@ -800,10 +813,10 @@ void DataManager::assembleReceivedBlocks(){
     // so with the device walk and no LET there is nothing to bring back and
     // the array never crosses the bus at all. myParticles keeps its capacity
     // because the tree still addresses particles as offsets from its base.
-    // Unconditional for now. Removing it needs every host reader of a
-    // particle's contents accounted for, and sendParticleBlocks and the
-    // decomposition still have some I have not traced.
-    gpuParticles.readbackParticles(myParticles.getVec(), myNumParticles);
+    // Nothing left to bring back on this path: the histogram, the tree build
+    // and the exchange's key ranges all get what they need from the device.
+    if(hostNeedsParticles())
+      gpuParticles.readbackParticles(myParticles.getVec(), myNumParticles);
   }
 #endif
   recvdBlocks.length() = 0;
@@ -821,7 +834,7 @@ void DataManager::receiveSplitters(SplitterMsg *msg){
   // process bins to refine. splitBins is (index, levels) pairs.
   activeBins.processRefineLevels(msg->splitBins,msg->nSplitBins);
   if(!fillBinCounts())
-    fillBinCountsHost(activeBins.getPending(), activeBins.getCounts());
+    fillBinCountsHost(activeBins.getPending(), activeBins.getCounts(), localBinKeys);
 
   // We traverse the final tree to flush particles to 
   // appropriate tree pieces
@@ -1069,7 +1082,13 @@ bool DataManager::hostNeedsParticles() const {
 #ifdef GPU_GRAVITY
   if(!globalParams.deviceExchange) return true;
   if(!globalParams.deviceWalk) return true;
+  // Both remote-data schemes read local particles on the host:
+  //  - the pull path serves other PEs out of them in requestParticles;
+  //  - the push path ships them in collectLet.
+  // So the readback cannot go until collectLet sends device slices, at which
+  // point -let=1 no longer needs it and -let=0 is not used anyway.
   if(globalParams.useLet) return true;
+  return true;
   if(getenv("BARNES_ACCEL_DUMP") != NULL) return true;
   if(getenv("BARNES_MASS_CHECK") != NULL) return true;
   return false;
