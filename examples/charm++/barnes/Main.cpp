@@ -38,15 +38,17 @@ Main::Main(CkArgMsg *msg){
   CkArrayOptions opts(globalParams.numTreePieces);
   if(globalParams.blockMap){
     // Tree piece indices follow the SFC key order the decomposition assigns,
-    // so the map from index to PE is a map from space to PE. The default map
-    // interleaves indices across PEs, which hands every PE a representative
-    // mix of dense and sparse regions -- close to the best static balance
-    // there is, and the reason a balancer has nothing to recover on a smooth
-    // input. Charm++'s built-in BlockMap gives each PE one contiguous run of
-    // indices instead, so the density variation of the distribution becomes
-    // load variation between PEs.
+    // so the map from index to PE is a map from space to PE. BlockMap gives
+    // each PE one contiguous run of indices, so the density variation of the
+    // distribution becomes load variation between PEs.
     opts.setMap(CProxy_BlockMap::ckNew());
   }
+  else if(globalParams.mapCyclic){
+    // Opt in only. See BlockCyclicMap in Main.h for why neither stock map
+    // places well when -p is a budget rather than a count.
+    opts.setMap(CProxy_BlockCyclicMap::ckNew(globalParams.mapChunk));
+  }
+  // Otherwise Charm++'s own map, which is what runs unless asked otherwise.
   treePieceProxy = CProxy_TreePiece::ckNew(opts);
 
   mainProxy = thisProxy;
@@ -113,7 +115,20 @@ void Main::setParameters(CkArgMsg *m){
   globalParams.lbPeriod = params.getiparam("lbperiod", DEFAULT_LB_PERIOD, table);
   globalParams.firstLbIteration = params.getiparam("firstlb", DEFAULT_FIRST_LB_ITERATION, table);
   globalParams.blockMap = params.getiparam("blockmap", 0, table);
+  globalParams.mapCyclic = params.getiparam("mapcyclic", 0, table);
+  globalParams.mapChunk = params.getiparam("mapchunk", DEFAULT_MAP_CHUNK, table);
+  if(globalParams.mapCyclic)
+    CkPrintf("map: node-aware block cyclic, chunk %d\n", globalParams.mapChunk);
+  else if(!globalParams.blockMap)
+    CkPrintf("map: Charm++ default\n");
   if(globalParams.blockMap) CkPrintf("blockMap: contiguous key ranges per PE\n");
+  globalParams.deviceWalk = params.getiparam("devwalk", DEFAULT_DEVICE_WALK, table);
+  CkPrintf("deviceWalk: %d\n", globalParams.deviceWalk);
+
+  globalParams.decompLevels = params.getiparam("decomplevels", DEFAULT_DECOMP_LEVELS, table);
+  if(globalParams.decompLevels < 1) globalParams.decompLevels = 1;
+  CkPrintf("decompLevels: %d\n", globalParams.decompLevels);
+
   globalParams.lbWindow = params.getiparam("lbwindow", DEFAULT_LB_WINDOW, table);
   // A window as long as the period is a window that never closes.
   if(globalParams.lbWindow >= globalParams.lbPeriod) globalParams.lbWindow = 0;
@@ -223,6 +238,8 @@ void Main::usage(){
   usage["in"] = "input file";
   usage["ppc"] = "particles per chare";
   usage["b"] = "particles per bucket (leaf)";
+  usage["devwalk"] = "run the local traversal on the device";
+  usage["decomplevels"] = "levels one histogram round may refine a bin by";
   usage["theta"] = "opening angle";
   usage["killat"] = "num single steps";
   usage["chunkDepth"] = "when fetching remote data, what depth of subtree to fetch";
@@ -232,6 +249,8 @@ void Main::usage(){
   usage["firstlb"] = "first iteration after which the load balancer may run";
   usage["lbasync"] = "split the AtSync barrier so decomposition overlaps the step (needs +LBAsync)";
   usage["lbwindow"] = "instrument only the N iterations before each balancing iteration (0 = always)";
+  usage["mapcyclic"] = "use node-aware block cyclic tree piece placement";
+  usage["mapchunk"] = "consecutive tree pieces per node under -mapcyclic";
   usage["blockmap"] = "place tree pieces in contiguous blocks per PE (1 = imbalanced, 0 = round robin)";
   usage["gpuflush"] = "interaction-list length at which a tree piece launches";
   usage["qd"] = "arm the quiescence deadlock detector (1 = yes, default)";

@@ -39,6 +39,17 @@
 // keeps a load-balanced run from paying for tracing it never reads. 0 restores
 // continuous instrumentation.
 #define DEFAULT_LB_WINDOW 2
+// One level per round: the decomposition converges exactly as it always has.
+// Raising it trades a larger histogram reduction for fewer of them.
+#define DEFAULT_DECOMP_LEVELS 1
+
+// Off: the host walk is the validated path, and -devwalk=1 is how the device
+// one is compared against it.
+#define DEFAULT_DEVICE_WALK 0
+
+// Consecutive tree pieces per PE. Large enough to keep neighbouring key ranges
+// together, small enough that the used prefix still reaches every PE.
+#define DEFAULT_MAP_CHUNK 64
 
 // 1M sources is 16 MB of pinned staging per tree piece, and only reached by a
 // tree piece holding an unusually large share of the PE's particles.

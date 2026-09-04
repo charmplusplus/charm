@@ -47,9 +47,21 @@ struct Parameters {
   // recent window: measured entirely after the previous step's migrations
   // settled, and ending at the decision. 0 instruments continuously.
   int lbWindow;
+  // Levels a single histogram round may refine an over-full bin by. One is the
+  // original behaviour. See DataManager::receiveHistogram.
+  int decompLevels;
+  // Stage 7. Run the LOCAL half of the traversal on the device instead of the
+  // host. The remote half stays on the host either way: the data it needs is
+  // not resident here until push-based LET lands.
+  int deviceWalk;
   // Initial tree piece placement. 0 = the default round-robin map, 1 = a block
   // map, which is what makes this benchmark imbalanced; see BlockMap.
   int blockMap;
+  // Consecutive tree piece indices per node before the placement moves on.
+  int mapChunk;
+  // Opt in to the node-aware block cyclic placement. Off by default: the
+  // stock Charm++ map is what runs unless asked otherwise.
+  int mapCyclic;
 
   // Interaction-list size, in sources, at which a tree piece stops
   // accumulating and launches. Only a memory bound: at typical particle
@@ -80,7 +92,11 @@ struct Parameters {
     p | lbPeriod;
     p | asyncLb;
     p | lbWindow;
+    p | decompLevels;
+    p | deviceWalk;
     p | blockMap;
+    p | mapChunk;
+    p | mapCyclic;
     p | gpuFlushLimit;
     p | quiescenceCheck;
   }

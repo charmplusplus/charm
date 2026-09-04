@@ -29,14 +29,16 @@ struct ActiveBinInfo{
   // in active..
   // in that case, we will have to use length of new vector 
   // to get number of fat nodes in while loop (can't use getNumCounts)
-  void addNewNode(Node<T> *node){
+  // A node joins the next round's active list, and its count joins the
+  // histogram. The two used to be written out separately in addNewNode and in
+  // processRefine; they have to stay in step, so there is one of them now.
+  void pushBin(Node<T> *node){
     std::pair<Node<T>*,bool> pr;
     pr.first = node;
     pr.second = false;
+    newvec->push_back(pr);
 
     Key kfirst, klast;
-
-    newvec->push_back(pr);
     int np = node->getNumParticles();
     Particle *particles = node->getParticles();
     if(np > 0){
@@ -48,6 +50,10 @@ struct ActiveBinInfo{
     counts.push_back(NodeDescriptor(np,node->getKey(),kfirst,klast));
   }
 
+  void addNewNode(Node<T> *node){
+    pushBin(node);
+  }
+
   void processRefine(int *binsToRefine, int numBinsToRefine){
     for(int i = 0; i < numBinsToRefine; i++){
       int bin = binsToRefine[i];
@@ -55,29 +61,40 @@ struct ActiveBinInfo{
       Node<T> *node = (*oldvec)[bin].first;
 
       refine(node);
-
-      Key kfirst, klast;
-
-      std::pair<Node<T>*,bool> pr;
-      pr.second = false;
-      for(int i = 0; i < node->getNumChildren(); i++){
-        Node<T> *child = node->getChild(i);
-        pr.first = child;
-        
-        newvec->push_back(pr);
-        int np = child->getNumParticles();
-        Particle *particles = child->getParticles();
-        if(np > 0){
-          kfirst = particles[0].key;
-          klast = particles[np-1].key;
-        }else{
-          kfirst = klast = Node<T>::getParticleLevelKey(child);
-        }
-        counts.push_back(NodeDescriptor(np,child->getKey(),kfirst,klast));
-      }
+      for(int j = 0; j < node->getNumChildren(); j++) pushBin(node->getChild(j));
     }
-
   }
+
+  // Refine a bin by more than one level in a single round. `pairs` is
+  // (bin index, levels) flattened, because the decision that says how deep to
+  // go is made once, on PE 0, and every PE has to make the same cut.
+  //
+  // Only the deepest level joins the next active list; the levels above it
+  // become ordinary internal nodes of the sorting tree, exactly as they would
+  // have if the same refinement had been reached one round at a time. The
+  // leaves of that tree are what ParticleFlushWorker walks, so the shape has
+  // to end up identical -- which is why the intermediate nodes are created
+  // rather than skipped.
+  void processRefineLevels(const int *pairs, int numPairs){
+    for(int i = 0; i < numPairs; i++){
+      const int bin = pairs[2*i];
+      const int levels = pairs[2*i + 1];
+      (*oldvec)[bin].second = true;
+      refineToDepth((*oldvec)[bin].first, levels);
+    }
+  }
+
+private:
+  void refineToDepth(Node<T> *node, int levels){
+    refine(node);
+    for(int i = 0; i < node->getNumChildren(); i++){
+      Node<T> *child = node->getChild(i);
+      if(levels > 1) refineToDepth(child, levels - 1);
+      else           pushBin(child);
+    }
+  }
+
+public:
 
   virtual void refine(Node<T> *node){
     node->refine();

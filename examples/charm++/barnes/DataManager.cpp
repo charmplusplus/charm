@@ -51,7 +51,10 @@ DataManager::DataManager() :
   atDistribute(false),
   pendingRangeMsg(NULL),
   stepThisIteration(false),
-  decompStalledAt(0.0)
+  decompStalledAt(0.0),
+  numBlocksRecvd(0),
+  expectedBlocks(0),
+  haveExpected(false)
 {
 #ifdef STATISTICS
   numInteractions[0] = 0;
@@ -66,28 +69,34 @@ void DataManager::loadParticles(const CkCallback &cb){
   numRankBits = LOG_BRANCH_FACTOR;
 
   const char *fname = globalParams.filename.c_str();
-  int npart = globalParams.numParticles;
+  const long long npart = (long long)globalParams.numParticles;
 
   std::ifstream partFile;
   partFile.open(fname, ios::in | ios::binary);
   CkAssert(partFile.is_open());
 
-  int offset = 0; 
-  int myid = CkMyPe();
-  int npes = CkNumPes();
+  // 64-bit throughout. The byte offset is the particle index times 32, so an
+  // int overflows at 67.1M particles and the seek below goes negative -- which
+  // partFile.fail() does not reliably catch, so the run would read the wrong
+  // slice rather than stop. Anything worth running on more than a node or two
+  // is past that limit.
+  const long long myid = CkMyPe();
+  const long long npes = CkNumPes();
 
-  int avgParticlesPerPE = npart/npes;
-  int rem = npart-npes*avgParticlesPerPE;
+  long long avgParticlesPerPE = npart/npes;
+  const long long rem = npart-npes*avgParticlesPerPE;
+  long long firstParticle;
   if(myid < rem){
     avgParticlesPerPE++;
-    offset = myid*avgParticlesPerPE;
+    firstParticle = myid*avgParticlesPerPE;
   }
   else{
-    offset = myid*avgParticlesPerPE+rem;
+    firstParticle = myid*avgParticlesPerPE+rem;
   }
-  myNumParticles = avgParticlesPerPE;
-  offset *= SIZE_PER_PARTICLE;
-  offset += PREAMBLE_SIZE;
+  myNumParticles = (int)avgParticlesPerPE;
+
+  const std::streamoff offset =
+      (std::streamoff)firstParticle * SIZE_PER_PARTICLE + PREAMBLE_SIZE;
 
   myParticles.reserve(myNumParticles);
   myParticles.length() = myNumParticles;
@@ -99,29 +108,47 @@ void DataManager::loadParticles(const CkCallback &cb){
     oss << "couldn't seek to position " << offset << " on PE " << CkMyPe() << " position " << partFile.tellg() << endl;
     CkAbort("%s", oss.str().c_str());
   }
-  unsigned int numParticlesDone = 0;
-
   BoundingBox myBox;
 
-  Real tmp[REALS_PER_PARTICLE];
-  while(numParticlesDone < myNumParticles && !partFile.eof()){
-    partFile.read((char *)tmp, SIZE_PER_PARTICLE);
-    myParticles[numParticlesDone].position.x = tmp[0];
-    myParticles[numParticlesDone].position.y = tmp[1];
-    myParticles[numParticlesDone].position.z = tmp[2];
-    myParticles[numParticlesDone].velocity.x = tmp[3];
-    myParticles[numParticlesDone].velocity.y = tmp[4];
-    myParticles[numParticlesDone].velocity.z = tmp[5];
-    myParticles[numParticlesDone].mass = tmp[6];
+  // In blocks. One 32-byte read per particle is a syscall per particle, and at
+  // scale that is hundreds of ranks doing millions of tiny reads against one
+  // file on a shared filesystem.
+  const int BATCH = 4096;
+  Real *buf = new Real[(size_t)BATCH * REALS_PER_PARTICLE];
+  int numParticlesDone = 0;
 
-    myParticles[numParticlesDone].acceleration.x = 0.0;
-    myParticles[numParticlesDone].acceleration.y = 0.0;
-    myParticles[numParticlesDone].acceleration.z = 0.0;
-    myParticles[numParticlesDone].potential = 0.0;
-    myBox.grow(myParticles[numParticlesDone].position);
+  while(numParticlesDone < myNumParticles){
+    const int n = (myNumParticles - numParticlesDone < BATCH)
+                      ? (myNumParticles - numParticlesDone) : BATCH;
+    const std::streamsize want = (std::streamsize)n * SIZE_PER_PARTICLE;
+    partFile.read((char *)buf, want);
+    if(partFile.gcount() != want){
+      std::ostringstream oss;
+      oss << "short read on PE " << CkMyPe() << ": wanted " << want
+          << " got " << partFile.gcount() << endl;
+      CkAbort("%s", oss.str().c_str());
+    }
 
-    numParticlesDone++;
+    for(int i = 0; i < n; i++){
+      const Real *tmp = buf + (size_t)i * REALS_PER_PARTICLE;
+      Particle &q = myParticles[numParticlesDone + i];
+      q.position.x = tmp[0];
+      q.position.y = tmp[1];
+      q.position.z = tmp[2];
+      q.velocity.x = tmp[3];
+      q.velocity.y = tmp[4];
+      q.velocity.z = tmp[5];
+      q.mass = tmp[6];
+
+      q.acceleration.x = 0.0;
+      q.acceleration.y = 0.0;
+      q.acceleration.z = 0.0;
+      q.potential = 0.0;
+      myBox.grow(q.position);
+    }
+    numParticlesDone += n;
   }
+  delete[] buf;
 
   CkAssert(numParticlesDone == myNumParticles);
   myBox.numParticles = myNumParticles;
@@ -164,8 +191,53 @@ void DataManager::hashParticleCoordinates(const OrientedBox<Real> &universe){
 }
 
 void DataManager::decompose(const BoundingBox &universe){
+  prof.begin(PhaseProfile::KEYGEN);
+  decomposeUniverse = universe;
+
+#ifdef GPU_GRAVITY
+  // The particles have been on the device since processSubmittedParticles and
+  // the integrator left them there, so the keys are generated where they are.
+  // Not on the first decomposition: nothing has been uploaded yet, because the
+  // upload happens in processSubmittedParticles further down this same
+  // pipeline.
+  if(gpuParticles.attached()){
+    const OrientedBox<Real> &b = universe.box;
+    CkCallback cb(CkIndex_DataManager::decomposeTail(), CkMyPe(), thisgroup);
+    gpuParticles.hashKeys(b.lesser_corner.x, b.lesser_corner.y, b.lesser_corner.z,
+                          b.greater_corner.x - b.lesser_corner.x,
+                          b.greater_corner.y - b.lesser_corner.y,
+                          b.greater_corner.z - b.lesser_corner.z,
+                          cb);
+    return;
+  }
+#endif
+
   hashParticleCoordinates(universe.box);
+  decomposeTail();
+}
+
+void DataManager::decomposeTail(){
+  const BoundingBox &universe = decomposeUniverse;
+
+#ifdef GPU_GRAVITY
+  // The drifted positions, the new velocities and the keys, back into the host
+  // particles. This is the O(N) transfer Stages 3 and 5 remove; until the sort
+  // and the exchange are device code the host cannot do without it.
+  if(gpuParticles.attached())
+    gpuParticles.applyIntegrated(myParticles.getVec(), myNumParticles);
+#endif
+  prof.end(PhaseProfile::KEYGEN);
+
+  prof.begin(PhaseProfile::SORT_PRE);
+#ifdef GPU_GRAVITY
+  // Stage 3: hashKeys() sorted on the device and applyIntegrated wrote the
+  // particles back in key order, so there is nothing to do here. The timer
+  // stays so the phase table keeps its shape across the two paths -- it should
+  // read zero on the device path, and that is the point.
+  if(!gpuParticles.attached())
+#endif
   myParticles.quickSort();
+  prof.end(PhaseProfile::SORT_PRE);
 
   if(CkMyPe()==0){
     float memMB = (1.0*CmiMemoryUsage())/(1<<20);
@@ -191,6 +263,10 @@ void DataManager::decompose(const BoundingBox &universe){
 
   numTreePieces = 1;
   initHistogramParticles();
+  // Opens here and closes when the gate in distributeParticles() lets go, so
+  // the span covers every round trip of the histogram and not just the
+  // counting. That distinction is the whole point of section 3.3 of the plan.
+  prof.begin(PhaseProfile::HIST);
   sendHistogram();
 }
 
@@ -226,7 +302,7 @@ void DataManager::receiveHistogram(CkReductionMsg *msg){
   // XXX remove this and make a refine function for ActiveBinInfo
   CkVec<int> binsToRefine;
 
-  binsToRefine.reserve(numRecvdBins);
+  binsToRefine.reserve(2*numRecvdBins);
   binsToRefine.length() = 0;
 
   int particlesHistogrammed = 0;
@@ -234,11 +310,37 @@ void DataManager::receiveHistogram(CkReductionMsg *msg){
   CkVec<pair<Node<NodeDescriptor>*,bool> > *active = activeBins.getActive();
   CkAssert(numRecvdBins == active->length());
 
+  const Real target = (Real)(DECOMP_TOLERANCE*globalParams.ppc);
+
   for(int i = 0; i < numRecvdBins; i++){
-    if(descriptors[i].numParticles > (Real)(DECOMP_TOLERANCE*globalParams.ppc)){
-      // need to refine this bin (partition)
+    if(descriptors[i].numParticles > target){
+      // Refine this bin. One level is the original behaviour and still the
+      // default; with -decomplevels above one, a bin far over the target is
+      // taken down several levels in this round instead of one per round.
+      //
+      // The whole cost of the histogram is the round trips -- the counting
+      // itself is a binary search per bin, because the particles are already
+      // sorted -- so the only thing worth optimising here is how few rounds it
+      // takes to converge.
+      int levels = 1;
+      if(globalParams.decompLevels > 1 && target > 0.0){
+        const Real ratio = descriptors[i].numParticles / target;
+        while(levels < globalParams.decompLevels &&
+              (Real)(1 << levels) < ratio) levels++;
+        // Splitting a clustered bin k levels deep can leave most of the
+        // children empty, and every child costs a tree piece whether or not it
+        // holds anything. Back off until the budget covers it rather than
+        // aborting: one level always fits if anything does, and the next round
+        // will pick the bin up again.
+        while(levels > 1 &&
+              numTreePieces + ((1 << levels) - 1) > globalParams.numTreePieces){
+          levels--;
+        }
+      }
+
       binsToRefine.push_back(i);
-      numTreePieces += (BRANCH_FACTOR-1);
+      binsToRefine.push_back(levels);
+      numTreePieces += (1 << levels) - 1;
       if(numTreePieces > globalParams.numTreePieces){
         CkPrintf("have %d treepieces need %d\n",globalParams.numTreePieces,numTreePieces);
         CkAbort("Need more tree pieces!\n");
@@ -252,11 +354,13 @@ void DataManager::receiveHistogram(CkReductionMsg *msg){
     particlesHistogrammed += descriptors[i].numParticles;
   }
 
-  int numBinsToRefine = binsToRefine.length();
+  // Two ints per bin: the index and the number of levels.
+  int numInts = binsToRefine.length();
+  int numBinsToRefine = numInts / 2;
 
   if(numBinsToRefine > 0){
-    SplitterMsg *m = new (numBinsToRefine,0) SplitterMsg;
-    memcpy(m->splitBins,binsToRefine.getVec(),sizeof(int)*numBinsToRefine);
+    SplitterMsg *m = new (numInts,0) SplitterMsg;
+    memcpy(m->splitBins,binsToRefine.getVec(),sizeof(int)*numInts);
     m->nSplitBins = numBinsToRefine; 
     thisProxy.receiveSplitters(m);
     decompIterations++;
@@ -265,42 +369,277 @@ void DataManager::receiveHistogram(CkReductionMsg *msg){
     // create tree pieces and send proxy
     #ifdef STATISTICS
     CkPrintf("[0] decomp done after %d iterations used treepieces %d\n", decompIterations, numTreePieces);
+    // -p is a budget and placement is derived from it, so a budget far above
+    // what the decomposition actually uses costs real time -- measured at
+    // 0.134 s/iter with -p sized to the used count against 0.146 with the
+    // block cyclic default and 0.506 with a plain block map over the same
+    // oversized budget.
+    static bool warnedBudget = false;
+    if(!warnedBudget && numTreePieces * 2 < globalParams.numTreePieces){
+      warnedBudget = true;
+      CkPrintf("[0] note: -p=%d is %.1fx the %d tree pieces actually used; "
+               "sizing it near that and passing -blockmap=1 keeps neighbouring "
+               "key ranges on one PE and cuts remote traffic\n",
+               globalParams.numTreePieces,
+               (double)globalParams.numTreePieces/(double)numTreePieces,
+               numTreePieces);
+    }
     #endif
     decompIterations = 0;
 
     // Everything past here needs the local tree pieces to hold still, so it
-    // lives in distributeParticles() behind the migration gate.
-    atDistribute = true;
-    distributeParticles();
+    // lives in distributeParticles() behind the migration gate. Broadcast,
+    // because every PE now has to reach the tree-piece map reduction before
+    // anything can be sent -- the key ranges used to be that signal, and they
+    // are not available until after the reduction.
+    thisProxy.beginDistribute();
   }
 
   delete msg;
 }
 
+// Walk the sorting tree and record its leaves. Nothing is sent here: the
+// leaves have to be grouped by destination PE first, and that needs the map.
+// On PE 0 this is also where the key ranges are filled, because PE 0's sorting
+// tree is the only one carrying the globally reduced NodeDescriptors.
 void DataManager::flushParticles(){
+  leafList.length() = 0;
   ParticleFlushWorker pfw(this);
   scaffoldTrav.preorderTraversal(sortingRoot,&pfw);
+}
 
-  int numUsefulTreePieces = pfw.getNumLeaves(); 
+void DataManager::recordLeaf(Node<NodeDescriptor> *nd, int tp){
+  CkAssert(nd->getNumChildren() == 0);
+  leafList.push_back(LeafRef(nd,tp));
 
-  for(int i = numUsefulTreePieces; i < globalParams.numTreePieces; i++){
-    treePieceProxy[i].receiveParticles();
+  // only PE 0 has the correct ranges
+  if(CkMyPe() == 0){
+    if(nd->data.numParticles > 0){
+      CkAssert(nd->data.smallestKey <= nd->data.largestKey);
+    } else {
+      CkAssert(nd->data.smallestKey == nd->data.largestKey);
+    }
+    keyRanges[(tp<<1)] = nd->data.smallestKey;
+    keyRanges[(tp<<1)+1] = nd->data.largestKey;
   }
+}
 
-  // done with sorting tree; delete
+void DataManager::freeSortingTree(){
+  if(sortingRoot == NULL) return;
   FreeTreeWorker<NodeDescriptor> freeWorker;
   scaffoldTrav.postorderTraversal(sortingRoot,&freeWorker);
-
   delete sortingRoot;
   sortingRoot = NULL;
+  leafList.length() = 0;
+}
+
+// Every PE says which tree pieces it holds; the max reduction folds those into
+// one array that every PE then has. A sender needs it to address its blocks.
+// Refreshed every iteration because the balancer moves elements between them.
+void DataManager::publishTreePieceMap(){
+  const int n = globalParams.numTreePieces;
+  CkVec<int> mine;
+  mine.resize(n);
+  for(int i = 0; i < n; i++) mine[i] = -1;
+  for(int i = 0; i < localTreePieces.indices.length(); i++){
+    const int idx = localTreePieces.indices[i];
+    if(idx >= 0 && idx < n) mine[idx] = CkMyPe();
+  }
+  CkCallback cb(CkIndex_DataManager::recvTreePieceMap(NULL),thisProxy);
+  contribute(sizeof(int)*n, mine.getVec(), CkReduction::max_int, cb);
+}
+
+void DataManager::recvTreePieceMap(CkReductionMsg *msg){
+  const int n = msg->getSize()/sizeof(int);
+  tpToPe.resize(n);
+  memcpy(tpToPe.getVec(), msg->getData(), sizeof(int)*n);
+  delete msg;
+
+  sendParticleBlocks();
+
+  if(CkMyPe() == 0){
+    // The ranges are filled now, so the other PEs can be told.
+    int numKeys = numTreePieces*2;
+    RangeMsg *rmsg = new (numKeys) RangeMsg;
+    rmsg->numTreePieces = numTreePieces;
+    memcpy(rmsg->keys,keyRanges,sizeof(Key)*numKeys);
+    thisProxy.sendParticles(rmsg);
+  }
+  maybeAssemble();
+}
+
+// One message per destination PE, holding every local leaf that belongs to a
+// tree piece living there. Empty blocks are still sent: the receiver counts to
+// CkNumPes() to know the exchange is complete.
+void DataManager::sendParticleBlocks(){
+  const int npes = CkNumPes();
+
+  CkVec<int> nTps, nParts;
+  nTps.resize(npes); nParts.resize(npes);
+  for(int q = 0; q < npes; q++){ nTps[q] = 0; nParts[q] = 0; }
+
+  for(int i = 0; i < leafList.length(); i++){
+    const int tp = leafList[i].tp;
+    const int q = (tp < tpToPe.length()) ? tpToPe[tp] : -1;
+    if(q < 0) continue;   // no element registered anywhere for this index
+    nTps[q]++;
+    nParts[q] += leafList[i].node->getNumParticles();
+  }
+
+  CkVec<ParticleBlockMsg *> out;
+  out.resize(npes);
+  CkVec<int> tpFill, partFill;
+  tpFill.resize(npes); partFill.resize(npes);
+  for(int q = 0; q < npes; q++){
+    const int t = nTps[q] > 0 ? nTps[q] : 1;
+    const int pcount = nParts[q] > 0 ? nParts[q] : 1;
+    out[q] = new (t, t, 2*t, pcount, 0) ParticleBlockMsg;
+    out[q]->numTps = nTps[q];
+    out[q]->numParticles = nParts[q];
+    out[q]->fromPe = CkMyPe();
+    tpFill[q] = 0; partFill[q] = 0;
+  }
+
+  for(int i = 0; i < leafList.length(); i++){
+    const int tp = leafList[i].tp;
+    const int q = (tp < tpToPe.length()) ? tpToPe[tp] : -1;
+    if(q < 0) continue;
+    Node<NodeDescriptor> *nd = leafList[i].node;
+    const int np = nd->getNumParticles();
+
+    ParticleBlockMsg *m = out[q];
+    const int k = tpFill[q]++;
+    m->tpIndex[k] = tp;
+    m->tpCount[k] = np;
+    if(np > 0){
+      Particle *src = nd->getParticles();
+      m->tpKeys[2*k]   = src[0].key;
+      m->tpKeys[2*k+1] = src[np-1].key;
+      memcpy(m->parts + partFill[q], src, sizeof(Particle)*np);
+      partFill[q] += np;
+    }
+    else{
+      m->tpKeys[2*k]   = ~Key(0);
+      m->tpKeys[2*k+1] = Key(0);
+    }
+  }
+
+  // Tell every PE how many senders it should expect, then send only to the
+  // ones that actually have something. One reduction of P ints replaces P^2
+  // empty messages.
+  CkVec<int> willSend;
+  willSend.resize(npes);
+  for(int q = 0; q < npes; q++) willSend[q] = (nTps[q] > 0) ? 1 : 0;
+  CkCallback cb(CkIndex_DataManager::recvSenderCounts(NULL),thisProxy);
+  contribute(sizeof(int)*npes, willSend.getVec(), CkReduction::sum_int, cb);
+
+  for(int q = 0; q < npes; q++){
+    if(nTps[q] > 0) thisProxy[q].receiveParticleBlock(out[q]);
+    else            delete out[q];
+  }
+
+  // The leaves point into myParticles and have been copied out, so the sorting
+  // tree can go.
+  freeSortingTree();
+}
+
+void DataManager::recvSenderCounts(CkReductionMsg *msg){
+  const int *counts = (const int *)msg->getData();
+  expectedBlocks = counts[CkMyPe()];
+  haveExpected = true;
+  delete msg;
+  maybeAssemble();
+}
+
+void DataManager::receiveParticleBlock(ParticleBlockMsg *msg){
+  recvdBlocks.push_back(msg);
+  numBlocksRecvd++;
+  maybeAssemble();
+}
+
+void DataManager::maybeAssemble(){
+  if(!haveRanges) return;
+  if(!haveExpected) return;
+  if(numBlocksRecvd != expectedBlocks) return;
+  assembleReceivedBlocks();
+}
+
+// Build this PE's particle array and its TreePieceDescriptors straight from
+// the received blocks. The tree pieces play no part: senseTreePieces() already
+// said which elements are here, and the blocks say how many particles each of
+// them got and over what key range.
+void DataManager::assembleReceivedBlocks(){
+  const int n = globalParams.numTreePieces;
+
+  // Fold the per-tree-piece contributions from every sender.
+  CkVec<int> count; count.resize(n);
+  CkVec<Key> smallest, largest;
+  smallest.resize(n); largest.resize(n);
+  for(int i = 0; i < n; i++){
+    count[i] = 0;
+    smallest[i] = ~Key(0);
+    largest[i] = Key(0);
+  }
+  for(int b = 0; b < recvdBlocks.length(); b++){
+    ParticleBlockMsg *m = recvdBlocks[b];
+    for(int k = 0; k < m->numTps; k++){
+      const int tp = m->tpIndex[k];
+      if(m->tpCount[k] == 0) continue;
+      count[tp] += m->tpCount[k];
+      if(smallest[tp] > m->tpKeys[2*k])   smallest[tp] = m->tpKeys[2*k];
+      if(largest[tp]  < m->tpKeys[2*k+1]) largest[tp]  = m->tpKeys[2*k+1];
+    }
+  }
+
+  // One descriptor per local element, in index order.
+  submittedParticles.length() = 0;
+  myNumParticles = 0;
+  CkVec<int> local = localTreePieces.indices;
+  local.quickSort();
+  for(int i = 0; i < local.length(); i++){
+    const int tp = local[i];
+    TreePiece *owner = treePieceProxy[tp].ckLocal();
+    TreePieceDescriptor d(NULL, count[tp], owner, tp, smallest[tp], largest[tp]);
+    submittedParticles.push_back(d);
+    myNumParticles += count[tp];
+  }
+
+  // Where each tree piece's particles start in myParticles.
+  CkVec<int> offset; offset.resize(n);
+  for(int i = 0; i < n; i++) offset[i] = -1;
+  int running = 0;
+  for(int i = 0; i < submittedParticles.length(); i++){
+    offset[submittedParticles[i].index] = running;
+    running += submittedParticles[i].numParticles;
+  }
+
+  myParticles.resize(myNumParticles);
+  for(int b = 0; b < recvdBlocks.length(); b++){
+    ParticleBlockMsg *m = recvdBlocks[b];
+    int p = 0;
+    for(int k = 0; k < m->numTps; k++){
+      const int tp = m->tpIndex[k];
+      const int np = m->tpCount[k];
+      if(np == 0) continue;
+      CkAssert(offset[tp] >= 0);
+      memcpy(myParticles.getVec()+offset[tp], m->parts + p, sizeof(Particle)*np);
+      offset[tp] += np;
+      p += np;
+    }
+    delete m;
+  }
+  recvdBlocks.length() = 0;
+  numBlocksRecvd = 0;
+  haveExpected = false;
+  expectedBlocks = 0;
+
+  processSubmittedParticles();
 }
 
 void DataManager::receiveSplitters(SplitterMsg *msg){
 
-  int numRefineBins = msg->nSplitBins;
-
-  // process bins to refine
-  activeBins.processRefine(msg->splitBins,msg->nSplitBins);
+  // process bins to refine. splitBins is (index, levels) pairs.
+  activeBins.processRefineLevels(msg->splitBins,msg->nSplitBins);
 
   // We traverse the final tree to flush particles to 
   // appropriate tree pieces
@@ -314,43 +653,17 @@ void DataManager::receiveSplitters(SplitterMsg *msg){
   delete msg;
 }
 
-void DataManager::sendParticlesToTreePiece(Node<NodeDescriptor> *nd, int tp) {
-  CkAssert(nd->getNumChildren() == 0);
-  int np = nd->getNumParticles();
-
-  if(np > 0){
-    ParticleMsg *msg = new (np,0) ParticleMsg;
-    memcpy(msg->part, nd->getParticles(), sizeof(Particle)*np);
-    msg->numParticles = np;
-    treePieceProxy[tp].receiveParticles(msg);
-  }
-  else{
-    treePieceProxy[tp].receiveParticles();
-  }
-
-  // only PE 0 has the correct ranges
-  if(CkMyPe() == 0){
-    if(nd->data.numParticles > 0){
-      CkAssert(nd->data.smallestKey <= nd->data.largestKey);
-    } else {
-      CkAssert(nd->data.smallestKey == nd->data.largestKey);
-    }
-
-    keyRanges[(tp<<1)] = nd->data.smallestKey;
-    keyRanges[(tp<<1)+1] = nd->data.largestKey;
-
-  }
-}
 
 void DataManager::sendParticles(RangeMsg *msg){
 
   if(CkMyPe() != 0){
-    // Same gate as PE 0's. The ranges have arrived, but this PE's own tree
-    // pieces may still be in flight, so hold the message until they are not.
-    CkAssert(pendingRangeMsg == NULL);
-    pendingRangeMsg = msg;
-    atDistribute = true;
-    distributeParticles();
+    // The ranges, which only PE 0 can compute. The blocks may already be here
+    // or may still be coming; whichever completes second starts the assembly.
+    numTreePieces = msg->numTreePieces;
+    keyRanges = msg->keys;
+    rangeMsg = msg;
+    haveRanges = true;
+    maybeAssemble();
   }
   else{
     CkAssert(numTreePieces == msg->numTreePieces);
@@ -374,36 +687,20 @@ void DataManager::senseTreePieces(){
   numLocalTreePieces = localTreePieces.count;
 }
 
-void DataManager::submitParticles(CkVec<ParticleMsg*> *vec, int numParticles, TreePiece * tp, Key smallestKey, Key largestKey){ 
-  submittedParticles.push_back(TreePieceDescriptor(vec,numParticles,tp,tp->getIndex(),smallestKey,largestKey));
-  myNumParticles += numParticles;
-  if(submittedParticles.length() == numLocalTreePieces &&
-     haveRanges){
-    processSubmittedParticles();
-  }
-}
 
 void DataManager::processSubmittedParticles(){
-  int offset = 0;
-
+  // myParticles and submittedParticles were filled by assembleReceivedBlocks.
+  // The per-tree-piece concatenation that used to live here went with the
+  // per-tree-piece messages.
   submittedParticles.quickSort();
-  
-  myParticles.resize(myNumParticles);
 
-  for(int i = 0; i < submittedParticles.length(); i++){
-    TreePieceDescriptor &descr = submittedParticles[i];
-    CkVec<ParticleMsg*> *vec = descr.vec;
-    for(int j = 0; j < vec->length(); j++){
-      ParticleMsg *msg = (*vec)[j];
-      memcpy(myParticles.getVec()+offset,msg->part,sizeof(Particle)*msg->numParticles);
-      offset += msg->numParticles;
-      delete msg;
-    }
-  }
-
+  prof.handoff(PhaseProfile::DISTRIB, PhaseProfile::SORT_POST);
   myParticles.quickSort();
+  prof.end(PhaseProfile::SORT_POST);
 
+  prof.begin(PhaseProfile::BUILD);
   buildTree();
+  prof.end(PhaseProfile::BUILD);
   // add dummy tree piece whose index is larger than
   // that of all others. this is required to mark the
   // boundary of nodes/particles owned by this PE.
@@ -415,21 +712,148 @@ void DataManager::processSubmittedParticles(){
   // which it can go to the device, and the traversals that read it back are
   // still several messages away.
   ensureDevice();
+  prof.begin(PhaseProfile::UPLOAD);
   gpuParticles.upload(myParticles.getVec(), myNumParticles);
+  prof.end(PhaseProfile::UPLOAD);
+
+  // Stage 6: the same tree, on the device. The host tree built above is still
+  // what the traversal walks; this one is for the device traversal to come,
+  // and is checked against the host's moments under BARNES_TREE_CHECK.
+  gpuParticles.buildDeviceTree(keyRanges, numTreePieces,
+                               (int)((Real)globalParams.ppb*BUCKET_TOLERANCE));
 #endif
 
   // makeMoments also sends out requests for moments
-  // of remote nodes
+  // of remote nodes. The span closes in treeReady(), so it covers the cross-PE
+  // exchange rather than only the local postorder pass.
+  prof.begin(PhaseProfile::MOMENTS);
   makeMoments();
 
   doneTreeBuild = true;
 
-  // are all particles local to this PE? 
-  if(root != NULL && root->getType() == Internal){
-    passMomentsUpward(root);
+  // One reduction instead of the request/reply chain up the tree.
+  contributeFrontierMoments();
+}
+
+static void collectHostNodes(Node<ForceData> *n,
+                             map<Key, Node<ForceData>*> &out){
+  if(n == NULL) return;
+  out[n->getKey()] = n;
+  for(int i = 0; i < n->getNumChildren(); i++)
+    collectHostNodes(n->getChild(i), out);
+}
+
+// Compare the flat device tree against the host tree over the same particles.
+//
+// Nodes are matched by SFC key, which both builds assign identically, so a
+// mismatch in *shape* shows up as a key present on one side and not the other.
+// The moments are then compared where the keys agree. This is the only handle
+// on the device build until a device traversal exists to disagree with the
+// host one, so it reports counts as well as errors: a tree with the right
+// moments and the wrong number of nodes is still wrong.
+void DataManager::patchDeviceBoundaryMoments(){
+#ifdef GPU_GRAVITY
+  if(!globalParams.deviceWalk) return;
+  if(!gpuParticles.attached() || myNumParticles == 0) return;
+  if(root == NULL) return;
+
+  // No readback: the scatter kernel finds each node by descending the key, so
+  // the host never has to learn where the device put them.
+  map<Key, Node<ForceData>*> hostNodes;
+  collectHostNodes(root, hostNodes);
+
+  CkVec<GpuMomentPatch> patches;
+  for(map<Key,Node<ForceData>*>::iterator it = hostNodes.begin();
+      it != hostNodes.end(); ++it){
+    Node<ForceData> *h = it->second;
+    const NodeType t = h->getType();
+    // Only the nodes whose moments the device could not have computed: the
+    // ones that own particles on other PEs.
+    if(t != Boundary) continue;
+
+    const MultipoleMoments &m = h->data.moments;
+    GpuMomentPatch p;
+    p.key = (unsigned long long)it->first;
+    p.cmMass = make_float4(m.cm.x, m.cm.y, m.cm.z, m.totalMass);
+    p.rsq = m.rsq;
+    p.qxx = m.qxx; p.qxy = m.qxy; p.qxz = m.qxz;
+    p.qyy = m.qyy; p.qyz = m.qyz;
+    patches.push_back(p);
   }
 
-  flushMomentRequests();
+  if(patches.length() > 0)
+    gpuParticles.patchMoments(patches.getVec(), patches.length());
+
+  if(getenv("BARNES_WALK_DEBUG") != NULL){
+    CkPrintf("[WALKDBG] pe %d patched %d boundary moments\n",
+             CkMyPe(), patches.length());
+  }
+#endif
+}
+
+void DataManager::checkDeviceTree(){
+#ifdef GPU_GRAVITY
+  if(getenv("BARNES_TREE_CHECK") == NULL) return;
+  if(!gpuParticles.attached() || myNumParticles == 0) return;
+
+  const int cap = 1 << 20;
+  DeviceNode *nodes = new DeviceNode[cap];
+  const int n = gpuParticles.readTree(nodes, cap);
+  const int m = (n < cap) ? n : cap;
+
+  // The host side, keyed the same way. Walked from the root rather than read
+  // out of nodeTable: that map only holds the nodes the remote-request path
+  // needs to look up, not the whole tree.
+  map<Key, Node<ForceData>*> hostByKey;
+  collectHostNodes(root, hostByKey);
+
+  int matched = 0, missing = 0, leafMismatch = 0, compared = 0;
+  double maxCmErr = 0.0, maxMassErr = 0.0, maxRsqErr = 0.0;
+  for(int i = 0; i < m; i++){
+    const DeviceNode &d = nodes[i];
+    map<Key,Node<ForceData>*>::iterator it = hostByKey.find((Key)d.key);
+    if(it == hostByKey.end()){ missing++; continue; }
+    Node<ForceData> *h = it->second;
+    matched++;
+
+    if((h->getNumChildren() == 0) != (d.firstChild < 0)) leafMismatch++;
+
+    // A Boundary node's host moments include contributions from other PEs,
+    // which the device tree cannot have: it only knows the particles resident
+    // here. Only fully local subtrees are comparable.
+    const NodeType ht = h->getType();
+    if(ht != Internal && ht != Bucket && ht != EmptyBucket) continue;
+
+    const MultipoleMoments &hm = h->data.moments;
+    const double mass = hm.totalMass;
+    if(mass <= 0.0) continue;
+    compared++;
+    const double dm = fabs((double)d.cmMass.w - mass)/mass;
+    if(dm > maxMassErr) maxMassErr = dm;
+
+    const double scale = sqrt((double)hm.rsq) > 0.0 ? sqrt((double)hm.rsq) : 1.0;
+    const double dx = (double)d.cmMass.x - hm.cm.x;
+    const double dy = (double)d.cmMass.y - hm.cm.y;
+    const double dz = (double)d.cmMass.z - hm.cm.z;
+    const double dc = sqrt(dx*dx+dy*dy+dz*dz)/scale;
+    if(dc > maxCmErr) maxCmErr = dc;
+
+    if(hm.rsq > 0.0){
+      const double dr = fabs((double)d.rsq - hm.rsq)/hm.rsq;
+      if(dr > maxRsqErr) maxRsqErr = dr;
+    }
+  }
+
+  CkPrintf("[TREECHECK] pe %d iter %d: device nodes %d, host nodes %zu, "
+           "matched %d, device-only %d, leaf-shape mismatches %d\n",
+           CkMyPe(), iteration, n, hostByKey.size(), matched, missing,
+           leafMismatch);
+  CkPrintf("[TREECHECK] pe %d compared %d nodes with mass: max rel err "
+           "mass %.3e  cm %.3e (of the opening radius)  rsq %.3e\n",
+           CkMyPe(), compared, maxMassErr, maxCmErr, maxRsqErr);
+
+  delete[] nodes;
+#endif
 }
 
 void DataManager::buildTree(){
@@ -474,6 +898,13 @@ void DataManager::buildTree(){
 
 }
 
+// mass, cm(3), rsq, quadrupole(5), box lesser(3), box greater(3), type.
+//
+// The type travels because copyMomentsToNode used to set it: the receiver
+// needs to know whether the owner holds a Bucket or an interior node, since
+// that is what decides whether its walk asks for particles or for a subtree.
+#define FRONTIER_W 17
+
 void DataManager::makeMoments(){
   if(root == NULL) return;
 
@@ -482,6 +913,153 @@ void DataManager::makeMoments(){
                    myBuckets
                    );
   fillTrav.postorderTraversal(root,&mw);
+}
+
+// Every node at which the owner range narrows to one tree piece. The
+// refinement that produced these ranges came from keyRanges, which is global,
+// so this preorder walk yields the same list on every PE -- that common
+// ordering is the whole trick.
+void DataManager::collectFrontier(Node<ForceData> *n, CkVec<Node<ForceData>*> &out){
+  if(n == NULL) return;
+  if(n->getOwnerStart() == n->getOwnerEnd() || n->getNumChildren() == 0){
+    out.push_back(n);
+    return;
+  }
+  for(int i = 0; i < n->getNumChildren(); i++) collectFrontier(n->getChild(i), out);
+}
+
+// One reduction in place of the whole moment exchange.
+//
+// A frontier node belongs to exactly one tree piece, so exactly one PE holds
+// its particles and can compute its moments; everyone else contributes zeros
+// and a plain sum is the answer. That is why nothing has to be reduced in
+// additive form here -- there is only ever one contributor per node.
+//
+// What this replaces was a message per remote node and then a chain of
+// childMomentsReady notifications up the tree, so the tree was not ready until
+// a round trip per level had completed. That chain is the part that scales
+// badly: its length is the tree depth and every link is a network hop.
+void DataManager::contributeFrontierMoments(){
+  frontier.length() = 0;
+  collectFrontier(root, frontier);
+
+  const int n = frontier.length();
+  // The bounding box travels too. getMomentsFromChildren derives rsq from the
+  // box, so a boundary node whose remote children have no box would get a
+  // meaningless opening radius and the walk would open the wrong cells.
+  CkVec<Real> mine;
+  mine.resize(n*FRONTIER_W + 1);
+  for(int i = 0; i < n*FRONTIER_W + 1; i++) mine[i] = 0.0;
+  // A tripwire on the assumption this whole scheme rests on: that every PE
+  // enumerates the same frontier in the same order. If the lengths ever
+  // diverge the sum below is meaningless, so carry the count and check it.
+  mine[n*FRONTIER_W] = (Real)n;
+
+  for(int i = 0; i < n; i++){
+    Node<ForceData> *f = frontier[i];
+    // Remote means someone else owns it; leave zeros and take theirs.
+    if(f->getType() == Remote || f->getType() == RemoteBucket ||
+       f->getType() == RemoteEmptyBucket) continue;
+    const MultipoleMoments &m = f->data.moments;
+    Real *o = mine.getVec() + i*FRONTIER_W;
+    o[16] = (Real)(int)f->getType();
+
+    // An empty node's box is the reset one, HUGE_VAL against -HUGE_VAL, and
+    // summing that would poison the result. Its moments are zero anyway, so
+    // only the box is withheld.
+    if(f->getNumParticles() <= 0) continue;
+
+    o[0] = m.totalMass;
+    o[1] = m.cm.x; o[2] = m.cm.y; o[3] = m.cm.z;
+    o[4] = m.rsq;
+    o[5] = m.qxx; o[6] = m.qxy; o[7] = m.qxz; o[8] = m.qyy; o[9] = m.qyz;
+    o[10] = f->data.box.lesser_corner.x;
+    o[11] = f->data.box.lesser_corner.y;
+    o[12] = f->data.box.lesser_corner.z;
+    o[13] = f->data.box.greater_corner.x;
+    o[14] = f->data.box.greater_corner.y;
+    o[15] = f->data.box.greater_corner.z;
+  }
+
+  if(getenv("BARNES_FRONTIER_DEBUG") != NULL){
+    fprintf(stderr, "[FRONTIER] pe %d contributing frontier=%d reals=%d\n",
+            CkMyPe(), n, n*FRONTIER_W + 1);
+    fflush(stderr);
+  }
+  CkCallback cb(CkIndex_DataManager::recvFrontierMoments(NULL),thisProxy);
+  contribute(sizeof(Real)*(n*FRONTIER_W + 1), mine.getVec(),
+             CkReduction::sum_float, cb);
+}
+
+// Boundary nodes -- everything above the frontier -- from their children, now
+// that the frontier is complete. Their moments were never touched by
+// MomentsWorker, so they are still zero and the accumulation is safe.
+void DataManager::fillBoundaryMoments(Node<ForceData> *n){
+  if(n == NULL) return;
+  // Only Boundary nodes are outstanding. MomentsWorker already computed every
+  // Internal node's moments from its own subtree, and every Bucket's from its
+  // particles; recursing into those and calling getMomentsFromChildren again
+  // would accumulate on top of what is already there and double them.
+  if(n->getType() != Boundary) return;
+  for(int i = 0; i < n->getNumChildren(); i++) fillBoundaryMoments(n->getChild(i));
+  n->getMomentsFromChildren();
+  // passMomentsUpward did both. The owner span is what requestNode picks a
+  // target from, so dropping it sends requests to the wrong tree pieces.
+  n->getOwnershipFromChildren();
+}
+
+void DataManager::recvFrontierMoments(CkReductionMsg *msg){
+  const Real *all = (const Real *)msg->getData();
+  const int n = frontier.length();
+
+  // Every PE contributed its own count, so the sum must be n per PE. Check the
+  // message size first: if the frontiers diverged the contributions had
+  // different lengths and indexing by our own n would read past the end.
+  const int got = msg->getSize()/(int)sizeof(Real);
+  const int want = n*FRONTIER_W + 1;
+  if(got != want){
+    CkPrintf("[FRONTIER] pe %d: reduced %d reals, expected %d (frontier %d) -- "
+             "the PEs did not enumerate the same frontier\n",
+             CkMyPe(), got, want, n);
+    CkAbort("frontier mismatch");
+  }
+  const Real counted = all[n*FRONTIER_W];
+  if(counted != (Real)(n*CkNumPes())){
+    CkPrintf("[FRONTIER] pe %d: counts summed to %g, expected %g\n",
+             CkMyPe(), (double)counted, (double)(n*CkNumPes()));
+    CkAbort("frontier count mismatch");
+  }
+
+  for(int i = 0; i < n; i++){
+    Node<ForceData> *f = frontier[i];
+    if(f->getType() != Remote && f->getType() != RemoteBucket &&
+       f->getType() != RemoteEmptyBucket) continue;
+    const Real *o = all + i*FRONTIER_W;
+    MultipoleMoments &m = f->data.moments;
+    m.totalMass = o[0];
+    m.cm = Vector3D<Real>(o[1], o[2], o[3]);
+    m.rsq = o[4];
+    m.qxx = o[5]; m.qxy = o[6]; m.qxz = o[7]; m.qyy = o[8]; m.qyz = o[9];
+    if(m.totalMass > 0.0){
+      f->data.box.lesser_corner  = Vector3D<Real>(o[10], o[11], o[12]);
+      f->data.box.greater_corner = Vector3D<Real>(o[13], o[14], o[15]);
+    }
+    else{
+      // Nothing there. The reset box makes grow() a no-op in the parent.
+      f->data.box.reset();
+    }
+    // What copyMomentsToNode did: the owner's type, seen from here.
+    f->setType(Node<ForceData>::makeRemote((NodeType)(int)o[16]));
+  }
+  delete msg;
+
+  const bool dbg = getenv("BARNES_FRONTIER_DEBUG") != NULL;
+  if(dbg){ fprintf(stderr,"[FRONTIER] pe %d filled remotes\n",CkMyPe()); fflush(stderr); }
+  fillBoundaryMoments(root);
+  if(dbg){ fprintf(stderr,"[FRONTIER] pe %d boundary done, root mass %g\n",
+                   CkMyPe(), root?(double)root->data.moments.totalMass:-1.0); fflush(stderr); }
+  treeReady();
+  if(dbg){ fprintf(stderr,"[FRONTIER] pe %d treeReady returned\n",CkMyPe()); fflush(stderr); }
 }
 
 Node<ForceData> *DataManager::lookupNode(Key k){
@@ -590,6 +1168,25 @@ void DataManager::passMomentsUpward(Node<ForceData> *node){
 // doneTreeBuild: built local tree and sent out requests for remote 
 
 void DataManager::treeReady(){
+  prof.handoff(PhaseProfile::MOMENTS, PhaseProfile::TRAV);
+#ifdef GPU_GRAVITY
+  if(getenv("BARNES_WALK_DEBUG") != NULL && gpuParticles.attached()){
+    DeviceNode rt[4];
+    const int n = gpuParticles.readTree(rt, 4);
+    CkPrintf("[WALKDBG] pe %d device tree: %d nodes; root mass=%g rsq=%g "
+             "cm=(%g %g %g) type=%d firstChild=%d partCount=%d | "
+             "host root mass=%g rsq=%g\n",
+             CkMyPe(), n, rt[0].cmMass.w, rt[0].rsq,
+             rt[0].cmMass.x, rt[0].cmMass.y, rt[0].cmMass.z,
+             rt[0].type, rt[0].firstChild, rt[0].partCount,
+             root ? root->data.moments.totalMass : -1.0,
+             root ? root->data.moments.rsq : -1.0);
+  }
+#endif
+  // Both here rather than next to the build: the host moments are only
+  // complete once passMomentsUpward has reached the root.
+  patchDeviceBoundaryMoments();
+  checkDeviceTree();
   treeMomentsReady = true;
   flushBufferedRemoteDataRequests();
   startTraversal();
@@ -655,6 +1252,8 @@ void DataManager::requestParticles(Node<ForceData> *leaf, CutoffWorker<ForceData
   Request &request = particleRequestTable[key];
   if(!request.sent){
     partReqs.incrRequests();
+    prof.partReqSent++;
+    request.sentAt = CmiWallTimer();
 
     if(leaf->isCached()) request.parentCached = true;
     else request.parentCached = false;
@@ -681,6 +1280,7 @@ void DataManager::requestParticles(RequestMsg *msg){
     bufferedParticleRequests.push_back(msg);
     return;
   }
+  prof.partReqServed++;
 
   RRDEBUG("(%d) REPLY particles key %lu to %d\n", 
           CkMyPe(), msg->key, msg->replyTo);
@@ -712,6 +1312,8 @@ void DataManager::requestNode(Node<ForceData> *leaf, CutoffWorker<ForceData> *wo
   Request &request = nodeRequestTable[key];
   if(!request.sent){
     nodeReqs.incrRequests();
+    prof.nodeReqSent++;
+    request.sentAt = CmiWallTimer();
 
     if(leaf->isCached()) request.parentCached = true;
     else request.parentCached = false;
@@ -737,6 +1339,7 @@ void DataManager::requestNode(RequestMsg *msg){
     bufferedNodeRequests.push_back(msg);
     return;
   }
+  prof.nodeReqServed++;
 
   RRDEBUG("(%d) REPLY node %lu to %d\n", 
           CkMyPe(), msg->key, msg->replyTo);
@@ -795,6 +1398,8 @@ void DataManager::recvParticles(ParticleReplyMsg *msg){
 
   partReqs.decrRequests();
   partReqs.decrDeliveries(req.requestors.length());
+  prof.partReplies++;
+  prof.partReqLatency += CmiWallTimer() - req.sentAt;
   req.deliverParticles(msg->np);
 }
 
@@ -826,6 +1431,8 @@ void DataManager::recvNode(NodeReplyMsg *msg){
 
   nodeReqs.decrRequests();
   nodeReqs.decrDeliveries(req.requestors.length());
+  prof.nodeReplies++;
+  prof.nodeReqLatency += CmiWallTimer() - req.sentAt;
   RRDEBUG("(%d) DELIVERING key %lu\n", 
           CkMyPe(), msg->key);
 
@@ -862,12 +1469,12 @@ void DataManager::ensureDevice(){
 // callback, so all of them having reported means all of their kernels have
 // run.
 void DataManager::forcesReady(){
-  gpuParticles.apply(myParticles.getVec(), myNumParticles);
   finishIterationTail();
 }
 #endif
 
 void DataManager::finishIteration(){
+  prof.handoff(PhaseProfile::TRAV, PhaseProfile::FINISH);
 #ifdef GPU_GRAVITY
   // A PE can hold no tree pieces at all -- the balancer is allowed to empty
   // one -- in which case nothing was ever uploaded and there is no stream to
@@ -876,13 +1483,47 @@ void DataManager::finishIteration(){
     finishIterationTail();
     return;
   }
-  // The accelerations are on the device; the rest of the iteration needs them
-  // on the host. Everything below moves to forcesReady.
+  // The accelerations stay on the device: the integrator reads them there and
+  // the only thing the host needs from them on this path is the NaN flag.
+  // Everything below moves to forcesReady.
   CkCallback cb(CkIndex_DataManager::forcesReady(), CkMyPe(), thisgroup);
-  gpuParticles.download(cb);
+  gpuParticles.nanCheck(cb);
 #else
   finishIterationTail();
 #endif
+}
+
+// Written at the end of the last iteration, while the accelerations still
+// mean something: the integrator zeroes them. Keyed by SFC key rather than by
+// index, because the two builds do not have to agree about which PE holds a
+// particle -- only about the force on it.
+void DataManager::dumpAccelerations(){
+  const char *prefix = getenv("BARNES_ACCEL_DUMP");
+  if(prefix == NULL) return;
+  if(iteration != globalParams.iterations - 1) return;
+
+#ifdef GPU_GRAVITY
+  // They are on the device on this path, and nothing else this iteration
+  // wants them on the host. The run is one reduction from finishing, so the
+  // blocking readback costs nothing that matters.
+  if(gpuParticles.attached()){
+    gpuParticles.downloadAccelSync();
+    gpuParticles.applyAccel(myParticles.getVec(), myNumParticles);
+  }
+#endif
+
+  std::ostringstream name;
+  name << prefix << "." << CkMyPe();
+  std::ofstream out(name.str().c_str());
+  out.precision(9);
+  out << std::scientific;
+  for(int i = 0; i < myNumParticles; i++){
+    const Particle &p = myParticles[i];
+    out << p.key << " "
+        << p.acceleration.x << " " << p.acceleration.y << " "
+        << p.acceleration.z << " " << p.potential << "\n";
+  }
+  out.close();
 }
 
 void DataManager::finishIterationTail(){
@@ -896,7 +1537,18 @@ void DataManager::finishIterationTail(){
   InteractionChecker ic;
   fillTrav.postorderTraversal(root,&ic);
 
+  dumpAccelerations();
+
   DtReductionStruct dtred;
+#ifdef GPU_GRAVITY
+  if(gpuParticles.attached()){
+    // Reduced on the device by nanCheck(); findMinVByA was a whole O(N) host
+    // pass whose only product was this flag.
+    dtred.haveNaN = (gpuParticles.reduction().haveNaN != 0);
+    dtred.vbya = -1.0;
+  }
+  else
+#endif
   findMinVByA(dtred);
 
 #ifdef STATISTICS
@@ -910,33 +1562,80 @@ void DataManager::finishIterationTail(){
 
   CkCallback cb(CkIndex_DataManager::advance(NULL),thisProxy);
   contribute(sizeof(DtReductionStruct),&dtred,DtReductionType,cb);
-
+  prof.end(PhaseProfile::FINISH);
 }
 
 void DataManager::advance(CkReductionMsg *msg){
+  prof.begin(PhaseProfile::ADVANCE);
 
   DtReductionStruct *dtred = (DtReductionStruct *)(msg->getData());
   if(dtred->haveNaN){
     CkPrintf("(%d) iteration %d NaN accel detected! Exit...\n", CkMyPe(), iteration);
+#ifdef GPU_GRAVITY
+    // markNaNBuckets reads the accelerations that produced the NaN, and on
+    // this path they are still on the device. The run is stopping, so this
+    // blocks rather than threading another entry method through.
+    if(gpuParticles.attached()){
+      gpuParticles.downloadAccelSync();
+      gpuParticles.applyAccel(myParticles.getVec(), myNumParticles);
+    }
+#endif
     markNaNBuckets();
     printTree();
     CkCallback exitCb(CkCallback::ckExit);
     contribute(0,0,CkReduction::sum_int,exitCb);
+    delete msg;
     return;
   }
-
-  BoundingBox myBox;
-  kickDriftKick(myBox.box,myBox.energy);
-
-  Real pad = 0.001;
-  myBox.expand(pad);
-  myBox.numParticles = myNumParticles;
 
   if(CkMyPe() == 0){
 #ifdef STATISTICS
     CkPrintf("[STATS] node inter %lu part inter %lu open crit %lu dt %f\n", dtred->pnInteractions, dtred->ppInteractions, dtred->openCrit, globalParams.dtime);
 #endif
   }
+  delete msg;
+
+#ifdef GPU_GRAVITY
+  if(gpuParticles.attached()){
+    // kick, drift, kick on the device, with the bounding box, the potential
+    // and the two kinetic sums reduced in the same pass. advanceTail() picks
+    // up when those forty bytes are in host memory.
+    const Real dt_k1 = (iteration == 0) ? globalParams.dtime : globalParams.dthf;
+    CkCallback cb(CkIndex_DataManager::advanceTail(), CkMyPe(), thisgroup);
+    gpuParticles.integrate(dt_k1, globalParams.dtime, globalParams.dthf, cb);
+    return;
+  }
+#endif
+  advanceTail();
+}
+
+void DataManager::advanceTail(){
+  BoundingBox myBox;
+
+#ifdef GPU_GRAVITY
+  if(gpuParticles.attached()){
+    const GpuKdkReduction &r = gpuParticles.reduction();
+    // The device sums the three energy terms separately; the branch that says
+    // how to seed the total is the host's, exactly as in kickDriftKick.
+    Real energy = (iteration == 0) ? (Real)(r.preKinetic/2.0) : savedEnergy;
+    energy += r.potential;
+    myBox.energy = energy;
+    savedEnergy = (Real)(r.postKinetic/2.0);
+    // An empty PE reduces to an inverted box. It is never merged -- the
+    // reducer skips a contribution with no particles -- but leave it reset
+    // rather than propagate infinities.
+    if(myNumParticles > 0){
+      myBox.box.lesser_corner  = Vector3D<Real>(r.minx, r.miny, r.minz);
+      myBox.box.greater_corner = Vector3D<Real>(r.maxx, r.maxy, r.maxz);
+    }
+  }
+  else
+#endif
+  kickDriftKick(myBox.box,myBox.energy);
+
+  Real pad = 0.001;
+  myBox.expand(pad);
+  myBox.numParticles = myNumParticles;
 
   CkAssert(pendingMoments.empty());
   // safe to reset here, since all tree pieces 
@@ -961,8 +1660,11 @@ void DataManager::advance(CkReductionMsg *msg){
 
   iteration++;
   updateLbInstrumentation();
+  prof.iterations++;
+  prof.end(PhaseProfile::ADVANCE);
   CkCallback cb;
   if(iteration == globalParams.iterations){
+    prof.report();
     cb = CkCallback(CkIndex_Main::niceExit(),mainProxy);
     if (thisIndex == 0) 
       CkPrintf("(%d) finished all %d iterations with avg time %f\n", CkMyPe(), iteration, avgIterationRuntime/globalParams.iterations);
@@ -972,7 +1674,6 @@ void DataManager::advance(CkReductionMsg *msg){
     cb = CkCallback(CkIndex_DataManager::recvUnivBoundingBox(NULL),thisProxy);
     contribute(sizeof(BoundingBox),&myBox,BoundingBoxGrowReductionType,cb);
   }
-  delete msg;
 }
 
 void DataManager::recvUnivBoundingBox(CkReductionMsg *msg){
@@ -1051,49 +1752,28 @@ void DataManager::distributeParticles(){
                "needed it -- fully overlapped\n", iteration);
     }
   }
+  prof.handoff(PhaseProfile::HIST, PhaseProfile::DISTRIB);
+
   decompStalledAt = 0.0;
   stepThisIteration = false;
   atDistribute = false;
   migrationsSettled = false;
 
+  senseTreePieces();
   if(CkMyPe() == 0){
     keyRanges = new Key[numTreePieces*2];
-    // so that by the time tree pieces start submitting
-    // particles (which can only happen after the flushParticles()
-    // below, we have the right count of local tree pieces
-    senseTreePieces();
-    flushParticles();
-    // PE 0 sets ranges in sendParticlesToTreePiece
-    haveRanges = true;
   }
-  else{
-    RangeMsg *msg = pendingRangeMsg;
-    pendingRangeMsg = NULL;
-    numTreePieces = msg->numTreePieces;
-    keyRanges = msg->keys;
-    haveRanges = true;
-    // delete this later
-    rangeMsg = msg;
-    flushParticles();
+  // Records the leaves and, on PE 0, fills the key ranges. Nothing goes on the
+  // wire until the map arrives.
+  flushParticles();
+  if(CkMyPe() == 0) haveRanges = true;
 
-    senseTreePieces();
-  }
+  publishTreePieceMap();
+}
 
-  // On PE 0 this matters once elements can move: a balancer is allowed to
-  // leave PE 0 with no tree pieces, and then no submitParticles would ever
-  // arrive to start the tree build and the iteration would stall.
-  if(submittedParticles.length() == numLocalTreePieces){
-    processSubmittedParticles();
-  }
-
-  if(CkMyPe() == 0){
-    int numKeys = numTreePieces*2;
-
-    RangeMsg *rmsg = new (numKeys) RangeMsg;
-    rmsg->numTreePieces = numTreePieces;
-    memcpy(rmsg->keys,keyRanges,sizeof(Key)*numKeys);
-    thisProxy.sendParticles(rmsg);
-  }
+void DataManager::beginDistribute(){
+  atDistribute = true;
+  distributeParticles();
 }
 
 void DataManager::startNextIteration(){

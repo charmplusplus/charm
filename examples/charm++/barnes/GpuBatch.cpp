@@ -143,6 +143,16 @@ void GpuTraversalBatch::release(){
 }
 
 void GpuParticleStore::ensure(int n){
+  // The reduction scratch does not scale with n, so it is allocated once and
+  // kept across resizes.
+  if (dRed == NULL){
+    hapiCheck(hapiMallocHost((void **)&hRed, sizeof(GpuKdkReduction)));
+    hapiCheck(hapiMalloc((void **)&dRed, sizeof(GpuKdkReduction)));
+    hapiCheck(hapiMalloc((void **)&dPartials,
+                         sizeof(GpuKdkReduction) * REDUCE_BLOCKS));
+    std::memset(hRed, 0, sizeof(GpuKdkReduction));
+  }
+
   if (n <= cap) return;
   if (hPos != NULL){
     // Nothing can still be reading these: the previous iteration's readback
@@ -150,19 +160,140 @@ void GpuParticleStore::ensure(int n){
     // ordered after the upload on their own streams and has completed -- a
     // tree piece reports its traversal done only from its HAPI callback.
     hapiCheck(hapiFreeHost(hPos));
+    hapiCheck(hapiFreeHost(hVel));
     hapiCheck(hapiFreeHost(hAccel));
+    hapiCheck(hapiFreeHost(hKey));
     hapiCheck(hapiFree(dPos));
+    hapiCheck(hapiFree(dVel));
     hapiCheck(hapiFree(dAccel));
+    hapiCheck(hapiFree(dKey));
+    hapiCheck(hapiFree(dPosAlt));
+    hapiCheck(hapiFree(dVelAlt));
+    hapiCheck(hapiFree(dKeyAlt));
+    hapiCheck(hapiFree(dIdx));
+    hapiCheck(hapiFree(dIdxAlt));
+    if (dSortTemp != NULL) hapiCheck(hapiFree(dSortTemp));
   }
   cap = n + n / 4 + 1024;
   hapiCheck(hapiMallocHost((void **)&hPos, sizeof(float4) * cap));
+  hapiCheck(hapiMallocHost((void **)&hVel, sizeof(float4) * cap));
   hapiCheck(hapiMallocHost((void **)&hAccel, sizeof(float4) * cap));
+  hapiCheck(hapiMallocHost((void **)&hKey, sizeof(unsigned long long) * cap));
   hapiCheck(hapiMalloc((void **)&dPos, sizeof(float4) * cap));
+  hapiCheck(hapiMalloc((void **)&dVel, sizeof(float4) * cap));
   hapiCheck(hapiMalloc((void **)&dAccel, sizeof(float4) * cap));
+  hapiCheck(hapiMalloc((void **)&dKey, sizeof(unsigned long long) * cap));
+  hapiCheck(hapiMalloc((void **)&dPosAlt, sizeof(float4) * cap));
+  hapiCheck(hapiMalloc((void **)&dVelAlt, sizeof(float4) * cap));
+  hapiCheck(hapiMalloc((void **)&dKeyAlt, sizeof(unsigned long long) * cap));
+  hapiCheck(hapiMalloc((void **)&dIdx, sizeof(int) * cap));
+  hapiCheck(hapiMalloc((void **)&dIdxAlt, sizeof(int) * cap));
+
+  // CUB sizes its scratch from the item count, so it is queried at the
+  // capacity rather than at n and reused until the next resize.
+  sortTempBytes = gpuSortTempBytes(cap);
+  dSortTemp = NULL;
+  if (sortTempBytes > 0)
+    hapiCheck(hapiMalloc((void **)&dSortTemp, sortTempBytes));
+}
+
+// The build allocates children two at a time and stops at bucket size, so the
+// node count is bounded by a small multiple of the bucket count. Sizing from
+// the capacity keeps it stable across a resize.
+void GpuParticleStore::ensureTree(int n){
+  const int want = 4 * (n / 8 + 1) + 1024;
+  if (dtree.nodes != NULL && dtree.capacity >= want) return;
+  if (dtree.nodes != NULL){
+    hapiCheck(hapiFree(dtree.nodes));
+    hapiCheck(hapiFree(dtree.active));
+    hapiCheck(hapiFree(dtree.activeNext));
+  }
+  else{
+    hapiCheck(hapiMalloc((void **)&dtree.nodeCount, sizeof(int)));
+    hapiCheck(hapiMalloc((void **)&dtree.activeCount, sizeof(int)));
+    hapiCheck(hapiMalloc((void **)&dtree.activeNextCount, sizeof(int)));
+    hapiCheck(hapiMalloc((void **)&dtree.levelStart,
+                         sizeof(int) * (DTREE_MAX_LEVELS + 2)));
+  }
+  dtree.capacity = want;
+  hapiCheck(hapiMalloc((void **)&dtree.nodes, sizeof(DeviceNode) * want));
+  hapiCheck(hapiMalloc((void **)&dtree.active, sizeof(int) * want));
+  hapiCheck(hapiMalloc((void **)&dtree.activeNext, sizeof(int) * want));
+}
+
+void GpuParticleStore::buildDeviceTree(const Key *owners, int numTreePieces,
+                                       int ppbLimit){
+  if (nParts <= 0 || owners == NULL) return;
+  ensureTree(nParts);
+
+  const int nOwners = 2 * numTreePieces;
+  if (nOwners > ownerCap){
+    if (dOwners != NULL) hapiCheck(hapiFree(dOwners));
+    ownerCap = nOwners + nOwners / 4 + 64;
+    hapiCheck(hapiMalloc((void **)&dOwners,
+                         sizeof(unsigned long long) * ownerCap));
+  }
+  hapiCheck(cudaMemcpyAsync(dOwners, owners,
+                            sizeof(unsigned long long) * nOwners,
+                            cudaMemcpyHostToDevice, stream));
+
+  invokeBuildTree(dKey, nParts, dOwners, numTreePieces, ppbLimit, dtree, stream);
+  invokeTreeMoments(dPos, dtree, stream);
+  hapiCheck(cudaEventRecord(treeBuilt, stream));
+}
+
+void GpuParticleStore::patchMoments(const GpuMomentPatch *patches, int n){
+  if (n <= 0 || dtree.nodes == NULL) return;
+  if (n > patchCap){
+    if (hPatch != NULL){ hapiCheck(hapiFreeHost(hPatch)); hapiCheck(hapiFree(dPatch)); }
+    patchCap = n + n/4 + 64;
+    hapiCheck(hapiMallocHost((void **)&hPatch, sizeof(GpuMomentPatch)*patchCap));
+    hapiCheck(hapiMalloc((void **)&dPatch, sizeof(GpuMomentPatch)*patchCap));
+  }
+  std::memcpy(hPatch, patches, sizeof(GpuMomentPatch)*n);
+  hapiCheck(cudaMemcpyAsync(dPatch, hPatch, sizeof(GpuMomentPatch)*n,
+                            cudaMemcpyHostToDevice, stream));
+  invokeScatterMoments(dtree.nodes, dPatch, n, stream);
+  // The walks wait on this, so it has to be re-recorded after the patch.
+  hapiCheck(cudaEventRecord(treeBuilt, stream));
+}
+
+int GpuParticleStore::treeNodeCount(){
+  if (dtree.nodeCount == NULL) return 0;
+  int n = 0;
+  hapiCheck(cudaMemcpyAsync(&n, dtree.nodeCount, sizeof(int),
+                            cudaMemcpyDeviceToHost, stream));
+  hapiCheck(cudaStreamSynchronize(stream));
+  return n;
+}
+
+int GpuParticleStore::readTree(DeviceNode *out, int maxNodes){
+  const int n = treeNodeCount();
+  const int m = (n < maxNodes) ? n : maxNodes;
+  if (m > 0){
+    hapiCheck(cudaMemcpyAsync(out, dtree.nodes, sizeof(DeviceNode) * m,
+                              cudaMemcpyDeviceToHost, stream));
+    hapiCheck(cudaStreamSynchronize(stream));
+  }
+  return n;
+}
+
+void GpuParticleStore::sortByKey(){
+  if (nParts <= 0) return;
+  invokeSortByKey(dKey, dKeyAlt, dPos, dPosAlt, dVel, dVelAlt,
+                  dIdx, dIdxAlt, dSortTemp, sortTempBytes, nParts, stream);
+  // The sorted arrays become the live ones. dAccel needs no permutation: the
+  // integrator zeroed it, and upload() memsets it again next iteration.
+  float4 *tp = dPos; dPos = dPosAlt; dPosAlt = tp;
+  float4 *tv = dVel; dVel = dVelAlt; dVelAlt = tv;
+  unsigned long long *tk = dKey; dKey = dKeyAlt; dKeyAlt = tk;
 }
 
 void GpuParticleStore::upload(const Particle *parts, int n){
   nParts = n;
+  // Before the early return: the reduction scratch does not depend on n, and
+  // an empty PE still runs the integrator and reads its result back.
+  ensure(n);
   if (n == 0){
     // Still record the event: a tree piece with no buckets of its own can sit
     // on a PE whose DataManager holds nothing, and its (empty) flush path
@@ -170,14 +301,24 @@ void GpuParticleStore::upload(const Particle *parts, int n){
     hapiCheck(cudaEventRecord(uploaded, stream));
     return;
   }
-  ensure(n);
 
   for (int i = 0; i < n; i++){
     const Particle &p = parts[i];
     hPos[i] = make_float4(p.position.x, p.position.y, p.position.z, p.mass);
+    hVel[i] = make_float4(p.velocity.x, p.velocity.y, p.velocity.z, 0.f);
+    hKey[i] = (unsigned long long)p.key;
   }
 
   hapiCheck(cudaMemcpyAsync(dPos, hPos, sizeof(float4) * n,
+                            cudaMemcpyHostToDevice, stream));
+  // The integrator needs the velocities on the device; the exchange still
+  // routes them through the host, so they are re-uploaded every iteration.
+  hapiCheck(cudaMemcpyAsync(dVel, hVel, sizeof(float4) * n,
+                            cudaMemcpyHostToDevice, stream));
+  // The keys too. hashKeys() regenerates them on the device each iteration,
+  // but it only runs from the second one onward -- the first decompose happens
+  // before anything has been uploaded -- and the tree build splits on them.
+  hapiCheck(cudaMemcpyAsync(dKey, hKey, sizeof(unsigned long long) * n,
                             cudaMemcpyHostToDevice, stream));
   // A memset rather than a kernel on purpose. processSubmittedParticles runs
   // inside whichever entry method delivered the last batch of particles, which
@@ -188,14 +329,75 @@ void GpuParticleStore::upload(const Particle *parts, int n){
   hapiCheck(cudaEventRecord(uploaded, stream));
 }
 
-void GpuParticleStore::download(const CkCallback &cb){
+void GpuParticleStore::nanCheck(const CkCallback &cb){
+  invokeNanCheck(dAccel, nParts, dPartials, dRed, stream);
+  hapiCheck(cudaMemcpyAsync(hRed, dRed, sizeof(GpuKdkReduction),
+                            cudaMemcpyDeviceToHost, stream));
+  hapiAddCallback(stream, cb);
+}
+
+void GpuParticleStore::integrate(float dt_k1, float dtime, float dt_k2,
+                                 const CkCallback &cb){
+  invokeKickDriftKick(dPos, dVel, dAccel, nParts, dt_k1, dtime, dt_k2,
+                      dPartials, dRed, stream);
+  hapiCheck(cudaMemcpyAsync(hRed, dRed, sizeof(GpuKdkReduction),
+                            cudaMemcpyDeviceToHost, stream));
+  hapiAddCallback(stream, cb);
+}
+
+void GpuParticleStore::hashKeys(float lx, float ly, float lz,
+                                float xsz, float ysz, float zsz,
+                                const CkCallback &cb){
+  invokeHashKeys(dPos, dKey, nParts, lx, ly, lz, xsz, ysz, zsz,
+                 BITS_PER_DIM, stream);
+  // Stage 3: the particles go back to the host already in key order, so
+  // decomposeTail has no sort left to do.
+  sortByKey();
+  if (nParts > 0){
+    // The O(N) transfer Stage 5 exists to remove. The host needs the
+    // particles because the all-to-all is still host code.
+    hapiCheck(cudaMemcpyAsync(hPos, dPos, sizeof(float4) * nParts,
+                              cudaMemcpyDeviceToHost, stream));
+    hapiCheck(cudaMemcpyAsync(hVel, dVel, sizeof(float4) * nParts,
+                              cudaMemcpyDeviceToHost, stream));
+    hapiCheck(cudaMemcpyAsync(hKey, dKey, sizeof(unsigned long long) * nParts,
+                              cudaMemcpyDeviceToHost, stream));
+  }
+  hapiAddCallback(stream, cb);
+}
+
+void GpuParticleStore::applyIntegrated(Particle *parts, int n) const {
+  for (int i = 0; i < n; i++){
+    const float4 p = hPos[i];
+    const float4 v = hVel[i];
+    Particle &q = parts[i];
+    q.position = Vector3D<Real>(p.x, p.y, p.z);
+    q.velocity = Vector3D<Real>(v.x, v.y, v.z);
+    q.key = (Key)hKey[i];
+    // The device already zeroed its own accumulator; keep the host copy in
+    // step so a GPU=0 comparison of the two builds sees the same state.
+    q.acceleration = Vector3D<Real>(0.0);
+    q.potential = 0.0;
+  }
+}
+
+// The abort path is about to stop the run, so it blocks rather than threading
+// another entry method through for a case that happens once.
+void GpuParticleStore::downloadAccelSync(){
+  if (nParts == 0) return;
+  hapiCheck(cudaMemcpyAsync(hAccel, dAccel, sizeof(float4) * nParts,
+                            cudaMemcpyDeviceToHost, stream));
+  hapiCheck(cudaStreamSynchronize(stream));
+}
+
+void GpuParticleStore::downloadAccel(const CkCallback &cb){
   if (nParts > 0)
     hapiCheck(cudaMemcpyAsync(hAccel, dAccel, sizeof(float4) * nParts,
                               cudaMemcpyDeviceToHost, stream));
   hapiAddCallback(stream, cb);
 }
 
-void GpuParticleStore::apply(Particle *parts, int n) const {
+void GpuParticleStore::applyAccel(Particle *parts, int n) const {
   for (int i = 0; i < n; i++){
     const float4 a = hAccel[i];
     parts[i].acceleration = Vector3D<Real>(a.x, a.y, a.z);
@@ -206,10 +408,40 @@ void GpuParticleStore::apply(Particle *parts, int n) const {
 void GpuParticleStore::release(){
   if (stream != NULL) cudaStreamSynchronize(stream);
   if (hPos != NULL){ hapiFreeHost(hPos); hPos = NULL; }
+  if (hVel != NULL){ hapiFreeHost(hVel); hVel = NULL; }
   if (hAccel != NULL){ hapiFreeHost(hAccel); hAccel = NULL; }
+  if (hKey != NULL){ hapiFreeHost(hKey); hKey = NULL; }
+  if (hRed != NULL){ hapiFreeHost(hRed); hRed = NULL; }
   if (dPos != NULL){ hapiFree(dPos); dPos = NULL; }
+  if (dVel != NULL){ hapiFree(dVel); dVel = NULL; }
   if (dAccel != NULL){ hapiFree(dAccel); dAccel = NULL; }
+  if (dKey != NULL){ hapiFree(dKey); dKey = NULL; }
+  if (dPosAlt != NULL){ hapiFree(dPosAlt); dPosAlt = NULL; }
+  if (dVelAlt != NULL){ hapiFree(dVelAlt); dVelAlt = NULL; }
+  if (dKeyAlt != NULL){ hapiFree(dKeyAlt); dKeyAlt = NULL; }
+  if (dIdx != NULL){ hapiFree(dIdx); dIdx = NULL; }
+  if (dIdxAlt != NULL){ hapiFree(dIdxAlt); dIdxAlt = NULL; }
+  if (dSortTemp != NULL){ hapiFree(dSortTemp); dSortTemp = NULL; }
+  if (dOwners != NULL){ hapiFree(dOwners); dOwners = NULL; }
+  if (hPatch != NULL){ hapiFreeHost(hPatch); hPatch = NULL; }
+  if (dPatch != NULL){ hapiFree(dPatch); dPatch = NULL; }
+  patchCap = 0;
+  ownerCap = 0;
+  if (dtree.nodes != NULL){
+    hapiFree(dtree.nodes);
+    hapiFree(dtree.active);
+    hapiFree(dtree.activeNext);
+    hapiFree(dtree.nodeCount);
+    hapiFree(dtree.activeCount);
+    hapiFree(dtree.activeNextCount);
+    hapiFree(dtree.levelStart);
+    clearTreeHandles();
+  }
+  sortTempBytes = 0;
+  if (dPartials != NULL){ hapiFree(dPartials); dPartials = NULL; }
+  if (dRed != NULL){ hapiFree(dRed); dRed = NULL; }
   if (uploaded != NULL){ cudaEventDestroy(uploaded); uploaded = NULL; }
+  if (treeBuilt != NULL){ cudaEventDestroy(treeBuilt); treeBuilt = NULL; }
   nParts = 0;
   cap = 0;
   stream = NULL;

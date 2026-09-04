@@ -20,9 +20,6 @@
 #endif
 
 class TreePiece : public CBase_TreePiece {
-  int numDecompMsgsRecvd;
-  CkVec<ParticleMsg *> decompMsgsRecvd;
-  int myNumParticles;
 
   int iteration;
 
@@ -42,7 +39,6 @@ class TreePiece : public CBase_TreePiece {
   Key largestKey;
   DataManager *myDM;
 
-  void submitParticles();
 
   int localStateID;
   int remoteStateID;
@@ -90,6 +86,16 @@ class TreePiece : public CBase_TreePiece {
 
   void ensureDevice();
   void flushGpu();
+  // Stage 7. Builds this tree piece's target list, ships it, and launches the
+  // device walk. From an entry method, so the launch stays under this chare's
+  // CUPTI correlation id.
+  bool launchDeviceWalk();
+  GpuTargetBucket *hTargets;
+  GpuTargetBucket *dTargets;
+  int targetCap;
+  // True for the iterations where the device covered the local half, so
+  // doLocalGravity knows not to walk as well.
+  bool deviceWalkRunning;
   void maybeReportDone();
   void initGpuState();
 #endif
@@ -102,8 +108,6 @@ class TreePiece : public CBase_TreePiece {
 
   int getIndex() {return thisIndex;}
 
-  void receiveParticles(ParticleMsg *msg);
-  void receiveParticles();
 
   void prepare(Node<ForceData> *_root, Node<ForceData> **buckets, int bucketStart, int bucketEnd);
   void startTraversal();

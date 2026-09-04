@@ -343,6 +343,23 @@ class Node {
     }
     if(mass > 0.0) cm /= mass;
 
+    // The quadrupole needs the parent's centre of mass, so it cannot go in the
+    // loop above. Shifting a child's reduced quadrupole to a new origin adds
+    // the child's monopole taken about the offset -- the cross terms vanish
+    // because the child's moments are already about its own centre of mass.
+    MultipoleMoments &pm = data.moments;
+    for(Node<ForceData> *c = getChildren(); c != getChildren()+getNumChildren(); c++){
+      const MultipoleMoments &cmom = c->data.moments;
+      const Vector3D<Real> t = cmom.cm - cm;
+      const Real t2 = t.lengthSquared();
+      const Real mc = cmom.totalMass;
+      pm.qxx += cmom.qxx + mc*(3.0*t.x*t.x - t2);
+      pm.qxy += cmom.qxy + mc*(3.0*t.x*t.y);
+      pm.qxz += cmom.qxz + mc*(3.0*t.x*t.z);
+      pm.qyy += cmom.qyy + mc*(3.0*t.y*t.y - t2);
+      pm.qyz += cmom.qyz + mc*(3.0*t.y*t.z);
+    }
+
     Vector3D<Real> delta1 = data.moments.cm - data.box.lesser_corner;	
     Vector3D<Real> delta2 = data.box.greater_corner - data.moments.cm;
     delta1.x = (delta1.x > delta2.x ? delta1.x : delta2.x);
@@ -364,11 +381,21 @@ class Node {
     }
     if(mass > 0.0) cm /= mass;
 
+    // One pass for the bounding radius and the quadrupole: both are taken
+    // about the centre of mass, which the loop above has just settled.
     Real d;
-    data.moments.rsq = 0;
+    MultipoleMoments &m = data.moments;
+    m.rsq = 0;
     for(p = getParticles(); p != getParticles()+getNumParticles(); p++) {
-      d = (cm - p->position).lengthSquared();
-      if(d > data.moments.rsq) data.moments.rsq = d;
+      const Vector3D<Real> s = p->position - cm;
+      d = s.lengthSquared();
+      if(d > m.rsq) m.rsq = d;
+      const Real mk = p->mass;
+      m.qxx += mk*(3.0*s.x*s.x - d);
+      m.qxy += mk*(3.0*s.x*s.y);
+      m.qxz += mk*(3.0*s.x*s.z);
+      m.qyy += mk*(3.0*s.y*s.y - d);
+      m.qyz += mk*(3.0*s.y*s.z);
     }
 
   }

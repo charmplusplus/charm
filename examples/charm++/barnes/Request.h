@@ -38,17 +38,23 @@ struct Request {
   Node<ForceData> *parent; 
   bool parentCached;
 
+  // Stage 0 instrumentation: when the request went on the wire, so recvNode /
+  // recvParticles can charge the round trip. Only read under BARNES_PHASE_REPORT.
+  double sentAt;
+
   Request() : 
     data(NULL),
     sent(false),
     msg(NULL),
-    parent(NULL)
+    parent(NULL),
+    sentAt(0.0)
   {
   }
 
   void reset(){
     data = NULL;
     sent = false;
+    sentAt = 0.0;
   }
 
   void deliverParticles(int num);

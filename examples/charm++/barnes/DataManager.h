@@ -11,6 +11,7 @@
 
 #include "Traversal_decls.h"
 #include "Request.h"
+#include "Profile.h"
 
 #ifdef GPU_GRAVITY
 #include "GpuBatch.h"
@@ -25,13 +26,19 @@ class TreePieceCounter : public CkLocIterator {
   public:
   int count;
   CkHashtableT<CkArrayIndex, int> registered;               
+  // The indices themselves, so the PE can say which tree pieces it holds
+  // without walking the hashtable. Published every iteration so that every
+  // sender knows where to address its block.
+  CkVec<int> indices;
   TreePieceCounter() : count(0) { }                      
   void addLocation(CkLocation &loc) {
     registered.put(loc.getIndex()) = ++count;               
+    indices.push_back(loc.getIndex().data()[0]);
   }
   void reset() {                                            
     count = 0;
     registered.empty();                                     
+    indices.length() = 0;
   }                                                         
 };
 
@@ -170,8 +177,20 @@ class DataManager : public CBase_DataManager {
   bool stepThisIteration;
   double decompStalledAt;
 
+  // Stage 0 instrumentation. See Profile.h and GPU_RESIDENT_PLAN.md section 4.
+  PhaseProfile prof;
+
   // The body of finishIteration, after the accelerations are in host memory.
   void finishIterationTail();
+
+  // Correctness harness. Writes this PE's accelerations on the last iteration
+  // when BARNES_ACCEL_DUMP names a prefix; compare_accel.py folds the per-PE
+  // files together. See GPU_RESIDENT_PLAN.md section 4, Stage 0.
+  void dumpAccelerations();
+
+  // decompose() prints this and decomposeTail() needs it after the device
+  // round trip, so it is held rather than passed.
+  BoundingBox decomposeUniverse;
 
 #ifdef GPU_GRAVITY
   GpuParticleStore gpuParticles;
@@ -188,13 +207,57 @@ class DataManager : public CBase_DataManager {
   void sendHistogram();
   
   void senseTreePieces();
+
+  // Stage 5a. tpToPe[t] is the PE holding tree piece t, refreshed every
+  // iteration by a max reduction over each PE's own element set. A sender
+  // needs it to group its sorting-tree leaves by destination PE.
+  // The sorting tree's leaves, one per tree piece, recorded by the preorder
+  // walk and consumed once the map says where each tree piece lives.
+  struct LeafRef {
+    Node<NodeDescriptor> *node;
+    int tp;
+    LeafRef() : node(NULL), tp(-1) {}
+    LeafRef(Node<NodeDescriptor> *n, int t) : node(n), tp(t) {}
+  };
+  CkVec<LeafRef> leafList;
+
+  CkVec<int> tpToPe;
+  CkVec<ParticleBlockMsg *> recvdBlocks;
+  int numBlocksRecvd;
+  // How many PEs will actually send this one a block. Without it the exchange
+  // has to send to every PE so the receiver can count to CkNumPes(), which is
+  // P^2 messages -- 25600 at 160 ranks, nearly all empty, because SFC ordering
+  // and a block map send a PE's particles to only a handful of neighbours.
+  int expectedBlocks;
+  bool haveExpected;
+  void publishTreePieceMap();
+  void freeSortingTree();
+  void maybeAssemble();
+  void sendParticleBlocks();
+  void assembleReceivedBlocks();
   void buildTree();
+  // Stage 6. Compares the flat device tree against the host tree built over
+  // the same particles; reports under BARNES_TREE_CHECK. It is the only check
+  // on the device build available while the traversal is still host code.
+  void checkDeviceTree();
+  // Push the host's completed moments for boundary nodes into the device tree.
+  // The device build only sees particles resident here, so those nodes are
+  // short the mass that lives on other PEs until this runs.
+  void patchDeviceBoundaryMoments();
 
   void printTree();
   void flushParticles();
 
   void processSubmittedParticles();
   void makeMoments();
+  // The ownership frontier: the nodes at which the owner range narrows to a
+  // single tree piece. Determined by keyRanges alone, so every PE enumerates
+  // the same list in the same order, which is what lets one reduction stand in
+  // for the whole moment exchange.
+  void collectFrontier(Node<ForceData> *n, CkVec<Node<ForceData>*> &out);
+  void contributeFrontierMoments();
+  void fillBoundaryMoments(Node<ForceData> *n);
+  CkVec<Node<ForceData>*> frontier;
   void flushMomentRequests();
   void respondToMomentsRequest(Node<ForceData> *,CkVec<int>&);
   Node<ForceData> *lookupNode(Key k);
@@ -223,12 +286,16 @@ class DataManager : public CBase_DataManager {
   void receiveHistogram(CkReductionMsg *msg);
   void receiveSplitters(SplitterMsg *msg);
   void sendParticles(RangeMsg *msg);
-  void sendParticlesToTreePiece(Node<NodeDescriptor> *nd, int tp);
+  void recordLeaf(Node<NodeDescriptor> *nd, int tp);
+  void beginDistribute();
+  void recvTreePieceMap(CkReductionMsg *msg);
+  void recvSenderCounts(CkReductionMsg *msg);
+  void recvFrontierMoments(CkReductionMsg *msg);
+  void receiveParticleBlock(ParticleBlockMsg *msg);
 
   void receiveMoments(MomentsMsg *msg);
   
   // called by tree pieces
-  void submitParticles(CkVec<ParticleMsg *> *vec, int numParticles, TreePiece *tp, Key smallestKey, Key largestKey); 
   void requestMoments(Key k, int replyTo);
   void advance(CkReductionMsg *);
 #ifdef STATISTICS
@@ -248,6 +315,14 @@ class DataManager : public CBase_DataManager {
   void recvParticles(ParticleReplyMsg *msg);
   void recvNode(NodeReplyMsg *msg);
 
+  // The rest of advance(), once the integrator's reduction is in host memory.
+  // Public because it is an entry method under GPU_GRAVITY; on the CPU path
+  // advance() simply calls it.
+  void advanceTail();
+  // The rest of decompose(), once the keys are generated and the particles are
+  // back. Same arrangement.
+  void decomposeTail();
+
   void recvUnivBoundingBox(CkReductionMsg *msg);
   void treePiecesReady(CkReductionMsg *msg);
   void treePiecesMigrated(CkReductionMsg *msg);
@@ -258,6 +333,9 @@ class DataManager : public CBase_DataManager {
   void ensureDevice();
   int particleOffset(Particle *p){ return (int)(p - myParticles.getVec()); }
   const float4 *devicePositions() const { return gpuParticles.positions(); }
+  // The flat device tree the local walk traverses; NULL until it is built.
+  const DeviceNode *deviceNodes() const { return gpuParticles.deviceNodes(); }
+  cudaEvent_t treeEvent() const { return gpuParticles.treeEvent(); }
   float4 *deviceAccel() const { return gpuParticles.accel(); }
   cudaEvent_t uploadEvent() const { return gpuParticles.uploadEvent(); }
   void forcesReady();

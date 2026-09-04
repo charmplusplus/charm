@@ -9,7 +9,11 @@ extern CProxy_TreePiece treePieceProxy;
 int ParticleFlushWorker::work(Node<NodeDescriptor> *node){
   if(node->getNumChildren() > 0) return 1;
 
-  dataManager->sendParticlesToTreePiece(node,leafCnt); 
+  // Record the leaf rather than sending it. The send is deferred until the
+  // tree-piece-to-PE map arrives, because the leaves have to be grouped by
+  // destination PE before anything goes on the wire -- see the note on
+  // ParticleBlockMsg.
+  dataManager->recordLeaf(node,leafCnt);
   leafCnt++;
   return 0;
 }
@@ -58,17 +62,9 @@ void MomentsWorker::setLeafType(Node<ForceData> *leaf){
   }
   else if(ownerStart < peTreePieces[curTP].index){
     // type could have been set to EmptyBucket during construction
-    if(leaf->getType() == Invalid){
-      leaf->setType(Remote); 
-      int numOwners = leaf->getOwnerEnd()-leaf->getOwnerStart()+1;
-      int requestOwner = leaf->getOwnerStart()+(rand()%numOwners);
-      TB_DEBUG("(%d) requestMoments %lu from tree piece %d\n", CkMyPe(), leaf->getKey(), requestOwner);
-
-      CkEntryOptions opts;
-      opts.setQueueing(CK_QUEUEING_IFIFO);
-      opts.setPriority(REQUEST_MOMENTS_PRIORITY);
-      treePieceProxy[requestOwner].requestMoments(leaf->getKey(),CkMyPe(),&opts);
-    }
+    // Just the type. The moments arrive with everyone else's in the frontier
+    // reduction; there is no per-node moment request any more.
+    if(leaf->getType() == Invalid) leaf->setType(Remote);
     return;
   }
   else do {
@@ -140,12 +136,11 @@ int TraversalWorker::work(Node<ForceData> *node){
   }
 
 #ifdef GPU_GRAVITY
-  // A multipole enters the kernel as the point mass it already is: grav() only
-  // ever reads totalMass and cm out of it.
+  // The whole expansion, not just the point mass: the kernel evaluates the
+  // quadrupole term too unless it was built -DMONOPOLE_ONLY.
   ownerTreePiece->getBatch().addSource(currentBucket,
                                        bucketPartStart, bucketPartCount,
-                                       node->data.moments.totalMass,
-                                       node->data.moments.cm);
+                                       node->data.moments);
   int computed = currentBucket->getNumParticles();
 #else
   int computed = nodeBucketForce(node,currentBucket);

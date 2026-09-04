@@ -15,6 +15,29 @@ struct ParticleMsg : public CMessage_ParticleMsg {
   int numParticles;
 };
 
+// One PE's entire contribution to another PE's tree pieces, in one message.
+//
+// The exchange used to be one message per (sending PE, tree piece) pair --
+// numTreePieces * numPes of them, 10432 at 652 pieces on 16 PEs, and most
+// carrying nothing, because a tree piece's key range is covered by only one or
+// two PEs. Aggregating per destination PE takes that to numPes^2, and it is
+// also the only shape a device transfer can take: at the ~80us IPC floor,
+// 10432 device sends per iteration would cost far more than the host path it
+// replaces.
+//
+// parts holds the tree pieces' particles back to back in the order tpIndex
+// lists them; tpCount says how many belong to each, and tpKeys holds the
+// (smallest, largest) key pair per tree piece.
+struct ParticleBlockMsg : public CMessage_ParticleBlockMsg {
+  int *tpIndex;
+  int *tpCount;
+  Key *tpKeys;
+  Particle *parts;
+  int numTps;
+  int numParticles;
+  int fromPe;
+};
+
 struct RangeMsg : public CMessage_RangeMsg {
   Key *keys;
   int numTreePieces;

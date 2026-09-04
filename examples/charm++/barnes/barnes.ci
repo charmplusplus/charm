@@ -25,6 +25,13 @@ mainmodule barnes {
     Key keys[];
   };
 
+  message ParticleBlockMsg {
+    int tpIndex[];
+    int tpCount[];
+    Key tpKeys[];
+    Particle parts[];
+  };
+
   message RequestMsg;
   message ParticleReplyMsg {
     ExternalParticle data[];
@@ -38,6 +45,10 @@ mainmodule barnes {
   message RescheduleMsg;
 
   include "Descriptor.h";
+
+  group BlockCyclicMap : CkArrayMap {
+    entry BlockCyclicMap(int chunk);
+  };
 
   mainchare Main {
     entry Main(CkArgMsg *m);
@@ -55,8 +66,6 @@ mainmodule barnes {
 
   array[1D] TreePiece {
     entry TreePiece();
-    entry void receiveParticles(ParticleMsg *msg);
-    entry void receiveParticles();
     entry void requestMoments(Key k, int replyTo);
 
     entry void startTraversal();
@@ -82,6 +91,14 @@ mainmodule barnes {
     entry void receiveHistogram(CkReductionMsg *msg);
     entry void receiveSplitters(SplitterMsg *msg);
     entry void sendParticles(RangeMsg *msg);
+    // The decomposition exchange. Both are DataManager-to-DataManager: the
+    // tree pieces are no longer in this path at all, because the receiving
+    // DataManager can attribute incoming particles to its own local elements.
+    entry void beginDistribute();
+    entry void recvTreePieceMap(CkReductionMsg *msg);
+    entry void recvSenderCounts(CkReductionMsg *msg);
+    entry void recvFrontierMoments(CkReductionMsg *msg);
+    entry void receiveParticleBlock(ParticleBlockMsg *msg);
     entry void receiveMoments(MomentsMsg *msg);
 
     entry void recvParticles(ParticleReplyMsg *msg);
@@ -98,6 +115,12 @@ mainmodule barnes {
     entry void treePiecesMigrated(CkReductionMsg *msg);
 #ifdef GPU_GRAVITY
     entry void forcesReady();
+    // Stage 2 split the two host passes that used to run inline. The
+    // integrator and the key generation are device work now, so the entry
+    // method that needed their result has to be reached from a HAPI callback
+    // rather than falling through.
+    entry void advanceTail();
+    entry void decomposeTail();
 #endif
 
     entry void quiescence();

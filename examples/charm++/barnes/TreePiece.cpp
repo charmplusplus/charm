@@ -20,15 +20,10 @@ extern CProxy_StreamPool streamPool;
 // is all a migrated tree piece needs to come up with, and it is why pup()
 // carries only the iteration counter.
 void TreePiece::initIterationState(){
-  myNumParticles = 0;
-  numDecompMsgsRecvd = 0;
-  decompMsgsRecvd.length() = 0;
   // Reset per iteration, not just once. These bound the key range this tree
   // piece submitted, and startTraversal() splits the PE's buckets by them; a
   // range accumulated across iterations would describe a tree piece that no
   // longer exists, and after a migration it would not even describe this PE.
-  smallestKey = ~Key(0);
-  largestKey = Key(0);
   numTraversalsDone = 0;
   myNumBuckets = 0;
   myBuckets = NULL;
@@ -36,9 +31,24 @@ void TreePiece::initIterationState(){
 }
 
 #ifdef GPU_GRAVITY
+// The same half-octave bucketing GpuBatch.cpp uses for the gravity kernel:
+// gpuStableWorkBucket hashes the tag with the launch geometry, so the tag has
+// to name a class of launches rather than one launch's exact size.
+static uint64_t walkWorkClass(unsigned long long buckets){
+  if (buckets == 0) return 0;
+  const int e = 63 - __builtin_clzll(buckets);
+  const int half = (e >= 1) ? (int)((buckets >> (e - 1)) & 1ULL) : 0;
+  // Offset past the gravity kernel's range so the two do not share a class.
+  return (uint64_t)(2 * e + half) + 1 + 256;
+}
+
 void TreePiece::initGpuState(){
   outstandingKernels = 0;
   traversalsComplete = false;
+  hTargets = NULL;
+  dTargets = NULL;
+  targetCap = 0;
+  deviceWalkRunning = false;
 }
 #endif
 
@@ -83,31 +93,10 @@ TreePiece::TreePiece(CkMigrateMessage *m) :
   myDM = dataManagerProxy.ckLocalBranch();
 }
 
-void TreePiece::receiveParticles(ParticleMsg *msg){
-  int msgNumParticles = msg->numParticles;
-  decompMsgsRecvd.push_back(msg);
-  myNumParticles += msgNumParticles;
-  numDecompMsgsRecvd++;
-  if(smallestKey > msg->part[0].key) smallestKey = msg->part[0].key;
-  if(largestKey < msg->part[msgNumParticles-1].key) largestKey = msg->part[msgNumParticles-1].key;
-
-  if(numDecompMsgsRecvd == CkNumPes()){
-    submitParticles();
-    numDecompMsgsRecvd = 0;
-  }
-}
-
-void TreePiece::receiveParticles(){
-  numDecompMsgsRecvd++;
-  if(numDecompMsgsRecvd == CkNumPes()){
-    submitParticles();
-    numDecompMsgsRecvd = 0;
-  }
-}
-
-void TreePiece::submitParticles(){
-  myDM->submitParticles(&decompMsgsRecvd,myNumParticles,this,smallestKey,largestKey);
-}
+// The decomposition no longer reaches the tree pieces at all: the DataManagers
+// exchange one block per PE pair and the receiving DataManager attributes the
+// particles to its own local elements. receiveParticles/submitParticles went
+// with that, and so did the per-element decomposition state.
 
 void TreePiece::prepare(Node<ForceData> *_root, Node<ForceData> **buckets, int bucketStart, int bucketEnd){
   root = _root;
@@ -120,6 +109,12 @@ void TreePiece::startTraversal(){
   trav.setDataManager(myDM);
 #ifdef GPU_GRAVITY
   traversalsComplete = false;
+  // The device walk covers every one of this tree piece's buckets in one
+  // launch, so it goes out here rather than per yield period. doLocalGravity
+  // then advances its counters without walking; the state machine, and the
+  // outstandingKernels accounting that decides when the tree piece is done,
+  // are untouched.
+  deviceWalkRunning = launchDeviceWalk();
 #endif
 
   if(myNumBuckets == 0){
@@ -148,6 +143,10 @@ void TreePiece::startTraversal(){
 // double would aggregate the whole process and hide the per-PE distribution.
 thread_local double _tpWalkLocal = 0.0;
 thread_local double _tpWalkRemote = 0.0;
+// Time inside flushGpu, which is called from the walk entry methods below and
+// so is already part of _tpWalkLocal/_tpWalkRemote. Tracked separately so the
+// phase report can say how much of the walk time was actually the device.
+thread_local double _tpGpuFlush = 0.0;
 
 void TreePiece::doLocalGravity(RescheduleMsg *msg){
   const double _t0 = CmiWallTimer();
@@ -155,6 +154,10 @@ void TreePiece::doLocalGravity(RescheduleMsg *msg){
   for(i = 0; i < globalParams.yieldPeriod &&
                  localTraversalState.current < myNumBuckets;
                  i++){
+#ifdef GPU_GRAVITY
+    // Already covered by the launch in startTraversal.
+    if(!deviceWalkRunning)
+#endif
     trav.topDownTraversal(root,&localTraversalWorker,&localTraversalState);
     localTraversalState.current++;
     localTraversalState.currentBucketPtr++;
@@ -264,8 +267,82 @@ void TreePiece::ensureDevice(){
   batch.attach(streamPool.ckLocalBranch()->acquire(), globalParams.gpuFlushLimit);
 }
 
+// Build this tree piece's target list and launch the device walk over it.
+// Returns false when the device path is not usable this iteration, in which
+// case doLocalGravity walks on the host as before.
+bool TreePiece::launchDeviceWalk(){
+  if(!globalParams.deviceWalk) return false;
+  if(myNumBuckets == 0) return false;
+  const DeviceNode *nodes = myDM->deviceNodes();
+  if(nodes == NULL) return false;
+
+  ensureDevice();
+  myDM->ensureDevice();
+
+  if(myNumBuckets > targetCap){
+    if(hTargets != NULL){
+      hapiCheck(hapiFreeHost(hTargets));
+      hapiCheck(hapiFree(dTargets));
+    }
+    targetCap = myNumBuckets + myNumBuckets/4 + 64;
+    hapiCheck(hapiMallocHost((void **)&hTargets, sizeof(GpuTargetBucket)*targetCap));
+    hapiCheck(hapiMalloc((void **)&dTargets, sizeof(GpuTargetBucket)*targetCap));
+  }
+
+  // The device walk needs no mapping back to a device node: the box drives the
+  // opening criterion and the particle range names the targets. Both come
+  // straight off the host bucket.
+  int n = 0;
+  for(int i = 0; i < myNumBuckets; i++){
+    Node<ForceData> *b = myBuckets[i];
+    const int np = b->getNumParticles();
+    if(np <= 0) continue;
+    GpuTargetBucket &t = hTargets[n++];
+    const OrientedBox<Real> &box = b->data.box;
+    t.boxMin = make_float3(box.lesser_corner.x, box.lesser_corner.y, box.lesser_corner.z);
+    t.boxMax = make_float3(box.greater_corner.x, box.greater_corner.y, box.greater_corner.z);
+    t.partStart = myDM->particleOffset(b->getParticles());
+    t.partCount = np;
+  }
+  if(n == 0) return false;
+
+  cudaStream_t stream = batch.getStream();
+  hapiCheck(cudaMemcpyAsync(dTargets, hTargets, sizeof(GpuTargetBucket)*n,
+                            cudaMemcpyHostToDevice, stream));
+  // The walk runs on this tree piece's stream while the tree was built on the
+  // DataManager's, so it has to wait for the build and its moments -- not just
+  // for the upload, which is recorded before the build starts.
+  hapiCheck(cudaStreamWaitEvent(stream, myDM->treeEvent(), 0));
+
+  {
+    // Same work class the gravity kernel is tagged with, so the estimator sees
+    // one family of launches rather than two.
+    hapiCuptiKernelTagScope workTag(walkWorkClass(n));
+    invokeLocalWalk(nodes, myDM->devicePositions(), dTargets, n,
+                    myDM->deviceAccel(), globalParams.epssq,
+                    globalParams.tolsq, stream);
+  }
+
+  outstandingKernels++;
+  CkCallback cb(CkIndex_TreePiece::gpuWorkDone(), thisProxy[thisIndex]);
+  hapiAddCallback(stream, cb);
+
+  if(getenv("BARNES_WALK_DEBUG") != NULL && thisIndex == 0){
+    CkPrintf("[WALKDBG] tp %d: buckets %d/%d nodes=%p pos=%p accel=%p "
+             "tolsq=%g epssq=%g firstBucket(start=%d count=%d box=[%g %g %g]..[%g %g %g])\n",
+             thisIndex, n, myNumBuckets, (const void*)nodes,
+             (const void*)myDM->devicePositions(), (void*)myDM->deviceAccel(),
+             globalParams.tolsq, globalParams.epssq,
+             hTargets[0].partStart, hTargets[0].partCount,
+             hTargets[0].boxMin.x, hTargets[0].boxMin.y, hTargets[0].boxMin.z,
+             hTargets[0].boxMax.x, hTargets[0].boxMax.y, hTargets[0].boxMax.z);
+  }
+  return true;
+}
+
 void TreePiece::flushGpu(){
   if(batch.empty()) return;
+  const double _t0 = CmiWallTimer();
   ensureDevice();
   myDM->ensureDevice();
 
@@ -274,6 +351,7 @@ void TreePiece::flushGpu(){
                  myDM->uploadEvent(), globalParams.epssq, cb)){
     outstandingKernels++;
   }
+  _tpGpuFlush += CmiWallTimer() - _t0;
 }
 
 void TreePiece::finishGpuWork(){
@@ -417,10 +495,9 @@ void TreePiece::checkTraversals(){
 }
 
 void TreePiece::quiescence(){
-  CkPrintf("QUIESCENCE tree piece %d proc %d submitted %d numBuckets %d trav_done %d outstanding local %d remote %d\n",
+  CkPrintf("QUIESCENCE tree piece %d proc %d numBuckets %d trav_done %d outstanding local %d remote %d\n",
                 thisIndex,
                 CkMyPe(),
-                myNumParticles,
                 myNumBuckets,
                 numTraversalsDone,
                 localTraversalState.pending,
