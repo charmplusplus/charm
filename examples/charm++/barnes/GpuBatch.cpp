@@ -611,6 +611,29 @@ void GpuParticleStore::binCounts(const Key *keys, const int *depths, int nbins,
   }
 }
 
+void GpuParticleStore::gatherExternal(const int *offs, const int *cnts,
+                                      int nranges, int total, void *out){
+  if(total <= 0) return;
+  if(total > gatherCap){
+    if(dGather != NULL){ hapiCheck(hapiFree(dGather)); hapiCheck(hapiFreeHost(hGather)); }
+    gatherCap = total + total/4 + 1024;
+    hapiCheck(hapiMalloc((void **)&dGather, sizeof(float4)*gatherCap));
+    hapiCheck(hapiMallocHost((void **)&hGather, sizeof(float4)*gatherCap));
+  }
+  int at = 0;
+  for(int r = 0; r < nranges; r++){
+    if(cnts[r] <= 0) continue;
+    hapiCheck(cudaMemcpyAsync(dGather + at, dPos + offs[r],
+                              sizeof(float4)*cnts[r],
+                              cudaMemcpyDeviceToDevice, stream));
+    at += cnts[r];
+  }
+  hapiCheck(cudaMemcpyAsync(hGather, dGather, sizeof(float4)*total,
+                            cudaMemcpyDeviceToHost, stream));
+  hapiCheck(cudaStreamSynchronize(stream));
+  std::memcpy(out, hGather, sizeof(float4)*total);
+}
+
 void GpuParticleStore::release(){
   if (stream != NULL) cudaStreamSynchronize(stream);
   if (hPos != NULL){ hapiFreeHost(hPos); hPos = NULL; }
@@ -638,6 +661,9 @@ void GpuParticleStore::release(){
   sendCap.length() = 0; recvCap.length() = 0;
   if (hStage != NULL){ hapiFreeHost(hStage); hStage = NULL; }
   hStageCap = 0;
+  if (dGather != NULL){ hapiFree(dGather); dGather = NULL; }
+  if (hGather != NULL){ hapiFreeHost(hGather); hGather = NULL; }
+  gatherCap = 0;
   ownerCap = 0;
   if (dtree.nodes != NULL){
     hapiFree(dtree.nodes);

@@ -183,6 +183,7 @@ public:
         dOwners(NULL), ownerCap(0),
         hPatch(NULL), dPatch(NULL), patchCap(0),
         hStage(NULL), hStageCap(0),
+        dGather(NULL), hGather(NULL), gatherCap(0),
         hBinKey(NULL), dBinKey(NULL), hBinFirst(NULL), dBinFirst(NULL),
         hBinLast(NULL), dBinLast(NULL), hBinDepth(NULL), dBinDepth(NULL),
         hBinStart(NULL), dBinStart(NULL), hBinCount(NULL), dBinCount(NULL),
@@ -292,6 +293,13 @@ public:
   // decomposition needs the answer before it can decide the next round.
   void binCounts(const Key *keys, const int *depths, int nbins,
                  int *start, int *count, Key *first, Key *last);
+
+  // Positions and masses for a set of particle ranges, as ExternalParticle.
+  // dPos is already (x, y, z, mass), which is exactly that layout, so this is
+  // a gather and one copy back -- collectLet never has to touch the host
+  // array, which is the last thing keeping it alive.
+  void gatherExternal(const int *offs, const int *cnts, int nranges,
+                      int total, void *out);
   cudaStream_t deviceStream() const { return stream; }
 
 
@@ -349,6 +357,8 @@ private:
   CkVec<int> sendCap, recvCap;
   char *hStage;
   int hStageCap;
+  float4 *dGather, *hGather;
+  int gatherCap;
   GpuKdkReduction *dPartials;  // REDUCE_BLOCKS entries
   GpuKdkReduction *dRed;
 

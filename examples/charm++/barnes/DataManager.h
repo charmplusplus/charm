@@ -312,7 +312,7 @@ class DataManager : public CBase_DataManager {
   // so the request counters measure whether the push was actually sufficient.
   void collectLet(Node<ForceData> *n, const OrientedBox<Real> &dest,
                   CkVec<Key> &keys, CkVec<Real> &mom, CkVec<int> &npart,
-                  CkVec<ExternalParticle> &parts);
+                  CkVec<int> &offs, CkVec<int> &cnts, int &total);
   void sendLets();
   Node<ForceData> *descendToKey(Key k);
   int letsExpected, letsRecvd;

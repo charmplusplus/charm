@@ -1087,8 +1087,11 @@ bool DataManager::hostNeedsParticles() const {
   //  - the push path ships them in collectLet.
   // So the readback cannot go until collectLet sends device slices, at which
   // point -let=1 no longer needs it and -let=0 is not used anyway.
-  if(globalParams.useLet) return true;
-  return true;
+  // collectLet gathers from the device now, so the push path does not need
+  // them. The pull path still does: requestParticles serves other PEs out of
+  // the host array.
+  if(!globalParams.useLet) return true;
+  return false;
   if(getenv("BARNES_ACCEL_DUMP") != NULL) return true;
   if(getenv("BARNES_MASS_CHECK") != NULL) return true;
   return false;
@@ -1398,7 +1401,7 @@ void DataManager::reportLetSizes(){
 void DataManager::collectLet(Node<ForceData> *n, const OrientedBox<Real> &dest,
                              CkVec<Key> &keys, CkVec<Real> &mom,
                              CkVec<int> &npart,
-                             CkVec<ExternalParticle> &parts){
+                             CkVec<int> &offs, CkVec<int> &cnts, int &total){
   if(n == NULL) return;
   const NodeType t = n->getType();
   if(t == Remote || t == RemoteBucket || t == RemoteEmptyBucket) return;
@@ -1433,7 +1436,7 @@ void DataManager::collectLet(Node<ForceData> *n, const OrientedBox<Real> &dest,
     for(int i = 0; i < LET_W; i++) mom.push_back(o[i]);
     npart.push_back(0);
     for(int i = 0; i < n->getNumChildren(); i++)
-      collectLet(n->getChild(i), dest, keys, mom, npart, parts);
+      collectLet(n->getChild(i), dest, keys, mom, npart, offs, cnts, total);
     return;
   }
 
@@ -1450,14 +1453,14 @@ void DataManager::collectLet(Node<ForceData> *n, const OrientedBox<Real> &dest,
   if(open && leaf && n->getNumParticles() > 0){
     o[16] = (Real)(int)Bucket;
     for(int i = 0; i < LET_W; i++) mom.push_back(o[i]);
-    npart.push_back(n->getNumParticles());
-    Particle *pp = n->getParticles();
-    for(int i = 0; i < n->getNumParticles(); i++){
-      ExternalParticle e;
-      e.position = pp[i].position;
-      e.mass = pp[i].mass;
-      parts.push_back(e);
-    }
+    const int np2 = n->getNumParticles();
+    npart.push_back(np2);
+    // The range, not the particles. dPos is (x, y, z, mass), which is the
+    // ExternalParticle layout, so one gather fills the payload and the host
+    // array is never read.
+    offs.push_back(particleOffset(n->getParticles()));
+    cnts.push_back(np2);
+    total += np2;
   }
   else{
     o[16] = (Real)(int)Internal;   // multipole only
@@ -1474,7 +1477,7 @@ void DataManager::sendLets(){
   for(int q = 0; q < CkNumPes(); q++){
     if(q == CkMyPe() || !peBoxes[q].initialized()) continue;
     CkVec<Key> keys; CkVec<Real> mom; CkVec<int> npart;
-    CkVec<ExternalParticle> parts;
+    CkVec<int> offs, cnts; int total = 0;
     // From the frontier down, not from the root. Above the frontier the tree
     // is shared: those nodes are Boundary on every PE and their moments were
     // completed by the frontier reduction. Emitting them here would ship one
@@ -1484,11 +1487,11 @@ void DataManager::sendLets(){
       Node<ForceData> *f = frontier[i];
       const NodeType ft = f->getType();
       if(ft == Remote || ft == RemoteBucket || ft == RemoteEmptyBucket) continue;
-      collectLet(f, peBoxes[q], keys, mom, npart, parts);
+      collectLet(f, peBoxes[q], keys, mom, npart, offs, cnts, total);
     }
 
     const int nn = keys.length();
-    const int np = parts.length();
+    const int np = total;
     LetMsg *m = new (nn, nn*LET_W, nn, (np > 0 ? np : 1), 0) LetMsg;
     m->numNodes = nn;
     m->numParts = np;
@@ -1498,7 +1501,9 @@ void DataManager::sendLets(){
       memcpy(m->mom, mom.getVec(), sizeof(Real)*nn*LET_W);
       memcpy(m->npart, npart.getVec(), sizeof(int)*nn);
     }
-    if(np > 0) memcpy(m->parts, parts.getVec(), sizeof(ExternalParticle)*np);
+    if(np > 0)
+      gpuParticles.gatherExternal(offs.getVec(), cnts.getVec(), offs.length(),
+                                  np, m->parts);
     thisProxy[q].recvLet(m);
   }
   if(letsExpected == 0){ letsDone = true; treeReady(); }
