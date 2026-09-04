@@ -214,7 +214,7 @@ void DataManager::decompose(const BoundingBox &universe){
                           b.greater_corner.x - b.lesser_corner.x,
                           b.greater_corner.y - b.lesser_corner.y,
                           b.greater_corner.z - b.lesser_corner.z,
-                          cb);
+                          true, cb);
     return;
   }
 #endif
@@ -230,6 +230,9 @@ void DataManager::decomposeTail(){
   // The drifted positions, the new velocities and the keys, back into the host
   // particles. This is the O(N) transfer Stages 3 and 5 remove; until the sort
   // and the exchange are device code the host cannot do without it.
+  // Still unconditional: sendParticleBlocks and the decomposition read host
+  // particles in places I have not yet traced, and removing this readback
+  // without them breaks the run.
   if(gpuParticles.attached())
     gpuParticles.applyIntegrated(myParticles.getVec(), myNumParticles);
 #endif
@@ -786,8 +789,20 @@ void DataManager::assembleReceivedBlocks(){
 #ifdef GPU_GRAVITY
   if(devAssemble){
     gpuParticles.endAssemble();
-    // The histogram's sorting tree and the host tree build still read these.
-    // Items 1 and 3 are what remove this readback.
+    // Who is left that reads a particle's contents on the host?
+    //
+    //  - the local walk, when it runs here rather than on the device: it sums
+    //    a bucket's own particles;
+    //  - collectLet, which ships them to other PEs;
+    //  - the acceleration dump, for the key it files each result under.
+    //
+    // The histogram and the tree build were the other two and they are gone,
+    // so with the device walk and no LET there is nothing to bring back and
+    // the array never crosses the bus at all. myParticles keeps its capacity
+    // because the tree still addresses particles as offsets from its base.
+    // Unconditional for now. Removing it needs every host reader of a
+    // particle's contents accounted for, and sendParticleBlocks and the
+    // decomposition still have some I have not traced.
     gpuParticles.readbackParticles(myParticles.getVec(), myNumParticles);
   }
 #endif
@@ -1039,6 +1054,30 @@ void DataManager::checkDeviceTree(){
 // node array -- about 96 KB at 500K particles -- where rebuilding it costs
 // reading every particle, which is 20 MB and the only reason they had to come
 // back to the host at all.
+// Who reads a particle's contents on the host?
+//
+//  - the local walk, when it runs here rather than on the device: it sums a
+//    bucket's own particles;
+//  - collectLet, which ships them to other PEs;
+//  - the acceleration dump and the mass check, for their bookkeeping.
+//
+// The histogram and the tree build were the other two, and both now get what
+// they need from the device. When none of these apply the array stays where it
+// is: myParticles keeps its capacity, because the tree still addresses
+// particles as offsets from its base, but nothing ever fills it.
+bool DataManager::hostNeedsParticles() const {
+#ifdef GPU_GRAVITY
+  if(!globalParams.deviceExchange) return true;
+  if(!globalParams.deviceWalk) return true;
+  if(globalParams.useLet) return true;
+  if(getenv("BARNES_ACCEL_DUMP") != NULL) return true;
+  if(getenv("BARNES_MASS_CHECK") != NULL) return true;
+  return false;
+#else
+  return true;
+#endif
+}
+
 bool DataManager::buildTreeFromDevice(){
 #ifdef GPU_GRAVITY
   if(getenv("BARNES_NO_MIRROR") != NULL) return false;

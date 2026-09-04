@@ -240,7 +240,8 @@ public:
   // the particles back to the host: the exchange is still host code. Stage 5
   // is what removes the transfer.
   void hashKeys(float lx, float ly, float lz,
-                float xsz, float ysz, float zsz, const CkCallback &cb);
+                float xsz, float ysz, float zsz, bool readback,
+                const CkCallback &cb);
 
   // Valid once the callback from any of the three above has fired.
   const GpuKdkReduction &reduction() const { return *hRed; }

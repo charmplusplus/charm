@@ -114,6 +114,9 @@ class DataManager : public CBase_DataManager {
   // before anything is, so it takes the host route and the device array is
   // still empty when ensureDevice() first succeeds.
   bool assembledOnDevice;
+  // Whether anything on this PE will read a particle's contents this
+  // iteration. False means the array never has to cross the bus.
+  bool hostNeedsParticles() const;
   //CkVec<RequestedMomentsDescriptor> requestedMoments;
   map<Key,Node<ForceData>*> nodeTable;
 

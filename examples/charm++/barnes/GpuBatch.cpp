@@ -354,14 +354,14 @@ void GpuParticleStore::integrate(float dt_k1, float dtime, float dt_k2,
 }
 
 void GpuParticleStore::hashKeys(float lx, float ly, float lz,
-                                float xsz, float ysz, float zsz,
+                                float xsz, float ysz, float zsz, bool readback,
                                 const CkCallback &cb){
   invokeHashKeys(dPos, dKey, nParts, lx, ly, lz, xsz, ysz, zsz,
                  BITS_PER_DIM, stream);
   // Stage 3: the particles go back to the host already in key order, so
   // decomposeTail has no sort left to do.
   sortByKey();
-  if (nParts > 0){
+  if (nParts > 0 && readback){
     // The O(N) transfer Stage 5 exists to remove. The host needs the
     // particles because the all-to-all is still host code.
     hapiCheck(cudaMemcpyAsync(hPos, dPos, sizeof(float4) * nParts,
