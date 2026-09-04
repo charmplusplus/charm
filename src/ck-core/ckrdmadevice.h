@@ -186,10 +186,28 @@ int CkRdmaDeviceBusyIpcSlots();
 // blocks back. `dm` is a DeviceManager*, passed opaquely so this declaration
 // does not drag the HAPI headers into every includer.
 void* CkRdmaDeviceAllocLbBuffer(void* dm, size_t size);
+
+// Load balance pool block recycling, without a host barrier.
+//
+// A block handed out by CkRdmaDeviceAllocLbBuffer had a previous life, and the
+// device work of that life -- the landing write into it, and the unpack copies
+// out of it -- can still be in flight when it is handed out again. Until now
+// that was covered by synchronizing the host, which waits for far more than
+// this block and stops the scheduler to do it.
+//
+// Instead: when a block goes back to the pool, record an event on the stream
+// whose work touched it (Freed). When one comes out, make the stream that is
+// about to write into it wait on those events (Gate). The ordering is then
+// exact, expressed on the device, and costs no host time. Events are reused
+// per (device, stream), so this allocates nothing per migration.
+void CkRdmaDeviceNoteLbBufferFreed(void* dm, cudaStream_t usedBy);
+void CkRdmaDeviceGateLbBuffer(void* dm, cudaStream_t consumer);
 #else
 inline size_t CkRdmaDeviceTakePendingSendBytes() { return 0; }
 inline int CkRdmaDeviceBusyIpcSlots() { return -1; }
 inline void* CkRdmaDeviceAllocLbBuffer(void* dm, size_t size) { return nullptr; }
+inline void CkRdmaDeviceNoteLbBufferFreed(void* dm, cudaStream_t usedBy) {}
+inline void CkRdmaDeviceGateLbBuffer(void* dm, cudaStream_t consumer) {}
 #endif
 
 #endif // _CKRDMADEVICE_H_

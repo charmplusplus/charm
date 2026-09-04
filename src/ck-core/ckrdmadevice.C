@@ -2229,6 +2229,52 @@ static void acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
 // Taking that sweep off the send fast path removed the accident and made the
 // dependency explicit: the reclaim now happens where the memory is actually
 // needed, which is also better timed than sweeping on every unrelated send.
+// One reusable event per (device, freeing stream). A block's previous work is
+// always on some stream; recording there and waiting on it from the consumer
+// is the exact ordering the host barrier was standing in for. Guarded by the
+// device manager's own lock, which is what serializes the pool itself.
+namespace {
+typedef std::unordered_map<cudaStream_t, cudaEvent_t> LbRetireEvents;
+std::unordered_map<void*, LbRetireEvents> lb_retire_events;
+CmiNodeLock lb_retire_lock = NULL;
+void lbRetireLockInit() {
+  if (lb_retire_lock == NULL) lb_retire_lock = CmiCreateLock();
+}
+}  // namespace
+
+void CkRdmaDeviceNoteLbBufferFreed(void* dm_opaque, cudaStream_t usedBy) {
+  if (dm_opaque == NULL) return;
+  lbRetireLockInit();
+  CmiLock(lb_retire_lock);
+  LbRetireEvents& evs = lb_retire_events[dm_opaque];
+  auto it = evs.find(usedBy);
+  if (it == evs.end()) {
+    cudaEvent_t e;
+    // Disable timing: this event is only ever waited on, and a timing-enabled
+    // event costs more to record.
+    hapiCheck(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
+    it = evs.emplace(usedBy, e).first;
+  }
+  // Re-recording overwrites the previous capture, which is correct: work on one
+  // stream is ordered, so the latest record subsumes every earlier one.
+  hapiCheck(cudaEventRecord(it->second, usedBy));
+  CmiUnlock(lb_retire_lock);
+}
+
+void CkRdmaDeviceGateLbBuffer(void* dm_opaque, cudaStream_t consumer) {
+  if (dm_opaque == NULL) return;
+  lbRetireLockInit();
+  CmiLock(lb_retire_lock);
+  auto dit = lb_retire_events.find(dm_opaque);
+  if (dit != lb_retire_events.end()) {
+    for (auto& kv : dit->second) {
+      if (kv.first == consumer) continue;  // same stream is already ordered
+      hapiCheck(cudaStreamWaitEvent(consumer, kv.second, 0));
+    }
+  }
+  CmiUnlock(lb_retire_lock);
+}
+
 void* CkRdmaDeviceAllocLbBuffer(void* dm_opaque, size_t size) {
   DeviceManager* dm = (DeviceManager*)dm_opaque;
 

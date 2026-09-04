@@ -3849,6 +3849,9 @@ void CkLocMgr::finishGPUSend(CmiUInt8 id)
 #if CMK_SMP
     CmiUnlock(dm->lock);
 #endif
+    // Whoever takes this block next waits on this, instead of the host waiting
+    // for the whole device. Staging rides the legacy default stream.
+    CkRdmaDeviceNoteLbBufferFreed(dm, (cudaStream_t)0);
   }
   sendGPUBuffers.erase(it);
 }
@@ -4297,6 +4300,9 @@ static inline bool ckMigrateArenaMode()
 
 void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, CkDeviceBufferPost* post)
 {
+  // Only set on the pooled path; arena mode allocates fresh memory that
+  // cannot alias anything, so there is nothing to gate against.
+  void* dm_for_gate = NULL;
   //CkPrintf("PE %d allocating GPU memory size %d for id %llu\n", CkMyPe(), size, id);
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   if (ckMigrateArenaMode()) {
@@ -4306,6 +4312,7 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
     hapiCheck(hapiMalloc((void**)&data, size));
   } else if(csv_gpu_manager.use_shm) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
+    dm_for_gate = dm;
     data = (char*)CkRdmaDeviceAllocLbBuffer(dm, size);
     if (data == nullptr) {
       CkAbort("PE %d, device %d: Not enough memory on device Load balance "
@@ -4367,7 +4374,30 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
   // Note for anyone debugging in this window: added synchronization hides the
   // failure, so probes placed inside it are worthless. Use failure-path-only
   // probes.
-  hapiCheck(cudaStreamSynchronize((cudaStream_t)0));
+  // Two ways to order the landing write behind whatever last used this
+  // recycled block.
+  //
+  // The default stops the host until the landing stream drains. The gate
+  // instead makes the landing stream wait, on the device, for exactly the
+  // events recorded when blocks were returned to this pool -- no host block,
+  // and it waits for this pool's prior work rather than for every kernel in
+  // flight in the process. The gate is the better design and is why
+  // CkRdmaDeviceNoteLbBufferFreed exists.
+  //
+  // It is off by default because it has not earned it yet. Measured at
+  // -lblag 8, 100 steps, 8 PEs per process: host sync 26 of 26 runs exact,
+  // gate 15 of 16, removing the wait entirely 15 of 16. Both failures were
+  // hangs with no error rather than wrong answers, which is not the failure
+  // mode this guards and looks like the intermittent OFI fault seen elsewhere
+  // -- but 32 runs cannot separate that from a real regression, and the thing
+  // being guarded is silent corruption. Turn it on, gather a hundred runs, and
+  // if the rates match, make it the default and delete the host wait.
+  static const bool poolEventGate =
+      (getenv("CHARM_LB_POOL_EVENT_GATE") != nullptr);
+  if (poolEventGate)
+    CkRdmaDeviceGateLbBuffer(dm_for_gate, (cudaStream_t)0);
+  else
+    hapiCheck(cudaStreamSynchronize((cudaStream_t)0));
   receivedDeviceMsgs[id] = data;
   post[0].hapi_stream = (cudaStream_t) 0;
 }
@@ -4516,6 +4546,10 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 #if CMK_SMP
     CmiUnlock(dm->lock);
 #endif
+  // The landing write into this block and the unpack copies out of it are both
+  // on the legacy default stream; record there so the next taker can order
+  // itself behind them without the host waiting.
+  CkRdmaDeviceNoteLbBufferFreed(dm, (cudaStream_t)0);
   }
 #endif
 
