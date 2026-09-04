@@ -50,6 +50,22 @@ void DiffusionLB::AcrossNodeLB()
   loadReceivers = std::count_if(toSendLoad.begin(), toSendLoad.end(),
                                 [](double load) { return load > 0; });
 
+  // Shed the EXCESS, not everything. my_loadAfterTransfer was initialised in
+  // BuildStats to this node's TOTAL load, so the loop below ran until the
+  // neighbours ran out of capacity rather than until this node reached its
+  // fair share -- a node would hand over nearly everything it held, one object
+  // at a time. The per-neighbour quotas in toSendLoad cap each RECIPIENT, but
+  // nothing capped the donor, which is why object counts per PE still spread
+  // 1..89 even once the geometry was constrained.
+  {
+    const double fair = avgNborLoad();
+    const double excess = my_load - fair;
+    my_loadAfterTransfer = (excess > 0.0) ? excess : 0.0;
+    if (_lb_args.debug() > 1)
+      CkPrintf("[node %d] AcrossNodeLB: my_load=%f fair=%f shedding=%f\n",
+               myNodeId, my_load, fair, my_loadAfterTransfer);
+  }
+
   // TEMPORARY diagnostic: why does across-node diffusion move nothing?
   if (_lb_args.debug() > 1)
   {
