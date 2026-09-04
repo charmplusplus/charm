@@ -4319,7 +4319,10 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
     data = (char*)CkRdmaDeviceAllocLbBuffer(dm, size);
     if (data == nullptr) {
-      CkAbort("PE %d, device %d: Not enough memory on device Load balance buffer (%zu free)",
+      CkAbort("PE %d, device %d: Not enough memory on device Load balance "
+              "buffer (%zu free). This buffer stages device state pupped with "
+              "pup_buffer_device and is 0 by default -- size it with "
+              "+gpulbbuffer <MB>.",
           CkMyPe(), dm->global_index, dm->get_lb_buffer_free_size());
     }
   }
