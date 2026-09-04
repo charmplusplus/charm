@@ -265,6 +265,13 @@ void Compute::updateInstrumentation() {
 }
 
 void Compute::launchForces() {
+  // A chare that migrated mid-step resumes here without having run
+  // calculateForces on its new PE. Its device buffers travelled, but a CUDA
+  // stream cannot -- it belongs to the PE, not the chare -- and ensureDevice()
+  // was only ever reached from the post entry method. So this used to stage a
+  // device send from a NULL stream and abort with "invalid argument" in
+  // CkRdmaDeviceIssueRgets. Idempotent: returns at once when a stream is held.
+  ensureDevice();
   updateInstrumentation();
   const double cutoffSq = (double)PTP_CUT_OFF * (double)PTP_CUT_OFF;
   const bool doEnergy = (stepCount == 1 || stepCount == finalStepCount);
@@ -320,6 +327,9 @@ void Compute::launchForces() {
 // not of the API: the direct CUDA IPC transport hands the cell this buffer
 // itself and leaves the completion callback as the only ordering there is.
 void Compute::sendForces() {
+  // Same reason as launchForces, and this is the one that actually failed:
+  // every device buffer handed out below is tagged with this stream.
+  ensureDevice();
   if (stepCount == 1) energy[0] = *h_energy;
   else if (stepCount == finalStepCount) energy[1] = *h_energy;
 
