@@ -42,6 +42,11 @@ class Compute : public CBase_Compute {
     int pendingForceSends;
     int ackCount;   // SDAG loop counter for draining them
 
+    // ---- split load balancing barrier (-lbasync); see Cell.h ----
+    int lbBlocked;
+    int lbWaitPending;
+    int lbStartStep;
+
     void updateInstrumentation();
     void deriveCells();
     void ensureDevice();
@@ -58,6 +63,9 @@ class Compute : public CBase_Compute {
 
     void launchForces();
     void sendForces();
+
+    void lbBegin();
+    bool lbWaitDue() const;
 
     // Device-zerocopy post entry method.
     void calculateForces(int ref, int ord, int cx, int cy, int cz, int& n,

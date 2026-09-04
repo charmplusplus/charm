@@ -69,6 +69,9 @@ Cell::Cell() : inbrs(NUM_NEIGHBORS), stepCount(1), updateCount(0), forceCount(0)
   }
 
   energy[0] = energy[1] = 0;
+  lbBlocked = 0;
+  lbWaitPending = 0;
+  lbStartStep = 0;
   setMigratable(false);
 }
 
@@ -89,6 +92,34 @@ Cell::Cell(CkMigrateMessage *msg): CBase_Cell(msg),
   usesAtSync = true;
   setMigratable(false);
   delete msg;
+}
+
+// The first half of the split barrier. AtSyncStart() joins the balancing step
+// and returns: the chare keeps iterating while the strategy runs, and nothing
+// moves until it parks in AtSyncWait() lbLag steps later. A Cell never migrates
+// (setMigratable(false)), so for it the split is only about not stalling the
+// simulation -- Cells drive every step, and a Cell stopped at the barrier stops
+// its Computes too.
+void Cell::lbBegin() {
+  // Closes the measurement window: the strategy decides from this sample, so
+  // whatever is measured past here belongs to the next window. A no-op unless
+  // MetaBalancer is on.
+  AtSyncSample();
+  lbStartStep = stepCount;
+  lbWaitPending = 1;
+  // Set before the call: a chare stopped at the tentative count comes back
+  // through ResumeFromSync, and the SDAG has to know to consume that resume.
+  lbBlocked = (AtSyncStart() == CkMigratable::AtSyncStatus::Blocked) ? 1 : 0;
+}
+
+// One AtSyncWait() is owed for every AtSyncStart(), even the calls that started
+// no step -- the wait is what reopens the measurement window, and skipping it
+// would leave instrumentation off for the rest of the run. The last step is a
+// backstop: a lag that runs off the end of the simulation would otherwise leave
+// the step unfinished and its migrations deferred forever.
+bool Cell::lbWaitDue() const {
+  if (!lbWaitPending) return false;
+  return (stepCount - lbStartStep) >= lbLag || stepCount == finalStepCount;
 }
 
 Cell::~Cell() { freeDevice(); }
@@ -347,6 +378,9 @@ void Cell::pup(PUP::er &p) {
   p | stepTime;
   p | inbrs;
   p | numReadyCheckpoint;
+  p | lbBlocked;
+  p | lbWaitPending;
+  p | lbStartStep;
   PUParray(p, energy, 2);
 
   p | computesList;

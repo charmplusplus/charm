@@ -156,3 +156,42 @@ physics.h - the original CPU force computation. No longer compiled; kept as the
 reference the kernels in leanmd.cu were ported from.
 
 defs.h - #define for constant values and some class declaration
+
+
+ASYNC LOAD BALANCING
+The balancing step can be split in two, so the strategy runs while the
+simulation keeps stepping instead of stopping it at a barrier:
+
+  -lbasync            split AtSync into AtSyncStart/AtSyncWait (needs +LBAsync)
+  -lblag <N>          steps to keep running between the two halves (default 1)
+
+A chare calls AtSyncSample()+AtSyncStart() on the balancing step and returns
+immediately; it runs N more steps and then parks in AtSyncWait(), which is where
+the step's migrations actually happen -- the runtime defers every move until the
+element is parked, because that is the one point a device-resident chare
+provably holds no unconsumed device receive. N must fit inside one LB period;
+0 reproduces the unsplit barrier exactly, which makes it the control.
+
+Cells are setMigratable(false) and never move, but they still take the split:
+Cells drive every step, so a Cell stopped at the barrier stops its Computes too.
+
+Measured on 4 A40s, 32 PEs, 6x6x6 cells, 100 steps, -computemap local, with
+DiffusionLB (+LBDiffusionCommOn +LBDiffusionGpuDim), NUMA-matched pemap:
+
+  -density gradient   noLB 10.12s   sync 8.32s   lag 0 8.34s   lag 2 8.28s
+  -density clump      noLB 15.05s   sync 10.42s                lag 2 10.44s
+
+Async ties sync, and it is worth understanding why rather than reading it as
+the split failing. It is not overhead: lag 0 -- the machinery on with no overlap
+window -- lands on sync to within noise. And the overlap really happens: the
+strategy's own wall clock stretches from 0.031s to 0.184s at the first event
+under -lblag 2, which is it timesharing the PE with application steps. There is
+simply almost nothing to hide. A balancing event here costs about 145 ms, of
+which the strategy is 5-31 ms; the rest is the migration of 754 Computes, each
+of which drops its device scratch on the source and reallocates it on the
+destination. Migration happens at the park by construction, so no lag can
+overlap it.
+
+The split would pay on an application whose strategy is expensive relative to
+its moves -- or on this one, if a migrated Compute carried its device scratch
+across instead of reallocating.

@@ -24,6 +24,8 @@
 /* readonly */ int computeMapMode;
 /* readonly */ int maxCellParts;
 /* readonly */ int densityReportFreq;
+/* readonly */ int asyncLb;
+/* readonly */ int lbLag;
 
 // Entry point of Charm++ application
 Main::Main(CkArgMsg* m) {
@@ -68,6 +70,12 @@ Main::Main(CkArgMsg* m) {
     densityReportFreq = 0;
     CmiGetArgIntDesc(m->argv, "-densityreport", &densityReportFreq,
                      "report atoms per x-slab every N steps (0 = off)");
+    asyncLb = CmiGetArgFlagDesc(m->argv, "-lbasync",
+                                "overlap the balancing step with the simulation "
+                                "(needs +LBAsync)") ? 1 : 0;
+    lbLag = DEFAULT_LB_LAG;
+    CmiGetArgIntDesc(m->argv, "-lblag", &lbLag,
+                     "steps to keep running between AtSyncStart and AtSyncWait");
     m->argc = CmiGetArgc(m->argv);
   }
 
@@ -114,6 +122,27 @@ Main::Main(CkArgMsg* m) {
   	checkptStrategy = 0;
     logs = m->argv[cur_arg];
   }
+
+  // The split is only safe under +LBAsync. With the flag off, an AtSyncStart()
+  // that finds no step due resumes the element inline *and* returns to its
+  // caller, so a chare written to the split pattern would take both paths --
+  // one AtSync worth of barrier for two resumes. Fall back rather than let that
+  // happen.
+  if (asyncLb && !_lb_args.lbAsync()) {
+    CkPrintf("[WARN] -lbasync ignored: it needs +LBAsync on the command line. "
+             "Running the unsplit AtSync barrier instead.\n");
+    asyncLb = 0;
+  }
+  if (lbLag < 0) lbLag = 0;
+  // The two halves have to pair up inside one period: AtSyncStart() aborts if
+  // the step it started is still in flight, which is what a lag reaching the
+  // next balancing step would mean.
+  if (asyncLb && lbLag >= ldbPeriod) {
+    CkPrintf("[WARN] -lblag %d does not fit in an LB period of %d; using %d.\n",
+             lbLag, ldbPeriod, ldbPeriod - 1);
+    lbLag = ldbPeriod - 1;
+  }
+  if (asyncLb) CkPrintf("Async LB: on, lag %d steps\n", lbLag);
 
   // Both knobs have to be reported: a run's numbers mean nothing without them,
   // and the defaults reproduce the stock benchmark exactly.

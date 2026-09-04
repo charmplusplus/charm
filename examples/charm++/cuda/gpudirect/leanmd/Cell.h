@@ -78,6 +78,16 @@ private:
   double energy[2];
   int numReadyCheckpoint;
 
+  // ---- split load balancing barrier (-lbasync) ----
+  // Set when AtSyncStart() stopped this chare at MetaBalancer's tentative
+  // count: the chare is not iterating and will come back through
+  // ResumeFromSync, which is a resume the SDAG has to consume.
+  int lbBlocked;
+  // One AtSyncWait() is owed for every AtSyncStart(), including the calls that
+  // started no step -- that is what reopens the measurement window.
+  int lbWaitPending;
+  int lbStartStep;   // step the outstanding AtSyncStart() was made at
+
   // ---- device-resident state ----
   int part_capacity;   // allocation size of d_particles / d_stay
   int exch_capacity;   // per-bucket allocation for migration traffic
@@ -114,6 +124,9 @@ public:
   void appendMigrants(int ordinal, int n, Particle* parts);
   void startCheckpoint(int);
   void pup(PUP::er &p);
+
+  void lbBegin();
+  bool lbWaitDue() const;
 
   // Device-zerocopy post entry methods: run when the message lands, and name the
   // device buffer the payload should be written into.

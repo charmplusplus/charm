@@ -75,6 +75,9 @@ Compute::Compute() : stepCount(1), d_energyPartial(NULL), d_energyScalar(NULL),
   nPart[0] = nPart[1] = 0;
   stream = NULL;
   pendingForceSends = 0;
+  lbBlocked = 0;
+  lbWaitPending = 0;
+  lbStartStep = 0;
   deriveCells();
 }
 
@@ -88,8 +91,28 @@ Compute::Compute(CkMigrateMessage *msg): CBase_Compute(msg) {
   h_energy = NULL;
   stream = NULL;
   pendingForceSends = 0;
+  lbBlocked = 0;
+  lbWaitPending = 0;
+  lbStartStep = 0;
   deriveCells();
   delete msg;
+}
+
+// The two halves of the split barrier; see Cell::lbBegin. Computes are the
+// elements that actually move, so this is where the overlap is bought: the
+// strategy and the migration decision run while the simulation keeps stepping,
+// and the move itself happens at the park, which is a step boundary with the
+// force sends already drained.
+void Compute::lbBegin() {
+  AtSyncSample();
+  lbStartStep = stepCount;
+  lbWaitPending = 1;
+  lbBlocked = (AtSyncStart() == CkMigratable::AtSyncStatus::Blocked) ? 1 : 0;
+}
+
+bool Compute::lbWaitDue() const {
+  if (!lbWaitPending) return false;
+  return (stepCount - lbStartStep) >= lbLag || stepCount == finalStepCount;
 }
 
 // NOTHING device-side may be touched from the constructors.
@@ -206,7 +229,6 @@ vec3 Compute::periodicShift() const {
 // imbalance being corrected. Toggle per PE (not per chare: hundreds of Computes
 // share a PE and the switch is PE-wide) and only on a transition.
 void Compute::updateInstrumentation() {
-  static thread_local bool instrumenting = true;  // runtime default at startup
   static thread_local int lastStep = -1;
   if (lastStep == stepCount) return;              // first Compute of the step wins
   lastStep = stepCount;
@@ -220,8 +242,12 @@ void Compute::updateInstrumentation() {
   }
 
   const bool want = (nextLb - stepCount) <= LB_INSTRUMENT_WINDOW;
-  if (want != instrumenting) {
-    instrumenting = want;
+  // Ask the runtime what the state is rather than remembering what we last
+  // asked for. Resuming from a balancing step turns instrumentation on
+  // unconditionally, so a private record of it goes stale every LB step -- and
+  // under -lbasync the resume lands mid-window, where the two disagree for the
+  // whole rest of the period and tracing never gets switched back off.
+  if (want != (bool)LBManager::Object()->StatsOn()) {
     if (want) LBTurnInstrumentOn(); else LBTurnInstrumentOff();
   }
 }
@@ -305,6 +331,9 @@ void Compute::pup(PUP::er &p) {
   __sdag_pup(p);
   p | stepCount;
   p | pendingForceSends;
+  p | lbBlocked;
+  p | lbWaitPending;
+  p | lbStartStep;
   PUParray(p, energy, 2);
 
   // Nothing device-side is puped. The scratch holds nothing that outlives a step

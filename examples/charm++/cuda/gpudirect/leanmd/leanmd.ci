@@ -19,6 +19,8 @@ mainmodule leanmd {
   readonly int computeMapMode; // -computemap: where Computes are first placed
   readonly int maxCellParts;   // atoms in the fullest cell, sizes device buffers
   readonly int densityReportFreq; // -densityreport: steps between density reports
+  readonly int asyncLb;        // -lbasync: split the barrier and overlap the step
+  readonly int lbLag;          // -lblag: steps between the two halves
 
   //central controller chare
   mainchare [migratable] Main {
@@ -134,7 +136,24 @@ mainmodule leanmd {
 
         //periodically call load balancer
         if (stepCount >= firstLdbStep && (stepCount - firstLdbStep) % ldbPeriod == 0) {
-          serial { AtSync(); }
+          if (asyncLb) {
+            // The split barrier: join the step and carry on. The strategy runs
+            // over the next lbLag steps; nothing migrates until the park below.
+            serial { lbBegin(); }
+            // Stopped at MetaBalancer's tentative count -- not iterating, and
+            // handed back through ResumeFromSync once the count is agreed.
+            if (lbBlocked) { when ResumeFromSync() { } }
+          } else {
+            serial { AtSync(); }
+            when ResumeFromSync() { }
+          }
+        }
+
+        // The other half, lbLag steps on -- after the start, so -lblag 0
+        // degrades to the unsplit barrier. This is where the element goes quiet
+        // and the step's migrations are allowed to happen.
+        if (lbWaitDue()) {
+          serial { lbWaitPending = 0; lbBlocked = 0; AtSyncWait(); }
           when ResumeFromSync() { }
         }
 
@@ -223,7 +242,19 @@ mainmodule leanmd {
 
         //periodically call load balancer
         if (stepCount >= firstLdbStep && (stepCount - firstLdbStep) % ldbPeriod== 0) {
-          serial { AtSync();}
+          if (asyncLb) {
+            serial { lbBegin(); }
+            if (lbBlocked) { when ResumeFromSync() { } }
+          } else {
+            serial { AtSync();}
+            when ResumeFromSync() { }
+          }
+        }
+
+        // See Cell::run. The force sends are drained just above, so this park
+        // is a point where nothing is reading d_force and the chare can move.
+        if (lbWaitDue()) {
+          serial { lbWaitPending = 0; lbBlocked = 0; AtSyncWait(); }
           when ResumeFromSync() { }
         }
       }

@@ -71,6 +71,10 @@ enum ComputeMapMode { COMPUTEMAP_RR = 0, COMPUTEMAP_LOCAL };
 
 #define DEFAULT_FIRST_LDB       20
 #define DEFAULT_LDB_PERIOD      20
+// Steps a chare keeps running between AtSyncStart() and AtSyncWait() under
+// -lbasync. This is the whole overlap window: the strategy runs during it, and
+// nothing migrates until the park at the end. 0 reproduces the unsplit barrier.
+#define DEFAULT_LB_LAG          1
 #define DEFAULT_FT_PERIOD       100000
 
 // 1-away decomposition: larger cells, so each Compute's pair kernel is wide enough
@@ -176,6 +180,10 @@ extern /* readonly */ int densityMode;      // DensityMode
 extern /* readonly */ int computeMapMode;   // ComputeMapMode
 extern /* readonly */ int maxCellParts;     // atoms in the fullest cell
 extern /* readonly */ int densityReportFreq; // -densityreport: steps between reports, 0 = off
+// -lbasync: split AtSync into AtSyncStart/AtSyncWait so the balancing step
+// overlaps the simulation. Needs +LBAsync on the command line to mean anything.
+extern /* readonly */ int asyncLb;
+extern /* readonly */ int lbLag;  // -lblag: steps between the two halves
 
 // Atoms in cell (x,y,z) under the selected density profile.
 inline int cellParticleCount(int x, int y, int z) {

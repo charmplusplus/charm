@@ -2,7 +2,7 @@ OPTS = -O3 -DHAPI_CUDA_CALLBACK
 
 # This charm links against LCI, and liblci.so has a transitive dependency on
 # liblct.so that ld will not resolve on its own.
-export LD_LIBRARY_PATH := $(HOME)/lci_install/lib:$(HOME)/lci_install_cuda/lib:$(LD_LIBRARY_PATH)
+export LD_LIBRARY_PATH := $(HOME)/lci_install/lib64:$(HOME)/lci_install/lib:$(HOME)/lci_install_cuda/lib64:$(HOME)/lci_install_cuda/lib:$(LD_LIBRARY_PATH)
 
 CHARM_DIR = ../../../../..
 CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
