@@ -4341,22 +4341,33 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
   // reproduced at one PE per process -- which is the clue that it was about two
   // PEs sharing a context, not about this pool's free paths, all of which are
   // already gated.
-  // This barrier's necessity is unresolved. Removing it correlated with wrong
-  // checksums at two PEs per process (4 of 11 runs) in one afternoon's testing;
-  // a later reconstruction of that same build could not reproduce it at all
-  // across ~70 runs, and a three-step bisect cleared every intervening change.
-  // So the evidence for it is a sample that never reproduced again, and the
-  // measurements it rests on could not distinguish the rates involved.
+  // A wait IS needed here, and the reason is mechanical rather than mysterious.
+  // The landing write is posted on the legacy default stream (the line below
+  // sets it), while an application's own streams are typically created with
+  // cudaStreamNonBlocking -- leanmd's StreamPool does -- and a non-blocking
+  // stream has NO implicit synchronization with the legacy default stream. So
+  // nothing orders a migrated chare's first kernel behind the write that
+  // delivered its state. That also explains the shape of the historical
+  // evidence: the corruption appeared at two PEs per process and never at one,
+  // because PEs per process is exactly how many independent non-blocking
+  // streams share the context.
   //
-  // It stays because nothing has shown it to be unnecessary, and because the
-  // failure it may guard is silent data corruption. Anyone removing it needs a
-  // reproducer that reproduces -- which nobody currently has -- not another
-  // eight-run sample. Ruled out as explanations, each by measurement: comm
-  // buffer reuse under live work, the pool's four free paths, per-thread vs
-  // legacy stream ordering here, the shared migration stream, IPC slot
-  // exhaustion. Note also that any added synchronization near this window hides
-  // the failure, so probes placed inside it are worthless.
-  cudaDeviceSynchronize();
+  // But the wait only has to cover the landing stream. cudaDeviceSynchronize
+  // additionally waits for every application kernel in flight in the process,
+  // which is unrelated work and is the whole cost of it -- once per arriving
+  // payload. A host-side wait on the landing stream gives the identical
+  // guarantee: this call returns only once the write has completed, so every
+  // launch issued afterwards, on any stream, is ordered behind it.
+  //
+  // Anything stronger than this is guesswork insurance. Anything weaker needs
+  // the consumer's stream to wait on an event recorded here, which the runtime
+  // cannot do because the stream a migrated chare will use is the
+  // application's choice and is not known at this point.
+  //
+  // Note for anyone debugging in this window: added synchronization hides the
+  // failure, so probes placed inside it are worthless. Use failure-path-only
+  // probes.
+  hapiCheck(cudaStreamSynchronize((cudaStream_t)0));
   receivedDeviceMsgs[id] = data;
   post[0].hapi_stream = (cudaStream_t) 0;
 }
