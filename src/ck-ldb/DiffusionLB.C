@@ -430,7 +430,34 @@ void DiffusionLB::WithinNodeLB()
         {
           start = prefixObjects[rank - 1];
         }
-        for (int j = start; j < prefixObjects[rank]; j++)
+        // Collect from the ENDS of this rank's key interval, not in array
+        // order. Same reasoning as the across-node interval rule: the volume
+        // that neighbour exchange costs is set by each PE's EXTENT, so the
+        // objects worth giving up are the ones at the edges. Taking them
+        // end-inward leaves the retained set contiguous; array order punches
+        // holes in it, which cost nothing in load but the full extent in
+        // volume. Only when the application registered a 1-D ordering key.
+        std::vector<int> _ord;
+        for (int j2 = start; j2 < prefixObjects[rank]; j2++) _ord.push_back(j2);
+        const bool _ordered =
+            !_ord.empty() && nodeStats->objData[_ord[0]].position.size() == 1;
+        if (_ordered)
+          std::sort(_ord.begin(), _ord.end(), [&](int a, int b) {
+            return nodeStats->objData[a].position[0] <
+                   nodeStats->objData[b].position[0];
+          });
+        int _lo = 0, _hi = (int)_ord.size() - 1;
+        bool _takeLo = true;
+        while (_lo <= _hi)
+        {
+          int j;
+          if (_ordered)
+          {
+            j = _takeLo ? _ord[_lo] : _ord[_hi];
+            if (_takeLo) _lo++; else _hi--;
+            _takeLo = !_takeLo;
+          }
+          else { j = _ord[_lo]; _lo++; }
         {
           // getCompLoad(), not getVertexLoad(): this weighs an object's load against
           // a budget in seconds (overLoad), and getVertexLoad()'s MAX(compLoad, 0.1)
@@ -463,6 +490,7 @@ void DiffusionLB::WithinNodeLB()
             isToken.push_back(0);
             overLoad -= objs[j].getCompLoad();
           }
+        }
         }
         if(rank==0) {
           // Objects migrating in. They land here because across-node migration
