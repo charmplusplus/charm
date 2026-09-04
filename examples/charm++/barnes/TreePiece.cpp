@@ -127,6 +127,37 @@ void TreePiece::startTraversal(){
   deviceWalkRunning = launchDeviceWalk();
 #endif
 
+  // Where this element sits, for geometric balancers (DiffusionLB's centroid
+  // metric, i.e. running without +LBDiffusionCommOn). A tree piece is a
+  // contiguous SFC key range, so the centre of its particles summarises it
+  // faithfully in one point. Weighted by particle count so an almost-empty
+  // bucket does not pull the centre off the mass.
+  //
+  // A piece holding nothing registers no position at all rather than claiming
+  // the origin, which is a real point in the domain and would drag the node
+  // centroid toward it.
+  {
+    std::vector<LBRealType> pos(3, 0.0);
+    long long tot = 0;
+    for(int i = 0; i < myNumBuckets; i++){
+      Node<ForceData> *b = myBuckets[i];
+      const int np = b->getNumParticles();
+      if(np <= 0) continue;
+      const OrientedBox<Real> &box = b->data.box;
+      pos[0] += (LBRealType)np * (LBRealType)0.5 *
+                (box.lesser_corner.x + box.greater_corner.x);
+      pos[1] += (LBRealType)np * (LBRealType)0.5 *
+                (box.lesser_corner.y + box.greater_corner.y);
+      pos[2] += (LBRealType)np * (LBRealType)0.5 *
+                (box.lesser_corner.z + box.greater_corner.z);
+      tot += np;
+    }
+    if(tot > 0){
+      for(int i = 0; i < 3; i++) pos[i] /= (LBRealType)tot;
+      setObjPosition(pos);
+    }
+  }
+
   if(myNumBuckets == 0){
     localGravityDone();
     remoteGravityDone();

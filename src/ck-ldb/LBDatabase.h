@@ -133,6 +133,14 @@ public:
   }
 #endif
 
+  inline void ObjPosition(LDObjHandle h, const std::vector<LBRealType>& pos) {
+    LbObj(h)->setPosition(pos);
+  };
+
+  inline const std::vector<LBRealType>& GetObjPosition(LDObjHandle h) {
+    return LbObj(h)->getPosition();
+  };
+
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();
   }

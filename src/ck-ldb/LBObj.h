@@ -78,6 +78,19 @@ public:
 #endif
   }
 
+  // Object position, for geometric load balancers (DiffusionLB's centroid
+  // metric). Empty unless the application calls CkMigratable::setObjPosition,
+  // so every reader has to cope with a zero-length vector.
+  inline void setPosition(const std::vector<LBRealType>& pos)
+  {
+    data.position = pos;
+  }
+
+  inline const std::vector<LBRealType>& getPosition()
+  {
+    return data.position;
+  }
+
   inline void setGPUTiming(LBRealType gputime)
   {
   #if CMK_CUDA

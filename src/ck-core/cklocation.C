@@ -1882,6 +1882,21 @@ void CkMigratable::pup(PUP::er& p)
     p | lbStepBlocked;
   }
 
+#if CMK_LBDB_ON
+  // The position travels with the object. It is registered by the application
+  // against the LB database entry on the source PE, and that entry does not
+  // migrate -- without carrying it here, an object arrives with an empty
+  // position and drops out of the centroid the geometric metric computes.
+  {
+    std::vector<LBRealType> position;
+    if (!p.isUnpacking())
+      position = myRec->getObjPosition();
+    p | position;
+    if (p.isUnpacking())
+      myRec->setObjPosition(position);
+  }
+#endif
+
   if (p.isUnpacking())
     ckFinishConstruction(epoch);
 }
@@ -1997,6 +2012,8 @@ void CkMigratable::UserSetLBLoad()
 // user can call this helper function to set obj load (for model-based lb)
 void CkMigratable::setObjTime(double cputime) { 
   myRec->setObjTime(cputime); }
+void CkMigratable::setObjPosition(const std::vector<LBRealType>& pos) {
+  myRec->setObjPosition(pos); }
 double CkMigratable::getObjTime() { return myRec->getObjTime(); }
 
 void CkMigratable::setObjGPUTime(double gputime) {
@@ -2574,6 +2591,7 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg)
 }
 #else
 void CkMigratable::setObjTime(double cputime) {}
+void CkMigratable::setObjPosition(const std::vector<LBRealType>& pos) {}
 double CkMigratable::getObjTime() { return 0.0; }
 void CkMigratable::setObjGPUTime(double gputime) {}
 double CkMigratable::getObjGPUTime() { return 0.0; }
@@ -2776,11 +2794,17 @@ void CkLocRec::stopTiming(int ignore_running)
 }
 void CkLocRec::setObjTime(double cputime) { 
   lbmgr->EstObjLoad(ldHandle, cputime); }
+void CkLocRec::setObjPosition(const std::vector<LBRealType>& pos) {
+  lbmgr->SetObjPosition(ldHandle, pos); }
 double CkLocRec::getObjTime()
 {
   LBRealType walltime, cputime;
   lbmgr->GetObjLoad(ldHandle, walltime, cputime);
   return walltime;
+}
+const std::vector<LBRealType>& CkLocRec::getObjPosition()
+{
+  return lbmgr->GetObjPosition(ldHandle);
 }
 void CkLocRec::setObjGPUTime(double gputime) {
   lbmgr->EstObjGPULoad(ldHandle, gputime);

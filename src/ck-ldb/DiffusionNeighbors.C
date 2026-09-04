@@ -549,11 +549,21 @@ void DiffusionLB::initializeCentroid()
     allNodeObjCount.resize(numNodes);
     allNodeDistances.resize(numNodes);
 
-    int position_dim = 0;
-    if (nodeStats->objData.size() > 0)
-    {
-        position_dim = nodeStats->objData[0].position.size();
-    }
+    // Take the dimension from the first object that actually has a position,
+    // not from object 0, and use the member rather than shadowing it with a
+    // local. An application that leaves some elements without a position -- an
+    // element holding an empty region, say -- would otherwise fix this at 0
+    // while processReceiveCentroid asserts against 3, and every node dies with
+    // "received centroid of size 0 from node 0, expected size 3".
+    position_dim = 0;
+    for (int i = 0; i < nodeStats->objData.size() && position_dim == 0; i++)
+        position_dim = nodeStats->objData[i].position.size();
+
+    if (position_dim == 0)
+        CkAbort("DiffusionLB: the centroid metric needs object positions, but no "
+                "object registered one. Call CkMigratable::setObjPosition() from "
+                "the application, or pass +LBDiffusionCommOn to use the "
+                "communication metric instead.\n");
 
     // initialize centroid structures
     myCentroid.resize(position_dim, 0);

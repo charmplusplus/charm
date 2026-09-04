@@ -113,6 +113,10 @@ public:
   virtual void ResumeFromSync(void);
   virtual void UserSetLBLoad(void);  /// user define this when setLBLoad is true
   void setObjTime(double cputime);
+  // Register this object's position for geometric load balancers (DiffusionLB's
+  // centroid metric). Optional: left uncalled, the position stays empty and
+  // centroid-based balancing has nothing to work with.
+  void setObjPosition(const std::vector<LBRealType>& pos);
   double getObjTime();
   void setObjGPUTime(double cputime);
   double getObjGPUTime();
