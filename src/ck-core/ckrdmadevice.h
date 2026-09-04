@@ -157,12 +157,10 @@ extern "C" {
   extern int device_ack_handler;
 }
 
-// Persistent registration of a device buffer used across many messages
-// (send source or posted receive destination): register once, deregister
-// when the application frees the buffer.  Exact (pointer, length) match.
-void CkDeviceBufferRegister(const void* ptr, size_t cnt);
-void CkDeviceBufferDeregister(const void* ptr, size_t cnt);
 // Device pool: arenas registered lazily, whole, on first network use.
+// Every other device buffer is registered per message and released on
+// completion; holding registrations across messages is the network layer's
+// registration cache to do.
 void* CkDeviceMalloc(size_t size);
 void CkDeviceFree(void* ptr);
 // Per-PE init of the device zerocopy path (idle-time ack flush).

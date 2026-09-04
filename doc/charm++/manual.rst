@@ -9375,28 +9375,17 @@ In reconverse builds (for example ``reconverse-linux-x86_64-amd``), a message
 whose source and destination are in different processes is transferred as a
 device-to-device RDMA get through the network backend, and both the source
 and the destination buffers have to be registered with the network for the
-duration of the transfer. By default the runtime registers each buffer per
-message and releases both registrations when the get completes; the
-release of the source registration is carried back to the sender inside the
-next device message the receiver sends to it, so no extra message is
-normally needed. This is correct for any buffer, but registration costs a
-few microseconds per message on each side.
+duration of the transfer. The runtime registers each buffer per message and
+releases both registrations when the get completes; the release of the
+source registration is carried back to the sender inside the next device
+message the receiver sends to it, so no extra message is normally needed.
 
-A buffer that is sent from, or received into, many times can instead be
-registered once for its lifetime:
-
-.. code-block:: c++
-
-   CkDeviceBufferRegister(ptr, bytes);    // after allocating the buffer
-   ...                                    // any number of sends and receive posts
-   CkDeviceBufferDeregister(ptr, bytes);  // before freeing it
-
-The runtime finds a registered buffer by address range, so a whole array may
-be registered once and sub-ranges of it sent or posted. The registration is
-released only by ``CkDeviceBufferDeregister``: call it before the buffer is
-freed, and in a chare's destructor or ``pup`` before migration. A buffer that
-is not registered this way falls back to per-message registration, which is
-correct and only slower.
+There is no application call to hold a registration across messages. A
+buffer that is sent from, or received into, many times is registered again
+on each message, and the cost of repeating that registration on the same
+address range is absorbed by the network layer's own registration cache;
+the runtime does not keep a second cache of its own. The one exception is
+memory the runtime itself owns, which is what the device pool below is for.
 
 Registration and buffer reuse are separate questions. The callback given to
 ``CkDeviceBuffer`` is invoked when the receiver's transfer out of the source
@@ -9406,8 +9395,8 @@ iteration must either wait for that callback before writing, or alternate
 between two send buffers: a neighbour that has sent its message for
 iteration ``i+1`` has already finished reading the buffer it received for
 iteration ``i``, so with two buffers no callback is needed. Overwriting a
-buffer the receiver may still be reading is a silent data race; registering
-the buffer does not change this. The callback, when requested, is delivered
+buffer the receiver may still be reading is a silent data race; where the
+buffer came from does not change this. The callback, when requested, is delivered
 through the same piggybacked acknowledgement as the release, and costs a
 few percent of a small chare-iteration. A callback with no message is
 delivered as an empty message: to match it by reference number in SDAG,
@@ -9433,13 +9422,11 @@ demand (``CK_GPU_ARENA_MB`` in the environment sets the arena size, default
 is sent or received into, whole, and stays registered; arenas whose buffers
 never cross the network are never registered. Arenas are per device: a
 request is served from arenas on the calling PE's current device, so a
-process that drives several GPUs gets one arena set per device. Buffers
-from the pool need no
-``CkDeviceBufferRegister`` call and no release per message, and a process
-sending from many such buffers holds one registration per arena rather than
-one per buffer, which measured faster than registering each buffer
-explicitly. The pool owns the arena, so freeing and reallocating pool buffers
-is safe with respect to registration.
+process that drives several GPUs gets one arena set per device. Buffers from
+the pool need no release per message, and a process sending from many such
+buffers holds one registration per arena rather than one per buffer. The
+pool owns the arena, so freeing and reallocating pool buffers is safe with
+respect to registration.
 
 The pool answers the registration question only. When a send buffer may be
 overwritten is still decided by the callback on ``CkDeviceBuffer`` or by

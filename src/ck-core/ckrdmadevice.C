@@ -604,33 +604,38 @@ extern "C" {
   int device_dereg_handler;
 }
 
-/* Persistent device-buffer registration (fix (b) for #3960), and a
- * registered device pool.
+/* The registered device pool.
  *
- * Registered REGIONS live in one interval map per process: [start, end)
- * with the layer's memory-region handle.  Two ways in:
- *   - CkDeviceBufferRegister(ptr, cnt): the application registers a buffer
- *     it allocated itself, once; CkDeviceBufferDeregister before freeing.
- *   - CkDeviceMalloc(size) / CkDeviceFree(ptr): a device pool of arenas
- *     (buddy allocator over one large device allocation each, grown on
- *     demand).  An arena is registered LAZILY, whole, on the first send or
- *     receive post that lands in it, so arenas that never cross the network
- *     are never pinned.  The pool owns the arena's lifetime, which is what
- *     makes the registration safe without allocator hooks.
+ * An ordinary device buffer is registered per message and released when the
+ * get completes (fix (a) above): that is the only behaviour the runtime
+ * offers, and holding a registration across messages for a buffer whose
+ * lifetime the runtime does not own is the network layer's job -- LCI's
+ * registration cache -- not this file's.
+ *
+ * The one exception is memory the runtime does own.  CkDeviceMalloc(size) /
+ * CkDeviceFree(ptr) hand out device buffers from arenas (buddy allocator
+ * over one large device allocation each, grown on demand).  An arena is
+ * registered LAZILY, whole, on the first send or receive post that lands in
+ * it, so arenas that never cross the network are never pinned; the pool owns
+ * the arena's lifetime, which is what makes that registration safe without
+ * allocator hooks.  Registered arenas live in one interval map per process:
+ * [start, end) with the layer's memory-region handle.
+ *
  * The send path (CkRdmaDeviceOnSender) and the receive path
  * (CkRdmaDeviceIssueRgets) look a buffer up by range containment; a hit
- * reuses the region's handle and marks the buffer NODEREG so the
- * completion-time release above leaves it alone; a miss falls back to the
- * per-message registration that fix (a) releases.  Sweeping idle arenas is
- * deliberately not done here (idle-time / load-balancing-time work, later). */
+ * reuses the arena's handle and marks the buffer NODEREG so the
+ * completion-time release above leaves it alone; a miss -- any buffer not
+ * from the pool -- takes the per-message registration that fix (a)
+ * releases.  Sweeping idle arenas is deliberately not done here (idle-time /
+ * load-balancing-time work, later). */
 #include <mutex>
 #include <map>
 #include <vector>
 #include "buddy_allocator.h"
 
-struct DeviceRegion { uintptr_t end; bool arena; char layerInfo[CMK_NOCOPY_DIRECT_BYTES]; };
+struct DeviceRegion { uintptr_t end; char layerInfo[CMK_NOCOPY_DIRECT_BYTES]; };
 struct DeviceArena { buddy::allocator* alloc; uintptr_t start, end; bool registered; int device; };
-static std::map<uintptr_t, DeviceRegion> device_regions;   // start -> region
+static std::map<uintptr_t, DeviceRegion> device_regions;   // start -> registered arena
 static std::vector<DeviceArena> device_arenas;
 static std::mutex device_reg_mutex;
 
@@ -644,7 +649,7 @@ static const DeviceRegion* deviceRegionFind(uintptr_t p, size_t cnt) {
   for (auto& ar : device_arenas) {
     if (p >= ar.start && p + cnt <= ar.end) {
       if (!ar.registered) {
-        DeviceRegion r; r.end = ar.end; r.arena = true;
+        DeviceRegion r; r.end = ar.end;
         CmiSetRdmaBufferInfo(r.layerInfo, (const void*)ar.start, ar.end - ar.start, CMK_BUFFER_REG);
         ar.registered = true;
         if (CkMyPe() == 0)
@@ -656,25 +661,6 @@ static const DeviceRegion* deviceRegionFind(uintptr_t p, size_t cnt) {
     }
   }
   return nullptr;
-}
-
-void CkDeviceBufferRegister(const void* ptr, size_t cnt) {
-  uintptr_t p = (uintptr_t)ptr;
-  std::lock_guard<std::mutex> g(device_reg_mutex);
-  if (deviceRegionFind(p, cnt)) return;  // already covered (explicit or arena)
-  if (device_regions.empty() && CkMyPe() == 0)
-    CmiPrintf("CkRdmaDevice> persistent device-buffer registration in use (CkDeviceBufferRegister)\n");
-  DeviceRegion r; r.end = p + cnt; r.arena = false;
-  CmiSetRdmaBufferInfo(r.layerInfo, ptr, cnt, CMK_BUFFER_REG);
-  device_regions.emplace(p, r);
-}
-
-void CkDeviceBufferDeregister(const void* ptr, size_t cnt) {
-  std::lock_guard<std::mutex> g(device_reg_mutex);
-  auto it = device_regions.find((uintptr_t)ptr);
-  if (it == device_regions.end() || it->second.arena) return;
-  CmiDeregisterMem(ptr, it->second.layerInfo, CkMyPe(), CMK_BUFFER_REG);
-  device_regions.erase(it);
 }
 
 static size_t deviceArenaBytes() {
@@ -721,8 +707,9 @@ void CkDeviceFree(void* ptr) {
   CkAbort("CkDeviceFree: pointer is not from the device pool");
 }
 
-// Initialise 'b' for ptr/cnt: from a registered region if one covers it
-// (kept handle, never released per message), else per message.
+// Initialise 'b' for ptr/cnt: from the pool arena that covers it, if any
+// (kept handle, never released per message), else registered per message
+// and released on completion.
 static void deviceNcpyBufferInit(CmiNcpyBuffer& b, const void* ptr, size_t cnt, void* opinfo) {
   b.deviceRdmaOpInfo = opinfo;
   {
