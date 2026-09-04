@@ -183,6 +183,10 @@ public:
         dOwners(NULL), ownerCap(0),
         hPatch(NULL), dPatch(NULL), patchCap(0),
         hStage(NULL), hStageCap(0),
+        hBinKey(NULL), dBinKey(NULL), hBinFirst(NULL), dBinFirst(NULL),
+        hBinLast(NULL), dBinLast(NULL), hBinDepth(NULL), dBinDepth(NULL),
+        hBinStart(NULL), dBinStart(NULL), hBinCount(NULL), dBinCount(NULL),
+        binCap(0),
         nParts(0), cap(0)
   {
     clearTreeHandles();
@@ -272,6 +276,21 @@ public:
   // Pull one arrived block back to the host as Particles.
   void unstageRecv(int src, int total, struct Particle *out);
   static size_t stageBytes(int n){ return (size_t)n*(sizeof(float4)*2 + sizeof(unsigned long long)); }
+
+  // Assemble this iteration's particles on the device, straight out of the
+  // staging regions the pushes landed in. Replaces the host concatenation, the
+  // host sort and the re-upload that followed it: the particles never leave.
+  void beginAssemble(int total);
+  void assembleRange(int srcPe, int srcTotal, int srcOff, int dstOff, int cnt);
+  void endAssemble();
+  // Bring the assembled, sorted particles back for whatever still runs on the
+  // host -- the histogram's sorting tree and the host tree build.
+  void readbackParticles(struct Particle *out, int n);
+
+  // Extent of each key-prefix bin over the sorted device keys. Blocking; the
+  // decomposition needs the answer before it can decide the next round.
+  void binCounts(const Key *keys, const int *depths, int nbins,
+                 int *start, int *count, Key *first, Key *last);
   cudaStream_t deviceStream() const { return stream; }
 
 
@@ -316,6 +335,11 @@ private:
   int *dIdx, *dIdxAlt;
   void *dSortTemp;
   size_t sortTempBytes;
+  // Bin query scratch, sized to the largest round seen.
+  unsigned long long *hBinKey, *dBinKey, *hBinFirst, *dBinFirst, *hBinLast, *dBinLast;
+  int *hBinDepth, *dBinDepth, *hBinStart, *dBinStart, *hBinCount, *dBinCount;
+  int binCap;
+
   GpuMomentPatch *hPatch;
   GpuMomentPatch *dPatch;
   int patchCap;

@@ -218,6 +218,28 @@ class Node {
     }
   }
 
+  // Structure only: children get their keys and depths, and their particle
+  // ranges are filled in afterwards from the device. The sorting tree uses
+  // this so that refining a bin costs no host reads of the particles -- the
+  // extent of a key prefix over a sorted array is a search, and the device
+  // holds the array.
+  void refineKeysOnly(){
+    CkAssert(core.numChildren == 0);
+    const int depth = getDepth();
+    core.numChildren = BRANCH_FACTOR;
+    children = new Node<T>[BRANCH_FACTOR];
+    Key childKey = (getKey() << LOG_BRANCH_FACTOR);
+    for(int i = 0; i < BRANCH_FACTOR; i++){
+      Key k = childKey + i;
+      children[i].setKey(k);
+      children[i].setDepth(depth + 1);
+      children[i].setParent(this);
+      children[i].core.particleStart = NULL;
+      children[i].core.numParticles = 0;
+      children[i].core.numChildren = 0;
+    }
+  }
+
   void initChild(int i, int *splitters, Key childKey, int childDepth){
     Node<T> *child = children+i;
     int childPartStart = splitters[i]; 

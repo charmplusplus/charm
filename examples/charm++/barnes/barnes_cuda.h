@@ -282,7 +282,18 @@ struct GpuMomentPatch {
   unsigned long long key;
 };
 
+// d_missed counts patches whose node the device tree does not reach, which
+// would otherwise be dropped in silence and leave a cell short of mass.
 void invokeScatterMoments(DeviceNode* d_nodes, const GpuMomentPatch* d_patch,
-                          int n, cudaStream_t stream);
+                          int n, int* d_missed, cudaStream_t stream);
+
+// Per-bin extent over the sorted keys: start index, count, first and last key.
+// Two binary searches per bin, which is what the host was doing by walking a
+// sorting tree over its own copy of the particles.
+void invokeBinCount(const unsigned long long* d_key, int n,
+                    const unsigned long long* d_binKey, const int* d_binDepth,
+                    int nbins, int* d_start, int* d_count,
+                    unsigned long long* d_first, unsigned long long* d_last,
+                    cudaStream_t stream);
 
 #endif // __BARNES_CUDA_H__

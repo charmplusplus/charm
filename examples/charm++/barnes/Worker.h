@@ -53,13 +53,19 @@ class MomentsWorker : public CutoffWorker<ForceData> {
   int curTP;
 
   public: 
+  // When the tree was mirrored from the device its moments came with it, so
+  // this pass only has to settle the node types and collect the buckets.
+  bool skipMoments;
+
   MomentsWorker(CkVec<TreePieceDescriptor> &petps,
                 map<Key,Node<ForceData>*> &tab,
-                CkVec<Node<ForceData>*> &bucks
+                CkVec<Node<ForceData>*> &bucks,
+                bool skipMom = false
                 ) : 
     peTreePieces(petps),
     nodeTable(tab),
     buckets(bucks),
+    skipMoments(skipMom),
     curTP(0)
   {
   }
@@ -134,9 +140,16 @@ class TraversalWorker : public CutoffWorker<ForceData> {
 
   // A Boundary node's moments are complete: they already include the mass held
   // on other PEs, gathered by the moment exchange. Both walks keep Boundary
-  // nodes, because both have to be able to descend through them, but only one
-  // of them may take the multipole when the criterion accepts one -- otherwise
-  // that node's whole subtree is counted twice. The local walk takes it.
+  // nodes, because both have to descend through them, but only one may take
+  // the multipole when the criterion accepts one -- otherwise that node's
+  // whole subtree is counted twice.
+  //
+  // The local walk takes it. It cannot be the remote one: a node that spans
+  // several tree pieces which all happen to be local is Internal to the host,
+  // and the remote walk discards Internal nodes entirely, so nothing would
+  // pick those up. When the local walk runs on the device its tree needs the
+  // completed Boundary moments pushed into it first -- see
+  // DataManager::patchDeviceBoundaryMoments, which is why that exists.
   virtual bool takesAcceptedBoundary() const { return true; }
 };
 

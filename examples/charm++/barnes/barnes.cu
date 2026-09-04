@@ -868,12 +868,12 @@ __device__ __forceinline__ int findByKey(const DeviceNode* nodes,
 
 __global__ void scatterMomentsKernel(DeviceNode* __restrict__ nodes,
                                      const GpuMomentPatch* __restrict__ patch,
-                                     int n){
+                                     int n, int* missed){
   for (int i = blockIdx.x*blockDim.x + threadIdx.x; i < n;
        i += gridDim.x*blockDim.x){
     const GpuMomentPatch p = patch[i];
     const int ni = findByKey(nodes, p.key);
-    if (ni < 0) continue;
+    if (ni < 0){ if (missed) atomicAdd(missed, 1); continue; }
     DeviceNode &d = nodes[ni];
     d.cmMass = p.cmMass;
     d.rsq = p.rsq;
@@ -883,8 +883,57 @@ __global__ void scatterMomentsKernel(DeviceNode* __restrict__ nodes,
 }
 
 void invokeScatterMoments(DeviceNode* d_nodes, const GpuMomentPatch* d_patch,
-                          int n, cudaStream_t stream){
+                          int n, int* d_missed, cudaStream_t stream){
   if (n <= 0) return;
   const int blocks = (n + REDUCE_BLOCK_SIZE - 1) / REDUCE_BLOCK_SIZE;
-  scatterMomentsKernel<<<blocks, REDUCE_BLOCK_SIZE, 0, stream>>>(d_nodes, d_patch, n);
+  scatterMomentsKernel<<<blocks, REDUCE_BLOCK_SIZE, 0, stream>>>(d_nodes, d_patch, n, d_missed);
+}
+
+// ---------------------------------------------------------------------------
+// Device histogram counting.
+//
+// A bin is a key prefix, so over a sorted key array its extent is two binary
+// searches: the first key at or above its lower bound and the first at or
+// above the next bin's. That makes the count, the first key and the last key
+// available without the host holding the particles at all -- which is the
+// point, since the host copy exists only to answer these three questions and
+// to give the tree build its ranges.
+// ---------------------------------------------------------------------------
+
+__global__ void binCountKernel(const unsigned long long* __restrict__ key, int n,
+                               const unsigned long long* __restrict__ binKey,
+                               const int* __restrict__ binDepth, int nbins,
+                               int* __restrict__ outStart,
+                               int* __restrict__ outCount,
+                               unsigned long long* __restrict__ outFirst,
+                               unsigned long long* __restrict__ outLast){
+  for (int b = blockIdx.x * blockDim.x + threadIdx.x; b < nbins;
+       b += gridDim.x * blockDim.x){
+    const unsigned long long k = binKey[b];
+    const int d = binDepth[b];
+    // The bin covers every key sharing its prefix: shift its key up to the
+    // leading position, and the next bin starts one increment along.
+    const int shift = 64 - d - 1;
+    const unsigned long long lo = k << shift;
+    const unsigned long long hi = (k + 1ULL) << shift;
+
+    const int s = lowerBound(key, 0, n, lo);
+    const int e = (shift == 0 || (k + 1ULL) == (1ULL << (d + 1)))
+                    ? n : lowerBound(key, s, n, hi);
+    outStart[b] = s;
+    outCount[b] = e - s;
+    outFirst[b] = (e > s) ? key[s]     : 0ULL;
+    outLast[b]  = (e > s) ? key[e - 1] : 0ULL;
+  }
+}
+
+void invokeBinCount(const unsigned long long* d_key, int n,
+                    const unsigned long long* d_binKey, const int* d_binDepth,
+                    int nbins, int* d_start, int* d_count,
+                    unsigned long long* d_first, unsigned long long* d_last,
+                    cudaStream_t stream){
+  if (nbins <= 0) return;
+  const int blocks = (nbins + REDUCE_BLOCK_SIZE - 1) / REDUCE_BLOCK_SIZE;
+  binCountKernel<<<blocks, REDUCE_BLOCK_SIZE, 0, stream>>>(
+      d_key, n, d_binKey, d_binDepth, nbins, d_start, d_count, d_first, d_last);
 }

@@ -106,6 +106,14 @@ class DataManager : public CBase_DataManager {
   // I am done constructing the tree 
   // from particles present on this PE
   bool doneTreeBuild;
+  // Whether this iteration's tree came from the device, in which case its
+  // moments are already in place.
+  bool treeMirrored;
+  // Whether this iteration's particles were assembled on the device. Not the
+  // same question as whether a device is attached: the first exchange runs
+  // before anything is, so it takes the host route and the device array is
+  // still empty when ensureDevice() first succeeds.
+  bool assembledOnDevice;
   //CkVec<RequestedMomentsDescriptor> requestedMoments;
   map<Key,Node<ForceData>*> nodeTable;
 
@@ -205,6 +213,10 @@ class DataManager : public CBase_DataManager {
   void hashParticleCoordinates(const OrientedBox<Real> &universe);
   void initHistogramParticles();
   void sendHistogram();
+  // Fill the pending bins' descriptors, and their nodes' particle ranges, from
+  // the device. Replaces walking a host copy of the particles to answer the
+  // same three questions per bin.
+  bool fillBinCounts();
   
   void senseTreePieces();
 
@@ -242,6 +254,11 @@ class DataManager : public CBase_DataManager {
   void sendParticleBlocks();
   void assembleReceivedBlocks();
   void buildTree();
+  // Mirror the device tree instead of rebuilding from the particles. The two
+  // have identical structure -- the device build applies the same refine
+  // predicate against the same key ranges -- so this copies structure,
+  // ownership and moments across and leaves nothing for the host to read.
+  bool buildTreeFromDevice();
   // Stage 6. Compares the flat device tree against the host tree built over
   // the same particles; reports under BARNES_TREE_CHECK. It is the only check
   // on the device build available while the traversal is still host code.

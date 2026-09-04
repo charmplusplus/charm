@@ -253,7 +253,15 @@ void GpuParticleStore::patchMoments(const GpuMomentPatch *patches, int n){
   std::memcpy(hPatch, patches, sizeof(GpuMomentPatch)*n);
   hapiCheck(cudaMemcpyAsync(dPatch, hPatch, sizeof(GpuMomentPatch)*n,
                             cudaMemcpyHostToDevice, stream));
-  invokeScatterMoments(dtree.nodes, dPatch, n, stream);
+  hapiCheck(cudaMemsetAsync(dtree.activeNextCount, 0, sizeof(int), stream));
+  invokeScatterMoments(dtree.nodes, dPatch, n, dtree.activeNextCount, stream);
+  int missed = 0;
+  hapiCheck(cudaMemcpyAsync(&missed, dtree.activeNextCount, sizeof(int),
+                            cudaMemcpyDeviceToHost, stream));
+  hapiCheck(cudaStreamSynchronize(stream));
+  if(missed > 0)
+    CkPrintf("[PATCH] pe %d: %d of %d boundary moments had no node in the "
+             "device tree\n", CkMyPe(), missed, n);
   // The walks wait on this, so it has to be re-recorded after the patch.
   hapiCheck(cudaEventRecord(treeBuilt, stream));
 }
@@ -476,6 +484,130 @@ void GpuParticleStore::unstageRecv(int src, int total, Particle *out){
     out[i].key = (Key)k[i];
     out[i].acceleration = Vector3D<Real>(0.0);
     out[i].potential = 0.0;
+  }
+}
+
+void GpuParticleStore::beginAssemble(int total){
+  nParts = total;
+  ensure(total);
+}
+
+// One range of one sender's block into its place in the destination array.
+// Contiguous on both sides, so three device-to-device copies and no kernel.
+void GpuParticleStore::assembleRange(int srcPe, int srcTotal, int srcOff,
+                                     int dstOff, int cnt){
+  if(cnt <= 0) return;
+  if(srcPe < 0 || srcPe >= dRecv.length() || dRecv[srcPe] == NULL ||
+     srcOff + cnt > srcTotal || dstOff + cnt > nParts ||
+     (size_t)recvCap[srcPe] < stageBytes(srcTotal)){
+    CkPrintf("[ASSEMBLE] pe %d BAD src=%d srcTotal=%d srcOff=%d cnt=%d "
+             "dstOff=%d nParts=%d regions=%d cap=%d\n",
+             CkMyPe(), srcPe, srcTotal, srcOff, cnt, dstOff, nParts,
+             dRecv.length(),
+             (srcPe >= 0 && srcPe < recvCap.length()) ? recvCap[srcPe] : -1);
+    return;
+  }
+  char *base = dRecv[srcPe];
+  const float4 *sp = (const float4 *)base + srcOff;
+  const float4 *sv = (const float4 *)(base + (size_t)srcTotal*sizeof(float4)) + srcOff;
+  const unsigned long long *sk =
+      (const unsigned long long *)(base + (size_t)srcTotal*sizeof(float4)*2) + srcOff;
+
+  hapiCheck(cudaMemcpyAsync(dPos + dstOff, sp, sizeof(float4)*cnt,
+                            cudaMemcpyDeviceToDevice, stream));
+  hapiCheck(cudaMemcpyAsync(dVel + dstOff, sv, sizeof(float4)*cnt,
+                            cudaMemcpyDeviceToDevice, stream));
+  hapiCheck(cudaMemcpyAsync(dKey + dstOff, sk,
+                            sizeof(unsigned long long)*cnt,
+                            cudaMemcpyDeviceToDevice, stream));
+}
+
+void GpuParticleStore::endAssemble(){
+  if(nParts <= 0){
+    hapiCheck(cudaEventRecord(uploaded, stream));
+    return;
+  }
+  // The blocks arrive in tree piece order, which is key order between pieces
+  // but not within the concatenation, so the array still has to be sorted --
+  // on the device now, where it already lives.
+  sortByKey();
+  hapiCheck(cudaMemsetAsync(dAccel, 0, sizeof(float4) * nParts, stream));
+  hapiCheck(cudaEventRecord(uploaded, stream));
+}
+
+void GpuParticleStore::readbackParticles(Particle *out, int n){
+  if(n <= 0) return;
+  hapiCheck(cudaMemcpyAsync(hPos, dPos, sizeof(float4)*n,
+                            cudaMemcpyDeviceToHost, stream));
+  hapiCheck(cudaMemcpyAsync(hVel, dVel, sizeof(float4)*n,
+                            cudaMemcpyDeviceToHost, stream));
+  hapiCheck(cudaMemcpyAsync(hKey, dKey, sizeof(unsigned long long)*n,
+                            cudaMemcpyDeviceToHost, stream));
+  hapiCheck(cudaStreamSynchronize(stream));
+  for(int i = 0; i < n; i++){
+    out[i].position = Vector3D<Real>(hPos[i].x, hPos[i].y, hPos[i].z);
+    out[i].mass = hPos[i].w;
+    out[i].velocity = Vector3D<Real>(hVel[i].x, hVel[i].y, hVel[i].z);
+    out[i].key = (Key)hKey[i];
+    out[i].acceleration = Vector3D<Real>(0.0);
+    out[i].potential = 0.0;
+  }
+}
+
+void GpuParticleStore::binCounts(const Key *keys, const int *depths, int nbins,
+                                 int *start, int *count, Key *first, Key *last){
+  if(nbins <= 0) return;
+  if(nbins > binCap){
+    if(hBinKey != NULL){
+      hapiCheck(hapiFreeHost(hBinKey));   hapiCheck(hapiFree(dBinKey));
+      hapiCheck(hapiFreeHost(hBinDepth)); hapiCheck(hapiFree(dBinDepth));
+      hapiCheck(hapiFreeHost(hBinStart)); hapiCheck(hapiFree(dBinStart));
+      hapiCheck(hapiFreeHost(hBinCount)); hapiCheck(hapiFree(dBinCount));
+      hapiCheck(hapiFreeHost(hBinFirst)); hapiCheck(hapiFree(dBinFirst));
+      hapiCheck(hapiFreeHost(hBinLast));  hapiCheck(hapiFree(dBinLast));
+    }
+    binCap = nbins + nbins/4 + 256;
+    hapiCheck(hapiMallocHost((void **)&hBinKey,   sizeof(unsigned long long)*binCap));
+    hapiCheck(hapiMalloc((void **)&dBinKey,       sizeof(unsigned long long)*binCap));
+    hapiCheck(hapiMallocHost((void **)&hBinFirst, sizeof(unsigned long long)*binCap));
+    hapiCheck(hapiMalloc((void **)&dBinFirst,     sizeof(unsigned long long)*binCap));
+    hapiCheck(hapiMallocHost((void **)&hBinLast,  sizeof(unsigned long long)*binCap));
+    hapiCheck(hapiMalloc((void **)&dBinLast,      sizeof(unsigned long long)*binCap));
+    hapiCheck(hapiMallocHost((void **)&hBinDepth, sizeof(int)*binCap));
+    hapiCheck(hapiMalloc((void **)&dBinDepth,     sizeof(int)*binCap));
+    hapiCheck(hapiMallocHost((void **)&hBinStart, sizeof(int)*binCap));
+    hapiCheck(hapiMalloc((void **)&dBinStart,     sizeof(int)*binCap));
+    hapiCheck(hapiMallocHost((void **)&hBinCount, sizeof(int)*binCap));
+    hapiCheck(hapiMalloc((void **)&dBinCount,     sizeof(int)*binCap));
+  }
+
+  for(int i = 0; i < nbins; i++){
+    hBinKey[i] = (unsigned long long)keys[i];
+    hBinDepth[i] = depths[i];
+  }
+  hapiCheck(cudaMemcpyAsync(dBinKey, hBinKey, sizeof(unsigned long long)*nbins,
+                            cudaMemcpyHostToDevice, stream));
+  hapiCheck(cudaMemcpyAsync(dBinDepth, hBinDepth, sizeof(int)*nbins,
+                            cudaMemcpyHostToDevice, stream));
+
+  invokeBinCount(dKey, nParts, dBinKey, dBinDepth, nbins,
+                 dBinStart, dBinCount, dBinFirst, dBinLast, stream);
+
+  hapiCheck(cudaMemcpyAsync(hBinStart, dBinStart, sizeof(int)*nbins,
+                            cudaMemcpyDeviceToHost, stream));
+  hapiCheck(cudaMemcpyAsync(hBinCount, dBinCount, sizeof(int)*nbins,
+                            cudaMemcpyDeviceToHost, stream));
+  hapiCheck(cudaMemcpyAsync(hBinFirst, dBinFirst, sizeof(unsigned long long)*nbins,
+                            cudaMemcpyDeviceToHost, stream));
+  hapiCheck(cudaMemcpyAsync(hBinLast, dBinLast, sizeof(unsigned long long)*nbins,
+                            cudaMemcpyDeviceToHost, stream));
+  hapiCheck(cudaStreamSynchronize(stream));
+
+  for(int i = 0; i < nbins; i++){
+    start[i] = hBinStart[i];
+    count[i] = hBinCount[i];
+    first[i] = (Key)hBinFirst[i];
+    last[i]  = (Key)hBinLast[i];
   }
 }
 

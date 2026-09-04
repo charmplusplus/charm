@@ -49,6 +49,7 @@ DataManager::DataManager() :
   treePiecesSettled(false),
   migrationsSettled(true),
   atDistribute(false),
+  assembledOnDevice(false),
   pendingRangeMsg(NULL),
   stepThisIteration(false),
   decompStalledAt(0.0),
@@ -276,6 +277,21 @@ void DataManager::decomposeTail(){
   sendHistogram();
 }
 
+// Fill the descriptors the host way, by reading the particles a bin covers.
+// Only used when there is no device to ask.
+static void fillBinCountsHost(CkVec<std::pair<Node<NodeDescriptor>*,bool> > *pend,
+                              NodeDescriptor *cs){
+  for(int i = 0; i < pend->length(); i++){
+    Node<NodeDescriptor> *nd = (*pend)[i].first;
+    const int np = nd->getNumParticles();
+    Particle *ps = nd->getParticles();
+    Key kf, kl;
+    if(np > 0){ kf = ps[0].key; kl = ps[np-1].key; }
+    else       { kf = kl = Node<NodeDescriptor>::getParticleLevelKey(nd); }
+    cs[i] = NodeDescriptor(np, nd->getKey(), kf, kl);
+  }
+}
+
 void DataManager::initHistogramParticles(){
   int rootDepth = 0;
   
@@ -283,13 +299,67 @@ void DataManager::initHistogramParticles(){
                          rootDepth,
                          myParticles.getVec(),
                          myNumParticles);
+#ifdef GPU_GRAVITY
+  // The bins never read the particles on the device path: refining one only
+  // needs its key, and its extent comes back from a search over the sorted
+  // device keys.
+  activeBins.structureOnly =
+      (gpuParticles.attached() && globalParams.deviceExchange);
+#endif
   activeBins.addNewNode(sortingRoot);
+  if(!fillBinCounts())
+    fillBinCountsHost(activeBins.getPending(), activeBins.getCounts());
 
   // don't access myParticles through ckvec after this
   // anyway. these must be reset before this DM starts
   // to receive submitted particles from TPs placed on it
   myNumParticles = 0;
   myParticles.length() = 0;
+}
+
+// A bin's extent over the sorted keys is two binary searches, and the sorted
+// keys are on the device. Returns false when there is no device to ask, in
+// which case the caller keeps the host path.
+bool DataManager::fillBinCounts(){
+#ifdef GPU_GRAVITY
+  // Must agree with ActiveBinInfo::structureOnly: with structure-only refines
+  // the bins have no ranges of their own, so the device is the only thing that
+  // can supply them.
+  if(getenv("BARNES_NO_DEVBINS") != NULL) return false;
+  if(!gpuParticles.attached() || !globalParams.deviceExchange) return false;
+
+  CkVec<std::pair<Node<NodeDescriptor>*,bool> > *pend = activeBins.getPending();
+  const int nb = pend->length();
+  if(nb == 0) return true;
+
+  CkVec<Key> keys; CkVec<int> depths;
+  keys.resize(nb); depths.resize(nb);
+  for(int i = 0; i < nb; i++){
+    keys[i] = (*pend)[i].first->getKey();
+    depths[i] = (*pend)[i].first->getDepth();
+  }
+
+  CkVec<int> start, count; CkVec<Key> first, last;
+  start.resize(nb); count.resize(nb); first.resize(nb); last.resize(nb);
+  gpuParticles.binCounts(keys.getVec(), depths.getVec(), nb,
+                         start.getVec(), count.getVec(),
+                         first.getVec(), last.getVec());
+
+  NodeDescriptor *cs = activeBins.getCounts();
+  for(int i = 0; i < nb; i++){
+    Node<NodeDescriptor> *nd = (*pend)[i].first;
+    // The range, so the tree build and the exchange can address the particles
+    // without anyone having read them.
+    nd->setParticles(myParticles.getVec() + start[i], count[i]);
+    const Key kf = (count[i] > 0) ? first[i]
+                                  : Node<NodeDescriptor>::getParticleLevelKey(nd);
+    const Key kl = (count[i] > 0) ? last[i] : kf;
+    cs[i] = NodeDescriptor(count[i], nd->getKey(), kf, kl);
+  }
+  return true;
+#else
+  return false;
+#endif
 }
 
 void DataManager::sendHistogram(){
@@ -678,32 +748,49 @@ void DataManager::assembleReceivedBlocks(){
   }
 
   myParticles.resize(myNumParticles);
-  CkVec<Particle> staged;
+
+#ifdef GPU_GRAVITY
+  // With the device exchange the particles are already here, in the staging
+  // regions the pushes landed in. Scatter them into place on the device and
+  // sort them there, rather than pulling every block back, concatenating on
+  // the host, sorting on the host and uploading the result again.
+  // Not separable from the device send: with -devexch the sender ships device
+  // slices and never fills m->parts, so the two are one unit.
+  const bool devAssemble =
+      (globalParams.deviceExchange && gpuParticles.attached());
+  assembledOnDevice = devAssemble;
+  if(devAssemble) gpuParticles.beginAssemble(myNumParticles);
+#endif
+
   for(int b = 0; b < recvdBlocks.length(); b++){
     ParticleBlockMsg *m = recvdBlocks[b];
-    const Particle *src = m->parts;
-#ifdef GPU_GRAVITY
-    // Pull this sender's block back from the device, in the order its
-    // bookkeeping lists the tree pieces.
-    if(globalParams.deviceExchange && gpuParticles.attached() &&
-       m->numParticles > 0){
-      staged.resize(m->numParticles);
-      gpuParticles.unstageRecv(m->fromPe, m->numParticles, staged.getVec());
-      src = staged.getVec();
-    }
-#endif
     int p = 0;
     for(int k = 0; k < m->numTps; k++){
       const int tp = m->tpIndex[k];
       const int np = m->tpCount[k];
       if(np == 0) continue;
       CkAssert(offset[tp] >= 0);
-      memcpy(myParticles.getVec()+offset[tp], src + p, sizeof(Particle)*np);
+#ifdef GPU_GRAVITY
+      if(devAssemble)
+        gpuParticles.assembleRange(m->fromPe, m->numParticles, p,
+                                   offset[tp], np);
+      else
+#endif
+      memcpy(myParticles.getVec()+offset[tp], m->parts + p, sizeof(Particle)*np);
       offset[tp] += np;
       p += np;
     }
     delete m;
   }
+
+#ifdef GPU_GRAVITY
+  if(devAssemble){
+    gpuParticles.endAssemble();
+    // The histogram's sorting tree and the host tree build still read these.
+    // Items 1 and 3 are what remove this readback.
+    gpuParticles.readbackParticles(myParticles.getVec(), myNumParticles);
+  }
+#endif
   recvdBlocks.length() = 0;
   numBlocksRecvd = 0;
   haveExpected = false;
@@ -718,6 +805,8 @@ void DataManager::receiveSplitters(SplitterMsg *msg){
 
   // process bins to refine. splitBins is (index, levels) pairs.
   activeBins.processRefineLevels(msg->splitBins,msg->nSplitBins);
+  if(!fillBinCounts())
+    fillBinCountsHost(activeBins.getPending(), activeBins.getCounts());
 
   // We traverse the final tree to flush particles to 
   // appropriate tree pieces
@@ -773,11 +862,30 @@ void DataManager::processSubmittedParticles(){
   submittedParticles.quickSort();
 
   prof.handoff(PhaseProfile::DISTRIB, PhaseProfile::SORT_POST);
+#ifdef GPU_GRAVITY
+  // endAssemble() already sorted this array on the device.
+  if(!(globalParams.deviceExchange && gpuParticles.attached()))
+#endif
   myParticles.quickSort();
   prof.end(PhaseProfile::SORT_POST);
 
+  ensureDevice();
+  prof.begin(PhaseProfile::UPLOAD);
+  // Only when the host assembled them. With the device exchange the array was
+  // built and sorted on the device and is already current.
+  if(!assembledOnDevice)
+    gpuParticles.upload(myParticles.getVec(), myNumParticles);
+  prof.end(PhaseProfile::UPLOAD);
+
+  // Before the host tree, not after: the host tree is a mirror of this one,
+  // and mirroring last iteration's would hand every bucket a particle range
+  // from the wrong array.
+  gpuParticles.buildDeviceTree(keyRanges, numTreePieces,
+                               (int)((Real)globalParams.ppb*BUCKET_TOLERANCE));
+
   prof.begin(PhaseProfile::BUILD);
-  buildTree();
+  const bool mirrored = buildTreeFromDevice();
+  if(!mirrored) buildTree();
   prof.end(PhaseProfile::BUILD);
   // add dummy tree piece whose index is larger than
   // that of all others. this is required to mark the
@@ -789,18 +897,9 @@ void DataManager::processSubmittedParticles(){
   // every bucket in the tree just built -- so this is the earliest point at
   // which it can go to the device, and the traversals that read it back are
   // still several messages away.
-  ensureDevice();
-  prof.begin(PhaseProfile::UPLOAD);
-  gpuParticles.upload(myParticles.getVec(), myNumParticles);
-  prof.end(PhaseProfile::UPLOAD);
-
-  // Stage 6: the same tree, on the device. The host tree built above is still
-  // what the traversal walks; this one is for the device traversal to come,
-  // and is checked against the host's moments under BARNES_TREE_CHECK.
-  gpuParticles.buildDeviceTree(keyRanges, numTreePieces,
-                               (int)((Real)globalParams.ppb*BUCKET_TOLERANCE));
 #endif
 
+  treeMirrored = mirrored;
   // makeMoments also sends out requests for moments
   // of remote nodes. The span closes in treeReady(), so it covers the cross-PE
   // exchange rather than only the local postorder pass.
@@ -934,6 +1033,70 @@ void DataManager::checkDeviceTree(){
 #endif
 }
 
+// The device already built this tree, from the same sorted keys with the same
+// refine predicate against the same ownership ranges, and its moments were
+// checked against the host's to within float rounding. Copying it back costs a
+// node array -- about 96 KB at 500K particles -- where rebuilding it costs
+// reading every particle, which is 20 MB and the only reason they had to come
+// back to the host at all.
+bool DataManager::buildTreeFromDevice(){
+#ifdef GPU_GRAVITY
+  if(getenv("BARNES_NO_MIRROR") != NULL) return false;
+  if(!gpuParticles.attached() || !globalParams.deviceExchange) return false;
+  // Same reason: on the first iteration the device tree was built over an
+  // array the host had just uploaded, which is fine, but the mirror is only
+  // safe once the ranges came from the device in the first place.
+  if(!assembledOnDevice) return false;
+  const int n = gpuParticles.treeNodeCount();
+  if(n <= 0) return false;
+
+  CkVec<DeviceNode> dn;
+  dn.resize(n);
+  gpuParticles.readTree(dn.getVec(), n);
+
+  CkVec<Node<ForceData>*> hn;
+  hn.resize(n);
+  int rootDepth = 0;
+  root = new Node<ForceData>(Key(1),rootDepth,myParticles.getVec(),myNumParticles);
+  hn[0] = root;
+
+  // Children are always allocated after their parent, so one forward pass is
+  // enough to have every node's host counterpart before it is needed.
+  for(int i = 0; i < n; i++){
+    Node<ForceData> *h = hn[i];
+    if(h == NULL) continue;
+    const DeviceNode &d = dn[i];
+
+    h->setParticles(myParticles.getVec() + d.partStart, d.partCount);
+    h->setOwners(d.ownerStart, d.ownerEnd);
+    nodeTable[(Key)d.key] = h;
+
+    // Only where the node belongs to a single tree piece. Above that it is a
+    // Boundary node whose moments the frontier reduction completes, and
+    // seeding it with this PE's share would be counted twice.
+    if(d.ownerStart == d.ownerEnd){
+      MultipoleMoments &m = h->data.moments;
+      m.totalMass = d.cmMass.w;
+      m.cm = Vector3D<Real>(d.cmMass.x, d.cmMass.y, d.cmMass.z);
+      m.rsq = d.rsq;
+      m.qxx = d.qxx; m.qxy = d.qxy; m.qxz = d.qxz;
+      m.qyy = d.qyy; m.qyz = d.qyz;
+      h->data.box.lesser_corner  = Vector3D<Real>(d.boxMin.x, d.boxMin.y, d.boxMin.z);
+      h->data.box.greater_corner = Vector3D<Real>(d.boxMax.x, d.boxMax.y, d.boxMax.z);
+    }
+
+    if(d.firstChild >= 0 && d.firstChild + 1 < n){
+      h->refineKeysOnly();
+      hn[d.firstChild]     = h->getChild(0);
+      hn[d.firstChild + 1] = h->getChild(1);
+    }
+  }
+  return true;
+#else
+  return false;
+#endif
+}
+
 void DataManager::buildTree(){
 
   int rootDepth = 0;
@@ -988,7 +1151,8 @@ void DataManager::makeMoments(){
 
   MomentsWorker mw(submittedParticles,
                    nodeTable,
-                   myBuckets
+                   myBuckets,
+                   treeMirrored
                    );
   fillTrav.postorderTraversal(root,&mw);
 }

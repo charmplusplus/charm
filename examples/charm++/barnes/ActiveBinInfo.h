@@ -14,9 +14,14 @@ struct ActiveBinInfo{
   CkVec<Node<T>*> unrefined;
 
 
+  // Set for the decomposition's sorting tree, whose bins never own host
+  // particles.
+  bool structureOnly;
+
   ActiveBinInfo(){
     oldvec = new CkVec<std::pair<Node<T> *, bool> >();
     newvec = new CkVec<std::pair<Node<T> *, bool> >();
+    structureOnly = false;
   }
 
   ~ActiveBinInfo(){
@@ -32,23 +37,19 @@ struct ActiveBinInfo{
   // A node joins the next round's active list, and its count joins the
   // histogram. The two used to be written out separately in addNewNode and in
   // processRefine; they have to stay in step, so there is one of them now.
+  // The descriptor is left empty and filled from the device afterwards; see
+  // DataManager::fillBinCounts. Only the bin's identity is known here.
   void pushBin(Node<T> *node){
     std::pair<Node<T>*,bool> pr;
     pr.first = node;
     pr.second = false;
     newvec->push_back(pr);
-
-    Key kfirst, klast;
-    int np = node->getNumParticles();
-    Particle *particles = node->getParticles();
-    if(np > 0){
-      kfirst = particles[0].key;
-      klast = particles[np-1].key;
-    }else{
-      kfirst = klast = Node<T>::getParticleLevelKey(node);
-    }
-    counts.push_back(NodeDescriptor(np,node->getKey(),kfirst,klast));
+    counts.push_back(NodeDescriptor(0,node->getKey(),Key(0),Key(0)));
   }
+
+  // The bins whose counts are still to be filled, in the order counts lists
+  // them.
+  CkVec<std::pair<Node<T>*,bool> > *getPending(){ return newvec; }
 
   void addNewNode(Node<T> *node){
     pushBin(node);
@@ -86,7 +87,7 @@ struct ActiveBinInfo{
 
 private:
   void refineToDepth(Node<T> *node, int levels){
-    refine(node);
+    if(structureOnly) refineStructureOnly(node); else refine(node);
     for(int i = 0; i < node->getNumChildren(); i++){
       Node<T> *child = node->getChild(i);
       if(levels > 1) refineToDepth(child, levels - 1);
@@ -99,6 +100,9 @@ public:
   virtual void refine(Node<T> *node){
     node->refine();
   }
+
+  // Used by the decomposition, where the particle ranges come from the device.
+  void refineStructureOnly(Node<T> *node){ node->refineKeysOnly(); }
 
   void processEmpty(int *emptyBins, int nEmptyBins){
     for(int i = 0; i < nEmptyBins; i++){
