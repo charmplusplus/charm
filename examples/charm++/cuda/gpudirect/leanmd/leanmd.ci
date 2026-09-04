@@ -240,6 +240,14 @@ mainmodule leanmd {
           when forceSendDone() { }
         }
 
+        // Safe to pack again: the forces are computed and delivered, the cells
+        // have finished pulling them, and next step's kernels have not started.
+        // Under +LBAsync this is where a move decided earlier in the step
+        // actually departs -- the runtime fires it when this entry method
+        // returns -- so the migration overlaps the simulation instead of
+        // waiting for the park.
+        serial { ReadyMigrate(true); }
+
         //periodically call load balancer
         if (stepCount >= firstLdbStep && (stepCount - firstLdbStep) % ldbPeriod== 0) {
           if (asyncLb) {

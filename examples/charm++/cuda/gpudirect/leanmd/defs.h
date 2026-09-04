@@ -75,6 +75,10 @@ enum ComputeMapMode { COMPUTEMAP_RR = 0, COMPUTEMAP_LOCAL };
 // -lbasync. This is the whole overlap window: the strategy runs during it, and
 // nothing migrates until the park at the end. 0 reproduces the unsplit barrier.
 #define DEFAULT_LB_LAG          1
+// Steps before a balancing step that LB instrumentation is left on for. Only
+// these are measured, so this is the window the balancer actually decides from
+// (Compute::updateInstrumentation).
+#define LB_INSTRUMENT_WINDOW    3
 #define DEFAULT_FT_PERIOD       100000
 
 // 1-away decomposition: larger cells, so each Compute's pair kernel is wide enough

@@ -219,9 +219,6 @@ vec3 Compute::periodicShift() const {
   return shift;
 }
 
-// Measurement window, in steps before an AtSync, mirroring pic2d.
-#define LB_INSTRUMENT_WINDOW 3
-
 // Instrumentation is only useful for the steps the balancer will actually read,
 // and it is not free: every traced kernel becomes a CUPTI activity record that
 // hapiProcessCuptiBuffers has to walk at LB time. Tracing all 90 steps of a run
@@ -254,6 +251,15 @@ void Compute::updateInstrumentation() {
 
 void Compute::launchForces() {
   updateInstrumentation();
+  // Closes this chare's safe-to-pack window for the rest of the step. pup()
+  // carries no device state -- it does not have to, because the scratch holds
+  // nothing that outlives a step -- but that is only true at a step boundary.
+  // Moved from here to sendForces() the chare would land on its new PE with a
+  // freshly allocated, never-written d_force and hand a cell garbage forces,
+  // while the kernel that computed the real ones ran out on the source. Under
+  // +LBAsync a move can be taken at any device-quiet moment, so the window has
+  // to be stated rather than assumed.
+  ReadyMigrate(false);
   const double cutoffSq = (double)PTP_CUT_OFF * (double)PTP_CUT_OFF;
   const bool doEnergy = (stepCount == 1 || stepCount == finalStepCount);
   const int nA = nPart[0];

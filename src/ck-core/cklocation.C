@@ -2481,6 +2481,13 @@ void CkMigratable::AtSyncWait()
   }
   waitParked = true;
   myRec->deviceRecvParked = true;
+  // The park is by definition a point the application has declared safe, so
+  // re-assert readiness here. An application that narrows its safe window with
+  // ReadyMigrate(false) -- which it must, if its pup is only valid at certain
+  // points -- would otherwise leave a move buffered in nextPe with nothing left
+  // to run and fire it. invokeEntry calls checkBufferedMigration when this
+  // element's entry method returns, which is where such a move departs.
+  myRec->ReadyMigrate(true);
   if (migDbg())
     CkPrintf("[PARK %d] elem %s pending=%d count=%d\n", CkMyPe(),
              idx2str(thisIndexMax), myRec->pendingMigrateTo,
@@ -2722,6 +2729,33 @@ CkLocRec* CkFindDeviceRecvElement(CkGroupID aid, CmiUInt8 id)
 // (DeferredMigrateMsg and its handler index are declared near the top of
 // this file; the handler body lives beside noteDeviceSendDone below.)
 
+// Under the split barrier a move used to wait for the element to park in
+// AtSyncWait. That meant an element never overlapped its own migration with its
+// own iterations -- most of the point of the split, per lbJoinStep.
+//
+// The park is not what makes a move safe. outstandingDeviceSends is: it counts
+// both directions (sends still sourcing from this element's buffers, and
+// receives deferred into them), and zero means nothing is touching memory the
+// move is about to free. What the park adds is a guarantee the count REACHES
+// zero -- admission control bounces new device receives for a parked element
+// with a move pending, so it cannot be fed faster than it drains.
+//
+// So take the move at any device-quiet moment and keep the park as the fallback
+// for an element that never goes quiet while running. Strictly more
+// opportunities to move, under the same safety condition, and admission control
+// is untouched: freezing a RUNNING element's receives is what deadlocked pic2d
+// (see 9ddd1d058), and that is not what this changes. An element that moves
+// mid-window carries its wait state -- lbStepPending, waitParked, lbWaitEpoch --
+// in CkMigratable::pup, calls AtSyncWait() on its new PE, and finds the step
+// already over there, which is the case that path already handles.
+//
+// CHARM_LB_MIGRATE_AT_PARK_ONLY restores the old behaviour for bisecting.
+static bool migrateAtParkOnly()
+{
+  static const bool on = (getenv("CHARM_LB_MIGRATE_AT_PARK_ONLY") != nullptr);
+  return on;
+}
+
 extern "C" void _deferredMigrateHandler(void* arg)
 {
   DeferredMigrateMsg* m = (DeferredMigrateMsg*)arg;
@@ -2730,7 +2764,25 @@ extern "C" void _deferredMigrateHandler(void* arg)
   if (rec != NULL) {
     bool movable = (rec->outstandingDeviceSends == 0);
 #if CMK_LBDB_ON
-    if (_lb_args.lbAsync() && !rec->deviceRecvParked) movable = false;
+    if (_lb_args.lbAsync() && migrateAtParkOnly() && !rec->deviceRecvParked)
+      movable = false;
+    // The application's safe-to-pack window still governs. This kick is a
+    // runtime-side zero crossing, not a point the application declared safe,
+    // and emigrating from here would walk straight past the readyMigrate gate
+    // that recvMigrate honours -- packing an element whose pup is only valid
+    // between steps, mid-step. Hand the move back through recvMigrate instead:
+    // it re-buffers into nextPe, and checkBufferedMigration takes it the moment
+    // the application reopens the window. (ledgerRecord keeps one entry per
+    // element per step, so re-entering is idempotent.)
+    if (!rec->isReadyMigrate())
+    {
+      if (getenv("CHARM_DEBUG_MIGRATE"))
+        CmiPrintf("[KICK-HOLD %d] id=%llu not ready to pack; re-buffering for "
+                  "toPe=%d\n", CkMyPe(), (unsigned long long)m->id, m->toPe);
+      rec->recvMigrate(m->toPe);
+      CmiFree(m);
+      return;
+    }
 #endif
     if (getenv("CHARM_DEBUG_MIGRATE"))
       CmiPrintf("[KICK %d] id=%llu movable=%d toPe=%d\n", CkMyPe(),
@@ -3953,16 +4005,14 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   // to a zerocopy send: migration frees and reallocates exactly those buffers.
   // Stand the migration down and let noteDeviceSendDone re-drive it when the
   // last transfer completes.
-  // Under the split barrier, only a parked element moves. A running element
-  // frozen in place mid-step deadlocks in cycles -- it stalls on receives
-  // from neighbours that are themselves frozen awaiting their own moves, which
-  // a batch decision (every element at once) makes certain. The park is the
-  // one point where the element provably holds no unconsumed device receive
-  // (CkDeviceRecvQuiet gates it), runs nothing, and admission control bounces
-  // everything new -- quiesced by construction, exactly what a move needs.
+  // Under the split barrier this used to additionally require the element to be
+  // parked. It does not: the count above is the safety condition, and the park
+  // only guarantees it is reached. See migrateAtParkOnly, which restores the
+  // old behaviour. An element that never goes quiet while running still moves
+  // at its park, which is where AtSyncWait re-drives this.
   if (rec->outstandingDeviceSends > 0
 #if CMK_LBDB_ON
-      || (_lb_args.lbAsync() && !rec->deviceRecvParked)
+      || (_lb_args.lbAsync() && migrateAtParkOnly() && !rec->deviceRecvParked)
 #endif
      )
   {

@@ -187,11 +187,32 @@ window -- lands on sync to within noise. And the overlap really happens: the
 strategy's own wall clock stretches from 0.031s to 0.184s at the first event
 under -lblag 2, which is it timesharing the PE with application steps. There is
 simply almost nothing to hide. A balancing event here costs about 145 ms, of
-which the strategy is 5-31 ms; the rest is the migration of 754 Computes, each
-of which drops its device scratch on the source and reallocates it on the
-destination. Migration happens at the park by construction, so no lag can
-overlap it.
+which the strategy is 5-31 ms.
 
-The split would pay on an application whose strategy is expensive relative to
-its moves -- or on this one, if a migrated Compute carried its device scratch
-across instead of reallocating.
+The rest is migrating 754 Computes. Those DO overlap, at a lag long enough for
+the decision to arrive while chares are still running -- verified by the debug
+trace, where at -lblag 10 and 15 every EMIG precedes the first PARK and no
+element reaches its park with a move still pending. At -lblag 2 they do not,
+and not because anything blocks them: the strategy has not finished deciding by
+the time everyone parks, so there is no decided move to overlap.
+
+Overlapping them does not pay either, and the longer lag it needs actively
+hurts: lag 2 8.27s, lag 8 8.42s, lag 16 8.48s against 8.24s sync. Waiting longer
+to apply the decision means more steps run on a placement the balancer has
+already superseded, and that staleness costs more than the move scheduling
+saves. It is worse still at a short period, where the stale window is a large
+fraction of every cycle: at -lbperiod 5, sync 8.81s against async 9.25s.
+
+-lblag is clamped to period - LB_INSTRUMENT_WINDOW - 1. The park has to land
+clear of the next event's measurement window: resuming from a step turns
+instrumentation back on, so a park inside that window bills the resume and the
+step's migrations to the objects as load, and the next decision is then made
+from a window describing the last balancing step rather than the application.
+
+So the split pays when the strategy is expensive relative to the moves, which at
+4 nodes it is not -- DiffusionLB's cost grows with the node graph, not with the
+box or the step count. On this application the lever is the move itself: a
+migrated Compute drops its device scratch on the source and reallocates it on
+the destination, and cudaMalloc/cudaFree synchronize the whole device.
+CHARM_MD_ASYNC_ALLOC halves the emigrate time (0.24s -> 0.11s), which at this
+scale is still too small to see in the total.

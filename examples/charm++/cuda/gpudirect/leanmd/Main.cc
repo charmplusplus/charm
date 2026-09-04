@@ -134,13 +134,19 @@ Main::Main(CkArgMsg* m) {
     asyncLb = 0;
   }
   if (lbLag < 0) lbLag = 0;
-  // The two halves have to pair up inside one period: AtSyncStart() aborts if
-  // the step it started is still in flight, which is what a lag reaching the
-  // next balancing step would mean.
-  if (asyncLb && lbLag >= ldbPeriod) {
-    CkPrintf("[WARN] -lblag %d does not fit in an LB period of %d; using %d.\n",
-             lbLag, ldbPeriod, ldbPeriod - 1);
-    lbLag = ldbPeriod - 1;
+  // The two halves have to pair up inside one period -- AtSyncStart() aborts if
+  // the step it started is still in flight -- and the park has to land clear of
+  // the NEXT step's measurement window. Resuming from a step turns
+  // instrumentation back on, so a park inside that window bills the resume and
+  // the step's migrations to the objects as load, and the next decision is made
+  // from a window describing the last balancing step rather than the
+  // application. That leaves period - window - 1 as the largest usable lag.
+  const int maxLag = ldbPeriod - LB_INSTRUMENT_WINDOW - 1;
+  if (asyncLb && lbLag > maxLag) {
+    CkPrintf("[WARN] -lblag %d does not clear the next measurement window "
+             "(period %d, window %d); using %d.\n",
+             lbLag, ldbPeriod, LB_INSTRUMENT_WINDOW, maxLag > 0 ? maxLag : 0);
+    lbLag = maxLag > 0 ? maxLag : 0;
   }
   if (asyncLb) CkPrintf("Async LB: on, lag %d steps\n", lbLag);
 
