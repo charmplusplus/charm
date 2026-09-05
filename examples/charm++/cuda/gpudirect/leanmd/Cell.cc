@@ -1,6 +1,7 @@
 #include "defs.h"
 #include "leanmd.decl.h"
 #include "Cell.h"
+#include "md_alloc.h"
 
 #include <algorithm>
 
@@ -136,19 +137,19 @@ void Cell::allocateDevice() {
   // within a thin shell of a face can leave. An eighth of the cell is generous.
   exch_capacity = std::max(64, part_capacity / 8);
 
-  hapiCheck(hapiMalloc((void**)&d_particles, sizeof(Particle) * part_capacity));
-  hapiCheck(hapiMalloc((void**)&d_stay, sizeof(Particle) * part_capacity));
-  hapiCheck(hapiMalloc((void**)&d_send_parts,
+  hapiCheck(mdMalloc((void**)&d_particles, sizeof(Particle) * part_capacity));
+  hapiCheck(mdMalloc((void**)&d_stay, sizeof(Particle) * part_capacity));
+  hapiCheck(mdMalloc((void**)&d_send_parts,
                        sizeof(Particle) * (size_t)inbrs * exch_capacity));
-  hapiCheck(hapiMalloc((void**)&d_recv_parts,
+  hapiCheck(mdMalloc((void**)&d_recv_parts,
                        sizeof(Particle) * (size_t)inbrs * exch_capacity));
-  hapiCheck(hapiMalloc((void**)&d_pos, sizeof(vec3) * part_capacity));
-  hapiCheck(hapiMalloc((void**)&d_force, sizeof(vec3) * part_capacity));
-  hapiCheck(hapiMalloc((void**)&d_recv_force,
+  hapiCheck(mdMalloc((void**)&d_pos, sizeof(vec3) * part_capacity));
+  hapiCheck(mdMalloc((void**)&d_force, sizeof(vec3) * part_capacity));
+  hapiCheck(mdMalloc((void**)&d_recv_force,
                        sizeof(vec3) * (size_t)inbrs * part_capacity));
-  hapiCheck(hapiMalloc((void**)&d_kePartial, sizeof(double) * 64));
-  hapiCheck(hapiMalloc((void**)&d_energy, sizeof(double)));
-  hapiCheck(hapiMalloc((void**)&d_counts, sizeof(int) * inbrs));
+  hapiCheck(mdMalloc((void**)&d_kePartial, sizeof(double) * 64));
+  hapiCheck(mdMalloc((void**)&d_energy, sizeof(double)));
+  hapiCheck(mdMalloc((void**)&d_counts, sizeof(int) * inbrs));
   hapiCheck(hapiMallocHost((void**)&h_counts, sizeof(int) * inbrs));
   hapiCheck(hapiMallocHost((void**)&h_energy, sizeof(double)));
 
@@ -162,16 +163,16 @@ void Cell::allocateDevice() {
 }
 
 void Cell::freeDevice() {
-  if (d_particles)   { hapiCheck(hapiFree(d_particles));   d_particles = NULL; }
-  if (d_stay)        { hapiCheck(hapiFree(d_stay));        d_stay = NULL; }
-  if (d_send_parts)  { hapiCheck(hapiFree(d_send_parts));  d_send_parts = NULL; }
-  if (d_recv_parts)  { hapiCheck(hapiFree(d_recv_parts));  d_recv_parts = NULL; }
-  if (d_pos)         { hapiCheck(hapiFree(d_pos));         d_pos = NULL; }
-  if (d_force)       { hapiCheck(hapiFree(d_force));       d_force = NULL; }
-  if (d_recv_force)  { hapiCheck(hapiFree(d_recv_force));  d_recv_force = NULL; }
-  if (d_kePartial)   { hapiCheck(hapiFree(d_kePartial));   d_kePartial = NULL; }
-  if (d_energy)      { hapiCheck(hapiFree(d_energy));      d_energy = NULL; }
-  if (d_counts)      { hapiCheck(hapiFree(d_counts));      d_counts = NULL; }
+  if (d_particles)   { hapiCheck(mdFree(d_particles));   d_particles = NULL; }
+  if (d_stay)        { hapiCheck(mdFree(d_stay));        d_stay = NULL; }
+  if (d_send_parts)  { hapiCheck(mdFree(d_send_parts));  d_send_parts = NULL; }
+  if (d_recv_parts)  { hapiCheck(mdFree(d_recv_parts));  d_recv_parts = NULL; }
+  if (d_pos)         { hapiCheck(mdFree(d_pos));         d_pos = NULL; }
+  if (d_force)       { hapiCheck(mdFree(d_force));       d_force = NULL; }
+  if (d_recv_force)  { hapiCheck(mdFree(d_recv_force));  d_recv_force = NULL; }
+  if (d_kePartial)   { hapiCheck(mdFree(d_kePartial));   d_kePartial = NULL; }
+  if (d_energy)      { hapiCheck(mdFree(d_energy));      d_energy = NULL; }
+  if (d_counts)      { hapiCheck(mdFree(d_counts));      d_counts = NULL; }
   if (h_counts)      { hapiCheck(hapiFreeHost(h_counts));  h_counts = NULL; }
   if (h_energy)      { hapiCheck(hapiFreeHost(h_energy));  h_energy = NULL; }
 }

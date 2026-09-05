@@ -217,7 +217,16 @@ arena is opened on every peer at startup (`+gpupoolsize <MB>` sizes an arena;
 `+gpucommbuffer`, `+gpulbbuffer` and `+gpuipcdirect` are not used). Paired at
 -lblag 2, three runs each: without the pool 7.95/8.16/8.37s, with `+gpupool`
 7.94/8.03/8.15s, and the largest per-PE emigrate falls from 0.58s to about
-0.3s. Without
+0.3s. With the Cells' buffers on the pool as well (md_alloc.h), three runs
+each, means:
+
+                    noLB      sync LB    async LB (-lblag 2)
+  without the pool  10.01s    8.15s      8.11s
+  +gpupool          9.95s     8.13s      8.01s
+
+Every device send in the pool runs is direct and every arena but a lazily
+created second one is open on all peers before the first step, so the
+per-process count of IPC handle opens goes from 130-200 to 3-6. Without
 `+gpupool` it needs two runtime knobs that are off by default and without which
 it cannot run at all: `+gpulbbuffer <MB>` to size the staging buffer, and
 CHARM_MIGRATE_ARENA=1 for the zero-copy rebind. Carrying the scratch is not

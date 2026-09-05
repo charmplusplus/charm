@@ -1,6 +1,7 @@
 #include "defs.h"
 #include "Cell.h"
 #include "Compute.h"
+#include "md_alloc.h"
 #include <algorithm>
 #include <cstdlib>
 #include <cstdio>
@@ -64,26 +65,7 @@ inline hapiError_t mdDevFree(void* p, cudaStream_t s) {
 // ordered, so a buffer is only freed at points where nothing is in flight
 // against it -- the destructor, after pup has settled the stream and the force
 // sends have drained, and ensureSlot growth, after the previous step's acks.
-// The runtime's choice is the application's: under +gpupool every buffer here
-// comes from CkDeviceMalloc; without it, from hapiMalloc (released through
-// hapiFreeMigratable), and nothing else changes. One binary, one switch.
-inline bool mdPoolOn() {
-  static const bool on = CkDevicePoolOn();
-  return on;
-}
-inline hapiError_t mdMigMalloc(void** p, size_t n) {
-  if (!mdPoolOn()) return hapiMalloc(p, n);
-  *p = CkDeviceMalloc(n);
-  return (*p != NULL) ? cudaSuccess : cudaErrorMemoryAllocation;
-}
-// fromPool is set only when this chare took the buffer from the pool, so with
-// the pool off it is never set and every buffer goes through
-// hapiFreeMigratable, which handles both a hapiMalloc'd buffer and one
-// rebound by migration.
-inline void mdMigFree(void* p, bool fromPool) {
-  if (p == NULL) return;
-  if (fromPool) CkDeviceFree(p); else hapiFreeMigratable(p);
-}
+// Allocation helpers: md_alloc.h (shared with Cell).
 
 struct AllocTimer {
   double t0; bool on;
