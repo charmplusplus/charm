@@ -205,6 +205,16 @@ void* CkRdmaDeviceAllocLbBuffer(void* dm, size_t size);
 // hapiFreeMigratable; callers that mix the two have to know which is which.
 void* CkDeviceMalloc(size_t size);
 void CkDeviceFree(void* ptr);
+// +gpupool: the pool is the runtime's allocation policy (migration arenas and
+// payloads from it, direct CUDA IPC only, no comm or load-balancing buffer).
+// An application that follows the runtime's choice allocates through
+// CkDeviceMalloc when this is true and through hapiMalloc otherwise.
+bool CkDevicePoolOn();
+// Set by the location manager around the send of a migration payload: the
+// runtime's own buffer, released by the receiver's ack rather than by a
+// completion callback, so the "direct send with no callback" warning does not
+// apply to it.
+void CkRdmaDeviceMarkMigrationPayload(bool sending);
 
 // Load balance pool block recycling, without a host barrier.
 //
@@ -227,6 +237,8 @@ inline int CkRdmaDeviceBusyIpcSlots() { return -1; }
 inline void* CkRdmaDeviceAllocLbBuffer(void* dm, size_t size) { return nullptr; }
 inline void* CkDeviceMalloc(size_t size) { return nullptr; }
 inline void CkDeviceFree(void* ptr) {}
+inline bool CkDevicePoolOn() { return false; }
+inline void CkRdmaDeviceMarkMigrationPayload(bool sending) {}
 inline void CkRdmaDeviceNoteLbBufferFreed(void* dm, cudaStream_t usedBy) {}
 inline void CkRdmaDeviceGateLbBuffer(void* dm, cudaStream_t consumer) {}
 #endif

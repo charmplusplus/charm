@@ -1426,6 +1426,29 @@ static void hapiMapping(char** argv) {
 
   // Check if user opted in to POSIX shared memory optimizations for
   // inter-process GPU messaging
+  // +gpupool: the device pool as the runtime's allocation policy. Parsed before
+  // +gpushm because that block decides, on it, whether a comm buffer exists.
+  {
+    const bool want_pool = CmiGetArgFlagDesc(argv, "+gpupool",
+        "device memory from the runtime's pooled arenas: migration arenas and "
+        "payloads come from it, cross-process device sends are direct CUDA IPC, "
+        "and each process's first arena is opened on all peers at startup; "
+        "+gpucommbuffer and +gpulbbuffer are not used");
+    int pool_mb = 0;
+    const bool have_size = CmiGetArgIntDesc(argv, "+gpupoolsize", &pool_mb,
+        "size of each device pool arena in MB (default 256, or CK_GPU_ARENA_MB)");
+    if (CmiMyRank() == 0) {
+      csv_gpu_manager.device_pool_on = want_pool;
+      if (have_size && pool_mb > 0)
+        csv_gpu_manager.device_pool_arena_bytes = (size_t)pool_mb << 20;
+    }
+    if (CmiMyPe() == 0 && want_pool)
+      CmiPrintf("HAPI> Device pool on (+gpupool): arenas of %d MB, migration "
+                "arenas and payloads from the pool, direct CUDA IPC only\n",
+                (have_size && pool_mb > 0) ? pool_mb
+                    : (getenv("CK_GPU_ARENA_MB") ? atoi(getenv("CK_GPU_ARENA_MB")) : 256));
+  }
+
   bool use_shm = false;
   if (CmiGetArgFlagDesc(argv, "+gpushm",
         "enable shared memory optimizations for inter-process GPU messaging")) {
@@ -1485,20 +1508,27 @@ static void hapiMapping(char** argv) {
     }
 
     if (CmiMyPe() == 0) {
-      CmiPrintf("HAPI> GPU communication buffer size: %zu MB "
-          "(rounded up to the nearest power of two)\n",
-          csv_gpu_manager.comm_buffer_size / (1024 * 1024));
+      if (csv_gpu_manager.device_pool_on) {
+        CmiPrintf("HAPI> No GPU communication or load balancing buffer: the "
+                  "device pool serves both (+gpupool)%s\n",
+                  (input_comm_buffer_size > 0 || input_lb_buffer_size > 0)
+                      ? "; +gpucommbuffer / +gpulbbuffer ignored" : "");
+      } else {
+        CmiPrintf("HAPI> GPU communication buffer size: %zu MB "
+            "(rounded up to the nearest power of two)\n",
+            csv_gpu_manager.comm_buffer_size / (1024 * 1024));
 
-      CmiPrintf("HAPI> GPU load balancing buffer size: %zu MB "
-          "\n",
-          csv_gpu_manager.lb_buffer_size / (1024 * 1024));
+        CmiPrintf("HAPI> GPU load balancing buffer size: %zu MB "
+            "\n",
+            csv_gpu_manager.lb_buffer_size / (1024 * 1024));
+      }
     }
 
     CmiNodeBarrier(); // Ensure device communication buffer size is set
 
     // Create device communication buffers
     // Should only be done by device representative threads
-    if (cpv_device_rep) {
+    if (cpv_device_rep && !csv_gpu_manager.device_pool_on) {
       DeviceManager* dm = csv_gpu_manager.device_map[CmiMyPe()];
 #if CMK_SMP
       CmiLock(dm->lock);
@@ -1532,7 +1562,9 @@ static void hapiMapping(char** argv) {
     const bool want_direct = CmiGetArgFlagDesc(argv, "+gpuipcdirect",
         "cross-process device sends export their source allocation (direct "
         "CUDA IPC) instead of staging it");
-    if (CmiMyRank() == 0) csv_gpu_manager.ipc_use_direct = want_direct;
+    // Under +gpupool there is nothing to stage into, so direct is the only mode.
+    if (CmiMyRank() == 0)
+      csv_gpu_manager.ipc_use_direct = want_direct || csv_gpu_manager.device_pool_on;
 
     CmiNodeBarrier(); // Ensure the choice is set before any send reads it
 
@@ -2068,21 +2100,25 @@ static void ipcHandleCreate() {
     CmiAbort("PE not found in device_map during ipcHandleCreate");
   }
   DeviceManager& my_dm = *(it->second);
+  const bool pool_mode = csv_gpu_manager.device_pool_on;
   auto comm_buffer = my_dm.get_comm_buffer();
-  CmiAssert(comm_buffer);
+  if (!pool_mode) CmiAssert(comm_buffer);
 
   // Use local device index (0 to device_count-1) for shm_mem_handle offset
   // int local_device_idx = my_dm.local_index;
   hapiIpcMemHandle_t* shm_mem_handle = (hapiIpcMemHandle_t*)((char*)csv_gpu_manager.shm_my_ptr +
       csv_gpu_manager.shm_chunk_size * cpv_my_device_id);
 
-  void* device_ptr = comm_buffer->base_ptr;
-  hapiCheck(hapiIpcGetMemHandle(shm_mem_handle, device_ptr));
+  // Pool mode has no comm buffer: its handle slot stays zeroed and unused, and
+  // the pool entry after the event slots carries the arena every peer opens.
+  void* device_ptr = pool_mode ? nullptr : comm_buffer->base_ptr;
+  if (pool_mode) memset(shm_mem_handle, 0, sizeof(*shm_mem_handle));
+  else hapiCheck(hapiIpcGetMemHandle(shm_mem_handle, device_ptr));
 
   // Publish the device pool's first arena beside the comm buffer's handle, so
-  // peers open it now rather than on the first send from it. Off by default.
+  // peers open it now rather than on the first send from it. Pool mode only.
   {
-    static const bool preopen = (getenv("CHARM_GPU_POOL_PREOPEN") != nullptr);
+    const bool preopen = pool_mode;
     hapi_pool_shm_entry* pe_entry = (hapi_pool_shm_entry*)((char*)shm_mem_handle +
         sizeof(hapiIpcMemHandle_t) +
         sizeof(hapi_ipc_event_shared) * csv_gpu_manager.hapi_ipc_event_pool_size_total);
@@ -2168,8 +2204,13 @@ static void ipcHandleOpen() {
       hapiIpcMemHandle_t* shm_mem_handle =
         (hapiIpcMemHandle_t*)((char*)csv_gpu_manager.shm_ptr
             + csv_gpu_manager.shm_chunk_size * device_index);
-      hapiCheck(hapiIpcOpenMemHandle(&cur_device_info.buffer, *shm_mem_handle,
-            hapiIpcMemLazyEnablePeerAccess));
+      // Pool mode published no comm buffer; nothing is ever staged, so no
+      // receive reads through this mapping.
+      if (csv_gpu_manager.device_pool_on)
+        cur_device_info.buffer = nullptr;
+      else
+        hapiCheck(hapiIpcOpenMemHandle(&cur_device_info.buffer, *shm_mem_handle,
+              hapiIpcMemLazyEnablePeerAccess));
 
       // The peer's published pool arena, if any: open it once and seed the
       // import cache under the same key the send path will look up
@@ -2218,6 +2259,10 @@ static void ipcHandleOpen() {
 
 bool hapiIpcUseDirect() {
   return CsvAccess(gpu_manager).ipc_use_direct;
+}
+
+bool hapiDevPoolOn() {
+  return CsvAccess(gpu_manager).device_pool_on;
 }
 
 bool hapiIpcExportBuffer(const void* ptr, hapiIpcMemHandle_t* handle,
@@ -2497,8 +2542,11 @@ std::vector<cudaEvent_t> hapi_devpool_spare_events;
 size_t hapiDevPoolArenaBytes() {
   static size_t bytes = 0;
   if (!bytes) {
-    const char* e = getenv("CK_GPU_ARENA_MB");
-    bytes = (size_t)(e ? atol(e) : 256) << 20;
+    bytes = CsvAccess(gpu_manager).device_pool_arena_bytes;   // +gpupoolsize
+    if (!bytes) {
+      const char* e = getenv("CK_GPU_ARENA_MB");
+      bytes = (size_t)(e ? atol(e) : 256) << 20;
+    }
   }
   return bytes;
 }

@@ -3809,8 +3809,10 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
       CkPrintf("[GPUSEND %d] stale _currentLocRec at payload send (id=%llu)\n",
                CkMyPe(), (unsigned long long)id);
     CkpvAccess(_currentLocRec) = NULL;
+    CkRdmaDeviceMarkMigrationPayload(true);
     thisProxy[gpuData.toPe].immigrateGPU(id, gpuData.size,
       (gpuData.stream ? CkDeviceBuffer(gpuData.data, gpuData.size, (hapiStream_t)gpuData.stream) : CkDeviceBuffer(gpuData.data, gpuData.size)), CkMyPe());
+    CkRdmaDeviceMarkMigrationPayload(false);
     CkpvAccess(_currentLocRec) = saved_rec;
   }
 
@@ -3825,8 +3827,11 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
   // measured, 213 allocations produced zero reclaims, which exhausted the load
   // balance buffer after two steps at 128MB. Keep the entry and let the
   // receiver's ack free it, as inter-node already does.
+  // Under +gpupool the payload is a pool block the IPC reclaim knows nothing
+  // about, so the entry stays until the receiver's ack in every case.
   const bool same_process = (CmiNodeOf(CkMyPe()) == CmiNodeOf(gpuData.toPe));
-  if (!did_inter_node_gpudirect_rdma(CkMyPe(), gpuData.toPe) && !same_process) {
+  if (!did_inter_node_gpudirect_rdma(CkMyPe(), gpuData.toPe) && !same_process &&
+      !CkDevicePoolOn()) {
     sendGPUBuffers.erase(id);
   }
   // Otherwise the entry stays in sendGPUBuffers until finishGPUSend(id).
@@ -3840,7 +3845,9 @@ void CkLocMgr::finishGPUSend(CmiUInt8 id)
   if (it == sendGPUBuffers.end()) return;
 
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-  if (csv_gpu_manager.use_shm) {
+  if (CkDevicePoolOn()) {
+    CkDeviceFree(it->second.data);   // the payload was a pool block
+  } else if (csv_gpu_manager.use_shm) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
 #if CMK_SMP
     CmiLock(dm->lock);
@@ -4121,15 +4128,25 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
       GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
       if(csv_gpu_manager.use_shm) {
         DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
-        // Takes dm->lock itself, and reclaims retired IPC slots before giving
-        // up -- this region is only ever freed by that scan.
-        gpuMsg = CkRdmaDeviceAllocLbBuffer(dm, gpuBufSize);
-        if (gpuMsg == nullptr) {
-          CkAbort("PE %d, device %d: Not enough memory on device Load balance "
-                  "buffer (%zu free). This buffer stages device state pupped "
-                  "with pup_buffer_device and is 0 by default -- size it with "
-                  "+gpulbbuffer <MB>.",
-              CkMyPe(), dm->global_index, dm->get_lb_buffer_free_size());
+        if (CkDevicePoolOn()) {
+          // The packed payload is a pool block: exported through its arena's
+          // handle like any other pool buffer, sent direct, and returned to
+          // the pool by finishGPUSend on the receiver's ack.
+          gpuMsg = (char*)CkDeviceMalloc(gpuBufSize);
+          if (gpuMsg == nullptr)
+            CkAbort("PE %d: device pool could not provide a %zu-byte migration "
+                    "payload (+gpupoolsize)", CkMyPe(), gpuBufSize);
+        } else {
+          // Takes dm->lock itself, and reclaims retired IPC slots before giving
+          // up -- this region is only ever freed by that scan.
+          gpuMsg = CkRdmaDeviceAllocLbBuffer(dm, gpuBufSize);
+          if (gpuMsg == nullptr) {
+            CkAbort("PE %d, device %d: Not enough memory on device Load balance "
+                    "buffer (%zu free). This buffer stages device state pupped "
+                    "with pup_buffer_device and is 0 by default -- size it with "
+                    "+gpulbbuffer <MB>.",
+                CkMyPe(), dm->global_index, dm->get_lb_buffer_free_size());
+          }
         }
 #if CMK_SMP
         CmiLock(dm->lock);
@@ -4300,17 +4317,19 @@ void CkLocMgr::metaLBCallLB(CkLocRec* rec)
 // copied. The arena needs only the payload's size, which this message
 // carries, so it works with either arrival order of host message and
 // payload. Off by default while experimental.
+// +gpupool implies it: the landing arena is the chare's storage.
 static inline bool ckMigrateArenaMode()
 {
-  static const bool on = (getenv("CHARM_MIGRATE_ARENA") != nullptr);
+  static const bool on = (getenv("CHARM_MIGRATE_ARENA") != nullptr) || CkDevicePoolOn();
   return on;
 }
 // Whether a migration arena comes from the device pool (CkDeviceMalloc) and goes
-// back to it, instead of hapiMalloc/hapiFree. Off by default: the pool is
-// optional, and this path has to keep working exactly as before without it.
+// back to it, instead of hapiMalloc/hapiFree. +gpupool implies it; otherwise
+// off by default: the pool is optional, and this path has to keep working
+// exactly as before without it.
 static inline bool ckMigrateArenaFromPool()
 {
-  static const bool on = (getenv("CHARM_MIGRATE_POOL") != nullptr);
+  static const bool on = (getenv("CHARM_MIGRATE_POOL") != nullptr) || CkDevicePoolOn();
   return on;
 }
 
@@ -4410,7 +4429,11 @@ void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe)
   // Ack for the two cases where the sender still holds the staged block:
   // inter-node, and same-process, whose memcpy send registers no IPC event so
   // nothing else would ever free it.
-  if (srcPe >= 0 && (did_inter_node_gpudirect_rdma(srcPe, CkMyPe()) ||
+  // Under +gpupool every payload is a pool block released by this ack, in
+  // all three cases: the direct same-node send claims an event slot but the
+  // reclaim frees nothing for it.
+  if (srcPe >= 0 && (CkDevicePoolOn() ||
+                     did_inter_node_gpudirect_rdma(srcPe, CkMyPe()) ||
                      CmiNodeOf(srcPe) == CmiNodeOf(CkMyPe())))
     thisProxy[srcPe].finishGPUSend(id);
 

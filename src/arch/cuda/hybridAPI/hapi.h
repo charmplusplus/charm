@@ -375,6 +375,8 @@ void hapiDevPoolEnsureArena(int device, void** base, size_t* extent);
 // event has completed. That is the stream-ordered free -- what cudaFreeAsync
 // does -- and it is what lets the packer's host wait go.
 void hapiDevPoolNoteRead(const void* ptr, hapiStream_t stream);
+// +gpupool: the pool is the runtime's own allocation policy (see gpumanager.h).
+bool hapiDevPoolOn();
 
 // The running chare's attributed live device-allocation bytes (see the
 // footprint tracking in hapi_portable.h/hapi_impl.cpp). Valid inside an entry

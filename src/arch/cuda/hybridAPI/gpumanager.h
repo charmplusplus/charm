@@ -74,7 +74,7 @@ struct CuptiBufferItem {
 // Use SMP lock in DeviceManager if needed.
 // One per (process, device) in the +gpushm shared segment, after the event
 // slots: the device pool's first arena, published so every peer can open it
-// once at startup instead of on the first send from it. CHARM_GPU_POOL_PREOPEN.
+// once at startup instead of on the first send from it. Written under +gpupool.
 struct hapi_pool_shm_entry {
   hapiIpcMemHandle_t handle;
   void* base;
@@ -245,6 +245,16 @@ struct GPUManager {
   // required for correctness, since the driver refuses to open a handle a
   // second time in a process that has not closed it.
   bool ipc_use_direct;
+
+  // +gpupool: the device pool is the runtime's allocation policy. Migration
+  // arenas and payloads come from it, cross-process device sends are direct
+  // CUDA IPC only, each process's first arena is opened on every peer at
+  // startup, and the comm buffer and load-balancing buffer are not created.
+  // Off: everything above is as it was, and the pool is only what an
+  // application chooses to call. device_pool_arena_bytes is +gpupoolsize, or
+  // 0 for the CK_GPU_ARENA_MB / 256 MB default.
+  bool device_pool_on;
+  size_t device_pool_arena_bytes;
 
   // Peer allocations mapped into this process, keyed by the exporting
   // allocation's identity -- (sender process, sender-side base). Process-wide,
@@ -452,6 +462,8 @@ struct GPUManager {
     // Direct CUDA IPC transport: off until a threshold is asked for, so an
     // unconfigured run behaves exactly as it did before.
     ipc_use_direct = false;
+    device_pool_on = false;
+    device_pool_arena_bytes = 0;
 #if CMK_SMP
     ipc_cache_lock = CmiCreateLock();
 #endif

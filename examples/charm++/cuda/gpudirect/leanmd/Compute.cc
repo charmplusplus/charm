@@ -64,12 +64,12 @@ inline hapiError_t mdDevFree(void* p, cudaStream_t s) {
 // ordered, so a buffer is only freed at points where nothing is in flight
 // against it -- the destructor, after pup has settled the stream and the force
 // sends have drained, and ensureSlot growth, after the previous step's acks.
-// CHARM_MD_NO_POOL: the pre-pool allocator (hapiMalloc / hapiFreeMigratable),
-// at run time rather than as a separate build, so the two can be compared on
-// the same binary and the pool stays optional.
+// The runtime's choice is the application's: under +gpupool every buffer here
+// comes from CkDeviceMalloc; without it, from hapiMalloc (released through
+// hapiFreeMigratable), and nothing else changes. One binary, one switch.
 inline bool mdPoolOn() {
-  static const bool off = (getenv("CHARM_MD_NO_POOL") != nullptr);
-  return !off;
+  static const bool on = CkDevicePoolOn();
+  return on;
 }
 inline hapiError_t mdMigMalloc(void** p, size_t n) {
   if (!mdPoolOn()) return hapiMalloc(p, n);

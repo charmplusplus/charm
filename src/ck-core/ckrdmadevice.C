@@ -1015,8 +1015,13 @@ struct DeviceRestageMeta {         // sender -> receiver, same node
   void* dest_op;
   int device_idx;
   int event_idx;
-  size_t comm_offset;
+  size_t comm_offset;              // STAGED: where in the sender's comm buffer
   size_t cnt;
+  // DIRECT (+gpupool): the sender's source allocation, exported in place.
+  CmiIpcProtocol protocol;
+  hapiIpcMemHandle_t ipc_handle;
+  void* ipc_base;
+  size_t ipc_offset;
 };
 
 struct DeviceRestagePutDone {      // sender -> receiver, inter-node put
@@ -1187,6 +1192,54 @@ extern "C" void* device_restage_req_bridge(void* arg)
         CMK_DEVICE_RESTAGE_PUT, NULL);
     QdCreate(1);   // released by device_restage_put_done_bridge
     CmiIssueRput(info);
+  } else if (hapiDevPoolOn()) {
+    // +gpupool: nothing to stage into, and no need. The only same-node
+    // correction left is the memcpy-chosen send whose target moved to another
+    // process, and the sender still owns that source. Export it and let the
+    // receiver read it in place, exactly as a first-time direct send would.
+    DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
+    const int cpv_my_device_id = CpvAccess(my_device_id);
+    hapiIpcMemHandle_t handle;
+    size_t export_offset = 0;
+    void* export_base = NULL;
+    if (!hapiIpcExportBuffer(src_ptr, &handle, &export_offset, &export_base)) {
+      CkAbort("PE %d: restage to PE %d could not export the %zu-byte source at "
+              "%p for direct CUDA IPC (%s). Under +gpupool every device buffer "
+              "sent must be cudaMalloc-backed.",
+              CkMyPe(), req->dest_pe, req->cnt, src_ptr,
+              hapiIpcLastImportErrorName());
+    }
+    void* unused = NULL;
+    int event_idx = -1;
+    acquireIpcSendSlot(dm, cpv_my_device_id, /*is_lb_buffer=*/false,
+                       /*direct=*/true, src_ptr, req->cnt, &unused, &event_idx);
+    // The receiver waits on this event before it reads; it has to sit behind
+    // whatever produced the source, which src_ready marks.
+    if (src_ready)
+      hapiCheck(hapiStreamWaitEvent(hapiStreamPerThread, src_ready, 0));
+    else if (src_needs_full_sync)
+      hapiCheck(cudaDeviceSynchronize());
+    const int device_idx =
+        csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id;
+    hapi_ipc_device_info& my_device_info =
+        csv_gpu_manager.hapi_ipc_device_infos[device_idx];
+    hapiCheck(hapiEventRecord(my_device_info.src_event_pool[event_idx],
+                              hapiStreamPerThread));
+
+    DeviceRestageMeta* m = (DeviceRestageMeta*)CmiAlloc(sizeof(DeviceRestageMeta));
+    CmiEnforce(m);
+    m->dest_op = req->dest_op;
+    m->device_idx = device_idx;
+    m->event_idx = event_idx;
+    m->comm_offset = 0;
+    m->cnt = req->cnt;
+    m->protocol = CmiIpcProtocol::DIRECT;
+    m->ipc_handle = handle;
+    m->ipc_base = export_base;
+    m->ipc_offset = export_offset;
+    QdCreate(1);
+    CmiSetHandler(m, device_restage_meta_handler);
+    CmiSyncSendAndFree(req->dest_pe, sizeof(DeviceRestageMeta), (char*)m);
   } else {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
     const int cpv_my_device_id = CpvAccess(my_device_id);
@@ -1250,6 +1303,9 @@ extern "C" void* device_restage_req_bridge(void* arg)
     m->event_idx = event_idx;
     m->comm_offset = (char*)staged - (char*)dm->comm_buffer->base_ptr;
     m->cnt = req->cnt;
+    m->protocol = CmiIpcProtocol::STAGED;
+    m->ipc_base = NULL;
+    m->ipc_offset = 0;
     QdCreate(1);
     CmiSetHandler(m, device_restage_meta_handler);
     CmiSyncSendAndFree(req->dest_pe, sizeof(DeviceRestageMeta), (char*)m);
@@ -1291,7 +1347,10 @@ extern "C" void* device_restage_meta_bridge(void* arg)
   source.device_idx = m->device_idx;
   source.event_idx = m->event_idx;
   source.comm_offset = m->comm_offset;
-  source.ipc_protocol = CmiIpcProtocol::STAGED;
+  source.ipc_protocol = m->protocol;
+  source.ipc_handle = m->ipc_handle;
+  source.ipc_base = m->ipc_base;
+  source.ipc_offset = m->ipc_offset;
   source.sender_prepared = true;
 
   CkDeviceBuffer dest(op->dest_ptr, op->size);
@@ -2197,6 +2256,12 @@ static void acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
       wait_start = CkWallTimer();
       waiting = true;
     } else if (CkWallTimer() - wait_start > timeout_s) {
+      if (dm->comm_buffer == nullptr)   // +gpupool: slots are the only resource
+        CkAbort("PE %d, device %d: no free CUDA IPC event slot after %.0fs. "
+                "If every peer is blocked here too, the transfers that would "
+                "release these slots cannot run; reduce concurrent device "
+                "sends, or raise +gpuipceventpool.",
+                CkMyPe(), dm->global_index, timeout_s);
       CkAbort("PE %d, device %d: no free CUDA IPC event/comm-buffer slot after "
               "%.0fs (comm buffer: %zu bytes free). If every peer is blocked "
               "here too, the transfers that would release these slots cannot "
@@ -2282,6 +2347,12 @@ void* CkDeviceMalloc(size_t size) {
   return hapiDevPoolMalloc(size, CpvAccess(my_device_id));
 }
 void CkDeviceFree(void* ptr) { hapiDevPoolFree(ptr); }
+bool CkDevicePoolOn() { return hapiDevPoolOn(); }
+
+static thread_local bool ck_sending_migration_payload = false;
+void CkRdmaDeviceMarkMigrationPayload(bool sending) {
+  ck_sending_migration_payload = sending;
+}
 
 void* CkRdmaDeviceAllocLbBuffer(void* dm_opaque, size_t size) {
   DeviceManager* dm = (DeviceManager*)dm_opaque;
@@ -2500,7 +2571,9 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
 
     for (int i = 0; i < numops; i++) {
-      bool is_lb_buffer = ( (size_t)((char*)(buffers[i]->ptr) - (char*)(dm->comm_buffer->base_ptr)) < dm->comm_buffer->total_size );
+      // Pool mode has no comm buffer, so nothing is "in the LB region".
+      bool is_lb_buffer = dm->comm_buffer != nullptr &&
+          ( (size_t)((char*)(buffers[i]->ptr) - (char*)(dm->comm_buffer->base_ptr)) < dm->comm_buffer->total_size );
 
       // Choose the transport for this buffer. Per buffer, not per message: one
       // entry method can legitimately carry payloads on both sides of the
@@ -2520,6 +2593,18 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
         direct = hapiIpcExportBuffer(buffers[i]->ptr, &export_handle,
                                      &export_offset, &export_base);
       }
+      // Under +gpupool the export is the only route: there is no comm buffer
+      // to fall back to. A buffer cudaIpcGetMemHandle will not name -- managed
+      // memory, a host allocation, an address the driver does not own -- is a
+      // contract violation there, not a slower path.
+      if (!direct && !is_lb_buffer && hapiDevPoolOn()) {
+        CkAbort("PE %d: a %zu-byte device buffer at %p could not be exported "
+                "for direct CUDA IPC (%s). Under +gpupool every device buffer "
+                "sent must be cudaMalloc-backed: from CkDeviceMalloc or "
+                "hapiMalloc.",
+                CkMyPe(), (size_t)buffers[i]->cnt, buffers[i]->ptr,
+                hapiIpcLastImportErrorName());
+      }
 
       // A zero-copy device send may not reuse or free its source buffer until
       // the CkDeviceBuffer's completion callback fires. That is the contract
@@ -2529,7 +2614,10 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       // Direct reads the sender's allocation itself, so the same bug shows up
       // as corrupted data instead. Report it once, where the send is still
       // identifiable, rather than let it surface there.
-      if (direct && buffers[i]->cb.type == CkCallback::ignore) {
+      // The runtime's own migration payload is the one exception: it is
+      // released by the receiver's ack, not by a callback.
+      if (direct && buffers[i]->cb.type == CkCallback::ignore &&
+          !ck_sending_migration_payload) {
         static std::atomic<bool> warned{false};
         bool expected = false;
         if (warned.compare_exchange_strong(expected, true)) {
@@ -2595,7 +2683,8 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
                   "src_ptr=%p comm_base=%p alloc=%p is_lb=%d dest_pe=%d\n",
                   CkMyPe(), buffers[i]->device_idx, buffers[i]->event_idx,
                   (size_t)buffers[i]->comm_offset, (size_t)buffers[i]->cnt,
-                  buffers[i]->ptr, dm->comm_buffer->base_ptr,
+                  buffers[i]->ptr,
+                  dm->comm_buffer ? (void*)dm->comm_buffer->base_ptr : nullptr,
                   alloc_comm_buffer, (int)is_lb_buffer, dest_pe);
         fflush(stdout);
       }

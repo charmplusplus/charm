@@ -211,8 +211,12 @@ from a window describing the last balancing step rather than the application.
 
 A migrating Compute carries its device scratch (pup_buffer_device), so it is
 packable at any entry-method boundary and needs no application-declared window.
-That path needs two runtime knobs that are off by default and without which it
-cannot run at all: `+gpulbbuffer <MB>` to size the staging buffer, and
+With `+gpupool` that path needs nothing else: the payload and the landing arena
+come from the device pool, sends are direct CUDA IPC, and each process's first
+arena is opened on every peer at startup (`+gpupoolsize <MB>` sizes an arena;
+`+gpucommbuffer`, `+gpulbbuffer` and `+gpuipcdirect` are not used). Without
+`+gpupool` it needs two runtime knobs that are off by default and without which
+it cannot run at all: `+gpulbbuffer <MB>` to size the staging buffer, and
 CHARM_MIGRATE_ARENA=1 for the zero-copy rebind. Carrying the scratch is not
 faster here -- the emigrate time roughly doubles, 0.24s to 0.42s, because the
 data is now copied instead of dropped -- but it is what makes "migrate whenever"
