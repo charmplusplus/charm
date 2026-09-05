@@ -367,6 +367,13 @@ void hapiFreeMigratable(void* ptr);
 void* hapiDevPoolMalloc(size_t size, int device);
 void hapiDevPoolFree(void* ptr);
 bool hapiDevPoolContains(const void* ptr);
+// The arena a pool pointer lives in: its base and extent. False if the pointer
+// is not the pool's. An arena is one cudaMalloc that is never freed, so a
+// network registration of [base, base+extent) stays valid for the life of the
+// process whatever the pool carves out of it -- which is why the device
+// zerocopy path registers each arena exactly once instead of every buffer on
+// every send (see acquireDeviceRegistration in ckrdmadevice.C).
+bool hapiDevPoolArenaOf(const void* ptr, void** base, size_t* extent);
 // The first arena on `device`, created if there is none. Base and extent out.
 void hapiDevPoolEnsureArena(int device, void** base, size_t* extent);
 // A block the migration packer has enqueued reads from on `stream`. A later

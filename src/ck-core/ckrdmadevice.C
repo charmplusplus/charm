@@ -51,6 +51,7 @@
 #include "ckrdmadevice.h"
 #include "buddy_allocator.h"
 #include <mutex>
+#include <map>
 
 #define CMK_GPU_COMM 1
 
@@ -113,6 +114,25 @@ CpvExtern(int, my_device_id);
 //   }
 // }
 
+// ---- Device registration: pool arenas once, everything else cached --------
+//
+// Under +gpupool every device buffer the runtime sends or lands lives inside a
+// pool arena: one cudaMalloc of CK_GPU_ARENA_MB that is never freed, whatever
+// the pool carves out of it and hands back. A network registration of the
+// whole arena is therefore valid for the life of the process, and one is all
+// an arena ever gets: the first send or receive that touches an arena
+// registers [base, base+extent) once, process-wide, and every descriptor for
+// a buffer inside it is a copy of that registration with the buffer's own
+// pointer and count. The LCI get addresses the remote buffer as a displacement
+// from the registered region's base, so a sub-range needs nothing more. Nothing
+// is ever deregistered, and nothing needs to be: the arena outlives every
+// transfer. That is the whole point of having a pool on the network side --
+// without it every inter-node device send was a real fi_mr_reg that nothing
+// released, and at 64 PEs the NIC's registration table filled in ~50 steps.
+//
+// Buffers that are not the pool's (a run without +gpupool, or an application
+// allocation outside it) keep the per-buffer path below.
+//
 // ---- Device registration cache (CHARM_DEVICE_MR_CACHE) --------------------
 //
 // The device path builds a fresh CmiNcpyBuffer for every send, and constructing
@@ -272,11 +292,44 @@ void CkRdmaDeviceMsgFreed(void* env)
   holds->erase(it);
 }
 
-// Registered descriptor for [ptr, ptr+cnt). Registers on a miss, and without
-// the cache behaves exactly as constructing one in place did.
+// One registration per pool arena, shared by every PE of the process. Keyed by
+// arena base; created on first use; marked no-dereg so no completion path can
+// ever release it.
+static std::mutex g_deviceArenaRegLock;
+static std::map<uintptr_t, CmiNcpyBuffer> g_deviceArenaRegs;
+
+static bool acquireArenaRegistration(const void* ptr, size_t cnt, CmiNcpyBuffer* out)
+{
+  if (!hapiDevPoolOn()) return false;
+  void* base = NULL;
+  size_t extent = 0;
+  if (!hapiDevPoolArenaOf(ptr, &base, &extent)) return false;
+
+  std::lock_guard<std::mutex> lk(g_deviceArenaRegLock);
+  auto it = g_deviceArenaRegs.find((uintptr_t)base);
+  if (it == g_deviceArenaRegs.end()) {
+    CmiNcpyBuffer reg(base, extent, CMK_BUFFER_REG, CMK_BUFFER_NODEREG);  // the one registration
+    it = g_deviceArenaRegs.emplace((uintptr_t)base, reg).first;
+    CmiPrintf("[%d] device pool: arena %p (%zu MB) registered once for RDMA\n",
+              CmiMyPe(), base, extent >> 20);
+  }
+  *out = it->second;
+  // The registration covers the arena; the transfer is the buffer.
+  out->ptr = ptr;
+  out->cnt = cnt;
+  out->pe = CmiMyPe();
+  return true;
+}
+
+// Registered descriptor for [ptr, ptr+cnt). A pool buffer gets its arena's
+// one registration; otherwise registers on a miss, and without the cache
+// behaves exactly as constructing one in place did.
 static CmiNcpyBuffer acquireDeviceRegistration(const void* ptr, size_t cnt,
                                                CkLocRec* owner)
 {
+  CmiNcpyBuffer arena;
+  if (acquireArenaRegistration(ptr, cnt, &arena)) return arena;
+
   DeviceMrCache* cache = CkpvAccess(device_mr_cache);
   if (cache == NULL) return CmiNcpyBuffer(ptr, cnt);
 
@@ -2053,9 +2106,15 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       // The destination registration is cached against the element this
       // receive is addressed to, whose migration frees the posted buffer and
       // retires the entry. A receive with no element behind it (a migration
-      // payload on a group entry) registers per-op as before.
+      // payload on a group entry) registers per-op as before -- unless the
+      // buffer is a pool block, which takes its arena's one registration
+      // whoever posted it.
       CmiNcpyBuffer lci_dest_ncpy_buffer;
-      if (recv_elt != NULL) {
+      void* arena_base_unused = NULL;
+      size_t arena_extent_unused = 0;
+      const bool in_pool = hapiDevPoolOn() &&
+          hapiDevPoolArenaOf(arrPtrs[i], &arena_base_unused, &arena_extent_unused);
+      if (recv_elt != NULL || in_pool) {
         lci_dest_ncpy_buffer =
             acquireDeviceRegistration(arrPtrs[i], (size_t)arrSizes[i], recv_elt);
         // What the uncached 3-arg constructor's third argument sets: the

@@ -2654,6 +2654,15 @@ bool hapiDevPoolContains(const void* ptr) {
   return hapiDevPoolArenaOfLocked(ptr) != nullptr;
 }
 
+bool hapiDevPoolArenaOf(const void* ptr, void** base, size_t* extent) {
+  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(ptr);
+  if (ar == nullptr) return false;
+  *base = (void*)ar->start;
+  *extent = (size_t)(ar->end - ar->start);
+  return true;
+}
+
 void hapiDevPoolEnsureArena(int dev, void** base, size_t* extent) {
   std::lock_guard<std::mutex> g(hapi_devpool_mutex);
   for (auto& ar : hapi_devpool_arenas)
