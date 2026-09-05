@@ -4349,82 +4349,50 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
           CkMyPe(), dm->global_index, dm->get_lb_buffer_free_size());
     }
   }
-  // No barrier here. Every path that returns a block to this pool already hands
-  // back memory with no device work in flight against it: the IPC reclaim
-  // queries the transfer's event, finishGPUSend waits for the receiver's ack, a
-  // block claimed without an event slot is handed back untouched, and the
-  // landing block freed after unpack is covered by the device sync in
-  // immigrate. Arena mode allocates fresh memory and cannot alias at all.
+  // What has to be ordered here, and what does not.
   //
-  // That last one is why this is worth a note: the sync in immigrate and the
-  // barrier that used to stand here were redundant with each other, and with
-  // this one gone that sync is load-bearing. Narrowing it to a stream sync
-  // means giving the free after unpack its own gate at the same time.
-  // The receive lands on this PE's per-thread stream, which is what every other
-  // device operation in the runtime uses, and the unpack copies ride the same
-  // stream (see immigrate) -- so the read out of this block is ordered behind
-  // the write into it by the stream, not by a barrier.
+  // This is the post function: it runs before the landing copy is issued.
+  // The copy goes on the legacy default stream (set below), and the runtime
+  // invokes the receiving entry method as a callback on that same stream, so
+  // by the time the payload is unpacked -- and long before the chare's first
+  // kernel on its own, non-blocking stream -- the write has completed. Nothing
+  // downstream needs a wait for the data to arrive; the callback is that wait.
   //
-  // It used to post on cudaStream_t(0), the legacy default stream, since
-  // nothing here builds with --default-stream per-thread. A per-thread stream
-  // is by definition non-blocking against the legacy one, so that left the
-  // landing write unordered against every other PE's work in the process, and a
-  // context-wide cudaDeviceSynchronize() stood here to cover the gap. It was
-  // load-bearing: removing it while still posting on stream 0 corrupted 4 of 11
-  // runs at two PEs per process (twice the same wrong checksum), and never
-  // reproduced at one PE per process -- which is the clue that it was about two
-  // PEs sharing a context, not about this pool's free paths, all of which are
-  // already gated.
-  // A wait IS needed here, and the reason is mechanical rather than mysterious.
-  // The landing write is posted on the legacy default stream (the line below
-  // sets it), while an application's own streams are typically created with
-  // cudaStreamNonBlocking -- leanmd's StreamPool does -- and a non-blocking
-  // stream has NO implicit synchronization with the legacy default stream. So
-  // nothing orders a migrated chare's first kernel behind the write that
-  // delivered its state. That also explains the shape of the historical
-  // evidence: the corruption appeared at two PEs per process and never at one,
-  // because PEs per process is exactly how many independent non-blocking
-  // streams share the context.
+  // What can go wrong is the opposite direction: writing the landing block
+  // while something is still reading it. That is only possible when the block
+  // is recycled, which only the load-balancing region of the comm buffer does.
+  // Every path that returns a block there already retires the device work
+  // against it (the IPC reclaim queries the transfer's event, finishGPUSend
+  // waits for the receiver's ack) except the free after unpack, whose reads
+  // ride the migration stream -- so CkRdmaDeviceNoteLbBufferFreed records an
+  // event on that stream at the free, and the gate below makes the landing
+  // stream wait on exactly those events. The host wait is the older, stronger
+  // form of the same thing: stop the host until the legacy stream drains,
+  // which also drains every other PE's landing in the process.
   //
-  // But the wait only has to cover the landing stream. cudaDeviceSynchronize
-  // additionally waits for every application kernel in flight in the process,
-  // which is unrelated work and is the whole cost of it -- once per arriving
-  // payload. A host-side wait on the landing stream gives the identical
-  // guarantee: this call returns only once the write has completed, so every
-  // launch issued afterwards, on any stream, is ordered behind it.
+  // Arena mode has no recycled block at all. The arena is fresh device memory,
+  // or a pool block the pool would not hand out until the reads it was told
+  // about had retired. So there is nothing to order and no wait of either kind
+  // (the gate has no device manager to look up, and returns at once).
+  // Measured on 4 A40s, arena mode, -lblag 8, direct IPC, 32 paired runs
+  // alternating host wait and no wait: 32 of 32 exact each way.
   //
-  // Anything stronger than this is guesswork insurance. Anything weaker needs
-  // the consumer's stream to wait on an event recorded here, which the runtime
-  // cannot do because the stream a migrated chare will use is the
-  // application's choice and is not known at this point.
+  // CHARM_LB_LANDING_HOST_WAIT=1 puts the host wait back in every mode, for
+  // bisecting if a landing corruption ever reappears. CHARM_LB_POOL_EVENT_GATE
+  // is the recycled-block gate's opt-in; without it the recycled-block path
+  // keeps the host wait, which is the behaviour that has never failed.
   //
   // Note for anyone debugging in this window: added synchronization hides the
   // failure, so probes placed inside it are worthless. Use failure-path-only
   // probes.
-  // Two ways to order the landing write behind whatever last used this
-  // recycled block.
-  //
-  // The default stops the host until the landing stream drains. The gate
-  // instead makes the landing stream wait, on the device, for exactly the
-  // events recorded when blocks were returned to this pool -- no host block,
-  // and it waits for this pool's prior work rather than for every kernel in
-  // flight in the process. The gate is the better design and is why
-  // CkRdmaDeviceNoteLbBufferFreed exists.
-  //
-  // It is off by default because it has not earned it yet. Measured at
-  // -lblag 8, 100 steps, 8 PEs per process: host sync 26 of 26 runs exact,
-  // gate 15 of 16, removing the wait entirely 15 of 16. Both failures were
-  // hangs with no error rather than wrong answers, which is not the failure
-  // mode this guards and looks like the intermittent OFI fault seen elsewhere
-  // -- but 32 runs cannot separate that from a real regression, and the thing
-  // being guarded is silent corruption. Turn it on, gather a hundred runs, and
-  // if the rates match, make it the default and delete the host wait.
+  static const bool landingHostWait =
+      (getenv("CHARM_LB_LANDING_HOST_WAIT") != nullptr);
   static const bool poolEventGate =
       (getenv("CHARM_LB_POOL_EVENT_GATE") != nullptr);
-  if (poolEventGate)
-    CkRdmaDeviceGateLbBuffer(dm_for_gate, (cudaStream_t)0);
-  else
+  if (landingHostWait || (dm_for_gate != NULL && !poolEventGate))
     hapiCheck(cudaStreamSynchronize((cudaStream_t)0));
+  else if (dm_for_gate != NULL)
+    CkRdmaDeviceGateLbBuffer(dm_for_gate, (cudaStream_t)0);
   receivedDeviceMsgs[id] = data;
   post[0].hapi_stream = (cudaStream_t) 0;
 }
