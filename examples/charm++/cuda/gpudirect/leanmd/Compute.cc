@@ -56,8 +56,29 @@ inline hapiError_t mdDevFree(void* p, cudaStream_t s) {
 // stream-ordered pool -- cudaFreeAsync cannot release an arena interior -- which
 // costs nothing, because carrying the scratch is what the pool was working
 // around in the first place.
+// Buffers this chare allocates come from the device pool: a host-side buddy
+// allocation out of a pre-allocated arena, so neither the malloc nor the free
+// touches the driver, and neither synchronizes the device. That was the whole
+// cost of a Compute leaving a PE (cudaFree in the destructor) and of a slot
+// growing (cudaMalloc), both device-wide barriers. The pool is not stream
+// ordered, so a buffer is only freed at points where nothing is in flight
+// against it -- the destructor, after pup has settled the stream and the force
+// sends have drained, and ensureSlot growth, after the previous step's acks.
+#ifdef MD_NO_POOL
+// A/B twin of the binary: the pre-pool allocator, so device_alloc_free_time
+// can be compared on the same metric. Build with OPTS+=-DMD_NO_POOL.
 inline hapiError_t mdMigMalloc(void** p, size_t n) { return hapiMalloc(p, n); }
-inline void mdMigFree(void* p) { hapiFreeMigratable(p); }
+inline void mdMigFree(void* p, bool) { hapiFreeMigratable(p); }
+#else
+inline hapiError_t mdMigMalloc(void** p, size_t n) {
+  *p = CkDeviceMalloc(n);
+  return (*p != NULL) ? cudaSuccess : cudaErrorMemoryAllocation;
+}
+inline void mdMigFree(void* p, bool fromPool) {
+  if (p == NULL) return;
+  if (fromPool) CkDeviceFree(p); else hapiFreeMigratable(p);
+}
+#endif
 
 struct AllocTimer {
   double t0; bool on;
@@ -85,6 +106,8 @@ Compute::Compute() : stepCount(1), d_energyPartial(NULL), d_energyScalar(NULL),
   nPart[0] = nPart[1] = 0;
   stream = NULL;
   pendingForceSends = 0;
+  poolPos[0] = poolPos[1] = poolForce[0] = poolForce[1] = false;
+  poolEnergyPartial = poolEnergyScalar = false;
   lbBlocked = 0;
   lbWaitPending = 0;
   lbStartStep = 0;
@@ -101,6 +124,8 @@ Compute::Compute(CkMigrateMessage *msg): CBase_Compute(msg) {
   h_energy = NULL;
   stream = NULL;
   pendingForceSends = 0;
+  poolPos[0] = poolPos[1] = poolForce[0] = poolForce[1] = false;
+  poolEnergyPartial = poolEnergyScalar = false;
   lbBlocked = 0;
   lbWaitPending = 0;
   lbStartStep = 0;
@@ -141,8 +166,10 @@ void Compute::ensureDevice() {
   // Guarded individually rather than by the stream alone: a migrated chare
   // arrives with stream NULL but with everything pup() carried already in
   // place, and reallocating over those would leak them and lose the contents.
-  if (d_energyScalar == NULL)
+  if (d_energyScalar == NULL) {
     hapiCheck(mdMigMalloc((void**)&d_energyScalar, sizeof(double)));
+    poolEnergyScalar = true;
+  }
   if (h_energy == NULL)
     hapiCheck(hapiMallocHost((void**)&h_energy, sizeof(double)));
 }
@@ -176,15 +203,17 @@ void Compute::ensureSlot(int s, int n) {
   AllocTimer _t;
   const int newcap = n + n / 4 + 64;
 
-  if (d_pos[s]) mdMigFree(d_pos[s]);
-  if (d_force[s]) mdMigFree(d_force[s]);
+  if (d_pos[s]) mdMigFree(d_pos[s], poolPos[s]);
+  if (d_force[s]) mdMigFree(d_force[s], poolForce[s]);
   hapiCheck(mdMigMalloc((void**)&d_pos[s], sizeof(vec3) * newcap));
   hapiCheck(mdMigMalloc((void**)&d_force[s], sizeof(vec3) * newcap));
+  poolPos[s] = poolForce[s] = true;
 
   // The energy partials are indexed by the A-side atom, one entry per block.
   if (s == 0) {
-    if (d_energyPartial) mdMigFree(d_energyPartial);
+    if (d_energyPartial) mdMigFree(d_energyPartial, poolEnergyPartial);
     hapiCheck(mdMigMalloc((void**)&d_energyPartial, sizeof(double) * newcap));
+    poolEnergyPartial = true;
   }
   cap[s] = newcap;
 }
@@ -192,12 +221,14 @@ void Compute::ensureSlot(int s, int n) {
 void Compute::freeDevice() {
   AllocTimer _t;
   for (int s = 0; s < 2; s++) {
-    if (d_pos[s])   { mdMigFree(d_pos[s]);   d_pos[s] = NULL; }
-    if (d_force[s]) { mdMigFree(d_force[s]); d_force[s] = NULL; }
+    if (d_pos[s])   { mdMigFree(d_pos[s], poolPos[s]);     d_pos[s] = NULL; }
+    if (d_force[s]) { mdMigFree(d_force[s], poolForce[s]); d_force[s] = NULL; }
+    poolPos[s] = poolForce[s] = false;
     cap[s] = 0;
   }
-  if (d_energyPartial) { mdMigFree(d_energyPartial); d_energyPartial = NULL; }
-  if (d_energyScalar)  { mdMigFree(d_energyScalar);  d_energyScalar = NULL; }
+  if (d_energyPartial) { mdMigFree(d_energyPartial, poolEnergyPartial); d_energyPartial = NULL; }
+  if (d_energyScalar)  { mdMigFree(d_energyScalar, poolEnergyScalar);   d_energyScalar = NULL; }
+  poolEnergyPartial = poolEnergyScalar = false;
   if (h_energy)        { hapiCheck(hapiFreeHost(h_energy));    h_energy = NULL; }
 }
 
@@ -408,7 +439,12 @@ void Compute::pup(PUP::er &p) {
     newCap[s] = (int)live;
   }
   if (sentCap[0] > 0) p.pup_buffer_device(d_energyPartial, (size_t)sentCap[0]);
-  if (p.isUnpacking()) { cap[0] = newCap[0]; cap[1] = newCap[1]; }
+  if (p.isUnpacking()) {
+    cap[0] = newCap[0]; cap[1] = newCap[1];
+    // Rebound into the runtime's migration arena, not taken from the pool.
+    poolPos[0] = poolPos[1] = poolForce[0] = poolForce[1] = false;
+    poolEnergyPartial = false;
+  }
 
   // d_energyScalar and h_energy deliberately do not travel: both are written
   // and read within one launchForces, and ensureDevice takes them again on the

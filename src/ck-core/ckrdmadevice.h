@@ -187,6 +187,25 @@ int CkRdmaDeviceBusyIpcSlots();
 // does not drag the HAPI headers into every includer.
 void* CkRdmaDeviceAllocLbBuffer(void* dm, size_t size);
 
+// Device pool: CkDeviceMalloc / CkDeviceFree hand out device buffers from
+// arenas -- one large device allocation each, managed by the buddy allocator
+// that already backs the communication buffer, grown on demand (CK_GPU_ARENA_MB,
+// default 256), one arena set per device. Both calls are host-side bookkeeping:
+// no cudaMalloc and no cudaFree per buffer, so neither synchronizes the device.
+//
+// Ported from device-rdma-dereg-3960 (8580c18ba, a58bf3ce4) without that
+// branch's lazy whole-arena registration, which hooks into an interval map of
+// registered regions this branch does not have.
+//
+// The pool answers the allocation-cost question only. CkDeviceFree returns the
+// block at once with no stream ordering, so a buffer with device work still in
+// flight against it must not be freed -- the caller owns that, exactly as with
+// cudaFreeAsync. A buffer that was rebound into a migration arena by
+// pup_buffer_device is NOT from this pool and must go back through
+// hapiFreeMigratable; callers that mix the two have to know which is which.
+void* CkDeviceMalloc(size_t size);
+void CkDeviceFree(void* ptr);
+
 // Load balance pool block recycling, without a host barrier.
 //
 // A block handed out by CkRdmaDeviceAllocLbBuffer had a previous life, and the
@@ -206,6 +225,8 @@ void CkRdmaDeviceGateLbBuffer(void* dm, cudaStream_t consumer);
 inline size_t CkRdmaDeviceTakePendingSendBytes() { return 0; }
 inline int CkRdmaDeviceBusyIpcSlots() { return -1; }
 inline void* CkRdmaDeviceAllocLbBuffer(void* dm, size_t size) { return nullptr; }
+inline void* CkDeviceMalloc(size_t size) { return nullptr; }
+inline void CkDeviceFree(void* ptr) {}
 inline void CkRdmaDeviceNoteLbBufferFreed(void* dm, cudaStream_t usedBy) {}
 inline void CkRdmaDeviceGateLbBuffer(void* dm, cudaStream_t consumer) {}
 #endif

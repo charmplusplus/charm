@@ -49,6 +49,8 @@
 #include "charm++.h"
 #include "ck.h"
 #include "ckrdmadevice.h"
+#include "buddy_allocator.h"
+#include <mutex>
 
 #define CMK_GPU_COMM 1
 
@@ -2273,6 +2275,62 @@ void CkRdmaDeviceGateLbBuffer(void* dm_opaque, cudaStream_t consumer) {
     }
   }
   CmiUnlock(lb_retire_lock);
+}
+
+// ---- Device pool (see ckrdmadevice.h) ---------------------------------------
+namespace {
+struct DeviceArena { buddy::allocator* alloc; uintptr_t start, end; int device; };
+std::vector<DeviceArena> device_arenas;
+std::mutex device_pool_mutex;
+
+size_t deviceArenaBytes() {
+  static size_t bytes = 0;
+  if (!bytes) {
+    const char* e = getenv("CK_GPU_ARENA_MB");
+    bytes = (size_t)(e ? atol(e) : 256) << 20;
+  }
+  return bytes;
+}
+}  // namespace
+
+void* CkDeviceMalloc(size_t size) {
+  // Arenas are per device: a process driving several GPUs must not hand a PE
+  // a block on another device, so a request is served only from arenas on the
+  // calling PE's device, and a new one is created there when none has room.
+  const int dev = CpvAccess(my_device_id);
+  std::lock_guard<std::mutex> g(device_pool_mutex);
+  for (auto& ar : device_arenas) {
+    if (ar.device != dev) continue;
+    void* q = ar.alloc->malloc(size, true);
+    if (q) return q;
+  }
+  size_t bytes = deviceArenaBytes();
+  while (bytes < size * 2) bytes <<= 1;
+  DeviceArena ar;
+  ar.alloc = new buddy::allocator(bytes, bytes);   // the one real cudaMalloc
+  ar.start = (uintptr_t)ar.alloc->base_ptr;
+  ar.end = ar.start + bytes;
+  ar.device = dev;
+  device_arenas.push_back(ar);
+  // Once per arena, from whichever PE creates it: gating this on PE 0 meant
+  // that when any other PE in the process created the device's one arena
+  // first -- the usual case -- nothing was ever printed, and a run gave no
+  // sign the pool was in use at all.
+  CmiPrintf("CkRdmaDevice> [%d] device pool: arena %zu of %zu MB at %p on device %d "
+            "(CK_GPU_ARENA_MB)\n", CkMyPe(), device_arenas.size(), bytes >> 20,
+            (void*)ar.start, dev);
+  void* q = ar.alloc->malloc(size, true);
+  if (!q) CkAbort("CkDeviceMalloc: request of %zu bytes larger than a fresh arena", size);
+  return q;
+}
+
+void CkDeviceFree(void* ptr) {
+  if (ptr == NULL) return;
+  const uintptr_t p = (uintptr_t)ptr;
+  std::lock_guard<std::mutex> g(device_pool_mutex);
+  for (auto& ar : device_arenas)
+    if (p >= ar.start && p < ar.end) { ar.alloc->free(ptr); return; }
+  CkAbort("CkDeviceFree: %p is not from the device pool", ptr);
 }
 
 void* CkRdmaDeviceAllocLbBuffer(void* dm_opaque, size_t size) {

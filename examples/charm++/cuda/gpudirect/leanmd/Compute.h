@@ -28,6 +28,13 @@ class Compute : public CBase_Compute {
     vec3* d_force[2];
     double* d_energyPartial;
     double* d_energyScalar;
+    // Which allocator each buffer came from. One this chare took from the
+    // device pool goes back with CkDeviceFree; one that arrived by migration
+    // was rebound into the runtime's arena by pup_buffer_device and goes back
+    // with hapiFreeMigratable. Neither call is correct for the other's
+    // pointer, so this has to be tracked, not assumed. Never pupped: a buffer
+    // is by definition not pool-owned on the PE it just arrived at.
+    bool poolPos[2], poolForce[2], poolEnergyPartial, poolEnergyScalar;
     double* h_energy;       // pinned
     cudaStream_t stream;
 
