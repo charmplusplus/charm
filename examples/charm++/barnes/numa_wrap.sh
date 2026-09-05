@@ -11,7 +11,7 @@
 # CUDA_DEVICE_ORDER defaults to FASTEST_FIRST, which is not stable between
 # steps; PCI_BUS_ID makes the enumeration deterministic so a rank gets the same
 # device every run.
-R=${SLURM_PROCID:-0}
+R=${SLURM_LOCALID:-${SLURM_PROCID:-0}}
 PES=${PES:-4}
 NUMA=$((3 - R))
 FIRST=$((NUMA * 16))
