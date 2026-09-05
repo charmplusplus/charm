@@ -1993,8 +1993,12 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
     // A memcpy-prepared device payload is readable only inside this process.
     // If the message is leaving it -- a forward after the target moved --
     // re-prepare the payload as direct IPC in place (see the definition).
-    if (CmiNodeOf(pe) != CmiMyNode())
-      CkRdmaDeviceRepairForward(UsrToEnv(msg), pe);
+    // Only a FORWARD can carry a payload prepared for somewhere else; a
+    // first-hop send (no hops yet) was prepared for this very destination, so
+    // there is nothing to repair and no reason to walk its descriptors.
+    if (msg->array_hops() > 0 && CmiNodeOf(pe) != CmiMyNode() &&
+        CkRdmaDeviceRepairForward(UsrToEnv(msg), pe))
+      return;   // redirected to the source process, which repairs and delivers
 #endif
     CkArrayManagerDeliver(pe, msg, opts);
   }

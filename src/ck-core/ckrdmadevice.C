@@ -1006,22 +1006,158 @@ static void acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
 // an IPC event slot, record the event behind the memcpy event that marks the
 // data as produced, and rewrite the descriptor in the message. The receiver
 // then takes its ordinary direct path and no correction is requested. Costs
-// nothing when nothing moves. A forward off the physical node keeps the
-// inter-node correction, since the bytes have to cross the network anyway.
+// nothing when nothing moves.
+//
+// A forward off the physical node is repaired the same way, as a first-time
+// RDMA send would have been prepared: the bytes have to cross the network
+// anyway, and the sender's side of that is a registered descriptor for the
+// live source, which in pool mode is the arena's one registration. The
+// receiver then takes its ordinary rget path. Before this the inter-node case
+// fell back to the correction round trip -- a NACK, a put, and a
+// notification -- through a path nothing else exercised.
 //
 // The descriptors sit at the front of every device-send message, right after
 // their count (see the generated _call_ functions), and have one width in
 // every protocol (CmiDeviceBuffer::pup), which is what makes the in-place
 // rewrite possible without generated code.
-void CkRdmaDeviceRepairForward(envelope* env, int newPe) {
-  if (!CMI_IS_ZC_DEVICE(env)) return;
-  if (env->getMsgtype() != ForArrayEltMsg) return;
-  if (CmiNodeOf(newPe) == CmiMyNode()) return;             // still readable as is
-  if (!CmiPeOnSamePhysicalNode(newPe, CkMyPe())) return;    // inter-node: correction path
+// forwarder -> source PE: a message whose device payload only the source's
+// process can re-prepare for the network, with the PE it must reach. The
+// envelope follows the header verbatim.
+struct DeviceForwardRedirect {
+  char header[CmiMsgHeaderSizeBytes];
+  int newPe;
+  int envSize;
+};
+extern "C" { int device_forward_redirect_handler; }
+
+bool CkRdmaDeviceRepairForward(envelope* env, int newPe) {
+  if (!CMI_IS_ZC_DEVICE(env)) return false;
+  if (env->getMsgtype() != ForArrayEltMsg) return false;
+  if (CmiNodeOf(newPe) == CmiMyNode()) return false;       // still readable as is
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-  if (!csv_gpu_manager.use_shm || !hapiIpcUseDirect()) return;
+  static const bool dbg = (getenv("CHARM_ZC_RESTAGE_DEBUG") != nullptr);
+
+  if (!CmiPeOnSamePhysicalNode(newPe, CkMyPe())) {
+    // Inter-node forward: re-prepare as an RDMA send.
+    //
+    // Only the source's own process can do that: the registration has to be
+    // of the live buffer in the address space that owns it. A forward from
+    // another process on the same physical node -- the common case with one
+    // PE per process, where every cross-process forward is one -- is bounced
+    // to the source PE over shared memory with the destination attached; it
+    // repairs and delivers off-node from there. One extra same-node hop, in
+    // place of the correction round trip nothing else exercised.
+    int redirectTo = -1;
+    char* buf = ((CkMarshallMsg*)EnvToUsr(env))->msgBuf;
+    PUP::fromMem rd(buf);
+    int n = 0;
+    rd | n;
+    for (int i = 0; i < n; i++) {
+      const size_t off = rd.size();
+      CkDeviceBuffer b;
+      rd | b;
+      const size_t width = rd.size() - off;
+      // Two kinds of descriptor can be repaired here, because in both the
+      // sender's live buffer is the payload: the memcpy-prepared one (nothing
+      // prepared at all) and the direct-IPC one (the live buffer exported by
+      // handle, which means nothing off this node). A staged descriptor's
+      // bytes are a copy in this node's comm buffer and keep the correction
+      // path; so does anything whose source is not in this process.
+      const bool direct_prepared =
+          b.sender_prepared && b.ipc_protocol == CmiIpcProtocol::DIRECT &&
+          b.device_idx >= 0 &&
+          (size_t)b.device_idx < csv_gpu_manager.hapi_ipc_device_infos.size();
+      // Already an RDMA descriptor (a first-hop inter-node send being
+      // forwarded again): readable from anywhere, nothing to do.
+      if (b.sender_prepared && b.device_idx < 0) continue;
+      const char* skip = NULL;
+      if (b.sender_prepared && !direct_prepared) skip = "staged, left to the correction path";
+      else if (b.src_mpi_rank != CmiMyNode()) {
+        if (CmiPeOnSamePhysicalNode(b.src_pe, CkMyPe())) { redirectTo = b.src_pe; break; }
+        skip = "source on another physical node";
+      }
+      if (skip) {
+        if (dbg) {
+          CmiPrintf("[%d] ZC FORWARD-SKIP src=%p cnt=%zu srcPe=%d -> PE %d: %s (inter-node)\n",
+                    CkMyPe(), b.ptr, (size_t)b.cnt, b.src_pe, newPe, skip);
+          fflush(stdout);
+        }
+        continue;
+      }
+      // The NIC reads the source outside any CUDA stream, so the production
+      // has to be complete, not merely ordered behind. The memcpy prepare marks
+      // it with memcpy_event; the direct prepare recorded its slot's src event
+      // on the producing stream. A null memcpy event means the send blocked at
+      // send time and the data is already there.
+      if (direct_prepared) {
+        hapi_ipc_device_info& info = csv_gpu_manager.hapi_ipc_device_infos[b.device_idx];
+        hapiCheck(cudaEventSynchronize(info.src_event_pool[b.event_idx]));
+        // Retire the IPC slot the direct prepare claimed: the receiver it was
+        // claimed for is on another node and will never set its flag. Same
+        // pairing the same-node correction uses -- dst event recorded, then
+        // the flag published -- so the owning PE's reclaim scan takes it back.
+        hapiCheck(hapiEventRecord(info.dst_event_pool[b.event_idx], hapiStreamPerThread));
+        hapi_ipc_event_shared* slot =
+            (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
+                + csv_gpu_manager.shm_chunk_size * b.device_idx
+                + sizeof(hapiIpcMemHandle_t)) + b.event_idx;
+        slot->dst_flag.store(true, std::memory_order_release);
+      } else if (b.memcpy_event != NULL) {
+        hapiCheck(cudaEventSynchronize((cudaEvent_t)b.memcpy_event));
+      }
+      // The source is still owned by the sending element: a memcpy send ships
+      // its completion callback with the message, and the receiver fires it
+      // once the rget has landed, exactly as it would for a first-time RDMA
+      // send. No owner is attributed here (the forwarding context is not the
+      // sender); in pool mode the registration is the arena's anyway.
+      b.lci_ncpy_buffer = acquireDeviceRegistration(b.ptr, b.cnt, NULL);
+      b.sender_prepared = true;
+      b.device_idx = -1;                              // not IPC-exported: the rget path
+      b.event_idx = -1;
+      b.comm_offset = 0;
+      b.ipc_protocol = CmiIpcProtocol::NONE;
+      b.dest_pe = newPe;
+      b.dest_mpi_rank = CmiNodeOf(newPe);
+      PUP::toMem wr(buf + off);
+      wr | b;
+      if (wr.size() != width)
+        CkAbort("CkRdmaDeviceRepairForward: descriptor width changed (%zu -> %zu)",
+                width, wr.size());
+      csv_gpu_manager.ipc_forward_repairs.fetch_add(1, std::memory_order_relaxed);
+      if (dbg) {
+        CmiPrintf("[%d] ZC FORWARD-REPAIR src=%p cnt=%zu -> PE %d (rdma)\n",
+                  CkMyPe(), b.ptr, (size_t)b.cnt, newPe);
+        fflush(stdout);
+      }
+    }
+    if (redirectTo < 0) return false;
+
+    // Every descriptor of one message comes from one element, so one source
+    // PE serves the whole message. Ship the envelope to it verbatim.
+    CkPackMessage(&env);
+    const int envSize = env->getTotalsize();
+    DeviceForwardRedirect* r = (DeviceForwardRedirect*)CmiAlloc(
+        sizeof(DeviceForwardRedirect) + envSize);
+    CmiEnforce(r);
+    r->newPe = newPe;
+    r->envSize = envSize;
+    memcpy((char*)r + sizeof(DeviceForwardRedirect), env, envSize);
+    if (dbg) {
+      CmiPrintf("[%d] ZC FORWARD-REDIRECT %d bytes -> source PE %d, for PE %d\n",
+                CkMyPe(), envSize, redirectTo, newPe);
+      fflush(stdout);
+    }
+    CmiFree(env);
+    QdCreate(1);
+    CmiSetHandler(r, device_forward_redirect_handler);
+    CmiSyncSendAndFree(redirectTo, sizeof(DeviceForwardRedirect) + envSize, (char*)r);
+    csv_gpu_manager.ipc_forward_repairs.fetch_add(1, std::memory_order_relaxed);
+    return true;
+  }
+
+  if (!csv_gpu_manager.use_shm || !hapiIpcUseDirect()) return false;
   auto dmit = csv_gpu_manager.device_map.find(CkMyPe());
-  if (dmit == csv_gpu_manager.device_map.end()) return;
+  if (dmit == csv_gpu_manager.device_map.end()) return false;
   DeviceManager* dm = dmit->second;
 
   char* buf = ((CkMarshallMsg*)EnvToUsr(env))->msgBuf;
@@ -1034,7 +1170,6 @@ void CkRdmaDeviceRepairForward(envelope* env, int newPe) {
     rd | b;
     const size_t width = rd.size() - off;
     if (b.sender_prepared) continue;                 // IPC-prepared: readable node-wide already
-    static const bool dbg = (getenv("CHARM_ZC_RESTAGE_DEBUG") != nullptr);
     const char* skip = NULL;
     auto srcit = csv_gpu_manager.device_map.find(b.src_pe);
     hapiIpcMemHandle_t handle;
@@ -1091,6 +1226,29 @@ void CkRdmaDeviceRepairForward(envelope* env, int newPe) {
       fflush(stdout);
     }
   }
+  return false;
+}
+
+// Source PE: a forward bounced here because only this process can re-prepare
+// its payload for the network. Repair in place -- the source is in this
+// process now, so the inter-node branch above takes it -- and deliver to the
+// PE the forwarder named. The descriptor is an RDMA one from here on, so any
+// further forward needs no repair at all.
+extern "C" void* device_forward_redirect_bridge(void* arg)
+{
+  QdProcess(1);
+  DeviceForwardRedirect* r = (DeviceForwardRedirect*)arg;
+  envelope* env = (envelope*)CmiAlloc(r->envSize);
+  CmiEnforce(env);
+  memcpy(env, (char*)r + sizeof(DeviceForwardRedirect), r->envSize);
+  const int newPe = r->newPe;
+  CmiFree(r);
+  CkUnpackMessage(&env);
+  if (CkRdmaDeviceRepairForward(env, newPe))
+    CkAbort("[%d] device forward redirect bounced again: the source process "
+            "could not repair its own payload", CkMyPe());
+  CkArrayManagerDeliver(newPe, EnvToUsr(env), 0);
+  return NULL;
 }
 
 /*************** Migration-mismatch payload correction (NACK + retransmit) ***************/

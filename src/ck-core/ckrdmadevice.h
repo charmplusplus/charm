@@ -128,7 +128,11 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);
 // A device-send message that is leaving this process for another one on the
 // same physical node: re-prepare every memcpy-prepared payload in it as a
 // direct IPC send, in place, so the new home reads it without a correction.
-void CkRdmaDeviceRepairForward(envelope* env, int newPe);
+// Returns true when the message was redirected (consumed) rather than
+// repaired in place; the caller must then not deliver it.
+bool CkRdmaDeviceRepairForward(envelope* env, int newPe);
+extern "C" void* device_forward_redirect_bridge(void* arg);
+extern "C" int device_forward_redirect_handler;
 
 class CkLocRec;
 CkpvExtern(CkLocRec*, _currentLocRec);
