@@ -214,7 +214,10 @@ packable at any entry-method boundary and needs no application-declared window.
 With `+gpupool` that path needs nothing else: the payload and the landing arena
 come from the device pool, sends are direct CUDA IPC, and each process's first
 arena is opened on every peer at startup (`+gpupoolsize <MB>` sizes an arena;
-`+gpucommbuffer`, `+gpulbbuffer` and `+gpuipcdirect` are not used). Without
+`+gpucommbuffer`, `+gpulbbuffer` and `+gpuipcdirect` are not used). Paired at
+-lblag 2, three runs each: without the pool 7.95/8.16/8.37s, with `+gpupool`
+7.94/8.03/8.15s, and the largest per-PE emigrate falls from 0.58s to about
+0.3s. Without
 `+gpupool` it needs two runtime knobs that are off by default and without which
 it cannot run at all: `+gpulbbuffer <MB>` to size the staging buffer, and
 CHARM_MIGRATE_ARENA=1 for the zero-copy rebind. Carrying the scratch is not
