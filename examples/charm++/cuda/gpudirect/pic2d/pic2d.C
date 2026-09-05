@@ -417,6 +417,7 @@ class Patch : public CBase_Patch {
   int phi_out[2] = {0, 0};     // phi sends, by round parity
   bool drain_pending = false;  // gateStepDrain is waiting
   bool phi_gate_pending = false;  // gatePhiRound is waiting on cur parity
+  bool push_pending = false;   // push kernel issued, finishPush not yet run
 
   // Async LB state (see iterate): the step was joined at lb_start_iter and
   // AtSyncWait is owed lb_wait_lag iterations later.
@@ -601,19 +602,72 @@ class Patch : public CBase_Patch {
     p | phi_out[1];
     p | lb_waiting;
     p | lb_start_iter;
+    p | drain_pending;
+    p | phi_gate_pending;
+    p | push_pending;
+    p | park_skips;
+    p | instrumenting;
 
     if (p.isUnpacking()) {
       computeNeighbors();
       allocateDeviceBuffers();
     }
+    // The push's counters: the D2H copy of d_counts lands on compute_stream,
+    // which the packer drained above, so at a mid-push migration they are
+    // exactly what finishPush will read on the destination.
+    PUParray(p, h_counts, NUM_COUNTERS);
 
-    // Only the live particles and the potential (warm start for the next
-    // solve) migrate; rho, E and all exchange buffers are recomputed or
-    // overwritten every step. Particles are pup'ed as a flat RealType array
-    // since the device pup overload only accepts fundamental types.
+    // A patch can move at any entry-method boundary, not only between steps,
+    // so what travels is whatever is live at the worst boundary rather than
+    // what is live at the step's end. The runtime guarantees two things at
+    // the moment of packing: every zerocopy send this patch issued has
+    // completed (so the send slabs are dead), and every device receive it
+    // was delivered has been consumed (so the receive slabs are dead). The
+    // rest is live somewhere in the step:
+    //   rho    partial through phases 1-2, read by every Jacobi sweep;
+    //   phi    the current field -- jacobiUpdate swaps the pointers, so d_phi
+    //          is always the newest and d_phi_new is scratch;
+    //   E      complete or partial through phase 3 until the push reads it.
+    // Fields are pup'ed as flat fundamental arrays (the device overload takes
+    // nothing else).
+    p(d_rho, FIELD_W * FIELD_H, PUP::PUPMode::DEVICE);
     p(d_phi, FIELD_W * FIELD_H, PUP::PUPMode::DEVICE);
-    p((RealType*)d_parts[cur], (size_t)np * (sizeof(Particle) / sizeof(RealType)),
-        PUP::PUPMode::DEVICE);
+    p((float*)d_efield, (size_t)2 * FIELD_W * FIELD_H, PUP::PUPMode::DEVICE);
+
+    // The outgoing ghost slabs. Each exchange is "pack on a stream, then send
+    // when the pack's callback arrives", and between those two the slab is
+    // packed but not yet sent: a patch that moves in that window sends from
+    // the destination's slab, which holds whatever the allocator handed it
+    // (the run showed a few parts in a million of field error, i.e. a
+    // previous tenant's slab). They are a few kilobytes each; carry all four
+    // unconditionally rather than track four more windows.
+    {
+      const size_t slab8 = (size_t)2 * (block_width + block_height) + 4;
+      const size_t rslab = rhoHaloSlab() > 0 ? (size_t)rhoHaloSlab() : 1;
+      const size_t slab4 = (size_t)phiSlab4();
+      p(d_send_rho, slab8, PUP::PUPMode::DEVICE);
+      p(d_send_rhoh, rslab, PUP::PUPMode::DEVICE);
+      p((float*)d_send_e, 2 * slab8, PUP::PUPMode::DEVICE);
+      p(d_send_phi, 2 * slab4, PUP::PUPMode::DEVICE);
+    }
+
+    // Particles. Between pushParticles and finishPush the kernel has already
+    // moved them: stayers are in d_parts[1-cur] (h_counts[STAY] of them) and
+    // leavers sit in d_send_parts by direction, while np and cur on the host
+    // still describe the pre-push buffer. Carry what the kernel produced and
+    // let finishPush on the destination flip cur and issue the sends from the
+    // carried slabs, exactly as it would have here. Otherwise the live set is
+    // d_parts[cur] with np, which appendParticles grows in place.
+    const size_t per = sizeof(Particle) / sizeof(RealType);
+    if (push_pending) {
+      p((RealType*)d_parts[1 - cur], (size_t)h_counts[STAY] * per,
+          PUP::PUPMode::DEVICE);
+      for (int d = 0; d < NUM_DIRS; d++)
+        p((RealType*)(d_send_parts + (size_t)d * exch_capacity),
+            (size_t)h_counts[d] * per, PUP::PUPMode::DEVICE);
+    } else {
+      p((RealType*)d_parts[cur], (size_t)np * per, PUP::PUPMode::DEVICE);
+    }
   }
 
   void init() {
@@ -999,6 +1053,7 @@ class Patch : public CBase_Patch {
 
     hapiCheck(cudaMemsetAsync(d_counts, 0, sizeof(int) * NUM_COUNTERS,
         compute_stream));
+    push_pending = true;
     invokePushAndMarkKernel(d_parts[cur], np, d_efield, d_parts[1 - cur],
         d_send_parts, exch_capacity, d_counts, (float)sim_dt, -1.0f,
         (float)px0, (float)py0, (float)grid_width, (float)grid_height,
@@ -1012,6 +1067,7 @@ class Patch : public CBase_Patch {
   }
 
   void finishPush() {
+    push_pending = false;
     if (getenv("CHARM_DEBUG_MIGRATE"))
       CkPrintf("[PUSHD] (%d,%d) iter=%d\n", thisIndex.x, thisIndex.y, my_iter);
     if (h_counts[ERR_COUNTER]) {
