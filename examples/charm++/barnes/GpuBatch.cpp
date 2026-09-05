@@ -3,6 +3,7 @@
 #ifdef GPU_GRAVITY
 
 #include "GpuBatch.h"
+#include "PoolAlloc.h"
 #include "Particle.h"
 
 #include <cstring>
@@ -57,18 +58,18 @@ void GpuTraversalBatch::growDevice(){
   if (nSrcs > devCapSrcs){
     if (dSrcs != NULL){
       hapiCheck(cudaStreamSynchronize(stream));
-      hapiCheck(hapiFree(dSrcs));
+      hapiCheck(bhFree(dSrcs));
     }
     devCapSrcs = nSrcs + nSrcs / 2 + 1024;
-    hapiCheck(hapiMalloc((void **)&dSrcs, sizeof(GpuSource) * devCapSrcs));
+    hapiCheck(bhMalloc((void **)&dSrcs, sizeof(GpuSource) * devCapSrcs));
   }
   if (nDescs > devCapDescs){
     if (dDescs != NULL){
       hapiCheck(cudaStreamSynchronize(stream));
-      hapiCheck(hapiFree(dDescs));
+      hapiCheck(bhFree(dDescs));
     }
     devCapDescs = nDescs + nDescs / 2 + 256;
-    hapiCheck(hapiMalloc((void **)&dDescs, sizeof(GpuBucketDesc) * devCapDescs));
+    hapiCheck(bhMalloc((void **)&dDescs, sizeof(GpuBucketDesc) * devCapDescs));
   }
 }
 
@@ -133,8 +134,8 @@ void GpuTraversalBatch::release(){
   if (stream != NULL) cudaStreamSynchronize(stream);
   if (hSrcs != NULL){ hapiFreeHost(hSrcs); hSrcs = NULL; }
   if (hDescs != NULL){ hapiFreeHost(hDescs); hDescs = NULL; }
-  if (dSrcs != NULL){ hapiFree(dSrcs); dSrcs = NULL; }
-  if (dDescs != NULL){ hapiFree(dDescs); dDescs = NULL; }
+  if (dSrcs != NULL){ bhFree(dSrcs); dSrcs = NULL; }
+  if (dDescs != NULL){ bhFree(dDescs); dDescs = NULL; }
   if (h2dDone != NULL){ cudaEventDestroy(h2dDone); h2dDone = NULL; }
   nSrcs = capSrcs = nDescs = capDescs = 0;
   devCapSrcs = devCapDescs = 0;
@@ -147,8 +148,8 @@ void GpuParticleStore::ensure(int n){
   // kept across resizes.
   if (dRed == NULL){
     hapiCheck(hapiMallocHost((void **)&hRed, sizeof(GpuKdkReduction)));
-    hapiCheck(hapiMalloc((void **)&dRed, sizeof(GpuKdkReduction)));
-    hapiCheck(hapiMalloc((void **)&dPartials,
+    hapiCheck(bhMalloc((void **)&dRed, sizeof(GpuKdkReduction)));
+    hapiCheck(bhMalloc((void **)&dPartials,
                          sizeof(GpuKdkReduction) * REDUCE_BLOCKS));
     std::memset(hRed, 0, sizeof(GpuKdkReduction));
   }
@@ -163,38 +164,38 @@ void GpuParticleStore::ensure(int n){
     hapiCheck(hapiFreeHost(hVel));
     hapiCheck(hapiFreeHost(hAccel));
     hapiCheck(hapiFreeHost(hKey));
-    hapiCheck(hapiFree(dPos));
-    hapiCheck(hapiFree(dVel));
-    hapiCheck(hapiFree(dAccel));
-    hapiCheck(hapiFree(dKey));
-    hapiCheck(hapiFree(dPosAlt));
-    hapiCheck(hapiFree(dVelAlt));
-    hapiCheck(hapiFree(dKeyAlt));
-    hapiCheck(hapiFree(dIdx));
-    hapiCheck(hapiFree(dIdxAlt));
-    if (dSortTemp != NULL) hapiCheck(hapiFree(dSortTemp));
+    hapiCheck(bhFree(dPos));
+    hapiCheck(bhFree(dVel));
+    hapiCheck(bhFree(dAccel));
+    hapiCheck(bhFree(dKey));
+    hapiCheck(bhFree(dPosAlt));
+    hapiCheck(bhFree(dVelAlt));
+    hapiCheck(bhFree(dKeyAlt));
+    hapiCheck(bhFree(dIdx));
+    hapiCheck(bhFree(dIdxAlt));
+    if (dSortTemp != NULL) hapiCheck(bhFree(dSortTemp));
   }
   cap = n + n / 4 + 1024;
   hapiCheck(hapiMallocHost((void **)&hPos, sizeof(float4) * cap));
   hapiCheck(hapiMallocHost((void **)&hVel, sizeof(float4) * cap));
   hapiCheck(hapiMallocHost((void **)&hAccel, sizeof(float4) * cap));
   hapiCheck(hapiMallocHost((void **)&hKey, sizeof(unsigned long long) * cap));
-  hapiCheck(hapiMalloc((void **)&dPos, sizeof(float4) * cap));
-  hapiCheck(hapiMalloc((void **)&dVel, sizeof(float4) * cap));
-  hapiCheck(hapiMalloc((void **)&dAccel, sizeof(float4) * cap));
-  hapiCheck(hapiMalloc((void **)&dKey, sizeof(unsigned long long) * cap));
-  hapiCheck(hapiMalloc((void **)&dPosAlt, sizeof(float4) * cap));
-  hapiCheck(hapiMalloc((void **)&dVelAlt, sizeof(float4) * cap));
-  hapiCheck(hapiMalloc((void **)&dKeyAlt, sizeof(unsigned long long) * cap));
-  hapiCheck(hapiMalloc((void **)&dIdx, sizeof(int) * cap));
-  hapiCheck(hapiMalloc((void **)&dIdxAlt, sizeof(int) * cap));
+  hapiCheck(bhMalloc((void **)&dPos, sizeof(float4) * cap));
+  hapiCheck(bhMalloc((void **)&dVel, sizeof(float4) * cap));
+  hapiCheck(bhMalloc((void **)&dAccel, sizeof(float4) * cap));
+  hapiCheck(bhMalloc((void **)&dKey, sizeof(unsigned long long) * cap));
+  hapiCheck(bhMalloc((void **)&dPosAlt, sizeof(float4) * cap));
+  hapiCheck(bhMalloc((void **)&dVelAlt, sizeof(float4) * cap));
+  hapiCheck(bhMalloc((void **)&dKeyAlt, sizeof(unsigned long long) * cap));
+  hapiCheck(bhMalloc((void **)&dIdx, sizeof(int) * cap));
+  hapiCheck(bhMalloc((void **)&dIdxAlt, sizeof(int) * cap));
 
   // CUB sizes its scratch from the item count, so it is queried at the
   // capacity rather than at n and reused until the next resize.
   sortTempBytes = gpuSortTempBytes(cap);
   dSortTemp = NULL;
   if (sortTempBytes > 0)
-    hapiCheck(hapiMalloc((void **)&dSortTemp, sortTempBytes));
+    hapiCheck(bhMalloc((void **)&dSortTemp, sortTempBytes));
 }
 
 // The build allocates children two at a time and stops at bucket size, so the
@@ -207,21 +208,21 @@ void GpuParticleStore::ensureTree(int n){
 void GpuParticleStore::ensureTreeCapacity(int want){
   if (dtree.nodes != NULL && dtree.capacity >= want) return;
   if (dtree.nodes != NULL){
-    hapiCheck(hapiFree(dtree.nodes));
-    hapiCheck(hapiFree(dtree.active));
-    hapiCheck(hapiFree(dtree.activeNext));
+    hapiCheck(bhFree(dtree.nodes));
+    hapiCheck(bhFree(dtree.active));
+    hapiCheck(bhFree(dtree.activeNext));
   }
   else{
-    hapiCheck(hapiMalloc((void **)&dtree.nodeCount, sizeof(int)));
-    hapiCheck(hapiMalloc((void **)&dtree.activeCount, sizeof(int)));
-    hapiCheck(hapiMalloc((void **)&dtree.activeNextCount, sizeof(int)));
-    hapiCheck(hapiMalloc((void **)&dtree.levelStart,
+    hapiCheck(bhMalloc((void **)&dtree.nodeCount, sizeof(int)));
+    hapiCheck(bhMalloc((void **)&dtree.activeCount, sizeof(int)));
+    hapiCheck(bhMalloc((void **)&dtree.activeNextCount, sizeof(int)));
+    hapiCheck(bhMalloc((void **)&dtree.levelStart,
                          sizeof(int) * (DTREE_MAX_LEVELS + 2)));
   }
   dtree.capacity = want;
-  hapiCheck(hapiMalloc((void **)&dtree.nodes, sizeof(DeviceNode) * want));
-  hapiCheck(hapiMalloc((void **)&dtree.active, sizeof(int) * want));
-  hapiCheck(hapiMalloc((void **)&dtree.activeNext, sizeof(int) * want));
+  hapiCheck(bhMalloc((void **)&dtree.nodes, sizeof(DeviceNode) * want));
+  hapiCheck(bhMalloc((void **)&dtree.active, sizeof(int) * want));
+  hapiCheck(bhMalloc((void **)&dtree.activeNext, sizeof(int) * want));
 }
 
 void GpuParticleStore::buildDeviceTree(const Key *owners, int numTreePieces,
@@ -231,9 +232,9 @@ void GpuParticleStore::buildDeviceTree(const Key *owners, int numTreePieces,
 
   const int nOwners = 2 * numTreePieces;
   if (nOwners > ownerCap){
-    if (dOwners != NULL) hapiCheck(hapiFree(dOwners));
+    if (dOwners != NULL) hapiCheck(bhFree(dOwners));
     ownerCap = nOwners + nOwners / 4 + 64;
-    hapiCheck(hapiMalloc((void **)&dOwners,
+    hapiCheck(bhMalloc((void **)&dOwners,
                          sizeof(unsigned long long) * ownerCap));
   }
   hapiCheck(cudaMemcpyAsync(dOwners, owners,
@@ -256,10 +257,10 @@ void GpuParticleStore::buildDeviceTree(const Key *owners, int numTreePieces,
 void GpuParticleStore::patchMoments(const GpuMomentPatch *patches, int n){
   if (n <= 0 || dtree.nodes == NULL) return;
   if (n > patchCap){
-    if (hPatch != NULL){ hapiCheck(hapiFreeHost(hPatch)); hapiCheck(hapiFree(dPatch)); }
+    if (hPatch != NULL){ hapiCheck(hapiFreeHost(hPatch)); hapiCheck(bhFree(dPatch)); }
     patchCap = n + n/4 + 64;
     hapiCheck(hapiMallocHost((void **)&hPatch, sizeof(GpuMomentPatch)*patchCap));
-    hapiCheck(hapiMalloc((void **)&dPatch, sizeof(GpuMomentPatch)*patchCap));
+    hapiCheck(bhMalloc((void **)&dPatch, sizeof(GpuMomentPatch)*patchCap));
   }
   std::memcpy(hPatch, patches, sizeof(GpuMomentPatch)*n);
   hapiCheck(cudaMemcpyAsync(dPatch, hPatch, sizeof(GpuMomentPatch)*n,
@@ -430,9 +431,9 @@ static void ensureRegion(CkVec<char *> &bufs, CkVec<int> &caps, int idx,
                          size_t want){
   while(bufs.length() <= idx){ bufs.push_back(NULL); caps.push_back(0); }
   if((size_t)caps[idx] >= want) return;
-  if(bufs[idx] != NULL) hapiCheck(hapiFree(bufs[idx]));
+  if(bufs[idx] != NULL) hapiCheck(bhFree(bufs[idx]));
   caps[idx] = (int)(want + want/4 + 4096);
-  hapiCheck(hapiMalloc((void **)&bufs[idx], caps[idx]));
+  hapiCheck(bhMalloc((void **)&bufs[idx], caps[idx]));
 }
 
 char *GpuParticleStore::stageSend(int dest, const int *offs, const int *cnts,
@@ -570,26 +571,26 @@ void GpuParticleStore::binCounts(const Key *keys, const int *depths, int nbins,
   if(nbins <= 0) return;
   if(nbins > binCap){
     if(hBinKey != NULL){
-      hapiCheck(hapiFreeHost(hBinKey));   hapiCheck(hapiFree(dBinKey));
-      hapiCheck(hapiFreeHost(hBinDepth)); hapiCheck(hapiFree(dBinDepth));
-      hapiCheck(hapiFreeHost(hBinStart)); hapiCheck(hapiFree(dBinStart));
-      hapiCheck(hapiFreeHost(hBinCount)); hapiCheck(hapiFree(dBinCount));
-      hapiCheck(hapiFreeHost(hBinFirst)); hapiCheck(hapiFree(dBinFirst));
-      hapiCheck(hapiFreeHost(hBinLast));  hapiCheck(hapiFree(dBinLast));
+      hapiCheck(hapiFreeHost(hBinKey));   hapiCheck(bhFree(dBinKey));
+      hapiCheck(hapiFreeHost(hBinDepth)); hapiCheck(bhFree(dBinDepth));
+      hapiCheck(hapiFreeHost(hBinStart)); hapiCheck(bhFree(dBinStart));
+      hapiCheck(hapiFreeHost(hBinCount)); hapiCheck(bhFree(dBinCount));
+      hapiCheck(hapiFreeHost(hBinFirst)); hapiCheck(bhFree(dBinFirst));
+      hapiCheck(hapiFreeHost(hBinLast));  hapiCheck(bhFree(dBinLast));
     }
     binCap = nbins + nbins/4 + 256;
     hapiCheck(hapiMallocHost((void **)&hBinKey,   sizeof(unsigned long long)*binCap));
-    hapiCheck(hapiMalloc((void **)&dBinKey,       sizeof(unsigned long long)*binCap));
+    hapiCheck(bhMalloc((void **)&dBinKey,       sizeof(unsigned long long)*binCap));
     hapiCheck(hapiMallocHost((void **)&hBinFirst, sizeof(unsigned long long)*binCap));
-    hapiCheck(hapiMalloc((void **)&dBinFirst,     sizeof(unsigned long long)*binCap));
+    hapiCheck(bhMalloc((void **)&dBinFirst,     sizeof(unsigned long long)*binCap));
     hapiCheck(hapiMallocHost((void **)&hBinLast,  sizeof(unsigned long long)*binCap));
-    hapiCheck(hapiMalloc((void **)&dBinLast,      sizeof(unsigned long long)*binCap));
+    hapiCheck(bhMalloc((void **)&dBinLast,      sizeof(unsigned long long)*binCap));
     hapiCheck(hapiMallocHost((void **)&hBinDepth, sizeof(int)*binCap));
-    hapiCheck(hapiMalloc((void **)&dBinDepth,     sizeof(int)*binCap));
+    hapiCheck(bhMalloc((void **)&dBinDepth,     sizeof(int)*binCap));
     hapiCheck(hapiMallocHost((void **)&hBinStart, sizeof(int)*binCap));
-    hapiCheck(hapiMalloc((void **)&dBinStart,     sizeof(int)*binCap));
+    hapiCheck(bhMalloc((void **)&dBinStart,     sizeof(int)*binCap));
     hapiCheck(hapiMallocHost((void **)&hBinCount, sizeof(int)*binCap));
-    hapiCheck(hapiMalloc((void **)&dBinCount,     sizeof(int)*binCap));
+    hapiCheck(bhMalloc((void **)&dBinCount,     sizeof(int)*binCap));
   }
 
   for(int i = 0; i < nbins; i++){
@@ -626,9 +627,9 @@ void GpuParticleStore::gatherExternal(const int *offs, const int *cnts,
                                       int nranges, int total, void *out){
   if(total <= 0) return;
   if(total > gatherCap){
-    if(dGather != NULL){ hapiCheck(hapiFree(dGather)); hapiCheck(hapiFreeHost(hGather)); }
+    if(dGather != NULL){ hapiCheck(bhFree(dGather)); hapiCheck(hapiFreeHost(hGather)); }
     gatherCap = total + total/4 + 1024;
-    hapiCheck(hapiMalloc((void **)&dGather, sizeof(float4)*gatherCap));
+    hapiCheck(bhMalloc((void **)&dGather, sizeof(float4)*gatherCap));
     hapiCheck(hapiMallocHost((void **)&hGather, sizeof(float4)*gatherCap));
   }
   int at = 0;
@@ -648,9 +649,9 @@ void GpuParticleStore::gatherExternal(const int *offs, const int *cnts,
 static void ensureF4(CkVec<float4 *> &bufs, CkVec<int> &caps, int idx, int want){
   while(bufs.length() <= idx){ bufs.push_back(NULL); caps.push_back(0); }
   if(caps[idx] >= want) return;
-  if(bufs[idx] != NULL) hapiCheck(hapiFree(bufs[idx]));
+  if(bufs[idx] != NULL) hapiCheck(bhFree(bufs[idx]));
   caps[idx] = want + want/4 + 1024;
-  hapiCheck(hapiMalloc((void **)&bufs[idx], sizeof(float4)*caps[idx]));
+  hapiCheck(bhMalloc((void **)&bufs[idx], sizeof(float4)*caps[idx]));
 }
 
 float4 *GpuParticleStore::stageLetSend(int dest, const int *offs,
@@ -680,13 +681,13 @@ int GpuParticleStore::appendRemote(int src, int n){
   if(remoteUsed + n > remoteCap){
     const int want = (remoteUsed + n) * 2 + 4096;
     float4 *grown = NULL;
-    hapiCheck(hapiMalloc((void **)&grown, sizeof(float4)*want));
+    hapiCheck(bhMalloc((void **)&grown, sizeof(float4)*want));
     if(dRemote != NULL && remoteUsed > 0)
       hapiCheck(cudaMemcpyAsync(grown, dRemote, sizeof(float4)*remoteUsed,
                                 cudaMemcpyDeviceToDevice, stream));
     if(dRemote != NULL){
       hapiCheck(cudaStreamSynchronize(stream));
-      hapiCheck(hapiFree(dRemote));
+      hapiCheck(bhFree(dRemote));
     }
     dRemote = grown;
     remoteCap = want;
@@ -701,10 +702,10 @@ int GpuParticleStore::appendRemote(int src, int n){
 int GpuParticleStore::insertLet(const GpuLetNode *nodes, int n){
   if(n <= 0 || dtree.nodes == NULL) return 0;
   if(n > letCap){
-    if(hLet != NULL){ hapiCheck(hapiFreeHost(hLet)); hapiCheck(hapiFree(dLet)); }
+    if(hLet != NULL){ hapiCheck(hapiFreeHost(hLet)); hapiCheck(bhFree(dLet)); }
     letCap = n + n/4 + 256;
     hapiCheck(hapiMallocHost((void **)&hLet, sizeof(GpuLetNode)*letCap));
-    hapiCheck(hapiMalloc((void **)&dLet, sizeof(GpuLetNode)*letCap));
+    hapiCheck(bhMalloc((void **)&dLet, sizeof(GpuLetNode)*letCap));
   }
   std::memcpy(hLet, nodes, sizeof(GpuLetNode)*n);
   hapiCheck(cudaMemcpyAsync(dLet, hLet, sizeof(GpuLetNode)*n,
@@ -726,52 +727,52 @@ void GpuParticleStore::release(){
   if (hAccel != NULL){ hapiFreeHost(hAccel); hAccel = NULL; }
   if (hKey != NULL){ hapiFreeHost(hKey); hKey = NULL; }
   if (hRed != NULL){ hapiFreeHost(hRed); hRed = NULL; }
-  if (dPos != NULL){ hapiFree(dPos); dPos = NULL; }
-  if (dVel != NULL){ hapiFree(dVel); dVel = NULL; }
-  if (dAccel != NULL){ hapiFree(dAccel); dAccel = NULL; }
-  if (dKey != NULL){ hapiFree(dKey); dKey = NULL; }
-  if (dPosAlt != NULL){ hapiFree(dPosAlt); dPosAlt = NULL; }
-  if (dVelAlt != NULL){ hapiFree(dVelAlt); dVelAlt = NULL; }
-  if (dKeyAlt != NULL){ hapiFree(dKeyAlt); dKeyAlt = NULL; }
-  if (dIdx != NULL){ hapiFree(dIdx); dIdx = NULL; }
-  if (dIdxAlt != NULL){ hapiFree(dIdxAlt); dIdxAlt = NULL; }
-  if (dSortTemp != NULL){ hapiFree(dSortTemp); dSortTemp = NULL; }
-  if (dOwners != NULL){ hapiFree(dOwners); dOwners = NULL; }
+  if (dPos != NULL){ bhFree(dPos); dPos = NULL; }
+  if (dVel != NULL){ bhFree(dVel); dVel = NULL; }
+  if (dAccel != NULL){ bhFree(dAccel); dAccel = NULL; }
+  if (dKey != NULL){ bhFree(dKey); dKey = NULL; }
+  if (dPosAlt != NULL){ bhFree(dPosAlt); dPosAlt = NULL; }
+  if (dVelAlt != NULL){ bhFree(dVelAlt); dVelAlt = NULL; }
+  if (dKeyAlt != NULL){ bhFree(dKeyAlt); dKeyAlt = NULL; }
+  if (dIdx != NULL){ bhFree(dIdx); dIdx = NULL; }
+  if (dIdxAlt != NULL){ bhFree(dIdxAlt); dIdxAlt = NULL; }
+  if (dSortTemp != NULL){ bhFree(dSortTemp); dSortTemp = NULL; }
+  if (dOwners != NULL){ bhFree(dOwners); dOwners = NULL; }
   if (hPatch != NULL){ hapiFreeHost(hPatch); hPatch = NULL; }
-  if (dPatch != NULL){ hapiFree(dPatch); dPatch = NULL; }
+  if (dPatch != NULL){ bhFree(dPatch); dPatch = NULL; }
   patchCap = 0;
-  for(int i = 0; i < dSend.length(); i++) if(dSend[i]) hapiFree(dSend[i]);
-  for(int i = 0; i < dRecv.length(); i++) if(dRecv[i]) hapiFree(dRecv[i]);
+  for(int i = 0; i < dSend.length(); i++) if(dSend[i]) bhFree(dSend[i]);
+  for(int i = 0; i < dRecv.length(); i++) if(dRecv[i]) bhFree(dRecv[i]);
   dSend.length() = 0; dRecv.length() = 0;
   sendCap.length() = 0; recvCap.length() = 0;
   if (hStage != NULL){ hapiFreeHost(hStage); hStage = NULL; }
   hStageCap = 0;
-  for(int i = 0; i < dLetSend.length(); i++) if(dLetSend[i]) hapiFree(dLetSend[i]);
-  for(int i = 0; i < dLetRecv.length(); i++) if(dLetRecv[i]) hapiFree(dLetRecv[i]);
+  for(int i = 0; i < dLetSend.length(); i++) if(dLetSend[i]) bhFree(dLetSend[i]);
+  for(int i = 0; i < dLetRecv.length(); i++) if(dLetRecv[i]) bhFree(dLetRecv[i]);
   dLetSend.length() = 0; dLetRecv.length() = 0;
   letSendCap.length() = 0; letRecvCap.length() = 0;
-  if (dRemote != NULL){ hapiFree(dRemote); dRemote = NULL; }
+  if (dRemote != NULL){ bhFree(dRemote); dRemote = NULL; }
   remoteCap = remoteUsed = 0;
   if (hLet != NULL){ hapiFreeHost(hLet); hLet = NULL; }
-  if (dLet != NULL){ hapiFree(dLet); dLet = NULL; }
+  if (dLet != NULL){ bhFree(dLet); dLet = NULL; }
   letCap = 0;
-  if (dGather != NULL){ hapiFree(dGather); dGather = NULL; }
+  if (dGather != NULL){ bhFree(dGather); dGather = NULL; }
   if (hGather != NULL){ hapiFreeHost(hGather); hGather = NULL; }
   gatherCap = 0;
   ownerCap = 0;
   if (dtree.nodes != NULL){
-    hapiFree(dtree.nodes);
-    hapiFree(dtree.active);
-    hapiFree(dtree.activeNext);
-    hapiFree(dtree.nodeCount);
-    hapiFree(dtree.activeCount);
-    hapiFree(dtree.activeNextCount);
-    hapiFree(dtree.levelStart);
+    bhFree(dtree.nodes);
+    bhFree(dtree.active);
+    bhFree(dtree.activeNext);
+    bhFree(dtree.nodeCount);
+    bhFree(dtree.activeCount);
+    bhFree(dtree.activeNextCount);
+    bhFree(dtree.levelStart);
     clearTreeHandles();
   }
   sortTempBytes = 0;
-  if (dPartials != NULL){ hapiFree(dPartials); dPartials = NULL; }
-  if (dRed != NULL){ hapiFree(dRed); dRed = NULL; }
+  if (dPartials != NULL){ bhFree(dPartials); dPartials = NULL; }
+  if (dRed != NULL){ bhFree(dRed); dRed = NULL; }
   if (uploaded != NULL){ cudaEventDestroy(uploaded); uploaded = NULL; }
   if (treeBuilt != NULL){ cudaEventDestroy(treeBuilt); treeBuilt = NULL; }
   nParts = 0;

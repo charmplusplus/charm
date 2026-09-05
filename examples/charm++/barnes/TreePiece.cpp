@@ -1,4 +1,5 @@
 #include "TreePiece.h"
+#include "PoolAlloc.h"
 #include "Messages.h"
 #include "DataManager.h"
 #include "Parameters.h"
@@ -324,12 +325,16 @@ bool TreePiece::launchDeviceWalk(){
 
   if(myNumBuckets > targetCap){
     if(hTargets != NULL){
+      // The previous walk's kernels may still be reading dTargets; drain the
+      // batch stream before it goes back (cudaFree used to do this implicitly,
+      // a pool free does not).
+      hapiCheck(cudaStreamSynchronize(batch.getStream()));
       hapiCheck(hapiFreeHost(hTargets));
-      hapiCheck(hapiFree(dTargets));
+      hapiCheck(bhFree(dTargets));
     }
     targetCap = myNumBuckets + myNumBuckets/4 + 64;
     hapiCheck(hapiMallocHost((void **)&hTargets, sizeof(GpuTargetBucket)*targetCap));
-    hapiCheck(hapiMalloc((void **)&dTargets, sizeof(GpuTargetBucket)*targetCap));
+    hapiCheck(bhMalloc((void **)&dTargets, sizeof(GpuTargetBucket)*targetCap));
   }
 
   // The device walk needs no mapping back to a device node: the box drives the

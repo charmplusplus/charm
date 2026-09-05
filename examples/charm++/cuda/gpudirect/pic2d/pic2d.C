@@ -6,6 +6,23 @@
 #include <vector>
 #include <utility>
 
+// Device allocation following the runtime's choice: under +gpupool every
+// buffer comes from CkDeviceMalloc (an arena the peers have already opened, no
+// driver call, no device sync); without it, from hapiMalloc as before. Patches
+// allocate once and free only in the destructor, after their sends drained.
+inline hapiError_t pcMalloc(void** p, size_t n) {
+  static const bool pool = CkDevicePoolOn();
+  if (!pool) return hapiMalloc(p, n);
+  *p = CkDeviceMalloc(n);
+  return (*p != NULL) ? cudaSuccess : cudaErrorMemoryAllocation;
+}
+inline hapiError_t pcFree(void* p) {
+  static const bool pool = CkDevicePoolOn();
+  if (p == NULL) return cudaSuccess;
+  if (pool) { CkDeviceFree(p); return cudaSuccess; }
+  return hapiFree(p);
+}
+
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Patch patch_proxy;
 /* readonly */ int grid_width;
@@ -475,23 +492,23 @@ class Patch : public CBase_Patch {
       hapiCheck(cudaEventDestroy(comm_event));
       return;
     }
-    hapiCheck(hapiFree(d_rho));
-    hapiCheck(hapiFree(d_phi));
-    hapiCheck(hapiFree(d_phi_new));
-    hapiCheck(hapiFree(d_efield));
-    hapiCheck(hapiFree(d_parts[0]));
-    hapiCheck(hapiFree(d_parts[1]));
-    hapiCheck(hapiFree(d_send_parts));
-    hapiCheck(hapiFree(d_recv_parts));
-    hapiCheck(hapiFree(d_send_rho));
-    hapiCheck(hapiFree(d_recv_rho));
-    hapiCheck(hapiFree(d_send_rhoh));
-    hapiCheck(hapiFree(d_recv_rhoh));
-    hapiCheck(hapiFree(d_send_e));
-    hapiCheck(hapiFree(d_recv_e));
-    hapiCheck(hapiFree(d_send_phi));
-    hapiCheck(hapiFree(d_recv_phi));
-    hapiCheck(hapiFree(d_counts));
+    hapiCheck(pcFree(d_rho));
+    hapiCheck(pcFree(d_phi));
+    hapiCheck(pcFree(d_phi_new));
+    hapiCheck(pcFree(d_efield));
+    hapiCheck(pcFree(d_parts[0]));
+    hapiCheck(pcFree(d_parts[1]));
+    hapiCheck(pcFree(d_send_parts));
+    hapiCheck(pcFree(d_recv_parts));
+    hapiCheck(pcFree(d_send_rho));
+    hapiCheck(pcFree(d_recv_rho));
+    hapiCheck(pcFree(d_send_rhoh));
+    hapiCheck(pcFree(d_recv_rhoh));
+    hapiCheck(pcFree(d_send_e));
+    hapiCheck(pcFree(d_recv_e));
+    hapiCheck(pcFree(d_send_phi));
+    hapiCheck(pcFree(d_recv_phi));
+    hapiCheck(pcFree(d_counts));
     hapiCheck(hapiFreeHost(h_counts));
 
     hapiCheck(cudaStreamDestroy(compute_stream));
@@ -526,31 +543,31 @@ class Patch : public CBase_Patch {
     int slab8 = 2 * (block_width + block_height) + 4;
     int slab4 = phiSlab4();
 
-    hapiCheck(hapiMalloc((void**)&d_rho, field_size));
-    hapiCheck(hapiMalloc((void**)&d_phi, field_size));
-    hapiCheck(hapiMalloc((void**)&d_phi_new, field_size));
-    hapiCheck(hapiMalloc((void**)&d_efield,
+    hapiCheck(pcMalloc((void**)&d_rho, field_size));
+    hapiCheck(pcMalloc((void**)&d_phi, field_size));
+    hapiCheck(pcMalloc((void**)&d_phi_new, field_size));
+    hapiCheck(pcMalloc((void**)&d_efield,
         sizeof(float2) * FIELD_W * FIELD_H));
-    hapiCheck(hapiMalloc((void**)&d_parts[0],
+    hapiCheck(pcMalloc((void**)&d_parts[0],
         sizeof(Particle) * part_capacity));
-    hapiCheck(hapiMalloc((void**)&d_parts[1],
+    hapiCheck(pcMalloc((void**)&d_parts[1],
         sizeof(Particle) * part_capacity));
-    hapiCheck(hapiMalloc((void**)&d_send_parts,
+    hapiCheck(pcMalloc((void**)&d_send_parts,
         sizeof(Particle) * (size_t)NUM_DIRS * exch_capacity));
-    hapiCheck(hapiMalloc((void**)&d_recv_parts,
+    hapiCheck(pcMalloc((void**)&d_recv_parts,
         sizeof(Particle) * (size_t)NUM_DIRS * exch_capacity));
-    hapiCheck(hapiMalloc((void**)&d_send_rho, sizeof(RealType) * slab8));
-    hapiCheck(hapiMalloc((void**)&d_recv_rho, sizeof(RealType) * slab8));
-    // Zero-sized when no sweep reads outside the interior; hapiMalloc(0) is
+    hapiCheck(pcMalloc((void**)&d_send_rho, sizeof(RealType) * slab8));
+    hapiCheck(pcMalloc((void**)&d_recv_rho, sizeof(RealType) * slab8));
+    // Zero-sized when no sweep reads outside the interior; pcMalloc(0) is
     // not worth relying on, so keep one element.
     const int rslab = rhoHaloSlab() > 0 ? rhoHaloSlab() : 1;
-    hapiCheck(hapiMalloc((void**)&d_send_rhoh, sizeof(RealType) * rslab));
-    hapiCheck(hapiMalloc((void**)&d_recv_rhoh, sizeof(RealType) * rslab));
-    hapiCheck(hapiMalloc((void**)&d_send_e, sizeof(float2) * slab8));
-    hapiCheck(hapiMalloc((void**)&d_recv_e, sizeof(float2) * slab8));
-    hapiCheck(hapiMalloc((void**)&d_send_phi, sizeof(RealType) * 2 * slab4));
-    hapiCheck(hapiMalloc((void**)&d_recv_phi, sizeof(RealType) * 2 * slab4));
-    hapiCheck(hapiMalloc((void**)&d_counts, sizeof(int) * NUM_COUNTERS));
+    hapiCheck(pcMalloc((void**)&d_send_rhoh, sizeof(RealType) * rslab));
+    hapiCheck(pcMalloc((void**)&d_recv_rhoh, sizeof(RealType) * rslab));
+    hapiCheck(pcMalloc((void**)&d_send_e, sizeof(float2) * slab8));
+    hapiCheck(pcMalloc((void**)&d_recv_e, sizeof(float2) * slab8));
+    hapiCheck(pcMalloc((void**)&d_send_phi, sizeof(RealType) * 2 * slab4));
+    hapiCheck(pcMalloc((void**)&d_recv_phi, sizeof(RealType) * 2 * slab4));
+    hapiCheck(pcMalloc((void**)&d_counts, sizeof(int) * NUM_COUNTERS));
     hapiCheck(hapiMallocHost((void**)&h_counts, sizeof(int) * NUM_COUNTERS));
   }
 
