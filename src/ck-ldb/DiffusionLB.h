@@ -89,6 +89,7 @@ public:
   void pseudoRoundStart(PseudoRoundMsg* m);
   void pseudoVerdictRoot(double maxRatio);
   void pseudoConvergeResult(PseudoRoundMsg* m);
+  void pseudoMetricContribute(double metric);
   DiffusionLB_SDAG_CODE DiffusionLB(const CkLBOptions&);
   DiffusionLB(CkMigrateMessage* m);
   ~DiffusionLB();
@@ -134,6 +135,15 @@ public:
   int acrossNbrDoneCount;
   bool acrossSelfDone;
   void maybeStartWithin();
+  // Within-node completion, tracked the same way. A node's within-node phase
+  // can RETARGET a token it received across nodes, and that retarget is a
+  // LoadReceived to the donor PE on the node that sent the token -- so a node's
+  // own move list is not final until every neighbour it sent tokens to has
+  // finished its within-node phase. Only neighbours can hold its tokens.
+  bool withinSelfDone;
+  int withinNbrDoneCount;
+  void nbrWithinDone();
+  void maybeStartMigrations();
   void withinDone();
   int withinDoneCount;
   void withinNodeReport();
@@ -294,6 +304,14 @@ private:
 
   double prev_pseudo_load;  // my_pseudo_load at the end of the previous round
   bool pseudo_converged;
+  // PE 0's counting reduction over the diffusing PEs' convergence metrics, one
+  // per round. Replaces the CkMulticast section reduction and verdict
+  // multicast: those travel as ordinary messages and sat behind the
+  // application's queue on every hop under +LBAsync, which is what stretched a
+  // 1 ms pseudo phase to 100-200 ms of wall time. numNodes point-to-point
+  // expedited messages into PE 0 and out again cost nothing at this width.
+  int pseudoContribCount;
+  double pseudoMaxMetric;
   // Only one PE per node drives diffusion; the rest join the convergence
   // reduction with a neutral value so the collective is over the whole group.
   bool isPseudoRoot;

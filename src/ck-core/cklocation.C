@@ -2939,6 +2939,56 @@ void CkLocRec::staticMigrate(LDObjHandle h, int dest)
   el->recvMigrate(dest);
 }
 
+#if CMK_LBDB_ON
+// Under +LBAsync a balancer's moves are not executed inline.
+//
+// ProcessMigrationDecision hands every move of a step to recvMigrate in one
+// loop, and each one used to pack, send and destroy its element right there --
+// all of a PE's moves back to back on the scheduler thread, with the
+// application's messages waiting behind them. With the application parked,
+// as it is under the unsplit barrier, that costs nothing extra. Under the
+// split barrier it is the one part of the step that never overlapped: a
+// leanmd step that moves ~750 Computes stopped every PE for 50-130 ms.
+//
+// So the move is queued instead, on this PE's own scheduler queue and BELOW
+// default priority. Application messages already queued run first, and any
+// that arrive while the moves drain go ahead of the moves still waiting, so
+// the application sees at most one emigrate of extra latency at a time and
+// the moves themselves fill the gaps where the PE would otherwise have been
+// waiting on the device. If the PE never goes quiet, its elements reach the
+// park, stop generating work, and the moves run then -- which is exactly when
+// they used to run. The move ledger holds the step's resume until every move
+// has landed, whichever way it was scheduled, so nothing about completion
+// changes.
+//
+// The network queue would not do: CsdNextMessage drains it ahead of the
+// scheduler queue, so a burst posted there still runs back to back.
+//
+// CHARM_LB_MIGRATE_INLINE=1 restores the inline emigrate for bisecting;
+// CHARM_LB_MIGRATE_PRIO sets the integer priority (default 1, i.e. just below
+// the default 0; larger is lower).
+static bool lbMigrateDeferred()
+{
+  static const bool inlineMoves = (getenv("CHARM_LB_MIGRATE_INLINE") != nullptr);
+  return _lb_args.lbAsync() && !inlineMoves;
+}
+
+static void ckPostDeferredMigrate(CkLocMgr* mgr, CmiUInt8 id, int toPe)
+{
+  static const int prio = []() {
+    const char* s = getenv("CHARM_LB_MIGRATE_PRIO");
+    return s ? atoi(s) : 1;
+  }();
+  DeferredMigrateMsg* m = (DeferredMigrateMsg*)CmiAlloc(sizeof(DeferredMigrateMsg));
+  m->mgrGid = mgr->ckGetGroupID();
+  m->id = id;
+  m->toPe = toPe;
+  CmiSetHandler(m, _deferredMigrateHandlerIdx);
+  unsigned int p = (unsigned int)prio;
+  CsdEnqueueGeneral(m, CQS_QUEUEING_IFIFO, 8 * sizeof(int), &p);
+}
+#endif
+
 void CkLocRec::recvMigrate(int toPe)
 {
 #if CMK_LBDB_ON
@@ -2953,6 +3003,16 @@ void CkLocRec::recvMigrate(int toPe)
   // till readyMigrate()
   if (readyMigrate)
   {
+#if CMK_LBDB_ON
+    // Queued below the application (see lbMigrateDeferred). The handler
+    // re-checks readiness and the outstanding-send count when it runs, and
+    // re-buffers into nextPe through this function if the window has closed.
+    if (lbMigrateDeferred())
+    {
+      ckPostDeferredMigrate(myLocMgr, getID(), toPe);
+      return;
+    }
+#endif
     migrateMe(toPe);
   }
   else

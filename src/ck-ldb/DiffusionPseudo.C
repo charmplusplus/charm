@@ -386,6 +386,21 @@ void DiffusionLB::pseudoConvergeResult(PseudoRoundMsg* m)
   thisProxy[CkMyPe()].pseudoVerdict(maxRatio);
 }
 
+// PE 0, once per round: the max over the diffusing PEs' metrics is the
+// verdict, handed straight back to each of them. A member contributes to
+// round k+1 only after it has this verdict for round k, so the count can never
+// mix rounds.
+void DiffusionLB::pseudoMetricContribute(double metric)
+{
+  if (metric > pseudoMaxMetric) pseudoMaxMetric = metric;
+  if (++pseudoContribCount < numNodes) return;
+  const double verdict = pseudoMaxMetric;
+  pseudoContribCount = 0;
+  pseudoMaxMetric = 0.0;
+  for (int i = 0; i < numNodes; i++)
+    thisProxy[i * nodeSize].pseudoVerdict(verdict);
+}
+
 // PE 0: every section member has left its round loop.
 void DiffusionLB::roundsDone()
 {

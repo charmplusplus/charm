@@ -44,6 +44,22 @@ static int diffusionIterations() {
 }
 #define ITERATIONS (diffusionIterations())
 
+// Two job-wide hops used to sit between the strategy's phases: PE 0 counting
+// every node out of the pseudo rounds before broadcasting AcrossNodeLB, and PE 0
+// counting every node's within-node phase before broadcasting
+// ProcessMigrations. Neither is needed. The convergence verdict a member leaves
+// the rounds on was reduced over every member, so no round message can still be
+// in flight; and a node's move list is final once its own within-node handoffs
+// are acked, because every LoadReceived that targets a PE of this node was
+// issued by this node's rank0PE (see migMaybeDone). Under +LBAsync each hop made
+// every node wait for the slowest before issuing a single move, while the
+// application kept running around it. Both are now node-local;
+// CHARM_DIFFUSION_GLOBAL_PHASES=1 restores the PE 0 barriers for bisecting.
+static bool diffusionGlobalPhases() {
+  static const bool on = (getenv("CHARM_DIFFUSION_GLOBAL_PHASES") != nullptr);
+  return on;
+}
+
 #include "DiffusionCostModel.h"
 
 // The across-node transfer-cost table, loaded once per process from the file
@@ -143,6 +159,10 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   withinDoneCount = 0;
   acrossNbrDoneCount = 0;
   acrossSelfDone = false;
+  withinSelfDone = false;
+  withinNbrDoneCount = 0;
+  pseudoContribCount = 0;
+  pseudoMaxMetric = 0.0;
   round = 0;
   hs_asksOut = 0;
   hs_confirmOut = 0;
@@ -246,6 +266,10 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   withinDoneCount = 0;
   acrossNbrDoneCount = 0;
   acrossSelfDone = false;
+  withinSelfDone = false;
+  withinNbrDoneCount = 0;
+  pseudoContribCount = 0;
+  pseudoMaxMetric = 0.0;
   rank0_barrier_counter = 0;
   pseudo_done = true;
 

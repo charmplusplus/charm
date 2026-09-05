@@ -236,8 +236,47 @@ void DiffusionLB::migMaybeDone()
   if (within_owed)
   {
     within_owed = false;
-    thisProxy[0].withinDone();
+    // The debug and dump paths keep every node in lockstep -- group-wide
+    // reductions in CollectStats, a PE 0 gather in ProcessFinalStats -- so
+    // they still go through the PE 0 barrier. Otherwise the moves start
+    // neighbour-locally, see maybeStartMigrations.
+    if (diffusionGlobalPhases() || step() == LBSimulation::dumpStep ||
+        _lb_args.debug() > 0)
+      thisProxy[0].withinDone();
+    else
+    {
+      withinSelfDone = true;
+      for (size_t i = 0; i < sendToNeighbors.size(); i++)
+        thisProxy[sendToNeighbors[i] * nodeSize].nbrWithinDone();
+      maybeStartMigrations();
+    }
   }
+}
+
+// A neighbour has finished its within-node phase, so it will retarget nothing
+// further of ours this step.
+void DiffusionLB::nbrWithinDone()
+{
+  withinNbrDoneCount++;
+  maybeStartMigrations();
+}
+
+// Start this node's moves once its own within-node phase is acked AND every
+// neighbour's is. The second half is what makes the move list final: a
+// neighbour that received one of our tokens may hand it on to another of its
+// PEs, and that retarget is a LoadReceived to OUR donor PE. It is acked to the
+// neighbour before the neighbour reports its phase done, so once every
+// neighbour has reported, every retarget of ours has been applied. Nodes that
+// are not neighbours hold none of our tokens and are not waited for; with one
+// node there are no neighbours and the moves start at once.
+void DiffusionLB::maybeStartMigrations()
+{
+  if (!withinSelfDone) return;
+  if (withinNbrDoneCount < (int)sendToNeighbors.size()) return;
+  withinSelfDone = false;
+  withinNbrDoneCount = 0;
+  const int first = myNodeId * nodeSize;
+  for (int r = 0; r < nodeSize; r++) thisProxy[first + r].ProcessMigrations();
 }
 
 // A neighbour has finished its across-node handoffs.

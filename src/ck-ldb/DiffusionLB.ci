@@ -23,22 +23,33 @@ module DiffusionLB
     entry[reductiontarget] void print_external_comm(double sum);
     entry[reductiontarget] void print_internal_comm(double sum);
     
-    entry void beginMST();
-    entry void startFirstRound();
+    // The strategy's phase messages are [expedited]. A regular group message
+    // is re-queued on the receiving PE's scheduler queue behind everything the
+    // application has pending there; an expedited one is handled as soon as
+    // the scheduler pulls it from the network. Under +LBAsync the application
+    // keeps that queue full for the whole step, and each of the strategy's
+    // ~40 hops was paying a full drain of it: pic2d's pseudo-LB phase went
+    // from 0.3 ms to 64 ms of wall time, leanmd's first-step neighbour
+    // selection to 106 ms -- latency that decides whether elements stall at
+    // the lag park. Every handler here is short; the two that build heaps
+    // (AcrossNodeLB, WithinNodeLB) run once per step on one PE per node.
+    entry[expedited] void beginMST();
+    entry[expedited] void startFirstRound();
     entry[reductiontarget] void findNBorsRound();
     entry[expedited] void proposeNbor(int nborId);
     entry[expedited] void askNbor(int nborId, int rnd);
     entry void update_peload(int rank, double load);
     entry[expedited] void okayNbor(int agree, int nborId);
-    entry void ackNbor(int nbor);
+    entry[expedited] void ackNbor(int nbor);
     // Confirms an ackNbor was processed, so the asker can prove its edge is
     // symmetric before it reports the round done; see hsMaybeAdvance.
     entry[expedited] void ackNborDone();
-    entry void roundsDone();
+    entry[expedited] void roundsDone();
     entry[expedited] void migMsgAck();
-    entry void acrossDone();
-    entry void nbrAcrossDone();
-    entry void withinDone();
+    entry[expedited] void acrossDone();
+    entry[expedited] void nbrAcrossDone();
+    entry[expedited] void nbrWithinDone();
+    entry[expedited] void withinDone();
 
     entry void ReceiveFinalStats(
         std::vector<bool> isMigratable, std::vector<int> from_proc,
@@ -47,27 +58,27 @@ module DiffusionLB
         std::vector<LDCommData> commData);
 
     entry void receiveCentroid(int node, std::vector<LBRealType> centroid, int count);
-    entry void ReceiveLoadInfo(int itr, double load, int node);
-    entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
+    entry[expedited] void ReceiveLoadInfo(int itr, double load, int node);
+    entry[expedited] void ReceiveStats(CkMarshalledCLBStatsMessage data);
     // entry void LoadTransfer(double load, int initPE, int objId);
-    entry void LoadReceived(int objId, int fromPE, int ackPE);
-    entry void AcrossNodeLB();
+    entry[expedited] void LoadReceived(int objId, int fromPE, int ackPE);
+    entry[expedited] void AcrossNodeLB();
 
     // (pseudolb_barrier removed -- global convergence check deleted)
 
     entry[reductiontarget] void startMSTBarrier();
 
-    entry void startStrategy();
-    entry void startStrategyBarrier();
+    entry[expedited] void startStrategy();
+    entry[expedited] void startStrategyBarrier();
     // entry [reductiontarget] void DoneNodeLB();
     // entry void MigratedHelper(LDObjHandle h, int waitBarrier);
-    entry void ProcessMigrations();
+    entry[expedited] void ProcessMigrations();
     entry void ProcessFinalStats();
     entry void CollectStats();
-    entry void next_phase(int val);
-    entry void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount, int ackPE);
+    entry[expedited] void next_phase(int val);
+    entry[expedited] void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount, int ackPE);
     entry void MigrationDoneWrapper();  // Call when migration is complete
-    entry void WithinNodeLB();
+    entry[expedited] void WithinNodeLB();
   
     entry void buildMSTinRounds(double best_weight, int best_parent, int best_to);
     entry void next_MSTphase(double newcost, int newparent, int newto);
@@ -76,7 +87,7 @@ module DiffusionLB
     // entry void ResumeClients(CkReductionMsg * msg);
     // entry void ResumeClients(int balancing);
 
-    entry void PseudoLoad(int itr, double load, int node);
+    entry[expedited] void PseudoLoad(int itr, double load, int node);
     // Fires on PE 0 once the neighbour handshake has drained (quiescence), which
     // is what guarantees the neighbour graph is symmetric before the rounds start.
     entry void beginPseudoRounds();
@@ -90,7 +101,8 @@ module DiffusionLB
     // of the outgoing message, which silently shreds a marshalled one.
     entry void pseudoConvergeResult(PseudoRoundMsg* m);
     // Local hand-off from pseudoConvergeResult into the SDAG round loop.
-    entry void pseudoVerdict(double maxRatio);
+    entry[expedited] void pseudoVerdict(double maxRatio);
+    entry[expedited] void pseudoMetricContribute(double metric);
     // pseudoDone / pseudolb_barrier removed with the global convergence check;
     // see the note in the pseudolb_rounds loop below.
     // entry void CallResumeClients();
@@ -234,15 +246,12 @@ module DiffusionLB
             pseudo_metric = fabs(my_pseudo_load - prev_pseudo_load) / denom;
             prev_pseudo_load = my_pseudo_load;
           }
-          // Reduce across the section's members only. The result goes to PE 0,
-          // which multicasts the verdict back so every member leaves the loop
-          // on the same round.
-          CkMulticastMgr* mg =
-              CProxy_CkMulticastMgr(pseudoMcastGid).ckLocalBranch();
-          mg->contribute(sizeof(double), &pseudo_metric, CkReduction::max_double,
-                         pseudoCookie,
-                         CkCallback(CkReductionTarget(DiffusionLB, pseudoVerdictRoot),
-                                    thisProxy[0]));
+          // Counted on PE 0, which sends the same verdict back to every
+          // member so they all leave the loop on the same round. Expedited
+          // point-to-point in both directions: the section reduction and
+          // verdict multicast this replaces travel as ordinary messages and
+          // wait behind the application on every hop under +LBAsync.
+          thisProxy[0].pseudoMetricContribute(pseudo_metric);
         }
 
         when pseudoVerdict(double maxRatio) serial "Convergence verdict"
@@ -265,11 +274,15 @@ module DiffusionLB
         if (_lb_args.debug() > 1) CkPrintf("PSEUDO: Node %d (load %f) with pseudo_load after LB %f\n", myNodeId,
                  my_load, my_pseudo_load);
         loadReceivers = 0;
-        // Every member leaving the loop is the whole condition AcrossNodeLB
-        // needs: the convergence verdict cannot have been issued while any
-        // round message was unprocessed, so nothing of the rounds is in
-        // flight once the last member reports.
-        thisProxy[0].roundsDone();
+        // Leaving the loop is the whole condition AcrossNodeLB needs: the
+        // convergence verdict cannot have been issued while any round message
+        // was unprocessed, so nothing of the rounds is in flight. That holds
+        // for this member alone, so it starts its across-node phase directly;
+        // a LoadMetaInfo it sends can only reach a node that has also left the
+        // rounds, and nothing that handler touches depends on that node having
+        // started its own phase. The PE 0 count is kept as an opt-in.
+        if (diffusionGlobalPhases()) thisProxy[0].roundsDone();
+        else AcrossNodeLB();
       }
     }
   };
