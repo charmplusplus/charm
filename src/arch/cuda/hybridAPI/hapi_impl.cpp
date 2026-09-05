@@ -2483,10 +2483,12 @@ void hapiIpcReportStats() {
   const long misses = csv_gpu_manager.ipc_import_misses.load();
   const long stale = csv_gpu_manager.ipc_import_stale_dropped.load();
   const long shared = csv_gpu_manager.ipc_import_region_shared.load();
+  const long repairs = csv_gpu_manager.ipc_forward_repairs.load();
   if (staged + direct + hits + misses == 0) return;
   CmiPrintf("[ipc-stats] pid=%d staged=%ld direct=%ld import_hits=%ld "
-            "import_misses=%ld stale_dropped=%ld region_shared=%ld transport=%s\n",
-            (int)getpid(), staged, direct, hits, misses, stale, shared,
+            "import_misses=%ld stale_dropped=%ld region_shared=%ld "
+            "forward_repairs=%ld transport=%s\n",
+            (int)getpid(), staged, direct, hits, misses, stale, shared, repairs,
             csv_gpu_manager.ipc_use_direct ? "direct" : "staged");
 }
 

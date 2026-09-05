@@ -125,6 +125,10 @@ void CkRdmaDeviceRecvHandler(void* data);
 void CkRdmaDeviceRecvHandler(void* data, void* msg);
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);
+// A device-send message that is leaving this process for another one on the
+// same physical node: re-prepare every memcpy-prepared payload in it as a
+// direct IPC send, in place, so the new home reads it without a correction.
+void CkRdmaDeviceRepairForward(envelope* env, int newPe);
 
 class CkLocRec;
 CkpvExtern(CkLocRec*, _currentLocRec);

@@ -936,6 +936,110 @@ static void acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
                                const void* src_ptr, size_t cnt,
                                void** out_buffer, int* out_event_idx);
 
+/*************** Forward-time repair of a memcpy-prepared payload ***************/
+//
+// CkRdmaDeviceOnSender prepares a send for a co-resident target as MEMCPY: a
+// raw device pointer, no export, no IPC event. That is exact at the moment it
+// is decided (the process-wide resident table is consulted), but the message
+// is then queued, and if the balancer moves the target out of the process
+// before the message is consumed, the location manager forwards it to a home
+// that cannot read the pointer. Until now that cost a correction round trip
+// (requestDeviceRestage): the new home asked the sender for the bytes again.
+//
+// The forward happens in the process that owns the source, and the source is
+// still alive -- a memcpy send ships its completion callback with the message,
+// so nothing has released the buffer -- so the payload can be re-prepared
+// here as a first-time direct send would have been: export the source, claim
+// an IPC event slot, record the event behind the memcpy event that marks the
+// data as produced, and rewrite the descriptor in the message. The receiver
+// then takes its ordinary direct path and no correction is requested. Costs
+// nothing when nothing moves. A forward off the physical node keeps the
+// inter-node correction, since the bytes have to cross the network anyway.
+//
+// The descriptors sit at the front of every device-send message, right after
+// their count (see the generated _call_ functions), and have one width in
+// every protocol (CmiDeviceBuffer::pup), which is what makes the in-place
+// rewrite possible without generated code.
+void CkRdmaDeviceRepairForward(envelope* env, int newPe) {
+  if (!CMI_IS_ZC_DEVICE(env)) return;
+  if (env->getMsgtype() != ForArrayEltMsg) return;
+  if (CmiNodeOf(newPe) == CmiMyNode()) return;             // still readable as is
+  if (!CmiPeOnSamePhysicalNode(newPe, CkMyPe())) return;    // inter-node: correction path
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  if (!csv_gpu_manager.use_shm || !hapiIpcUseDirect()) return;
+  auto dmit = csv_gpu_manager.device_map.find(CkMyPe());
+  if (dmit == csv_gpu_manager.device_map.end()) return;
+  DeviceManager* dm = dmit->second;
+
+  char* buf = ((CkMarshallMsg*)EnvToUsr(env))->msgBuf;
+  PUP::fromMem rd(buf);
+  int n = 0;
+  rd | n;
+  for (int i = 0; i < n; i++) {
+    const size_t off = rd.size();
+    CkDeviceBuffer b;
+    rd | b;
+    const size_t width = rd.size() - off;
+    if (b.sender_prepared) continue;                 // IPC-prepared: readable node-wide already
+    static const bool dbg = (getenv("CHARM_ZC_RESTAGE_DEBUG") != nullptr);
+    const char* skip = NULL;
+    auto srcit = csv_gpu_manager.device_map.find(b.src_pe);
+    hapiIpcMemHandle_t handle;
+    size_t export_offset = 0;
+    void* export_base = NULL;
+    if (b.src_mpi_rank != CmiMyNode()) skip = "source not in this process";
+    else if (srcit == csv_gpu_manager.device_map.end() || srcit->second != dm)
+      skip = "source on another device";
+    else if (!hapiIpcExportBuffer(b.ptr, &handle, &export_offset, &export_base))
+      skip = "export failed";
+    if (skip) {
+      if (dbg) {
+        CmiPrintf("[%d] ZC FORWARD-SKIP src=%p cnt=%zu srcPe=%d -> PE %d: %s\n",
+                  CkMyPe(), b.ptr, (size_t)b.cnt, b.src_pe, newPe, skip);
+        fflush(stdout);
+      }
+      continue;                                      // left to the correction protocol
+    }
+    const int dev = CpvAccess(my_device_id);
+    void* unused = NULL;
+    int ev = -1;
+    acquireIpcSendSlot(dm, dev, /*is_lb_buffer=*/false, /*direct=*/true,
+                       b.ptr, b.cnt, &unused, &ev);
+    // The receiver waits on this event before it reads. Order it behind the
+    // memcpy event the send recorded on the producing stream (the receiver's
+    // memcpy branch would have waited on that same event).
+    if (b.memcpy_event != NULL)
+      hapiCheck(hapiStreamWaitEvent(hapiStreamPerThread,
+                                    (hapiEvent_t)b.memcpy_event, 0));
+    const int device_idx =
+        csv_gpu_manager.device_count * CmiMyNodeRankLocal() + dev;
+    hapi_ipc_device_info& info = csv_gpu_manager.hapi_ipc_device_infos[device_idx];
+    hapiCheck(hapiEventRecord(info.src_event_pool[ev], hapiStreamPerThread));
+
+    b.ipc_protocol = CmiIpcProtocol::DIRECT;
+    b.ipc_handle = handle;
+    b.ipc_offset = export_offset;
+    b.ipc_base = export_base;
+    b.device_idx = device_idx;
+    b.event_idx = ev;
+    b.comm_offset = 0;
+    b.sender_prepared = true;
+    b.dest_pe = newPe;
+    b.dest_mpi_rank = CmiNodeOf(newPe);
+    PUP::toMem wr(buf + off);
+    wr | b;
+    if (wr.size() != width)
+      CkAbort("CkRdmaDeviceRepairForward: descriptor width changed (%zu -> %zu)",
+              width, wr.size());
+    csv_gpu_manager.ipc_forward_repairs.fetch_add(1, std::memory_order_relaxed);
+    if (getenv("CHARM_ZC_RESTAGE_DEBUG") != nullptr) {
+      CmiPrintf("[%d] ZC FORWARD-REPAIR src=%p cnt=%zu -> PE %d (direct, ev %d)\n",
+                CkMyPe(), b.ptr, (size_t)b.cnt, newPe, ev);
+      fflush(stdout);
+    }
+  }
+}
+
 /*************** Migration-mismatch payload correction (NACK + retransmit) ***************/
 //
 // A device send picks its transfer mode from where the sender believes the
@@ -1068,6 +1172,12 @@ extern "C" void* device_restage_put_done_bridge(void* arg)
 }
 
 // Receiver side: defer this buffer and ask the sender to retransmit it.
+// What the receiver saw in the descriptor when it asked for a correction;
+// only read by the CHARM_ZC_RESTAGE_DEBUG print.
+static thread_local bool src_prepared_dbg = false;
+static thread_local int src_proto_dbg = 0;
+static thread_local int src_dev_idx_dbg = -1;
+
 static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
                                  CkGroupID dest_aid, CmiUInt8 dest_id,
                                  bool src_staged, size_t src_comm_offset,
@@ -1113,10 +1223,13 @@ static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
   static const bool restage_debug = (getenv("CHARM_ZC_RESTAGE_DEBUG") != nullptr);
   if (restage_debug) {
     static std::atomic<unsigned> n{0};
-    CmiPrintf("[%d] ZC RESTAGE #%u srcPe=%d cnt=%zu id=%llu %s\n", CkMyPe(),
+    CmiPrintf("[%d] ZC RESTAGE #%u srcPe=%d cnt=%zu id=%llu %s "
+              "(sender_prepared=%d proto=%d dev_idx=%d src_staged=%d)\n", CkMyPe(),
               n.fetch_add(1, std::memory_order_relaxed) + 1, srcPe, cnt,
               (unsigned long long)dest_id,
-              inter_node ? "inter-node put" : "same-node stage");
+              inter_node ? "inter-node put" : "same-node stage",
+              (int)src_prepared_dbg, (int)src_proto_dbg, src_dev_idx_dbg,
+              (int)src_staged);
     fflush(stdout);
   }
 
@@ -1782,6 +1895,21 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       // Order against the sender's stream first: without this the copy could
       // run before the kernels that produced the source data. A null event
       // means the sender blocked instead, so the data is already there.
+      // A send that left this process (forward-repaired to direct, with an
+      // IPC event slot claimed) and then came back to it is read here by
+      // memcpy, so the slot would never be released by the IPC path. Retire
+      // it the way that path does: record the destination event and raise
+      // the flag the sender's reclaim scan polls.
+      if (source.sender_prepared && source.ipc_protocol == CmiIpcProtocol::DIRECT &&
+          source.event_idx >= 0 && source.device_idx >= 0 && csv_gpu_manager.use_shm) {
+        hapi_ipc_device_info& di = csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
+        hapiCheck(hapiEventRecord(di.dst_event_pool[source.event_idx],
+                                  postStructs[i].hapi_stream));
+        hapi_ipc_event_shared* sh = (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
+            + csv_gpu_manager.shm_chunk_size * source.device_idx
+            + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
+        sh->dst_flag.store(true, std::memory_order_release);
+      }
       if (source.memcpy_event != NULL) {
         hapiCheck(hapiStreamWaitEvent(postStructs[i].hapi_stream,
               (hapiEvent_t)source.memcpy_event, 0));
@@ -1866,6 +1994,9 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
                               source.ipc_offset + (size_t)dest.cnt) == NULL) {
         if (watch) watch->deferred[i] = 1;
         CkGroupID def_aid; def_aid.idx = save_op.dest_aid_idx;
+        src_prepared_dbg = source.sender_prepared;
+        src_proto_dbg = (int)source.ipc_protocol;
+        src_dev_idx_dbg = source.device_idx;
         requestDeviceRestage(env->getSrcPe(), (void*)&save_op, source.ptr,
                              def_aid, save_op.dest_id,
                              source.ipc_protocol == CmiIpcProtocol::STAGED,
@@ -1902,6 +2033,9 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
            !CmiPeOnSamePhysicalNode(env->getSrcPe(), CkMyPe()))) {
         if (watch) watch->deferred[i] = 1;
         CkGroupID def_aid; def_aid.idx = save_op.dest_aid_idx;
+        src_prepared_dbg = source.sender_prepared;
+        src_proto_dbg = (int)source.ipc_protocol;
+        src_dev_idx_dbg = source.device_idx;
         requestDeviceRestage(env->getSrcPe(), (void*)&save_op, source.ptr,
                              def_aid, save_op.dest_id,
                              source.ipc_protocol == CmiIpcProtocol::STAGED,

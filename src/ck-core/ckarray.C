@@ -1836,6 +1836,15 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
     // We know the ID, so fill in the rest of the envelope to allow for sending
     env->setRecipientID(ck::ObjID(thisgroup, id));
     int dest = locMgr->whichPe(id);
+    // The process-wide resident table is ground truth for this process, and
+    // the per-PE cache can lag an element's move back in. Consulting it only
+    // when the cache points out of the process keeps the common case lock-free
+    // and keeps a payload prepared for a resident target from leaving the
+    // process on a stale entry.
+    if (dest == -1 || CmiNodeOf(dest) != CmiMyNode()) {
+      const int resident = locMgr->residentOwnerPe(id);
+      if (resident != -1) dest = resident;
+    }
     if (dest != -1)
     {
       // We know the ID AND the location, so we can send the message as normal.
@@ -1979,6 +1988,13 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
       recordSend(msg->array_element_id(),
                  UsrToEnv(msg)->getTotalsize() + deviceBytes, pe, opts);
     }
+#endif
+#if CMK_CUDA
+    // A memcpy-prepared device payload is readable only inside this process.
+    // If the message is leaving it -- a forward after the target moved --
+    // re-prepare the payload as direct IPC in place (see the definition).
+    if (CmiNodeOf(pe) != CmiMyNode())
+      CkRdmaDeviceRepairForward(UsrToEnv(msg), pe);
 #endif
     CkArrayManagerDeliver(pe, msg, opts);
   }

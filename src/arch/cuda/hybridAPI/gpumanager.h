@@ -301,6 +301,10 @@ struct GPUManager {
   std::atomic<long> ipc_import_misses;
   std::atomic<long> ipc_staged_sends;
   std::atomic<long> ipc_direct_sends;
+  // Memcpy-prepared payloads re-prepared as direct at the moment their
+  // message left the process (CkRdmaDeviceRepairForward): each one is a
+  // same-node correction round trip that did not happen.
+  std::atomic<long> ipc_forward_repairs;
 
   //CUPTI load balancing
 #ifdef CMK_LBDB_ON
@@ -470,6 +474,7 @@ struct GPUManager {
     ipc_import_hits = 0;
     ipc_import_last_err = 0;
     ipc_import_stale_dropped = 0;
+    ipc_forward_repairs = 0;
     ipc_import_region_shared = 0;
     ipc_import_misses = 0;
     ipc_staged_sends = 0;

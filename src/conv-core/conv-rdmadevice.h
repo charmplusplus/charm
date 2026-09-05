@@ -126,17 +126,16 @@ public:
     p|comm_offset;
     p|event_idx;
     p|sender_prepared;
-    // The 64-byte handle is only meaningful to a DIRECT receive, and every
-    // device send carries one of these descriptors, so pup it conditionally.
-    // The width stays a function of ipc_protocol alone, which nothing rewrites
-    // -- what CkRdmaDeviceIssueRgets patches in place is ptr -- so the
-    // read-then-write retarget there still round-trips to the same size.
+    // The IPC fields travel unconditionally, so the descriptor's image in a
+    // message has one width whatever the protocol. That is what lets a
+    // descriptor be rewritten in place after the fact: CkRdmaDeviceIssueRgets
+    // retargets ptr, and CkRdmaDeviceRepairForward turns a memcpy-prepared
+    // descriptor into a direct one when its message leaves the process. The
+    // cost is ~80 bytes on each device-send message.
     p((char *)&ipc_protocol, sizeof(ipc_protocol));
-    if (ipc_protocol == CmiIpcProtocol::DIRECT) {
-      p((char *)&ipc_handle, sizeof(ipc_handle));
-      p|ipc_offset;
-      p((char *)&ipc_base, sizeof(ipc_base));
-    }
+    p((char *)&ipc_handle, sizeof(ipc_handle));
+    p|ipc_offset;
+    p((char *)&ipc_base, sizeof(ipc_base));
     p((char *)&memcpy_event, sizeof(memcpy_event));
     p|data_stored;
     if (data_stored) {
