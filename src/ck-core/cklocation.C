@@ -4297,6 +4297,14 @@ static inline bool ckMigrateArenaMode()
   static const bool on = (getenv("CHARM_MIGRATE_ARENA") != nullptr);
   return on;
 }
+// Whether a migration arena comes from the device pool (CkDeviceMalloc) and goes
+// back to it, instead of hapiMalloc/hapiFree. Off by default: the pool is
+// optional, and this path has to keep working exactly as before without it.
+static inline bool ckMigrateArenaFromPool()
+{
+  static const bool on = (getenv("CHARM_MIGRATE_POOL") != nullptr);
+  return on;
+}
 
 void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, CkDeviceBufferPost* post)
 {
@@ -4308,8 +4316,19 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
   if (ckMigrateArenaMode()) {
     // The arena: the chare's storage, not a landing block, so it comes from
     // ordinary device memory -- pool memory is transient by contract.
+    // Optional: the arena from the device pool (host-side buddy allocation, no
+    // cudaMalloc and later no cudaFree) rather than a fresh device allocation.
+    // CHARM_MIGRATE_POOL selects it; the default is the allocation it always
+    // was, so a run without the pool is unchanged.
     data = nullptr;
-    hapiCheck(hapiMalloc((void**)&data, size));
+    if (ckMigrateArenaFromPool()) {
+      data = (char*)CkDeviceMalloc(size);
+      if (data == nullptr)
+        CkAbort("PE %d: device pool could not provide a %d-byte migration arena",
+                CkMyPe(), size);
+    } else {
+      hapiCheck(hapiMalloc((void**)&data, size));
+    }
   } else if(csv_gpu_manager.use_shm) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
     dm_for_gate = dm;
@@ -4531,11 +4550,16 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
       size_t extent = 0;
       for (int i = 0; i < msg->nGpuBufs; ++i)
         extent = PUP::alignDeviceOffset(extent) + msg->gpuManifest[i];
-      hapiArenaRegister(gpuMsg, extent, p.deviceReboundCount);
+      // If the arena came from the device pool (immigrateGPU), it goes back
+      // there when the last rebound buffer is released -- a buddy free, not a
+      // cudaFree. Otherwise hapiFree, as before.
+      hapiArenaRegister(gpuMsg, extent, p.deviceReboundCount,
+                        ckMigrateArenaFromPool() ? CkDeviceFree : nullptr);
     } else {
       // Nothing rebound: the arena served as a plain landing area for a
       // legacy pup, and its contents were copied out.
-      hapiCheck(hapiFree(gpuMsg));
+      if (ckMigrateArenaFromPool()) CkDeviceFree(gpuMsg);
+      else hapiCheck(hapiFree(gpuMsg));
     }
   } else if(csv_gpu_manager.use_shm && gpuMsg != nullptr) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];

@@ -64,21 +64,26 @@ inline hapiError_t mdDevFree(void* p, cudaStream_t s) {
 // ordered, so a buffer is only freed at points where nothing is in flight
 // against it -- the destructor, after pup has settled the stream and the force
 // sends have drained, and ensureSlot growth, after the previous step's acks.
-#ifdef MD_NO_POOL
-// A/B twin of the binary: the pre-pool allocator, so device_alloc_free_time
-// can be compared on the same metric. Build with OPTS+=-DMD_NO_POOL.
-inline hapiError_t mdMigMalloc(void** p, size_t n) { return hapiMalloc(p, n); }
-inline void mdMigFree(void* p, bool) { hapiFreeMigratable(p); }
-#else
+// CHARM_MD_NO_POOL: the pre-pool allocator (hapiMalloc / hapiFreeMigratable),
+// at run time rather than as a separate build, so the two can be compared on
+// the same binary and the pool stays optional.
+inline bool mdPoolOn() {
+  static const bool off = (getenv("CHARM_MD_NO_POOL") != nullptr);
+  return !off;
+}
 inline hapiError_t mdMigMalloc(void** p, size_t n) {
+  if (!mdPoolOn()) return hapiMalloc(p, n);
   *p = CkDeviceMalloc(n);
   return (*p != NULL) ? cudaSuccess : cudaErrorMemoryAllocation;
 }
+// fromPool is set only when this chare took the buffer from the pool, so with
+// the pool off it is never set and every buffer goes through
+// hapiFreeMigratable, which handles both a hapiMalloc'd buffer and one
+// rebound by migration.
 inline void mdMigFree(void* p, bool fromPool) {
   if (p == NULL) return;
   if (fromPool) CkDeviceFree(p); else hapiFreeMigratable(p);
 }
-#endif
 
 struct AllocTimer {
   double t0; bool on;
@@ -168,7 +173,7 @@ void Compute::ensureDevice() {
   // place, and reallocating over those would leak them and lose the contents.
   if (d_energyScalar == NULL) {
     hapiCheck(mdMigMalloc((void**)&d_energyScalar, sizeof(double)));
-    poolEnergyScalar = true;
+    poolEnergyScalar = mdPoolOn();
   }
   if (h_energy == NULL)
     hapiCheck(hapiMallocHost((void**)&h_energy, sizeof(double)));
@@ -207,13 +212,13 @@ void Compute::ensureSlot(int s, int n) {
   if (d_force[s]) mdMigFree(d_force[s], poolForce[s]);
   hapiCheck(mdMigMalloc((void**)&d_pos[s], sizeof(vec3) * newcap));
   hapiCheck(mdMigMalloc((void**)&d_force[s], sizeof(vec3) * newcap));
-  poolPos[s] = poolForce[s] = true;
+  poolPos[s] = poolForce[s] = mdPoolOn();
 
   // The energy partials are indexed by the A-side atom, one entry per block.
   if (s == 0) {
     if (d_energyPartial) mdMigFree(d_energyPartial, poolEnergyPartial);
     hapiCheck(mdMigMalloc((void**)&d_energyPartial, sizeof(double) * newcap));
-    poolEnergyPartial = true;
+    poolEnergyPartial = mdPoolOn();
   }
   cap[s] = newcap;
 }

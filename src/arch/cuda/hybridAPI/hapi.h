@@ -344,6 +344,12 @@ void hapiIpcReportStats();
 // number of live rebound buffers; each hapiFreeMigratable of an interior
 // pointer decrements that count, and the arena is freed when it reaches zero.
 void hapiArenaRegister(void* base, size_t extent, size_t liveBuffers);
+// Same, for an arena whose memory belongs to some other allocator: `release`
+// is called with the base when the last rebound buffer goes, instead of
+// hapiFree. Such a base is never recycled by the driver, so its IPC export is
+// left alone rather than invalidated.
+void hapiArenaRegister(void* base, size_t extent, size_t liveBuffers,
+                       void (*release)(void*));
 
 // Free a device buffer that may be arena-interior (a pointer rebound by
 // pup_buffer_device) or an ordinary allocation -- safe for both, so

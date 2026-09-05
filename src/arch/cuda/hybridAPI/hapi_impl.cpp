@@ -2415,17 +2415,28 @@ std::map<char*, HapiArenaRec> hapi_arena_registry;
 std::mutex hapi_arena_registry_lock;
 }
 
+// Arenas that are not ours to cudaFree: base -> the function that takes it
+// back. Kept beside the registry rather than in HapiArenaRec so the common
+// (hapiMalloc) arena pays nothing for it.
+std::map<char*, void (*)(void*)> hapi_arena_release;
+
 void hapiArenaRegister(void* base, size_t extent, size_t liveBuffers) {
   std::lock_guard<std::mutex> g(hapi_arena_registry_lock);
   hapi_arena_registry[(char*)base] = HapiArenaRec{extent, liveBuffers};
 }
 
+void hapiArenaRegister(void* base, size_t extent, size_t liveBuffers,
+                       void (*release)(void*)) {
+  std::lock_guard<std::mutex> g(hapi_arena_registry_lock);
+  hapi_arena_registry[(char*)base] = HapiArenaRec{extent, liveBuffers};
+  if (release) hapi_arena_release[(char*)base] = release;
+  else hapi_arena_release.erase((char*)base);
+}
+
 void hapiFreeMigratable(void* ptr) {
   if (ptr == NULL) return;
-  // Before anything is freed: a recycled base would otherwise keep handing out
-  // this allocation's IPC handle. See hapiIpcInvalidateExport.
-  hapiIpcInvalidateExport(ptr);
   void* arena_to_free = NULL;
+  void (*release)(void*) = NULL;
   {
     std::lock_guard<std::mutex> g(hapi_arena_registry_lock);
     if (!hapi_arena_registry.empty()) {
@@ -2436,6 +2447,11 @@ void hapiFreeMigratable(void* ptr) {
             (char*)ptr < it->first + it->second.extent) {
           if (--it->second.live == 0) {
             arena_to_free = it->first;
+            auto r = hapi_arena_release.find(it->first);
+            if (r != hapi_arena_release.end()) {
+              release = r->second;
+              hapi_arena_release.erase(r);
+            }
             hapi_arena_registry.erase(it);
           }
           // Interior pointer handled: either the arena still has live
@@ -2446,10 +2462,24 @@ void hapiFreeMigratable(void* ptr) {
     }
   }
   if (arena_to_free != NULL) {
+    if (release != NULL) {
+      // The base belongs to another allocator (the device pool) and is never
+      // recycled by the driver, so its IPC export stays valid and is NOT
+      // invalidated: invalidating by this address would resolve to the pool
+      // arena that contains it and drop the export every peer is using for
+      // every other buffer in it.
+      release(arena_to_free);
+      return;
+    }
+    // A cudaMalloc base about to be cudaFree'd: a recycled base would
+    // otherwise keep handing out this allocation's IPC handle. Invalidate at
+    // the free itself, not on every interior release.
+    hapiIpcInvalidateExport(arena_to_free);
     hapiCheck(hapiFree(arena_to_free));
     return;
   }
   // Not arena-interior: an ordinary allocation.
+  hapiIpcInvalidateExport(ptr);
   hapiCheck(hapiFree(ptr));
 }
 
