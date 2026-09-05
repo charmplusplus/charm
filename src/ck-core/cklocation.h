@@ -277,9 +277,14 @@ public:
   int toPe;
   int size;
   void* data;
+  // The stream the pack copies were issued on. The payload send stages from
+  // `data` on this stream, which orders it behind those copies on the device
+  // -- the ordering emigrate used to buy by waiting on the host.
+  void* stream;
 
-  GPUMigrateData() : toPe(-1), size(0), data(nullptr) {}
-  GPUMigrateData(int toPe_, int size_, void* data_) : toPe(toPe_), size(size_), data(data_) {}
+  GPUMigrateData() : toPe(-1), size(0), data(nullptr), stream(nullptr) {}
+  GPUMigrateData(int toPe_, int size_, void* data_, void* stream_ = nullptr)
+      : toPe(toPe_), size(size_), data(data_), stream(stream_) {}
 };
 
 /********************** CkLocMgr ********************/

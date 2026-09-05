@@ -21,6 +21,9 @@ virtual functions are defined here.
 
 #include "converse.h"
 #include "pup.h"
+#if CMK_CUDA
+#include "hapi.h"
+#endif
 #include "ckhashtable.h"
 #include "conv-mach-cuda.h"
 
@@ -299,12 +302,41 @@ void PUP::fromMem::deviceManifestCheck(size_t nBytes)
 
 void PUP::sizer::pup_buffer_device(void *&p, size_t n, size_t itemSize)
 {
+#if CMK_CUDA
+  if (!hapiDevPoolContains(p)) deviceAllPool = false;
+#endif
   bytes(p, n, itemSize, Tchar, PUPMode::DEVICE);
 }
 
 void PUP::toMem::pup_buffer_device(void *&p, size_t n, size_t itemSize)
 {
+#if CMK_CUDA
+  // Tell the pool this block is being read on the migration stream, so a free
+  // of it parks until those reads retire instead of handing it straight out.
+  // A block that is not the pool's cannot be ordered that way, and the host
+  // wait in emigrate has to cover it.
+  if (hapiDevPoolContains(p)) hapiDevPoolNoteRead(p, (hapiStream_t)gpuStream);
+  else deviceAllPool = false;
+#endif
   bytes(p, n, itemSize, Tchar, PUPMode::DEVICE);
+}
+
+void PUP::toMem::pup_device_order(void* producerStream)
+{
+#if CMK_CUDA
+  if (producerStream == nullptr) return;
+  // One event per thread is enough: the record and the wait are issued back to
+  // back on the host, and cudaStreamWaitEvent captures the event's state at
+  // the time of the call, so a later re-record cannot disturb an earlier wait.
+  static thread_local cudaEvent_t ev = nullptr;
+  if (ev == nullptr) hapiCheck(cudaEventCreateWithFlags(&ev, cudaEventDisableTiming));
+  hapiCheck(cudaEventRecord(ev, (cudaStream_t)producerStream));
+  // gpuStream null means the copies go on the legacy default stream; waiting
+  // there is legal.
+  hapiCheck(cudaStreamWaitEvent((cudaStream_t)gpuStream, ev, 0));
+#else
+  (void)producerStream;
+#endif
 }
 
 void PUP::fromMem::pup_buffer_device(void *&p, size_t n, size_t itemSize)

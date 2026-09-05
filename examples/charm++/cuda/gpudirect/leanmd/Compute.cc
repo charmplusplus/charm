@@ -409,8 +409,11 @@ void Compute::pup(PUP::er &p) {
   // were launched on -- and the migration copy reads these buffers as soon as
   // pup returns. This is the whole of what a chare owes migration; it is not a
   // restriction on WHEN it may move.
-  if (p.isPacking() && !p.isSizing() && stream != NULL)
-    hapiCheck(cudaStreamSynchronize(stream));
+  // Not a host wait: the packer records an event on this chare's stream and
+  // makes the migration stream wait on it, so the copies queue up behind the
+  // kernels on the device and the scheduler thread never stops. No-op for the
+  // sizer and the unpacker.
+  if (stream != NULL) p.pup_device_order((void*)stream);
 
   // The scratch travels. Unpacking rebinds these pointers into the arena the
   // payload landed in, so they are released through hapiFreeMigratable (see

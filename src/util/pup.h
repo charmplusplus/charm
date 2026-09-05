@@ -323,6 +323,12 @@ class er {
   virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize) {
     (void)p; (void)n; (void)itemSize;
   }
+  // Order this PUP::er's device copies behind the application's own device
+  // work. Packing records an event on `producerStream` (a hapiStream_t) and
+  // makes the migration stream wait on it -- on the device; the host does not
+  // block. Call it once before the pup_buffer_device calls whose sources that
+  // stream produces. Every other PUP::er ignores it.
+  virtual void pup_device_order(void* producerStream) { (void)producerStream; }
 
   //For pointers: the last parameter is to make it more difficult to call
   //(should not be used in normal code as pointers may loose meaning across processor)
@@ -456,6 +462,10 @@ class sizer : public er {
   //Return the current number of bytes to be packed
   size_t size(void) const {return nBytes;}
 
+  // False once any DEVICE-mode buffer sized was not from the device pool.
+  // Set here as well as in toMem because emigrate's wait decision is made
+  // where the sizer, not the packer, is in scope; both see the same buffers.
+  bool deviceAllPool = true;
   size_t gpu_size(void) const {return gpuBytes;}
   size_t gpu_buf_count(void) const {return gpuBufCount;}
 };
@@ -551,7 +561,14 @@ class toMem : public mem {
   // for the pack side.
   size_t deviceManifestCap = 0;
 
+  // False once any DEVICE-mode buffer packed was not from the device pool.
+  // emigrate reads it: if every packed buffer is pool-interior, the pool's
+  // stream-ordered free protects the sources and the host wait after packing
+  // is unnecessary; otherwise that wait stays.
+  bool deviceAllPool = true;
+
   virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize);
+  virtual void pup_device_order(void* producerStream);
 
   //Write data to the given buffer
   toMem(void* Nbuf, 

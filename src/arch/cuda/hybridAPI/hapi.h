@@ -357,6 +357,25 @@ void hapiArenaRegister(void* base, size_t extent, size_t liveBuffers,
 // instead of hapiFree.
 void hapiFreeMigratable(void* ptr);
 
+/*** Device pool ***/
+// Device buffers from arenas: one large device allocation each, buddy-managed,
+// grown on demand (CK_GPU_ARENA_MB, default 256), one arena set per device.
+// Malloc and free are host-side bookkeeping -- no cudaMalloc, no cudaFree per
+// buffer, so neither synchronizes the device. Lives here rather than in ck-core
+// because it has no ck dependency and two things below ck need it: the packer
+// (pup_util.C) marks blocks it is reading, and IPC init can pre-open an arena.
+void* hapiDevPoolMalloc(size_t size, int device);
+void hapiDevPoolFree(void* ptr);
+bool hapiDevPoolContains(const void* ptr);
+// The first arena on `device`, created if there is none. Base and extent out.
+void hapiDevPoolEnsureArena(int device, void** base, size_t* extent);
+// A block the migration packer has enqueued reads from on `stream`. A later
+// hapiDevPoolFree of that block records an event on that stream and parks the
+// block; it is returned to the allocator by a later hapiDevPoolMalloc once the
+// event has completed. That is the stream-ordered free -- what cudaFreeAsync
+// does -- and it is what lets the packer's host wait go.
+void hapiDevPoolNoteRead(const void* ptr, hapiStream_t stream);
+
 // The running chare's attributed live device-allocation bytes (see the
 // footprint tracking in hapi_portable.h/hapi_impl.cpp). Valid inside an entry
 // method of a migratable chare; returns 0 otherwise.

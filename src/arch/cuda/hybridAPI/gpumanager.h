@@ -72,6 +72,17 @@ struct CuptiBufferItem {
 
 // Per-device struct containing data for CUDA IPC.
 // Use SMP lock in DeviceManager if needed.
+// One per (process, device) in the +gpushm shared segment, after the event
+// slots: the device pool's first arena, published so every peer can open it
+// once at startup instead of on the first send from it. CHARM_GPU_POOL_PREOPEN.
+struct hapi_pool_shm_entry {
+  hapiIpcMemHandle_t handle;
+  void* base;
+  size_t extent;
+  int src_node;   // CmiMyNode() of the owner -- the key the import cache uses
+  int valid;
+};
+
 struct hapi_ipc_device_info {
   std::vector<hapiEvent_t> src_event_pool;
   std::vector<hapiEvent_t> dst_event_pool;

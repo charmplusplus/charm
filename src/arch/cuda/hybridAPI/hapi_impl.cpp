@@ -28,6 +28,7 @@
 
 #include "hapi.h"
 #include "hapi_impl.h"
+#include <unordered_map>
 #include "gpumanager.h"
 #ifdef HAPI_NVTX_PROFILE
 #include "hapi_nvtx.h"
@@ -143,6 +144,8 @@ static void shmMap();
 static void shmAbort();
 static void shmCleanup();
 static void ipcHandleCreate();
+void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle, int src_process,
+                          const void* src_base, size_t span);
 static void ipcHandleOpen();
 
 #ifdef CMK_LBDB_ON
@@ -1929,7 +1932,8 @@ static void shmSetup() {
 
   // Calculate shared memory region size
   csv_gpu_manager.shm_chunk_size = sizeof(hapiIpcMemHandle_t) +
-      sizeof(hapi_ipc_event_shared) * csv_gpu_manager.hapi_ipc_event_pool_size_total;
+      sizeof(hapi_ipc_event_shared) * csv_gpu_manager.hapi_ipc_event_pool_size_total +
+      sizeof(hapi_pool_shm_entry);
   csv_gpu_manager.shm_size = csv_gpu_manager.shm_chunk_size *
     csv_gpu_manager.device_count * ((CmiNumNodes() / CmiNumPhysicalNodes()));
 }
@@ -2075,6 +2079,29 @@ static void ipcHandleCreate() {
   void* device_ptr = comm_buffer->base_ptr;
   hapiCheck(hapiIpcGetMemHandle(shm_mem_handle, device_ptr));
 
+  // Publish the device pool's first arena beside the comm buffer's handle, so
+  // peers open it now rather than on the first send from it. Off by default.
+  {
+    static const bool preopen = (getenv("CHARM_GPU_POOL_PREOPEN") != nullptr);
+    hapi_pool_shm_entry* pe_entry = (hapi_pool_shm_entry*)((char*)shm_mem_handle +
+        sizeof(hapiIpcMemHandle_t) +
+        sizeof(hapi_ipc_event_shared) * csv_gpu_manager.hapi_ipc_event_pool_size_total);
+    pe_entry->valid = 0;
+    if (preopen) {
+      void* base = nullptr; size_t extent = 0;
+      hapiDevPoolEnsureArena(cpv_my_device_id, &base, &extent);
+      hapiCheck(hapiIpcGetMemHandle(&pe_entry->handle, base));
+      pe_entry->base = base;
+      pe_entry->extent = extent;
+      pe_entry->src_node = CmiMyNode();
+      // Our own export, seeded: the first send from this arena finds it.
+      csv_gpu_manager.ipc_export_cache[(const void*)base] = pe_entry->handle;
+      pe_entry->valid = 1;
+      CmiPrintf("HAPI> [%d] device pool arena %p (%zu MB) published for pre-open\n",
+                CmiMyPe(), base, extent >> 20);
+    }
+  }
+
   // Create CUDA IPC events and store them locally (in hapi_ipc_device_info),
   // and create corresponding IPC handles in shared memory
   hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id];
@@ -2143,6 +2170,22 @@ static void ipcHandleOpen() {
             + csv_gpu_manager.shm_chunk_size * device_index);
       hapiCheck(hapiIpcOpenMemHandle(&cur_device_info.buffer, *shm_mem_handle,
             hapiIpcMemLazyEnablePeerAccess));
+
+      // The peer's published pool arena, if any: open it once and seed the
+      // import cache under the same key the send path will look up
+      // (owner's node id, arena base), so that lookup hits from the start.
+      {
+        hapi_pool_shm_entry* pe_entry = (hapi_pool_shm_entry*)((char*)shm_mem_handle +
+            sizeof(hapiIpcMemHandle_t) +
+            sizeof(hapi_ipc_event_shared) * csv_gpu_manager.hapi_ipc_event_pool_size_total);
+        if (pe_entry->valid) {
+          void* mapped = hapiIpcImportBuffer(pe_entry->handle, pe_entry->src_node,
+                                             pe_entry->base, pe_entry->extent);
+          CmiPrintf("HAPI> [%d] pre-opened peer node %d's pool arena %p (%zu MB) at %p\n",
+                    CmiMyPe(), pe_entry->src_node, pe_entry->base,
+                    pe_entry->extent >> 20, mapped);
+        }
+      }
 
       // Open event handles
       hapi_ipc_event_shared* shm_event_shared =
@@ -2431,6 +2474,150 @@ void hapiArenaRegister(void* base, size_t extent, size_t liveBuffers,
   hapi_arena_registry[(char*)base] = HapiArenaRec{extent, liveBuffers};
   if (release) hapi_arena_release[(char*)base] = release;
   else hapi_arena_release.erase((char*)base);
+}
+
+/*** Device pool (see hapi.h) ***/
+namespace {
+struct HapiDevPoolArena { buddy::allocator* alloc; uintptr_t start, end; int device; };
+std::vector<HapiDevPoolArena> hapi_devpool_arenas;
+std::mutex hapi_devpool_mutex;
+// Buffers the packer is reading: ptr -> the stream those reads are on. An
+// ordered map, because what the packer notes and what comes back to be freed
+// are not always the same pointer: a migration arena carved from the pool holds
+// several sub-buffers, each noted on its own address, and its release is one
+// free of the arena base. The free has to find every note inside the block it
+// is freeing, which lower_bound over the block's range does.
+std::map<const void*, cudaStream_t> hapi_devpool_read_on;
+// Freed blocks waiting for their reads to retire before they can be reused --
+// one event per stream the reads were on (in practice one).
+struct HapiDevPoolPending { void* ptr; std::vector<cudaEvent_t> evs; };
+std::vector<HapiDevPoolPending> hapi_devpool_pending;
+std::vector<cudaEvent_t> hapi_devpool_spare_events;
+
+size_t hapiDevPoolArenaBytes() {
+  static size_t bytes = 0;
+  if (!bytes) {
+    const char* e = getenv("CK_GPU_ARENA_MB");
+    bytes = (size_t)(e ? atol(e) : 256) << 20;
+  }
+  return bytes;
+}
+
+HapiDevPoolArena* hapiDevPoolArenaOfLocked(const void* p) {
+  const uintptr_t q = (uintptr_t)p;
+  for (auto& ar : hapi_devpool_arenas)
+    if (q >= ar.start && q < ar.end) return &ar;
+  return nullptr;
+}
+
+// Return every parked block whose reads have retired. Called with the lock
+// held, before a malloc searches, so a block is never handed out while the
+// migration copy that packed it is still reading.
+void hapiDevPoolReapLocked() {
+  for (size_t i = 0; i < hapi_devpool_pending.size();) {
+    HapiDevPoolPending& pd = hapi_devpool_pending[i];
+    bool done = true;
+    for (cudaEvent_t ev : pd.evs)
+      if (cudaEventQuery(ev) != cudaSuccess) { done = false; break; }
+    if (done) {
+      HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(pd.ptr);
+      if (ar) ar->alloc->free(pd.ptr);
+      for (cudaEvent_t ev : pd.evs) hapi_devpool_spare_events.push_back(ev);
+      pd = std::move(hapi_devpool_pending.back());
+      hapi_devpool_pending.pop_back();
+    } else {
+      ++i;
+    }
+  }
+}
+
+HapiDevPoolArena& hapiDevPoolNewArenaLocked(size_t need, int dev) {
+  size_t bytes = hapiDevPoolArenaBytes();
+  while (bytes < need * 2) bytes <<= 1;
+  HapiDevPoolArena ar;
+  ar.alloc = new buddy::allocator(bytes, bytes);   // the one real cudaMalloc
+  ar.start = (uintptr_t)ar.alloc->base_ptr;
+  ar.end = ar.start + bytes;
+  ar.device = dev;
+  hapi_devpool_arenas.push_back(ar);
+  CmiPrintf("HAPI> [%d] device pool: arena %zu of %zu MB at %p on device %d "
+            "(CK_GPU_ARENA_MB)\n", CmiMyPe(), hapi_devpool_arenas.size(),
+            bytes >> 20, (void*)ar.start, dev);
+  return hapi_devpool_arenas.back();
+}
+}  // namespace
+
+void* hapiDevPoolMalloc(size_t size, int dev) {
+  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  hapiDevPoolReapLocked();
+  for (auto& ar : hapi_devpool_arenas) {
+    if (ar.device != dev) continue;
+    void* q = ar.alloc->malloc(size, true);
+    if (q) return q;
+  }
+  HapiDevPoolArena& ar = hapiDevPoolNewArenaLocked(size, dev);
+  void* q = ar.alloc->malloc(size, true);
+  if (!q) CmiAbort("hapiDevPoolMalloc: request larger than a fresh arena");
+  return q;
+}
+
+void hapiDevPoolFree(void* ptr) {
+  if (ptr == NULL) return;
+  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(ptr);
+  if (!ar) CmiAbort("hapiDevPoolFree: pointer is not from the device pool");
+  // The block's full extent, from the allocator's own record of it: every
+  // read noted anywhere inside it -- the block itself, or a sub-buffer of an
+  // arena carved from it -- has to retire before the block goes back.
+  const auto blk = ar->alloc->alloc_map.find((uint8_t*)ptr);
+  const char* lo = (const char*)ptr;
+  const char* hi = lo + (blk != ar->alloc->alloc_map.end() ? blk->second.size : 1);
+  std::vector<cudaStream_t> streams;
+  for (auto it = hapi_devpool_read_on.lower_bound(ptr);
+       it != hapi_devpool_read_on.end() && (const char*)it->first < hi;) {
+    if (std::find(streams.begin(), streams.end(), it->second) == streams.end())
+      streams.push_back(it->second);
+    it = hapi_devpool_read_on.erase(it);
+  }
+  if (streams.empty()) {
+    ar->alloc->free(ptr);       // nothing reading it: reusable at once
+    return;
+  }
+  // The packer is (or was) reading inside this block on those streams. Record
+  // behind the reads and park; reaped once every event has completed.
+  HapiDevPoolPending pd; pd.ptr = ptr;
+  for (cudaStream_t st : streams) {
+    cudaEvent_t ev;
+    if (!hapi_devpool_spare_events.empty()) {
+      ev = hapi_devpool_spare_events.back(); hapi_devpool_spare_events.pop_back();
+    } else {
+      hapiCheck(cudaEventCreateWithFlags(&ev, cudaEventDisableTiming));
+    }
+    hapiCheck(cudaEventRecord(ev, st));
+    pd.evs.push_back(ev);
+  }
+  hapi_devpool_pending.push_back(std::move(pd));
+}
+
+bool hapiDevPoolContains(const void* ptr) {
+  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  return hapiDevPoolArenaOfLocked(ptr) != nullptr;
+}
+
+void hapiDevPoolEnsureArena(int dev, void** base, size_t* extent) {
+  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  for (auto& ar : hapi_devpool_arenas)
+    if (ar.device == dev) { *base = (void*)ar.start; *extent = ar.end - ar.start; return; }
+  HapiDevPoolArena& ar = hapiDevPoolNewArenaLocked(0, dev);
+  *base = (void*)ar.start; *extent = ar.end - ar.start;
+}
+
+void hapiDevPoolNoteRead(const void* ptr, hapiStream_t stream) {
+  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  if (hapiDevPoolArenaOfLocked(ptr) == nullptr) return;   // not ours; nothing to order
+  // The null stream is the legacy default: recording on it is legal and orders
+  // behind everything blocking, which is the safe reading.
+  hapi_devpool_read_on[ptr] = (cudaStream_t)stream;
 }
 
 void hapiFreeMigratable(void* ptr) {

@@ -3810,7 +3810,7 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
                CkMyPe(), (unsigned long long)id);
     CkpvAccess(_currentLocRec) = NULL;
     thisProxy[gpuData.toPe].immigrateGPU(id, gpuData.size,
-      CkDeviceBuffer(gpuData.data, gpuData.size), CkMyPe());
+      (gpuData.stream ? CkDeviceBuffer(gpuData.data, gpuData.size, (hapiStream_t)gpuData.stream) : CkDeviceBuffer(gpuData.data, gpuData.size)), CkMyPe());
     CkpvAccess(_currentLocRec) = saved_rec;
   }
 
@@ -4191,10 +4191,18 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   // the device-wide fallback covers the no-pool path, whose packing still
   // used the null stream (and cudaMemcpy(D2D) is async in CUDA 12.x).
   if (gpuBufSize > 0) {
-    if (migStream != NULL)
-      hapiCheck(hapiStreamSynchronize(migStream));
-    else
+    if (migStream != NULL) {
+      // The wait covered two things: the sources must not be freed under the
+      // copies, and the payload send must not stage before they finish. When
+      // every packed buffer came from the device pool, both are ordered on the
+      // device instead -- the pool parks a freed block until the reads it was
+      // told about retire, and the send below is tagged with this stream -- so
+      // the host does not have to stop. A buffer from anywhere else has no
+      // such ordering, and the wait stays exactly as it was.
+      if (!p.deviceAllPool) hapiCheck(hapiStreamSynchronize(migStream));
+    } else {
       cudaDeviceSynchronize();
+    }
   }
 #endif
 
@@ -4212,7 +4220,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #if CMK_CUDA
   if (gpuBufSize > 0)
   {
-    sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg);
+    sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg, (void*)migStream);
     thisProxy[CkMyPe()].sendGPUMsg(id);
   }
   if (getenv("CHARM_DEBUG_MIGRATE"))
