@@ -197,3 +197,23 @@ Running a single PE: a one-task `srun` step owns only eight of the
 allocation's cores, so the NUMA wrapper's `+pemap` aborts the run
 (`CmiSetCPUAffinity failed`) with an empty log. Launch single-PE tests
 without the wrapper.
+
+## Reference implementation
+
+`ref/moe_ref.py` is the same layer in PyTorch with NCCL, written the way an
+MoE training framework writes it: one `all_to_all_single` per exchange instead
+of one message per expert, one chunked pass per expert instead of one per
+source, and expert re-placement between steps instead of object migration. Its
+routing, initialization and update are ports of this example's, checked bit for
+bit by `ref/selftest.py`, so the two produce the same checksums and the same
+imbalance and can be compared step for step on the same node.
+
+On four A40s at the defaults the example takes 204 ms per step without
+balancing against the reference's 189, and 195 ms balanced against the
+reference's 153. The gap is not the migration mechanism: the example's async
+balancing beats its own sync, while the reference's does not, because
+overlapping NCCL weight transfers costs a step of stale placement and shares
+the links with the dispatch. The gap is the placement decision, where greedy
+re-placement reaches a token imbalance of 1.01 against DiffusionLB's 1.28, and
+the GEMM structure, where one pass per expert is worth 30% of the compute
+time. `ref/README.md` has the tables and the derivations.
