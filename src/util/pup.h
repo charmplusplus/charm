@@ -616,6 +616,13 @@ class fromMem : public mem {
   bool deviceRebind = false;
   size_t deviceReboundCount = 0;
 
+  // If non-null (a hapiStream_t), DEVICE-mode unpack copies are issued
+  // asynchronously on this stream instead of as blocking cudaMemcpy on the
+  // legacy default stream; the caller owns completion. immigrate sets it for
+  // pooled arenas so the wait after the unpack covers only this element's
+  // copies, not every other payload still landing on the default stream.
+  void* gpuStream = nullptr;
+
   virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize);
 
  protected:

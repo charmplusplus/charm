@@ -167,6 +167,11 @@ void PUP::sizer::bytes(void * p,size_t n,size_t itemSize,dataType t, PUPMode mod
     // so gpu_size() is the true extent of the packed region.
     gpuBytes = alignDeviceOffset(gpuBytes) + n * itemSize;
     gpuBufCount++;
+#if CMK_CUDA
+    // As pup_buffer_device: a source outside the pool forces emigrate's host
+    // wait after packing.
+    if (!hapiDevPoolContains(p)) deviceAllPool = false;
+#endif
   }
 }
 
@@ -224,6 +229,14 @@ void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode
       // same rule the sizer counted with and fromMem (or the receiver's arena
       // layout) walks with.
 #if CMK_CUDA
+      // The bookkeeping pup_buffer_device does, for plain DEVICE-mode pups
+      // too (pic2d, moe): a pool source is noted as read on the copy stream,
+      // so a CkDeviceFree of it parks until the copy retires; anything else
+      // keeps emigrate's host wait. Without this the wait was skipped AND the
+      // free was immediate, so a destructor could hand the source back to the
+      // pool under an in-flight pack copy.
+      if (hapiDevPoolContains(p)) hapiDevPoolNoteRead(p, (hapiStream_t)gpuStream);
+      else deviceAllPool = false;
       gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
       if (gpuStream != nullptr)
         cudaMemcpyAsync((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice,
@@ -268,7 +281,11 @@ void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mo
     // Mirror of the toMem walk: skip to the aligned offset the packer wrote
     // this buffer at before copying out.
     gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
-    cudaMemcpy(p, (const void *)gpuBuf, n, cudaMemcpyDeviceToDevice);
+    if (gpuStream != nullptr)
+      cudaMemcpyAsync(p, (const void *)gpuBuf, n, cudaMemcpyDeviceToDevice,
+                      (cudaStream_t)gpuStream);
+    else
+      cudaMemcpy(p, (const void *)gpuBuf, n, cudaMemcpyDeviceToDevice);
     gpuBuf += n;
 #endif
   }

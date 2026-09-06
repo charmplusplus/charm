@@ -1895,6 +1895,27 @@ void CkMigratable::pup(PUP::er& p)
     if (p.isUnpacking())
       myRec->setObjPosition(position);
   }
+  // Where this element is coming from and which balancing step moved it, so
+  // the balancer can take a step back (see LDObjData::prevPe). On a migration
+  // the source is this PE and the step is the one in progress; a checkpoint
+  // carries whatever the element last recorded, which is harmless.
+  {
+    int prevPe = -1, prevStep = -1;
+    if (p.isPacking())
+    {
+      if (p.isMigration())
+      {
+        prevPe = CkMyPe();
+        prevStep = myRec->lbStep();
+      }
+      else
+        myRec->getObjPrev(prevPe, prevStep);
+    }
+    p | prevPe;
+    p | prevStep;
+    if (p.isUnpacking())
+      myRec->setObjPrev(prevPe, prevStep);
+  }
 #endif
 
   if (p.isUnpacking())
@@ -2837,6 +2858,11 @@ void CkLocRec::setObjTime(double cputime) {
   lbmgr->EstObjLoad(ldHandle, cputime); }
 void CkLocRec::setObjPosition(const std::vector<LBRealType>& pos) {
   lbmgr->SetObjPosition(ldHandle, pos); }
+void CkLocRec::setObjPrev(int pe, int stepNo) {
+  lbmgr->SetObjPrev(ldHandle, pe, stepNo); }
+void CkLocRec::getObjPrev(int& pe, int& stepNo) {
+  lbmgr->GetObjPrev(ldHandle, pe, stepNo); }
+int CkLocRec::lbStep() { return lbmgr->step(); }
 double CkLocRec::getObjTime()
 {
   LBRealType walltime, cputime;
@@ -4276,7 +4302,14 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
       // told about retire, and the send below is tagged with this stream -- so
       // the host does not have to stop. A buffer from anywhere else has no
       // such ordering, and the wait stays exactly as it was.
-      if (!p.deviceAllPool) hapiCheck(hapiStreamSynchronize(migStream));
+      if (!p.deviceAllPool) {
+        const double tw0 = CmiWallTimer();
+        hapiCheck(hapiStreamSynchronize(migStream));
+        if (migDbg())
+          CkPrintf("[EMIG %d] id=%llu pack wait %.3f ms (non-pool source)\n",
+                   CkMyPe(), (unsigned long long)id,
+                   (CmiWallTimer() - tw0) * 1e3);
+      }
     } else {
       cudaDeviceSynchronize();
     }
@@ -4549,6 +4582,17 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
       ckMigrateArenaMode() && msg->hasGPUMsg && msg->nGpuBufs > 0 &&
       gpuMsg != nullptr;
   if (gpuMsgIsArena) p.deviceRebind = true;
+  // Pooled arena: the unpack copies go on a per-PE unpack stream. The payload
+  // has landed (this entry runs behind the landing's callback), so the copies
+  // depend on nothing on the default stream -- and waiting there afterwards
+  // meant waiting behind every OTHER payload still landing on it. With 128 MB
+  // experts at PCIe rates (moe) that was ~50 ms per arrival with the host
+  // blocked and nothing of this element's in flight.
+  static thread_local hapiStream_t unpackStream = NULL;
+  if (gpuMsgIsArena) {
+    if (unpackStream == NULL) hapiCheck(hapiStreamCreate(&unpackStream));
+    p.gpuStream = (void*)unpackStream;
+  }
 #endif
 
   if (msg->nManagers < managers.size())
@@ -4591,8 +4635,17 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   // default stream, so waiting on that stream is exactly the wait that was
   // wanted.
   const bool deviceRebound = gpuMsgIsArena && p.deviceReboundCount > 0;
-  if (gpuMsg != nullptr && !deviceRebound)
-    hapiCheck(cudaStreamSynchronize((cudaStream_t)0));
+  if (gpuMsg != nullptr && !deviceRebound) {
+    const double tw0 = CmiWallTimer();
+    if (p.gpuStream != nullptr)
+      hapiCheck(hapiStreamSynchronize((hapiStream_t)p.gpuStream));
+    else
+      hapiCheck(cudaStreamSynchronize((cudaStream_t)0));
+    if (migDbg())
+      CkPrintf("[IMMIG %d] id=%llu unpack wait %.3f ms (%s)\n", CkMyPe(),
+               (unsigned long long)msg->id, (CmiWallTimer() - tw0) * 1e3,
+               p.gpuStream ? "unpack stream" : "default stream");
+  }
 #endif
 
 #if CMK_CUDA

@@ -87,7 +87,16 @@ typedef struct hapiEvent {
             : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_) {}
 } hapiEvent;
 
-CpvDeclare(std::queue<hapiEvent>, hapi_event_queue);
+// Pending events, one FIFO per stream. Events on one stream complete in the
+// order they were recorded, so its queue is popped from the head and left at
+// the first incomplete event; events on different streams do not, and one
+// queue for all of them stalled everything recorded after a long kernel's
+// completion event: in moe, every receive landed on the comm stream behind an
+// expert's 10-150 ms compute-done event was not noticed until that expert
+// finished. A stream's entry stays once created (a handful per PE), so a
+// destroyed-and-reused handle just reuses it.
+typedef std::vector<std::pair<hapiStream_t, std::queue<hapiEvent>>> hapiEventQueues;
+CpvDeclare(hapiEventQueues, hapi_event_queue);
 CpvDeclare(std::queue<hapiEvent_t>, hapi_event_pool);
 #endif // HAPI_CUDA_CALLBACK
 CpvDeclare(int, n_hapi_events);
@@ -261,12 +270,27 @@ void hapiCuptiInit() { hapiCuptiStartTracing(); }
 // the cost that remains once tracing itself is windowed. So attach here and
 // detach in hapiCuptiStopTracing, rather than staying attached for the whole
 // run. Enabling an activity kind is separately what makes records flow.
+// Per-PE view of the tracing switch. LBDatabase::TurnStatsOn/Off is a PE-local
+// switch, but CUPTI tracing is process-wide: a PE that switched its own
+// instrumentation off used to switch tracing off for every PE in the process,
+// and whichever PE was still finishing its iteration lost every kernel it
+// launched after that instant. On barnes, which closes its window from each
+// element's AtSync, that was one whole PE per process reading zero GPU load at
+// every step. So the process traces while ANY PE wants instrumentation:
+// tracing starts with the first PE to switch on and stops with the last to
+// switch off, counted per PE so repeated switches do not skew the count.
+static thread_local bool cupti_pe_tracing = false;
+
 void hapiCuptiStartTracing() {
   GPUManager& gm = CsvAccess(gpu_manager);
   // Every PE thread reaches this through its own LBDatabase::TurnStatsOn, so
   // the check and the enable must be one atomic step -- otherwise several
   // threads each enable the same activity kinds.
   std::lock_guard<std::mutex> lk(gm.cupti_tracing_lock_);
+  if (!cupti_pe_tracing) {
+    cupti_pe_tracing = true;
+    gm.cupti_tracing_users_++;
+  }
   if (gm.cupti_tracing_active_.load(std::memory_order_relaxed)) return;
 
   if (!gm.cupti_initialized_) {
@@ -290,6 +314,13 @@ void hapiCuptiStartTracing() {
 void hapiCuptiStopTracing() {
   GPUManager& gm = CsvAccess(gpu_manager);
   std::lock_guard<std::mutex> lk(gm.cupti_tracing_lock_);
+  if (cupti_pe_tracing) {
+    cupti_pe_tracing = false;
+    if (gm.cupti_tracing_users_ > 0) gm.cupti_tracing_users_--;
+  }
+  // Other PEs of this process still have their instrumentation on: their
+  // kernels are still being launched and must keep being recorded.
+  if (gm.cupti_tracing_users_ > 0) return;
   if (!gm.cupti_initialized_ ||
       !gm.cupti_tracing_active_.load(std::memory_order_relaxed))
     return;
@@ -1175,6 +1206,22 @@ void hapiNormalizeCuptiLoads() {
 // reads its own objects out of it, and the work itself must be done by one
 // thread; holding the lock across both gives the readers their ordering without
 // a barrier that every PE has to reach.
+bool hapiCuptiArrive(uint64_t epoch, int expected) {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  std::lock_guard<std::mutex> lk(gm.cupti_arrive_lock_);
+  // A new round resets the count. Rounds are strictly sequential -- a step
+  // completes on a job-wide barrier before the next can start -- so a stale
+  // count from a previous epoch can only mean that epoch is over.
+  if (gm.cupti_arrive_epoch_ != epoch) {
+    gm.cupti_arrive_epoch_ = epoch;
+    gm.cupti_arrive_count_ = 0;
+  }
+  gm.cupti_arrive_count_++;
+  if (gm.cupti_arrive_count_ < expected) return false;
+  gm.cupti_arrive_count_ = 0;
+  return true;
+}
+
 void hapiPrepareCuptiLoads(uint64_t epoch) {
   GPUManager& gm = CsvAccess(gpu_manager);
   std::lock_guard<std::mutex> lk(gm.cupti_prepare_lock_);
@@ -1242,7 +1289,7 @@ void hapiClearCuptiData() {
 static void hapiInitCpv() {
   // HAPI event-related
 #ifndef HAPI_CUDA_CALLBACK
-  CpvInitialize(std::queue<hapiEvent>, hapi_event_queue);
+  CpvInitialize(hapiEventQueues, hapi_event_queue);
   CpvInitialize(std::queue<hapiEvent_t>, hapi_event_pool);
   // for(int i = 0; i < 8; i++) {
   //   hapiEvent_t ev;
@@ -1645,8 +1692,16 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
 
   hapiEvent hev(ev, cb, cb_msg, wr);
 
-  // push event information in queue
-  CpvAccess(hapi_event_queue).push(hev);
+  // push event information in this stream's queue
+  hapiEventQueues& queues = CpvAccess(hapi_event_queue);
+  std::queue<hapiEvent>* q = nullptr;
+  for (auto& entry : queues)
+    if (entry.first == stream) { q = &entry.second; break; }
+  if (q == nullptr) {
+    queues.emplace_back(stream, std::queue<hapiEvent>());
+    q = &queues.back().second;
+  }
+  q->push(hev);
 
   // increase count so that scheduler can poll the queue
   CpvAccess(n_hapi_events)++;
@@ -2534,7 +2589,7 @@ std::mutex hapi_devpool_mutex;
 // several sub-buffers, each noted on its own address, and its release is one
 // free of the arena base. The free has to find every note inside the block it
 // is freeing, which lower_bound over the block's range does.
-std::map<const void*, cudaStream_t> hapi_devpool_read_on;
+std::multimap<const void*, cudaStream_t> hapi_devpool_read_on;
 // Freed blocks waiting for their reads to retire before they can be reused --
 // one event per stream the reads were on (in practice one).
 struct HapiDevPoolPending { void* ptr; std::vector<cudaEvent_t> evs; };
@@ -2676,7 +2731,14 @@ void hapiDevPoolNoteRead(const void* ptr, hapiStream_t stream) {
   if (hapiDevPoolArenaOfLocked(ptr) == nullptr) return;   // not ours; nothing to order
   // The null stream is the legacy default: recording on it is legal and orders
   // behind everything blocking, which is the safe reading.
-  hapi_devpool_read_on[ptr] = (cudaStream_t)stream;
+  // More than one stream can be reading a block when it is freed: the packer
+  // on the migration stream and the application's kernels on its own stream
+  // (moe notes both). Keep every distinct (block, stream) pair; the free
+  // parks on all of them.
+  auto range = hapi_devpool_read_on.equal_range(ptr);
+  for (auto it = range.first; it != range.second; ++it)
+    if (it->second == (cudaStream_t)stream) return;
+  hapi_devpool_read_on.emplace(ptr, (cudaStream_t)stream);
 }
 
 void hapiFreeMigratable(void* ptr) {
@@ -3234,29 +3296,32 @@ void hapiPollEvents(void* param) {
 #ifndef HAPI_CUDA_CALLBACK
   if (CpvAccess(n_hapi_events) <= 0) return;
 
-  std::queue<hapiEvent>& queue = CpvAccess(hapi_event_queue);
-  while (!queue.empty()) {
-    hapiEvent hev = queue.front();
-    if (hapiEventQuery(hev.event) == hapiSuccess) {
-      queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
+  hapiEventQueues& queues = CpvAccess(hapi_event_queue);
+  for (auto& entry : queues) {
+    std::queue<hapiEvent>& queue = entry.second;
+    while (!queue.empty()) {
+      hapiEvent hev = queue.front();
+      if (hapiEventQuery(hev.event) == hapiSuccess) {
+        queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
 
-      // invoke Charm++ callback if one was given
-      hev.cb.send(hev.cb_msg);
+        // invoke Charm++ callback if one was given
+        hev.cb.send(hev.cb_msg);
 
-      // clean up hapiWorkRequest
-      if (hev.wr) {
-        hapiWorkRequestCleanup(hev.wr);
+        // clean up hapiWorkRequest
+        if (hev.wr) {
+          hapiWorkRequestCleanup(hev.wr);
+        }
+        CpvAccess(hapi_event_pool).push(hev.event);
+        CpvAccess(n_hapi_events)--;
+
+        // inform QD that an event was processed
+        CmiAssert(hapiQdProcess);
+        hapiQdProcess(1);
       }
-      CpvAccess(hapi_event_pool).push(hev.event);
-      CpvAccess(n_hapi_events)--;
-
-      // inform QD that an event was processed
-      CmiAssert(hapiQdProcess);
-      hapiQdProcess(1);
-    }
-    else {
-      // stop going through the queue once we encounter a non-successful event
-      break;
+      else {
+        // this stream's later events cannot be complete; try the next stream
+        break;
+      }
     }
   }
 #endif

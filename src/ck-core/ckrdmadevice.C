@@ -909,15 +909,30 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
       // stronger ordering than the stream wait, and confined to this one case,
       // which only became reachable once load balancing moved chares between
       // GPUs within a process.
-      {
-        const int my_dev_idx = csv_gpu_manager.device_count * CmiMyNodeRankLocal()
-                             + CpvAccess(my_device_id);
-        if (source.device_idx != my_dev_idx) {
-          hapiCheck(cudaEventSynchronize(device_info.src_event_pool[source.event_idx]));
-        } else {
-          hapiCheck(hapiStreamWaitEvent(recv_stream,
-                device_info.src_event_pool[source.event_idx], 0));
-        }
+      // "Different device inside this process" is BOTH conditions. device_idx
+      // is node-local (device_count * process rank + device), so with one
+      // device per process every other process's index differs too, and the
+      // device test alone sent every cross-process receive down this host-wait
+      // path: the receiver stopped until the sender's stream had drained, then
+      // (below) drained its own. Measured on moe: ~3 ms per 1 MB receive, an
+      // all-to-all exchange at 0.5 GB/s on 24 GB/s links, and no overlap of
+      // any transfer with compute. For a peer process the imported events are
+      // valid under our device, so the stream-ordered path is the right one.
+      const bool same_process_other_device =
+          (CmiNodeOf(srcPe) == CmiMyNode()) &&
+          (source.device_idx != csv_gpu_manager.device_count * CmiMyNodeRankLocal()
+                                    + CpvAccess(my_device_id));
+      if (same_process_other_device) {
+        hapiCheck(cudaEventSynchronize(device_info.src_event_pool[source.event_idx]));
+      } else if (hapiEventQuery(device_info.src_event_pool[source.event_idx]) != hapiSuccess ||
+                 getenv("CHARM_IPC_ALWAYS_WAIT")) {
+        // Only when the sender's event is not already complete. A stream wait
+        // on an imported interprocess event that completed moments ago was
+        // measured (moe) to pace the receiver's stream at ~0.35 ms per copy,
+        // whatever the copy's size; for an event the host already sees as
+        // complete there is nothing to order and the wait is pure cost.
+        hapiCheck(hapiStreamWaitEvent(recv_stream,
+              device_info.src_event_pool[source.event_idx], 0));
       }
       ipcDebugSync("recv 1: wait imported src_event", recv_stream);
 
@@ -936,9 +951,7 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
       //    (ipcHandleOpen skips our own process), so settle the copy and record
       //    on the owning device rather than on our stream.
       {
-        const int my_dev_idx = csv_gpu_manager.device_count * CmiMyNodeRankLocal()
-                             + CpvAccess(my_device_id);
-        if (source.device_idx != my_dev_idx) {
+        if (same_process_other_device) {
           hapiCheck(hapiStreamSynchronize(recv_stream));
           const int src_local = source.device_idx % csv_gpu_manager.device_count;
           const int src_global = csv_gpu_manager.device_managers[src_local].global_index;
