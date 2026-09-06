@@ -440,6 +440,22 @@ void hapiPrepareCuptiLoads(uint64_t epoch = HAPI_CUPTI_EPOCH_LB_ROUND);
 void hapiNormalizeCuptiLoads();
 void hapiClearCuptiData();
 
+// Arrival gate in front of hapiPrepareCuptiLoads for a load-balancing round.
+// Each PE of the process calls this once per round with the round number and
+// the number of PEs in the process; the call that completes the count returns
+// true and that PE is the one to build the loads. Every other PE gets false
+// and must wait to be told the loads are ready.
+//
+// Why the LAST arrival and not the first. The records are process-wide but
+// the balancer's barrier is per PE: it fires when that PE's own objects have
+// reached AtSync. The first PE to fire would drain and clear the records while
+// another PE's objects were still finishing their kernels, and those kernels
+// were then lost to the round -- the objects of the last PE to arrive read as
+// zero GPU load, step after step. Once every PE has arrived, every object in
+// the process is at AtSync and every kernel it launched under instrumentation
+// has been issued, so the drain sees the whole interval.
+bool hapiCuptiArrive(uint64_t epoch, int expected);
+
 // Start/stop CUPTI activity tracing. Tracing is the dominant cost of GPU load
 // instrumentation, and the loads it produces are only read at a load-balancing
 // step, so an application that balances on an explicit schedule can leave it

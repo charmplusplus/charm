@@ -8,6 +8,9 @@ group [migratable] DistBaseLB: BaseLB {
   entry void DistBaseLB(const CkLBOptions &);  
   entry void LoadBalance();
   entry [reductiontarget] void barrierDone();
+  // Sent to every PE of a process by the PE that built the round's GPU loads;
+  // see the arrival gate in barrierDone.
+  entry [expedited] void gpuLoadsReady();
   entry [reductiontarget] void ResumeClients();
   entry void ResumeClients(int balancing);
 #if CMK_GLOBAL_LOCATION_UPDATE

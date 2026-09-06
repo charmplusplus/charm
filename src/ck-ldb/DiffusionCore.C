@@ -61,10 +61,32 @@ void DiffusionLB::AcrossNodeLB()
     const double fair = avgNborLoad();
     const double excess = my_load - fair;
     my_loadAfterTransfer = (excess > 0.0) ? excess : 0.0;
+    // The floor: an excess under effMinImbalance of the neighbourhood mean is
+    // noise, and a revert step sheds nothing at all (WithinNodeLB does the
+    // taking-back).
+    if (revertThisStep || my_load <= fair * (1.0 + effMinImbalance))
+      my_loadAfterTransfer = 0.0;
     if (_lb_args.debug() > 1)
-      CkPrintf("[node %d] AcrossNodeLB: my_load=%f fair=%f shedding=%f\n",
-               myNodeId, my_load, fair, my_loadAfterTransfer);
+      CkPrintf("[node %d] AcrossNodeLB: my_load=%f fair=%f shedding=%f (floor %.3f%s)\n",
+               myNodeId, my_load, fair, my_loadAfterTransfer, effMinImbalance,
+               revertThisStep ? ", revert step" : "");
   }
+
+  // Per-step cap on what may leave this node: a wrong signal then costs one
+  // bounded step, which the regret check can take back, rather than a
+  // wholesale redistribution. +LBDiffusionMaxMoveFrac >= 1 lifts the cap.
+  int maxMoves = n_objs;
+  {
+    const double frac = _lb_args.diffusionMaxMoveFrac();
+    if (frac < 1.0)
+    {
+      int nMig = 0;
+      for (int i = 0; i < n_objs; i++) if (nodeStats->objData[i].migratable) nMig++;
+      maxMoves = std::max(1, (int)std::ceil(frac * nMig));
+    }
+  }
+  int movesThisStep = 0;
+  std::vector<char> allowed;
 
   // TEMPORARY diagnostic: why does across-node diffusion move nothing?
   if (_lb_args.debug() > 1)
@@ -108,10 +130,26 @@ void DiffusionLB::AcrossNodeLB()
                 my_loadAfterTransfer);
       }
 
+      if (movesThisStep >= maxMoves)
+      {
+        if (_lb_args.debug() > 1)
+          CkPrintf("[node %d] AcrossNodeLB: move cap %d reached, %.6f left unshed\n",
+                   myNodeId, maxMoves, my_loadAfterTransfer);
+        break;
+      }
+
       // What this node still owes, so the metric can cap a candidate's benefit:
       // load shed beyond the fair share buys nothing and must not pay for a
       // move. Refreshed every iteration because each accepted move reduces it.
       metric->setRemainingShed(my_loadAfterTransfer);
+
+      // With a 1-D ordering key only the interval's ends may go, and only
+      // toward the side this neighbour is on. Both metrics honour the filter.
+      if (keyed1D)
+      {
+        allowedEndsFor(nborId, allowed);
+        metric->setAllowed(&allowed);
+      }
 
       int v_id = metric->popBestObject(nborId);
 
@@ -141,7 +179,10 @@ void DiffusionLB::AcrossNodeLB()
       //
       // Both read getCompLoad()/objData rather than getVertexLoad(), whose
       // MAX(compLoad, 0.1) floor would retire the budget in yet another unit.
-      const double shedLoad = diffusionObjLoad(nodeStats->objData[v_id]);
+      // Floored like the budget it retires (BuildStats): an object measured at
+      // zero would otherwise retire nothing and the loop would hand over every
+      // such object before touching the budget.
+      const double shedLoad = std::max(diffusionObjLoad(nodeStats->objData[v_id]), objLoadFloor);
       const double cpuLoad  = objs[v_id].getCompLoad();
       objs[v_id].setCurrPe(-1);
 
@@ -170,7 +211,9 @@ void DiffusionLB::AcrossNodeLB()
       }
 
       mig_acksOut += 2;
-      thisProxy[destPE].LoadMetaInfo(objHandle, pe_local_id, cpuLoad, donorPE, 0, CkMyPe());
+      movesThisStep++;
+      thisProxy[destPE].LoadMetaInfo(objHandle, pe_local_id, cpuLoad, shedLoad, donorPE, 0,
+                                     CkMyPe(), keyOf(nodeStats->objData[v_id]));
       thisProxy[donorPE].LoadReceived(pe_local_id, destPE, CkMyPe());
       nodeStats->to_proc[v_id] = destPE;
     }
@@ -313,7 +356,8 @@ void DiffusionLB::acrossDone()
 /* LoadMetaInfo is called on the receiver with the object that will be migrated to it
  * (via a MigrateMe in  LoadReceived). It is only called when migrating at the node
  * level. Not sure why the receiver would already have this handle though...*/
-void DiffusionLB::LoadMetaInfo(LDObjHandle h, int local_id, double load, int senderPE, int only_mcount, int ackPE)
+void DiffusionLB::LoadMetaInfo(LDObjHandle h, int local_id, double load, double gload, int senderPE,
+                               int only_mcount, int ackPE, double key)
 {
   // The rank0PE that issued this handoff and is holding its phase barrier
   // open. Carried explicitly: a within-node token's donorPE is on another
@@ -337,6 +381,8 @@ void DiffusionLB::LoadMetaInfo(LDObjHandle h, int local_id, double load, int sen
     objectHandles.push_back(h);
     objectSrcIds.push_back(local_id);
     objectLoads.push_back(load);
+    objectGLoads.push_back(gload);
+    objectKeys.push_back(key);
     objSenderPEs.push_back(senderPE);
   }
   else

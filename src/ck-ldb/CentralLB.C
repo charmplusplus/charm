@@ -175,21 +175,34 @@ void CentralLB::CallLB()
   
 #if CMK_CUDA
   // Reduce the kernel timeline to one scalar load per object, while the records
-  // are still local -- only those scalars are sent to the central LB. Done once
-  // per round under a lock rather than by rank 0 between two CmiNodeBarriers:
-  // those barriers were behind #if CMK_SMP, which is 0 in the multicore build
-  // even though a process really does run many PE threads, so they compiled away
-  // and left the other ranks reading the map while it was being rebuilt.
+  // are still local -- only those scalars are sent to the central LB.
+  //
+  // Built by the LAST PE of the process to get here, not the first: CallLB runs
+  // when this PE's own objects are at AtSync, but the records are shared by the
+  // whole process, and a drain by the first arrival dropped every kernel the
+  // other PEs' objects were still finishing. See DistBaseLB::barrierDone for
+  // the measurement. The earlier arrivals continue from gpuLoadsReady.
+  if (!hapiCuptiArrive((uint64_t)step(), CkNodeSize(CkMyNode()))) return;
   hapiPrepareCuptiLoads();
-  // Every PE picks up the normalized loads for its own objects
+  const int first = CkNodeFirst(CkMyNode());
+  for (int r = 0; r < CkNodeSize(CkMyNode()); r++)
+    thisProxy[first + r].gpuLoadsReady();
+#else
+  thisProxy [CkMyPe()].ProcessAtSync();
+#endif
+#endif
+}
+
+// The round's GPU loads exist: copy this PE's share out and send its stats.
+void CentralLB::gpuLoadsReady()
+{
+#if CMK_LBDB_ON
+#if CMK_CUDA
   lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
   if (_lb_args.gpuScaling())
     lbmgr->SetObjGPUCosts(CsvAccess(gpu_manager).cupti_obj_epoch_costs_);
 #endif
-
-  {
-    thisProxy [CkMyPe()].ProcessAtSync();
-  }
+  thisProxy [CkMyPe()].ProcessAtSync();
 #endif
 }
 

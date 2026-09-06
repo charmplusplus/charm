@@ -20,6 +20,18 @@ public:
   // moves, which cannot reject one.
   virtual int acceptedCount() const { return 0; }
   virtual int rejectedCount() const { return 0; }
+  // Candidate filter the balancer sets before each selection: with a 1-D
+  // ordering key only the ends of the node's interval may leave, and only
+  // toward the neighbour on their side (DiffusionLB::allowedEndsFor). Null
+  // means no restriction. Honoured by every metric so the interval property
+  // does not depend on which metric was selected.
+  void setAllowed(const std::vector<char>* a) { allowed_ = a; }
+  bool isAllowed(int i) const
+  {
+    return allowed_ == NULL || i < 0 || i >= (int)allowed_->size() || (*allowed_)[i];
+  }
+protected:
+  const std::vector<char>* allowed_ = NULL;
 };
 
 class MetricComm : public DiffusionMetric
@@ -299,6 +311,7 @@ int MetricComm::popBestObject(int nbor)
   {
     if (!objAvailable[i]) continue;
     if (!nodeStats->objData[i].migratable) continue;
+    if (!isAllowed(i)) continue;
 
     double objLoad = diffusionObjLoad(nodeStats->objData[i]);
     if (objLoad > nborCapacity) continue;
@@ -521,6 +534,7 @@ int MetricCentroid::popBestObject(int nbor)
     double objLoad = diffusionObjLoad(nodeStats->objData[i]);
 
     if (position_dim == 1 && i != loEnd && i != hiEnd) continue;
+    if (!isAllowed(i)) continue;
 
     if (objNborDistances[i].size() <= nbor)
     {

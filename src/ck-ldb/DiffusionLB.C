@@ -16,6 +16,9 @@
 #include "DiffusionLB.h"
 #include "LBSimulation.h"
 
+#include <algorithm>
+#include <cmath>
+#include <limits>
 
 #include "ck.h"
 #include "ckgraph.h"
@@ -73,7 +76,9 @@ DiffusionCostConfig diffusionCostCfg;
 #include "DiffusionPseudo.C"
 #include "DiffusionCore.C"
 
-// Percentage of error acceptable.
+// Percentage of error acceptable. Only the pseudo-round convergence ratio
+// still derives its default from this; the decision floors themselves come
+// from +LBDiffusionMinImbalance (effMinImbalance).
 #define THRESHOLD 2
 
 // Diffusion rounds stop once no node wants to shift more than this fraction of
@@ -163,6 +168,17 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   withinNbrDoneCount = 0;
   pseudoContribCount = 0;
   pseudoMaxMetric = 0.0;
+  effMinImbalance = _lb_args.diffusionMinImbalance();
+  quietSteps = 0;
+  stepEndTime = 0.0;
+  thisInterval = 0.0;
+  lastInterval = 0.0;
+  lastStepMoves = 0;
+  lastMigratesIssued = 0;
+  revertThisStep = false;
+  lastStepWasRevert = false;
+  keyed1D = false;
+  myKeyLo = myKeyHi = 0.0;
   round = 0;
   hs_asksOut = 0;
   hs_confirmOut = 0;
@@ -280,8 +296,22 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   objectSrcIds.clear();
   objSenderPEs.clear();
   objectLoads.clear();
+  objectGLoads.clear();
+  objectKeys.clear();
 
-  
+  // The regret loop's two inputs, reduced ahead of statsAssembled. Group
+  // reductions complete in contribution order, and every PE contributes these
+  // two before its statsAssembled contribution (a rank0PE's comes later, from
+  // ReceiveStats), so both verdict inputs are on every PE by the time the
+  // strategy starts. The interval is this PE's wall time since the previous
+  // step ended; zero on the first step, which decideRegret treats as unknown.
+  {
+    const double interval = (stepEndTime > 0.0) ? (CmiWallTimer() - stepEndTime) : 0.0;
+    CkCallback cbI(CkReductionTarget(DiffusionLB, regretInterval), thisProxy);
+    contribute(sizeof(double), &interval, CkReduction::max_double, cbI);
+    CkCallback cbM(CkReductionTarget(DiffusionLB, regretMoves), thisProxy);
+    contribute(sizeof(int), &lastMigratesIssued, CkReduction::sum_int, cbM);
+  }
 
   thisProxy[rank0PE].ReceiveStats(*marshmsg);
 
@@ -337,10 +367,162 @@ void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage&& data)
 /*Once stats are assembled on rank0PEs, can begin finding Nbors*/
 void DiffusionLB::statsAssembled()
 {
+  // Same inputs on every PE, so the same verdict everywhere.
+  decideRegret();
   if (CkMyPe() == rank0PE)
   {
     findNBors(1);
   }
+}
+
+void DiffusionLB::regretInterval(double maxInterval)
+{
+  lastInterval = thisInterval;
+  thisInterval = maxInterval;
+}
+
+void DiffusionLB::regretMoves(int moves) { lastStepMoves = moves; }
+
+// Judge the previous step by what it did to the application. thisInterval
+// covers the iterations run under the previous step's placement, lastInterval
+// the ones before it; if the placement made those iterations slower by more
+// than the tolerance, the step is taken back and the floor raised so the same
+// noise is not chased again next time. Only a step that actually moved
+// something is judged, and never one that was itself a revert -- the interval
+// after a revert is compared against the bad placement and would always look
+// like an improvement, so judging it could only ever undo the undo.
+void DiffusionLB::decideRegret()
+{
+  const double tol = _lb_args.diffusionRegret();
+  const bool judge = tol > 0.0 && !lastStepWasRevert && lastStepMoves > 0 &&
+                     lastInterval > 0.0 && thisInterval > 0.0;
+  revertThisStep = judge && thisInterval > lastInterval * (1.0 + tol);
+
+  if (revertThisStep)
+  {
+    effMinImbalance = std::min(2.0 * effMinImbalance, 1.0);
+    quietSteps = 0;
+  }
+  else if (lastStepMoves == 0)
+  {
+    // Two quiet steps in a row: relax the floor back toward its configured
+    // value one halving at a time.
+    if (++quietSteps >= 2)
+    {
+      effMinImbalance = std::max(_lb_args.diffusionMinImbalance(), 0.5 * effMinImbalance);
+      quietSteps = 0;
+    }
+  }
+  else
+    quietSteps = 0;
+
+  if (CkMyPe() == 0 && _lb_args.debug() > 0)
+    CkPrintf("[DiffusionLB] step %d: interval %.4fs (previous %.4fs), previous step "
+             "moved %d%s -> %s, floor %.3f\n",
+             step(), thisInterval, lastInterval, lastStepMoves,
+             lastStepWasRevert ? " (a revert)" : "",
+             revertThisStep ? "REVERT" : "balance", effMinImbalance);
+}
+
+double DiffusionLB::keyOf(const LDObjData& od)
+{
+  if (od.position.size() != 1) return std::numeric_limits<double>::quiet_NaN();
+  return (double)od.position[0];
+}
+
+bool DiffusionLB::nborKeyAdjacent(int nbor) const
+{
+  if (!keyed1D) return true;
+  if (nbor < 0 || nbor >= (int)nborKeyLo.size()) return true;
+  const double nlo = nborKeyLo[nbor], nhi = nborKeyHi[nbor];
+  if (nlo != nlo || nhi != nhi) return true;
+  const bool below = nhi <= myKeyLo;
+  const bool above = nlo >= myKeyHi;
+  if (!below && !above) return true;  // overlapping: nothing to preserve
+  for (int j = 0; j < (int)nborKeyLo.size(); j++)
+  {
+    if (j == nbor) continue;
+    const double jlo = nborKeyLo[j], jhi = nborKeyHi[j];
+    if (jlo != jlo || jhi != jhi) continue;
+    // Another neighbour sits between us and this one.
+    if (below && jlo >= nhi && jhi <= myKeyLo) return false;
+    if (above && jhi <= nlo && jlo >= myKeyHi) return false;
+  }
+  return true;
+}
+
+void DiffusionLB::allowedEndsFor(int nbor, std::vector<char>& allowed)
+{
+  const int n = nodeStats->objData.size();
+  allowed.assign(n, 1);
+  if (!keyed1D) return;
+  if (!nborKeyAdjacent(nbor))
+  {
+    // Nothing may cross to a non-adjacent interval.
+    std::fill(allowed.begin(), allowed.end(), 0);
+    return;
+  }
+  int loEnd = -1, hiEnd = -1;
+  double loKey = 0.0, hiKey = 0.0;
+  for (int i = 0; i < n; i++)
+  {
+    if (objs[i].getCurrPe() == -1 || !nodeStats->objData[i].migratable) continue;
+    const double k = keyOf(nodeStats->objData[i]);
+    if (k != k) continue;
+    if (loEnd == -1 || k < loKey) { loEnd = i; loKey = k; }
+    if (hiEnd == -1 || k > hiKey) { hiEnd = i; hiKey = k; }
+  }
+  std::fill(allowed.begin(), allowed.end(), 0);
+  if (loEnd == -1) return;
+  // Which side of us does this neighbour sit on? Its interval ends came with
+  // its round-0 load. An unkeyed or overlapping neighbour gets both ends and
+  // the metric's own distance rule decides.
+  bool below = false, above = false;
+  if (nbor >= 0 && nbor < (int)nborKeyLo.size())
+  {
+    const double nlo = nborKeyLo[nbor], nhi = nborKeyHi[nbor];
+    if (nlo == nlo && nhi == nhi)
+    {
+      below = nhi <= loKey;
+      above = nlo >= hiKey;
+    }
+  }
+  if (below && !above) allowed[loEnd] = 1;
+  else if (above && !below) allowed[hiEnd] = 1;
+  else { allowed[loEnd] = 1; allowed[hiEnd] = 1; }
+}
+
+// Undo the previous step: every object it moved onto this node goes back to
+// the PE it came from. Objects are addressed directly (the token form of the
+// handoff, only_mcount=1), whether the previous home is in this node or not,
+// so the within-node phase has nothing to retarget. Rank0PE only.
+int DiffusionLB::revertPreviousStep()
+{
+  const int n = nodeStats->objData.size();
+  const int prevStepNo = step() - 1;
+  int reverted = 0;
+  for (int j = 0; j < n; j++)
+  {
+    const LDObjData& od = nodeStats->objData[j];
+    if (od.prevStep != prevStepNo || od.prevPe < 0 || od.prevPe >= numPes) continue;
+    if (!od.migratable || objs[j].getCurrPe() == -1) continue;
+    const int rank = GetRank(j);
+    const int donorPE = rank0PE + rank;
+    const int destPE = od.prevPe;
+    if (destPE == donorPE) continue;
+    const int pe_local_id = j - (rank > 0 ? prefixObjects[rank - 1] : 0);
+    objs[j].setCurrPe(-1);
+    mig_acksOut += 2;
+    thisProxy[destPE].LoadMetaInfo(od.handle, pe_local_id, objs[j].getCompLoad(),
+                                   diffusionObjLoad(od), donorPE, 1, CkMyPe(), keyOf(od));
+    thisProxy[donorPE].LoadReceived(pe_local_id, destPE, CkMyPe());
+    nodeStats->to_proc[j] = destPE;
+    reverted++;
+  }
+  if (_lb_args.debug() > 0)
+    CkPrintf("[DiffusionLB node %d] step %d: reverting %d object(s) moved by step %d\n",
+             myNodeId, step(), reverted, prevStepNo);
+  return reverted;
 }
 
 void DiffusionLB::InitializeObjHeap(int n)
@@ -428,15 +610,91 @@ void DiffusionLB::WithinNodeLB()
 
   if( nodeSize == 1) {
       if (_lb_args.debug() == 3) CkPrintf("--------Node size is 1--------\n");
-    // Every PE is its own node's rank0PE: report with nothing outstanding.
+    // Every PE is its own node's rank0PE: nothing to balance within it, but a
+    // revert step still has to hand back what the previous step moved here.
+    if (revertThisStep) revertPreviousStep();
     withinNodeReport();
     return;
   }
   if (CkMyPe() == rank0PE)
   {
    
-    // CkPrintf("[%d] GRD: DoneNodeLB \n", CkMyPe());
+    // A revert step moves only what the previous step moved; see decideRegret.
+    if (revertThisStep)
+    {
+      revertPreviousStep();
+      endWithinTiming();
+      withinNodeReport();
+      return;
+    }
+
+    const int n = nodeStats->objData.size();
+
+    // ---- which resource does this phase balance? -------------------------
+    // PEs of a process share a device, so moving a chare between them relieves
+    // the host only. When the diffused dimension is host time that is the whole
+    // story. When it is GPU time, host work matters only if some PE's host time
+    // exceeds the node's device time; otherwise the device is the bottleneck,
+    // and per-PE host time is mostly driver overhead plus group work charged to
+    // whatever object happened to be current -- measured on barnes as a 100x
+    // spread between PEs of one node, all of it noise. Cutting the placement
+    // for that shredded it (1 object on one PE, 65 on the next) for nothing.
+    // The device dimension is then the smoother, real signal: equal device
+    // work per PE keeps the per-PE driving cost even as well.
+    bool onHost = true;
+#if CMK_CUDA
+    if (_lb_args.diffusionGpuDim())
+    {
+      double maxPeHost = 0.0, nodeGpu = 0.0;
+      for (int r = 0; r < nodeSize; r++) maxPeHost = std::max(maxPeHost, pe_load[r]);
+      for (int j = 0; j < n; j++)
+        if (objs[j].getCurrPe() != -1) nodeGpu += diffusionObjLoad(nodeStats->objData[j]);
+      for (size_t t = 0; t < objectGLoads.size(); t++) nodeGpu += objectGLoads[t];
+      onHost = maxPeHost > nodeGpu;
+    }
+#endif
+    if (!onHost)
+    {
+      // Re-express every within-node figure in the device dimension, with the
+      // same mean floor the across-node phase applies (BuildStats). From here
+      // on pe_load, the CkVertex loads and the token loads are what this phase
+      // balances; nothing after this point reads them as host time.
+      double sum = 0.0;
+      int cnt = 0;
+      for (int j = 0; j < n; j++)
+        if (objs[j].getCurrPe() != -1) { sum += diffusionObjLoad(nodeStats->objData[j]); cnt++; }
+      for (size_t t = 0; t < objectGLoads.size(); t++) { sum += objectGLoads[t]; cnt++; }
+      const double floor = cnt > 0 ? sum / cnt : 0.0;
+      for (int r = 0; r < nodeSize; r++) pe_load[r] = 0.0;
+      for (int j = 0; j < n; j++)
+      {
+        const double g = std::max(diffusionObjLoad(nodeStats->objData[j]), floor);
+        objs[j].setCompLoad(g);
+        if (objs[j].getCurrPe() != -1) pe_load[GetRank(j)] += g;
+      }
+      for (size_t t = 0; t < objectGLoads.size(); t++)
+      {
+        objectLoads[t] = std::max(objectGLoads[t], floor);
+        pe_load[0] += objectLoads[t];
+      }
+    }
+
     double avgPE = averagePE();
+    double maxPE = 0.0;
+    for (int r = 0; r < nodeSize; r++) maxPE = std::max(maxPE, pe_load[r]);
+
+    // ---- the floor -------------------------------------------------------
+    // Below it there is nothing to balance, only noise to chase.
+    if (avgPE <= 0.0 || maxPE <= avgPE * (1.0 + effMinImbalance))
+    {
+      if (_lb_args.debug() > 1)
+        CkPrintf("[WITHIN node %d] max/avg %.3f under floor %.3f (%s): no moves\n",
+                 myNodeId, avgPE > 0.0 ? maxPE / avgPE : 0.0, 1.0 + effMinImbalance,
+                 onHost ? "host" : "device");
+      endWithinTiming();
+      withinNodeReport();
+      return;
+    }
 
     // Create a max heap and min heap for pe loads
     std::vector<double> objectSizes;
@@ -445,7 +703,7 @@ void DiffusionLB::WithinNodeLB()
     std::vector<LDObjHandle> objectHdl;
     std::vector<int> isToken;
     minHeap minPes(nodeSize);
-    double threshold = THRESHOLD * avgPE / 100.0;
+    double threshold = effMinImbalance * avgPE;
 
     // ---- interval repartition ----------------------------------------
     // When the application registered a 1-D ordering key, do not shuffle
@@ -459,55 +717,81 @@ void DiffusionLB::WithinNodeLB()
     // interleaves them. Partitioning gives every PE one interval by
     // construction, which is the property blockmap had before any balancing.
     //
-    // Skipped when objects have arrived from another node this round: those
-    // are not in nodeStats and have no key here, so the partition would be
-    // computed over an incomplete set.
+    // Tokens -- objects another node handed this one this step -- take part:
+    // their key travels in LoadMetaInfo, so the cut is over the complete set.
+    // This used to be skipped whenever a token had arrived, and the heap path
+    // below then shuffled the node instead (measured: 13 of 24 phases).
     {
-      bool allKeyed = !nodeStats->objData.empty() && objectLoads.empty();
-      for (int j = 0; j < (int)nodeStats->objData.size() && allKeyed; j++)
-        if (nodeStats->objData[j].position.size() != 1) allKeyed = false;
+      bool allKeyed = keyed1D;
+      for (size_t t = 0; t < objectKeys.size() && allKeyed; t++)
+        if (objectKeys[t] != objectKeys[t]) allKeyed = false;
 
       if (allKeyed)
       {
-        const int n = nodeStats->objData.size();
-        std::vector<int> ord(n);
-        for (int j = 0; j < n; j++) ord[j] = j;
-        std::sort(ord.begin(), ord.end(), [&](int a, int b) {
-          return nodeStats->objData[a].position[0] <
-                 nodeStats->objData[b].position[0];
-        });
+        struct Ent { double key; double load; int idx; bool token; };
+        std::vector<Ent> ents;
+        ents.reserve(n + objectKeys.size());
+        for (int j = 0; j < n; j++)
+        {
+          if (objs[j].getCurrPe() == -1) continue;
+          ents.push_back({keyOf(nodeStats->objData[j]), objs[j].getCompLoad(), j, false});
+        }
+        for (size_t t = 0; t < objectKeys.size(); t++)
+          ents.push_back({objectKeys[t], objectLoads[t], (int)t, true});
+        std::sort(ents.begin(), ents.end(),
+                  [](const Ent& a, const Ent& b) { return a.key < b.key; });
 
+        const int m = ents.size();
         double total = 0.0;
-        for (int j = 0; j < n; j++) total += objs[j].getCompLoad();
+        for (int k = 0; k < m; k++) total += ents[k].load;
         const double share = total / (double)nodeSize;
 
         int moved = 0;
         double acc = 0.0;
         int target = 0;
-        for (int k = 0; k < n; k++)
+        for (int k = 0; k < m; k++)
         {
-          const int j = ord[k];
+          const Ent& e = ents[k];
           // Advance the cut once this chunk has its share, but never past the
           // last rank, and leave at least one object for each remaining rank.
           while (target < nodeSize - 1 && acc >= share * (target + 1) &&
-                 (n - k) > (nodeSize - 1 - target))
+                 (m - k) > (nodeSize - 1 - target))
             target++;
-          acc += objs[j].getCompLoad();
+          acc += e.load;
+          const int destPE = rank0PE + target;
 
+          if (e.token)
+          {
+            // Addressed to this rank0PE by the across-node phase; retarget it
+            // to its cut, the way the heap path hands tokens on.
+            if (target == 0) continue;
+            const int t = e.idx;
+            const int donorPE = objSenderPEs[t];
+            migrates_expected--;
+            mig_acksOut += 2;
+            thisProxy[destPE].LoadMetaInfo(objectHandles[t], objectSrcIds[t], objectLoads[t],
+                                           objectGLoads[t], donorPE, 1, CkMyPe(), objectKeys[t]);
+            thisProxy[donorPE].LoadReceived(objectSrcIds[t], destPE, CkMyPe());
+            pe_load[0] -= objectLoads[t];
+            pe_load[target] += objectLoads[t];
+            moved++;
+            continue;
+          }
+
+          const int j = e.idx;
           const int rank = GetRank(j);
           if (rank == target) continue;
           if (!nodeStats->objData[j].migratable) continue;
-          if (objs[j].getCurrPe() == -1) continue;
 
           const int pe_local_id = j - (rank > 0 ? prefixObjects[rank - 1] : 0);
           const int donorPE = rank0PE + rank;
-          const int destPE = rank0PE + target;
           if (donorPE == destPE) continue;
 
           mig_acksOut += 2;
           thisProxy[destPE].LoadMetaInfo(nodeStats->objData[j].handle,
                                          pe_local_id, objs[j].getCompLoad(),
-                                         donorPE, 1, CkMyPe());
+                                         diffusionObjLoad(nodeStats->objData[j]),
+                                         donorPE, 1, CkMyPe(), e.key);
           thisProxy[donorPE].LoadReceived(pe_local_id, destPE, CkMyPe());
           nodeStats->to_proc[j] = destPE;
           pe_load[rank] -= objs[j].getCompLoad();
@@ -515,8 +799,9 @@ void DiffusionLB::WithinNodeLB()
           moved++;
         }
         if (_lb_args.debug() > 1)
-          CkPrintf("[WITHIN node %d] interval repartition: %d of %d objects "
-                   "moved, share=%.6f\n", myNodeId, moved, n, share);
+          CkPrintf("[WITHIN node %d] interval repartition (%s): %d of %d objects "
+                   "moved, share=%.6f\n", myNodeId, onHost ? "host" : "device",
+                   moved, m, share);
 
         endWithinTiming();
         withinNodeReport();
@@ -698,7 +983,9 @@ void DiffusionLB::WithinNodeLB()
                 objId, objId, donorPE, rank0PE);
       }
       mig_acksOut += 2;
-      thisProxy[destPE].LoadMetaInfo(objHandle, objId, currLoad, donorPE, 1, CkMyPe()); // to the receiving PE (mig++)
+      // Count-only handoff: the receiver keeps neither the loads nor the key.
+      thisProxy[destPE].LoadMetaInfo(objHandle, objId, currLoad, 0.0, donorPE, 1, CkMyPe(),
+                                     std::numeric_limits<double>::quiet_NaN()); // to the receiving PE (mig++)
       thisProxy[donorPE].LoadReceived(objId, destPE, CkMyPe());
       pe_load[minPE->Id] += maxObj->load;
       pe_load[rank] -= maxObj->load;
@@ -739,6 +1026,8 @@ void DiffusionLB::ProcessMigrations()
   // SAME AS IN PACKANDSENDMIGRATEMSGS
   LBMigrateMsg* msg = new (total_migrates, CkNumPes(), CkNumPes(), 0) LBMigrateMsg;
   msg->n_moves = total_migrates;
+  // This PE's contribution to the next step's regret verdict.
+  lastMigratesIssued = total_migrates;
   if (_lb_args.debug() > 1) CkPrintf("PE-%d with %d migrates and %d cross-node migrates\n", CkMyPe(), total_migrates, total_crossnode_migrates);
   for (int i = 0; i < total_migrates; i++)
   {
@@ -910,8 +1199,19 @@ void DiffusionLB::MigrationDoneWrapper()
 {
   int balancing = 1;
   MigrationDone(balancing);  // call DistBaseLB version
-  
+
   // End LB timing instrumentation
+}
+
+void DiffusionLB::MigrationDone(int balancing)
+{
+  // The interval the next step judges starts here, once this step's moves
+  // are done; and remember whether this step was a revert, so the next one
+  // does not judge it. This is the one point every end-of-step path passes
+  // through -- the move ledger's resume calls it directly.
+  stepEndTime = CmiWallTimer();
+  lastStepWasRevert = revertThisStep;
+  DistBaseLB::MigrationDone(balancing);
 }
 
 void DiffusionLB::printDiffusionTiming()

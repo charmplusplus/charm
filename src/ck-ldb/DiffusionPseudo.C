@@ -109,11 +109,12 @@ void DiffusionLB::PseudoLoadBalancing()
 {
   std::vector<double> thisRoundToSend(sendToNeighbors.size(), 0.0);
 
-  // Define threshold as a percentage of average neighbor load
-  // Prevents micro-migrations when loads are very similar
-  const double THRESHOLD_PERCENT = 1.0;  // 1% threshold
+  // The floor, as a fraction of the average neighbour load: differences under
+  // it are noise and produce no flow. This used to be a fixed 1%, far under
+  // the step-to-step noise of a balanced GPU run (~5-10% between nodes), so a
+  // uniform workload diffused every step and never settled.
   double avgLoadNeighbor = std::accumulate(loadNeighbors.begin(), loadNeighbors.begin() + neighborCount, 0.0) / neighborCount;
-  double threshold = THRESHOLD_PERCENT * avgLoadNeighbor / 100.0;
+  double threshold = effMinImbalance * avgLoadNeighbor;
 
   // create pairs for sorting
   std::vector<std::pair<int, double>> nborPairs;
@@ -137,6 +138,13 @@ void DiffusionLB::PseudoLoadBalancing()
   {
     int id = p.first;
     double load = p.second;
+
+    // Load flows only between adjacent key intervals (nborKeyAdjacent). A
+    // neighbour on the far side of another one still takes part in the
+    // averages -- it is part of the neighbourhood -- but receives no flow
+    // from here; the flow reaches it through the node in between, one step
+    // later, with every interval kept whole on the way.
+    if (!nborKeyAdjacent(id)) continue;
 
     // Calculate current average including me and all selected neighbors so far
     currAverage = (my_pseudo_load + sumNeighborLoads) / (nborsToBalance.size() + 1);
@@ -162,8 +170,9 @@ void DiffusionLB::PseudoLoadBalancing()
   // balance with neighborstobalance
   double myOverload = my_pseudo_load - currAverage;
 
-  // Don't bother balancing if my overload is insignificant
-  if (myOverload < threshold)
+  // Don't bother balancing if my overload is insignificant. A revert step
+  // proposes no flow at all: it only takes the previous step's moves back.
+  if (myOverload < threshold || revertThisStep)
   {
     myOverload = 0;
   }

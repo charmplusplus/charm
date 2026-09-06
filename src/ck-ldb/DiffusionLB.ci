@@ -58,7 +58,13 @@ module DiffusionLB
         std::vector<LDCommData> commData);
 
     entry void receiveCentroid(int node, std::vector<LBRealType> centroid, int count);
-    entry[expedited] void ReceiveLoadInfo(int itr, double load, int node);
+    // A node's diffused load for the round, plus the ends of its 1-D key
+    // interval (NaN when it has none) so its neighbours know which side of
+    // themselves it lies on.
+    entry[expedited] void ReceiveLoadInfo(int itr, double load, int node, double keyLo, double keyHi);
+    // Regret loop: reduced before every step's strategy, see decideRegret.
+    entry[reductiontarget] void regretInterval(double maxInterval);
+    entry[reductiontarget] void regretMoves(int moves);
     entry[expedited] void ReceiveStats(CkMarshalledCLBStatsMessage data);
     // entry void LoadTransfer(double load, int initPE, int objId);
     entry[expedited] void LoadReceived(int objId, int fromPE, int ackPE);
@@ -76,7 +82,7 @@ module DiffusionLB
     entry void ProcessFinalStats();
     entry void CollectStats();
     entry[expedited] void next_phase(int val);
-    entry[expedited] void LoadMetaInfo(LDObjHandle h, int objId, double load, int senderPE, int only_mcount, int ackPE);
+    entry[expedited] void LoadMetaInfo(LDObjHandle h, int objId, double load, double gload, int senderPE, int only_mcount, int ackPE, double key);
     entry void MigrationDoneWrapper();  // Call when migration is complete
     entry[expedited] void WithinNodeLB();
   
@@ -161,6 +167,8 @@ module DiffusionLB
         toReceiveLoad.resize(neighborCount, 0);
         // Momentum starts at zero each LB step: the first round is pure first-order.
         prevRoundToSend.assign(neighborCount, 0.0);
+        nborKeyLo.assign(neighborCount, std::numeric_limits<double>::quiet_NaN());
+        nborKeyHi.assign(neighborCount, std::numeric_limits<double>::quiet_NaN());
 
         my_pseudo_load = my_load;
         pseudo_itr = 0;
@@ -185,21 +193,27 @@ module DiffusionLB
           for (int i = 0; i < neighborCount; i++)
           {
             thisProxy[sendToNeighbors[i] * nodeSize].ReceiveLoadInfo(
-                pseudo_itr, my_pseudo_load, myNodeId);
+                pseudo_itr, my_pseudo_load, myNodeId,
+                keyed1D ? myKeyLo : std::numeric_limits<double>::quiet_NaN(),
+                keyed1D ? myKeyHi : std::numeric_limits<double>::quiet_NaN());
           }
         }
 
         // Wait for all its neighbors load
         for (temp_itr = 0; temp_itr < sendToNeighbors.size(); temp_itr++)
         {
-          when ReceiveLoadInfo[pseudo_itr](int itr, double load, int node) serial
+          when ReceiveLoadInfo[pseudo_itr](int itr, double load, int node, double keyLo, double keyHi) serial
           {
             int pos = findNborIdx(node);
             if (pos < 0)
               CkPrintf("[DiffusionLB] ERROR: node %d got round-%d load from non-neighbour "
                        "node %d -- neighbour graph is asymmetric\n", myNodeId, itr, node);
             else
+            {
               loadNeighbors[pos] = load;
+              nborKeyLo[pos] = keyLo;
+              nborKeyHi[pos] = keyHi;
+            }
           }
         }
 

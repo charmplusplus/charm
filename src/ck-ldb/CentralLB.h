@@ -99,6 +99,9 @@ public:
   inline void setConcurrent(bool c) { concurrent = c; }
 
   void CallLB();
+  // Second half of CallLB on a CUDA build: runs once the process's per-object
+  // GPU loads for this round exist.
+  void gpuLoadsReady();
   void InvokeLB(); // Everything is at the PE barrier
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny

@@ -62,22 +62,38 @@ void DistBaseLB::barrierDone() {
   // LDObjData::gpuTime stays zero for every distributed strategy, so
   // DiffusionLB's across-node dimension (+LBDiffusionGpuDim, which diffuses on
   // gpuTime) sees no load at all and diffuses nothing -- the device work is
-  // invisible because the host only enqueues kernels. CentralLB::CallLB does
-  // exactly this for the centralized strategies; the distributed path was
-  // simply never given the same treatment.
-  // Whichever PE thread gets here first does the work; the rest block inside
-  // until it is done, so nobody reads cupti_obj_norm_load_ while it is being
-  // rebuilt. This used to be "rank 0 does it between two CmiNodeBarrier calls",
-  // but both barriers were behind #if CMK_SMP -- which is 0 in the multicore
-  // build even though a process really does run many PE threads -- so the
-  // barriers compiled away and the other ranks raced the rebuild.
+  // invisible because the host only enqueues kernels.
+  //
+  // Built once per process by the LAST PE to reach its barrier, not the first.
+  // This barrier is per PE -- it fires when this PE's own objects are at
+  // AtSync -- while the CUPTI records are per process. The first arrival used
+  // to flush, drain and clear them on the spot, so any PE whose objects were
+  // still finishing their kernels lost those kernels from the round: measured
+  // on barnes, one PE per process (always the last to arrive) reported zero GPU
+  // load for all of its objects at every step, and the balancer spent every
+  // step filling a hole that was never there. The earlier arrivals return here
+  // and continue from gpuLoadsReady once the build is done.
+  if (!hapiCuptiArrive((uint64_t)step(), CkNodeSize(CkMyNode()))) return;
   hapiPrepareCuptiLoads();
+  const int first = CkNodeFirst(CkMyNode());
+  for (int r = 0; r < CkNodeSize(CkMyNode()); r++)
+    thisProxy[first + r].gpuLoadsReady();
+#else
+  gpuLoadsReady();
+#endif
+#endif
+}
+
+// The round's GPU loads are built (or there are none to build): copy this
+// PE's share out, assemble its stats and start the strategy.
+void DistBaseLB::gpuLoadsReady() {
+#if CMK_LBDB_ON
+#if CMK_CUDA
   // Every PE picks up the normalized loads for its own objects.
   lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
   if (_lb_args.gpuScaling())
     lbmgr->SetObjGPUCosts(CsvAccess(gpu_manager).cupti_obj_epoch_costs_);
 #endif
-
   AssembleStats();
   thisProxy[CkMyPe()].LoadBalance();
 #endif

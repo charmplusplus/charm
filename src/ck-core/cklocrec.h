@@ -73,6 +73,11 @@ public:
   void setObjPosition(const std::vector<LBRealType>& pos);
   double getObjTime();
   const std::vector<LBRealType>& getObjPosition();
+  // Previous home of the element and the balancing step that moved it; see
+  // LDObjData::prevPe. Set on arrival by CkMigratable::pup.
+  void setObjPrev(int pe, int stepNo);
+  void getObjPrev(int& pe, int& stepNo);
+  int lbStep();
 
   void setObjGPUTime(double gputime);
   double getObjGPUTime();

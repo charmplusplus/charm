@@ -91,6 +91,19 @@ public:
     return data.position;
   }
 
+  // Previous home and the step that moved the object away from it; see
+  // LDObjData::prevPe.
+  inline void setPrev(int pe, int stepNo)
+  {
+    data.prevPe = pe;
+    data.prevStep = stepNo;
+  }
+  inline void getPrev(int& pe, int& stepNo) const
+  {
+    pe = data.prevPe;
+    stepNo = data.prevStep;
+  }
+
   inline void setGPUTiming(LBRealType gputime)
   {
   #if CMK_CUDA

@@ -202,7 +202,14 @@ void GpuParticleStore::ensure(int n){
 // node count is bounded by a small multiple of the bucket count. Sizing from
 // the capacity keeps it stable across a resize.
 void GpuParticleStore::ensureTree(int n){
-  ensureTreeCapacity(4 * (n / 8 + 1) + 1024);
+  // The pushed locally essential trees are spliced into this same array
+  // after the local build, so the capacity has to leave room for them. With
+  // only the local bound, a PE that gained tree pieces from a balancing step
+  // built a bigger local tree, insertLet found no room for ~4000 of ~5200
+  // pushed cells, and the half-spliced tree was later mirrored to the host
+  // and walked off the end (buildTreeFromDevice). 32K nodes of headroom is
+  // under 3 MB of device memory.
+  ensureTreeCapacity(4 * (n / 8 + 1) + 1024 + 32768);
 }
 
 void GpuParticleStore::ensureTreeCapacity(int want){

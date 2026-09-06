@@ -20,6 +20,9 @@ public:
 
   void InvokeLB(void);
   void barrierDone(); // Everything is at the PE barrier
+  // Second half of barrierDone: runs once the process's per-object GPU loads
+  // for this round exist (immediately on a non-CUDA build).
+  void gpuLoadsReady();
   void LoadBalance();
   void ResumeClients();
   void ResumeClients(int balancing);
@@ -58,7 +61,10 @@ public:
 protected:
   virtual void Strategy(const LDStats* const myStats);
   void ProcessMigrationDecision(LBMigrateMsg* migrateMsg);
-  void MigrationDone(int balancing);  // Call when migration is complete
+  // Call when migration is complete. Virtual so a strategy can see the end of
+  // its own step: the ledger-driven resume reaches this directly, not through
+  // any entry method of the derived class.
+  virtual void MigrationDone(int balancing);
 #if CMK_GLOBAL_LOCATION_UPDATE
   // Broadcasts this PE's own moves (the only ones it knows about) so every
   // other PE's location cache stays current for them too. Safe to call with

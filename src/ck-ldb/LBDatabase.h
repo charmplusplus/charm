@@ -141,6 +141,14 @@ public:
     return LbObj(h)->getPosition();
   };
 
+  inline void ObjPrev(LDObjHandle h, int pe, int stepNo) {
+    LbObj(h)->setPrev(pe, stepNo);
+  };
+
+  inline void GetObjPrev(LDObjHandle h, int& pe, int& stepNo) {
+    LbObj(h)->getPrev(pe, stepNo);
+  };
+
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();
   }

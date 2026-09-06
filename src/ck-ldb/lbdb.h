@@ -273,6 +273,14 @@ struct LDObjData {
   // (MetricComm, +LBDiffusionCommOn) does not use it. It therefore stays empty --
   // anything reading it must guard for that.
   std::vector<LBRealType> position;
+  // The PE this object lived on before its most recent migration, and the
+  // balancing step that moved it; -1 until it has ever moved. Set by the
+  // runtime on arrival (CkMigratable::pup), so a balancer can undo its own
+  // previous step -- send every object that step moved back where it came
+  // from -- without keeping a ledger of moves that would itself have to
+  // survive the moves.
+  int prevPe;
+  int prevStep;
 #if CMK_LB_USER_DATA
   LBObjUserData   userData;
 #endif
@@ -457,6 +465,9 @@ inline void LDObjData::pup(PUP::er &p) {
   p|migratable;
   if (_lb_version > -1) p|asyncArrival;
   p|position;
+  // Version-gated like gpuCosts: an older dump has no such fields.
+  if (_lb_version > 3) { p|prevPe; p|prevStep; }
+  else if (p.isUnpacking()) { prevPe = -1; prevStep = -1; }
 #if CMK_LB_USER_DATA
   if (_lb_version > 2) {
     p|userData;

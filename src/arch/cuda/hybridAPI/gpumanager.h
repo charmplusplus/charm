@@ -383,6 +383,9 @@ struct GPUManager {
   // same mutex as cupti_queue_lock_: the flush in the stop path invokes the
   // buffer-completed callback, which takes that one.
   std::mutex cupti_tracing_lock_;
+  // PEs of this process whose instrumentation is currently on. Tracing runs
+  // while this is non-zero; see hapiCuptiStartTracing.
+  int cupti_tracing_users_ = 0;
   // Bumped every time CUPTI is detached. Detaching clears CUPTI's
   // external-correlation stack for every PE, but the counters that keep the
   // entry-method push/pop hooks paired are per-PE, and only the PE that ran the
@@ -406,6 +409,15 @@ struct GPUManager {
   // HAPI_CUPTI_EPOCH_LB_ROUND, which is above every sampling epoch and so
   // always rebuilds once and then satisfies the rest of the round's PEs.
   uint64_t cupti_loads_epoch_ = 0;
+  // Arrival gate for the per-round load build; see hapiCuptiArrive. A load
+  // balancer's per-PE barrier fires when THAT PE's objects are at AtSync, and
+  // the first PE to fire used to flush, drain and clear the process-wide CUPTI
+  // records on the spot. Any PE whose objects were still finishing kernels at
+  // that instant had them dropped from the round -- consistently the last PE
+  // of the process, whose objects then read as zero GPU load every step.
+  std::mutex cupti_arrive_lock_;
+  uint64_t cupti_arrive_epoch_ = 0;
+  int cupti_arrive_count_ = 0;
 #endif
 
   void init() {

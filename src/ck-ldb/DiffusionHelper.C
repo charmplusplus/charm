@@ -159,9 +159,11 @@ void DiffusionLB::BuildStats()
   // and self-cancelling when the loads are real. If a dimension is genuinely
   // all zero its mean is zero, the floor vanishes, and nothing moves: correct,
   // because there is no load to balance.
+  objLoadFloor = 0.0;
   if (nobj > 0)
   {
     const double gpuFloor = my_load / (double)nobj;
+    objLoadFloor = gpuFloor;
     double cpuTotal = 0.0;
     for (int r = 0; r < nodeSize; r++) cpuTotal += pe_load[r];
     const double cpuFloor = cpuTotal / (double)nobj;
@@ -186,6 +188,20 @@ void DiffusionLB::BuildStats()
 
   my_loadAfterTransfer = my_load;
   nodeStats->n_migrateobjs = nmigobj;
+
+  // Is this node an interval of a 1-D ordering? Only when every object here
+  // registered a width-1 position; one object without a key and the interval
+  // rules stand down for the node (the metrics then choose freely).
+  keyed1D = nobj > 0;
+  myKeyLo = myKeyHi = 0.0;
+  for (int i = 0; i < nobj && keyed1D; i++)
+  {
+    const double k = keyOf(nodeStats->objData[i]);
+    if (k != k) { keyed1D = false; break; }
+    if (i == 0 || k < myKeyLo) myKeyLo = k;
+    if (i == 0 || k > myKeyHi) myKeyHi = k;
+  }
+
   // Generate a hash with key object id, value index in objs vector
   nodeStats->deleteCommHash();
   nodeStats->makeCommHash();

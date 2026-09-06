@@ -14,6 +14,9 @@ initnode void lbinit(void);
 group [migratable] CentralLB : BaseLB {
   entry void CentralLB(const CkLBOptions &);  
   entry void ProcessAtSync(void);
+  // Sent to every PE of a process by the PE that built the round's GPU loads;
+  // see the arrival gate in CallLB.
+  entry [expedited] void gpuLoadsReady();
   entry [reductiontarget] void SendStats();
   entry void ReceiveStats(CkMarshalledCLBStatsMessage data);
   entry void ReceiveStatsViaTree(CkMarshalledCLBStatsMessage data);
