@@ -74,6 +74,7 @@ inline hapiError_t mmFree(void* p) {
 /* readonly */ int use_adam;
 /* readonly */ int use_tf32;
 /* readonly */ int use_instrument;
+/* readonly */ int fuse_sources;
 /* readonly */ int print_place;
 /* readonly */ double zipf_z;
 /* readonly */ double learning_rate;
@@ -151,11 +152,12 @@ public:
     use_adam = 0;
     use_tf32 = 0;
     use_instrument = 0;
+    fuse_sources = 1;
     print_place = 0;
     disp_step = exp_step = done_count = 0;
 
     int c;
-    while ((c = getopt(m->argc, m->argv, "e:m:h:t:k:i:u:z:p:c:r:L:C:s:f:b:l:S:n:aATIP")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "e:m:h:t:k:i:u:z:p:c:r:L:C:s:f:b:l:S:n:aAUTIP")) != -1) {
       switch (c) {
         case 'e': n_experts = atoi(optarg); break;
         case 'm': d_model = atoi(optarg); break;
@@ -180,6 +182,7 @@ public:
         case 'A': use_adam = 1; break;
         case 'T': use_tf32 = 1; break;
         case 'I': use_instrument = 1; break;
+        case 'U': fuse_sources = 0; break;
         case 'P': print_place = 1; break;
         default:
           CkPrintf(
@@ -190,6 +193,10 @@ public:
               "  -c [chunk: tokens per GEMM] -r [capacity headroom, 0 = auto from zipf]\n"
               "  -n [compute lanes per PE: streams experts are spread over]\n"
               "  -L [learning rate] -A (Adam: 3x payload) -T (TF32 GEMMs)\n"
+              "  -U (one chunked pass per source instead of one per expert: many more\n"
+              "      weight updates, ~12%% slower, kept for comparison. Either way the\n"
+              "      chunk boundaries follow the routing alone, so the checksums are\n"
+              "      placement-independent; the two modes' values differ.)\n"
               "  -C [checksum frequency, 0 disables] -s [stats frequency, 0 disables]\n"
               "  -f [first LB step] -b [LB frequency]\n"
               "  -a (async LB: overlap the step; needs +LBAsync) -l [wait lag]\n"
@@ -244,8 +251,9 @@ public:
     CkPrintf("Experts: %d, d_model %d, d_ff %d, %s%s\n", n_experts, d_model,
         d_ff, use_adam ? "Adam" : "SGD", use_tf32 ? ", TF32" : "");
     CkPrintf("Tokens: %d per PE per step on %d PEs, top-%d, chunk %d, "
-        "slab capacity %d per (PE, expert), %d compute lanes per PE\n",
-        n_tokens, n_disp, top_k, chunk_tokens, cap_src, n_lanes);
+        "slab capacity %d per (PE, expert), %d compute lanes per PE%s\n",
+        n_tokens, n_disp, top_k, chunk_tokens, cap_src, n_lanes,
+        fuse_sources ? "" : ", one pass per source");
     CkPrintf("Routing: zipf %.2f (hottest expert %.1fx average), hot set "
         "reshuffled every %d steps, seed %ld\n", zipf_z, p_max * n_experts,
         drift_period, moe_seed);
@@ -438,6 +446,14 @@ class Dispatcher : public CBase_Dispatcher {
       if (use_adam) {
         hapiCheck(mmMalloc((void**)&g.dW1, sizeof(float) * wsz));
         hapiCheck(mmMalloc((void**)&g.dW2, sizeof(float) * wsz));
+      }
+      if (fuse_sources) {
+        // Bounded by what one expert can be sent in a step, the same bound its
+        // own slabs use. Sized once: growing it would have to free a block the
+        // lane's queued kernels may still be reading.
+        const size_t frows = (size_t)n_disp * cap_src;
+        hapiCheck(mmMalloc((void**)&g.fx, sizeof(float) * frows * d_model));
+        hapiCheck(mmMalloc((void**)&g.fy, sizeof(float) * frows * d_model));
       }
       g.workspace_bytes = (size_t)32 << 20;
       hapiCheck(mmMalloc(&g.workspace, g.workspace_bytes));
@@ -707,6 +723,12 @@ class Expert : public CBase_Expert {
   double* h_chk;
   cudaEvent_t ev_start;
   cudaEvent_t ev_end;
+  // Recorded after the checksum's device-to-host copy. A pack reads h_chk on
+  // the host, which the copy may still be writing; pup_device_order only
+  // orders DEVICE-mode copies and leaves that host read racing. Losing it
+  // costs one expert's slot in the w2 reduction, seen once in eight async
+  // runs at Llama size as a deficit of exactly 1/64.
+  cudaEvent_t ev_chk;
   // Same reason as the dispatcher's: the lane's tail at send time includes
   // other experts' queued GEMMs, and a landing that waited on it stalled the
   // receiver's comm stream for a remote expert's compute. This stream waits
@@ -750,6 +772,7 @@ class Expert : public CBase_Expert {
     }
     hapiCheck(cudaEventDestroy(ev_start));
     hapiCheck(cudaEventDestroy(ev_end));
+    hapiCheck(cudaEventDestroy(ev_chk));
     hapiCheck(cudaStreamDestroy(send_stream));
     if (outstanding_sends != 0) {
       // A transport may still be reading a send buffer. Leak rather than pull
@@ -797,6 +820,7 @@ class Expert : public CBase_Expert {
   void createEvents() {
     hapiCheck(cudaEventCreate(&ev_start));
     hapiCheck(cudaEventCreate(&ev_end));
+    hapiCheck(cudaEventCreateWithFlags(&ev_chk, cudaEventDisableTiming));
     hapiCheck(cudaStreamCreateWithPriority(&send_stream, cudaStreamNonBlocking,
         -1));
     ev_pending = false;
@@ -869,6 +893,10 @@ class Expert : public CBase_Expert {
       allocate();
       createEvents();   // a pending timing sample is lost with the old events
     }
+    // The checksum's copy into h_chk is asynchronous; wait for it before the
+    // host reads it, or a migration here packs whatever was there before.
+    if (p.isPacking() && h_chk && chk_due)
+      hapiCheck(cudaEventSynchronize(ev_chk));
     double chk = (h_chk && chk_due) ? *h_chk : 0.0;
     p | chk;
     if (p.isUnpacking()) *h_chk = chk;
@@ -942,7 +970,16 @@ class Expert : public CBase_Expert {
     sampleTiming();
     n_tot = 0;
     for (int s = 0; s < n_disp; s++) n_tot += std::max(n_src[s], 0);
-    setObjGPUTime(spt * n_tot);
+    // The PE's pooled figure, so an expert that has not run yet (just
+    // migrated, or idle last step) still declares a load on the same scale.
+    const MoeCtx* c = ctx();
+    double s_tok = (c->spt_tok > 0.0) ? c->spt_gpu / c->spt_tok : spt;
+    // Diagnostic: a fixed per-token cost, identical on every PE. Every expert
+    // here does the same work per token, so this is the exact load ratio; it
+    // separates a balancer that cannot use a good signal from a bad signal.
+    static const bool flat = getenv("CHARM_MOE_FLATLOAD") != NULL;
+    if (flat) s_tok = 1e-5;
+    setObjGPUTime(s_tok * n_tot);
 
     if (use_instrument) {
       const bool want = (nextLBStep(my_step) - my_step) <= LB_INSTRUMENT_WINDOW;
@@ -996,8 +1033,12 @@ class Expert : public CBase_Expert {
     ev_pending = false;
     gpu_last = ms * 1e-3;
     if (n_last > 0 && step_last > 1) {
-      const double s = gpu_last / n_last;
-      spt = (spt > 0.0) ? 0.5 * spt + 0.5 * s : s;
+      // Pool the sample into the PE's figure rather than keeping a per-expert
+      // one; see MoeCtx. The decay makes it track without a window.
+      MoeCtx* c = ctx();
+      c->spt_gpu = 0.75 * c->spt_gpu + gpu_last;
+      c->spt_tok = 0.75 * c->spt_tok + n_last;
+      spt = c->spt_gpu / c->spt_tok;
     }
   }
 
@@ -1016,12 +1057,45 @@ class Expert : public CBase_Expert {
       int chunks = 0;
       hapiCheck(cudaEventRecord(ev_start, g->stream));
       if (use_adam) moeZeroGrad(g, d_model, d_ff);
-      for (int s = 0; s < n_disp; s++) {
-        if (n_src[s] <= 0) continue;
-        chunks += (n_src[s] + chunk_tokens - 1) / chunk_tokens;
-        moeExpertChunks(g, W1, W2, x_seg + s * segStride(),
-            y_seg + s * segStride(), n_src[s], d_model, d_ff, chunk_tokens,
-            (float)learning_rate, 1.0f / n_tot, use_adam != 0);
+      if (fuse_sources) {
+        // One pass over all this expert's tokens instead of one per source.
+        // The two weight-update GEMMs of a chunk read and rewrite both weight
+        // matrices whatever the chunk holds, so a step's cost is set by the
+        // number of chunks, and unfused that is at least one per (source,
+        // expert) pair: a typical expert gets a few hundred tokens from each
+        // dispatcher and pays a full weight update for each. Concatenating in
+        // dispatcher order keeps the chunk boundaries a function of the
+        // routing alone, so the reduction order is still placement-independent
+        // -- the values differ from the unfused ones, the property does not.
+        size_t off = 0;
+        for (int s = 0; s < n_disp; s++) {
+          if (n_src[s] <= 0) continue;
+          const size_t n = (size_t)n_src[s] * d_model;
+          hapiCheck(cudaMemcpyAsync(g->fx + off, x_seg + s * segStride(),
+              sizeof(float) * n, cudaMemcpyDeviceToDevice, g->stream));
+          off += n;
+        }
+        chunks = (n_tot + chunk_tokens - 1) / chunk_tokens;
+        moeExpertChunks(g, W1, W2, g->fx, g->fy, n_tot, d_model, d_ff,
+            chunk_tokens, (float)learning_rate, 1.0f / n_tot, use_adam != 0);
+        // Back into the per-source segments, so the sends and both pup phases
+        // are unchanged. Queued before ev_end, which orders a pack behind it.
+        off = 0;
+        for (int s = 0; s < n_disp; s++) {
+          if (n_src[s] <= 0) continue;
+          const size_t n = (size_t)n_src[s] * d_model;
+          hapiCheck(cudaMemcpyAsync(y_seg + s * segStride(), g->fy + off,
+              sizeof(float) * n, cudaMemcpyDeviceToDevice, g->stream));
+          off += n;
+        }
+      } else {
+        for (int s = 0; s < n_disp; s++) {
+          if (n_src[s] <= 0) continue;
+          chunks += (n_src[s] + chunk_tokens - 1) / chunk_tokens;
+          moeExpertChunks(g, W1, W2, x_seg + s * segStride(),
+              y_seg + s * segStride(), n_src[s], d_model, d_ff, chunk_tokens,
+              (float)learning_rate, 1.0f / n_tot, use_adam != 0);
+        }
       }
       TRACE(2, "expert %d step %d issued %d chunks in %.1f ms", thisIndex,
           my_step, chunks, (tnow() - ti0) * 1e3);
@@ -1039,6 +1113,7 @@ class Expert : public CBase_Expert {
       moeSumSqAdd(W2, wsz(), g, d_chk, g->stream);
       hapiCheck(hapiMemcpyAsync(h_chk, d_chk, sizeof(double),
           cudaMemcpyDeviceToHost, g->stream));
+      hapiCheck(cudaEventRecord(ev_chk, g->stream));
     }
     if (n_tot > 0 || chk_due) {
       CkCallback* cb = new CkCallback(CkIndex_Expert::computeDone(),

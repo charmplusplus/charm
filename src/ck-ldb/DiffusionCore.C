@@ -72,9 +72,22 @@ void DiffusionLB::AcrossNodeLB()
                revertThisStep ? ", revert step" : "");
   }
 
-  // Per-step cap on what may leave this node: a wrong signal then costs one
-  // bounded step, which the regret check can take back, rather than a
-  // wholesale redistribution. +LBDiffusionMaxMoveFrac >= 1 lifts the cap.
+  // Per-step cap on what may leave this node, as a share of its migratable
+  // objects. The bound that makes a step safe is the one above -- a node sheds
+  // its EXCESS over the neighbourhood mean and nothing more -- and this cap
+  // only limits how fast it gets there. It is a count, applied to objects that
+  // carry very unequal load, so it can stop a shed part-way: measured on the
+  // moe example, whose expert loads are Zipf-skewed, a node asked to shed
+  // 0.187 stopped after four objects with 0.102 still unshed and the job sat
+  // at 1.9x imbalance for five steps instead of recovering in one.
+  //
+  // Lifting it entirely is not the answer either: at 1.0 the same runs did
+  // recover in one step and held 1.2-1.33x, but moved 35-54 objects where the
+  // capped runs moved 6-9, and the step time did not improve (190-212 ms
+  // against 179-202). At this object size the migration traffic pays for the
+  // balance it buys. The cap stays at its default; a balancer that could cap
+  // in the load dimension rather than by object count would get the recovery
+  // without the traffic, and that is the open item.
   int maxMoves = n_objs;
   {
     const double frac = _lb_args.diffusionMaxMoveFrac();

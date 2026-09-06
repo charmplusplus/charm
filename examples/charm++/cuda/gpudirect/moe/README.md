@@ -93,6 +93,8 @@ LB step, as pic2d does, and the balancer uses measured loads.
     -C checksum frequency (5; 0 off)              -s stats frequency (1)
     -f first LB step (10)  -b LB frequency (9999) -a async LB  -l wait lag (3)
     -I CUPTI-measured loads instead of estimates  -S seed  -P print placement
+    -U one chunked pass per source instead of one per expert (slower; the
+       fused default is described under Measured below)
 
 ## Build and run
 
@@ -169,12 +171,55 @@ messages (a slab per destination PE instead of per expert) would remove most
 of it at the cost of location transparency; a cheaper per-message path in
 the runtime would keep it.
 
-Load balancing, final build (DiffusionLB, `-f 5 -b 5`, async `-l 3`):
+Load balancing, final build (DiffusionLB, `-f 5 -b 5`, async `-l 3`), after
+the source fusion and the load-model fix below:
 
 | config                      | no LB | sync | async |
 |-----------------------------|------:|-----:|------:|
-| defaults, 30 steps, ms/step |   198 |  213 |   197 |
-| 4096 x 14336, 20 steps      |   629 |  619 |   592 |
+| defaults, 30 steps, ms/step |   191 |  199 |   185 |
+| 4096 x 14336, 20 steps      |   560 |  545 |   530 |
+
+Before those two changes the same runs were 205 / 216 / 207 and 631 / 623 /
+605. What changed:
+
+- **One chunked pass per expert, not one per source** (the default; `-U`
+  restores the old way). A chunk runs two weight-update GEMMs that read and
+  rewrite both weight matrices whatever the chunk holds, so a step's cost is
+  set by the number of chunks, and per source that is at least one per
+  (source, expert) pair: a typical expert receives a few hundred tokens from
+  each dispatcher and paid a full weight update for each. At the defaults that
+  is 260 chunked passes per step against 78, and 30 ms per GPU of weight
+  traffic. The expert's tokens are copied into one run first and the outputs
+  copied back, about 0.8 ms per GPU, so the sends and both pup phases are
+  unchanged. Concatenating in dispatcher order keeps the chunk boundaries a
+  function of the routing alone: the checksums differ from the unfused ones in
+  value and are still identical across placements. Compute span 154 -> 131 ms.
+- **Seconds per token is pooled per PE, not per expert.** An expert timed
+  itself with events around its own kernels, but up to `-n` experts share the
+  device, so the span was inflated by however much company it had -- and a hot
+  expert, outliving its lane-mates, had less of it. Per-expert figures
+  compressed exactly the skew the balancer has to see. Every expert here does
+  identical work per token, so one pooled figure is both the right model and an
+  accurate one. `CHARM_MOE_FLATLOAD=1` declares an exact token-proportional
+  load instead, which separates a balancer that cannot use a good signal from
+  a bad signal.
+- **The checksum's copy is waited for before a pack reads it.** `h_chk` is
+  filled by an asynchronous device-to-host copy, and `pup_device_order` orders
+  only DEVICE-mode copies, so a migration in that window packed whatever was
+  there before. It cost one expert's slot in the `w2` reduction, seen once in
+  eight async runs at Llama size as a deficit of exactly 1/64. The outputs
+  were never affected: `out2` matched in the failing run.
+
+What the balancer still leaves on the table: between reshuffles DiffusionLB
+holds `tokens/PE max/avg` at 1.20 to 1.33, where a greedy re-placement reaches
+1.01 (see `ref/`). The per-step move cap is a count applied to objects of very
+unequal load, so it can stop a shed part-way -- a node asked to shed 0.187 of
+its load stopped after four objects with 0.102 unshed and the job sat at 1.9x
+for five steps. Lifting the cap (`+LBDiffusionMaxMoveFrac 1`) does recover in
+one step and holds 1.2 to 1.33, but moves 35 to 54 objects where the capped
+runs move 6 to 9, and the step time does not improve. At this object size the
+migration traffic pays for the balance it buys; a cap expressed in the load
+dimension rather than by object count is the open item.
 
 Balancing cuts tokens per PE from 1.9x to 1.3x and the GPU-time imbalance
 from 1.5x to 1.15x. In the Llama-sized run the balanced steps take 476 to 497

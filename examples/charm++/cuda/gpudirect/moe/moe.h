@@ -16,6 +16,11 @@ struct MoeGpu {
   float* dh;              // [chunk x d_ff]   dL/dh, overwritten by dL/dz
   float* dW1;             // [d_model x d_ff] gradient accumulators, Adam only
   float* dW2;             // [d_ff x d_model]
+  // Default (-U turns it off): one expert's tokens gathered from its per-source segments into a
+  // single run, so the step is one chunked pass instead of one per source.
+  // Lane scratch: experts sharing a lane are serialized by its stream.
+  float* fx;              // [n_disp x cap_src x d_model]
+  float* fy;
   void* workspace;        // cuBLAS workspace
   size_t workspace_bytes;
   double* partials;       // MOE_RED_BLOCKS partial sums for the checksums
@@ -41,6 +46,16 @@ struct MoeCtx {
   MoeGpu comm;                  // stream + partials only; no cuBLAS, no scratch
   MoeGpu lanes[MOE_MAX_LANES];
   int n_lanes;
+  // Seconds per token, pooled over this PE's experts. An expert times itself
+  // with events around its own kernels, but up to n_lanes experts share the
+  // device, so the span is inflated by however much company it had -- and a
+  // hot expert, which outlives its lane-mates, has less of it. Per-expert
+  // figures therefore compress exactly the skew the balancer has to see. Every
+  // expert here does identical work per token, so one pooled figure is both
+  // the right model and an accurate one: whatever concurrency inflation is
+  // left is common to all of them and cancels in the comparison.
+  double spt_gpu;               // decayed sum of measured device seconds
+  double spt_tok;               // decayed sum of the tokens they covered
 };
 
 #define MOE_RED_BLOCKS 256

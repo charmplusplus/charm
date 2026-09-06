@@ -73,16 +73,18 @@ fp32, 30 steps, LB every 5 steps from step 5.
 
 | implementation                  | no LB   | sync LB | async LB |
 |---------------------------------|--------:|--------:|---------:|
-| Charm++ example                 | 204-206 |     215 |  195-206 |
+| Charm++ example, per source (-U) | 204-206 |     215 |  195-206 |
+| Charm++ example, fused (default) |     191 |     199 |      185 |
 | reference, per-source chunks    |     219 |     190 |      193 |
 | reference, one pass per expert  | 189-199 | 153-155 |      159 |
 
 Llama-sized FFN (4096 x 14336), 20 steps:
 
-| implementation                  | no LB | sync LB | async LB |
-|---------------------------------|------:|--------:|---------:|
-| Charm++ example                 |   631 |     623 |      605 |
-| reference, one pass per expert  |   568 |     448 |      498 |
+| implementation                   | no LB | sync LB | async LB |
+|----------------------------------|------:|--------:|---------:|
+| Charm++ example, per source (-U) |   631 |     623 |      605 |
+| Charm++ example, fused (default) |   560 |     545 |      530 |
+| reference, one pass per expert   |   568 |     448 |      498 |
 
 Correctness: with identical arguments the two agree to fp32 accumulation
 noise. At step 30 of the defaults the example gives `out2
@@ -118,11 +120,13 @@ token, forward and backward):
 | reference, TF32                |                    148 |       37.2 |     50% |
 | reference, bf16                |                     72 |       76.5 |     51% |
 
-The example chunks per source, as the reference does with `--fuse` off, and
-its busiest rank takes 153 ms against the reference's 150: the same 37%. One
-pass per expert over all its sources is worth 30% of the GEMM time and needs
-only a copy into contiguous scratch. A real framework goes further with a
-grouped GEMM over all local experts.
+The example chunked per source, as the reference does with `--fuse` off, and
+its busiest rank took 153 ms against the reference's 150: the same 37%. Fusing
+was worth 30% of the GEMM time and needed only a copy into contiguous scratch,
+so the example now does it by default and its compute span is 131 ms. That
+closes the no-LB gap: 191 ms against the fused reference's 189-199, and 560
+against 568 at Llama size. A real framework goes further with a grouped GEMM
+over all local experts.
 
 **Precision.** Reference without LB: fp32 199 ms, TF32 120 ms, bf16 59 ms per
 step. The example at TF32 takes 148 ms against the reference's 120.
