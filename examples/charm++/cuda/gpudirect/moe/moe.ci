@@ -1,0 +1,103 @@
+mainmodule moe {
+  include "moe.h";
+
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Dispatcher disp_proxy;
+  readonly CProxy_Expert expert_proxy;
+  readonly int n_experts;
+  readonly int d_model;
+  readonly int d_ff;
+  readonly int n_tokens;
+  readonly int top_k;
+  readonly int n_steps;
+  readonly int warmup_steps;
+  readonly int chunk_tokens;
+  readonly int n_lanes;
+  readonly int cap_src;
+  readonly int n_disp;
+  readonly int drift_period;
+  readonly int first_lb;
+  readonly int lb_freq;
+  readonly int async_lb;
+  readonly int lb_wait_lag;
+  readonly int checksum_freq;
+  readonly int stats_freq;
+  readonly int use_adam;
+  readonly int use_tf32;
+  readonly int use_instrument;
+  readonly int print_place;
+  readonly double zipf_z;
+  readonly double learning_rate;
+  readonly long moe_seed;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void dispReady();
+    entry [reductiontarget] void expertsReady();
+    entry void stepStatsDisp(CkReductionMsg* msg);
+    entry void stepStatsExpert(CkReductionMsg* msg);
+    entry [reductiontarget] void dispDone();
+    entry [reductiontarget] void expertsDone();
+  };
+
+  // One per PE. Owns the PE's token batch, routes it, ships one slab per
+  // expert, and combines what comes back. Never migrates; it is also where the
+  // per-PE GPU context (stream, cuBLAS handle, scratch) lives.
+  group Dispatcher {
+    entry Dispatcher();
+    entry void init();
+    // Targets of hapiAddCallback, invoked when the stream reaches them
+    entry void gathered();
+    entry void combined();
+    // Completion of a zerocopy device send; the source slab is live until then
+    entry void sendDone();
+    entry void sendsDrained();
+    // Zerocopy device receive of one expert's outputs for this PE's tokens;
+    // the post entry method that supplies the device buffer is in moe.C
+    entry void receiveOutput(int ref, int e, int n, int len, nocopydevice float buf[len]);
+
+    entry void runStep() {
+      serial { beginStep(); }
+      when gathered() serial { sendTokens(); }
+      for (recv_count = 0; recv_count < n_experts; recv_count++) {
+        when receiveOutput[my_step](int ref, int e, int n, int len, nocopydevice float buf[len])
+          serial { noteOutput(e, n); }
+      }
+      serial { combine(); }
+      when combined() serial { gateDrain(); }
+      when sendsDrained() serial { endStep(); }
+    };
+  };
+
+  // One per expert: the migratable unit. Holds the expert's weights (and
+  // optimizer state) on the device, receives one token slab per dispatcher
+  // per step, runs the chunked forward/backward, and sends each dispatcher its
+  // outputs back.
+  array [1D] Expert {
+    entry Expert();
+    entry void init();
+    entry void initDone();
+    // Load-balancing join point released: continue with this step's compute
+    entry void resumed();
+    entry void computeDone();
+    entry void sendDone();
+    entry void sendsDrained();
+    entry void receiveTokens(int ref, int src, int n, int len, nocopydevice float buf[len]);
+
+    entry void runStep() {
+      serial { beginStep(); }
+      for (recv_count = 0; recv_count < n_disp; recv_count++) {
+        when receiveTokens[my_step](int ref, int src, int n, int len, nocopydevice float buf[len])
+          serial { noteTokens(src, n); }
+      }
+      // Every slab of this step has been consumed and nothing can be sent to
+      // this expert until its outputs go out, so this is the one place where a
+      // migration finds no device receive landed or in flight. AtSync (or the
+      // split AtSyncStart/AtSyncWait under async LB) happens here.
+      serial { lbPoint(); }
+      when resumed() serial { compute(); }
+      when computeDone() serial { sendOutputs(); }
+      when sendsDrained() serial { endStep(); }
+    };
+  };
+};
