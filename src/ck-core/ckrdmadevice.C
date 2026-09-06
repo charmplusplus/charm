@@ -2804,8 +2804,99 @@ static void deviceSendReleaseFn(void* param, void* msg)
   if (rec) rec->noteDeviceSendDone();  // may start a deferred migration
 }
 
+// Only network/fallback sends need a host-side producer completion. Keep the
+// descriptors by value: the generated proxy's CkDeviceBuffers are stack locals.
+// Nothing in this state is sent over the wire.
+struct CkDeviceDeferredSend {
+  std::vector<CkDeviceBuffer> buffers;
+  CkLocRec* owner;
+  Chare* sourceObject;
+  int sourcePe;
+  size_t bytes = 0;
+  size_t descriptorBytes = 0;
+  size_t remaining = 0;
+  void* msg = nullptr;
+  std::function<void()> send;
+
+  explicit CkDeviceDeferredSend(CkLocRec* rec)
+      : owner(rec), sourceObject(rec ? CkActiveObj() : nullptr), sourcePe(CkMyPe()) {}
+};
+
+static void deviceSendProducerReady(void* arg, void*) {
+  auto* pending = static_cast<CkDeviceDeferredSend*>(arg);
+  CkAssert(CkMyPe() == pending->sourcePe);
+  CkAssert(pending->remaining > 0);
+  if (--pending->remaining != 0) return;
+
+  // HAPI invokes this on the issuing PE, not on the CUDA host-function thread.
+  // Registration and metadata publication happen only after every producer.
+  for (auto& buffer : pending->buffers) {
+    buffer.lci_ncpy_buffer =
+        acquireDeviceRegistration(buffer.ptr, buffer.cnt, pending->owner);
+    buffer.sender_prepared = true;
+  }
+
+  // Device descriptors occupy a fixed-width prefix of the marshalled message.
+  // Fill in the registrations without touching scalar/array arguments after it.
+  PUP::sizer size;
+  int numops = pending->buffers.size();
+  size | numops;
+  for (auto& buffer : pending->buffers) size | buffer;
+  if (size.size() != pending->descriptorBytes)
+    CkAbort("Deferred device send changed its descriptor prefix size");
+  PUP::toMem pack(((CkMarshallMsg*)pending->msg)->msgBuf);
+  pack | numops;
+  for (auto& buffer : pending->buffers) pack | buffer;
+
+  // The original entry method has returned. Restore its attribution just for
+  // the send, so LB records an object-to-object edge and the actual device bytes.
+  // The outstanding-send references keep this source object stationary/live.
+  CkLocRec* savedRec = CkpvAccess(_currentLocRec);
+  const size_t savedBytes = _ck_pending_device_send_bytes;
+  CkpvAccess(_currentLocRec) = pending->owner;
+  _ck_pending_device_send_bytes = pending->bytes;
+  if (pending->sourceObject) CkCallstackPush(pending->sourceObject);
+  pending->send();
+  if (pending->sourceObject) CkCallstackPop(pending->sourceObject);
+  _ck_pending_device_send_bytes = savedBytes;
+  CkpvAccess(_currentLocRec) = savedRec;
+  delete pending;
+  // The buffer callbacks, now in the message, release the owner after the
+  // network read completes. Producer readiness must not release those holds.
+}
+
+void CkRdmaDeviceSendWhenReady(CkDeviceDeferredSend* pending, void* msg,
+                              const std::function<void()>& send) {
+  CkAssert(pending != nullptr && !pending->buffers.empty());
+  pending->msg = msg;
+  pending->send = send;
+  PUP::sizer size;
+  int numops = pending->buffers.size();
+  size | numops;
+  for (auto& buffer : pending->buffers) size | buffer;
+  pending->descriptorBytes = size.size();
+  _ck_pending_device_send_bytes = 0;  // do not charge the next unrelated send
+
+  std::vector<hapiStream_t> streams;
+  for (const auto& buffer : pending->buffers) {
+    if (std::find(streams.begin(), streams.end(), buffer.hapi_stream) == streams.end())
+      streams.push_back(buffer.hapi_stream);
+  }
+  pending->remaining = streams.size();
+  const CkCallback cb(deviceSendProducerReady, pending);
+  for (auto stream : streams) hapiAddCallback(stream, cb);
+  // HAPI accounts for these callbacks in quiescence detection. The final one
+  // publishes the ordinary message before its callback work is retired.
+}
+
 // Performs sender-side operations necessary for device zerocopy
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
+  CkRdmaDeviceOnSender(dest_pe, numops, buffers, nullptr);
+}
+
+void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
+                          CkDeviceDeferredSend** pending) {
+  if (pending) *pending = nullptr;
   // dest_pe == -1 means this PE has never confirmed where the target element
   // actually lives (xi-Parameter.C asks the location manager directly for
   // this, rather than substituting a homePe() guess). Don't decide
@@ -3119,21 +3210,36 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       hapiCheck(hapiStreamSynchronize(buffers[i]->hapi_stream));
     }
 #else
+  CkLocRec* sender_rec = CkpvAccess(_currentLocRec);
+  if (pending && numops > 0) *pending = new CkDeviceDeferredSend(sender_rec);
   for (int i = 0; i < numops; i++) {
-    cudaStreamSynchronize(buffers[i]->hapi_stream);
     // This registers the application's own buffer and the receiver reads it over
     // the network, so it stays live well past this call. Count it against the
     // issuing element; emigrate stands down while any are outstanding.
-    CkLocRec* sender_rec = CkpvAccess(_currentLocRec);
     // Same element owns the registration: it is that element's buffer, and its
     // migration is when the buffer dies.
-    buffers[i]->lci_ncpy_buffer =
-        acquireDeviceRegistration(buffers[i]->ptr, buffers[i]->cnt, sender_rec);
-    buffers[i]->sender_prepared = true;
     if (sender_rec) {
       sender_rec->noteDeviceSendPosted();
       buffers[i]->cb = CkCallback(deviceSendReleaseFn,
                                   (void*)new DeviceSendRelease{sender_rec, buffers[i]->cb});
+    }
+    if (pending) {
+      // The proxy marshals an unregistered placeholder. SendWhenReady replaces
+      // it after HAPI completion, before publishing any RDMA metadata.
+      buffers[i]->lci_ncpy_buffer = CmiNcpyBuffer();
+      buffers[i]->lci_ncpy_buffer.deviceRdmaOpInfo = nullptr;
+      memset(buffers[i]->lci_ncpy_buffer.layerInfo, 0,
+             sizeof(buffers[i]->lci_ncpy_buffer.layerInfo));
+      buffers[i]->sender_prepared = false;
+      (*pending)->buffers.push_back(*buffers[i]);
+      (*pending)->bytes += buffers[i]->cnt;
+    } else {
+      // Synchronous entry methods and callers using the original prepare API
+      // have no deferred continuation and retain their blocking contract.
+      hapiCheck(hapiStreamSynchronize(buffers[i]->hapi_stream));
+      buffers[i]->lci_ncpy_buffer =
+          acquireDeviceRegistration(buffers[i]->ptr, buffers[i]->cnt, sender_rec);
+      buffers[i]->sender_prepared = true;
     }
   }
 #endif

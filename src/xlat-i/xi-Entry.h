@@ -287,6 +287,7 @@ class Entry : public Member {
   int isThreaded(void);
   int isSync(void);
   int isIget(void);
+  bool canDeferDeviceSend();
   int isConstructor(void);
   bool isMigrationConstructor();
   int isExclusive(void);

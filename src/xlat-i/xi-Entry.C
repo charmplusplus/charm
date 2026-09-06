@@ -298,6 +298,12 @@ XStr Entry::marshallMsg(void) {
   return ret;
 }
 
+bool Entry::canDeferDeviceSend() {
+  return param->hasDevice() && container->isForElement() &&
+         (container->isArray() || container->isGroup() || container->isNodeGroup()) &&
+         !isConstructor() && !isSync() && !isIget() && !isLocal();
+}
+
 XStr Entry::epStr(bool isForRedn, bool templateCall) {
   XStr str;
   if (isForRedn) str << "redn_wrapper_";
@@ -574,7 +580,9 @@ void Entry::genArrayDefs(XStr& str) {
         inlineCall << "    unsigned int impl_off = UsrToEnv("
                    << param->getName() << ")->getTotalsize();\n";
       } else {
-        param->size(inlineCall); // Puts size of parameters in bytes into impl_off
+        // An inline local call has no outgoing message/continuation to own a
+        // deferred send. Its remote fallback is marshalled separately below.
+        param->size(inlineCall, false);
         inlineCall << "    impl_off += sizeof(envelope);\n";
       }
       inlineCall << "    ckLocalBranch()->recordSend(id, impl_off, CkMyPe());\n";
@@ -652,7 +660,18 @@ void Entry::genArrayDefs(XStr& str) {
       if (isInline()) opts << "+CK_MSG_INLINE";
       if (!isIget()) {
         if (container->isForElement() || container->isForSection()) {
+          if (canDeferDeviceSend()) {
+            // A proxy is often a temporary (array[index]); retain its value,
+            // never its this pointer, across the HAPI continuation.
+            str << "  if (impl_device_send) {\n"
+                   "    const auto impl_proxy = *this;\n"
+                   "    CkRdmaDeviceSendWhenReady(impl_device_send, impl_msg,\n"
+                   "      [impl_proxy, impl_amsg]() { impl_proxy.ckSend(impl_amsg, "
+                << epIdx() << opts << "); });\n"
+                   "  } else {\n";
+          }
           str << "  ckSend(impl_amsg, " << epIdx() << opts << ");\n";
+          if (canDeferDeviceSend()) str << "  }\n";
         } else
           str << "  ckBroadcast(impl_amsg, " << epIdx() << opts << ");\n";
       }
@@ -935,8 +954,19 @@ void Entry::genGroupDefs(XStr& str) {
               << parampg << ");\n";
         }
         str << "  } else {\n";
+        if (canDeferDeviceSend()) {
+          str << "    if (impl_device_send) {\n"
+                 "      const int impl_dest = ckGetGroupPe();\n"
+                 "      const CkGroupID impl_gid = ckGetGroupID();\n"
+                 "      CkRdmaDeviceSendWhenReady(impl_device_send, impl_msg,\n"
+                 "        [impl_msg, impl_dest, impl_gid]() { CkSendMsg"
+              << node << "Branch(" << epIdx()
+              << ", impl_msg, impl_dest, impl_gid" << opts << "); });\n"
+                 "    } else {\n";
+        }
         str << "    CkSendMsg" << node << "Branch"
             << "(" << parampg << opts << ");\n";
+        if (canDeferDeviceSend()) str << "    }\n";
         str << "  }\n";
       } else if (container->isForSection()) {  // Multicast
         str << "  if (ckIsDelegated()) {\n";

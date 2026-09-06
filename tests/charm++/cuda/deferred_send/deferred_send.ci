@@ -1,0 +1,19 @@
+mainmodule deferred_send {
+  readonly CProxy_Main mainProxy;
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry void ready();
+    entry void senderDone();
+    entry void receiverDone();
+    entry void progress();
+    entry void quiescent();
+  };
+  array [1D] Endpoint {
+    entry Endpoint();
+    entry void start();
+    entry void progress();
+    entry void sent();
+    entry void receive(int n, nocopydevice int a[n], nocopydevice int b[n],
+                       nocopydevice int c[n], int ntags, int tags[ntags]);
+  };
+};

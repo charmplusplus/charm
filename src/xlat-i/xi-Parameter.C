@@ -242,7 +242,7 @@ void ParamList::callEach(rdmadevicefn_t f, XStr& str, int& index) {
 
 int ParamList::hasConditional() { return orEach(&Parameter::isConditional); }
 
-void ParamList::size(XStr& str)
+void ParamList::size(XStr& str, bool allowDeferredDeviceSend)
 {
   str << "  int impl_off=0;\n";
   int hasArrays = orEach(&Parameter::isArray);
@@ -298,8 +298,13 @@ void ParamList::size(XStr& str)
       str << "  CkDeviceBuffer* device_buffers[" << entry->numRdmaDeviceParams << "];\n";
       int device_rdma_index = 0;
       callEach(&Parameter::marshallDeviceRdmaParameters, str, device_rdma_index);
+      const bool defer = allowDeferredDeviceSend && entry->canDeferDeviceSend();
+      if (defer)
+        str << "  CkDeviceDeferredSend* impl_device_send = nullptr;\n";
       str << "  CkRdmaDeviceOnSender(dest_pe, impl_num_device_rdma_fields, "
-             "device_buffers);\n";
+             "device_buffers";
+      if (defer) str << ", &impl_device_send";
+      str << ");\n";
     }
     else if (hasDevice())
     {

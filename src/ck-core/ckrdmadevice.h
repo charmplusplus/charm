@@ -6,6 +6,7 @@
 
 #if CMK_CUDA || CMK_HIP
 #include "hapi_portable.h"
+#include <functional>
 
 #define CkNcpyModeDevice CmiNcpyModeDevice
 #define CkDeviceStatus CmiDeviceStatus
@@ -125,6 +126,14 @@ void CkRdmaDeviceRecvHandler(void* data);
 void CkRdmaDeviceRecvHandler(void* data, void* msg);
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);
+// Generated asynchronous proxies use the four-argument prepare followed by
+// SendWhenReady. The latter owns the marshalled message and continuation until
+// all producer streams complete. The three-argument API remains synchronous.
+struct CkDeviceDeferredSend;
+void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
+                          CkDeviceDeferredSend** pending);
+void CkRdmaDeviceSendWhenReady(CkDeviceDeferredSend* pending, void* msg,
+                              const std::function<void()>& send);
 // A device-send message that is leaving this process for another one on the
 // same physical node: re-prepare every memcpy-prepared payload in it as a
 // direct IPC send, in place, so the new home reads it without a correction.
