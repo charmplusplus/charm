@@ -84,12 +84,18 @@ struct DeviceManager {
     comm_buffer->free((void*)(comm_buffer->base_ptr + offset));
   }
 
+  // Both are asked unconditionally by CentralLB::BuildStatsMsg, which runs for
+  // every CentralLB-derived balancer on every stats round. Under +gpupool the
+  // device pool serves communication and load balancing, so hapi_impl.cpp never
+  // calls create_comm_buffer and comm_buffer stays null: without these guards
+  // the query is a call on a null object and every CentralLB balancer segfaults
+  // on its first load-balancing step. Nothing is free because nothing exists.
   size_t get_comm_buffer_free_size() {
-    return comm_buffer->get_free_size();
+    return comm_buffer ? comm_buffer->get_free_size() : 0;
   }
 
   size_t get_lb_buffer_free_size() {
-    return comm_buffer->get_lb_free_size();
+    return comm_buffer ? comm_buffer->get_lb_free_size() : 0;
   }
 
   void destroy_comm_buffer() {

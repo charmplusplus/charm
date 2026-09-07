@@ -5,6 +5,7 @@
 # of the arguments, so every placement must produce the same bits. Stops at
 # the first failure and dumps that run's log tail.
 #   BASE=  the application arguments (default: 64 experts, 2048x8192, 8192 tokens/PE, zipf 1)
+#   BAL=   balancer (DiffusionLB); BALFLAGS= its flags, set empty for a non-diffusion one
 #   LBF=   extra balancer flags (e.g. "+LBDiffusionMaxMoveFrac 1")
 #   NODES= node count (1); TMO= per-run timeout in seconds (300)
 J=$1; REPS=$2; shift 2
@@ -15,7 +16,7 @@ NODES=${NODES:-1}; NT=$((NODES * 4))
 BASE=${BASE:-"-e 64 -m 2048 -h 8192 -t 8192 -i 30 -u 3 -z 1.0 -p 10 -C 5"}
 NOPOOL="+gpushm +gpuipcdirect +gpucommbuffer 256 +gpulbbuffer 1024 +gpuipceventpool 256"
 POOL="+gpushm +gpupool +gpupoolsize 1024 +gpuipceventpool 256"
-LBFLAGS="+balancer DiffusionLB +LBDiffusionCommOn +LBDiffusionGpuDim ${LBF:-}"
+LBFLAGS="+balancer ${BAL:-DiffusionLB} ${BALFLAGS-+LBDiffusionCommOn +LBDiffusionGpuDim} ${LBF:-}"
 REF_OUT=""; REF_W=""
 OUT=$RL/lbcmp_results.txt; : > $OUT
 for r in $(seq 1 $REPS); do for tag in "$@"; do
