@@ -2666,6 +2666,14 @@ void* hapiDevPoolMalloc(size_t size, int dev) {
   return q;
 }
 
+size_t hapiDevPoolFreeBytes() {
+  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  hapiDevPoolReapLocked();   // parked blocks whose reads retired are free again
+  size_t free = 0;
+  for (auto& ar : hapi_devpool_arenas) free += ar.alloc->get_free_size();
+  return free;
+}
+
 void hapiDevPoolFree(void* ptr) {
   if (ptr == NULL) return;
   std::lock_guard<std::mutex> g(hapi_devpool_mutex);

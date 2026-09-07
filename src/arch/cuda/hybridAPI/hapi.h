@@ -384,6 +384,11 @@ void hapiDevPoolEnsureArena(int device, void** base, size_t* extent);
 void hapiDevPoolNoteRead(const void* ptr, hapiStream_t stream);
 // +gpupool: the pool is the runtime's own allocation policy (see gpumanager.h).
 bool hapiDevPoolOn();
+// Bytes the device pool's arenas have free right now. The pool also grows into
+// free device memory on demand, so a planner asking what it may stage should
+// add whatever the device itself still reports free. One device per process on
+// this branch, so this sums every arena the process owns.
+size_t hapiDevPoolFreeBytes();
 
 // The running chare's attributed live device-allocation bytes (see the
 // footprint tracking in hapi_portable.h/hapi_impl.cpp). Valid inside an entry

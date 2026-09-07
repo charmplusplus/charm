@@ -382,7 +382,15 @@ void CentralLB::BuildStatsMsg()
   cudaMemGetInfo(&freeMem, &totalMem);
   msg->gpu_mem_remaining = freeMem;
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-  if(csv_gpu_manager.use_shm) {
+  if (csv_gpu_manager.device_pool_on) {
+    // Under +gpupool the device pool serves the load-balancing staging role,
+    // and it grows into free device memory on demand, so what may be staged is
+    // what its arenas have free plus what the device has left. There is no
+    // comm buffer in this mode, so the query below would report 0 free, and
+    // ContractVerifier then refuses every cross-process move: the strategy
+    // decides a good placement and not one object migrates.
+    msg->pool_buff_mem_remaining = hapiDevPoolFreeBytes() + freeMem;
+  } else if(csv_gpu_manager.use_shm) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
     msg->pool_buff_mem_remaining = dm->get_lb_buffer_free_size();
     // printf("PE %d: GPU %ld free mem: %ld, pool buffer free mem: %ld\n", CkMyPe(), msg->gpu_device_id, msg->gpu_mem_remaining, msg->pool_buff_mem_remaining);

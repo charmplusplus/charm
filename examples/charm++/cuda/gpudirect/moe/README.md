@@ -210,6 +210,26 @@ Before those two changes the same runs were 205 / 216 / 207 and 631 / 623 /
   eight async runs at Llama size as a deficit of exactly 1/64. The outputs
   were never affected: `out2` matched in the failing run.
 
+GreedyRefineCentralGPULB, a centralized greedy re-placement of the kind the
+reference uses, was tried on the same runs. It reaches the same balance as
+DiffusionLB and loses anyway, because it moves four to five times as many
+experts:
+
+| balancer, defaults           | ms/step | experts moved | tokens/PE |
+|------------------------------|--------:|--------------:|-----------|
+| no LB                        |     191 |             0 | 1.67-1.84 |
+| DiffusionLB, sync            | 199-201 |         19-23 | 1.07-1.25 |
+| DiffusionLB, async           | 189-205 |         18-27 | 1.17-1.31 |
+| GreedyRefineCentralGPULB sync| 281-298 |        95-112 | 1.07-1.25 |
+| GreedyRefineCentralGPULB async|    212 |         53-55 | 1.13-1.35 |
+
+`+LBPercentMovesAllowed 25` brings its async case to 209 ms, still behind both.
+At 134 MB of weights per expert the migration traffic costs more than the
+balance buys, which is the same conclusion the move-cap experiment reached from
+the other direction. Two runtime bugs had to be fixed before this could be
+measured at all; see the git log for `+gpupool`'s null comm buffer and the
+memory contract's staging figure.
+
 What the balancer still leaves on the table: between reshuffles DiffusionLB
 holds `tokens/PE max/avg` at 1.20 to 1.33, where a greedy re-placement reaches
 1.01 (see `ref/`). The per-step move cap is a count applied to objects of very
