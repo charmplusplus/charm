@@ -517,6 +517,8 @@ void _loadbalancerInit()
       "DiffusionLB diffuses GPU load across nodes (default: CPU load)");
   CmiGetArgDoubleDesc(argv, "+LBDiffusionMinImbalance", &_lb_args.diffusionMinImbalance(),
                       "DiffusionLB leaves an imbalance below this fraction of the mean alone (default 0.10)");
+  CmiGetArgDoubleDesc(argv, "+LBShedEps", &_lb_args.shedEps(),
+                      "ShedLB: allowed excess over the mean load, as a fraction");
   CmiGetArgDoubleDesc(argv, "+LBDiffusionMaxMoveFrac", &_lb_args.diffusionMaxMoveFrac(),
                       "DiffusionLB moves at most this fraction of a node's objects across nodes per step (default 0.25)");
   CmiGetArgDoubleDesc(argv, "+LBDiffusionRegret", &_lb_args.diffusionRegret(),

@@ -85,8 +85,8 @@ add_dependencies(ckmain ck)
 # CommonLBs used to be a subset of EveryLB, but they were unified as
 # part of the LB refactor. However, maintain both targets for
 # backwards compatibility and for possible future divergence.
-add_library(moduleCommonLBs ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h ../ck-ldb/GreedyCentralLB.C ../ck-ldb/GreedyCentralLB.h ../ck-ldb/GreedyRefineCentralLB.C ../ck-ldb/GreedyRefineCentralLB.h ../ck-ldb/GreedyRefineCentralGPULB.C ../ck-ldb/GreedyRefineCentralGPULB.h)
-add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h ../ck-ldb/GreedyCentralLB.C ../ck-ldb/GreedyCentralLB.h ../ck-ldb/GreedyRefineCentralLB.C ../ck-ldb/GreedyRefineCentralLB.h ../ck-ldb/GreedyRefineCentralGPULB.C ../ck-ldb/GreedyRefineCentralGPULB.h)
+add_library(moduleCommonLBs ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h ../ck-ldb/GreedyCentralLB.C ../ck-ldb/GreedyCentralLB.h ../ck-ldb/GreedyRefineCentralLB.C ../ck-ldb/GreedyRefineCentralLB.h ../ck-ldb/GreedyRefineCentralGPULB.C ../ck-ldb/GreedyRefineCentralGPULB.h ../ck-ldb/ShedLB.C ../ck-ldb/ShedLB.h)
+add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h ../ck-ldb/GreedyCentralLB.C ../ck-ldb/GreedyCentralLB.h ../ck-ldb/GreedyRefineCentralLB.C ../ck-ldb/GreedyRefineCentralLB.h ../ck-ldb/GreedyRefineCentralGPULB.C ../ck-ldb/GreedyRefineCentralGPULB.h ../ck-ldb/ShedLB.C ../ck-ldb/ShedLB.h)
 configure_file(../ck-ldb/libmoduleCommonLBs.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 configure_file(../ck-ldb/libmoduleEveryLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 add_dependencies(moduleCommonLBs ck ckmetis)
@@ -127,6 +127,8 @@ add_library(moduleGreedyRefineCentralLB ../ck-ldb/GreedyRefineCentralLB.C ../ck-
 add_dependencies(moduleGreedyRefineCentralLB ck)
 add_library(moduleGreedyRefineCentralGPULB ../ck-ldb/GreedyRefineCentralGPULB.C ../ck-ldb/GreedyRefineCentralGPULB.h)
 add_dependencies(moduleGreedyRefineCentralGPULB ck)
+add_library(moduleShedLB ../ck-ldb/ShedLB.C ../ck-ldb/ShedLB.h)
+add_dependencies(moduleShedLB ck)
 add_library(moduleScotchLB EXCLUDE_FROM_ALL ../ck-ldb/ScotchLB.C ../ck-ldb/ScotchLB.h)
 configure_file(../ck-ldb/libmoduleScotchLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 add_dependencies(moduleScotchLB ck)

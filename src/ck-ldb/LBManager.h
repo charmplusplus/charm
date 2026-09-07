@@ -55,6 +55,16 @@ class CkLBArgs
   // in one step. _lb_diffRegret is the fraction by which the interval after a
   // step's moves may be slower than the interval before them before the moves
   // are taken back; 0 disables the check.
+  // ShedLB: no bin may exceed (1 + _lb_shedEps) times the mean load. Below
+  // the largest object's share of the mean it cannot be met at all, because
+  // an indivisible object sets a floor on any assignment's maximum.
+  //
+  // The default is not "as tight as possible". A target tighter than the rate
+  // at which load drifts buys precision the next step destroys and pays for it
+  // in migrations: on the moe example at Llama size, 0.02 moved 19 objects for
+  // 549 ms and 0.10 moved 7 for 490 ms, with 0.20 losing the balance again at
+  // 538 ms. Match it to how far load moves between balancing steps.
+  double _lb_shedEps;
   double _lb_diffMinImbalance;
   double _lb_diffMaxMoveFrac;
   double _lb_diffRegret;
@@ -91,6 +101,7 @@ class CkLBArgs
     _lb_diffnumnbors = 1;
     _lb_diffbeta = 1.0;
     _lb_diffgpudim = false;
+    _lb_shedEps = 0.10;
     _lb_diffMinImbalance = 0.10;
     _lb_diffMaxMoveFrac = 0.25;
     _lb_diffRegret = 0.05;
@@ -131,6 +142,7 @@ class CkLBArgs
   inline int& diffusionNumNbors() { return _lb_diffnumnbors; }
   inline double& diffusionBeta() { return _lb_diffbeta; }
   inline bool& diffusionGpuDim() { return _lb_diffgpudim; }
+  inline double& shedEps() { return _lb_shedEps; }
   inline double& diffusionMinImbalance() { return _lb_diffMinImbalance; }
   inline double& diffusionMaxMoveFrac() { return _lb_diffMaxMoveFrac; }
   inline double& diffusionRegret() { return _lb_diffRegret; }
