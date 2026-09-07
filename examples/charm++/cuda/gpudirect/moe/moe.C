@@ -74,6 +74,7 @@ inline hapiError_t mmFree(void* p) {
 /* readonly */ int use_adam;
 /* readonly */ int use_tf32;
 /* readonly */ int use_instrument;
+/* readonly */ double capacity_factor;
 /* readonly */ int fuse_sources;
 /* readonly */ int print_place;
 /* readonly */ double zipf_z;
@@ -112,8 +113,8 @@ static inline int nextLBStep(int s) {
 
 // Per-step figures from one of the two reductions, held until the other
 // reduction of the same step arrives so one line reports both.
-struct DispRec { double out2; double t; };
-struct ExpRec { double tokratio, gpuratio, gmax_ms, expratio, w2; };
+struct DispRec { double out2; double drop; double t; };
+struct ExpRec { double tokratio, gpuratio, gmax_ms, expratio, w2; long sum_tok; };
 
 class Main : public CBase_Main {
   double init_start_time;
@@ -152,12 +153,13 @@ public:
     use_adam = 0;
     use_tf32 = 0;
     use_instrument = 0;
+    capacity_factor = 0.0;
     fuse_sources = 1;
     print_place = 0;
     disp_step = exp_step = done_count = 0;
 
     int c;
-    while ((c = getopt(m->argc, m->argv, "e:m:h:t:k:i:u:z:p:c:r:L:C:s:f:b:l:S:n:aAUTIP")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "e:m:h:t:k:i:u:z:p:c:r:L:C:s:f:b:l:S:n:D:aAUTIP")) != -1) {
       switch (c) {
         case 'e': n_experts = atoi(optarg); break;
         case 'm': d_model = atoi(optarg); break;
@@ -182,6 +184,7 @@ public:
         case 'A': use_adam = 1; break;
         case 'T': use_tf32 = 1; break;
         case 'I': use_instrument = 1; break;
+        case 'D': capacity_factor = atof(optarg); break;
         case 'U': fuse_sources = 0; break;
         case 'P': print_place = 1; break;
         default:
@@ -193,6 +196,11 @@ public:
               "  -c [chunk: tokens per GEMM] -r [capacity headroom, 0 = auto from zipf]\n"
               "  -n [compute lanes per PE: streams experts are spread over]\n"
               "  -L [learning rate] -A (Adam: 3x payload) -T (TF32 GEMMs)\n"
+              "  -D [capacity factor: cap each expert at f x the mean tokens per\n"
+              "      expert and DROP the overflow, the GShard/Switch policy. Bounds\n"
+              "      the imbalance without moving anything; the dropped tokens get a\n"
+              "      zero output, so the checksums differ from every other mode and\n"
+              "      the drop rate is reported.]\n"
               "  -U (one chunked pass per source instead of one per expert: many more\n"
               "      weight updates, ~12%% slower, kept for comparison. Either way the\n"
               "      chunk boundaries follow the routing alone, so the checksums are\n"
@@ -254,6 +262,9 @@ public:
         "slab capacity %d per (PE, expert), %d compute lanes per PE%s\n",
         n_tokens, n_disp, top_k, chunk_tokens, cap_src, n_lanes,
         fuse_sources ? "" : ", one pass per source");
+    if (capacity_factor > 0.0)
+      CkPrintf("Capacity factor: %.2f (GShard/Switch token dropping; no state moves)\n",
+          capacity_factor);
     CkPrintf("Routing: zipf %.2f (hottest expert %.1fx average), hot set "
         "reshuffled every %d steps, seed %ld\n", zipf_z, p_max * n_experts,
         drift_period, moe_seed);
@@ -283,8 +294,9 @@ public:
 
   void stepStatsDisp(CkReductionMsg* msg) {
     const double* outpe = (const double*)msg->getData();
-    double out2 = 0.0;
+    double out2 = 0.0, drop = 0.0;
     for (int p = 0; p < n_disp; p++) out2 += outpe[p];
+    for (int p = 0; p < n_disp; p++) drop += outpe[n_disp + p];
     delete msg;
     disp_step++;
     const double now = CkWallTimer();
@@ -294,6 +306,7 @@ public:
     }
     DispRec r;
     r.out2 = out2;
+    r.drop = drop;
     r.t = now;
     disp_q.push_back(r);
     tryPrint();
@@ -312,8 +325,11 @@ public:
     const double* gpupe = (const double*)results[4].data;
     exp_step++;
 
+    // With a capacity factor the experts legitimately see fewer tokens than
+    // were routed; the pair is checked in tryPrint, where the dispatchers'
+    // drop count for the same step is also in hand.
     const long expect = (long)top_k * n_tokens * n_disp;
-    if (sum_tok != expect)
+    if (capacity_factor == 0.0 && sum_tok != expect)
       CkAbort("Token count not conserved at step %d: experts saw %ld of %ld\n",
           exp_step, sum_tok, expect);
 
@@ -330,6 +346,7 @@ public:
     r.gmax_ms = gmax * 1e3;
     r.expratio = (double)max_tok / ((double)sum_tok / n_experts);
     r.w2 = w2;
+    r.sum_tok = sum_tok;
     exp_q.push_back(r);
     delete msg;
     delete [] results;
@@ -345,22 +362,33 @@ public:
       // The step both records describe: as many as have been popped so far.
       static int step = 0;
       step++;
+      // Conservation, now that both halves of the step are in hand: every
+      // routed slot was either seen by an expert or dropped for capacity.
+      const long routed = (long)top_k * n_tokens * n_disp;
+      if (e.sum_tok + (long)llround(d.drop) != routed)
+        CkAbort("Step %d: %ld tokens seen + %ld dropped != %ld routed\n",
+            step, e.sum_tok, (long)llround(d.drop), routed);
       if (stats_freq > 0 && step > warmup_steps &&
           (step - warmup_steps) % stats_freq == 0) {
         const double ms = (d.t - window_start_time) / stats_freq * 1e3;
         window_start_time = d.t;
+        char dropbuf[64];
+        dropbuf[0] = '\0';
+        if (capacity_factor > 0.0)
+          snprintf(dropbuf, sizeof(dropbuf), ", dropped %.2lf%%",
+              100.0 * d.drop / ((double)top_k * n_tokens * n_disp));
         // %.15e on the checksums: a placement-to-placement comparison needs
         // every digit.
         if (checksum_freq > 0 && step % checksum_freq == 0)
           CkPrintf("Step %d: %.3lf ms/step, tokens/PE max/avg %.2lf, "
-              "gpu/PE max %.1lf ms max/avg %.2lf (prev), expert max/avg %.2lf, "
+              "gpu/PE max %.1lf ms max/avg %.2lf (prev), expert max/avg %.2lf%s, "
               "out2 %.15e, w2 %.15e\n", step, ms, e.tokratio, e.gmax_ms,
-              e.gpuratio, e.expratio, d.out2, e.w2);
+              e.gpuratio, e.expratio, dropbuf, d.out2, e.w2);
         else
           CkPrintf("Step %d: %.3lf ms/step, tokens/PE max/avg %.2lf, "
               "gpu/PE max %.1lf ms max/avg %.2lf (prev), expert max/avg "
-              "%.2lf\n", step, ms, e.tokratio, e.gmax_ms, e.gpuratio,
-              e.expratio);
+              "%.2lf%s\n", step, ms, e.tokratio, e.gmax_ms, e.gpuratio,
+              e.expratio, dropbuf);
       }
     }
   }
@@ -395,11 +423,13 @@ class Dispatcher : public CBase_Dispatcher {
   std::vector<int> counts;      // tokens per expert, this step
   std::vector<int> offs;        // slab offsets per expert (n_experts + 1)
   std::vector<int> fill_;
-  std::vector<int> slot_expert; // expert chosen for each (token, j)
+  std::vector<int> slot_expert;
+  // expert chosen for each (token, j)
+  long dropped;   // tokens the capacity factor refused this step
 
   float* d_x;         // [n_tokens x d_model], fixed for the run
   float* d_send;      // [(n_tokens*k + 1) x d_model], tokens sorted by expert
-  float* d_recv;      // same layout, expert outputs; +1 row of slack for n = 0
+  float* d_recv;      // same layout, expert outputs; +2 rows, see allocate()
   float* d_y;         // [n_tokens x d_model], combined outputs
   int* d_send_idx;    // token for each slot of d_send
   int* d_recv_pos;    // slot of d_recv for each (token, j)
@@ -466,7 +496,11 @@ class Dispatcher : public CBase_Dispatcher {
     const size_t TK = slots();
     hapiCheck(mmMalloc((void**)&d_x, sizeof(float) * n_tokens * d_model));
     hapiCheck(mmMalloc((void**)&d_send, sizeof(float) * (TK + 1) * d_model));
-    hapiCheck(mmMalloc((void**)&d_recv, sizeof(float) * (TK + 1) * d_model));
+    // TK+2 rows: [TK] absorbs the one-row dummy a zero-token expert sends,
+    // [TK+1] is held at zero for tokens dropped by the capacity factor.
+    hapiCheck(mmMalloc((void**)&d_recv, sizeof(float) * (TK + 2) * d_model));
+    hapiCheck(cudaMemset(d_recv + (TK + 1) * d_model, 0,
+        sizeof(float) * d_model));
     hapiCheck(mmMalloc((void**)&d_y, sizeof(float) * n_tokens * d_model));
     hapiCheck(mmMalloc((void**)&d_send_idx, sizeof(int) * TK));
     hapiCheck(mmMalloc((void**)&d_recv_pos, sizeof(int) * TK));
@@ -548,6 +582,21 @@ class Dispatcher : public CBase_Dispatcher {
         counts[e]++;
       }
     }
+    // Capacity factor (-D), the GShard/Switch policy: an expert accepts at
+    // most cap tokens from this dispatcher and the rest are dropped, which
+    // bounds the imbalance without moving any state. Dropped tokens keep their
+    // routing but take no slab slot; the combine reads them from a row held at
+    // zero, so their contribution to the layer output is nothing. Tokens are
+    // admitted in token order, so which ones are dropped is still a pure
+    // function of the routing and independent of placement.
+    dropped = 0;
+    if (capacity_factor > 0.0) {
+      const int cap = std::max(1, (int)ceil(capacity_factor * (double)K *
+                                            (double)T / (double)E));
+      for (int e = 0; e < E; e++) {
+        if (counts[e] > cap) { dropped += counts[e] - cap; counts[e] = cap; }
+      }
+    }
     offs[0] = 0;
     for (int e = 0; e < E; e++) {
       offs[e + 1] = offs[e] + counts[e];
@@ -558,8 +607,10 @@ class Dispatcher : public CBase_Dispatcher {
     }
     std::fill(fill_.begin(), fill_.end(), 0);
     const size_t TK = slots();
+    const int zero_row = (int)TK + 1;   // d_recv row kept at zero; TK is the n=0 slack
     for (size_t i = 0; i < TK; i++) {
       const int e = slot_expert[i];
+      if (fill_[e] >= counts[e]) { h_recv_pos[i] = zero_row; continue; }
       const int pos = offs[e] + fill_[e]++;
       h_send_idx[pos] = (int)(i / K);
       h_recv_pos[i] = pos;
@@ -667,9 +718,12 @@ class Dispatcher : public CBase_Dispatcher {
     // combines contributions in, so the checksum is the same bits on every
     // run. Main adds the slots in PE order. (A plain sum_double of the values
     // differed in the last digit from run to run, with zero migrations.)
-    std::vector<double> outpe(n_disp, 0.0);
+    // [0, n_disp) the checksum slots, [n_disp, 2*n_disp) the tokens this PE's
+    // capacity factor dropped: one slot each, so both are order-independent.
+    std::vector<double> outpe(2 * n_disp, 0.0);
     outpe[CkMyPe()] = chk_due ? *h_chk : 0.0;
-    contribute(sizeof(double) * n_disp, outpe.data(), CkReduction::sum_double,
+    outpe[n_disp + CkMyPe()] = (double)dropped;
+    contribute(sizeof(double) * 2 * n_disp, outpe.data(), CkReduction::sum_double,
         CkCallback(CkIndex_Main::stepStatsDisp(NULL), main_proxy));
     if (my_step < warmup_steps + n_steps) {
       thisProxy[CkMyPe()].runStep();

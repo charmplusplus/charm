@@ -25,6 +25,7 @@ mainmodule moe {
   readonly int use_adam;
   readonly int use_tf32;
   readonly int use_instrument;
+  readonly double capacity_factor;
   readonly int fuse_sources;
   readonly int print_place;
   readonly double zipf_z;
