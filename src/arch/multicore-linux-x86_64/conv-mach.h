@@ -59,10 +59,17 @@
 
 #define CMK_LBDB_ON					   1
 
-/* Broadcast post-migration location updates so every PE's location cache
- * has the destination PE for a migrated ID. Required for GPU-aware LB
- * paths that consult dest_pe on the sender (see ckrdmadevice.C). */
-#define CMK_GLOBAL_LOCATION_UPDATE     1
+/* Broadcast post-migration location updates so every PE's location cache has
+ * the destination PE for a migrated ID. Off: the device send path no longer
+ * needs it. The decision that has to be right -- may the receiver read the
+ * sender's device pointer directly -- comes from the process-wide resident
+ * table (CkLocMgr, "cannot be stale about residency"), not from the per-PE
+ * location cache. A stale cache can now only cost a forward, and forward-time
+ * repair re-prepares the payload in place (ckrdmadevice.C, "Forward-time
+ * repair of a memcpy-prepared payload") instead of taking a correction round
+ * trip. Keeping it on also puts array-element LB ids in a different key space
+ * from the one CkArray::recordSend builds destinations in. */
+#define CMK_GLOBAL_LOCATION_UPDATE     0
 
 /*#define CMK_PCQUEUE_LOCK                                   1 */
 /*Replaced by CMK_NOT_USE_TLS_THREAD for the default case*/

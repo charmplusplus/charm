@@ -28,9 +28,11 @@ public:
   void ResumeClients(int balancing);
   // Migrated-element callback
   void Migrated(int waitBarrier);
-#if CMK_GLOBAL_LOCATION_UPDATE
+  // Declared unconditionally: DistBaseLB.ci declares the entry method with no
+  // guard, so the generated .def.h references it whatever
+  // CMK_GLOBAL_LOCATION_UPDATE is set to. With the flag off nothing sends it
+  // and the body just frees the message.
   void ReceiveLocationUpdate(LBMigrateMsg* msg);
-#endif
 
   struct LDStats {  // Passed to Strategy
     int from_pe;

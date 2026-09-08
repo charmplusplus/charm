@@ -334,7 +334,17 @@ void DistBaseLB::BroadcastSingleLocationUpdate(const LDObjHandle& h, int to_pe) 
   thisProxy.ReceiveLocationUpdate(msg);
 }
 
+#endif  // CMK_GLOBAL_LOCATION_UPDATE -- the broadcasters above are guarded, the
+        // receiving entry method below is not (DistBaseLB.ci declares it
+        // unconditionally, so the generated .def.h always needs a definition).
+
 void DistBaseLB::ReceiveLocationUpdate(LBMigrateMsg* msg) {
+#if !CMK_GLOBAL_LOCATION_UPDATE
+  // Nothing broadcasts these when the flag is off; the per-PE location cache is
+  // allowed to be stale and a forward is repaired in place instead.
+  delete msg;
+  return;
+#else
   const int me = CkMyPe();
   for (int i = 0; i < msg->n_moves; i++) {
     MigrateInfo& move = msg->moves[i];
@@ -343,8 +353,8 @@ void DistBaseLB::ReceiveLocationUpdate(LBMigrateMsg* msg) {
     }
   }
   delete msg;
-}
 #endif
+}
 
 void DistBaseLB::MigrationDone(int balancing) {
 #if CMK_LBDB_ON

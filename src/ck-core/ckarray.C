@@ -1930,7 +1930,17 @@ void CkArray::recordSend(const CmiUInt8 id, const unsigned int bytes, int pe, co
     // LB deals in IDs with collection information only when CMK_GLOBAL_LOCATION_UPDATE
     // is enabled, so add the group information if so.
 #  if CMK_GLOBAL_LOCATION_UPDATE
-    const CmiUInt8 lbObjId = ck::ObjID(thisgroup, id).getID();
+    // The collection folded in here has to be the one CkLocRec registers the
+    // element with -- mgr->getGroupID(), the location manager's -- not this
+    // array's own group. They are different groups, so with
+    // CMK_GLOBAL_LOCATION_UPDATE on, every destination key built from
+    // thisgroup missed objData and removeCommDataOfDeletedObjs discarded the
+    // record. The sender key comes from the registered LDObjHandle and
+    // resolved fine, so the effect was that 100% of object-to-object
+    // communication was dropped and every comm-aware balancer (MetisLB and
+    // the other ckgraph strategies, DiffusionLB's comm dimension) saw an
+    // empty neighbour graph.
+    const CmiUInt8 lbObjId = ck::ObjID(locMgr->getGroupID(), id).getID();
 #  else
     const CmiUInt8 lbObjId = id;
 #  endif
