@@ -24,6 +24,11 @@ virtual functions are defined here.
 #include "ckhashtable.h"
 
 #include "conv-rdma.h"
+
+#if CMK_CUDA
+// For the device-to-device copies behind PUPMode::DEVICE.
+#include "hapi.h"
+#endif
 #if defined(_WIN32)
 #include <io.h>
 
@@ -162,9 +167,47 @@ void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t)
 	((pupCheckRec *)buf)->check(t,n);
 	buf+=sizeof(pupCheckRec);
 #endif
-	n*=itemSize; 
-	memcpy(p,(const void *)buf,n); 
+	n*=itemSize;
+	memcpy(p,(const void *)buf,n);
 	buf+=n;
+}
+
+/*Device-mode PUP::er's.
+ *
+ * The sender's device region layout is never described on the wire: the
+ * receiver reconstructs it by making the same sequence of pup calls, so the
+ * sizer, the packer and the unpacker must agree exactly on where each buffer
+ * starts. DEVICE_PUP_ALIGN is that agreement.
+ *
+ * A walker with no device region (gpuOrigBuf == NULL) drops DEVICE buffers,
+ * matching the base er::bytes default. A chare with device state pupped this
+ * way therefore migrates its device data but does not checkpoint it.
+ */
+void PUP::sizer::bytes_device(void *p,size_t n,size_t itemSize,dataType t)
+{
+	gpuBytes = alignDeviceOffset(gpuBytes) + n*itemSize;
+}
+
+void PUP::toMem::bytes_device(void *p,size_t n,size_t itemSize,dataType t)
+{
+	if (gpuOrigBuf == nullptr) return;
+	n*=itemSize;
+#if CMK_CUDA
+	gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
+	hapiCheck(cudaMemcpy((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice));
+	gpuBuf += n;
+#endif
+}
+
+void PUP::fromMem::bytes_device(void *p,size_t n,size_t itemSize,dataType t)
+{
+	if (gpuOrigBuf == nullptr) return;
+	n*=itemSize;
+#if CMK_CUDA
+	gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
+	hapiCheck(cudaMemcpy(p, (const void *)gpuBuf, n, cudaMemcpyDeviceToDevice));
+	gpuBuf += n;
+#endif
 }
 
 void PUP::sizer::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t) {

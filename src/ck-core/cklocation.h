@@ -92,13 +92,15 @@ class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessag
 {
 public:
   CkArrayElementMigrateMessage(CkArrayIndex idx_, CmiUInt8 id_, bool ignoreArrival_,
-                               int length_, int nManagers_, int epoch_)
+                               int length_, int nManagers_, int epoch_,
+                               bool hasGPUMsg_ = false)
       : idx(idx_),
         id(id_),
         ignoreArrival(ignoreArrival_),
         length(length_),
         nManagers(nManagers_),
-        epoch(epoch_)
+        epoch(epoch_),
+        hasGPUMsg(hasGPUMsg_)
   {
   }
 
@@ -108,6 +110,10 @@ public:
   int length;          // Size in bytes of the packed data
   int nManagers;       // Number of associated array managers
   int epoch;
+  // Whether a device payload travels alongside this message, on its own
+  // device-zerocopy send. The two arrive independently and in either order;
+  // whichever gets there first is buffered until the other lands.
+  bool hasGPUMsg;
   char* packData;
 };
 
@@ -219,6 +225,24 @@ CkpvExtern(int, CkSaveRestorePrefetch);
 #endif
 
 #include "ckmigratable.h"
+
+#if CMK_CUDA
+/// A device migration payload staged on the source, waiting for the
+/// destination to read it. The buffer is a copy of the element's device state,
+/// not the state itself, so the element can be destroyed as soon as the pack
+/// finishes; only this buffer has to outlive the transfer.
+class GPUMigrateData
+{
+public:
+  int toPe;
+  size_t size;
+  void* data;
+
+  GPUMigrateData() : toPe(-1), size(0), data(nullptr) {}
+  GPUMigrateData(int toPe_, size_t size_, void* data_)
+      : toPe(toPe_), size(size_), data(data_) {}
+};
+#endif
 
 /********************** CkLocMgr ********************/
 /// A tiny class for detecting heap corruption
@@ -417,6 +441,29 @@ private:
 
   // Immigration messages which are waiting for all array managers to be ready
   std::list<CkArrayElementMigrateMessage*> pendingImmigrate;
+
+#if CMK_CUDA
+  // A migration with device state travels as two independent sends: the host
+  // message through immigrate(), and the device payload through immigrateGPU()
+  // on the device-zerocopy path. Neither ordering is guaranteed, so whichever
+  // arrives first waits here for the other.
+  //
+  // Source side: staged device payloads awaiting the destination's ack.
+  std::unordered_map<CmiUInt8, GPUMigrateData> sendGPUBuffers;
+  // Destination side: a host message that arrived before its device payload,
+  // and a device payload that arrived before its host message.
+  std::unordered_map<CmiUInt8, CkArrayElementMigrateMessage*> bufferedHostMigrateMsgs;
+  // Landing buffers handed to the transport, before and after it has written
+  // them. Only an entry in the second means the device state is readable.
+  std::unordered_map<CmiUInt8, void*> postedDeviceBuffers;
+  std::unordered_map<CmiUInt8, void*> receivedDeviceMsgs;
+  // Source PE of a landed device payload, so the ack can be addressed once
+  // the unpack has consumed it.
+  std::unordered_map<CmiUInt8, int> receivedDeviceSrcPe;
+
+  // Unpack a migration whose host message and device payload are both present.
+  void immigrateWithDevice(CkArrayElementMigrateMessage* msg);
+#endif
 
   // The mapping of index to ID is either done via compression or an explicit map,
   // depending on if the bounds of this array are compressible into a 64bit ID.
@@ -691,6 +738,19 @@ public:
 
   // Communication:
   void immigrate(CkArrayElementMigrateMessage* msg);
+#if CMK_CUDA
+  // Send a staged device payload to its destination. Runs as its own entry
+  // method rather than inline in emigrate so the send is attributed to the
+  // runtime and not to whichever element last ran on this PE.
+  void sendGPUMsg(CmiUInt8 id);
+  // Device-zerocopy receive: the post variant supplies the landing buffer,
+  // the second runs once the transfer has landed.
+  void immigrateGPU(CmiUInt8& id, int& size, char*& data, int& srcPe,
+                    CkDeviceBufferPost* post);
+  void immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe);
+  // Destination's ack: the staged payload has been read and can be released.
+  void finishGPUSend(CmiUInt8 id);
+#endif
   void requestLocation(CmiUInt8 id);
   void requestLocation(const CkArrayIndex& idx);
   bool requestLocation(const CkArrayIndex& idx, int peToTell);

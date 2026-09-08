@@ -11,6 +11,12 @@
 #include "TopoManager.h"
 #include "charm++.h"
 #include "ck.h"
+#if CMK_CUDA
+// For the staged device migration payload: hapiMalloc/hapiFree hold it, and
+// CkDeviceBuffer hands it to the device zerocopy layer.
+#include "hapi.h"
+#include "ckrdmadevice.h"
+#endif
 #include "cksyncbarrier.h"
 #include "hilbert.h"
 #include "partitioning_strategies.h"
@@ -1951,6 +1957,12 @@ void CkMigratable::AtSync(int waitForMigration)
     this->virtual_pup(ps);
     if (_lb_psizer_on)
       setPupSize(ps.size());
+#if CMK_CUDA
+    // Device bytes are reported separately and exactly: a balancer weighing a
+    // migration against free device memory needs the real figure, and pupSize
+    // is an encoded approximation tuned for host state.
+    setGPUPupSize(ps.gpu_size());
+#endif
     if (_lb_args.metaLbOn())
       myRec->getMetaBalancer()->SetCharePupSize(ps.size());
   }
@@ -2048,6 +2060,13 @@ void CkMigratable::ResumeFromSyncHelper()
 void CkMigratable::setMigratable(int migratable) { myRec->setMigratable(migratable); }
 
 void CkMigratable::setPupSize(size_t obj_pup_size) { myRec->setPupSize(obj_pup_size); }
+
+void CkMigratable::setGPUPupSize(size_t obj_gpu_pup_size)
+{
+#if CMK_CUDA
+  myRec->setGPUPupSize(obj_gpu_pup_size);
+#endif
+}
 
 void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg)
 {
@@ -2298,6 +2317,13 @@ void CkLocRec::setMigratable(int migratable)
 void CkLocRec::setPupSize(size_t obj_pup_size)
 {
   lbmgr->setPupSize(ldHandle, obj_pup_size);
+}
+
+void CkLocRec::setGPUPupSize(size_t obj_gpu_pup_size)
+{
+#if CMK_CUDA
+  lbmgr->setGPUPupSize(ldHandle, obj_gpu_pup_size);
+#endif
 }
 
 #endif
@@ -3003,16 +3029,36 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   // First pass: find size of migration message
   size_t bufSize;
+  size_t gpuBufSize = 0;
   {
     PUP::sizer p(PUP::er::IS_MIGRATION);
     pupElementsFor(p, rec, CkElementCreation_migrate);
     bufSize = p.size();
+#if CMK_CUDA
+    gpuBufSize = p.gpu_size();
+#endif
   }
 #if CMK_ERROR_CHECKING
   if (bufSize > std::numeric_limits<int>::max())
   {
     CkAbort("Cannot migrate an object with size greater than %d bytes!\n",
             std::numeric_limits<int>::max());
+  }
+#endif
+
+  void* gpuMsg = nullptr;
+#if CMK_CUDA
+  if (gpuBufSize > 0)
+  {
+    if (gpuBufSize > (size_t)std::numeric_limits<int>::max())
+      CkAbort("Cannot migrate an object with more than %d bytes of device "
+              "state!\n", std::numeric_limits<int>::max());
+    // A staging copy, deliberately: with the element's device state copied
+    // out, the element can be destroyed as soon as the pack below finishes,
+    // and only this buffer has to survive until the destination has read it.
+    // Handing the destination the element's own buffers instead would mean
+    // keeping the element alive across the transfer.
+    hapiCheck(hapiMalloc(&gpuMsg, gpuBufSize));
   }
 #endif
 
@@ -3025,10 +3071,11 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
                                                     false,
 #endif
                                                     bufSize, managers.size(),
-                                                    cache->getEpoch(id) + 1);
+                                                    cache->getEpoch(id) + 1,
+                                                    gpuBufSize > 0);
 
   {
-    PUP::toMem p(msg->packData, PUP::er::IS_MIGRATION);
+    PUP::toMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
     p.becomeDeleting();
     pupElementsFor(p, rec, CkElementCreation_migrate);
     if (p.size() != bufSize)
@@ -3039,11 +3086,35 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
           bufSize, p.size());
       CkAbort("Array element's pup routine has a direction mismatch.\n");
     }
+#if CMK_CUDA
+    if (p.gpu_size() != gpuBufSize)
+    {
+      CkError(
+          "ERROR! Array element claimed it was %zu device bytes to a "
+          "sizing PUP::er, but copied %zu device bytes into the packing "
+          "PUP::er!\n",
+          gpuBufSize, p.gpu_size());
+      CkAbort("Array element's pup routine has a device direction mismatch.\n");
+    }
+#endif
   }
 
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
 
   thisProxy[toPe].immigrate(msg);
+
+#if CMK_CUDA
+  if (gpuBufSize > 0)
+  {
+    // Dispatch the device payload from a fresh entry method rather than
+    // sending it here: the element this migration is tearing down is still
+    // the running one at this point, and the payload belongs to the runtime
+    // rather than to it. sendGPUMsg runs once this call has returned and the
+    // element is gone.
+    sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg);
+    thisProxy[CkMyPe()].sendGPUMsg(id);
+  }
+#endif
 
   duringMigration = true;
   for (auto itr = managers.begin(); itr != managers.end(); ++itr)
@@ -3084,8 +3155,6 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 {
   const CkArrayIndex& idx = msg->idx;
 
-  PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
-
   if (msg->nManagers < managers.size())
     CkAbort("Array element arrived from location with fewer managers!\n");
   if (msg->nManagers > managers.size())
@@ -3096,6 +3165,40 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
     pendingImmigrate.push_back(msg);
     return;
   }
+
+#if CMK_CUDA
+  // The device payload is a separate send and may not be here yet. Hold the
+  // host message until it lands; immigrateGPU resumes from the other side.
+  if (msg->hasGPUMsg && receivedDeviceMsgs.find(msg->id) == receivedDeviceMsgs.end())
+  {
+    bufferedHostMigrateMsgs[msg->id] = msg;
+    return;
+  }
+  immigrateWithDevice(msg);
+}
+
+/// Both halves of the migration are in hand: unpack the element, reading its
+/// device state out of the landed payload.
+void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
+{
+  const CkArrayIndex& idx = msg->idx;
+  void* gpuData = nullptr;
+  int gpuSrcPe = -1;
+  if (msg->hasGPUMsg)
+  {
+    auto it = receivedDeviceMsgs.find(msg->id);
+    CmiAssert(it != receivedDeviceMsgs.end());
+    gpuData = it->second;
+    receivedDeviceMsgs.erase(it);
+    auto pe = receivedDeviceSrcPe.find(msg->id);
+    CmiAssert(pe != receivedDeviceSrcPe.end());
+    gpuSrcPe = pe->second;
+    receivedDeviceSrcPe.erase(pe);
+  }
+  PUP::fromMem p(msg->packData, gpuData, PUP::er::IS_MIGRATION);
+#else
+  PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
+#endif
 
   insertID(idx, msg->id);
 
@@ -3128,6 +3231,17 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
     CkAbort("Array element's pup routine has a direction mismatch.\n");
   }
 
+#if CMK_CUDA
+  if (msg->hasGPUMsg)
+  {
+    // The element's own device buffers now hold copies of everything in the
+    // landed payload, so the landing buffer is finished with, and so is the
+    // source's staged copy.
+    hapiCheck(hapiFree(gpuData));
+    thisProxy[gpuSrcPe].finishGPUSend(msg->id);
+  }
+#endif
+
   if (!zcRgetsActive)
   {
     // Let all the elements know we've arrived
@@ -3136,6 +3250,69 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 
   delete msg;
 }
+
+#if CMK_CUDA
+void CkLocMgr::sendGPUMsg(CmiUInt8 id)
+{
+  auto it = sendGPUBuffers.find(id);
+  CmiAssert(it != sendGPUBuffers.end());
+  const GPUMigrateData& gpuData = it->second;
+
+  thisProxy[gpuData.toPe].immigrateGPU(id, (int)gpuData.size,
+                                       CkDeviceBuffer(gpuData.data), CkMyPe());
+  // The entry stays until finishGPUSend: the transport may still be reading
+  // the staged block, and only the destination knows when it has stopped.
+}
+
+/// Post variant: supply the device buffer the payload should land in. The
+/// transport writes into it and then runs the delivery variant below.
+///
+/// The buffer is recorded here under the element's id rather than recovered
+/// from the delivery variant's `data` argument: for a non-SDAG entry method
+/// the generated dispatch passes the posted pointer only on the zerocopy leg,
+/// and the delivery leg -- the one that runs once the transfer has landed --
+/// sees a null. Keying off the id is also what an application would do, since
+/// it is the one that knows where it posted.
+void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char*& data, int& srcPe,
+                            CkDeviceBufferPost* post)
+{
+  void* landing = nullptr;
+  hapiCheck(hapiMalloc(&landing, (size_t)size));
+  data = (char*)landing;
+  postedDeviceBuffers[id] = landing;
+}
+
+void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe)
+{
+  // Only now has the transfer landed. The buffer moves from posted to
+  // received here and not in the post method above, because immigrate() reads
+  // receivedDeviceMsgs to decide whether the device half is ready -- seeing a
+  // merely posted buffer there would let it unpack from memory the transport
+  // has not written yet.
+  auto posted = postedDeviceBuffers.find(id);
+  CmiAssert(posted != postedDeviceBuffers.end());
+  receivedDeviceMsgs[id] = posted->second;
+  postedDeviceBuffers.erase(posted);
+  receivedDeviceSrcPe[id] = srcPe;
+
+  // If the host message beat us here it is parked; this was the missing half.
+  auto host = bufferedHostMigrateMsgs.find(id);
+  if (host != bufferedHostMigrateMsgs.end())
+  {
+    CkArrayElementMigrateMessage* msg = host->second;
+    bufferedHostMigrateMsgs.erase(host);
+    immigrateWithDevice(msg);
+  }
+}
+
+void CkLocMgr::finishGPUSend(CmiUInt8 id)
+{
+  auto it = sendGPUBuffers.find(id);
+  CmiAssert(it != sendGPUBuffers.end());
+  hapiCheck(hapiFree(it->second.data));
+  sendGPUBuffers.erase(it);
+}
+#endif
 
 void CkLocMgr::restore(const CkArrayIndex& idx, CmiUInt8 id, PUP::er& p)
 {
