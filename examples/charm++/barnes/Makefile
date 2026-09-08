@@ -54,7 +54,7 @@ SRC = Main.cpp DataManager.cpp TreePiece.cpp \
       State.cpp GpuBatch.cpp particleGenerator.cpp gen_util.cpp plummer.cpp
 
 TARGET = barnes
-all: $(TARGET) gen plummer
+all: $(TARGET) gen plummer galaxy
 
 $(TARGET): $(OBJECTS) Makefile.dep
 	$(CHARMC) -o $(TARGET) $(LDFLAGS) $(OBJECTS)
@@ -84,6 +84,12 @@ gen_util.o: gen_util.cpp
 
 plummer: plummer.o gen_util.o
 	g++ -I$(STRUCTURES_PATH) -o plummer plummer.o gen_util.o
+
+# The colliding-galaxy generator. Standalone: it includes common.h for the file
+# format and nothing else, and c++17 is for the Bessel functions the disk's
+# rotation curve needs.
+galaxy: galaxy.cpp common.h
+	g++ -O2 -std=c++17 -I. -o galaxy galaxy.cpp
 
 %.decl.h %.def.h : %.ci
 	$(CHARMC) $(APP_FLAGS) -E $<

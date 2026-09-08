@@ -126,7 +126,7 @@ Compute::Compute(CkMigrateMessage *msg): CBase_Compute(msg) {
 // and the move itself happens at the park, which is a step boundary with the
 // force sends already drained.
 void Compute::lbBegin() {
-  AtSyncSample();
+  // AtSyncSample() removed: MetaBalancer hook, no-op without it.
   lbStartStep = stepCount;
   lbWaitPending = 1;
   lbBlocked = (AtSyncStart() == CkMigratable::AtSyncStatus::Blocked) ? 1 : 0;

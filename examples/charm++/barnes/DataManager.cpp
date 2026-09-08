@@ -547,6 +547,27 @@ void DataManager::recvTreePieceMap(CkReductionMsg *msg){
   memcpy(tpToPe.getVec(), msg->getData(), sizeof(int)*n);
   delete msg;
 
+  // BARNES_TP_MAP: the placement, run-length encoded along the SFC ordering.
+  // Tree pieces are numbered in key order, so a run is a contiguous stretch of
+  // the curve held by one PE. A partition with one run per PE has tight
+  // bounding boxes and a small locally essential tree; one that has been cut
+  // into many runs per PE has PEs whose boxes overlap everyone else's, and
+  // sendLets has nothing left to prune against. Balancing device time alone
+  // does not preserve that structure, so this is what has to be watched
+  // alongside the load.
+  if(CkMyPe() == 0 && getenv("BARNES_TP_MAP") != NULL){
+    std::ostringstream oss;
+    int runs = 0;
+    for(int i = 0; i < n; ){
+      int j = i;
+      while(j+1 < n && tpToPe[j+1] == tpToPe[i]) j++;
+      runs++;
+      if(runs <= 96) oss << " " << tpToPe[i] << ":" << i << "-" << j;
+      i = j+1;
+    }
+    CkPrintf("[TPMAP] it %d runs %d |%s\n", iteration, runs, oss.str().c_str());
+  }
+
   sendParticleBlocks();
 
   if(CkMyPe() == 0){

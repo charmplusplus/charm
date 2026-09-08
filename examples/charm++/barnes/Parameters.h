@@ -42,6 +42,27 @@ struct Parameters {
   // decomposes while the strategy runs and elements move, and it waits for the
   // step only where it needs the elements to be still.
   int asyncLb;
+  // Iterations between the two halves of the split barrier. The element joins
+  // the step, keeps iterating for this many iterations, and only then parks in
+  // AtSyncWait(). What that buys is the strategy: DiffusionLB's rounds run
+  // while the application works, instead of inside one decomposition's worth
+  // of slack.
+  //
+  // It does NOT buy migration overlap, and that is a property of this
+  // application rather than of the runtime. Under +LBAsync an element is
+  // normally movable at any entry-method boundary it has declared safe --
+  // leanmd's Computes carry no ReadyMigrate at all and are moved whenever the
+  // strategy decides. A tree piece cannot be, because the decomposition binds
+  // it to its PE's DataManager for a whole iteration: publishTreePieceMap()
+  // reduces the tree-piece-to-PE map once per iteration, every sender
+  // addresses its particle blocks by it, and assembleReceivedBlocks() then
+  // attributes what arrives through a raw local TreePiece*. An element that
+  // moves after the map is published has its particles delivered to a PE that
+  // no longer hosts it, where descr.owner is null. So the safe-to-pack window
+  // stays closed across the lag and the moves happen at the park. Opening it
+  // mid-lag needs the blocks to follow the element -- forwarding plus new
+  // termination detection -- which is a decomposition change, not a flag.
+  int lbLag;
   // How many iterations before a balancing iteration the measurement window
   // opens. Instrumentation is off outside it, so the strategy reads a short,
   // recent window: measured entirely after the previous step's migrations
@@ -100,6 +121,7 @@ struct Parameters {
     p | firstLbIteration;
     p | lbPeriod;
     p | asyncLb;
+    p | lbLag;
     p | lbWindow;
     p | decompLevels;
     p | deviceWalk;

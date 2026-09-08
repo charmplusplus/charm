@@ -398,6 +398,17 @@ size_t hapiCurrentObjectFootprint();
 #ifdef CMK_LBDB_ON
 void hapiCuptiInit();
 void hapiCuptiFinalize();
+// Forward declaration so this header compiles standalone: an application that
+// includes hapi.h directly (pic2d does) has not necessarily seen the load
+// balancer headers.
+struct LDObjHandle;
+
+// Close/reopen ONE object's measurement window. Called when an element joins a
+// load balancing step and when it is released from it: under +LBAsync an
+// element keeps running between those two points, and work it does there must
+// not be billed to the load the strategy is about to read.
+void hapiCuptiObjectJoinedStep(const LDObjHandle& handle);
+void hapiCuptiObjectResumed(const LDObjHandle& handle);
 uint64_t hapiCuptiPushObjCorrelation();
 void hapiCuptiPopObjCorrelation();
 bool hapiCuptiPushKernelTag(uint64_t workTag);

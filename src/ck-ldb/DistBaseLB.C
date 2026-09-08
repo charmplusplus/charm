@@ -28,6 +28,24 @@ void DistBaseLB::barrierDone() {
   }
   lb_started = true;
 
+  // Close the measurement window where the load is READ.
+  //
+  // The runtime opens it in three places -- AtSyncWait's early return,
+  // ResumeFromSyncHelper, and the arrival-epoch release -- plus the balancer's
+  // own constructor. Until now it closed it in exactly one: AtSyncSample(),
+  // which returns immediately unless MetaBalancer is on. With MetaBalancer off
+  // the window therefore never closed, and CUPTI kernel tracing -- the
+  // expensive half of instrumentation -- ran for the whole job after the first
+  // resume. That asymmetry is why pic2d, barnes and jacobi2d each hand-roll a
+  // window with their own LBTurnInstrumentOn/Off calls: not as an
+  // optimisation, but because nothing else switched it off.
+  //
+  // Here is the symmetric point: the strategy is about to read the loads, so
+  // anything measured past here belongs to the next window, and tracing it is
+  // pure cost. Reopened at the resume, which is where the runtime already
+  // opens it.
+  LBTurnInstrumentOff();
+
   // Hold the AtSync barrier down for the duration of the step, the way
   // CentralLB does. It is what makes the framework one-step-at-a-time: while a
   // step is registering, checkBarrier cannot fire, so no element can start the

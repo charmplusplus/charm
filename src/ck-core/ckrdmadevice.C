@@ -1856,8 +1856,25 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // ever unparks and replays what was buffered. Measured: one element stuck
   // at its send drain, two neighbours holding 7 of 8 particle messages, and
   // sixty-one elements parked behind them.
-  if (recv_elt != NULL && recv_elt->deviceRecvParked
-      && recv_elt->pendingMigrateTo != -1) {
+  // The pendingMigrateTo condition used to be here too, so a device message
+  // arriving at a PARKED element whose destination the strategy had not yet
+  // chosen went down the normal delivery path. The element is parked, so its
+  // `when` is not ready, and the SDAG buffers the message -- and if the
+  // strategy then decides to move that element, _sdag_pup serialises a
+  // buffered nocopydevice payload whose pointer is process-local. pic2d's own
+  // pup comment states the invariant this violates: "no device-zerocopy
+  // message ... is buffered here at migration time". The window is between the
+  // park (cklocation.C, AtSyncWait sets deviceRecvParked) and the migration
+  // decision (pendingMigrateTo, set when the strategy's move arrives), which
+  // is why the wedge is nondeterministic and why it hits sync LB too -- AtSync
+  // is AtSyncStart + AtSyncWait and parks just the same.
+  //
+  // Buffering for the whole park is safe now in a way it was not when this was
+  // narrowed: that narrowing predates the switch from REQUEUE to BUFFER below.
+  // A requeue spun on the local queue and starved the resume broadcast, so the
+  // sender's completion never fired; the buffer path takes a reference and
+  // replays on unpark or departure, so the sender completes at replay.
+  if (recv_elt != NULL && recv_elt->deviceRecvParked) {
     // Buffered, NOT requeued: a requeue spins on the scheduler's local
     // queue, which is popped ahead of the network -- so the resume
     // broadcast that would unpark this element starves behind its own

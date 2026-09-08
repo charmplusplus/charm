@@ -11,6 +11,10 @@
 #include "TopoManager.h"
 #include "charm++.h"
 #include "ck.h"
+#if CMK_CUDA
+void hapiCuptiObjectJoinedStep(const LDObjHandle&);
+void hapiCuptiObjectResumed(const LDObjHandle&);
+#endif
 #include <atomic>
 #include <mutex>
 #include <unordered_map>
@@ -2462,6 +2466,18 @@ void CkMigratable::lbJoinStep(int waitForMigration)
   DEBL((AA "Element %s starting LB step %d\n" AB, idx2str(thisIndexMax), lbStepSeen));
   recordLBSizes(true);
 
+  // This element's measurement window closes HERE, at its own join -- not at
+  // the barrier, and not PE-wide. Under +LBAsync it keeps running from this
+  // point until AtSyncWait releases it, and that work belongs to the next
+  // round: billing it here inflated the measured load of whichever elements
+  // reached the barrier earliest, non-uniformly, so the strategy saw a
+  // different imbalance than an identical sync run. Reopened in
+  // ResumeFromSync.
+  myRec->getLBMgr()->SetObjJoinedStep(myRec->getLdHandle(), true);
+#if CMK_CUDA
+  hapiCuptiObjectJoinedStep(myRec->getLdHandle());
+#endif
+
   local_state = LOAD_BALANCE;
   can_reset = true;
   lbStepPending = true;
@@ -2482,6 +2498,16 @@ void CkMigratable::AtSyncWait()
   if (!lbStepPending)
   {
     // The step already finished, so the wait is where the window opens.
+    // This path bypasses ResumeFromSyncHelper(), so it must reopen this
+    // element's own measurement window itself -- and it is the path always
+    // taken at a long -lblag, where the step completes long before the element
+    // parks. Missing it left the element marked joined for the rest of the run:
+    // its load decayed to zero and every node handed the strategy an all-zero
+    // load vector.
+    myRec->getLBMgr()->SetObjJoinedStep(myRec->getLdHandle(), false);
+#if CMK_CUDA
+    hapiCuptiObjectResumed(myRec->getLdHandle());
+#endif
     LBTurnInstrumentOn();
     ResumeFromSync();
     return;
@@ -2580,6 +2606,11 @@ void CkMigratable::ResumeFromSyncHelper()
   // before its next AtSyncSample(); without it the step's own resume is the
   // same moment. Either way nothing between the step and here is measured.
   LBTurnInstrumentOn();
+  // Reopen this element's own window; see lbJoinStep.
+  myRec->getLBMgr()->SetObjJoinedStep(myRec->getLdHandle(), false);
+#if CMK_CUDA
+  hapiCuptiObjectResumed(myRec->getLdHandle());
+#endif
 
   CkLocMgr* localLocMgr = myRec->getLocMgr();
   auto iter = localLocMgr->bufferedActiveRgetMsgs.find(ckGetID());

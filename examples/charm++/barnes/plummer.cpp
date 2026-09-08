@@ -75,7 +75,13 @@ Particle *testdata(int nbody)
       p->position = cp->position+offset;
       p->velocity = cp->velocity;
       cmr += p->position;
-      cmv += p->position;
+      // Was cmv += p->position, so the velocity centroid subtracted below was
+      // really half a position centroid. Every particle came out with the same
+      // spurious drift -- about 3.5 per unit time in the datasets this
+      // generated, against a Plummer sphere's own velocities of order 0.5, so
+      // the whole system flew across its own bounding box while the internal
+      // dynamics were unaffected.
+      cmv += p->velocity;
    }
 
    cmr /= nbody;

@@ -349,6 +349,14 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 #endif
 }
 
+void LBDatabase::SetObjJoinedStep(const LDObjHandle &_h, bool joined)
+{
+#if CMK_LBDB_ON
+  LBObj *const obj = LbObj(_h);
+  if (obj != NULL) obj->setJoinedStep(joined);
+#endif
+}
+
 void LBDatabase::EstObjGPULoad(const LDObjHandle &_h, double gputime)
 {
 #if CMK_CUDA

@@ -29,6 +29,7 @@
 #include "hapi.h"
 #include "hapi_impl.h"
 #include <unordered_map>
+#include <unordered_set>
 #include "gpumanager.h"
 #ifdef HAPI_NVTX_PROFILE
 #include "hapi_nvtx.h"
@@ -3398,6 +3399,26 @@ static thread_local uint64_t cupti_seen_generation = 0;
 static thread_local std::unordered_map<LDObjKey, uint64_t, LDObjKeyHash>
     cupti_local_object_tokens;
 
+// Objects on this PE that have joined the current load balancing step.
+//
+// The measurement window has to close per OBJECT, at its own join, not per PE.
+// The PE-wide switch (LBManager::CollectStatsOff) is the wrong granularity in
+// both directions: closed at the first join it stops measuring every object on
+// the PE that has not joined yet, and closed at the barrier it has already let
+// the early joiners run ahead. Under the unsplit barrier the distinction does
+// not exist -- a joined element is parked and does no more work -- but under
+// +LBAsync it keeps running, and the kernels it launches after joining were
+// being charged to its own measured load. That inflated the async load by 11-13%
+// against a 2.8-3.9% run-to-run spread on leanmd, non-uniformly across nodes, so
+// the strategy saw a different imbalance than the sync run over identical work.
+//
+// Suppressing the correlation stamp is what "stop measuring this one" means
+// here: its later kernels land in cupti_unattributed_kernels_ instead of its
+// own bucket, so they still count toward device occupancy but are not billed
+// to an object whose load has already been read.
+static thread_local std::unordered_set<LDObjKey, LDObjKeyHash>
+    cupti_joined_objects;
+
 // Drop this PE's outstanding push count if CUPTI has been detached since we
 // last looked -- the stack those pushes referred to no longer exists, so
 // popping against it would report CUPTI_ERROR_QUEUE_EMPTY.
@@ -3407,6 +3428,20 @@ static inline void hapiCuptiSyncGeneration(GPUManager& gm) {
     cupti_pushed_depth = 0;
     cupti_tag_pushed_depth = 0;
   }
+}
+
+void hapiCuptiObjectJoinedStep(const LDObjHandle& handle) {
+  LDObjKey key;
+  key.omID() = handle.omID();
+  key.objID() = handle.objID();
+  cupti_joined_objects.insert(key);
+}
+
+void hapiCuptiObjectResumed(const LDObjHandle& handle) {
+  LDObjKey key;
+  key.omID() = handle.omID();
+  key.objID() = handle.objID();
+  cupti_joined_objects.erase(key);
 }
 
 uint64_t hapiCuptiPushObjCorrelation() {
@@ -3430,6 +3465,14 @@ uint64_t hapiCuptiPushObjCorrelation() {
     // Steady state is a PE-local hit: the shared lock is taken only the first
     // time this PE runs a given object, so it costs O(objects that ever run
     // here) acquisitions rather than one per entry method.
+    // Joined the step already: leave it unattributed for the rest of the round.
+    if (cupti_joined_objects.find(key) != cupti_joined_objects.end()) {
+      CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
+          CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, HAPI_CUPTI_NO_OBJECT));
+      ++cupti_pushed_depth;
+      return HAPI_CUPTI_NO_OBJECT;
+    }
+
     auto cached = cupti_local_object_tokens.find(key);
     if (cached != cupti_local_object_tokens.end()) {
       object_token = cached->second;

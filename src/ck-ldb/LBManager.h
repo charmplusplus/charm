@@ -544,6 +544,10 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->EstObjLoad(h, cpuload);
   }
+  void SetObjJoinedStep(const LDObjHandle& h, bool joined)
+  {
+    lbdb_obj->SetObjJoinedStep(h, joined);
+  }
   void EstObjGPULoad(const LDObjHandle& h, double gputime)
   {
     lbdb_obj->EstObjGPULoad(h, gputime);

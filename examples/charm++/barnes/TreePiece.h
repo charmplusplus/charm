@@ -72,6 +72,17 @@ class TreePiece : public CBase_TreePiece {
     LB_OVERLAP    // reported the iteration, parked in AtSyncWait()
   };
   int lbState;
+  // -lblag. The iteration at which this element joined the step, and whether a
+  // park is still owed for it. One AtSyncWait() is owed for every
+  // AtSyncStart(), including the calls that started no step: the wait is what
+  // reopens the measurement window, so skipping it leaves instrumentation off
+  // for the rest of the run.
+  int lbStartIter;
+  int lbWaitPending;
+  // Is the park due? The lag counts iterations since the join. The last
+  // iteration is a backstop -- a lag that runs off the end of the run would
+  // otherwise leave the step unfinished and its migrations never released.
+  bool lbWaitDue() const;
   // Report the iteration and then park for the step, in that order: the point
   // of the split is that the DataManager gets to work in between.
   void startLbOverlap();

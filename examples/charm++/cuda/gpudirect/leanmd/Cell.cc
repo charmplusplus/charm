@@ -102,10 +102,10 @@ Cell::Cell(CkMigrateMessage *msg): CBase_Cell(msg),
 // simulation -- Cells drive every step, and a Cell stopped at the barrier stops
 // its Computes too.
 void Cell::lbBegin() {
-  // Closes the measurement window: the strategy decides from this sample, so
-  // whatever is measured past here belongs to the next window. A no-op unless
-  // MetaBalancer is on.
-  AtSyncSample();
+  // AtSyncSample() used to sit here. It is MetaBalancer's sampling hook and a
+  // no-op without it, and the measurement window it claimed to close is now
+  // closed by the balancer at its barrier (DistBaseLB::barrierDone), which is
+  // the point where every local object has actually joined the step.
   lbStartStep = stepCount;
   lbWaitPending = 1;
   // Set before the call: a chare stopped at the tentative count comes back

@@ -749,8 +749,13 @@ class Patch : public CBase_Patch {
       // for the previous step is still owed -- the quiet check can delay the
       // park -- starting another AtSyncStart aborts by contract; the missed
       // step is simply skipped and the cadence resumes at the next one.
-      cudaStreamSynchronize(comm_stream);
-      cudaStreamSynchronize(compute_stream);
+      // No drain here. Migration safety is pup()'s job -- it synchronizes both
+      // streams on isPacking(), which is the only moment the device state has
+      // to be settled, and only the patches that actually move pay it. The
+      // runtime independently refuses to take a move until this element's
+      // outstandingDeviceSends reaches zero. Draining here instead charged
+      // every patch on every balancing iteration for a guarantee that two
+      // other mechanisms already provide, on an app whose whole step is ~12 ms.
       if (!async_lb) {
         // The patch stops here; the next thing it hears (ResumeFromSync) is
         // that the whole step -- strategy and migrations -- is over.
@@ -776,8 +781,8 @@ class Patch : public CBase_Patch {
       // be quiesced before it can be pupped, and AtSyncWait is where the step
       // is collected. Resumes inline if the step is already over.
       lb_waiting = false;
-      cudaStreamSynchronize(comm_stream);
-      cudaStreamSynchronize(compute_stream);
+      // Nor here: parking does not pup anything. If this element is moved,
+      // pup() drains on the way out.
       AtSyncWait();
     } else {
       thisProxy[thisIndex].runStep();

@@ -159,6 +159,46 @@ void DiffusionLB::BuildStats()
   // and self-cancelling when the loads are real. If a dimension is genuinely
   // all zero its mean is zero, the floor vanishes, and nothing moves: correct,
   // because there is no load to balance.
+  // CHARM_LB_RAWLOAD: exactly what this node was handed, before any floor is
+  // applied. my_load is a sum of these, so a node that reports 0.000000 to the
+  // across-node phase is a node whose objects all measured zero.
+  if (getenv("CHARM_LB_RAWLOAD"))
+  {
+    double gsum = 0.0, wsum = 0.0, gmax = 0.0, wmax = 0.0;
+    int gz = 0, wz = 0;
+    for (int i = 0; i < nobj; i++)
+    {
+      const LDObjData& od = nodeStats->objData[i];
+#if CMK_CUDA
+      const double g = od.gpuTime;
+#else
+      const double g = 0.0;
+#endif
+      const double w = od.wallTime;
+      gsum += g; wsum += w;
+      if (g > gmax) gmax = g;
+      if (w > wmax) wmax = w;
+      if (g <= 0.0) gz++;
+      if (w <= 0.0) wz++;
+    }
+    // Per-PE object counts too: the CUPTI loads are built only once every PE of
+    // the process has arrived at its LB barrier (hapiCuptiArrive, expected =
+    // CkNodeSize). A PE holding no objects is the case to watch.
+    std::string pes;
+    int empty = 0;
+    for (int pe = 0; pe < statsReceived; pe++)
+    {
+      char b[32];
+      snprintf(b, sizeof(b), " %d", numObjects[pe]);
+      pes += b;
+      if (numObjects[pe] == 0) empty++;
+    }
+    CkPrintf("[RAWLOAD node %d] nobj %d migr %d | gpu sum %.6f max %.6f zero %d/%d"
+             " | wall sum %.6f max %.6f zero %d/%d | statsReceived %d empty %d objs/pe%s\n",
+             myNodeId, nobj, nmigobj, gsum, gmax, gz, nobj, wsum, wmax, wz, nobj,
+             statsReceived, empty, pes.c_str());
+  }
+
   objLoadFloor = 0.0;
   if (nobj > 0)
   {

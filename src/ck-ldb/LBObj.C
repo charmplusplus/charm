@@ -45,6 +45,9 @@ void LBObj::Clear(void)
 
 void LBObj::IncrementTime(LBRealType walltime, LBRealType cputime)
 {
+  // Joined the step: this work belongs to the next round, not the one whose
+  // loads are being read. See LBObj::setJoinedStep.
+  if (joinedStep) return;
   data.wallTime += walltime;
 #if CMK_LB_CPUTIMER
   data.cpuTime += cputime;
@@ -57,6 +60,7 @@ void LBObj::IncrementTime(LBRealType walltime, LBRealType cputime)
 
 void LBObj::IncrementGPUTime(LBRealType walltime)
 {
+  if (joinedStep) return;
 #if CMK_CUDA
   data.gpuTime += walltime;
 #else

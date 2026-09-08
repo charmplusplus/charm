@@ -15,6 +15,73 @@ Usage:
    ./charmrun +p1 ./barnes -in=particles.bin -p=100 -killat=50
 
 
+DATASETS
+--------
+Three generators, all writing the same format: nbody, ndims and tnow, then
+eight floats per particle (position, velocity, mass, softening; the run takes
+its softening from -eps, so the last field is only a record of what the
+generator thought it should be).
+
+  ./gen <n> <file>                 uniform cube, velocities of order 1e-3
+  ./plummer <n> <file>             a Plummer sphere and a copy of itself
+                                   displaced by 4, sharing its velocities
+  ./galaxy <n> <file> [key=value]  two disk galaxies on a collision orbit
+
+galaxy is the one to use for anything about load balancing, because it is the
+only one whose density field both is strongly non-uniform AND moves. Each
+galaxy is an exponential disk inside a Hernquist bulge and a Hernquist halo,
+in equilibrium (the generator prints 2T/|W| per galaxy, measured by direct
+summation over a subsample; it comes out at 0.98 to 1.00), on a Kepler
+encounter orbit with the Antennae-like geometry of Toomre & Toomre 1972.
+Everything is in N-body units, G = 1, the pair carries unit mass, and the disk
+scale length of the larger galaxy is the unit of length.
+
+It prints the parameters the run should use, because they follow from the
+model and the particle count and are not guessable:
+
+  ./galaxy 500000 galaxy.bin
+  ...
+    equilibrium    2T/|W| = 0.990 (galaxy 1), 0.996 (galaxy 2)
+    suggested      -eps=0.0249 -dtime=0.005941 -killat=3499
+
+The softening is the mean interparticle separation where the disk is dense,
+and the step is the smaller of a quarter of a softening length per unit of the
+fastest motion and the free-fall time at the largest acceleration in the model.
+Both scale with the particle count, so a 2M-particle file wants a smaller step
+than a 500K one.
+
+Note the killat. A resolved encounter takes thousands of iterations; that is
+what a collisionless N-body run costs and no choice of initial conditions
+changes it. Over the tens of iterations a load-balancing experiment usually
+runs, the default dataset is a pair of well-separated galaxies that barely
+move. Two ways out, and they trade different things:
+
+  ./galaxy 500000 galaxy-peri.bin steps=60
+
+places pericentre two thirds of the way through a 60-iteration run. The
+galaxies then start already interpenetrating, which is dense and moving but is
+not a physically prepared encounter -- real galaxies that close have already
+been distorted by each other. Alternatively eps= coarsens the force
+resolution on purpose, and the step scales with it, so twice the softening is
+half the iterations to the same physical time.
+
+Both files run clean here. On four A40s, 500K particles, -p=2048 -b=128
+-blockmap=1 with the device walk, 200 iterations of galaxy.bin: the total
+energy moves 3.5% over the first 25 iterations as the model settles against
+the softened force and then holds to 0.3% over the remaining 175, and the
+universe box closes at exactly the orbit's approach speed. The 2M file is the
+same model at -eps=0.01569 -dtime=0.003742.
+
+  ./galaxy                         with no arguments, the full parameter list
+
+A highly clustered dataset needs more tree pieces than a uniform one of the
+same size, because a piece is a contiguous run of the key ordering and a cusp
+puts a lot of particles into a short one. Everything above was run at -p=2048
+for 500K particles and -p=8192 for 2M. Too few and the run aborts with "Need
+more tree pieces!", which under the default buffering is lost when the abort
+follows it -- run under stdbuf -oL to see it.
+
+
 GPU PORT
 --------
 The tree walk stays on the host; only the force evaluation moves to the device.

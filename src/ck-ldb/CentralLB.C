@@ -209,6 +209,10 @@ void CentralLB::gpuLoadsReady()
 void CentralLB::InvokeLB()
 {
   lbmgr->lb_in_progress = true;
+  // See DistBaseLB::barrierDone: the window closes where the load is read.
+  // Without this the only OFF is AtSyncSample's, which is MetaBalancer-gated,
+  // so with MetaBalancer off instrumentation never stopped.
+  LBTurnInstrumentOff();
 #if CMK_SHRINK_EXPAND
   contribute(CkCallback(CkReductionTarget(CentralLB, CheckForLB), thisProxy[0]));
 #else

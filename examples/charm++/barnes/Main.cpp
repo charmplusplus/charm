@@ -141,9 +141,21 @@ void Main::setParameters(CkArgMsg *m){
   CkPrintf("lbWindow: %d iterations%s\n", globalParams.lbWindow,
            globalParams.lbWindow > 0 ? "" : " (instrumenting continuously)");
   globalParams.asyncLb = params.getiparam("lbasync", DEFAULT_ASYNC_LB, table);
-  CkPrintf("lbPeriod: %d firstLbIteration: %d asyncLb: %d\n",
+  globalParams.lbLag = params.getiparam("lblag", DEFAULT_LB_LAG, table);
+  if(globalParams.lbLag < 0) globalParams.lbLag = 0;
+  // Strictly inside the period. At lag == period the park for one step and the
+  // join for the next fall on the same iteration, and AtSyncStart() aborts on
+  // a step that is still in flight -- correctly, since one AtSyncWait() is owed
+  // per AtSyncStart(). Clamped rather than rejected: -lblag is naturally
+  // written as a fraction of the period and rounding up to it is an easy miss.
+  if(globalParams.lbPeriod > 0 && globalParams.lbLag >= globalParams.lbPeriod){
+    CkPrintf("[WARN] -lblag=%d is not less than -lbperiod=%d; clamped to %d\n",
+             globalParams.lbLag, globalParams.lbPeriod, globalParams.lbPeriod-1);
+    globalParams.lbLag = globalParams.lbPeriod - 1;
+  }
+  CkPrintf("lbPeriod: %d firstLbIteration: %d asyncLb: %d lbLag: %d\n",
            globalParams.lbPeriod, globalParams.firstLbIteration,
-           globalParams.asyncLb);
+           globalParams.asyncLb, globalParams.lbLag);
   // The split is only safe under +LBAsync, and this is not a preference: with
   // the flag off, an AtSyncStart() that finds no step due calls ResumeFromSync()
   // inline *and* returns Continue, so an application written to the split
@@ -257,6 +269,7 @@ void Main::usage(){
   usage["lbperiod"] = "run the load balancer every N iterations (0 = never)";
   usage["firstlb"] = "first iteration after which the load balancer may run";
   usage["lbasync"] = "split the AtSync barrier so decomposition overlaps the step (needs +LBAsync)";
+  usage["lblag"] = "iterations between AtSyncStart and AtSyncWait; the strategy runs over them (needs -lbasync=1)";
   usage["lbwindow"] = "instrument only the N iterations before each balancing iteration (0 = always)";
   usage["mapcyclic"] = "use node-aware block cyclic tree piece placement";
   usage["mapchunk"] = "consecutive tree pieces per node under -mapcyclic";

@@ -26,9 +26,23 @@ public:
   ~LBObj() { };
 
   void Clear(void);
+  bool joinedStep = false;
 
   void IncrementTime(LBRealType walltime, LBRealType cputime);
   void IncrementGPUTime(LBRealType walltime);
+
+  // Has this object joined the current load balancing step? While it has, its
+  // work is no longer billed to it: the strategy is about to read (or has
+  // already read) the load it accumulated up to the join, and anything after
+  // that belongs to the next round. Under the unsplit barrier this is never
+  // true for long, because a joined element parks and does no work. Under
+  // +LBAsync it keeps running, and charging that work inflated the measured
+  // load of exactly the elements that reached the barrier first.
+  //
+  // Per object, deliberately: the PE-wide switch stops measuring elements that
+  // have NOT joined yet, which biases the late ones the other way.
+  inline void setJoinedStep(bool v) { joinedStep = v; }
+  inline bool hasJoinedStep(void) const { return joinedStep; }
 
   inline void StartTimer(void) {
     startWTime = CkWallTimer();

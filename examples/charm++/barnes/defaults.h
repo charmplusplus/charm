@@ -34,6 +34,10 @@
 // anything, and the unsplit path is what every existing run used.
 #define DEFAULT_ASYNC_LB 0
 
+// Iterations between AtSyncStart() and AtSyncWait(). 0 parks immediately,
+// which is what -lbasync=1 did before this existed and is still the default.
+#define DEFAULT_LB_LAG 0
+
 // Instrument the two iterations before each balancing iteration. The same
 // switch gates CUPTI tracing, which is the expensive half, so a window is what
 // keeps a load-balanced run from paying for tracing it never reads. 0 restores

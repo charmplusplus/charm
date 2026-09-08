@@ -69,6 +69,8 @@ TreePiece::TreePiece() :
 #endif
   usesAtSync = true;
   lbState = LB_IDLE;
+  lbStartIter = -1;
+  lbWaitPending = 0;
   myDM = dataManagerProxy.ckLocalBranch();
 }
 
@@ -91,6 +93,8 @@ TreePiece::TreePiece(CkMigrateMessage *m) :
 #endif
   usesAtSync = true;
   lbState = LB_IDLE;
+  lbStartIter = -1;
+  lbWaitPending = 0;
   myDM = dataManagerProxy.ckLocalBranch();
 }
 
@@ -428,6 +432,12 @@ bool TreePiece::isLbIteration() const {
   return isBalancingIteration(globalParams, iteration);
 }
 
+bool TreePiece::lbWaitDue() const {
+  if(!lbWaitPending) return false;
+  if(iteration >= globalParams.iterations) return true;   // backstop
+  return (iteration - lbStartIter) >= globalParams.lbLag;
+}
+
 void TreePiece::finishIteration(){
   localTraversalState.finishedIteration();
   remoteTraversalState.finishedIteration();
@@ -470,8 +480,21 @@ void TreePiece::finishIteration(){
     }
   }
 
-  if(!isLbIteration()){
+  const bool lbIter = isLbIteration();
+  // Under -lblag the park comes lag iterations after the join, so an ordinary
+  // iteration can be the one that owes it.
+  const bool parkDue = lbWaitDue();
+
+  if(!lbIter && !parkDue){
     lbBarrierDone(0);
+    return;
+  }
+
+  if(!lbIter && parkDue){
+    // The lag has run out. Reopen the safe-to-pack window and park: this is
+    // where the step's migrations are taken.
+    ReadyMigrate(true);
+    startLbOverlap();
     return;
   }
 
@@ -496,15 +519,29 @@ void TreePiece::finishIteration(){
   // method returns.
   ReadyMigrate(true);
 
-  // Flushes this element's GPU counters and feeds MetaBalancer's sample
-  // stream. A no-op when MetaBalancer is off, so it is safe to call on this
-  // application's own -lbperiod cadence either way.
-  AtSyncSample();
+  // AtSyncSample() used to sit here: MetaBalancer's sampling hook, and a no-op
+  // without it. The measurement window is closed by the balancer at its own
+  // barrier now, where every local object has joined.
+  lbStartIter = iteration;
+  lbWaitPending = 1;
   // Set before the call, not after: an element stopped at the tentative count
   // is handed back through ResumeFromSync, which then has to know that this
   // iteration was never reported.
   lbState = LB_BLOCKED;
   if(AtSyncStart() == CkMigratable::AtSyncStatus::Blocked) return;
+
+  if(globalParams.lbLag > 0 && !lbWaitDue()){
+    // Joined, and staying in the run for lag more iterations. lbJoinStep() has
+    // just set ReadyMigrate(true) for us; close it again, because a tree piece
+    // that moves before the park would have this iteration's particles
+    // delivered to the PE it left. See Parameters::lbLag for why that is a
+    // decomposition property and not something the flag can wish away.
+    ReadyMigrate(false);
+    lbState = LB_IDLE;
+    // Nothing of ours is moving, so the decomposition must not wait for us.
+    lbBarrierDone(0);
+    return;
+  }
   startLbOverlap();
 }
 
@@ -515,6 +552,12 @@ void TreePiece::finishIteration(){
 // and elements move. Only senseTreePieces() needs the elements to be still,
 // and lbMigrationDone() is what releases it.
 void TreePiece::startLbOverlap(){
+  // Every park clears the debt here rather than at each call site: with
+  // -lblag 0 the join and the park are the same call, and a debt left standing
+  // would make the next ordinary iteration park again with no AtSyncStart
+  // behind it -- which resumes inline and contributes a second
+  // treePiecesMigrated the DataManager is not expecting.
+  lbWaitPending = 0;
   lbState = LB_OVERLAP;
   lbBarrierDone(1);
   // Resumes inline when the step is already over, in which case ResumeFromSync
@@ -537,6 +580,12 @@ void TreePiece::ResumeFromSync(){
     case LB_BLOCKED:
       // Released from the tentative count -- either joined to the step or let
       // go to keep iterating. Either way the iteration is still unreported.
+      if(globalParams.lbLag > 0 && !lbWaitDue()){
+        // Same as the join path: hold the element until the park is due.
+        ReadyMigrate(false);
+        lbBarrierDone(0);
+        break;
+      }
       startLbOverlap();
       break;
     default:
@@ -600,6 +649,10 @@ void TreePiece::pup(PUP::er &p){
   // Travels because an element parked in AtSyncWait() can be moved by the step
   // it is waiting on, and the destination is where its ResumeFromSync runs.
   p | lbState;
+  // The lag's bookkeeping travels with the element: a move taken at the park
+  // lands on a destination that still owes the rest of the schedule.
+  p | lbStartIter;
+  p | lbWaitPending;
   // Nothing else travels. AtSync is reached from finishIteration(), after the
   // interaction list has been consumed and every per-iteration counter has
   // been reset, so the destination reconstructs the rest in
