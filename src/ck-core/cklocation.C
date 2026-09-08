@@ -1833,6 +1833,8 @@ void CkMigratable::UserSetLBLoad()
 // user can call this helper function to set obj load (for model-based lb)
 void CkMigratable::setObjTime(double cputime) { myRec->setObjTime(cputime); }
 double CkMigratable::getObjTime() { return myRec->getObjTime(); }
+void CkMigratable::setObjGPUTime(double gputime) { myRec->setObjGPUTime(gputime); }
+double CkMigratable::getObjGPUTime() { return myRec->getObjGPUTime(); }
 
 #  if CMK_LB_USER_DATA
 /**
@@ -2056,6 +2058,8 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg)
 #else
 void CkMigratable::setObjTime(double cputime) {}
 double CkMigratable::getObjTime() { return 0.0; }
+void CkMigratable::setObjGPUTime(double gputime) {}
+double CkMigratable::getObjGPUTime() { return 0.0; }
 
 #  if CMK_LB_USER_DATA
 void* CkMigratable::getObjUserData(int idx) { return NULL; }
@@ -2142,6 +2146,22 @@ double CkLocRec::getObjTime()
   LBRealType walltime, cputime;
   lbmgr->GetObjLoad(ldHandle, walltime, cputime);
   return walltime;
+}
+void CkLocRec::setObjGPUTime(double gputime)
+{
+#if CMK_CUDA
+  lbmgr->EstObjGPULoad(ldHandle, gputime);
+#endif
+}
+double CkLocRec::getObjGPUTime()
+{
+#if CMK_CUDA
+  LBRealType gputime;
+  lbmgr->GetObjGPULoad(ldHandle, gputime);
+  return gputime;
+#else
+  return 0.0;
+#endif
 }
 #  if CMK_LB_USER_DATA
 void* CkLocRec::getObjUserData(int idx) { return lbmgr->GetDBObjUserData(ldHandle, idx); }

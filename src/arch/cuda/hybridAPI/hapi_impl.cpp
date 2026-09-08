@@ -25,13 +25,21 @@
 #include "hapi_nvtx.h"
 #endif
 
-#ifdef HAPI_CUPTI_LB
-#if CMK_CUDA
-#include <cupti.h>
-#endif
+#if CMK_CUDA && CMK_LBDB_ON
 #include "LBManager.h"
+#include "cklocation.h"
+#include <algorithm>
+#include <climits>
+#include <set>
 
-#if CMK_CUDA
+// Defined in ck.C. Forward-declared rather than reached through ck.h, which
+// this file does not otherwise need. Gives the entry-method correlation hook
+// the running element's full LB identity.
+CkLocRec* CkActiveLocRec(void);
+
+#ifdef HAPI_CUPTI_LB
+#include <cupti.h>
+
 #define CUPTI_SAFE_CALL(call)                                              \
   do {                                                                     \
     CUptiResult _status = call;                                            \
@@ -72,11 +80,9 @@ typedef struct hapiEvent {
   CkCallback cb;
   void* cb_msg;
   hapiWorkRequest* wr; // if this is not NULL, buffers and request itself are deallocated
-  CkMigratable* obj; // pointer to the object whose load we want to set
-  hapiEvent_t start_ev; // event to record the start time
 
-  hapiEvent(hapiEvent_t event_, const CkCallback& cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL, CkMigratable* obj_ = NULL, hapiEvent_t start_ev_ = NULL)
-            : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_), obj(obj_), start_ev(start_ev_) {}
+  hapiEvent(hapiEvent_t event_, const CkCallback& cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL)
+            : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_) {}
 } hapiEvent;
 
 CpvDeclare(std::queue<hapiEvent>, hapi_event_queue);
@@ -141,52 +147,184 @@ static void shmCleanup();
 static void ipcHandleCreate();
 static void ipcHandleOpen();
 
+#if CMK_CUDA && CMK_LBDB_ON
+
+// Sentinel external-correlation ID meaning "no owning migratable object".
+// Must not collide with a real chare ID -- 0 is a perfectly valid one, which
+// is why this is UINT64_MAX rather than the obvious choice.
+static constexpr uint64_t HAPI_CUPTI_NO_OBJECT =
+    GpuObjectTokenTable::noObjectToken();
+
 #ifdef HAPI_CUPTI_LB
 
-#if CMK_CUDA
 static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords) {
-  *size = 5*1024 * 1024;  // 5MB per buffer
-  *buffer = (uint8_t *)malloc(*size);
-  *maxNumRecords = 0;
+  // CUPTI writes activity records straight into this buffer and has no way to
+  // tell us the allocation failed: hand it NULL and it writes through a null
+  // pointer, and the NULL comes back through cuptiBufferCompleted to be parsed
+  // later, so the fault surfaces inside cuptiActivityGetNextRecord with nothing
+  // left to say where it came from. Step down to a smaller buffer before giving
+  // up, and if even that fails, say so here.
+  static const size_t sizes[] = {5*1024*1024, 1024*1024, 256*1024};
+  for (size_t s : sizes) {
+    *buffer = (uint8_t *)malloc(s);
+    if (*buffer != NULL) {
+      *size = s;
+      *maxNumRecords = 0;
+      return;
+    }
+  }
+  CmiAbort("HAPI: could not allocate a CUPTI activity buffer (tried down to "
+           "%zu bytes). GPU load instrumentation cannot continue.", sizes[2]);
 }
 
-//TODO: handle SMP mode
 static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t streamId,
                                           uint8_t *buffer, size_t size, size_t validSize) {
   GPUManager& gm = CsvAccess(gpu_manager);
 
+  std::lock_guard<std::mutex> lk(gm.cupti_queue_lock_);
   gm.cupti_buffer_queue_.push({buffer, validSize});
 }
+
+// Populate DeviceManager with the device attributes needed to compute per-kernel
+// SM usage from CUPTI records. Queried once per local device, lazily, because
+// device_managers is not populated when the GPUManager is constructed.
+static void hapiPopulateDeviceProps(GPUManager& gm) {
+  for (DeviceManager& dm : gm.device_managers) {
+    if (dm.props_initialized) continue;
+    int dev = dm.global_index;
+    cudaDeviceProp props;
+    hapiCheck(cudaGetDeviceProperties(&props, dev));
+
+    dm.multi_processor_count = props.multiProcessorCount;
+    dm.max_threads_per_sm = props.maxThreadsPerMultiProcessor;
+#ifdef cudaDevAttrMaxBlocksPerMultiprocessor
+    hapiCheck(cudaDeviceGetAttribute(&dm.max_blocks_per_sm,
+                                     cudaDevAttrMaxBlocksPerMultiprocessor, dev));
+#else
+    dm.max_blocks_per_sm = 0;
 #endif
+    dm.max_registers_per_sm = props.regsPerMultiprocessor;
+    dm.max_shared_mem_per_sm = static_cast<int>(props.sharedMemPerMultiprocessor);
+    dm.warp_size = props.warpSize;
+    dm.props_initialized = true;
+  }
+}
 
-// Initialize CUPTI activity tracing — called once per process
-void hapiCuptiInit() {
-#if CMK_CUDA
-  CmiPrintf("HAPI: Initializing CUPTI...\n");
-  hapiDeviceSynchronize(); 
+// Kept for callers that want tracing up before the balancer asks for it;
+// hapiCuptiStartTracing attaches on its own, so this is not needed at startup.
+void hapiCuptiInit() { hapiCuptiStartTracing(); }
+
+// Attaching CUPTI to the process is NOT free even when no activity kind is
+// enabled -- measured at ~1.3 ms per step on a 4-PE run, which is most of the
+// cost that remains once tracing itself is windowed. So attach here and stop in
+// hapiCuptiStopTracing, rather than staying enabled for the whole run.
+// Enabling an activity kind is separately what makes records flow.
+//
+// Per-PE view of the tracing switch. LBDatabase::TurnStatsOn/Off is a PE-local
+// switch, but CUPTI tracing is process-wide: a PE that switched its own
+// instrumentation off would otherwise switch tracing off for every PE in the
+// process, and whichever PE was still finishing its iteration would lose every
+// kernel it launched after that instant -- one whole PE per process reading
+// zero GPU load at every step. So the process traces while ANY PE wants
+// instrumentation: tracing starts with the first PE to switch on and stops with
+// the last to switch off, counted per PE so repeated switches do not skew the
+// count.
+static thread_local bool cupti_pe_tracing = false;
+
+void hapiCuptiStartTracing() {
   GPUManager& gm = CsvAccess(gpu_manager);
-  if (gm.cupti_initialized_) return;
+  // Every PE thread reaches this through its own LBDatabase::TurnStatsOn, so
+  // the check and the enable must be one atomic step -- otherwise several
+  // threads each enable the same activity kinds.
+  std::lock_guard<std::mutex> lk(gm.cupti_tracing_lock_);
+  if (!cupti_pe_tracing) {
+    cupti_pe_tracing = true;
+    gm.cupti_tracing_users_++;
+  }
+  if (gm.cupti_tracing_active_.load(std::memory_order_relaxed)) return;
 
-  CUPTI_SAFE_CALL(cuptiActivityRegisterCallbacks(cuptiBufferRequested, cuptiBufferCompleted));
+  if (!gm.cupti_initialized_) {
+    cudaDeviceSynchronize();
+    CUPTI_SAFE_CALL(
+        cuptiActivityRegisterCallbacks(cuptiBufferRequested, cuptiBufferCompleted));
+    gm.cupti_initialized_ = true;
+  }
+
+  // RUNTIME must stay enabled alongside the kernel records even though nothing
+  // consumes its records directly: EXTERNAL_CORRELATION records are only
+  // emitted for correlation IDs generated by runtime-API tracking, so without
+  // it every kernel arrives unattributed and the balancer sees zero GPU load.
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL));
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_RUNTIME));
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION));
 
-  gm.cupti_initialized_ = true;
-#endif
+  gm.cupti_tracing_active_.store(true, std::memory_order_relaxed);
+}
+
+void hapiCuptiStopTracing() {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  std::lock_guard<std::mutex> lk(gm.cupti_tracing_lock_);
+  if (cupti_pe_tracing) {
+    cupti_pe_tracing = false;
+    if (gm.cupti_tracing_users_ > 0) gm.cupti_tracing_users_--;
+  }
+  // Other PEs of this process still have their instrumentation on: their
+  // kernels are still being launched and must keep being recorded.
+  if (gm.cupti_tracing_users_ > 0) return;
+  if (!gm.cupti_initialized_ ||
+      !gm.cupti_tracing_active_.load(std::memory_order_relaxed))
+    return;
+
+  CUPTI_SAFE_CALL(cuptiActivityDisable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL));
+  CUPTI_SAFE_CALL(cuptiActivityDisable(CUPTI_ACTIVITY_KIND_RUNTIME));
+  CUPTI_SAFE_CALL(cuptiActivityDisable(CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION));
+
+  // Clear the flag before flushing so the buffers handed back by the flush are
+  // the last ones, and no further correlation pushes race with them. Flush on
+  // the way out so records buffered before the stop are not lost when the
+  // application switches instrumentation off around its own AtSync. The flush
+  // drives the buffer-completed callback, which takes cupti_queue_lock_ -- a
+  // different mutex from the one held here, so this cannot deadlock.
+  gm.cupti_tracing_active_.store(false, std::memory_order_relaxed);
+  CUPTI_SAFE_CALL(cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
+
+  // Deliberately NOT detaching with cuptiFinalize(). Staying attached costs
+  // ~1.3 ms per step even with every kind disabled, and detaching measured
+  // cheaper (~2.3 ms per window against 1.3 ms per step) -- but it cannot be
+  // done safely from here. The entry-method hooks check cupti_tracing_active_
+  // and then call into CUPTI without holding this lock, so a thread that has
+  // already passed that check can be inside cuptiActivityPushExternalCorrelationId
+  // while this one finalizes underneath it, which corrupts CUPTI's allocator
+  // and surfaces later as heap corruption in unrelated allocations. Reclaiming
+  // that 1.3 ms needs the hooks made safe against detach first.
+}
+
+bool hapiCuptiTracingActive() {
+  return CsvAccess(gpu_manager).cupti_tracing_active_.load(
+      std::memory_order_relaxed);
 }
 
 void hapiCuptiFinalize() {
-  CmiPrintf("HAPI: Finalizing CUPTI...\n");
-  hapiDeviceSynchronize(); // Ensure all activity records are flushed
   GPUManager& gm = CsvAccess(gpu_manager);
-  if(gm.cupti_initialized_== false) return;
+  if (!gm.cupti_initialized_) return;
+  cudaDeviceSynchronize(); // Ensure all activity records are flushed
   gm.cupti_initialized_ = false;
-#if CMK_CUDA
+  gm.cupti_tracing_active_.store(false, std::memory_order_relaxed);
+  ++gm.cupti_generation_;
+
   CUPTI_SAFE_CALL(cuptiFinalize());
-#endif
 }
-#endif
+
+#else /* !HAPI_CUPTI_LB: no CUPTI in this build */
+
+void hapiCuptiInit() {}
+void hapiCuptiFinalize() {}
+void hapiCuptiStartTracing() {}
+void hapiCuptiStopTracing() {}
+bool hapiCuptiTracingActive() { return false; }
+
+#endif /* HAPI_CUPTI_LB */
+#endif /* CMK_CUDA && CMK_LBDB_ON */
 
 #ifndef HAPI_CUDA_CALLBACK
 #if CSD_NO_SCHEDLOOP
@@ -252,104 +390,515 @@ static void hapiInitCsv(char** argv) {
   // Create and initialize GPU Manager object
   CsvInitialize(GPUManager, gpu_manager);
   CsvAccess(gpu_manager).init();
-  #ifdef HAPI_CUPTI_LB
-    if (LBHasBalancersRegistered() && _lb_args.statsOn())
-      hapiCuptiInit();
-  #endif
+  // CUPTI is attached lazily by hapiCuptiStartTracing, which the balancer
+  // reaches through LBDatabase::TurnStatsOn. Attaching here instead would pay
+  // the attach cost for the whole run even when the application only wants
+  // instrumentation around its load-balancing steps.
 }
 
 
+#if CMK_CUDA && CMK_LBDB_ON
 #ifdef HAPI_CUPTI_LB
 
+// Find the DeviceManager that matches this kernel's device id.
+static DeviceManager* findDeviceManager(GPUManager& gm, uint32_t device_id) {
+  for (DeviceManager& dm : gm.device_managers) {
+    if ((uint32_t)dm.global_index == device_id) return &dm;
+  }
+  return nullptr;
+}
+
+// Compute the number of SMs this kernel occupies while running.
+// Uses the CUDA occupancy model: theoretical max_active_blocks_per_sm is
+// limited by (a) max blocks per SM, (b) warp count, (c) register pressure,
+// (d) shared memory. Then:
+//   sms_used = min(num_sms, ceil(total_blocks / max_active_blocks_per_sm))
+static int computeKernelSMs(const DeviceManager& dm,
+                            const CUpti_ActivityKernel4* k) {
+  if (!dm.props_initialized || dm.multi_processor_count <= 0) return 1;
+
+  uint64_t threads_per_block =
+      (uint64_t)k->blockX * (uint64_t)k->blockY * (uint64_t)k->blockZ;
+  uint64_t total_blocks =
+      (uint64_t)k->gridX * (uint64_t)k->gridY * (uint64_t)k->gridZ;
+  if (threads_per_block == 0 || total_blocks == 0) return 1;
+
+  // Warp-count limit: maxThreadsPerSM / threadsPerBlock (rounded down).
+  int limit_warps =
+      dm.max_threads_per_sm > 0
+          ? (int)(dm.max_threads_per_sm / threads_per_block)
+          : INT_MAX;
+  if (limit_warps <= 0) limit_warps = 1;
+
+  // Block-count limit (CUDA 11+; 0 means not available -> use a large value).
+  int limit_blocks = dm.max_blocks_per_sm > 0 ? dm.max_blocks_per_sm : INT_MAX;
+
+  // Register-pressure limit.
+  uint64_t regs_per_block = (uint64_t)k->registersPerThread * threads_per_block;
+  int limit_regs = INT_MAX;
+  if (regs_per_block > 0 && dm.max_registers_per_sm > 0) {
+    uint64_t r = (uint64_t)dm.max_registers_per_sm / regs_per_block;
+    limit_regs = r > INT_MAX ? INT_MAX : (int)r;
+    if (limit_regs <= 0) limit_regs = 1;
+  }
+
+  // Shared-memory limit.
+  uint64_t smem_per_block =
+      (uint64_t)k->staticSharedMemory + (uint64_t)k->dynamicSharedMemory;
+  int limit_smem = INT_MAX;
+  if (smem_per_block > 0 && dm.max_shared_mem_per_sm > 0) {
+    uint64_t s = (uint64_t)dm.max_shared_mem_per_sm / smem_per_block;
+    limit_smem = s > INT_MAX ? INT_MAX : (int)s;
+    if (limit_smem <= 0) limit_smem = 1;
+  }
+
+  int max_active_blocks_per_sm =
+      std::min(std::min(limit_blocks, limit_warps),
+               std::min(limit_regs, limit_smem));
+  if (max_active_blocks_per_sm < 1) max_active_blocks_per_sm = 1;
+
+  uint64_t sms_needed =
+      (total_blocks + max_active_blocks_per_sm - 1) / max_active_blocks_per_sm;
+  int sms_used = (int)std::min<uint64_t>(sms_needed,
+                                         (uint64_t)dm.multi_processor_count);
+  if (sms_used < 1) sms_used = 1;
+  return sms_used;
+}
+
 void hapiProcessCuptiBuffers() {
-  #if CMK_CUDA
   GPUManager& gm = CsvAccess(gpu_manager);
-  
+  hapiPopulateDeviceProps(gm);  // lazy: device_managers is ready by now
+
+  // A kernel record can be parsed before the correlation record that names it:
+  // correlation and kernel records are queued at different points in the
+  // launch's life and land in buffers that complete independently. Only those
+  // kernels are parked for a second pass; one whose correlation is already
+  // known is filed immediately, so the common case never holds two copies of
+  // every record.
+  struct PendingKernel {
+    uint32_t       correlation_id;
+    LBKernelRecord rec;
+  };
+  std::vector<PendingKernel> pending;
+  pending.reserve(gm.cupti_pending_hint_);
+
   uint32_t kernel_count = 0;
-  uint32_t corr_count = 0;
+  uint32_t object_corr_count = 0;
+  uint32_t invalid_duration_count = 0;
+  uint32_t attributed = 0;
+  uint32_t unattributed = 0;
+  uint32_t unresolved_token = 0;
+  uint32_t deferred = 0;
+
+  // Resolve each distinct token once rather than once per kernel record. A
+  // round holds far more kernels than objects, and this lock is the same one
+  // every entry method needs, so taking it per record would both dominate the
+  // drain and stall PEs that are still running.
+  struct ResolvedToken {
+    LDObjKey key{};
+    bool valid = false;
+  };
+  std::unordered_map<uint64_t, ResolvedToken> resolved_tokens;
+
+  auto fileKernel = [&](const LBKernelRecord& rec, uint64_t object_token) {
+    if (object_token == HAPI_CUPTI_NO_OBJECT) {
+      gm.cupti_unattributed_kernels_.push_back(rec);
+      unattributed++;
+      return;
+    }
+    auto memo = resolved_tokens.find(object_token);
+    if (memo == resolved_tokens.end()) {
+      ResolvedToken entry;
+      {
+        std::lock_guard<std::mutex> token_lock(gm.cupti_object_token_lock_);
+        entry.valid = gm.cupti_object_tokens_.resolve(object_token, entry.key);
+      }
+      memo = resolved_tokens.emplace(object_token, entry).first;
+    }
+    if (!memo->second.valid) {
+      gm.cupti_unattributed_kernels_.push_back(rec);
+      unattributed++;
+      unresolved_token++;
+      return;
+    }
+    gm.cupti_obj_kernel_records_[memo->second.key].push_back(rec);
+    attributed++;
+  };
+
   while (true) {
-    uint32_t record_count = 0;
     CuptiBufferItem item;
 
     // Pop one buffer from the queue
-    if (gm.cupti_buffer_queue_.empty()) {
-      break;
+    {
+      std::lock_guard<std::mutex> lk(gm.cupti_queue_lock_);
+      if (gm.cupti_buffer_queue_.empty()) break;
+      item = gm.cupti_buffer_queue_.front();
+      gm.cupti_buffer_queue_.pop();
     }
-    item = gm.cupti_buffer_queue_.front();
-    gm.cupti_buffer_queue_.pop();
+
+    // A buffer CUPTI never wrote to (or one it handed back empty) has nothing
+    // to parse, and passing it on would dereference whatever came back.
+    if (item.buffer == NULL || item.validSize == 0) {
+      free(item.buffer);
+      continue;
+    }
 
     // Parse records in this buffer
     CUpti_Activity *record = NULL;
-    // ckout<<"valid size for the CUPTI buffer: "<<item.validSize<<" bytes"<<endl;
     while (cuptiActivityGetNextRecord(item.buffer, item.validSize, &record) == CUPTI_SUCCESS) {
-      ++record_count;
       if (record->kind == CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION) {
         CUpti_ActivityExternalCorrelation *corr = (CUpti_ActivityExternalCorrelation *)record;
-        corr_count++;
-        if(gm.cupti_correlation_db_.find(corr->correlationId)!=gm.cupti_correlation_db_.end())
-        {
-          //out of order block 
-          uint64_t curr_kernel_time = gm.cupti_correlation_db_[corr->correlationId];
-          gm.cupti_obj_gpu_times_[corr->externalId] += curr_kernel_time;
-          gm.cupti_correlation_db_.erase(corr->correlationId); // Remove correlation ID after processing
-        }
-        else 
-        {
-          gm.cupti_correlation_db_[corr->correlationId] = corr->externalId;
+        if (corr->externalKind == CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN) {
+          object_corr_count++;
+          gm.cupti_object_correlation_db_[corr->correlationId] = corr->externalId;
         }
       }
       else if (record->kind == CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL ||
                record->kind == CUPTI_ACTIVITY_KIND_KERNEL) {
         kernel_count++;
         CUpti_ActivityKernel4 *kernel = (CUpti_ActivityKernel4 *)record;
-        uint64_t duration_ns = kernel->end - kernel->start;
-        // ckout<<"the current kernel's duration is "<<duration_ns<<" ns "<<endl;
 
-        auto it = gm.cupti_correlation_db_.find(kernel->correlationId);
-        if (it != gm.cupti_correlation_db_.end()) {
-          uint64_t obj_id = it->second;
-          gm.cupti_obj_gpu_times_[obj_id] += duration_ns;
-          gm.cupti_correlation_db_.erase(it); // Remove correlation ID after processing
-        }
-        else 
-        {
-          // CmiPrintf("found an out of order entry\n");
-          gm.cupti_correlation_db_[kernel->correlationId] = duration_ns;
+        DeviceManager* dm = findDeviceManager(gm, kernel->deviceId);
+
+        LBKernelRecord rec{};
+        rec.start_ns  = kernel->start;
+        rec.end_ns    = kernel->end;
+        rec.device_id = kernel->deviceId;
+        rec.sms_used  = dm ? computeKernelSMs(*dm, kernel) : 1;
+        if (rec.end_ns <= rec.start_ns) invalid_duration_count++;
+
+        auto object = gm.cupti_object_correlation_db_.find(kernel->correlationId);
+        if (object != gm.cupti_object_correlation_db_.end()) {
+          const uint64_t object_token = object->second;
+          gm.cupti_object_correlation_db_.erase(object);
+          fileKernel(rec, object_token);
+        } else {
+          pending.push_back({kernel->correlationId, rec});
+          deferred++;
         }
       }
     }
-    
-    // ckout<<"number of CUPTI records in this buffer: "<<record_count<<endl;
-    
+
     free(item.buffer);
   }
-  //final state of gm.cupti_correlation_db_ and gm.cupti_obj_gpu_times_ 
-  // CmiPrintf("size of correlation DB is: %zu\n", gm.cupti_correlation_db_.size());
-  // CmiPrintf("size of obj_gpu_times_ map is: %zu\n", gm.cupti_obj_gpu_times_.size());
-  // CmiPrintf("number of kernel records processed: %u\n", kernel_count);
-  // CmiPrintf("number of correlation records processed: %u\n", corr_count);
-  
-  // DEBUG: print CUPTI obj-gpu-time map summary
-  // if (!gm.cupti_obj_gpu_times_.empty()) {
-    //   CkPrintf("[PE %d] CUPTI: %zu objects with GPU times:\n", CmiMyPe(), gm.cupti_obj_gpu_times_.size());
-    //   for (auto& kv : gm.cupti_obj_gpu_times_)
-    //     CkPrintf("[PE %d]   objID=%lu  gpu_ns=%lu (%.6f s)\n", CmiMyPe(), kv.first, kv.second, kv.second / 1.0e9);
-    // } else {
-      //   CkPrintf("[PE %d] CUPTI: no obj GPU times recorded (map empty)\n", CmiMyPe());
-      // }
-      #endif
-    }
-    
-    
-//TODO: safely handle SMP mode
-void hapiClearCuptiData() {
-  GPUManager& gm = CsvAccess(gpu_manager);
 
-  gm.cupti_obj_gpu_times_.clear();
-  gm.cupti_correlation_db_.clear();
+  // Second pass: correlations that arrived in a later buffer are now known.
+  for (PendingKernel& pending_kernel : pending) {
+    auto object =
+        gm.cupti_object_correlation_db_.find(pending_kernel.correlation_id);
+    if (object == gm.cupti_object_correlation_db_.end()) {
+      gm.cupti_unattributed_kernels_.push_back(pending_kernel.rec);
+      unattributed++;
+      continue;
+    }
+
+    const uint64_t object_token = object->second;
+    gm.cupti_object_correlation_db_.erase(object);
+    fileKernel(pending_kernel.rec, object_token);
+  }
+
+  // Size next round's parked vector from this one: the straggler count is a
+  // property of how CUPTI is batching buffers, which changes slowly.
+  gm.cupti_pending_hint_ = deferred;
+
+  // Every entry method pushes a correlation ID, and CUPTI emits a record for
+  // each runtime call made under it -- memcpys, syncs and so on, not just
+  // kernel launches. Those never match a kernel record. We flush before
+  // draining, so any kernel that was going to arrive has arrived; whatever is
+  // left over is non-kernel traffic and would otherwise accumulate without
+  // bound (entry-method correlation emits on the order of 10^5 records a step).
+  size_t object_corr_dropped = gm.cupti_object_correlation_db_.size();
+  gm.cupti_object_correlation_db_.clear();
+
+  if (_lb_args.debug() > 1) {
+    CmiPrintf("HAPI[pe=%d]: hapiProcessCuptiBuffers kernels=%u "
+              "object_correlations=%u attributed=%u unattributed=%u "
+              "deferred=%u invalid_durations=%u unresolved_tokens=%u "
+              "objects=%zu object_corr_dropped=%zu\n",
+              CmiMyPe(), kernel_count, object_corr_count, attributed,
+              unattributed, deferred, invalid_duration_count, unresolved_token,
+              gm.cupti_obj_kernel_records_.size(), object_corr_dropped);
+  }
 }
 
+// Convert this process's raw kernel timeline into one SM-utilization-
+// normalized load per object, in seconds of whole-device occupancy.
+//
+// Per-device sweep-line over all kernel intervals. At each event (kernel start
+// or end) the interval's device time is split among the kernels then running,
+// in proportion to the SMs each occupies.
+//
+// Because the result is device-seconds of demand rather than elapsed time, it
+// is (to first order) invariant to how the objects happen to be placed right
+// now, which is what makes it usable as a load estimate for a *different*
+// placement.
+//
+// This runs in the process that produced the records, before the stats leave
+// for the central LB: every PE bound to a device is in the same process, so the
+// timeline for that device is already complete here. If several processes share
+// one GPU, each sees only its own kernels and the contention between processes
+// is not modelled.
+void hapiNormalizeCuptiLoads() {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  gm.cupti_obj_norm_load_.clear();
+
+  struct SweepKernel {
+    LDObjKey obj_key;
+    uint64_t start_ns;
+    uint64_t end_ns;
+    int      sms_used;
+    bool     attributed;   // false => consumes SMs but earns no load
+    // Whole-device occupancy this kernel earned, filled in by the sweep.
+    double   demand;
+  };
+  std::unordered_map<uint32_t, std::vector<SweepKernel>> byDevice;
+  for (const auto& kv : gm.cupti_obj_kernel_records_) {
+    for (const LBKernelRecord& k : kv.second) {
+      if (k.end_ns <= k.start_ns) continue;
+      byDevice[k.device_id].push_back({kv.first, k.start_ns, k.end_ns,
+                                       k.sms_used, true, 0.0});
+    }
+  }
+  for (const LBKernelRecord& k : gm.cupti_unattributed_kernels_) {
+    if (k.end_ns <= k.start_ns) continue;
+    byDevice[k.device_id].push_back({LDObjKey{}, k.start_ns, k.end_ns,
+                                     k.sms_used, false, 0.0});
+  }
+
+  size_t total_kernels = 0, devices_normalized = 0;
+  // Completeness accounting: device-seconds credited to an object,
+  // device-seconds consumed by kernels with no owner, and the wall time the
+  // device had any work at all. The unowned share is work no object is charged
+  // for, so it vanishes from the balancer's view of the node.
+  double sweep_attr_demand = 0.0, sweep_unattr_demand = 0.0, sweep_busy_s = 0.0;
+  size_t sweep_unattr_kernels = gm.cupti_unattributed_kernels_.size();
+  for (auto& kv : byDevice) {
+    std::vector<SweepKernel>& kernels = kv.second;
+    if (kernels.empty()) continue;
+
+    DeviceManager* dm = findDeviceManager(gm, kv.first);
+    int total_sms = (dm != nullptr) ? dm->multi_processor_count : 0;
+    if (total_sms <= 0) continue;  // unknown device size -- cannot normalize
+    total_kernels += kernels.size();
+    devices_normalized++;
+
+    // Two events per kernel. END sorts before START on a tie so a kernel
+    // ending at instant t does not briefly count alongside one starting at t.
+    struct Event { uint64_t time; int kind; int kidx; };  // kind: 0=END, 1=START
+    std::vector<Event> events;
+    events.reserve(2 * kernels.size());
+    for (int ki = 0; ki < (int)kernels.size(); ++ki) {
+      events.push_back({kernels[ki].start_ns, 1, ki});
+      events.push_back({kernels[ki].end_ns,   0, ki});
+    }
+    std::sort(events.begin(), events.end(),
+              [](const Event& a, const Event& b) {
+                if (a.time != b.time) return a.time < b.time;
+                return a.kind < b.kind;
+              });
+
+    // Active set ordered by start_ns (then index, for stability) so that
+    // iteration order is FIFO by submission.
+    auto cmpActive = [&kernels](int a, int b) {
+      if (kernels[a].start_ns != kernels[b].start_ns)
+        return kernels[a].start_ns < kernels[b].start_ns;
+      return a < b;
+    };
+    std::set<int, decltype(cmpActive)> active(cmpActive);
+
+    uint64_t t_prev = events.front().time;
+    for (const auto& ev : events) {
+      if (ev.time > t_prev && !active.empty()) {
+        double dt_s = (double)(ev.time - t_prev) / 1.0e9;
+
+        // Split this interval's occupancy in proportion to what each active
+        // kernel asked for.
+        //
+        // Handing SMs out FIFO by submission and stopping at the first kernel
+        // that finds the pool empty does not work: every kernel behind that
+        // point earns nothing for the interval, so whether an object is
+        // credited depends on where its kernels land in the launch order
+        // relative to its neighbours' -- which reshuffles whenever placement
+        // changes. That makes the metric unstable in the one direction that
+        // matters: a device running more objects oversubscribes harder, so more
+        // of its kernels fall past the cut-off and its objects measure cheaper
+        // than they are, and a balancer reading that sends the busiest node
+        // still more work. Proportional sharing is also the better model of the
+        // hardware: kernels that oversubscribe an SM pool time-share it rather
+        // than running strictly in submission order.
+        long want = 0;
+        for (int ki : active) {
+          if (kernels[ki].sms_used > 0) want += kernels[ki].sms_used;
+        }
+        if (want > 0) {
+          sweep_busy_s += dt_s;
+          // Split the interval's DEVICE TIME among the kernels holding the
+          // device, in proportion to the SMs each asked for. The weights decide
+          // how concurrent work is divided; they must not decide how much there
+          // is to divide.
+          //
+          // Charging dt * sms_used/total_sms instead -- SM-occupancy seconds --
+          // records a kernel that held the device for an interval at low
+          // occupancy as almost no load. That is the right measure of
+          // throughput and the wrong one for balancing: an object whose kernels
+          // tie up the GPU for 10ms costs its PE 10ms whether they fill 4 SMs
+          // or 80. The error is also not uniform, which is what makes it
+          // dangerous: an imbalanced distribution gives lightly-loaded objects
+          // small grids, so a node holding many of them runs many low-occupancy
+          // kernels -- busy the whole interval, yet reporting almost nothing --
+          // and the balancer reads it as idle and sends it still more work.
+          //
+          // Weighting by sms_used keeps a big kernel worth more than a small
+          // one running beside it, while the interval total stays dt: summed
+          // over a device, attributed demand equals its busy time.
+          for (int ki : active) {
+            const int used = kernels[ki].sms_used;
+            if (used <= 0) continue;
+            // Computed for unowned kernels too; they are still not credited to
+            // any object below, but leaving their share uncomputed is what
+            // makes such a loss invisible to the audit.
+            kernels[ki].demand += dt_s * ((double)used / (double)want);
+          }
+        }
+      }
+      if (ev.kind == 1) active.insert(ev.kidx);
+      else              active.erase(ev.kidx);
+      t_prev = ev.time;
+    }
+
+    for (const SweepKernel& k : kernels) {
+      if (k.demand <= 0.0) continue;
+      if (!k.attributed) { sweep_unattr_demand += k.demand; continue; }
+      sweep_attr_demand += k.demand;
+      gm.cupti_obj_norm_load_[k.obj_key] += k.demand;
+    }
+  }
+
+  if (_lb_args.debug() > 1) {
+    CmiPrintf("HAPI[pe=%d]: hapiNormalizeCuptiLoads  %zu kernels across %zu "
+              "device(s) -> %zu objects\n",
+              CmiMyPe(), total_kernels, devices_normalized,
+              gm.cupti_obj_norm_load_.size());
+  }
+
+  // Where the device's work went. attributed+unowned is every device-second the
+  // sweep saw.
+  if (getenv("CHARM_GPU_LOAD_AUDIT") != nullptr) {
+    const double seen = sweep_attr_demand + sweep_unattr_demand;
+    // Wall time this window actually covered. busy_s alone cannot say whether a
+    // round measured more work or simply measured for longer, and those call
+    // for opposite responses.
+    static double s_last_audit_t = 0.0;
+    const double now_t = CmiWallTimer();
+    const double window_s = (s_last_audit_t > 0.0) ? (now_t - s_last_audit_t) : 0.0;
+    s_last_audit_t = now_t;
+    CmiPrintf("[gpu-audit pe=%d] kernels=%zu unowned_kernels=%zu objects=%zu "
+              "attributed_s=%.6f unowned_s=%.6f unowned_frac=%.3f busy_s=%.6f "
+              "util=%.3f window_s=%.6f occ=%.4f\n",
+              CmiMyPe(), total_kernels, sweep_unattr_kernels,
+              gm.cupti_obj_norm_load_.size(), sweep_attr_demand,
+              sweep_unattr_demand, (seen > 0.0) ? sweep_unattr_demand / seen : 0.0,
+              sweep_busy_s, (sweep_busy_s > 0.0) ? seen / sweep_busy_s : 0.0,
+              window_s, (window_s > 0.0) ? sweep_busy_s / window_s : 0.0);
+    fflush(stdout);
+  }
+}
+
+void hapiPrepareCuptiLoads(uint64_t epoch) {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  std::lock_guard<std::mutex> lk(gm.cupti_prepare_lock_);
+  // Already built for this epoch or a later one.
+  if (gm.cupti_loads_ready_ && epoch <= gm.cupti_loads_epoch_) return;
+
+  const bool timeIt = (getenv("CHARM_LB_CUPTI_TIME") != nullptr);
+  const double t0 = timeIt ? CmiWallTimer() : 0.0;
+  // Only flush while CUPTI is attached: an application driving its own
+  // instrumentation window may already have switched tracing off, and its stop
+  // path flushed on the way out, so there is nothing left to pull.
+  //
+  // FLUSH_FORCED rather than a plain flush: without it CUPTI hands back only
+  // the buffers it considers complete, and the kernel records still sitting in
+  // a partly-filled buffer are read a round late or not at all.
+  if (hapiCuptiTracingActive())
+    CUPTI_SAFE_CALL(cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
+  const double t1 = timeIt ? CmiWallTimer() : 0.0;
+  hapiProcessCuptiBuffers();
+  const double t2 = timeIt ? CmiWallTimer() : 0.0;
+  hapiNormalizeCuptiLoads();
+  // Close the measurement window exactly where it was read. These records were
+  // just consumed; anything recorded from here on belongs to the next round.
+  //
+  // Dropping them at MigrationDone instead -- after the strategy has run and
+  // the migrations have executed -- means kernels running through all of that
+  // are recorded and then discarded, belonging to no round at all, and the
+  // amount discarded depends on how long that round's LB step took. That is a
+  // feedback loop between migration count and measured load.
+  gm.cupti_obj_kernel_records_.clear();
+  gm.cupti_unattributed_kernels_.clear();
+  if (timeIt) {
+    const double t3 = CmiWallTimer();
+    CmiPrintf("[LBCUPTI pe=%d] flush=%.3fs process=%.3fs normalize=%.3fs total=%.3fs\n",
+              CmiMyPe(), t1 - t0, t2 - t1, t3 - t2, t3 - t0);
+    fflush(stdout);
+  }
+
+  gm.cupti_loads_ready_ = true;
+  gm.cupti_loads_epoch_ = epoch;
+}
+
+void hapiClearCuptiData() {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  // Same lock as hapiPrepareCuptiLoads: this drops the maps that function
+  // builds and that every PE reads, so it must not run underneath either.
+  std::lock_guard<std::mutex> lk(gm.cupti_prepare_lock_);
+  gm.cupti_loads_ready_ = false;
+  gm.cupti_loads_epoch_ = 0;
+
+  gm.cupti_obj_kernel_records_.clear();
+  gm.cupti_unattributed_kernels_.clear();
+  gm.cupti_obj_norm_load_.clear();
+  // The correlation map is drained alongside the CUPTI buffers in
+  // hapiProcessCuptiBuffers. Do not clear the object-token table: later epochs
+  // must reuse the same token for the same full LB identity, and the per-PE
+  // caches in front of it have no invalidation protocol.
+}
+
+#else /* !HAPI_CUPTI_LB */
+
+void hapiProcessCuptiBuffers() {}
+void hapiNormalizeCuptiLoads() {}
+void hapiPrepareCuptiLoads(uint64_t epoch) {}
+void hapiClearCuptiData() {}
+
+#endif /* HAPI_CUPTI_LB */
+
+// Build this round's per-object GPU loads exactly once per round, however many
+// PE threads call in. A load balancer's per-PE barrier fires when THAT PE's
+// objects are at AtSync, but the records are shared by the whole process, so
+// the drain has to wait for the last PE rather than run on the first.
+bool hapiCuptiArrive(uint64_t epoch, int expected) {
+#ifdef HAPI_CUPTI_LB
+  GPUManager& gm = CsvAccess(gpu_manager);
+  std::lock_guard<std::mutex> lk(gm.cupti_arrive_lock_);
+  // A new round resets the count. Rounds are strictly sequential -- a step
+  // completes on a job-wide barrier before the next can start -- so a stale
+  // count from a previous epoch can only mean that epoch is over.
+  if (gm.cupti_arrive_epoch_ != epoch) {
+    gm.cupti_arrive_epoch_ = epoch;
+    gm.cupti_arrive_count_ = 0;
+  }
+  gm.cupti_arrive_count_++;
+  if (gm.cupti_arrive_count_ < expected) return false;
+  gm.cupti_arrive_count_ = 0;
+  return true;
+#else
+  // Nothing to build, so nothing to wait for: every caller proceeds and reads
+  // an empty load map.
+  return true;
 #endif
+}
+
+#endif /* CMK_CUDA && CMK_LBDB_ON */
 
 
 // Initialize per-PE variables
@@ -665,25 +1214,19 @@ static void hapiMapping(char** argv) {
 }
 
 #ifndef HAPI_CUDA_CALLBACK
-void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL, CkMigratable* obj = NULL, hapiEvent_t start_ev = NULL) {
-  // if(obj!=NULL)
-  //   CmiAbort("non null without HAPI hapi CALLBACK");
+void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
   // create hapi event / get hapi event from the pool and insert into stream
   hapiEvent_t ev;
   auto& hapi_event_pool_local = CpvAccess(hapi_event_pool);
   if(hapi_event_pool_local.size() == 0) {
-  #ifdef HAPI_CUPTI_LB
-    hapiEventCreateWithFlags(&ev, hapiEventDefault);
-  #else
     hapiEventCreateWithFlags(&ev, hapiEventDisableTiming);
-  #endif
   } else {
     ev = hapi_event_pool_local.front();
     hapi_event_pool_local.pop();
   }
   hapiEventRecord(ev, stream);
 
-  hapiEvent hev(ev, cb, cb_msg, wr, obj, start_ev);
+  hapiEvent hev(ev, cb, cb_msg, wr);
 
   // push event information in queue
   CpvAccess(hapi_event_queue).push(hev);
@@ -1641,17 +2184,6 @@ void hapiPollEvents(void* param) {
     if (hapiEventQuery(hev.event) == hapiSuccess) {
       queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
 
-#ifdef HAPI_CUPTI_LB
-      if (hev.obj) {
-        // CmiPrintf("should not be printed w/o hapi hapi callback \n");
-        float gpu_time;
-        hapiEventElapsedTime(&gpu_time, hev.start_ev, hev.event);
-        // hapiEventElapsedTime returns ms, convert to seconds to match wallTime units
-        double gpu_time_s = gpu_time / 1000.0;
-        hev.obj->setObjGPUTime(gpu_time_s + hev.obj->getObjGPUTime());
-        hapiEventDestroy(hev.start_ev);
-      } else 
-#endif        
       // invoke Charm++ callback if one was given
       hev.cb.send(hev.cb_msg);
 
@@ -1705,64 +2237,113 @@ hapiStream_t hapiGetStream() {
 
   return ret;
 }
+#if CMK_CUDA && CMK_LBDB_ON
 #ifdef HAPI_CUPTI_LB
-// Lightweight HAPI, to be invoked after data transfer or kernel execution.
-void hapiRecordTime(hapiStream_t stream, hapiEvent_t start) {
-  Chare* obj = CkActiveObj();
-  if (obj && dynamic_cast<CkMigratable*>(obj)) {
 
-  #ifndef HAPI_CUDA_CALLBACK
-  // record hapi event
-    recordEvent(stream, CkCallback(), NULL, NULL, dynamic_cast<CkMigratable*>(obj), start);
-#else
-  #error hapi record time with HAPI_CUDA_CALLBACK not supported
-#endif
+// How many external-correlation IDs this PE has actually pushed and not yet
+// popped. Tracing is switched on and off from inside entry methods, so a push
+// can be skipped while its matching pop still runs (or the reverse). Pairing
+// the pop against this count rather than against the tracing flag keeps
+// CUPTI's stack balanced across those transitions; without it the pop reports
+// CUPTI_ERROR_QUEUE_EMPTY and attribution drifts. Each Charm++ PE is its own
+// thread, so thread_local is per-PE.
+static thread_local int cupti_pushed_depth = 0;
+// The detach generation this PE last observed; see GPUManager::cupti_generation_.
+static thread_local uint64_t cupti_seen_generation = 0;
 
-    // while there is an ongoing workrequest, quiescence should not be detected
-    // even if all PEs seem idle
-    CmiAssert(hapiQdCreate);
-    hapiQdCreate(1);
+// This PE's view of the process-wide token table. Every entry method on a
+// migratable chare needs its object's token, and the table behind it is shared
+// by every PE in the process, so consulting it under the node-wide lock would
+// serialize the whole process on one mutex for the length of the run.
+//
+// The table is append-only for the lifetime of the process, which is what makes
+// this cache safe without any invalidation protocol: an entry, once correct,
+// stays correct, including across migration (the destination PE simply misses
+// once and interns the same token the source PE already has). Anything that
+// gains the ability to clear or renumber GpuObjectTokenTable must also
+// invalidate these caches.
+static thread_local std::unordered_map<LDObjKey, uint64_t, LDObjKeyHash>
+    cupti_local_object_tokens;
+
+// Drop this PE's outstanding push count if CUPTI has been detached since we
+// last looked -- the stack those pushes referred to no longer exists, so
+// popping against it would report CUPTI_ERROR_QUEUE_EMPTY.
+static inline void hapiCuptiSyncGeneration(GPUManager& gm) {
+  if (cupti_seen_generation != gm.cupti_generation_) {
+    cupti_seen_generation = gm.cupti_generation_;
+    cupti_pushed_depth = 0;
   }
 }
-#endif
 
-#ifdef HAPI_CUPTI_LB
 uint64_t hapiCuptiPushObjCorrelation() {
-  // printf("seeing CsvAccess(gpu_manager).cupti_initialized_ as %d\n", CsvAccess(gpu_manager).cupti_initialized_);
-  if (!CsvAccess(gpu_manager).cupti_initialized_) return 0;
+  GPUManager& gm = CsvAccess(gpu_manager);
+  // Gated on tracing rather than initialization: this runs on every entry
+  // method, so when tracing is off the whole body -- the active-object lookup
+  // and two CUPTI calls -- must be skipped, not just wasted.
+  if (!gm.cupti_tracing_active_.load(std::memory_order_relaxed)) return 0;
+  hapiCuptiSyncGeneration(gm);
 
-  // Get the active Charm++ object
-  Chare* chare = CkActiveObj();
-  if (!chare)
-    CmiAbort("hapiCuptiPushObjCorrelation call without active object is not possible");
+  // The CUPTI external ID is a process-local token for the complete LB object
+  // key. Using CkMigratable::ckGetID() here loses the object-manager identity
+  // and aliases equal element IDs from different chare arrays.
+  uint64_t object_token = HAPI_CUPTI_NO_OBJECT;
+  if (CkLocRec* active = CkActiveLocRec()) {
+    const LDObjHandle& handle = active->getLdHandle();
+    LDObjKey key;
+    key.omID() = handle.omID();
+    key.objID() = handle.objID();
 
-  CkMigratable* mig = dynamic_cast<CkMigratable*>(chare);
-  // printf("mig %p\n", mig);
-  if (!mig) return 0;
+    // Steady state is a PE-local hit: the shared lock is taken only the first
+    // time this PE runs a given object, so it costs O(objects that ever run
+    // here) acquisitions rather than one per entry method.
+    auto cached = cupti_local_object_tokens.find(key);
+    if (cached != cupti_local_object_tokens.end()) {
+      object_token = cached->second;
+    } else {
+      {
+        std::lock_guard<std::mutex> token_lock(gm.cupti_object_token_lock_);
+        if (!gm.cupti_object_tokens_.intern(key, object_token))
+          CmiAbort("HAPI: exhausted CUPTI object-correlation tokens");
+      }
+      cupti_local_object_tokens.emplace(key, object_token);
+    }
+  }
 
-  // Use the raw element ID as the external correlation ID
-  // CmiUInt8 is a 64-bit unique object identifier
-  uint64_t obj_id = (uint64_t)mig->ckGetID();
-#if CMK_CUDA
+  // Always push, even with the sentinel, so that the matching pop always has
+  // something to remove; an unbalanced stack would mis-attribute every
+  // subsequent kernel.
   CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
-      CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, obj_id));
-#endif
-  // printf("pushed corr id\n");
+      CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, object_token));
+  ++cupti_pushed_depth;
 
-  return obj_id;
+  return object_token;
 }
 
 void hapiCuptiPopObjCorrelation() {
-  if (!CsvAccess(gpu_manager).cupti_initialized_) return;
+  // Runs the generation check even when tracing is off: a detach may have
+  // happened between this entry method's push and its pop, and the stale count
+  // has to be cleared here rather than on the next push.
+  GPUManager& gm = CsvAccess(gpu_manager);
+  hapiCuptiSyncGeneration(gm);
 
-  // printf("popped corr id\n");
+  // Pop exactly what was pushed. Checking the tracing flag here instead would
+  // pop entries this PE never pushed, once tracing is switched on part-way
+  // through an entry method.
+  if (cupti_pushed_depth == 0 || !gm.cupti_initialized_) return;
+  --cupti_pushed_depth;
+
   uint64_t tag;
-#if CMK_CUDA
   CUPTI_SAFE_CALL(cuptiActivityPopExternalCorrelationId(
       CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, &tag));
-#endif
 }
-#endif  /* HAPI_CUPTI_LB */
+
+#else /* !HAPI_CUPTI_LB */
+
+uint64_t hapiCuptiPushObjCorrelation() { return 0; }
+void hapiCuptiPopObjCorrelation() {}
+
+#endif /* HAPI_CUPTI_LB */
+#endif /* CMK_CUDA && CMK_LBDB_ON */
 
 // Lightweight HAPI, to be invoked after data transfer or kernel execution.
 void hapiAddCallback(hapiStream_t stream, const CkCallback& cb, void* cb_msg) {
@@ -1848,5 +2429,21 @@ uint64_t hapiMyDevice() {
   int physical_node_id = CmiPhysicalNodeID(CmiMyPe());
   int my_device = CpvAccess(my_device);
   return (static_cast<uint64_t>(physical_node_id) << 32) | my_device;
+}
+
+int hapiMyDeviceTotalSMs() {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  int local_id = CpvAccess(my_device_id);
+  if (local_id < 0 || local_id >= (int)gm.device_managers.size()) return 0;
+  DeviceManager& dm = gm.device_managers[local_id];
+  if (!dm.props_initialized) {
+    // The lazy population in hapiProcessCuptiBuffers has not run yet (or CUPTI
+    // is not in this build at all), so ask for just this one attribute.
+    int count = 0;
+    hapiCheck(cudaDeviceGetAttribute(&count, cudaDevAttrMultiProcessorCount,
+                                     dm.global_index));
+    return count;
+  }
+  return dm.multi_processor_count;
 }
 

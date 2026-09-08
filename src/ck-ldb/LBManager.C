@@ -315,6 +315,8 @@ void _loadbalancerInit()
   CmiGetArgIntDesc(argv, "+LBVersion", &_lb_args.lbversion(),
                    "LB database file version number");
   CmiGetArgIntDesc(argv, "+LBCentPE", &_lb_args.central_pe(), "CentralLB processor");
+  CmiGetArgIntDesc(argv, "+LBPercentMovesAllowed", &_lb_args.percentMovesAllowed(),
+                   "For the greedy-refine balancers, the percentage of chares that can be moved");
   bool _lb_dump_activated = false;
   if (CmiGetArgIntDesc(argv, "+LBDump", &LBSimulation::dumpStep,
                        "Dump the LB state from this step"))
@@ -474,6 +476,7 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBPredictorWindow");
   _registerCommandLineOpt("+LBVersion");
   _registerCommandLineOpt("+LBCentPE");
+  _registerCommandLineOpt("+LBPercentMovesAllowed");
   _registerCommandLineOpt("+LBDump");
   _registerCommandLineOpt("+LBDumpSteps");
   _registerCommandLineOpt("+LBDumpFile");
