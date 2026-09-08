@@ -18,29 +18,31 @@ ProcArray::ProcArray(BaseLB::LDStats *stats) {
 
   // fill the processor array
   procs.resize(numPes);
-  availPeMap.resize(numPes);
-  std::fill(availPeMap.data(), availPeMap.data() + numPes, -1);
+  availPeMap.clear();
+  availPeMap.reserve(numPes);
 
   // Loop through the LDStats structure, copying data into this array and calculating
   //   the average 'totalLoad' of all the PEs
-  availProcSize = 0;
   avgLoad = 0.0;
-  int currAvailPe = 0;
   for(int pe = 0; pe < numPes; pe++) {
     procs[pe].id        = stats->procs[pe].pe;
     procs[pe].setOverhead(stats->procs[pe].bg_walltime);
     procs[pe].setTotalLoad(stats->procs[pe].total_walltime - stats->procs[pe].idletime);
     procs[pe].available = stats->procs[pe].available;
     //CkPrintf("%i avail = %d\n", pe, procs[pe].available);
-    availProcSize += (procs[pe].available ? 1 : 0);
     avgLoad += procs[pe].getTotalLoad();
-    if (!procs[pe].available)
-      currAvailPe++;
-    if (currAvailPe < numPes)
-      availPeMap[pe] = currAvailPe++;
+    // availPeMap[k] is the PE that the k-th available processor is. A graph
+    // partitioner numbers its parts 0..availProcSize-1 over the available PEs
+    // only, and reassignPeMapToAvailable turns a part number back into a real
+    // PE by indexing this. It used to be filled the other way round -- PE to
+    // running index -- with a second stray increment on every unavailable PE,
+    // and then truncated to availProcSize. With every PE available that is the
+    // identity and works; with even one unavailable it hands back the wrong PE
+    // or the -1 fill, and -1 goes on to setNewPe as a migration destination.
+    if (procs[pe].available) availPeMap.push_back(pe);
 //		CkPrintf("PE%d overhead:%f totalLoad:%f \n",pe,procs[pe].overhead(),procs[pe].totalLoad());
   }
-  availPeMap.resize(availProcSize);
+  availProcSize = availPeMap.size();
   avgLoad /= numPes;
 }
 

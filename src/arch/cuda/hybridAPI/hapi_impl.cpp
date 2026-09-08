@@ -7,6 +7,7 @@
 #include <queue>
 #include <atomic>
 #include <vector>
+#include <deque>
 #include <set>
 #include <map>
 #include <mutex>
@@ -96,7 +97,14 @@ typedef struct hapiEvent {
 // expert's 10-150 ms compute-done event was not noticed until that expert
 // finished. A stream's entry stays once created (a handful per PE), so a
 // destroyed-and-reused handle just reuses it.
-typedef std::vector<std::pair<hapiStream_t, std::queue<hapiEvent>>> hapiEventQueues;
+// A deque, not a vector: hapiPollEvents walks this by reference and the
+// callbacks it fires can record new events, and a new stream appends a
+// queue here. A vector reallocates on that append, leaving the reference
+// hapiPollEvents is holding dangling -- its next pop() then frees through
+// stale memory, which is the double free seen inside hapiPollEvents when a
+// balancer migrates enough objects to create a batch of new streams.
+// A deque keeps references to existing elements valid across push_back.
+typedef std::deque<std::pair<hapiStream_t, std::queue<hapiEvent>>> hapiEventQueues;
 CpvDeclare(hapiEventQueues, hapi_event_queue);
 CpvDeclare(std::queue<hapiEvent_t>, hapi_event_pool);
 #endif // HAPI_CUDA_CALLBACK
@@ -2593,9 +2601,17 @@ std::mutex hapi_devpool_mutex;
 std::multimap<const void*, cudaStream_t> hapi_devpool_read_on;
 // Freed blocks waiting for their reads to retire before they can be reused --
 // one event per stream the reads were on (in practice one).
-struct HapiDevPoolPending { void* ptr; std::vector<cudaEvent_t> evs; };
+struct HapiDevPoolPending { void* ptr; int device; std::vector<cudaEvent_t> evs; };
 std::vector<HapiDevPoolPending> hapi_devpool_pending;
-std::vector<cudaEvent_t> hapi_devpool_spare_events;
+// Spare events to record with, kept per device. A CUDA event belongs to the
+// device that was current when it was created, and recording it on a stream
+// belonging to another device fails with cudaErrorInvalidResourceHandle. PEs
+// in one process sit on different devices (my_device is a Cpv, and a process
+// that owns the whole node sees every GPU), and they share this pool under
+// hapi_devpool_mutex -- so a single list hands a PE freeing a device-1 block
+// an event created on device 0. That costs nothing until the first reuse,
+// which is why it survives one load-balancing step and fails on the next.
+std::map<int, std::vector<cudaEvent_t>> hapi_devpool_spare_events;
 
 size_t hapiDevPoolArenaBytes() {
   static size_t bytes = 0;
@@ -2623,12 +2639,21 @@ void hapiDevPoolReapLocked() {
   for (size_t i = 0; i < hapi_devpool_pending.size();) {
     HapiDevPoolPending& pd = hapi_devpool_pending[i];
     bool done = true;
-    for (cudaEvent_t ev : pd.evs)
-      if (cudaEventQuery(ev) != cudaSuccess) { done = false; break; }
+    for (cudaEvent_t ev : pd.evs) {
+      const cudaError_t ev_state = cudaEventQuery(ev);
+      // A query records its verdict as this thread's last error, and the
+      // application's next cudaPeekAtLastError would report our "not ready"
+      // as its own kernel's failure. Clear that one code and nothing else: a
+      // real fault is sticky and comes back from the query itself, so leaving
+      // any other code in place keeps it visible to whoever checks next.
+      if (ev_state == cudaErrorNotReady) cudaGetLastError();
+      if (ev_state != cudaSuccess) { done = false; break; }
+    }
     if (done) {
       HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(pd.ptr);
       if (ar) ar->alloc->free(pd.ptr);
-      for (cudaEvent_t ev : pd.evs) hapi_devpool_spare_events.push_back(ev);
+      auto& spares = hapi_devpool_spare_events[pd.device];
+      for (cudaEvent_t ev : pd.evs) spares.push_back(ev);
       pd = std::move(hapi_devpool_pending.back());
       hapi_devpool_pending.pop_back();
     } else {
@@ -2699,15 +2724,33 @@ void hapiDevPoolFree(void* ptr) {
   }
   // The packer is (or was) reading inside this block on those streams. Record
   // behind the reads and park; reaped once every event has completed.
-  HapiDevPoolPending pd; pd.ptr = ptr;
+  // Keyed by the device this PE has current, which is the device the streams
+  // it noted reads on belong to -- not the device the block's arena is on.
+  // A block can be freed by a PE on a different device than the arena was
+  // created for, so pairing the event with the arena records a device-0 event
+  // on a device-1 stream and CUDA rejects it.
+  int cur_dev = 0;
+  hapiCheck(cudaGetDevice(&cur_dev));
+  HapiDevPoolPending pd; pd.ptr = ptr; pd.device = cur_dev;
+  auto& spares = hapi_devpool_spare_events[cur_dev];
   for (cudaStream_t st : streams) {
     cudaEvent_t ev;
-    if (!hapi_devpool_spare_events.empty()) {
-      ev = hapi_devpool_spare_events.back(); hapi_devpool_spare_events.pop_back();
+    if (!spares.empty()) {
+      ev = spares.back(); spares.pop_back();
     } else {
       hapiCheck(cudaEventCreateWithFlags(&ev, cudaEventDisableTiming));
     }
-    hapiCheck(cudaEventRecord(ev, st));
+    const cudaError_t rec = cudaEventRecord(ev, st);
+    if (rec != cudaSuccess) {
+      int cur = -1; cudaGetDevice(&cur);
+      const cudaError_t sq = cudaStreamQuery(st);
+      const cudaError_t eq = cudaEventQuery(ev);
+      CmiPrintf("[%d] devpool record failed: %s | ptr=%p arena_dev=%d cur_dev=%d "
+                "stream=%p (query %s) event=%p (query %s)\n",
+                CmiMyPe(), cudaGetErrorName(rec), ptr, ar->device, cur,
+                (void*)st, cudaGetErrorName(sq), (void*)ev, cudaGetErrorName(eq));
+      CmiAbort("devpool: cudaEventRecord failed");
+    }
     pd.evs.push_back(ev);
   }
   hapi_devpool_pending.push_back(std::move(pd));

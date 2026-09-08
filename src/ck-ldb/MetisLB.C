@@ -14,6 +14,8 @@
 #include "LBMemoryContract.h"
 #include <algorithm>
 #include <cstddef>
+#include <limits>
+#include <map>
 #include <metis.h>
 
 extern int quietModeRequested;
@@ -93,12 +95,27 @@ void MetisLB::work(LDStats* stats)
 
   /* adjacency list */
   std::vector<idx_t> xadj(numVertices + 1);
-  /* id of the neighbors */
-  std::vector<idx_t> adjncy(numEdges);
+  /* id of the neighbors (one entry per distinct neighbour, so at most numEdges) */
+  std::vector<idx_t> adjncy;
+  adjncy.reserve(numEdges);
   /* weights of the vertices (interleaved when nConstraints > 1) */
   std::vector<idx_t> vwgt((size_t)numVertices * nConstraints);
   /* weights of the edges */
-  std::vector<idx_t> adjwgt(numEdges);
+  std::vector<idx_t> adjwgt;
+  adjwgt.reserve(numEdges);
+
+  // METIS requires a clean undirected structure: no self-loop, no neighbour
+  // repeated within a vertex's list, and positive weights. The graph as built
+  // guarantees none of that. The central statistics are the per-PE commData
+  // lists concatenated (CentralLB::depositData), never merged by
+  // (sender, receiver), so one object pair contributes one edge per PE that
+  // recorded it -- routine as soon as an object has migrated during the
+  // instrumented window. METIS does not reject such input; it walks off its
+  // arrays, and the damage surfaces later as an unrelated abort somewhere
+  // else in the process. Merge to one entry per neighbour, and drop what METIS
+  // cannot accept.
+  int selfLoops = 0, outOfRange = 0, duplicates = 0;
+  std::map<idx_t, long long> nbrs;
 
   int edgeNum = 0;
   double ratio;
@@ -123,22 +140,39 @@ void MetisLB::work(LDStats* stats)
       w[1] = (idx_t)(fp >> 20) + 1;
     }
 #endif
+    nbrs.clear();
+    auto addEdge = [&](int nbr, int bytes) {
+      if (nbr == i) { selfLoops++; return; }
+      if (nbr < 0 || nbr >= numVertices) { outOfRange++; return; }
+      const auto res = nbrs.emplace((idx_t)nbr, 0LL);
+      if (!res.second) duplicates++;
+      if (bytes > 0) res.first->second += bytes;
+    };
     for (const auto& outEdge : ogr->vertices[i].sendToList)
-    {
-      adjncy[edgeNum] = outEdge.getNeighborId();
-      adjwgt[edgeNum] = outEdge.getNumBytes();
-      edgeNum++;
-    }
+      addEdge(outEdge.getNeighborId(), outEdge.getNumBytes());
     for (const auto& inEdge : ogr->vertices[i].recvFromList)
+      addEdge(inEdge.getNeighborId(), inEdge.getNumBytes());
+
+    for (const auto& nbr : nbrs)
     {
-      adjncy[edgeNum] = inEdge.getNeighborId();
-      adjwgt[edgeNum] = inEdge.getNumBytes();
+      adjncy.push_back(nbr.first);
+      // Positive and in range: idx_t is 32 bits in a stock METIS build, and
+      // these are byte counts summed over the whole instrumented window. Both
+      // endpoints sum the same set of records, so the capped weight stays
+      // symmetric, which METIS also requires.
+      adjwgt.push_back((idx_t)std::min<long long>(
+          std::max<long long>(nbr.second, 1),
+          (long long)std::numeric_limits<idx_t>::max()));
       edgeNum++;
     }
   }
 
   xadj[numVertices] = edgeNum;
-  CkAssert(edgeNum == numEdges);
+
+  if (selfLoops || outOfRange || duplicates)
+    CkPrintf("CharmLB> MetisLB: dropped %d self-loop(s) and %d out-of-range "
+             "edge(s), merged %d duplicate edge(s) of %zu\n",
+             selfLoops, outOfRange, duplicates, numEdges);
 
   std::array<idx_t, METIS_NOPTIONS> options;
   METIS_SetDefaultOptions(options.data());
@@ -146,13 +180,14 @@ void MetisLB::work(LDStats* stats)
   options[METIS_OPTION_NUMBERING] = 0;
   // options[METIS_OPTION_PTYPE] = METIS_PTYPE_RB;
 
-  // number of constraints
-  constexpr idx_t numConstraints = 1;
-  idx_t ncon = numConstraints;
+  // number of constraints -- has to agree with how vwgt was filled above, or
+  // METIS reads a two-weight interleaved array as a one-weight one and the
+  // memory dimension silently does nothing.
+  idx_t ncon = nConstraints;
   // number of partitions
   idx_t numPes = parr->procs.size();
-  // allow 10% imbalance
-  std::array<real_t, numConstraints> ubvec = {1.1};
+  // allow 10% imbalance, in every constraint
+  std::vector<real_t> ubvec(nConstraints, 1.1);
 
   // Specifies size of vertices for computing the total communication volume
   constexpr idx_t* vsize = nullptr;
