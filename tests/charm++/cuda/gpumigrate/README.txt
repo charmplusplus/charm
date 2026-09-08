@@ -25,6 +25,20 @@ Migration is driven with ckMigrate(), not a load balancer, so the device
 migration path is exercised on its own rather than through a strategy's
 decision about whether to move anything.
 
+Build prerequisite
+------------------
+The Charm++ build must set -DCMK_GLOBAL_LOCATION_UPDATE=1, passed through
+EXTRA_OPTS at configure time:
+
+  cmake ... -DEXTRA_OPTS="-DCMK_GLOBAL_LOCATION_UPDATE=1"
+
+Device zerocopy sends are addressed to the PE the sender believes hosts the
+target. Without the global update a send issued around a migration arrives at
+a PE that no longer hosts it, and CkRdmaDeviceIssueRgets aborts rather than
+read the wrong buffer. This test does not itself send device zerocopy messages,
+so it passes either way -- but a real GPU application being balanced needs the
+option, so build with it.
+
 Running it
 ----------
   make CHARM_DIR=<build>

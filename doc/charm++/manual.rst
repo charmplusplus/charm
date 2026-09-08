@@ -2679,6 +2679,37 @@ infrastructure:
   options to point to the include and library directories used,
   respectively. (``+balancer ScotchLB``)
 
+The following centralized balancer targets GPU applications, and is
+available on CUDA builds only:
+
+- **GreedyRefineCentralGPULB**: Balances at two granularities at once.
+  Objects are assigned across *GPU groups* — the sets of PEs that share a
+  device — by their measured GPU load, and then across the PEs within a
+  group by their host load. This matches the usual arrangement in which
+  each process owns a GPU: which device an object runs on is decided by
+  its device work, and which PE drives it by its host work.
+  (``+balancer GreedyRefineCentralGPULB``)
+
+  The GPU load it reads is measured by CUPTI, per object, and normalized
+  to seconds of whole-device occupancy, so it estimates what an object
+  would cost on a *different* device rather than only what it cost where
+  it ran. Measurement follows ``LBTurnInstrumentOn()`` /
+  ``LBTurnInstrumentOff()``, so an application that instruments a window
+  around its own ``AtSync`` pays the tracing cost only inside it. See
+  :numref:`lbFramework` for the instrumentation calls.
+
+.. note::
+
+   Migrating a GPU application requires the runtime to be built with
+   ``-DCMK_GLOBAL_LOCATION_UPDATE=1`` (pass it through ``EXTRA_OPTS`` at
+   configure time). Device zerocopy sends are addressed to the PE the
+   sender believes hosts the target; without the global update, a send
+   issued around a migration arrives at a PE that no longer hosts it, and
+   the receive path aborts rather than silently reading the wrong buffer
+   (``ckrdmadevice.C``). The option keeps every PE's view of object
+   locations current, which is what makes migration and device zerocopy
+   usable together.
+
 In distributed approaches, the strategy executes across multiple PEs,
 providing scalable computational and communication performance.
 
