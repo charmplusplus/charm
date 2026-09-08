@@ -1344,12 +1344,29 @@ int LBManager::ProcessorGPUSpeed()
     CmiAbort("LB> PE %d: No GPU available, GPU speed = 0\n", CkMyPe());
   }
   
-  // Get device for this PE (round-robin assignment)
+  // Which device to describe. Both queries below take an explicit device id, so
+  // there is NOTHING to select here -- and the cudaSetDevice that used to be in
+  // this spot never restored the device that was current. It runs once per PE
+  // at the first load-balancing step, so from then on every PE had the wrong
+  // GPU selected, every stream created afterwards (a migrated-in element's, for
+  // instance) bound to the wrong device, and every cudaEventRecord pairing such
+  // a stream with a correctly-created event failed with
+  // cudaErrorInvalidResourceHandle -- silently, because the record was
+  // unchecked, so it surfaced as a CUDA error blamed on an unrelated chare
+  // hundreds of steps later.
+  //
+  // The id itself was a round-robin guess (CkMyPe() % deviceCount) rather than
+  // the device this PE actually drives, which is what CpvAccess(my_device)
+  // holds; keep the guess only as a fallback for a non-CUDA-aware build.
   int deviceId = CkMyPe() % deviceCount;
-  if (cudaSetDevice(deviceId) != cudaSuccess) {
-    CmiAbort("LB> PE %d: Failed to set GPU device %d, GPU speed = 0\n", CkMyPe(), deviceId);
+#if CMK_CUDA
+  {
+    int cur = -1;
+    if (cudaGetDevice(&cur) == cudaSuccess && cur >= 0 && cur < deviceCount)
+      deviceId = cur;
   }
-  
+#endif
+
   // Get device properties
   cudaDeviceProp prop;
   if (cudaGetDeviceProperties(&prop, deviceId) != cudaSuccess) {

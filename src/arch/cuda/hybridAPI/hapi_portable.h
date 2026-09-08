@@ -44,6 +44,8 @@
 
 #define hapiStreamSynchronize(stream) cudaStreamSynchronize(stream)
 #define hapiStreamCreate(stream) cudaStreamCreate(stream)
+#define hapiStreamCreateNonBlocking(stream) \
+    cudaStreamCreateWithFlags(stream, cudaStreamNonBlocking)
 #define hapiStreamDestroy cudaStreamDestroy
 #define hapiStreamDefault cudaStreamDefault
 #define hapiStreamCreateWithPriority cudaStreamCreateWithPriority
@@ -173,6 +175,8 @@ static inline cudaError_t hapiFreeRecord(void* ptr) {
 #define hapiGetDeviceProperties(prop, dev) hipGetDeviceProperties(prop, dev)
 #define hapiGetDevice(dev) hipGetDevice(dev)
 #define hapiStreamCreate(stream) hipStreamCreate(stream)
+#define hapiStreamCreateNonBlocking(stream) \
+    hipStreamCreateWithFlags(stream, hipStreamNonBlocking)
 
 // See the CUDA branch: allocation attribution for the LB memory contract.
 void hapiRecordAlloc(void* ptr, size_t size);

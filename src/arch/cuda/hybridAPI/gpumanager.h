@@ -638,9 +638,11 @@ struct GPUManager {
       streams_[i] = old_streams[i];
     }
 
-    // Create new streams
+    // Create new streams. Non-blocking: a blocking stream implicitly
+    // synchronizes with the legacy default stream, so every user of one of
+    // these serializes against every other stream's default-stream work.
     for (; i < new_n_streams; i++) {
-      hapiCheck(hapiStreamCreate(&streams_[i]));
+      hapiCheck(hapiStreamCreateNonBlocking(&streams_[i]));
     }
 
     // Update

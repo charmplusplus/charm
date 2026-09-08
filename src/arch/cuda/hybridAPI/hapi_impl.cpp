@@ -106,7 +106,10 @@ typedef struct hapiEvent {
 // A deque keeps references to existing elements valid across push_back.
 typedef std::deque<std::pair<hapiStream_t, std::queue<hapiEvent>>> hapiEventQueues;
 CpvDeclare(hapiEventQueues, hapi_event_queue);
-CpvDeclare(std::queue<hapiEvent_t>, hapi_event_pool);
+// Free events, partitioned by the device they were created on: an event can
+// only be recorded on a stream of its own device.
+typedef std::map<int, std::queue<hapiEvent_t>> HapiEventPools;
+CpvDeclare(HapiEventPools, hapi_event_pool);
 #endif // HAPI_CUDA_CALLBACK
 CpvDeclare(int, n_hapi_events);
 
@@ -1299,7 +1302,7 @@ static void hapiInitCpv() {
   // HAPI event-related
 #ifndef HAPI_CUDA_CALLBACK
   CpvInitialize(hapiEventQueues, hapi_event_queue);
-  CpvInitialize(std::queue<hapiEvent_t>, hapi_event_pool);
+  CpvInitialize(HapiEventPools, hapi_event_pool);
   // for(int i = 0; i < 8; i++) {
   //   hapiEvent_t ev;
   //   hapiEventCreateWithFlags(&ev, hapiEventDisableTiming);
@@ -1330,10 +1333,11 @@ static void hapiExitCsv() {
     releasePool(csv_gpu_manager.mempool_free_bufs_);
   }
 #ifndef HAPI_CUDA_CALLBACK
-  auto& hapi_event_pool_ = CpvAccess(hapi_event_pool);
-  while(!hapi_event_pool_.empty()) {
-    hapiEventDestroy(hapi_event_pool_.front());
-    hapi_event_pool_.pop();
+  for (auto& kv : CpvAccess(hapi_event_pool)) {
+    while (!kv.second.empty()) {
+      hapiEventDestroy(kv.second.front());
+      kv.second.pop();
+    }
   }
 #endif
 }
@@ -1680,14 +1684,31 @@ static void hapiMapping(char** argv) {
   }
 }
 
+int hapiStreamDeviceOf(hapiStream_t stream);   // defined with the stream pool below
+
 #ifndef HAPI_CUDA_CALLBACK
 void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
   // if(obj!=NULL)
   //   CmiAbort("non null without HAPI CUDA CALLBACK");
   // create CUDA event / get CUDA event from the pool and insert into stream
+  // An event belongs to the device that was current when it was created, and it
+  // can only be recorded on a stream of that same device. `stream` is not
+  // necessarily ours: the device-send path records a completion event on the
+  // stream carried by a CkDeviceBuffer, which for a received buffer is the
+  // SENDER's stream, on the sender's GPU. So switch to the stream's device for
+  // both the create and the record, and keep the free pool partitioned by
+  // device so a pooled event is never handed across GPUs.
+  const int stream_dev = hapiStreamDeviceOf(stream);
+  int prev_dev = -1;
+  hapiCheck(hapiGetDevice(&prev_dev));
+  const int use_dev = (stream_dev >= 0) ? stream_dev : prev_dev;
+  if (use_dev != prev_dev) hapiCheck(hapiSetDevice(use_dev));
+
   hapiEvent_t ev;
-  auto& hapi_event_pool_local = CpvAccess(hapi_event_pool);
+  bool was_fresh = false;
+  auto& hapi_event_pool_local = CpvAccess(hapi_event_pool)[use_dev];
   if(hapi_event_pool_local.size() == 0) {
+    was_fresh = true;
   #if CMK_LBDB_ON
     hapiEventCreateWithFlags(&ev, hapiEventDefault);
   #else
@@ -1697,7 +1718,47 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
     ev = hapi_event_pool_local.front();
     hapi_event_pool_local.pop();
   }
-  hapiEventRecord(ev, stream);
+  // Checked, and loudly. This was unchecked, so a failure here left
+  // cudaErrorInvalidResourceHandle as the thread's sticky error and the next
+  // cudaPeekAtLastError in application code aborted on a fault it did not
+  // cause. An event and a stream must belong to the same device; the pool is
+  // per-PE, so a mismatch means the event outlived the device context it was
+  // made for.
+  // Checked, and self-healing. This was unchecked, so a failure left
+  // cudaErrorInvalidResourceHandle as the thread's sticky error and the next
+  // cudaPeekAtLastError in application code aborted on a fault it did not
+  // cause -- which is how this surfaced: as a CUDA error reported by an
+  // unrelated chare's kernel launch, hundreds of steps after a migration.
+  //
+  // A recycled event can become unusable (it belongs to a device context that
+  // is no longer the right one for this stream). Recording on it is then
+  // permanently impossible, and since the event goes back to the pool
+  // afterwards the failure repeats on every callback for the rest of the run.
+  // Drop such an event and record on a fresh one instead: the pool must never
+  // hand out an event that cannot be recorded.
+  {
+    cudaError_t rec = hapiEventRecord(ev, stream);
+    if (rec != cudaSuccess) {
+      cudaGetLastError();               // do not leave it for a bystander
+      if (!was_fresh) {
+        hapiEventDestroy(ev);
+        cudaGetLastError();
+#if CMK_LBDB_ON
+        hapiEventCreateWithFlags(&ev, hapiEventDefault);
+#else
+        hapiEventCreateWithFlags(&ev, hapiEventDisableTiming);
+#endif
+        rec = hapiEventRecord(ev, stream);
+      }
+      if (rec != cudaSuccess) {
+        cudaGetLastError();
+        CmiAbort("hapiAddCallback: cannot record a completion event on this "
+                 "stream (%s)", cudaGetErrorName(rec));
+      }
+    }
+  }
+
+  if (use_dev != prev_dev) hapiCheck(hapiSetDevice(prev_dev));
 
   hapiEvent hev(ev, cb, cb_msg, wr);
 
@@ -3353,7 +3414,28 @@ void hapiPollEvents(void* param) {
     std::queue<hapiEvent>& queue = entry.second;
     while (!queue.empty()) {
       hapiEvent hev = queue.front();
-      if (hapiEventQuery(hev.event) == hapiSuccess) {
+      const cudaError_t q = hapiEventQuery(hev.event);
+      // A query records its verdict as this thread's last error. cudaErrorNot
+      // Ready is this poll's own answer, not a fault of the application's, and
+      // leaving it set means the next cudaPeekAtLastError in application code
+      // reports a failure that never happened. Anything else is a real problem
+      // with the queued event -- say so rather than silently treating it as
+      // "not finished yet" and polling it forever.
+      if (q == cudaErrorNotReady) {
+        cudaGetLastError();
+      } else if (q != cudaSuccess) {
+        // A queued event that cannot even be queried is not going to
+        // complete; drop it rather than polling it forever.
+        cudaGetLastError();
+        queue.pop();
+        {
+          const int d = hapiStreamDeviceOf(entry.first);
+          CpvAccess(hapi_event_pool)[d >= 0 ? d : 0].push(hev.event);
+        }
+        CpvAccess(n_hapi_events)--;
+        continue;
+      }
+      if (q == hapiSuccess) {
         queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
 
         // invoke Charm++ callback if one was given
@@ -3363,7 +3445,10 @@ void hapiPollEvents(void* param) {
         if (hev.wr) {
           hapiWorkRequestCleanup(hev.wr);
         }
-        CpvAccess(hapi_event_pool).push(hev.event);
+        {
+          const int d = hapiStreamDeviceOf(entry.first);
+          CpvAccess(hapi_event_pool)[d >= 0 ? d : 0].push(hev.event);
+        }
         CpvAccess(n_hapi_events)--;
 
         // inform QD that an event was processed
@@ -3377,6 +3462,83 @@ void hapiPollEvents(void* param) {
     }
   }
 #endif
+}
+
+
+/*** Per-device stream pool (see hapi.h) ***/
+namespace {
+// device -> free streams belonging to it, and the reverse map so a stream can
+// be returned by a PE that is not on its device (a chare that migrated between
+// GPUs releases from its new PE).
+std::map<int, std::vector<hapiStream_t>> hapi_stream_free;
+std::unordered_map<void*, int> hapi_stream_owner;
+CmiNodeLock hapi_stream_pool_lock = NULL;
+void hapiStreamPoolInit() {
+  if (hapi_stream_pool_lock == NULL) hapi_stream_pool_lock = CmiCreateLock();
+}
+}  // namespace
+
+hapiStream_t hapiAcquireStream() {
+  // The PE's own device, NOT whatever the calling thread happens to have
+  // current. A chare's streams are acquired from its constructor, and the
+  // thread running a constructor is not necessarily the PE worker thread --
+  // the communication thread, for one, is deliberately put on its own device.
+  // Keying off cudaGetDevice() there binds the stream to the wrong GPU, and
+  // every completion event later recorded against it (events are created on
+  // the current device) fails with cudaErrorInvalidResourceHandle.
+  const int dev = CpvAccess(my_device);
+  hapiStreamPoolInit();
+
+  CmiLock(hapi_stream_pool_lock);
+  auto it = hapi_stream_free.find(dev);
+  if (it != hapi_stream_free.end() && !it->second.empty()) {
+    hapiStream_t s = it->second.back();
+    it->second.pop_back();
+    CmiUnlock(hapi_stream_pool_lock);
+    return s;
+  }
+  CmiUnlock(hapi_stream_pool_lock);
+
+  // Non-blocking: a pooled stream must not implicitly synchronize with the
+  // legacy default stream, or every chare using one serializes against every
+  // other chare's default-stream work.
+  // Created with the PE's device actually current, then the caller's device
+  // restored -- a stream belongs to whichever device was current at creation.
+  hapiStream_t s;
+  int prev = -1;
+  hapiCheck(hapiGetDevice(&prev));
+  if (prev != dev) hapiCheck(hapiSetDevice(dev));
+  hapiCheck(hapiStreamCreateNonBlocking(&s));
+  if (prev != dev) hapiCheck(hapiSetDevice(prev));
+  CmiLock(hapi_stream_pool_lock);
+  hapi_stream_owner[(void*)s] = dev;
+  CmiUnlock(hapi_stream_pool_lock);
+  return s;
+}
+
+int hapiStreamDeviceOf(hapiStream_t stream) {
+  if (stream == NULL) return -1;
+  hapiStreamPoolInit();
+  CmiLock(hapi_stream_pool_lock);
+  auto it = hapi_stream_owner.find((void*)stream);
+  const int d = (it != hapi_stream_owner.end()) ? it->second : -1;
+  CmiUnlock(hapi_stream_pool_lock);
+  return d;
+}
+
+int hapiGetDeviceNum() { return CpvAccess(my_device); }
+
+void hapiReleaseStream(hapiStream_t stream) {
+  if (stream == NULL) return;
+  hapiStreamPoolInit();
+  CmiLock(hapi_stream_pool_lock);
+  auto it = hapi_stream_owner.find((void*)stream);
+  // Back to the device that created it, not the device of whoever is releasing
+  // it. A chare that migrated across GPUs releases from its new PE, and the
+  // stream still belongs to the old one.
+  if (it != hapi_stream_owner.end())
+    hapi_stream_free[it->second].push_back(stream);
+  CmiUnlock(hapi_stream_pool_lock);
 }
 
 int hapiCreateStreams() {

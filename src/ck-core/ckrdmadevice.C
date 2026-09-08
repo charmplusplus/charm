@@ -809,7 +809,15 @@ void* ckDeviceRecordMemcpyEvent(hapiStream_t stream) {
   if (ring == nullptr) return NULL;
   hapiEvent_t ev = ring[next];
   next = (next + 1) % ring_size;
-  if (hapiEventRecord(ev, stream) != hapiSuccess) return NULL;
+  if (hapiEventRecord(ev, stream) != hapiSuccess) {
+    // Expected here: the event can belong to another device (see the
+    // cross-device notes below), and this is a try-and-fall-back. Clear the
+    // sticky error so it is not left for the next cudaPeekAtLastError in
+    // application code, which would abort on a failure it did not cause and
+    // which was already handled.
+    cudaGetLastError();
+    return NULL;
+  }
   return (void*)ev;
 }
 
@@ -2682,7 +2690,31 @@ static void acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
 // is the exact ordering the host barrier was standing in for. Guarded by the
 // device manager's own lock, which is what serializes the pool itself.
 namespace {
-typedef std::unordered_map<cudaStream_t, cudaEvent_t> LbRetireEvents;
+// Keyed by the stream AND the device the entry was made on. A raw
+// cudaStream_t is not a stable identity: when an element migrates away its
+// stream is destroyed (or pooled), and the next stream created on this PE --
+// or an element that arrives and takes the pooled handle -- can carry the very
+// same handle value. Keying on the handle alone then returns the departed
+// element's event, which was created on whatever device THAT PE had current.
+// An event and a stream on different devices is cudaErrorInvalidResourceHandle,
+// and because nothing here checks the result the error becomes this thread's
+// sticky error and aborts whichever unrelated chare next peeks at it.
+// Including the device in the key keeps the two apart; the gate below then
+// only waits on events belonging to the consumer's own device, which is the
+// only wait that is valid anyway.
+struct LbRetireKey {
+  cudaStream_t stream;
+  int device;
+  bool operator==(const LbRetireKey& o) const {
+    return stream == o.stream && device == o.device;
+  }
+};
+struct LbRetireKeyHash {
+  size_t operator()(const LbRetireKey& k) const {
+    return std::hash<void*>()((void*)k.stream) ^ (std::hash<int>()(k.device) << 1);
+  }
+};
+typedef std::unordered_map<LbRetireKey, cudaEvent_t, LbRetireKeyHash> LbRetireEvents;
 std::unordered_map<void*, LbRetireEvents> lb_retire_events;
 CmiNodeLock lb_retire_lock = NULL;
 void lbRetireLockInit() {
@@ -2690,18 +2722,22 @@ void lbRetireLockInit() {
 }
 }  // namespace
 
+
 void CkRdmaDeviceNoteLbBufferFreed(void* dm_opaque, cudaStream_t usedBy) {
   if (dm_opaque == NULL) return;
   lbRetireLockInit();
   CmiLock(lb_retire_lock);
+  int dev = -1;
+  hapiCheck(cudaGetDevice(&dev));
   LbRetireEvents& evs = lb_retire_events[dm_opaque];
-  auto it = evs.find(usedBy);
+  const LbRetireKey key{usedBy, dev};
+  auto it = evs.find(key);
   if (it == evs.end()) {
     cudaEvent_t e;
     // Disable timing: this event is only ever waited on, and a timing-enabled
     // event costs more to record.
     hapiCheck(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
-    it = evs.emplace(usedBy, e).first;
+    it = evs.emplace(key, e).first;
   }
   // Re-recording overwrites the previous capture, which is correct: work on one
   // stream is ordered, so the latest record subsumes every earlier one.
@@ -2715,8 +2751,11 @@ void CkRdmaDeviceGateLbBuffer(void* dm_opaque, cudaStream_t consumer) {
   CmiLock(lb_retire_lock);
   auto dit = lb_retire_events.find(dm_opaque);
   if (dit != lb_retire_events.end()) {
+    int dev = -1;
+    hapiCheck(cudaGetDevice(&dev));
     for (auto& kv : dit->second) {
-      if (kv.first == consumer) continue;  // same stream is already ordered
+      if (kv.first.device != dev) continue;   // another device's event
+      if (kv.first.stream == consumer) continue;  // same stream, already ordered
       hapiCheck(cudaStreamWaitEvent(consumer, kv.second, 0));
     }
   }

@@ -1,0 +1,94 @@
+mainmodule sph2d {
+  include "sph2d.h";
+
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Patch patch_proxy;
+
+  readonly RealType dom_lx;        // domain (tank incl. walls) extent
+  readonly RealType dom_ly;
+  readonly int n_chares_x;
+  readonly int n_chares_y;
+
+  readonly RealType spacing;       // initial particle spacing dx
+  readonly RealType smooth_h;      // smoothing length
+  readonly RealType support;       // kernel support radius, KERNEL_SUPPORT*h
+  readonly RealType pmass;         // per-particle mass (uniform lattice)
+  readonly RealType rho0;
+  readonly RealType sound_c0;
+  readonly RealType gravity;
+  readonly RealType sim_dt;
+  readonly RealType wall_t;        // wall thickness
+  readonly RealType col_w;         // initial water column
+  readonly RealType col_h;
+
+  readonly int n_iters;
+  readonly int warmup_iters;
+  readonly int first_lb;
+  readonly int lb_freq;
+  readonly int async_lb;
+  readonly int lb_wait_lag;
+  readonly int part_capacity;
+  readonly int exch_capacity;
+  readonly int stats_freq;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void initDone(long total_np);
+    entry void stepStats(CkReductionMsg* msg);
+    entry [reductiontarget] void allDone();
+  };
+
+  array [2D] Patch {
+    entry Patch(void);
+    entry void init();
+    entry void iterate();
+
+    // hapiAddCallback targets: the device work that has to finish before the
+    // corresponding sends can be issued.
+    entry void haloPacked();
+    entry void leaversPacked();
+
+    // Zerocopy send completion. A send may not reuse or free its source
+    // buffer until this fires; direct IPC reads the sender's own allocation.
+    entry void sendDone();
+    entry void sendsDrained();
+
+    // m = max(n,1) so an empty message still carries a valid buffer.
+    entry void receiveHalo(int ref, int dir, int n, int m,
+                           nocopydevice Particle parts[m]);
+    entry void receiveParticles(int ref, int dir, int n, int m,
+                                nocopydevice Particle parts[m]);
+
+    entry void runStep() {
+      // Phase 1: pressure from density, then ship every particle within one
+      // support radius of an edge to that neighbour. Ghosts are sources for
+      // the neighbour's sums and are thrown away at the end of the step.
+      // Pressure is evaluated BEFORE the exchange because a ghost's pressure
+      // is its owner's to compute -- the receiver has no claim on the ghost's
+      // density history.
+      serial { my_iter++; startHalo(); }
+      when haloPacked() serial { sendHalo(); }
+      for (recv_count = 0; recv_count < NUM_DIRS; recv_count++) {
+        when receiveHalo[my_iter](int ref, int dir, int n, int m,
+                                  nocopydevice Particle parts[m])
+          serial { appendGhosts(dir, n); }
+      }
+
+      // Phase 2: cell list over local+ghost, one neighbour pass for continuity
+      // and momentum, integrate, then compact out whatever left the rectangle.
+      serial { computeAndIntegrate(); }
+      when leaversPacked() serial { sendLeavers(); }
+      for (recv_count = 0; recv_count < NUM_DIRS; recv_count++) {
+        when receiveParticles[my_iter](int ref, int dir, int n, int m,
+                                       nocopydevice Particle parts[m])
+          serial { appendParticles(dir, n); }
+      }
+
+      // The step is not over until every zerocopy send it issued is quiet:
+      // the next step repacks these buffers, and under async load balancing a
+      // migration's pup frees them.
+      serial { gateStepDrain(); }
+      when sendsDrained() serial { endOfStep(); }
+    };
+  };
+};

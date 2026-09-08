@@ -384,6 +384,32 @@ void hapiDevPoolEnsureArena(int device, void** base, size_t* extent);
 void hapiDevPoolNoteRead(const void* ptr, hapiStream_t stream);
 // +gpupool: the pool is the runtime's own allocation policy (see gpumanager.h).
 bool hapiDevPoolOn();
+
+// Per-device pool of non-blocking streams, with ownership.
+//
+// hapiGetStream() is NOT this: it hands out streams round-robin from one shared
+// array with no ownership (two chares can be given the same stream, and none
+// can be given back), and that array is created wholesale on whatever device
+// the calling thread happened to have current -- so a PE driving another GPU
+// can be handed a stream that does not belong to its device. Recording an event
+// (always created on the current device) against such a stream fails with
+// cudaErrorInvalidResourceHandle.
+//
+// hapiAcquireStream returns a stream belonging to the CALLER'S current device,
+// exclusively, creating one if that device's free list is empty. Streams are
+// non-blocking, so they do not serialize against the legacy default stream.
+//
+// hapiReleaseStream returns it for reuse and is the call a migrating chare owes
+// in its destructor -- the stream goes back to the free list of the device that
+// created it, whichever device the releasing PE happens to be on, so a chare
+// that migrates between GPUs cannot leak a stream or recycle it onto the wrong
+// device. Streams are never destroyed; the pool is bounded by peak concurrency.
+hapiStream_t hapiAcquireStream();
+void hapiReleaseStream(hapiStream_t stream);
+// The device a pooled stream belongs to, or -1 if it is not one of ours.
+int hapiStreamDeviceOf(hapiStream_t stream);
+// The CUDA device this PE is mapped to.
+int hapiGetDeviceNum();
 // Bytes the device pool's arenas have free right now. The pool also grows into
 // free device memory on demand, so a planner asking what it may stage should
 // add whatever the device itself still reports free. One device per process on
