@@ -46,7 +46,6 @@ inline hapiError_t pcFree(void* p) {
 // How many steps before an AtSync step to start gathering load measurements.
 // Instrumentation is expensive enough to be worth confining to a window, and a
 // few steps are enough to characterise a chare's load.
-#define LB_INSTRUMENT_WINDOW 3
 /* readonly */ int dist_type;
 /* readonly */ long n_total_particles;
 /* readonly */ double bunch_frac;
@@ -407,7 +406,6 @@ class Patch : public CBase_Patch {
 
  public:
   int my_iter;
-  bool instrumenting = true;  // matches the runtime default at startup
 
   // Zerocopy send-completion accounting. A send's source buffer is live until
   // its completion callback fires; these counters are what the two gates in
@@ -606,7 +604,6 @@ class Patch : public CBase_Patch {
     p | phi_gate_pending;
     p | push_pending;
     p | park_skips;
-    p | instrumenting;
 
     if (p.isUnpacking()) {
       computeNeighbors();
@@ -725,24 +722,13 @@ class Patch : public CBase_Patch {
     return it == first_lb || (it != 0 && lb_freq > 0 && it % lb_freq == 0);
   }
 
-  // The next iteration at which this chare will call AtSync.
-  int nextLBIter(int it) const {
-    if (it < first_lb) return first_lb;
-    if (lb_freq <= 0) return INT_MAX;
-    return ((it / lb_freq) + 1) * lb_freq;
-  }
-
   void iterate() {
-    // Drive instrumentation off the distance to the next AtSync, rather than
-    // switching it on at one particular iteration -- with closely spaced
-    // load-balancing steps the latter can leave a step with no measurements at
-    // all, and the balancer then decides on zero load. Toggle only on a
-    // transition so the common case costs a comparison.
-    const bool want = (nextLBIter(my_iter) - my_iter) <= LB_INSTRUMENT_WINDOW;
-    if (want != instrumenting) {
-      instrumenting = want;
-      if (want) LBTurnInstrumentOn(); else LBTurnInstrumentOff();
-    }
+    // No instrumentation window here. The runtime owns both edges: it enables
+    // instrumentation when AtSyncWait releases this patch and disables it when
+    // the step it joins is registered, so the measured window is exactly the
+    // interval this patch spends outside a balancing step. Doing it here as
+    // well only overrode that -- it anchored the window to the next AtSync
+    // regardless of the lag, so -l could not shrink what was traced.
 
     if (isLBIter(my_iter) && !lb_waiting) {
       // The !lb_waiting guard: one step at a time per element. If the wait
