@@ -1044,9 +1044,6 @@ void CentralLB::ProcessReceiveMigration()
   future_migrates_expected = 0;
   for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
-    #if CMK_GLOBAL_LOCATION_UPDATE      
-      UpdateLocation(move); 
-    #endif
     const int me = CkMyPe();
     if (move.from_pe == me && move.to_pe != me) {
 #if CMK_DRONE_MODE
@@ -1067,6 +1064,19 @@ void CentralLB::ProcessReceiveMigration()
        DEBUGF(("[%d] expecting object from %d\n",move.to_pe,move.from_pe));
       if (!move.async_arrival) migrates_expected++;
       else future_migrates_expected++;
+    }
+    else {
+      // Everyone EXCEPT the source learns the new location from here. The
+      // source must not: its own cache entry is still "the element is on me",
+      // and emigrate() -> CkLocCache::recordEmigration is what turns that into
+      // "it is on the destination", asserting on the way that it was here to
+      // begin with. Updating the source's entry first made that assert fail on
+      // the first migration of any centralized balancer built with
+      // CMK_GLOBAL_LOCATION_UPDATE=1 -- which device zerocopy asks for, so a
+      // GPU build is exactly where this bites.
+      #if CMK_GLOBAL_LOCATION_UPDATE
+        UpdateLocation(move);
+      #endif
     }
 
   }
