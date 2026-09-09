@@ -309,6 +309,93 @@ __global__ void statsKernel(const Particle* parts, int n_local, RealType* out) {
   }
 }
 
+// ---------------------------------------------------------------- checks ----
+// splitmix64's finalizer. Any decent 64-bit mixer would do; the point is that
+// a single flipped bit anywhere in the input changes about half the output
+// bits, so two different particle sets cannot land on the same total by
+// accident, and losing one particle while duplicating another does not cancel.
+__device__ __forceinline__ unsigned long long mix64(unsigned long long z) {
+  z += 0x9E3779B97F4A7C15ull;
+  z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ull;
+  z = (z ^ (z >> 27)) * 0x94D049BB133111EBull;
+  return z ^ (z >> 31);
+}
+
+// Runs over the LOCAL particles only, before the physics of the step, i.e. on
+// exactly what the previous step's halo exchange and migration produced.
+__global__ void checkKernel(const Particle* parts, int n_local, RealType x0,
+    RealType y0, RealType x1, RealType y1, RealType rho0, RealType c0,
+    unsigned long long* out) {
+  __shared__ unsigned long long s_id[BLOCK_1D], s_bnd[BLOCK_1D],
+      s_nf[BLOCK_1D], s_nb[BLOCK_1D];
+  const int t = threadIdx.x;
+  const int i = blockIdx.x * blockDim.x + t;
+
+  unsigned long long idh = 0, bndh = 0, nf = 0, nb = 0;
+  unsigned long long bad = 0;
+
+  // No early return: the block reduction below has __syncthreads in it, which
+  // every thread of the block has to reach.
+  if (i < n_local) {
+    const Particle p = parts[i];
+    const unsigned long long id = (unsigned long long)(unsigned int)p.id;
+    idh = mix64(id + 1);
+
+    if (p.type == PTYPE_BOUND) {
+      nb = 1;
+      // Position, not just identity: a boundary particle is fixed for the
+      // whole run, so this term is a constant the run must keep reproducing.
+      bndh = mix64(id + 1) ^
+             mix64(((unsigned long long)__float_as_uint(p.x) << 32) |
+                   (unsigned long long)__float_as_uint(p.y));
+    } else if (p.type == PTYPE_FLUID) {
+      nf = 1;
+    } else {
+      bad |= CHK_BAD_TYPE;
+    }
+
+    if (!isfinite(p.x) || !isfinite(p.y) || !isfinite(p.vx) ||
+        !isfinite(p.vy) || !isfinite(p.rho) || !isfinite(p.p)) {
+      bad |= CHK_BAD_NAN;
+    } else {
+      // Wide bands on purpose. Weakly-compressible density stays within about
+      // 1% of rho0 and the dam break peaks near Mach 0.08, so these trip only
+      // on a state that is unambiguously wrong, never on a healthy run.
+      if (p.rho < 0.2f * rho0 || p.rho > 5.0f * rho0) bad |= CHK_BAD_RHO;
+      const RealType v2 = p.vx * p.vx + p.vy * p.vy;
+      if (v2 > (0.5f * c0) * (0.5f * c0)) bad |= CHK_BAD_SPEED;
+      // Same comparisons markLeavers uses, so a particle this call keeps is
+      // exactly one the previous step's markLeavers should have kept.
+      if (p.x < x0 || p.x >= x1 || p.y < y0 || p.y >= y1)
+        bad |= CHK_BAD_OUTSIDE;
+    }
+
+    if (bad) {
+      atomicOr(&out[CHK_BAD_MASK], bad);
+      atomicAdd(&out[CHK_BAD_COUNT], 1ull);
+    }
+  }
+
+  s_id[t] = idh; s_bnd[t] = bndh; s_nf[t] = nf; s_nb[t] = nb;
+  __syncthreads();
+  for (int s = blockDim.x / 2; s > 0; s >>= 1) {
+    if (t < s) {
+      s_id[t] += s_id[t + s];
+      s_bnd[t] += s_bnd[t + s];
+      s_nf[t] += s_nf[t + s];
+      s_nb[t] += s_nb[t + s];
+    }
+    __syncthreads();
+  }
+  if (t == 0) {
+    // Integer atomics: the block order does not matter, the total is exact.
+    atomicAdd(&out[CHK_ID_SUM], s_id[0]);
+    atomicAdd(&out[CHK_BND_SUM], s_bnd[0]);
+    atomicAdd(&out[CHK_N_FLUID], s_nf[0]);
+    atomicAdd(&out[CHK_N_BOUND], s_nb[0]);
+  }
+}
+
 // ---------------------------------------------------------------- launch ----
 void invokeCellBuild(const Particle* d_parts, int n, RealType x0, RealType y0,
     RealType inv_csize, int ncx, int ncy, int ncells, int* d_cnt, int* d_off,
@@ -378,5 +465,16 @@ void invokeStats(const Particle* d_parts, int n_local, RealType* d_out,
   hapiCheck(cudaMemsetAsync(d_out, 0, sizeof(RealType) * 8, s));
   if (n_local > 0)
     statsKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, d_out);
+  hapiCheck(cudaPeekAtLastError());
+}
+
+void invokeCheck(const Particle* d_parts, int n_local, RealType x0, RealType y0,
+    RealType x1, RealType y1, RealType rho0, RealType c0,
+    unsigned long long* d_out, cudaStream_t s) {
+  hapiCheck(cudaMemsetAsync(d_out, 0,
+      sizeof(unsigned long long) * NUM_CHECKS, s));
+  if (n_local > 0)
+    checkKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, x0, y0,
+        x1, y1, rho0, c0, d_out);
   hapiCheck(cudaPeekAtLastError());
 }

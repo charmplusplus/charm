@@ -27,13 +27,14 @@ mainmodule sph2d {
   readonly int lb_freq;
   readonly int async_lb;
   readonly int lb_wait_lag;
+  readonly int lattice_nx;      // lattice columns, for the global particle id
   readonly int part_capacity;
   readonly int exch_capacity;
   readonly int stats_freq;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
-    entry [reductiontarget] void initDone(long total_np);
+    entry void initDone(CkReductionMsg* msg);
     entry void stepStats(CkReductionMsg* msg);
     entry [reductiontarget] void allDone();
   };

@@ -32,7 +32,7 @@ struct Particle {
   RealType rho;         // density (evolved)
   RealType p;           // pressure (derived from rho each step)
   int type;             // PTYPE_FLUID or PTYPE_BOUND
-  int pad;
+  int id;               // global lattice id, unique and fixed for the run
 };
 
 #define PTYPE_FLUID 0
@@ -62,6 +62,51 @@ enum Dir { LEFT = 0, RIGHT, TOP, BOTTOM, TL, TR, BL, BR, NUM_DIRS = 8, STAY = 8 
 
 // Softening in the mu_ij denominator, in units of h^2.
 #define ETA2 0.01f
+
+
+// ---------------------------------------------------------------- checks ----
+// Correctness checking. Ordering in this application is NOT reproducible: the
+// compaction, the halo pack and the cell scatter all place particles with
+// atomicAdd, so the neighbour sums are summed in a different order every run
+// and the float state diverges in the low bits. A float checksum could
+// therefore never be compared between two runs, let alone between no-LB and
+// LB. So every check below is built out of quantities that are exact and
+// INDEPENDENT OF ORDER -- 64-bit integers under wrapping addition, which is
+// associative and commutative, so the global value does not depend on how the
+// particles are spread over patches, on the order they arrive in, or on the
+// order the reduction combines them. That is what makes the same number
+// comparable across no-LB, sync LB and async LB.
+//
+//   id sum        sum of a 64-bit mix of every particle's id. Constant while
+//                 no particle leaves the domain: catches a particle lost or
+//                 duplicated by the halo/migration path, and any corruption
+//                 of the id field itself.
+//   boundary sum  the same over the boundary particles' ids AND positions.
+//                 A boundary particle never moves, so this is a constant of
+//                 the whole run -- and boundary particles are interleaved with
+//                 fluid throughout the local array, so it is a direct test
+//                 that a migration's device-to-device pup moved the bits
+//                 unchanged.
+//   counts        fluid and boundary particle counts, separately, so a
+//                 particle that changes type is caught even though the total
+//                 is unchanged.
+//   validity      per-particle: finite, density and speed in range, type
+//                 known, and inside the owning patch's rectangle. The last
+//                 one tests the exchange's routing: a particle handed to the
+//                 wrong neighbour lands outside that neighbour's rectangle.
+#define CHK_ID_SUM     0
+#define CHK_BND_SUM    1
+#define CHK_N_FLUID    2
+#define CHK_N_BOUND    3
+#define CHK_BAD_MASK   4
+#define CHK_BAD_COUNT  5
+#define NUM_CHECKS     8
+
+#define CHK_BAD_NAN      0x01ull   // non-finite position, velocity, rho or p
+#define CHK_BAD_RHO      0x02ull   // density far outside the weakly-compressible band
+#define CHK_BAD_SPEED    0x04ull   // speed past Mach 0.5, i.e. the run has blown up
+#define CHK_BAD_TYPE     0x08ull   // type field is neither FLUID nor BOUND
+#define CHK_BAD_OUTSIDE  0x10ull   // local particle outside its own patch rectangle
 
 #if !defined(__CUDACC__)
 #include "pup.h"
