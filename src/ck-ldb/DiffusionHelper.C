@@ -141,7 +141,7 @@ void DiffusionLB::BuildStats()
     delete msg;
     statsList[pe] = 0;
   }
-  // Charge an unmeasured object the node's mean, in both dimensions.
+  // Charge an unmeasured object the node's mean -- in the HOST dimension only.
   //
   // Every budget in this balancer is retired by subtraction --
   // my_loadAfterTransfer -= shedLoad across nodes, overLoad -= compLoad within
@@ -159,6 +159,15 @@ void DiffusionLB::BuildStats()
   // and self-cancelling when the loads are real. If a dimension is genuinely
   // all zero its mean is zero, the floor vanishes, and nothing moves: correct,
   // because there is no load to balance.
+  //
+  // The diffused dimension takes no floor. Across nodes the metric now picks
+  // by load first and refuses a zero-load move outright (MetricComm and
+  // MetricCentroid::popBestObject), so nothing there hands over light objects
+  // in a loop -- and a floor there was actively harmful: it credited a move
+  // with load the object did not carry. Shedding a node's empty objects then
+  // "retired" a quarter of its obligation while its real load did not change
+  // (sph2d, 24 fluid patches on one GPU). my_load and shedLoad are the
+  // measured figures; only the within-node host heap keeps the mean floor.
   // CHARM_LB_RAWLOAD: exactly what this node was handed, before any floor is
   // applied. my_load is a sum of these, so a node that reports 0.000000 to the
   // across-node phase is a node whose objects all measured zero.
@@ -199,16 +208,13 @@ void DiffusionLB::BuildStats()
              statsReceived, empty, pes.c_str());
   }
 
-  objLoadFloor = 0.0;
+  objLoadFloor = 0.0;  // the diffused dimension is unfloored; see above
   if (nobj > 0)
   {
-    const double gpuFloor = my_load / (double)nobj;
-    objLoadFloor = gpuFloor;
     double cpuTotal = 0.0;
     for (int r = 0; r < nodeSize; r++) cpuTotal += pe_load[r];
     const double cpuFloor = cpuTotal / (double)nobj;
 
-    my_load = 0.0;
     for (int r = 0; r < nodeSize; r++) pe_load[r] = 0;
     int at = 0;
     for (int pe = 0; pe < statsReceived; pe++)
@@ -217,10 +223,8 @@ void DiffusionLB::BuildStats()
       for (int k = 0; k < numObjects[pe]; k++, at++)
       {
         const LDObjData& od = nodeStats->objData[at];
-        const double g = std::max(diffusionObjLoad(od), gpuFloor);
         const double c = std::max(diffusionObjCpuLoad(od), cpuFloor);
         objs[at].setCompLoad(c);
-        my_load += g;
         pe_load[pe] += c;
       }
     }

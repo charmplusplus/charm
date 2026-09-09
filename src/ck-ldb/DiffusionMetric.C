@@ -258,6 +258,14 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize_, int nCoun
   }
 };
 
+// Load band for the uncalibrated pickers below. An object is a candidate only
+// if it carries at least this fraction of the heaviest load that fits the
+// neighbour's quota; the metric's own criterion (edge cut, distance) ranks
+// within the band. 0.5 keeps every object of a uniform application in the
+// band -- those rank exactly as before -- while excluding the light objects
+// of a skewed one until the heavy ones no longer fit.
+static const double kLoadBand = 0.5;
+
 int MetricComm::popBestObject(int nbor)
 {
   // Pick the object whose move costs this node the least edge cut: the bytes it
@@ -307,6 +315,36 @@ int MetricComm::popBestObject(int nbor)
       (nbor >= 0 && nbor < (int)nborTier.size()) ? nborTier[nbor]
                                                  : DIFF_TIER_INTER_NODE;
 
+  // Load first, edge cut second. The quota this phase retires is load, so the
+  // heaviest object that fits is the natural candidate. Ranking on edge cut
+  // alone -- what this did before -- picks the LEAST wired object, which on a
+  // stencil is the one with nothing to exchange and therefore nothing to shed.
+  // Measured on sph2d with 24 fluid patches on one GPU and 13x the load of the
+  // other three: the first step moved that node's eight empty patches, its
+  // GPU share went UP in the next window, and after three steps it still held
+  // 67% of the job's GPU time with 19 of 128 objects.
+  //
+  // Edge cut keeps its real job inside a band of near-equal loads: of several
+  // equally heavy candidates, take the one whose departure cuts the least, so
+  // the retained set stays contiguous and updateState pulls the next pick
+  // next to it. The calibrated path below already weighs load against
+  // communication in one unit and is left as it is.
+  double heaviest = 0.0;
+  if (costCfg == NULL)
+  {
+    for (int i = 0; i < n_objs; i++)
+    {
+      if (!objAvailable[i] || !nodeStats->objData[i].migratable || !isAllowed(i)) continue;
+      const double objLoad = diffusionObjLoad(nodeStats->objData[i]);
+      if (objLoad > nborCapacity) continue;
+      if (objLoad > heaviest) heaviest = objLoad;
+    }
+    // Nothing with measurable load fits. Moving a zero-load object retires
+    // nothing and still costs a migration, so there is no candidate -- not
+    // the lightest one, which is what a plain minimum would hand back.
+    if (heaviest <= 0.0) return -1;
+  }
+
   for (int i = 0; i < n_objs; i++)
   {
     if (!objAvailable[i]) continue;
@@ -319,6 +357,7 @@ int MetricComm::popBestObject(int nbor)
     double score;
     if (costCfg == NULL)
     {
+      if (objLoad < kLoadBand * heaviest) continue;
       score = externalComm[nbor][i] - internalComm[i];
     }
     else
@@ -529,6 +568,22 @@ int MetricCentroid::popBestObject(int nbor)
     }
   }
 
+  // Load first, distance second, for the reason given at
+  // MetricComm::popBestObject: the quota is load, and a picker that ignores it
+  // hands over the objects with nothing to shed. Distance ranks inside the
+  // band of near-equal loads.
+  double heaviest = 0.0;
+  for (int i = 0; i < n_objs; i++)
+  {
+    if (position_dim == 1 && i != loEnd && i != hiEnd) continue;
+    if (!isAllowed(i) || !objAvailable[i] || !nodeStats->objData[i].migratable) continue;
+    if (objNborDistances[i].size() <= nbor) continue;
+    const double objLoad = diffusionObjLoad(nodeStats->objData[i]);
+    if (objLoad > nborCapacity) continue;
+    if (objLoad > heaviest) heaviest = objLoad;
+  }
+  if (heaviest <= 0.0) return -1;  // nothing with measurable load fits
+
   for (int i = 0; i < n_objs; i++)
   {
     double objLoad = diffusionObjLoad(nodeStats->objData[i]);
@@ -548,7 +603,7 @@ int MetricCentroid::popBestObject(int nbor)
     bool available = objAvailable[i];
 
     if (testDistance < minDistance && available && migratable &&
-        (objLoad <= nborCapacity))
+        (objLoad <= nborCapacity) && objLoad >= kLoadBand * heaviest)
     {
       minDistance = testDistance;
       bestObject = i;

@@ -165,6 +165,9 @@ void DiffusionLB::AcrossNodeLB()
       }
 
       int v_id = metric->popBestObject(nborId);
+      // Both metrics refuse a zero-load candidate; should one ever not, it is
+      // treated as no candidate here rather than retiring nothing forever.
+      if (v_id != -1 && diffusionObjLoad(nodeStats->objData[v_id]) <= 0.0) v_id = -1;
 
       if (v_id == -1)// && nborId==-1)
       {
@@ -192,10 +195,11 @@ void DiffusionLB::AcrossNodeLB()
       //
       // Both read getCompLoad()/objData rather than getVertexLoad(), whose
       // MAX(compLoad, 0.1) floor would retire the budget in yet another unit.
-      // Floored like the budget it retires (BuildStats): an object measured at
-      // zero would otherwise retire nothing and the loop would hand over every
-      // such object before touching the budget.
-      const double shedLoad = std::max(diffusionObjLoad(nodeStats->objData[v_id]), objLoadFloor);
+      // Unfloored, like the budget it retires (BuildStats): the metric never
+      // hands back a zero-load object, so this is positive, and crediting a
+      // move with load the object does not carry is exactly what let a node
+      // "retire" a quarter of its obligation by shedding its empty objects.
+      const double shedLoad = diffusionObjLoad(nodeStats->objData[v_id]);
       const double cpuLoad  = objs[v_id].getCompLoad();
       objs[v_id].setCurrPe(-1);
 

@@ -655,8 +655,9 @@ void DiffusionLB::WithinNodeLB()
 #endif
     if (!onHost)
     {
-      // Re-express every within-node figure in the device dimension, with the
-      // same mean floor the across-node phase applies (BuildStats). From here
+      // Re-express every within-node figure in the device dimension, with a
+      // mean floor of its own (the across-node phase applies none; see
+      // BuildStats). From here
       // on pe_load, the CkVertex loads and the token loads are what this phase
       // balances; nothing after this point reads them as host time.
       double sum = 0.0;
