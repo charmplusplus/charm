@@ -62,14 +62,12 @@ void DiffusionLB::AcrossNodeLB()
     const double excess = my_load - fair;
     my_loadAfterTransfer = (excess > 0.0) ? excess : 0.0;
     // The floor: an excess under effMinImbalance of the neighbourhood mean is
-    // noise, and a revert step sheds nothing at all (WithinNodeLB does the
-    // taking-back).
-    if (revertThisStep || my_load <= fair * (1.0 + effMinImbalance))
+    // noise.
+    if (my_load <= fair * (1.0 + effMinImbalance))
       my_loadAfterTransfer = 0.0;
     if (_lb_args.debug() > 1)
-      CkPrintf("[node %d] AcrossNodeLB: my_load=%f fair=%f shedding=%f (floor %.3f%s)\n",
-               myNodeId, my_load, fair, my_loadAfterTransfer, effMinImbalance,
-               revertThisStep ? ", revert step" : "");
+      CkPrintf("[node %d] AcrossNodeLB: my_load=%f fair=%f shedding=%f (floor %.3f)\n",
+               myNodeId, my_load, fair, my_loadAfterTransfer, effMinImbalance);
   }
 
   // Per-step cap on what may leave this node, as a share of its migratable

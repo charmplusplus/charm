@@ -164,9 +164,6 @@ public:
   // pseudolb_barrier removed with the global convergence check (DiffusionPseudo.C)
 
   void MigrationDoneWrapper();  // Call when migration is complete
-  // The end of the step, whichever path reaches it (the move ledger's resume
-  // or the wrapper above): stamps the interval the next step judges.
-  void MigrationDone(int balancing) override;
   void ReceiveStats(CkMarshalledCLBStatsMessage&& data);
   void ReceiveFinalStats(std::vector<bool> isMigratable, std::vector<int> from_proc,
                          std::vector<int> to_proc, int n_migrateobjs,
@@ -198,10 +195,6 @@ public:
   // the within-node interval repartition instead of forcing it to be skipped.
   void LoadMetaInfo(LDObjHandle h, int objId, double load, double gload, int senderPE,
                     int only_mcount, int ackPE, double key);
-
-  // Reduction targets for the regret loop; see decideRegret.
-  void regretInterval(double maxInterval);
-  void regretMoves(int moves);
 
 protected:
   virtual bool QueryBalanceNow(int) { return true; };
@@ -358,34 +351,13 @@ private:
   int total_migrates;
   int total_crossnode_migrates;
 
-  // ---- decision floors, ordering keys and the regret loop ----------------
+  // ---- decision floor and ordering keys ----------------------------------
   //
   // The floor. An imbalance below effMinImbalance (a fraction of the mean) is
   // treated as noise at every level: the pseudo rounds send nothing for it,
   // the across-node phase sheds nothing for it, the within-node phase moves
-  // nothing for it. Starts at +LBDiffusionMinImbalance; doubled after a step
-  // that had to be taken back, halved again after two quiet steps, never below
-  // the configured value.
+  // nothing for it. +LBDiffusionMinImbalance, fixed for the run.
   double effMinImbalance;
-  int quietSteps;
-
-  // The regret loop. Every step reduces two numbers across the job before its
-  // strategy runs: the longest per-PE wall interval since the previous step
-  // ended, and how many objects that previous step moved. Both land identical
-  // on every PE, so every node reaches the same verdict without a coordinator.
-  // If the previous step moved something and this interval is slower than the
-  // one before it by more than +LBDiffusionRegret, the step is taken back:
-  // every object it moved goes home (LDObjData::prevPe), nothing else moves,
-  // and the floor doubles. A step that is itself a revert is never judged.
-  double stepEndTime;       // MigrationDone, this PE's clock
-  double thisInterval;      // reduced, this step
-  double lastInterval;      // reduced, previous step
-  int lastStepMoves;        // reduced: objects the previous step moved
-  int lastMigratesIssued;   // this PE's moves in the previous step (its contribution)
-  bool revertThisStep;
-  bool lastStepWasRevert;
-  void decideRegret();
-  int revertPreviousStep(); // rank0: hand back everything the previous step moved
 
   // 1-D ordering keys. When every object on this node registered a position
   // of width 1, the node holds an interval of an ordering and the rules that

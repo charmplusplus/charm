@@ -62,9 +62,6 @@ module DiffusionLB
     // interval (NaN when it has none) so its neighbours know which side of
     // themselves it lies on.
     entry[expedited] void ReceiveLoadInfo(int itr, double load, int node, double keyLo, double keyHi);
-    // Regret loop: reduced before every step's strategy, see decideRegret.
-    entry[reductiontarget] void regretInterval(double maxInterval);
-    entry[reductiontarget] void regretMoves(int moves);
     entry[expedited] void ReceiveStats(CkMarshalledCLBStatsMessage data);
     // entry void LoadTransfer(double load, int initPE, int objId);
     entry[expedited] void LoadReceived(int objId, int fromPE, int ackPE);

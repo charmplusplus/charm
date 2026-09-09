@@ -169,14 +169,6 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   pseudoContribCount = 0;
   pseudoMaxMetric = 0.0;
   effMinImbalance = _lb_args.diffusionMinImbalance();
-  quietSteps = 0;
-  stepEndTime = 0.0;
-  thisInterval = 0.0;
-  lastInterval = 0.0;
-  lastStepMoves = 0;
-  lastMigratesIssued = 0;
-  revertThisStep = false;
-  lastStepWasRevert = false;
   keyed1D = false;
   myKeyLo = myKeyHi = 0.0;
   round = 0;
@@ -299,20 +291,6 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   objectGLoads.clear();
   objectKeys.clear();
 
-  // The regret loop's two inputs, reduced ahead of statsAssembled. Group
-  // reductions complete in contribution order, and every PE contributes these
-  // two before its statsAssembled contribution (a rank0PE's comes later, from
-  // ReceiveStats), so both verdict inputs are on every PE by the time the
-  // strategy starts. The interval is this PE's wall time since the previous
-  // step ended; zero on the first step, which decideRegret treats as unknown.
-  {
-    const double interval = (stepEndTime > 0.0) ? (CmiWallTimer() - stepEndTime) : 0.0;
-    CkCallback cbI(CkReductionTarget(DiffusionLB, regretInterval), thisProxy);
-    contribute(sizeof(double), &interval, CkReduction::max_double, cbI);
-    CkCallback cbM(CkReductionTarget(DiffusionLB, regretMoves), thisProxy);
-    contribute(sizeof(int), &lastMigratesIssued, CkReduction::sum_int, cbM);
-  }
-
   thisProxy[rank0PE].ReceiveStats(*marshmsg);
 
   if (CkMyPe() != rank0PE)
@@ -367,61 +345,10 @@ void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage&& data)
 /*Once stats are assembled on rank0PEs, can begin finding Nbors*/
 void DiffusionLB::statsAssembled()
 {
-  // Same inputs on every PE, so the same verdict everywhere.
-  decideRegret();
   if (CkMyPe() == rank0PE)
   {
     findNBors(1);
   }
-}
-
-void DiffusionLB::regretInterval(double maxInterval)
-{
-  lastInterval = thisInterval;
-  thisInterval = maxInterval;
-}
-
-void DiffusionLB::regretMoves(int moves) { lastStepMoves = moves; }
-
-// Judge the previous step by what it did to the application. thisInterval
-// covers the iterations run under the previous step's placement, lastInterval
-// the ones before it; if the placement made those iterations slower by more
-// than the tolerance, the step is taken back and the floor raised so the same
-// noise is not chased again next time. Only a step that actually moved
-// something is judged, and never one that was itself a revert -- the interval
-// after a revert is compared against the bad placement and would always look
-// like an improvement, so judging it could only ever undo the undo.
-void DiffusionLB::decideRegret()
-{
-  const double tol = _lb_args.diffusionRegret();
-  const bool judge = tol > 0.0 && !lastStepWasRevert && lastStepMoves > 0 &&
-                     lastInterval > 0.0 && thisInterval > 0.0;
-  revertThisStep = judge && thisInterval > lastInterval * (1.0 + tol);
-
-  if (revertThisStep)
-  {
-    effMinImbalance = std::min(2.0 * effMinImbalance, 1.0);
-    quietSteps = 0;
-  }
-  else if (lastStepMoves == 0)
-  {
-    // Two quiet steps in a row: relax the floor back toward its configured
-    // value one halving at a time.
-    if (++quietSteps >= 2)
-    {
-      effMinImbalance = std::max(_lb_args.diffusionMinImbalance(), 0.5 * effMinImbalance);
-      quietSteps = 0;
-    }
-  }
-  else
-    quietSteps = 0;
-
-  if (CkMyPe() == 0 && _lb_args.debug() > 0)
-    CkPrintf("[DiffusionLB] step %d: interval %.4fs (previous %.4fs), previous step "
-             "moved %d%s -> %s, floor %.3f\n",
-             step(), thisInterval, lastInterval, lastStepMoves,
-             lastStepWasRevert ? " (a revert)" : "",
-             revertThisStep ? "REVERT" : "balance", effMinImbalance);
 }
 
 double DiffusionLB::keyOf(const LDObjData& od)
@@ -490,39 +417,6 @@ void DiffusionLB::allowedEndsFor(int nbor, std::vector<char>& allowed)
   if (below && !above) allowed[loEnd] = 1;
   else if (above && !below) allowed[hiEnd] = 1;
   else { allowed[loEnd] = 1; allowed[hiEnd] = 1; }
-}
-
-// Undo the previous step: every object it moved onto this node goes back to
-// the PE it came from. Objects are addressed directly (the token form of the
-// handoff, only_mcount=1), whether the previous home is in this node or not,
-// so the within-node phase has nothing to retarget. Rank0PE only.
-int DiffusionLB::revertPreviousStep()
-{
-  const int n = nodeStats->objData.size();
-  const int prevStepNo = step() - 1;
-  int reverted = 0;
-  for (int j = 0; j < n; j++)
-  {
-    const LDObjData& od = nodeStats->objData[j];
-    if (od.prevStep != prevStepNo || od.prevPe < 0 || od.prevPe >= numPes) continue;
-    if (!od.migratable || objs[j].getCurrPe() == -1) continue;
-    const int rank = GetRank(j);
-    const int donorPE = rank0PE + rank;
-    const int destPE = od.prevPe;
-    if (destPE == donorPE) continue;
-    const int pe_local_id = j - (rank > 0 ? prefixObjects[rank - 1] : 0);
-    objs[j].setCurrPe(-1);
-    mig_acksOut += 2;
-    thisProxy[destPE].LoadMetaInfo(od.handle, pe_local_id, objs[j].getCompLoad(),
-                                   diffusionObjLoad(od), donorPE, 1, CkMyPe(), keyOf(od));
-    thisProxy[donorPE].LoadReceived(pe_local_id, destPE, CkMyPe());
-    nodeStats->to_proc[j] = destPE;
-    reverted++;
-  }
-  if (_lb_args.debug() > 0)
-    CkPrintf("[DiffusionLB node %d] step %d: reverting %d object(s) moved by step %d\n",
-             myNodeId, step(), reverted, prevStepNo);
-  return reverted;
 }
 
 void DiffusionLB::InitializeObjHeap(int n)
@@ -610,24 +504,12 @@ void DiffusionLB::WithinNodeLB()
 
   if( nodeSize == 1) {
       if (_lb_args.debug() == 3) CkPrintf("--------Node size is 1--------\n");
-    // Every PE is its own node's rank0PE: nothing to balance within it, but a
-    // revert step still has to hand back what the previous step moved here.
-    if (revertThisStep) revertPreviousStep();
+    // Every PE is its own node's rank0PE: nothing to balance within it.
     withinNodeReport();
     return;
   }
   if (CkMyPe() == rank0PE)
   {
-   
-    // A revert step moves only what the previous step moved; see decideRegret.
-    if (revertThisStep)
-    {
-      revertPreviousStep();
-      endWithinTiming();
-      withinNodeReport();
-      return;
-    }
-
     const int n = nodeStats->objData.size();
 
     // ---- which resource does this phase balance? -------------------------
@@ -1027,8 +909,6 @@ void DiffusionLB::ProcessMigrations()
   // SAME AS IN PACKANDSENDMIGRATEMSGS
   LBMigrateMsg* msg = new (total_migrates, CkNumPes(), CkNumPes(), 0) LBMigrateMsg;
   msg->n_moves = total_migrates;
-  // This PE's contribution to the next step's regret verdict.
-  lastMigratesIssued = total_migrates;
   if (_lb_args.debug() > 1) CkPrintf("PE-%d with %d migrates and %d cross-node migrates\n", CkMyPe(), total_migrates, total_crossnode_migrates);
   for (int i = 0; i < total_migrates; i++)
   {
@@ -1202,17 +1082,6 @@ void DiffusionLB::MigrationDoneWrapper()
   MigrationDone(balancing);  // call DistBaseLB version
 
   // End LB timing instrumentation
-}
-
-void DiffusionLB::MigrationDone(int balancing)
-{
-  // The interval the next step judges starts here, once this step's moves
-  // are done; and remember whether this step was a revert, so the next one
-  // does not judge it. This is the one point every end-of-step path passes
-  // through -- the move ledger's resume calls it directly.
-  stepEndTime = CmiWallTimer();
-  lastStepWasRevert = revertThisStep;
-  DistBaseLB::MigrationDone(balancing);
 }
 
 void DiffusionLB::printDiffusionTiming()

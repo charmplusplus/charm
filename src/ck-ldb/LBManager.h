@@ -52,9 +52,7 @@ class CkLBArgs
   // fraction of the mean) is treated as measurement noise and left alone, at
   // both the across-node and the within-node level. _lb_diffMaxMoveFrac caps
   // the share of a node's migratable objects that may leave it across nodes
-  // in one step. _lb_diffRegret is the fraction by which the interval after a
-  // step's moves may be slower than the interval before them before the moves
-  // are taken back; 0 disables the check.
+  // in one step.
   // ShedLB: no bin may exceed (1 + _lb_shedEps) times the mean load. Below
   // the largest object's share of the mean it cannot be met at all, because
   // an indivisible object sets a floor on any assignment's maximum.
@@ -67,7 +65,6 @@ class CkLBArgs
   double _lb_shedEps;
   double _lb_diffMinImbalance;
   double _lb_diffMaxMoveFrac;
-  double _lb_diffRegret;
   bool _lb_gpuScaling;      // Learn destination-dependent per-kernel GPU costs
   double _lb_gpuScalingAlphaMin;  // EWMA floor; 0 selects a stationary mean
   int _lb_gpuScalingMinSamples;   // Samples needed before a factor is calibrated
@@ -104,7 +101,6 @@ class CkLBArgs
     _lb_shedEps = 0.10;
     _lb_diffMinImbalance = 0.10;
     _lb_diffMaxMoveFrac = 0.25;
-    _lb_diffRegret = 0.05;
     _lb_gpuScaling = false;
     _lb_gpuScalingAlphaMin = 0.0;
     _lb_gpuScalingMinSamples = 1;
@@ -145,7 +141,6 @@ class CkLBArgs
   inline double& shedEps() { return _lb_shedEps; }
   inline double& diffusionMinImbalance() { return _lb_diffMinImbalance; }
   inline double& diffusionMaxMoveFrac() { return _lb_diffMaxMoveFrac; }
-  inline double& diffusionRegret() { return _lb_diffRegret; }
   inline bool& gpuScaling() { return _lb_gpuScaling; }
   inline double& gpuScalingAlphaMin() { return _lb_gpuScalingAlphaMin; }
   inline int& gpuScalingMinSamples() { return _lb_gpuScalingMinSamples; }

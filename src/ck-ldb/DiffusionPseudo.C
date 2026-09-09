@@ -170,9 +170,8 @@ void DiffusionLB::PseudoLoadBalancing()
   // balance with neighborstobalance
   double myOverload = my_pseudo_load - currAverage;
 
-  // Don't bother balancing if my overload is insignificant. A revert step
-  // proposes no flow at all: it only takes the previous step's moves back.
-  if (myOverload < threshold || revertThisStep)
+  // Don't bother balancing if my overload is insignificant.
+  if (myOverload < threshold)
   {
     myOverload = 0;
   }
