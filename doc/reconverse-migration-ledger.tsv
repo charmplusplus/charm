@@ -190,7 +190,7 @@ src/libs/ck-libs/metis/GKlib/GKlib.h	23	needs-judgment
 src/libs/ck-libs/metis/GKlib/gkregex.c	2	needs-judgment	
 src/scripts/Make.depends	33	superseded	reviewed line two-way version is authoritative
 src/scripts/Makefile	6	superseded	reviewed line two-way version is authoritative
-src/scripts/charmc	96	superseded	reviewed line two-way version is authoritative
+src/scripts/charmc	96	superseded	reviewed line two-way version is authoritative, EXCEPT the RPATH hunk: branch commit bf7329331 ("Add reconverse,lci,lcw to rpath") had no counterpart here, so "superseded" was dropping a real fix -- charmc emitted only -L for libreconverse, and every charmc-built binary needed (DY)LD_LIBRARY_PATH set by hand to start. Ported; the env-var workarounds in src/scripts/testrun and reconverse-ci.yaml are removed with it so CI exercises the RPATH rather than masking it
 src/scripts/configure.ac	16	superseded	reviewed line two-way version is authoritative
 src/util/charmrun-src/CMakeLists.txt	14	superseded	reviewed line two-way version is authoritative
 src/util/charmrun-src/Makefile	6	needs-judgment	

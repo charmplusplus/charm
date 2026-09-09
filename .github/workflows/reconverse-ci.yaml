@@ -159,9 +159,8 @@ jobs:
         run: |
           set -e
           cd tests/charm++/anytime_bcastred
-          B=$PWD/../../../reconverse-linux-x86_64
           for S in 1 2 3; do
-            env LD_LIBRARY_PATH=$B/lib ./bcastred +pe 4 -n 8 -i 500 -m 1 -c 8 -S $S -w 30
+            ./bcastred +pe 4 -n 8 -i 500 -m 1 -c 8 -S $S -w 30
           done
       - name: anytime migration stress (2 processes)
         run: |
@@ -169,13 +168,13 @@ jobs:
           cd tests/charm++/anytime_bcastred
           B=$PWD/../../../reconverse-linux-x86_64
           for S in 4 5; do
-            $B/_deps/lci-src/lcrun -n 2 env LD_LIBRARY_PATH=$B/lib ./bcastred +pe 4 -n 8 -i 500 -m 1 -c 8 -S $S -w 30
+            $B/_deps/lci-src/lcrun -n 2 ./bcastred +pe 4 -n 8 -i 500 -m 1 -c 8 -S $S -w 30
           done
       - name: qd + megatest multi-process
         run: |
           set -e
           B=$PWD/reconverse-linux-x86_64
           cd tests/charm++/qd
-          $B/_deps/lci-src/lcrun -n 2 env LD_LIBRARY_PATH=$B/lib ./qdbench +pe 4
+          $B/_deps/lci-src/lcrun -n 2 ./qdbench +pe 4
           cd ../megatest
-          $B/_deps/lci-src/lcrun -n 2 env LD_LIBRARY_PATH=$B/lib ./megatest +pe 4
+          $B/_deps/lci-src/lcrun -n 2 ./megatest +pe 4
