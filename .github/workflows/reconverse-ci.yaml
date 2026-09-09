@@ -53,6 +53,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          # reconverse is the contrib/reconverse submodule.
+          submodules: true
       - name: install dependencies
         run: sudo apt-get update && sudo apt-get install -y cmake libfabric-dev
       - name: build
@@ -79,6 +82,9 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v5
+        with:
+          # reconverse is the contrib/reconverse submodule.
+          submodules: true
       - name: install dependencies
         run: sudo apt-get update && sudo apt-get install -y cmake libfabric-dev
       - name: build
@@ -102,6 +108,9 @@ jobs:
     runs-on: macos-latest  # Apple Silicon
     steps:
       - uses: actions/checkout@v5
+        with:
+          # reconverse is the contrib/reconverse submodule.
+          submodules: true
       - name: install dependencies
         run: brew install libfabric
       - name: build
@@ -129,6 +138,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          # reconverse is the contrib/reconverse submodule.
+          submodules: true
       - name: install dependencies
         run: sudo apt-get update && sudo apt-get install -y cmake libfabric-dev
       - name: build (error checking on)

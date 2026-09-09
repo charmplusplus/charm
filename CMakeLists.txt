@@ -495,7 +495,7 @@ if(RECONVERSE)
   endif()
   # This needs to be include before we set charmc as the linker
   # but after CMAKE_LIBRARY_OUTPUT_DIRECTORY has been set
-  add_subdirectory(cmake/fetch_reconverse)
+  add_subdirectory(cmake/reconverse)
 endif()
 
 if (NOT CMK_MEMPOOL_CUTOFFNUM)

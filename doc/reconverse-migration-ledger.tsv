@@ -8,7 +8,7 @@ buildcmake	59	superseded	reviewed line two-way version is authoritative
 buildold	4	superseded	reviewed line two-way version is authoritative
 cmake/converse.cmake	159	superseded	reviewed line two-way version is authoritative
 cmake/detect-features.cmake	4	superseded	reviewed line two-way version is authoritative
-cmake/fetch_reconverse/CMakeLists.txt	52	superseded	reviewed line two-way version is authoritative
+cmake/reconverse/CMakeLists.txt	52	superseded	reviewed line two-way version is authoritative; renamed from cmake/fetch_reconverse when reconverse became the contrib/reconverse submodule
 contrib/ci.vim	2	needs-judgment	
 doc/charm++/manual.rst	3	needs-judgment	
 examples/ampi/Cjacobi3D/Makefile	9	with-feature	lands with the series that exercises it
@@ -174,7 +174,7 @@ src/conv-ccs/ccs-builtins.h	2	needs-judgment
 src/conv-ccs/conv-ccs.C	30	needs-judgment	
 src/conv-ccs/conv-ccs.h	12	needs-judgment	
 src/conv-core/conv-config.h	4	needs-judgment	
-src/conv-core/conv-rdma.h	197	item-9.2-DONE	landed via branch gpu-stage2-d2d (GPU-direct D2D transport); no change needed -- reconverse builds use reconverse's own conv-rdma.h and this copy is excluded from the Converse header copy (see cmake/fetch_reconverse), so it stays classic-only
+src/conv-core/conv-rdma.h	197	item-9.2-DONE	landed via branch gpu-stage2-d2d (GPU-direct D2D transport); no change needed -- reconverse builds use reconverse's own conv-rdma.h and this copy is excluded from the Converse header copy (see cmake/reconverse), so it stays classic-only
 src/conv-core/conv-rdmadevice.C	14	item-9.2-DONE	landed via branch gpu-stage2-d2d (GPU-direct D2D transport); no change needed -- Converse's copy is not compiled in a reconverse build, so findTransferModeDevice lives in ckrdmadevice.C's reconverse half instead
 src/conv-core/conv-rdmadevice.h	44	item-9.2-DONE	landed via branch gpu-stage2-d2d (GPU-direct D2D transport); the reconverse half of this header had already landed with 9.1
 src/conv-core/convcore.C	9	needs-judgment	
