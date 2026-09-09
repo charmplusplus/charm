@@ -187,12 +187,6 @@ class DataManager : public CBase_DataManager {
   RangeMsg *pendingRangeMsg;
   void distributeParticles();
 
-  // Opens and closes the load-balancing measurement window. Lives here, not in
-  // the tree pieces, because a balancer is allowed to leave a PE with none and
-  // the window still has to be managed there. The closing edge is duplicated
-  // in TreePiece::finishIteration, which is the only place that runs before
-  // the decision; both calls are idempotent.
-  void updateLbInstrumentation();
 
   // Whether a balancing step was still running when this iteration's tree
   // pieces reported, and when the decomposition first reached the gate without

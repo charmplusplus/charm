@@ -2551,7 +2551,6 @@ void DataManager::advanceTail(){
   keyRangeCount = 0;
 
   iteration++;
-  updateLbInstrumentation();
   prof.iterations++;
   prof.end(PhaseProfile::ADVANCE);
   CkCallback cb;
@@ -2601,27 +2600,6 @@ void DataManager::treePiecesMigrated(CkReductionMsg *msg){
   migrationsSettled = true;
   delete msg;
   distributeParticles();
-}
-
-// The strategy should read a short, recent window: opened after the previous
-// step's migrations settled and closed at the decision, rather than the whole
-// period between steps, most of which is stale by the time it is read. The
-// same switch gates CUPTI tracing, which is by far the more expensive half, so
-// this is also what keeps an instrumented run affordable -- the tracing that
-// no strategy will ever read is simply not done.
-void DataManager::updateLbInstrumentation(){
-  if(globalParams.lbWindow <= 0) return;
-  // Level-triggered, not edge-triggered: whether the window is open is a
-  // function of the iteration alone, so there is no switch state that can end
-  // up out of step with the schedule. Open when one of the next lbWindow
-  // iterations is a balancing iteration; closed at the balancing iteration
-  // itself, since lbWindow is clamped below the period.
-  bool inWindow = false;
-  for(int k = 1; k <= globalParams.lbWindow && !inWindow; k++){
-    inWindow = isBalancingIteration(globalParams, iteration + k);
-  }
-  if(inWindow) LBTurnInstrumentOn();
-  else LBTurnInstrumentOff();
 }
 
 // The tail of the decomposition: hand each tree piece its particles and start

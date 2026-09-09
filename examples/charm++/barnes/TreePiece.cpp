@@ -506,13 +506,10 @@ void TreePiece::finishIteration(){
     return;
   }
 
-  // Close the measurement window. This has to happen here rather than in the
-  // DataManager's own end-of-iteration hook: the last tree piece's
-  // reportTraversalsDone() only *starts* the reduction that reaches advance(),
-  // so advance() lands after this point, and the strategy would read a window
-  // that stayed open across its own decision.
-  if(globalParams.lbWindow > 0) LBTurnInstrumentOff();
-
+  // The measurement window is the runtime's: it disables instrumentation when
+  // the step this element joins is registered and re-enables it when
+  // AtSyncWait releases the element. This used to close the window here, which
+  // needed a duplicated edge because advance() lands after this point.
   // Safe to pack again: the interaction list is consumed and every
   // per-iteration counter is reset, which is exactly what pup() assumes. The
   // runtime takes any move decided for this element the moment this entry

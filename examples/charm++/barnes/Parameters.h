@@ -63,11 +63,6 @@ struct Parameters {
   // mid-lag needs the blocks to follow the element -- forwarding plus new
   // termination detection -- which is a decomposition change, not a flag.
   int lbLag;
-  // How many iterations before a balancing iteration the measurement window
-  // opens. Instrumentation is off outside it, so the strategy reads a short,
-  // recent window: measured entirely after the previous step's migrations
-  // settled, and ending at the decision. 0 instruments continuously.
-  int lbWindow;
   // Levels a single histogram round may refine an over-full bin by. One is the
   // original behaviour. See DataManager::receiveHistogram.
   int decompLevels;
@@ -122,7 +117,6 @@ struct Parameters {
     p | lbPeriod;
     p | asyncLb;
     p | lbLag;
-    p | lbWindow;
     p | decompLevels;
     p | deviceWalk;
     p | useLet;

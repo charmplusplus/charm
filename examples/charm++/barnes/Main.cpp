@@ -135,11 +135,6 @@ void Main::setParameters(CkArgMsg *m){
   if(globalParams.decompLevels < 1) globalParams.decompLevels = 1;
   CkPrintf("decompLevels: %d\n", globalParams.decompLevels);
 
-  globalParams.lbWindow = params.getiparam("lbwindow", DEFAULT_LB_WINDOW, table);
-  // A window as long as the period is a window that never closes.
-  if(globalParams.lbWindow >= globalParams.lbPeriod) globalParams.lbWindow = 0;
-  CkPrintf("lbWindow: %d iterations%s\n", globalParams.lbWindow,
-           globalParams.lbWindow > 0 ? "" : " (instrumenting continuously)");
   globalParams.asyncLb = params.getiparam("lbasync", DEFAULT_ASYNC_LB, table);
   globalParams.lbLag = params.getiparam("lblag", DEFAULT_LB_LAG, table);
   if(globalParams.lbLag < 0) globalParams.lbLag = 0;
@@ -270,7 +265,6 @@ void Main::usage(){
   usage["firstlb"] = "first iteration after which the load balancer may run";
   usage["lbasync"] = "split the AtSync barrier so decomposition overlaps the step (needs +LBAsync)";
   usage["lblag"] = "iterations between AtSyncStart and AtSyncWait; the strategy runs over them (needs -lbasync=1)";
-  usage["lbwindow"] = "instrument only the N iterations before each balancing iteration (0 = always)";
   usage["mapcyclic"] = "use node-aware block cyclic tree piece placement";
   usage["mapchunk"] = "consecutive tree pieces per node under -mapcyclic";
   usage["blockmap"] = "place tree pieces in contiguous blocks per PE (1 = imbalanced, 0 = round robin)";

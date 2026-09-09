@@ -38,11 +38,6 @@
 // which is what -lbasync=1 did before this existed and is still the default.
 #define DEFAULT_LB_LAG 0
 
-// Instrument the two iterations before each balancing iteration. The same
-// switch gates CUPTI tracing, which is the expensive half, so a window is what
-// keeps a load-balanced run from paying for tracing it never reads. 0 restores
-// continuous instrumentation.
-#define DEFAULT_LB_WINDOW 2
 // One level per round: the decomposition converges exactly as it always has.
 // Raising it trades a larger histogram reduction for fewer of them.
 #define DEFAULT_DECOMP_LEVELS 1
