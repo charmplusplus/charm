@@ -968,6 +968,16 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
           hapiCheck(hapiSetDevice(src_global));
           hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx], 0));
           hapiCheck(hapiSetDevice(prev_dev));
+        } else if (hapiStreamDeviceOf(recv_stream) >= 0 &&
+                   hapiStreamDeviceOf(recv_stream) != hapiGetDeviceNum()) {
+          // The receive stream is not on this PE's device. The imported event
+          // is, so recording one on the other fails with
+          // invalid-resource-handle. Same remedy as the branch above: settle
+          // the stream on the host and record on our own device instead --
+          // stronger ordering, and only on this path.
+          hapiCheck(hapiStreamSynchronize(recv_stream));
+          hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx],
+                NULL));
         } else {
           hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx],
                 recv_stream));
@@ -1078,6 +1088,8 @@ bool CkRdmaDeviceRepairForward(envelope* env, int newPe) {
       CkDeviceBuffer b;
       rd | b;
       const size_t width = rd.size() - off;
+      // Empty: nothing to re-prepare, in any mode (CkRdmaDeviceOnSender).
+      if (b.cnt == 0) continue;
       // Two kinds of descriptor can be repaired here, because in both the
       // sender's live buffer is the payload: the memcpy-prepared one (nothing
       // prepared at all) and the direct-IPC one (the live buffer exported by
@@ -1190,6 +1202,7 @@ bool CkRdmaDeviceRepairForward(envelope* env, int newPe) {
     CkDeviceBuffer b;
     rd | b;
     const size_t width = rd.size() - off;
+    if (b.cnt == 0) continue;                        // empty: nothing to re-prepare
     if (b.sender_prepared) continue;                 // IPC-prepared: readable node-wide already
     const char* skip = NULL;
     auto srcit = csv_gpu_manager.device_map.find(b.src_pe);
@@ -2060,6 +2073,20 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
                 CkMyPe(), source.dest_pe, env->getSrcPe());
     }
 
+    // Empty payload: the sender prepared nothing and fired its callback
+    // already (CkRdmaDeviceOnSender). Complete the op here, on the host, with
+    // no stream wait, copy or event, and deliver once the message's last op
+    // is in -- the same count the asynchronous completions drive. There is no
+    // QdProcess to balance: nothing was created for this op.
+    if (source.cnt == 0) {
+      rdma_info->counter++;
+      if (rdma_info->counter == rdma_info->n_ops) {
+        QdCreate(1);
+        enqueueNcpyMessage(CkMyPe(), new_env);
+      }
+      continue;
+    }
+
     // Destination buffer (on this receiver)
     CkDeviceBuffer dest((const void *)arrPtrs[i], arrSizes[i]);
 
@@ -2887,6 +2914,7 @@ static void deviceSendProducerReady(void* arg, void*) {
   // HAPI invokes this on the issuing PE, not on the CUDA host-function thread.
   // Registration and metadata publication happen only after every producer.
   for (auto& buffer : pending->buffers) {
+    if (buffer.cnt == 0) continue;  // empty: prepared as such by the sender
     buffer.lci_ncpy_buffer =
         acquireDeviceRegistration(buffer.ptr, buffer.cnt, pending->owner);
     buffer.sender_prepared = true;
@@ -2935,6 +2963,7 @@ void CkRdmaDeviceSendWhenReady(CkDeviceDeferredSend* pending, void* msg,
 
   std::vector<hapiStream_t> streams;
   for (const auto& buffer : pending->buffers) {
+    if (buffer.cnt == 0) continue;  // nothing produced it
     if (std::find(streams.begin(), streams.end(), buffer.hapi_stream) == streams.end())
       streams.push_back(buffer.hapi_stream);
   }
@@ -3003,6 +3032,38 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
   }
   _ck_pending_device_send_bytes = device_bytes;
 
+  // Empty payloads. A zero-length buffer has nothing to transfer and nothing to
+  // order against, so it takes none of what follows: no event, no IPC slot or
+  // export, no registration, no producer wait, and no migration interlock. Its
+  // completion callback fires now -- the source is trivially free -- and the
+  // descriptor travels marked prepared with no protocol, which the receiver
+  // (CkRdmaDeviceIssueRgets) completes without touching the device and the
+  // forward repair (CkRdmaDeviceRepairForward) leaves alone. The message keeps
+  // its device-zerocopy type, so the post entry method still runs, and a
+  // message can mix empty and real payloads: this is per buffer.
+  //
+  // What it buys: a stencil exchange that sends to every neighbour every step,
+  // whether or not it has anything for them, otherwise pays a device handshake
+  // per empty message -- on sph2d that was 16 of the 32 device messages a
+  // patch sends per step, in a step that is nothing but that protocol.
+  //
+  // The runtime's own migration payload is exempt: it is released by the
+  // receiver's ack, not by a callback, and goes through unchanged.
+  int live_ops = 0;
+  for (int i = 0; i < numops; i++) {
+    if (buffers[i]->cnt != 0 || ck_sending_migration_payload) { live_ops++; continue; }
+    buffers[i]->ipc_protocol = CmiIpcProtocol::NONE;
+    buffers[i]->device_idx = -1;
+    buffers[i]->event_idx = -1;
+    buffers[i]->memcpy_event = NULL;
+    buffers[i]->sender_prepared = true;
+    if (buffers[i]->cb.type != CkCallback::ignore) {
+      buffers[i]->cb.send();
+      buffers[i]->cb = CkCallback(CkCallback::ignore);
+    }
+  }
+  if (live_ops == 0) return;  // nothing to prepare; the proxy sends at once
+
   // CHARM_ZC_VALIDATE: check every outgoing source pointer, in every transfer
   // mode, at the moment the send is posted. A device buffer whose owning chare
   // has migrated is either unmapped (freed by the old PE) or resident on a
@@ -3014,6 +3075,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
       int cur_dev = -1;
       cudaGetDevice(&cur_dev);
       for (int i = 0; i < numops; i++) {
+        if (buffers[i]->cnt == 0) continue;
         cudaPointerAttributes sattr{};
         const cudaError_t serr = cudaPointerGetAttributes(&sattr, buffers[i]->ptr);
         const bool unmapped = (serr != cudaSuccess || sattr.type == cudaMemoryTypeUnregistered);
@@ -3053,6 +3115,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
     CkLocRec* memcpy_rec = CkpvAccess(_currentLocRec);
     if (memcpy_rec) {
       for (int i = 0; i < numops; i++) {
+        if (buffers[i]->cnt == 0) continue;  // completed above, nothing to hold
         memcpy_rec->noteDeviceSendPosted();
         buffers[i]->cb = CkCallback(deviceSendReleaseFn,
                                     (void*)new DeviceSendRelease{memcpy_rec, buffers[i]->cb});
@@ -3061,6 +3124,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
 
     static const bool force_sync = (getenv("CHARM_ZC_MEMCPY_SYNC") != nullptr);
     for (int i = 0; i < numops; i++) {
+      if (buffers[i]->cnt == 0) continue;
       if (force_sync) {
         hapiStreamSynchronize(buffers[i]->hapi_stream);
       } else {
@@ -3082,6 +3146,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
 
     for (int i = 0; i < numops; i++) {
+      if (buffers[i]->cnt == 0) continue;  // empty: completed above
       // Pool mode has no comm buffer, so nothing is "in the LB region".
       bool is_lb_buffer = dm->comm_buffer != nullptr &&
           ( (size_t)((char*)(buffers[i]->ptr) - (char*)(dm->comm_buffer->base_ptr)) < dm->comm_buffer->total_size );
@@ -3246,7 +3311,27 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
       // produced the source buffer as retired. Either way it is recorded on the
       // application's own stream, so it sits after whatever produced the data.
       hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[(csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id)];
-      hapiCheck(hapiEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->hapi_stream));
+      // The event comes from THIS PE's pool, so it belongs to this PE's device,
+      // and an event can only be recorded on a stream of its own device. The
+      // buffer's stream is not always ours: forward-time repair re-prepares a
+      // payload on the forwarding PE while the buffer still carries the stream
+      // of the PE that built it, and load balancing can put those on different
+      // GPUs. Recording across devices fails with invalid-resource-handle.
+      //
+      // Same remedy the cross-device cases above use: settle that stream on the
+      // host and record on ours instead. Stronger ordering than the stream
+      // record, and confined to the case where the two devices differ -- which
+      // only became reachable once chares started moving between GPUs.
+      const int buf_dev = hapiStreamDeviceOf(buffers[i]->hapi_stream);
+      if (buf_dev >= 0 && buf_dev != hapiGetDeviceNum()) {
+        hapiCheck(hapiStreamSynchronize(buffers[i]->hapi_stream));
+        hapiCheck(hapiEventRecord(
+            my_device_info.src_event_pool[buffers[i]->event_idx], NULL));
+      } else {
+        hapiCheck(hapiEventRecord(
+            my_device_info.src_event_pool[buffers[i]->event_idx],
+            buffers[i]->hapi_stream));
+      }
       ipcDebugSync("send 2: record own src_event", buffers[i]->hapi_stream);
     }
   } else {
@@ -3254,6 +3339,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
     // Use a naive host-staged mechanism
     // Allocate temporary host buffers and copy source buffers
     for (int i = 0; i < numops; i++) {
+      if (buffers[i]->cnt == 0) continue;
       buffers[i]->data_stored = true;
       buffers[i]->sender_prepared = true;
       hapiCheck(hapiMallocHost(&buffers[i]->data, buffers[i]->cnt));
@@ -3263,12 +3349,19 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
 
     // Wait for the copies to finish
     for (int i = 0; i < numops; i++) {
+      if (buffers[i]->cnt == 0) continue;
       hapiCheck(hapiStreamSynchronize(buffers[i]->hapi_stream));
     }
 #else
   CkLocRec* sender_rec = CkpvAccess(_currentLocRec);
   if (pending && numops > 0) *pending = new CkDeviceDeferredSend(sender_rec);
   for (int i = 0; i < numops; i++) {
+    if (buffers[i]->cnt == 0) {
+      // Empty: its descriptor keeps its place in the message's fixed-width
+      // prefix, but nothing is registered or held.
+      if (pending) (*pending)->buffers.push_back(*buffers[i]);
+      continue;
+    }
     // This registers the application's own buffer and the receiver reads it over
     // the network, so it stays live well past this call. Count it against the
     // issuing element; emigrate stands down while any are outstanding.
