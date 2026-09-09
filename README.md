@@ -34,6 +34,16 @@ you want and rebuild:
      $ git -C contrib/reconverse fetch origin
      $ git -C contrib/reconverse checkout <branch-or-sha>
 
+To jump straight to the tip of reconverse `main` instead, use
+
+     $ git submodule update --remote -- contrib/reconverse
+
+Note that this is deliberately not what a plain clone or
+`--init` does: those check out the exact commit Charm++ records, so a
+given Charm++ commit always builds against a known reconverse. Use
+`--remote` when you want the latest reconverse, not when you want a
+reproducible build.
+
 Committing the moved submodule pointer is what changes the pairing for
 everyone else. To build against a reconverse tree kept outside the
 Charm++ checkout, pass `--with-reconverse-dir=<path>` to `./build`.

@@ -1,3 +1,7 @@
 [submodule "contrib/reconverse"]
 	path = contrib/reconverse
 	url = https://github.com/charmplusplus/reconverse.git
+	# Only consulted by `git submodule update --remote`, which moves the
+	# submodule to the tip of this branch. A plain `--init` still checks out
+	# the recorded commit, so ordinary builds stay reproducible.
+	branch = main
