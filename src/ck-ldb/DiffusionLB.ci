@@ -5,6 +5,8 @@ module DiffusionLB
   include "CentralLBMsg.h";
   extern module DistBaseLB;
   extern module CkMulticast;
+  // The scratch-remap a step can be handed to (+LBDiffusionRemapAbove).
+  extern module MetisLB;
   initnode void lbinit(void);
 
   message PseudoRoundMsg;
@@ -45,6 +47,11 @@ module DiffusionLB
     // symmetric before it reports the round done; see hsMaybeAdvance.
     entry[expedited] void ackNborDone();
     entry[expedited] void roundsDone();
+    // The plan's summary from each node to PE 0, and PE 0's verdict to every
+    // PE: execute the plan, or hand the step to the scratch-remap whose group
+    // id travels with the verdict.
+    entry[expedited] void planReport(double load, double predicted, double planIn, double planOut);
+    entry[expedited] void planVerdict(int remap, CkGroupID remapGid);
     entry[expedited] void migMsgAck();
     entry[expedited] void acrossDone();
     entry[expedited] void nbrAcrossDone();
@@ -291,9 +298,10 @@ module DiffusionLB
         // for this member alone, so it starts its across-node phase directly;
         // a LoadMetaInfo it sends can only reach a node that has also left the
         // rounds, and nothing that handler touches depends on that node having
-        // started its own phase. The PE 0 count is kept as an opt-in.
-        if (diffusionGlobalPhases()) thisProxy[0].roundsDone();
-        else AcrossNodeLB();
+        // started its own phase. The PE 0 count is kept as an opt-in. With
+        // +LBDiffusionRemapAbove the plan is first reported to PE 0, which
+        // decides whether it is worth executing at all (proceedAfterPlan).
+        proceedAfterPlan();
       }
     }
   };

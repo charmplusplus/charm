@@ -122,7 +122,13 @@ set_source_files_properties(
   ../ck-ldb/DiffusionCore.C ../ck-ldb/DiffusionHelper.C ../ck-ldb/DiffusionMetric.C
   ../ck-ldb/DiffusionNeighbors.C ../ck-ldb/DiffusionPseudo.C
   PROPERTIES HEADER_FILE_ONLY TRUE)
-add_dependencies(moduleDiffusionLB ck)
+# DiffusionLB can hand a step to a scratch-remap (+LBDiffusionRemapAbove), which
+# it runs on a MetisLB it creates itself; so it links the CommonLBs module (which
+# carries MetisLB together with the ckgraph classes it needs) and METIS. Link
+# -module DiffusionLB alone, not together with -module EveryLB, which carries a
+# second copy of the same objects.
+add_dependencies(moduleDiffusionLB ck moduleCommonLBs)
+configure_file(../ck-ldb/libmoduleDiffusionLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 add_library(moduleGreedyCentralLB ../ck-ldb/GreedyCentralLB.C ../ck-ldb/GreedyCentralLB.h)
 add_dependencies(moduleGreedyCentralLB ck)
 add_library(moduleGreedyRefineCentralLB ../ck-ldb/GreedyRefineCentralLB.C ../ck-ldb/GreedyRefineCentralLB.h)

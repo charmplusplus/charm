@@ -30,6 +30,8 @@ void CreateDiffusionLB();
 // DiffusionLoad.h so that the metric, the flow arithmetic and the offline
 // simulator can use them without this header.
 #include "DiffusionLoad.h"
+// The round arithmetic and the plan summary the remap decision is made on.
+#include "DiffusionFlow.h"
 
 /// for backward compatibility
 typedef LBMigrateMsg NLBMigrateMsg;
@@ -84,6 +86,41 @@ public:
   // left to know is that every member has left the loop.
   void roundsDone();
   int roundsDoneCount;
+
+  // ---- the remap decision (+LBDiffusionRemapAbove) -------------------------
+  //
+  // Diffusion executes its plan one hop: a node hands over objects it holds,
+  // and cannot forward what it receives in the same step. When the plan is
+  // deeper than that -- a hot region whose interior nodes see no gradient --
+  // the step cannot reduce the maximum, however many objects it moves, and
+  // the balanced partition is one most regions must relocate to reach. That
+  // is a scratch-remap's job: partition from scratch, relabel for overlap,
+  // migrate once. Measured on the 256-node stencil, one step from 4.49x to
+  // 1.12x with 0 detached pieces, where eight diffusion steps and five times
+  // the migrations reached 1.9x.
+  //
+  // After the rounds every node reports what its plan predicts; PE 0 sums,
+  // decides on the predicted max/avg against the flag, and tells every PE.
+  // On a hand-off DiffusionLB steps aside and a MetisLB it created for the
+  // purpose -- outside the manager's balancer sequence -- finishes the step
+  // as a central balancer does. Three things make that hand-off clean:
+  // this balancer keeps its own hold on the AtSync barrier until the central
+  // step's migration-done callback, so no new step can start in between; it
+  // forwards the arrivals the manager routes to it, since the hidden balancer
+  // is never the manager's current one; and it clears its started flag so
+  // its next step is not refused.
+  void proceedAfterPlan();
+  void planReport(double load, double predicted, double planIn, double planOut);
+  void planVerdict(int remap, CkGroupID remapGid);
+  void remapHandoff();
+  void onCentralStepDone();
+  void Migrated(int waitBarrier) override;
+  double remapAbove;
+  bool remapHandoffActive;
+  bool remapGidValid;
+  CkGroupID remapGid;
+  DiffusionPlanSummary planSummary;
+  int planReports;
   // Migration-handoff completion counting, replacing the quiescence detectors
   // between AcrossNodeLB -> WithinNodeLB -> ProcessMigrations. Each
   // LoadMetaInfo/LoadReceived a rank0PE sends is acked by its receiver after

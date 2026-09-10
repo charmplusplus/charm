@@ -15,6 +15,7 @@
 
 #include "DiffusionLB.h"
 #include "LBSimulation.h"
+#include "MetisLB.h"
 
 #include <algorithm>
 #include <cmath>
@@ -69,6 +70,22 @@ DiffusionCostConfig diffusionCostCfg;
 // still derives its default from this; the decision floors themselves come
 // from +LBDiffusionMinImbalance (effMinImbalance).
 #define THRESHOLD 2
+
+// +LBDiffusionRemapAbove <max/avg>: hand a step to the scratch-remap when the
+// one-hop plan would leave the predicted max/avg above this. 0 never does,
+// which is the default. Read once per process: Converse removes an option
+// from argv when it is read, and every PE of a process shares one argv.
+static double diffusionRemapAbove()
+{
+  static const double v = []() {
+    double r = 0.0;
+    CmiGetArgDoubleDesc(CkGetArgv(), "+LBDiffusionRemapAbove", &r,
+                        "DiffusionLB hands a step to a scratch-remap when its one-hop plan "
+                        "leaves max/avg above this (0: never)");
+    return r;
+  }();
+  return v;
+}
 
 // Diffusion rounds stop once no node wants to shift more than this fraction of
 // its own load; see diffusionPseudoConvergeRatio in DiffusionFlow.h, whose
@@ -197,10 +214,19 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   num_migrations = 0;
   pseudoSectionBuilt = false;
 
+  remapAbove = diffusionRemapAbove();
+  remapHandoffActive = false;
+  remapGidValid = false;
+  remapGid.setZero();
+  planReports = 0;
+
 #if CMK_LBDB_ON
   lbname = "DiffusionLB";
   if (_lb_args.statsOn())
     lbmgr->CollectStatsOn();
+  // The end of a central balancer's step, which is where a handed-off step
+  // ends; see onCentralStepDone.
+  lbmgr->AddMigrationDoneFn([this]() { onCentralStepDone(); });
   // Every comm-aware balancer in this tree enables communication instrumentation
   // from its own constructor rather than requiring the user to pass +LBCommOn --
   // MetisLB.C:23, ScotchLB.C:23, ScotchTopoLB.C:25, ScotchRefineLB.C:20,
@@ -1123,6 +1149,120 @@ void DiffusionLB::MigrationDoneWrapper()
   MigrationDone(balancing);  // call DistBaseLB version
 
   // End LB timing instrumentation
+}
+
+// ---- the remap decision -------------------------------------------------------
+
+// A root node has left the rounds. Without the flag, straight on to the
+// across-node phase as before; with it, the plan goes to PE 0 first.
+void DiffusionLB::proceedAfterPlan()
+{
+  if (remapAbove > 0.0)
+  {
+    double in = 0.0, out = 0.0;
+    for (double q : toSendLoad)
+    {
+      if (q > 0) out += q;
+      else in -= q;
+    }
+    thisProxy[0].planReport(my_load, my_pseudo_load, in, out);
+    return;
+  }
+  if (diffusionGlobalPhases()) thisProxy[0].roundsDone();
+  else AcrossNodeLB();
+}
+
+// PE 0: one report per node, then the verdict to every PE.
+void DiffusionLB::planReport(double load, double predicted, double planIn, double planOut)
+{
+  planSummary.add(load, predicted, planIn, planOut);
+  if (++planReports < numNodes) return;
+  planReports = 0;
+
+  const bool remap = diffusionShouldRemap(planSummary, remapAbove);
+  if (_lb_args.debug() > 0)
+    CkPrintf("[DiffusionLB] step %d plan: max/avg %.3f now, %.3f after one hop; %.0f%% of the "
+             "load would move, relay share %.0f%%; %s\n",
+             step(), planSummary.currentImbalance(), planSummary.predictedImbalance(),
+             100.0 * planSummary.movedShare(), 100.0 * planSummary.relayShare(),
+             remap ? "handing the step to scratch-remap" : "executing the plan");
+  planSummary = DiffusionPlanSummary();
+
+  // The remap balancer, created on first use. Sequence number -1 keeps it out
+  // of the manager's balancer list: the manager never starts it and never
+  // advances past it, so this balancer stays the one the manager runs.
+  if (remap && !remapGidValid)
+  {
+    remapGid = CProxy_MetisLB::ckNew(CkLBOptions(-1));
+    remapGidValid = true;
+  }
+  CkGroupID gid;
+  gid.setZero();
+  if (remapGidValid) gid = remapGid;
+  thisProxy.planVerdict(remap ? 1 : 0, gid);
+}
+
+// Every PE: hand off, or (roots only) carry on with the plan.
+void DiffusionLB::planVerdict(int remap, CkGroupID gid)
+{
+  if (remap)
+  {
+    remapGid = gid;
+    remapGidValid = true;
+    remapHandoff();
+    return;
+  }
+  if (thisIndex != rank0PE) return;
+  if (diffusionGlobalPhases()) thisProxy[0].roundsDone();
+  else AcrossNodeLB();
+}
+
+// This PE's part of the hand-off. The central balancer takes the step from
+// its stats-gathering entry, which is what its own start path reaches once the
+// loads for the step exist -- and they do, this balancer's barrier built them.
+// Its start path is skipped deliberately: it would count a second arrival for
+// the step's device loads and register a second hold on the AtSync barrier.
+// The hold this balancer already has stays until the central step is done.
+void DiffusionLB::remapHandoff()
+{
+  remapHandoffActive = true;
+  stepHandedOff();
+  if (thisIndex == 0 && _lb_args.debug() > 0)
+    CkPrintf("[DiffusionLB] step %d handed to MetisLB (scratch-remap)\n", step());
+  CProxy_CentralLB(remapGid)[CkMyPe()].ProcessAtSync();
+}
+
+// The manager's migration-done callback, which a central balancer invokes on
+// every PE as its step ends, before it resumes the clients and releases its
+// own hold on the barrier. Releasing this balancer's hold here, and not when
+// the step was handed off, is what keeps the barrier held throughout: the
+// central balancer's own hold is taken only once its stats are sent, which is
+// after the hand-off message lands, and a moment with no hold at all would let
+// the clients' next AtSync start a new step underneath the remap.
+void DiffusionLB::onCentralStepDone()
+{
+  if (!remapHandoffActive) return;
+  remapHandoffActive = false;
+  LDOMHandle h;
+  h.id.id.idx = 0;
+  lbmgr->DoneRegisteringObjects(h);
+}
+
+// The manager routes every object arrival to its current balancer, which is
+// this one even while the hidden remap balancer is migrating; a central
+// balancer completes its step by counting exactly those arrivals.
+void DiffusionLB::Migrated(int waitBarrier)
+{
+  if (remapHandoffActive && remapGidValid)
+  {
+    CentralLB* lb = CProxy_CentralLB(remapGid).ckLocalBranch();
+    if (lb != NULL)
+    {
+      lb->Migrated(waitBarrier);
+      return;
+    }
+  }
+  DistBaseLB::Migrated(waitBarrier);
 }
 
 void DiffusionLB::printDiffusionTiming()

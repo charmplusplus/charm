@@ -81,6 +81,13 @@ protected:
   LDStats myStats;
   int migrates_expected;
 
+  // For a strategy that lets another balancer finish its step (DiffusionLB's
+  // scratch-remap hand-off): clears the started flag so the next step is not
+  // refused as already running. Nothing else of the step's bookkeeping is
+  // touched -- the balancer that finishes the step increments the step
+  // counter, clears the loads and resumes the clients.
+  void stepHandedOff() { lb_started = false; }
+
 private:
 	bool lb_started;
   double start_lb_time;
