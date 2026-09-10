@@ -45,20 +45,40 @@
 /*readonly*/ int ny;
 /*readonly*/ int itersPerPhase;
 /*readonly*/ int ghostBytes;
+/*readonly*/ double workScale;
 
 // Weight patterns. Phase 1 is flat, so the first balancer partitions on
 // communication alone and produces the compact blocks a stencil should get.
 // Phase 2 puts a heavy disc off-centre, which is the imbalance the second
 // balancer has to repair -- and because it straddles whatever partition the
 // first one chose, repairing it means moving objects across several PEs.
-static double weightUniform(int, int) { return 1.0; }
+// The weights are SECONDS, because that is what setObjTime declares and what
+// the cost model compares against. A chare doing 1 ms of work per iteration
+// while exchanging a few hundred KB of ghosts is an ordinary stencil; declaring
+// 1.0 instead would say each chare computes for a second between exchanges,
+// against which no communication or migration cost could ever matter and the
+// cost model would accept every move by many orders of magnitude.
+//
+// Nothing else in the experiment depends on the scale: max/avg imbalance is a
+// ratio, and edge cut and object counts are counts, so results here remain
+// comparable with runs made before this was set to a realistic value.
+// Chosen against the ghost size below so the two are commensurable: with 4 KB
+// faces exchanged six times an object's incident traffic prices at ~1.6e-4 s
+// under the synthetic cost table, so a base chare at 1e-4 s is a move the model
+// should refuse and a hot one at 1.2e-3 s is a move it should take. Pick these
+// orders of magnitude apart and the model degenerates to always-yes or
+// always-no and tells you nothing.
+static const double kBaseWork = 1.0;
+static const double kHotWork = 12.0;
+
+static double weightUniform(int, int) { return kBaseWork * workScale; }
 
 static double weightHotSpot(int i, int j)
 {
   const double cx = nx * 0.30, cy = ny * 0.30;
   const double r = std::sqrt((i - cx) * (i - cx) + (j - cy) * (j - cy));
   const double radius = 0.22 * (nx < ny ? nx : ny);
-  return (r <= radius) ? 12.0 : 1.0;
+  return (r <= radius) ? kHotWork * workScale : kBaseWork * workScale;
 }
 
 class Main : public CBase_Main
@@ -85,6 +105,13 @@ public:
     nx = 32;
     ny = 32;
     itersPerPhase = 6;
+    // Kept small on purpose. MetisLB normalises VERTEX weights to 1..256 but
+    // passes edge weights to METIS as raw byte counts, so a large ghost makes
+    // the cut term dwarf the load term; and because METIS's balance constraint
+    // is an upper bound only, an empty partition satisfies it. Measured here at
+    // 256 KB: Metis emptied a PE entirely (0..426 objects) on uniform weights.
+    // At 4 KB it partitions evenly. The load scale above is set against this
+    // figure rather than the other way round.
     ghostBytes = 4096;
     if (m->argc > 1) nx = atoi(m->argv[1]);
     if (m->argc > 2) ny = atoi(m->argv[2]);
@@ -93,6 +120,7 @@ public:
     // The balancer names, for labelling only. Charm decides which balancer runs
     // at which step from the order of the +balancer arguments; nothing here can
     // read that back, so the caller passes the same order again.
+    workScale = m->argc > 7 ? atof(m->argv[7]) : 1.0;
     lb1 = m->argc > 5 ? m->argv[5] : "balancer 1";
     lb2 = m->argc > 6 ? m->argv[6] : "balancer 2";
     delete m;

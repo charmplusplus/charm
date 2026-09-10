@@ -4,6 +4,13 @@ lbdriver.decl.h
 lbdriver.def.h
 lbdriver.json
 lbmap.html
+lbsim
+lbsim.o
+lbsim.decl.h
+lbsim.def.h
+lbsim.json
+lbsim.html
+__pycache__/
 charmrun*
 hapi_memory_daemon
 *.btr

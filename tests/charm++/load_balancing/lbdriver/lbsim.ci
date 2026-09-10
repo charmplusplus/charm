@@ -1,0 +1,7 @@
+mainmodule lbsim
+{
+  mainchare Main
+  {
+    entry Main(CkArgMsg* m);
+  };
+};

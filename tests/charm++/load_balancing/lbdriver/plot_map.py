@@ -8,6 +8,7 @@ HTML file that opens locally in a browser and is also publishable as-is.
 """
 
 import json
+import random
 import sys
 
 # Categorical palette for PE identity. These four hues are the only 4-subset of
@@ -19,6 +20,25 @@ import sys
 PE_LIGHT = ["#2a78d6", "#eda100", "#e87ba4", "#008300"]
 PE_DARK = ["#3987e5", "#c98500", "#d55181", "#008300"]
 
+# Beyond four PEs no palette can name each one, and a map does not need it to:
+# what has to be told apart is a region from the regions it touches. So the
+# page is coloured as a map -- no two PEs that share a boundary in ANY phase
+# get the same colour, one colouring for the whole page so a PE keeps its
+# colour from panel to panel -- from the four hues above and then these, which
+# a greedy colouring reaches only when the adjacency needs them. Identity is on
+# hover and in the table; the boundary lines carry the partition regardless.
+#
+# Validated against the four above (scripts/validate_palette.js, all pairs).
+# Light: the purple passes every check, the cyan passes with a CVD warning,
+# and the two after them clear the normal-vision floor but not the CVD floor
+# against the green -- no fifth hue does. Dark: purple and teal clear the
+# normal-vision floor; the last two clear neither against the pink and the
+# amber. They come last, so only the few PEs whose neighbourhoods force a
+# seventh or eighth colour reach them, and for those pairs the boundary lines
+# are the separation.
+EXTRA_LIGHT = ["#7f3f98", "#17becf", "#e0521f", "#a52a2a"]
+EXTRA_DARK = ["#7b4fc4", "#29a89a", "#a9463c", "#a86b2f"]
+
 CELL = 15
 PAD = 1
 
@@ -28,7 +48,90 @@ def esc(s):
             .replace('"', "&quot;"))
 
 
-def grid_svg(phase, nx, ny, npes, idx):
+def colour_pes(phases, nx, ny, npes):
+    """Colour index per PE. The PE itself while the four-hue palette can name
+    every PE; otherwise a DSATUR colouring of the union, over all phases, of
+    the PE adjacency on the grid."""
+    if npes <= len(PE_LIGHT):
+        return list(range(npes))
+    adj = [set() for _ in range(npes)]
+
+    def link(a, b):
+        if a != b and 0 <= a < npes and 0 <= b < npes:
+            adj[a].add(b)
+            adj[b].add(a)
+
+    for ph in phases:
+        m = ph["map"]
+        for i in range(nx):
+            for j in range(ny):
+                a = m[i * ny + j]
+                if i + 1 < nx:
+                    link(a, m[(i + 1) * ny + j])
+                if j + 1 < ny:
+                    link(a, m[i * ny + j + 1])
+    def dsatur():
+        colour = [-1] * npes
+        sat = [set() for _ in range(npes)]
+        for _ in range(npes):
+            best = max((pe for pe in range(npes) if colour[pe] < 0),
+                       key=lambda pe: (len(sat[pe]), len(adj[pe])))
+            c = 0
+            while c in sat[best]:
+                c += 1
+            colour[best] = c
+            for nb in adj[best]:
+                sat[nb].add(c)
+        return colour
+
+    def greedy(order):
+        colour = [-1] * npes
+        for pe in order:
+            used = set(colour[nb] for nb in adj[pe] if colour[nb] >= 0)
+            c = 0
+            while c in used:
+                c += 1
+            colour[pe] = c
+        return colour
+
+    # Fewer colours is fewer weakly-separated pairs, so a handful of restarts
+    # is worth their milliseconds: largest-degree-first with random ties.
+    best = dsatur()
+    rnd = random.Random(1)
+    order = list(range(npes))
+    for _ in range(40):
+        rnd.shuffle(order)
+        order.sort(key=lambda pe: -len(adj[pe]))
+        cand = greedy(order)
+        if max(cand) < max(best):
+            best = cand
+    return best
+
+
+def pieces(m, nx, ny, npes):
+    """Connected pieces (4-connectivity) beyond one per PE: how many PEs'
+    regions have fallen apart, and into how many extra bits."""
+    seen = [False] * (nx * ny)
+    count = [0] * npes
+    for s in range(nx * ny):
+        if seen[s] or not (0 <= m[s] < npes):
+            continue
+        count[m[s]] += 1
+        stack = [s]
+        seen[s] = True
+        while stack:
+            k = stack.pop()
+            i, j = k // ny, k % ny
+            for ii, jj in ((i - 1, j), (i + 1, j), (i, j - 1), (i, j + 1)):
+                if 0 <= ii < nx and 0 <= jj < ny:
+                    kk = ii * ny + jj
+                    if not seen[kk] and m[kk] == m[k]:
+                        seen[kk] = True
+                        stack.append(kk)
+    return sum(c - 1 for c in count if c > 1)
+
+
+def grid_svg(phase, nx, ny, npes, colour):
     """One phase as a grid of cells, plus partition and hot-region outlines."""
     m = phase["map"]
     w = phase["weights"]
@@ -47,16 +150,26 @@ def grid_svg(phase, nx, ny, npes, idx):
         '<svg class="grid" viewBox="-1 -1 %d %d" role="img" '
         'aria-label="Object to PE mapping, %s">' % (W + 2, H + 2, esc(phase["name"])))
 
-    # Cells. x is the horizontal axis, y runs downward.
-    for i in range(nx):
-        for j in range(ny):
+    # Cells, as horizontal runs of one PE and one weight. x is the horizontal
+    # axis, y runs downward. A run is one element instead of one per cell, which
+    # is what keeps a 128x128 grid times several phases inside a page that a
+    # browser will still open; the boundary paths below separate PEs.
+    for j in range(ny):
+        i = 0
+        while i < nx:
             pe = m[i * ny + j]
-            cls = "c%d" % (pe % len(PE_LIGHT)) if pe >= 0 else "cna"
+            wt = w[i * ny + j]
+            i2 = i
+            while i2 + 1 < nx and m[(i2 + 1) * ny + j] == pe and w[(i2 + 1) * ny + j] == wt:
+                i2 += 1
+            cls = "c%d" % colour[pe] if 0 <= pe < npes else "cna"
+            span = "(%d, %d)" % (i, j) if i2 == i else "(%d&#8211;%d, %d)" % (i, i2, j)
             out.append(
                 '<rect class="cell %s" x="%d" y="%d" width="%d" height="%d">'
-                '<title>(%d, %d) &#183; PE %d &#183; weight %g</title></rect>'
-                % (cls, i * side, j * side, side - PAD, side - PAD, i, j, pe,
-                   w[i * ny + j]))
+                '<title>%s &#183; PE %d &#183; weight %g</title></rect>'
+                % (cls, i * side, j * side, (i2 - i + 1) * side - PAD, side - PAD, span,
+                   pe, wt))
+            i = i2 + 1
 
     # Partition boundaries: an edge wherever the neighbour belongs to another PE.
     # This is the secondary encoding -- the partition stays legible even where two
@@ -117,17 +230,29 @@ def main():
 
     nx, ny, npes = data["nx"], data["ny"], data["npes"]
     phases = data["phases"]
+    simulated = data.get("tool") == "lbsim"
 
+    colour = colour_pes(phases, nx, ny, npes)
+    ncol = max(colour) + 1
+    light = PE_LIGHT + EXTRA_LIGHT
+    dark = PE_DARK + EXTRA_DARK
+    if ncol > len(light):
+        print("plot_map: the map needs %d colours and the palette has %d; some "
+              "neighbouring PEs will share a colour (the boundary lines still "
+              "separate them)" % (ncol, len(light)))
     pe_light = "\n".join(
-        "  --pe-%d: %s;" % (i, PE_LIGHT[i % len(PE_LIGHT)]) for i in range(npes))
+        "  --pe-%d: %s;" % (c, light[c % len(light)]) for c in range(ncol))
     pe_dark = "\n".join(
-        "  --pe-%d: %s;" % (i, PE_DARK[i % len(PE_DARK)]) for i in range(npes))
+        "  --pe-%d: %s;" % (c, dark[c % len(dark)]) for c in range(ncol))
     cell_rules = "\n".join(
-        ".c%d { fill: var(--pe-%d); }" % (i, i) for i in range(npes))
+        ".c%d { fill: var(--pe-%d); }" % (c, c) for c in range(ncol))
+    sw_rules = "\n".join(
+        ".sw.c%d { background: var(--pe-%d); }" % (c, c) for c in range(ncol))
 
     panels = []
     for n, ph in enumerate(phases):
         counts, loads, ratio = stats(ph, npes)
+        extra = pieces(ph["map"], nx, ny, npes)
 
         # What the balancer was handed. Between two steps the weights can change
         # under a fixed mapping, so the imbalance this step started from is the
@@ -152,35 +277,60 @@ def main():
             '%s'
             '      <div><dt>max/avg load</dt><dd class="key">%.2f&#215;</dd></div>\n'
             '      <div><dt>objects per PE</dt><dd>%d&#8211;%d</dd></div>\n'
+            '      <div><dt>detached pieces</dt><dd>%d</dd></div>\n'
             '    </dl>\n'
             '  </figcaption>\n'
             '%s\n'
             '</figure>' % (n, esc(ph["name"]), before, ratio, min(counts), max(counts),
-                           grid_svg(ph, nx, ny, npes, n)))
+                           extra, grid_svg(ph, nx, ny, npes, colour)))
 
-    legend = "\n".join(
-        '<li><span class="sw c%d"></span>PE %d</li>' % (i, i) for i in range(npes))
+    if npes <= len(PE_LIGHT):
+        legend = "\n".join(
+            '<li><span class="sw c%d"></span>PE %d</li>' % (colour[i], i)
+            for i in range(npes))
+    else:
+        legend = ('<li>%d PEs, %d colours: a colour separates a PE from its '
+                  'neighbours, it does not name it &#8212; hover a cell for the PE</li>'
+                  % (npes, ncol))
 
     head = "".join("<th>%s</th>" % esc(p["name"]) for p in phases)
+    per_phase = [stats(ph, npes) for ph in phases]
     rows = []
     for pe in range(npes):
         cells = []
-        for ph in phases:
-            counts, loads, _ = stats(ph, npes)
+        for counts, loads, _ in per_phase:
             cells.append("<td>%d obj &#183; %.0f load</td>" % (counts[pe], loads[pe]))
         rows.append('<tr><th scope="row"><span class="sw c%d"></span>PE %d</th>%s</tr>'
-                    % (pe, pe, "".join(cells)))
+                    % (colour[pe], pe, "".join(cells)))
+
+    # A long table folds; the summary line says what is inside.
+    if npes > 16:
+        table_open = ('<details class="tablewrap"><summary>Objects and total weight '
+                      'per PE, %d rows</summary>' % npes)
+        table_close = '</details>'
+    else:
+        table_open = '<div class="tablewrap">'
+        table_close = '</div>'
+
+    if simulated:
+        where = ("%d virtual nodes, DiffusionLB run offline by <code>lbsim</code> on "
+                 "its own decision code" % npes)
+    else:
+        where = "%d PEs" % npes
 
     html = TEMPLATE % {
-        "nx": nx, "ny": ny, "nobj": nx * ny, "npes": npes,
+        "nx": nx, "ny": ny, "nobj": nx * ny, "npes": npes, "where": where,
         "pe_light": pe_light, "pe_dark": pe_dark, "cell_rules": cell_rules,
+        "sw_rules": sw_rules,
         "panels": "\n".join(panels), "legend": legend,
         "thead": head, "rows": "\n".join(rows),
+        "table_open": table_open, "table_close": table_close,
     }
 
     with open(dst, "w") as f:
         f.write(html)
-    print("wrote %s (%d phases, %dx%d on %d PEs)" % (dst, len(phases), nx, ny, npes))
+    print("wrote %s (%d phases, %dx%d on %d PEs, %d colours)"
+          % (dst, len(phases), nx, ny, npes, ncol))
 
 
 TEMPLATE = """<title>Stencil Partition Walk</title>
@@ -253,10 +403,7 @@ h1 { font-size: 30px; font-weight: 600; margin: 0 0 10px; text-wrap: balance;
 .sw { width: 11px; height: 11px; border-radius: 2px; display: inline-block;
       flex: none; }
 %(cell_rules)s
-.sw.c0 { background: var(--pe-0); }
-.sw.c1 { background: var(--pe-1); }
-.sw.c2 { background: var(--pe-2); }
-.sw.c3 { background: var(--pe-3); }
+%(sw_rules)s
 .legend .marks { color: var(--ink-3); }
 
 .panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -287,6 +434,9 @@ h1 { font-size: 30px; font-weight: 600; margin: 0 0 10px; text-wrap: balance;
        opacity: .9; }
 
 .tablewrap { margin: 34px 0 0; overflow-x: auto; }
+details.tablewrap summary { cursor: pointer; color: var(--ink-2); font-size: 13.5px;
+                            padding: 6px 0; }
+details.tablewrap summary:focus-visible { outline: 2px solid var(--ink-3); }
 table { border-collapse: collapse; width: 100%%; font-size: 13.5px;
         font-variant-numeric: tabular-nums; }
 caption { text-align: left; color: var(--ink-2); font-size: 13px;
@@ -310,10 +460,10 @@ code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .93em;
 <header>
   <p class="eyebrow">Charm++ &#183; ck-ldb &#183; lbdriver</p>
   <h1>Stencil Partition Walk</h1>
-  <p class="lede">A %(nx)d&#215;%(ny)d stencil of %(nobj)d chares on %(npes)d PEs.
+  <p class="lede">A %(nx)d&#215;%(ny)d stencil of %(nobj)d chares on %(where)s.
   Each square is one chare, coloured by the PE holding it. The partition is
   balanced once with the weights flat, then the load is concentrated into one
-  region and a second balancer has to repair it.</p>
+  region and DiffusionLB has to repair it.</p>
   <ul class="legend">
     %(legend)s
     <li class="marks">&#9472; partition boundary</li>
@@ -325,9 +475,9 @@ code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .93em;
 %(panels)s
 </div>
 
-<div class="tablewrap">
+%(table_open)s
 <table>
-  <caption>Objects and total weight per PE. Two of the four fills sit under 3:1
+  <caption>Objects and total weight per PE. Some fills sit under 3:1
   contrast on a light ground, so the figures are given here as well as in the
   grids.</caption>
   <thead><tr><th scope="col">PE</th>%(thead)s</tr></thead>
@@ -335,7 +485,7 @@ code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: .93em;
 %(rows)s
   </tbody>
 </table>
-</div>
+%(table_close)s
 
 <footer>Generated by <code>tests/charm++/load_balancing/lbdriver</code>. Chare
 loads are declared with <code>setObjTime</code> rather than measured, so the
