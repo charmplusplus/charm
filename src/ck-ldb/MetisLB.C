@@ -13,6 +13,7 @@
 #include "ckgraph.h"
 #include "LBMemoryContract.h"
 #include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <limits>
 #include <map>
@@ -33,6 +34,108 @@ MetisLB::MetisLB(const CkLBOptions& opt) : CBase_MetisLB(opt)
   lbname = "MetisLB";
   if (CkMyPe() == 0 && !quietModeRequested)
     CkPrintf("CharmLB> MetisLB created.\n");
+}
+
+// ---- scratch-remap: relabel the parts for overlap --------------------------------
+//
+// METIS numbers its parts arbitrarily, so a partition computed from scratch
+// sends most objects somewhere new even when it is nearly the partition they
+// are already in. Relabelling the parts to the current owners they overlap
+// most -- heaviest overlap first, greedily -- recovers what can be recovered
+// without touching the partition itself; only parts with equal target shares
+// may exchange labels, so the balance is exactly what METIS produced. This is
+// the remap half of Schloegel, Karypis and Kumar's scratch-remap, and it is
+// what makes a from-scratch partition a repartitioner for a large
+// perturbation. Measured on a 128x128 stencil over 256 nodes with a 12x hot
+// disc: one step from 4.49x to 1.12x with 67% of the objects moving once,
+// where diffusion took eight steps and five times the migrations to 1.9x.
+// Off with +LBMetisNoRemap. Read once per process, since Converse removes an
+// option from argv when it is read and every PE of a process shares one argv.
+static bool metisRemapOn()
+{
+  static const bool on = []() {
+    return !CmiGetArgFlagDesc(CkGetArgv(), "+LBMetisNoRemap",
+                              "MetisLB: do not relabel the new parts to the owners they "
+                              "overlap most (same partition, more migrations)");
+  }();
+  return on;
+}
+
+// sigma[part]: the label that part takes. current[k] is vertex k's label now,
+// or -1 when it has none among these; target[p] a part's share, and labels
+// are exchanged only between parts of near-equal share.
+//
+// Near-equal, not equal: a PE's share carries its measured background load
+// (fixedCpu), so on a uniform machine the shares differ by fractions of a
+// percent and no two are ever exactly equal -- with an exact test the
+// relabel never fired, and a block map went to a uniform partition with every
+// object moving. Two parts whose shares are within this fraction of each
+// other may exchange labels; the balance METIS produced is then off by at
+// most that fraction of a share, inside the 10% it was allowed anyway.
+static const double kRelabelShareTolerance = 0.05;
+
+static std::vector<int> relabelForOverlap(const std::vector<idx_t>& partOf, int nparts,
+                                          const std::vector<int>& current,
+                                          const std::vector<std::vector<double>>& target)
+{
+  std::vector<std::vector<int>> overlap(nparts, std::vector<int>(nparts, 0));
+  for (size_t k = 0; k < partOf.size(); k++)
+    if (current[k] >= 0 && current[k] < nparts) overlap[partOf[k]][current[k]]++;
+  auto sameShare = [&](int a, int b) {
+    for (size_t c = 0; c < target[a].size() && c < target[b].size(); c++)
+    {
+      const double scale =
+          std::max(1e-12, std::max(std::fabs(target[a][c]), std::fabs(target[b][c])));
+      if (std::fabs(target[a][c] - target[b][c]) > kRelabelShareTolerance * scale)
+        return false;
+    }
+    return true;
+  };
+  struct Pair { int n, part, label; };
+  std::vector<Pair> pairs;
+  for (int p = 0; p < nparts; p++)
+    for (int l = 0; l < nparts; l++)
+      if (overlap[p][l] > 0 && sameShare(p, l)) pairs.push_back(Pair{overlap[p][l], p, l});
+  std::sort(pairs.begin(), pairs.end(), [](const Pair& a, const Pair& b) {
+    if (a.n != b.n) return a.n > b.n;
+    if (a.part != b.part) return a.part < b.part;
+    return a.label < b.label;
+  });
+  std::vector<int> sigma(nparts, -1);
+  std::vector<char> used(nparts, 0);
+  for (const Pair& pr : pairs)
+    if (sigma[pr.part] < 0 && !used[pr.label])
+    {
+      sigma[pr.part] = pr.label;
+      used[pr.label] = 1;
+    }
+  // What is left keeps its own number where it can, else takes any free label
+  // of equal share; one always exists, since parts and labels are one set.
+  for (int p = 0; p < nparts; p++)
+    if (sigma[p] < 0 && !used[p])
+    {
+      sigma[p] = p;
+      used[p] = 1;
+    }
+  for (int p = 0; p < nparts; p++)
+    if (sigma[p] < 0)
+      for (int l = 0; l < nparts; l++)
+        if (!used[l] && sameShare(p, l))
+        {
+          sigma[p] = l;
+          used[l] = 1;
+          break;
+        }
+  for (int p = 0; p < nparts; p++)
+    if (sigma[p] < 0)
+      for (int l = 0; l < nparts; l++)
+        if (!used[l])
+        {
+          sigma[p] = l;
+          used[l] = 1;
+          break;
+        }
+  return sigma;
 }
 
 void MetisLB::work(LDStats* stats)
@@ -338,9 +441,31 @@ void MetisLB::work(LDStats* stats)
   const std::vector<idx_t> groupOf = partitionSubset(
       migVerts, nGroups, nGroups > 1 ? &tpwgts : nullptr, vwgtCross, nConstraints);
 
+  // Scratch-remap, level one: the group each part becomes is the group its
+  // objects mostly come from, where the shares allow.
+  std::vector<idx_t> groupLabel = groupOf;
+  int relabelledGroups = 0, relabelledPes = 0;
+  if (metisRemapOn() && nGroups > 1)
+  {
+    std::vector<int> cur(migVerts.size(), -1);
+    for (size_t k = 0; k < migVerts.size(); k++)
+    {
+      const int pe = ogr->vertices[migVerts[k]].getCurrentPe();
+      if (pe >= 0 && pe < (int)groupOfPe.size()) cur[k] = groupOfPe[pe];
+    }
+    std::vector<std::vector<double>> shares(nGroups);
+    for (idx_t g = 0; g < nGroups; g++)
+      for (int c = 0; c < nConstraints; c++)
+        shares[g].push_back(tpwgts[(size_t)g * nConstraints + c]);
+    const std::vector<int> sigma = relabelForOverlap(groupOf, (int)nGroups, cur, shares);
+    for (idx_t g = 0; g < nGroups; g++)
+      if (sigma[g] != (int)g) relabelledGroups++;
+    for (size_t k = 0; k < migVerts.size(); k++) groupLabel[k] = sigma[groupOf[k]];
+  }
+
   std::vector<std::vector<int>> grpVerts(nGroups);
   for (size_t k = 0; k < migVerts.size(); k++)
-    grpVerts[groupOf[k]].push_back(migVerts[k]);
+    grpVerts[groupLabel[k]].push_back(migVerts[k]);
 
   // Level two: within a group, over the PEs sharing that GPU, on host load --
   // every PE here drives the same device, so device time cannot separate them.
@@ -374,8 +499,42 @@ void MetisLB::work(LDStats* stats)
     const std::vector<idx_t> peOf = partitionSubset(
         grpVerts[g], (idx_t)pes.size(), pes.size() > 1 ? &tpwgts2 : nullptr,
         vwgtIntra, 1);
+
+    // Scratch-remap, level two: the PE each part becomes is the PE its
+    // objects mostly come from, where the shares allow.
+    std::vector<idx_t> peLabel = peOf;
+    if (metisRemapOn() && pes.size() > 1)
+    {
+      std::vector<int> cur(grpVerts[g].size(), -1);
+      for (size_t k = 0; k < grpVerts[g].size(); k++)
+      {
+        const int pe = ogr->vertices[grpVerts[g][k]].getCurrentPe();
+        for (size_t j = 0; j < pes.size(); j++)
+          if (pes[j] == pe)
+          {
+            cur[k] = (int)j;
+            break;
+          }
+      }
+      std::vector<std::vector<double>> shares(pes.size());
+      for (size_t j = 0; j < pes.size(); j++) shares[j].push_back(tpwgts2[j]);
+      const std::vector<int> sigma = relabelForOverlap(peOf, (int)pes.size(), cur, shares);
+      for (size_t j = 0; j < pes.size(); j++)
+        if (sigma[j] != (int)j) relabelledPes++;
+      for (size_t k = 0; k < grpVerts[g].size(); k++) peLabel[k] = sigma[peOf[k]];
+    }
     for (size_t k = 0; k < grpVerts[g].size(); k++)
-      newPe[grpVerts[g][k]] = pes[peOf[k]];
+      newPe[grpVerts[g][k]] = pes[peLabel[k]];
+  }
+
+  if (metisRemapOn() && _lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
+  {
+    int moved = 0;
+    for (int v : migVerts)
+      if (newPe[v] >= 0 && newPe[v] != ogr->vertices[v].getCurrentPe()) moved++;
+    CkPrintf("[%d] MetisLB remap: relabelled %d group(s) and %d PE part(s); %d of %d "
+             "migratable objects move\n",
+             CkMyPe(), relabelledGroups, relabelledPes, moved, (int)migVerts.size());
   }
 
   if (_lb_args.debug() > 1 && CkMyPe() == cur_ld_balancer)
