@@ -26,7 +26,11 @@
 #endif
 
 #if CMK_CUDA && CMK_LBDB_ON
-#include "LBManager.h"
+// lbdb.h, not LBManager.h: this file needs the LB *types* (LDObjKey,
+// GpuObjectTokenTable, LBKernelRecord), which are header-only, and must not
+// acquire a link dependency on ck-ldb globals such as _lb_args. See the note on
+// cuptiDebugLevel below.
+#include "lbdb.h"
 #include "cklocation.h"
 #include <algorithm>
 #include <climits>
@@ -36,6 +40,25 @@
 // this file does not otherwise need. Gives the entry-method correlation hook
 // the running element's full LB identity.
 CkLocRec* CkActiveLocRec(void);
+
+// Verbosity for the CUPTI accounting below, from the environment rather than
+// from _lb_args.debug().
+//
+// This object is only ever pulled into a link that also has libck -- hapi is
+// reached from ck-core/init.C -- but nothing enforces that, and when it is
+// violated the failure is a wall of undefined references in unrelated
+// pure-Converse programs rather than anything pointing here. Reading a global
+// that lives in ck-ldb would add one more way to trip it, for two diagnostic
+// printfs. The other diagnostics in this file (CHARM_GPU_LOAD_AUDIT,
+// CHARM_LB_CUPTI_TIME) are already environment-driven, so this matches them.
+static int cuptiDebugLevel()
+{
+  static const int level = []() {
+    const char* s = getenv("CHARM_LB_CUPTI_DEBUG");
+    return s != nullptr ? atoi(s) : 0;
+  }();
+  return level;
+}
 
 #ifdef HAPI_CUPTI_LB
 #include <cupti.h>
@@ -610,7 +633,7 @@ void hapiProcessCuptiBuffers() {
   size_t object_corr_dropped = gm.cupti_object_correlation_db_.size();
   gm.cupti_object_correlation_db_.clear();
 
-  if (_lb_args.debug() > 1) {
+  if (cuptiDebugLevel() > 1) {
     CmiPrintf("HAPI[pe=%d]: hapiProcessCuptiBuffers kernels=%u "
               "object_correlations=%u attributed=%u unattributed=%u "
               "deferred=%u invalid_durations=%u unresolved_tokens=%u "
@@ -774,7 +797,7 @@ void hapiNormalizeCuptiLoads() {
     }
   }
 
-  if (_lb_args.debug() > 1) {
+  if (cuptiDebugLevel() > 1) {
     CmiPrintf("HAPI[pe=%d]: hapiNormalizeCuptiLoads  %zu kernels across %zu "
               "device(s) -> %zu objects\n",
               CmiMyPe(), total_kernels, devices_normalized,
