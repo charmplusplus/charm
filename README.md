@@ -18,7 +18,35 @@ Source code is provided, and non-commercial use is free.
 You can use anonymous Git access to obtain the latest Charm++ source
 code, as follows:
 
-     $ git clone https://github.com/charmplusplus/charm
+     $ git clone --recurse-submodules https://github.com/charmplusplus/charm
+
+Reconverse (the communication layer used by the `reconverse-*` build
+targets) is the `contrib/reconverse` submodule, which is what
+`--recurse-submodules` picks up. If you already cloned without it, run
+
+     $ git submodule update --init -- contrib/reconverse
+
+The build does this for you when the submodule is missing, so classic
+(non-reconverse) builds need no extra step either way. To experiment with
+a different reconverse, check the submodule out to the branch or commit
+you want and rebuild:
+
+     $ git -C contrib/reconverse fetch origin
+     $ git -C contrib/reconverse checkout <branch-or-sha>
+
+To jump straight to the tip of reconverse `main` instead, use
+
+     $ git submodule update --remote -- contrib/reconverse
+
+Note that this is deliberately not what a plain clone or
+`--init` does: those check out the exact commit Charm++ records, so a
+given Charm++ commit always builds against a known reconverse. Use
+`--remote` when you want the latest reconverse, not when you want a
+reproducible build.
+
+Committing the moved submodule pointer is what changes the pairing for
+everyone else. To build against a reconverse tree kept outside the
+Charm++ checkout, pass `--with-reconverse-dir=<path>` to `./build`.
 
 
 ## Build Configuration

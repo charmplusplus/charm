@@ -134,11 +134,11 @@ opt_qlogic=0
 opt_randomized_msgq=0
 # OFF unless the target network is reconverse (set below) or
 # --enable-reconverse is passed. The old default of 1 made EVERY build --
-# netlrts included -- pull in fetch_reconverse, which installs reconverse's
-# converse.h over the classic one and breaks all classic arches (#3941).
+# netlrts included -- add the reconverse subdirectory, which installs
+# reconverse's converse.h over the classic one and breaks all classic
+# arches (#3941).
 opt_reconverse=0
-opt_fetch_reconverse_tag=""
-opt_fetch_reconverse_dir=""
+opt_reconverse_dir=""
 opt_reconverse_fetch_lci=1
 opt_refnum_type="unsigned short"
 opt_replay=0
@@ -367,10 +367,24 @@ function processArgs() {
         opt_reconverse=1
         ;;
       --with-fetch-reconverse-tag=*)
-        opt_fetch_reconverse_tag=${arg#*=}
+        # Reconverse is a submodule now, so the version is the gitlink at
+        # contrib/reconverse rather than a tag this script passes to CMake.
+        echo "Error: --with-fetch-reconverse-tag is gone; reconverse is a git" >&2
+        echo "submodule. To build against ${arg#*=}, check it out:" >&2
+        echo "  git -C contrib/reconverse fetch origin" >&2
+        echo "  git -C contrib/reconverse checkout ${arg#*=}" >&2
+        echo "and commit the moved gitlink to change it for everyone." >&2
+        exit 1
         ;;
-      --with-fetch-reconverse-dir=*)
-        opt_fetch_reconverse_dir=${arg#*=}
+      --with-reconverse-dir=*|--with-fetch-reconverse-dir=*)
+        # Build against a reconverse tree outside the charm checkout instead of
+        # the submodule. (--with-fetch-reconverse-dir is the old spelling.)
+        # Resolved here, while the cwd is still the one the user invoked from:
+        # by the time it is passed to cmake we have cd'd into the build tree.
+        opt_reconverse_dir=$(cd "${arg#*=}" 2>/dev/null && pwd) || {
+          echo "Error: --with-reconverse-dir: ${arg#*=} is not a directory" >&2
+          exit 1
+        }
         ;;
       --without-reconverse-fetch-lci)
         opt_reconverse_fetch_lci=0
@@ -675,11 +689,11 @@ fi
 # Run configure step
 
 CMAKE_EXTRA_ARGS=()
-if [[ -n "$opt_fetch_reconverse_tag" ]]; then
-  CMAKE_EXTRA_ARGS+=(-DAUTOFETCH_RECONVERSE_TAG="$opt_fetch_reconverse_tag")
-fi
-if [[ -n "$opt_fetch_reconverse_dir" ]]; then
-  CMAKE_EXTRA_ARGS+=(-DFETCHCONTENT_SOURCE_DIR_RECONVERSE="$opt_fetch_reconverse_dir")
+if [[ -n "$opt_reconverse_dir" ]]; then
+  # We have already cd'd into the build directory, so a relative path the user
+  # typed would resolve against the wrong directory; $opt_reconverse_dir was
+  # made absolute at parse time.
+  CMAKE_EXTRA_ARGS+=(-DRECONVERSE_SOURCE_DIR="$opt_reconverse_dir")
 fi
 if (( ${#opt_cmake_extra_args[@]} > 0 )); then
   CMAKE_EXTRA_ARGS+=("${opt_cmake_extra_args[@]}")

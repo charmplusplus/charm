@@ -323,7 +323,7 @@ endforeach()
 set(conv-core-h-to-install ${conv-core-h-sources})
 if(NOT RECONVERSE)
     # Classic builds install the classic converse.h; reconverse builds get
-    # reconverse's own (installed by cmake/fetch_reconverse), which must not
+    # reconverse's own (installed by cmake/reconverse), which must not
     # be shadowed.
     list(APPEND conv-core-h-to-install src/conv-core/converse.h)
     list(APPEND conv-core-h-to-install src/conv-core/charm-config.h)
@@ -332,7 +332,7 @@ if(RECONVERSE)
     # Reconverse provides its own conv-rdma.h, which is the authority on the
     # RDMA configuration (CMK_REG_REQUIRED, CMK_NOCOPY_DIRECT_BYTES) and must
     # agree with what libreconverse was compiled against. Do not shadow it with
-    # the legacy Converse copy; cmake/fetch_reconverse installs the real one.
+    # the legacy Converse copy; cmake/reconverse installs the real one.
     list(REMOVE_ITEM conv-core-h-to-install src/conv-core/conv-rdma.h)
     # Same for persistent.h: reconverse's converse.h includes it, so the copy
     # on the include path has to be reconverse's. The legacy one pulls in

@@ -34,6 +34,12 @@ on:
       - 'src/xlat-i/xi-Parameter.C'
       - 'CMakeLists.txt'
       - 'cmake/**'
+      # The reconverse submodule gitlink. Moving the reconverse pin used to
+      # edit a file under cmake/ and so matched the line above; as a submodule
+      # the bump is a change to this one path, and without it a reconverse
+      # version bump would skip the CUDA job entirely.
+      - 'contrib/reconverse'
+      - '.gitmodules'
       - '.github/workflows/reconverse-cuda.yaml'
   pull_request:
     branches: [reviewed-with-reconverse]
@@ -60,6 +66,12 @@ on:
       - 'src/xlat-i/xi-Parameter.C'
       - 'CMakeLists.txt'
       - 'cmake/**'
+      # The reconverse submodule gitlink. Moving the reconverse pin used to
+      # edit a file under cmake/ and so matched the line above; as a submodule
+      # the bump is a change to this one path, and without it a reconverse
+      # version bump would skip the CUDA job entirely.
+      - 'contrib/reconverse'
+      - '.gitmodules'
       - '.github/workflows/reconverse-cuda.yaml'
 
 concurrency:
@@ -72,6 +84,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          # reconverse is the contrib/reconverse submodule.
+          submodules: true
       # The toolkit download, not the build, is what makes this job's wall time
       # swing: measured 2.1 / 15.2 / 51.0 minutes across three runs of the same
       # unchanged step, while every build step stayed within a minute of itself.

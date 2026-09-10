@@ -39,17 +39,18 @@ then
     echo "testrun(reconverse): +pe $p not divisible by $procs processes. Skipping the test."
     exit 0
   fi
-  envpfx=(env "DYLD_LIBRARY_PATH=$CHARMBIN/../lib:${DYLD_LIBRARY_PATH}" "LD_LIBRARY_PATH=$CHARMBIN/../lib:${LD_LIBRARY_PATH}")
+  # No (DY)LD_LIBRARY_PATH prefix here: charmc records the directory it linked
+  # libreconverse from as an RPATH in every binary, so programs run bare.
+  # Setting it anyway would hide a regression in that -- the whole tier would
+  # go on passing with the RPATH gone, which is how the gap survived this long.
   if [[ $procs -gt 1 ]]; then
     LCRUN="$CHARMBIN/../_deps/lci-src/lcrun"
     [[ -x "$LCRUN" ]] || LCRUN=lcrun
-    cmd=("$LCRUN" -n "$procs" "${envpfx[@]}" "$prog" +pe "$p" "${args[@]}")
+    cmd=("$LCRUN" -n "$procs" "$prog" +pe "$p" "${args[@]}")
   else
-    cmd=("${envpfx[@]}" "$prog" +pe "$p" "${args[@]}")
+    cmd=("$prog" +pe "$p" "${args[@]}")
   fi
-  # Echo with library paths unexpanded: the real values inline the whole
-  # inherited module environment (~1KB per line in HPC logs).
-  echo "testrun(reconverse): ${cmd[*]}" | sed "s|LD_LIBRARY_PATH=[^ ]*|LD_LIBRARY_PATH=<build>/lib:...|g"
+  echo "testrun(reconverse): ${cmd[*]}"
   time "${cmd[@]}"
   exit $?
 fi
