@@ -9,7 +9,7 @@ buildcmake	c1471a669:Laxmikant Kale:buildcmake: don't force RECONVERSE=ON for ev
 buildold	6841dfe62:Ritvik Rao:fix CMK_OPTIMIZE redefinition
 cmake/converse.cmake	50dbead86:Laxmikant Kale:cmake: charm_cxx_utils must wait for charmxi-|15f774f0f:Laxmikant Kale:build: stop forcing RECONVERSE into every bui|98694d42c:Ritvik Rao:Merge branch 'cupti_lb_reconverse_hapi' into reco|86db40707:Ritvik Rao:copy persistent.h from reconverse|9794fead2:Ritvik Rao:copy conv-rdma from reconverse|e337bccd8:Ritvik Rao:New build for reconverse
 cmake/detect-features.cmake	6841dfe62:Ritvik Rao:fix CMK_OPTIMIZE redefinition|02ec45859:Ritvik Rao:cmake changes
-cmake/fetch_reconverse/CMakeLists.txt	3f8847602:Laxmikant Kale:fetch_reconverse: pin reconverse by commit SH|86db40707:Ritvik Rao:copy persistent.h from reconverse|9794fead2:Ritvik Rao:copy conv-rdma from reconverse|dfb6b119d:Ritvik Rao:cmake changes for building shmem with reconverse|adac3c4ce:Ritvik Rao:fix cmake|75bba6989:Ritvik Rao:add charm config
+cmake/reconverse/CMakeLists.txt	3f8847602:Laxmikant Kale:fetch_reconverse: pin reconverse by commit SH|86db40707:Ritvik Rao:copy persistent.h from reconverse|9794fead2:Ritvik Rao:copy conv-rdma from reconverse|dfb6b119d:Ritvik Rao:cmake changes for building shmem with reconverse|adac3c4ce:Ritvik Rao:fix cmake|75bba6989:Ritvik Rao:add charm config
 contrib/ci.vim	3c63232e5:Matthias Diener:(untested) changes to charmc
 doc/charm++/manual.rst	9e48ce995:Ritvik Rao:merge reconverse changes with lb
 examples/ampi/Cjacobi3D/Makefile	9e48ce995:Ritvik Rao:merge reconverse changes with lb
