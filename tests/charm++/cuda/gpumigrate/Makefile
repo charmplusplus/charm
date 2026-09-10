@@ -19,7 +19,7 @@ TARGET = gpumigrate
 all: $(TARGET)
 
 $(TARGET): $(TARGET).o
-	$(CHARMC) -language charm++ -o $@ $(TARGET).o $(LD_LIBS)
+	$(CHARMC) -language charm++ -module CommonLBs -o $@ $(TARGET).o $(LD_LIBS)
 
 $(TARGET).decl.h $(TARGET).def.h: $(TARGET).ci
 	$(CHARMC) $<
@@ -33,5 +33,9 @@ clean:
 # Two PEs in one process: the same-process transport only. IPC needs more than
 # one process and RDMA more than one physical node, which a bare `make test`
 # cannot arrange -- see README.txt.
+#
+# RotateLB moves every object one PE onward at each step, which is what makes
+# the migration happen at all: no other strategy would move a set of identically
+# loaded objects.
 test: all
-	./$(TARGET) +pe 2
+	./$(TARGET) +pe 2 +balancer RotateLB

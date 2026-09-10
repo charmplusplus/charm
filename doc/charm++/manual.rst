@@ -2701,14 +2701,14 @@ available on CUDA builds only:
 .. note::
 
    Migrating a GPU application requires the runtime to be built with
-   ``-DCMK_GLOBAL_LOCATION_UPDATE=1`` (pass it through ``EXTRA_OPTS`` at
-   configure time). Device zerocopy sends are addressed to the PE the
-   sender believes hosts the target; without the global update, a send
-   issued around a migration arrives at a PE that no longer hosts it, and
-   the receive path aborts rather than silently reading the wrong buffer
-   (``ckrdmadevice.C``). The option keeps every PE's view of object
-   locations current, which is what makes migration and device zerocopy
-   usable together.
+   ``CMK_GLOBAL_LOCATION_UPDATE`` (see `Global Location Update`_). A device
+   zerocopy send is addressed to the PE the sender believes hosts the
+   target, so without it a send issued around a migration arrives at a PE
+   that no longer hosts the element, and the receive path aborts rather
+   than silently reading the wrong buffer (``ckrdmadevice.C``). Note the
+   restriction that comes with the option: migrations must happen at load
+   balancing steps, so a GPU application must migrate through ``AtSync()``
+   rather than ``migrateMe()``.
 
 In distributed approaches, the strategy executes across multiple PEs,
 providing scalable computational and communication performance.

@@ -21,9 +21,16 @@ the test can pass while doing nothing: on the same-process path the source has
 just freed buffers of exactly the right size, and cudaMalloc is free to return
 that same device memory with the old contents still in it.
 
-Migration is driven with ckMigrate(), not a load balancer, so the device
-migration path is exercised on its own rather than through a strategy's
-decision about whether to move anything.
+Migration is driven through AtSync with RotateLB, which moves every object one
+PE onward at each step. No load-based strategy would move a set of identically
+loaded objects, and RotateLB exists for exactly this -- exercising pup routines
+and migration paths.
+
+Anytime migration (ckMigrate/migrateMe) would be the more direct way to move an
+element, and is deliberately not used: it is unsupported under
+CMK_GLOBAL_LOCATION_UPDATE, which this test requires (below). Going through a
+real load-balancing step is also closer to the thing being protected, since
+that is how a GPU application's chares actually move.
 
 Build prerequisite
 ------------------
@@ -35,20 +42,23 @@ EXTRA_OPTS at configure time:
 Device zerocopy sends are addressed to the PE the sender believes hosts the
 target. Without the global update a send issued around a migration arrives at
 a PE that no longer hosts it, and CkRdmaDeviceIssueRgets aborts rather than
-read the wrong buffer. This test does not itself send device zerocopy messages,
-so it passes either way -- but a real GPU application being balanced needs the
-option, so build with it.
+read the wrong buffer. This test sends no device zerocopy messages of its own,
+so that particular abort is not what it is checking -- but it migrates the way
+an application in this mode has to, so build it the way such an application is
+built. See "Global Location Update" in the manual.
 
 Running it
 ----------
   make CHARM_DIR=<build>
-  make test                     # 8 blocks, 3 rounds, 2 PEs in one process
+  make test                     # 8 blocks, 3 rounds, 2 PEs, +balancer RotateLB
 
 or directly:
 
-  ./gpumigrate [blocks] [rounds] +pe <n>
+  ./gpumigrate [blocks] [rounds] +pe <n> +balancer RotateLB
 
-It needs at least 2 PEs; with one there is nowhere to migrate to.
+It needs at least 2 PEs; with one there is nowhere to migrate to. It also needs
+a balancer that actually moves something -- without +balancer RotateLB the
+blocks stay put and the test verifies nothing.
 
 Transport coverage
 ------------------

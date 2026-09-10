@@ -1045,7 +1045,26 @@ void CentralLB::ProcessReceiveMigration()
   for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
     const int me = CkMyPe();
-    if (move.from_pe == me && move.to_pe != me) {
+    const bool iAmSource = (move.from_pe == me && move.to_pe != me);
+#if CMK_GLOBAL_LOCATION_UPDATE
+    // Every PE but the one the object is leaving learns the new location here,
+    // before the move is acted on.
+    //
+    // The source is the exception. Its entry still says "the element is on me",
+    // and emigrate() -> CkLocCache::recordEmigration is what turns that into
+    // "it is on the destination" -- asserting on the way that it was here to
+    // begin with. Updating it first makes that assert fail on the very first
+    // migration of any centralized balancer.
+    //
+    // The destination is NOT an exception, even though it will learn the
+    // location for itself when the element lands in createLocal. Between this
+    // decision and that arrival it would otherwise still believe the element is
+    // on the source, and address messages there; the source has already let it
+    // go, so each one takes an extra hop -- which is precisely what
+    // CkLocMgr::multiHop asserts against in this mode.
+    if (!iAmSource) UpdateLocation(move);
+#endif
+    if (iAmSource) {
 #if CMK_DRONE_MODE
       int to_pe_rank0 = CMK_RANK_0(move.to_pe);
       if(move.from_pe == to_pe_rank0) continue;
@@ -1064,19 +1083,6 @@ void CentralLB::ProcessReceiveMigration()
        DEBUGF(("[%d] expecting object from %d\n",move.to_pe,move.from_pe));
       if (!move.async_arrival) migrates_expected++;
       else future_migrates_expected++;
-    }
-    else {
-      // Everyone EXCEPT the source learns the new location from here. The
-      // source must not: its own cache entry is still "the element is on me",
-      // and emigrate() -> CkLocCache::recordEmigration is what turns that into
-      // "it is on the destination", asserting on the way that it was here to
-      // begin with. Updating the source's entry first made that assert fail on
-      // the first migration of any centralized balancer built with
-      // CMK_GLOBAL_LOCATION_UPDATE=1 -- which device zerocopy asks for, so a
-      // GPU build is exactly where this bites.
-      #if CMK_GLOBAL_LOCATION_UPDATE
-        UpdateLocation(move);
-      #endif
     }
 
   }

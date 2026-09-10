@@ -13,11 +13,16 @@
  * DEVICE_PUP_ALIGN: a single buffer would not catch a packer and an unpacker
  * that disagree about where the next one starts.
  *
- * Migration is driven with ckMigrate() rather than a load balancer, so the
- * device path is exercised on its own and does not depend on a strategy
- * deciding to move anything. Verification runs in ckJustMigrated(), which is
- * called once the element and its device state have both landed, so the test
- * needs no barrier of its own.
+ * Migration is driven through AtSync with RotateLB, which moves every object one
+ * PE onward at each step -- the strategy the manual recommends for exercising
+ * pup routines and migration paths. Anytime migration (ckMigrate/migrateMe) is
+ * deliberately NOT used: it is unsupported under CMK_GLOBAL_LOCATION_UPDATE,
+ * which a GPU build needs (see "Global Location Update" in the manual). Driving
+ * the move through a real load-balancing step is also closer to what this test
+ * exists to protect.
+ *
+ * Verification runs in ResumeFromSync, which is reached once the element and its
+ * device state have both landed, so the test needs no barrier of its own.
  *
  * Two PEs in one process covers the same-process transport. The IPC and RDMA
  * transports need more than one process and more than one physical node
@@ -81,7 +86,7 @@ public:
     round++;
     CkPrintf("gpumigrate: round %d, migrating every block one PE onward\n",
              round);
-    blocks.move();
+    blocks.step();
   }
 };
 
@@ -89,17 +94,19 @@ class Block : public CBase_Block
 {
   double* d_buf;
   int* d_second;
-  int moves;  // how many times this element has migrated
+  int moves;   // how many times this element has migrated
+  int lastPe;  // PE this element was on before the current step
 
 public:
-  Block() : d_buf(nullptr), d_second(nullptr), moves(0)
+  Block() : d_buf(nullptr), d_second(nullptr), moves(0), lastPe(CkMyPe())
   {
+    usesAtSync = true;
     allocate();
     fill();
   }
 
   Block(CkMigrateMessage* m)
-      : CBase_Block(m), d_buf(nullptr), d_second(nullptr), moves(0)
+      : CBase_Block(m), d_buf(nullptr), d_second(nullptr), moves(0), lastPe(-1)
   {
   }
 
@@ -137,6 +144,7 @@ public:
   {
     CBase_Block::pup(p);
     p | moves;
+    p | lastPe;
 
     // The device buffers must exist before they are pupped: PUPMode::DEVICE
     // copies into what the pointer names, it does not allocate.
@@ -196,16 +204,24 @@ public:
     mainProxy.blockChecked();
   }
 
-  void move()
-  {
-    moves++;
-    ckMigrate((CkMyPe() + 1) % CkNumPes());
-  }
+  // Join the load-balancing step. RotateLB will move this element one PE on.
+  void step() { AtSync(); }
 
-  // Called once this element and its device payload have both landed.
-  void ckJustMigrated()
+  // Reached once this element and its device payload have both landed.
+  void ResumeFromSync()
   {
-    CBase_Block::ckJustMigrated();
+    // A step in which nothing actually moved would let every later check pass
+    // trivially -- the buffers were never packed, sent or unpacked, so of
+    // course they still read correctly. Catch that here rather than report a
+    // green run that tested nothing. RotateLB moves every object at every
+    // step, so on more than one PE the destination is always a different one.
+    if (CkMyPe() == lastPe)
+      CkAbort("gpumigrate: block %d did not move at step %d (it is still on "
+              "PE %d). Run with +balancer RotateLB -- without a balancer that "
+              "migrates, this test verifies nothing.",
+              thisIndex, moves + 1, CkMyPe());
+    lastPe = CkMyPe();
+    moves++;
     verify();
     mainProxy.blockChecked();
   }

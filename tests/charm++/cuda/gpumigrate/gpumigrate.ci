@@ -14,7 +14,8 @@ mainmodule gpumigrate {
     // Read the device buffers back and compare them against what this element
     // wrote before it moved.
     entry void check();
-    // Hand this element to the next PE, taking its device state with it.
-    entry void move();
+    // Join the load-balancing step that hands this element to the next PE,
+    // taking its device state with it.
+    entry void step();
   };
 };
