@@ -86,16 +86,33 @@ void DiffusionLB::AcrossNodeLB()
   // balance it buys. The cap stays at its default; a balancer that could cap
   // in the load dimension rather than by object count would get the recovery
   // without the traffic, and that is the open item.
-  int maxMoves = n_objs;
+  // The cap is now in the diffused dimension, not a count of objects: a share
+  // of the load this node could migrate, rather than a share of the objects it
+  // holds. This is the open item the paragraph above describes. A count cap
+  // stops a shed at a point unrelated to the load it has retired, so a node
+  // whose load sits in a few heavy objects gives up with most of its excess
+  // still on it -- moe's Zipf-skewed experts stopping after four objects with
+  // 0.102 of 0.187 unshed, and the lbdriver stencil spending all 64 of its
+  // moves on hot cells while a quarter of the job's load stayed put.
+  //
+  // Expressed against migratable load so the two ends behave: a node holding
+  // many near-empty objects still cannot hand them all over (they retire no
+  // budget, so the cap is never what stops them -- the metric's zero-load
+  // refusal is), and a node holding a few heavy ones can shed enough of them
+  // to matter in one step.
+  double maxShed = std::numeric_limits<double>::max();
   {
     const double frac = _lb_args.diffusionMaxMoveFrac();
     if (frac < 1.0)
     {
-      int nMig = 0;
-      for (int i = 0; i < n_objs; i++) if (nodeStats->objData[i].migratable) nMig++;
-      maxMoves = std::max(1, (int)std::ceil(frac * nMig));
+      double migLoad = 0.0;
+      for (int i = 0; i < n_objs; i++)
+        if (nodeStats->objData[i].migratable)
+          migLoad += diffusionObjLoad(nodeStats->objData[i]);
+      maxShed = frac * migLoad;
     }
   }
+  double shedThisStep = 0.0;
   int movesThisStep = 0;
   std::vector<char> allowed;
 
@@ -130,10 +147,29 @@ void DiffusionLB::AcrossNodeLB()
     for (int i = 0; i < neighborCount; i++)
       tries[i] = 0;
 
-    int nid = 0; 
+    // Stay with one neighbour until it can take nothing more, then move on --
+    // rather than advancing to the next neighbour after every accepted move.
+    //
+    // The rotation this replaces defeated the metric's own locality mechanism.
+    // MetricComm::updateState re-scores after each move so that the NEXT
+    // candidate is the one adjacent to the object just sent: that is what makes
+    // a shed peel a contiguous chunk off the boundary instead of taking objects
+    // from all over. Rotating the destination immediately handed that carefully
+    // chosen neighbour-of-the-last-move to a DIFFERENT PE, so the two mechanisms
+    // worked against each other and the departing set came out interleaved.
+    //
+    // Measured on the lbdriver stencil (32x32 chares, 4 one-PE nodes, a 12x
+    // heavy disc dropped on a MetisLB partition): with the rotation, all 64
+    // moved objects alternated between two destinations along each row, the
+    // edge cut went 72 -> 113 and one PE was left in three disconnected pieces.
+    //
+    // Each recipient is still capped by its own quota (toSendLoad), so draining
+    // one neighbour cannot overload it; and the termination condition is
+    // unchanged, since a neighbour that yields no candidate is marked in tries[]
+    // exactly as before.
+    int nid = 0;
     while (my_loadAfterTransfer > 0)
     {
-      nid = (nid + 1)%neighborCount; //change to round robin for now
       int nborId = nid;//metric->getBestNeighbor();  // this is buggy (hangs)
       if (nborId == -1)
       {
@@ -141,11 +177,12 @@ void DiffusionLB::AcrossNodeLB()
                 my_loadAfterTransfer);
       }
 
-      if (movesThisStep >= maxMoves)
+      if (shedThisStep >= maxShed)
       {
         if (_lb_args.debug() > 1)
-          CkPrintf("[node %d] AcrossNodeLB: move cap %d reached, %.6f left unshed\n",
-                   myNodeId, maxMoves, my_loadAfterTransfer);
+          CkPrintf("[node %d] AcrossNodeLB: shed cap %.6f reached after %d move(s), "
+                   "%.6f left unshed\n",
+                   myNodeId, maxShed, movesThisStep, my_loadAfterTransfer);
         break;
       }
 
@@ -176,8 +213,12 @@ void DiffusionLB::AcrossNodeLB()
             not_done = true;
         if(!not_done)
           break;  // no more objects to send
-        else
-          continue;
+        // This neighbour is done; advance to the next one still open. Skipping
+        // the exhausted ones matters now that the cursor no longer moves on its
+        // own -- otherwise the loop would sit on a neighbour that can never
+        // supply a candidate again.
+        do { nid = (nid + 1) % neighborCount; } while (tries[nid] != 0);
+        continue;
       }
 
       // Two different figures, because two different consumers.
@@ -227,6 +268,7 @@ void DiffusionLB::AcrossNodeLB()
 
       mig_acksOut += 2;
       movesThisStep++;
+      shedThisStep += shedLoad;
       thisProxy[destPE].LoadMetaInfo(objHandle, pe_local_id, cpuLoad, shedLoad, donorPE, 0,
                                      CkMyPe(), keyOf(nodeStats->objData[v_id]));
       thisProxy[donorPE].LoadReceived(pe_local_id, destPE, CkMyPe());

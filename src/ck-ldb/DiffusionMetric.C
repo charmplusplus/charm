@@ -75,6 +75,11 @@ private:
   DiffusionTier localTier;
   double remainingShed;
 
+  // Objects already accepted for each neighbour this step. Non-zero means a
+  // chunk is being grown toward that neighbour, which changes what the load
+  // band is for (see popBestObject).
+  std::vector<int> movesTo;
+
   // The inbound half of an external edge is recorded on the peer node, so a
   // locally-observed external byte stands for this many incident bytes. Exactly
   // 2 under the symmetric-exchange assumption documented in the constructor;
@@ -184,6 +189,7 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize_, int nCoun
   }
 
   objAvailable.resize(n_objs, true);
+  movesTo.assign(neighborCount, 0);
   objCommEdges.resize(n_objs);
   for (int edge = 0; edge < nodeStats->commData.size(); edge++)
   {
@@ -357,7 +363,27 @@ int MetricComm::popBestObject(int nbor)
     double score;
     if (costCfg == NULL)
     {
-      if (objLoad < kLoadBand * heaviest) continue;
+      // The band picks the SEED of a chunk, not every object in it.
+      //
+      // Its job is to stop a node shedding its empty objects while its heavy
+      // ones stay put (sph2d: eight empty fluid patches moved, the node's GPU
+      // share went up). That risk is real only for the first pick, which has no
+      // context to go on but load. Once a move to this neighbour has been
+      // accepted, updateState has re-scored the departing object's partners so
+      // the edge-cut term names the objects ADJACENT to it -- and applying the
+      // band again there throws that away, because it re-ranks by load and
+      // jumps to whatever heavy object sits elsewhere on the node.
+      //
+      // That is what carved the hot region on the lbdriver stencil: every one of
+      // the 64 moved objects was a heavy cell, drawn from across the disc rather
+      // than peeled off its boundary, so the partition came apart. Growing the
+      // chunk instead lets cheap boundary objects join the move, which is how a
+      // partition boundary shifts without fragmenting.
+      //
+      // Zero-load objects stay excluded even while growing: they retire no
+      // budget, so a chunk made of them would never end.
+      if (movesTo[nbor] == 0 && objLoad < kLoadBand * heaviest) continue;
+      if (objLoad <= 0.0) continue;
       score = externalComm[nbor][i] - internalComm[i];
     }
     else
@@ -428,6 +454,7 @@ void MetricComm::updateState(int objId, int destNbor)
             myNodeId, objId, objLoad, sendToNeighbors[destNbor], 
             toSendLoad[destNbor], toSendLoad[destNbor] - objLoad);
   toSendLoad[destNbor] -= objLoad;
+  if (destNbor >= 0 && destNbor < (int)movesTo.size()) movesTo[destNbor]++;
   if(objId<0 || objId>=n_objs)
     return;
   // Every local edge incident to the departing object stops being local for the
