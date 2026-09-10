@@ -335,12 +335,47 @@ int MetricComm::popBestObject(int nbor)
   // the retained set stays contiguous and updateState pulls the next pick
   // next to it. The calibrated path below already weighs load against
   // communication in one unit and is left as it is.
+  // The seed must border the destination.
+  //
+  // A chunk grows outward from its seed and stays contiguous with itself, but
+  // that is not enough: it has to arrive ATTACHED to the receiver. When the
+  // seed is chosen on load alone it lands wherever this node's heaviest object
+  // happens to be, and if that is not on the shared boundary the whole chunk
+  // arrives as an island -- the receiver goes from one region to two, and the
+  // partition fragments even though nothing about the move looked wrong
+  // locally.
+  //
+  // Measured on the lbdriver stencil, over six runs: every chunk with no cell
+  // bordering its receiver fragmented that receiver, and every chunk with at
+  // least one did not. The correlation was exact, and it explained variance I
+  // had wrongly attributed to the size of the per-step cap.
+  //
+  // "Borders the destination" is just externalComm[nbor][i] > 0 -- the object
+  // already exchanges messages with something on that node. Applied to the seed
+  // only; growth is unchanged. If no such object exists (this node may not
+  // border that neighbour at all, or the comm graph may be empty) the
+  // restriction lifts rather than refusing to shed, since an unattached chunk
+  // still beats an unmet obligation.
+  const bool seeding =
+      (nbor >= 0 && nbor < (int)movesTo.size()) ? (movesTo[nbor] == 0) : true;
+  bool seedOnBoundary = false;
+  if (costCfg == NULL && seeding)
+  {
+    for (int i = 0; i < n_objs; i++)
+    {
+      if (!objAvailable[i] || !nodeStats->objData[i].migratable || !isAllowed(i)) continue;
+      if (diffusionObjLoad(nodeStats->objData[i]) > nborCapacity) continue;
+      if (externalComm[nbor][i] > 0.0) { seedOnBoundary = true; break; }
+    }
+  }
+
   double heaviest = 0.0;
   if (costCfg == NULL)
   {
     for (int i = 0; i < n_objs; i++)
     {
       if (!objAvailable[i] || !nodeStats->objData[i].migratable || !isAllowed(i)) continue;
+      if (seedOnBoundary && externalComm[nbor][i] <= 0.0) continue;
       const double objLoad = diffusionObjLoad(nodeStats->objData[i]);
       if (objLoad > nborCapacity) continue;
       if (objLoad > heaviest) heaviest = objLoad;
@@ -382,7 +417,8 @@ int MetricComm::popBestObject(int nbor)
       //
       // Zero-load objects stay excluded even while growing: they retire no
       // budget, so a chunk made of them would never end.
-      if (movesTo[nbor] == 0 && objLoad < kLoadBand * heaviest) continue;
+      if (seedOnBoundary && externalComm[nbor][i] <= 0.0) continue;
+      if (seeding && objLoad < kLoadBand * heaviest) continue;
       if (objLoad <= 0.0) continue;
       score = externalComm[nbor][i] - internalComm[i];
     }
