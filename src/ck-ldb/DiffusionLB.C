@@ -147,7 +147,30 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
       diffusionCostCfg.load(_lb_args.costConfig());
   }
 
+  // Node decomposition. A Charm node is a process, so a single-process build
+  // (multicore) has numNodes == 1, the across-node phase returns immediately,
+  // and the diffusion this balancer exists for cannot be exercised at all.
+  // CHARM_DIFFUSION_NODE_SIZE overrides the PEs-per-node figure so one process
+  // can be split into several logical nodes.
+  //
+  // Test hook, and safe as one: every address in this balancer is computed as
+  // node*nodeSize rather than through CkNodeFirst/CkMyNode (see the commented
+  // originals below), so a smaller nodeSize regroups the PEs without changing
+  // how any of them is reached. It does NOT make the PEs of a logical node
+  // share a device, so +LBDiffusionGpuDim results under it are not meaningful.
   nodeSize = CkNodeSize(0);
+  {
+    const char* s = getenv("CHARM_DIFFUSION_NODE_SIZE");
+    if (s != NULL)
+    {
+      const int v = atoi(s);
+      if (v > 0 && CkNumPes() % v == 0)
+        nodeSize = v;
+      else if (CkMyPe() == 0)
+        CkPrintf("DiffusionLB: ignoring CHARM_DIFFUSION_NODE_SIZE=%s; it must be "
+                 "> 0 and divide CkNumPes()=%d\n", s, CkNumPes());
+    }
+  }
   myNodeId = CkMyPe() / nodeSize;
   acks = 0;
   max = 0;

@@ -1,0 +1,9 @@
+lbdriver
+lbdriver.o
+lbdriver.decl.h
+lbdriver.def.h
+lbdriver.json
+lbmap.html
+charmrun*
+hapi_memory_daemon
+*.btr
