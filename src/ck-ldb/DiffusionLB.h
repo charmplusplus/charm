@@ -26,44 +26,10 @@ int numPes;
 
 void CreateDiffusionLB();
 
-// DiffusionLB balances two different resources at its two levels, and they are not
-// interchangeable:
-//
-//   Across nodes. Under one process per device a node IS a GPU, so the scarce
-//   resource is device occupancy and the quantity to equalise is the sum of GPU
-//   time over the node's objects. Selected with +LBDiffusionGpuDim.
-//
-//   Within a node. The PEs of a process SHARE that device, so moving a chare from
-//   one PE to another does not relieve the GPU by a microsecond -- the kernel still
-//   runs on the same card. Only host-side work relocates. The intra-node heap must
-//   therefore balance CPU time alone; charging it GPU time would have it believe it
-//   is rebalancing something it structurally cannot.
-//
-// Hence two accessors. diffusionObjLoad() is the diffused dimension (what crosses
-// node boundaries); diffusionObjCpuLoad() is always host time (what moves between
-// PEs inside a node).
-//
-// Note deliberately NOT max(cpu, gpu): summing per-object maxima over-counts every
-// object whose two timelines overlap. A node's step time is
-// max(sum of gpuTime, max over PEs of sum of wallTime) -- aggregate first, then take
-// the max, never the other way round.
-
-// The dimension diffused across nodes. Defaults to host time so that CPU-only
-// workloads keep working; +LBDiffusionGpuDim switches it to device occupancy for
-// GPU-bound runs. An automatic choice would have to be identical on every node --
-// nodes disagreeing about which resource they are equalising would diffuse
-// incoherently -- so it is an explicit flag rather than a local heuristic.
-static inline double diffusionObjLoad(const LDObjData& o)
-{
-#if CMK_CUDA
-  if (_lb_args.diffusionGpuDim()) return o.gpuTime;
-#endif
-  return o.wallTime;
-}
-
-// Host time, always. Used for per-PE totals and the within-node heap, which can only
-// ever move host work between PEs that share a device.
-static inline double diffusionObjCpuLoad(const LDObjData& o) { return o.wallTime; }
+// The two load accessors, diffusionObjLoad() and diffusionObjCpuLoad(), live in
+// DiffusionLoad.h so that the metric, the flow arithmetic and the offline
+// simulator can use them without this header.
+#include "DiffusionLoad.h"
 
 /// for backward compatibility
 typedef LBMigrateMsg NLBMigrateMsg;
@@ -99,6 +65,10 @@ public:
   // void MigratedHelper(LDObjHandle h, int waitBarrier);
   // void Migrated(LDObjHandle h, int waitBarrier = 1);
   void createCommList();
+  // Bytes this node's objects sent to each other node last interval, into
+  // cost_for_neighbor and `ebytes` (both indexed by node). Runs every step,
+  // cached graph or not, because nborCommAdjacent reads the result.
+  void countCommToNodes(std::vector<long>& ebytes);
   void findNBors(int do_again);
   void beginMST();
   void findNBorsRound();
@@ -385,6 +355,15 @@ private:
   // bottom, which is what inflates a domain box. An unkeyed or overlapping
   // neighbour counts as adjacent (nothing to be preserved there).
   bool nborKeyAdjacent(int nbor) const;
+  // Whether this node's objects sent anything to neighbour `nbor`'s in the
+  // last interval, i.e. the two nodes share a boundary of the application's
+  // communication graph. True whenever there is no comm data to say otherwise.
+  bool nborCommAdjacent(int nbor) const;
+  // Whether load may flow from this node to neighbour `nbor`: nborKeyAdjacent
+  // and nborCommAdjacent together, with the comm rule waived for a node that
+  // borders none of its neighbours. The pseudo rounds consult this; a
+  // neighbour that fails it receives no flow and therefore no objects.
+  bool nborFlowAdjacent(int nbor) const;
 
   // Diffusion-specific timing instrumentation
   static double totalNeighborTime;

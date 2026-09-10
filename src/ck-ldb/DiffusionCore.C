@@ -8,6 +8,7 @@
 */
 
 #include "DiffusionJSON.h"
+#include "DiffusionSelect.h"
 void DiffusionLB::AcrossNodeLB()
 {
   if (thisIndex != rank0PE)
@@ -114,7 +115,6 @@ void DiffusionLB::AcrossNodeLB()
   }
   double shedThisStep = 0.0;
   int movesThisStep = 0;
-  std::vector<char> allowed;
 
   // TEMPORARY diagnostic: why does across-node diffusion move nothing?
   if (_lb_args.debug() > 1)
@@ -135,145 +135,67 @@ void DiffusionLB::AcrossNodeLB()
     nodeStats->to_proc[i] = -1;  // negative one if not migrated
   }
 
-  // build obj heap from gain values
-  if (loadReceivers > 0)
+  // The selection loop is diffusionSelectMoves (DiffusionSelect.h), shared with
+  // the offline simulator so the two cannot drift apart. It hands back the
+  // accepted moves in order; everything below is the messaging for each one.
+  std::vector<DiffusionMove> moves;
   {
-    // compute gain vals
-    // buildGainValues(n_objs);
+    std::function<void(int, std::vector<char>&)> allowedEnds;
+    // With a 1-D ordering key only the interval's ends may go, and only
+    // toward the side this neighbour is on. Both metrics honour the filter.
+    if (keyed1D)
+      allowedEnds = [this](int nbor, std::vector<char>& a) { allowedEndsFor(nbor, a); };
+    diffusionSelectMoves(*metric, *nodeStats, toSendLoad, my_loadAfterTransfer, maxShed,
+                         allowedEnds, myNodeId, moves, shedThisStep, movesThisStep);
+  }
 
-    // // T1: create a heap based on gain values, and its position also.
-    // InitializeObjHeap(n_objs);
-    int tries[neighborCount];
-    for (int i = 0; i < neighborCount; i++)
-      tries[i] = 0;
+  for (const DiffusionMove& mv : moves)
+  {
+    const int v_id = mv.obj;
+    const int nborId = mv.nbor;
 
-    // Stay with one neighbour until it can take nothing more, then move on --
-    // rather than advancing to the next neighbour after every accepted move.
+    // Two different figures, because two different consumers.
     //
-    // The rotation this replaces defeated the metric's own locality mechanism.
-    // MetricComm::updateState re-scores after each move so that the NEXT
-    // candidate is the one adjacent to the object just sent: that is what makes
-    // a shed peel a contiguous chunk off the boundary instead of taking objects
-    // from all over. Rotating the destination immediately handed that carefully
-    // chosen neighbour-of-the-last-move to a DIFFERENT PE, so the two mechanisms
-    // worked against each other and the departing set came out interleaved.
+    // shedLoad is in the diffused dimension: it retired this node's obligation
+    // (my_loadAfterTransfer) and the per-neighbour quota in the selection loop,
+    // both of which the pseudo-LB rounds expressed in that dimension.
     //
-    // Measured on the lbdriver stencil (32x32 chares, 4 one-PE nodes, a 12x
-    // heavy disc dropped on a MetisLB partition): with the rotation, all 64
-    // moved objects alternated between two destinations along each row, the
-    // edge cut went 72 -> 113 and one PE was left in three disconnected pieces.
+    // cpuLoad is host time, and is what travels in the message: the receiver adds
+    // it to pe_load and hands it to the within-node heap, which balances host work
+    // between PEs that share a device. Shipping GPU time would corrupt that.
     //
-    // Each recipient is still capped by its own quota (toSendLoad), so draining
-    // one neighbour cannot overload it; and the termination condition is
-    // unchanged, since a neighbour that yields no candidate is marked in tries[]
-    // exactly as before.
-    int nid = 0;
-    while (my_loadAfterTransfer > 0)
-    {
-      int nborId = nid;//metric->getBestNeighbor();  // this is buggy (hangs)
-      if (nborId == -1)
-      {
-        CkAbort("Error: no neighbor found to send to, but my_loadAfterTransfer = %f\n",
-                my_loadAfterTransfer);
-      }
+    // Both read getCompLoad()/objData rather than getVertexLoad(), whose
+    // MAX(compLoad, 0.1) floor would retire the budget in yet another unit.
+    const double shedLoad = mv.shedLoad;
+    const double cpuLoad = objs[v_id].getCompLoad();
+    objs[v_id].setCurrPe(-1);
 
-      if (shedThisStep >= maxShed)
-      {
-        if (_lb_args.debug() > 1)
-          CkPrintf("[node %d] AcrossNodeLB: shed cap %.6f reached after %d move(s), "
-                   "%.6f left unshed\n",
-                   myNodeId, maxShed, movesThisStep, my_loadAfterTransfer);
-        break;
-      }
+    int rank = GetRank(v_id);
+    int node = sendToNeighbors[nborId];
+    int donorPE = rank0PE + rank;
+    int destPE = node * nodeSize;  // send to rank0PE of dest node
+    CkAssert(destPE != donorPE);   // if this is hit, our neighbor choice is not working
 
-      // What this node still owes, so the metric can cap a candidate's benefit:
-      // load shed beyond the fair share buys nothing and must not pay for a
-      // move. Refreshed every iteration because each accepted move reduces it.
-      metric->setRemainingShed(my_loadAfterTransfer);
-
-      // With a 1-D ordering key only the interval's ends may go, and only
-      // toward the side this neighbour is on. Both metrics honour the filter.
-      if (keyed1D)
-      {
-        allowedEndsFor(nborId, allowed);
-        metric->setAllowed(&allowed);
-      }
-
-      int v_id = metric->popBestObject(nborId);
-      // Both metrics refuse a zero-load candidate; should one ever not, it is
-      // treated as no candidate here rather than retiring nothing forever.
-      if (v_id != -1 && diffusionObjLoad(nodeStats->objData[v_id]) <= 0.0) v_id = -1;
-
-      if (v_id == -1)// && nborId==-1)
-      {
-        tries[nborId] = 1;
-        bool not_done = false;
-        for(int i = 0; i < neighborCount; i++)
-          if(tries[i] == 0)
-            not_done = true;
-        if(!not_done)
-          break;  // no more objects to send
-        // This neighbour is done; advance to the next one still open. Skipping
-        // the exhausted ones matters now that the cursor no longer moves on its
-        // own -- otherwise the loop would sit on a neighbour that can never
-        // supply a candidate again.
-        do { nid = (nid + 1) % neighborCount; } while (tries[nid] != 0);
-        continue;
-      }
-
-      // Two different figures, because two different consumers.
-      //
-      // shedLoad is in the diffused dimension: it retires this node's obligation
-      // (my_loadAfterTransfer) and the per-neighbour quota, both of which the
-      // pseudo-LB rounds expressed in that dimension. Using anything else would
-      // retire the budget in different units from the ones it was computed in.
-      //
-      // cpuLoad is host time, and is what travels in the message: the receiver adds
-      // it to pe_load and hands it to the within-node heap, which balances host work
-      // between PEs that share a device. Shipping GPU time would corrupt that.
-      //
-      // Both read getCompLoad()/objData rather than getVertexLoad(), whose
-      // MAX(compLoad, 0.1) floor would retire the budget in yet another unit.
-      // Unfloored, like the budget it retires (BuildStats): the metric never
-      // hands back a zero-load object, so this is positive, and crediting a
-      // move with load the object does not carry is exactly what let a node
-      // "retire" a quarter of its obligation by shedding its empty objects.
-      const double shedLoad = diffusionObjLoad(nodeStats->objData[v_id]);
-      const double cpuLoad  = objs[v_id].getCompLoad();
-      objs[v_id].setCurrPe(-1);
-
-      int rank = GetRank(v_id);
-      int node = sendToNeighbors[nborId];
-      int donorPE = rank0PE + rank;
-      int destPE = node * nodeSize;  // send to rank0PE of dest node
-      CkAssert(destPE != donorPE);   // if this is hit, our neighbor choice is not working
-
-      if (nodeStats->from_proc[v_id] != donorPE) {
-        CkAbort(
-            "ERROR: Across Node LB - from_proc[%d] = %d does not match donorPE = %d\n",
-            v_id, nodeStats->from_proc[v_id], donorPE);
-      }
-
-      my_loadAfterTransfer -= shedLoad;
-      num_migrations++;
-
-      metric->updateState(v_id, nborId);  // update state to keep track of migrations
-
-      LDObjHandle objHandle = nodeStats->objData[v_id].handle;
-
-      int pe_local_id = v_id;
-      if (donorPE != rank0PE) {
-        pe_local_id = v_id - prefixObjects[donorPE - rank0PE - 1];
-      }
-
-      mig_acksOut += 2;
-      movesThisStep++;
-      shedThisStep += shedLoad;
-      thisProxy[destPE].LoadMetaInfo(objHandle, pe_local_id, cpuLoad, shedLoad, donorPE, 0,
-                                     CkMyPe(), keyOf(nodeStats->objData[v_id]));
-      thisProxy[donorPE].LoadReceived(pe_local_id, destPE, CkMyPe());
-      nodeStats->to_proc[v_id] = destPE;
+    if (nodeStats->from_proc[v_id] != donorPE) {
+      CkAbort(
+          "ERROR: Across Node LB - from_proc[%d] = %d does not match donorPE = %d\n",
+          v_id, nodeStats->from_proc[v_id], donorPE);
     }
+
+    num_migrations++;
+
+    LDObjHandle objHandle = nodeStats->objData[v_id].handle;
+
+    int pe_local_id = v_id;
+    if (donorPE != rank0PE) {
+      pe_local_id = v_id - prefixObjects[donorPE - rank0PE - 1];
+    }
+
+    mig_acksOut += 2;
+    thisProxy[destPE].LoadMetaInfo(objHandle, pe_local_id, cpuLoad, shedLoad, donorPE, 0,
+                                   CkMyPe(), keyOf(nodeStats->objData[v_id]));
+    thisProxy[donorPE].LoadReceived(pe_local_id, destPE, CkMyPe());
+    nodeStats->to_proc[v_id] = destPE;
   }
 
   // Says which of the two reasons a quiet step had: nothing available to move,

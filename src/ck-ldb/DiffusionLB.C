@@ -31,20 +31,9 @@
 #define DEBUGF(x) CmiPrintf x;
 #define DEBUGR(x)  // CmiPrintf x;
 #define DEBUGL(x) /*CmiPrintf x*/;
-// Rounds of the pseudo-load diffusion loop. Fixed, with no convergence check:
-// every round costs two neighbour exchanges and the SDAG waits between them, so
-// the strategy pays all 40 even when the load is already even. On a GPU-bound
-// run where diffusion wants to move ~1% of the load, that is the single largest
-// cost of load balancing -- larger than the migration it decides on.
-// CHARM_LB_DIFFUSION_ITERS overrides it so the trade can be measured.
-static int diffusionIterations() {
-  static const int n = []() {
-    const char* s = getenv("CHARM_LB_DIFFUSION_ITERS");
-    const int v = s ? atoi(s) : 40;
-    return v > 0 ? v : 40;
-  }();
-  return n;
-}
+// The round count, the convergence ratio and the round arithmetic itself live in
+// DiffusionFlow.h, shared with the offline simulator.
+#include "DiffusionFlow.h"
 #define ITERATIONS (diffusionIterations())
 
 // Two job-wide hops used to sit between the strategy's phases: PE 0 counting
@@ -82,18 +71,9 @@ DiffusionCostConfig diffusionCostCfg;
 #define THRESHOLD 2
 
 // Diffusion rounds stop once no node wants to shift more than this fraction of
-// its own load. Measured on a GPU-bound run, diffusion asks to move ~1.6% on the
-// first round and converges immediately after, so the fixed 40 rounds were
-// almost entirely wasted.
-static double pseudoConvergeRatio() {
-  static const double r = []() {
-    const char* s = getenv("CHARM_LB_DIFFUSION_CONVERGE");
-    const double v = s ? atof(s) : (THRESHOLD / 100.0);
-    return v > 0.0 ? v : (THRESHOLD / 100.0);
-  }();
-  return r;
-}
-#define PSEUDO_CONVERGE_RATIO (pseudoConvergeRatio())
+// its own load; see diffusionPseudoConvergeRatio in DiffusionFlow.h, whose
+// default is THRESHOLD percent.
+#define PSEUDO_CONVERGE_RATIO (diffusionPseudoConvergeRatio())
 
 // Initialize static Diffusion timing variables
 double DiffusionLB::totalNeighborTime = 0.0;
@@ -398,6 +378,44 @@ bool DiffusionLB::nborKeyAdjacent(int nbor) const
     if (below && jlo >= nhi && jhi <= myKeyLo) return false;
     if (above && jhi <= nlo && jlo >= myKeyHi) return false;
   }
+  return true;
+}
+
+bool DiffusionLB::nborCommAdjacent(int nbor) const
+{
+  // No comm data: the centroid graph, or a step before any traffic was
+  // recorded. Every neighbour then counts as bordering, which is the
+  // behaviour this predicate refines rather than replaces.
+  if (cost_for_neighbor.empty()) return true;
+  if (nbor < 0 || nbor >= (int)sendToNeighbors.size()) return true;
+  const auto it = cost_for_neighbor.find(sendToNeighbors[nbor]);
+  if (it == cost_for_neighbor.end()) return true;
+  return it->second > 0.0;
+}
+
+// The pseudo rounds decide WHERE load goes; the across-node phase only decides
+// WHICH objects realise a flow whose destination is already fixed. If that
+// destination shares no boundary with this node, every object sent lands as an
+// island there, and no choice of object can repair it -- the ring backbone
+// joins nodes that may have nothing in common, and a flow over such an edge is
+// exactly what leaves a domain in detached pieces.
+//
+// So a flow is refused to a neighbour this node does not border. The load
+// reaches that neighbour through a bordering one, one step later, contiguous
+// all the way. Ring edges that fail the test still keep the graph connected
+// and still take part in the threshold's neighbourhood mean; they just carry
+// no objects.
+//
+// A node that borders NONE of its neighbours (its objects are silent, or the
+// comm graph is not connected) has the comm rule waived rather than being left
+// unable to shed at all. That keeps the diffusion converging on any connected
+// neighbour graph, at the price of islands from such a node only.
+bool DiffusionLB::nborFlowAdjacent(int nbor) const
+{
+  if (!nborKeyAdjacent(nbor)) return false;
+  if (nborCommAdjacent(nbor)) return true;
+  for (int j = 0; j < (int)sendToNeighbors.size(); j++)
+    if (nborCommAdjacent(j)) return false;
   return true;
 }
 

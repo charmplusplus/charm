@@ -115,7 +115,9 @@ add_dependencies(moduleRecBipartLB ck)
 # only DiffusionLB.C is compiled. The rest are listed for dependency tracking.
 add_library(moduleDiffusionLB ../ck-ldb/DiffusionLB.C ../ck-ldb/DiffusionLB.h
   ../ck-ldb/DiffusionCore.C ../ck-ldb/DiffusionHelper.C ../ck-ldb/DiffusionMetric.C
-  ../ck-ldb/DiffusionNeighbors.C ../ck-ldb/DiffusionPseudo.C ../ck-ldb/DiffusionJSON.h)
+  ../ck-ldb/DiffusionNeighbors.C ../ck-ldb/DiffusionPseudo.C ../ck-ldb/DiffusionJSON.h
+  ../ck-ldb/DiffusionLoad.h ../ck-ldb/DiffusionMetric.h ../ck-ldb/DiffusionFlow.h
+  ../ck-ldb/DiffusionSelect.h ../ck-ldb/DiffusionCostModel.h)
 set_source_files_properties(
   ../ck-ldb/DiffusionCore.C ../ck-ldb/DiffusionHelper.C ../ck-ldb/DiffusionMetric.C
   ../ck-ldb/DiffusionNeighbors.C ../ck-ldb/DiffusionPseudo.C

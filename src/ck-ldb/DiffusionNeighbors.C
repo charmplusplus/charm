@@ -48,6 +48,14 @@ void DiffusionLB::findNBors(int do_again)
     // the strategy -- startStrategy must run exactly once.
     if (hs_graphCached && getenv("CHARM_DIFFUSION_GRAPH_REBUILD") == NULL)
     {
+        // The graph is reused, but which of its edges this node actually
+        // borders is not: that follows the objects, and nborFlowAdjacent
+        // reads it every step. One pass over the comm data, no protocol.
+        if (_lb_args.diffusionCommOn())
+        {
+            std::vector<long> ebytes;
+            countCommToNodes(ebytes);
+        }
         if (thisIndex == 0) thisProxy[0].startStrategy();
         return;
     }
@@ -104,9 +112,13 @@ void DiffusionLB::startMSTBarrier() {
 // and closed each round with a *group* reduction that only rank-0 PEs ever
 // contributed to -- so it could never complete and simply hung.
 //
-// Ring edges may carry little traffic, which is fine: they exist so that load can
-// FLOW anywhere, while popBestObject still routes individual objects along the
-// high-affinity edges added by the neighbour rounds that follow this.
+// Ring edges may carry no traffic at all. They exist so that the graph is
+// connected and the averages see the whole neighbourhood; they do NOT carry
+// load. A flow over an edge between two nodes that share no boundary lands every
+// object it moves as an island, and the across-node phase, which only chooses
+// WHICH objects realise a flow, cannot repair that. So PseudoLoadBalancing
+// refuses flow to a neighbour this node does not border (nborFlowAdjacent), and
+// the ring's job ends at connectivity.
 void DiffusionLB::buildRingBackbone()
 {
     assert(thisIndex == rank0PE);
@@ -662,13 +674,24 @@ void DiffusionLB::finishCentroidList()
 // ******** COMMUNICATION METHOD FUNCTIONS ********
 void DiffusionLB::createCommList()
 {
-
-    long ebytes[numNodes];
-    std::fill_n(ebytes, numNodes, 0);
-
     node_idx = new int[numNodes];
     for (int i = 0; i < numNodes; i++)
         node_idx[i] = -1;
+
+    std::vector<long> ebytes;
+    countCommToNodes(ebytes);
+
+    sortArr(ebytes.data(), numNodes, node_idx);
+}
+
+// Send side only: the stats a node holds record its own objects' sends, so
+// this is "bytes I sent to node X", not the exchange in both directions.
+// Symmetric traffic gives the same answer either way; one-way traffic makes
+// adjacency one-way too, which is harmless -- each direction of flow is gated
+// on its own.
+void DiffusionLB::countCommToNodes(std::vector<long>& ebytes)
+{
+    ebytes.assign(numNodes, 0);
 
     for (int edge = 0; edge < nodeStats->commData.size(); edge++)
     {
@@ -693,12 +716,12 @@ void DiffusionLB::createCommList()
     }
 
     // initialize cost per neighbor (cost is a misnomer: higher cost is better neighbor)
-    // TODO: note that this cost can be zero... is this okay?
+    // A zero here is meaningful: it is what nborCommAdjacent reads as "no
+    // shared boundary".
+    cost_for_neighbor.clear();
     for (int i = 0; i < numNodes; i++)
     {
         cost_for_neighbor[i] = ebytes[i];
         // CkPrintf("\n[PE-%d] ebytes[%d] = %d", thisIndex, i, ebytes[i]);
     }
-
-    sortArr(ebytes, numNodes, node_idx);
 }
