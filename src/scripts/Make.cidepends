@@ -5,6 +5,9 @@ CommonLBs.decl.h CommonLBs.def.h: CommonLBs.ci.stamp
 DistBaseLB.decl.h DistBaseLB.def.h: DistBaseLB.ci.stamp
 DistributedLB.decl.h DistributedLB.def.h: DistributedLB.ci.stamp
 EveryLB.decl.h EveryLB.def.h: EveryLB.ci.stamp
+GreedyCentralLB.decl.h GreedyCentralLB.def.h: GreedyCentralLB.ci.stamp
+GreedyRefineCentralGPULB.decl.h GreedyRefineCentralGPULB.def.h: GreedyRefineCentralGPULB.ci.stamp
+GreedyRefineCentralLB.decl.h GreedyRefineCentralLB.def.h: GreedyRefineCentralLB.ci.stamp
 HybridBaseLB.decl.h HybridBaseLB.def.h: HybridBaseLB.ci.stamp
 LBManager.decl.h LBManager.def.h: LBManager.ci.stamp
 MetaBalancer.decl.h MetaBalancer.def.h: MetaBalancer.ci.stamp
@@ -13,6 +16,7 @@ RecBipartLB.decl.h RecBipartLB.def.h: RecBipartLB.ci.stamp
 ScotchLB.decl.h ScotchLB.def.h: ScotchLB.ci.stamp
 ScotchRefineLB.decl.h ScotchRefineLB.def.h: ScotchRefineLB.ci.stamp
 ScotchTopoLB.decl.h ScotchTopoLB.def.h: ScotchTopoLB.ci.stamp
+ShedLB.decl.h ShedLB.def.h: ShedLB.ci.stamp
 TempAwareRefineLB.decl.h TempAwareRefineLB.def.h: TempAwareRefineLB.ci.stamp
 TreeLB.decl.h TreeLB.def.h: TreeLB.ci.stamp
 TreeLevel.decl.h TreeLevel.def.h: TreeLevel.ci.stamp
