@@ -37,6 +37,14 @@ set(CMK_USE_CMA ${CMK_HAS_CMA})
 if(NETWORK STREQUAL "multicore")
   set(CMK_USE_CMA 0)
 endif()
+# Reconverse has no CMA transport: its conv-rdma.cpp compiles the CMA paths
+# only under a CMK_USE_CMA it never defines, and it does not parse
+# +noCMAForZC. Leaving CMK_USE_CMA on for a reconverse build compiles dead
+# CMA branches into Charm++ and makes the zerocopy tests' +noCMAForZC runs
+# (guarded by CMK_USE_CMA in their Makefiles) abort with a usage error.
+if(RECONVERSE)
+  set(CMK_USE_CMA 0)
+endif()
 
 
 # Misc. linker flags (mostly for Charm4py)
