@@ -459,7 +459,6 @@ private:
   std::unordered_map<CmiUInt8, void*> receivedDeviceMsgs;
   // Source PE of a landed device payload, so the ack can be addressed once
   // the unpack has consumed it.
-  std::unordered_map<CmiUInt8, int> receivedDeviceSrcPe;
 
   // Unpack a migration whose host message and device payload are both present.
   void immigrateWithDevice(CkArrayElementMigrateMessage* msg);
@@ -745,11 +744,10 @@ public:
   void sendGPUMsg(CmiUInt8 id);
   // Device-zerocopy receive: the post variant supplies the landing buffer,
   // the second runs once the transfer has landed.
-  void immigrateGPU(CmiUInt8& id, int& size, char*& data, int& srcPe,
+  void immigrateGPU(CmiUInt8& id, int& size, char*& data,
                     CkDeviceBufferPost* post);
-  void immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe);
+  void immigrateGPU(CmiUInt8 id, int size, char* data);
   // Destination's ack: the staged payload has been read and can be released.
-  void finishGPUSend(CmiUInt8 id);
 #endif
   void requestLocation(CmiUInt8 id);
   void requestLocation(const CkArrayIndex& idx);

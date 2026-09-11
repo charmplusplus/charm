@@ -3183,17 +3183,12 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
 {
   const CkArrayIndex& idx = msg->idx;
   void* gpuData = nullptr;
-  int gpuSrcPe = -1;
   if (msg->hasGPUMsg)
   {
     auto it = receivedDeviceMsgs.find(msg->id);
     CmiAssert(it != receivedDeviceMsgs.end());
     gpuData = it->second;
     receivedDeviceMsgs.erase(it);
-    auto pe = receivedDeviceSrcPe.find(msg->id);
-    CmiAssert(pe != receivedDeviceSrcPe.end());
-    gpuSrcPe = pe->second;
-    receivedDeviceSrcPe.erase(pe);
   }
   PUP::fromMem p(msg->packData, gpuData, PUP::er::IS_MIGRATION);
 #else
@@ -3235,10 +3230,9 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
   if (msg->hasGPUMsg)
   {
     // The element's own device buffers now hold copies of everything in the
-    // landed payload, so the landing buffer is finished with, and so is the
-    // source's staged copy.
+    // landed payload, so the landing buffer is finished with. The sender's
+    // staged copy is not this side's concern: its source callback releases it.
     hapiCheck(hapiFree(gpuData));
-    thisProxy[gpuSrcPe].finishGPUSend(msg->id);
   }
 #endif
 
@@ -3252,16 +3246,32 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
 }
 
 #if CMK_CUDA
+/// Source callback for a migration payload: the transport has finished reading
+/// the staged copy, so it goes back to the device allocator.
+///
+/// CkCallback(CkCallbackFn, param) records the PE that built it and routes back
+/// there however far the buffer travelled, so this runs on the sending PE --
+/// the same context the old finishGPUSend entry method ran in. `param` is the
+/// staged pointer itself, which is why nothing has to be looked up here.
+static void gpuMigrateStagedFree(void* param, void* msg)
+{
+  hapiCheck(hapiFree(param));
+}
+
 void CkLocMgr::sendGPUMsg(CmiUInt8 id)
 {
   auto it = sendGPUBuffers.find(id);
   CmiAssert(it != sendGPUBuffers.end());
-  const GPUMigrateData& gpuData = it->second;
+  const GPUMigrateData gpuData = it->second;  // by value: the entry goes now
+  sendGPUBuffers.erase(it);
 
-  thisProxy[gpuData.toPe].immigrateGPU(id, (int)gpuData.size,
-                                       CkDeviceBuffer(gpuData.data), CkMyPe());
-  // The entry stays until finishGPUSend: the transport may still be reading
-  // the staged block, and only the destination knows when it has stopped.
+  // The staged block has to outlive this send -- the transport may still be
+  // reading it -- but the zerocopy layer already reports exactly that, through
+  // the buffer's source callback. Hand it ownership rather than keeping the
+  // entry alive and waiting for the destination to send an ack back.
+  thisProxy[gpuData.toPe].immigrateGPU(
+      id, (int)gpuData.size,
+      CkDeviceBuffer(gpuData.data, CkCallback(gpuMigrateStagedFree, gpuData.data)));
 }
 
 /// Post variant: supply the device buffer the payload should land in. The
@@ -3273,7 +3283,7 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
 /// and the delivery leg -- the one that runs once the transfer has landed --
 /// sees a null. Keying off the id is also what an application would do, since
 /// it is the one that knows where it posted.
-void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char*& data, int& srcPe,
+void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char*& data,
                             CkDeviceBufferPost* post)
 {
   void* landing = nullptr;
@@ -3282,7 +3292,7 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char*& data, int& srcPe,
   postedDeviceBuffers[id] = landing;
 }
 
-void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe)
+void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data)
 {
   // Only now has the transfer landed. The buffer moves from posted to
   // received here and not in the post method above, because immigrate() reads
@@ -3293,7 +3303,6 @@ void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe)
   CmiAssert(posted != postedDeviceBuffers.end());
   receivedDeviceMsgs[id] = posted->second;
   postedDeviceBuffers.erase(posted);
-  receivedDeviceSrcPe[id] = srcPe;
 
   // If the host message beat us here it is parked; this was the missing half.
   auto host = bufferedHostMigrateMsgs.find(id);
@@ -3303,14 +3312,6 @@ void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe)
     bufferedHostMigrateMsgs.erase(host);
     immigrateWithDevice(msg);
   }
-}
-
-void CkLocMgr::finishGPUSend(CmiUInt8 id)
-{
-  auto it = sendGPUBuffers.find(id);
-  CmiAssert(it != sendGPUBuffers.end());
-  hapiCheck(hapiFree(it->second.data));
-  sendGPUBuffers.erase(it);
 }
 #endif
 
