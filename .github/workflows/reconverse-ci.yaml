@@ -38,13 +38,25 @@ env:
 
   # Curated test tier. Grows one reviewed PR at a time; every tests/ dir NOT
   # listed here is by definition unsupported-on-reconverse until added (the
-  # parity matrix mirrors this list).
+  # parity matrix mirrors this list). within_node_bcast and the zerocopy
+  # dirs entered with the reconverse bump to 58921e9 (reconverse #217, #222):
+  # they are the tests that caught both bugs. zerocopy/zc_post_modify_size
+  # stays out until reconverse #223 (2-process data mismatch) is fixed.
   TEST_DIRS: >-
     tests/charm++/megatest
     tests/charm++/simplearrayhello
     tests/charm++/anytime_migration
     tests/charm++/anytime_bcastred
     tests/charm++/qd
+    tests/charm++/within_node_bcast
+    tests/charm++/zerocopy/zerocopy_with_qd
+    tests/charm++/zerocopy/direct_api
+    tests/charm++/zerocopy/large_bcast
+    tests/charm++/zerocopy/large_p2p
+    tests/charm++/zerocopy/bcast_nonzero_root
+    tests/charm++/zerocopy/dereg_and_nodereg
+    tests/charm++/zerocopy/zc_post_async
+    tests/charm++/zerocopy/pup_buffer
 
 jobs:
 
