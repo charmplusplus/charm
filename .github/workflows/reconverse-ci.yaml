@@ -41,7 +41,9 @@ env:
   # parity matrix mirrors this list). within_node_bcast and the zerocopy
   # dirs entered with the reconverse bump to 58921e9 (reconverse #217, #222):
   # they are the tests that caught both bugs. zerocopy/zc_post_modify_size
-  # stays out until reconverse #223 (2-process data mismatch) is fixed.
+  # stays out until reconverse #223 (2-process data mismatch) is fixed, and
+  # zerocopy/large_p2p (a 2 GiB transfer, kept out of zerocopy/Makefile's own
+  # test target as well) does not fit a hosted runner.
   TEST_DIRS: >-
     tests/charm++/megatest
     tests/charm++/simplearrayhello
@@ -52,7 +54,6 @@ env:
     tests/charm++/zerocopy/zerocopy_with_qd
     tests/charm++/zerocopy/direct_api
     tests/charm++/zerocopy/large_bcast
-    tests/charm++/zerocopy/large_p2p
     tests/charm++/zerocopy/bcast_nonzero_root
     tests/charm++/zerocopy/dereg_and_nodereg
     tests/charm++/zerocopy/zc_post_async
