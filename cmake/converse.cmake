@@ -327,6 +327,9 @@ if(NOT RECONVERSE)
     # be shadowed.
     list(APPEND conv-core-h-to-install src/conv-core/converse.h)
     list(APPEND conv-core-h-to-install src/conv-core/charm-config.h)
+    # Classic seed-balancer header: ck.h includes it when CMK_USE_SHMEM is on.
+    # Reconverse builds get reconverse's own cldb.h from cmake/reconverse.
+    list(APPEND conv-core-h-to-install src/conv-ldb/cldb.h)
 endif()
 if(RECONVERSE)
     # Reconverse provides its own conv-rdma.h, which is the authority on the

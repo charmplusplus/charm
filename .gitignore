@@ -14,6 +14,9 @@ configure~
 *.def.h
 *.ci.stamp
 
+# Ignore crash backtrace dumps written beside a crashing binary
+*.btr
+
 # Ignore build artifacts
 config_opts.sh
 smart-build.log

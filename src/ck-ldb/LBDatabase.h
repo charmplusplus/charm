@@ -8,6 +8,15 @@
 #include "LBComm.h"
 #include "LBMachineUtil.h"
 
+#if CMK_CUDA && CMK_LBDB_ON
+// For hapiCuptiStartTracing/hapiCuptiStopTracing, called from TurnStatsOn/Off.
+// Declared here rather than by including hapi.h, which drags the CUDA runtime
+// headers into every consumer of LBDatabase.h.
+void hapiCuptiStartTracing();
+void hapiCuptiStopTracing();
+#endif
+
+#include <unordered_map>
 #include <vector>
 
 class CkSyncBarrier;
@@ -67,13 +76,50 @@ public:
     LbObj(h)->getTime(&walltime, &cputime);
   };
 
+  inline void GetObjGPULoad(LDObjHandle &h, LBRealType &gputime) {
+    LbObj(h)->getGPUTime(&gputime);
+  };
+
+  // Copy the per-object normalized GPU loads computed by
+  // hapiNormalizeCuptiLoads into this PE's LB objects. The map is shared
+  // per-process and every PE reads it concurrently, so this must not mutate it.
+  inline void SetObjGPULoad(
+      const std::unordered_map<LDObjKey, double, LDObjKeyHash> &id_loadMap)
+  {
+    for (size_t i = 0; i < objs.size(); i++) {
+      if (objs[i].obj == nullptr)
+        continue;
+      const LDObjHandle &handle = objs[i].obj->GetLDObjHandle();
+      LDObjKey key;
+      key.omID() = handle.omID();
+      key.objID() = handle.objID();
+      auto it = id_loadMap.find(key);
+      if (it == id_loadMap.end())
+        continue;
+      objs[i].obj->setGPUTiming(it->second);
+    }
+  }
+
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();
   }
+  // GPU activity tracing follows the same switch as CPU instrumentation, so an
+  // application that calls LBTurnInstrumentOn()/LBTurnInstrumentOff() around
+  // its own AtSync schedule controls both with one call. Tracing is by far the
+  // more expensive of the two, so leaving it off between load-balancing steps
+  // is what makes instrumented runs affordable.
   inline void TurnStatsOn(void)
-       {statsAreOn = true; machineUtil.StatsOn();}
+       {statsAreOn = true; machineUtil.StatsOn();
+#if CMK_CUDA && CMK_LBDB_ON
+        hapiCuptiStartTracing();
+#endif
+       }
   inline void TurnStatsOff(void)
-       {statsAreOn = false; machineUtil.StatsOff();}
+       {statsAreOn = false; machineUtil.StatsOff();
+#if CMK_CUDA && CMK_LBDB_ON
+        hapiCuptiStopTracing();
+#endif
+       }
   inline bool StatsOn(void) const
        { return statsAreOn; };
   inline void IdleTime(LBRealType *walltime) {
@@ -89,6 +135,7 @@ public:
   inline void NonMigratable(LDObjHandle h) { LbObj(h)->SetMigratable(false); };
   inline void Migratable(LDObjHandle h) { LbObj(h)->SetMigratable(true); };
   inline void setPupSize(LDObjHandle h, size_t pup_size) { LbObj(h)->setPupSize(pup_size);};
+  inline void setGPUPupSize(LDObjHandle h, size_t gpu_pup_size) { LbObj(h)->setGPUPupSize(gpu_pup_size);};
   inline void UseAsyncMigrate(LDObjHandle h, bool flag) { LbObj(h)->UseAsyncMigrate(flag); };
   inline int GetCommDataSz(void) {
     if (commTable)
@@ -121,6 +168,7 @@ public:
                           int migratable);
   void UnregisterObj(LDObjHandle h);
   void EstObjLoad(const LDObjHandle &h, double cpuload);
+  void EstObjGPULoad(const LDObjHandle &h, double gpuload);
   void BackgroundLoad(LBRealType *walltime, LBRealType *cputime);
   void Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned int bytes, int destObjProc, int force = 0);
   void MulticastSend(const LDOMHandle &_om, CmiUInt8 *_ids, int _n, unsigned int _b, int _nMsgs=1);

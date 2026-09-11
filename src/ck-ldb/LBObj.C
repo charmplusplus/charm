@@ -28,6 +28,10 @@ void LBObj::Clear(void)
   data.minWall = 1e6;
   data.maxWall = 0.;
 #endif
+#if CMK_CUDA
+  data.gpuTime = 0.;
+  data.gpuPupSize = 0;
+#endif
 }
 
 void LBObj::IncrementTime(LBRealType walltime, LBRealType cputime)
@@ -39,6 +43,15 @@ void LBObj::IncrementTime(LBRealType walltime, LBRealType cputime)
 #if ! COMPRESS_LDB
   if (walltime < data.minWall) data.minWall = walltime;
   if (walltime > data.maxWall) data.maxWall = walltime;
+#endif
+}
+
+void LBObj::IncrementGPUTime(LBRealType gputime)
+{
+#if CMK_CUDA
+  data.gpuTime += gputime;
+#else
+  CmiAbort("LBObj::IncrementGPUTime called but CMK_CUDA is not set");
 #endif
 }
 

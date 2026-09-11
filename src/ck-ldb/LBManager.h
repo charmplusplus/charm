@@ -44,6 +44,22 @@ class CkLBArgs
   bool _lb_metaLbOn;
   char* _lb_metaLbModelDir;
   char* _lb_treeLBFile = (char*)"treelb.json";
+  int _lb_percentMovesAllowed;  // for the greedy-refine balancers, as a
+                                // percentage of chares that may be moved
+  // For the greedy-refine balancers: how far above the max load plain greedy
+  // achieves this balancer may go, in exchange for migrating less. 1.1 allows
+  // a 10% higher max load. It is the "tolerance" the manual documents.
+  //
+  // Defaults to 1.1: allow a max load 10% above what plain greedy achieves, and
+  // spend that slack on not migrating. Measured on jacobi2d-imbalance, 256
+  // chares on 32 PEs, that is 26 moves against 366 for the parameter search it
+  // replaces as the default, and less than half the time.
+  //
+  // 0 or below asks for that search instead: every PE builds a candidate from a
+  // different (A,B) pair and the best is chosen. It costs a reduction per
+  // balancing step and is bounded by the PE count, which is why it is no longer
+  // the default -- but it stays reachable with +LBGreedyRefineTolerance 0.
+  double _lb_greedyRefineTolerance;
 
  public:
   CkLBArgs()
@@ -60,6 +76,8 @@ class CkLBArgs
     _lb_targetRatio = 1.05;
     _lb_metaLbOn = false;
     _lb_metaLbModelDir = nullptr;
+    _lb_percentMovesAllowed = 100;
+    _lb_greedyRefineTolerance = 1.1;  // 10% over greedy; <=0 searches instead
   }
   inline char*& treeLBFile() { return _lb_treeLBFile; }
   inline double& lbperiod() { return _autoLbPeriod; }
@@ -82,6 +100,8 @@ class CkLBArgs
   inline double& targetRatio() { return _lb_targetRatio; }
   inline bool& metaLbOn() { return _lb_metaLbOn; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
+  inline int& percentMovesAllowed() { return _lb_percentMovesAllowed; }
+  inline double& greedyRefineTolerance() { return _lb_greedyRefineTolerance; }
 };
 
 extern CkLBArgs _lb_args;
@@ -288,6 +308,10 @@ class LBManager : public CBase_LBManager
   void NonMigratable(LDObjHandle h) { lbdb_obj->NonMigratable(h); }
   void Migratable(LDObjHandle h) { lbdb_obj->Migratable(h); }
   void setPupSize(LDObjHandle h, size_t pup_size) { lbdb_obj->setPupSize(h, pup_size); }
+  void setGPUPupSize(LDObjHandle h, size_t gpu_pup_size)
+  {
+    lbdb_obj->setGPUPupSize(h, gpu_pup_size);
+  }
   void UseAsyncMigrate(LDObjHandle h, bool flag) { lbdb_obj->UseAsyncMigrate(h, flag); };
   int GetObjDataSz(void) { return lbdb_obj->GetObjDataSz(); }
   int GetCommDataSz(void) { return lbdb_obj->GetCommDataSz(); }
@@ -310,6 +334,18 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetObjLoad(h, walltime, cputime);
   };
+  void GetObjGPULoad(LDObjHandle& h, LBRealType& gputime)
+  {
+    lbdb_obj->GetObjGPULoad(h, gputime);
+  };
+  // Copy a round's normalized per-object GPU loads (built by
+  // hapiPrepareCuptiLoads) into this PE's LB objects, just before its stats
+  // are sent.
+  void SetObjGPULoad(
+      const std::unordered_map<LDObjKey, double, LDObjKeyHash>& id_loadMap)
+  {
+    lbdb_obj->SetObjGPULoad(id_loadMap);
+  }
   void* GetObjUserData(LDObjHandle& h) { return lbdb_obj->GetObjUserData(h); }
   void MetaLBCallLBOnChares() { lbdb_obj->MetaLBCallLBOnChares(); }
   void MetaLBResumeWaitingChares(int lb_period)
@@ -337,6 +373,10 @@ class LBManager : public CBase_LBManager
   void EstObjLoad(const LDObjHandle& h, double cpuload)
   {
     lbdb_obj->EstObjLoad(h, cpuload);
+  }
+  void EstObjGPULoad(const LDObjHandle& h, double gpuload)
+  {
+    lbdb_obj->EstObjGPULoad(h, gpuload);
   }
   void BackgroundLoad(LBRealType* walltime, LBRealType* cputime)
   {

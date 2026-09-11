@@ -24,6 +24,17 @@ virtual functions are defined here.
 #include "ckhashtable.h"
 
 #include "conv-rdma.h"
+
+#if CMK_CUDA
+// The CUDA runtime directly, NOT hapi.h, for the copies behind PUPMode::DEVICE.
+// pup_util.o is part of the Converse-level utility library (LIBCONV_UTIL), which
+// is linked into pure-Converse programs that have no libck. hapiCheck expands to
+// hapiErrorDie, which lives in hapi_impl.cpp, so referencing it from here drags
+// that whole object into every such link -- along with the Charm++ symbols it
+// uses (_lb_args, CkActiveLocRec, CkCallback::send), none of which can resolve
+// there. Keep this file's dependencies at the Converse level.
+#include <cuda_runtime.h>
+#endif
 #if defined(_WIN32)
 #include <io.h>
 
@@ -162,9 +173,57 @@ void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t)
 	((pupCheckRec *)buf)->check(t,n);
 	buf+=sizeof(pupCheckRec);
 #endif
-	n*=itemSize; 
-	memcpy(p,(const void *)buf,n); 
+	n*=itemSize;
+	memcpy(p,(const void *)buf,n);
 	buf+=n;
+}
+
+/*Device-mode PUP::er's.
+ *
+ * The sender's device region layout is never described on the wire: the
+ * receiver reconstructs it by making the same sequence of pup calls, so the
+ * sizer, the packer and the unpacker must agree exactly on where each buffer
+ * starts. DEVICE_PUP_ALIGN is that agreement.
+ *
+ * A walker with no device region (gpuOrigBuf == NULL) drops DEVICE buffers,
+ * matching the base er::bytes default. A chare with device state pupped this
+ * way therefore migrates its device data but does not checkpoint it.
+ */
+#if CMK_CUDA
+static void pupDeviceCopy(void *dst, const void *src, size_t n)
+{
+	cudaError_t err = cudaMemcpy(dst, src, n, cudaMemcpyDeviceToDevice);
+	if (err != cudaSuccess)
+		CmiAbort("PUP: device-to-device copy of %zu bytes failed: %s",
+		         n, cudaGetErrorString(err));
+}
+#endif
+
+void PUP::sizer::bytes_device(void *p,size_t n,size_t itemSize,dataType t)
+{
+	gpuBytes = alignDeviceOffset(gpuBytes) + n*itemSize;
+}
+
+void PUP::toMem::bytes_device(void *p,size_t n,size_t itemSize,dataType t)
+{
+	if (gpuOrigBuf == nullptr) return;
+	n*=itemSize;
+#if CMK_CUDA
+	gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
+	pupDeviceCopy((void *)gpuBuf, p, n);
+	gpuBuf += n;
+#endif
+}
+
+void PUP::fromMem::bytes_device(void *p,size_t n,size_t itemSize,dataType t)
+{
+	if (gpuOrigBuf == nullptr) return;
+	n*=itemSize;
+#if CMK_CUDA
+	gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
+	pupDeviceCopy(p, (const void *)gpuBuf, n);
+	gpuBuf += n;
+#endif
 }
 
 void PUP::sizer::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t) {

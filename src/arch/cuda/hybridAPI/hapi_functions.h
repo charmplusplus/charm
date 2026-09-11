@@ -49,11 +49,6 @@ AMPI_CUSTOM_FUNC(void, hapiAddCallback, hapiStream_t, void*, void*)
 // AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpyAsync, void*, const void*, size_t, enum cudaMemcpyKind, cudaStream_t)
 // AMPI_CUSTOM_FUNC(cudaError_t, hapiMemcpy2DAsync, void*, size_t, const void*, size_t, size_t, size_t, enum cudaMemcpyKind, cudaStream_t)
 
-// Kernel launch wrapper
-#ifdef HAPI_CUPTI_LB  /* pairs with HAPI_LAUNCH_KERNEL_WRAPPER; lands with plan item 11 */
-AMPI_CUSTOM_FUNC(hapiError_t, hapiLaunchKernel, const void*, dim3, dim3, void**, size_t, hapiStream_t)
-#endif
-
 // Explicit memory allocations using pinned memory pool.
 AMPI_CUSTOM_FUNC(hapiError_t, hapiPoolMalloc, void**, size_t)
 AMPI_CUSTOM_FUNC(hapiError_t, hapiPoolFree, void*)
@@ -63,6 +58,9 @@ AMPI_CUSTOM_FUNC(void, hapiErrorDie, hapiError_t, const char*, const char*, int)
 
 // Returns the GPU device index this PE is mapped to (set during hapiMapping).
 AMPI_CUSTOM_FUNC(uint64_t, hapiMyDevice, void)
+// SM count of that device, or 0 if it has not been queried yet. A GPU-aware
+// balancer needs it to compare devices of different sizes.
+AMPI_CUSTOM_FUNC(int, hapiMyDeviceTotalSMs, void)
 
 #ifdef HAPI_INSTRUMENT_WRS
 AMPI_CUSTOM_FUNC(void, hapiInitInstrument, int n_chares, char n_types)

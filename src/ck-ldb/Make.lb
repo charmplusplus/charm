@@ -4,6 +4,7 @@ COMMON_LDBS=\
    DistributedLB \
    MetisLB \
    RecBipartLB \
+   GreedyRefineCentralGPULB \
    manager.o
 
 ALL_LDBS=\
@@ -11,6 +12,7 @@ ALL_LDBS=\
    DistributedLB \
    MetisLB \
    RecBipartLB \
+   GreedyRefineCentralGPULB \
    manager.o
 
 $(L)/libmoduleTreeLB.a:
@@ -25,6 +27,9 @@ LBHEADERS += MetisLB.h MetisLB.decl.h
 $(L)/libmoduleRecBipartLB.a:
 LBHEADERS += RecBipartLB.h RecBipartLB.decl.h
 
+$(L)/libmoduleGreedyRefineCentralGPULB.a:
+LBHEADERS += GreedyRefineCentralGPULB.h GreedyRefineCentralGPULB.decl.h
+
 $(L)/libmoduleScotchLB.a:
 LBHEADERS += ScotchLB.h ScotchLB.decl.h
 
@@ -38,6 +43,7 @@ ALL_LB_OBJS=EveryLB.o \
     DistributedLB.o \
     MetisLB.o \
     RecBipartLB.o \
+    GreedyRefineCentralGPULB.o \
     ScotchLB.o \
     TempAwareRefineLB.o \
 # EveryLB dependecies
@@ -46,12 +52,14 @@ EVERYLB_DEPS=EveryLB.o \
     DistributedLB.o \
     MetisLB.o \
     RecBipartLB.o \
+    GreedyRefineCentralGPULB.o \
 # CommonLBs dependencies
 COMMONLBS_DEPS=CommonLBs.o \
     TreeLB.o \
     DistributedLB.o \
     MetisLB.o \
     RecBipartLB.o \
+    GreedyRefineCentralGPULB.o \
     manager.o \
 
 $(L)/libmoduleEveryLB.a: $(EVERYLB_DEPS)

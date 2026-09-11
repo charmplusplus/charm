@@ -11,6 +11,12 @@
 #include "CentralLB.h"
 #include "LBSimulation.h"
 
+#if CMK_CUDA
+#include "hapi.h"
+#include "gpumanager.h"
+CsvExtern(GPUManager, gpu_manager);
+#endif
+
 #define  DEBUGF(x)       // CmiPrintf x;
 #define  DEBUG(x)        // x;
 
@@ -143,9 +149,36 @@ void CentralLB::InvokeLB()
     MigrationDone(0);
     return;
   }
-  {
-    thisProxy [CkMyPe()].ProcessAtSync();
-  }
+
+#if CMK_CUDA
+  // Reduce the kernel timeline to one scalar load per object, while the records
+  // are still local -- only those scalars are sent to the central LB.
+  //
+  // Built by the LAST PE of the process to get here, not the first: InvokeLB
+  // runs when this PE's own objects are at AtSync, but the records are shared
+  // by the whole process, and a drain by the first arrival would drop every
+  // kernel the other PEs' objects were still finishing. The earlier arrivals
+  // continue from gpuLoadsReady.
+  if (!hapiCuptiArrive((uint64_t)step(), CkNodeSize(CkMyNode()))) return;
+  hapiPrepareCuptiLoads();
+  const int first = CkNodeFirst(CkMyNode());
+  for (int r = 0; r < CkNodeSize(CkMyNode()); r++)
+    thisProxy[first + r].gpuLoadsReady();
+#else
+  thisProxy [CkMyPe()].ProcessAtSync();
+#endif
+#endif
+}
+
+// The round's GPU loads exist: copy this PE's share out, then carry on into
+// the stats path exactly as the non-CUDA build does.
+void CentralLB::gpuLoadsReady()
+{
+#if CMK_LBDB_ON
+#if CMK_CUDA
+  lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
+#endif
+  thisProxy [CkMyPe()].ProcessAtSync();
 #endif
 }
 
@@ -305,6 +338,10 @@ void CentralLB::BuildStatsMsg()
 #else
   msg->pe_speed = myspeed;
 #endif
+#if CMK_CUDA
+  msg->gpu_device_id = hapiMyDevice();
+  msg->gpu_total_sms = hapiMyDeviceTotalSMs();
+#endif
 
   DEBUGF(("Processor %d Total time (wall,cpu) = %f %f Idle = %f Bg = %f %f\n", CkMyPe(),msg->total_walltime,msg->total_cputime,msg->idletime,msg->bg_walltime,msg->bg_cputime));
 
@@ -435,6 +472,10 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.bg_cputime = m->bg_cputime;
 #endif
   procStat.pe_speed = m->pe_speed;
+#if CMK_CUDA
+  procStat.gpu_device_id = m->gpu_device_id;
+  procStat.gpu_total_sms = m->gpu_total_sms;
+#endif
 
   //procStat.utilization = 1.0;
   procStat.available = true;
@@ -510,6 +551,10 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
       procStat.bg_cputime = m->bg_cputime;
 #endif
       procStat.pe_speed = m->pe_speed;
+#if CMK_CUDA
+      procStat.gpu_device_id = m->gpu_device_id;
+      procStat.gpu_total_sms = m->gpu_total_sms;
+#endif
       //procStat.utilization = 1.0;
       procStat.available = true;
       procStat.n_objs = msg_n_objs;
@@ -999,11 +1044,27 @@ void CentralLB::ProcessReceiveMigration()
   future_migrates_expected = 0;
   for(i=0; i < m->n_moves; i++) {
     MigrateInfo& move = m->moves[i];
-    #if CMK_GLOBAL_LOCATION_UPDATE      
-      UpdateLocation(move); 
-    #endif
     const int me = CkMyPe();
-    if (move.from_pe == me && move.to_pe != me) {
+    const bool iAmSource = (move.from_pe == me && move.to_pe != me);
+#if CMK_GLOBAL_LOCATION_UPDATE
+    // Every PE but the one the object is leaving learns the new location here,
+    // before the move is acted on.
+    //
+    // The source is the exception. Its entry still says "the element is on me",
+    // and emigrate() -> CkLocCache::recordEmigration is what turns that into
+    // "it is on the destination" -- asserting on the way that it was here to
+    // begin with. Updating it first makes that assert fail on the very first
+    // migration of any centralized balancer.
+    //
+    // The destination is NOT an exception, even though it will learn the
+    // location for itself when the element lands in createLocal. Between this
+    // decision and that arrival it would otherwise still believe the element is
+    // on the source, and address messages there; the source has already let it
+    // go, so each one takes an extra hop -- which is precisely what
+    // CkLocMgr::multiHop asserts against in this mode.
+    if (!iAmSource) UpdateLocation(move);
+#endif
+    if (iAmSource) {
 #if CMK_DRONE_MODE
       int to_pe_rank0 = CMK_RANK_0(move.to_pe);
       if(move.from_pe == to_pe_rank0) continue;
@@ -1650,6 +1711,10 @@ CLBStatsMsg::~CLBStatsMsg() {
 void CLBStatsMsg::pup(PUP::er &p) {
   p|from_pe;
   p|pe_speed;
+#if CMK_CUDA
+  p|gpu_device_id;
+  p|gpu_total_sms;
+#endif
   p|total_walltime;
   p|idletime;
 #if defined(TEMP_LDB)
