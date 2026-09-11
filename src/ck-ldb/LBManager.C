@@ -317,9 +317,6 @@ void _loadbalancerInit()
   CmiGetArgIntDesc(argv, "+LBCentPE", &_lb_args.central_pe(), "CentralLB processor");
   CmiGetArgIntDesc(argv, "+LBPercentMovesAllowed", &_lb_args.percentMovesAllowed(),
                    "For the greedy-refine balancers, the percentage of chares that can be moved");
-  CmiGetArgDoubleDesc(argv, "+LBLoadMigBal", &_lb_args.loadMigBal(),
-                      "For the greedy-refine balancers, how much worse than the best max load a "
-                      "candidate may be and still win for having fewer migrations (1.003 = 0.3%)");
   bool _lb_dump_activated = false;
   if (CmiGetArgIntDesc(argv, "+LBDump", &LBSimulation::dumpStep,
                        "Dump the LB state from this step"))
