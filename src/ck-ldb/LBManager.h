@@ -46,6 +46,15 @@ class CkLBArgs
   char* _lb_treeLBFile = (char*)"treelb.json";
   int _lb_percentMovesAllowed;  // for the greedy-refine balancers, as a
                                 // percentage of chares that may be moved
+  // For the greedy-refine balancers: among solutions within the migration
+  // budget, one with fewer migrations is preferred only if its max load is
+  // within this factor of the best solution's. The default is deliberately
+  // tight (0.3%), so with the default unlimited budget it rarely binds and the
+  // lowest-max-load solution wins -- that is PE 0's, computed by regular
+  // greedy with migrations ignored, which can move nearly every object to gain
+  // a fraction of a percent. Raise it (+LBLoadMigBal) to trade a little max
+  // load for far fewer migrations.
+  double _lb_loadMigBal;
 
  public:
   CkLBArgs()
@@ -63,6 +72,7 @@ class CkLBArgs
     _lb_metaLbOn = false;
     _lb_metaLbModelDir = nullptr;
     _lb_percentMovesAllowed = 100;
+    _lb_loadMigBal = 1.003;
   }
   inline char*& treeLBFile() { return _lb_treeLBFile; }
   inline double& lbperiod() { return _autoLbPeriod; }
@@ -86,6 +96,7 @@ class CkLBArgs
   inline bool& metaLbOn() { return _lb_metaLbOn; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
   inline int& percentMovesAllowed() { return _lb_percentMovesAllowed; }
+  inline double& loadMigBal() { return _lb_loadMigBal; }
 };
 
 extern CkLBArgs _lb_args;

@@ -27,9 +27,9 @@
 extern int quietModeRequested;
 
 // a solution is feasible if num migrations <= user-specified limit
-// LOAD_MIG_BAL is used to control tradeoff between maxload and migrations
-// when selecting solutions from the feasible set
-#define LOAD_MIG_BAL 1.003
+// (+LBPercentMovesAllowed). Among feasible solutions, one with fewer
+// migrations wins only if its max load is within _lb_args.loadMigBal() of the
+// best -- see CkLBArgs in LBManager.h for the default and why it is tight.
 
 using namespace std;
 
@@ -694,6 +694,7 @@ void GreedyRefineCentralGPULB::receiveSolutions(CkReductionMsg *msg)
   std::vector<GreedyRefineCentralGPULB::Solution> results(NUM_SOLUTIONS);
 
   int migrationsAllowed = totalObjs * migrationTolerance;
+  const double loadMigBal = _lb_args.loadMigBal();
   // feasible solutions are those satistying user's migration constraint
   bool feasibleSolutions = false;
   float lowest_max_load = FLT_MAX;    // lowest max load of all solutions
@@ -734,7 +735,7 @@ void GreedyRefineCentralGPULB::receiveSolutions(CkReductionMsg *msg)
     int bestMigrations = INT_MAX;  // num migrations of best solution
     for (int i=0; i < results.size(); i++) {
       const GreedyRefineCentralGPULB::Solution &r = results[i];
-      if ((r.migrations < bestMigrations && r.max_load <= lowest_max_load_f*LOAD_MIG_BAL) ||
+      if ((r.migrations < bestMigrations && r.max_load <= lowest_max_load_f*loadMigBal) ||
           (r.migrations == bestMigrations && r.max_load < bestSol->max_load)) {
         bestMigrations = r.migrations;
         bestSol = &r;
