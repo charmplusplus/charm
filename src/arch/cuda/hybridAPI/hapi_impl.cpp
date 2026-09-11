@@ -34,7 +34,6 @@
 #include "cklocation.h"
 #include <algorithm>
 #include <climits>
-#include <set>
 
 // Defined in ck.C. Forward-declared rather than reached through ck.h, which
 // this file does not otherwise need. Gives the entry-method correlation hook
@@ -714,14 +713,14 @@ void hapiNormalizeCuptiLoads() {
                 return a.kind < b.kind;
               });
 
-    // Active set ordered by start_ns (then index, for stability) so that
-    // iteration order is FIFO by submission.
-    auto cmpActive = [&kernels](int a, int b) {
-      if (kernels[a].start_ns != kernels[b].start_ns)
-        return kernels[a].start_ns < kernels[b].start_ns;
-      return a < b;
-    };
-    std::set<int, decltype(cmpActive)> active(cmpActive);
+    // Kernels holding the device right now. Order is irrelevant: the two loops
+    // below sum sms_used and then credit each kernel its own share, and both
+    // give the same answer in any order. (An earlier version handed SMs out
+    // FIFO by submission, which is what the proportional split above replaced.)
+    // A vector with swap-and-pop erase beats a node-based container here --
+    // these sets are small, and every event does one insert or one erase.
+    std::vector<int> active;
+    active.reserve(kernels.size());
 
     uint64_t t_prev = events.front().time;
     for (const auto& ev : events) {
@@ -777,8 +776,13 @@ void hapiNormalizeCuptiLoads() {
           }
         }
       }
-      if (ev.kind == 1) active.insert(ev.kidx);
-      else              active.erase(ev.kidx);
+      if (ev.kind == 1) {
+        active.push_back(ev.kidx);
+      } else {
+        // Swap-and-pop: nothing here depends on the order of the remainder.
+        auto it = std::find(active.begin(), active.end(), ev.kidx);
+        if (it != active.end()) { *it = active.back(); active.pop_back(); }
+      }
       t_prev = ev.time;
     }
 
