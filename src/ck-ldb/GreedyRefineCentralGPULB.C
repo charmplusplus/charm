@@ -196,14 +196,18 @@ GreedyRefineCentralGPULB::GreedyRefineCentralGPULB(const CkLBOptions &opt): CBas
   if (_lb_args.percentMovesAllowed() < 100) {
     migrationTolerance = float(_lb_args.percentMovesAllowed())/100.0;
   }
-  concurrent = true;
+  // A tolerance (the default, 1.1) says what to aim for, so one candidate is
+  // built. Asking for 0 or less asks for the search instead: every PE builds a
+  // candidate from a different (A,B) pair and receiveSolutions picks between
+  // them, at the cost of a reduction per balancing step.
+  concurrent = (_lb_args.greedyRefineTolerance() <= 0.0);
 }
 
 GreedyRefineCentralGPULB::GreedyRefineCentralGPULB(CkMigrateMessage *m): CBase_GreedyRefineCentralGPULB(m), migrationTolerance(1.0) {
   lbname = "GreedyRefineCentralGPULB";
   if (_lb_args.percentMovesAllowed() < 100)
     migrationTolerance = float(_lb_args.percentMovesAllowed())/100.0;
-  concurrent = true;
+  concurrent = (_lb_args.greedyRefineTolerance() <= 0.0);
 }
 
 // ------------------------------------------------
@@ -420,7 +424,19 @@ void GreedyRefineCentralGPULB::sendSolution(double maxLoad, int migrations)
 void GreedyRefineCentralGPULB::work(LDStats *stats)
 {
   strategyStartTime = CkWallTimer();
+  // Greedy's max host load, the CPU twin of greedyMaxLoad. Set in the GPU path
+  // only; the CPU-only path below has a single dimension and uses greedyMaxLoad.
+  double greedyMaxCpuLoad = 0.0;
+  // maxCpuLoad itself is scoped to the GPU branch; carry it out for the report.
+  double maxCpuLoadReported = 0.0;
+
+  // A is the tolerance: the refine target is plain greedy's max load times A
+  // (M *= A below), and an object stays where it is while its PE is under that.
+  // B is the stay-put band against the lightest PE; FLT_MAX means the target is
+  // the only thing holding an object back, which is the documented behaviour.
   float A = 1.001, B = FLT_MAX; // Use A=0, B=-1 to imitate regular Greedy (ignore migrations)
+  if (_lb_args.greedyRefineTolerance() > 0.0)
+    A = (float)_lb_args.greedyRefineTolerance();
   if (concurrent) {
     getGreedyRefineParams(CkMyPe(), A, B);
     if (A < 0) {
@@ -544,6 +560,34 @@ void GreedyRefineCentralGPULB::work(LDStats *stats)
   }
   M *= A;
 
+  // --- The same preprocessing at PE level, for the CPU target Mcpu ---
+  //
+  // The inner decision balances host load across the PEs of a group, and until
+  // now had no ceiling at all: only B held an object in place, so B = FLT_MAX
+  // meant nothing ever moved whatever the tolerance said. Give it the twin of
+  // M so the tolerance governs both decisions in the same terms.
+  //
+  // On a copy: procs[].cpuLoad is the real background load the assignment pass
+  // starts from, and unlike the GPU groups it is never reset.
+  double Mcpu = 0;
+  {
+    std::vector<double> peLoad(n_pes);
+    for (int pe = 0; pe < n_pes; pe++)
+      peLoad[pe] = procs[pe].available ? procs[pe].cpuLoad : 0.0;
+    for (int i = 0; i < (int)pobjs.size(); i++) {
+      int lightest = -1;
+      for (int pe = 0; pe < n_pes; pe++) {
+        if (!procs[pe].available) continue;
+        if (lightest < 0 || peLoad[pe] < peLoad[lightest]) lightest = pe;
+      }
+      if (lightest < 0) break;   // no available PE: nothing to target
+      peLoad[lightest] += pobjs[i]->cpuLoad / procs[lightest].speed;
+      if (peLoad[lightest] > Mcpu) Mcpu = peLoad[lightest];
+    }
+    greedyMaxCpuLoad = Mcpu;
+  }
+  Mcpu *= A;
+
   // Reset GPU group loads back to bg-only for the real assignment pass.
   for (int gi = 0; gi < nGroups; gi++) {
     gpuGroups[gi].load = 0;
@@ -606,7 +650,8 @@ void GreedyRefineCentralGPULB::work(LDStats *stats)
     // CPU load is within B tolerance of the lightest PE — reduces migrations.
     if (obj->oldPE >= 0 && peToGrpIdx.count(obj->oldPE) &&
         peToGrpIdx[obj->oldPE] == chosen_gi &&
-        procs[obj->oldPE].cpuLoad <= (procs[bestPe].cpuLoad + 0.01) * B)
+        procs[obj->oldPE].cpuLoad <= (procs[bestPe].cpuLoad + 0.01) * B &&
+        procs[obj->oldPE].cpuLoad + obj_cpu / procs[obj->oldPE].speed <= Mcpu)
       bestPe = obj->oldPE;
 
     GreedyRefineCentralGPULB::GProc *p = &procs[bestPe];
@@ -619,7 +664,10 @@ void GreedyRefineCentralGPULB::work(LDStats *stats)
       maxLoad = g.load;
       if (maxLoad > M) M = maxLoad;
     }
-    if (p->cpuLoad > maxCpuLoad) maxCpuLoad = p->cpuLoad;
+    if (p->cpuLoad > maxCpuLoad) {
+      maxCpuLoad = p->cpuLoad;
+      if (maxCpuLoad > Mcpu) Mcpu = maxCpuLoad;
+    }
 
     if (bestPe != obj->oldPE) {
       nmoves++;
@@ -634,6 +682,7 @@ void GreedyRefineCentralGPULB::work(LDStats *stats)
   // single GPU group that term is the same for every (A,B) candidate, so
   // receiveSolutions falls through to its fewest-migrations tie-break and picks
   // the do-nothing solution. That is why a one-GPU run never migrated anything.
+  maxCpuLoadReported = maxCpuLoad;
   maxLoad = std::max(maxLoad, maxCpuLoad);
 
   if ((_lb_args.debug() > 1) && (CkMyPe() == cur_ld_balancer)) {
@@ -688,10 +737,16 @@ void GreedyRefineCentralGPULB::work(LDStats *stats)
     contribute(sizeof(double), &strategyStartTime, CkReduction::sum_double, cb);
 #endif
   } else if (_lb_args.debug() > 0) {
-    double greedyRatio = 1.0;
-    if (greedyMaxLoad > 0) greedyRatio = maxLoad / greedyMaxLoad;
-    double migrationRatio = nmoves/double(pobjs.size());
-    (void)greedyRatio; (void)migrationRatio;
+    // Single-candidate mode, so this PE's result is the result. Report what the
+    // tolerance bought: the ratio to greedy says how much max load was given up,
+    // the migration count says what that saved.
+    double gpuRatio = 1.0, cpuRatio = 1.0;
+    if (greedyMaxLoad > 0)    gpuRatio = maxLoad / greedyMaxLoad;
+    if (greedyMaxCpuLoad > 0) cpuRatio = maxCpuLoadReported / greedyMaxCpuLoad;
+    CkPrintf("CharmLB> %s: after lb, migrations=%d(%.2f%%), tolerance=%.3f, "
+             "gpu max=%.4f (%.2fx greedy), cpu max=%.4f (%.2fx greedy)\n",
+             lbname, nmoves, 100.0 * nmoves / double(pobjs.size()), A,
+             maxLoad, gpuRatio, maxCpuLoadReported, cpuRatio);
   }
 }
 

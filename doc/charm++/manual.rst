@@ -2698,6 +2698,20 @@ available on CUDA builds only:
   around its own ``AtSync`` pays the tracing cost only inside it. See
   :numref:`lbFramework` for the instrumentation calls.
 
+  Like the other greedy-refine balancers it accepts a *tolerance*: how far
+  above the maximum load plain greedy would produce it may go, in exchange
+  for migrating fewer objects. ``+LBGreedyRefineTolerance 1.1`` allows a
+  maximum load 10% higher than greedy's, and an object then stays where it
+  is for as long as its PE remains under that target.
+
+  The default is ``1.1``. Passing ``0`` or less asks the balancer to search
+  for a tolerance instead of being told one: each PE builds a candidate
+  assignment from a different parameter pair and the best is chosen, which
+  costs a reduction per balancing step and is bounded by the PE count.
+  ``+LBDebug 1`` reports the migration count and the achieved maximum load
+  against greedy's, separately for the GPU and host dimensions, which is
+  what says whether the tolerance is buying anything.
+
 .. note::
 
    Migrating a GPU application requires the runtime to be built with
