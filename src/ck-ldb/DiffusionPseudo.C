@@ -113,6 +113,28 @@ void DiffusionLB::PseudoLoadBalancing()
   std::vector<char> flowAdjacent(neighborCount, 1);
   for (int i = 0; i < neighborCount; i++) flowAdjacent[i] = nborFlowAdjacent(i) ? 1 : 0;
 
+  // Which rule refuses a destination, and on what evidence. cost_for_neighbor
+  // treats an ABSENT neighbour as bordering and only a present-and-zero one as
+  // silent, so "refused" and "never counted" have to be told apart by eye.
+  if (_lb_args.debug() > 1 && pseudo_itr == 0)
+  {
+    for (int i = 0; i < neighborCount; i++)
+    {
+      const int nborNode = sendToNeighbors[i];
+      const auto it = cost_for_neighbor.find(nborNode);
+      const char* comm = cost_for_neighbor.empty() ? "no-comm-data"
+                         : (it == cost_for_neighbor.end()) ? "absent"
+                         : (it->second > 0.0)              ? "bytes>0"
+                                                           : "zero";
+      CkPrintf("[FLOWGATE node %d] nbor %d: flow %d  keyAdj %d  commAdj %d (%s %.0f)  "
+               "keyed1D %d  load %.6f (mine %.6f)\n",
+               myNodeId, nborNode, (int)flowAdjacent[i], nborKeyAdjacent(i) ? 1 : 0,
+               nborCommAdjacent(i) ? 1 : 0, comm,
+               (it == cost_for_neighbor.end()) ? -1.0 : (double)it->second,
+               keyed1D ? 1 : 0, loadNeighbors[i], my_pseudo_load);
+    }
+  }
+
   std::vector<double> thisRoundToSend;
   diffusionRoundFlows(my_load, my_pseudo_load, effMinImbalance, _lb_args.diffusionBeta(),
                       loadNeighbors, flowAdjacent, toSendLoad, prevRoundToSend,

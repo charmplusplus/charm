@@ -520,7 +520,7 @@ void _loadbalancerInit()
   CmiGetArgDoubleDesc(argv, "+LBShedEps", &_lb_args.shedEps(),
                       "ShedLB: allowed excess over the mean load, as a fraction");
   CmiGetArgDoubleDesc(argv, "+LBDiffusionMaxMoveFrac", &_lb_args.diffusionMaxMoveFrac(),
-                      "DiffusionLB moves at most this fraction of a node's objects across nodes per step (default 0.25)");
+                      "DiffusionLB moves at most this fraction of a node's migratable load across nodes per step (default 1.0: no cap)");
   // Transfer-cost table, as produced by benchmarks/charm++/cuda/gpudirect/lbcalib.
   // With it, DiffusionLB weighs each across-node move against what the move
   // costs; without it, every move the diffusion quota asks for is made.

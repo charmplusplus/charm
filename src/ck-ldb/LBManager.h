@@ -51,8 +51,13 @@ class CkLBArgs
   // DiffusionLB decision floors. An imbalance below _lb_diffMinImbalance (a
   // fraction of the mean) is treated as measurement noise and left alone, at
   // both the across-node and the within-node level. _lb_diffMaxMoveFrac caps
-  // the share of a node's migratable objects that may leave it across nodes
-  // in one step.
+  // the share of a node's migratable LOAD that may leave it across nodes in
+  // one step; 1.0, the default, applies no cap and lets the pseudo rounds'
+  // own obligation govern. A cap below 1 is spent on one neighbour at a time
+  // (selection stays with a neighbour until it can take nothing more), so a
+  // node far above its fair share exhausts the budget on its first
+  // destination and never reaches the rest: measured on sph2d, 0.25 left
+  // node 0 shedding 2.23 of the 6.16 it owed and cost 13 ms/step.
   // ShedLB: no bin may exceed (1 + _lb_shedEps) times the mean load. Below
   // the largest object's share of the mean it cannot be met at all, because
   // an indivisible object sets a floor on any assignment's maximum.
@@ -100,7 +105,7 @@ class CkLBArgs
     _lb_diffgpudim = false;
     _lb_shedEps = 0.10;
     _lb_diffMinImbalance = 0.10;
-    _lb_diffMaxMoveFrac = 0.25;
+    _lb_diffMaxMoveFrac = 1.0;
     _lb_gpuScaling = false;
     _lb_gpuScalingAlphaMin = 0.0;
     _lb_gpuScalingMinSamples = 1;

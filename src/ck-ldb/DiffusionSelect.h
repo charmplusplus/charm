@@ -52,6 +52,13 @@ inline void diffusionSelectMoves(
   std::vector<char> tries(neighborCount, 0);
   std::vector<char> allowed;
 
+  // The quota the rounds actually planned per neighbour. A destination that
+  // never appears here was refused by the FLOW gate; one that appears with a
+  // quota but yields no candidate below was refused by the METRIC.
+  if (_lb_args.debug() > 1)
+    for (int i = 0; i < neighborCount; i++)
+      CkPrintf("[QUOTA node %d] nbor idx %d: planned %.6f\n", myNodeId, i, toSendLoad[i]);
+
   // Stay with one neighbour until it can take nothing more, then move on --
   // rather than advancing to the next neighbour after every accepted move.
   //
@@ -106,6 +113,9 @@ inline void diffusionSelectMoves(
 
     if (v_id == -1)
     {
+      if (_lb_args.debug() > 1)
+        CkPrintf("[NOCAND node %d] nbor idx %d: quota %.6f, metric supplied no object\n",
+                 myNodeId, nborId, toSendLoad[nborId]);
       tries[nborId] = 1;
       bool not_done = false;
       for (int i = 0; i < neighborCount; i++)
