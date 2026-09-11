@@ -181,6 +181,18 @@ GreedyRefineCentralGPULB::GreedyRefineCentralGPULB(const CkLBOptions &opt): CBas
   lbname = "GreedyRefineCentralGPULB";
   if ((CkMyPe() == 0) && !quietModeRequested)
     CkPrintf("CharmLB> GreedyRefineCentralGPULB created.\n");
+#if CMK_HIP
+  // This balancer's cross-GPU stage balances on LDObjData::gpuTime, which is
+  // filled in from CUPTI activity records -- a CUDA-only facility with no HIP
+  // equivalent wired up yet. On HIP every object's gpuTime stays zero, so that
+  // stage sums zeros and only the within-group CPU pass does any work. Warn
+  // rather than balance silently on a dimension that is not being measured.
+  // Printed even under quiet mode: it reports degraded behaviour, not a banner.
+  if (CkMyPe() == 0)
+    CkPrintf("CharmLB> Warning: GPU load measurement on HIP is not implemented "
+             "yet. GreedyRefineCentralGPULB will see zero GPU load for every "
+             "object and balance on CPU load alone.\n");
+#endif
   if (_lb_args.percentMovesAllowed() < 100) {
     migrationTolerance = float(_lb_args.percentMovesAllowed())/100.0;
   }
