@@ -49,8 +49,8 @@ CkLocRec* CkActiveLocRec(void);
 // violated the failure is a wall of undefined references in unrelated
 // pure-Converse programs rather than anything pointing here. Reading a global
 // that lives in ck-ldb would add one more way to trip it, for two diagnostic
-// printfs. The other diagnostics in this file (CHARM_GPU_LOAD_AUDIT,
-// CHARM_LB_CUPTI_TIME) are already environment-driven, so this matches them.
+// printfs. The other diagnostic in this file (CHARM_LB_CUPTI_TIME) is already
+// environment-driven, so this matches it.
 static int cuptiDebugLevel()
 {
   static const int level = []() {
@@ -689,12 +689,6 @@ void hapiNormalizeCuptiLoads() {
   }
 
   size_t total_kernels = 0, devices_normalized = 0;
-  // Completeness accounting: device-seconds credited to an object,
-  // device-seconds consumed by kernels with no owner, and the wall time the
-  // device had any work at all. The unowned share is work no object is charged
-  // for, so it vanishes from the balancer's view of the node.
-  double sweep_attr_demand = 0.0, sweep_unattr_demand = 0.0, sweep_busy_s = 0.0;
-  size_t sweep_unattr_kernels = gm.cupti_unattributed_kernels_.size();
   for (auto& kv : byDevice) {
     std::vector<SweepKernel>& kernels = kv.second;
     if (kernels.empty()) continue;
@@ -754,7 +748,6 @@ void hapiNormalizeCuptiLoads() {
           if (kernels[ki].sms_used > 0) want += kernels[ki].sms_used;
         }
         if (want > 0) {
-          sweep_busy_s += dt_s;
           // Split the interval's DEVICE TIME among the kernels holding the
           // device, in proportion to the SMs each asked for. The weights decide
           // how concurrent work is divided; they must not decide how much there
@@ -791,8 +784,7 @@ void hapiNormalizeCuptiLoads() {
 
     for (const SweepKernel& k : kernels) {
       if (k.demand <= 0.0) continue;
-      if (!k.attributed) { sweep_unattr_demand += k.demand; continue; }
-      sweep_attr_demand += k.demand;
+      if (!k.attributed) continue;
       gm.cupti_obj_norm_load_[k.obj_key] += k.demand;
     }
   }
@@ -804,27 +796,6 @@ void hapiNormalizeCuptiLoads() {
               gm.cupti_obj_norm_load_.size());
   }
 
-  // Where the device's work went. attributed+unowned is every device-second the
-  // sweep saw.
-  if (getenv("CHARM_GPU_LOAD_AUDIT") != nullptr) {
-    const double seen = sweep_attr_demand + sweep_unattr_demand;
-    // Wall time this window actually covered. busy_s alone cannot say whether a
-    // round measured more work or simply measured for longer, and those call
-    // for opposite responses.
-    static double s_last_audit_t = 0.0;
-    const double now_t = CmiWallTimer();
-    const double window_s = (s_last_audit_t > 0.0) ? (now_t - s_last_audit_t) : 0.0;
-    s_last_audit_t = now_t;
-    CmiPrintf("[gpu-audit pe=%d] kernels=%zu unowned_kernels=%zu objects=%zu "
-              "attributed_s=%.6f unowned_s=%.6f unowned_frac=%.3f busy_s=%.6f "
-              "util=%.3f window_s=%.6f occ=%.4f\n",
-              CmiMyPe(), total_kernels, sweep_unattr_kernels,
-              gm.cupti_obj_norm_load_.size(), sweep_attr_demand,
-              sweep_unattr_demand, (seen > 0.0) ? sweep_unattr_demand / seen : 0.0,
-              sweep_busy_s, (sweep_busy_s > 0.0) ? seen / sweep_busy_s : 0.0,
-              window_s, (window_s > 0.0) ? sweep_busy_s / window_s : 0.0);
-    fflush(stdout);
-  }
 }
 
 void hapiPrepareCuptiLoads(uint64_t epoch) {
