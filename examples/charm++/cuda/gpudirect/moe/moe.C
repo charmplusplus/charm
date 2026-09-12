@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstring>
 #include <deque>
+#include <map>
 #include <vector>
 #include <sys/time.h>
 #include <unistd.h>
@@ -110,6 +111,17 @@ static inline int nextLBStep(int s) {
   if (lb_freq <= 0) return INT_MAX;
   return ((s / lb_freq) + 1) * lb_freq;
 }
+// Steps from the previous balancing step to step s: the span the balancer's
+// own host-side loads accumulate over, and so the span a declared device
+// load has to cover to be commensurate with them (LBLoadDim.h). Before the
+// first balancing step, the run so far.
+static inline int stepsSinceLastLB(int s) {
+  if (s <= first_lb) return s > 0 ? s : 1;
+  int prev = (lb_freq > 0) ? (s / lb_freq) * lb_freq : 0;
+  if (prev == s) prev -= lb_freq;
+  if (prev < first_lb) prev = first_lb;
+  return s - prev > 0 ? s - prev : 1;
+}
 
 // Per-step figures from one of the two reductions, held until the other
 // reduction of the same step arrives so one line reports both.
@@ -140,7 +152,7 @@ public:
     zipf_z = 1.0;
     drift_period = 10;
     chunk_tokens = 1024;
-    n_lanes = 4;
+    n_lanes = 0;   // resolved below: -n, else four per GPU shared by its PEs
     double headroom = 0.0;
     learning_rate = 1e-4;
     checksum_freq = 5;
@@ -189,12 +201,16 @@ public:
         case 'P': print_place = 1; break;
         default:
           CkPrintf(
-              "Usage: %s -e [experts] -m [d_model] -h [d_ff] -t [tokens per PE per step]\n"
+              "Usage: %s -e [experts] -m [d_model] -h [d_ff] -t [tokens per process per step]\n"
               "  -k [top-k] -i [steps] -u [warmup steps]\n"
               "  -z [zipf exponent of expert popularity, 0 = uniform]\n"
               "  -p [drift period: steps between reshuffles of the hot set, 0 = static]\n"
               "  -c [chunk: tokens per GEMM] -r [capacity headroom, 0 = auto from zipf]\n"
-              "  -n [compute lanes per PE: streams experts are spread over]\n"
+              "  -n [compute lanes per PE: streams experts are spread over;\n"
+              "      default four per GPU divided among the process's PEs]\n"
+              "  With several PEs per process (+ppn N, MOE_PPN=N through the\n"
+              "  wrapper) the process still has one dispatcher and -t tokens, on\n"
+              "  its first PE; the experts spread over all of its PEs.\n"
               "  -L [learning rate] -A (Adam: 3x payload) -T (TF32 GEMMs)\n"
               "  -D [capacity factor: cap each expert at f x the mean tokens per\n"
               "      expert and DROP the overflow, the GShard/Switch policy. Bounds\n"
@@ -220,6 +236,14 @@ public:
     if (top_k < 1 || top_k > MOE_MAX_TOPK || top_k > n_experts)
       CkAbort("-k must be in [1, min(%d, experts)]\n", MOE_MAX_TOPK);
     if (chunk_tokens < 1) CkAbort("-c must be positive\n");
+    // Several PEs per process (+ppn) share one GPU, and each PE's dispatcher
+    // owns its own lanes -- a stream, a cuBLAS handle with a fixed workspace,
+    // and fused-source scratch sized by the dispatcher count. Lanes exist to
+    // overlap experts on one device; PEs already do that, so the default
+    // keeps about four lanes per GPU rather than four per PE, which at eight
+    // PEs would mean 32 handles and gigabytes of scratch on one card.
+    const int pes_per_proc = CkNodeSize(CkMyNode());
+    if (n_lanes == 0) n_lanes = std::max(1, 4 / pes_per_proc);
     if (n_lanes < 1 || n_lanes > MOE_MAX_LANES)
       CkAbort("-n must be in [1, %d]\n", MOE_MAX_LANES);
     if (async_lb && !_lb_args.lbAsync()) {
@@ -231,7 +255,12 @@ public:
       CkAbort("-l (%d) must be in [1, lb_freq): the wait must land before "
               "the next AtSyncStart\n", lb_wait_lag);
     }
-    n_disp = CkNumPes();
+    // One dispatcher per process, on its first PE. The other PEs of a process
+    // hold no tokens; they carry experts, each on its own PE, and provide the
+    // compute context those experts run in. So the work per GPU, the slabs
+    // and the routing are the same at any +ppn, and the checksums match the
+    // one-PE run bit for bit.
+    n_disp = CkNumNodes();
 
     // Per-(source, expert) slab capacity. The hottest expert draws a share
     // p_max of every dispatcher's tokens; auto sizes for 1.5x that plus slack.
@@ -258,9 +287,11 @@ public:
     CkPrintf("\n[CUDA mixture-of-experts layer]\n");
     CkPrintf("Experts: %d, d_model %d, d_ff %d, %s%s\n", n_experts, d_model,
         d_ff, use_adam ? "Adam" : "SGD", use_tf32 ? ", TF32" : "");
-    CkPrintf("Tokens: %d per PE per step on %d PEs, top-%d, chunk %d, "
-        "slab capacity %d per (PE, expert), %d compute lanes per PE%s\n",
-        n_tokens, n_disp, top_k, chunk_tokens, cap_src, n_lanes,
+    CkPrintf("Tokens: %d per process per step on %d processes of %d PE%s, "
+        "top-%d, chunk %d, slab capacity %d per (process, expert), %d compute "
+        "lanes per PE%s\n",
+        n_tokens, n_disp, pes_per_proc, pes_per_proc == 1 ? "" : "s", top_k,
+        chunk_tokens, cap_src, n_lanes,
         fuse_sources ? "" : ", one pass per source");
     if (capacity_factor > 0.0)
       CkPrintf("Capacity factor: %.2f (GShard/Switch token dropping; no state moves)\n",
@@ -288,16 +319,33 @@ public:
     CkPrintf("Init time: %.3lf s\n", CkWallTimer() - init_start_time);
     start_time = CkWallTimer();
     window_start_time = start_time;
-    disp_proxy.runStep();
+    // Only the dispatcher branch on each process's first PE runs steps.
+    for (int d = 0; d < n_disp; d++) disp_proxy[CkNodeFirst(d)].runStep();
     expert_proxy.runStep();
   }
 
-  void stepStatsDisp(CkReductionMsg* msg) {
-    const double* outpe = (const double*)msg->getData();
+  // One report per dispatcher per step. A step is in hand once all n_disp
+  // have reported; their values are then added in dispatcher order, the same
+  // fixed order the old slot reduction summed in, so the checksum is the same
+  // bits on every run and every placement. Dispatchers run at most a step
+  // apart, so the map holds one or two steps.
+  std::map<int, std::vector<double>> pend_out2, pend_drop;
+  std::map<int, int> pend_n;
+  int disp_done_n = 0;
+
+  void dispStep(int disp, int step, double out2_d, double drop_d) {
+    std::vector<double>& o = pend_out2[step];
+    std::vector<double>& d = pend_drop[step];
+    if (o.empty()) { o.assign(n_disp, 0.0); d.assign(n_disp, 0.0); }
+    o[disp] = out2_d;
+    d[disp] = drop_d;
+    if (++pend_n[step] < n_disp) return;
     double out2 = 0.0, drop = 0.0;
-    for (int p = 0; p < n_disp; p++) out2 += outpe[p];
-    for (int p = 0; p < n_disp; p++) drop += outpe[n_disp + p];
-    delete msg;
+    for (int p = 0; p < n_disp; p++) out2 += o[p];
+    for (int p = 0; p < n_disp; p++) drop += d[p];
+    pend_out2.erase(step);
+    pend_drop.erase(step);
+    pend_n.erase(step);
     disp_step++;
     const double now = CkWallTimer();
     if (disp_step == warmup_steps) {
@@ -333,16 +381,18 @@ public:
       CkAbort("Token count not conserved at step %d: experts saw %ld of %ld\n",
           exp_step, sum_tok, expect);
 
+    // Per PE, whatever the process count: the experts' spread over PEs.
+    const int npes = CkNumPes();
     long max_pe = 0;
     double gsum = 0.0, gmax = 0.0;
-    for (int p = 0; p < n_disp; p++) {
+    for (int p = 0; p < npes; p++) {
       max_pe = std::max(max_pe, tokpe[p]);
       gsum += gpupe[p];
       gmax = std::max(gmax, gpupe[p]);
     }
     ExpRec r;
-    r.tokratio = (double)max_pe / ((double)sum_tok / n_disp);
-    r.gpuratio = gsum > 0.0 ? gmax / (gsum / n_disp) : 0.0;
+    r.tokratio = (double)max_pe / ((double)sum_tok / npes);
+    r.gpuratio = gsum > 0.0 ? gmax / (gsum / npes) : 0.0;
     r.gmax_ms = gmax * 1e3;
     r.expratio = (double)max_tok / ((double)sum_tok / n_experts);
     r.w2 = w2;
@@ -393,7 +443,10 @@ public:
     }
   }
 
-  void dispDone() { finish(); }
+  void dispDone() {
+    if (++disp_done_n < n_disp) return;
+    finish();
+  }
   void expertsDone() { finish(); }
 
   void finish() {
@@ -443,6 +496,11 @@ class Dispatcher : public CBase_Dispatcher {
   // waits only on the event recorded right after the gather.
   cudaStream_t send_stream;
   cudaEvent_t ev_gather;
+  // Which process's batch this branch owns, and whether it owns one at all:
+  // only the first PE of a process dispatches. The other branches exist for
+  // the compute context (lanes) the experts on their PE run in.
+  int dispId = -1;
+  bool active = false;
 
   Dispatcher() {}
 
@@ -453,6 +511,9 @@ class Dispatcher : public CBase_Dispatcher {
     // token); with instrumentation on, the balancer would overwrite them with
     // CUPTI's measurement, and pay CUPTI's cost every step. -I keeps it.
     if (!use_instrument) LBTurnInstrumentOff();
+
+    dispId = CkMyNode();
+    active = (CkMyRank() == 0);
 
     memset(&gpu, 0, sizeof(gpu));
     gpu.n_lanes = n_lanes;
@@ -493,6 +554,13 @@ class Dispatcher : public CBase_Dispatcher {
         CkAbort("cublasCreate failed on PE %d lane %d\n", CkMyPe(), l);
     }
 
+    if (!active) {
+      // Context only; no batch, no steps. Still a member of the group's
+      // init reduction.
+      contribute(CkCallback(CkReductionTarget(Main, dispReady), main_proxy));
+      return;
+    }
+
     const size_t TK = slots();
     hapiCheck(mmMalloc((void**)&d_x, sizeof(float) * n_tokens * d_model));
     hapiCheck(mmMalloc((void**)&d_send, sizeof(float) * (TK + 1) * d_model));
@@ -516,7 +584,7 @@ class Dispatcher : public CBase_Dispatcher {
 
     // Unit-variance inputs, a pure function of (seed, PE, element)
     moeInitUniform(d_x, (size_t)n_tokens * d_model,
-        hmix(hmix(moe_seed, 1000), CkMyPe()), sqrtf(3.0f), gpu.comm.stream);
+        hmix(hmix(moe_seed, 1000), dispId), sqrtf(3.0f), gpu.comm.stream);
     hapiCheck(cudaStreamSynchronize(gpu.comm.stream));
     contribute(CkCallback(CkReductionTarget(Main, dispReady), main_proxy));
   }
@@ -558,7 +626,7 @@ class Dispatcher : public CBase_Dispatcher {
         int e = -1;
         for (int attempt = 0; attempt < 16 && e < 0; attempt++) {
           const uint64_t h = hmix(hmix(hmix(hmix(hmix(moe_seed, my_step),
-              CkMyPe()), t), j), attempt);
+              dispId), t), j), attempt);
           int r = (int)(std::upper_bound(cdf.begin(), cdf.end(), u01(h)) -
                         cdf.begin());
           if (r >= E) r = E - 1;
@@ -650,7 +718,7 @@ class Dispatcher : public CBase_Dispatcher {
     for (int e = 0; e < n_experts; e++) {
       const int n = counts[e];
       const int len = std::max(n, 1) * d_model;
-      expert_proxy[e].receiveTokens(my_step, CkMyPe(), n, len,
+      expert_proxy[e].receiveTokens(my_step, dispId, n, len,
           (outstanding_sends++,
            CkDeviceBuffer(d_send + (size_t)offs[e] * d_model,
                CkCallback(CkIndex_Dispatcher::sendDone(), thisProxy[CkMyPe()]),
@@ -718,17 +786,15 @@ class Dispatcher : public CBase_Dispatcher {
     // combines contributions in, so the checksum is the same bits on every
     // run. Main adds the slots in PE order. (A plain sum_double of the values
     // differed in the last digit from run to run, with zero migrations.)
-    // [0, n_disp) the checksum slots, [n_disp, 2*n_disp) the tokens this PE's
-    // capacity factor dropped: one slot each, so both are order-independent.
-    std::vector<double> outpe(2 * n_disp, 0.0);
-    outpe[CkMyPe()] = chk_due ? *h_chk : 0.0;
-    outpe[n_disp + CkMyPe()] = (double)dropped;
-    contribute(sizeof(double) * 2 * n_disp, outpe.data(), CkReduction::sum_double,
-        CkCallback(CkIndex_Main::stepStatsDisp(NULL), main_proxy));
+    // Reported point-to-point rather than through a group reduction: only the
+    // active branch of each process runs steps, and a group reduction would
+    // wait on the branches that never do. Main sums the reports in dispatcher
+    // order, which is the same fixed-order sum the reduction's slots gave.
+    main_proxy.dispStep(dispId, my_step, chk_due ? *h_chk : 0.0, (double)dropped);
     if (my_step < warmup_steps + n_steps) {
       thisProxy[CkMyPe()].runStep();
     } else {
-      contribute(CkCallback(CkReductionTarget(Main, dispDone), main_proxy));
+      main_proxy.dispDone();
     }
   }
 };
@@ -1033,7 +1099,18 @@ class Expert : public CBase_Expert {
     // separates a balancer that cannot use a good signal from a bad signal.
     static const bool flat = getenv("CHARM_MOE_FLATLOAD") != NULL;
     if (flat) s_tok = 1e-5;
-    setObjGPUTime(s_tok * n_tot);
+    // Declared over the balancing interval, not the step. The balancer holds
+    // this against host time it accumulated since the previous balancing
+    // step and against that interval's wall time, so a per-step figure is
+    // short by the interval length: measured 12 Sep 2026, it read as 17% of
+    // the interval when the device was 68-77% busy (nvidia-smi). This step's
+    // tokens stand for the interval; every expert scales by the same factor,
+    // so the balance is unchanged and only the units are right.
+    //
+    // A declaration now takes precedence over the CUPTI attribution for the
+    // interval (LBObj::gpuDeclared), so under -I, which asks for the measured
+    // loads, nothing is declared.
+    if (!use_instrument) setObjGPUTime(s_tok * n_tot * stepsSinceLastLB(my_step));
 
     if (use_instrument) {
       const bool want = (nextLBStep(my_step) - my_step) <= LB_INSTRUMENT_WINDOW;
@@ -1185,7 +1262,7 @@ class Expert : public CBase_Expert {
     for (int s = 0; s < n_disp; s++) {
       const int n = std::max(n_src[s], 0);
       const int len = std::max(n, 1) * d_model;
-      disp_proxy[s].receiveOutput(my_step, thisIndex, n, len,
+      disp_proxy[CkNodeFirst(s)].receiveOutput(my_step, thisIndex, n, len,
           (outstanding_sends++,
            CkDeviceBuffer(y_seg + s * segStride(),
                CkCallback(CkIndex_Expert::sendDone(), thisProxy[thisIndex]),
@@ -1219,8 +1296,9 @@ class Expert : public CBase_Expert {
     // the dispatcher's out2 slots: an order-independent exact sum.
     std::vector<double> w2e(n_experts, 0.0);
     w2e[thisIndex] = chk_due ? *h_chk : 0.0;
-    std::vector<long> tokpe(n_disp, 0);
-    std::vector<double> gpupe(n_disp, 0.0);
+    const int npes = CkNumPes();
+    std::vector<long> tokpe(npes, 0);
+    std::vector<double> gpupe(npes, 0.0);
     tokpe[CkMyPe()] = n_tot;
     gpupe[CkMyPe()] = gpu_last;
     CkReduction::tupleElement tuple[] = {
@@ -1228,9 +1306,9 @@ class Expert : public CBase_Expert {
         CkReduction::tupleElement(sizeof(long), &max_tok, CkReduction::max_long),
         CkReduction::tupleElement(sizeof(double) * n_experts, w2e.data(),
             CkReduction::sum_double),
-        CkReduction::tupleElement(sizeof(long) * n_disp, tokpe.data(),
+        CkReduction::tupleElement(sizeof(long) * npes, tokpe.data(),
             CkReduction::sum_long),
-        CkReduction::tupleElement(sizeof(double) * n_disp, gpupe.data(),
+        CkReduction::tupleElement(sizeof(double) * npes, gpupe.data(),
             CkReduction::sum_double)};
     CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple, 5);
     msg->setCallback(CkCallback(CkIndex_Main::stepStatsExpert(NULL),

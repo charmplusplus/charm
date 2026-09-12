@@ -282,3 +282,41 @@ the links with the dispatch. The gap is the placement decision, where greedy
 re-placement reaches a token imbalance of 1.01 against DiffusionLB's 1.28, and
 the GEMM structure, where one pass per expert is worth 30% of the compute
 time. `ref/README.md` has the tables and the derivations.
+
+## Several PEs per process
+
+`MOE_PPN=N` through `ranklogs/moewrap.sh` (or `+ppn N +pemap <cores>` by
+hand) runs N PEs per process on one GPU. The program is the same at any N:
+one dispatcher per process, on its first PE, owns the process's `-t` tokens,
+routes them and ships one slab per expert exactly as with one PE, so the
+work per GPU, the slab count and the routing do not change with N and the
+checksums match the one-PE run bit for bit. What N changes is where the
+experts run: they spread over all the process's PEs, each with its own
+compute context (the lane count defaults to four per GPU divided among the
+PEs, `-n` overrides), so their kernel launches, landing copies and output
+sends run on N PEs instead of one, and the balancer moves them between the
+PEs of a process on host time as well as across processes on device time.
+The other PEs' dispatcher branches hold no tokens and run no steps; they
+exist for that context.
+
+Measured 12 Sep 2026, one A40 node, 8 cores per process, ms/step:
+
+    PEs per process          1        2        4        6        7        8
+    no LB, defaults      188-193    193   180-182    183      181    202-205
+    async LB, defaults   215-248     -    216-230     -        -     216-230
+    no LB, Llama size      557       -      530       -        -       576
+    async LB, Llama        659       -      650       -        -       721
+
+Four PEs per process is the sweet spot, 6% faster than one with no
+balancer and 5% at the Llama size. The step's phase trace
+(`CHARM_MOE_TRACE=2`, `ranklogs/phases.py`) shows where: route+gather
+23.8 -> 10.9 ms, compute span 131 -> 128, combine 14 -> 18, output
+exchange 17 -> 12.5. At eight PEs the output exchange -- the time from
+the last expert's output sends to the dispatcher having every output
+landed -- triples to 46-53 ms and eats the gains; the dispatcher PE consumes
+landed outputs in bursts tens of milliseconds apart instead of as they
+arrive. Same-process and remote outputs are delayed alike, so it is not the
+intra-process transport, and `MOE_ONE_DEVICE=1` (which cuts the driver's
+per-GPU threads from four to one) leaves it unchanged, so it is not thread
+oversubscription of the eight cores either. Open. Use four until it is
+understood.

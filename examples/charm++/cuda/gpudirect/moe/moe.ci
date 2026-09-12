@@ -36,9 +36,11 @@ mainmodule moe {
     entry Main(CkArgMsg* m);
     entry [reductiontarget] void dispReady();
     entry [reductiontarget] void expertsReady();
-    entry void stepStatsDisp(CkReductionMsg* msg);
+    // Point-to-point from each process's dispatcher; a step is complete once
+    // all n_disp have reported (see Main::dispStep).
+    entry void dispStep(int disp, int step, double out2, double drop);
     entry void stepStatsExpert(CkReductionMsg* msg);
-    entry [reductiontarget] void dispDone();
+    entry void dispDone();
     entry [reductiontarget] void expertsDone();
   };
 
