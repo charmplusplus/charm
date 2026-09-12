@@ -90,11 +90,15 @@ public:
   // Copy the per-object normalized GPU loads computed by
   // hapiNormalizeCuptiLoads into this PE's LB objects. The map is shared
   // per-process and every PE reads it concurrently, so this must not mutate it.
+  // An object whose application declared its load this interval keeps the
+  // declaration (LBObj::gpuDeclared).
   inline void SetObjGPULoad(
       const std::unordered_map<LDObjKey, double, LDObjKeyHash> &id_loadMap)
   {
     for (int i = 0; i < objs.size(); i++) {
       if(objs[i].obj == nullptr)
+        continue;
+      if(objs[i].obj->hasGPUDeclared())
         continue;
       const LDObjHandle &handle = objs[i].obj->GetLDObjHandle();
       LDObjKey key;

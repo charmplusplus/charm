@@ -161,6 +161,7 @@ void MetisLB::work(LDStats* stats)
              CkMyPe(), lbLoadDimName(ogr->deviceDim),
              lbLoadDimOverride() == LB_DIM_AUTO ? "criticality" : "flag", c.boundHost(),
              c.pes, c.boundDev(), c.gpus, c.alphaHost(), c.alphaDev());
+    lbPrintExplained("[MetisLB]", c);
   }
 
   const idx_t numVertices = ogr->vertices.size();

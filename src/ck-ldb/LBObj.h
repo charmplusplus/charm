@@ -44,6 +44,18 @@ public:
   inline void setJoinedStep(bool v) { joinedStep = v; }
   inline bool hasJoinedStep(void) const { return joinedStep; }
 
+  // The application declared this object's device load for the current
+  // interval (EstObjGPULoad), so the CUPTI attribution must not replace it.
+  // An application that declares knows its cost before the work runs -- moe
+  // prices an expert at its token count times a measured rate -- and the
+  // attribution can be far off it: measured on moe, CUPTI credited the
+  // experts with 17% of the interval while the devices were 68-77% busy.
+  // Cleared with the loads at each balancing step, so an object that stops
+  // declaring goes back to being measured.
+  bool gpuDeclared = false;
+  inline void setGPUDeclared(bool v) { gpuDeclared = v; }
+  inline bool hasGPUDeclared(void) const { return gpuDeclared; }
+
   inline void StartTimer(void) {
     startWTime = CkWallTimer();
 #if CMK_LB_CPUTIMER

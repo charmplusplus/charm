@@ -377,7 +377,12 @@ void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage&& data)
     // Which dimension this step diffuses is decided job-wide before the
     // neighbour phase. Report this node's totals; the barrier contribution
     // this PE owes is released by the verdict (loadDimVerdict).
-    thisProxy[0].loadDimReport(nodeHostSum, nodeHostMax, nodeDevSum, nodeDevMax);
+    // The interval's wall time as this node's PEs saw it, for the diagnosis
+    // of how much of it the two measured loads account for.
+    double period = 0.0;
+    for (int r = 0; r < nodeSize && r < (int)nodeStats->procs.size(); r++)
+      period = std::max(period, (double)nodeStats->procs[r].total_walltime);
+    thisProxy[0].loadDimReport(nodeHostSum, nodeHostMax, nodeDevSum, nodeDevMax, period);
     statsReceived = 0;
   }
 #endif
@@ -395,7 +400,8 @@ void DiffusionLB::statsAssembled()
 // PE 0: one report per node, then the verdict to every PE. A DiffusionLB node
 // is one process driving one device, so each report stands for nodeSize PEs
 // of host capacity and one GPU of device capacity.
-void DiffusionLB::loadDimReport(double sumHost, double maxHost, double sumDev, double maxDev)
+void DiffusionLB::loadDimReport(double sumHost, double maxHost, double sumDev, double maxDev,
+                                double period)
 {
   LBCriticality c;
   c.sumHost = sumHost;
@@ -404,6 +410,7 @@ void DiffusionLB::loadDimReport(double sumHost, double maxHost, double sumDev, d
   c.maxDev = maxDev;
   c.pes = nodeSize;
   c.gpus = 1;
+  c.period = period;
   loadDimCrit.merge(c);
   if (++loadDimReports < numNodes) return;
   loadDimReports = 0;
@@ -416,6 +423,7 @@ void DiffusionLB::loadDimReport(double sumHost, double maxHost, double sumDev, d
              lbLoadDimOverride() == LB_DIM_AUTO ? "criticality" : "flag",
              loadDimCrit.boundHost(), loadDimCrit.pes, loadDimCrit.boundDev(),
              loadDimCrit.gpus, loadDimCrit.alphaHost(), loadDimCrit.alphaDev());
+  if (_lb_args.debug() > 0) lbPrintExplained("[DiffusionLB]", loadDimCrit);
   const double alphaHost = loadDimCrit.alphaHost(), alphaDev = loadDimCrit.alphaDev();
   loadDimCrit = LBCriticality();
   thisProxy.loadDimVerdict(mode, alphaHost, alphaDev);

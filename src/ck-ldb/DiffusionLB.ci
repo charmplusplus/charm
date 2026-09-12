@@ -56,7 +56,8 @@ module DiffusionLB
     // load totals to PE 0 once its stats are assembled; PE 0 resolves which
     // dimension binds job-wide (LBLoadDim.h) and tells every PE before the
     // neighbour phase starts, so all nodes diffuse the same thing.
-    entry[expedited] void loadDimReport(double sumHost, double maxHost, double sumDev, double maxDev);
+    entry[expedited] void loadDimReport(double sumHost, double maxHost, double sumDev, double maxDev,
+                                        double period);
     entry[expedited] void loadDimVerdict(int device, double alphaHost, double alphaDev);
     entry[expedited] void migMsgAck();
     entry[expedited] void acrossDone();

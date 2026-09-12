@@ -129,7 +129,8 @@ public:
   // reports its node's totals, PE 0 resolves, every PE takes the verdict
   // (diffusionLoadDimDevice), and the rank-0 PEs price their node in it
   // before releasing the stats barrier.
-  void loadDimReport(double sumHost, double maxHost, double sumDev, double maxDev);
+  void loadDimReport(double sumHost, double maxHost, double sumDev, double maxDev,
+                     double period);
   void loadDimVerdict(int device, double alphaHost, double alphaDev);
   LBCriticality loadDimCrit;  // PE 0: the reports folded so far
   int loadDimReports;

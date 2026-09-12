@@ -265,6 +265,7 @@ void LBDatabase::ClearLoads(void)
       }
 #if CMK_CUDA
       obj->data.gpuTime = 0.0;
+      obj->setGPUDeclared(false);
 #endif
       obj->data.wallTime = 0.0;
 #if CMK_LB_CPUTIMER
@@ -365,6 +366,7 @@ void LBDatabase::EstObjGPULoad(const LDObjHandle &_h, double gputime)
 
   CmiAssert(obj != NULL);
   obj->data.gpuTime = gputime;
+  obj->setGPUDeclared(true);
 #endif
 #else
     CmiAbort("LBDatabase::EstObjGPULoad called but CMK_CUDA is not set");

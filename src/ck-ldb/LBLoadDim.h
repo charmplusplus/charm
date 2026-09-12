@@ -55,6 +55,14 @@ struct LBCriticality
   double sumDev = 0.0, maxDev = 0.0;
   int pes = 0;   // P: PEs the host dimension is spread over
   int gpus = 0;  // G: devices the device dimension is spread over
+  // Wall time of the balancing interval, the longest any PE saw. What the
+  // two measured loads are held against: alpha says which of them is the
+  // larger relative to its resources, and nothing about whether either is
+  // what holds the step open. A dimension's share of the interval says
+  // that. When both shares are small the step is spent elsewhere --
+  // communication, waiting, launch latency -- and no choice of dimension
+  // can move it much. Zero when unknown (the offline simulator).
+  double period = 0.0;
 
   void addObject(double h, double g)
   {
@@ -72,6 +80,15 @@ struct LBCriticality
     maxDev = std::max(maxDev, o.maxDev);
     pes += o.pes;
     gpus += o.gpus;
+    period = std::max(period, o.period);
+  }
+  // Each dimension's even-spread bound as a share of the interval.
+  double hostShare() const { return period > 0.0 ? boundHost() / period : 0.0; }
+  double devShare() const { return period > 0.0 ? boundDev() / period : 0.0; }
+  // Neither dimension accounts for as much as `below` of the interval.
+  bool unexplained(double below) const
+  {
+    return period > 0.0 && hostShare() < below && devShare() < below;
   }
 
   double boundHost() const { return pes > 0 ? std::max(sumHost / pes, maxHost) : 0.0; }
@@ -160,6 +177,32 @@ static inline const char* lbLoadModeName(int mode)
   return mode == LB_MODE_STEP ? "step (both)" : mode == LB_MODE_DEVICE ? "device" : "host";
 }
 
+// Below this share of the interval a dimension is not what the step waits
+// on. Half: at less than half, even a perfect balance of that dimension
+// leaves the majority of the step to whatever else the time went to.
+static const double kLBUnexplainedBelow = 0.5;
+
+// One line of diagnosis for a strategy's debug output: the shares, and a
+// warning when neither dimension explains the interval.
+static inline void lbPrintExplained(const char* who, const LBCriticality& c)
+{
+  if (c.period <= 0.0) return;
+  // A load larger than the interval it is held against means the two do not
+  // cover the same span: an application declaring a per-step load against a
+  // multi-step interval, or a stats window that started after the interval
+  // did (a central balancer's first step, before any ClearLoads). The shares
+  // then say nothing, and the verdict is withheld.
+  const bool spans = c.hostShare() > 1.5 || c.devShare() > 1.5;
+  CkPrintf("%s measured loads explain host %.0f%%, device %.0f%% of the %.3f s interval%s\n",
+           who, 100.0 * c.hostShare(), 100.0 * c.devShare(), c.period,
+           spans ? " -- loads exceed the interval: they do not cover the same span (declared "
+                   "per-step loads, or a stats window shorter than the interval); shares "
+                   "not meaningful"
+           : c.unexplained(kLBUnexplainedBelow)
+               ? " -- NEITHER dimension holds the step open; balancing either cannot move it much"
+               : "");
+}
+
 // The central form: everything a central strategy needs is in the stats it
 // was handed. P counts the available PEs, G the distinct devices among them.
 static inline LBCriticality lbCriticalityOf(const BaseLB::LDStats* stats)
@@ -171,6 +214,7 @@ static inline LBCriticality lbCriticalityOf(const BaseLB::LDStats* stats)
     if (!stats->procs[pe].available) continue;
     c.pes++;
     devices.insert(stats->procs[pe].gpu_device_id);
+    c.period = std::max(c.period, (double)stats->procs[pe].total_walltime);
   }
   c.gpus = (int)devices.size();
   for (size_t i = 0; i < stats->objData.size(); i++)
