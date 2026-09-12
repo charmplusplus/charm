@@ -153,6 +153,11 @@ private:
   // chunk is being grown toward that neighbour, which changes what the load
   // band is for (see popBestObject).
   std::vector<int> movesTo;
+  // Per neighbour, the objects adjacent to the piece being grown toward it:
+  // partners of something already sent there this step. Growth is confined
+  // to them (see popBestObject); CHARM_DIFFUSION_GROW_ANY=1 lifts that.
+  std::vector<std::vector<char>> nearPiece;
+  bool growAnywhere;
 
   // The inbound half of an external edge is recorded on the peer node, so a
   // locally-observed external byte stands for this many incident bytes. Exactly

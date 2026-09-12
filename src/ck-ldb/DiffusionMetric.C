@@ -51,6 +51,8 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize_, int nCoun
 
   objAvailable.resize(n_objs, true);
   movesTo.assign(neighborCount, 0);
+  nearPiece.assign(neighborCount, std::vector<char>(n_objs, 0));
+  growAnywhere = (getenv("CHARM_DIFFUSION_GROW_ANY") != NULL);
   objCommEdges.resize(n_objs);
   for (int edge = 0; edge < nodeStats->commData.size(); edge++)
   {
@@ -235,6 +237,16 @@ int MetricComm::popBestObject(int nbor)
   // A partial peel has more perimeter than either a whole one or none.
   const bool seeding =
       (nbor >= 0 && nbor < (int)movesTo.size()) ? (movesTo[nbor] == 0) : true;
+  // Once a piece is growing toward this neighbour, only objects adjacent to
+  // it may join. Selection used to take the best-scoring object that fit
+  // anywhere on the boundary when the piece's own frontier had none, which
+  // starts a second piece; under the receiver check that happened at every
+  // refused frontier object, and the lbsim cross cases came out as 12 pieces
+  // of 18 objects where one dimension gave 4 of 28. Now the piece grows or
+  // the neighbour is done for the step, and what is left unshed is the next
+  // step's business, as it is whenever a neighbour runs out.
+  const bool contiguous = !seeding && !growAnywhere && nbor >= 0 && nbor < (int)nearPiece.size();
+  auto onPiece = [&](int i) { return !contiguous || nearPiece[nbor][i]; };
   bool seedOnBoundary = false;
   if (seeding)
   {
@@ -269,6 +281,7 @@ int MetricComm::popBestObject(int nbor)
     for (int i = 0; i < n_objs; i++)
     {
       if (!objAvailable[i] || !nodeStats->objData[i].migratable || !isAllowed(i)) continue;
+      if (!onPiece(i)) continue;
       if (seedOnBoundary && externalComm[nbor][i] <= 0.0) continue;
       const double objLoad = diffusionObjLoad(nodeStats->objData[i]);
       if (objLoad > nborCapacity) continue;
@@ -292,6 +305,7 @@ int MetricComm::popBestObject(int nbor)
     if (!objAvailable[i]) continue;
     if (!nodeStats->objData[i].migratable) continue;
     if (!isAllowed(i)) continue;
+    if (!onPiece(i)) continue;
 
     double objLoad = diffusionObjLoad(nodeStats->objData[i]);
     if (objLoad > nborCapacity) continue;
@@ -410,6 +424,7 @@ void MetricComm::updateState(int objId, int destNbor)
       internalComm[toObj] -= edge.bytes;
       externalMsgs[destNbor][toObj] += edge.msgs;
       internalMsgs[toObj] -= edge.msgs;
+      if (destNbor >= 0 && destNbor < (int)nearPiece.size()) nearPiece[destNbor][toObj] = 1;
     }
   }
   objAvailable[objId] = false;

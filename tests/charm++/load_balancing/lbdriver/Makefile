@@ -44,7 +44,9 @@ lbsim.o: lbsim.C lbsim.decl.h
 # of lbsim.C.
 SA_CXX	= g++ -std=c++17 -O2
 CUDA_DIR := $(shell sed -n 's/^CUDA_DIR="\(.*\)"/\1/p' ../../../../include/conv-mach-opt.sh)
-SA_INC	= -I../../../../include $(SIMINC) -I$(CUDA_DIR)/include
+# The source tree's ck-ldb headers first, ahead of the installed copies, so
+# an LB header change compiles here without a charm rebuild.
+SA_INC	= $(SIMINC) -I../../../../include -I$(CUDA_DIR)/include
 SA_SRC	= lbsim.C lbsim_stub.C ../../../../src/ck-ldb/DiffusionMetric.C
 SA_DEPS	= ../../../../src/ck-ldb/DiffusionSelect.h ../../../../src/ck-ldb/DiffusionFlow.h \
 	  ../../../../src/ck-ldb/DiffusionMetric.h ../../../../src/ck-ldb/DiffusionLoad.h \

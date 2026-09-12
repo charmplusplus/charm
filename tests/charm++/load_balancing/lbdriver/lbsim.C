@@ -434,7 +434,10 @@ static void buildGraph(std::vector<VNode>& nodes)
 
 // DiffusionLB::nborFlowAdjacent, comm rule only (there are no 1-D keys here),
 // plus PseudoLoadBalancing's rule that a neighbour with no room in the
-// dimension not being diffused takes no flow.
+// dimension not being diffused takes no flow. Step mode has no plan-side
+// room rule (see PseudoLoadBalancing for the one that was tried and why it
+// went): the receiver check at selection is where the other dimension's room
+// is enforced.
 static void flowAdjacency(const VNode& n, const std::vector<VNode>& nodes,
                           std::vector<char>& adj)
 {
@@ -1403,6 +1406,43 @@ static double imbalance(const Grid& g, const std::vector<int>& map, int nnodes)
   return imbalanceOf(g.w, map, nnodes);
 }
 
+// The shape of a step's moves: how many connected pieces the objects that
+// changed owner form, counting two moved objects as connected when they are
+// stencil partners with the same source and destination. One piece per
+// (source, destination) pair is a clean peel; many is fragmentation, which
+// no single-object repair can undo.
+static void movedChunks(const Grid& g, const std::vector<int>& before, const std::vector<int>& after,
+                        int& moved, int& pieces, int& largest)
+{
+  moved = pieces = largest = 0;
+  std::vector<char> seen(g.n(), 0);
+  std::vector<int> p;
+  for (int s = 0; s < g.n(); s++)
+  {
+    if (before[s] == after[s] || seen[s]) continue;
+    pieces++;
+    int size = 0;
+    std::deque<int> q;
+    q.push_back(s);
+    seen[s] = 1;
+    while (!q.empty())
+    {
+      const int k = q.front();
+      q.pop_front();
+      size++;
+      g.partners(k, p);
+      for (int m : p)
+        if (!seen[m] && before[m] != after[m] && before[m] == before[k] && after[m] == after[k])
+        {
+          seen[m] = 1;
+          q.push_back(m);
+        }
+    }
+    moved += size;
+    if (size > largest) largest = size;
+  }
+}
+
 // The step a node's two terms would set, max/avg over nodes: what the
 // balancer is actually minimising once both dimensions are loaded.
 static double stepImbalance(const Grid& g, const std::vector<int>& map, int nnodes)
@@ -1703,7 +1743,15 @@ static void lbsimRun(int argc, char** argv)
           continue;
         }
 
+        const std::vector<int> mapBefore = map;
         acrossNode(nodes, costCfg, map, ss);
+        {
+          int mv = 0, pieces = 0, largest = 0;
+          movedChunks(g, mapBefore, map, mv, pieces, largest);
+          if (mv > 0)
+            CkPrintf("lbsim>   moves form %d piece(s), largest %d, mean %.1f objects\n",
+                     pieces, largest, (double)mv / pieces);
+        }
 
         // LBSIM_REFINE=1: heal and smooth after the moves, as route mode does,
         // so the multi-step physical execution can be compared on equal terms.

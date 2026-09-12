@@ -163,6 +163,16 @@ void DiffusionLB::PseudoLoadBalancing()
     }
   }
 
+  // Step mode plans in step time with no per-neighbour room rule. One was
+  // tried -- no flow to a neighbour without room in the other dimension for
+  // a typical object, and the rest capped by their room in this node's
+  // dimension -- and it stalled the plan on the lbsim cross cases (0 moves
+  // after the first step, max/avg stuck at 1.40): the heaviest node's
+  // neighbours all sit near the neighbourhood mean, and a room computed from
+  // their current loads forbids exactly the relays the rounds need. The
+  // receiver check at selection (DiffusionMetric::slackFits) is where a
+  // neighbour's room in the other dimension is enforced.
+
   std::vector<double> thisRoundToSend;
   diffusionRoundFlows(my_load, my_pseudo_load, effMinImbalance, _lb_args.diffusionBeta(),
                       loadNeighbors, flowAdjacent, toSendLoad, prevRoundToSend,
