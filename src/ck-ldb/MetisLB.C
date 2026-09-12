@@ -11,6 +11,7 @@
 
 #include "MetisLB.h"
 #include "ckgraph.h"
+#include "LBLoadDim.h"
 #include "LBMemoryContract.h"
 #include <algorithm>
 #include <cmath>
@@ -150,6 +151,18 @@ void MetisLB::work(LDStats* stats)
     CkPrintf("[%d] In MetisLB Strategy...\n", CkMyPe());
   }
 
+  // Which dimension the cross level partitions on, and how far the other one
+  // is from binding. ObjGraph decided it (LBLoadDim.h); this is the record.
+  if (_lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
+  {
+    const LBCriticality c = lbCriticalityOf(stats);
+    CkPrintf("[%d] MetisLB load dimension: %s by %s (T_h %.6f over %d PEs, T_g %.6f over "
+             "%d GPUs; alpha_h %.2f, alpha_g %.2f)\n",
+             CkMyPe(), lbLoadDimName(ogr->deviceDim),
+             lbLoadDimOverride() == LB_DIM_AUTO ? "criticality" : "flag", c.boundHost(),
+             c.pes, c.boundDev(), c.gpus, c.alphaHost(), c.alphaDev());
+  }
+
   const idx_t numVertices = ogr->vertices.size();
   if (numVertices == 0 || parr->availProcSize < 1)
   {
@@ -164,14 +177,47 @@ void MetisLB::work(LDStats* stats)
   // device bytes as well as load. The verifier in CentralLB::Strategy then
   // hardens METIS's soft tolerance into hard capacity compliance.
   int nConstraints = 1;
+  bool memAware = false;
 #if CMK_CUDA
   LBMemoryModel memModel;
   memModel.build(stats);
-  bool memAware = false;
   if (memModel.numDevices() > 0)
     for (int i = 0; i < numVertices && !memAware; i++)
       if (memModel.footprint(ogr->vertices[i].getVertexId()) > 0) memAware = true;
   if (memAware) nConstraints = 2;
+#endif
+
+  // The second load dimension as a partition constraint, when neither
+  // dimension has the slack to be ignored (LBLoadDim.h). METIS balances every
+  // constraint to its own tolerance, so the slack dimension is given the
+  // ratio it can be out of balance before it binds: a group's load in it may
+  // reach the step's lower bound T_lb, and its mean across groups is
+  // alpha * T_lb, hence (1 + eps) / alpha. At alpha 0.2 that is 5.5 and the
+  // constraint is as good as absent, which is why it is not added there at
+  // all; at alpha 0.8 it is 1.4, and METIS will not let one group take the
+  // whole of the other dimension's hot region while it balances this one.
+  // The verify-and-repair pass after level 2 still runs behind it.
+  int slackIdx = -1;
+  double slackUbvec = 1.1;
+  double slackAlpha = 0.0;
+#if CMK_CUDA
+  {
+    const LBCriticality crit = lbCriticalityOf(stats);
+    if (lbLoadDimOverride() == LB_DIM_AUTO && crit.comparable(lbLoadVectorAbove()))
+    {
+      slackIdx = nConstraints++;
+      slackAlpha = ogr->deviceDim ? crit.alphaHost() : crit.alphaDev();
+      slackUbvec = std::max(1.1, 1.1 / std::max(slackAlpha, 1e-6));
+      if (_lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
+        CkPrintf("[%d] MetisLB: %s dimension carried as constraint %d, tolerance %.2f "
+                 "(alpha %.2f)\n",
+                 CkMyPe(), lbLoadDimName(!ogr->deviceDim), slackIdx, slackUbvec, slackAlpha);
+    }
+  }
+  auto slackOf = [&](int i) {
+    return ogr->deviceDim ? (double)stats->objData[i].wallTime
+                          : (double)stats->objData[i].gpuTime;
+  };
 #endif
 
   // The object graph as one merged adjacency per vertex. METIS requires a
@@ -223,6 +269,15 @@ void MetisLB::work(LDStats* stats)
   /** each object load is normalized to an integer between 1 and 256 */
   const double crossRatio = (maxCross == 0) ? 0 : 256.0 / maxCross;
   const double intraRatio = (maxIntra == 0) ? 0 : 256.0 / maxIntra;
+  double slackRatio = 0.0;
+#if CMK_CUDA
+  if (slackIdx >= 0)
+  {
+    double maxSlack = 0.0;
+    for (int i = 0; i < numVertices; i++) maxSlack = std::max(maxSlack, slackOf(i));
+    slackRatio = (maxSlack == 0) ? 0 : 256.0 / maxSlack;
+  }
+#endif
 
   std::vector<idx_t> vwgtCross((size_t)numVertices * nConstraints);
   std::vector<idx_t> vwgtIntra(numVertices);
@@ -233,12 +288,14 @@ void MetisLB::work(LDStats* stats)
     // and ceil() of a zero load is zero.
     w[0] = std::max((idx_t)1, (idx_t)ceil(ogr->vertices[i].getVertexLoad() * crossRatio));
 #if CMK_CUDA
-    if (nConstraints > 1) {
+    if (memAware) {
       // Footprint in MB, floored at 1 so every object has nonzero weight in
       // the memory dimension.
       size_t fp = memModel.footprint(ogr->vertices[i].getVertexId());
       w[1] = (idx_t)(fp >> 20) + 1;
     }
+    if (slackIdx >= 0)
+      w[slackIdx] = std::max((idx_t)1, (idx_t)ceil(slackOf(i) * slackRatio));
 #endif
     vwgtIntra[i] =
         std::max((idx_t)1, (idx_t)ceil(stats->objData[i].wallTime * intraRatio));
@@ -251,10 +308,13 @@ void MetisLB::work(LDStats* stats)
   // Partition the subgraph induced by `verts` into `nparts`, returning a part
   // number per entry of `verts`. Edges leaving the subset are dropped: at the
   // second level they are the traffic the first level already decided to pay.
+  // `ubvecIn` gives each constraint its own tolerance; null means METIS's
+  // usual 1.1 for every one.
   auto partitionSubset = [&](const std::vector<int>& verts, idx_t nparts,
                              const std::vector<real_t>* tpwgts,
                              const std::vector<idx_t>& weights,
-                             int ncon_in) -> std::vector<idx_t>
+                             int ncon_in,
+                             const std::vector<real_t>* ubvecIn) -> std::vector<idx_t>
   {
     const idx_t nv = (idx_t)verts.size();
     std::vector<idx_t> parts(verts.size(), 0);
@@ -293,6 +353,8 @@ void MetisLB::work(LDStats* stats)
 
     idx_t ncon = ncon_in, nv_arg = nv, np = nparts, edgecut = 0;
     std::vector<real_t> ubvec(ncon_in, (real_t)1.1);
+    if (ubvecIn != nullptr)
+      for (int c = 0; c < ncon_in && c < (int)ubvecIn->size(); c++) ubvec[c] = (*ubvecIn)[c];
     METIS_PartGraphRecursive(&nv_arg, &ncon, xadj.data(), adjncy.data(), lvwgt.data(),
                              nullptr, adjwgt.data(), &np,
                              tpwgts ? const_cast<real_t*>(tpwgts->data()) : nullptr,
@@ -359,11 +421,17 @@ void MetisLB::work(LDStats* stats)
     peSpeed[pe] = (sp > 0.0) ? sp : 1.0;
   }
 
-  std::vector<double> fixedCross(nGroups, 0.0), fixedMem(nGroups, 0.0);
+  std::vector<double> fixedCross(nGroups, 0.0), fixedMem(nGroups, 0.0), fixedSlack(nGroups, 0.0);
   std::vector<double> fixedCpu(parr->procs.size(), 0.0);
   for (int pe = 0; pe < (int)parr->procs.size(); pe++)
     if (groupOfPe[pe] >= 0)
+    {
       fixedCpu[pe] = stats->procs[pe].bg_walltime * intraRatio;
+      // When host time is the slack constraint, the PEs' background time is
+      // fixed host load on their group.
+      if (slackIdx >= 0 && ogr->deviceDim)
+        fixedSlack[groupOfPe[pe]] += stats->procs[pe].bg_walltime * slackRatio;
+    }
 
   std::vector<int> migVerts;
   migVerts.reserve(numVertices);
@@ -375,25 +443,29 @@ void MetisLB::work(LDStats* stats)
     fixedCross[groupOfPe[pe]] += ogr->vertices[i].getVertexLoad() * crossRatio;
     fixedCpu[pe] += stats->objData[i].wallTime * intraRatio;
 #if CMK_CUDA
-    if (nConstraints > 1)
+    if (memAware)
       fixedMem[groupOfPe[pe]] +=
           (double)(memModel.footprint(ogr->vertices[i].getVertexId()) >> 20) + 1.0;
+    if (slackIdx >= 0) fixedSlack[groupOfPe[pe]] += slackOf(i) * slackRatio;
 #endif
   }
 
   // Level one: migratable objects to GPU groups, on device load (and device
   // memory), each group's share proportional to how many PEs feed it less what
   // it already carries.
-  double movCross = 0.0, movMem = 0.0;
+  double movCross = 0.0, movMem = 0.0, movSlack = 0.0;
   for (int v : migVerts)
   {
     movCross += (double)vwgtCross[(size_t)v * nConstraints];
-    if (nConstraints > 1) movMem += (double)vwgtCross[(size_t)v * nConstraints + 1];
+    if (memAware) movMem += (double)vwgtCross[(size_t)v * nConstraints + 1];
+    if (slackIdx >= 0) movSlack += (double)vwgtCross[(size_t)v * nConstraints + slackIdx];
   }
   const double allCross =
       movCross + std::accumulate(fixedCross.begin(), fixedCross.end(), 0.0);
   const double allMem =
       movMem + std::accumulate(fixedMem.begin(), fixedMem.end(), 0.0);
+  const double allSlack =
+      movSlack + std::accumulate(fixedSlack.begin(), fixedSlack.end(), 0.0);
 
   std::vector<real_t> tpwgts((size_t)nGroups * nConstraints);
   {
@@ -406,11 +478,7 @@ void MetisLB::work(LDStats* stats)
     double speedAll = 0.0;
     for (idx_t g2 = 0; g2 < nGroups; g2++)
       for (int pe : grpPes[g2]) speedAll += peSpeed[pe];
-#if CMK_CUDA
-    const bool deviceIsResource = _lb_args.diffusionGpuDim();
-#else
-    const bool deviceIsResource = false;
-#endif
+    const bool deviceIsResource = ogr->deviceDim;
     for (idx_t g = 0; g < nGroups; g++)
     {
       double grpSpeed = 0.0;
@@ -422,10 +490,17 @@ void MetisLB::work(LDStats* stats)
       double* wg = &want[(size_t)g * nConstraints];
       wg[0] = std::max(1e-6, allCross * share - fixedCross[g]);
       sum[0] += wg[0];
-      if (nConstraints > 1)
+      if (memAware)
       {
         wg[1] = std::max(1e-6, allMem * share - fixedMem[g]);
         sum[1] += wg[1];
+      }
+      if (slackIdx >= 0)
+      {
+        // Same share as the binding dimension: a group of ppn PEs takes ppn
+        // PEs' worth of host time, one GPU's worth of device time.
+        wg[slackIdx] = std::max(1e-6, allSlack * share - fixedSlack[g]);
+        sum[slackIdx] += wg[slackIdx];
       }
     }
     for (idx_t g = 0; g < nGroups; g++)
@@ -438,8 +513,10 @@ void MetisLB::work(LDStats* stats)
            "of %d PEs\n", (int)migVerts.size(), (int)numVertices, (int)nGroups,
            parr->availProcSize);
 
+  std::vector<real_t> ubvecCross(nConstraints, (real_t)1.1);
+  if (slackIdx >= 0) ubvecCross[slackIdx] = (real_t)slackUbvec;
   const std::vector<idx_t> groupOf = partitionSubset(
-      migVerts, nGroups, nGroups > 1 ? &tpwgts : nullptr, vwgtCross, nConstraints);
+      migVerts, nGroups, nGroups > 1 ? &tpwgts : nullptr, vwgtCross, nConstraints, &ubvecCross);
 
   // Scratch-remap, level one: the group each part becomes is the group its
   // objects mostly come from, where the shares allow.
@@ -498,7 +575,7 @@ void MetisLB::work(LDStats* stats)
 
     const std::vector<idx_t> peOf = partitionSubset(
         grpVerts[g], (idx_t)pes.size(), pes.size() > 1 ? &tpwgts2 : nullptr,
-        vwgtIntra, 1);
+        vwgtIntra, 1, nullptr);
 
     // Scratch-remap, level two: the PE each part becomes is the PE its
     // objects mostly come from, where the shares allow.
@@ -526,6 +603,167 @@ void MetisLB::work(LDStats* stats)
     for (size_t k = 0; k < grpVerts[g].size(); k++)
       newPe[grpVerts[g][k]] = pes[peLabel[k]];
   }
+
+  // ---- the dimension that was not partitioned ----------------------------
+  //
+  // Level one balanced the binding dimension across groups and level two
+  // spread host time within each group. Nothing above looked at the other
+  // dimension. With the device binding, a group can leave here
+  // device-balanced and still hold more host work than its PEs can finish in
+  // the step; with the host binding, a group can be handed more device time
+  // than its one GPU can run in it. Check every group against the step the
+  // partition achieved in the binding dimension, and repair the groups the
+  // slack dimension would hold open -- the verify-and-repair the memory
+  // contract applies after the partition, in the other dimension.
+  //
+  // Repair is greedy and bounded: from the group whose slack term is highest
+  // over the target, move the object carrying the most of that dimension to
+  // the group that ends up lowest in it, provided the binding dimension there
+  // stays under target; stop when no such move exists. Unexercised on a real
+  // workload as of 12 Sep 2026: both measured applications sit at alpha ~ 0.2
+  // on their slack dimension, where no group ever trips the check.
+#if CMK_CUDA
+  {
+    const bool devBinds = ogr->deviceDim;
+    const int nPe = (int)parr->procs.size();
+    auto hostOf = [&](int i) { return (double)stats->objData[i].wallTime; };
+    auto devOf = [&](int i) { return (double)stats->objData[i].gpuTime; };
+    auto peOfObj = [&](int i) {
+      return newPe[i] >= 0 ? newPe[i] : ogr->vertices[i].getCurrentPe();
+    };
+
+    std::vector<double> grpDev(nGroups, 0.0), peHost(nPe, 0.0);
+    for (int pe = 0; pe < nPe; pe++)
+      if (groupOfPe[pe] >= 0) peHost[pe] = stats->procs[pe].bg_walltime;
+    for (int i = 0; i < numVertices; i++)
+    {
+      const int pe = peOfObj(i);
+      if (pe < 0 || pe >= nPe || groupOfPe[pe] < 0) continue;
+      grpDev[groupOfPe[pe]] += devOf(i);
+      peHost[pe] += hostOf(i) / peSpeed[pe];
+    }
+    auto grpHostMax = [&](int g) {
+      double m = 0.0;
+      for (int pe : grpPes[g]) m = std::max(m, peHost[pe]);
+      return m;
+    };
+    auto bindTerm = [&](int g) { return devBinds ? grpDev[g] : grpHostMax(g); };
+    auto slackTerm = [&](int g) { return devBinds ? grpHostMax(g) : grpDev[g]; };
+
+    double target = 0.0, slackBefore = 0.0;
+    for (idx_t g = 0; g < nGroups; g++)
+    {
+      target = std::max(target, bindTerm((int)g));
+      slackBefore = std::max(slackBefore, slackTerm((int)g));
+    }
+    // The slack dimension cannot be brought under what its granularity
+    // allows, so the limit is the larger of that and the binding dimension's
+    // achieved max -- otherwise, when a flag forces the partition onto the
+    // dimension that does not bind, every group is over the limit and the
+    // repair churns to no end. For host time the reachable per-PE maximum is
+    // the list-scheduling bound, the even spread plus the largest object's
+    // share of a PE's surplus, since objects are indivisible; for device time
+    // it is the even spread or the largest object, whichever is more. METIS's
+    // own tolerance (ubvec 1.1) applies to both.
+    double slackEven = 0.0;
+    if (devBinds)
+    {
+      int nAvail = 0, ppnMax = 1;
+      double hMax = 0.0;
+      for (int pe = 0; pe < nPe; pe++)
+        if (groupOfPe[pe] >= 0) { slackEven += peHost[pe]; nAvail++; }
+      slackEven = nAvail > 0 ? slackEven / nAvail : 0.0;
+      for (idx_t g = 0; g < nGroups; g++) ppnMax = std::max(ppnMax, (int)grpPes[g].size());
+      for (int i : migVerts)
+      {
+        const int pe = peOfObj(i);
+        if (pe >= 0 && pe < nPe) hMax = std::max(hMax, hostOf(i) / peSpeed[pe]);
+      }
+      slackEven += hMax * (1.0 - 1.0 / ppnMax);
+    }
+    else
+    {
+      double gMax = 0.0;
+      for (idx_t g = 0; g < nGroups; g++) slackEven += grpDev[g];
+      slackEven /= (double)nGroups;
+      for (int i : migVerts) gMax = std::max(gMax, devOf(i));
+      slackEven = std::max(slackEven, gMax);
+    }
+    const double eps = 0.1;
+    const double limit = std::max(target, slackEven) * (1.0 + eps);
+
+    int repaired = 0;
+    bool stuck = false;
+    if (nGroups > 1 && target > 0.0)
+    {
+      for (size_t iter = 0; iter < migVerts.size(); iter++)
+      {
+        int worst = -1;
+        double worstSlack = limit;
+        for (idx_t g = 0; g < nGroups; g++)
+          if (slackTerm((int)g) > worstSlack) { worstSlack = slackTerm((int)g); worst = (int)g; }
+        if (worst < 0) break;
+
+        // The object in `worst` carrying the most of the slack dimension. A
+        // host slack term is the group's busiest PE, so only that PE's
+        // objects can lower it.
+        int busiestPe = -1;
+        if (devBinds)
+          for (int pe : grpPes[worst])
+            if (busiestPe < 0 || peHost[pe] > peHost[busiestPe]) busiestPe = pe;
+        int obj = -1;
+        double objSlack = 0.0;
+        for (int i : migVerts)
+        {
+          const int pe = peOfObj(i);
+          if (pe < 0 || pe >= nPe || groupOfPe[pe] != worst) continue;
+          if (devBinds && pe != busiestPe) continue;
+          const double s = devBinds ? hostOf(i) / peSpeed[pe] : devOf(i);
+          if (s > objSlack) { objSlack = s; obj = i; }
+        }
+        if (obj < 0) { stuck = true; break; }
+
+        // Destination: the group, and its least-loaded PE, that ends lowest
+        // in the slack dimension with the binding dimension still under the
+        // limit -- and strictly better than where the object is now.
+        int bestG = -1, bestPe = -1;
+        double bestAfter = worstSlack;
+        for (idx_t g = 0; g < nGroups; g++)
+        {
+          if ((int)g == worst) continue;
+          int pe = -1;
+          for (int p : grpPes[g])
+            if (pe < 0 || peHost[p] < peHost[pe]) pe = p;
+          if (pe < 0) continue;
+          const double hostAfter =
+              std::max(grpHostMax((int)g), peHost[pe] + hostOf(obj) / peSpeed[pe]);
+          const double devAfter = grpDev[g] + devOf(obj);
+          const double bindAfter = devBinds ? devAfter : hostAfter;
+          const double slackAfter = devBinds ? hostAfter : devAfter;
+          if (bindAfter > limit) continue;
+          if (slackAfter < bestAfter) { bestAfter = slackAfter; bestG = (int)g; bestPe = pe; }
+        }
+        if (bestG < 0) { stuck = true; break; }
+
+        const int from = peOfObj(obj);
+        peHost[from] -= hostOf(obj) / peSpeed[from];
+        grpDev[worst] -= devOf(obj);
+        peHost[bestPe] += hostOf(obj) / peSpeed[bestPe];
+        grpDev[bestG] += devOf(obj);
+        newPe[obj] = bestPe;
+        repaired++;
+      }
+    }
+    double slackAfter = 0.0;
+    for (idx_t g = 0; g < nGroups; g++) slackAfter = std::max(slackAfter, slackTerm((int)g));
+    if ((_lb_args.debug() > 0 || repaired > 0) && CkMyPe() == cur_ld_balancer)
+      CkPrintf("[%d] MetisLB %s dimension partitioned to %.6f; %s dimension max %.6f -> %.6f "
+               "against limit %.6f; %d repair move(s)%s\n",
+               CkMyPe(), lbLoadDimName(devBinds), target, lbLoadDimName(!devBinds),
+               slackBefore, slackAfter, limit, repaired,
+               stuck ? " (stopped with a group still over the limit)" : "");
+  }
+#endif
 
   if (metisRemapOn() && _lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
   {

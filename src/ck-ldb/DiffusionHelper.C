@@ -90,6 +90,9 @@ void DiffusionLB::BuildStats()
   int start = rank0PE;
   my_load = 0;
   my_loadAfterTransfer = 0;
+  // Both dimensions' totals, reported to PE 0 to decide which one this step
+  // diffuses (loadDimReport). my_load is priced once the verdict is back.
+  nodeHostSum = nodeHostMax = nodeDevSum = nodeDevMax = 0.0;
 
   // copy all data in individual message to this big structure
   for (int pe = 0; pe < statsReceived; pe++)
@@ -119,6 +122,10 @@ void DiffusionLB::BuildStats()
                             nodeStats->from_proc[nobj]);
       my_load += diffusionObjLoad(oData);
       pe_load[pe] += diffusionObjCpuLoad(oData);
+      nodeHostSum += oData.wallTime;
+      nodeHostMax = std::max(nodeHostMax, (double)oData.wallTime);
+      nodeDevSum += diffusionObjGpuLoad(oData);
+      nodeDevMax = std::max(nodeDevMax, diffusionObjGpuLoad(oData));
 
       /*TODO Keys LDObjKey key;
       key.omID() = msg->objData[i].handle.omID;

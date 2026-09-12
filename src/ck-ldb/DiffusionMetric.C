@@ -242,25 +242,49 @@ int MetricComm::popBestObject(int nbor)
     {
       if (!objAvailable[i] || !nodeStats->objData[i].migratable || !isAllowed(i)) continue;
       if (diffusionObjLoad(nodeStats->objData[i]) > nborCapacity) continue;
+      if (!slackFits(nodeStats->objData[i], nbor)) continue;
       if (externalComm[nbor][i] > 0.0) { seedOnBoundary = true; break; }
     }
   }
 
+  // What the band ranks on. One dimension: the object's load in it. Both
+  // (LB_MODE_STEP): the load it takes off this node's binding term per unit
+  // of step time it adds to the receiver -- an object that lands on the
+  // receiver's slack term costs it nothing and ranks highest, one that lands
+  // on its binding term ranks as its load would. That is the dot-product
+  // rule of vector bin packing in local form, and the only place the second
+  // dimension enters the ranking; the edge-cut ranking below it is unchanged.
+  const bool stepMode = diffusionStepMode();
+  auto effOf = [&](int i) {
+    const double l = diffusionObjLoad(nodeStats->objData[i]);
+    if (!stepMode) return l;
+    const double rise = receiverRise(nodeStats->objData[i], nbor, nodeSize);
+    return l / (rise + 0.01 * l + 1e-12);
+  };
+
   double heaviest = 0.0;
   if (costCfg == NULL)
   {
+    int refusedHere = 0;
     for (int i = 0; i < n_objs; i++)
     {
       if (!objAvailable[i] || !nodeStats->objData[i].migratable || !isAllowed(i)) continue;
       if (seedOnBoundary && externalComm[nbor][i] <= 0.0) continue;
       const double objLoad = diffusionObjLoad(nodeStats->objData[i]);
       if (objLoad > nborCapacity) continue;
-      if (objLoad > heaviest) heaviest = objLoad;
+      if (!slackFits(nodeStats->objData[i], nbor)) { refusedHere++; continue; }
+      const double e = effOf(i);
+      if (e > heaviest) heaviest = e;
     }
     // Nothing with measurable load fits. Moving a zero-load object retires
     // nothing and still costs a migration, so there is no candidate -- not
-    // the lightest one, which is what a plain minimum would hand back.
-    if (heaviest <= 0.0) return -1;
+    // the lightest one, which is what a plain minimum would hand back. When
+    // the slack check is what emptied the field, say so in the count.
+    if (heaviest <= 0.0)
+    {
+      slackRefusals += refusedHere;
+      return -1;
+    }
   }
 
   for (int i = 0; i < n_objs; i++)
@@ -271,6 +295,7 @@ int MetricComm::popBestObject(int nbor)
 
     double objLoad = diffusionObjLoad(nodeStats->objData[i]);
     if (objLoad > nborCapacity) continue;
+    if (!slackFits(nodeStats->objData[i], nbor)) { slackRefusals++; continue; }
     if (seedOnBoundary && externalComm[nbor][i] <= 0.0) continue;
 
     double score;
@@ -295,7 +320,7 @@ int MetricComm::popBestObject(int nbor)
       //
       // Zero-load objects stay excluded even while growing: they retire no
       // budget, so a chunk made of them would never end.
-      if (seeding && objLoad < kLoadBand * heaviest) continue;
+      if (seeding && effOf(i) < kLoadBand * heaviest) continue;
       if (objLoad <= 0.0) continue;
       score = externalComm[nbor][i] - internalComm[i];
     }
@@ -367,6 +392,7 @@ void MetricComm::updateState(int objId, int destNbor)
             myNodeId, objId, objLoad, sendToNeighbors[destNbor], 
             toSendLoad[destNbor], toSendLoad[destNbor] - objLoad);
   toSendLoad[destNbor] -= objLoad;
+  slackTake(nodeStats->objData[objId], destNbor);
   if (destNbor >= 0 && destNbor < (int)movesTo.size()) movesTo[destNbor]++;
   if(objId<0 || objId>=n_objs)
     return;
@@ -520,6 +546,7 @@ int MetricCentroid::popBestObject(int nbor)
     if (objNborDistances[i].size() <= nbor) continue;
     const double objLoad = diffusionObjLoad(nodeStats->objData[i]);
     if (objLoad > nborCapacity) continue;
+    if (!slackFits(nodeStats->objData[i], nbor)) continue;
     if (objLoad > heaviest) heaviest = objLoad;
   }
   if (heaviest <= 0.0) return -1;  // nothing with measurable load fits
@@ -543,7 +570,8 @@ int MetricCentroid::popBestObject(int nbor)
     bool available = objAvailable[i];
 
     if (testDistance < minDistance && available && migratable &&
-        (objLoad <= nborCapacity) && objLoad >= kLoadBand * heaviest)
+        (objLoad <= nborCapacity) && objLoad >= kLoadBand * heaviest &&
+        slackFits(nodeStats->objData[i], nbor))
     {
       minDistance = testDistance;
       bestObject = i;
@@ -587,6 +615,7 @@ void MetricCentroid::updateState(int objId, int destNbor)
     CkAbort("Error: invalid objId %d in MetricCentroid::updateState\n", objId);
   objAvailable[objId] = false;
   toSendLoad[destNbor] -= diffusionObjLoad(nodeStats->objData[objId]);
+  slackTake(nodeStats->objData[objId], destNbor);
   if(nborCentroids.size()<=destNbor) return;
 
   // TODO: update my centroid (not used anywhere rn)

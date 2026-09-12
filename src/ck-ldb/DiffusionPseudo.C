@@ -113,6 +113,34 @@ void DiffusionLB::PseudoLoadBalancing()
   std::vector<char> flowAdjacent(neighborCount, 1);
   for (int i = 0; i < neighborCount; i++) flowAdjacent[i] = nborFlowAdjacent(i) ? 1 : 0;
 
+  // A neighbour with no room left in the dimension NOT being diffused takes
+  // no flow either. The across-node phase would refuse every object for it
+  // (DiffusionMetric::slackFits), so planning flow into it only leaves that
+  // quota unshed and, worse, executes the rest of the plan without the part
+  // that was routed through it -- measured on the lbsim cross case, the host
+  // max/avg went 1.80 -> 2.50 in a step whose plan predicted 1.30. Same
+  // target as AcrossNodeLB's: the larger of the two dimensions' neighbourhood
+  // means, in seconds of step time, with the floor as tolerance. Not under
+  // LB_MODE_STEP: there the diffused quantity is the step itself, and a
+  // neighbour with no room is simply not below this node in it.
+  if (!diffusionStepMode() && neighborCount > 0 &&
+      (int)nborHostPerPe.size() >= neighborCount && (int)nborDev.size() >= neighborCount)
+  {
+    const bool devDim = diffusionDeviceDim();
+    double fairD = 0.0, fairOther = 0.0;
+    for (int i = 0; i < neighborCount; i++)
+    {
+      fairD += loadNeighbors[i];
+      fairOther += devDim ? nborHostPerPe[i] : nborDev[i];
+    }
+    fairD /= neighborCount;
+    fairOther /= neighborCount;
+    const double limit =
+        std::max(devDim ? fairD : fairD / nodeSize, fairOther) * (1.0 + effMinImbalance);
+    for (int i = 0; i < neighborCount; i++)
+      if ((devDim ? nborHostPerPe[i] : nborDev[i]) >= limit) flowAdjacent[i] = 0;
+  }
+
   // Which rule refuses a destination, and on what evidence. cost_for_neighbor
   // treats an ABSENT neighbour as bordering and only a present-and-zero one as
   // silent, so "refused" and "never counted" have to be told apart by eye.

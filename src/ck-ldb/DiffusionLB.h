@@ -121,6 +121,24 @@ public:
   CkGroupID remapGid;
   DiffusionPlanSummary planSummary;
   int planReports;
+
+  // ---- the load dimension (LBLoadDim.h) ------------------------------------
+  //
+  // Which of the two dimensions the rounds diffuse is decided once per step,
+  // job-wide, so that no two nodes equalise different things: each rank-0 PE
+  // reports its node's totals, PE 0 resolves, every PE takes the verdict
+  // (diffusionLoadDimDevice), and the rank-0 PEs price their node in it
+  // before releasing the stats barrier.
+  void loadDimReport(double sumHost, double maxHost, double sumDev, double maxDev);
+  void loadDimVerdict(int device, double alphaHost, double alphaDev);
+  LBCriticality loadDimCrit;  // PE 0: the reports folded so far
+  int loadDimReports;
+  // This node's totals in both dimensions, from BuildStats.
+  double nodeHostSum, nodeHostMax, nodeDevSum, nodeDevMax;
+  // Per neighbour, refreshed every round: host time per PE and device time,
+  // so the across-node phase can bound what a neighbour takes in the
+  // dimension not being diffused.
+  std::vector<double> nborHostPerPe, nborDev;
   // Migration-handoff completion counting, replacing the quiescence detectors
   // between AcrossNodeLB -> WithinNodeLB -> ProcessMigrations. Each
   // LoadMetaInfo/LoadReceived a rank0PE sends is acked by its receiver after

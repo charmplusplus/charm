@@ -8,6 +8,7 @@
 // DiffusionMetric.C, which DiffusionLB.C includes into its single translation
 // unit, so linking -module DiffusionLB provides them.
 
+#include <algorithm>
 #include <limits>
 #include <vector>
 
@@ -43,8 +44,68 @@ public:
   {
     return allowed_ == NULL || i < 0 || i >= (int)allowed_->size() || (*allowed_)[i];
   }
+
+  // The receiver check, in both dimensions.
+  //
+  // The rounds plan in one quantity, and the quota a neighbour holds says how
+  // much of THAT it may take. It says nothing about the rest: a device-bound
+  // node shedding device time can hand a neighbour so much host work that the
+  // neighbour's step becomes host-bound, above the level the plan was
+  // bringing everyone to. So each neighbour also carries a capacity in each
+  // dimension -- how much more host time and how much more device time it
+  // can take before that dimension decides its step -- and a candidate that
+  // would exceed either is refused for that neighbour. Both metrics honour
+  // it; a refusal ends the neighbour like any other "no candidate", and the
+  // selection loop moves on to the next.
+  //
+  // Capacities are in the raw units of each dimension (seconds of host time
+  // summed over the node's PEs, seconds of device time), computed by the
+  // caller from the neighbour's loads and the step-time target. Under
+  // one-dimensional diffusion the diffused dimension's capacity is
+  // unbounded here, since the quota already bounds it. Empty vectors mean no
+  // check, which is what a build without device loads gets.
+  void setReceiverCapacity(const std::vector<double>& capHost,
+                           const std::vector<double>& capDev)
+  {
+    capHost_ = capHost;
+    capDev_ = capDev;
+  }
+  bool slackFits(const LDObjData& o, int nbor) const
+  {
+    if (nbor < 0 || nbor >= (int)capHost_.size() || nbor >= (int)capDev_.size()) return true;
+    return o.wallTime <= capHost_[nbor] && diffusionObjGpuLoad(o) <= capDev_[nbor];
+  }
+  void slackTake(const LDObjData& o, int nbor)
+  {
+    if (nbor < 0 || nbor >= (int)capHost_.size() || nbor >= (int)capDev_.size()) return;
+    capHost_[nbor] -= o.wallTime;
+    capDev_[nbor] -= diffusionObjGpuLoad(o);
+  }
+  // What the object costs the receiver's step if it arrives now: the rise
+  // in the larger of the receiver's two terms, in seconds of step time.
+  // Reconstructed from the room left in each dimension -- room is target
+  // minus term, so the term is target minus room, and the target cancels.
+  // Only meaningful when both capacities came from the same step-time
+  // target (LB_MODE_STEP); zero otherwise.
+  double receiverRise(const LDObjData& o, int nbor, int ppn) const
+  {
+    if (!riseKnown_ || nbor < 0 || nbor >= (int)capHost_.size() || nbor >= (int)capDev_.size())
+      return 0.0;
+    const double roomH = capHost_[nbor] / (ppn > 0 ? ppn : 1);
+    const double roomG = capDev_[nbor];
+    const double dH = o.wallTime / (ppn > 0 ? ppn : 1) - roomH;
+    const double dG = diffusionObjGpuLoad(o) - roomG;
+    const double rise = std::max(dH, dG) + std::min(roomH, roomG);
+    return rise > 0.0 ? rise : 0.0;
+  }
+  void setRiseKnown(bool known) { riseKnown_ = known; }
+  // Candidates the receiver check turned away, for the step's diagnostics.
+  int slackRefusals = 0;
+
 protected:
   const std::vector<char>* allowed_ = NULL;
+  std::vector<double> capHost_, capDev_;
+  bool riseKnown_ = false;
 };
 
 class MetricComm : public DiffusionMetric

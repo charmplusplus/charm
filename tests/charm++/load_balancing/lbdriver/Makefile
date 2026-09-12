@@ -36,6 +36,24 @@ lbsim.decl.h lbsim.def.h: lbsim.ci
 lbsim.o: lbsim.C lbsim.decl.h
 	$(CHARMC) $(SIMINC) -c lbsim.C
 
+# The standalone lbsim: the same simulation without the Charm++ runtime, so
+# it runs on a login node (the runtime's startup wants a GPU and the NIC).
+# Compiled against the same headers, linked with METIS, the decision code,
+# and lbsim_stub.C, which supplies the few runtime symbols the decision code
+# touches. Takes the same arguments and +LB flags. See the note at the top
+# of lbsim.C.
+SA_CXX	= g++ -std=c++17 -O2
+CUDA_DIR := $(shell sed -n 's/^CUDA_DIR="\(.*\)"/\1/p' ../../../../include/conv-mach-opt.sh)
+SA_INC	= -I../../../../include $(SIMINC) -I$(CUDA_DIR)/include
+SA_SRC	= lbsim.C lbsim_stub.C ../../../../src/ck-ldb/DiffusionMetric.C
+SA_DEPS	= ../../../../src/ck-ldb/DiffusionSelect.h ../../../../src/ck-ldb/DiffusionFlow.h \
+	  ../../../../src/ck-ldb/DiffusionMetric.h ../../../../src/ck-ldb/DiffusionLoad.h \
+	  ../../../../src/ck-ldb/LBLoadDim.h ../../../../src/ck-ldb/DiffusionCostModel.h \
+	  ../../../../src/ck-ldb/DiffusionCostModel.C
+
+lbsim-standalone: $(SA_SRC) $(SA_DEPS)
+	$(SA_CXX) -DLBSIM_STANDALONE $(SA_INC) -o $@ $(SA_SRC) ../../../../lib/libckmetis.a
+
 # 128x128 objects on 256 virtual nodes, four diffusion steps. The default
 # neighbour count is 1, which the two ring edges already exceed, so the graph
 # would be the ring alone; 6 lets every node add its four stencil partners.
@@ -55,4 +73,4 @@ test: lbdriver
 	python3 plot_map.py lbdriver.json lbmap.html
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o lbdriver lbsim charmrun lbdriver.json lbsim.json
+	rm -f *.decl.h *.def.h conv-host *.o lbdriver lbsim lbsim-standalone charmrun lbdriver.json lbsim.json

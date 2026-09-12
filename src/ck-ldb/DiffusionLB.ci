@@ -52,6 +52,12 @@ module DiffusionLB
     // id travels with the verdict.
     entry[expedited] void planReport(double load, double predicted, double planIn, double planOut);
     entry[expedited] void planVerdict(int remap, CkGroupID remapGid);
+    // Which dimension this step diffuses. Every node's rank-0 PE reports its
+    // load totals to PE 0 once its stats are assembled; PE 0 resolves which
+    // dimension binds job-wide (LBLoadDim.h) and tells every PE before the
+    // neighbour phase starts, so all nodes diffuse the same thing.
+    entry[expedited] void loadDimReport(double sumHost, double maxHost, double sumDev, double maxDev);
+    entry[expedited] void loadDimVerdict(int device, double alphaHost, double alphaDev);
     entry[expedited] void migMsgAck();
     entry[expedited] void acrossDone();
     entry[expedited] void nbrAcrossDone();
@@ -67,8 +73,11 @@ module DiffusionLB
     entry void receiveCentroid(int node, std::vector<LBRealType> centroid, int count);
     // A node's diffused load for the round, plus the ends of its 1-D key
     // interval (NaN when it has none) so its neighbours know which side of
-    // themselves it lies on.
-    entry[expedited] void ReceiveLoadInfo(int itr, double load, int node, double keyLo, double keyHi);
+    // themselves it lies on, plus its load in both dimensions as step-time
+    // terms -- host time per PE and device time -- so a sender can tell how
+    // much of the dimension NOT being diffused this node can still take.
+    entry[expedited] void ReceiveLoadInfo(int itr, double load, int node, double keyLo, double keyHi,
+                                          double hostPerPe, double dev);
     entry[expedited] void ReceiveStats(CkMarshalledCLBStatsMessage data);
     // entry void LoadTransfer(double load, int initPE, int objId);
     entry[expedited] void LoadReceived(int objId, int fromPE, int ackPE);
@@ -173,6 +182,8 @@ module DiffusionLB
         prevRoundToSend.assign(neighborCount, 0.0);
         nborKeyLo.assign(neighborCount, std::numeric_limits<double>::quiet_NaN());
         nborKeyHi.assign(neighborCount, std::numeric_limits<double>::quiet_NaN());
+        nborHostPerPe.assign(neighborCount, 0.0);
+        nborDev.assign(neighborCount, 0.0);
 
         my_pseudo_load = my_load;
         pseudo_itr = 0;
@@ -199,14 +210,16 @@ module DiffusionLB
             thisProxy[sendToNeighbors[i] * nodeSize].ReceiveLoadInfo(
                 pseudo_itr, my_pseudo_load, myNodeId,
                 keyed1D ? myKeyLo : std::numeric_limits<double>::quiet_NaN(),
-                keyed1D ? myKeyHi : std::numeric_limits<double>::quiet_NaN());
+                keyed1D ? myKeyHi : std::numeric_limits<double>::quiet_NaN(),
+                nodeHostSum / nodeSize, nodeDevSum);
           }
         }
 
         // Wait for all its neighbors load
         for (temp_itr = 0; temp_itr < sendToNeighbors.size(); temp_itr++)
         {
-          when ReceiveLoadInfo[pseudo_itr](int itr, double load, int node, double keyLo, double keyHi) serial
+          when ReceiveLoadInfo[pseudo_itr](int itr, double load, int node, double keyLo, double keyHi,
+                                           double hostPerPe, double dev) serial
           {
             int pos = findNborIdx(node);
             if (pos < 0)
@@ -217,6 +230,8 @@ module DiffusionLB
               loadNeighbors[pos] = load;
               nborKeyLo[pos] = keyLo;
               nborKeyHi[pos] = keyHi;
+              nborHostPerPe[pos] = hostPerPe;
+              nborDev[pos] = dev;
             }
           }
         }

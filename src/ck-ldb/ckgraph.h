@@ -186,6 +186,12 @@ public:
 
   // all vertices in the graph. Each vertex corresponds to a chare
   std::vector<CkVertex> vertices;
+
+  // The load dimension the vertex weights carry: device occupancy when the
+  // device binds (or +LBDiffusionGpuDim), host time otherwise. Decided in the
+  // constructor from the stats (LBLoadDim.h), so every consumer of the graph
+  // and the strategy reading this agree on what a weight means.
+  bool deviceDim;
 };
 
 #endif // _CKGRAPH_H_

@@ -41,6 +41,12 @@
  *   initial   metis (default) or block
  *   hot       the disc's weight relative to the rest (default 12)
  *
+ * Two builds: `make lbsim` is the Charm++ program (needs a compute node on
+ * this machine, since the runtime's startup wants a GPU and the NIC);
+ * `make lbsim-standalone` is the same simulation as a plain program that
+ * runs on a login node, with the runtime stubbed by lbsim_stub.C. Same
+ * arguments, same +LB flags, same decisions -- verified move for move.
+ *
  * DiffusionLB's own flags apply, since it reads them from the same place:
  * +LBDiffusionNumNbors, +LBDiffusionMaxMoveFrac, +LBDiffusionMinImbalance,
  * +LBDiffusionBeta, +LBCostConfig, +LBnoMST, +LBDebug, and the environment
@@ -70,9 +76,28 @@
  *                      hand the step to scratch-remap when the one-hop plan
  *                      leaves max/avg above this; the same decision function
  *   LBSIM_REFINE_PASSES, LBSIM_PATIENCE, LBSIM_TRACE   tuning and tracing
+ *   LBSIM_VECTOR=host|device|cross
+ *                      a second load dimension per object (device time beside
+ *                      host time; see Grid::weightsVector). The step then
+ *                      decides which dimension binds, diffuses that one, and
+ *                      bounds what a receiver takes in the other -- the same
+ *                      code the chare runs (LBLoadDim.h, DiffusionMetric.h).
+ *                      LBSIM_HOT2 sets the device disc's hot factor in cross
+ *                      mode (default: the host disc's).
  */
 
+// Two builds of this file. The Charm++ one (default) is a chare program run
+// with charmrun/srun and needs the runtime it links -- which on this
+// machine calls cuInit at startup and so needs a compute node. The
+// standalone one (-DLBSIM_STANDALONE, `make lbsim-standalone`) is a plain
+// program: it compiles against the same Charm headers, links METIS and the
+// decision code directly, and takes the handful of runtime symbols the
+// decision code touches from lbsim_stub.C. It runs anywhere, the login node
+// included. Same decisions either way; only the entry point and the +LB
+// flag parsing differ.
+#ifndef LBSIM_STANDALONE
 #include "lbsim.decl.h"
+#endif
 
 #include "DiffusionCostModel.h"
 #include "DiffusionFlow.h"
@@ -138,7 +163,48 @@ struct Grid
         w[at(i, j)] = (r <= radius) ? kHotWork : kBaseWork;
       }
   }
+
+  // A second load dimension (LBSIM_VECTOR): device time per object in w2,
+  // beside the host time in w. The balancer then decides which of the two
+  // binds (LBLoadDim.h) and diffuses that one, and the receiver check bounds
+  // what a neighbour takes in the other.
+  //   host    the hot disc is host time, device time is flat
+  //   device  the hot disc is device time, host time is flat
+  //   cross   two discs: host at (0.30, 0.30), device at (0.70, 0.70) --
+  //           both dimensions loaded, neither a copy of the other, which is
+  //           the comparable-alpha regime the receiver check exists for.
+  // A second hot factor for the device disc comes from LBSIM_HOT2 (default:
+  // the same as the host disc's), so which dimension binds can be swept.
+  std::vector<double> w2;
+  void weightsVector(const std::string& mode)
+  {
+    weightsHotSpot();
+    w2.assign(n(), kBaseWork);
+    if (mode == "device")
+    {
+      w2 = w;
+      w.assign(n(), kBaseWork);
+    }
+    else if (mode == "cross")
+    {
+      const char* hot2Env = getenv("LBSIM_HOT2");
+      const double hot2 = hot2Env ? atof(hot2Env) : kHotWork;
+      const double cx = nx * 0.70, cy = ny * 0.70;
+      const double radius = 0.22 * (nx < ny ? nx : ny);
+      for (int i = 0; i < nx; i++)
+        for (int j = 0; j < ny; j++)
+        {
+          const double r = std::sqrt((i - cx) * (i - cx) + (j - cy) * (j - cy));
+          if (r <= radius) w2[at(i, j)] = hot2;
+        }
+    }
+    else if (mode != "host")
+      CkAbort("lbsim: LBSIM_VECTOR must be host, device or cross\n");
+  }
 };
+
+// Whether a second dimension is in play this run (LBSIM_VECTOR given).
+static bool gVectorMode = false;
 
 // One DiffusionLB node, as far as the decision code can tell. The fields mirror
 // the chare's, named the same where they are the same thing.
@@ -148,6 +214,9 @@ struct VNode
   std::vector<int> objs;  // global object ids, in objData order
   BaseLB::LDStats* st = NULL;
   double my_load = 0.0;
+  // Both dimensions' totals (nodeHostSum, nodeDevSum in the chare). One PE
+  // per virtual node, so host per PE is the host total.
+  double hostSum = 0.0, hostMax = 0.0, devSum = 0.0, devMax = 0.0;
 
   // The neighbour graph. Survives steps, like hs_graphCached.
   std::vector<int> sendToNeighbors;
@@ -202,6 +271,7 @@ static void buildNodeStats(VNode& n, const Grid& g, const std::vector<int>& map)
   n.st->from_proc.resize(nobj);
   n.st->to_proc.resize(nobj);
   n.my_load = 0.0;
+  n.hostSum = n.hostMax = n.devSum = n.devMax = 0.0;
   for (int a = 0; a < nobj; a++)
   {
     const int k = n.objs[a];
@@ -216,9 +286,13 @@ static void buildNodeStats(VNode& n, const Grid& g, const std::vector<int>& map)
     od.cpuTime = g.w[k];
 #endif
 #if CMK_CUDA
-    od.gpuTime = 0.0;
+    od.gpuTime = g.w2.empty() ? 0.0 : g.w2[k];
     od.gpuPupSize = 0;
 #endif
+    n.hostSum += od.wallTime;
+    n.hostMax = std::max(n.hostMax, (double)od.wallTime);
+    n.devSum += diffusionObjGpuLoad(od);
+    n.devMax = std::max(n.devMax, diffusionObjGpuLoad(od));
     od.migratable = true;
     od.asyncArrival = false;
     od.prevPe = -1;
@@ -358,8 +432,11 @@ static void buildGraph(std::vector<VNode>& nodes)
   }
 }
 
-// DiffusionLB::nborFlowAdjacent, comm rule only (there are no 1-D keys here).
-static void flowAdjacency(const VNode& n, std::vector<char>& adj)
+// DiffusionLB::nborFlowAdjacent, comm rule only (there are no 1-D keys here),
+// plus PseudoLoadBalancing's rule that a neighbour with no room in the
+// dimension not being diffused takes no flow.
+static void flowAdjacency(const VNode& n, const std::vector<VNode>& nodes,
+                          std::vector<char>& adj)
 {
   const int nc = (int)n.sendToNeighbors.size();
   adj.assign(nc, 0);
@@ -370,6 +447,27 @@ static void flowAdjacency(const VNode& n, std::vector<char>& adj)
     if (adj[i]) any = true;
   }
   if (!any) adj.assign(nc, 1);
+
+  if (gVectorMode && nc > 0 && !diffusionStepMode())
+  {
+    const bool devDim = diffusionDeviceDim();
+    const double eps = _lb_args.diffusionMinImbalance();
+    double fairD = 0.0, fairOther = 0.0;
+    for (int i = 0; i < nc; i++)
+    {
+      const VNode& nb = nodes[n.sendToNeighbors[i]];
+      fairD += n.loadNeighbors[i];
+      fairOther += devDim ? nb.hostSum : nb.devSum;
+    }
+    fairD /= nc;
+    fairOther /= nc;
+    const double limit = std::max(fairD, fairOther) * (1.0 + eps);
+    for (int i = 0; i < nc; i++)
+    {
+      const VNode& nb = nodes[n.sendToNeighbors[i]];
+      if ((devDim ? nb.hostSum : nb.devSum) >= limit) adj[i] = 0;
+    }
+  }
 }
 
 // Route mode carries tokens along with the rounds; defined with the route code.
@@ -415,7 +513,7 @@ static int pseudoRounds(std::vector<VNode>& nodes, double effMinImbalance, bool 
     // PseudoLoadBalancing on every node, from the same snapshot.
     for (VNode& n : nodes)
     {
-      flowAdjacency(n, adj);
+      flowAdjacency(n, nodes, adj);
       diffusionRoundFlows(n.my_load, n.my_pseudo_load, effMinImbalance, beta, n.loadNeighbors,
                           adj, n.toSendLoad, n.prevRoundToSend, flows[n.id], relayHoldings);
     }
@@ -578,8 +676,44 @@ struct StepStats
   int rounds = 0;
   int moves = 0;
   int accepted = 0, rejected = 0;
+  int slackRefused = 0;  // candidates the receiver check turned away
   double unshed = 0.0;
 };
+
+// loadDimReport / loadDimVerdict: which dimension this step diffuses, from
+// every node's totals, the way PE 0 decides it for the chare. Each virtual
+// node is one PE and one device. Then my_load is priced in that dimension --
+// buildNodeStats summed it before the verdict, as BuildStats does.
+static void resolveLoadDim(std::vector<VNode>& nodes, int step)
+{
+  LBCriticality c;
+  for (const VNode& n : nodes)
+  {
+    LBCriticality one;
+    one.sumHost = n.hostSum;
+    one.maxHost = n.hostMax;
+    one.sumDev = n.devSum;
+    one.maxDev = n.devMax;
+    one.pes = 1;
+    one.gpus = 1;
+    c.merge(one);
+  }
+  const int mode = lbResolveLoadMode(c);
+  diffusionLoadDimDevice = mode;
+  for (VNode& n : nodes)
+  {
+    // The node's own side, for the step-time mode (DiffusionLoad.h).
+    diffusionNodeDeviceBound = (n.devSum >= n.hostSum) ? 1 : 0;
+    n.my_load = 0.0;
+    for (const LDObjData& od : n.st->objData) n.my_load += diffusionObjLoad(od);
+  }
+  if (gVectorMode || _lb_args.debug() > 0)
+    CkPrintf("lbsim> step %d load dimension: %s by %s (T_h %.1f, T_g %.1f; alpha_h %.2f,"
+             " alpha_g %.2f)\n",
+             step, lbLoadModeName(mode),
+             lbLoadDimOverride() == LB_DIM_AUTO ? "criticality" : "flag", c.boundHost(),
+             c.boundDev(), c.alphaHost(), c.alphaDev());
+}
 
 // AcrossNodeLB on every node, against the pre-step mapping, as the real nodes
 // do concurrently; the moves are applied afterwards.
@@ -592,6 +726,8 @@ static void acrossNode(std::vector<VNode>& nodes, const DiffusionCostConfig& cos
   {
     const int nc = (int)n.sendToNeighbors.size();
     if (nc == 0) continue;
+    // This node's side, for what each of its objects is worth (DiffusionLoad.h).
+    diffusionNodeDeviceBound = (n.devSum >= n.hostSum) ? 1 : 0;
 
     // Shed the EXCESS over the neighbourhood mean, and nothing under the floor.
     double fair = 0.0;
@@ -638,6 +774,46 @@ static void acrossNode(std::vector<VNode>& nodes, const DiffusionCostConfig& cos
       metric = new MetricComm(n.st, n.id, 1, nc, n.toSendLoad, n.sendToNeighbors, internalBytes,
                               externalBytes, &costCfg);
 
+    // The receiver check in the dimension not being diffused, as AcrossNodeLB
+    // sets it: a neighbour may take that dimension up to the step-time level
+    // the plan brings everyone to, and no further. One PE per node, so both
+    // terms are already per node and no unit conversion is needed.
+    if (gVectorMode)
+    {
+      const double inf = std::numeric_limits<double>::max();
+      std::vector<double> capH(nc, inf), capG(nc, inf);
+      if (diffusionStepMode())
+      {
+        const double limit = fair * (1.0 + effMinImbalance);
+        for (int i = 0; i < nc; i++)
+        {
+          const VNode& nb = nodes[n.sendToNeighbors[i]];
+          capH[i] = std::max(0.0, limit - nb.hostSum);
+          capG[i] = std::max(0.0, limit - nb.devSum);
+        }
+        metric->setRiseKnown(true);
+      }
+      else
+      {
+        const bool devDim = diffusionDeviceDim();
+        double fairOther = 0.0;
+        for (int i = 0; i < nc; i++)
+        {
+          const VNode& nb = nodes[n.sendToNeighbors[i]];
+          fairOther += devDim ? nb.hostSum : nb.devSum;
+        }
+        fairOther /= nc;
+        const double limit = std::max(fair, fairOther) * (1.0 + effMinImbalance);
+        for (int i = 0; i < nc; i++)
+        {
+          const VNode& nb = nodes[n.sendToNeighbors[i]];
+          if (devDim) capH[i] = std::max(0.0, limit - nb.hostSum);
+          else capG[i] = std::max(0.0, limit - nb.devSum);
+        }
+      }
+      metric->setReceiverCapacity(capH, capG);
+    }
+
     std::vector<DiffusionMove> moves;
     double shedThisStep = 0.0;
     int movesThisStep = 0;
@@ -650,6 +826,7 @@ static void acrossNode(std::vector<VNode>& nodes, const DiffusionCostConfig& cos
     ss.moves += (int)moves.size();
     ss.accepted += metric->acceptedCount();
     ss.rejected += metric->rejectedCount();
+    ss.slackRefused += metric->slackRefusals;
     delete metric;
     if (remaining > 0.0) ss.unshed += remaining;
   }
@@ -1206,15 +1383,43 @@ static int detachedPieces(const Grid& g, const std::vector<int>& map, int nnodes
   return extra;
 }
 
-static double imbalance(const Grid& g, const std::vector<int>& map, int nnodes)
+static double imbalanceOf(const std::vector<double>& w, const std::vector<int>& map, int nnodes)
 {
   std::vector<double> load(nnodes, 0.0);
-  for (int k = 0; k < g.n(); k++) load[map[k]] += g.w[k];
+  for (size_t k = 0; k < w.size(); k++) load[map[k]] += w[k];
   double sum = 0.0, mx = 0.0;
   for (double l : load)
   {
     sum += l;
     mx = std::max(mx, l);
+  }
+  const double avg = sum / nnodes;
+  return avg > 0 ? mx / avg : 0.0;
+}
+
+// max/avg in the host dimension -- the one the scalar experiments report.
+static double imbalance(const Grid& g, const std::vector<int>& map, int nnodes)
+{
+  return imbalanceOf(g.w, map, nnodes);
+}
+
+// The step a node's two terms would set, max/avg over nodes: what the
+// balancer is actually minimising once both dimensions are loaded.
+static double stepImbalance(const Grid& g, const std::vector<int>& map, int nnodes)
+{
+  if (g.w2.empty()) return imbalance(g, map, nnodes);
+  std::vector<double> h(nnodes, 0.0), d(nnodes, 0.0);
+  for (int k = 0; k < g.n(); k++)
+  {
+    h[map[k]] += g.w[k];
+    d[map[k]] += g.w2[k];
+  }
+  double sum = 0.0, mx = 0.0;
+  for (int q = 0; q < nnodes; q++)
+  {
+    const double t = std::max(h[q], d[q]);
+    sum += t;
+    mx = std::max(mx, t);
   }
   const double avg = sum / nnodes;
   return avg > 0 ? mx / avg : 0.0;
@@ -1255,10 +1460,10 @@ static void writeJson(const char* path, const Grid& g, int nnodes, const std::ve
   CkPrintf("lbsim> wrote %s (%zu phases)\n", path, ph.size());
 }
 
-class Main : public CBase_Main
+// The simulation, from the positional arguments (the +LB flags have already
+// been taken out of argv, by the runtime or by the standalone parser).
+static void lbsimRun(int argc, char** argv)
 {
-public:
-  Main(CkArgMsg* m)
   {
     Grid g;
     g.nx = 128;
@@ -1268,15 +1473,14 @@ public:
     g.ghostBytes = 4096;
     g.iters = 6;
     std::string initial = "metis";
-    if (m->argc > 1) g.nx = atoi(m->argv[1]);
-    if (m->argc > 2) g.ny = atoi(m->argv[2]);
-    if (m->argc > 3) nnodes = atoi(m->argv[3]);
-    if (m->argc > 4) steps = atoi(m->argv[4]);
-    if (m->argc > 5) g.ghostBytes = atoi(m->argv[5]);
-    if (m->argc > 6) g.iters = atoi(m->argv[6]);
-    if (m->argc > 7) initial = m->argv[7];
-    if (m->argc > 8) kHotWork = atof(m->argv[8]);
-    delete m;
+    if (argc > 1) g.nx = atoi(argv[1]);
+    if (argc > 2) g.ny = atoi(argv[2]);
+    if (argc > 3) nnodes = atoi(argv[3]);
+    if (argc > 4) steps = atoi(argv[4]);
+    if (argc > 5) g.ghostBytes = atoi(argv[5]);
+    if (argc > 6) g.iters = atoi(argv[6]);
+    if (argc > 7) initial = argv[7];
+    if (argc > 8) kHotWork = atof(argv[8]);
 
     if (nnodes < 2) CkAbort("lbsim: need at least 2 nodes\n");
     if (steps < 1) CkAbort("lbsim: need at least 1 step\n");
@@ -1291,6 +1495,8 @@ public:
     // Tiers: the metric prices every neighbour as a separate node, as it does
     // under the logical-node hook, rather than calling every pair intra-process.
     setenv("CHARM_DIFFUSION_NODE_SIZE", "1", 1);
+    // One PE per virtual node: host time per PE is the node's host total.
+    diffusionPpn = 1;
 
     DiffusionCostConfig costCfg;
     if (_lb_args.costConfig() != NULL) costCfg.load(_lb_args.costConfig());
@@ -1318,8 +1524,18 @@ public:
              phases.back().name.c_str(), imbalance(g, map, nnodes), edgeCut(g, map),
              detachedPieces(g, map, nnodes));
 
-    // Then the hot region appears and DiffusionLB has to repair it.
-    g.weightsHotSpot();
+    // Then the hot region appears and DiffusionLB has to repair it. With
+    // LBSIM_VECTOR the region is in one of two load dimensions, or in both.
+    const char* vectorEnv = getenv("LBSIM_VECTOR");
+    if (vectorEnv != NULL)
+    {
+      gVectorMode = true;
+      g.weightsVector(vectorEnv);
+      CkPrintf("lbsim> vector loads: %s (host disc x%.0f%s)\n", vectorEnv, kHotWork,
+               strcmp(vectorEnv, "cross") == 0 ? ", device disc from LBSIM_HOT2" : "");
+    }
+    else
+      g.weightsHotSpot();
 
     std::vector<VNode> nodes(nnodes);
     for (int n = 0; n < nnodes; n++) nodes[n].id = n;
@@ -1348,6 +1564,7 @@ public:
         buildNodeStats(n, g, map);
         countCommToNodes(n, g, map, nnodes);
       }
+      resolveLoadDim(nodes, step);
 
       // Neighbour graph: built once, kept across steps; the adjacency the flow
       // rule reads is recounted every step.
@@ -1372,6 +1589,8 @@ public:
       }
 
       const double imbBefore = imbalance(g, map, nnodes);
+      const double devBefore = g.w2.empty() ? 0.0 : imbalanceOf(g.w2, map, nnodes);
+      const double stepBefore = stepImbalance(g, map, nnodes);
       const int cutBefore = edgeCut(g, map);
 
       Phase p;
@@ -1511,6 +1730,16 @@ public:
                  imbBefore, imbalance(g, map, nnodes), cutBefore, edgeCut(g, map),
                  cutBefore ? 100.0 * (edgeCut(g, map) - cutBefore) / cutBefore : 0.0,
                  detachedPieces(g, map, nnodes));
+        // With two dimensions, the max/avg above is the host one; what the
+        // balancer minimises is the step, max over nodes of the larger term.
+        if (gVectorMode)
+          CkPrintf("lbsim>   dimensions: host max/avg %.3f -> %.3f, device %.3f -> %.3f,"
+                   " step %.3f -> %.3f; %d candidate(s) refused by the receiver check%s\n",
+                   imbBefore, imbalance(g, map, nnodes), devBefore,
+                   imbalanceOf(g.w2, map, nnodes), stepBefore, stepImbalance(g, map, nnodes),
+                   ss.slackRefused,
+                   diffusionStepMode() ? ""
+                   : diffusionDeviceDim() ? " (host dimension)" : " (device dimension)");
       }
 
       p.map = map;
@@ -1520,8 +1749,30 @@ public:
 
     writeJson("lbsim.json", g, nnodes, phases);
     for (VNode& n : nodes) delete n.st;
+  }
+}
+
+#ifdef LBSIM_STANDALONE
+// lbsim_stub.C: takes the +LB flags out of argv into _lb_args, the way the
+// runtime's LBManager does in the Charm++ build.
+void lbsimParseArgs(int& argc, char** argv);
+int main(int argc, char** argv)
+{
+  lbsimParseArgs(argc, argv);
+  lbsimRun(argc, argv);
+  return 0;
+}
+#else
+class Main : public CBase_Main
+{
+public:
+  Main(CkArgMsg* m)
+  {
+    lbsimRun(m->argc, m->argv);
+    delete m;
     CkExit();
   }
 };
 
 #include "lbsim.def.h"
+#endif

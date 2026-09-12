@@ -10,6 +10,9 @@ lbsim.decl.h
 lbsim.def.h
 lbsim.json
 lbsim.html
+lbsim-standalone
+V_*.log
+SA_*.log
 __pycache__/
 charmrun*
 hapi_memory_daemon

@@ -69,6 +69,70 @@ void DiffusionLB::AcrossNodeLB()
     if (_lb_args.debug() > 1)
       CkPrintf("[node %d] AcrossNodeLB: my_load=%f fair=%f shedding=%f (floor %.3f)\n",
                myNodeId, my_load, fair, my_loadAfterTransfer, effMinImbalance);
+
+    // The receiver check in the dimension NOT being diffused (DiffusionMetric.h).
+    // Both terms are read as seconds of step time. The step the plan brings
+    // every node to is the larger of the two dimensions' neighbourhood means:
+    // the diffused one's when it binds, which is the measured choice; the
+    // other one's when a flag forced the diffused dimension against the
+    // measurement -- taking only the diffused mean there would put the target
+    // below every node's actual step and refuse every move. A neighbour may
+    // take load in the slack dimension up to that level and no further;
+    // beyond it that dimension, not the diffused one, decides its step. Host
+    // time is a per-PE term (a node's total over its PEs) and device time a
+    // per-node term, so the capacity handed to the metric is converted back
+    // to the raw units the object loads come in.
+    //
+    // Under LB_MODE_STEP the diffused quantity IS step time, so the fair level
+    // is the target as it stands, and both dimensions are bounded by it; the
+    // metric then also knows what a candidate costs the receiver's step.
+    if (neighborCount > 0 && (int)nborHostPerPe.size() >= neighborCount &&
+        (int)nborDev.size() >= neighborCount)
+    {
+      const int mode = diffusionLoadMode();
+      const double inf = std::numeric_limits<double>::max();
+      std::vector<double> capH(neighborCount, inf), capG(neighborCount, inf);
+      double limit = 0.0, fairStep = 0.0, fairOther = 0.0;
+      if (mode == LB_MODE_STEP)
+      {
+        fairStep = fair;
+        limit = fairStep * (1.0 + effMinImbalance);
+        for (int i = 0; i < neighborCount; i++)
+        {
+          capH[i] = std::max(0.0, limit - nborHostPerPe[i]) * nodeSize;
+          capG[i] = std::max(0.0, limit - nborDev[i]);
+        }
+        metric->setRiseKnown(true);
+      }
+      else
+      {
+        const bool devDim = (mode == LB_MODE_DEVICE);
+        for (int i = 0; i < neighborCount; i++)
+          fairOther += devDim ? nborHostPerPe[i] : nborDev[i];
+        fairOther /= neighborCount;
+        fairStep = std::max(devDim ? fair : fair / nodeSize, fairOther);
+        limit = fairStep * (1.0 + effMinImbalance);
+        for (int i = 0; i < neighborCount; i++)
+        {
+          if (devDim) capH[i] = std::max(0.0, limit - nborHostPerPe[i]) * nodeSize;
+          else capG[i] = std::max(0.0, limit - nborDev[i]);
+        }
+      }
+      metric->setReceiverCapacity(capH, capG);
+      if (_lb_args.debug() > 1)
+        CkPrintf("[node %d] AcrossNodeLB: %s; step target %.6f (fair %.6f, other-dimension "
+                 "mean %.6f); receiver room per neighbour (host,device):%s\n",
+                 myNodeId, lbLoadModeName(mode), limit, fairStep, fairOther, [&]() {
+                   std::string s;
+                   for (int i = 0; i < neighborCount; i++)
+                   {
+                     char b[64];
+                     snprintf(b, sizeof(b), " (%.4g,%.4g)", capH[i], capG[i]);
+                     s += b;
+                   }
+                   return s;
+                 }().c_str());
+    }
   }
 
   // Per-step cap on what may leave this node, as a share of its migratable
@@ -156,18 +220,23 @@ void DiffusionLB::AcrossNodeLB()
 
     // Two different figures, because two different consumers.
     //
-    // shedLoad is in the diffused dimension: it retired this node's obligation
+    // shedLoad is in the diffused quantity: it retired this node's obligation
     // (my_loadAfterTransfer) and the per-neighbour quota in the selection loop,
-    // both of which the pseudo-LB rounds expressed in that dimension.
+    // both of which the pseudo-LB rounds expressed in that quantity. It stays
+    // here; what travels are the object's two measured loads.
     //
-    // cpuLoad is host time, and is what travels in the message: the receiver adds
-    // it to pe_load and hands it to the within-node heap, which balances host work
-    // between PEs that share a device. Shipping GPU time would corrupt that.
+    // cpuLoad is host time: the receiver adds it to pe_load and hands it to the
+    // within-node heap, which balances host work between PEs that share a
+    // device. Shipping GPU time would corrupt that. gpuLoad is the object's
+    // measured device time, which the receiver's within-node phase reads when
+    // its own device is what binds.
     //
     // Both read getCompLoad()/objData rather than getVertexLoad(), whose
     // MAX(compLoad, 0.1) floor would retire the budget in yet another unit.
     const double shedLoad = mv.shedLoad;
+    (void)shedLoad;
     const double cpuLoad = objs[v_id].getCompLoad();
+    const double gpuLoad = diffusionObjGpuLoad(nodeStats->objData[v_id]);
     objs[v_id].setCurrPe(-1);
 
     int rank = GetRank(v_id);
@@ -192,7 +261,7 @@ void DiffusionLB::AcrossNodeLB()
     }
 
     mig_acksOut += 2;
-    thisProxy[destPE].LoadMetaInfo(objHandle, pe_local_id, cpuLoad, shedLoad, donorPE, 0,
+    thisProxy[destPE].LoadMetaInfo(objHandle, pe_local_id, cpuLoad, gpuLoad, donorPE, 0,
                                    CkMyPe(), keyOf(nodeStats->objData[v_id]));
     thisProxy[donorPE].LoadReceived(pe_local_id, destPE, CkMyPe());
     nodeStats->to_proc[v_id] = destPE;
@@ -203,8 +272,12 @@ void DiffusionLB::AcrossNodeLB()
   // indistinguishable from the outside, and they call for opposite responses.
   if (_lb_args.debug() > 1 && metric != NULL)
     CkPrintf("[node %d] AcrossNodeLB: %d move(s) accepted, %d neighbour(s) with "
-             "no move worth making, %.6f load left unshed\n",
+             "no move worth making, %d candidate(s) refused by the receiver check%s, "
+             "%.6f load left unshed\n",
              myNodeId, metric->acceptedCount(), metric->rejectedCount(),
+             metric->slackRefusals,
+             diffusionStepMode() ? ""
+             : diffusionDeviceDim() ? " (host dimension)" : " (device dimension)",
              my_loadAfterTransfer > 0 ? my_loadAfterTransfer : 0.0);
 
   // Owned by this function since it was created here; the per-object vectors

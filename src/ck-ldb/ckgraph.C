@@ -12,6 +12,7 @@
 /*@{*/
 
 #include "ckgraph.h"
+#include "LBLoadDim.h"
 
 ProcArray::ProcArray(BaseLB::LDStats *stats) {
   const int numPes = stats->procs.size();
@@ -60,22 +61,21 @@ ObjGraph::ObjGraph(BaseLB::LDStats *stats) {
   // fill the vertex list
   vertices.resize(stats->objData.size());
 
-  // Which resource the graph strategies balance. Host wallTime by default, so
-  // nothing changes unless asked. +LBDiffusionGpuDim switches it to measured
-  // device occupancy: on a GPU-resident application the host side only enqueues
-  // kernels and returns, so wallTime is launch overhead and partitioning on it
-  // balances nothing real. Set here rather than in each strategy so every
-  // ckgraph consumer (MetisLB, Scotch*, RecBipartLB, ZoltanLB) agrees on what a
-  // vertex weight means.
+  // Which resource the graph strategies balance: the dimension that binds the
+  // step, measured from these stats (LBLoadDim.h), unless +LBDiffusionGpuDim
+  // or +LBDiffusionHostDim says otherwise. On a GPU-resident application the
+  // host side only enqueues kernels and returns, so wallTime is launch
+  // overhead and partitioning on it balances nothing real; on a host-bound one
+  // the reverse holds, and partitioning on device occupancy spends every move
+  // on the resource nobody waits for. Set here rather than in each strategy so
+  // every ckgraph consumer (MetisLB, Scotch*, RecBipartLB, ZoltanLB) agrees on
+  // what a vertex weight means.
   //
   // gpuTime is only populated for strategies whose base class collects the
   // CUPTI loads (CentralLB::CallLB, DistBaseLB::barrierDone); a strategy that
-  // does neither sees zeros here, the same as it saw before.
-#if CMK_CUDA
-  const bool useGpuDim = _lb_args.diffusionGpuDim();
-#else
-  const bool useGpuDim = false;
-#endif
+  // does neither sees zeros here, the host binds, and nothing changes.
+  deviceDim = lbResolveDeviceDim(lbCriticalityOf(stats));
+  const bool useGpuDim = deviceDim;
 
   for(int vert = 0; vert < stats->objData.size(); vert++) {
     vertices[vert].id         = vert;

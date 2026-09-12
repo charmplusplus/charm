@@ -103,6 +103,13 @@ double DiffusionLB::totalWithinTime = 0.0;
 
 static bool diffusionTimingExitRegistered = false;
 
+// The step's verdict on what is diffused (DiffusionLoad.h). Set on every PE
+// of the process by loadDimVerdict; -1 until the first verdict. The node's
+// own side and PE count follow it, for the step-time mode.
+int diffusionLoadDimDevice = -1;
+int diffusionNodeDeviceBound = 0;
+int diffusionPpn = 1;
+
 static void printDiffusionTimingAtExit() {
   DiffusionLB::printDiffusionTiming();
   CkContinueExit();
@@ -169,6 +176,7 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
     }
   }
   myNodeId = CkMyPe() / nodeSize;
+  diffusionPpn = nodeSize;
   acks = 0;
   max = 0;
   hs_asksOut = 0;
@@ -219,6 +227,8 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   remapGidValid = false;
   remapGid.setZero();
   planReports = 0;
+  loadDimReports = 0;
+  nodeHostSum = nodeHostMax = nodeDevSum = nodeDevMax = 0.0;
 
 #if CMK_LBDB_ON
   lbname = "DiffusionLB";
@@ -364,8 +374,10 @@ void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage&& data)
   {
     // build LDStats
     BuildStats();
-    CkCallback cb(CkReductionTarget(DiffusionLB, statsAssembled), thisProxy);
-    contribute(cb);
+    // Which dimension this step diffuses is decided job-wide before the
+    // neighbour phase. Report this node's totals; the barrier contribution
+    // this PE owes is released by the verdict (loadDimVerdict).
+    thisProxy[0].loadDimReport(nodeHostSum, nodeHostMax, nodeDevSum, nodeDevMax);
     statsReceived = 0;
   }
 #endif
@@ -378,6 +390,52 @@ void DiffusionLB::statsAssembled()
   {
     findNBors(1);
   }
+}
+
+// PE 0: one report per node, then the verdict to every PE. A DiffusionLB node
+// is one process driving one device, so each report stands for nodeSize PEs
+// of host capacity and one GPU of device capacity.
+void DiffusionLB::loadDimReport(double sumHost, double maxHost, double sumDev, double maxDev)
+{
+  LBCriticality c;
+  c.sumHost = sumHost;
+  c.maxHost = maxHost;
+  c.sumDev = sumDev;
+  c.maxDev = maxDev;
+  c.pes = nodeSize;
+  c.gpus = 1;
+  loadDimCrit.merge(c);
+  if (++loadDimReports < numNodes) return;
+  loadDimReports = 0;
+
+  const int mode = lbResolveLoadMode(loadDimCrit);
+  if (_lb_args.debug() > 0)
+    CkPrintf("[DiffusionLB] step %d load dimension: %s by %s (T_h %.6f over %d PEs, T_g %.6f "
+             "over %d nodes; alpha_h %.2f, alpha_g %.2f)\n",
+             step(), lbLoadModeName(mode),
+             lbLoadDimOverride() == LB_DIM_AUTO ? "criticality" : "flag",
+             loadDimCrit.boundHost(), loadDimCrit.pes, loadDimCrit.boundDev(),
+             loadDimCrit.gpus, loadDimCrit.alphaHost(), loadDimCrit.alphaDev());
+  const double alphaHost = loadDimCrit.alphaHost(), alphaDev = loadDimCrit.alphaDev();
+  loadDimCrit = LBCriticality();
+  thisProxy.loadDimVerdict(mode, alphaHost, alphaDev);
+}
+
+// Every PE takes the verdict; the rank-0 PEs then price their node in the
+// chosen quantity and release the stats barrier they held for it. In the
+// step-time mode the node's own binding side decides what each of its objects
+// is worth (DiffusionLoad.h).
+void DiffusionLB::loadDimVerdict(int mode, double, double)
+{
+  diffusionLoadDimDevice = mode;
+  if (CkMyPe() != rank0PE) return;
+  diffusionNodeDeviceBound = (nodeDevSum >= nodeHostSum / nodeSize) ? 1 : 0;
+  my_load = 0.0;
+  for (size_t i = 0; i < nodeStats->objData.size(); i++)
+    my_load += diffusionObjLoad(nodeStats->objData[i]);
+  my_loadAfterTransfer = my_load;
+  CkCallback cb(CkReductionTarget(DiffusionLB, statsAssembled), thisProxy);
+  contribute(cb);
 }
 
 double DiffusionLB::keyOf(const LDObjData& od)
@@ -592,7 +650,7 @@ void DiffusionLB::WithinNodeLB()
     // work per PE keeps the per-PE driving cost even as well.
     bool onHost = true;
 #if CMK_CUDA
-    if (_lb_args.diffusionGpuDim())
+    if (diffusionDeviceDim() || diffusionStepMode())
     {
       double maxPeHost = 0.0, nodeGpu = 0.0;
       for (int r = 0; r < nodeSize; r++) maxPeHost = std::max(maxPeHost, pe_load[r]);
@@ -740,7 +798,7 @@ void DiffusionLB::WithinNodeLB()
           mig_acksOut += 2;
           thisProxy[destPE].LoadMetaInfo(nodeStats->objData[j].handle,
                                          pe_local_id, objs[j].getCompLoad(),
-                                         diffusionObjLoad(nodeStats->objData[j]),
+                                         diffusionObjGpuLoad(nodeStats->objData[j]),
                                          donorPE, 1, CkMyPe(), e.key);
           thisProxy[donorPE].LoadReceived(pe_local_id, destPE, CkMyPe());
           nodeStats->to_proc[j] = destPE;
