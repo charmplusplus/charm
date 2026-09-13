@@ -116,7 +116,7 @@ CpvDeclare(HapiEventPools, hapi_event_pool);
 #endif // HAPI_CUDA_CALLBACK
 CpvDeclare(int, n_hapi_events);
 
-// Pinned-flag completion detection (+gpuflagpoll), ported from paw-atm26
+// Pinned-flag completion detection, ported from paw-atm26
 // (2119bcbc1). The scheduler polls the head of every stream queue on every
 // loop iteration, and an event query is a driver call: with eight PE threads
 // on one context the not-ready answers alone held the driver 90% of a step
@@ -132,7 +132,9 @@ CpvDeclare(int, n_hapi_events);
 // entry's slot is never overwritten. Device time comes from CUPTI on this
 // branch, so nothing needs event timestamps and every callback may take it.
 // The driver entry point is looked up at startup: libcuda is only reached
-// through libcupti here, not on the link line.
+// through libcupti here, not on the link line. This is the default; a
+// driver without cuStreamWriteValue32 falls back to event queries, and
+// +gpueventquery asks for them explicitly.
 #define HAPI_FLAG_SLOTS 256  // power of two; max in-flight flag entries per PE
 #define HAPI_FLAG_STRIDE 16  // uint32s per slot: one cache line, no false sharing
 static bool hapi_use_flag_poll = false;
@@ -1721,13 +1723,17 @@ static void hapiMapping(char** argv) {
   
   hapiCheck(hapiSetDevice(cpv_my_device));
 
-  // +gpuflagpoll: completion by pinned-flag write instead of event query.
-  // Every PE parses it (the value is the same on all); the ring must be
-  // allocated after hapiSetDevice so the pinned pages and their device alias
-  // belong to this PE's device.
-  if (CmiGetArgFlagDesc(argv, "+gpuflagpoll",
-        "detect kernel completion via pinned-flag writes instead of event polling")) {
-    hapi_use_flag_poll = true;
+  // Pinned-flag completion is the default; +gpueventquery asks for the old
+  // cudaEventQuery path instead. Every PE parses the flag (the value is the
+  // same on all); the ring must be allocated after hapiSetDevice so the
+  // pinned pages and their device alias belong to this PE's device.
+  const bool want_event_query = CmiGetArgFlagDesc(argv, "+gpueventquery",
+        "detect kernel completion by querying CUDA events instead of pinned-flag writes");
+  // Accepted and ignored: it asked for what is now the default. Kept so that
+  // existing run scripts and job files keep working unchanged.
+  CmiGetArgFlagDesc(argv, "+gpuflagpoll",
+        "(deprecated, now the default) use pinned-flag completion detection");
+  if (!want_event_query) {
     if (hapi_stream_write_value32 == nullptr) {
       void* fn = nullptr;
       cudaDriverEntryPointQueryResult status = cudaDriverEntryPointSymbolNotFound;
@@ -1735,10 +1741,19 @@ static void hapiMapping(char** argv) {
                                            cudaEnableDefault, &status) != cudaSuccess ||
           status != cudaDriverEntryPointSuccess || fn == nullptr) {
         cudaGetLastError();
-        CmiAbort("HAPI> +gpuflagpoll: cuStreamWriteValue32 is not available from this driver");
+        // Not fatal now that this is the default: nobody asked for it, so a
+        // driver without the entry point falls back to event queries rather
+        // than refusing to start.
+        if (CmiMyPe() == 0)
+          CmiPrintf("HAPI> cuStreamWriteValue32 is not available from this driver; "
+                    "falling back to event-query completion detection\n");
+      } else {
+        hapi_stream_write_value32 = (hapiStreamWriteValue32Fn)fn;
       }
-      hapi_stream_write_value32 = (hapiStreamWriteValue32Fn)fn;
     }
+  }
+  if (!want_event_query && hapi_stream_write_value32 != nullptr) {
+    hapi_use_flag_poll = true;
     uint32_t*& slots = CpvAccess(hapi_flag_slots);
     const size_t bytes = (size_t)HAPI_FLAG_SLOTS * HAPI_FLAG_STRIDE * sizeof(uint32_t);
     hapiCheck(cudaHostAlloc((void**)&slots, bytes, cudaHostAllocPortable | cudaHostAllocMapped));
@@ -1978,7 +1993,7 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
   hapiCheck(hapiGetDevice(&prev_dev));
   const int use_dev = (stream_dev >= 0) ? stream_dev : prev_dev;
 
-  // Pinned-flag path (+gpuflagpoll): no event object, no query later. Only for
+  // Pinned-flag path (the default): no event object, no query later. Only for
   // a stream on this PE's own device -- the ring's device alias belongs to
   // it -- and while the ring has a free slot; otherwise an event, as before.
   if (hapi_use_flag_poll && use_dev == CpvAccess(my_device) &&
@@ -1994,7 +2009,7 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
     const CUresult res = hapi_stream_write_value32((CUstream)stream, (CUdeviceptr)slot_dev,
                                                    seq, CU_STREAM_WRITE_VALUE_DEFAULT);
     if (res != CUDA_SUCCESS)
-      CmiAbort("HAPI> cuStreamWriteValue32 failed (%d); +gpuflagpoll is not supported here",
+      CmiAbort("HAPI> cuStreamWriteValue32 failed (%d); rerun with +gpueventquery",
                (int)res);
     hapiEvent hev(NULL, cb, cb_msg, wr);
     hev.flag_seq = seq;
