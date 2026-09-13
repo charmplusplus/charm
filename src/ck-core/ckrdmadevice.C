@@ -253,12 +253,32 @@ void CkDeviceRecvAdmissionReplay(CmiUInt8 id)
     CmiPushPE(CmiMyRank(), envs[k]);
 }
 
+// Receive-side envelope accounting, on only under CHARM_ZC_LEAKDBG. One copy
+// is made per device receive and one free is expected per copy.
+std::atomic<long> g_zc_copies{0}, g_zc_frees{0};
+std::atomic<long> g_zc_meta{0}, g_zc_metafree{0}, g_zc_empty{0}, g_zc_real{0};
+bool zcLeakDbg() {
+  static const bool on = getenv("CHARM_ZC_LEAKDBG") != NULL;
+  return on;
+}
+void zcLeakReport(const char* where) {
+  if (!zcLeakDbg()) return;
+  const long c = g_zc_copies.load(), f = g_zc_frees.load();
+  if (c % 20000 != 0 || c == 0) return;
+  CmiPrintf("[ZCLEAK %d] %s: env %ld/%ld live %ld | meta %ld/%ld live %ld | "
+            "ops empty %ld real %ld\n", CkMyPe(), where, c, f, c - f,
+            g_zc_meta.load(), g_zc_metafree.load(),
+            g_zc_meta.load() - g_zc_metafree.load(),
+            g_zc_empty.load(), g_zc_real.load());
+}
+
 void CkRdmaDeviceMsgFreed(void* env)
 {
   DeviceRecvHoldMap* holds = CkpvAccess(device_recv_holds);
   if (holds == NULL || holds->empty()) return;
   auto it = holds->find(env);
   if (it == holds->end()) return;
+  if (zcLeakDbg()) g_zc_frees.fetch_add(1);
   // The map is keyed by envelope ADDRESS, and the allocator recycles
   // addresses. A held message freed through a path that does not run this
   // hook -- any raw CmiFree, of which the runtime has many -- leaves its
@@ -487,6 +507,7 @@ void CkRdmaDeviceRecvHandler(void* data, void* msg)
   // If so, invoke regular entry method
   if (info->counter == info->n_ops) {
     QdCreate(1);
+    if (zcLeakDbg()) g_zc_metafree.fetch_add(1);
 
     // The receive is complete here, which is the moment the application can
     // act on it, so this is the interval worth charging to the transport.
@@ -1924,6 +1945,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // FIXME: Reuse the old message instead of creating a new one
   void* old_msg = EnvToUsr(env);
   envelope* new_env = UsrToEnv(CkCopyMsg(&old_msg));
+  if (zcLeakDbg()) { g_zc_copies.fetch_add(1); zcLeakReport("issue"); }
 
   // Retarget the copied message's device buffers to the buffers this receiver
   // posted. The transfers below land in arrPtrs[], but the copy still carries
@@ -1975,6 +1997,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // Allocate and fill in metadata for this zerocopy operation
   void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * numops);
   CmiEnforce(rdma_data);
+  if (zcLeakDbg()) g_zc_meta.fetch_add(1);
   DeviceRdmaInfo* rdma_info = (DeviceRdmaInfo*)rdma_data;
   rdma_info->n_ops = numops;
   // Timed tally: zero posted time means "not measuring", so the completion path
@@ -1997,6 +2020,11 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
                         std::vector<int>(numops, -1), false});
     watch = &CkpvAccess(device_recv_watch)->back();
   }
+
+  // Set when the last op of this receive is an empty one, which completes
+  // here rather than on a stream callback: nothing else will come back to
+  // release the metadata, so this function has to.
+  bool completed_inline = false;
 
   for (int i = 0; i < numops; i++) {
     // Unpack source buffer from sender
@@ -2079,10 +2107,17 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // is in -- the same count the asynchronous completions drive. There is no
     // QdProcess to balance: nothing was created for this op.
     if (source.cnt == 0) {
+      if (zcLeakDbg()) g_zc_empty.fetch_add(1);
       rdma_info->counter++;
       if (rdma_info->counter == rdma_info->n_ops) {
         QdCreate(1);
         enqueueNcpyMessage(CkMyPe(), new_env);
+        // The counter can only reach n_ops on the last op there is: every
+        // other op has already counted itself, and an op later in this loop
+        // has not been unpacked yet. So no save_op below is still live, and
+        // the metadata is freed after the loop rather than here only to keep
+        // that obvious.
+        completed_inline = true;
       }
       continue;
     }
@@ -2100,6 +2135,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // stages IPC info when it isn't certain MEMCPY suffices and RDMA can be
     // ruled out, so an unconfirmed-destination send still leaves
     // source.device_idx valid for the IPC branch below.
+    if (zcLeakDbg()) g_zc_real.fetch_add(1);
     zcStatsCount(mode);
     // Every op of one receive comes from the same sender and so resolves the
     // same way; recording it per op just avoids a second mode computation.
@@ -2361,6 +2397,19 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
 
     // Add source callback for polling, so that it can be invoked once the transfer is complete
     hapiAddCallback(postStructs[i].hapi_stream, CkCallback(CkRdmaDeviceRecvHandler, &save_op));
+  }
+
+  // A receive whose every buffer was empty raises no completion: the device
+  // was never touched, so no stream callback runs and CkRdmaDeviceRecvHandler,
+  // which is what frees this for every other receive, is never reached. Left
+  // undone it is one CmiAlloc per message for a stencil that sends to each
+  // neighbour every step whether or not it has anything to say -- tens of
+  // thousands of messages a second, and the process is killed for memory long
+  // before the run ends.
+  if (completed_inline) {
+    if (zcLeakDbg()) g_zc_metafree.fetch_add(1);
+    deviceRecvWatchDrop(rdma_info);
+    CmiFree(rdma_data);
   }
 }
 
