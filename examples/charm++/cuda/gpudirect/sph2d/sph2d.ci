@@ -90,7 +90,7 @@ mainmodule sph2d {
       for (recv_count = 0; recv_count < n_expect_mig; recv_count++) {
         when receiveParticles[my_iter](int ref, int dir, int adv, int n, int m,
                                        nocopydevice Particle parts[m])
-          serial { appendParticles(dir, n); }
+          serial { appendParticles(ref, dir, n); }
       }
 
       // The step is not over until every zerocopy send it issued is quiet:

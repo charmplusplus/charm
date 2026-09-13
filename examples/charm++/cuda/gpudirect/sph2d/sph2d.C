@@ -572,7 +572,10 @@ public:
     hapiCheck(pcMalloc((void**)&d_send_halo, ecap));
     hapiCheck(pcMalloc((void**)&d_recv_halo, ecap));
     hapiCheck(pcMalloc((void**)&d_send_mig, ecap));
-    hapiCheck(pcMalloc((void**)&d_recv_mig, ecap));
+    // Twice the directions: the migration receive slot is indexed by the
+    // SENDING step's parity. See receiveParticles for why it has to be, and
+    // why d_recv_halo above does not.
+    hapiCheck(pcMalloc((void**)&d_recv_mig, 2 * ecap));
     hapiCheck(pcMalloc((void**)&d_halo_ptrs, sizeof(Particle*) * NUM_DIRS));
     hapiCheck(pcMalloc((void**)&d_mig_ptrs, sizeof(Particle*) * NUM_DIRS));
     hapiCheck(pcMalloc((void**)&d_counts, sizeof(int) * NUM_COUNTERS));
@@ -1147,17 +1150,40 @@ public:
               "ran more than one step ahead, which the two advertisement slots "
               "assume cannot happen\n", x, y, my_iter, ref);
     nbr_adv[dir][(ref + 1) & 1] = adv;
-    parts = d_recv_mig + (size_t)dir * exch_capacity;
+    // The payload slot needs the same parity the advertisement has. This
+    // handler runs when the message ARRIVES, not when the step consumes it,
+    // and a partner one step ahead is expected, not exceptional (see the
+    // abort above). A patch takes its migration in phase 6, AFTER the phase-5
+    // send that is all a partner needs to finish its own step -- so a partner
+    // can complete that step, run phases 1-5 of the next one, and post a
+    // second payload into this direction while the first is still sitting
+    // here unread. Stream order does not save it: the rgets and the copy in
+    // appendParticles all run on comm_stream, but the HOST enqueues them, and
+    // the second rget is enqueued at arrival while the first copy waits for
+    // the SDAG to reach its serial block. The count travels in the message,
+    // so nothing downstream notices -- checkArrivals balances and the
+    // capacity check passes, and the step consumes the wrong generation of
+    // particles in silence.
+    //
+    // The halo has no such window: it is consumed in phase 3, before the
+    // phase-5 send that lets a partner advance, so d_recv_halo is safe with
+    // one slot per direction. That is an invariant of the phase order in
+    // sph2d.ci, not an accident -- moving the migration receive earlier, or
+    // the halo receive later, would change which of these needs doubling.
+    parts = d_recv_mig + (size_t)((ref & 1) * NUM_DIRS + dir) * exch_capacity;
     devicePost[0].hapi_stream = comm_stream;
   }
 
-  void appendParticles(int dir, int n) {
+  // ref, not my_iter: the slot is the one the sender's step parity chose in
+  // receiveParticles, and a message from step my_iter+1 is legitimate.
+  void appendParticles(int ref, int dir, int n) {
     if (n == 0) return;
     if (np + n > part_capacity)
       CkAbort("Patch (%d,%d): %d particles exceed capacity %d at step %d; "
               "increase headroom (-r)\n", x, y, np + n, part_capacity, my_iter);
     hapiCheck(cudaMemcpyAsync(d_parts[cur] + np,
-        d_recv_mig + (size_t)dir * exch_capacity, sizeof(Particle) * n,
+        d_recv_mig + (size_t)((ref & 1) * NUM_DIRS + dir) * exch_capacity,
+        sizeof(Particle) * n,
         cudaMemcpyDeviceToDevice, comm_stream));
     np += n;
     n_fluid += n;   // only fluid migrates
