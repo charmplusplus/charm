@@ -41,7 +41,18 @@ FTDIRS = \
   jacobi3d \
   jacobi3d-sdag \
 
-TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
+# Not applicable on reconverse: queue tests classic's Cqs API, which the
+# reconverse build does not compile (reconverse has its own queue and its own
+# test for it); longIdle needs CcdCallOnConditionOnPE, which reconverse does
+# not provide.
+ifeq ($(CMK_GDIR),reconverse)
+RECONVERSE_NA = \
+  queue \
+  longIdle \
+
+endif
+
+TESTDIRS = $(filter-out $(FTDIRS) $(RECONVERSE_NA),$(DIRS))
 
 NONSCALEDIRS = \
   alignment \

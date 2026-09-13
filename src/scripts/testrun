@@ -43,7 +43,18 @@ then
   # libreconverse from as an RPATH in every binary, so programs run bare.
   # Setting it anyway would hide a regression in that -- the whole tier would
   # go on passing with the RPATH gone, which is how the gap survived this long.
-  if [[ $procs -gt 1 ]]; then
+  #
+  # TESTRUN_LAUNCHER (site runs under a batch system): a launcher and its
+  # flags, e.g. "srun --mpi=pmi2 -N2 --ntasks-per-node=1 -c2", used for EVERY
+  # run including single-process ones, with "-n <procs>" appended. Inside a
+  # Slurm allocation a reconverse binary must go through srun even alone:
+  # LCI's bootstrap reads the inherited SLURM_NTASKS/SLURM_PROCID and waits
+  # for peers that never come. Unset, the default is lcrun for multi-process
+  # and a bare exec for single-process, as on a workstation or hosted CI.
+  if [[ -n "$TESTRUN_LAUNCHER" ]]; then
+    read -r -a launcher <<< "$TESTRUN_LAUNCHER"
+    cmd=("${launcher[@]}" -n "$procs" "$prog" +pe "$p" "${args[@]}")
+  elif [[ $procs -gt 1 ]]; then
     LCRUN="$CHARMBIN/../_deps/lci-src/lcrun"
     [[ -x "$LCRUN" ]] || LCRUN=lcrun
     cmd=("$LCRUN" -n "$procs" "$prog" +pe "$p" "${args[@]}")

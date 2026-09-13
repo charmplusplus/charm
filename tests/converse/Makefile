@@ -3,6 +3,13 @@
 DIRS = \
   megacon \
 
+# megacon is written against the Cpm interface and other classic-only
+# Converse APIs that reconverse does not provide; reconverse carries its own
+# port of the bank (tests/megarecon in the reconverse repository).
+ifeq ($(CMK_GDIR),reconverse)
+DIRS =
+endif
+
 TESTDIRS = $(DIRS)
 
 all: $(foreach i,$(DIRS),build-$i)
