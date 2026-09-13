@@ -548,3 +548,4 @@ inline void hapiLaunchKernelWrapper(Kernel kernel, dim3 grid_dim, dim3 block_dim
 #endif /* !defined AMPI_INTERNAL_SKIP_FUNCTIONS */
 
 #endif // __HAPI_H_
+void hapiDumpFlagState();

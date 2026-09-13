@@ -144,6 +144,15 @@ CpvDeclare(uint32_t*, hapi_flag_slots);   // pinned host ring
 CpvDeclare(void*, hapi_flag_slots_dev);   // device alias of the ring
 CpvDeclare(uint32_t, hapi_flag_seq);      // last assigned sequence number
 CpvDeclare(int, hapi_flag_inflight);      // flag entries currently queued
+// Which ring slots hold an entry that has not been drained yet. The in-flight
+// COUNT is not enough to protect them: entries drain per stream, and
+// hapiPollEvents stops at the first incomplete entry in each stream, so a
+// stream whose head is blocked keeps its slots while other streams drain and
+// the sequence number runs on. Once seq advances HAPI_FLAG_SLOTS past a queued
+// entry, that entry's slot is rewritten with a newer value, its *slot ==
+// flag_seq test can never come true again, and every later entry on the same
+// stream is stuck behind it forever.
+CpvDeclare(unsigned char*, hapi_flag_busy);
 
 // With flags, a PE waiting on its GPU spins on a plain load and never leaves
 // its core. With events it did: most of the PE threads sat in a futex on the
@@ -1555,10 +1564,12 @@ static void hapiInitCpv() {
   CpvInitialize(void*, hapi_flag_slots_dev);
   CpvInitialize(uint32_t, hapi_flag_seq);
   CpvInitialize(int, hapi_flag_inflight);
+  CpvInitialize(unsigned char*, hapi_flag_busy);
   CpvAccess(hapi_flag_slots) = NULL;
   CpvAccess(hapi_flag_slots_dev) = NULL;
   CpvAccess(hapi_flag_seq) = 0;
   CpvAccess(hapi_flag_inflight) = 0;
+  CpvAccess(hapi_flag_busy) = NULL;
   // The ring itself is allocated in hapiMapping, once the PE has its device.
 
   // Device mapping
@@ -1759,6 +1770,7 @@ static void hapiMapping(char** argv) {
     hapiCheck(cudaHostAlloc((void**)&slots, bytes, cudaHostAllocPortable | cudaHostAllocMapped));
     memset((void*)slots, 0, bytes);
     hapiCheck(hapiHostGetDevicePointer(&CpvAccess(hapi_flag_slots_dev), (void*)slots, 0));
+    CpvAccess(hapi_flag_busy) = (unsigned char*)calloc(HAPI_FLAG_SLOTS, 1);
     if (CmiMyPe() == 0)
       CmiPrintf("HAPI> Pinned-flag completion detection enabled (%d slots per PE)\n",
                 HAPI_FLAG_SLOTS);
@@ -1996,12 +2008,17 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
   // Pinned-flag path (the default): no event object, no query later. Only for
   // a stream on this PE's own device -- the ring's device alias belongs to
   // it -- and while the ring has a free slot; otherwise an event, as before.
+  // hapiFlagNextSeq: the seq this issue would take, 0 skipped as it means
+  // "slot never written". Checked against the slot it would land in, because
+  // the slot is what must be free -- see hapi_flag_busy.
+  uint32_t hapi_next_seq = CpvAccess(hapi_flag_seq) + 1;
+  if (hapi_next_seq == 0) hapi_next_seq = 1;
   if (hapi_use_flag_poll && use_dev == CpvAccess(my_device) &&
-      CpvAccess(hapi_flag_inflight) < HAPI_FLAG_SLOTS) {
-    uint32_t& seq_counter = CpvAccess(hapi_flag_seq);
-    if (++seq_counter == 0) ++seq_counter;  // 0 means "slot never written"
-    const uint32_t seq = seq_counter;
+      !CpvAccess(hapi_flag_busy)[hapi_next_seq & (HAPI_FLAG_SLOTS - 1)]) {
+    const uint32_t seq = hapi_next_seq;
+    CpvAccess(hapi_flag_seq) = seq;
     const uint32_t idx = seq & (HAPI_FLAG_SLOTS - 1);
+    CpvAccess(hapi_flag_busy)[idx] = 1;
     uint32_t* slot_dev =
         (uint32_t*)CpvAccess(hapi_flag_slots_dev) + (size_t)idx * HAPI_FLAG_STRIDE;
     // Executes only after all prior work on the stream, so the slot reaching
@@ -3730,6 +3747,48 @@ void hapiClearInstrument() {
 // all successive completed events in the queue starting from the front.
 // TODO Maybe we should make one pass of all events in the queue instead,
 // since there might be completed events later in the queue.
+// What is the flag path waiting for? For each stream queue on this PE, the
+// head entry's kind, its awaited sequence number, and what the slot actually
+// holds. Slot 0 means the GPU never wrote it; a different nonzero value means
+// the slot was reassigned under it; the matching value means the poll should
+// have drained it.
+void hapiDumpFlagState() {
+#ifndef HAPI_CUDA_CALLBACK
+  hapiEventQueues& queues = CpvAccess(hapi_event_queue);
+  int qi = 0;
+  for (auto& entry : queues) {
+    std::queue<hapiEvent>& q = entry.second;
+    if (q.empty()) { qi++; continue; }
+    const hapiEvent& h = q.front();
+    if (h.event == NULL) {
+      volatile uint32_t* slot = CpvAccess(hapi_flag_slots) +
+          (size_t)(h.flag_seq & (HAPI_FLAG_SLOTS - 1)) * HAPI_FLAG_STRIDE;
+      // Is the stream itself done? If the write has not landed AND the
+      // stream still has pending work while the GPU is idle, the stream is
+      // blocked -- on a cudaStreamWaitEvent whose event never came, not on
+      // anything the flag mechanism did.
+      const cudaError_t sq = cudaStreamQuery((cudaStream_t)entry.first);
+      cudaGetLastError();
+      CkPrintf("[hapi] pe %d q%d stream %p depth %zu head=FLAG seq=%u "
+               "slot[%u]=%u delta=%d write=%s stream=%s inflight=%d\n",
+               CkMyPe(), qi, entry.first, q.size(), h.flag_seq,
+               h.flag_seq & (HAPI_FLAG_SLOTS - 1), (uint32_t)*slot,
+               (int)(h.flag_seq - (uint32_t)*slot),
+               (*slot == h.flag_seq) ? "LANDED" : "NOT-LANDED",
+               sq == cudaSuccess ? "IDLE(all work done)"
+                 : (sq == cudaErrorNotReady ? "PENDING(blocked)" : "ERR"),
+               CpvAccess(hapi_flag_inflight));
+    } else {
+      CkPrintf("[hapi] pe %d q%d stream %p depth %zu head=EVENT query=%d\n",
+               CkMyPe(), qi, entry.first, q.size(),
+               (int)hapiEventQuery(h.event));
+      cudaGetLastError();
+    }
+    qi++;
+  }
+#endif
+}
+
 void hapiPollEvents(void* param) {
 #ifndef HAPI_CUDA_CALLBACK
   if (CpvAccess(n_hapi_events) <= 0) return;
@@ -3782,7 +3841,8 @@ void hapiPollEvents(void* param) {
         hapiWorkRequestCleanup(hev.wr);
       }
       if (hev.event == NULL) {
-        CpvAccess(hapi_flag_inflight)--;  // the slot may now be reassigned
+        CpvAccess(hapi_flag_inflight)--;
+        CpvAccess(hapi_flag_busy)[hev.flag_seq & (HAPI_FLAG_SLOTS - 1)] = 0;
       } else {
         const int d = hapiStreamDeviceOf(entry.first);
         CpvAccess(hapi_event_pool)[d >= 0 ? d : 0].push(hev.event);
