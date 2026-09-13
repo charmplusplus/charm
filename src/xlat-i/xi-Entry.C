@@ -1987,6 +1987,15 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
       str << "  if (CMI_IS_ZC_DEVICE(env)) {\n";
       genRegularCall(str, preCall, redn_wrapper, usesImplBuf, true);
       param->extractPostedPtrs(str, isSDAGGen, false, true);
+      // The post entry method is done with the closure here. The entry method
+      // proper does not run from it: CkRdmaDeviceIssueRgets delivers a copy of
+      // the message, which arrives with the device flag cleared and takes the
+      // branch below, where the closure it makes is released as usual. Without
+      // this the closure survives, and with it the reference it took on the
+      // message -- about 700 bytes for every device message, which is a
+      // gigabyte every few thousand steps for a stencil that sends to all of
+      // its neighbours every step, and an OOM kill for any long GPU run.
+      if (needsClosure) str << "  genClosure->deref();\n";
       str << "  } else {\n";
     }
     genRegularCall(str, preCall, redn_wrapper, usesImplBuf, false);
