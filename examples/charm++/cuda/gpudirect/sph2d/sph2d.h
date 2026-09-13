@@ -35,6 +35,11 @@ struct Particle {
   int id;               // global lattice id, unique and fixed for the run
 };
 
+// Advertisement bits, carried on every migration message (see sph2d.C).
+#define ADV_ACTIVE 1
+#define ADV_FLUID  2
+#define ADV_ANY    1
+
 #define PTYPE_FLUID 0
 #define PTYPE_BOUND 1
 

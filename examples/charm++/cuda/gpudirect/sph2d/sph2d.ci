@@ -20,6 +20,7 @@ mainmodule sph2d {
   readonly RealType wall_t;        // wall thickness
   readonly RealType col_w;         // initial water column
   readonly RealType col_h;
+  readonly RealType init_vx;       // initial fluid velocity, +x
 
   readonly int n_iters;
   readonly int warmup_iters;
@@ -55,17 +56,15 @@ mainmodule sph2d {
     entry void sendsDrained();
 
     // m = max(n,1) so an empty message still carries a valid buffer.
+    // Ghosts go only between partners that both take part in the step.
     entry void receiveHalo(int ref, int dir, int n, int m,
                            nocopydevice Particle parts[m]);
-    entry void receiveParticles(int ref, int dir, int n, int m,
+    // Migration goes to every partner every step, count zero included: it is
+    // what keeps an idle patch from running past the step at which one of
+    // these hands it particles. adv is the sender's advertisement, which is
+    // how the two sides of a halo agree on whether it is coming.
+    entry void receiveParticles(int ref, int dir, int adv, int n, int m,
                                 nocopydevice Particle parts[m]);
-
-    // Activity. A patch with no fluid and no fluid next to it takes no part
-    // in a step: no device work, no messages, no waits. wake(step) comes from
-    // a neighbour that has just acquired fluid; activate(dir, from) is the
-    // woken patch telling each neighbour the step it joins at.
-    entry void wake(int step);
-    entry void activate(int dir, int from);
 
     entry void runStep() {
       // Phase 1: pressure from density, then ship every particle within one
@@ -76,7 +75,7 @@ mainmodule sph2d {
       // density history.
       serial { my_iter++; startHalo(); }
       when haloPacked() serial { sendHalo(); }
-      // n_expect: the neighbours that take part in this step (startHalo).
+      // n_expect: the partners that exchange ghosts with this one (startHalo).
       for (recv_count = 0; recv_count < n_expect; recv_count++) {
         when receiveHalo[my_iter](int ref, int dir, int n, int m,
                                   nocopydevice Particle parts[m])
@@ -87,8 +86,9 @@ mainmodule sph2d {
       // and momentum, integrate, then compact out whatever left the rectangle.
       serial { computeAndIntegrate(); }
       when leaversPacked() serial { sendLeavers(); }
-      for (recv_count = 0; recv_count < n_expect; recv_count++) {
-        when receiveParticles[my_iter](int ref, int dir, int n, int m,
+      // n_expect_mig: every partner inside the tank, working or idle.
+      for (recv_count = 0; recv_count < n_expect_mig; recv_count++) {
+        when receiveParticles[my_iter](int ref, int dir, int adv, int n, int m,
                                        nocopydevice Particle parts[m])
           serial { appendParticles(dir, n); }
       }
