@@ -976,6 +976,25 @@ void CentralLB::LoadBalance()
       int nmsgs, nbytes;
       statsData->computeNonlocalComm(nmsgs, nbytes);
       CkPrintf("[%d] Load Summary (before LB): max (with bg load): %f max (obj only): %f average: %f at step %d nonlocal: %d msgs %.2fKB.\n", CkMyPe(), mLoad, mCpuLoad, totalLoad/clients, step(), nmsgs, 1.0*nbytes/1024);
+      // Which PE is the max, and whether its excess is object time or
+      // background: the summary's two maxima alone cannot say, and on sph2d
+      // the first-window max PE read 1.27 to 1.79x the mean across identical
+      // runs while the mean held still.
+      if (_lb_args.debug() > 1) {
+        std::vector<double> objSum(clients, 0.0);
+        std::vector<int> objCnt(clients, 0);
+        for (int i = 0; i < statsData->objData.size(); i++) {
+          const int p = statsData->from_proc[i];
+          if (p < 0 || p >= clients) continue;
+          objSum[p] += statsData->objData[i].wallTime;
+          objCnt[p]++;
+        }
+        for (int p = 0; p < clients; p++)
+          CkPrintf("[%d] PE %d: %d obj, obj %.4f bg %.4f total %.4f%s\n", CkMyPe(), p,
+                   objCnt[p], objSum[p], (double)statsData->procs[p].bg_walltime,
+                   objSum[p] + statsData->procs[p].bg_walltime,
+                   objSum[p] + statsData->procs[p].bg_walltime >= mLoad * 0.999 ? "  <-- max" : "");
+      }
 //      if (_lb_args.debug() > 1) {
 //        for (int i=0; i<statsData->n_objs; i++)
 //          CmiPrintf("[%d] %.10f %.10f\n", i, statsData->objData[i].minWall, statsData->objData[i].maxWall);

@@ -36,6 +36,12 @@ static void lbinit()
 MetisLB::MetisLB(const CkLBOptions& opt) : CBase_MetisLB(opt)
 {
   lbname = "MetisLB";
+  // A partitioner is only as good as its edges. Communication instrumentation
+  // is off by default, and MetisLB run on its own had been partitioning a
+  // graph with no edges at all (every cut reported 0.0): its output was an
+  // arbitrary balanced permutation. DiffusionLB switches this on from its
+  // own constructor; so does every other comm-aware balancer here.
+  LBTurnCommOn();
   if (CkMyPe() == 0 && !quietModeRequested)
     CkPrintf("CharmLB> MetisLB created.\n");
 }
@@ -63,6 +69,29 @@ static bool metisRemapOn()
                               "overlap most (same partition, more migrations)");
   }();
   return on;
+}
+
+// The least the step bound must fall, as a fraction of what it is now, for a
+// new mapping to be applied at all. METIS never sees the current placement:
+// it partitions from scratch and the relabel only renames parts, so against a
+// balanced state it returns a different tiling of the same balance and moves
+// nearly everything for nothing. Measured 12 Sep 2026 on sph2d once the dam
+// break had spread (busiest PE 1.05x the mean): 105 of 128 patches moved for
+// a 1.6% fall in the bound, and the run then paid ~20% for the stale mapping
+// until the end. A fall below the floor is inside the balance METIS is
+// allowed to miss by and inside round-to-round noise in the loads; it is
+// DiffusionLB's +LBDiffusionMinImbalance applied to the whole partition, and
+// defaults to the same value. +LBMetisMinGain overrides it.
+static double metisMinGain()
+{
+  static const double frac = []() {
+    double f = _lb_args.diffusionMinImbalance();
+    CmiGetArgDoubleDesc(CkGetArgv(), "+LBMetisMinGain", &f,
+                        "MetisLB: least fall in the step bound, as a fraction of the current "
+                        "bound, for a new mapping to be applied (default: +LBDiffusionMinImbalance)");
+    return f;
+  }();
+  return frac;
 }
 
 // sigma[part]: the label that part takes. current[k] is vertex k's label now,
@@ -875,8 +904,8 @@ void MetisLB::work(LDStats* stats)
   // for the whole partition. The saving is the fall in the larger of the two
   // bounds, the busiest GPU's device time and the busiest PE's host time,
   // which is the most the step can shorten by; the loads say nothing about
-  // the rest of it. Without a table nothing is priced and the mapping is
-  // applied as before. The memory contract is no reason to skip this: the
+  // the rest of it. Without a table nothing is priced, only the floor below
+  // applies. The memory contract is no reason to skip this: the
   // current mapping is where the objects already reside, so keeping it
   // cannot exceed a capacity they already occupy.
   //
@@ -885,7 +914,9 @@ void MetisLB::work(LDStats* stats)
   // block map it replaces (1.84 -> 1.88 s per interval) and moves 82 of 128
   // patches to bring the busiest PE down 13%, and a step that came out no
   // faster for it.
-  if (costCfg.calibrated)
+  //
+  // Before any of that, and with or without a table: the bound must fall by
+  // at least metisMinGain() of itself, or the current mapping is kept.
   {
     const int nPe = (int)parr->procs.size();
     auto peUnder = [&](int i, bool fresh) {
@@ -934,22 +965,41 @@ void MetisLB::work(LDStats* stats)
     for (int i = 0; i < numVertices; i++)
       if (newPe[i] >= 0 && newPe[i] != ogr->vertices[i].getCurrentPe())
       {
-        migration += model.migrateCost(stats->objData[i]);
+        if (costCfg.calibrated) migration += model.migrateCost(stats->objData[i]);
         moving++;
       }
     const double boundOld = bound(false), boundNew = bound(true);
-    const double cutOld = cutCost(false), cutNew = cutCost(true);
     const double gain = boundOld - boundNew;
-    const double cost = (cutNew - cutOld) + migration;
-    const bool worth = moving > 0 && gain > cost;
+    const double minGain = metisMinGain() * boundOld;
+    bool worth = moving > 0 && gain >= minGain;
+    const char* verdict = moving == 0 ? "nothing moves"
+                          : !worth    ? "below the floor, current mapping kept"
+                                      : "applied";
+    double cutOld = 0.0, cutNew = 0.0;
+    if (worth && costCfg.calibrated)
+    {
+      cutOld = cutCost(false);
+      cutNew = cutCost(true);
+      const double cost = (cutNew - cutOld) + migration;
+      worth = gain > cost;
+      if (!worth) verdict = "does not pay, current mapping kept";
+    }
     if ((_lb_args.debug() > 0 || !worth) && CkMyPe() == cur_ld_balancer)
-      CkPrintf("[%d] MetisLB priced: step bound %.6f -> %.6f (saves %.6f s/interval); cut "
-               "%.6f -> %.6f; %d migration(s) %.6f s/interval over %.0f interval(s); %s\n",
-               CkMyPe(), boundOld, boundNew, gain, cutOld, cutNew, moving, migration,
-               costCfg.placementLifetimeIntervals,
-               moving == 0 ? "nothing moves"
-               : worth     ? "applied"
-                           : "does not pay, current mapping kept");
+    {
+      if (costCfg.calibrated)
+        CkPrintf("[%d] MetisLB priced: step bound %.6f -> %.6f (saves %.6f s/interval, %.1f%% "
+                 "against a floor of %.1f%%); cut %.6f -> %.6f; %d migration(s) %.6f s/interval "
+                 "over %.0f interval(s); %s\n",
+                 CkMyPe(), boundOld, boundNew, gain,
+                 boundOld > 0.0 ? 100.0 * gain / boundOld : 0.0, 100.0 * metisMinGain(),
+                 cutOld, cutNew, moving, migration, costCfg.placementLifetimeIntervals, verdict);
+      else
+        CkPrintf("[%d] MetisLB gate: step bound %.6f -> %.6f (saves %.6f s/interval, %.1f%% "
+                 "against a floor of %.1f%%); %d migration(s); %s\n",
+                 CkMyPe(), boundOld, boundNew, gain,
+                 boundOld > 0.0 ? 100.0 * gain / boundOld : 0.0, 100.0 * metisMinGain(),
+                 moving, verdict);
+    }
     if (!worth) std::fill(newPe.begin(), newPe.end(), -1);
   }
 
