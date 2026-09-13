@@ -20,11 +20,21 @@ FetchContent_Declare(
 
 # Set cmake variables for reconverse
 set(_save_BUILD_SHARED_LIBS ${BUILD_SHARED_LIBS})
-set(BUILD_SHARED_LIBS ON CACHE INTERNAL "")
+get_property(_build_shared_libs_cache_type CACHE BUILD_SHARED_LIBS PROPERTY TYPE)
+if(_build_shared_libs_cache_type)
+  get_property(_build_shared_libs_cache_value CACHE BUILD_SHARED_LIBS PROPERTY VALUE)
+endif()
+set(BUILD_SHARED_LIBS ON CACHE BOOL "Build Reconverse shared libraries" FORCE)
 
 FetchContent_MakeAvailable(reconverse)
 
-set(BUILD_SHARED_LIBS ${_save_BUILD_SHARED_LIBS} CACHE INTERNAL "")
+if(_build_shared_libs_cache_type)
+  set(BUILD_SHARED_LIBS ${_build_shared_libs_cache_value}
+      CACHE ${_build_shared_libs_cache_type} "" FORCE)
+else()
+  unset(BUILD_SHARED_LIBS CACHE)
+endif()
+set(BUILD_SHARED_LIBS ${_save_BUILD_SHARED_LIBS})
 
 configure_file(${reconverse_SOURCE_DIR}/include/converse.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 configure_file(${reconverse_SOURCE_DIR}/src/cldb.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)

@@ -113,11 +113,13 @@ if(GIT AND EXISTS ${CMAKE_SOURCE_DIR}/.git)
              RESULT_VARIABLE git_result
              OUTPUT_STRIP_TRAILING_WHITESPACE
              ERROR_QUIET
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
              )
   if(NOT ${git_result} EQUAL 0)
     execute_process(COMMAND git describe --long --always
              OUTPUT_VARIABLE CHARM_VERSION_GIT
              OUTPUT_STRIP_TRAILING_WHITESPACE
+             WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
              )
   endif()
 else()
@@ -170,6 +172,9 @@ if(RECONVERSE)
     # sit on: it needs machine-persistent.h from src/arch/<layer>, and its
     # entry points would collide with the ones in libreconverse.
     list(REMOVE_ITEM conv-util-cxx-sources src/arch/util/persist-comm.C)
+    # Reconverse also provides the non-copy RDMA helpers in cmirdmautils.cpp.
+    # Do not put the legacy definitions into libcharm as well.
+    list(REMOVE_ITEM conv-util-cxx-sources src/util/cmirdmautils.C)
 endif()
 
 #Uncommenting spanning tree to satisfy ckrdma dep errors
