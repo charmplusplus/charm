@@ -1,6 +1,11 @@
 // Implementation of the cost-model config loader and tier resolution.
-// Textually included from DiffusionLB.C, following the pattern the rest of this
-// module uses for DiffusionMetric.C and friends.
+// Compiled into libck, since MetisLB prices its edge cut from the same table
+// DiffusionLB prices its moves from and the two are separate modules. The
+// standalone lbsim still includes it textually after the header; the guards
+// make that harmless.
+
+#include "DiffusionCostModel.h"
+#include "charm++.h"
 
 const char* DiffusionCostConfig::tierName(DiffusionTier t)
 {

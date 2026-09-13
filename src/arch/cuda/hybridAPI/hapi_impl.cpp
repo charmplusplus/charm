@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <climits>
 #include <cstdint>
+#include <cstring>
+#include <string>
 #include <cmath>
 #include <algorithm>
 #include <queue>
@@ -80,13 +82,14 @@ struct hapiCallbackMessage {
 
 #ifndef HAPI_CUDA_CALLBACK
 typedef struct hapiEvent {
-  hapiEvent_t event;
+  hapiEvent_t event;   // NULL marks a pinned-flag entry (see flag_seq)
   CkCallback cb;
   void* cb_msg;
   hapiWorkRequest* wr; // if this is not NULL, buffers and request itself are deallocated
+  uint32_t flag_seq;   // pinned-flag entries: the value the slot must reach
 
   hapiEvent(hapiEvent_t event_, const CkCallback& cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL)
-            : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_) {}
+            : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_), flag_seq(0) {}
 } hapiEvent;
 
 // Pending events, one FIFO per stream. Events on one stream complete in the
@@ -112,6 +115,44 @@ typedef std::map<int, std::queue<hapiEvent_t>> HapiEventPools;
 CpvDeclare(HapiEventPools, hapi_event_pool);
 #endif // HAPI_CUDA_CALLBACK
 CpvDeclare(int, n_hapi_events);
+
+// Pinned-flag completion detection (+gpuflagpoll), ported from paw-atm26
+// (2119bcbc1). The scheduler polls the head of every stream queue on every
+// loop iteration, and an event query is a driver call: with eight PE threads
+// on one context the not-ready answers alone held the driver 90% of a step
+// on sph2d (42 million cudaEventQuery calls per LB window on the process
+// with the fluid, each followed by a cudaGetLastError to clear the code), and
+// every real launch queued behind them. Instead, completion is a stream-
+// ordered 32-bit write of a per-PE sequence number into a pinned slot
+// (cuStreamWriteValue32, executed by the stream's front end after all prior
+// work), and the poll is a plain load: no driver call, no lock, nanoseconds.
+// Slots form a per-PE ring; a slot is reassigned only after HAPI_FLAG_SLOTS
+// newer entries, and recordEvent falls back to an event when that many are
+// in flight or when the stream belongs to another device, so a pending
+// entry's slot is never overwritten. Device time comes from CUPTI on this
+// branch, so nothing needs event timestamps and every callback may take it.
+// The driver entry point is looked up at startup: libcuda is only reached
+// through libcupti here, not on the link line.
+#define HAPI_FLAG_SLOTS 256  // power of two; max in-flight flag entries per PE
+#define HAPI_FLAG_STRIDE 16  // uint32s per slot: one cache line, no false sharing
+static bool hapi_use_flag_poll = false;
+typedef CUresult (*hapiStreamWriteValue32Fn)(CUstream, CUdeviceptr, cuuint32_t, unsigned int);
+static hapiStreamWriteValue32Fn hapi_stream_write_value32 = nullptr;
+CpvDeclare(uint32_t*, hapi_flag_slots);   // pinned host ring
+CpvDeclare(void*, hapi_flag_slots_dev);   // device alias of the ring
+CpvDeclare(uint32_t, hapi_flag_seq);      // last assigned sequence number
+CpvDeclare(int, hapi_flag_inflight);      // flag entries currently queued
+
+// With flags, a PE waiting on its GPU spins on a plain load and never leaves
+// its core. With events it did: most of the PE threads sat in a futex on the
+// driver lock, and CUPTI's worker and the network progress thread ran in the
+// gaps. Measured 12 Sep 2026 on sph2d at 8 PEs on 8 cores: flags were 15%
+// slower under LB than events, and 10% faster at 6 or 4 PEs. So while flag
+// entries are pending and the scheduler finds nothing else to do, give the
+// core away for a slice; it comes straight back when nothing else is runnable.
+static void hapiIdleYield(void*) {
+  if (CpvAccess(hapi_flag_inflight) > 0) sched_yield();
+}
 
 int firstRankForDevice = 0; // First rank for each device, used for mapping
 
@@ -407,6 +448,8 @@ void hapiInit(char** argv) {
 #ifndef HAPI_CUDA_CALLBACK
     // Register polling function to be invoked at every scheduler loop
     CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)hapiPollEvents, NULL);
+    if (hapi_use_flag_poll)
+      CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE, (CcdCondFn)hapiIdleYield, NULL);
 #endif
   }
 
@@ -531,6 +574,12 @@ void hapiExit() {
   // Ensure all PEs have finished GPU work
   CmiPrintf("Exit called on PE %d\n", CmiMyPe());
   CmiNodeBarrier();
+
+  if (CpvAccess(hapi_flag_slots) != NULL) {
+    hapiFreeHost((void*)CpvAccess(hapi_flag_slots));
+    CpvAccess(hapi_flag_slots) = NULL;
+    CpvAccess(hapi_flag_slots_dev) = NULL;
+  }
 
 #if CMK_SHRINK_EXPAND
   char client_fifo_path[BUFFER_SIZE];
@@ -672,6 +721,37 @@ void hapiProcessCuptiBuffers() {
   };
   std::vector<PendingKernel> pending;
   pending.reserve(gm.cupti_pending_hint_);
+
+  // Runtime API records: the host time each call took, per object where the
+  // correlation names one. Like kernels, a record can precede its correlation
+  // and is parked for the second pass. A new drain is a new round.
+  gm.cupti_obj_api_raw_.clear();
+  gm.cupti_api_total_ = 0.0;
+  struct PendingApi { uint32_t correlation_id; double seconds; };
+  std::vector<PendingApi> pendingApi;
+  std::unordered_map<uint64_t, double> apiByToken;
+  double api_unattributed_s = 0.0;
+  uint32_t api_count = 0;
+  // Most runtime records are the scheduler polling an event between entry
+  // methods -- millions per window on a GPU-bound step, at a microsecond
+  // each. They never belong to an object, so they skip the correlation
+  // table (a lookup that misses in a table of every launch this window),
+  // and a thread's back-to-back calls are folded into one interval as they
+  // are read, which is what the union would make of them anyway. Measured
+  // 12 Sep 2026: storing and sorting every record cost 3-5 s per LB step on
+  // sph2d at 12.5M particles, most of the step's regression.
+  // Per-record state is kept in flat arrays: at 85 million records a window
+  // (measured, sph2d 12.5M particles, the process with the fluid) even a small
+  // hash lookup per record is seconds. Callback ids are small integers, and
+  // records arrive in long runs from one thread, so a one-entry thread cache
+  // almost always hits.
+  struct CbidUse { uint64_t count = 0; double seconds = 0.0; bool poll = false; bool known = false; };
+  std::vector<CbidUse> byCbid(CUPTI_RUNTIME_TRACE_CBID_SIZE + 1);
+  struct LastInterval { size_t idx = SIZE_MAX; uint64_t start = 0; };  // SIZE_MAX: none yet
+  std::unordered_map<uint32_t, LastInterval> lastByThread;
+  uint32_t cachedThread = 0;
+  LastInterval* cachedLast = nullptr;
+  const uint64_t kCoalesceNs = 2000;
 
   uint32_t kernel_count = 0;
   uint32_t object_corr_count = 0;
@@ -847,14 +927,57 @@ void hapiProcessCuptiBuffers() {
               applyWorkTag(kernel->correlationId, launch, rec, /*last_chance=*/false);
         }
 
+        // The correlation stays in the table: the launch's own API record
+        // shares the id and may still be coming. Everything left is dropped
+        // when the drain ends.
         auto object = gm.cupti_object_correlation_db_.find(kernel->correlationId);
         if (bucket_settled && object != gm.cupti_object_correlation_db_.end()) {
-          const uint64_t object_token = object->second;
-          gm.cupti_object_correlation_db_.erase(object);
-          fileKernel(rec, object_token);
+          fileKernel(rec, object->second);
         } else {
           pending.push_back({kernel->correlationId, launch, rec});
           deferred++;
+        }
+      }
+      else if (record->kind == CUPTI_ACTIVITY_KIND_RUNTIME) {
+        const CUpti_ActivityAPI* api = (const CUpti_ActivityAPI*)record;
+        if (api->end > api->start) {
+          api_count++;
+          const double seconds = (double)(api->end - api->start) / 1.0e9;
+          gm.cupti_api_total_ += seconds;
+          CbidUse& use = byCbid[api->cbid < byCbid.size() ? api->cbid : byCbid.size() - 1];
+          if (!use.known) {
+            use.known = true;
+            const char* name = nullptr;
+            if (cuptiGetCallbackName(CUPTI_CB_DOMAIN_RUNTIME_API, api->cbid, &name) == CUPTI_SUCCESS &&
+                name != nullptr)
+              use.poll = (strstr(name, "Query") != nullptr);
+          }
+          use.count++;
+          use.seconds += seconds;
+          if (cachedLast == nullptr || cachedThread != api->threadId) {
+            cachedThread = api->threadId;
+            cachedLast = &lastByThread[api->threadId];
+          }
+          LastInterval& last = *cachedLast;
+          if (last.idx != SIZE_MAX && last.idx < gm.cupti_api_intervals_.size() &&
+              api->start >= last.start &&
+              api->start <= gm.cupti_api_intervals_[last.idx].second + kCoalesceNs) {
+            auto& iv = gm.cupti_api_intervals_[last.idx];
+            if (api->end > iv.second) iv.second = api->end;
+          } else {
+            last.idx = gm.cupti_api_intervals_.size();
+            last.start = api->start;
+            gm.cupti_api_intervals_.emplace_back(api->start, api->end);
+          }
+          if (use.poll) {
+            api_unattributed_s += seconds;
+          } else {
+            auto object = gm.cupti_object_correlation_db_.find(api->correlationId);
+            if (object != gm.cupti_object_correlation_db_.end())
+              apiByToken[object->second] += seconds;
+            else
+              pendingApi.push_back({api->correlationId, seconds});
+          }
         }
       }
     }
@@ -876,9 +999,55 @@ void hapiProcessCuptiBuffers() {
       continue;
     }
 
-    const uint64_t object_token = object->second;
-    gm.cupti_object_correlation_db_.erase(object);
-    fileKernel(pending_kernel.rec, object_token);
+    fileKernel(pending_kernel.rec, object->second);
+  }
+
+  // API records whose correlation arrived later, then every token to its
+  // object. A call made outside any entry method -- the scheduler polling an
+  // event, say -- belongs to no object; it still occupied the driver and is
+  // in the intervals, so the launch term counts it, but nobody is charged.
+  for (const PendingApi& p : pendingApi) {
+    auto object = gm.cupti_object_correlation_db_.find(p.correlation_id);
+    if (object == gm.cupti_object_correlation_db_.end()) api_unattributed_s += p.seconds;
+    else apiByToken[object->second] += p.seconds;
+  }
+  for (const auto& kv : apiByToken) {
+    auto memo = resolved_tokens.find(kv.first);
+    if (memo == resolved_tokens.end()) {
+      ResolvedToken entry;
+      {
+        std::lock_guard<std::mutex> token_lock(gm.cupti_object_token_lock_);
+        entry.valid = gm.cupti_object_tokens_.resolve(kv.first, entry.key);
+      }
+      memo = resolved_tokens.emplace(kv.first, entry).first;
+    }
+    if (memo->second.valid) gm.cupti_obj_api_raw_[memo->second.key] += kv.second;
+    else api_unattributed_s += kv.second;
+  }
+  if (_lb_args.debug() > 1) {
+    CmiPrintf("HAPI[pe=%d]: runtime API records=%u total=%.6fs unattributed=%.6fs "
+              "objects=%zu intervals=%zu\n", CmiMyPe(), api_count, gm.cupti_api_total_,
+              api_unattributed_s, gm.cupti_obj_api_raw_.size(), gm.cupti_api_intervals_.size());
+    // Where the driver time went, by call: the few calls that carry most of it.
+    std::vector<std::pair<uint32_t, CbidUse>> top;
+    for (uint32_t c = 0; c < byCbid.size(); c++)
+      if (byCbid[c].count > 0) top.emplace_back(c, byCbid[c]);
+    std::sort(top.begin(), top.end(), [](const std::pair<uint32_t, CbidUse>& a,
+                                         const std::pair<uint32_t, CbidUse>& b) {
+      return a.second.seconds > b.second.seconds;
+    });
+    std::string line;
+    for (size_t i = 0; i < top.size() && i < 6; i++) {
+      const char* name = nullptr;
+      if (cuptiGetCallbackName(CUPTI_CB_DOMAIN_RUNTIME_API, top[i].first, &name) != CUPTI_SUCCESS ||
+          name == nullptr)
+        name = "?";
+      char buf[160];
+      snprintf(buf, sizeof buf, " %s x%llu %.3fs", name, (unsigned long long)top[i].second.count,
+               top[i].second.seconds);
+      line += buf;
+    }
+    CmiPrintf("HAPI[pe=%d]: runtime API by call:%s\n", CmiMyPe(), line.c_str());
   }
 
   // Size next round's parked vector from this one: the straggler count is a
@@ -942,6 +1111,33 @@ void hapiNormalizeCuptiLoads() {
   GPUManager& gm = CsvAccess(gpu_manager);
   gm.cupti_obj_norm_load_.clear();
   gm.cupti_obj_epoch_costs_.clear();
+
+  // The driver's busy time this round: the union of every runtime-API
+  // interval from every thread of the process. The per-thread sums cannot be
+  // it -- eight threads waiting on one lock each count the same wait -- and
+  // the union is exactly the time the serialised driver had a call in hand.
+  // One context per process is assumed; a process driving several devices
+  // merges their contexts here and over-states nothing but their overlap.
+  {
+    auto& iv = gm.cupti_api_intervals_;
+    std::sort(iv.begin(), iv.end());
+    uint64_t busy_ns = 0, cur_lo = 0, cur_hi = 0;
+    bool open = false;
+    for (const auto& s : iv) {
+      if (!open || s.first > cur_hi) {
+        if (open) busy_ns += cur_hi - cur_lo;
+        cur_lo = s.first;
+        cur_hi = s.second;
+        open = true;
+      } else if (s.second > cur_hi) {
+        cur_hi = s.second;
+      }
+    }
+    if (open) busy_ns += cur_hi - cur_lo;
+    gm.cupti_driver_busy_ = (double)busy_ns / 1.0e9;
+    iv.clear();
+    iv.shrink_to_fit();
+  }
 
   const bool scaling = _lb_args.gpuScaling();
 
@@ -1209,6 +1405,11 @@ void hapiNormalizeCuptiLoads() {
               sweep_unattr_demand, (seen > 0.0) ? sweep_unattr_demand / seen : 0.0,
               sweep_busy_s, (sweep_busy_s > 0.0) ? seen / sweep_busy_s : 0.0,
               window_s, (window_s > 0.0) ? sweep_busy_s / window_s : 0.0);
+    CmiPrintf("[driver-audit pe=%d] api_total_s=%.6f driver_busy_s=%.6f "
+              "contention=%.2f window_s=%.6f driver_util=%.3f\n",
+              CmiMyPe(), gm.cupti_api_total_, gm.cupti_driver_busy_,
+              (gm.cupti_driver_busy_ > 0.0) ? gm.cupti_api_total_ / gm.cupti_driver_busy_ : 0.0,
+              window_s, (window_s > 0.0) ? gm.cupti_driver_busy_ / window_s : 0.0);
     fflush(stdout);
   }
 }
@@ -1289,6 +1490,10 @@ void hapiClearCuptiData() {
   gm.cupti_unattributed_kernels_.clear();
   gm.cupti_obj_norm_load_.clear();
   gm.cupti_obj_epoch_costs_.clear();
+  gm.cupti_obj_api_raw_.clear();
+  gm.cupti_api_intervals_.clear();
+  gm.cupti_api_total_ = 0.0;
+  gm.cupti_driver_busy_ = 0.0;
   // Correlation maps are drained alongside the CUPTI buffers in
   // hapiProcessCuptiBuffers. Do not clear the object-token table: later epochs
   // must reuse the same token for the same full LB identity.
@@ -1311,6 +1516,16 @@ static void hapiInitCpv() {
 #endif
   CpvInitialize(int, n_hapi_events);
   CpvAccess(n_hapi_events) = 0;
+
+  CpvInitialize(uint32_t*, hapi_flag_slots);
+  CpvInitialize(void*, hapi_flag_slots_dev);
+  CpvInitialize(uint32_t, hapi_flag_seq);
+  CpvInitialize(int, hapi_flag_inflight);
+  CpvAccess(hapi_flag_slots) = NULL;
+  CpvAccess(hapi_flag_slots_dev) = NULL;
+  CpvAccess(hapi_flag_seq) = 0;
+  CpvAccess(hapi_flag_inflight) = 0;
+  // The ring itself is allocated in hapiMapping, once the PE has its device.
 
   // Device mapping
   CpvInitialize(int, my_device);
@@ -1473,6 +1688,34 @@ static void hapiMapping(char** argv) {
   }
   
   hapiCheck(hapiSetDevice(cpv_my_device));
+
+  // +gpuflagpoll: completion by pinned-flag write instead of event query.
+  // Every PE parses it (the value is the same on all); the ring must be
+  // allocated after hapiSetDevice so the pinned pages and their device alias
+  // belong to this PE's device.
+  if (CmiGetArgFlagDesc(argv, "+gpuflagpoll",
+        "detect kernel completion via pinned-flag writes instead of event polling")) {
+    hapi_use_flag_poll = true;
+    if (hapi_stream_write_value32 == nullptr) {
+      void* fn = nullptr;
+      cudaDriverEntryPointQueryResult status = cudaDriverEntryPointSymbolNotFound;
+      if (cudaGetDriverEntryPointByVersion("cuStreamWriteValue32", &fn, 12000,
+                                           cudaEnableDefault, &status) != cudaSuccess ||
+          status != cudaDriverEntryPointSuccess || fn == nullptr) {
+        cudaGetLastError();
+        CmiAbort("HAPI> +gpuflagpoll: cuStreamWriteValue32 is not available from this driver");
+      }
+      hapi_stream_write_value32 = (hapiStreamWriteValue32Fn)fn;
+    }
+    uint32_t*& slots = CpvAccess(hapi_flag_slots);
+    const size_t bytes = (size_t)HAPI_FLAG_SLOTS * HAPI_FLAG_STRIDE * sizeof(uint32_t);
+    hapiCheck(cudaHostAlloc((void**)&slots, bytes, cudaHostAllocPortable | cudaHostAllocMapped));
+    memset((void*)slots, 0, bytes);
+    hapiCheck(hapiHostGetDevicePointer(&CpvAccess(hapi_flag_slots_dev), (void*)slots, 0));
+    if (CmiMyPe() == 0)
+      CmiPrintf("HAPI> Pinned-flag completion detection enabled (%d slots per PE)\n",
+                HAPI_FLAG_SLOTS);
+  }
 #if CMK_SMP
   CmiLock(csv_gpu_manager.device_mapping_lock);
 #endif
@@ -1702,6 +1945,41 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
   int prev_dev = -1;
   hapiCheck(hapiGetDevice(&prev_dev));
   const int use_dev = (stream_dev >= 0) ? stream_dev : prev_dev;
+
+  // Pinned-flag path (+gpuflagpoll): no event object, no query later. Only for
+  // a stream on this PE's own device -- the ring's device alias belongs to
+  // it -- and while the ring has a free slot; otherwise an event, as before.
+  if (hapi_use_flag_poll && use_dev == CpvAccess(my_device) &&
+      CpvAccess(hapi_flag_inflight) < HAPI_FLAG_SLOTS) {
+    uint32_t& seq_counter = CpvAccess(hapi_flag_seq);
+    if (++seq_counter == 0) ++seq_counter;  // 0 means "slot never written"
+    const uint32_t seq = seq_counter;
+    const uint32_t idx = seq & (HAPI_FLAG_SLOTS - 1);
+    uint32_t* slot_dev =
+        (uint32_t*)CpvAccess(hapi_flag_slots_dev) + (size_t)idx * HAPI_FLAG_STRIDE;
+    // Executes only after all prior work on the stream, so the slot reaching
+    // seq means that work is complete.
+    const CUresult res = hapi_stream_write_value32((CUstream)stream, (CUdeviceptr)slot_dev,
+                                                   seq, CU_STREAM_WRITE_VALUE_DEFAULT);
+    if (res != CUDA_SUCCESS)
+      CmiAbort("HAPI> cuStreamWriteValue32 failed (%d); +gpuflagpoll is not supported here",
+               (int)res);
+    hapiEvent hev(NULL, cb, cb_msg, wr);
+    hev.flag_seq = seq;
+    CpvAccess(hapi_flag_inflight)++;
+    hapiEventQueues& queues = CpvAccess(hapi_event_queue);
+    std::queue<hapiEvent>* q = nullptr;
+    for (auto& entry : queues)
+      if (entry.first == stream) { q = &entry.second; break; }
+    if (q == nullptr) {
+      queues.emplace_back(stream, std::queue<hapiEvent>());
+      q = &queues.back().second;
+    }
+    q->push(hev);
+    CpvAccess(n_hapi_events)++;
+    return;
+  }
+
   if (use_dev != prev_dev) hapiCheck(hapiSetDevice(use_dev));
 
   hapiEvent_t ev;
@@ -3414,51 +3692,59 @@ void hapiPollEvents(void* param) {
     std::queue<hapiEvent>& queue = entry.second;
     while (!queue.empty()) {
       hapiEvent hev = queue.front();
-      const cudaError_t q = hapiEventQuery(hev.event);
-      // A query records its verdict as this thread's last error. cudaErrorNot
-      // Ready is this poll's own answer, not a fault of the application's, and
-      // leaving it set means the next cudaPeekAtLastError in application code
-      // reports a failure that never happened. Anything else is a real problem
-      // with the queued event -- say so rather than silently treating it as
-      // "not finished yet" and polling it forever.
-      if (q == cudaErrorNotReady) {
-        cudaGetLastError();
-      } else if (q != cudaSuccess) {
-        // A queued event that cannot even be queried is not going to
-        // complete; drop it rather than polling it forever.
-        cudaGetLastError();
-        queue.pop();
-        {
-          const int d = hapiStreamDeviceOf(entry.first);
-          CpvAccess(hapi_event_pool)[d >= 0 ? d : 0].push(hev.event);
+      if (hev.event == NULL) {
+        // Pinned-flag entry: a plain load, no runtime call, no lock. Entries
+        // on one stream complete in order, so a slot short of its value means
+        // nothing behind it is done either.
+        volatile uint32_t* slot = CpvAccess(hapi_flag_slots) +
+            (size_t)(hev.flag_seq & (HAPI_FLAG_SLOTS - 1)) * HAPI_FLAG_STRIDE;
+        if (*slot != hev.flag_seq) break;
+      } else {
+        const cudaError_t q = hapiEventQuery(hev.event);
+        // A query records its verdict as this thread's last error. cudaErrorNot
+        // Ready is this poll's own answer, not a fault of the application's, and
+        // leaving it set means the next cudaPeekAtLastError in application code
+        // reports a failure that never happened. Anything else is a real problem
+        // with the queued event -- say so rather than silently treating it as
+        // "not finished yet" and polling it forever.
+        if (q == cudaErrorNotReady) {
+          cudaGetLastError();
+          // this stream's later events cannot be complete; try the next stream
+          break;
+        } else if (q != cudaSuccess) {
+          // A queued event that cannot even be queried is not going to
+          // complete; drop it rather than polling it forever.
+          cudaGetLastError();
+          queue.pop();
+          {
+            const int d = hapiStreamDeviceOf(entry.first);
+            CpvAccess(hapi_event_pool)[d >= 0 ? d : 0].push(hev.event);
+          }
+          CpvAccess(n_hapi_events)--;
+          continue;
         }
-        CpvAccess(n_hapi_events)--;
-        continue;
       }
-      if (q == hapiSuccess) {
-        queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
 
-        // invoke Charm++ callback if one was given
-        hev.cb.send(hev.cb_msg);
+      queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
 
-        // clean up hapiWorkRequest
-        if (hev.wr) {
-          hapiWorkRequestCleanup(hev.wr);
-        }
-        {
-          const int d = hapiStreamDeviceOf(entry.first);
-          CpvAccess(hapi_event_pool)[d >= 0 ? d : 0].push(hev.event);
-        }
-        CpvAccess(n_hapi_events)--;
+      // invoke Charm++ callback if one was given
+      hev.cb.send(hev.cb_msg);
 
-        // inform QD that an event was processed
-        CmiAssert(hapiQdProcess);
-        hapiQdProcess(1);
+      // clean up hapiWorkRequest
+      if (hev.wr) {
+        hapiWorkRequestCleanup(hev.wr);
       }
-      else {
-        // this stream's later events cannot be complete; try the next stream
-        break;
+      if (hev.event == NULL) {
+        CpvAccess(hapi_flag_inflight)--;  // the slot may now be reassigned
+      } else {
+        const int d = hapiStreamDeviceOf(entry.first);
+        CpvAccess(hapi_event_pool)[d >= 0 ? d : 0].push(hev.event);
       }
+      CpvAccess(n_hapi_events)--;
+
+      // inform QD that an event was processed
+      CmiAssert(hapiQdProcess);
+      hapiQdProcess(1);
     }
   }
 #endif

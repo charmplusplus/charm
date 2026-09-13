@@ -130,12 +130,15 @@ public:
   // (diffusionLoadDimDevice), and the rank-0 PEs price their node in it
   // before releasing the stats barrier.
   void loadDimReport(double sumHost, double maxHost, double sumDev, double maxDev,
-                     double period);
-  void loadDimVerdict(int device, double alphaHost, double alphaDev);
+                     double sumDrv, double maxDrv, double period);
+  void loadDimVerdict(int mode, int launch, double alphaHost, double alphaDev);
   LBCriticality loadDimCrit;  // PE 0: the reports folded so far
   int loadDimReports;
-  // This node's totals in both dimensions, from BuildStats.
-  double nodeHostSum, nodeHostMax, nodeDevSum, nodeDevMax;
+  // This node's totals in every dimension, from BuildStats: host work, device
+  // time, driver time. The group dimension's total is whichever of the last
+  // two the verdict chose (LBLoadDim.h).
+  double nodeHostSum, nodeHostMax, nodeDevSum, nodeDevMax, nodeDrvSum, nodeDrvMax;
+  double nodeGroupSum() const { return _lb_groupDimLaunch ? nodeDrvSum : nodeDevSum; }
   // Per neighbour, refreshed every round: host time per PE and device time,
   // so the across-node phase can bound what a neighbour takes in the
   // dimension not being diffused.

@@ -11,11 +11,14 @@
 
 #include "MetisLB.h"
 #include "ckgraph.h"
+#include "DiffusionCostModel.h"
 #include "LBLoadDim.h"
 #include "LBMemoryContract.h"
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <functional>
+#include <string>
 #include <limits>
 #include <map>
 #include <numeric>
@@ -157,10 +160,11 @@ void MetisLB::work(LDStats* stats)
   {
     const LBCriticality c = lbCriticalityOf(stats);
     CkPrintf("[%d] MetisLB load dimension: %s by %s (T_h %.6f over %d PEs, T_g %.6f over "
-             "%d GPUs; alpha_h %.2f, alpha_g %.2f)\n",
+             "%d GPUs, T_l %.6f over %d processes; alpha_h %.2f, alpha_g %.2f, alpha_l %.2f)\n",
              CkMyPe(), lbLoadDimName(ogr->deviceDim),
              lbLoadDimOverride() == LB_DIM_AUTO ? "criticality" : "flag", c.boundHost(),
-             c.pes, c.boundDev(), c.gpus, c.alphaHost(), c.alphaDev());
+             c.pes, c.boundDev(), c.gpus, c.boundDrv(), c.procs, c.alphaHost(), c.alphaGpu(),
+             c.alphaDrv());
     lbPrintExplained("[MetisLB]", c);
   }
 
@@ -217,7 +221,7 @@ void MetisLB::work(LDStats* stats)
   }
   auto slackOf = [&](int i) {
     return ogr->deviceDim ? (double)stats->objData[i].wallTime
-                          : (double)stats->objData[i].gpuTime;
+                          : lbObjGroupLoad(stats->objData[i]);
   };
 #endif
 
@@ -231,26 +235,53 @@ void MetisLB::work(LDStats* stats)
   // the graph be re-partitioned without rebuilding it.
   int selfLoops = 0, outOfRange = 0, duplicates = 0;
   size_t rawEdges = 0;
-  std::vector<std::map<int, long long>> adj(numVertices);
+  struct EdgeSum { long long bytes = 0, msgs = 0; };
+  std::vector<std::map<int, EdgeSum>> adj(numVertices);
   for (int i = 0; i < numVertices; i++)
   {
-    auto addEdge = [&](int nbr, int bytes) {
+    auto addEdge = [&](int nbr, int bytes, int msgs) {
       rawEdges++;
       if (nbr == i) { selfLoops++; return; }
       if (nbr < 0 || nbr >= numVertices) { outOfRange++; return; }
-      const auto res = adj[i].emplace(nbr, 0LL);
+      const auto res = adj[i].emplace(nbr, EdgeSum());
       if (!res.second) duplicates++;
-      if (bytes > 0) res.first->second += bytes;
+      if (bytes > 0) res.first->second.bytes += bytes;
+      if (msgs > 0) res.first->second.msgs += msgs;
     };
     for (const auto& outEdge : ogr->vertices[i].sendToList)
-      addEdge(outEdge.getNeighborId(), outEdge.getNumBytes());
+      addEdge(outEdge.getNeighborId(), outEdge.getNumBytes(), outEdge.getNumMsgs());
     for (const auto& inEdge : ogr->vertices[i].recvFromList)
-      addEdge(inEdge.getNeighborId(), inEdge.getNumBytes());
+      addEdge(inEdge.getNeighborId(), inEdge.getNumBytes(), inEdge.getNumMsgs());
   }
   if (selfLoops || outOfRange || duplicates)
     CkPrintf("CharmLB> MetisLB: dropped %d self-loop(s) and %d out-of-range "
              "edge(s), merged %d duplicate edge(s) of %zu\n",
              selfLoops, outOfRange, duplicates, rawEdges);
+
+  // What an edge costs if the partition cuts it. With the table DiffusionLB
+  // prices moves from (+LBCostConfig, written by lbcalib), that is the
+  // transfer cost per interval at the tier the cut lands on: alpha seconds
+  // per message plus beta per byte. Without it, the byte count, as before.
+  //
+  // Bytes alone say a boundary through objects that exchange nothing is
+  // free, and it is not: every edge cut costs a message a step whatever it
+  // carries. On sph2d at 60k particles per patch, where three quarters of
+  // the patches are empty and exchange zero-length halos, the byte-weighted
+  // cut ran through the empty region -- a third of the bytes, on paper --
+  // and the host work per step rose 40-55% from the messages that created,
+  // taking the step from 4.4 to 6.9 ms while the balance it was asked for
+  // improved. The per-message term is what makes that cut expensive.
+  static DiffusionCostConfig costCfg;
+  static bool costCfgTried = false;
+  if (!costCfgTried)
+  {
+    costCfgTried = true;
+    if (_lb_args.costConfig() != NULL) costCfg.load(_lb_args.costConfig());
+  }
+  auto edgeCost = [&](const EdgeSum& e, DiffusionTier t) -> double {
+    if (!costCfg.calibrated) return (double)e.bytes;
+    return costCfg.tier[t].alpha * (double)e.msgs + costCfg.tier[t].beta * (double)e.bytes;
+  };
 
   // The two levels balance different resources, so they need different weights.
   // Across GPU groups what counts is device work -- and device memory, when
@@ -264,7 +295,13 @@ void MetisLB::work(LDStats* stats)
   double maxCross = 0.0, maxIntra = 0.0;
   for (int i = 0; i < numVertices; i++)
   {
-    maxCross = std::max(maxCross, ogr->vertices[i].getVertexLoad());
+    // The measured load, not getVertexLoad(): that one floors every object at
+    // 0.1 s, and a patch's device or launch time per interval is a few
+    // milliseconds to 0.09 s, so the floor made every vertex the same weight
+    // and level one balanced object counts, not the dimension it was asked to.
+    // Measured 12 Sep 2026 on sph2d: every group-level partition came out 10
+    // to 44% over the mean against a 10% tolerance, at both sizes.
+    maxCross = std::max(maxCross, ogr->vertices[i].getCompLoad());
     maxIntra = std::max(maxIntra, (double)stats->objData[i].wallTime);
   }
   /** each object load is normalized to an integer between 1 and 256 */
@@ -287,7 +324,7 @@ void MetisLB::work(LDStats* stats)
     idx_t* w = &vwgtCross[(size_t)i * nConstraints];
     // Floored at 1 throughout: METIS needs a positive weight to balance on,
     // and ceil() of a zero load is zero.
-    w[0] = std::max((idx_t)1, (idx_t)ceil(ogr->vertices[i].getVertexLoad() * crossRatio));
+    w[0] = std::max((idx_t)1, (idx_t)ceil(ogr->vertices[i].getCompLoad() * crossRatio));
 #if CMK_CUDA
     if (memAware) {
       // Footprint in MB, floored at 1 so every object has nonzero weight in
@@ -310,12 +347,15 @@ void MetisLB::work(LDStats* stats)
   // number per entry of `verts`. Edges leaving the subset are dropped: at the
   // second level they are the traffic the first level already decided to pay.
   // `ubvecIn` gives each constraint its own tolerance; null means METIS's
-  // usual 1.1 for every one.
+  // usual 1.1 for every one. `tier` is what a cut edge is paid at: across
+  // groups the transport between two GPUs, within a group the one between
+  // two PEs of a process.
   auto partitionSubset = [&](const std::vector<int>& verts, idx_t nparts,
                              const std::vector<real_t>* tpwgts,
                              const std::vector<idx_t>& weights,
                              int ncon_in,
-                             const std::vector<real_t>* ubvecIn) -> std::vector<idx_t>
+                             const std::vector<real_t>* ubvecIn,
+                             DiffusionTier tier) -> std::vector<idx_t>
   {
     const idx_t nv = (idx_t)verts.size();
     std::vector<idx_t> parts(verts.size(), 0);
@@ -326,6 +366,7 @@ void MetisLB::work(LDStats* stats)
     for (idx_t k = 0; k < nv; k++) local[verts[k]] = k;
 
     std::vector<idx_t> xadj(nv + 1), adjncy, adjwgt;
+    std::vector<double> cost;
     std::vector<idx_t> lvwgt((size_t)nv * ncon_in);
     idx_t e = 0;
     for (idx_t k = 0; k < nv; k++)
@@ -338,17 +379,26 @@ void MetisLB::work(LDStats* stats)
         const auto it = local.find(nb.first);
         if (it == local.end()) continue;
         adjncy.push_back(it->second);
-        // Positive and in range: idx_t is 32 bits in a stock METIS build and
-        // these are byte counts summed over the whole instrumented window.
-        // Both endpoints sum the same records, so the capped weight stays
-        // symmetric, which METIS also requires.
-        adjwgt.push_back((idx_t)std::min<long long>(
-            std::max<long long>(nb.second, 1),
-            (long long)std::numeric_limits<idx_t>::max()));
+        cost.push_back(edgeCost(nb.second, tier));
         e++;
       }
     }
     xadj[nv] = e;
+    // Positive and in range: idx_t is 32 bits in a stock METIS build. Without
+    // a table the weight is the byte count summed over the instrumented
+    // window, capped; with one it is seconds per interval, scaled so the
+    // heaviest edge of this subset is 2^20. Both endpoints sum the same
+    // records, so the weight stays symmetric either way, which METIS
+    // requires.
+    double maxCost = 0.0;
+    for (double c : cost) maxCost = std::max(maxCost, c);
+    const double scale =
+        (costCfg.calibrated && maxCost > 0.0) ? (double)(1 << 20) / maxCost : 1.0;
+    adjwgt.reserve(cost.size());
+    for (double c : cost)
+      adjwgt.push_back((idx_t)std::min<long long>(
+          std::max<long long>((long long)llround(c * scale), 1),
+          (long long)std::numeric_limits<idx_t>::max()));
     // METIS reads the zeroth element even when there are no edges.
     if (adjncy.empty()) { adjncy.push_back(0); adjwgt.push_back(1); }
 
@@ -441,7 +491,7 @@ void MetisLB::work(LDStats* stats)
     if (ogr->vertices[i].isMigratable()) { migVerts.push_back(i); continue; }
     const int pe = ogr->vertices[i].getCurrentPe();
     if (pe < 0 || pe >= (int)groupOfPe.size() || groupOfPe[pe] < 0) continue;
-    fixedCross[groupOfPe[pe]] += ogr->vertices[i].getVertexLoad() * crossRatio;
+    fixedCross[groupOfPe[pe]] += ogr->vertices[i].getCompLoad() * crossRatio;
     fixedCpu[pe] += stats->objData[i].wallTime * intraRatio;
 #if CMK_CUDA
     if (memAware)
@@ -514,10 +564,23 @@ void MetisLB::work(LDStats* stats)
            "of %d PEs\n", (int)migVerts.size(), (int)numVertices, (int)nGroups,
            parr->availProcSize);
 
+  // The tier a cross-group edge is paid at. Groups are GPUs: two on one host
+  // talk over CUDA IPC, two on different hosts over the network. METIS takes
+  // one weight per edge, not one per pair of parts, so if any two groups sit
+  // on different hosts every cross-group edge is priced at the network tier
+  // -- the over-priced direction, which keeps objects where they are rather
+  // than moving them onto a boundary the price understated.
+  DiffusionTier crossTier = DIFF_TIER_IPC_CROSS_GPU;
+  for (idx_t g = 1; g < nGroups; g++)
+    if (!grpPes[g].empty() && !grpPes[0].empty() &&
+        !CmiPeOnSamePhysicalNode(grpPes[0][0], grpPes[g][0]))
+      crossTier = DIFF_TIER_INTER_NODE;
+
   std::vector<real_t> ubvecCross(nConstraints, (real_t)1.1);
   if (slackIdx >= 0) ubvecCross[slackIdx] = (real_t)slackUbvec;
   const std::vector<idx_t> groupOf = partitionSubset(
-      migVerts, nGroups, nGroups > 1 ? &tpwgts : nullptr, vwgtCross, nConstraints, &ubvecCross);
+      migVerts, nGroups, nGroups > 1 ? &tpwgts : nullptr, vwgtCross, nConstraints, &ubvecCross,
+      crossTier);
 
   // Scratch-remap, level one: the group each part becomes is the group its
   // objects mostly come from, where the shares allow.
@@ -539,6 +602,40 @@ void MetisLB::work(LDStats* stats)
     for (idx_t g = 0; g < nGroups; g++)
       if (sigma[g] != (int)g) relabelledGroups++;
     for (size_t k = 0; k < migVerts.size(); k++) groupLabel[k] = sigma[groupOf[k]];
+  }
+
+  // What level one actually achieved in the dimension it balanced, group by
+  // group, against where the objects came from. METIS's tolerance is a
+  // request; with several constraints and heavy edges it is not always met,
+  // and a partition that leaves one group far over the mean is worth seeing
+  // before the levels below build on it.
+  if (_lb_args.debug() > 1 && CkMyPe() == cur_ld_balancer && nGroups > 1)
+  {
+    std::vector<double> was(nGroups, 0.0), now(nGroups, 0.0);
+    std::vector<double> loads;
+    int zeros = 0;
+    for (size_t k = 0; k < migVerts.size(); k++)
+    {
+      const double l = ogr->vertices[migVerts[k]].getCompLoad();
+      const int pe = ogr->vertices[migVerts[k]].getCurrentPe();
+      if (pe >= 0 && pe < (int)groupOfPe.size() && groupOfPe[pe] >= 0) was[groupOfPe[pe]] += l;
+      now[groupLabel[k]] += l;
+      loads.push_back(l);
+      if (l <= 0.0) zeros++;
+    }
+    std::sort(loads.begin(), loads.end(), std::greater<double>());
+    std::string line;
+    char buf[96];
+    for (idx_t g = 0; g < nGroups; g++)
+    {
+      snprintf(buf, sizeof buf, " g%d %.4f->%.4f", (int)g, was[g], now[g]);
+      line += buf;
+    }
+    CkPrintf("[%d] MetisLB level one (%s):%s; %d of %zu objects carry none; largest %.4f %.4f %.4f %.4f %.4f\n",
+             CkMyPe(), lbLoadDimName(ogr->deviceDim), line.c_str(), zeros, loads.size(),
+             loads.size() > 0 ? loads[0] : 0.0, loads.size() > 1 ? loads[1] : 0.0,
+             loads.size() > 2 ? loads[2] : 0.0, loads.size() > 3 ? loads[3] : 0.0,
+             loads.size() > 4 ? loads[4] : 0.0);
   }
 
   std::vector<std::vector<int>> grpVerts(nGroups);
@@ -576,7 +673,7 @@ void MetisLB::work(LDStats* stats)
 
     const std::vector<idx_t> peOf = partitionSubset(
         grpVerts[g], (idx_t)pes.size(), pes.size() > 1 ? &tpwgts2 : nullptr,
-        vwgtIntra, 1, nullptr);
+        vwgtIntra, 1, nullptr, DIFF_TIER_INTRA_PROCESS);
 
     // Scratch-remap, level two: the PE each part becomes is the PE its
     // objects mostly come from, where the shares allow.
@@ -628,7 +725,7 @@ void MetisLB::work(LDStats* stats)
     const bool devBinds = ogr->deviceDim;
     const int nPe = (int)parr->procs.size();
     auto hostOf = [&](int i) { return (double)stats->objData[i].wallTime; };
-    auto devOf = [&](int i) { return (double)stats->objData[i].gpuTime; };
+    auto devOf = [&](int i) { return lbObjGroupLoad(stats->objData[i]); };
     auto peOfObj = [&](int i) {
       return newPe[i] >= 0 ? newPe[i] : ogr->vertices[i].getCurrentPe();
     };
@@ -766,6 +863,96 @@ void MetisLB::work(LDStats* stats)
   }
 #endif
 
+  // ---- is the new mapping worth what it costs? ----------------------------
+  //
+  // METIS returns the least cut it can find subject to balance, and until now
+  // whatever it returned was applied. That is the right rule only when moving
+  // is free. With a table it is priced: a mapping is applied when the step
+  // time it saves per interval exceeds what it costs per interval -- the
+  // communication its cut adds over the current mapping's, plus the
+  // migrations, amortised over the intervals the placement is expected to
+  // last. It is the trade DiffusionLB's metric makes per move, made once here
+  // for the whole partition. The saving is the fall in the larger of the two
+  // bounds, the busiest GPU's device time and the busiest PE's host time,
+  // which is the most the step can shorten by; the loads say nothing about
+  // the rest of it. Without a table nothing is priced and the mapping is
+  // applied as before. The memory contract is no reason to skip this: the
+  // current mapping is where the objects already reside, so keeping it
+  // cannot exceed a capacity they already occupy.
+  //
+  // sph2d at 60k particles per patch is the case this is for: a 1.55 host
+  // imbalance, a partition that cuts the priced graph no better than the
+  // block map it replaces (1.84 -> 1.88 s per interval) and moves 82 of 128
+  // patches to bring the busiest PE down 13%, and a step that came out no
+  // faster for it.
+  if (costCfg.calibrated)
+  {
+    const int nPe = (int)parr->procs.size();
+    auto peUnder = [&](int i, bool fresh) {
+      const int cur = ogr->vertices[i].getCurrentPe();
+      return (fresh && newPe[i] >= 0) ? newPe[i] : cur;
+    };
+    // The step bound under a mapping: busiest GPU or busiest PE, host time
+    // with the PE's background and its speed, as the levels above count them.
+    auto bound = [&](bool fresh) {
+      std::vector<double> grpDev(nGroups, 0.0), peHost(nPe, 0.0);
+      for (int pe = 0; pe < nPe; pe++)
+        if (groupOfPe[pe] >= 0) peHost[pe] = stats->procs[pe].bg_walltime;
+      for (int i = 0; i < numVertices; i++)
+      {
+        const int pe = peUnder(i, fresh);
+        if (pe < 0 || pe >= nPe || groupOfPe[pe] < 0) continue;
+        grpDev[groupOfPe[pe]] += lbObjGroupLoad(stats->objData[i]);
+        peHost[pe] += (double)stats->objData[i].wallTime / peSpeed[pe];
+      }
+      double b = 0.0;
+      for (idx_t g = 0; g < nGroups; g++) b = std::max(b, grpDev[g]);
+      for (int pe = 0; pe < nPe; pe++) b = std::max(b, peHost[pe]);
+      return b;
+    };
+    // What a mapping's cut costs per interval: each cut edge at the tier its
+    // endpoints' PEs make -- nothing on one PE, the in-process tier across
+    // the PEs of one process, IPC or the network beyond.
+    auto cutCost = [&](bool fresh) {
+      double c = 0.0;
+      for (int i = 0; i < numVertices; i++)
+      {
+        const int p = peUnder(i, fresh);
+        for (const auto& nb : adj[i])
+        {
+          if (nb.first <= i) continue;
+          const int q = peUnder(nb.first, fresh);
+          if (p < 0 || q < 0 || p == q) continue;
+          c += edgeCost(nb.second, DiffusionCostConfig::tierBetween(p, q));
+        }
+      }
+      return c;
+    };
+    const DiffusionCostModel model(costCfg, DIFF_TIER_INTRA_PROCESS);
+    double migration = 0.0;
+    int moving = 0;
+    for (int i = 0; i < numVertices; i++)
+      if (newPe[i] >= 0 && newPe[i] != ogr->vertices[i].getCurrentPe())
+      {
+        migration += model.migrateCost(stats->objData[i]);
+        moving++;
+      }
+    const double boundOld = bound(false), boundNew = bound(true);
+    const double cutOld = cutCost(false), cutNew = cutCost(true);
+    const double gain = boundOld - boundNew;
+    const double cost = (cutNew - cutOld) + migration;
+    const bool worth = moving > 0 && gain > cost;
+    if ((_lb_args.debug() > 0 || !worth) && CkMyPe() == cur_ld_balancer)
+      CkPrintf("[%d] MetisLB priced: step bound %.6f -> %.6f (saves %.6f s/interval); cut "
+               "%.6f -> %.6f; %d migration(s) %.6f s/interval over %.0f interval(s); %s\n",
+               CkMyPe(), boundOld, boundNew, gain, cutOld, cutNew, moving, migration,
+               costCfg.placementLifetimeIntervals,
+               moving == 0 ? "nothing moves"
+               : worth     ? "applied"
+                           : "does not pay, current mapping kept");
+    if (!worth) std::fill(newPe.begin(), newPe.end(), -1);
+  }
+
   if (metisRemapOn() && _lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
   {
     int moved = 0;
@@ -784,7 +971,8 @@ void MetisLB::work(LDStats* stats)
     // no locality information whatsoever and its partition is an arbitrary
     // permutation -- which on a cyclic initial map means throwing spatial
     // locality away rather than improving it.
-    long long edges = 0, wTotal = 0, cutOld = 0, cutNew = 0;
+    long long edges = 0;
+    double wTotal = 0.0, cutOld = 0.0, cutNew = 0.0;
     for (int i = 0; i < numVertices; i++)
     {
       const int oldPeI = ogr->vertices[i].getCurrentPe();
@@ -796,21 +984,24 @@ void MetisLB::work(LDStats* stats)
         const int oldPeJ = ogr->vertices[j].getCurrentPe();
         const int newPeJ = (newPe[j] >= 0) ? newPe[j] : oldPeJ;
         edges++;
-        wTotal += nb.second;
+        const double w = edgeCost(nb.second, crossTier);
+        wTotal += w;
         const int gOldI = (oldPeI >= 0 && oldPeI < (int)groupOfPe.size()) ? groupOfPe[oldPeI] : -1;
         const int gOldJ = (oldPeJ >= 0 && oldPeJ < (int)groupOfPe.size()) ? groupOfPe[oldPeJ] : -1;
         const int gNewI = (newPeI >= 0 && newPeI < (int)groupOfPe.size()) ? groupOfPe[newPeI] : -1;
         const int gNewJ = (newPeJ >= 0 && newPeJ < (int)groupOfPe.size()) ? groupOfPe[newPeJ] : -1;
-        if (gOldI != gOldJ) cutOld += nb.second;
-        if (gNewI != gNewJ) cutNew += nb.second;
+        if (gOldI != gOldJ) cutOld += w;
+        if (gNewI != gNewJ) cutNew += w;
       }
     }
     int moved = 0;
     for (int i = 0; i < numVertices; i++)
       if (newPe[i] >= 0 && newPe[i] != ogr->vertices[i].getCurrentPe()) moved++;
     CkPrintf("[%d] MetisLB locality: %lld edge(s) over %d objects, total weight "
-             "%lld; cross-group weight before=%lld after=%lld; %d object(s) moved\n",
-             CkMyPe(), edges, (int)numVertices, wTotal, cutOld, cutNew, moved);
+             "%.6g %s; cross-group weight before=%.6g after=%.6g; %d object(s) moved\n",
+             CkMyPe(), edges, (int)numVertices, wTotal,
+             costCfg.calibrated ? "s/interval at the cross-group tier" : "bytes", cutOld,
+             cutNew, moved);
   }
 
   if ((_lb_args.debug() > 1) && (CkMyPe() == cur_ld_balancer))
@@ -827,7 +1018,7 @@ void MetisLB::work(LDStats* stats)
     {
       const int pe = (newPe[i] >= 0) ? newPe[i] : ogr->vertices[i].getCurrentPe();
       if (pe < 0 || pe >= (int)groupOfPe.size() || groupOfPe[pe] < 0) continue;
-      grpDev[groupOfPe[pe]] += ogr->vertices[i].getVertexLoad();
+      grpDev[groupOfPe[pe]] += ogr->vertices[i].getCompLoad();
       peHost[pe] += stats->objData[i].wallTime / peSpeed[pe];
     }
     double devMax = 0.0, devSum = 0.0;

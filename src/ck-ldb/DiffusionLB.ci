@@ -57,8 +57,8 @@ module DiffusionLB
     // dimension binds job-wide (LBLoadDim.h) and tells every PE before the
     // neighbour phase starts, so all nodes diffuse the same thing.
     entry[expedited] void loadDimReport(double sumHost, double maxHost, double sumDev, double maxDev,
-                                        double period);
-    entry[expedited] void loadDimVerdict(int device, double alphaHost, double alphaDev);
+                                        double sumDrv, double maxDrv, double period);
+    entry[expedited] void loadDimVerdict(int mode, int launch, double alphaHost, double alphaDev);
     entry[expedited] void migMsgAck();
     entry[expedited] void acrossDone();
     entry[expedited] void nbrAcrossDone();
@@ -212,7 +212,7 @@ module DiffusionLB
                 pseudo_itr, my_pseudo_load, myNodeId,
                 keyed1D ? myKeyLo : std::numeric_limits<double>::quiet_NaN(),
                 keyed1D ? myKeyHi : std::numeric_limits<double>::quiet_NaN(),
-                nodeHostSum / nodeSize, nodeDevSum);
+                nodeHostSum / nodeSize, nodeGroupSum());
           }
         }
 

@@ -112,6 +112,33 @@ public:
   }
 
 #if CMK_CUDA
+  // Companion to SetObjGPULoad for the driver. Each object's runtime-API time
+  // (hapiProcessCuptiBuffers, contended as its PE saw it) comes out of its
+  // host load, and scaled by `scale` -- the process's driver busy time over
+  // its total API time -- becomes its launch load, so the objects' launch
+  // loads sum to what the serialised driver actually spent. An object with
+  // no record this round has no driver time. Nothing is put back into the
+  // PE's background: obj_walltime was accumulated as the objects ran and is
+  // not recomputed, so the time simply leaves the host dimension.
+  inline void SetObjDriverLoad(
+      const std::unordered_map<LDObjKey, double, LDObjKeyHash> &apiRaw, double scale)
+  {
+    for (int i = 0; i < objs.size(); i++) {
+      if (objs[i].obj == nullptr) continue;
+      const LDObjHandle &handle = objs[i].obj->GetLDObjHandle();
+      LDObjKey key;
+      key.omID() = handle.omID();
+      key.objID() = handle.objID();
+      auto it = apiRaw.find(key);
+      if (it == apiRaw.end()) {
+        objs[i].obj->setDriverTiming(0.0);
+        continue;
+      }
+      objs[i].obj->takeApiTime(it->second);
+      objs[i].obj->setDriverTiming(it->second * scale);
+    }
+  }
+
   // Companion to SetObjGPULoad for the per-kernel breakdown. Objects missing
   // from the map get an empty summary rather than a stale one from a previous
   // epoch, so a load balancer can tell "no GPU work this round" from "the same

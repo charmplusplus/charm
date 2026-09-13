@@ -31,6 +31,7 @@ void LBObj::Clear(void)
 
 #if CMK_CUDA
   data.gpuTime = 0.;
+  data.driverTime = 0.;
 #endif
   data.prevPe = -1;
   data.prevStep = -1;

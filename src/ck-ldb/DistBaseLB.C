@@ -109,6 +109,16 @@ void DistBaseLB::gpuLoadsReady() {
 #if CMK_CUDA
   // Every PE picks up the normalized loads for its own objects.
   lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
+  {
+    const GPUManager& gm = CsvAccess(gpu_manager);
+    // CHARM_LB_NO_DRIVER_SPLIT: leave the driver time inside the host load and
+    // carry no launch term -- the pre-split behaviour, for A/B runs.
+    static const bool noSplit = (getenv("CHARM_LB_NO_DRIVER_SPLIT") != nullptr);
+    static const std::unordered_map<LDObjKey, double, LDObjKeyHash> noApi;
+    lbmgr->SetObjDriverLoad(noSplit ? noApi : gm.cupti_obj_api_raw_,
+                            gm.cupti_api_total_ > 0.0 ? gm.cupti_driver_busy_ / gm.cupti_api_total_
+                                                      : 0.0);
+  }
   if (_lb_args.gpuScaling())
     lbmgr->SetObjGPUCosts(CsvAccess(gpu_manager).cupti_obj_epoch_costs_);
 #endif

@@ -98,6 +98,8 @@ static inline cudaError_t hapiFreeRecord(void* ptr) {
 #define hapiFree(ptr) hapiFreeRecord(ptr)
 #define hapiMallocHost(ptr, size) cudaMallocHost(ptr, size)
 #define hapiFreeHost(ptr) cudaFreeHost(ptr)
+#define hapiHostGetDevicePointer(devPtr, hostPtr, flags) \
+    cudaHostGetDevicePointer(devPtr, hostPtr, flags)
 
 #define hapiErrorMemoryAllocation cudaErrorMemoryAllocation
 #define hapiErrorInitializationError cudaErrorInitializationError
@@ -197,6 +199,8 @@ static inline hipError_t hapiFreeRecord(void* ptr) {
 #define hapiFree(ptr) hapiFreeRecord(ptr)
 #define hapiMallocHost(ptr, size) hipHostMalloc(ptr, size)
 #define hapiFreeHost(ptr) hipFreeHost(ptr)
+#define hapiHostGetDevicePointer(devPtr, hostPtr, flags) \
+    hipHostGetDevicePointer(devPtr, hostPtr, flags)
 
 #define hapiErrorMemoryAllocation hipErrorMemoryAllocation
 #define hapiErrorInitializationError hipErrorInitializationError

@@ -43,6 +43,7 @@ CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
 int diffusionLoadDimDevice = -1;
 int diffusionNodeDeviceBound = 0;
 int diffusionPpn = 1;
+int _lb_groupDimLaunch = 0;
 
 // ---- printing and aborting -----------------------------------------------
 

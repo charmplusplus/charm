@@ -330,6 +330,23 @@ struct GPUManager {
   // Full object identity -> SM-utilization-normalized GPU load in seconds.
   std::unordered_map<LDObjKey, double, LDObjKeyHash> cupti_obj_norm_load_;
 
+  // Host-side driver time. A CUDA runtime call is host time the calling PE
+  // spends inside the driver, and with several PEs on one context most of it
+  // is waiting for the context lock: on sph2d at eight PEs per GPU an object's
+  // wall time was three times the work one PE does for it alone, and lowering
+  // the busiest PE's did not shorten the step. That time is neither the
+  // object's nor the PE's; it is a per-process resource, serialised like the
+  // device. So each object's runtime-API time -- contended, as its PE saw it
+  // -- is kept here to be taken OUT of its host load, and the process's
+  // driver busy time, the union of every API interval, which is what the
+  // serialised driver actually spent, becomes the launch term, shared out to
+  // the objects in proportion to their API time (LBDatabase::SetObjDriverLoad).
+  std::unordered_map<LDObjKey, double, LDObjKeyHash> cupti_obj_api_raw_;  // seconds
+  double cupti_api_total_ = 0.0;    // seconds of API time this round, every thread
+  double cupti_driver_busy_ = 0.0;  // seconds with at least one call in flight
+  // Every API record's interval this round, for the union.
+  std::vector<std::pair<uint64_t, uint64_t>> cupti_api_intervals_;
+
   // Full object identity -> this epoch's per-kernel summary. Built alongside
   // cupti_obj_norm_load_ and read by every PE in the process, so like that map
   // it is const once hapiPrepareCuptiLoads has run.

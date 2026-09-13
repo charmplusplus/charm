@@ -60,7 +60,6 @@ static bool diffusionGlobalPhases() {
 // nothing mutates it after the load.
 DiffusionCostConfig diffusionCostCfg;
 
-#include "DiffusionCostModel.C"
 #include "DiffusionMetric.C"
 #include "DiffusionNeighbors.C"
 #include "DiffusionPseudo.C"
@@ -228,7 +227,7 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   remapGid.setZero();
   planReports = 0;
   loadDimReports = 0;
-  nodeHostSum = nodeHostMax = nodeDevSum = nodeDevMax = 0.0;
+  nodeHostSum = nodeHostMax = nodeDevSum = nodeDevMax = nodeDrvSum = nodeDrvMax = 0.0;
 
 #if CMK_LBDB_ON
   lbname = "DiffusionLB";
@@ -382,7 +381,8 @@ void DiffusionLB::ReceiveStats(CkMarshalledCLBStatsMessage&& data)
     double period = 0.0;
     for (int r = 0; r < nodeSize && r < (int)nodeStats->procs.size(); r++)
       period = std::max(period, (double)nodeStats->procs[r].total_walltime);
-    thisProxy[0].loadDimReport(nodeHostSum, nodeHostMax, nodeDevSum, nodeDevMax, period);
+    thisProxy[0].loadDimReport(nodeHostSum, nodeHostMax, nodeDevSum, nodeDevMax, nodeDrvSum,
+                               nodeDrvMax, period);
     statsReceived = 0;
   }
 #endif
@@ -401,15 +401,18 @@ void DiffusionLB::statsAssembled()
 // is one process driving one device, so each report stands for nodeSize PEs
 // of host capacity and one GPU of device capacity.
 void DiffusionLB::loadDimReport(double sumHost, double maxHost, double sumDev, double maxDev,
-                                double period)
+                                double sumDrv, double maxDrv, double period)
 {
   LBCriticality c;
   c.sumHost = sumHost;
   c.maxHost = maxHost;
   c.sumDev = sumDev;
   c.maxDev = maxDev;
+  c.sumDrv = sumDrv;
+  c.maxDrv = maxDrv;
   c.pes = nodeSize;
   c.gpus = 1;
+  c.procs = 1;
   c.period = period;
   loadDimCrit.merge(c);
   if (++loadDimReports < numNodes) return;
@@ -418,26 +421,29 @@ void DiffusionLB::loadDimReport(double sumHost, double maxHost, double sumDev, d
   const int mode = lbResolveLoadMode(loadDimCrit);
   if (_lb_args.debug() > 0)
     CkPrintf("[DiffusionLB] step %d load dimension: %s by %s (T_h %.6f over %d PEs, T_g %.6f "
-             "over %d nodes; alpha_h %.2f, alpha_g %.2f)\n",
+             "over %d nodes, T_l %.6f; alpha_h %.2f, alpha_g %.2f, alpha_l %.2f)\n",
              step(), lbLoadModeName(mode),
              lbLoadDimOverride() == LB_DIM_AUTO ? "criticality" : "flag",
              loadDimCrit.boundHost(), loadDimCrit.pes, loadDimCrit.boundDev(),
-             loadDimCrit.gpus, loadDimCrit.alphaHost(), loadDimCrit.alphaDev());
+             loadDimCrit.gpus, loadDimCrit.boundDrv(), loadDimCrit.alphaHost(),
+             loadDimCrit.alphaGpu(), loadDimCrit.alphaDrv());
   if (_lb_args.debug() > 0) lbPrintExplained("[DiffusionLB]", loadDimCrit);
   const double alphaHost = loadDimCrit.alphaHost(), alphaDev = loadDimCrit.alphaDev();
   loadDimCrit = LBCriticality();
-  thisProxy.loadDimVerdict(mode, alphaHost, alphaDev);
+  thisProxy.loadDimVerdict(mode, _lb_groupDimLaunch, alphaHost, alphaDev);
 }
 
-// Every PE takes the verdict; the rank-0 PEs then price their node in the
-// chosen quantity and release the stats barrier they held for it. In the
-// step-time mode the node's own binding side decides what each of its objects
-// is worth (DiffusionLoad.h).
-void DiffusionLB::loadDimVerdict(int mode, double, double)
+// Every PE takes the verdict -- the mode, and which load the group dimension
+// carries; the rank-0 PEs then price their node in the chosen quantity and
+// release the stats barrier they held for it. In the step-time mode the
+// node's own binding side decides what each of its objects is worth
+// (DiffusionLoad.h).
+void DiffusionLB::loadDimVerdict(int mode, int launch, double, double)
 {
   diffusionLoadDimDevice = mode;
+  _lb_groupDimLaunch = launch;
   if (CkMyPe() != rank0PE) return;
-  diffusionNodeDeviceBound = (nodeDevSum >= nodeHostSum / nodeSize) ? 1 : 0;
+  diffusionNodeDeviceBound = (nodeGroupSum() >= nodeHostSum / nodeSize) ? 1 : 0;
   my_load = 0.0;
   for (size_t i = 0; i < nodeStats->objData.size(); i++)
     my_load += diffusionObjLoad(nodeStats->objData[i]);

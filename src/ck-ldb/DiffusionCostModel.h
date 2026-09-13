@@ -127,7 +127,9 @@ public:
 
   // One-off cost of moving the object, amortised over the intervals the
   // placement is expected to survive so it can be compared against per-interval
-  // load and communication figures.
+  // load and communication figures. Sizes the application never declared are
+  // zero (LBObj), so such an object is priced at the per-migration constant
+  // alone -- an under-estimate, and the reason declaring them matters.
   double migrateCost(const LDObjData& o) const
   {
     double hostBytes = (double)pup_decodeSize(o.pupSize);

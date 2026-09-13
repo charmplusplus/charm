@@ -49,12 +49,38 @@
 #include "LBManager.h"
 #include "lbdb.h"
 
+// A third term, measured 12 Sep 2026 on sph2d at 60k particles per patch:
+// with eight PEs driving one GPU, two thirds of what the per-object timers
+// called host time was the CUDA driver -- eight threads serialised on one
+// context, each counting its wait as work. One PE did the same 32 patches'
+// host work in a third of the time the eight measured. That time is a
+// per-process resource like the device, and balancing it across PEs cannot
+// shorten the step; the PE-level imbalance it produced (1.55) was who waited
+// longest for the lock, and a balancer moved 82 of 128 patches for it. So
+// the host dimension is host work with the driver time taken out
+// (LBDatabase::SetObjDriverLoad), and the driver time is a launch term,
+// aggregated per process and balanced by the same moves as device time:
+//
+//   T_l = max( sum_l / N_proc , l_max )
+//
+// Device time and launch time both aggregate over the PEs sharing a device
+// and both move with the object between groups, so they are one balancing
+// dimension with two candidate loads; the larger bound of the two is the
+// group dimension (lbObjGroupLoad).
+
+// Which per-group load an object's group load is: 0 device time, 1 driver
+// time. Set job-wide by the resolvers below on the PE that decides, and by
+// DiffusionLB's verdict on every PE. Defined in LBManager.C.
+extern int _lb_groupDimLaunch;
+
 struct LBCriticality
 {
   double sumHost = 0.0, maxHost = 0.0;
   double sumDev = 0.0, maxDev = 0.0;
-  int pes = 0;   // P: PEs the host dimension is spread over
-  int gpus = 0;  // G: devices the device dimension is spread over
+  double sumDrv = 0.0, maxDrv = 0.0;
+  int pes = 0;    // P: PEs the host dimension is spread over
+  int gpus = 0;   // G: devices the device dimension is spread over
+  int procs = 0;  // processes (CUDA contexts) the driver time is spread over
   // Wall time of the balancing interval, the longest any PE saw. What the
   // two measured loads are held against: alpha says which of them is the
   // larger relative to its resources, and nothing about whether either is
@@ -64,12 +90,14 @@ struct LBCriticality
   // can move it much. Zero when unknown (the offline simulator).
   double period = 0.0;
 
-  void addObject(double h, double g)
+  void addObject(double h, double g, double l = 0.0)
   {
     sumHost += h;
     if (h > maxHost) maxHost = h;
     sumDev += g;
     if (g > maxDev) maxDev = g;
+    sumDrv += l;
+    if (l > maxDrv) maxDrv = l;
   }
   // Fold another node's (or PE's) totals in, for a distributed reduction.
   void merge(const LBCriticality& o)
@@ -78,42 +106,74 @@ struct LBCriticality
     maxHost = std::max(maxHost, o.maxHost);
     sumDev += o.sumDev;
     maxDev = std::max(maxDev, o.maxDev);
+    sumDrv += o.sumDrv;
+    maxDrv = std::max(maxDrv, o.maxDrv);
     pes += o.pes;
     gpus += o.gpus;
+    procs += o.procs;
     period = std::max(period, o.period);
   }
   // Each dimension's even-spread bound as a share of the interval.
   double hostShare() const { return period > 0.0 ? boundHost() / period : 0.0; }
   double devShare() const { return period > 0.0 ? boundDev() / period : 0.0; }
-  // Neither dimension accounts for as much as `below` of the interval.
+  double drvShare() const { return period > 0.0 ? boundDrv() / period : 0.0; }
+  // No dimension accounts for as much as `below` of the interval.
   bool unexplained(double below) const
   {
-    return period > 0.0 && hostShare() < below && devShare() < below;
+    return period > 0.0 && hostShare() < below && devShare() < below && drvShare() < below;
   }
 
   double boundHost() const { return pes > 0 ? std::max(sumHost / pes, maxHost) : 0.0; }
   double boundDev() const { return gpus > 0 ? std::max(sumDev / gpus, maxDev) : 0.0; }
-  double lowerBound() const { return std::max(boundHost(), boundDev()); }
+  double boundDrv() const { return procs > 0 ? std::max(sumDrv / procs, maxDrv) : 0.0; }
+  // The group dimension: device time or driver time, whichever bound is
+  // larger. Both aggregate over the PEs sharing a device and both move with
+  // the object, so a balancer equalises one of them per step.
+  bool groupDimLaunch() const { return boundDrv() > boundDev(); }
+  double boundGroup() const { return std::max(boundDev(), boundDrv()); }
+  double lowerBound() const { return std::max(boundHost(), boundGroup()); }
   double alphaHost() const
   {
     const double lb = lowerBound();
     return lb > 0.0 ? boundHost() / lb : 0.0;
   }
+  // The group dimension's slack -- device or launch, whichever it is.
   double alphaDev() const
+  {
+    const double lb = lowerBound();
+    return lb > 0.0 ? boundGroup() / lb : 0.0;
+  }
+  double alphaGpu() const
   {
     const double lb = lowerBound();
     return lb > 0.0 ? boundDev() / lb : 0.0;
   }
+  double alphaDrv() const
+  {
+    const double lb = lowerBound();
+    return lb > 0.0 ? boundDrv() / lb : 0.0;
+  }
   // Ties go to the host: a job with no device load at all has both bounds at
   // zero and must keep balancing host time, as it always did.
-  bool deviceBinds() const { return boundDev() > boundHost(); }
+  bool deviceBinds() const { return boundGroup() > boundHost(); }
   // Neither dimension has enough slack to be ignored.
   bool comparable(double above) const
   {
-    return boundHost() > 0.0 && boundDev() > 0.0 &&
+    return boundHost() > 0.0 && boundGroup() > 0.0 &&
            std::min(alphaHost(), alphaDev()) >= above;
   }
 };
+
+// An object's load in the group dimension: its device time, or its driver
+// time when that is the larger bound job-wide.
+static inline double lbObjGroupLoad(const LDObjData& o)
+{
+#if CMK_CUDA
+  return _lb_groupDimLaunch ? (double)o.driverTime : (double)o.gpuTime;
+#else
+  return 0.0;
+#endif
+}
 
 enum LBLoadDimOverride
 {
@@ -145,10 +205,20 @@ static inline LBLoadDimOverride lbLoadDimOverride()
 // The alpha at or above which both dimensions count (+LBLoadVectorAbove).
 static inline double lbLoadVectorAbove() { return _lb_args.loadVectorAbove(); }
 
+// Both resolvers also settle which load the group dimension carries this
+// step (_lb_groupDimLaunch), on the PE that decides. A flag means device
+// time, as it always did.
+static inline void lbSettleGroupDim(const LBCriticality& c)
+{
+  _lb_groupDimLaunch =
+      (lbLoadDimOverride() == LB_DIM_AUTO && c.groupDimLaunch()) ? 1 : 0;
+}
+
 // The one-dimensional decision: an override wins, otherwise whichever
 // dimension binds.
 static inline bool lbResolveDeviceDim(const LBCriticality& c)
 {
+  lbSettleGroupDim(c);
   switch (lbLoadDimOverride())
   {
     case LB_DIM_DEVICE: return true;
@@ -161,6 +231,7 @@ static inline bool lbResolveDeviceDim(const LBCriticality& c)
 // they are comparable, else the one that binds.
 static inline LBLoadMode lbResolveLoadMode(const LBCriticality& c)
 {
+  lbSettleGroupDim(c);
   switch (lbLoadDimOverride())
   {
     case LB_DIM_DEVICE: return LB_MODE_DEVICE;
@@ -171,10 +242,11 @@ static inline LBLoadMode lbResolveLoadMode(const LBCriticality& c)
   }
 }
 
-static inline const char* lbLoadDimName(bool device) { return device ? "device" : "host"; }
+static inline const char* lbGroupDimName() { return _lb_groupDimLaunch ? "launch" : "device"; }
+static inline const char* lbLoadDimName(bool device) { return device ? lbGroupDimName() : "host"; }
 static inline const char* lbLoadModeName(int mode)
 {
-  return mode == LB_MODE_STEP ? "step (both)" : mode == LB_MODE_DEVICE ? "device" : "host";
+  return mode == LB_MODE_STEP ? "step (both)" : mode == LB_MODE_DEVICE ? lbGroupDimName() : "host";
 }
 
 // Below this share of the interval a dimension is not what the step waits
@@ -192,14 +264,15 @@ static inline void lbPrintExplained(const char* who, const LBCriticality& c)
   // multi-step interval, or a stats window that started after the interval
   // did (a central balancer's first step, before any ClearLoads). The shares
   // then say nothing, and the verdict is withheld.
-  const bool spans = c.hostShare() > 1.5 || c.devShare() > 1.5;
-  CkPrintf("%s measured loads explain host %.0f%%, device %.0f%% of the %.3f s interval%s\n",
-           who, 100.0 * c.hostShare(), 100.0 * c.devShare(), c.period,
+  const bool spans = c.hostShare() > 1.5 || c.devShare() > 1.5 || c.drvShare() > 1.5;
+  CkPrintf("%s measured loads explain host %.0f%%, device %.0f%%, launch %.0f%% of the %.3f s "
+           "interval%s\n",
+           who, 100.0 * c.hostShare(), 100.0 * c.devShare(), 100.0 * c.drvShare(), c.period,
            spans ? " -- loads exceed the interval: they do not cover the same span (declared "
                    "per-step loads, or a stats window shorter than the interval); shares "
                    "not meaningful"
            : c.unexplained(kLBUnexplainedBelow)
-               ? " -- NEITHER dimension holds the step open; balancing either cannot move it much"
+               ? " -- NO dimension holds the step open; balancing any cannot move it much"
                : "");
 }
 
@@ -209,21 +282,24 @@ static inline LBCriticality lbCriticalityOf(const BaseLB::LDStats* stats)
 {
   LBCriticality c;
   std::unordered_set<uint64_t> devices;
+  std::unordered_set<int> processes;
   for (int pe = 0; pe < stats->nprocs(); pe++)
   {
     if (!stats->procs[pe].available) continue;
     c.pes++;
     devices.insert(stats->procs[pe].gpu_device_id);
+    processes.insert(CmiNodeOf(pe));
     c.period = std::max(c.period, (double)stats->procs[pe].total_walltime);
   }
   c.gpus = (int)devices.size();
+  c.procs = (int)processes.size();
   for (size_t i = 0; i < stats->objData.size(); i++)
   {
     const LDObjData& o = stats->objData[i];
 #if CMK_CUDA
-    c.addObject(o.wallTime, o.gpuTime);
+    c.addObject(o.wallTime, o.gpuTime, o.driverTime);
 #else
-    c.addObject(o.wallTime, 0.0);
+    c.addObject(o.wallTime, 0.0, 0.0);
 #endif
   }
   return c;

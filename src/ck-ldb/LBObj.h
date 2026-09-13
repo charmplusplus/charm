@@ -19,6 +19,14 @@ public:
     data.handle = _h;
     data.migratable = _migratable;
     data.asyncArrival = _asyncArrival;
+    // Unknown until the application declares them (setPupSize/setGPUPupSize);
+    // none of the examples does. Left uninitialised these reached the cost
+    // model as garbage -- 10^16 bytes per object, a migration priced at 10^8
+    // seconds -- and every priced decision refused to move anything.
+    data.pupSize = 0;
+#if CMK_CUDA
+    data.gpuPupSize = 0;
+#endif
     Clear();
     localUserData = usr_ptr;
   }
@@ -95,6 +103,22 @@ public:
     CmiAbort("LBObj::getGPUTime called but CMK_CUDA is not set");
   #endif
   }
+
+#if CMK_CUDA
+  // The host time this object spent inside the CUDA driver is not host work:
+  // it comes out of wallTime, what the per-PE dimension balances, and its
+  // share of the process's driver busy time goes in as the launch load.
+  // Returns what came out, which is at most what was there.
+  inline LBRealType takeApiTime(LBRealType raw) {
+    const LBRealType taken = (raw < data.wallTime) ? raw : data.wallTime;
+    data.wallTime -= taken;
+#if CMK_LB_CPUTIMER
+    data.cpuTime = (data.cpuTime > taken) ? data.cpuTime - taken : 0;
+#endif
+    return taken;
+  }
+  inline void setDriverTiming(LBRealType t) { data.driverTime = t; }
+#endif
 
   inline void setTiming(LBRealType cputime)
   {

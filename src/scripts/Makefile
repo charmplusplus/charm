@@ -689,7 +689,7 @@ LIBCK_CORE=trace-common.o tracec.o tracef.o init.o register.o qd.o ck.o \
 	   ckcheckpoint.o ckmemcheckpoint.o \
            LBComm.o LBObj.o LBMachineUtil.o CentralPredictor.o \
 	   BaseLB.o CentralLB.o TreeLB.o HybridBaseLB.o DistBaseLB.o \
-           ckgraph.o LButil.o RefinerTemp.o Refiner.o \
+           ckgraph.o LButil.o RefinerTemp.o Refiner.o DiffusionCostModel.o \
            manager.o ckset.o ckheap.o \
 	   LBSimulation.o modifyScheduler.o \
 	   charmProjections.o ckbitvector.o \

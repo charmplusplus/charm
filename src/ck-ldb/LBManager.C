@@ -30,6 +30,10 @@ CkpvDeclare(int, _lb_obj_index);
 CkpvDeclare(bool, lbmanagerInited); /**< true if lbdatabase is inited */
 CkpvDeclare(int, _lbStepRequested);
 CkpvDeclare(int, _lbStepPeriod);
+// Which load the group dimension carries this step (LBLoadDim.h): 0 device
+// time, 1 driver time. Process-wide; set by the resolvers on the deciding PE
+// and by DiffusionLB's verdict on every PE.
+int _lb_groupDimLaunch = 0;
 CkpvDeclare(int, _lbStepTentative);
 
 extern int quietModeRequested;

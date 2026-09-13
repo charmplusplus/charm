@@ -820,6 +820,8 @@ ckfutures.o: ckfutures.C charm++.h charm.h converse.h conv-header.h \
  ../include/TopoManager.h ../include/topomanager_config.h \
  ../include/converse.h CkFutures.def.h
 
+DiffusionCostModel.o: DiffusionCostModel.C DiffusionCostModel.h lbdb.h \
+ converse.h charm++.h
 ckgraph.o: ckgraph.C ckgraph.h BaseLB.h LBManager.h LBDatabase.h lbdb.h \
  converse.h conv-header.h conv-config.h conv-autoconfig.h conv-common.h \
  conv-mach-common.h conv-mach.h conv-mach-opt.h lrts-common.h cmiqueue.h \

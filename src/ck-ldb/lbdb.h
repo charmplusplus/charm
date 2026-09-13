@@ -254,6 +254,12 @@ struct LDObjData {
   // SM-utilization-normalized GPU load, in seconds of whole-device occupancy.
   // Computed in-process by hapiNormalizeCuptiLoads before the stats are sent.
   LBRealType gpuTime;
+  // The object's share of its process's driver time: the host time spent
+  // inside CUDA runtime calls, which several PEs on one context serialise
+  // between them. Taken out of wallTime (LBDatabase::SetObjDriverLoad), so
+  // wallTime is host work the PE alone does, and aggregated per process like
+  // gpuTime -- the launch term of LBLoadDim.h.
+  LBRealType driverTime;
   // The same demand broken down by kernel identity, plus the GPU it was
   // measured on. Empty unless +LBGpuScaling is on. gpuTime remains the
   // authoritative scalar: gpuCosts.totalDemand() reconciles with it.
@@ -454,6 +460,9 @@ inline void LDObjData::pup(PUP::er &p) {
   p|wallTime;
 #if CMK_CUDA
   p|gpuTime;
+  // Version-gated like gpuCosts: an older dump has no such field.
+  if (_lb_version > 3) p|driverTime;
+  else if (p.isUnpacking()) driverTime = 0;
 #endif
 #if CMK_LB_CPUTIMER
   p|cpuTime;

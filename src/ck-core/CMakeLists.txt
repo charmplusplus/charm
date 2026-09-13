@@ -4,6 +4,7 @@ set(ck-cxx-sources
     ../ck-ldb/BaseLB.C ../ck-ldb/CentralLB.C
     ../ck-ldb/CentralPredictor.C ../ck-ldb/ckgraph.C
     ../ck-ldb/ckheap.C ../ck-ldb/ckset.C
+    ../ck-ldb/DiffusionCostModel.C
     ../ck-ldb/DistBaseLB.C ../ck-ldb/forestTest.C
     ../ck-ldb/HybridBaseLB.C
     ../ck-ldb/GpuScalingModel.C

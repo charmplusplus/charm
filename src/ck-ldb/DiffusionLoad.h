@@ -75,14 +75,11 @@ static inline int diffusionLoadMode()
 static inline bool diffusionDeviceDim() { return diffusionLoadMode() == LB_MODE_DEVICE; }
 static inline bool diffusionStepMode() { return diffusionLoadMode() == LB_MODE_STEP; }
 
-static inline double diffusionObjGpuLoad(const LDObjData& o)
-{
-#if CMK_CUDA
-  return o.gpuTime;
-#else
-  return 0.0;
-#endif
-}
+// The object's load in the group dimension -- device time, or driver time
+// when the launch term is the larger bound (LBLoadDim.h). Named for what it
+// was before the launch term existed; every consumer of the node's "device"
+// total means this.
+static inline double diffusionObjGpuLoad(const LDObjData& o) { return lbObjGroupLoad(o); }
 
 // The object's share of the diffused quantity, in the units the rounds
 // planned in. Under one dimension that is the object's load in it; under

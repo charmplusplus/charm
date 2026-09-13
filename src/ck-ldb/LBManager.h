@@ -499,6 +499,13 @@ class LBManager : public CBase_LBManager
     lbdb_obj->GetObjGPULoad(h, gputime);
   };
   LBRealType GetTotalObjGPULoad(void) { return lbdb_obj->GetTotalObjGPULoad(); }
+#if CMK_CUDA
+  void SetObjDriverLoad(
+      const std::unordered_map<LDObjKey, double, LDObjKeyHash> &apiRaw, double scale)
+  {
+    lbdb_obj->SetObjDriverLoad(apiRaw, scale);
+  }
+#endif
   void SetObjGPULoad(
       const std::unordered_map<LDObjKey, double, LDObjKeyHash> &id_loadMap)
   {
