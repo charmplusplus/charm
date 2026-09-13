@@ -1,16 +1,18 @@
-
 /** @file
  * MPI based machine layer
  * @ingroup Machine
  */
 /*@{*/
 
+#include <string>
 #include <stdio.h>
 #include <errno.h>
 #include "converse.h"
 #include "cmirdmautils.h"
 #include <mpi.h>
 #include <algorithm>
+#include <cuda_runtime.h>
+
 
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
@@ -41,6 +43,16 @@ static char* strsignal(int sig) {
 
 #include "machine.h"
 #include "pcqueue.h"
+#include "conv-ccs.h"
+#include "ccs-server.h"
+#include "ckrescale.h"
+
+#if CMK_SHRINK_EXPAND
+CcsDelayedReply shrinkExpandreplyToken;
+extern int numProcessAfterRestart;
+extern char *_shrinkexpand_basedir;
+int mynewpe=0;
+#endif
 
 /* Msg types to have different actions taken for different message types
  * REGULAR                     - Regular Charm++ message
@@ -53,7 +65,12 @@ static char* strsignal(int sig) {
  * */
 
 #define CMI_MSGTYPE(msg)            ((CmiMsgHeaderBasic *)msg)->mpiMsgType
-enum mpiMsgTypes { REGULAR, ONESIDED_BUFFER_SEND, ONESIDED_BUFFER_RECV, ONESIDED_BUFFER_DIRECT_RECV, ONESIDED_BUFFER_DIRECT_SEND, POST_DIRECT_RECV, POST_DIRECT_SEND};
+enum mpiMsgTypes { REGULAR, ONESIDED_BUFFER_SEND, ONESIDED_BUFFER_RECV, ONESIDED_BUFFER_DIRECT_RECV, ONESIDED_BUFFER_DIRECT_SEND, POST_DIRECT_RECV, POST_DIRECT_SEND,
+#if CMK_CUDA
+    DEVICE_SEND_OP,
+    DEVICE_RECV_OP
+#endif
+};
 
 /* =======Beginning of Definitions of Performance-Specific Macros =======*/
 /* Whether to use multiple send queue in SMP mode */
@@ -349,6 +366,13 @@ typedef struct msg_list {
     struct msg_list *next;
     int size, destpe, mode, type;
     MPI_Request req;
+#if CMK_CUDA
+    void* ptr;
+    size_t device_size;
+    DeviceRdmaOp* op;
+    uint64_t tag;
+    int dest_mpi_rank;
+#endif
 #if CMK_ONESIDED_IMPL
     void *ref;
     // This field can store the pointer to any structure that might have to be accessed.
@@ -409,6 +433,38 @@ static int SendMsgBuf(void);
 static  void EnqueueMsg(void *m, int size, int node, int mode, int type, void *ref);
 #endif
 
+#if CMK_CUDA
+
+CpvDeclare(int, tag_counter);
+
+MPI_Win globalDevWin = MPI_WIN_NULL;
+void LrtsInitRMA() {
+    int result = MPI_Win_create_dynamic(MPI_INFO_NULL, MPI_COMM_WORLD, &globalDevWin);
+    
+    if (result != MPI_SUCCESS) {
+        CmiAbort("RMA Window Creation Failed!");
+    }
+}
+
+void LrtsCleanupRMA() {
+    if (globalDevWin != MPI_WIN_NULL) {
+        MPI_Win_free(&globalDevWin); // This will fail if memory is still attached!
+    }
+}
+
+#if CMK_SMP
+
+void* deviceRecvCallback(void* arg) {
+  DeviceRdmaOpMsg_* recv_msg = (DeviceRdmaOpMsg_*)arg;
+  CmiInvokeRecvHandler(recv_msg->op);
+  return NULL;
+}
+int deviceRecvCallbackHandler;
+
+#endif
+
+#endif
+
 /* ### End of Machine-running Related Functions ### */
 
 /* ### Beginning of Idle-state Related Functions ### */
@@ -431,6 +487,17 @@ void CmiNotifyIdleForMPI(void);
 #include "machine-ctrlmsg.C"
 #endif
 
+void print_nodelist(char* arg_nodelist){
+    FILE *f=fopen(arg_nodelist,"r");
+    char c;
+    c = fgetc(f); 
+    while (c != EOF) {
+      printf ("%c", c); 
+      c = fgetc(f); 
+    } 
+    fclose(f);
+}
+
 SMSG_LIST *allocateSmsgList(char *msg, int destNode, int size, int mode, int type, void *ref) {
   SMSG_LIST *msg_tmp = (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
   msg_tmp->msg = msg;
@@ -452,14 +519,6 @@ static void EnqueueMsg(void *m, int size, int node, int mode, int type, void *re
     /*SMSG_LIST *msg_tmp = (SMSG_LIST *) CmiAlloc(sizeof(SMSG_LIST));*/
     SMSG_LIST *msg_tmp = allocateSmsgList((char *)m, node, size, mode, type, ref);
     MACHSTATE1(3,"EnqueueMsg to node %d {{ ", node);
-    msg_tmp->msg = (char *)m;
-    msg_tmp->size = size;
-    msg_tmp->destpe = node;
-    msg_tmp->next = 0;
-    msg_tmp->mode = mode;
-#if CMK_ONESIDED_IMPL
-    msg_tmp->ref = NULL;
-#endif
 
 #if MULTI_SENDQUEUE
     PCQueuePush(procState[CmiMyRank()].postMsgBuf,(char *)msg_tmp);
@@ -625,6 +684,7 @@ static void ReleasePostedMessages(void) {
 
     MACHSTATE1(2,"ReleasePostedMessages begin on %d {", CmiMyPe());
     while (msg_tmp!=0) {
+        int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         done =0;
 #if CMK_SMP_TRACE_COMMTHREAD || CMK_TRACE_COMMOVERHEAD
         double startT = CmiWallTimer();
@@ -678,8 +738,13 @@ static void ReleasePostedMessages(void) {
                 // which is freed in the above code (either ONESIDED_BUFFER_DIRECT_RECV or
                 // ONESIDED_BUFFER_DIRECT_SEND)
             }
-            else
+            #if CMK_CUDA
+            else if(msg_tmp->type == DEVICE_SEND_OP || msg_tmp->type == DEVICE_RECV_OP) {
+                // TODO: check if we can remove this
+            }
+            #endif
 #endif
+            else
             {
               CmiFree(msg_tmp->msg);
             }
@@ -815,6 +880,7 @@ static int PumpMsgs(void) {
             CmiAbort("MPI_Iprobe failed\n");
 
         if (!flg) break;
+        int rank; MPI_Comm_rank(MPI_COMM_WORLD, &rank);
         CONDITIONAL_TRACE_USER_EVENT(70); /* MPI_Iprobe related user event */
         
         recd = 1;
@@ -824,7 +890,7 @@ static int PumpMsgs(void) {
 #if USE_ASYNC_RECV_FUNC
         if(nbytes >= IRECV_MSG_THRESHOLD) doSyncRecv = 0;
 #endif        
-        if(doSyncRecv){
+        if(doSyncRecv) {
             START_EVENT();
             if (MPI_SUCCESS != MPI_Recv(msg,nbytes,MPI_BYTE,sts.MPI_SOURCE,sts.MPI_TAG, charmComm,&sts))
                 CmiAbort("PumpMsgs: MPI_Recv failed!\n");            
@@ -846,7 +912,7 @@ static int PumpMsgs(void) {
 
 #endif /*end of !MPI_POST_RECV and !USE_MPI_CTRLMSG_SCHEME*/
 
-		if(doSyncRecv){
+		if (doSyncRecv) {
 			MACHSTATE2(3,"PumpMsgs recv one from node:%d to rank:%d", sts.MPI_SOURCE, CMI_DEST_RANK(msg));
 			CMI_CHECK_CHECKSUM(msg, nbytes);
 	#if CMK_ERROR_CHECKING
@@ -1048,6 +1114,13 @@ static void PumpMsgsBlocking(void) {
     handleOneRecvedMsg(nbytes, msg);
 }
 
+#if CMK_CUDA
+    #include <map>
+
+    std::vector<std::pair<MPI_Request, DeviceRdmaOp*>> rdma_requests;
+    // a map to tell how many rdma requests are gone to some rank 
+    std::map<int, int> access_epochs;
+#endif
 
 #if CMK_SMP
 
@@ -1055,32 +1128,36 @@ static void PumpMsgsBlocking(void) {
 static int SendMsgBuf(void) {
     SMSG_LIST *msg_tmp;
     char *msg;
-    int node, rank, size;
+    // int node, rank, size;
+    int rank;
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     int i;
     int sent = 0;
 
-#if CMI_EXERT_SEND_CAP || CMI_DYNAMIC_EXERT_CAP
-    int sentCnt = 0;
-#endif
-
-#if CMI_DYNAMIC_EXERT_CAP
-    dynamicSendCap = CMI_DYNAMIC_MAXCAPSIZE;
-#endif
-
     MACHSTATE(2,"SendMsgBuf begin {");
-#if MULTI_SENDQUEUE
-    for (i=0; i<_Cmi_mynodesize+1; i++) { /* subtle: including comm thread */
-        if (!PCQueueEmpty(procState[i].postMsgBuf)) {
-            msg_tmp = (SMSG_LIST *)PCQueuePop(procState[i].postMsgBuf);
-#else
     /* single message sending queue */
     /* CmiLock(postMsgBufLock); */
     msg_tmp = (SMSG_LIST *)PCQueuePop(postMsgBuf);
     /* CmiUnlock(postMsgBufLock); */
     while (NULL != msg_tmp) {
-#endif
-
 #if CMK_ONESIDED_IMPL
+#if CMK_CUDA
+            if (msg_tmp->type == DEVICE_SEND_OP) {
+                if (MPI_Win_attach(globalDevWin, msg_tmp->ptr, msg_tmp->device_size) != MPI_SUCCESS) 
+                    CmiAbort("MPI_Win_attach failed\n");
+            } else if(msg_tmp->type == DEVICE_RECV_OP) {
+                if (access_epochs[msg_tmp->op->src_mpi_rank] == 0) 
+                    MPI_Win_lock(MPI_LOCK_SHARED, msg_tmp->op->src_mpi_rank, 0, globalDevWin);
+                access_epochs[msg_tmp->op->src_mpi_rank]++;
+                MPI_Request req;
+                int result = MPI_Rget((void*)msg_tmp->op->dest_ptr, msg_tmp->op->size, MPI_BYTE, 
+                msg_tmp->op->src_mpi_rank, (MPI_Aint)(msg_tmp->op->tag), msg_tmp->op->size, 
+                MPI_BYTE, globalDevWin, &req);
+                if (result != MPI_SUCCESS)
+                    CmiAbort("LrtsRecvDevice: MPI_Get failed!\n");
+                rdma_requests.push_back({req, msg_tmp->op});
+            } else
+#endif
             if(msg_tmp->type == ONESIDED_BUFFER_DIRECT_RECV || msg_tmp->type == ONESIDED_BUFFER_DIRECT_SEND) {
                 NcpyOperationInfo *ncpyOpInfo = (NcpyOperationInfo *)(msg_tmp->ref);
                 MPISendOrRecvOneBuffer(msg_tmp, ncpyOpInfo->tag);
@@ -1091,24 +1168,8 @@ static int SendMsgBuf(void) {
                 MPISendOneMsg(msg_tmp);
             }
             sent=1;
-
-#if CMI_EXERT_SEND_CAP
-            if (++sentCnt == SEND_CAP) break;
-#elif CMI_DYNAMIC_EXERT_CAP
-            if (++sentCnt >= dynamicSendCap) break;
-            if (CpvAccess(MsgQueueLen) > CMI_DYNAMIC_OUTGOING_THRESHOLD)
-                dynamicSendCap = CMI_DYNAMIC_SEND_CAPSIZE;
-#endif
-
-#if ! MULTI_SENDQUEUE
-            /* CmiLock(postMsgBufLock); */
             msg_tmp = (SMSG_LIST *)PCQueuePop(postMsgBuf);
-            /* CmiUnlock(postMsgBufLock); */
-#endif
         }
-#if MULTI_SENDQUEUE
-    }
-#endif
     MACHSTATE(2,"}SendMsgBuf end ");
     return sent;
 }
@@ -1144,6 +1205,120 @@ static double sendtime = 0.0;
 
 #endif //end of CMK_SMP
 
+#if CMK_CUDA
+
+#if CMK_SMP
+
+void processRdmaRequests() {
+    int n = rdma_requests.size();
+    if (n == 0) return;
+
+    static std::vector<MPI_Request> requests(10);
+    static std::vector<int> indices(10);
+    static std::vector<MPI_Status> statuses(10);
+
+    if(n > requests.size()) {
+        requests.resize(n); indices.resize(n); statuses.resize(n);
+    }
+
+    for (int i = 0; i < n; i++)
+        requests[i] = rdma_requests[i].first;
+
+    int outcount;
+    MPI_Testsome(n,
+                 requests.data(),
+                 &outcount,
+                 indices.data(),
+                 statuses.data());
+
+    if (outcount == MPI_UNDEFINED || outcount == 0)
+        return;
+
+    for (int i = 0; i < outcount; i++) {
+        int idx = indices[i];
+
+        auto &entry = rdma_requests[idx];
+        DeviceRdmaOp *op = entry.second;
+
+        DeviceRdmaOpMsg_* conv_msg =
+            (DeviceRdmaOpMsg_*)CmiAlloc(sizeof(DeviceRdmaOpMsg_));
+
+        conv_msg->op = op;
+
+        access_epochs[op->src_mpi_rank]--;
+        if (access_epochs[op->src_mpi_rank] == 0)
+            MPI_Win_unlock(op->src_mpi_rank, globalDevWin);
+
+        CmiSetHandler(conv_msg, deviceRecvCallbackHandler);
+        CmiPushPE(CmiRankOf(op->dest_pe), conv_msg);
+
+        rdma_requests[idx].first = MPI_REQUEST_NULL;
+    }
+
+    rdma_requests.erase(
+        std::remove_if(rdma_requests.begin(),
+                       rdma_requests.end(),
+                       [](const std::pair<MPI_Request, DeviceRdmaOp*> &e) {
+                           return e.first == MPI_REQUEST_NULL;
+                       }),
+        rdma_requests.end());
+}
+
+#else
+
+void processRdmaRequests() {
+    int n = rdma_requests.size();
+    if (n == 0) return;
+
+    static std::vector<MPI_Request> requests(10);
+    static std::vector<int> indices(10);
+    static std::vector<MPI_Status> statuses(10);
+
+    if(n > requests.size()) {
+        requests.resize(n); indices.resize(n); statuses.resize(n);
+    }
+
+    for (int i = 0; i < n; i++)
+        requests[i] = rdma_requests[i].first;
+
+    int outcount;
+    MPI_Testsome(n,
+                 requests.data(),
+                 &outcount,
+                 indices.data(),
+                 statuses.data());
+
+    if (outcount == MPI_UNDEFINED || outcount == 0)
+        return;
+
+    for (int i = 0; i < outcount; i++) {
+        int idx = indices[i];
+
+        auto &entry = rdma_requests[idx];
+        DeviceRdmaOp *op = entry.second;
+
+        access_epochs[op->src_mpi_rank]--;
+        if (access_epochs[op->src_mpi_rank] == 0)
+            MPI_Win_unlock(op->src_mpi_rank, globalDevWin);
+        
+        CmiInvokeRecvHandler(op);
+
+        rdma_requests[idx].first = MPI_REQUEST_NULL;
+    }
+
+    rdma_requests.erase(
+        std::remove_if(rdma_requests.begin(),
+                       rdma_requests.end(),
+                       [](const std::pair<MPI_Request, DeviceRdmaOp*> &e) {
+                           return e.first == MPI_REQUEST_NULL;
+                       }),
+        rdma_requests.end());
+}
+
+#endif
+
+#endif
+
 void LrtsAdvanceCommunication(int whenidle) {
 #if REPORT_COMM_METRICS
     double t1, t2, t3, t4;
@@ -1158,10 +1333,10 @@ void LrtsAdvanceCommunication(int whenidle) {
 #endif
 
     ReleasePostedMessages();
+    
 #if REPORT_COMM_METRICS
     t3 = CmiWallTimer();
 #endif
-
     SendMsgBuf();
 
 #if REPORT_COMM_METRICS
@@ -1169,6 +1344,10 @@ void LrtsAdvanceCommunication(int whenidle) {
     pumptime += (t2-t1);
     releasetime += (t3-t2);
     sendtime += (t4-t3);
+#endif
+
+#if CMK_CUDA
+    processRdmaRequests();
 #endif
 
 #else /* non-SMP case */
@@ -1183,6 +1362,10 @@ void LrtsAdvanceCommunication(int whenidle) {
     t3 = CmiWallTimer();
     pumptime += (t3-t2);
     releasetime += (t2-t1);
+#endif
+
+#if CMK_CUDA
+    processRdmaRequests();
 #endif
 
 #endif /* end of #if CMK_SMP */
@@ -1323,6 +1506,9 @@ void LrtsExit(int exitcode) {
 #else
       signal(SIGINT, signal_int);
 #endif
+#if CMK_CUDA
+      LrtsCleanupRMA();
+#endif
       MPI_Finalize();
 #endif
       // Still want to return control to the user in userDrivenMode
@@ -1388,6 +1574,12 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     char** largv=*argv;
     int tagUbGetResult;
     void *tagUbVal;
+    char* arg_nodelist;
+
+    /*if (CmiGetArgStringDesc(argv, "++nodelist", &arg_nodelist, "nodelist"))
+    {
+        print_nodelist(arg_nodelist);
+    }*/
 
     if (CmiGetArgFlag(largv, "+comm_thread_only_recv")) {
 #if CMK_SMP
@@ -1518,6 +1710,7 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
       if (newpe == -1) {
           MPI_Barrier(charmComm);
           //MPI_Barrier(charmComm);
+          LrtsCleanupRMA();
           MPI_Finalize();
           exit(0);
       }
@@ -1681,6 +1874,12 @@ void LrtsInit(int *argc, char ***argv, int *numNodes, int *myNodeID) {
     rdmaTagLock = CmiCreateLock();
 #endif
 #endif
+
+#if CMK_CUDA
+    LrtsInitRMA();
+    CpvInitialize(int, tag_counter);
+    CpvAccess(tag_counter) = 0;
+#endif
 }
 
 INLINE_KEYWORD void LrtsNotifyIdle(void) {}
@@ -1818,6 +2017,7 @@ void LrtsPostCommonInit(int everReturn) {
 /* ######End of functions related with starting programs###### */
 
 /***********************************************************************
+ *
  *
  * Abort function:
  *
@@ -1989,6 +2189,56 @@ int CmiBarrierZero(void) {
 }
 
 
+#if CMK_SHRINK_EXPAND
+void ConverseCleanup(void)
+{
+  MACHSTATE(2,"ConverseCleanup {");
+
+  #if (CMK_SMP && !CMK_SMP_NO_COMMTHD)
+    CmiAbort(" ConverseCleanup called in SMP. CmiBarrier needs to be called on comm thread as well! Right now, this hangs. Remove this abort when SMP support implemented.\n");
+  #endif
+  CmiBarrier(); // TODO: for smp, this must also be called on comm thread. otherwise, hangs
+
+#if CMK_USE_SYSVSHM
+	CmiExitSysvshm();
+#elif CMK_USE_PXSHM
+	CmiExitPxshm();
+#endif
+  ConverseCommonExit();               /* should be called by every rank */
+  CmiNodeBarrier();        /* single node SMP, make sure every rank is done */
+  //if (CmiMyRank()==0) CmiStdoutFlush();
+
+  if (get_shrinkexpand_exit() && CmiMyPe() == 0) {
+    // launch charmrun here
+
+    std::string path = std::string(_shrinkexpand_basedir) + "/numRestartProcs.txt";
+    FILE *fp = fopen(path.c_str(), "w");
+    if (fp != NULL) {
+      CmiPrintf("Charm> Writing numProcessAfterRestart %i to %s\n", numProcessAfterRestart, path.c_str());
+      fprintf(fp, "%d", numProcessAfterRestart);
+      fclose(fp);
+    } else {
+      perror("Error opening file");
+    }
+
+    // Use the new synchronous reply function. This blocks until the reply is
+    // sent and acknowledged by charmrun, robustly fixing the race condition.
+    CcsSendDelayedReplyAndTerm(shrinkExpandreplyToken, 0, 0);
+
+    CmiBarrier();
+    ConverseExit(100);
+
+  } else {
+    // kill all other processes
+    CmiBarrier();
+    //printf("Exiting PE %d\n", CmiMyPe());
+    //fflush(stdout);
+    ConverseExit();
+  }
+}
+#endif
+
+
 #if CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING
 
 void mpi_restart_crashed(int pe, int rank)
@@ -2057,6 +2307,7 @@ void CkDieNow(void)
     }
     MPI_Barrier(charmComm);
  //   MPI_Barrier(charmComm);
+    LrtsCleanupRMA();
     MPI_Finalize();
     exit(0);
 #endif
@@ -2356,6 +2607,63 @@ void CmiSetupMachineRecvBuffersUser(void)
 #endif
 }
 /*=======End of Msg Histogram or Dynamic Post-Recv Related Funcs======*/
+
+#if CMK_CUDA
+
+#include <map>
+std::map<std::pair<void*, size_t>, uint64_t> cache_window;
+
+void LrtsSendDevice(int dest_mpi_rank, int src_mpi_rank, const void*& ptr, size_t size, uint64_t& tag) {
+    if(cache_window.find(std::make_pair((void*)ptr, size)) != cache_window.end()) {
+        tag = cache_window[std::make_pair((void*)ptr, size)];
+    } else {
+#if CMK_SMP
+        SMSG_LIST *msg_tmp = (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
+        msg_tmp->ptr = (void*)(ptr);
+        msg_tmp->device_size = size;
+        msg_tmp->type = DEVICE_SEND_OP;
+        msg_tmp->dest_mpi_rank = dest_mpi_rank;
+        msg_tmp->tag = (uint64_t)(void*)(ptr);
+        PCQueuePush(postMsgBuf,(char *)msg_tmp);
+#else
+        if (MPI_Win_attach(globalDevWin, (void*)ptr, size) != MPI_SUCCESS) CmiAbort("MPI_Win_attach failed\n");
+#endif
+        // tag is the virtual address of the buffer
+        tag = (uint64_t)(void*)(ptr);
+        cache_window[{(void*)ptr, size}] = tag;
+    }
+}
+
+std::map<int, bool> handler_registered;
+
+void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type)
+{
+#if CMK_SMP
+    if(handler_registered[CmiMyPe()] == false) {
+        deviceRecvCallbackHandler = CmiRegisterHandler((CmiHandler) deviceRecvCallback);
+        handler_registered[CmiMyPe()] = true;
+    }
+    SMSG_LIST *msg_tmp = (SMSG_LIST *) malloc(sizeof(SMSG_LIST));
+    msg_tmp->op = op;
+    msg_tmp->type = DEVICE_RECV_OP;
+    PCQueuePush(postMsgBuf,(char *)msg_tmp);
+#else
+    if (access_epochs[op->src_mpi_rank] == 0) {
+        MPI_Win_lock(MPI_LOCK_SHARED, op->src_mpi_rank, 0, globalDevWin);
+    }
+    access_epochs[op->src_mpi_rank]++;
+    MPI_Request req;
+    int result = MPI_Rget((void*)op->dest_ptr, op->size, MPI_BYTE, 
+    op->src_mpi_rank, (MPI_Aint)(op->tag), op->size, 
+    MPI_BYTE, globalDevWin, &req);
+    if (result != MPI_SUCCESS) {
+        CmiAbort("LrtsRecvDevice: MPI_Get failed!\n");
+    }
+    rdma_requests.push_back({req, op});
+#endif
+}
+
+#endif // CMK_CUDA
 
 
 /*@}*/

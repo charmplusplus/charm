@@ -1,6 +1,8 @@
 #ifndef _MACHINE_RDMA_H_
 #define _MACHINE_RDMA_H_
 
+#define CMK_GPU_COMM 1
+
 /* Support for Nocopy Direct API */
 void LrtsSetRdmaBufferInfo(void *info, const void *ptr, int size, unsigned short int mode);
 void LrtsIssueRget(NcpyOperationInfo *ncpyOpInfo);
@@ -15,15 +17,15 @@ void LrtsInvokeRemoteDeregAckHandler(int pe, NcpyOperationInfo *ncpyOpInfo);
 
 void CmiInvokeNcpyAck(void *ack);
 
-#if CMK_CUDA && CMK_GPU_COMM
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
 // Function pointer to acknowledgement handler
 typedef void (*RdmaAckHandlerFn)(void *token);
 
-void LrtsSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag);
+void LrtsSendDevice(int dest_rank, int src_rank, const void*& ptr, size_t size, uint64_t& tag);
 void LrtsRecvDevice(DeviceRdmaOp* op, DeviceRecvType type);
 
 void CmiInvokeRecvHandler(void* data);
-#endif // CMK_CUDA && CMK_GPU_COMM
+#endif // (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
 
 int CmiGetRdmaCommonInfoSize();
 #endif

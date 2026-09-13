@@ -10,6 +10,7 @@ module LBManager {
 
   group [migratable] LBManager {
     entry void LBManager(void);
+    entry void StartLB();
     entry void ResumeClients();
     initnode void initnodeFn();
   };

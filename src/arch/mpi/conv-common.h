@@ -50,3 +50,6 @@
 #define CMK_USE_COMMON_LOCK                                1
 
 #define CMK_ONESIDED_IMPL                                  1
+
+/* cuda aware mpi machine layer supports GPU-aware communication */
+#define CMK_GPU_COMM                   1

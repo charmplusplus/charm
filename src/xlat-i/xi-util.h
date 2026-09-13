@@ -7,7 +7,9 @@
 #include <vector>
 
 #ifndef XI_LIBRARY
-#include "conv-config.h"
+//#include "conv-config.h"
+#include "charm-config.h"
+#include "converse.h"
 #endif
 #include <stdio.h>
 #include <stdlib.h>

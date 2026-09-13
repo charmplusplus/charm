@@ -9,6 +9,7 @@ DIRS = \
   chkpt \
   delegation \
   queue \
+  qd \
   sdag \
   ckAllocSysMsgTest \
   method_templates \

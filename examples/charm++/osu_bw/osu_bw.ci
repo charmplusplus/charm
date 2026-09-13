@@ -1,0 +1,23 @@
+// osu_bw.ci
+mainmodule osu_bw {
+  message DataMsg {
+    char data[];
+  };
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry void nextSize();
+    entry void doneOne(double seconds);
+    entry void finish();
+    entry void ready();
+  };
+
+  chare Endpoint {
+    entry Endpoint(CProxy_Main m, int iters, int window, int skip);
+    entry void setPeer(CProxy_Endpoint p);
+    entry void start(int size);
+    entry void recv(DataMsg *m);
+    entry void ack();
+  };
+}
+

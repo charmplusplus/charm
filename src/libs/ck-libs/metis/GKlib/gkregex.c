@@ -111,7 +111,7 @@ void gkfooo() { return; }
 #if defined HAVE_WCTYPE_H || defined _LIBC
 # include <wctype.h>
 #endif /* HAVE_WCTYPE_H || _LIBC */
-#if defined HAVE_STDBOOL_H || defined _LIBC
+#if defined HAVE_STDBOOL_H || defined _LIBC || (defined __STDC_VERSION__ && __STDC_VERSION__ >= 199901L) || defined __cplusplus
 # include <stdbool.h>
 #else
 typedef enum { false, true } bool;

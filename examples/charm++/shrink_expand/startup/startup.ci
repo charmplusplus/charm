@@ -1,0 +1,7 @@
+mainmodule startup {
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+  };
+
+};

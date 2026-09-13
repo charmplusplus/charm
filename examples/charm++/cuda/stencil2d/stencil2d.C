@@ -15,7 +15,7 @@
 #define BOTTOM 4
 #define DIVIDEBY5 0.2
 
-#define USE_CUSTOM_MAP 1 // Should be set to 1 to use GPU handler PEs
+#define USE_CUSTOM_MAP 0 // Should be set to 1 to use GPU handler PEs
 
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ int grid_x;
@@ -31,8 +31,8 @@
 /* readonly */ bool gpu_prio;
 /* readonly */ int gpu_pes;
 
-extern void invokeKernel(cudaStream_t stream, double* d_temperature,
-                         double* d_new_temperature, int block_x, int block_y,
+extern void invokeKernel(cudaStream_t stream, float* d_temperature,
+                         float* d_new_temperature, int block_x, int block_y,
                          int thread_size);
 
 // Calculate the number of digits.
@@ -85,15 +85,9 @@ class CustomMap : public CkArrayMap {
     }
 };
 
-// Used to specify LIFO ordering on callbacks.
-class CallbackMsg : public CMessage_CallbackMsg {
- public:
-  CallbackMsg() {}
-};
-
 class Main : public CBase_Main {
-  double init_start_time;
-  double start_time;
+  float init_start_time;
+  float start_time;
 
  public:
   CProxy_Stencil stencils;
@@ -214,6 +208,21 @@ class Main : public CBase_Main {
     stencils.init();
   }
 
+  void pup(PUP::er& p) {
+    p | grid_x;
+    p | grid_y;
+    p | block_x;
+    p | block_y;
+    p | num_iters;
+    p | global_exec_mode;
+    p | thread_size;
+    p | offload_ratio;
+    p | gpu_prio;
+    p | gpu_pes;
+    p | stencils;
+    p | init_start_time;
+  }
+
   void initDone() {
 #ifdef USE_NVTX
     NVTXTracer nvtx_range("Main::initDone", NVTXColor::Emerald);
@@ -225,16 +234,23 @@ class Main : public CBase_Main {
     start_time = CkWallTimer();
 
     // Start stencil iterations
-    CallbackMsg* m = new CallbackMsg();
-    stencils.iterate(m);
+    stencils.iterate();
   }
 
-  void done(double time) {
+  void done(float *times, int size) {
 #ifdef USE_NVTX
     NVTXTracer nvtx_range("Main::done", NVTXColor::Emerald);
 #endif
-    CkPrintf("\nAverage time per iteration: %lf\n",
-             time / ((num_chares_x * num_chares_y) * num_iters));
+    if (size != 2) {
+      CkAbort("Received reduction of incorrect size!");
+    }
+    float agg_time = times[0];
+    float gpu_time = times[1];
+    CkPrintf("Total times are: %lf CPU time, %lf GPU time\n",
+             agg_time, gpu_time);
+    CkPrintf("\nAverage time per iteration: %lf CPU time, %lf GPU time\n",
+             agg_time / ((num_chares_x * num_chares_y) * num_iters),
+             gpu_time / ((num_chares_x * num_chares_y) * num_iters));
     CkPrintf("Finished due to max iterations %d, total time %lf seconds\n",
              num_iters, CkWallTimer() - start_time);
     CkExit();
@@ -250,14 +266,14 @@ class Stencil : public CBase_Stencil {
   int neighbors;
   int remote_count;
 
-  double* __restrict__ temperature;
-  double* __restrict__ new_temperature;
-  double* __restrict__ d_temperature;
-  double* __restrict__ d_new_temperature;
-  double* __restrict__ left_ghost;
-  double* __restrict__ right_ghost;
-  double* __restrict__ bottom_ghost;
-  double* __restrict__ top_ghost;
+  float*  temperature;
+  float*  new_temperature;
+  float*  d_temperature;
+  float*  d_new_temperature;
+  float*  left_ghost;
+  float*  right_ghost;
+  float*  bottom_ghost;
+  float*  top_ghost;
 
   cudaStream_t stream;
 
@@ -265,20 +281,36 @@ class Stencil : public CBase_Stencil {
   int local_exec_mode;
 
   bool left_bound, right_bound, top_bound, bottom_bound;
-  double iter_start_time;
-  double agg_time;
+  float iter_start_time;
+  float agg_time;
 
-  Stencil() {}
+  Stencil() {
+    usesAtSync = true;
+  }
+
+  Stencil(CkMigrateMessage* msg) : CBase_Stencil(msg) {
+    cudaStreamCreate(&stream);
+    hapiCheck(
+          hapiMallocHost((void**)&temperature,
+                         sizeof(float) * (block_x + 2) * (block_y + 2)));
+    //hapiCheck(
+    //    hapiMallocHost((void**)&left_ghost, sizeof(float) * block_y));
+    //hapiCheck(
+    //    hapiMallocHost((void**)&right_ghost, sizeof(float) * block_y));
+    //hapiCheck(
+    //    hapiMallocHost((void**)&bottom_ghost, sizeof(float) * block_x));
+    //hapiCheck(hapiMallocHost((void**)&top_ghost, sizeof(float) * block_x));
+  }
 
   ~Stencil() {
     if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
-      hapiCheck(cudaFreeHost(temperature));
-      hapiCheck(cudaFree(d_temperature));
-      hapiCheck(cudaFree(d_new_temperature));
-      hapiCheck(cudaFreeHost(left_ghost));
-      hapiCheck(cudaFreeHost(right_ghost));
-      hapiCheck(cudaFreeHost(top_ghost));
-      hapiCheck(cudaFreeHost(bottom_ghost));
+      hapiCheck(hapiFreeHost(temperature));
+      hapiCheck(hapiFree(d_temperature));
+      hapiCheck(hapiFree(d_new_temperature));
+      hapiCheck(hapiFreeHost(left_ghost));
+      hapiCheck(hapiFreeHost(right_ghost));
+      hapiCheck(hapiFreeHost(top_ghost));
+      hapiCheck(hapiFreeHost(bottom_ghost));
 
       cudaStreamDestroy(stream);
     } else { // CPU_MODE
@@ -289,6 +321,40 @@ class Stencil : public CBase_Stencil {
       delete top_ghost;
       delete bottom_ghost;
     }
+  }
+
+  void pup(PUP::er& p) {
+    p | n_digits;
+    p | my_iter;
+    p | neighbors;
+    p | remote_count;
+    p | iter_start_time;
+    p | agg_time;
+    p | thisFlatIndex;
+    p | left_bound;
+    p | right_bound;
+    p | top_bound;
+    p | bottom_bound;
+    p | local_exec_mode;
+
+    if (p.isUnpacking()) {
+      //hapiMallocHost((void**)&temperature, sizeof(float) * (block_x + 2) * (block_y + 2));
+      hapiMalloc((void**)&d_temperature, sizeof(float) * (block_x + 2) * (block_y + 2));
+      hapiMalloc((void**)&d_new_temperature, sizeof(float) * (block_x + 2) * (block_y + 2));
+      hapiMallocHost((void**)&left_ghost, sizeof(float) * block_y);
+      hapiMallocHost((void**)&right_ghost, sizeof(float) * block_y);
+      hapiMallocHost((void**)&bottom_ghost, sizeof(float) * block_x);
+      hapiMallocHost((void**)&top_ghost, sizeof(float) * block_x);
+    }
+
+    //p(temperature, (block_x + 2) * (block_y + 2));
+    //p(new_temperature, (block_x + 2) * (block_y + 2));
+    p(d_temperature, (block_x + 2) * (block_y + 2), PUP::PUPMode::DEVICE);
+    p(d_new_temperature, (block_x + 2) * (block_y + 2), PUP::PUPMode::DEVICE);
+    p(left_ghost, block_y);
+    p(right_ghost, block_y);
+    p(bottom_ghost, block_x);
+    p(top_ghost, block_x);
   }
 
   void init() {
@@ -336,7 +402,7 @@ class Stencil : public CBase_Stencil {
         mode_string = "HAPI";
         break;
     }
-    CkPrintf("[%*d] Mode: %s, PE: %d\n", n_digits, thisFlatIndex, mode_string.c_str(), CkMyPe());
+   // CkPrintf("[%*d] Mode: %s, PE: %d\n", n_digits, thisFlatIndex, mode_string.c_str(), CkMyPe());
 
     // Initialize values
     my_iter = 0;
@@ -365,28 +431,28 @@ class Stencil : public CBase_Stencil {
     // Allocate memory and create CUDA stream
     if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
       hapiCheck(
-          cudaMallocHost((void**)&temperature,
-                         sizeof(double) * (block_x + 2) * (block_y + 2)));
-      hapiCheck(cudaMalloc((void**)&d_temperature,
-                           sizeof(double) * (block_x + 2) * (block_y + 2)));
-      hapiCheck(cudaMalloc((void**)&d_new_temperature,
-                           sizeof(double) * (block_x + 2) * (block_y + 2)));
+          hapiMallocHost((void**)&temperature,
+                         sizeof(float) * (block_x + 2) * (block_y + 2)));
+      hapiCheck(hapiMalloc((void**)&d_temperature,
+                           sizeof(float) * (block_x + 2) * (block_y + 2)));
+      hapiCheck(hapiMalloc((void**)&d_new_temperature,
+                           sizeof(float) * (block_x + 2) * (block_y + 2)));
       hapiCheck(
-          cudaMallocHost((void**)&left_ghost, sizeof(double) * block_y));
+          hapiMallocHost((void**)&left_ghost, sizeof(float) * block_y));
       hapiCheck(
-          cudaMallocHost((void**)&right_ghost, sizeof(double) * block_y));
+          hapiMallocHost((void**)&right_ghost, sizeof(float) * block_y));
       hapiCheck(
-          cudaMallocHost((void**)&bottom_ghost, sizeof(double) * block_x));
-      hapiCheck(cudaMallocHost((void**)&top_ghost, sizeof(double) * block_x));
+          hapiMallocHost((void**)&bottom_ghost, sizeof(float) * block_x));
+      hapiCheck(hapiMallocHost((void**)&top_ghost, sizeof(float) * block_x));
 
       cudaStreamCreate(&stream);
     } else {  // CPU_MODE
-      temperature = new double[(block_x + 2) * (block_y + 2)];
-      new_temperature = new double[(block_x + 2) * (block_y + 2)];
-      left_ghost = new double[block_y];
-      right_ghost = new double[block_y];
-      top_ghost = new double[block_x];
-      bottom_ghost = new double[block_x];
+      temperature = new float[(block_x + 2) * (block_y + 2)];
+      new_temperature = new float[(block_x + 2) * (block_y + 2)];
+      left_ghost = new float[block_y];
+      right_ghost = new float[block_y];
+      top_ghost = new float[block_x];
+      bottom_ghost = new float[block_x];
     }
 
     // Initialize temperature data
@@ -414,8 +480,8 @@ class Stencil : public CBase_Stencil {
     if ((local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) &&
         my_iter == 0) {
       hapiCheck(
-          cudaMemcpyAsync(d_temperature, temperature,
-                          sizeof(double) * (block_x + 2) * (block_y + 2),
+          hapiMemcpyAsync(d_temperature, temperature,
+                          sizeof(float) * (block_x + 2) * (block_y + 2),
                           cudaMemcpyHostToDevice, stream));
     }
 
@@ -445,17 +511,17 @@ class Stencil : public CBase_Stencil {
       thisProxy(x, y - 1).receiveGhosts(my_iter, TOP, block_x, bottom_ghost);
   }
 
-  void processGhosts(int dir, int width, double* gh) {
+  void processGhosts(int dir, int width, float* gh) {
 #ifdef USE_NVTX
     NVTXTracer nvtx_range(std::to_string(thisFlatIndex) + " Stencil::processGhosts", NVTXColor::WetAsphalt);
 #endif
     switch (dir) {
       case LEFT:
         if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
-          memcpy(left_ghost, gh, width * sizeof(double));
-          hapiCheck(cudaMemcpy2DAsync(
-              d_temperature + (block_x + 2), (block_x + 2) * sizeof(double),
-              left_ghost, sizeof(double), sizeof(double), block_y,
+          memcpy(left_ghost, gh, width * sizeof(float));
+          hapiCheck(hapiMemcpy2DAsync(
+              d_temperature + (block_x + 2), (block_x + 2) * sizeof(float),
+              left_ghost, sizeof(float), sizeof(float), block_y,
               cudaMemcpyHostToDevice, stream));
         } else {
           for (int j = 0; j < width; j++) {
@@ -465,11 +531,11 @@ class Stencil : public CBase_Stencil {
         break;
       case RIGHT:
         if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
-          memcpy(right_ghost, gh, width * sizeof(double));
-          hapiCheck(cudaMemcpy2DAsync(
+          memcpy(right_ghost, gh, width * sizeof(float));
+          hapiCheck(hapiMemcpy2DAsync(
               d_temperature + (block_x + 2) + (block_x + 1),
-              (block_x + 2) * sizeof(double), right_ghost, sizeof(double),
-              sizeof(double), block_y, cudaMemcpyHostToDevice, stream));
+              (block_x + 2) * sizeof(float), right_ghost, sizeof(float),
+              sizeof(float), block_y, cudaMemcpyHostToDevice, stream));
         } else {
           for (int j = 0; j < width; j++) {
             temperature[(block_x + 2) * (1 + j) + (block_x + 1)] = gh[j];
@@ -478,9 +544,9 @@ class Stencil : public CBase_Stencil {
         break;
       case BOTTOM:
         if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
-          memcpy(bottom_ghost, gh, width * sizeof(double));
-          hapiCheck(cudaMemcpyAsync(d_temperature + 1, bottom_ghost,
-                                    block_x * sizeof(double),
+          memcpy(bottom_ghost, gh, width * sizeof(float));
+          hapiCheck(hapiMemcpyAsync(d_temperature + 1, bottom_ghost,
+                                    block_x * sizeof(float),
                                     cudaMemcpyHostToDevice, stream));
         } else {
           for (int j = 0; j < width; j++) {
@@ -490,10 +556,10 @@ class Stencil : public CBase_Stencil {
         break;
       case TOP:
         if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
-          memcpy(top_ghost, gh, width * sizeof(double));
-          hapiCheck(cudaMemcpyAsync(
+          memcpy(top_ghost, gh, width * sizeof(float));
+          hapiCheck(hapiMemcpyAsync(
               d_temperature + (block_x + 2) * (block_y + 1) + 1, top_ghost,
-              block_x * sizeof(double), cudaMemcpyHostToDevice, stream));
+              block_x * sizeof(float), cudaMemcpyHostToDevice, stream));
         } else {
           for (int j = 0; j < width; j++) {
             temperature[(block_x + 2) * (block_y + 1) + (1 + j)] = gh[j];
@@ -505,60 +571,82 @@ class Stencil : public CBase_Stencil {
     }
   }
 
+  void ResumeFromSync()
+  {
+    CkCallback cb(CkReductionTarget(Stencil, compute), thisProxy);
+    contribute(cb);
+  }
+
+  void iterate()
+  {
+    if (my_iter > 0 && my_iter < num_iters && my_iter % 1000 == 0)
+    {
+      cudaStreamSynchronize(stream);
+      CkPrintf("Load balancing: %d/%d, iteration %d. GPU Load = %f\n",
+               thisFlatIndex, num_chares_x * num_chares_y, my_iter, getObjGPUTime());
+      AtSync();
+    }
+    else
+    {
+      if (thisFlatIndex == 0 && my_iter % 100 == 0)
+        CkPrintf("[%*d] Iteration %d\n", n_digits, thisFlatIndex, my_iter);
+      thisProxy(thisIndex.x, thisIndex.y).compute();
+    }
+  }
+
   // Updates local data with stencil computation.
   void update() {
 #ifdef USE_NVTX
     NVTXTracer nvtx_range(std::to_string(thisFlatIndex) + " Stencil::update", NVTXColor::Amethyst);
 #endif
 
-    CallbackMsg* m = new CallbackMsg();
     if (local_exec_mode == CUDA_MODE || local_exec_mode == HAPI_MODE) {
       // Invoke 2D stencil kernel
       invokeKernel(stream, d_temperature, d_new_temperature, block_x, block_y,
                    thread_size);
 
       // Transfer left ghost
-      hapiCheck(cudaMemcpy2DAsync(left_ghost, sizeof(double),
+      hapiCheck(hapiMemcpy2DAsync(left_ghost, sizeof(float),
             d_new_temperature + (block_x + 2),
-            (block_x + 2) * sizeof(double), sizeof(double),
+            (block_x + 2) * sizeof(float), sizeof(float),
             block_y, cudaMemcpyDeviceToHost, stream));
 
       // Transfer right ghost
       hapiCheck(
-          cudaMemcpy2DAsync(right_ghost, sizeof(double),
+          hapiMemcpy2DAsync(right_ghost, sizeof(float),
             d_new_temperature + (block_x + 2) + (block_x + 1),
-            (block_x + 2) * sizeof(double), sizeof(double),
+            (block_x + 2) * sizeof(float), sizeof(float),
             block_y, cudaMemcpyDeviceToHost, stream));
 
       // Transfer bottom ghost
-      hapiCheck(cudaMemcpyAsync(bottom_ghost, d_new_temperature + 1,
-            block_x * sizeof(double), cudaMemcpyDeviceToHost,
+      hapiCheck(hapiMemcpyAsync(bottom_ghost, d_new_temperature + 1,
+            block_x * sizeof(float), cudaMemcpyDeviceToHost,
             stream));
 
       // Transfer top ghost
-      hapiCheck(cudaMemcpyAsync(
+      hapiCheck(hapiMemcpyAsync(
             top_ghost, d_new_temperature + (block_x + 2) * (block_y + 1) + 1,
-            block_x * sizeof(double), cudaMemcpyDeviceToHost, stream));
+            block_x * sizeof(float), cudaMemcpyDeviceToHost, stream));
 
       // Copy final temperature data back to host (on last iteration)
       if (my_iter == num_iters - 1) {
         hapiCheck(
-            cudaMemcpyAsync(temperature, d_new_temperature,
-                            sizeof(double) * (block_x + 2) * (block_y + 2),
+            hapiMemcpyAsync(temperature, d_new_temperature,
+                            sizeof(float) * (block_x + 2) * (block_y + 2),
                             cudaMemcpyDeviceToHost, stream));
       }
 
       if (local_exec_mode == CUDA_MODE) {
         cudaStreamSynchronize(stream);
 
-        thisProxy(thisIndex.x, thisIndex.y).iterate(m);
+        thisProxy(thisIndex.x, thisIndex.y).iterate();
       } else {
         CkArrayIndex2D myIndex = CkArrayIndex2D(thisIndex);
         CkCallback* cb =
-            new CkCallback(CkIndex_Stencil::iterate(NULL), myIndex, thisProxy);
-        if (gpu_prio)
-          CkSetQueueing(m, CK_QUEUEING_LIFO);
-        hapiAddCallback(stream, cb, m);
+            new CkCallback(CkIndex_Stencil::iterate(), myIndex, thisProxy);
+        //if (gpu_prio)
+        //  CkSetQueueing(m, CK_QUEUEING_LIFO);
+        hapiAddCallback(stream, cb);
       }
     } else {  // CPU_MODE
       for (int i = 1; i <= block_x; ++i) {
@@ -573,12 +661,12 @@ class Stencil : public CBase_Stencil {
               DIVIDEBY5;
         }
       }
-      double* tmp;
+      float* tmp;
       tmp = temperature;
       temperature = new_temperature;
       new_temperature = tmp;
 
-      thisProxy(thisIndex.x, thisIndex.y).iterate(m);
+      thisProxy(thisIndex.x, thisIndex.y).iterate();
     }
   }
 

@@ -1,3 +1,5 @@
+#include "conv-mach-opt.h"
+
 module CkLocation {
   extern module CkMarshall;
 
@@ -14,6 +16,10 @@ module CkLocation {
   group [migratable] CkLocMgr {
     entry CkLocMgr(CkArrayOptions opts);
     entry [expedited] void immigrate(CkArrayElementMigrateMessage *msg);
+#if CMK_CUDA || CMK_HIP
+    entry [expedited, threaded] void sendGPUMsg(CmiUInt8 id);
+    entry [expedited] void immigrateGPU(CmiUInt8 id, int size, nocopydevice char data[size]);
+#endif
     entry [expedited] void requestLocation(const CkArrayIndex& idx, int peToTell);
     entry [expedited] void updateLocation(const CkArrayIndex& idx, const CkLocEntry& e);
     entry void reclaimRemote(const CkArrayIndex& idx, int deletedOnPe);

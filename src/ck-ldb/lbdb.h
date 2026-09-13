@@ -157,6 +157,9 @@ public:
 struct LDObjData {
   LDObjHandle handle;
   LBRealType wallTime;
+#if CMK_CUDA || CMK_HIP
+  LBRealType gpuTime;
+#endif
 #if CMK_LB_CPUTIMER
   LBRealType cpuTime;
 #endif
@@ -171,6 +174,9 @@ struct LDObjData {
   // An encoded approximation of the amount of data the object would pack;
   // call pup_decodeSize(pupSize) to get the actual approximate value
   CmiUInt2 pupSize;
+#if CMK_CUDA || CMK_HIP
+  size_t gpuPupSize;
+#endif
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
   inline const LDOMid &omID() const { return handle.omhandle.id; }
   inline const CmiUInt8 &objID() const { return handle.id; }
@@ -333,6 +339,9 @@ inline void LBObjUserData::pup(PUP::er &p) {
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
   p|wallTime;
+#if CMK_CUDA || CMK_HIP
+  p|gpuTime;
+#endif
 #if CMK_LB_CPUTIMER
   p|cpuTime;
 #endif
@@ -348,6 +357,9 @@ inline void LDObjData::pup(PUP::er &p) {
   }
 #endif
   p|pupSize;
+#if CMK_CUDA || CMK_HIP
+  p|gpuPupSize;
+#endif
 }
 
 inline bool LDCommDesc::operator==(const LDCommDesc &obj) const {

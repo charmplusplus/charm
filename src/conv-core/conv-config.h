@@ -123,6 +123,10 @@
 #define CMK_CUDA                  0
 #endif
 
+#if !defined(CMK_HIP)
+#define CMK_HIP                  0
+#endif
+
 #ifndef CMI_QD
 #define CMI_QD (CMK_REPLAYSYSTEM)
 #endif

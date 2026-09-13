@@ -63,6 +63,14 @@ void CcsImpl_kill(void)
     SOCKET fd=skt_connect(killList->ip,killList->port,20);
     if (fd!=INVALID_SOCKET) {
       skt_sendN(fd,"die\n",strlen("die\n")+1);
+
+      // Set SO_LINGER to ensure the "die" message is sent before we exit.
+      // This forces close() to block until the kernel has transmitted the data.
+      struct linger linger_opt;
+      linger_opt.l_onoff = 1;  // Enable linger
+      linger_opt.l_linger = 5; // Timeout in seconds
+      setsockopt(fd, SOL_SOCKET, SO_LINGER, &linger_opt, sizeof(linger_opt));
+
       skt_close(fd);
     }
     killList=killList->next;

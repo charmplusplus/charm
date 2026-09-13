@@ -80,6 +80,8 @@ public:
   virtual void UserSetLBLoad(void);  /// user define this when setLBLoad is true
   void setObjTime(double cputime);
   double getObjTime();
+  void setObjGPUTime(double cputime);
+  double getObjGPUTime();
 #if CMK_LB_USER_DATA
   void *getObjUserData(int idx);
 #endif
@@ -96,6 +98,7 @@ public:
   void ckFinishConstruction(int epoch = -1);
   void setMigratable(int migratable);
   void setPupSize(size_t obj_pup_size);
+  void setGPUPupSize(size_t obj_gpu_pup_size);
 #else
   void AtSync(int waitForMigration=1) { ResumeFromSync();}
   void setMigratable(int migratable)  { }

@@ -295,10 +295,10 @@ void CmiSyncBroadcastFn1(int size, char *msg) {
     }
     #endif
 	
-    for ( i=mype+1; i<_Cmi_numpes; i++ )
+    for ( int i=mype+1; i<_Cmi_numpes; i++ )
         CmiSyncSendFn(i, size, msg) ;
 	
-    for ( i=0; i<mype; i++ )
+    for ( int i=0; i<mype; i++ )
         CmiSyncSendFn(i, size, msg) ;
 #endif
 }

@@ -38,6 +38,7 @@ class RefineA : public Strategy<O, P, S>
 
   void solve(std::vector<O>& objs, std::vector<P>& procs, S& solution, bool objsSorted)
   {
+    CkPrintf("Solving with RefineA strategy\n");
     float M = calcGreedyMaxload(objs, procs, objsSorted);
     if (CkMyPe() == 0 && _lb_args.debug() > 0)
       CkPrintf("[%d] RefineA: greedy maxload is %f\n", CkMyPe(), M);
@@ -73,7 +74,6 @@ class RefineA : public Strategy<O, P, S>
     while (reldiff(lower, upper) > 1.01)
     {
       M = (lower + upper) / 2;
-
       solutions.emplace_back(initialAssignment);
       std::unordered_map<int, std::vector<O>> proc_objs(
           proc_objs0);  // real pe -> list of its objects
@@ -104,13 +104,13 @@ class RefineA : public Strategy<O, P, S>
         for (auto it = heavy_objs.begin(); it != heavy_objs.end(); it++)
         {
           O& o = *it;
-          if (lightest.getLoad() + o.getLoad() <= M)
+          if (lightest.getLoad() + (o.getLoad() / lightest.speed[0]) <= M)
           {
             heavy_processors.pop();
-            heavy.load -= o.getLoad();
+            heavy.load -= o.getLoad() / heavy.speed[0];
             for (auto& light : light_processors)
             {
-              if (light.getLoad() + o.getLoad() <= M)
+              if (light.getLoad() + (o.getLoad() / light.speed[0]) <= M)
               {
                 solutions.back().assign(o, light);
                 lightH.remove(light);
@@ -178,6 +178,7 @@ class RefineB : public Strategy<O, P, S>
 
   void solve(std::vector<O>& objs, std::vector<P>& procs, S& solution, bool objsSorted)
   {
+    CkPrintf("Solving with RefineB strategy\n");
     float M = calcGreedyMaxload(objs, procs, objsSorted);
     if (CkMyPe() == 0 && _lb_args.debug() > 0)
       CkPrintf("[%d] RefineB: greedy maxload is %f\n", CkMyPe(), M);

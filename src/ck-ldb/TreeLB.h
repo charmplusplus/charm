@@ -6,6 +6,7 @@
 #include "BaseLB.h"
 #include "TreeLB.decl.h"
 #include "json.hpp"
+#include "manager.h"
 #include <vector>
 using json = nlohmann::json;
 
@@ -25,18 +26,29 @@ class TreeLBMessage
  public:
   uint8_t level;
   // WARNING: don't add any virtual methods here
+
+  virtual void pup(PUP::er& p) { CkAbort("TreeLBMessage::pup not implemented\n"); }
 };
 
-class LevelLogic
+class LevelLogic : public PUP::able
 {
  public:
+   std::vector<TreeLBMessage*> stats_msgs;
+
+  LevelLogic() : PUP::able() {
+    num_stats_msgs = 0;
+    num_strategies = 0;
+  }
   virtual ~LevelLogic() {}
 
   /// return msg with lb stats for this PE. only needed at leaves
   virtual TreeLBMessage* getStats() { CkAbort("LevelLogic::getStats not implemented\n"); }
+  virtual bool collectSpeeds(int pe_id, float speed) { CkAbort("LevelLogic::collectSpeeds not implemented\n"); return false; }
+  virtual int getNumNewPes() { CkAbort("LevelLogic::getNumNewPes not implemented\n"); return 0; }
   // Note: These are not "=0" methods, because then the subclass would have to
   // implement (and abort inside) empty methods if it doesn't need them
 
+  virtual void resetObjs() { CkAbort("LevelLogic::resetObjs not implemented\n"); }
   /// deposit stats msg received from a child
   virtual void depositStats(TreeLBMessage* stats) { stats_msgs.push_back(stats); }
 
@@ -102,6 +114,18 @@ class LevelLogic
     CkAbort("LevelLogic::processDecision not implemented\n");
   }
 
+  PUPable_decl(LevelLogic);
+  LevelLogic(CkMigrateMessage *m) : PUP::able(m) {}
+  virtual void pup(PUP::er& p) { 
+    PUP::able::pup(p);
+    if (p.isPacking()) {
+      CkPrintf("[PE %d] PUPPING LevelLogic with %d stats and %d strategies\n", CkMyPe(), stats_msgs.size());
+      num_stats_msgs = stats_msgs.size();
+    }
+    p|num_stats_msgs;
+  }
+   
+
   virtual bool makesTokens() { return false; }
 
   /// return nominal load that is being transferred in the tokens
@@ -124,7 +148,8 @@ class LevelLogic
   }
 
  protected:
-  std::vector<TreeLBMessage*> stats_msgs;
+  unsigned int num_stats_msgs;
+  int num_strategies;
 };
 
 class LBTreeBuilder;
@@ -139,10 +164,21 @@ class TreeLB : public CBase_TreeLB
   {
     loadConfigFile(opts);
     init(opts);
+#if CMK_SHRINK_EXPAND
+	  manager_init();
+#endif
   }
-  TreeLB(CkMigrateMessage* m) : CBase_TreeLB(m) {}
+
+  TreeLB(CkMigrateMessage* m) : CBase_TreeLB(m) 
+  {
+#if CMK_SHRINK_EXPAND
+    CkPrintf("TREELB MIGRATION constructor ON PE %d\n", CkMyPe());
+#endif
+  }
+
   virtual ~TreeLB();
 
+  void expand_init();
   void pup(PUP::er& p);
 
   void loadConfigFile(const CkLBOptions& opts);
@@ -153,7 +189,7 @@ class TreeLB : public CBase_TreeLB
 
   // start load balancing (non-AtSync mode)  NOTE: This seems to do a broadcast
   // (is this the behavior we want?)
-  inline void StartLB() { thisProxy.ProcessAtSync(); }
+  void StartLB();
 
   // TODO: I would rename this group of functions (to maybe something like startLBLocal)
   // since they are also used in non-AtSync mode
@@ -162,6 +198,8 @@ class TreeLB : public CBase_TreeLB
   void ProcessAtSync();  // Receive a message from AtSync to avoid making projections
                          // output look funny
                          // TODO: do we still need this?
+
+
 
   // send stats up using the comm-tree for this level
   void sendStatsUp(CkMessage* stats);
@@ -180,6 +218,20 @@ class TreeLB : public CBase_TreeLB
 
   void reportLbTime(double* times, int n);
 
+  void resumeFromReallocCheckpoint();
+
+  void lb_done_impl();
+
+  void startCleanup();
+  void CallLB();
+  void CheckForLB();
+
+  void checkForRealloc();
+
+  void willIbekilled(std::vector<char> avail, int newnumProcessAfterRestart);
+  void restartFromSE(bool rateAware);
+  void collectSpeeds(int pe_id, float speed);
+
  private:
   void init(const CkLBOptions& opts);
 
@@ -187,6 +239,7 @@ class TreeLB : public CBase_TreeLB
   void receiveStats(TreeLBMessage* stats, int level);
 
   void loadBalanceSubtree(int level);
+  void setupForProcessing(int level);
 
   // receive lb decision from parent (decision could be empty -do nothing-)
   // a non-empty decision implies load is moved from one subtree to another subtree
@@ -211,6 +264,7 @@ class TreeLB : public CBase_TreeLB
   // load can be actual objects or tokens
   inline bool checkLoadReceived(int level)
   {
+    //if (_lb_args.debug() > 2) CkPrintf("[PE %d] TreeLB::checkLoadReceived at level %d: received=%d expected=%d\n", CkMyPe(), level, load_received[level], expected_incoming[level]);
     if (load_received[level] == expected_incoming[level])
     {
       load_received[level] = expected_incoming[level] = 0;
@@ -229,6 +283,8 @@ class TreeLB : public CBase_TreeLB
 
   uint8_t numLevels = 0;  // total number of tree levels (this chare won't necessarily
                           // participate in all levels)
+
+  bool thisPeNew = false; // true if this PE is new after a shrink/expand operation
   std::vector<LevelLogic*> logic;  // level -> my logic object at this level
   std::vector<int>
       comm_parent;  // level -> my parent PE in comm-tree connecting level to level+1

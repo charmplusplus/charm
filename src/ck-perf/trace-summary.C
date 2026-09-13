@@ -978,6 +978,28 @@ void TraceSummaryBOC::traceSummaryParallelShutdown(int pe) {
     contribute(sizeof(double), &(CkpvAccess(binSize)), CkReduction::max_double, cb);
 }
 
+// Per-PE close driven from the exit path itself: some runtimes (reconverse)
+// never call traceClose() from ConverseExit, so the .sum/.sumd writes in
+// SumLogPool's destructor would otherwise never run. This runs while the
+// scheduler is still delivering messages (the reduction below, other
+// modules' exit work), so it must not use traceClose(): its removeTrace()
+// leaves a NULL hole that the reverse-iteration dispatch derefs on the next
+// endExecute. Instead disable the module, then write and free the pool;
+// a later ConverseExit-driven traceClose() skips disabled modules, so
+// nothing closes twice.
+void TraceSummaryBOC::closeSummaryOnPe() {
+    TraceSummary* t = CkpvAccess(_trace);
+    t->setTraceOnPE(0);
+    if (CkMyPe() == 0) t->traceWriteSts();
+    t->endComputation();
+    t->closePool();
+    contribute(CkCallback(CkReductionTarget(TraceSummaryBOC, closeSummaryDone), thisProxy[0]));
+}
+
+void TraceSummaryBOC::closeSummaryDone() {
+    CkContinueExit();
+}
+
 // collect the max bin size
 void TraceSummaryBOC::maxBinSize(double _maxBinSize)
 {
@@ -1290,7 +1312,7 @@ static void CombineSummary()
 #if CMK_TRACE_ENABLED
   CmiPrintf("[%d] CombineSummary called!\n", CkMyPe());
 
-  if ((sumonly || sumDetail) && traceSummaryGID.isZero()) {
+  if (traceSummaryGID.isZero()) {
     CkContinueExit();
     return;
   }
@@ -1312,7 +1334,10 @@ static void CombineSummary()
   */
   else
   {
-    CkContinueExit();
+    // Per-PE .sum/.sumd writes must be driven from here: the runtime's
+    // ConverseExit may never call traceClose() (reconverse does not).
+    CProxy_TraceSummaryBOC sumProxy(traceSummaryGID);
+    sumProxy.closeSummaryOnPe();
   }
 #else
   CkContinueExit();

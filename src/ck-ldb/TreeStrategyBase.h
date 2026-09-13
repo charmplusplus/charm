@@ -172,7 +172,7 @@ class Proc<N, false, multi>
 {
  public:
   int id = -1;
-
+  float speed[N] = {1.0};
   inline void populate(int _id, float* _bgload, float* _speed)
   {
     id = _id;

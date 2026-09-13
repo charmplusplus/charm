@@ -3,12 +3,14 @@
 
 #include "lbdb.h"
 
+#include "objid.h"
 #include "LBObj.h"
 #include "LBOM.h"
 #include "LBComm.h"
 #include "LBMachineUtil.h"
 
 #include <vector>
+#include <unordered_map>
 
 class CkSyncBarrier;
 
@@ -32,6 +34,7 @@ private:
   LBCommTable* commTable;
   bool statsAreOn;
   double obj_walltime;
+  double obj_gputime;
   LBMachineUtil machineUtil;
   CkSyncBarrier* syncBarrier;
 
@@ -48,6 +51,13 @@ public:
 #endif
     }
   }
+
+  inline void MeasuredObjGPUTime(double gputime) {
+    if (statsAreOn) {
+      obj_gputime += gputime;
+    }
+  }
+
   inline LBOM* LbOM(LDOMHandle h) {
     return oms[h.handle];
   }
@@ -67,6 +77,37 @@ public:
     LbObj(h)->getTime(&walltime, &cputime);
   };
 
+  inline void GetObjGPULoad(LDObjHandle &h, LBRealType &gputime) {
+    LbObj(h)->getGPUTime(&gputime);
+  };
+
+  inline void SetObjGPULoad(std::unordered_map<uint64_t, uint64_t> &id_gputimeMap)
+  {
+    int matched = 0;
+    int liveObjs = 0;
+    for (int i = 0; i < objs.size(); i++) {
+      if(objs[i].obj == nullptr)
+        continue;
+      liveObjs++;
+      // The CUPTI map is keyed by raw element IDs (from CkMigratable::ckGetID()).
+      // The LB database stores IDs with collection bits prepended (when
+      // CMK_GLOBAL_LOCATION_UPDATE is set). Strip collection bits to match.
+      CmiUInt8 lb_id = objs[i].obj->ObjData().objID();
+      CmiUInt8 raw_id = ck::ObjID(lb_id).getElementID();
+      auto it = id_gputimeMap.find(raw_id);
+      if(it==id_gputimeMap.end()) {
+        // CkPrintf("[PE %d] SetObjGPULoad: obj %d lb_id=%lu raw_id=%lu NO MATCH\n", CmiMyPe(), i, (unsigned long)lb_id, (unsigned long)raw_id);
+        continue;
+      }
+
+      matched++;
+      // CkPrintf("[PE %d] SetObjGPULoad: obj %d id=%lu -> gpuTime=%.6f s\n",
+      //          CmiMyPe(), i, (unsigned long)it->first, it->second / 1.0e9);
+      objs[i].obj->setGPUTiming(it->second / 1.0e9);
+    }
+    // CkPrintf("[PE %d] SetObjGPULoad: %d/%d live objects matched from %zu CUPTI entries (objs.size=%zu)\n",
+    //          CmiMyPe(), matched, liveObjs, id_gputimeMap.size(), objs.size());
+  }
   inline void* GetObjUserData(LDObjHandle &h) {
     return LbObj(h)->getLocalUserData();
   }
@@ -89,6 +130,7 @@ public:
   inline void NonMigratable(LDObjHandle h) { LbObj(h)->SetMigratable(false); };
   inline void Migratable(LDObjHandle h) { LbObj(h)->SetMigratable(true); };
   inline void setPupSize(LDObjHandle h, size_t pup_size) { LbObj(h)->setPupSize(pup_size);};
+  inline void setGPUPupSize(LDObjHandle h, size_t gpu_pup_size) { LbObj(h)->setGPUPupSize(gpu_pup_size);};
   inline void UseAsyncMigrate(LDObjHandle h, bool flag) { LbObj(h)->UseAsyncMigrate(flag); };
   inline int GetCommDataSz(void) {
     if (commTable)
@@ -121,12 +163,14 @@ public:
                           int migratable);
   void UnregisterObj(LDObjHandle h);
   void EstObjLoad(const LDObjHandle &h, double cpuload);
+  void EstObjGPULoad(const LDObjHandle &h, double cpuload);
   void BackgroundLoad(LBRealType *walltime, LBRealType *cputime);
   void Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned int bytes, int destObjProc, int force = 0);
   void MulticastSend(const LDOMHandle &_om, CmiUInt8 *_ids, int _n, unsigned int _b, int _nMsgs=1);
   void GetTime(LBRealType *total_walltime, LBRealType *total_cputime,
                LBRealType *idletime, LBRealType *bg_walltime,
                LBRealType *bg_cputime);
+  void GetGPUBGTime(LBRealType *bg_gputime);
   const std::vector<LBObjEntry>& getObjs() {return objs;}
 
   inline void ObjectStart(const LDObjHandle &h) {
@@ -143,6 +187,10 @@ public:
       obj->StopTimer(&walltime, &cputime);
       obj->IncrementTime(walltime, cputime);
       MeasuredObjTime(walltime, cputime);
+
+      #if CMK_CUDA || CMK_HIP
+      MeasuredObjGPUTime(obj->data.gpuTime);
+      #endif
     }
   };
   inline const LDObjHandle &GetObjHandle(int idx) {

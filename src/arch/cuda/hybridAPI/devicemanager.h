@@ -1,7 +1,7 @@
 #ifndef __DEVICEMANAGER_H_
 #define __DEVICEMANAGER_H_
 
-#include <cuda_runtime.h>
+#include <hapi_portable.h>
 #include "converse.h"
 #include "buddy_allocator.h"
 
@@ -37,13 +37,13 @@ struct DeviceManager {
     return comm_buffer;
   }
 
-  void create_comm_buffer(size_t size) {
+  void create_comm_buffer(size_t total_size, size_t comm_size) {
     if (comm_buffer == nullptr)
-      comm_buffer = new buddy::allocator(size);
+      comm_buffer = new buddy::allocator(total_size, comm_size);
   }
 
-  void* alloc_comm_buffer(size_t size) {
-    return comm_buffer->malloc(size);
+  void* alloc_comm_buffer(size_t size, bool is_comm = true) {
+    return comm_buffer->malloc(size, is_comm);
   }
 
   void free_comm_buffer(size_t offset) {
@@ -52,6 +52,10 @@ struct DeviceManager {
 
   size_t get_comm_buffer_free_size() {
     return comm_buffer->get_free_size();
+  }
+
+  size_t get_lb_buffer_free_size() {
+    return comm_buffer->get_lb_free_size();
   }
 
   void destroy_comm_buffer() {

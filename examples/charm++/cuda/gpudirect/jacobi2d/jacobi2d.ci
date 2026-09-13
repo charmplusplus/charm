@@ -14,6 +14,8 @@ mainmodule jacobi2d {
   readonly bool sync_ver;
   readonly bool use_zerocopy;
   readonly bool print_elements;
+  readonly int lb_freq;
+  readonly int first_lb;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
@@ -35,6 +37,12 @@ mainmodule jacobi2d {
     entry void packGhostsDone();
     entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
     entry void receiveGhostsReg(int ref, int dir, int w, DataType gh[w]);
+    entry void d_send_left_ghost_done();
+    entry void d_send_right_ghost_done();
+    entry void d_send_top_ghost_done();
+    entry void d_send_bottom_ghost_done();
+
+    entry void iterate();
 
     entry void exchangeGhosts() {
       serial {
@@ -68,12 +76,29 @@ mainmodule jacobi2d {
         }
       }
 
+      for (send_done_idx = 0; send_done_idx < 1; send_done_idx++) {
+        if (!sync_ver) {
+          if(!left_bound) {
+            when d_send_left_ghost_done() {}
+          }
+          if(!right_bound) {
+            when d_send_right_ghost_done() {}
+          }
+          if(!top_bound) {
+            when d_send_top_ghost_done() {}
+          }
+          if(!bottom_bound) {
+            when d_send_bottom_ghost_done() {}
+          }
+        }
+      }
+
       serial {
         if (sync_ver || my_iter <= warmup_iters) {
           contribute(CkCallback(CkReductionTarget(Main, commDone), main_proxy));
         } else {
           if (my_iter < warmup_iters + n_iters) {
-            thisProxy[thisIndex].exchangeGhosts();
+            thisProxy[thisIndex].iterate();
           } else {
             contribute(CkCallback(CkReductionTarget(Main, allDone), main_proxy));
           }

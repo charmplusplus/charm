@@ -1,3 +1,4 @@
+#include "conv-autoconfig.h"
 #include "sockRoutines.h"
 
 #ifndef CMK_NO_SOCKETS /*<- for ASCI Red*/

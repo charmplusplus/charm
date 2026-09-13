@@ -94,6 +94,18 @@ void CcsSendReply(int replyLen, const void *replyData);
 void CcsSendReplyNoError(int replyLen, const void *replyData);
 CcsDelayedReply CcsDelayReply(void);
 void CcsSendDelayedReply(CcsDelayedReply d,int replyLen, const void *replyData);
+
+/**
+ * Send a delayed reply and then perform a synchronous close on the socket.
+ * This function blocks until the peer has acknowledged receipt of the data
+ * by closing its end of the connection. This is intended for final replies
+ * before program exit to prevent race conditions.
+ */
+void CcsSendDelayedReplyAndTerm(CcsDelayedReply d, int replyLen, const void *replyData);
+
+/**
+ Send an empty reply for a request that was previously delayed.
+*/
 void CcsNoReply();
 void CcsNoDelayedReply(CcsDelayedReply d);
 

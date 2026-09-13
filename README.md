@@ -92,19 +92,22 @@ of the `<options>` below.
 
 (Note: this isn't a complete list.  Run `./build` for a complete listing)
 
-| Charm++ Version           | OS      | Communication | Default Compiler                      |
-|---------------------------|---------|---------------|---------------------------------------|
-| `netlrts-linux-x86_64`    | Linux   | UDP           | GNU compiler                          |
-| `netlrts-darwin-x86_64`   | macOS   | UDP           | Clang C++ compiler                    |
-| `netlrts-win-x86_64`      | Windows | UDP           | MS Visual C++                         |
-| `mpi-linux-x86_64`        | Linux   | MPI           | GNU compiler                          |
-| `multicore-linux-x86_64`  | Linux   | Shared memory | GNU compiler                          |
-| `multicore-darwin-x86_64` | macOS   | Shared memory | Clang C++ compiler                    |
-| `gni-crayxc`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
-| `gni-crayxe`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
-| `verbs-linux-x86_64`      | Linux   | IB Verbs      | GNU compiler                          |
-| `ofi-linux-x86_64`        | Linux   | OFI           | GNU compiler                          |
-| `ucx-linux-x86_64`        | Linux   | UCX           | GNU compiler                          |
+| Charm++ Version               | OS      | Communication  | Default Compiler                      |
+|-------------------------------|---------|----------------|---------------------------------------|
+| `netlrts-linux-x86_64`        | Linux   | UDP            | GNU compiler                          |
+| `netlrts-darwin-x86_64`       | macOS   | UDP            | Clang C++ compiler                    |
+| `netlrts-win-x86_64`          | Windows | UDP            | MS Visual C++                         |
+| `mpi-linux-x86_64`            | Linux   | MPI            | GNU compiler                          |
+| `multicore-linux-x86_64`      | Linux   | Shared memory  | GNU compiler                          |
+| `multicore-darwin-x86_64`     | macOS   | Shared memory  | Clang C++ compiler                    |
+| `reconverse-linux-x86_64`     | Linux   | LCI/LCW        | GNU compiler                          |
+| `reconverse-linux-arm8`       | Linux   | LCI/LCW        | GNU compiler                          |
+| `reconverse-darwin-arm8`      | macOS   | LCI/LCW        | Clang C++ compiler                    |
+| `gni-crayxc`                  | Linux   | GNI            | CC (whatever PrgEnv module is loaded) |
+| `gni-crayxe`                  | Linux   | GNI            | CC (whatever PrgEnv module is loaded) |
+| `verbs-linux-x86_64`          | Linux   | IB Verbs       | GNU compiler                          |
+| `ofi-linux-x86_64`            | Linux   | OFI            | GNU compiler                          |
+| `ucx-linux-x86_64`            | Linux   | UCX            | GNU compiler                          |
 
 
 To choose `<version>`, your choice is determined by two options:
@@ -119,6 +122,12 @@ To choose `<version>`, your choice is determined by two options:
     but performance is often worse than using the machine's direct calls referenced above.
     * `multicore-`: Charm++ communicates using shared memory within a single node. A version of
     Charm++ built with this option will not run on more than a single node.
+    * `reconverse-`: Charm++ uses the Reconverse communication layer backed by LCI or LCW.
+    Reconverse is an alternative to the standard Converse layer and is always built in SMP mode
+    (there is no separate communication thread; LCI handles progress internally). It supports
+    single-node runs with no backend, multi-node runs via LCI (recommended for performance),
+    or multi-node runs via LCW (an MPI-based fallback). See
+    [Building with Reconverse](#building-with-reconverse) below.
 
 
 2. Your operating system/architecture:
@@ -181,6 +190,71 @@ for more information:
       Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64 icx
       Supported options: common cuda flang gfortran ifort local nolb omp ooc papi perftools persistent pgf90 pxshm smp syncft sysvshm tcp tsan
 
+
+## Building with Reconverse
+
+The `reconverse-` triplets are always SMP (no `-smp` suffix needed) and always
+enable the Reconverse communication layer. They are built with the standard
+`./build` script like any other version.
+
+### Quick start
+
+On Linux x86\_64:
+
+    $ ./build charm++ reconverse-linux-x86_64
+
+On Linux ARM64:
+
+    $ ./build charm++ reconverse-linux-arm8
+
+On macOS ARM64:
+
+    $ ./build charm++ reconverse-darwin-arm8
+
+This fetches Reconverse (and optionally LCI) from their upstream repositories
+and builds everything in a single step. The resulting build directory is named
+after the triplet (e.g. `reconverse-linux-x86_64/`).
+
+### Communication backends
+
+Reconverse supports three backends, selected at runtime:
+
+* **None** (default for single-process runs): no inter-node communication library
+  is required. This is suitable for development and testing on a single machine.
+* **LCI** (recommended for multi-node): a lightweight communication interface
+  designed for low-latency active-message communication. LCI is fetched and
+  built automatically unless a pre-installed copy is available.
+* **LCW**: an MPI-based wrapper backend. Useful as a fallback on systems where
+  LCI is not available or supported.
+
+At runtime, the backend is selected automatically based on what was compiled in.
+To force a specific backend, pass `+backend lci` or `+backend lcw` on the
+command line.
+
+### Fetching LCI automatically
+
+LCI is fetched by default for reconverse triplets. To use a pre-installed copy
+of LCI instead, set `LCI_ROOT` in your environment before building:
+
+    $ LCI_ROOT=/path/to/lci ./build charm++ reconverse-linux-x86_64
+
+To fetch a specific Reconverse tag or use a local checkout:
+
+    $ ./build charm++ reconverse-linux-x86_64 --with-fetch-reconverse-tag=v1.2.3
+    $ ./build charm++ reconverse-linux-x86_64 --with-fetch-reconverse-dir=/path/to/reconverse
+
+### Build options
+
+The same options available for other versions work with reconverse builds:
+
+* `-j<N>` — parallel build with N jobs (e.g. `-j8`)
+* `--with-production` — enable production optimizations
+* `--enable-tracing` — enable Projections performance tracing
+* `--destination=<dir>` — place the build in a custom directory
+
+For example:
+
+    $ ./build charm++ reconverse-linux-x86_64 -j8 --with-production
 
 ## Building the Source
 

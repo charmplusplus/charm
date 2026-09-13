@@ -7,6 +7,7 @@
 #define LBMANAGER_H
 
 #include <cassert>
+#include <unordered_map>
 
 #include "LBDatabase.h"
 #include "json_fwd.hpp"
@@ -44,6 +45,7 @@ class CkLBArgs
   bool _lb_metaLbOn;
   char* _lb_metaLbModelDir;
   char* _lb_treeLBFile = (char*)"treelb.json";
+  int _lb_percentMovesAllowed;  // for GreedyRefineCentralLB, as percentage of chares that can be moved
 
  public:
   CkLBArgs()
@@ -60,6 +62,7 @@ class CkLBArgs
     _lb_targetRatio = 1.05;
     _lb_metaLbOn = false;
     _lb_metaLbModelDir = nullptr;
+    _lb_percentMovesAllowed = 100;
   }
   inline char*& treeLBFile() { return _lb_treeLBFile; }
   inline double& lbperiod() { return _autoLbPeriod; }
@@ -82,6 +85,7 @@ class CkLBArgs
   inline double& targetRatio() { return _lb_targetRatio; }
   inline bool& metaLbOn() { return _lb_metaLbOn; }
   inline char*& metaLbModelDir() { return _lb_metaLbModelDir; }
+  inline int& percentMovesAllowed() { return _lb_percentMovesAllowed; }
 };
 
 extern CkLBArgs _lb_args;
@@ -95,6 +99,8 @@ extern bool _lb_psizer_on;
 #endif
 #define PredictorPrintf \
   if (PREDICT_DEBUG) CmiPrintf
+
+extern void realloc(char*);
 
 // used in constructor of all load balancers
 class CkLBOptions
@@ -134,6 +140,7 @@ typedef BaseLB* (*LBAllocFn)();
 void LBDefaultCreate(LBCreateFn f);
 
 void LBRegisterBalancer(std::string, LBCreateFn, LBAllocFn, std::string, bool shown = true);
+bool LBHasBalancersRegistered();
 
 template <typename T>
 void LBRegisterBalancer(std::string name, std::string description, bool shown = true)
@@ -239,8 +246,12 @@ class LBManager : public CBase_LBManager
 
   int startLBFn_count;
 
+  char* reallocBuffer;
+
  public:
   int chare_count;
+  bool lb_in_progress;
+
 
   LBManager(void) { init(); }
   LBManager(CkMigrateMessage* m) : CBase_LBManager(m) { init(); }
@@ -263,6 +274,22 @@ class LBManager : public CBase_LBManager
 
   void configureTreeLB(const char* json_str);
   void configureTreeLB(json& config);
+
+  void bufferRealloc(char* bitmap)
+  {
+    int size = CkNumPes() + 2 * sizeof(int);
+    reallocBuffer = (char*)malloc(size);
+    memcpy(reallocBuffer, bitmap, size);
+  }
+
+  void callRealloc()
+  {
+    if (reallocBuffer != nullptr)
+    {
+      realloc(reallocBuffer);
+      reallocBuffer = nullptr;
+    }
+  }
 
   /*
    * Calls from object managers to load database
@@ -288,6 +315,7 @@ class LBManager : public CBase_LBManager
   void NonMigratable(LDObjHandle h) { lbdb_obj->NonMigratable(h); }
   void Migratable(LDObjHandle h) { lbdb_obj->Migratable(h); }
   void setPupSize(LDObjHandle h, size_t pup_size) { lbdb_obj->setPupSize(h, pup_size); }
+  void setGPUPupSize(LDObjHandle h, size_t gpu_pup_size) { lbdb_obj->setGPUPupSize(h, gpu_pup_size); }
   void UseAsyncMigrate(LDObjHandle h, bool flag) { lbdb_obj->UseAsyncMigrate(h, flag); };
   int GetObjDataSz(void) { return lbdb_obj->GetObjDataSz(); }
   int GetCommDataSz(void) { return lbdb_obj->GetCommDataSz(); }
@@ -310,6 +338,14 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetObjLoad(h, walltime, cputime);
   };
+   void GetObjGPULoad(LDObjHandle& h, LBRealType& gputime)
+  {
+    lbdb_obj->GetObjGPULoad(h, gputime);
+  };
+  void SetObjGPULoad(std::unordered_map<uint64_t, uint64_t> &id_gputimeMap)
+  {
+    lbdb_obj->SetObjGPULoad(id_gputimeMap);
+  }
   void* GetObjUserData(LDObjHandle& h) { return lbdb_obj->GetObjUserData(h); }
   void MetaLBCallLBOnChares() { lbdb_obj->MetaLBCallLBOnChares(); }
   void MetaLBResumeWaitingChares(int lb_period)
@@ -329,6 +365,10 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetTime(total_walltime, total_cputime, idletime, bg_walltime, bg_cputime);
   }
+  void GetGPUBGTime(LBRealType* bg_gputime)
+  {
+    lbdb_obj->GetGPUBGTime(bg_gputime);
+  }
   LDObjHandle RegisterObj(LDOMHandle omh, CmiUInt8 id, void* userPtr, int migratable)
   {
     return lbdb_obj->RegisterObj(omh, id, userPtr, migratable);
@@ -337,6 +377,10 @@ class LBManager : public CBase_LBManager
   void EstObjLoad(const LDObjHandle& h, double cpuload)
   {
     lbdb_obj->EstObjLoad(h, cpuload);
+  }
+  void EstObjGPULoad(const LDObjHandle& h, double gputime)
+  {
+    lbdb_obj->EstObjGPULoad(h, gputime);
   }
   void BackgroundLoad(LBRealType* walltime, LBRealType* cputime)
   {
@@ -476,6 +520,7 @@ class LBManager : public CBase_LBManager
   void LocalBarrierOff(void);
   void ResumeClients();
   static int ProcessorSpeed();
+  static int ProcessorGPUSpeed();
   static void SetLBPeriod(double period)
   {
     _lb_args.lbperiod() = period;

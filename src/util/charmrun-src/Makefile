@@ -5,13 +5,13 @@ SHELL=/bin/sh
 
 INCLUDED=../conv-mach.h ../conv-mach-opt.h \
 	../ccs-server.C ../ccs-server.h ../ccs-auth.C ../ccs-auth.h \
-	../sockRoutines.C ../sockRoutines.h
+	../sockRoutines.C ../sockRoutines.h ../ckcheckpoint.C ../ckcheckpoint.h
 
 all: charmrun charmd charmd_faceless
 
-charmrun: charmrun.C $(INCLUDED)
+charmrun: charmrun.C $(INCLUDED) ck.o
 	$(CHARMC) -c -seq -DCMK_NOT_USE_CONVERSE=1 charmrun.C -o charmrun.o
-	$(CHARMC) -cp $(BIN) -seq -language c++ -o charmrun charmrun.o
+	$(CHARMC) -cp $(BIN) -seq -language c++ -o charmrun charmrun.o ck.o
 
 charmd: daemon.C daemon.h ../sockRoutines-seq.o
 	$(CHARMC) -seq -c daemon.C -o daemon.o

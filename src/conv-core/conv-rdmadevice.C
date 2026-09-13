@@ -1,7 +1,8 @@
 #include "converse.h"
 #include "conv-rdmadevice.h"
+#include "ck.h"
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 
 CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
   CmiEnforce((srcPe >= 0) && (srcPe <= CmiNumPes()));
@@ -10,12 +11,10 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
   if (CmiNodeOf(srcPe) == CmiNodeOf(dstPe)) {
     // Same logical node
     return CmiNcpyModeDevice::MEMCPY;
-  }
-  else if (CmiPeOnSamePhysicalNode(srcPe, dstPe)) {
+  } else if (CmiPeOnSamePhysicalNode(srcPe, dstPe)) {
     // Different logical nodes, same physical node
     return CmiNcpyModeDevice::IPC;
-  }
-  else {
+  } else {
     // Different physical nodes, requires GPUDirect RDMA
     return CmiNcpyModeDevice::RDMA;
   }
@@ -24,8 +23,8 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
 #if CMK_GPU_COMM
 #include "machine-rdma.h"
 
-void CmiSendDevice(int dest_pe, const void*& ptr, size_t size, uint64_t& tag) {
-  LrtsSendDevice(dest_pe, ptr, size, tag);
+void CmiSendDevice(int dest_rank, int src_rank, const void*& ptr, size_t size, uint64_t& tag) {
+  LrtsSendDevice(dest_rank, src_rank, ptr, size, tag);
 }
 
 void CmiRecvDevice(DeviceRdmaOp* op, DeviceRecvType type) {
@@ -40,6 +39,7 @@ void CmiRdmaDeviceRecvInit(RdmaAckHandlerFn fn) {
 }
 
 void CmiInvokeRecvHandler(void* data) {
+  QdProcess(1);
   rdmaDeviceRecvHandlerFn(data);
 }
 #endif // CMK_GPU_COMM

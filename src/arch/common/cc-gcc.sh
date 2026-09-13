@@ -43,7 +43,7 @@ if [ "$CMK_MACOSX" ]; then
 
   # keep in sync with mpi-darwin-x86_64/conv-mach.sh
   CMK_CC_FLAGS="-fPIC"
-  CMK_CXX_FLAGS="-fPIC -Wno-deprecated"
+  CMK_CXX_FLAGS="-fPIC -Wno-deprecated -std=gnu++17"
   CMK_LD_FLAGS="-fPIC"
   CMK_LDXX_FLAGS="-fPIC -multiply_defined suppress"
 fi

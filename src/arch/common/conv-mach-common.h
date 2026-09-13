@@ -122,5 +122,5 @@ enum cmiZCMsgType {
 
 /* GPU-aware communication is not supported by the machine layer by default */
 #ifndef CMK_GPU_COMM
-#define CMK_GPU_COMM 0
+#define CMK_GPU_COMM 1
 #endif
