@@ -165,6 +165,218 @@ static void hapiIdleYield(void*) {
   if (CpvAccess(hapi_flag_inflight) > 0) sched_yield();
 }
 
+// A second way to write the flag, +gpuflagmemset: cuMemsetD32Async of one
+// word into the slot's device alias. It goes through the fill path (a kernel
+// or the copy engine) rather than the front end's stream memop, and exists to
+// tell the two apart when a flag write never lands.
+typedef CUresult (*hapiMemsetD32AsyncFn)(CUdeviceptr, unsigned int, size_t, CUstream);
+static hapiMemsetD32AsyncFn hapi_memset_d32_async = nullptr;
+static bool hapi_flag_use_memset = false;
+
+// ---- stall trace (+gpustalltrace) --------------------------------------------
+// A node-wide log of every event record, stream wait and flag issue that goes
+// through hapi, kept so that a stalled stream can be walked back to the wait
+// that never came and to the record it was waiting for. The lock and the maps
+// cost on the hot path, so this is off unless asked for.
+#include <unordered_map>
+#include <vector>
+#include <mutex>
+struct HapiTraceOp {
+  uint64_t idx;     // position in the stream's op sequence
+  char kind;        // 'R' record, 'W' wait, 'F' flag issue
+  void* ev;         // R/W: the event
+  uint64_t evgen;   // R: the generation this record made; W: the one captured
+  uint32_t seq;     // F: sequence number
+  int rank;         // issuing PE's rank in the node
+  int note;         // caller's tag (IPC slot), 0 if none
+};
+#define HAPI_TRACE_RING 128
+struct HapiTraceStream {
+  HapiTraceOp ops[HAPI_TRACE_RING];
+  uint64_t n = 0;   // ops issued; the ring holds the last HAPI_TRACE_RING
+};
+struct HapiTraceEvRec { void* stream; uint64_t idx; uint64_t gen; int rank; int note; };
+struct HapiTraceEvent {
+  uint64_t gen = 0;
+  HapiTraceEvRec last[4]; int nlast = 0;
+};
+static bool hapi_trace_on = false;
+static CmiNodeLock hapi_trace_lock = NULL;
+static std::unordered_map<void*, HapiTraceStream>* hapi_trace_streams = nullptr;
+static std::unordered_map<void*, HapiTraceEvent>* hapi_trace_events = nullptr;
+static std::once_flag hapi_trace_once;
+CpvDeclare(uint32_t*, hapi_flag_probe);      // pinned word for live probes
+CpvDeclare(void*, hapi_flag_probe_dev);
+
+static void hapiTraceInit() {
+  std::call_once(hapi_trace_once, []() {
+    hapi_trace_lock = CmiCreateLock();
+    hapi_trace_streams = new std::unordered_map<void*, HapiTraceStream>();
+    hapi_trace_events = new std::unordered_map<void*, HapiTraceEvent>();
+  });
+}
+static HapiTraceOp& hapiTracePush(void* stream) {
+  HapiTraceStream& s = (*hapi_trace_streams)[stream];
+  HapiTraceOp& op = s.ops[s.n % HAPI_TRACE_RING];
+  op.idx = s.n++;
+  return op;
+}
+static void hapiTraceFlag(void* stream, uint32_t seq) {
+  if (!hapi_trace_on) return;
+  CmiLock(hapi_trace_lock);
+  HapiTraceOp& op = hapiTracePush(stream);
+  op.kind = 'F'; op.ev = NULL; op.evgen = 0; op.seq = seq; op.rank = CmiMyRank(); op.note = 0;
+  CmiUnlock(hapi_trace_lock);
+}
+
+cudaError_t hapiEventRecordNoted(cudaEvent_t event, cudaStream_t stream, int note) {
+  if (!hapi_trace_on) return cudaEventRecord(event, stream);
+  // The lock spans the call so the generation the log assigns is the one the
+  // driver saw: a wait logged after this record captured it, one before did not.
+  CmiLock(hapi_trace_lock);
+  const cudaError_t r = cudaEventRecord(event, stream);
+  if (r == cudaSuccess) {
+    HapiTraceEvent& e = (*hapi_trace_events)[(void*)event];
+    HapiTraceOp& op = hapiTracePush((void*)stream);
+    op.kind = 'R'; op.ev = (void*)event; op.evgen = ++e.gen; op.seq = 0;
+    op.rank = CmiMyRank(); op.note = note;
+    HapiTraceEvRec& rec = e.last[e.nlast % 4]; e.nlast++;
+    rec.stream = (void*)stream; rec.idx = op.idx; rec.gen = e.gen;
+    rec.rank = op.rank; rec.note = note;
+  }
+  CmiUnlock(hapi_trace_lock);
+  return r;
+}
+cudaError_t hapiStreamWaitEventNoted(cudaStream_t stream, cudaEvent_t event,
+                                     unsigned int flags, int note) {
+  if (!hapi_trace_on) return cudaStreamWaitEvent(stream, event, flags);
+  CmiLock(hapi_trace_lock);
+  const cudaError_t r = cudaStreamWaitEvent(stream, event, flags);
+  if (r == cudaSuccess) {
+    auto it = hapi_trace_events->find((void*)event);
+    const uint64_t gen = (it == hapi_trace_events->end()) ? 0 : it->second.gen;
+    HapiTraceOp& op = hapiTracePush((void*)stream);
+    op.kind = 'W'; op.ev = (void*)event; op.evgen = gen; op.seq = 0;
+    op.rank = CmiMyRank(); op.note = note;
+  }
+  CmiUnlock(hapi_trace_lock);
+  return r;
+}
+
+// Has PE `rank`'s flag `seq` landed? True also once the slot has moved on to
+// a later sequence number, which can only happen after this one was drained.
+static bool hapiTraceFlagLanded(int rank, uint32_t seq) {
+  uint32_t* slots = CpvAccessOther(hapi_flag_slots, rank);
+  if (slots == NULL) return false;
+  volatile uint32_t* slot = slots + (size_t)(seq & (HAPI_FLAG_SLOTS - 1)) * HAPI_FLAG_STRIDE;
+  return (int32_t)(*slot - seq) >= 0;
+}
+
+// Has `stream` executed past op `idx`? 1: a flag issued at or after idx has
+// landed. 0: the first flag after idx has not landed (out_seq says which).
+// -1: no flag after idx in the ring, so nothing to go on.
+static int hapiTraceStreamReached(void* stream, uint64_t idx, uint32_t* out_seq, int* out_rank) {
+  auto it = hapi_trace_streams->find(stream);
+  if (it == hapi_trace_streams->end()) return -1;
+  HapiTraceStream& s = it->second;
+  const uint64_t lo = s.n > HAPI_TRACE_RING ? s.n - HAPI_TRACE_RING : 0;
+  for (uint64_t i = lo; i < s.n; i++) {
+    HapiTraceOp& op = s.ops[i % HAPI_TRACE_RING];
+    if (op.kind != 'F' || op.idx < idx) continue;
+    *out_seq = op.seq; *out_rank = op.rank;
+    return hapiTraceFlagLanded(op.rank, op.seq) ? 1 : 0;
+  }
+  return -1;
+}
+
+// Walk one stalled stream: list what was enqueued on it since its last landed
+// flag, decide for each wait whether the record it captured has executed, and
+// follow the first one that has not into the stream it was recorded on.
+static void hapiTraceWalk(void* stream, int depth, std::vector<void*>& path) {
+  char ind[32]; snprintf(ind, sizeof ind, "%*s", depth * 2, "");
+  if (depth > 8) { CkPrintf("[trace]%s ... depth limit\n", ind); return; }
+  for (void* p : path)
+    if (p == stream) { CkPrintf("[trace]%s CYCLE: back to stream %p\n", ind, stream); return; }
+  path.push_back(stream);
+  auto it = hapi_trace_streams->find(stream);
+  if (it == hapi_trace_streams->end()) {
+    CkPrintf("[trace]%s stream %p: no trace (nothing recorded, waited or flagged through hapi)\n", ind, stream);
+    return;
+  }
+  HapiTraceStream& s = it->second;
+  const uint64_t lo = s.n > HAPI_TRACE_RING ? s.n - HAPI_TRACE_RING : 0;
+  // The window starts after the newest flag that has landed.
+  uint64_t start = lo;
+  for (uint64_t i = lo; i < s.n; i++) {
+    HapiTraceOp& op = s.ops[i % HAPI_TRACE_RING];
+    if (op.kind == 'F' && hapiTraceFlagLanded(op.rank, op.seq)) start = op.idx + 1;
+  }
+  CkPrintf("[trace]%s stream %p: %llu ops logged, window [%llu,%llu) since last landed flag\n",
+           ind, stream, (unsigned long long)s.n, (unsigned long long)start,
+           (unsigned long long)s.n);
+  void* follow = NULL;
+  for (uint64_t i = start; i < s.n; i++) {
+    HapiTraceOp& op = s.ops[i % HAPI_TRACE_RING];
+    if (op.kind == 'F') {
+      CkPrintf("[trace]%s  #%llu F seq=%u pe-rank=%d %s\n", ind, (unsigned long long)op.idx,
+               op.seq, op.rank, hapiTraceFlagLanded(op.rank, op.seq) ? "landed" : "NOT landed");
+    } else if (op.kind == 'R') {
+      CkPrintf("[trace]%s  #%llu R ev=%p gen=%llu note=%d\n", ind, (unsigned long long)op.idx,
+               op.ev, (unsigned long long)op.evgen, op.note);
+    } else if (op.kind == 'W') {
+      const cudaError_t q = cudaEventQuery((cudaEvent_t)op.ev);
+      cudaGetLastError();
+      const char* qs = (q == cudaSuccess) ? "done" : (q == cudaErrorNotReady ? "NOT-READY" : "ERR");
+      auto et = hapi_trace_events->find(op.ev);
+      if (et == hapi_trace_events->end()) {
+        CkPrintf("[trace]%s  #%llu W ev=%p note=%d EXTERNAL (recorded outside this process) latest-record query=%s\n",
+                 ind, (unsigned long long)op.idx, op.ev, op.note, qs);
+        if (q == cudaErrorNotReady && follow == NULL) {
+          CkPrintf("[trace]%s  -> blocked on an external record (see the peer's [trace] for note=%d)\n", ind, op.note);
+          follow = (void*)1;  // resolved: external
+        }
+        continue;
+      }
+      HapiTraceEvent& e = et->second;
+      if (op.evgen == 0) {
+        CkPrintf("[trace]%s  #%llu W ev=%p captured NO record (no-op)\n", ind, (unsigned long long)op.idx, op.ev);
+        continue;
+      }
+      const HapiTraceEvRec* rec = NULL;
+      for (int k = 0; k < 4 && k < e.nlast; k++)
+        if (e.last[k].gen == op.evgen) rec = &e.last[k];
+      if (rec == NULL) {
+        CkPrintf("[trace]%s  #%llu W ev=%p gen=%llu (now %llu): record fell out of the ring; latest query=%s\n",
+                 ind, (unsigned long long)op.idx, op.ev, (unsigned long long)op.evgen,
+                 (unsigned long long)e.gen, qs);
+        continue;
+      }
+      uint32_t fseq = 0; int frank = -1;
+      const int reached = hapiTraceStreamReached(rec->stream, rec->idx, &fseq, &frank);
+      const bool aliased = (e.gen != op.evgen);
+      const char* verdict =
+          reached == 1 ? "SATISFIED (a later flag on that stream landed)" :
+          reached == 0 ? "UNSATISFIED (that stream's next flag has not landed)" :
+          (!aliased ? (q == cudaSuccess ? "SATISFIED (event query done)" :
+                       q == cudaErrorNotReady ? "UNSATISFIED (event query not ready)" : "ERR") :
+                      "UNKNOWN (re-recorded since, no flag after the record)");
+      CkPrintf("[trace]%s  #%llu W ev=%p gen=%llu%s -> recorded on stream %p at #%llu (pe-rank %d, note %d): %s\n",
+               ind, (unsigned long long)op.idx, op.ev, (unsigned long long)op.evgen,
+               aliased ? " [RE-RECORDED since]" : "", rec->stream, (unsigned long long)rec->idx,
+               rec->rank, rec->note, verdict);
+      const bool blocked = (reached == 0) || (reached == -1 && (aliased || q == cudaErrorNotReady));
+      if (blocked && follow == NULL) follow = rec->stream;
+    }
+  }
+  if (follow == NULL) {
+    CkPrintf("[trace]%s  => every wait in the window is satisfied: this stream is stuck on a "
+             "non-wait op (its flag write, a copy, or a kernel)\n", ind);
+  } else if (follow != (void*)1) {
+    CkPrintf("[trace]%s  => following the first unsatisfied wait into stream %p\n", ind, follow);
+    hapiTraceWalk(follow, depth + 1, path);
+  }
+}
+
 int firstRankForDevice = 0; // First rank for each device, used for mapping
 
 // Managing memory state in server
@@ -1735,35 +1947,59 @@ static void hapiMapping(char** argv) {
   hapiCheck(hapiSetDevice(cpv_my_device));
 
   // Pinned-flag completion is the default; +gpueventquery asks for the old
-  // cudaEventQuery path instead. Every PE parses the flag (the value is the
-  // same on all); the ring must be allocated after hapiSetDevice so the
-  // pinned pages and their device alias belong to this PE's device.
+  // cudaEventQuery path instead. The flag WRITE goes on the copy engine
+  // (cuMemsetD32Async), NOT the front-end stream-memop path
+  // (cuStreamWriteValue32). The front-end path serialises all of a context's
+  // memory operations through one channel, so a flag write queued behind a
+  // stream's cross-process cudaStreamWaitEvent head-of-line blocks EVERY later
+  // flag write in the process -- on fresh streams too -- and two processes each
+  // waiting on the other's IPC event then deadlock with the GPU idle. Proven
+  // with +gpustalltrace: at the stall a lone write on a brand-new empty stream
+  // would not even execute. The copy engine is scheduled per stream, so a
+  // stuck memset stalls only its own stream while the rest keep completing,
+  // which is what lets the awaited data flow and the wait clear. Measured:
+  // memset ties cuStreamWriteValue32 on the GPU-bound LB config (within 1%) and
+  // beats event queries there by ~11%, at ~2% over events on a non-GPU-bound
+  // run where flag polling is a wash anyway. cuStreamWriteValue32 stays behind
+  // +gpustreamwrite for comparison; it must never be the default.
+  // Every PE parses the flags (the value is the same on all); the ring is
+  // allocated after hapiSetDevice so its pinned pages and their device alias
+  // belong to this PE's device.
   const bool want_event_query = CmiGetArgFlagDesc(argv, "+gpueventquery",
         "detect kernel completion by querying CUDA events instead of pinned-flag writes");
-  // Accepted and ignored: it asked for what is now the default. Kept so that
+  // Accepted and ignored: they ask for what is now the default. Kept so that
   // existing run scripts and job files keep working unchanged.
   CmiGetArgFlagDesc(argv, "+gpuflagpoll",
         "(deprecated, now the default) use pinned-flag completion detection");
+  CmiGetArgFlagDesc(argv, "+gpuflagmemset",
+        "(deprecated, now the default) write completion flags with cuMemsetD32Async");
+  const bool want_stream_write = CmiGetArgFlagDesc(argv, "+gpustreamwrite",
+        "write completion flags with cuStreamWriteValue32 (front-end memop; "
+        "DEADLOCK-PRONE under cross-process IPC -- for comparison only)");
   if (!want_event_query) {
+    // Preferred writer, looked up first because it is the default.
+    if (hapi_memset_d32_async == nullptr) {
+      void* fn = nullptr;
+      cudaDriverEntryPointQueryResult st = cudaDriverEntryPointSymbolNotFound;
+      if (cudaGetDriverEntryPointByVersion("cuMemsetD32Async", &fn, 12000,
+                                           cudaEnableDefault, &st) == cudaSuccess &&
+          st == cudaDriverEntryPointSuccess && fn != nullptr)
+        hapi_memset_d32_async = (hapiMemsetD32AsyncFn)fn;
+      else cudaGetLastError();
+    }
+    // Fallback / +gpustreamwrite opt-in writer.
     if (hapi_stream_write_value32 == nullptr) {
       void* fn = nullptr;
       cudaDriverEntryPointQueryResult status = cudaDriverEntryPointSymbolNotFound;
       if (cudaGetDriverEntryPointByVersion("cuStreamWriteValue32", &fn, 12000,
-                                           cudaEnableDefault, &status) != cudaSuccess ||
-          status != cudaDriverEntryPointSuccess || fn == nullptr) {
-        cudaGetLastError();
-        // Not fatal now that this is the default: nobody asked for it, so a
-        // driver without the entry point falls back to event queries rather
-        // than refusing to start.
-        if (CmiMyPe() == 0)
-          CmiPrintf("HAPI> cuStreamWriteValue32 is not available from this driver; "
-                    "falling back to event-query completion detection\n");
-      } else {
+                                           cudaEnableDefault, &status) == cudaSuccess &&
+          status == cudaDriverEntryPointSuccess && fn != nullptr)
         hapi_stream_write_value32 = (hapiStreamWriteValue32Fn)fn;
-      }
+      else cudaGetLastError();
     }
   }
-  if (!want_event_query && hapi_stream_write_value32 != nullptr) {
+  if (!want_event_query &&
+      (hapi_memset_d32_async != nullptr || hapi_stream_write_value32 != nullptr)) {
     hapi_use_flag_poll = true;
     uint32_t*& slots = CpvAccess(hapi_flag_slots);
     const size_t bytes = (size_t)HAPI_FLAG_SLOTS * HAPI_FLAG_STRIDE * sizeof(uint32_t);
@@ -1771,9 +2007,63 @@ static void hapiMapping(char** argv) {
     memset((void*)slots, 0, bytes);
     hapiCheck(hapiHostGetDevicePointer(&CpvAccess(hapi_flag_slots_dev), (void*)slots, 0));
     CpvAccess(hapi_flag_busy) = (unsigned char*)calloc(HAPI_FLAG_SLOTS, 1);
-    if (CmiMyPe() == 0)
-      CmiPrintf("HAPI> Pinned-flag completion detection enabled (%d slots per PE)\n",
-                HAPI_FLAG_SLOTS);
+
+    // Pick the writer. memset by default, validated with one synchronous write
+    // so a driver that will not fill mapped host memory is caught here rather
+    // than as a silent stall. +gpustreamwrite forces the front-end path when
+    // its entry point is present.
+    bool memset_ok = false;
+    if (hapi_memset_d32_async != nullptr) {
+      cudaStream_t ts;
+      hapiCheck(cudaStreamCreateWithFlags(&ts, cudaStreamNonBlocking));
+      const CUresult r = hapi_memset_d32_async((CUdeviceptr)CpvAccess(hapi_flag_slots_dev),
+                                               0x5A5A0001u, 1, (CUstream)ts);
+      if (r == CUDA_SUCCESS && cudaStreamSynchronize(ts) == cudaSuccess &&
+          ((volatile uint32_t*)slots)[0] == 0x5A5A0001u) memset_ok = true;
+      cudaGetLastError();
+      ((volatile uint32_t*)slots)[0] = 0;
+      cudaStreamDestroy(ts);
+    }
+    if (want_stream_write && hapi_stream_write_value32 != nullptr) {
+      hapi_flag_use_memset = false;
+    } else if (memset_ok) {
+      hapi_flag_use_memset = true;
+    } else if (hapi_stream_write_value32 != nullptr) {
+      hapi_flag_use_memset = false;   // memset unusable here; last resort
+    } else {
+      // Neither writer is usable: undo the ring and fall back to events.
+      hapi_use_flag_poll = false;
+      hapiFreeHost((void*)slots); slots = NULL;
+      CpvAccess(hapi_flag_slots_dev) = NULL;
+      free(CpvAccess(hapi_flag_busy)); CpvAccess(hapi_flag_busy) = NULL;
+    }
+    if (CmiMyPe() == 0) {
+      if (!hapi_use_flag_poll)
+        CmiPrintf("HAPI> no usable flag writer from this driver; using "
+                  "event-query completion detection\n");
+      else
+        CmiPrintf("HAPI> Pinned-flag completion detection enabled (%d slots per "
+                  "PE), flags written by %s\n", HAPI_FLAG_SLOTS,
+                  hapi_flag_use_memset
+                      ? "cuMemsetD32Async (copy engine)"
+                      : "cuStreamWriteValue32 (front-end memop; DEADLOCK-PRONE under IPC)");
+    }
+  } else if (!want_event_query && CmiMyPe() == 0) {
+    CmiPrintf("HAPI> no flag writer available from this driver; using "
+              "event-query completion detection\n");
+  }
+  // +gpustalltrace: log records, waits and flag issues for hapiDumpFlagState.
+  if (CmiGetArgFlagDesc(argv, "+gpustalltrace",
+                        "log event records and stream waits so a stalled stream can be walked")) {
+    hapiTraceInit();
+    hapi_trace_on = true;
+    CpvInitialize(uint32_t*, hapi_flag_probe);
+    CpvInitialize(void*, hapi_flag_probe_dev);
+    uint32_t*& pr = CpvAccess(hapi_flag_probe);
+    hapiCheck(cudaHostAlloc((void**)&pr, 256, cudaHostAllocPortable | cudaHostAllocMapped));
+    memset((void*)pr, 0, 256);
+    hapiCheck(hapiHostGetDevicePointer(&CpvAccess(hapi_flag_probe_dev), (void*)pr, 0));
+    if (CmiMyPe() == 0) CmiPrintf("HAPI> stall trace on\n");
   }
 #if CMK_SMP
   CmiLock(csv_gpu_manager.device_mapping_lock);
@@ -2023,11 +2313,14 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
         (uint32_t*)CpvAccess(hapi_flag_slots_dev) + (size_t)idx * HAPI_FLAG_STRIDE;
     // Executes only after all prior work on the stream, so the slot reaching
     // seq means that work is complete.
-    const CUresult res = hapi_stream_write_value32((CUstream)stream, (CUdeviceptr)slot_dev,
-                                                   seq, CU_STREAM_WRITE_VALUE_DEFAULT);
+    const CUresult res = hapi_flag_use_memset
+        ? hapi_memset_d32_async((CUdeviceptr)slot_dev, seq, 1, (CUstream)stream)
+        : hapi_stream_write_value32((CUstream)stream, (CUdeviceptr)slot_dev,
+                                    seq, CU_STREAM_WRITE_VALUE_DEFAULT);
     if (res != CUDA_SUCCESS)
-      CmiAbort("HAPI> cuStreamWriteValue32 failed (%d); rerun with +gpueventquery",
-               (int)res);
+      CmiAbort("HAPI> %s failed (%d); rerun with +gpueventquery",
+               hapi_flag_use_memset ? "cuMemsetD32Async" : "cuStreamWriteValue32", (int)res);
+    hapiTraceFlag((void*)stream, seq);
     hapiEvent hev(NULL, cb, cb_msg, wr);
     hev.flag_seq = seq;
     CpvAccess(hapi_flag_inflight)++;
@@ -3755,12 +4048,14 @@ void hapiClearInstrument() {
 void hapiDumpFlagState() {
 #ifndef HAPI_CUDA_CALLBACK
   hapiEventQueues& queues = CpvAccess(hapi_event_queue);
+  std::vector<void*> pending;
   int qi = 0;
   for (auto& entry : queues) {
     std::queue<hapiEvent>& q = entry.second;
     if (q.empty()) { qi++; continue; }
     const hapiEvent& h = q.front();
     if (h.event == NULL) {
+      pending.push_back((void*)entry.first);
       volatile uint32_t* slot = CpvAccess(hapi_flag_slots) +
           (size_t)(h.flag_seq & (HAPI_FLAG_SLOTS - 1)) * HAPI_FLAG_STRIDE;
       // Is the stream itself done? If the write has not landed AND the
@@ -3786,6 +4081,50 @@ void hapiDumpFlagState() {
     }
     qi++;
   }
+  if (!hapi_trace_on || pending.empty()) return;
+
+  // Live probes: does a flag write land right now on a stream with nothing
+  // ahead of it? If the memop lands here but not behind the stalled work,
+  // the stall is in the dependency; if it does not land even here, the
+  // write path itself is wedged.
+  {
+    volatile uint32_t* pr = CpvAccess(hapi_flag_probe);
+    uint32_t* prd = (uint32_t*)CpvAccess(hapi_flag_probe_dev);
+    cudaStream_t ps;
+    hapiCheck(cudaStreamCreateWithFlags(&ps, cudaStreamNonBlocking));
+    pr[0] = 0; pr[4] = 0;
+    CUresult r1 = hapi_stream_write_value32((CUstream)ps, (CUdeviceptr)prd, 0x11u,
+                                            CU_STREAM_WRITE_VALUE_DEFAULT);
+    CUresult r2 = hapi_memset_d32_async ? hapi_memset_d32_async((CUdeviceptr)(prd + 4), 0x22u, 1, (CUstream)ps)
+                                        : CUDA_ERROR_NOT_SUPPORTED;
+    const double t0 = CmiWallTimer();
+    while (CmiWallTimer() - t0 < 0.5 && !(pr[0] == 0x11u && (r2 != CUDA_SUCCESS || pr[4] == 0x22u))) {}
+    const cudaError_t sq = cudaStreamQuery(ps); cudaGetLastError();
+    CkPrintf("[probe] pe %d empty-stream memop=%s (issue rc %d) memset=%s (issue rc %d) stream=%s after %.0f ms\n",
+             CkMyPe(), pr[0] == 0x11u ? "LANDED" : "NOT-LANDED", (int)r1,
+             r2 != CUDA_SUCCESS ? "n/a" : (pr[4] == 0x22u ? "LANDED" : "NOT-LANDED"), (int)r2,
+             sq == cudaSuccess ? "idle" : "PENDING", (CmiWallTimer() - t0) * 1e3);
+    cudaStreamDestroy(ps);
+  }
+  // Same probe, but enqueued BEHIND the stalled work on each pending stream:
+  // a memop that lands proves the stream is not blocked at all, only its
+  // earlier flag write was lost.
+  for (void* st : pending) {
+    volatile uint32_t* pr = CpvAccess(hapi_flag_probe);
+    uint32_t* prd = (uint32_t*)CpvAccess(hapi_flag_probe_dev);
+    pr[8] = 0;
+    hapi_stream_write_value32((CUstream)st, (CUdeviceptr)(prd + 8), 0x33u, CU_STREAM_WRITE_VALUE_DEFAULT);
+    const double t0 = CmiWallTimer();
+    while (CmiWallTimer() - t0 < 0.2 && pr[8] != 0x33u) {}
+    CkPrintf("[probe] pe %d memop behind stream %p: %s\n", CkMyPe(), st,
+             pr[8] == 0x33u ? "LANDED (stream is NOT blocked; earlier write lost)" : "NOT-LANDED (stream blocked)");
+  }
+  CmiLock(hapi_trace_lock);
+  for (void* st : pending) {
+    std::vector<void*> path;
+    hapiTraceWalk(st, 0, path);
+  }
+  CmiUnlock(hapi_trace_lock);
 #endif
 }
 

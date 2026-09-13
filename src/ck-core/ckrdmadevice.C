@@ -960,8 +960,9 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
         // measured (moe) to pace the receiver's stream at ~0.35 ms per copy,
         // whatever the copy's size; for an event the host already sees as
         // complete there is nothing to order and the wait is pure cost.
-        hapiCheck(hapiStreamWaitEvent(recv_stream,
-              device_info.src_event_pool[source.event_idx], 0));
+        hapiCheck(hapiStreamWaitEventNoted(recv_stream,
+              device_info.src_event_pool[source.event_idx], 0,
+              source.device_idx * 100000 + source.event_idx));
       }
       ipcDebugSync("recv 1: wait imported src_event", recv_stream);
 
@@ -3377,9 +3378,11 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
         hapiCheck(hapiEventRecord(
             my_device_info.src_event_pool[buffers[i]->event_idx], NULL));
       } else {
-        hapiCheck(hapiEventRecord(
+        hapiCheck(hapiEventRecordNoted(
             my_device_info.src_event_pool[buffers[i]->event_idx],
-            buffers[i]->hapi_stream));
+            buffers[i]->hapi_stream,
+            (csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id) * 100000
+                + buffers[i]->event_idx));
       }
       ipcDebugSync("send 2: record own src_event", buffers[i]->hapi_stream);
     }

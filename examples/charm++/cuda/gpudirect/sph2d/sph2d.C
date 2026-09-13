@@ -1048,8 +1048,8 @@ public:
       if (stats_freq > 0 && (my_iter % stats_freq) == 0) {
         // Particles that arrived here landed on comm_stream, in earlier steps
         // and possibly in this one; the check reads them on compute_stream.
-        hapiCheck(cudaEventRecord(halo_done, comm_stream));
-        hapiCheck(cudaStreamWaitEvent(compute_stream, halo_done, 0));
+        hapiCheck(hapiEventRecord(halo_done, comm_stream));
+        hapiCheck(hapiStreamWaitEvent(compute_stream, halo_done, 0));
         runCheck();
         invokeStats(d_parts[cur], np, d_stats, compute_stream);
         hapiCheck(cudaMemcpyAsync(h_stats, d_stats, sizeof(RealType) * 8,
@@ -1066,8 +1066,8 @@ public:
     // resumes at this phase without passing through startHalo again. The
     // migration constructor left the handles null.
     // The ghosts landed on comm_stream; the physics runs on compute_stream.
-    hapiCheck(cudaEventRecord(halo_done, comm_stream));
-    hapiCheck(cudaStreamWaitEvent(compute_stream, halo_done, 0));
+    hapiCheck(hapiEventRecord(halo_done, comm_stream));
+    hapiCheck(hapiStreamWaitEvent(compute_stream, halo_done, 0));
 
     // Before the physics: this is exactly what the previous step's halo
     // exchange and migration produced, and (unlike the state after integrate)

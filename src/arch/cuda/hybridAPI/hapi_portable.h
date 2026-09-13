@@ -36,11 +36,28 @@
 
 #define hapiEventCreateWithFlags(flags, event) cudaEventCreateWithFlags(flags, event)
 
+// Records and stream waits go through hapi so that +gpustalltrace can log
+// them: a stalled stream is then walked back to the wait that never came,
+// and the record it was waiting for. Off, these are the plain CUDA calls
+// behind one predictable branch. The noted forms carry a caller's tag (the
+// IPC event slot, say) so a wait in one process can be matched to the
+// record in another.
+#ifdef __cplusplus
+extern "C++" {
+cudaError_t hapiEventRecordNoted(cudaEvent_t event, cudaStream_t stream, int note);
+cudaError_t hapiStreamWaitEventNoted(cudaStream_t stream, cudaEvent_t event,
+                                     unsigned int flags, int note);
+}
+#define hapiEventRecord(event, stream) hapiEventRecordNoted(event, stream, 0)
+#define hapiStreamWaitEvent(stream, event, flags) \
+    hapiStreamWaitEventNoted(stream, event, flags, 0)
+#else
 #define hapiEventRecord(event, stream) cudaEventRecord(event, stream)
-#define hapiEventQuery(event) cudaEventQuery(event)
-#define hapiEventDestroy(event) cudaEventDestroy(event)
 #define hapiStreamWaitEvent(stream, event, flags) \
     cudaStreamWaitEvent(stream, event, flags)
+#endif
+#define hapiEventQuery(event) cudaEventQuery(event)
+#define hapiEventDestroy(event) cudaEventDestroy(event)
 
 #define hapiStreamSynchronize(stream) cudaStreamSynchronize(stream)
 #define hapiStreamCreate(stream) cudaStreamCreate(stream)
