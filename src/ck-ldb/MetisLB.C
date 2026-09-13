@@ -923,8 +923,21 @@ void MetisLB::work(LDStats* stats)
       const int cur = ogr->vertices[i].getCurrentPe();
       return (fresh && newPe[i] >= 0) ? newPe[i] : cur;
     };
+    const DiffusionCostModel model(costCfg, DIFF_TIER_INTRA_PROCESS);
     // The step bound under a mapping: busiest GPU or busiest PE, host time
-    // with the PE's background and its speed, as the levels above count them.
+    // with the PE's background and its speed, as the levels above count them,
+    // and the communication and migration the mapping puts on that same PE.
+    //
+    // The last part is the whole point. A bound is a MAXIMUM over PEs; a cut
+    // is a SUM over the job. Priced against each other directly -- which is
+    // what this did -- the cut arrives inflated by something close to the
+    // number of PEs, and a partition that took the busiest PE down by a fifth
+    // was refused for a communication cost that no single PE ever pays. On
+    // sph2d with a load in motion that was every decision, twenty out of
+    // twenty, each one leaving a measured 16-33% on the table. So the cut is
+    // charged where it lands instead: a cut edge costs both of its endpoints,
+    // each paying for its half of the exchange, and the comparison is then
+    // one bound against another with nothing left outside it.
     auto bound = [&](bool fresh) {
       std::vector<double> grpDev(nGroups, 0.0), peHost(nPe, 0.0);
       for (int pe = 0; pe < nPe; pe++)
@@ -935,6 +948,35 @@ void MetisLB::work(LDStats* stats)
         if (pe < 0 || pe >= nPe || groupOfPe[pe] < 0) continue;
         grpDev[groupOfPe[pe]] += lbObjGroupLoad(stats->objData[i]);
         peHost[pe] += (double)stats->objData[i].wallTime / peSpeed[pe];
+      }
+      if (costCfg.calibrated)
+      {
+        for (int i = 0; i < numVertices; i++)
+        {
+          const int p = peUnder(i, fresh);
+          if (p < 0 || p >= nPe || groupOfPe[p] < 0) continue;
+          for (const auto& nb : adj[i])
+          {
+            if (nb.first <= i) continue;
+            const int q = peUnder(nb.first, fresh);
+            if (q < 0 || q >= nPe || groupOfPe[q] < 0 || p == q) continue;
+            const double e = edgeCost(nb.second, DiffusionCostConfig::tierBetween(p, q));
+            peHost[p] += e / peSpeed[p];
+            peHost[q] += e / peSpeed[q];
+          }
+        }
+        // What the move itself costs the PE that packs it, spread over the
+        // intervals the placement is expected to last. Only the new mapping
+        // pays it: staying put moves nothing.
+        if (fresh && costCfg.placementLifetimeIntervals > 0.0)
+          for (int i = 0; i < numVertices; i++)
+          {
+            const int cur = ogr->vertices[i].getCurrentPe();
+            if (newPe[i] < 0 || newPe[i] == cur) continue;
+            if (cur < 0 || cur >= nPe || groupOfPe[cur] < 0) continue;
+            peHost[cur] += model.migrateCost(stats->objData[i]) /
+                           (costCfg.placementLifetimeIntervals * peSpeed[cur]);
+          }
       }
       double b = 0.0;
       for (idx_t g = 0; g < nGroups; g++) b = std::max(b, grpDev[g]);
@@ -959,7 +1001,6 @@ void MetisLB::work(LDStats* stats)
       }
       return c;
     };
-    const DiffusionCostModel model(costCfg, DIFF_TIER_INTRA_PROCESS);
     double migration = 0.0;
     int moving = 0;
     for (int i = 0; i < numVertices; i++)
@@ -968,28 +1009,34 @@ void MetisLB::work(LDStats* stats)
         if (costCfg.calibrated) migration += model.migrateCost(stats->objData[i]);
         moving++;
       }
+    // Both bounds already carry the communication and the migration each PE
+    // bears, so this is the whole trade: the busiest resource under the new
+    // mapping against the busiest under the current one. What remains is the
+    // floor, which keeps the current mapping when the difference is too small
+    // to be worth disturbing.
     const double boundOld = bound(false), boundNew = bound(true);
     const double gain = boundOld - boundNew;
     const double minGain = metisMinGain() * boundOld;
-    bool worth = moving > 0 && gain >= minGain;
+    const bool worth = moving > 0 && gain >= minGain;
     const char* verdict = moving == 0 ? "nothing moves"
                           : !worth    ? "below the floor, current mapping kept"
                                       : "applied";
+    // Reported, not priced: the job-wide cut says how much traffic the
+    // partition makes, which is worth seeing, but it is a sum and the bounds
+    // above are maxima, so it is not a quantity either of them can be
+    // compared against.
     double cutOld = 0.0, cutNew = 0.0;
-    if (worth && costCfg.calibrated)
+    if (costCfg.calibrated)
     {
       cutOld = cutCost(false);
       cutNew = cutCost(true);
-      const double cost = (cutNew - cutOld) + migration;
-      worth = gain > cost;
-      if (!worth) verdict = "does not pay, current mapping kept";
     }
     if ((_lb_args.debug() > 0 || !worth) && CkMyPe() == cur_ld_balancer)
     {
       if (costCfg.calibrated)
-        CkPrintf("[%d] MetisLB priced: step bound %.6f -> %.6f (saves %.6f s/interval, %.1f%% "
-                 "against a floor of %.1f%%); cut %.6f -> %.6f; %d migration(s) %.6f s/interval "
-                 "over %.0f interval(s); %s\n",
+        CkPrintf("[%d] MetisLB priced: step bound %.6f -> %.6f, comm and migration included "
+                 "(saves %.6f s/interval, %.1f%% against a floor of %.1f%%); job cut %.6f -> %.6f; "
+                 "%d migration(s) %.6f s/interval over %.0f interval(s); %s\n",
                  CkMyPe(), boundOld, boundNew, gain,
                  boundOld > 0.0 ? 100.0 * gain / boundOld : 0.0, 100.0 * metisMinGain(),
                  cutOld, cutNew, moving, migration, costCfg.placementLifetimeIntervals, verdict);
