@@ -60,6 +60,13 @@ mainmodule sph2d {
     entry void receiveParticles(int ref, int dir, int n, int m,
                                 nocopydevice Particle parts[m]);
 
+    // Activity. A patch with no fluid and no fluid next to it takes no part
+    // in a step: no device work, no messages, no waits. wake(step) comes from
+    // a neighbour that has just acquired fluid; activate(dir, from) is the
+    // woken patch telling each neighbour the step it joins at.
+    entry void wake(int step);
+    entry void activate(int dir, int from);
+
     entry void runStep() {
       // Phase 1: pressure from density, then ship every particle within one
       // support radius of an edge to that neighbour. Ghosts are sources for
@@ -69,7 +76,8 @@ mainmodule sph2d {
       // density history.
       serial { my_iter++; startHalo(); }
       when haloPacked() serial { sendHalo(); }
-      for (recv_count = 0; recv_count < NUM_DIRS; recv_count++) {
+      // n_expect: the neighbours that take part in this step (startHalo).
+      for (recv_count = 0; recv_count < n_expect; recv_count++) {
         when receiveHalo[my_iter](int ref, int dir, int n, int m,
                                   nocopydevice Particle parts[m])
           serial { appendGhosts(dir, n); }
@@ -79,7 +87,7 @@ mainmodule sph2d {
       // and momentum, integrate, then compact out whatever left the rectangle.
       serial { computeAndIntegrate(); }
       when leaversPacked() serial { sendLeavers(); }
-      for (recv_count = 0; recv_count < NUM_DIRS; recv_count++) {
+      for (recv_count = 0; recv_count < n_expect; recv_count++) {
         when receiveParticles[my_iter](int ref, int dir, int n, int m,
                                        nocopydevice Particle parts[m])
           serial { appendParticles(dir, n); }

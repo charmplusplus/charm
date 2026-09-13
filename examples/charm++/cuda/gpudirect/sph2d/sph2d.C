@@ -4,6 +4,8 @@
 #include <algorithm>
 #include <cmath>
 #include <vector>
+#include <map>
+#include <climits>
 #include <cstdlib>
 #include <unistd.h>
 
@@ -236,6 +238,7 @@ public:
     const unsigned long long n_fl    = *(unsigned long long*)t[9].data;
     const unsigned long long n_bd    = *(unsigned long long*)t[10].data;
     const long escaped = *(long*)t[11].data;
+    const long n_active = *(long*)t[12].data;
     delete[] t;
     delete msg;
 
@@ -246,8 +249,9 @@ public:
       // max/avg particles per patch is the imbalance a balancer can act on.
       const double imb = (double)max_np * (n_chares_x * n_chares_y) / (double)sum_np;
       CkPrintf("  step %6d: rho %.2f  KE %.4e  |v|max %.3f  front x %.3f  "
-               "particle imbalance (max/avg) %.2f  [check ok]\n",
-               step, sum_rho / n_fluid, sum_ke * pmass, vmax, front, imb);
+               "particle imbalance (max/avg) %.2f  active %ld/%d  [check ok]\n",
+               step, sum_rho / n_fluid, sum_ke * pmass, vmax, front, imb,
+               n_active, n_chares_x * n_chares_y);
     }
     stat_count++;
   }
@@ -334,6 +338,34 @@ class Patch : public CBase_Patch {
   int lb_start_iter;
   double lb_t0;             // wall time of this patch's last AtSync/AtSyncStart
   long escaped;                   // particles that left the tank (instability)
+
+  // ---- activity ------------------------------------------------------------
+  // Five sixths of the tank is air, and a patch with nothing in it used to pay
+  // the whole step anyway: memsets, the scan kernel, two copies, sixteen empty
+  // messages and their callbacks -- 0.3-0.4 ms of host time against 0.55 for a
+  // patch holding 60k particles (pinned, 12 Sep 2026). That flat cost is why
+  // no balancer could find anything to move at that size.
+  //
+  // A patch is ACTIVE from step active_from on. It is active from the start
+  // if it or any of its eight neighbours holds fluid on the lattice; wall
+  // particles never move, so a patch of wall alone next to air is not. An
+  // inactive patch skips the step entirely and takes no part in the exchange;
+  // an active patch sends to, and expects from, exactly the neighbours active
+  // at that step (nbr_active_from[d] <= step). Fluid can only enter a patch
+  // by migrating from a neighbour that has fluid, which is active by
+  // definition, so activity only ever has to spread one ring at a time: a
+  // patch that acquires its first fluid wakes its inactive neighbours, and a
+  // woken patch announces to all of its neighbours the step it joins at. That
+  // step is chosen on the load-balancing schedule, the only clock an idle
+  // patch has (see activationStep); the arrival counts in endOfStep abort the
+  // run if a message ever reaches a patch that did not expect it.
+  int n_fluid;                    // fluid particles here, tracked exactly
+  bool had_fluid;                 // whether n_fluid has ever been > 0
+  int active_from;                // INT_MAX while inactive
+  int nbr_active_from[NUM_DIRS];
+  bool wake_sent[NUM_DIRS];
+  int n_expect;                   // neighbours taking part in this step
+  std::map<int, int> halo_arrived, parts_arrived;   // per step, for the check
 
   // cell list geometry
   int ncx, ncy, ncells;
@@ -447,6 +479,8 @@ public:
     outstanding_sends = 0; draining = false;
     halo_pending = mig_pending = false;
     lb_waiting = false; lb_start_iter = 0; escaped = 0;
+    n_fluid = 0; had_fluid = false; active_from = INT_MAX; n_expect = 0;
+    for (int d = 0; d < NUM_DIRS; d++) { nbr_active_from[d] = INT_MAX; wake_sent[d] = false; }
     for (int i = 0; i < 2; i++) d_parts[i] = NULL;
     d_send_halo = d_recv_halo = d_send_mig = d_recv_mig = NULL;
     d_halo_ptrs = d_mig_ptrs = NULL;
@@ -491,6 +525,11 @@ public:
     hapiCheck(hapiMallocHost((void**)&h_stats, sizeof(RealType) * 8));
     hapiCheck(hapiMallocHost((void**)&h_check,
         sizeof(unsigned long long) * NUM_CHECKS));
+    // An inactive patch never runs the stats or check kernels; it reports
+    // whatever these last held, which for one that never ran is these zeros.
+    for (int i = 0; i < 8; i++) h_stats[i] = 0;
+    for (int i = 0; i < NUM_CHECKS; i++) h_check[i] = 0;
+    for (int i = 0; i < NUM_COUNTERS; i++) h_counts[i] = 0;
 
     // The per-direction base pointers the pack kernels scatter into.
     // Same ordering argument as the lattice upload in init(): these are read by
@@ -538,6 +577,10 @@ public:
     CBase_Patch::pup(p);
     p | my_iter; p | np; p | cur; p | lb_waiting; p | lb_start_iter; p | lb_t0;
     p | escaped;
+    p | n_fluid; p | had_fluid; p | active_from; p | n_expect;
+    PUParray(p, nbr_active_from, NUM_DIRS);
+    PUParray(p, wake_sent, NUM_DIRS);
+    p | halo_arrived; p | parts_arrived;
     // n_ghost, not reset: a move partway through the ghost-receive loop leaves
     // ghosts already appended above np, and the remaining receives have to
     // append after them.
@@ -660,6 +703,10 @@ public:
     if (np > part_capacity)
       CkAbort("Patch (%d,%d): %d initial particles exceed capacity %d; "
               "increase headroom (-r)\n", x, y, np, part_capacity);
+    n_fluid = 0;
+    for (const Particle& q : mine) if (q.type == PTYPE_FLUID) n_fluid++;
+    had_fluid = n_fluid > 0;
+    setupActivity();
     // On compute_stream, NOT the null stream. The runtime's pool hands out
     // cudaStreamNonBlocking streams, so null-stream work no longer implicitly
     // orders against them -- and a pageable host-to-device cudaMemcpy returns
@@ -729,6 +776,108 @@ public:
     return it == first_lb || (it != 0 && lb_freq > 0 && it % lb_freq == 0);
   }
 
+  // ---- activity ------------------------------------------------------------
+  // Fluid lattice sites inside patch (px,py), by the rule init() lays them
+  // down with, so every patch computes the same answer about every patch.
+  static int fluidSitesIn(int px, int py) {
+    if (px < 0 || px >= n_chares_x || py < 0 || py >= n_chares_y) return 0;
+    const RealType pw = dom_lx / n_chares_x, ph = dom_ly / n_chares_y;
+    const RealType ax0 = px * pw, ax1 = (px + 1) * pw;
+    const RealType ay0 = py * ph, ay1 = (py + 1) * ph;
+    const RealType s = spacing;
+    const int ix_lo = std::max(0, (int)std::floor(ax0 / s) - 1);
+    const int ix_hi = (int)std::ceil(ax1 / s) + 1;
+    const int iy_lo = std::max(0, (int)std::floor(ay0 / s) - 1);
+    const int iy_hi = (int)std::ceil(ay1 / s) + 1;
+    int n = 0;
+    for (int iy = iy_lo; iy <= iy_hi; iy++) {
+      const RealType qy = (iy + 0.5f) * s;
+      if (qy >= dom_ly || qy < ay0 || qy >= ay1) continue;
+      if (!(qy >= wall_t && qy < wall_t + col_h)) continue;
+      for (int ix = ix_lo; ix <= ix_hi; ix++) {
+        const RealType qx = (ix + 0.5f) * s;
+        if (qx >= dom_lx || qx < ax0 || qx >= ax1) continue;
+        const bool is_wall = (qx < wall_t) || (qx > dom_lx - wall_t) || (qy < wall_t);
+        if (is_wall) continue;
+        if (qx >= wall_t && qx < wall_t + col_w) n++;
+      }
+    }
+    return n;
+  }
+  // A patch is active at the start if it or a neighbour holds fluid. The
+  // neighbours' verdicts are computed here too, over the 5x5 block, so this
+  // patch's view of each neighbour agrees with that neighbour's own.
+  static bool activeAtStart(int px, int py) {
+    if (fluidSitesIn(px, py) > 0) return true;
+    for (int d = 0; d < NUM_DIRS; d++)
+      if (fluidSitesIn(px + DIR_DX[d], py + DIR_DY[d]) > 0) return true;
+    return false;
+  }
+  void setupActivity() {
+    active_from = activeAtStart(x, y) ? 0 : INT_MAX;
+    for (int d = 0; d < NUM_DIRS; d++) {
+      const int nx = x + DIR_DX[d], ny = y + DIR_DY[d];
+      nbr_active_from[d] = (valid_dir[d] && activeAtStart(nx, ny)) ? 0 : INT_MAX;
+      wake_sent[d] = false;
+    }
+  }
+  bool isActive() const { return my_iter >= active_from; }
+  bool nbrActiveAt(int d, int t) const { return valid_dir[d] && nbr_active_from[d] <= t; }
+  int countExpected(int t) const {
+    int n = 0;
+    for (int d = 0; d < NUM_DIRS; d++) if (nbrActiveAt(d, t)) n++;
+    return n;
+  }
+  // The step a patch woken during step s joins at. An idle patch has no clock
+  // of its own; what it does have is the load-balancing schedule, which it
+  // follows like everyone else (iterate), parking in the wait of the next LB
+  // step. It resumes with the rest at that step's resume and joins the step
+  // after, and its neighbours are told that same number, so it is the first
+  // step at which they expect it. The next LB step strictly after s: a wake
+  // sent on an LB step itself is already too late for that step's barrier.
+  int activationStep(int s) const {
+    if (lb_freq <= 0 && first_lb > warmup_iters + n_iters) return INT_MAX;
+    int b;
+    if (s < first_lb) b = first_lb;
+    else if (lb_freq > 0) b = (s / lb_freq + 1) * lb_freq;
+    else return INT_MAX;
+    return async_lb ? b + lb_wait_lag + 1 : b + 1;
+  }
+  void wake(int step) {
+    if (active_from != INT_MAX) return;           // already active or pending
+    const int t = activationStep(step);
+    if (t == INT_MAX || t <= my_iter)
+      CkAbort("Patch (%d,%d) at step %d: woken at step %d but no load-balancing "
+              "step lies ahead to join on (-f/-b give an idle patch its clock); "
+              "run with a schedule, e.g. +balancer DummyLB\n", x, y, my_iter, step);
+    active_from = t;
+    for (int d = 0; d < NUM_DIRS; d++)
+      if (valid_dir[d]) thisProxy(nbr_x[d], nbr_y[d]).activate(flipDir(d), t);
+  }
+  void activate(int dir, int from) {
+    if (from < nbr_active_from[dir]) nbr_active_from[dir] = from;
+  }
+  void wakeNeighbours() {
+    for (int d = 0; d < NUM_DIRS; d++) {
+      if (!valid_dir[d] || wake_sent[d] || nbr_active_from[d] != INT_MAX) continue;
+      wake_sent[d] = true;
+      thisProxy(nbr_x[d], nbr_y[d]).wake(my_iter);
+    }
+  }
+  // Every message this patch was sent for a step must have been one it
+  // expected, else the step consumed fewer than arrived and the rest sit in
+  // the SDAG buffer forever, with the physics having run without them.
+  void checkArrivals(std::map<int, int>& arrived, const char* what) {
+    auto it = arrived.find(my_iter);
+    const int got = it == arrived.end() ? 0 : it->second;
+    if (got != n_expect)
+      CkAbort("Patch (%d,%d) step %d: %d %s message(s) arrived but %d were "
+              "expected -- a neighbour's activation reached this patch after "
+              "the step had started (activationStep needs more margin)\n",
+              x, y, my_iter, got, what, n_expect);
+    if (it != arrived.end()) arrived.erase(it);
+  }
+
   void iterate() {
     if (isLBIter(my_iter) && !lb_waiting) {
       lb_start_iter = my_iter;
@@ -766,6 +915,13 @@ public:
   // ---- phase 1: pressure, then halo ----------------------------------------
   void startHalo() {
     n_ghost = 0;
+    n_expect = isActive() ? countExpected(my_iter) : 0;
+    if (!isActive()) {
+      // Nothing to do this step: no fluid here or next door. The step's
+      // continuations still have to fire, so hand them their messages.
+      thisProxy[thisIndex].haloPacked();
+      return;
+    }
     invokeEOS(d_parts[cur], np, rho0, sound_c0, compute_stream);
     invokePackHalo(d_parts[cur], np, x0, y0, x1, y1, support, d_halo_ptrs,
         d_counts, exch_capacity, compute_stream);
@@ -777,6 +933,7 @@ public:
   }
 
   void sendHalo() {
+    if (!isActive()) return;
     halo_pending = false;
     if (h_counts[ERR_COUNTER] > 0)
       CkAbort("Patch (%d,%d): halo exchange overflowed the %d-particle buffer "
@@ -789,7 +946,10 @@ public:
     // a particle needs ~2000 steps to cross one spacing, so nearly every
     // migration message below is empty too.
     for (int d = 0; d < NUM_DIRS; d++) {
-      const int cnt = valid_dir[d] ? h_counts[d] : 0;
+      // Only the neighbours taking part in this step; they expect exactly
+      // these (n_expect on their side is the same rule).
+      if (!nbrActiveAt(d, my_iter)) continue;
+      const int cnt = h_counts[d];
       thisProxy(nbr_x[d], nbr_y[d]).receiveHalo(my_iter, flipDir(d), cnt, cnt,
           (outstanding_sends++,
            CkDeviceBuffer(d_send_halo + (size_t)d * exch_capacity,
@@ -800,6 +960,7 @@ public:
 
   void receiveHalo(int ref, int dir, int n, int& m, Particle*& parts,
       CkDeviceBufferPost* devicePost) {
+    halo_arrived[ref]++;
     parts = d_recv_halo + (size_t)dir * exch_capacity;
     devicePost[0].hapi_stream = comm_stream;
   }
@@ -818,6 +979,10 @@ public:
 
   // ---- phase 2: neighbours, forces, integrate, migrate ---------------------
   void computeAndIntegrate() {
+    if (!isActive()) {
+      thisProxy[thisIndex].leaversPacked();
+      return;
+    }
     // Also binds here, not only in startHalo: under async LB the element can
     // migrate MID-step, and _sdag_pup brings the continuation with it, so it
     // resumes at this phase without passing through startHalo again. The
@@ -857,6 +1022,7 @@ public:
   }
 
   void sendLeavers() {
+    if (!isActive()) return;
     mig_pending = false;
     if (h_counts[ERR_COUNTER] > 0)
       CkAbort("Patch (%d,%d): migration overflowed the %d-particle buffer at "
@@ -875,7 +1041,16 @@ public:
         // unstable -- drop it and keep count rather than wrapping it around.
         if (cnt > 0) escaped += cnt;
         cnt = 0;
+        continue;
       }
+      // Every leaver is fluid: wall particles never move.
+      n_fluid -= cnt;
+      if (cnt > 0 && !nbrActiveAt(d, my_iter))
+        CkAbort("Patch (%d,%d) step %d: %d particle(s) leaving toward an inactive "
+                "neighbour. Fluid reached a patch edge before the neighbour was "
+                "woken, which the one-ring activation rule assumes cannot happen "
+                "within a patch width\n", x, y, my_iter, cnt);
+      if (!nbrActiveAt(d, my_iter)) continue;
       thisProxy(nbr_x[d], nbr_y[d]).receiveParticles(my_iter, flipDir(d), cnt, cnt,
           (outstanding_sends++,
            CkDeviceBuffer(d_send_mig + (size_t)d * exch_capacity,
@@ -886,6 +1061,7 @@ public:
 
   void receiveParticles(int ref, int dir, int n, int& m, Particle*& parts,
       CkDeviceBufferPost* devicePost) {
+    parts_arrived[ref]++;
     parts = d_recv_mig + (size_t)dir * exch_capacity;
     devicePost[0].hapi_stream = comm_stream;
   }
@@ -899,6 +1075,7 @@ public:
         d_recv_mig + (size_t)dir * exch_capacity, sizeof(Particle) * n,
         cudaMemcpyDeviceToDevice, comm_stream));
     np += n;
+    n_fluid += n;   // only fluid migrates
   }
 
   // ---- end of step ---------------------------------------------------------
@@ -919,23 +1096,33 @@ public:
   }
 
   void endOfStep() {
+    checkArrivals(halo_arrived, "halo");
+    checkArrivals(parts_arrived, "migration");
+    // First fluid here: the neighbours that were idle have to start taking
+    // part before any of it can reach them.
+    if (!had_fluid && n_fluid > 0) {
+      had_fluid = true;
+      wakeNeighbours();
+    }
     const bool reporting = (stats_freq > 0 && (my_iter % stats_freq) == 0);
     // The count reduced is the one the check kernel actually saw, not the
     // current np: this step's leavers have already been subtracted by
     // sendLeavers and its arrivals added by appendParticles, so np here is the
     // NEXT step's state. Mixing the two would make the conservation check
     // compare a checksum and a count taken at different instants.
-    long sum_np = 0, max_np = 0, esc = escaped;
-    double sum_rho = 0, sum_ke = 0, n_fluid = 0, vmax = 0, front = 0;
+    long sum_np = 0, max_np = 0, esc = escaped, n_active = isActive() ? 1 : 0;
+    double sum_rho = 0, sum_ke = 0, n_fluid_d = 0, vmax = 0, front = 0;
     unsigned long long id_sum = 0, bnd_sum = 0, n_fl = 0, n_bd = 0;
     if (reporting) {
       // No sync. Both copies were enqueued on compute_stream ahead of the
       // migration pack, and leaversPacked is a hapiAddCallback on that same
       // stream -- it cannot fire until they have landed. endOfStep runs
       // strictly after leaversPacked, so h_stats and h_check are already valid.
+      // An inactive patch reports what these last held: nothing in it has
+      // changed since, so the checksums still describe its particles.
       sum_rho = h_stats[0];
       sum_ke = h_stats[1];
-      n_fluid = h_stats[2];
+      n_fluid_d = h_stats[2];
       vmax = h_stats[3];
       front = h_stats[4];
 
@@ -952,7 +1139,7 @@ public:
         CkReduction::tupleElement(sizeof(long), &max_np, CkReduction::max_long),
         CkReduction::tupleElement(sizeof(double), &sum_rho, CkReduction::sum_double),
         CkReduction::tupleElement(sizeof(double), &sum_ke, CkReduction::sum_double),
-        CkReduction::tupleElement(sizeof(double), &n_fluid, CkReduction::sum_double),
+        CkReduction::tupleElement(sizeof(double), &n_fluid_d, CkReduction::sum_double),
         CkReduction::tupleElement(sizeof(double), &vmax, CkReduction::max_double),
         CkReduction::tupleElement(sizeof(double), &front, CkReduction::max_double),
         CkReduction::tupleElement(sizeof(unsigned long long), &id_sum,
@@ -963,9 +1150,10 @@ public:
             CkReduction::sum_ulong_long),
         CkReduction::tupleElement(sizeof(unsigned long long), &n_bd,
             CkReduction::sum_ulong_long),
-        CkReduction::tupleElement(sizeof(long), &esc, CkReduction::sum_long)};
+        CkReduction::tupleElement(sizeof(long), &esc, CkReduction::sum_long),
+        CkReduction::tupleElement(sizeof(long), &n_active, CkReduction::sum_long)};
     if (reporting) {
-      CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple, 12);
+      CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple, 13);
       msg->setCallback(CkCallback(CkIndex_Main::stepStats(NULL), main_proxy));
       contribute(msg);
     }
