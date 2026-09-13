@@ -334,7 +334,24 @@ void hapiCuptiInit() { hapiCuptiStartTracing(); }
 // switch off, counted per PE so repeated switches do not skew the count.
 static thread_local bool cupti_pe_tracing = false;
 
+// Entry-method hooks currently inside a CUPTI call, process-wide. A hook
+// counts itself in, then re-reads the active flag: hapiCuptiStopTracing clears
+// the flag first and only then waits for this to reach zero, so a hook that
+// saw the flag set is either already counted (the stop waits for it) or will
+// see it clear (and never calls CUPTI). That is what makes cuptiFinalize safe
+// underneath the hooks -- the race that kept CUPTI attached for the whole run.
+static std::atomic<int> cupti_hooks_inflight{0};
+struct CuptiHookGuard {
+  CuptiHookGuard() { cupti_hooks_inflight.fetch_add(1, std::memory_order_seq_cst); }
+  ~CuptiHookGuard() { cupti_hooks_inflight.fetch_sub(1, std::memory_order_seq_cst); }
+};
+
 void hapiCuptiStartTracing() {
+  // CHARM_LB_NO_CUPTI: never attach -- the host-side instrumentation alone,
+  // for measuring what the GPU tracing itself costs. The balancer then sees
+  // zero device load.
+  static const bool no_cupti = (getenv("CHARM_LB_NO_CUPTI") != nullptr);
+  if (no_cupti) return;
   GPUManager& gm = CsvAccess(gpu_manager);
   // Every PE thread reaches this through its own LBDatabase::TurnStatsOn, so
   // the check and the enable must be one atomic step -- otherwise several
@@ -344,6 +361,9 @@ void hapiCuptiStartTracing() {
     cupti_pe_tracing = true;
     gm.cupti_tracing_users_++;
   }
+  if (_lb_args.debug() > 1)
+    CmiPrintf("HAPI[pe=%d]: start tracing: users %d, active %d, attached %d\n", CmiMyPe(),
+              gm.cupti_tracing_users_, (int)gm.cupti_tracing_active_.load(), (int)gm.cupti_initialized_);
   if (gm.cupti_tracing_active_.load(std::memory_order_relaxed)) return;
 
   if (!gm.cupti_initialized_) {
@@ -371,6 +391,9 @@ void hapiCuptiStopTracing() {
     cupti_pe_tracing = false;
     if (gm.cupti_tracing_users_ > 0) gm.cupti_tracing_users_--;
   }
+  if (_lb_args.debug() > 1)
+    CmiPrintf("HAPI[pe=%d]: stop tracing: users left %d, active %d, attached %d\n", CmiMyPe(),
+              gm.cupti_tracing_users_, (int)gm.cupti_tracing_active_.load(), (int)gm.cupti_initialized_);
   // Other PEs of this process still have their instrumentation on: their
   // kernels are still being launched and must keep being recorded.
   if (gm.cupti_tracing_users_ > 0) return;
@@ -388,18 +411,27 @@ void hapiCuptiStopTracing() {
   // application switches instrumentation off around its own AtSync. The flush
   // drives the buffer-completed callback, which takes cupti_queue_lock_ -- a
   // different mutex from the one held here, so this cannot deadlock.
-  gm.cupti_tracing_active_.store(false, std::memory_order_relaxed);
+  gm.cupti_tracing_active_.store(false, std::memory_order_seq_cst);
   CUPTI_SAFE_CALL(cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
 
-  // Deliberately NOT detaching with cuptiFinalize(). Staying attached costs
-  // ~1.3 ms per step even with every kind disabled, and detaching measured
-  // cheaper (~2.3 ms per window against 1.3 ms per step) -- but it cannot be
-  // done safely from here. The entry-method hooks check cupti_tracing_active_
-  // and then call into CUPTI without holding this lock, so a thread that has
-  // already passed that check can be inside cuptiActivityPushExternalCorrelationId
-  // while this one finalizes underneath it, which corrupts CUPTI's allocator
-  // and surfaces later as heap corruption in unrelated allocations. Reclaiming
-  // that 1.3 ms needs the hooks made safe against detach first.
+  // Detach. Staying attached with every kind disabled still routes every
+  // runtime call through CUPTI's interposition: measured 0.8 ms per step on
+  // sph2d at 60k particles per patch (a balancer configured but never firing
+  // cost the same as one tracing three quarters of the run), and ~1.3 ms per
+  // step on pic2d before that; detaching measured ~2.3 ms per window. It used
+  // to be unsafe: the hooks checked the flag and then called CUPTI with no
+  // way for this thread to know one was inside, and a finalize underneath
+  // corrupted CUPTI's allocator. Now each hook is counted (CuptiHookGuard) and
+  // re-checks the flag after counting itself in; the flag is already clear,
+  // so waiting for the count to reach zero drains the ones that got through.
+  // The buffers the flush just handed back stay queued and are parsed by the
+  // next drain, after CUPTI has been re-attached by the next start.
+  static const bool stay_attached = (getenv("CHARM_CUPTI_STAY_ATTACHED") != nullptr);
+  if (stay_attached) return;
+  while (cupti_hooks_inflight.load(std::memory_order_seq_cst) > 0) {
+    // microseconds: a hook holds the count for one CUPTI call
+  }
+  hapiCuptiFinalize();
 }
 
 bool hapiCuptiTracingActive() {
@@ -408,12 +440,12 @@ bool hapiCuptiTracingActive() {
 }
 
 void hapiCuptiFinalize() {
-  CmiPrintf("HAPI: Finalizing CUPTI...\n");
-  cudaDeviceSynchronize(); // Ensure all activity records are flushed
   GPUManager& gm = CsvAccess(gpu_manager);
   if(gm.cupti_initialized_== false) return;
+  if (_lb_args.debug() > 1) CmiPrintf("HAPI[pe=%d]: detaching CUPTI\n", CmiMyPe());
+  cudaDeviceSynchronize(); // Ensure all activity records are flushed
   gm.cupti_initialized_ = false;
-  gm.cupti_tracing_active_.store(false, std::memory_order_relaxed);
+  gm.cupti_tracing_active_.store(false, std::memory_order_seq_cst);
   ++gm.cupti_generation_;
 
   CUPTI_SAFE_CALL(cuptiFinalize());
@@ -3941,6 +3973,8 @@ uint64_t hapiCuptiPushObjCorrelation() {
   // method, so when tracing is off the whole body -- the active-object lookup
   // and two CUPTI calls -- must be skipped, not just wasted.
   if (!gm.cupti_tracing_active_.load(std::memory_order_relaxed)) return 0;
+  CuptiHookGuard guard;
+  if (!gm.cupti_tracing_active_.load(std::memory_order_seq_cst)) return 0;
   hapiCuptiSyncGeneration(gm);
 
   // The CUPTI external ID is a process-local token for the complete LB object
@@ -3998,6 +4032,10 @@ void hapiCuptiPopObjCorrelation() {
   // pop entries this PE never pushed, once tracing is switched on part-way
   // through an entry method.
   if (cupti_pushed_depth == 0 || !gm.cupti_initialized_) return;
+  CuptiHookGuard guard;
+  // Detaching (or detached): the generation bump has cleared, or will clear,
+  // the depth this pop belongs to.
+  if (!gm.cupti_tracing_active_.load(std::memory_order_seq_cst) && !gm.cupti_initialized_) return;
   --cupti_pushed_depth;
 
   uint64_t tag;
@@ -4010,6 +4048,8 @@ bool hapiCuptiPushKernelTag(uint64_t workTag) {
   if (!_lb_args.gpuScaling() ||
       !gm.cupti_tracing_active_.load(std::memory_order_relaxed))
     return false;
+  CuptiHookGuard guard;
+  if (!gm.cupti_tracing_active_.load(std::memory_order_seq_cst)) return false;
   hapiCuptiSyncGeneration(gm);
 
   CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
@@ -4022,6 +4062,8 @@ void hapiCuptiPopKernelTag() {
   GPUManager& gm = CsvAccess(gpu_manager);
   hapiCuptiSyncGeneration(gm);
   if (cupti_tag_pushed_depth == 0 || !gm.cupti_initialized_) return;
+  CuptiHookGuard guard;
+  if (!gm.cupti_tracing_active_.load(std::memory_order_seq_cst) && !gm.cupti_initialized_) return;
   --cupti_tag_pushed_depth;
 
   uint64_t tag;
