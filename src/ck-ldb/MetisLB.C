@@ -36,7 +36,7 @@ static void lbinit()
 
 static bool metisRemapOn();
 static double metisMinGain();
-static double metisStickiness();
+static double metisMaxCutRise();
 
 MetisLB::MetisLB(const CkLBOptions& opt) : CBase_MetisLB(opt)
 {
@@ -48,7 +48,7 @@ MetisLB::MetisLB(const CkLBOptions& opt) : CBase_MetisLB(opt)
   // and died of a divide by zero in its step test (SIGFPE in Cell::_if_7).
   metisRemapOn();
   metisMinGain();
-  metisStickiness();
+  metisMaxCutRise();
   // A partitioner is only as good as its edges. Communication instrumentation
   // is off by default, and MetisLB run on its own had been partitioning a
   // graph with no edges at all (every cut reported 0.0): its output was an
@@ -107,23 +107,30 @@ static double metisMinGain()
   return frac;
 }
 
-// What staying put is worth to an object, as a fraction of the traffic it
-// has with its neighbours: an edge of that weight to the anchor of the part
-// it is in now (see partitionSubset). METIS partitions from scratch, and a
-// vertex whose neighbours are split between two parts -- a leanmd compute,
-// with one cell on each side -- pays the same cut in either, so from scratch
-// half of them change sides for nothing: 5845 of 7168 moved at a step that
-// balanced device load 0.93 -> 0.64, where DiffusionLB reached the same
-// balance moving ~1200. With the fraction set, a move has to save at least
-// that much traffic to be made. 0 (the default) keeps the from-scratch
-// partition; +LBMetisStickiness overrides.
-static double metisStickiness()
+// How much a new mapping may raise the cross-group cut, as a fraction of the
+// current cut, and still be applied. Zero by default: a repartition must not
+// cost locality. METIS partitions from scratch under a balance constraint and
+// minimises the cut it makes, not the cut it adds; against a placement that
+// is already local it reaches its balance by moving objects away from what
+// they talk to, and the step pays for that on every step afterwards. Measured
+// 14 Sep 2026 on leanmd 8x8x8 (computes tied to immovable cells, initial
+// placement local): five Metis partitions raised the cross-GPU cut 20-118%
+// and ran 235-367 ms/step, the one that doubled it slowest, while
+// DiffusionLB, which balances by flipping the computes that already cross,
+// ran 231. The bound gate above cannot see this: it is a maximum over
+// resources, the cut lands as a per-PE sum far below the busiest GPU, and
+// the busiest GPU is not what holds a latency-bound step open. Where the
+// current placement is the bad one (sph2d's initial layout) the partition
+// cuts far less than before and passes. Refused, a step moves nothing and
+// the next balancer in the +balancer list (DiffusionLB) takes the next one.
+// +LBMetisMaxCutRise overrides.
+static double metisMaxCutRise()
 {
   static const double frac = []() {
     double f = 0.0;
-    CmiGetArgDoubleDesc(CkGetArgv(), "+LBMetisStickiness", &f,
-                        "MetisLB: weight of an object's current placement, as a fraction of "
-                        "its communication (default 0: partition from scratch)");
+    CmiGetArgDoubleDesc(CkGetArgv(), "+LBMetisMaxCutRise", &f,
+                        "MetisLB: largest rise in the cross-group cut, as a fraction of the "
+                        "current cut, for a new mapping to be applied (default 0)");
     return f;
   }();
   return frac;
@@ -500,12 +507,13 @@ void MetisLB::work(LDStats* stats)
   // another group at the second level, whose edge stays dropped as before).
   // `anchorsPinned` reports which of the two happened.
   //
-  // The same anchors carry the cost of moving: a vertex's edge to the anchor
-  // of the part it is in now, `currentPartOf`, worth its migration cost from
-  // the calibrated table (DiffusionCostModel::migrateCost) or, without one,
-  // the fraction of its traffic that metisStickiness asks for -- so that
-  // staying is preferred over a move that saves nothing. That term counts
-  // toward the relabel too, since it says where the vertices came from.
+  // The current placement does not enter the graph. A stay edge to the
+  // anchor of the part a vertex is in now was tried in two weights, a
+  // fraction of the vertex's traffic and its measured migration cost, and
+  // neither addressed what makes a repartition expensive: not the moves,
+  // which are cheap, but the cut the new placement carries on every step
+  // after them. That is judged where it can be, in the gate on the whole
+  // mapping (metisMaxCutRise), and METIS partitions from scratch here.
   auto partitionSubset = [&](const std::vector<int>& verts, idx_t nparts,
                              const std::vector<real_t>* tpwgts,
                              const std::vector<idx_t>& weights,
@@ -513,7 +521,6 @@ void MetisLB::work(LDStats* stats)
                              const std::vector<real_t>* ubvecIn,
                              DiffusionTier tier,
                              const std::function<int(int)>& fixedPartOf,
-                             const std::function<int(int)>& currentPartOf,
                              std::vector<std::vector<double>>* fixedOverlap,
                              bool* anchorsPinned) -> std::vector<idx_t>
   {
@@ -527,48 +534,18 @@ void MetisLB::work(LDStats* stats)
     local.reserve(verts.size() * 2);
     for (idx_t k = 0; k < nv; k++) local[verts[k]] = k;
 
-    // Per vertex, the cost of its traffic with the fixed objects of each
-    // part, then its stickiness to the part it is in now.
+    // Per vertex, the cost of its traffic with the fixed objects of each part.
     std::vector<std::map<int, double>> fixedAff(nv);
     long long fixedEdges = 0;
-    const double stick = metisStickiness();
-    const DiffusionCostModel migrateModel(costCfg, DIFF_TIER_INTRA_PROCESS);
-    long long stickN = 0;
-    double stickSum = 0.0, stickMax = 0.0;
     for (idx_t k = 0; k < nv; k++)
     {
-      double total = 0.0;
       for (const auto& nb : adj[verts[k]])
       {
-        const double c = edgeCost(nb.second, tier);
-        if (local.find(nb.first) != local.end()) { total += c; continue; }
+        if (local.find(nb.first) != local.end()) continue;
         const int p = fixedPartOf(nb.first);
         if (p < 0 || p >= (int)nparts) continue;
-        fixedAff[k][p] += c;
-        total += c;
+        fixedAff[k][p] += edgeCost(nb.second, tier);
         fixedEdges++;
-      }
-      // Staying put is worth the object's migration cost. With a calibrated
-      // table that is the cost model's migrateCost: the measured one-off cost
-      // of packing, staging, landing and unpacking this object, amortised over
-      // the intervals a placement is assumed to survive -- the same seconds
-      // per interval the calibrated edge costs are in, so the two trade off
-      // in one unit: a move has to save more traffic per interval than its
-      // amortised cost, and an exact tie stays. The debug print below
-      // reports where it lands against the heaviest edge. Without a table
-      // it is the fraction of the object's traffic that +LBMetisStickiness
-      // asks for, 0 by default.
-      const int cur = currentPartOf(verts[k]);
-      if (cur >= 0 && cur < (int)nparts)
-      {
-        double stay = 0.0;
-        if (costCfg.calibrated) stay = migrateModel.migrateCost(stats->objData[verts[k]]);
-        else if (stick > 0.0 && total > 0.0) stay = stick * total;
-        if (stay > 0.0)
-        {
-          fixedAff[k][cur] += stay;
-          stickN++; stickSum += stay; stickMax = std::max(stickMax, stay);
-        }
       }
     }
     lastFixedEdges = fixedEdges;
@@ -634,12 +611,6 @@ void MetisLB::work(LDStats* stats)
     for (double c : cost) maxCost = std::max(maxCost, c);
     const double scale =
         (costCfg.calibrated && maxCost > 0.0) ? (double)(1 << 20) / maxCost : 1.0;
-    if (stickN > 0 && _lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
-      CkPrintf("[%d] MetisLB stay edges: %lld vertices from %s, mean %.3e max %.3e vs heaviest edge %.3e "
-               "(%s); the heaviest stay edge weighs %lld after scaling\n",
-               CkMyPe(), stickN, costCfg.calibrated ? "migrateCost" : "+LBMetisStickiness",
-               stickSum / (double)stickN, stickMax, maxCost,
-               costCfg.calibrated ? "s/interval" : "bytes", (long long)llround(stickMax * scale));
     adjwgt.reserve(cost.size());
     for (double c : cost)
       adjwgt.push_back((idx_t)std::min<long long>(
@@ -941,15 +912,11 @@ void MetisLB::work(LDStats* stats)
     const int pe = ogr->vertices[v].getCurrentPe();
     return (pe >= 0 && pe < (int)groupOfPe.size()) ? groupOfPe[pe] : -1;
   };
-  auto currentGroupOf = [&](int v) -> int {
-    const int pe = ogr->vertices[v].getCurrentPe();
-    return (pe >= 0 && pe < (int)groupOfPe.size()) ? groupOfPe[pe] : -1;
-  };
   std::vector<std::vector<double>> fixedOverlap;
   bool anchorsPinned = false;
   const std::vector<idx_t> groupOf = partitionSubset(
       migVerts, nGroups, nGroups > 1 ? &tpwgts : nullptr, vwgtCross, nConstraints, &ubvecCross,
-      crossTier, fixedGroupOf, currentGroupOf, &fixedOverlap, &anchorsPinned);
+      crossTier, fixedGroupOf, &fixedOverlap, &anchorsPinned);
   const long long fixedEdgesLevelOne = lastFixedEdges;
 
   // Level one's labels. With edges to fixed objects the part numbers are
@@ -1063,17 +1030,11 @@ void MetisLB::work(LDStats* stats)
         if (pes[j] == pe) return (int)j;
       return -1;
     };
-    auto currentPeIdxOf = [&](int v) -> int {
-      const int pe = ogr->vertices[v].getCurrentPe();
-      for (size_t j = 0; j < pes.size(); j++)
-        if (pes[j] == pe) return (int)j;
-      return -1;  // arriving from another group: no place here to keep
-    };
     std::vector<std::vector<double>> fixedOverlap2;
     bool anchorsPinned2 = false;
     const std::vector<idx_t> peOf = partitionSubset(
         grpVerts[g], (idx_t)pes.size(), pes.size() > 1 ? &tpwgts2 : nullptr,
-        vwgtIntra, 1, nullptr, DIFF_TIER_INTRA_PROCESS, fixedPeIdxOf, currentPeIdxOf,
+        vwgtIntra, 1, nullptr, DIFF_TIER_INTRA_PROCESS, fixedPeIdxOf,
         &fixedOverlap2, &anchorsPinned2);
     if (_lb_args.debug() > 1 && CkMyPe() == cur_ld_balancer && lastFixedEdges > 0)
       CkPrintf("[%d] MetisLB level two, group %d: %lld edge(s) to fixed objects, anchors %s\n",
@@ -1395,14 +1356,43 @@ void MetisLB::work(LDStats* stats)
     const double boundOld = bound(false), boundNew = bound(true);
     const double gain = boundOld - boundNew;
     const double minGain = metisMinGain() * boundOld;
-    const bool worth = moving > 0 && gain >= minGain;
-    const char* verdict = moving == 0 ? "nothing moves"
-                          : !worth    ? "below the floor, current mapping kept"
-                                      : "applied";
-    // Reported, not priced: the job-wide cut says how much traffic the
-    // partition makes, which is worth seeing, but it is a sum and the bounds
-    // above are maxima, so it is not a quantity either of them can be
-    // compared against.
+    // The other half of the verdict: what the mapping does to locality. The
+    // cross-group cut -- every edge whose endpoints sit on different groups,
+    // at the tier a group boundary costs -- under the current mapping and
+    // under the new one. A sum, so it is never compared against the bound;
+    // it is compared against itself, and a mapping that raises it beyond
+    // metisMaxCutRise is refused whatever the bound says. See that option
+    // for why the bound alone let through partitions that ran slower.
+    auto crossCut = [&](bool fresh) {
+      double c = 0.0;
+      for (int i = 0; i < numVertices; i++)
+      {
+        const int p = peUnder(i, fresh);
+        const int gp = (p >= 0 && p < (int)groupOfPe.size()) ? groupOfPe[p] : -1;
+        for (const auto& nb : adj[i])
+        {
+          if (nb.first <= i) continue;
+          const int q = peUnder(nb.first, fresh);
+          const int gq = (q >= 0 && q < (int)groupOfPe.size()) ? groupOfPe[q] : -1;
+          if (gp == gq) continue;
+          c += edgeCost(nb.second, crossTier);
+        }
+      }
+      return c;
+    };
+    const double crossOld = crossCut(false), crossNew = crossCut(true);
+    const double maxRise = metisMaxCutRise();
+    const bool local = crossNew <= crossOld * (1.0 + maxRise) * (1.0 + 1e-9);
+    const bool worth = moving > 0 && local && gain >= minGain;
+    const char* verdict = moving == 0        ? "nothing moves"
+                          : !local           ? "raises the cross-group cut, current mapping kept"
+                          : gain < minGain   ? "below the floor, current mapping kept"
+                                             : "applied";
+    const double risePct = crossOld > 0.0 ? 100.0 * (crossNew - crossOld) / crossOld
+                           : crossNew > 0.0 ? 100.0 : 0.0;
+    // Reported, not priced: the job-wide cut over every tier says how much
+    // traffic the partition makes in all, which is worth seeing next to the
+    // cross-group part the gate judges.
     double cutOld = 0.0, cutNew = 0.0;
     if (costCfg.calibrated)
     {
@@ -1413,17 +1403,20 @@ void MetisLB::work(LDStats* stats)
     {
       if (costCfg.calibrated)
         CkPrintf("[%d] MetisLB priced: step bound %.6f -> %.6f, comm and migration included "
-                 "(saves %.6f s/interval, %.1f%% against a floor of %.1f%%); job cut %.6f -> %.6f; "
+                 "(saves %.6f s/interval, %.1f%% against a floor of %.1f%%); cross-group cut "
+                 "%.6f -> %.6f (%+.1f%% against a ceiling of %+.1f%%); job cut %.6f -> %.6f; "
                  "%d migration(s) %.6f s/interval over %.0f interval(s); %s\n",
                  CkMyPe(), boundOld, boundNew, gain,
                  boundOld > 0.0 ? 100.0 * gain / boundOld : 0.0, 100.0 * metisMinGain(),
-                 cutOld, cutNew, moving, migration, costCfg.placementLifetimeIntervals, verdict);
+                 crossOld, crossNew, risePct, 100.0 * maxRise, cutOld, cutNew, moving, migration,
+                 costCfg.placementLifetimeIntervals, verdict);
       else
         CkPrintf("[%d] MetisLB gate: step bound %.6f -> %.6f (saves %.6f s/interval, %.1f%% "
-                 "against a floor of %.1f%%); %d migration(s); %s\n",
+                 "against a floor of %.1f%%); cross-group cut %.6g -> %.6g bytes (%+.1f%% "
+                 "against a ceiling of %+.1f%%); %d migration(s); %s\n",
                  CkMyPe(), boundOld, boundNew, gain,
                  boundOld > 0.0 ? 100.0 * gain / boundOld : 0.0, 100.0 * metisMinGain(),
-                 moving, verdict);
+                 crossOld, crossNew, risePct, 100.0 * maxRise, moving, verdict);
     }
     if (!worth) std::fill(newPe.begin(), newPe.end(), -1);
   }
