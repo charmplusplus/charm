@@ -181,7 +181,12 @@ void DistBaseLB::AssembleStats() {
 #endif
   lbmgr->IdleTime(&myStats.idletime);
 
-  myStats.move = true; 
+  myStats.move = true;
+
+#if CMK_CUDA
+  hapiLBDeviceMemory(&myStats.gpu_mem_remaining, &myStats.pool_buff_mem_remaining,
+                     &myStats.gpu_pool_arena_bytes, &myStats.gpu_ipc_slots);
+#endif
 
   myStats.objData.clear();
   myStats.objData.resize(lbmgr->GetObjDataSz());

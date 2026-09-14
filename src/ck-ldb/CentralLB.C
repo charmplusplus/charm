@@ -392,27 +392,11 @@ void CentralLB::BuildStatsMsg()
   msg->gpu_device_id = hapiMyDevice();
   msg->gpu_total_sms = hapiMyDeviceTotalSMs();
   if (_lb_args.gpuScaling()) msg->gpu_descriptor = hapiMyDeviceDescriptor();
-  size_t freeMem, totalMem;
-  cudaMemGetInfo(&freeMem, &totalMem);
-  msg->gpu_mem_remaining = freeMem;
-  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-  if (csv_gpu_manager.device_pool_on) {
-    // Under +gpupool the device pool serves the load-balancing staging role,
-    // and it grows into free device memory on demand, so what may be staged is
-    // what its arenas have free plus what the device has left. There is no
-    // comm buffer in this mode, so the query below would report 0 free, and
-    // ContractVerifier then refuses every cross-process move: the strategy
-    // decides a good placement and not one object migrates.
-    msg->pool_buff_mem_remaining = hapiDevPoolFreeBytes() + freeMem;
-  } else if(csv_gpu_manager.use_shm) {
-    DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
-    msg->pool_buff_mem_remaining = dm->get_lb_buffer_free_size();
-    // printf("PE %d: GPU %ld free mem: %ld, pool buffer free mem: %ld\n", CkMyPe(), msg->gpu_device_id, msg->gpu_mem_remaining, msg->pool_buff_mem_remaining);
-  } else 
-  {
-    msg->pool_buff_mem_remaining = 0;//// should not run
-  }
-  // printf("msg->gpu_device_id is %ld\n", msg->gpu_device_id);
+  // Device memory for the memory contract. Under +gpupool the pool's free
+  // bytes and the device's are reported apart: the pool is per process and
+  // the device is shared, so LBMemoryModel combines them per device.
+  hapiLBDeviceMemory(&msg->gpu_mem_remaining, &msg->pool_buff_mem_remaining,
+                     &msg->gpu_pool_arena_bytes, &msg->gpu_ipc_slots);
 #endif
 
   DEBUGF(("Processor %d Total time (wall,cpu) = %f Idle = %f Bg = %f\n", CkMyPe(),msg->total_walltime,msg->idletime,msg->bg_walltime));
@@ -565,6 +549,8 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.gpu_total_sms = m->gpu_total_sms;
   procStat.gpu_mem_remaining = m->gpu_mem_remaining;
   procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
+  procStat.gpu_pool_arena_bytes = m->gpu_pool_arena_bytes;
+  procStat.gpu_ipc_slots = m->gpu_ipc_slots;
   procStat.gpu_descriptor = m->gpu_descriptor;
 #endif
 
@@ -647,6 +633,8 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
       procStat.gpu_total_sms = m->gpu_total_sms;
       procStat.gpu_mem_remaining = m->gpu_mem_remaining;
       procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
+      procStat.gpu_pool_arena_bytes = m->gpu_pool_arena_bytes;
+      procStat.gpu_ipc_slots = m->gpu_ipc_slots;
       procStat.gpu_descriptor = m->gpu_descriptor;
 #endif
       //procStat.utilization = 1.0;
@@ -1026,17 +1014,25 @@ void CentralLB::ApplyDecision() {
 #endif
 
 #if CMK_CUDA
-  // Memory contract, I-batch: partition the decision so each batch's staged
-  // bytes fit every device's staging reserve. One batch (the usual case)
-  // takes the unmodified path below; multiple batches are stashed here and
-  // released sequentially by ReleaseNextBatch as each completes.
+  // Memory contract, I-batch: partition the decision so each batch fits what
+  // every device can stage and land, and every PE's IPC slots. One batch (the
+  // usual case) takes the unmodified path below; multiple batches are stashed
+  // here and released sequentially by ReleaseNextBatch as each completes.
   {
     std::vector<int> batchOf;
-    const int nBatches = LBBatchPlanner::plan(statsData, batchOf);
+    int refused = 0;
+    const int nBatches = LBBatchPlanner::plan(statsData, batchOf, &refused);
+    if (nBatches == 1 && refused > 0) {
+      // The planner took moves back; the message must not carry them.
+      delete migrateMsg;
+      migrateMsg = createMigrateMsg(statsData);
+    }
     if (nBatches > 1) {
-      if (_lb_args.debug() || getenv("CHARM_DEBUG_MEMCONTRACT") != NULL)
-        CkPrintf("CharmLB> memory contract: executing this step's migrations "
-                 "in %d batches\n", nBatches);
+      int nMoves = 0;
+      for (int i = 0; i < (int)statsData->objData.size(); i++)
+        if (statsData->to_proc[i] != statsData->from_proc[i]) nMoves++;
+      CkPrintf("CharmLB> memory contract: executing this step's %d migrations "
+               "in %d batches\n", nMoves, nBatches);
       std::vector<int> savedTo = statsData->to_proc;
       lbBatchMsgs.clear();
       for (int k = 0; k < nBatches; k++) {
@@ -2199,6 +2195,8 @@ void CLBStatsMsg::pup(PUP::er &p) {
   p|gpu_total_sms;
   p|gpu_mem_remaining;
   p|pool_buff_mem_remaining;
+  p|gpu_pool_arena_bytes;
+  p|gpu_ipc_slots;
   p|gpu_descriptor;
 #endif
   p|total_walltime;

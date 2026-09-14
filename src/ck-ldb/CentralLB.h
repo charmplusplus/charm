@@ -334,6 +334,8 @@ public:
 #if CMK_CUDA
   size_t gpu_mem_remaining;
   size_t pool_buff_mem_remaining;
+  size_t gpu_pool_arena_bytes;
+  int gpu_ipc_slots;
   uint64_t gpu_device_id;
   int gpu_total_sms;
   GpuDeviceDescriptor gpu_descriptor;
@@ -357,6 +359,7 @@ public:
 #if CMK_CUDA
 		 gpu_device_id(-1), gpu_total_sms(0),
 		 gpu_mem_remaining(0), pool_buff_mem_remaining(0),
+		 gpu_pool_arena_bytes(0), gpu_ipc_slots(0),
 #endif
 		 total_walltime(0.0), idletime(0.0),
 		 bg_walltime(0.0),

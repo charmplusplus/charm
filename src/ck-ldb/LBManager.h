@@ -14,7 +14,8 @@
 using json = nlohmann::json;
 
 // 4 adds GpuObjectEpochCosts to LDObjData and GpuDeviceDescriptor to ProcStats.
-#define LB_FORMAT_VERSION 4
+// 5 adds the device pool's arena quantum and the IPC slot budget to ProcStats.
+#define LB_FORMAT_VERSION 5
 
 #define LB_MANAGER_VERSION 1
 

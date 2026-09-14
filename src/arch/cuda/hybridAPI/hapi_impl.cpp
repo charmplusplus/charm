@@ -23,6 +23,14 @@
 #include <cuda_runtime.h>
 #include <cuda.h>
 
+// The versioned driver entry-point lookup arrived after CUDA 12.0, whose
+// runtime has only the unversioned one. Every lookup here asks for the 12.0
+// ABI, which is what the unversioned form resolves, so the two agree there.
+#if defined(CUDA_VERSION) && CUDA_VERSION <= 12000
+#define cudaGetDriverEntryPointByVersion(symbol, fn, version, flags, status) \
+    cudaGetDriverEntryPoint(symbol, fn, flags, status)
+#endif
+
 #include "hapi_portable.h"
 #include "converse.h"
 #include "conv-mach-opt.h" /* for CMK_CUDA */
@@ -3394,6 +3402,52 @@ size_t hapiDevPoolFreeBytes() {
   size_t free = 0;
   for (auto& ar : hapi_devpool_arenas) free += ar.alloc->get_free_size();
   return free;
+}
+
+size_t hapiDevPoolFreeBytesOn(int device) {
+  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  hapiDevPoolReapLocked();
+  size_t free = 0;
+  for (auto& ar : hapi_devpool_arenas)
+    if (ar.device == device) free += ar.alloc->get_free_size();
+  return free;
+}
+
+size_t hapiDevPoolArenaSize() { return hapiDevPoolArenaBytes(); }
+
+void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
+                        int* ipcSlots) {
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  size_t freeMem = 0, totalMem = 0;
+  hapiCheck(cudaMemGetInfo(&freeMem, &totalMem));
+  *devFree = freeMem;
+  if (csv_gpu_manager.device_pool_on) {
+    // Chare state, migration payloads and landing arenas all come from this
+    // pool, which grows into free device memory an arena at a time. The
+    // contract reads the two halves separately: pool bytes are per process,
+    // device bytes are shared by every process on the device.
+    *poolFree = hapiDevPoolFreeBytesOn(CpvAccess(my_device_id));
+    *arenaBytes = hapiDevPoolArenaBytes();
+  } else if (csv_gpu_manager.use_shm) {
+    DeviceManager* dm = csv_gpu_manager.device_map[CmiMyPe()];
+    *poolFree = dm->get_lb_buffer_free_size();
+    *arenaBytes = 0;
+  } else {
+    *poolFree = 0;
+    *arenaBytes = 0;
+  }
+  static const int slotOverride = []() {
+    const char* s = getenv("CHARM_LB_IPC_SLOTS");
+    return s ? atoi(s) : -1;
+  }();
+  if (slotOverride >= 0) {
+    *ipcSlots = slotOverride;
+  } else if (csv_gpu_manager.use_shm) {
+    const int slice = csv_gpu_manager.hapi_ipc_event_pool_size_pe;
+    *ipcSlots = slice >= 4 ? slice * 3 / 4 : (slice > 0 ? 1 : 0);
+  } else {
+    *ipcSlots = 0;
+  }
 }
 
 void hapiDevPoolFree(void* ptr) {

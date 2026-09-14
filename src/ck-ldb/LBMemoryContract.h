@@ -2,15 +2,35 @@
 #define LB_MEMORY_CONTRACT_H
 
 // The LB memory contract: the strategy-side interface that discharges the
-// migration runtime's two per-device preconditions,
+// migration runtime's per-device preconditions. For every device g,
 //
-//   I-final:  u0(g) - sum_{src=g} f(m) + sum_{dst=g} f(m)  <=  (1-eps) * C_g
-//   I-batch:  sum_{src=g, batch} sigma(m)                  <=  S_g
+//   I-final:  sum_{dst=g} phi(m) - sum_{src=g} phi(m)      <=  H_g
+//   I-batch:  for each batch, in the order batches run,
+//               staged(g)                                 <=  A_g
+//               staged(g) - departed(g) + arrived(g)      <=  A_g
+//             and for each source PE p, ipc(p)            <=  slots(p)
 //
-// for every device g, where f is a chare's resident device footprint and
-// sigma its serialized (staged) size. Any strategy whose emitted move set
-// satisfies these inherits the runtime's no-OOM / no-deadlock guarantee; the
-// ContractVerifier below repairs the output of strategies that do not use
+// phi is a chare's resident device footprint, sigma its staged payload block.
+//
+//   T_g  what a migration can obtain on g. Under +gpupool, the free arena bytes
+//        of every process on g plus the device's free bytes counted in whole
+//        arenas, since the pool grows an arena at a time. Without the pool,
+//        free device memory.
+//   H_g  (1-eps)*T_g - sigma_max(g): final placement is planned against T_g
+//        less the largest payload block g could pack, so one pack always fits.
+//   A_g  (1-eps)*T_g less the net change of the batches already released:
+//        what a batch stages into. Under the pool the payload block, the
+//        landing arena and chare state are all allocations from the same
+//        arenas, so there is no separate reserve; the second line is the peak
+//        with departures packed before arrivals land, which the admission gate
+//        in immigrateGPU enforces.
+//
+// Without the pool, staging is the +gpulbbuffer region S_g, debited on both
+// ends, and the first line reads staged(g) <= S_g instead.
+//
+// Any strategy whose emitted move set satisfies I-final inherits the runtime's
+// no-OOM / no-deadlock guarantee once LBBatchPlanner has split it for I-batch;
+// the ContractVerifier below repairs the output of strategies that do not use
 // the ledger themselves.
 //
 // Header-only: strategies and the central LB include this directly.
@@ -19,9 +39,35 @@
 #include "CentralLB.h"
 #include <vector>
 #include <unordered_map>
+#include <algorithm>
+#include <cstdint>
 #include <cstdlib>
 
 CkpvExtern(int, _lb_obj_index);  // the footprint slot (see _loadbalancerInit)
+
+// ---------------------------------------------------------------------------
+// LBMemoryTopology: where PEs are, as the migration transport sees it. The
+// runtime answers from Converse; a test substitutes its own to exercise
+// cross-process cases on one process.
+// ---------------------------------------------------------------------------
+class LBMemoryTopology {
+public:
+  virtual ~LBMemoryTopology() {}
+  virtual int nodeOf(int pe) const { return CmiNodeOf(pe); }
+  virtual bool samePhysicalNode(int a, int b) const {
+    return CmiPeOnSamePhysicalNode(a, b);
+  }
+  // Whether a move within one process and one device hands the chare over
+  // without serializing it (CkLocMgr::emigrateIntraProcess).
+  virtual bool intraProcessHandoff() const {
+    static const bool off = (getenv("CHARM_NO_INTRAPROC_MIGRATE") != NULL);
+    return !off;
+  }
+  static const LBMemoryTopology& runtime() {
+    static const LBMemoryTopology t;
+    return t;
+  }
+};
 
 // ---------------------------------------------------------------------------
 // LBMemoryModel: one uniform view over what the contract needs, built from
@@ -33,35 +79,92 @@ class LBMemoryModel {
 public:
   struct Device {
     uint64_t gpu_id;
-    size_t memFree;       // free device memory at stats time (cudaMemGetInfo)
-    size_t stagingFree;   // staging (LB pool) free bytes at stats time
+    size_t reach;         // T_g
+    size_t stagingFree;   // S_g; equal to reach when the device is pooled
+    bool pooled;          // staging, landing and chare state share the pool
+    size_t sigmaMax;      // largest payload block a migratable object here packs
     std::vector<int> pes; // PEs mapped to this device
   };
 
-  void build(BaseLB::LDStats* stats) {
+  // How a move travels. Only kStaged moves device bytes: the source packs a
+  // payload block and frees the chare's state, the destination lands the
+  // payload in an arena that becomes the chare's state.
+  enum Transport { kNone, kStaged };
+
+  void build(BaseLB::LDStats* stats, const LBMemoryTopology* topo = nullptr) {
+    stats_ = stats;
+    topo_ = topo ? topo : &LBMemoryTopology::runtime();
     devices_.clear();
     devToIdx_.clear();
     peToDev_.assign(stats->nprocs(), -1);
+    peSlots_.assign(stats->nprocs(), 0);
+    pooled_ = false;
+
+    std::vector<size_t> devFree, poolSum, arena;
+    std::vector<std::vector<int>> poolNodes;  // processes already summed per device
     for (int pe = 0; pe < stats->nprocs(); pe++) {
       if (!stats->procs[pe].available) continue;
-      uint64_t id = stats->procs[pe].gpu_device_id;
-      auto it = devToIdx_.find(id);
+      const BaseLB::ProcStats& ps = stats->procs[pe];
+      auto it = devToIdx_.find(ps.gpu_device_id);
       int d;
       if (it == devToIdx_.end()) {
         d = (int)devices_.size();
-        devToIdx_[id] = d;
+        devToIdx_[ps.gpu_device_id] = d;
         Device dev;
-        dev.gpu_id = id;
-        dev.memFree = stats->procs[pe].gpu_mem_remaining;
-        dev.stagingFree = stats->procs[pe].pool_buff_mem_remaining;
+        dev.gpu_id = ps.gpu_device_id;
+        dev.reach = 0;
+        dev.stagingFree = ps.pool_buff_mem_remaining;  // the legacy reading
+        dev.pooled = false;
+        dev.sigmaMax = 0;
         devices_.push_back(dev);
+        devFree.push_back(ps.gpu_mem_remaining);
+        poolSum.push_back(0);
+        arena.push_back(0);
+        poolNodes.emplace_back();
       } else {
         d = it->second;
       }
       devices_[d].pes.push_back(pe);
       peToDev_[pe] = d;
+      peSlots_[pe] = ps.gpu_ipc_slots;
+      // PEs report at slightly different moments; take the least.
+      devFree[d] = std::min(devFree[d], ps.gpu_mem_remaining);
+      if (ps.gpu_pool_arena_bytes > 0) {
+        arena[d] = std::max(arena[d], ps.gpu_pool_arena_bytes);
+        const int node = topo_->nodeOf(pe);
+        if (std::find(poolNodes[d].begin(), poolNodes[d].end(), node) ==
+            poolNodes[d].end()) {
+          poolNodes[d].push_back(node);
+          poolSum[d] += ps.pool_buff_mem_remaining;
+        }
+      }
     }
-    stats_ = stats;
+
+    // Environment override for adversarial testing: cap what every device can
+    // reach at CHARM_LB_MEM_CAP_MB regardless of what it reports.
+    const char* capEnv = getenv("CHARM_LB_MEM_CAP_MB");
+    const size_t cap = capEnv ? (size_t)atol(capEnv) << 20 : SIZE_MAX;
+    for (int d = 0; d < (int)devices_.size(); d++) {
+      Device& dev = devices_[d];
+      if (arena[d] > 0) {
+        dev.pooled = true;
+        pooled_ = true;
+        dev.reach = poolSum[d] + (devFree[d] / arena[d]) * arena[d];
+      } else {
+        dev.reach = devFree[d];
+      }
+      dev.reach = std::min(dev.reach, cap);
+      if (dev.pooled) dev.stagingFree = dev.reach;
+    }
+
+    // sigma_max after pooled_ is known: under the pool a payload is a buddy
+    // block, so its size is rounded.
+    for (int i = 0; i < (int)stats->objData.size(); i++) {
+      if (!stats->objData[i].migratable) continue;
+      const int d = deviceOfPe(stats->from_proc[i]);
+      if (d < 0) continue;
+      devices_[d].sigmaMax = std::max(devices_[d].sigmaMax, stagedSize(i));
+    }
   }
 
   int numDevices() const { return (int)devices_.size(); }
@@ -73,13 +176,27 @@ public:
     auto it = devToIdx_.find(gpu_id);
     return it == devToIdx_.end() ? -1 : it->second;
   }
+  bool pooled() const { return pooled_; }
+  const LBMemoryTopology& topology() const { return *topo_; }
 
-  // Serialized (staged) size of object i: what one migration stages.
-  size_t stagedSize(int i) const { return (size_t)stats_->objData[i].gpuPupSize; }
+  // The buddy block a request of `bytes` occupies in the pool.
+  static size_t poolBlock(size_t bytes) {
+    if (bytes == 0) return 0;
+    size_t b = 4;  // buddy::allocator's min_size
+    while (b < bytes) b <<= 1;
+    return b;
+  }
+
+  // Staged size of object i: the block one migration packs.
+  size_t stagedSize(int i) const {
+    const size_t s = (size_t)stats_->objData[i].gpuPupSize;
+    return pooled_ ? poolBlock(s) : s;
+  }
 
   // Resident device footprint of object i: the user-data slot the AtSync
-  // producer fills, floored at the serialized size so a missing producer can
-  // never read as "free to move".
+  // producer fills, floored at the staged size so a missing producer can
+  // never read as "free to move". Under the pool a chare that arrives by
+  // migration holds at least its landing arena, which is that same block.
   size_t footprint(int i) const {
     size_t f = 0;
 #if CMK_LB_USER_DATA
@@ -90,33 +207,54 @@ public:
     return f > s ? f : s;
   }
 
-  // Two migrating endpoints on one physical process use a held transport
-  // (peer copies with the source retained until completion); everything else
-  // is staged. Held moves get no source credit in the ledger.
-  static bool heldTransport(int fromPe, int toPe) {
-    return CmiNodeOf(fromPe) == CmiNodeOf(toPe);
+  // A move within one process onto the same device is an ownership handoff
+  // and moves no bytes. Everything else stages -- including a move within one
+  // process onto a different device, and a move between processes sharing a
+  // device (see CkLocMgr::emigrate).
+  Transport transport(int fromPe, int toPe) const {
+    if (fromPe == toPe) return kNone;
+    if (topo_->nodeOf(fromPe) == topo_->nodeOf(toPe) &&
+        deviceOfPe(fromPe) == deviceOfPe(toPe) && topo_->intraProcessHandoff())
+      return kNone;
+    return kStaged;
+  }
+
+  // Whether a move's payload holds one of the source PE's CUDA IPC event
+  // slots until the destination has read it: cross-process on one physical
+  // node (findTransferModeDevice's IPC mode).
+  bool usesIpcSlot(int obj, int fromPe, int toPe) const {
+    return transport(fromPe, toPe) == kStaged && stagedSize(obj) > 0 &&
+           topo_->nodeOf(fromPe) != topo_->nodeOf(toPe) &&
+           topo_->samePhysicalNode(fromPe, toPe);
+  }
+
+  // The source PE's slot budget for one batch; 0 means unbounded.
+  int slotsOf(int pe) const {
+    return (pe >= 0 && pe < (int)peSlots_.size()) ? peSlots_[pe] : 0;
   }
 
 private:
   std::vector<Device> devices_;
   std::unordered_map<uint64_t, int> devToIdx_;
   std::vector<int> peToDev_;
+  std::vector<int> peSlots_;
+  bool pooled_ = false;
   BaseLB::LDStats* stats_ = nullptr;
+  const LBMemoryTopology* topo_ = nullptr;
 };
 
 // ---------------------------------------------------------------------------
-// MemoryLedger: transactional feasibility for planning. Encodes the
-// accounting a strategy must not get wrong: staged moves credit the source at
-// pack time; held transports credit nothing until completion; staging is
-// debited on both ends while the runtime lands payloads in pool blocks.
+// MemoryLedger: transactional feasibility for planning I-final. A staged move
+// debits its footprint at the destination and credits it at the source, which
+// frees the chare's state at pack. The batch planner is what makes that
+// credit safe to take.
+//
+// waveStaging: for a strategy whose waves execute unbatched, the whole wave's
+// staging must also fit, so sigma is debited per move. CentralLB batches every
+// step, so the verifier and batch-aware strategies leave it off.
 // ---------------------------------------------------------------------------
 class MemoryLedger {
 public:
-  // headroom: the (1 - eps) margin applied to free device memory.
-  // waveStaging: while migration waves execute unbatched, the whole wave's
-  // staging demand must fit the reserve, so sigma is debited per move; once
-  // batch execution is active this becomes the batch planner's job and the
-  // per-move debit is disabled.
   void init(const LBMemoryModel* model, double headroom = 0.95,
             bool waveStaging = true) {
     model_ = model;
@@ -124,85 +262,81 @@ public:
     memAvail_.resize(model->numDevices());
     stagingAvail_.resize(model->numDevices());
     for (int d = 0; d < model->numDevices(); d++) {
-      // Environment override for adversarial testing: cap every device's
-      // planning headroom at CHARM_LB_MEM_CAP_MB regardless of what the
-      // device reports.
-      size_t mem = (size_t)((double)model->device(d).memFree * headroom);
-      const char* cap = getenv("CHARM_LB_MEM_CAP_MB");
-      if (cap != NULL) {
-        size_t capB = (size_t)atol(cap) * 1024 * 1024;
-        if (mem > capB) mem = capB;
-      }
-      memAvail_[d] = mem;
-      stagingAvail_[d] = model->device(d).stagingFree;
+      const LBMemoryModel::Device& dev = model->device(d);
+      long long h = (long long)((double)dev.reach * headroom);
+      if (dev.pooled) h -= (long long)dev.sigmaMax;  // H_g
+      memAvail_[d] = h > 0 ? h : 0;
+      stagingAvail_[d] = (long long)dev.stagingFree;
     }
   }
 
   bool feasible(int obj, int fromPe, int toPe) const {
     int s = model_->deviceOfPe(fromPe), d = model_->deviceOfPe(toPe);
-    if (s < 0 || d < 0 || s == d) return true;  // no device change: no memory moves
-    size_t f = model_->footprint(obj);
-    size_t sig = model_->stagedSize(obj);
-    if (sig == 0 && f == 0) return true;        // no device state
-    bool held = LBMemoryModel::heldTransport(fromPe, toPe);
-    if (memAvail_[d] < f) return false;
-    if (!held && waveStaging_ &&
-        (stagingAvail_[s] < sig || stagingAvail_[d] < sig))
-      return false;
-    if (!held && sig > model_->device(s).stagingFree)
-      return false;                             // could never be packed at all
+    if (s < 0 || d < 0) return true;
+    if (model_->transport(fromPe, toPe) == LBMemoryModel::kNone) return true;
+    const long long f = (long long)model_->footprint(obj);
+    const long long sig = (long long)model_->stagedSize(obj);
+    if (f == 0 && sig == 0) return true;        // no device state
+    const LBMemoryModel::Device& src = model_->device(s);
+    if (sig > (long long)src.stagingFree) return false;  // could never be packed
+    if (s != d && memAvail_[d] < f) return false;
+    if (waveStaging_) {
+      if (src.pooled) {
+        // The wave's payloads draw on the pool that H_g held sigma_max back in.
+        if (memAvail_[s] + (long long)src.sigmaMax < sig) return false;
+      } else if (stagingAvail_[s] < sig ||
+                 (!model_->device(d).pooled && stagingAvail_[d] < sig)) {
+        return false;
+      }
+    }
     return true;
   }
 
-  void commit(int obj, int fromPe, int toPe) {
-    int s = model_->deviceOfPe(fromPe), d = model_->deviceOfPe(toPe);
-    if (s < 0 || d < 0 || s == d) return;
-    size_t f = model_->footprint(obj);
-    size_t sig = model_->stagedSize(obj);
-    bool held = LBMemoryModel::heldTransport(fromPe, toPe);
-    memAvail_[d] -= (memAvail_[d] >= f) ? f : memAvail_[d];
-    if (!held) {
-      memAvail_[s] += f;  // departure frees at pack: the two-phase credit
-      if (waveStaging_) {
-        stagingAvail_[s] -= (stagingAvail_[s] >= sig) ? sig : stagingAvail_[s];
-        stagingAvail_[d] -= (stagingAvail_[d] >= sig) ? sig : stagingAvail_[d];
-      }
-    }
-  }
+  void commit(int obj, int fromPe, int toPe) { apply(obj, fromPe, toPe, +1); }
+  void rollback(int obj, int fromPe, int toPe) { apply(obj, fromPe, toPe, -1); }
 
-  void rollback(int obj, int fromPe, int toPe) {
-    int s = model_->deviceOfPe(fromPe), d = model_->deviceOfPe(toPe);
-    if (s < 0 || d < 0 || s == d) return;
-    size_t f = model_->footprint(obj);
-    size_t sig = model_->stagedSize(obj);
-    bool held = LBMemoryModel::heldTransport(fromPe, toPe);
-    memAvail_[d] += f;
-    if (!held) {
-      memAvail_[s] -= (memAvail_[s] >= f) ? f : memAvail_[s];
-      if (waveStaging_) {
-        stagingAvail_[s] += sig;
-        stagingAvail_[d] += sig;
-      }
-    }
+  size_t memAvailOn(int dev) const {
+    return memAvail_[dev] > 0 ? (size_t)memAvail_[dev] : 0;
   }
-
-  size_t memAvailOn(int dev) const { return memAvail_[dev]; }
-  size_t stagingAvailOn(int dev) const { return stagingAvail_[dev]; }
+  size_t stagingAvailOn(int dev) const {
+    return stagingAvail_[dev] > 0 ? (size_t)stagingAvail_[dev] : 0;
+  }
 
 private:
+  void apply(int obj, int fromPe, int toPe, int sign) {
+    int s = model_->deviceOfPe(fromPe), d = model_->deviceOfPe(toPe);
+    if (s < 0 || d < 0) return;
+    if (model_->transport(fromPe, toPe) == LBMemoryModel::kNone) return;
+    const long long f = (long long)model_->footprint(obj) * sign;
+    const long long sig = (long long)model_->stagedSize(obj) * sign;
+    if (s != d) {
+      memAvail_[d] -= f;
+      memAvail_[s] += f;  // departure frees at pack: the two-phase credit
+    }
+    if (waveStaging_) {
+      if (model_->device(s).pooled) {
+        memAvail_[s] -= sig;
+      } else {
+        stagingAvail_[s] -= sig;
+        if (!model_->device(d).pooled) stagingAvail_[d] -= sig;
+      }
+    }
+  }
+
   const LBMemoryModel* model_ = nullptr;
   bool waveStaging_ = true;
-  std::vector<size_t> memAvail_;
-  std::vector<size_t> stagingAvail_;
+  std::vector<long long> memAvail_;
+  std::vector<long long> stagingAvail_;
 };
 
 // ---------------------------------------------------------------------------
-// ContractVerifier: hardens ANY strategy's finished move list. Recomputes the
-// contract over the moves and repairs violations by refusing moves --
-// largest-footprint first on the offending device, so the fewest moves are
-// lost. A refused move keeps its chare where it is, which is always feasible.
-// Returns the number of refused moves; refused entries have to_pe set back to
-// from_pe.
+// ContractVerifier: hardens ANY strategy's finished move list against I-final.
+// Recomputes the contract over the moves and repairs violations by refusing
+// moves -- committing smallest footprint first, so large offenders are what
+// remains when a device runs out. A refused move keeps its chare where it is,
+// which is always feasible. Returns the number of refused moves; refused
+// entries have to_pe set back to from_pe. Staging is not checked here: the
+// batch planner splits the step for it.
 // ---------------------------------------------------------------------------
 class ContractVerifier {
 public:
@@ -214,26 +348,22 @@ public:
   };
 
   static int verifyAndRepair(BaseLB::LDStats* stats, std::vector<Move>& moves,
-                             double headroom = 0.95) {
+                             double headroom = 0.95,
+                             const LBMemoryTopology* topo = nullptr) {
     LBMemoryModel model;
-    model.build(stats);
+    model.build(stats, topo);
     if (model.numDevices() == 0) return 0;
     MemoryLedger ledger;
-    ledger.init(&model, headroom);
+    ledger.init(&model, headroom, /*waveStaging=*/false);
 
     const bool dbg = (getenv("CHARM_DEBUG_MEMCONTRACT") != NULL);
     int refused = 0;
 
-    // Commit cheapest-feasibility-order: smallest footprint first, so large
-    // offenders are what remains when a device runs out and get refused.
     std::vector<int> order(moves.size());
     for (size_t i = 0; i < moves.size(); i++) order[i] = (int)i;
-    for (size_t a = 0; a < order.size(); a++)      // insertion sort: lists are small
-      for (size_t b = a + 1; b < order.size(); b++)
-        if (model.footprint(moves[order[b]].obj) <
-            model.footprint(moves[order[a]].obj)) {
-          int t = order[a]; order[a] = order[b]; order[b] = t;
-        }
+    std::stable_sort(order.begin(), order.end(), [&](int a, int b) {
+      return model.footprint(moves[a].obj) < model.footprint(moves[b].obj);
+    });
 
     for (size_t k = 0; k < order.size(); k++) {
       Move& m = moves[order[k]];
@@ -249,26 +379,39 @@ public:
         refused++;
       }
     }
-    if (dbg && refused)
-      CkPrintf("[%d] memcontract: refused %d move(s) to preserve the "
-               "memory contract\n", CkMyPe(), refused);
+    if (refused)
+      CkPrintf("CharmLB> memory contract: refused %d of %zu move(s) that would "
+               "overfill a device\n", refused, moves.size());
     return refused;
   }
 };
 
 // ---------------------------------------------------------------------------
-// LBBatchPlanner: discharges I-batch. Partitions the decided move list so
-// each batch's staged bytes fit every device's staging reserve (both ends
-// debited, matching the unbatched runtime's pool use). Held transports stage
-// nothing and always ride the first batch. Greedy first-fit; returns the
-// number of batches, and batchOf[i] for every object whose to != from.
-// CHARM_LB_FORCE_BATCHES=N round-robins moves into N batches regardless of
-// staging -- the protocol-test knob.
+// LBBatchPlanner: discharges I-batch. Splits the decided moves into batches
+// that run one after another (CentralLB::ReleaseNextBatch). Each batch starts
+// as every move not yet placed and sheds moves until every device and every
+// source PE is within bounds:
+//
+//   pooled device g:  staged(g) <= A_g  and  staged(g) - departed(g) + arrived(g) <= A_g
+//   legacy device g:  staged(g) + landed(g) <= S_g  and  arrived(g) - departed(g) <= A_g
+//   source PE p:      ipc(p) <= slots(p)
+//
+// where A_g starts at (1-eps)*T_g and each released batch moves it by its net
+// change. A move within one device stages but changes no final footprint.
+// Moves that move no device bytes ride batch 0. Returns the number of
+// batches, and batchOf[i] for every object whose to != from. A move that
+// cannot run in any batch -- which I-final with its sigma_max holdback should
+// rule out -- is refused (to_proc reset to from_proc) and counted in *refused.
+// CHARM_LB_FORCE_BATCHES=N round-robins moves into N batches regardless --
+// the protocol-test knob.
 // ---------------------------------------------------------------------------
 class LBBatchPlanner {
 public:
-  static int plan(BaseLB::LDStats* stats, std::vector<int>& batchOf) {
+  static int plan(BaseLB::LDStats* stats, std::vector<int>& batchOf,
+                  int* refusedOut = nullptr, double headroom = 0.95,
+                  const LBMemoryTopology* topo = nullptr) {
     batchOf.assign(stats->objData.size(), 0);
+    if (refusedOut) *refusedOut = 0;
 
     std::vector<int> moved;
     for (int i = 0; i < (int)stats->objData.size(); i++)
@@ -283,33 +426,169 @@ public:
     }
 
     LBMemoryModel model;
-    model.build(stats);
-    if (model.numDevices() == 0) return 1;
+    model.build(stats, topo);
+    const int D = model.numDevices();
+    if (D == 0) return 1;
 
-    int nb = 1;
-    std::vector<std::vector<size_t>> used(1,
-        std::vector<size_t>(model.numDevices(), 0));
+    struct Mv { int obj, from, s, d; long long sig, phi; bool ipc; };
+    std::vector<Mv> mv;
     for (int i : moved) {
-      int s = model.deviceOfPe(stats->from_proc[i]);
-      int d = model.deviceOfPe(stats->to_proc[i]);
-      size_t sig = model.stagedSize(i);
-      if (s < 0 || d < 0 || s == d || sig == 0 ||
-          LBMemoryModel::heldTransport(stats->from_proc[i], stats->to_proc[i]))
-        continue;  // stages nothing: batch 0
-      size_t Ss = model.device(s).stagingFree, Sd = model.device(d).stagingFree;
-      int k = -1;
-      for (int b = 0; b < nb; b++)
-        if (used[b][s] + sig <= Ss && used[b][d] + sig <= Sd) { k = b; break; }
-      if (k < 0) {
-        nb++;
-        used.push_back(std::vector<size_t>(model.numDevices(), 0));
-        k = nb - 1;
-      }
-      used[k][s] += sig;
-      used[k][d] += sig;
-      batchOf[i] = k;
+      const int from = stats->from_proc[i], to = stats->to_proc[i];
+      const int s = model.deviceOfPe(from), d = model.deviceOfPe(to);
+      if (s < 0 || d < 0) continue;
+      if (model.transport(from, to) == LBMemoryModel::kNone) continue;
+      const long long sig = (long long)model.stagedSize(i);
+      const long long phi = (long long)model.footprint(i);
+      if (sig == 0 && phi == 0) continue;
+      mv.push_back(Mv{i, from, s, d, sig, phi, model.usesIpcSlot(i, from, to)});
     }
-    return nb;
+    if (mv.empty()) return 1;
+
+    const int P = stats->nprocs();
+    std::vector<long long> avail(D);
+    for (int g = 0; g < D; g++)
+      avail[g] = (long long)((double)model.device(g).reach * headroom);
+
+    std::vector<int> remaining(mv.size());
+    for (size_t k = 0; k < mv.size(); k++) remaining[k] = (int)k;
+
+    int nb = 0;
+    while (!remaining.empty()) {
+      std::vector<char> in(mv.size(), 0);
+      std::vector<long long> stg(D, 0), net(D, 0);
+      std::vector<int> ipc(P, 0);
+      auto account = [&](int k, int sign) {
+        const Mv& m = mv[k];
+        const bool ps = model.device(m.s).pooled, pd = model.device(m.d).pooled;
+        stg[m.s] += sign * m.sig;
+        if (ps) net[m.s] += sign * m.sig;
+        if (!pd && m.d != m.s) stg[m.d] += sign * m.sig;
+        if (!ps && m.d == m.s) stg[m.d] += sign * m.sig;  // lands in the same region
+        if (m.s != m.d) {
+          net[m.s] -= sign * m.phi;
+          net[m.d] += sign * m.phi;
+        }
+        if (m.ipc) ipc[m.from] += sign;
+      };
+      for (int k : remaining) { in[k] = 1; account(k, +1); }
+
+      // Candidates to shed, largest first, walked with cursors.
+      std::vector<std::vector<int>> depBySig(D), landBySig(D), arrByPhi(D),
+                                    sameBySig(D), ipcBySig(P);
+      for (int k : remaining) {
+        const Mv& m = mv[k];
+        depBySig[m.s].push_back(k);
+        if (m.s != m.d) {
+          landBySig[m.d].push_back(k);
+          arrByPhi[m.d].push_back(k);
+        } else {
+          sameBySig[m.s].push_back(k);
+        }
+        if (m.ipc) ipcBySig[m.from].push_back(k);
+      }
+      auto bySig = [&](int a, int b) { return mv[a].sig > mv[b].sig; };
+      auto byPhi = [&](int a, int b) { return mv[a].phi > mv[b].phi; };
+      for (int g = 0; g < D; g++) {
+        std::sort(depBySig[g].begin(), depBySig[g].end(), bySig);
+        std::sort(landBySig[g].begin(), landBySig[g].end(), bySig);
+        std::sort(arrByPhi[g].begin(), arrByPhi[g].end(), byPhi);
+        std::sort(sameBySig[g].begin(), sameBySig[g].end(), bySig);
+      }
+      for (int p = 0; p < P; p++)
+        std::sort(ipcBySig[p].begin(), ipcBySig[p].end(), bySig);
+      std::vector<size_t> cDep(D, 0), cLand(D, 0), cArr(D, 0), cSame(D, 0), cIpc(P, 0);
+      auto next = [&](const std::vector<int>& list, size_t& c) {
+        while (c < list.size() && !in[list[c]]) c++;
+        return c < list.size() ? list[c] : -1;
+      };
+
+      std::vector<int> devQ, peQ;
+      std::vector<char> devQueued(D, 1), peQueued(P, 1);
+      for (int g = 0; g < D; g++) devQ.push_back(g);
+      for (int p = 0; p < P; p++) peQ.push_back(p);
+      auto shed = [&](int k) {
+        in[k] = 0;
+        account(k, -1);
+        const Mv& m = mv[k];
+        for (int g : {m.s, m.d})
+          if (!devQueued[g]) { devQueued[g] = 1; devQ.push_back(g); }
+        if (m.ipc && !peQueued[m.from]) { peQueued[m.from] = 1; peQ.push_back(m.from); }
+      };
+
+      while (!devQ.empty() || !peQ.empty()) {
+        while (!devQ.empty()) {
+          const int g = devQ.back();
+          devQ.pop_back();
+          devQueued[g] = 0;
+          const LBMemoryModel::Device& dev = model.device(g);
+          for (;;) {
+            const long long stagingCap =
+                dev.pooled ? avail[g] : (long long)dev.stagingFree;
+            int k = -1;
+            if (stg[g] > stagingCap) {
+              k = next(depBySig[g], cDep[g]);
+              if (!dev.pooled) {
+                const int l = next(landBySig[g], cLand[g]);
+                if (k < 0 || (l >= 0 && mv[l].sig > mv[k].sig)) k = l;
+              }
+            } else if (net[g] > avail[g]) {
+              // What raises the net: arrivals, and moves that stage without
+              // changing a footprint (within one device).
+              const int a = next(arrByPhi[g], cArr[g]);
+              const int w = next(sameBySig[g], cSame[g]);
+              k = a;
+              if (k < 0 || (w >= 0 && mv[w].sig > mv[a].phi)) k = w;
+              if (k < 0) k = next(depBySig[g], cDep[g]);
+            } else {
+              break;
+            }
+            if (k < 0) break;
+            shed(k);
+          }
+        }
+        while (!peQ.empty() && devQ.empty()) {
+          const int p = peQ.back();
+          peQ.pop_back();
+          peQueued[p] = 0;
+          const int slots = model.slotsOf(p);
+          while (slots > 0 && ipc[p] > slots) {
+            const int k = next(ipcBySig[p], cIpc[p]);
+            if (k < 0) break;
+            shed(k);
+          }
+        }
+      }
+
+      std::vector<int> later;
+      int placed = 0;
+      std::vector<long long> change(D, 0);
+      for (int k : remaining) {
+        if (!in[k]) { later.push_back(k); continue; }
+        const Mv& m = mv[k];
+        batchOf[m.obj] = nb;
+        placed++;
+        if (m.s != m.d) {
+          change[m.s] -= m.phi;
+          change[m.d] += m.phi;
+        }
+      }
+      if (placed == 0) {
+        // Nothing left fits even alone. Refuse the rest: a chare that stays
+        // put is always feasible.
+        for (int k : remaining) {
+          stats->to_proc[mv[k].obj] = stats->from_proc[mv[k].obj];
+          batchOf[mv[k].obj] = 0;
+        }
+        if (refusedOut) *refusedOut = (int)remaining.size();
+        CkPrintf("CharmLB> memory contract: %zu move(s) fit no batch and were "
+                 "refused\n", remaining.size());
+        break;
+      }
+      for (int g = 0; g < D; g++) avail[g] -= change[g];
+      remaining.swap(later);
+      nb++;
+    }
+    return nb > 0 ? nb : 1;
   }
 };
 

@@ -415,6 +415,27 @@ int hapiGetDeviceNum();
 // add whatever the device itself still reports free. One device per process on
 // this branch, so this sums every arena the process owns.
 size_t hapiDevPoolFreeBytes();
+// The same, counting only the arenas on `device` (the index CkDeviceMalloc
+// passes, CpvAccess(my_device_id)).
+size_t hapiDevPoolFreeBytesOn(int device);
+// The quantum the pool grows by: one fresh arena (+gpupoolsize, else
+// CK_GPU_ARENA_MB, default 256 MB).
+size_t hapiDevPoolArenaSize();
+
+// What the load balancer's memory contract needs to know about this PE's
+// device, filled the same way for every stats producer (CentralLB and
+// DistBaseLB):
+//   devFree     free device memory (cudaMemGetInfo)
+//   poolFree    under +gpupool, this process's free arena bytes on the PE's
+//               device; otherwise the free bytes of the +gpulbbuffer region
+//   arenaBytes  under +gpupool, the arena quantum; 0 means staging is a
+//               separate reserve rather than the same pool chare state lives in
+//   ipcSlots    CUDA IPC event slots this PE may spend on migrations in one
+//               batch: three quarters of its slice, since application sends
+//               draw on the same slots. 0 when there is no IPC slot pool.
+//               CHARM_LB_IPC_SLOTS overrides it.
+void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
+                        int* ipcSlots);
 
 // The running chare's attributed live device-allocation bytes (see the
 // footprint tracking in hapi_portable.h/hapi_impl.cpp). Valid inside an entry

@@ -48,6 +48,14 @@ public:
     int pe_speed;
     bool available;
     bool move;
+#if CMK_CUDA
+    // This PE's device memory, the same four numbers CentralLB's ProcStats
+    // carries (see hapiLBDeviceMemory).
+    size_t gpu_mem_remaining = 0;
+    size_t pool_buff_mem_remaining = 0;
+    size_t gpu_pool_arena_bytes = 0;
+    int gpu_ipc_slots = 0;
+#endif
 
     std::vector<LDObjData> objData;
     std::vector<LDCommData> commData;
