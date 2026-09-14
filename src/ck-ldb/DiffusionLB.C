@@ -24,6 +24,10 @@
 #include "ck.h"
 #include "ckgraph.h"
 #include "envelope.h"
+#if CMK_CUDA
+#include "hapi.h"
+#include "LBMemoryContract.h"
+#endif
 // #include "LBDBManager.h"
 // #include "LBSimulation.h"
 #include "DiffusionHelper.C"

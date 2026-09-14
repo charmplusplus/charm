@@ -680,8 +680,60 @@ struct StepStats
   int moves = 0;
   int accepted = 0, rejected = 0;
   int slackRefused = 0;  // candidates the receiver check turned away
+  int memChecksFailed = 0;  // of which, failed memory checks (LBSIM_MEM_*)
   double unshed = 0.0;
 };
+
+// The memory contract across nodes (DiffusionMetric::setMemoryCapacity), with
+// device memory synthesised, since the stencil's cells hold none:
+//
+//   LBSIM_MEM_OBJ_KB    every object's footprint and staged size (off if unset)
+//   LBSIM_MEM_NODE_MB   every node's device capacity (default: unbounded)
+//   LBSIM_MEM_TIGHT     node:MB[,node:MB...], capacities for chosen nodes
+//
+// A node's free bytes are its capacity less what its objects hold, so they
+// shrink as objects arrive. It advertises what the chare does -- 95% of that,
+// less one payload -- and a donor stages at most 95% of its own.
+struct SimMemory
+{
+  double objBytes = 0.0;
+  double nodeBytes = std::numeric_limits<double>::max();
+  std::vector<std::pair<int, double>> tight;
+  bool on() const { return objBytes > 0.0; }
+  double capOf(int node) const
+  {
+    for (const auto& t : tight)
+      if (t.first == node) return t.second;
+    return nodeBytes;
+  }
+};
+
+static const SimMemory& simMemory()
+{
+  static const SimMemory m = []() {
+    SimMemory s;
+    if (const char* e = getenv("LBSIM_MEM_OBJ_KB")) s.objBytes = atof(e) * 1024.0;
+    if (const char* e = getenv("LBSIM_MEM_NODE_MB")) s.nodeBytes = atof(e) * 1048576.0;
+    if (const char* e = getenv("LBSIM_MEM_TIGHT"))
+    {
+      std::string spec(e);
+      size_t pos = 0;
+      while (pos < spec.size())
+      {
+        size_t comma = spec.find(',', pos);
+        if (comma == std::string::npos) comma = spec.size();
+        const std::string item = spec.substr(pos, comma - pos);
+        const size_t colon = item.find(':');
+        if (colon != std::string::npos)
+          s.tight.push_back({atoi(item.substr(0, colon).c_str()),
+                             atof(item.substr(colon + 1).c_str()) * 1048576.0});
+        pos = comma + 1;
+      }
+    }
+    return s;
+  }();
+  return m;
+}
 
 // loadDimReport / loadDimVerdict: which dimension this step diffuses, from
 // every node's totals, the way PE 0 decides it for the chare. Each virtual
@@ -725,6 +777,22 @@ static void acrossNode(std::vector<VNode>& nodes, const DiffusionCostConfig& cos
 {
   const double effMinImbalance = _lb_args.diffusionMinImbalance();
   std::vector<int> newMap = map;
+
+  // What every node advertises this step, from the mapping it starts from.
+  const SimMemory& mem = simMemory();
+  std::vector<double> memRoom(nodes.size(), std::numeric_limits<double>::max());
+  std::vector<double> memStage(nodes.size(), std::numeric_limits<double>::max());
+  if (mem.on())
+    for (const VNode& n : nodes)
+    {
+      const double cap = mem.capOf(n.id);
+      if (cap == std::numeric_limits<double>::max()) continue;
+      const double free = std::max(0.0, cap - mem.objBytes * n.objs.size());
+      const double sigmaMax = n.objs.empty() ? 0.0 : mem.objBytes;
+      memRoom[n.id] = std::max(0.0, 0.95 * free - sigmaMax);
+      memStage[n.id] = 0.95 * free;
+    }
+
   for (VNode& n : nodes)
   {
     const int nc = (int)n.sendToNeighbors.size();
@@ -817,6 +885,15 @@ static void acrossNode(std::vector<VNode>& nodes, const DiffusionCostConfig& cos
       metric->setReceiverCapacity(capH, capG);
     }
 
+    // The memory contract, as AcrossNodeLB sets it.
+    if (mem.on())
+    {
+      std::vector<double> capBytes(nc);
+      for (int i = 0; i < nc; i++) capBytes[i] = memRoom[n.sendToNeighbors[i]];
+      const std::vector<double> fp(n.st->objData.size(), mem.objBytes);
+      metric->setMemoryCapacity(capBytes, memStage[n.id], 0, fp, fp, n.st->objData);
+    }
+
     std::vector<DiffusionMove> moves;
     double shedThisStep = 0.0;
     int movesThisStep = 0;
@@ -830,8 +907,34 @@ static void acrossNode(std::vector<VNode>& nodes, const DiffusionCostConfig& cos
     ss.accepted += metric->acceptedCount();
     ss.rejected += metric->rejectedCount();
     ss.slackRefused += metric->slackRefusals;
+    ss.memChecksFailed += metric->memRefusals;
     delete metric;
     if (remaining > 0.0) ss.unshed += remaining;
+  }
+
+  // Where memory binds: every node with a capacity of its own, before and
+  // after, against what it can hold. Donors plan independently, so a node two
+  // donors both filled can land over its room here; the chare's admission
+  // gate is what holds that line at run time.
+  if (mem.on())
+  {
+    std::vector<int> before(nodes.size(), 0), after(nodes.size(), 0);
+    for (size_t k = 0; k < map.size(); k++)
+    {
+      if (map[k] >= 0 && map[k] < (int)nodes.size()) before[map[k]]++;
+      if (newMap[k] >= 0 && newMap[k] < (int)nodes.size()) after[newMap[k]]++;
+    }
+    int over = 0;
+    for (const VNode& n : nodes)
+      if (after[n.id] * mem.objBytes > mem.capOf(n.id)) over++;
+    for (const auto& t : mem.tight)
+      if (t.first >= 0 && t.first < (int)nodes.size())
+        CkPrintf("lbsim>   memory node %d: %d -> %d objects, %.1f -> %.1f MB of %.1f MB\n",
+                 t.first, before[t.first], after[t.first],
+                 before[t.first] * mem.objBytes / 1048576.0,
+                 after[t.first] * mem.objBytes / 1048576.0, t.second / 1048576.0);
+    CkPrintf("lbsim>   memory: %d failed check(s), %d node(s) over capacity after the step\n",
+             ss.memChecksFailed, over);
   }
   map = newMap;
 }

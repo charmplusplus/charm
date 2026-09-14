@@ -72,15 +72,50 @@ public:
   }
   bool slackFits(const LDObjData& o, int nbor) const
   {
+    if (!memoryFits(o, nbor)) { memRefusals++; return false; }
     if (nbor < 0 || nbor >= (int)capHost_.size() || nbor >= (int)capDev_.size()) return true;
     return o.wallTime <= capHost_[nbor] && diffusionObjGpuLoad(o) <= capDev_[nbor];
   }
   void slackTake(const LDObjData& o, int nbor)
   {
+    memoryTake(o, nbor);
     if (nbor < 0 || nbor >= (int)capHost_.size() || nbor >= (int)capDev_.size()) return;
     capHost_[nbor] -= o.wallTime;
     capDev_[nbor] -= diffusionObjGpuLoad(o);
   }
+
+  // The memory contract, as a receiver check. Every across-node move stages:
+  // the donor packs a payload block, the receiver lands it in an arena that
+  // becomes the object's state.
+  //
+  //   capBytes      per neighbour, the room it advertised (H_g: what it can
+  //                 take net of a payload held back), debited by each
+  //                 accepted object's footprint
+  //   stagingBytes  this donor's own room for the payloads its step packs,
+  //                 debited by each accepted object's staged size -- the
+  //                 local I-batch, since this balancer issues a step's moves
+  //                 together
+  //   slots         this donor's IPC slots across its PEs; 0 means unbounded
+  //   footprint, staged   per object of `objs`, in bytes
+  //
+  // A neighbour's advertisement is a hint -- two donors can plan against the
+  // same room -- and the admission gate at the receiver is what holds.
+  void setMemoryCapacity(const std::vector<double>& capBytes, double stagingBytes, int slots,
+                         const std::vector<double>& footprint,
+                         const std::vector<double>& staged,
+                         const std::vector<LDObjData>& objs)
+  {
+    capMem_ = capBytes;
+    memStaging_ = stagingBytes;
+    memSlots_ = slots > 0 ? slots : -1;
+    memFp_ = footprint;
+    memSig_ = staged;
+    memObjs_ = objs.empty() ? NULL : objs.data();
+    memNobjs_ = (int)objs.size();
+  }
+  // Memory checks that failed, counting each scan a candidate fails in (the
+  // refusals among them are also in slackRefusals).
+  mutable int memRefusals = 0;
   // What the object costs the receiver's step if it arrives now: the rise
   // in the larger of the receiver's two terms, in seconds of step time.
   // Reconstructed from the room left in each dimension -- room is target
@@ -106,6 +141,39 @@ protected:
   const std::vector<char>* allowed_ = NULL;
   std::vector<double> capHost_, capDev_;
   bool riseKnown_ = false;
+
+  // The object's index, from where it sits in the stats it was configured with.
+  int memIndexOf(const LDObjData& o) const
+  {
+    if (memObjs_ == NULL) return -1;
+    const long i = (long)(&o - memObjs_);
+    return (i >= 0 && i < memNobjs_) ? (int)i : -1;
+  }
+  bool memoryFits(const LDObjData& o, int nbor) const
+  {
+    const int i = memIndexOf(o);
+    if (i < 0 || i >= (int)memFp_.size() || i >= (int)memSig_.size()) return true;
+    if (memFp_[i] <= 0.0 && memSig_[i] <= 0.0) return true;  // no device state
+    if (nbor >= 0 && nbor < (int)capMem_.size() && memFp_[i] > capMem_[nbor]) return false;
+    if (memSig_[i] > memStaging_) return false;
+    if (memSlots_ == 0 && memSig_[i] > 0.0) return false;
+    return true;
+  }
+  void memoryTake(const LDObjData& o, int nbor)
+  {
+    const int i = memIndexOf(o);
+    if (i < 0 || i >= (int)memFp_.size() || i >= (int)memSig_.size()) return;
+    if (nbor >= 0 && nbor < (int)capMem_.size()) capMem_[nbor] -= memFp_[i];
+    memStaging_ -= memSig_[i];
+    if (memSlots_ > 0 && memSig_[i] > 0.0) memSlots_--;
+  }
+
+  std::vector<double> capMem_;
+  double memStaging_ = std::numeric_limits<double>::max();
+  int memSlots_ = -1;  // -1: unbounded
+  std::vector<double> memFp_, memSig_;
+  const LDObjData* memObjs_ = NULL;
+  int memNobjs_ = 0;
 };
 
 class MetricComm : public DiffusionMetric

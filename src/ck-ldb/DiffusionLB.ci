@@ -76,9 +76,10 @@ module DiffusionLB
     // interval (NaN when it has none) so its neighbours know which side of
     // themselves it lies on, plus its load in both dimensions as step-time
     // terms -- host time per PE and device time -- so a sender can tell how
-    // much of the dimension NOT being diffused this node can still take.
+    // much of the dimension NOT being diffused this node can still take, plus
+    // the device bytes it can take (the memory contract's H_g).
     entry[expedited] void ReceiveLoadInfo(int itr, double load, int node, double keyLo, double keyHi,
-                                          double hostPerPe, double dev);
+                                          double hostPerPe, double dev, double memHeadroom);
     entry[expedited] void ReceiveStats(CkMarshalledCLBStatsMessage data);
     // entry void LoadTransfer(double load, int initPE, int objId);
     entry[expedited] void LoadReceived(int objId, int fromPE, int ackPE);
@@ -185,6 +186,7 @@ module DiffusionLB
         nborKeyHi.assign(neighborCount, std::numeric_limits<double>::quiet_NaN());
         nborHostPerPe.assign(neighborCount, 0.0);
         nborDev.assign(neighborCount, 0.0);
+        nborMem.assign(neighborCount, std::numeric_limits<double>::max());
 
         my_pseudo_load = my_load;
         pseudo_itr = 0;
@@ -212,7 +214,7 @@ module DiffusionLB
                 pseudo_itr, my_pseudo_load, myNodeId,
                 keyed1D ? myKeyLo : std::numeric_limits<double>::quiet_NaN(),
                 keyed1D ? myKeyHi : std::numeric_limits<double>::quiet_NaN(),
-                nodeHostSum / nodeSize, nodeGroupSum());
+                nodeHostSum / nodeSize, nodeGroupSum(), myMemHeadroom);
           }
         }
 
@@ -220,7 +222,7 @@ module DiffusionLB
         for (temp_itr = 0; temp_itr < sendToNeighbors.size(); temp_itr++)
         {
           when ReceiveLoadInfo[pseudo_itr](int itr, double load, int node, double keyLo, double keyHi,
-                                           double hostPerPe, double dev) serial
+                                           double hostPerPe, double dev, double memHeadroom) serial
           {
             int pos = findNborIdx(node);
             if (pos < 0)
@@ -233,6 +235,7 @@ module DiffusionLB
               nborKeyHi[pos] = keyHi;
               nborHostPerPe[pos] = hostPerPe;
               nborDev[pos] = dev;
+              nborMem[pos] = memHeadroom;
             }
           }
         }

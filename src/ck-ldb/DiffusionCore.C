@@ -135,6 +135,19 @@ void DiffusionLB::AcrossNodeLB()
     }
   }
 
+#if CMK_CUDA
+  // The memory contract, planned here and held at the receiver. Every
+  // across-node move stages, so each neighbour may take objects up to the
+  // room it advertised with its loads, and this node's step may pack payloads
+  // up to its own room and IPC slots (the local I-batch: this balancer issues
+  // a step's moves together). Two donors can plan against one neighbour's
+  // room; the admission gate at the receiver is what holds.
+  if (neighborCount > 0 && (int)nborMem.size() >= neighborCount &&
+      (int)objFootprint.size() == n_objs)
+    metric->setMemoryCapacity(nborMem, myStagingCap, mySlots, objFootprint, objStaged,
+                              nodeStats->objData);
+#endif
+
   // Per-step cap on what may leave this node, as a share of its migratable
   // objects. The bound that makes a step safe is the one above -- a node sheds
   // its EXCESS over the neighbourhood mean and nothing more -- and this cap
@@ -272,13 +285,13 @@ void DiffusionLB::AcrossNodeLB()
   // indistinguishable from the outside, and they call for opposite responses.
   if (_lb_args.debug() > 1 && metric != NULL)
     CkPrintf("[node %d] AcrossNodeLB: %d move(s) accepted, %d neighbour(s) with "
-             "no move worth making, %d candidate(s) refused by the receiver check%s, "
-             "%.6f load left unshed\n",
+             "no move worth making, %d candidate(s) refused by the receiver check%s "
+             "(%d failed memory checks), %.6f load left unshed\n",
              myNodeId, metric->acceptedCount(), metric->rejectedCount(),
              metric->slackRefusals,
              diffusionStepMode() ? ""
              : diffusionDeviceDim() ? " (host dimension)" : " (device dimension)",
-             my_loadAfterTransfer > 0 ? my_loadAfterTransfer : 0.0);
+             metric->memRefusals, my_loadAfterTransfer > 0 ? my_loadAfterTransfer : 0.0);
 
   // Owned by this function since it was created here; the per-object vectors
   // inside it are sized by the node's object count, so leaking one per node per

@@ -48,6 +48,13 @@ CLBStatsMsg* DiffusionLB::AssembleStats()
   // statsMsg->n_comm = csz;
   lbmgr->GetCommData(statsMsg->commData.data());
 
+#if CMK_CUDA
+  // The device memory the node's rank 0 advertises and plans against
+  // (computeNodeMemory).
+  hapiLBDeviceMemory(&statsMsg->gpu_mem_remaining, &statsMsg->pool_buff_mem_remaining,
+                     &statsMsg->gpu_pool_arena_bytes, &statsMsg->gpu_ipc_slots);
+#endif
+
   return statsMsg;
 }
 
@@ -262,6 +269,67 @@ void DiffusionLB::BuildStats()
   // Generate a hash with key object id, value index in objs vector
   nodeStats->deleteCommHash();
   nodeStats->makeCommHash();
+
+  computeNodeMemory();
+}
+
+// This node's device as the memory contract reads it (LBMemoryContract.h). A
+// DiffusionLB node is one process, so its PEs report one pool: T is that
+// pool's free bytes plus the device's free bytes in whole arenas, and the room
+// it advertises holds back the largest payload block it could pack. Without
+// the pool, T is free device memory and staging is the +gpulbbuffer region.
+void DiffusionLB::computeNodeMemory()
+{
+  const int n = (int)nodeStats->objData.size();
+  objFootprint.assign(n, 0.0);
+  objStaged.assign(n, 0.0);
+  myMemHeadroom = myStagingCap = std::numeric_limits<double>::max();
+  mySlots = 0;
+#if CMK_CUDA
+  size_t devFree = std::numeric_limits<size_t>::max(), poolFree = 0, arena = 0;
+  size_t legacyStaging = std::numeric_limits<size_t>::max();
+  int slots = 0;
+  bool slotless = false;
+  for (int r = 0; r < (int)nodeStats->procs.size(); r++)
+  {
+    const ProcStats& ps = nodeStats->procs[r];
+    if (!ps.available) continue;
+    devFree = std::min(devFree, ps.gpu_mem_remaining);
+    poolFree = std::max(poolFree, ps.pool_buff_mem_remaining);
+    legacyStaging = std::min(legacyStaging, ps.pool_buff_mem_remaining);
+    arena = std::max(arena, ps.gpu_pool_arena_bytes);
+    if (ps.gpu_ipc_slots > 0) slots += ps.gpu_ipc_slots;
+    else slotless = true;
+  }
+  if (devFree == std::numeric_limits<size_t>::max()) return;
+  const bool pooled = arena > 0;
+  size_t reach = pooled ? poolFree + devFree / arena * arena : devFree;
+  if (const char* cap = getenv("CHARM_LB_MEM_CAP_MB"))
+    reach = std::min(reach, (size_t)atol(cap) << 20);
+
+  double sigmaMax = 0.0;
+  const int slot = CkpvAccess(_lb_obj_index);
+  for (int i = 0; i < n; i++)
+  {
+    LDObjData& od = nodeStats->objData[i];
+    const size_t pup = od.gpuPupSize;
+    const double sig = (double)(pooled ? LBMemoryModel::poolBlock(pup) : pup);
+    double fp = sig;
+#if CMK_LB_USER_DATA
+    if (slot >= 0) fp = std::max(fp, (double)*(size_t*)od.getUserData(slot));
+#endif
+    objStaged[i] = sig;
+    objFootprint[i] = fp;
+    if (od.migratable) sigmaMax = std::max(sigmaMax, sig);
+  }
+  myMemHeadroom = std::max(0.0, 0.95 * (double)reach - sigmaMax);
+  myStagingCap = pooled ? 0.95 * (double)reach : (double)legacyStaging;
+  mySlots = slotless ? 0 : slots;
+  if (_lb_args.debug() > 1)
+    CkPrintf("[node %d] memory: T %.1f MB (%s), advertises %.1f MB, stages up to %.1f MB, "
+             "%d IPC slot(s)\n", myNodeId, reach / 1048576.0, pooled ? "pool" : "device",
+             myMemHeadroom / 1048576.0, myStagingCap / 1048576.0, mySlots);
+#endif
 }
 
 void DiffusionLB::AddToList(CLBStatsMsg* m, int rank)
@@ -283,6 +351,12 @@ void DiffusionLB::AddToList(CLBStatsMsg* m, int rank)
   procStat.pe_speed = m->pe_speed;  // important
   procStat.available = true;
   procStat.n_objs = m->objData.size();
+#if CMK_CUDA
+  procStat.gpu_mem_remaining = m->gpu_mem_remaining;
+  procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
+  procStat.gpu_pool_arena_bytes = m->gpu_pool_arena_bytes;
+  procStat.gpu_ipc_slots = m->gpu_ipc_slots;
+#endif
 }
 
 // takes in node local id and returns rank

@@ -14,6 +14,7 @@
 
 #include "Heap_helper.C"
 
+#include <limits>
 #include <queue>
 #include <unordered_map>
 #include <vector>
@@ -143,6 +144,17 @@ public:
   // so the across-node phase can bound what a neighbour takes in the
   // dimension not being diffused.
   std::vector<double> nborHostPerPe, nborDev;
+  // The memory contract across nodes. This node's device, from BuildStats:
+  // the room it advertises to its neighbours each round (H_g, bytes), what its
+  // own step may stage (bytes), its PEs' IPC slots (0: unbounded), and each of
+  // its objects' footprint and staged size. nborMem is each neighbour's
+  // advertised room, refreshed with the round's loads.
+  double myMemHeadroom = std::numeric_limits<double>::max();
+  double myStagingCap = std::numeric_limits<double>::max();
+  int mySlots = 0;
+  std::vector<double> objFootprint, objStaged;
+  std::vector<double> nborMem;
+  void computeNodeMemory();
   // Migration-handoff completion counting, replacing the quiescence detectors
   // between AcrossNodeLB -> WithinNodeLB -> ProcessMigrations. Each
   // LoadMetaInfo/LoadReceived a rank0PE sends is acked by its receiver after
