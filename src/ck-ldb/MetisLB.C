@@ -344,6 +344,21 @@ void MetisLB::work(LDStats* stats)
     for (int i = 0; i < numVertices; i++) maxSlack = std::max(maxSlack, slackOf(i));
     slackRatio = (maxSlack == 0) ? 0 : 256.0 / maxSlack;
   }
+  // Footprints on the same 1..256 scale as the loads. Whole megabytes, which
+  // this used to be, weigh every object under 1 MB the same -- a LeanMD
+  // Compute holds 147 KB -- and the memory constraint was an object count.
+  double memRatio = 0.0;
+  if (memAware)
+  {
+    size_t maxFp = 0;
+    for (int i = 0; i < numVertices; i++)
+      maxFp = std::max(maxFp, memModel.footprint(ogr->vertices[i].getVertexId()));
+    memRatio = (maxFp == 0) ? 0 : 256.0 / (double)maxFp;
+  }
+  auto memWeight = [&](int i) {
+    return std::max((idx_t)1,
+                    (idx_t)ceil(memModel.footprint(ogr->vertices[i].getVertexId()) * memRatio));
+  };
 #endif
 
   std::vector<idx_t> vwgtCross((size_t)numVertices * nConstraints);
@@ -355,12 +370,7 @@ void MetisLB::work(LDStats* stats)
     // and ceil() of a zero load is zero.
     w[0] = std::max((idx_t)1, (idx_t)ceil(ogr->vertices[i].getCompLoad() * crossRatio));
 #if CMK_CUDA
-    if (memAware) {
-      // Footprint in MB, floored at 1 so every object has nonzero weight in
-      // the memory dimension.
-      size_t fp = memModel.footprint(ogr->vertices[i].getVertexId());
-      w[1] = (idx_t)(fp >> 20) + 1;
-    }
+    if (memAware) w[1] = memWeight(i);
     if (slackIdx >= 0)
       w[slackIdx] = std::max((idx_t)1, (idx_t)ceil(slackOf(i) * slackRatio));
 #endif
@@ -523,12 +533,38 @@ void MetisLB::work(LDStats* stats)
     fixedCross[groupOfPe[pe]] += ogr->vertices[i].getCompLoad() * crossRatio;
     fixedCpu[pe] += stats->objData[i].wallTime * intraRatio;
 #if CMK_CUDA
-    if (memAware)
-      fixedMem[groupOfPe[pe]] +=
-          (double)(memModel.footprint(ogr->vertices[i].getVertexId()) >> 20) + 1.0;
+    if (memAware) fixedMem[groupOfPe[pe]] += (double)memWeight(i);
     if (slackIdx >= 0) fixedSlack[groupOfPe[pe]] += slackOf(i) * slackRatio;
 #endif
   }
+
+  // What each group can hold in the memory dimension, in its weight units: the
+  // footprints already on it plus the room the contract plans against, H_g.
+  // Its share of the whole is its share of the target, so a device with less
+  // room is asked to hold fewer bytes. The tolerance is where a group would
+  // actually overflow: with room to spare the constraint gets out of the load
+  // dimension's way, and it tightens toward METIS's usual 1.1 as memory fills.
+  // The verifier still repairs whatever residue the tolerance leaves.
+  std::vector<double> memCap(nGroups, 0.0);
+  double memUbvec = 1.1;
+#if CMK_CUDA
+  if (memAware)
+  {
+    MemoryLedger memLedger;
+    memLedger.init(&memModel, 0.95, /*waveStaging=*/false);
+    for (int i = 0; i < numVertices; i++)
+    {
+      const int pe = ogr->vertices[i].getCurrentPe();
+      if (pe >= 0 && pe < (int)groupOfPe.size() && groupOfPe[pe] >= 0)
+        memCap[groupOfPe[pe]] += (double)memWeight(i);
+    }
+    for (idx_t g = 0; g < nGroups; g++)
+    {
+      const int d = memModel.deviceIndexOf(stats->procs[grpPes[g][0]].gpu_device_id);
+      if (d >= 0) memCap[g] += (double)memLedger.memAvailOn(d) * memRatio;
+    }
+  }
+#endif
 
   // Level one: migratable objects to GPU groups, on device load (and device
   // memory), each group's share proportional to how many PEs feed it less what
@@ -559,6 +595,8 @@ void MetisLB::work(LDStats* stats)
     for (idx_t g2 = 0; g2 < nGroups; g2++)
       for (int pe : grpPes[g2]) speedAll += peSpeed[pe];
     const bool deviceIsResource = ogr->deviceDim;
+    const double memCapAll = std::accumulate(memCap.begin(), memCap.end(), 0.0);
+    double memHeadroom = std::numeric_limits<double>::max();
     for (idx_t g = 0; g < nGroups; g++)
     {
       double grpSpeed = 0.0;
@@ -572,8 +610,13 @@ void MetisLB::work(LDStats* stats)
       sum[0] += wg[0];
       if (memAware)
       {
-        wg[1] = std::max(1e-6, allMem * share - fixedMem[g]);
+        const double memShare = memCapAll > 0.0 ? memCap[g] / memCapAll : share;
+        wg[1] = std::max(1e-6, allMem * memShare - fixedMem[g]);
         sum[1] += wg[1];
+        // How far over its target group g's migratable bytes may run before
+        // the group overflows.
+        if (memCapAll > 0.0)
+          memHeadroom = std::min(memHeadroom, (memCap[g] - fixedMem[g]) / wg[1]);
       }
       if (slackIdx >= 0)
       {
@@ -587,6 +630,15 @@ void MetisLB::work(LDStats* stats)
       for (int c = 0; c < nConstraints; c++)
         tpwgts[(size_t)g * nConstraints + c] =
             (real_t)(want[(size_t)g * nConstraints + c] / sum[c]);
+    // tpwgts are renormalised over the migratable total, which the want[]
+    // above already sums to unless a group's share was clamped; the margin
+    // absorbs that and METIS's own slop.
+    if (memAware && memHeadroom < std::numeric_limits<double>::max())
+      memUbvec = std::max(1.1, 0.9 * memHeadroom);
+    if (memAware && _lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
+      CkPrintf("[%d] MetisLB: memory constraint tolerance %.2f (fill %.3f of what the "
+               "groups can hold)\n",
+               CkMyPe(), memUbvec, memCapAll > 0.0 ? allMem / memCapAll : 0.0);
   }
 
   CkPrintf("Metis partitioning %d migratable of %d objects over %d GPU group(s) "
@@ -606,6 +658,7 @@ void MetisLB::work(LDStats* stats)
       crossTier = DIFF_TIER_INTER_NODE;
 
   std::vector<real_t> ubvecCross(nConstraints, (real_t)1.1);
+  if (memAware) ubvecCross[1] = (real_t)memUbvec;
   if (slackIdx >= 0) ubvecCross[slackIdx] = (real_t)slackUbvec;
   const std::vector<idx_t> groupOf = partitionSubset(
       migVerts, nGroups, nGroups > 1 ? &tpwgts : nullptr, vwgtCross, nConstraints, &ubvecCross,
