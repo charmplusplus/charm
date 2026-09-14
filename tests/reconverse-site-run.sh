@@ -4,14 +4,14 @@
 # runners: build each directory, then `make test` once as a single process
 # and once as PROCS processes, through the site's launcher.
 #
-# Usage (from a Slurm allocation, e.g. `salloc -N 2 -n 4 -c 2` or an sbatch
+# Usage (from a Slurm allocation, e.g. `salloc -N 2 -n 4 -c 8` or an sbatch
 # script), with CHARM_BUILD pointing at the reconverse build directory:
 #
 #   SITE=anvil CHARM_BUILD=$PWD/reconverse-linux-x86_64 tests/reconverse-site-run.sh
 #   SITE=delta NODES=2 CHARM_BUILD=... tests/reconverse-site-run.sh tests/charm++/megatest
 #
 # Environment:
-#   SITE        anvil | delta | generic  (module loads and launcher flags)
+#   SITE        anvil | delta | frontier | generic  (module loads and launcher flags)
 #   CHARM_BUILD the build directory (has bin/charmc, bin/testrun)
 #   NODES       nodes for the multi-process pass (default 2; 1 = two
 #               processes on one node)
@@ -25,7 +25,9 @@
 # .github/workflows/reconverse-ci.yaml, so the site run and CI stay in step.
 #
 # Output: one "RESULT <dir> <shape> exit=<code>" line per run and a summary;
-# paste them on the pull request being validated.
+# paste them on the pull request being validated. When a run aborts, the
+# runtime's "Reason:" line is appended, so a launcher or cpuset problem
+# (e.g. "Multiple PEs assigned to same core") is not read as a test failure.
 set -u
 cd "$(dirname "$0")/.." || exit 1
 CHARM_BUILD=${CHARM_BUILD:?set CHARM_BUILD to the reconverse build directory}
@@ -33,12 +35,12 @@ SITE=${SITE:-generic}
 NODES=${NODES:-2}
 PROCS=${PROCS:-2}
 LAUNCHER=${LAUNCHER:-"srun --mpi=pmi2"}
-LAUNCHER_ARGS_SINGLE=${LAUNCHER_ARGS_SINGLE-"-N1 -c4"}
+LAUNCHER_ARGS_SINGLE=${LAUNCHER_ARGS_SINGLE-"-N1 -c8"}
 if [[ $NODES -ge 2 ]]; then
-  LAUNCHER_ARGS_MULTI=${LAUNCHER_ARGS_MULTI-"-N$NODES --ntasks-per-node=$((PROCS / NODES)) -c2"}
+  LAUNCHER_ARGS_MULTI=${LAUNCHER_ARGS_MULTI-"-N$NODES --ntasks-per-node=$((PROCS / NODES)) -c8"}
   MULTI_SHAPE="${PROCS}proc-${NODES}nodes"
 else
-  LAUNCHER_ARGS_MULTI=${LAUNCHER_ARGS_MULTI-"-N1 -c2"}
+  LAUNCHER_ARGS_MULTI=${LAUNCHER_ARGS_MULTI-"-N1 -c4"}
   MULTI_SHAPE="${PROCS}proc-1node"
 fi
 
@@ -58,12 +60,36 @@ case "$SITE" in
     export FI_PROVIDER=cxi
     export LCI_NETWORK_BACKENDS=ofi
     ;;
+  frontier)
+    # OLCF Frontier: Slingshot-11 through libfabric's cxi provider, as on
+    # delta. Load the modules before running this (PrgEnv-gnu cmake hwloc
+    # python; a batch script must `source /opt/cray/pe/lmod/lmod/init/bash`
+    # first, because `module` is not defined in a non-login shell); they
+    # are not pinned here for the same reason as delta. Cray PMI's key-value
+    # store holds 30 entries by default, too few for a multi-process launch
+    # (_pmi2_add_kvs: "The KVS data segment ... is not large enough").
+    # Every step gets --network=single_node_vni: a step confined to one node
+    # has no VNI otherwise (job_vni only covers multi-node steps) and the cxi
+    # provider aborts in LCI with "Function not implemented". The multi-node
+    # pass also needs it, because a Makefile's +p1 cases run as one process
+    # and Slurm shrinks that step to one node; the flag is harmless on a step
+    # that does span nodes (verified 2026-09-13, 2 nodes x 1 and 2 x 2 tasks).
+    export FI_PROVIDER=cxi
+    export LCI_NETWORK_BACKENDS=ofi
+    export PMI_MAX_KVS_ENTRIES=${PMI_MAX_KVS_ENTRIES:-1000}
+    LAUNCHER_ARGS_SINGLE="$LAUNCHER_ARGS_SINGLE --network=single_node_vni"
+    LAUNCHER_ARGS_MULTI="$LAUNCHER_ARGS_MULTI --network=single_node_vni"
+    ;;
   generic) ;;
   *) echo "unknown SITE=$SITE" >&2; exit 2 ;;
 esac
 export LD_LIBRARY_PATH=$CHARM_BUILD/lib:${LD_LIBRARY_PATH:-}
 # GNU timeout is `timeout` on Linux, `gtimeout` from coreutils on macOS.
 TIMEOUT=$(command -v timeout || command -v gtimeout || true)
+# reason <exit> <out-file>: why a failed run aborted, with a leading space so
+# the RESULT line can carry it: the runtime's "Reason:" line (CmiAbort), or the
+# C++ exception text when the network layer threw instead.
+reason() { [[ $1 -ne 0 ]] && grep -m1 -oE 'Reason:.*|what\(\):.*' "$2" 2>/dev/null | cut -c1-200 | sed 's/^/ /'; return 0; }
 
 if [[ $# -gt 0 ]]; then
   DIRS=("$@")
@@ -82,10 +108,10 @@ for d in "${DIRS[@]}"; do
   # single process: testrun appends -n 1 to the launcher
   TESTRUN_LAUNCHER="$LAUNCHER $LAUNCHER_ARGS_SINGLE" TESTRUN_PROCS=1 \
     ${TIMEOUT:+$TIMEOUT 600} make -C "$d" test > "$d/site-1proc.out" 2>&1; e1=$?
-  echo "RESULT $d 1proc exit=$e1"
+  echo "RESULT $d 1proc exit=$e1$(reason "$e1" "$d/site-1proc.out")"
   TESTRUN_LAUNCHER="$LAUNCHER $LAUNCHER_ARGS_MULTI" TESTRUN_PROCS=$PROCS \
     ${TIMEOUT:+$TIMEOUT 600} make -C "$d" test > "$d/site-$MULTI_SHAPE.out" 2>&1; e2=$?
-  echo "RESULT $d $MULTI_SHAPE exit=$e2"
+  echo "RESULT $d $MULTI_SHAPE exit=$e2$(reason "$e2" "$d/site-$MULTI_SHAPE.out")"
   [[ $e1 -eq 0 && $e2 -eq 0 ]] || fail=1
 done
 echo "SUMMARY: $([[ $fail -eq 0 ]] && echo ALL PASSED || echo FAILURES ABOVE) $(date)"
