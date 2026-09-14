@@ -364,12 +364,15 @@ private:
 
 // ---------------------------------------------------------------------------
 // ContractVerifier: hardens ANY strategy's finished move list against I-final.
-// Recomputes the contract over the moves and repairs violations by refusing
-// moves -- committing smallest footprint first, so large offenders are what
-// remains when a device runs out. A refused move keeps its chare where it is,
-// which is always feasible. Returns the number of refused moves; refused
-// entries have to_pe set back to from_pe. Staging is not checked here: the
-// batch planner splits the step for it.
+// Sums each device's net change over the whole move list, so departures credit
+// the arrivals they make room for whatever order the strategy listed them in
+// -- a swap between two full devices nets to zero and passes. While a device
+// is over its H_g, the largest arrival into it is refused; refusing it takes
+// the credit back from its source, which is re-checked in turn. A move whose
+// payload no batch could ever stage is refused first. A refused move keeps
+// its chare where it is, which is always feasible. Returns the number of
+// refused moves; refused entries have to_pe set back to from_pe. Staging is
+// not checked here: the batch planner splits the step for it.
 // ---------------------------------------------------------------------------
 class ContractVerifier {
 public:
@@ -385,32 +388,61 @@ public:
                              const LBMemoryTopology* topo = nullptr) {
     LBMemoryModel model;
     model.build(stats, topo);
-    if (model.numDevices() == 0) return 0;
-    MemoryLedger ledger;
+    const int D = model.numDevices();
+    if (D == 0) return 0;
+    MemoryLedger ledger;  // for H_g
     ledger.init(&model, headroom, /*waveStaging=*/false);
 
     const bool dbg = (getenv("CHARM_DEBUG_MEMCONTRACT") != NULL);
     int refused = 0;
     if (dbg) model.print("[memcontract]");
 
-    std::vector<int> order(moves.size());
-    for (size_t i = 0; i < moves.size(); i++) order[i] = (int)i;
-    std::stable_sort(order.begin(), order.end(), [&](int a, int b) {
-      return model.footprint(moves[a].obj) < model.footprint(moves[b].obj);
-    });
+    auto refuse = [&](Move& m, const char* why) {
+      if (dbg)
+        CkPrintf("[%d] memcontract: refusing move of obj %d (%zu bytes) pe %d -> %d: %s\n",
+                 CkMyPe(), m.obj, model.footprint(m.obj), m.fromPe, *m.toPe, why);
+      *m.toPe = m.fromPe;
+      refused++;
+    };
 
-    for (size_t k = 0; k < order.size(); k++) {
-      Move& m = moves[order[k]];
+    std::vector<long long> net(D, 0);
+    std::vector<std::vector<int>> arrivals(D);  // indices into moves
+    for (size_t k = 0; k < moves.size(); k++) {
+      Move& m = moves[k];
       if (*m.toPe == m.fromPe) continue;
-      if (ledger.feasible(m.obj, m.fromPe, *m.toPe)) {
-        ledger.commit(m.obj, m.fromPe, *m.toPe);
-      } else {
-        if (dbg)
-          CkPrintf("[%d] memcontract: refusing move of obj %d (%zu bytes) "
-                   "pe %d -> %d\n",
-                   CkMyPe(), m.obj, model.footprint(m.obj), m.fromPe, *m.toPe);
-        *m.toPe = m.fromPe;
-        refused++;
+      const int s = model.deviceOfPe(m.fromPe), d = model.deviceOfPe(*m.toPe);
+      if (s < 0 || d < 0) continue;
+      if (model.transport(m.fromPe, *m.toPe) == LBMemoryModel::kNone) continue;
+      if (model.stagedSize(m.obj) > model.device(s).stagingFree) {
+        refuse(m, "payload larger than the source can ever stage");
+        continue;
+      }
+      if (s == d) continue;
+      const long long f = (long long)model.footprint(m.obj);
+      net[d] += f;
+      net[s] -= f;
+      arrivals[d].push_back((int)k);
+    }
+    for (int g = 0; g < D; g++)
+      std::sort(arrivals[g].begin(), arrivals[g].end(), [&](int a, int b) {
+        return model.footprint(moves[a].obj) > model.footprint(moves[b].obj);
+      });
+
+    std::vector<size_t> cursor(D, 0);
+    for (bool again = true; again;) {
+      again = false;
+      for (int g = 0; g < D; g++) {
+        const long long H = (long long)ledger.memAvailOn(g);
+        while (net[g] > H && cursor[g] < arrivals[g].size()) {
+          Move& m = moves[arrivals[g][cursor[g]++]];
+          if (*m.toPe == m.fromPe) continue;
+          const int s = model.deviceOfPe(m.fromPe);
+          const long long f = (long long)model.footprint(m.obj);
+          refuse(m, "destination device would overfill");
+          net[g] -= f;
+          net[s] += f;
+          if (s < g) again = true;  // a device already passed lost credit
+        }
       }
     }
     if (refused)
