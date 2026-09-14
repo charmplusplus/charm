@@ -11,7 +11,23 @@
 #include <fcntl.h>
 #include <sched.h>
 
-#define hapi_API_PER_THREAD_DEFAULT_STREAM
+/* Make the legacy default stream (stream 0) per-thread in this translation
+ * unit, so that a call which does not name a stream does not implicitly
+ * serialize against every other blocking stream in the process. The vendor
+ * runtime headers read these names verbatim, so they must be spelled the
+ * vendor's way and must be defined before those headers are pulled in --
+ * which hapi_portable.h does on the very next line.
+ *
+ * Both spellings are given unconditionally: each runtime looks at only its
+ * own, and which of CMK_CUDA / CMK_HIP is set is not known here, because
+ * conv-mach-opt.h is not included until hapi_portable.h includes it.
+ *
+ * This was CUDA_API_PER_THREAD_DEFAULT_STREAM until the rename in #3951
+ * (c10ffa01a) turned it into hapi_API_PER_THREAD_DEFAULT_STREAM, a name no
+ * runtime header has ever looked at, silently reverting this file to legacy
+ * default-stream semantics. */
+#define CUDA_API_PER_THREAD_DEFAULT_STREAM
+#define HIP_API_PER_THREAD_DEFAULT_STREAM
 
 #include "hapi_portable.h"
 #include "converse.h"
@@ -214,14 +230,14 @@ static void hapiPopulateDeviceProps(GPUManager& gm) {
   for (DeviceManager& dm : gm.device_managers) {
     if (dm.props_initialized) continue;
     int dev = dm.global_index;
-    cudaDeviceProp props;
-    hapiCheck(cudaGetDeviceProperties(&props, dev));
+    hapiDeviceProp props;
+    hapiCheck(hapiGetDeviceProperties(&props, dev));
 
     dm.multi_processor_count = props.multiProcessorCount;
     dm.max_threads_per_sm = props.maxThreadsPerMultiProcessor;
-#ifdef cudaDevAttrMaxBlocksPerMultiprocessor
-    hapiCheck(cudaDeviceGetAttribute(&dm.max_blocks_per_sm,
-                                     cudaDevAttrMaxBlocksPerMultiprocessor, dev));
+#if HAPI_HAS_MAX_BLOCKS_PER_SM
+    hapiCheck(hapiDeviceGetAttribute(&dm.max_blocks_per_sm,
+                                     hapiDevAttrMaxBlocksPerMultiprocessor, dev));
 #else
     dm.max_blocks_per_sm = 0;
 #endif
@@ -266,7 +282,7 @@ void hapiCuptiStartTracing() {
   if (gm.cupti_tracing_active_.load(std::memory_order_relaxed)) return;
 
   if (!gm.cupti_initialized_) {
-    cudaDeviceSynchronize();
+    hapiDeviceSynchronize();
     CUPTI_SAFE_CALL(
         cuptiActivityRegisterCallbacks(cuptiBufferRequested, cuptiBufferCompleted));
     gm.cupti_initialized_ = true;
@@ -329,7 +345,7 @@ bool hapiCuptiTracingActive() {
 void hapiCuptiFinalize() {
   GPUManager& gm = CsvAccess(gpu_manager);
   if (!gm.cupti_initialized_) return;
-  cudaDeviceSynchronize(); // Ensure all activity records are flushed
+  hapiDeviceSynchronize(); // Ensure all activity records are flushed
   gm.cupti_initialized_ = false;
   gm.cupti_tracing_active_.store(false, std::memory_order_relaxed);
   ++gm.cupti_generation_;
@@ -2438,7 +2454,7 @@ int hapiMyDeviceTotalSMs() {
     // The lazy population in hapiProcessCuptiBuffers has not run yet (or CUPTI
     // is not in this build at all), so ask for just this one attribute.
     int count = 0;
-    hapiCheck(cudaDeviceGetAttribute(&count, cudaDevAttrMultiProcessorCount,
+    hapiCheck(hapiDeviceGetAttribute(&count, hapiDevAttrMultiProcessorCount,
                                      dm.global_index));
     return count;
   }
