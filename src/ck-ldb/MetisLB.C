@@ -500,11 +500,12 @@ void MetisLB::work(LDStats* stats)
   // another group at the second level, whose edge stays dropped as before).
   // `anchorsPinned` reports which of the two happened.
   //
-  // The same anchors carry stickiness (metisStickiness): a vertex's edge to
-  // the anchor of the part it is in now, `currentPartOf`, worth that fraction
-  // of its traffic, so that staying is preferred over a move that saves
-  // nothing. That term counts toward the relabel too, since it says where
-  // the vertices came from.
+  // The same anchors carry the cost of moving: a vertex's edge to the anchor
+  // of the part it is in now, `currentPartOf`, worth its migration cost from
+  // the calibrated table (DiffusionCostModel::migrateCost) or, without one,
+  // the fraction of its traffic that metisStickiness asks for -- so that
+  // staying is preferred over a move that saves nothing. That term counts
+  // toward the relabel too, since it says where the vertices came from.
   auto partitionSubset = [&](const std::vector<int>& verts, idx_t nparts,
                              const std::vector<real_t>* tpwgts,
                              const std::vector<idx_t>& weights,
@@ -531,6 +532,9 @@ void MetisLB::work(LDStats* stats)
     std::vector<std::map<int, double>> fixedAff(nv);
     long long fixedEdges = 0;
     const double stick = metisStickiness();
+    const DiffusionCostModel migrateModel(costCfg, DIFF_TIER_INTRA_PROCESS);
+    long long stickN = 0;
+    double stickSum = 0.0, stickMax = 0.0;
     for (idx_t k = 0; k < nv; k++)
     {
       double total = 0.0;
@@ -544,10 +548,27 @@ void MetisLB::work(LDStats* stats)
         total += c;
         fixedEdges++;
       }
-      if (stick > 0.0 && total > 0.0)
+      // Staying put is worth the object's migration cost. With a calibrated
+      // table that is the cost model's migrateCost: the measured one-off cost
+      // of packing, staging, landing and unpacking this object, amortised over
+      // the intervals a placement is assumed to survive -- the same seconds
+      // per interval the calibrated edge costs are in, so the two trade off
+      // in one unit: a move has to save more traffic per interval than its
+      // amortised cost, and an exact tie stays. The debug print below
+      // reports where it lands against the heaviest edge. Without a table
+      // it is the fraction of the object's traffic that +LBMetisStickiness
+      // asks for, 0 by default.
+      const int cur = currentPartOf(verts[k]);
+      if (cur >= 0 && cur < (int)nparts)
       {
-        const int cur = currentPartOf(verts[k]);
-        if (cur >= 0 && cur < (int)nparts) fixedAff[k][cur] += stick * total;
+        double stay = 0.0;
+        if (costCfg.calibrated) stay = migrateModel.migrateCost(stats->objData[verts[k]]);
+        else if (stick > 0.0 && total > 0.0) stay = stick * total;
+        if (stay > 0.0)
+        {
+          fixedAff[k][cur] += stay;
+          stickN++; stickSum += stay; stickMax = std::max(stickMax, stay);
+        }
       }
     }
     lastFixedEdges = fixedEdges;
@@ -613,6 +634,12 @@ void MetisLB::work(LDStats* stats)
     for (double c : cost) maxCost = std::max(maxCost, c);
     const double scale =
         (costCfg.calibrated && maxCost > 0.0) ? (double)(1 << 20) / maxCost : 1.0;
+    if (stickN > 0 && _lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
+      CkPrintf("[%d] MetisLB stay edges: %lld vertices from %s, mean %.3e max %.3e vs heaviest edge %.3e "
+               "(%s); the heaviest stay edge weighs %lld after scaling\n",
+               CkMyPe(), stickN, costCfg.calibrated ? "migrateCost" : "+LBMetisStickiness",
+               stickSum / (double)stickN, stickMax, maxCost,
+               costCfg.calibrated ? "s/interval" : "bytes", (long long)llround(stickMax * scale));
     adjwgt.reserve(cost.size());
     for (double c : cost)
       adjwgt.push_back((idx_t)std::min<long long>(
