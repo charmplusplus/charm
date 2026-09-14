@@ -905,6 +905,8 @@ public:
   std::unordered_map<CmiUInt8, char*> grantedLandings;
   bool landingRetryScheduled = false;
   long landingDeferrals = 0;
+  // The migration window's queue looks its moves up again when a place frees.
+  CkLocRec* queuedMigrationRec(CmiUInt8 id) const { return elementNrec(id); }
 private:
   void dispatchGPUMsg(CmiUInt8 id);
 public:

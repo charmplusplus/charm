@@ -110,18 +110,25 @@ static inline size_t ckPoolBlock(size_t bytes)
   return b;
 }
 
+// The payload block a move of rec to toPe will pack: none for a same-process
+// move onto the same device, which is a handoff.
+static size_t ckStagedBytes(CkLocRec* rec, int toPe)
+{
+  static const bool intraProcDisabled =
+      (getenv("CHARM_NO_INTRAPROC_MIGRATE") != nullptr);
+  if (!intraProcDisabled && CmiNodeOf(toPe) == CkMyNode() &&
+      hapiDeviceForPe(toPe) == hapiDeviceForPe(CkMyPe()))
+    return 0;
+  return ckPoolBlock(rec->lbGpuPupSize);
+}
+
 // A move the balancer ordered is pending a pack from now until emigrate packs
 // it or hands the element over without packing. Only moves that will stage
-// count: a same-process move onto the same device is a handoff.
+// count.
 static void ckNotePendingPack(CkLocRec* rec, int toPe)
 {
   if (!ckAdmissionGateOn()) return;
-  static const bool intraProcDisabled =
-      (getenv("CHARM_NO_INTRAPROC_MIGRATE") != nullptr);
-  size_t bytes = ckPoolBlock(rec->lbGpuPupSize);
-  if (!intraProcDisabled && CmiNodeOf(toPe) == CkMyNode() &&
-      hapiDeviceForPe(toPe) == hapiDeviceForPe(CkMyPe()))
-    bytes = 0;
+  const size_t bytes = ckStagedBytes(rec, toPe);
   if (rec->pendingPackBytes > 0) ck_pending_pack_bytes -= rec->pendingPackBytes;
   rec->pendingPackBytes = bytes;
   if (bytes > 0) ck_pending_pack_bytes += bytes;
@@ -147,6 +154,110 @@ static bool ckLandingAdmissible(size_t size, size_t* reachOut, size_t* floorOut)
   *reachOut = reach;
   *floorOut = floor;
   return reach >= ckPoolBlock(size) + floor;
+}
+
+// The migration window (+gpupool): pacing, not the safety argument. The batch
+// planner and the admission gate are what keep a step inside device memory;
+// this bounds how much of a step one PE has in flight at once, so a balancer
+// that issues a whole step together (DiffusionLB, or a central step the planner
+// kept in one batch) does not hold every payload block and every IPC slot of
+// the step at the same moment. A staged move takes a place when recvMigrate
+// sees it, if this PE has fewer moves in flight than its IPC slot budget and
+// one more payload keeps its in-flight bytes within one arena; otherwise it
+// queues in order. The place is given back by the payload's ack
+// (finishGPUSend), or as soon as the move turns out not to stage. Larger
+// windows buy fewer barriers with more arena growth, which is never returned.
+//
+// CHARM_LB_MIGRATE_WINDOW (moves) and CHARM_LB_MIGRATE_WINDOW_MB override the
+// two bounds; CHARM_LB_NO_MIGRATE_WINDOW turns it off; CHARM_DEBUG_WINDOW
+// traces it against the pool's reach less the gate's floor.
+struct CkMigrateWindow
+{
+  struct Entry { size_t bytes; bool packed; };
+  std::unordered_map<CmiUInt8, Entry> inflight;  // by element id
+  size_t bytes = 0;
+  struct Queued { CkLocMgr* mgr; CmiUInt8 id; int toPe; };
+  std::deque<Queued> queue;
+  bool pumpScheduled = false;
+};
+static thread_local CkMigrateWindow ck_window;  // one per PE
+
+static inline bool ckWindowOn()
+{
+  static const bool on =
+      CkDevicePoolOn() && getenv("CHARM_LB_NO_MIGRATE_WINDOW") == nullptr;
+  return on;
+}
+
+static inline bool ckWindowDbg()
+{
+  static const bool on = (getenv("CHARM_DEBUG_WINDOW") != nullptr);
+  return on;
+}
+
+static void ckWindowLimits(int* moves, size_t* bytes)
+{
+  static thread_local int m = -1;
+  static thread_local size_t b = 0;
+  if (m < 0) {
+    size_t devFree = 0, poolFree = 0, arena = 0;
+    int slots = 0;
+    hapiLBDeviceMemory(&devFree, &poolFree, &arena, &slots);
+    const char* em = getenv("CHARM_LB_MIGRATE_WINDOW");
+    const char* eb = getenv("CHARM_LB_MIGRATE_WINDOW_MB");
+    m = em ? atoi(em) : slots;
+    b = eb ? (size_t)atol(eb) << 20 : (arena > 0 ? arena : hapiDevPoolArenaSize());
+  }
+  *moves = m;
+  *bytes = b;
+}
+
+static void ckWindowTrace(const char* what, CmiUInt8 id, size_t moveBytes)
+{
+  if (!ckWindowDbg()) return;
+  int maxMoves;
+  size_t maxBytes;
+  ckWindowLimits(&maxMoves, &maxBytes);
+  size_t reach = 0, floor = 0;
+  ckLandingAdmissible(0, &reach, &floor);
+  CkPrintf("[WINDOW %d] %s id=%llu (%zu bytes): in flight %zu move(s) / %zu bytes of "
+           "%d / %zu; queued %zu; pool reach less floor %lld\n",
+           CkMyPe(), what, (unsigned long long)id, moveBytes, ck_window.inflight.size(),
+           ck_window.bytes, maxMoves, maxBytes, ck_window.queue.size(),
+           (long long)reach - (long long)floor);
+}
+
+// Takes a place for a move of `bytes` if there is one. The first move always
+// goes, so a payload larger than the byte bound still moves, alone.
+static bool ckWindowTake(CmiUInt8 id, size_t bytes)
+{
+  int maxMoves;
+  size_t maxBytes;
+  ckWindowLimits(&maxMoves, &maxBytes);
+  const bool empty = ck_window.inflight.empty();
+  if (!empty && maxMoves > 0 && (int)ck_window.inflight.size() >= maxMoves) return false;
+  if (!empty && ck_window.bytes + bytes > maxBytes) return false;
+  ck_window.inflight[id] = CkMigrateWindow::Entry{bytes, false};
+  ck_window.bytes += bytes;
+  ckWindowTrace("admit", id, bytes);
+  return true;
+}
+
+static void ckWindowPump(void*, double);
+
+static void ckWindowGiveBack(CmiUInt8 id, bool onlyIfUnpacked)
+{
+  auto it = ck_window.inflight.find(id);
+  if (it == ck_window.inflight.end()) return;
+  if (onlyIfUnpacked && it->second.packed) return;
+  ck_window.bytes -= it->second.bytes;
+  const size_t bytes = it->second.bytes;
+  ck_window.inflight.erase(it);
+  ckWindowTrace("release", id, bytes);
+  if (!ck_window.queue.empty() && !ck_window.pumpScheduled) {
+    ck_window.pumpScheduled = true;
+    CcdCallFnAfter(ckWindowPump, nullptr, 0.0);  // not from inside emigrate
+  }
 }
 #endif
 
@@ -2786,6 +2897,9 @@ CkLocRec::~CkLocRec()
   if (lbLedgerStep >= 0) lbmgr->ledgerRetireLocal(getID(), "element destroyed");
 #if CMK_CUDA
   ckClearPendingPack(this);
+  // Destroyed without having packed: its window place goes back. A packed
+  // payload keeps its place until the ack, after this record is gone.
+  ckWindowGiveBack(getID(), /*onlyIfUnpacked=*/true);
 #endif
   stopTiming();
   DEBL((AA "Unregistering element %s from load balancer\n" AB, idx2str(idx)));
@@ -3145,6 +3259,22 @@ void CkLocRec::recvMigrate(int toPe)
 #if CMK_CUDA
   // Its payload is owed from here: the admission gate keeps it free.
   ckNotePendingPack(this, toPe);
+  // And it waits its turn in this PE's migration window, if it stages. A move
+  // already holding a place (this is a re-entry) goes straight on.
+  if (ckWindowOn() && ck_window.inflight.find(getID()) == ck_window.inflight.end())
+  {
+    const size_t bytes = ckStagedBytes(this, toPe);
+    if (bytes > 0 && (!ck_window.queue.empty() || !ckWindowTake(getID(), bytes)))
+    {
+      CkMigrateWindow::Queued q;
+      q.mgr = myLocMgr;
+      q.id = getID();
+      q.toPe = toPe;
+      ck_window.queue.push_back(q);
+      ckWindowTrace("queue", getID(), bytes);
+      return;
+    }
+  }
 #endif
 #endif
   // we are in the mode of delaying actual migration
@@ -3166,6 +3296,27 @@ void CkLocRec::recvMigrate(int toPe)
   else
     nextPe = toPe;
 }
+
+#if CMK_CUDA
+// Starts queued moves, in order, while the window has places for them.
+static void ckWindowPump(void*, double)
+{
+  ck_window.pumpScheduled = false;
+  while (!ck_window.queue.empty())
+  {
+    const CkMigrateWindow::Queued q = ck_window.queue.front();
+    CkLocRec* rec = q.mgr->queuedMigrationRec(q.id);
+    if (rec == nullptr)  // destroyed while it waited; its ledger entry retired
+    {
+      ck_window.queue.pop_front();
+      continue;
+    }
+    if (!ckWindowTake(q.id, ckStagedBytes(rec, q.toPe))) return;
+    ck_window.queue.pop_front();
+    rec->recvMigrate(q.toPe);  // holds a place now, so it goes on from here
+  }
+}
+#endif
 
 void CkLocRec::AsyncMigrate(bool use)
 {
@@ -4154,6 +4305,7 @@ void CkLocMgr::finishGPUSend(CmiUInt8 id)
   if (CkDevicePoolOn()) {
     CkDeviceFree(it->second.data);   // the payload was a pool block
     sendGPUBuffers.erase(it);
+    ckWindowGiveBack(id, /*onlyIfUnpacked=*/false);
     if (!deferredLandings.empty()) admitLandings();  // those bytes may be enough
     return;
   } else if (csv_gpu_manager.use_shm) {
@@ -4371,7 +4523,10 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #if CMK_CUDA
   gpuBufSize = p.gpu_size();
   nGpuBufs = p.gpu_buf_count();
-  if (gpuBufSize == 0) ckClearPendingPack(rec);  // nothing to pack after all
+  if (gpuBufSize == 0) {  // nothing to pack after all
+    ckClearPendingPack(rec);
+    ckWindowGiveBack(id, /*onlyIfUnpacked=*/false);
+  }
 #endif
 
   // Fast path: for intra-process (same CmiNode) migration, transfer ownership
@@ -4397,7 +4552,12 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
     if (handedOff) ckClearPendingPack(handedOff);
 #endif
     if (sameGpuRequirementMet && emigrateIntraProcess(rec, toPe))
+    {
+#if CMK_CUDA
+      ckWindowGiveBack(id, /*onlyIfUnpacked=*/false);
+#endif
       return;
+    }
 #if CMK_CUDA
     if (handedOff && owed > 0) {  // not handed over after all: it will pack
       handedOff->pendingPackBytes = owed;
@@ -4463,6 +4623,10 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
                     "payload (+gpupoolsize)", CkMyPe(), gpuBufSize);
           // Packed: the floor no longer needs to keep these bytes free.
           ckClearPendingPack(rec);
+          {
+            auto w = ck_window.inflight.find(id);  // the ack gives it back now
+            if (w != ck_window.inflight.end()) w->second.packed = true;
+          }
         } else {
           // Takes dm->lock itself, and reclaims retired IPC slots before giving
           // up -- this region is only ever freed by that scan.
