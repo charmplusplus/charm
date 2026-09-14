@@ -1,6 +1,33 @@
 # MetisLB on GPUDirect LeanMD: migration memory/slot exhaustion, and the fix
 
-Status: diagnosed 2026-09-13, not yet implemented. Branch `rate-aware-gpu-lb`.
+Status: diagnosed 2026-09-13; implemented 2026-09-14 as part of the memory contract
+under `+gpupool` (commits 95959779a..cdb754540, branch `rate-aware-gpu-lb`), and
+awaiting the four-GPU check in `pool_contract.sbatch`.
+
+What was built is broader than the window below, which became the pacing layer of
+three:
+
+- **Batches** (`LBBatchPlanner`, LBMemoryContract.h). The planner now sees the pool
+  (capacity = pool free + device free in whole arenas) and splits a central step so
+  each batch's payloads, landing arenas and per-PE IPC slots fit. This is what
+  bounds MetisLB's repartition.
+- **The admission gate** (`requestLanding`, cklocation.C). A landing is granted only
+  above the floor of payloads the destination process still owes; otherwise it waits.
+- **The window** (`ckWindowTake`, cklocation.C). As proposed below, per PE, bounded by
+  the IPC slot budget and one arena of in-flight payload bytes; overrides
+  `CHARM_LB_MIGRATE_WINDOW` and `CHARM_LB_MIGRATE_WINDOW_MB` (environment, not a `+`
+  flag).
+
+Three corrections to the diagnosis below:
+
+- MetisLB is a CentralLB. Its issue loop is `CentralLB::ProcessMigrationDecision`,
+  which was already batch-aware; the `DistBaseLB` loop cited below is DiffusionLB's.
+  The batches never split because the stats reported pool free plus device free as
+  the staging reserve.
+- A failed pool arena growth prints "Failed to allocate GPU memory", not "Fatal CUDA
+  Error [2] out of memory". That message comes from a hapiCheck'd call and names its
+  file and line, which the logs should be read for.
+- IPC event slots are sliced per PE, not per device.
 
 ## Summary
 
