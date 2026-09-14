@@ -133,6 +133,28 @@ typedef enum {
   dataType_last //<- for setting table lengths, etc.
 } dataType;
 
+/// Which side of the machine a pupped buffer lives on. DEVICE means `p` is a
+/// device pointer, so the bytes travel through the migration message's device
+/// region rather than its host region. PUP::ers that have no device region
+/// ignore DEVICE buffers entirely -- checkpointing a chare does not capture
+/// its device state.
+enum class PUPMode {
+  HOST,
+  DEVICE
+};
+
+/// Layout rule for the device side of a migration stream. Every DEVICE-mode
+/// buffer starts at an offset that is a multiple of this, measured from the
+/// start of the device region -- relative, not absolute, because the region's
+/// own base carries no alignment guarantee. The sizer and both memory walkers
+/// apply the same rule, which is what lets the receiver reconstruct the
+/// sender's layout from its own pup calls alone, with nothing on the wire
+/// describing it.
+constexpr size_t DEVICE_PUP_ALIGN = 256;
+static inline size_t alignDeviceOffset(size_t offset) {
+  return (offset + (DEVICE_PUP_ALIGN - 1)) & ~(DEVICE_PUP_ALIGN - 1);
+}
+
 static inline dataType getXlateDataType(signed char *a) { return Tchar; }
 #if CMK_SIGNEDCHAR_DIFF_CHAR
 static inline dataType getXlateDataType(char *a) { return Tchar; }
@@ -267,6 +289,18 @@ class er {
     bytes((void *)a,nItems, sizeof(T), getXlateDataType(a));
   }
 
+  /// For a buffer that lives on the device. `a` must already point at
+  /// device memory in BOTH directions -- unlike pup_buffer, this does not
+  /// allocate, so an unpacking chare allocates its device buffer first and
+  /// then pups into it.
+  template<class T>
+  void operator()(T *a,size_t nItems,PUPMode mode) {
+    if (mode == PUPMode::DEVICE)
+      bytes_device((void *)a,nItems, sizeof(T), getXlateDataType(a));
+    else
+      bytes((void *)a,nItems, sizeof(T), getXlateDataType(a));
+  }
+
   // Standard pup_buffer API that calls malloc for allocation on isUnpacking and free for deallocation on isPacking
   template<class T>
   void pup_buffer(T *&a, size_t nItems) {
@@ -324,6 +358,17 @@ class er {
   //Generic bottleneck: pack/unpack n items of size itemSize
   // and data type t from p.  Desc describes the data item
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t) =0;
+  /// Device-mode bottleneck. Deliberately a distinct name rather than an
+  /// overload of bytes(): as an overload it would be hidden in every subclass
+  /// that overrides the host bottleneck alone, which is all but three of them,
+  /// and every compiler that warns about a partially overridden virtual would
+  /// say so in user code that merely includes this header.
+  ///
+  /// Defaults to dropping the buffer, which is what every PUP::er without a
+  /// device region should do: sizing for a checkpoint, writing to disk and
+  /// converting to text all operate on host memory and cannot dereference `p`
+  /// at all. Only the migration walkers override it.
+  virtual void bytes_device(void *p,size_t n,size_t itemSize,dataType t) {}
   virtual void object(able** a);
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t) = 0;
@@ -391,21 +436,29 @@ enum {
 class sizer : public er {
  protected:
   size_t nBytes;
+  size_t gpuBytes;
   //Generic bottleneck: n items of size itemSize
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+  virtual void bytes_device(void *p,size_t n,size_t itemSize,dataType t);
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
 
  public:
   //Write data to the given buffer
-  sizer(const unsigned int purpose = 0) : er(IS_SIZING | purpose), nBytes(0)
+  sizer(const unsigned int purpose = 0) : er(IS_SIZING | purpose), nBytes(0),
+    gpuBytes(0)
   {
     CmiAssert((purpose & TYPE_MASK) == 0);
   }
 
   //Return the current number of bytes to be packed
   size_t size(void) const {return nBytes;}
+
+  //Return the number of DEVICE bytes to be packed, including the padding
+  //DEVICE_PUP_ALIGN inserts between buffers, so it is directly comparable
+  //with mem::gpu_size().
+  size_t gpu_size(void) const {return gpuBytes;}
 };
 
 template <class T>
@@ -418,8 +471,15 @@ class mem : public er { //Memory-buffer packers and unpackers
  protected:
   myByte *origBuf;//Start of memory buffer
   myByte *buf;//Memory buffer (stuff gets packed into/out of here)
-  mem(const unsigned int type, myByte* Nbuf, const unsigned int purpose = 0)
-      : er(type | purpose), origBuf(Nbuf), buf(Nbuf)
+  //Device-side counterparts, NULL unless this walker was given a device
+  //region. A DEVICE-mode buffer pupped through a walker with no device region
+  //is dropped, the same as for every other PUP::er.
+  myByte *gpuOrigBuf;
+  myByte *gpuBuf;
+  mem(const unsigned int type, myByte* Nbuf, myByte* gpuNbuf,
+      const unsigned int purpose = 0)
+      : er(type | purpose), origBuf(Nbuf), buf(Nbuf),
+        gpuOrigBuf(gpuNbuf), gpuBuf(gpuNbuf)
   {
     CmiAssert((purpose & TYPE_MASK) == 0);
   }
@@ -433,6 +493,12 @@ class mem : public er { //Memory-buffer packers and unpackers
  public:
   //Return the current number of buffer bytes used
   size_t size(void) const {return buf-origBuf;}
+
+  //Device bytes consumed so far, including inter-buffer alignment padding,
+  //so it is directly comparable with sizer::gpu_size().
+  size_t gpu_size(void) const {
+    return (gpuOrigBuf == nullptr) ? 0 : (size_t)(gpuBuf - gpuOrigBuf);
+  }
 
   inline char* get_current_pointer() const {
     return reinterpret_cast<char*>(buf);
@@ -456,14 +522,20 @@ class toMem : public mem {
  protected:
   //Generic bottleneck: pack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+  virtual void bytes_device(void *p,size_t n,size_t itemSize,dataType t);
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
 
  public:
-  //Write data to the given buffer
+  //Write data to the given buffer, with an optional device region for
+  //DEVICE-mode buffers.
+  toMem(void* Nbuf, void* gpuNbuf, const unsigned int purpose = 0)
+      : mem(IS_PACKING, (myByte*)Nbuf, (myByte*)gpuNbuf, purpose)
+  {
+  }
   toMem(void* Nbuf, const unsigned int purpose = 0)
-      : mem(IS_PACKING, (myByte*)Nbuf, purpose)
+      : mem(IS_PACKING, (myByte*)Nbuf, nullptr, purpose)
   {
   }
 };
@@ -480,6 +552,7 @@ class fromMem : public mem {
  protected:
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
+  virtual void bytes_device(void *p,size_t n,size_t itemSize,dataType t);
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
@@ -487,9 +560,14 @@ class fromMem : public mem {
   void pup_buffer_generic(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, bool isMalloc);
 
  public:
-  //Read data from the given buffer
+  //Read data from the given buffer, with an optional device region holding
+  //the DEVICE-mode buffers the sender packed.
+  fromMem(const void* Nbuf, const void* gpuNbuf, const unsigned int purpose = 0)
+      : mem(IS_UNPACKING, (myByte*)Nbuf, (myByte*)gpuNbuf, purpose)
+  {
+  }
   fromMem(const void* Nbuf, const unsigned int purpose = 0)
-      : mem(IS_UNPACKING, (myByte*)Nbuf, purpose)
+      : mem(IS_UNPACKING, (myByte*)Nbuf, nullptr, purpose)
   {
   }
 };

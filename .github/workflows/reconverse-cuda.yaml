@@ -170,6 +170,13 @@ jobs:
         run: |
           make -j4 -C netlrts-linux-x86_64-cuda/tests/charm++/cuda/d2dtest \
             GPU=cuda CUDATOOLKIT_HOME=/usr OPTS="-g"
+      - name: gpumigrate compiles
+        # Device-state migration. Running it needs a GPU, but compiling it
+        # gates the PUPMode::DEVICE surface that application pup routines see,
+        # and the nocopydevice entry method the migration payload travels on.
+        run: |
+          make -j4 -C netlrts-linux-x86_64-cuda/tests/charm++/cuda/gpumigrate \
+            OPTS="-g"
 
       - name: legacy buildold path
         run: |

@@ -5,6 +5,7 @@ module EveryLB {
   extern module DistributedLB;
   extern module MetisLB;
   extern module RecBipartLB;
+  extern module GreedyRefineCentralGPULB;
 
   initnode void initEveryLB(void);
 };

@@ -1,0 +1,21 @@
+mainmodule gpumigrate {
+  readonly CProxy_Main mainProxy;
+  readonly int numBlocks;
+  readonly int numRounds;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    // One element finished verifying its device state.
+    entry void blockChecked();
+  };
+
+  array [1D] Block {
+    entry Block();
+    // Read the device buffers back and compare them against what this element
+    // wrote before it moved.
+    entry void check();
+    // Join the load-balancing step that hands this element to the next PE,
+    // taking its device state with it.
+    entry void step();
+  };
+};

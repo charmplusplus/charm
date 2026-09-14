@@ -66,6 +66,7 @@ set(ldb-cxx-sources
 set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
     ../ck-ldb/DistBaseLB.h ../ck-ldb/DistributedLB.h
     ../ck-ldb/HybridBaseLB.h ../ck-ldb/HybridLBMsg.h
+    ../ck-ldb/GreedyRefineCentralGPULB.h
     ../ck-ldb/LBComm.h
     ../ck-ldb/LBDatabase.h ../ck-ldb/LBManager.h ../ck-ldb/LBMachineUtil.h ../ck-ldb/LBOM.h
     ../ck-ldb/LBObj.h ../ck-ldb/LBSimulation.h
@@ -92,8 +93,8 @@ add_dependencies(ckmain ck)
 # CommonLBs used to be a subset of EveryLB, but they were unified as
 # part of the LB refactor. However, maintain both targets for
 # backwards compatibility and for possible future divergence.
-add_library(moduleCommonLBs ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
-add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h)
+add_library(moduleCommonLBs ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h ../ck-ldb/GreedyRefineCentralGPULB.C ../ck-ldb/GreedyRefineCentralGPULB.h)
+add_library(moduleEveryLB ${ldb-cxx-sources} ${ldb-h-sources} ../ck-ldb/MetisLB.C ../ck-ldb/MetisLB.h ../ck-ldb/GreedyRefineCentralGPULB.C ../ck-ldb/GreedyRefineCentralGPULB.h)
 configure_file(../ck-ldb/libmoduleCommonLBs.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 configure_file(../ck-ldb/libmoduleEveryLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 add_dependencies(moduleCommonLBs ck ckmetis)
@@ -117,6 +118,8 @@ add_library(moduleTreeLB ../ck-ldb/TreeLB.C)
 add_dependencies(moduleTreeLB ck)
 add_library(moduleRecBipartLB ../ck-ldb/RecBipartLB.C ../ck-ldb/RecBipartLB.h)
 add_dependencies(moduleRecBipartLB ck)
+add_library(moduleGreedyRefineCentralGPULB ../ck-ldb/GreedyRefineCentralGPULB.C ../ck-ldb/GreedyRefineCentralGPULB.h)
+add_dependencies(moduleGreedyRefineCentralGPULB ck)
 add_library(moduleScotchLB EXCLUDE_FROM_ALL ../ck-ldb/ScotchLB.C ../ck-ldb/ScotchLB.h)
 configure_file(../ck-ldb/libmoduleScotchLB.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 add_dependencies(moduleScotchLB ck)
@@ -142,7 +145,7 @@ foreach(filename ${ck-h-sources} ${ldb-h-sources})
 endforeach()
 
 target_include_directories(ck PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager ../conv-perf)
-if(HAPI_CUPTI_LB AND BUILD_CUDA AND CUPTI_LIBRARY)  # dormant until the GPU-LB series (plan item 11)
+if(HAPI_CUPTI_LB AND BUILD_CUDA AND CUPTI_LIBRARY)
   target_include_directories(ck PRIVATE "${CUDA_DIR}/extras/CUPTI/include")
   target_link_libraries(ck ${CUPTI_LIBRARY})
 endif()

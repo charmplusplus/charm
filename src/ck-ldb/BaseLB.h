@@ -53,9 +53,21 @@ public:
     // double utilization;
     int pe;			// processor id
     bool available;
+#if CMK_CUDA
+    /// GPU this PE is mapped to, as (physical node id << 32 | device index),
+    /// so that the same physical device is one value across every process that
+    /// shares it. -1 when this PE has no GPU. PEs with equal values form the
+    /// GPU group a GPU-aware strategy balances across.
+    uint64_t gpu_device_id;
+    /// SM count of that GPU, 0 if it could not be queried.
+    int gpu_total_sms;
+#endif
     ProcStats(): n_objs(0), pe_speed(1), total_walltime(0.0), idletime(0.0),
 #if CMK_LB_CPUTIMER
 		 total_cputime(0.0), bg_cputime(0.0),
+#endif
+#if CMK_CUDA
+		 gpu_device_id((uint64_t)-1), gpu_total_sms(0),
 #endif
 	   	 bg_walltime(0.0), pe(-1), available(true) {}
     inline void clearBgLoad() {
@@ -78,7 +90,11 @@ public:
          double dummy;  p|dummy;    // for old format with utilization
       }
       p|available; p|n_objs;
-      if (_lb_args.lbversion()>=2) p|pe; 
+      if (_lb_args.lbversion()>=2) p|pe;
+#if CMK_CUDA
+      p|gpu_device_id;
+      p|gpu_total_sms;
+#endif
     }
   };
 

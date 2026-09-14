@@ -18,6 +18,7 @@
 #endif
 #include <inttypes.h>
 #include <list>
+#include <unordered_map>
 #include <vector>
 
 #include "pup_stl.h"
@@ -92,6 +93,68 @@ public:
   inline void pup(PUP::er &p);
 };
 
+// Hash the complete load-balancing identity. Equality still verifies both
+// fields, so hash collisions cannot alias objects from different managers.
+struct LDObjKeyHash {
+  std::size_t operator()(const LDObjKey &key) const noexcept {
+    uint64_t hash = static_cast<uint64_t>(key.objID());
+    hash ^= static_cast<uint64_t>(key.omID().id.idx) +
+            UINT64_C(0x9e3779b97f4a7c15) + (hash << 6) + (hash >> 2);
+    hash ^= hash >> 30;
+    hash *= UINT64_C(0xbf58476d1ce4e5b9);
+    hash ^= hash >> 27;
+    hash *= UINT64_C(0x94d049bb133111eb);
+    hash ^= hash >> 31;
+    return static_cast<std::size_t>(hash);
+  }
+};
+
+#if CMK_CUDA
+// CUPTI external-correlation IDs carry only 64 bits, while a Charm++ load-
+// balancing identity contains both an object-manager ID and an element ID.
+// This table assigns process-local tokens without discarding either part of
+// that identity.
+//
+// Append-only for the lifetime of the process: a token is never reassigned,
+// reused for a different identity, or dropped. That is what lets each PE cache
+// its own lookups without an invalidation protocol, including across migration
+// -- a destination PE simply misses once and interns the same token the source
+// already holds. Synchronization is left to the owner, which serializes the
+// few paths that reach it.
+class GpuObjectTokenTable {
+public:
+  static constexpr uint64_t noObjectToken() { return UINT64_MAX; }
+
+  bool intern(const LDObjKey &key, uint64_t &token) {
+    auto found = keyToToken_.find(key);
+    if (found != keyToToken_.end()) {
+      token = found->second;
+      return true;
+    }
+    if (nextToken_ == noObjectToken()) return false;
+
+    token = nextToken_++;
+    keyToToken_.emplace(key, token);
+    tokenToKey_.emplace(token, key);
+    return true;
+  }
+
+  bool resolve(uint64_t token, LDObjKey &key) const {
+    auto found = tokenToKey_.find(token);
+    if (found == tokenToKey_.end()) return false;
+    key = found->second;
+    return true;
+  }
+
+  std::size_t size() const { return keyToToken_.size(); }
+
+private:
+  std::unordered_map<LDObjKey, uint64_t, LDObjKeyHash> keyToToken_;
+  std::unordered_map<uint64_t, LDObjKey> tokenToKey_;
+  uint64_t nextToken_ = 1;
+};
+#endif
+
 typedef int LDObjIndex;
 typedef int LDOMIndex;
 
@@ -154,9 +217,31 @@ public:
   void *getData(int idx) { return data.data()+idx; }
 };
 
+#if CMK_CUDA
+// Per-kernel record captured via CUPTI, used for SM-utilization-normalized
+// GPU load attribution.
+//
+// These are consumed entirely within the process that produced them (see
+// hapiNormalizeCuptiLoads) and are never shipped to the central LB: every PE
+// sharing a GPU is in the same process, so the whole kernel timeline for a
+// device is already local. Only the resulting scalar load per object crosses
+// the wire, in LDObjData::gpuTime.
+struct LBKernelRecord {
+  uint64_t start_ns;   // CUPTI device-clock timestamp (ns)
+  uint64_t end_ns;     // CUPTI device-clock timestamp (ns)
+  uint32_t device_id;  // CUPTI device id this kernel ran on
+  int      sms_used;   // Number of SMs occupied while this kernel was running
+};
+#endif
+
 struct LDObjData {
   LDObjHandle handle;
   LBRealType wallTime;
+#if CMK_CUDA
+  // SM-utilization-normalized GPU load, in seconds of whole-device occupancy.
+  // Computed in-process by hapiNormalizeCuptiLoads before the stats are sent.
+  LBRealType gpuTime;
+#endif
 #if CMK_LB_CPUTIMER
   LBRealType cpuTime;
 #endif
@@ -171,6 +256,13 @@ struct LDObjData {
   // An encoded approximation of the amount of data the object would pack;
   // call pup_decodeSize(pupSize) to get the actual approximate value
   CmiUInt2 pupSize;
+#if CMK_CUDA
+  // Device bytes the object would pack, exactly rather than encoded: a device
+  // buffer is sized in megabytes where pupSize's approximation is tuned for
+  // host state, and a balancer weighing a migration against free device memory
+  // needs the real figure.
+  size_t gpuPupSize;
+#endif
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
   inline const LDOMid &omID() const { return handle.omhandle.id; }
   inline const CmiUInt8 &objID() const { return handle.id; }
@@ -333,6 +425,9 @@ inline void LBObjUserData::pup(PUP::er &p) {
 inline void LDObjData::pup(PUP::er &p) {
   p|handle;
   p|wallTime;
+#if CMK_CUDA
+  p|gpuTime;
+#endif
 #if CMK_LB_CPUTIMER
   p|cpuTime;
 #endif
@@ -348,6 +443,9 @@ inline void LDObjData::pup(PUP::er &p) {
   }
 #endif
   p|pupSize;
+#if CMK_CUDA
+  p|gpuPupSize;
+#endif
 }
 
 inline bool LDCommDesc::operator==(const LDCommDesc &obj) const {

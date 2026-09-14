@@ -36,7 +36,20 @@ extern "C++" {
 #define hapiSetDevice(dev) cudaSetDevice(dev)
 
 #define hapiDevAttrClockRate cudaDevAttrClockRate
+#define hapiDevAttrMultiProcessorCount cudaDevAttrMultiProcessorCount
 #define hapiDeviceGetAttribute(a,b,c) cudaDeviceGetAttribute(a,b,c)
+
+/* Added in CUDA 11.0. Gated on the runtime version, not #ifdef on the name
+ * itself: these are enumerators of cudaDeviceAttr, not macros, so an #ifdef
+ * test against one is always false. HAPI_HAS_MAX_BLOCKS_PER_SM is how a
+ * caller asks whether the attribute is spellable in this build. */
+#if CUDART_VERSION >= 11000
+#define HAPI_HAS_MAX_BLOCKS_PER_SM 1
+#define hapiDevAttrMaxBlocksPerMultiprocessor \
+    cudaDevAttrMaxBlocksPerMultiprocessor
+#else
+#define HAPI_HAS_MAX_BLOCKS_PER_SM 0
+#endif
 
 #define hapiPeekAtLastError cudaPeekAtLastError
 #define hapiGetLastError cudaGetLastError
@@ -171,7 +184,15 @@ static inline cudaError_t hapiFreeHost(void* ptr) {
 #define hapiSetDevice(dev) hipSetDevice(dev)
 #define hapiGetDeviceCount(devCount) hipGetDeviceCount(devCount)
 #define hapiDevAttrClockRate hipDeviceAttributeClockRate
+#define hapiDevAttrMultiProcessorCount hipDeviceAttributeMultiprocessorCount
 #define hapiDeviceGetAttribute(a,b,c) hipDeviceGetAttribute(a,b,c)
+
+/* See the CUDA side: HAPI_HAS_MAX_BLOCKS_PER_SM says whether the attribute is
+ * spellable here. HIP has carried hipDeviceAttributeMaxBlocksPerMultiProcessor
+ * since ROCm 4.5; older ROCm is not supported by this build anyway. */
+#define HAPI_HAS_MAX_BLOCKS_PER_SM 1
+#define hapiDevAttrMaxBlocksPerMultiprocessor \
+    hipDeviceAttributeMaxBlocksPerMultiProcessor
 
 #define hapiPeekAtLastError hipPeekAtLastError
 #define hapiGetLastError hipGetLastError

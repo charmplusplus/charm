@@ -97,6 +97,9 @@ public:
   inline void setConcurrent(bool c) { concurrent = c; }
 
   void InvokeLB(); // Everything is at the PE barrier
+  // Second half of InvokeLB on a CUDA build: runs once the process's
+  // per-object GPU loads for this round exist.
+  void gpuLoadsReady();
   void ProcessAtSync(void); // Receive a message from AtSync to avoid
                             // making projections output look funny
   void SendStats();
@@ -283,6 +286,12 @@ public:
 
   int from_pe;
   int pe_speed;
+#if CMK_CUDA
+  // GPU this PE is mapped to and that device's SM count; see
+  // BaseLB::ProcStats, into which these are copied on arrival.
+  uint64_t gpu_device_id;
+  int gpu_total_sms;
+#endif
   LBRealType total_walltime;
   LBRealType idletime;
   LBRealType bg_walltime;
@@ -298,7 +307,11 @@ public:
 
 public:
   CLBStatsMsg(int osz, int csz);
-  CLBStatsMsg(): from_pe(0), pe_speed(0), total_walltime(0.0), idletime(0.0),
+  CLBStatsMsg(): from_pe(0), pe_speed(0),
+#if CMK_CUDA
+		 gpu_device_id((uint64_t)-1), gpu_total_sms(0),
+#endif
+		 total_walltime(0.0), idletime(0.0),
 		 bg_walltime(0.0),
 #if defined(TEMP_LDB)
 		pe_temp(1.0),

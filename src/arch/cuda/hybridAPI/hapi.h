@@ -2,11 +2,13 @@
 #define __HAPI_H_
 #include "hapi_portable.h"
 
-/* HAPI_CUPTI_LB: per-object GPU time attribution (CUPTI activity tracing,
- * event-based kernel timing, launch wrappers) feeding GPU-aware load
- * balancing. Dormant -- nothing defines it -- until the GPU-LB series
- * (plan item 11) enables it together with its ck-ldb counterparts
- * (setObjGPUTime and friends, LBHasBalancersRegistered). */
+/* HAPI_CUPTI_LB: per-object GPU time attribution via CUPTI activity tracing,
+ * feeding GPU-aware load balancing. Defined for a CUDA build in which CUPTI
+ * was found; without it the entry points below are no-ops and every object
+ * reads zero GPU load, so a GPU-aware balancer falls back to the host
+ * dimension. The data structures the attribution produces are declared under
+ * CMK_CUDA rather than under this macro, so that LDObjData has one layout
+ * across every translation unit either way. */
 
 /* See hapi_functions.h for the majority of function declarations provided
  * by the Hybrid API. */
@@ -263,29 +265,50 @@ static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
   return hapiFreeHost(ptr, pool);
 }
 
-void hapiRecordTime(hapiStream_t stream, hapiEvent_t start);
-#ifdef HAPI_CUPTI_LB
+#if CMK_CUDA && CMK_LBDB_ON
 void hapiCuptiInit();
 void hapiCuptiFinalize();
+
+// Stamp/unstamp the running migratable object onto every kernel launched
+// inside the scope. Called around every entry method, so both are no-ops
+// unless tracing is running.
 uint64_t hapiCuptiPushObjCorrelation();
 void hapiCuptiPopObjCorrelation();
+
+// Epoch a load balancer passes to hapiPrepareCuptiLoads: larger than any
+// epoch an application-level sampler will use, so an LB round always rebuilds
+// rather than reading a sampler's older loads.
+#define HAPI_CUPTI_EPOCH_LB_ROUND UINT64_MAX
+
+// Flush, parse and normalize the CUPTI records accumulated since the last
+// hapiClearCuptiData, once per epoch however many PE threads call it. The
+// result is GPUManager::cupti_obj_norm_load_, which every PE of the process
+// then reads; see the comment on GPUManager::cupti_prepare_lock_.
+void hapiPrepareCuptiLoads(uint64_t epoch = HAPI_CUPTI_EPOCH_LB_ROUND);
 void hapiProcessCuptiBuffers();
+void hapiNormalizeCuptiLoads();
 void hapiClearCuptiData();
+
+// Arrival gate in front of hapiPrepareCuptiLoads for a load-balancing round.
+// Returns true to exactly one caller per epoch, once `expected` callers have
+// arrived: the records are process-wide, so the drain has to wait for the last
+// PE of the process rather than run on the first.
+bool hapiCuptiArrive(uint64_t epoch, int expected);
+
+// Start/stop CUPTI activity tracing. Tracing is the dominant cost of GPU load
+// measurement, so an application that instruments a window rather than the
+// whole run pays for it only inside that window. Reached per-PE through
+// LBDatabase::TurnStatsOn/Off; the process traces while any of its PEs wants
+// instrumentation.
+void hapiCuptiStartTracing();
+void hapiCuptiStopTracing();
+bool hapiCuptiTracingActive();
 #endif
 
-#ifdef HAPI_CUPTI_LB
-#define HAPI_LAUNCH_KERNEL_WRAPPER(call, stream)\
-    hapiEvent_t start;\
-    hapiEventCreate(&start);\
-    hapiEventRecord(start, stream);\
-    call;\
-    hapiRecordTime(stream, start);
-#else
-#define HAPI_LAUNCH_KERNEL_WRAPPER(call, stream)\
-    call;
-#endif
-
-#ifdef HAPI_CUPTI_LB
+// Attribute one kernel launch to the running object. The runtime already
+// brackets every entry method this way (see CkCallstackPush/Pop), so an
+// application needs this only for a launch it makes outside one.
+#if CMK_CUDA && CMK_LBDB_ON
 #define CUPTI_LAUNCH_WRAPPER(call)\
   hapiCuptiPushObjCorrelation();\
   call;\

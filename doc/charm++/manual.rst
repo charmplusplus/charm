@@ -2679,6 +2679,51 @@ infrastructure:
   options to point to the include and library directories used,
   respectively. (``+balancer ScotchLB``)
 
+The following centralized balancer targets GPU applications, and is
+available on CUDA builds only:
+
+- **GreedyRefineCentralGPULB**: Balances at two granularities at once.
+  Objects are assigned across *GPU groups* — the sets of PEs that share a
+  device — by their measured GPU load, and then across the PEs within a
+  group by their host load. This matches the usual arrangement in which
+  each process owns a GPU: which device an object runs on is decided by
+  its device work, and which PE drives it by its host work.
+  (``+balancer GreedyRefineCentralGPULB``)
+
+  The GPU load it reads is measured by CUPTI, per object, and normalized
+  to seconds of whole-device occupancy, so it estimates what an object
+  would cost on a *different* device rather than only what it cost where
+  it ran. Measurement follows ``LBTurnInstrumentOn()`` /
+  ``LBTurnInstrumentOff()``, so an application that instruments a window
+  around its own ``AtSync`` pays the tracing cost only inside it. See
+  :numref:`lbFramework` for the instrumentation calls.
+
+  Like the other greedy-refine balancers it accepts a *tolerance*: how far
+  above the maximum load plain greedy would produce it may go, in exchange
+  for migrating fewer objects. ``+LBGreedyRefineTolerance 1.1`` allows a
+  maximum load 10% higher than greedy's, and an object then stays where it
+  is for as long as its PE remains under that target.
+
+  The default is ``1.1``. Passing ``0`` or less asks the balancer to search
+  for a tolerance instead of being told one: each PE builds a candidate
+  assignment from a different parameter pair and the best is chosen, which
+  costs a reduction per balancing step and is bounded by the PE count.
+  ``+LBDebug 1`` reports the migration count and the achieved maximum load
+  against greedy's, separately for the GPU and host dimensions, which is
+  what says whether the tolerance is buying anything.
+
+.. note::
+
+   Migrating a GPU application requires the runtime to be built with
+   ``CMK_GLOBAL_LOCATION_UPDATE`` (see `Global Location Update`_). A device
+   zerocopy send is addressed to the PE the sender believes hosts the
+   target, so without it a send issued around a migration arrives at a PE
+   that no longer hosts the element, and the receive path aborts rather
+   than silently reading the wrong buffer (``ckrdmadevice.C``). Note the
+   restriction that comes with the option: migrations must happen at load
+   balancing steps, so a GPU application must migrate through ``AtSync()``
+   rather than ``migrateMe()``.
+
 In distributed approaches, the strategy executes across multiple PEs,
 providing scalable computational and communication performance.
 

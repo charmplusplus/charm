@@ -755,6 +755,11 @@ if(BUILD_CUDA OR BUILD_HIP)
       message(WARNING "CUPTI library not found. GPU load balancing will not be available.")
     else()
       message(STATUS "Found CUPTI: ${CUPTI_LIBRARY}")
+      # Global, not per-target: the GPU load fields live in LDObjData, which
+      # ck-core, ck-ldb and hybridapi all see. A per-target definition would
+      # give them different layouts for the same struct.
+      add_compile_definitions(HAPI_CUPTI_LB)
+      set(HAPI_CUPTI_LB ON)
     endif()
 
     add_library(hybridapi ${hybridAPI-cxx-sources})

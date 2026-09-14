@@ -13,6 +13,12 @@
 
 #include <unordered_map>
 #include <queue>
+#include <mutex>
+#include <atomic>
+
+#if CMK_CUDA && CMK_LBDB_ON
+#include "lbdb.h"  // for LBKernelRecord, LDObjKey and GpuObjectTokenTable
+#endif
 
 // Local rank of the logical node (process) that the given PE belongs to,
 // within its physical node: the logical node index modulo the number of
@@ -55,7 +61,7 @@ struct hapi_ipc_event_shared {
   pthread_mutex_t lock;
 };
 
-#ifdef HAPI_CUPTI_LB
+#if CMK_CUDA && CMK_LBDB_ON
 struct CuptiBufferItem {
   uint8_t* buffer;
   size_t validSize;
@@ -183,14 +189,89 @@ struct GPUManager {
   std::vector<hapi_ipc_device_info> hapi_ipc_device_infos;
 
   //CUPTI load balancing
-#ifdef HAPI_CUPTI_LB
-  std::unordered_map<uint32_t, uint64_t> cupti_correlation_db_;//correlationID -> ObjectID
+#if CMK_CUDA && CMK_LBDB_ON
+  // Runtime correlation ID -> process-local full-object token.
+  std::unordered_map<uint32_t, uint64_t> cupti_object_correlation_db_;
 
-  std::unordered_map<uint64_t, uint64_t> cupti_obj_gpu_times_;//objectID -> accumulated GPU time in ns
-  
+  GpuObjectTokenTable cupti_object_tokens_;
+  std::mutex cupti_object_token_lock_;
+
+  // Full LB object identity -> attributed kernel records.
+  std::unordered_map<LDObjKey, std::vector<LBKernelRecord>, LDObjKeyHash>
+      cupti_obj_kernel_records_;
+
+  // Kernels that could not be attributed to any object (launched outside a
+  // migratable entry method, or with no correlation record). They occupy SMs
+  // and so take part in the sweep-line as contention, but receive no load.
+  // Kept separate rather than under a sentinel object ID, because 0 is a
+  // perfectly valid chare element ID.
+  std::vector<LBKernelRecord> cupti_unattributed_kernels_;
+
+  // Full object identity -> SM-utilization-normalized GPU load in seconds.
+  std::unordered_map<LDObjKey, double, LDObjKeyHash> cupti_obj_norm_load_;
+
+  // Previous round's count of kernels whose correlations had not been parsed
+  // yet, used to size the parked vector.
+  uint32_t cupti_pending_hint_ = 0;
+
+  // Written by CUPTI's buffer-completed callback, which may run on a
+  // CUPTI-owned thread. That thread exists in non-SMP builds too, where the
+  // Converse locks compile out, so this needs a real mutex rather than a
+  // CmiNodeLock.
   std::queue<CuptiBufferItem> cupti_buffer_queue_;
+  std::mutex cupti_queue_lock_;
 
   bool cupti_initialized_;
+  // Whether activity tracing is currently running. Separate from
+  // cupti_initialized_: the buffer callbacks are registered once, but tracing
+  // itself is switched on and off as the application asks for it.
+  //
+  // Atomic because the entry-method hooks read it on every invocation from
+  // every PE thread while another thread may be switching tracing on or off.
+  std::atomic<bool> cupti_tracing_active_{false};
+  // Serializes hapiCuptiStartTracing/hapiCuptiStopTracing. This state lives in
+  // the node-wide GPUManager, but the switch is reached per-PE through
+  // LBDatabase::TurnStatsOn/Off, so every PE thread calls in. Without this,
+  // several threads enable or disable the same CUPTI activity kinds and flush
+  // concurrently, which corrupts CUPTI's internal buffer bookkeeping and shows
+  // up later as heap corruption in an unrelated allocation. Must NOT be the
+  // same mutex as cupti_queue_lock_: the flush in the stop path invokes the
+  // buffer-completed callback, which takes that one.
+  std::mutex cupti_tracing_lock_;
+  // PEs of this process whose instrumentation is currently on. Tracing runs
+  // while this is non-zero; see hapiCuptiStartTracing.
+  int cupti_tracing_users_ = 0;
+  // Bumped every time CUPTI is detached. Detaching clears CUPTI's
+  // external-correlation stack for every PE, but the counters that keep the
+  // entry-method push/pop hooks paired are per-PE, and only the PE that ran the
+  // detach could reset its own. Each PE compares this against the generation it
+  // last saw and zeroes its counter when they differ.
+  uint64_t cupti_generation_ = 0;
+  // Serializes turning this round's raw CUPTI records into cupti_obj_norm_load_,
+  // and makes that work happen exactly once per LB round no matter how many PE
+  // threads ask for it. Doing it with "rank 0 works between two CmiNodeBarrier
+  // calls" does not hold: both barriers sit behind #if CMK_SMP, which is 0 in
+  // the multicore build even though a process really does run many PE threads,
+  // so the barriers vanish and the other ranks read cupti_obj_norm_load_ while
+  // rank 0 is rebuilding it. A lock also cannot deadlock the way a spin barrier
+  // can: a PE waiting here waits on a PE that is running, not on one that has
+  // yet to arrive.
+  std::mutex cupti_prepare_lock_;
+  // Set once this round's loads are built; cleared by hapiClearCuptiData.
+  bool cupti_loads_ready_ = false;
+  // Epoch the built loads correspond to, so a second caller in the same round
+  // reads what the first built instead of rebuilding it.
+  uint64_t cupti_loads_epoch_ = 0;
+  // Arrival gate for the per-round load build; see hapiCuptiArrive. A load
+  // balancer's per-PE barrier fires when THAT PE's objects are at AtSync, and
+  // the first PE to fire would otherwise flush, drain and clear the
+  // process-wide CUPTI records on the spot. Any PE whose objects were still
+  // finishing kernels at that instant has them dropped from the round --
+  // consistently the last PE of the process, whose objects then read as zero
+  // GPU load every step.
+  std::mutex cupti_arrive_lock_;
+  uint64_t cupti_arrive_epoch_ = 0;
+  int cupti_arrive_count_ = 0;
 #endif
 
   void init() {
@@ -233,6 +314,15 @@ struct GPUManager {
     // Number of CUDA IPC events per PE
     hapi_ipc_event_pool_size_pe = -1;
     hapi_ipc_event_pool_size_total = -1;
+
+#if CMK_CUDA && CMK_LBDB_ON
+    // CUPTI load balancing
+    cupti_initialized_ = false;
+    cupti_tracing_active_.store(false, std::memory_order_relaxed);
+    cupti_generation_ = 0;
+    cupti_loads_ready_ = false;
+    cupti_loads_epoch_ = 0;
+#endif
 
     // Allocate host/device buffers array (both user and system-addressed)
     host_buffers_ = new void*[NUM_BUFFERS*2];
