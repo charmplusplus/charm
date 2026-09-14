@@ -426,6 +426,23 @@ void MetisLB::work(LDStats* stats)
   std::array<idx_t, METIS_NOPTIONS> options;
   METIS_SetDefaultOptions(options.data());
   options[METIS_OPTION_NUMBERING] = 0;   // C style numbering
+  // Experiment knobs: how many partitions METIS computes before keeping the
+  // best cut, and how many refinement passes each gets (METIS defaults 1 and
+  // 10). Environment, not argv: read at the first balance, an argv option
+  // would still be there for the application to parse (see the constructor).
+  // Measured on leanmd 8x8x8 with the anchors pinned and stickiness 0.5:
+  // 1 / 4 / 8 partitions left 485 / 492 / 460 MB of cross-GPU traffic per
+  // window against the block map's 243 (this file's own accounting, below),
+  // and the steps after the balance at 229 / 235 / 242 ms -- no gain. Do not
+  // compare those figures with DiffusionLB's per-neighbour bytes: those are
+  // sender-side records keyed by the receiver's last-known PE, stale for an
+  // object that just moved, and undercount the traffic to migrated objects.
+  {
+    static const int ncuts = getenv("CHARM_METIS_NCUTS") ? atoi(getenv("CHARM_METIS_NCUTS")) : 0;
+    static const int niter = getenv("CHARM_METIS_NITER") ? atoi(getenv("CHARM_METIS_NITER")) : 0;
+    if (ncuts > 0) options[METIS_OPTION_NCUTS] = ncuts;
+    if (niter > 0) options[METIS_OPTION_NITER] = niter;
+  }
 
   // Edges to fixed objects the last partitionSubset call kept (see below).
   long long lastFixedEdges = 0;
