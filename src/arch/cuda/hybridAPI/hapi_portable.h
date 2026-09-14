@@ -99,6 +99,9 @@ cudaError_t hapiStreamWaitEventNoted(cudaStream_t stream, cudaEvent_t event,
 // outside entry methods (runtime startup, comm buffers) are left unattributed.
 void hapiRecordAlloc(void* ptr, size_t size);
 void hapiRecordFree(void* ptr);
+// Drops a pointer's attribution without the IPC export invalidation
+// hapiRecordFree does (a pool block, whose base is never freed).
+void hapiRecordForget(void* ptr);
 
 template <typename hapiMallocT>
 static inline cudaError_t hapiMallocRecord(hapiMallocT** ptr, size_t size) {
@@ -113,6 +116,10 @@ static inline cudaError_t hapiFreeRecord(void* ptr) {
 
 #define hapiMalloc(ptr, size) hapiMallocRecord(ptr, size)
 #define hapiFree(ptr) hapiFreeRecord(ptr)
+// An allocation that belongs to the runtime whatever is running: an arena the
+// pool or a comm buffer carves up, whose blocks are charged as they are handed
+// out. Charging the arena too would bill a chare for all of it.
+#define hapiMallocUnattributed(ptr, size) cudaMalloc((void**)(ptr), size)
 #define hapiMallocHost(ptr, size) cudaMallocHost(ptr, size)
 #define hapiFreeHost(ptr) cudaFreeHost(ptr)
 #define hapiHostGetDevicePointer(devPtr, hostPtr, flags) \
@@ -200,6 +207,7 @@ static inline cudaError_t hapiFreeRecord(void* ptr) {
 // See the CUDA branch: allocation attribution for the LB memory contract.
 void hapiRecordAlloc(void* ptr, size_t size);
 void hapiRecordFree(void* ptr);
+void hapiRecordForget(void* ptr);
 
 template <typename hapiMallocT>
 static inline hipError_t hapiMallocRecord(hapiMallocT** ptr, size_t size) {
@@ -214,6 +222,7 @@ static inline hipError_t hapiFreeRecord(void* ptr) {
 
 #define hapiMalloc(ptr, size) hapiMallocRecord(ptr, size)
 #define hapiFree(ptr) hapiFreeRecord(ptr)
+#define hapiMallocUnattributed(ptr, size) hipMalloc((void**)(ptr), size)
 #define hapiMallocHost(ptr, size) hipHostMalloc(ptr, size)
 #define hapiFreeHost(ptr) hipFreeHost(ptr)
 #define hapiHostGetDevicePointer(devPtr, hostPtr, flags) \

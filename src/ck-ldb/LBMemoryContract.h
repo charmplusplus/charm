@@ -233,6 +233,39 @@ public:
     return (pe >= 0 && pe < (int)peSlots_.size()) ? peSlots_[pe] : 0;
   }
 
+  // One line per device: what it can reach, what the objects on it hold, and
+  // (under the pool) how many bytes its arenas hand out now -- the attributed
+  // footprints should account for nearly all of that.
+  void print(const char* who) const {
+    for (int d = 0; d < numDevices(); d++) {
+      const Device& dev = devices_[d];
+      size_t resident = 0, poolFree = 0, arenaSz = 0;
+      int objs = 0;
+      for (int i = 0; i < (int)stats_->objData.size(); i++)
+        if (deviceOfPe(stats_->from_proc[i]) == d) {
+          resident += footprint(i);
+          objs++;
+        }
+      std::vector<int> seen;
+      for (int pe : dev.pes) {
+        const BaseLB::ProcStats& ps = stats_->procs[pe];
+        const int node = topo_->nodeOf(pe);
+        if (ps.gpu_pool_arena_bytes == 0 ||
+            std::find(seen.begin(), seen.end(), node) != seen.end())
+          continue;
+        seen.push_back(node);
+        poolFree += ps.pool_buff_mem_remaining;
+        arenaSz = ps.gpu_pool_arena_bytes;
+      }
+      CkPrintf("%s device %d (gpu %llu, %zu PE(s)): T %.1f MB, %s, sigma_max %.1f KB, "
+               "%d object(s) holding %.1f MB; pool free %.1f MB in %zu-MB arenas\n",
+               who, d, (unsigned long long)dev.gpu_id, dev.pes.size(),
+               dev.reach / 1048576.0, dev.pooled ? "pooled" : "separate staging",
+               dev.sigmaMax / 1024.0, objs, resident / 1048576.0, poolFree / 1048576.0,
+               arenaSz >> 20);
+    }
+  }
+
 private:
   std::vector<Device> devices_;
   std::unordered_map<uint64_t, int> devToIdx_;
@@ -358,6 +391,7 @@ public:
 
     const bool dbg = (getenv("CHARM_DEBUG_MEMCONTRACT") != NULL);
     int refused = 0;
+    if (dbg) model.print("[memcontract]");
 
     std::vector<int> order(moves.size());
     for (size_t i = 0; i < moves.size(); i++) order[i] = (int)i;

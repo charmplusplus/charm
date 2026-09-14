@@ -437,10 +437,26 @@ size_t hapiDevPoolArenaSize();
 void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
                         int* ipcSlots);
 
+// The buddy block `ptr` heads, if it is one of the pool's: what an allocation
+// of any size actually holds (the next power of two).
+bool hapiDevPoolBlockSize(const void* ptr, size_t* size);
+
 // The running chare's attributed live device-allocation bytes (see the
 // footprint tracking in hapi_portable.h/hapi_impl.cpp). Valid inside an entry
 // method of a migratable chare; returns 0 otherwise.
 size_t hapiCurrentObjectFootprint();
+
+// Attribution for allocations the runtime makes on an element's behalf,
+// outside that element's entry methods. Between hapiFootprintBegin(rec) and
+// hapiFootprintEnd() every recorded allocation on this thread is charged to
+// rec, or to nobody when rec is null (a migration payload, say). Scopes nest.
+// hapiFootprintCharge charges an existing allocation to rec -- the landing
+// arena, allocated before the element it becomes storage for existed; for a
+// pool block the block's size is used instead of `size`.
+class CkLocRec;
+void hapiFootprintBegin(CkLocRec* rec);
+void hapiFootprintEnd();
+void hapiFootprintCharge(void* ptr, size_t size, CkLocRec* rec);
 
 #ifdef CMK_LBDB_ON
 void hapiCuptiInit();

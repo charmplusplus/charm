@@ -96,8 +96,11 @@ namespace buddy {
       abort();
     }
 
-    // Request GPU memory (closest power of 2)
-    hapiError_t status = hapiMalloc(&base_ptr, _comm_lb_size);
+    // Request GPU memory (closest power of 2). Unattributed: the region is the
+    // runtime's, and the blocks carved from it are charged as they go out. A
+    // device pool arena grown from inside an entry method was otherwise billed
+    // in full to whichever chare happened to trigger the growth.
+    hapiError_t status = hapiMallocUnattributed(&base_ptr, _comm_lb_size);
     this->comm_size = _comm_size;
     if (status != hapiSuccess) {
       fprintf(stderr, "Failed to allocate GPU memory\n");

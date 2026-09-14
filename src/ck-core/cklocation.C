@@ -2200,9 +2200,10 @@ void CkMigratable::recordLBSizes(bool forStep)
   setGPUPupSize(ps.gpu_size());
   #if CMK_LB_USER_DATA
   // Per-chare device footprint, written into the LB user-data slot the
-  // memory-aware strategies read. Floored at the serialized size so an
-  // unattributed footprint (allocations outside entry methods, arena
-  // storage) can never read as "free to move".
+  // memory-aware strategies read: its hapiMalloc and device pool blocks, and
+  // the migration arena it landed in. Floored at the serialized size so an
+  // unattributed footprint (allocations made by other code on its behalf)
+  // can never read as "free to move".
   {
     const int udIdx = CkpvAccess(_lb_obj_index);
     void* ud = (udIdx >= 0) ? getObjUserData(udIdx) : NULL;
@@ -4248,8 +4249,11 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
         if (CkDevicePoolOn()) {
           // The packed payload is a pool block: exported through its arena's
           // handle like any other pool buffer, sent direct, and returned to
-          // the pool by finishGPUSend on the receiver's ack.
+          // the pool by finishGPUSend on the receiver's ack. The runtime's,
+          // not the departing element's, whatever is running.
+          hapiFootprintBegin(nullptr);
           gpuMsg = (char*)CkDeviceMalloc(gpuBufSize);
+          hapiFootprintEnd();
           if (gpuMsg == nullptr)
             CkAbort("PE %d: device pool could not provide a %zu-byte migration "
                     "payload (+gpupoolsize)", CkMyPe(), gpuBufSize);
@@ -4472,6 +4476,9 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
     // CHARM_MIGRATE_POOL selects it; the default is the allocation it always
     // was, so a run without the pool is unchanged.
     data = nullptr;
+    // Charged to nobody here; immigrate charges it to the element it becomes
+    // storage for, once that element exists.
+    hapiFootprintBegin(nullptr);
     if (ckMigrateArenaFromPool()) {
       data = (char*)CkDeviceMalloc(size);
       if (data == nullptr)
@@ -4480,6 +4487,7 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
     } else {
       hapiCheck(hapiMalloc((void**)&data, size));
     }
+    hapiFootprintEnd();
   } else if(csv_gpu_manager.use_shm) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
     dm_for_gate = dm;
@@ -4649,8 +4657,16 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
       rec = createLocal(idx, true, msg->ignoreArrival, false /* home told on departure */, msg->epoch);
 
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
-  // Create the new elements as we unpack the message
+  // Create the new elements as we unpack the message. What the unpack
+  // allocates is the arriving element's, though its entry method is not what
+  // is running.
+#if CMK_CUDA
+  hapiFootprintBegin(rec);
+#endif
   pupElementsFor(p, rec, CkElementCreation_migrate);
+#if CMK_CUDA
+  hapiFootprintEnd();
+#endif
 #if CMK_CUDA
   // The unpack's copies must complete before the element runs, and the wait
   // also gates the free of gpuMsg below. But it does not need to be a
@@ -4698,6 +4714,9 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
       // cudaFree. Otherwise hapiFree, as before.
       hapiArenaRegister(gpuMsg, extent, p.deviceReboundCount,
                         ckMigrateArenaFromPool() ? CkDeviceFree : nullptr);
+      // The arena is this element's state now: charge it, so its footprint on
+      // this PE is what it holds rather than 0. Released by the free above.
+      hapiFootprintCharge(gpuMsg, extent, rec);
     } else {
       // Nothing rebound: the arena served as a plain landing area for a
       // legacy pup, and its contents were copied out.
