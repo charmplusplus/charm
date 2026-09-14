@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <cstring>
 #include <functional>
 #include <string>
 #include <limits>
@@ -352,8 +353,19 @@ void MetisLB::work(LDStats* stats)
     costCfgTried = true;
     if (_lb_args.costConfig() != NULL) costCfg.load(_lb_args.costConfig());
   }
+  // Experiment knob (CHARM_METIS_EDGE=msgs): weigh an uncalibrated cut by
+  // message count rather than bytes. A leanmd pair compute's messages grow
+  // with its particle count and so does its load, so a byte-weighted cut
+  // prefers to move the light computes and needs more of them for the same
+  // load. Measured on leanmd 8x8x8 in alternation with DiffusionLB: no
+  // change (steps 22-40 at 226-234 ms against 195-205), like the calibrated
+  // table, k-way, more partitions and the tolerance in either direction.
+  static const bool edgeMsgs = [] {
+    const char* e = getenv("CHARM_METIS_EDGE");
+    return e != NULL && strcmp(e, "msgs") == 0;
+  }();
   auto edgeCost = [&](const EdgeSum& e, DiffusionTier t) -> double {
-    if (!costCfg.calibrated) return (double)e.bytes;
+    if (!costCfg.calibrated) return edgeMsgs ? (double)e.msgs : (double)e.bytes;
     return costCfg.tier[t].alpha * (double)e.msgs + costCfg.tier[t].beta * (double)e.bytes;
   };
 
@@ -624,11 +636,26 @@ void MetisLB::work(LDStats* stats)
             tpwgtsAll[(size_t)p * nconAll + c] = (*tpwgts)[(size_t)p * ncon_in + c];
     }
     std::vector<idx_t> partsAll(nAll, 0);
-    METIS_PartGraphRecursive(&nv_arg, &ncon, xadj.data(), adjncy.data(), lvwgt.data(),
-                             nullptr, adjwgt.data(), &np,
-                             anchored ? tpwgtsAll.data()
-                                      : (tpwgts ? const_cast<real_t*>(tpwgts->data()) : nullptr),
-                             ubvec.data(), options.data(), &edgecut, partsAll.data());
+    // Direct k-way (CHARM_METIS_KWAY) against recursive bisection. On a ring
+    // of GPUs with a gradient the balancing flow is a chain around the ring,
+    // each hop carried by the objects that straddle that boundary at no new
+    // cut; a bisection has to balance its two halves in one move across the
+    // two half-boundaries, whose straddlers do not carry enough, and takes
+    // interior objects at two cut edges each. Measured on leanmd 8x8x8:
+    // the same cut (460-465 MB against 476-528 MB) and the same steps
+    // (228-253 ms); the dense GPU holds no straddlers under the local compute
+    // map, so the chain was not available to either method.
+    static const bool kway = (getenv("CHARM_METIS_KWAY") != NULL);
+    real_t* tp = anchored ? tpwgtsAll.data()
+                          : (tpwgts ? const_cast<real_t*>(tpwgts->data()) : nullptr);
+    if (kway)
+      METIS_PartGraphKway(&nv_arg, &ncon, xadj.data(), adjncy.data(), lvwgt.data(),
+                          nullptr, adjwgt.data(), &np, tp, ubvec.data(), options.data(),
+                          &edgecut, partsAll.data());
+    else
+      METIS_PartGraphRecursive(&nv_arg, &ncon, xadj.data(), adjncy.data(), lvwgt.data(),
+                               nullptr, adjwgt.data(), &np, tp, ubvec.data(), options.data(),
+                               &edgecut, partsAll.data());
     std::copy(partsAll.begin(), partsAll.begin() + nv, parts.begin());
     if (anchorsPinned) *anchorsPinned = false;
     if (anchored)
@@ -868,6 +895,19 @@ void MetisLB::work(LDStats* stats)
   std::vector<real_t> ubvecCross(nConstraints, (real_t)1.1);
   if (memAware) ubvecCross[1] = (real_t)memUbvec;
   if (slackIdx >= 0) ubvecCross[slackIdx] = (real_t)slackUbvec;
+  // Experiment knob: the balance tolerance of the binding dimension across
+  // groups. METIS's usual 1.1 is what it was. Measured on leanmd 8x8x8: at
+  // 1.03 the GPUs came out at max/avg 1.07 instead of 1.14 and the step got
+  // SLOWER (275-280 vs 243-258 ms), with more cross-GPU traffic; at 1.25-1.4
+  // Metis moved 334-936 objects and the step improved to 231-234 only
+  // because DiffusionLB finished the balance at the next step. After the
+  // balance every GPU runs at 11-19% utilisation: the step is latency-bound,
+  // and a tighter GPU balance buys nothing there.
+  if (const char* e = getenv("CHARM_METIS_UBVEC"))
+  {
+    const double u = atof(e);
+    if (u > 1.0) ubvecCross[0] = (real_t)u;
+  }
   // A fixed object's group, for the edges to it.
   auto fixedGroupOf = [&](int v) -> int {
     if (ogr->vertices[v].isMigratable()) return -1;
@@ -956,6 +996,7 @@ void MetisLB::work(LDStats* stats)
   std::vector<std::vector<int>> grpVerts(nGroups);
   for (size_t k = 0; k < migVerts.size(); k++)
     grpVerts[groupLabel[k]].push_back(migVerts[k]);
+
 
   // Level two: within a group, over the PEs sharing that GPU, on host load --
   // every PE here drives the same device, so device time cannot separate them.
@@ -1380,6 +1421,7 @@ void MetisLB::work(LDStats* stats)
     // locality away rather than improving it.
     long long edges = 0;
     double wTotal = 0.0, cutOld = 0.0, cutNew = 0.0;
+    std::vector<double> pairNew;
     for (int i = 0; i < numVertices; i++)
     {
       const int oldPeI = ogr->vertices[i].getCurrentPe();
@@ -1399,8 +1441,20 @@ void MetisLB::work(LDStats* stats)
         const int gNewJ = (newPeJ >= 0 && newPeJ < (int)groupOfPe.size()) ? groupOfPe[newPeJ] : -1;
         if (gOldI != gOldJ) cutOld += w;
         if (gNewI != gNewJ) cutNew += w;
+        if (gNewI != gNewJ && gNewI >= 0 && gNewJ >= 0)
+        {
+          if (pairNew.empty()) pairNew.assign((size_t)nGroups * nGroups, 0.0);
+          pairNew[(size_t)std::min(gNewI, gNewJ) * nGroups + std::max(gNewI, gNewJ)] += w;
+        }
       }
     }
+    // Which pairs of groups carry the cut under the new placement: a ring
+    // balancer only ever loads adjacent pairs, a global one any pair.
+    for (idx_t a = 0; a < nGroups && !pairNew.empty(); a++)
+      for (idx_t b = a + 1; b < nGroups; b++)
+        if (pairNew[(size_t)a * nGroups + b] > 0.0)
+          CkPrintf("[%d] MetisLB locality: groups %d-%d carry %.4g bytes after\n", CkMyPe(),
+                   (int)a, (int)b, pairNew[(size_t)a * nGroups + b]);
     int moved = 0;
     for (int i = 0; i < numVertices; i++)
       if (newPe[i] >= 0 && newPe[i] != ogr->vertices[i].getCurrentPe()) moved++;
