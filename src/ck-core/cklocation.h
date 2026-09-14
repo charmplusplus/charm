@@ -9,6 +9,7 @@ array proxies, or the details of element creation (see ckarray.h).
 #ifndef __CKLOCATION_H
 #define __CKLOCATION_H
 
+#include <deque>
 #include <unordered_map>
 struct IndexHasher
 {
@@ -884,6 +885,29 @@ public:
   void immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, CkDeviceBufferPost* post);
   void immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe);
   void finishGPUSend(CmiUInt8 id);
+
+  // The landing admission gate (+gpupool; see ckLandingAdmissible in
+  // cklocation.C). The source asks before sending a payload; the destination
+  // grants once the pool can hand the landing arena out above the floor of
+  // payloads this process still owes, taking the arena at the grant.
+  void requestLanding(CmiUInt8 id, int size, int srcPe);
+  void landingGranted(CmiUInt8 id);
+  void admitLandings();
+  struct DeferredLanding {
+    CmiUInt8 id;
+    int size;
+    int srcPe;
+    double since;
+    bool reported = false;
+    bool warned = false;
+  };
+  std::deque<DeferredLanding> deferredLandings;
+  std::unordered_map<CmiUInt8, char*> grantedLandings;
+  bool landingRetryScheduled = false;
+  long landingDeferrals = 0;
+private:
+  void dispatchGPUMsg(CmiUInt8 id);
+public:
 #endif
   void requestLocation(CmiUInt8 id);
   // See CkLocCache::requestLocationOnce.

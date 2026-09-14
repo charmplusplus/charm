@@ -418,6 +418,8 @@ size_t hapiDevPoolFreeBytes();
 // The same, counting only the arenas on `device` (the index CkDeviceMalloc
 // passes, CpvAccess(my_device_id)).
 size_t hapiDevPoolFreeBytesOn(int device);
+// Bytes the arenas on `device` have handed out (their extent less their free).
+size_t hapiDevPoolUsedBytesOn(int device);
 // The quantum the pool grows by: one fresh arena (+gpupoolsize, else
 // CK_GPU_ARENA_MB, default 256 MB).
 size_t hapiDevPoolArenaSize();

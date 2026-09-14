@@ -44,6 +44,12 @@ public:
   // to ack this PE's LBManager once the element registers there. Survives any
   // deferral in between; never pupped (the message carries it instead).
   int lbLedgerStep = -1;
+  // The device payload block this element's size said a staged migration
+  // would pack (cached from the last setGPUPupSize), and the part of it counted
+  // in this process's pending-pack floor: from the LB ordering the move until
+  // emigrate has packed or handed the element over. See ckLandingAdmissible.
+  size_t lbGpuPupSize = 0;
+  size_t pendingPackBytes = 0;
   // Set while the element is parked in AtSyncWait. A parked element runs no
   // SDAG, so a device receive delivered to it could only sit preprocessed and
   // unconsumed -- pinned to this process -- until the resume; admission

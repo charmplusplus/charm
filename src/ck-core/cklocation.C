@@ -67,6 +67,89 @@ static inline bool migDbg() {
   return on;
 }
 
+#if CMK_CUDA
+// The landing admission gate (+gpupool). The memory contract plans each
+// balancer step so that every batch fits the devices; this is the runtime half
+// that keeps its assumption true. A staged arrival asks its destination for a
+// landing arena before its payload is sent, and the destination grants it
+// only if the pool can hand the arena out and still cover every payload this
+// process has yet to pack for departures the balancer ordered -- the floor.
+// Packs are never gated and never wait on anything remote, so an arrival that
+// is refused waits only on local progress: its own process's packs, a payload
+// ack, or a free. A deferred arrival costs the destination nothing; its
+// payload stays in the sender's pool block.
+//
+// Under the pool, payloads, landing arenas and chare state are all blocks of
+// one pool. Without the floor an arrival could take the bytes a departure
+// needs to pack, and that departure's destination could be waiting on an
+// arrival of its own: the cycle a separate staging reserve used to rule out.
+//
+// CHARM_LB_NO_ADMISSION_GATE turns it off; CHARM_DEBUG_GATE traces it. To see
+// it defer on a device with memory to spare, CHARM_GPU_POOL_CAP_MB shrinks the
+// device the balancer and the gate both see (hapiLBDeviceMemory).
+static std::atomic<size_t> ck_pending_pack_bytes{0};
+
+static inline bool ckAdmissionGateOn()
+{
+  static const bool on =
+      CkDevicePoolOn() && getenv("CHARM_LB_NO_ADMISSION_GATE") == nullptr;
+  return on;
+}
+
+static inline bool ckGateDbg()
+{
+  static const bool on = (getenv("CHARM_DEBUG_GATE") != nullptr);
+  return on;
+}
+
+static inline size_t ckPoolBlock(size_t bytes)
+{
+  if (bytes == 0) return 0;
+  size_t b = 4;
+  while (b < bytes) b <<= 1;
+  return b;
+}
+
+// A move the balancer ordered is pending a pack from now until emigrate packs
+// it or hands the element over without packing. Only moves that will stage
+// count: a same-process move onto the same device is a handoff.
+static void ckNotePendingPack(CkLocRec* rec, int toPe)
+{
+  if (!ckAdmissionGateOn()) return;
+  static const bool intraProcDisabled =
+      (getenv("CHARM_NO_INTRAPROC_MIGRATE") != nullptr);
+  size_t bytes = ckPoolBlock(rec->lbGpuPupSize);
+  if (!intraProcDisabled && CmiNodeOf(toPe) == CkMyNode() &&
+      hapiDeviceForPe(toPe) == hapiDeviceForPe(CkMyPe()))
+    bytes = 0;
+  if (rec->pendingPackBytes > 0) ck_pending_pack_bytes -= rec->pendingPackBytes;
+  rec->pendingPackBytes = bytes;
+  if (bytes > 0) ck_pending_pack_bytes += bytes;
+}
+
+static void ckClearPendingPack(CkLocRec* rec)
+{
+  if (rec->pendingPackBytes == 0) return;
+  ck_pending_pack_bytes -= rec->pendingPackBytes;
+  rec->pendingPackBytes = 0;
+}
+
+// Whether a landing of `size` bytes may be taken from the pool now. The pool
+// can reach its arenas' free bytes and, by growing, the device's free bytes in
+// whole arenas.
+static bool ckLandingAdmissible(size_t size, size_t* reachOut, size_t* floorOut)
+{
+  size_t devFree = 0, poolFree = 0, arena = 0;
+  int slots = 0;
+  hapiLBDeviceMemory(&devFree, &poolFree, &arena, &slots);
+  const size_t reach = poolFree + (arena > 0 ? devFree / arena * arena : devFree);
+  const size_t floor = ck_pending_pack_bytes.load();
+  *reachOut = reach;
+  *floorOut = floor;
+  return reach >= ckPoolBlock(size) + floor;
+}
+#endif
+
 // Process-wide table of which PE inside this process currently owns each
 // element, keyed by the globally unique (array id, element id) pair.
 //
@@ -2701,6 +2784,9 @@ CkLocRec::~CkLocRec()
   // element is being destroyed without having emigrated (emigrate clears the
   // tag when it consumes it). Retire locally or the step never resumes.
   if (lbLedgerStep >= 0) lbmgr->ledgerRetireLocal(getID(), "element destroyed");
+#if CMK_CUDA
+  ckClearPendingPack(this);
+#endif
   stopTiming();
   DEBL((AA "Unregistering element %s from load balancer\n" AB, idx2str(idx)));
   lbmgr->UnregisterObj(ldHandle);
@@ -3056,6 +3142,10 @@ void CkLocRec::recvMigrate(int toPe)
   // record so emigrate can tell the destination whom to ack.
   const int step = lbmgr->ledgerRecord(getID(), toPe);
   if (step >= 0) lbLedgerStep = step;
+#if CMK_CUDA
+  // Its payload is owed from here: the admission gate keeps it free.
+  ckNotePendingPack(this, toPe);
+#endif
 #endif
   // we are in the mode of delaying actual migration
   // till readyMigrate()
@@ -3121,6 +3211,7 @@ void CkLocRec::setPupSize(size_t obj_pup_size)
 
 void CkLocRec::setGPUPupSize(size_t obj_gpu_pup_size)
 {
+  lbGpuPupSize = obj_gpu_pup_size;
   lbmgr->setGPUPupSize(ldHandle, obj_gpu_pup_size);
 }
 
@@ -3902,6 +3993,103 @@ bool did_inter_node_gpudirect_rdma(int srcPe, int dstPe) {
 #if CMK_CUDA
 void CkLocMgr::sendGPUMsg(CmiUInt8 id)
 {
+  if (ckAdmissionGateOn()) {
+    // Ask for the landing first (see ckLandingAdmissible). The payload waits
+    // in its pool block until the destination grants it.
+    const GPUMigrateData& gpuData = sendGPUBuffers[id];
+    thisProxy[gpuData.toPe].requestLanding(id, gpuData.size, CkMyPe());
+    return;
+  }
+  dispatchGPUMsg(id);
+}
+
+void CkLocMgr::landingGranted(CmiUInt8 id)
+{
+  if (sendGPUBuffers.find(id) == sendGPUBuffers.end())
+    CkAbort("PE %d: landing granted for migration %llu, which has no payload here",
+            CkMyPe(), (unsigned long long)id);
+  dispatchGPUMsg(id);
+}
+
+// Destination: grant the landing now, or queue it until the pool can take it
+// above the floor.
+void CkLocMgr::requestLanding(CmiUInt8 id, int size, int srcPe)
+{
+  DeferredLanding d;
+  d.id = id;
+  d.size = size;
+  d.srcPe = srcPe;
+  d.since = CkWallTimer();
+  deferredLandings.push_back(d);
+  admitLandings();
+}
+
+void CkLocMgr::admitLandings()
+{
+  // Strictly in arrival order: a large arrival is not starved by smaller ones
+  // taking the bytes it waits for.
+  while (!deferredLandings.empty()) {
+    DeferredLanding& d = deferredLandings.front();
+    size_t reach = 0, floor = 0;
+    // A landing that has waited this long is past anything the plan accounted
+    // for -- memory another allocation took, or a cycle of payloads each
+    // waiting on the other's landing. Take it anyway: the allocation either
+    // succeeds or fails the way it did before the gate existed, rather than
+    // hanging the job.
+    static const double timeout = []() {
+      const char* s = getenv("CHARM_LB_GATE_TIMEOUT");
+      return s ? atof(s) : 120.0;
+    }();
+    const bool expired = (CkWallTimer() - d.since) > timeout;
+    if (expired && !d.warned)
+      CkPrintf("[%d] WARNING: admitting a %d-byte migration landing after %.0f s "
+               "without the admission gate's guarantee (CHARM_LB_GATE_TIMEOUT)\n",
+               CkMyPe(), d.size, timeout);
+    if (!expired && !ckLandingAdmissible((size_t)d.size, &reach, &floor)) {
+      const double waited = CkWallTimer() - d.since;
+      if (ckGateDbg() && !d.reported)
+        CkPrintf("[GATE %d] defer id=%llu from PE %d: landing %zu, reach %zu, "
+                 "floor %zu\n", CkMyPe(), (unsigned long long)d.id, d.srcPe,
+                 ckPoolBlock((size_t)d.size), reach, floor);
+      if (!d.reported && landingDeferrals++ == 0)
+        CkPrintf("[%d] memory contract: a migration landing waits for device memory "
+                 "(admission gate; CHARM_DEBUG_GATE traces each)\n", CkMyPe());
+      d.reported = true;
+      if (waited > 30.0 && !d.warned) {
+        d.warned = true;
+        CkPrintf("[%d] WARNING: a %d-byte migration landing has waited %.0f s for "
+                 "device memory (pool reach %zu, pending packs %zu). The balancer "
+                 "planned this step against more memory than the device has now.\n",
+                 CkMyPe(), d.size, waited, reach, floor);
+      }
+      if (!landingRetryScheduled) {
+        landingRetryScheduled = true;
+        CcdCallFnAfter([](void* mgr, double) {
+          CkLocMgr* m = (CkLocMgr*)mgr;
+          m->landingRetryScheduled = false;
+          m->admitLandings();
+        }, this, 2.0);
+      }
+      return;
+    }
+    // Admitted: take the arena now, so the next check sees it gone.
+    hapiFootprintBegin(nullptr);
+    char* arena = (char*)CkDeviceMalloc((size_t)d.size);
+    hapiFootprintEnd();
+    if (arena == nullptr)
+      CkAbort("PE %d: device pool could not provide a %d-byte migration arena",
+              CkMyPe(), d.size);
+    grantedLandings[d.id] = arena;
+    if (ckGateDbg() && d.reported)
+      CkPrintf("[GATE %d] admit id=%llu after %.1f ms\n", CkMyPe(),
+               (unsigned long long)d.id, (CkWallTimer() - d.since) * 1e3);
+    thisProxy[d.srcPe].landingGranted(d.id);
+    deferredLandings.pop_front();
+  }
+}
+
+void CkLocMgr::dispatchGPUMsg(CmiUInt8 id)
+{
   if (migDbg())
     CkPrintf("[GPUSEND %d] dispatch id=%llu\n", CkMyPe(), (unsigned long long)id);
   auto gpuData = sendGPUBuffers[id];
@@ -3965,6 +4153,9 @@ void CkLocMgr::finishGPUSend(CmiUInt8 id)
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   if (CkDevicePoolOn()) {
     CkDeviceFree(it->second.data);   // the payload was a pool block
+    sendGPUBuffers.erase(it);
+    if (!deferredLandings.empty()) admitLandings();  // those bytes may be enough
+    return;
   } else if (csv_gpu_manager.use_shm) {
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
 #if CMK_SMP
@@ -4180,6 +4371,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #if CMK_CUDA
   gpuBufSize = p.gpu_size();
   nGpuBufs = p.gpu_buf_count();
+  if (gpuBufSize == 0) ckClearPendingPack(rec);  // nothing to pack after all
 #endif
 
   // Fast path: for intra-process (same CmiNode) migration, transfer ownership
@@ -4198,8 +4390,20 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
     if (gpuBufSize > 0)
       sameGpuRequirementMet = (hapiDeviceForPe(CkMyPe()) == hapiDeviceForPe(toPe));
 #endif
+#if CMK_CUDA
+    // A handoff packs nothing. Released before the call, which consumes rec.
+    CkLocRec* handedOff = sameGpuRequirementMet ? rec : nullptr;
+    size_t owed = handedOff ? handedOff->pendingPackBytes : 0;
+    if (handedOff) ckClearPendingPack(handedOff);
+#endif
     if (sameGpuRequirementMet && emigrateIntraProcess(rec, toPe))
       return;
+#if CMK_CUDA
+    if (handedOff && owed > 0) {  // not handed over after all: it will pack
+      handedOff->pendingPackBytes = owed;
+      ck_pending_pack_bytes += owed;
+    }
+#endif
   }
 
   // Anything the intra-process handoff above did not take stages from here --
@@ -4257,6 +4461,8 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
           if (gpuMsg == nullptr)
             CkAbort("PE %d: device pool could not provide a %zu-byte migration "
                     "payload (+gpupoolsize)", CkMyPe(), gpuBufSize);
+          // Packed: the floor no longer needs to keep these bytes free.
+          ckClearPendingPack(rec);
         } else {
           // Takes dm->lock itself, and reclaims retired IPC slots before giving
           // up -- this region is only ever freed by that scan.
@@ -4478,8 +4684,12 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
     data = nullptr;
     // Charged to nobody here; immigrate charges it to the element it becomes
     // storage for, once that element exists.
+    auto granted = grantedLandings.find(id);
     hapiFootprintBegin(nullptr);
-    if (ckMigrateArenaFromPool()) {
+    if (granted != grantedLandings.end()) {
+      data = granted->second;  // taken when the admission gate granted it
+      grantedLandings.erase(granted);
+    } else if (ckMigrateArenaFromPool()) {
       data = (char*)CkDeviceMalloc(size);
       if (data == nullptr)
         CkAbort("PE %d: device pool could not provide a %d-byte migration arena",

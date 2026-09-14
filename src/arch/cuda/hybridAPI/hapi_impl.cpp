@@ -3435,6 +3435,16 @@ size_t hapiDevPoolFreeBytesOn(int device) {
   return free;
 }
 
+size_t hapiDevPoolUsedBytesOn(int device) {
+  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  hapiDevPoolReapLocked();
+  size_t used = 0;
+  for (auto& ar : hapi_devpool_arenas)
+    if (ar.device == device)
+      used += (size_t)(ar.end - ar.start) - ar.alloc->get_free_size();
+  return used;
+}
+
 size_t hapiDevPoolArenaSize() { return hapiDevPoolArenaBytes(); }
 
 void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
@@ -3450,6 +3460,19 @@ void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
     // device bytes are shared by every process on the device.
     *poolFree = hapiDevPoolFreeBytesOn(CpvAccess(my_device_id));
     *arenaBytes = hapiDevPoolArenaBytes();
+    // CHARM_GPU_POOL_CAP_MB: a device of that size, for exercising the memory
+    // contract on a device with memory to spare. The pool may hand out at most
+    // that much in this process, and the device offers nothing beyond it. The
+    // balancer's stats and the admission gate both read it here.
+    static const size_t cap = []() {
+      const char* s = getenv("CHARM_GPU_POOL_CAP_MB");
+      return s ? (size_t)atol(s) << 20 : (size_t)0;
+    }();
+    if (cap > 0) {
+      const size_t used = hapiDevPoolUsedBytesOn(CpvAccess(my_device_id));
+      *poolFree = used < cap ? cap - used : 0;
+      *devFree = 0;
+    }
   } else if (csv_gpu_manager.use_shm) {
     DeviceManager* dm = csv_gpu_manager.device_map[CmiMyPe()];
     *poolFree = dm->get_lb_buffer_free_size();
