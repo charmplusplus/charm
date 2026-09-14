@@ -235,30 +235,12 @@ int MetricComm::popBestObject(int nbor)
   // over five trials, the uncalibrated path went +1% edge cut and 66 moves to
   // +14% and 40, with cut worsening as moves fell (34 moves -> +25%, 53 -> +1%).
   // A partial peel has more perimeter than either a whole one or none.
-  const bool seeding =
-      (nbor >= 0 && nbor < (int)movesTo.size()) ? (movesTo[nbor] == 0) : true;
-  // Once a piece is growing toward this neighbour, only objects adjacent to
-  // it may join. Selection used to take the best-scoring object that fit
-  // anywhere on the boundary when the piece's own frontier had none, which
-  // starts a second piece; under the receiver check that happened at every
-  // refused frontier object, and the lbsim cross cases came out as 12 pieces
-  // of 18 objects where one dimension gave 4 of 28. Now the piece grows or
-  // the neighbour is done for the step, and what is left unshed is the next
-  // step's business, as it is whenever a neighbour runs out.
-  const bool contiguous = !seeding && !growAnywhere && nbor >= 0 && nbor < (int)nearPiece.size();
-  auto onPiece = [&](int i) { return !contiguous || nearPiece[nbor][i]; };
-  bool seedOnBoundary = false;
-  if (seeding)
-  {
-    for (int i = 0; i < n_objs; i++)
-    {
-      if (!objAvailable[i] || !nodeStats->objData[i].migratable || !isAllowed(i)) continue;
-      if (diffusionObjLoad(nodeStats->objData[i]) > nborCapacity) continue;
-      if (!slackFits(nodeStats->objData[i], nbor)) continue;
-      if (externalComm[nbor][i] > 0.0) { seedOnBoundary = true; break; }
-    }
-  }
-
+  // One pass of the selection. asSeed: a piece toward this neighbour is being
+  // started, so the load band and the boundary requirement apply. confine:
+  // only the frontier of the piece already growing may be chosen. fieldEmpty
+  // reports a confined pass that found nothing usable at all -- as opposed to
+  // one whose candidates the receiver check refused.
+  //
   // What the band ranks on. One dimension: the object's load in it. Both
   // (LB_MODE_STEP): the load it takes off this node's binding term per unit
   // of step time it adds to the receiver -- an object that lands on the
@@ -273,86 +255,174 @@ int MetricComm::popBestObject(int nbor)
     const double rise = receiverRise(nodeStats->objData[i], nbor, nodeSize);
     return l / (rise + 0.01 * l + 1e-12);
   };
-
-  double heaviest = 0.0;
-  if (costCfg == NULL)
-  {
-    int refusedHere = 0;
-    for (int i = 0; i < n_objs; i++)
+  auto pass = [&](bool asSeed, bool confine, bool& deadFrontier) -> int {
+    double passBest = -std::numeric_limits<double>::max();
+    int passObject = -1;
+    int refusedPass = 0, zeroLoadPass = 0, positivePass = 0, immovablePass = 0;
+    auto onPiece = [&](int i) { return !confine || nearPiece[nbor][i]; };
+    bool seedOnBoundary = false;
+    if (asSeed)
     {
-      if (!objAvailable[i] || !nodeStats->objData[i].migratable || !isAllowed(i)) continue;
-      if (!onPiece(i)) continue;
-      if (seedOnBoundary && externalComm[nbor][i] <= 0.0) continue;
-      const double objLoad = diffusionObjLoad(nodeStats->objData[i]);
-      if (objLoad > nborCapacity) continue;
-      if (!slackFits(nodeStats->objData[i], nbor)) { refusedHere++; continue; }
-      const double e = effOf(i);
-      if (e > heaviest) heaviest = e;
+      for (int i = 0; i < n_objs; i++)
+      {
+        if (!objAvailable[i] || !nodeStats->objData[i].migratable || !isAllowed(i)) continue;
+        if (diffusionObjLoad(nodeStats->objData[i]) > nborCapacity) continue;
+        if (!slackFits(nodeStats->objData[i], nbor)) continue;
+        if (externalComm[nbor][i] > 0.0) { seedOnBoundary = true; break; }
+      }
     }
-    // Nothing with measurable load fits. Moving a zero-load object retires
-    // nothing and still costs a migration, so there is no candidate -- not
-    // the lightest one, which is what a plain minimum would hand back. When
-    // the slack check is what emptied the field, say so in the count.
-    if (heaviest <= 0.0)
-    {
-      slackRefusals += refusedHere;
-      return -1;
-    }
-  }
 
-  for (int i = 0; i < n_objs; i++)
-  {
-    if (!objAvailable[i]) continue;
-    if (!nodeStats->objData[i].migratable) continue;
-    if (!isAllowed(i)) continue;
-    if (!onPiece(i)) continue;
-
-    double objLoad = diffusionObjLoad(nodeStats->objData[i]);
-    if (objLoad > nborCapacity) continue;
-    if (!slackFits(nodeStats->objData[i], nbor)) { slackRefusals++; continue; }
-    if (seedOnBoundary && externalComm[nbor][i] <= 0.0) continue;
-
-    double score;
+    double heaviest = 0.0;
     if (costCfg == NULL)
     {
-      // The band picks the SEED of a chunk, not every object in it.
-      //
-      // Its job is to stop a node shedding its empty objects while its heavy
-      // ones stay put (sph2d: eight empty fluid patches moved, the node's GPU
-      // share went up). That risk is real only for the first pick, which has no
-      // context to go on but load. Once a move to this neighbour has been
-      // accepted, updateState has re-scored the departing object's partners so
-      // the edge-cut term names the objects ADJACENT to it -- and applying the
-      // band again there throws that away, because it re-ranks by load and
-      // jumps to whatever heavy object sits elsewhere on the node.
-      //
-      // That is what carved the hot region on the lbdriver stencil: every one of
-      // the 64 moved objects was a heavy cell, drawn from across the disc rather
-      // than peeled off its boundary, so the partition came apart. Growing the
-      // chunk instead lets cheap boundary objects join the move, which is how a
-      // partition boundary shifts without fragmenting.
-      //
-      // Zero-load objects stay excluded even while growing: they retire no
-      // budget, so a chunk made of them would never end.
-      if (seeding && effOf(i) < kLoadBand * heaviest) continue;
-      if (objLoad <= 0.0) continue;
-      score = externalComm[nbor][i] - internalComm[i];
-    }
-    else
-    {
-      const double benefit = DiffusionCostModel::loadBenefit(objLoad, remainingShed);
-      const double cost =
-          model.migrateCost(nodeStats->objData[i]) +
-          model.commDelta(internalComm[i], internalMsgs[i], externalComm[nbor][i],
-                          externalMsgs[nbor][i], destTier);
-      score = benefit - cost;
+      int refusedHere = 0;
+      for (int i = 0; i < n_objs; i++)
+      {
+        if (!objAvailable[i] || !isAllowed(i)) continue;
+        if (!onPiece(i)) continue;
+        if (!nodeStats->objData[i].migratable) { immovablePass++; continue; }
+        if (seedOnBoundary && externalComm[nbor][i] <= 0.0) continue;
+        const double objLoad = diffusionObjLoad(nodeStats->objData[i]);
+        if (objLoad > nborCapacity) continue;
+        if (!slackFits(nodeStats->objData[i], nbor)) { refusedHere++; continue; }
+        const double e = effOf(i);
+        if (e <= 0.0) { zeroLoadPass++; continue; }
+        if (e > heaviest) heaviest = e;
+      }
+      // Nothing with measurable load fits. Moving a zero-load object retires
+      // nothing and still costs a migration, so there is no candidate -- not
+      // the lightest one, which is what a plain minimum would hand back. When
+      // the slack check is what emptied the field, say so in the count.
+      if (heaviest <= 0.0)
+      {
+        slackRefusals += refusedHere;
+        deadFrontier = (refusedHere == 0 && (zeroLoadPass > 0 || immovablePass > 0));
+        if (_lb_args.debug() > 2)
+          CkPrintf("[PASS node %d] nbor %d asSeed %d confine %d: no load fits; refused %d "
+                   "zeroLoad %d immovable %d\n", myNodeId, nbor, (int)asSeed, (int)confine,
+                   refusedHere, zeroLoadPass, immovablePass);
+        return -1;
+      }
     }
 
-    if (score > bestScore)
+    for (int i = 0; i < n_objs; i++)
     {
-      bestScore = score;
-      bestObject = i;
+      if (!objAvailable[i]) continue;
+      if (!isAllowed(i)) continue;
+      if (!onPiece(i)) continue;
+      if (!nodeStats->objData[i].migratable) { immovablePass++; continue; }
+
+      double objLoad = diffusionObjLoad(nodeStats->objData[i]);
+      if (objLoad > nborCapacity) continue;
+      if (!slackFits(nodeStats->objData[i], nbor)) { slackRefusals++; refusedPass++; continue; }
+      if (seedOnBoundary && externalComm[nbor][i] <= 0.0) continue;
+      if (objLoad <= 0.0) zeroLoadPass++; else positivePass++;
+
+      double score;
+      if (costCfg == NULL)
+      {
+        // The band picks the SEED of a chunk, not every object in it.
+        //
+        // Its job is to stop a node shedding its empty objects while its heavy
+        // ones stay put (sph2d: eight empty fluid patches moved, the node's GPU
+        // share went up). That risk is real only for the first pick, which has
+        // no context to go on but load. Once a move to this neighbour has been
+        // accepted, updateState has re-scored the departing object's partners
+        // so the edge-cut term names the objects ADJACENT to it -- and applying
+        // the band again there throws that away, because it re-ranks by load
+        // and jumps to whatever heavy object sits elsewhere on the node.
+        //
+        // That is what carved the hot region on the lbdriver stencil: every
+        // one of the 64 moved objects was a heavy cell, drawn from across the
+        // disc rather than peeled off its boundary, so the partition came
+        // apart. Growing the chunk instead lets cheap boundary objects join
+        // the move, which is how a partition boundary shifts without
+        // fragmenting.
+        //
+        // Zero-load objects stay excluded even while growing: they retire no
+        // budget, so a chunk made of them would never end.
+        if (asSeed && effOf(i) < kLoadBand * heaviest) continue;
+        if (objLoad <= 0.0) continue;
+        score = externalComm[nbor][i] - internalComm[i];
+      }
+      else
+      {
+        const double benefit = DiffusionCostModel::loadBenefit(objLoad, remainingShed);
+        const double cost =
+            model.migrateCost(nodeStats->objData[i]) +
+            model.commDelta(internalComm[i], internalMsgs[i], externalComm[nbor][i],
+                            externalMsgs[nbor][i], destTier);
+        score = benefit - cost;
+      }
+      if (score > passBest)
+      {
+        passBest = score;
+        passObject = i;
+      }
     }
+    deadFrontier = (refusedPass == 0 && positivePass == 0 &&
+                    (zeroLoadPass > 0 || immovablePass > 0));
+    if (_lb_args.debug() > 2)
+    {
+      int onPieceAvail = 0;
+      for (int i = 0; i < n_objs; i++)
+        if (objAvailable[i] && onPiece(i)) onPieceAvail++;
+      CkPrintf("[PASS node %d] nbor %d asSeed %d confine %d -> obj %d; on piece %d, refused %d "
+               "zeroLoad %d positive %d immovable %d\n", myNodeId, nbor, (int)asSeed,
+               (int)confine, passObject, onPieceAvail, refusedPass, zeroLoadPass, positivePass,
+               immovablePass);
+    }
+    bestScore = passBest;
+    return passObject;
+  };
+
+  // Once a piece is growing toward this neighbour, only objects adjacent to
+  // it may join. Selection used to take the best-scoring object that fit
+  // anywhere on the boundary when the piece's own frontier had none, which
+  // starts a second piece; under the receiver check that happened at every
+  // refused frontier object, and the lbsim cross cases came out as 12 pieces
+  // of 18 objects where one dimension gave 4 of 28. So a frontier the
+  // receiver REFUSED still ends the neighbour for the step.
+  //
+  // A frontier that is DEAD WEIGHT does not. A piece can only grow along the
+  // comm graph, and on a graph where the heavy objects talk only to light
+  // ones the frontier of a heavy seed is a few objects that retire nothing:
+  // leanmd's computes each talk to their two cells and nothing else, and the
+  // cells carry no device load, so a piece seeded on a compute had a frontier
+  // of zero-load cells and the neighbour was done after one object with the
+  // whole excess unshed -- measured as 2 cross-node migrations a step at 1.6x
+  // device imbalance, and DiffusionLB losing to no balancing at all (285 vs
+  // 270 ms/step; 235 with the confinement lifted). When every object the
+  // frontier offers passes every filter but carries no load, start another
+  // piece the way the first one started: seeded on the boundary, so it
+  // arrives attached to the receiver.
+  //
+  // Only then. A frontier that is empty, or whose objects no longer fit the
+  // neighbour's quota, ends the neighbour as before: restarting there too
+  // was measured on the lbsim cross cases (32x32 stencil, 8 nodes, 12x host
+  // and 12x/20x device discs, 6 neighbours, no refinement) at 6 detached
+  // pieces and an edge cut of 186 where the stop gives 2 and 164 -- the
+  // restart seeds light boundary cells once the heavy ones no longer fit,
+  // one new piece each. With the dead-weight rule the stencil is unchanged
+  // and leanmd sheds its excess.
+  const bool pieceStarted =
+      (nbor >= 0 && nbor < (int)movesTo.size()) ? (movesTo[nbor] > 0) : false;
+  const bool confine =
+      pieceStarted && !growAnywhere && nbor >= 0 && nbor < (int)nearPiece.size();
+  bool deadFrontier = false;
+  bestObject = pass(!pieceStarted, confine, deadFrontier);
+  const bool noGo = (bestObject == -1) || (costCfg != NULL && bestScore <= 0.0);
+  if (_lb_args.debug() > 2)
+    CkPrintf("[PICK node %d] nbor %d capacity %.6f asSeed %d confine %d -> obj %d "
+             "(load %.6f) deadFrontier %d\n",
+             myNodeId, nbor, nborCapacity, (int)!pieceStarted, (int)confine, bestObject,
+             bestObject >= 0 ? diffusionObjLoad(nodeStats->objData[bestObject]) : 0.0,
+             (int)deadFrontier);
+  if (noGo && confine && deadFrontier)
+  {
+    bestObject = pass(true, false, deadFrontier);
+    if (_lb_args.debug() > 2)
+      CkPrintf("[PICK node %d] nbor %d restart -> obj %d\n", myNodeId, nbor, bestObject);
   }
 
   // A move that does not pay for itself is not made, even with quota left. An
@@ -369,16 +439,6 @@ int MetricComm::popBestObject(int nbor)
     acceptedMoves++;
   }
 
-  // if (bestObject != -1)
-  // {
-  //   assert(objAvailable[bestObject]);
-  //   objAvailable[bestObject] = false;
-  // }
-  // else
-  // {
-  //   CkPrintf("No object found for neighbor %d, with capacity %f\n", nbor,
-  //   nborCapacity);
-  // }
   return bestObject;
 };
 
