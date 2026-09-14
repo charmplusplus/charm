@@ -109,7 +109,8 @@ class Main : public CBase_Main {
     size_t min_size = 64;
 
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:x:i:w:o:b:r:")) != -1) {
+    size_t migHostMax = (size_t)4 << 20, migDevMax = (size_t)4 << 20;
+    while ((c = getopt(m->argc, m->argv, "s:x:i:w:o:b:r:H:D:")) != -1) {
       switch (c) {
         case 's': min_size = atol(optarg); break;
         case 'x': max_size = atol(optarg); break;
@@ -118,14 +119,22 @@ class Main : public CBase_Main {
         case 'o': outPath = optarg; break;
         case 'b': migBatch = atoi(optarg); break;
         case 'r': migRounds = atoi(optarg); break;
+        case 'H': migHostMax = (size_t)atol(optarg) << 20; break;
+        case 'D': migDevMax = (size_t)atol(optarg) << 20; break;
         default: CkAbort("usage: lbcalib [-s min] [-x max] [-i iters] [-w warmup] [-o out.conf] "
-                         "[-b migration batch] [-r migration round trips]\n");
+                         "[-b migration batch] [-r migration round trips] "
+                         "[-H max host MB per object] [-D max device MB per object]\n");
       }
     }
     // The migration points: a host sweep with no device state, then a device
-    // sweep with a small host part, so the two slopes separate.
-    for (size_t h = 4096; h <= (size_t)4 << 20; h *= 4) migPoints.push_back(MigPoint{h, 0, 0.0});
-    for (size_t d = (size_t)256 << 10; d <= (size_t)16 << 20; d *= 4) migPoints.push_back(MigPoint{4096, d, 0.0});
+    // sweep with a small host part, so the two slopes separate. The largest
+    // device point times the batch is what the pool has to land at once; the
+    // 4 MB default keeps a batch of 32 inside one 256 MB arena. (A 16 MB
+    // point, 512 MB per batch, made both processes grow to four arenas and
+    // the destination died in the landing: arenas added after startup are
+    // not pre-opened on the peers the way the first one is.)
+    for (size_t h = 4096; h <= migHostMax; h *= 4) migPoints.push_back(MigPoint{h, 0, 0.0});
+    for (size_t d = (size_t)256 << 10; d <= migDevMax; d *= 2) migPoints.push_back(MigPoint{4096, d, 0.0});
     delete m;
 
     // Geometric sweep. A linear sweep would put nearly every sample in the
