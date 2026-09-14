@@ -33,9 +33,21 @@ static void lbinit()
   LBTurnCommOn();
 }
 
+static bool metisRemapOn();
+static double metisMinGain();
+static double metisStickiness();
+
 MetisLB::MetisLB(const CkLBOptions& opt) : CBase_MetisLB(opt)
 {
   lbname = "MetisLB";
+  // Read the options now, at startup. Converse removes an option from argv
+  // when it is read, and reading +LBMetisStickiness lazily at the first
+  // balance left its value in argv for the application to parse: leanmd took
+  // the 0.5 as one of its positional arguments, zeroed its balancing period,
+  // and died of a divide by zero in its step test (SIGFPE in Cell::_if_7).
+  metisRemapOn();
+  metisMinGain();
+  metisStickiness();
   // A partitioner is only as good as its edges. Communication instrumentation
   // is off by default, and MetisLB run on its own had been partitioning a
   // graph with no edges at all (every cut reported 0.0): its output was an
@@ -94,6 +106,28 @@ static double metisMinGain()
   return frac;
 }
 
+// What staying put is worth to an object, as a fraction of the traffic it
+// has with its neighbours: an edge of that weight to the anchor of the part
+// it is in now (see partitionSubset). METIS partitions from scratch, and a
+// vertex whose neighbours are split between two parts -- a leanmd compute,
+// with one cell on each side -- pays the same cut in either, so from scratch
+// half of them change sides for nothing: 5845 of 7168 moved at a step that
+// balanced device load 0.93 -> 0.64, where DiffusionLB reached the same
+// balance moving ~1200. With the fraction set, a move has to save at least
+// that much traffic to be made. 0 (the default) keeps the from-scratch
+// partition; +LBMetisStickiness overrides.
+static double metisStickiness()
+{
+  static const double frac = []() {
+    double f = 0.0;
+    CmiGetArgDoubleDesc(CkGetArgv(), "+LBMetisStickiness", &f,
+                        "MetisLB: weight of an object's current placement, as a fraction of "
+                        "its communication (default 0: partition from scratch)");
+    return f;
+  }();
+  return frac;
+}
+
 // sigma[part]: the label that part takes. current[k] is vertex k's label now,
 // or -1 when it has none among these; target[p] a part's share, and labels
 // are exchanged only between parts of near-equal share.
@@ -107,13 +141,14 @@ static double metisMinGain()
 // most that fraction of a share, inside the 10% it was allowed anyway.
 static const double kRelabelShareTolerance = 0.05;
 
-static std::vector<int> relabelForOverlap(const std::vector<idx_t>& partOf, int nparts,
-                                          const std::vector<int>& current,
-                                          const std::vector<std::vector<double>>& target)
+// The greedy assignment both relabels share: overlap[part][label] is what
+// giving `part` the name `label` is worth -- how many of its vertices carry
+// that label now (relabelForOverlap), or how much traffic its vertices have
+// with the fixed objects under that label (the anchored partition in work()).
+static std::vector<int> relabelByWeight(const std::vector<std::vector<double>>& overlap,
+                                        int nparts,
+                                        const std::vector<std::vector<double>>& target)
 {
-  std::vector<std::vector<int>> overlap(nparts, std::vector<int>(nparts, 0));
-  for (size_t k = 0; k < partOf.size(); k++)
-    if (current[k] >= 0 && current[k] < nparts) overlap[partOf[k]][current[k]]++;
   auto sameShare = [&](int a, int b) {
     for (size_t c = 0; c < target[a].size() && c < target[b].size(); c++)
     {
@@ -124,11 +159,11 @@ static std::vector<int> relabelForOverlap(const std::vector<idx_t>& partOf, int 
     }
     return true;
   };
-  struct Pair { int n, part, label; };
+  struct Pair { double n; int part, label; };
   std::vector<Pair> pairs;
   for (int p = 0; p < nparts; p++)
     for (int l = 0; l < nparts; l++)
-      if (overlap[p][l] > 0 && sameShare(p, l)) pairs.push_back(Pair{overlap[p][l], p, l});
+      if (overlap[p][l] > 0.0 && sameShare(p, l)) pairs.push_back(Pair{overlap[p][l], p, l});
   std::sort(pairs.begin(), pairs.end(), [](const Pair& a, const Pair& b) {
     if (a.n != b.n) return a.n > b.n;
     if (a.part != b.part) return a.part < b.part;
@@ -169,6 +204,16 @@ static std::vector<int> relabelForOverlap(const std::vector<idx_t>& partOf, int 
           break;
         }
   return sigma;
+}
+
+static std::vector<int> relabelForOverlap(const std::vector<idx_t>& partOf, int nparts,
+                                          const std::vector<int>& current,
+                                          const std::vector<std::vector<double>>& target)
+{
+  std::vector<std::vector<double>> overlap(nparts, std::vector<double>(nparts, 0.0));
+  for (size_t k = 0; k < partOf.size(); k++)
+    if (current[k] >= 0 && current[k] < nparts) overlap[partOf[k]][current[k]] += 1.0;
+  return relabelByWeight(overlap, nparts, target);
 }
 
 void MetisLB::work(LDStats* stats)
@@ -382,6 +427,9 @@ void MetisLB::work(LDStats* stats)
   METIS_SetDefaultOptions(options.data());
   options[METIS_OPTION_NUMBERING] = 0;   // C style numbering
 
+  // Edges to fixed objects the last partitionSubset call kept (see below).
+  long long lastFixedEdges = 0;
+
   // Partition the subgraph induced by `verts` into `nparts`, returning a part
   // number per entry of `verts`. Edges leaving the subset are dropped: at the
   // second level they are the traffic the first level already decided to pay.
@@ -389,24 +437,88 @@ void MetisLB::work(LDStats* stats)
   // usual 1.1 for every one. `tier` is what a cut edge is paid at: across
   // groups the transport between two GPUs, within a group the one between
   // two PEs of a process.
+  //
+  // Edges to FIXED objects are kept. A non-migratable object is not a vertex
+  // of the subgraph, but it sits in one of the parts being cut and the
+  // traffic between it and a migratable object is paid exactly as any other
+  // cut edge is, unless the object lands in that part. Dropping those edges
+  // -- what this did -- left leanmd's computes, which talk only to their
+  // (non-migratable) cells, as a graph with no edges at all: METIS balanced
+  // their device load and scattered them, every position and force message
+  // crossed a process, and the step after the balance ran slower than with
+  // no balancing (276 vs 250 ms, host and launch terms up by half).
+  //
+  // METIS has no fixed vertices, so the traffic is carried by one anchor
+  // vertex per part: an edge from a migratable vertex to the anchor of part p
+  // weighs what that vertex exchanges with the fixed objects of p. Anchors
+  // carry the least weight METIS allows, so the balance is unchanged, and
+  // METIS keeps each anchor with the vertices that talk to it. Which part
+  // METIS gives an anchor is arbitrary, as all its part numbers are; the
+  // caller relabels the parts so that each takes the label of the fixed
+  // objects its vertices talk to most (fixedOverlap[part][label], the summed
+  // edge cost, filled in only when any such edge exists). `fixedPartOf` says
+  // which part a vertex outside the subset is fixed in, or -1 for one that is
+  // not fixed here (a migratable vertex of another group at the second
+  // level, whose edge stays dropped as before).
+  //
+  // The same anchors carry stickiness (metisStickiness): a vertex's edge to
+  // the anchor of the part it is in now, `currentPartOf`, worth that fraction
+  // of its traffic, so that staying is preferred over a move that saves
+  // nothing. That term counts toward the relabel too, since it says where
+  // the vertices came from.
   auto partitionSubset = [&](const std::vector<int>& verts, idx_t nparts,
                              const std::vector<real_t>* tpwgts,
                              const std::vector<idx_t>& weights,
                              int ncon_in,
                              const std::vector<real_t>* ubvecIn,
-                             DiffusionTier tier) -> std::vector<idx_t>
+                             DiffusionTier tier,
+                             const std::function<int(int)>& fixedPartOf,
+                             const std::function<int(int)>& currentPartOf,
+                             std::vector<std::vector<double>>* fixedOverlap) -> std::vector<idx_t>
   {
     const idx_t nv = (idx_t)verts.size();
     std::vector<idx_t> parts(verts.size(), 0);
+    if (fixedOverlap) fixedOverlap->clear();
+    lastFixedEdges = 0;
     if (nv == 0 || nparts <= 1) return parts;
 
     std::unordered_map<int, idx_t> local;
     local.reserve(verts.size() * 2);
     for (idx_t k = 0; k < nv; k++) local[verts[k]] = k;
 
-    std::vector<idx_t> xadj(nv + 1), adjncy, adjwgt;
+    // Per vertex, the cost of its traffic with the fixed objects of each
+    // part, then its stickiness to the part it is in now.
+    std::vector<std::map<int, double>> fixedAff(nv);
+    long long fixedEdges = 0;
+    const double stick = metisStickiness();
+    for (idx_t k = 0; k < nv; k++)
+    {
+      double total = 0.0;
+      for (const auto& nb : adj[verts[k]])
+      {
+        const double c = edgeCost(nb.second, tier);
+        if (local.find(nb.first) != local.end()) { total += c; continue; }
+        const int p = fixedPartOf(nb.first);
+        if (p < 0 || p >= (int)nparts) continue;
+        fixedAff[k][p] += c;
+        total += c;
+        fixedEdges++;
+      }
+      if (stick > 0.0 && total > 0.0)
+      {
+        const int cur = currentPartOf(verts[k]);
+        if (cur >= 0 && cur < (int)nparts) fixedAff[k][cur] += stick * total;
+      }
+    }
+    lastFixedEdges = fixedEdges;
+    bool anchored = false;
+    for (idx_t k = 0; k < nv && !anchored; k++) anchored = !fixedAff[k].empty();
+    const idx_t nAll = nv + (anchored ? nparts : 0);
+
+    std::vector<std::vector<std::pair<idx_t, double>>> anchorEdges(anchored ? nparts : 0);
+    std::vector<idx_t> xadj(nAll + 1), adjncy, adjwgt;
     std::vector<double> cost;
-    std::vector<idx_t> lvwgt((size_t)nv * ncon_in);
+    std::vector<idx_t> lvwgt((size_t)nAll * ncon_in, 1);  // anchors: the least weight
     idx_t e = 0;
     for (idx_t k = 0; k < nv; k++)
     {
@@ -421,8 +533,27 @@ void MetisLB::work(LDStats* stats)
         cost.push_back(edgeCost(nb.second, tier));
         e++;
       }
+      for (const auto& fa : fixedAff[k])
+      {
+        const double c = fa.second;
+        adjncy.push_back(nv + (idx_t)fa.first);
+        cost.push_back(c);
+        e++;
+        anchorEdges[fa.first].push_back(std::make_pair(k, c));
+      }
     }
-    xadj[nv] = e;
+    // The anchors' own lists: METIS wants every edge from both ends.
+    for (idx_t p = 0; p < (anchored ? nparts : 0); p++)
+    {
+      xadj[nv + p] = e;
+      for (const auto& ae : anchorEdges[p])
+      {
+        adjncy.push_back(ae.first);
+        cost.push_back(ae.second);
+        e++;
+      }
+    }
+    xadj[nAll] = e;
     // Positive and in range: idx_t is 32 bits in a stock METIS build. Without
     // a table the weight is the byte count summed over the instrumented
     // window, capped; with one it is seconds per interval, scaled so the
@@ -441,14 +572,23 @@ void MetisLB::work(LDStats* stats)
     // METIS reads the zeroth element even when there are no edges.
     if (adjncy.empty()) { adjncy.push_back(0); adjwgt.push_back(1); }
 
-    idx_t ncon = ncon_in, nv_arg = nv, np = nparts, edgecut = 0;
+    idx_t ncon = ncon_in, nv_arg = nAll, np = nparts, edgecut = 0;
     std::vector<real_t> ubvec(ncon_in, (real_t)1.1);
     if (ubvecIn != nullptr)
       for (int c = 0; c < ncon_in && c < (int)ubvecIn->size(); c++) ubvec[c] = (*ubvecIn)[c];
+    std::vector<idx_t> partsAll(nAll, 0);
     METIS_PartGraphRecursive(&nv_arg, &ncon, xadj.data(), adjncy.data(), lvwgt.data(),
                              nullptr, adjwgt.data(), &np,
                              tpwgts ? const_cast<real_t*>(tpwgts->data()) : nullptr,
-                             ubvec.data(), options.data(), &edgecut, parts.data());
+                             ubvec.data(), options.data(), &edgecut, partsAll.data());
+    std::copy(partsAll.begin(), partsAll.begin() + nv, parts.begin());
+    if (anchored && fixedOverlap)
+    {
+      fixedOverlap->assign(nparts, std::vector<double>(nparts, 0.0));
+      for (idx_t k = 0; k < nv; k++)
+        for (const auto& fa : fixedAff[k])
+          (*fixedOverlap)[partsAll[k]][fa.first] += fa.second;
+    }
     return parts;
   };
 
@@ -660,15 +800,30 @@ void MetisLB::work(LDStats* stats)
   std::vector<real_t> ubvecCross(nConstraints, (real_t)1.1);
   if (memAware) ubvecCross[1] = (real_t)memUbvec;
   if (slackIdx >= 0) ubvecCross[slackIdx] = (real_t)slackUbvec;
+  // A fixed object's group, for the edges to it.
+  auto fixedGroupOf = [&](int v) -> int {
+    if (ogr->vertices[v].isMigratable()) return -1;
+    const int pe = ogr->vertices[v].getCurrentPe();
+    return (pe >= 0 && pe < (int)groupOfPe.size()) ? groupOfPe[pe] : -1;
+  };
+  auto currentGroupOf = [&](int v) -> int {
+    const int pe = ogr->vertices[v].getCurrentPe();
+    return (pe >= 0 && pe < (int)groupOfPe.size()) ? groupOfPe[pe] : -1;
+  };
+  std::vector<std::vector<double>> fixedOverlap;
   const std::vector<idx_t> groupOf = partitionSubset(
       migVerts, nGroups, nGroups > 1 ? &tpwgts : nullptr, vwgtCross, nConstraints, &ubvecCross,
-      crossTier);
+      crossTier, fixedGroupOf, currentGroupOf, &fixedOverlap);
+  const long long fixedEdgesLevelOne = lastFixedEdges;
 
-  // Scratch-remap, level one: the group each part becomes is the group its
+  // Level one's labels. With edges to fixed objects the part numbers are
+  // relabelled to the groups whose fixed objects the parts talk to most:
+  // that is what makes the anchors mean anything, so it is not optional.
+  // Otherwise scratch-remap: the group each part becomes is the group its
   // objects mostly come from, where the shares allow.
   std::vector<idx_t> groupLabel = groupOf;
   int relabelledGroups = 0, relabelledPes = 0;
-  if (metisRemapOn() && nGroups > 1)
+  if (nGroups > 1 && (metisRemapOn() || !fixedOverlap.empty()))
   {
     std::vector<int> cur(migVerts.size(), -1);
     for (size_t k = 0; k < migVerts.size(); k++)
@@ -680,11 +835,17 @@ void MetisLB::work(LDStats* stats)
     for (idx_t g = 0; g < nGroups; g++)
       for (int c = 0; c < nConstraints; c++)
         shares[g].push_back(tpwgts[(size_t)g * nConstraints + c]);
-    const std::vector<int> sigma = relabelForOverlap(groupOf, (int)nGroups, cur, shares);
+    const std::vector<int> sigma =
+        fixedOverlap.empty() ? relabelForOverlap(groupOf, (int)nGroups, cur, shares)
+                             : relabelByWeight(fixedOverlap, (int)nGroups, shares);
     for (idx_t g = 0; g < nGroups; g++)
       if (sigma[g] != (int)g) relabelledGroups++;
     for (size_t k = 0; k < migVerts.size(); k++) groupLabel[k] = sigma[groupOf[k]];
   }
+  if (_lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer && fixedEdgesLevelOne > 0)
+    CkPrintf("[%d] MetisLB level one: %lld edge(s) to fixed objects kept through %d anchor(s); "
+             "%d group part(s) relabelled to the fixed objects they talk to\n",
+             CkMyPe(), fixedEdgesLevelOne, (int)nGroups, relabelledGroups);
 
   // What level one actually achieved in the dimension it balanced, group by
   // group, against where the objects came from. METIS's tolerance is a
@@ -753,14 +914,32 @@ void MetisLB::work(LDStats* stats)
     }
     for (auto& t : tpwgts2) t = (real_t)(t / sum2);
 
+    // A fixed object's PE within this group, for the edges to it; one in
+    // another group is not this level's to place around.
+    auto fixedPeIdxOf = [&](int v) -> int {
+      if (ogr->vertices[v].isMigratable()) return -1;
+      const int pe = ogr->vertices[v].getCurrentPe();
+      for (size_t j = 0; j < pes.size(); j++)
+        if (pes[j] == pe) return (int)j;
+      return -1;
+    };
+    auto currentPeIdxOf = [&](int v) -> int {
+      const int pe = ogr->vertices[v].getCurrentPe();
+      for (size_t j = 0; j < pes.size(); j++)
+        if (pes[j] == pe) return (int)j;
+      return -1;  // arriving from another group: no place here to keep
+    };
+    std::vector<std::vector<double>> fixedOverlap2;
     const std::vector<idx_t> peOf = partitionSubset(
         grpVerts[g], (idx_t)pes.size(), pes.size() > 1 ? &tpwgts2 : nullptr,
-        vwgtIntra, 1, nullptr, DIFF_TIER_INTRA_PROCESS);
+        vwgtIntra, 1, nullptr, DIFF_TIER_INTRA_PROCESS, fixedPeIdxOf, currentPeIdxOf,
+        &fixedOverlap2);
 
-    // Scratch-remap, level two: the PE each part becomes is the PE its
-    // objects mostly come from, where the shares allow.
+    // Level two's labels: to the PEs whose fixed objects the parts talk to
+    // most when there are such edges, else scratch-remap to the PE each
+    // part's objects mostly come from, where the shares allow.
     std::vector<idx_t> peLabel = peOf;
-    if (metisRemapOn() && pes.size() > 1)
+    if (pes.size() > 1 && (metisRemapOn() || !fixedOverlap2.empty()))
     {
       std::vector<int> cur(grpVerts[g].size(), -1);
       for (size_t k = 0; k < grpVerts[g].size(); k++)
@@ -775,7 +954,9 @@ void MetisLB::work(LDStats* stats)
       }
       std::vector<std::vector<double>> shares(pes.size());
       for (size_t j = 0; j < pes.size(); j++) shares[j].push_back(tpwgts2[j]);
-      const std::vector<int> sigma = relabelForOverlap(peOf, (int)pes.size(), cur, shares);
+      const std::vector<int> sigma =
+          fixedOverlap2.empty() ? relabelForOverlap(peOf, (int)pes.size(), cur, shares)
+                                : relabelByWeight(fixedOverlap2, (int)pes.size(), shares);
       for (size_t j = 0; j < pes.size(); j++)
         if (sigma[j] != (int)j) relabelledPes++;
       for (size_t k = 0; k < grpVerts[g].size(); k++) peLabel[k] = sigma[peOf[k]];
