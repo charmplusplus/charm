@@ -10,6 +10,9 @@
 
 #include "charm++.h"
 #include "ShedLB.h"
+#if CMK_CUDA
+#include "LBMemoryContract.h"
+#endif
 
 #include <algorithm>
 #include <cmath>
@@ -157,6 +160,27 @@ void ShedLB::work(LDStats* stats)
   int moves = 0;
   double shedBytes = 0.0;
 
+  // Memory is a constraint here, not the objective: the bytes a move stages
+  // are still what shedding minimises, and a destination is only a candidate
+  // if it can hold what the object holds (the memory contract's I-final). The
+  // two differ under the device pool -- a Compute stages its live prefix but
+  // holds its capacity. Staging and IPC slots are the batch planner's.
+#if CMK_CUDA
+  LBMemoryModel memModel;
+  memModel.build(stats);
+  MemoryLedger ledger;
+  ledger.init(&memModel, 0.95, /*waveStaging=*/false);
+  int memRefusals = 0;
+#endif
+  // Where an object placed in each bin would go: its least host-loaded PE.
+  auto landingPe = [&](int b) {
+    int dstPe = bins[b].pes[0];
+    for (int pe : bins[b].pes)
+      if (peCpu[pe] < peCpu[dstPe]) dstPe = pe;
+    return dstPe;
+  };
+  std::vector<int> binPe(nbins);
+
   for (;;)
   {
     int h = 0;
@@ -164,6 +188,7 @@ void ShedLB::work(LDStats* stats)
       if (bins[b].load > bins[h].load) h = b;
     if (bins[h].load <= T) break;
     const double excess = bins[h].load - T;
+    for (int b = 0; b < nbins; b++) binPe[b] = landingPe(b);
 
     int pick = -1, pickDst = -1;
     double pickScore = -1.0, pickSmallest = std::numeric_limits<double>::max();
@@ -180,7 +205,16 @@ void ShedLB::work(LDStats* stats)
       {
         if (b == h) continue;
         const double after = bins[b].load + c.load;
-        if (after <= T && after > bestAfter) { bestAfter = after; dst = b; }
+        if (!(after <= T && after > bestAfter)) continue;
+#if CMK_CUDA
+        if (!ledger.feasible(c.idx, stats->from_proc[c.idx], binPe[b]))
+        {
+          memRefusals++;
+          continue;
+        }
+#endif
+        bestAfter = after;
+        dst = b;
       }
       if (dst < 0) continue;   // nowhere to put it: not a candidate at all
 
@@ -207,11 +241,12 @@ void ShedLB::work(LDStats* stats)
     // Within the destination bin, the least host-loaded PE. Host time decides
     // only this, never which bin the object lands on.
     const int oldPe = stats->from_proc[c.idx];
-    int dstPe = bins[pickDst].pes[0];
-    for (int pe : bins[pickDst].pes)
-      if (peCpu[pe] < peCpu[dstPe]) dstPe = pe;
+    const int dstPe = binPe[pickDst];
     if (dstPe != oldPe)
     {
+#if CMK_CUDA
+      ledger.commit(c.idx, oldPe, dstPe);
+#endif
       stats->to_proc[c.idx] = dstPe;
       peCpu[dstPe] += stats->objData[c.idx].wallTime;
       peCpu[oldPe] -= stats->objData[c.idx].wallTime;
@@ -227,6 +262,11 @@ void ShedLB::work(LDStats* stats)
              "%d of %d objects moved, %.1f MB staged\n",
              nbins, useGpu ? "device" : "host", maxLoad / avg, after / avg,
              1.0 + eps, moves, (int)cands.size(), shedBytes / 1e6);
+#if CMK_CUDA
+    if (memRefusals > 0)
+      CkPrintf("[ShedLB] %d destination check(s) refused because the bin could not "
+               "hold the object\n", memRefusals);
+#endif
   }
 }
 
