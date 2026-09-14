@@ -13,6 +13,11 @@ mainmodule lbcalib {
     entry void sampleDone(double seconds);
     entry void runNextSize();
     entry void runNextTier();
+    // Migration sweep: the movers of one size point report in as they are
+    // built and as they land.
+    entry void moverReady();
+    entry void moverArrived();
+    entry void runNextMigPoint();
   };
 
   group Calib {
@@ -25,5 +30,12 @@ mainmodule lbcalib {
     entry void startSweep(size_t size);
     entry void ping(size_t size, nocopydevice char data[size]);
     entry void pong(size_t size, nocopydevice char data[size]);
+  };
+
+  // An object of known host and device footprint that migrates on request,
+  // through the same pack / stage / land / unpack path a balancer's move takes.
+  array [1D] Mover {
+    entry Mover(size_t hostBytes, size_t devBytes);
+    entry void moveTo(int pe);
   };
 };

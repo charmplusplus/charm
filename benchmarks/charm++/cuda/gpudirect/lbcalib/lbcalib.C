@@ -26,9 +26,19 @@
 //    tiers -- and expect the absolute scale to need an end-to-end correction.
 //    DiffusionLB's own predicted-vs-actual residual is the intended source of
 //    that correction.
+//
+// 3. Migration is measured, not derived. After the transfer sweeps a batch of
+//    objects with a known host and device footprint migrates between the PEs
+//    of the most expensive same-host tier the launch exposes (cross-GPU IPC,
+//    else intra-process) through the same pack / stage / land / unpack path a
+//    balancer's move takes, and the batch time per object is fitted as
+//    alpha + beta_host * hostBytes + beta_device * devBytes. The batch is what
+//    a balancing step pays, so the per-object figure is the batch time divided
+//    by the batch, which is what the cost model sums over a step's moves.
 
 #include "lbcalib.decl.h"
 #include "hapi.h"
+#include "ckrdmadevice.h"
 #include <algorithm>
 #include <vector>
 #include <string>
@@ -76,6 +86,19 @@ class Main : public CBase_Main {
   std::string outPath;
   int devicesPerHost = 0;
 
+  // Migration sweep. Each point is (hostBytes, devBytes) for a batch of
+  // migBatch objects that migrate src -> dst -> src, migRounds round trips;
+  // the sample is the mean batch time per object.
+  struct MigPoint { size_t hostBytes, devBytes; double perObject; };
+  std::vector<MigPoint> migPoints;
+  int migIdx = 0, migBatch = 32, migRounds = 3;
+  int migTier = -1, migSrc = -1, migDst = -1;
+  int migReady = 0, migArrived = 0, migLeg = 0;
+  double migStart = 0.0, migAccum = 0.0;
+  CProxy_Mover movers;
+  bool haveMigrate = false;
+  double migAlpha = 0.0, migBetaHost = 0.0, migBetaDevice = 0.0, migRsq = 0.0;
+
  public:
   Main(CkArgMsg* m) {
     main_proxy = thisProxy;
@@ -86,16 +109,23 @@ class Main : public CBase_Main {
     size_t min_size = 64;
 
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:x:i:w:o:")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:x:i:w:o:b:r:")) != -1) {
       switch (c) {
         case 's': min_size = atol(optarg); break;
         case 'x': max_size = atol(optarg); break;
         case 'i': n_iters = atoi(optarg); break;
         case 'w': warmup_iters = atoi(optarg); break;
         case 'o': outPath = optarg; break;
-        default: CkAbort("usage: lbcalib [-s min] [-x max] [-i iters] [-w warmup] [-o out.conf]\n");
+        case 'b': migBatch = atoi(optarg); break;
+        case 'r': migRounds = atoi(optarg); break;
+        default: CkAbort("usage: lbcalib [-s min] [-x max] [-i iters] [-w warmup] [-o out.conf] "
+                         "[-b migration batch] [-r migration round trips]\n");
       }
     }
+    // The migration points: a host sweep with no device state, then a device
+    // sweep with a small host part, so the two slopes separate.
+    for (size_t h = 4096; h <= (size_t)4 << 20; h *= 4) migPoints.push_back(MigPoint{h, 0, 0.0});
+    for (size_t d = (size_t)256 << 10; d <= (size_t)16 << 20; d *= 4) migPoints.push_back(MigPoint{4096, d, 0.0});
     delete m;
 
     // Geometric sweep. A linear sweep would put nearly every sample in the
@@ -165,7 +195,7 @@ class Main : public CBase_Main {
 
   void runNextTier() {
     while (tier < TIER_COUNT && !haveTier[tier]) tier++;
-    if (tier >= TIER_COUNT) { writeConfig(); return; }
+    if (tier >= TIER_COUNT) { runMigration(); return; }
     sizeIdx = 0;
     timesForTier.assign(sizes.size(), 0.0);
     calib_proxy.setPair(pairA[tier], pairB[tier]);
@@ -214,6 +244,112 @@ class Main : public CBase_Main {
              tierName(tier), a, b, rsq[tier]);
   }
 
+  // ---- migration sweep --------------------------------------------------
+  //
+  // The pair: the costliest same-host tier the launch has, since that is the
+  // move a balancer makes across GPUs; intra-process if that is all there is
+  // (a handoff, which the runtime does not stage). Inter-node is not used even
+  // when present: a table is per host type, and the network move is priced by
+  // the inter_node transfer tier.
+  void runMigration() {
+    for (int t : {TIER_IPC_CROSS_GPU, TIER_IPC_SAME_GPU, TIER_INTRA_PROCESS})
+      if (haveTier[t]) { migTier = t; migSrc = pairA[t]; migDst = pairB[t]; break; }
+    if (migTier < 0) {
+      CkPrintf("lbcalib: no same-host pair to migrate between; migration cost stays estimated\n");
+      writeConfig();
+      return;
+    }
+    CkPrintf("=== migration: %d objects per batch, %d round trip(s), PE %d <-> PE %d (%s)\n",
+             migBatch, migRounds, migSrc, migDst, tierName(migTier));
+    migIdx = 0;
+    startMigPoint();
+  }
+
+  void startMigPoint() {
+    const MigPoint& pt = migPoints[migIdx];
+    migReady = 0; migArrived = 0; migLeg = 0; migAccum = 0.0;
+    CkArrayOptions opts;
+    movers = CProxy_Mover::ckNew(opts);
+    for (int i = 0; i < migBatch; i++) movers[i].insert(pt.hostBytes, pt.devBytes, migSrc);
+    movers.doneInserting();
+  }
+
+  void moverReady() {
+    if (++migReady < migBatch) return;
+    startLeg();
+  }
+
+  void startLeg() {
+    migArrived = 0;
+    migStart = CkWallTimer();
+    movers.moveTo((migLeg % 2 == 0) ? migDst : migSrc);
+  }
+
+  void moverArrived() {
+    if (++migArrived < migBatch) return;
+    const double leg = CkWallTimer() - migStart;
+    // The first leg also pays for the destination's first look at the source
+    // arena (the IPC import); every later one is the steady case a balancer
+    // sees, so only those count.
+    if (migLeg > 0) migAccum += leg;
+    if (++migLeg < 2 * migRounds) { startLeg(); return; }
+    MigPoint& pt = migPoints[migIdx];
+    pt.perObject = migAccum / (double)(2 * migRounds - 1) / (double)migBatch;
+    CkPrintf("  migrate %8zu B host + %9zu B device: %10.3f us per object (batch of %d)\n",
+             pt.hostBytes, pt.devBytes, pt.perObject * 1e6, migBatch);
+    movers.ckDestroy();
+    migIdx++;
+    thisProxy.runNextMigPoint();
+  }
+
+  void runNextMigPoint() {
+    if (migIdx >= (int)migPoints.size()) { fitMigration(); writeConfig(); return; }
+    startMigPoint();
+  }
+
+  // Least squares of t = alpha + bh*host + bd*device over the points: the
+  // normal equations of a 3-parameter fit, solved directly.
+  void fitMigration() {
+    const int N = (int)migPoints.size();
+    double A[3][3] = {{0,0,0},{0,0,0},{0,0,0}}, B[3] = {0,0,0};
+    for (int i = 0; i < N; i++) {
+      const double x[3] = {1.0, (double)migPoints[i].hostBytes, (double)migPoints[i].devBytes};
+      const double y = migPoints[i].perObject;
+      for (int r = 0; r < 3; r++) { B[r] += x[r] * y; for (int c = 0; c < 3; c++) A[r][c] += x[r] * x[c]; }
+    }
+    // Gaussian elimination with partial pivoting on the 3x3 system.
+    double M[3][4];
+    for (int r = 0; r < 3; r++) { for (int c = 0; c < 3; c++) M[r][c] = A[r][c]; M[r][3] = B[r]; }
+    for (int col = 0; col < 3; col++) {
+      int piv = col;
+      for (int r = col + 1; r < 3; r++) if (std::fabs(M[r][col]) > std::fabs(M[piv][col])) piv = r;
+      for (int c = 0; c < 4; c++) std::swap(M[col][c], M[piv][c]);
+      if (std::fabs(M[col][col]) < 1e-300) { CkPrintf("  WARNING: migration fit is singular\n"); return; }
+      for (int r = 0; r < 3; r++) {
+        if (r == col) continue;
+        const double f = M[r][col] / M[col][col];
+        for (int c = 0; c < 4; c++) M[r][c] -= f * M[col][c];
+      }
+    }
+    double a = M[0][3] / M[0][0], bh = M[1][3] / M[1][1], bd = M[2][3] / M[2][2];
+    if (a < 0) { CkPrintf("  WARNING: migrate_alpha fitted negative (%.3e); clamped to 0\n", a); a = 0; }
+    if (bh < 0) { CkPrintf("  WARNING: migrate_beta_host fitted negative (%.3e); clamped to 0\n", bh); bh = 0; }
+    if (bd < 0) { CkPrintf("  WARNING: migrate_beta_device fitted negative (%.3e); clamped to 0\n", bd); bd = 0; }
+    double mean = 0, ssTot = 0, ssRes = 0;
+    for (int i = 0; i < N; i++) mean += migPoints[i].perObject;
+    mean /= N;
+    for (int i = 0; i < N; i++) {
+      const double pred = a + bh * migPoints[i].hostBytes + bd * migPoints[i].devBytes;
+      ssRes += (migPoints[i].perObject - pred) * (migPoints[i].perObject - pred);
+      ssTot += (migPoints[i].perObject - mean) * (migPoints[i].perObject - mean);
+    }
+    migAlpha = a; migBetaHost = bh; migBetaDevice = bd;
+    migRsq = (ssTot > 0) ? 1.0 - ssRes / ssTot : 1.0;
+    haveMigrate = true;
+    CkPrintf("  --> migration alpha=%.6es beta_host=%.6es/B beta_device=%.6es/B  R2=%.4f\n\n",
+             a, bh, bd, migRsq);
+  }
+
   void writeConfig() {
     // Any tier the launch could not expose is filled from the next more
     // expensive one that was measured. That direction is deliberate: an
@@ -250,15 +386,22 @@ class Main : public CBase_Main {
       fprintf(f, "%s_beta  = %.9e\n", tierName(t), beta[t]);
     }
 
-    // Migration cost. NOT measured here: a migration is not a pingpong -- it
-    // packs the object, ships host and device state through the migration
-    // path, and unpacks. These are estimates from the transport numbers, marked
-    // so nobody mistakes them for measurements, and are the obvious next thing
-    // to measure directly (time a migration of an object of known footprint).
-    fprintf(f, "\n# Estimated, not measured -- see the note in lbcalib.C.\n");
-    fprintf(f, "migrate_alpha       = %.9e\n", alpha[TIER_INTER_NODE] * 4.0);
-    fprintf(f, "migrate_beta_host   = %.9e\n", beta[TIER_INTER_NODE]);
-    fprintf(f, "migrate_beta_device = %.9e\n", beta[TIER_INTER_NODE]);
+    // Migration cost: measured by migrating batches of objects of known
+    // footprint (runMigration) when the launch had a same-host pair; otherwise
+    // the old estimate from the transport numbers, marked as such.
+    if (haveMigrate) {
+      fprintf(f, "\n# Migration: measured (R2=%.4f), batches of %d objects migrating\n"
+                 "# PE %d <-> PE %d (%s), per-object time = batch time / batch.\n",
+              migRsq, migBatch, migSrc, migDst, tierName(migTier));
+      fprintf(f, "migrate_alpha       = %.9e\n", migAlpha);
+      fprintf(f, "migrate_beta_host   = %.9e\n", migBetaHost);
+      fprintf(f, "migrate_beta_device = %.9e\n", migBetaDevice);
+    } else {
+      fprintf(f, "\n# Estimated, not measured -- see the note in lbcalib.C.\n");
+      fprintf(f, "migrate_alpha       = %.9e\n", alpha[TIER_INTER_NODE] * 4.0);
+      fprintf(f, "migrate_beta_host   = %.9e\n", beta[TIER_INTER_NODE]);
+      fprintf(f, "migrate_beta_device = %.9e\n", beta[TIER_INTER_NODE]);
+    }
     fprintf(f, "\n# How many balancer intervals a placement is assumed to last,\n");
     fprintf(f, "# used to amortise the one-off migration cost.\n");
     fprintf(f, "placement_lifetime_intervals = 4\n");
@@ -353,6 +496,47 @@ class Calib : public CBase_Calib {
     startTime = CkWallTimer();
     thisProxy[peer].ping(curSize, sendBuf);
   }
+};
+
+// An object of known footprint that migrates on request. Its device buffer
+// comes from the device pool when that is on, as an application's would, and
+// travels through pup_buffer_device; after a migration it is arena-bound and
+// is released through hapiFreeMigratable, as the applications do (leanmd's
+// md_alloc.h).
+class Mover : public CBase_Mover {
+  size_t hostBytes = 0, devBytes = 0;
+  std::vector<char> host;
+  char* dev = nullptr;
+  bool devFromPool = false, migrated = false;
+
+ public:
+  Mover(size_t h, size_t d) : hostBytes(h), devBytes(d) {
+    host.assign(h, 'x');
+    if (d > 0) {
+      if (CkDevicePoolOn()) { dev = (char*)CkDeviceMalloc(d); devFromPool = true; }
+      else hapiCheck(hapiMalloc((void**)&dev, d));
+      if (dev == nullptr) CkAbort("lbcalib: could not allocate %zu device bytes for a mover\n", d);
+      hapiCheck(cudaMemset(dev, 'y', d));
+    }
+    main_proxy.moverReady();
+  }
+  Mover(CkMigrateMessage* m) : CBase_Mover(m) { migrated = true; }
+  ~Mover() {
+    if (dev == nullptr) return;
+    if (migrated) hapiFreeMigratable(dev);
+    else if (devFromPool) CkDeviceFree(dev);
+    else hapiCheck(hapiFree(dev));
+  }
+  void pup(PUP::er& p) {
+    CBase_Mover::pup(p);
+    p | hostBytes; p | devBytes; p | host;
+    if (devBytes > 0) p.pup_buffer_device(dev, devBytes);
+  }
+  void ckJustMigrated() override {
+    CBase_Mover::ckJustMigrated();
+    main_proxy.moverArrived();
+  }
+  void moveTo(int pe) { ckMigrate(pe); }
 };
 
 #include "lbcalib.def.h"
