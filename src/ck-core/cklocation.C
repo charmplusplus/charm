@@ -4460,6 +4460,9 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   CK_MAGICNUMBER_CHECK
   if (toPe == CkMyPe())
     return;  // You're already there!
+  // CHARM_DEBUG_MIGRATE: stage clock for the EMIG line below.
+  const double tE0 = CmiWallTimer();
+  double tE1 = tE0, tE2 = tE0, tE3 = tE0, tE4 = tE0, tE5 = tE0;
 
   // Do not move an element while the runtime is still reading buffers it handed
   // to a zerocopy send: migration frees and reallocates exactly those buffers.
@@ -4477,9 +4480,9 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
      )
   {
     if (getenv("CHARM_DEBUG_MIGRATE"))
-      CmiPrintf("[DEFER-MIG %d] elem %s count=%d parked=%d toPe=%d\n", CkMyPe(),
-                idx2str(rec->getIndex()), rec->outstandingDeviceSends,
-                (int)rec->deviceRecvParked, toPe);
+      CmiPrintf("[DEFER-MIG %d] elem %s id=%llu count=%d parked=%d toPe=%d\n", CkMyPe(),
+                idx2str(rec->getIndex()), (unsigned long long)rec->getID(),
+                rec->outstandingDeviceSends, (int)rec->deviceRecvParked, toPe);
     rec->pendingMigrateTo = toPe;
     return;
   }
@@ -4517,6 +4520,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   PUP::sizer p(PUP::er::IS_MIGRATION);
   pupElementsFor(p, rec, CkElementCreation_migrate);
   bufSize = p.size();
+  tE1 = CmiWallTimer();
 
   gpuBufSize = 0;
   size_t nGpuBufs = 0;
@@ -4654,6 +4658,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
       }
     }
 #endif
+    tE2 = CmiWallTimer();
     PUP::toMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
 #if CMK_CUDA
     p.gpuStream = (void*)migStream;
@@ -4662,6 +4667,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #endif
     p.becomeDeleting();
     pupElementsFor(p, rec, CkElementCreation_migrate);
+    tE3 = CmiWallTimer();
     if (p.size() != bufSize)
     {
       CkError(
@@ -4722,6 +4728,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #endif
 
   thisProxy[toPe].immigrate(msg);
+  tE4 = CmiWallTimer();
 
   duringMigration = true;
   for (auto itr = managers.begin(); itr != managers.end(); ++itr)
@@ -4730,6 +4737,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   }
   duringMigration = false;
 
+  tE5 = CmiWallTimer();
   cache->recordEmigration(id, toPe);
   informHome(idx, toPe);
 #if CMK_CUDA
@@ -4739,8 +4747,11 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
     thisProxy[CkMyPe()].sendGPUMsg(id);
   }
   if (getenv("CHARM_DEBUG_MIGRATE"))
-    CmiPrintf("[EMIG %d] id=%llu gpuBufSize=%zu toPe=%d\n", CkMyPe(),
-              (unsigned long long)id, (size_t)gpuBufSize, toPe);
+    CmiPrintf("[EMIG %d] id=%llu gpuBufSize=%zu toPe=%d stages_ms sizer=%.3f alloc=%.3f "
+              "pack=%.3f send=%.3f delete=%.3f tail=%.3f\n", CkMyPe(),
+              (unsigned long long)id, (size_t)gpuBufSize, toPe,
+              (tE1 - tE0) * 1e3, (tE2 - tE1) * 1e3, (tE3 - tE2) * 1e3,
+              (tE4 - tE3) * 1e3, (tE5 - tE4) * 1e3, (CmiWallTimer() - tE5) * 1e3);
 #endif
   // Anything admission control held for this element goes back through
   // delivery, which forwards it to the new home.
