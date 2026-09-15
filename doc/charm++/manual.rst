@@ -9511,8 +9511,8 @@ neither reports itself:
   be served the registration made for the old mapping, and the transfer
   then runs against a registration whose mapping is gone, with no error
   reported. Allocate the buffers that cross the network once and keep them
-  for the run, or take them from the device pool below, which the runtime
-  owns and can invalidate.
+  for the run, or take them from the device pool below, whose arenas the
+  runtime owns and keeps mapped and registered for the whole run.
 - **Registrations are not evicted.** The cache is configured without
   limits on the number or total size of regions, and releasing a
   registration only drops a reference count, so an application whose set
