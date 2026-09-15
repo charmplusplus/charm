@@ -9284,6 +9284,19 @@ system, which is automatically found by the build script. If the script fails
 to find it, provide the path as one of ``CUDATOOLKIT_HOME``, ``CUDA_DIR``,
 or ``CUDA_HOME`` environment variables.
 
+For AMD GPUs, use the ``amd`` option (``hip`` is accepted as a synonym; the
+CMake variable is ``BUILD_HIP``) in place of ``cuda``; the build directory
+is suffixed ``-amd``. The device-to-device transfer path described under
+Direct GPU Messaging below is supported on reconverse builds, for example
+
+.. code-block:: bash
+
+   $ ./build charm++ reconverse-linux-x86_64 cuda -j8 --with-production
+   $ ./build charm++ reconverse-linux-x86_64 amd  -j8 --with-production
+
+See Section :numref:`sec:reconverseinstall` for reconverse builds and how
+their programs are launched.
+
 Using GPU Support through HAPI
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -9336,6 +9349,51 @@ Examples using CUDA and HAPI can be found under
 ``examples/charm++/cuda``. Codes under ``#ifdef USE_WR`` use the
 ``hapiWorkRequest`` scheme, which is now deprecated.
 
+Streams: create your own, non-blocking
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Create the streams your chares use, and create them with the
+non-blocking flag:
+
+.. code-block:: c++
+
+   hapiStream_t stream;
+   hapiCheck(hapiStreamCreateWithPriority(&stream, hapiStreamNonBlocking, 0));
+
+``hapiStreamCreateWithPriority``, ``hapiStreamNonBlocking`` and
+``hapiStreamDefault`` are the backend-neutral spellings from
+``hapi_portable.h``, resolving to the ``cuda`` names in a CUDA build and the
+``hip`` names in a HIP build. The portable header exports no
+``...CreateWithFlags``; ``hapiStreamCreateWithPriority`` is how flags are
+passed, with priority ``0`` for an ordinary stream. Plain
+``hapiStreamCreate`` uses the default flags and is what most of the
+in-tree examples still call.
+
+Streams created with the default flags implicitly synchronize with the
+legacy default (null) stream, so any work on the null stream anywhere in
+the process serializes against them, and they are also more expensive to
+create: at the stream counts an overdecomposed application reaches,
+default-flagged creation measured 11-13 microseconds per stream against a
+flat 1.6 microseconds for non-blocking creation. ``hapiGetStream`` hands
+out runtime-created streams with the default flags and is therefore
+discouraged for new code; it remains available, and a return queue for
+runtime-owned streams may be added later.
+
+How many streams are useful is bounded by the hardware, not by the number
+of chares. A device offers a fixed number of hardware queues that streams
+are multiplexed onto -- 32 on NVIDIA (raise or lower it with the
+``CUDA_DEVICE_MAX_CONNECTIONS`` environment variable) and about 8 on AMD
+(``GPU_MAX_HW_QUEUES``) -- so streams beyond that count share a queue and
+their work serializes. Independently of queues, current NVIDIA devices
+execute at most 128 concurrent kernels, and a device has only a small
+fixed number of copy engines, so transfers in the same direction overlap
+with each other only up to that count, no matter how many streams they
+are issued in.
+
+Load balancing can take GPU work into account: the
+``GreedyRefineCentralGPULB`` strategy (Section :numref:`lbStrategy`)
+balances measured GPU load per object alongside CPU load.
+
 Direct GPU Messaging
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -9373,9 +9431,10 @@ specifier to the corresponding parameter of the receiver's entry method in the `
 
 This entry method should be invoked on the sender by wrapping the
 source buffer with ``CkDeviceBuffer``, whose constructor takes a pointer
-to the source buffer, a Charm++ callback to be invoked once the transfer
-completes (optional), and a GPU stream associated with the transfer
-(which is only used internally in the device memcpy and IPC based implementation and is also optional).
+to the source buffer, a Charm++ callback to be invoked once the receiver
+has finished reading the source buffer, and a GPU stream associated with
+the transfer (which is only used internally in the device memcpy and IPC
+based implementation and is optional).
 ``hapiStream_t`` is the backend-neutral stream type: it is ``cudaStream_t`` in a
 CUDA build and ``hipStream_t`` in a HIP build.
 
@@ -9389,6 +9448,17 @@ CUDA build and ``hipStream_t`` in a HIP build.
 
    // Call on sender
    someProxy.foo(size, CkDeviceBuffer(buf, cb, stream));
+
+The callback is the only signal the sender gets that the source buffer may
+be written again, so an application that reuses a send buffer must pass
+one. The receiver reads the sender's buffer with an RDMA get issued when it
+processes the metadata message; the sender proceeds to its next iteration
+as soon as its own incoming data has arrived, which says nothing about
+whether every receiver's get has completed, so repacking the same buffer
+can overwrite bytes a receiver is still reading. The alternative to the
+callback is to double-buffer the send set and alternate by iteration
+parity, described under `Registration of device buffers, and when a source
+buffer may be reused`_ below.
 
 As with the Zero Copy Entry Method Post API, both the post entry method
 and regular entry method must be defined. In the post entry method,
@@ -9431,6 +9501,28 @@ on each message, and the cost of repeating that registration on the same
 address range is absorbed by the network layer's own registration cache;
 the runtime does not keep a second cache of its own. The one exception is
 memory the runtime itself owns, which is what the device pool below is for.
+
+Two properties of that network-layer cache have to be worked around, and
+neither reports itself:
+
+- **Do not free and reallocate device buffers that have been sent.**
+  Nothing invalidates a cached registration of a device region when the
+  application frees it, so a later allocation that reuses the address can
+  be served the registration made for the old mapping, and the transfer
+  then runs against a registration whose mapping is gone, with no error
+  reported. Allocate the buffers that cross the network once and keep them
+  for the run, or take them from the device pool below, which the runtime
+  owns and can invalidate.
+- **Registrations are not evicted.** The cache is configured without
+  limits on the number or total size of regions, and releasing a
+  registration only drops a reference count, so an application whose set
+  of distinct sent buffers is bounded is unaffected, while one that keeps
+  sending from new addresses accumulates registrations until the network
+  interface's memory-region table is full. The failure is an abort from
+  inside the network layer, far from the allocation that caused it. Use
+  the device pool, which holds one registration per arena rather than one
+  per buffer, if the working set of distinct sent buffers is large or
+  unbounded.
 
 Registration and buffer reuse are separate questions. The callback given to
 ``CkDeviceBuffer`` is invoked when the receiver's transfer out of the source
@@ -9477,20 +9569,40 @@ buffers holds one registration per arena rather than one per buffer. The
 pool owns the arena, so freeing and reallocating pool buffers is safe with
 respect to registration.
 
+``CkDeviceMalloc`` is for buffers that are going to be sent or received
+into, not a general device allocator. Registration is per arena and covers
+the whole arena, so anything else allocated from the pool -- scratch space,
+temporaries -- is pinned along with the communication buffers that share
+its arena. Allocate scratch with ``cudaMalloc``/``hipMalloc`` as usual.
+
 The pool answers the registration question only. When a send buffer may be
 overwritten is still decided by the callback on ``CkDeviceBuffer`` or by
 alternating between two buffers, as described above.
 
 For non-UCX builds, a more optimized mechanism for inter-process communication using CUDA IPC, POSIX shared memory,
 and pre-allocated GPU communication buffers are available through runtime flags.
-This significantly reduces the overhead from creating and opening device IPC handles,
-especially for small messages. ``+gpushm`` enables this optimization
+This reduces the overhead from creating and opening device IPC handles.
+``+gpushm`` enables this optimization
 feature, ``+gpucommbuffer [size]`` specifies the size of the communication buffer
 allocated on each GPU (default is 64MB), and ``+gpuipceventpool`` determines the number of
-device IPC events per PE (default is 16).
+device IPC events per PE (default is 16). The size and pool options are
+parsed but ignored, with a note printed on PE 0, unless ``+gpushm`` is also
+given.
+
+``+gpushm`` is opt-in and its absence is silent: without the flag,
+same-node transfers go through the network interface like any other, and
+nothing says so. It is also not uniformly faster. Measured against the
+RDMA-get path it was **slower** for messages between 2 and 16 KB, so treat
+it as something to measure on the message sizes an application actually
+sends rather than as the setting to turn on.
 
 Examples and benchmarks of the direct GPU messaging feature can be found in
 ``examples/charm++/cuda/gpudirect`` and ``benchmarks/charm++/cuda/gpudirect``.
+Note that these codes construct their ``CkDeviceBuffer`` arguments without a
+source callback and repack their send buffers each iteration; they are being
+corrected (issue #3963) and should not be copied as a model for buffer reuse
+until they are. Follow the rule above instead: pass the callback, or
+double-buffer.
 
 Intra-node Persistent GPU Communication
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -11639,6 +11751,9 @@ appropriate choices for the build one wants to perform.
    OFI with 64 bit Linux                                            ``./build charm++ ofi-linux-x86_64 --with-production -j8``
    UCX with 64 bit Linux                                            ``./build charm++ ucx-linux-x86_64 --with-production -j8``
    UCX with 64 bit Linux (AArch64)                                  ``./build charm++ ucx-linux-arm8 --with-production -j8``
+   Reconverse with 64 bit Linux                                     ``./build charm++ reconverse-linux-x86_64 --with-production -j8``
+   Reconverse with 64 bit Linux (AArch64)                           ``./build charm++ reconverse-linux-arm8 --with-production -j8``
+   Reconverse with 64 bit macOS (ARM64)                             ``./build charm++ reconverse-darwin-arm8 --with-production -j8``
    Net with 64 bit Windows                                          ``./build charm++ netlrts-win-x86_64 --with-production -j8``
    MPI with 64 bit Windows                                          ``./build charm++ mpi-win-x86_64 --with-production -j8``
    Net with 64 bit macOS (x86_64)                                   ``./build charm++ netlrts-darwin-x86_64 --with-production -j8``
@@ -11790,6 +11905,59 @@ test-programs. These may be deleted with no other effects. You may also
 
 Installation for Specific Builds
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. _sec:reconverseinstall:
+
+Reconverse
+^^^^^^^^^^
+
+Reconverse is a reimplementation of the Converse layer that Charm++ can be
+built on in place of the classic machine layers. It is selected by the
+network part of the build triplet:
+
+.. code-block:: bash
+
+   $ ./build charm++ reconverse-linux-x86_64 --with-production -j8
+   $ ./build charm++ reconverse-linux-arm8   --with-production -j8
+   $ ./build charm++ reconverse-darwin-arm8  --with-production -j8
+
+Reconverse itself is a git submodule at ``contrib/reconverse``, and the
+commit recorded there is the version a given Charm++ commit builds
+against. Clone with ``git clone --recurse-submodules``; a clone made
+without it is initialized by the build, so nothing has to be done by hand.
+To build against a different reconverse, check the submodule out to it
+(``git -C contrib/reconverse fetch origin`` then
+``git -C contrib/reconverse checkout <branch-or-sha>``) and rebuild. To
+build against a reconverse tree kept outside the Charm++ checkout, pass
+``--with-reconverse-dir=<path>``; the submodule is then left alone.
+Reconverse builds are always SMP (``CMK_SMP`` is set for these targets
+regardless of the build options), so the ``smp`` option does not need to
+be passed.
+
+Reconverse programs are launched without ``charmrun``, which is not built
+for these targets. A single process takes the total number of PEs on its
+own command line, and multiple processes are started by LCI's ``lcrun``:
+
+.. code-block:: bash
+
+   $ ./pgm +pe 8                 # one process, 8 PEs
+   $ lcrun -n 2 ./pgm +pe 8      # two processes, 8 PEs in total
+
+``+pe`` is always the total across all processes, and the total must be
+divisible by the number of processes. ``lcrun`` is installed by the LCI
+build under ``<builddir>/_deps/lci-src/lcrun`` rather than in
+``<builddir>/bin``.
+
+Inside a batch allocation, use the site's launcher instead of ``lcrun``,
+and use it even for a single-process run: LCI bootstraps from the
+inherited job environment (``SLURM_NTASKS`` and friends) and a bare
+process started inside an allocation waits for peers that never start.
+The test harness takes the launcher from an environment variable, for
+example
+
+.. code-block:: bash
+
+   $ TESTRUN_LAUNCHER="srun --mpi=pmi2 -N2 --ntasks-per-node=1 -c2" make test
 
 UCX
 ^^^
