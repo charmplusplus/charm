@@ -125,6 +125,11 @@ public:
 void CkRdmaDeviceRecvHandler(void* data);
 void CkRdmaDeviceRecvHandler(void* data, void* msg);
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs);
+// A device message parked at the PE its element is migrating to: pull its
+// payload into landing buffers now and complete the sender, so the sender is
+// not pinned for the whole landing (see the definition). Returns false when
+// the message was left as it was.
+bool CkRdmaDeviceStageParked(envelope* env);
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers);
 // Generated asynchronous proxies use the four-argument prepare followed by
 // SendWhenReady. The latter owns the marshalled message and continuation until
@@ -254,6 +259,7 @@ inline int CkRdmaDeviceBusyIpcSlots() { return -1; }
 inline void* CkRdmaDeviceAllocLbBuffer(void* dm, size_t size) { return nullptr; }
 inline void* CkDeviceMalloc(size_t size) { return nullptr; }
 inline void CkDeviceFree(void* ptr) {}
+inline bool CkRdmaDeviceStageParked(envelope* env) { return false; }
 inline bool CkDevicePoolOn() { return false; }
 inline void CkRdmaDeviceMarkMigrationPayload(bool sending) {}
 inline void CkRdmaDeviceNoteLbBufferFreed(void* dm, cudaStream_t usedBy) {}

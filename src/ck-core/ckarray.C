@@ -56,6 +56,14 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "register.h"
 #include <stdarg.h>
 
+// CHARM_DEBUG_MIGRATE: trace what happens to a message whose element is not
+// where it was sent -- forwarded, sent home, or parked until it lands.
+static inline bool arrMigDbg()
+{
+  static const bool on = (getenv("CHARM_DEBUG_MIGRATE") != nullptr);
+  return on;
+}
+
 bool _isAnytimeMigration;
 bool _isNotifyChildInRed;
 
@@ -1882,6 +1890,30 @@ void CkArray::recvMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int op
   }
   else
   {
+    // The element is on its way HERE. Park the message until it lands, before
+    // the location cache is consulted: a stale entry there still names the PE
+    // it left, which forwards straight back (its cache names us), and the
+    // message ping-pongs between the two until the landing -- measured at
+    // 234k forwards for 1350 moves in one balancing step, hop counts wrapping
+    // at 255, the bouncing itself delaying the landings it waited on.
+    // createLocal drops the in-flight mark before the location listeners
+    // replay this buffer, so the parked messages go out in order once the
+    // element is here.
+    //
+    // A parked DEVICE message would pin its sender until the landing, and
+    // that wait can cycle (sph2d wedged at its first async LB step with the
+    // park alone). So its payload is pulled into landing buffers now and the
+    // sender completed: CkRdmaDeviceStageParked.
+    if (locMgr->isImmigrationInFlight(id))
+    {
+      bufferedIDMsgs[id].push_back(msg);
+      const bool staged = CkRdmaDeviceStageParked(UsrToEnv(msg));
+      if (arrMigDbg())
+        CmiPrintf("[PARKDST %d] id=%llu hops=%d n=%zu staged=%d (immigration in flight)\n",
+                  CkMyPe(), (unsigned long long)id, msg->array_hops(),
+                  bufferedIDMsgs[id].size(), (int)staged);
+      return;
+    }
     // If the object is not here, figure out where we think it is and forward the message
     int pe = locMgr->whichPe(id);
     if (pe == -1)
@@ -1917,6 +1949,9 @@ void CkArray::recvMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int op
       //{
       //  pe = locMgr->homePe(id);
       //}
+      if (arrMigDbg())
+        CmiPrintf("[FWD %d] id=%llu hops=%d -> pe=%d\n", CkMyPe(),
+                  (unsigned long long)id, msg->array_hops(), pe);
       sendToPe(msg, pe, type, opts);
     }
   }
@@ -1982,6 +2017,11 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
     if (locMgr->isImmigrationInFlight(id) && lookup(id) == nullptr)
     {
       bufferedIDMsgs[id].push_back(msg);
+      const bool staged = CkRdmaDeviceStageParked(UsrToEnv(msg));
+      if (arrMigDbg())
+        CmiPrintf("[PARKDST %d] id=%llu hops=%d n=%zu staged=%d (immigration in flight, local)\n",
+                  CkMyPe(), (unsigned long long)id, msg->array_hops(),
+                  bufferedIDMsgs[id].size(), (int)staged);
       return;
     }
   }
@@ -2097,6 +2137,9 @@ void CkArray::handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t ty
     // later send to the same element pays the same detour -- and a device
     // zerocopy send keeps resolving its destination to -1. Ask once.
     locMgr->requestLocationOnce(id);
+    if (arrMigDbg())
+      CmiPrintf("[TOHOME %d] id=%llu hops=%d -> home=%d\n", CkMyPe(),
+                (unsigned long long)id, msg->array_hops(), home);
     sendToPe(msg, home, type, opts);
     return;
   }
@@ -2107,6 +2150,9 @@ void CkArray::handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t ty
     locMgr->requestLocation(id);
   }
   bufferedIDMsgs[id].push_back(msg);
+  if (arrMigDbg())
+    CmiPrintf("[HOLDLOC %d] id=%llu hops=%d n=%zu (location unknown)\n", CkMyPe(),
+              (unsigned long long)id, msg->array_hops(), bufferedIDMsgs[id].size());
 }
 
 void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
@@ -2277,39 +2323,62 @@ void CkArray::requestDemandCreation(const CkArrayIndex& idx, int ctor, int pe)
 
 void CkArray::sendBufferedMsgs(CmiUInt8 id, int pe)
 {
-  for (CkArrayMessage* msg : bufferedIDMsgs[id])
+  auto it = bufferedIDMsgs.find(id);
+  if (it == bufferedIDMsgs.end()) return;
+  // The element is still landing here: leave the messages parked. The landing
+  // replays them (createLocal clears the in-flight mark before the location
+  // listeners run). A replay from an earlier location update only parked them
+  // again -- and that re-park pushed into the list being iterated, which was
+  // then erased underneath it: five ghost messages lost and sph2d wedged
+  // (2026-09-15, job 22084755).
+  if (pe == CkMyPe() && locMgr->isImmigrationInFlight(id) && lookup(id) == nullptr)
+  {
+    if (arrMigDbg())
+      CmiPrintf("[UNBUF-HOLD %d] id=%llu n=%zu still landing\n", CkMyPe(),
+                (unsigned long long)id, it->second.size());
+    return;
+  }
+  // Take the list out first: a message that parks again during the replay
+  // goes into a fresh list, not the one being walked and erased.
+  std::vector<CkArrayMessage*> msgs;
+  msgs.swap(it->second);
+  bufferedIDMsgs.erase(it);
+  if (arrMigDbg() && !msgs.empty())
+    CmiPrintf("[UNBUF %d] id=%llu n=%zu -> pe=%d\n", CkMyPe(),
+              (unsigned long long)id, msgs.size(), pe);
+  for (CkArrayMessage* msg : msgs)
   {
     CkAssert(msg->array_element_id() == id);
     sendToPe(msg, pe, CkDeliver_queue);
   }
-  bufferedIDMsgs.erase(id);
-
-  CkAssert(bufferedIDMsgs.find(id) == bufferedIDMsgs.end());
 }
 
 void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id, int pe)
 {
   // TODO: This shouldn't be needed
   sendBufferedMsgs(id, pe);
-  for (CkArrayMessage* msg : bufferedIndexMsgs[idx])
   {
-    UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, id));
-    // TODO: Is deliver_queue right?
-    sendToPe(msg, pe, CkDeliver_queue);
+    std::vector<CkArrayMessage*> msgs;
+    auto it = bufferedIndexMsgs.find(idx);
+    if (it != bufferedIndexMsgs.end()) { msgs.swap(it->second); bufferedIndexMsgs.erase(it); }
+    for (CkArrayMessage* msg : msgs)
+    {
+      UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, id));
+      // TODO: Is deliver_queue right?
+      sendToPe(msg, pe, CkDeliver_queue);
+    }
   }
-  bufferedIndexMsgs.erase(idx);
-
-  for (CkArrayMessage* msg : bufferedCreationMsgs[idx])
   {
-    UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, id));
-    // TODO: Is deliver_queue right?
-    sendToPe(msg, pe, CkDeliver_queue);
+    std::vector<CkArrayMessage*> msgs;
+    auto it = bufferedCreationMsgs.find(idx);
+    if (it != bufferedCreationMsgs.end()) { msgs.swap(it->second); bufferedCreationMsgs.erase(it); }
+    for (CkArrayMessage* msg : msgs)
+    {
+      UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, id));
+      // TODO: Is deliver_queue right?
+      sendToPe(msg, pe, CkDeliver_queue);
+    }
   }
-  bufferedCreationMsgs.erase(idx);
-
-  CkAssert(bufferedIDMsgs.find(id) == bufferedIDMsgs.end());
-  CkAssert(bufferedIndexMsgs.find(idx) == bufferedIndexMsgs.end());
-  CkAssert(bufferedCreationMsgs.find(idx) == bufferedCreationMsgs.end());
 }
 
 #include "CkArray.def.h"

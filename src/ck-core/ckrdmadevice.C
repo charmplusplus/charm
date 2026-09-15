@@ -206,6 +206,51 @@ CkpvDeclare(DeviceRecvHoldMap*, device_recv_holds);
 typedef std::unordered_map<CmiUInt8, std::vector<void*>> DeviceRecvAdmissionMap;
 CkpvDeclare(DeviceRecvAdmissionMap*, device_recv_admission);
 
+// Landing buffers of staged parked receives (CkRdmaDeviceStageParked), keyed
+// by the landing pointer the rewritten descriptor now carries. `ready` is
+// recorded on the staging stream behind the pull; the delivery waits on it.
+struct StagedLanding {
+  hapiEvent_t ready;
+  size_t cnt;
+  const void* src;        // CHARM_STAGE_VERIFY: the address the pull read
+  unsigned long long sum; // CHARM_STAGE_VERIFY: checksum of the landing after the pull
+  bool verified;
+};
+static inline bool stageVerifyOn()
+{
+  static const bool on = (getenv("CHARM_STAGE_VERIFY") != nullptr);
+  return on;
+}
+// Synchronous device-to-host checksum, verification only.
+static unsigned long long stageChecksum(const void* dptr, size_t cnt)
+{
+  std::vector<unsigned char> h(cnt);
+  if (cudaMemcpy(h.data(), dptr, cnt, cudaMemcpyDefault) != cudaSuccess) {
+    cudaGetLastError();
+    return ~0ULL;
+  }
+  unsigned long long sum = 1469598103934665603ULL;
+  for (size_t i = 0; i < cnt; i++) sum = (sum ^ h[i]) * 1099511628211ULL;
+  return sum;
+}
+typedef std::unordered_map<const void*, StagedLanding> StagedLandingMap;
+// Stamped into comm_offset of a rewritten descriptor (unused when the protocol
+// is NONE). A pointer alone does not identify a landing: `ptr` in an incoming
+// message is an address in the SENDER's process, and every process lays its
+// device arenas out the same way, so a foreign pointer can equal one of this
+// PE's landing buffers. Matching on the pointer alone copied a landing buffer
+// into a migration payload once in ~5 sph2d runs (2026-09-15, job 22084755).
+static const size_t kStagedLandingMark = (size_t)0x53544147454431ULL;
+static inline bool isStagedLandingDescriptor(const CkDeviceBuffer& b)
+{
+  return b.src_pe == CkMyPe() && b.ipc_protocol == CmiIpcProtocol::NONE &&
+         b.device_idx == -1 && b.event_idx == -1 && b.sender_prepared &&
+         b.comm_offset == kStagedLandingMark;
+}
+CkpvDeclare(StagedLandingMap*, staged_landings);
+CkpvDeclare(hapiStream_t, staging_stream);
+CkpvDeclare(std::vector<hapiEvent_t>*, staging_events);
+
 void CkRdmaDeviceRegistrationCacheInit()
 {
   CkpvInitialize(DeviceMrCache*, device_mr_cache);
@@ -214,6 +259,52 @@ void CkRdmaDeviceRegistrationCacheInit()
   CkpvAccess(device_recv_holds) = new DeviceRecvHoldMap();
   CkpvInitialize(DeviceRecvAdmissionMap*, device_recv_admission);
   CkpvAccess(device_recv_admission) = new DeviceRecvAdmissionMap();
+  CkpvInitialize(StagedLandingMap*, staged_landings);
+  CkpvAccess(staged_landings) = new StagedLandingMap();
+  CkpvInitialize(hapiStream_t, staging_stream);
+  CkpvAccess(staging_stream) = nullptr;
+  CkpvInitialize(std::vector<hapiEvent_t>*, staging_events);
+  CkpvAccess(staging_events) = new std::vector<hapiEvent_t>();
+}
+
+static hapiStream_t stagingStream()
+{
+  hapiStream_t& s = CkpvAccess(staging_stream);
+  if (s == nullptr) hapiCheck(cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking));
+  return s;
+}
+static hapiEvent_t stagingEventTake()
+{
+  std::vector<hapiEvent_t>& pool = *CkpvAccess(staging_events);
+  if (pool.empty()) {
+    hapiEvent_t e;
+    hapiCheck(hapiEventCreateWithFlags(&e, hapiEventDisableTiming));
+    return e;
+  }
+  hapiEvent_t e = pool.back();
+  pool.pop_back();
+  return e;
+}
+static void stagingEventGive(hapiEvent_t e) { CkpvAccess(staging_events)->push_back(e); }
+
+// Runs on the posting stream behind the copy out of a landing buffer: the
+// buffer goes back to the pool (CkDeviceFree has no stream ordering of its
+// own, so it must be called from here, not at issue) and the event to its pool.
+struct StagedLandingFree {
+  void* ptr;
+  hapiEvent_t ready;
+};
+static void stagedLandingFreeFn(void* param, void*)
+{
+  StagedLandingFree* f = (StagedLandingFree*)param;
+  CkDeviceFree(f->ptr);
+  stagingEventGive(f->ready);
+  delete f;
+}
+static inline bool stagedDbg()
+{
+  static const bool on = (getenv("CHARM_DEBUG_MIGRATE") != nullptr);
+  return on;
 }
 
 // Called from CkFreeMsg for every message: release whatever this one held.
@@ -474,6 +565,10 @@ void CkRdmaDeviceRecvHandler(void* data)
   // Check if all buffers have been received
   // If so, invoke regular entry method
   if (info->counter == info->n_ops) {
+    if (info->msg == nullptr) {  // a staged pull for a parked message: nothing to deliver
+      CmiFree(info);
+      return;
+    }
     QdCreate(1);
 
     enqueueNcpyMessage(op->dest_pe, info->msg);
@@ -507,6 +602,31 @@ void CkRdmaDeviceRecvHandler(void* data, void* msg)
   // Check if all buffers have been received
   // If so, invoke regular entry method
   if (info->counter == info->n_ops) {
+    if (info->msg == nullptr) {
+      // A staged pull for a parked message (CkRdmaDeviceStageParked): the
+      // senders are complete, the payload sits in landing buffers, and the
+      // message itself is delivered when its element lands.
+      if (stageVerifyOn()) {
+        StagedLandingMap& landings = *CkpvAccess(staged_landings);
+        for (int k = 0; k < info->n_ops; k++) {
+          // ops are laid out after the info block, live ones only were counted,
+          // so walk by address: every op whose dest is a registered landing
+          DeviceRdmaOp* o = (DeviceRdmaOp*)((char*)info + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * k);
+          auto lit = landings.find(o->dest_ptr);
+          if (lit == landings.end()) continue;
+          const unsigned long long land_sum = stageChecksum(o->dest_ptr, lit->second.cnt);
+          const unsigned long long src_sum = lit->second.src ? stageChecksum(lit->second.src, lit->second.cnt) : 0;
+          lit->second.sum = land_sum;
+          lit->second.verified = true;
+          if (lit->second.src && src_sum != land_sum)
+            CmiPrintf("[STAGE-VERIFY %d] pull mismatch: landing %p (%zu B) sum %llx != source %p sum %llx\n",
+                      CkMyPe(), o->dest_ptr, lit->second.cnt, land_sum, lit->second.src, src_sum);
+        }
+      }
+      deviceRecvWatchDrop(info);
+      CmiFree(info);
+      return;
+    }
     QdCreate(1);
     if (zcLeakDbg()) g_zc_metafree.fetch_add(1);
 
@@ -2197,6 +2317,47 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // on its own node, so an export arriving from another physical node means
     // the target moved after the mode was chosen. Treat it as unprepared and
     // let the correction path re-fetch the payload by a route that works.
+    {
+      // A staged landing (CkRdmaDeviceStageParked): the payload is already on
+      // this device behind the event the pull recorded. Copy it into the
+      // posted buffer on the posting stream and free it behind that copy. The
+      // sender was completed by the staging pull; the descriptor carries no
+      // callback, so src_cb is null and nothing fires twice.
+      StagedLandingMap& landings = *CkpvAccess(staged_landings);
+      auto lit = isStagedLandingDescriptor(source) ? landings.find(source.ptr) : landings.end();
+      if (lit != landings.end() && (size_t)dest.cnt > lit->second.cnt)
+        CkAbort("CkRdmaDeviceIssueRgets: staged landing %p holds %zu bytes but %zu were posted",
+                source.ptr, lit->second.cnt, (size_t)dest.cnt);
+      if (lit != landings.end()) {
+        const StagedLanding sl = lit->second;
+        landings.erase(lit);
+        if (save_op.src_cb) {  // the sender was completed by the staging pull
+          delete (CkCallback*)save_op.src_cb;
+          save_op.src_cb = nullptr;
+        }
+        hapiCheck(hapiStreamWaitEvent(postStructs[i].hapi_stream, sl.ready, 0));
+        if (stageVerifyOn()) {
+          hapiCheck(cudaEventSynchronize(sl.ready));
+          const unsigned long long now = stageChecksum(source.ptr, sl.cnt);
+          if (!sl.verified)
+            CmiPrintf("[STAGE-VERIFY %d] delivered before the pull's completion was seen: landing %p\n",
+                      CkMyPe(), source.ptr);
+          else if (now != sl.sum)
+            CkAbort("[STAGE-VERIFY %d] landing %p (%zu B) changed between pull and delivery: %llx -> %llx",
+                    CkMyPe(), source.ptr, sl.cnt, sl.sum, now);
+        }
+        hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt,
+              cudaMemcpyDefault, postStructs[i].hapi_stream));
+        hapiAddCallback(postStructs[i].hapi_stream,
+                        CkCallback(stagedLandingFreeFn,
+                                   (void*)new StagedLandingFree{(void*)source.ptr, sl.ready}));
+        hapiAddCallback(postStructs[i].hapi_stream, CkCallback(CkRdmaDeviceRecvHandler, &save_op));
+        if (stagedDbg())
+          CmiPrintf("[STAGE-USE %d] land=%p cnt=%zu -> posted %p\n", CkMyPe(),
+                    source.ptr, (size_t)dest.cnt, (void*)dest.ptr);
+        continue;
+      }
+    }
     const bool sender_exported =
         (source.ipc_protocol != CmiIpcProtocol::NONE &&
          source.device_idx != -1 && csv_gpu_manager.use_shm &&
@@ -2414,6 +2575,240 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     deviceRecvWatchDrop(rdma_info);
     CmiFree(rdma_data);
   }
+}
+
+/*************** Staged receive for a message parked at its destination ***************/
+//
+// A device message that reaches the PE an element is migrating TO before the
+// element has landed is parked there (ckarray.C, bufferedIDMsgs) until it
+// lands. A direct device send keeps the SENDER's buffer live and its
+// outstanding-send count raised until the receiver pulls, so a parked message
+// pins its sender for the whole landing. When that sender must itself move,
+// or this PE's landing gate is holding memory for that sender's pack, the wait
+// is a cycle and nothing lands: with parking alone, every sph2d async run
+// wedged at its first balancing step (2026-09-15).
+//
+// So the payload is pulled NOW, into landing buffers from the device pool,
+// with the same per-protocol code the element's own receive would use, and the
+// sender is completed the same way (its callback, its IPC slot flag). The
+// parked message's descriptors are rewritten in place to name the landing
+// buffers; when the element lands and the message is delivered,
+// CkRdmaDeviceIssueRgets recognises a landing buffer, copies it into the
+// element's posted buffer on the posting stream, and frees it behind the copy.
+//
+// Left parked as before, with the sender live: a source this PE cannot pull
+// directly -- an unprepared sender, an IPC handle that does not import, any
+// off-node source (the rget path completes by ack, not on a stream, and is not
+// staged in this version) -- and a payload the pool cannot serve.
+bool CkRdmaDeviceStageParked(envelope* env)
+{
+  // CHARM_LB_NO_STAGE_PARKED: leave every parked message as it is (bisect).
+  // CHARM_LB_STAGE_SYNC: block the host until the staging pull has finished
+  // before the descriptors are rewritten (bisect for an ordering race).
+  static const bool stage_off = (getenv("CHARM_LB_NO_STAGE_PARKED") != nullptr);
+  static const bool sync_after_pull = (getenv("CHARM_LB_STAGE_SYNC") != nullptr);
+  if (stage_off) return false;
+  if (!CMI_IS_ZC_DEVICE(env) || env->getMsgtype() != ForArrayEltMsg) return false;  // host message
+  if (!CkDevicePoolOn()) return false;
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  const int srcPe = env->getSrcPe();
+  if (!CmiPeOnSamePhysicalNode(srcPe, CkMyPe())) {
+    if (stagedDbg()) CmiPrintf("[STAGE-SKIP %d] source PE %d is off-node\n", CkMyPe(), srcPe);
+    return false;
+  }
+  const CkNcpyModeDevice mode = findTransferModeDevice(srcPe, CkMyPe());
+  char* buf = ((CkMarshallMsg*)EnvToUsr(env))->msgBuf;
+
+  // Pass 1: every descriptor, and whether each is pullable from here.
+  std::vector<CkDeviceBuffer> src;
+  std::vector<size_t> off, width;
+  {
+    PUP::fromMem rd(buf);
+    int n = 0;
+    rd | n;
+    for (int i = 0; i < n; i++) {
+      const size_t o = rd.size();
+      CkDeviceBuffer b;
+      rd | b;
+      src.push_back(b);
+      off.push_back(o);
+      width.push_back(rd.size() - o);
+    }
+  }
+  StagedLandingMap& landings = *CkpvAccess(staged_landings);
+  int live = 0;
+  for (size_t i = 0; i < src.size(); i++) {
+    const CkDeviceBuffer& b = src[i];
+    if (b.cnt == 0) continue;
+    if (isStagedLandingDescriptor(b)) {
+      if (stagedDbg()) CmiPrintf("[STAGE-SKIP %d] already staged %p\n", CkMyPe(), b.ptr);
+      return false;
+    }
+    const bool sender_exported =
+        (b.ipc_protocol != CmiIpcProtocol::NONE && b.device_idx != -1 &&
+         csv_gpu_manager.use_shm);
+    const bool sender_direct =
+        (sender_exported && b.ipc_protocol == CmiIpcProtocol::DIRECT);
+    if (mode == CkNcpyModeDevice::MEMCPY && !sender_exported) { live++; continue; }
+    if (sender_exported) {
+      if (sender_direct && mode != CkNcpyModeDevice::MEMCPY &&
+          hapiIpcImportBuffer(b.ipc_handle, CmiNodeOf(srcPe), b.ipc_base,
+                              b.ipc_offset + (size_t)b.cnt) == NULL) {
+        if (stagedDbg()) CmiPrintf("[STAGE-SKIP %d] IPC handle from PE %d did not import\n", CkMyPe(), srcPe);
+        return false;
+      }
+      live++;
+      continue;
+    }
+    // needs the rget / correction path: leave it to the element
+    if (stagedDbg())
+      CmiPrintf("[STAGE-SKIP %d] from PE %d: mode=%d proto=%d dev_idx=%d prepared=%d not pullable here\n",
+                CkMyPe(), srcPe, (int)mode, (int)b.ipc_protocol, b.device_idx, (int)b.sender_prepared);
+    return false;
+  }
+  if (live == 0) return false;
+
+  // Pass 2: landing buffers, all or nothing.
+  std::vector<void*> land(src.size(), nullptr);
+  for (size_t i = 0; i < src.size(); i++) {
+    if (src[i].cnt == 0) continue;
+    land[i] = CkDeviceMalloc(src[i].cnt);
+    if (land[i] == nullptr) {
+      for (size_t j = 0; j < i; j++) if (land[j]) CkDeviceFree(land[j]);
+      if (stagedDbg())
+        CmiPrintf("[STAGE-SKIP %d] pool could not serve %zu bytes\n", CkMyPe(),
+                  (size_t)src[i].cnt);
+      return false;
+    }
+  }
+
+  // Pass 3: pull, as CkRdmaDeviceIssueRgets would, into the landing buffers.
+  const int numops = (int)src.size();
+  void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * numops);
+  CmiEnforce(rdma_data);
+  DeviceRdmaInfo* info = (DeviceRdmaInfo*)rdma_data;
+  info->n_ops = live;
+  info->counter = 0;
+  info->msg = nullptr;   // the mark of a staged pull: nothing to deliver at completion
+  info->zc_posted = 0.0;
+  info->zc_bytes = 0;
+  info->zc_mode = zcModeSlot(mode);
+  hapiStream_t st = stagingStream();
+  size_t bytes = 0;
+  for (int i = 0; i < numops; i++) {
+    CkDeviceBuffer& source = src[i];
+    if (source.cnt == 0) continue;
+    DeviceRdmaOp& op = *(DeviceRdmaOp*)((char*)rdma_data
+        + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
+    op.stream = (void*)st;
+    op.dest_ptr = land[i];
+    op.size = (size_t)source.cnt;
+    op.info = info;
+    op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
+    op.dst_cb = nullptr;
+    op.tag = 0;
+    op.dest_pe = CkMyPe();
+    op.dest_aid_idx = env->getArrayMgr().idx;
+    op.dest_id = env->getRecipientID();
+    op.src_pe = srcPe;
+    op.src_mpi_rank = source.src_mpi_rank;
+    op.dest_mpi_rank = CmiMyNode();
+    CkDeviceBuffer dest((const void*)land[i], source.cnt);
+    bytes += (size_t)source.cnt;
+    const bool sender_exported =
+        (source.ipc_protocol != CmiIpcProtocol::NONE && source.device_idx != -1 &&
+         csv_gpu_manager.use_shm);
+    if (mode == CkNcpyModeDevice::MEMCPY && !sender_exported) {
+      if (source.sender_prepared && source.ipc_protocol == CmiIpcProtocol::DIRECT &&
+          source.event_idx >= 0 && source.device_idx >= 0 && csv_gpu_manager.use_shm) {
+        hapi_ipc_device_info& di = csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
+        hapiCheck(hapiEventRecord(di.dst_event_pool[source.event_idx], st));
+        hapi_ipc_event_shared* sh = (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
+            + csv_gpu_manager.shm_chunk_size * source.device_idx
+            + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
+        sh->dst_flag.store(true, std::memory_order_release);
+      }
+      if (source.memcpy_event != NULL)
+        hapiCheck(hapiStreamWaitEvent(st, (hapiEvent_t)source.memcpy_event, 0));
+      hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt, cudaMemcpyDefault, st));
+      if (source.device_idx != -1 && csv_gpu_manager.use_shm) {
+        hapi_ipc_device_info& device_info =
+          csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
+        const int my_dev_idx =
+            csv_gpu_manager.device_count * CmiMyNodeRankLocal() + CpvAccess(my_device_id);
+        if (source.device_idx != my_dev_idx) {
+          hapiCheck(hapiStreamSynchronize(st));
+          const int src_local = source.device_idx % csv_gpu_manager.device_count;
+          const int src_global = csv_gpu_manager.device_managers[src_local].global_index;
+          int prev_dev = 0;
+          hapiCheck(hapiGetDevice(&prev_dev));
+          hapiCheck(hapiSetDevice(src_global));
+          hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx], 0));
+          hapiCheck(hapiSetDevice(prev_dev));
+        } else {
+          hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx], st));
+        }
+        hapi_ipc_event_shared* shm_event_shared =
+          (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
+              + csv_gpu_manager.shm_chunk_size * source.device_idx
+              + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
+        shm_event_shared->dst_flag.store(true, std::memory_order_release);
+      }
+    } else {
+      deviceIpcReceive(source, dest, st, srcPe, mode);
+    }
+    hapiAddCallback(st, CkCallback(CkRdmaDeviceRecvHandler, &op));
+    hapiEvent_t ready = stagingEventTake();
+    hapiCheck(hapiEventRecord(ready, st));
+    const void* src_addr = nullptr;
+    if (stageVerifyOn()) {
+      if (mode == CkNcpyModeDevice::MEMCPY) src_addr = source.ptr;
+      else if (sender_exported && source.ipc_protocol == CmiIpcProtocol::DIRECT) {
+        void* base = hapiIpcImportBuffer(source.ipc_handle, CmiNodeOf(srcPe), source.ipc_base,
+                                         source.ipc_offset + (size_t)source.cnt);
+        if (base) src_addr = (const char*)base + source.ipc_offset;
+      }
+    }
+    landings[land[i]] = StagedLanding{ready, (size_t)source.cnt, src_addr, 0ULL, false};
+  }
+
+  if (sync_after_pull) hapiCheck(hapiStreamSynchronize(st));
+
+  // Pass 4: the descriptors now name the landing buffers, as a process-local
+  // source with no callback (the sender's fired from the pull above).
+  for (int i = 0; i < numops; i++) {
+    if (src[i].cnt == 0) continue;
+    CkDeviceBuffer nb = src[i];
+    nb.ptr = land[i];
+    nb.src_pe = CkMyPe();
+    nb.src_mpi_rank = CmiMyNode();
+    nb.dest_pe = CkMyPe();
+    nb.dest_mpi_rank = CmiMyNode();
+    nb.device_idx = -1;
+    nb.event_idx = -1;
+    nb.comm_offset = kStagedLandingMark;
+    nb.ipc_protocol = CmiIpcProtocol::NONE;
+    nb.ipc_offset = 0;
+    nb.ipc_base = NULL;
+    nb.memcpy_event = NULL;
+    nb.sender_prepared = true;
+    nb.data_stored = false;
+    nb.data = NULL;
+    // The sender's callback stays in the descriptor: a CkCallback pups a
+    // type-dependent number of bytes, so replacing it would change the
+    // width of an in-place rewrite. It fired once, from the staging pull
+    // above; the landing branch in CkRdmaDeviceIssueRgets drops its copy.
+    PUP::toMem wr(buf + off[i]);
+    wr | nb;
+    if (wr.size() != width[i])
+      CkAbort("CkRdmaDeviceStageParked: descriptor width changed (%zu -> %zu)",
+              width[i], wr.size());
+  }
+  if (stagedDbg())
+    CmiPrintf("[STAGE %d] id=%llu from PE %d: %d op(s), %zu bytes into landing buffers\n",
+              CkMyPe(), (unsigned long long)ck::ObjID(env->getRecipientID()).getElementID(),
+              srcPe, live, bytes);
+  return true;
 }
 
 // Unused, left for future reference
