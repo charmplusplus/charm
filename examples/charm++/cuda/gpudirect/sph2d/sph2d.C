@@ -27,6 +27,95 @@ inline hapiError_t pcFree(void* p) {
   return hapiFree(p);
 }
 
+// Pinned landing pads and the ordering event are recycled, never returned to
+// the driver. cudaMallocHost / cudaFreeHost synchronize the device and take
+// the driver lock, and cudaEventCreate / cudaEventDestroy take the lock: on a
+// busy device each is tens of ms, and every one blocks the PE. A patch paid
+// three pad frees and the event destroy at departure and three pad mallocs
+// and the event create at arrival, so a move mid-step (async balancing) cost
+// what a move at an idle barrier (sync balancing) never did. Measured on
+// leanmd's one pinned double: 23 ms mean, 351 ms max per move (job 22081612).
+// The pools are process-wide, one lock each; the PEs of a process share one
+// device, so an event or a pad from any of them is valid on all.
+namespace {
+class PinnedBlockPool {
+ public:
+  explicit PinnedBlockPool(size_t bytes)
+      : bytes_((bytes + 63) & ~size_t(63)), lock_(CmiCreateLock()) {}
+  void* take() {
+    CmiLock(lock_);
+    if (free_.empty()) grow();
+    void* p = free_.back();
+    free_.pop_back();
+    CmiUnlock(lock_);
+    return p;
+  }
+  void give(void* p) {
+    if (p == NULL) return;
+    CmiLock(lock_);
+    free_.push_back(p);
+    CmiUnlock(lock_);
+  }
+ private:
+  void grow() {
+    const size_t n = 1024;
+    char* slab = NULL;
+    hapiCheck(hapiMallocHost((void**)&slab, bytes_ * n));
+    free_.reserve(free_.size() + n);
+    for (size_t i = 0; i < n; i++) free_.push_back(slab + i * bytes_);
+  }
+  size_t bytes_;
+  std::vector<void*> free_;
+  CmiNodeLock lock_;
+};
+PinnedBlockPool& pinnedPool(size_t bytes) {
+  static CmiNodeLock lock = CmiCreateLock();
+  static std::map<size_t, PinnedBlockPool*> pools;
+  CmiLock(lock);
+  PinnedBlockPool*& p = pools[bytes];
+  if (p == NULL) p = new PinnedBlockPool(bytes);
+  CmiUnlock(lock);
+  return *p;
+}
+template <typename T>
+inline T* takePinned(size_t count) {
+  return (T*)pinnedPool(sizeof(T) * count).take();
+}
+template <typename T>
+inline void givePinned(T* p, size_t count) {
+  pinnedPool(sizeof(T) * count).give((void*)p);
+}
+
+class EventPool {
+ public:
+  EventPool() : lock_(CmiCreateLock()) {}
+  cudaEvent_t take() {
+    CmiLock(lock_);
+    cudaEvent_t e;
+    if (free_.empty()) {
+      hapiCheck(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
+    } else {
+      e = free_.back();
+      free_.pop_back();
+    }
+    CmiUnlock(lock_);
+    return e;
+  }
+  void give(cudaEvent_t e) {
+    CmiLock(lock_);
+    free_.push_back(e);
+    CmiUnlock(lock_);
+  }
+ private:
+  std::vector<cudaEvent_t> free_;
+  CmiNodeLock lock_;
+};
+EventPool& eventPool() {
+  static EventPool s;
+  return s;
+}
+}  // namespace
+
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Patch patch_proxy;
 /* readonly */ RealType dom_lx;
@@ -499,7 +588,7 @@ public:
     // is what makes a chare that migrates between GPUs safe.
     hapiReleaseStream(compute_stream);
     hapiReleaseStream(comm_stream);
-    cudaEventDestroy(halo_done);
+    eventPool().give(halo_done);
   }
 
   // Everything derived from the array index. Recomputed on the destination
@@ -561,7 +650,7 @@ public:
     // ours, created here on the same device.
     compute_stream = hapiAcquireStream();
     comm_stream = hapiAcquireStream();
-    hapiCheck(cudaEventCreateWithFlags(&halo_done, cudaEventDisableTiming));
+    halo_done = eventPool().take();
   }
 
   void allocDevice() {
@@ -589,10 +678,9 @@ public:
     hapiCheck(pcMalloc((void**)&d_stats, sizeof(RealType) * 8));
     hapiCheck(pcMalloc((void**)&d_check,
         sizeof(unsigned long long) * NUM_CHECKS));
-    hapiCheck(hapiMallocHost((void**)&h_counts, sizeof(int) * NUM_COUNTERS));
-    hapiCheck(hapiMallocHost((void**)&h_stats, sizeof(RealType) * 8));
-    hapiCheck(hapiMallocHost((void**)&h_check,
-        sizeof(unsigned long long) * NUM_CHECKS));
+    h_counts = takePinned<int>(NUM_COUNTERS);
+    h_stats = takePinned<RealType>(8);
+    h_check = takePinned<unsigned long long>(NUM_CHECKS);
     // An inactive patch never runs the stats or check kernels; it reports
     // whatever these last held, which for one that never ran is these zeros.
     for (int i = 0; i < 8; i++) h_stats[i] = 0;
@@ -622,9 +710,9 @@ public:
     pcFree(d_cursor); pcFree(d_cell_parts);
     pcFree(d_drho); pcFree(d_ax); pcFree(d_ay); pcFree(d_stats);
     pcFree(d_check);
-    if (h_counts) hapiFreeHost(h_counts);
-    if (h_stats) hapiFreeHost(h_stats);
-    if (h_check) hapiFreeHost(h_check);
+    givePinned(h_counts, NUM_COUNTERS);
+    givePinned(h_stats, 8);
+    givePinned(h_check, NUM_CHECKS);
     for (int i = 0; i < 2; i++) d_parts[i] = NULL;
     d_send_halo = d_recv_halo = d_send_mig = d_recv_mig = NULL;
     d_halo_ptrs = d_mig_ptrs = NULL;
