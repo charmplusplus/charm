@@ -92,6 +92,18 @@
 
 #include "machine.h"
 
+//
+// "container_of" macro is no longer defined in libfabric 2.x update
+//
+// See the following information from the Frontier User Guide:
+// https://docs.olcf.ornl.gov/systems/frontier_user_guide.html#olcfdev-1880-container-of-c-macro-missing-following-may-26-2026-update
+//
+#include <stddef.h> // for offsetof
+#ifndef container_of
+#define container_of(ptr, type, field) \
+  ((type *) ((char *)ptr - offsetof(type, field)))
+#endif
+
 // Trace communication thread
 
 #if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
