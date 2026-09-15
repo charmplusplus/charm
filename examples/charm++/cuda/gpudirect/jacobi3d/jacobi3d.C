@@ -249,7 +249,13 @@ class Block : public CBase_Block {
    * zerocopy path allocates the second set; the persistent path registers its
    * buffers once at init and so always uses set 0. */
   DataType* d_send_ghosts[2][DIR_COUNT];
-  DataType* d_recv_ghosts[DIR_COUNT];
+  /* Receive side, same shape and same reason. The post entry method runs when
+   * a message is delivered to this object, before the SDAG when-clause matches
+   * it, so a neighbour's iteration i+1 ghost can be fetched into a receive
+   * buffer while iteration i's contents are still waiting to be unpacked. The
+   * zerocopy path selects a set by the message's iteration parity; the
+   * persistent path posts fixed addresses once and uses set 0. */
+  DataType* d_recv_ghosts[2][DIR_COUNT];
 
   hapiStream_t compute_stream;
   hapiStream_t comm_stream;
@@ -281,8 +287,11 @@ class Block : public CBase_Block {
     if (use_zerocopy || use_persistent) {
       for (int i = 0; i < DIR_COUNT; i++) {
         hapiCheck(hapiFree(d_send_ghosts[0][i]));
-        if (use_zerocopy) hapiCheck(hapiFree(d_send_ghosts[1][i]));
-        hapiCheck(hapiFree(d_recv_ghosts[i]));
+        hapiCheck(hapiFree(d_recv_ghosts[0][i]));
+        if (use_zerocopy) {
+          hapiCheck(hapiFree(d_send_ghosts[1][i]));
+          hapiCheck(hapiFree(d_recv_ghosts[1][i]));
+        }
       }
     } else {
       for (int i = 0; i < DIR_COUNT; i++) {
@@ -334,9 +343,11 @@ class Block : public CBase_Block {
     if (use_zerocopy || use_persistent) {
       for (int i = 0; i < DIR_COUNT; i++) {
         hapiCheck(hapiMalloc((void**)&d_send_ghosts[0][i], ghost_sizes[i]));
-        if (use_zerocopy)
+        hapiCheck(hapiMalloc((void**)&d_recv_ghosts[0][i], ghost_sizes[i]));
+        if (use_zerocopy) {
           hapiCheck(hapiMalloc((void**)&d_send_ghosts[1][i], ghost_sizes[i]));
-        hapiCheck(hapiMalloc((void**)&d_recv_ghosts[i], ghost_sizes[i]));
+          hapiCheck(hapiMalloc((void**)&d_recv_ghosts[1][i], ghost_sizes[i]));
+        }
       }
     } else {
       for (int i = 0; i < DIR_COUNT; i++) {
@@ -362,7 +373,7 @@ class Block : public CBase_Block {
 
       for (int i = 0; i < DIR_COUNT; i++) {
         p_send_bufs.emplace_back(d_send_ghosts[0][i], ghost_sizes[i], CkCallback::ignore, comm_stream);
-        p_recv_bufs.emplace_back(d_recv_ghosts[i], ghost_sizes[i], recv_cb, comm_stream);
+        p_recv_bufs.emplace_back(d_recv_ghosts[0][i], ghost_sizes[i], recv_cb, comm_stream);
 
         // Open buffers that will be sent to neighbors
         p_recv_bufs[i].open();
@@ -389,17 +400,20 @@ class Block : public CBase_Block {
       std::vector<DataType*> recv_ghosts;
       for (int i = 0; i < DIR_COUNT; i++) {
         send_ghosts.push_back(d_send_ghosts[0][i]);
-        recv_ghosts.push_back(d_recv_ghosts[i]);
+        recv_ghosts.push_back(d_recv_ghosts[0][i]);
       }
       invokeGhostInitKernels(send_ghosts, ghost_counts, compute_stream);
       invokeGhostInitKernels(recv_ghosts, ghost_counts, compute_stream);
 
       if (use_zerocopy) {
         std::vector<DataType*> send_ghosts_odd;
+        std::vector<DataType*> recv_ghosts_odd;
         for (int i = 0; i < DIR_COUNT; i++) {
           send_ghosts_odd.push_back(d_send_ghosts[1][i]);
+          recv_ghosts_odd.push_back(d_recv_ghosts[1][i]);
         }
         invokeGhostInitKernels(send_ghosts_odd, ghost_counts, compute_stream);
+        invokeGhostInitKernels(recv_ghosts_odd, ghost_counts, compute_stream);
       }
     } else {
       std::vector<DataType*> ghosts;
@@ -532,7 +546,9 @@ class Block : public CBase_Block {
   // SDAG entry method in the .ci file
   void recvGhostZC(int ref, int dir, int &count, DataType *&buf, CkDeviceBufferPost *devicePost) {
     CkAssert(dir >= 0 && dir < DIR_COUNT);
-    buf = d_recv_ghosts[dir];
+    // ref is the sender's iteration; it equals my_iter for the message the
+    // SDAG loop is waiting on and my_iter+1 for one that arrived early.
+    buf = d_recv_ghosts[ref & 1][dir];
     if (dir == LEFT || dir == RIGHT) count = x_surf_count;
     else if (dir == TOP || dir == BOTTOM) count = y_surf_count;
     else if (dir == FRONT || dir == BACK) count = z_surf_count;
@@ -540,15 +556,16 @@ class Block : public CBase_Block {
   }
 
   void processGhostZC(int dir, int count, DataType* gh) {
-    // FIXME: d_recv_ghosts[dir] should be used instead of gh
-    invokeUnpackingKernel(d_temperature, d_recv_ghosts[dir], dir, block_width, block_height,
+    // gh is the buffer posted for this message's iteration, which is not
+    // necessarily d_recv_ghosts[my_iter & 1][dir] if messages were reordered.
+    invokeUnpackingKernel(d_temperature, gh, dir, block_width, block_height,
         block_depth, comm_stream);
   }
 
   void processGhostP(PersistentMsg* msg) {
     int dir = msg->dir;
     CkAssert(dir >= 0 && dir < DIR_COUNT);
-    DataType* d_ghost = d_recv_ghosts[dir];
+    DataType* d_ghost = d_recv_ghosts[0][dir];
 
     invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
         block_depth, comm_stream);

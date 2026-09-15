@@ -123,6 +123,14 @@ here:
     no acknowledgement is needed. It costs one extra ghost-sized allocation per
     direction and nothing at run time.
 
+The receive side has the same hazard in mirror image. The post entry method
+runs when a message is delivered to the object, before the SDAG when-clause
+matches it, so an early iteration i+1 message is fetched into whatever buffer
+the post entry hands out while iteration i's contents may still be waiting to
+be unpacked. jacobi3d keeps two receive sets too, selected by the message's
+iteration parity in the post entry method, and unpacks from the pointer the
+runtime passes back rather than from a fixed buffer.
+
 A registered device pool removes the per-message release, so for a pooled
 buffer the source callback becomes the only signal the sender gets: "the pool
 owns the lifetime" does not mean the buffer is safe to overwrite.
