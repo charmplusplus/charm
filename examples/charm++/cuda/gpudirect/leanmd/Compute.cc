@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <atomic>
+#include <vector>
 #include <unistd.h>
 
 // CHARM_MD_ALLOCSTATS: how much of a migration step goes into device
@@ -147,6 +148,50 @@ bool Compute::lbWaitDue() const {
 //
 // So every device resource is taken on first use instead, from the post entry
 // method, which is the earliest point at which this chare does real work.
+// Pinned host doubles for the energy read-back, carved from process-wide
+// pinned slabs that are never handed back to the driver. cudaMallocHost and
+// cudaFreeHost both synchronize the device and serialize on the driver lock.
+// Paid once per Compute at first use and once in the destructor, they were
+// 95% of the cost of moving a Compute mid-step under async balancing: with
+// the device busy, hapiFreeHost of this one double took 23 ms on average and
+// 351 ms at worst (CHARM_DEBUG_MIGRATE stage timers, job 22081612), about a
+// second of blocked PE time per PE per balancing step. At a sync balancer's
+// barrier the device is idle and the same call is free, which is why only the
+// async arm paid it.
+namespace {
+class PinnedDoubles {
+ public:
+  PinnedDoubles() : lock_(CmiCreateLock()) {}
+  double* take() {
+    CmiLock(lock_);
+    if (free_.empty()) grow();
+    double* p = free_.back();
+    free_.pop_back();
+    CmiUnlock(lock_);
+    return p;
+  }
+  void give(double* p) {
+    CmiLock(lock_);
+    free_.push_back(p);
+    CmiUnlock(lock_);
+  }
+ private:
+  void grow() {
+    const size_t n = 4096;
+    double* slab = nullptr;
+    hapiCheck(hapiMallocHost((void**)&slab, sizeof(double) * n));
+    free_.reserve(free_.size() + n);
+    for (size_t i = 0; i < n; i++) free_.push_back(slab + i);
+  }
+  std::vector<double*> free_;
+  CmiNodeLock lock_;
+};
+PinnedDoubles& pinnedDoubles() {
+  static PinnedDoubles s;  // thread-safe static init; shared by the PEs of a process
+  return s;
+}
+}  // namespace
+
 void Compute::ensureDevice() {
   if (stream != NULL) return;
   stream = streamPool.ckLocalBranch()->acquire();
@@ -157,8 +202,7 @@ void Compute::ensureDevice() {
     hapiCheck(mdMigMalloc((void**)&d_energyScalar, sizeof(double)));
     poolEnergyScalar = mdPoolOn();
   }
-  if (h_energy == NULL)
-    hapiCheck(hapiMallocHost((void**)&h_energy, sizeof(double)));
+  if (h_energy == NULL) h_energy = pinnedDoubles().take();
 }
 
 Compute::~Compute() { freeDevice(); }
@@ -216,7 +260,13 @@ void Compute::freeDevice() {
   if (d_energyPartial) { mdMigFree(d_energyPartial, poolEnergyPartial); d_energyPartial = NULL; }
   if (d_energyScalar)  { mdMigFree(d_energyScalar, poolEnergyScalar);   d_energyScalar = NULL; }
   poolEnergyPartial = poolEnergyScalar = false;
-  if (h_energy)        { hapiCheck(hapiFreeHost(h_energy));    h_energy = NULL; }
+  if (h_energy) {
+    const double t0 = CkWallTimer();
+    pinnedDoubles().give(h_energy);
+    h_energy = NULL;
+    static const bool dbg = (getenv("CHARM_DEBUG_MIGRATE") != NULL);
+    if (dbg) CkPrintf("[MDFREEHOST %d] %.3f ms\n", CkMyPe(), (CkWallTimer() - t0) * 1e3);
+  }
 }
 
 void Compute::calculateForces(int ref, int ord, int cx, int cy, int cz, int& n,
