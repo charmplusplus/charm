@@ -37,13 +37,37 @@
 // cell of side (PTP_CUT_OFF + CELL_MARGIN)/KAWAY. At KAWAY 2,2,1 that cap is 250,
 // which is exactly why the stock values are 100-250. Dropping to KAWAY 1,1,1 gives
 // a cell of side 30 = PERDIM(10) x GAP(3), so 10^3 = 1000 sites.
-#define PARTICLES_PER_CELL_START        800
-#define PARTICLES_PER_CELL_END          1000
+//
+// L1 granularity (measured 14 Sep 2026 on gpub023, 4 A40 / 32 PEs): the L0
+// decision above fixed the kernel width but not what binds the step. A sweep at
+// 64, 128, 192 and 256 cells per device held noLB at a flat 0.54-0.56 ms per
+// cell and the device share at 32-41% of the interval, while the launch (driver)
+// share climbed to 51%. Adding cells adds objects, and an object costs its
+// messages and its launches whatever its atom count, so the step never becomes
+// device-bound; the balancer's win decayed from 23% at 128 cells/GPU to nothing
+// at 256, because LeanMD's imbalance is in work PER object (which a balancer can
+// move) while the cost that grows with size is per object (which it cannot).
+//
+// Device time per Compute goes as N_A x N_B, so the lever is atoms per cell, not
+// cells. GAP stays 3: the LJ minimum for these constants is at
+// r = (2A/B)^(1/6) = 3.18, so anything tighter starts every atom inside the
+// r^-12 wall. PERDIM x GAP must equal the cell side, so holding more atoms means
+// a wider cell, and CELL_MARGIN is the way to widen it without touching the
+// physics: side 42 = PERDIM(14) x GAP(3) gives 14^3 = 2744 sites, 2.7x the atoms
+// and ~6x the pair work per Compute, which should put the device at 70-80% of
+// the step. PTP_CUT_OFF stays 26, so the interaction physics is unchanged and a
+// cell wider than the cutoff only makes the 1-away decomposition more
+// conservative -- fewer, fatter kernels, which is the trade this benchmark wants.
+//
+// The stock granularity, for comparison runs: CELL_MARGIN 4, PERDIM 10,
+// densities 200 / 800 / 1000.
+#define PARTICLES_PER_CELL_START        2200
+#define PARTICLES_PER_CELL_END          2744
 
 // Atom count for the sparse cells of the imbalanced profiles below. A Compute
-// evaluates N_A x N_B pairs, so 200 against 1000 is a 25x spread in work between
+// evaluates N_A x N_B pairs, so 550 against 2744 is a 25x spread in work between
 // the lightest and heaviest pair -- far more than any measurement noise.
-#define PARTICLES_PER_CELL_LIGHT        200
+#define PARTICLES_PER_CELL_LIGHT        550
 
 // Where the load imbalance comes from.
 //
@@ -97,7 +121,7 @@ enum ComputeMapMode { COMPUTEMAP_RR = 0, COMPUTEMAP_LOCAL };
 #define CELLARRAY_DIM_Y         3
 #define CELLARRAY_DIM_Z         3
 #define PTP_CUT_OFF             26 // cut off for atom to atom interactions
-#define CELL_MARGIN             4  // constant diff between cutoff and cell size
+#define CELL_MARGIN             16 // cell side - cutoff; 16 makes the cell 42 = PERDIM x GAP
 #define CELL_SIZE_X             (PTP_CUT_OFF + CELL_MARGIN)/KAWAY_X
 #define CELL_SIZE_Y             (PTP_CUT_OFF + CELL_MARGIN)/KAWAY_Y
 #define CELL_SIZE_Z             (PTP_CUT_OFF + CELL_MARGIN)/KAWAY_Z
@@ -106,7 +130,7 @@ enum ComputeMapMode { COMPUTEMAP_RR = 0, COMPUTEMAP_LOCAL };
 //atoms should not be too close at startup for a stable system;  
 //PERDIM * GAP should be less than (PTPCUTOFF+CELL_MARGIN);
 //max particles per cell should not be greater thatn PERDIM^3 for 1 AWAY;
-#define PERDIM                  10
+#define PERDIM                  14
 #define GAP                     3 
 
 #define CELL_ORIGIN_X           0
