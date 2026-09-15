@@ -96,6 +96,38 @@ Fixed since these examples were first run, and required by them:
     GPU-specific: ckhello hung identically. Fixed in reconverse 2c50813e7
     (charmplusplus/reconverse#212); this tree pins it.
 
+Reusing a send buffer
+---------------------
+
+CkDeviceBuffer hands the runtime an address, not a copy. On the inter-host path
+the receiver reads that address with an RDMA get issued when it processes the
+metadata message, so the sender learns nothing about when the read finishes: it
+proceeds as soon as its own ghosts have arrived, which does not depend on the
+neighbour's get. An iterative program that repacks the same send buffer every
+iteration therefore needs something to order the repack after the read.
+
+The two ways to get that ordering, either sufficient, are both demonstrated
+here:
+
+  - Pass a source callback to CkDeviceBuffer and wait for it before repacking.
+    jacobi2d and jacobi2d-imbalance do this, in the d_send_*_ghost_done entry
+    methods their SDAG awaits at the end of each iteration. It is the general
+    answer -- it also covers freeing or migrating the buffer, which is why
+    these two, the load-balancing examples, use it -- and it costs an
+    acknowledgement per message.
+
+  - Keep two send-buffer sets and alternate them by iteration parity. jacobi3d
+    does this, in curSendGhosts(). A neighbour only sends its iteration i+1
+    ghost once its get of buffer i has completed, and the sender cannot reach
+    iteration i+2 -- the next use of that set -- until that message arrives, so
+    no acknowledgement is needed. It costs one extra ghost-sized allocation per
+    direction and nothing at run time.
+
+A registered device pool removes the per-message release, so for a pooled
+buffer the source callback becomes the only signal the sender gets: "the pool
+owns the lifetime" does not mean the buffer is safe to overwrite.
+
+
 The examples
 ------------
 
@@ -134,7 +166,8 @@ jacobi2d-imbalance
                   ./jacobi2d +pe 8 -z -i 40 -f 10 -l 10 +balancer GreedyRefineLB
 
 jacobi3d      The 3D counterpart of jacobi2d, exchanging six faces. -d selects
-              the GPU-direct path and -s the persistent one.
+              the GPU-direct path and -s the persistent one. The -d path
+              double-buffers its send faces; see "Reusing a send buffer".
 
 
 Related benchmarks

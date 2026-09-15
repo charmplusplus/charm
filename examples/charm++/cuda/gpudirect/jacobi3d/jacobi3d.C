@@ -245,7 +245,10 @@ class Block : public CBase_Block {
 
   DataType* h_ghosts[DIR_COUNT];
   DataType* d_ghosts[DIR_COUNT];
-  DataType* d_send_ghosts[DIR_COUNT];
+  /* Two send-buffer sets, selected per iteration by curSendGhosts(). Only the
+   * zerocopy path allocates the second set; the persistent path registers its
+   * buffers once at init and so always uses set 0. */
+  DataType* d_send_ghosts[2][DIR_COUNT];
   DataType* d_recv_ghosts[DIR_COUNT];
 
   hapiStream_t compute_stream;
@@ -256,6 +259,19 @@ class Block : public CBase_Block {
 
   bool bounds[DIR_COUNT];
 
+  /* The send-buffer set this iteration packs into and sends from.
+   *
+   * Alternating by iteration parity is sufficient on its own, with no
+   * acknowledgement from the receiver: a neighbour issues its get of our
+   * iteration i buffer while processing our iteration i metadata, and it only
+   * sends its own iteration i+1 ghost after that get has completed and it has
+   * finished iteration i. We cannot start packing iteration i+2 -- the next
+   * use of this same set -- until that i+1 message has arrived, so by then
+   * every neighbour has finished reading the set. */
+  DataType** curSendGhosts() {
+    return d_send_ghosts[use_zerocopy ? (my_iter & 1) : 0];
+  }
+
   Block() {}
 
   ~Block() {
@@ -264,7 +280,8 @@ class Block : public CBase_Block {
     hapiCheck(hapiFree(d_new_temperature));
     if (use_zerocopy || use_persistent) {
       for (int i = 0; i < DIR_COUNT; i++) {
-        hapiCheck(hapiFree(d_send_ghosts[i]));
+        hapiCheck(hapiFree(d_send_ghosts[0][i]));
+        if (use_zerocopy) hapiCheck(hapiFree(d_send_ghosts[1][i]));
         hapiCheck(hapiFree(d_recv_ghosts[i]));
       }
     } else {
@@ -316,7 +333,9 @@ class Block : public CBase_Block {
       y_surf_size, z_surf_size, z_surf_size};
     if (use_zerocopy || use_persistent) {
       for (int i = 0; i < DIR_COUNT; i++) {
-        hapiCheck(hapiMalloc((void**)&d_send_ghosts[i], ghost_sizes[i]));
+        hapiCheck(hapiMalloc((void**)&d_send_ghosts[0][i], ghost_sizes[i]));
+        if (use_zerocopy)
+          hapiCheck(hapiMalloc((void**)&d_send_ghosts[1][i], ghost_sizes[i]));
         hapiCheck(hapiMalloc((void**)&d_recv_ghosts[i], ghost_sizes[i]));
       }
     } else {
@@ -342,7 +361,7 @@ class Block : public CBase_Block {
       p_neighbor_bufs.resize(DIR_COUNT);
 
       for (int i = 0; i < DIR_COUNT; i++) {
-        p_send_bufs.emplace_back(d_send_ghosts[i], ghost_sizes[i], CkCallback::ignore, comm_stream);
+        p_send_bufs.emplace_back(d_send_ghosts[0][i], ghost_sizes[i], CkCallback::ignore, comm_stream);
         p_recv_bufs.emplace_back(d_recv_ghosts[i], ghost_sizes[i], recv_cb, comm_stream);
 
         // Open buffers that will be sent to neighbors
@@ -369,11 +388,19 @@ class Block : public CBase_Block {
       std::vector<DataType*> send_ghosts;
       std::vector<DataType*> recv_ghosts;
       for (int i = 0; i < DIR_COUNT; i++) {
-        send_ghosts.push_back(d_send_ghosts[i]);
+        send_ghosts.push_back(d_send_ghosts[0][i]);
         recv_ghosts.push_back(d_recv_ghosts[i]);
       }
       invokeGhostInitKernels(send_ghosts, ghost_counts, compute_stream);
       invokeGhostInitKernels(recv_ghosts, ghost_counts, compute_stream);
+
+      if (use_zerocopy) {
+        std::vector<DataType*> send_ghosts_odd;
+        for (int i = 0; i < DIR_COUNT; i++) {
+          send_ghosts_odd.push_back(d_send_ghosts[1][i]);
+        }
+        invokeGhostInitKernels(send_ghosts_odd, ghost_counts, compute_stream);
+      }
     } else {
       std::vector<DataType*> ghosts;
       for (int i = 0; i < DIR_COUNT; i++) {
@@ -408,7 +435,7 @@ class Block : public CBase_Block {
   void packGhosts() {
     if (use_persistent || use_zerocopy) {
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
-      invokePackingKernels(d_temperature, d_send_ghosts, bounds,
+      invokePackingKernels(d_temperature, curSendGhosts(), bounds,
           block_width, block_height, block_depth, comm_stream);
     } else {
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
@@ -456,24 +483,29 @@ class Block : public CBase_Block {
         }
       }
     } else if (use_zerocopy) {
+      // Same set packGhosts() just filled -- see curSendGhosts() for why
+      // alternating it by parity keeps a neighbour's get from racing the
+      // repack two iterations later.
+      DataType** d_send = curSendGhosts();
+
       if (!bounds[LEFT])
         thisProxy(x-1, y, z).recvGhostZC(my_iter, RIGHT, x_surf_count,
-            CkDeviceBuffer(d_send_ghosts[LEFT], x_surf_count, comm_stream));
+            CkDeviceBuffer(d_send[LEFT], x_surf_count, comm_stream));
       if (!bounds[RIGHT])
         thisProxy(x+1, y, z).recvGhostZC(my_iter, LEFT, x_surf_count,
-            CkDeviceBuffer(d_send_ghosts[RIGHT], x_surf_count, comm_stream));
+            CkDeviceBuffer(d_send[RIGHT], x_surf_count, comm_stream));
       if (!bounds[TOP])
         thisProxy(x, y-1, z).recvGhostZC(my_iter, BOTTOM, y_surf_count,
-            CkDeviceBuffer(d_send_ghosts[TOP], y_surf_count, comm_stream));
+            CkDeviceBuffer(d_send[TOP], y_surf_count, comm_stream));
       if (!bounds[BOTTOM])
         thisProxy(x, y+1, z).recvGhostZC(my_iter, TOP, y_surf_count,
-            CkDeviceBuffer(d_send_ghosts[BOTTOM], y_surf_count, comm_stream));
+            CkDeviceBuffer(d_send[BOTTOM], y_surf_count, comm_stream));
       if (!bounds[FRONT])
         thisProxy(x, y, z-1).recvGhostZC(my_iter, BACK, z_surf_count,
-            CkDeviceBuffer(d_send_ghosts[FRONT], z_surf_count, comm_stream));
+            CkDeviceBuffer(d_send[FRONT], z_surf_count, comm_stream));
       if (!bounds[BACK])
         thisProxy(x, y, z+1).recvGhostZC(my_iter, FRONT, z_surf_count,
-            CkDeviceBuffer(d_send_ghosts[BACK], z_surf_count, comm_stream));
+            CkDeviceBuffer(d_send[BACK], z_surf_count, comm_stream));
     } else {
       if (!bounds[LEFT])
         thisProxy(x-1, y, z).recvGhostReg(my_iter, RIGHT,
