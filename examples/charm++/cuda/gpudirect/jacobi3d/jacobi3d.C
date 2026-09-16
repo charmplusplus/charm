@@ -555,11 +555,15 @@ class Block : public CBase_Block {
     POST_STREAM(devicePost[0]) = comm_stream;
   }
 
-  void processGhostZC(int dir, int count, DataType* gh) {
-    // gh is the buffer posted for this message's iteration, which is not
-    // necessarily d_recv_ghosts[my_iter & 1][dir] if messages were reordered.
-    invokeUnpackingKernel(d_temperature, gh, dir, block_width, block_height,
-        block_depth, comm_stream);
+  void processGhostZC(int ref, int dir, int count, DataType* gh) {
+    // Do not unpack from gh. On the inter-process (RDMA) path the pointer
+    // delivered with the regular entry method is the SENDER's device address,
+    // copied out of the metadata message, not the buffer we posted; reading it
+    // faults the kernel and the context, and the run hangs with no message.
+    // Index our own receive set by the message's iteration, exactly as the
+    // post entry method did when it handed the buffer out.
+    invokeUnpackingKernel(d_temperature, d_recv_ghosts[ref & 1][dir], dir,
+        block_width, block_height, block_depth, comm_stream);
   }
 
   void processGhostP(PersistentMsg* msg) {
