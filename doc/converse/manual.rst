@@ -208,7 +208,9 @@ Writing Handler Functions
 A message handler function is just a C function that accepts a void
 pointer (to a message buffer) as an argument, and returns nothing. The
 handler may use the message buffer for any purpose, but is responsible
-for eventually deleting the message using CmiFree.
+for eventually deleting the message using CmiFree. A message which the
+sender flagged nokeep is an exception: the handler may neither modify it
+nor retain it past its own return. See :ref:`msgownership`.
 
 Building Messages
 -----------------
@@ -272,6 +274,50 @@ number.
 
 This call returns the handler of a message in the form of a function
 pointer.
+
+.. _msgownership:
+
+Message Ownership and the nokeep Flag
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A message sent to several destinations - with a broadcast, a list send,
+or a multicast - is by default delivered as a separate copy to each
+destination. The handler that receives a copy owns that copy: it may keep
+it past the return of the handler, modify it, or free it, and it is
+responsible for eventually deleting it with CmiFree. On the sending side,
+the AndFree variants of the send functions transfer the caller's buffer to
+the runtime, which frees it with CmiFree once the send completes, so the
+caller must not touch the buffer after the call; the variants without
+AndFree leave the buffer with the caller, which may reuse or free it once
+the call returns.
+
+The message header carries a nokeep flag which the sender may set to relax
+this contract. Setting the flag is a promise that no receiving handler will
+retain the message beyond its return and that no receiving handler will
+modify it. In exchange, the runtime may deliver one shared buffer to
+several PEs of the same process instead of making one copy per PE. Each
+PE's CmiFree on such a message drops one reference and the last CmiFree
+releases the buffer, so a handler that receives a nokeep message must treat
+it as read only, and must still either call CmiFree on it exactly once or
+hand it back to the runtime unchanged.
+
+Charm++ sets the flag for entry methods declared [nokeep] (section
+:numref:`attributes` of the Charm++ manual). A Converse program sets it on
+a message it has built:
+
+.. code-block:: c++
+
+  void CmiSetMsgNokeep(void *msg)
+
+Sets the nokeep flag in the header of msg. The macro
+``CMI_MSG_NOKEEP(msg)``, which reads and writes the header bit directly,
+is also available and can be used where the accessor is not.
+
+On reconverse the flag takes effect today in CmiWithinNodeBroadcast and in
+the within-node delivery of list sends and multicasts: those calls send one
+network message per destination process, and within a destination process
+the message is shared among the destination PEs when the flag is set.
+Without the flag, each destination receives its own copy.
 
 Sending Messages
 ----------------
@@ -434,6 +480,11 @@ will not be able to provide the service to the user.)
 
 Broadcasting Messages
 ---------------------
+
+Each destination of a broadcast receives its own copy of the message, which
+its handler owns and must free, unless the sender set the nokeep flag; see
+:ref:`msgownership`.
+
 .. code-block:: c++
 
   void CmiSyncBroadcast(unsigned int size, void *msg)
@@ -498,6 +549,18 @@ buffer.
 Sends msg of length size bytes to all nodes including the node on which
 the caller resides. This function frees the message buffer for msg
 before returning, so msg must point to a dynamically allocated buffer.
+
+.. code-block:: c++
+
+  void CmiWithinNodeBroadcast(int size, void *msg)
+
+Sends msg of length size bytes to every PE of the node on which the caller
+resides, including the calling PE itself. On reconverse, a message with the
+nokeep flag set is delivered to those PEs as one shared buffer, each PE's
+CmiFree dropping one reference; otherwise each PE receives its own copy.
+The caller's buffer is consumed either way, since it is delivered to the
+calling PE, so msg must point to a buffer allocated with CmiAlloc and the
+caller must not reuse or free it after the call.
 
 .. code-block:: c++
 
@@ -574,7 +637,10 @@ processors.
   void CmiSyncMulticast(CmiGroup grp, unsigned int size, void *msg)
 
 Sends msg of length size bytes to all members of the specified group.
-Group IDs are created using CmiEstablishGroup.
+Group IDs are created using CmiEstablishGroup. On reconverse this is one
+network message per destination process; delivery within a process shares
+the buffer for nokeep messages and copies otherwise (see
+:ref:`msgownership`).
 
 .. code-block:: c++
 
@@ -602,7 +668,10 @@ CmiEstablishGroup.
 
   void CmiSyncListSend(int npes, int *pes, unsigned int size, void *msg)
 
-Sends msg of length size bytes to npes processors in the array pes.
+Sends msg of length size bytes to npes processors in the array pes. On
+reconverse this is one network message per destination process; delivery
+within a process shares the buffer for nokeep messages and copies
+otherwise (see :ref:`msgownership`).
 
 .. code-block:: c++
 
