@@ -93,6 +93,11 @@ class Main : public CBase_Main {
   std::vector<MigPoint> migPoints;
   int migIdx = 0, migBatch = 32, migRounds = 3;
   int migTier = -1, migSrc = -1, migDst = -1;
+  // -M <tier>: force the migration sweep onto a tier instead of picking the
+  // costliest same-host one. -M 3 measures an OFF-NODE move, which the default
+  // deliberately skips (see runMigration); the resulting migrate_* is the
+  // network move, not the local pack/land work, and the table says which.
+  int migTierForce = -1;
   int migReady = 0, migArrived = 0, migLeg = 0;
   double migStart = 0.0, migAccum = 0.0;
   CProxy_Mover movers;
@@ -110,7 +115,7 @@ class Main : public CBase_Main {
 
     int c;
     size_t migHostMax = (size_t)4 << 20, migDevMax = (size_t)4 << 20;
-    while ((c = getopt(m->argc, m->argv, "s:x:i:w:o:b:r:H:D:")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:x:i:w:o:b:r:H:D:M:")) != -1) {
       switch (c) {
         case 's': min_size = atol(optarg); break;
         case 'x': max_size = atol(optarg); break;
@@ -119,10 +124,12 @@ class Main : public CBase_Main {
         case 'o': outPath = optarg; break;
         case 'b': migBatch = atoi(optarg); break;
         case 'r': migRounds = atoi(optarg); break;
+        case 'M': migTierForce = atoi(optarg); break;
         case 'H': migHostMax = (size_t)atol(optarg) << 20; break;
         case 'D': migDevMax = (size_t)atol(optarg) << 20; break;
         default: CkAbort("usage: lbcalib [-s min] [-x max] [-i iters] [-w warmup] [-o out.conf] "
                          "[-b migration batch] [-r migration round trips] "
+                         "[-M migration tier 0..3] "
                          "[-H max host MB per object] [-D max device MB per object]\n");
       }
     }
@@ -261,8 +268,18 @@ class Main : public CBase_Main {
   // when present: a table is per host type, and the network move is priced by
   // the inter_node transfer tier.
   void runMigration() {
-    for (int t : {TIER_IPC_CROSS_GPU, TIER_IPC_SAME_GPU, TIER_INTRA_PROCESS})
-      if (haveTier[t]) { migTier = t; migSrc = pairA[t]; migDst = pairB[t]; break; }
+    if (migTierForce >= 0 && migTierForce < TIER_COUNT) {
+      if (!haveTier[migTierForce]) {
+        CkPrintf("lbcalib: -M %d (%s) has no pair in this launch; migration cost stays estimated\n",
+                 migTierForce, tierName(migTierForce));
+        writeConfig();
+        return;
+      }
+      migTier = migTierForce; migSrc = pairA[migTier]; migDst = pairB[migTier];
+    } else {
+      for (int t : {TIER_IPC_CROSS_GPU, TIER_IPC_SAME_GPU, TIER_INTRA_PROCESS})
+        if (haveTier[t]) { migTier = t; migSrc = pairA[t]; migDst = pairB[t]; break; }
+    }
     if (migTier < 0) {
       CkPrintf("lbcalib: no same-host pair to migrate between; migration cost stays estimated\n");
       writeConfig();
@@ -402,6 +419,10 @@ class Main : public CBase_Main {
       fprintf(f, "\n# Migration: measured (R2=%.4f), batches of %d objects migrating\n"
                  "# PE %d <-> PE %d (%s), per-object time = batch time / batch.\n",
               migRsq, migBatch, migSrc, migDst, tierName(migTier));
+      if (migTier == TIER_INTER_NODE)
+        fprintf(f, "# NOTE: this migrate_* is an OFF-NODE move (-M 3). It already contains the\n"
+                   "# network transfer, so do NOT also charge the inter_node transfer tier for\n"
+                   "# a migration priced from it.\n");
       fprintf(f, "migrate_alpha       = %.9e\n", migAlpha);
       fprintf(f, "migrate_beta_host   = %.9e\n", migBetaHost);
       fprintf(f, "migrate_beta_device = %.9e\n", migBetaDevice);
