@@ -2195,7 +2195,8 @@ void hapiPollEvents(void* param) {
   std::queue<hapiEvent>& queue = CpvAccess(hapi_event_queue);
   while (!queue.empty()) {
     hapiEvent hev = queue.front();
-    if (hapiEventQuery(hev.event) == hapiSuccess) {
+    hapiError_t retCode = hapiEventQuery(hev.event);
+    if (retCode == hapiSuccess) {
       queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
 
       // invoke Charm++ callback if one was given
@@ -2213,6 +2214,11 @@ void hapiPollEvents(void* param) {
       hapiQdProcess(1);
     }
     else {
+      if (retCode != hapiErrorNotReady) {
+        CmiPrintf("%d %d: Fatal GPU Error %s: %d.\n", CmiMyNode(), CmiMyPe(),
+                  hapiGetErrorString(retCode), retCode);
+        CmiAbort("%d: hapiPollEvents: bad GPU event\n", CmiMyPe());
+      }
       // stop going through the queue once we encounter a non-successful event
       break;
     }
