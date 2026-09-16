@@ -78,7 +78,7 @@ mainmodule jacobi3d {
         if (use_zerocopy) {
           when recvGhostZC[my_iter](int ref, int dir, int w, nocopydevice DataType buf[w]) {
             serial {
-              processGhostZC(dir, w, buf);
+              processGhostZC(ref, dir, w, buf);
             }
           }
         } else if (use_persistent) {
