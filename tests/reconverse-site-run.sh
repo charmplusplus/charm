@@ -17,7 +17,7 @@
 #               processes on one node)
 #   PROCS       processes for the multi-process pass (default 2)
 #   PES         PEs per single-process run (default: what each Makefile asks)
-#   LAUNCHER    override the launcher (default "srun --mpi=pmi2")
+#   LAUNCHER    override the launcher (default "srun --mpi=pmi2"; delta: "srun --mpi=pmix")
 #   LAUNCHER_ARGS_SINGLE / LAUNCHER_ARGS_MULTI
 #               launcher flags for the two passes (defaults are srun's
 #               node/cpu flags; set both empty to use lcrun on a workstation)
@@ -34,7 +34,12 @@ CHARM_BUILD=${CHARM_BUILD:?set CHARM_BUILD to the reconverse build directory}
 SITE=${SITE:-generic}
 NODES=${NODES:-2}
 PROCS=${PROCS:-2}
-LAUNCHER=${LAUNCHER:-"srun --mpi=pmi2"}
+# The launcher default is per site: Delta's srun does not bootstrap a
+# multi-process reconverse job with --mpi=pmi2 (each rank starts as its own
+# one-process job and every multi-process test passes vacuously), so the delta
+# case below picks pmix. Anvil and Frontier work with pmi2. LAUNCHER in the
+# environment overrides either.
+SITE_LAUNCHER="srun --mpi=pmi2"
 LAUNCHER_ARGS_SINGLE=${LAUNCHER_ARGS_SINGLE-"-N1 -c8"}
 if [[ $NODES -ge 2 ]]; then
   LAUNCHER_ARGS_MULTI=${LAUNCHER_ARGS_MULTI-"-N$NODES --ntasks-per-node=$((PROCS / NODES)) -c8"}
@@ -59,6 +64,10 @@ case "$SITE" in
     # software stack.
     export FI_PROVIDER=cxi
     export LCI_NETWORK_BACKENDS=ofi
+    # Verified 2026-09-15 on gpuA100x4-interactive: --mpi=pmi2 gives N isolated
+    # one-process jobs ("Starting Reconverse with 1 process" on every rank) and
+    # LCT_PMI_BACKEND=pmi2 does not help; --mpi=pmix bootstraps correctly.
+    SITE_LAUNCHER="srun --mpi=pmix"
     ;;
   frontier)
     # OLCF Frontier: Slingshot-11 through libfabric's cxi provider, as on
@@ -98,7 +107,8 @@ else
 fi
 [[ ${#DIRS[@]} -gt 0 ]] || { echo "no test directories" >&2; exit 2; }
 
-echo "SITE=$SITE NODES=$NODES PROCS=$PROCS CHARM_BUILD=$CHARM_BUILD"
+LAUNCHER=${LAUNCHER:-$SITE_LAUNCHER}
+echo "SITE=$SITE NODES=$NODES PROCS=$PROCS LAUNCHER=\"$LAUNCHER\" CHARM_BUILD=$CHARM_BUILD"
 echo "JOB=${SLURM_JOB_ID:-none} NODELIST=${SLURM_JOB_NODELIST:-none} DATE=$(date)"
 fail=0
 for d in "${DIRS[@]}"; do
