@@ -11911,9 +11911,8 @@ Installation for Specific Builds
 Reconverse
 ^^^^^^^^^^
 
-Reconverse is a reimplementation of the Converse layer that Charm++ can be
-built on in place of the classic machine layers. It is selected by the
-network part of the build triplet:
+Reconverse is a reimplementation of Converse, the runtime layer beneath
+Charm++. It is selected by the network part of the build triplet:
 
 .. code-block:: bash
 
