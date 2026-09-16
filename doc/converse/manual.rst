@@ -307,11 +307,13 @@ a message it has built:
 
 .. code-block:: c++
 
-  void CmiSetMsgNokeep(void *msg)
+  void CmiSetMsgNokeep(void *msg, int nokeep)
+  int  CmiMsgIsNokeep(const void *msg)
 
-Sets the nokeep flag in the header of msg. The macro
+``CmiSetMsgNokeep`` sets (nonzero) or clears (zero) the nokeep flag in the
+header of msg, and ``CmiMsgIsNokeep`` reads it. The macro
 ``CMI_MSG_NOKEEP(msg)``, which reads and writes the header bit directly,
-is also available and can be used where the accessor is not.
+remains available for existing programs.
 
 On reconverse the flag takes effect today in CmiWithinNodeBroadcast and in
 the within-node delivery of list sends and multicasts: those calls send one
