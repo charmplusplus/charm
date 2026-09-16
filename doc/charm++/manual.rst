@@ -9502,8 +9502,16 @@ address range is absorbed by the network layer's own registration cache;
 the runtime does not keep a second cache of its own. The one exception is
 memory the runtime itself owns, which is what the device pool below is for.
 
-Two properties of that network-layer cache have to be worked around, and
-neither reports itself:
+Recommendation: a device buffer from ``cudaMalloc``/``hipMalloc`` is
+registered for each send or receive and the runtime's registration is
+released when that transfer completes, so such buffers suit occasional
+transfers. For buffers that are used for communication throughout a run,
+allocate them with ``CkDeviceMalloc`` (below): the pool's arena is
+registered once and stays registered, and the two cache properties that
+follow do not arise for pool memory.
+
+Two properties of the network-layer cache have to be worked around for
+buffers that do not come from the pool, and neither reports itself:
 
 - **Do not free and reallocate device buffers that have been sent.**
   Nothing invalidates a cached registration of a device region when the
