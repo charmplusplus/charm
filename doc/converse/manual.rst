@@ -298,8 +298,8 @@ modify it. In exchange, the runtime may deliver one shared buffer to
 several PEs of the same process instead of making one copy per PE. Each
 PE's CmiFree on such a message drops one reference and the last CmiFree
 releases the buffer, so a handler that receives a nokeep message must treat
-it as read only, and must still either call CmiFree on it exactly once or
-hand it back to the runtime unchanged.
+it as read only, and must still call CmiFree on it exactly once, as for any
+other message.
 
 Charm++ sets the flag for entry methods declared [nokeep] (section
 :numref:`attributes` of the Charm++ manual). A Converse program sets it on
