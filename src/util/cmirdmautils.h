@@ -86,7 +86,8 @@ void setNcpyOpInfo(
   int destPe,
   const void *destRef,
   int rootNode,
-  NcpyOperationInfo *ncpyOpInfo);
+  NcpyOperationInfo *ncpyOpInfo,
+  void *deviceRdmaOpInfo);  // reconverse's definition takes this argument; see performEmApiRget
 
 void resetNcpyOpInfoPointers(NcpyOperationInfo *ncpyOpInfo);
 

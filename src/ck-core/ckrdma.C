@@ -608,7 +608,17 @@ void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, Ncp
                 dest.pe,
                 (char *)(ncpyEmBufferInfo), // destRef
                 rootNode,
-                ncpyOpInfo);
+                ncpyOpInfo
+#if CMK_RECONVERSE
+                // reconverse's setNcpyOpInfo takes one more argument than
+                // classic's: the device RDMA op info. This is a host-side
+                // operation, so it carries none. Leaving the argument off
+                // compiled and linked (extern "C"), and the callee then read
+                // stack garbage into deviceRdmaOpInfo, which CUDA builds use
+                // to route acks to the device handler.
+                , nullptr
+#endif
+                );
 
   // set opMode
   if(emMode == ncpyEmApiMode::BCAST_SEND || emMode == ncpyEmApiMode::BCAST_RECV)
