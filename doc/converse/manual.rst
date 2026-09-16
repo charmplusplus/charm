@@ -315,7 +315,7 @@ header of msg, and ``CmiMsgIsNokeep`` reads it. The macro
 ``CMI_MSG_NOKEEP(msg)``, which reads and writes the header bit directly,
 remains available for existing programs.
 
-On reconverse the flag takes effect today in CmiWithinNodeBroadcast and in
+On reconverse the flag takes effect in CmiWithinNodeBroadcast and in
 the within-node delivery of list sends and multicasts: those calls send one
 network message per destination process, and within a destination process
 the message is shared among the destination PEs when the flag is set.
