@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstdio>
 #include <atomic>
+#include <cstring>
 #include <vector>
 #include <unistd.h>
 
@@ -85,7 +86,7 @@ extern /* readonly */ CProxy_StreamPool streamPool;
 
 //compute - Default constructor
 Compute::Compute() : stepCount(1), d_energyPartial(NULL), d_energyScalar(NULL),
-                     h_energy(NULL) {
+                     h_energy(NULL), lastWork(NULL), lastWorkValid(false) {
   energy[0] = energy[1] = 0;
   usesAtSync = true;
   cap[0] = cap[1] = 0;
@@ -110,6 +111,8 @@ Compute::Compute(CkMigrateMessage *msg): CBase_Compute(msg) {
   d_energyPartial = NULL;
   d_energyScalar = NULL;
   h_energy = NULL;
+  lastWork = NULL;
+  lastWorkValid = false;
   stream = NULL;
   pendingForceSends = 0;
   poolPos[0] = poolPos[1] = poolForce[0] = poolForce[1] = false;
@@ -190,6 +193,37 @@ PinnedDoubles& pinnedDoubles() {
   static PinnedDoubles s;  // thread-safe static init; shared by the PEs of a process
   return s;
 }
+
+// Events for pup_device_order_event, recycled the same way. cudaEventCreate and
+// cudaEventDestroy take the driver lock, so they are never done per move.
+class EventPool {
+ public:
+  EventPool() : lock_(CmiCreateLock()) {}
+  cudaEvent_t take() {
+    CmiLock(lock_);
+    cudaEvent_t e;
+    if (free_.empty()) {
+      hapiCheck(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
+    } else {
+      e = free_.back();
+      free_.pop_back();
+    }
+    CmiUnlock(lock_);
+    return e;
+  }
+  void give(cudaEvent_t e) {
+    CmiLock(lock_);
+    free_.push_back(e);
+    CmiUnlock(lock_);
+  }
+ private:
+  std::vector<cudaEvent_t> free_;
+  CmiNodeLock lock_;
+};
+EventPool& eventPool() {
+  static EventPool s;
+  return s;
+}
 }  // namespace
 
 void Compute::ensureDevice() {
@@ -203,6 +237,7 @@ void Compute::ensureDevice() {
     poolEnergyScalar = mdPoolOn();
   }
   if (h_energy == NULL) h_energy = pinnedDoubles().take();
+  if (lastWork == NULL) { lastWork = eventPool().take(); lastWorkValid = false; }
 }
 
 Compute::~Compute() { freeDevice(); }
@@ -260,6 +295,7 @@ void Compute::freeDevice() {
   if (d_energyPartial) { mdMigFree(d_energyPartial, poolEnergyPartial); d_energyPartial = NULL; }
   if (d_energyScalar)  { mdMigFree(d_energyScalar, poolEnergyScalar);   d_energyScalar = NULL; }
   poolEnergyPartial = poolEnergyScalar = false;
+  if (lastWork) { eventPool().give(lastWork); lastWork = NULL; lastWorkValid = false; }
   if (h_energy) {
     const double t0 = CkWallTimer();
     pinnedDoubles().give(h_energy);
@@ -308,29 +344,6 @@ vec3 Compute::periodicShift() const {
 // to balance on the last few costs seconds per LB event -- far more than the
 // imbalance being corrected. Toggle per PE (not per chare: hundreds of Computes
 // share a PE and the switch is PE-wide) and only on a transition.
-void Compute::updateInstrumentation() {
-  static thread_local int lastStep = -1;
-  if (lastStep == stepCount) return;              // first Compute of the step wins
-  lastStep = stepCount;
-
-  int nextLb;
-  if (stepCount <= firstLdbStep) {
-    nextLb = firstLdbStep;
-  } else {
-    const int k = (stepCount - firstLdbStep + ldbPeriod - 1) / ldbPeriod;
-    nextLb = firstLdbStep + k * ldbPeriod;
-  }
-
-  const bool want = (nextLb - stepCount) <= LB_INSTRUMENT_WINDOW;
-  // Ask the runtime what the state is rather than remembering what we last
-  // asked for. Resuming from a balancing step turns instrumentation on
-  // unconditionally, so a private record of it goes stale every LB step -- and
-  // under -lbasync the resume lands mid-window, where the two disagree for the
-  // whole rest of the period and tracing never gets switched back off.
-  if (want != (bool)LBManager::Object()->StatsOn()) {
-    if (want) LBTurnInstrumentOn(); else LBTurnInstrumentOff();
-  }
-}
 
 void Compute::launchForces() {
   // A chare that migrated mid-step resumes here without having run
@@ -340,7 +353,6 @@ void Compute::launchForces() {
   // device send from a NULL stream and abort with "invalid argument" in
   // CkRdmaDeviceIssueRgets. Idempotent: returns at once when a stream is held.
   ensureDevice();
-  updateInstrumentation();
   const double cutoffSq = (double)PTP_CUT_OFF * (double)PTP_CUT_OFF;
   const bool doEnergy = (stepCount == 1 || stepCount == finalStepCount);
   const int nA = nPart[0];
@@ -371,6 +383,11 @@ void Compute::launchForces() {
     hapiCheck(cudaMemcpyAsync(h_energy, d_energyScalar, sizeof(double),
                               cudaMemcpyDeviceToHost, stream));
   }
+  // The last device work of this step that touches the pupped buffers. A
+  // migration's pack copies wait for this event, not for the shared stream's
+  // tail (see Compute::pup).
+  hapiCheck(cudaEventRecord(lastWork, stream));
+  lastWorkValid = true;
 
   CkCallback* cb = new CkCallback(CkIndex_Compute::forcesReady(),
                                   thisProxy[thisIndex]);
@@ -445,7 +462,22 @@ void Compute::pup(PUP::er &p) {
   // makes the migration stream wait on it, so the copies queue up behind the
   // kernels on the device and the scheduler thread never stops. No-op for the
   // sizer and the unpacker.
-  if (stream != NULL) p.pup_device_order((void*)stream);
+  // Order the pack copies behind this Compute's own last kernel (the event
+  // recorded in launchForces), not behind the tail of the stream it shares
+  // with ~27 other Computes. Before the first launch there is nothing to
+  // order behind; the stream form stays as the fallback.
+  // Under CHARM_DEBUG_MIGRATE, whether the event was already complete at
+  // pack time (it is, whenever the runtime kicked a quiet element).
+  static const bool dbg = (getenv("CHARM_DEBUG_MIGRATE") != NULL);
+  if (p.isPacking()) {
+    if (dbg) {
+      const int ready = (lastWorkValid && cudaEventQuery(lastWork) == cudaSuccess) ? 1 : 0;
+      cudaGetLastError();
+      CkPrintf("[PACKORD %d] valid=%d ready=%d\n", CkMyPe(), (int)lastWorkValid, ready);
+    }
+    if (lastWorkValid) p.pup_device_order_event((void*)lastWork);
+    else if (stream != NULL) p.pup_device_order((void*)stream);
+  }
 
   // The scratch travels. Unpacking rebinds these pointers into the arena the
   // payload landed in, so they are released through hapiFreeMigratable (see

@@ -84,7 +84,6 @@ inline hapiError_t mmFree(void* p) {
 
 // With -I (CUPTI-measured loads instead of the experts' own estimates): how
 // many steps before an AtSync step to switch instrumentation on, as in pic2d.
-#define LB_INSTRUMENT_WINDOW 3
 
 // ---- host hashing: routing is a pure function of (seed, step, PE, token,
 // slot), so every run with the same arguments routes identically whatever the
@@ -510,7 +509,6 @@ class Dispatcher : public CBase_Dispatcher {
     // The experts declare their own loads (token count x measured seconds per
     // token); with instrumentation on, the balancer would overwrite them with
     // CUPTI's measurement, and pay CUPTI's cost every step. -I keeps it.
-    if (!use_instrument) LBTurnInstrumentOff();
 
     dispId = CkMyNode();
     active = (CkMyRank() == 0);
@@ -820,7 +818,6 @@ class Expert : public CBase_Expert {
   // owed lb_wait_lag steps later.
   bool lb_waiting = false;
   int lb_start_step = 0;
-  bool instrumenting = true;   // matches the runtime default at startup
 
   // Load estimate: seconds per token, an EMA of the measured step time over
   // its token count. Rate-aware for free: a slower device shows up here.
@@ -1002,7 +999,6 @@ class Expert : public CBase_Expert {
     p | chk_due;
     p | lb_waiting;
     p | lb_start_step;
-    p | instrumenting;
     p | spt;
     p | gpu_last;
     p | n_last;
@@ -1112,13 +1108,6 @@ class Expert : public CBase_Expert {
     // loads, nothing is declared.
     if (!use_instrument) setObjGPUTime(s_tok * n_tot * stepsSinceLastLB(my_step));
 
-    if (use_instrument) {
-      const bool want = (nextLBStep(my_step) - my_step) <= LB_INSTRUMENT_WINDOW;
-      if (want != instrumenting) {
-        instrumenting = want;
-        if (want) LBTurnInstrumentOn(); else LBTurnInstrumentOff();
-      }
-    }
     if (isLBStep(my_step) && !lb_waiting) {
       if (!async_lb) {
         // Stops here; ResumeFromSync means the strategy and the migrations

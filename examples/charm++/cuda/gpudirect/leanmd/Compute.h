@@ -37,6 +37,8 @@ class Compute : public CBase_Compute {
     bool poolPos[2], poolForce[2], poolEnergyPartial, poolEnergyScalar;
     double* h_energy;       // pinned
     cudaStream_t stream;
+    cudaEvent_t lastWork;   // recorded after this Compute's last device work of a step
+    bool lastWorkValid;
 
     // Filled by the post entry method as messages land.
     int nPart[2];
@@ -54,7 +56,6 @@ class Compute : public CBase_Compute {
     int lbWaitPending;
     int lbStartStep;
 
-    void updateInstrumentation();
     void deriveCells();
     void ensureDevice();
     void ensureSlot(int s, int n);

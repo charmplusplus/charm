@@ -123,30 +123,13 @@ Main::Main(CkArgMsg* m) {
     logs = m->argv[cur_arg];
   }
 
-  // The split is only safe under +LBAsync. With the flag off, an AtSyncStart()
-  // that finds no step due resumes the element inline *and* returns to its
-  // caller, so a chare written to the split pattern would take both paths --
-  // one AtSync worth of barrier for two resumes. Fall back rather than let that
-  // happen.
-  if (asyncLb && !_lb_args.lbAsync()) {
-    CkPrintf("[WARN] -lbasync ignored: it needs +LBAsync on the command line. "
-             "Running the unsplit AtSync barrier instead.\n");
-    asyncLb = 0;
-  }
-  if (lbLag < 0) lbLag = 0;
-  // The two halves have to pair up inside one period -- AtSyncStart() aborts if
-  // the step it started is still in flight -- and the park has to land clear of
-  // the NEXT step's measurement window. Resuming from a step turns
-  // instrumentation back on, so a park inside that window bills the resume and
-  // the step's migrations to the objects as load, and the next decision is made
-  // from a window describing the last balancing step rather than the
-  // application. That leaves period - window - 1 as the largest usable lag.
-  const int maxLag = ldbPeriod - LB_INSTRUMENT_WINDOW - 1;
+  // The lag may run up to the step before the next balancing step; the
+  // measurement window is the runtime's (open at resume, closed where the
+  // strategy reads the loads), not the application's.
+  const int maxLag = ldbPeriod - 1;
   if (asyncLb && lbLag > maxLag) {
-    CkPrintf("[WARN] -lblag %d does not clear the next measurement window "
-             "(period %d, window %d); using %d.\n",
-             lbLag, ldbPeriod, LB_INSTRUMENT_WINDOW, maxLag > 0 ? maxLag : 0);
-    lbLag = maxLag > 0 ? maxLag : 0;
+    CkPrintf("[WARN] -lblag %d exceeds the period %d; using %d.\n", lbLag, ldbPeriod, maxLag);
+    lbLag = maxLag;
   }
   if (asyncLb) CkPrintf("Async LB: on, lag %d steps\n", lbLag);
 
