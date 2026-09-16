@@ -11,6 +11,7 @@ mainmodule async_arrival {
 
   array [1D] Blk {
     entry Blk();
-    entry void run();
+    entry void run(bool split_wait);
+    entry void waitForStep();
   };
 };

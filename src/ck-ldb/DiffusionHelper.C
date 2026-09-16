@@ -100,6 +100,7 @@ void DiffusionLB::BuildStats()
   // Both dimensions' totals, reported to PE 0 to decide which one this step
   // diffuses (loadDimReport). my_load is priced once the verdict is back.
   nodeHostSum = nodeHostMax = nodeDevSum = nodeDevMax = nodeDrvSum = nodeDrvMax = 0.0;
+  nodeHostMaxObj = -1; nodeHostMaxPe = -1;
 
   // copy all data in individual message to this big structure
   for (int pe = 0; pe < statsReceived; pe++)
@@ -130,6 +131,7 @@ void DiffusionLB::BuildStats()
       my_load += diffusionObjLoad(oData);
       pe_load[pe] += diffusionObjCpuLoad(oData);
       nodeHostSum += oData.wallTime;
+      if ((double)oData.wallTime > nodeHostMax) { nodeHostMaxObj = nobj; nodeHostMaxPe = start + pe; }
       nodeHostMax = std::max(nodeHostMax, (double)oData.wallTime);
       // Both per-group loads, separately: which one the group dimension
       // carries is this step's verdict, which these totals feed.
@@ -160,6 +162,17 @@ void DiffusionLB::BuildStats()
     // free the memory TODO: Free the memory in Destructor
     delete msg;
     statsList[pe] = 0;
+  }
+  if (_lb_args.debug() > 0) {
+    for (int pe = 0; pe < statsReceived; pe++)
+      CkPrintf("[PELOAD] step=%d pe=%d host=%.4f objs=%zu\n", step(), start + pe, pe_load[pe],
+               statsList[pe] ? statsList[pe]->objData.size() : (size_t)0);
+    if (nodeHostMaxObj >= 0) {
+      const LDObjData& mo = nodeStats->objData[nodeHostMaxObj];
+      CkPrintf("[PELOAD] step=%d node host: sum=%.4f max-object=%.4f on pe=%d (obj %d, gpu=%.4f, drv=%.4f, migratable=%d)\n",
+               step(), nodeHostSum, nodeHostMax, nodeHostMaxPe, nodeHostMaxObj,
+               (double)mo.gpuTime, (double)mo.driverTime, (int)mo.migratable);
+    }
   }
   // Charge an unmeasured object the node's mean -- in the HOST dimension only.
   //

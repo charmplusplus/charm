@@ -47,6 +47,9 @@ private:
   // element migrated by the very step it waits on notice, on arrival, that its
   // destination has already resumed. All three are pupped across migration.
   bool lbStepPending;
+  // The measurement window stays closed until AtSyncWait even if the
+  // balancing step has already finished. Preserve it across every migration.
+  bool lbMeasurementClosed;
   bool waitParked;
   int lbWaitEpoch;
 protected:
@@ -159,6 +162,7 @@ public:
   virtual void ckStopFastDelivery() {}
 private:
   void lbJoinStep(int waitForMigration);
+  void lbSetMeasurementClosed(bool closed);
 public:
 
   // True when the next AtSyncStart() will actually start a step, so an

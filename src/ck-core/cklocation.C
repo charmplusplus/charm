@@ -59,9 +59,17 @@ CkpvExtern(int, currentChareIdx);
 CpvExtern(void*, CkGridObject);
 #endif
 
-// CHARM_DEBUG_MIGRATE: trace the steps of the export-and-pull device migration
-// handshake and the in-flight immigration registry, so a stall can be located to
-// a specific step rather than inferred.
+// Diagnostics, all off by default, all environment variables:
+//   CHARM_DEBUG_MIGRATE=1   every step of a move: decision, kick, pack (with
+//                           stage timers), payload dispatch/post/receipt,
+//                           landing, parked/staged messages, forwards.
+//   CHARM_PRINTF_TS=1       a wall-clock prefix on every printed line, so the
+//                           prints of all PEs and processes lie on one timeline.
+//   CHARM_DEBUG_SLOWEM=<ms> every entry-method invocation longer than <ms>,
+//                           with element and entry name (cklocation.C).
+//   CHARM_STAGE_VERIFY=1    checksum each staged landing buffer at the pull
+//                           and at delivery; abort on a change (ckrdmadevice.C).
+//   +LBDebug 1              per-PE host load the balancer received ([PELOAD]).
 static inline bool migDbg() {
   static const bool on = (getenv("CHARM_DEBUG_MIGRATE") != nullptr);
   return on;
@@ -396,6 +404,24 @@ struct DeferredMigrateMsg
 };
 
 int _deferredMigrateHandlerIdx;
+extern "C" void _deferredMigrateHandler(void* arg);
+// A kick -- "move this element now" -- is a plain FIFO push, so it runs after
+// the work already queued on this PE. It is a message, not an inline call: the
+// count reaches zero inside the element's own entry, inside HAPI's event poll,
+// or inside the IPC pump, none of which may have the element deleted under it.
+//
+// An urgent (queue-jumping) kick was tried and reverted. It does land sooner --
+// first-kick success 28-46% -> near one, payload p50 0.5 s -> prompt -- but the
+// element then migrates ahead of the messages already queued for it, and every
+// one of those must be parked and forwarded to the new home. Measured on leanmd
+// (2026-09-15, 5 runs each, with all three LB-step fixes in): urgent 123.6 s
+// mean (117.7-127.7), FIFO 119.1 s (115.2-123.1), against sync 121.4 s. FIFO is
+// the only async arm that beats sync, so the kick waits its turn.
+static void ckPostKick(DeferredMigrateMsg* m)
+{
+  CmiSetHandler(m, _deferredMigrateHandlerIdx);
+  CmiPushPE(CmiMyRank(), m);
+}
 
 unsigned char& CkArrayMessage::array_hops(void)
 {
@@ -2004,6 +2030,7 @@ void CkMigratable::commonInit(void)
   lbStepBlocked = false;
   metaLBStreamJoinedPe = -1;
   lbStepPending = false;
+  lbMeasurementClosed = false;
   waitParked = false;
   // (CkLocRec::deviceRecvParked default-initializes to false; myRec is not
   // necessarily wired yet in this init path, so it is not touched here.)
@@ -2039,6 +2066,22 @@ CkMigratable::CkMigratable(CkMigrateMessage* m) : Chare(m) { commonInit(); }
 
 int CkMigratable::ckGetChareType(void) const { return thisChareType; }
 
+void CkMigratable::lbSetMeasurementClosed(bool closed)
+{
+  lbMeasurementClosed = closed;
+#if CMK_LBDB_ON
+  myRec->getLBMgr()->SetObjJoinedStep(myRec->getLdHandle(), closed);
+#if CMK_CUDA
+  // This set is PE-local. An arrival must overwrite both a missing exclusion
+  // on a new PE and a stale exclusion when returning to a previous PE.
+  if (closed)
+    hapiCuptiObjectJoinedStep(myRec->getLdHandle());
+  else
+    hapiCuptiObjectResumed(myRec->getLdHandle());
+#endif
+#endif
+}
+
 void CkMigratable::pup(PUP::er& p)
 {
   DEBM((AA "In CkMigratable::pup %s\n" AB, idx2str(thisIndexMax)));
@@ -2073,11 +2116,13 @@ void CkMigratable::pup(PUP::er& p)
     // able to finish that wait -- see lbCheckWaitRelease. Not checkpointed, for
     // the same reason the barrier epoch is not: it describes a step in flight.
     p | lbStepPending;
+    p | lbMeasurementClosed;
     p | waitParked;
     p | lbWaitEpoch;
     p | lbStepSeen;
     p | lbIterNo;
     p | lbStepBlocked;
+    if (p.isUnpacking()) lbSetMeasurementClosed(lbMeasurementClosed);
   }
 
 #if CMK_LBDB_ON
@@ -2169,6 +2214,7 @@ int CkMigratable::ckPrepareIntraProcessMigrate()
 void CkMigratable::ckFinalizeIntraProcessMigrate(CkLocRec* newRec, int epoch)
 {
   myRec = newRec;
+  lbSetMeasurementClosed(lbMeasurementClosed);
   ckFinishConstruction(epoch);
 }
 void CkMigratable::ckJustMigrated(void) {}
@@ -2515,12 +2561,10 @@ void CkMigratable::AtSyncSample()
   ckFinishConstruction();
   recordLBSizes(false);
   sampleMetaLBLoad();
-  // The decision is made from this sample, so this is where the measurement
-  // window closes. It opened when AtSyncWait() released this chare, which the
-  // application places a few iterations back -- so what the strategy sees is a
-  // short, recent window, measured entirely after the previous step's
-  // migrations settled and ending at the decision itself.
-  LBTurnInstrumentOff();
+  // This chare's own window closes in lbJoinStep (SetObjJoinedStep), which is
+  // per object. No LBTurnInstrumentOff() here: the PE-wide flag is closed once
+  // per LB step where the strategy reads the loads (DistBaseLB::barrierDone,
+  // CentralLB::InvokeLB) and reopened at ClearLoads. See the note there.
 }
 
 bool CkMigratable::AtSyncPending() const
@@ -2668,10 +2712,7 @@ void CkMigratable::lbJoinStep(int waitForMigration)
   // reached the barrier earliest, non-uniformly, so the strategy saw a
   // different imbalance than an identical sync run. Reopened in
   // ResumeFromSync.
-  myRec->getLBMgr()->SetObjJoinedStep(myRec->getLdHandle(), true);
-#if CMK_CUDA
-  hapiCuptiObjectJoinedStep(myRec->getLdHandle());
-#endif
+  lbSetMeasurementClosed(true);
 
   local_state = LOAD_BALANCE;
   can_reset = true;
@@ -2684,6 +2725,8 @@ void CkMigratable::lbJoinStep(int waitForMigration)
 }
 
 // The blocking half of the split. See the header for the contract.
+
+
 void CkMigratable::AtSyncWait()
 {
   if (!usesAtSync)
@@ -2699,11 +2742,7 @@ void CkMigratable::AtSyncWait()
     // parks. Missing it left the element marked joined for the rest of the run:
     // its load decayed to zero and every node handed the strategy an all-zero
     // load vector.
-    myRec->getLBMgr()->SetObjJoinedStep(myRec->getLdHandle(), false);
-#if CMK_CUDA
-    hapiCuptiObjectResumed(myRec->getLdHandle());
-#endif
-    LBTurnInstrumentOn();
+    lbSetMeasurementClosed(false);
     ResumeFromSync();
     return;
   }
@@ -2732,8 +2771,7 @@ void CkMigratable::AtSyncWait()
     m->mgrGid = myRec->getLocMgr()->ckGetGroupID();
     m->id = myRec->getID();
     m->toPe = toPe;
-    CmiSetHandler(m, _deferredMigrateHandlerIdx);
-    CmiPushPE(CmiMyRank(), m);
+    ckPostKick(m);
   }
 }
 
@@ -2762,7 +2800,7 @@ void CkMigratable::lbCheckWaitRelease()
            CkMyPe(), idx2str(thisIndexMax));
   DEBL((AA "Element %s released after migrating into a resumed PE\n" AB,
         idx2str(thisIndexMax)));
-  LBTurnInstrumentOn();
+  lbSetMeasurementClosed(false);
   ResumeFromSync();
 }
 
@@ -2796,16 +2834,10 @@ void CkMigratable::ResumeFromSyncHelper()
     // to hand back here. It finds the step already over in AtSyncWait().
     return;
   }
-  // Released from the wait -- open the measurement window. Under +LBAsync this
-  // is AtSyncWait() returning, which the application places a few iterations
-  // before its next AtSyncSample(); without it the step's own resume is the
-  // same moment. Either way nothing between the step and here is measured.
-  LBTurnInstrumentOn();
+  // Released from the wait -- reopen THIS element's window. The PE-wide flag is
+  // not this element's to flip; see the note at CentralLB/DistBaseLB ClearLoads.
   // Reopen this element's own window; see lbJoinStep.
-  myRec->getLBMgr()->SetObjJoinedStep(myRec->getLdHandle(), false);
-#if CMK_CUDA
-  hapiCuptiObjectResumed(myRec->getLdHandle());
-#endif
+  lbSetMeasurementClosed(false);
 
   CkLocMgr* localLocMgr = myRec->getLocMgr();
   auto iter = localLocMgr->bufferedActiveRgetMsgs.find(ckGetID());
@@ -3021,14 +3053,20 @@ extern "C" void _deferredMigrateHandler(void* arg)
       if (getenv("CHARM_DEBUG_MIGRATE"))
         CmiPrintf("[KICK-HOLD %d] id=%llu not ready to pack; re-buffering for "
                   "toPe=%d\n", CkMyPe(), (unsigned long long)m->id, m->toPe);
+      // The application has to run on to its safe-to-pack window: let its
+      // receives through again.
+      if (rec->migrateKickHeld) {
+        rec->migrateKickHeld = false;
+        CkDeviceRecvAdmissionReplay(m->id);
+      }
       rec->recvMigrate(m->toPe);
       CmiFree(m);
       return;
     }
 #endif
     if (getenv("CHARM_DEBUG_MIGRATE"))
-      CmiPrintf("[KICK %d] id=%llu movable=%d toPe=%d\n", CkMyPe(),
-                (unsigned long long)m->id, (int)movable, m->toPe);
+      CmiPrintf("[KICK %d] id=%llu movable=%d held=%d toPe=%d\n", CkMyPe(),
+                (unsigned long long)m->id, (int)movable, (int)rec->migrateKickHeld, m->toPe);
     if (movable) {
       mgr->emigrate(rec, m->toPe);  // does not return to this record
     } else if (rec->pendingMigrateTo == -1) {
@@ -3060,10 +3098,17 @@ void CkLocRec::noteDeviceSendDone()
     // message -- at the cost of one local hop.
     DeferredMigrateMsg* m = (DeferredMigrateMsg*)CmiAlloc(sizeof(DeferredMigrateMsg));
     m->mgrGid = myLocMgr->ckGetGroupID();
+    // Hold new device receives until the kick runs (see migrateKickHeld).
+    // Not under the park-only bisect knob: there the element must run on to
+    // its park, and holding its receives would stop it getting there.
+#if CMK_LBDB_ON
+    if (!(_lb_args.lbAsync() && migrateAtParkOnly())) migrateKickHeld = true;
+#else
+    migrateKickHeld = true;
+#endif
     m->id = getID();
     m->toPe = toPe;
-    CmiSetHandler(m, _deferredMigrateHandlerIdx);
-    CmiPushPE(CmiMyRank(), m);
+    ckPostKick(m);
   }
 }
 
@@ -3148,10 +3193,23 @@ bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
   }
 #endif
 
+  // CHARM_DEBUG_SLOWEM=<ms>: print every entry invocation that ran longer.
+  static const double slowEmMs = []() {
+    const char* e = getenv("CHARM_DEBUG_SLOWEM");
+    return e ? atof(e) : -1.0;
+  }();
+  const double tSlow = (slowEmMs > 0.0) ? CmiWallTimer() : 0.0;
   if (doFree)
     CkDeliverMessageFree(epIdx, msg, obj);
   else /* !doFree */
     CkDeliverMessageReadonly(epIdx, msg, obj);
+  if (slowEmMs > 0.0) {
+    const double dt = (CmiWallTimer() - tSlow) * 1e3;
+    if (dt > slowEmMs)
+      CmiPrintf("[SLOWEM %d] elem %s ep=%d %s dt=%.1f ms\n", CkMyPe(),
+                isDeleted ? "(deleted)" : idx2str(idx), epIdx,
+                _entryTable[epIdx]->name ? _entryTable[epIdx]->name : "?", dt);
+  }
 
 #if CMK_TRACE_ENABLED
   if (msg)
@@ -3219,12 +3277,10 @@ void CkLocRec::staticMigrate(LDObjHandle h, int dest)
 // has landed, whichever way it was scheduled, so nothing about completion
 // changes.
 //
-// The network queue would not do: CsdNextMessage drains it ahead of the
-// scheduler queue, so a burst posted there still runs back to back.
+// The kick now goes to the urgent queue (ckPostKick), and a busy element gets
+// no kick at all until its zero crossing; see there.
 //
-// CHARM_LB_MIGRATE_INLINE=1 restores the inline emigrate for bisecting;
-// CHARM_LB_MIGRATE_PRIO sets the integer priority (default 1, i.e. just below
-// the default 0; larger is lower).
+// CHARM_LB_MIGRATE_INLINE=1 restores the inline emigrate for bisecting.
 static bool lbMigrateDeferred()
 {
   static const bool inlineMoves = (getenv("CHARM_LB_MIGRATE_INLINE") != nullptr);
@@ -3233,17 +3289,11 @@ static bool lbMigrateDeferred()
 
 static void ckPostDeferredMigrate(CkLocMgr* mgr, CmiUInt8 id, int toPe)
 {
-  static const int prio = []() {
-    const char* s = getenv("CHARM_LB_MIGRATE_PRIO");
-    return s ? atoi(s) : 1;
-  }();
   DeferredMigrateMsg* m = (DeferredMigrateMsg*)CmiAlloc(sizeof(DeferredMigrateMsg));
   m->mgrGid = mgr->ckGetGroupID();
   m->id = id;
   m->toPe = toPe;
-  CmiSetHandler(m, _deferredMigrateHandlerIdx);
-  unsigned int p = (unsigned int)prio;
-  CsdEnqueueGeneral(m, CQS_QUEUEING_IFIFO, 8 * sizeof(int), &p);
+  ckPostKick(m);
 }
 #endif
 
@@ -3287,6 +3337,18 @@ void CkLocRec::recvMigrate(int toPe)
     // re-buffers into nextPe through this function if the window has closed.
     if (lbMigrateDeferred())
     {
+      if (outstandingDeviceSends > 0 && !migrateAtParkOnly())
+      {
+        // Busy: a kick now would only find it busy and re-arm (1225 of 3407
+        // kicks in one run did exactly that). Record the move; the zero
+        // crossing in noteDeviceSendDone posts the kick, with the hold.
+        pendingMigrateTo = toPe;
+        return;
+      }
+      // Quiet now: hold new device receives until the kick runs, so it finds
+      // the element still quiet (see migrateKickHeld).
+      if (!(_lb_args.lbAsync() && migrateAtParkOnly()))
+        migrateKickHeld = true;
       ckPostDeferredMigrate(myLocMgr, getID(), toPe);
       return;
     }
@@ -4270,6 +4332,8 @@ void CkLocMgr::dispatchGPUMsg(CmiUInt8 id)
     thisProxy[gpuData.toPe].immigrateGPU(id, gpuData.size,
       (gpuData.stream ? CkDeviceBuffer(gpuData.data, gpuData.size, (hapiStream_t)gpuData.stream) : CkDeviceBuffer(gpuData.data, gpuData.size)), CkMyPe());
     CkRdmaDeviceMarkMigrationPayload(false);
+    if (migDbg())
+      CkPrintf("[GPUSENT %d] id=%llu\n", CkMyPe(), (unsigned long long)id);
     CkpvAccess(_currentLocRec) = saved_rec;
   }
 
@@ -4744,6 +4808,12 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   if (gpuBufSize > 0)
   {
     sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg, (void*)migStream);
+    if (migDbg() && migStream != NULL) {
+      // when the pack copies of this element have completed on the migration stream
+      struct PackDone { static void fn(void* p, void*) {
+        CmiPrintf("[PACKDONE %d] id=%llu\n", CkMyPe(), (unsigned long long)(uintptr_t)p); } };
+      hapiAddCallback((hapiStream_t)migStream, CkCallback(PackDone::fn, (void*)(uintptr_t)id));
+    }
     thisProxy[CkMyPe()].sendGPUMsg(id);
   }
   if (getenv("CHARM_DEBUG_MIGRATE"))
@@ -4842,6 +4912,14 @@ static inline bool ckMigrateArenaFromPool()
   return on;
 }
 
+// Per-PE non-blocking stream for migration payload landings in arena mode.
+static hapiStream_t ckLandingStream()
+{
+  static thread_local hapiStream_t s = nullptr;
+  if (s == nullptr) hapiCheck(cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking));
+  return s;
+}
+
 void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, CkDeviceBufferPost* post)
 {
   // Only set on the pooled path; arena mode allocates fresh memory that
@@ -4925,12 +5003,24 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
       (getenv("CHARM_LB_LANDING_HOST_WAIT") != nullptr);
   static const bool poolEventGate =
       (getenv("CHARM_LB_POOL_EVENT_GATE") != nullptr);
+  // Arena mode lands on a per-PE non-blocking stream. Stream 0 is one per
+  // process and FIFO, so every landing of a burst -- ~40 per PE, 8 PEs --
+  // queued behind every earlier one, each also waiting on its sender's
+  // cross-process event: 245 ms median from dispatch to receipt on leanmd.
+  // Arena mode has nothing to order (see above); the recycled-block modes
+  // keep stream 0 and their gate.
+  hapiStream_t landing = (cudaStream_t)0;
   if (landingHostWait || (dm_for_gate != NULL && !poolEventGate))
     hapiCheck(cudaStreamSynchronize((cudaStream_t)0));
   else if (dm_for_gate != NULL)
     CkRdmaDeviceGateLbBuffer(dm_for_gate, (cudaStream_t)0);
+  else
+    landing = ckLandingStream();
   receivedDeviceMsgs[id] = data;
-  post[0].hapi_stream = (cudaStream_t) 0;
+  post[0].hapi_stream = landing;
+  if (migDbg())
+    CkPrintf("[GPUPOST %d] id=%llu size=%d srcPe=%d\n", CkMyPe(),
+             (unsigned long long)id, size, srcPe);
 }
 
 

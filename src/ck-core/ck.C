@@ -1608,8 +1608,11 @@ static void _noCldEnqueueMulti(int npes, const int *pes, envelope *env)
   CmiSyncListSendAndFree(npes, pes, len, (char *)env);
 }
 
-static void _noCldEnqueue(int pe, envelope *env)
+static void _noCldEnqueue(int pe, envelope *env, bool urgent = false)
 {
+  // [expedited]: the destination serves it from its urgent queue, ahead of
+  // everything in its FIFO (the header bit; every arrival path honours it).
+  if (urgent) ((CmiMessageHeader *)env)->urgent = 1;
 /*
   if (pe == CkMyPe()) {
     CmiHandleMessage(env);
@@ -1865,7 +1868,7 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
   _TRACE_CREATION_N(env, numPes);
   if (opts & CK_MSG_SKIP_OR_IMM)
-    _noCldEnqueue(pe, env);
+    _noCldEnqueue(pe, env, (opts & CK_MSG_EXPEDITED) != 0);
   else
     _skipCldEnqueue(pe, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
@@ -2191,7 +2194,7 @@ void CkArrayManagerDeliver(int pe,void *msg, int opts) {
   if (opts & CK_MSG_IMMEDIATE)
     CmiBecomeImmediate(env);
   if (opts & CK_MSG_SKIP_OR_IMM)
-    _noCldEnqueue(pe, env);
+    _noCldEnqueue(pe, env, (opts & CK_MSG_EXPEDITED) != 0);
   else
     _skipCldEnqueue(pe, env, _infoIdx);
 }

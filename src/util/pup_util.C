@@ -356,6 +356,15 @@ void PUP::toMem::pup_device_order(void* producerStream)
 #endif
 }
 
+void PUP::toMem::pup_device_order_event(void* producerEvent)
+{
+#if CMK_CUDA
+  if (producerEvent == nullptr) return;
+  hapiCheck(cudaStreamWaitEvent((cudaStream_t)gpuStream, (cudaEvent_t)producerEvent, 0));
+#else
+  (void)producerEvent;
+#endif
+}
 void PUP::fromMem::pup_buffer_device(void *&p, size_t n, size_t itemSize)
 {
 #ifdef CK_CHECK_PUP

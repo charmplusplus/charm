@@ -251,8 +251,36 @@ CkpvDeclare(StagedLandingMap*, staged_landings);
 CkpvDeclare(hapiStream_t, staging_stream);
 CkpvDeclare(std::vector<hapiEvent_t>*, staging_events);
 
+// Device work in flight on an element (hapiDeviceWorkBegin/End, see hapi.h):
+// every HAPI callback registered inside an element's entry method raises its
+// outstanding count until the callback fires. Without this a Compute went
+// "quiet" the moment it consumed its positions, its force kernels still
+// running, and 46% of kicks packed an element whose last kernel had not
+// finished -- the pack copies then waited on the device and, on the shared
+// migration stream, held every later pack behind them (128-190 ms median).
+struct CkDeviceWorkToken {
+  CkLocMgr* mgr;
+  CmiUInt8 id;
+};
+static void* ckDeviceWorkBegin()
+{
+  CkLocRec* r = CkpvAccess(_currentLocRec);
+  if (r == NULL) return nullptr;
+  r->noteDeviceSendPosted();
+  return new CkDeviceWorkToken{r->getLocMgr(), r->getID()};
+}
+static void ckDeviceWorkEnd(void* token)
+{
+  CkDeviceWorkToken* t = (CkDeviceWorkToken*)token;
+  CkLocRec* r = t->mgr->recForDeviceWork(t->id);   // gone if it migrated or died meanwhile
+  if (r) r->noteDeviceSendDone();
+  delete t;
+}
+
 void CkRdmaDeviceRegistrationCacheInit()
 {
+  hapiDeviceWorkBegin = ckDeviceWorkBegin;
+  hapiDeviceWorkEnd = ckDeviceWorkEnd;
   CkpvInitialize(DeviceMrCache*, device_mr_cache);
   CkpvAccess(device_mr_cache) = deviceMrCacheEnabled() ? new DeviceMrCache() : NULL;
   CkpvInitialize(DeviceRecvHoldMap*, device_recv_holds);
@@ -1076,6 +1104,8 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
         hapiCheck(cudaEventSynchronize(device_info.src_event_pool[source.event_idx]));
       } else if (hapiEventQuery(device_info.src_event_pool[source.event_idx]) != hapiSuccess ||
                  getenv("CHARM_IPC_ALWAYS_WAIT")) {
+        if (stagedDbg() && source.cnt >= 100000)
+          CmiPrintf("[SRCEV %d] cnt=%zu srcPe=%d ready=0\n", CkMyPe(), (size_t)source.cnt, srcPe);
         // Only when the sender's event is not already complete. A stream wait
         // on an imported interprocess event that completed moments ago was
         // measured (moe) to pace the receiver's stream at ~0.35 ms per copy,
@@ -1085,6 +1115,9 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
               device_info.src_event_pool[source.event_idx], 0,
               source.device_idx * 100000 + source.event_idx));
       }
+      if (stagedDbg() && source.cnt >= 100000 &&
+          hapiEventQuery(device_info.src_event_pool[source.event_idx]) == hapiSuccess)
+        CmiPrintf("[SRCEV %d] cnt=%zu srcPe=%d ready=1\n", CkMyPe(), (size_t)source.cnt, srcPe);
       ipcDebugSync("recv 1: wait imported src_event", recv_stream);
 
       // 2. Invoke hapiMemcpyAsync from the peer's memory to the destination
@@ -2039,7 +2072,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // A requeue spun on the local queue and starved the resume broadcast, so the
   // sender's completion never fired; the buffer path takes a reference and
   // replays on unpark or departure, so the sender completes at replay.
-  if (recv_elt != NULL && recv_elt->deviceRecvParked) {
+  if (recv_elt != NULL && (recv_elt->deviceRecvParked || recv_elt->migrateKickHeld)) {
     // Buffered, NOT requeued: a requeue spins on the scheduler's local
     // queue, which is popped ahead of the network -- so the resume
     // broadcast that would unpark this element starves behind its own
@@ -2602,12 +2635,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
 // staged in this version) -- and a payload the pool cannot serve.
 bool CkRdmaDeviceStageParked(envelope* env)
 {
-  // CHARM_LB_NO_STAGE_PARKED: leave every parked message as it is (bisect).
-  // CHARM_LB_STAGE_SYNC: block the host until the staging pull has finished
-  // before the descriptors are rewritten (bisect for an ordering race).
-  static const bool stage_off = (getenv("CHARM_LB_NO_STAGE_PARKED") != nullptr);
-  static const bool sync_after_pull = (getenv("CHARM_LB_STAGE_SYNC") != nullptr);
-  if (stage_off) return false;
   if (!CMI_IS_ZC_DEVICE(env) || env->getMsgtype() != ForArrayEltMsg) return false;  // host message
   if (!CkDevicePoolOn()) return false;
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
@@ -2771,8 +2798,6 @@ bool CkRdmaDeviceStageParked(envelope* env)
     }
     landings[land[i]] = StagedLanding{ready, (size_t)source.cnt, src_addr, 0ULL, false};
   }
-
-  if (sync_after_pull) hapiCheck(hapiStreamSynchronize(st));
 
   // Pass 4: the descriptors now name the landing buffers, as a process-local
   // source with no callback (the sender's fired from the pull above).

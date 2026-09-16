@@ -378,6 +378,22 @@ void DistBaseLB::MigrationDone(int balancing) {
   // Increment to next step
   lbmgr->incStep();
   lbmgr->ClearLoads();
+  // Open the next interval's window here, PE-wide, symmetric with the
+  // LBTurnInstrumentOff() where the strategy read the loads. It used to be
+  // opened per chare at the resume and closed per chare at AtSyncStart
+  // (cklocation.C): a per-element event driving a process-level flag, so with
+  // ~240 elements per PE the FIRST element to reach AtSync stopped billing all
+  // the others -- which had not joined and were still working -- and the first
+  // to resume started it again. Under -lbasync that gap is the lag, and its
+  // length varied per LB step with scheduling order: leanmd 8x8x8 at -lblag 16
+  // saw the diffused device bound T_g swing 2.95/7.08/4.43/3.57 where sync held
+  // 14.8-16.0, so DiffusionLB re-balanced an already balanced system every step
+  // (cross-node moves [1186 636 607 2] against sync's [1181 0 0 0]).
+  // Per-element exclusion stays per element: LBObj::joinedStep gates
+  // IncrementTime/IncrementGPUTime and cupti_joined_objects gates the CUPTI
+  // attribution, so a chare that has joined is still not billed.
+  LBTurnInstrumentOn();
+
 #if CMK_CUDA
   // Drop the kernel records this round's loads were derived from, so the next
   // round measures the next interval rather than everything since startup

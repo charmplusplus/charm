@@ -55,6 +55,12 @@ public:
   // unconsumed -- pinned to this process -- until the resume; admission
   // control bounces such receives instead (see CkRdmaDeviceIssueRgets).
   bool deviceRecvParked = false;
+  // Set when the count reached zero with a move pending and the kick was
+  // enqueued. New device receives are held (admission buffer) until the kick
+  // runs, so it finds the element still quiet. Without this the kick, queued
+  // behind a step's worth of messages, found the next step's arrivals already
+  // admitted: 28% of moves went at the first kick, median 2.5 s to move.
+  bool migrateKickHeld = false;
   void noteDeviceSendPosted() { outstandingDeviceSends++; }
   void noteDeviceSendDone();
 

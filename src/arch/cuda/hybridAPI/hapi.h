@@ -230,6 +230,12 @@ extern "C" {
 
 // Provide a C++-only stub for this function's default parameter.
 void hapiAddCallback(hapiStream_t stream, const CkCallback& cb, void* cb_msg);
+// Device-work accounting hooks, set by the Charm++ runtime: a callback
+// registered from inside an element's entry method marks device work in
+// flight on that element until it fires, so the element is not treated as
+// quiet (and migrated) while its kernels are still running.
+extern void* (*hapiDeviceWorkBegin)();
+extern void (*hapiDeviceWorkEnd)(void* token);
 static inline void hapiAddCallback(hapiStream_t stream, const CkCallback& cb) {
   hapiAddCallback(stream, cb, nullptr);
 }

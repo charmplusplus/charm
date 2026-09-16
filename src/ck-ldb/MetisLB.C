@@ -601,16 +601,20 @@ void MetisLB::work(LDStats* stats)
       }
     }
     xadj[nAll] = e;
-    // Positive and in range: idx_t is 32 bits in a stock METIS build. Without
-    // a table the weight is the byte count summed over the instrumented
-    // window, capped; with one it is seconds per interval, scaled so the
-    // heaviest edge of this subset is 2^20. Both endpoints sum the same
-    // records, so the weight stays symmetric either way, which METIS
-    // requires.
-    double maxCost = 0.0;
-    for (double c : cost) maxCost = std::max(maxCost, c);
-    const double scale =
-        (costCfg.calibrated && maxCost > 0.0) ? (double)(1 << 20) / maxCost : 1.0;
+    // Positive and in range: idx_t is 32 bits in a stock METIS build, and
+    // METIS sums edge weights into it -- the cut, and the merged edges of a
+    // coarse vertex -- so the TOTAL has to fit, not just the heaviest edge.
+    // 2026-09-15: raw byte counts over a 20-step leanmd window summed to
+    // 4.4e10 and METIS walked off its arrays in coarsening (replayed against
+    // a debug libmetis: ComputeCut != mincut). The heaviest edge of this
+    // subset maps to 2^20 unless the total would then pass 2^30, in which
+    // case the total does. Both endpoints sum the same records, so the
+    // weight stays symmetric either way, which METIS requires.
+    double maxCost = 0.0, sumCost = 0.0;
+    for (double c : cost) { maxCost = std::max(maxCost, c); sumCost += c; }
+    const double scale = (maxCost > 0.0)
+        ? std::min((double)(1 << 20) / maxCost, (double)(1 << 30) / sumCost)
+        : 1.0;
     adjwgt.reserve(cost.size());
     for (double c : cost)
       adjwgt.push_back((idx_t)std::min<long long>(
@@ -646,6 +650,67 @@ void MetisLB::work(LDStats* stats)
     static const bool kway = (getenv("CHARM_METIS_KWAY") != NULL);
     real_t* tp = anchored ? tpwgtsAll.data()
                           : (tpwgts ? const_cast<real_t*>(tpwgts->data()) : nullptr);
+    // METIS checks nothing: an index out of range, a neighbour listed twice
+    // or an edge present at one end only walks it off its arrays inside
+    // coarsening. Under +LBDebug, verify the CSR before handing it over.
+    if (_lb_args.debug() > 0)
+    {
+      long long bad = 0, unpaired = 0, dup = 0, asymW = 0, sumW = 0;
+      idx_t maxW = 0;
+      std::unordered_map<long long, std::pair<int, idx_t>> seen;
+      for (idx_t u = 0; u < nAll; u++)
+      {
+        if (xadj[u] > xadj[u + 1] || xadj[u + 1] > (idx_t)adjncy.size()) { bad++; continue; }
+        for (idx_t j = xadj[u]; j < xadj[u + 1]; j++)
+        {
+          const idx_t v = adjncy[j];
+          if (v < 0 || v >= nAll || v == u) { bad++; continue; }
+          sumW += adjwgt[j];
+          maxW = std::max(maxW, adjwgt[j]);
+          const long long key = (u < v) ? ((long long)u * nAll + v) : ((long long)v * nAll + u);
+          auto& rec = seen[key];
+          if (rec.first == 0) rec.second = adjwgt[j];
+          else if (rec.second != adjwgt[j]) asymW++;
+          rec.first++;
+        }
+      }
+      for (const auto& kv : seen)
+      {
+        if (kv.second.first == 1) unpaired++;
+        else if (kv.second.first > 2) dup++;
+      }
+      CkPrintf("[%d] MetisLB check: %d vertices, %zu edge entries (xadj end %d), "
+               "%lld bad, %lld unpaired, %lld duplicated, %lld weight-asymmetric; "
+               "max weight %d, total %lld\n",
+               CkMyPe(), (int)nAll, adjncy.size(), (int)xadj[nAll], bad, unpaired, dup,
+               asymW, (int)maxW, sumW);
+      if (bad || unpaired || dup)
+        CkAbort("MetisLB: invalid graph handed to METIS (see the check line above)");
+      // CHARM_DEBUG_METIS=<dir>: write the exact call so it can be replayed
+      // against libmetis off the machine (tests/.../metis_replay.C).
+      static const char* dumpDir = getenv("CHARM_DEBUG_METIS");
+      if (dumpDir != nullptr)
+      {
+        static int seq = 0;
+        char path[1024];
+        snprintf(path, sizeof(path), "%s/metis_pe%d_%d.txt", dumpDir, CkMyPe(), seq++);
+        FILE* f = fopen(path, "w");
+        if (f != nullptr)
+        {
+          fprintf(f, "%d %d %zu %d %d\n", (int)nAll, (int)nconAll, adjncy.size(), (int)nparts, kway ? 1 : 0);
+          for (idx_t u = 0; u <= nAll; u++) fprintf(f, "%d ", (int)xadj[u]); fprintf(f, "\n");
+          for (size_t j = 0; j < adjncy.size(); j++) fprintf(f, "%d ", (int)adjncy[j]); fprintf(f, "\n");
+          for (size_t j = 0; j < adjwgt.size(); j++) fprintf(f, "%d ", (int)adjwgt[j]); fprintf(f, "\n");
+          for (size_t j = 0; j < lvwgt.size(); j++) fprintf(f, "%d ", (int)lvwgt[j]); fprintf(f, "\n");
+          fprintf(f, "%d\n", tp ? 1 : 0);
+          if (tp) { for (size_t j = 0; j < (size_t)nparts * nconAll; j++) fprintf(f, "%.9g ", (double)tp[j]); fprintf(f, "\n"); }
+          for (int c = 0; c < nconAll; c++) fprintf(f, "%.9g ", (double)ubvec[c]); fprintf(f, "\n");
+          for (int o = 0; o < METIS_NOPTIONS; o++) fprintf(f, "%d ", (int)options[o]); fprintf(f, "\n");
+          fclose(f);
+          CkPrintf("[%d] MetisLB: call written to %s\n", CkMyPe(), path);
+        }
+      }
+    }
     if (kway)
       METIS_PartGraphKway(&nv_arg, &ncon, xadj.data(), adjncy.data(), lvwgt.data(),
                           nullptr, adjwgt.data(), &np, tp, ubvec.data(), options.data(),

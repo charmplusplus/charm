@@ -329,6 +329,14 @@ class er {
   // block. Call it once before the pup_buffer_device calls whose sources that
   // stream produces. Every other PUP::er ignores it.
   virtual void pup_device_order(void* producerStream) { (void)producerStream; }
+  // Same, behind an EVENT the application recorded right after its own last
+  // device work on those buffers. pup_device_order(stream) waits for the whole
+  // stream, and when the stream is shared by many objects that is every kernel
+  // queued after this object's last one: measured 245 ms median from dispatch
+  // to arrival for a mid-step move in leanmd (8 streams for ~224 Computes per
+  // PE) against ~1 ms at an idle barrier. The event names only this object's
+  // work.
+  virtual void pup_device_order_event(void* producerEvent) { (void)producerEvent; }
 
   //For pointers: the last parameter is to make it more difficult to call
   //(should not be used in normal code as pointers may loose meaning across processor)
@@ -569,6 +577,7 @@ class toMem : public mem {
 
   virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize);
   virtual void pup_device_order(void* producerStream);
+  virtual void pup_device_order_event(void* producerEvent);
 
   //Write data to the given buffer
   toMem(void* Nbuf, 

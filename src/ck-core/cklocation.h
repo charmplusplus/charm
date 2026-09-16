@@ -874,6 +874,8 @@ public:
   int deviceSendDestPe(const CkArrayIndex& idx);
 
   void noteImmigrationInFlight(CmiUInt8 id);
+  // Public id lookup for the runtime's device-work accounting (ckrdmadevice.C).
+  CkLocRec* recForDeviceWork(CmiUInt8 id) const { return elementNrec(id); }
   bool isImmigrationInFlight(CmiUInt8 id) const
   {
     return inFlightImmigrations.find(id) != inFlightImmigrations.end();

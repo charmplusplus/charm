@@ -272,25 +272,34 @@ public:
     return total;
   }
 
+  // Billing is PER OBJECT, gated by that object's own LBObj::joinedStep, not by
+  // the PE-wide statsAreOn. statsAreOn is flipped by per-chare events (AtSync,
+  // resume) and by the balancer around its own step; with many elements per PE
+  // that let ONE element's progress stop the measurement of all the others,
+  // which had not joined and were still doing real work. Under -lbasync the
+  // elements are spread across the lag, so most of the interval went unbilled
+  // for most elements and the amount varied per LB step with scheduling order.
+  // joinedStep is the correct gate and is already checked in IncrementTime /
+  // IncrementGPUTime; cupti_joined_objects is its device-side twin.
   inline void ObjectStart(const LDObjHandle &h) {
-    if (StatsOn()) {
-      LbObj(h)->StartTimer();
-    }
+    LbObj(h)->StartTimer();
   };
 
   inline void ObjectStop(const LDObjHandle &h) {
     LBObj* const obj = LbObj(h);
 
-    if (StatsOn()) {
-      LBRealType walltime, cputime;
-      obj->StopTimer(&walltime, &cputime);
-      obj->IncrementTime(walltime, cputime);
-      MeasuredObjTime(walltime, cputime);
+    LBRealType walltime, cputime;
+    obj->StopTimer(&walltime, &cputime);
+    // Per object: a joined element is dropped inside IncrementTime.
+    obj->IncrementTime(walltime, cputime);
+    // The PE background accumulators stay behind statsAreOn: they are PE-level
+    // quantities, not per-object ones, and the balancer's own step should not
+    // count toward the PE's background load.
+    MeasuredObjTime(walltime, cputime);
 
-      #if CMK_CUDA
-      MeasuredObjGPUTime(obj->data.gpuTime);
-      #endif
-    }
+    #if CMK_CUDA
+    MeasuredObjGPUTime(obj->data.gpuTime);
+    #endif
   };
   inline const LDObjHandle &GetObjHandle(int idx) {
     return LbObjIdx(idx)->GetLDObjHandle();

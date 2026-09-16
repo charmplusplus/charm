@@ -48,6 +48,7 @@
 
 #if CMK_LBDB_ON
 #include <cupti.h>
+#include <cupti_runtime_cbid.h>
 #include "LBManager.h"
 #include "ck.h"
 #include "cklocrec.h"
@@ -89,15 +90,20 @@ struct hapiCallbackMessage {
 #endif
 
 #ifndef HAPI_CUDA_CALLBACK
+void* (*hapiDeviceWorkBegin)() = nullptr;
+void (*hapiDeviceWorkEnd)(void* token) = nullptr;
+
 typedef struct hapiEvent {
   hapiEvent_t event;   // NULL marks a pinned-flag entry (see flag_seq)
   CkCallback cb;
   void* cb_msg;
   hapiWorkRequest* wr; // if this is not NULL, buffers and request itself are deallocated
   uint32_t flag_seq;   // pinned-flag entries: the value the slot must reach
+  void* workToken;     // hapiDeviceWorkBegin's token, handed to hapiDeviceWorkEnd when this fires
 
   hapiEvent(hapiEvent_t event_, const CkCallback& cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL)
-            : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_), flag_seq(0) {}
+            : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_), flag_seq(0),
+              workToken(hapiDeviceWorkBegin ? hapiDeviceWorkBegin() : nullptr) {}
 } hapiEvent;
 
 // Pending events, one FIFO per stream. Events on one stream complete in the
@@ -143,7 +149,16 @@ CpvDeclare(int, n_hapi_events);
 // through libcupti here, not on the link line. This is the default; a
 // driver without cuStreamWriteValue32 falls back to event queries, and
 // +gpueventquery asks for them explicitly.
-#define HAPI_FLAG_SLOTS 256  // power of two; max in-flight flag entries per PE
+// Power of two; max in-flight flag entries per PE. 256 covered sph2d's few
+// patches per PE. leanmd keeps 240 objects per PE with a callback or two in
+// flight each, and every callback past the ring's end fell back to a CUDA
+// event -- create, record, and a query on every scheduler loop: measured
+// 2026-09-15 at 17.5 M cudaEventQuery and 44 k cudaEventCreate per process
+// per 20-step window, 11% of PE time inside those two calls, and 34 M CUPTI
+// runtime records for the load balancer to parse at each LB step (1.6-2.7 s,
+// on the last PE to close its window, inside whatever entry method it was
+// running). 4096 slots is 256 KB of pinned memory per PE.
+#define HAPI_FLAG_SLOTS 4096
 #define HAPI_FLAG_STRIDE 16  // uint32s per slot: one cache line, no false sharing
 static bool hapi_use_flag_poll = false;
 typedef CUresult (*hapiStreamWriteValue32Fn)(CUstream, CUdeviceptr, cuuint32_t, unsigned int);
@@ -550,10 +565,9 @@ static void hapiPopulateDeviceProps(GPUManager& gm) {
 void hapiCuptiInit() { hapiCuptiStartTracing(); }
 
 // Attaching CUPTI to the process is NOT free even when no activity kind is
-// enabled -- measured at ~1.3 ms per step on a 4-PE pic2d run, which is most of
-// the cost that remains once tracing itself is windowed. So attach here and
-// detach in hapiCuptiStopTracing, rather than staying attached for the whole
-// run. Enabling an activity kind is separately what makes records flow.
+// enabled -- measured at ~1.3 ms per step on a 4-PE pic2d run. It used to be
+// attached at the first start and detached at the last stop of each window;
+// see hapiCuptiStopTracing for why it now stays attached and enabled.
 // Per-PE view of the tracing switch. LBDatabase::TurnStatsOn/Off is a PE-local
 // switch, but CUPTI tracing is process-wide: a PE that switched its own
 // instrumentation off used to switch tracing off for every PE in the process,
@@ -566,11 +580,8 @@ void hapiCuptiInit() { hapiCuptiStartTracing(); }
 static thread_local bool cupti_pe_tracing = false;
 
 // Entry-method hooks currently inside a CUPTI call, process-wide. A hook
-// counts itself in, then re-reads the active flag: hapiCuptiStopTracing clears
-// the flag first and only then waits for this to reach zero, so a hook that
-// saw the flag set is either already counted (the stop waits for it) or will
-// see it clear (and never calls CUPTI). That is what makes cuptiFinalize safe
-// underneath the hooks -- the race that kept CUPTI attached for the whole run.
+// counts itself in, then re-reads the active flag, so a finalize (now only at
+// exit) can wait for the count to reach zero before cuptiFinalize.
 static std::atomic<int> cupti_hooks_inflight{0};
 struct CuptiHookGuard {
   CuptiHookGuard() { cupti_hooks_inflight.fetch_add(1, std::memory_order_seq_cst); }
@@ -611,6 +622,20 @@ void hapiCuptiStartTracing() {
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL));
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_RUNTIME));
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION));
+  // Except for the calls that carry no driver time and no correlation:
+  // completion polls and error peeks. hapiPrepareCuptiLoads parses every
+  // runtime record at each LB step, and these were 33 M of the 34 M records
+  // in one leanmd window (see HAPI_FLAG_SLOTS) -- the launch dimension only
+  // counts the other calls anyway (their names contain "Query").
+  static const CUpti_CallbackId no_record[] = {
+      CUPTI_RUNTIME_TRACE_CBID_cudaEventQuery_v3020,
+      CUPTI_RUNTIME_TRACE_CBID_cudaStreamQuery_v3020,
+      CUPTI_RUNTIME_TRACE_CBID_cudaGetLastError_v3020,
+      CUPTI_RUNTIME_TRACE_CBID_cudaPeekAtLastError_v3020,
+      CUPTI_RUNTIME_TRACE_CBID_cudaGetDevice_v3020,
+  };
+  for (CUpti_CallbackId cbid : no_record)
+    CUPTI_SAFE_CALL(cuptiActivityEnableRuntimeApi(cbid, 0));
 
   gm.cupti_tracing_active_.store(true, std::memory_order_relaxed);
 }
@@ -625,44 +650,22 @@ void hapiCuptiStopTracing() {
   if (_lb_args.debug() > 1)
     CmiPrintf("HAPI[pe=%d]: stop tracing: users left %d, active %d, attached %d\n", CmiMyPe(),
               gm.cupti_tracing_users_, (int)gm.cupti_tracing_active_.load(), (int)gm.cupti_initialized_);
-  // Other PEs of this process still have their instrumentation on: their
-  // kernels are still being launched and must keep being recorded.
-  if (gm.cupti_tracing_users_ > 0) return;
-  if (!gm.cupti_initialized_ ||
-      !gm.cupti_tracing_active_.load(std::memory_order_relaxed))
-    return;
-
-  CUPTI_SAFE_CALL(cuptiActivityDisable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL));
-  CUPTI_SAFE_CALL(cuptiActivityDisable(CUPTI_ACTIVITY_KIND_RUNTIME));
-  CUPTI_SAFE_CALL(cuptiActivityDisable(CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION));
-
-  // Clear the flag before flushing so the buffers handed back by the flush are
-  // the last ones, and no further correlation pushes race with them. Flush on
-  // the way out so records buffered before the stop are not lost when the
-  // application switches instrumentation off around its own AtSync. The flush
-  // drives the buffer-completed callback, which takes cupti_queue_lock_ -- a
-  // different mutex from the one held here, so this cannot deadlock.
-  gm.cupti_tracing_active_.store(false, std::memory_order_seq_cst);
-  CUPTI_SAFE_CALL(cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
-
-  // Detach. Staying attached with every kind disabled still routes every
-  // runtime call through CUPTI's interposition: measured 0.8 ms per step on
-  // sph2d at 60k particles per patch (a balancer configured but never firing
-  // cost the same as one tracing three quarters of the run), and ~1.3 ms per
-  // step on pic2d before that; detaching measured ~2.3 ms per window. It used
-  // to be unsafe: the hooks checked the flag and then called CUPTI with no
-  // way for this thread to know one was inside, and a finalize underneath
-  // corrupted CUPTI's allocator. Now each hook is counted (CuptiHookGuard) and
-  // re-checks the flag after counting itself in; the flag is already clear,
-  // so waiting for the count to reach zero drains the ones that got through.
-  // The buffers the flush just handed back stay queued and are parsed by the
-  // next drain, after CUPTI has been re-attached by the next start.
-  static const bool stay_attached = (getenv("CHARM_CUPTI_STAY_ATTACHED") != nullptr);
-  if (stay_attached) return;
-  while (cupti_hooks_inflight.load(std::memory_order_seq_cst) > 0) {
-    // microseconds: a hook holds the count for one CUPTI call
-  }
-  hapiCuptiFinalize();
+  // And nothing else: tracing stays enabled and attached from the first start
+  // to the end of the run. Disabling the activity kinds, the forced flush and
+  // the detach (cuptiFinalize, behind an explicit cudaDeviceSynchronize) that
+  // used to follow when the last PE switched off each drain the device, and
+  // this is reached from every element's AtSync -- the first element on a PE
+  // to finish its step closes the PE's window while the rest of the process
+  // is mid-step. Measured 2026-09-15 on leanmd 8x8x8: that drain stalled
+  // other elements' CUDA calls for 1.2-2.9 s, charged as host time to
+  // whatever entry method made them (receiveMigrants, forceSendDone), and
+  // DiffusionLB balanced it: ~1000 spurious within-GPU moves and +3 s per LB
+  // step, sync and async alike. What staying attached costs is tracing
+  // through the LB step itself, where nothing of interest runs; the
+  // interposition tax of an attached-but-idle CUPTI (0.8-1.3 ms per step on
+  // small sph2d/pic2d) is not paid, because tracing is never idle now.
+  // hapiPrepareCuptiLoads collects the records with a flush that does not
+  // synchronise the device.
 }
 
 bool hapiCuptiTracingActive() {
@@ -2345,6 +2348,25 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
     return;
   }
 
+  if (hapi_use_flag_poll) {
+    // Said once per PE: an event here costs a create (until the pool has
+    // grown), a record, and a driver query on every scheduler loop until it
+    // completes -- see HAPI_FLAG_SLOTS.
+    static thread_local bool warned_ring = false, warned_dev = false;
+    if (use_dev != CpvAccess(my_device)) {
+      if (!warned_dev) {
+        warned_dev = true;
+        CmiPrintf("HAPI[pe=%d]: callback on a stream of device %d, not this PE's %d: "
+                  "completion by CUDA event instead of the pinned flag (reported once)\n",
+                  CmiMyPe(), use_dev, CpvAccess(my_device));
+      }
+    } else if (!warned_ring) {
+      warned_ring = true;
+      CmiPrintf("HAPI[pe=%d]: pinned-flag ring full (%d in flight): completion by CUDA "
+                "event until it drains; raise HAPI_FLAG_SLOTS (reported once)\n",
+                CmiMyPe(), CpvAccess(hapi_flag_inflight));
+    }
+  }
   if (use_dev != prev_dev) hapiCheck(hapiSetDevice(use_dev));
 
   hapiEvent_t ev;
@@ -4333,6 +4355,7 @@ void hapiPollEvents(void* param) {
 
       // invoke Charm++ callback if one was given
       hev.cb.send(hev.cb_msg);
+      if (hev.workToken && hapiDeviceWorkEnd) hapiDeviceWorkEnd(hev.workToken);
 
       // clean up hapiWorkRequest
       if (hev.wr) {

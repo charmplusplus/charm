@@ -12,6 +12,7 @@ async_arrival.decl.h: async_arrival.ci
 test: async_arrival
 	$(call run, +p2 ./async_arrival 4 +balancer GreedyCentralLB)
 	$(call run, +p4 ./async_arrival 4 +balancer GreedyCentralLB)
+	$(call run, +p4 ./async_arrival 4 1 +LBAsync +balancer GreedyCentralLB)
 
 testp: async_arrival
 	$(call run, +p$(P) ./async_arrival 4 +balancer GreedyCentralLB)

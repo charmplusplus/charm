@@ -139,6 +139,7 @@ public:
   // time, driver time. The group dimension's total is whichever of the last
   // two the verdict chose (LBLoadDim.h).
   double nodeHostSum, nodeHostMax, nodeDevSum, nodeDevMax, nodeDrvSum, nodeDrvMax;
+  int nodeHostMaxObj = -1, nodeHostMaxPe = -1;
   double nodeGroupSum() const { return _lb_groupDimLaunch ? nodeDrvSum : nodeDevSum; }
   // Per neighbour, refreshed every round: host time per PE and device time,
   // so the across-node phase can bound what a neighbour takes in the
