@@ -9397,7 +9397,7 @@ balances measured GPU load per object alongside CPU load.
 Direct GPU Messaging
 ~~~~~~~~~~~~~~~~~~~~
 
-Inspired by CUDA-aware MPI, the direct GPU messaging feature in Charm++
+Similar to CUDA-aware MPI, the direct GPU messaging feature in Charm++
 attempts to reduce the latency and increase the bandwidth for inter-GPU
 data transfers by bypassing host memory. In Charm++, however, some
 metadata exchanges between the sender and receiver are required as the
