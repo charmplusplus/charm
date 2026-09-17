@@ -48,6 +48,14 @@ typedef struct DeviceRdmaOp_ {
   int src_pe;
   int src_mpi_rank;
   int dest_mpi_rank;
+  // Per-op timing for the cross-node tier (CHARM_ZC_STATS), zero when off.
+  // The per-message tally in DeviceRdmaInfo only records once every op of a
+  // receive has completed; an rget issued alongside an op that resolves some
+  // other way never reaches it, which is why the RDMA slot printed no row at
+  // all while its mode counter showed 60480 receives per process. This one
+  // is stamped where the rget is issued and read where it completes, so it
+  // cannot be lost to the aggregation.
+  double rget_posted;
 } DeviceRdmaOp;
 
 typedef struct DeviceRdmaOpMsg_ {

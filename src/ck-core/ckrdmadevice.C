@@ -87,6 +87,9 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
 CsvExtern(GPUManager, gpu_manager);
 CpvExtern(int, my_device_id);
 
+// Defined further down, used by both receive completion handlers above it.
+void zcRecordRecvTime(int slot, size_t bytes, double seconds);
+
 // void CkRdmaDeviceRecvHandler(void* data)
 // {
 //   DeviceRdmaOp* op = (DeviceRdmaOp*)data;
@@ -587,6 +590,13 @@ void CkRdmaDeviceRecvHandler(void* data)
     delete cb;
   }
 
+  // Cross-node tier, per op: this fires for every completed rget, whether or
+  // not the receive it belongs to ever completes as a whole.
+  if (op->rget_posted > 0.0) {
+    zcRecordRecvTime(2, op->size, CkWallTimer() - op->rget_posted);
+    op->rget_posted = 0.0;
+  }
+
   // Update counter (there may be multiple buffers in transit)
   info->counter++;
 
@@ -609,7 +619,6 @@ static void deviceRecvWatchDrop(DeviceRdmaInfo* info);  // defined by the stall 
 // Defined just below the zerocopy stats, which live in an anonymous namespace
 // this declaration cannot name. The completion path above is where a receive's
 // elapsed time becomes known, hence the forward declaration.
-void zcRecordRecvTime(int slot, size_t bytes, double seconds);
 
 // Invoked when a GPU buffer arrives on the receiver
 void CkRdmaDeviceRecvHandler(void* data, void* msg)
@@ -622,6 +631,13 @@ void CkRdmaDeviceRecvHandler(void* data, void* msg)
     CkCallback* cb = (CkCallback*)op->src_cb;
     cb->send();
     delete cb;
+  }
+
+  // Cross-node tier, per op: this fires for every completed rget, whether or
+  // not the receive it belongs to ever completes as a whole.
+  if (op->rget_posted > 0.0) {
+    zcRecordRecvTime(2, op->size, CkWallTimer() - op->rget_posted);
+    op->rget_posted = 0.0;
   }
 
   // Update counter (there may be multiple buffers in transit)
@@ -2202,6 +2218,11 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     save_op.dest_ptr = arrPtrs[i];
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
+    // rdma_data comes from CmiAlloc, so this is uninitialised storage: without
+    // clearing it, a stale non-zero would be read as an rget timestamp and
+    // charge a nonsense interval to the cross-node tier. Only the rget branch
+    // sets it.
+    save_op.rget_posted = 0.0;
     // DIAGNOSTIC: what buffer did this receive post, for which element, and in
     // which mode. Correlated against the application's own record of which
     // ghost it later reads out of that buffer, this shows whether the runtime
@@ -2580,6 +2601,8 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         lci_dest_ncpy_buffer =
             CmiNcpyBuffer(arrPtrs[i], (size_t)arrSizes[i], (void*)(&save_op));
       }
+      // Stamp the cross-node tier per op; see DeviceRdmaOp::rget_posted.
+      save_op.rget_posted = zcStatsOn() ? CkWallTimer() : 0.0;
       lci_dest_ncpy_buffer.rdmaGet(source.lci_ncpy_buffer, 0, nullptr, nullptr);
       continue;
 #else
