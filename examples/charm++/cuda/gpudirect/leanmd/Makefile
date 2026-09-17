@@ -17,6 +17,8 @@ all: $(TARGET)
 
 OBJS = Main.o Cell.o Compute.o leanmdCUDA.o
 
+Main.o Cell.o Compute.o: JoinTrace.h
+
 $(TARGET): $(OBJS)
 	$(CHARMC) -language charm++ -o $@ $(OBJS) $(LD_LIBS)
 

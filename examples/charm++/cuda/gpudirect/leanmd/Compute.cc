@@ -1,3 +1,4 @@
+#include "JoinTrace.h"
 #include "defs.h"
 #include "Cell.h"
 #include "Compute.h"
@@ -308,6 +309,8 @@ void Compute::freeDevice() {
 void Compute::calculateForces(int ref, int ord, int cx, int cy, int cz, int& n,
                               vec3*& pos, CkDeviceBufferPost* devicePost) {
   ensureDevice();
+  if (joinTrace(ref) && !traceInputPosts.count(ref))
+    traceInputPosts[ref] = {CkWallTimer(), CkMyPe()};
   const int s = slotFor(cx, cy, cz);
   ensureSlot(s, n);
   pos = d_pos[s];
@@ -346,6 +349,14 @@ vec3 Compute::periodicShift() const {
 // share a PE and the switch is PE-wide) and only on a transition.
 
 void Compute::launchForces() {
+  if (joinTrace(stepCount)) {
+    traceInput = CkWallTimer(); tracePe = CkMyPe();
+    auto it = traceInputPosts.find(stepCount);
+    const double waitMs = it != traceInputPosts.end() && it->second.second == CkMyPe()
+        ? 1000*(traceInput-it->second.first) : -1;
+    CkPrintf("[join-input] step=%d pe=%d c=%d,%d,%d,%d,%d,%d input_ms=%.3f\n", stepCount,CkMyPe(),thisIndex.x1,thisIndex.y1,thisIndex.z1,thisIndex.x2,thisIndex.y2,thisIndex.z2,waitMs);
+    if (it != traceInputPosts.end()) traceInputPosts.erase(it);
+  }
   // A chare that migrated mid-step resumes here without having run
   // calculateForces on its new PE. Its device buffers travelled, but a CUDA
   // stream cannot -- it belongs to the PE, not the chare -- and ensureDevice()
@@ -418,17 +429,23 @@ void Compute::sendForces() {
   if (stepCount == 1) energy[0] = *h_energy;
   else if (stepCount == finalStepCount) energy[1] = *h_energy;
 
+  double readyMs = -1;
+  if (joinTrace(stepCount)) {
+    traceSent = CkWallTimer();
+    if (tracePe == CkMyPe()) readyMs = 1000*(traceSent-traceInput);
+    CkPrintf("[join-compute] step=%d pe=%d c=%d,%d,%d,%d,%d,%d ready_ms=%.3f\n", stepCount,CkMyPe(),thisIndex.x1,thisIndex.y1,thisIndex.z1,thisIndex.x2,thisIndex.y2,thisIndex.z2,readyMs);
+  }
   pendingForceSends = selfCompute ? 1 : 2;
 
   CkCallback sentCb(CkIndex_Compute::forceSendDone(), thisProxy[thisIndex]);
 
   cellArray(cellIdx[0][0], cellIdx[0][1], cellIdx[0][2])
-      .receiveForces(stepCount, ordinal[0], nPart[0],
+      .receiveForces(stepCount, ordinal[0], CkMyPe(), readyMs, nPart[0],
                      CkDeviceBuffer(d_force[0], sentCb, stream));
 
   if (!selfCompute)
     cellArray(cellIdx[1][0], cellIdx[1][1], cellIdx[1][2])
-        .receiveForces(stepCount, ordinal[1], nPart[1],
+        .receiveForces(stepCount, ordinal[1], CkMyPe(), readyMs, nPart[1],
                        CkDeviceBuffer(d_force[1], sentCb, stream));
 }
 
@@ -437,6 +454,8 @@ void Compute::pup(PUP::er &p) {
   CBase_Compute::pup(p);
   __sdag_pup(p);
   p | stepCount;
+  p | traceInputPosts;
+  p | traceInput; p | traceSent; p | tracePe;
   p | pendingForceSends;
   p | ackCount;
   p | lbBlocked;

@@ -81,7 +81,7 @@ mainmodule leanmd {
     entry void binDone();
 
     // Forces from one of my computes, landing straight in device memory.
-    entry void receiveForces(int ref, int ordinal, int n, nocopydevice vec3 f[n]);
+    entry void receiveForces(int ref, int ordinal, int sourcePe, double readyMs, int n, nocopydevice vec3 f[n]);
     // Atoms that crossed into my cell, likewise.
     entry void receiveMigrants(int ref, int ordinal, int n, int m, nocopydevice Particle parts[m]);
 
@@ -100,8 +100,8 @@ mainmodule leanmd {
 
         //one force array back from each of my computes, folded in on the device
         for(forceCount = 0; forceCount < inbrs; forceCount++) {
-          when receiveForces[stepCount](int ref, int ordinal, int n, nocopydevice vec3 f[n])
-            serial { accumulateForce(ordinal, n, f); }
+          when receiveForces[stepCount](int ref, int ordinal, int sourcePe, double readyMs, int n, nocopydevice vec3 f[n])
+            serial { accumulateForce(ordinal, sourcePe, readyMs, n, f); }
         }
 
         //update properties of atoms using new force values
@@ -238,6 +238,10 @@ mainmodule leanmd {
         // completion callback is the only thing standing between the two.
         for (ackCount = 0; ackCount < pendingForceSends; ackCount++) {
           when forceSendDone() { }
+        }
+        serial {
+          if (joinTrace(stepCount) && tracePe == CkMyPe())
+            CkPrintf("[join-ack] step=%d pe=%d c=%d,%d,%d,%d,%d,%d ack_ms=%.3f\n", stepCount, CkMyPe(), thisIndex.x1,thisIndex.y1,thisIndex.z1,thisIndex.x2,thisIndex.y2,thisIndex.z2, 1000*(CkWallTimer()-traceSent));
         }
 
         //periodically call load balancer

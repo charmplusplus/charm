@@ -1,3 +1,4 @@
+#include "JoinTrace.h"
 #include <string>
 #include <cstring>
 #include <algorithm>

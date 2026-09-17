@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 #include "hapi.h"
 #include "leanmd_cuda.h"
@@ -57,6 +58,8 @@ class CellMap : public CkArrayMap {
 // energy scalars ever crosses back to the host.
 class Cell : public CBase_Cell {
 private:
+  double traceStart = 0, traceFirst = 0;
+  std::map<std::pair<int,int>, double> tracePosts;
   Cell_SDAG_CODE;
 
   // Host copy of the particles. Populated by the constructor to lay out the
@@ -116,7 +119,7 @@ public:
   void reportDensity();  //bin my atoms by x for the density report
   void beginStep();
   void sendPositions();
-  void accumulateForce(int ordinal, int n, vec3* f);
+  void accumulateForce(int ordinal, int sourcePe, double readyMs, int n, vec3* f);
   void computeKineticEnergy();
   void integrate();
   void binParticles();
@@ -130,7 +133,7 @@ public:
 
   // Device-zerocopy post entry methods: run when the message lands, and name the
   // device buffer the payload should be written into.
-  void receiveForces(int ref, int ordinal, int& n, vec3*& f,
+  void receiveForces(int ref, int ordinal, int sourcePe, double readyMs, int& n, vec3*& f,
                      CkDeviceBufferPost* devicePost);
   void receiveMigrants(int ref, int ordinal, int n, int& m, Particle*& parts,
                        CkDeviceBufferPost* devicePost);

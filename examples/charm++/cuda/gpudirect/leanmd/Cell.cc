@@ -1,3 +1,4 @@
+#include "JoinTrace.h"
 #include "defs.h"
 #include "leanmd.decl.h"
 #include "Cell.h"
@@ -258,14 +259,16 @@ void Cell::beginStep() {
 // device-buffer multicast does not exist, and the point-to-point edges are what
 // the load balancer's communication graph needs to see anyway.
 void Cell::sendPositions() {
+  if (joinTrace(stepCount)) { traceStart = CkWallTimer(); traceFirst = 0; }
   for (int num = 0; num < inbrs; num++)
     computeArray[computesList[num]].calculateForces(
         stepCount, num, thisIndex.x, thisIndex.y, thisIndex.z, myNumParts,
         CkDeviceBuffer(d_pos, stream));
 }
 
-void Cell::receiveForces(int ref, int ordinal, int& n, vec3*& f,
+void Cell::receiveForces(int ref, int ordinal, int sourcePe, double readyMs, int& n, vec3*& f,
                          CkDeviceBufferPost* devicePost) {
+  if (joinTrace(ref)) tracePosts[{ref,ordinal}] = CkWallTimer();
   f = d_recv_force + (size_t)ordinal * part_capacity;
   devicePost[0].hapi_stream = stream;
 }
@@ -276,7 +279,15 @@ void Cell::receiveForces(int ref, int ordinal, int& n, vec3*& f,
 // step. Summation order is now arrival order rather than tree order, so the total
 // is no longer bit-identical run to run -- well inside ENERGY_VAR, but worth
 // knowing when comparing balancer configurations.
-void Cell::accumulateForce(int ordinal, int n, vec3* f) {
+void Cell::accumulateForce(int ordinal, int sourcePe, double readyMs, int n, vec3* f) {
+  if (joinTrace(stepCount)) {
+    const double now = CkWallTimer();
+    if (forceCount == 0) traceFirst = now;
+    auto it = tracePosts.find({stepCount,ordinal});
+    const double postedMs = it == tracePosts.end() ? -1 : 1000*(now-it->second);
+    if (it != tracePosts.end()) tracePosts.erase(it);
+    CkPrintf("[join-force] step=%d cell=%d,%d,%d pe=%d source=%d ordinal=%d order=%d ready_ms=%.3f post_ms=%.3f elapsed_ms=%.3f span_ms=%.3f\n", stepCount,thisIndex.x,thisIndex.y,thisIndex.z,CkMyPe(),sourcePe,ordinal,forceCount,readyMs,postedMs,1000*(now-traceStart),1000*(now-traceFirst));
+  }
   invokeAccumulateForces(d_force, f, n, stream);
 }
 

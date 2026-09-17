@@ -2,6 +2,7 @@
 #define __COMPUTE_H__
 
 #include "defs.h"
+#include <map>
 #include "hapi.h"
 #include "leanmd_cuda.h"
 
@@ -14,6 +15,9 @@
 class Compute : public CBase_Compute {
   private:
     Compute_SDAG_CODE
+    std::map<int, std::pair<double,int>> traceInputPosts;
+    double traceInput = 0, traceSent = 0;
+    int tracePe = -1;
     int stepCount;  //current step number
     double energy[2]; //store potential energy
 
