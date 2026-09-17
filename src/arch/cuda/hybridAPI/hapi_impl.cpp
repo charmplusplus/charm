@@ -588,6 +588,23 @@ struct CuptiHookGuard {
   ~CuptiHookGuard() { cupti_hooks_inflight.fetch_sub(1, std::memory_order_seq_cst); }
 };
 
+// Device-to-device copies are GPU work that no object owns, so the per-object
+// attribution the balancer reads cannot see them and CUPTI is not even asked to
+// trace them by default. leanmd issues one per local device receive -- ~6000 a
+// step per process -- so the question "is the unexplained fraction of the step
+// idle GPU, or GPU busy with work T_g structurally cannot see" turns on exactly
+// this number. Gated on CHARM_CUPTI_MEMCPY so a default run is unperturbed.
+// File-scope rather than a GPUManager field on purpose: gpumanager.h is
+// included everywhere and changing it forces a full rebuild of every app.
+static std::atomic<uint64_t> g_cupti_memcpy_n{0};
+static std::atomic<uint64_t> g_cupti_memcpy_ns{0};
+static std::atomic<uint64_t> g_cupti_memcpy_bytes{0};
+static std::atomic<uint64_t> g_cupti_kernel_ns{0};
+bool hapiCuptiTraceMemcpy() {
+  static const bool on = (getenv("CHARM_CUPTI_MEMCPY") != nullptr);
+  return on;
+}
+
 void hapiCuptiStartTracing() {
   // CHARM_LB_NO_CUPTI: never attach -- the host-side instrumentation alone,
   // for measuring what the GPU tracing itself costs. The balancer then sees
@@ -622,6 +639,12 @@ void hapiCuptiStartTracing() {
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL));
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_RUNTIME));
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION));
+  // Opt-in: what share of device time is runtime copies rather than object
+  // kernels. Off by default so the record volume of a normal run is unchanged.
+  if (hapiCuptiTraceMemcpy()) {
+    CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_MEMCPY));
+    CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_MEMSET));
+  }
   // Except for the calls that carry no driver time and no correlation:
   // completion polls and error peeks. hapiPrepareCuptiLoads parses every
   // runtime record at each LB step, and these were 33 M of the 34 M records
@@ -1166,6 +1189,8 @@ void hapiProcessCuptiBuffers() {
         rec.device_id = kernel->deviceId;
         rec.sms_used  = dm ? computeKernelSMs(*dm, kernel) : 1;
         if (rec.end_ns <= rec.start_ns) invalid_duration_count++;
+        else g_cupti_kernel_ns.fetch_add(rec.end_ns - rec.start_ns,
+                                         std::memory_order_relaxed);
 
         GpuLaunchSignature launch;
         bool bucket_settled = true;
@@ -1202,6 +1227,21 @@ void hapiProcessCuptiBuffers() {
         } else {
           pending.push_back({kernel->correlationId, launch, rec});
           deferred++;
+        }
+      }
+      else if (record->kind == CUPTI_ACTIVITY_KIND_MEMCPY) {
+        const CUpti_ActivityMemcpy* mc = (const CUpti_ActivityMemcpy*)record;
+        if (mc->end > mc->start) {
+          g_cupti_memcpy_n.fetch_add(1, std::memory_order_relaxed);
+          g_cupti_memcpy_ns.fetch_add(mc->end - mc->start, std::memory_order_relaxed);
+          g_cupti_memcpy_bytes.fetch_add(mc->bytes, std::memory_order_relaxed);
+        }
+      }
+      else if (record->kind == CUPTI_ACTIVITY_KIND_MEMSET) {
+        const CUpti_ActivityMemset* ms = (const CUpti_ActivityMemset*)record;
+        if (ms->end > ms->start) {
+          g_cupti_memcpy_n.fetch_add(1, std::memory_order_relaxed);
+          g_cupti_memcpy_ns.fetch_add(ms->end - ms->start, std::memory_order_relaxed);
         }
       }
       else if (record->kind == CUPTI_ACTIVITY_KIND_RUNTIME) {
@@ -1351,6 +1391,17 @@ void hapiProcessCuptiBuffers() {
               unresolved_token, hash_collision_count, lost_work_tags,
               gm.cupti_obj_kernel_records_.size(), object_corr_dropped,
               work_tags_dropped);
+    // Cumulative, not per drain: kernel device time CUPTI saw at all, against
+    // the copies no object owns. Compare the first against the balancer's T_g
+    // to see how much of what it CAN see it actually attributes, and the second
+    // against the interval to see whether the rest of the step is idle GPU.
+    CmiPrintf("HAPI[pe=%d]: cupti-device-total kernel_s=%.6f memcpy_n=%llu "
+              "memcpy_s=%.6f memcpy_GB=%.3f\n",
+              CmiMyPe(),
+              (double)g_cupti_kernel_ns.load() / 1.0e9,
+              (unsigned long long)g_cupti_memcpy_n.load(),
+              (double)g_cupti_memcpy_ns.load() / 1.0e9,
+              (double)g_cupti_memcpy_bytes.load() / 1.0e9);
   }
 }
 
