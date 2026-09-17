@@ -139,6 +139,7 @@ static inline cudaError_t hapiFreeHost(void* ptr) {
 
 #define hapiErrorMemoryAllocation cudaErrorMemoryAllocation
 #define hapiErrorInitializationError cudaErrorInitializationError
+#define hapiErrorNotReady cudaErrorNotReady
 #define hapiSuccess cudaSuccess
 #define hapiError_t cudaError_t
 
@@ -278,6 +279,7 @@ static inline hipError_t hapiFreeHost(void* ptr) {
 
 #define hapiErrorMemoryAllocation hipErrorMemoryAllocation
 #define hapiErrorInitializationError hipErrorInitializationError
+#define hapiErrorNotReady hipErrorNotReady
 #define hapiSuccess hipSuccess
 #define hapiError_t hipError_t
 #define hapiStreamDestroy hipStreamDestroy

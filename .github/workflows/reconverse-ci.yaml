@@ -85,7 +85,9 @@ jobs:
       - name: test (2 processes, lcrun)
         run: |
           set -e
-          for d in $TEST_DIRS; do TESTRUN_PROCS=2 make -C $d test; done
+          # lcrun's file PMI backend shares one fixed rendezvous dir per host; a run that dies mid-bootstrap poisons it and the next launch aborts or hangs (charm #3987, uiuc-hpc/lci#202).
+          rm -rf "$HOME/.tmp/lct_pmi_file-"*
+          for d in $TEST_DIRS; do TESTRUN_PROCS=2 timeout 900 make -C $d test; done
 
   # ARM64 Linux (Grace-class systems). Replaces the coverage CircleCI's
   # arm.medium jobs provided on the classic line; -Werror=vla carried over
@@ -114,7 +116,9 @@ jobs:
       - name: test (2 processes, lcrun)
         run: |
           set -e
-          for d in $TEST_DIRS; do TESTRUN_PROCS=2 make -C $d test; done
+          # lcrun's file PMI backend shares one fixed rendezvous dir per host; a run that dies mid-bootstrap poisons it and the next launch aborts or hangs (charm #3987, uiuc-hpc/lci#202).
+          rm -rf "$HOME/.tmp/lct_pmi_file-"*
+          for d in $TEST_DIRS; do TESTRUN_PROCS=2 timeout 900 make -C $d test; done
 
   reconverse-darwin-arm64:
     timeout-minutes: 90
@@ -125,7 +129,7 @@ jobs:
           # reconverse is the contrib/reconverse submodule.
           submodules: true
       - name: install dependencies
-        run: brew install libfabric
+        run: brew install libfabric coreutils  # coreutils for gtimeout (see the 2-process test step)
       - name: build
         run: ./build charm++ reconverse-darwin-arm8 -j4 -g
       - name: build tests
@@ -140,7 +144,9 @@ jobs:
       - name: test (2 processes, lcrun)
         run: |
           set -e
-          for d in $TEST_DIRS; do TESTRUN_PROCS=2 make -C $d test; done
+          # lcrun's file PMI backend shares one fixed rendezvous dir per host; a run that dies mid-bootstrap poisons it and the next launch aborts or hangs (charm #3987, uiuc-hpc/lci#202).
+          rm -rf "$HOME/.tmp/lct_pmi_file-"*
+          for d in $TEST_DIRS; do TESTRUN_PROCS=2 gtimeout 900 make -C $d test; done
 
   # Race/stress tier: error checking live (CkEnforce-heavy tests with teeth),
   # heavy anytime-migration stress (the #3939 regression class), QD settles,
@@ -178,16 +184,20 @@ jobs:
       - name: anytime migration stress (2 processes)
         run: |
           set -e
+          # lcrun's file PMI backend shares one fixed rendezvous dir per host; a run that dies mid-bootstrap poisons it and the next launch aborts or hangs (charm #3987, uiuc-hpc/lci#202).
+          rm -rf "$HOME/.tmp/lct_pmi_file-"*
           cd tests/charm++/anytime_bcastred
           B=$PWD/../../../reconverse-linux-x86_64
           for S in 4 5; do
-            $B/_deps/lci-src/lcrun -n 2 ./bcastred +pe 4 -n 8 -i 500 -m 1 -c 8 -S $S -w 30
+            timeout 900 $B/_deps/lci-src/lcrun -n 2 ./bcastred +pe 4 -n 8 -i 500 -m 1 -c 8 -S $S -w 30
           done
       - name: qd + megatest multi-process
         run: |
           set -e
+          # lcrun's file PMI backend shares one fixed rendezvous dir per host; a run that dies mid-bootstrap poisons it and the next launch aborts or hangs (charm #3987, uiuc-hpc/lci#202).
+          rm -rf "$HOME/.tmp/lct_pmi_file-"*
           B=$PWD/reconverse-linux-x86_64
           cd tests/charm++/qd
-          $B/_deps/lci-src/lcrun -n 2 ./qdbench +pe 4
+          timeout 900 $B/_deps/lci-src/lcrun -n 2 ./qdbench +pe 4
           cd ../megatest
-          $B/_deps/lci-src/lcrun -n 2 ./megatest +pe 4
+          timeout 900 $B/_deps/lci-src/lcrun -n 2 ./megatest +pe 4

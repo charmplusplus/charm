@@ -983,8 +983,9 @@ void CkRdmaIssueRgets(envelope *env, void **arrPtrs, int *arrSizes, int arrayInd
   for(int i=0; i<numops; i++){
     up|source;
 
-    if(source.cnt < arrSizes[i])
-      CkAbort("CkRdmaIssueRgets: Size of the posted buffer > Size of the source buffer\n");
+    if((size_t)arrSizes[i] > source.cnt)
+      CkAbort("CkPostBuffer: posted buffer of %zu bytes is larger than the %zu-byte source (operation %d); the posted size must be <= the source size",
+              (size_t)arrSizes[i], source.cnt, i);
 
 #if CMK_USE_CMA && CMK_REG_REQUIRED
     if(!sendBackToSourceForDereg && ncpyMode == CkNcpyMode::CMA && source.refAckInfo != NULL)
@@ -2427,8 +2428,9 @@ int CkPerformRget(CkNcpyBufferPost &post, void *destBuffer, int destSize) {
 
       if(i == destIndex) {
 
-        if(source.cnt < destSize)
-          CkAbort("CkRdmaIssueRgets: Size of the posted buffer > Size of the source buffer\n");
+        if((size_t)destSize > source.cnt)
+          CkAbort("CkPostBuffer: posted buffer of %zu bytes is larger than the %zu-byte source (tag %zu); the posted size must be <= the source size",
+                  (size_t)destSize, source.cnt, post.tag);
 
 #if CMK_USE_CMA && CMK_REG_REQUIRED
         if(!sendBackToSourceForDereg && ncpyMode == CkNcpyMode::CMA && source.refAckInfo != NULL)
@@ -2527,6 +2529,12 @@ int CkPerformRget(CkNcpyBufferPost &post, void *destBuffer, int destSize) {
     return true;
 
   } else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {
+
+    // The node-level receive already completed, so the source size is the one
+    // recorded in the post structure rather than one unpacked from the message.
+    if((size_t)destSize > post.srcSize)
+      CkAbort("CkPostBuffer: posted buffer of %zu bytes is larger than the %zu-byte source (tag %zu); the posted size must be <= the source size",
+              (size_t)destSize, post.srcSize, post.tag);
 
     memcpy(destBuffer, post.srcBuffer, post.srcSize);
 

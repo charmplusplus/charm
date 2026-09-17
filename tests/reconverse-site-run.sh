@@ -17,7 +17,8 @@
 #               processes on one node)
 #   PROCS       processes for the multi-process pass (default 2)
 #   PES         PEs per single-process run (default: what each Makefile asks)
-#   LAUNCHER    override the launcher (default "srun --mpi=pmi2"; delta: "srun --mpi=pmix")
+#   LAUNCHER    override the launcher (default "srun --mpi=pmi2"; delta:
+#               "srun --mpi=pmix"; frontier: plain "srun")
 #   LAUNCHER_ARGS_SINGLE / LAUNCHER_ARGS_MULTI
 #               launcher flags for the two passes (defaults are srun's
 #               node/cpu flags; set both empty to use lcrun on a workstation)
@@ -37,8 +38,9 @@ PROCS=${PROCS:-2}
 # The launcher default is per site: Delta's srun does not bootstrap a
 # multi-process reconverse job with --mpi=pmi2 (each rank starts as its own
 # one-process job and every multi-process test passes vacuously), so the delta
-# case below picks pmix. Anvil and Frontier work with pmi2. LAUNCHER in the
-# environment overrides either.
+# case below picks pmix; Frontier fails the same way with pmi2 and uses plain
+# srun. Anvil works with pmi2. LAUNCHER in the environment overrides any of
+# them.
 SITE_LAUNCHER="srun --mpi=pmi2"
 LAUNCHER_ARGS_SINGLE=${LAUNCHER_ARGS_SINGLE-"-N1 -c8"}
 if [[ $NODES -ge 2 ]]; then
@@ -86,6 +88,14 @@ case "$SITE" in
     export FI_PROVIDER=cxi
     export LCI_NETWORK_BACKENDS=ofi
     export PMI_MAX_KVS_ENTRIES=${PMI_MAX_KVS_ENTRIES:-1000}
+    # Launcher: plain srun, NOT the default --mpi=pmi2. With --mpi=pmi2 each
+    # srun task starts as its own one-process reconverse job (every rank
+    # prints "Starting Reconverse with 1 process"), so every multi-process
+    # test passes vacuously; verified 2026-09-17 by in-job probes in jobs
+    # 5495903/5495904. Plain srun uses the cray_shasta plugin (the site
+    # default; `srun --mpi=list` offers none, cray_shasta, pmi2) and
+    # bootstraps the multi-process job correctly.
+    SITE_LAUNCHER="srun"
     LAUNCHER_ARGS_SINGLE="$LAUNCHER_ARGS_SINGLE --network=single_node_vni"
     LAUNCHER_ARGS_MULTI="$LAUNCHER_ARGS_MULTI --network=single_node_vni"
     ;;
