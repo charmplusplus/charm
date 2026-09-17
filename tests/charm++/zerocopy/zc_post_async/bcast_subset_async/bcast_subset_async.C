@@ -189,6 +189,13 @@ class nodegrp : public CBase_nodegrp {
   bool evenElement;
   public:
     nodegrp() {
+      // The array element and the group set this in their constructors; the
+      // nodegroup never did, so an uninitialised byte that was neither 0 nor 1
+      // made both `if (evenElement)` and `if (!evenElement)` true, the buffer
+      // was posted twice, and the second delivery double-freed destBuffer
+      // (Frontier, 2026-09-17, after a system software update changed the heap
+      // state at construction; the same binary had passed before).
+      evenElement = (thisIndex % 2 == 0);
       destBuffer = new int[SIZE];
       assignValuesToIndex(destBuffer, SIZE);
       tag = 400 + thisIndex;
