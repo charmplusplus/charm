@@ -155,6 +155,13 @@ CPT=${CPT:-${SLURM_CPUS_PER_TASK:-16}}
 SRUN="srun --jobid=$JID --mpi=cray_shasta -N $NODES -n $((4*NODES)) --ntasks-per-node=4 --gpus-per-node=4 --cpus-per-task=$CPT --cpu-bind=none --exact --kill-on-bad-exit=1"
 SUM=$SPH/../scale_N${NODES}_$(date +%m%d_%H%M).tsv
 budget_left() { echo $(( DEADLINE_MIN*60 - ($(date +%s) - START) )); }
+# An arm's TIMEOUT is 2-3.7x its expectation -- it exists to catch a hang, not
+# to reserve wall. Refusing to start an arm that has less than its full timeout
+# left skipped a 120 s sph2d run with 298 s in hand, two seconds under the 300 s
+# timeout. Start whenever the EXPECTATION plus a margin fits, and clamp the
+# timeout to what is actually left so an overrun still cannot outlive the job.
+fits() { local exp=$1; [ $(budget_left) -ge $(( exp*130/100 + 45 )) ]; }
+clamp_tmo() { local tmo=$1 left; left=$(( $(budget_left) - 20 )); [ $left -lt $tmo ] && tmo=$left; echo $tmo; }
 PLAN_S=0; EXP_S=0   # sums of timeouts / expected runtimes, printed by DRY=1
 
 # Never underutilize: the allocation must be exactly the node count being run.
@@ -174,8 +181,8 @@ run_leanmd() { local kind=$1 arm=$2
   case $kind in weak) grid="$((8*NODES)) 8 8";; strong) grid="${LMD_GRID:-32 8 8}";; esac
   pes=$((32*NODES)); cells=$(echo $grid | awk '{print $1*$2*$3}'); cpg=$((cells/(4*NODES)))
   case $arm in
-    sync)  extra="$LMD_MD +LBDebug 1";;
-    async) extra="$LMD_MD -lbasync -lblag $LAG +LBAsync +LBDebug 1";;
+    sync)  extra="$LMD_MD +LBDebug ${LBDEBUG:-1}";;
+    async) extra="$LMD_MD -lbasync -lblag $LAG +LBAsync +LBDebug ${LBDEBUG:-1}";;
   esac
   # ~0.011 s per cell per GPU at the 2744-atom granularity, x2 for noLB+startup
   tmo=$(awk "BEGIN{t=int(2*$STEPS*0.011*$cells/(4*$NODES))+180; print (t<300)?300:t}")
@@ -189,7 +196,8 @@ run_leanmd() { local kind=$1 arm=$2
   dir=$RL/${kind}_N${NODES}_$arm
   local C="$grid $STEPS $PERIOD $PERIOD -computemap local -density gradient +pe $pes +setcpuaffinity +gpushm +gpuipceventpool 256 +gpupool +gpupoolsize $pool"
   if [ -n "$DRY" ]; then PLAN_S=$((PLAN_S+tmo)); EXP_S=$((EXP_S+exp)); printf "  [dry] leanmd %-6s %-6s grid=[%s] %d cells %d/GPU %d PEs pool=%dMB expect=%ds timeout=%ds\n" "$kind" "$arm" "$grid" $cells $cpg $pes $pool $exp $tmo; return; fi
-  [ $(budget_left) -lt $tmo ] && { printf "  leanmd %-6s %-6s SKIPPED (%ds left, needs %ds)\n" "$kind" "$arm" "$(budget_left)" "$tmo"; return; }
+  fits $exp || { printf "  leanmd %-6s %-6s SKIPPED (%ds left, needs %ds for a %ds run)\n" "$kind" "$arm" "$(budget_left)" "$(( exp*130/100 + 45 ))" "$exp"; return; }
+  tmo=$(clamp_tmo $tmo)
   rm -rf $dir; mkdir -p $dir
   ( cd $LMD && RANKLOG_DIR=$dir env RANKLOG_DIR=$dir timeout $tmo $SRUN stdbuf -oL -eL $RL/rankwrap.sh $LMD/leanmd $C $extra >$dir/srun.err 2>&1 )
   rc=$?; m21=$(lmd_mean $dir/rank_0.log 21); m42=$(lmd_mean $dir/rank_0.log 42)
@@ -205,7 +213,15 @@ run_leanmd() { local kind=$1 arm=$2
   grep -ah "MetisLB gate" $dir/rank_0.log 2>/dev/null | head -1 | sed 's/^/      /' | cut -c1-250; }
 
 # ----------------------------------------------------------------- sph2d ----
-SPH_MD="+balancer MetisLB +balancer DiffusionLB +LBDiffusionCommOn +LBCostConfig $COSTCFG"
+# The async lag (-l) must be SHORTER than the gap to the next LB trigger, not
+# just shorter than the period. -f is the FIRST LB step and -b the period, so
+# -f 1000 -b 2000 triggers at 1000, 2000, 4000, 6000 and the shortest gap is
+# 1000. sph2d drops any trigger that lands inside an open lag window, so -l 1800
+# made the async arm balance TWICE where sync balanced four times -- it hid
+# 1.38 s of stall and still lost 0.5 s to the stale placement. Weak: gap 1000,
+# lag 800. Strong (-f 500 -b 750): gap 250, lag 200. sph2d.C now aborts on a lag
+# that straddles a trigger.
+SPH_MD="+balancer MetisLB +balancer DiffusionLB +LBDiffusionCommOn +LBCostConfig $COSTCFG +LBDebug ${LBDEBUG:-1}"
 run_sph2d() { local kind=$1 arm=$2
   local cfg lbargs tmo exp log rc ms imb patches fluid pool
   if [ "$kind" = weak ]; then
@@ -213,16 +229,17 @@ run_sph2d() { local kind=$1 arm=$2
     cfg="-X $X -Y 2.5 -x $XC -y 10 -w $CW -t 2 -s 0.00042 -r 2 -e 0.1 -V 10 -u 200 -i 6000 -S 2000"
     # 93-114 s wall measured at N=1 (22106974); 120 covers the slowest arm.
     patches=$((120*NODES)); fluid=$((64*NODES)); tmo=300; exp=120; pool=$(pool_for $SPH_POOL_WEAK)
-    case $arm in nolb) lbargs="-f 99999";; sync) lbargs="-f 1000 -b 2000 $SPH_MD";; async) lbargs="-f 1000 -b 2000 -a -l 1800 $SPH_MD +LBAsync";; esac
+    case $arm in nolb) lbargs="-f 99999";; sync) lbargs="-f 1000 -b 2000 $SPH_MD";; async) lbargs="-f 1000 -b 2000 -a -l 800 $SPH_MD +LBAsync";; esac
   else
     cfg="-X 8 -Y 8.5 -x 64 -y 34 -w 4 -t 8 -s 0.00042 -r 2 -e 0.1 -V 10 -u 200 -i 1500 -S 500"
     # exp=600 is a GUESS -- sph2d strong has never been run at any node count.
     patches=2176; fluid=1024; tmo=900; exp=600; pool=$(pool_for $SPH_POOL_STRONG)
-    case $arm in nolb) lbargs="-f 99999";; sync) lbargs="-f 500 -b 750 $SPH_MD";; async) lbargs="-f 500 -b 750 -a -l 700 $SPH_MD +LBAsync";; esac
+    case $arm in nolb) lbargs="-f 99999";; sync) lbargs="-f 500 -b 750 $SPH_MD";; async) lbargs="-f 500 -b 750 -a -l 200 $SPH_MD +LBAsync";; esac
   fi
   log=$SPH/${kind^^}_N${NODES}_$arm.log
   if [ -n "$DRY" ]; then PLAN_S=$((PLAN_S+tmo)); EXP_S=$((EXP_S+exp)); printf "  [dry] sph2d  %-6s %-6s %d patches %d fluid %d PEs pool=%dMB expect=%ds timeout=%ds\n" "$kind" "$arm" $patches $fluid $((16*NODES)) $pool $exp $tmo; return; fi
-  [ $(budget_left) -lt $tmo ] && { printf "  sph2d  %-6s %-6s SKIPPED (%ds left, needs %ds)\n" "$kind" "$arm" "$(budget_left)" "$tmo"; return; }
+  fits $exp || { printf "  sph2d  %-6s %-6s SKIPPED (%ds left, needs %ds for a %ds run)\n" "$kind" "$arm" "$(budget_left)" "$(( exp*130/100 + 45 ))" "$exp"; return; }
+  tmo=$(clamp_tmo $tmo)
   ( cd $SPH && env X=1 PES=4 timeout $tmo $SRUN --chdir="$SPH" stdbuf -oL -eL $SPH/numa_wrap_sph.sh ./sph2d $cfg $lbargs +gpushm +gpupool +gpupoolsize $pool +gpuipceventpool 256 +ppn 4 > $log 2>&1 )
   rc=$?; ms=$(grep -a 'Average iteration' $log | awk '{print $4}')
   imb=$(grep -a '^  step' $log | tail -1 | sed 's/.*imbalance (max\/avg) //;s/ .*//')

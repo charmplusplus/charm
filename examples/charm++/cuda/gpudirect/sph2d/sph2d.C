@@ -265,9 +265,26 @@ public:
                "line. Running the unsplit AtSync barrier instead.\n");
       async_lb = 0;
     }
-    if (async_lb && (lb_wait_lag < 1 || (lb_freq > 0 && lb_wait_lag >= lb_freq))) {
-      CkAbort("-l (%d) must be in [1, lb_freq): the wait must land before the "
-              "next AtSyncStart\n", lb_wait_lag);
+    // The lag must close the window before the NEXT trigger, and the first LB
+    // need not sit on a period boundary: with -f 1000 -b 2000 the triggers are
+    // 1000, 2000, 4000, 6000, so the shortest gap is 1000, not lb_freq. A lag
+    // that straddles a trigger does not delay it -- iterate() drops it, because
+    // it only starts a step while !lb_waiting -- so the async arm silently runs
+    // FEWER balancing rounds than the sync arm and the two stop being
+    // comparable. Checking against lb_freq alone let -l 1800 through and cost
+    // async half its placements on every weak run.
+    if (async_lb && lb_freq > 0) {
+      int gap_after_first = lb_freq - (first_lb % lb_freq);
+      int min_gap = gap_after_first < lb_freq ? gap_after_first : lb_freq;
+      if (lb_wait_lag < 1 || lb_wait_lag >= min_gap)
+        CkAbort("-l (%d) must be in [1, %d): the wait must land before the next "
+                "LB trigger. First LB %d, period %d, so the triggers are %d, "
+                "%d, %d, ... and the shortest gap is %d.\n",
+                lb_wait_lag, min_gap, first_lb, lb_freq, first_lb,
+                first_lb + gap_after_first, first_lb + gap_after_first + lb_freq,
+                min_gap);
+    } else if (async_lb && lb_wait_lag < 1) {
+      CkAbort("-l (%d) must be at least 1\n", lb_wait_lag);
     }
 
     // Capacity. A patch's share of the fluid at rest is what it starts with;
