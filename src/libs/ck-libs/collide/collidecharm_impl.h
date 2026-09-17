@@ -101,7 +101,6 @@ class CollisionAggregator {
 
 class collideMgr : public CBase_collideMgr
 {
-  CProxy_collideMgr thisproxy;
   private:
   void status(const char *msg) {
     CkPrintf("CMgr pe %d> %s\n",CkMyPe(),msg);
@@ -131,10 +130,25 @@ class collideMgr : public CBase_collideMgr
   collideMgr(const CollideGrid3d &gridMap,
       const CProxy_collideClient &client,
       const CProxy_collideVoxel &voxels);
+  collideMgr(CkMigrateMessage* m);
+
+  void pup(PUP::er &p) {
+    // The migrate constructor does not initialize Group/CkReductionMgr state.
+    // Restore it explicitly so group reductions have a valid thisProxy/tree.
+    Group::pup(p);
+    p | voxelProxy;
+    p | gridMap;
+    p | client;
+  }
 
   //Maintain contributor registration count
   void registerContributor(int chunkNo);
   void unregisterContributor(int chunkNo);
+
+  // Reinitialize collideClient's state on restart
+  void reinitClient(
+    CollisionClientFn clientFn,
+    void *clientParam );
 
   //Clients call this to contribute their objects
   void addBoxes(int chunkNo, int n, const bbox3d* boxes, const int* prio);
@@ -194,6 +208,13 @@ class serialCollideClient : public collideClient {
   public:
   serialCollideClient(void);
   serialCollideClient(CkCallback clientCb_);
+  serialCollideClient(CkMigrateMessage *m);
+  void pup(PUP::er &p) {
+    // The reduction callback in collisions() relies on Group/CkReductionMgr
+    // state restored by Group::pup(), including thisgroup and thisProxy.
+    Group::pup(p);
+    p | useCb;
+  }
 
   /// Call this client function on processor 0:
   void setClient(CollisionClientFn clientFn,void *clientParam);
@@ -216,6 +237,7 @@ class distributedCollideClient : public collideClient {
 
   /// Called by voxel array on each processor:
   virtual void collisions(int step,CollisionList &colls);
+  void setClient(CollisionClientFn, void *) {}
 };
 
 
