@@ -6359,7 +6359,7 @@ CkArrayMap and defines these virtual methods:
 
 .. code-block:: c++
 
-    class CkArrayMap : public Group {
+    class CkArrayMap : public IrrGroup {
     public:
       // ...
 
@@ -6368,6 +6368,9 @@ CkArrayMap and defines these virtual methods:
       // Return the home processor number for this element of this array
       virtual int procNum(int arrayHdl,const CkArrayIndex &element);
     };
+
+CkArrayMap derives from IrrGroup, not Group, so a map class cannot
+contribute to a reduction.
 
 For example, a simple 1D blockmapping scheme. Actual mapping is handled
 in the procNum function.
@@ -6412,6 +6415,25 @@ map object named BlockMap:
     CkArrayOptions opts(nElements);
     opts.setMap(myMap);
     a1=CProxy_A1::ckNew(parameters,opts);
+
+Creating the map and the array together like this is safe only during
+program initialization, where every PE replays the creations in order
+before any other message runs. Later in the run the array creation can
+reach a PE before the map group's branch exists there, and the array
+constructor aborts with "ERROR! Local branch of array map is NULL!";
+the race grows likelier with the PE count. Name the map as a creation
+dependence, as for groups (Section :numref:`sec:groups/creation`):
+
+.. code-block:: c++
+
+    CkEntryOptions e_opts;                 // after opts.setMap(myMap)
+    e_opts.setGroupDepID(opts.getMap());   // buffer the array creation
+    a1 = CProxy_A1::ckNew(parameters, opts, &e_opts);
+
+The runtime declares this dependence itself for the location manager it
+creates with a new array, so a plain setMap is already ordered. The
+exception is bindTo with a newly created map: bindTo reuses the bound-to
+array's location manager and skips that chain.
 
 A very basic example which also demonstrates how initial elements are created
 may be found in ``examples/charm++/array_map``
