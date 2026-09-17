@@ -15,6 +15,34 @@ item-21 PR** (endgame step 3). The renames behind it wait on Kale's
 announcement email. A GPU follow-on section below tracks work opened by
 running the merged support rather than by merging it.
 
+## Sync status 2026-09-17
+
+Sync PR **#3986** (squash `b26e48b51`) landed; the line is current with
+reconverse main.
+
+- Pin **58921e9 -> 61a69dd4a** — 11 reconverse commits since 09-11:
+  **#238** per-process broadcast fan-out + `CmiSetMsgNokeep`, **#240**
+  macOS PE stack size, **#242** RMA transfer-length fix, **#234**,
+  **#227**.
+- Ported from classic main: **#3921** (Collide restart), **#3938**
+  (`hapiPollEvents` aborts on GPU error).
+- Docs: Converse manual states the **nokeep contract** (who owns a
+  message after the handler returns).
+- `tests/reconverse-site-run.sh`: per-site launcher — Frontier plain
+  `srun`, Delta `srun --mpi=pmix` (**#3982**).
+- CI: lcrun PMI-directory cleanup + per-step timeout (**#3987**,
+  lci**#202**); zerocopy post-size abort (**#3989**).
+- Validated on **Delta, Anvil, Frontier (CPU + HIP)** with the CI tier
+  plus Anvil's full `tests/` folder.
+- **ABI note:** `CcdCallFnAfter` now has C linkage. Build trees from
+  before the bump link against the C++-mangled symbol — full rebuild
+  required, not an incremental `make`.
+
+Open runtime issues found by this round: reconverse **#241**, **#243**
+(exit-path crash; hit 43% of runs on a distant Frontier node pair);
+charm **#3988**, **#3989**, **#3978**. Closed: reconverse **#219**,
+**#223**.
+
 ## Now (unlocked)
 
 | # | Item | Trigger / owner |
@@ -30,7 +58,7 @@ running the merged support rather than by merging it.
 | 4 | ~~Required status checks on the reviewed line~~ | DONE 08-27: all four reconverse jobs required, strict mode on |
 | 5 | ~~Reduction fix (#3939) to the reviewed line, heavy stress enabled~~ | DONE 08-28: **#3947** merged `601472d57` |
 | 6 | ~~Record-replay repairs to the reviewed line~~ | DONE by subsumption: already present via #3944's ck.C graft (verified 08-27); #3943 remains the classic-main vehicle for item 8. Verification found the token-pool comment-out — proper guard in **PR #3948** |
-| 7 | ~~Re-pin `AUTOFETCH_RECONVERSE_TAG` to reconverse **main**~~ | DONE, and re-done as reconverse moved: `f3f4110` (#3949) -> `0673ee8` (#3956, picks up reconverse#211 `CmiNodeRankOnPhysicalNode`) -> `2c50813e7` (#3959, picks up reconverse#212, the `CmiCheckAffinity` startup hang). Standing obligation: every reconverse merge we depend on needs a pin bump. The pin is no longer a SHA in a CMake file: reconverse is the `contrib/reconverse` submodule and its gitlink is the pin, so a bump is `git -C contrib/reconverse checkout <sha>` plus committing the moved gitlink. That also retires the stale-build-directory hazard this row used to carry -- there is no CMake cache holding a previous SHA, because the source tree on disk is the pin |
+| 7 | ~~Re-pin `AUTOFETCH_RECONVERSE_TAG` to reconverse **main**~~ | DONE, and re-done as reconverse moved: `f3f4110` (#3949) -> `0673ee8` (#3956, picks up reconverse#211 `CmiNodeRankOnPhysicalNode`) -> `2c50813e7` (#3959, picks up reconverse#212, the `CmiCheckAffinity` startup hang) -> `58921e9` -> `61a69dd4a` (#3986, 2026-09-17; see the sync-status section above). Standing obligation: every reconverse merge we depend on needs a pin bump. The pin is no longer a SHA in a CMake file: reconverse is the `contrib/reconverse` submodule and its gitlink is the pin, so a bump is `git -C contrib/reconverse checkout <sha>` plus committing the moved gitlink. That also retires the stale-build-directory hazard this row used to carry -- there is no CMake cache holding a previous SHA, because the source tree on disk is the pin |
 | 8 | ~~Merge #3942/#3943 to classic **main**, then cut the freeze tag~~ | DONE 08-30: tag **`v8.0.2`** at `935d1441d` is the final classic release. Announcement email to users is Kale's, and gates the renames in step 4 below |
 | 8b | **Classic main is maintenance-mode after the freeze tag, not dead** | Policy (Kale, 08-27): bugfixes keep landing on main for users not yet on reconverse (known dependent: Quinoa/CFD, Aditya Pandare — fix current bug jointly, then migrate Quinoa to reconverse as an external pilot). Main keeps full CI incl. the #3946 ARM jobs; feature work on the reviewed line only |
 | 8a | Silence CircleCI's "no configuration found" status on the reviewed line | DONE 2026-08-27: Eric turned CircleCI off project-wide; the interim stub is removed. Classic main's ARM coverage moved to Actions (PR #3946: netlrts-linux-arm8, smp variant, mpi-linux-arm8 on ubuntu-24.04-arm) |
