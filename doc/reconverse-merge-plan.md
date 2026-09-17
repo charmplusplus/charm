@@ -15,6 +15,34 @@ item-21 PR** (endgame step 3). The renames behind it wait on Kale's
 announcement email. A GPU follow-on section below tracks work opened by
 running the merged support rather than by merging it.
 
+## Sync status 2026-09-17
+
+Sync PR **#3986** (squash `b26e48b51`) landed; the line is current with
+reconverse main.
+
+- Pin **58921e9 -> 61a69dd4a** — 11 reconverse commits since 09-11:
+  **#238** per-process broadcast fan-out + `CmiSetMsgNokeep`, **#240**
+  macOS PE stack size, **#242** RMA transfer-length fix, **#234**,
+  **#227**.
+- Ported from classic main: **#3921** (Collide restart), **#3938**
+  (`hapiPollEvents` aborts on GPU error).
+- Docs: Converse manual states the **nokeep contract** (who owns a
+  message after the handler returns).
+- `tests/reconverse-site-run.sh`: per-site launcher — Frontier plain
+  `srun`, Delta `srun --mpi=pmix` (**#3982**).
+- CI: lcrun PMI-directory cleanup + per-step timeout (**#3987**,
+  lci**#202**); zerocopy post-size abort (**#3989**).
+- Validated on **Delta, Anvil, Frontier (CPU + HIP)** with the CI tier
+  plus Anvil's full `tests/` folder.
+- **ABI note:** `CcdCallFnAfter` now has C linkage. Build trees from
+  before the bump link against the C++-mangled symbol — full rebuild
+  required, not an incremental `make`.
+
+Open runtime issues found by this round: reconverse **#241**, **#243**
+(exit-path crash; hit 43% of runs on a distant Frontier node pair);
+charm **#3988**, **#3989**, **#3978**. Closed: reconverse **#219**,
+**#223**.
+
 ## Now (unlocked)
 
 | # | Item | Trigger / owner |
