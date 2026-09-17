@@ -2047,8 +2047,10 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
     // first-hop send (no hops yet) was prepared for this very destination, so
     // there is nothing to repair and no reason to walk its descriptors.
     if (msg->array_hops() > 0 && CmiNodeOf(pe) != CmiMyNode() &&
-        CkRdmaDeviceRepairForward(UsrToEnv(msg), pe))
-      return;   // redirected to the source process, which repairs and delivers
+        CkRdmaDeviceRepairForward(UsrToEnv(msg), pe, opts) !=
+            CkDeviceRepairResult::CallerDelivers)
+      return;   // consumed: redirected to the source process, or parked behind
+                // its producer -- either way that path delivers it, not this one
 #endif
     CkArrayManagerDeliver(pe, msg, opts);
   }

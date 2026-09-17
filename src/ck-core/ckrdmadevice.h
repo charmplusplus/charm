@@ -142,9 +142,20 @@ void CkRdmaDeviceSendWhenReady(CkDeviceDeferredSend* pending, void* msg,
 // A device-send message that is leaving this process for another one on the
 // same physical node: re-prepare every memcpy-prepared payload in it as a
 // direct IPC send, in place, so the new home reads it without a correction.
-// Returns true when the message was redirected (consumed) rather than
-// repaired in place; the caller must then not deliver it.
-bool CkRdmaDeviceRepairForward(envelope* env, int newPe);
+// Three outcomes, and they must not be collapsed into one bool: the redirect
+// bridge treats a SECOND redirect as fatal (the source process failed to repair
+// its own payload) but has to let a park through, since a park is delivered by
+// the callback that resumes the repair. Merging the two aborted the async arm
+// at the first parked redirect.
+enum class CkDeviceRepairResult {
+  CallerDelivers,   // repaired in place, or nothing needed repairing
+  Redirected,       // shipped to the source process, which repairs and delivers
+  Parked,           // waiting on a producer; deviceForwardRepairReady delivers
+};
+// A parked message is delivered by the callback that resumes the repair, which
+// is why the caller's delivery options have to travel with it.
+CkDeviceRepairResult CkRdmaDeviceRepairForward(envelope* env, int newPe,
+                                               int opts = 0);
 extern "C" void* device_forward_redirect_bridge(void* arg);
 extern "C" int device_forward_redirect_handler;
 

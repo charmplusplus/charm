@@ -252,6 +252,10 @@ static inline bool isStagedLandingDescriptor(const CkDeviceBuffer& b)
 }
 CkpvDeclare(StagedLandingMap*, staged_landings);
 CkpvDeclare(hapiStream_t, staging_stream);
+// Carries only the producer wait that an inter-node restage put has to observe
+// before the NIC may read the source. Its own stream, so that wait is never
+// queued behind an unrelated staging copy.
+CkpvDeclare(hapiStream_t, restage_wait_stream);
 CkpvDeclare(std::vector<hapiEvent_t>*, staging_events);
 
 // Device work in flight on an element (hapiDeviceWorkBegin/End, see hapi.h):
@@ -294,6 +298,8 @@ void CkRdmaDeviceRegistrationCacheInit()
   CkpvAccess(staged_landings) = new StagedLandingMap();
   CkpvInitialize(hapiStream_t, staging_stream);
   CkpvAccess(staging_stream) = nullptr;
+  CkpvInitialize(hapiStream_t, restage_wait_stream);
+  CkpvAccess(restage_wait_stream) = nullptr;
   CkpvInitialize(std::vector<hapiEvent_t>*, staging_events);
   CkpvAccess(staging_events) = new std::vector<hapiEvent_t>();
 }
@@ -301,6 +307,12 @@ void CkRdmaDeviceRegistrationCacheInit()
 static hapiStream_t stagingStream()
 {
   hapiStream_t& s = CkpvAccess(staging_stream);
+  if (s == nullptr) hapiCheck(cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking));
+  return s;
+}
+static hapiStream_t restageWaitStream()
+{
+  hapiStream_t& s = CkpvAccess(restage_wait_stream);
   if (s == nullptr) hapiCheck(cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking));
   return s;
 }
@@ -1254,10 +1266,63 @@ struct DeviceForwardRedirect {
 };
 extern "C" { int device_forward_redirect_handler; }
 
-bool CkRdmaDeviceRepairForward(envelope* env, int newPe) {
-  if (!CMI_IS_ZC_DEVICE(env)) return false;
-  if (env->getMsgtype() != ForArrayEltMsg) return false;
-  if (CmiNodeOf(newPe) == CmiMyNode()) return false;       // still readable as is
+// An inter-node forward repair re-registers the sender's live buffer so the
+// new home can rget it, and the NIC reads that buffer outside every CUDA
+// stream -- so, exactly as in issueDeviceRestagePut, the producing kernel has
+// to have FINISHED before the descriptor is published, not merely be ordered
+// ahead of it. cudaEventSynchronize bought that by stopping the PE until the
+// GPU drained, once per repaired payload.
+//
+// Park the message behind the producer instead. The repair is re-entrant: a
+// descriptor it has already rewritten is marked sender_prepared with
+// device_idx -1, which the loop below skips as an RDMA descriptor, so resuming
+// simply picks up where the wait interrupted it. Each pass repairs at least
+// the descriptor it waited on, so the chain terminates.
+struct DeviceForwardRepairCtx
+{
+  envelope* env;
+  int newPe;
+  int opts;
+};
+
+static void deviceForwardRepairReady(void* arg, void*)
+{
+  DeviceForwardRepairCtx* ctx = (DeviceForwardRepairCtx*)arg;
+  // Resume. A further descriptor may park again, or the pass may now redirect;
+  // in both cases something else owns the message and this pass must not
+  // deliver it.
+  if (CkRdmaDeviceRepairForward(ctx->env, ctx->newPe, ctx->opts) ==
+      CkDeviceRepairResult::CallerDelivers)
+    CkArrayManagerDeliver(ctx->newPe, EnvToUsr(ctx->env), ctx->opts);
+  delete ctx;
+}
+
+// True when the producer has already finished and the caller may publish the
+// descriptor now. False when the message has been parked behind it: the caller
+// owns nothing further and must report the message consumed.
+static bool forwardRepairReadyOrPark(envelope* env, int newPe, int opts,
+                                     hapiEvent_t ev)
+{
+  if (ev == NULL) return true;
+  // The overwhelmingly common case: the payload was produced long before its
+  // target moved, so there is nothing to wait for and nothing to park.
+  const cudaError_t q = cudaEventQuery(ev);
+  if (q == cudaSuccess) return true;
+  if (q != cudaErrorNotReady) {
+    hapiCheck(q);   // a real failure: report it where it happened
+    return true;
+  }
+  hapiCheck(hapiStreamWaitEvent(restageWaitStream(), ev, 0));
+  DeviceForwardRepairCtx* ctx = new DeviceForwardRepairCtx{env, newPe, opts};
+  // hapiAddCallback holds quiescence for the whole gap and delivers to this PE.
+  hapiAddCallback(restageWaitStream(), CkCallback(deviceForwardRepairReady, ctx));
+  return false;
+}
+
+CkDeviceRepairResult CkRdmaDeviceRepairForward(envelope* env, int newPe, int opts) {
+  if (!CMI_IS_ZC_DEVICE(env)) return CkDeviceRepairResult::CallerDelivers;
+  if (env->getMsgtype() != ForArrayEltMsg) return CkDeviceRepairResult::CallerDelivers;
+  if (CmiNodeOf(newPe) == CmiMyNode()) return CkDeviceRepairResult::CallerDelivers;       // still readable as is
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   static const bool dbg = (getenv("CHARM_ZC_RESTAGE_DEBUG") != nullptr);
 
@@ -1317,7 +1382,8 @@ bool CkRdmaDeviceRepairForward(envelope* env, int newPe) {
       // send time and the data is already there.
       if (direct_prepared) {
         hapi_ipc_device_info& info = csv_gpu_manager.hapi_ipc_device_infos[b.device_idx];
-        hapiCheck(cudaEventSynchronize(info.src_event_pool[b.event_idx]));
+        if (!forwardRepairReadyOrPark(env, newPe, opts, info.src_event_pool[b.event_idx]))
+          return CkDeviceRepairResult::Parked;
         // Retire the IPC slot the direct prepare claimed: the receiver it was
         // claimed for is on another node and will never set its flag. Same
         // pairing the same-node correction uses -- dst event recorded, then
@@ -1329,7 +1395,8 @@ bool CkRdmaDeviceRepairForward(envelope* env, int newPe) {
                 + sizeof(hapiIpcMemHandle_t)) + b.event_idx;
         slot->dst_flag.store(true, std::memory_order_release);
       } else if (b.memcpy_event != NULL) {
-        hapiCheck(cudaEventSynchronize((cudaEvent_t)b.memcpy_event));
+        if (!forwardRepairReadyOrPark(env, newPe, opts, (hapiEvent_t)b.memcpy_event))
+          return CkDeviceRepairResult::Parked;
       }
       // The source is still owned by the sending element: a memcpy send ships
       // its completion callback with the message, and the receiver fires it
@@ -1356,7 +1423,7 @@ bool CkRdmaDeviceRepairForward(envelope* env, int newPe) {
         fflush(stdout);
       }
     }
-    if (redirectTo < 0) return false;
+    if (redirectTo < 0) return CkDeviceRepairResult::CallerDelivers;
 
     // Every descriptor of one message comes from one element, so one source
     // PE serves the whole message. Ship the envelope to it verbatim.
@@ -1378,12 +1445,12 @@ bool CkRdmaDeviceRepairForward(envelope* env, int newPe) {
     CmiSetHandler(r, device_forward_redirect_handler);
     CmiSyncSendAndFree(redirectTo, sizeof(DeviceForwardRedirect) + envSize, (char*)r);
     csv_gpu_manager.ipc_forward_repairs.fetch_add(1, std::memory_order_relaxed);
-    return true;
+    return CkDeviceRepairResult::Redirected;
   }
 
-  if (!csv_gpu_manager.use_shm || !hapiIpcUseDirect()) return false;
+  if (!csv_gpu_manager.use_shm || !hapiIpcUseDirect()) return CkDeviceRepairResult::CallerDelivers;
   auto dmit = csv_gpu_manager.device_map.find(CkMyPe());
-  if (dmit == csv_gpu_manager.device_map.end()) return false;
+  if (dmit == csv_gpu_manager.device_map.end()) return CkDeviceRepairResult::CallerDelivers;
   DeviceManager* dm = dmit->second;
 
   char* buf = ((CkMarshallMsg*)EnvToUsr(env))->msgBuf;
@@ -1453,7 +1520,7 @@ bool CkRdmaDeviceRepairForward(envelope* env, int newPe) {
       fflush(stdout);
     }
   }
-  return false;
+  return CkDeviceRepairResult::CallerDelivers;
 }
 
 // Source PE: a forward bounced here because only this process can re-prepare
@@ -1471,9 +1538,21 @@ extern "C" void* device_forward_redirect_bridge(void* arg)
   const int newPe = r->newPe;
   CmiFree(r);
   CkUnpackMessage(&env);
-  if (CkRdmaDeviceRepairForward(env, newPe))
-    CkAbort("[%d] device forward redirect bounced again: the source process "
-            "could not repair its own payload", CkMyPe());
+  // A second REDIRECT is fatal: this is already the source process, so there is
+  // nowhere left to bounce it. A PARK is not -- the payload's producer simply
+  // has not finished yet, and the callback that resumes the repair delivers it.
+  // Collapsing the two is what aborted the async arm at the first parked
+  // redirect, since every park read as a bounce.
+  switch (CkRdmaDeviceRepairForward(env, newPe)) {
+    case CkDeviceRepairResult::Redirected:
+      CkAbort("[%d] device forward redirect bounced again: the source process "
+              "could not repair its own payload", CkMyPe());
+      break;
+    case CkDeviceRepairResult::Parked:
+      return NULL;   // deviceForwardRepairReady delivers it
+    case CkDeviceRepairResult::CallerDelivers:
+      break;
+  }
   CkArrayManagerDeliver(newPe, EnvToUsr(env), 0);
   return NULL;
 }
@@ -1616,6 +1695,58 @@ static thread_local bool src_prepared_dbg = false;
 static thread_local int src_proto_dbg = 0;
 static thread_local int src_dev_idx_dbg = -1;
 
+// An inter-node restage put may only be issued once the kernel that produced
+// the source has actually finished: the NIC reads that buffer outside every
+// CUDA stream, so a stream wait -- which orders CUDA work against CUDA work --
+// cannot hold it back, and a put issued early ships whatever the buffer held
+// before. That ordering is required. Blocking the PE on it is not, and
+// cudaEventSynchronize did exactly that: the PE stopped scheduling until the
+// GPU drained, once per correction, in an LB step that makes hundreds of them.
+//
+// The wait is enqueued on this PE's restage stream instead, and the put issued
+// from that stream's HAPI callback. hapiAddCallback delivers it to the PE that
+// registered it (a converse message on light_cb_idx_), so the put is still
+// issued by this PE, in the same order relative to its own work -- the PE just
+// keeps launching and draining in the meantime. Distinct corrections are
+// independent: each carries its own dest_op and its own registered landing
+// buffer, and completion is resolved per op by the notification, so letting
+// them overlap changes nothing about how any one of them resolves.
+struct DeviceRestagePutCtx
+{
+  DeviceRestageReq* req;
+  const void* src_ptr;
+};
+
+static void issueDeviceRestagePut(DeviceRestageReq* req, const void* src_ptr)
+{
+  // Put with notification. The NACK already carried the receiver's registered
+  // landing buffer, so the payload goes straight there: one RDMA write from
+  // the side that already owns the source registration.
+  //
+  // CMK_DEVICE_RESTAGE_PUT marks the operation so that its completion --
+  // which a write raises on the initiator, here the sender -- is turned into
+  // a notification to the target instead of being resolved locally. Without
+  // that the receiver is never told, and the run stalls with the bytes
+  // already in place and zero load balancing steps.
+  CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler);
+  CmiNcpyBuffer src_ncpy(src_ptr, req->cnt);
+  NcpyOperationInfo* info = src_ncpy.createNcpyOpInfo(
+      src_ncpy, req->dest_ncpy, /*ackSize=*/0, NULL, NULL, /*rootNode=*/-1,
+      CMK_DEVICE_RESTAGE_PUT, NULL);
+  QdCreate(1);   // released by device_restage_put_done_bridge
+  CmiIssueRput(info);
+}
+
+// The producer has finished; issue the put and retire the request that was
+// held across the wait. Runs on the PE that enqueued the wait.
+static void deviceRestagePutReady(void* arg, void*)
+{
+  DeviceRestagePutCtx* ctx = (DeviceRestagePutCtx*)arg;
+  issueDeviceRestagePut(ctx->req, ctx->src_ptr);
+  CmiFree(ctx->req);
+  delete ctx;
+}
+
 static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
                                  CkGroupID dest_aid, CmiUInt8 dest_id,
                                  bool src_staged, size_t src_comm_offset,
@@ -1722,27 +1853,26 @@ extern "C" void* device_restage_req_bridge(void* arg)
   }
 
   if (req->inter_node) {
-    // Put with notification. The NACK already carried the receiver's registered
-    // landing buffer, so the payload goes straight there: one RDMA write from
-    // the side that already owns the source registration.
-    //
-    // CMK_DEVICE_RESTAGE_PUT marks the operation so that its completion --
-    // which a write raises on the initiator, here the sender -- is turned into
-    // a notification to the target instead of being resolved locally. Without
-    // that the receiver is never told, and the run stalls with the bytes
-    // already in place and zero load balancing steps.
-    // The NIC reads this buffer outside any CUDA stream, so the production has
-    // to be complete before the write is issued, not merely ordered behind it.
-    if (src_ready) hapiCheck(cudaEventSynchronize(src_ready));
-    else if (src_needs_full_sync) hapiCheck(cudaDeviceSynchronize());
-
-    CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler);
-    CmiNcpyBuffer src_ncpy(src_ptr, req->cnt);
-    NcpyOperationInfo* info = src_ncpy.createNcpyOpInfo(
-        src_ncpy, req->dest_ncpy, /*ackSize=*/0, NULL, NULL, /*rootNode=*/-1,
-        CMK_DEVICE_RESTAGE_PUT, NULL);
-    QdCreate(1);   // released by device_restage_put_done_bridge
-    CmiIssueRput(info);
+    // See issueDeviceRestagePut: the production has to be COMPLETE before the
+    // write is issued, not merely ordered behind it, because the NIC reads
+    // outside every stream. Observe that without stopping the PE -- enqueue the
+    // wait and issue the put from the stream's callback. hapiAddCallback holds
+    // quiescence for the whole gap, so nothing can complete out from under it.
+    if (src_ready) {
+      hapiCheck(hapiStreamWaitEvent(restageWaitStream(), src_ready, 0));
+      DeviceRestagePutCtx* ctx = new DeviceRestagePutCtx{req, src_ptr};
+      hapiAddCallback(restageWaitStream(), CkCallback(deviceRestagePutReady, ctx));
+      return NULL;  // ctx owns req until the callback issues the put
+    }
+    // No event to wait on, and the staged path means something produced these
+    // bytes on a stream this PE can no longer name -- the sender found no free
+    // IPC event slot. There is nothing to enqueue a wait against, so this one
+    // case still drains the device. It fires only under slot exhaustion; the
+    // fix for it is a free slot, not a different wait.
+    if (src_needs_full_sync) hapiCheck(cudaDeviceSynchronize());
+    // Otherwise the sender blocked at send time (CHARM_ZC_MEMCPY_SYNC, or no
+    // event was free on the unstaged path), so the bytes are already there.
+    issueDeviceRestagePut(req, src_ptr);
   } else if (hapiDevPoolOn()) {
     // +gpupool: nothing to stage into, and no need. The only same-node
     // correction left is the memcpy-chosen send whose target moved to another
