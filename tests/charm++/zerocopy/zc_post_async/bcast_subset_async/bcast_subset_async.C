@@ -96,12 +96,16 @@ class arr : public CBase_arr {
     void recv_zerocopy(int *buffer, size_t size, CkNcpyBufferPost *ncpyPost) {
       CkMatchBuffer(ncpyPost, 0, tag);
 
+      // One test of the flag, one branch each: even elements post later
+      // (immediately via a self-message when DELAYED_POST, else from
+      // postBuffers()), odd elements post right here.
+      if (evenElement) {
 #if DELAYED_POST
-      if(evenElement) // Post buffer now for delayed posting
         thisProxy[thisIndex].readyToPost();
 #endif
-      if(!evenElement)
+      } else {
         readyToPost();
+      }
     }
 
     void postBuffers() {
@@ -149,12 +153,16 @@ class grp : public CBase_grp {
       CkMatchBuffer(ncpyPost, 0, tag1);
       CkMatchBuffer(ncpyPost, 1, tag2);
 
+      // One test of the flag, one branch each: even elements post later
+      // (immediately via a self-message when DELAYED_POST, else from
+      // postBuffers()), odd elements post right here.
+      if (evenElement) {
 #if DELAYED_POST
-      if(evenElement) // Post buffer now for delayed posting
         thisProxy[thisIndex].readyToPost();
 #endif
-      if(!evenElement)
+      } else {
         readyToPost();
+      }
     }
 
     void postBuffers() {
@@ -204,12 +212,16 @@ class nodegrp : public CBase_nodegrp {
     void recv_zerocopy(int *buffer, size_t size, CkNcpyBufferPost *ncpyPost) {
       CkMatchNodeBuffer(ncpyPost, 0, tag);
 
+      // One test of the flag, one branch each: even elements post later
+      // (immediately via a self-message when DELAYED_POST, else from
+      // postBuffers()), odd elements post right here.
+      if (evenElement) {
 #if DELAYED_POST
-      if(evenElement) // Post buffer now for delayed posting
         thisProxy[thisIndex].readyToPost();
 #endif
-      if(!evenElement)
+      } else {
         readyToPost();
+      }
     }
 
     void readyToPost() {
