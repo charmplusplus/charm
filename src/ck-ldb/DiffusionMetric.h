@@ -226,6 +226,11 @@ private:
   // to them (see popBestObject); CHARM_DIFFUSION_GROW_ANY=1 lifts that.
   std::vector<std::vector<char>> nearPiece;
   bool growAnywhere;
+  // Per neighbour: no object moved to it so far had a positive-load movable
+  // local partner. Such a piece is independent (leanmd's computes, wired only
+  // to fixed cells) and may restart from an empty frontier; an exhausted
+  // connected stencil piece may not.
+  std::vector<char> independentPiece;
 
   // The inbound half of an external edge is recorded on the peer node, so a
   // locally-observed external byte stands for this many incident bytes. Exactly

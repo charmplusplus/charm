@@ -75,4 +75,11 @@ test: lbdriver
 	python3 plot_map.py lbdriver.json lbmap.html
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o lbdriver lbsim lbsim-standalone charmrun lbdriver.json lbsim.json
+	rm -f *.decl.h *.def.h conv-host *.o lbdriver lbsim lbsim-standalone reseed-test charmrun lbdriver.json lbsim.json
+
+# Pure decision-code regression tests; no Charm/LCI/GPU startup.
+reseed-test: reseed_test.C lbsim_stub.C ../../../../src/ck-ldb/DiffusionMetric.C $(SA_DEPS)
+	$(SA_CXX) $(SA_INC) -o $@ reseed_test.C lbsim_stub.C ../../../../src/ck-ldb/DiffusionMetric.C
+
+check-reseed: reseed-test
+	./reseed-test

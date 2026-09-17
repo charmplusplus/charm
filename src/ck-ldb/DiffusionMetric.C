@@ -54,6 +54,7 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize_, int nCoun
   nearPiece.assign(neighborCount, std::vector<char>(n_objs, 0));
   growAnywhere = (getenv("CHARM_DIFFUSION_GROW_ANY") != NULL);
   objCommEdges.resize(n_objs);
+  independentPiece.assign(neighborCount, 1);
   for (int edge = 0; edge < nodeStats->commData.size(); edge++)
   {
     LDCommData& commData = nodeStats->commData[edge];
@@ -96,7 +97,6 @@ MetricComm::MetricComm(BaseLB::LDStats* ns, int nodeId, int nodeSize_, int nCoun
       {
         int nborId = getNborId(toNode);
         externalbytes += commData.bytes;
-
 
         if (nborId == -1)  // could comm with node that is not a "neighbor".. ignore
           continue;
@@ -376,35 +376,32 @@ int MetricComm::popBestObject(int nbor)
     return passObject;
   };
 
-  // Once a piece is growing toward this neighbour, only objects adjacent to
-  // it may join. Selection used to take the best-scoring object that fit
-  // anywhere on the boundary when the piece's own frontier had none, which
-  // starts a second piece; under the receiver check that happened at every
-  // refused frontier object, and the lbsim cross cases came out as 12 pieces
-  // of 18 objects where one dimension gave 4 of 28. So a frontier the
-  // receiver REFUSED still ends the neighbour for the step.
+  // Connected growth is for graphs whose movable objects talk to each other:
+  // the piece stays attached to the receiver by construction. It ends
+  // STRUCTURALLY when the frontier holds no positive-load movable object --
+  // every partner of every moved object is fixed or empty -- or when the
+  // frontier is empty and nothing moved had a movable partner to begin with
+  // (an independent piece: leanmd's computes, each wired to two fixed cells
+  // and to nothing else, come out that way whether their cells are local or
+  // remote). A frontier the quota, capacity, mask, or cost refused is not a
+  // structural end and still ends the neighbour, as measured on the lbsim
+  // stencil cases (see the history of this comment).
   //
-  // A frontier that is DEAD WEIGHT does not. A piece can only grow along the
-  // comm graph, and on a graph where the heavy objects talk only to light
-  // ones the frontier of a heavy seed is a few objects that retire nothing:
-  // leanmd's computes each talk to their two cells and nothing else, and the
-  // cells carry no device load, so a piece seeded on a compute had a frontier
-  // of zero-load cells and the neighbour was done after one object with the
-  // whole excess unshed -- measured as 2 cross-node migrations a step at 1.6x
-  // device imbalance, and DiffusionLB losing to no balancing at all (285 vs
-  // 270 ms/step; 235 with the confinement lifted). When every object the
-  // frontier offers passes every filter but carries no load, start another
-  // piece the way the first one started: seeded on the boundary, so it
-  // arrives attached to the receiver.
-  //
-  // Only then. A frontier that is empty, or whose objects no longer fit the
-  // neighbour's quota, ends the neighbour as before: restarting there too
-  // was measured on the lbsim cross cases (32x32 stencil, 8 nodes, 12x host
-  // and 12x/20x device discs, 6 neighbours, no refinement) at 6 detached
-  // pieces and an edge cut of 186 where the stop gives 2 and 164 -- the
-  // restart seeds light boundary cells once the heavy ones no longer fit,
-  // one new piece each. With the dead-weight rule the stencil is unchanged
-  // and leanmd sheds its excess.
+  // At a structural end the piece has nothing to grow along, so the pick is
+  // the ordinary unconfined growth pass: every available object, ranked by
+  // the same score, no boundary requirement. Attachment is a preference the
+  // score already prices -- a compute with one cell on the receiver has a
+  // communication delta near zero, one with both cells here pays for two new
+  // cross edges -- and making it a filter starved the donors. A restart that
+  // HAD to already talk to the receiver, with no fallback, had 576 candidates
+  // on leanmd's 16x8x8 grid (the computes straddling one face, light under
+  // the density gradient, 2.3 s in all) against a 15.1 s obligation; once
+  // they went the donor got one move a round with 13-16 s owed, and a donor
+  // whose face computes sit on the far side had none at all. Measured at
+  // 1873 ms/step against 1576 unbalanced. The unconfined pass is what
+  // CHARM_DIFFUSION_GROW_ANY runs after its first move, and on leanmd it
+  // makes the same decisions: 1392 ms/step against the boundary-first
+  // restart's 1531.
   const bool pieceStarted =
       (nbor >= 0 && nbor < (int)movesTo.size()) ? (movesTo[nbor] > 0) : false;
   const bool confine =
@@ -418,11 +415,25 @@ int MetricComm::popBestObject(int nbor)
              myNodeId, nbor, nborCapacity, (int)!pieceStarted, (int)confine, bestObject,
              bestObject >= 0 ? diffusionObjLoad(nodeStats->objData[bestObject]) : 0.0,
              (int)deadFrontier);
-  if (noGo && confine && deadFrontier)
+  bool structuralEnd = confine;
+  bool frontierPresent = false;
+  if (confine)
+    for (int i = 0; i < n_objs; ++i)
+      if (objAvailable[i] && nearPiece[nbor][i]) {
+        frontierPresent = true;
+        if (nodeStats->objData[i].migratable &&
+            diffusionObjLoad(nodeStats->objData[i]) > 0.0)
+          structuralEnd = false;
+      }
+  const bool mayReseed = structuralEnd &&
+      (frontierPresent || (costCfg != NULL && independentPiece[nbor]));
+  if (noGo && mayReseed)
   {
-    bestObject = pass(true, false, deadFrontier);
-    if (_lb_args.debug() > 2)
-      CkPrintf("[PICK node %d] nbor %d restart -> obj %d\n", myNodeId, nbor, bestObject);
+    bestObject = pass(false, false, deadFrontier);
+    if (_lb_args.debug() > 1)
+      CkPrintf("[RESEED node %d] nbor %d reason=%s -> obj %d score %.6f\n",
+               myNodeId, nbor, frontierPresent ? "fixed-or-zero-frontier" : "independent-empty-frontier",
+               bestObject, bestObject >= 0 ? bestScore : 0.0);
   }
 
   // A move that does not pay for itself is not made, even with quota left. An
@@ -470,6 +481,10 @@ void MetricComm::updateState(int objId, int destNbor)
   if (destNbor >= 0 && destNbor < (int)movesTo.size()) movesTo[destNbor]++;
   if(objId<0 || objId>=n_objs)
     return;
+  for (const CommEdge& edge : objCommEdges[objId])
+    if (nodeStats->objData[edge.obj].migratable &&
+        diffusionObjLoad(nodeStats->objData[edge.obj]) > 0.0)
+      independentPiece[destNbor] = 0;
   // Every local edge incident to the departing object stops being local for the
   // partner that stays: it now runs between that partner and destNbor. Both
   // sides of the ledger move together, and both dimensions move with them, so
