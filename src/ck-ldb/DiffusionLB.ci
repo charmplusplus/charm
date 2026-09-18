@@ -124,6 +124,14 @@ module DiffusionLB
     // Local hand-off from pseudoConvergeResult into the SDAG round loop.
     entry[expedited] void pseudoVerdict(double maxRatio);
     entry[expedited] void pseudoMetricContribute(double metric);
+    // One collective before the rounds: PE 0 counts one load per node and hands
+    // the job-wide mean back to each of them. The decision floor in
+    // diffusionRoundFlows is held against that mean once a node's own
+    // neighbourhood looks flat, which is what lets a plan cross a gradient
+    // whose per-hop slope is under the floor. Same shape as the convergence
+    // check above -- numNodes expedited messages in, numNodes out, once a step.
+    entry[expedited] void pseudoLoadContribute(double load);
+    entry[expedited] void pseudoLoadVerdict(double avgLoad);
     // pseudoDone / pseudolb_barrier removed with the global convergence check;
     // see the note in the pseudolb_rounds loop below.
     // entry void CallResumeClients();
@@ -193,6 +201,23 @@ module DiffusionLB
         pseudo_converged = false;
         prev_pseudo_load = my_load;
         isPseudoRoot = (CkMyPe() == rank0PE);
+        pseudoGlobalAvg = 0.0;
+      }
+
+      // The job-wide mean node load, before the first round plans anything.
+      // Gathered here rather than folded into the per-round convergence check
+      // because the rounds often converge on the first one -- a step whose
+      // plan is entirely zero never changes my_pseudo_load, so the metric is 0
+      // and the loop leaves immediately -- and a mean that only arrived in
+      // round 1 would never be consulted on exactly the steps that need it.
+      serial "Global mean load report"
+      {
+        thisProxy[0].pseudoLoadContribute(isPseudoRoot ? my_load : -1.0);
+      }
+
+      when pseudoLoadVerdict(double avgLoad) serial "Global mean load verdict"
+      {
+        pseudoGlobalAvg = avgLoad;
       }
 
       // Rounds stop when diffusion has nothing left worth moving, rather than

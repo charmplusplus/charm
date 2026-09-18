@@ -19,6 +19,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <limits>
 
 #include "ck.h"
@@ -199,6 +201,10 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   withinNbrDoneCount = 0;
   pseudoContribCount = 0;
   pseudoMaxMetric = 0.0;
+  pseudoLoadCount = 0;
+  pseudoLoadValid = 0;
+  pseudoLoadSum = 0.0;
+  pseudoGlobalAvg = 0.0;
   effMinImbalance = _lb_args.diffusionMinImbalance();
   keyed1D = false;
   myKeyLo = myKeyHi = 0.0;
@@ -320,6 +326,10 @@ void DiffusionLB::Strategy(const DistBaseLB::LDStats* const stats)
   withinNbrDoneCount = 0;
   pseudoContribCount = 0;
   pseudoMaxMetric = 0.0;
+  pseudoLoadCount = 0;
+  pseudoLoadValid = 0;
+  pseudoLoadSum = 0.0;
+  pseudoGlobalAvg = 0.0;
   rank0_barrier_counter = 0;
   pseudo_done = true;
 

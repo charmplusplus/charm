@@ -24,11 +24,14 @@
 //     loadGain   vs   migrateCost/K + commDelta
 //
 // Note where the horizon sits. commDelta needs no multiplier: LBDatabase::Send
-// records communication only while instrumentation is on (LBDatabase.C:134), the
-// same window that bounds the load measurement, so both figures already cover
-// exactly one balancer interval and are directly comparable. It is the one-off
-// migration cost that must be amortised, over however many intervals the
-// placement is expected to survive.
+// records object communication only while its measurement window is open,
+// including the per-object joinedStep gate under async LB. Load and traffic
+// therefore describe the same sampled work. An async sample can be shorter
+// than a full balancer period; without an explicit sampling fraction the
+// one-off migration charge below is conservative for such a sample. Do not
+// infer that fraction from wall time (which also includes waiting), or rescale
+// GPU load alone. A full-period prediction needs a common horizon for both
+// load and traffic and the corresponding placement lifetime.
 
 #include "lbdb.h"
 

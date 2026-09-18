@@ -109,6 +109,10 @@ inline bool diffusionShouldRemap(const DiffusionPlanSummary& s, double remapAbov
 //                    without which pseudo load cannot pass through a node
 //                    beyond that node's own load and the plan stalls short of
 //                    balance on any graph deeper than one hop.
+//   globalAvgLoad    the mean node load over the whole job, or <= 0 when the
+//                    caller has no global figure. What the floor is held
+//                    against once a node's own neighbourhood looks flat; see
+//                    the note at the floor below.
 //
 // The caller commits: toSendLoad += thisRoundToSend, prevRoundToSend =
 // thisRoundToSend, my_pseudo_load -= sum, and tells each neighbour its share.
@@ -119,7 +123,7 @@ inline void diffusionRoundFlows(double my_load, double my_pseudo_load,
                                 const std::vector<double>& toSendLoad,
                                 const std::vector<double>& prevRoundToSend,
                                 std::vector<double>& thisRoundToSend,
-                                bool relayHoldings = false)
+                                bool relayHoldings = false, double globalAvgLoad = 0.0)
 {
   const int neighborCount = (int)loadNeighbors.size();
   thisRoundToSend.assign(neighborCount, 0.0);
@@ -191,9 +195,41 @@ inline void diffusionRoundFlows(double my_load, double my_pseudo_load,
   double myOverload = my_pseudo_load - currAverage;
 
   // Don't bother balancing if my overload is insignificant.
+  //
+  // "Insignificant" was a purely local question -- is my neighbourhood flat? --
+  // and on a graph carrying a global gradient every node answers yes while the
+  // system is nowhere near balanced. A ramp's per-hop slope sits under the
+  // floor: leanmd at N=2 plateaued at max/avg 1.25 this way (job 22137894),
+  // node 6 holding 20.88 against neighbours at 17.43 and 18.18, overload
+  // 1.7243 just under a threshold of 1.7804, so the plan was zero at a declared
+  // spread of 13.40..21.16.
+  //
+  // The floor exists to keep step-to-step noise from moving work (the 1-2%
+  // floors it replaced diffused a uniform workload every step and never
+  // settled, commit 402913794). Noise is what a node's distance from the
+  // GLOBAL average measures, and that average is the balanced state every node
+  // is heading for. So keep the zero only while this node is within the floor
+  // of it; a node above it keeps shovelling however flat its own neighbourhood
+  // looks, and the fixed point becomes max/avg <= 1 + effMinImbalance across
+  // the job rather than between each pair of neighbours. A caller with no
+  // global figure (globalAvgLoad <= 0) keeps the old local rule.
+  //
+  // What such a node ships is bounded by how far above the global target it
+  // actually is, not by the local difference alone. That bound is what keeps
+  // the noise case quiet: a node a hair over the line has almost nothing to
+  // give and plans almost nothing, while a node on a real ramp is far over and
+  // ships its whole local overload. Both stop at the same fixed point, every
+  // node within the floor of the mean.
+  //
+  // How far this node is over the job-wide target, which is the mean plus the
+  // same floor. Positive means the node is one of the ones that has to give,
+  // whatever its own neighbourhood looks like; it is also the cap on what the
+  // exception below lets it plan.
+  const double aboveGlobal =
+      (globalAvgLoad > 0.0) ? my_pseudo_load - globalAvgLoad * (1.0 + effMinImbalance) : 0.0;
   if (myOverload < threshold)
   {
-    myOverload = 0;
+    myOverload = (aboveGlobal > 0.0) ? std::min(myOverload, aboveGlobal) : 0.0;
   }
 
   // adjust my overload for what I've already sent out
@@ -250,8 +286,14 @@ inline void diffusionRoundFlows(double my_load, double my_pseudo_load,
     double toSend = idealSend[id] * scaleFactor;
 
     // Only actually send if the amount is significant (exceeds threshold)
-    // This prevents tiny transfers that have high overhead relative to benefit
-    if (toSend < threshold)
+    // This prevents tiny transfers that have high overhead relative to benefit.
+    // The same exception as the overload floor above, and for the same reason:
+    // a node over the job-wide target plans under the local floor, because the
+    // hop it needs is small precisely when its neighbours are nearly as loaded
+    // as it is -- a ramp's next step down. It cannot run away with this: what
+    // it plans in total is already capped at aboveGlobal, so a node a hair over
+    // the target plans a hair, and one on a real ramp plans the hop.
+    if (toSend < threshold && aboveGlobal <= 0.0)
     {
       toSend = 0;
     }
@@ -297,8 +339,14 @@ inline void diffusionRoundFlows(double my_load, double my_pseudo_load,
 
     // Momentum may sustain or accelerate a flow, never reverse it: a negative send
     // would mean pulling load back, which this protocol's accounting (alreadySent
-    // sums only positive entries) does not model.
-    if (flow < threshold)
+    // sums only positive entries) does not model. The third and last place the
+    // floor applies, gated like the other two: a node over the job-wide target
+    // keeps the flow the passes above sized for it.
+    if (flow < threshold && aboveGlobal <= 0.0)
+    {
+      flow = 0.0;
+    }
+    if (flow < 0.0)
     {
       flow = 0.0;
     }

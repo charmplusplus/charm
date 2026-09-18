@@ -7,6 +7,8 @@
   On completion, waits for QD then calls WITHINNODELB.
 */
 
+#include <cstdlib>
+#include <cstring>
 #include "DiffusionJSON.h"
 #include "DiffusionSelect.h"
 void DiffusionLB::AcrossNodeLB()
@@ -51,24 +53,57 @@ void DiffusionLB::AcrossNodeLB()
   loadReceivers = std::count_if(toSendLoad.begin(), toSendLoad.end(),
                                 [](double load) { return load > 0; });
 
-  // Shed the EXCESS, not everything. my_loadAfterTransfer was initialised in
-  // BuildStats to this node's TOTAL load, so the loop below ran until the
-  // neighbours ran out of capacity rather than until this node reached its
-  // fair share -- a node would hand over nearly everything it held, one object
-  // at a time. The per-neighbour quotas in toSendLoad cap each RECIPIENT, but
-  // nothing capped the donor, which is why object counts per PE still spread
-  // 1..89 even once the geometry was constrained.
+  // Shed what the PLAN routes out of this node. The pseudo rounds have already
+  // diffused the load numerically, and on a graph deeper than one hop their
+  // plan routes load THROUGH nodes that are themselves below the mean: the
+  // per-neighbour quotas say exactly what each relay must pass on, out of what
+  // it holds (diffusionRoundFlows plans within holdings, so every quota is
+  // executable in one step). The budget used to be this node's own excess over
+  // the neighbourhood mean, zeroed within the floor -- added when the donor was
+  // uncapped and shed everything it held (my_loadAfterTransfer started at the
+  // TOTAL load). That capped the donor, but it also zeroed every relay: on
+  // leanmd's 16x8x8 grid over 8 processes the density ramp runs monotone round
+  // the ring, every interior process sits at its neighbours' mean, and
+  // processes 0-4 made 0 moves in round 1 against planned outflows of 1.4-9 s.
+  // Load crossed one hop per LB step, max/avg went 1.88, 1.56, 1.31, 1.24 over
+  // four steps where the 4-process ring converges in one, and the step time
+  // was 1442 ms against 990 at one node for the same work per process.
+  //
+  // The quotas cap the donor now, a node cannot send more than it holds, and
+  // the plan's own floor (effMinImbalance inside the rounds) is the floor.
+  // What this costs on a stencil, lbsim 32x32 over 8 nodes with a 12x hot
+  // disc: the plan budget reaches 1.03 in two steps where the excess budget is
+  // at 1.41 and ends at 1.15 after four, for 1.4x the moves, a worse cut (250
+  // against 163) and more detached pieces (10 against 2). A scratch-remap
+  // beats both there (1.02, cut -16%, 0 pieces; +LBDiffusionRemapAbove), so
+  // that stays the tool for deep plans on a stencil; leanmd's remap is a
+  // MetisLB its cut gate refuses. CHARM_DIFFUSION_SHED=excess restores the
+  // excess rule.
   {
     const double fair = avgNborLoad();
     const double excess = my_load - fair;
-    my_loadAfterTransfer = (excess > 0.0) ? excess : 0.0;
-    // The floor: an excess under effMinImbalance of the neighbourhood mean is
-    // noise.
-    if (my_load <= fair * (1.0 + effMinImbalance))
-      my_loadAfterTransfer = 0.0;
+    double planOut = 0.0, planIn = 0.0;
+    for (double q : toSendLoad)
+    {
+      if (q > 0.0) planOut += q;
+      else planIn -= q;
+    }
+    static const bool shedExcess = []() {
+      const char* v = getenv("CHARM_DIFFUSION_SHED");
+      return v != NULL && strcmp(v, "excess") == 0;
+    }();
+    if (shedExcess)
+    {
+      my_loadAfterTransfer = (excess > 0.0) ? excess : 0.0;
+      if (my_load <= fair * (1.0 + effMinImbalance)) my_loadAfterTransfer = 0.0;
+    }
+    else
+      my_loadAfterTransfer = (planOut < my_load) ? planOut : my_load;
     if (_lb_args.debug() > 1)
-      CkPrintf("[node %d] AcrossNodeLB: my_load=%f fair=%f shedding=%f (floor %.3f)\n",
-               myNodeId, my_load, fair, my_loadAfterTransfer, effMinImbalance);
+      CkPrintf("[node %d] AcrossNodeLB: my_load=%f fair=%f shedding=%f (floor %.3f) "
+               "plan out=%f in=%f excess=%f rule=%s\n",
+               myNodeId, my_load, fair, my_loadAfterTransfer, effMinImbalance, planOut,
+               planIn, excess, shedExcess ? "excess" : "plan");
 
     // The receiver check in the dimension NOT being diffused (DiffusionMetric.h).
     // Both terms are read as seconds of step time. The step the plan brings

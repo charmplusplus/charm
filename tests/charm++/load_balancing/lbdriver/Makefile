@@ -75,7 +75,7 @@ test: lbdriver
 	python3 plot_map.py lbdriver.json lbmap.html
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o lbdriver lbsim lbsim-standalone reseed-test charmrun lbdriver.json lbsim.json
+	rm -f *.decl.h *.def.h conv-host *.o lbdriver lbsim lbsim-standalone reseed-test ringflow-test comm-window-test charmrun lbdriver.json lbsim.json
 
 # Pure decision-code regression tests; no Charm/LCI/GPU startup.
 reseed-test: reseed_test.C lbsim_stub.C ../../../../src/ck-ldb/DiffusionMetric.C $(SA_DEPS)
@@ -83,3 +83,21 @@ reseed-test: reseed_test.C lbsim_stub.C ../../../../src/ck-ldb/DiffusionMetric.C
 
 check-reseed: reseed-test
 	./reseed-test
+
+ringflow-test: ringflow_test.C $(SA_DEPS)
+	$(SA_CXX) $(SA_INC) -o $@ ringflow_test.C
+
+check-ringflow: ringflow-test
+	./ringflow-test
+
+COMM_WINDOW_SRC = comm_window_test.C lbsim_stub.C ../../../../src/ck-ldb/LBDatabase.C \
+	../../../../src/ck-ldb/LBObj.C ../../../../src/ck-ldb/LBComm.C ../../../../src/ck-ldb/LBMachineUtil.C
+comm-window-test: $(COMM_WINDOW_SRC) ../../../../src/ck-ldb/LBDatabase.h \
+	../../../../src/ck-ldb/LBObj.h ../../../../src/ck-ldb/LBComm.h
+	$(SA_CXX) $(SA_INC) -I../../../../src/ck-core -ffunction-sections -fdata-sections \
+		-Wl,--gc-sections -o $@ $(COMM_WINDOW_SRC)
+
+check-comm-window: comm-window-test
+	./comm-window-test
+
+.PHONY: check-comm-window

@@ -138,6 +138,11 @@ void LBDatabase::Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned
     if (activeRec) {
       const LDObjHandle &runObj = activeRec->getLdHandle();
 
+      // Async objects keep sending after their compute measurement closes.
+      // Use that same per-object window for traffic, including force=1 array
+      // sends: force bypasses the PE-wide switch, not the object's epoch.
+      if (LbObj(runObj)->hasJoinedStep()) return;
+
       // Don't record self-messages from an object to an object
       if (runObj.omhandle.id == destOM.id
           && runObj.id == destID )
@@ -166,6 +171,8 @@ void LBDatabase::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destIDs, int 
     auto *activeRec = CkActiveLocRec();
     if (activeRec) {
       const LDObjHandle &runObj = activeRec->getLdHandle();
+
+      if (LbObj(runObj)->hasJoinedStep()) return;
 
       LBCommData item(runObj, destOM.id, destIDs, nDests);
       item_ptr = commTable->HashInsertUnique(item);

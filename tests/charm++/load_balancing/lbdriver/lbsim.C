@@ -65,8 +65,12 @@
  *                      and smooth, migrate once (see the route section)
  *   LBSIM_MODE=remap   scratch-remap: METIS on the current weights, relabel
  *                      parts to the owners they overlap most, migrate once
- *   LBSIM_SHED=plan    across-node phase sheds the plan's outflow, not the
- *                      node's own excess
+ *   LBSIM_SHED=excess  across-node phase sheds the node's own excess over the
+ *                      neighbourhood mean (the chare's former rule) instead of
+ *                      the plan's outflow (its rule now, CHARM_DIFFUSION_SHED);
+ *                      =plan is the outflow rule with the fine per-edge floor
+ *                      (LBSIM_LOCAL_FLOOR) in the rounds, which the chare does
+ *                      not do -- it plans at its own floor
  *   LBSIM_PEEL=layers  chunks grow by layers from the destination boundary
  *   LBSIM_REFINE=1     heal detached pieces and smooth boundaries after the
  *                      balancer's own moves
@@ -76,6 +80,14 @@
  *                      hand the step to scratch-remap when the one-hop plan
  *                      leaves max/avg above this; the same decision function
  *   LBSIM_REFINE_PASSES, LBSIM_PATIENCE, LBSIM_TRACE   tuning and tracing
+ *   LBSIM_RAMP=<factor>
+ *                      weights rise linearly in x from 1 to <factor> instead
+ *                      of the hot disc -- leanmd's shape, and the one whose
+ *                      per-hop slope sits under the decision floor
+ *   LBSIM_GLOBAL_FLOOR=0
+ *                      withhold the job-wide mean load from the rounds, so the
+ *                      floor is the purely local one the chare used before
+ *                      (mirrors CHARM_DIFFUSION_GLOBAL_FLOOR=0)
  *   LBSIM_VECTOR=host|device|cross
  *                      a second load dimension per object (device time beside
  *                      host time; see Grid::weightsVector). The step then
@@ -151,8 +163,29 @@ struct Grid
     w.assign(n(), kBaseWork);
   }
 
+  // A linear ramp in x instead of the disc, when LBSIM_RAMP is set: weight
+  // 1 at i=0 rising to the factor at i=nx-1. This is leanmd's shape -- an
+  // x-slab decomposition under a density gradient linear in the x fraction --
+  // and the case the local decision floor could not cross: every node's slab
+  // is only a little heavier than the slab beside it while the ends of the
+  // ramp differ by the whole factor.
+  void weightsRamp(double factor)
+  {
+    w.resize(n());
+    const double span = (nx > 1) ? (double)(nx - 1) : 1.0;
+    for (int i = 0; i < nx; i++)
+      for (int j = 0; j < ny; j++)
+        w[at(i, j)] = kBaseWork * (1.0 + (factor - 1.0) * (double)i / span);
+  }
+
   void weightsHotSpot()
   {
+    const char* rampEnv = getenv("LBSIM_RAMP");
+    if (rampEnv != NULL && atof(rampEnv) > 1.0)
+    {
+      weightsRamp(atof(rampEnv));
+      return;
+    }
     w.resize(n());
     const double cx = nx * 0.30, cy = ny * 0.30;
     const double radius = 0.22 * (nx < ny ? nx : ny);
@@ -498,6 +531,22 @@ static int pseudoRounds(std::vector<VNode>& nodes, double effMinImbalance, bool 
     n.prev_pseudo_load = n.my_load;
   }
 
+  // The chare gathers this in one collective before the rounds
+  // (pseudoLoadContribute); here every node's load is already in hand. It is
+  // what the decision floor is held against once a node's own neighbourhood
+  // looks flat -- see the floor note in DiffusionFlow.h. LBSIM_GLOBAL_FLOOR=0
+  // withholds it, mirroring CHARM_DIFFUSION_GLOBAL_FLOOR=0.
+  double globalAvgLoad = 0.0;
+  {
+    const char* v = getenv("LBSIM_GLOBAL_FLOOR");
+    if ((v == NULL || strcmp(v, "0") != 0) && !nodes.empty())
+    {
+      double sum = 0.0;
+      for (const VNode& n : nodes) sum += n.my_load;
+      globalAvgLoad = sum / nodes.size();
+    }
+  }
+
   int itr = 0;
   bool converged = false;
   std::vector<std::vector<double>> flows(nodes.size());
@@ -518,7 +567,8 @@ static int pseudoRounds(std::vector<VNode>& nodes, double effMinImbalance, bool 
     {
       flowAdjacency(n, nodes, adj);
       diffusionRoundFlows(n.my_load, n.my_pseudo_load, effMinImbalance, beta, n.loadNeighbors,
-                          adj, n.toSendLoad, n.prevRoundToSend, flows[n.id], relayHoldings);
+                          adj, n.toSendLoad, n.prevRoundToSend, flows[n.id], relayHoldings,
+                          globalAvgLoad);
     }
 
     if (router == NULL)
@@ -800,25 +850,28 @@ static void acrossNode(std::vector<VNode>& nodes, const DiffusionCostConfig& cos
     // This node's side, for what each of its objects is worth (DiffusionLoad.h).
     diffusionNodeDeviceBound = (n.devSum >= n.hostSum) ? 1 : 0;
 
-    // Shed the EXCESS over the neighbourhood mean, and nothing under the floor.
+    // The chare's budget (DiffusionCore.C): the plan's gross outflow on this
+    // node's positive-quota edges, capped at what it holds, so a node the plan
+    // uses as a relay forwards what the plan routes through it. LBSIM_SHED=excess
+    // is the former rule -- the node's own excess over the neighbourhood mean,
+    // zeroed within the floor -- kept so the two can be compared: on the 32x32
+    // hot disc over 8 nodes the plan budget reaches 1.03 in two steps for 1.4x
+    // the moves, cut 250 against 163 and 10 detached pieces against 2.
     double fair = 0.0;
     for (double l : n.loadNeighbors) fair += l;
     fair /= nc;
     const double excess = n.my_load - fair;
-    double remaining = (excess > 0.0) ? excess : 0.0;
-    if (n.my_load <= fair * (1.0 + effMinImbalance)) remaining = 0.0;
-
-    // Experiment knob, simulator only. LBSIM_SHED=plan sheds the pseudo plan's
-    // gross outflow on this node's positive-quota edges instead of the node's
-    // own excess: a node the plan uses as a relay then forwards what the plan
-    // routes through it (from what it holds now), rather than only its own
-    // surplus. The chare does not have this; it is here to measure the
-    // difference before deciding whether it should.
     double planOut = 0.0, planIn = 0.0;
     for (double q : n.toSendLoad)
       if (q > 0) planOut += q; else planIn -= q;
     const char* shedMode = getenv("LBSIM_SHED");
-    if (shedMode != NULL && strcmp(shedMode, "plan") == 0)
+    double remaining;
+    if (shedMode != NULL && strcmp(shedMode, "excess") == 0)
+    {
+      remaining = (excess > 0.0) ? excess : 0.0;
+      if (n.my_load <= fair * (1.0 + effMinImbalance)) remaining = 0.0;
+    }
+    else
       remaining = (planOut < n.my_load) ? planOut : n.my_load;
     if (_lb_args.debug() > 1)
       CkPrintf("[node %d] load %.0f nbr-mean %.0f excess %.0f | plan out %.0f in %.0f"
@@ -1800,10 +1853,11 @@ static void lbsimRun(int argc, char** argv)
       else
       {
         StepStats ss;
-        // LBSIM_SHED=plan uses the fine per-edge floor; the plan must NOT
-        // relay, since a node executing it physically can only hand over what
-        // it holds (a relaying plan executed this way empties nodes into their
-        // neighbours: measured 8.6x). The balancer's own execution keeps its floor.
+        // LBSIM_SHED=plan plans at the fine per-edge floor; unset mirrors the
+        // chare, which plans at effMinImbalance. Either way the plan must NOT
+        // relay receipts, since a node executing it physically can only hand
+        // over what it holds (a plan that relays receipts, executed this way,
+        // empties nodes into their neighbours: measured 8.6x).
         const char* shedEnv = getenv("LBSIM_SHED");
         const bool planShed = (shedEnv != NULL && strcmp(shedEnv, "plan") == 0);
         ss.rounds = pseudoRounds(nodes, planShed ? localFloor : effMinImbalance, false);

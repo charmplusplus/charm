@@ -59,6 +59,7 @@ public:
   void pseudoVerdictRoot(double maxRatio);
   void pseudoConvergeResult(PseudoRoundMsg* m);
   void pseudoMetricContribute(double metric);
+  void pseudoLoadContribute(double load);
   DiffusionLB_SDAG_CODE DiffusionLB(const CkLBOptions&);
   DiffusionLB(CkMigrateMessage* m);
   ~DiffusionLB();
@@ -359,6 +360,15 @@ private:
   // expedited messages into PE 0 and out again cost nothing at this width.
   int pseudoContribCount;
   double pseudoMaxMetric;
+  // One collective before the rounds: the mean node load over the job, which
+  // is what the decision floor is held against once a node's own neighbourhood
+  // looks flat (DiffusionFlow.h). Counted on PE 0 the same way as the
+  // convergence metric, one expedited message each way. Zero means "not known
+  // this step", which leaves the planner on its old purely local rule.
+  int pseudoLoadCount;
+  int pseudoLoadValid;
+  double pseudoLoadSum;
+  double pseudoGlobalAvg;
   // Only one PE per node drives diffusion; the rest join the convergence
   // reduction with a neutral value so the collective is over the whole group.
   bool isPseudoRoot;

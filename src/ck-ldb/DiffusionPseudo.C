@@ -173,10 +173,19 @@ void DiffusionLB::PseudoLoadBalancing()
   // receiver check at selection (DiffusionMetric::slackFits) is where a
   // neighbour's room in the other dimension is enforced.
 
+  // The job-wide mean, gathered once before the rounds, is what keeps the floor
+  // from stopping a plan that has to cross a gradient. CHARM_DIFFUSION_GLOBAL_FLOOR=0
+  // withholds it and restores the purely local floor, for an A/B on one binary.
+  static const bool globalFloor = []() {
+    const char* v = getenv("CHARM_DIFFUSION_GLOBAL_FLOOR");
+    return v == NULL || strcmp(v, "0") != 0;
+  }();
+  const double globalAvg = globalFloor ? pseudoGlobalAvg : 0.0;
+
   std::vector<double> thisRoundToSend;
   diffusionRoundFlows(my_load, my_pseudo_load, effMinImbalance, _lb_args.diffusionBeta(),
                       loadNeighbors, flowAdjacent, toSendLoad, prevRoundToSend,
-                      thisRoundToSend);
+                      thisRoundToSend, false, globalAvg);
 
   // Commit: record the flow for next round's momentum, charge it against this
   // node's notional load, and tell each neighbour what it is receiving. Exactly one
@@ -237,6 +246,27 @@ void DiffusionLB::pseudoConvergeResult(PseudoRoundMsg* m)
 // verdict, handed straight back to each of them. A member contributes to
 // round k+1 only after it has this verdict for round k, so the count can never
 // mix rounds.
+// PE 0, once per step: one report per node, the mean handed back to each of
+// them. A node that is not driving diffusion reports a negative load and is
+// counted but not averaged, so the collective is over the whole section however
+// it was built. The mean is what the decision floor is held against in
+// diffusionRoundFlows: without it a gradient whose per-hop slope sits under the
+// floor plans nothing at any node, however far from balance the job is.
+void DiffusionLB::pseudoLoadContribute(double load)
+{
+  if (load >= 0.0)
+  {
+    pseudoLoadSum += load;
+    pseudoLoadValid++;
+  }
+  if (++pseudoLoadCount < numNodes) return;
+  const double avg = (pseudoLoadValid > 0) ? pseudoLoadSum / pseudoLoadValid : 0.0;
+  pseudoLoadCount = 0;
+  pseudoLoadValid = 0;
+  pseudoLoadSum = 0.0;
+  for (int i = 0; i < numNodes; i++) thisProxy[i * nodeSize].pseudoLoadVerdict(avg);
+}
+
 void DiffusionLB::pseudoMetricContribute(double metric)
 {
   if (metric > pseudoMaxMetric) pseudoMaxMetric = metric;
