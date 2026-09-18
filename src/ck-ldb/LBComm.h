@@ -8,6 +8,7 @@
 
 #include "converse.h"
 #include "lbdb.h"
+#include <functional>
 
 class LBObj; //Forward declaration
 
@@ -111,6 +112,11 @@ public:
   LBCommData* HashSearch(const LBCommData &data);
   int CommCount() { return in_use; };
   void GetCommData(LDCommData* data);
+  // Each record's bytes and messages multiplied by senderScale(sender), the
+  // sampling factor of the object that sent them (LBDatabase::GetCommData);
+  // records from a process rather than an object are handed out as recorded.
+  void GetCommData(LDCommData* data,
+                   const std::function<double(const LDObjHandle&)>& senderScale);
   void GetCommInfo(int& bytes, int& msgs, int& withinpebytes,
       int& outsidepebytes, int& num_nghbor, int& hops, int& hopbytes);
 	

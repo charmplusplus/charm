@@ -35,6 +35,10 @@ void LBObj::Clear(void)
 #endif
   data.prevPe = -1;
   data.prevStep = -1;
+  data.windowTime = 0.;
+  windowOpenedAt = joinedStep ? -1.0 : CkWallTimer();
+  activeSince = -1.0;
+  closedAt = -1.0;
 
   startWTime = -1.0;
   lastWallTime = .0;

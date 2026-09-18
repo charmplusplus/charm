@@ -25,13 +25,15 @@
 //
 // Note where the horizon sits. commDelta needs no multiplier: LBDatabase::Send
 // records object communication only while its measurement window is open,
-// including the per-object joinedStep gate under async LB. Load and traffic
-// therefore describe the same sampled work. An async sample can be shorter
-// than a full balancer period; without an explicit sampling fraction the
-// one-off migration charge below is conservative for such a sample. Do not
-// infer that fraction from wall time (which also includes waiting), or rescale
-// GPU load alone. A full-period prediction needs a common horizon for both
-// load and traffic and the corresponding placement lifetime.
+// including the per-object joinedStep gate under async LB, so load and traffic
+// describe the same sampled work. That sample can be shorter than the balancer
+// period -- under +LBAsync the window opens only once every migration has
+// landed -- and the database scales both load and traffic to the full interval
+// by the same per-object factor before any strategy sees them
+// (LBDatabase::GetObjData, GetCommData; the fraction rides along as
+// LDObjData::windowTime). So the quantities here are full-interval rates, the
+// migration charge is amortised over whole intervals, and the horizon is
+// common to both sides of the comparison.
 
 #include "lbdb.h"
 

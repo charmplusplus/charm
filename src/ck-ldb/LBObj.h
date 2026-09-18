@@ -35,6 +35,20 @@ public:
 
   void Clear(void);
   bool joinedStep = false;
+  // When this object's measurement window last opened, or -1 while it is
+  // closed. Its open time accumulates into data.windowTime (see there).
+  double windowOpenedAt = -1.0;
+  // The span this interval's load is extrapolated over: from the object's
+  // first activity after ClearLoads (activeSince, set by StartTimer) to its
+  // join (closedAt), or to now while it is still open. Under +LBAsync an
+  // object keeps computing through the lag with its window closed, so the
+  // span is the whole interval and the window a fraction of it; under the
+  // barrier it joins and then waits idle, so span and window coincide and
+  // nothing is scaled. Wall time since ClearLoads would count that idle wait
+  // as unmeasured work and inflate exactly the light objects (leanmd sync
+  // 903 -> 994 ms/step, job 22173198).
+  double activeSince = -1.0;
+  double closedAt = -1.0;
 
   void IncrementTime(LBRealType walltime, LBRealType cputime);
   void IncrementGPUTime(LBRealType walltime);
@@ -49,8 +63,49 @@ public:
   //
   // Per object, deliberately: the PE-wide switch stops measuring elements that
   // have NOT joined yet, which biases the late ones the other way.
-  inline void setJoinedStep(bool v) { joinedStep = v; }
+  inline void setJoinedStep(bool v) {
+    if (v && !joinedStep) {            // closing: bank the time it was open
+      const double now = CkWallTimer();
+      if (windowOpenedAt >= 0.0) data.windowTime += now - windowOpenedAt;
+      windowOpenedAt = -1.0;
+      closedAt = now;
+    } else if (!v && joinedStep) {     // opening
+      windowOpenedAt = CkWallTimer();
+      closedAt = -1.0;
+    }
+    joinedStep = v;
+  }
   inline bool hasJoinedStep(void) const { return joinedStep; }
+  // The window time so far this interval, the open tail included.
+  inline double windowTime() const {
+    return data.windowTime + (windowOpenedAt >= 0.0 ? CkWallTimer() - windowOpenedAt : 0.0);
+  }
+  // A new interval starts: nothing banked, and a window that is open restarts
+  // its clock here, where the interval's own clock restarts (ClearLoads).
+  inline void clearWindow(double now) {
+    data.windowTime = 0.0;
+    if (windowOpenedAt >= 0.0) windowOpenedAt = now;
+    activeSince = -1.0;
+    closedAt = -1.0;
+  }
+  // The span this interval's sample stands for; see activeSince.
+  inline double activeSpan() const {
+    if (activeSince < 0.0) return 0.0;
+    const double end = closedAt >= 0.0 ? closedAt : CkWallTimer();
+    return end > activeSince ? end - activeSince : 0.0;
+  }
+  // activeSpan / window: the factor that turns this object's sampled load and
+  // traffic into a rate over the time it was actually active. 1 when the
+  // window covers the span; capped, since a window seen for a tenth of the
+  // span supports no finer an extrapolation than that.
+  static constexpr double kMaxSampleScale = 10.0;
+  inline double sampleScale() const {
+    const double w = windowTime();
+    const double span = activeSpan();
+    if (w <= 0.0 || span <= w) return 1.0;
+    const double f = span / w;
+    return f > kMaxSampleScale ? kMaxSampleScale : f;
+  }
 
   // The application declared this object's device load for the current
   // interval (EstObjGPULoad), so the CUPTI attribution must not replace it.
@@ -66,6 +121,7 @@ public:
 
   inline void StartTimer(void) {
     startWTime = CkWallTimer();
+    if (activeSince < 0.0) activeSince = startWTime;   // first activity this interval
 #if CMK_LB_CPUTIMER
     startCTime = CkCpuTimer();
 #endif

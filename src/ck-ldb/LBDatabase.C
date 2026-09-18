@@ -198,21 +198,78 @@ int LBDatabase::GetObjDataSz()
   return nitems;
 }
 
+// The interval a strategy holds these loads against (LBLoadDim.h, the
+// Diffusion cost model) is the wall time since ClearLoads. Under +LBAsync an
+// object is measured over less of it: from its reopen once every migration
+// has landed until its own join -- at leanmd's lag of 16 steps in a 20-step
+// period, 20% of the interval; at sph2d's 800 in 2000, 60%, and 20% of the
+// first Diffusion interval after Metis -- while it keeps computing through the
+// lag. Held against the interval unscaled, such a load read the device as
+// half busy when it was 85% busy, the criticality verdict flipped run to run,
+// and the cost model undercharged every load gain by the same factor. The
+// window itself stays as it is -- an object's rate depends on the device it
+// runs on, so the transition must not be measured -- and the loads leave here
+// scaled to the span the object was active (LBObj::activeSpan), traffic
+// (GetCommData) by the same factor per sender, so load and traffic keep a
+// common horizon. Under the barrier the span is the window itself and nothing
+// changes. A load the application declared per interval (EstObjGPULoad) is
+// already a full-interval figure and is left alone.
 void LBDatabase::GetObjData(LDObjData *dp)
 {
-  if (_lb_args.migObjOnly()) {
-    for (int i = 0; i < objs.size(); i++) {
-      LBObj* obj = objs[i].obj;
-      if (obj && obj->data.migratable)
-        *dp++ = obj->ObjData();
+  LBRealType period = 0, cpu = 0;
+  TotalTime(&period, &cpu);
+  const bool migOnly = _lb_args.migObjOnly();
+  int scaled = 0, counted = 0;
+  double maxScale = 1.0, sumScale = 0.0;
+  for (int i = 0; i < objs.size(); i++) {
+    LBObj* obj = objs[i].obj;
+    if (!obj || (migOnly && !obj->data.migratable)) continue;
+    LDObjData d = obj->ObjData();
+    d.windowTime = obj->windowTime();
+    const double f = obj->sampleScale();
+    if (f != 1.0) {
+      d.wallTime *= f;
+#if CMK_LB_CPUTIMER
+      d.cpuTime *= f;
+#endif
+#if CMK_CUDA
+      d.driverTime *= f;
+      if (!obj->hasGPUDeclared()) d.gpuTime *= f;
+#endif
     }
-  } else {
-    for (int i = 0; i < objs.size(); i++) {
-      LBObj* obj = objs[i].obj;
-      if (obj)
-        *dp++ = obj->ObjData();
+    if (obj->data.migratable) {
+      counted++;
+      sumScale += f;
+      if (f > maxScale) maxScale = f;
+      if (f != 1.0) scaled++;
     }
+    *dp++ = d;
   }
+  // Once per interval on PE 0 (the stats are read more than once per step);
+  // the interval clock tells the reads of one step apart from the next.
+  static thread_local double lastReported = -1.0;
+  if (_lb_args.debug() > 0 && scaled > 0 && CkMyPe() == 0 &&
+      (lastReported < 0.0 || period < lastReported || period - lastReported > 0.5)) {
+    lastReported = period;
+    CmiPrintf("[%d] LBDB: %d of %d migratable objects were measured over less of the "
+              "%.3f s interval than they were active; loads and traffic scaled by "
+              "%.2fx on average, %.2fx at most\n",
+              CkMyPe(), scaled, counted, (double)period, sumScale / counted, maxScale);
+  }
+}
+
+// Traffic recorded while the sender's window was open, scaled to the interval
+// by the sender's factor (see GetObjData). A record whose sender is gone, or
+// whose handle now names another object, is handed out as recorded.
+void LBDatabase::GetCommData(LDCommData *data)
+{
+  if (!commTable) return;
+  commTable->GetCommData(data, [this](const LDObjHandle& h) -> double {
+    if (h.handle < 0 || (size_t)h.handle >= objs.size()) return 1.0;
+    LBObj* obj = objs[h.handle].obj;
+    if (obj == NULL || obj->data.handle.id != h.id) return 1.0;
+    return obj->sampleScale();
+  });
 }
 
 void LBDatabase::BackgroundLoad(LBRealType* walltime, LBRealType* cputime)
@@ -260,10 +317,12 @@ void LBDatabase::GetGPUBGTime(LBRealType *bg_gputime)
 void LBDatabase::ClearLoads(void)
 {
   int i;
+  const double now = CkWallTimer();
   for (i = 0; i < objs.size(); i++) {
     LBObj *obj = objs[i].obj;
     if (obj)
     {
+      obj->clearWindow(now);
       if (obj->data.wallTime > 0.0) {
         obj->lastWallTime = obj->data.wallTime;
 #if CMK_LB_CPUTIMER

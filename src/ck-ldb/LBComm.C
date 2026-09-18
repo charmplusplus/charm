@@ -164,6 +164,12 @@ int LBCommData::hash(const int i, const int m) const
 
 void LBCommTable::GetCommData(LDCommData* data)
 {
+  GetCommData(data, std::function<double(const LDObjHandle&)>());
+}
+
+void LBCommTable::GetCommData(LDCommData* data,
+                              const std::function<double(const LDObjHandle&)>& senderScale)
+{
   LDCommData* out=data;
   LBCommData* curtable=set;
   TableState* curstate=state;
@@ -180,8 +186,16 @@ void LBCommTable::GetCommData(LDCommData* data)
         out->sender.objID() = curtable->srcObj.objID();
       }
       out->receiver = curtable->destObj;
-      out->messages = curtable->n_messages;
-      out->bytes = curtable->n_bytes;
+      double f = 1.0;
+      if (senderScale && !curtable->from_proc()) f = senderScale(curtable->srcObj);
+      if (f == 1.0) {
+        out->messages = curtable->n_messages;
+        out->bytes = curtable->n_bytes;
+      } else {
+        const double m = curtable->n_messages * f, b = curtable->n_bytes * f;
+        out->messages = m > 2147483647.0 ? 2147483647 : (int)(m + 0.5);
+        out->bytes = b > 2147483647.0 ? 2147483647 : (int)(b + 0.5);
+      }
       out++;
     }
   }

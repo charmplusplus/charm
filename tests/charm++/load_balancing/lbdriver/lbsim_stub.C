@@ -20,6 +20,7 @@
 // declaration, so nothing here needs to repeat extern "C".
 
 #include <cstdarg>
+#include <time.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -46,6 +47,17 @@ int diffusionPpn = 1;
 int _lb_groupDimLaunch = 0;
 
 // ---- printing and aborting -----------------------------------------------
+
+// The interval clock LBDatabase::GetObjData and GetCommData hold loads
+// against (LBMachineUtil::TotalTime, LBObj::windowTime). A monotonic clock is
+// all they need; no test here depends on its value, and with stats never
+// turned on the interval stays zero, so nothing is scaled.
+double CmiWallTimer()
+{
+  struct timespec ts;
+  clock_gettime(CLOCK_MONOTONIC, &ts);
+  return ts.tv_sec + 1e-9 * ts.tv_nsec;
+}
 
 int CmiPrintf(const char* format, ...)
 {

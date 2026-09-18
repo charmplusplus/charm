@@ -223,9 +223,8 @@ public:
     else return 0;
   }
 
-  inline void GetCommData(LDCommData *data) {
-    if (commTable) commTable->GetCommData(data);
-  }
+  // Scaled to the interval by each sender's sampling factor; see GetObjData.
+  void GetCommData(LDCommData *data);
 
   inline void GetCommInfo(int& bytes, int& msgs, int& withinbytes, int& outsidebytes, int& num_nghbors, int& hops, int& hopbytes) {
     if (commTable)
