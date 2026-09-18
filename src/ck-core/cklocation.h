@@ -10,6 +10,8 @@ array proxies, or the details of element creation (see ckarray.h).
 #define __CKLOCATION_H
 
 #include <deque>
+#include <map>
+#include <vector>
 #include <unordered_map>
 struct IndexHasher
 {
@@ -282,10 +284,19 @@ public:
   // `data` on this stream, which orders it behind those copies on the device
   // -- the ordering emigrate used to buy by waiting on the host.
   void* stream;
+  // The element's resident device footprint at the source, read before the
+  // pack, as the blocks that make it up ((size, count) pairs, flattened):
+  // what its unpack will allocate at the destination on top of the landing
+  // arena. The admission gate allocates exactly these before it grants.
+  size_t footprint;
+  std::vector<CmiUInt8> blocks;
 
-  GPUMigrateData() : toPe(-1), size(0), data(nullptr), stream(nullptr) {}
-  GPUMigrateData(int toPe_, int size_, void* data_, void* stream_ = nullptr)
-      : toPe(toPe_), size(size_), data(data_), stream(stream_) {}
+  GPUMigrateData()
+      : toPe(-1), size(0), data(nullptr), stream(nullptr), footprint(0) {}
+  GPUMigrateData(int toPe_, int size_, void* data_, void* stream_ = nullptr,
+                 size_t footprint_ = 0, std::vector<CmiUInt8> blocks_ = {})
+      : toPe(toPe_), size(size_), data(data_), stream(stream_),
+        footprint(footprint_), blocks(std::move(blocks_)) {}
 };
 
 /********************** CkLocMgr ********************/
@@ -889,22 +900,30 @@ public:
   void finishGPUSend(CmiUInt8 id);
 
   // The landing admission gate (+gpupool; see ckLandingAdmissible in
-  // cklocation.C). The source asks before sending a payload; the destination
-  // grants once the pool can hand the landing arena out above the floor of
-  // payloads this process still owes, taking the arena at the grant.
-  void requestLanding(CmiUInt8 id, int size, int srcPe);
+  // cklocation.C). The source asks before sending a payload, naming the
+  // blocks its element holds; the destination grants once it has taken the
+  // landing arena AND every one of those blocks from the pool without
+  // growing it, above the floor of payloads this process still owes. The
+  // blocks are the landing set: the element's unpack is served from it
+  // (hapiPreallocBegin), and whatever it leaves is freed after the unpack.
+  void requestLanding(CmiUInt8 id, int size, int srcPe, int n, CmiUInt8* blocks);
   void landingGranted(CmiUInt8 id);
   void admitLandings();
+  void releaseLandingSet(CmiUInt8 id);
   struct DeferredLanding {
     CmiUInt8 id;
     int size;
     int srcPe;
+    size_t footprint;                 // sum of blocks
+    std::vector<CmiUInt8> blocks;     // (size, count) pairs, flattened
     double since;
     bool reported = false;
     bool warned = false;
   };
   std::deque<DeferredLanding> deferredLandings;
   std::unordered_map<CmiUInt8, char*> grantedLandings;
+  // The landing set per granted landing, from the grant to the unpack.
+  std::unordered_map<CmiUInt8, std::multimap<size_t, void*>> landingSets;
   bool landingRetryScheduled = false;
   long landingDeferrals = 0;
   // The migration window's queue looks its moves up again when a place frees.

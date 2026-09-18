@@ -150,7 +150,9 @@ void checkPlan(const char* test, Scenario& sc, const std::vector<int>& batchOf, 
       }
     }
     pooled[d] = arena > 0;
-    reach[d] = (long long)(pooled[d] ? pool + devFree / arena * arena : devFree);
+    // A pooled device reaches only what its arenas have free: growth is not
+    // credited (T_g in LBMemoryContract.h).
+    reach[d] = (long long)(pooled[d] ? pool : devFree);
     staging[d] = pooled[d] ? reach[d] : (long long)legacy;
   }
   const bool anyPooled = std::find(pooled.begin(), pooled.end(), true) != pooled.end();

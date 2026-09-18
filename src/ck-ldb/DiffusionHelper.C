@@ -288,9 +288,10 @@ void DiffusionLB::BuildStats()
 
 // This node's device as the memory contract reads it (LBMemoryContract.h). A
 // DiffusionLB node is one process, so its PEs report one pool: T is that
-// pool's free bytes plus the device's free bytes in whole arenas, and the room
-// it advertises holds back the largest payload block it could pack. Without
-// the pool, T is free device memory and staging is the +gpulbbuffer region.
+// pool's free bytes in the arenas it already has (growth is not credited; see
+// T_g in LBMemoryContract.h), and the room it advertises holds back the
+// largest payload block it could pack. Without the pool, T is free device
+// memory and staging is the +gpulbbuffer region.
 void DiffusionLB::computeNodeMemory()
 {
   const int n = (int)nodeStats->objData.size();
@@ -316,7 +317,9 @@ void DiffusionLB::computeNodeMemory()
   }
   if (devFree == std::numeric_limits<size_t>::max()) return;
   const bool pooled = arena > 0;
-  size_t reach = pooled ? poolFree + devFree / arena * arena : devFree;
+  static const bool creditGrowth = (getenv("CHARM_LB_MEM_CREDIT_GROWTH") != NULL);
+  size_t reach = pooled ? poolFree : devFree;
+  if (pooled && creditGrowth) reach += devFree / arena * arena;
   if (const char* cap = getenv("CHARM_LB_MEM_CAP_MB"))
     reach = std::min(reach, (size_t)atol(cap) << 20);
 

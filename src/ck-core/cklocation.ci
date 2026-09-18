@@ -28,7 +28,7 @@ module CkLocation {
     entry [expedited, threaded] void sendGPUMsg(CmiUInt8 id);
     entry [expedited] void immigrateGPU(CmiUInt8 id, int size, nocopydevice char data[size], int srcPe);
     entry [expedited] void finishGPUSend(CmiUInt8 id);
-    entry [expedited] void requestLanding(CmiUInt8 id, int size, int srcPe);
+    entry [expedited] void requestLanding(CmiUInt8 id, int size, int srcPe, int n, CmiUInt8 blocks[n]);
     entry [expedited, threaded] void landingGranted(CmiUInt8 id);
 #endif
 #endif

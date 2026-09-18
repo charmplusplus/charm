@@ -12,10 +12,17 @@
 //
 // phi is a chare's resident device footprint, sigma its staged payload block.
 //
-//   T_g  what a migration can obtain on g. Under +gpupool, the free arena bytes
-//        of every process on g plus the device's free bytes counted in whole
-//        arenas, since the pool grows an arena at a time. Without the pool,
-//        free device memory.
+//   T_g  what a migration can obtain on g. Under +gpupool, the free bytes in
+//        the arenas every process on g already holds -- and nothing more: the
+//        pool grows a whole arena at a time, so a plan that leaned on growth
+//        turned a few hundred MB of misjudgement into a full-arena cudaMalloc
+//        mid-migration, and at 2+ nodes every arena is registered with the
+//        fabric whole, which has a ceiling (hapiDevPoolNewArenaLocked). A plan
+//        that does not fit the arenas is split into more batches or refused,
+//        visibly; growth is left to the application's own allocations.
+//        CHARM_LB_MEM_CREDIT_GROWTH restores the old credit (the device's free
+//        bytes in whole arenas), for A/B only. Without the pool, free device
+//        memory.
 //   H_g  (1-eps)*T_g - sigma_max(g): final placement is planned against T_g
 //        less the largest payload block g could pack, so one pack always fits.
 //   A_g  (1-eps)*T_g less the net change of the batches already released:
@@ -144,12 +151,14 @@ public:
     // reach at CHARM_LB_MEM_CAP_MB regardless of what it reports.
     const char* capEnv = getenv("CHARM_LB_MEM_CAP_MB");
     const size_t cap = capEnv ? (size_t)atol(capEnv) << 20 : SIZE_MAX;
+    static const bool creditGrowth = (getenv("CHARM_LB_MEM_CREDIT_GROWTH") != NULL);
     for (int d = 0; d < (int)devices_.size(); d++) {
       Device& dev = devices_[d];
       if (arena[d] > 0) {
         dev.pooled = true;
         pooled_ = true;
-        dev.reach = poolSum[d] + (devFree[d] / arena[d]) * arena[d];
+        dev.reach = poolSum[d];  // the arenas the pool has; no growth (T_g)
+        if (creditGrowth) dev.reach += (devFree[d] / arena[d]) * arena[d];
       } else {
         dev.reach = devFree[d];
       }

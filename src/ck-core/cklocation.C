@@ -79,18 +79,40 @@ static inline bool migDbg() {
 // The landing admission gate (+gpupool). The memory contract plans each
 // balancer step so that every batch fits the devices; this is the runtime half
 // that keeps its assumption true. A staged arrival asks its destination for a
-// landing arena before its payload is sent, and the destination grants it
-// only if the pool can hand the arena out and still cover every payload this
-// process has yet to pack for departures the balancer ordered -- the floor.
-// Packs are never gated and never wait on anything remote, so an arrival that
-// is refused waits only on local progress: its own process's packs, a payload
-// ack, or a free. A deferred arrival costs the destination nothing; its
-// payload stays in the sender's pool block.
+// landing before its payload is sent, and the destination grants it only if
+// the pool can hand out the landing arena AND the state the element's unpack
+// will allocate, and still cover every payload this process has yet to pack
+// for departures the balancer ordered -- the floor. Packs are never gated and
+// never wait on anything remote, so an arrival that is refused waits only on
+// local progress: its own process's packs, a payload ack, or a free. A
+// deferred arrival costs the destination nothing; its payload stays in the
+// sender's pool block.
+//
+// The arrival's full cost is the payload block plus the element's resident
+// footprint at the source, read before the pack as the blocks that make it up
+// (GPUMigrateData::blocks). The gate reserves by ALLOCATING: it takes the
+// landing arena and every one of those blocks from the pool without growing
+// it, or defers. Byte sums are not enough under a buddy allocator -- a pool
+// with 50 MB "free" on each of four ranks admitted arrivals by bytes and every
+// rank still grew an 8 GB arena (job 22191010), because the 8 MB landings
+// split the 16 MB blocks the arrivals' state needed. The blocks taken are the
+// landing set: the element's unpack is served from it (hapiPreallocBegin), so
+// it allocates nothing new; what it leaves -- everything, for an element that
+// rebinds its buffers into the arena instead -- is freed after the unpack.
+// Gating on the payload alone had admitted arrivals into memory that was not
+// there, and under +LBAsync -- where departures stay resident until their own
+// pack point -- grew the pool by whole arenas.
 //
 // Under the pool, payloads, landing arenas and chare state are all blocks of
 // one pool. Without the floor an arrival could take the bytes a departure
 // needs to pack, and that departure's destination could be waiting on an
 // arrival of its own: the cycle a separate staging reserve used to rule out.
+//
+// The gate reads what the pool's arenas have free NOW, exactly as the batch
+// planner did (LBMemoryContract.h): growing the pool is not credited, since
+// growth is a whole arena or nothing and at 2+ nodes every arena is
+// registered with the fabric, which has a ceiling (hapiDevPoolNewArenaLocked).
+// CHARM_LB_MEM_CREDIT_GROWTH restores the old credit, for A/B only.
 //
 // CHARM_LB_NO_ADMISSION_GATE turns it off; CHARM_DEBUG_GATE traces it. To see
 // it defer on a device with memory to spare, CHARM_GPU_POOL_CAP_MB shrinks the
@@ -149,19 +171,63 @@ static void ckClearPendingPack(CkLocRec* rec)
   rec->pendingPackBytes = 0;
 }
 
-// Whether a landing of `size` bytes may be taken from the pool now. The pool
-// can reach its arenas' free bytes and, by growing, the device's free bytes in
-// whole arenas.
-static bool ckLandingAdmissible(size_t size, size_t* reachOut, size_t* floorOut)
+// Whether a landing of `size` payload bytes, for an element whose state is
+// `footprint` bytes, could be taken from the pool now, by bytes: the pool's
+// free bytes in the arenas it has, less the floor of pending packs. Earlier
+// grants are already allocated, so they are already out of the free bytes.
+// This is the cheap pre-check; the grant itself allocates (admitLandings).
+static bool ckLandingAdmissible(size_t size, size_t footprint, size_t* reachOut,
+                                size_t* floorOut)
 {
+  static const bool creditGrowth = (getenv("CHARM_LB_MEM_CREDIT_GROWTH") != nullptr);
   size_t devFree = 0, poolFree = 0, arena = 0;
   int slots = 0;
   hapiLBDeviceMemory(&devFree, &poolFree, &arena, &slots);
-  const size_t reach = poolFree + (arena > 0 ? devFree / arena * arena : devFree);
+  size_t reach = poolFree;
+  if (creditGrowth) reach += (arena > 0 ? devFree / arena * arena : devFree);
   const size_t floor = ck_pending_pack_bytes.load();
   *reachOut = reach;
   *floorOut = floor;
-  return reach >= ckPoolBlock(size) + floor;
+  return reach >= ckPoolBlock(size) + footprint + floor;
+}
+
+// Take the landing arena and the element's blocks from the pool without
+// growing it; on any miss, give everything back and report failure. Largest
+// blocks first, which is the order a buddy allocator fits best.
+static bool ckTakeLandingSet(int size, const std::vector<CmiUInt8>& blocks,
+                             char** arenaOut, std::multimap<size_t, void*>& set)
+{
+  std::vector<std::pair<size_t, int>> want;
+  for (size_t k = 0; k + 1 < blocks.size(); k += 2)
+    want.emplace_back((size_t)blocks[k], (int)blocks[k + 1]);
+  std::sort(want.begin(), want.end(),
+            [](const std::pair<size_t, int>& a, const std::pair<size_t, int>& b) {
+              return a.first > b.first;
+            });
+  hapiFootprintBegin(nullptr);   // nobody's until the unpack takes them
+  bool ok = true;
+  for (const auto& w : want) {
+    for (int c = 0; ok && c < w.second; c++) {
+      void* p = CkDeviceMallocNoGrow(w.first);
+      if (p == nullptr) ok = false;
+      else set.emplace(w.first, p);
+    }
+    if (!ok) break;
+  }
+  char* arena = nullptr;
+  if (ok && size > 0) {
+    arena = (char*)CkDeviceMallocNoGrow((size_t)size);
+    if (arena == nullptr) ok = false;
+  }
+  hapiFootprintEnd();
+  if (!ok) {
+    for (auto& e : set) CkDeviceFree(e.second);
+    set.clear();
+    if (arena) CkDeviceFree(arena);
+    return false;
+  }
+  *arenaOut = arena;
+  return true;
 }
 
 // The migration window (+gpupool): pacing, not the safety argument. The batch
@@ -227,7 +293,7 @@ static void ckWindowTrace(const char* what, CmiUInt8 id, size_t moveBytes)
   size_t maxBytes;
   ckWindowLimits(&maxMoves, &maxBytes);
   size_t reach = 0, floor = 0;
-  ckLandingAdmissible(0, &reach, &floor);
+  ckLandingAdmissible(0, 0, &reach, &floor);
   CkPrintf("[WINDOW %d] %s id=%llu (%zu bytes): in flight %zu move(s) / %zu bytes of "
            "%d / %zu; queued %zu; pool reach less floor %lld\n",
            CkMyPe(), what, (unsigned long long)id, moveBytes, ck_window.inflight.size(),
@@ -4210,7 +4276,10 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
     // Ask for the landing first (see ckLandingAdmissible). The payload waits
     // in its pool block until the destination grants it.
     const GPUMigrateData& gpuData = sendGPUBuffers[id];
-    thisProxy[gpuData.toPe].requestLanding(id, gpuData.size, CkMyPe());
+    thisProxy[gpuData.toPe].requestLanding(id, gpuData.size, CkMyPe(),
+                                           (int)gpuData.blocks.size(),
+                                           gpuData.blocks.empty() ? nullptr
+                                               : const_cast<CmiUInt8*>(gpuData.blocks.data()));
     return;
   }
   dispatchGPUMsg(id);
@@ -4226,15 +4295,34 @@ void CkLocMgr::landingGranted(CmiUInt8 id)
 
 // Destination: grant the landing now, or queue it until the pool can take it
 // above the floor.
-void CkLocMgr::requestLanding(CmiUInt8 id, int size, int srcPe)
+void CkLocMgr::requestLanding(CmiUInt8 id, int size, int srcPe, int n, CmiUInt8* blocks)
 {
   DeferredLanding d;
   d.id = id;
   d.size = size;
   d.srcPe = srcPe;
+  d.blocks.assign(blocks, blocks + n);
+  d.footprint = 0;
+  for (int k = 0; k + 1 < n; k += 2) d.footprint += (size_t)blocks[k] * (size_t)blocks[k + 1];
   d.since = CkWallTimer();
   deferredLandings.push_back(d);
   admitLandings();
+}
+
+// The granted element has unpacked, served from its landing set. Whatever it
+// did not take -- everything, for an element that rebound its buffers into
+// the arena -- goes back to the pool, where a deferred landing may fit now.
+void CkLocMgr::releaseLandingSet(CmiUInt8 id)
+{
+  auto it = landingSets.find(id);
+  if (it == landingSets.end()) return;
+  size_t left = 0;
+  for (auto& e : it->second) { left += e.first; CkDeviceFree(e.second); }
+  if (ckGateDbg())
+    CkPrintf("[GATE %d] unpacked id=%llu: %zu block(s) / %zu bytes of its landing set "
+             "unused, freed\n", CkMyPe(), (unsigned long long)id, it->second.size(), left);
+  landingSets.erase(it);
+  if (!deferredLandings.empty()) admitLandings();
 }
 
 void CkLocMgr::admitLandings()
@@ -4255,25 +4343,28 @@ void CkLocMgr::admitLandings()
     }();
     const bool expired = (CkWallTimer() - d.since) > timeout;
     if (expired && !d.warned)
-      CkPrintf("[%d] WARNING: admitting a %d-byte migration landing after %.0f s "
-               "without the admission gate's guarantee (CHARM_LB_GATE_TIMEOUT)\n",
-               CkMyPe(), d.size, timeout);
-    if (!expired && !ckLandingAdmissible((size_t)d.size, &reach, &floor)) {
+      CkPrintf("[%d] WARNING: admitting a %d-byte migration landing (+%zu bytes of "
+               "element state) after %.0f s without the admission gate's guarantee "
+               "(CHARM_LB_GATE_TIMEOUT)\n", CkMyPe(), d.size, d.footprint, timeout);
+    if (!expired &&
+        !ckLandingAdmissible((size_t)d.size, d.footprint, &reach, &floor)) {
       const double waited = CkWallTimer() - d.since;
       if (ckGateDbg() && !d.reported)
-        CkPrintf("[GATE %d] defer id=%llu from PE %d: landing %zu, reach %zu, "
-                 "floor %zu\n", CkMyPe(), (unsigned long long)d.id, d.srcPe,
-                 ckPoolBlock((size_t)d.size), reach, floor);
+        CkPrintf("[GATE %d] defer id=%llu from PE %d: landing %zu + state %zu in %zu "
+                 "block size(s), pool free %zu, floor %zu (by bytes)\n", CkMyPe(),
+                 (unsigned long long)d.id, d.srcPe, ckPoolBlock((size_t)d.size),
+                 d.footprint, d.blocks.size() / 2, reach, floor);
       if (!d.reported && landingDeferrals++ == 0)
         CkPrintf("[%d] memory contract: a migration landing waits for device memory "
                  "(admission gate; CHARM_DEBUG_GATE traces each)\n", CkMyPe());
       d.reported = true;
       if (waited > 30.0 && !d.warned) {
         d.warned = true;
-        CkPrintf("[%d] WARNING: a %d-byte migration landing has waited %.0f s for "
-                 "device memory (pool reach %zu, pending packs %zu). The balancer "
-                 "planned this step against more memory than the device has now.\n",
-                 CkMyPe(), d.size, waited, reach, floor);
+        CkPrintf("[%d] WARNING: a %d-byte migration landing (+%zu bytes of element "
+                 "state) has waited %.0f s for device memory (pool free %zu, pending "
+                 "packs and reserved landings %zu). The balancer planned this step "
+                 "against more memory than the pool has now.\n",
+                 CkMyPe(), d.size, d.footprint, waited, reach, floor);
       }
       if (!landingRetryScheduled) {
         landingRetryScheduled = true;
@@ -4285,17 +4376,48 @@ void CkLocMgr::admitLandings()
       }
       return;
     }
-    // Admitted: take the arena now, so the next check sees it gone.
-    hapiFootprintBegin(nullptr);
-    char* arena = (char*)CkDeviceMalloc((size_t)d.size);
-    hapiFootprintEnd();
-    if (arena == nullptr)
-      CkAbort("PE %d: device pool could not provide a %d-byte migration arena",
-              CkMyPe(), d.size);
+    // Admissible by bytes: now take the arena and the element's blocks for
+    // real, without growing the pool. By shape they may still not fit --
+    // that is the case the byte check cannot see -- and then this waits like
+    // any other deferral, for a free.
+    char* arena = nullptr;
+    std::multimap<size_t, void*> set;
+    if (!expired && !ckTakeLandingSet(d.size, d.blocks, &arena, set)) {
+      if (ckGateDbg() && !d.reported)
+        CkPrintf("[GATE %d] defer id=%llu from PE %d: landing %zu + state %zu fit by "
+                 "bytes (pool free %zu) but not by block shape\n", CkMyPe(),
+                 (unsigned long long)d.id, d.srcPe, ckPoolBlock((size_t)d.size),
+                 d.footprint, reach);
+      if (!d.reported && landingDeferrals++ == 0)
+        CkPrintf("[%d] memory contract: a migration landing waits for device memory "
+                 "(admission gate; CHARM_DEBUG_GATE traces each)\n", CkMyPe());
+      d.reported = true;
+      if (!landingRetryScheduled) {
+        landingRetryScheduled = true;
+        CcdCallFnAfter([](void* mgr, double) {
+          CkLocMgr* m = (CkLocMgr*)mgr;
+          m->landingRetryScheduled = false;
+          m->admitLandings();
+        }, this, 2.0);
+      }
+      return;
+    }
+    if (expired) {
+      // Past the timeout: the arena the old way, growing if it must; the
+      // element's unpack then allocates for itself.
+      hapiFootprintBegin(nullptr);
+      arena = (char*)CkDeviceMalloc((size_t)d.size);
+      hapiFootprintEnd();
+      if (arena == nullptr)
+        CkAbort("PE %d: device pool could not provide a %d-byte migration arena",
+                CkMyPe(), d.size);
+    }
     grantedLandings[d.id] = arena;
+    if (!set.empty()) landingSets[d.id] = std::move(set);
     if (ckGateDbg() && d.reported)
-      CkPrintf("[GATE %d] admit id=%llu after %.1f ms\n", CkMyPe(),
-               (unsigned long long)d.id, (CkWallTimer() - d.since) * 1e3);
+      CkPrintf("[GATE %d] admit id=%llu after %.1f ms (landing %d + %zu block(s) of "
+               "state taken)\n", CkMyPe(), (unsigned long long)d.id,
+               (CkWallTimer() - d.since) * 1e3, d.size, landingSets[d.id].size());
     thisProxy[d.srcPe].landingGranted(d.id);
     deferredLandings.pop_front();
   }
@@ -4554,6 +4676,22 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   // Started only past the stand-down above, so the count is actual emigrations
   // rather than deferral attempts.
   MigTimer _te(&g_mig.emigSecs, &g_mig.emigN);
+#if CMK_CUDA
+  // What the element holds on the device now, before the pack frees it, as
+  // blocks: the destination's admission gate takes exactly these on top of
+  // the landing arena, since the unpack allocates them again there.
+  std::vector<CmiUInt8> emigBlocks;
+  size_t emigFootprint = 0;
+  {
+    std::vector<std::pair<size_t, int>> blocks;
+    hapiObjectBlocks(rec, blocks);
+    for (const auto& b : blocks) {
+      emigBlocks.push_back((CmiUInt8)b.first);
+      emigBlocks.push_back((CmiUInt8)b.second);
+      emigFootprint += b.first * (size_t)b.second;
+    }
+  }
+#endif
 
 #if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
   // Those same buffers are about to be freed, so any registration cached for
@@ -4807,7 +4945,8 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #if CMK_CUDA
   if (gpuBufSize > 0)
   {
-    sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg, (void*)migStream);
+    sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg, (void*)migStream,
+                                        emigFootprint, std::move(emigBlocks));
     if (migDbg() && migStream != NULL) {
       // when the pack copies of this element have completed on the migration stream
       struct PackDone { static void fn(void* p, void*) {
@@ -5137,10 +5276,16 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   // is running.
 #if CMK_CUDA
   hapiFootprintBegin(rec);
+  {
+    auto ls = landingSets.find(msg->id);   // the gate's landing set, if any
+    hapiPreallocBegin(ls != landingSets.end() ? &ls->second : nullptr);
+  }
 #endif
   pupElementsFor(p, rec, CkElementCreation_migrate);
 #if CMK_CUDA
+  hapiPreallocEnd();
   hapiFootprintEnd();
+  releaseLandingSet(msg->id);   // what the unpack did not take goes back
 #endif
 #if CMK_CUDA
   // The unpack's copies must complete before the element runs, and the wait
