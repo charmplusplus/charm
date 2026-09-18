@@ -9,6 +9,8 @@
 # srun spans the whole allocation. It REFUSES to run on an allocation bigger
 # than NODES (that would idle the rest); FORCE=1 overrides.
 # Env: STEPS/PERIOD/LAG (leanmd 100/20/16), LMD_GRID (strong grid, "32 8 8"),
+#      LBDEBUG (+LBDebug for both apps), SPH_LBDEBUG / LMD_LBDEBUG (per app),
+#      LMD_EXTRA (extra +LB flags on leanmd's balanced arms, e.g. a cut ceiling),
 #      DEADLINE_MIN (55) stop launching new arms this long after the start,
 #      COSTCFG (cost table, both apps), LMD_COSTCFG (leanmd override).
 #
@@ -181,8 +183,8 @@ run_leanmd() { local kind=$1 arm=$2
   case $kind in weak) grid="$((8*NODES)) 8 8";; strong) grid="${LMD_GRID:-32 8 8}";; esac
   pes=$((32*NODES)); cells=$(echo $grid | awk '{print $1*$2*$3}'); cpg=$((cells/(4*NODES)))
   case $arm in
-    sync)  extra="$LMD_MD +LBDebug ${LBDEBUG:-1}";;
-    async) extra="$LMD_MD -lbasync -lblag $LAG +LBAsync +LBDebug ${LBDEBUG:-1}";;
+    sync)  extra="$LMD_MD +LBDebug ${LMD_LBDEBUG:-${LBDEBUG:-1}} ${LMD_EXTRA:-}";;
+    async) extra="$LMD_MD -lbasync -lblag $LAG +LBAsync +LBDebug ${LMD_LBDEBUG:-${LBDEBUG:-1}} ${LMD_EXTRA:-}";;
   esac
   # ~0.011 s per cell per GPU at the 2744-atom granularity, x2 for noLB+startup
   tmo=$(awk "BEGIN{t=int(2*$STEPS*0.011*$cells/(4*$NODES))+180; print (t<300)?300:t}")
@@ -221,7 +223,12 @@ run_leanmd() { local kind=$1 arm=$2
 # 1.38 s of stall and still lost 0.5 s to the stale placement. Weak: gap 1000,
 # lag 800. Strong (-f 500 -b 750): gap 250, lag 200. sph2d.C now aborts on a lag
 # that straddles a trigger.
-SPH_MD="+balancer MetisLB +balancer DiffusionLB +LBDiffusionCommOn +LBCostConfig $COSTCFG +LBDebug ${LBDEBUG:-1}"
+# Per-app LB debug levels. sph2d moves 2-4 objects across nodes in a whole run,
+# so its +LBDebug output is nearly all of what the LB step costs it -- and it
+# lands inside application execution on the async arm, where sync pays it in a
+# barrier. SPH_LBDEBUG/LMD_LBDEBUG set each app independently so a timing arm
+# can run quiet while the other still records its decisions.
+SPH_MD="+balancer MetisLB +balancer DiffusionLB +LBDiffusionCommOn +LBCostConfig $COSTCFG +LBDebug ${SPH_LBDEBUG:-${LBDEBUG:-1}}"
 run_sph2d() { local kind=$1 arm=$2
   local cfg lbargs tmo exp log rc ms imb patches fluid pool
   if [ "$kind" = weak ]; then
