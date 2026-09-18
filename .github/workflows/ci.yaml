@@ -482,6 +482,8 @@ jobs:
   # project (2026-08-27). Native arm64 runners; configs mirror the old
   # CircleCI arm.medium jobs.
   netlrts-linux-arm8:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 60
     runs-on: ubuntu-24.04-arm
     steps:
@@ -494,6 +496,8 @@ jobs:
       run: make -C netlrts-linux-arm8/tmp testp P=2 TESTOPTS="++local"
 
   netlrts-linux-arm8_smp:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 60
     runs-on: ubuntu-24.04-arm
     steps:
@@ -506,6 +510,8 @@ jobs:
       run: make -C netlrts-linux-arm8-smp/tmp testp P=4 TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle ++ppn 2"
 
   mpi-linux-arm8:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 90
     runs-on: ubuntu-24.04-arm
     env:
