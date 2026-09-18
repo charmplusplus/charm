@@ -318,6 +318,7 @@ void Compute::calculateForces(int ref, int ord, int cx, int cy, int cz, int& n,
   ordinal[s] = ord;
   cellIdx[s][0] = cx; cellIdx[s][1] = cy; cellIdx[s][2] = cz;
   devicePost[0].hapi_stream = stream;
+  devicePost[0].buffer_free = leanmdBufferFree();
 }
 
 // The displacement to apply to B's positions so the two cells are adjacent across

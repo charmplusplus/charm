@@ -17,6 +17,7 @@ struct CkDevicePersistent {
   CkCallback cb;
   void* cb_msg;
   hapiStream_t hapi_stream;
+
   int pe;
   hapiIpcMemHandle_t hapi_ipc_handle;
   void* ipc_ptr;
@@ -64,6 +65,15 @@ struct CkDevicePersistent {
 struct CkDeviceBufferPost {
   // CUDA stream for device transfers
   hapiStream_t hapi_stream;
+
+  // The posted buffer is free: nothing still running on hapi_stream reads or
+  // writes it, so the runtime may land the transfer as soon as the sender's
+  // work is done. Left false, the transfer is also held until every
+  // operation issued on hapi_stream before this post has completed -- the
+  // ordering a copy on that stream used to give. Neither case puts a wait on
+  // hapi_stream or on any other stream: the copy runs on the PE's receive
+  // stream and is issued only once it can run (see DeviceRecvPending).
+  bool buffer_free = false;
 
   // Use per-thread stream by default
   CkDeviceBufferPost() : hapi_stream(hapiStreamPerThread) {}

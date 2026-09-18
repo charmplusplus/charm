@@ -79,6 +79,12 @@ public:
   // meaningful precisely because MEMCPY means one process. Null when the sender
   // did not record one, in which case the receiver must not assume ordering.
   void* memcpy_event;
+  // Same-process sends: the pinned flag the sender issued on its stream after
+  // the work producing this buffer (hapiFlagIssue). The receiver reads it with
+  // a plain load before issuing its copy; ready_seq 0 means none was issued
+  // and memcpy_event is what to query.
+  int ready_rank;
+  uint32_t ready_seq;
 
   // Store the actual data for host-staged inter-node messaging (no GPUDirect RDMA)
   // Whether the sender prepared a source this buffer's receiver can actually
@@ -108,6 +114,8 @@ public:
     ipc_offset = 0;
     ipc_base = NULL;
     memcpy_event = NULL;
+    ready_rank = -1;
+    ready_seq = 0;
     hapi_stream = hapiStreamPerThread;
 
     sender_prepared = false;
@@ -137,6 +145,8 @@ public:
     p|ipc_offset;
     p((char *)&ipc_base, sizeof(ipc_base));
     p((char *)&memcpy_event, sizeof(memcpy_event));
+    p|ready_rank;
+    p|ready_seq;
     p|data_stored;
     if (data_stored) {
       if (p.isUnpacking()) {

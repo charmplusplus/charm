@@ -414,6 +414,19 @@ hapiStream_t hapiAcquireStream();
 void hapiReleaseStream(hapiStream_t stream);
 // The device a pooled stream belongs to, or -1 if it is not one of ours.
 int hapiStreamDeviceOf(hapiStream_t stream);
+
+// Readiness flags: the stream-ordered pinned-flag write that completes a
+// callback, issued on its own with nothing behind it. hapiFlagIssue writes a
+// fresh sequence number into this PE's ring once every operation issued on
+// `stream` before it has executed. It returns false, issuing nothing, when the
+// ring has no free slot or the stream belongs to another device; the caller
+// then falls back to a CUDA event. hapiFlagLanded is a plain load with no
+// driver call: has PE `rank`'s flag `seq` been written? A slot that has moved
+// on to a later sequence number counts as landed, because a slot is reassigned
+// only after the entry holding it drained, and it drains only once its value
+// was seen.
+bool hapiFlagIssue(hapiStream_t stream, int* rank, uint32_t* seq);
+bool hapiFlagLanded(int rank, uint32_t seq);
 // The CUDA device this PE is mapped to.
 int hapiGetDeviceNum();
 // Bytes the device pool's arenas have free right now. The pool also grows into

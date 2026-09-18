@@ -13,6 +13,17 @@
 // single GPU cannot deliver anyway.
 #define NUM_STREAMS 8
 
+// Every receive buffer here is free when it is posted: positions go into
+// per-compute input slots whose previous reader finished before the cell sent
+// new positions, forces and migrants into per-neighbour landing slots. Saying
+// so lets the runtime land the copy as soon as the sender's work is done
+// instead of also waiting for earlier work on the posting stream.
+// LEANMD_ORDERED_RECV=1 keeps that ordering, for comparison only.
+inline bool leanmdBufferFree() {
+  static const bool free_ = (getenv("LEANMD_ORDERED_RECV") == nullptr);
+  return free_;
+}
+
 // The (0,0,0) neighbour offset -- a particle that stays where it is.
 #define SELF_NBR (KAWAY_X * NBRS_Y * NBRS_Z + KAWAY_Y * NBRS_Z + KAWAY_Z)
 

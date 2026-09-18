@@ -257,6 +257,14 @@ CkpvDeclare(hapiStream_t, staging_stream);
 // queued behind an unrelated staging copy.
 CkpvDeclare(hapiStream_t, restage_wait_stream);
 CkpvDeclare(std::vector<hapiEvent_t>*, staging_events);
+// The PE's receive stream: every device receive lands its copy on it, and
+// nothing is ever issued on it that cannot run at once (DeviceRecvPending).
+CkpvDeclare(hapiStream_t, device_recv_stream);
+struct DeviceRecvPending;
+CkpvDeclare(std::vector<DeviceRecvPending*>*, device_recv_pending);
+// Events for the destination-order fallback when the flag ring is full.
+CkpvDeclare(std::vector<hapiEvent_t>*, device_recv_events);
+static void deviceRecvPendingPoll(void*);
 
 // Device work in flight on an element (hapiDeviceWorkBegin/End, see hapi.h):
 // every HAPI callback registered inside an element's entry method raises its
@@ -302,6 +310,13 @@ void CkRdmaDeviceRegistrationCacheInit()
   CkpvAccess(restage_wait_stream) = nullptr;
   CkpvInitialize(std::vector<hapiEvent_t>*, staging_events);
   CkpvAccess(staging_events) = new std::vector<hapiEvent_t>();
+  CkpvInitialize(hapiStream_t, device_recv_stream);
+  CkpvAccess(device_recv_stream) = nullptr;
+  CkpvInitialize(std::vector<DeviceRecvPending*>*, device_recv_pending);
+  CkpvAccess(device_recv_pending) = new std::vector<DeviceRecvPending*>();
+  CkpvInitialize(std::vector<hapiEvent_t>*, device_recv_events);
+  CkpvAccess(device_recv_events) = new std::vector<hapiEvent_t>();
+  CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)deviceRecvPendingPoll, NULL);
 }
 
 static hapiStream_t stagingStream()
@@ -392,6 +407,8 @@ void CkDeviceRecvAdmissionReplay(CmiUInt8 id)
 // is made per device receive and one free is expected per copy.
 std::atomic<long> g_zc_copies{0}, g_zc_frees{0};
 std::atomic<long> g_zc_meta{0}, g_zc_metafree{0}, g_zc_empty{0}, g_zc_real{0};
+// Receives parked for a dependency still running, and the most parked at once.
+static long g_recv_parked = 0, g_recv_parked_max = 0;
 bool zcLeakDbg() {
   static const bool on = getenv("CHARM_ZC_LEAKDBG") != NULL;
   return on;
@@ -401,10 +418,10 @@ void zcLeakReport(const char* where) {
   const long c = g_zc_copies.load(), f = g_zc_frees.load();
   if (c % 20000 != 0 || c == 0) return;
   CmiPrintf("[ZCLEAK %d] %s: env %ld/%ld live %ld | meta %ld/%ld live %ld | "
-            "ops empty %ld real %ld\n", CkMyPe(), where, c, f, c - f,
+            "ops empty %ld real %ld | parked %ld (max %ld at once)\n", CkMyPe(), where, c, f, c - f,
             g_zc_meta.load(), g_zc_metafree.load(),
             g_zc_meta.load() - g_zc_metafree.load(),
-            g_zc_empty.load(), g_zc_real.load());
+            g_zc_empty.load(), g_zc_real.load(), g_recv_parked, g_recv_parked_max);
 }
 
 void CkRdmaDeviceMsgFreed(void* env)
@@ -1104,49 +1121,17 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
         src_addr = (const void*)((char*)imported_base + source.ipc_offset);
       }
 
-      // 1. Make user-provided stream wait for IPC event using hapiStreamWaitEvent
-      //    (staged: source buffer to device comm buffer on source; direct: the
-      //    kernels that produced the source buffer)
-      // Same reason as the dst_event_pool record below: across processes
-      // ipcHandleOpen imports a peer's events under our own device, but it skips
-      // our own process, so a source that is a different device inside this
-      // process leaves that device's original event in the pool. Making our
-      // stream wait on it is not valid from here. Wait on the host instead --
-      // stronger ordering than the stream wait, and confined to this one case,
-      // which only became reachable once load balancing moved chares between
-      // GPUs within a process.
+      // No wait here: the caller issues this only once the sender's work is
+      // known complete on the host (DeviceRecvPending), so nothing on
+      // recv_stream can block behind a sender. The same-process, other-device
+      // case still matters below: its event cannot be recorded on our stream.
       // "Different device inside this process" is BOTH conditions. device_idx
       // is node-local (device_count * process rank + device), so with one
-      // device per process every other process's index differs too, and the
-      // device test alone sent every cross-process receive down this host-wait
-      // path: the receiver stopped until the sender's stream had drained, then
-      // (below) drained its own. Measured on moe: ~3 ms per 1 MB receive, an
-      // all-to-all exchange at 0.5 GB/s on 24 GB/s links, and no overlap of
-      // any transfer with compute. For a peer process the imported events are
-      // valid under our device, so the stream-ordered path is the right one.
+      // device per process every other process's index differs too.
       const bool same_process_other_device =
           (CmiNodeOf(srcPe) == CmiMyNode()) &&
           (source.device_idx != csv_gpu_manager.device_count * CmiMyNodeRankLocal()
                                     + CpvAccess(my_device_id));
-      if (same_process_other_device) {
-        hapiCheck(cudaEventSynchronize(device_info.src_event_pool[source.event_idx]));
-      } else if (hapiEventQuery(device_info.src_event_pool[source.event_idx]) != hapiSuccess ||
-                 getenv("CHARM_IPC_ALWAYS_WAIT")) {
-        if (stagedDbg() && source.cnt >= 100000)
-          CmiPrintf("[SRCEV %d] cnt=%zu srcPe=%d ready=0\n", CkMyPe(), (size_t)source.cnt, srcPe);
-        // Only when the sender's event is not already complete. A stream wait
-        // on an imported interprocess event that completed moments ago was
-        // measured (moe) to pace the receiver's stream at ~0.35 ms per copy,
-        // whatever the copy's size; for an event the host already sees as
-        // complete there is nothing to order and the wait is pure cost.
-        hapiCheck(hapiStreamWaitEventNoted(recv_stream,
-              device_info.src_event_pool[source.event_idx], 0,
-              source.device_idx * 100000 + source.event_idx));
-      }
-      if (stagedDbg() && source.cnt >= 100000 &&
-          hapiEventQuery(device_info.src_event_pool[source.event_idx]) == hapiSuccess)
-        CmiPrintf("[SRCEV %d] cnt=%zu srcPe=%d ready=1\n", CkMyPe(), (size_t)source.cnt, srcPe);
-      ipcDebugSync("recv 1: wait imported src_event", recv_stream);
 
       // 2. Invoke hapiMemcpyAsync from the peer's memory to the destination
       //    buffer. This is the only copy a direct transfer makes.
@@ -1224,6 +1209,325 @@ static bool acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
                                const void* src_ptr, size_t cnt,
                                void** out_buffer, int* out_event_idx,
                                bool wait = true);
+
+/*************** Host-gated receive issue ***************/
+//
+// A device receive has two dependencies: the sender's producing work, and
+// whatever ran on the posted stream before the post (the buffer's previous
+// reader or writer). Putting either into a stream as a wait makes everything
+// queued behind it wait too: on the consumer's compute stream that stalled
+// other chares' kernels behind an unrelated sender; on a shared receive
+// stream it would stall other receives. So neither goes on the GPU. The copy
+// is issued only once both are known complete on the host, on the PE's one
+// receive stream, where consequently nothing ever blocks. A receive whose
+// dependencies are still running is parked and re-checked from the scheduler
+// loop -- with plain loads where the sender or the post issued a pinned flag,
+// and with an event query no more than once per kRecvQueryPeriod otherwise.
+
+static hapiStream_t deviceRecvStream()
+{
+  hapiStream_t& s = CkpvAccess(device_recv_stream);
+  if (s == nullptr) s = hapiAcquireStream();
+  return s;
+}
+
+static hapiEvent_t deviceRecvEventTake()
+{
+  std::vector<hapiEvent_t>& pool = *CkpvAccess(device_recv_events);
+  if (pool.empty()) {
+    hapiEvent_t e;
+    hapiCheck(hapiEventCreateWithFlags(&e, hapiEventDisableTiming));
+    return e;
+  }
+  hapiEvent_t e = pool.back();
+  pool.pop_back();
+  return e;
+}
+static void deviceRecvEventGive(hapiEvent_t e)
+{
+  CkpvAccess(device_recv_events)->push_back(e);
+}
+
+static inline hapi_ipc_event_shared* ipcSharedSlot(int device_idx, int event_idx)
+{
+  GPUManager& gm = CsvAccess(gpu_manager);
+  return (hapi_ipc_event_shared*)((char*)gm.shm_ptr
+      + gm.shm_chunk_size * device_idx + sizeof(hapiIpcMemHandle_t)) + event_idx;
+}
+
+// The sender's half of the source condition for a cross-process send: once
+// the work that produced this slot's payload has completed, raise src_ready
+// in the shared slot so the receiving process sees it without a driver call.
+// A HAPI callback on the producing stream; reclaimCompletedIpcEvents will not
+// free the slot before it has fired.
+static void ipcSrcReadyFn(void* param, void*)
+{
+  const uintptr_t packed = (uintptr_t)param;
+  ipcSharedSlot((int)(packed >> 32), (int)(uint32_t)packed)
+      ->src_ready.store(true, std::memory_order_release);
+}
+static void ipcPublishSrcReady(int device_idx, int event_idx, hapiStream_t stream)
+{
+  const uintptr_t packed = ((uintptr_t)(uint32_t)device_idx << 32) | (uint32_t)event_idx;
+  hapiAddCallback(stream, CkCallback(ipcSrcReadyFn, (void*)packed));
+}
+// For a sender that settled its stream synchronously: ready now.
+static void ipcPublishSrcReadyNow(int device_idx, int event_idx)
+{
+  ipcSharedSlot(device_idx, event_idx)->src_ready.store(true, std::memory_order_release);
+}
+
+// Decide at post time what the destination still has to wait for: nothing if
+// the poster said the buffer is free or the posted stream is idle; else a
+// flag on the posted stream, or an event when the ring has no slot. Kept in
+// the op so a receive deferred for correction resumes with the same
+// condition, taken before anything later was added to that stream.
+static void deviceRecvNoteDestination(DeviceRdmaOp& op, const CkDeviceBufferPost& post)
+{
+  op.dst_flag_rank = -1;
+  op.dst_flag_seq = 0;
+  op.dst_event = NULL;
+  if (post.buffer_free) return;
+  const cudaError_t q = cudaStreamQuery(post.hapi_stream);
+  if (q == cudaSuccess) return;
+  if (q != cudaErrorNotReady) { hapiCheck(q); return; }
+  cudaGetLastError();   // NotReady is the answer, not an error to leave behind
+  int rank = -1;
+  uint32_t seq = 0;
+  if (hapiFlagIssue(post.hapi_stream, &rank, &seq)) {
+    op.dst_flag_rank = rank;
+    op.dst_flag_seq = seq;
+    return;
+  }
+  hapiEvent_t ev = deviceRecvEventTake();
+  if (hapiEventRecord(ev, post.hapi_stream) == hapiSuccess) {
+    op.dst_event = (void*)ev;
+  } else {
+    // Another device's stream (a chare that moved between GPUs): our event
+    // cannot be recorded on it. Settle it instead; rare and bounded.
+    cudaGetLastError();
+    deviceRecvEventGive(ev);
+    hapiCheck(hapiStreamSynchronize(post.hapi_stream));
+  }
+}
+
+enum class DeviceRecvKind : char { Memcpy, Ipc, Staged };
+
+struct DeviceRecvPending {
+  DeviceRdmaOp* op = nullptr;
+  CkDeviceBuffer source;
+  CkDeviceBuffer dest;
+  CkNcpyModeDevice mode = CkNcpyModeDevice::MEMCPY;
+  int src_pe = -1;
+  DeviceRecvKind kind = DeviceRecvKind::Memcpy;
+  StagedLanding sl{};          // Staged only
+  CkCallbackFn done = nullptr; // completion handler, called with op
+  bool src_ready = false;
+  bool dst_ready = false;
+  double next_query = 0.0;     // earliest time for the next driver-call check
+};
+
+static const double kRecvQueryPeriod = 100e-6;
+
+static inline bool deviceRecvEventDone(hapiEvent_t ev)
+{
+  const cudaError_t q = cudaEventQuery(ev);
+  if (q == cudaSuccess) return true;
+  if (q != cudaErrorNotReady) hapiCheck(q);
+  cudaGetLastError();
+  return false;
+}
+
+// Is the sender's producing work done? Plain loads first; a driver query only
+// when may_query.
+static bool deviceRecvSourceReady(const DeviceRecvPending& p, bool may_query)
+{
+  GPUManager& gm = CsvAccess(gpu_manager);
+  switch (p.kind) {
+  case DeviceRecvKind::Memcpy:
+    if (p.source.ready_seq != 0)
+      return hapiFlagLanded(p.source.ready_rank, p.source.ready_seq);
+    if (p.source.memcpy_event == NULL) return true;   // the sender settled synchronously
+    return may_query && deviceRecvEventDone((hapiEvent_t)p.source.memcpy_event);
+  case DeviceRecvKind::Ipc:
+    if (p.source.event_idx < 0 ||
+        (size_t)p.source.device_idx >= gm.hapi_ipc_device_infos.size())
+      return true;   // deviceIpcReceive reports a bad index
+    if (ipcSharedSlot(p.source.device_idx, p.source.event_idx)
+            ->src_ready.load(std::memory_order_acquire))
+      return true;
+    return may_query &&
+        deviceRecvEventDone(gm.hapi_ipc_device_infos[p.source.device_idx]
+                                .src_event_pool[p.source.event_idx]);
+  case DeviceRecvKind::Staged:
+    return may_query && deviceRecvEventDone(p.sl.ready);
+  }
+  return true;
+}
+
+// Has everything issued on the posted stream before the post completed?
+static bool deviceRecvDestinationReady(DeviceRecvPending& p, bool may_query)
+{
+  DeviceRdmaOp& op = *p.op;
+  if (op.dst_flag_seq != 0) return hapiFlagLanded(op.dst_flag_rank, op.dst_flag_seq);
+  if (op.dst_event == NULL) return true;
+  if (!may_query || !deviceRecvEventDone((hapiEvent_t)op.dst_event)) return false;
+  deviceRecvEventGive((hapiEvent_t)op.dst_event);
+  op.dst_event = NULL;
+  return true;
+}
+
+static void deviceRecvIssue(DeviceRecvPending& p)
+{
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  hapiStream_t rs = deviceRecvStream();
+  CkDeviceBuffer& source = p.source;
+  CkDeviceBuffer& dest = p.dest;
+  switch (p.kind) {
+  case DeviceRecvKind::Staged: {
+    // The pull's completion was the source condition; copy the landing into
+    // the posted buffer and free it behind that copy.
+    const StagedLanding& sl = p.sl;
+    if (stageVerifyOn()) {
+      const unsigned long long now = stageChecksum(source.ptr, sl.cnt);
+      if (!sl.verified)
+        CmiPrintf("[STAGE-VERIFY %d] delivered before the pull's completion was seen: landing %p\n",
+                  CkMyPe(), source.ptr);
+      else if (now != sl.sum)
+        CkAbort("[STAGE-VERIFY %d] landing %p (%zu B) changed between pull and delivery: %llx -> %llx",
+                CkMyPe(), source.ptr, sl.cnt, sl.sum, now);
+    }
+    hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt, cudaMemcpyDefault, rs));
+    hapiAddCallback(rs, CkCallback(stagedLandingFreeFn,
+                                   (void*)new StagedLandingFree{(void*)source.ptr, sl.ready}));
+    if (stagedDbg())
+      CmiPrintf("[STAGE-USE %d] land=%p cnt=%zu -> posted %p\n", CkMyPe(),
+                source.ptr, (size_t)dest.cnt, (void*)dest.ptr);
+    break;
+  }
+  case DeviceRecvKind::Memcpy: {
+    // Same process: a device-to-device copy from the sender's buffer. The
+    // sender's producing work is already complete (deviceRecvSourceReady),
+    // so no stream wait precedes it.
+    // A send that left this process (forward-repaired to direct, with an
+    // IPC event slot claimed) and then came back to it is read here by
+    // memcpy, so the slot would never be released by the IPC path. Retire
+    // it the way that path does: record the destination event and raise
+    // the flag the sender's reclaim scan polls.
+    if (source.sender_prepared && source.ipc_protocol == CmiIpcProtocol::DIRECT &&
+        source.event_idx >= 0 && source.device_idx >= 0 && csv_gpu_manager.use_shm) {
+      hapi_ipc_device_info& di = csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
+      hapiCheck(hapiEventRecord(di.dst_event_pool[source.event_idx],
+                                rs));
+      hapi_ipc_event_shared* sh = (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
+          + csv_gpu_manager.shm_chunk_size * source.device_idx
+          + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
+      sh->dst_flag.store(true, std::memory_order_release);
+    }
+    // cudaMemcpyDefault, not DeviceToDevice: once load balancing has moved
+    // chares between GPUs, the source and destination of a same-process
+    // transfer can sit on different devices, and an explicit DeviceToDevice
+    // kind is rejected for that pair. Default resolves the direction from the
+    // pointers themselves and handles the peer case.
+    hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt,
+          cudaMemcpyDefault, rs));
+
+    // The sender may have staged IPC info for this transfer anyway: an
+    // unconfirmed destination that turned out to be this same process
+    // (see CkRdmaDeviceOnSender). That staging allocated a device
+    // comm-buffer slot and claimed a CUDA IPC event that nothing will
+    // ever free unless we tell the sender it's unused -- the free-up
+    // logic in reclaimCompletedIpcEvents only runs once it sees the dst_flag
+    // this receiver would have set had it taken the IPC branch below.
+    // Signal that now (skip the actual comm-buffer copy in steps 1-2,
+    // since the real data already moved via source.ptr above; just record
+    // the completion event and flag so the sender can reclaim the slot).
+    if (source.device_idx != -1 && csv_gpu_manager.use_shm) {
+      hapi_ipc_device_info& device_info =
+        csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
+
+      // The event belongs to the sender's device, and cudaEventRecord
+      // requires the event and the stream to be on the same one. Across
+      // processes that is never a problem: ipcHandleOpen imports a peer's
+      // events under our own device. It skips our own process, though -- a
+      // process cannot open a handle it exported itself -- so when the source
+      // is a different device inside this same process, what sits in the pool
+      // is that device's original event, and recording it on our stream fails
+      // with 'invalid argument'. This only became reachable once load
+      // balancing started moving chares between GPUs in one process.
+      //
+      // Settle the copy, then record on the owning device. Synchronous, but
+      // it applies only to this one case: a same-process transfer that
+      // crossed devices and whose sender staged IPC state that has to be
+      // released.
+      const int my_dev_idx =
+          csv_gpu_manager.device_count * CmiMyNodeRankLocal() + CpvAccess(my_device_id);
+      if (source.device_idx != my_dev_idx) {
+        hapiCheck(hapiStreamSynchronize(rs));
+        const int src_local = source.device_idx % csv_gpu_manager.device_count;
+        const int src_global =
+            csv_gpu_manager.device_managers[src_local].global_index;
+        int prev_dev = 0;
+        hapiCheck(hapiGetDevice(&prev_dev));
+        hapiCheck(hapiSetDevice(src_global));
+        hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx], 0));
+        hapiCheck(hapiSetDevice(prev_dev));
+      } else {
+        hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx],
+              rs));
+      }
+      hapi_ipc_event_shared* shm_event_shared =
+        (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
+            + csv_gpu_manager.shm_chunk_size * source.device_idx
+            + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
+      shm_event_shared->dst_flag.store(true, std::memory_order_release);
+    }
+    break;
+  }
+  case DeviceRecvKind::Ipc:
+    deviceIpcReceive(source, dest, rs, p.src_pe, p.mode);
+    break;
+  }
+  hapiAddCallback(rs, CkCallback(p.done, (void*)p.op));
+}
+
+// Issue now if both conditions hold, else park for deviceRecvPendingPoll.
+static void deviceRecvTryIssue(DeviceRecvPending&& pending)
+{
+  pending.src_ready = deviceRecvSourceReady(pending, /*may_query=*/true);
+  pending.dst_ready = deviceRecvDestinationReady(pending, /*may_query=*/true);
+  if (pending.src_ready && pending.dst_ready) {
+    deviceRecvIssue(pending);
+    return;
+  }
+  pending.next_query = CkWallTimer() + kRecvQueryPeriod;
+  std::vector<DeviceRecvPending*>& list = *CkpvAccess(device_recv_pending);
+  list.push_back(new DeviceRecvPending(std::move(pending)));
+  g_recv_parked++;
+  if ((long)list.size() > g_recv_parked_max) g_recv_parked_max = (long)list.size();
+}
+
+static void deviceRecvPendingPoll(void*)
+{
+  std::vector<DeviceRecvPending*>& list = *CkpvAccess(device_recv_pending);
+  if (list.empty()) return;
+  const double now = CkWallTimer();
+  size_t kept = 0;
+  for (size_t i = 0; i < list.size(); i++) {
+    DeviceRecvPending* p = list[i];
+    const bool may_query = (now >= p->next_query);
+    if (may_query) p->next_query = now + kRecvQueryPeriod;
+    if (!p->src_ready) p->src_ready = deviceRecvSourceReady(*p, may_query);
+    if (!p->dst_ready) p->dst_ready = deviceRecvDestinationReady(*p, may_query);
+    if (p->src_ready && p->dst_ready) {
+      deviceRecvIssue(*p);
+      delete p;
+    } else {
+      list[kept++] = p;
+    }
+  }
+  list.resize(kept);
+}
 
 /*************** Forward-time repair of a memcpy-prepared payload ***************/
 //
@@ -1497,6 +1801,7 @@ CkDeviceRepairResult CkRdmaDeviceRepairForward(envelope* env, int newPe, int opt
         csv_gpu_manager.device_count * CmiMyNodeRankLocal() + dev;
     hapi_ipc_device_info& info = csv_gpu_manager.hapi_ipc_device_infos[device_idx];
     hapiCheck(hapiEventRecord(info.src_event_pool[ev], hapiStreamPerThread));
+    ipcPublishSrcReady(device_idx, ev, hapiStreamPerThread);
 
     b.ipc_protocol = CmiIpcProtocol::DIRECT;
     b.ipc_handle = handle;
@@ -1906,6 +2211,7 @@ extern "C" void* device_restage_req_bridge(void* arg)
         csv_gpu_manager.hapi_ipc_device_infos[device_idx];
     hapiCheck(hapiEventRecord(my_device_info.src_event_pool[event_idx],
                               hapiStreamPerThread));
+    ipcPublishSrcReady(device_idx, event_idx, hapiStreamPerThread);
 
     DeviceRestageMeta* m = (DeviceRestageMeta*)CmiAlloc(sizeof(DeviceRestageMeta));
     CmiEnforce(m);
@@ -1943,6 +2249,7 @@ extern "C" void* device_restage_req_bridge(void* arg)
         csv_gpu_manager.hapi_ipc_device_infos[device_idx];
     hapiCheck(hapiEventRecord(my_device_info.src_event_pool[event_idx],
                               hapiStreamPerThread));
+    ipcPublishSrcReady(device_idx, event_idx, hapiStreamPerThread);
 
     // Retire the ORIGINAL send's slot, now that its bytes have been re-read.
     //
@@ -2035,11 +2342,19 @@ extern "C" void* device_restage_meta_bridge(void* arg)
   source.sender_prepared = true;
 
   CkDeviceBuffer dest(op->dest_ptr, op->size);
-  hapiStream_t recv_stream = (hapiStream_t)op->stream;
 
-  deviceIpcReceive(source, dest, recv_stream, op->src_pe,
-                   CkNcpyModeDevice::IPC);
-  hapiAddCallback(recv_stream, CkCallback(deviceRestageRecvDone, op));
+  // The same gate as a first-time receive: the retransmit's producer (the
+  // sender's staging copy, or its original kernels for a direct export) and
+  // the destination condition the original post recorded in the op.
+  DeviceRecvPending pr;
+  pr.op = op;
+  pr.source = source;
+  pr.dest = dest;
+  pr.mode = CkNcpyModeDevice::IPC;
+  pr.src_pe = op->src_pe;
+  pr.kind = DeviceRecvKind::Ipc;
+  pr.done = deviceRestageRecvDone;
+  deviceRecvTryIssue(std::move(pr));
 
   CmiFree(m);
   return NULL;
@@ -2429,6 +2744,16 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       continue;
     }
 
+    // The copy lands on the PE's receive stream, issued only once what it
+    // depends on is complete (DeviceRecvPending); save_op.stream names it for
+    // a transfer that resumes after a correction. What the destination waits
+    // for is decided per branch below, before anything later reaches the
+    // posted stream.
+    save_op.stream = (void*)deviceRecvStream();
+    save_op.dst_flag_rank = -1;
+    save_op.dst_flag_seq = 0;
+    save_op.dst_event = NULL;
+
     // Destination buffer (on this receiver)
     CkDeviceBuffer dest((const void *)arrPtrs[i], arrSizes[i]);
 
@@ -2519,26 +2844,19 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
           delete (CkCallback*)save_op.src_cb;
           save_op.src_cb = nullptr;
         }
-        hapiCheck(hapiStreamWaitEvent(postStructs[i].hapi_stream, sl.ready, 0));
-        if (stageVerifyOn()) {
-          hapiCheck(cudaEventSynchronize(sl.ready));
-          const unsigned long long now = stageChecksum(source.ptr, sl.cnt);
-          if (!sl.verified)
-            CmiPrintf("[STAGE-VERIFY %d] delivered before the pull's completion was seen: landing %p\n",
-                      CkMyPe(), source.ptr);
-          else if (now != sl.sum)
-            CkAbort("[STAGE-VERIFY %d] landing %p (%zu B) changed between pull and delivery: %llx -> %llx",
-                    CkMyPe(), source.ptr, sl.cnt, sl.sum, now);
-        }
-        hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt,
-              cudaMemcpyDefault, postStructs[i].hapi_stream));
-        hapiAddCallback(postStructs[i].hapi_stream,
-                        CkCallback(stagedLandingFreeFn,
-                                   (void*)new StagedLandingFree{(void*)source.ptr, sl.ready}));
-        hapiAddCallback(postStructs[i].hapi_stream, CkCallback(CkRdmaDeviceRecvHandler, &save_op));
-        if (stagedDbg())
-          CmiPrintf("[STAGE-USE %d] land=%p cnt=%zu -> posted %p\n", CkMyPe(),
-                    source.ptr, (size_t)dest.cnt, (void*)dest.ptr);
+        // The pull's completion (sl.ready) is the source condition here;
+        // deviceRecvIssue copies the landing into the posted buffer.
+        deviceRecvNoteDestination(save_op, postStructs[i]);
+        DeviceRecvPending pr;
+        pr.op = &save_op;
+        pr.source = source;
+        pr.dest = dest;
+        pr.mode = mode;
+        pr.src_pe = env->getSrcPe();
+        pr.kind = DeviceRecvKind::Staged;
+        pr.sl = sl;
+        pr.done = CkRdmaDeviceRecvHandler;
+        deviceRecvTryIssue(std::move(pr));
         continue;
       }
     }
@@ -2550,89 +2868,20 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
         (sender_exported && source.ipc_protocol == CmiIpcProtocol::DIRECT);
 
     if (mode == CkNcpyModeDevice::MEMCPY && !sender_exported) {
-      // Source and destination PEs are in the same process (logical node)
-      // Directly invoke memcpy from source buffer to destination buffer.
-      // Order against the sender's stream first: without this the copy could
-      // run before the kernels that produced the source data. A null event
-      // means the sender blocked instead, so the data is already there.
-      // A send that left this process (forward-repaired to direct, with an
-      // IPC event slot claimed) and then came back to it is read here by
-      // memcpy, so the slot would never be released by the IPC path. Retire
-      // it the way that path does: record the destination event and raise
-      // the flag the sender's reclaim scan polls.
-      if (source.sender_prepared && source.ipc_protocol == CmiIpcProtocol::DIRECT &&
-          source.event_idx >= 0 && source.device_idx >= 0 && csv_gpu_manager.use_shm) {
-        hapi_ipc_device_info& di = csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
-        hapiCheck(hapiEventRecord(di.dst_event_pool[source.event_idx],
-                                  postStructs[i].hapi_stream));
-        hapi_ipc_event_shared* sh = (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
-            + csv_gpu_manager.shm_chunk_size * source.device_idx
-            + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
-        sh->dst_flag.store(true, std::memory_order_release);
-      }
-      if (source.memcpy_event != NULL) {
-        hapiCheck(hapiStreamWaitEvent(postStructs[i].hapi_stream,
-              (hapiEvent_t)source.memcpy_event, 0));
-      }
-      // cudaMemcpyDefault, not DeviceToDevice: once load balancing has moved
-      // chares between GPUs, the source and destination of a same-process
-      // transfer can sit on different devices, and an explicit DeviceToDevice
-      // kind is rejected for that pair. Default resolves the direction from the
-      // pointers themselves and handles the peer case.
-      hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt,
-            cudaMemcpyDefault, postStructs[i].hapi_stream));
-
-      // The sender may have staged IPC info for this transfer anyway: an
-      // unconfirmed destination that turned out to be this same process
-      // (see CkRdmaDeviceOnSender). That staging allocated a device
-      // comm-buffer slot and claimed a CUDA IPC event that nothing will
-      // ever free unless we tell the sender it's unused -- the free-up
-      // logic in reclaimCompletedIpcEvents only runs once it sees the dst_flag
-      // this receiver would have set had it taken the IPC branch below.
-      // Signal that now (skip the actual comm-buffer copy in steps 1-2,
-      // since the real data already moved via source.ptr above; just record
-      // the completion event and flag so the sender can reclaim the slot).
-      if (source.device_idx != -1 && csv_gpu_manager.use_shm) {
-        hapi_ipc_device_info& device_info =
-          csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
-
-        // The event belongs to the sender's device, and cudaEventRecord
-        // requires the event and the stream to be on the same one. Across
-        // processes that is never a problem: ipcHandleOpen imports a peer's
-        // events under our own device. It skips our own process, though -- a
-        // process cannot open a handle it exported itself -- so when the source
-        // is a different device inside this same process, what sits in the pool
-        // is that device's original event, and recording it on our stream fails
-        // with 'invalid argument'. This only became reachable once load
-        // balancing started moving chares between GPUs in one process.
-        //
-        // Settle the copy, then record on the owning device. Synchronous, but
-        // it applies only to this one case: a same-process transfer that
-        // crossed devices and whose sender staged IPC state that has to be
-        // released.
-        const int my_dev_idx =
-            csv_gpu_manager.device_count * CmiMyNodeRankLocal() + CpvAccess(my_device_id);
-        if (source.device_idx != my_dev_idx) {
-          hapiCheck(hapiStreamSynchronize(postStructs[i].hapi_stream));
-          const int src_local = source.device_idx % csv_gpu_manager.device_count;
-          const int src_global =
-              csv_gpu_manager.device_managers[src_local].global_index;
-          int prev_dev = 0;
-          hapiCheck(hapiGetDevice(&prev_dev));
-          hapiCheck(hapiSetDevice(src_global));
-          hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx], 0));
-          hapiCheck(hapiSetDevice(prev_dev));
-        } else {
-          hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx],
-                postStructs[i].hapi_stream));
-        }
-        hapi_ipc_event_shared* shm_event_shared =
-          (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
-              + csv_gpu_manager.shm_chunk_size * source.device_idx
-              + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
-        shm_event_shared->dst_flag.store(true, std::memory_order_release);
-      }
+      // Same process: the copy is issued by deviceRecvIssue once the sender's
+      // producing work and the destination's earlier work are both complete.
+      deviceRecvNoteDestination(save_op, postStructs[i]);
+      DeviceRecvPending pr;
+      pr.op = &save_op;
+      pr.source = source;
+      pr.dest = dest;
+      pr.mode = mode;
+      pr.src_pe = env->getSrcPe();
+      pr.kind = DeviceRecvKind::Memcpy;
+      pr.done = CkRdmaDeviceRecvHandler;
+      deviceRecvTryIssue(std::move(pr));
     } else if (sender_exported) {
+      deviceRecvNoteDestination(save_op, postStructs[i]);
       // A direct send can be unmappable here even though nothing is wrong with
       // it. One cudaIpcOpenMemHandle maps the whole suballocator region behind
       // an allocation, so a second allocation carved from that same region
@@ -2666,8 +2915,15 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
                              mode != CkNcpyModeDevice::IPC);
         continue;  // completion deferred until the retransmit lands
       }
-      deviceIpcReceive(source, dest, postStructs[i].hapi_stream,
-                       env->getSrcPe(), mode);
+      DeviceRecvPending pr;
+      pr.op = &save_op;
+      pr.source = source;
+      pr.dest = dest;
+      pr.mode = mode;
+      pr.src_pe = env->getSrcPe();
+      pr.kind = DeviceRecvKind::Ipc;
+      pr.done = CkRdmaDeviceRecvHandler;
+      deviceRecvTryIssue(std::move(pr));
     } else {
       // Nothing staged and not same-process. That is legitimate only for a
       // genuine cross-physical-node transfer, where the sender's else-branch
@@ -2692,6 +2948,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
           (source.device_idx != -1 &&
            !CmiPeOnSamePhysicalNode(env->getSrcPe(), CkMyPe()))) {
         if (watch) watch->deferred[i] = 1;
+        deviceRecvNoteDestination(save_op, postStructs[i]);
         CkGroupID def_aid; def_aid.idx = save_op.dest_aid_idx;
         src_prepared_dbg = source.sender_prepared;
         src_proto_dbg = (int)source.ipc_protocol;
@@ -2742,11 +2999,9 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       CkAssert(source.data_stored);
       hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.data, dest.cnt,
             hapiMemcpyHostToDevice, postStructs[i].hapi_stream));
+      hapiAddCallback(postStructs[i].hapi_stream, CkCallback(CkRdmaDeviceRecvHandler, &save_op));
 #endif
     }
-
-    // Add source callback for polling, so that it can be invoked once the transfer is complete
-    hapiAddCallback(postStructs[i].hapi_stream, CkCallback(CkRdmaDeviceRecvHandler, &save_op));
   }
 
   // A receive whose every buffer was empty raises no completion: the device
@@ -2969,6 +3224,8 @@ bool CkRdmaDeviceStageParked(envelope* env)
     nb.ipc_offset = 0;
     nb.ipc_base = NULL;
     nb.memcpy_event = NULL;
+    nb.ready_rank = -1;
+    nb.ready_seq = 0;
     nb.sender_prepared = true;
     nb.data_stored = false;
     nb.data = NULL;
@@ -3099,6 +3356,10 @@ static int reclaimCompletedIpcEvents(DeviceManager* dm, int cpv_my_device_id,
     // pairs with the receiver's release store, and is what makes its
     // hapiEventRecord visible before the query below.
     if (!my_shm_events[i].dst_flag.load(std::memory_order_acquire)) continue;
+    // The publish callback behind this use's source event must have fired
+    // too: freed before that, the slot could be claimed and named in a new
+    // send, and the late callback would mark that use ready.
+    if (!my_shm_events[i].src_ready.load(std::memory_order_acquire)) continue;
 
     // The receiver has invoked the memcpy, so the sender may query the event.
     if (hapiEventQuery(my_device_info.dst_event_pool[i]) != hapiSuccess) continue;
@@ -3149,7 +3410,9 @@ static int claimFreeIpcEvent(int cpv_my_device_id, const size_t comm_offset,
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   int pool_size = csv_gpu_manager.hapi_ipc_event_pool_size_pe;
   int pool_start = ipcEventPoolSlice(cpv_my_device_id) * pool_size;
-  hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id];
+  const int my_device_index =
+      csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id;
+  hapi_ipc_device_info& my_device_info = csv_gpu_manager.hapi_ipc_device_infos[my_device_index];
 
   for (int i = pool_start; i < pool_start + pool_size; i++) {
     int& event_flag = my_device_info.event_pool_flags[i];
@@ -3157,6 +3420,10 @@ static int claimFreeIpcEvent(int cpv_my_device_id, const size_t comm_offset,
     if (event_flag == 0) {
       event_flag = flag_value;
       buff_offset = comm_offset;
+      // Not ready until this use's publish callback says so. The receiver
+      // reads it only after the message naming the slot, which follows this.
+      if (csv_gpu_manager.use_shm)
+        ipcSharedSlot(my_device_index, i)->src_ready.store(false, std::memory_order_release);
       return i;
     }
   }
@@ -4029,11 +4296,13 @@ static bool ipcPrepareBuffers(int dest_pe, int numops, CkDeviceBuffer** buffers,
       hapiCheck(hapiStreamSynchronize(buffers[i]->hapi_stream));
       hapiCheck(hapiEventRecord(
           my_device_info.src_event_pool[buffers[i]->event_idx], NULL));
+      ipcPublishSrcReadyNow(my_device_idx, buffers[i]->event_idx);
     } else {
       hapiCheck(hapiEventRecordNoted(
           my_device_info.src_event_pool[buffers[i]->event_idx],
           buffers[i]->hapi_stream,
           my_device_idx * 100000 + buffers[i]->event_idx));
+      ipcPublishSrcReady(my_device_idx, buffers[i]->event_idx, buffers[i]->hapi_stream);
     }
     ipcDebugSync("send 2: record own src_event", buffers[i]->hapi_stream);
   }
@@ -4187,6 +4456,8 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
     buffers[i]->device_idx = -1;
     buffers[i]->event_idx = -1;
     buffers[i]->memcpy_event = NULL;
+    buffers[i]->ready_rank = -1;
+    buffers[i]->ready_seq = 0;
     buffers[i]->sender_prepared = true;
     if (buffers[i]->cb.type != CkCallback::ignore) {
       buffers[i]->cb.send();
@@ -4259,6 +4530,19 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
       if (force_sync) {
         hapiStreamSynchronize(buffers[i]->hapi_stream);
       } else {
+        // The receiver gates its copy on this on the host (DeviceRecvPending):
+        // a pinned flag it reads with a plain load, or, when this ring has no
+        // slot, the event it queries.
+        buffers[i]->ready_rank = -1;
+        buffers[i]->ready_seq = 0;
+        {
+          int rank = -1;
+          uint32_t seq = 0;
+          if (hapiFlagIssue(buffers[i]->hapi_stream, &rank, &seq)) {
+            buffers[i]->ready_rank = rank;
+            buffers[i]->ready_seq = seq;
+          }
+        }
         buffers[i]->memcpy_event = ckDeviceRecordMemcpyEvent(buffers[i]->hapi_stream);
         if (buffers[i]->memcpy_event == NULL)  // no event available; fall back
           hapiStreamSynchronize(buffers[i]->hapi_stream);

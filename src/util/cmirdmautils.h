@@ -28,9 +28,9 @@ typedef struct DeviceRdmaInfo_ {
 } DeviceRdmaInfo;
 
 typedef struct DeviceRdmaOp_ {
-  // The stream this receive was posted on. Kept so a transfer deferred by the
-  // migration-mismatch correction can resume on the same stream it would have
-  // used had the sender guessed the destination right.
+  // The PE's receive stream, where this receive's copy lands. Every device
+  // receive on a PE uses the one stream; a transfer deferred by the
+  // migration-mismatch correction resumes on it too.
   void* stream;
   const void* dest_ptr;
   size_t size;
@@ -56,6 +56,15 @@ typedef struct DeviceRdmaOp_ {
   // is stamped where the rget is issued and read where it completes, so it
   // cannot be lost to the aggregation.
   double rget_posted;
+  // What the destination still had to wait for when the receive was posted:
+  // the work issued on the posted stream before the post. dst_flag_seq names
+  // the pinned flag issued on that stream then (0: none), dst_event an event
+  // recorded there when the flag ring had no slot (NULL: none). Both zero
+  // means the destination was already free at post time. Decided at post so
+  // a receive deferred for correction resumes with the same condition.
+  int dst_flag_rank;
+  uint32_t dst_flag_seq;
+  void* dst_event;
 } DeviceRdmaOp;
 
 typedef struct DeviceRdmaOpMsg_ {

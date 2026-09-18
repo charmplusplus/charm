@@ -41,7 +41,16 @@
 struct hapi_ipc_event_shared {
   hapiIpcEventHandle_t src_event_handle;
   hapiIpcEventHandle_t dst_event_handle;
-  bool src_flag; // Unused for now
+  // Set by the owning sender's PE once the work that produced this slot's
+  // payload has completed on the device (a HAPI callback behind its source
+  // event record), cleared by that sender when it claims the slot, before
+  // the message naming the slot is sent. The receiving process reads it
+  // before issuing its copy, so a receive whose producer is still running
+  // parks on the host instead of putting a stream wait in front of anyone.
+  // The sender's reclaim scan will not free a slot before this is set, so a
+  // late callback can never mark a later use of the slot. Same lock-free
+  // requirement as dst_flag below.
+  std::atomic<bool> src_ready;
   // Set by the receiving process once it has recorded dst_event; read and
   // cleared by the owning sender when it reclaims the slot.
   //

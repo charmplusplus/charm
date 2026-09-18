@@ -101,9 +101,12 @@ typedef struct hapiEvent {
   uint32_t flag_seq;   // pinned-flag entries: the value the slot must reach
   void* workToken;     // hapiDeviceWorkBegin's token, handed to hapiDeviceWorkEnd when this fires
 
-  hapiEvent(hapiEvent_t event_, const CkCallback& cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL)
+  // track: mark device work in flight on the current element until this
+  // fires. A readiness flag (hapiFlagIssue) carries no work of its own.
+  hapiEvent(hapiEvent_t event_, const CkCallback& cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL,
+            bool track = true)
             : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_), flag_seq(0),
-              workToken(hapiDeviceWorkBegin ? hapiDeviceWorkBegin() : nullptr) {}
+              workToken((track && hapiDeviceWorkBegin) ? hapiDeviceWorkBegin() : nullptr) {}
 } hapiEvent;
 
 // Pending events, one FIFO per stream. Events on one stream complete in the
@@ -2341,6 +2344,16 @@ static void hapiMapping(char** argv) {
 int hapiStreamDeviceOf(hapiStream_t stream);   // defined with the stream pool below
 
 #ifndef HAPI_CUDA_CALLBACK
+// The pending-entry queue for `stream`, created on first use and kept (see
+// hapi_event_queue).
+static std::queue<hapiEvent>& hapiQueueFor(hapiStream_t stream) {
+  hapiEventQueues& queues = CpvAccess(hapi_event_queue);
+  for (auto& entry : queues)
+    if (entry.first == stream) return entry.second;
+  queues.emplace_back(stream, std::queue<hapiEvent>());
+  return queues.back().second;
+}
+
 void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
   // if(obj!=NULL)
   //   CmiAbort("non null without HAPI CUDA CALLBACK");
@@ -2386,15 +2399,7 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
     hapiEvent hev(NULL, cb, cb_msg, wr);
     hev.flag_seq = seq;
     CpvAccess(hapi_flag_inflight)++;
-    hapiEventQueues& queues = CpvAccess(hapi_event_queue);
-    std::queue<hapiEvent>* q = nullptr;
-    for (auto& entry : queues)
-      if (entry.first == stream) { q = &entry.second; break; }
-    if (q == nullptr) {
-      queues.emplace_back(stream, std::queue<hapiEvent>());
-      q = &queues.back().second;
-    }
-    q->push(hev);
+    hapiQueueFor(stream).push(hev);
     CpvAccess(n_hapi_events)++;
     return;
   }
@@ -3000,7 +3005,7 @@ static void ipcHandleCreate() {
   for (int i = 0; i < csv_gpu_manager.hapi_ipc_event_pool_size_total; i++) {
     hapi_ipc_event_shared* cur_shm_event_shared = shm_event_shared + i;
 
-    cur_shm_event_shared->src_flag = false;
+    cur_shm_event_shared->src_ready.store(false, std::memory_order_relaxed);
     cur_shm_event_shared->dst_flag.store(false, std::memory_order_relaxed);
 
     my_device_info.event_pool_flags.push_back(0);
@@ -4757,6 +4762,62 @@ void hapiAddCallback(hapiStream_t stream, const CkCallback& cb, void* cb_msg) {
 
 void hapiAddCallback(hapiStream_t stream, void* cb, void* cb_msg) {
   hapiAddCallback(stream, *(CkCallback*)cb, cb_msg);
+}
+
+// A readiness flag: recordEvent's pinned-flag path with no callback behind
+// it. The entry still drains through hapiPollEvents, which is what frees the
+// slot (and what makes hapiFlagLanded's "later value means landed" sound);
+// it fires nothing and marks no device work on an element.
+bool hapiFlagIssue(hapiStream_t stream, int* rank, uint32_t* seq) {
+#ifndef HAPI_CUDA_CALLBACK
+  if (!hapi_use_flag_poll) return false;
+  const int stream_dev = hapiStreamDeviceOf(stream);
+  if (stream_dev >= 0 && stream_dev != CpvAccess(my_device)) return false;
+  uint32_t next = CpvAccess(hapi_flag_seq) + 1;
+  if (next == 0) next = 1;
+  const uint32_t idx = next & (HAPI_FLAG_SLOTS - 1);
+  if (CpvAccess(hapi_flag_busy)[idx]) return false;   // ring full: caller uses an event
+  CpvAccess(hapi_flag_seq) = next;
+  CpvAccess(hapi_flag_busy)[idx] = 1;
+  uint32_t* slot_dev =
+      (uint32_t*)CpvAccess(hapi_flag_slots_dev) + (size_t)idx * HAPI_FLAG_STRIDE;
+  const CUresult res = hapi_flag_use_memset
+      ? hapi_memset_d32_async((CUdeviceptr)slot_dev, next, 1, (CUstream)stream)
+      : hapi_stream_write_value32((CUstream)stream, (CUdeviceptr)slot_dev,
+                                  next, CU_STREAM_WRITE_VALUE_DEFAULT);
+  if (res != CUDA_SUCCESS)
+    CmiAbort("HAPI> %s failed (%d); rerun with +gpueventquery",
+             hapi_flag_use_memset ? "cuMemsetD32Async" : "cuStreamWriteValue32", (int)res);
+  hapiTraceFlag((void*)stream, next);
+  hapiEvent hev(NULL, CkCallback(CkCallback::ignore), NULL, NULL, /*track=*/false);
+  hev.flag_seq = next;
+  CpvAccess(hapi_flag_inflight)++;
+  hapiQueueFor(stream).push(hev);
+  CpvAccess(n_hapi_events)++;
+  // Drained by hapiPollEvents like any callback, which processes one; balance it.
+  CmiAssert(hapiQdCreate);
+  hapiQdCreate(1);
+  *rank = CmiMyRank();
+  *seq = next;
+  return true;
+#else
+  (void)stream; (void)rank; (void)seq;
+  return false;
+#endif
+}
+
+bool hapiFlagLanded(int rank, uint32_t seq) {
+#ifndef HAPI_CUDA_CALLBACK
+  if (seq == 0) return true;
+  uint32_t* slots = CpvAccessOther(hapi_flag_slots, rank);
+  if (slots == NULL) return true;   // no ring there: nothing was ever issued on it
+  volatile uint32_t* slot =
+      slots + (size_t)(seq & (HAPI_FLAG_SLOTS - 1)) * HAPI_FLAG_STRIDE;
+  return (int32_t)(*slot - seq) >= 0;
+#else
+  (void)rank; (void)seq;
+  return true;
+#endif
 }
 
 void hapiSendMemoryRequest(char* msg, int size)

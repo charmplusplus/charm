@@ -271,6 +271,7 @@ void Cell::receiveForces(int ref, int ordinal, int sourcePe, double readyMs, int
   if (joinTrace(ref)) tracePosts[{ref,ordinal}] = CkWallTimer();
   f = d_recv_force + (size_t)ordinal * part_capacity;
   devicePost[0].hapi_stream = stream;
+  devicePost[0].buffer_free = leanmdBufferFree();
 }
 
 // Fold one compute's contribution into the accumulator. This is what used to be a
@@ -360,6 +361,7 @@ void Cell::receiveMigrants(int ref, int ordinal, int n, int& m, Particle*& parts
                            CkDeviceBufferPost* devicePost) {
   parts = d_recv_parts + (size_t)ordinal * exch_capacity;
   devicePost[0].hapi_stream = stream;
+  devicePost[0].buffer_free = leanmdBufferFree();
 }
 
 void Cell::appendMigrants(int ordinal, int n, Particle* parts) {
