@@ -117,13 +117,17 @@ typedef struct hapiEvent {
 // expert's 10-150 ms compute-done event was not noticed until that expert
 // finished. A stream's entry stays once created (a handful per PE), so a
 // destroyed-and-reused handle just reuses it.
-// A deque, not a vector: hapiPollEvents walks this by reference and the
-// callbacks it fires can record new events, and a new stream appends a
-// queue here. A vector reallocates on that append, leaving the reference
-// hapiPollEvents is holding dangling -- its next pop() then frees through
-// stale memory, which is the double free seen inside hapiPollEvents when a
-// balancer migrates enough objects to create a batch of new streams.
-// A deque keeps references to existing elements valid across push_back.
+// A deque, not a vector: hapiPollEvents walks this and the callbacks it
+// fires can record new events, and a new stream appends a queue here. A
+// vector reallocates on that append, leaving the reference hapiPollEvents is
+// holding dangling -- its next pop() then frees through stale memory, which
+// is the double free seen inside hapiPollEvents when a balancer migrates
+// enough objects to create a batch of new streams. A deque keeps references
+// to existing elements valid across push_back -- but NOT iterators: past a
+// few chunks (five queues each) a push_back reallocates the deque's node map,
+// and a range-for's iterator holds a pointer into that map. So hapiPollEvents
+// walks it by index (operator[] re-derives the chunk from the live map), and
+// nothing may keep an iterator into it across a callback.
 typedef std::deque<std::pair<hapiStream_t, std::queue<hapiEvent>>> hapiEventQueues;
 CpvDeclare(hapiEventQueues, hapi_event_queue);
 // Free events, partitioned by the device they were created on: an event can
@@ -4370,7 +4374,15 @@ void hapiPollEvents(void* param) {
   if (CpvAccess(n_hapi_events) <= 0) return;
 
   hapiEventQueues& queues = CpvAccess(hapi_event_queue);
-  for (auto& entry : queues) {
+  // By index, never by iterator (see hapiEventQueues): a callback fired below
+  // can register the first callback on a new stream, which appends a queue
+  // here and may reallocate the deque's node map. The range-for this was held
+  // a pointer into that map and, on the next chunk boundary, read the next
+  // chunk's address out of freed memory -- leanmd's sync LB flood (job
+  // 22169082) segfaulted here on every rank that crossed a chunk after such
+  // an append. Queues appended during the walk are simply visited too.
+  for (size_t qi = 0; qi < queues.size(); qi++) {
+    std::pair<hapiStream_t, std::queue<hapiEvent>>& entry = queues[qi];
     std::queue<hapiEvent>& queue = entry.second;
     while (!queue.empty()) {
       hapiEvent hev = queue.front();
