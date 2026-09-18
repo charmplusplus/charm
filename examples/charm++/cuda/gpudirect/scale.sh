@@ -29,9 +29,11 @@
 #   0.125x0.25 m, 8x8 = 64 fluid), replicated along the flow direction x:
 #   dom_lx 1.5*N, n_chares_x 12*N, col_w 1.0*N; y, spacing and col_h fixed, so
 #   patch size, fluid fraction and 7.5 patches/PE are all held.
-# sph2d STRONG: fixed 64x34 = 2176 patches / 1024 fluid (~181M particles), sized
-#   for the 16-node end; N=1 is the heaviest point (~35 GB/GPU) -- run it as the
-#   canary and drop -r to 1.5 if it OOMs.
+# sph2d STRONG: fixed SPH_STRONG_X x 34 patches at 177k particles each (default
+#   32x34 = 1088 patches / 512 fluid, ~90M particles, 22 GB/GPU at N=1). The
+#   per-patch size is what keeps it GPU-bound at every N; the count sets the
+#   run time. SPH_STRONG_X=64 SPH_STRONG_W=4 restores the 16-node sizing (2176
+#   patches / 1024 fluid, ~35 GB/GPU at N=1 -- drop -r to 1.5 if it OOMs).
 #
 # -------------------------------------------------------------- gotchas ----
 # * leanmd's +pe is the TOTAL PE count (8 per process), sph2d's +ppn is PER
@@ -137,9 +139,11 @@ pool_for() { local mb; mb=$(pow2_mb "$1")
   if [ "$NODES" -gt 1 ] && [ "$mb" -gt "$POOL_MULTINODE_MAX" ]; then mb=$POOL_MULTINODE_MAX; fi
   echo "$mb"; }
 # arenas created in total, and those created after the first timed step
+# Under the vmm backend (POOL_ALLOC=vmm) the count is heaps (one per process)
+# and growth is every in-place chunk mapping the pool reported after the mark.
 pool_growth() { local log=$1 mark=$2 t m
-  t=$(grep -acE "device pool: arena [0-9]+ of" "$log" 2>/dev/null || echo 0)
-  m=$(awk -v mk="$mark" '$0 ~ mk {s=1} /device pool: arena [0-9]+ of/{if(s)m++} END{print m+0}' "$log" 2>/dev/null)
+  t=$(grep -acE "device pool: arena [0-9]+ of|device pool \(vmm\): heap at" "$log" 2>/dev/null || echo 0)
+  m=$(awk -v mk="$mark" '$0 ~ mk {s=1} /device pool: arena [0-9]+ of|device pool.*: growing for/{if(s)m++} END{print m+0}' "$log" 2>/dev/null)
   echo "${t}(+${m:-0})"; }
 START=$(date +%s); DEADLINE_MIN=${DEADLINE_MIN:-55}
 # DRY=1 reports two sums. PLAN_SECONDS is the sum of the arms' TIMEOUTS -- the
@@ -197,6 +201,7 @@ run_leanmd() { local kind=$1 arm=$2
   pool=$(pool_for $pool)
   dir=$RL/${kind}_N${NODES}_$arm
   local C="$grid $STEPS $PERIOD $PERIOD -computemap local -density gradient +pe $pes +setcpuaffinity +gpushm +gpuipceventpool 256 +gpupool +gpupoolsize $pool"
+  [ "${POOL_ALLOC:-buddy}" = vmm ] && C="$C +gpupoolalloc vmm"
   if [ -n "$DRY" ]; then PLAN_S=$((PLAN_S+tmo)); EXP_S=$((EXP_S+exp)); printf "  [dry] leanmd %-6s %-6s grid=[%s] %d cells %d/GPU %d PEs pool=%dMB expect=%ds timeout=%ds\n" "$kind" "$arm" "$grid" $cells $cpg $pes $pool $exp $tmo; return; fi
   fits $exp || { printf "  leanmd %-6s %-6s SKIPPED (%ds left, needs %ds for a %ds run)\n" "$kind" "$arm" "$(budget_left)" "$(( exp*130/100 + 45 ))" "$exp"; return; }
   tmo=$(clamp_tmo $tmo)
@@ -230,7 +235,7 @@ run_leanmd() { local kind=$1 arm=$2
 # can run quiet while the other still records its decisions.
 SPH_MD="+balancer MetisLB +balancer DiffusionLB +LBDiffusionCommOn +LBCostConfig $COSTCFG +LBDebug ${SPH_LBDEBUG:-${LBDEBUG:-1}}"
 run_sph2d() { local kind=$1 arm=$2
-  local cfg lbargs tmo exp log rc ms imb patches fluid pool
+  local cfg lbargs tmo exp log rc ms imb patches fluid pool arenas=1
   if [ "$kind" = weak ]; then
     local X XC CW; X=$(awk "BEGIN{printf \"%.4f\",1.5*$NODES}"); XC=$((12*NODES)); CW=$(awk "BEGIN{printf \"%.4f\",1.0*$NODES}")
     cfg="-X $X -Y 2.5 -x $XC -y 10 -w $CW -t 2 -s 0.00042 -r 2 -e 0.1 -V 10 -u 200 -i 6000 -S 2000"
@@ -238,26 +243,55 @@ run_sph2d() { local kind=$1 arm=$2
     patches=$((120*NODES)); fluid=$((64*NODES)); tmo=300; exp=120; pool=$(pool_for $SPH_POOL_WEAK)
     case $arm in nolb) lbargs="-f 99999";; sync) lbargs="-f 1000 -b 2000 $SPH_MD";; async) lbargs="-f 1000 -b 2000 -a -l 800 $SPH_MD +LBAsync";; esac
   else
-    cfg="-X 8 -Y 8.5 -x 64 -y 34 -w 4 -t 8 -s 0.00042 -r 2 -e 0.1 -V 10 -u 200 -i 1500 -S 500"
-    # exp=600 is a GUESS -- sph2d strong has never been run at any node count.
-    patches=2176; fluid=1024; tmo=900; exp=600; pool=$(pool_for $SPH_POOL_STRONG)
-    case $arm in nolb) lbargs="-f 99999";; sync) lbargs="-f 500 -b 750 $SPH_MD";; async) lbargs="-f 500 -b 750 -a -l 200 $SPH_MD +LBAsync";; esac
+    # A fixed problem whose per-patch size -- 177k particles at spacing 0.00042
+    # on 0.125 x 0.25 m patches -- keeps every node count GPU-bound (the size
+    # study: host-bound below 60k/patch, GPU-bound at 586k). Its COUNT is the
+    # knob: SPH_STRONG_X patches across (default 32: half the 16-node sizing
+    # of 64, so N=1 holds 22 GB/GPU and ~15 min of arms instead of 35 GB and
+    # 30) with a fluid column SPH_STRONG_W m wide (default 2 = 16 patches),
+    # 8 m tall (32 patches) in a domain 34 patches high. LB every
+    # SPH_STRONG_B iterations from SPH_STRONG_F, lag SPH_STRONG_LAG: the
+    # defaults give four LB steps in 1500 iterations (the lag must stay
+    # shorter than the gap; see the weak note above).
+    local SX=${SPH_STRONG_X:-32} SW=${SPH_STRONG_W:-2} SI=${SPH_STRONG_ITERS:-1500}
+    local SF=${SPH_STRONG_F:-300} SB=${SPH_STRONG_B:-300} SL=${SPH_STRONG_LAG:-200}
+    local SDX; SDX=$(awk "BEGIN{printf \"%.4f\", 0.125*$SX}")
+    cfg="-X $SDX -Y 8.5 -x $SX -y 34 -w $SW -t 8 -s 0.00042 -r 2 -e 0.1 -V 10 -u 200 -i $SI -S 500"
+    patches=$((SX*34)); fluid=$((SW*8*32))
+    # Expected time: a GUESS scaled from the original 600 s guess for 256
+    # fluid patches/GPU over 1500 iterations (1.56 ms per fluid patch per
+    # iteration per GPU) -- sph2d strong had never been run at any node count.
+    exp=$(awk "BEGIN{print int(25 + 0.00156*$fluid/(4*$NODES)*$SI)}"); tmo=$(( exp*3/2 + 120 ))
+    pool=$(pool_for $SPH_POOL_STRONG)
+    # The balancer plans only within the arenas the pool already has (no
+    # growth credit, 2026-09-18), so the LB's headroom must be opened at
+    # startup: strong needs ~32 GB/GPU of patches at N=1 (4 x 8 GB arenas, the
+    # last one nearly full, ~50 MB slack) and a 5th arena for migrations.
+    # Multi-node caps the pool at 4096 MB per process (fabric registration).
+    arenas=${SPH_ARENAS_STRONG:-5}
+    if [ "$NODES" -gt 1 ]; then arenas=$(( 4096 / pool )); [ "$arenas" -lt 1 ] && arenas=1; fi
+    case $arm in nolb) lbargs="-f 99999";; sync) lbargs="-f $SF -b $SB $SPH_MD";; async) lbargs="-f $SF -b $SB -a -l $SL $SPH_MD +LBAsync";; esac
   fi
+  local poolargs="+gpupool +gpupoolsize $pool"; [ "${arenas:-1}" -gt 1 ] && poolargs="$poolargs +gpupoolarenas $arenas"
+  # POOL_ALLOC=vmm selects the virtual-memory pool backend (+gpupoolalloc vmm:
+  # one reserved range per device, 256-byte blocks, chunks mapped in place);
+  # default buddy. Same +gpupoolsize x +gpupoolarenas budget either way.
+  [ "${POOL_ALLOC:-buddy}" = vmm ] && poolargs="$poolargs +gpupoolalloc vmm"
   log=$SPH/${kind^^}_N${NODES}_$arm.log
-  if [ -n "$DRY" ]; then PLAN_S=$((PLAN_S+tmo)); EXP_S=$((EXP_S+exp)); printf "  [dry] sph2d  %-6s %-6s %d patches %d fluid %d PEs pool=%dMB expect=%ds timeout=%ds\n" "$kind" "$arm" $patches $fluid $((16*NODES)) $pool $exp $tmo; return; fi
+  if [ -n "$DRY" ]; then PLAN_S=$((PLAN_S+tmo)); EXP_S=$((EXP_S+exp)); printf "  [dry] sph2d  %-6s %-6s %d patches %d fluid %d PEs pool=%dMBx%d expect=%ds timeout=%ds\n" "$kind" "$arm" $patches $fluid $((16*NODES)) $pool $arenas $exp $tmo; return; fi
   fits $exp || { printf "  sph2d  %-6s %-6s SKIPPED (%ds left, needs %ds for a %ds run)\n" "$kind" "$arm" "$(budget_left)" "$(( exp*130/100 + 45 ))" "$exp"; return; }
   tmo=$(clamp_tmo $tmo)
-  ( cd $SPH && env X=1 PES=4 timeout $tmo $SRUN --chdir="$SPH" stdbuf -oL -eL $SPH/numa_wrap_sph.sh ./sph2d $cfg $lbargs +gpushm +gpupool +gpupoolsize $pool +gpuipceventpool 256 +ppn 4 > $log 2>&1 )
+  ( cd $SPH && env X=1 PES=4 timeout $tmo $SRUN --chdir="$SPH" stdbuf -oL -eL $SPH/numa_wrap_sph.sh ./sph2d $cfg $lbargs +gpushm $poolargs +gpuipceventpool 256 +ppn 4 > $log 2>&1 )
   rc=$?; ms=$(grep -a 'Average iteration' $log | awk '{print $4}')
   imb=$(grep -a '^  step' $log | tail -1 | sed 's/.*imbalance (max\/avg) //;s/ .*//')
   printf "  sph2d  %-6s %-6s %5d patches %4d fluid %4d PEs  %-9s ms/step  patch/PE=%-5s pimb=%-5s pool=%-8s rc=%s\n" \
     "$kind" "$arm" $patches $fluid $((16*NODES)) "${ms:-HUNG/FAIL}" \
-    "$(awk "BEGIN{printf \"%.1f\",$patches/(16.0*$NODES)}")" "${imb:-?}" "$(pool_growth $log '^  step')" $rc
+    "$(awk "BEGIN{printf \"%.1f\",$patches/(16.0*$NODES)}")" "${imb:-?}" "$(pool_growth $log '^Init:')" $rc
   printf "sph2d\t%s\t%s\t%d\t%dpatch\t%d\t%s\t%s\t%s\n" "$kind" "$arm" $NODES $patches $((patches/(16*NODES))) "${ms:-NA}" "" "$rc" >> $SUM
   grep -aE "Abort|Fatal|Out Of|out of memory|ran more than" $log 2>/dev/null | sed 's/^\[[0-9]*\] //' | sort -u | head -1 | cut -c1-150; }
 
 # ------------------------------------------------------------------ main ----
-echo "=== SCALING N=$NODES  apps=[$APPS] kinds=[$KINDS] arms=[$ARMS]  deadline ${DEADLINE_MIN}min"
+echo "=== SCALING N=$NODES  apps=[$APPS] kinds=[$KINDS] arms=[$ARMS]  pool=${POOL_ALLOC:-buddy}  deadline ${DEADLINE_MIN}min"
 echo "    leanmd $(date -r $LMD/leanmd +%m-%d_%H:%M)  sph2d $(date -r $SPH/sph2d +%m-%d_%H:%M)  cost $(basename $COSTCFG)  ${CPT} cores/rank  $(date +%T)"
 [ -z "$DRY" ] && printf "app\tkind\tarm\tnodes\tsize\tper_gpu\tmetric1\tmetric2\trc\n" > $SUM
 for kind in $KINDS; do

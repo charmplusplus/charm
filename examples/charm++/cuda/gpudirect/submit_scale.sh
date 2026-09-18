@@ -45,6 +45,7 @@ for n in $COUNTS; do
   # commas -- so export them here and let --export=ALL carry the environment.
   export APPS KINDS ARMS STEPS=${STEPS:-100} PERIOD=${PERIOD:-20} LAG=${LAG:-16}
   [ -n "$LMD_GRID" ] && export LMD_GRID
+  [ -n "$POOL_ALLOC" ] && export POOL_ALLOC
   [ -n "$COSTCFG" ] && export COSTCFG
   # PART overrides the script's gpuA40x4; gpuA40x4-interactive starts sooner
   # but caps at 1 h, so a plan longer than that must be split across jobs.
