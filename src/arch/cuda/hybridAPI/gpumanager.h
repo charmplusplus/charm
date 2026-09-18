@@ -84,12 +84,24 @@ struct CuptiBufferItem {
 // One per (process, device) in the +gpushm shared segment, after the event
 // slots: the device pool's first arena, published so every peer can open it
 // once at startup instead of on the first send from it. Written under +gpupool.
+// The virtual-memory backend (+gpupoolalloc vmm) publishes its heap here
+// instead: the reserved range, the chunk size, and one exported file
+// descriptor per mapped chunk, appended as the heap grows. A peer duplicates
+// the descriptors it needs with pidfd_getfd and maps the chunks at the same
+// offsets in a mirror of the range (hapiIpcImportBuffer). n_chunks is written
+// with release semantics after the descriptor it covers.
+#define HAPI_VMM_MAX_CHUNKS 1024
 struct hapi_pool_shm_entry {
   hapiIpcMemHandle_t handle;
   void* base;
   size_t extent;
   int src_node;   // CmiMyNode() of the owner -- the key the import cache uses
   int valid;
+  int kind;       // 0: one cudaMalloc arena (buddy); 1: a vmm heap
+  int pid;        // owner, for pidfd_getfd
+  size_t chunk_bytes;
+  int n_chunks;
+  int fds[HAPI_VMM_MAX_CHUNKS];
 };
 
 struct hapi_ipc_device_info {
@@ -264,6 +276,18 @@ struct GPUManager {
   // 0 for the CK_GPU_ARENA_MB / 256 MB default.
   bool device_pool_on;
   size_t device_pool_arena_bytes;
+  // +gpupoolarenas: arenas opened per device at startup (default 1). The
+  // balancer plans only within the arenas the pool has, so this is how a run
+  // reserves migration headroom without growing the pool mid-run.
+  int device_pool_arenas;
+  // +gpupoolalloc: 0 = buddy allocator over cudaMalloc arenas (the default),
+  // 1 = vmm: one reserved virtual range per device backed lazily by
+  // cuMemCreate chunks of device_pool_chunk_bytes (+gpupoolchunk), reserving
+  // device_pool_reserve_bytes of address space (+gpupoolreserve; 0 = twice
+  // the device's memory). See hapi_range_heap.h.
+  int device_pool_backend;
+  size_t device_pool_chunk_bytes;
+  size_t device_pool_reserve_bytes;
 
   // Peer allocations mapped into this process, keyed by the exporting
   // allocation's identity -- (sender process, sender-side base). Process-wide,
@@ -506,6 +530,10 @@ struct GPUManager {
     ipc_use_direct = false;
     device_pool_on = false;
     device_pool_arena_bytes = 0;
+    device_pool_arenas = 1;
+    device_pool_backend = 0;
+    device_pool_chunk_bytes = 0;
+    device_pool_reserve_bytes = 0;
 #if CMK_SMP
     ipc_cache_lock = CmiCreateLock();
 #endif

@@ -371,7 +371,19 @@ void hapiFreeMigratable(void* ptr);
 // because it has no ck dependency and two things below ck need it: the packer
 // (pup_util.C) marks blocks it is reading, and IPC init can pre-open an arena.
 void* hapiDevPoolMalloc(size_t size, int device);
+// The same, but returns nullptr instead of opening a new arena when no arena
+// has a block that fits. What the admission gate reserves with.
+void* hapiDevPoolMallocNoGrow(size_t size, int device);
 void hapiDevPoolFree(void* ptr);
+// Blocks set aside for an element about to unpack: while a set is current on
+// this thread, hapiDevPoolMalloc serves a request from the smallest block in
+// it that fits before touching the arenas. The migration runtime allocates
+// the set at the landing grant (the arriving element's blocks as they were at
+// its source), so the unpack allocates nothing new and the pool never grows
+// for an admitted arrival. Leftovers are the caller's to free.
+#include <map>
+void hapiPreallocBegin(std::multimap<size_t, void*>* set);
+void hapiPreallocEnd();
 bool hapiDevPoolContains(const void* ptr);
 // The arena a pool pointer lives in: its base and extent. False if the pointer
 // is not the pool's. An arena is one cudaMalloc that is never freed, so a
@@ -380,6 +392,14 @@ bool hapiDevPoolContains(const void* ptr);
 // zerocopy path registers each arena exactly once instead of every buffer on
 // every send (see acquireDeviceRegistration in ckrdmadevice.C).
 bool hapiDevPoolArenaOf(const void* ptr, void** base, size_t* extent);
+// The unit the transport registers for [ptr, ptr+cnt): the whole arena under
+// the buddy backend, the smallest run of whole chunks covering the range under
+// the vmm backend (a chunk is what gets mapped, exported and registered).
+bool hapiDevPoolSegmentOf(const void* ptr, size_t cnt, void** base, size_t* extent);
+// Whether the pool is the virtual-memory backend (+gpupoolalloc vmm).
+bool hapiDevPoolIsVmm();
+// The pool's growth granule: an arena (buddy) or a chunk (vmm).
+size_t hapiDevPoolGrowthBytes();
 // The first arena on `device`, created if there is none. Base and extent out.
 void hapiDevPoolEnsureArena(int device, void** base, size_t* extent);
 // A block the migration packer has enqueued reads from on `stream`. A later
@@ -466,6 +486,17 @@ bool hapiDevPoolBlockSize(const void* ptr, size_t* size);
 // footprint tracking in hapi_portable.h/hapi_impl.cpp). Valid inside an entry
 // method of a migratable chare; returns 0 otherwise.
 size_t hapiCurrentObjectFootprint();
+// The same for a given element, from outside its entry methods: what the
+// migration runtime reads before it packs the element, so the destination's
+// admission gate can reserve the state the unpack will allocate.
+class CkLocRec;
+size_t hapiObjectFootprint(CkLocRec* rec);
+// That footprint as the blocks that make it up: (size, count) pairs, sizes as
+// charged (pool blocks at their block size). The gate allocates exactly these
+// at the destination before it grants the landing.
+#include <vector>
+#include <utility>
+void hapiObjectBlocks(CkLocRec* rec, std::vector<std::pair<size_t, int>>& out);
 
 // Attribution for allocations the runtime makes on an element's behalf,
 // outside that element's entry methods. Between hapiFootprintBegin(rec) and

@@ -3,6 +3,7 @@
 #include <climits>
 #include <cstdint>
 #include <cstring>
+#include <cerrno>
 #include <string>
 #include <cmath>
 #include <algorithm>
@@ -15,6 +16,7 @@
 #include <mutex>
 #include <unistd.h>
 #include <sys/mman.h>
+#include <sys/syscall.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sched.h>
@@ -39,6 +41,13 @@
 
 #include "hapi.h"
 #include "hapi_impl.h"
+#include "hapi_range_heap.h"
+// The device pool's vmm backend, defined with the pool further down; the IPC
+// startup code above it publishes the heap and exports handles for it.
+struct hapi_pool_shm_entry;
+bool hapiDevPoolVmmPublish(int dev, hapi_pool_shm_entry* e, int shm_index,
+                           hapiIpcMemHandle_t* handle);
+bool hapiDevPoolVmmHandleOf(const void* ptr, hapiIpcMemHandle_t* handle, void** base);
 #include <unordered_map>
 #include <unordered_set>
 #include "gpumanager.h"
@@ -2158,11 +2167,43 @@ static void hapiMapping(char** argv) {
     int pool_mb = 0;
     const bool have_size = CmiGetArgIntDesc(argv, "+gpupoolsize", &pool_mb,
         "size of each device pool arena in MB (default 256, or CK_GPU_ARENA_MB)");
+    int pool_arenas = 0;
+    const bool have_arenas = CmiGetArgIntDesc(argv, "+gpupoolarenas", &pool_arenas,
+        "device pool arenas opened per device at startup (default 1): the load "
+        "balancer plans within the arenas the pool has, so this reserves its "
+        "migration headroom without growing the pool mid-run");
+    char* pool_alloc = nullptr;
+    const bool have_alloc = CmiGetArgStringDesc(argv, "+gpupoolalloc", &pool_alloc,
+        "device pool backend: 'buddy' (default: power-of-two blocks in cudaMalloc "
+        "arenas of +gpupoolsize) or 'vmm' (one reserved virtual range per device, "
+        "backed in place by cuMemCreate chunks of +gpupoolchunk MB, 256-byte "
+        "granularity, peers map chunks by file descriptor)");
+    int pool_chunk_mb = 0, pool_reserve_mb = 0;
+    const bool have_chunk = CmiGetArgIntDesc(argv, "+gpupoolchunk", &pool_chunk_mb,
+        "vmm backend: chunk size in MB (default 256); one IPC handle and one RDMA "
+        "registration per chunk");
+    const bool have_reserve = CmiGetArgIntDesc(argv, "+gpupoolreserve", &pool_reserve_mb,
+        "vmm backend: virtual address range reserved per device in MB (default: "
+        "twice the device's memory)");
     if (CmiMyRank() == 0) {
       csv_gpu_manager.device_pool_on = want_pool;
       if (have_size && pool_mb > 0)
         csv_gpu_manager.device_pool_arena_bytes = (size_t)pool_mb << 20;
+      if (have_arenas && pool_arenas > 0)
+        csv_gpu_manager.device_pool_arenas = pool_arenas;
+      if (have_alloc && pool_alloc != nullptr) {
+        if (strcmp(pool_alloc, "vmm") == 0) csv_gpu_manager.device_pool_backend = 1;
+        else if (strcmp(pool_alloc, "buddy") == 0) csv_gpu_manager.device_pool_backend = 0;
+        else CmiAbort("+gpupoolalloc: expected 'buddy' or 'vmm', got '%s'", pool_alloc);
+      }
+      if (have_chunk && pool_chunk_mb > 0)
+        csv_gpu_manager.device_pool_chunk_bytes = (size_t)pool_chunk_mb << 20;
+      if (have_reserve && pool_reserve_mb > 0)
+        csv_gpu_manager.device_pool_reserve_bytes = (size_t)pool_reserve_mb << 20;
     }
+    if (CmiMyPe() == 0 && want_pool && have_alloc && pool_alloc && strcmp(pool_alloc, "vmm") == 0)
+      CmiPrintf("HAPI> Device pool backend: vmm (reserved range per device, %d MB chunks "
+                "mapped in place, 256-byte blocks)\n", pool_chunk_mb > 0 ? pool_chunk_mb : 256);
     if (CmiMyPe() == 0 && want_pool)
       CmiPrintf("HAPI> Device pool on (+gpupool): arenas of %d MB, migration "
                 "arenas and payloads from the pool, direct CUDA IPC only\n",
@@ -2972,19 +3013,32 @@ static void ipcHandleCreate() {
     hapi_pool_shm_entry* pe_entry = (hapi_pool_shm_entry*)((char*)shm_mem_handle +
         sizeof(hapiIpcMemHandle_t) +
         sizeof(hapi_ipc_event_shared) * csv_gpu_manager.hapi_ipc_event_pool_size_total);
+    memset(pe_entry, 0, sizeof(*pe_entry));
     pe_entry->valid = 0;
     if (preopen) {
       void* base = nullptr; size_t extent = 0;
       hapiDevPoolEnsureArena(cpv_my_device_id, &base, &extent);
-      hapiCheck(hapiIpcGetMemHandle(&pe_entry->handle, base));
-      pe_entry->base = base;
-      pe_entry->extent = extent;
       pe_entry->src_node = CmiMyNode();
-      // Our own export, seeded: the first send from this arena finds it.
-      csv_gpu_manager.ipc_export_cache[(const void*)base] = pe_entry->handle;
-      pe_entry->valid = 1;
-      CmiPrintf("HAPI> [%d] device pool arena %p (%zu MB) published for pre-open\n",
-                CmiMyPe(), base, extent >> 20);
+      if (hapiDevPoolIsVmm()) {
+        // The heap: its chunk descriptors, for peers to mirror (kind 1).
+        const int shm_index = csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id;
+        if (!hapiDevPoolVmmPublish(cpv_my_device_id, pe_entry, shm_index, &pe_entry->handle))
+          CmiAbort("HAPI> [%d] device pool (vmm): no heap to publish", CmiMyPe());
+        csv_gpu_manager.ipc_export_cache[(const void*)base] = pe_entry->handle;
+        pe_entry->valid = 1;
+        CmiPrintf("HAPI> [%d] device pool (vmm) heap %p (%zu MB mapped of %zu MB) published "
+                  "for pre-open, %d chunk descriptor(s)\n", CmiMyPe(), base, extent >> 20,
+                  pe_entry->extent >> 20, pe_entry->n_chunks);
+      } else {
+        hapiCheck(hapiIpcGetMemHandle(&pe_entry->handle, base));
+        pe_entry->base = base;
+        pe_entry->extent = extent;
+        // Our own export, seeded: the first send from this arena finds it.
+        csv_gpu_manager.ipc_export_cache[(const void*)base] = pe_entry->handle;
+        pe_entry->valid = 1;
+        CmiPrintf("HAPI> [%d] device pool arena %p (%zu MB) published for pre-open\n",
+                  CmiMyPe(), base, extent >> 20);
+      }
     }
   }
 
@@ -3072,9 +3126,9 @@ static void ipcHandleOpen() {
         if (pe_entry->valid) {
           void* mapped = hapiIpcImportBuffer(pe_entry->handle, pe_entry->src_node,
                                              pe_entry->base, pe_entry->extent);
-          CmiPrintf("HAPI> [%d] pre-opened peer node %d's pool arena %p (%zu MB) at %p\n",
-                    CmiMyPe(), pe_entry->src_node, pe_entry->base,
-                    pe_entry->extent >> 20, mapped);
+          CmiPrintf("HAPI> [%d] pre-opened peer node %d's pool %s %p (%zu MB) at %p\n",
+                    CmiMyPe(), pe_entry->src_node, pe_entry->kind == 1 ? "heap" : "arena",
+                    pe_entry->base, pe_entry->extent >> 20, mapped);
         }
       }
 
@@ -3115,8 +3169,148 @@ bool hapiDevPoolOn() {
   return CsvAccess(gpu_manager).device_pool_on;
 }
 
+// +gpupoolalloc vmm: cudaIpcGetMemHandle cannot name cuMemMap'd memory, so a
+// direct send from the vmm heap carries this instead, in the same 64 bytes. It
+// names the owner's whole heap: one mirror of the reserved range reaches every
+// chunk, and the chunk file descriptors travel through the owner's +gpushm
+// entry (hapi_pool_shm_entry), duplicated by the peer with pidfd_getfd.
+struct HapiVmmIpcHandle {
+  uint64_t magic, base, reserve, chunk;
+  int32_t pid, shm_index, src_node, pad;
+  uint8_t rest[16];
+};
+static_assert(sizeof(HapiVmmIpcHandle) == sizeof(hapiIpcMemHandle_t),
+              "the vmm heap handle must overlay a CUDA IPC handle");
+static const uint64_t HAPI_VMM_IPC_MAGIC = 0x564D4D2D48415049ull;   // "VMM-HAPI"
+
+static bool hapiVmmHandleIs(const hapiIpcMemHandle_t& h) {
+  HapiVmmIpcHandle v;
+  memcpy(&v, &h, sizeof(v));
+  return v.magic == HAPI_VMM_IPC_MAGIC;
+}
+static void hapiVmmMakeHandle(hapiIpcMemHandle_t* h, uint64_t base, uint64_t reserve,
+                              uint64_t chunk, int pid, int shm_index, int src_node) {
+  HapiVmmIpcHandle v;
+  memset(&v, 0, sizeof(v));
+  v.magic = HAPI_VMM_IPC_MAGIC;
+  v.base = base; v.reserve = reserve; v.chunk = chunk;
+  v.pid = pid; v.shm_index = shm_index; v.src_node = src_node;
+  memcpy(h, &v, sizeof(v));
+}
+
+// A peer's vmm heap as mapped here: the mirror of its reserved range, with the
+// chunks it has published so far mapped at their own offsets. Grows as the
+// owner publishes more; never shrinks (the owner never unmaps).
+struct HapiVmmMirror {
+  CUdeviceptr base = 0;
+  size_t reserve = 0, chunk = 0;
+  int pid = -1, pidfd = -1;
+  hapi_pool_shm_entry* entry = nullptr;
+  size_t mapped = 0;   // chunks
+  std::vector<CUmemGenericAllocationHandle> handles;
+};
+static std::map<std::pair<int, const void*>, HapiVmmMirror> hapi_vmm_mirrors;  // under ipc_cache_lock
+
+static const char* hapiCuErrNameIpc(CUresult r) {
+  const char* s = nullptr;
+  cuGetErrorName(r, &s);
+  return s ? s : "CUDA_ERROR_?";
+}
+
+// Map the peer heap named by `handle` (a HapiVmmIpcHandle) and return where
+// its base is reachable from this process; every chunk the owner has
+// published is mapped, so any offset into it addresses. Called with
+// ipc_cache_lock held.
+static void* hapiVmmImportLocked(const hapiIpcMemHandle_t& handle, int src_process,
+                                 const void* src_base) {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  HapiVmmIpcHandle v;
+  memcpy(&v, &handle, sizeof(v));
+  const auto key = std::make_pair(src_process, src_base);
+  auto it = hapi_vmm_mirrors.find(key);
+  if (it == hapi_vmm_mirrors.end()) {
+    HapiVmmMirror m;
+    m.reserve = v.reserve;
+    m.chunk = v.chunk;
+    m.pid = v.pid;
+    m.entry = (hapi_pool_shm_entry*)((char*)gm.shm_ptr + gm.shm_chunk_size * v.shm_index +
+        sizeof(hapiIpcMemHandle_t) +
+        sizeof(hapi_ipc_event_shared) * gm.hapi_ipc_event_pool_size_total);
+    if (m.entry->kind != 1 || m.entry->base != (void*)(uintptr_t)v.base)
+      CmiAbort("HAPI> [%d] vmm import: the +gpushm entry %d does not describe heap %p of "
+               "process %d (kind %d, base %p)", CmiMyPe(), v.shm_index,
+               (void*)(uintptr_t)v.base, src_process, m.entry->kind, m.entry->base);
+#ifdef SYS_pidfd_open
+    m.pidfd = (int)syscall(SYS_pidfd_open, (pid_t)v.pid, 0);
+#else
+    m.pidfd = -1;
+#endif
+    if (m.pidfd < 0)
+      CmiAbort("HAPI> [%d] vmm import: pidfd_open(%d) failed (%s); the vmm backend needs "
+               "Linux >= 5.6", CmiMyPe(), v.pid, strerror(errno));
+    CUresult r = cuMemAddressReserve(&m.base, m.reserve, 0, 0, 0);
+    if (r != CUDA_SUCCESS)
+      CmiAbort("HAPI> [%d] vmm import: cuMemAddressReserve(%zu MB) for a peer heap: %s",
+               CmiMyPe(), m.reserve >> 20, hapiCuErrNameIpc(r));
+    it = hapi_vmm_mirrors.emplace(key, m).first;
+    gm.ipc_import_misses.fetch_add(1, std::memory_order_relaxed);
+  } else {
+    gm.ipc_import_hits.fetch_add(1, std::memory_order_relaxed);
+  }
+  HapiVmmMirror& m = it->second;
+  const int published = __atomic_load_n(&m.entry->n_chunks, __ATOMIC_ACQUIRE);
+  int cur_dev = 0;
+  if (m.mapped < (size_t)published) hapiCheck(cudaGetDevice(&cur_dev));
+  for (; m.mapped < (size_t)published; m.mapped++) {
+    const int theirfd = m.entry->fds[m.mapped];
+#ifdef SYS_pidfd_getfd
+    const int fd = (int)syscall(SYS_pidfd_getfd, m.pidfd, theirfd, 0);
+#else
+    const int fd = -1;
+#endif
+    if (fd < 0)
+      CmiAbort("HAPI> [%d] vmm import: pidfd_getfd(pid %d, fd %d) failed (%s). The peer's "
+               "chunk descriptor could not be duplicated; this needs Linux >= 5.6 and "
+               "ptrace permission over same-user processes (kernel.yama.ptrace_scope <= 1)",
+               CmiMyPe(), m.pid, theirfd, strerror(errno));
+    CUmemGenericAllocationHandle h;
+    CUresult r = cuMemImportFromShareableHandle(&h, (void*)(uintptr_t)fd,
+                                                CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR);
+    if (r != CUDA_SUCCESS)
+      CmiAbort("HAPI> [%d] vmm import: cuMemImportFromShareableHandle(chunk %zu of process %d): %s",
+               CmiMyPe(), m.mapped, src_process, hapiCuErrNameIpc(r));
+    close(fd);
+    const CUdeviceptr at = m.base + (CUdeviceptr)(m.mapped * m.chunk);
+    r = cuMemMap(at, m.chunk, 0, h, 0);
+    if (r != CUDA_SUCCESS)
+      CmiAbort("HAPI> [%d] vmm import: cuMemMap(chunk %zu): %s", CmiMyPe(), m.mapped,
+               hapiCuErrNameIpc(r));
+    CUmemAccessDesc acc;
+    memset(&acc, 0, sizeof(acc));
+    acc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    acc.location.id = cur_dev;
+    acc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+    r = cuMemSetAccess(at, m.chunk, &acc, 1);
+    if (r != CUDA_SUCCESS)
+      CmiAbort("HAPI> [%d] vmm import: cuMemSetAccess(chunk %zu) from device %d: %s (peer "
+               "access between the devices is required)", CmiMyPe(), m.mapped, cur_dev,
+               hapiCuErrNameIpc(r));
+    m.handles.push_back(h);
+  }
+  return (void*)m.base;
+}
+
 bool hapiIpcExportBuffer(const void* ptr, hapiIpcMemHandle_t* handle,
                          size_t* offset, void** base_out) {
+  // A vmm pool block: the handle names the heap, the offset is from its base.
+  if (hapiDevPoolIsVmm()) {
+    void* hb = NULL;
+    if (hapiDevPoolVmmHandleOf(ptr, handle, &hb)) {
+      *offset = (size_t)((const char*)ptr - (const char*)hb);
+      if (base_out != NULL) *base_out = hb;
+      return true;
+    }
+  }
   // cudaIpcGetMemHandle names an allocation, and cudaIpcOpenMemHandle hands the
   // peer that allocation's base -- so an interior pointer has to be split into
   // (base, offset) here and reassembled on the far side.
@@ -3178,6 +3372,13 @@ void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle, int src_process,
 #if CMK_SMP
   CmiLock(csv_gpu_manager.ipc_cache_lock);
 #endif
+  if (hapiVmmHandleIs(handle)) {
+    void* mirror = hapiVmmImportLocked(handle, src_process, src_base);
+#if CMK_SMP
+    CmiUnlock(csv_gpu_manager.ipc_cache_lock);
+#endif
+    return mirror;
+  }
   auto& cache = csv_gpu_manager.ipc_import_cache;
   const auto key = std::make_pair(src_process, src_base);
   auto it = cache.find(key);
@@ -3288,6 +3489,8 @@ void hapiIpcInvalidateExport(const void* ptr) {
   if (ptr == NULL) return;
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   if (csv_gpu_manager.ipc_export_cache.empty()) return;
+  // A vmm heap's handle names the heap, which is never freed or recycled.
+  if (hapiDevPoolIsVmm() && hapiDevPoolContains(ptr)) return;
   void* base = NULL;
   size_t alloc_size = 0;
   if (!hapiMemGetAddressRange(&base, &alloc_size, ptr)) return;
@@ -3375,7 +3578,42 @@ void hapiArenaRegister(void* base, size_t extent, size_t liveBuffers,
 
 /*** Device pool (see hapi.h) ***/
 namespace {
-struct HapiDevPoolArena { buddy::allocator* alloc; uintptr_t start, end; int device; };
+// The allocator behind one pool segment. Two backends (+gpupoolalloc): the
+// buddy allocator over one cudaMalloc arena -- the default, power-of-two
+// blocks, a new arena when none fits -- and the range heap over a virtual
+// range reserved once per device and backed in place by cuMemCreate chunks
+// (hapi_range_heap.h), which grows by mapping only what a request is short
+// of and rounds sizes to 256 bytes. An arena's [start, end) is what is usable
+// now; under vmm `end` moves as chunks are mapped.
+struct HapiRangeAlloc {
+  virtual ~HapiRangeAlloc() {}
+  virtual void* malloc(size_t size) = 0;
+  virtual void free(void* p) = 0;
+  virtual bool blockSize(const void* p, size_t* size) const = 0;
+  virtual size_t freeBytes() const = 0;
+  virtual size_t largestFree() const = 0;
+  virtual size_t extent() const = 0;                       // usable bytes now
+  virtual bool grow(size_t need) { (void)need; return false; }  // in place; vmm only
+  virtual bool vmm() const { return false; }
+};
+struct HapiBuddyAlloc : HapiRangeAlloc {
+  buddy::allocator* a;
+  size_t bytes;
+  HapiBuddyAlloc(size_t b) : a(new buddy::allocator(b, b)), bytes(b) {}  // the one cudaMalloc
+  void* malloc(size_t size) override { return a->malloc(size, true); }
+  void free(void* p) override { a->free(p); }
+  bool blockSize(const void* p, size_t* size) const override {
+    const auto blk = a->alloc_map.find((uint8_t*)p);
+    if (blk == a->alloc_map.end()) return false;
+    *size = blk->second.size;
+    return true;
+  }
+  size_t freeBytes() const override { return a->get_free_size(); }
+  size_t largestFree() const override { return a->largest_free_block(); }
+  size_t extent() const override { return bytes; }
+};
+struct HapiVmmAlloc;   // below, after the registration check it uses
+struct HapiDevPoolArena { HapiRangeAlloc* alloc; uintptr_t start, end; int device; };
 std::vector<HapiDevPoolArena> hapi_devpool_arenas;
 std::mutex hapi_devpool_mutex;
 // Buffers the packer is reading: ptr -> the stream those reads are on. An
@@ -3448,7 +3686,7 @@ void hapiDevPoolReapLocked() {
     }
     if (done) {
       HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(pd.ptr);
-      if (ar) ar->alloc->free(pd.ptr);
+      if (ar) ar->alloc->free(pd.ptr);   // interface call: buddy or vmm
       auto& spares = hapi_devpool_spare_events[pd.device];
       for (cudaEvent_t ev : pd.evs) spares.push_back(ev);
       pd = std::move(hapi_devpool_pending.back());
@@ -3459,12 +3697,54 @@ void hapiDevPoolReapLocked() {
   }
 }
 
+// At 2+ physical nodes every arena is registered with the fabric whole, the
+// first time a peer off-node is sent to (acquireArenaRegistration), and never
+// deregistered. The provider has a ceiling: one 4096 MB arena, or a process
+// total past ~4 GB (3-4 x 2048 MB), fails every rank in lci poll_comp with
+// "Err 5: Input/output error" -- at startup for a pre-sized pool, or in the
+// middle of a step for growth. Refuse here, with the reason, instead. One node
+// takes any size. CK_GPU_ARENA_MAX_MB and CK_GPU_ARENA_TOTAL_MAX_MB move the
+// two ceilings when a provider allows more.
+size_t hapiDevPoolHeldLocked() {
+  size_t held = 0;
+  for (auto& ar : hapi_devpool_arenas) held += (size_t)(ar.end - ar.start);
+  return held;
+}
+
+void hapiDevPoolCheckRegistrable(size_t bytes, size_t nArenas, size_t held) {
+  if (CmiNumPhysicalNodes() <= 1) return;
+  static const size_t arenaMax = []() {
+    const char* e = getenv("CK_GPU_ARENA_MAX_MB");
+    return (size_t)(e ? atol(e) : 2048) << 20;
+  }();
+  static const size_t totalMax = []() {
+    const char* e = getenv("CK_GPU_ARENA_TOTAL_MAX_MB");
+    return (size_t)(e ? atol(e) : 4096) << 20;
+  }();
+  if (bytes <= arenaMax && held + bytes <= totalMax) return;
+  CmiAbort("HAPI> [%d] device pool: refusing to open %s %zu of %zu MB: this process "
+           "would hold %zu MB of pool arenas. With %d physical nodes every arena is "
+           "registered with the fabric whole, and registrations past %zu MB per arena "
+           "or %zu MB per process fail every rank in the transport (lci poll_comp Err 5). "
+           "%sReduce the per-GPU problem size, or size +gpupoolsize so the working set "
+           "fits at startup; CK_GPU_ARENA_MAX_MB / CK_GPU_ARENA_TOTAL_MAX_MB move the "
+           "ceilings.",
+           CmiMyPe(), CsvAccess(gpu_manager).device_pool_backend == 1 ? "chunk" : "arena",
+           nArenas + 1, bytes >> 20, (held + bytes) >> 20,
+           CmiNumPhysicalNodes(), arenaMax >> 20, totalMax >> 20,
+           held > 0 ? "The balancer plans only within the arenas the pool already has, "
+                      "so this growth is an application or runtime allocation. "
+                    : "");
+}
+
 HapiDevPoolArena& hapiDevPoolNewArenaLocked(size_t need, int dev) {
   size_t bytes = hapiDevPoolArenaBytes();
   while (bytes < need * 2) bytes <<= 1;
+  hapiDevPoolCheckRegistrable(bytes, hapi_devpool_arenas.size(), hapiDevPoolHeldLocked());
   HapiDevPoolArena ar;
-  ar.alloc = new buddy::allocator(bytes, bytes);   // the one real cudaMalloc
-  ar.start = (uintptr_t)ar.alloc->base_ptr;
+  HapiBuddyAlloc* b = new HapiBuddyAlloc(bytes);   // the one real cudaMalloc
+  ar.alloc = b;
+  ar.start = (uintptr_t)b->a->base_ptr;
   ar.end = ar.start + bytes;
   ar.device = dev;
   hapi_devpool_arenas.push_back(ar);
@@ -3473,9 +3753,197 @@ HapiDevPoolArena& hapiDevPoolNewArenaLocked(size_t need, int dev) {
             bytes >> 20, (void*)ar.start, dev);
   return hapi_devpool_arenas.back();
 }
+
+const char* hapiCuErrName(CUresult r) {
+  const char* s = nullptr;
+  cuGetErrorName(r, &s);
+  return s ? s : "CUDA_ERROR_?";
+}
+
+// The vmm backend's segment: one per device. The heap does the bookkeeping
+// (hapi_range_heap.h); this maps chunks when it asks, exports each chunk's
+// file descriptor for peers, and publishes them through the +gpushm entry.
+struct HapiVmmAlloc : HapiRangeAlloc {
+  hapi_pool::RangeHeap heap;
+  int dev;
+  CUmemAllocationProp prop;
+  std::vector<CUmemGenericAllocationHandle> handles;
+  std::vector<int> fds;
+  hapi_pool_shm_entry* shm = nullptr;   // set by publish(); null without +gpushm
+  int shm_index = -1;
+  bool exportable = false;
+
+  HapiVmmAlloc(uintptr_t base, size_t reserve, size_t chunk, int dev_)
+      : heap(base, reserve, chunk), dev(dev_) {
+    memset(&prop, 0, sizeof(prop));
+    heap.mapper = [this](uintptr_t addr, size_t bytes) { return mapChunks(addr, bytes); };
+  }
+  void* malloc(size_t size) override { return heap.malloc(size); }
+  void free(void* p) override { heap.free(p); }
+  bool blockSize(const void* p, size_t* size) const override { return heap.blockSize(p, size); }
+  size_t freeBytes() const override { return heap.freeBytes(); }
+  size_t largestFree() const override { return heap.largestFree(); }
+  size_t extent() const override { return heap.mappedBytes(); }
+  bool grow(size_t need) override { return heap.grow(need); }
+  bool vmm() const override { return true; }
+
+  // Called by the heap with addr == its mapped end and bytes a multiple of
+  // the chunk. Every chunk is checked against the fabric ceiling first, then
+  // created, mapped, made accessible to this device, and exported.
+  bool mapChunks(uintptr_t addr, size_t bytes) {
+    const size_t chunk = heap.chunkBytes();
+    const size_t n = bytes / chunk;
+    size_t held = hapiDevPoolHeldLocked();
+    for (size_t i = 0; i < n; i++) {
+      if (handles.size() >= HAPI_VMM_MAX_CHUNKS)
+        CmiAbort("HAPI> [%d] device pool (vmm): %zu chunks of %zu MB mapped, the shared "
+                 "table's limit; raise +gpupoolchunk", CmiMyPe(), handles.size(), chunk >> 20);
+      hapiDevPoolCheckRegistrable(chunk, handles.size(), held);
+      const CUdeviceptr at = (CUdeviceptr)(addr + i * chunk);
+      CUmemGenericAllocationHandle h;
+      CUresult r = cuMemCreate(&h, chunk, &prop, 0);
+      if (r != CUDA_SUCCESS) {
+        CmiPrintf("HAPI> [%d] device pool (vmm): cuMemCreate of a %zu MB chunk failed: %s "
+                  "(device %d, %zu MB mapped)\n", CmiMyPe(), chunk >> 20, hapiCuErrName(r),
+                  dev, extent() >> 20);
+        return false;   // the heap stays as it was; the caller reports OOM
+      }
+      r = cuMemMap(at, chunk, 0, h, 0);
+      if (r != CUDA_SUCCESS)
+        CmiAbort("HAPI> [%d] device pool (vmm): cuMemMap failed: %s", CmiMyPe(), hapiCuErrName(r));
+      CUmemAccessDesc acc;
+      memset(&acc, 0, sizeof(acc));
+      acc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+      acc.location.id = dev;
+      acc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+      r = cuMemSetAccess(at, chunk, &acc, 1);
+      if (r != CUDA_SUCCESS)
+        CmiAbort("HAPI> [%d] device pool (vmm): cuMemSetAccess failed: %s", CmiMyPe(), hapiCuErrName(r));
+      int fd = -1;
+      if (exportable) {
+        r = cuMemExportToShareableHandle(&fd, h, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR, 0);
+        if (r != CUDA_SUCCESS)
+          CmiAbort("HAPI> [%d] device pool (vmm): cuMemExportToShareableHandle failed: %s",
+                   CmiMyPe(), hapiCuErrName(r));
+      }
+      handles.push_back(h);
+      fds.push_back(fd);   // kept open for the run: peers duplicate it with pidfd_getfd
+      held += chunk;
+      if (shm != nullptr) {
+        shm->fds[handles.size() - 1] = fd;
+        __atomic_store_n(&shm->n_chunks, (int)handles.size(), __ATOMIC_RELEASE);
+      }
+    }
+    return true;
+  }
+
+  // Fill this process's +gpushm entry for the heap so peers can mirror it.
+  void publish(hapi_pool_shm_entry* e, int index) {
+    shm = e;
+    shm_index = index;
+    e->kind = 1;
+    e->pid = (int)getpid();
+    e->base = (void*)heap.base();
+    e->extent = heap.reserveBytes();
+    e->chunk_bytes = heap.chunkBytes();
+    for (size_t i = 0; i < fds.size(); i++) e->fds[i] = fds[i];
+    __atomic_store_n(&e->n_chunks, (int)fds.size(), __ATOMIC_RELEASE);
+  }
+};
+
+HapiDevPoolArena* hapiDevPoolVmmArenaLocked(int dev) {
+  for (auto& ar : hapi_devpool_arenas)
+    if (ar.device == dev && ar.alloc->vmm()) return &ar;
+  return nullptr;
+}
+
+size_t hapiDevPoolChunkBytesConfigured() {
+  size_t c = CsvAccess(gpu_manager).device_pool_chunk_bytes;
+  return c ? c : ((size_t)256 << 20);
+}
+
+// Open the device's vmm heap: reserve the range, and map the startup budget
+// (+gpupoolsize x +gpupoolarenas) so the load balancer's headroom exists from
+// the first step (the balancer plans only within what is mapped).
+HapiDevPoolArena& hapiDevPoolNewVmmHeapLocked(int dev) {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  CUdevice cudev;
+  CUresult r = cuDeviceGet(&cudev, dev);
+  if (r != CUDA_SUCCESS)
+    CmiAbort("HAPI> [%d] device pool (vmm): cuDeviceGet(%d): %s", CmiMyPe(), dev, hapiCuErrName(r));
+  int vmmOk = 0, fdOk = 0, rdmaOk = 0;
+  cuDeviceGetAttribute(&vmmOk, CU_DEVICE_ATTRIBUTE_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED, cudev);
+  cuDeviceGetAttribute(&fdOk, CU_DEVICE_ATTRIBUTE_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR_SUPPORTED, cudev);
+  cuDeviceGetAttribute(&rdmaOk, CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_WITH_CUDA_VMM_SUPPORTED, cudev);
+  if (!vmmOk)
+    CmiAbort("HAPI> [%d] device %d does not support CUDA virtual memory management; "
+             "use +gpupoolalloc buddy", CmiMyPe(), dev);
+  CUmemAllocationProp prop;
+  memset(&prop, 0, sizeof(prop));
+  prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
+  prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+  prop.location.id = dev;
+  if (fdOk) prop.requestedHandleTypes = CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR;
+  if (rdmaOk) prop.allocFlags.gpuDirectRDMACapable = 1;   // registrable by the NIC
+  size_t gran = 0;
+  r = cuMemGetAllocationGranularity(&gran, &prop, CU_MEM_ALLOC_GRANULARITY_RECOMMENDED);
+  if (r != CUDA_SUCCESS || gran == 0) gran = (size_t)2 << 20;
+  size_t chunk = hapi_pool::RangeHeap::roundUp(hapiDevPoolChunkBytesConfigured(), gran);
+  size_t reserve = gm.device_pool_reserve_bytes;
+  if (reserve == 0) {
+    size_t total = 0;
+    cuDeviceTotalMem(&total, cudev);
+    reserve = total * 2;
+  }
+  reserve = hapi_pool::RangeHeap::roundUp(reserve, chunk);
+  CUdeviceptr base = 0;
+  r = cuMemAddressReserve(&base, reserve, 0, 0, 0);
+  if (r != CUDA_SUCCESS)
+    CmiAbort("HAPI> [%d] device pool (vmm): cuMemAddressReserve of %zu MB failed: %s",
+             CmiMyPe(), reserve >> 20, hapiCuErrName(r));
+  HapiVmmAlloc* v = new HapiVmmAlloc((uintptr_t)base, reserve, chunk, dev);
+  v->prop = prop;
+  v->exportable = fdOk != 0;
+  HapiDevPoolArena ar;
+  ar.alloc = v;
+  ar.start = (uintptr_t)base;
+  ar.end = ar.start;   // nothing mapped yet
+  ar.device = dev;
+  hapi_devpool_arenas.push_back(ar);
+  HapiDevPoolArena& ref = hapi_devpool_arenas.back();
+  const size_t initial = hapiDevPoolArenaBytes() * (size_t)std::max(1, gm.device_pool_arenas);
+  if (!v->grow(initial))
+    CmiAbort("HAPI> [%d] device pool (vmm): could not map the startup budget of %zu MB on "
+             "device %d (+gpupoolsize x +gpupoolarenas)", CmiMyPe(), initial >> 20, dev);
+  ref.end = ref.start + v->extent();
+  CmiPrintf("HAPI> [%d] device pool (vmm): heap at %p on device %d, %zu MB reserved, %zu MB "
+            "mapped in %zu chunks of %zu MB (RDMA-capable: %s, exportable: %s)\n",
+            CmiMyPe(), (void*)base, dev, reserve >> 20, v->extent() >> 20, v->heap.nChunks(),
+            chunk >> 20, rdmaOk ? "yes" : "no", fdOk ? "yes" : "no");
+  return ref;
+}
 }  // namespace
 
-void* hapiDevPoolMalloc(size_t size, int dev) {
+// Who is asking for device memory, for the growth notice (defined with the
+// footprint ledger below).
+static const char* hapiDescribeRequester();
+
+namespace {
+// The landing set current on this thread (hapiPreallocBegin), if any.
+thread_local std::multimap<size_t, void*>* hapi_prealloc_current = nullptr;
+
+void* hapiDevPoolMallocImpl(size_t size, int dev, bool grow) {
+  // A landing set serves first: the smallest block in it that fits.
+  if (hapi_prealloc_current != nullptr && !hapi_prealloc_current->empty()) {
+    auto it = hapi_prealloc_current->lower_bound(size);
+    if (it != hapi_prealloc_current->end()) {
+      void* p = it->second;
+      const size_t held = it->first;
+      hapi_prealloc_current->erase(it);
+      hapiRecordAlloc(p, held);   // the element's now, at the block's size
+      return p;
+    }
+  }
   void* q = nullptr;
   size_t held = 0;
   {
@@ -3484,38 +3952,80 @@ void* hapiDevPoolMalloc(size_t size, int dev) {
     HapiDevPoolArena* from = nullptr;
     for (auto& ar : hapi_devpool_arenas) {
       if (ar.device != dev) continue;
-      q = ar.alloc->malloc(size, true);
+      q = ar.alloc->malloc(size);
       if (q) { from = &ar; break; }
     }
+    if (!q && !grow) return nullptr;
     if (!q) {
-      HapiDevPoolArena& ar = hapiDevPoolNewArenaLocked(size, dev);
-      q = ar.alloc->malloc(size, true);
-      if (!q) CmiAbort("hapiDevPoolMalloc: request larger than a fresh arena");
-      from = &ar;
+      // Growth: say what asked and what the arenas had, so a grown arena can
+      // be traced to its allocation. The free-byte sum and the largest free
+      // block differ under a buddy allocator, and the difference is the
+      // usual reason a request that "fits" by bytes still lands here.
+      size_t freeSum = 0, largest = 0;
+      int mine = 0;
+      for (auto& ar : hapi_devpool_arenas) {
+        if (ar.device != dev) continue;
+        mine++;
+        freeSum += ar.alloc->freeBytes();
+        largest = std::max(largest, ar.alloc->largestFree());
+      }
+      const bool vmm = CsvAccess(gpu_manager).device_pool_backend == 1;
+      CmiPrintf("HAPI> [%d] device pool%s: growing for a %zu-byte request from %s; the %d "
+                "%s on device %d had %zu MB free, largest free block %zu KB\n",
+                CmiMyPe(), vmm ? " (vmm)" : "", size, hapiDescribeRequester(), mine,
+                vmm ? "heap(s)" : "arena(s)", dev, freeSum >> 20, largest >> 10);
+      if (vmm) {
+        // In place: map only what the request is short of, at the heap's end.
+        HapiDevPoolArena* ar = hapiDevPoolVmmArenaLocked(dev);
+        if (ar == nullptr) ar = &hapiDevPoolNewVmmHeapLocked(dev);
+        if (!ar->alloc->grow(size))
+          CmiAbort("HAPI> [%d] device pool (vmm): could not map %zu more bytes on device %d "
+                   "(%zu MB mapped of %zu MB reserved): the device is out of memory or "
+                   "the reservation (+gpupoolreserve) is exhausted",
+                   CmiMyPe(), size, dev, ar->alloc->extent() >> 20,
+                   ((HapiVmmAlloc*)ar->alloc)->heap.reserveBytes() >> 20);
+        ar->end = ar->start + ar->alloc->extent();
+        q = ar->alloc->malloc(size);
+        if (!q) CmiAbort("hapiDevPoolMalloc (vmm): no block after growing");
+        from = ar;
+      } else {
+        HapiDevPoolArena& ar = hapiDevPoolNewArenaLocked(size, dev);
+        q = ar.alloc->malloc(size);
+        if (!q) CmiAbort("hapiDevPoolMalloc: request larger than a fresh arena");
+        from = &ar;
+      }
     }
-    const auto blk = from->alloc->alloc_map.find((uint8_t*)q);
-    held = (blk != from->alloc->alloc_map.end()) ? blk->second.size : size;
+    if (!from->alloc->blockSize(q, &held)) held = size;
   }
   // Charged at the block's size, which is what the pool gave up for it.
   hapiRecordAlloc(q, held);
   return q;
 }
+}  // namespace
+
+void* hapiDevPoolMalloc(size_t size, int dev) {
+  return hapiDevPoolMallocImpl(size, dev, /*grow=*/true);
+}
+
+void* hapiDevPoolMallocNoGrow(size_t size, int dev) {
+  return hapiDevPoolMallocImpl(size, dev, /*grow=*/false);
+}
+
+void hapiPreallocBegin(std::multimap<size_t, void*>* set) { hapi_prealloc_current = set; }
+void hapiPreallocEnd() { hapi_prealloc_current = nullptr; }
 
 bool hapiDevPoolBlockSize(const void* ptr, size_t* size) {
   std::lock_guard<std::mutex> g(hapi_devpool_mutex);
   HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(ptr);
   if (ar == nullptr) return false;
-  const auto blk = ar->alloc->alloc_map.find((uint8_t*)ptr);
-  if (blk == ar->alloc->alloc_map.end()) return false;
-  *size = blk->second.size;
-  return true;
+  return ar->alloc->blockSize(ptr, size);
 }
 
 size_t hapiDevPoolFreeBytes() {
   std::lock_guard<std::mutex> g(hapi_devpool_mutex);
   hapiDevPoolReapLocked();   // parked blocks whose reads retired are free again
   size_t free = 0;
-  for (auto& ar : hapi_devpool_arenas) free += ar.alloc->get_free_size();
+  for (auto& ar : hapi_devpool_arenas) free += ar.alloc->freeBytes();
   return free;
 }
 
@@ -3524,7 +4034,7 @@ size_t hapiDevPoolFreeBytesOn(int device) {
   hapiDevPoolReapLocked();
   size_t free = 0;
   for (auto& ar : hapi_devpool_arenas)
-    if (ar.device == device) free += ar.alloc->get_free_size();
+    if (ar.device == device) free += ar.alloc->freeBytes();
   return free;
 }
 
@@ -3534,11 +4044,17 @@ size_t hapiDevPoolUsedBytesOn(int device) {
   size_t used = 0;
   for (auto& ar : hapi_devpool_arenas)
     if (ar.device == device)
-      used += (size_t)(ar.end - ar.start) - ar.alloc->get_free_size();
+      used += (size_t)(ar.end - ar.start) - ar.alloc->freeBytes();
   return used;
 }
 
-size_t hapiDevPoolArenaSize() { return hapiDevPoolArenaBytes(); }
+bool hapiDevPoolIsVmm() { return CsvAccess(gpu_manager).device_pool_backend == 1; }
+
+size_t hapiDevPoolGrowthBytes() {
+  return hapiDevPoolIsVmm() ? hapiDevPoolChunkBytesConfigured() : hapiDevPoolArenaBytes();
+}
+
+size_t hapiDevPoolArenaSize() { return hapiDevPoolGrowthBytes(); }
 
 void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
                         int* ipcSlots) {
@@ -3552,7 +4068,7 @@ void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
     // contract reads the two halves separately: pool bytes are per process,
     // device bytes are shared by every process on the device.
     *poolFree = hapiDevPoolFreeBytesOn(CpvAccess(my_device_id));
-    *arenaBytes = hapiDevPoolArenaBytes();
+    *arenaBytes = hapiDevPoolGrowthBytes();   // an arena, or a vmm chunk
     // CHARM_GPU_POOL_CAP_MB: a device of that size, for exercising the memory
     // contract on a device with memory to spare. The pool may hand out at most
     // that much in this process, and the device offers nothing beyond it. The
@@ -3599,9 +4115,10 @@ void hapiDevPoolFree(void* ptr) {
   // The block's full extent, from the allocator's own record of it: every
   // read noted anywhere inside it -- the block itself, or a sub-buffer of an
   // arena carved from it -- has to retire before the block goes back.
-  const auto blk = ar->alloc->alloc_map.find((uint8_t*)ptr);
+  size_t blkSize = 0;
+  const bool known = ar->alloc->blockSize(ptr, &blkSize);
   const char* lo = (const char*)ptr;
-  const char* hi = lo + (blk != ar->alloc->alloc_map.end() ? blk->second.size : 1);
+  const char* hi = lo + (known ? blkSize : 1);
   std::vector<cudaStream_t> streams;
   for (auto it = hapi_devpool_read_on.lower_bound(ptr);
        it != hapi_devpool_read_on.end() && (const char*)it->first < hi;) {
@@ -3667,12 +4184,76 @@ bool hapiDevPoolArenaOf(const void* ptr, void** base, size_t* extent) {
   return true;
 }
 
+bool hapiDevPoolSegmentOf(const void* ptr, size_t cnt, void** base, size_t* extent) {
+  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(ptr);
+  if (ar == nullptr) return false;
+  if (!ar->alloc->vmm()) {
+    *base = (void*)ar->start;
+    *extent = (size_t)(ar->end - ar->start);
+    return true;
+  }
+  // The run of whole chunks covering [ptr, ptr+cnt): what peers map and the
+  // fabric registers, one unit each.
+  const size_t chunk = ((HapiVmmAlloc*)ar->alloc)->heap.chunkBytes();
+  const uintptr_t p = (uintptr_t)ptr;
+  const uintptr_t lo = ar->start + (p - ar->start) / chunk * chunk;
+  uintptr_t hi = ar->start + hapi_pool::RangeHeap::roundUp(p + (cnt ? cnt : 1) - ar->start, chunk);
+  if (hi > ar->end) hi = ar->end;
+  *base = (void*)lo;
+  *extent = (size_t)(hi - lo);
+  return true;
+}
+
 void hapiDevPoolEnsureArena(int dev, void** base, size_t* extent) {
   std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  if (CsvAccess(gpu_manager).device_pool_backend == 1) {
+    HapiDevPoolArena* ar = hapiDevPoolVmmArenaLocked(dev);
+    if (ar == nullptr) ar = &hapiDevPoolNewVmmHeapLocked(dev);   // maps the startup budget
+    *base = (void*)ar->start;
+    *extent = (size_t)(ar->end - ar->start);
+    return;
+  }
+  // +gpupoolarenas: the pool's whole budget is opened here, at startup, since
+  // the balancer plans only within the arenas the pool has (LBMemoryContract.h).
+  int have = 0;
+  for (auto& ar : hapi_devpool_arenas) if (ar.device == dev) have++;
+  const int want = std::max(1, CsvAccess(gpu_manager).device_pool_arenas);
+  for (; have < want; have++) hapiDevPoolNewArenaLocked(0, dev);
   for (auto& ar : hapi_devpool_arenas)
     if (ar.device == dev) { *base = (void*)ar.start; *extent = ar.end - ar.start; return; }
-  HapiDevPoolArena& ar = hapiDevPoolNewArenaLocked(0, dev);
-  *base = (void*)ar.start; *extent = ar.end - ar.start;
+  CmiAbort("hapiDevPoolEnsureArena: no arena after opening one");
+}
+
+// +gpushm publication of the vmm heap (ipcHandleCreate): the entry peers read
+// the chunk descriptors from, and the synthetic handle a send carries.
+bool hapiDevPoolVmmPublish(int dev, hapi_pool_shm_entry* e, int shm_index,
+                           hapiIpcMemHandle_t* handle) {
+  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolArena* ar = hapiDevPoolVmmArenaLocked(dev);
+  if (ar == nullptr) return false;
+  HapiVmmAlloc* v = (HapiVmmAlloc*)ar->alloc;
+  if (!v->exportable)
+    CmiAbort("HAPI> [%d] device pool (vmm): device %d cannot export chunks as file "
+             "descriptors, so peers cannot map the heap; use +gpupoolalloc buddy",
+             CmiMyPe(), dev);
+  v->publish(e, shm_index);
+  hapiVmmMakeHandle(handle, (uint64_t)v->heap.base(), v->heap.reserveBytes(),
+                    v->heap.chunkBytes(), e->pid, shm_index, CmiMyNode());
+  return true;
+}
+
+// The synthetic handle for a pointer in this process's vmm heap, for a send.
+bool hapiDevPoolVmmHandleOf(const void* ptr, hapiIpcMemHandle_t* handle, void** base) {
+  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(ptr);
+  if (ar == nullptr || !ar->alloc->vmm()) return false;
+  HapiVmmAlloc* v = (HapiVmmAlloc*)ar->alloc;
+  if (v->shm == nullptr) return false;   // not published: no peers can map it
+  hapiVmmMakeHandle(handle, (uint64_t)v->heap.base(), v->heap.reserveBytes(),
+                    v->heap.chunkBytes(), v->shm->pid, v->shm_index, CmiMyNode());
+  *base = (void*)ar->start;
+  return true;
 }
 
 void hapiDevPoolNoteRead(const void* ptr, hapiStream_t stream) {
@@ -3761,8 +4342,20 @@ void hapiFreeMigratable(void* ptr) {
 
 namespace {
 std::unordered_map<LDObjKey, size_t, LDObjKeyHash> gpu_obj_footprint;
+// The same footprint as blocks: size -> count, the shape the admission gate
+// has to find room for at the destination (hapiObjectBlocks).
+std::unordered_map<LDObjKey, std::map<size_t, int>, LDObjKeyHash> gpu_obj_blocks;
 std::unordered_map<void*, std::pair<LDObjKey, size_t>> gpu_ptr_owner;
 std::mutex gpu_footprint_lock;
+
+void hapiDropBlockLocked(const LDObjKey& key, size_t size) {
+  auto ob = gpu_obj_blocks.find(key);
+  if (ob == gpu_obj_blocks.end()) return;
+  auto b = ob->second.find(size);
+  if (b == ob->second.end()) return;
+  if (--b->second <= 0) ob->second.erase(b);
+  if (ob->second.empty()) gpu_obj_blocks.erase(ob);
+}
 
 // Attribution set by the runtime: charge a given element, or nobody.
 struct HapiFootprintScope { bool nobody; LDObjKey key; };
@@ -3791,8 +4384,10 @@ void hapiChargeLocked(const LDObjKey& key, void* ptr, size_t size) {
     auto owner = gpu_obj_footprint.find(prev->second.first);
     if (owner != gpu_obj_footprint.end())
       owner->second -= std::min(owner->second, prev->second.second);
+    hapiDropBlockLocked(prev->second.first, prev->second.second);
   }
   gpu_obj_footprint[key] += size;
+  gpu_obj_blocks[key][size]++;
   gpu_ptr_owner[ptr] = std::make_pair(key, size);
 }
 }
@@ -3834,6 +4429,7 @@ void hapiRecordForget(void* ptr) {
     owner->second -= (owner->second >= it->second.second)
                          ? it->second.second : owner->second;
   }
+  hapiDropBlockLocked(it->second.first, it->second.second);
   gpu_ptr_owner.erase(it);
 }
 
@@ -3855,6 +4451,14 @@ void hapiRecordFree(void* ptr) {
   hapiRecordForget(ptr);
 }
 
+static const char* hapiDescribeRequester() {
+  if (!hapi_footprint_scopes.empty())
+    return hapi_footprint_scopes.back().nobody ? "the runtime (a payload or landing)"
+                                               : "an arriving element's unpack";
+  LDObjKey k{};
+  return hapiActiveObjKey(k) ? "the running element" : "no element (startup or runtime)";
+}
+
 // The running chare's attributed live bytes; called from the AtSync path,
 // where the active object is the chare itself.
 size_t hapiCurrentObjectFootprint() {
@@ -3863,6 +4467,24 @@ size_t hapiCurrentObjectFootprint() {
   std::lock_guard<std::mutex> g(gpu_footprint_lock);
   auto it = gpu_obj_footprint.find(key);
   return (it == gpu_obj_footprint.end()) ? 0 : it->second;
+}
+
+size_t hapiObjectFootprint(CkLocRec* rec) {
+  LDObjKey key{};
+  if (!hapiKeyOf(rec, key)) return 0;
+  std::lock_guard<std::mutex> g(gpu_footprint_lock);
+  auto it = gpu_obj_footprint.find(key);
+  return (it == gpu_obj_footprint.end()) ? 0 : it->second;
+}
+
+void hapiObjectBlocks(CkLocRec* rec, std::vector<std::pair<size_t, int>>& out) {
+  out.clear();
+  LDObjKey key{};
+  if (!hapiKeyOf(rec, key)) return;
+  std::lock_guard<std::mutex> g(gpu_footprint_lock);
+  auto it = gpu_obj_blocks.find(key);
+  if (it == gpu_obj_blocks.end()) return;
+  for (const auto& b : it->second) out.emplace_back(b.first, b.second);
 }
 
 #else
@@ -3875,7 +4497,12 @@ void hapiFootprintEnd() {}
 void hapiFootprintCharge(void* ptr, size_t size, CkLocRec* rec) {
   (void)ptr; (void)size; (void)rec;
 }
+static const char* hapiDescribeRequester() { return "an allocation"; }
 size_t hapiCurrentObjectFootprint() { return 0; }
+size_t hapiObjectFootprint(CkLocRec* rec) { (void)rec; return 0; }
+void hapiObjectBlocks(CkLocRec* rec, std::vector<std::pair<size_t, int>>& out) {
+  (void)rec; out.clear();
+}
 
 #endif  // CMK_LBDB_ON
 

@@ -92,6 +92,9 @@ namespace buddy {
     void print_status();
     size_t get_free_size();
     size_t get_lb_free_size();
+    // The largest block a malloc could be served from now (0 when none): the
+    // sum of the free lists says nothing about whether one request fits.
+    size_t largest_free_block() const;
     int get_bucket(size_t size);
     int get_block_index(uint8_t* ptr, size_t size);
 

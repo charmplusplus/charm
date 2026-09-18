@@ -247,6 +247,9 @@ void* CkRdmaDeviceAllocLbBuffer(void* dm, size_t size);
 // pup_buffer_device is NOT from this pool and must go back through
 // hapiFreeMigratable; callers that mix the two have to know which is which.
 void* CkDeviceMalloc(size_t size);
+// The same, but never grows the pool: nullptr when no arena has a block that
+// fits. The admission gate reserves with it (cklocation.C).
+void* CkDeviceMallocNoGrow(size_t size);
 void CkDeviceFree(void* ptr);
 // +gpupool: the pool is the runtime's allocation policy (migration arenas and
 // payloads from it, direct CUDA IPC only, no comm or load-balancing buffer).
@@ -279,6 +282,7 @@ inline size_t CkRdmaDeviceTakePendingSendBytes() { return 0; }
 inline int CkRdmaDeviceBusyIpcSlots() { return -1; }
 inline void* CkRdmaDeviceAllocLbBuffer(void* dm, size_t size) { return nullptr; }
 inline void* CkDeviceMalloc(size_t size) { return nullptr; }
+inline void* CkDeviceMallocNoGrow(size_t size) { return nullptr; }
 inline void CkDeviceFree(void* ptr) {}
 inline bool CkRdmaDeviceStageParked(envelope* env) { return false; }
 inline bool CkDevicePoolOn() { return false; }

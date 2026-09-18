@@ -465,26 +465,28 @@ void CkRdmaDeviceMsgFreed(void* env)
   holds->erase(it);
 }
 
-// One registration per pool arena, shared by every PE of the process. Keyed by
-// arena base; created on first use; marked no-dereg so no completion path can
-// ever release it.
+// One registration per pool segment, shared by every PE of the process: the
+// arena under the buddy backend, the run of chunks covering the buffer under
+// the vmm backend (hapiDevPoolSegmentOf). Keyed by (base, extent); created on
+// first use; marked no-dereg so no completion path can ever release it.
 static std::mutex g_deviceArenaRegLock;
-static std::map<uintptr_t, CmiNcpyBuffer> g_deviceArenaRegs;
+static std::map<std::pair<uintptr_t, size_t>, CmiNcpyBuffer> g_deviceArenaRegs;
 
 static bool acquireArenaRegistration(const void* ptr, size_t cnt, CmiNcpyBuffer* out)
 {
   if (!hapiDevPoolOn()) return false;
   void* base = NULL;
   size_t extent = 0;
-  if (!hapiDevPoolArenaOf(ptr, &base, &extent)) return false;
+  if (!hapiDevPoolSegmentOf(ptr, cnt, &base, &extent)) return false;
 
   std::lock_guard<std::mutex> lk(g_deviceArenaRegLock);
-  auto it = g_deviceArenaRegs.find((uintptr_t)base);
+  const auto key = std::make_pair((uintptr_t)base, extent);
+  auto it = g_deviceArenaRegs.find(key);
   if (it == g_deviceArenaRegs.end()) {
     CmiNcpyBuffer reg(base, extent, CMK_BUFFER_REG, CMK_BUFFER_NODEREG);  // the one registration
-    it = g_deviceArenaRegs.emplace((uintptr_t)base, reg).first;
-    CmiPrintf("[%d] device pool: arena %p (%zu MB) registered once for RDMA\n",
-              CmiMyPe(), base, extent >> 20);
+    it = g_deviceArenaRegs.emplace(key, reg).first;
+    CmiPrintf("[%d] device pool: %s %p (%zu MB) registered once for RDMA\n",
+              CmiMyPe(), hapiDevPoolIsVmm() ? "chunk run" : "arena", base, extent >> 20);
   }
   *out = it->second;
   // The registration covers the arena; the transfer is the buffer.
@@ -3583,6 +3585,9 @@ void CkRdmaDeviceGateLbBuffer(void* dm_opaque, cudaStream_t consumer) {
 // ---- Device pool: thin wrappers over hapi's (see hapi.h) ----------------------
 void* CkDeviceMalloc(size_t size) {
   return hapiDevPoolMalloc(size, CpvAccess(my_device_id));
+}
+void* CkDeviceMallocNoGrow(size_t size) {
+  return hapiDevPoolMallocNoGrow(size, CpvAccess(my_device_id));
 }
 void CkDeviceFree(void* ptr) { hapiDevPoolFree(ptr); }
 bool CkDevicePoolOn() { return hapiDevPoolOn(); }

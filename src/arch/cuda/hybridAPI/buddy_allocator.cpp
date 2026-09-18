@@ -160,6 +160,12 @@ namespace buddy {
     delete[] buckets;
   }
 
+  size_t allocator::largest_free_block() const {
+    for (int b = bucket_count - 1; b >= 0; b--)
+      if (!buckets[b].empty()) return buckets[b].front().size;
+    return 0;
+  }
+
   void* allocator::malloc(size_t request, bool is_comm) {
     if(!is_comm) {
       // buffers for load balancing
