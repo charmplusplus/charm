@@ -86,6 +86,7 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
 
 CsvExtern(GPUManager, gpu_manager);
 CpvExtern(int, my_device_id);
+static inline hapi_ipc_event_shared* ipcSharedSlot(int device_idx, int event_idx);
 
 // Defined further down, used by both receive completion handlers above it.
 void zcRecordRecvTime(int slot, size_t bytes, double seconds);
@@ -655,6 +656,24 @@ void CkRdmaDeviceRecvHandler(void* data, void* msg)
   DeviceRdmaOp* op = (DeviceRdmaOp*)data;
   DeviceRdmaInfo* info = op->info;
 
+  // The copy out of the sender's IPC slot has landed (this runs behind it on
+  // the receive stream), so the sender may take the slot back. Raised here,
+  // at completion, rather than when the copy was issued: that is what lets
+  // reclaimCompletedIpcEvents trust the flag alone and query no event.
+  // The sender clears it when it reclaims the slot, so finding it already set
+  // means a second receive is signalling the same (device, event) pair before
+  // the first was retired -- the sender would then free a block another
+  // transfer is still reading.
+  if (op->ipc_event_idx >= 0) {
+    hapi_ipc_event_shared* sh = ipcSharedSlot(op->ipc_device_idx, op->ipc_event_idx);
+    if (sh->dst_flag.exchange(true, std::memory_order_acq_rel)) {
+      CmiPrintf("[%d] IPC DUPLICATE dst_flag dev_idx=%d ev_idx=%d srcPe=%d cnt=%zu\n",
+                CkMyPe(), op->ipc_device_idx, op->ipc_event_idx, op->src_pe, op->size);
+      fflush(stdout);
+    }
+    op->ipc_event_idx = -1;
+  }
+
   // Invoke source callbacks
   if (op->src_cb) {
     CkCallback* cb = (CkCallback*)op->src_cb;
@@ -1123,15 +1142,7 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
 
       // No wait here: the caller issues this only once the sender's work is
       // known complete on the host (DeviceRecvPending), so nothing on
-      // recv_stream can block behind a sender. The same-process, other-device
-      // case still matters below: its event cannot be recorded on our stream.
-      // "Different device inside this process" is BOTH conditions. device_idx
-      // is node-local (device_count * process rank + device), so with one
-      // device per process every other process's index differs too.
-      const bool same_process_other_device =
-          (CmiNodeOf(srcPe) == CmiMyNode()) &&
-          (source.device_idx != csv_gpu_manager.device_count * CmiMyNodeRankLocal()
-                                    + CpvAccess(my_device_id));
+      // recv_stream can block behind a sender.
 
       // 2. Invoke hapiMemcpyAsync from the peer's memory to the destination
       //    buffer. This is the only copy a direct transfer makes.
@@ -1140,66 +1151,9 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
       hapiCheck(hapiMemcpyAsync((void*)dest.ptr, src_addr,
             dest.cnt, cudaMemcpyDefault, recv_stream));
       ipcDebugSync("recv 2: peer copy -> dest", recv_stream);
-
-      // 3. Record IPC event so that the sender can query it for freeing
-      //    device comm buffer and corresponding pair of CUDA IPC events.
-      //    The event belongs to the source's device; when that is a different
-      //    device inside this same process it was never imported under ours
-      //    (ipcHandleOpen skips our own process), so settle the copy and record
-      //    on the owning device rather than on our stream.
-      {
-        if (same_process_other_device) {
-          hapiCheck(hapiStreamSynchronize(recv_stream));
-          const int src_local = source.device_idx % csv_gpu_manager.device_count;
-          const int src_global = csv_gpu_manager.device_managers[src_local].global_index;
-          int prev_dev = 0;
-          hapiCheck(hapiGetDevice(&prev_dev));
-          hapiCheck(hapiSetDevice(src_global));
-          hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx], 0));
-          hapiCheck(hapiSetDevice(prev_dev));
-        } else if (hapiStreamDeviceOf(recv_stream) >= 0 &&
-                   hapiStreamDeviceOf(recv_stream) != hapiGetDeviceNum()) {
-          // The receive stream is not on this PE's device. The imported event
-          // is, so recording one on the other fails with
-          // invalid-resource-handle. Same remedy as the branch above: settle
-          // the stream on the host and record on our own device instead --
-          // stronger ordering, and only on this path.
-          hapiCheck(hapiStreamSynchronize(recv_stream));
-          hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx],
-                NULL));
-        } else {
-          hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx],
-                recv_stream));
-        }
-      }
-      ipcDebugSync("recv 3: record imported dst_event", recv_stream);
-
-      // 4. Set flag in shared memory so that the sender can start querying
-      //    completion of the IPC event
-      hapi_ipc_event_shared* shm_event_shared =
-        (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
-            + csv_gpu_manager.shm_chunk_size * source.device_idx
-            + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
-      // The sender clears this when it reclaims the slot, so finding it already
-      // set means a second receive is signalling the same (device, event) pair
-      // before the first was retired. The sender would then free the block
-      // belonging to whichever transfer claimed the slot next, while that
-      // transfer is still reading it -- a use-after-free inside the comm buffer
-      // that surfaces later as an illegal access on an unrelated stream.
-      //
-      // Release pairs with the sender's acquire load in
-      // reclaimCompletedIpcEvents: it is what makes the hapiEventRecord above
-      // visible before the sender is allowed to query that event.
-      const bool already =
-          shm_event_shared->dst_flag.exchange(true, std::memory_order_acq_rel);
-      if (already) {
-        CmiPrintf("[%d] IPC DUPLICATE dst_flag dev_idx=%d ev_idx=%d srcPe=%d "
-                  "off=%zu cnt=%zu\n",
-                  CkMyPe(), source.device_idx, source.event_idx,
-                  srcPe, (size_t)source.comm_offset, (size_t)dest.cnt);
-        fflush(stdout);
-      }
-
+      // The slot is released when this copy completes: the caller recorded
+      // it in the op, and CkRdmaDeviceRecvHandler raises its dst_flag then.
+      // No destination event is recorded any more -- nothing queries it.
 }
 
 
@@ -1409,20 +1363,14 @@ static void deviceRecvIssue(DeviceRecvPending& p)
     // Same process: a device-to-device copy from the sender's buffer. The
     // sender's producing work is already complete (deviceRecvSourceReady),
     // so no stream wait precedes it.
-    // A send that left this process (forward-repaired to direct, with an
-    // IPC event slot claimed) and then came back to it is read here by
-    // memcpy, so the slot would never be released by the IPC path. Retire
-    // it the way that path does: record the destination event and raise
-    // the flag the sender's reclaim scan polls.
-    if (source.sender_prepared && source.ipc_protocol == CmiIpcProtocol::DIRECT &&
-        source.event_idx >= 0 && source.device_idx >= 0 && csv_gpu_manager.use_shm) {
-      hapi_ipc_device_info& di = csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
-      hapiCheck(hapiEventRecord(di.dst_event_pool[source.event_idx],
-                                rs));
-      hapi_ipc_event_shared* sh = (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
-          + csv_gpu_manager.shm_chunk_size * source.device_idx
-          + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
-      sh->dst_flag.store(true, std::memory_order_release);
+    // A sender that staged IPC state for this transfer anyway -- an
+    // unconfirmed destination that turned out to be this process, or a send
+    // that left the process and came back -- holds a slot nothing else will
+    // release. Its dst_flag is raised when this copy completes
+    // (CkRdmaDeviceRecvHandler), exactly as on the IPC path.
+    if (source.device_idx >= 0 && source.event_idx >= 0 && csv_gpu_manager.use_shm) {
+      p.op->ipc_device_idx = source.device_idx;
+      p.op->ipc_event_idx = source.event_idx;
     }
     // cudaMemcpyDefault, not DeviceToDevice: once load balancing has moved
     // chares between GPUs, the source and destination of a same-process
@@ -1432,59 +1380,15 @@ static void deviceRecvIssue(DeviceRecvPending& p)
     hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt,
           cudaMemcpyDefault, rs));
 
-    // The sender may have staged IPC info for this transfer anyway: an
-    // unconfirmed destination that turned out to be this same process
-    // (see CkRdmaDeviceOnSender). That staging allocated a device
-    // comm-buffer slot and claimed a CUDA IPC event that nothing will
-    // ever free unless we tell the sender it's unused -- the free-up
-    // logic in reclaimCompletedIpcEvents only runs once it sees the dst_flag
-    // this receiver would have set had it taken the IPC branch below.
-    // Signal that now (skip the actual comm-buffer copy in steps 1-2,
-    // since the real data already moved via source.ptr above; just record
-    // the completion event and flag so the sender can reclaim the slot).
-    if (source.device_idx != -1 && csv_gpu_manager.use_shm) {
-      hapi_ipc_device_info& device_info =
-        csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
-
-      // The event belongs to the sender's device, and cudaEventRecord
-      // requires the event and the stream to be on the same one. Across
-      // processes that is never a problem: ipcHandleOpen imports a peer's
-      // events under our own device. It skips our own process, though -- a
-      // process cannot open a handle it exported itself -- so when the source
-      // is a different device inside this same process, what sits in the pool
-      // is that device's original event, and recording it on our stream fails
-      // with 'invalid argument'. This only became reachable once load
-      // balancing started moving chares between GPUs in one process.
-      //
-      // Settle the copy, then record on the owning device. Synchronous, but
-      // it applies only to this one case: a same-process transfer that
-      // crossed devices and whose sender staged IPC state that has to be
-      // released.
-      const int my_dev_idx =
-          csv_gpu_manager.device_count * CmiMyNodeRankLocal() + CpvAccess(my_device_id);
-      if (source.device_idx != my_dev_idx) {
-        hapiCheck(hapiStreamSynchronize(rs));
-        const int src_local = source.device_idx % csv_gpu_manager.device_count;
-        const int src_global =
-            csv_gpu_manager.device_managers[src_local].global_index;
-        int prev_dev = 0;
-        hapiCheck(hapiGetDevice(&prev_dev));
-        hapiCheck(hapiSetDevice(src_global));
-        hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx], 0));
-        hapiCheck(hapiSetDevice(prev_dev));
-      } else {
-        hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx],
-              rs));
-      }
-      hapi_ipc_event_shared* shm_event_shared =
-        (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
-            + csv_gpu_manager.shm_chunk_size * source.device_idx
-            + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
-      shm_event_shared->dst_flag.store(true, std::memory_order_release);
-    }
     break;
   }
   case DeviceRecvKind::Ipc:
+    // The slot is released from the completion handler; naming it in the op
+    // is what arms that.
+    if (source.device_idx >= 0 && source.event_idx >= 0) {
+      p.op->ipc_device_idx = source.device_idx;
+      p.op->ipc_event_idx = source.event_idx;
+    }
     deviceIpcReceive(source, dest, rs, p.src_pe, p.mode);
     break;
   }
@@ -1689,10 +1593,9 @@ CkDeviceRepairResult CkRdmaDeviceRepairForward(envelope* env, int newPe, int opt
         if (!forwardRepairReadyOrPark(env, newPe, opts, info.src_event_pool[b.event_idx]))
           return CkDeviceRepairResult::Parked;
         // Retire the IPC slot the direct prepare claimed: the receiver it was
-        // claimed for is on another node and will never set its flag. Same
-        // pairing the same-node correction uses -- dst event recorded, then
-        // the flag published -- so the owning PE's reclaim scan takes it back.
-        hapiCheck(hapiEventRecord(info.dst_event_pool[b.event_idx], hapiStreamPerThread));
+        // claimed for is on another node and will never set its flag. A direct
+        // slot holds no block and its producer is complete (checked above), so
+        // the flag alone lets the owning PE's reclaim scan take it back.
         hapi_ipc_event_shared* slot =
             (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
                 + csv_gpu_manager.shm_chunk_size * b.device_idx
@@ -2265,13 +2168,11 @@ extern "C" void* device_restage_req_bridge(void* arg)
     // unmappable direct sends started routing through here in volume, at which
     // point the pic2d repro needed +gpuipceventpool 2048 where 16 had done.
     //
-    // reclaimCompletedIpcEvents wants both halves: dst_flag set, and the slot's
-    // dst_event complete. Record the event on the stream that did the re-read
-    // so it retires exactly when that read is done, then publish the flag --
-    // the same order, and the same release pairing, the receiving side uses.
+    // The original slot's block, if it has one, was written by the sender's
+    // own staging copy, whose completion its src_ready publication (a gate on
+    // reclaim) attests; the failed delivery never read it. The flag alone
+    // releases it.
     if (req->src_event_idx >= 0) {
-      hapiCheck(hapiEventRecord(my_device_info.dst_event_pool[req->src_event_idx],
-                                hapiStreamPerThread));
       hapi_ipc_event_shared* orig_shared =
           (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
               + csv_gpu_manager.shm_chunk_size * device_idx
@@ -2444,15 +2345,13 @@ static void deviceStallScan(void*, double)
           if ((size_t)ei < dinfo.src_event_pool.size()) {
             const bool src_done =
                 (hapiEventQuery(dinfo.src_event_pool[ei]) == hapiSuccess);
-            const bool dst_done =
-                (hapiEventQuery(dinfo.dst_event_pool[ei]) == hapiSuccess);
             hapi_ipc_event_shared* sh =
                 (hapi_ipc_event_shared*)((char*)gm.shm_ptr
                     + gm.shm_chunk_size * di + sizeof(hapiIpcMemHandle_t)) + ei;
             snprintf(ev_state, sizeof(ev_state),
-                     " dev=%d ev=%d src_ev=%s dst_ev=%s dst_flag=%d", di, ei,
+                     " dev=%d ev=%d src_ev=%s src_ready=%d dst_done=%d", di, ei,
                      src_done ? "DONE" : "PENDING",
-                     dst_done ? "DONE" : "PENDING",
+                     (int)sh->src_ready.load(std::memory_order_relaxed),
                      (int)sh->dst_flag.load(std::memory_order_relaxed));
           }
         }
@@ -2753,6 +2652,8 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     save_op.dst_flag_rank = -1;
     save_op.dst_flag_seq = 0;
     save_op.dst_event = NULL;
+    save_op.ipc_device_idx = -1;
+    save_op.ipc_event_idx = -1;
 
     // Destination buffer (on this receiver)
     CkDeviceBuffer dest((const void *)arrPtrs[i], arrSizes[i]);
@@ -3148,47 +3049,26 @@ bool CkRdmaDeviceStageParked(envelope* env)
     op.src_pe = srcPe;
     op.src_mpi_rank = source.src_mpi_rank;
     op.dest_mpi_rank = CmiMyNode();
+    op.dst_flag_rank = -1;
+    op.dst_flag_seq = 0;
+    op.dst_event = NULL;
+    op.ipc_device_idx = -1;
+    op.ipc_event_idx = -1;
     CkDeviceBuffer dest((const void*)land[i], source.cnt);
     bytes += (size_t)source.cnt;
     const bool sender_exported =
         (source.ipc_protocol != CmiIpcProtocol::NONE && source.device_idx != -1 &&
          csv_gpu_manager.use_shm);
+    // The sender's slot, if it claimed one, is released when the pull
+    // completes: CkRdmaDeviceRecvHandler raises its dst_flag.
+    if (source.device_idx >= 0 && source.event_idx >= 0 && csv_gpu_manager.use_shm) {
+      op.ipc_device_idx = source.device_idx;
+      op.ipc_event_idx = source.event_idx;
+    }
     if (mode == CkNcpyModeDevice::MEMCPY && !sender_exported) {
-      if (source.sender_prepared && source.ipc_protocol == CmiIpcProtocol::DIRECT &&
-          source.event_idx >= 0 && source.device_idx >= 0 && csv_gpu_manager.use_shm) {
-        hapi_ipc_device_info& di = csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
-        hapiCheck(hapiEventRecord(di.dst_event_pool[source.event_idx], st));
-        hapi_ipc_event_shared* sh = (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
-            + csv_gpu_manager.shm_chunk_size * source.device_idx
-            + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
-        sh->dst_flag.store(true, std::memory_order_release);
-      }
       if (source.memcpy_event != NULL)
         hapiCheck(hapiStreamWaitEvent(st, (hapiEvent_t)source.memcpy_event, 0));
       hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt, cudaMemcpyDefault, st));
-      if (source.device_idx != -1 && csv_gpu_manager.use_shm) {
-        hapi_ipc_device_info& device_info =
-          csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
-        const int my_dev_idx =
-            csv_gpu_manager.device_count * CmiMyNodeRankLocal() + CpvAccess(my_device_id);
-        if (source.device_idx != my_dev_idx) {
-          hapiCheck(hapiStreamSynchronize(st));
-          const int src_local = source.device_idx % csv_gpu_manager.device_count;
-          const int src_global = csv_gpu_manager.device_managers[src_local].global_index;
-          int prev_dev = 0;
-          hapiCheck(hapiGetDevice(&prev_dev));
-          hapiCheck(hapiSetDevice(src_global));
-          hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx], 0));
-          hapiCheck(hapiSetDevice(prev_dev));
-        } else {
-          hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx], st));
-        }
-        hapi_ipc_event_shared* shm_event_shared =
-          (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
-              + csv_gpu_manager.shm_chunk_size * source.device_idx
-              + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
-        shm_event_shared->dst_flag.store(true, std::memory_order_release);
-      }
     } else {
       deviceIpcReceive(source, dest, st, srcPe, mode);
     }
@@ -3355,6 +3235,9 @@ static int reclaimCompletedIpcEvents(DeviceManager* dm, int cpv_my_device_id,
     // the device comm buffer on the sender to the destination buffer. Acquire
     // pairs with the receiver's release store, and is what makes its
     // hapiEventRecord visible before the query below.
+    // Raised by the receiver's completion handler once its copy out of this
+    // slot has landed (or by a correction path that owns the slot): no event
+    // to query.
     if (!my_shm_events[i].dst_flag.load(std::memory_order_acquire)) continue;
     // The publish callback behind this use's source event must have fired
     // too: freed before that, the slot could be claimed and named in a new
@@ -3362,8 +3245,6 @@ static int reclaimCompletedIpcEvents(DeviceManager* dm, int cpv_my_device_id,
     if (!my_shm_events[i].src_ready.load(std::memory_order_acquire)) continue;
 
     // The receiver has invoked the memcpy, so the sender may query the event.
-    if (hapiEventQuery(my_device_info.dst_event_pool[i]) != hapiSuccess) continue;
-
     // Event completion means the transfer from the source device comm buffer to
     // the destination buffer is done, so the allocated block can go back.
     if (event_flag == 1) {
@@ -3374,7 +3255,7 @@ static int reclaimCompletedIpcEvents(DeviceManager* dm, int cpv_my_device_id,
       // nothing to release beyond the event slot itself. Its completion
       // still matters -- it is what tells the sender the receiver has
       // finished reading its source buffer.
-      CkAbort("Retrieved hapiSuccess for a free IPC event");
+      CkAbort("IPC slot flagged complete but not in use");
     }
 
     // Mark event as free. Ordered after the offset is read above, so the slot

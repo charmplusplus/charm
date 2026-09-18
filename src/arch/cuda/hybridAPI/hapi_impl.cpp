@@ -3387,7 +3387,15 @@ std::mutex hapi_devpool_mutex;
 std::multimap<const void*, cudaStream_t> hapi_devpool_read_on;
 // Freed blocks waiting for their reads to retire before they can be reused --
 // one event per stream the reads were on (in practice one).
-struct HapiDevPoolPending { void* ptr; int device; std::vector<cudaEvent_t> evs; };
+// A block whose last readers may still be running: reusable once every flag
+// has landed and every event completed. Flags (hapiFlagIssue on the reading
+// stream) are the normal case and cost the reap a plain load each; an event
+// stands in when the ring had no slot or the stream is another device's.
+struct HapiDevPoolPending {
+  void* ptr; int device;
+  std::vector<std::pair<int, uint32_t>> flags;   // (rank, seq)
+  std::vector<cudaEvent_t> evs;
+};
 std::vector<HapiDevPoolPending> hapi_devpool_pending;
 // Spare events to record with, kept per device. A CUDA event belongs to the
 // device that was current when it was created, and recording it on a stream
@@ -3425,7 +3433,10 @@ void hapiDevPoolReapLocked() {
   for (size_t i = 0; i < hapi_devpool_pending.size();) {
     HapiDevPoolPending& pd = hapi_devpool_pending[i];
     bool done = true;
-    for (cudaEvent_t ev : pd.evs) {
+    for (const auto& f : pd.flags)
+      if (!hapiFlagLanded(f.first, f.second)) { done = false; break; }
+    for (size_t k = 0; done && k < pd.evs.size(); k++) {   // fallback events only
+      cudaEvent_t ev = pd.evs[k];
       const cudaError_t ev_state = cudaEventQuery(ev);
       // A query records its verdict as this thread's last error, and the
       // application's next cudaPeekAtLastError would report our "not ready"
@@ -3614,6 +3625,12 @@ void hapiDevPoolFree(void* ptr) {
   HapiDevPoolPending pd; pd.ptr = ptr; pd.device = cur_dev;
   auto& spares = hapi_devpool_spare_events[cur_dev];
   for (cudaStream_t st : streams) {
+    int rank = -1;
+    uint32_t seq = 0;
+    if (hapiFlagIssue(st, &rank, &seq)) {   // the normal case: reaped by a plain load
+      pd.flags.emplace_back(rank, seq);
+      continue;
+    }
     cudaEvent_t ev;
     if (!spares.empty()) {
       ev = spares.back(); spares.pop_back();
@@ -4783,6 +4800,7 @@ void hapiAddCallback(hapiStream_t stream, void* cb, void* cb_msg) {
 bool hapiFlagIssue(hapiStream_t stream, int* rank, uint32_t* seq) {
 #ifndef HAPI_CUDA_CALLBACK
   if (!hapi_use_flag_poll) return false;
+  if (CpvAccess(hapi_flag_slots) == NULL) return false;   // no ring on this thread
   const int stream_dev = hapiStreamDeviceOf(stream);
   if (stream_dev >= 0 && stream_dev != CpvAccess(my_device)) return false;
   uint32_t next = CpvAccess(hapi_flag_seq) + 1;

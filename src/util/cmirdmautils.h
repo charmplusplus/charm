@@ -65,6 +65,12 @@ typedef struct DeviceRdmaOp_ {
   int dst_flag_rank;
   uint32_t dst_flag_seq;
   void* dst_event;
+  // The IPC slot this receive reads from -- the sender's (node-local device,
+  // event) pair -- or -1. The completion handler raises that slot's dst_flag
+  // once the copy has landed, which is what tells the owning sender its block
+  // and buffer are no longer being read; its reclaim scan queries no event.
+  int ipc_device_idx;
+  int ipc_event_idx;
 } DeviceRdmaOp;
 
 typedef struct DeviceRdmaOpMsg_ {
