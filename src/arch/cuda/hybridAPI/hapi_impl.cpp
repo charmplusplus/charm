@@ -1884,8 +1884,11 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
 
   // pre-calculate memory per size
   int max_buffers = *std::max_element(n_buffers, n_buffers + n_slots);
-  int n_buffers_to_allocate[n_slots];
-  memset(n_buffers_to_allocate, 0, sizeof(n_buffers_to_allocate));
+  // Not `int n_buffers_to_allocate[n_slots]`: n_slots is a runtime parameter,
+  // so that is a VLA -- a GNU extension rather than standard C++, and one the
+  // arm builds compile with -Werror=vla. The fill constructor also replaces
+  // the memset, whose sizeof() only gave the right length while this was a VLA.
+  std::vector<int> n_buffers_to_allocate(n_slots, 0);
   size_t buf_size;
   while (available_memory >= mempool_boundaries[0] + sizeof(BufferPoolHeader)) {
     for (int i = 0; i < max_buffers; i++) {
