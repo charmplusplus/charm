@@ -248,13 +248,18 @@ jobs:
             runner: ubuntu-24.04-arm
             build_opts: '-Werror=vla'
             nvidia_repo: 'ubuntu2404/sbsa'
-            # Only the four packages this job compiles and links against:
-            # nvcc for the .cu files and LCI's enable_language(CUDA), cudart
-            # and cupti for conv-mach-cuda.sh's -lcudart -lcupti, and
-            # driver-dev for the libcuda stub that reconverse+CUDA links.
-            # Deliberately not the cuda-toolkit-12-6 metapackage, which pulls
-            # several GB of math libraries and profilers nothing here touches.
-            cuda_pkgs: 'cuda-nvcc-12-6 cuda-cudart-dev-12-6 cuda-cupti-dev-12-6 cuda-driver-dev-12-6'
+            # Only the packages this job compiles and links against: nvcc for
+            # the .cu files and LCI's enable_language(CUDA), cudart and cupti
+            # for conv-mach-cuda.sh's -lcudart -lcupti, driver-dev for the
+            # libcuda stub that reconverse+CUDA links, and cublas because
+            # examples/charm++/cuda/matmul includes cublas_v2.h and links
+            # -lcublas. Deliberately not the cuda-toolkit-12-6 metapackage,
+            # which pulls several GB of math libraries and profilers nothing
+            # here touches -- x86_64 gets those only incidentally, because
+            # Ubuntu's nvidia-cuda-toolkit depends on them.
+            # No nvtx package: the examples' -lnvToolsExt is commented out and
+            # hapi_nvtx.h is compiled only under -DHAPI_NVTX_PROFILE.
+            cuda_pkgs: 'cuda-nvcc-12-6 cuda-cudart-dev-12-6 cuda-cupti-dev-12-6 cuda-driver-dev-12-6 libcublas-dev-12-6'
             cuda_home: '/usr/local/cuda-12.6'
     runs-on: ${{ matrix.runner }}
     steps:
@@ -269,14 +274,22 @@ jobs:
       # report the same ImageVersion.
       - name: cache key inputs
         id: keyinfo
-        run: echo "image=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "image=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+          # The package list is part of the key, so editing cuda_pkgs
+          # invalidates the cache by itself. Without this, adding a package
+          # would restore the previous deb set, and the "already downloaded?"
+          # guard in the install step would then skip fetching the new one --
+          # a stale cache that fails at compile time, not at install time.
+          echo "pkgs=$(printf '%s' '${{ matrix.cuda_pkgs }}' | sha1sum | cut -c1-12)" >> "$GITHUB_OUTPUT"
       - name: cache cuda toolkit packages
         uses: actions/cache@v5
         with:
           path: ~/cuda-debs
           # Exact key only, no restore-keys: a partial match would restore a
-          # deb set built for a different image and the install would fail.
-          key: cuda-debs-${{ matrix.target }}-${{ steps.keyinfo.outputs.image }}-v2
+          # deb set built for a different image or package list, and the
+          # install would fail or silently under-install.
+          key: cuda-debs-${{ matrix.target }}-${{ steps.keyinfo.outputs.image }}-${{ steps.keyinfo.outputs.pkgs }}
       - name: install dependencies
         run: |
           set -e
