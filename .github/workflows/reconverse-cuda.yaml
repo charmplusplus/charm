@@ -7,6 +7,16 @@ name: reconverse-cuda
 # advisory, NOT a required status check (a skipped required check would
 # block unrelated PRs). Runtime GPU validation stays with the PR
 # template's HPC-site field until a GPU runner exists (plan item 17).
+#
+# Two machine layers, because CUDA support is not a property of the GPU code
+# alone: CMakeLists.txt forces RECONVERSE_ENABLE_CUDA so reconverse's
+# GPU-aware loopback copies and LCI's GPUDirect registration come up with
+# the same backend, and it appends `-L$CUDA_DIR/lib64/stubs -lcuda` to every
+# charmc link line under reconverse+CUDA and nowhere else. None of that is
+# reached by a netlrts build, so until the reconverse jobs below existed the
+# device path this line's 9.x work targets -- d2dtest's own Makefile documents
+# `reconverse-linux-x86_64-cuda` as its build root -- compiled only against
+# the machine layer it is not meant to run on.
 
 on:
   push:
@@ -26,6 +36,9 @@ on:
       - 'benchmarks/charm*/cuda/**'
       - 'src/arch/common/conv-mach-cuda.*'
       - 'src/arch/common/special.sh'
+      # The reconverse machine layers the jobs below build with `cuda`; their
+      # conv-mach files set the link line those jobs are the only gate on.
+      - 'src/arch/reconverse-linux-*/**'
       - 'src/ck-core/ckrdmadevice.*'
       - 'src/conv-core/conv-rdmadevice.*'
       # ckrdma.C routes device (D2D) completions, and xi-Parameter.C emits the
@@ -58,6 +71,9 @@ on:
       - 'benchmarks/charm*/cuda/**'
       - 'src/arch/common/conv-mach-cuda.*'
       - 'src/arch/common/special.sh'
+      # The reconverse machine layers the jobs below build with `cuda`; their
+      # conv-mach files set the link line those jobs are the only gate on.
+      - 'src/arch/reconverse-linux-*/**'
       - 'src/ck-core/ckrdmadevice.*'
       - 'src/conv-core/conv-rdmadevice.*'
       # ckrdma.C routes device (D2D) completions, and xi-Parameter.C emits the
@@ -183,3 +199,116 @@ jobs:
           rm -rf netlrts-linux-x86_64-cuda
           ./buildold charm++ netlrts-linux-x86_64 cuda -j4 -g
           test -L netlrts-linux-x86_64-cuda/include/hapi_portable.h || test -f netlrts-linux-x86_64-cuda/include/hapi_portable.h
+
+  # The same build-only gate over the reconverse machine layer, which is the
+  # one the 9.x device work is aimed at. A proper subset of cuda-buildonly's
+  # steps, and deliberately not a copy of it:
+  #
+  #   * `./build charm++`, not `all-test`: AMPI rides on TCharm, and
+  #     CMakeLists.txt still excludes TCharm from reconverse builds ("not yet
+  #     ported to reconverse builds"), so there is no examples/ampi/cuda to
+  #     compile on this side. When TCharm lands, add the target here and drop
+  #     this note rather than widening `all-test` blindly.
+  #   * no buildold leg: buildold does not mention reconverse anywhere, so the
+  #     cmake path is the only path this machine layer has ever had.
+  #
+  # x86_64 and arm8 are one matrix because they differ only in runner and
+  # target; -Werror=vla on arm8 carries over from reconverse-ci.yaml's job of
+  # the same name. fail-fast is off so an arm-side toolkit problem cannot mask
+  # the x86_64 result, which is the one the device work lands against.
+  reconverse-cuda-buildonly:
+    name: reconverse-cuda-buildonly (${{ matrix.target }})
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: reconverse-linux-x86_64
+            runner: ubuntu-latest
+            build_opts: ''
+          - target: reconverse-linux-arm8
+            runner: ubuntu-24.04-arm
+            build_opts: '-Werror=vla'
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # reconverse is the contrib/reconverse submodule.
+          submodules: true
+      # Same toolkit-download variance and the same two fixes as cuda-buildonly
+      # above; see that job for the measurements. runner.arch is in the key on
+      # top of the image version because the arm and x86_64 images can report
+      # the same ImageVersion while needing entirely different .debs.
+      - name: cache key inputs
+        id: keyinfo
+        run: echo "image=${ImageVersion:-unknown}" >> "$GITHUB_OUTPUT"
+      - name: cache cuda toolkit packages
+        uses: actions/cache@v5
+        with:
+          path: ~/cuda-debs
+          # Exact key only, no restore-keys: a partial match would restore a
+          # deb set built for a different image and the install would fail.
+          key: cuda-debs-${{ runner.arch }}-${{ steps.keyinfo.outputs.image }}-nvidia-cuda-toolkit-v1
+      - name: install dependencies
+        run: |
+          set -e
+          # libfabric is reconverse's transport; cmake is its only build path.
+          sudo apt-get update
+          sudo apt-get install -y cmake libfabric-dev
+          mkdir -p ~/cuda-debs/partial
+          if ! ls ~/cuda-debs/*.deb >/dev/null 2>&1; then
+            sudo apt-get install -y --no-install-recommends -d \
+              -o Dir::Cache::archives="$HOME/cuda-debs" nvidia-cuda-toolkit
+            sudo chown -R "$(id -u):$(id -g)" ~/cuda-debs
+          fi
+          sudo apt-get install -y --no-install-recommends ~/cuda-debs/*.deb
+      # Informational, never fails the job. Under reconverse+CUDA -- and only
+      # there -- CMakeLists.txt appends `-L$CUDA_DIR/lib64/stubs -lcuda` to
+      # every charmc link line, because liblci.so calls the CUDA driver API
+      # directly. CUDA_DIR comes from CUDAToolkit_TARGET_DIR, so on a distro
+      # toolkit whose stubs sit somewhere other than $prefix/lib64/stubs that
+      # -L resolves to nothing and every link below fails on -lcuda. Printing
+      # the real layout here turns that into a one-line diagnosis in the same
+      # run instead of an unexplained undefined-reference wall.
+      - name: report cuda stub layout
+        run: |
+          echo "--- libcuda stubs visible to the linker ---"
+          find /usr -name 'libcuda.so*' 2>/dev/null || true
+          echo "--- candidate stub dirs ---"
+          ls -d /usr/lib64/stubs /usr/lib/*/stubs /usr/local/cuda/lib64/stubs 2>/dev/null || true
+      - name: cmake build
+        run: |
+          ./build charm++ ${{ matrix.target }} cuda -j4 -g ${{ matrix.build_opts }}
+          test -f ${{ matrix.target }}-cuda/lib/libhybridapi.a
+          ! grep -r cudahybridapi ${{ matrix.target }}-cuda/lib
+      - name: cuda examples compile
+        # No examples/ampi/cuda here: see the job comment (TCharm, hence AMPI,
+        # is not built under reconverse).
+        run: |
+          export CUDATOOLKIT_HOME=/usr
+          make -j4 -C ${{ matrix.target }}-cuda/examples/charm++/cuda OPTS="-g"
+      - name: cuda benchmarks compile
+        run: |
+          export CUDATOOLKIT_HOME=/usr
+          make -j4 -C ${{ matrix.target }}-cuda/benchmarks/charm++/cuda OPTS="-g"
+      - name: hapitest compiles
+        # Gate on hapi_portable.h staying self-sufficient for user code, now
+        # with reconverse's headers in the include path rather than converse's.
+        run: |
+          make -j4 -C ${{ matrix.target }}-cuda/tests/charm++/cuda/hapitest \
+            GPU=cuda CUDATOOLKIT_HOME=/usr OPTS="-g"
+      - name: d2dtest compiles
+        # The reason this job exists. d2dtest drives two device buffers in one
+        # entry method across array, group and nodegroup proxies, and the
+        # nocopydevice code charmxi emits for them reaches reconverse's
+        # setNcpyOpInfo -- the surface #3984 had to repair. Compiling it here
+        # is the first time that pairing is checked anywhere in CI.
+        run: |
+          make -j4 -C ${{ matrix.target }}-cuda/tests/charm++/cuda/d2dtest \
+            GPU=cuda CUDATOOLKIT_HOME=/usr OPTS="-g"
+      - name: gpumigrate compiles
+        # PUPMode::DEVICE plus the nocopydevice entry method the migration
+        # payload travels on.
+        run: |
+          make -j4 -C ${{ matrix.target }}-cuda/tests/charm++/cuda/gpumigrate \
+            OPTS="-g"
