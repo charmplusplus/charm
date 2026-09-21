@@ -4190,6 +4190,14 @@ size_t hapiDevPoolUsedBytesOn(int device) {
   return used;
 }
 
+size_t hapiDevPoolCapacityOn(int device) {
+  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  size_t cap = 0;
+  for (auto& ar : hapi_devpool_arenas)
+    if (ar.device == device) cap += (size_t)(ar.end - ar.start);
+  return cap;
+}
+
 bool hapiDevPoolIsVmm() { return CsvAccess(gpu_manager).device_pool_backend == 1; }
 
 size_t hapiDevPoolGrowthBytes() {
@@ -4211,6 +4219,16 @@ void hapiLBDevicePool(size_t* poolFree, int* pesOnDevice) {
     }
   }
   *pesOnDevice = n > 0 ? n : 1;
+}
+
+size_t hapiLBDevicePoolCapacity() {
+  if (!CsvAccess(gpu_manager).device_pool_on) return 0;
+  // CHARM_GPU_POOL_CAP_MB stands for a device of that size (hapiLBDeviceMemory).
+  static const size_t cap = []() {
+    const char* s = getenv("CHARM_GPU_POOL_CAP_MB");
+    return s ? (size_t)atol(s) << 20 : (size_t)0;
+  }();
+  return cap > 0 ? cap : hapiDevPoolCapacityOn(CpvAccess(my_device_id));
 }
 
 void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,

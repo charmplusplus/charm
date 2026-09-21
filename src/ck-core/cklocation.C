@@ -241,7 +241,7 @@ static bool ckTakeLandingSet(int size, const std::vector<CmiUInt8>& blocks,
 // one more payload keeps its in-flight bytes within the byte bound; otherwise it
 // queues in order. The place is given back by the payload's ack
 // (finishGPUSend), or as soon as the move turns out not to stage. The byte
-// bound per PE is min(256 MB, a quarter of the pool's free bytes shared by
+// bound per PE is min(256 MB, a quarter of the pool's capacity shared by
 // the device's PEs) -- CHARM_LB_MIGRATE_WINDOW_MB moves the 256 -- and the
 // balancer reserves exactly that per PE for landings in flight (L_g): the
 // rule lives in LBMigrateWindow.h, so the two are one number.
@@ -283,14 +283,17 @@ static void ckWindowLimits(int* moves, size_t* bytes)
     const char* em = getenv("CHARM_LB_MIGRATE_WINDOW");
     m = em ? atoi(em) : slots;
   }
-  // The byte bound follows the pool: the balancer reserved a quarter of what
-  // the device's PEs can reach (L_g, LBMigrateWindow.h), so each PE's window
-  // is its share of that, never more than the configured 256 MB.
+  // The byte bound follows the pool: the balancer reserved at most a quarter
+  // of the pool's capacity on the device for landings in flight (L_g,
+  // LBMigrateWindow.h), so each PE's window is its share of that, never more
+  // than the configured 256 MB. Capacity, not the bytes free now: that is the
+  // number the balancer reserved from, and the two must be one.
   size_t poolFree = 0;
   int pes = 1;
   hapiLBDevicePool(&poolFree, &pes);
+  const size_t capacity = hapiLBDevicePoolCapacity();
   *moves = m;
-  *bytes = lbLandingWindowBytes(poolFree, (size_t)pes);
+  *bytes = lbLandingWindowBytes(capacity > poolFree ? capacity : poolFree, (size_t)pes);
 }
 
 static void ckWindowTrace(const char* what, CmiUInt8 id, size_t moveBytes)
@@ -4454,9 +4457,10 @@ void CkLocMgr::admitLandingsLoop()
       }
       return;
     }
-    if (expired) {
+    if (expired && d.size > 0) {
       // Past the timeout: the arena the old way, growing if it must; the
-      // element's unpack then allocates for itself.
+      // element's unpack then allocates for itself. (A landing without a
+      // payload has no arena to take: it is simply let through.)
       hapiFootprintBegin(nullptr);
       arena = (char*)CkDeviceMalloc((size_t)d.size);
       hapiFootprintEnd();
@@ -4470,7 +4474,23 @@ void CkLocMgr::admitLandingsLoop()
       CkPrintf("[GATE %d] admit id=%llu after %.1f ms (landing %d + %zu block(s) of "
                "state taken)\n", CkMyPe(), (unsigned long long)d.id,
                (CkWallTimer() - d.since) * 1e3, d.size, landingSets[d.id].size());
-    thisProxy[d.srcPe].landingGranted(d.id);
+    if (d.size == 0) {
+      // Nothing to pull: this landing only reserves the arriving element's
+      // blocks, and the element's own message is what waits for it, parked
+      // here. Release it THROUGH THE SCHEDULER: immigrate() ends in
+      // releaseLandingSet, which admits, and running it inside this loop is
+      // the re-entry that once double-granted and double-destroyed a landing.
+      // If the grant beat the message, immigrate() finds the id in
+      // grantedLandings on arrival and goes straight ahead.
+      auto h = bufferedHostMigrateMsgs.find(d.id);
+      if (h != bufferedHostMigrateMsgs.end()) {
+        CkArrayElementMigrateMessage* m = h->second;
+        bufferedHostMigrateMsgs.erase(h);
+        thisProxy[CkMyPe()].immigrate(m);
+      }
+    } else {
+      thisProxy[d.srcPe].landingGranted(d.id);
+    }
     deferredLandings.pop_front();
   }
 }
@@ -4863,6 +4883,19 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   rec->lbLedgerStep = -1;
 #endif
 
+#if CMK_CUDA
+  // The admission gate hung entirely off gpuBufSize > 0, so an element with
+  // device state but nothing to copy out skipped it and landed with no
+  // reservation: its unpack allocated from the arenas with growth allowed,
+  // behind the gate's back. sph2d is the case in point -- part_capacity is a
+  // readonly, so a patch holding no particles still allocates 74 MB on arrival,
+  // and those are most of what a step moves. Such an element takes the same
+  // road as a payload-bearing one, less the payload.
+  const bool needsLanding =
+      ckAdmissionGateOn() && gpuBufSize == 0 && !emigBlocks.empty();
+  msg->needsLanding = needsLanding;
+#endif
+
   {
 #if CMK_CUDA
     if (gpuBufSize > 0) {
@@ -5007,6 +5040,14 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
       hapiAddCallback((hapiStream_t)migStream, CkCallback(PackDone::fn, (void*)(uintptr_t)id));
     }
     thisProxy[CkMyPe()].sendGPUMsg(id);
+  }
+  else if (needsLanding)
+  {
+    // Size 0 says "reserve the blocks, there is nothing to pull". No payload
+    // means no sendGPUBuffers entry and no landingGranted round trip: the
+    // destination grants to itself and releases the element's own message.
+    thisProxy[toPe].requestLanding(id, 0, CkMyPe(), (int)emigBlocks.size(),
+                                   emigBlocks.data());
   }
   if (getenv("CHARM_DEBUG_MIGRATE"))
     CmiPrintf("[EMIG %d] id=%llu gpuBufSize=%zu toPe=%d stages_ms sizer=%.3f alloc=%.3f "
@@ -5268,6 +5309,18 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
     }
     gpuMsg = it->second;
   }
+#if CMK_CUDA
+  else if (msg->needsLanding && grantedLandings.find(msg->id) == grantedLandings.end())
+  {
+    // Device state but no payload: nothing else holds this message back, so
+    // park it until the gate has reserved the element's blocks; admitLandings
+    // releases it. CHARM_LB_GATE_TIMEOUT still admits without a guarantee if
+    // the pool never frees, so this cannot wedge a run.
+    bufferedHostMigrateMsgs[msg->id] = msg;
+    noteImmigrationInFlight(msg->id);
+    return;
+  }
+#endif
 
   const CkArrayIndex& idx = msg->idx;
 
@@ -5338,6 +5391,11 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 #if CMK_CUDA
   hapiPreallocEnd();
   hapiFootprintEnd();
+  // A payload landing's grant is retired when immigrateGPU takes its arena; a
+  // landing without a payload has no such moment, so it is retired here, once
+  // the element it was reserved for has unpacked. Before releaseLandingSet,
+  // which may admit the next landing.
+  if (msg->needsLanding) grantedLandings.erase(msg->id);
   releaseLandingSet(msg->id);   // what the unpack did not take goes back
 #endif
 #if CMK_CUDA

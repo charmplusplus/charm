@@ -161,6 +161,12 @@ public:
   // destination retires the entry once the element has registered.
   int lbLedgerSrcPe = -1;
   int lbLedgerStep = -1;
+  // Device STATE but no device PAYLOAD: nothing had to be copied out of the
+  // element (gpuBufSize 0), yet its unpack allocates its buffers again here,
+  // so it owes the admission gate a landing just as a payload does. Set by
+  // the source, which also sends the request; the destination parks this
+  // message until the gate has reserved those blocks (CkLocMgr::immigrate).
+  bool needsLanding = false;
   char* packData;
   size_t* gpuManifest;
 };

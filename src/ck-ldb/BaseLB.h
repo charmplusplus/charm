@@ -71,10 +71,13 @@ public:
     // Device memory as the memory contract reads it (hapiLBDeviceMemory):
     // free device bytes; this process's free pool bytes on the device (or the
     // +gpulbbuffer region's, without the pool); the pool's arena quantum (0
-    // without it); and the IPC event slots a batch may use from this PE.
+    // without it); the pool's capacity on the device, free or not, which the
+    // contract's reserve is measured against (0: not reported; format 7); and
+    // the IPC event slots a batch may use from this PE.
     size_t gpu_mem_remaining;
     size_t pool_buff_mem_remaining;
     size_t gpu_pool_arena_bytes;
+    size_t gpu_pool_capacity_bytes;
     int gpu_ipc_slots;
     uint64_t gpu_device_id;		// GPU device this PE is mapped to (-1 = no GPU)
     int gpu_total_sms;			// Number of SMs on that GPU (0 if unknown)
@@ -90,7 +93,7 @@ public:
 #if CMK_CUDA
 	   	 gpu_device_id(-1), gpu_total_sms(0),
 		 gpu_mem_remaining(0), pool_buff_mem_remaining(0),
-		 gpu_pool_arena_bytes(0), gpu_ipc_slots(0),
+		 gpu_pool_arena_bytes(0), gpu_pool_capacity_bytes(0), gpu_ipc_slots(0),
 #endif
 	   	 bg_walltime(0.0), pe(-1), available(true) {}
     inline void clearBgLoad() {
@@ -121,6 +124,7 @@ public:
       p|gpu_total_sms;
       if (_lb_args.lbversion() > 3) p|gpu_descriptor;
       if (_lb_args.lbversion() > 4) { p|gpu_pool_arena_bytes; p|gpu_ipc_slots; }
+      if (_lb_args.lbversion() > 6) p|gpu_pool_capacity_bytes;
 #endif
     }
   };

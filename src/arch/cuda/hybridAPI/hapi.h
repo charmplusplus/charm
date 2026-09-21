@@ -459,6 +459,9 @@ size_t hapiDevPoolFreeBytes();
 size_t hapiDevPoolFreeBytesOn(int device);
 // Bytes the arenas on `device` have handed out (their extent less their free).
 size_t hapiDevPoolUsedBytesOn(int device);
+// Bytes the arenas on `device` span, handed out or not: a buddy arena's size,
+// what a vmm heap has mapped.
+size_t hapiDevPoolCapacityOn(int device);
 // For the calling PE's device: the pool's free bytes there and how many PEs of
 // this process share it (what the migration window per PE is sized from).
 void hapiLBDevicePool(size_t* poolFree, int* pesOnDevice);
@@ -480,6 +483,11 @@ size_t hapiDevPoolArenaSize();
 //               CHARM_LB_IPC_SLOTS overrides it.
 void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
                         int* ipcSlots);
+// Under +gpupool, the capacity of this process's pool on the calling PE's
+// device (free or not); 0 without the pool. The memory contract measures its
+// reserve against this rather than against the bytes free at the LB step,
+// which shrink as the device fills (LBMigrateWindow.h).
+size_t hapiLBDevicePoolCapacity();
 
 // The buddy block `ptr` heads, if it is one of the pool's: what an allocation
 // of any size actually holds (the next power of two).

@@ -74,10 +74,18 @@ struct Scenario
     pes[p] = Pe{gpu, devFree, poolFree, arena, slots};
   }
 
-  void obj(int from, int to, size_t pup, size_t footprint)
+  // The pool's capacity on a PE's device (C_g). Left at 0 -- not reported --
+  // the contract's reserve is taken from the free bytes, which is what every
+  // scenario written before the capacity existed expects.
+  void capacity(int p, size_t bytes) { stats.procs[p].gpu_pool_capacity_bytes = bytes; }
+
+  void obj(int from, int to, size_t pup, size_t footprint, double load = 0.0)
   {
     LDObjData od;
     od.migratable = true;
+    od.wallTime = load;   // the verifier ranks refusals by load per byte
+    od.gpuTime = 0;
+    od.driverTime = 0;
     od.gpuPupSize = pup;
     *(size_t*)od.getUserData(CkpvAccess(_lb_obj_index)) = footprint;
     stats.objData.push_back(od);
@@ -269,11 +277,13 @@ void testInfeasibleOneWayMoves()
   sc.pe(1, 1, 0, 100 * MB, 256 * MB, 0);
   for (int i = 0; i < 40; i++) sc.obj(0, 1, 4 * MB, 4 * MB);
   const int refused = sc.verify();
-  // The destination packs nothing, so it holds no payload back: H = 0.95 *
-  // 100 MB = 95 MB, and 23 arrivals of 4 MB fit.
+  // The destination packs nothing, so it holds no payload back, but it does
+  // hold L_g for landings in flight (one PE: min(256 MB, 100 MB / 4) = 25 MB):
+  // H = 0.95 * 100 MB - 25 MB = 70 MB, and 17 arrivals of 4 MB fit. (The
+  // expectation here predated L_g and had been failing since it landed.)
   char buf[96];
   snprintf(buf, sizeof(buf), "refused %d, kept %d", refused, sc.moved());
-  expect(sc.moved() == 23 && refused == 17, test, buf);
+  expect(sc.moved() == 17 && refused == 23, test, buf);
   std::vector<int> batchOf;
   int pr = 0;
   const int nb = plan(sc, batchOf, &pr);
@@ -362,6 +372,72 @@ void testSeparateStagingRegion()
   checkPlan(test, sc, batchOf, nb);
 }
 
+// A device the balancer keeps feeding. With the reserve taken from the bytes
+// free at each step, every step could fill most of what the last one left and
+// the device converged on full; taken from the pool's capacity it is the same
+// at every step, so a device already inside its reserve takes nothing more.
+void testReserveDoesNotShrinkWithTheRoom()
+{
+  const char* test = "reserve measured against capacity";
+  char buf[96];
+  {
+    // 1000 MB pool, 100 MB free: inside the 50 MB margin + 250 MB of L_g.
+    Scenario sc(2);
+    sc.pe(0, 0, 0, 900 * MB, 256 * MB, 0);
+    sc.pe(1, 1, 0, 100 * MB, 256 * MB, 0);
+    sc.capacity(0, 1000 * MB);
+    sc.capacity(1, 1000 * MB);
+    for (int i = 0; i < 4; i++) sc.obj(0, 1, 1 * MB, 10 * MB);
+    const int refused = sc.verify();
+    snprintf(buf, sizeof(buf), "refused %d of 4 arrivals into a device inside its reserve",
+             refused);
+    expect(refused == 4, test, buf);
+  }
+  {
+    // The same device with 395 MB free: 395 - 300 = 95 MB of room (nothing
+    // resides there, so its sigma_max is 0): nine 10 MB arrivals of ten.
+    Scenario sc(2);
+    sc.pe(0, 0, 0, 900 * MB, 256 * MB, 0);
+    sc.pe(1, 1, 0, 395 * MB, 256 * MB, 0);
+    sc.capacity(0, 1000 * MB);
+    sc.capacity(1, 1000 * MB);
+    for (int i = 0; i < 10; i++) sc.obj(0, 1, 1 * MB, 10 * MB);
+    const int refused = sc.verify();
+    snprintf(buf, sizeof(buf), "refused %d of 10 arrivals with 95 MB of room", refused);
+    expect(refused == 1, test, buf);
+  }
+  {
+    // No capacity reported: the free bytes stand in, the rule as it was.
+    // 0.95 * 105 - 26.25 (L_g) = 73.5 MB: seven of eight.
+    Scenario sc(2);
+    sc.pe(0, 0, 0, 900 * MB, 256 * MB, 0);
+    sc.pe(1, 1, 0, 105 * MB, 256 * MB, 0);
+    for (int i = 0; i < 8; i++) sc.obj(0, 1, 1 * MB, 10 * MB);
+    const int refused = sc.verify();
+    snprintf(buf, sizeof(buf), "refused %d of 8 arrivals without a capacity", refused);
+    expect(refused == 1, test, buf);
+  }
+}
+
+// When memory forces refusals, the arrivals that bring the least load per byte
+// go first: the bytes are what the device is short of, the load is what the
+// strategy moved the object for.
+void testRefusalsKeepTheLoad()
+{
+  const char* test = "refusals keep the load";
+  Scenario sc(2);
+  sc.pe(0, 0, 0, 900 * MB, 256 * MB, 0);
+  sc.pe(1, 1, 0, 325 * MB, 256 * MB, 0);   // 325 - 300 = 25 MB of room: two of six
+  sc.capacity(0, 1000 * MB);
+  sc.capacity(1, 1000 * MB);
+  for (int i = 0; i < 6; i++) sc.obj(0, 1, 1 * MB, 10 * MB, (i == 1 || i == 4) ? 3.0 : 0.0);
+  const int refused = sc.verify();
+  char buf[96];
+  snprintf(buf, sizeof(buf), "refused %d of 6; loaded arrivals to PE %d and %d", refused,
+           sc.stats.to_proc[1], sc.stats.to_proc[4]);
+  expect(refused == 4 && sc.stats.to_proc[1] == 1 && sc.stats.to_proc[4] == 1, test, buf);
+}
+
 }  // namespace
 
 class Main : public CBase_Main
@@ -377,6 +453,8 @@ public:
     testProcessesSharingADevice();
     testHandoffMovesNoBytes();
     testSeparateStagingRegion();
+    testReserveDoesNotShrinkWithTheRoom();
+    testRefusalsKeepTheLoad();
     CkPrintf("memcontract test passed\n");
     CkExit(0);
   }

@@ -23,7 +23,9 @@
 //        CHARM_LB_MEM_CREDIT_GROWTH restores the old credit (the device's free
 //        bytes in whole arenas), for A/B only. Without the pool, free device
 //        memory.
-//   H_g  (1-eps)*T_g - sigma_max(g) - L_g: final placement is planned against
+//   C_g  under +gpupool, the pool's capacity on g: every byte its arenas
+//        span, free or not. The reserve below is measured against it.
+//   H_g  T_g - eps*C_g - L_g - sigma_max(g): final placement is planned against
 //        T_g less the largest payload block g could pack, so one pack always
 //        fits, and less L_g, the landing arenas the runtime may hold on g at
 //        once: every PE of g may have one migration window's worth of
@@ -32,7 +34,15 @@
 //        without L_g a device filled to (1-eps)*T_g stalled its last arrivals
 //        for the gate's whole timeout (sph2d strong, job 22196595): 1.1 GB of
 //        slack, 1 GB of landings in flight, and fragmentation took the rest.
-//   A_g  (1-eps)*T_g less the net change of the batches already released:
+//        eps and L_g are taken from C_g, not from T_g. Taken from T_g -- the
+//        bytes free at this step -- they shrank with it, each step could fill
+//        ~70% of what the last had left, and the device the balancer kept
+//        feeding ended within one element of full, where blocks stop fitting
+//        by shape: landings waited out the gate's timeout and ungated arrivals
+//        grew the pool (sph2d strong N=1, jobs 22244226 and 22245278; the rule
+//        and the numbers are in LBMigrateWindow.h). Without the pool there is
+//        no capacity to read and the margin is eps*T_g as before.
+//   A_g  T_g - eps*C_g - L_g less the net change of the batches already released:
 //        what a batch stages into. Under the pool the payload block, the
 //        landing arena and chare state are all allocations from the same
 //        arenas, so there is no separate reserve; the second line is the peak
@@ -98,6 +108,7 @@ public:
   struct Device {
     uint64_t gpu_id;
     size_t reach;         // T_g
+    size_t capacity;      // C_g: the pool's extent on the device; 0 if not reported
     size_t stagingFree;   // S_g; equal to reach when the device is pooled
     bool pooled;          // staging, landing and chare state share the pool
     size_t sigmaMax;      // largest payload block a migratable object here packs
@@ -118,7 +129,7 @@ public:
     peSlots_.assign(stats->nprocs(), 0);
     pooled_ = false;
 
-    std::vector<size_t> devFree, poolSum, arena;
+    std::vector<size_t> devFree, poolSum, poolCap, arena;
     std::vector<std::vector<int>> poolNodes;  // processes already summed per device
     for (int pe = 0; pe < stats->nprocs(); pe++) {
       if (!stats->procs[pe].available) continue;
@@ -131,12 +142,14 @@ public:
         Device dev;
         dev.gpu_id = ps.gpu_device_id;
         dev.reach = 0;
+        dev.capacity = 0;
         dev.stagingFree = ps.pool_buff_mem_remaining;  // the legacy reading
         dev.pooled = false;
         dev.sigmaMax = 0;
         devices_.push_back(dev);
         devFree.push_back(ps.gpu_mem_remaining);
         poolSum.push_back(0);
+        poolCap.push_back(0);
         arena.push_back(0);
         poolNodes.emplace_back();
       } else {
@@ -154,6 +167,7 @@ public:
             poolNodes[d].end()) {
           poolNodes[d].push_back(node);
           poolSum[d] += ps.pool_buff_mem_remaining;
+          poolCap[d] += ps.gpu_pool_capacity_bytes;
         }
       }
     }
@@ -169,11 +183,13 @@ public:
         dev.pooled = true;
         pooled_ = true;
         dev.reach = poolSum[d];  // the arenas the pool has; no growth (T_g)
+        dev.capacity = poolCap[d];
         if (creditGrowth) dev.reach += (devFree[d] / arena[d]) * arena[d];
       } else {
         dev.reach = devFree[d];
       }
       dev.reach = std::min(dev.reach, cap);
+      dev.capacity = std::min(dev.capacity, cap);  // a device of that size
       if (dev.pooled) dev.stagingFree = dev.reach;
     }
 
@@ -277,10 +293,12 @@ public:
         poolFree += ps.pool_buff_mem_remaining;
         arenaSz = ps.gpu_pool_arena_bytes;
       }
-      CkPrintf("%s device %d (gpu %llu, %zu PE(s)): T %.1f MB, %s, sigma_max %.1f KB, "
-               "%d object(s) holding %.1f MB; pool free %.1f MB in %zu-MB arenas\n",
+      CkPrintf("%s device %d (gpu %llu, %zu PE(s)): T %.1f MB of C %.1f MB, %s, "
+               "sigma_max %.1f KB, %d object(s) holding %.1f MB; pool free %.1f MB in "
+               "%zu-MB arenas\n",
                who, d, (unsigned long long)dev.gpu_id, dev.pes.size(),
-               dev.reach / 1048576.0, dev.pooled ? "pooled" : "separate staging",
+               dev.reach / 1048576.0, dev.capacity / 1048576.0,
+               dev.pooled ? "pooled" : "separate staging",
                dev.sigmaMax / 1024.0, objs, resident / 1048576.0, poolFree / 1048576.0,
                arenaSz >> 20);
     }
@@ -316,10 +334,14 @@ public:
     stagingAvail_.resize(model->numDevices());
     for (int d = 0; d < model->numDevices(); d++) {
       const LBMemoryModel::Device& dev = model->device(d);
-      long long h = (long long)((double)dev.reach * headroom);
+      long long h;
       if (dev.pooled) {
-        h -= (long long)dev.sigmaMax;                                    // one pack
-        h -= (long long)lbLandingReserveBytes(dev.reach, dev.pes.size());  // L_g: landings in flight
+        // Less the margin and L_g (landings in flight), both from C_g, and
+        // one pack.
+        h = (long long)lbPlannableBytes(dev.reach, dev.capacity, dev.pes.size(), headroom);
+        h -= (long long)dev.sigmaMax;
+      } else {
+        h = (long long)((double)dev.reach * headroom);
       }
       memAvail_[d] = h > 0 ? h : 0;
       stagingAvail_[d] = (long long)dev.stagingFree;
@@ -390,12 +412,20 @@ private:
 // Sums each device's net change over the whole move list, so departures credit
 // the arrivals they make room for whatever order the strategy listed them in
 // -- a swap between two full devices nets to zero and passes. While a device
-// is over its H_g, the largest arrival into it is refused; refusing it takes
-// the credit back from its source, which is re-checked in turn. A move whose
-// payload no batch could ever stage is refused first. A refused move keeps
-// its chare where it is, which is always feasible. Returns the number of
-// refused moves; refused entries have to_pe set back to from_pe. Staging is
-// not checked here: the batch planner splits the step for it.
+// is over its H_g, the arrival that brings the least measured load per byte is
+// refused; refusing it takes the credit back from its source, which is
+// re-checked in turn. The bytes are what the device is short of and the load
+// is what the strategy moved the object for, so this keeps the most of the
+// plan the memory allows: sph2d's idle patches hold a full 74 MB each and do
+// no work, and refusing by size alone (every footprint equal) dropped active
+// and idle arrivals alike, leaving the device that collects the idle ones
+// short of the load it was planned to carry. Equal densities fall back to the
+// larger footprint, then the object index, so the outcome is deterministic.
+// CHARM_LB_MEMVERIFY_LARGEST_FIRST restores largest-first, for A/B only. A
+// move whose payload no batch could ever stage is refused first. A refused
+// move keeps its chare where it is, which is always feasible. Returns the
+// number of refused moves; refused entries have to_pe set back to from_pe.
+// Staging is not checked here: the batch planner splits the step for it.
 // ---------------------------------------------------------------------------
 class ContractVerifier {
 public:
@@ -446,9 +476,27 @@ public:
       net[s] -= f;
       arrivals[d].push_back((int)k);
     }
+    static const bool largestFirst =
+        (getenv("CHARM_LB_MEMVERIFY_LARGEST_FIRST") != NULL);
+    auto loadOf = [&](int k) {
+      const LDObjData& od = stats->objData[moves[k].obj];
+      double l = (double)od.wallTime;
+#if CMK_CUDA
+      l += (double)od.gpuTime + (double)od.driverTime;
+#endif
+      return l > 0.0 ? l : 0.0;
+    };
     for (int g = 0; g < D; g++)
       std::sort(arrivals[g].begin(), arrivals[g].end(), [&](int a, int b) {
-        return model.footprint(moves[a].obj) > model.footprint(moves[b].obj);
+        const size_t fa = model.footprint(moves[a].obj), fb = model.footprint(moves[b].obj);
+        if (!largestFirst) {
+          // load/footprint ascending, cross-multiplied so a move without a
+          // footprint -- which refusing would free nothing for -- sorts last.
+          const double da = loadOf(a) * (double)fb, db = loadOf(b) * (double)fa;
+          if (da != db) return da < db;
+        }
+        if (fa != fb) return fa > fb;
+        return moves[a].obj < moves[b].obj;
       });
 
     std::vector<size_t> cursor(D, 0);
@@ -536,12 +584,14 @@ public:
     const int P = stats->nprocs();
     std::vector<long long> avail(D);
     for (int g = 0; g < D; g++) {
-      avail[g] = (long long)((double)model.device(g).reach * headroom);
-      // L_g: the landing arenas the batch's arrivals hold at a pooled device
-      // while in flight, bounded by the window on each of its PEs.
-      if (model.device(g).pooled)
-        avail[g] -= (long long)lbLandingReserveBytes(model.device(g).reach,
-                                                     model.device(g).pes.size());
+      const LBMemoryModel::Device& dev = model.device(g);
+      // Under the pool, less the margin and L_g: the landing arenas the
+      // batch's arrivals hold while in flight, bounded by the window on each
+      // of the device's PEs. The same reserve I-final planned with.
+      avail[g] = dev.pooled
+                     ? (long long)lbPlannableBytes(dev.reach, dev.capacity,
+                                                   dev.pes.size(), headroom)
+                     : (long long)((double)dev.reach * headroom);
       if (avail[g] < 0) avail[g] = 0;
     }
 

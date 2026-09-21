@@ -397,6 +397,7 @@ void CentralLB::BuildStatsMsg()
   // the device is shared, so LBMemoryModel combines them per device.
   hapiLBDeviceMemory(&msg->gpu_mem_remaining, &msg->pool_buff_mem_remaining,
                      &msg->gpu_pool_arena_bytes, &msg->gpu_ipc_slots);
+  msg->gpu_pool_capacity_bytes = hapiLBDevicePoolCapacity();
 #endif
 
   DEBUGF(("Processor %d Total time (wall,cpu) = %f Idle = %f Bg = %f\n", CkMyPe(),msg->total_walltime,msg->idletime,msg->bg_walltime));
@@ -550,6 +551,7 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.gpu_mem_remaining = m->gpu_mem_remaining;
   procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
   procStat.gpu_pool_arena_bytes = m->gpu_pool_arena_bytes;
+  procStat.gpu_pool_capacity_bytes = m->gpu_pool_capacity_bytes;
   procStat.gpu_ipc_slots = m->gpu_ipc_slots;
   procStat.gpu_descriptor = m->gpu_descriptor;
 #endif
@@ -634,6 +636,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
       procStat.gpu_mem_remaining = m->gpu_mem_remaining;
       procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
       procStat.gpu_pool_arena_bytes = m->gpu_pool_arena_bytes;
+      procStat.gpu_pool_capacity_bytes = m->gpu_pool_capacity_bytes;
       procStat.gpu_ipc_slots = m->gpu_ipc_slots;
       procStat.gpu_descriptor = m->gpu_descriptor;
 #endif
@@ -2212,6 +2215,7 @@ void CLBStatsMsg::pup(PUP::er &p) {
   p|gpu_mem_remaining;
   p|pool_buff_mem_remaining;
   p|gpu_pool_arena_bytes;
+  p|gpu_pool_capacity_bytes;
   p|gpu_ipc_slots;
   p|gpu_descriptor;
 #endif
