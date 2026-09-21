@@ -23,8 +23,15 @@
 //        CHARM_LB_MEM_CREDIT_GROWTH restores the old credit (the device's free
 //        bytes in whole arenas), for A/B only. Without the pool, free device
 //        memory.
-//   H_g  (1-eps)*T_g - sigma_max(g): final placement is planned against T_g
-//        less the largest payload block g could pack, so one pack always fits.
+//   H_g  (1-eps)*T_g - sigma_max(g) - L_g: final placement is planned against
+//        T_g less the largest payload block g could pack, so one pack always
+//        fits, and less L_g, the landing arenas the runtime may hold on g at
+//        once: every PE of g may have one migration window's worth of
+//        payloads landing (cklocation.C, CHARM_LB_MIGRATE_WINDOW_MB, 256 MB
+//        by default), transient blocks the final state does not show. Planned
+//        without L_g a device filled to (1-eps)*T_g stalled its last arrivals
+//        for the gate's whole timeout (sph2d strong, job 22196595): 1.1 GB of
+//        slack, 1 GB of landings in flight, and fragmentation took the rest.
 //   A_g  (1-eps)*T_g less the net change of the batches already released:
 //        what a batch stages into. Under the pool the payload block, the
 //        landing arena and chare state are all allocations from the same
@@ -51,6 +58,10 @@
 #include <cstdlib>
 
 CkpvExtern(int, _lb_obj_index);  // the footprint slot (see _loadbalancerInit)
+
+// The runtime's per-PE migration window and the landing reserve it adds up to
+// (L_g) come from LBMigrateWindow.h: one rule for the runtime and the contract.
+#include "LBMigrateWindow.h"
 
 // ---------------------------------------------------------------------------
 // LBMemoryTopology: where PEs are, as the migration transport sees it. The
@@ -306,7 +317,10 @@ public:
     for (int d = 0; d < model->numDevices(); d++) {
       const LBMemoryModel::Device& dev = model->device(d);
       long long h = (long long)((double)dev.reach * headroom);
-      if (dev.pooled) h -= (long long)dev.sigmaMax;  // H_g
+      if (dev.pooled) {
+        h -= (long long)dev.sigmaMax;                                    // one pack
+        h -= (long long)lbLandingReserveBytes(dev.reach, dev.pes.size());  // L_g: landings in flight
+      }
       memAvail_[d] = h > 0 ? h : 0;
       stagingAvail_[d] = (long long)dev.stagingFree;
     }
@@ -521,8 +535,15 @@ public:
 
     const int P = stats->nprocs();
     std::vector<long long> avail(D);
-    for (int g = 0; g < D; g++)
+    for (int g = 0; g < D; g++) {
       avail[g] = (long long)((double)model.device(g).reach * headroom);
+      // L_g: the landing arenas the batch's arrivals hold at a pooled device
+      // while in flight, bounded by the window on each of its PEs.
+      if (model.device(g).pooled)
+        avail[g] -= (long long)lbLandingReserveBytes(model.device(g).reach,
+                                                     model.device(g).pes.size());
+      if (avail[g] < 0) avail[g] = 0;
+    }
 
     std::vector<int> remaining(mv.size());
     for (size_t k = 0; k < mv.size(); k++) remaining[k] = (int)k;

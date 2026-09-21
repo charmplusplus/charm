@@ -56,7 +56,7 @@ set(ldb-cxx-sources
     ../ck-ldb/ckset.C  ../ck-ldb/manager.C)
 
 
-set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h
+set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h ../ck-ldb/LBMigrateWindow.h
     ../ck-ldb/DistBaseLB.h ../ck-ldb/DistributedLB.h
     ../ck-ldb/HybridBaseLB.h ../ck-ldb/HybridLBMsg.h
     ../ck-ldb/GpuScalingModel.h

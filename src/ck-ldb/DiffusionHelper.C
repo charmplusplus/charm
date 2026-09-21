@@ -338,8 +338,11 @@ void DiffusionLB::computeNodeMemory()
     objFootprint[i] = fp;
     if (od.migratable) sigmaMax = std::max(sigmaMax, sig);
   }
-  myMemHeadroom = std::max(0.0, 0.95 * (double)reach - sigmaMax);
-  myStagingCap = pooled ? 0.95 * (double)reach : (double)legacyStaging;
+  // H_g: less one pack and the landing arenas this node's PEs may hold in
+  // flight (L_g; see LBMemoryContract.h).
+  const double landing = pooled ? (double)lbLandingReserveBytes(reach, nodeStats->procs.size()) : 0.0;
+  myMemHeadroom = std::max(0.0, 0.95 * (double)reach - sigmaMax - landing);
+  myStagingCap = pooled ? std::max(0.0, 0.95 * (double)reach - landing) : (double)legacyStaging;
   mySlots = slotless ? 0 : slots;
   if (_lb_args.debug() > 1)
     CkPrintf("[node %d] memory: T %.1f MB (%s), advertises %.1f MB, stages up to %.1f MB, "

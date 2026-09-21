@@ -35,6 +35,7 @@ void hapiCuptiObjectResumed(const LDObjHandle&);
 
 #include "hapi.h"
 #include "gpumanager.h"
+#include "LBMigrateWindow.h"
 
 CsvExtern(GPUManager, gpu_manager);
 
@@ -237,10 +238,13 @@ static bool ckTakeLandingSet(int size, const std::vector<CmiUInt8>& blocks,
 // kept in one batch) does not hold every payload block and every IPC slot of
 // the step at the same moment. A staged move takes a place when recvMigrate
 // sees it, if this PE has fewer moves in flight than its IPC slot budget and
-// one more payload keeps its in-flight bytes within one arena; otherwise it
+// one more payload keeps its in-flight bytes within the byte bound; otherwise it
 // queues in order. The place is given back by the payload's ack
-// (finishGPUSend), or as soon as the move turns out not to stage. Larger
-// windows buy fewer barriers with more arena growth, which is never returned.
+// (finishGPUSend), or as soon as the move turns out not to stage. The byte
+// bound per PE is min(256 MB, a quarter of the pool's free bytes shared by
+// the device's PEs) -- CHARM_LB_MIGRATE_WINDOW_MB moves the 256 -- and the
+// balancer reserves exactly that per PE for landings in flight (L_g): the
+// rule lives in LBMigrateWindow.h, so the two are one number.
 //
 // CHARM_LB_MIGRATE_WINDOW (moves) and CHARM_LB_MIGRATE_WINDOW_MB override the
 // two bounds; CHARM_LB_NO_MIGRATE_WINDOW turns it off; CHARM_DEBUG_WINDOW
@@ -272,18 +276,21 @@ static inline bool ckWindowDbg()
 static void ckWindowLimits(int* moves, size_t* bytes)
 {
   static thread_local int m = -1;
-  static thread_local size_t b = 0;
   if (m < 0) {
     size_t devFree = 0, poolFree = 0, arena = 0;
     int slots = 0;
     hapiLBDeviceMemory(&devFree, &poolFree, &arena, &slots);
     const char* em = getenv("CHARM_LB_MIGRATE_WINDOW");
-    const char* eb = getenv("CHARM_LB_MIGRATE_WINDOW_MB");
     m = em ? atoi(em) : slots;
-    b = eb ? (size_t)atol(eb) << 20 : (arena > 0 ? arena : hapiDevPoolArenaSize());
   }
+  // The byte bound follows the pool: the balancer reserved a quarter of what
+  // the device's PEs can reach (L_g, LBMigrateWindow.h), so each PE's window
+  // is its share of that, never more than the configured 256 MB.
+  size_t poolFree = 0;
+  int pes = 1;
+  hapiLBDevicePool(&poolFree, &pes);
   *moves = m;
-  *bytes = b;
+  *bytes = lbLandingWindowBytes(poolFree, (size_t)pes);
 }
 
 static void ckWindowTrace(const char* what, CmiUInt8 id, size_t moveBytes)
@@ -4295,6 +4302,9 @@ void CkLocMgr::landingGranted(CmiUInt8 id)
 
 // Destination: grant the landing now, or queue it until the pool can take it
 // above the floor.
+// Which caller is inside admitLandings, for the re-entry report.
+static thread_local const char* ck_admit_from = "?";
+static thread_local const char* ck_admit_outer = "?";
 void CkLocMgr::requestLanding(CmiUInt8 id, int size, int srcPe, int n, CmiUInt8* blocks)
 {
   DeferredLanding d;
@@ -4306,6 +4316,7 @@ void CkLocMgr::requestLanding(CmiUInt8 id, int size, int srcPe, int n, CmiUInt8*
   for (int k = 0; k + 1 < n; k += 2) d.footprint += (size_t)blocks[k] * (size_t)blocks[k + 1];
   d.since = CkWallTimer();
   deferredLandings.push_back(d);
+  ck_admit_from = "requestLanding";
   admitLandings();
 }
 
@@ -4322,10 +4333,49 @@ void CkLocMgr::releaseLandingSet(CmiUInt8 id)
     CkPrintf("[GATE %d] unpacked id=%llu: %zu block(s) / %zu bytes of its landing set "
              "unused, freed\n", CkMyPe(), (unsigned long long)id, it->second.size(), left);
   landingSets.erase(it);
+  ck_admit_from = "releaseLandingSet";
   if (!deferredLandings.empty()) admitLandings();
 }
 
+// Not re-entrant: the loop holds a reference into deferredLandings while it
+// takes memory and sends the grant, and a nested call -- a free that admits,
+// a pool release hook -- would pop that entry from under it: a double grant
+// ("landing granted for migration N, which has no payload here" at the
+// source) and a double destroy (free(): invalid pointer; job 22220495, the
+// first cross-node landings under the vmm pool). A nested call only asks the
+// outer loop for another round.
 void CkLocMgr::admitLandings()
+{
+  if (admittingLandings) {
+    admitLandingsAgain = true;
+    // Not expected any more (enqueueNcpyMessage no longer runs a completed
+    // zero-copy message inline); say so once per PE if it happens, every time
+    // under CHARM_DEBUG_GATE.
+    static thread_local bool said = false;
+    if (ckGateDbg() || !said) {
+      said = true;
+      CkPrintf("[%d] WARNING: admitLandings re-entered from %s inside %s (%zu deferred): a "
+               "message ran inside another entry method; deferring the round\n",
+               CkMyPe(), ck_admit_from, ck_admit_outer, deferredLandings.size());
+    }
+    // CHARM_LB_GATE_REENTRY_ABORT: stop here, so a debugger shows the whole
+    // nested stack (what ran the unpack inside the admission).
+    static const bool abortOnReentry = getenv("CHARM_LB_GATE_REENTRY_ABORT") != nullptr;
+    if (abortOnReentry)
+      CkAbort("PE %d: admitLandings re-entered from %s inside %s", CkMyPe(),
+              ck_admit_from, ck_admit_outer);
+    return;
+  }
+  admittingLandings = true;
+  ck_admit_outer = ck_admit_from;
+  do {
+    admitLandingsAgain = false;
+    admitLandingsLoop();
+  } while (admitLandingsAgain && !deferredLandings.empty());
+  admittingLandings = false;
+}
+
+void CkLocMgr::admitLandingsLoop()
 {
   // Strictly in arrival order: a large arrival is not starved by smaller ones
   // taking the bytes it waits for.
@@ -4371,6 +4421,7 @@ void CkLocMgr::admitLandings()
         CcdCallFnAfter([](void* mgr, double) {
           CkLocMgr* m = (CkLocMgr*)mgr;
           m->landingRetryScheduled = false;
+          ck_admit_from = "retry";
           m->admitLandings();
         }, this, 2.0);
       }
@@ -4397,6 +4448,7 @@ void CkLocMgr::admitLandings()
         CcdCallFnAfter([](void* mgr, double) {
           CkLocMgr* m = (CkLocMgr*)mgr;
           m->landingRetryScheduled = false;
+          ck_admit_from = "retry";
           m->admitLandings();
         }, this, 2.0);
       }
@@ -4492,6 +4544,7 @@ void CkLocMgr::finishGPUSend(CmiUInt8 id)
     CkDeviceFree(it->second.data);   // the payload was a pool block
     sendGPUBuffers.erase(it);
     ckWindowGiveBack(id, /*onlyIfUnpacked=*/false);
+    ck_admit_from = "finishGPUSend";
     if (!deferredLandings.empty()) admitLandings();  // those bytes may be enough
     return;
   } else if (csv_gpu_manager.use_shm) {

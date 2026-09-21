@@ -355,17 +355,18 @@ void invokeCallback(void *cb, int pe, CkNcpyBuffer &buff) {
 }
 
 void enqueueNcpyMessage(int destPe, void *msg){
-  // invoke the charm message handler to enqueue the messsage
-#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRES
-  if(destPe == CkMyPe()) // invoked from the same worker thread, call message handler directly
-    CmiHandleMessage(msg);
-  else                   // invoked from the comm thread, so send message to the worker thread
-    CmiPushPE(CmiRankOf(destPe), msg);
-#else
-  // invoked from the same logical node (process), call message handler directly
-  // or invoked from the same worker thread, call message handler directly
-  CmiHandleMessage(msg);
-#endif
+  // Always through the destination PE's queue, never CmiHandleMessage here.
+  // Stock Charm++ ran a same-PE message directly because an RDMA completion
+  // could only be processed by the scheduler between entry methods. With
+  // reconverse the network is also progressed inside a send that has to
+  // retry (CommBackendLCI2::issueAm), so this completion can fire in the
+  // MIDDLE of any entry method that sends: an immigrateGPU ran inside
+  // CkLocMgr::admitLandings while it held a reference into its deque, and the
+  // first cross-node migrations under the vmm pool died of a double grant and
+  // a double destroy (job 22219945, nested stack captured in 22222638). The
+  // queue hop costs one scheduler pass on a message that just carried a bulk
+  // transfer; CmiPushPE honours the [expedited] bit.
+  CmiPushPE(CmiRankOf(destPe), msg);
 }
 
 inline void zcQdIncrement() {

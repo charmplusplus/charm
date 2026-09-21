@@ -909,6 +909,9 @@ public:
   void requestLanding(CmiUInt8 id, int size, int srcPe, int n, CmiUInt8* blocks);
   void landingGranted(CmiUInt8 id);
   void admitLandings();
+  void admitLandingsLoop();
+  bool admittingLandings = false;     // admitLandings is not re-entrant
+  bool admitLandingsAgain = false;    // a nested call asks for another round
   void releaseLandingSet(CmiUInt8 id);
   struct DeferredLanding {
     CmiUInt8 id;

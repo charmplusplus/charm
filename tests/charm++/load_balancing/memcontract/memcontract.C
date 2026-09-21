@@ -158,7 +158,19 @@ void checkPlan(const char* test, Scenario& sc, const std::vector<int>& batchOf, 
   const bool anyPooled = std::find(pooled.begin(), pooled.end(), true) != pooled.end();
 
   std::vector<long long> avail(D);
-  for (int d = 0; d < D; d++) avail[d] = (long long)(reach[d] * 0.95);
+  for (int d = 0; d < D; d++)
+  {
+    avail[d] = (long long)(reach[d] * 0.95);
+    // L_g: one migration window of landings per PE of a pooled device, at
+    // most a quarter of its reach (LBMigrateWindow.h).
+    if (pooled[d])
+    {
+      int pes = 0;
+      for (int p = 0; p < P; p++) if (devOf[p] == d) pes++;
+      avail[d] -= (long long)lbLandingReserveBytes((size_t)reach[d], (size_t)pes);
+      if (avail[d] < 0) avail[d] = 0;
+    }
+  }
 
   for (size_t i = 0; i < st.objData.size(); i++)
     if (st.to_proc[i] != st.from_proc[i] && (batchOf[i] < 0 || batchOf[i] >= nb))
