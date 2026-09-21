@@ -75,7 +75,12 @@ test: lbdriver
 	python3 plot_map.py lbdriver.json lbmap.html
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o lbdriver lbsim lbsim-standalone reseed-test ringflow-test comm-window-test charmrun lbdriver.json lbsim.json
+	rm -f *.decl.h *.def.h conv-host *.o lbdriver lbsim lbsim-standalone metis_replay reseed-test ringflow-test comm-window-test charmrun lbdriver.json lbsim.json
+
+# Replays a METIS call MetisLB wrote (CHARM_DEBUG_METIS=<dir>) over seeds and
+# load tolerances; plain program, login node. See the note at the top of it.
+metis_replay: metis_replay.C
+	$(SA_CXX) -I../../../../src/libs/ck-libs/metis/libmetis -I../../../../src/libs/ck-libs/metis/include -o $@ metis_replay.C ../../../../lib/libckmetis.a
 
 # Pure decision-code regression tests; no Charm/LCI/GPU startup.
 reseed-test: reseed_test.C lbsim_stub.C ../../../../src/ck-ldb/DiffusionMetric.C $(SA_DEPS)

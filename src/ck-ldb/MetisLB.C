@@ -956,21 +956,45 @@ void MetisLB::work(LDStats* stats)
       crossTier = DIFF_TIER_INTER_NODE;
 
   std::vector<real_t> ubvecCross(nConstraints, (real_t)1.1);
+  // The load tolerance across groups: 1.01, not METIS's usual 1.1. METIS
+  // minimises the cut and promises the load only WITHIN the tolerance, so
+  // where in that band a partition lands is an accident of the input -- and
+  // the input is measured loads, which differ in the eighth digit between runs
+  // of one command, which to a multilevel partitioner is a different graph.
+  // sph2d strong, N=1, 20 runs at 1.1: the priced step bound ranged 17.9 to
+  // 21.3 against a per-GPU mean of 17.8, and the step time followed it, 116 to
+  // 131 ms (64.8 + 2.93 x bound), swamping the sync/async difference being
+  // measured. Replayed offline on three captured calls
+  // (tests/.../lbdriver/metis_replay, 65 seeds each), the most loaded group
+  // against the mean:
+  //     1.10   1.007 .. 1.208, median 1.11-1.14 (the memory constraint beside
+  //            it lets METIS overshoot the tolerance)
+  //     1.03   1.007 .. 1.061
+  //     1.01   1.005 .. 1.021, for 1.5-2% more cut
+  // and on the machine at 1.01: bound 17.92-18.11 on every run, 114.6-116.4
+  // ms/step in both arms, whichever layout METIS chose, and DiffusionLB left
+  // with nothing to repair (0 cross-node moves a step; it made 2-40 before).
+  //
+  // leanmd does not gain from it and at a small size loses: 8x8x8 at 1.03 came
+  // out at max/avg 1.07 instead of 1.14 and the step got SLOWER (275-280 vs
+  // 243-258 ms) with more cross-GPU traffic -- after the balance every GPU ran
+  // at 11-19% utilisation, the step latency-bound, and at 1.25-1.4 it improved
+  // to 231-234 only because DiffusionLB finished the balance a step later. At
+  // the strong-scaling size (16 8 8 on one node) 1.01 changes nothing: sync
+  // 1677.9 vs 1680.8, async 1607.7 vs 1613.6, the bound 26.9 vs 29.9. So the
+  // default serves the device-bound case; CHARM_METIS_UBVEC sets it per run
+  // (1.1 is the old behaviour).
+  if (!ubvecCross.empty()) ubvecCross[0] = (real_t)1.01;
   if (memAware) ubvecCross[1] = (real_t)memUbvec;
   if (slackIdx >= 0) ubvecCross[slackIdx] = (real_t)slackUbvec;
-  // Experiment knob: the balance tolerance of the binding dimension across
-  // groups. METIS's usual 1.1 is what it was. Measured on leanmd 8x8x8: at
-  // 1.03 the GPUs came out at max/avg 1.07 instead of 1.14 and the step got
-  // SLOWER (275-280 vs 243-258 ms), with more cross-GPU traffic; at 1.25-1.4
-  // Metis moved 334-936 objects and the step improved to 231-234 only
-  // because DiffusionLB finished the balance at the next step. After the
-  // balance every GPU runs at 11-19% utilisation: the step is latency-bound,
-  // and a tighter GPU balance buys nothing there.
   if (const char* e = getenv("CHARM_METIS_UBVEC"))
   {
     const double u = atof(e);
     if (u > 1.0) ubvecCross[0] = (real_t)u;
   }
+  if (_lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
+    CkPrintf("[%d] MetisLB: load tolerance across groups %.3f\n", CkMyPe(),
+             (double)ubvecCross[0]);
   // A fixed object's group, for the edges to it.
   auto fixedGroupOf = [&](int v) -> int {
     if (ogr->vertices[v].isMigratable()) return -1;
