@@ -459,6 +459,9 @@ size_t hapiDevPoolFreeBytes();
 size_t hapiDevPoolFreeBytesOn(int device);
 // Bytes the arenas on `device` have handed out (their extent less their free).
 size_t hapiDevPoolUsedBytesOn(int device);
+// For the calling PE's device: the pool's free bytes there and how many PEs of
+// this process share it (what the migration window per PE is sized from).
+void hapiLBDevicePool(size_t* poolFree, int* pesOnDevice);
 // The quantum the pool grows by: one fresh arena (+gpupoolsize, else
 // CK_GPU_ARENA_MB, default 256 MB).
 size_t hapiDevPoolArenaSize();

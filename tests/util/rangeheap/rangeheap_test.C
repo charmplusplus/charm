@@ -157,12 +157,57 @@ static void testRandomChurn() {
   printf("  random churn: mapped %.0f MiB, one free range at the end\n", h.mappedBytes() / (double)MiB);
 }
 
+// No block that fits in a chunk may cross a chunk boundary: each chunk is a
+// separate physical allocation and the fabric cannot register a run of them
+// (job 22217038). Blocks bigger than a chunk are still served (they span).
+static void testChunkBoundary() {
+  srand(11);
+  const size_t chunk = 16 * MiB;
+  RangeHeap h = makeHeap(8192 * MiB, chunk);
+  // A block bigger than a chunk spans one boundary, by necessity, and grow()
+  // still keeps its promise for it (checked on the fresh heap: the churn
+  // below maps the whole reserve).
+  CHECK(h.grow(chunk + MiB));
+  void* big = h.malloc(chunk + MiB);
+  CHECK(big != nullptr);
+  const uintptr_t b = (uintptr_t)big - h.base();
+  CHECK(b / chunk != (b + chunk + MiB - 1) / chunk);
+  h.free(big);
+  CHECK(h.freeRanges() == 1 && h.freeBytes() == h.mappedBytes());
+  std::vector<void*> live;
+  size_t placed = 0;
+  for (int i = 0; i < 20000; i++) {
+    if (live.empty() || rand() % 3 != 0) {
+      const size_t s = 1 + (rand() % (6 * MiB));
+      void* p = h.malloc(s);
+      if (!p) { if (!h.grow(s)) continue; p = h.malloc(s); }
+      CHECK(p != nullptr);                 // grow() promised a fit
+      size_t blk = 0;
+      CHECK(h.blockSize(p, &blk));
+      const uintptr_t a = (uintptr_t)p - h.base();
+      CHECK(a / chunk == (a + blk - 1) / chunk);
+      live.push_back(p);
+      placed++;
+    } else {
+      const size_t k = rand() % live.size();
+      h.free(live[k]);
+      live[k] = live.back();
+      live.pop_back();
+    }
+  }
+  for (void* p : live) h.free(p);
+  CHECK(h.freeRanges() == 1 && h.freeBytes() == h.mappedBytes());
+  printf("  chunk boundary: %zu blocks placed, none across a %zu MiB boundary; mapped %.0f MiB\n",
+         placed, chunk / MiB, h.mappedBytes() / (double)MiB);
+}
+
 int main() {
   testBasics();
   testGrowInPlace();
   testMapperRefusal();
   testSph2dShape();
   testRandomChurn();
+  testChunkBoundary();
   if (fails) { printf("rangeheap_test: %d FAILURE(S)\n", fails); return 1; }
   printf("rangeheap_test: all passed\n");
   return 0;

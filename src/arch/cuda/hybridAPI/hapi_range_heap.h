@@ -41,23 +41,48 @@ public:
   // not grow).
   std::function<bool(uintptr_t addr, size_t bytes)> mapper;
 
-  // Best fit among the mapped free ranges; nullptr when none fits. Never
-  // grows: the pool decides whether growth is allowed (hapiDevPoolMallocNoGrow).
+  // Best fit among the mapped free ranges, and never across a chunk boundary
+  // for a block that fits in one chunk: each chunk is its own physical
+  // allocation (cuMemCreate), and the fabric accepts a DMA registration that
+  // spans two of them but fails the first transfer on it (lci poll_comp Err 5;
+  // job 22217038: every 512 MB two-chunk run died, 166 single-chunk runs ran
+  // clean). A block larger than a chunk necessarily spans and takes the start
+  // of its range. nullptr when nothing fits. Never grows: the pool decides
+  // whether growth is allowed (hapiDevPoolMallocNoGrow).
   void* malloc(size_t size) {
     size = roundUp(size ? size : 1, align_);
-    auto it = bySize_.lower_bound(size);
-    if (it == bySize_.end()) return nullptr;
-    const size_t sz = it->first;
-    const uintptr_t addr = it->second;
-    eraseRange(addr, sz);
-    if (sz > size) insertRange(addr + size, sz - size);
-    allocs_[addr] = size;
-    return (void*)addr;
+    for (auto it = bySize_.lower_bound(size); it != bySize_.end(); ++it) {
+      const size_t sz = it->first;
+      const uintptr_t addr = it->second;
+      uintptr_t at;
+      if (!placeIn(addr, sz, size, &at)) continue;
+      eraseRange(addr, sz);
+      if (at > addr) insertRange(addr, at - addr);
+      if (addr + sz > at + size) insertRange(at + size, addr + sz - (at + size));
+      allocs_[at] = size;
+      return (void*)at;
+    }
+    return nullptr;
   }
+
+  // Where a block of `size` bytes goes in the free range [addr, addr+sz): at
+  // its start when it stays inside one chunk (or is bigger than a chunk), else
+  // at the next chunk boundary when it still fits there.
+  bool placeIn(uintptr_t addr, size_t sz, size_t size, uintptr_t* at) const {
+    if (sz < size) return false;
+    if (size > chunk_ || chunkOf(addr) == chunkOf(addr + size - 1)) { *at = addr; return true; }
+    const uintptr_t next = base_ + (chunkOf(addr) + 1) * chunk_;
+    if (next + size <= addr + sz) { *at = next; return true; }
+    return false;
+  }
+  size_t chunkOf(uintptr_t a) const { return (a - base_) / chunk_; }
 
   // Map enough more of the reserve that a `need`-byte request can be served
   // from the range at the mapped end. Returns false when the reserve is
-  // exhausted or the mapper refused; the heap is unchanged then.
+  // exhausted or the mapper refused; the heap is unchanged then. (A tail of
+  // at least `need` bytes always has a placement that respects chunk
+  // boundaries: it ends on one, so either it holds a whole chunk or it lies
+  // inside one.)
   bool grow(size_t need) {
     need = roundUp(need ? need : 1, align_);
     size_t tail = 0;

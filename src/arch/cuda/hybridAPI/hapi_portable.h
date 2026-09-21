@@ -103,16 +103,25 @@ void hapiRecordFree(void* ptr);
 // hapiRecordFree does (a pool block, whose base is never freed).
 void hapiRecordForget(void* ptr);
 
+// Under +gpupool these are the device pool: hapiMalloc hands out a pool block
+// (an arena the peers have opened and the fabric has registered, no driver
+// call) and hapiFree returns one. Without the pool, cudaMalloc/cudaFree as
+// ever. A pointer that predates the pool is still cudaFree'd. One difference
+// to know: cudaFree waits for the device, a pool free does not -- use
+// hapiFreeAsync(ptr, stream) to order the free behind a stream's work.
+// Implemented in hapi_impl.cpp.
+cudaError_t hapiMallocImpl(void** ptr, size_t size);
+cudaError_t hapiFreeImpl(void* ptr);
+cudaError_t hapiFreeAsync(void* ptr, cudaStream_t stream);
+
 template <typename hapiMallocT>
 static inline cudaError_t hapiMallocRecord(hapiMallocT** ptr, size_t size) {
-  const cudaError_t hapi_malloc_err = cudaMalloc((void**)ptr, size);
-  if (hapi_malloc_err == cudaSuccess) hapiRecordAlloc((void*)*ptr, size);
+  void* p = nullptr;
+  const cudaError_t hapi_malloc_err = hapiMallocImpl(&p, size);
+  if (hapi_malloc_err == cudaSuccess) *ptr = (hapiMallocT*)p;
   return hapi_malloc_err;
 }
-static inline cudaError_t hapiFreeRecord(void* ptr) {
-  hapiRecordFree(ptr);
-  return cudaFree(ptr);
-}
+static inline cudaError_t hapiFreeRecord(void* ptr) { return hapiFreeImpl(ptr); }
 
 #define hapiMalloc(ptr, size) hapiMallocRecord(ptr, size)
 #define hapiFree(ptr) hapiFreeRecord(ptr)
@@ -209,16 +218,19 @@ void hapiRecordAlloc(void* ptr, size_t size);
 void hapiRecordFree(void* ptr);
 void hapiRecordForget(void* ptr);
 
+// See the CUDA branch: the device pool when +gpupool is on.
+hipError_t hapiMallocImpl(void** ptr, size_t size);
+hipError_t hapiFreeImpl(void* ptr);
+hipError_t hapiFreeAsync(void* ptr, hipStream_t stream);
+
 template <typename hapiMallocT>
 static inline hipError_t hapiMallocRecord(hapiMallocT** ptr, size_t size) {
-  const hipError_t hapi_malloc_err = hipMalloc((void**)ptr, size);
-  if (hapi_malloc_err == hipSuccess) hapiRecordAlloc((void*)*ptr, size);
+  void* p = nullptr;
+  const hipError_t hapi_malloc_err = hapiMallocImpl(&p, size);
+  if (hapi_malloc_err == hipSuccess) *ptr = (hapiMallocT*)p;
   return hapi_malloc_err;
 }
-static inline hipError_t hapiFreeRecord(void* ptr) {
-  hapiRecordFree(ptr);
-  return hipFree(ptr);
-}
+static inline hipError_t hapiFreeRecord(void* ptr) { return hapiFreeImpl(ptr); }
 
 #define hapiMalloc(ptr, size) hapiMallocRecord(ptr, size)
 #define hapiFree(ptr) hapiFreeRecord(ptr)
