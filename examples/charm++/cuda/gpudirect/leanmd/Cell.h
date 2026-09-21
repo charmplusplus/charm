@@ -8,11 +8,6 @@
 #include "hapi.h"
 #include "leanmd_cuda.h"
 
-// CUDA streams handed out per PE. A 3x3x3 decomposition already has 27 Cells and
-// 378 Computes; one stream apiece would be hundreds per PE, buying overlap a
-// single GPU cannot deliver anyway.
-#define NUM_STREAMS 8
-
 // Every receive buffer here is free when it is posted: positions go into
 // per-compute input slots whose previous reader finished before the cell sent
 // new positions, forces and migrants into per-neighbour landing slots. Saying
@@ -27,18 +22,14 @@ inline bool leanmdBufferFree() {
 // The (0,0,0) neighbour offset -- a particle that stays where it is.
 #define SELF_NBR (KAWAY_X * NBRS_Y * NBRS_Z + KAWAY_Y * NBRS_Z + KAWAY_Z)
 
-class StreamPool : public CBase_StreamPool {
-  std::vector<cudaStream_t> streams;
-  int next;
-
- public:
-  StreamPool() : streams(NUM_STREAMS), next(0) {
-    for (int i = 0; i < NUM_STREAMS; i++)
-      hapiCheck(cudaStreamCreateWithFlags(&streams[i], cudaStreamNonBlocking));
-  }
-  StreamPool(CkMigrateMessage* m) : streams(0), next(0) {}
-  cudaStream_t acquire() { return streams[(next++) % NUM_STREAMS]; }
-};
+// Streams come from the runtime's per-device pool (hapiAcquireStream), not from
+// the application. The app cannot make this decision correctly: it does not know
+// how many PEs share the GPU, how many hardware channels the driver gave this
+// process, or what else is resident. The runtime does, and owning the streams is
+// what lets it choose their mapping onto channels and the order work is issued.
+// hapiAcquireStream also binds each stream to the PE's OWN device rather than to
+// whatever device the constructing thread happened to have current, and takes the
+// stream back on migration.
 
 class CellMap : public CkArrayMap {
   int num_x, num_y, num_z, num_yz;

@@ -4,7 +4,6 @@ mainmodule leanmd {
   readonly CProxy_Main mainProxy;       //central controller
   readonly CProxy_Cell cellArray;     //array that houses atoms
   readonly CProxy_Compute computeArray; //computational kernels
-  readonly CProxy_StreamPool streamPool; //per-PE pool of CUDA streams
 
   readonly int cellArrayDimX;		// X dimension of the Cell array
   readonly int cellArrayDimY;		// Y dimension of the Cell array
@@ -60,10 +59,6 @@ mainmodule leanmd {
 
   group CellMap {
     entry CellMap(int cell_x, int cell_y, int cell_z);
-  }
-
-  group StreamPool {
-    entry StreamPool();
   }
 
   //chares to house atoms

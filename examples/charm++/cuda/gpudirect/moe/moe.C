@@ -34,22 +34,9 @@ static inline bool hostSyncMode() {
       CkPrintf("[T %.6f pe%d] " fmt "\n", tnow(), CkMyPe(), ##__VA_ARGS__); \
   } while (0)
 
-// Device allocation following the runtime's choice: under +gpupool every
-// buffer comes from CkDeviceMalloc (an arena the peers have already opened, no
-// driver call, no device sync); without it, from hapiMalloc. Same convention
-// as pic2d.
-inline hapiError_t mmMalloc(void** p, size_t n) {
-  static const bool pool = CkDevicePoolOn();
-  if (!pool) return hapiMalloc(p, n);
-  *p = CkDeviceMalloc(n);
-  return (*p != NULL) ? cudaSuccess : cudaErrorMemoryAllocation;
-}
-inline hapiError_t mmFree(void* p) {
-  static const bool pool = CkDevicePoolOn();
-  if (p == NULL) return cudaSuccess;
-  if (pool) { CkDeviceFree(p); return cudaSuccess; }
-  return hapiFree(p);
-}
+// Device buffers come from hapiMalloc/hapiFree, which are the device pool
+// under +gpupool (an arena the peers have already opened, no driver call, no
+// device sync) and cudaMalloc/cudaFree without it. The runtime owns the switch.
 
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Dispatcher disp_proxy;
@@ -518,7 +505,7 @@ class Dispatcher : public CBase_Dispatcher {
     // See MoeCtx in moe.h for why communication has its own stream.
     hapiCheck(cudaStreamCreateWithPriority(&gpu.comm.stream,
         cudaStreamNonBlocking, -1));
-    hapiCheck(mmMalloc((void**)&gpu.comm.partials,
+    hapiCheck(hapiMalloc((void**)&gpu.comm.partials,
         sizeof(double) * MOE_RED_BLOCKS));
     hapiCheck(cudaStreamCreateWithPriority(&send_stream, cudaStreamNonBlocking,
         -1));
@@ -528,25 +515,25 @@ class Dispatcher : public CBase_Dispatcher {
       MoeGpu& g = gpu.lanes[l];
       hapiCheck(cudaStreamCreateWithPriority(&g.stream, cudaStreamNonBlocking,
           0));
-      hapiCheck(mmMalloc((void**)&g.h,
+      hapiCheck(hapiMalloc((void**)&g.h,
           sizeof(float) * (size_t)chunk_tokens * d_ff));
-      hapiCheck(mmMalloc((void**)&g.dh,
+      hapiCheck(hapiMalloc((void**)&g.dh,
           sizeof(float) * (size_t)chunk_tokens * d_ff));
       if (use_adam) {
-        hapiCheck(mmMalloc((void**)&g.dW1, sizeof(float) * wsz));
-        hapiCheck(mmMalloc((void**)&g.dW2, sizeof(float) * wsz));
+        hapiCheck(hapiMalloc((void**)&g.dW1, sizeof(float) * wsz));
+        hapiCheck(hapiMalloc((void**)&g.dW2, sizeof(float) * wsz));
       }
       if (fuse_sources) {
         // Bounded by what one expert can be sent in a step, the same bound its
         // own slabs use. Sized once: growing it would have to free a block the
         // lane's queued kernels may still be reading.
         const size_t frows = (size_t)n_disp * cap_src;
-        hapiCheck(mmMalloc((void**)&g.fx, sizeof(float) * frows * d_model));
-        hapiCheck(mmMalloc((void**)&g.fy, sizeof(float) * frows * d_model));
+        hapiCheck(hapiMalloc((void**)&g.fx, sizeof(float) * frows * d_model));
+        hapiCheck(hapiMalloc((void**)&g.fy, sizeof(float) * frows * d_model));
       }
       g.workspace_bytes = (size_t)32 << 20;
-      hapiCheck(mmMalloc(&g.workspace, g.workspace_bytes));
-      hapiCheck(mmMalloc((void**)&g.partials,
+      hapiCheck(hapiMalloc(&g.workspace, g.workspace_bytes));
+      hapiCheck(hapiMalloc((void**)&g.partials,
           sizeof(double) * MOE_RED_BLOCKS));
       if (moeBlasCreate(&g, use_tf32 != 0))
         CkAbort("cublasCreate failed on PE %d lane %d\n", CkMyPe(), l);
@@ -560,17 +547,17 @@ class Dispatcher : public CBase_Dispatcher {
     }
 
     const size_t TK = slots();
-    hapiCheck(mmMalloc((void**)&d_x, sizeof(float) * n_tokens * d_model));
-    hapiCheck(mmMalloc((void**)&d_send, sizeof(float) * (TK + 1) * d_model));
+    hapiCheck(hapiMalloc((void**)&d_x, sizeof(float) * n_tokens * d_model));
+    hapiCheck(hapiMalloc((void**)&d_send, sizeof(float) * (TK + 1) * d_model));
     // TK+2 rows: [TK] absorbs the one-row dummy a zero-token expert sends,
     // [TK+1] is held at zero for tokens dropped by the capacity factor.
-    hapiCheck(mmMalloc((void**)&d_recv, sizeof(float) * (TK + 2) * d_model));
+    hapiCheck(hapiMalloc((void**)&d_recv, sizeof(float) * (TK + 2) * d_model));
     hapiCheck(cudaMemset(d_recv + (TK + 1) * d_model, 0,
         sizeof(float) * d_model));
-    hapiCheck(mmMalloc((void**)&d_y, sizeof(float) * n_tokens * d_model));
-    hapiCheck(mmMalloc((void**)&d_send_idx, sizeof(int) * TK));
-    hapiCheck(mmMalloc((void**)&d_recv_pos, sizeof(int) * TK));
-    hapiCheck(mmMalloc((void**)&d_chk, sizeof(double)));
+    hapiCheck(hapiMalloc((void**)&d_y, sizeof(float) * n_tokens * d_model));
+    hapiCheck(hapiMalloc((void**)&d_send_idx, sizeof(int) * TK));
+    hapiCheck(hapiMalloc((void**)&d_recv_pos, sizeof(int) * TK));
+    hapiCheck(hapiMalloc((void**)&d_chk, sizeof(double)));
     hapiCheck(hapiMallocHost((void**)&h_send_idx, sizeof(int) * TK));
     hapiCheck(hapiMallocHost((void**)&h_recv_pos, sizeof(int) * TK));
     hapiCheck(hapiMallocHost((void**)&h_chk, sizeof(double)));
@@ -899,15 +886,15 @@ class Expert : public CBase_Expert {
                  "sends outstanding\n", CkMyPe(), thisIndex, outstanding_sends);
       return;
     }
-    hapiCheck(mmFree(W1));
-    hapiCheck(mmFree(W2));
-    hapiCheck(mmFree(m1));
-    hapiCheck(mmFree(v1));
-    hapiCheck(mmFree(m2));
-    hapiCheck(mmFree(v2));
-    hapiCheck(mmFree(x_seg));
-    hapiCheck(mmFree(y_seg));
-    hapiCheck(mmFree(d_chk));
+    hapiCheck(hapiFree(W1));
+    hapiCheck(hapiFree(W2));
+    hapiCheck(hapiFree(m1));
+    hapiCheck(hapiFree(v1));
+    hapiCheck(hapiFree(m2));
+    hapiCheck(hapiFree(v2));
+    hapiCheck(hapiFree(x_seg));
+    hapiCheck(hapiFree(y_seg));
+    hapiCheck(hapiFree(d_chk));
     hapiCheck(hapiFreeHost(h_chk));
   }
 
@@ -920,17 +907,17 @@ class Expert : public CBase_Expert {
 
   void allocate() {
     const size_t seg = segStride() * n_disp;
-    hapiCheck(mmMalloc((void**)&W1, sizeof(float) * wsz()));
-    hapiCheck(mmMalloc((void**)&W2, sizeof(float) * wsz()));
+    hapiCheck(hapiMalloc((void**)&W1, sizeof(float) * wsz()));
+    hapiCheck(hapiMalloc((void**)&W2, sizeof(float) * wsz()));
     if (use_adam) {
-      hapiCheck(mmMalloc((void**)&m1, sizeof(float) * wsz()));
-      hapiCheck(mmMalloc((void**)&v1, sizeof(float) * wsz()));
-      hapiCheck(mmMalloc((void**)&m2, sizeof(float) * wsz()));
-      hapiCheck(mmMalloc((void**)&v2, sizeof(float) * wsz()));
+      hapiCheck(hapiMalloc((void**)&m1, sizeof(float) * wsz()));
+      hapiCheck(hapiMalloc((void**)&v1, sizeof(float) * wsz()));
+      hapiCheck(hapiMalloc((void**)&m2, sizeof(float) * wsz()));
+      hapiCheck(hapiMalloc((void**)&v2, sizeof(float) * wsz()));
     }
-    hapiCheck(mmMalloc((void**)&x_seg, sizeof(float) * seg));
-    hapiCheck(mmMalloc((void**)&y_seg, sizeof(float) * seg));
-    hapiCheck(mmMalloc((void**)&d_chk, sizeof(double)));
+    hapiCheck(hapiMalloc((void**)&x_seg, sizeof(float) * seg));
+    hapiCheck(hapiMalloc((void**)&y_seg, sizeof(float) * seg));
+    hapiCheck(hapiMalloc((void**)&d_chk, sizeof(double)));
     hapiCheck(hapiMallocHost((void**)&h_chk, sizeof(double)));
   }
 

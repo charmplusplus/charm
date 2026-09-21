@@ -11,21 +11,10 @@
 #include <cstdlib>
 #include <unistd.h>
 
-// Device allocation following the runtime's choice: under +gpupool every buffer
-// comes from CkDeviceMalloc (an arena the peers have already opened, no driver
-// call, no device sync); without it, from hapiMalloc.
-inline hapiError_t pcMalloc(void** p, size_t n) {
-  static const bool pool = CkDevicePoolOn();
-  if (!pool) return hapiMalloc(p, n);
-  *p = CkDeviceMalloc(n);
-  return (*p != NULL) ? cudaSuccess : cudaErrorMemoryAllocation;
-}
-inline hapiError_t pcFree(void* p) {
-  static const bool pool = CkDevicePoolOn();
-  if (p == NULL) return cudaSuccess;
-  if (pool) { CkDeviceFree(p); return cudaSuccess; }
-  return hapiFree(p);
-}
+// Device buffers come from hapiMalloc/hapiFree, which are the device pool
+// under +gpupool (an arena the peers have already opened, no driver call, no
+// device sync) and cudaMalloc/cudaFree without it. The runtime owns the
+// switch; the application does not see it.
 
 // Pinned landing pads and the ordering event are recycled, never returned to
 // the driver. cudaMallocHost / cudaFreeHost synchronize the device and take
@@ -673,27 +662,27 @@ public:
   void allocDevice() {
     const size_t pcap = sizeof(Particle) * (size_t)part_capacity;
     const size_t ecap = sizeof(Particle) * (size_t)NUM_DIRS * exch_capacity;
-    hapiCheck(pcMalloc((void**)&d_parts[0], pcap));
-    hapiCheck(pcMalloc((void**)&d_parts[1], pcap));
-    hapiCheck(pcMalloc((void**)&d_send_halo, ecap));
-    hapiCheck(pcMalloc((void**)&d_recv_halo, ecap));
-    hapiCheck(pcMalloc((void**)&d_send_mig, ecap));
+    hapiCheck(hapiMalloc((void**)&d_parts[0], pcap));
+    hapiCheck(hapiMalloc((void**)&d_parts[1], pcap));
+    hapiCheck(hapiMalloc((void**)&d_send_halo, ecap));
+    hapiCheck(hapiMalloc((void**)&d_recv_halo, ecap));
+    hapiCheck(hapiMalloc((void**)&d_send_mig, ecap));
     // Twice the directions: the migration receive slot is indexed by the
     // SENDING step's parity. See receiveParticles for why it has to be, and
     // why d_recv_halo above does not.
-    hapiCheck(pcMalloc((void**)&d_recv_mig, 2 * ecap));
-    hapiCheck(pcMalloc((void**)&d_halo_ptrs, sizeof(Particle*) * NUM_DIRS));
-    hapiCheck(pcMalloc((void**)&d_mig_ptrs, sizeof(Particle*) * NUM_DIRS));
-    hapiCheck(pcMalloc((void**)&d_counts, sizeof(int) * NUM_COUNTERS));
-    hapiCheck(pcMalloc((void**)&d_cell_cnt, sizeof(int) * ncells));
-    hapiCheck(pcMalloc((void**)&d_cell_off, sizeof(int) * ncells));
-    hapiCheck(pcMalloc((void**)&d_cursor, sizeof(int) * ncells));
-    hapiCheck(pcMalloc((void**)&d_cell_parts, sizeof(int) * part_capacity));
-    hapiCheck(pcMalloc((void**)&d_drho, sizeof(RealType) * part_capacity));
-    hapiCheck(pcMalloc((void**)&d_ax, sizeof(RealType) * part_capacity));
-    hapiCheck(pcMalloc((void**)&d_ay, sizeof(RealType) * part_capacity));
-    hapiCheck(pcMalloc((void**)&d_stats, sizeof(RealType) * 8));
-    hapiCheck(pcMalloc((void**)&d_check,
+    hapiCheck(hapiMalloc((void**)&d_recv_mig, 2 * ecap));
+    hapiCheck(hapiMalloc((void**)&d_halo_ptrs, sizeof(Particle*) * NUM_DIRS));
+    hapiCheck(hapiMalloc((void**)&d_mig_ptrs, sizeof(Particle*) * NUM_DIRS));
+    hapiCheck(hapiMalloc((void**)&d_counts, sizeof(int) * NUM_COUNTERS));
+    hapiCheck(hapiMalloc((void**)&d_cell_cnt, sizeof(int) * ncells));
+    hapiCheck(hapiMalloc((void**)&d_cell_off, sizeof(int) * ncells));
+    hapiCheck(hapiMalloc((void**)&d_cursor, sizeof(int) * ncells));
+    hapiCheck(hapiMalloc((void**)&d_cell_parts, sizeof(int) * part_capacity));
+    hapiCheck(hapiMalloc((void**)&d_drho, sizeof(RealType) * part_capacity));
+    hapiCheck(hapiMalloc((void**)&d_ax, sizeof(RealType) * part_capacity));
+    hapiCheck(hapiMalloc((void**)&d_ay, sizeof(RealType) * part_capacity));
+    hapiCheck(hapiMalloc((void**)&d_stats, sizeof(RealType) * 8));
+    hapiCheck(hapiMalloc((void**)&d_check,
         sizeof(unsigned long long) * NUM_CHECKS));
     h_counts = takePinned<int>(NUM_COUNTERS);
     h_stats = takePinned<RealType>(8);
@@ -719,14 +708,14 @@ public:
   }
 
   void freeDevice() {
-    pcFree(d_parts[0]); pcFree(d_parts[1]);
-    pcFree(d_send_halo); pcFree(d_recv_halo);
-    pcFree(d_send_mig); pcFree(d_recv_mig);
-    pcFree(d_halo_ptrs); pcFree(d_mig_ptrs);
-    pcFree(d_counts); pcFree(d_cell_cnt); pcFree(d_cell_off);
-    pcFree(d_cursor); pcFree(d_cell_parts);
-    pcFree(d_drho); pcFree(d_ax); pcFree(d_ay); pcFree(d_stats);
-    pcFree(d_check);
+    hapiFree(d_parts[0]); hapiFree(d_parts[1]);
+    hapiFree(d_send_halo); hapiFree(d_recv_halo);
+    hapiFree(d_send_mig); hapiFree(d_recv_mig);
+    hapiFree(d_halo_ptrs); hapiFree(d_mig_ptrs);
+    hapiFree(d_counts); hapiFree(d_cell_cnt); hapiFree(d_cell_off);
+    hapiFree(d_cursor); hapiFree(d_cell_parts);
+    hapiFree(d_drho); hapiFree(d_ax); hapiFree(d_ay); hapiFree(d_stats);
+    hapiFree(d_check);
     givePinned(h_counts, NUM_COUNTERS);
     givePinned(h_stats, 8);
     givePinned(h_check, NUM_CHECKS);

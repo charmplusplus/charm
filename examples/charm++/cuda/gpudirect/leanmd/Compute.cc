@@ -2,7 +2,6 @@
 #include "defs.h"
 #include "Cell.h"
 #include "Compute.h"
-#include "md_alloc.h"
 #include <algorithm>
 #include <cstdlib>
 #include <cstdio>
@@ -68,7 +67,9 @@ inline hapiError_t mdDevFree(void* p, cudaStream_t s) {
 // ordered, so a buffer is only freed at points where nothing is in flight
 // against it -- the destructor, after pup has settled the stream and the force
 // sends have drained, and ensureSlot growth, after the previous step's acks.
-// Allocation helpers: md_alloc.h (shared with Cell).
+// Device buffers: hapiMalloc/hapiFree (the pool under +gpupool); a buffer
+// that may have been rebound into a landing arena by migration is released
+// with hapiFreeMigratable, which is correct for every origin.
 
 struct AllocTimer {
   double t0; bool on;
@@ -83,7 +84,6 @@ struct AllocTimer {
 };
 }  // namespace
 
-extern /* readonly */ CProxy_StreamPool streamPool;
 
 //compute - Default constructor
 Compute::Compute() : stepCount(1), d_energyPartial(NULL), d_energyScalar(NULL),
@@ -229,19 +229,19 @@ EventPool& eventPool() {
 
 void Compute::ensureDevice() {
   if (stream != NULL) return;
-  stream = streamPool.ckLocalBranch()->acquire();
+  stream = hapiAcquireStream();
   // Guarded individually rather than by the stream alone: a migrated chare
   // arrives with stream NULL but with everything pup() carried already in
   // place, and reallocating over those would leak them and lose the contents.
   if (d_energyScalar == NULL) {
-    hapiCheck(mdMigMalloc((void**)&d_energyScalar, sizeof(double)));
-    poolEnergyScalar = mdPoolOn();
+    hapiCheck(hapiMalloc((void**)&d_energyScalar, sizeof(double)));
+    poolEnergyScalar = CkDevicePoolOn();
   }
   if (h_energy == NULL) h_energy = pinnedDoubles().take();
   if (lastWork == NULL) { lastWork = eventPool().take(); lastWorkValid = false; }
 }
 
-Compute::~Compute() { freeDevice(); }
+Compute::~Compute() { freeDevice(); hapiReleaseStream(stream); stream = NULL; }
 
 // Recover the two cells from my own index. createComputes built it as
 // (cell1 + KAWAY, cell2 + KAWAY) with cell2 possibly outside the array, so both
@@ -270,17 +270,17 @@ void Compute::ensureSlot(int s, int n) {
   AllocTimer _t;
   const int newcap = n + n / 4 + 64;
 
-  if (d_pos[s]) mdMigFree(d_pos[s], poolPos[s]);
-  if (d_force[s]) mdMigFree(d_force[s], poolForce[s]);
-  hapiCheck(mdMigMalloc((void**)&d_pos[s], sizeof(vec3) * newcap));
-  hapiCheck(mdMigMalloc((void**)&d_force[s], sizeof(vec3) * newcap));
-  poolPos[s] = poolForce[s] = mdPoolOn();
+  if (d_pos[s]) hapiFreeMigratable(d_pos[s]);
+  if (d_force[s]) hapiFreeMigratable(d_force[s]);
+  hapiCheck(hapiMalloc((void**)&d_pos[s], sizeof(vec3) * newcap));
+  hapiCheck(hapiMalloc((void**)&d_force[s], sizeof(vec3) * newcap));
+  poolPos[s] = poolForce[s] = CkDevicePoolOn();
 
   // The energy partials are indexed by the A-side atom, one entry per block.
   if (s == 0) {
-    if (d_energyPartial) mdMigFree(d_energyPartial, poolEnergyPartial);
-    hapiCheck(mdMigMalloc((void**)&d_energyPartial, sizeof(double) * newcap));
-    poolEnergyPartial = mdPoolOn();
+    if (d_energyPartial) hapiFreeMigratable(d_energyPartial);
+    hapiCheck(hapiMalloc((void**)&d_energyPartial, sizeof(double) * newcap));
+    poolEnergyPartial = CkDevicePoolOn();
   }
   cap[s] = newcap;
 }
@@ -288,13 +288,13 @@ void Compute::ensureSlot(int s, int n) {
 void Compute::freeDevice() {
   AllocTimer _t;
   for (int s = 0; s < 2; s++) {
-    if (d_pos[s])   { mdMigFree(d_pos[s], poolPos[s]);     d_pos[s] = NULL; }
-    if (d_force[s]) { mdMigFree(d_force[s], poolForce[s]); d_force[s] = NULL; }
+    if (d_pos[s])   { hapiFreeMigratable(d_pos[s]);     d_pos[s] = NULL; }
+    if (d_force[s]) { hapiFreeMigratable(d_force[s]); d_force[s] = NULL; }
     poolPos[s] = poolForce[s] = false;
     cap[s] = 0;
   }
-  if (d_energyPartial) { mdMigFree(d_energyPartial, poolEnergyPartial); d_energyPartial = NULL; }
-  if (d_energyScalar)  { mdMigFree(d_energyScalar, poolEnergyScalar);   d_energyScalar = NULL; }
+  if (d_energyPartial) { hapiFreeMigratable(d_energyPartial); d_energyPartial = NULL; }
+  if (d_energyScalar)  { hapiFreeMigratable(d_energyScalar);   d_energyScalar = NULL; }
   poolEnergyPartial = poolEnergyScalar = false;
   if (lastWork) { eventPool().give(lastWork); lastWork = NULL; lastWorkValid = false; }
   if (h_energy) {
@@ -500,8 +500,8 @@ void Compute::pup(PUP::er &p) {
   }
 
   // The scratch travels. Unpacking rebinds these pointers into the arena the
-  // payload landed in, so they are released through hapiFreeMigratable (see
-  // mdMigFree) rather than by the allocator that first produced them.
+  // payload landed in, so they are released through hapiFreeMigratable rather
+  // than by the allocator that first produced them.
   // Carry the occupied part of each buffer, not its capacity. cap is sized with
   // headroom (1314 for 1000 atoms) and everything past nPart is untouched
   // memory that the destination has no use for. The destination's capacity

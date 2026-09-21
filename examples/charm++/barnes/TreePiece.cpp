@@ -1,5 +1,9 @@
 #include "TreePiece.h"
-#include "PoolAlloc.h"
+// Device buffers come from hapiMalloc/hapiFree: the device pool under
+// +gpupool, cudaMalloc/cudaFree without it. A pool free does not wait for
+// the device the way cudaFree did; every site here that frees a buffer
+// something may still be reading drains its stream first
+// (GpuTraversalBatch::growDevice, TreePiece::launchDeviceWalk).
 #include "Messages.h"
 #include "DataManager.h"
 #include "Parameters.h"
@@ -334,11 +338,11 @@ bool TreePiece::launchDeviceWalk(){
       // a pool free does not).
       hapiCheck(cudaStreamSynchronize(batch.getStream()));
       hapiCheck(hapiFreeHost(hTargets));
-      hapiCheck(bhFree(dTargets));
+      hapiCheck(hapiFree(dTargets));
     }
     targetCap = myNumBuckets + myNumBuckets/4 + 64;
     hapiCheck(hapiMallocHost((void **)&hTargets, sizeof(GpuTargetBucket)*targetCap));
-    hapiCheck(bhMalloc((void **)&dTargets, sizeof(GpuTargetBucket)*targetCap));
+    hapiCheck(hapiMalloc((void **)&dTargets, sizeof(GpuTargetBucket)*targetCap));
   }
 
   // The device walk needs no mapping back to a device node: the box drives the

@@ -10,7 +10,6 @@
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ CProxy_Cell cellArray;
 /* readonly */ CProxy_Compute computeArray;
-/* readonly */ CProxy_StreamPool streamPool;
 
 /* readonly */ int cellArrayDimX;
 /* readonly */ int cellArrayDimY;
@@ -44,7 +43,6 @@ Main::Main(CkArgMsg* m) {
   mainProxy = thisProxy;
 
   // Created before any Cell or Compute, so a branch exists wherever they land.
-  streamPool = CProxy_StreamPool::ckNew();
 
   int numPes = CkNumPes();
   int currPe = -1, pe;
