@@ -131,13 +131,106 @@ __global__ void pairForceKernel(const vec3* __restrict__ A, int nA,
     __syncthreads();
   }
 
-  // One block owns forceA[i] outright, so this is a plain store, not an atomic.
+  // One block owns forceA[i] outright, so this is a plain store, not an atomic --
+  // and an assignment, not an accumulation: each force array is written by exactly
+  // one launch per step, so the zeroing kernel that used to precede it is gone.
   if (threadIdx.x == 0)
   {
-    forceA[i].x += sx[0];
-    forceA[i].y += sy[0];
-    forceA[i].z += sz[0];
+    forceA[i].x = sx[0];
+    forceA[i].y = sy[0];
+    forceA[i].z = sz[0];
     if (energyPartial != nullptr) energyPartial[i] = se[0];
+  }
+}
+
+// Both directions of a two-cell pair in ONE launch: blocks [0, nA) compute the
+// force on A's atoms from B exactly as pairForceKernel does, blocks [nA, nA+nB)
+// the force on B's atoms from A with the shift negated. Same arithmetic per atom,
+// so the forces are bit-identical to the two launches this replaces. A pair
+// Compute used to issue four kernels a step (two zeroings, two force kernels);
+// measured 2026-09-21 at 960 atoms, kernel launches were 12.2 k per process per
+// step at 9.2 us each under 8-PE driver contention -- 11% of every PE.
+// energyPartial, when non-null, is filled for A's blocks only (each unordered
+// pair counted once, as before).
+__global__ void pairForceBothKernel(const vec3* A, int nA, const vec3* B, int nB,
+                                    vec3* forceA, vec3* forceB,
+                                    vec3 shiftB, double cutoffSq,
+                                    double* energyPartial)
+{
+  const int blk = blockIdx.x;
+  if (blk >= nA + nB) return;
+
+  __shared__ double sx[BLOCK_THREADS];
+  __shared__ double sy[BLOCK_THREADS];
+  __shared__ double sz[BLOCK_THREADS];
+  __shared__ double se[BLOCK_THREADS];
+
+  const bool onA = blk < nA;
+  const int i = onA ? blk : blk - nA;
+  const vec3* self = onA ? A : B;
+  const vec3* other = onA ? B : A;
+  const int nOther = onA ? nB : nA;
+  const double shx = onA ? shiftB.x : -shiftB.x;
+  const double shy = onA ? shiftB.y : -shiftB.y;
+  const double shz = onA ? shiftB.z : -shiftB.z;
+  const bool wantEnergy = onA && energyPartial != nullptr;
+
+  const vec3 pos_i = self[i];
+
+  double fx = 0.0, fy = 0.0, fz = 0.0, en = 0.0;
+
+  for (int j = threadIdx.x; j < nOther; j += blockDim.x)
+  {
+    const vec3 pos_j = other[j];
+
+    const double dx = pos_i.x - (pos_j.x + shx);
+    const double dy = pos_i.y - (pos_j.y + shy);
+    const double dz = pos_i.z - (pos_j.z + shz);
+
+    double rsqd = dx*dx + dy*dy + dz*dz;
+
+    if (rsqd > 1.0 && rsqd < cutoffSq)
+    {
+      rsqd *= POW_TWENTY;
+      const double rSix    = rsqd * rsqd * rsqd;
+      const double rTwelve = rSix * rSix;
+
+      const double f  = (12.0 * VDW_A_D) / rTwelve - (6.0 * VDW_B_D) / rSix;
+      const double fr = (f / rsqd) * POW_TEN;
+
+      fx += dx * fr;
+      fy += dy * fr;
+      fz += dz * fr;
+
+      if (wantEnergy) en += VDW_A_D / rTwelve - VDW_B_D / rSix;
+    }
+  }
+
+  sx[threadIdx.x] = fx;
+  sy[threadIdx.x] = fy;
+  sz[threadIdx.x] = fz;
+  se[threadIdx.x] = en;
+  __syncthreads();
+
+  for (int s = blockDim.x / 2; s > 0; s >>= 1)
+  {
+    if (threadIdx.x < s)
+    {
+      sx[threadIdx.x] += sx[threadIdx.x + s];
+      sy[threadIdx.x] += sy[threadIdx.x + s];
+      sz[threadIdx.x] += sz[threadIdx.x + s];
+      se[threadIdx.x] += se[threadIdx.x + s];
+    }
+    __syncthreads();
+  }
+
+  if (threadIdx.x == 0)
+  {
+    vec3* out = onA ? forceA : forceB;
+    out[i].x = sx[0];
+    out[i].y = sy[0];
+    out[i].z = sz[0];
+    if (wantEnergy) energyPartial[i] = se[0];
   }
 }
 
@@ -183,6 +276,27 @@ __global__ void zeroForcesKernel(vec3* f, int n)
 // through host memory every step -- the opposite of device residency. Instead each
 // Compute ships its force array device-to-device and the owning Cell folds it in
 // here.
+// The whole fold in ONE launch: dst[i] = sum over the cell's landing slots, in
+// slot order. Every Compute's force array lands in its own slot of one
+// contiguous array (slot k at src + k*stride), and the Cell integrates only after
+// all of them have arrived, so nothing needs folding on arrival. Replaces one
+// zeroing plus one accumulateForcesKernel per arriving message (~27 a step per
+// Cell). The order is now the slot order rather than the arrival order, so the
+// sum is reproducible run to run, which it was not before.
+__global__ void sumForcesKernel(vec3* __restrict__ dst, const vec3* __restrict__ src,
+                                int slots, int stride, int n)
+{
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= n) return;
+  double x = 0.0, y = 0.0, z = 0.0;
+  for (int k = 0; k < slots; k++)
+  {
+    const vec3 f = src[(size_t)k * stride + i];
+    x += f.x; y += f.y; z += f.z;
+  }
+  dst[i].x = x; dst[i].y = y; dst[i].z = z;
+}
+
 __global__ void accumulateForcesKernel(vec3* __restrict__ dst,
                                        const vec3* __restrict__ src, int n)
 {
@@ -361,6 +475,24 @@ void invokePairForce(const vec3* d_A, int nA, const vec3* d_B, int nB,
   pairForceKernel<<<nA, BLOCK_THREADS, 0, stream>>>(
       d_A, nA, d_B, nB, d_forceA, shift, cutoffSq, selfInteract ? 1 : 0,
       d_energyPartial);
+}
+
+void invokePairForceBoth(const vec3* d_A, int nA, const vec3* d_B, int nB,
+                         vec3* d_forceA, vec3* d_forceB, vec3 shiftB,
+                         double cutoffSq, double* d_energyPartial,
+                         cudaStream_t stream)
+{
+  if (nA <= 0 || nB <= 0) return;
+  pairForceBothKernel<<<nA + nB, BLOCK_THREADS, 0, stream>>>(
+      d_A, nA, d_B, nB, d_forceA, d_forceB, shiftB, cutoffSq, d_energyPartial);
+}
+
+void invokeSumForces(vec3* d_dst, const vec3* d_slots, int slots, int stride, int n,
+                     cudaStream_t stream)
+{
+  if (n <= 0 || slots <= 0) return;
+  const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;
+  sumForcesKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(d_dst, d_slots, slots, stride, n);
 }
 
 void invokeGatherPositions(const Particle* d_p, vec3* d_pos, int n,

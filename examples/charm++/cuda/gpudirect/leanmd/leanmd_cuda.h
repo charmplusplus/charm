@@ -42,6 +42,16 @@ void invokePairForce(const vec3* d_A, int nA, const vec3* d_B, int nB,
                      vec3* d_forceA, vec3 shift, double cutoffSq, bool selfInteract,
                      double* d_energyPartial, cudaStream_t stream);
 
+// Both directions of a two-cell pair in one launch; assigns both force arrays.
+void invokePairForceBoth(const vec3* d_A, int nA, const vec3* d_B, int nB,
+                         vec3* d_forceA, vec3* d_forceB, vec3 shiftB,
+                         double cutoffSq, double* d_energyPartial,
+                         cudaStream_t stream);
+
+// d_dst[i] = sum over `slots` landing slots of d_slots[k*stride + i], one launch.
+void invokeSumForces(vec3* d_dst, const vec3* d_slots, int slots, int stride, int n,
+                     cudaStream_t stream);
+
 void invokeZeroForces(vec3* d_f, int n, cudaStream_t stream);
 
 // Extract positions from the device-resident Particle array, for sending.

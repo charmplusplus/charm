@@ -369,25 +369,38 @@ void Compute::launchForces() {
   const bool doEnergy = (stepCount == 1 || stepCount == finalStepCount);
   const int nA = nPart[0];
 
-  invokeZeroForces(d_force[0], nA, stream);
+  // One launch per Compute per step. The force kernels ASSIGN, so the zeroing
+  // launches are only needed where no force kernel will run (an empty partner),
+  // and a pair's two directions go in one kernel. LEANMD_UNFUSED=1 keeps the
+  // original four-launch sequence, for comparing the two on one binary.
+  static const bool unfused = (getenv("LEANMD_UNFUSED") != nullptr);
 
   if (selfCompute) {
+    if (unfused || nA <= 0) invokeZeroForces(d_force[0], nA, stream);
     invokePairForce(d_pos[0], nA, d_pos[0], nA, d_force[0], vec3(0.0), cutoffSq,
                     true, doEnergy ? d_energyPartial : NULL, stream);
   } else {
     const int nB = nPart[1];
-    invokeZeroForces(d_force[1], nB, stream);
-
     const vec3 shiftB = periodicShift();
-    // Forces on A from B, carrying the energy for the whole pair...
-    invokePairForce(d_pos[0], nA, d_pos[1], nB, d_force[0], shiftB, cutoffSq,
-                    false, doEnergy ? d_energyPartial : NULL, stream);
-    // ...and the reciprocal, with the roles and the shift both reversed. Newton's
-    // third law would halve this work, but only by writing into the other cell's
-    // force array under atomics; recomputing is cheaper than the contention.
-    const vec3 shiftA(-shiftB.x, -shiftB.y, -shiftB.z);
-    invokePairForce(d_pos[1], nB, d_pos[0], nA, d_force[1], shiftA, cutoffSq,
-                    false, NULL, stream);
+    if (unfused || nA <= 0 || nB <= 0) {
+      invokeZeroForces(d_force[0], nA, stream);
+      invokeZeroForces(d_force[1], nB, stream);
+    }
+    if (unfused) {
+      // Forces on A from B, carrying the energy for the whole pair...
+      invokePairForce(d_pos[0], nA, d_pos[1], nB, d_force[0], shiftB, cutoffSq,
+                      false, doEnergy ? d_energyPartial : NULL, stream);
+      // ...and the reciprocal, with the roles and the shift both reversed.
+      const vec3 shiftA(-shiftB.x, -shiftB.y, -shiftB.z);
+      invokePairForce(d_pos[1], nB, d_pos[0], nA, d_force[1], shiftA, cutoffSq,
+                      false, NULL, stream);
+    } else {
+      // Both directions in one kernel. Newton's third law would halve the work,
+      // but only by writing into the other cell's force array under atomics;
+      // recomputing is cheaper than the contention.
+      invokePairForceBoth(d_pos[0], nA, d_pos[1], nB, d_force[0], d_force[1],
+                          shiftB, cutoffSq, doEnergy ? d_energyPartial : NULL, stream);
+    }
   }
 
   if (doEnergy) {

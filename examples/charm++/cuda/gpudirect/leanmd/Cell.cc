@@ -5,6 +5,13 @@
 
 #include <algorithm>
 
+// LEANMD_UNFUSED=1: the original launch sequence (zero + one fold per arriving
+// force message), for comparing against the fused fold on one binary.
+static inline bool leanmdUnfused() {
+  static const bool on = (getenv("LEANMD_UNFUSED") != nullptr);
+  return on;
+}
+
 
 Cell::Cell() : inbrs(NUM_NEIGHBORS), stepCount(1), updateCount(0), forceCount(0),
                computesList(NUM_NEIGHBORS), part_capacity(0), exch_capacity(0),
@@ -243,7 +250,9 @@ void Cell::reportDensity() {
 // sendPositions runs from the completion callback, so the buffer that goes on the
 // wire is the one the gather just filled.
 void Cell::beginStep() {
-  invokeZeroForces(d_force, myNumParts, stream);
+  // The fused fold in integrate() assigns d_force; only the original per-message
+  // fold (LEANMD_UNFUSED=1) accumulates into it and needs it zeroed first.
+  if (leanmdUnfused()) invokeZeroForces(d_force, myNumParts, stream);
   invokeGatherPositions(d_particles, d_pos, myNumParts, stream);
   CkCallback* cb = new CkCallback(CkIndex_Cell::positionsReady(),
                                   thisProxy[thisIndex]);
@@ -287,7 +296,9 @@ void Cell::accumulateForce(int ordinal, int sourcePe, double readyMs, int n, vec
     if (it != tracePosts.end()) tracePosts.erase(it);
     CkPrintf("[join-force] step=%d cell=%d,%d,%d pe=%d source=%d ordinal=%d order=%d ready_ms=%.3f post_ms=%.3f elapsed_ms=%.3f span_ms=%.3f\n", stepCount,thisIndex.x,thisIndex.y,thisIndex.z,CkMyPe(),sourcePe,ordinal,forceCount,readyMs,postedMs,1000*(now-traceStart),1000*(now-traceFirst));
   }
-  invokeAccumulateForces(d_force, f, n, stream);
+  // Nothing to launch on arrival: the array is already in its landing slot, and
+  // integrate() sums all the slots with one kernel once the last has arrived.
+  if (leanmdUnfused()) invokeAccumulateForces(d_force, f, n, stream);
 }
 
 // Kinetic energy is sampled before the velocity update, matching the original
@@ -302,6 +313,11 @@ void Cell::computeKineticEnergy() {
 
 void Cell::integrate() {
   if (stepCount == 1 || stepCount == finalStepCount) computeKineticEnergy();
+
+  // Every Compute's forces for this step are in d_recv_force by now (the SDAG
+  // loop above counted inbrs arrivals): fold them in one launch.
+  if (!leanmdUnfused())
+    invokeSumForces(d_force, d_recv_force, inbrs, part_capacity, myNumParts, stream);
 
   // Two deltas: acceleration is in m/s^2 and velocity in A/fs, so the velocity
   // update carries the 10^-20 and the position update does not.
