@@ -3536,17 +3536,15 @@ struct LbRetireKeyHash {
 };
 typedef std::unordered_map<LbRetireKey, cudaEvent_t, LbRetireKeyHash> LbRetireEvents;
 std::unordered_map<void*, LbRetireEvents> lb_retire_events;
-CmiNodeLock lb_retire_lock = NULL;
-void lbRetireLockInit() {
-  if (lb_retire_lock == NULL) lb_retire_lock = CmiCreateLock();
-}
+// A std::mutex, not a CmiNodeLock created on first use: "if NULL, create" races
+// when two PEs arrive together (see hapi_stream_pool_lock).
+std::mutex lb_retire_lock;
 }  // namespace
 
 
 void CkRdmaDeviceNoteLbBufferFreed(void* dm_opaque, cudaStream_t usedBy) {
   if (dm_opaque == NULL) return;
-  lbRetireLockInit();
-  CmiLock(lb_retire_lock);
+  lb_retire_lock.lock();
   int dev = -1;
   hapiCheck(cudaGetDevice(&dev));
   LbRetireEvents& evs = lb_retire_events[dm_opaque];
@@ -3562,13 +3560,12 @@ void CkRdmaDeviceNoteLbBufferFreed(void* dm_opaque, cudaStream_t usedBy) {
   // Re-recording overwrites the previous capture, which is correct: work on one
   // stream is ordered, so the latest record subsumes every earlier one.
   hapiCheck(cudaEventRecord(it->second, usedBy));
-  CmiUnlock(lb_retire_lock);
+  lb_retire_lock.unlock();
 }
 
 void CkRdmaDeviceGateLbBuffer(void* dm_opaque, cudaStream_t consumer) {
   if (dm_opaque == NULL) return;
-  lbRetireLockInit();
-  CmiLock(lb_retire_lock);
+  lb_retire_lock.lock();
   auto dit = lb_retire_events.find(dm_opaque);
   if (dit != lb_retire_events.end()) {
     int dev = -1;
@@ -3579,7 +3576,7 @@ void CkRdmaDeviceGateLbBuffer(void* dm_opaque, cudaStream_t consumer) {
       hapiCheck(cudaStreamWaitEvent(consumer, kv.second, 0));
     }
   }
-  CmiUnlock(lb_retire_lock);
+  lb_retire_lock.unlock();
 }
 
 // ---- Device pool: thin wrappers over hapi's (see hapi.h) ----------------------

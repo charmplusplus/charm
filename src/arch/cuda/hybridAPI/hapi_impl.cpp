@@ -5290,10 +5290,14 @@ namespace {
 // GPUs releases from its new PE).
 std::map<int, std::vector<hapiStream_t>> hapi_stream_free;
 std::unordered_map<void*, int> hapi_stream_owner;
-CmiNodeLock hapi_stream_pool_lock = NULL;
-void hapiStreamPoolInit() {
-  if (hapi_stream_pool_lock == NULL) hapi_stream_pool_lock = CmiCreateLock();
-}
+// Constructed before any PE thread exists. It used to be a CmiNodeLock created
+// on first use ("if NULL, create"), and the first use is every PE of a process
+// at once -- leanmd's cells all acquire their streams in the same broadcast.
+// Two PEs could each see NULL and each create a lock; a PE that locked the
+// first and unlocked through the overwritten pointer left the first locked for
+// good, and a PE still holding the old pointer then blocked on it forever: a
+// silent hang in step 1, about one run in six at 4 4 4 (stack: job 22283809).
+std::mutex hapi_stream_pool_lock;
 }  // namespace
 
 hapiStream_t hapiAcquireStream() {
@@ -5305,17 +5309,16 @@ hapiStream_t hapiAcquireStream() {
   // every completion event later recorded against it (events are created on
   // the current device) fails with cudaErrorInvalidResourceHandle.
   const int dev = CpvAccess(my_device);
-  hapiStreamPoolInit();
 
-  CmiLock(hapi_stream_pool_lock);
+  hapi_stream_pool_lock.lock();
   auto it = hapi_stream_free.find(dev);
   if (it != hapi_stream_free.end() && !it->second.empty()) {
     hapiStream_t s = it->second.back();
     it->second.pop_back();
-    CmiUnlock(hapi_stream_pool_lock);
+    hapi_stream_pool_lock.unlock();
     return s;
   }
-  CmiUnlock(hapi_stream_pool_lock);
+  hapi_stream_pool_lock.unlock();
 
   // Non-blocking: a pooled stream must not implicitly synchronize with the
   // legacy default stream, or every chare using one serializes against every
@@ -5328,19 +5331,18 @@ hapiStream_t hapiAcquireStream() {
   if (prev != dev) hapiCheck(hapiSetDevice(dev));
   hapiCheck(hapiStreamCreateNonBlocking(&s));
   if (prev != dev) hapiCheck(hapiSetDevice(prev));
-  CmiLock(hapi_stream_pool_lock);
+  hapi_stream_pool_lock.lock();
   hapi_stream_owner[(void*)s] = dev;
-  CmiUnlock(hapi_stream_pool_lock);
+  hapi_stream_pool_lock.unlock();
   return s;
 }
 
 int hapiStreamDeviceOf(hapiStream_t stream) {
   if (stream == NULL) return -1;
-  hapiStreamPoolInit();
-  CmiLock(hapi_stream_pool_lock);
+  hapi_stream_pool_lock.lock();
   auto it = hapi_stream_owner.find((void*)stream);
   const int d = (it != hapi_stream_owner.end()) ? it->second : -1;
-  CmiUnlock(hapi_stream_pool_lock);
+  hapi_stream_pool_lock.unlock();
   return d;
 }
 
@@ -5348,15 +5350,14 @@ int hapiGetDeviceNum() { return CpvAccess(my_device); }
 
 void hapiReleaseStream(hapiStream_t stream) {
   if (stream == NULL) return;
-  hapiStreamPoolInit();
-  CmiLock(hapi_stream_pool_lock);
+  hapi_stream_pool_lock.lock();
   auto it = hapi_stream_owner.find((void*)stream);
   // Back to the device that created it, not the device of whoever is releasing
   // it. A chare that migrated across GPUs releases from its new PE, and the
   // stream still belongs to the old one.
   if (it != hapi_stream_owner.end())
     hapi_stream_free[it->second].push_back(stream);
-  CmiUnlock(hapi_stream_pool_lock);
+  hapi_stream_pool_lock.unlock();
 }
 
 int hapiCreateStreams() {
