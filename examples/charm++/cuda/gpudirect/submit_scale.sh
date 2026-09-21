@@ -40,6 +40,7 @@ for n in $COUNTS; do
   else want=$(( plan*115/100/60 + 5 )); fi
   note=""
   if [ $want -gt $MAXTIME_MIN ]; then note="CLAMPED from ${want}min -- arms past the deadline will be SKIPPED; split KINDS across jobs or raise MAXTIME_MIN"; want=$MAXTIME_MIN; fi
+  [ -n "$WALLTIME_MIN" ] && want=$WALLTIME_MIN   # explicit override (minutes)
   wt=$(printf "%02d:%02d:00" $((want/60)) $((want%60)))
   # The values carry spaces ("nolb sync async"), and Slurm splits --export on
   # commas -- so export them here and let --export=ALL carry the environment.

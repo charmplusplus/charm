@@ -84,6 +84,18 @@ JID=$1; NODES=$2; APPS=${3:-leanmd sph2d}; KINDS=${4:-weak strong}; ARMS=${5:-no
 [ -z "$NODES" ] && { echo "usage: scale.sh <JOBID> <NODES> [APPS] [KINDS] [ARMS]"; exit 1; }
 export LD_LIBRARY_PATH=/u/bhosale/charm-reconverse/multicore-linux-x86_64-cuda/lib:/u/bhosale/lci_install/lib64:$LD_LIBRARY_PATH
 export FI_MR_CACHE_MONITOR=disabled PMI_MAX_KVS_ENTRIES=8192
+# CUDA_DEVICE_MAX_CONNECTIONS: hardware work channels per process. The driver
+# default is 8 and nothing in this tree set it, so every stream beyond the 8th
+# aliased onto a channel already in use. Measured on an A40 2026-09-20
+# (tests/util/streamorder): two dependent kernels from one stream park the
+# channel head and block an unrelated stream behind them, costing (Q/C + 1)xT
+# against 2xT, where Q is the number of CONCURRENTLY ACTIVE streams. 32 is the
+# driver maximum; it cuts Q/C fourfold for free. Set CONNECTIONS= to override.
+export CUDA_DEVICE_MAX_CONNECTIONS=${CONNECTIONS:-32}
+# LCI_LIB=<dir>: run against that directory's liblci.so instead of the one in
+# libreconverse's RPATH (/u/bhosale/lci_install/lib64, which beats
+# LD_LIBRARY_PATH, so the only way is LD_PRELOAD -- see lci-rcache-build).
+if [ -n "$LCI_LIB" ]; then export LD_PRELOAD=$LCI_LIB/liblci.so LD_LIBRARY_PATH=$LCI_LIB:$LD_LIBRARY_PATH; fi
 ulimit -c 0
 ROOT=/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect
 LMD=$ROOT/leanmd; SPH=$ROOT/sph2d; RL=$LMD/ranklogs
@@ -135,8 +147,11 @@ pow2_mb() { awk -v v="$1" 'BEGIN{p=1; while(p<v) p*=2; print p}'; }
 # at 1 node the size stands as asked. 2048 is also the smallest that keeps
 # leanmd weak to a SINGLE arena through its migrations (1024 -> 2 arenas).
 POOL_MULTINODE_MAX=${POOL_MULTINODE_MAX:-2048}
+# The cap is for buddy arenas, registered whole: a vmm heap registers 256 MB
+# chunks one at a time (6 GB/process ran clean, job 22217872), so it keeps the
+# same per-GPU budget at every node count.
 pool_for() { local mb; mb=$(pow2_mb "$1")
-  if [ "$NODES" -gt 1 ] && [ "$mb" -gt "$POOL_MULTINODE_MAX" ]; then mb=$POOL_MULTINODE_MAX; fi
+  if [ "$NODES" -gt 1 ] && [ "${POOL_ALLOC:-buddy}" != vmm ] && [ "$mb" -gt "$POOL_MULTINODE_MAX" ]; then mb=$POOL_MULTINODE_MAX; fi
   echo "$mb"; }
 # arenas created in total, and those created after the first timed step
 # Under the vmm backend (POOL_ALLOC=vmm) the count is heaps (one per process)
@@ -206,7 +221,7 @@ run_leanmd() { local kind=$1 arm=$2
   fits $exp || { printf "  leanmd %-6s %-6s SKIPPED (%ds left, needs %ds for a %ds run)\n" "$kind" "$arm" "$(budget_left)" "$(( exp*130/100 + 45 ))" "$exp"; return; }
   tmo=$(clamp_tmo $tmo)
   rm -rf $dir; mkdir -p $dir
-  ( cd $LMD && RANKLOG_DIR=$dir env RANKLOG_DIR=$dir timeout $tmo $SRUN stdbuf -oL -eL $RL/rankwrap.sh $LMD/leanmd $C $extra >$dir/srun.err 2>&1 )
+  ( cd $LMD && RANKLOG_DIR=$dir env RANKLOG_DIR=$dir timeout $tmo $SRUN stdbuf -oL -eL ${RANKWRAP:-$RL/rankwrap.sh} $LMD/leanmd $C $extra >$dir/srun.err 2>&1 )
   rc=$?; m21=$(lmd_mean $dir/rank_0.log 21); m42=$(lmd_mean $dir/rank_0.log 42)
   printf "  leanmd %-6s %-6s [%s] %4d cells/GPU %4d PEs  mean21=%-8s mean42=%-8s ms/cell=%-6s pool=%-8s rc=%s migr=[%s] %s\n" \
     "$kind" "$arm" "$grid" $cpg $pes "$m21" "$m42" \
@@ -269,7 +284,11 @@ run_sph2d() { local kind=$1 arm=$2
     # last one nearly full, ~50 MB slack) and a 5th arena for migrations.
     # Multi-node caps the pool at 4096 MB per process (fabric registration).
     arenas=${SPH_ARENAS_STRONG:-5}
-    if [ "$NODES" -gt 1 ]; then arenas=$(( 4096 / pool )); [ "$arenas" -lt 1 ] && arenas=1; fi
+    # Multi-node startup budget: 4096 MB (the fabric ceiling, whole-arena
+    # registration) unless SPH_POOL_BUDGET_MULTI_MB says otherwise -- the vmm
+    # backend registers only the chunk runs it sends from, so its heap may
+    # map more than the ceiling (CK_GPU_ARENA_TOTAL_MAX_MB must allow it).
+    if [ "$NODES" -gt 1 ] && [ "${POOL_ALLOC:-buddy}" != vmm ]; then arenas=$(( ${SPH_POOL_BUDGET_MULTI_MB:-4096} / pool )); [ "$arenas" -lt 1 ] && arenas=1; fi
     case $arm in nolb) lbargs="-f 99999";; sync) lbargs="-f $SF -b $SB $SPH_MD";; async) lbargs="-f $SF -b $SB -a -l $SL $SPH_MD +LBAsync";; esac
   fi
   local poolargs="+gpupool +gpupoolsize $pool"; [ "${arenas:-1}" -gt 1 ] && poolargs="$poolargs +gpupoolarenas $arenas"
@@ -291,7 +310,7 @@ run_sph2d() { local kind=$1 arm=$2
   grep -aE "Abort|Fatal|Out Of|out of memory|ran more than" $log 2>/dev/null | sed 's/^\[[0-9]*\] //' | sort -u | head -1 | cut -c1-150; }
 
 # ------------------------------------------------------------------ main ----
-echo "=== SCALING N=$NODES  apps=[$APPS] kinds=[$KINDS] arms=[$ARMS]  pool=${POOL_ALLOC:-buddy}  deadline ${DEADLINE_MIN}min"
+echo "=== SCALING N=$NODES  apps=[$APPS] kinds=[$KINDS] arms=[$ARMS]  pool=${POOL_ALLOC:-buddy}  lci=${LCI_LIB:-install}  conn=$CUDA_DEVICE_MAX_CONNECTIONS  deadline ${DEADLINE_MIN}min"
 echo "    leanmd $(date -r $LMD/leanmd +%m-%d_%H:%M)  sph2d $(date -r $SPH/sph2d +%m-%d_%H:%M)  cost $(basename $COSTCFG)  ${CPT} cores/rank  $(date +%T)"
 [ -z "$DRY" ] && printf "app\tkind\tarm\tnodes\tsize\tper_gpu\tmetric1\tmetric2\trc\n" > $SUM
 for kind in $KINDS; do
