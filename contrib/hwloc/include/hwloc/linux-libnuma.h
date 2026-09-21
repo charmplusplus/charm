@@ -1,4 +1,5 @@
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
  * Copyright © 2009 CNRS
  * Copyright © 2009-2023 Inria.  All rights reserved.
  * Copyright © 2009-2010, 2012 Université Bordeaux
@@ -52,6 +53,9 @@ extern "C" {
  * node number as input parameter.
  *
  * \return 0.
+ *
+ * \note On heterogeneous memory platforms, we may return multiple local NUMA nodes
+ * even if libnuma reports only one (usually the first one).
  */
 static __hwloc_inline int
 hwloc_cpuset_to_linux_libnuma_ulongs(hwloc_topology_t topology, hwloc_const_cpuset_t cpuset,
@@ -197,6 +201,9 @@ hwloc_nodeset_from_linux_libnuma_ulongs(hwloc_topology_t topology, hwloc_nodeset
  * that use a struct bitmask as an input parameter.
  *
  * \return newly allocated struct bitmask, or \c NULL on error.
+ *
+ * \note On heterogeneous memory platforms, we may return multiple local NUMA nodes
+ * even if libnuma reports only one (usually the first one).
  */
 static __hwloc_inline struct bitmask *
 hwloc_cpuset_to_linux_libnuma_bitmask(hwloc_topology_t topology, hwloc_const_cpuset_t cpuset) __hwloc_attribute_malloc;

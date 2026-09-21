@@ -264,15 +264,17 @@ hwloc-hello.c'') prints the topology of the machine and performs some thread
 and memory binding. More examples are available in the doc/examples/ directory
 of the source tree.
 
-/* Example hwloc API program.
-*
-* See other examples under doc/examples/ in the source tree
-* for more details.
-*
+/*
+* SPDX-License-Identifier: BSD-3-Clause
 * Copyright (c) 2009-2016 Inria. All rights reserved.
 * Copyright (c) 2009-2011 Universit?eacute; Bordeaux
 * Copyright (c) 2009-2010 Cisco Systems, Inc. All rights reserved.
 * See COPYING in top-level directory.
+*
+* Example hwloc API program.
+*
+* See other examples under doc/examples/ in the source tree
+* for more details.
 *
 * hwloc-hello.c
 */
@@ -418,36 +420,30 @@ return 0;
 }
 
 hwloc provides a pkg-config executable to obtain relevant compiler and linker
-flags. For example, it can be used thusly to compile applications that utilize
-the hwloc library (assuming GNU Make):
-
-CFLAGS += $(shell pkg-config --cflags hwloc)
-LDLIBS += $(shell pkg-config --libs hwloc)
-
-hwloc-hello: hwloc-hello.c
-     $(CC) hwloc-hello.c $(CFLAGS) -o hwloc-hello $(LDLIBS)
+flags. See Compiling software on top of hwloc's C API for details on building
+program on top of hwloc's API using GNU Make or CMake.
 
 On a machine 2 processor packages -- each package of which has two processing
 cores -- the output from running hwloc-hello could be something like the
 following:
 
 shell$ ./hwloc-hello
-*** Objects at level 0
+ Objects at level 0
 Index 0: Machine
-*** Objects at level 1
+ Objects at level 1
 Index 0: Package#0
 Index 1: Package#1
-*** Objects at level 2
+ Objects at level 2
 Index 0: Core#0
 Index 1: Core#1
 Index 2: Core#3
 Index 3: Core#2
-*** Objects at level 3
+ Objects at level 3
 Index 0: PU#0
 Index 1: PU#1
 Index 2: PU#2
 Index 3: PU#3
-*** Printing overall tree
+ Printing overall tree
 Machine
   Package#0
  Core#0
@@ -459,8 +455,8 @@ Machine
    PU#2
  Core#2
    PU#3
-*** 2 package(s)
-*** Logical processor 0 has 0 caches totaling 0KB
+ 2 package(s)
+ Logical processor 0 has 0 caches totaling 0KB
 shell$
 
 Questions and Bugs
@@ -487,6 +483,7 @@ initially developed by the Open MPI development team as a sub-project. Both are
 now deprecated in favor of hwloc, which is distributed as an Open MPI
 sub-project.
 
+ 
 
 
 See https://www.open-mpi.org/projects/hwloc/doc/ for more hwloc documentation,

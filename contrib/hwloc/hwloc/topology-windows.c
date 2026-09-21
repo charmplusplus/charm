@@ -1,6 +1,7 @@
 /*
+ * SPDX-License-Identifier: BSD-3-Clause
  * Copyright © 2009 CNRS
- * Copyright © 2009-2023 Inria.  All rights reserved.
+ * Copyright © 2009-2025 Inria.  All rights reserved.
  * Copyright © 2009-2012, 2020 Université Bordeaux
  * Copyright © 2011 Cisco Systems, Inc.  All rights reserved.
  * See COPYING in top-level directory.
@@ -56,6 +57,9 @@ typedef enum _LOGICAL_PROCESSOR_RELATIONSHIP {
   RelationCache,
   RelationProcessorPackage,
   RelationGroup,
+  RelationProcessorDie,
+  RelationNumaNodeEx, /* only used to *request* extended numa info only, but included in RelationAll, never returned on output */
+  RelationProcessorModule,
   RelationAll = 0xffff
 } LOGICAL_PROCESSOR_RELATIONSHIP;
 #else /* HAVE_LOGICAL_PROCESSOR_RELATIONSHIP */
@@ -64,6 +68,11 @@ typedef enum _LOGICAL_PROCESSOR_RELATIONSHIP {
 #    define RelationGroup 4
 #    define RelationAll 0xffff
 #  endif /* HAVE_RELATIONPROCESSORPACKAGE */
+#  ifndef HAVE_RELATIONPROCESSORDIE
+#    define RelationProcessorDie 5
+#    define RelationNumaNodeEx 6
+#    define RelationProcessorModule 7
+#  endif
 #endif /* HAVE_LOGICAL_PROCESSOR_RELATIONSHIP */
 
 #ifndef HAVE_GROUP_AFFINITY
@@ -179,9 +188,6 @@ static PFN_GETACTIVEPROCESSORGROUPCOUNT GetActiveProcessorGroupCountProc;
 typedef WORD (WINAPI *PFN_GETACTIVEPROCESSORCOUNT)(WORD);
 static PFN_GETACTIVEPROCESSORCOUNT GetActiveProcessorCountProc;
 
-typedef DWORD (WINAPI *PFN_GETCURRENTPROCESSORNUMBER)(void);
-static PFN_GETCURRENTPROCESSORNUMBER GetCurrentProcessorNumberProc;
-
 typedef VOID (WINAPI *PFN_GETCURRENTPROCESSORNUMBEREX)(PPROCESSOR_NUMBER);
 static PFN_GETCURRENTPROCESSORNUMBEREX GetCurrentProcessorNumberExProc;
 
@@ -194,17 +200,8 @@ static PFN_SETTHREADGROUPAFFINITY SetThreadGroupAffinityProc;
 typedef BOOL (WINAPI *PFN_GETTHREADGROUPAFFINITY)(HANDLE hThread, PGROUP_AFFINITY GroupAffinity);
 static PFN_GETTHREADGROUPAFFINITY GetThreadGroupAffinityProc;
 
-typedef BOOL (WINAPI *PFN_GETNUMAAVAILABLEMEMORYNODE)(UCHAR Node, PULONGLONG AvailableBytes);
-static PFN_GETNUMAAVAILABLEMEMORYNODE GetNumaAvailableMemoryNodeProc;
-
 typedef BOOL (WINAPI *PFN_GETNUMAAVAILABLEMEMORYNODEEX)(USHORT Node, PULONGLONG AvailableBytes);
 static PFN_GETNUMAAVAILABLEMEMORYNODEEX GetNumaAvailableMemoryNodeExProc;
-
-typedef LPVOID (WINAPI *PFN_VIRTUALALLOCEXNUMA)(HANDLE hProcess, LPVOID lpAddress, SIZE_T dwSize, DWORD flAllocationType, DWORD flProtect, DWORD nndPreferred);
-static PFN_VIRTUALALLOCEXNUMA VirtualAllocExNumaProc;
-
-typedef BOOL (WINAPI *PFN_VIRTUALFREEEX)(HANDLE hProcess, LPVOID lpAddress, SIZE_T dwSize, DWORD dwFreeType);
-static PFN_VIRTUALFREEEX VirtualFreeExProc;
 
 typedef BOOL (WINAPI *PFN_QUERYWORKINGSETEX)(HANDLE hProcess, PVOID pv, DWORD cb);
 static PFN_QUERYWORKINGSETEX QueryWorkingSetExProc;
@@ -216,45 +213,41 @@ static void hwloc_win_get_function_ptrs(void)
 {
   HMODULE kernel32, ntdll;
 
-#if HWLOC_HAVE_GCC_W_CAST_FUNCTION_TYPE
+#if (defined HWLOC_HAVE_GCC_W_CAST_FUNCTION_TYPE) && HWLOC_HAVE_GCC_W_CAST_FUNCTION_TYPE
 #pragma GCC diagnostic ignored "-Wcast-function-type"
 #endif
 
-    kernel32 = LoadLibrary("kernel32.dll");
+    kernel32 = LoadLibrary(TEXT("kernel32.dll"));
     if (kernel32) {
+      /* Windows7 and Server 2008 R2 */
       GetActiveProcessorGroupCountProc =
 	(PFN_GETACTIVEPROCESSORGROUPCOUNT) GetProcAddress(kernel32, "GetActiveProcessorGroupCount");
       GetActiveProcessorCountProc =
 	(PFN_GETACTIVEPROCESSORCOUNT) GetProcAddress(kernel32, "GetActiveProcessorCount");
-      GetCurrentProcessorNumberProc =
-	(PFN_GETCURRENTPROCESSORNUMBER) GetProcAddress(kernel32, "GetCurrentProcessorNumber");
       GetCurrentProcessorNumberExProc =
 	(PFN_GETCURRENTPROCESSORNUMBEREX) GetProcAddress(kernel32, "GetCurrentProcessorNumberEx");
       SetThreadGroupAffinityProc =
 	(PFN_SETTHREADGROUPAFFINITY) GetProcAddress(kernel32, "SetThreadGroupAffinity");
       GetThreadGroupAffinityProc =
 	(PFN_GETTHREADGROUPAFFINITY) GetProcAddress(kernel32, "GetThreadGroupAffinity");
-      GetNumaAvailableMemoryNodeProc =
-	(PFN_GETNUMAAVAILABLEMEMORYNODE) GetProcAddress(kernel32, "GetNumaAvailableMemoryNode");
       GetNumaAvailableMemoryNodeExProc =
 	(PFN_GETNUMAAVAILABLEMEMORYNODEEX) GetProcAddress(kernel32, "GetNumaAvailableMemoryNodeEx");
       GetLogicalProcessorInformationExProc =
 	(PFN_GETLOGICALPROCESSORINFORMATIONEX)GetProcAddress(kernel32, "GetLogicalProcessorInformationEx");
+      /* Windows7 and Server 2008 R2,
+       * and PSAPI_VERSION not set to 1 in Psapi.h */
       QueryWorkingSetExProc =
 	(PFN_QUERYWORKINGSETEX) GetProcAddress(kernel32, "K32QueryWorkingSetEx");
-      VirtualAllocExNumaProc =
-	(PFN_VIRTUALALLOCEXNUMA) GetProcAddress(kernel32, "VirtualAllocExNuma");
-      VirtualFreeExProc =
-	(PFN_VIRTUALFREEEX) GetProcAddress(kernel32, "VirtualFreeEx");
     }
 
     if (!QueryWorkingSetExProc) {
-      HMODULE psapi = LoadLibrary("psapi.dll");
+      /* Vista and Server 2003 with SP1 and Server 2008 */
+      HMODULE psapi = LoadLibrary(TEXT("psapi.dll"));
       if (psapi)
         QueryWorkingSetExProc = (PFN_QUERYWORKINGSETEX) GetProcAddress(psapi, "QueryWorkingSetEx");
     }
 
-    ntdll = GetModuleHandle("ntdll");
+    ntdll = GetModuleHandle(TEXT("ntdll"));
     RtlGetVersionProc = (PFN_RTLGETVERSION) GetProcAddress(ntdll, "RtlGetVersion");
 
 #if HWLOC_HAVE_GCC_W_CAST_FUNCTION_TYPE
@@ -366,7 +359,7 @@ hwloc_win_get_processor_groups(void)
   hwloc_debug("found %lu windows processor groups\n", nr_processor_groups);
 
   if (nr_processor_groups > 1 && SIZEOF_VOID_P == 4) {
-    if (HWLOC_SHOW_ALL_ERRORS())
+    if (HWLOC_SHOW_CRITICAL_ERRORS())
       fprintf(stderr, "hwloc/windows: multiple processor groups found on 32bits Windows, topology may be invalid/incomplete.\n");
   }
 
@@ -524,16 +517,16 @@ hwloc_windows_get_processor_group_cpuset(hwloc_topology_t topology, unsigned pg_
 static int
 hwloc_win_get_thisthread_last_cpu_location(hwloc_topology_t topology __hwloc_attribute_unused, hwloc_cpuset_t set, int flags __hwloc_attribute_unused)
 {
-  assert(GetCurrentProcessorNumberExProc || (GetCurrentProcessorNumberProc && nr_processor_groups == 1));
+  assert(GetCurrentProcessorNumberExProc || nr_processor_groups == 1);
 
-  if (nr_processor_groups > 1 || !GetCurrentProcessorNumberProc) {
+  if (nr_processor_groups > 1) {
     PROCESSOR_NUMBER num;
     GetCurrentProcessorNumberExProc(&num);
     hwloc_bitmap_from_ith_ULONG_PTR(set, num.Group, ((ULONG_PTR)1) << num.Number);
     return 0;
   }
 
-  hwloc_bitmap_from_ith_ULONG_PTR(set, 0, ((ULONG_PTR)1) << GetCurrentProcessorNumberProc());
+  hwloc_bitmap_from_ith_ULONG_PTR(set, 0, ((ULONG_PTR)1) << GetCurrentProcessorNumber());
   return 0;
 }
 
@@ -826,14 +819,14 @@ hwloc_win_alloc_membind(hwloc_topology_t topology __hwloc_attribute_unused, size
   }
 
   node = hwloc_bitmap_first(nodeset);
-  return VirtualAllocExNumaProc(GetCurrentProcess(), NULL, len, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE, node);
+  return VirtualAllocExNuma(GetCurrentProcess(), NULL, len, MEM_COMMIT|MEM_RESERVE, PAGE_EXECUTE_READWRITE, node);
 }
 
 static int
 hwloc_win_free_membind(hwloc_topology_t topology __hwloc_attribute_unused, void *addr, size_t len __hwloc_attribute_unused) {
   if (!addr)
     return 0;
-  if (!VirtualFreeExProc(GetCurrentProcess(), addr, 0, MEM_RELEASE))
+  if (!VirtualFreeEx(GetCurrentProcess(), addr, 0, MEM_RELEASE))
     return -1;
   return 0;
 }
@@ -1068,6 +1061,7 @@ hwloc_look_windows(struct hwloc_backend *backend, struct hwloc_disc_status *dsta
 
 	id = HWLOC_UNKNOWN_INDEX;
 	switch (procInfo->Relationship) {
+          case RelationNumaNodeEx: /* only used on input anyway */
 	  case RelationNumaNode:
 	    type = HWLOC_OBJ_NUMANODE;
             /* Starting with Windows 11 and Server 2022, the GroupCount field is valid and >=1
@@ -1087,9 +1081,19 @@ hwloc_look_windows(struct hwloc_backend *backend, struct hwloc_disc_status *dsta
 	    break;
 	  case RelationProcessorPackage:
 	    type = HWLOC_OBJ_PACKAGE;
+	    num = procInfo->Processor.GroupCount;
+	    GroupMask = procInfo->Processor.GroupMask;
+	    break;
+	  case RelationProcessorDie:
+            type = HWLOC_OBJ_DIE;
             num = procInfo->Processor.GroupCount;
             GroupMask = procInfo->Processor.GroupMask;
-	    break;
+            break;
+	  case RelationProcessorModule:
+            type = HWLOC_OBJ_GROUP;
+            num = procInfo->Processor.GroupCount;
+            GroupMask = procInfo->Processor.GroupMask;
+            break;
 	  case RelationCache:
 	    type = (procInfo->Cache.Type == CacheInstruction ? HWLOC_OBJ_L1ICACHE : HWLOC_OBJ_L1CACHE) + procInfo->Cache.Level - 1;
             /* GroupCount added approximately with NumaNode.GroupCount above */
@@ -1170,7 +1174,7 @@ hwloc_look_windows(struct hwloc_backend *backend, struct hwloc_disc_status *dsta
 	      obj->nodeset = hwloc_bitmap_alloc();
 	      hwloc_bitmap_set(obj->nodeset, id);
 	      if ((GetNumaAvailableMemoryNodeExProc && GetNumaAvailableMemoryNodeExProc(id, &avail))
-		  || (GetNumaAvailableMemoryNodeProc && GetNumaAvailableMemoryNodeProc(id, &avail))) {
+		  || GetNumaAvailableMemoryNode(id, &avail)) {
 	        obj->attr->numanode.local_memory = avail;
 		gotnumamemory++;
 	      }
@@ -1211,6 +1215,19 @@ hwloc_look_windows(struct hwloc_backend *backend, struct hwloc_disc_status *dsta
 		continue;
 	    }
 	    break;
+          case HWLOC_OBJ_GROUP:
+            switch (procInfo->Relationship) {
+            case RelationGroup:
+              obj->attr->group.kind = HWLOC_GROUP_KIND_WINDOWS_PROCESSOR_GROUP;
+              break;
+            case RelationProcessorModule:
+              obj->attr->group.kind = HWLOC_GROUP_KIND_INTEL_MODULE;
+              obj->subtype = strdup("Module");
+              break;
+            default:
+              obj->attr->group.kind = HWLOC_GROUP_KIND_WINDOWS_RELATIONSHIP_UNKNOWN;
+            }
+            break;
 	  default:
 	    break;
 	}
@@ -1324,7 +1341,7 @@ void
 hwloc_set_windows_hooks(struct hwloc_binding_hooks *hooks,
 			struct hwloc_topology_support *support)
 {
-  if (GetCurrentProcessorNumberExProc || (GetCurrentProcessorNumberProc && nr_processor_groups == 1))
+  if (GetCurrentProcessorNumberExProc || nr_processor_groups == 1)
     hooks->get_thisthread_last_cpu_location = hwloc_win_get_thisthread_last_cpu_location;
 
   if (nr_processor_groups == 1) {
@@ -1348,12 +1365,10 @@ hwloc_set_windows_hooks(struct hwloc_binding_hooks *hooks,
     hooks->get_thisthread_membind = hwloc_win_get_thisthread_membind;
   }
 
-  if (VirtualAllocExNumaProc) {
-    hooks->alloc_membind = hwloc_win_alloc_membind;
-    hooks->alloc = hwloc_win_alloc;
-    hooks->free_membind = hwloc_win_free_membind;
-    support->membind->bind_membind = 1;
-  }
+  hooks->alloc_membind = hwloc_win_alloc_membind;
+  hooks->alloc = hwloc_win_alloc;
+  hooks->free_membind = hwloc_win_free_membind;
+  support->membind->bind_membind = 1;
 
   if (QueryWorkingSetExProc && max_numanode_index <= 63 /* PSAPI_WORKING_SET_EX_BLOCK.Node is 6 bits only */)
     hooks->get_area_memlocation = hwloc_win_get_area_memlocation;
