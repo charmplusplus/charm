@@ -76,3 +76,6 @@ PUP_BASIC_DATATYPE(size_t, size_t)
 
 /*Pack/unpack untyped byte array:*/
 AMPI_CUSTOM_FUNC(void, pup_bytes, pup_er p,void *ptr,size_t nBytes)
+FILE* CmiFopen(const char* path, const char* mode);
+int CmiFclose(FILE* fp);
+void CmiMkdir(const char* dirName);

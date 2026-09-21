@@ -14,15 +14,12 @@
 #include <cuda_runtime.h>
 
 #include "converse.h"
+#include "conv-mach-opt.h" /* for CMK_CUDA */
 #include "hapi.h"
 #include "hapi_impl.h"
 #include "gpumanager.h"
 #ifdef HAPI_NVTX_PROFILE
 #include "hapi_nvtx.h"
-#endif
-
-#if defined HAPI_TRACE || defined HAPI_INSTRUMENT_WRS
-extern "C" double CmiWallTimer();
 #endif
 
 static void createPool(int *nbuffers, int n_slots, std::vector<BufferPool> &pools);

@@ -131,6 +131,10 @@ opt_shmem=0
 opt_xpmem=0
 opt_qlogic=0
 opt_randomized_msgq=0
+opt_reconverse=1 # fake argument for now
+opt_fetch_reconverse_tag=""
+opt_fetch_reconverse_dir=""
+opt_reconverse_fetch_lci=1
 opt_refnum_type="unsigned short"
 opt_replay=0
 opt_shrinkexpand=0
@@ -143,6 +147,7 @@ opt_tcp=0
 opt_tracing= #undef
 opt_tracing_commthread=0
 opt_zlib=1
+declare -a opt_cmake_extra_args=()
 
 # default to not building ROMIO on AMPI due to GCC 14 cascade failures
 case "$actual_triplet" in
@@ -348,6 +353,18 @@ function processArgs() {
       --enable-ccs)
         opt_ccs=1
         ;;
+      --enable-reconverse)
+        opt_reconverse=1
+        ;;
+      --with-fetch-reconverse-tag=*)
+        opt_fetch_reconverse_tag=${arg#*=}
+        ;;
+      --with-fetch-reconverse-dir=*)
+        opt_fetch_reconverse_dir=${arg#*=}
+        ;;
+      --without-reconverse-fetch-lci)
+        opt_reconverse_fetch_lci=0
+        ;;
       --enable-controlpoint)
         opt_controlpoint=1
         ;;
@@ -461,6 +478,11 @@ function processArgs() {
         ;;
       --incdir=*)
         opt_incdir+=("-I${arg#*=}")
+        ;;
+      --with-cmake-args=*)
+        # Split the value into words (quotes preserved by the shell before this point)
+        read -r -a _vals <<< "${arg#*=}"
+        opt_cmake_extra_args+=("${_vals[@]}")
         ;;
       *)
         echo "*** Note: Adding unknown option '$arg' to compiler flags."
@@ -634,6 +656,17 @@ fi
 
 # Run configure step
 
+CMAKE_EXTRA_ARGS=()
+if [[ -n "$opt_fetch_reconverse_tag" ]]; then
+  CMAKE_EXTRA_ARGS+=(-DAUTOFETCH_RECONVERSE_TAG="$opt_fetch_reconverse_tag")
+fi
+if [[ -n "$opt_fetch_reconverse_dir" ]]; then
+  CMAKE_EXTRA_ARGS+=(-DFETCHCONTENT_SOURCE_DIR_RECONVERSE="$opt_fetch_reconverse_dir")
+fi
+if (( ${#opt_cmake_extra_args[@]} > 0 )); then
+  CMAKE_EXTRA_ARGS+=("${opt_cmake_extra_args[@]}")
+fi
+
 CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -G "Unix Makefiles" \
   -DARCH="$opt_arch" \
@@ -670,6 +703,8 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DCMK_USE_SHMEM="$opt_shmem" \
   -DQLOGIC="$opt_qlogic" \
   -DRANDOMIZED_MSGQ="$opt_randomized_msgq" \
+  -DRECONVERSE="$opt_reconverse" \
+  -DRECONVERSE_AUTOFETCH_LCI2="$opt_reconverse_fetch_lci" \
   -DREFNUM_TYPE="$opt_refnum_type" \
   -DREPLAY="$opt_replay" \
   -DSHRINKEXPAND="$opt_shrinkexpand" \
@@ -683,7 +718,8 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DTRACING_COMMTHREAD="$opt_tracing_commthread" \
   -DCXI="$opt_cxi" \
   -DCMK_BUILD_OFI="$opt_build_ofi" \
-  -DZLIB="$opt_zlib"
+  -DZLIB="$opt_zlib" \
+  "${CMAKE_EXTRA_ARGS[@]}"
 
 
 # Run build step

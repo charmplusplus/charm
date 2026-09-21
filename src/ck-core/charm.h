@@ -5,7 +5,10 @@
 #ifndef CHARM_H
 #define CHARM_H
 
+#include "charm-config.h"
 #include "converse.h"
+#include "conv-autoconfig.h"
+#include "conv-mach-opt.h" /* for CMK_CUDA */
 #include <sys/types.h> /* for size_t */
 
 #ifdef __cplusplus

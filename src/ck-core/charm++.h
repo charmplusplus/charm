@@ -21,6 +21,7 @@ public: static int __idx;
 #endif
 
 #include "pup.h"
+#include "pup_c.h"
 #include "cklists.h"
 #include "ckbitvector.h"
 #include "init.h"

@@ -28,6 +28,6 @@ CMK_CPP_C_FLAGS="-E"
 # avoid the need to link -lmpi_cxx on some systems
 CMK_DEFS="$CMK_DEFS -DMPICH_SKIP_MPICXX -DOMPI_SKIP_MPICXX"
 
-CMK_LIBS="-lckqt $CMK_SYSLIBS "
+CMK_LIBS="$CMK_SYSLIBS "
 CMK_QT='generic64-light'
 CMK_RANLIB='ranlib'

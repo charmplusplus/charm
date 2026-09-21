@@ -27,6 +27,7 @@ restarting of Charm++ programs. ...
 #define _CKCHECKPOINT_H
 
 #include <pup.h>
+#include "pup_c.h"
 #include <ckcallback.h>
 #include <ckmessage.h>
 #include "CkCheckpointStatus.decl.h"

@@ -3,7 +3,8 @@
 */
 /*@{*/
 
-#include <converse.h>
+#include "charm-config.h"
+#include "converse.h"
 
 #if CMK_LBDB_ON
 

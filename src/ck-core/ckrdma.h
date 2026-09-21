@@ -8,9 +8,11 @@
 #include "envelope.h"
 #include "ckcallback.h"
 #include "conv-rdma.h"
+#include <atomic>
 #include <vector>
 
-/*********************************** Zerocopy Direct API **********************************/
+/*********************************** Zerocopy Direct API
+ * **********************************/
 
 #define CK_BUFFER_REG     CMK_BUFFER_REG
 #define CK_BUFFER_UNREG   CMK_BUFFER_UNREG

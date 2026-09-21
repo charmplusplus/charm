@@ -97,7 +97,8 @@
 #ifndef __SOCK_ROUTINES_H
 #define __SOCK_ROUTINES_H
 
-#include "conv-config.h" /*<- for CMK_NO_SOCKETS*/
+#include "charm-config.h"
+#include "converse.h" /*<- for CMK_NO_SOCKETS*/
 
 #include <string.h> /* for memcmp */
 

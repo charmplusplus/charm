@@ -45,7 +45,8 @@ void partitionPEs(int *pes, int numpes, int numparts, int *part_offsets);
 // Fragile: machine-broadcast.C depends on this header, but we don't want
 // Converse to see charm++.h. Symptoms will include bigsim breakage.
 #if defined __cplusplus && !defined CONVERSE_MACHINE_BROADCAST_C_
-#include "charm++.h"
+// #include "charm++.h"
+#include <map>
 #include <vector>
 
 /**
