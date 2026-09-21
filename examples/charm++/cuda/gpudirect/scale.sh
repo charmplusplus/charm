@@ -174,7 +174,7 @@ START=$(date +%s); DEADLINE_MIN=${DEADLINE_MIN:-55}
 # threads get the rest. Pinning is +pemap's job; --cpu-bind=none stays.
 CPT=${CPT:-${SLURM_CPUS_PER_TASK:-16}}
 SRUN="srun --jobid=$JID --mpi=cray_shasta -N $NODES -n $((4*NODES)) --ntasks-per-node=4 --gpus-per-node=4 --cpus-per-task=$CPT --cpu-bind=none --exact --kill-on-bad-exit=1"
-SUM=$SPH/../scale_N${NODES}_$(date +%m%d_%H%M).tsv
+SUM=$SPH/../scale_N${NODES}_${TAG:+${TAG}_}$(date +%m%d_%H%M).tsv
 budget_left() { echo $(( DEADLINE_MIN*60 - ($(date +%s) - START) )); }
 # An arm's TIMEOUT is 2-3.7x its expectation -- it exists to catch a hang, not
 # to reserve wall. Refusing to start an arm that has less than its full timeout
@@ -214,7 +214,7 @@ run_leanmd() { local kind=$1 arm=$2
   local exp; exp=$(awk "BEGIN{print int($STEPS*0.0098*$cells/(4*$NODES))+25}")
   local pool; case $kind in weak) pool=$LMD_POOL_WEAK;; strong) pool=$LMD_POOL_STRONG;; esac
   pool=$(pool_for $pool)
-  dir=$RL/${kind}_N${NODES}_$arm
+  dir=$RL/${TAG:+${TAG}_}${kind}_N${NODES}_$arm
   local C="$grid $STEPS $PERIOD $PERIOD -computemap local -density gradient +pe $pes +setcpuaffinity +gpushm +gpuipceventpool 256 +gpupool +gpupoolsize $pool"
   [ "${POOL_ALLOC:-buddy}" = vmm ] && C="$C +gpupoolalloc vmm"
   if [ -n "$DRY" ]; then PLAN_S=$((PLAN_S+tmo)); EXP_S=$((EXP_S+exp)); printf "  [dry] leanmd %-6s %-6s grid=[%s] %d cells %d/GPU %d PEs pool=%dMB expect=%ds timeout=%ds\n" "$kind" "$arm" "$grid" $cells $cpg $pes $pool $exp $tmo; return; fi
@@ -253,10 +253,10 @@ run_sph2d() { local kind=$1 arm=$2
   local cfg lbargs tmo exp log rc ms imb patches fluid pool arenas=1
   if [ "$kind" = weak ]; then
     local X XC CW; X=$(awk "BEGIN{printf \"%.4f\",1.5*$NODES}"); XC=$((12*NODES)); CW=$(awk "BEGIN{printf \"%.4f\",1.0*$NODES}")
-    cfg="-X $X -Y 2.5 -x $XC -y 10 -w $CW -t 2 -s 0.00042 -r 2 -e 0.1 -V 10 -u 200 -i 6000 -S 2000"
+    cfg="-X $X -Y 2.5 -x $XC -y 10 -w $CW -t 2 -s ${SPH_WEAK_S:-0.00042} -r 2 -e 0.1 -V 10 -u 200 -i ${SPH_WEAK_I:-6000} -S ${SPH_WEAK_REPORT:-2000}"
     # 93-114 s wall measured at N=1 (22106974); 120 covers the slowest arm.
     patches=$((120*NODES)); fluid=$((64*NODES)); tmo=300; exp=120; pool=$(pool_for $SPH_POOL_WEAK)
-    case $arm in nolb) lbargs="-f 99999";; sync) lbargs="-f 1000 -b 2000 $SPH_MD";; async) lbargs="-f 1000 -b 2000 -a -l 800 $SPH_MD +LBAsync";; esac
+    case $arm in nolb) lbargs="-f 99999";; sync) lbargs="-f ${SPH_WEAK_F:-1000} -b ${SPH_WEAK_B:-2000} $SPH_MD";; async) lbargs="-f ${SPH_WEAK_F:-1000} -b ${SPH_WEAK_B:-2000} -a -l ${SPH_WEAK_LAG:-800} $SPH_MD +LBAsync";; esac
   else
     # A fixed problem whose per-patch size -- 177k particles at spacing 0.00042
     # on 0.125 x 0.25 m patches -- keeps every node count GPU-bound (the size
@@ -296,7 +296,7 @@ run_sph2d() { local kind=$1 arm=$2
   # one reserved range per device, 256-byte blocks, chunks mapped in place);
   # default buddy. Same +gpupoolsize x +gpupoolarenas budget either way.
   [ "${POOL_ALLOC:-buddy}" = vmm ] && poolargs="$poolargs +gpupoolalloc vmm"
-  log=$SPH/${kind^^}_N${NODES}_$arm.log
+  log=$SPH/${TAG:+${TAG}_}${kind^^}_N${NODES}_$arm.log
   if [ -n "$DRY" ]; then PLAN_S=$((PLAN_S+tmo)); EXP_S=$((EXP_S+exp)); printf "  [dry] sph2d  %-6s %-6s %d patches %d fluid %d PEs pool=%dMBx%d expect=%ds timeout=%ds\n" "$kind" "$arm" $patches $fluid $((16*NODES)) $pool $arenas $exp $tmo; return; fi
   fits $exp || { printf "  sph2d  %-6s %-6s SKIPPED (%ds left, needs %ds for a %ds run)\n" "$kind" "$arm" "$(budget_left)" "$(( exp*130/100 + 45 ))" "$exp"; return; }
   tmo=$(clamp_tmo $tmo)
