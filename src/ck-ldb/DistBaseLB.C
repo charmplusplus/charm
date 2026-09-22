@@ -12,6 +12,129 @@
 #include <cupti.h>
 #include "gpumanager.h"
 #include "hapi.h"
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <chrono>
+#include <thread>
+#include <sched.h>
+
+// CHARM_LB_CUPTI_OFFTHREAD: build the round's GPU loads on a helper thread and
+// let this PE go back to its scheduler until they are ready.
+//
+// hapiPrepareCuptiLoads parses the whole window's CUPTI records: measured on
+// sph2d at 100k particles per patch, 56-65 ms per process per LB step (120 ms
+// at worst) with LB every 400 iterations, 225 ms every 2000. It ran on a PE
+// thread. Under sync LB that is simply most of the stall (105 ms per step).
+// Under +LBAsync the application is running while it happens, but a PE that is
+// busy for 60 ms delays its own patches by 60 ms, and in a lock-step halo
+// exchange that delays everyone: the overlapped LB step cost exactly what the
+// stall did, and async tied sync (job 22284602). The work needs a core, not a
+// PE, and every rank has idle cores next to its PEs.
+//
+// The value is the CPU list the helper may run on (e.g. 8-15,24-31), or 1 for
+// any CPU. A thread inherits its creator's affinity, which is the PE's single
+// core, so it has to be widened or the helper just time-slices with that PE.
+namespace {
+struct CuptiBuild {
+  CkGroupID gid;
+  int first, count;
+  std::atomic<bool> done{false};
+};
+
+bool cuptiOffThreadCpus(cpu_set_t* set) {
+  static const char* spec = getenv("CHARM_LB_CUPTI_OFFTHREAD");
+  if (spec == nullptr || *spec == '\0' || strcmp(spec, "0") == 0) return false;
+  CPU_ZERO(set);
+  bool any = false;
+  // near[:<domain>:<first>-<last>]: the idle cores of the PE's own NUMA domain,
+  // default 16-core domains with PEs on the first half (the gpuA40x4 wrappers).
+  // A helper on another domain parses the records across the socket link.
+  if (strncmp(spec, "near", 4) == 0) {
+    int dom = 16, lo = 8, hi = 15;
+    if (spec[4] == ':') sscanf(spec + 5, "%d:%d-%d", &dom, &lo, &hi);
+    const int cpu = sched_getcpu();
+    if (cpu >= 0 && dom > 0) {
+      const int base = (cpu / dom) * dom;
+      for (int c = base + lo; c <= base + hi && c < CPU_SETSIZE; c++) { CPU_SET(c, set); any = true; }
+    }
+  } else
+  if (strchr(spec, '-') != nullptr || strchr(spec, ',') != nullptr) {
+    const char* p = spec;
+    while (*p) {
+      char* end = nullptr;
+      long lo = strtol(p, &end, 10), hi = lo;
+      if (end == p) break;
+      if (*end == '-') { p = end + 1; hi = strtol(p, &end, 10); }
+      for (long c = lo; c <= hi && c < CPU_SETSIZE; c++) if (c >= 0) { CPU_SET((int)c, set); any = true; }
+      p = (*end == ',') ? end + 1 : end;
+      if (*end != ',' ) break;
+    }
+  }
+  if (!any) for (int c = 0; c < CPU_SETSIZE; c++) CPU_SET(c, set);
+  return true;
+}
+
+// ONE helper per process, started on first use and reused. A fresh thread per
+// LB step was measured first and is a trap: every thread that has called into
+// CUPTI leaves per-thread tracing state behind, and leanmd's quiet steps grew
+// 115 -> 126 -> 131 -> 132 ms over four LB steps (flat at 118 without it).
+struct CuptiWorker {
+  std::mutex m;
+  std::condition_variable cv;
+  CuptiBuild* job = nullptr;
+  bool started = false;
+};
+// Heap-allocated and never destroyed, on purpose. As a static object its
+// condition_variable is destroyed by exit() while the detached helper is still
+// waiting on it, and pthread_cond_destroy blocks until no waiter is left:
+// every process hung in __run_exit_handlers after "Exit called" (caught with
+// gdb, job 22284602, leanmd pw_p35_r2).
+CuptiWorker& g_cuptiWorker = *new CuptiWorker;
+
+void cuptiWorkerSubmit(CuptiBuild* b, const cpu_set_t& cpus) {
+  CuptiWorker& w = g_cuptiWorker;
+  std::unique_lock<std::mutex> lk(w.m);
+  if (!w.started) {
+    w.started = true;
+    std::thread([cpus]() {
+      sched_setaffinity(0, sizeof(cpus), &cpus);
+      static const bool timeIt = (getenv("CHARM_LB_CUPTI_OFFTHREAD_TIME") != nullptr);
+      CuptiWorker& w = g_cuptiWorker;
+      for (;;) {
+        CuptiBuild* job;
+        {
+          std::unique_lock<std::mutex> lk(w.m);
+          w.cv.wait(lk, [&w] { return w.job != nullptr; });
+          job = w.job;
+          w.job = nullptr;
+        }
+        const auto t0 = std::chrono::steady_clock::now();
+        hapiPrepareCuptiLoads();
+        if (timeIt) {
+          const double ms = std::chrono::duration<double, std::milli>(
+              std::chrono::steady_clock::now() - t0).count();
+          fprintf(stderr, "[LBCUPTI helper first-pe=%d cpu=%d] total=%.1f ms\n", job->first, sched_getcpu(), ms);
+        }
+        job->done.store(true, std::memory_order_release);
+      }
+    }).detach();
+  }
+  w.job = b;
+  w.cv.notify_one();
+}
+
+void cuptiBuildPoll(void* arg) {
+  CuptiBuild* b = (CuptiBuild*)arg;
+  if (!b->done.load(std::memory_order_acquire)) {
+    CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, arg);
+    return;
+  }
+  CProxy_DistBaseLB proxy(b->gid);
+  for (int r = 0; r < b->count; r++) proxy[b->first + r].gpuLoadsReady();
+  delete b;
+}
+}  // namespace
 CsvExtern(GPUManager, gpu_manager);
 #endif
 
@@ -92,6 +215,31 @@ void DistBaseLB::barrierDone() {
   // step filling a hole that was never there. The earlier arrivals return here
   // and continue from gpuLoadsReady once the build is done.
   if (!hapiCuptiArrive((uint64_t)step(), CkNodeSize(CkMyNode()))) return;
+  {
+    cpu_set_t cpus;
+    if (cuptiOffThreadCpus(&cpus)) {
+      CuptiBuild* b = new CuptiBuild;
+      b->gid = thisgroup;
+      b->first = CkNodeFirst(CkMyNode());
+      b->count = CkNodeSize(CkMyNode());
+      // CHARM_LB_CUPTI_OFFTHREAD_FLUSH_ON_PE: pull the records on this PE and
+      // leave only the parsing to the helper (diagnostic: which half matters).
+      static const bool flushOnPe = (getenv("CHARM_LB_CUPTI_OFFTHREAD_FLUSH_ON_PE") != nullptr);
+      if (flushOnPe && hapiCuptiTracingActive())
+        cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
+      cuptiWorkerSubmit(b, cpus);
+      // CHARM_LB_CUPTI_OFFTHREAD_STALL_MS (diagnostic): hold this PE for that long
+      // anyway, as the on-PE build did, to tell "the PE is free" apart from
+      // "the PEs stay in phase".
+      static const int stallMs = getenv("CHARM_LB_CUPTI_OFFTHREAD_STALL_MS") ? atoi(getenv("CHARM_LB_CUPTI_OFFTHREAD_STALL_MS")) : 0;
+      if (stallMs > 0) {
+        const double until = CkWallTimer() + stallMs * 1e-3;
+        while (CkWallTimer() < until) {}
+      }
+      CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, (void*)b);
+      return;
+    }
+  }
   hapiPrepareCuptiLoads();
   const int first = CkNodeFirst(CkMyNode());
   for (int r = 0; r < CkNodeSize(CkMyNode()); r++)
@@ -107,6 +255,16 @@ void DistBaseLB::barrierDone() {
 void DistBaseLB::gpuLoadsReady() {
 #if CMK_LBDB_ON
 #if CMK_CUDA
+  // CHARM_LB_STALL_ALL_MS (diagnostic): hold EVERY PE here for that long. With
+  // CHARM_LB_CUPTI_OFFTHREAD_STALL_MS (one PE per process) it separates "a pause
+  // helps" from "a pause on ONE PE, which breaks the PEs' phase, helps".
+  {
+    static const int allMs = getenv("CHARM_LB_STALL_ALL_MS") ? atoi(getenv("CHARM_LB_STALL_ALL_MS")) : 0;
+    if (allMs > 0) {
+      const double until = CkWallTimer() + allMs * 1e-3;
+      while (CkWallTimer() < until) {}
+    }
+  }
   // Every PE picks up the normalized loads for its own objects.
   lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
   {
