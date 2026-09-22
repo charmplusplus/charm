@@ -101,7 +101,7 @@ public:
   void setMigratable(int migratable)  { }
   void setPupSize(size_t obj_pup_size) { }
 public:
-  void ckFinishConstruction(int epoch) { }
+  void ckFinishConstruction(int epoch = -1) { }
 #endif
 
 #if CMK_OUT_OF_CORE
