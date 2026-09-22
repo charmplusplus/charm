@@ -1,6 +1,26 @@
 #include "hapi.h"
 #include "sph2d.h"
+
+// A peek after every wrapper was 7 runtime calls per patch per step, and with the
+// launches queued (+gpusubmit) it says nothing about a launch that has not been
+// issued yet. Build with -DSPH_PEEK_ERRORS to get them back.
+#ifdef SPH_PEEK_ERRORS
+#define SPH_PEEK() hapiCheck(cudaPeekAtLastError())
+#else
+#define SPH_PEEK() ((void)0)
+#endif
 #include <cstdio>
+
+// +gpusubmit: everything a patch issues on its streams reaches the driver through
+// the runtime's submitter, in queue order (with the mode off these run at once,
+// right here). The arguments are evaluated HERE, at the call, and captured by
+// value -- the closure runs later, on another thread.
+static inline void sphSubmitMemset(void* d, int v, size_t n, cudaStream_t s) {
+  hapiSubmit(s, [=]() { hapiCheck(cudaMemsetAsync(d, v, n, s)); });
+}
+static inline void sphSubmitMemcpy(void* dst, const void* src, size_t n, cudaMemcpyKind k, cudaStream_t s) {
+  hapiSubmit(s, [=]() { hapiCheck(cudaMemcpyAsync(dst, src, n, k, s)); });
+}
 
 #define BLOCK_1D 128
 static inline int nblocks(int n) { return (n + BLOCK_1D - 1) / BLOCK_1D; }
@@ -40,7 +60,10 @@ __global__ void cellCountKernel(const Particle* parts, int n, RealType x0,
 // Exclusive scan of the cell counts, one block. The cell count is small (a
 // patch is tens of cells on a side), so a single block looping over chunks is
 // both simpler and quicker than a multi-kernel scan.
-__global__ void scanCellsKernel(const int* counts, int* offsets, int ncells) {
+// Writes the scatter pass's cursor array too (a copy of the offsets): that was a
+// separate device-to-device cudaMemcpyAsync per patch per step, and at the small
+// sizes the step is bound by how many driver calls a process can issue.
+__global__ void scanCellsKernel(const int* counts, int* offsets, int* cursor, int ncells) {
   extern __shared__ int tmp[];
   int running = 0;
   for (int base = 0; base < ncells; base += blockDim.x) {
@@ -54,7 +77,7 @@ __global__ void scanCellsKernel(const int* counts, int* offsets, int ncells) {
       tmp[threadIdx.x] += t;
       __syncthreads();
     }
-    if (i < ncells) offsets[i] = running + tmp[threadIdx.x] - v;  // exclusive
+    if (i < ncells) { offsets[i] = running + tmp[threadIdx.x] - v; cursor[i] = offsets[i]; }  // exclusive
     __syncthreads();
     running += tmp[blockDim.x - 1];
     __syncthreads();
@@ -74,9 +97,15 @@ __global__ void cellScatterKernel(const Particle* parts, int n, RealType x0,
 // Tait equation of state. Run before the halo exchange so a ghost arrives with
 // its pressure already set by its owner -- the receiver cannot compute it,
 // having no claim on the ghost's density history.
-__global__ void eosKernel(Particle* parts, int n, RealType rho0, RealType c0) {
+// zero/nzero: a small counter array the NEXT kernel on this stream accumulates
+// into with atomic adds. Thread 0 clears it here, so that kernel needs no
+// cudaMemsetAsync in front of it (one driver call per patch per step); this kernel
+// finishes before the next one starts, so nothing races the clear.
+__global__ void eosKernel(Particle* parts, int n, RealType rho0, RealType c0,
+    int* zero, int nzero) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= n) return;
+  if (i == 0 && zero != nullptr) for (int k = 0; k < nzero; k++) zero[k] = 0;
   RealType rho = parts[i].rho;
   // A boundary particle is not allowed to fall below the reference density:
   // without this the wall develops negative pressure and sucks the fluid into
@@ -188,9 +217,11 @@ __global__ void forcesKernel(const Particle* parts, int n_local, RealType x0,
 // Euler-Cromer: velocity first, then position from the new velocity. Boundary
 // particles integrate density only -- they are what holds the tank together.
 __global__ void integrateKernel(Particle* parts, int n_local, RealType dt,
-    RealType rho0, RealType* drho, RealType* ax, RealType* ay) {
+    RealType rho0, RealType* drho, RealType* ax, RealType* ay,
+    int* zero, int nzero) {   // zero/nzero: see eosKernel
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= n_local) return;
+  if (i == 0 && zero != nullptr) for (int k = 0; k < nzero; k++) zero[k] = 0;
   parts[i].rho += dt * drho[i];
   if (parts[i].type == PTYPE_BOUND) {
     if (parts[i].rho < rho0) parts[i].rho = rho0;
@@ -400,24 +431,30 @@ __global__ void checkKernel(const Particle* parts, int n_local, RealType x0,
 void invokeCellBuild(const Particle* d_parts, int n, RealType x0, RealType y0,
     RealType inv_csize, int ncx, int ncy, int ncells, int* d_cnt, int* d_off,
     int* d_cursor, int* d_cell_parts, cudaStream_t s) {
-  hapiCheck(cudaMemsetAsync(d_cnt, 0, sizeof(int) * ncells, s));
+  sphSubmitMemset(d_cnt, 0, sizeof(int) * ncells, s);
   if (n > 0)
-    cellCountKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(d_parts, n, x0, y0,
-        inv_csize, ncx, ncy, d_cnt);
-  scanCellsKernel<<<1, 1024, sizeof(int) * 1024, s>>>(d_cnt, d_off, ncells);
-  hapiCheck(cudaMemcpyAsync(d_cursor, d_off, sizeof(int) * ncells,
-      cudaMemcpyDeviceToDevice, s));
+    hapiSubmit(s, [=]() {
+      cellCountKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(d_parts, n, x0, y0,
+          inv_csize, ncx, ncy, d_cnt);
+    });
+  hapiSubmit(s, [=]() {
+    scanCellsKernel<<<1, 1024, sizeof(int) * 1024, s>>>(d_cnt, d_off, d_cursor, ncells);
+  });
   if (n > 0)
-    cellScatterKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(d_parts, n, x0, y0,
-        inv_csize, ncx, ncy, d_cursor, d_cell_parts);
-  hapiCheck(cudaPeekAtLastError());
+    hapiSubmit(s, [=]() {
+      cellScatterKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(d_parts, n, x0, y0,
+          inv_csize, ncx, ncy, d_cursor, d_cell_parts);
+    });
+  SPH_PEEK();
 }
 
 void invokeEOS(Particle* d_parts, int n, RealType rho0, RealType c0,
-    cudaStream_t s) {
+    int* d_zero, cudaStream_t s) {
   if (n <= 0) return;
-  eosKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(d_parts, n, rho0, c0);
-  hapiCheck(cudaPeekAtLastError());
+  hapiSubmit(s, [=]() {
+    eosKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(d_parts, n, rho0, c0, d_zero, NUM_COUNTERS);
+  });
+  SPH_PEEK();
 }
 
 void invokeForces(const Particle* d_parts, int n_local, RealType x0, RealType y0,
@@ -426,55 +463,69 @@ void invokeForces(const Particle* d_parts, int n_local, RealType x0, RealType y0
     RealType gravity, RealType* d_drho, RealType* d_ax, RealType* d_ay,
     cudaStream_t s) {
   if (n_local <= 0) return;
-  forcesKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, x0, y0,
-      inv_csize, ncx, ncy, d_off, d_cnt, d_cell_parts, h, mass, c0, gravity,
-      d_drho, d_ax, d_ay);
-  hapiCheck(cudaPeekAtLastError());
+  hapiSubmit(s, [=]() {
+    forcesKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, x0, y0,
+        inv_csize, ncx, ncy, d_off, d_cnt, d_cell_parts, h, mass, c0, gravity,
+        d_drho, d_ax, d_ay);
+  });
+  SPH_PEEK();
 }
 
 void invokeIntegrate(Particle* d_parts, int n_local, RealType dt, RealType rho0,
-    RealType* d_drho, RealType* d_ax, RealType* d_ay, cudaStream_t s) {
+    RealType* d_drho, RealType* d_ax, RealType* d_ay, int* d_zero, cudaStream_t s) {
   if (n_local <= 0) return;
-  integrateKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, dt,
-      rho0, d_drho, d_ax, d_ay);
-  hapiCheck(cudaPeekAtLastError());
+  hapiSubmit(s, [=]() {
+    integrateKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, dt,
+        rho0, d_drho, d_ax, d_ay, d_zero, NUM_COUNTERS);
+  });
+  SPH_PEEK();
 }
 
 void invokePackHalo(const Particle* d_parts, int n_local, RealType x0,
     RealType y0, RealType x1, RealType y1, RealType support, Particle** d_bufs,
-    int* d_counts, int cap, cudaStream_t s) {
-  hapiCheck(cudaMemsetAsync(d_counts, 0, sizeof(int) * NUM_COUNTERS, s));
+    int* d_counts, int cap, bool counts_zeroed, cudaStream_t s) {
+  // counts_zeroed: the kernel just before this one on s cleared d_counts (it only
+  // ran if n_local > 0, which is also the only case this kernel runs).
+  if (!(counts_zeroed && n_local > 0)) sphSubmitMemset(d_counts, 0, sizeof(int) * NUM_COUNTERS, s);
   if (n_local > 0)
-    packHaloKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, x0,
-        y0, x1, y1, support, d_bufs, d_counts, cap);
-  hapiCheck(cudaPeekAtLastError());
+    hapiSubmit(s, [=]() {
+      packHaloKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, x0,
+          y0, x1, y1, support, d_bufs, d_counts, cap);
+    });
+  SPH_PEEK();
 }
 
 void invokeMarkLeavers(const Particle* d_parts, int n_local, RealType x0,
     RealType y0, RealType x1, RealType y1, Particle** d_bufs, Particle* d_stay,
-    int* d_counts, int cap, cudaStream_t s) {
-  hapiCheck(cudaMemsetAsync(d_counts, 0, sizeof(int) * NUM_COUNTERS, s));
+    int* d_counts, int cap, bool counts_zeroed, cudaStream_t s) {
+  if (!(counts_zeroed && n_local > 0)) sphSubmitMemset(d_counts, 0, sizeof(int) * NUM_COUNTERS, s);
   if (n_local > 0)
-    markLeaversKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local,
-        x0, y0, x1, y1, d_bufs, d_stay, d_counts, cap);
-  hapiCheck(cudaPeekAtLastError());
+    hapiSubmit(s, [=]() {
+      markLeaversKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local,
+          x0, y0, x1, y1, d_bufs, d_stay, d_counts, cap);
+    });
+  SPH_PEEK();
 }
 
 void invokeStats(const Particle* d_parts, int n_local, RealType* d_out,
     cudaStream_t s) {
-  hapiCheck(cudaMemsetAsync(d_out, 0, sizeof(RealType) * 8, s));
+  sphSubmitMemset(d_out, 0, sizeof(RealType) * 8, s);
   if (n_local > 0)
-    statsKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, d_out);
-  hapiCheck(cudaPeekAtLastError());
+    hapiSubmit(s, [=]() {
+      statsKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, d_out);
+    });
+  SPH_PEEK();
 }
 
 void invokeCheck(const Particle* d_parts, int n_local, RealType x0, RealType y0,
     RealType x1, RealType y1, RealType rho0, RealType c0,
     unsigned long long* d_out, cudaStream_t s) {
-  hapiCheck(cudaMemsetAsync(d_out, 0,
-      sizeof(unsigned long long) * NUM_CHECKS, s));
+  sphSubmitMemset(d_out, 0,
+      sizeof(unsigned long long) * NUM_CHECKS, s);
   if (n_local > 0)
-    checkKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, x0, y0,
-        x1, y1, rho0, c0, d_out);
-  hapiCheck(cudaPeekAtLastError());
+    hapiSubmit(s, [=]() {
+      checkKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, x0, y0,
+          x1, y1, rho0, c0, d_out);
+    });
+  SPH_PEEK();
 }

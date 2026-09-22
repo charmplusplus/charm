@@ -11,6 +11,23 @@
 #include <cstdlib>
 #include <unistd.h>
 
+// +gpusubmit (see sph2d.cu): copies, event records, stream waits and synchronizes
+// on a patch's streams go through the submitter's queue. Arguments are evaluated
+// at the call and captured by value. NOTE: the comm->compute dependency is an
+// event record on one stream and a wait on the other; their order is the queue's
+// order, which holds with ONE submitter (the default). With more than one the two
+// streams can land on different submitters -- not supported here.
+static inline void sphSubmitMemcpy(void* dst, const void* src, size_t n, cudaMemcpyKind k, cudaStream_t s) {
+  hapiSubmit(s, [=]() { hapiCheck(cudaMemcpyAsync(dst, src, n, k, s)); });
+}
+static inline void sphSubmitWaitEvent(cudaStream_t s, cudaEvent_t ev) {
+  hapiSubmit(s, [=]() { hapiCheck(hapiStreamWaitEvent(s, ev, 0)); });
+}
+static inline cudaError_t sphDrainSync(cudaStream_t s) {
+  hapiSubmitDrain();
+  return cudaStreamSynchronize(s);
+}
+
 // Device buffers come from hapiMalloc/hapiFree, which are the device pool
 // under +gpupool (an arena the peers have already opened, no driver call, no
 // device sync) and cudaMalloc/cudaFree without it. The runtime owns the
@@ -136,16 +153,16 @@ EventPool& eventPool() {
 
 extern void invokeCellBuild(const Particle*, int, RealType, RealType, RealType,
     int, int, int, int*, int*, int*, int*, cudaStream_t);
-extern void invokeEOS(Particle*, int, RealType, RealType, cudaStream_t);
+extern void invokeEOS(Particle*, int, RealType, RealType, int*, cudaStream_t);
 extern void invokeForces(const Particle*, int, RealType, RealType, RealType,
     int, int, const int*, const int*, const int*, RealType, RealType, RealType,
     RealType, RealType*, RealType*, RealType*, cudaStream_t);
 extern void invokeIntegrate(Particle*, int, RealType, RealType, RealType*,
-    RealType*, RealType*, cudaStream_t);
+    RealType*, RealType*, int*, cudaStream_t);
 extern void invokePackHalo(const Particle*, int, RealType, RealType, RealType,
-    RealType, RealType, Particle**, int*, int, cudaStream_t);
+    RealType, RealType, Particle**, int*, int, bool, cudaStream_t);
 extern void invokeMarkLeavers(const Particle*, int, RealType, RealType, RealType,
-    RealType, Particle**, Particle*, int*, int, cudaStream_t);
+    RealType, Particle**, Particle*, int*, int, bool, cudaStream_t);
 extern void invokeStats(const Particle*, int, RealType*, cudaStream_t);
 extern void invokeCheck(const Particle*, int, RealType, RealType, RealType,
     RealType, RealType, RealType, unsigned long long*, cudaStream_t);
@@ -520,6 +537,13 @@ class Patch : public CBase_Patch {
   int n_expect;                   // halo partners this step
   int n_expect_mig;               // == n_valid, every step, for all time
   std::map<int, int> halo_arrived, parts_arrived;   // per step, for the check
+  // Halos of the CURRENT iteration land straight in the particle array's tail
+  // (receiveHalo), so appendGhosts has no copy to issue for them. One running
+  // offset serves both those and the slot-and-copy fallback, so the ghost region
+  // stays contiguous. SPH_NO_DIRECT_HALO=1 keeps every halo on the old path.
+  int ghost_alloc = 0;
+  bool halo_open = false;
+  std::map<int, int> halo_direct;   // dir -> offset of a halo already in place
 
   // cell list geometry
   int ncx, ncy, ncells;
@@ -699,12 +723,12 @@ public:
     // on the stack, hence the sync before it goes out of scope.
     Particle* hp[NUM_DIRS];
     for (int d = 0; d < NUM_DIRS; d++) hp[d] = d_send_halo + (size_t)d * exch_capacity;
-    hapiCheck(cudaMemcpyAsync(d_halo_ptrs, hp, sizeof(hp), cudaMemcpyHostToDevice,
-        compute_stream));
+    sphSubmitMemcpy(d_halo_ptrs, hp, sizeof(hp), cudaMemcpyHostToDevice,
+        compute_stream);
     for (int d = 0; d < NUM_DIRS; d++) hp[d] = d_send_mig + (size_t)d * exch_capacity;
-    hapiCheck(cudaMemcpyAsync(d_mig_ptrs, hp, sizeof(hp), cudaMemcpyHostToDevice,
-        compute_stream));
-    hapiCheck(cudaStreamSynchronize(compute_stream));
+    sphSubmitMemcpy(d_mig_ptrs, hp, sizeof(hp), cudaMemcpyHostToDevice,
+        compute_stream);
+    hapiCheck(sphDrainSync(compute_stream));
   }
 
   void freeDevice() {
@@ -748,6 +772,11 @@ public:
     // ghosts already appended above np, and the remaining receives have to
     // append after them.
     p | n_ghost;
+    // The tail handed out to halos landing DIRECTLY in the particle array
+    // (receiveHalo), which n_ghost does not count until appendGhosts runs: a
+    // move between landing and append must carry those particles too, and the
+    // per-direction offsets so the appends on the new PE skip their copies.
+    p | ghost_alloc; p | halo_open; p | halo_direct;
     // Which whens are outstanding and any buffered ordinary messages: under
     // async LB an element can be moved mid-step and its continuations must
     // follow it.
@@ -773,8 +802,8 @@ public:
       // compute_stream fills. A sizer that ran ahead of that copy would
       // report different lengths than the packer and trip the pup direction
       // mismatch check.
-      cudaStreamSynchronize(compute_stream);
-      cudaStreamSynchronize(comm_stream);
+      sphDrainSync(compute_stream);
+      sphDrainSync(comm_stream);
     }
     if (p.isUnpacking()) {
       setupGeometry();          // thisIndex is valid here, unlike in the ctor
@@ -804,8 +833,10 @@ public:
       p((RealType*)d_parts[1 - cur],
         (size_t)std::max(h_counts[STAY], 0) * per, PUP::PUPMode::DEVICE);
     } else {
-      // Locals AND the ghosts appended after them, for the reason above.
-      p((RealType*)d_parts[cur], (size_t)(np + n_ghost) * per,
+      // Locals AND the ghosts after them, for the reason above -- the whole
+      // tail handed out so far (ghost_alloc >= n_ghost: it also counts halos
+      // that have landed directly but are not yet appended).
+      p((RealType*)d_parts[cur], (size_t)(np + std::max(n_ghost, ghost_alloc)) * per,
         PUP::PUPMode::DEVICE);
     }
 
@@ -878,8 +909,8 @@ public:
     // stays invisible while a patch holds a few hundred particles and starts
     // handing out uninitialised particles once the transfer is megabytes.
     if (np > 0)
-      hapiCheck(cudaMemcpyAsync(d_parts[cur], mine.data(),
-          sizeof(Particle) * np, cudaMemcpyHostToDevice, compute_stream));
+      sphSubmitMemcpy(d_parts[cur], mine.data(),
+          sizeof(Particle) * np, cudaMemcpyHostToDevice, compute_stream);
 
     // The reference values come from the initial lattice on the device, by the
     // same kernel that will recompute them every stats step -- so the check is
@@ -887,7 +918,7 @@ public:
     // from wherever the first report happens to fall. A blocking sync is fine
     // here; this runs once, before any timing starts.
     runCheck();
-    hapiCheck(cudaStreamSynchronize(compute_stream));
+    hapiCheck(sphDrainSync(compute_stream));
     abortOnBadParticles(0);
 
     long n = np;
@@ -910,9 +941,9 @@ public:
   void runCheck() {
     invokeCheck(d_parts[cur], np, x0, y0, x1, y1, rho0, sound_c0, d_check,
         compute_stream);
-    hapiCheck(cudaMemcpyAsync(h_check, d_check,
+    sphSubmitMemcpy(h_check, d_check,
         sizeof(unsigned long long) * NUM_CHECKS, cudaMemcpyDeviceToHost,
-        compute_stream));
+        compute_stream);
   }
 
   // Per-particle validity. Aborted here rather than through the reduction so
@@ -1056,6 +1087,7 @@ public:
   // ---- phase 1: pressure, then halo ----------------------------------------
   void startHalo() {
     n_ghost = 0;
+    ghost_alloc = 0; halo_direct.clear(); halo_open = true;
     // Both fixed for the step from here on. step_active is what this patch
     // told its neighbours one step ago, not a fresh answer: the two sides of
     // every halo have to agree about it, and the advertisement is the only
@@ -1076,14 +1108,19 @@ public:
       thisProxy[thisIndex].haloPacked();
       return;
     }
-    invokeEOS(d_parts[cur], np, rho0, sound_c0, compute_stream);
+    // The kernel in front of each counter kernel clears d_counts for it, on the same
+    // stream (SPH_NO_FOLD_ZERO=1 keeps the separate cudaMemsetAsync).
+    static const bool fold_zero = (getenv("SPH_NO_FOLD_ZERO") == nullptr);
+    hapiSubmitBatchBegin();   // one handoff for the phase (see computeAndIntegrate)
+    invokeEOS(d_parts[cur], np, rho0, sound_c0, fold_zero ? d_counts : NULL, compute_stream);
     invokePackHalo(d_parts[cur], np, x0, y0, x1, y1, support, d_halo_ptrs,
-        d_counts, exch_capacity, compute_stream);
-    hapiCheck(cudaMemcpyAsync(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
-        cudaMemcpyDeviceToHost, compute_stream));
+        d_counts, exch_capacity, fold_zero, compute_stream);
+    sphSubmitMemcpy(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
+        cudaMemcpyDeviceToHost, compute_stream);
     halo_pending = true;
     hapiAddCallback(compute_stream,
         CkCallback(CkIndex_Patch::haloPacked(), thisProxy[thisIndex]));
+    hapiSubmitBatchEnd();
   }
 
   void sendHalo() {
@@ -1116,6 +1153,28 @@ public:
       CkDeviceBufferPost* devicePost) {
     halo_arrived[ref]++;
     parts = d_recv_halo + (size_t)dir * exch_capacity;
+    // Direct landing only when it cannot be wrong: the halo is for THIS iteration
+    // (a later one can arrive early -- that is what the per-direction slots are
+    // for), the patch is collecting ghosts (np is final, the tail is free), it
+    // fits. A mid-step move (async LB) between landing and appendGhosts is
+    // covered: pup ships np + ghost_alloc particles and the halo_direct map.
+    static const bool direct_ok = (getenv("SPH_NO_DIRECT_HALO") == nullptr);
+    if (direct_ok && halo_open && ref == my_iter && n > 0 &&
+        halo_direct.find(dir) == halo_direct.end() &&
+        np + ghost_alloc + n <= part_capacity) {
+      parts = d_parts[cur] + np + ghost_alloc;
+      halo_direct[dir] = ghost_alloc;
+      ghost_alloc += n;
+      // Nothing in flight touches this piece of the tail: everything issued so
+      // far this step works on [0, np), the previous step's ghosts and migrants
+      // sit below np or in the other buffer, and the region is handed out once.
+      // So the runtime need not wait for comm_stream's earlier work before it
+      // lands the copy (CkDeviceBufferPost::buffer_free) -- which also skips the
+      // stream-idle check, and under +gpusubmit the drain in front of it.
+      // SPH_HALO_ORDERED=1 keeps the ordered receive for comparison.
+      static const bool ordered = (getenv("SPH_HALO_ORDERED") != nullptr);
+      devicePost[0].buffer_free = !ordered;
+    }
     devicePost[0].hapi_stream = comm_stream;
   }
 
@@ -1125,14 +1184,24 @@ public:
       CkAbort("Patch (%d,%d): %d particles+ghosts exceed capacity %d at step "
               "%d; increase headroom (-r)\n", x, y, np + n_ghost + n,
               part_capacity, my_iter);
-    hapiCheck(cudaMemcpyAsync(d_parts[cur] + np + n_ghost,
-        d_recv_halo + (size_t)dir * exch_capacity, sizeof(Particle) * n,
-        cudaMemcpyDeviceToDevice, comm_stream));
+    auto landed = halo_direct.find(dir);
+    if (landed != halo_direct.end()) {
+      halo_direct.erase(landed);          // already in place: nothing to issue
+    } else {
+      if (np + ghost_alloc + n > part_capacity)
+        CkAbort("Patch (%d,%d): %d particles+ghosts exceed capacity %d at step %d; increase headroom (-r)\n",
+                x, y, np + ghost_alloc + n, part_capacity, my_iter);
+      sphSubmitMemcpy(d_parts[cur] + np + ghost_alloc,
+          d_recv_halo + (size_t)dir * exch_capacity, sizeof(Particle) * n,
+          cudaMemcpyDeviceToDevice, comm_stream);
+      ghost_alloc += n;
+    }
     n_ghost += n;
   }
 
   // ---- phase 2: neighbours, forces, integrate, migrate ---------------------
   void computeAndIntegrate() {
+    halo_open = false;   // the ghost region is final; nothing may land in it now
     if (!isActive()) {
       // No physics, but particles CAN have arrived here -- migration reaches
       // every neighbour now, working or not -- so on a reporting step the
@@ -1142,12 +1211,12 @@ public:
       if (stats_freq > 0 && (my_iter % stats_freq) == 0) {
         // Particles that arrived here landed on comm_stream, in earlier steps
         // and possibly in this one; the check reads them on compute_stream.
-        hapiCheck(hapiEventRecord(halo_done, comm_stream));
-        hapiCheck(hapiStreamWaitEvent(compute_stream, halo_done, 0));
+        hapiSubmitEventRecord((void*)halo_done, comm_stream);
+        sphSubmitWaitEvent(compute_stream, halo_done);
         runCheck();
         invokeStats(d_parts[cur], np, d_stats, compute_stream);
-        hapiCheck(cudaMemcpyAsync(h_stats, d_stats, sizeof(RealType) * 8,
-            cudaMemcpyDeviceToHost, compute_stream));
+        sphSubmitMemcpy(h_stats, d_stats, sizeof(RealType) * 8,
+            cudaMemcpyDeviceToHost, compute_stream);
         hapiAddCallback(compute_stream,
             CkCallback(CkIndex_Patch::leaversPacked(), thisProxy[thisIndex]));
       } else {
@@ -1160,8 +1229,12 @@ public:
     // resumes at this phase without passing through startHalo again. The
     // migration constructor left the handles null.
     // The ghosts landed on comm_stream; the physics runs on compute_stream.
-    hapiCheck(hapiEventRecord(halo_done, comm_stream));
-    hapiCheck(hapiStreamWaitEvent(compute_stream, halo_done, 0));
+    // The whole phase is one submitter handoff (+gpusubmit): the event record
+    // and wait, the cell build, forces, integrate, the leaver mark and the
+    // counts copy -- ~10 driver calls -- go over as one queue entry.
+    hapiSubmitBatchBegin();
+    hapiSubmitEventRecord((void*)halo_done, comm_stream);
+    sphSubmitWaitEvent(compute_stream, halo_done);
 
     // Before the physics: this is exactly what the previous step's halo
     // exchange and migration produced, and (unlike the state after integrate)
@@ -1175,22 +1248,24 @@ public:
     invokeForces(d_parts[cur], np, x0, y0, inv_csize, ncx, ncy, d_cell_off,
         d_cell_cnt, d_cell_parts, smooth_h, pmass, sound_c0, gravity,
         d_drho, d_ax, d_ay, compute_stream);
+    static const bool fold_zero = (getenv("SPH_NO_FOLD_ZERO") == nullptr);
     invokeIntegrate(d_parts[cur], np, sim_dt, rho0, d_drho, d_ax, d_ay,
-        compute_stream);
+        fold_zero ? d_counts : NULL, compute_stream);
 
     if (stats_freq > 0 && (my_iter % stats_freq) == 0) {
       invokeStats(d_parts[cur], np, d_stats, compute_stream);
-      hapiCheck(cudaMemcpyAsync(h_stats, d_stats, sizeof(RealType) * 8,
-          cudaMemcpyDeviceToHost, compute_stream));
+      sphSubmitMemcpy(h_stats, d_stats, sizeof(RealType) * 8,
+          cudaMemcpyDeviceToHost, compute_stream);
     }
 
     invokeMarkLeavers(d_parts[cur], np, x0, y0, x1, y1, d_mig_ptrs,
-        d_parts[1 - cur], d_counts, exch_capacity, compute_stream);
-    hapiCheck(cudaMemcpyAsync(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
-        cudaMemcpyDeviceToHost, compute_stream));
+        d_parts[1 - cur], d_counts, exch_capacity, fold_zero, compute_stream);
+    sphSubmitMemcpy(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
+        cudaMemcpyDeviceToHost, compute_stream);
     mig_pending = true;
     hapiAddCallback(compute_stream,
         CkCallback(CkIndex_Patch::leaversPacked(), thisProxy[thisIndex]));
+    hapiSubmitBatchEnd();
   }
 
   void sendLeavers() {
@@ -1203,8 +1278,12 @@ public:
       cur = 1 - cur;
       np = h_counts[STAY];
     }
-    // Dropped either way: this step's ghosts are this step's only.
-    n_ghost = 0;
+    // Dropped either way: this step's ghosts are this step's only. So is the
+    // tail handed to direct-landed halos: a pup after this point ships
+    // np + max(n_ghost, ghost_alloc), and a stale ghost_alloc here would ship
+    // last step's ghost region, which the compaction into the other buffer
+    // just left behind, past a NEW np -- more particles than the buffer holds.
+    n_ghost = 0; ghost_alloc = 0; halo_direct.clear();
     // What every neighbour is told, and the only thing they have to go on.
     // Worked out here because the migration message is the one message that is
     // always sent -- it is what keeps a patch with nothing in it from running
@@ -1275,10 +1354,10 @@ public:
     if (np + n > part_capacity)
       CkAbort("Patch (%d,%d): %d particles exceed capacity %d at step %d; "
               "increase headroom (-r)\n", x, y, np + n, part_capacity, my_iter);
-    hapiCheck(cudaMemcpyAsync(d_parts[cur] + np,
+    sphSubmitMemcpy(d_parts[cur] + np,
         d_recv_mig + (size_t)((ref & 1) * NUM_DIRS + dir) * exch_capacity,
         sizeof(Particle) * n,
-        cudaMemcpyDeviceToDevice, comm_stream));
+        cudaMemcpyDeviceToDevice, comm_stream);
     np += n;
     n_fluid += n;   // only fluid migrates
   }
