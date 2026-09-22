@@ -2,6 +2,7 @@
 #ifndef __DEFS__
 #define __DEFS__
 
+#include <cstdlib>
 #include "pup.h"
 
 #define HYDROGEN_MASS           (1.67 * pow( 10.0,-24)) // in g
@@ -212,8 +213,21 @@ extern /* readonly */ int densityReportFreq; // -densityreport: steps between re
 extern /* readonly */ int asyncLb;
 extern /* readonly */ int lbLag;  // -lblag: steps between the two halves
 
-// Atoms in cell (x,y,z) under the selected density profile.
-inline int cellParticleCount(int x, int y, int z) {
+// LEANMD_ATOM_PCT=<1..100> scales every cell's atom count (default 100): a
+// smaller problem on the SAME cells and computes. The object count, the
+// communication graph and the imbalance ratio are unchanged; only the work per
+// object shrinks (a Compute's pair work goes as the square).
+inline int atomScalePct() {
+  static const int pct = [] {
+    const char* e = getenv("LEANMD_ATOM_PCT");
+    const int p = e ? atoi(e) : 100;
+    return (p >= 1 && p <= 100) ? p : 100;
+  }();
+  return pct;
+}
+
+// Atoms in cell (x,y,z) under the selected density profile, before scaling.
+inline int cellParticleCountFull(int x, int y, int z) {
   const int nCells = cellArrayDimX * cellArrayDimY * cellArrayDimZ;
   switch (densityMode) {
     case DENSITY_GRADIENT: {
@@ -233,5 +247,11 @@ inline int cellParticleCount(int x, int y, int z) {
              (myid * (PARTICLES_PER_CELL_END - PARTICLES_PER_CELL_START)) / nCells;
     }
   }
+}
+
+// Atoms in cell (x,y,z): the profile's count, scaled by LEANMD_ATOM_PCT.
+inline int cellParticleCount(int x, int y, int z) {
+  const int n = cellParticleCountFull(x, y, z) * atomScalePct() / 100;
+  return n > 0 ? n : 1;
 }
 #endif
