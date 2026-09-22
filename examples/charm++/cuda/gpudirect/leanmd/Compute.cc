@@ -405,13 +405,15 @@ void Compute::launchForces() {
 
   if (doEnergy) {
     invokeReduceDoubles(d_energyPartial, nA, d_energyScalar, stream);
-    hapiCheck(cudaMemcpyAsync(h_energy, d_energyScalar, sizeof(double),
-                              cudaMemcpyDeviceToHost, stream));
+    // Through the submitter like the launches it follows (see hapiSubmit): issued
+    // directly it would overtake the queued reduce kernel and read a stale scalar.
+    double* const h = h_energy; double* const d = d_energyScalar; const cudaStream_t st = stream;
+    hapiSubmit(st, [=]() { hapiCheck(cudaMemcpyAsync(h, d, sizeof(double), cudaMemcpyDeviceToHost, st)); });
   }
   // The last device work of this step that touches the pupped buffers. A
   // migration's pack copies wait for this event, not for the shared stream's
   // tail (see Compute::pup).
-  hapiCheck(cudaEventRecord(lastWork, stream));
+  hapiSubmitEventRecord((void*)lastWork, stream);   // behind the queued launches, not ahead of them
   lastWorkValid = true;
 
   CkCallback* cb = new CkCallback(CkIndex_Compute::forcesReady(),
@@ -508,6 +510,10 @@ void Compute::pup(PUP::er &p) {
       cudaGetLastError();
       CkPrintf("[PACKORD %d] valid=%d ready=%d\n", CkMyPe(), (int)lastWorkValid, ready);
     }
+    // lastWork is recorded through the submitter's queue; the pack must not wait
+    // on it before that record has reached the driver (an unrecorded event reads
+    // as complete). This PE queued it, so draining this PE's rings is enough.
+    hapiSubmitDrain();
     if (lastWorkValid) p.pup_device_order_event((void*)lastWork);
     else if (stream != NULL) p.pup_device_order((void*)stream);
   }

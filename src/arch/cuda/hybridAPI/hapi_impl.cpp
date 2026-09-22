@@ -14,6 +14,8 @@
 #include <set>
 #include <map>
 #include <mutex>
+#include <chrono>
+#include <thread>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
@@ -179,6 +181,10 @@ CpvDeclare(int, n_hapi_events);
 #define HAPI_FLAG_SLOTS 4096
 #define HAPI_FLAG_STRIDE 16  // uint32s per slot: one cache line, no false sharing
 static bool hapi_use_flag_poll = false;
+static void hapiSubmitStart(int nsub, int device);   // submitter threads, defined with recordEvent
+static void hapiSubmitSetToken(uint64_t token);
+static void hapiSetStreamCap(int cap);
+static void hapiSetRecvPriority();
 typedef CUresult (*hapiStreamWriteValue32Fn)(CUstream, CUdeviceptr, cuuint32_t, unsigned int);
 static hapiStreamWriteValue32Fn hapi_stream_write_value32 = nullptr;
 CpvDeclare(uint32_t*, hapi_flag_slots);   // pinned host ring
@@ -270,7 +276,11 @@ static void hapiTraceFlag(void* stream, uint32_t seq) {
   CmiUnlock(hapi_trace_lock);
 }
 
+void hapiSubmitEventRecord(void* event, hapiStream_t stream);
+bool hapiSubmitOn();
 cudaError_t hapiEventRecordNoted(cudaEvent_t event, cudaStream_t stream, int note) {
+  // Submit mode: behind the PE's queued work on this stream, never ahead of it.
+  if (hapiSubmitOn()) { hapiSubmitEventRecord((void*)event, (hapiStream_t)stream); return cudaSuccess; }
   if (!hapi_trace_on) return cudaEventRecord(event, stream);
   // The lock spans the call so the generation the log assigns is the one the
   // driver saw: a wait logged after this record captured it, one before did not.
@@ -2146,6 +2156,38 @@ static void hapiMapping(char** argv) {
     CmiPrintf("HAPI> no flag writer available from this driver; using "
               "event-query completion detection\n");
   }
+  if (CmiGetArgFlagDesc(argv, "+gpurecvpriority", "create the runtime's receive streams at the device's highest stream priority")) {
+    hapiSetRecvPriority();
+  }
+  // +gpustreams N: cap on shared application streams per device (see the pool).
+  {
+    int cap = 0;
+    if (CmiGetArgIntDesc(argv, "+gpustreams", &cap, "application streams per GPU, shared by chares (0 = one per chare)") && cap > 0)
+      hapiSetStreamCap(cap);
+  }
+  // +gpusubmit: the runtime's own driver calls go through submitter threads
+  // (+gpusubmitters N per GPU, default 1). Needs the pinned-flag path: a queued
+  // completion has to be safe to read before it is issued, which an event is not.
+  {
+    const bool want_submit = CmiGetArgFlagDesc(argv, "+gpusubmit",
+        "issue the runtime's device copies and completion flags from submitter threads");
+    int nsub = 1;
+    CmiGetArgIntDesc(argv, "+gpusubmitters", &nsub, "submitter threads per GPU (default 1)");
+    if (want_submit && nsub >= 1) {
+      if (!hapi_use_flag_poll) {
+        if (CmiMyPe() == 0) CmiPrintf("HAPI> +gpusubmit ignored: it needs pinned-flag completion detection\n");
+      } else if (CsvAccess(gpu_manager).device_count != 1) {
+        // A submitter holds ONE current device; one GPU per process is the supported layout.
+        if (CmiMyPe() == 0) CmiPrintf("HAPI> +gpusubmit ignored: %d devices in this process, it needs exactly one\n",
+                                      CsvAccess(gpu_manager).device_count);
+      } else {
+        hapiSubmitStart(nsub, CpvAccess(my_device));
+        if (CmiMyPe() == 0)
+          CmiPrintf("HAPI> Submitter threads on: %d per GPU; device-receive copies and completion flags "
+                    "are issued off the PEs\n", nsub);
+      }
+    }
+  }
   // +gpustalltrace: log records, waits and flag issues for hapiDumpFlagState.
   if (CmiGetArgFlagDesc(argv, "+gpustalltrace",
                         "log event records and stream waits so a stalled stream can be walked")) {
@@ -2418,6 +2460,290 @@ static void hapiMapping(char** argv) {
 
 int hapiStreamDeviceOf(hapiStream_t stream);   // defined with the stream pool below
 
+/*** Per-GPU submitter threads (+gpusubmit, +gpusubmitters N) ***
+ *
+ * One thread (or N) issues the runtime's own driver calls for the whole
+ * process; PEs hand them over through single-producer rings and go back to
+ * running chares. Measured 2026-09-21 on an A40 with CUPTI attached: a driver
+ * call costs 3.7 us from one thread and 15.6 us when 8 threads call at once,
+ * and 8 threads together deliver only 1.9x one thread's call rate
+ * (tests/util/launchcost). Stage 1 routes what the runtime issues itself and
+ * what is safe to issue LATE: the device-receive copies on the per-PE receive
+ * stream and every pinned completion-flag write. Event records stay direct --
+ * a peer may QUERY an event, and an event not yet recorded reads as complete;
+ * a flag not yet written reads as not landed, which is the safe direction.
+ *
+ * Ordering: a stream always maps to the same submitter, a PE's ops for it sit
+ * in one FIFO ring, and the submitter issues each ring in order, so per-PE,
+ * per-stream order is the enqueue order -- what hapiPollEvents relies on. An op
+ * queued here is issued no earlier than any call the PE made directly before
+ * it, so a flag can never precede the work it follows.
+ *
+ * No condition variables and nothing with a destructor: the threads spin, and
+ * the state is heap-allocated and never freed, so exit() cannot block on it
+ * (see the LB trace helper's exit hang, 2026-09-21).
+ */
+namespace {
+enum HapiSubmitKind : uint32_t { HAPI_SUBMIT_MEMCPY = 1, HAPI_SUBMIT_FLAG = 2,
+                                 HAPI_SUBMIT_CLOSURE = 3, HAPI_SUBMIT_EVENT = 4 };
+static const size_t HAPI_SUBMIT_INLINE = 128;   // bytes of closure state carried in the entry
+static const size_t HAPI_SUBMIT_BATCH_MAX = 64;   // ops one batch entry can hold
+struct HapiSubmitOp {
+  uint32_t kind;
+  uint32_t value;       // FLAG: the sequence number to write
+  hapiStream_t stream;
+  void* dst;            // MEMCPY: destination; FLAG: device alias of the slot; EVENT: the event
+  const void* src;
+  size_t bytes;
+  int copyKind;
+  void (*fn)(void*);    // CLOSURE: called with the inline state below
+  uint64_t token;       // CLOSURE: the chare the PE was running, for CUPTI attribution
+  unsigned char state[HAPI_SUBMIT_INLINE];
+  struct HapiSubmitOp* batch;   // BATCH: `value` ops, issued in order, then freed
+};
+enum : uint32_t { HAPI_SUBMIT_BATCH = 5 };
+
+// hapiSubmitBatchBegin/End (a PE, on itself): between them every op this PE
+// hands over is appended to ONE ring entry instead of taking a slot each. The
+// submitter issues them back to back. A patch-step's fixed launch sequence is
+// ~10-28 ops; measured 2026-09-21 the per-entry handoff, not the driver call,
+// was the submitter's cost on sph2d. Nested begins are counted; a closure that
+// must be issued before the batch ends does not exist (nothing here waits on
+// the GPU inside a batch), and a drain inside a batch ends it first.
+static thread_local HapiSubmitOp* hapi_submit_batch = nullptr;
+static thread_local uint32_t hapi_submit_batch_n = 0;
+static thread_local int hapi_submit_batch_depth = 0;
+static const uint32_t HAPI_SUBMIT_RING = 1u << 14;   // entries per (submitter, PE) ring
+struct HapiSubmitRing {
+  alignas(64) std::atomic<uint32_t> head{0};   // advanced by the submitter, after issuing
+  alignas(64) std::atomic<uint32_t> tail{0};   // advanced by the owning PE
+  HapiSubmitOp ops[HAPI_SUBMIT_RING];
+};
+struct HapiSubmitState {
+  int nsub = 0, npes = 0, device = -1;
+  HapiSubmitRing** rings = nullptr;            // [nsub][npes]
+  std::atomic<unsigned long long>* issued = nullptr;   // per submitter, for the exit report
+};
+HapiSubmitState* hapi_submit = nullptr;        // NULL: mode off (the default)
+std::once_flag hapi_submit_once;
+
+// The chare this submitter thread currently has pushed as its CUPTI external
+// correlation (0: none). A push/pop pair costs about as much as the launch it
+// brackets under CUPTI, and consecutive entries are usually the same chare's, so
+// the correlation is pushed when the chare CHANGES and popped when the run of
+// entries ends -- the same attribution, a fraction of the CUPTI calls.
+static thread_local uint64_t hapi_submit_pushed_token = 0;
+static inline void hapiSubmitSetCorrelation(uint64_t token) {
+  if (token == hapi_submit_pushed_token) return;
+  if (hapi_submit_pushed_token != 0) {
+    uint64_t id; cuptiActivityPopExternalCorrelationId(CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, &id);
+  }
+  if (token != 0) cuptiActivityPushExternalCorrelationId(CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, token);
+  hapi_submit_pushed_token = token;
+}
+
+void hapiSubmitIssue(HapiSubmitOp& op) {
+  if (op.kind == HAPI_SUBMIT_CLOSURE) {
+    // The application's own launches. The PE's CUPTI correlation stack is not
+    // this thread's, so the chare travels in the entry and is applied here, or
+    // the balancer would see no GPU load for anything launched through a closure.
+    hapiSubmitSetCorrelation(hapiCuptiTracingActive() ? op.token : 0);
+    op.fn((void*)op.state);
+  } else if (op.kind == HAPI_SUBMIT_BATCH) {
+    for (uint32_t i = 0; i < op.value; i++) hapiSubmitIssue(op.batch[i]);
+    delete[] op.batch;
+  } else if (op.kind == HAPI_SUBMIT_EVENT) {
+    if (cudaEventRecord((cudaEvent_t)op.dst, (cudaStream_t)op.stream) != cudaSuccess) {
+      fprintf(stderr, "HAPI submitter: cudaEventRecord failed\n"); abort();
+    }
+  } else if (op.kind == HAPI_SUBMIT_MEMCPY) {
+    const cudaError_t e = cudaMemcpyAsync(op.dst, op.src, op.bytes, (cudaMemcpyKind)op.copyKind,
+                                          (cudaStream_t)op.stream);
+    if (e != cudaSuccess) {
+      fprintf(stderr, "HAPI submitter: cudaMemcpyAsync(%p <- %p, %zu) failed: %s\n", op.dst, op.src,
+              op.bytes, cudaGetErrorString(e));
+      abort();
+    }
+  } else {
+    const CUresult r = hapi_flag_use_memset
+        ? hapi_memset_d32_async((CUdeviceptr)op.dst, op.value, 1, (CUstream)op.stream)
+        : hapi_stream_write_value32((CUstream)op.stream, (CUdeviceptr)op.dst, op.value,
+                                    CU_STREAM_WRITE_VALUE_DEFAULT);
+    if (r != CUDA_SUCCESS) {
+      fprintf(stderr, "HAPI submitter: completion-flag write failed (%d)\n", (int)r);
+      abort();
+    }
+  }
+}
+
+void hapiSubmitThread(int k) {
+  HapiSubmitState* st = hapi_submit;
+  // A thread inherits its creator's affinity -- one PE's core. Widen it, or the
+  // submitter time-slices with that PE. CHARM_GPU_SUBMIT_CPUS=<first>-<last>
+  // names the cores (e.g. the rank's idle ones); default: any CPU.
+  cpu_set_t set; CPU_ZERO(&set);
+  int lo = 0, hi = CPU_SETSIZE - 1;
+  if (const char* e = getenv("CHARM_GPU_SUBMIT_CPUS")) {
+    if (strncmp(e, "near", 4) == 0) {           // idle half of the creating PE's 16-core domain
+      const int base = (sched_getcpu() / 16) * 16; lo = base + 8; hi = base + 15;
+    } else if (sscanf(e, "%d-%d", &lo, &hi) != 2) { lo = 0; hi = CPU_SETSIZE - 1; }
+  }
+  for (int c = lo; c <= hi && c < CPU_SETSIZE; c++) CPU_SET(c, &set);
+  sched_setaffinity(0, sizeof(set), &set);
+  if (cudaSetDevice(st->device) != cudaSuccess) { fprintf(stderr, "HAPI submitter: cudaSetDevice failed\n"); abort(); }
+  unsigned idle = 0;
+  // CHARM_GPU_SUBMIT_STATS: every ~2 s, how busy this submitter is, what a copy
+  // and a flag write cost it, and the deepest backlog it found in any PE's ring.
+  static const bool stats = (getenv("CHARM_GPU_SUBMIT_STATS") != nullptr);
+  typedef std::chrono::steady_clock clk;
+  clk::time_point winStart = clk::now();
+  double busyCopy = 0, busyFlag = 0; unsigned long nCopy = 0, nFlag = 0; uint32_t maxDepth = 0;
+  for (;;) {
+    bool any = false;
+    for (int r = 0; r < st->npes; r++) {
+      HapiSubmitRing& ring = st->rings[k][r];
+      const uint32_t h = ring.head.load(std::memory_order_relaxed);
+      uint32_t n = ring.tail.load(std::memory_order_acquire) - h;
+      if (n == 0) continue;
+      if (stats && n > maxDepth) maxDepth = n;
+      if (n > 4) n = 4;                          // a few per PE, then the next PE: breadth-first
+      if (stats) {
+        for (uint32_t i = 0; i < n; i++) {
+          HapiSubmitOp& op = ring.ops[(h + i) & (HAPI_SUBMIT_RING - 1)];
+          const clk::time_point t0 = clk::now();
+          hapiSubmitIssue(op);
+          const double d = std::chrono::duration<double>(clk::now() - t0).count();
+          if (op.kind == HAPI_SUBMIT_FLAG) { busyFlag += d; nFlag++; } else { busyCopy += d; nCopy++; }
+        }
+        const double win = std::chrono::duration<double>(clk::now() - winStart).count();
+        if (win > 2.0) {
+          fprintf(stderr, "[submit %d dev %d] %.0f ops/s, busy %.0f%% (copies+launches+events %lu x %.2f us, flags %lu x %.2f us), deepest ring %u, cpu %d\n",
+                  k, st->device, (nCopy + nFlag) / win, 100.0 * (busyCopy + busyFlag) / win, nCopy,
+                  nCopy ? 1e6 * busyCopy / nCopy : 0.0, nFlag, nFlag ? 1e6 * busyFlag / nFlag : 0.0, maxDepth, sched_getcpu());
+          winStart = clk::now(); busyCopy = busyFlag = 0; nCopy = nFlag = 0; maxDepth = 0;
+        }
+      } else
+      for (uint32_t i = 0; i < n; i++) hapiSubmitIssue(ring.ops[(h + i) & (HAPI_SUBMIT_RING - 1)]);
+      ring.head.store(h + n, std::memory_order_release);
+      st->issued[k].fetch_add(n, std::memory_order_relaxed);
+      any = true;
+    }
+    if (any) idle = 0;
+    else {
+      hapiSubmitSetCorrelation(0);   // nothing queued: leave no correlation pushed
+      if (++idle > 4096) { sched_yield(); idle = 4096; }
+    }
+  }
+}
+
+inline bool hapiSubmitPushRaw(const HapiSubmitOp& op);
+inline void hapiSubmitBatchFlush() {
+  if (hapi_submit_batch_n == 0) return;
+  HapiSubmitOp e{};
+  e.kind = HAPI_SUBMIT_BATCH; e.value = hapi_submit_batch_n; e.batch = hapi_submit_batch;
+  e.stream = hapi_submit_batch[0].stream;
+  hapi_submit_batch = nullptr; hapi_submit_batch_n = 0;
+  hapiSubmitPushRaw(e);
+}
+inline bool hapiSubmitPush(const HapiSubmitOp& op) {
+  HapiSubmitState* st = hapi_submit;
+  if (st == nullptr) return false;
+  if (hapi_submit_batch_depth > 0) {
+    if (hapi_submit_batch == nullptr) hapi_submit_batch = new HapiSubmitOp[HAPI_SUBMIT_BATCH_MAX];
+    hapi_submit_batch[hapi_submit_batch_n++] = op;
+    if (hapi_submit_batch_n == HAPI_SUBMIT_BATCH_MAX) hapiSubmitBatchFlush();
+    return true;
+  }
+  return hapiSubmitPushRaw(op);
+}
+inline bool hapiSubmitPushRaw(const HapiSubmitOp& op) {
+  HapiSubmitState* st = hapi_submit;
+  if (st == nullptr) return false;
+  // The submitter is chosen by PE, not by stream: everything one PE issues, on
+  // all its streams, then has a single total order. A chare's streams depend on
+  // each other (sph2d records an event on its comm stream and waits for it on
+  // its compute stream), and with the choice made per stream those two calls
+  // could reach different submitters and swap.
+  const int k = CmiMyRank() % st->nsub;
+  HapiSubmitRing& ring = st->rings[k][CmiMyRank()];
+  const uint32_t t = ring.tail.load(std::memory_order_relaxed);
+  while (t - ring.head.load(std::memory_order_acquire) >= HAPI_SUBMIT_RING) {}   // full: wait for room
+  ring.ops[t & (HAPI_SUBMIT_RING - 1)] = op;
+  ring.tail.store(t + 1, std::memory_order_release);
+  return true;
+}
+}  // namespace
+
+bool hapiSubmitOn() { return hapi_submit != nullptr; }
+
+// Everything this PE has queued has been ISSUED to the driver. Call before a
+// device- or stream-wide synchronize that must cover the runtime's queued work.
+void hapiSubmitBatchBegin() { if (hapi_submit != nullptr) hapi_submit_batch_depth++; }
+void hapiSubmitBatchEnd() {
+  if (hapi_submit == nullptr || hapi_submit_batch_depth == 0) return;
+  if (--hapi_submit_batch_depth == 0) hapiSubmitBatchFlush();
+}
+
+void hapiSubmitDrain() {
+  HapiSubmitState* st = hapi_submit;
+  if (st == nullptr) return;
+  if (hapi_submit_batch_n > 0) hapiSubmitBatchFlush();   // a drain covers what was batched so far
+  const int r = CmiMyRank();
+  for (int k = 0; k < st->nsub; k++) {
+    HapiSubmitRing& ring = st->rings[k][r];
+    while (ring.head.load(std::memory_order_acquire) != ring.tail.load(std::memory_order_relaxed)) {}
+  }
+}
+
+// A device copy the runtime issues on a stream it owns: through the submitter
+// when the mode is on, directly otherwise.
+void hapiSubmitMemcpyAsync(void* dst, const void* src, size_t bytes, int kind, hapiStream_t stream) {
+  HapiSubmitOp op{};
+  op.kind = HAPI_SUBMIT_MEMCPY; op.stream = stream; op.dst = dst; op.src = src; op.bytes = bytes; op.copyKind = kind;
+  if (hapiSubmitPush(op)) return;
+  hapiCheck(cudaMemcpyAsync(dst, src, bytes, (cudaMemcpyKind)kind, (cudaStream_t)stream));
+}
+
+// The chare whose entry method this PE is running, as CUPTI knows it (0: none).
+static thread_local uint64_t hapi_submit_cur_token = 0;
+
+// An application launch (or any driver call on a chare's stream) handed to the
+// submitter: fn(state) runs on the submitter thread. `bytes` of state are copied
+// into the queue entry, so it must be trivially copyable and at most
+// HAPI_SUBMIT_INLINE bytes. With the mode off it runs here, at once.
+void hapiSubmitClosure(hapiStream_t stream, void (*fn)(void*), const void* state, size_t bytes) {
+  if (hapi_submit == nullptr) { fn(const_cast<void*>(state)); return; }
+  if (bytes > HAPI_SUBMIT_INLINE) CmiAbort("hapiSubmitClosure: %zu bytes of state, at most %zu fit", bytes, HAPI_SUBMIT_INLINE);
+  HapiSubmitOp op{};
+  op.kind = HAPI_SUBMIT_CLOSURE; op.stream = stream; op.fn = fn; op.token = hapi_submit_cur_token;
+  memcpy(op.state, state, bytes);
+  hapiSubmitPush(op);
+}
+
+// cudaEventRecord behind this PE's queued work on the stream. NEVER query or
+// wait on such an event from elsewhere before a flag says its work is done: an
+// event still in the queue reads as complete.
+void hapiSubmitEventRecord(void* event, hapiStream_t stream) {
+  HapiSubmitOp op{};
+  op.kind = HAPI_SUBMIT_EVENT; op.stream = stream; op.dst = event;
+  if (hapiSubmitPush(op)) return;
+  hapiCheck(cudaEventRecord((cudaEvent_t)event, (cudaStream_t)stream));
+}
+
+static void hapiSubmitSetToken(uint64_t token) { hapi_submit_cur_token = token; }
+
+static void hapiSubmitStart(int nsub, int device) {
+  std::call_once(hapi_submit_once, [nsub, device]() {
+    HapiSubmitState* st = new HapiSubmitState;
+    st->nsub = nsub; st->npes = CmiMyNodeSize(); st->device = device;
+    st->rings = new HapiSubmitRing*[nsub];
+    st->issued = new std::atomic<unsigned long long>[nsub];
+    for (int k = 0; k < nsub; k++) { st->rings[k] = new HapiSubmitRing[st->npes]; st->issued[k].store(0); }
+    hapi_submit = st;
+    for (int k = 0; k < nsub; k++) std::thread(hapiSubmitThread, k).detach();
+  });
+}
+
 #ifndef HAPI_CUDA_CALLBACK
 // The pending-entry queue for `stream`, created on first use and kept (see
 // hapi_event_queue).
@@ -2463,7 +2789,9 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
         (uint32_t*)CpvAccess(hapi_flag_slots_dev) + (size_t)idx * HAPI_FLAG_STRIDE;
     // Executes only after all prior work on the stream, so the slot reaching
     // seq means that work is complete.
-    const CUresult res = hapi_flag_use_memset
+    HapiSubmitOp flagOp{};
+    flagOp.kind = HAPI_SUBMIT_FLAG; flagOp.value = seq; flagOp.stream = stream; flagOp.dst = (void*)slot_dev;
+    const CUresult res = hapiSubmitPush(flagOp) ? CUDA_SUCCESS : hapi_flag_use_memset
         ? hapi_memset_d32_async((CUdeviceptr)slot_dev, seq, 1, (CUstream)stream)
         : hapi_stream_write_value32((CUstream)stream, (CUdeviceptr)slot_dev,
                                     seq, CU_STREAM_WRITE_VALUE_DEFAULT);
@@ -2478,6 +2806,11 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
     CpvAccess(n_hapi_events)++;
     return;
   }
+
+  // An event is recorded directly, so it must not overtake this PE's queued
+  // work on the same stream (a receive copy still in a submitter ring): the
+  // callback behind it would fire before the copy had even been issued.
+  hapiSubmitDrain();
 
   if (hapi_use_flag_poll) {
     // Said once per PE: an event here costs a create (until the pool has
@@ -5290,6 +5623,14 @@ namespace {
 // GPUs releases from its new PE).
 std::map<int, std::vector<hapiStream_t>> hapi_stream_free;
 std::unordered_map<void*, int> hapi_stream_owner;
+// +gpustreams N: at most N application streams per device, SHARED by the chares
+// bound to them (least-bound first), instead of one stream per chare. A stream is
+// only a GPU-side ordering lane; the device has CUDA_DEVICE_MAX_CONNECTIONS
+// hardware channels (32 here), so leanmd's ~1,900 streams per GPU were already
+// sharing them, ~60 to a channel, in an order the driver chose. 0 = unbounded.
+int hapi_stream_cap = 0;
+struct HapiSharedStream { hapiStream_t stream; int bound; };
+std::map<int, std::vector<HapiSharedStream>> hapi_stream_shared;
 // Constructed before any PE thread exists. It used to be a CmiNodeLock created
 // on first use ("if NULL, create"), and the first use is every PE of a process
 // at once -- leanmd's cells all acquire their streams in the same broadcast.
@@ -5300,6 +5641,44 @@ std::unordered_map<void*, int> hapi_stream_owner;
 std::mutex hapi_stream_pool_lock;
 }  // namespace
 
+// A stream the RUNTIME owns (the per-PE receive stream, staging, restage): never
+// one of the shared application lanes -- a receive copy queued behind a chare's
+// kernels is exactly what the receive stream exists to avoid. highPriority asks
+// for the device's greatest stream priority (+gpurecvpriority): the copy is tiny
+// and gates a whole entry method, so it should not wait its turn behind kernels.
+static bool hapi_recv_priority = false;
+hapiStream_t hapiAcquireRuntimeStream(bool highPriority) {
+  const int dev = CpvAccess(my_device);
+  hapiStream_t s;
+  int prev = -1;
+  hapiCheck(hapiGetDevice(&prev));
+  if (prev != dev) hapiCheck(hapiSetDevice(dev));
+  bool done = false;
+  if (highPriority && hapi_recv_priority) {
+    int least = 0, greatest = 0;
+    if (cudaDeviceGetStreamPriorityRange(&least, &greatest) == cudaSuccess &&
+        cudaStreamCreateWithPriority((cudaStream_t*)&s, cudaStreamNonBlocking, greatest) == cudaSuccess)
+      done = true;
+    else cudaGetLastError();
+  }
+  if (!done) hapiCheck(hapiStreamCreateNonBlocking(&s));
+  if (prev != dev) hapiCheck(hapiSetDevice(prev));
+  std::lock_guard<std::mutex> lk(hapi_stream_pool_lock);
+  hapi_stream_owner[(void*)s] = dev;
+  return s;
+}
+
+static void hapiSetRecvPriority() {
+  if (!hapi_recv_priority && CmiMyPe() == 0) CmiPrintf("HAPI> Receive streams at the device's highest stream priority\n");
+  hapi_recv_priority = true;
+}
+
+static void hapiSetStreamCap(int cap) {
+  if (hapi_stream_cap != cap && CmiMyPe() == 0)
+    CmiPrintf("HAPI> Application streams: at most %d per GPU, shared by the chares bound to them\n", cap);
+  hapi_stream_cap = cap;   // same value from every PE, before any chare exists
+}
+
 hapiStream_t hapiAcquireStream() {
   // The PE's own device, NOT whatever the calling thread happens to have
   // current. A chare's streams are acquired from its constructor, and the
@@ -5309,6 +5688,26 @@ hapiStream_t hapiAcquireStream() {
   // every completion event later recorded against it (events are created on
   // the current device) fails with cudaErrorInvalidResourceHandle.
   const int dev = CpvAccess(my_device);
+
+  if (hapi_stream_cap > 0) {
+    std::lock_guard<std::mutex> lk(hapi_stream_pool_lock);
+    std::vector<HapiSharedStream>& lanes = hapi_stream_shared[dev];
+    if ((int)lanes.size() < hapi_stream_cap) {
+      hapiStream_t s;
+      int prev = -1;
+      hapiCheck(hapiGetDevice(&prev));
+      if (prev != dev) hapiCheck(hapiSetDevice(dev));
+      hapiCheck(hapiStreamCreateNonBlocking(&s));
+      if (prev != dev) hapiCheck(hapiSetDevice(prev));
+      hapi_stream_owner[(void*)s] = dev;
+      lanes.push_back(HapiSharedStream{s, 1});
+      return s;
+    }
+    size_t best = 0;
+    for (size_t i = 1; i < lanes.size(); i++) if (lanes[i].bound < lanes[best].bound) best = i;
+    lanes[best].bound++;
+    return lanes[best].stream;
+  }
 
   hapi_stream_pool_lock.lock();
   auto it = hapi_stream_free.find(dev);
@@ -5350,6 +5749,14 @@ int hapiGetDeviceNum() { return CpvAccess(my_device); }
 
 void hapiReleaseStream(hapiStream_t stream) {
   if (stream == NULL) return;
+  if (hapi_stream_cap > 0) {
+    // A shared lane is never handed back for exclusive reuse: just unbind.
+    std::lock_guard<std::mutex> lk(hapi_stream_pool_lock);
+    for (auto& dev : hapi_stream_shared)
+      for (auto& lane : dev.second)
+        if (lane.stream == stream) { if (lane.bound > 0) lane.bound--; return; }
+    return;
+  }
   hapi_stream_pool_lock.lock();
   auto it = hapi_stream_owner.find((void*)stream);
   // Back to the device that created it, not the device of whoever is releasing
@@ -5518,11 +5925,13 @@ uint64_t hapiCuptiPushObjCorrelation() {
   CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
       CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, object_token));
   ++cupti_pushed_depth;
+  hapiSubmitSetToken(object_token);
 
   return object_token;
 }
 
 void hapiCuptiPopObjCorrelation() {
+  hapiSubmitSetToken(0);
   // Runs the generation check even when tracing is off: a detach may have
   // happened between this entry method's push and its pop, and the stale count
   // has to be cleared here rather than on the next push.
@@ -5631,7 +6040,9 @@ bool hapiFlagIssue(hapiStream_t stream, int* rank, uint32_t* seq) {
   CpvAccess(hapi_flag_busy)[idx] = 1;
   uint32_t* slot_dev =
       (uint32_t*)CpvAccess(hapi_flag_slots_dev) + (size_t)idx * HAPI_FLAG_STRIDE;
-  const CUresult res = hapi_flag_use_memset
+  HapiSubmitOp flagOp{};
+  flagOp.kind = HAPI_SUBMIT_FLAG; flagOp.value = next; flagOp.stream = stream; flagOp.dst = (void*)slot_dev;
+  const CUresult res = hapiSubmitPush(flagOp) ? CUDA_SUCCESS : hapi_flag_use_memset
       ? hapi_memset_d32_async((CUdeviceptr)slot_dev, next, 1, (CUstream)stream)
       : hapi_stream_write_value32((CUstream)stream, (CUdeviceptr)slot_dev,
                                   next, CU_STREAM_WRITE_VALUE_DEFAULT);

@@ -217,6 +217,7 @@ run_leanmd() { local kind=$1 arm=$2
   dir=$RL/${TAG:+${TAG}_}${kind}_N${NODES}_$arm
   local C="$grid $STEPS $PERIOD $PERIOD -computemap local -density gradient +pe $pes +setcpuaffinity +gpushm +gpuipceventpool 256 +gpupool +gpupoolsize $pool"
   [ "${POOL_ALLOC:-buddy}" = vmm ] && C="$C +gpupoolalloc vmm"
+  C="$C ${GPU_EXTRA:-}"   # GPU_EXTRA: extra runtime flags for EVERY arm of both apps (e.g. +gpusubmit)
   if [ -n "$DRY" ]; then PLAN_S=$((PLAN_S+tmo)); EXP_S=$((EXP_S+exp)); printf "  [dry] leanmd %-6s %-6s grid=[%s] %d cells %d/GPU %d PEs pool=%dMB expect=%ds timeout=%ds\n" "$kind" "$arm" "$grid" $cells $cpg $pes $pool $exp $tmo; return; fi
   fits $exp || { printf "  leanmd %-6s %-6s SKIPPED (%ds left, needs %ds for a %ds run)\n" "$kind" "$arm" "$(budget_left)" "$(( exp*130/100 + 45 ))" "$exp"; return; }
   tmo=$(clamp_tmo $tmo)
@@ -300,7 +301,7 @@ run_sph2d() { local kind=$1 arm=$2
   if [ -n "$DRY" ]; then PLAN_S=$((PLAN_S+tmo)); EXP_S=$((EXP_S+exp)); printf "  [dry] sph2d  %-6s %-6s %d patches %d fluid %d PEs pool=%dMBx%d expect=%ds timeout=%ds\n" "$kind" "$arm" $patches $fluid $((16*NODES)) $pool $arenas $exp $tmo; return; fi
   fits $exp || { printf "  sph2d  %-6s %-6s SKIPPED (%ds left, needs %ds for a %ds run)\n" "$kind" "$arm" "$(budget_left)" "$(( exp*130/100 + 45 ))" "$exp"; return; }
   tmo=$(clamp_tmo $tmo)
-  ( cd $SPH && env X=1 PES=4 timeout $tmo $SRUN --chdir="$SPH" stdbuf -oL -eL $SPH/numa_wrap_sph.sh ./sph2d $cfg $lbargs +gpushm $poolargs +gpuipceventpool 256 +ppn 4 > $log 2>&1 )
+  ( cd $SPH && env X=1 PES=4 timeout $tmo $SRUN --chdir="$SPH" stdbuf -oL -eL ${SPH_WRAP:-$SPH/numa_wrap_sph.sh} ./sph2d $cfg $lbargs +gpushm $poolargs +gpuipceventpool 256 ${GPU_EXTRA:-} +ppn 4 > $log 2>&1 )
   rc=$?; ms=$(grep -a 'Average iteration' $log | awk '{print $4}')
   imb=$(grep -a '^  step' $log | tail -1 | sed 's/.*imbalance (max\/avg) //;s/ .*//')
   printf "  sph2d  %-6s %-6s %5d patches %4d fluid %4d PEs  %-9s ms/step  patch/PE=%-5s pimb=%-5s pool=%-8s rc=%s\n" \

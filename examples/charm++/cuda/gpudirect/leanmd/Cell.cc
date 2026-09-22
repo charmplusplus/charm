@@ -307,8 +307,10 @@ void Cell::computeKineticEnergy() {
   const int nb = std::min(64, (myNumParts + 255) / 256);
   invokeKineticEnergy(d_particles, myNumParts, d_kePartial, nb, stream);
   invokeReduceDoubles(d_kePartial, nb, d_energy, stream);
-  hapiCheck(cudaMemcpyAsync(h_energy, d_energy, sizeof(double),
-                            cudaMemcpyDeviceToHost, stream));
+  {
+    double* const h = h_energy; double* const d = d_energy; const cudaStream_t st = stream;
+    hapiSubmit(st, [=]() { hapiCheck(cudaMemcpyAsync(h, d, sizeof(double), cudaMemcpyDeviceToHost, st)); });
+  }
 }
 
 void Cell::integrate() {
@@ -332,13 +334,18 @@ void Cell::integrate() {
 // Sort the particles into per-neighbour buckets on the device. Only the bucket
 // counts come back to the host.
 void Cell::binParticles() {
-  hapiCheck(cudaMemsetAsync(d_counts, 0, sizeof(int) * inbrs, stream));
+  {
+    int* const dc = d_counts; const size_t nb = sizeof(int) * inbrs; const cudaStream_t st = stream;
+    hapiSubmit(st, [=]() { hapiCheck(cudaMemsetAsync(dc, 0, nb, st)); });
+  }
   invokeBinParticles(d_particles, myNumParts, thisIndex.x, thisIndex.y, thisIndex.z,
                      CELL_SIZE_X, CELL_SIZE_Y, CELL_SIZE_Z,
                      cellArrayDimX, cellArrayDimY, cellArrayDimZ,
                      d_stay, d_send_parts, exch_capacity, d_counts, stream);
-  hapiCheck(cudaMemcpyAsync(h_counts, d_counts, sizeof(int) * inbrs,
-                            cudaMemcpyDeviceToHost, stream));
+  {
+    int* const hc = h_counts; int* const dc = d_counts; const size_t nb = sizeof(int) * inbrs; const cudaStream_t st = stream;
+    hapiSubmit(st, [=]() { hapiCheck(cudaMemcpyAsync(hc, dc, nb, cudaMemcpyDeviceToHost, st)); });
+  }
   CkCallback* cb = new CkCallback(CkIndex_Cell::binDone(), thisProxy[thisIndex]);
   hapiAddCallback(stream, cb);
 }

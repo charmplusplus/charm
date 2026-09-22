@@ -466,15 +466,27 @@ __global__ void appendParticlesKernel(Particle* __restrict__ dst, int dstOffset,
 // synchronous wait.
 // ---------------------------------------------------------------------------
 
+// Every launch goes through the runtime's submitter when +gpusubmit is on (and
+// runs right here when it is off): a chare's kernels, copies and event records
+// must reach the driver in one order, and with the mode on that order is the
+// submitter's queue. Declared here rather than by including hapi.h, which this
+// nvcc translation unit otherwise does not need.
+void hapiSubmitClosure(cudaStream_t stream, void (*fn)(void*), const void* state, size_t bytes);
+template <class F> static inline void submitLaunch(cudaStream_t stream, F f) {
+  hapiSubmitClosure(stream, [](void* p) { (*(F*)p)(); }, &f, sizeof(F));
+}
+
 void invokePairForce(const vec3* d_A, int nA, const vec3* d_B, int nB,
                      vec3* d_forceA, vec3 shift, double cutoffSq, bool selfInteract,
                      double* d_energyPartial, cudaStream_t stream)
 {
   if (nA <= 0 || nB <= 0) return;
   // One block per atom of A -- see the decomposition note at the top.
-  pairForceKernel<<<nA, BLOCK_THREADS, 0, stream>>>(
-      d_A, nA, d_B, nB, d_forceA, shift, cutoffSq, selfInteract ? 1 : 0,
-      d_energyPartial);
+  submitLaunch(stream, [=]() {
+    pairForceKernel<<<nA, BLOCK_THREADS, 0, stream>>>(
+        d_A, nA, d_B, nB, d_forceA, shift, cutoffSq, selfInteract ? 1 : 0,
+        d_energyPartial);
+  });
 }
 
 void invokePairForceBoth(const vec3* d_A, int nA, const vec3* d_B, int nB,
@@ -483,8 +495,10 @@ void invokePairForceBoth(const vec3* d_A, int nA, const vec3* d_B, int nB,
                          cudaStream_t stream)
 {
   if (nA <= 0 || nB <= 0) return;
-  pairForceBothKernel<<<nA + nB, BLOCK_THREADS, 0, stream>>>(
-      d_A, nA, d_B, nB, d_forceA, d_forceB, shiftB, cutoffSq, d_energyPartial);
+  submitLaunch(stream, [=]() {
+    pairForceBothKernel<<<nA + nB, BLOCK_THREADS, 0, stream>>>(
+        d_A, nA, d_B, nB, d_forceA, d_forceB, shiftB, cutoffSq, d_energyPartial);
+  });
 }
 
 void invokeSumForces(vec3* d_dst, const vec3* d_slots, int slots, int stride, int n,
@@ -492,7 +506,9 @@ void invokeSumForces(vec3* d_dst, const vec3* d_slots, int slots, int stride, in
 {
   if (n <= 0 || slots <= 0) return;
   const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;
-  sumForcesKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(d_dst, d_slots, slots, stride, n);
+  submitLaunch(stream, [=]() {
+    sumForcesKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(d_dst, d_slots, slots, stride, n);
+  });
 }
 
 void invokeGatherPositions(const Particle* d_p, vec3* d_pos, int n,
@@ -500,21 +516,27 @@ void invokeGatherPositions(const Particle* d_p, vec3* d_pos, int n,
 {
   if (n <= 0) return;
   const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;
-  gatherPositionsKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(d_p, d_pos, n);
+  submitLaunch(stream, [=]() {
+    gatherPositionsKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(d_p, d_pos, n);
+  });
 }
 
 void invokeReduceDoubles(const double* d_in, int n, double* d_out,
                          cudaStream_t stream)
 {
   if (n <= 0) return;
-  reduceDoublesKernel<<<1, BLOCK_THREADS, 0, stream>>>(d_in, n, d_out);
+  submitLaunch(stream, [=]() {
+    reduceDoublesKernel<<<1, BLOCK_THREADS, 0, stream>>>(d_in, n, d_out);
+  });
 }
 
 void invokeZeroForces(vec3* d_f, int n, cudaStream_t stream)
 {
   if (n <= 0) return;
   const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;
-  zeroForcesKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(d_f, n);
+  submitLaunch(stream, [=]() {
+    zeroForcesKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(d_f, n);
+  });
 }
 
 void invokeAccumulateForces(vec3* d_dst, const vec3* d_src, int n,
@@ -522,7 +544,9 @@ void invokeAccumulateForces(vec3* d_dst, const vec3* d_src, int n,
 {
   if (n <= 0) return;
   const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;
-  accumulateForcesKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(d_dst, d_src, n);
+  submitLaunch(stream, [=]() {
+    accumulateForcesKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(d_dst, d_src, n);
+  });
 }
 
 void invokeIntegrate(Particle* d_p, const vec3* d_f, int n, double dtVel,
@@ -530,15 +554,19 @@ void invokeIntegrate(Particle* d_p, const vec3* d_f, int n, double dtVel,
 {
   if (n <= 0) return;
   const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;
-  integrateKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(
-      d_p, d_f, n, dtVel, dtPos, maxVelocity);
+  submitLaunch(stream, [=]() {
+    integrateKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(
+        d_p, d_f, n, dtVel, dtPos, maxVelocity);
+  });
 }
 
 void invokeKineticEnergy(const Particle* d_p, int n, double* d_partial, int nBlocks,
                          cudaStream_t stream)
 {
   if (n <= 0) return;
-  kineticEnergyKernel<<<nBlocks, BLOCK_THREADS, 0, stream>>>(d_p, n, d_partial);
+  submitLaunch(stream, [=]() {
+    kineticEnergyKernel<<<nBlocks, BLOCK_THREADS, 0, stream>>>(d_p, n, d_partial);
+  });
 }
 
 void invokeBinParticles(const Particle* d_p, int n, int cellX, int cellY, int cellZ,
@@ -549,9 +577,11 @@ void invokeBinParticles(const Particle* d_p, int n, int cellX, int cellY, int ce
 {
   if (n <= 0) return;
   const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;
-  binParticlesKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(
-      d_p, n, cellX, cellY, cellZ, cellSizeX, cellSizeY, cellSizeZ,
-      dimX, dimY, dimZ, d_stay, d_send, exchCapacity, d_counts);
+  submitLaunch(stream, [=]() {
+    binParticlesKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(
+        d_p, n, cellX, cellY, cellZ, cellSizeX, cellSizeY, cellSizeZ,
+        dimX, dimY, dimZ, d_stay, d_send, exchCapacity, d_counts);
+  });
 }
 
 void invokeAppendParticles(Particle* d_dst, int dstOffset, const Particle* d_src,
@@ -559,6 +589,8 @@ void invokeAppendParticles(Particle* d_dst, int dstOffset, const Particle* d_src
 {
   if (n <= 0) return;
   const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;
-  appendParticlesKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(
-      d_dst, dstOffset, d_src, n);
+  submitLaunch(stream, [=]() {
+    appendParticlesKernel<<<blocks, BLOCK_THREADS, 0, stream>>>(
+        d_dst, dstOffset, d_src, n);
+  });
 }

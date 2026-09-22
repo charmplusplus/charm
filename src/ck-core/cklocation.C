@@ -34,6 +34,13 @@ void hapiCuptiObjectResumed(const LDObjHandle&);
 #if CMK_CUDA || CMK_HIP
 
 #include "hapi.h"
+
+// A stream synchronize that also covers work this PE has handed to a submitter
+// thread (+gpusubmit): it has to be in the driver before the wait means anything.
+static inline hapiError_t ckSubmitDrainThenSync(hapiStream_t stream) {
+  hapiSubmitDrain();
+  return cudaStreamSynchronize(stream);
+}
 #include "gpumanager.h"
 #include "LBMigrateWindow.h"
 
@@ -5003,13 +5010,14 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
       // such ordering, and the wait stays exactly as it was.
       if (!p.deviceAllPool) {
         const double tw0 = CmiWallTimer();
-        hapiCheck(hapiStreamSynchronize(migStream));
+        hapiCheck(ckSubmitDrainThenSync(migStream));
         if (migDbg())
           CkPrintf("[EMIG %d] id=%llu pack wait %.3f ms (non-pool source)\n",
                    CkMyPe(), (unsigned long long)id,
                    (CmiWallTimer() - tw0) * 1e3);
       }
     } else {
+      hapiSubmitDrain();   // cover copies still in a submitter ring
       cudaDeviceSynchronize();
     }
   }
@@ -5416,7 +5424,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   if (gpuMsg != nullptr && !deviceRebound) {
     const double tw0 = CmiWallTimer();
     if (p.gpuStream != nullptr)
-      hapiCheck(hapiStreamSynchronize((hapiStream_t)p.gpuStream));
+      hapiCheck(ckSubmitDrainThenSync((hapiStream_t)p.gpuStream));
     else
       hapiCheck(cudaStreamSynchronize((cudaStream_t)0));
     if (migDbg())

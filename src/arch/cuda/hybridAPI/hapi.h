@@ -649,3 +649,28 @@ inline void hapiLaunchKernelWrapper(Kernel kernel, dim3 grid_dim, dim3 block_dim
 
 #endif // __HAPI_H_
 void hapiDumpFlagState();
+
+// Submitter threads (+gpusubmit): see hapi_impl.cpp. hapiSubmitMemcpyAsync is
+// cudaMemcpyAsync for a copy the RUNTIME issues on a stream it owns -- queued to
+// a submitter when the mode is on, direct otherwise. hapiSubmitDrain returns once
+// everything this PE queued has been issued to the driver.
+// A runtime-owned stream: outside the +gpustreams cap; highPriority honours +gpurecvpriority.
+hapiStream_t hapiAcquireRuntimeStream(bool highPriority);
+bool hapiSubmitOn();
+void hapiSubmitDrain();
+void hapiSubmitMemcpyAsync(void* dst, const void* src, size_t bytes, int kind, hapiStream_t stream);
+// A driver call on a chare's stream, issued by the submitter in queue order
+// (at once, here, with the mode off). In submit mode EVERYTHING a chare issues
+// on its stream must go through one of these, or it overtakes the queued work.
+void hapiSubmitClosure(hapiStream_t stream, void (*fn)(void*), const void* state, size_t bytes);
+void hapiSubmitEventRecord(void* event, hapiStream_t stream);
+// Between Begin and End, everything this PE hands to the submitter goes into one
+// queue entry (one handoff for a whole launch sequence). No-ops with the mode off.
+void hapiSubmitBatchBegin();
+void hapiSubmitBatchEnd();
+#if defined(__cplusplus) && !defined(HAPI_SUBMIT_TEMPLATE_DEFINED)
+#define HAPI_SUBMIT_TEMPLATE_DEFINED
+template <class F> inline void hapiSubmit(hapiStream_t stream, F f) {
+  hapiSubmitClosure(stream, [](void* p) { (*(F*)p)(); }, &f, sizeof(F));
+}
+#endif
