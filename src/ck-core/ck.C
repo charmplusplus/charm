@@ -697,9 +697,12 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 #if CMK_ERROR_CHECKING
   void *prevNokeepMsg = CkpvAccess(_nokeepMsgInFlight);
   int prevNokeepEp = CkpvAccess(_nokeepEpInFlight);
-  // Zerocopy messages are excluded: the generated code and ckrdma.C free them
-  // themselves as part of the protocol, not the user.
+  // Excluded: zerocopy messages (the generated code and ckrdma.C free them
+  // themselves as part of the protocol), and the runtime's own CkMessage*
+  // entries (msgIdx == -1: CkArray::recvNoKeep*Broadcast forwards the message
+  // to the elements and frees it on the last delivery, see recvBroadcast).
   if (_entryTable[epIdx]->noKeep && msg != NULL &&
+      _entryTable[epIdx]->msgIdx != -1 &&
       CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_REG_NO_ZC_MSG)
   { CkpvAccess(_nokeepMsgInFlight) = msg; CkpvAccess(_nokeepEpInFlight) = epIdx; }
 #endif
@@ -744,7 +747,7 @@ void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 #if CMK_ERROR_CHECKING
   void *prevNokeepMsg = CkpvAccess(_nokeepMsgInFlight);
   int prevNokeepEp = CkpvAccess(_nokeepEpInFlight);
-  if (_entryTable[epIdx]->noKeep &&
+  if (_entryTable[epIdx]->noKeep && _entryTable[epIdx]->msgIdx != -1 &&
       CMI_ZC_MSGTYPE(UsrToEnv(deliverMsg)) == CMK_REG_NO_ZC_MSG)
   { CkpvAccess(_nokeepMsgInFlight) = deliverMsg; CkpvAccess(_nokeepEpInFlight) = epIdx; }
 #endif
