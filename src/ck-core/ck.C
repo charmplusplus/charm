@@ -686,6 +686,12 @@ CkLocRec *CkActiveLocRec(void) {
 /******************** Basic support *****************/
 void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
+  if (msg != NULL && UsrToEnv(msg)->isPacked())
+  { /* A stored array broadcast is kept packed (CkArray::recvBroadcast) */
+    envelope *env = UsrToEnv(msg);
+    CkUnpackMessage(&env);
+    msg = EnvToUsr(env);
+  }
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
@@ -714,12 +720,17 @@ void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
     deliverMsg=(void *)msg;
   } else
   { /* Method needs a copy of the message to keep/delete */
-    void *oldMsg=(void *)msg;
-    deliverMsg=CkCopyMsg(&oldMsg);
+    if (UsrToEnv(msg)->isPacked())
+    { /* Copy the bytes and unpack only the copy; the source stays packed */
+      deliverMsg=CkCopyPackedMsg(msg);
+    } else {
+      void *oldMsg=(void *)msg;
+      deliverMsg=CkCopyMsg(&oldMsg);
 #if CMK_ERROR_CHECKING
-    if (oldMsg!=msg)
-      CkAbort("CkDeliverMessageReadonly: message pack/unpack changed message pointer!");
+      if (oldMsg!=msg)
+        CkAbort("CkDeliverMessageReadonly: message pack/unpack changed message pointer!");
 #endif
+    }
   }
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, (void*)msg);

@@ -1402,12 +1402,20 @@ bool CkArrayBroadcaster::performDelivery(CkArrayMessage* bcast, ArrayElement* el
     return el->ckInvokeEntry(bcast->array_ep_bcast(), bcast, doFree);
   else
   {
+    envelope* env = UsrToEnv(bcast);
     if (!doFree)
     {
-      CkArrayMessage* newMsg = (CkArrayMessage*)CkCopyMsg((void**)&bcast);
+      CkArrayMessage* newMsg = env->isPacked()
+                                   ? (CkArrayMessage*)CkCopyPackedMsg(bcast)
+                                   : (CkArrayMessage*)CkCopyMsg((void**)&bcast);
       bcast = newMsg;
     }
-    envelope* env = UsrToEnv(bcast);
+    else if (env->isPacked())
+    {
+      CkUnpackMessage(&env);
+      bcast = (CkArrayMessage*)EnvToUsr(env);
+    }
+    env = UsrToEnv(bcast);
     env->setRecipientID(el->ckGetID());
     CkArrayManagerDeliver(CkMyPe(), bcast, 0);
     return true;
@@ -1657,6 +1665,20 @@ void CkArray::recvBroadcast(CkMessage* m)
   CK_MAGICNUMBER_CHECK
   CkArrayMessage* msg = (CkArrayMessage*)m;
   envelope* env = UsrToEnv(msg);
+
+  // A keep entry gets its own copy per local element, and the broadcast is also
+  // stored for elements that arrive later. Pack it once, here, and make every copy
+  // from the packed bytes (CkCopyPackedMsg). Copying the unpacked message instead
+  // packs and re-unpacks the source per copy (CkCopyMsg), which for a custom
+  // pack/unpack pair replaces the source object while this loop and the stored
+  // copy still hold the old pointer. Zerocopy broadcasts keep their pointers live
+  // in the message, so they are left unpacked.
+  if (CMI_ZC_MSGTYPE(env) == CMK_REG_NO_ZC_MSG && !env->isPacked() &&
+      !_entryTable[msg->array_ep_bcast()]->noKeep)
+  {
+    CkPackMessage(&env);
+    msg = (CkArrayMessage*)EnvToUsr(env);
+  }
 
   // Process the incoming message, buffers if necessary
   broadcaster->ingestIncoming(msg);
