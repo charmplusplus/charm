@@ -19,6 +19,10 @@ clients, including the rest of Charm++, are actually C++.
 #ifndef CMK_CHARE_USE_PTR
 #include <map>
 CkpvDeclare(std::vector<void *>, chare_objs);
+#if CMK_ERROR_CHECKING
+CkpvExtern(void *, _nokeepMsgInFlight);  // see CkFreeMsg (msgalloc.C)
+CkpvExtern(int, _nokeepEpInFlight);
+#endif
 CkpvDeclare(std::vector<int>, chare_types);
 CkpvDeclare(std::vector<VidBlock *>, vidblocks);
 CksvExtern(ObjNumRdmaOpsMap, pendingZCOps);
@@ -658,7 +662,23 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
   const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
+#if CMK_ERROR_CHECKING
+  void *prevNokeepMsg = CkpvAccess(_nokeepMsgInFlight);
+  int prevNokeepEp = CkpvAccess(_nokeepEpInFlight);
+  // Excluded: zerocopy messages (the generated code and ckrdma.C free them
+  // themselves as part of the protocol), and the runtime's own CkMessage*
+  // entries (msgIdx == -1: CkArray::recvNoKeep*Broadcast forwards the message
+  // to the elements and frees it on the last delivery, see recvBroadcast).
+  if (_entryTable[epIdx]->noKeep && msg != NULL &&
+      _entryTable[epIdx]->msgIdx != -1 &&
+      CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_REG_NO_ZC_MSG)
+  { CkpvAccess(_nokeepMsgInFlight) = msg; CkpvAccess(_nokeepEpInFlight) = epIdx; }
+#endif
   CkInvokeEP((Chare*)obj, epIdx, msg);
+#if CMK_ERROR_CHECKING
+  CkpvAccess(_nokeepMsgInFlight) = prevNokeepMsg;
+  CkpvAccess(_nokeepEpInFlight) = prevNokeepEp;
+#endif
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -692,7 +712,18 @@ void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, (void*)msg);
 #endif
+#if CMK_ERROR_CHECKING
+  void *prevNokeepMsg = CkpvAccess(_nokeepMsgInFlight);
+  int prevNokeepEp = CkpvAccess(_nokeepEpInFlight);
+  if (_entryTable[epIdx]->noKeep && _entryTable[epIdx]->msgIdx != -1 &&
+      CMI_ZC_MSGTYPE(UsrToEnv(deliverMsg)) == CMK_REG_NO_ZC_MSG)
+  { CkpvAccess(_nokeepMsgInFlight) = deliverMsg; CkpvAccess(_nokeepEpInFlight) = epIdx; }
+#endif
   CkInvokeEP((Chare*)obj, epIdx, deliverMsg);
+#if CMK_ERROR_CHECKING
+  CkpvAccess(_nokeepMsgInFlight) = prevNokeepMsg;
+  CkpvAccess(_nokeepEpInFlight) = prevNokeepEp;
+#endif
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
