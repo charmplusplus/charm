@@ -665,7 +665,10 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 #if CMK_ERROR_CHECKING
   void *prevNokeepMsg = CkpvAccess(_nokeepMsgInFlight);
   int prevNokeepEp = CkpvAccess(_nokeepEpInFlight);
-  if (_entryTable[epIdx]->noKeep && msg != NULL)
+  // Zerocopy messages are excluded: the generated code and ckrdma.C free them
+  // themselves as part of the protocol, not the user.
+  if (_entryTable[epIdx]->noKeep && msg != NULL &&
+      CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_REG_NO_ZC_MSG)
   { CkpvAccess(_nokeepMsgInFlight) = msg; CkpvAccess(_nokeepEpInFlight) = epIdx; }
 #endif
   CkInvokeEP((Chare*)obj, epIdx, msg);
@@ -709,7 +712,8 @@ void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 #if CMK_ERROR_CHECKING
   void *prevNokeepMsg = CkpvAccess(_nokeepMsgInFlight);
   int prevNokeepEp = CkpvAccess(_nokeepEpInFlight);
-  if (_entryTable[epIdx]->noKeep)
+  if (_entryTable[epIdx]->noKeep &&
+      CMI_ZC_MSGTYPE(UsrToEnv(deliverMsg)) == CMK_REG_NO_ZC_MSG)
   { CkpvAccess(_nokeepMsgInFlight) = deliverMsg; CkpvAccess(_nokeepEpInFlight) = epIdx; }
 #endif
   CkInvokeEP((Chare*)obj, epIdx, deliverMsg);
