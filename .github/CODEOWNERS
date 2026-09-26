@@ -1,7 +1,10 @@
-# Code owners for the reviewed reconverse line. Branch protection requires a
-# code-owner review on these paths IN ADDITION to the branch's required
-# approving review -- i.e., runtime-core changes effectively need two sets of
-# eyes; everything else needs one.
+# Code owners for the reviewed reconverse line. Branch protection requires
+# ONE approving review, and on the paths below that review must come from a
+# code owner. A single code-owner approval satisfies both rules, so a
+# runtime-core change merges with one review, from one of the owners; any
+# other change merges with one review from anyone. This is a staffing
+# decision (2026-09-26), not a design one: the count may go back to two
+# reviews when more reviewers are available.
 /src/ck-core/     @ritvikrao @adityapb @lvkale @ericjbohm
 /src/conv-core/   @ritvikrao @adityapb @lvkale @ericjbohm
 /src/ck-ldb/      @ritvikrao @adityapb @lvkale @ericjbohm
