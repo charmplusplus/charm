@@ -5,7 +5,9 @@ LIBOBJ = CkCache.o
 
 HEADERS = $(CDIR)/include/CkCache.decl.h \
           $(CDIR)/include/CkCache.def.h \
-          $(CDIR)/include/CkCache.h 
+          $(CDIR)/include/CkCache.h \
+          $(CDIR)/include/CkTreeCache.h \
+          $(CDIR)/include/TreeCacheCore.h
 LIBDEST =  $(LIBDIR)/$(LIB)
 CHARMXI_FLAGS = -E -I$(CDIR)/tmp
 
