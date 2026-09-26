@@ -62,9 +62,26 @@ void* CkAllocBuffer(void *msg, int bufsize)
   return EnvToUsr(packbuf);;
 }
 
+#if CMK_ERROR_CHECKING
+// The message of the [nokeep] entry method this PE is executing, if any
+// (set around the call in ck.C). The runtime owns nokeep messages, marshalled
+// parameters included, and frees them when the method returns; a free by the
+// method itself is a double free that used to surface, if at all, as a crash
+// somewhere else later.
+CkpvDeclare(void *, _nokeepMsgInFlight);
+CkpvDeclare(int, _nokeepEpInFlight);
+#endif
+
 void  CkFreeMsg(void *msg)
 {
   if (msg!=NULL) {
+#if CMK_ERROR_CHECKING
+      if (CkpvInitialized(_nokeepMsgInFlight) && msg == CkpvAccess(_nokeepMsgInFlight))
+        CkAbort("Entry method %s is [nokeep] but freed its message. The runtime owns "
+                "the message of a nokeep entry method (every marshalled entry method "
+                "that is not threaded is nokeep) and frees it when the method returns.",
+                _entryTable[CkpvAccess(_nokeepEpInFlight)]->name);
+#endif
       CmiFree(UsrToEnv(msg));
   }
 }
