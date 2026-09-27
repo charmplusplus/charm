@@ -855,9 +855,11 @@ public:
   {
     return ref.fetch_add(1, std::memory_order_release);
   }
+  // acq_rel, not release: the caller that drops the last reference frees the
+  // block, and must observe every other holder's accesses to it first.
   int decRef()
   {
-    return ref.fetch_sub(1, std::memory_order_release);
+    return ref.fetch_sub(1, std::memory_order_acq_rel);
   }
 #else
   int getRef() const { return ref; }
