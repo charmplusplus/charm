@@ -1799,6 +1799,10 @@ XStr Entry::callThread(const XStr& procName, int prependEntryName) {
   if (prependEntryName) procFull << name << "_";
   procFull << procName;
 
+  // A nokeep message may be shared with other receivers, and the runtime drops
+  // its reference when this wrapper returns, i.e. at the thread's first
+  // suspend. The thread takes its own reference, released when it ends.
+  if (isNoKeep() && !param->isVoid()) str << "  CkReferenceMsg(impl_msg);\n";
   str << "  CthThread tid = CthCreate((CthVoidFn)" << procFull
       << ", new CkThrCallArg(impl_msg,impl_obj), " << getStackSize() << ");\n";
   str << "  ((Chare *)impl_obj)->CkAddThreadListeners(tid,impl_msg);\n";
@@ -2311,6 +2315,8 @@ void Entry::genDefs(XStr& str) {
     param->endUnmarshall(str);
     str << postCall;
     if (isThreaded() && param->isMarshalled()) str << "  delete impl_msg_typed;\n";
+    else if (isThreaded() && isNoKeep() && !param->isVoid())
+      str << "  CkFreeMsg(impl_msg);\n";
   } else if (isWhenIdle()) {
     str << "  bool res = impl_obj->" << name << "();\n";
     str << "  if (res) CkCallWhenIdle(idx_" << epStr() << "(), impl_obj);\n";
