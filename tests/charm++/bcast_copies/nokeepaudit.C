@@ -294,7 +294,7 @@ class Main : public CBase_Main {
   int test = 0;          // index into the (target, kind) sequence
   struct Row { std::string target, kind; int regNokeep; long recv, distinct,
                procs, minPP, maxPP, recvProcs, badPayload;
-               int envNK; long reused = 0; };
+               int envNK; long reused; };
   std::vector<Row> rows;
   int failures = 0;  // rows whose buffer count or payload check is wrong
 
