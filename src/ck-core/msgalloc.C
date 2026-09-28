@@ -95,6 +95,23 @@ void* CkCopyMsg(void **pMsg)
   return srcMsg;
 }
 
+// Copy a PACKED message and unpack only the copy; the source stays packed and at
+// the same address. CkCopyMsg instead packs and re-unpacks the source itself, which
+// for a custom pack/unpack pair (the manual's idiom: pack deletes its input, unpack
+// builds a new object) replaces the source object, so any other holder of the old
+// pointer is left with freed memory.
+void* CkCopyPackedMsg(const void *packedMsg)
+{
+  envelope *env = UsrToEnv(packedMsg);
+  CkAssert(env->isPacked());
+  const int size = env->getTotalsize();
+  envelope *newenv = (envelope *) CmiAlloc(size);
+  CmiMemcpy(newenv, env, size);
+  setMemoryTypeMessage(newenv);
+  CkUnpackMessage(&newenv);
+  return EnvToUsr(newenv);
+}
+
 void* CkReferenceMsg(void* msg)
 {
   CmiReference(UsrToEnv(msg));
