@@ -4343,8 +4343,11 @@ nokeep
    ``threaded`` ones, see above. Entry methods taking a message are
    ``nokeep`` only when the ``nokeep`` attribute is specified; without it, each receiver
    of a broadcast gets its own copy of the message and owns it. Freeing a
-   ``nokeep`` message or modifying its contents is an error that the
-   runtime does not detect. An example can be found in
+   ``nokeep`` message during the call is an error; builds with error
+   checking (the default without ``--with-production``) abort with a
+   message naming the entry method. Modifying the contents of a
+   ``nokeep`` message is also an error, which the runtime does not
+   detect. An example can be found in
    ``examples/charm++/histogram_group``.
 
 notrace
