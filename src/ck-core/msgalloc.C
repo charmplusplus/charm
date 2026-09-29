@@ -60,9 +60,26 @@ void* CkAllocBuffer(void *msg, int bufsize)
   return EnvToUsr(packbuf);;
 }
 
+#if CMK_ERROR_CHECKING
+// The message of the [nokeep] entry method this PE is executing, if any
+// (set around the call in ck.C). The runtime owns nokeep messages, marshalled
+// parameters included, and frees them when the method returns; a free by the
+// method itself is a double free that used to surface, if at all, as a crash
+// somewhere else later.
+CkpvDeclare(void *, _nokeepMsgInFlight);
+CkpvDeclare(int, _nokeepEpInFlight);
+#endif
+
 void  CkFreeMsg(void *msg)
 {
   if (msg!=NULL) {
+#if CMK_ERROR_CHECKING
+      if (CkpvInitialized(_nokeepMsgInFlight) && msg == CkpvAccess(_nokeepMsgInFlight))
+        CkAbort("Entry method %s is [nokeep] but freed its message. The runtime owns "
+                "the message of a nokeep entry method (every marshalled entry method "
+                "that is not threaded is nokeep) and frees it when the method returns.",
+                _entryTable[CkpvAccess(_nokeepEpInFlight)]->name);
+#endif
       CmiFree(UsrToEnv(msg));
   }
 }
@@ -93,6 +110,23 @@ void* CkCopyMsg(void **pMsg)
 
   setMemoryTypeMessage(newenv);
   return srcMsg;
+}
+
+// Copy a PACKED message and unpack only the copy; the source stays packed and at
+// the same address. CkCopyMsg instead packs and re-unpacks the source itself, which
+// for a custom pack/unpack pair (the manual's idiom: pack deletes its input, unpack
+// builds a new object) replaces the source object, so any other holder of the old
+// pointer is left with freed memory.
+void* CkCopyPackedMsg(const void *packedMsg)
+{
+  envelope *env = UsrToEnv(packedMsg);
+  CkAssert(env->isPacked());
+  const int size = env->getTotalsize();
+  envelope *newenv = (envelope *) CmiAlloc(size);
+  CmiMemcpy(newenv, env, size);
+  setMemoryTypeMessage(newenv);
+  CkUnpackMessage(&newenv);
+  return EnvToUsr(newenv);
 }
 
 void* CkReferenceMsg(void* msg)
