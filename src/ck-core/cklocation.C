@@ -2474,6 +2474,26 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 
   // Figure out the mapping from indices to object IDs if one is possible
   compressor = ck::FixedArrayIndexCompressor::make(bounds);
+  if (compressor == nullptr && CkMyPe() == 0)
+  {
+    // Say so once: without a compressor the array pays for an index<->id map and
+    // a per-PE id counter. The sized CkArrayOptions constructors set bounds, but
+    // setNumInitial/setEnd do not, so this is easy to get by accident.
+    const unsigned int need = ck::FixedArrayIndexCompressor::bitsNeeded(bounds);
+    if (need > 0)
+      CkPrintf("Charm++> Note: chare array (location manager %d) has bounds that need %u"
+               " bits to pack its index, but element ids hold %d; elements use per-PE"
+               " counter ids (limit %" PRIu64 " per PE per array) and an index map.\n",
+               thisgroup.idx, need, (int)CMK_OBJID_ELEMENT_BITS,
+               (CmiUInt8)ck::ObjID::masks::ELEMENT_MASK);
+    else if (opts.getNumInitial().dimension > 0 || opts.getEnd().dimension > 0)
+      CkPrintf("Charm++> Note: chare array (location manager %d) was given an initial"
+               " size but no bounds, so its index is not packed into element ids;"
+               " elements use per-PE counter ids (limit %" PRIu64 " per PE per array)"
+               " and an index map. Call CkArrayOptions::setBounds(...) if the index"
+               " space is fixed.\n",
+               thisgroup.idx, (CmiUInt8)ck::ObjID::masks::ELEMENT_MASK);
+  }
 
   // Find and register with the load balancer
 #if CMK_LBDB_ON
@@ -2644,6 +2664,17 @@ CmiUInt8 CkLocMgr::getNewObjectID(const CkArrayIndex& idx)
   CmiUInt8 id;
   if (!lookupID(idx, id))
   {
+    // Without a compressor each PE mints ids from its own counter in the element
+    // field. Past the field's width the counter would carry into the home field and
+    // the id would silently collide with another PE's; stop here instead.
+    if (idCounter > ck::ObjID::masks::ELEMENT_MASK)
+      // Keep this under 255 characters: reconverse's CmiAbort formats into a 256-byte
+      // buffer and drops the rest.
+      CkAbort("PE %d created %" PRIu64 " elements of chare array (locmgr %d) with an"
+              " unpacked index: per-PE limit. Fix: insert from more PEs, or"
+              " CkArrayOptions::setBounds so the index packs into ids, or rebuild with"
+              " fewer -DCMK_OBJID_COLLECTION_BITS.\n",
+              CkMyPe(), (CmiUInt8)ck::ObjID::masks::ELEMENT_MASK, thisgroup.idx);
     id = idCounter++ + ((CmiUInt8)CkMyPe() << CMK_OBJID_ELEMENT_BITS);
     insertID(idx, id);
   }
