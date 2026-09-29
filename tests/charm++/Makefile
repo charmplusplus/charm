@@ -34,6 +34,7 @@ DIRS = \
   amr_1d_random \
   amr_1d_simple \
   anytime_migration \
+  unbounded_migration \
   anytime_bcastred \
   qd \
 
