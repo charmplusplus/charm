@@ -35,6 +35,7 @@ DIRS = \
   amr_1d_simple \
   anytime_migration \
   unbounded_migration \
+  unbounded_restart \
   anytime_bcastred \
   qd \
 

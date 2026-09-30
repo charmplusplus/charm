@@ -5,39 +5,35 @@
 #include "converse.h"
 #include "pup.h"
 
-// The default 64-bit ID layout is: 21 collection bits + 24 home bits + 16 element bits + 3 type tag bits.
-// Users can override the number of bits for collections using -DCMK_OBJID_COLLECTION_BITS=N.
-// Users can override the number of home bits using -DCMK_OBJID_HOME_BITS=N.
-// The element bits trade-off with the home and collection bits, while the type tag bits remain constant.
+// The 64-bit object id layout is: 3 type tag bits + COLLECTION bits + PAYLOAD bits,
+// most significant first.
+//
+//   - COLLECTION identifies the chare array (its CkGroupID). The default is 12 bits;
+//     override with -DCMK_OBJID_COLLECTION_BITS=N at build time (an AMPI build, which
+//     creates one array per virtual rank, needs more).
+//   - PAYLOAD identifies the element within the array. Its meaning is decided per
+//     array by CkLocMgr, not here: for an array with bounds that fit, it is the
+//     packed index; otherwise it is a hash key of the index followed by a number
+//     that is unique within the array (see cklocation.h, ck::objid::Layout).
+//   - The type tag bits are reserved and unused.
+//
+// No PE number is stored in the id. The home of an element is computed from the
+// id, or from the index, by CkLocMgr (design: doc/objid64-design.md).
 
-// TODO: Collection bits are not necessarily universal for 64bit IDs. They are only relevant to
-// arrays, groups, and node groups.
 #ifndef CMK_OBJID_COLLECTION_BITS
-#define CMK_OBJID_COLLECTION_BITS 21
-#endif
-
-// TODO: This can be determined at runtime for most cases. Special cases are shrink expand and checkpoint restart.
-// Home bits allow the home to be stored directly in the ID. This is necessary for location
-// management so that anyone in the system knows where to go to get location information
-// about an ID that was previously unknown.
-#ifndef CMK_OBJID_HOME_BITS
-#define CMK_OBJID_HOME_BITS 24
+#define CMK_OBJID_COLLECTION_BITS 12
 #endif
 
 #define CMK_OBJID_TYPE_TAG_BITS   3
-#define CMK_OBJID_ELEMENT_BITS    (64 - CMK_OBJID_HOME_BITS - CMK_OBJID_COLLECTION_BITS - CMK_OBJID_TYPE_TAG_BITS)
+#define CMK_OBJID_PAYLOAD_BITS    (64 - CMK_OBJID_COLLECTION_BITS - CMK_OBJID_TYPE_TAG_BITS)
 
 // Sanity checks:
 static_assert(CMK_OBJID_COLLECTION_BITS > 0,
               "CMK_OBJID_COLLECTION_BITS must be greater than 0!");
-static_assert(CMK_OBJID_COLLECTION_BITS < (64 - CMK_OBJID_TYPE_TAG_BITS),
-              "CMK_OBJID_COLLECTION_BITS must be less than (64 - CMK_OBJID_TYPE_TAG_BITS)!");
-static_assert((CMK_OBJID_COLLECTION_BITS + CMK_OBJID_ELEMENT_BITS + CMK_OBJID_HOME_BITS + CMK_OBJID_TYPE_TAG_BITS) == 64,
-              "The total number of collection + element + pe + type tag bits must be 64!");
-
-// TODO: Home may not always be directly correlated to PE. For now though, home is always a PE.
-//static_assert(((1ULL << CMK_OBJID_HOME_BITS) - 1) <= CkNumPes(),
-//              "The total number of home bits is not enough for the number of PEs being run on!");
+static_assert(CMK_OBJID_COLLECTION_BITS <= 40,
+              "CMK_OBJID_COLLECTION_BITS must leave at least 21 payload bits!");
+static_assert((CMK_OBJID_COLLECTION_BITS + CMK_OBJID_PAYLOAD_BITS + CMK_OBJID_TYPE_TAG_BITS) == 64,
+              "The total number of collection + payload + type tag bits must be 64!");
 
 namespace ck {
 
@@ -45,70 +41,50 @@ namespace ck {
  * The basic element identifier
  */
 class ObjID {
-    /// @note: may have to befriend the ArrayMgr
     public:
         ObjID(): id(0) {}
         ///
         ObjID(const CmiUInt8 id_) : id(id_) { }
         ObjID(const CkGroupID gid, const CmiUInt8 eid)
-            : id( ((CmiUInt8)gid.idx << (HOME_BITS + ELEMENT_BITS)) | eid)
+            : id( ((CmiUInt8)gid.idx << PAYLOAD_BITS) | eid)
         {
-          if ((CmiUInt8)gid.idx > (COLLECTION_MASK >> (HOME_BITS + ELEMENT_BITS)))
+          if ((CmiUInt8)gid.idx > (COLLECTION_MASK >> PAYLOAD_BITS))
           {
-            // We don't generally recommend collections bits > 30, though it's possible,
-            // b/c then ObjID only has < 32 bits for the element ID.
             CmiAbort(
-                "\nError> ObjID ran out of collection bits, please try re-building "
-                "Charm++ with a higher number of collection bits using "
-                "-DCMK_OBJID_COLLECTION_BITS=N, such that %d<N<30 (gid: %" PRIx64
-                ", current limit: %" PRIx64
-                " (%u bits))\n"
-                "Attempting to create too many chare collections!",
-                COLLECTION_BITS, (CmiUInt8)gid.idx,
-                (CmiUInt8)(COLLECTION_MASK >> (HOME_BITS + ELEMENT_BITS)),
+                "\nError> ObjID ran out of collection bits: too many chare collections"
+                " (gid %" PRIx64 ", limit %" PRIx64 " with %u bits). Rebuild Charm++ with"
+                " -DCMK_OBJID_COLLECTION_BITS=N for a larger N.\n",
+                (CmiUInt8)gid.idx, (CmiUInt8)(COLLECTION_MASK >> PAYLOAD_BITS),
                 COLLECTION_BITS);
           }
-          if (eid > (HOME_MASK | ELEMENT_MASK))
+          if (eid > PAYLOAD_MASK)
           {
-            // We don't generally recommend collections bits <= 3 though it's possible
             CmiAbort(
-                "\nError> ObjID ran out of element bits, please try re-building "
-                "Charm++ with a lower number of collection bits using "
-                "-DCMK_OBJID_COLLECTION_BITS=N, such that 3<N<%d (eid: %" PRIx64
-                ", current limit: %" PRIx64
-                " (Home: %u + Element: %u = Total: %u bits))\n"
-                "Attempting to create too many chare elements!",
-                COLLECTION_BITS, eid, (CmiUInt8)(HOME_MASK | ELEMENT_MASK), HOME_BITS,
-                ELEMENT_BITS, (HOME_BITS + ELEMENT_BITS));
+                "\nError> ObjID element payload %" PRIx64 " exceeds %u bits (limit %" PRIx64
+                "). Rebuild Charm++ with a smaller -DCMK_OBJID_COLLECTION_BITS=N.\n",
+                eid, PAYLOAD_BITS, (CmiUInt8)PAYLOAD_MASK);
           }
         }
 
-        // should tag system be query-able
-        // get collection id
+        /// The chare array this element belongs to
         inline CkGroupID getCollectionID() const {
             CkGroupID gid;
-            gid.idx = (id & COLLECTION_MASK) >> (HOME_BITS + ELEMENT_BITS);
+            gid.idx = (id & COLLECTION_MASK) >> PAYLOAD_BITS;
             return gid;
         }
-        inline int getHomeID() const { return (id & HOME_MASK) >> ELEMENT_BITS; }
-        /// get element id
-        // For now, the element ID is the part used by location management, and consists
-        // of the element bits and home bits. This is everything the location management
-        // system needs.
-        inline CmiUInt8 getElementID() const { return id & (HOME_MASK | ELEMENT_MASK); }
-        inline CmiUInt8 getID() const { return id & (COLLECTION_MASK | HOME_MASK | ELEMENT_MASK); }
+        /// The element payload: everything location management keys on
+        inline CmiUInt8 getElementID() const { return id & PAYLOAD_MASK; }
+        inline CmiUInt8 getID() const { return id & (COLLECTION_MASK | PAYLOAD_MASK); }
 
         enum bits {
-          ELEMENT_BITS    = CMK_OBJID_ELEMENT_BITS,
-          HOME_BITS       = CMK_OBJID_HOME_BITS,
+          PAYLOAD_BITS    = CMK_OBJID_PAYLOAD_BITS,
           COLLECTION_BITS = CMK_OBJID_COLLECTION_BITS,
           TYPE_TAG_BITS   = CMK_OBJID_TYPE_TAG_BITS
         };
         enum masks : CmiUInt8 {
-          ELEMENT_MASK    = ((1ULL << ELEMENT_BITS) - 1),
-          HOME_MASK       = (((1ULL << HOME_BITS) - 1) << ELEMENT_BITS),
-          COLLECTION_MASK = (((1ULL << COLLECTION_BITS) - 1) << (ELEMENT_BITS + HOME_BITS)),
-          TYPE_TAG_MASK   = (((1ULL << TYPE_TAG_BITS) - 1) << (ELEMENT_BITS + HOME_BITS + COLLECTION_BITS))
+          PAYLOAD_MASK    = ((1ULL << PAYLOAD_BITS) - 1),
+          COLLECTION_MASK = (((1ULL << COLLECTION_BITS) - 1) << PAYLOAD_BITS),
+          TYPE_TAG_MASK   = (((1ULL << TYPE_TAG_BITS) - 1) << (PAYLOAD_BITS + COLLECTION_BITS))
         };
 
     private:
@@ -128,4 +104,3 @@ inline bool operator!=(ObjID lhs, ObjID rhs) {
 
 PUPbytes(ck::ObjID)
 #endif // OBJID_H
-

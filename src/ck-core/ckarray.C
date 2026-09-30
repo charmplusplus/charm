@@ -1869,23 +1869,19 @@ void CkArray::recvMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int op
       // The element is unknown to us. If we are its home, then it just means it hasn't
       // been created yet (or has been deleted). If we are not the home this can still
       // occur if we knew the element but it has been deleted or our location cache has
-      // been purged.
-      const CkArrayIndex& idx = locMgr->lookupIdx(id);
-      handleUnknown(msg, idx, type, opts);
+      // been purged. Either way the index is not needed: the home is computable
+      // from the id.
+      handleUnknownByID(msg, id, type, opts);
     }
     else
     {
-      // TODO: This currently doesn't work due to home of an id being different than the
-      // home of an index, as well as some issues with messages arriving before a
-      // migrating element.
-      // If we haven't found the element in two tries, send it back home.
-      // This limits message sends for cases where there's a lot of migration, creating
-      // potentially long chains of stale location entries. In cases where there is not
-      // a lot of migration, the number of hops is likely to be 2 or less anyways.
-      //if (msg->array_hops() > 1 && CkMyPe() != pe)
-      //{
-      //  pe = locMgr->homePe(id);
-      //}
+      // If we haven't found the element in two tries, send it back home rather than
+      // chase a chain of stale location entries; the home always knows. (Sound now
+      // that the home of an id and the home of its index are the same PE.)
+      if (msg->array_hops() > 1 && CkMyPe() != pe)
+      {
+        pe = locMgr->homePe(id);
+      }
       sendToPe(msg, pe, type, opts);
     }
   }
@@ -1990,6 +1986,40 @@ void CkArray::deliverToElement(CkArrayMessage* msg, ArrayElement* elem)
   elem->ckInvokeEntry(msg->array_ep(), (void*)msg, true);
 }
 
+// Handle a message for an element whose index this PE cannot name (recvMsg): the
+// same choices as handleUnknown below, sourced entirely from the id. An id-addressed
+// message buffers against bufferedIDMsgs anyway; bufferForLocation only needs the
+// index for messages that carry no id.
+void CkArray::handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type,
+                                int opts)
+{
+  envelope* env = UsrToEnv(msg);
+  // Only id-addressed messages arrive here; without an id there is nothing to route on.
+  CkAssert(env->getRecipientID() != 0);
+  const bool isSmall = env->getTotalsize() < _messageBufferingThreshold;
+  const int home = locMgr->homePe(id);
+  const int ifNotThere = msg->array_ifNotThere();
+
+  // Same forwarding rule as handleUnknown: hand a small message to the home, which
+  // either knows the location or can demand-create. createhere is excluded because
+  // it must be created on this PE, not at home.
+  if (isSmall && CkMyPe() != home && ifNotThere != CkArray_IfNotThere_createhere)
+  {
+    // Forwarding gets this message there but teaches this PE nothing, so every
+    // later send to the same element would pay the same detour. Ask once.
+    locMgr->requestLocationOnce(id);
+    sendToPe(msg, home, type, opts);
+    return;
+  }
+
+  // Otherwise hold it here until the location manager resolves the id.
+  if (bufferedIDMsgs.find(id) == bufferedIDMsgs.end())
+  {
+    locMgr->requestLocation(id);
+  }
+  bufferedIDMsgs[id].push_back(msg);
+}
+
 // Handle a message to an unknown destination. If we at least know the ID, we have the
 // option to send the message to the elements home. If we don't know that, the message
 // must be buffered or trigger demand creation.
@@ -2005,6 +2035,8 @@ void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
   {
     if (isSmall && hasID && CkMyPe() != home)
     {
+      // See handleUnknownByID: forwarding alone never populates this PE's cache.
+      locMgr->requestLocationOnce(msg->array_element_id());
       sendToPe(msg, home, type, opts);
     }
     else
@@ -2020,6 +2052,7 @@ void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
     {
       // Send the message home where it will trigger demand creation, or get delivered to
       // the element if it already exists
+      locMgr->requestLocationOnce(msg->array_element_id());
       sendToPe(msg, home, type, opts);
     }
     else
