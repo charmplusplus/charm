@@ -20,7 +20,7 @@ name: reconverse-cuda
 
 on:
   push:
-    branches: [reviewed-with-reconverse]
+    branches: [reviewed-with-reconverse, objid-redesign]
     paths:
       - 'src/arch/cuda/**'
       # NOT 'tests/charm++/cuda/**' or 'examples/charm++/cuda/**': in GitHub's
@@ -55,7 +55,7 @@ on:
       - '.gitmodules'
       - '.github/workflows/reconverse-cuda.yaml'
   pull_request:
-    branches: [reviewed-with-reconverse]
+    branches: [reviewed-with-reconverse, objid-redesign]
     paths:
       - 'src/arch/cuda/**'
       # NOT 'tests/charm++/cuda/**' or 'examples/charm++/cuda/**': in GitHub's
