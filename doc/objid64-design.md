@@ -48,6 +48,11 @@ directory spread is limited to 2^H processes, and the runtime prints a warning.
 CMK_OBJID_HOME_BITS is removed. Build-time static_asserts: 1 <= C <= 40. Runtime
 checks at startup and restart: H >= 1, U >= 16.
 
+The three TYPE_TAG bits stay reserved and unused (Kale, 2026-09-29 22:33): they were
+meant for a universal object handle (analysis section 7); a use may turn up in a
+corner of the system, or inside this scheme, e.g. to mark a kind of payload. They
+are not reclaimed for capacity.
+
 Which kind a payload is comes from the collection: every PE's CkLocMgr branch knows
 whether its array has a compressor. ObjID itself does not need a kind bit.
 
@@ -445,6 +450,13 @@ PR 3  Process-level directory and cache (section 7). Measure: directory request
       counts and location-miss latency on a 64-PE node before/after.
 PR 4  Cleanup: delete CMK_OBJID_HOME_BITS remnants, CMK_RANK_0, __FAULT__ cache
       pup, tryLookupIdx variants; optional CkArrayMap::homeKey hook.
+PR 5  (optional, later) Id-carrying CkCallback variant. CkCallback's array form
+      stores the index (ckcallback.h:121), which predates the object id; invoking
+      it costs an index -> id step at the sender, and for a hashed-kind element the
+      sending PE has never dealt with, a round trip to the home. A variant built
+      where the id is known (the element itself, or a PE holding its record) sends
+      by id directly; it is the first user of a kind field in the tag bits if
+      callbacks to chares and groups are ever folded into the same handle.
 
 ## 10. Test matrix
 
