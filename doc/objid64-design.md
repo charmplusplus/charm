@@ -230,6 +230,37 @@ homePe(idx) for both kinds, no second registration exists and the creator holds
 no special entry. reclaimRemote keeps the idx -> id binding (as today, so late
 messages are not stranded) and erases the location.
 
+### 4.2a Epochs (Kale's question, 2026-09-29 22:36)
+
+The epoch mechanism carries over unchanged in meaning: it is a per-element migration
+counter, not a property of the home. It lives in the element's location entry at its
+current PE, travels in the migrate message as getEpoch(id)+1 (cklocation.C:3074), is
+installed at the destination by cache->insert (:2440), and every update that reports
+a migration carries the epoch of that migration; a receiver applies an update only if
+its epoch is newer (:2421). Migrations of one element are serialized by the element
+itself, so its epochs are totally ordered, and two informs racing to the home from
+consecutive migrations resolve to the later one whatever their arrival order. None
+of this depends on which PE the home is, so PR 1 keeps the code as is.
+
+Three places need care:
+- PR 3, same-process migration (section 7.3 R3): today the source runs
+  recordEmigration (pe = dest, epoch++, with an assert that pe == self) AFTER sending
+  the migrate message. With a shared table the destination thread can process the
+  message first, so the increment-in-place and its assert are wrong. recordEmigration
+  becomes an epoch-tagged compare-write {dest, e+1}, idempotent with the
+  destination's insert of the same value; no in-place increment anywhere.
+- CMK_GLOBAL_LOCATION_UPDATE (section 4.4): today UpdateLocation on every PE
+  fabricates the epoch as its OWN cached epoch + 1 (cklocation.C:106), which is not
+  the element's epoch; a bystander with a stale cache stores a low epoch and a later
+  older reply can overwrite the newer location. The redesigned update must carry
+  the true epoch from the emigrating PE (it has it: the same value put in the
+  migrate message), as the !CMK_LBDB_ON branch at :3133 already does.
+- Restart: entries are rebuilt with epoch 0 (createLocal's default) on every PE,
+  which is sound because every table is empty at that point; no pre-restart epoch
+  survives anywhere.
+- Aditya's intra-process live-pointer fast path must bump the epoch exactly as the
+  packed path does when it is cherry-picked (one compare-write of {dest, e+1}).
+
 ### 4.3 Delivery by id (ckarray.C)
 
 recvMsg (ckarray.C:1852) cache-miss branch: replace `lookupIdx(id); handleUnknown(idx)`
@@ -246,7 +277,9 @@ Multi-hop repair (multiHop -> cache->requestLocation(id, srcPe)) unchanged.
 
 UpdateLocation (cklocation.C:90) becomes id-keyed: cache->updateLocation(entry); if a
 local record or the compressor yields the index, also fire the index listeners.
-Never calls lookupIdx on a PE that has no record.
+Never calls lookupIdx on a PE that has no record. The entry's epoch must be the
+element's true epoch, sent by the emigrating PE (section 4.2a), not each
+receiver's cached epoch + 1 as today (:106).
 
 ### 4.5 Envelope
 
@@ -368,9 +401,12 @@ R2 A reader sees an entry that is about to change (element migrating). Benign an
    per-PE pointer table, consults the shared table (now updated), forwards; the
    multi-hop repair (multiHop) then corrects the sender. No new failure mode.
 R3 Intra-process migration b -> c. W2 on b and W3 on c write the same value
-   {c, e+1}; order does not matter. With Aditya's live-pointer fast path
-   (emigrateIntraProcess on his branch) it is one write. Messages in b's queue for
-   the element after b's W2 take the R2 path to c: one extra local hop, no loss.
+   {c, e+1}; order does not matter ONLY because both are epoch-tagged compare-writes:
+   today's recordEmigration increments in place and asserts pe == self after the
+   send, which fails if c's thread processes the migrate message first (section
+   4.2a). With Aditya's live-pointer fast path (emigrateIntraProcess on his branch)
+   it is one write. Messages in b's queue for the element after b's W2 take the R2
+   path to c: one extra local hop, no loss.
 R4 Insert or erase concurrent with a read. The map structure is only ever touched
    under the shard lock, so a reader never sees a torn bucket. (A lock-free read of
    the entry value is possible later because {pe, epoch} packs into one 64-bit
