@@ -1877,10 +1877,13 @@ void CkArray::recvMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int op
     {
       // If we haven't found the element in two tries, send it back home rather than
       // chase a chain of stale location entries; the home always knows. (Sound now
-      // that the home of an id and the home of its index are the same PE.)
-      if (msg->array_hops() > 1 && CkMyPe() != pe)
+      // that the home of an id and the home of its index are the same PE.) The home
+      // itself must follow its own entry: redirecting there would send the message
+      // to this PE again, forever.
+      if (msg->array_hops() > 1)
       {
-        pe = locMgr->homePe(id);
+        const int home = locMgr->homePe(id);
+        if (CkMyPe() != home) pe = home;
       }
       sendToPe(msg, pe, type, opts);
     }
