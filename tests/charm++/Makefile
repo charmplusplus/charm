@@ -39,6 +39,7 @@ DIRS = \
   anytime_bcastred \
   objid_home \
   objid_insert \
+  objid_sections \
   qd \
 
 FTDIRS = \
