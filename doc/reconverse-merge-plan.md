@@ -146,8 +146,28 @@ freeze tag on main. Order:
    `.github/workflows/ci.yaml`: its trigger is `branches: [main]`, so
    after step 4 it would otherwise start running the classic matrix on
    every PR to the renamed branch.
+3b. **Triage the open PRs and issues before the rename** (audits of
+   2026-09-30 in `doc/triage/`; Kale asked to be reminded of this agenda at
+   the rename and at later check-ins). GitHub moves every open PR against
+   `main` to `classic` at the rename, and only a manual retarget moves one
+   to this line, so all 148 must be handled first: retarget the tier-1
+   "still wanted" PRs (12, listed in `pr-audit-main-2026-09-30.md`), close
+   the already-equivalent, obsolete and unclear ones with a one-line note
+   citing the audit; Kale's #4013 and #3937 merge to classic first, their
+   twins #4014 and #4020 land here. Of the 482 open issues
+   (`issue-audit-2026-09-30.md`): close fixed + obsolete (~170) citing the
+   audit; label the 84 "keep" issues `reconverse` (9 critical, owners
+   needed: #3762, #3872, #1378, #2018, #3158, #2643, #3978, #3994, #4018);
+   fold the 155 ideas into one wishlist; ask reporters on the 30
+   undecidable; the 42 AMPI/TCharm ones follow the AMPI port plan.
+3c. Final classic release BEFORE the rename (Kale, 2026-09-30): v8.0.2 was
+   a tag only, with no GitHub Release and no CHANGES entry, and main has
+   moved 12 bugfix commits since. Cut v8.0.3 with CHANGES entries for
+   8.0.1-8.0.3, bump the CMake project VERSION (still 8.0.1), publish a
+   GitHub Release marked Latest (v7.0.1r currently holds that slot).
 4. Rename `main` -> `classic` (protection moves with it) and set the
-   DEFAULT branch to `reviewed-with-reconverse`. Deliberately do NOT
+   DEFAULT branch to `reviewed-with-reconverse` (Kale reconfirmed the
+   rename 2026-09-30). Deliberately do NOT
    rename this line to `main` yet (amendment, Kale 2026-08-28): with no
    branch named `main`, every stale consumer -- old clones pulling,
    scripts pinned to origin/main -- fails loudly ("couldn't find remote
