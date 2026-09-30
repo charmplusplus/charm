@@ -465,12 +465,17 @@ Q1 Which shrink/expand path is in use on rate-aware-gpu-lb: the ckcheckpoint.C
    CkResumeRestartMain route (+shrinkexpand, Cmi_myoldpe) or something newer? Does
    the LB database survive a restart (ids held across it)?
 Q2 The AMR index: custom CkArrayIndexT with how many ints (CK_ARRAYINDEX_MAXLEN)?
-   Peak elements inserted per process per array in one burst (sizes the initial
-   tranche needed at his scale, section 1 table).
+   (Kale, 2026-09-29 22:26: the initial insertion burst is not large and fits the
+   initial tranche; it is the refinements afterwards that add chares, and those run
+   between steps, where a tranche refill has time to land. So the deferred-insert
+   fallback of 3.1 should stay unreached in AMR; the index width is still open.)
 Q3 Does any device or LB code read ObjID home bits or assume home == creator PE?
    (Audit on the reviewed line says no; his branch adds handleUnknownByID and
    emigrateIntraProcess, both id-keyed.)
-Q4 Any stored ids in application state across LB steps or restarts beyond sections
-   and callbacks (CkCallback stores the index and is safe)?
+Q4 (withdrawn 2026-09-29 22:26.) The question asked about ids stored across LB
+   steps; ids never change within a run, today or in this design, so that part was
+   moot. The only case where an id changes today is a restart with a different PE
+   count for a compressible array (analysis D4), and this design removes it. Nothing
+   in application state needs auditing.
 Q5 Is rank 0 of the home process as the interim directory PE (PR 1) acceptable for
    his runs, or does he need PR 3 before the AMR work can use this?
