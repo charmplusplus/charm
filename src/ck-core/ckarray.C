@@ -1962,6 +1962,11 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
         CkAssertMsg(ctor != -1,
             "Can't demand create an element with no default ctor in the .ci file\n");
         demandCreateElement(idx, ctor);
+        // The element now exists here; the pointer looked up above predates it.
+        elem = lookup(id);
+        if (elem == nullptr)
+          CkAbort("CkArray::deliverInline: demand creation of bound element id %" PRIx64
+                  " on PE %d did not create it\n", id, CkMyPe());
       }
     }
 #if CMK_LBDB_ON
