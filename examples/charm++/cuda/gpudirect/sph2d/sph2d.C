@@ -165,7 +165,7 @@ extern void invokeMarkLeavers(const Particle*, int, RealType, RealType, RealType
     RealType, Particle**, Particle*, int*, int, bool, cudaStream_t);
 extern void invokeStats(const Particle*, int, RealType*, cudaStream_t);
 extern void invokeCheck(const Particle*, int, RealType, RealType, RealType,
-    RealType, RealType, RealType, unsigned long long*, cudaStream_t);
+    RealType, RealType, RealType, unsigned long long*, cudaStream_t, int);
 
 // The direction tag a message carries is the side of the RECEIVING patch it
 // arrived on, so the sender flips its own direction on the way out.
@@ -938,9 +938,10 @@ public:
   }
 
   // Enqueued on compute_stream; the result lands in h_check.
+  bool check_ghosts = false;   // runCheck from the compute phase: the ghosts are in place
   void runCheck() {
     invokeCheck(d_parts[cur], np, x0, y0, x1, y1, rho0, sound_c0, d_check,
-        compute_stream);
+        compute_stream, check_ghosts ? n_ghost : 0);
     sphSubmitMemcpy(h_check, d_check,
         sizeof(unsigned long long) * NUM_CHECKS, cudaMemcpyDeviceToHost,
         compute_stream);
@@ -953,8 +954,9 @@ public:
     const unsigned long long mask = h_check[CHK_BAD_MASK];
     if (!mask) return;
     CkAbort("CORRUPTION at step %d, patch (%d,%d) on PE %d: %llu of %d local "
-            "particle(s) are invalid --%s%s%s%s%s\n",
+            "particle(s) are invalid (ghosts: %llu of %d non-finite, first at %lld) --%s%s%s%s%s\n",
             step, x, y, CkMyPe(), h_check[CHK_BAD_COUNT], np,
+            h_check[6], n_ghost, (long long)(h_check[7] == ~0ull ? -1 : (long long)h_check[7]),
             (mask & CHK_BAD_NAN)     ? " non-finite state;" : "",
             (mask & CHK_BAD_RHO)     ? " density far outside the weakly-"
                                        "compressible band;" : "",
@@ -1111,7 +1113,17 @@ public:
     // The kernel in front of each counter kernel clears d_counts for it, on the same
     // stream (SPH_NO_FOLD_ZERO=1 keeps the separate cudaMemsetAsync).
     static const bool fold_zero = (getenv("SPH_NO_FOLD_ZERO") == nullptr);
-    hapiSubmitBatchBegin();   // one handoff for the phase (see computeAndIntegrate)
+    static const bool batch_halo = (getenv("SPH_NO_BATCH_HALO") == nullptr);
+    if (batch_halo) hapiSubmitBatchBegin();   // one handoff for the phase (see computeAndIntegrate)
+    // The migrants appended last step landed on comm_stream (appendParticles);
+    // EOS and the halo pack below read them on compute_stream. Nothing ordered
+    // the two streams here -- the host used to take long enough between the
+    // append and this launch for the copy to have finished, and +gpusubmit's
+    // batching removed that slack: non-finite particles within a few hundred
+    // steps (job 22293347). The same record/wait pair the compute phase uses
+    // for the ghosts, one event per step, no synchronization.
+    hapiSubmitEventRecord((void*)halo_done, comm_stream);
+    sphSubmitWaitEvent(compute_stream, halo_done);
     invokeEOS(d_parts[cur], np, rho0, sound_c0, fold_zero ? d_counts : NULL, compute_stream);
     invokePackHalo(d_parts[cur], np, x0, y0, x1, y1, support, d_halo_ptrs,
         d_counts, exch_capacity, fold_zero, compute_stream);
@@ -1120,7 +1132,7 @@ public:
     halo_pending = true;
     hapiAddCallback(compute_stream,
         CkCallback(CkIndex_Patch::haloPacked(), thisProxy[thisIndex]));
-    hapiSubmitBatchEnd();
+    if (batch_halo) hapiSubmitBatchEnd();
   }
 
   void sendHalo() {
@@ -1151,7 +1163,10 @@ public:
 
   void receiveHalo(int ref, int dir, int n, int& m, Particle*& parts,
       CkDeviceBufferPost* devicePost) {
-    halo_arrived[ref]++;
+    // Counted in appendGhosts, not here: a post method runs where the message
+    // ARRIVES, and a message that reached the old PE just after a migration
+    // is forwarded and posted again on the new one -- counted twice, it made
+    // checkArrivals abort with 9 of 8 (job 22293347). The when body runs once.
     parts = d_recv_halo + (size_t)dir * exch_capacity;
     // Direct landing only when it cannot be wrong: the halo is for THIS iteration
     // (a later one can arrive early -- that is what the per-direction slots are
@@ -1168,9 +1183,9 @@ public:
       // Nothing in flight touches this piece of the tail: everything issued so
       // far this step works on [0, np), the previous step's ghosts and migrants
       // sit below np or in the other buffer, and the region is handed out once.
-      // So the runtime need not wait for comm_stream's earlier work before it
-      // lands the copy (CkDeviceBufferPost::buffer_free) -- which also skips the
-      // stream-idle check, and under +gpusubmit the drain in front of it.
+      // So the runtime need not wait for the stream's earlier work before it
+      // lands the copy (CkDeviceBufferPost::buffer_free), which also skips the
+      // stream-idle check and, under +gpusubmit, the drain in front of it.
       // SPH_HALO_ORDERED=1 keeps the ordered receive for comparison.
       static const bool ordered = (getenv("SPH_HALO_ORDERED") != nullptr);
       devicePost[0].buffer_free = !ordered;
@@ -1179,6 +1194,7 @@ public:
   }
 
   void appendGhosts(int dir, int n) {
+    halo_arrived[my_iter]++;
     if (n == 0) return;
     if (np + n_ghost + n > part_capacity)
       CkAbort("Patch (%d,%d): %d particles+ghosts exceed capacity %d at step "
@@ -1232,7 +1248,8 @@ public:
     // The whole phase is one submitter handoff (+gpusubmit): the event record
     // and wait, the cell build, forces, integrate, the leaver mark and the
     // counts copy -- ~10 driver calls -- go over as one queue entry.
-    hapiSubmitBatchBegin();
+    static const bool batch_compute = (getenv("SPH_NO_BATCH_COMPUTE") == nullptr);
+    if (batch_compute) hapiSubmitBatchBegin();
     hapiSubmitEventRecord((void*)halo_done, comm_stream);
     sphSubmitWaitEvent(compute_stream, halo_done);
 
@@ -1240,7 +1257,7 @@ public:
     // exchange and migration produced, and (unlike the state after integrate)
     // every local particle is required to be inside this patch's rectangle,
     // which is what makes the routing check meaningful.
-    if (stats_freq > 0 && (my_iter % stats_freq) == 0) runCheck();
+    if (stats_freq > 0 && (my_iter % stats_freq) == 0) { check_ghosts = true; runCheck(); check_ghosts = false; }
 
     const int ntot = np + n_ghost;
     invokeCellBuild(d_parts[cur], ntot, x0, y0, inv_csize, ncx, ncy, ncells,
@@ -1265,7 +1282,7 @@ public:
     mig_pending = true;
     hapiAddCallback(compute_stream,
         CkCallback(CkIndex_Patch::leaversPacked(), thisProxy[thisIndex]));
-    hapiSubmitBatchEnd();
+    if (batch_compute) hapiSubmitBatchEnd();
   }
 
   void sendLeavers() {
@@ -1314,7 +1331,7 @@ public:
 
   void receiveParticles(int ref, int dir, int adv, int n, int& m,
       Particle*& parts, CkDeviceBufferPost* devicePost) {
-    parts_arrived[ref]++;
+    // Counted in appendParticles (see receiveHalo).
     // Sent with step ref, so it is the answer for ref+1. A message two steps
     // ahead would land in the slot this patch has yet to read; the migration
     // exchange makes that impossible, and this says so out loud.
@@ -1350,6 +1367,7 @@ public:
   // ref, not my_iter: the slot is the one the sender's step parity chose in
   // receiveParticles, and a message from step my_iter+1 is legitimate.
   void appendParticles(int ref, int dir, int n) {
+    parts_arrived[my_iter]++;
     if (n == 0) return;
     if (np + n > part_capacity)
       CkAbort("Patch (%d,%d): %d particles exceed capacity %d at step %d; "

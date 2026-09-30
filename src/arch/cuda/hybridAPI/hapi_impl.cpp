@@ -2576,8 +2576,10 @@ void hapiSubmitIssue(HapiSubmitOp& op) {
   }
 }
 
+static thread_local bool hapi_is_submitter_thread = false;
 void hapiSubmitThread(int k) {
   HapiSubmitState* st = hapi_submit;
+  hapi_is_submitter_thread = true;
   // A thread inherits its creator's affinity -- one PE's core. Widen it, or the
   // submitter time-slices with that PE. CHARM_GPU_SUBMIT_CPUS=<first>-<last>
   // names the cores (e.g. the rank's idle ones); default: any CPU.
@@ -2648,6 +2650,14 @@ inline void hapiSubmitBatchFlush() {
 inline bool hapiSubmitPush(const HapiSubmitOp& op) {
   HapiSubmitState* st = hapi_submit;
   if (st == nullptr) return false;
+  // Only a PE may push: a push from any other thread would land in ring 0
+  // (CmiMyRank() is 0 on a thread with no Converse state) and reorder against
+  // PE 0's real work. A submitter that reaches here is issuing an op that
+  // itself tries to queue.
+  if (hapi_is_submitter_thread) {
+    fprintf(stderr, "HAPI submitter: an issued op pushed a new op (kind %u) from the submitter thread\n", op.kind);
+    abort();
+  }
   if (hapi_submit_batch_depth > 0) {
     if (hapi_submit_batch == nullptr) hapi_submit_batch = new HapiSubmitOp[HAPI_SUBMIT_BATCH_MAX];
     hapi_submit_batch[hapi_submit_batch_n++] = op;

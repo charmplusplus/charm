@@ -427,6 +427,21 @@ __global__ void checkKernel(const Particle* parts, int n_local, RealType x0,
   }
 }
 
+// Diagnostic: how many of the ghosts in [n_local, n_local + n_ghost) are
+// non-finite, and the first such index (relative to n_local). Runs on report
+// steps behind checkKernel; no extra synchronization.
+__global__ void ghostCheckKernel(const Particle* parts, int n_local, int n_ghost,
+    unsigned long long* out) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= n_ghost) return;
+  const Particle p = parts[n_local + i];
+  if (!isfinite(p.x) || !isfinite(p.y) || !isfinite(p.rho) || !isfinite(p.p) ||
+      !isfinite(p.vx) || !isfinite(p.vy)) {
+    atomicAdd(&out[6], 1ull);
+    atomicMin(&out[7], (unsigned long long)i);
+  }
+}
+
 // ---------------------------------------------------------------- launch ----
 void invokeCellBuild(const Particle* d_parts, int n, RealType x0, RealType y0,
     RealType inv_csize, int ncx, int ncy, int ncells, int* d_cnt, int* d_off,
@@ -519,9 +534,14 @@ void invokeStats(const Particle* d_parts, int n_local, RealType* d_out,
 
 void invokeCheck(const Particle* d_parts, int n_local, RealType x0, RealType y0,
     RealType x1, RealType y1, RealType rho0, RealType c0,
-    unsigned long long* d_out, cudaStream_t s) {
+    unsigned long long* d_out, cudaStream_t s, int n_ghost) {
   sphSubmitMemset(d_out, 0,
       sizeof(unsigned long long) * NUM_CHECKS, s);
+  if (n_ghost > 0)
+    hapiSubmit(s, [=]() {
+      hapiCheck(cudaMemsetAsync(d_out + 7, 0xff, sizeof(unsigned long long), s));   // "first bad" = max
+      ghostCheckKernel<<<nblocks(n_ghost), BLOCK_1D, 0, s>>>(d_parts, n_local, n_ghost, d_out);
+    });
   if (n_local > 0)
     hapiSubmit(s, [=]() {
       checkKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, x0, y0,
