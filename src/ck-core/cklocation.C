@@ -4530,8 +4530,12 @@ void CkLocMgr::dispatchGPUMsg(CmiUInt8 id)
                CkMyPe(), (unsigned long long)id);
     CkpvAccess(_currentLocRec) = NULL;
     CkRdmaDeviceMarkMigrationPayload(true);
+    // Always tagged: a stream-less CkDeviceBuffer now means "complete at send
+    // time", and a payload packed with no migration stream was copied on the
+    // null stream, which the per-thread stream orders behind.
     thisProxy[gpuData.toPe].immigrateGPU(id, gpuData.size,
-      (gpuData.stream ? CkDeviceBuffer(gpuData.data, gpuData.size, (hapiStream_t)gpuData.stream) : CkDeviceBuffer(gpuData.data, gpuData.size)), CkMyPe());
+      CkDeviceBuffer(gpuData.data, gpuData.size,
+                     gpuData.stream ? (hapiStream_t)gpuData.stream : hapiStreamPerThread), CkMyPe());
     CkRdmaDeviceMarkMigrationPayload(false);
     if (migDbg())
       CkPrintf("[GPUSENT %d] id=%llu\n", CkMyPe(), (unsigned long long)id);

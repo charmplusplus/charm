@@ -28,6 +28,16 @@ static inline cudaError_t sphDrainSync(cudaStream_t s) {
   return cudaStreamSynchronize(s);
 }
 
+// Every device send here is made from the completion callback of the kernel
+// that packed the buffer, so the buffer is complete when the send is issued
+// and the runtime need not mark the stream (a flag write per send). Passing a
+// stream is the old contract: the send orders behind that stream's tail.
+// SPH_SEND_STREAM=1 restores it, for A/B on one binary.
+static inline CkDeviceBuffer sphSendBuffer(const void* ptr, const CkCallback& cb, cudaStream_t s) {
+  static const bool tag = getenv("SPH_SEND_STREAM") != nullptr;
+  return tag ? CkDeviceBuffer(ptr, cb, s) : CkDeviceBuffer(ptr, cb);
+}
+
 // Device buffers come from hapiMalloc/hapiFree, which are the device pool
 // under +gpupool (an arena the peers have already opened, no driver call, no
 // device sync) and cudaMalloc/cudaFree without it. The runtime owns the
@@ -1153,11 +1163,14 @@ public:
     for (int d = 0; d < NUM_DIRS; d++) {
       if (!halo_peer[d]) continue;
       const int cnt = h_counts[d];
+      // No stream: this runs from the pack's completion callback, so the halo
+      // is complete and the runtime marks nothing (SPH_SEND_STREAM=1 tags the
+      // old way, a flag per send).
       thisProxy(nbr_x[d], nbr_y[d]).receiveHalo(my_iter, flipDir(d), cnt, cnt,
-          (outstanding_sends++,
-           CkDeviceBuffer(d_send_halo + (size_t)d * exch_capacity,
-               CkCallback(CkIndex_Patch::sendDone(), thisProxy[thisIndex]),
-               comm_stream)));
+          (outstanding_sends++, sphSendBuffer(
+           d_send_halo + (size_t)d * exch_capacity,
+           CkCallback(CkIndex_Patch::sendDone(), thisProxy[thisIndex]),
+           comm_stream)));
     }
   }
 
@@ -1322,10 +1335,10 @@ public:
       n_fluid -= cnt;
       thisProxy(nbr_x[d], nbr_y[d]).receiveParticles(my_iter, flipDir(d),
           my_adv_next, cnt, cnt,
-          (outstanding_sends++,
-           CkDeviceBuffer(d_send_mig + (size_t)d * exch_capacity,
-               CkCallback(CkIndex_Patch::sendDone(), thisProxy[thisIndex]),
-               comm_stream)));
+          (outstanding_sends++, sphSendBuffer(
+           d_send_mig + (size_t)d * exch_capacity,
+           CkCallback(CkIndex_Patch::sendDone(), thisProxy[thisIndex]),
+           comm_stream)));
     }
   }
 

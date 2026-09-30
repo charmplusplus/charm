@@ -1540,6 +1540,40 @@ static bool forwardRepairReadyOrPark(envelope* env, int newPe, int opts,
   return false;
 }
 
+// The same gate for a sender that marked its stream with a pinned flag and
+// recorded no event (the normal same-process send). A flag lands without a
+// callback, so the wait is a scheduler-loop poll; QdCreate holds quiescence
+// across it exactly as hapiAddCallback does above.
+struct DeviceForwardFlagWait
+{
+  DeviceForwardRepairCtx* ctx;
+  int rank;
+  uint32_t seq;
+};
+
+static void deviceForwardFlagPoll(void* arg)
+{
+  DeviceForwardFlagWait* w = (DeviceForwardFlagWait*)arg;
+  if (!hapiFlagLanded(w->rank, w->seq)) {
+    CcdCallOnCondition(CcdSCHEDLOOP, deviceForwardFlagPoll, w);
+    return;
+  }
+  QdProcess(1);
+  deviceForwardRepairReady(w->ctx, NULL);
+  delete w;
+}
+
+static bool forwardRepairFlagReadyOrPark(envelope* env, int newPe, int opts,
+                                         int rank, uint32_t seq)
+{
+  if (hapiFlagLanded(rank, seq)) return true;
+  DeviceForwardRepairCtx* ctx = new DeviceForwardRepairCtx{env, newPe, opts};
+  QdCreate(1);
+  CcdCallOnCondition(CcdSCHEDLOOP, deviceForwardFlagPoll,
+                     new DeviceForwardFlagWait{ctx, rank, seq});
+  return false;
+}
+
 CkDeviceRepairResult CkRdmaDeviceRepairForward(envelope* env, int newPe, int opts) {
   if (!CMI_IS_ZC_DEVICE(env)) return CkDeviceRepairResult::CallerDelivers;
   if (env->getMsgtype() != ForArrayEltMsg) return CkDeviceRepairResult::CallerDelivers;
@@ -1598,9 +1632,10 @@ CkDeviceRepairResult CkRdmaDeviceRepairForward(envelope* env, int newPe, int opt
       }
       // The NIC reads the source outside any CUDA stream, so the production
       // has to be complete, not merely ordered behind. The memcpy prepare marks
-      // it with memcpy_event; the direct prepare recorded its slot's src event
-      // on the producing stream. A null memcpy event means the send blocked at
-      // send time and the data is already there.
+      // it with a pinned flag (ready_seq), or with memcpy_event when no flag
+      // could be issued; the direct prepare recorded its slot's src event on
+      // the producing stream. Neither flag nor event means the data was
+      // complete at send time (no stream given, or the send blocked).
       if (direct_prepared) {
         hapi_ipc_device_info& info = csv_gpu_manager.hapi_ipc_device_infos[b.device_idx];
         if (!forwardRepairReadyOrPark(env, newPe, opts, info.src_event_pool[b.event_idx]))
@@ -1614,6 +1649,9 @@ CkDeviceRepairResult CkRdmaDeviceRepairForward(envelope* env, int newPe, int opt
                 + csv_gpu_manager.shm_chunk_size * b.device_idx
                 + sizeof(hapiIpcMemHandle_t)) + b.event_idx;
         slot->dst_flag.store(true, std::memory_order_release);
+      } else if (b.ready_seq != 0) {
+        if (!forwardRepairFlagReadyOrPark(env, newPe, opts, b.ready_rank, b.ready_seq))
+          return CkDeviceRepairResult::Parked;
       } else if (b.memcpy_event != NULL) {
         if (!forwardRepairReadyOrPark(env, newPe, opts, (hapiEvent_t)b.memcpy_event))
           return CkDeviceRepairResult::Parked;
@@ -1847,6 +1885,11 @@ struct DeviceRestageReq {          // receiver -> sender
   // ordered against neither.
   const void* src_event;           // memcpy path: the sender's recorded event
   int src_event_idx;               // staged path: the sender's IPC event slot
+  // memcpy path, the normal case: the pinned flag the sender issued instead of
+  // an event (CmiDeviceBuffer::ready_seq). Read with a plain load on the PE
+  // that issued it; seq 0 means none.
+  int src_flag_rank;
+  uint32_t src_flag_seq;
   size_t cnt;
   bool inter_node;
   CmiNcpyBuffer dest_ncpy;         // inter-node only: registered destination
@@ -1972,6 +2015,7 @@ static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
                                  CkGroupID dest_aid, CmiUInt8 dest_id,
                                  bool src_staged, size_t src_comm_offset,
                                  const void* src_event, int src_event_idx,
+                                 int src_flag_rank, uint32_t src_flag_seq,
                                  size_t cnt, void* dest_ptr, size_t dest_cnt,
                                  bool inter_node)
 {
@@ -1999,6 +2043,8 @@ static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
   req->src_comm_offset = src_comm_offset;
   req->src_event = src_event;
   req->src_event_idx = src_event_idx;
+  req->src_flag_rank = src_flag_rank;
+  req->src_flag_seq = src_flag_seq;
   req->cnt = cnt;
   req->inter_node = inter_node;
   if (inter_node) {
@@ -2030,10 +2076,24 @@ static void requestDeviceRestage(int srcPe, void* dest_op, const void* src_ptr,
   CmiSyncSendAndFree(srcPe, sizeof(DeviceRestageReq), (char*)req);
 }
 
+static void deviceRestageFlagPoll(void* arg)
+{
+  device_restage_req_bridge(arg);
+}
+
 extern "C" void* device_restage_req_bridge(void* arg)
 {
-  QdProcess(1);
   DeviceRestageReq* req = (DeviceRestageReq*)arg;
+  // The normal memcpy sender marked its stream with a pinned flag and recorded
+  // no event; until it lands the bytes are not there to re-read. A flag has no
+  // callback, so poll from the scheduler loop. The request's QdCreate keeps
+  // holding quiescence until the pass below balances it.
+  if (req->src_flag_seq != 0 &&
+      !hapiFlagLanded(req->src_flag_rank, req->src_flag_seq)) {
+    CcdCallOnCondition(CcdSCHEDLOOP, deviceRestageFlagPoll, req);
+    return NULL;
+  }
+  QdProcess(1);
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
   // Read back whatever this PE still owns. A staged send copied the payload
@@ -2825,6 +2885,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
                              source.ipc_protocol == CmiIpcProtocol::STAGED,
                              source.comm_offset,
                              source.memcpy_event, source.event_idx,
+                             source.ready_rank, source.ready_seq,
                              (size_t)dest.cnt, arrPtrs[i], (size_t)arrSizes[i],
                              mode != CkNcpyModeDevice::IPC);
         continue;  // completion deferred until the retransmit lands
@@ -2872,6 +2933,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
                              source.ipc_protocol == CmiIpcProtocol::STAGED,
                              source.comm_offset,
                              source.memcpy_event, source.event_idx,
+                             source.ready_rank, source.ready_seq,
                              (size_t)dest.cnt, arrPtrs[i], (size_t)arrSizes[i],
                              mode != CkNcpyModeDevice::IPC);
         continue;  // completion deferred until the retransmit lands
@@ -4426,16 +4488,20 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
       } else {
         // The receiver gates its copy on this on the host (DeviceRecvPending):
         // a pinned flag it reads with a plain load, or, when this ring has no
-        // slot, the event it queries.
+        // slot, the event it queries. A send made without a stream carries
+        // neither -- the caller is sending from the completion callback of
+        // the work that produced the buffer, or the data is static -- and the
+        // receiver reads "no flag, no event" as complete.
         buffers[i]->ready_rank = -1;
         buffers[i]->ready_seq = 0;
-        {
-          int rank = -1;
-          uint32_t seq = 0;
-          if (hapiFlagIssue(buffers[i]->hapi_stream, &rank, &seq)) {
-            buffers[i]->ready_rank = rank;
-            buffers[i]->ready_seq = seq;
-          }
+        buffers[i]->memcpy_event = NULL;
+        if (buffers[i]->source_ready) continue;
+        int rank = -1;
+        uint32_t seq = 0;
+        if (hapiFlagIssue(buffers[i]->hapi_stream, &rank, &seq)) {
+          buffers[i]->ready_rank = rank;
+          buffers[i]->ready_seq = seq;
+          continue;   // one driver call; the event is only its fallback
         }
         buffers[i]->memcpy_event = ckDeviceRecordMemcpyEvent(buffers[i]->hapi_stream);
         if (buffers[i]->memcpy_event == NULL)  // no event available; fall back

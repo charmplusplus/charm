@@ -96,14 +96,19 @@ public:
     cb = cb_;
   }
 
+  // With a stream: the buffer is produced by work on that stream and the send
+  // orders behind its tail. Without one: the buffer is complete now (see
+  // CmiDeviceBuffer::source_ready).
   explicit CkDeviceBuffer(const void* ptr_, hapiStream_t hapi_stream_) : CmiDeviceBuffer(ptr_, 0) {
     cb = CkCallback(CkCallback::ignore);
     hapi_stream = hapi_stream_;
+    source_ready = false;
   }
 
   explicit CkDeviceBuffer(const void* ptr_, const CkCallback& cb_, hapiStream_t hapi_stream_) : CmiDeviceBuffer(ptr_, 0) {
     cb = cb_;
     hapi_stream = hapi_stream_;
+    source_ready = false;
   }
 
   explicit CkDeviceBuffer(const void* ptr_, size_t cnt_) : CmiDeviceBuffer(ptr_, cnt_) {
@@ -117,11 +122,13 @@ public:
   explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, hapiStream_t hapi_stream_) : CmiDeviceBuffer(ptr_, cnt_) {
     cb = CkCallback(CkCallback::ignore);
     hapi_stream = hapi_stream_;
+    source_ready = false;
   }
 
   explicit CkDeviceBuffer(const void* ptr_, size_t cnt_, const CkCallback& cb_, hapiStream_t hapi_stream_) : CmiDeviceBuffer(ptr_, cnt_) {
     cb = cb_;
     hapi_stream = hapi_stream_;
+    source_ready = false;
   }
 
   void pup(PUP::er &p) {

@@ -270,7 +270,7 @@ void Cell::sendPositions() {
   for (int num = 0; num < inbrs; num++)
     computeArray[computesList[num]].calculateForces(
         stepCount, num, thisIndex.x, thisIndex.y, thisIndex.z, myNumParts,
-        CkDeviceBuffer(d_pos, stream));
+        leanmdSendBuffer(d_pos, stream));   // from positionsReady: complete
 }
 
 void Cell::receiveForces(int ref, int ordinal, int sourcePe, double readyMs, int& n, vec3*& f,
@@ -373,8 +373,8 @@ void Cell::sendMigrants() {
     // landing slot: two different neighbours never mirror to the same value.
     cellArray(WRAP_X(thisIndex.x+dx), WRAP_Y(thisIndex.y+dy), WRAP_Z(thisIndex.z+dz))
         .receiveMigrants(stepCount, (inbrs - 1) - num, cnt, std::max(cnt, 1),
-                         CkDeviceBuffer(d_send_parts + (size_t)num * exch_capacity,
-                                        stream));
+                         leanmdSendBuffer(d_send_parts + (size_t)num * exch_capacity,
+                                          stream));   // from binDone: complete
   }
 }
 

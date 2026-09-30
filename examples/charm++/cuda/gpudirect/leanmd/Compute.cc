@@ -455,14 +455,16 @@ void Compute::sendForces() {
 
   CkCallback sentCb(CkIndex_Compute::forceSendDone(), thisProxy[thisIndex]);
 
+  // From forcesReady: the force arrays are complete, so no stream is tagged
+  // (leanmdSendBuffer) and the runtime marks nothing per send.
   cellArray(cellIdx[0][0], cellIdx[0][1], cellIdx[0][2])
       .receiveForces(stepCount, ordinal[0], CkMyPe(), readyMs, nPart[0],
-                     CkDeviceBuffer(d_force[0], sentCb, stream));
+                     leanmdSendBuffer(d_force[0], sentCb, stream));
 
   if (!selfCompute)
     cellArray(cellIdx[1][0], cellIdx[1][1], cellIdx[1][2])
         .receiveForces(stepCount, ordinal[1], CkMyPe(), readyMs, nPart[1],
-                       CkDeviceBuffer(d_force[1], sentCb, stream));
+                       leanmdSendBuffer(d_force[1], sentCb, stream));
 }
 
 //pack important information if I am moving

@@ -226,6 +226,23 @@ inline int atomScalePct() {
   return pct;
 }
 
+// Every device send in leanmd is made from the completion callback of the
+// kernel that produced the buffer (positionsReady, binDone, forcesReady), so
+// the buffer is complete when the send is issued and the runtime need not
+// mark the stream (a flag write per send). Passing the stream is the old
+// contract: the send orders behind that stream's tail. LEANMD_SEND_STREAM=1
+// restores it, for A/B on one binary.
+inline bool leanmdTagSends() {
+  static const bool tag = getenv("LEANMD_SEND_STREAM") != nullptr;
+  return tag;
+}
+inline CkDeviceBuffer leanmdSendBuffer(const void* ptr, cudaStream_t s) {
+  return leanmdTagSends() ? CkDeviceBuffer(ptr, s) : CkDeviceBuffer(ptr);
+}
+inline CkDeviceBuffer leanmdSendBuffer(const void* ptr, const CkCallback& cb, cudaStream_t s) {
+  return leanmdTagSends() ? CkDeviceBuffer(ptr, cb, s) : CkDeviceBuffer(ptr, cb);
+}
+
 // Atoms in cell (x,y,z) under the selected density profile, before scaling.
 inline int cellParticleCountFull(int x, int y, int z) {
   const int nCells = cellArrayDimX * cellArrayDimY * cellArrayDimZ;

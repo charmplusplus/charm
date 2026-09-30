@@ -76,15 +76,23 @@ public:
   // stream, which has no ordering against the stream still producing the data,
   // so the two have to be tied together somehow. This carries an event recorded
   // on the sender's stream for the receiver to wait on -- a raw handle, which is
-  // meaningful precisely because MEMCPY means one process. Null when the sender
-  // did not record one, in which case the receiver must not assume ordering.
+  // meaningful precisely because MEMCPY means one process. Recorded only when
+  // no pinned flag (below) could be issued; null with ready_seq 0 means the
+  // data was complete at send time and the receiver may read at once.
   void* memcpy_event;
   // Same-process sends: the pinned flag the sender issued on its stream after
   // the work producing this buffer (hapiFlagIssue). The receiver reads it with
   // a plain load before issuing its copy; ready_seq 0 means none was issued
-  // and memcpy_event is what to query.
+  // and memcpy_event, if any, is what to query.
   int ready_rank;
   uint32_t ready_seq;
+  // The caller passed no stream: the buffer is complete at send time -- it is
+  // sending from the completion callback of the work that produced it, or the
+  // data is static -- so the same-process path marks nothing on any stream.
+  // Passing a stream makes this false and puts the flag above at that
+  // stream's tail. hapi_stream then holds the per-thread stream only for the
+  // paths that still need one (staging copies, the deferred prepare).
+  bool source_ready;
 
   // Store the actual data for host-staged inter-node messaging (no GPUDirect RDMA)
   // Whether the sender prepared a source this buffer's receiver can actually
@@ -117,6 +125,7 @@ public:
     ready_rank = -1;
     ready_seq = 0;
     hapi_stream = hapiStreamPerThread;
+    source_ready = true;
 
     sender_prepared = false;
     data_stored = false;
