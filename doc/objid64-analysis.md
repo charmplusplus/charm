@@ -358,3 +358,22 @@ Q3 e417584dd keys its pending-request set by the element id; with H_id defined a
    is anything in his device/LB code reading the home bits directly? (Audit says no on
    the reviewed line.)
 Q4 Any stored ids in application state across LB steps or restarts (sections, callbacks)?
+
+## 7. Singleton chares, groups, and the three tag bits (Kale's question, 2026-09-29 22:29)
+
+Singleton chares never get an ObjID. They are addressed by CkChareID {int onPE; void*
+objPtr} (charm.h:281): a PE plus a pointer, or, in builds without CMK_CHARE_USE_PTR, an
+index into the per-PE chare table (ck.C:79-82) so that checkpoints can re-create them.
+They do not migrate, so they have no location management and nothing in this design
+touches them. Groups and nodegroups are addressed by CkGroupID alone; the ObjID's
+collection field carries a group id, but no ObjID is ever minted for a group or
+nodegroup (every construction site is an array element or an LB object id).
+
+The three TYPE_TAG bits were reserved in the original 2013 header (Ramprasad
+Venkataraman, 8a56e4755, with the comment "should tag system be query-able") to make
+ObjID a universal handle that could distinguish kinds of objects. They have never been
+given accessors and are neither written nor read anywhere in the tree today: only the
+mask definitions in objid.h mention them. The design keeps them reserved (payload 49,
+not 52) because a universal handle is still the direction of the open objid_t issues
+(#172-#179, e.g. callbacks carrying an id instead of an index), and reclaiming three
+bits would not change any capacity that matters.
