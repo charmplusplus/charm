@@ -709,6 +709,14 @@ public:
   }
 
   void requestLocationOnce(CmiUInt8 id) { cache->requestLocationOnce(id); }
+  /// Ask the home of idx for its location by index, whether or not this PE already
+  /// holds an id for it. The home buffers the request until the element exists, so
+  /// this is the request to pair with a demand-creation request.
+  void requestLocationAtHome(const CkArrayIndex& idx)
+  {
+    const int home = homePe(idx);
+    if (home != CkMyPe()) thisProxy[home].requestLocation(idx, CkMyPe());
+  }
 
   int getMapHandle() const { return mapHandle; }
   CkGroupID getMap() const { return mapID; }

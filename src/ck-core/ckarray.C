@@ -2152,6 +2152,11 @@ void CkArray::bufferForCreation(CkArrayMessage* msg, const CkArrayIndex& idx)
 
     // Send the request to the target PE
     thisProxy[home].requestDemandCreation(idx, ctor, pe);
+    // The request carries no reply for the requester: the home creates the element
+    // (or finds it exists) and, for createhome, tells nobody. Ask the home for the
+    // location by index as well; it buffers that request until the element exists and
+    // its answer is what flushes bufferedCreationMsgs here.
+    locMgr->requestLocationAtHome(idx);
   }
   bufferedCreationMsgs[idx].push_back(msg);
 }
