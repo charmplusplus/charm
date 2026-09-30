@@ -38,6 +38,7 @@ DIRS = \
   unbounded_restart \
   anytime_bcastred \
   objid_home \
+  objid_insert \
   qd \
 
 FTDIRS = \
