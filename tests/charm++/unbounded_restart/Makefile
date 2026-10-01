@@ -24,13 +24,14 @@ test: all
 
 smptest: test
 
-# Reconverse only: checkpoint from 2 processes x 1 PE, restart on 1 process x 2 PEs
-# and on 2 processes x 1 PE. (Not 2 processes x 2 PEs: a reconverse restart hang.)
+# Reconverse only: checkpoint from 2 processes x 1 PE, restart on 1 process x 2 PEs,
+# on 2 processes x 1 PE, and on 2 processes x 2 PEs (the shape of charm #4018).
 testprocs: all
 	-rm -rf ckptlog
 	$(LCRUN) -n 2 ./restart +pe 2
 	./restart +pe 2 +restart ckptlog
 	$(LCRUN) -n 2 ./restart +pe 2 +restart ckptlog
+	$(LCRUN) -n 2 ./restart +pe 4 +restart ckptlog
 	-rm -rf ckptlog
 
 clean:
