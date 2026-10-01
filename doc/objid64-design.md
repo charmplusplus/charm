@@ -167,6 +167,33 @@ not part of this design. The deferred-insert fallback stays the v1 behaviour.
 Uniqueness: u is unique within the collection by construction (disjoint tranches).
 Two different indices may share a key; the key takes no part in uniqueness.
 
+Implementation notes (PR 1b, 2026-09-30), where the code departs from or refines the
+text above:
+- Deferred insertion is a re-send, not a queue of half-built elements: when minting
+  fails, CkLocMgr::registerNewElement returns null and CkArray::insertElement hands
+  the constructor message and index to CkLocMgr::deferInsertion on that PE;
+  grantTranche (rank 0 of the process) wakes every PE that deferred
+  (resumeDeferredInsertions), and the PE re-runs insertElement. Demand creation and
+  remote insertion go through the same entry, so they are covered.
+- The fast path is lock-free: read `end` (acquire), then fetch_add the cursor; a
+  tranche is installed by storing the cursor first and `end` (release) second, so a
+  number taken against a stale cursor fails the bound test and is wasted, never
+  reused. The slow path (swap in the spare, request, register as waiter) holds
+  _nodeLock. At most one spare is held; the request goes out when half of the
+  current tranche is used, and again whenever a process is exhausted.
+- The allocator hands out the pool bottom up in powers of two: the requester asks
+  for twice its current tranche; PE 0 clamps between the initial tranche size and
+  region / (8 * processes). A zero-length grant means the pool is spent and the
+  requester aborts with a message naming setBounds, +objid_expand and
+  CMK_OBJID_COLLECTION_BITS.
+- Restart does not wait for grants: the restored layout is marked afterRestart,
+  getTranche then starts empty and sends the request (rank 0 does this from
+  CkLocMgr::pup, so it is usually answered before user code inserts), and any
+  insertion that comes first is simply deferred. Per-process cursors are not
+  checkpointed at all; only the allocator cursor is.
+- `+objid_tranche_log2 N` caps every tranche at 2^N numbers so tests can see refills
+  and deferral at small scale; it is pupped with the layout.
+
 ### 3.2 Index hash key
 
     ck::indexHashKey(const CkArrayIndex& idx) -> uint32 in [0, 2^H)
@@ -524,6 +551,9 @@ PR 1  Layout (section 1), packed budget (2), hashed minting with per-process
       by id (4.4), lookupIdx scan removed (3.4), persisted layout, allocator cursor
       and directory rebuild on restart (6). Home PE = rank 0
       of the hashed process for hashed-kind arrays; per-PE caches unchanged.
+      Landed as PR 1a (#4017, layout/home/delivery, per-process initial tranche
+      only) and PR 1b (allocator, refills, deferred insertion, restart with any
+      process count).
       Tests: PR 0's test, bcastred, megatest, pingpong, ckpt tests (tests/charm++/
       chkpt, shrink/expand example), sections test after restart.
 PR 2  Manual: id layout, build flags, what "compressible" means, the sizing note,
