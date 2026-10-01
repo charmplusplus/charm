@@ -2021,9 +2021,8 @@ void CkArray::handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t ty
   // it must be created on this PE, not at home.
   if (isSmall && CkMyPe() != home && ifNotThere != CkArray_IfNotThere_createhere)
   {
-    // Forwarding gets this message there but teaches this PE nothing, so every
-    // later send to the same element would pay the same detour. Ask once.
-    locMgr->requestLocationOnce(id);
+    // The delivering PE sends this PE the location (multiHop on a forwarded
+    // message), so later sends go direct.
     sendToPe(msg, home, type, opts);
     return;
   }
@@ -2051,8 +2050,7 @@ void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
   {
     if (isSmall && hasID && CkMyPe() != home)
     {
-      // See handleUnknownByID: forwarding alone never populates this PE's cache.
-      locMgr->requestLocationOnce(msg->array_element_id());
+      // The delivering PE sends this PE the location (multiHop on a forwarded message).
       sendToPe(msg, home, type, opts);
     }
     else
@@ -2067,8 +2065,7 @@ void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
         msg->array_ifNotThere() != CkArray_IfNotThere_createhere)
     {
       // Send the message home where it will trigger demand creation, or get delivered to
-      // the element if it already exists
-      locMgr->requestLocationOnce(msg->array_element_id());
+      // the element if it already exists (either way the delivery repairs this PE's cache)
       sendToPe(msg, home, type, opts);
     }
     else

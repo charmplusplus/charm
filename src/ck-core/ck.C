@@ -1347,7 +1347,10 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
     // First see if we already have a direct pointer to the object
     _SET_USED(env, 0);
     ck->process(); // ck->process() updates mProcessed count used in QD
-    if (msg->array_hops()>1) {
+    // recvMsg counts a hop each time a PE forwards; a direct delivery arrives with
+    // 0. Any forwarded message (through the home or a stale location) teaches the
+    // sender where the element is, so later sends go direct.
+    if (msg->array_hops() >= 1) {
       CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
     }
     bool doFree = true;
