@@ -649,6 +649,10 @@ class CkArray : public CkReductionMgr
   // We need a separate buffer for demand creation messages because it also serves as an
   // indicator of whether a demand creation request has already been sent.
   IndexMsgBuffer bufferedCreationMsgs;
+  // Home side: indices whose demand creation was approved but whose element has
+  // not registered yet. A second request in that window is not approved again
+  // (its sender's location request is answered once the element exists).
+  std::unordered_set<CkArrayIndex, IndexHasher> pendingDemandCreations;
 
   CkMagicNumber<ArrayElement> magic;  // To detect heap corruption
   CkLocMgr* locMgr;

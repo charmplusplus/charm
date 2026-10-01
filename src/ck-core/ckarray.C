@@ -1058,6 +1058,14 @@ bool CkArray::insertElement(CkArrayMessage* m, const CkArrayIndex& idx,
 
   // Register the new element with the location manager
   CkLocRec* rec = locMgr->registerNewElement(idx);
+  if (rec == nullptr)
+  {
+    // Hashed-kind id and this process is out of unique numbers until the allocator's
+    // next tranche arrives: the insertion completes then (the element does not exist
+    // when this call returns, even for a local [inline] insert).
+    locMgr->deferInsertion(this, m, idx, listenerData);
+    return false;
+  }
   CmiUInt8 id = rec->getID();
 
   // Make sure the element doesn't already exist
@@ -2013,9 +2021,8 @@ void CkArray::handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t ty
   // it must be created on this PE, not at home.
   if (isSmall && CkMyPe() != home && ifNotThere != CkArray_IfNotThere_createhere)
   {
-    // Forwarding gets this message there but teaches this PE nothing, so every
-    // later send to the same element would pay the same detour. Ask once.
-    locMgr->requestLocationOnce(id);
+    // The delivering PE sends this PE the location (multiHop on a forwarded
+    // message), so later sends go direct.
     sendToPe(msg, home, type, opts);
     return;
   }
@@ -2043,8 +2050,7 @@ void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
   {
     if (isSmall && hasID && CkMyPe() != home)
     {
-      // See handleUnknownByID: forwarding alone never populates this PE's cache.
-      locMgr->requestLocationOnce(msg->array_element_id());
+      // The delivering PE sends this PE the location (multiHop on a forwarded message).
       sendToPe(msg, home, type, opts);
     }
     else
@@ -2059,8 +2065,7 @@ void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
         msg->array_ifNotThere() != CkArray_IfNotThere_createhere)
     {
       // Send the message home where it will trigger demand creation, or get delivered to
-      // the element if it already exists
-      locMgr->requestLocationOnce(msg->array_element_id());
+      // the element if it already exists (either way the delivery repairs this PE's cache)
       sendToPe(msg, home, type, opts);
     }
     else
@@ -2178,7 +2183,11 @@ void CkArray::requestDemandCreation(const CkArrayIndex& idx, int ctor, int pe)
   if (!locMgr->lookupID(idx, id) || locMgr->whichPe(id) == -1)
   {
     // We (the home PE) do not know the elements location, therefore it (and its siblings)
-    // do not exist. So we can approve the demand creation request.
+    // do not exist. So we can approve the demand creation request -- once: until the
+    // element registers here, further requests would create it again (a creation on
+    // another PE has not reported yet, or one here is deferred for an element id).
+    // The requester asked for the location as well and is told when it exists.
+    if (!pendingDemandCreations.insert(idx).second) return;
     if (pe == CkMyPe())
     {
       // Directly create the element
@@ -2216,6 +2225,7 @@ void CkArray::sendBufferedMsgs(CmiUInt8 id, int pe)
 
 void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id, int pe)
 {
+  pendingDemandCreations.erase(idx);  // the element exists and has registered
   // TODO: This shouldn't be needed
   sendBufferedMsgs(id, pe);
   for (CkArrayMessage* msg : bufferedIndexMsgs[idx])

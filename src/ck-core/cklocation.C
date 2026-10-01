@@ -2350,6 +2350,7 @@ void pupLayout(PUP::er& p)
   {
     Layout restored;
     restored.pup(p);
+    restored.afterRestart = true;  // minting restarts from the allocator, not the initial region
     CmiLock(CksvAccess(_nodeLock));
     CksvAccess(_objidLayout) = restored;
     CmiUnlock(CksvAccess(_nodeLock));
@@ -2361,12 +2362,13 @@ void pupLayout(PUP::er& p)
   }
 }
 
-void initLayout(int expandFactor)
+void initLayout(int expandFactor, int trancheLog2Cap)
 {
   CksvInitialize(Layout, _objidLayout);
   Layout& l = CksvAccess(_objidLayout);
   if (expandFactor < 1) expandFactor = 1;
   l.expandFactor = expandFactor;
+  l.trancheLog2Cap = trancheLog2Cap > 0 ? trancheLog2Cap : 0;
   l.nodesAtLaunch = CkNumNodes();
   int keyBits = ceilLog2((CmiUInt8)CkNumNodes() * (CmiUInt8)expandFactor);
   if (keyBits < 1) keyBits = 1;
@@ -2407,18 +2409,28 @@ CmiUInt8 indexHashKey(const CkArrayIndex& idx)
 using TrancheTable = std::unordered_map<int, ck::objid::Tranche*>;
 CksvDeclare(TrancheTable*, _objidTranches);
 
+static int floorLog2(CmiUInt8 n)
+{
+  int b = -1;
+  while (n) { ++b; n >>= 1; }
+  return b < 0 ? 0 : b;
+}
+
 // Size of a process's initial tranche: the lower half of the unique space split
-// evenly among the processes present at launch. (The upper half is the allocator's
-// pool for refills; the allocator arrives in a later change.)
+// evenly among the processes present at launch. The upper half is the allocator's
+// pool for refills and for every process after a restart. +objid_tranche_log2 caps
+// it (and every grant) for tests that need to see refills.
 static CmiUInt8 initialTrancheSize(const ck::objid::Layout& l)
 {
-  const int shareBits = l.uniqueBits - 1 - ck::objid::ceilLog2((CmiUInt8)l.nodesAtLaunch);
+  int shareBits = l.uniqueBits - 1 - ck::objid::ceilLog2((CmiUInt8)l.nodesAtLaunch);
+  if (l.trancheLog2Cap > 0 && shareBits > l.trancheLog2Cap) shareBits = l.trancheLog2Cap;
   return shareBits > 0 ? ((CmiUInt8)1 << shareBits) : 1;
 }
 
 ck::objid::Tranche* CkLocMgr::getTranche()
 {
   if (tranche) return tranche;
+  bool requestFirst = false;
   CmiLock(CksvAccess(_nodeLock));
   TrancheTable*& table = CksvAccess(_objidTranches);
   if (table == nullptr) table = new TrancheTable();
@@ -2426,13 +2438,189 @@ ck::objid::Tranche* CkLocMgr::getTranche()
   if (itr == table->end())
   {
     const ck::objid::Layout& l = ck::objid::getLayout();
-    const CmiUInt8 size = initialTrancheSize(l);
-    const CmiUInt8 begin = (CmiUInt8)CkMyNode() * size;
-    itr = table->emplace(thisgroup.idx, new ck::objid::Tranche(begin, begin + size)).first;
+    ck::objid::Tranche* t = new ck::objid::Tranche();
+    if (!l.afterRestart)
+    {
+      // First launch: this process's share of the initial region, no message needed.
+      const CmiUInt8 size = initialTrancheSize(l);
+      const CmiUInt8 begin = (CmiUInt8)CkMyNode() * size;
+      t->len = size;
+      t->cursor.store(begin, std::memory_order_relaxed);
+      t->end.store(begin + size, std::memory_order_release);
+      t->refillAt.store(begin + size / 2, std::memory_order_relaxed);
+    }
+    else
+    {
+      // After a restart the initial region is spent (restored ids came from it);
+      // start empty and ask the allocator for a tranche right away.
+      t->requested = true;
+      requestFirst = true;
+    }
+    itr = table->emplace(thisgroup.idx, t).first;
   }
   tranche = itr->second;
   CmiUnlock(CksvAccess(_nodeLock));
+  if (requestFirst)
+    requestTrancheFromAllocator(floorLog2(initialTrancheSize(ck::objid::getLayout())));
   return tranche;
+}
+
+void CkLocMgr::requestTrancheFromAllocator(int wantLog2)
+{
+  thisProxy[0].requestTranche(CkMyNode(), wantLog2);
+}
+
+bool CkLocMgr::mintUnique(CmiUInt8& u)
+{
+  ck::objid::Tranche* t = getTranche();
+  CmiNodeLock lock = CksvAccess(_nodeLock);
+  for (;;)
+  {
+    // Read end before bumping the cursor: a tranche is installed by storing the
+    // cursor first and the end (release) second, so a number taken after an end we
+    // saw is in that tranche, and a number from an older cursor fails the test and
+    // is merely wasted, never reused.
+    const CmiUInt8 e = t->end.load(std::memory_order_acquire);
+    u = t->cursor.fetch_add(1, std::memory_order_relaxed);
+    if (u < e)
+    {
+      if (u >= t->refillAt.load(std::memory_order_relaxed))
+      {
+        // Half of the tranche is used: ask for the next one, once.
+        bool send = false;
+        int want = 0;
+        CmiLock(lock);
+        if (!t->haveNext && !t->requested)
+        {
+          t->requested = true;
+          send = true;
+          want = floorLog2(t->len) + 1;
+        }
+        t->refillAt.store(~(CmiUInt8)0, std::memory_order_relaxed);
+        CmiUnlock(lock);
+        if (send) requestTrancheFromAllocator(want);
+      }
+      return true;
+    }
+    // Exhausted. Under the lock: swap in the spare if it is here, else make sure a
+    // request is in flight and register this PE to be woken by the grant.
+    CmiLock(lock);
+    if (t->cursor.load(std::memory_order_relaxed) < t->end.load(std::memory_order_relaxed))
+    {
+      CmiUnlock(lock);  // another PE installed the spare meanwhile
+      continue;
+    }
+    if (t->haveNext)
+    {
+      t->len = t->nextLen;
+      t->haveNext = false;
+      t->cursor.store(t->nextBase, std::memory_order_relaxed);
+      t->end.store(t->nextBase + t->nextLen, std::memory_order_release);
+      t->refillAt.store(t->nextBase + t->nextLen / 2, std::memory_order_relaxed);
+      CmiUnlock(lock);
+      continue;
+    }
+    bool send = false;
+    int want = 0;
+    if (!t->requested)
+    {
+      t->requested = true;
+      send = true;
+      want = floorLog2(t->len ? t->len : initialTrancheSize(ck::objid::getLayout())) + 1;
+    }
+    if (std::find(t->waitingPes.begin(), t->waitingPes.end(), CkMyPe()) == t->waitingPes.end())
+      t->waitingPes.push_back(CkMyPe());
+    CmiUnlock(lock);
+    if (send) requestTrancheFromAllocator(want);
+    return false;
+  }
+}
+
+// PE 0: hand out the next tranche. Sizes are powers of two, clamped between the
+// initial tranche size and a cap that leaves every process several more grants.
+void CkLocMgr::requestTranche(int node, int wantLog2)
+{
+  CkAssert(CkMyPe() == 0);
+  const ck::objid::Layout& l = ck::objid::getLayout();
+  const CmiUInt8 region = (CmiUInt8)1 << (l.uniqueBits - 1);
+  int capLog2 = floorLog2(region / (8 * (CmiUInt8)CkNumNodes()));
+  if (l.trancheLog2Cap > 0 && capLog2 > l.trancheLog2Cap) capLog2 = l.trancheLog2Cap;
+  int minLog2 = floorLog2(initialTrancheSize(l));
+  if (minLog2 > capLog2) minLog2 = capLog2;
+  int log2 = wantLog2;
+  if (log2 < minLog2) log2 = minLog2;
+  if (log2 > capLog2) log2 = capLog2;
+  CmiUInt8 len = (CmiUInt8)1 << log2;
+  if (allocNext + len > allocEnd) len = allocEnd - allocNext;
+  const CmiUInt8 base = allocNext;
+  allocNext += len;
+  thisProxy[CkNodeFirst(node)].grantTranche(base, len);
+}
+
+// Rank 0 of the requesting process: install the spare and wake the PEs that
+// deferred insertions while waiting for it.
+void CkLocMgr::grantTranche(CmiUInt8 base, CmiUInt8 len)
+{
+  ck::objid::Tranche* t = getTranche();
+  CmiNodeLock lock = CksvAccess(_nodeLock);
+  CmiLock(lock);
+  if (len == 0)
+  {
+    CmiUnlock(lock);
+    const ck::objid::Layout& l = ck::objid::getLayout();
+    CkAbort("Chare array (location manager %d) has used all 2^%d unique element ids"
+            " available to it in this run (its index is not packed into ids). Give the"
+            " array bounds (CkArrayOptions::setBounds), lower +objid_expand, or rebuild"
+            " with fewer -DCMK_OBJID_COLLECTION_BITS.\n",
+            thisgroup.idx, l.uniqueBits);
+  }
+  CkAssert(!t->haveNext);
+  CkAssert(base >= t->end.load(std::memory_order_relaxed));
+  t->nextBase = base;
+  t->nextLen = len;
+  t->haveNext = true;
+  t->requested = false;
+  std::vector<int> wake;
+  wake.swap(t->waitingPes);
+  CmiUnlock(lock);
+  for (int pe : wake) thisProxy[pe].resumeDeferredInsertions();
+}
+
+void CkLocMgr::deferInsertion(CkArray* mgr, CkArrayMessage* msg, const CkArrayIndex& idx,
+                              const int listenerData[CK_ARRAYLISTENER_MAXLEN])
+{
+  static bool warned = false;  // once per process (a static shared by its PEs); informational
+  if (!warned)
+  {
+    warned = true;
+    const ck::objid::Layout& l = ck::objid::getLayout();
+    if (getTranche()->len == 0)
+      CkPrintf("Charm++> Note: PE %d deferred an insertion into chare array (location"
+               " manager %d): this process's first tranche of element ids after the"
+               " restart has not arrived yet. The element is created when it does;"
+               " until then ckLocal() is null even for a local insert.\n",
+               CkMyPe(), thisgroup.idx);
+    else
+      CkPrintf("Charm++> Note: PE %d deferred an insertion into chare array (location"
+               " manager %d): this process used its tranche of element ids before the"
+               " next one arrived. The element is created when it does; until then"
+               " ckLocal() is null even for a local insert. Lower +objid_expand (%d) for"
+               " larger tranches (initial tranche: %" PRIu64 " ids).\n",
+               CkMyPe(), thisgroup.idx, l.expandFactor, initialTrancheSize(l));
+  }
+  DeferredInsertion d;
+  d.mgr = mgr;
+  d.msg = msg;
+  d.idx = idx;
+  for (int i = 0; i < CK_ARRAYLISTENER_MAXLEN; ++i) d.listenerData[i] = listenerData[i];
+  deferredInsertions.push_back(d);
+}
+
+void CkLocMgr::resumeDeferredInsertions()
+{
+  std::vector<DeferredInsertion> work;
+  work.swap(deferredInsertions);
+  for (DeferredInsertion& d : work) d.mgr->insertElement(d.msg, d.idx, d.listenerData);
 }
 
 /*************************** LocCache **************************/
@@ -2508,6 +2696,8 @@ void CkLocCache::insert(CmiUInt8 id, int epoch)
 CkLocMgr::CkLocMgr(CkArrayOptions opts)
     : bounds(opts.getBounds()),
       tranche(nullptr),
+      allocNext(0),
+      allocEnd(0),
       thisProxy(thisgroup),
       thislocalproxy(thisgroup, CkMyPe())
 {
@@ -2531,6 +2721,15 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
 
   // Figure out the mapping from indices to object IDs if one is possible
   compressor = ck::FixedArrayIndexCompressor::make(bounds);
+  if (compressor == nullptr)
+  {
+    // The allocator's pool: the upper half of the unique space. Only PE 0's branch
+    // hands it out, but every branch starts with the same value so a shrink/expand
+    // restart, which restores PE 0's copy everywhere, changes nothing.
+    const int U = ck::objid::getLayout().uniqueBits;
+    allocNext = (CmiUInt8)1 << (U - 1);
+    allocEnd = (CmiUInt8)1 << U;
+  }
   if (compressor == nullptr && CkMyPe() == 0)
   {
     // Say so once: without a compressor the array pays for an index<->id map and
@@ -2587,15 +2786,17 @@ void CkLocMgr::pup(PUP::er& p)
   p | mapHandle;
   p | cacheID;
   p | bounds;
-  // The process's tranche cursor travels with rank 0's branch. (Until the tranche
-  // allocator lands, a restart must keep the process count and each process must
-  // get its own branch back; see the checks below.)
-  CmiUInt8 cursor = 0;
-  int packedByNode = CkMyNode();
-  if (p.isPacking() && compressor == nullptr && CkMyRank() == 0)
-    cursor = getTranche()->cursor.load();
-  p | cursor;
-  p | packedByNode;
+  // The allocator's state (meaningful on PE 0, whose copy every PE restores after a
+  // shrink/expand). Per-process tranches are not checkpointed: after any restart a
+  // process starts empty and takes its first tranche from the allocator, so ids
+  // minted after the checkpoint can never collide with ids minted after the restart.
+  p | allocNext;
+  p | allocEnd;
+  if (p.isPacking() && !deferredInsertions.empty())
+    CkAbort("Checkpointing chare array (location manager %d) on PE %d while %d insertions"
+            " are waiting for a tranche of element ids; they would be lost. Checkpoint"
+            " after the insertions complete (quiescence), or lower +objid_expand.\n",
+            thisgroup.idx, CkMyPe(), (int)deferredInsertions.size());
   if (p.isUnpacking())
   {
     thisProxy = thisgroup;
@@ -2615,22 +2816,10 @@ void CkLocMgr::pup(PUP::er& p)
 
     compressor = ck::FixedArrayIndexCompressor::make(bounds);
     tranche = nullptr;
-    // A location manager is only ever unpacked at a restart.
-    if (compressor == nullptr)
-    {
-      const ck::objid::Layout& l = ck::objid::getLayout();
-      if (CkNumNodes() != l.nodesAtLaunch || packedByNode != CkMyNode())
-        CkAbort("Restarting with a different process count (%d, launched with %d) is"
-                " not yet supported for chare array %d, whose index is not packed"
-                " into element ids (the tranche allocator is a later change).\n",
-                CkNumNodes(), l.nodesAtLaunch, thisgroup.idx);
-      if (CkMyRank() == 0)
-      {
-        ck::objid::Tranche* t = getTranche();
-        CmiUInt8 cur = t->cursor.load();
-        while (cur < cursor && !t->cursor.compare_exchange_weak(cur, cursor)) {}
-      }
-    }
+    // A location manager is only ever unpacked at a restart: rank 0 asks the
+    // allocator for this process's first tranche now rather than at the first
+    // insertion (getTranche sends the request when the layout says afterRestart).
+    if (compressor == nullptr && CkMyRank() == 0) getTranche();
   }
 
 #if CMK_LBDB_ON
@@ -2740,32 +2929,26 @@ void CkLocMgr::processAfterActiveRgetsCompleted(CmiUInt8 id)
   }
 }
 
-CmiUInt8 CkLocMgr::getNewObjectID(const CkArrayIndex& idx)
+bool CkLocMgr::tryNewObjectID(const CkArrayIndex& idx, CmiUInt8& id)
 {
-  CmiUInt8 id;
   if (!lookupID(idx, id))
   {
     // Hashed kind: the top bits are the index's hash key (so the home is
     // computable from the id), the low bits a number unique within the array,
     // taken from this process's tranche.
+    CmiUInt8 u;
+    if (!mintUnique(u)) return false;
     const ck::objid::Layout& l = ck::objid::getLayout();
-    ck::objid::Tranche* t = getTranche();
-    const CmiUInt8 u = t->cursor.fetch_add(1);
-    if (u >= t->end)
-      CkAbort("Process %d has used up its tranche of %" PRIu64 " element ids for chare"
-              " array %d (index not packed into ids). Give the array bounds"
-              " (CkArrayOptions::setBounds) or lower +objid_expand; tranche refills"
-              " arrive in a later change.\n",
-              CkMyNode(), initialTrancheSize(l), thisgroup.idx);
     id = (ck::objid::indexHashKey(idx) << l.uniqueBits) | u;
     insertID(idx, id);
   }
-  return id;
+  return true;
 }
 
 CkLocRec* CkLocMgr::registerNewElement(const CkArrayIndex& idx)
 {
-  CmiUInt8 id = getNewObjectID(idx);
+  CmiUInt8 id;
+  if (!tryNewObjectID(idx, id)) return nullptr;
   CkLocRec* rec = elementNrec(id);
   if (rec == nullptr)
   {

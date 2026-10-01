@@ -362,16 +362,19 @@ struct Layout
   int uniqueBits = 0;
   int expandFactor = 8;
   int nodesAtLaunch = 0;
+  int trancheLog2Cap = 0;  // +objid_tranche_log2: cap on tranche sizes (testing); 0 = none
+  bool afterRestart = false;  // not pupped: set when a checkpointed layout is restored
   void pup(PUP::er& p)
   {
     p | keyBits;
     p | uniqueBits;
     p | expandFactor;
     p | nodesAtLaunch;
+    p | trancheLog2Cap;
   }
 };
 /// Called once per process (rank 0) before any chare array exists.
-void initLayout(int expandFactor);
+void initLayout(int expandFactor, int trancheLog2Cap);
 const Layout& getLayout();
 /// Checkpoint the layout with the readonlies; on restore it replaces the
 /// startup layout of this process (called by CkPupROData).
@@ -379,12 +382,20 @@ void pupLayout(PUP::er& p);
 /// Hash key of an index, in [0, 2^keyBits): a pure function of the index bytes.
 CmiUInt8 indexHashKey(const CkArrayIndex& idx);
 
-/// A process's current tranche of unique numbers for one array: [cursor, end).
+/// A process's current tranche of unique numbers for one array: [cursor, end),
+/// plus the spare tranche the allocator granted for when it runs out. The fast path
+/// (CkLocMgr::mintUnique) touches only the three atomics; everything else is read
+/// and written under _nodeLock.
 struct Tranche
 {
-  std::atomic<CmiUInt8> cursor;
-  CmiUInt8 end;
-  Tranche(CmiUInt8 begin, CmiUInt8 end_) : cursor(begin), end(end_) {}
+  std::atomic<CmiUInt8> cursor{0};
+  std::atomic<CmiUInt8> end{0};
+  std::atomic<CmiUInt8> refillAt{~(CmiUInt8)0};  // cursor value at which to ask for the next
+  CmiUInt8 len = 0;                            // length of the current tranche
+  CmiUInt8 nextBase = 0, nextLen = 0;          // the spare, installed by grantTranche
+  bool haveNext = false;
+  bool requested = false;                      // a requestTranche is in flight
+  std::vector<int> waitingPes;                 // PEs holding deferred insertions
 };
 }  // namespace objid
 }  // namespace ck
@@ -553,8 +564,24 @@ private:
 
   bool checkInBounds(const CkArrayIndex& idx) const;
 
-  // Get a new ID based on the ID generation scheme
-  CmiUInt8 getNewObjectID(const CkArrayIndex& idx);
+  // Get a new ID based on the ID generation scheme. False when the hashed kind has
+  // no unique number to give right now (tranche exhausted, refill not yet here).
+  bool tryNewObjectID(const CkArrayIndex& idx, CmiUInt8& id);
+  // Take the next unique number from this process's tranche; false if exhausted,
+  // in which case a refill has been requested and this PE is registered to be woken.
+  bool mintUnique(CmiUInt8& u);
+  void requestTrancheFromAllocator(int wantLog2);
+  // Allocator state (PE 0's branch is the allocator; other branches carry a copy
+  // that is never used): [allocNext, allocEnd) is the unhanded part of the pool.
+  CmiUInt8 allocNext, allocEnd;
+  struct DeferredInsertion
+  {
+    CkArray* mgr;
+    CkArrayMessage* msg;
+    CkArrayIndex idx;
+    int listenerData[CK_ARRAYLISTENER_MAXLEN];
+  };
+  std::vector<DeferredInsertion> deferredInsertions;  // this PE's, waiting for a tranche
 
   // Insert the ID into the idx2id table
   inline void insertID(const CkArrayIndex& idx, const CmiUInt8 id)
@@ -822,6 +849,15 @@ public:
   bool requestLocation(const CkArrayIndex& idx, int peToTell);
   void updateLocation(const CkArrayIndex& idx, const CkLocEntry& e);
   void reclaimRemote(const CkArrayIndex& idx, int deletedOnPe);
+
+  // Tranche allocator (design section 3.1). The allocator is this group's branch on
+  // PE 0; it hands out tranches of the upper half of the unique space, bottom up.
+  void requestTranche(int node, int wantLog2);           // on PE 0
+  void grantTranche(CmiUInt8 base, CmiUInt8 len);        // on rank 0 of the requesting process
+  void resumeDeferredInsertions();                       // on a PE that deferred insertions
+  // Hold an insertion until this process has a tranche again (see mintUnique).
+  void deferInsertion(CkArray* mgr, CkArrayMessage* msg, const CkArrayIndex& idx,
+                      const int listenerData[CK_ARRAYLISTENER_MAXLEN]);
   void dummyAtSync(void);
 
   /// return a list of migratables in this local record

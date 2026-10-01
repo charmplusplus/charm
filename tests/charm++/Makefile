@@ -41,6 +41,7 @@ DIRS = \
   objid_insert \
   objid_sections \
   objid_bound \
+  objid_tranche \
   qd \
 
 FTDIRS = \
