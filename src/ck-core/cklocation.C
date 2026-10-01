@@ -2819,6 +2819,11 @@ void CkLocMgr::pup(PUP::er& p)
   // minted after the checkpoint can never collide with ids minted after the restart.
   p | allocNext;
   p | allocEnd;
+  if (p.isPacking() && !deferredInsertions.empty())
+    CkAbort("Checkpointing chare array (location manager %d) on PE %d while %d insertions"
+            " are waiting for a tranche of element ids; they would be lost. Checkpoint"
+            " after the insertions complete (quiescence), or lower +objid_expand.\n",
+            thisgroup.idx, CkMyPe(), (int)deferredInsertions.size());
   if (p.isUnpacking())
   {
     thisProxy = thisgroup;
