@@ -1058,6 +1058,14 @@ bool CkArray::insertElement(CkArrayMessage* m, const CkArrayIndex& idx,
 
   // Register the new element with the location manager
   CkLocRec* rec = locMgr->registerNewElement(idx);
+  if (rec == nullptr)
+  {
+    // Hashed-kind id and this process is out of unique numbers until the allocator's
+    // next tranche arrives: the insertion completes then (the element does not exist
+    // when this call returns, even for a local [inline] insert).
+    locMgr->deferInsertion(this, m, idx, listenerData);
+    return false;
+  }
   CmiUInt8 id = rec->getID();
 
   // Make sure the element doesn't already exist

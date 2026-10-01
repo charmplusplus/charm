@@ -307,6 +307,7 @@ void _registerCommandLineOpt(const char* opt) {
 
 // +objid_expand, parsed by rank 0 and read by every PE after the node barrier
 static int _objidExpandFactor = 8;
+static int _objidTrancheLog2Cap = 0;
 
 static inline void _parseCommandLineOpts(char **argv)
 {
@@ -351,6 +352,9 @@ static inline void _parseCommandLineOpts(char **argv)
                         "Expansion headroom assumed when sizing element id home keys"
                         " (max processes / launch processes; default 8)"))
       _objidExpandFactor = 8;
+  if (!CmiGetArgIntDesc(argv, "+objid_tranche_log2", &_objidTrancheLog2Cap,
+                        "Testing: cap element id tranches at 2^N numbers per process"))
+      _objidTrancheLog2Cap = 0;
 
   if(CmiGetArgString(argv,"+restart",&_restartDir))
       faultFunc = CkRestartMain;
@@ -1543,7 +1547,7 @@ void _initCharm(int unused_argc, char **argv)
 		_parseCommandLineOpts(argv);
 		// The element id layout for this process, from the process count and
 		// +objid_expand; a checkpoint restore overrides it (CkPupROData).
-		ck::objid::initLayout(_objidExpandFactor);
+		ck::objid::initLayout(_objidExpandFactor, _objidTrancheLog2Cap);
 		_registerInit();
 		CkRegisterMsg("System", 0, 0, CkFreeMsg, sizeof(int));
 		CkRegisterChareInCharm(CkRegisterChare("null", 0, TypeChare));
