@@ -908,8 +908,14 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
 
         _inrestart = false;
 
-   	if (CmiMyRank()==0) _initDone();  // this rank will trigger other ranks
-   	//_initDone();
+	// Every PE finishes its own initialization here, as the shrink/expand restart
+	// path already does. The other ranks of a process used to rely on the readonly
+	// broadcast from PE 0 (bdcastRO -> _roRestartHandler) to reach _initDone. On
+	// reconverse that broadcast is relayed to the ranks of a remote process by the
+	// process's rank 0, inside a handler, and rank 0 was already blocked in the first
+	// node barrier of its own _initDone waiting for those very ranks: a deadlock
+	// whenever a process had more than one PE (charm #4018).
+	_initDone();
 	CkMemCheckPT::inRestarting = false;
 	if(CkMyPe()==0) {
 		CmiPrintf("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());
