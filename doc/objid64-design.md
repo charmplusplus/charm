@@ -103,7 +103,9 @@ Unchanged mechanism, wider budget:
 - lookupIdx for this kind = decompress (unchanged).
 - Home: homeProc(idx) = CkNodeOf(map->homePe(mapHandle, idx)); homeProc(id) =
   homeProc(decompress(id)). Directory PE (PR 1) = map->homePe(idx) exactly as today,
-  so compressible arrays see no behavioural change in PR 1 beyond the wider budget.
+  so compressible arrays see no behavioural change in PR 1 beyond the wider budget --
+  except the sender-repair rule of 4.3, which applies to both kinds: a forwarded delivery
+  now teaches the sender the location (measured in doc/objid64-perf.md).
 - checkInBounds unchanged.
 - Warning (decision: no bounds inference): in CkLocMgr's constructor, if
   `compressor == nullptr` and `opts.numInitial` or `opts.end` is non-empty, print
@@ -298,7 +300,11 @@ commented-out rule at ckarray.C:1885: after more than one hop with a stale cache
 entry, forward to homePe(id) rather than chase the chain. sendMsg / handleUnknown /
 bufferForLocation on the source PE keep their index-keyed shape.
 
-Multi-hop repair (multiHop -> cache->requestLocation(id, srcPe)) unchanged.
+Multi-hop repair (multiHop -> cache->requestLocation(id, srcPe)): now fired by the
+fast delivery path for ANY forwarded message (hops >= 1; recvMsg counts a hop per
+forwarding PE, a direct delivery arrives with 0), so a sender learns the location from
+the first forwarded delivery, cold or one-hop stale; the explicit requestLocationOnce
+of the first 1a draft is gone (PR 1b, 2026-10-01; numbers in doc/objid64-perf.md).
 
 ### 4.4 Load balancer global update (CMK_GLOBAL_LOCATION_UPDATE)
 
