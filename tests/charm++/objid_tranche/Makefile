@@ -9,7 +9,8 @@ objid_tranche: objid_tranche.decl.h objid_tranche.C
 objid_tranche.decl.h: objid_tranche.ci
 	$(CHARMC) objid_tranche.ci
 
-# Default tranches (no refill), 64-id tranches (refills), 4-id tranches (deferral).
+# 3 unbounded arrays plus demand creation ([createhome]) on each, with default
+# tranches (no refill), 64-id tranches (refills), 4-id tranches (deferral).
 test: objid_tranche
 	$(call run, ./objid_tranche +p4 )
 	$(call run, ./objid_tranche +p4 +objid_tranche_log2 6 )
