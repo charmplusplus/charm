@@ -2209,7 +2209,11 @@ void CkArray::requestDemandCreation(const CkArrayIndex& idx, int ctor, int pe)
   if (!locMgr->lookupID(idx, id) || locMgr->whichPe(id) == -1)
   {
     // We (the home PE) do not know the elements location, therefore it (and its siblings)
-    // do not exist. So we can approve the demand creation request.
+    // do not exist. So we can approve the demand creation request -- once: until the
+    // element registers here, further requests would create it again (a creation on
+    // another PE has not reported yet, or one here is deferred for an element id).
+    // The requester asked for the location as well and is told when it exists.
+    if (!pendingDemandCreations.insert(idx).second) return;
     if (pe == CkMyPe())
     {
       // Directly create the element
@@ -2247,6 +2251,7 @@ void CkArray::sendBufferedMsgs(CmiUInt8 id, int pe)
 
 void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id, int pe)
 {
+  pendingDemandCreations.erase(idx);  // the element exists and has registered
   // TODO: This shouldn't be needed
   sendBufferedMsgs(id, pe);
   for (CkArrayMessage* msg : bufferedIndexMsgs[idx])
