@@ -455,6 +455,52 @@ one shared write per migration per process touched instead of per PE. Measure on
 contention (all ranks sending to the same 1,000 elements), and a migration-heavy
 run (megatest 4x8 x3, anytime_migration) for correctness under R1-R6.
 
+### 7.6 Shortcuts the shared table must provide (Kale, 2026-09-30)
+
+The point of the shared table is that a PE never asks the home about anything it
+could learn from its own process. Stated as guarantees, so PR 3 can be tested
+against them:
+
+S1 **Resident elements resolve locally, always.** Every element currently in the
+   process has its idx -> id binding (hashed kind) and its id -> {pe, epoch} entry
+   in the shared shards, written by the PE that created it (W1) or received it
+   (W3) before that PE runs any entry method of it. So a send by index from any PE
+   of the process to an element on another PE of the process costs: per-PE read
+   cache miss, one shard read for idx -> id, one shard read for id -> pe, then
+   CmiPushPE to that rank. No message leaves the process and the home is not
+   consulted. Today the same send on a PE that has never seen the index goes to
+   the home and back (bufferForLocation -> requestLocation(idx)), even when the
+   element is one core away; objid_insert's cold-send phase measures exactly this.
+   The packed kind needs no idx2id at all (compress is a pure function), so S1
+   for it is the location entry alone.
+
+S2 **An element that left the process leaves a forwarding entry.** Emigration (W2)
+   writes {dest, epoch+1}; it is never erased by departure, only by death (W5,
+   as a tombstone) or by a newer location. A PE of the old process that still
+   addresses the element pays one hop to dest, which repairs the sender (multiHop)
+   -- no trip to the home. Intra-process migration (R3) is the degenerate case:
+   the forwarding entry is the final location.
+
+S3 **One request per process, not per PE.** When no PE of the process knows the
+   element, the first PE to miss sends the request and registers as a waiter; the
+   others find the pending request in the shard (R6) and only register. The reply
+   fills the shard once and wakes every waiting rank.
+
+S4 **The home answers from the shard, on any rank.** A request arriving at the home
+   process is answered by whichever PE dequeues it (R9); the index -> id binding
+   and the location are both in the shard, so the home never needs the element's
+   own PE to be the one that answers.
+
+S5 **Same-PE delivery stays as it is.** sendMsg on the owning PE finds the element
+   in the per-PE pointer table and delivers inline; the shared table is not
+   touched. Chares remain PE-bound; S1 shortens the lookup, not the queue hop.
+
+What S1 needs that the per-PE design does not have: the per-PE idx2id of the
+hashed kind is today filled only by local creation, immigration and home replies;
+in PR 3 the shared idx2id is filled by every creation and immigration on any rank
+of the process. The per-PE read cache in front of it (R7) is fill-on-miss and
+never invalidated, which is sound because a binding never changes.
+
 ## 8. Diagnostics and limits (PR 0, can land first)
 
 - Abort in getNewObjectID when the per-PE counter would exceed the element mask
