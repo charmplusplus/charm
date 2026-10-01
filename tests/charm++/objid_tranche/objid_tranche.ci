@@ -1,0 +1,29 @@
+mainmodule objid_tranche {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Elem arrProxy;
+  readonly CProxy_Checker checkerProxy;
+  readonly int nMain;
+  readonly int nPerPe;
+  initnode void unbufferStdout(void);
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry void registerElem(int x, int y, CmiUInt8 id, int pe);
+    entry void checkerDone(int pe, int nullLocal);
+    entry void insertsQuiet();
+    entry void pong(int x, int y, CmiUInt8 id, int pe);
+    entry void migratedQuiet();
+    entry void checkProgress();
+  };
+
+  group Checker {
+    entry Checker();
+    entry void insertMore();
+  };
+
+  array [2D] Elem {
+    entry Elem();
+    entry void ping();
+    entry void migrateOnce();
+  };
+};
