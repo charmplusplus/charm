@@ -87,25 +87,10 @@ int _messageBufferingThreshold;
 #if CMK_LBDB_ON
 
 #  if CMK_GLOBAL_LOCATION_UPDATE
-void UpdateLocation(MigrateInfo& migData)
-{
-  CkGroupID locMgrGid = ck::ObjID(migData.obj.id).getCollectionID();
-  if (locMgrGid.idx == 0)
-  {
-    return;
-  }
-  CkLocMgr* localLocMgr = (CkLocMgr*)CkLocalBranch(locMgrGid);
-  CkLocCache *cache = (CkLocCache *)CkLocalBranch(localLocMgr->getLocationCache());
-
-  CmiUInt8 elementID = ck::ObjID(migData.obj.id).getElementID();
-  CkArrayIndex idx = localLocMgr->lookupIdx(elementID);
-
-  CkLocEntry entry;
-  entry.id = elementID;
-  entry.pe = migData.to_pe;
-  entry.epoch = cache->getEpoch(elementID) + 1;
-
-  localLocMgr->updateLocation(idx, entry);}
+// Called by the load balancer on every PE for each migration it decided. The
+// location itself is broadcast by the emigrating PE (CkLocMgr::emigrate) with the
+// element's true epoch, which this PE cannot know, so there is nothing to do here.
+void UpdateLocation(MigrateInfo& migData) {}
 #  endif
 
 #endif
@@ -2342,53 +2327,122 @@ void CkLocMgr::flushLocalRecs(void)
 // All records are local records after the 64bit ID update
 void CkLocMgr::flushAllRecs(void) { flushLocalRecs(); }
 
+/*************************** Object id layout and tranches **************************/
+// One copy per process; written by rank 0 at startup and by the checkpoint restore,
+// read by every PE after the node barriers that follow both.
+CksvDeclare(ck::objid::Layout, _objidLayout);
+
+namespace ck {
+namespace objid {
+
+static int ceilLog2(CmiUInt8 n)
+{
+  int b = 0;
+  while (((CmiUInt8)1 << b) < n) ++b;
+  return b;
+}
+
+const Layout& getLayout() { return CksvAccess(_objidLayout); }
+
+void pupLayout(PUP::er& p)
+{
+  if (p.isUnpacking())
+  {
+    Layout restored;
+    restored.pup(p);
+    CmiLock(CksvAccess(_nodeLock));
+    CksvAccess(_objidLayout) = restored;
+    CmiUnlock(CksvAccess(_nodeLock));
+  }
+  else
+  {
+    Layout current = getLayout();
+    current.pup(p);
+  }
+}
+
+void initLayout(int expandFactor)
+{
+  CksvInitialize(Layout, _objidLayout);
+  Layout& l = CksvAccess(_objidLayout);
+  if (expandFactor < 1) expandFactor = 1;
+  l.expandFactor = expandFactor;
+  l.nodesAtLaunch = CkNumNodes();
+  int keyBits = ceilLog2((CmiUInt8)CkNumNodes() * (CmiUInt8)expandFactor);
+  if (keyBits < 1) keyBits = 1;
+  if (keyBits > 24) keyBits = 24;
+  l.keyBits = keyBits;
+  l.uniqueBits = ObjID::bits::PAYLOAD_BITS - keyBits;
+  if (l.uniqueBits < 16)
+    CkAbort("Object id layout: %d processes x expand factor %d need %d home key bits,"
+            " leaving %d unique bits of the %d-bit payload (minimum 16). Lower"
+            " +objid_expand or rebuild with fewer -DCMK_OBJID_COLLECTION_BITS.\n",
+            CkNumNodes(), expandFactor, keyBits, l.uniqueBits,
+            (int)ObjID::bits::PAYLOAD_BITS);
+}
+
+static inline CmiUInt8 mix64(CmiUInt8 z)
+{
+  // splitmix64 finalizer
+  z += 0x9e3779b97f4a7c15ULL;
+  z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+  z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+  return z ^ (z >> 31);
+}
+
+CmiUInt8 indexHashKey(const CkArrayIndex& idx)
+{
+  CmiUInt8 h = 0x243f6a8885a308d3ULL ^ ((CmiUInt8)idx.nInts << 8) ^ (CmiUInt8)idx.dimension;
+  for (int i = 0; i < idx.nInts; ++i)
+    h = mix64(h ^ (CmiUInt8)(unsigned int)idx.index[i]);
+  h = mix64(h);
+  const int keyBits = CksvAccess(_objidLayout).keyBits;
+  return h >> (64 - keyBits);
+}
+
+}  // namespace objid
+}  // namespace ck
+
+// One tranche per process per location manager, shared by the process's PEs.
+using TrancheTable = std::unordered_map<int, ck::objid::Tranche*>;
+CksvDeclare(TrancheTable*, _objidTranches);
+
+// Size of a process's initial tranche: the lower half of the unique space split
+// evenly among the processes present at launch. (The upper half is the allocator's
+// pool for refills; the allocator arrives in a later change.)
+static CmiUInt8 initialTrancheSize(const ck::objid::Layout& l)
+{
+  const int shareBits = l.uniqueBits - 1 - ck::objid::ceilLog2((CmiUInt8)l.nodesAtLaunch);
+  return shareBits > 0 ? ((CmiUInt8)1 << shareBits) : 1;
+}
+
+ck::objid::Tranche* CkLocMgr::getTranche()
+{
+  if (tranche) return tranche;
+  CmiLock(CksvAccess(_nodeLock));
+  TrancheTable*& table = CksvAccess(_objidTranches);
+  if (table == nullptr) table = new TrancheTable();
+  auto itr = table->find(thisgroup.idx);
+  if (itr == table->end())
+  {
+    const ck::objid::Layout& l = ck::objid::getLayout();
+    const CmiUInt8 size = initialTrancheSize(l);
+    const CmiUInt8 begin = (CmiUInt8)CkMyNode() * size;
+    itr = table->emplace(thisgroup.idx, new ck::objid::Tranche(begin, begin + size)).first;
+  }
+  tranche = itr->second;
+  CmiUnlock(CksvAccess(_nodeLock));
+  return tranche;
+}
+
 /*************************** LocCache **************************/
 const CkLocEntry CkLocEntry::nullEntry = CkLocEntry();
 void CkLocCache::pup(PUP::er& p)
 {
-#if __FAULT__
-  if (!p.isUnpacking())
-  {
-    /**
-     * pack the indexes of elements which have their homes on this processor
-     * but dont exist on it.. needed for broadcast after a restart
-     * indexes of local elements dont need to be packed since they will be
-     * recreated later anyway
-     */
-    std::vector<CkLocEntry> entries;
-    for (const auto& itr : locMap)
-    {
-      if (homePe(itr.first) == CmiMyPe() && itr.second.pe != CmiMyPe())
-      {
-        entries.push_back(itr.second);
-      }
-    }
-
-    int count = entries.size();
-    p | count;
-    for (int i = 0; i < count; i++)
-    {
-      p | entries[i];
-    }
-  }
-  else
-  {
-    int count;
-    p | count;
-    for (int i = 0; i < count; i++)
-    {
-      CkLocEntry e;
-      p | e;
-      e.epoch = 0;
-      updateLocation(e);
-      if (homePe(e.id) != CkMyPe())
-      {
-        thisProxy[homePe(e.id)].updateLocation(e);
-      }
-      CkAssert(getPe(e.id) == e.pe);
-    }
-  }
-#endif
+  // Nothing to checkpoint: every location entry is rebuilt after a restart by the
+  // restored elements registering with their homes (CkLocMgr::restore/resume), and
+  // the manager back-pointer is re-set by CkLocMgr::pup. (The former __FAULT__
+  // branch shipped the home's remote entries, encoded against the old PE count.)
 }
 
 void CkLocCache::requestLocation(CmiUInt8 id)
@@ -2417,6 +2471,8 @@ void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
 void CkLocCache::updateLocation(const CkLocEntry& newEntry)
 {
   CkAssert(newEntry.pe != -1);
+  // The answer is in; a later miss on this element may ask again.
+  pendingLocReqs.erase(newEntry.id);
   CkLocEntry& oldEntry = locMap[newEntry.id];
   if (newEntry.epoch > oldEntry.epoch)
   {
@@ -2451,7 +2507,7 @@ void CkLocCache::insert(CmiUInt8 id, int epoch)
 /*************************** LocMgr: CREATION *****************************/
 CkLocMgr::CkLocMgr(CkArrayOptions opts)
     : bounds(opts.getBounds()),
-      idCounter(1),
+      tranche(nullptr),
       thisProxy(thisgroup),
       thislocalproxy(thisgroup, CkMyPe())
 {
@@ -2471,28 +2527,27 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
   cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
   if (cache == nullptr)
     CkAbort("ERROR! Local branch of location cache is NULL!\n");
+  cache->setManager(this);
 
   // Figure out the mapping from indices to object IDs if one is possible
   compressor = ck::FixedArrayIndexCompressor::make(bounds);
   if (compressor == nullptr && CkMyPe() == 0)
   {
     // Say so once: without a compressor the array pays for an index<->id map and
-    // a per-PE id counter. The sized CkArrayOptions constructors set bounds, but
-    // setNumInitial/setEnd do not, so this is easy to get by accident.
+    // hashed ids handed out in tranches. The sized CkArrayOptions constructors set
+    // bounds, but setNumInitial/setEnd do not, so this is easy to get by accident.
     const unsigned int need = ck::FixedArrayIndexCompressor::bitsNeeded(bounds);
     if (need > 0)
       CkPrintf("Charm++> Note: chare array (location manager %d) has bounds that need %u"
-               " bits to pack its index, but element ids hold %d; elements use per-PE"
-               " counter ids (limit %" PRIu64 " per PE per array) and an index map.\n",
-               thisgroup.idx, need, (int)CMK_OBJID_ELEMENT_BITS,
-               (CmiUInt8)ck::ObjID::masks::ELEMENT_MASK);
+               " bits to pack its index, but element ids hold %d; elements use hashed"
+               " ids and an index map.\n",
+               thisgroup.idx, need, (int)ck::ObjID::bits::PAYLOAD_BITS);
     else if (opts.getNumInitial().dimension > 0 || opts.getEnd().dimension > 0)
       CkPrintf("Charm++> Note: chare array (location manager %d) was given an initial"
                " size but no bounds, so its index is not packed into element ids;"
-               " elements use per-PE counter ids (limit %" PRIu64 " per PE per array)"
-               " and an index map. Call CkArrayOptions::setBounds(...) if the index"
-               " space is fixed.\n",
-               thisgroup.idx, (CmiUInt8)ck::ObjID::masks::ELEMENT_MASK);
+               " elements use hashed ids and an index map. Call"
+               " CkArrayOptions::setBounds(...) if the index space is fixed.\n",
+               thisgroup.idx);
   }
 
   // Find and register with the load balancer
@@ -2532,7 +2587,15 @@ void CkLocMgr::pup(PUP::er& p)
   p | mapHandle;
   p | cacheID;
   p | bounds;
-  p | idCounter;
+  // The process's tranche cursor travels with rank 0's branch. (Until the tranche
+  // allocator lands, a restart must keep the process count and each process must
+  // get its own branch back; see the checks below.)
+  CmiUInt8 cursor = 0;
+  int packedByNode = CkMyNode();
+  if (p.isPacking() && compressor == nullptr && CkMyRank() == 0)
+    cursor = getTranche()->cursor.load();
+  p | cursor;
+  p | packedByNode;
   if (p.isUnpacking())
   {
     thisProxy = thisgroup;
@@ -2548,8 +2611,26 @@ void CkLocMgr::pup(PUP::er& p)
     cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
     if (cache == nullptr)
       CkAbort("ERROR! Local branch of location cache is NULL!");
+    cache->setManager(this);
 
     compressor = ck::FixedArrayIndexCompressor::make(bounds);
+    tranche = nullptr;
+    // A location manager is only ever unpacked at a restart.
+    if (compressor == nullptr)
+    {
+      const ck::objid::Layout& l = ck::objid::getLayout();
+      if (CkNumNodes() != l.nodesAtLaunch || packedByNode != CkMyNode())
+        CkAbort("Restarting with a different process count (%d, launched with %d) is"
+                " not yet supported for chare array %d, whose index is not packed"
+                " into element ids (the tranche allocator is a later change).\n",
+                CkNumNodes(), l.nodesAtLaunch, thisgroup.idx);
+      if (CkMyRank() == 0)
+      {
+        ck::objid::Tranche* t = getTranche();
+        CmiUInt8 cur = t->cursor.load();
+        while (cur < cursor && !t->cursor.compare_exchange_weak(cur, cursor)) {}
+      }
+    }
   }
 
 #if CMK_LBDB_ON
@@ -2664,18 +2745,19 @@ CmiUInt8 CkLocMgr::getNewObjectID(const CkArrayIndex& idx)
   CmiUInt8 id;
   if (!lookupID(idx, id))
   {
-    // Without a compressor each PE mints ids from its own counter in the element
-    // field. Past the field's width the counter would carry into the home field and
-    // the id would silently collide with another PE's; stop here instead.
-    if (idCounter > ck::ObjID::masks::ELEMENT_MASK)
-      // Keep this under 255 characters: reconverse's CmiAbort formats into a 256-byte
-      // buffer and drops the rest.
-      CkAbort("PE %d created %" PRIu64 " elements of chare array (locmgr %d) with an"
-              " unpacked index: per-PE limit. Fix: insert from more PEs, or"
-              " CkArrayOptions::setBounds so the index packs into ids, or rebuild with"
-              " fewer -DCMK_OBJID_COLLECTION_BITS.\n",
-              CkMyPe(), (CmiUInt8)ck::ObjID::masks::ELEMENT_MASK, thisgroup.idx);
-    id = idCounter++ + ((CmiUInt8)CkMyPe() << CMK_OBJID_ELEMENT_BITS);
+    // Hashed kind: the top bits are the index's hash key (so the home is
+    // computable from the id), the low bits a number unique within the array,
+    // taken from this process's tranche.
+    const ck::objid::Layout& l = ck::objid::getLayout();
+    ck::objid::Tranche* t = getTranche();
+    const CmiUInt8 u = t->cursor.fetch_add(1);
+    if (u >= t->end)
+      CkAbort("Process %d has used up its tranche of %" PRIu64 " element ids for chare"
+              " array %d (index not packed into ids). Give the array bounds"
+              " (CkArrayOptions::setBounds) or lower +objid_expand; tranche refills"
+              " arrive in a later change.\n",
+              CkMyNode(), initialTrancheSize(l), thisgroup.idx);
+    id = (ck::objid::indexHashKey(idx) << l.uniqueBits) | u;
     insertID(idx, id);
   }
   return id;
@@ -3157,11 +3239,12 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   cache->recordEmigration(id, toPe);
   informHome(idx, toPe);
 
-#if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
-  DEBM((AA "Global location update. idx %s "
-           "assigned to %d \n" AB,
-        idx2str(idx), toPe));
-  thisProxy.updateLocation(id, toPe);
+#if CMK_GLOBAL_LOCATION_UPDATE
+  // Every PE learns the new location with the element's true epoch (the entry
+  // recordEmigration just advanced), so no cache can be overwritten by an older
+  // reply. The home was told above and ignores the duplicate by epoch.
+  DEBM((AA "Global location update. idx %s assigned to %d \n" AB, idx2str(idx), toPe));
+  thisProxy.updateLocation(idx, cache->getLocationEntry(id));
 #endif
 
   CK_MAGICNUMBER_CHECK
@@ -3350,7 +3433,8 @@ void CkLocMgr::restore(const CkArrayIndex& idx, CmiUInt8 id, PUP::er& p)
 {
   insertID(idx, id);
 
-  CkLocRec* rec = createLocal(idx, false, false, false);
+  // Directories are rebuilt from the restored elements, so tell the home.
+  CkLocRec* rec = createLocal(idx, false, false, true);
 
   // Create the new elements as we unpack the message
   pupElementsFor(p, rec, CkElementCreation_restore);

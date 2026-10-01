@@ -391,7 +391,7 @@ namespace ck {
         bits[i] = bitCount(bound);
       }
 
-      if (bitsNeeded(bounds) > CMK_OBJID_ELEMENT_BITS)
+      if (bitsNeeded(bounds) > CMK_OBJID_PAYLOAD_BITS)
         return NULL;
 
       return new FixedArrayIndexCompressor(dims, bits);
@@ -412,9 +412,9 @@ namespace ck {
         eid = (eid << numBits) | thisDim;
       }
 
-      CmiAssertMsg(eid <= ck::ObjID::masks::ELEMENT_MASK,
+      CmiAssertMsg(eid <= ck::ObjID::masks::PAYLOAD_MASK,
                    "eid is too big! (eid: %" PRIx64 ", max: %" PRIx64 ")", eid,
-                   (CmiUInt8)ck::ObjID::masks::ELEMENT_MASK);
+                   (CmiUInt8)ck::ObjID::masks::PAYLOAD_MASK);
 
       return eid;
     }
