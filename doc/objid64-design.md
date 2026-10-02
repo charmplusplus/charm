@@ -534,6 +534,43 @@ in PR 3 the shared idx2id is filled by every creation and immigration on any ran
 of the process. The per-PE read cache in front of it (R7) is fill-on-miss and
 never invalidated, which is sound because a binding never changes.
 
+### 7.7 Bounded caches (Kale, 2026-10-01)
+
+Every fill-only table above grows with the number of distinct elements a PE or a
+process has ever addressed, and a long-running program that keeps migrating and
+keeps sending to new elements never stops adding entries. Today's per-PE
+CkLocCache::locMap already has this property; the redesign must not make it worse
+and should fix it while the tables are being rebuilt.
+
+Classify entries as authoritative or cached. Authoritative entries are never
+evicted: the id -> location and idx -> id entries of elements RESIDENT in the process
+(S1 depends on them), the home-directory entries for elements whose home is this
+process (the home must always answer), tranche state, and the per-PE element pointer
+and record tables. Everything else is a cache that can be refetched from the home at
+the cost of one request: locations of remote elements learned from replies, repairs
+and forwarding entries left by departed elements, tombstones, and the whole per-PE
+idx -> id read cache (R7).
+
+Policy, cheap on the hot path: a size cap per shard for cached entries and a cap for
+the per-PE read cache; when a cap is hit, drop the cached entries of that shard (or
+the whole read cache) in one sweep rather than keeping LRU state per entry. A
+two-generation variant (entries carry the generation they were filled in; a sweep
+drops the older generation) halves the refetch burst after a sweep at the cost of
+one byte per entry. Caps default to a few hundred thousand entries per process and
+are runtime options (+objid_cache_cap), with a counter of sweeps in the diagnostics.
+
+What eviction may cost: a later send to an evicted element pays one request to the
+home (hashed kind) or one forwarded delivery (packed kind), which the repair rule of
+4.3 then fixes again. Dropping a forwarding entry or a tombstone is safe: a message
+for the element goes to the home instead of along the chain; a late, older location
+update that would have been rejected by a tombstone re-creates a cached entry that
+is wrong only until the next forwarded delivery repairs it, and that entry is itself
+evictable. Authoritative entries are never in that position.
+
+Measure before choosing the per-PE read cache at all: if one shard read per
+index-addressed send is cheap enough on a 64-PE node, the read cache can be dropped
+and only the shared table needs the cap.
+
 ## 8. Diagnostics and limits (PR 0, can land first)
 
 - Abort in getNewObjectID when the per-PE counter would exceed the element mask
