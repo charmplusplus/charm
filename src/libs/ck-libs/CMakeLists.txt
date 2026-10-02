@@ -1,8 +1,10 @@
 ## The targets in this file are only built when building LIBS
 
 # cache
-add_library(moduleCkCache cache/CkCache.C cache/CkCache.h)
+add_library(moduleCkCache cache/CkCache.C cache/CkCache.h cache/CkTreeCache.h cache/TreeCacheCore.h)
 configure_file(cache/CkCache.h ${CMAKE_BINARY_DIR}/include COPYONLY)
+configure_file(cache/CkTreeCache.h ${CMAKE_BINARY_DIR}/include COPYONLY)
+configure_file(cache/TreeCacheCore.h ${CMAKE_BINARY_DIR}/include COPYONLY)
 add_dependencies(moduleCkCache ck)
 
 # sparseContiguousReducer
