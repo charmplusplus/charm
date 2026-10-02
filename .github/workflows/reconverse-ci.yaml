@@ -12,9 +12,10 @@ name: reconverse-ci
 
 on:
   push:
-    branches: [reviewed-with-reconverse]
+    branches: [reviewed-with-reconverse, objid-redesign]
   pull_request:
-    branches: [reviewed-with-reconverse]
+    # objid-pr*: the PRs stacked on objid-redesign (their base is the previous PR's branch)
+    branches: [reviewed-with-reconverse, objid-redesign, 'objid-pr*']
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
