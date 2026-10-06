@@ -15,6 +15,34 @@ item-21 PR** (endgame step 3). The renames behind it wait on Kale's
 announcement email. A GPU follow-on section below tracks work opened by
 running the merged support rather than by merging it.
 
+## Sync status 2026-09-17
+
+Sync PR **#3986** (squash `b26e48b51`) landed; the line is current with
+reconverse main.
+
+- Pin **58921e9 -> 61a69dd4a** — 11 reconverse commits since 09-11:
+  **#238** per-process broadcast fan-out + `CmiSetMsgNokeep`, **#240**
+  macOS PE stack size, **#242** RMA transfer-length fix, **#234**,
+  **#227**.
+- Ported from classic main: **#3921** (Collide restart), **#3938**
+  (`hapiPollEvents` aborts on GPU error).
+- Docs: Converse manual states the **nokeep contract** (who owns a
+  message after the handler returns).
+- `tests/reconverse-site-run.sh`: per-site launcher — Frontier plain
+  `srun`, Delta `srun --mpi=pmix` (**#3982**).
+- CI: lcrun PMI-directory cleanup + per-step timeout (**#3987**,
+  lci**#202**); zerocopy post-size abort (**#3989**).
+- Validated on **Delta, Anvil, Frontier (CPU + HIP)** with the CI tier
+  plus Anvil's full `tests/` folder.
+- **ABI note:** `CcdCallFnAfter` now has C linkage. Build trees from
+  before the bump link against the C++-mangled symbol — full rebuild
+  required, not an incremental `make`.
+
+Open runtime issues found by this round: reconverse **#241**, **#243**
+(exit-path crash; hit 43% of runs on a distant Frontier node pair);
+charm **#3988**, **#3989**, **#3978**. Closed: reconverse **#219**,
+**#223**.
+
 ## Now (unlocked)
 
 | # | Item | Trigger / owner |
@@ -118,8 +146,28 @@ freeze tag on main. Order:
    `.github/workflows/ci.yaml`: its trigger is `branches: [main]`, so
    after step 4 it would otherwise start running the classic matrix on
    every PR to the renamed branch.
+3b. **Triage the open PRs and issues before the rename** (audits of
+   2026-09-30 in `doc/triage/`; Kale asked to be reminded of this agenda at
+   the rename and at later check-ins). GitHub moves every open PR against
+   `main` to `classic` at the rename, and only a manual retarget moves one
+   to this line, so all 148 must be handled first: retarget the tier-1
+   "still wanted" PRs (12, listed in `pr-audit-main-2026-09-30.md`), close
+   the already-equivalent, obsolete and unclear ones with a one-line note
+   citing the audit; Kale's #4013 and #3937 merge to classic first, their
+   twins #4014 and #4020 land here. Of the 482 open issues
+   (`issue-audit-2026-09-30.md`): close fixed + obsolete (~170) citing the
+   audit; label the 84 "keep" issues `reconverse` (9 critical, owners
+   needed: #3762, #3872, #1378, #2018, #3158, #2643, #3978, #3994, #4018);
+   fold the 155 ideas into one wishlist; ask reporters on the 30
+   undecidable; the 42 AMPI/TCharm ones follow the AMPI port plan.
+3c. Final classic release BEFORE the rename (Kale, 2026-09-30): v8.0.2 was
+   a tag only, with no GitHub Release and no CHANGES entry, and main has
+   moved 12 bugfix commits since. Cut v8.0.3 with CHANGES entries for
+   8.0.1-8.0.3, bump the CMake project VERSION (still 8.0.1), publish a
+   GitHub Release marked Latest (v7.0.1r currently holds that slot).
 4. Rename `main` -> `classic` (protection moves with it) and set the
-   DEFAULT branch to `reviewed-with-reconverse`. Deliberately do NOT
+   DEFAULT branch to `reviewed-with-reconverse` (Kale reconfirmed the
+   rename 2026-09-30). Deliberately do NOT
    rename this line to `main` yet (amendment, Kale 2026-08-28): with no
    branch named `main`, every stale consumer -- old clones pulling,
    scripts pinned to origin/main -- fails loudly ("couldn't find remote
