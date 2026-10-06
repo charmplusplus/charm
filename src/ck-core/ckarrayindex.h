@@ -364,23 +364,34 @@ namespace ck {
   public:
     /// Factory that checks whether a bit-packing compression is possible given
     /// @arg bounds
+    /// Number of bits a packed index needs for these bounds (sum over dimensions
+    /// of ceil(log2(bound))); 0 when no bounds are set.
+    static unsigned int bitsNeeded(const CkArrayIndex &bounds) {
+      if (bounds.nInts == 0)
+        return 0;
+      unsigned int sum = 0;
+      bool shorts = bounds.dimension > 3;
+      for (int i = 0; i < bounds.dimension; ++i) {
+        int bound = shorts ? bounds.indexShorts[i] : bounds.index[i];
+        sum += bitCount(bound);
+      }
+      return sum;
+    }
+
     static FixedArrayIndexCompressor* make(const CkArrayIndex &bounds) {
       if (bounds.nInts == 0)
         return NULL;
 
       char dims = bounds.dimension;
       char bits[6];
-      unsigned int sum = 0;
       bool shorts = bounds.dimension > 3;
 
       for (int i = 0; i < bounds.dimension; ++i) {
         int bound = shorts ? bounds.indexShorts[i] : bounds.index[i];
-        unsigned int b = bitCount(bound);
-        bits[i] = b;
-        sum += b;
+        bits[i] = bitCount(bound);
       }
 
-      if (sum > CMK_OBJID_ELEMENT_BITS)
+      if (bitsNeeded(bounds) > CMK_OBJID_ELEMENT_BITS)
         return NULL;
 
       return new FixedArrayIndexCompressor(dims, bits);
