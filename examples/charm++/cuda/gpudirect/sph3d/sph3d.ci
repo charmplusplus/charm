@@ -1,0 +1,104 @@
+mainmodule sph3d {
+  include "sph3d.h";
+
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Patch patch_proxy;
+
+  readonly RealType dom_lx;        // tank extent (incl. walls): length, depth, height
+  readonly RealType dom_ly;
+  readonly RealType dom_lz;
+  readonly int n_chares_x;
+  readonly int n_chares_y;
+  readonly int n_chares_z;
+
+  readonly RealType spacing;       // initial particle spacing
+  readonly RealType smooth_h;      // smoothing length
+  readonly RealType support;       // kernel support radius, KERNEL_SUPPORT*h
+  readonly RealType pmass;         // per-particle mass (uniform lattice)
+  readonly RealType rho0;
+  readonly RealType sound_c0;
+  readonly RealType gravity;
+  readonly RealType sim_dt;
+  readonly RealType wall_t;        // wall thickness
+  readonly RealType col_w;         // initial water column: width along x,
+  readonly RealType col_h;         // height along z; it spans the full depth
+  readonly RealType init_vx;       // initial fluid velocity, +x
+
+  readonly int n_iters;
+  readonly int warmup_iters;
+  readonly int first_lb;
+  readonly int lb_freq;
+  readonly int async_lb;
+  readonly int lb_wait_lag;
+  readonly int lattice_nx;      // lattice extents, for the global particle id
+  readonly int lattice_ny;
+  readonly int part_capacity;
+  readonly int exch_capacity;   // face slot; edges and corners are smaller
+  readonly int stats_freq;
+
+  readonly int nl_freq;            // neighbour-list window (-k): cell list, halo
+                                   // membership and migration every nl_freq steps
+  readonly int integrator;         // 0 Euler-Cromer, 1 predictor-corrector (-p)
+  readonly RealType verlet_margin; // -m, in units of h: widens the cells and the halo
+  readonly RealType cell_size;     // support + verlet_margin * h
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry void initDone(CkReductionMsg* msg);
+    entry void stepStats(CkReductionMsg* msg);
+    entry [reductiontarget] void allDone();
+  };
+
+  array [3D] Patch {
+    entry Patch(void);
+    entry void init();
+    entry void iterate();
+
+    entry void haloPacked();
+    entry void haloPacked2();
+    entry void leaversPacked();
+    entry void sendDone();
+    entry void sendsDrained();
+
+    entry void receiveHalo(int ref, int dir, int n, int m,
+                           nocopydevice Particle parts[m]);
+    entry void receiveHalo2(int ref, int dir, int n, int m,
+                            nocopydevice Particle parts[m]);
+    entry void receiveParticles(int ref, int dir, int adv, int n, int m,
+                                nocopydevice Particle parts[m]);
+
+    // Same phase order as sph2d.ci (the halo is consumed before the migration
+    // send, which is what lets d_recv_halo have one slot per direction while
+    // d_recv_mig needs two). The predictor-corrector adds a second halo
+    // exchange of the predicted state between the two force evaluations; it
+    // has its own entry methods and staging buffer because a partner can post
+    // its second exchange before this patch has consumed its first.
+    entry void runStep() {
+      serial { my_iter++; startHalo(); }
+      when haloPacked() serial { sendHalo(); }
+      for (recv_count = 0; recv_count < n_expect; recv_count++) {
+        when receiveHalo[my_iter](int ref, int dir, int n, int m,
+                                  nocopydevice Particle parts[m])
+          serial { appendGhosts(dir, n); }
+      }
+      serial { computeForces(); }
+      if (pc_step) {
+        when haloPacked2() serial { sendHalo2(); }
+        for (recv_count = 0; recv_count < n_expect; recv_count++) {
+          when receiveHalo2[my_iter](int ref, int dir, int n, int m,
+                                     nocopydevice Particle parts[m])
+            serial { appendGhosts2(dir, n); }
+        }
+        serial { correct(); }
+      }
+      when leaversPacked() serial { sendLeavers(); }
+      for (recv_count = 0; recv_count < n_expect_mig; recv_count++) {
+        when receiveParticles[my_iter](int ref, int dir, int adv, int n, int m,
+                                       nocopydevice Particle parts[m])
+          serial { appendParticles(ref, dir, n); }
+      }
+      serial { gateStepDrain(); }
+      when sendsDrained() serial { endOfStep(); }
+    };
+  };
+};
