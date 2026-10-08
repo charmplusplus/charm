@@ -1,0 +1,78 @@
+mainmodule smload {
+  include "smload.h";
+
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Block block_proxy;
+  readonly int grid_width;
+  readonly int grid_height;
+  readonly int block_width;
+  readonly int block_height;
+  readonly int n_chares_x;
+  readonly int n_chares_y;
+  readonly int n_iters;
+  readonly int warmup_iters;
+  readonly int lb_freq;
+  readonly int first_lb;
+  readonly int work_iters;
+  readonly int sms_lo;
+  readonly int sms_hi;
+  readonly int sm_pattern;
+  readonly int verbose;
+  readonly bool fixed_placement;
+  readonly double tolerance;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void initDone();
+    entry [reductiontarget] void warmupDone();
+    entry [reductiontarget] void allDone();
+    entry [reductiontarget] void checksumDone(unsigned long long sum);
+    // One tuple reduction per balancing step: sums, min ratio, max ratio.
+    entry void lbReport(CkReductionMsg* m);
+  };
+
+  array [2D] Block {
+    entry Block(void);
+    entry void init();
+    entry void initDone();
+    entry void packGhostsDone();
+    entry void receiveGhosts(int ref, int dir, int w, DataType gh[w]);
+    entry void iterate();
+    entry void checksum();
+
+    entry void exchangeGhosts() {
+      serial {
+        my_iter++;
+        update();
+        packGhosts();
+      }
+
+      when packGhostsDone() {
+        serial {
+          // The pack ran behind the stencil on the device, so the new grid is
+          // complete: it becomes the current one and its ghosts go out.
+          std::swap(d_temperature, d_new_temperature);
+          sendGhosts();
+        }
+      }
+
+      for (remote_count = 0; remote_count < neighbors; remote_count++) {
+        when receiveGhosts[my_iter](int ref, int dir, int w, DataType buf[w]) {
+          serial {
+            processGhosts(dir, w, buf);
+          }
+        }
+      }
+
+      serial {
+        if (my_iter == warmup_iters)
+          contribute(CkCallback(CkReductionTarget(Main, warmupDone), main_proxy));
+        if (my_iter < warmup_iters + n_iters) {
+          thisProxy[thisIndex].iterate();
+        } else {
+          contribute(CkCallback(CkReductionTarget(Main, allDone), main_proxy));
+        }
+      }
+    }
+  };
+};

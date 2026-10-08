@@ -2368,6 +2368,8 @@ void CkMigratable::setObjGPUTime(double gputime) {
   myRec->setObjGPUTime(gputime);
 }
 double CkMigratable::getObjGPUTime() { return myRec->getObjGPUTime(); }
+double CkMigratable::getObjLastTime() { return myRec->getObjLastTime(); }
+double CkMigratable::getObjLastGPUTime() { return myRec->getObjLastGPUTime(); }
 
 #  if CMK_LB_USER_DATA
 /**
@@ -2953,6 +2955,8 @@ void CkMigratable::setObjPosition(const std::vector<LBRealType>& pos) {}
 double CkMigratable::getObjTime() { return 0.0; }
 void CkMigratable::setObjGPUTime(double gputime) {}
 double CkMigratable::getObjGPUTime() { return 0.0; }
+double CkMigratable::getObjLastTime() { return 0.0; }
+double CkMigratable::getObjLastGPUTime() { return 0.0; }
 
 #  if CMK_LB_USER_DATA
 void* CkMigratable::getObjUserData(int idx) { return NULL; }
@@ -3240,6 +3244,18 @@ double CkLocRec::getObjGPUTime()
 {
   LBRealType gputime;
   lbmgr->GetObjGPULoad(ldHandle, gputime);
+  return gputime;
+}
+double CkLocRec::getObjLastTime()
+{
+  LBRealType walltime, cputime;
+  lbmgr->QueryKnownObjLoad(ldHandle, walltime, cputime);
+  return walltime;
+}
+double CkLocRec::getObjLastGPUTime()
+{
+  LBRealType gputime;
+  lbmgr->QueryKnownObjGPULoad(ldHandle, gputime);
   return gputime;
 }
 #  if CMK_LB_USER_DATA

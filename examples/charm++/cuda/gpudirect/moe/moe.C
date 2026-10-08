@@ -488,7 +488,10 @@ class Dispatcher : public CBase_Dispatcher {
   int dispId = -1;
   bool active = false;
 
-  Dispatcher() {}
+  // A fixed load balancing object on this PE: the dispatcher's host time and
+  // kernels are its own, not unattributed background that DiffusionLB ignores
+  // and MetisLB reads as PE overhead.
+  Dispatcher() { ckRegisterWithLB(); }
 
   size_t slots() const { return (size_t)n_tokens * top_k; }
 

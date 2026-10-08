@@ -249,6 +249,9 @@ public:
     *c = *w;
 #endif
   }
+  // The GPU load the last balancing step read for this object (set at
+  // ClearLoads, when the interval's figure is complete); 0 before the first.
+  inline void lastKnownGPULoad(LBRealType *g) { *g = lastGPUTime; }
   inline void *getLocalUserData() { return  localUserData; }
 #if CMK_LB_USER_DATA
   inline void *getDBUserData(int idx) { return  data.getUserData(idx); }
@@ -262,6 +265,7 @@ private:
 //  bool registered;
   double startWTime;             // needs double precision
   LBRealType lastWallTime;
+  LBRealType lastGPUTime = 0.0;
 #if CMK_LB_CPUTIMER
   double startCTime;
   LBRealType lastCpuTime;

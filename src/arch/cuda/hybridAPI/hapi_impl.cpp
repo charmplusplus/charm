@@ -1663,6 +1663,32 @@ void hapiNormalizeCuptiLoads() {
       gm.cupti_obj_norm_load_[k.obj_key] += k.demand;
     }
 
+    // CHARM_GPU_LOAD_OBJDUMP: one line per object this device charged. Beside
+    // the sweep's demand, what the same kernels would earn in isolation --
+    // duration x SMs used / SMs -- so a benchmark that knows its kernels'
+    // SM counts (benchmarks/.../smload) can check the model kernel by kernel.
+    // The two agree while the device is not oversubscribed.
+    static const bool objdump = (getenv("CHARM_GPU_LOAD_OBJDUMP") != nullptr);
+    if (objdump) {
+      struct Tally { int kernels = 0; double elapsed = 0.0, isolated = 0.0, demand = 0.0; };
+      std::unordered_map<LDObjKey, Tally, LDObjKeyHash> tallies;
+      for (const SweepKernel& k : kernels) {
+        if (!k.attributed) continue;
+        Tally& t = tallies[k.obj_key];
+        const double d = (k.end_ns > k.start_ns) ? (double)(k.end_ns - k.start_ns) / 1.0e9 : 0.0;
+        t.kernels++;
+        t.elapsed += d;
+        t.isolated += d * (double)k.sms_used / (double)total_sms;
+        t.demand += k.demand;
+      }
+      for (const auto& tv : tallies)
+        CmiPrintf("[gpu-objdump pe=%d dev=%u om=%d obj=%llu kernels=%d elapsed_s=%.6f "
+                  "isolated_s=%.6f demand_s=%.6f]\n",
+                  CmiMyPe(), (unsigned)kv.first, (int)tv.first.omID().id.idx,
+                  (unsigned long long)tv.first.objID(), tv.second.kernels,
+                  tv.second.elapsed, tv.second.isolated, tv.second.demand);
+    }
+
     if (!scaling) continue;
 
     const uint64_t instanceId = dm->descriptor.instanceId;
@@ -5899,8 +5925,9 @@ uint64_t hapiCuptiPushObjCorrelation() {
   // key. Using CkMigratable::ckGetID() here loses the object-manager identity
   // and aliases equal element IDs from different chare arrays.
   uint64_t object_token = HAPI_CUPTI_NO_OBJECT;
-  if (CkLocRec* active = CkActiveLocRec()) {
-    const LDObjHandle& handle = active->getLdHandle();
+  // An array element, or a group branch registered with ckRegisterWithLB.
+  LDObjHandle handle;
+  if (CkActiveLdHandle(handle)) {
     LDObjKey key;
     key.omID() = handle.omID();
     key.objID() = handle.objID();

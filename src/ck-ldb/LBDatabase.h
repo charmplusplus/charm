@@ -212,6 +212,9 @@ public:
   inline void QueryKnownObjLoad(LDObjHandle &h, LBRealType &walltime, LBRealType &cputime) {
     LbObj(h)->lastKnownLoad(&walltime, &cputime);
   };
+  inline void QueryKnownObjGPULoad(LDObjHandle &h, LBRealType &gputime) {
+    LbObj(h)->lastKnownGPULoad(&gputime);
+  };
   inline void NonMigratable(LDObjHandle h) { LbObj(h)->SetMigratable(false); };
   inline void Migratable(LDObjHandle h) { LbObj(h)->SetMigratable(true); };
   inline void setPupSize(LDObjHandle h, size_t pup_size) { LbObj(h)->setPupSize(pup_size);};

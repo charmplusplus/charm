@@ -63,7 +63,7 @@ void _initChareTables()
 }
 
 //Charm++ virtual functions: declaring these here results in a smaller executable
-Chare::Chare(void) : myRec(nullptr) {
+Chare::Chare(void) : myRec(nullptr), ckLbRec(nullptr) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
   this->ckInitialized=true;
@@ -82,7 +82,7 @@ Chare::Chare(void) : myRec(nullptr) {
 #endif
 }
 
-Chare::Chare(CkMigrateMessage* m) : myRec(nullptr) {
+Chare::Chare(CkMigrateMessage* m) : myRec(nullptr), ckLbRec(nullptr) {
   thishandle.onPE=CkMyPe();
   thishandle.objPtr=this;
   this->ckInitialized=false;
@@ -203,11 +203,77 @@ void CkMessage::ckDebugPup(PUP::er &p,void *msg) {
     p((char*)msg,msgLen);
 }
 
+#if CMK_LBDB_ON
+// A chare that is a load balancing object without being an array element: a
+// group branch that called IrrGroup::ckRegisterWithLB. Each branch is its own
+// object manager, keyed by the group id, so its callbacks are these and no
+// array manager's ever casts its user pointer to a location record.
+struct CkGroupLBRec {
+  LDObjHandle handle;
+  LBManager *lbmgr;
+};
+
+static void _groupLBMigrate(LDObjHandle h, int dest) {
+  CkAbort("[%d] A group branch registered with ckRegisterWithLB never migrates, "
+          "but a load balancer asked to move it to PE %d\n", CkMyPe(), dest);
+}
+static void _groupLBResumeWaitingChares(LDObjHandle, int) {}
+static void _groupLBCallLBOnChares(LDObjHandle) {}
+
+bool CkActiveLdHandle(LDObjHandle &out) {
+  Chare *obj = CkActiveObj();
+  if (obj == nullptr || !obj->ckInitialized) return false;
+  if (CkLocRec *rec = obj->getCkLocRec()) { out = rec->getLdHandle(); return true; }
+  if (CkGroupLBRec *rec = obj->ckGetLBRec()) { out = rec->handle; return true; }
+  return false;
+}
+#endif
+
+void IrrGroup::ckRegisterWithLB(void) {
+#if CMK_LBDB_ON
+  if (ckLbRec != nullptr) return;
+  if (isNodeGroup())
+    CkAbort("ckRegisterWithLB: a nodegroup's entry methods run on any PE of the "
+            "node, so a branch cannot be a per-PE load balancing object\n");
+  LBManager *lbmgr = LBManager::Object();
+  if (lbmgr == nullptr)
+    CkAbort("ckRegisterWithLB: the load balancing manager is not up yet\n");
+  LDOMid omId;
+  omId.id = thisgroup;
+  LDCallbacks cb;
+  cb.migrate = _groupLBMigrate;
+  cb.setStats = NULL;
+  cb.queryEstLoad = NULL;
+  cb.metaLBResumeWaitingChares = _groupLBResumeWaitingChares;
+  cb.metaLBCallLBOnChares = _groupLBCallLBOnChares;
+  const LDOMHandle om = lbmgr->RegisterOM(omId, this, cb);
+  CkGroupLBRec *rec = new CkGroupLBRec;
+  rec->lbmgr = lbmgr;
+  // The id carries the group id the way an element's carries its array's, and
+  // the PE where an element's carries its index: unique per branch, and
+  // unmistakable next to element ids in a balancer's output.
+  rec->handle = lbmgr->RegisterObj(om, ck::ObjID(thisgroup, (CmiUInt8)CkMyPe()).getID(),
+                                   this, /*migratable=*/0);
+  ckLbRec = rec;
+#endif
+}
+
 IrrGroup::IrrGroup(void) {
   thisgroup = CkpvAccess(_currentGroup);
 }
 
 IrrGroup::~IrrGroup() {
+#if CMK_LBDB_ON
+  if (ckLbRec != nullptr) {
+    // The manager outlives every application group except at exit.
+    if (LBManager *lbmgr = LBManager::Object()) {
+      lbmgr->UnregisterObj(ckLbRec->handle);
+      lbmgr->UnregisterOM(ckLbRec->handle.omhandle);
+    }
+    delete ckLbRec;
+    ckLbRec = nullptr;
+  }
+#endif
   // remove the object pointer
   if (CkpvAccess(_destroyingNodeGroup)) {
     CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
@@ -610,17 +676,24 @@ extern uint64_t hapiCuptiPushObjCorrelation();
 extern void     hapiCuptiPopObjCorrelation();
 #endif
 
+// An array element is timed through its location record; a group branch
+// registered with ckRegisterWithLB straight through the manager. Any other
+// chare is not timed, and its time is the PE's background.
 inline void _ckStartTiming(void) {
 #if CMK_LBDB_ON
-  auto *active = CkActiveLocRec();
-  if (active) active->startTiming();
+  Chare *obj = CkActiveObj();
+  if (obj == nullptr || !obj->ckInitialized) return;
+  if (CkLocRec *rec = obj->getCkLocRec()) rec->startTiming();
+  else if (CkGroupLBRec *g = obj->ckGetLBRec()) g->lbmgr->ObjectStart(g->handle);
 #endif
 }
 
 inline void _ckStopTiming(void) {
 #if CMK_LBDB_ON
-  auto *active = CkActiveLocRec();
-  if (active) active->stopTiming();
+  Chare *obj = CkActiveObj();
+  if (obj == nullptr || !obj->ckInitialized) return;
+  if (CkLocRec *rec = obj->getCkLocRec()) rec->stopTiming();
+  else if (CkGroupLBRec *g = obj->ckGetLBRec()) g->lbmgr->ObjectStop(g->handle);
 #endif
 }
 

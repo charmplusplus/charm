@@ -334,6 +334,10 @@ CkpvExtern(CkCoreState *, _coreState);
 
 #if CMK_LBDB_ON
 CkLocRec *CkActiveLocRec(void);
+struct LDObjHandle;
+// The load balancing object running on this PE, whichever kind: an array
+// element's handle (CkActiveLocRec) or a group branch's (ckRegisterWithLB).
+bool CkActiveLdHandle(LDObjHandle &out);
 #endif // CMK_LBDB_ON
 
 void CpdHandleLBMessage(LBMigrateMsg **msg);

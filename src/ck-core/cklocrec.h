@@ -93,6 +93,10 @@ public:
 
   void setObjGPUTime(double gputime);
   double getObjGPUTime();
+  // What the last balancing step read for this element: see
+  // CkMigratable::getObjLastTime / getObjLastGPUTime.
+  double getObjLastTime();
+  double getObjLastGPUTime();
 
   void *getObjUserData(int idx);
 #else

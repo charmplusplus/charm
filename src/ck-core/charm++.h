@@ -213,6 +213,7 @@ public:
 #define CHARE_MAGIC    0x201201
 
 /* forward */ class CkLocRec;
+/* forward */ struct CkGroupLBRec;
 
 /**
   The base class of all parallel objects in Charm++,
@@ -225,6 +226,10 @@ class Chare {
     CkObjectMsgQ objQ;                // object message queue
 #endif
     CkLocRec *myRec;
+    // Non-null when this chare is a load balancing object without being an
+    // array element (IrrGroup::ckRegisterWithLB): the runtime then times its
+    // entry methods and attributes its kernels through it. Owned here.
+    CkGroupLBRec *ckLbRec;
   public:
     bool ckInitialized;
 #if CMK_ERROR_CHECKING
@@ -261,6 +266,7 @@ class Chare {
     /// Return the type of this chare, as present in _chareTable
     virtual int ckGetChareType() const;
     CkLocRec *getCkLocRec(void) const { return this->myRec; }
+    CkGroupLBRec *ckGetLBRec(void) const { return this->ckLbRec; }
     /// Return a strdup'd array containing this object's string name.
     virtual char *ckDebugChareName(void);
     /// Place into str a copy of the id of this object up to limit bytes, return
@@ -359,6 +365,16 @@ class IrrGroup : public Chare {
     virtual int ckGetChareType() const;
     virtual char *ckDebugChareName();
     virtual int ckDebugChareID(char *, int);
+
+    // Make this branch a load balancing object that never migrates. Its entry
+    // methods are then timed and its kernels attributed to it, so its work is
+    // a fixed load on this PE that every strategy sees as an object, instead
+    // of unattributed background -- which only the strategies that read
+    // bg_walltime count at all, and then as PE overhead. Call it from the
+    // constructor. Groups only: a nodegroup's entry methods run on any PE of
+    // the node, which no per-PE object can stand for. Not preserved across a
+    // checkpoint restart; call it again on unpacking.
+    void ckRegisterWithLB(void);
 
     // Silly run-time type information
     virtual bool isNodeGroup() { return false; };

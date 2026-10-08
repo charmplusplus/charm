@@ -495,6 +495,16 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->GetObjLoad(h, walltime, cputime);
   };
+  // The loads the last balancing step read for an object; the current window's
+  // accumulators above are cleared when a step completes, these are not.
+  void QueryKnownObjLoad(LDObjHandle& h, LBRealType& walltime, LBRealType& cputime)
+  {
+    lbdb_obj->QueryKnownObjLoad(h, walltime, cputime);
+  }
+  void QueryKnownObjGPULoad(LDObjHandle& h, LBRealType& gputime)
+  {
+    lbdb_obj->QueryKnownObjGPULoad(h, gputime);
+  }
    void GetObjGPULoad(LDObjHandle& h, LBRealType& gputime)
   {
     lbdb_obj->GetObjGPULoad(h, gputime);

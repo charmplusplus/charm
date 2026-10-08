@@ -15,11 +15,8 @@ LBDatabase::LBDatabase() {
 
 void LBDatabase::CollectStatsOn(void){
   if (!StatsOn()) {
-    auto *activeRec = CkActiveLocRec();
-    if (activeRec) {
-      const LDObjHandle &runObj = activeRec->getLdHandle();
-      LbObj(runObj)->StartTimer();
-    }
+    LDObjHandle runObj;
+    if (CkActiveLdHandle(runObj)) LbObj(runObj)->StartTimer();
     TurnStatsOn();
   }
 }
@@ -330,6 +327,9 @@ void LBDatabase::ClearLoads(void)
 #endif
       }
 #if CMK_CUDA
+      // Unconditionally, unlike lastWallTime: an interval that measured no
+      // GPU load reads back as 0, which is what it was.
+      obj->lastGPUTime = obj->data.gpuTime;
       obj->data.gpuTime = 0.0;
       obj->setGPUDeclared(false);
 #endif

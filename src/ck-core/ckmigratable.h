@@ -123,6 +123,13 @@ public:
   double getObjTime();
   void setObjGPUTime(double cputime);
   double getObjGPUTime();
+  // The host and GPU loads the LAST balancing step read for this element,
+  // i.e. the figures the strategy decided from. getObjTime / getObjGPUTime
+  // return the window still being measured, which the step's completion
+  // clears, so from ResumeFromSync they read 0 -- these do not. An element
+  // that migrated in the step has a fresh record on its new PE and reads 0.
+  double getObjLastTime();
+  double getObjLastGPUTime();
 #if CMK_LB_USER_DATA
   void *getObjUserData(int idx);
 #endif
