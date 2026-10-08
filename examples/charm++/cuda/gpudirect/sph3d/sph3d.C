@@ -186,13 +186,18 @@ extern void invokeEOS(Particle*, int, RealType, RealType, int*, cudaStream_t);
 extern void invokeForces(const Particle*, int, int, int, int, const int*,
     const int*, const int*, const float4*, const float4*, RealType, RealType,
     RealType, RealType, RealType*, RealType*, RealType*, RealType*, cudaStream_t);
-extern void invokeIntegrate(Particle*, int, RealType, RealType, RealType*,
+extern void invokeIntegrate(Particle*, int, RealType, RealType, RealType, RealType*,
     RealType*, RealType*, RealType*, int*, cudaStream_t);
-extern void invokePredict(const Particle*, Particle*, int, RealType, RealType,
-    const RealType*, const RealType*, const RealType*, const RealType*,
+extern void invokeIntegrateLeavers(bool, const Particle*, int, RealType, RealType,
+    RealType, RealType*, RealType*, RealType*, RealType*, RealType, RealType,
+    RealType, RealType, RealType, RealType, Particle**, Particle*, int*, int,
     cudaStream_t);
-extern void invokeCorrect(Particle*, int, RealType, RealType, const RealType*,
-    const RealType*, const RealType*, const RealType*, int*, cudaStream_t);
+extern void invokePredict(const Particle*, Particle*, int, RealType, RealType,
+    RealType, const RealType*, const RealType*, const RealType*, const RealType*,
+    cudaStream_t);
+extern void invokeCorrect(Particle*, int, RealType, RealType, RealType,
+    const RealType*, const RealType*, const RealType*, const RealType*, int*,
+    cudaStream_t);
 extern void invokePackHalo(const Particle*, int, RealType, RealType, RealType,
     RealType, RealType, RealType, RealType, Particle**, int**, int*, int, int,
     bool, cudaStream_t);
@@ -911,6 +916,8 @@ public:
     if (np > 0)
       sphSubmitMemcpy(d_parts[cur], mine.data(),
           sizeof(Particle) * np, cudaMemcpyHostToDevice, compute_stream);
+    // Pressures once here; from now on every integrator sets them.
+    invokeEOS(d_parts[cur], np, rho0, sound_c0, NULL, compute_stream);
 
     runCheck(0.0f);
     hapiCheck(sphDrainSync(compute_stream));
@@ -1098,7 +1105,6 @@ public:
       thisProxy[thisIndex].haloPacked();
       return;
     }
-    static const bool fold_zero = (getenv("SPH_NO_FOLD_ZERO") == nullptr);
     static const bool batch_halo = (getenv("SPH_NO_BATCH_HALO") == nullptr);
     static const bool sort_locals = (getenv("SPH_NO_SORT") == nullptr);
     if (batch_halo) hapiSubmitBatchBegin();
@@ -1118,15 +1124,12 @@ public:
         invokeGather(d_parts[cur], d_cell_parts, np, d_parts[1 - cur], compute_stream);
         cur = 1 - cur;
       }
-      invokeEOS(d_parts[cur], np, rho0, sound_c0, fold_zero ? d_counts : NULL,
-          compute_stream);
       invokePackHalo(d_parts[cur], np, x0, y0, z0, x1, y1, z1, cell_size,
           d_halo_ptrs, d_halo_idx_ptrs, d_counts, exch_capacity, valid_mask,
-          fold_zero, compute_stream);
+          /*counts_zeroed=*/false, compute_stream);
       sphSubmitMemcpy(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
           cudaMemcpyDeviceToHost, compute_stream);
     } else {
-      invokeEOS(d_parts[cur], np, rho0, sound_c0, NULL, compute_stream);
       invokePackHaloByIndex(d_parts[cur], d_halo_ptrs, d_halo_idx, d_halo_cnt,
           exch_capacity, exch_slots, compute_stream);
     }
@@ -1279,15 +1282,22 @@ public:
         d_drho, d_ax, d_ay, d_az, compute_stream);
 
     if (!pc_step) {
-      invokeIntegrate(d_parts[cur], np, sim_dt, rho0, d_drho, d_ax, d_ay, d_az,
-          fold_zero ? d_counts : NULL, compute_stream);
-      finishCompute();
+      // On a migration step that is not reporting, the integration and the
+      // compaction are one pass (finishCompute then only copies the counts).
+      const bool fused = migrate_step && !isStatsIter();
+      if (fused)
+        invokeIntegrateLeavers(false, d_parts[cur], np, sim_dt, rho0, sound_c0,
+            d_drho, d_ax, d_ay, d_az, x0, y0, z0, x1, y1, z1, d_mig_ptrs,
+            d_parts[1 - cur], d_counts, exch_capacity, compute_stream);
+      else
+        invokeIntegrate(d_parts[cur], np, sim_dt, rho0, sound_c0, d_drho, d_ax,
+            d_ay, d_az, fold_zero ? d_counts : NULL, compute_stream);
+      finishCompute(fused);
     } else {
-      // Half step into the other buffer, its pressure, and the second
+      // Half step into the other buffer (with its pressure), and the second
       // exchange of exactly the particles the first one sent.
       invokePredict(d_parts[cur], d_parts[1 - cur], np, 0.5f * sim_dt, rho0,
-          d_drho, d_ax, d_ay, d_az, compute_stream);
-      invokeEOS(d_parts[1 - cur], np, rho0, sound_c0, NULL, compute_stream);
+          sound_c0, d_drho, d_ax, d_ay, d_az, compute_stream);
       invokePackHaloByIndex(d_parts[1 - cur], d_halo_ptrs2, d_halo_idx,
           d_halo_cnt, exch_capacity, exch_slots, compute_stream);
       pc_pending = true;
@@ -1300,7 +1310,9 @@ public:
 
   // The tail of the compute phase on compute_stream: stats on a reporting
   // step, the compaction on a migrate step, and the callback that ends it.
-  void finishCompute() {
+  // leavers_done: the integrator already compacted (invokeIntegrateLeavers),
+  // so only the counts are still to come.
+  void finishCompute(bool leavers_done) {
     static const bool fold_zero = (getenv("SPH_NO_FOLD_ZERO") == nullptr);
     if (isStatsIter()) {
       invokeStats(d_parts[cur], np, d_stats, compute_stream);
@@ -1308,8 +1320,9 @@ public:
           cudaMemcpyDeviceToHost, compute_stream);
     }
     if (migrate_step) {
-      invokeMarkLeavers(d_parts[cur], np, x0, y0, z0, x1, y1, z1, d_mig_ptrs,
-          d_parts[1 - cur], d_counts, exch_capacity, fold_zero, compute_stream);
+      if (!leavers_done)
+        invokeMarkLeavers(d_parts[cur], np, x0, y0, z0, x1, y1, z1, d_mig_ptrs,
+            d_parts[1 - cur], d_counts, exch_capacity, fold_zero, compute_stream);
       sphSubmitMemcpy(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
           cudaMemcpyDeviceToHost, compute_stream);
       mig_pending = true;
@@ -1384,10 +1397,16 @@ public:
     invokeForces(d_parts[1 - cur], np, ncx, ncy, ncz, d_cell_of, d_cell_off,
         d_cell_cnt, d_pos4, d_vel4, smooth_h, pmass, sound_c0, gravity,
         d_drho, d_ax, d_ay, d_az, compute_stream);
-    invokeCorrect(d_parts[cur], np, sim_dt, rho0, d_drho, d_ax, d_ay, d_az,
-        fold_zero ? d_counts : NULL, compute_stream);
+    const bool fused = migrate_step && !isStatsIter();
+    if (fused)
+      invokeIntegrateLeavers(true, d_parts[cur], np, sim_dt, rho0, sound_c0,
+          d_drho, d_ax, d_ay, d_az, x0, y0, z0, x1, y1, z1, d_mig_ptrs,
+          d_parts[1 - cur], d_counts, exch_capacity, compute_stream);
+    else
+      invokeCorrect(d_parts[cur], np, sim_dt, rho0, sound_c0, d_drho, d_ax, d_ay,
+          d_az, fold_zero ? d_counts : NULL, compute_stream);
     pc_pending = false;
-    finishCompute();
+    finishCompute(fused);
     if (batch_compute) hapiSubmitBatchEnd();
   }
 

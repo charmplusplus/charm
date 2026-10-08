@@ -108,9 +108,18 @@ __global__ void gatherKernel(const Particle* src, const int* cell_parts, int n,
 }
 
 // --------------------------------------------------------------- physics ----
-// Tait equation of state, before the halo exchange so a ghost arrives with its
-// pressure set by its owner. zero/nzero: see sph2d.cu (a counter array the next
-// kernel on this stream accumulates into, cleared here by thread 0).
+// Tait equation of state, no tension (see sph2d.cu). Pressure is set wherever
+// the density changes -- the integrators below, and once at init -- so a ghost
+// arrives with its pressure set by its owner and no pass precedes the pack.
+__device__ __forceinline__ RealType taitPressure(RealType rho, RealType rho0, RealType c0) {
+  const RealType B = rho0 * c0 * c0 / EOS_GAMMA;
+  const RealType r = rho / rho0;
+  const RealType r2 = r * r, r4 = r2 * r2;
+  const RealType pres = B * (r4 * r2 * r - 1.0f);   // r^7
+  return pres < 0.0f ? 0.0f : pres;
+}
+
+// Init only: the lattice arrives without pressures.
 __global__ void eosKernel(Particle* parts, int n, RealType rho0, RealType c0,
     int* zero, int nzero) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -118,12 +127,7 @@ __global__ void eosKernel(Particle* parts, int n, RealType rho0, RealType c0,
   if (i == 0 && zero != nullptr) for (int k = 0; k < nzero; k++) zero[k] = 0;
   RealType rho = parts[i].rho;
   if (parts[i].type == PTYPE_BOUND && rho < rho0) rho = rho0;
-  const RealType B = rho0 * c0 * c0 / EOS_GAMMA;
-  const RealType r = rho / rho0;
-  const RealType r2 = r * r, r4 = r2 * r2;
-  RealType pres = B * (r4 * r2 * r - 1.0f);   // r^7
-  if (pres < 0.0f) pres = 0.0f;                // no tension (see sph2d.cu)
-  parts[i].p = pres;
+  parts[i].p = taitPressure(rho, rho0, c0);
   parts[i].rho = rho;
 }
 
@@ -219,76 +223,147 @@ __global__ void forcesKernel(const Particle* __restrict__ parts, int n_local, in
   }
 }
 
-// Euler-Cromer: velocity first, then position from the new velocity. Boundary
-// particles integrate density only.
-__global__ void integrateKernel(Particle* parts, int n_local, RealType dt,
-    RealType rho0, RealType* drho, RealType* ax, RealType* ay, RealType* az,
-    int* zero, int nzero) {
-  const int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= n_local) return;
-  if (i == 0 && zero != nullptr) for (int k = 0; k < nzero; k++) zero[k] = 0;
-  parts[i].rho += dt * drho[i];
-  if (parts[i].type == PTYPE_BOUND) {
-    if (parts[i].rho < rho0) parts[i].rho = rho0;
-    return;
+// Euler-Cromer for one particle: velocity first, then position from the new
+// velocity; boundary particles integrate density only. Pressure from the new
+// density.
+__device__ __forceinline__ void ecStep(Particle& q, int i, RealType dt, RealType rho0,
+    RealType c0, const RealType* drho, const RealType* ax, const RealType* ay,
+    const RealType* az) {
+  q.rho += dt * drho[i];
+  if (q.type == PTYPE_BOUND) {
+    if (q.rho < rho0) q.rho = rho0;
+  } else {
+    q.vx += dt * ax[i];
+    q.vy += dt * ay[i];
+    q.vz += dt * az[i];
+    q.x += dt * q.vx;
+    q.y += dt * q.vy;
+    q.z += dt * q.vz;
   }
-  parts[i].vx += dt * ax[i];
-  parts[i].vy += dt * ay[i];
-  parts[i].vz += dt * az[i];
-  parts[i].x += dt * parts[i].vx;
-  parts[i].y += dt * parts[i].vy;
-  parts[i].z += dt * parts[i].vz;
+  q.p = taitPressure(q.rho, rho0, c0);
 }
 
-// GPUSPH's predictor-corrector (euler_kernel.def there), two kernels. The
-// predictor writes the half-step state to a second buffer so the n-state stays
-// intact for the corrector:
+// GPUSPH's predictor-corrector (euler_kernel.def there). Predictor, a half
+// step from the n-state:
 //   x* = x + v dt/2,  v* = v + a dt/2,  rho* = rho + drho dt/2.
-__global__ void predictKernel(const Particle* src, Particle* dst, int n_local,
-    RealType dt2, RealType rho0, const RealType* drho, const RealType* ax,
-    const RealType* ay, const RealType* az) {
-  const int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= n_local) return;
-  Particle q = src[i];
+// Corrector, the n-state advanced with the forces at the predicted state:
+//   vc = v + a* dt/2;  x1 = x + vc dt;  v1 = v + a* dt;  rho1 = rho + drho* dt.
+__device__ __forceinline__ void pcPredict(Particle& q, int i, RealType dt2, RealType rho0,
+    RealType c0, const RealType* drho, const RealType* ax, const RealType* ay,
+    const RealType* az) {
   q.rho += dt2 * drho[i];
   if (q.type == PTYPE_BOUND) {
     if (q.rho < rho0) q.rho = rho0;
-    dst[i] = q;
-    return;
+  } else {
+    q.x += dt2 * q.vx;
+    q.y += dt2 * q.vy;
+    q.z += dt2 * q.vz;
+    q.vx += dt2 * ax[i];
+    q.vy += dt2 * ay[i];
+    q.vz += dt2 * az[i];
   }
-  q.x += dt2 * q.vx;
-  q.y += dt2 * q.vy;
-  q.z += dt2 * q.vz;
-  q.vx += dt2 * ax[i];
-  q.vy += dt2 * ay[i];
-  q.vz += dt2 * az[i];
-  dst[i] = q;
+  q.p = taitPressure(q.rho, rho0, c0);
+}
+__device__ __forceinline__ void pcCorrect(Particle& q, int i, RealType dt, RealType rho0,
+    RealType c0, const RealType* drho, const RealType* ax, const RealType* ay,
+    const RealType* az) {
+  q.rho += dt * drho[i];
+  if (q.type == PTYPE_BOUND) {
+    if (q.rho < rho0) q.rho = rho0;
+  } else {
+    const RealType hdt = 0.5f * dt;
+    q.x += dt * (q.vx + hdt * ax[i]);
+    q.y += dt * (q.vy + hdt * ay[i]);
+    q.z += dt * (q.vz + hdt * az[i]);
+    q.vx += dt * ax[i];
+    q.vy += dt * ay[i];
+    q.vz += dt * az[i];
+  }
+  q.p = taitPressure(q.rho, rho0, c0);
 }
 
-// The corrector integrates the n-state in place with the forces evaluated at
-// the predicted state:
-//   vc = v + a* dt/2;  x1 = x + vc dt;  v1 = v + a* dt;  rho1 = rho + drho* dt.
-__global__ void correctKernel(Particle* parts, int n_local, RealType dt,
-    RealType rho0, const RealType* drho, const RealType* ax, const RealType* ay,
-    const RealType* az, int* zero, int nzero) {
+// Where an integrated particle goes at a migration: into the compacted "stay"
+// buffer, or the slot of the neighbour it crossed into. Boundary particles
+// are fixed, so they always stay.
+__device__ __forceinline__ void placeParticle(const Particle& p, RealType x0,
+    RealType y0, RealType z0, RealType x1, RealType y1, RealType z1,
+    Particle** bufs, Particle* stay, int* counts, int cap_face) {
+  int sx = 0, sy = 0, sz = 0;
+  if (p.type == PTYPE_FLUID) {
+    if (p.x < x0) sx = -1; else if (p.x >= x1) sx = 1;
+    if (p.y < y0) sy = -1; else if (p.y >= y1) sy = 1;
+    if (p.z < z0) sz = -1; else if (p.z >= z1) sz = 1;
+  }
+  const int d = dirIndex(sx, sy, sz);
+  if (d == STAY) {
+    stay[atomicAdd(&counts[STAY], 1)] = p;
+    return;
+  }
+  const int slot = atomicAdd(&counts[d], 1);
+  if (slot < dirCap(d, cap_face)) bufs[d][slot] = p;
+  else atomicAdd(&counts[ERR_COUNTER], 1);
+}
+
+// In place (a step inside a neighbour-list window, or a reporting step whose
+// statistics read the array before the compaction). zero/nzero: see sph2d.cu
+// (a counter array the next kernel on this stream accumulates into, cleared
+// here by thread 0).
+__global__ void integrateKernel(Particle* parts, int n_local, RealType dt,
+    RealType rho0, RealType c0, const RealType* drho, const RealType* ax,
+    const RealType* ay, const RealType* az, int* zero, int nzero) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= n_local) return;
   if (i == 0 && zero != nullptr) for (int k = 0; k < nzero; k++) zero[k] = 0;
   Particle q = parts[i];
-  q.rho += dt * drho[i];
-  if (q.type == PTYPE_BOUND) {
-    if (q.rho < rho0) q.rho = rho0;
-    parts[i] = q;
-    return;
-  }
-  const RealType hdt = 0.5f * dt;
-  q.x += dt * (q.vx + hdt * ax[i]);
-  q.y += dt * (q.vy + hdt * ay[i]);
-  q.z += dt * (q.vz + hdt * az[i]);
-  q.vx += dt * ax[i];
-  q.vy += dt * ay[i];
-  q.vz += dt * az[i];
+  ecStep(q, i, dt, rho0, c0, drho, ax, ay, az);
   parts[i] = q;
+}
+
+// Integrate and compact in one pass: the particle is read once and written
+// once, to where it belongs after the step. counts must be zero on entry.
+__global__ void integrateLeaversKernel(const Particle* parts, int n_local,
+    RealType dt, RealType rho0, RealType c0, const RealType* drho,
+    const RealType* ax, const RealType* ay, const RealType* az,
+    RealType x0, RealType y0, RealType z0, RealType x1, RealType y1, RealType z1,
+    Particle** bufs, Particle* stay, int* counts, int cap_face) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= n_local) return;
+  Particle q = parts[i];
+  ecStep(q, i, dt, rho0, c0, drho, ax, ay, az);
+  placeParticle(q, x0, y0, z0, x1, y1, z1, bufs, stay, counts, cap_face);
+}
+
+__global__ void predictKernel(const Particle* src, Particle* dst, int n_local,
+    RealType dt2, RealType rho0, RealType c0, const RealType* drho,
+    const RealType* ax, const RealType* ay, const RealType* az) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= n_local) return;
+  Particle q = src[i];
+  pcPredict(q, i, dt2, rho0, c0, drho, ax, ay, az);
+  dst[i] = q;
+}
+
+__global__ void correctKernel(Particle* parts, int n_local, RealType dt,
+    RealType rho0, RealType c0, const RealType* drho, const RealType* ax,
+    const RealType* ay, const RealType* az, int* zero, int nzero) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= n_local) return;
+  if (i == 0 && zero != nullptr) for (int k = 0; k < nzero; k++) zero[k] = 0;
+  Particle q = parts[i];
+  pcCorrect(q, i, dt, rho0, c0, drho, ax, ay, az);
+  parts[i] = q;
+}
+
+__global__ void correctLeaversKernel(const Particle* parts, int n_local,
+    RealType dt, RealType rho0, RealType c0, const RealType* drho,
+    const RealType* ax, const RealType* ay, const RealType* az,
+    RealType x0, RealType y0, RealType z0, RealType x1, RealType y1, RealType z1,
+    Particle** bufs, Particle* stay, int* counts, int cap_face) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= n_local) return;
+  Particle q = parts[i];
+  pcCorrect(q, i, dt, rho0, c0, drho, ax, ay, az);
+  placeParticle(q, x0, y0, z0, x1, y1, z1, bufs, stay, counts, cap_face);
 }
 
 // ------------------------------------------------------------- exchanges ----
@@ -310,6 +385,8 @@ __global__ void packHaloKernel(const Particle* parts, int n_local,
   const bool nx0 = (p.x - x0) < support, nx1 = (x1 - p.x) < support;
   const bool ny0 = (p.y - y0) < support, ny1 = (y1 - p.y) < support;
   const bool nz0 = (p.z - z0) < support, nz1 = (z1 - p.z) < support;
+  // Interior particles -- most of them -- go to nobody.
+  if (!(nx0 | nx1 | ny0 | ny1 | nz0 | nz1)) return;
 
   for (int d = 0; d < NUM_DIRS; d++) {
     // Only directions with a partner: a tank wall is three layers thick and
@@ -348,29 +425,15 @@ __global__ void packHaloByIndexKernel(const Particle* parts, Particle** bufs,
   bufs[d][k] = parts[idx[off + k]];
 }
 
-// After integration, move out anything that left the box and compact what
-// stays. Boundary particles are fixed, so they always stay.
+// After an in-place integration, move out anything that left the box and
+// compact what stays (placeParticle). Used on the reporting steps; elsewhere
+// the integration and this are one kernel.
 __global__ void markLeaversKernel(const Particle* parts, int n_local,
     RealType x0, RealType y0, RealType z0, RealType x1, RealType y1, RealType z1,
     Particle** bufs, Particle* stay, int* counts, int cap_face) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= n_local) return;
-  const Particle p = parts[i];
-
-  int sx = 0, sy = 0, sz = 0;
-  if (p.type == PTYPE_FLUID) {
-    if (p.x < x0) sx = -1; else if (p.x >= x1) sx = 1;
-    if (p.y < y0) sy = -1; else if (p.y >= y1) sy = 1;
-    if (p.z < z0) sz = -1; else if (p.z >= z1) sz = 1;
-  }
-  const int d = dirIndex(sx, sy, sz);
-  if (d == STAY) {
-    stay[atomicAdd(&counts[STAY], 1)] = p;
-    return;
-  }
-  const int slot = atomicAdd(&counts[d], 1);
-  if (slot < dirCap(d, cap_face)) bufs[d][slot] = p;
-  else atomicAdd(&counts[ERR_COUNTER], 1);
+  placeParticle(parts[i], x0, y0, z0, x1, y1, z1, bufs, stay, counts, cap_face);
 }
 
 // Diagnostics: fluid count, summed density, kinetic energy, max speed and the
@@ -580,34 +643,57 @@ void invokeForces(const Particle* d_parts, int n_local, int ncx, int ncy,
 }
 
 void invokePredict(const Particle* d_src, Particle* d_dst, int n_local,
-    RealType dt2, RealType rho0, const RealType* d_drho, const RealType* d_ax,
-    const RealType* d_ay, const RealType* d_az, cudaStream_t s) {
+    RealType dt2, RealType rho0, RealType c0, const RealType* d_drho,
+    const RealType* d_ax, const RealType* d_ay, const RealType* d_az,
+    cudaStream_t s) {
   if (n_local <= 0) return;
   hapiSubmit(s, [=]() {
     predictKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_src, d_dst, n_local, dt2,
-        rho0, d_drho, d_ax, d_ay, d_az);
+        rho0, c0, d_drho, d_ax, d_ay, d_az);
   });
   SPH_PEEK();
 }
 
 void invokeCorrect(Particle* d_parts, int n_local, RealType dt, RealType rho0,
-    const RealType* d_drho, const RealType* d_ax, const RealType* d_ay,
+    RealType c0, const RealType* d_drho, const RealType* d_ax, const RealType* d_ay,
     const RealType* d_az, int* d_zero, cudaStream_t s) {
   if (n_local <= 0) return;
   hapiSubmit(s, [=]() {
     correctKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, dt, rho0,
-        d_drho, d_ax, d_ay, d_az, d_zero, NUM_COUNTERS);
+        c0, d_drho, d_ax, d_ay, d_az, d_zero, NUM_COUNTERS);
   });
   SPH_PEEK();
 }
 
 void invokeIntegrate(Particle* d_parts, int n_local, RealType dt, RealType rho0,
-    RealType* d_drho, RealType* d_ax, RealType* d_ay, RealType* d_az, int* d_zero,
-    cudaStream_t s) {
+    RealType c0, RealType* d_drho, RealType* d_ax, RealType* d_ay, RealType* d_az,
+    int* d_zero, cudaStream_t s) {
   if (n_local <= 0) return;
   hapiSubmit(s, [=]() {
     integrateKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, dt,
-        rho0, d_drho, d_ax, d_ay, d_az, d_zero, NUM_COUNTERS);
+        rho0, c0, d_drho, d_ax, d_ay, d_az, d_zero, NUM_COUNTERS);
+  });
+  SPH_PEEK();
+}
+
+// Integrate (Euler-Cromer or the corrector, by pc) and compact in one pass.
+// Clears the counters itself.
+void invokeIntegrateLeavers(bool pc, const Particle* d_parts, int n_local,
+    RealType dt, RealType rho0, RealType c0, RealType* d_drho, RealType* d_ax,
+    RealType* d_ay, RealType* d_az, RealType x0, RealType y0, RealType z0,
+    RealType x1, RealType y1, RealType z1, Particle** d_bufs, Particle* d_stay,
+    int* d_counts, int cap_face, cudaStream_t s) {
+  sphSubmitMemset(d_counts, 0, sizeof(int) * NUM_COUNTERS, s);
+  if (n_local <= 0) return;
+  hapiSubmit(s, [=]() {
+    if (pc)
+      correctLeaversKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local,
+          dt, rho0, c0, d_drho, d_ax, d_ay, d_az, x0, y0, z0, x1, y1, z1, d_bufs,
+          d_stay, d_counts, cap_face);
+    else
+      integrateLeaversKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local,
+          dt, rho0, c0, d_drho, d_ax, d_ay, d_az, x0, y0, z0, x1, y1, z1, d_bufs,
+          d_stay, d_counts, cap_face);
   });
   SPH_PEEK();
 }
