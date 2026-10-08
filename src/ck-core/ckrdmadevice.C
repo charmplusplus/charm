@@ -273,6 +273,11 @@ CkpvDeclare(std::vector<DeviceRecvPending*>*, device_recv_pending);
 // Events for the destination-order fallback when the flag ring is full.
 CkpvDeclare(std::vector<hapiEvent_t>*, device_recv_events);
 static void deviceRecvPendingPoll(void*);
+// Landings waiting to be issued as one batch (see deviceRecvBatchAdd).
+struct DeviceRecvBatch;
+CkpvDeclare(DeviceRecvBatch*, device_recv_batch);
+static void deviceRecvBatchPoll(void*);
+static void deviceRecvBatchIdle(void*);
 
 // Device work in flight on an element (hapiDeviceWorkBegin/End, see hapi.h):
 // every HAPI callback registered inside an element's entry method raises its
@@ -325,6 +330,13 @@ void CkRdmaDeviceRegistrationCacheInit()
   CkpvInitialize(std::vector<hapiEvent_t>*, device_recv_events);
   CkpvAccess(device_recv_events) = new std::vector<hapiEvent_t>();
   CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)deviceRecvPendingPoll, NULL);
+  CkpvInitialize(DeviceRecvBatch*, device_recv_batch);
+  CkpvAccess(device_recv_batch) = nullptr;
+  // A batch flushes on age (checked every scheduler pass) and as soon as the
+  // PE has nothing else to do.
+  CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)deviceRecvBatchPoll, NULL);
+  CcdCallOnConditionKeep(CcdPROCESSOR_BEGIN_IDLE, (CcdCondFn)deviceRecvBatchIdle, NULL);
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE, (CcdCondFn)deviceRecvBatchIdle, NULL);
 }
 
 static hapiStream_t stagingStream()
@@ -587,6 +599,108 @@ static void notifyDeviceRestagePut(int dest_pe, void* dest_op);
 // moves both ends of many send pairs per step, so the window was hit
 // constantly.
 
+// Zero-copy statistics, declared ahead of the completion handlers that record into them.
+namespace {
+inline bool zcStatsOnFast() {
+  static const bool on = (getenv("CHARM_ZC_STATS") != nullptr);
+  return on;
+}
+struct ZcModeStats {
+  std::atomic<long> memcpy_n{0};
+  std::atomic<long> ipc_n{0};
+  std::atomic<long> other_n{0};
+  // Completed receives, their bytes, and the wall time from posting the receive
+  // to its last op completing -- per mode. Counts alone answer "did placement
+  // move traffic to a slower transport"; they cannot answer "by how much", and
+  // a cost model needs the second question. A pingpong benchmark cannot answer
+  // it either: it measures a transfer alone on the machine, whereas what a
+  // balancer needs is what the transfer costs amid all the others contending
+  // for the same device, link and NIC. Only the application's own traffic has
+  // that contention in it.
+  //
+  // Recorded per receive, not per op: the receive is the unit the application
+  // waits on, and its ops complete concurrently.
+  std::atomic<long> recv_n[3];
+  std::atomic<long> recv_bytes[3];
+  // Microseconds, as an integer so the accumulation stays a relaxed atomic add.
+  std::atomic<long> recv_us[3];
+  // Batched landings (deviceRecvBatchAdd): batches issued, ops they carried,
+  // the largest, and how often the batched copy API refused and the batch fell
+  // back to one copy per op (still one completion per batch).
+  std::atomic<long> batch_flushes{0};
+  std::atomic<long> batch_ops{0};
+  std::atomic<long> batch_max{0};
+  std::atomic<long> batch_fallback{0};
+  // Host time (us) the PEs of this process spent inside the per-message paths:
+  // preparing a send (CkRdmaDeviceOnSender), admitting and issuing a receive
+  // (CkRdmaDeviceIssueRgets), and completing ops (CkRdmaDeviceRecvHandler).
+  // What a cross-process device message costs the host, as distinct from what
+  // its bytes cost the device.
+  std::atomic<long> host_send_us{0};
+  std::atomic<long> host_send_n{0};
+  std::atomic<long> host_recv_us{0};
+  std::atomic<long> host_recv_n{0};
+  std::atomic<long> host_done_us{0};
+  std::atomic<long> host_done_n{0};
+
+  ZcModeStats() {
+    for (int i = 0; i < 3; i++) { recv_n[i] = 0; recv_bytes[i] = 0; recv_us[i] = 0; }
+  }
+  static const char* slotName(int s) {
+    return (s == 0) ? "MEMCPY" : (s == 1) ? "IPC" : "OTHER";
+  }
+  ~ZcModeStats() {
+    const long m = memcpy_n.load(), i = ipc_n.load(), o = other_n.load();
+    const long total = m + i + o;
+    if (total == 0) return;
+    fprintf(stderr, "[zc-stats] pid=%d MEMCPY=%ld IPC=%ld OTHER=%ld "
+                    "(same-process %.1f%% of %ld)\n",
+            (int)getpid(), m, i, o, 100.0 * m / total, total);
+    for (int s = 0; s < 3; s++) {
+      const long n = recv_n[s].load();
+      if (n == 0) continue;
+      const long us = recv_us[s].load(), by = recv_bytes[s].load();
+      // mean us/receive and mean bytes/receive: fit alpha and beta across the
+      // three rows and the result already carries the real contention.
+      fprintf(stderr, "[zc-time] pid=%d %-6s recvs=%ld bytes=%ld total_us=%ld "
+                      "mean_us=%.3f mean_bytes=%.1f\n",
+              (int)getpid(), slotName(s), n, by, us, (double)us / n,
+              (double)by / n);
+    }
+    if (host_send_n.load() + host_recv_n.load() > 0)
+      fprintf(stderr, "[zc-host] pid=%d send: n=%ld total_ms=%.1f mean_us=%.1f | recv-issue: n=%ld "
+                      "total_ms=%.1f mean_us=%.1f | complete: n=%ld total_ms=%.1f mean_us=%.1f\n",
+              (int)getpid(), host_send_n.load(), host_send_us.load() / 1e3,
+              host_send_n.load() ? (double)host_send_us.load() / host_send_n.load() : 0.0,
+              host_recv_n.load(), host_recv_us.load() / 1e3,
+              host_recv_n.load() ? (double)host_recv_us.load() / host_recv_n.load() : 0.0,
+              host_done_n.load(), host_done_us.load() / 1e3,
+              host_done_n.load() ? (double)host_done_us.load() / host_done_n.load() : 0.0);
+    const long bf = batch_flushes.load();
+    if (bf > 0)
+      fprintf(stderr, "[zc-batch] pid=%d batches=%ld ops=%ld mean_ops=%.1f max_ops=%ld "
+                      "fallbacks=%ld\n",
+              (int)getpid(), bf, batch_ops.load(), (double)batch_ops.load() / bf,
+              batch_max.load(), batch_fallback.load());
+    fflush(stderr);
+  }
+};
+ZcModeStats zc_mode_stats;
+
+// Adds the scope's wall time to one of the host counters above; free when the
+// statistics are off (one cached env lookup).
+struct ZcHostTimer {
+  std::atomic<long>* us; std::atomic<long>* n; double t0;
+  ZcHostTimer(std::atomic<long>& us_, std::atomic<long>& n_)
+      : us(&us_), n(&n_), t0(zcStatsOnFast() ? CkWallTimer() : 0.0) {}
+  ~ZcHostTimer() {
+    if (t0 == 0.0) return;
+    us->fetch_add((long)((CkWallTimer() - t0) * 1e6), std::memory_order_relaxed);
+    n->fetch_add(1, std::memory_order_relaxed);
+  }
+};
+}  // namespace
+
 void CkRdmaDeviceRecvHandler(void* data)
 {
   NcpyOperationInfo *ncpy_op_info = (NcpyOperationInfo *)data;
@@ -662,6 +776,7 @@ static void deviceRecvWatchDrop(DeviceRdmaInfo* info);  // defined by the stall 
 // Invoked when a GPU buffer arrives on the receiver
 void CkRdmaDeviceRecvHandler(void* data, void* msg)
 {
+  ZcHostTimer zc_host_timer(zc_mode_stats.host_done_us, zc_mode_stats.host_done_n);
   DeviceRdmaOp* op = (DeviceRdmaOp*)data;
   DeviceRdmaInfo* info = op->info;
 
@@ -900,54 +1015,6 @@ static inline void ipcDebugSync(const char* step, hapiStream_t stream) {
 // path that already issues a CUDA call, and the env lookup is cached, so an
 // instrumented run stays representative.
 namespace {
-struct ZcModeStats {
-  std::atomic<long> memcpy_n{0};
-  std::atomic<long> ipc_n{0};
-  std::atomic<long> other_n{0};
-  // Completed receives, their bytes, and the wall time from posting the receive
-  // to its last op completing -- per mode. Counts alone answer "did placement
-  // move traffic to a slower transport"; they cannot answer "by how much", and
-  // a cost model needs the second question. A pingpong benchmark cannot answer
-  // it either: it measures a transfer alone on the machine, whereas what a
-  // balancer needs is what the transfer costs amid all the others contending
-  // for the same device, link and NIC. Only the application's own traffic has
-  // that contention in it.
-  //
-  // Recorded per receive, not per op: the receive is the unit the application
-  // waits on, and its ops complete concurrently.
-  std::atomic<long> recv_n[3];
-  std::atomic<long> recv_bytes[3];
-  // Microseconds, as an integer so the accumulation stays a relaxed atomic add.
-  std::atomic<long> recv_us[3];
-
-  ZcModeStats() {
-    for (int i = 0; i < 3; i++) { recv_n[i] = 0; recv_bytes[i] = 0; recv_us[i] = 0; }
-  }
-  static const char* slotName(int s) {
-    return (s == 0) ? "MEMCPY" : (s == 1) ? "IPC" : "OTHER";
-  }
-  ~ZcModeStats() {
-    const long m = memcpy_n.load(), i = ipc_n.load(), o = other_n.load();
-    const long total = m + i + o;
-    if (total == 0) return;
-    fprintf(stderr, "[zc-stats] pid=%d MEMCPY=%ld IPC=%ld OTHER=%ld "
-                    "(same-process %.1f%% of %ld)\n",
-            (int)getpid(), m, i, o, 100.0 * m / total, total);
-    for (int s = 0; s < 3; s++) {
-      const long n = recv_n[s].load();
-      if (n == 0) continue;
-      const long us = recv_us[s].load(), by = recv_bytes[s].load();
-      // mean us/receive and mean bytes/receive: fit alpha and beta across the
-      // three rows and the result already carries the real contention.
-      fprintf(stderr, "[zc-time] pid=%d %-6s recvs=%ld bytes=%ld total_us=%ld "
-                      "mean_us=%.3f mean_bytes=%.1f\n",
-              (int)getpid(), slotName(s), n, by, us, (double)us / n,
-              (double)by / n);
-    }
-    fflush(stderr);
-  }
-};
-ZcModeStats zc_mode_stats;
 
 // Sender-side companion: how often the destination could not be resolved at
 // send time. An unresolved destination cannot take the cheap same-process path,
@@ -1072,9 +1139,11 @@ void* ckDeviceRecordMemcpyEvent(hapiStream_t stream) {
 // exactly the same code when the sender's retransmit metadata arrives. Pure
 // extraction: the caller still owns completion (the hapiAddCallback at the end
 // of the loop), and every value this needs is passed in rather than closed over.
-static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
-                             hapiStream_t recv_stream, int srcPe,
-                             CkNcpyModeDevice mode)
+// Where the bytes of a direct or staged IPC receive are, as an address this
+// process can read: the peer's communication buffer through the mapping opened
+// at startup, or the peer's own allocation through its (cached) IPC import.
+static const void* deviceIpcResolveSource(CkDeviceBuffer& source, CkDeviceBuffer& dest,
+                                          int srcPe, CkNcpyModeDevice mode)
 {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   const bool sender_exported =
@@ -1151,19 +1220,25 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
         src_addr = (const void*)((char*)imported_base + source.ipc_offset);
       }
 
-      // No wait here: the caller issues this only once the sender's work is
-      // known complete on the host (DeviceRecvPending), so nothing on
-      // recv_stream can block behind a sender.
+      (void)imported_base;
+      return src_addr;
+}
 
-      // 2. Invoke hapiMemcpyAsync from the peer's memory to the destination
-      //    buffer. This is the only copy a direct transfer makes.
-      // Same reason as the same-process copy above: the peer's buffer may be on
-      // a different device from ours.
-      hapiSubmitMemcpyAsync((void*)dest.ptr, src_addr, dest.cnt, cudaMemcpyDefault, recv_stream);
-      ipcDebugSync("recv 2: peer copy -> dest", recv_stream);
-      // The slot is released when this copy completes: the caller recorded
-      // it in the op, and CkRdmaDeviceRecvHandler raises its dst_flag then.
-      // No destination event is recorded any more -- nothing queries it.
+// The one copy a direct transfer makes, unbatched: from the resolved peer
+// address into the posted buffer, on the given stream. The ordinary receive
+// path batches this (deviceRecvBatchAdd); the pull of a parked message's
+// payload (CkRdmaDeviceStageParked) issues it alone on the staging stream.
+static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
+                             hapiStream_t recv_stream, int srcPe,
+                             CkNcpyModeDevice mode)
+{
+  const void* src_addr = deviceIpcResolveSource(source, dest, srcPe, mode);
+  // No wait here: the caller issues this only once the sender's work is known
+  // complete on the host, so nothing on recv_stream can block behind a sender.
+  // The slot is released when this copy completes: the caller recorded it in
+  // the op, and CkRdmaDeviceRecvHandler raises its dst_flag then.
+  hapiSubmitMemcpyAsync((void*)dest.ptr, src_addr, dest.cnt, cudaMemcpyDefault, recv_stream);
+  ipcDebugSync("recv 2: peer copy -> dest", recv_stream);
 }
 
 
@@ -1345,6 +1420,139 @@ static bool deviceRecvDestinationReady(DeviceRecvPending& p, bool may_query)
   return true;
 }
 
+// ---- batched landings -------------------------------------------------------
+//
+// A receive that is ready to land used to be its own copy on the PE's receive
+// stream with its own completion behind it. A halo exchange lands hundreds of
+// small payloads per PE in one burst, and the per-landing fixed costs -- the
+// copy issue, the completion record, the poll that retires it -- came to more
+// than the bytes: sph3d at 25M particles on 4 A40s lost ~10 ms per slab
+// boundary per exchange, and two GPUs were slower than one. Landings are now
+// gathered per PE and issued as ONE batched copy (cudaMemcpyBatchAsync, CUDA
+// 12.8+; one copy per op on the same stream otherwise) with ONE completion
+// behind it, whose handler completes every op of the batch exactly as the
+// per-op handler did. The protocol per message -- post, readiness, slot
+// release, delivery, source callback, migration interlocks -- is untouched;
+// only how the bytes move changed.
+//
+// A batch flushes when it is full, when it has aged CHARM_GPU_RECV_BATCH_USEC
+// microseconds (default 500; 0 restores one copy and one completion per op),
+// or as soon as the PE goes idle -- so a landing waits at most for the rest of
+// the burst it arrived in, and never when there is nothing to wait for.
+struct DeviceRecvBatchEntry {
+  DeviceRdmaOp* op;
+  CkCallbackFn done;
+};
+struct DeviceRecvBatch {
+  std::vector<void*> dsts;
+  std::vector<const void*> srcs;
+  std::vector<size_t> sizes;
+  std::vector<DeviceRecvBatchEntry> entries;
+  double opened = 0.0;
+};
+static const size_t kRecvBatchMax = 256;
+
+static int deviceRecvBatchUsec()
+{
+  static const int usec = [] {
+    const char* s = getenv("CHARM_GPU_RECV_BATCH_USEC");
+    return s ? atoi(s) : 500;
+  }();
+  return usec;
+}
+
+// Behind the batch's copies on the receive stream: every op of it has landed.
+static void deviceRecvBatchDone(void* arg, void*)
+{
+  DeviceRecvBatch* b = (DeviceRecvBatch*)arg;
+  for (const DeviceRecvBatchEntry& e : b->entries) e.done((void*)e.op, nullptr);
+  delete b;
+}
+
+static void deviceRecvBatchFlush()
+{
+  DeviceRecvBatch*& cur = CkpvAccess(device_recv_batch);
+  if (cur == nullptr) return;
+  DeviceRecvBatch* b = cur;
+  cur = nullptr;
+  const size_t n = b->entries.size();
+  if (zcStatsOn()) {
+    zc_mode_stats.batch_flushes.fetch_add(1, std::memory_order_relaxed);
+    zc_mode_stats.batch_ops.fetch_add((long)n, std::memory_order_relaxed);
+    long m = zc_mode_stats.batch_max.load(std::memory_order_relaxed);
+    while (m < (long)n &&
+           !zc_mode_stats.batch_max.compare_exchange_weak(m, (long)n, std::memory_order_relaxed)) {}
+  }
+  hapiStream_t rs = deviceRecvStream();
+  // The arrays belong to the batch, which lives until its completion handler
+  // frees it, so the closure may run later (submit mode) and still read them.
+  hapiSubmit(rs, [=]() {
+    cudaError_t err = cudaErrorNotSupported;
+#if defined(CUDART_VERSION) && CUDART_VERSION >= 12080
+    if (n > 1) {
+      cudaMemcpyAttributes attr{};
+      attr.srcAccessOrder = cudaMemcpySrcAccessOrderStream;
+      size_t attr_idx = 0;
+#if CUDART_VERSION >= 13000
+      err = cudaMemcpyBatchAsync(b->dsts.data(), b->srcs.data(), b->sizes.data(), n,
+                                 &attr, &attr_idx, 1, rs);
+#else
+      size_t fail_idx = 0;   // 12.8 and 12.9 report the first failed copy here
+      err = cudaMemcpyBatchAsync(b->dsts.data(), b->srcs.data(), b->sizes.data(), n,
+                                 &attr, &attr_idx, 1, &fail_idx, rs);
+#endif
+    }
+#endif
+    if (err != cudaSuccess) {
+      if (n > 1) {
+        cudaGetLastError();   // the refusal is answered by the loop below
+        if (zcStatsOn()) zc_mode_stats.batch_fallback.fetch_add(1, std::memory_order_relaxed);
+      }
+      // cudaMemcpyDefault: source and destination may sit on different devices
+      // (a peer's memory through its IPC import, or a chare moved between GPUs).
+      for (size_t i = 0; i < n; i++)
+        hapiCheck(cudaMemcpyAsync(b->dsts[i], b->srcs[i], b->sizes[i], cudaMemcpyDefault, rs));
+    }
+  });
+  hapiAddCallback(rs, CkCallback(deviceRecvBatchDone, (void*)b));
+}
+
+// A landing whose source and destination are both ready: into the open batch,
+// or straight onto the stream with its own completion when batching is off.
+static void deviceRecvBatchAdd(void* dst, const void* src, size_t bytes,
+                               DeviceRdmaOp* op, CkCallbackFn done)
+{
+  if (deviceRecvBatchUsec() <= 0) {
+    hapiStream_t rs = deviceRecvStream();
+    hapiSubmitMemcpyAsync(dst, src, bytes, cudaMemcpyDefault, rs);
+    hapiAddCallback(rs, CkCallback(done, (void*)op));
+    return;
+  }
+  DeviceRecvBatch*& cur = CkpvAccess(device_recv_batch);
+  if (cur == nullptr) {
+    cur = new DeviceRecvBatch;
+    cur->opened = CkWallTimer();
+    cur->dsts.reserve(64); cur->srcs.reserve(64); cur->sizes.reserve(64); cur->entries.reserve(64);
+  }
+  cur->dsts.push_back(dst);
+  cur->srcs.push_back(src);
+  cur->sizes.push_back(bytes);
+  cur->entries.push_back(DeviceRecvBatchEntry{op, done});
+  if (cur->entries.size() >= kRecvBatchMax) deviceRecvBatchFlush();
+}
+
+static void deviceRecvBatchPoll(void*)
+{
+  DeviceRecvBatch* cur = CkpvAccess(device_recv_batch);
+  if (cur == nullptr) return;
+  if (CkWallTimer() - cur->opened >= deviceRecvBatchUsec() * 1e-6) deviceRecvBatchFlush();
+}
+
+static void deviceRecvBatchIdle(void*)
+{
+  if (CkpvAccess(device_recv_batch) != nullptr) deviceRecvBatchFlush();
+}
+
 static void deviceRecvIssue(DeviceRecvPending& p)
 {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
@@ -1391,9 +1599,8 @@ static void deviceRecvIssue(DeviceRecvPending& p)
     // transfer can sit on different devices, and an explicit DeviceToDevice
     // kind is rejected for that pair. Default resolves the direction from the
     // pointers themselves and handles the peer case.
-    hapiSubmitMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt, cudaMemcpyDefault, rs);
-
-    break;
+    deviceRecvBatchAdd((void*)dest.ptr, source.ptr, dest.cnt, p.op, p.done);
+    return;
   }
   case DeviceRecvKind::Ipc:
     // The slot is released from the completion handler; naming it in the op
@@ -1402,8 +1609,9 @@ static void deviceRecvIssue(DeviceRecvPending& p)
       p.op->ipc_device_idx = source.device_idx;
       p.op->ipc_event_idx = source.event_idx;
     }
-    deviceIpcReceive(source, dest, rs, p.src_pe, p.mode);
-    break;
+    deviceRecvBatchAdd((void*)dest.ptr, deviceIpcResolveSource(source, dest, p.src_pe, p.mode),
+                       dest.cnt, p.op, p.done);
+    return;
   }
   hapiAddCallback(rs, CkCallback(p.done, (void*)p.op));
 }
@@ -2450,6 +2658,7 @@ void CkRdmaDeviceStallWatchInit()
 }
 
 void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrSizes, CkDeviceBufferPost *postStructs) {
+  ZcHostTimer zc_host_timer(zc_mode_stats.host_recv_us, zc_mode_stats.host_recv_n);
   // The element every op of this message is addressed to, or NULL for a
   // message with no element behind it (a migration payload arriving on a
   // group entry -- asking such an envelope for an ArrayID aborts, hence the
@@ -4337,6 +4546,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
 
 void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
                           CkDeviceDeferredSend** pending) {
+  ZcHostTimer zc_host_timer(zc_mode_stats.host_send_us, zc_mode_stats.host_send_n);
   if (pending) *pending = nullptr;
   // dest_pe == -1 means this PE has never confirmed where the target element
   // actually lives (xi-Parameter.C asks the location manager directly for
