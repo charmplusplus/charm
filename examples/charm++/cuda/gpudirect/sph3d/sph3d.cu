@@ -1,3 +1,6 @@
+// CUB first: converse.h defines ALIGN_BYTES as a macro, which is also the name
+// of a member constant in CUB's alignment traits.
+#include <cub/device/device_scan.cuh>
 #include "hapi.h"
 #include "sph3d.h"
 
@@ -63,34 +66,31 @@ __global__ void cellCountKernel(const Particle* parts, int n, RealType x0,
   atomicAdd(&counts[c], 1);
 }
 
-// Exclusive scan of the cell counts, one block looping over chunks; writes
-// the scatter cursor too (see sph2d.cu).
-__global__ void scanCellsKernel(const int* counts, int* offsets, int* cursor, int ncells) {
-  extern __shared__ int tmp[];
-  int running = 0;
-  for (int base = 0; base < ncells; base += blockDim.x) {
-    const int i = base + threadIdx.x;
-    const int v = (i < ncells) ? counts[i] : 0;
-    tmp[threadIdx.x] = v;
-    __syncthreads();
-    for (int off = 1; off < blockDim.x; off <<= 1) {
-      const int t = (threadIdx.x >= off) ? tmp[threadIdx.x - off] : 0;
-      __syncthreads();
-      tmp[threadIdx.x] += t;
-      __syncthreads();
-    }
-    if (i < ncells) { offsets[i] = running + tmp[threadIdx.x] - v; cursor[i] = offsets[i]; }
-    __syncthreads();
-    running += tmp[blockDim.x - 1];
-    __syncthreads();
-  }
-}
+// The exclusive scan of the cell counts is CUB's DeviceScan (invokeCellBuild):
+// the single-block scan it replaces took 65 us per call on 13.5k cells, twice
+// per patch per step, 12% of all GPU time in the 25M single-GPU profile.
 
 __global__ void cellScatterKernel(const int* cell_of, int n, int* cursor,
     int* cell_parts) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= n) return;
   cell_parts[atomicAdd(&cursor[cell_of[i]], 1)] = i;
+}
+
+// The neighbour data of every particle (locals and ghosts) in cell order, as
+// two float4 streams: pos4 = (x, y, z, rho), vel4 = (vx, vy, vz, p). The forces
+// kernel walks a cell as a contiguous run of these -- two 16-byte loads per
+// neighbour, no index indirection -- instead of 40-byte Particle structs
+// reached through cell_parts. Rebuilt every evaluation (positions change);
+// the cell list it follows may be a window's stale one (sph3d.h).
+__global__ void layoutKernel(const Particle* __restrict__ parts,
+    const int* __restrict__ cell_parts, int n, float4* __restrict__ pos4,
+    float4* __restrict__ vel4) {
+  const int k = blockIdx.x * blockDim.x + threadIdx.x;
+  if (k >= n) return;
+  const Particle p = parts[cell_parts[k]];
+  pos4[k] = make_float4(p.x, p.y, p.z, p.rho);
+  vel4[k] = make_float4(p.vx, p.vy, p.vz, p.p);
 }
 
 // Gather particles in cell order: dst[k] = src[cell_parts[k]]. Run on the
@@ -130,9 +130,10 @@ __global__ void eosKernel(Particle* parts, int n, RealType rho0, RealType c0,
 // One neighbour pass: continuity (with delta-SPH diffusion) and momentum
 // (pressure + Monaghan artificial viscosity). Local particles only; ghosts
 // are sources, never sinks.
-__global__ void forcesKernel(const Particle* parts, int n_local, int ncx,
-    int ncy, int ncz, const int* cell_of, const int* cell_off,
-    const int* cell_cnt, const int* cell_parts, RealType h, RealType mass,
+__global__ void forcesKernel(const Particle* __restrict__ parts, int n_local, int ncx,
+    int ncy, int ncz, const int* __restrict__ cell_of, const int* __restrict__ cell_off,
+    const int* __restrict__ cell_cnt, const float4* __restrict__ pos4,
+    const float4* __restrict__ vel4, RealType h, RealType mass,
     RealType c0, RealType gravity, RealType* drho, RealType* ax, RealType* ay,
     RealType* az) {
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
@@ -165,36 +166,38 @@ __global__ void forcesKernel(const Particle* parts, int n_local, int ncx,
         const int c = (zz * (ncy + 2) + yy) * (ncx + 2) + xx;
         const int beg = cell_off[c], end = beg + cell_cnt[c];
         for (int k = beg; k < end; k++) {
-          const int j = cell_parts[k];
-          if (j == i) continue;
-          const Particle pj = parts[j];
+          // The particle itself is the pair at zero distance, skipped below
+          // with everything closer than 1e-8 h.
+          const float4 pj = __ldg(&pos4[k]);   // x y z rho
           const RealType dx = pi.x - pj.x, dy = pi.y - pj.y, dz = pi.z - pj.z;
           const RealType r2 = dx * dx + dy * dy + dz * dz;
           if (r2 >= support2 || r2 < 1e-16f) continue;
+          const float4 vj = __ldg(&vel4[k]);   // vx vy vz p
+          const RealType rhoj = pj.w, pj_p = vj.w;
 
           const RealType r = sqrtf(r2);
           const RealType dwdr = wendlandDW(r * inv_h, inv_h);
           const RealType gwx = dwdr * dx / r, gwy = dwdr * dy / r, gwz = dwdr * dz / r;
 
-          const RealType dvx = pi.vx - pj.vx, dvy = pi.vy - pj.vy, dvz = pi.vz - pj.vz;
+          const RealType dvx = pi.vx - vj.x, dvy = pi.vy - vj.y, dvz = pi.vz - vj.z;
 
           // continuity
           adrho += mass * (dvx * gwx + dvy * gwy + dvz * gwz);
 
           // delta-SPH density diffusion; sign as explained in sph2d.cu
           const RealType rdotg = -(dx * gwx + dy * gwy + dz * gwz);   // (r_j - r_i).gradW_i
-          adrho += 2.0f * DELTA_SPH * h * c0 * (mass / pj.rho) *
-                   (pj.rho - pi.rho) * rdotg / (r2 + eta2h2);
+          adrho += 2.0f * DELTA_SPH * h * c0 * (mass / rhoj) *
+                   (rhoj - pi.rho) * rdotg / (r2 + eta2h2);
 
           if (pi.type == PTYPE_FLUID) {
             const RealType vdotr = dvx * dx + dvy * dy + dvz * dz;
             RealType visc = 0.0f;
             if (vdotr < 0.0f) {   // only for approaching pairs
               const RealType mu = h * vdotr / (r2 + eta2h2);
-              visc = -VISC_ALPHA * c0 * mu / (0.5f * (pi.rho + pj.rho));
+              visc = -VISC_ALPHA * c0 * mu / (0.5f * (pi.rho + rhoj));
             }
             const RealType term =
-                pi.p * inv_rhoi2 + pj.p / (pj.rho * pj.rho) + visc;
+                pi.p * inv_rhoi2 + pj_p / (rhoj * rhoj) + visc;
             aax -= mass * term * gwx;
             aay -= mass * term * gwy;
             aaz -= mass * term * gwz;
@@ -501,10 +504,19 @@ __global__ void ghostCheckKernel(const Particle* parts, int n_local, int n_ghost
 }
 
 // ---------------------------------------------------------------- launch ----
+// Temporary storage CUB's scan needs for ncells counts; allocated once per
+// patch (allocDevice) and reused by every build.
+size_t sphScanTempBytes(int ncells) {
+  size_t bytes = 0;
+  int* dummy = NULL;
+  hapiCheck(cub::DeviceScan::ExclusiveSum(NULL, bytes, dummy, dummy, ncells));
+  return bytes;
+}
+
 void invokeCellBuild(const Particle* d_parts, int n, RealType x0, RealType y0,
     RealType z0, RealType inv_csize, int ncx, int ncy, int ncz, int ncells,
     int* d_cnt, int* d_off, int* d_cursor, int* d_cell_parts, int* d_cell_of,
-    cudaStream_t s) {
+    void* d_scan_tmp, size_t scan_tmp_bytes, cudaStream_t s) {
   sphSubmitMemset(d_cnt, 0, sizeof(int) * ncells, s);
   if (n > 0)
     hapiSubmit(s, [=]() {
@@ -512,7 +524,11 @@ void invokeCellBuild(const Particle* d_parts, int n, RealType x0, RealType y0,
           inv_csize, ncx, ncy, ncz, d_cnt, d_cell_of);
     });
   hapiSubmit(s, [=]() {
-    scanCellsKernel<<<1, 1024, sizeof(int) * 1024, s>>>(d_cnt, d_off, d_cursor, ncells);
+    size_t bytes = scan_tmp_bytes;
+    hapiCheck(cub::DeviceScan::ExclusiveSum(d_scan_tmp, bytes, d_cnt, d_off, ncells, s));
+    // The scatter's cursor starts at each cell's offset.
+    hapiCheck(cudaMemcpyAsync(d_cursor, d_off, sizeof(int) * ncells,
+        cudaMemcpyDeviceToDevice, s));
   });
   if (n > 0)
     hapiSubmit(s, [=]() {
@@ -540,15 +556,24 @@ void invokeEOS(Particle* d_parts, int n, RealType rho0, RealType c0,
   SPH_PEEK();
 }
 
+void invokeLayout(const Particle* d_parts, const int* d_cell_parts, int n,
+    float4* d_pos4, float4* d_vel4, cudaStream_t s) {
+  if (n <= 0) return;
+  hapiSubmit(s, [=]() {
+    layoutKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(d_parts, d_cell_parts, n, d_pos4, d_vel4);
+  });
+  SPH_PEEK();
+}
+
 void invokeForces(const Particle* d_parts, int n_local, int ncx, int ncy,
     int ncz, const int* d_cell_of, const int* d_off, const int* d_cnt,
-    const int* d_cell_parts, RealType h, RealType mass, RealType c0,
-    RealType gravity, RealType* d_drho, RealType* d_ax, RealType* d_ay,
-    RealType* d_az, cudaStream_t s) {
+    const float4* d_pos4, const float4* d_vel4, RealType h, RealType mass,
+    RealType c0, RealType gravity, RealType* d_drho, RealType* d_ax,
+    RealType* d_ay, RealType* d_az, cudaStream_t s) {
   if (n_local <= 0) return;
   hapiSubmit(s, [=]() {
     forcesKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, ncx, ncy,
-        ncz, d_cell_of, d_off, d_cnt, d_cell_parts, h, mass, c0, gravity, d_drho,
+        ncz, d_cell_of, d_off, d_cnt, d_pos4, d_vel4, h, mass, c0, gravity, d_drho,
         d_ax, d_ay, d_az);
   });
   SPH_PEEK();

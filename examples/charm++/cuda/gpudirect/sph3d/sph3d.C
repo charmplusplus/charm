@@ -176,13 +176,16 @@ EventPool& eventPool() {
 /* readonly */ RealType verlet_margin;
 /* readonly */ RealType cell_size;
 
+extern size_t sphScanTempBytes(int);
 extern void invokeCellBuild(const Particle*, int, RealType, RealType, RealType,
-    RealType, int, int, int, int, int*, int*, int*, int*, int*, cudaStream_t);
+    RealType, int, int, int, int, int*, int*, int*, int*, int*, void*, size_t,
+    cudaStream_t);
 extern void invokeGather(const Particle*, const int*, int, Particle*, cudaStream_t);
+extern void invokeLayout(const Particle*, const int*, int, float4*, float4*, cudaStream_t);
 extern void invokeEOS(Particle*, int, RealType, RealType, int*, cudaStream_t);
 extern void invokeForces(const Particle*, int, int, int, int, const int*,
-    const int*, const int*, const int*, RealType, RealType, RealType, RealType,
-    RealType*, RealType*, RealType*, RealType*, cudaStream_t);
+    const int*, const int*, const float4*, const float4*, RealType, RealType,
+    RealType, RealType, RealType*, RealType*, RealType*, RealType*, cudaStream_t);
 extern void invokeIntegrate(Particle*, int, RealType, RealType, RealType*,
     RealType*, RealType*, RealType*, int*, cudaStream_t);
 extern void invokePredict(const Particle*, Particle*, int, RealType, RealType,
@@ -557,6 +560,10 @@ class Patch : public CBase_Patch {
   int* d_cursor;
   int* d_cell_parts;
   int* d_cell_of;
+  float4* d_pos4;                 // neighbour data in cell order (layoutKernel)
+  float4* d_vel4;
+  void* d_scan_tmp;               // CUB scan temporaries
+  size_t scan_tmp_bytes;
   RealType *d_drho, *d_ax, *d_ay, *d_az, *d_stats;
   unsigned long long* d_check;
   int* h_counts;
@@ -645,6 +652,7 @@ public:
     d_halo_ptrs = d_halo_ptrs2 = d_mig_ptrs = NULL;
     d_halo_idx = NULL; d_halo_idx_ptrs = NULL; d_halo_cnt = NULL;
     d_counts = d_cell_cnt = d_cell_off = d_cursor = d_cell_parts = d_cell_of = NULL;
+    d_pos4 = d_vel4 = NULL; d_scan_tmp = NULL; scan_tmp_bytes = 0;
     d_drho = d_ax = d_ay = d_az = d_stats = NULL;
     d_check = NULL;
     h_counts = NULL; h_halo_cnt = NULL; h_stats = NULL; h_check = NULL;
@@ -679,6 +687,10 @@ public:
     hapiCheck(hapiMalloc((void**)&d_cursor, sizeof(int) * ncells));
     hapiCheck(hapiMalloc((void**)&d_cell_parts, sizeof(int) * part_capacity));
     hapiCheck(hapiMalloc((void**)&d_cell_of, sizeof(int) * part_capacity));
+    hapiCheck(hapiMalloc((void**)&d_pos4, sizeof(float4) * part_capacity));
+    hapiCheck(hapiMalloc((void**)&d_vel4, sizeof(float4) * part_capacity));
+    scan_tmp_bytes = sphScanTempBytes(ncells);
+    hapiCheck(hapiMalloc((void**)&d_scan_tmp, std::max(scan_tmp_bytes, (size_t)256)));
     hapiCheck(hapiMalloc((void**)&d_drho, sizeof(RealType) * part_capacity));
     hapiCheck(hapiMalloc((void**)&d_ax, sizeof(RealType) * part_capacity));
     hapiCheck(hapiMalloc((void**)&d_ay, sizeof(RealType) * part_capacity));
@@ -729,6 +741,7 @@ public:
     hapiFree(d_halo_idx); hapiFree(d_halo_idx_ptrs); hapiFree(d_halo_cnt);
     hapiFree(d_counts); hapiFree(d_cell_cnt); hapiFree(d_cell_off);
     hapiFree(d_cursor); hapiFree(d_cell_parts); hapiFree(d_cell_of);
+    hapiFree(d_pos4); hapiFree(d_vel4); hapiFree(d_scan_tmp);
     hapiFree(d_drho); hapiFree(d_ax); hapiFree(d_ay); hapiFree(d_az);
     hapiFree(d_stats); hapiFree(d_check);
     givePinned(h_counts, NUM_COUNTERS);
@@ -741,6 +754,7 @@ public:
     d_halo_ptrs = d_halo_ptrs2 = d_mig_ptrs = NULL;
     d_halo_idx = NULL; d_halo_idx_ptrs = NULL; d_halo_cnt = NULL;
     d_counts = d_cell_cnt = d_cell_off = d_cursor = d_cell_parts = d_cell_of = NULL;
+    d_pos4 = d_vel4 = NULL; d_scan_tmp = NULL; scan_tmp_bytes = 0;
     d_drho = d_ax = d_ay = d_az = d_stats = NULL;
     d_check = NULL;
     h_counts = NULL; h_halo_cnt = NULL; h_stats = NULL; h_check = NULL;
@@ -1100,7 +1114,7 @@ public:
       if (sort_locals && np > 0) {
         invokeCellBuild(d_parts[cur], np, x0, y0, z0, inv_csize, ncx, ncy, ncz,
             ncells, d_cell_cnt, d_cell_off, d_cursor, d_cell_parts, d_cell_of,
-            compute_stream);
+            d_scan_tmp, scan_tmp_bytes, compute_stream);
         invokeGather(d_parts[cur], d_cell_parts, np, d_parts[1 - cur], compute_stream);
         cur = 1 - cur;
       }
@@ -1256,11 +1270,12 @@ public:
     if (rebuild_step || !cells_valid) {
       invokeCellBuild(d_parts[cur], ntot, x0, y0, z0, inv_csize, ncx, ncy, ncz,
           ncells, d_cell_cnt, d_cell_off, d_cursor, d_cell_parts, d_cell_of,
-          compute_stream);
+          d_scan_tmp, scan_tmp_bytes, compute_stream);
       cells_valid = true;
     }
+    invokeLayout(d_parts[cur], d_cell_parts, ntot, d_pos4, d_vel4, compute_stream);
     invokeForces(d_parts[cur], np, ncx, ncy, ncz, d_cell_of, d_cell_off,
-        d_cell_cnt, d_cell_parts, smooth_h, pmass, sound_c0, gravity,
+        d_cell_cnt, d_pos4, d_vel4, smooth_h, pmass, sound_c0, gravity,
         d_drho, d_ax, d_ay, d_az, compute_stream);
 
     if (!pc_step) {
@@ -1362,11 +1377,12 @@ public:
     if (!cells_valid) {   // moved here between the two evaluations
       invokeCellBuild(d_parts[1 - cur], ntot, x0, y0, z0, inv_csize, ncx, ncy, ncz,
           ncells, d_cell_cnt, d_cell_off, d_cursor, d_cell_parts, d_cell_of,
-          compute_stream);
+          d_scan_tmp, scan_tmp_bytes, compute_stream);
       cells_valid = true;
     }
+    invokeLayout(d_parts[1 - cur], d_cell_parts, ntot, d_pos4, d_vel4, compute_stream);
     invokeForces(d_parts[1 - cur], np, ncx, ncy, ncz, d_cell_of, d_cell_off,
-        d_cell_cnt, d_cell_parts, smooth_h, pmass, sound_c0, gravity,
+        d_cell_cnt, d_pos4, d_vel4, smooth_h, pmass, sound_c0, gravity,
         d_drho, d_ax, d_ay, d_az, compute_stream);
     invokeCorrect(d_parts[cur], np, sim_dt, rho0, d_drho, d_ax, d_ay, d_az,
         fold_zero ? d_counts : NULL, compute_stream);
