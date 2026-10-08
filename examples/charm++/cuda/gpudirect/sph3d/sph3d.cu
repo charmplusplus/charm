@@ -11,6 +11,7 @@
 #define SPH_PEEK() ((void)0)
 #endif
 #include <cstdio>
+#include <cstdlib>
 
 static inline void sphSubmitMemset(void* d, int v, size_t n, cudaStream_t s) {
   hapiSubmit(s, [=]() { hapiCheck(cudaMemsetAsync(d, v, n, s)); });
@@ -85,12 +86,13 @@ __global__ void cellScatterKernel(const int* cell_of, int n, int* cursor,
 // the cell list it follows may be a window's stale one (sph3d.h).
 __global__ void layoutKernel(const Particle* __restrict__ parts,
     const int* __restrict__ cell_parts, int n, float4* __restrict__ pos4,
-    float4* __restrict__ vel4) {
+    float4* __restrict__ vel4, unsigned char* __restrict__ type8) {
   const int k = blockIdx.x * blockDim.x + threadIdx.x;
   if (k >= n) return;
   const Particle p = parts[cell_parts[k]];
   pos4[k] = make_float4(p.x, p.y, p.z, p.rho);
   vel4[k] = make_float4(p.vx, p.vy, p.vz, p.p);
+  type8[k] = (unsigned char)p.type;
 }
 
 // Gather particles in cell order: dst[k] = src[cell_parts[k]]. Run on the
@@ -134,16 +136,31 @@ __global__ void eosKernel(Particle* parts, int n, RealType rho0, RealType c0,
 // One neighbour pass: continuity (with delta-SPH diffusion) and momentum
 // (pressure + Monaghan artificial viscosity). Local particles only; ghosts
 // are sources, never sinks.
-__global__ void forcesKernel(const Particle* __restrict__ parts, int n_local, int ncx,
-    int ncy, int ncz, const int* __restrict__ cell_of, const int* __restrict__ cell_off,
+// One thread per SORTED position k, locals only: a warp then holds 32
+// particles of one cell and reads each neighbour cell once through L1. With
+// the threads in array order instead, every thread streams its own 27 cells
+// -- 2x to 5x slower, and worse as the compaction scrambles the array (the
+// sort of the locals used to buy this coherence for the whole array; it is
+// no longer needed). Results go back by the original index.
+__global__ void forcesKernel(int n_total, int n_local, int ncx,
+    int ncy, int ncz, const int* __restrict__ cell_parts,
+    const int* __restrict__ cell_of, const int* __restrict__ cell_off,
     const int* __restrict__ cell_cnt, const float4* __restrict__ pos4,
-    const float4* __restrict__ vel4, RealType h, RealType mass,
-    RealType c0, RealType gravity, RealType* drho, RealType* ax, RealType* ay,
-    RealType* az) {
-  const int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= n_local) return;
+    const float4* __restrict__ vel4, const unsigned char* __restrict__ type8,
+    RealType h, RealType mass, RealType c0, RealType gravity, RealType* drho,
+    RealType* ax, RealType* ay, RealType* az) {
+  const int k = blockIdx.x * blockDim.x + threadIdx.x;
+  if (k >= n_total) return;
+  const int i = cell_parts[k];
+  if (i >= n_local) return;   // a ghost: a source, never a sink
 
-  const Particle pi = parts[i];
+  struct { RealType x, y, z, vx, vy, vz, rho, p; int type; } pi;
+  {
+    const float4 a = pos4[k], b = vel4[k];
+    pi.x = a.x; pi.y = a.y; pi.z = a.z; pi.rho = a.w;
+    pi.vx = b.x; pi.vy = b.y; pi.vz = b.z; pi.p = b.w;
+    pi.type = type8[k];
+  }
   const RealType inv_h = 1.0f / h;
   const RealType support2 = (KERNEL_SUPPORT * h) * (KERNEL_SUPPORT * h);
   const RealType eta2h2 = ETA2 * h * h;
@@ -179,9 +196,14 @@ __global__ void forcesKernel(const Particle* __restrict__ parts, int n_local, in
           const float4 vj = __ldg(&vel4[k]);   // vx vy vz p
           const RealType rhoj = pj.w, pj_p = vj.w;
 
-          const RealType r = sqrtf(r2);
-          const RealType dwdr = wendlandDW(r * inv_h, inv_h);
-          const RealType gwx = dwdr * dx / r, gwy = dwdr * dy / r, gwz = dwdr * dz / r;
+          // One reciprocal square root per pair; the eight divisions this
+          // replaced were a measurable share of the kernel.
+          const RealType rinv = rsqrtf(r2);
+          const RealType r = r2 * rinv;
+          const RealType gw = wendlandDW(r * inv_h, inv_h) * rinv;   // dW/dr / r
+          const RealType gwx = gw * dx, gwy = gw * dy, gwz = gw * dz;
+          const RealType inv_rhoj = 1.0f / rhoj;
+          const RealType inv_r2e = 1.0f / (r2 + eta2h2);
 
           const RealType dvx = pi.vx - vj.x, dvy = pi.vy - vj.y, dvz = pi.vz - vj.z;
 
@@ -190,18 +212,18 @@ __global__ void forcesKernel(const Particle* __restrict__ parts, int n_local, in
 
           // delta-SPH density diffusion; sign as explained in sph2d.cu
           const RealType rdotg = -(dx * gwx + dy * gwy + dz * gwz);   // (r_j - r_i).gradW_i
-          adrho += 2.0f * DELTA_SPH * h * c0 * (mass / rhoj) *
-                   (rhoj - pi.rho) * rdotg / (r2 + eta2h2);
+          adrho += 2.0f * DELTA_SPH * h * c0 * (mass * inv_rhoj) *
+                   (rhoj - pi.rho) * rdotg * inv_r2e;
 
           if (pi.type == PTYPE_FLUID) {
             const RealType vdotr = dvx * dx + dvy * dy + dvz * dz;
             RealType visc = 0.0f;
             if (vdotr < 0.0f) {   // only for approaching pairs
-              const RealType mu = h * vdotr / (r2 + eta2h2);
-              visc = -VISC_ALPHA * c0 * mu / (0.5f * (pi.rho + rhoj));
+              const RealType mu = h * vdotr * inv_r2e;
+              visc = -VISC_ALPHA * c0 * mu * (2.0f / (pi.rho + rhoj));
             }
             const RealType term =
-                pi.p * inv_rhoi2 + pj_p / (rhoj * rhoj) + visc;
+                pi.p * inv_rhoi2 + pj_p * inv_rhoj * inv_rhoj + visc;
             aax -= mass * term * gwx;
             aay -= mass * term * gwy;
             aaz -= mass * term * gwz;
@@ -620,24 +642,28 @@ void invokeEOS(Particle* d_parts, int n, RealType rho0, RealType c0,
 }
 
 void invokeLayout(const Particle* d_parts, const int* d_cell_parts, int n,
-    float4* d_pos4, float4* d_vel4, cudaStream_t s) {
+    float4* d_pos4, float4* d_vel4, unsigned char* d_type8, cudaStream_t s) {
   if (n <= 0) return;
   hapiSubmit(s, [=]() {
-    layoutKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(d_parts, d_cell_parts, n, d_pos4, d_vel4);
+    layoutKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(d_parts, d_cell_parts, n, d_pos4,
+        d_vel4, d_type8);
   });
   SPH_PEEK();
 }
 
-void invokeForces(const Particle* d_parts, int n_local, int ncx, int ncy,
-    int ncz, const int* d_cell_of, const int* d_off, const int* d_cnt,
-    const float4* d_pos4, const float4* d_vel4, RealType h, RealType mass,
-    RealType c0, RealType gravity, RealType* d_drho, RealType* d_ax,
-    RealType* d_ay, RealType* d_az, cudaStream_t s) {
-  if (n_local <= 0) return;
+void invokeForces(int n_total, int n_local, int ncx, int ncy, int ncz,
+    const int* d_cell_parts, const int* d_cell_of, const int* d_off,
+    const int* d_cnt, const float4* d_pos4, const float4* d_vel4,
+    const unsigned char* d_type8, RealType h, RealType mass, RealType c0,
+    RealType gravity, RealType* d_drho, RealType* d_ax, RealType* d_ay,
+    RealType* d_az, cudaStream_t s) {
+  if (n_local <= 0 || n_total <= 0) return;
+  // SPH_FORCES_BLOCK: the forces kernel's block size (default 128).
+  static const int fb = [] { const char* e = getenv("SPH_FORCES_BLOCK"); return e ? atoi(e) : BLOCK_1D; }();
   hapiSubmit(s, [=]() {
-    forcesKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, ncx, ncy,
-        ncz, d_cell_of, d_off, d_cnt, d_pos4, d_vel4, h, mass, c0, gravity, d_drho,
-        d_ax, d_ay, d_az);
+    forcesKernel<<<(n_total + fb - 1) / fb, fb, 0, s>>>(n_total, n_local, ncx, ncy,
+        ncz, d_cell_parts, d_cell_of, d_off, d_cnt, d_pos4, d_vel4, d_type8, h, mass,
+        c0, gravity, d_drho, d_ax, d_ay, d_az);
   });
   SPH_PEEK();
 }
@@ -697,6 +723,7 @@ void invokeIntegrateLeavers(bool pc, const Particle* d_parts, int n_local,
   });
   SPH_PEEK();
 }
+
 
 void invokePackHalo(const Particle* d_parts, int n_local, RealType x0,
     RealType y0, RealType z0, RealType x1, RealType y1, RealType z1,
