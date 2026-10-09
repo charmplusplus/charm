@@ -708,6 +708,13 @@ public:
     return CkArrayIndex();
   }
 
+  /// id -> index where it can be had without a message: the compressor, or a local
+  /// record; with scanAtHome, also (hashed kind, at the home) the home's own
+  /// idx -> id bindings, which outlive the element. That last is a linear scan,
+  /// reached only by the demand creation of a deleted element, never by delivery.
+  /// Returns false when none applies.
+  bool recoverIndex(CmiUInt8 id, CkArrayIndex& idx, bool scanAtHome) const;
+
   void requestLocationOnce(CmiUInt8 id) { cache->requestLocationOnce(id); }
   /// Ask the home of idx for its location by index, whether or not this PE already
   /// holds an id for it. The home buffers the request until the element exists, so
@@ -821,6 +828,11 @@ public:
   void requestLocation(const CkArrayIndex& idx);
   bool requestLocation(const CkArrayIndex& idx, int peToTell);
   void updateLocation(const CkArrayIndex& idx, const CkLocEntry& e);
+#if CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
+  /// A migration the load balancer decided (UpdateLocation): record, by id, that the
+  /// element is about to live on pe, before the move is acted on.
+  void updateLocationFromLB(CmiUInt8 id, int pe);
+#endif
   void reclaimRemote(const CkArrayIndex& idx, int deletedOnPe);
   void dummyAtSync(void);
 

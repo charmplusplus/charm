@@ -4,6 +4,8 @@ mainmodule objid_insert {
   readonly CProxy_Inserter inserterProxy;
   readonly int K;
   readonly int bounded;
+  readonly int nonHomeOnly;
+  readonly int destroySeed;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
@@ -20,7 +22,7 @@ mainmodule objid_insert {
     entry Inserter();
     entry void phase1();
     entry void sendPings(int round, std::vector<int> xs, std::vector<int> ys);
-    entry void sendRevives();
+    entry void sendDemand(std::vector<int> xs, std::vector<int> ys, std::vector<char> here);
     entry void dumpState();
   };
 
@@ -28,7 +30,8 @@ mainmodule objid_insert {
     entry Elem(int origin);
     entry Elem();
     entry void ping(int round, int fromPe);
-    entry [createhome] void revive(int round);
+    entry [createhome] void revive(int fromPe);
+    entry [createhere] void reviveHere(int fromPe);
     entry void migrateNow(int seed);
     entry void maybeDie(int seed);
     entry void report();

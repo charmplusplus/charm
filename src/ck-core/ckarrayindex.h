@@ -423,7 +423,9 @@ namespace ck {
       int ix[6];
       for (int i = dims - 1; i >= 0; --i) {
         int bits = bitsPerDim[i];
-        ix[i] = id & ((1 << bits) - 1);
+        // CmiUInt8 arithmetic: with the 49-bit payload one dimension may need 31
+        // bits, for which a signed int shift is undefined.
+        ix[i] = (int)(id & (((CmiUInt8)1 << bits) - 1));
         id >>= bits;
       }
 

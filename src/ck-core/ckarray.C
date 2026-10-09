@@ -2008,10 +2008,33 @@ void CkArray::handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t ty
   const int home = locMgr->homePe(id);
   const int ifNotThere = msg->array_ifNotThere();
 
+  if (ifNotThere != CkArray_IfNotThere_buffer)
+  {
+    // Demand creation. The index-keyed path knows how to get the element created
+    // (at the home for createhome, at the original sender for createhere), and it
+    // needs the index: recover it where this PE can. Otherwise only the home can
+    // (it keeps idx -> id for every element it is home for), so hand the message
+    // there. Parking it here would wait for a location that nothing will ever
+    // report, since the element does not exist.
+    CkArrayIndex idx;
+    if (locMgr->recoverIndex(id, idx, true))
+    {
+      handleUnknown(msg, idx, type, opts);
+      return;
+    }
+    if (CkMyPe() != home)
+    {
+      sendToPe(msg, home, type, opts);
+      return;
+    }
+    CkAbort("CkArray::handleUnknownByID: demand creation requested for element id"
+            " %" PRIx64 " of chare array %d, whose index its home PE %d cannot"
+            " recover\n", id, thisgroup.idx, CkMyPe());
+  }
+
   // Same forwarding rule as handleUnknown: hand a small message to the home, which
-  // either knows the location or can demand-create. createhere is excluded because
-  // it must be created on this PE, not at home.
-  if (isSmall && CkMyPe() != home && ifNotThere != CkArray_IfNotThere_createhere)
+  // either knows the location or will learn it.
+  if (isSmall && CkMyPe() != home)
   {
     // Forwarding gets this message there but teaches this PE nothing, so every
     // later send to the same element would pay the same detour. Ask once.

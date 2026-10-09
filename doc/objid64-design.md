@@ -235,6 +235,16 @@ deliverInline's bound-sibling demand creation (ckarray.C:1959; the sibling's rec
 is local, so the record branch serves) and the LB UpdateLocation path (rewritten,
 section 4.4).
 
+One scan survives, off the delivery path (PR 1a fixes, 2026-10-09):
+CkLocMgr::recoverIndex(id, idx, scanAtHome). Demand creation needs the index (the
+home approves by index; createhere creates at the original sender), and a message
+can reach a PE by id for an element that has no record there: a deleted element
+whose id and stale location the sender still held. The compressor or a local record
+serve first; failing both, the home of a hashed-kind element scans its own idx -> id
+bindings (kept by reclaimRemote for exactly this reason), and a non-home PE hands
+the message to the home. handleUnknownByID uses it only for messages that ask for
+creation; a buffer-kind message never recovers the index.
+
 ## 4. Location manager and delivery
 
 ### 4.1 One home function
@@ -313,6 +323,19 @@ local record or the compressor yields the index, also fire the index listeners.
 Never calls lookupIdx on a PE that has no record. The entry's epoch must be the
 element's true epoch, sent by the emigrating PE (section 4.2a), not each
 receiver's cached epoch + 1 as today (:106).
+
+As implemented (PR 1a fixes, 2026-10-09, after Aditya's review of #4017): the
+synchronous update stays, through CkLocMgr::updateLocationFromLB(id, pe), so every
+PE but the source addresses the element at its destination before the move is acted
+on (the CentralLB invariant; multiHop asserts in this mode). The balancer's decision
+(MigrateInfo) does not carry the element's epoch, so the entry is counted from the
+receiver's cache as before; that count never exceeds the true epoch (both advance by
+one per migration, and a bystander's starts no higher), so the destination's insert
+still applies over it. The emigrating PE then broadcasts the entry with the true
+epoch (CkLocMgr::emigrate), which closes the stale-reply window of the fabricated
+count. Cost: one group broadcast per migration, in this build mode only. Carrying
+the true epoch in MigrateInfo (through LDObjData) would remove the broadcast; left
+for later.
 
 ### 4.5 Envelope
 
