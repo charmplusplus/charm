@@ -48,6 +48,22 @@ static bool metisHostTight()
                            "MetisLB: host dimension within 1.1 of its even spread") ? 1 : 0;
   return on == 1;
 }
+// +LBMetisHostByMsgs: an object's host weight is its message count from the
+// comm graph, scaled so the total matches the measured host time, instead of
+// the wallTime measured before the move. Measured 2026-10-08 on sph3d at 2
+// nodes: a PE's host time tracks the messages it handles (r = 0.82), not its
+// objects (-0.09) or where its partners sit (cross-node r = 0.09); the cost per
+// message is the same on the hot PE and the median one; and the measured
+// wallTime, inflated on crowded PEs, left the groups' host sums 1.4-3.5x apart
+// even with the host constraint at 1.1.
+static bool metisHostByMsgs()
+{
+  static int on = -1;
+  if (on < 0)
+    on = CmiGetArgFlagDesc(CkGetArgv(), "+LBMetisHostByMsgs",
+                           "MetisLB: host weights from message counts, not measured time") ? 1 : 0;
+  return on == 1;
+}
 static bool metisRemapOn();
 static double metisMinGain();
 static double metisMaxCutRise();
@@ -315,8 +331,12 @@ void MetisLB::work(LDStats* stats)
                  CkMyPe(), lbLoadDimName(!ogr->deviceDim), slackIdx, slackUbvec, slackAlpha);
     }
   }
+  // Per-object host weight: measured wallTime, or (+LBMetisHostByMsgs) the
+  // message count scaled to it once the comm graph is merged below.
+  std::vector<double> hostW(numVertices);
+  for (int i = 0; i < numVertices; i++) hostW[i] = (double)stats->objData[i].wallTime;
   auto slackOf = [&](int i) {
-    return ogr->deviceDim ? (double)stats->objData[i].wallTime
+    return ogr->deviceDim ? hostW[i]
                           : lbObjGroupLoad(stats->objData[i]);
   };
 #endif
@@ -354,6 +374,26 @@ void MetisLB::work(LDStats* stats)
              "edge(s), merged %d duplicate edge(s) of %zu\n",
              selfLoops, outOfRange, duplicates, rawEdges);
 
+  if (metisHostByMsgs())
+  {
+    double sumT = 0.0, sumM = 0.0;
+    std::vector<double> msgs(numVertices, 0.0);
+    for (int i = 0; i < numVertices; i++)
+    {
+      for (const auto& nb : adj[i]) msgs[i] += (double)nb.second.msgs;
+      sumT += (double)stats->objData[i].wallTime;
+      sumM += msgs[i];
+    }
+    if (sumM > 0.0)
+    {
+      const double perMsg = sumT / sumM;
+      for (int i = 0; i < numVertices; i++)
+        if (msgs[i] > 0.0) hostW[i] = msgs[i] * perMsg;
+      if (_lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
+        CkPrintf("[%d] MetisLB: host weights by message count, %.2f us per message over "
+                 "%.0f messages\n", CkMyPe(), 1e6 * perMsg, sumM);
+    }
+  }
   // What an edge costs if the partition cuts it. With the table DiffusionLB
   // prices moves from (+LBCostConfig, written by lbcalib), that is the
   // transfer cost per interval at the tier the cut lands on: alpha seconds
@@ -409,7 +449,7 @@ void MetisLB::work(LDStats* stats)
     // Measured 12 Sep 2026 on sph2d: every group-level partition came out 10
     // to 44% over the mean against a 10% tolerance, at both sizes.
     maxCross = std::max(maxCross, ogr->vertices[i].getCompLoad());
-    maxIntra = std::max(maxIntra, (double)stats->objData[i].wallTime);
+    maxIntra = std::max(maxIntra, hostW[i]);
   }
   /** each object load is normalized to an integer between 1 and 256 */
   const double crossRatio = (maxCross == 0) ? 0 : 256.0 / maxCross;
@@ -453,7 +493,7 @@ void MetisLB::work(LDStats* stats)
       w[slackIdx] = std::max((idx_t)1, (idx_t)ceil(slackOf(i) * slackRatio));
 #endif
     vwgtIntra[i] =
-        std::max((idx_t)1, (idx_t)ceil(stats->objData[i].wallTime * intraRatio));
+        std::max((idx_t)1, (idx_t)ceil(hostW[i] * intraRatio));
   }
 
   std::array<idx_t, METIS_NOPTIONS> options;
@@ -1094,6 +1134,61 @@ void MetisLB::work(LDStats* stats)
   for (size_t k = 0; k < migVerts.size(); k++)
     grpVerts[groupLabel[k]].push_back(migVerts[k]);
 
+  if (metisHostByMsgs())
+  {
+    // Level one has fixed every object's group, so each of its edges now has a
+    // tier: the same group (one process), another group on this node, or
+    // another node. The host cost of a message differs by tier -- sph3d at 2
+    // nodes, fit over 96 PEs with sends and receives merged: 3.3 us in-process,
+    // 1.6 us same-node IPC, 5.5 us cross-node (a cross-node send alone ~8.8 us)
+    // -- and the PE that sets the step is the one with the most cross-node
+    // partners. Level two and the repair balance that cost, scaled to the
+    // measured total so the tolerances stay in seconds.
+    std::vector<int> grpOfVertex(numVertices, -1);
+    for (int i = 0; i < numVertices; i++)
+    {
+      const int pe = ogr->vertices[i].getCurrentPe();
+      if (pe >= 0 && pe < (int)groupOfPe.size()) grpOfVertex[i] = groupOfPe[pe];
+    }
+    for (size_t k = 0; k < migVerts.size(); k++) grpOfVertex[migVerts[k]] = (int)groupLabel[k];
+    std::vector<int> grpNode(nGroups, -1);
+    for (idx_t g = 0; g < nGroups; g++)
+      if (!grpPes[g].empty()) grpNode[g] = CmiPhysicalNodeID(grpPes[g][0]);
+    const double usIntra = 3.3, usNode = 1.6, usXnode = 5.5;
+    double sumOld = 0.0, sumNew = 0.0;
+    std::vector<double> w(numVertices, 0.0);
+    for (int i = 0; i < numVertices; i++)
+    {
+      const int gi = grpOfVertex[i];
+      for (const auto& nb : adj[i])
+      {
+        const int gj = grpOfVertex[nb.first];
+        const double us = (gi == gj) ? usIntra
+                          : (gi >= 0 && gj >= 0 && grpNode[gi] == grpNode[gj]) ? usNode : usXnode;
+        w[i] += us * 1e-6 * (double)nb.second.msgs;
+      }
+      sumOld += hostW[i];
+      sumNew += w[i];
+    }
+    if (sumNew > 0.0)
+    {
+      const double scale = sumOld / sumNew;
+      double mx = 0.0;
+      for (int i = 0; i < numVertices; i++)
+      {
+        if (w[i] > 0.0) hostW[i] = w[i] * scale;
+        mx = std::max(mx, hostW[i]);
+      }
+      const double ratio = mx > 0.0 ? 256.0 / mx : 0.0;
+      for (int i = 0; i < numVertices; i++)
+        vwgtIntra[i] = std::max((idx_t)1, (idx_t)ceil(hostW[i] * ratio));
+      if (_lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
+        CkPrintf("[%d] MetisLB: level-two host weights by message tier (%.1f/%.1f/%.1f us "
+                 "in-process/same-node/cross-node), scaled %.3f to the measured total\n",
+                 CkMyPe(), usIntra, usNode, usXnode, scale);
+    }
+  }
+
 
   // Level two: within a group, over the PEs sharing that GPU, on host load --
   // every PE here drives the same device, so device time cannot separate them.
@@ -1195,7 +1290,7 @@ void MetisLB::work(LDStats* stats)
   {
     const bool devBinds = ogr->deviceDim;
     const int nPe = (int)parr->procs.size();
-    auto hostOf = [&](int i) { return (double)stats->objData[i].wallTime; };
+    auto hostOf = [&](int i) { return hostW[i]; };
     auto devOf = [&](int i) { return lbObjGroupLoad(stats->objData[i]); };
     auto peOfObj = [&](int i) {
       return newPe[i] >= 0 ? newPe[i] : ogr->vertices[i].getCurrentPe();
@@ -1389,29 +1484,63 @@ void MetisLB::work(LDStats* stats)
       std::vector<double> grpDev(nGroups, 0.0), peHost(nPe, 0.0);
       for (int pe = 0; pe < nPe; pe++)
         if (groupOfPe[pe] >= 0) peHost[pe] = stats->procs[pe].bg_walltime;
+      // +LBMetisHostByMsgs: a PE's host time under a mapping is what its
+      // objects' messages cost it at the tiers that mapping gives them (the
+      // level-two model, scaled to the measured total), so the comparison of
+      // old and new mapping is one model applied to both. Without the flag the
+      // measured wallTime stands and every cut message is charged to both
+      // endpoints at the calibrated alpha -- the ping-pong latency, 24 us,
+      // where the host actually spends 2-9 us. That overcharge refused a
+      // mapping that measured -36% (sph3d 98M, 256 patches, 2 nodes,
+      // 2026-10-08: predicted 4.50 -> 4.46, 0.8%, floor 10%).
+      const bool byMsgs = metisHostByMsgs();
+      std::vector<double> hw;
+      if (byMsgs)
+      {
+        hw.assign(numVertices, 0.0);
+        double sumT = 0.0, sumW = 0.0;
+        for (int i = 0; i < numVertices; i++)
+        {
+          const int p = peUnder(i, fresh);
+          for (const auto& nb : adj[i])
+          {
+            const int q = peUnder(nb.first, fresh);
+            const double us = (p < 0 || q < 0) ? 5.5
+                              : (CmiNodeOf(p) == CmiNodeOf(q)) ? 3.3
+                              : CmiPeOnSamePhysicalNode(p, q) ? 1.6 : 5.5;
+            hw[i] += us * 1e-6 * (double)nb.second.msgs;
+          }
+          sumT += (double)stats->objData[i].wallTime;
+          sumW += hw[i];
+        }
+        const double scale = sumW > 0.0 ? sumT / sumW : 1.0;
+        for (int i = 0; i < numVertices; i++)
+          hw[i] = hw[i] > 0.0 ? hw[i] * scale : (double)stats->objData[i].wallTime;
+      }
       for (int i = 0; i < numVertices; i++)
       {
         const int pe = peUnder(i, fresh);
         if (pe < 0 || pe >= nPe || groupOfPe[pe] < 0) continue;
         grpDev[groupOfPe[pe]] += lbObjGroupLoad(stats->objData[i]);
-        peHost[pe] += (double)stats->objData[i].wallTime / peSpeed[pe];
+        peHost[pe] += (byMsgs ? hw[i] : hostW[i]) / peSpeed[pe];
       }
       if (costCfg.calibrated)
       {
-        for (int i = 0; i < numVertices; i++)
-        {
-          const int p = peUnder(i, fresh);
-          if (p < 0 || p >= nPe || groupOfPe[p] < 0) continue;
-          for (const auto& nb : adj[i])
+        if (!byMsgs)
+          for (int i = 0; i < numVertices; i++)
           {
-            if (nb.first <= i) continue;
-            const int q = peUnder(nb.first, fresh);
-            if (q < 0 || q >= nPe || groupOfPe[q] < 0 || p == q) continue;
-            const double e = edgeCost(nb.second, DiffusionCostConfig::tierBetween(p, q));
-            peHost[p] += e / peSpeed[p];
-            peHost[q] += e / peSpeed[q];
+            const int p = peUnder(i, fresh);
+            if (p < 0 || p >= nPe || groupOfPe[p] < 0) continue;
+            for (const auto& nb : adj[i])
+            {
+              if (nb.first <= i) continue;
+              const int q = peUnder(nb.first, fresh);
+              if (q < 0 || q >= nPe || groupOfPe[q] < 0 || p == q) continue;
+              const double e = edgeCost(nb.second, DiffusionCostConfig::tierBetween(p, q));
+              peHost[p] += e / peSpeed[p];
+              peHost[q] += e / peSpeed[q];
+            }
           }
-        }
         // What the move itself costs the PE that packs it, spread over the
         // intervals the placement is expected to last. Only the new mapping
         // pays it: staying put moves nothing.
@@ -1608,7 +1737,7 @@ void MetisLB::work(LDStats* stats)
       const int pe = (newPe[i] >= 0) ? newPe[i] : ogr->vertices[i].getCurrentPe();
       if (pe < 0 || pe >= (int)groupOfPe.size() || groupOfPe[pe] < 0) continue;
       grpDev[groupOfPe[pe]] += ogr->vertices[i].getCompLoad();
-      peHost[pe] += stats->objData[i].wallTime / peSpeed[pe];
+      peHost[pe] += hostW[i] / peSpeed[pe];
     }
     double devMax = 0.0, devSum = 0.0;
     for (idx_t g = 0; g < nGroups; g++)
