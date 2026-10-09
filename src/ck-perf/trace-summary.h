@@ -184,6 +184,12 @@ class SumLogPool {
     /// for Summary-Detail
     double *cpuTime;    //[MAX_INTERVALS * MAX_ENTRIES];
     int *numExecutions; //[MAX_INTERVALS * MAX_ENTRIES];
+    /** Bytes of the messages counted by numExecutions, so that a summary
+	trace can say how much data an entry method received and not only how
+	many messages. Only messages delivered to an entry method are counted;
+	packing and unpacking, which numExecutions also counts, contribute
+	none. */
+    CmiUInt8 *msgBytes; //[MAX_INTERVALS * MAX_ENTRIES];
 
   public:
     SumLogPool(char *pgm);
@@ -232,10 +238,18 @@ class SumLogPool {
     inline int incNumExecutions(unsigned int interval, unsigned int ep){
         ++numExecutions[interval*epInfoSize+ep];
         return numExecutions[interval*epInfoSize+ep]; }
+    inline CmiUInt8 getMsgBytes(unsigned int interval, unsigned int ep){
+        return msgBytes[interval*epInfoSize+ep]; }
+    inline void setMsgBytes(unsigned int interval, unsigned int ep, CmiUInt8 val){
+        msgBytes[interval*epInfoSize+ep] = val; }
+    inline CmiUInt8 addToMsgBytes(unsigned int interval, unsigned int ep, CmiUInt8 val){
+        msgBytes[interval*epInfoSize+ep] += val;
+        return msgBytes[interval*epInfoSize+ep]; }
     inline int getUtilization(int interval, int ep);
 
 
-    void updateSummaryDetail(int epIdx, double startTime, double endTime);
+    void updateSummaryDetail(int epIdx, double startTime, double endTime,
+                             CmiUInt8 bytes = 0);
 
 
 };
@@ -250,6 +264,7 @@ class TraceSummary : public Trace {
     int execEvent;
     int execEp;
     int execPe;
+    CmiUInt8 execMsgBytes; /* size of the message being executed, for summary detail */
     int msgNum; /* used to handle multiple endComputation calls?? */
 
     /* per-log metadata maintained to derive cross-event information */
