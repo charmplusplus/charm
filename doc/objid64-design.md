@@ -613,6 +613,29 @@ PR 5  (optional, later) Id-carrying CkCallback variant. CkCallback's array form
       by id directly; it is the first user of a kind field in the tag bits if
       callbacks to chares and groups are ever folded into the same handle.
 
+### 9.1 Merge gate into the reviewed line (Kale, 2026-10-09)
+
+The redesign is not merged into reviewed-with-reconverse all at once. The cut is
+PR 1 as a whole: 1a (#4017, merged into objid-redesign 2026-10-09), its fixes
+(#4028, from Aditya's review of 1a), and 1b (#4021), together. 1a alone leaves
+hashed-kind arrays with the initial tranche only, an abort when it runs out, and an
+abort on a restart with a different process count; 1b removes all three, so 1a is
+never merged to the reviewed line without 1b. The gate:
+
+1. #4028 approved by Aditya and merged into objid-redesign.
+2. #4021 rebased onto that, its tests (including the restart ones) passing, merged
+   into objid-redesign.
+3. ChaNGa, which creates a ~262k-element bounded array and today sees the PR 0
+   "needs 17 bits ... hold 16" note, rebuilt and run against objid-redesign by
+   someone at PPL (not by its author): the note gone, the run unchanged.
+
+Then #4015 (objid-redesign -> reviewed-with-reconverse) leaves draft and merges.
+PR 2 (manual) follows as a small PR straight to the reviewed line. PR 3 and PR 4
+are their own PRs against the reviewed line after PR 1 is in, not passengers on
+objid-redesign. A checkpoint written before PR 1 cannot be restored after it (id
+layout and checkpoint format change; pupLayout's marker makes that a clear abort):
+the release notes must say so.
+
 ## 10. Test matrix
 
 | test | kind | exercises |
