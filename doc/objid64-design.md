@@ -627,7 +627,15 @@ never merged to the reviewed line without 1b. The gate:
    into objid-redesign.
 3. ChaNGa, which creates a ~262k-element bounded array and today sees the PR 0
    "needs 17 bits ... hold 16" note, rebuilt and run against objid-redesign by
-   someone at PPL (not by its author): the note gone, the run unchanged.
+   Kale or Ritvik (Tom Quinn's schedule is not to be depended on): the note gone,
+   the run unchanged.
+4. A full sweep, because the id layout is a deep change: every test under
+   tests/charm++ and tests/converse, every example under examples/charm++ with a
+   test target, and the benchmarks and miniapps we run (pingpong, jacobi, LeanMD,
+   paratreet2, ChaNGa), each in at least single-process multi-PE and
+   multi-process configurations, with a balancer where the program supports one,
+   and checkpoint/restart where it does. On the Mac and on one Linux cluster
+   (Anvil). CI's subset is not enough for this merge.
 
 Then #4015 (objid-redesign -> reviewed-with-reconverse) leaves draft and merges.
 PR 2 (manual) follows as a small PR straight to the reviewed line. PR 3 and PR 4
