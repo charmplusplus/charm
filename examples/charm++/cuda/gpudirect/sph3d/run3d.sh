@@ -10,7 +10,8 @@ export FI_MR_CACHE_MONITOR=disabled PMI_MAX_KVS_ENTRIES=8192 CUDA_DEVICE_ORDER=P
 ulimit -c 0
 POOL=${POOL:-8192}
 COST=/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect/sph2d/lbcost.delta-a40.conf
-MD="+balancer MetisLB +balancer DiffusionLB +LBDiffusionCommOn +LBCostConfig $COST +LBDebug ${LBDEBUG:-1}"
+DIFF_FLAGS=${DIFF_FLAGS-"+balancer DiffusionLB +LBDiffusionCommOn"}   # DIFF_FLAGS= (empty) runs MetisLB alone at every event
+MD="+balancer MetisLB $DIFF_FLAGS +LBCostConfig $COST +LBDebug ${LBDEBUG:-1}"
 case ${LB:-none} in
   none)  lbargs="-f 99999";;
   sync)  lbargs="-f ${LBF:-100} -b ${LBB:-100} $MD";;
