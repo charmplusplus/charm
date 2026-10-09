@@ -42,6 +42,10 @@ $T/run_variant.sh $JID tnl98_nolb_2000 nolb_2000
 echo "tnl done $(date +%T) node time $(squeue -j $JID -h -o %M)"
 # phase 2: sph3d 98M 256 patches, 2000 steps, Metis alone at every event (period 100), sync/async x2
 DIFF_FLAGS= LBF=100 LBB=100 LBLAG=50 $D/n2_final.sh $JID "8 4 8" 2000 syncT asyncT syncT asyncT
+# phase 2b: where does async lose at period 25? profiled sync/async pair, and async with the off-thread CUPTI load build
+SPH_HOST_PROFILE=1 LBF=25 LBB=25 LBLAG=10 $D/n2_final.sh $JID "8 4 8" 1000 syncT asyncT
+CHARM_LB_CUPTI_OFFTHREAD=1 LBF=25 LBB=25 LBLAG=10 $D/n2_final.sh $JID "8 4 8" 1000 asyncT
+echo "phase 2b done $(date +%T) node time $(squeue -j $JID -h -o %M)"
 # phase 3: 25M on 2 nodes, 128 patches, 600 steps
 export NODES=2 NP=8
 for ARM in none syncT asyncT; do

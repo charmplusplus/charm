@@ -1208,7 +1208,15 @@ public:
     // default: the forces kernel iterates in cell order by itself now, and
     // the sort's cell build and gather cost more than the random reads of the
     // layout pass they used to prevent (73.2 vs 79.1 ms/step at 25M, 1 GPU).
+    // SPH_SORT_EVERY=N sorts at every N-th step's rebuild instead: the layout
+    // pass reads particles in cell order, and over a long run the unsorted
+    // array mixes across cells as the fluid moves (98M, 8 GPUs, 2000 steps:
+    // the busiest GPU's kernel time grew 23% at a flat host load; TNL-SPH,
+    // which reorders every step, stayed flat), so a sort every 100 steps
+    // keeps the reads coherent for a cost that does not register.
     static const bool sort_locals = (getenv("SPH_SORT") != nullptr);
+    static const int sort_every =
+        getenv("SPH_SORT_EVERY") ? atoi(getenv("SPH_SORT_EVERY")) : (sort_locals ? 1 : 0);
     if (batch_halo) hapiSubmitBatchBegin();
     // The migrants appended last step landed on comm_stream; everything below
     // reads them on compute_stream.
@@ -1219,7 +1227,7 @@ public:
       // pack records its index lists, so the lists survive until the
       // compaction at the end of the window. The swap is inside this serial
       // block, so cur names the live buffer at every entry-method boundary.
-      if (sort_locals && np > 0) {
+      if (sort_every > 0 && np > 0 && (my_iter % sort_every) == 0) {
         invokeCellBuild(d_parts[cur], np, x0, y0, z0, inv_csize, ncx, ncy, ncz,
             ncells, d_cell_cnt, d_cell_off, d_cursor, d_cell_parts, d_cell_of,
             d_scan_tmp, scan_tmp_bytes, compute_stream);
