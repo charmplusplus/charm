@@ -631,8 +631,10 @@ never merged to the reviewed line without 1b. The gate:
    the run unchanged.
 4. A full sweep, because the id layout is a deep change: every test under
    tests/charm++ and tests/converse, every example under examples/charm++ with a
-   test target, and the benchmarks and miniapps we run (pingpong, jacobi, LeanMD,
-   paratreet2, ChaNGa), each in at least single-process multi-PE and
+   test target, the benchmarks we run (pingpong, jacobi), the ten PPL mini-apps
+   listed at https://charmplusplus.org/miniApps/ (LeanMD, AMR, Barnes-Hut, DenseLU,
+   HPCCG, Kripke, TS, FFT, RA, EP Stream; repositories under github.com/UIUC-PPL),
+   and the applications paratreet2 and ChaNGa, each in at least single-process multi-PE and
    multi-process configurations, with a balancer where the program supports one,
    and checkpoint/restart where it does. On the Mac and on one Linux cluster
    (Anvil). CI's subset is not enough for this merge.
