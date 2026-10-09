@@ -150,21 +150,35 @@ freeze tag on main. Order:
    2026-09-30 in `doc/triage/`; Kale asked to be reminded of this agenda at
    the rename and at later check-ins). GitHub moves every open PR against
    `main` to `classic` at the rename, and only a manual retarget moves one
-   to this line, so all 148 must be handled first: retarget the tier-1
-   "still wanted" PRs (12, listed in `pr-audit-main-2026-09-30.md`), close
-   the already-equivalent, obsolete and unclear ones with a one-line note
-   citing the audit; Kale's #4013 and #3937 merge to classic first, their
-   twins #4014 and #4020 land here. Of the 482 open issues
-   (`issue-audit-2026-09-30.md`): close fixed + obsolete (~170) citing the
-   audit; label the 84 "keep" issues `reconverse` (9 critical, owners
-   needed: #3762, #3872, #1378, #2018, #3158, #2643, #3978, #3994, #4018);
-   fold the 155 ideas into one wishlist; ask reporters on the 30
+   to this line. **PR side in progress (2026-10-08):** tracking issue
+   **#4024** lists all 147 open PRs by disposition and every PR carries a
+   one-line note pointing at it; comment period ends 2026-10-22, then one
+   pass: retarget 15 (tier 1-2 that still apply, plus #3193 Collide, #3607
+   and #3597 by decision), close 9 already-equivalent, 30 obsolete and 37
+   wanted-but-needs-rework (kept listed in #4024). The 48 "unclear" PRs
+   STAY OPEN on `classic` by decision (Kale, 2026-10-08): an open PR on the
+   frozen branch is inert, so closing them buys only a shorter PR list.
+   Current contributors handle their own (#3904, #3910, #3858, #3859,
+   #3768, #3869, #3589). Kale's #4013 and #3937 are merged on classic
+   main; their twins #4014 and #4020 are merged here. #3676 closed in
+   favour of reconverse#268. Issue side still to do: of the 482 open
+   issues (`issue-audit-2026-09-30.md`): close fixed + obsolete (~170)
+   citing the audit; label the 84 "keep" issues `reconverse` (9 critical,
+   owners needed: #3762, #3872, #1378, #2018, #3158, #2643, #3978, #3994,
+   #4018); fold the 155 ideas into one wishlist; ask reporters on the 30
    undecidable; the 42 AMPI/TCharm ones follow the AMPI port plan.
 3c. Final classic release BEFORE the rename (Kale, 2026-09-30): v8.0.2 was
    a tag only, with no GitHub Release and no CHANGES entry, and main has
-   moved 12 bugfix commits since. Cut v8.0.3 with CHANGES entries for
-   8.0.1-8.0.3, bump the CMake project VERSION (still 8.0.1), publish a
-   GitHub Release marked Latest (v7.0.1r currently holds that slot).
+   moved 14 commits since (bug fixes plus CkTreeCacheManager #4013 and the
+   trace-summary message bytes #3937). **Decided 2026-10-09: the final
+   classic release is 8.1.0** (a feature number, since it adds a library).
+   Steps: PR on main with the CHANGES entry covering everything since
+   8.0.0, the CMake project VERSION bump 8.0.1 -> 8.1.0 and README fixes
+   (needs main's two approvals); tag `v8.1.0`; publish a GitHub Release
+   marked Latest (v7.0.1r currently holds that slot). GitHub's automatic
+   source tarball at `archive/refs/tags/v8.1.0.tar.gz` is the download;
+   no tarball is hosted on the website (Kale, 2026-10-08). The tag and
+   Release happen before the announcement email, which cites them.
 4. Rename `main` -> `classic` (protection moves with it) and set the
    DEFAULT branch to `reviewed-with-reconverse` (Kale reconfirmed the
    rename 2026-09-30). Deliberately do NOT
@@ -172,7 +186,8 @@ freeze tag on main. Order:
    branch named `main`, every stale consumer -- old clones pulling,
    scripts pinned to origin/main -- fails loudly ("couldn't find remote
    ref main") instead of silently receiving a different runtime's tree.
-   No open PRs may target old main at this point.
+   Open PRs against old main have all been triaged by this point (3b);
+   the ones left open move to `classic` with the branch, by decision.
 5. Announcement to users: `main` no longer exists; classic dependents
    run `git checkout classic`; new development and releases are on the
    default branch `reviewed-with-reconverse`.
