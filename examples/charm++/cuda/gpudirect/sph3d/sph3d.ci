@@ -42,11 +42,19 @@ mainmodule sph3d {
   readonly RealType verlet_margin; // -m, in units of h: widens the cells and the halo
   readonly RealType cell_size;     // support + verlet_margin * h
 
+  readonly CProxy_HostProfGroup prof_proxy;
+
+  group HostProfGroup {
+    entry HostProfGroup();
+    entry void report(CkCallback cb);
+  };
+
   mainchare Main {
     entry Main(CkArgMsg* m);
     entry void initDone(CkReductionMsg* msg);
     entry void stepStats(CkReductionMsg* msg);
     entry [reductiontarget] void allDone();
+    entry [reductiontarget] void profDone();
   };
 
   array [3D] Patch {

@@ -143,6 +143,7 @@ EventPool& eventPool() {
 
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Patch patch_proxy;
+/* readonly */ CProxy_HostProfGroup prof_proxy;
 /* readonly */ RealType dom_lx;
 /* readonly */ RealType dom_ly;
 /* readonly */ RealType dom_lz;
@@ -223,6 +224,35 @@ static size_t dirOffset(int d, int cap_face) {
   return off;
 }
 static size_t exchSlots(int cap_face) { return dirOffset(NUM_DIRS, cap_face); }
+
+// ---- per-PE host-time profile (SPH_HOST_PROFILE=1) ---------------------------
+// Every entry body is wrapped in a PhaseScope; a PE is a thread, so the
+// accumulators are thread_local. Messages are counted by the tier of the
+// partner's PE: same process, same physical node, other node. One line per PE
+// at the end (HostProfGroup::report), so the hot PE's time can be split by
+// phase and set against its message mix in a single run.
+enum HostPhase { PH_ITERATE, PH_START_HALO, PH_SEND_HALO, PH_RECV_HALO, PH_APPEND_GHOSTS,
+                 PH_COMPUTE, PH_FINISH, PH_SEND_LEAVERS, PH_RECV_PARTS, PH_APPEND_PARTS,
+                 PH_DRAIN, PH_SEND_DONE, PH_END_STEP, PH_PC, PH_N };
+static const char* const host_phase_name[PH_N] = {
+  "iterate", "startHalo", "sendHalo", "recvHalo", "appendGhosts", "compute", "finish",
+  "sendLeavers", "recvParts", "appendParts", "drain", "sendDone", "endOfStep", "pc" };
+struct HostProf {
+  double t[PH_N] = {}; long n[PH_N] = {};
+  long sent[3] = {}, recv[3] = {}; long sent_bytes[3] = {}, recv_bytes[3] = {};
+};
+static thread_local HostProf g_hprof;
+static const bool host_profile_on = (getenv("SPH_HOST_PROFILE") != nullptr);
+struct PhaseScope {
+  int ph; double t0;
+  PhaseScope(int p) : ph(p), t0(host_profile_on ? CkWallTimer() : 0.0) {}
+  ~PhaseScope() { if (host_profile_on) { g_hprof.t[ph] += CkWallTimer() - t0; g_hprof.n[ph]++; } }
+};
+static inline int peTier(int pe) {
+  if (pe < 0) return 2;
+  if (CmiNodeOf(pe) == CmiMyNode()) return 0;
+  return CmiPeOnSamePhysicalNode(pe, CkMyPe()) ? 1 : 2;
+}
 
 class Main : public CBase_Main {
   double start_time;
@@ -376,6 +406,7 @@ public:
              async_lb ? ", async" : "");
 
     patch_proxy = CProxy_Patch::ckNew(n_chares_x, n_chares_y, n_chares_z);
+    prof_proxy = CProxy_HostProfGroup::ckNew();
     patch_proxy.init();
   }
 
@@ -494,7 +525,32 @@ public:
     CkPrintf("Average iteration time: %.3f ms\n", per_step);
     CkPrintf("  %d force evaluation%s per step: %.3f ms per force evaluation\n",
              evals, evals > 1 ? "s" : "", per_step / evals);
-    CkExit();
+    prof_proxy.report(CkCallback(CkReductionTarget(Main, profDone), main_proxy));
+  }
+  void profDone() { CkExit(); }
+};
+
+class HostProfGroup : public CBase_HostProfGroup {
+ public:
+  HostProfGroup() {}
+  void report(CkCallback cb) {
+    if (host_profile_on) {
+      const HostProf& h = g_hprof;
+      double total = 0.0;
+      for (int i = 0; i < PH_N; i++) total += h.t[i];
+      char line[2048]; int o = 0;
+      o += snprintf(line + o, sizeof(line) - o, "HOSTPROF pe=%d proc=%d objs=%u total=%.3f |",
+                    CkMyPe(), CmiMyNode(), patch_proxy.ckLocMgr()->numLocalElements(), total);
+      for (int i = 0; i < PH_N; i++)
+        o += snprintf(line + o, sizeof(line) - o, " %s=%.3f/%ld", host_phase_name[i], h.t[i], h.n[i]);
+      o += snprintf(line + o, sizeof(line) - o,
+                    " | sent intra/node/xnode=%ld/%ld/%ld (MB %.0f/%.0f/%.0f) recv=%ld/%ld/%ld (MB %.0f/%.0f/%.0f)\n",
+                    h.sent[0], h.sent[1], h.sent[2], h.sent_bytes[0] / 1e6, h.sent_bytes[1] / 1e6,
+                    h.sent_bytes[2] / 1e6, h.recv[0], h.recv[1], h.recv[2], h.recv_bytes[0] / 1e6,
+                    h.recv_bytes[1] / 1e6, h.recv_bytes[2] / 1e6);
+      CkPrintf("%s", line);
+    }
+    contribute(cb);
   }
 };
 
@@ -1086,6 +1142,7 @@ public:
   }
 
   void iterate() {
+    PhaseScope _ps(PH_ITERATE);
     if (isLBIter(my_iter) && !lb_waiting) {
       lb_start_iter = my_iter;
       lb_t0 = CkWallTimer();
@@ -1117,6 +1174,7 @@ public:
 
   // ---- phase 1: pressure, then halo ----------------------------------------
   void startHalo() {
+    PhaseScope _ps(PH_START_HALO);
     // Step 1 and every nl_freq-th step rebuild; the step before a rebuild
     // migrates. With nl_freq = 1 every step does both (the original scheme).
     rebuild_step = (my_iter == 1) || (my_iter % nl_freq == 0);
@@ -1184,6 +1242,7 @@ public:
   }
 
   void sendHalo() {
+    PhaseScope _ps(PH_SEND_HALO);
     if (!step_active) return;
     halo_pending = false;
     if (rebuild_step) {
@@ -1209,6 +1268,10 @@ public:
     for (int d = 0; d < NUM_DIRS; d++) {
       if (!halo_peer[d]) continue;
       const int cnt = h_halo_cnt[d];
+      if (host_profile_on) {
+        const int tier = peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[d], nbr_y[d], nbr_z[d])));
+        g_hprof.sent[tier]++; g_hprof.sent_bytes[tier] += (long)cnt * sizeof(Particle);
+      }
       thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveHalo(my_iter, flipDir(d), cnt, cnt,
           (outstanding_sends++, sphSendBuffer(
            d_send_halo + dirOffset(d, exch_capacity),
@@ -1223,6 +1286,11 @@ public:
   // recorded one, and the count has to match.
   void receiveHalo(int ref, int dir, int n, int& m, Particle*& parts,
       CkDeviceBufferPost* devicePost) {
+    PhaseScope _ps(PH_RECV_HALO);
+    if (host_profile_on) {
+      const int tier = peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[dir], nbr_y[dir], nbr_z[dir])));
+      g_hprof.recv[tier]++; g_hprof.recv_bytes[tier] += (long)n * sizeof(Particle);
+    }
     parts = d_recv_halo + dirOffset(dir, exch_capacity);
     static const bool direct_ok = (getenv("SPH_NO_DIRECT_HALO") == nullptr);
     static const bool ordered = (getenv("SPH_HALO_ORDERED") != nullptr);
@@ -1246,6 +1314,7 @@ public:
   }
 
   void appendGhosts(int dir, int n) {
+    PhaseScope _ps(PH_APPEND_GHOSTS);
     halo_arrived[my_iter]++;
     if (rebuild_step) {
       if (n == 0) { ghost_off[dir] = ghost_alloc; ghost_cnt[dir] = 0; return; }
@@ -1287,6 +1356,7 @@ public:
 
   // ---- phase 2: neighbours, forces, then integrate or predict --------------
   void computeForces() {
+    PhaseScope _ps(PH_COMPUTE);
     halo_open = false;
     if (!isActive()) {
       if (isStatsIter()) {
@@ -1357,6 +1427,7 @@ public:
   // leavers_done: the integrator already compacted (invokeIntegrateLeavers),
   // so only the counts are still to come.
   void finishCompute(bool leavers_done) {
+    PhaseScope _ps(PH_FINISH);
     static const bool fold_zero = (getenv("SPH_NO_FOLD_ZERO") == nullptr);
     if (isStatsIter()) {
       invokeStats(d_parts[cur], np, d_stats, compute_stream);
@@ -1377,6 +1448,7 @@ public:
 
   // ---- predictor-corrector: second exchange, second evaluation -------------
   void sendHalo2() {
+    PhaseScope _ps(PH_PC);
     halo_pending2 = false;
     for (int d = 0; d < NUM_DIRS; d++) {
       if (!halo_peer[d]) continue;
@@ -1394,6 +1466,7 @@ public:
   // posted; before that (or for a later step) the message is staged.
   void receiveHalo2(int ref, int dir, int n, int& m, Particle*& parts,
       CkDeviceBufferPost* devicePost) {
+    PhaseScope _ps(PH_PC);
     parts = d_recv_halo2 + dirOffset(dir, exch_capacity);
     static const bool direct_ok = (getenv("SPH_NO_DIRECT_HALO") == nullptr);
     static const bool ordered = (getenv("SPH_HALO_ORDERED") != nullptr);
@@ -1407,6 +1480,7 @@ public:
   }
 
   void appendGhosts2(int dir, int n) {
+    PhaseScope _ps(PH_PC);
     halo_arrived2[my_iter]++;
     if (n != ghost_cnt[dir])
       CkAbort("Patch (%d,%d,%d) step %d: %d predicted halo particles from "
@@ -1424,6 +1498,7 @@ public:
   }
 
   void correct() {
+    PhaseScope _ps(PH_PC);
     pc_open = false;
     static const bool batch_compute = (getenv("SPH_NO_BATCH_COMPUTE") == nullptr);
     static const bool fold_zero = (getenv("SPH_NO_FOLD_ZERO") == nullptr);
@@ -1456,6 +1531,7 @@ public:
 
   // ---- migration -----------------------------------------------------------
   void sendLeavers() {
+    PhaseScope _ps(PH_SEND_LEAVERS);
     const bool moved = isActive() && migrate_step;
     if (moved) {
       mig_pending = false;
@@ -1508,6 +1584,10 @@ public:
       n_fluid -= cnt;   // every leaver is fluid
       // Sent every step the edge is not quiet, empty inside a window: the
       // advertisement rides on it.
+      if (host_profile_on) {
+        const int tier = peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[d], nbr_y[d], nbr_z[d])));
+        g_hprof.sent[tier]++; g_hprof.sent_bytes[tier] += (long)cnt * sizeof(Particle);
+      }
       thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveParticles(my_iter, flipDir(d),
           adv_out, cnt, cnt,
           (outstanding_sends++, sphSendBuffer(
@@ -1519,6 +1599,11 @@ public:
 
   void receiveParticles(int ref, int dir, int adv, int n, int& m,
       Particle*& parts, CkDeviceBufferPost* devicePost) {
+    PhaseScope _ps(PH_RECV_PARTS);
+    if (host_profile_on) {
+      const int tier = peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[dir], nbr_y[dir], nbr_z[dir])));
+      g_hprof.recv[tier]++; g_hprof.recv_bytes[tier] += (long)n * sizeof(Particle);
+    }
     // A partner can run ahead only over a quiet edge, by at most its level;
     // such a message is empty, and its advertisement has a slot of its own.
     if (ref > my_iter + ADV_LEVEL_CAP)
@@ -1533,6 +1618,7 @@ public:
   }
 
   void appendParticles(int ref, int dir, int n) {
+    PhaseScope _ps(PH_APPEND_PARTS);
     parts_arrived[my_iter]++;
     // Both ends now hold each other's advertisement for the next step and
     // compute the same skip count for this edge (see edgeSkips).
@@ -1553,6 +1639,7 @@ public:
 
   // ---- end of step ---------------------------------------------------------
   void gateStepDrain() {
+    PhaseScope _ps(PH_DRAIN);
     if (outstanding_sends == 0) {
       thisProxy[thisIndex].sendsDrained();
     } else {
@@ -1581,6 +1668,7 @@ public:
   }
 
   void sendDone() {
+    PhaseScope _ps(PH_SEND_DONE);
     outstanding_sends--;
     if (draining && outstanding_sends == 0) {
       draining = false;
@@ -1589,6 +1677,7 @@ public:
   }
 
   void endOfStep() {
+    PhaseScope _ps(PH_END_STEP);
     checkArrivals(halo_arrived, "halo", n_expect);
     checkArrivals(halo_arrived2, "predicted halo", pc_step ? n_expect : 0);
     checkArrivals(parts_arrived, "migration", n_expect_mig);
