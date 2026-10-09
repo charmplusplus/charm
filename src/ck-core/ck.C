@@ -7,6 +7,7 @@ the bindings are written to the C language, although most
 clients, including the rest of Charm++, are actually C++.
 */
 #include "ck.h"
+#include "cknvtx.h"
 #include "trace.h"
 //#include "queueing.h"
 
@@ -762,7 +763,9 @@ void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
   const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
+  CK_NVTX_BEGIN_ENTRY(epIdx, msg, obj);
   CkInvokeEP((Chare*)obj, epIdx, msg);
+  CK_NVTX_END_ENTRY();
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -796,7 +799,9 @@ void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, (void*)msg);
 #endif
+  CK_NVTX_BEGIN_ENTRY(epIdx, deliverMsg, obj);
   CkInvokeEP((Chare*)obj, epIdx, deliverMsg);
+  CK_NVTX_END_ENTRY();
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif

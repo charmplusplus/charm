@@ -22,7 +22,7 @@ set(ck-cxx-sources
     ../ck-perf/trace-common.C ../ck-perf/trace-controlPoints.C
     ../ck-perf/tracec.C ../ck-perf/tracef.C ../conv-perf/charmProjections.C
     ../util/ckbitvector.C ../util/ckregex.C
-    ck.C ckarray.C ckarrayoptions.C ckcallback.C
+    ck.C ckarray.C ckarrayoptions.C ckcallback.C cknvtx.C
     ckcheckpoint.C ckfutures.C ckIgetControl.C
     cklocation.C ckmemcheckpoint.C ckmulticast.C
     ckrdma.C ckrdmadevice.C ckreduction.C cksyncbarrier.C debug-charm.C
@@ -166,6 +166,11 @@ target_include_directories(ck PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/to
 if(BUILD_CUDA AND CUPTI_LIBRARY)
   target_include_directories(ck PRIVATE "${CUDA_DIR}/extras/CUPTI/include")
   target_link_libraries(ck ${CUPTI_LIBRARY})
+endif()
+if(BUILD_CUDA)
+  # NVTX3 is header-only (nvtx3/nvToolsExt.h); +nvtx ranges around entry methods, see cknvtx.C
+  target_compile_definitions(ck PRIVATE CMK_NVTX=1)
+  target_include_directories(ck PRIVATE "${CUDA_DIR}/include")
 endif()
 target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager)
 

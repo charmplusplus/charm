@@ -733,6 +733,8 @@ if(BUILD_CUDA OR BUILD_HIP)
     endif()
 
     add_library(hybridapi ${hybridAPI-cxx-sources} $<TARGET_OBJECTS:ckrescale>)
+    target_compile_definitions(hybridapi PRIVATE CMK_NVTX=1)   # +nvtx gates the HAPI NVTX ranges (hapi_nvtx.h)
+    target_include_directories(hybridapi PRIVATE "${CUDA_DIR}/include")
     add_dependencies(hybridapi ci-generated)
 
     if(CUPTI_LIBRARY)

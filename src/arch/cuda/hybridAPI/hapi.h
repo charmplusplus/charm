@@ -608,11 +608,22 @@ bool hapiCuptiArrive(uint64_t epoch, int expected);
 void hapiCuptiStartTracing();
 void hapiCuptiStopTracing();
 bool hapiCuptiTracingActive();
+
+// +gputrace <dir> (parsed in ck-core/cknvtx.C): this process's CUPTI kernel, memcpy and memset
+// records go to <dir>/gputrace.<host>.<pid>.proc and each PE's entry-method and idle ranges beside
+// it; gputrace_merge.py joins them into one Perfetto trace of every GPU. The runtime keeps its CUPTI
+// subscription, so the balancer's device loads are unaffected (nsys would take it over).
+void hapiTraceStart(const char* dir);
+void hapiTraceStop();
+uint64_t hapiTraceTimestamp();   // the CUPTI clock, the time base of every record
 #else
 class hapiCuptiKernelTagScope {
  public:
   explicit hapiCuptiKernelTagScope(uint64_t) {}
 };
+static inline void hapiTraceStart(const char*) {}
+static inline void hapiTraceStop() {}
+static inline uint64_t hapiTraceTimestamp() { return 0; }
 #endif
 
 #ifdef CMK_LBDB_ON

@@ -64,6 +64,7 @@ never be excluded...
 /*@{*/
 
 #include "ckcheckpoint.h"
+#include "cknvtx.h"
 #include "ck.h"
 #include "ckrescale.h"
 #include "trace.h"
@@ -689,6 +690,7 @@ static void _exitHandler(envelope *env)
         CmiFree(env);
 
 #if CMK_CUDA || CMK_HIP
+      _nvtxExit();   // +gputrace: close this PE's trace file
       // Clean up HAPI
       hapiExit();
 #endif
@@ -1525,6 +1527,7 @@ void _initCharm(int unused_argc, char **argv)
 		SDAG::registerPUPables();
 		CmiArgGroup("Charm++",NULL);
 		_parseCommandLineOpts(argv);
+		_nvtxInit(argv);
 		_registerInit();
 		CkRegisterMsg("System", 0, 0, CkFreeMsg, sizeof(int));
 		CkRegisterChareInCharm(CkRegisterChare("null", 0, TypeChare));
@@ -1616,6 +1619,7 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 	_registerDone();
 	CmiNodeAllBarrier();
+	_nvtxInitPE();
 
 	CkpvAccess(_myStats) = new Stats();
 	CkpvAccess(_msgPool) = new MsgPool();
@@ -1712,6 +1716,7 @@ void _initCharm(int unused_argc, char **argv)
 #if CMK_CUDA || CMK_HIP
   // Perform HAPI initialization for GPU support
   hapiInit(argv);
+  _nvtxStartTrace();   // +gputrace: open the sink once HAPI is up
   //hapiStartMemoryDaemon();
 
   // Initialize Charm++ layer functions

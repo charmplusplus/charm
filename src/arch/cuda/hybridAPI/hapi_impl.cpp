@@ -17,6 +17,7 @@
 #include <chrono>
 #include <thread>
 #include <unistd.h>
+#include <cxxabi.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
 #include <sys/stat.h>
@@ -55,8 +56,9 @@ static bool hapi_gpu_load_busy = false;
 #include <unordered_map>
 #include <unordered_set>
 #include "gpumanager.h"
-#ifdef HAPI_NVTX_PROFILE
+#if CMK_NVTX
 #include "hapi_nvtx.h"
+bool hapiNvtxOn = false;   // +nvtx (ck-core/cknvtx.C) turns the HAPI ranges on
 #endif
 
 #if CMK_LBDB_ON
@@ -628,8 +630,97 @@ static std::atomic<uint64_t> g_cupti_memcpy_n{0};
 static std::atomic<uint64_t> g_cupti_memcpy_ns{0};
 static std::atomic<uint64_t> g_cupti_memcpy_bytes{0};
 static std::atomic<uint64_t> g_cupti_kernel_ns{0};
+// ---- GPU timeline sink: +gputrace <dir> (the flag is parsed in ck-core/cknvtx.C) ----
+// This process's CUPTI kernel, memcpy and memset records go to <dir>/gputrace.<host>.<pid>.proc as
+// text records on the CUPTI clock (K dev stream start end nameId objToken / M,S dev stream start end
+// bytes kind / N nameId name / T objToken omIdx objId); every PE writes its entry-method and idle
+// ranges beside it (cknvtx.C). gputrace_merge.py joins them into one Perfetto trace of all GPUs.
+// Unlike nsys, this leaves the runtime's CUPTI subscription -- and so the balancer's device loads --
+// intact: CUPTI admits one subscriber per process.
+#ifdef CMK_LBDB_ON
+void hapiProcessCuptiBuffers();
+static FILE* g_trace = nullptr;
+static std::mutex g_trace_lock;
+static std::unordered_map<std::string, int> g_trace_names;
+
+uint64_t hapiTraceTimestamp() { uint64_t t = 0; cuptiGetTimestamp(&t); return t; }
+
+static void hapiTraceObject(uint64_t token, const LDObjKey& key) {
+  std::lock_guard<std::mutex> lk(g_trace_lock);
+  if (g_trace == nullptr) return;
+  fprintf(g_trace, "T %llu %d %llu\n", (unsigned long long)token, (int)key.omID().id.idx,
+          (unsigned long long)key.objID());
+}
+
+static void hapiTraceKernel(const CUpti_ActivityKernel4* k, uint64_t token) {
+  std::lock_guard<std::mutex> lk(g_trace_lock);
+  if (g_trace == nullptr) return;
+  const char* nm = k->name != nullptr ? k->name : "?";
+  int id;
+  auto it = g_trace_names.find(nm);
+  if (it == g_trace_names.end()) {
+    id = (int)g_trace_names.size();
+    g_trace_names.emplace(nm, id);
+    int status = 0;
+    char* dem = abi::__cxa_demangle(nm, nullptr, nullptr, &status);
+    fprintf(g_trace, "N %d %s\n", id, (status == 0 && dem != nullptr) ? dem : nm);
+    free(dem);
+  } else {
+    id = it->second;
+  }
+  fprintf(g_trace, "K %u %u %llu %llu %d %llu\n", (unsigned)k->deviceId, (unsigned)k->streamId,
+          (unsigned long long)k->start, (unsigned long long)k->end, id, (unsigned long long)token);
+}
+
+static void hapiTraceCopy(char kind, uint32_t dev, uint32_t stream, uint64_t s, uint64_t e,
+                          uint64_t bytes, int copyKind) {
+  std::lock_guard<std::mutex> lk(g_trace_lock);
+  if (g_trace == nullptr) return;
+  fprintf(g_trace, "%c %u %u %llu %llu %llu %d\n", kind, (unsigned)dev, (unsigned)stream,
+          (unsigned long long)s, (unsigned long long)e, (unsigned long long)bytes, copyKind);
+}
+
+void hapiTraceStart(const char* dir) {
+  if (g_trace != nullptr) return;
+  mkdir(dir, 0775);
+  char host[256] = "?";
+  gethostname(host, sizeof host - 1); host[sizeof host - 1] = 0;
+  if (char* dot = strchr(host, '.')) *dot = 0;
+  char path[1024];
+  snprintf(path, sizeof path, "%s/gputrace.%s.%d.proc", dir, host, (int)getpid());
+  FILE* f = fopen(path, "w");
+  if (f == nullptr) {
+    CmiPrintf("HAPI[pe=%d]: +gputrace: cannot open %s: %s\n", CmiMyPe(), path, strerror(errno));
+    return;
+  }
+  setvbuf(f, nullptr, _IOFBF, 1 << 20);
+  // The clock pair that lines processes up across nodes: CUPTI's clock against CLOCK_REALTIME.
+  const uint64_t c0 = hapiTraceTimestamp();
+  struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);
+  const uint64_t c1 = hapiTraceTimestamp();
+  const uint64_t real_now = (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
+  fprintf(f, "# gputrace v1 host=%s pid=%d pe0=%d realtime_ns=%llu cupti_ns=%llu\n", host,
+          (int)getpid(), CmiMyPe(), (unsigned long long)real_now, (unsigned long long)((c0 + c1) / 2));
+  { std::lock_guard<std::mutex> lk(g_trace_lock); g_trace = f; }
+  hapiCuptiStartTracing();   // records from the start of the run, not from the first LB window
+  CmiPrintf("HAPI[pe=%d]: +gputrace: writing %s\n", CmiMyPe(), path);
+}
+
+void hapiTraceStop() {
+  if (g_trace == nullptr) return;
+  if (hapiCuptiTracingActive()) CUPTI_SAFE_CALL(cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
+  hapiProcessCuptiBuffers();   // the records queued since the last LB step
+  std::lock_guard<std::mutex> lk(g_trace_lock);
+  fclose(g_trace);
+  g_trace = nullptr;
+}
+#endif
+
 bool hapiCuptiTraceMemcpy() {
   static const bool on = (getenv("CHARM_CUPTI_MEMCPY") != nullptr);
+#ifdef CMK_LBDB_ON
+  if (g_trace != nullptr) return true;   // the +gputrace timeline wants the copies too
+#endif
   return on;
 }
 
@@ -891,6 +982,7 @@ void hapiExit() {
   // Ensure all PEs have finished GPU work
   CmiPrintf("Exit called on PE %d\n", CmiMyPe());
   CmiNodeBarrier();
+  if (CmiMyRank() == 0) hapiTraceStop();   // +gputrace: flush the last CUPTI records and close
 
   if (CpvAccess(hapi_flag_slots) != NULL) {
     hapiFreeHost((void*)CpvAccess(hapi_flag_slots));
@@ -1250,6 +1342,9 @@ void hapiProcessCuptiBuffers() {
         // shares the id and may still be coming. Everything left is dropped
         // when the drain ends.
         auto object = gm.cupti_object_correlation_db_.find(kernel->correlationId);
+        if (g_trace != nullptr)
+          hapiTraceKernel(kernel, object != gm.cupti_object_correlation_db_.end() ? object->second
+                                                                                   : HAPI_CUPTI_NO_OBJECT);
         if (bucket_settled && object != gm.cupti_object_correlation_db_.end()) {
           fileKernel(rec, object->second);
         } else {
@@ -1259,6 +1354,8 @@ void hapiProcessCuptiBuffers() {
       }
       else if (record->kind == CUPTI_ACTIVITY_KIND_MEMCPY) {
         const CUpti_ActivityMemcpy* mc = (const CUpti_ActivityMemcpy*)record;
+        if (g_trace != nullptr)
+          hapiTraceCopy('M', mc->deviceId, mc->streamId, mc->start, mc->end, mc->bytes, mc->copyKind);
         if (mc->end > mc->start) {
           g_cupti_memcpy_n.fetch_add(1, std::memory_order_relaxed);
           g_cupti_memcpy_ns.fetch_add(mc->end - mc->start, std::memory_order_relaxed);
@@ -1267,6 +1364,8 @@ void hapiProcessCuptiBuffers() {
       }
       else if (record->kind == CUPTI_ACTIVITY_KIND_MEMSET) {
         const CUpti_ActivityMemset* ms = (const CUpti_ActivityMemset*)record;
+        if (g_trace != nullptr)
+          hapiTraceCopy('S', ms->deviceId, ms->streamId, ms->start, ms->end, ms->bytes, 0);
         if (ms->end > ms->start) {
           g_cupti_memcpy_n.fetch_add(1, std::memory_order_relaxed);
           g_cupti_memcpy_ns.fetch_add(ms->end - ms->start, std::memory_order_relaxed);
@@ -2964,7 +3063,7 @@ inline static void hapiWorkRequestCleanup(hapiWorkRequest* wr) {
 #ifdef HAPI_CUDA_CALLBACK
 // Invokes user's host-to-device callback.
 static void* hostToDeviceCallback(void* arg) {
-#ifdef HAPI_NVTX_PROFILE
+#if CMK_NVTX
   NVTXTracer nvtx_range("hostToDeviceCallback", NVTXColor::Asbestos);
 #endif
   hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
@@ -2979,7 +3078,7 @@ static void* hostToDeviceCallback(void* arg) {
 
 // Invokes user's kernel execution callback.
 static void* kernelCallback(void* arg) {
-#ifdef HAPI_NVTX_PROFILE
+#if CMK_NVTX
   NVTXTracer nvtx_range("kernelCallback", NVTXColor::Asbestos);
 #endif
   hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
@@ -2995,7 +3094,7 @@ static void* kernelCallback(void* arg) {
 // Frees device buffers and invokes user's device-to-host callback.
 // Invoked regardless of the availability of the user's callback.
 static void* deviceToHostCallback(void* arg) {
-#ifdef HAPI_NVTX_PROFILE
+#if CMK_NVTX
   NVTXTracer nvtx_range("deviceToHostCallback", NVTXColor::Asbestos);
 #endif
   hapiWorkRequest* wr = *((hapiWorkRequest**)((char*)arg + CmiMsgHeaderSizeBytes + sizeof(int)));
@@ -3012,7 +3111,7 @@ static void* deviceToHostCallback(void* arg) {
 
 // Used by lightweight HAPI.
 static void* lightCallback(void *arg) {
-#ifdef HAPI_NVTX_PROFILE
+#if CMK_NVTX
   NVTXTracer nvtx_range("lightCallback", NVTXColor::Asbestos);
 #endif
 
@@ -3055,7 +3154,7 @@ static void hapiRegisterCallbacks() {
 // CpvDeclare'd variables as it is not one of the threads created by the Charm++
 // runtime.
 static void CUDACallback(void *data) {
-#ifdef HAPI_NVTX_PROFILE
+#if CMK_NVTX
   NVTXTracer nvtx_range("CUDACallback", NVTXColor::Silver);
 #endif
 
@@ -3105,7 +3204,7 @@ static void addCallback(hapiWorkRequest *wr, CallbackStage stage) {
 /******************** DEPRECATED ********************/
 // User calls this function to offload work to the GPU.
 void hapiEnqueue(hapiWorkRequest* wr) {
-#ifdef HAPI_NVTX_PROFILE
+#if CMK_NVTX
   NVTXTracer nvtx_range("enqueue", NVTXColor::Pomegranate);
 #endif
 
@@ -5953,6 +6052,7 @@ uint64_t hapiCuptiPushObjCorrelation() {
           CmiAbort("HAPI: exhausted CUPTI object-correlation tokens");
       }
       cupti_local_object_tokens.emplace(key, object_token);
+      if (g_trace != nullptr) hapiTraceObject(object_token, key);
     }
   }
 

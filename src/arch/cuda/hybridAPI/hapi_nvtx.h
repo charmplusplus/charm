@@ -1,9 +1,13 @@
 #ifndef __HAPI_NVTX_H_
 #define __HAPI_NVTX_H_
 
+// NVTX ranges inside HAPI (callbacks, enqueue). Runtime-gated: hapiNvtxOn is set by the +nvtx
+// command-line flag (ck-core/cknvtx.C); without it every NVTXTracer is a no-op.
 #include "nvtx3/nvToolsExt.h"
+#include <cstring>
 #include <type_traits>
-#include <string>
+
+extern bool hapiNvtxOn;
 
 enum class NVTXColor : uint32_t {
   Turquoise    = 0x1abc9c, Emerald   = 0x2ecc71,
@@ -19,31 +23,26 @@ enum class NVTXColor : uint32_t {
 };
 
 class NVTXTracer {
-  std::string name;
+  bool pushed = false;
 
-  void init(char const* name, NVTXColor color) {
+  public:
+  NVTXTracer(const char* name, NVTXColor color) {
+    if (!hapiNvtxOn) return;
     nvtxEventAttributes_t eventAttrib;
+    memset(&eventAttrib, 0, sizeof eventAttrib);
     eventAttrib.version = NVTX_VERSION;
     eventAttrib.size = NVTX_EVENT_ATTRIB_STRUCT_SIZE;
     eventAttrib.colorType = NVTX_COLOR_ARGB;
     using et = typename std::underlying_type<NVTXColor>::type;
-    eventAttrib.color = static_cast<et>(color);
+    eventAttrib.color = 0xff000000u | static_cast<et>(color);
     eventAttrib.messageType = NVTX_MESSAGE_TYPE_ASCII;
     eventAttrib.message.ascii = name;
     nvtxRangePushEx(&eventAttrib);
-  }
-
-  public:
-  NVTXTracer(std::string name, NVTXColor color) : name{std::move(name)} {
-    init(this->name.c_str(), color);
-  }
-
-  NVTXTracer(const char* name, NVTXColor color) {
-    init(name, color);
+    pushed = true;
   }
 
   ~NVTXTracer() {
-    nvtxRangePop();
+    if (pushed) nvtxRangePop();
   }
 };
 
