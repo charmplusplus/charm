@@ -34,6 +34,10 @@
 //        -m <migration period in steps, default 10; 0 disables migration>
 //        -c <elements migrated per event, default 1>
 //        -S <seed, default 42>  -v (verbose)
+//        -u (unbounded array: created with CkArrayOptions() and no bounds,
+//            elements inserted dynamically from main, so element ids are
+//            hashed-kind, minted from a per-process tranche, instead of
+//            packed-kind; see doc/objid64-design.md)
 //        -w <watchdog stall threshold seconds, default 5; 0 disables --
 //            use 0 for +record/+replay runs so no timer-driven messages
 //            perturb the recorded order>
@@ -57,6 +61,7 @@
 /*readonly*/ int gSeed;
 /*readonly*/ int verbose;
 /*readonly*/ int useP2P;
+/*readonly*/ int unbounded;
 
 // splitmix64: deterministic, replicated on every PE -- no state to pup.
 static inline unsigned long long mix64(unsigned long long z) {
@@ -109,6 +114,7 @@ public:
     CmiGetArgInt(m->argv, "-w", &wdSecs);
     if (CmiGetArgFlag(m->argv, "-v")) verbose = 1;
     useP2P = CmiGetArgFlag(m->argv, "-B") ? 1 : 0;
+    unbounded = CmiGetArgFlag(m->argv, "-u") ? 1 : 0;
     delete m;
     CkEnforce(nElems >= 3);  // ring with distinct left/right neighbors
     CkEnforce(nSteps >= 1);
@@ -117,14 +123,22 @@ public:
       migPeriod = 0;
     }
     CkPrintf("bcastred: %d PEs, %d processes, %d elements, %d steps, "
-             "migration every %d steps x %d elements, seed %d\n",
+             "migration every %d steps x %d elements, seed %d%s\n",
              CkNumPes(), CkNumNodes(), nElems, nSteps, migPeriod,
-             migPerEvent, gSeed);
+             migPerEvent, gSeed,
+             unbounded ? ", unbounded array (hashed ids)" : "");
     if (useP2P)
       CkPrintf("bcastred: -B set, per-step notification is p2p, not broadcast "
                "(for +record/+replay, which crash on array broadcasts: #3940)\n");
     mainProxy = thisProxy;
-    elemProxy = CProxy_Elem::ckNew(nElems);
+    if (unbounded) {
+      // No bounds, no initial size: the hashed id kind. Insert from main.
+      elemProxy = CProxy_Elem::ckNew(CkArrayOptions());
+      for (int i = 0; i < nElems; i++) elemProxy[i].insert(i % CkNumPes());
+      elemProxy.doneInserting();
+    } else {
+      elemProxy = CProxy_Elem::ckNew(nElems);
+    }
     t0 = CkWallTimer();
     lastAdvance = t0;
     if (wdSecs > 0) CcdCallFnAfter(watchdogFire, NULL, 2000);
