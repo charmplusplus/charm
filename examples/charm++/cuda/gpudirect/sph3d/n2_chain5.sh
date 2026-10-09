@@ -6,6 +6,11 @@ XF="+LBMetisMinGain 0.03 +LBMetisMaxCutRise 0.1"
 echo "chain5 start $(date +%T) on $(squeue -j $JID -h -o %N)"
 DIFF_FLAGS= LBF=100 LBB=100 LBLAG=50 XFLAGS="$XF" TAGPFX=c5 $D/n2_final2.sh $JID "8 4 8" 2000 none syncT asyncT syncT asyncT
 DIFF_FLAGS= LBF=100 LBB=100 LBLAG=90 XFLAGS="$XF" TAGPFX=c5lag90 $D/n2_final2.sh $JID "8 4 8" 2000 asyncT asyncT
+# idea 2: async at its own best period (25, lag 10) vs sync at 25; idea 3: async with a 10-step window at period 100
+DIFF_FLAGS= LBF=25 LBB=25 LBLAG=10 XFLAGS="$XF" TAGPFX=c5p25 $D/n2_final2.sh $JID "8 4 8" 2000 asyncT asyncT syncT
+DIFF_FLAGS= LBF=100 LBB=100 LBLAG=10 XFLAGS="$XF" TAGPFX=c5lag10 $D/n2_final2.sh $JID "8 4 8" 2000 asyncT
+# paced migration: the runtime's migrate window (CkMigrateWindow) capped at one move in flight per PE, async x2 and sync x1
+CHARM_LB_MIGRATE_WINDOW=1 DIFF_FLAGS= LBF=100 LBB=100 LBLAG=50 XFLAGS="$XF" TAGPFX=c5win1 $D/n2_final2.sh $JID "8 4 8" 2000 asyncT asyncT syncT
 echo "98M set done $(date +%T) node time $(squeue -j $JID -h -o %M)"
 SPH_HOST_PROFILE=1 DIFF_FLAGS= LBF=100 LBB=100 LBLAG=50 XFLAGS="$XF" TAGPFX=c5prof $D/n2_final2.sh $JID "8 4 8" 1000 syncT asyncT
 echo "profile pair done $(date +%T)"
