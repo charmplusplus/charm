@@ -2322,6 +2322,10 @@ void StartCharmExt(int argc, char **argv) {
     strcpy(ext_args[i].data(), argv[i]);
     ext_argv[i] = ext_args[i].data();
   }
+#if CMK_TRACE_ENABLED && CMK_RECONVERSE
+  /* Same hand-off as charm_main: reconverse's ConverseInit invokes it. */
+  registerTraceInit(traceInit);
+#endif
   ConverseInit(argc, ext_argv.data(), _initCharm, 0, 0);
 }
 
