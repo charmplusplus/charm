@@ -34,6 +34,20 @@ static void lbinit()
   LBTurnCommOn();
 }
 
+// +LBMetisHostTight: hold the host dimension to 1.1 of its even spread, as a
+// level-one constraint and in the repair after level two, instead of letting a
+// PE's host time grow to the device bound. Measured 2026-10-08 on sph3d at 2
+// nodes: the step followed the busiest PE's host time (42 ms at 1.4 s per
+// interval, 55 ms at 3.5 s) while the device bound stayed at 3.3; the 1.1/alpha
+// tolerance (1.70) and the (1+eps)*device limit (3.6) both let that PE through.
+static bool metisHostTight()
+{
+  static int on = -1;
+  if (on < 0)
+    on = CmiGetArgFlagDesc(CkGetArgv(), "+LBMetisHostTight",
+                           "MetisLB: host dimension within 1.1 of its even spread") ? 1 : 0;
+  return on == 1;
+}
 static bool metisRemapOn();
 static double metisMinGain();
 static double metisMaxCutRise();
@@ -294,7 +308,7 @@ void MetisLB::work(LDStats* stats)
     {
       slackIdx = nConstraints++;
       slackAlpha = ogr->deviceDim ? crit.alphaHost() : crit.alphaDev();
-      slackUbvec = std::max(1.1, 1.1 / std::max(slackAlpha, 1e-6));
+      slackUbvec = metisHostTight() ? 1.1 : std::max(1.1, 1.1 / std::max(slackAlpha, 1e-6));
       if (_lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
         CkPrintf("[%d] MetisLB: %s dimension carried as constraint %d, tolerance %.2f "
                  "(alpha %.2f)\n",
@@ -1245,7 +1259,12 @@ void MetisLB::work(LDStats* stats)
       slackEven = std::max(slackEven, gMax);
     }
     const double eps = 0.1;
-    const double limit = std::max(target, slackEven) * (1.0 + eps);
+    // The binding dimension may not rise past its achieved max; the slack
+    // dimension, with +LBMetisHostTight, not past its own even spread --
+    // otherwise (the default) the two share one limit and the slack one is
+    // allowed up to the binding bound.
+    const double limitBind = std::max(target, slackEven) * (1.0 + eps);
+    const double limit = (metisHostTight() && devBinds) ? slackEven * (1.0 + eps) : limitBind;
 
     int repaired = 0;
     bool stuck = false;
@@ -1295,7 +1314,7 @@ void MetisLB::work(LDStats* stats)
           const double devAfter = grpDev[g] + devOf(obj);
           const double bindAfter = devBinds ? devAfter : hostAfter;
           const double slackAfter = devBinds ? hostAfter : devAfter;
-          if (bindAfter > limit) continue;
+          if (bindAfter > limitBind) continue;
           if (slackAfter < bestAfter) { bestAfter = slackAfter; bestG = (int)g; bestPe = pe; }
         }
         if (bestG < 0) { stuck = true; break; }
