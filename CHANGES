@@ -1,6 +1,125 @@
 This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 ================================================================================
+What's new in Charm++ 8.1.0
+================================================================================
+
+This is the final release of the classic Converse line of Charm++.
+After this release the 'main' branch of the repository is renamed
+'classic' and receives bug fixes only. New development, including all
+future releases, continues on the reconverse-based line of Charm++,
+which becomes the repository's default branch; see README.md and the
+repository page (https://github.com/charmplusplus/charm) for details.
+Releases 8.0.1 and 8.0.2 were tagged without entries in this file, so
+this section covers all changes since 8.0.0.
+
+Highlights:
+
+New features and APIs:
+
+- CkTreeCacheManager, a new class in ck-libs/cache beside
+  CkCacheManager: it keeps CkCache's request/reply protocol but stores
+  fetched tree nodes once per process instead of once per PE. CkCache's
+  request/reply counters are now always compiled in, not only under
+  COSMO_STATS (#4013).
+
+- Summary tracing with +sumDetail now records the message bytes
+  delivered to each entry method in each interval, as a new
+  MsgBytesPerEPperInterval line in the .sumd file. Older versions of
+  Projections ignore the new line (#3937).
+
+- New allGather library (ring, hypercube and flooding algorithms),
+  built by default; link with -lmoduleallGather (#3886).
+
+- [whenidle] entry methods no longer receive a time argument: the
+  generated code calls the method, and CkIndex_X::method(), with no
+  arguments, matching the .ci declaration (#3820).
+
+- Collide: the collision manager and serial client groups are now
+  migratable, and the new CollideSerialClientRestart() reinstalls the
+  client function after a checkpoint restart (#3921).
+
+- CMK_GLOBAL_LOCATION_UPDATE uses the location-cache API; with it,
+  migrations must happen at load balancing steps, not by anytime
+  migration (#3919).
+
+- Charm4py support: Projections tracing (#3880), CCS (#3885), and
+  hapiAddCallback (#3852, #3889, #3894).
+
+- New verbs-linux-arm8 port (#3837).
+
+- New Converse benchmarks: send to self (#3891) and ping_ack (#3906).
+
+Bug fixes:
+
+- Fixed a reduction hang when anytime migration leaves a PE with no
+  contribution owed for the current round (#3942).
+
+- Record-replay (+record/+replay) repairs: no crash on array
+  broadcasts, no replay stall on SMP broadcasts, durable per-record
+  logs, and truncated logs treated as the end of the recording (#3943).
+
+- [threaded, nokeep] entry methods no longer use their message after
+  it is freed (#4001).
+
+- Array broadcasts to entry methods without [nokeep] that carry a
+  message with custom pack/unpack no longer use freed memory (#4003).
+
+- Builds with error checking abort, naming the entry method, when a
+  [nokeep] entry method frees its message (#4007).
+
+- Isomalloc probes free address space without unmapping live memory,
+  which crashed Charm++ programs intermittently on macOS 26 (#3996).
+
+- macOS SMP worker threads get the main thread's stack size, fixing
+  SIGBUS crashes (#3927).
+
+- hapiPollEvents() aborts with a message on a CUDA error instead of
+  hanging (#3938).
+
+- Checkpoint/restart sets the group and node group counts correctly in
+  CkPupPerPlaceData() (#3899).
+
+- Less lock contention in CsdNextMessage() with many threads per
+  process (#3916); ucx-linux-arm8 keeps the previous scheme through the
+  new CMK_NODE_QUEUE_LOCK_BEFORE_CHECK option (#3928).
+
+- OFI: builds against libfabric 2.x on Frontier (#3929); improved CXI
+  defaults for ALCF Aurora (#3855).
+
+- Build fixes: CMI-SHMEM (#3909), Cray PMI headers (#3887), CMake
+  builds with CUDA (#3836), pamilrts (#3829), CentralLB (#3874), and
+  allGather on Windows (#3907).
+
+Build and CI:
+
+- CMake 3.12 or newer is required (#3882).
+
+- AMPI no longer builds ROMIO by default, because the port is
+  incompatible with GCC 14 and later; add --with-romio to enable
+  MPI-IO (#3871).
+
+- Continuous integration: ARM64 Linux jobs moved to GitHub Actions and
+  CircleCI retired (#3946); documentation-only pull requests skip the
+  build/test matrix (#3932, #3992); actions upgraded off the deprecated
+  Node 20 runtime (#3952); runner and Spack job updates (#3871, #3873,
+  #3875, #3881, #3896, #3897, #3912, #3917).
+
+Documentation:
+
+- What [nokeep] means for marshalled, message and threaded entry
+  methods, and what error-checking builds detect (#4005, #4011).
+
+- Creation ordering for array maps, and declaring a map as a creation
+  dependence of its array (#3931).
+
+- Reductions in groups and node groups (#3883); global location update
+  (#3919); zero-copy links (#3830); LiveViz paths (#3895).
+
+- Example and benchmark fixes: pingpong_multipairs timing (#3902),
+  Molecular2D uses std::vector (#3835), periodic test (#3841, #3844).
+
+================================================================================
 What's new in Charm++ 8.0.0
 ================================================================================
 

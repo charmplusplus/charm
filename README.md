@@ -1,6 +1,5 @@
 # Charm++
 
-[![Build Status](https://travis-ci.org/charmplusplus/charm.svg?branch=main)](https://travis-ci.org/charmplusplus/charm)
 [![Documentation Status](https://readthedocs.org/projects/charm/badge/?version=latest)](https://charm.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3370873.svg)](https://doi.org/10.5281/zenodo.3370873)
 
@@ -335,7 +334,7 @@ binaries and takes much less linking time.
 The recommended way to contribute to Charm++ development is to open a pull request (PR) on GitHub.
 To open a pull request, create a fork of the Charm++ repo in your own space
 (if you already have a fork, make sure is it up-to-date), and then create a new branch off of the
-`main` branch.
+branch you are contributing to (the repository's default branch for new development, or `classic` for fixes to the classic line).
 
 GitHub provides a detailed tutorial on creating pull requests 
 (https://docs.github.com/en/pull-requests/collaborating-with-pull-requests). 
