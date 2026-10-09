@@ -156,7 +156,7 @@ public:
 	bool isExtCallback = false;
 #endif
 
-	bool operator==(CkCallback & other){
+	bool operator==(const CkCallback & other) const {
 	  if(type != other.type)
 	    return false;
 	  switch (type) {
