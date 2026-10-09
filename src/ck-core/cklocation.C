@@ -87,10 +87,21 @@ int _messageBufferingThreshold;
 #if CMK_LBDB_ON
 
 #  if CMK_GLOBAL_LOCATION_UPDATE
-// Called by the load balancer on every PE for each migration it decided. The
-// location itself is broadcast by the emigrating PE (CkLocMgr::emigrate) with the
-// element's true epoch, which this PE cannot know, so there is nothing to do here.
-void UpdateLocation(MigrateInfo& migData) {}
+// Called by the load balancer on every PE but the source, for each migration it
+// decided, before the move is acted on (CentralLB::ReceiveMigration): from here on
+// this PE addresses the element at its destination, so no message takes an extra
+// hop (which CkLocMgr::multiHop asserts against in this mode). Keyed by id: the
+// index is not recoverable on a PE that has never seen a hashed-kind element, and
+// is not needed.
+void UpdateLocation(MigrateInfo& migData)
+{
+  const ck::ObjID oid(migData.obj.id);
+  const CkGroupID locMgrGid = oid.getCollectionID();
+  if (locMgrGid.idx == 0)
+    return;
+  CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(locMgrGid);
+  mgr->updateLocationFromLB(oid.getElementID(), migData.to_pe);
+}
 #  endif
 
 #endif
@@ -2344,8 +2355,19 @@ static int ceilLog2(CmiUInt8 n)
 
 const Layout& getLayout() { return CksvAccess(_objidLayout); }
 
+// Precedes the layout in a checkpoint, so that a checkpoint written without one
+// (by a build before the 64-bit object id redesign) fails here, not by misreading
+// what follows as readonly messages.
+static const int LAYOUT_MARKER = 0x4F424A31;  // "OBJ1"
+
 void pupLayout(PUP::er& p)
 {
+  int marker = LAYOUT_MARKER;
+  p | marker;
+  if (p.isUnpacking() && marker != LAYOUT_MARKER)
+    CkAbort("Checkpoint has no object id layout record (written by a Charm++ build"
+            " before the 64-bit object id redesign, or corrupt); this build cannot"
+            " restore it.\n");
   if (p.isUnpacking())
   {
     Layout restored;
@@ -2373,12 +2395,9 @@ void initLayout(int expandFactor)
   if (keyBits > 24) keyBits = 24;
   l.keyBits = keyBits;
   l.uniqueBits = ObjID::bits::PAYLOAD_BITS - keyBits;
-  if (l.uniqueBits < 16)
-    CkAbort("Object id layout: %d processes x expand factor %d need %d home key bits,"
-            " leaving %d unique bits of the %d-bit payload (minimum 16). Lower"
-            " +objid_expand or rebuild with fewer -DCMK_OBJID_COLLECTION_BITS.\n",
-            CkNumNodes(), expandFactor, keyBits, l.uniqueBits,
-            (int)ObjID::bits::PAYLOAD_BITS);
+  // A layout too narrow for hashed ids is rejected when the first hashed-kind array
+  // asks for a tranche (CkLocMgr::getTranche), not here: a run with only packed
+  // arrays never needs the unique bits.
 }
 
 static inline CmiUInt8 mix64(CmiUInt8 z)
@@ -2426,6 +2445,14 @@ ck::objid::Tranche* CkLocMgr::getTranche()
   if (itr == table->end())
   {
     const ck::objid::Layout& l = ck::objid::getLayout();
+    if (l.uniqueBits < 16)
+      CkAbort("Object id layout: %d processes x expand factor %d need %d home key bits,"
+              " leaving %d unique bits of the %d-bit payload (minimum 16) for chare"
+              " array %d, whose index is not packed into ids. Lower +objid_expand,"
+              " give the array bounds, or rebuild with fewer"
+              " -DCMK_OBJID_COLLECTION_BITS.\n",
+              l.nodesAtLaunch, l.expandFactor, l.keyBits, l.uniqueBits,
+              (int)ck::ObjID::bits::PAYLOAD_BITS, thisgroup.idx);
     const CmiUInt8 size = initialTrancheSize(l);
     const CmiUInt8 begin = (CmiUInt8)CkMyNode() * size;
     itr = table->emplace(thisgroup.idx, new ck::objid::Tranche(begin, begin + size)).first;
@@ -2619,11 +2646,18 @@ void CkLocMgr::pup(PUP::er& p)
     if (compressor == nullptr)
     {
       const ck::objid::Layout& l = ck::objid::getLayout();
-      if (CkNumNodes() != l.nodesAtLaunch || packedByNode != CkMyNode())
+      if (CkNumNodes() != l.nodesAtLaunch)
         CkAbort("Restarting with a different process count (%d, launched with %d) is"
                 " not yet supported for chare array %d, whose index is not packed"
                 " into element ids (the tranche allocator is a later change).\n",
                 CkNumNodes(), l.nodesAtLaunch, thisgroup.idx);
+      if (packedByNode != CkMyNode())
+        CkAbort("Restarting with a different number of PEs per process is not yet"
+                " supported for chare array %d, whose index is not packed into"
+                " element ids: this branch was checkpointed by process %d and is"
+                " being restored on process %d (the tranche allocator is a later"
+                " change).\n",
+                thisgroup.idx, packedByNode, CkMyNode());
       if (CkMyRank() == 0)
       {
         ck::objid::Tranche* t = getTranche();
@@ -2844,20 +2878,69 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
   CkAssert(peToTell != CkMyPe());
 
   CmiUInt8 id;
-  if (lookupID(idx, id))
+  if (lookupID(idx, id) && cache->getPe(id) != -1)
   {
-    // We found the ID so update the location for peToTell
+    // We know the id and where it lives: answer now.
     thisProxy[peToTell].updateLocation(idx, cache->getLocationEntry(id));
     return true;
   }
-  else
-  {
-    // We don't know the ID so buffer the location request
-    DEBN(("%d Buffering ID/location req for %s\n", CkMyPe(), idx2str(idx)));
-    bufferedLocationRequests[idx].push_back(peToTell);
-    return false;
-  }
+  // Either the index has no id yet (hashed kind: the element was never created), or
+  // the id is known but its location is not (packed kind, whose ids exist before
+  // the element does; or an element deleted since, whose idx -> id binding is
+  // kept). Answering with the null entry would teach peToTell a location of -1 and
+  // an id of 0, so hold the request: updateLocation answers it once the element
+  // registers here.
+  DEBN(("%d Buffering ID/location req for %s\n", CkMyPe(), idx2str(idx)));
+  bufferedLocationRequests[idx].push_back(peToTell);
+  return false;
 }
+
+bool CkLocMgr::recoverIndex(CmiUInt8 id, CkArrayIndex& idx, bool scanAtHome) const
+{
+  if (compressor)
+  {
+    idx = compressor->decompress(id);
+    return true;
+  }
+  if (CkLocRec* rec = elementNrec(id))
+  {
+    idx = rec->getIndex();
+    return true;
+  }
+  if (!scanAtHome || homePe(id) != CkMyPe())
+    return false;
+  // Hashed kind, at the home, no record: the element was deleted (reclaimRemote
+  // keeps the home's idx -> id binding for exactly this reason) or never existed
+  // here. A linear scan, acceptable because only the demand creation of a deleted
+  // element reaches it; delivery never does (design section 3.4).
+  for (const auto& kv : idx2id)
+    if (kv.second == id)
+    {
+      idx = kv.first;
+      return true;
+    }
+  return false;
+}
+
+#if CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
+void CkLocMgr::updateLocationFromLB(CmiUInt8 id, int pe)
+{
+  CkLocEntry e;
+  e.id = id;
+  e.pe = pe;
+  // The balancer's decision does not carry the element's epoch. Count this
+  // migration from what this PE last heard (a bystander that never heard of the
+  // element starts at 0): that is at most the element's true epoch after the move
+  // (design section 4.2a), so the destination's insert and the emigrating PE's
+  // broadcast, which carry the true epoch, still apply over this entry.
+  e.epoch = cache->getEpoch(id) + 1;
+  CkArrayIndex idx;
+  if (recoverIndex(id, idx, false))
+    updateLocation(idx, e);  // also binds idx -> id and fires the index listeners
+  else
+    cache->updateLocation(e);
+}
+#endif
 
 void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
 {
@@ -3240,9 +3323,13 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   informHome(idx, toPe);
 
 #if CMK_GLOBAL_LOCATION_UPDATE
-  // Every PE learns the new location with the element's true epoch (the entry
-  // recordEmigration just advanced), so no cache can be overwritten by an older
-  // reply. The home was told above and ignores the duplicate by epoch.
+  // Every PE already recorded this move before it was acted on (UpdateLocation,
+  // from the balancer's decision), with an epoch counted from its own cache. This
+  // broadcast carries the element's true epoch (the entry recordEmigration just
+  // advanced), so a bystander whose count fell short cannot have the entry
+  // overwritten by an older reply still in flight. The home was told above and
+  // ignores the duplicate by epoch. Cost: one group broadcast per migration, in
+  // this build mode only.
   DEBM((AA "Global location update. idx %s assigned to %d \n" AB, idx2str(idx), toPe));
   thisProxy.updateLocation(idx, cache->getLocationEntry(id));
 #endif
