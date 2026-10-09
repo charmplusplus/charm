@@ -33,6 +33,14 @@ struct Particle {
 #define ADV_ACTIVE 1
 #define ADV_FLUID  2
 #define ADV_ANY    1
+// Bits 4-7 of an advertisement carry the quiet level: for how many steps
+// after the one it describes the patch can prove it will not be active
+// (sph3d.C sendLeavers). Two quiet ends skip that many of the empty
+// migration messages that would only have carried advertisements.
+#define ADV_LEVEL_SHIFT 4
+#define ADV_LEVEL_CAP   14
+#define ADV_LEVEL(a)    (((a) >> ADV_LEVEL_SHIFT) & 15)
+#define ADV_RING        16   // advertisement slots per direction, by step
 
 #define PTYPE_FLUID 0
 #define PTYPE_BOUND 1

@@ -9,6 +9,7 @@
 #include <malloc.h>
 #include <cstdio>
 #include <cstdlib>
+#include <cstdint>
 #include <unistd.h>
 
 // A 3D port of sph2d.C. The runtime machinery -- submitter queue, stream-less
@@ -416,6 +417,7 @@ public:
     const unsigned long long n_bd    = *(unsigned long long*)t[10].data;
     const long escaped = *(long*)t[11].data;
     const long n_active = *(long*)t[12].data;
+    const long n_skipped = *(long*)t[13].data;
     delete[] t;
     delete msg;
 
@@ -441,10 +443,10 @@ public:
       const double now = CkWallTimer() - start_time;
       CkPrintf("  step %6d: rho %.2f  KE %.4e  |v|max %.3f  front x %.3f  "
                "particle imbalance (max/avg) %.2f  active %ld/%ld  [check ok]  "
-               "wall %.1f s, %.1f ms/step over the last %d\n",
+               "wall %.1f s, %.1f ms/step over the last %d  quiet-skipped %ld msgs\n",
                step, sum_rho / n_fluid, sum_ke * pmass, vmax, front, imb,
                n_active, n_patches, now, (now - last_report_t) * 1000.0 / stats_freq,
-               stats_freq);
+               stats_freq, n_skipped);
       last_report_t = now;
     }
     stat_count++;
@@ -521,7 +523,11 @@ class Patch : public CBase_Patch {
   // ---- activity (see sph2d.C) ---------------------------------------------
   int n_fluid;
   int my_adv, my_adv_next;
-  int nbr_adv[NUM_DIRS][2];
+  int nbr_adv[NUM_DIRS][ADV_RING];  // advertisement for step t in slot t % ADV_RING
+  int xchg_step[NUM_DIRS];          // last step the migration message crossed this edge
+  int xchg_min[NUM_DIRS];           // min quiet level of its two ends for the step after
+  int my_level_next;                // quiet level advertised for the next step
+  long n_skipped;                   // migration messages not sent over quiet edges
   bool step_active;
   bool halo_peer[NUM_DIRS];
   int n_valid;
@@ -645,6 +651,8 @@ public:
     lb_waiting = false; lb_start_iter = 0; escaped = 0;
     n_fluid = 0; step_active = false; n_expect = 0; n_expect_mig = 0;
     my_adv = my_adv_next = 0;
+    my_level_next = 0; n_skipped = 0;
+    for (int d = 0; d < NUM_DIRS; d++) { xchg_step[d] = 0; xchg_min[d] = 0; }
     ghost_alloc = 0; halo_open = pc_open = false;
     rebuild_step = migrate_step = pc_step = pc_pending = false;
     cells_valid = false;
@@ -788,7 +796,10 @@ public:
     p | escaped;
     p | n_fluid; p | step_active; p | n_valid; p | n_expect; p | n_expect_mig;
     p | my_adv; p | my_adv_next;
-    for (int d = 0; d < NUM_DIRS; d++) PUParray(p, nbr_adv[d], 2);
+    for (int d = 0; d < NUM_DIRS; d++) PUParray(p, nbr_adv[d], ADV_RING);
+    PUParray(p, xchg_step, NUM_DIRS);
+    PUParray(p, xchg_min, NUM_DIRS);
+    p | my_level_next; p | n_skipped;
     PUParray(p, halo_peer, NUM_DIRS);
     PUParray(p, rebuild_peer, NUM_DIRS);
     PUParray(p, ghost_off, NUM_DIRS);
@@ -1026,14 +1037,37 @@ public:
   void seedActivity() {
     for (int d = 0; d < NUM_DIRS; d++) {
       const int nx = x + dirSX(d), ny = y + dirSY(d), nz = z + dirSZ(d);
-      nbr_adv[d][0] = nbr_adv[d][1] = !valid_dir[d] ? 0
+      const int seed = !valid_dir[d] ? 0
           : ((activeAtStart(nx, ny, nz) ? ADV_ACTIVE : 0) |
              (siteMask(nx, ny, nz) & ADV_FLUID));
+      for (int s = 0; s < ADV_RING; s++) nbr_adv[d][s] = seed;
     }
     my_adv = my_adv_next =
         (activeAtStart(x, y, z) ? ADV_ACTIVE : 0) | (n_fluid > 0 ? ADV_FLUID : 0);
   }
-  int nbrAdv(int d, int t) const { return nbr_adv[d][t & 1]; }
+  // The advertisement a neighbour made for step t. On an edge that skipped
+  // step t-1 none was sent: both ends had proven they are inactive at t and
+  // t+1 (quiet levels), which is exactly an all-zero advertisement.
+  int nbrAdv(int d, int t) const {
+    return (xchg_step[d] == t - 1) ? nbr_adv[d][t % ADV_RING] : 0;
+  }
+  // A lower bound on the neighbour's quiet level for step t: its own word
+  // when one arrived, otherwise the edge's level at the last exchange, less
+  // the steps since (a guarantee shortens by one step per step).
+  int nbrLevel(int d, int t) const {
+    return (xchg_step[d] == t - 1) ? ADV_LEVEL(nbr_adv[d][t % ADV_RING])
+                                   : std::max(0, xchg_min[d] - (t - xchg_step[d] - 1));
+  }
+  bool anyNbrAdvActive(int t) const {
+    for (int d = 0; d < NUM_DIRS; d++)
+      if (valid_dir[d] && (nbrAdv(d, t) & ADV_ACTIVE)) return true;
+    return false;
+  }
+  // Both ends computed the same level at their last exchange, so both skip
+  // the same steps; the message resumes one step past the guarantee.
+  bool edgeSkips(int d, int t) const {
+    return valid_dir[d] && t > xchg_step[d] && t - xchg_step[d] <= xchg_min[d];
+  }
   bool anyNbrAdvFluid(int t) const {
     for (int d = 0; d < NUM_DIRS; d++)
       if (valid_dir[d] && (nbrAdv(d, t) & ADV_FLUID)) return true;
@@ -1091,7 +1125,9 @@ public:
     step_active = (my_adv & ADV_ACTIVE) != 0;
     pc_step = (integrator == 1) && step_active;
     n_expect = 0;
-    n_expect_mig = n_valid;
+    n_expect_mig = 0;
+    for (int d = 0; d < NUM_DIRS; d++)
+      if (valid_dir[d] && !edgeSkips(d, my_iter)) n_expect_mig++;
     for (int d = 0; d < NUM_DIRS; d++) {
       halo_peer[d] = valid_dir[d] && step_active &&
           (nbrAdv(d, my_iter) & ADV_ACTIVE);
@@ -1176,7 +1212,7 @@ public:
       thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveHalo(my_iter, flipDir(d), cnt, cnt,
           (outstanding_sends++, sphSendBuffer(
            d_send_halo + dirOffset(d, exch_capacity),
-           CkCallback(CkIndex_Patch::sendDone(), thisProxy[thisIndex]),
+           sendDoneCb(),
            comm_stream)));
     }
   }
@@ -1348,7 +1384,7 @@ public:
       thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveHalo2(my_iter, flipDir(d), cnt, cnt,
           (outstanding_sends++, sphSendBuffer(
            d_send_halo2 + dirOffset(d, exch_capacity),
-           CkCallback(CkIndex_Patch::sendDone(), thisProxy[thisIndex]),
+           sendDoneCb(),
            comm_stream)));
     }
   }
@@ -1433,6 +1469,23 @@ public:
     if (migrate_step) { n_ghost = 0; ghost_alloc = 0; }
     my_adv_next = (n_fluid > 0 ? ADV_FLUID : 0) |
         ((np > 0 && (n_fluid > 0 || anyNbrAdvFluid(my_iter))) ? ADV_ACTIVE : 0);
+    // Quiet level for the next step. Particles only leave an active patch,
+    // and a patch is active only when it holds fluid or a neighbour held
+    // fluid the step before; so a patch that is inactive next step with no
+    // active neighbour now stays inactive for one step more than the least
+    // quiet of its neighbours. Over such a step the only thing a migration
+    // message would carry is an all-zero advertisement, and both ends know
+    // it, so neither sends (edgeSkips). SPH_NO_QUIET_SKIP=1 restores the
+    // message on every edge every step.
+    static const bool quiet_skip = (getenv("SPH_NO_QUIET_SKIP") == nullptr);
+    my_level_next = 0;
+    if (quiet_skip && !(my_adv_next & ADV_ACTIVE) && !anyNbrAdvActive(my_iter)) {
+      int lo = ADV_LEVEL_CAP;
+      for (int d = 0; d < NUM_DIRS; d++)
+        if (valid_dir[d]) lo = std::min(lo, nbrLevel(d, my_iter));
+      my_level_next = std::min(ADV_LEVEL_CAP, 1 + lo);
+    }
+    const int adv_out = my_adv_next | (my_level_next << ADV_LEVEL_SHIFT);
 
     for (int d = 0; d < NUM_DIRS; d++) {
       if (d == STAY) continue;
@@ -1444,24 +1497,35 @@ public:
         cnt = 0;
         continue;
       }
+      if (edgeSkips(d, my_iter)) {
+        if (cnt > 0)
+          CkAbort("Patch (%d,%d,%d) step %d: %d particle(s) bound for a quiet "
+                  "edge (direction %d); the quiet-level proof is broken\n",
+                  x, y, z, my_iter, cnt, d);
+        n_skipped++;
+        continue;
+      }
       n_fluid -= cnt;   // every leaver is fluid
-      // Sent every step, empty inside a window: the advertisement rides on it.
+      // Sent every step the edge is not quiet, empty inside a window: the
+      // advertisement rides on it.
       thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveParticles(my_iter, flipDir(d),
-          my_adv_next, cnt, cnt,
+          adv_out, cnt, cnt,
           (outstanding_sends++, sphSendBuffer(
            d_send_mig + dirOffset(d, exch_capacity),
-           CkCallback(CkIndex_Patch::sendDone(), thisProxy[thisIndex]),
+           sendDoneCb(),
            comm_stream)));
     }
   }
 
   void receiveParticles(int ref, int dir, int adv, int n, int& m,
       Particle*& parts, CkDeviceBufferPost* devicePost) {
-    if (ref > my_iter + 1)
+    // A partner can run ahead only over a quiet edge, by at most its level;
+    // such a message is empty, and its advertisement has a slot of its own.
+    if (ref > my_iter + ADV_LEVEL_CAP)
       CkAbort("Patch (%d,%d,%d) at step %d: migration from step %d -- a partner "
-              "ran more than one step ahead, which the two advertisement slots "
-              "assume cannot happen\n", x, y, z, my_iter, ref);
-    nbr_adv[dir][(ref + 1) & 1] = adv;
+              "ran more than %d steps ahead, beyond the advertisement ring\n",
+              x, y, z, my_iter, ref, ADV_LEVEL_CAP);
+    nbr_adv[dir][(ref + 1) % ADV_RING] = adv;
     // Slot by the SENDER's step parity (see sph2d.C receiveParticles).
     parts = d_recv_mig + (size_t)(ref & 1) * exchSlots(exch_capacity) +
             dirOffset(dir, exch_capacity);
@@ -1470,6 +1534,11 @@ public:
 
   void appendParticles(int ref, int dir, int n) {
     parts_arrived[my_iter]++;
+    // Both ends now hold each other's advertisement for the next step and
+    // compute the same skip count for this edge (see edgeSkips).
+    xchg_step[dir] = my_iter;
+    xchg_min[dir] = std::min(my_level_next,
+                             ADV_LEVEL(nbr_adv[dir][(my_iter + 1) % ADV_RING]));
     if (n == 0) return;
     if (np + n > part_capacity)
       CkAbort("Patch (%d,%d,%d): %d particles exceed capacity %d at step %d; "
@@ -1489,6 +1558,26 @@ public:
     } else {
       draining = true;
     }
+  }
+
+  // A send's completion runs this on the sending PE, in the scheduler between
+  // entry methods, instead of posting a sendDone message the scheduler would
+  // deliver later. The patch is found by index: it may have migrated with the
+  // send in flight (the async window packs mid-step), and then the message
+  // route is kept.
+  static void* sendDoneParam(int px, int py, int pz) {
+    return (void*)(uintptr_t)(((uint64_t)px << 40) | ((uint64_t)py << 20) | (uint64_t)pz);
+  }
+  static void sendDoneFn(void* param, void*) {
+    const uint64_t v = (uint64_t)(uintptr_t)param;
+    const int px = (int)(v >> 40), py = (int)((v >> 20) & 0xfffff), pz = (int)(v & 0xfffff);
+    if (Patch* p = patch_proxy(px, py, pz).ckLocal()) p->sendDone();
+    else patch_proxy(px, py, pz).sendDone();
+  }
+  CkCallback sendDoneCb() const {
+    static const bool by_msg = (getenv("SPH_SENDDONE_MSG") != nullptr);  // A/B: the old route
+    if (by_msg) return CkCallback(CkIndex_Patch::sendDone(), thisProxy[thisIndex]);
+    return CkCallback(&Patch::sendDoneFn, sendDoneParam(x, y, z));
   }
 
   void sendDone() {
@@ -1539,9 +1628,10 @@ public:
         CkReduction::tupleElement(sizeof(unsigned long long), &n_bd,
             CkReduction::sum_ulong_long),
         CkReduction::tupleElement(sizeof(long), &esc, CkReduction::sum_long),
-        CkReduction::tupleElement(sizeof(long), &n_active, CkReduction::sum_long)};
+        CkReduction::tupleElement(sizeof(long), &n_active, CkReduction::sum_long),
+        CkReduction::tupleElement(sizeof(long), &n_skipped, CkReduction::sum_long)};
     if (reporting) {
-      CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple, 13);
+      CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple, 14);
       msg->setCallback(CkCallback(CkIndex_Main::stepStats(NULL), main_proxy));
       contribute(msg);
     }
