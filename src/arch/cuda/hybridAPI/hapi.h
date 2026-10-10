@@ -615,6 +615,7 @@ bool hapiCuptiTracingActive();
 // subscription, so the balancer's device loads are unaffected (nsys would take it over).
 void hapiTraceStart(const char* dir);
 void hapiTraceStop();
+void hapiTraceCopies(bool on);   // +gputracenocopy: kernels only, no memcpy/memset records (cheaper, closer to an untraced run)
 uint64_t hapiTraceTimestamp();   // the CUPTI clock, the time base of every record
 #else
 class hapiCuptiKernelTagScope {
@@ -623,6 +624,7 @@ class hapiCuptiKernelTagScope {
 };
 static inline void hapiTraceStart(const char*) {}
 static inline void hapiTraceStop() {}
+static inline void hapiTraceCopies(bool) {}
 static inline uint64_t hapiTraceTimestamp() { return 0; }
 #endif
 

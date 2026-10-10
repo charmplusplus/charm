@@ -162,6 +162,7 @@ void _nvtxInit(char **argv) {
   const bool noIdle = CmiGetArgFlagDesc(argv, "+nvtxnoidle", "+nvtx / +gputrace without the idle ranges");
   char *dir = nullptr;
   const bool trace = CmiGetArgStringDesc(argv, "+gputrace", &dir, "write the runtime's GPU timeline (CUPTI kernels, entry methods, idle) to this directory; gputrace_merge.py builds the Perfetto trace");
+  const bool noCopy = CmiGetArgFlagDesc(argv, "+gputracenocopy", "+gputrace without memcpy/memset records: kernels only (the copy records are most of the trace's cost)");
   if (!nvtx && !trace) return;
   _nvtxIdleOn = !noIdle;
   if (nvtx) {
@@ -173,11 +174,12 @@ void _nvtxInit(char **argv) {
   if (trace) {
     _gpuTraceDir = strdup(dir);
     mkdir(_gpuTraceDir, 0775);
+    if (noCopy) hapiTraceCopies(false);
   }
   _nvtxOn.store(true);
   if (CkMyPe() == 0) {
     if (nvtx) CmiPrintf("Charm++> NVTX ranges on: entry methods%s, domain \"charm\"\n", noIdle ? "" : " and PE idle time");
-    if (trace) CmiPrintf("Charm++> GPU timeline trace on: entry methods%s and CUPTI kernels to %s\n", noIdle ? "" : ", PE idle time", _gpuTraceDir);
+    if (trace) CmiPrintf("Charm++> GPU timeline trace on: entry methods%s and CUPTI kernels%s to %s\n", noIdle ? "" : ", PE idle time", noCopy ? "" : " and copies", _gpuTraceDir);
   }
 }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""gputrace_merge.py --out trace.json [--last SECONDS | --window T0:T1] [--no-host] <dir>
+"""gputrace_merge.py --out trace.json [--last SECONDS | --window T0:T1] [--no-host] [--idle] <dir>
 
 Join the +gputrace files of one run into one Chrome/Perfetto trace (open at https://ui.perfetto.dev):
   gputrace.<host>.<pid>.proc   the process's CUPTI records: K kernel, M memcpy, S memset, N kernel names,
@@ -8,7 +8,9 @@ Join the +gputrace files of one run into one Chrome/Perfetto trace (open at http
 One process row per rank (ordered by first PE) with a thread per GPU stream and per PE. Every record is on the
 CUPTI clock; the clock pair lines processes on different nodes up to the nodes' clock agreement (NTP).
 --last 1.0 keeps the final second of GPU activity (about 20 sph3d steps), --window is seconds since the
-earliest process start. Kernels carry the array index of the object the runtime attributed them to."""
+earliest process start. Kernels carry the array index of the object the runtime attributed them to.
+A PE row shows only its entry methods: the empty space between them is the PE's idle time. --idle also
+draws the runtime's idle ranges as events (gap_report.py reads them from the files either way)."""
 import argparse, glob, json, os, re, sys
 
 COPY = {0: 'memcpy', 1: 'HtoD', 2: 'DtoH', 3: 'HtoA', 4: 'AtoH', 5: 'AtoA', 6: 'AtoD', 7: 'DtoA', 8: 'DtoD', 9: 'HtoH', 10: 'PtoP'}
@@ -38,6 +40,7 @@ def main():
     ap.add_argument('--last', type=float, default=None, help='keep the last SECONDS of GPU activity')
     ap.add_argument('--window', default=None, help='T0:T1 seconds since the earliest process start')
     ap.add_argument('--no-host', action='store_true', help='GPU rows only')
+    ap.add_argument('--idle', action='store_true', help='also draw the PE idle ranges as events (default: empty space is idle)')
     ap.add_argument('--streams', action='store_true', help='one row per CUDA stream instead of packed concurrency lanes per GPU')
     ap.add_argument('dir')
     a = ap.parse_args()
@@ -158,6 +161,7 @@ def main():
                             if int(idx) >= 0: ev['args'] = {'idx': idx3(idx)}
                             emit(ev); n += 1
                         elif c == 'I':
+                            if not a.idle: continue
                             _, s, e = line.split()
                             s = int(s) + off; e = int(e) + off
                             if not keep(s, e): continue

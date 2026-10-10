@@ -716,10 +716,17 @@ void hapiTraceStop() {
 }
 #endif
 
+#ifdef CMK_LBDB_ON
+static bool g_trace_copies = true;   // +gputracenocopy clears it: kernels only
+void hapiTraceCopies(bool on) { g_trace_copies = on; }
+#else
+void hapiTraceCopies(bool) {}
+#endif
+
 bool hapiCuptiTraceMemcpy() {
   static const bool on = (getenv("CHARM_CUPTI_MEMCPY") != nullptr);
 #ifdef CMK_LBDB_ON
-  if (g_trace != nullptr) return true;   // the +gputrace timeline wants the copies too
+  if (g_trace != nullptr) return g_trace_copies;   // the +gputrace timeline wants the copies too, unless +gputracenocopy
 #endif
   return on;
 }
