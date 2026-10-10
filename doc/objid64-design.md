@@ -184,15 +184,22 @@ text above:
   _nodeLock. At most one spare is held; the request goes out when half of the
   current tranche is used, and again whenever a process is exhausted.
 - The allocator hands out the pool bottom up in powers of two: the requester asks
-  for twice its current tranche; PE 0 clamps between the initial tranche size and
-  region / (8 * processes). A zero-length grant means the pool is spent and the
-  requester aborts with a message naming setBounds, +objid_expand and
-  CMK_OBJID_COLLECTION_BITS.
-- Restart does not wait for grants: the restored layout is marked afterRestart,
-  getTranche then starts empty and sends the request (rank 0 does this from
-  CkLocMgr::pup, so it is usually answered before user code inserts), and any
-  insertion that comes first is simply deferred. Per-process cursors are not
-  checkpointed at all; only the allocator cursor is.
+  for twice its current tranche, or for 2^16 (FIRST_GRANT_LOG2) when it has none;
+  PE 0 clamps between 2^16 and region / (8 * processes). A zero-length grant means
+  the pool is spent and the requester aborts with a message naming setBounds,
+  +objid_expand and CMK_OBJID_COLLECTION_BITS. (Until 2026-10-10 the floor was the
+  launch share, which is 8x the cap, so every grant was the cap and each restart in
+  a chain of restarts spent 1/8 of the pool: the ninth aborted. Aditya's review of
+  #4021.)
+- Restart does not wait for grants, and does not request any: a restored CkLocMgr
+  (restoredFromCheckpoint, set in its pup) starts with an empty tranche, and the
+  first insertion on a process asks the allocator for 2^16 numbers and is deferred
+  until the grant arrives. A process that never inserts after the restart costs the
+  pool nothing. Per-process cursors are not checkpointed at all; only the allocator
+  cursor is. An array created after a restart is not restored, so it takes its share
+  of its own (untouched) initial region as at launch, split by the current process
+  count rather than the launch count (after an expand the launch share would run
+  into the allocator's half).
 - `+objid_tranche_log2 N` caps every tranche at 2^N numbers so tests can see refills
   and deferral at small scale; it is pupped with the layout.
 
@@ -327,7 +334,7 @@ receiver's cached epoch + 1 as today (:106).
 As implemented (PR 1a fixes, 2026-10-09, after Aditya's review of #4017): the
 synchronous update stays, through CkLocMgr::updateLocationFromLB(id, pe), so every
 PE but the source addresses the element at its destination before the move is acted
-on (the CentralLB invariant; multiHop asserts in this mode). The balancer's decision
+on (the CentralLB invariant). The balancer's decision
 (MigrateInfo) does not carry the element's epoch, so the entry is counted from the
 receiver's cache as before; that count never exceeds the true epoch (both advance by
 one per migration, and a bystander's starts no higher), so the destination's insert
@@ -377,7 +384,7 @@ PE count).
 Tranches: the allocator cursor `trancheTop` is part of the PE 0 CkLocMgr branch's
 pup, so it is restored on every restart path (same count or shrink/expand). Every
 process discards its pre-restart tranche and obtains a fresh one from the allocator
-before user code resumes (section 3.1). The initial region is considered fully
+at its first insertion after the restart (section 3.1). The initial region is considered fully
 consumed after the first launch; the allocator never hands out from it. This
 replaces the per-PE `p | idCounter`, which under shrink/expand is restored from
 PE 0's copy on every PE and can collide.
