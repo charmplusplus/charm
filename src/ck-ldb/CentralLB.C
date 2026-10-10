@@ -11,6 +11,8 @@
 #include "CentralLB.h"
 #include "LBSimulation.h"
 #include "LBMemoryContract.h"
+#include "LBOffThread.h"
+#include <atomic>
 #if CMK_CUDA
 #include <cupti.h>
 #include "gpumanager.h"
@@ -72,11 +74,70 @@ static int broadcastThreshold = []() {
 static void getPredictedLoadWithMsg(BaseLB::LDStats* stats, int count, 
 		             LBMigrateMsg *, LBInfo &info, int considerComm);
 
+#if CMK_LBDB_ON
+// ---- The strategy off the PE thread: CHARM_LB_STRATEGY_THREAD=near | <cpulist> | 1 ----
+// The decision PE runs the strategy as an entry method (MetisLB: ~13 ms at 256 objects), and for
+// that long none of its own objects are delivered a message. With a halo exchange every neighbour
+// of those objects then waits for them, and the stall spreads: on sph3d at 98M it was half of a
+// 46 ms bubble on all 8 GPUs at every async LB event (job 22776188, the +gputrace timeline).
+// With this knob the compute half, work(), runs on one persistent helper thread per process while
+// the decision PE keeps stepping, and a scheduler-loop poll continues with strategyFinish() --
+// the memory-contract verifier and the migrate message, which read PE-local state -- and
+// ApplyDecision() as an entry. The helper's CmiGetState() is a zero thread-local, so CkMyPe()
+// reads 0 there and the prints keyed on the decision PE still work when that PE is 0.
+// Validated with MetisLB; a balancer that reads Ckpv state in work() is not safe here.
+namespace {
+struct StrategyJob {
+  CentralLB* lb;
+  BaseLB::LDStats* stats;
+  std::atomic<bool> done;
+  StrategyJob(CentralLB* l, BaseLB::LDStats* s) : lb(l), stats(s), done(false) {}
+};
+std::atomic<bool> g_strategyInFlight{false};
+
+bool strategyOffThreadCpus(cpu_set_t* set) {
+  static const char* spec = getenv("CHARM_LB_STRATEGY_THREAD");
+  return lbOffThreadCpus(spec, set);
+}
+
+struct CuptiBuildJob {
+  CkGroupID gid;
+  int first, count;
+  std::atomic<bool> done;
+  CuptiBuildJob(CkGroupID g, int f, int c) : gid(g), first(f), count(c), done(false) {}
+};
+void cuptiBuildPoll(void* arg) {
+  CuptiBuildJob* b = (CuptiBuildJob*)arg;
+  if (!b->done.load(std::memory_order_acquire)) {
+    CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, arg);
+    return;
+  }
+  CProxy_CentralLB proxy(b->gid);
+  for (int r = 0; r < b->count; r++) proxy[b->first + r].gpuLoadsReady();
+  delete b;
+}
+
+void strategyPoll(void* arg) {
+  StrategyJob* j = (StrategyJob*)arg;
+  if (!j->done.load(std::memory_order_acquire)) {
+    CcdCallOnCondition(CcdSCHEDLOOP, strategyPoll, arg);
+    return;
+  }
+  CentralLB* lb = j->lb;
+  BaseLB::LDStats* stats = j->stats;
+  delete j;
+  g_strategyInFlight.store(false);
+  lb->strategyFinishOffThread(stats);
+}
+}  // namespace
+#endif
+
 void CentralLB::initLB(const CkLBOptions &opt)
 {
 #if CMK_LBDB_ON
   lbname = "CentralLB";
   thisProxy = CProxy_CentralLB(thisgroup);
+  strategyOffThreadOk = true;
   //  CkPrintf("Construct in %d\n",CkMyPe());
   loadbalancer = thisgroup;
   // create and turn on by default
@@ -90,8 +151,10 @@ void CentralLB::initLB(const CkLBOptions &opt)
   #if CMK_CUDA
   // The footprint slot is registered once per PE in _loadbalancerInit; a
   // second claim here would leak layout space and desynchronize the index.
-  if (CkpvAccess(_lb_obj_index) < 0)
+  if (CkpvAccess(_lb_obj_index) < 0) {
     CkpvAccess(_lb_obj_index) = LBRegisterObjUserData(sizeof(size_t));
+    lbSetObjFootprintSlot(CkpvAccess(_lb_obj_index));
+  }
   #endif
 
   stats_msg_count = 0;
@@ -183,6 +246,28 @@ void CentralLB::CallLB()
   // other PEs' objects were still finishing. See DistBaseLB::barrierDone for
   // the measurement. The earlier arrivals continue from gpuLoadsReady.
   if (!hapiCuptiArrive((uint64_t)step(), CkNodeSize(CkMyNode()))) return;
+  {
+    // CHARM_LB_CUPTI_OFFTHREAD=near | <cpulist> | 1: the window's CUPTI flush, parse and normalise
+    // on the shared helper thread instead of inline in this PE's entry method (the same knob and
+    // FLUSH_ON_PE diagnostic as DistBaseLB). The build took 99 ms on one PE of sph3d at 98M (job
+    // 22776188 trace), and with a halo exchange every other PE waited for it.
+    static const char* spec = getenv("CHARM_LB_CUPTI_OFFTHREAD");
+    cpu_set_t cpus;
+    if (lbOffThreadCpus(spec, &cpus)) {
+      static const bool flushOnPe = (getenv("CHARM_LB_CUPTI_OFFTHREAD_FLUSH_ON_PE") != nullptr);
+      static bool announced = false;
+      if (!announced) {
+        announced = true;
+        CmiPrintf("CharmLB> PE %d: CUPTI load build on the helper thread (CHARM_LB_CUPTI_OFFTHREAD=%s)\n", CkMyPe(), spec);
+      }
+      if (flushOnPe && hapiCuptiTracingActive())
+        cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
+      CuptiBuildJob* bj = new CuptiBuildJob(thisgroup, CkNodeFirst(CkMyNode()), CkNodeSize(CkMyNode()));
+      lbHelperSubmit(cpus, [bj]() { hapiPrepareCuptiLoads(); bj->done.store(true, std::memory_order_release); });
+      CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, (void*)bj);
+      return;
+    }
+  }
   hapiPrepareCuptiLoads();
   const int first = CkNodeFirst(CkMyNode());
   for (int r = 0; r < CkNodeSize(CkMyNode()); r++)
@@ -992,9 +1077,31 @@ void CentralLB::LoadBalance()
 //      }
   }
   
+  {
+    cpu_set_t cpus;
+    if (!concurrent && !use_thread && strategyOffThreadOk && !g_strategyInFlight.load() &&
+        strategyOffThreadCpus(&cpus)) {
+      g_strategyInFlight.store(true);
+      StrategyJob* j = new StrategyJob(this, statsData);
+      lbHelperSubmit(cpus, [j]() { j->lb->strategyCompute(j->stats); j->done.store(true, std::memory_order_release); });
+      CcdCallOnCondition(CcdSCHEDLOOP, strategyPoll, (void*)j);
+      return;   // strategyFinishOffThread -> ApplyDecision once the helper is done
+    }
+  }
   storedMigrateMsg = Strategy(statsData);
 
   if (!concurrent) ApplyDecision(); // immediately apply the migration decision
+#endif
+}
+
+void CentralLB::strategyFinishOffThread(LDStats* stats)
+{
+#if CMK_LBDB_ON
+  if (_lb_args.debug() && (CkMyPe() == cur_ld_balancer))
+    CkPrintf("CharmLB> %s: strategy ran %.1f ms on the helper thread\n", lbname,
+             (CkWallTimer() - strat_start_time) * 1e3);
+  storedMigrateMsg = strategyFinish(stats);
+  if (!concurrent) thisProxy[CkMyPe()].ApplyDecision();
 #endif
 }
 
@@ -1813,13 +1920,24 @@ void CentralLB::printStrategyStats(LBMigrateMsg *msg) {
 // default load balancing strategy
 LBMigrateMsg* CentralLB::Strategy(LDStats* stats)
 {
+  strategyCompute(stats);
+  return strategyFinish(stats);
+}
+
+void CentralLB::strategyCompute(LDStats* stats)
+{
 #if CMK_LBDB_ON
   strat_start_time = CkWallTimer();
   if (_lb_args.debug() && (CkMyPe() == cur_ld_balancer))
     CkPrintf("CharmLB> %s: PE [%d] strategy starting at %f\n", lbname, cur_ld_balancer, strat_start_time);
 
   work(stats);
+#endif
+}
 
+LBMigrateMsg* CentralLB::strategyFinish(LDStats* stats)
+{
+#if CMK_LBDB_ON
 #if CMK_CUDA
   // Memory contract: every strategy's output passes through the verifier,
   // memory-aware or not. Moves that would violate a device's headroom are

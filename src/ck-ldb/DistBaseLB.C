@@ -3,6 +3,7 @@
  * Base class for distributed load balancer.
 */
 
+#include "LBOffThread.h"
 #include "BaseLB.h"
 #include "ckrdmadevice.h"
 #include "DistBaseLB.h"
@@ -44,35 +45,7 @@ struct CuptiBuild {
 
 bool cuptiOffThreadCpus(cpu_set_t* set) {
   static const char* spec = getenv("CHARM_LB_CUPTI_OFFTHREAD");
-  if (spec == nullptr || *spec == '\0' || strcmp(spec, "0") == 0) return false;
-  CPU_ZERO(set);
-  bool any = false;
-  // near[:<domain>:<first>-<last>]: the idle cores of the PE's own NUMA domain,
-  // default 16-core domains with PEs on the first half (the gpuA40x4 wrappers).
-  // A helper on another domain parses the records across the socket link.
-  if (strncmp(spec, "near", 4) == 0) {
-    int dom = 16, lo = 8, hi = 15;
-    if (spec[4] == ':') sscanf(spec + 5, "%d:%d-%d", &dom, &lo, &hi);
-    const int cpu = sched_getcpu();
-    if (cpu >= 0 && dom > 0) {
-      const int base = (cpu / dom) * dom;
-      for (int c = base + lo; c <= base + hi && c < CPU_SETSIZE; c++) { CPU_SET(c, set); any = true; }
-    }
-  } else
-  if (strchr(spec, '-') != nullptr || strchr(spec, ',') != nullptr) {
-    const char* p = spec;
-    while (*p) {
-      char* end = nullptr;
-      long lo = strtol(p, &end, 10), hi = lo;
-      if (end == p) break;
-      if (*end == '-') { p = end + 1; hi = strtol(p, &end, 10); }
-      for (long c = lo; c <= hi && c < CPU_SETSIZE; c++) if (c >= 0) { CPU_SET((int)c, set); any = true; }
-      p = (*end == ',') ? end + 1 : end;
-      if (*end != ',' ) break;
-    }
-  }
-  if (!any) for (int c = 0; c < CPU_SETSIZE; c++) CPU_SET(c, set);
-  return true;
+  return lbOffThreadCpus(spec, set);   // LBOffThread.h: near | <cpulist> | 1
 }
 
 // ONE helper per process, started on first use and reused. A fresh thread per

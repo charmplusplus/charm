@@ -113,6 +113,12 @@ public:
   
   void depositData(CLBStatsMsg *m);
   void LoadBalance(void); 
+  // Strategy() in two halves, so CHARM_LB_STRATEGY_THREAD (CentralLB.C) can run the compute on a
+  // helper thread while the decision PE keeps delivering its objects' messages:
+  // Strategy(stats) == strategyCompute(stats) + strategyFinish(stats).
+  void strategyCompute(LDStats* stats);            // work(): thread-safe for MetisLB
+  LBMigrateMsg* strategyFinish(LDStats* stats);    // verifier, migrate message: on the PE
+  void strategyFinishOffThread(LDStats* stats);    // the helper's completion, from a scheduler poll
   void t_LoadBalance(void); 
   void ApplyDecision(void);
   void ResumeClients(int);                      // Resuming clients needs
@@ -264,6 +270,7 @@ protected:
   void loadbalance_with_thread() { use_thread = true; }
 
   bool concurrent;
+  bool strategyOffThreadOk;   // a derived balancer whose work() reads PE-local state sets this false in its ctor
 private:  
   int myspeed;
   int stats_msg_count;

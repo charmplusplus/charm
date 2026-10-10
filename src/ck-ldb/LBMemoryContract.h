@@ -68,6 +68,8 @@
 #include <cstdlib>
 
 CkpvExtern(int, _lb_obj_index);  // the footprint slot (see _loadbalancerInit)
+int lbObjFootprintSlot();        // the same slot without Ckpv: readable from a strategy helper thread
+void lbSetObjFootprintSlot(int slot);
 
 // The runtime's per-PE migration window and the landing reserve it adds up to
 // (L_g) come from LBMigrateWindow.h: one rule for the runtime and the contract.
@@ -236,8 +238,8 @@ public:
   size_t footprint(int i) const {
     size_t f = 0;
 #if CMK_LB_USER_DATA
-    if (CkpvAccess(_lb_obj_index) >= 0)
-      f = *(size_t*)stats_->objData[i].getUserData(CkpvAccess(_lb_obj_index));
+    const int slot = lbObjFootprintSlot();
+    if (slot >= 0) f = *(size_t*)stats_->objData[i].getUserData(slot);
 #endif
     size_t s = stagedSize(i);
     return f > s ? f : s;

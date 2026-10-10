@@ -3,6 +3,7 @@
  */
 /*@{*/
 
+#include <atomic>
 #include "converse.h"
 #include <charm++.h>
 #include <ck.h>
@@ -26,6 +27,11 @@ CkGroupID _lbmgr;
 
 CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
 CkpvDeclare(int, _lb_obj_index);
+// The same slot as a plain global: every PE registers the layout in the same order, so the value is
+// identical on all of them, and a strategy helper thread (CentralLB.C) has no Ckpv to read.
+static std::atomic<int> _lb_obj_index_any{-1};
+int lbObjFootprintSlot() { return _lb_obj_index_any.load(std::memory_order_relaxed); }
+void lbSetObjFootprintSlot(int slot) { _lb_obj_index_any.store(slot, std::memory_order_relaxed); }
 
 CkpvDeclare(bool, lbmanagerInited); /**< true if lbdatabase is inited */
 CkpvDeclare(int, _lbStepRequested);
@@ -220,6 +226,7 @@ void _loadbalancerInit()
   // balancer family -- central, tree, distributed -- reads it, and layout
   // claims must precede object registration.
   CkpvAccess(_lb_obj_index) = LBRegisterObjUserData(sizeof(size_t));
+  lbSetObjFootprintSlot(CkpvAccess(_lb_obj_index));
 #endif
 
   char** argv = CkGetArgv();

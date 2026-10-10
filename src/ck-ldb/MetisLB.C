@@ -79,6 +79,10 @@ MetisLB::MetisLB(const CkLBOptions& opt) : CBase_MetisLB(opt)
   metisRemapOn();
   metisMinGain();
   metisMaxCutRise();
+  // These two also: CHARM_LB_STRATEGY_THREAD runs work() on a helper thread, where CkGetArgv()
+  // has no per-PE storage (job 22794485: segfault in CkGetArgv from MetisLB::work).
+  metisHostTight();
+  metisHostByMsgs();
   // A partitioner is only as good as its edges. Communication instrumentation
   // is off by default, and MetisLB run on its own had been partitioning a
   // graph with no edges at all (every cut reported 0.0): its output was an

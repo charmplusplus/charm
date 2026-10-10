@@ -309,8 +309,8 @@ double GreedyRefineCentralLB::fillData(LDStats *stats,
     // Resident device footprint from the user-data slot, produced at AtSync
     // (already floored at the serialized size there). Guard the slot index:
     // reading through -1 would index past the user-data block.
-    obj.gpuAllocSize = (CkpvAccess(_lb_obj_index) >= 0)
-        ? *(size_t *)oData.getUserData(CkpvAccess(_lb_obj_index))
+    obj.gpuAllocSize = (lbObjFootprintSlot() >= 0)
+        ? *(size_t *)oData.getUserData(lbObjFootprintSlot())
         : (size_t)oData.gpuPupSize;
     CkAssert(pe >= 0 && pe <= n_pes);
     if (pe == n_pes) obj.oldPE = -1; // this can happen in HybridLB if object comes from outside group. mark oldPE as -1 in this situation
