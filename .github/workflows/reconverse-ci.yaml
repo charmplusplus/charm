@@ -12,9 +12,10 @@ name: reconverse-ci
 
 on:
   push:
-    branches: [reviewed-with-reconverse]
+    branches: [reviewed-with-reconverse, objid-redesign]
   pull_request:
-    branches: [reviewed-with-reconverse]
+    # objid-pr*: the PRs stacked on objid-redesign (their base is the previous PR's branch)
+    branches: [reviewed-with-reconverse, objid-redesign, 'objid-pr*']
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -172,7 +173,8 @@ jobs:
           make -C tests/charm++/qd CHARMC=$B/bin/charmc
           make -C tests/charm++/megatest CHARMC=$B/bin/charmc
       # Heavy migration config (-m 1 -c 8): every step migrates 8 of the 8
-      # elements. Exercises the #3939 class (obligation-free PEs vs reduction
+      # elements; -u repeats it on an unbounded array (hashed element ids,
+      # whose home is rank 0 of a process chosen by the index hash). Exercises the #3939 class (obligation-free PEs vs reduction
       # tree) that this line's reduction fix closes; hangs without it.
       - name: anytime migration stress (single process)
         run: |
@@ -180,6 +182,7 @@ jobs:
           cd tests/charm++/anytime_bcastred
           for S in 1 2 3; do
             ./bcastred +pe 4 -n 8 -i 500 -m 1 -c 8 -S $S -w 30
+            ./bcastred +pe 4 -n 8 -i 500 -m 1 -c 8 -S $S -w 30 -u
           done
       - name: anytime migration stress (2 processes)
         run: |
@@ -190,6 +193,7 @@ jobs:
           B=$PWD/../../../reconverse-linux-x86_64
           for S in 4 5; do
             timeout 900 $B/_deps/lci-src/lcrun -n 2 ./bcastred +pe 4 -n 8 -i 500 -m 1 -c 8 -S $S -w 30
+            timeout 900 $B/_deps/lci-src/lcrun -n 2 ./bcastred +pe 4 -n 8 -i 500 -m 1 -c 8 -S $S -w 30 -u
           done
       - name: qd + megatest multi-process
         run: |

@@ -10,6 +10,8 @@ array proxies, or the details of element creation (see ckarray.h).
 #define __CKLOCATION_H
 
 #include <unordered_map>
+#include <unordered_set>
+#include <atomic>
 struct IndexHasher
 {
 public:
@@ -342,6 +344,53 @@ public:
 };
 CkpvExtern(CkMigratable_initInfo, mig_initInfo);
 
+namespace ck {
+namespace objid {
+/**
+ * Per-run layout of the element payload of an array whose index is not packed into
+ * the id ("hashed kind"): the top keyBits are a hash key of the index, and the home
+ * of the element is (key % CkNumNodes()) on any PE, from the id or from the index
+ * alike; the low uniqueBits are a number unique within the array, handed out in
+ * tranches. One copy per process, set at startup by rank 0 (initLayout) from the
+ * process count and the +objid_expand factor; a checkpoint restores the launch-time
+ * layout instead (CkPupROData), because keys live inside ids that survive the
+ * restart.
+ */
+struct Layout
+{
+  int keyBits = 0;
+  int uniqueBits = 0;
+  int expandFactor = 8;
+  int nodesAtLaunch = 0;
+  void pup(PUP::er& p)
+  {
+    p | keyBits;
+    p | uniqueBits;
+    p | expandFactor;
+    p | nodesAtLaunch;
+  }
+};
+/// Called once per process (rank 0) before any chare array exists.
+void initLayout(int expandFactor);
+const Layout& getLayout();
+/// Checkpoint the layout with the readonlies; on restore it replaces the
+/// startup layout of this process (called by CkPupROData).
+void pupLayout(PUP::er& p);
+/// Hash key of an index, in [0, 2^keyBits): a pure function of the index bytes.
+CmiUInt8 indexHashKey(const CkArrayIndex& idx);
+
+/// A process's current tranche of unique numbers for one array: [cursor, end).
+struct Tranche
+{
+  std::atomic<CmiUInt8> cursor;
+  CmiUInt8 end;
+  Tranche(CmiUInt8 begin, CmiUInt8 end_) : cursor(begin), end(end_) {}
+};
+}  // namespace objid
+}  // namespace ck
+
+class CkLocMgr;
+
 class CkLocCache : public CBase_CkLocCache
 {
 private:
@@ -352,13 +401,32 @@ private:
   using Listener = std::function<void(CmiUInt8, int)>;
   std::list<Listener> listeners;
 
+  // Elements this PE has already asked the home about, so a stream of sends to an
+  // element whose location is unknown costs one request rather than one per message.
+  std::unordered_set<CmiUInt8> pendingLocReqs;
+
+  // The location manager this cache serves (created one-to-one with it; bound arrays
+  // share both). Needed to compute the home of an id, which is not stored in the id.
+  CkLocMgr* mgr = nullptr;
+
 public:
   CkLocCache() = default;
   CkLocCache(CkMigrateMessage* m) : CBase_CkLocCache(m) {}
   ~CkLocCache() = default;
   void pup(PUP::er& p);
 
+  void setManager(CkLocMgr* m) { mgr = m; }
+
   void requestLocation(CmiUInt8 id);
+  // Ask the home where an element lives, at most once until the answer arrives.
+  // Forwarding a message via the home teaches this PE nothing, so without this a
+  // sender keeps paying the detour on every send.
+  void requestLocationOnce(CmiUInt8 id)
+  {
+    if (locMap.find(id) != locMap.end()) return;
+    if (!pendingLocReqs.insert(id).second) return;
+    requestLocation(id);
+  }
 
   // Entry methods for updating location tables across PEs
   void requestLocation(CmiUInt8 id, int peToTell);
@@ -375,7 +443,7 @@ public:
   }
   int getPe(const CmiUInt8 id) const { return getLocationEntry(id).pe; }
   int getEpoch(const CmiUInt8 id) const { return getLocationEntry(id).epoch; }
-  int homePe(const CmiUInt8 id) const { return ck::ObjID(id).getHomeID(); }
+  int homePe(const CmiUInt8 id) const;  // via the manager; defined after CkLocMgr
 
   // Insertion and removal
   void insert(CmiUInt8 id, int epoch = 0);
@@ -469,7 +537,10 @@ private:
   CkArrayIndex bounds;
   ck::ArrayIndexCompressor* compressor;
   IdxIdMap idx2id;    // Explicit map for non-compressible case
-  CmiUInt8 idCounter; // Counter for creating new IDs in the non-compressible case
+  // Non-compressible case: this process's tranche of unique numbers for this array,
+  // shared by all its PEs (see ck::objid::Tranche); resolved on first use.
+  ck::objid::Tranche* tranche;
+  ck::objid::Tranche* getTranche();
 
   /// This flag is set while we delete an old copy of a migrator
   bool duringMigration;
@@ -545,14 +616,24 @@ public:
   CkLocRec* registerNewElement(const CkArrayIndex& idx);
 
   // Interface used by external users:
-  /// Home mapping
+  /// Home mapping. One home per element, computable from the index or from the id
+  /// alike, on any PE, under the current process count. Packed-index arrays use the
+  /// array map, as before; hashed-kind arrays hash the index to a process.
+  static int hashedHomePe(CmiUInt8 key)
+  {
+    return CMK_RANK_0(CkNodeFirst((int)(key % (CmiUInt8)CkNumNodes())));
+  }
   int homePe(const CkArrayIndex& idx) const
   {
-    return CMK_RANK_0(map->homePe(mapHandle, idx));
+    if (compressor)
+      return CMK_RANK_0(map->homePe(mapHandle, idx));
+    return hashedHomePe(ck::objid::indexHashKey(idx));
   }
   int homePe(const CmiUInt8 id) const
   {
-    return CMK_RANK_0(id >> CMK_OBJID_ELEMENT_BITS);
+    if (compressor)
+      return homePe(compressor->decompress(id));
+    return hashedHomePe(id >> ck::objid::getLayout().uniqueBits);
   }
   int procNum(const CkArrayIndex& idx) const
   {
@@ -573,17 +654,7 @@ public:
     CkAssert(checkInBounds(idx));
     if (compressor)
     {
-      const CmiUInt8 home = homePe(idx);
-      CmiAssertMsg(
-          home <= (ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS),
-          "home is too big! (home: %" PRIx64 ", max: %" PRIx64 ")", home,
-          (CmiUInt8)(ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS));
-      const CmiUInt8 id = (home << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
-      CmiAssertMsg(
-          id <= (ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK),
-          "id is too big! (id: %" PRIx64 ", max: %" PRIx64 ")", id,
-          (CmiUInt8)(ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK));
-      return id;
+      return compressor->compress(idx);
     }
     else
     {
@@ -599,16 +670,7 @@ public:
     CkAssert(checkInBounds(idx));
     if (compressor)
     {
-      const CmiUInt8 home = homePe(idx);
-      CmiAssertMsg(
-          home <= (ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS),
-          "home is too big! (home: %" PRIx64 ", max: %" PRIx64 ")", home,
-          (CmiUInt8)(ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS));
-      id = (home << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
-      CmiAssertMsg(
-          id <= (ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK),
-          "id is too big! (id: %" PRIx64 ", max: %" PRIx64 ")", id,
-          (CmiUInt8)(ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK));
+      id = compressor->compress(idx);
       return true;
     }
     else
@@ -626,6 +688,9 @@ public:
     }
   }
 
+  /// id -> index. Only for a packed-index array (decode) or an element that lives
+  /// here (its record). No delivery path may call this for an element this PE has
+  /// never seen: delivery by id routes through homePe(id) and never needs the index.
   CkArrayIndex lookupIdx(const CmiUInt8& id) const
   {
     CkLocRec* rec = nullptr;
@@ -637,17 +702,27 @@ public:
     {
       return rec->getIndex();
     }
-    else
-    {
-      IdxIdMap::const_iterator itr;
-      for (itr = idx2id.begin(); itr != idx2id.end(); itr++)
-      {
-        if (itr->second == id)
-          break;
-      }
-      CkAssert(itr != idx2id.end());
-      return itr->first;
-    }
+    CkAbort("CkLocMgr::lookupIdx: the index of element id %" PRIx64
+            " (location manager %d) is not known on PE %d\n",
+            id, thisgroup.idx, CkMyPe());
+    return CkArrayIndex();
+  }
+
+  /// id -> index where it can be had without a message: the compressor, or a local
+  /// record; with scanAtHome, also (hashed kind, at the home) the home's own
+  /// idx -> id bindings, which outlive the element. That last is a linear scan,
+  /// reached only by the demand creation of a deleted element, never by delivery.
+  /// Returns false when none applies.
+  bool recoverIndex(CmiUInt8 id, CkArrayIndex& idx, bool scanAtHome) const;
+
+  void requestLocationOnce(CmiUInt8 id) { cache->requestLocationOnce(id); }
+  /// Ask the home of idx for its location by index, whether or not this PE already
+  /// holds an id for it. The home buffers the request until the element exists, so
+  /// this is the request to pair with a demand-creation request.
+  void requestLocationAtHome(const CkArrayIndex& idx)
+  {
+    const int home = homePe(idx);
+    if (home != CkMyPe()) thisProxy[home].requestLocation(idx, CkMyPe());
   }
 
   int getMapHandle() const { return mapHandle; }
@@ -753,6 +828,11 @@ public:
   void requestLocation(const CkArrayIndex& idx);
   bool requestLocation(const CkArrayIndex& idx, int peToTell);
   void updateLocation(const CkArrayIndex& idx, const CkLocEntry& e);
+#if CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
+  /// A migration the load balancer decided (UpdateLocation): record, by id, that the
+  /// element is about to live on pe, before the move is acted on.
+  void updateLocationFromLB(CmiUInt8 id, int pe);
+#endif
   void reclaimRemote(const CkArrayIndex& idx, int deletedOnPe);
   void dummyAtSync(void);
 
@@ -768,5 +848,11 @@ public:
 bool haveConfigurableRRMap();
 
 /*@}*/
+
+inline int CkLocCache::homePe(const CmiUInt8 id) const
+{
+  CkAssert(mgr != nullptr);
+  return mgr->homePe(id);
+}
 
 #endif /*def(thisHeader)*/

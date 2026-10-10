@@ -1,0 +1,14 @@
+mainmodule restart {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Elem arrProxy;
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void ready();
+    entry void checkpointed();
+    entry [reductiontarget] void done();
+  };
+  array [1D] Elem {
+    entry Elem();
+    entry void ping();
+  };
+};

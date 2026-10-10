@@ -425,6 +425,11 @@ void CkPupROData(PUP::er &p)
 	    CkAbort("You cannot add readonlies and restore from checkpoint...");
 	}
 	for(int i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(p);
+
+	// The element id layout of the launch that wrote the checkpoint: hash keys of
+	// that width live inside the ids being restored, so it replaces the one
+	// computed at this startup.
+	ck::objid::pupLayout(p);
 	if (!p.isUnpacking()) _numReadonlyMsgs=_readonlyMsgs.size();
         p|_numReadonlyMsgs;
 	for(int i=0;i<_numReadonlyMsgs; i++){

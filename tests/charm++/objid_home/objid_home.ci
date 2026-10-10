@@ -1,0 +1,33 @@
+mainmodule objid_home {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Packed packedProxy;
+  readonly CProxy_Hashed hashedProxy;
+  readonly CProxy_Prober proberProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void insertedAll();
+    entry void quiet();
+    entry void report(int kind, int x, int y, int z, CmiUInt8 id, int pe);
+    entry void homes(int pe, int round, std::vector<int> h);
+    entry void checkProgress();
+  };
+
+  group Prober {
+    entry Prober();
+    entry void insertAll();
+    entry void check(int round, std::vector<CmiInt8> table);
+  };
+
+  array [3D] Packed {
+    entry Packed(int creator);
+    entry void report();
+    entry void hop();
+  };
+
+  array [2D] Hashed {
+    entry Hashed(int creator);
+    entry void report();
+    entry void hop();
+  };
+};
