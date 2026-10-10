@@ -9,6 +9,9 @@ One process row per rank (ordered by first PE) with a thread per GPU stream and 
 CUPTI clock; the clock pair lines processes on different nodes up to the nodes' clock agreement (NTP).
 --last 1.0 keeps the final second of GPU activity (about 20 sph3d steps), --window is seconds since the
 earliest process start. Kernels carry the array index of the object the runtime attributed them to.
+Two counter tracks per GPU, from the kernel records in --bin ms bins (default 1): "GPUd busy %" (share of the bin with
+at least one kernel running) and "GPUd kernels in flight" (time-weighted mean concurrency); the per-GPU means over the
+window are printed. Copies are not counted. --no-util leaves them out.
 A PE row shows only its entry methods: the empty space between them is the PE's idle time. --idle also
 draws the runtime's idle ranges as events (gap_report.py reads them from the files either way)."""
 import argparse, glob, json, os, re, sys
@@ -42,6 +45,8 @@ def main():
     ap.add_argument('--no-host', action='store_true', help='GPU rows only')
     ap.add_argument('--idle', action='store_true', help='also draw the PE idle ranges as events (default: empty space is idle)')
     ap.add_argument('--streams', action='store_true', help='one row per CUDA stream instead of packed concurrency lanes per GPU')
+    ap.add_argument('--bin', type=float, default=1.0, help='bin width in ms for the per-GPU busy %% and kernels-in-flight counters')
+    ap.add_argument('--no-util', action='store_true', help='no per-GPU utilization counter tracks')
     ap.add_argument('dir')
     a = ap.parse_args()
     procs = {}
@@ -126,6 +131,36 @@ def main():
                     gpu[(int(dev), int(st))].append({'ph': 'X', 'cat': 'memcpy' if c == 'M' else 'memset', 'pid': rank, 'ts': (s - base) / 1000.0,
                           'dur': (e - s) / 1000.0, 'name': COPY.get(int(kind), 'memcpy') if c == 'M' else 'memset', 'args': {'bytes': int(nb), 'stream': int(st)}})
                     n += 1
+        if not a.no_util:
+            # Per-GPU utilization counters from the kernel intervals: sweep the starts and ends, spread each constant-
+            # concurrency segment over the bins it covers.
+            bydevk = defaultdict(list)
+            for (dev, st), evs in gpu.items():
+                bydevk[dev].extend((ev['ts'], ev['ts'] + ev['dur']) for ev in evs if ev['cat'] == 'kernel')
+            binus = a.bin * 1000.0
+            for dev, iv in sorted(bydevk.items()):
+                if not iv: continue
+                t0 = (w0 - base) / 1000.0 if w0 is not None else min(s for s, e in iv)
+                t1 = (w1 - base) / 1000.0 if w1 is not None else max(e for s, e in iv)
+                nb = max(1, int((t1 - t0) / binus) + 1)
+                busy = [0.0] * nb; infl = [0.0] * nb
+                pts = sorted([(s, 1) for s, e in iv] + [(e, -1) for s, e in iv])
+                c = 0; tprev = pts[0][0]
+                for t, d in pts:
+                    if t > tprev and c > 0:
+                        lo = max(tprev, t0); hi = min(t, t1)
+                        b = int((lo - t0) / binus)
+                        while lo < hi and b < nb:
+                            be = t0 + (b + 1) * binus; seg = min(hi, be) - lo
+                            busy[b] += seg; infl[b] += c * seg
+                            lo = be; b += 1
+                    c += d; tprev = t
+                for b in range(nb):
+                    ts = t0 + b * binus
+                    emit({'ph': 'C', 'name': f'GPU{dev} busy %', 'pid': rank, 'ts': ts, 'args': {'busy': round(100.0 * busy[b] / binus, 1)}})
+                    emit({'ph': 'C', 'name': f'GPU{dev} kernels in flight', 'pid': rank, 'ts': ts, 'args': {'kernels': round(infl[b] / binus, 2)}})
+                span = max(binus, t1 - t0)
+                print(f'  rank {rank} GPU{dev}: busy {100.0 * sum(busy) / span:.1f}%, kernels in flight {sum(infl) / span:.2f} mean over {span / 1000.0:.0f} ms')
         if a.streams:
             for (dev, st), evs in sorted(gpu.items()):
                 tid = 1000 + st; row(tid, f'GPU{dev} stream {st}', tid)
