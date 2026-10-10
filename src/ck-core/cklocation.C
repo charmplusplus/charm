@@ -2686,8 +2686,6 @@ void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
 void CkLocCache::updateLocation(const CkLocEntry& newEntry)
 {
   CkAssert(newEntry.pe != -1);
-  // The answer is in; a later miss on this element may ask again.
-  pendingLocReqs.erase(newEntry.id);
   CkLocEntry& oldEntry = locMap[newEntry.id];
   if (newEntry.epoch > oldEntry.epoch)
   {

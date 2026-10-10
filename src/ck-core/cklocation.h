@@ -412,10 +412,6 @@ private:
   using Listener = std::function<void(CmiUInt8, int)>;
   std::list<Listener> listeners;
 
-  // Elements this PE has already asked the home about, so a stream of sends to an
-  // element whose location is unknown costs one request rather than one per message.
-  std::unordered_set<CmiUInt8> pendingLocReqs;
-
   // The location manager this cache serves (created one-to-one with it; bound arrays
   // share both). Needed to compute the home of an id, which is not stored in the id.
   CkLocMgr* mgr = nullptr;
@@ -429,15 +425,6 @@ public:
   void setManager(CkLocMgr* m) { mgr = m; }
 
   void requestLocation(CmiUInt8 id);
-  // Ask the home where an element lives, at most once until the answer arrives.
-  // Forwarding a message via the home teaches this PE nothing, so without this a
-  // sender keeps paying the detour on every send.
-  void requestLocationOnce(CmiUInt8 id)
-  {
-    if (locMap.find(id) != locMap.end()) return;
-    if (!pendingLocReqs.insert(id).second) return;
-    requestLocation(id);
-  }
 
   // Entry methods for updating location tables across PEs
   void requestLocation(CmiUInt8 id, int peToTell);
@@ -742,7 +729,6 @@ public:
   /// Returns false when none applies.
   bool recoverIndex(CmiUInt8 id, CkArrayIndex& idx, bool scanAtHome) const;
 
-  void requestLocationOnce(CmiUInt8 id) { cache->requestLocationOnce(id); }
   /// Ask the home of idx for its location by index, whether or not this PE already
   /// holds an id for it. The home buffers the request until the element exists, so
   /// this is the request to pair with a demand-creation request.
