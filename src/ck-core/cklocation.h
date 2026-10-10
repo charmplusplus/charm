@@ -363,7 +363,6 @@ struct Layout
   int expandFactor = 8;
   int nodesAtLaunch = 0;
   int trancheLog2Cap = 0;  // +objid_tranche_log2: cap on tranche sizes (testing); 0 = none
-  bool afterRestart = false;  // not pupped: set when a checkpointed layout is restored
   void pup(PUP::er& p)
   {
     p | keyBits;
@@ -381,6 +380,12 @@ const Layout& getLayout();
 void pupLayout(PUP::er& p);
 /// Hash key of an index, in [0, 2^keyBits): a pure function of the index bytes.
 CmiUInt8 indexHashKey(const CkArrayIndex& idx);
+
+/// Size (log2) of the first tranche a process asks the allocator for when it has
+/// none: after a restart, or when a tranche smaller than this ran out. Grants double
+/// from here up to the allocator's cap, so a restart costs each inserting process
+/// 2^16 numbers, not a fixed fraction of the pool.
+constexpr int FIRST_GRANT_LOG2 = 16;
 
 /// A process's current tranche of unique numbers for one array: [cursor, end),
 /// plus the spare tranche the allocator granted for when it runs out. The fast path
@@ -539,6 +544,10 @@ private:
   // shared by all its PEs (see ck::objid::Tranche); resolved on first use.
   ck::objid::Tranche* tranche;
   ck::objid::Tranche* getTranche();
+  // Unpacked from a checkpoint: this process's share of the initial region is spent
+  // (the restored ids came from it), so the first tranche comes from the allocator.
+  // An array created after a restart is not restored and takes its share as usual.
+  bool restoredFromCheckpoint;
 
   /// This flag is set while we delete an old copy of a migrator
   bool duringMigration;
@@ -563,7 +572,7 @@ private:
   CmiUInt8 allocNext, allocEnd;
   struct DeferredInsertion
   {
-    CkArray* mgr;
+    CkGroupID mgr;  // looked up at resume: the array may have been destroyed meanwhile
     CkArrayMessage* msg;
     CkArrayIndex idx;
     int listenerData[CK_ARRAYLISTENER_MAXLEN];

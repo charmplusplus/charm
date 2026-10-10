@@ -2372,7 +2372,6 @@ void pupLayout(PUP::er& p)
   {
     Layout restored;
     restored.pup(p);
-    restored.afterRestart = true;  // minting restarts from the allocator, not the initial region
     CmiLock(CksvAccess(_nodeLock));
     CksvAccess(_objidLayout) = restored;
     CmiUnlock(CksvAccess(_nodeLock));
@@ -2437,11 +2436,14 @@ static int floorLog2(CmiUInt8 n)
 
 // Size of a process's initial tranche: the lower half of the unique space split
 // evenly among the processes present at launch. The upper half is the allocator's
-// pool for refills and for every process after a restart. +objid_tranche_log2 caps
-// it (and every grant) for tests that need to see refills.
+// pool for refills and for every process after a restart. Divided by the current
+// process count, not the launch count: an array created after an expand splits its
+// (untouched) initial region among the processes that exist now, and a larger launch
+// share would run into the allocator's half. +objid_tranche_log2 caps it (and every
+// grant) for tests that need to see refills.
 static CmiUInt8 initialTrancheSize(const ck::objid::Layout& l)
 {
-  int shareBits = l.uniqueBits - 1 - ck::objid::ceilLog2((CmiUInt8)l.nodesAtLaunch);
+  int shareBits = l.uniqueBits - 1 - ck::objid::ceilLog2((CmiUInt8)CkNumNodes());
   if (l.trancheLog2Cap > 0 && shareBits > l.trancheLog2Cap) shareBits = l.trancheLog2Cap;
   return shareBits > 0 ? ((CmiUInt8)1 << shareBits) : 1;
 }
@@ -2449,7 +2451,6 @@ static CmiUInt8 initialTrancheSize(const ck::objid::Layout& l)
 ck::objid::Tranche* CkLocMgr::getTranche()
 {
   if (tranche) return tranche;
-  bool requestFirst = false;
   CmiLock(CksvAccess(_nodeLock));
   TrancheTable*& table = CksvAccess(_objidTranches);
   if (table == nullptr) table = new TrancheTable();
@@ -2466,9 +2467,9 @@ ck::objid::Tranche* CkLocMgr::getTranche()
               l.nodesAtLaunch, l.expandFactor, l.keyBits, l.uniqueBits,
               (int)ck::ObjID::bits::PAYLOAD_BITS, thisgroup.idx);
     ck::objid::Tranche* t = new ck::objid::Tranche();
-    if (!l.afterRestart)
+    if (!restoredFromCheckpoint)
     {
-      // First launch: this process's share of the initial region, no message needed.
+      // A new array: this process's share of the initial region, no message needed.
       const CmiUInt8 size = initialTrancheSize(l);
       const CmiUInt8 begin = (CmiUInt8)CkMyNode() * size;
       t->len = size;
@@ -2476,19 +2477,15 @@ ck::objid::Tranche* CkLocMgr::getTranche()
       t->end.store(begin + size, std::memory_order_release);
       t->refillAt.store(begin + size / 2, std::memory_order_relaxed);
     }
-    else
-    {
-      // After a restart the initial region is spent (restored ids came from it);
-      // start empty and ask the allocator for a tranche right away.
-      t->requested = true;
-      requestFirst = true;
-    }
+    // Restored from a checkpoint: the initial region is spent (the restored ids came
+    // from it). Start empty; the first insertion on this process asks the allocator
+    // (mintUnique) and is deferred until the grant arrives. Asking here, for every
+    // process at every restart, would spend a grant per process per restart whether
+    // or not anything is ever inserted.
     itr = table->emplace(thisgroup.idx, t).first;
   }
   tranche = itr->second;
   CmiUnlock(CksvAccess(_nodeLock));
-  if (requestFirst)
-    requestTrancheFromAllocator(floorLog2(initialTrancheSize(ck::objid::getLayout())));
   return tranche;
 }
 
@@ -2553,7 +2550,9 @@ bool CkLocMgr::mintUnique(CmiUInt8& u)
     {
       t->requested = true;
       send = true;
-      want = floorLog2(t->len ? t->len : initialTrancheSize(ck::objid::getLayout())) + 1;
+      // Twice the current tranche; a process with none yet (after a restart) starts
+      // small and doubles from there.
+      want = t->len ? floorLog2(t->len) + 1 : ck::objid::FIRST_GRANT_LOG2;
     }
     if (std::find(t->waitingPes.begin(), t->waitingPes.end(), CkMyPe()) == t->waitingPes.end())
       t->waitingPes.push_back(CkMyPe());
@@ -2563,16 +2562,21 @@ bool CkLocMgr::mintUnique(CmiUInt8& u)
   }
 }
 
-// PE 0: hand out the next tranche. Sizes are powers of two, clamped between the
-// initial tranche size and a cap that leaves every process several more grants.
+// PE 0: hand out the next tranche. Sizes are powers of two: what the requester asks
+// for (twice its current tranche), at least 2^FIRST_GRANT_LOG2 and at most a cap
+// that leaves every process several more grants. The floor must stay well below
+// the cap, or the doubling never takes effect and every grant is a fixed fraction
+// of the pool: with the launch share as the floor, a restart cost 1/8 of the pool
+// and the ninth restart in a chain aborted (Aditya's review of #4021).
 void CkLocMgr::requestTranche(int node, int wantLog2)
 {
   CkAssert(CkMyPe() == 0);
   const ck::objid::Layout& l = ck::objid::getLayout();
   const CmiUInt8 region = (CmiUInt8)1 << (l.uniqueBits - 1);
   int capLog2 = floorLog2(region / (8 * (CmiUInt8)CkNumNodes()));
+  if (capLog2 < 0) capLog2 = 0;
   if (l.trancheLog2Cap > 0 && capLog2 > l.trancheLog2Cap) capLog2 = l.trancheLog2Cap;
-  int minLog2 = floorLog2(initialTrancheSize(l));
+  int minLog2 = ck::objid::FIRST_GRANT_LOG2;
   if (minLog2 > capLog2) minLog2 = capLog2;
   int log2 = wantLog2;
   if (log2 < minLog2) log2 = minLog2;
@@ -2616,12 +2620,16 @@ void CkLocMgr::grantTranche(CmiUInt8 base, CmiUInt8 len)
 void CkLocMgr::deferInsertion(CkArray* mgr, CkArrayMessage* msg, const CkArrayIndex& idx,
                               const int listenerData[CK_ARRAYLISTENER_MAXLEN])
 {
-  static bool warned = false;  // once per process (a static shared by its PEs); informational
-  if (!warned)
+  // Once per process (a static shared by its PEs); informational.
+  static std::atomic<bool> warned{false};
+  if (!warned.exchange(true))
   {
-    warned = true;
     const ck::objid::Layout& l = ck::objid::getLayout();
-    if (getTranche()->len == 0)
+    ck::objid::Tranche* t = getTranche();
+    CmiLock(CksvAccess(_nodeLock));
+    const CmiUInt8 len = t->len;
+    CmiUnlock(CksvAccess(_nodeLock));
+    if (len == 0)
       CkPrintf("Charm++> Note: PE %d deferred an insertion into chare array (location"
                " manager %d): this process's first tranche of element ids after the"
                " restart has not arrived yet. The element is created when it does;"
@@ -2636,7 +2644,7 @@ void CkLocMgr::deferInsertion(CkArray* mgr, CkArrayMessage* msg, const CkArrayIn
                CkMyPe(), thisgroup.idx, l.expandFactor, initialTrancheSize(l));
   }
   DeferredInsertion d;
-  d.mgr = mgr;
+  d.mgr = mgr->ckGetGroupID();
   d.msg = msg;
   d.idx = idx;
   for (int i = 0; i < CK_ARRAYLISTENER_MAXLEN; ++i) d.listenerData[i] = listenerData[i];
@@ -2647,7 +2655,17 @@ void CkLocMgr::resumeDeferredInsertions()
 {
   std::vector<DeferredInsertion> work;
   work.swap(deferredInsertions);
-  for (DeferredInsertion& d : work) d.mgr->insertElement(d.msg, d.idx, d.listenerData);
+  for (DeferredInsertion& d : work)
+  {
+    CkArray* mgr = static_cast<CkArray*>(CkLocalBranch(d.mgr));
+    if (mgr == nullptr)
+    {
+      // The array was destroyed while the insertion waited for a tranche.
+      CkFreeMsg(d.msg);
+      continue;
+    }
+    mgr->insertElement(d.msg, d.idx, d.listenerData);
+  }
 }
 
 /*************************** LocCache **************************/
@@ -2721,6 +2739,7 @@ void CkLocCache::insert(CmiUInt8 id, int epoch)
 CkLocMgr::CkLocMgr(CkArrayOptions opts)
     : bounds(opts.getBounds()),
       tranche(nullptr),
+      restoredFromCheckpoint(false),
       allocNext(0),
       allocEnd(0),
       thisProxy(thisgroup),
@@ -2841,10 +2860,9 @@ void CkLocMgr::pup(PUP::er& p)
 
     compressor = ck::FixedArrayIndexCompressor::make(bounds);
     tranche = nullptr;
-    // A location manager is only ever unpacked at a restart: rank 0 asks the
-    // allocator for this process's first tranche now rather than at the first
-    // insertion (getTranche sends the request when the layout says afterRestart).
-    if (compressor == nullptr && CkMyRank() == 0) getTranche();
+    // A location manager is only ever unpacked at a restart. The process's first
+    // tranche is requested by the first insertion that needs one (getTranche).
+    restoredFromCheckpoint = true;
   }
 
 #if CMK_LBDB_ON
@@ -3217,9 +3235,11 @@ void CkLocMgr::multiHop(CkArrayMessage* msg)
   {  // Send a routing message letting original sender know new element location
     DEBS((AA "Sending update back to %d for element %" PRIu64 "\n" AB, srcPe,
           msg->array_element_id()));
-    #if CMK_GLOBAL_LOCATION_UPDATE
-    CkAssert(false && "Hop-count based location update should not occur with CMK_GLOBAL_LOCATION_UPDATE; all migrations must happen at load balancing steps via AtSync()");
-    #endif
+    // Under CMK_GLOBAL_LOCATION_UPDATE a migration is announced to every PE before
+    // it is acted on, so a forward is never due to a stale entry after a move; it is
+    // a cold send through the home (routine for an element that does not live at its
+    // home), a demand creation, or a send that raced an announced move. All of these
+    // are repaired the same way, so there is nothing to assert here.
     cache->requestLocation(msg->array_element_id(), srcPe);
   }
 }
