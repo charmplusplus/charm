@@ -10,22 +10,30 @@
 // survive the restart unchanged, and every element must be reachable afterwards,
 // also when the restart uses a different number of PEs or processes.
 //
-// After a restart main inserts 16 NEW elements (indices 100..115). Every process
-// restarts with an empty tranche and takes its unique numbers from the allocator
+// After a restart main inserts 16 NEW elements (indices 100..115 after the first
+// restart, 200..215 after a second, and so on). Every process restarts with an
+// empty tranche and takes its unique numbers from the allocator
 // (doc/objid64-design.md sections 3.1 and 6), so each new id's unique part must
-// lie in the allocator region [2^(U-1), 2^U), and all 32 ids must be distinct:
-// a new id can never collide with a restored one. Then all 32 elements are pinged
-// by index; each reply carries the element's id, which must match the id main
+// lie in the allocator region [2^(U-1), 2^U), and all ids must be distinct: a new
+// id can never collide with a restored one. Then every element is pinged by
+// index; each reply carries the element's id, which must match the id main
 // recorded (restored elements: the id from before the checkpoint).
+//
+// With -c a restarted run checkpoints again (to the same directory) once the pings
+// are back, so a chain of restarts can be run, each from the previous run's
+// checkpoint. Each restart must cost the allocator's pool only what its insertions
+// use: with the grant floor at the launch share (before 2026-10-10) every restart
+// spent 1/8 of the pool and the ninth aborted in grantTranche (make testchain).
 //
 // Run: ./restart +pe 4            writes the checkpoint to ckptlog/
 //      ./restart +pe 2 +restart ckptlog
+//      ./restart +pe 4 +restart ckptlog -c   (and again, from the new checkpoint)
 // Different process count (reconverse): make testprocs
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ CProxy_Elem arrProxy;
 static const int nElements = 16;
-static const int newBase = 100;  // indices of the elements inserted after a restart
+static const int newBaseStep = 100;  // restart g inserts indices [100 g, 100 g + 16)
 
 // Unbuffered stdout, so an abort in another process does not discard its output.
 void unbufferStdout(void) { setvbuf(stdout, NULL, _IONBF, 0); }
@@ -33,8 +41,17 @@ void unbufferStdout(void) { setvbuf(stdout, NULL, _IONBF, 0); }
 class Main : public CBase_Main
 {
   std::map<int, CmiUInt8> ids;  // index -> element id; pupped with the checkpoint
+  int gen = 0;                  // restarts so far; pupped: the chain's generation
   int nNew = 0;
   int pongs = 0;
+  bool pinged = false;  // this run has pinged: the next checkpointed() ends the run
+  static bool chain()  // -c; CmiGetArgFlag removes the flag, so look only once
+  {
+    static const bool c =
+        CmiGetArgFlagDesc(CkGetArgv(), "-c", "checkpoint again after a restart") != 0;
+    return c;
+  }
+  int newBase() const { return newBaseStep * gen; }
 
 public:
   Main(CkArgMsg* m)
@@ -64,9 +81,10 @@ public:
       }
       return;
     }
-    CkEnforce(idx >= newBase && idx < newBase + nElements);
+    CkEnforce(idx >= newBase() && idx < newBase() + nElements);
     if (++nNew == nElements) checkNewIds();
   }
+  // Called after every checkpoint, and once at the start of a restarted run.
   void checkpointed()
   {
     if (!_restarted)
@@ -75,9 +93,19 @@ public:
       pingAll();
       return;
     }
-    CkEnforceMsg((int)ids.size() == nElements, "restored main lost the recorded ids");
-    CkPrintf("Checkpoint done (restarted=1); inserting %d new elements\n", nElements);
-    for (int i = newBase; i < newBase + nElements; i++) arrProxy[i].insert(i % CkNumPes());
+    if (pinged)
+    {
+      CkPrintf("Checkpoint done (restarted=1, generation %d); All done\n", gen);
+      CkExit();
+      return;
+    }
+    CkEnforceMsg((int)ids.size() == nElements * (gen + 1),
+                 "restored main lost the recorded ids");
+    gen++;
+    CkPrintf("Restarted (generation %d); inserting %d new elements at %d\n", gen,
+             nElements, newBase());
+    for (int i = newBase(); i < newBase() + nElements; i++)
+      arrProxy[i].insert(i % CkNumPes());
     arrProxy.doneInserting();
   }
   void checkNewIds()
@@ -89,7 +117,7 @@ public:
     for (auto& e : ids)
     {
       CkEnforceMsg(seen.insert(e.second).second, "two elements share an id");
-      if (e.first >= newBase && (e.second & mask) < half)
+      if (e.first >= newBase() && (e.second & mask) < half)
         CkAbort("restart: new element %d has unique part %llu below 2^%d: not from"
                 " the allocator\n",
                 e.first, (unsigned long long)(e.second & mask), U - 1);
@@ -102,6 +130,7 @@ public:
   void pingAll()
   {
     pongs = 0;
+    pinged = true;
     for (auto& e : ids) arrProxy[e.first].ping();
   }
   void pong(int idx, CmiUInt8 id, int pe)
@@ -110,10 +139,21 @@ public:
     CkEnforce(it != ids.end());
     CkEnforceMsg(it->second == id, "element id changed across the restart");
     if (++pongs < (int)ids.size()) return;
+    if (_restarted && chain())
+    {
+      CkPrintf("All %d pinged; checkpointing again (generation %d)\n", (int)ids.size(),
+               gen);
+      CkStartCheckpoint("ckptlog", CkCallback(CkIndex_Main::checkpointed(), thisProxy));
+      return;
+    }
     CkPrintf("All done\n");
     CkExit();
   }
-  void pup(PUP::er& p) { p | ids; }
+  void pup(PUP::er& p)
+  {
+    p | ids;
+    p | gen;
+  }
 };
 
 class Elem : public CBase_Elem
