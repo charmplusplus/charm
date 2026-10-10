@@ -1,0 +1,9 @@
+// Run through charmxi directly, without -orig-file (see test-charmxi-direct).
+mainmodule SerialNoOrigFile {
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry void run() {
+      serial { int x = 1; (void)x; }
+    };
+  };
+};

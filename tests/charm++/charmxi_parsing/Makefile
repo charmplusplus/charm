@@ -10,7 +10,7 @@ TARGETS = \
 
 all: $(TARGETS)
 
-test: $(foreach i,$(TARGETS),test-$i)
+test: $(foreach i,$(TARGETS),test-$i) test-charmxi-direct
 
 smptest: $(foreach i,$(TARGETS),smptest-$i)
 
@@ -36,6 +36,12 @@ endef
 
 $(foreach i,$(TARGETS),$(eval $(call TARGETRULES,$i)))
 
+
+# charmxi invoked without -orig-file must still emit #line directives for
+# serial blocks that name the .ci file.
+test-charmxi-direct: SerialNoOrigFile.ci
+	../../../bin/charmxi SerialNoOrigFile.ci
+	grep -q '#line .*"SerialNoOrigFile.ci"' SerialNoOrigFile.def.h
 
 %.decl.h: %.ci
 	$(CHARMC) $^
