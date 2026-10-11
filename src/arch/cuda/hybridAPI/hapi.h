@@ -582,6 +582,9 @@ void hapiProcessCuptiBuffers();
 // taking the largest epoch means each of them reads data at least as fresh as
 // its own epoch, for one rebuild rather than one per PE.
 void hapiPrepareCuptiLoads(uint64_t epoch = HAPI_CUPTI_EPOCH_LB_ROUND);
+// cuptiActivityFlushAll with no chare launch in flight (the flush gate, hapi_impl.cpp). Any flush while kernels
+// may be launched from other threads must go through this.
+void hapiCuptiFlushGated(uint32_t flag);
 void hapiNormalizeCuptiLoads();
 void hapiClearCuptiData();
 

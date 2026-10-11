@@ -199,7 +199,7 @@ void DistBaseLB::barrierDone() {
       // leave only the parsing to the helper (diagnostic: which half matters).
       static const bool flushOnPe = (getenv("CHARM_LB_CUPTI_OFFTHREAD_FLUSH_ON_PE") != nullptr);
       if (flushOnPe && hapiCuptiTracingActive())
-        cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
+        hapiCuptiFlushGated(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
       cuptiWorkerSubmit(b, cpus);
       // CHARM_LB_CUPTI_OFFTHREAD_STALL_MS (diagnostic): hold this PE for that long
       // anyway, as the on-PE build did, to tell "the PE is free" apart from

@@ -16,6 +16,7 @@
 #include <mutex>
 #include <chrono>
 #include <thread>
+#include <pthread.h>
 #include <unistd.h>
 #include <cxxabi.h>
 #include <sys/mman.h>
@@ -492,6 +493,27 @@ static void ipcHandleOpen();
 static constexpr uint64_t HAPI_CUPTI_NO_OBJECT =
     GpuObjectTokenTable::noObjectToken();
 
+// The flush gate. cuptiActivityFlushAll on one thread (the LB helper, or the last PE of the process to reach the
+// window close) races with the kernel-launch intercept of another PE thread inside CUPTI: the +LBAsync segfault
+// (job 22809309, two more with the retired-buffer quarantine in place; every backtrace is the first launch of the
+// next step, cudaLaunchKernel -> libcupti, at a window close). Every driver call the runtime issues for a chare goes
+// through hapiSubmitIssue / hapiSubmitClosure / hapiSubmitEventRecord / hapiSubmitMemcpyAsync, so those take the gate
+// shared and the flush takes it exclusive: no launch is in flight while CUPTI flushes, and none starts until it is
+// done. A PE blocks at most for the flush (~3 ms per window). Nested submits on one thread hold one read lock.
+static pthread_rwlock_t g_cupti_flush_gate = PTHREAD_RWLOCK_INITIALIZER;
+static thread_local int t_cupti_gate_depth = 0;
+struct CuptiGateShared {
+  CuptiGateShared() { if (t_cupti_gate_depth++ == 0) pthread_rwlock_rdlock(&g_cupti_flush_gate); }
+  ~CuptiGateShared() { if (--t_cupti_gate_depth == 0) pthread_rwlock_unlock(&g_cupti_flush_gate); }
+};
+void hapiCuptiFlushGated(uint32_t flag) {
+  if (t_cupti_gate_depth > 0) CmiAbort("hapiCuptiFlushGated: called from inside a gated launch");
+  pthread_rwlock_wrlock(&g_cupti_flush_gate);
+  const CUptiResult r = cuptiActivityFlushAll(flag);
+  pthread_rwlock_unlock(&g_cupti_flush_gate);
+  CUPTI_SAFE_CALL(r);
+}
+
 // CHARM_LB_CUPTI_SOFT_FLUSH=1: the non-forced flush at the LB window close (see hapiPrepareCuptiLoads); the default
 // is the forced flush with retired buffers quarantined (hapiCuptiRetireBuffer).
 static bool hapiCuptiForcedFlush() {
@@ -745,7 +767,7 @@ void hapiTraceStart(const char* dir) {
 
 void hapiTraceStop() {
   if (g_trace == nullptr) return;
-  if (hapiCuptiTracingActive()) CUPTI_SAFE_CALL(cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
+  if (hapiCuptiTracingActive()) hapiCuptiFlushGated(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
   hapiProcessCuptiBuffers();   // the records queued since the last LB step
   std::lock_guard<std::mutex> lk(g_trace_lock);
   fclose(g_trace);
@@ -2032,7 +2054,7 @@ void hapiPrepareCuptiLoads(uint64_t epoch) {
   // buffers and the carried-over correlations of hapiProcessCuptiBuffers; it withholds the open buffer each close.
   static const bool periodic = (getenv("CHARM_LB_CUPTI_PERIODIC") != nullptr);
   if (hapiCuptiTracingActive() && !periodic)
-    CUPTI_SAFE_CALL(cuptiActivityFlushAll(hapiCuptiForcedFlush() ? CUPTI_ACTIVITY_FLAG_FLUSH_FORCED : 0));
+    hapiCuptiFlushGated(hapiCuptiForcedFlush() ? CUPTI_ACTIVITY_FLAG_FLUSH_FORCED : 0);
   const double t1 = timeIt ? CmiWallTimer() : 0.0;
   hapiProcessCuptiBuffers();
   const double t2 = timeIt ? CmiWallTimer() : 0.0;
@@ -2767,6 +2789,7 @@ static inline void hapiSubmitSetCorrelation(uint64_t token) {
 }
 
 void hapiSubmitIssue(HapiSubmitOp& op) {
+  CuptiGateShared gate;   // no CUPTI flush while this driver call runs
   if (op.kind == HAPI_SUBMIT_CLOSURE) {
     // The application's own launches. The PE's CUPTI correlation stack is not
     // this thread's, so the chare travels in the entry and is applied here, or
@@ -2935,6 +2958,7 @@ void hapiSubmitMemcpyAsync(void* dst, const void* src, size_t bytes, int kind, h
   HapiSubmitOp op{};
   op.kind = HAPI_SUBMIT_MEMCPY; op.stream = stream; op.dst = dst; op.src = src; op.bytes = bytes; op.copyKind = kind;
   if (hapiSubmitPush(op)) return;
+  CuptiGateShared gate;
   hapiCheck(cudaMemcpyAsync(dst, src, bytes, (cudaMemcpyKind)kind, (cudaStream_t)stream));
 }
 
@@ -2946,7 +2970,7 @@ static thread_local uint64_t hapi_submit_cur_token = 0;
 // into the queue entry, so it must be trivially copyable and at most
 // HAPI_SUBMIT_INLINE bytes. With the mode off it runs here, at once.
 void hapiSubmitClosure(hapiStream_t stream, void (*fn)(void*), const void* state, size_t bytes) {
-  if (hapi_submit == nullptr) { fn(const_cast<void*>(state)); return; }
+  if (hapi_submit == nullptr) { CuptiGateShared gate; fn(const_cast<void*>(state)); return; }
   if (bytes > HAPI_SUBMIT_INLINE) CmiAbort("hapiSubmitClosure: %zu bytes of state, at most %zu fit", bytes, HAPI_SUBMIT_INLINE);
   HapiSubmitOp op{};
   op.kind = HAPI_SUBMIT_CLOSURE; op.stream = stream; op.fn = fn; op.token = hapi_submit_cur_token;
@@ -2961,6 +2985,7 @@ void hapiSubmitEventRecord(void* event, hapiStream_t stream) {
   HapiSubmitOp op{};
   op.kind = HAPI_SUBMIT_EVENT; op.stream = stream; op.dst = event;
   if (hapiSubmitPush(op)) return;
+  CuptiGateShared gate;
   hapiCheck(cudaEventRecord((cudaEvent_t)event, (cudaStream_t)stream));
 }
 

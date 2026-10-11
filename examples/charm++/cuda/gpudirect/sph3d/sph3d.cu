@@ -357,6 +357,55 @@ __global__ void forcesTwoListKernel(int n_total, int n_local, int n0, int ncx, i
   else { ax[i] = 0.0f; ay[i] = 0.0f; az[i] = 0.0f; }
 }
 
+// Migrant scatter (interior-first with a 1-cell band, SPH_INTERIOR_LAYERS=1): the interior pass at the end of the
+// previous step covered cells [2, nc-1] with stencils over [1, nc], where the migrants of this step had not landed
+// yet. The band pass gives the band targets and the migrants their full stencils; what is still missing is each
+// migrant's contribution to the INTERIOR targets within its stencil (cells 2 / nc-1 next to its landing cell).
+// One thread per extras entry: a ghost returns (its stencil reaches band cells only); a migrant walks its 27 cells,
+// and for every interior cell adds its single-pair contribution to each target there (atomics; the interior pass
+// wrote those accumulators at the previous step). With a 2-cell band no interior cell is within reach and the
+// kernel adds nothing.
+__global__ void migrantScatterKernel(int n_total, int n_local, int n0, int ncx, int ncy, int ncz,
+    const int* __restrict__ cell_parts, const int* __restrict__ cell_off, const int* __restrict__ cell_cnt,
+    const int* __restrict__ cell_parts2, const int* __restrict__ cell_of2, const float4* __restrict__ pos4,
+    const float4* __restrict__ vel4, const unsigned char* __restrict__ type8, RealType h, RealType mass,
+    RealType c0, RealType* drho, RealType* ax, RealType* ay, RealType* az) {
+  const int e = blockIdx.x * blockDim.x + threadIdx.x;
+  if (e >= n_total - n0) return;
+  const int j = cell_parts2[e];
+  if (n0 + j >= n_local) return;   // a ghost
+  const int ci = cell_of2[j];
+  const int cx = ci % (ncx + 2), cy = (ci / (ncx + 2)) % (ncy + 2), cz = ci / ((ncx + 2) * (ncy + 2));
+  const int me = n0 + e;           // the migrant's entry in the cell-ordered streams
+  const RealType inv_h = 1.0f / h;
+  const RealType support2 = (KERNEL_SUPPORT * h) * (KERNEL_SUPPORT * h);
+  const RealType eta2h2 = ETA2 * h * h;
+  for (int oz = -1; oz <= 1; oz++) {
+    const int zz = cz + oz; if (zz < 0 || zz > ncz + 1) continue;
+    for (int oy = -1; oy <= 1; oy++) {
+      const int yy = cy + oy; if (yy < 0 || yy > ncy + 1) continue;
+      for (int ox = -1; ox <= 1; ox++) {
+        const int xx = cx + ox; if (xx < 0 || xx > ncx + 1) continue;
+        if (!cellIsInterior(xx, yy, zz, ncx, ncy, ncz)) continue;
+        const int c = (zz * (ncy + 2) + yy) * (ncx + 2) + xx;
+        const int beg = cell_off[c], end = beg + cell_cnt[c];
+        for (int q = beg; q < end; q++) {
+          TargetState pi;
+          { const float4 a = pos4[q], b = vel4[q]; pi.x = a.x; pi.y = a.y; pi.z = a.z; pi.rho = a.w;
+            pi.vx = b.x; pi.vy = b.y; pi.vz = b.z; pi.p = b.w; pi.type = type8[q]; }
+          const RealType inv_rhoi2 = 1.0f / (pi.rho * pi.rho);
+          PairAccum acc = {0.0f, 0.0f, 0.0f, 0.0f};
+          accumulatePairs(pi, pos4, vel4, me, me + 1, h, inv_h, support2, eta2h2, inv_rhoi2, mass, c0, acc);
+          if (acc.adrho == 0.0f && acc.aax == 0.0f && acc.aay == 0.0f && acc.aaz == 0.0f) continue;
+          const int p = cell_parts[q];
+          atomicAdd(&drho[p], acc.adrho);
+          if (pi.type == PTYPE_FLUID) { atomicAdd(&ax[p], acc.aax); atomicAdd(&ay[p], acc.aay); atomicAdd(&az[p], acc.aaz); }
+        }
+      }
+    }
+  }
+}
+
 __global__ void forcesKernel(int n_total, int n_local, int ncx,
     int ncy, int ncz, const int* __restrict__ cell_parts,
     const int* __restrict__ cell_of, const int* __restrict__ cell_off,
@@ -1063,6 +1112,19 @@ void invokeForcesTwoListRows(int n_total, int n_local, int n0, int ncx, int ncy,
         d_cell_parts, d_cell_of, d_off, d_cnt, d_cell_parts2, d_cell_of2, d_off2, d_cnt2,
         d_pos4, d_vel4, d_type8, h, mass, c0, gravity, d_drho, d_ax, d_ay, d_az,
         (const int*)nullptr, (const int*)nullptr, d_item_beg, d_item_pre, nitems);
+  });
+  SPH_PEEK();
+}
+
+void invokeMigrantScatter(int n_total, int n_local, int n0, int ncx, int ncy, int ncz, const int* d_cell_parts,
+    const int* d_off, const int* d_cnt, const int* d_cell_parts2, const int* d_cell_of2, const float4* d_pos4,
+    const float4* d_vel4, const unsigned char* d_type8, RealType h, RealType mass, RealType c0,
+    RealType* d_drho, RealType* d_ax, RealType* d_ay, RealType* d_az, cudaStream_t s) {
+  const int nx = n_total - n0;
+  if (nx <= 0) return;
+  hapiSubmit(s, [=]() {
+    migrantScatterKernel<<<(nx + 127) / 128, 128, 0, s>>>(n_total, n_local, n0, ncx, ncy, ncz, d_cell_parts, d_off, d_cnt,
+        d_cell_parts2, d_cell_of2, d_pos4, d_vel4, d_type8, h, mass, c0, d_drho, d_ax, d_ay, d_az);
   });
   SPH_PEEK();
 }

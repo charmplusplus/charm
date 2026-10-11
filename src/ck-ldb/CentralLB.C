@@ -261,7 +261,7 @@ void CentralLB::CallLB()
         CmiPrintf("CharmLB> PE %d: CUPTI load build on the helper thread (CHARM_LB_CUPTI_OFFTHREAD=%s)\n", CkMyPe(), spec);
       }
       if (flushOnPe && hapiCuptiTracingActive())
-        cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
+        hapiCuptiFlushGated(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
       CuptiBuildJob* bj = new CuptiBuildJob(thisgroup, CkNodeFirst(CkMyNode()), CkNodeSize(CkMyNode()));
       lbHelperSubmit(cpus, [bj]() { hapiPrepareCuptiLoads(); bj->done.store(true, std::memory_order_release); });
       CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, (void*)bj);

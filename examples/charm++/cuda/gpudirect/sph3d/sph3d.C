@@ -296,6 +296,9 @@ extern void invokeForcesTwoListRows(int, int, int, int, int, int, int, const int
     const unsigned char*, RealType, RealType, RealType, RealType, RealType*, RealType*, RealType*,
     RealType*, int*, int*, cudaStream_t);
 extern void sphIota(int, int*, cudaStream_t);
+extern void invokeMigrantScatter(int, int, int, int, int, int, const int*, const int*, const int*, const int*,
+    const int*, const float4*, const float4*, const unsigned char*, RealType, RealType, RealType, RealType*,
+    RealType*, RealType*, RealType*, cudaStream_t);
 extern void invokeForcesInteriorSel(int, int, int, int, const int*, const int*, const int*, const int*,
     const float4*, const float4*, const unsigned char*, RealType, RealType, RealType, RealType, RealType*,
     RealType*, RealType*, RealType*, const int*, unsigned char*, int*, int*, void*, size_t, cudaStream_t);
@@ -1094,7 +1097,7 @@ public:
       const int layers = interiorLayers();
       sphSetInteriorLayers(layers);
       if (CkMyPe() == 0 && interiorRows()) CkPrintf("  interior-first: rows form (row tables, no select)\n");
-      if (CkMyPe() == 0) CkPrintf("  interior-first: %d boundary layer(s) per side%s\n", layers, layers == 1 ? " (TIMING EXPERIMENT: cell-2 targets miss the migrants)" : "");
+      if (CkMyPe() == 0) CkPrintf("  interior-first: %d boundary layer(s) per side%s\n", layers, layers == 1 ? " (1-cell band: the migrant scatter adds the migrants to the cell-2 targets)" : "");
     }
     return on;
   }
@@ -2159,6 +2162,9 @@ public:
             d_cell_parts2, d_cell_of2, d_cell_off2, d_cell_cnt2, d_pos4, d_vel4, d_type8,
             smooth_h, pmass, sound_c0, gravity, d_drho, d_ax, d_ay, d_az,
             d_iota, d_sel_flags, d_sel, d_sel_num, d_sel_tmp, sel_tmp_bytes, compute_stream);
+      // Each migrant's contribution to the interior targets within its stencil (a no-op with a 2-cell band).
+      invokeMigrantScatter(ntot, np, n0, ncx, ncy, ncz, d_cell_parts, d_cell_off, d_cell_cnt, d_cell_parts2, d_cell_of2,
+          d_pos4, d_vel4, d_type8, smooth_h, pmass, sound_c0, d_drho, d_ax, d_ay, d_az, compute_stream);
       splitStats("boundary", ntot);
       cells_valid = false;   // L alone is not the full list
       interior_done = false;
