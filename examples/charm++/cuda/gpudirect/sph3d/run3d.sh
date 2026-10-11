@@ -4,7 +4,7 @@
 #      NODELIST (-w), POOL_ALLOC=vmm (+gpupoolalloc vmm, required off-node), LCI_LIB (dir of a liblci.so to preload: the vmm device-lookup fix), POOL (MB, power of two, default 8192), POOLX (extra pool flags), TMO (s), LB=sync|async|none
 # (default none; sync/async add Metis+Diffusion with sph2d's calibrated cost table; LBF/LBB/LBLAG).
 JID=$1; TAG=$2; shift 2
-DIR=/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect/sph3d
+DIR=${SPH_DIR:-/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect/sph3d}
 export LD_LIBRARY_PATH=/u/bhosale/charm-reconverse/lib:/u/bhosale/charm-reconverse/multicore-linux-x86_64-cuda/lib:/u/bhosale/lci_install/lib64:$LD_LIBRARY_PATH
 export FI_MR_CACHE_MONITOR=disabled PMI_MAX_KVS_ENTRIES=8192 CUDA_DEVICE_ORDER=PCI_BUS_ID
 ulimit -c 0

@@ -262,10 +262,22 @@ extern void invokeIntegrateLeavers(bool, const Particle*, int, RealType, RealTyp
     RealType, RealType, RealType, RealType, Particle**, Particle*, int*, int,
     cudaStream_t);
 extern void sphSetInteriorLayers(int);
+extern size_t sphSelectTempBytes(int);
+extern void invokeForcesInteriorRows(int, int, int, int, int, const int*, const int*, const int*, const int*,
+    const float4*, const float4*, const unsigned char*, RealType, RealType, RealType, RealType, RealType*,
+    RealType*, RealType*, RealType*, int*, int*, cudaStream_t);
+extern void invokeForcesTwoListRows(int, int, int, int, int, int, int, const int*, const int*, const int*,
+    const int*, const int*, const int*, const int*, const int*, const float4*, const float4*,
+    const unsigned char*, RealType, RealType, RealType, RealType, RealType*, RealType*, RealType*,
+    RealType*, int*, int*, cudaStream_t);
+extern void sphIota(int, int*, cudaStream_t);
+extern void invokeForcesInteriorSel(int, int, int, int, const int*, const int*, const int*, const int*,
+    const float4*, const float4*, const unsigned char*, RealType, RealType, RealType, RealType, RealType*,
+    RealType*, RealType*, RealType*, const int*, unsigned char*, int*, int*, void*, size_t, cudaStream_t);
 extern void invokeForcesTwoList(int, int, int, int, int, int, const int*, const int*, const int*,
     const int*, const int*, const int*, const int*, const int*, const float4*, const float4*,
     const unsigned char*, RealType, RealType, RealType, RealType, RealType*, RealType*, RealType*,
-    RealType*, cudaStream_t);
+    RealType*, const int*, unsigned char*, int*, int*, void*, size_t, cudaStream_t);
 extern void invokePredict(const Particle*, Particle*, int, RealType, RealType,
     RealType, const RealType*, const RealType*, const RealType*, const RealType*,
     cudaStream_t);
@@ -895,6 +907,8 @@ class Patch : public CBase_Patch {
   cudaEvent_t pack_ev;            // the pack has read the positions
   cudaEvent_t compact_ev;         // the compaction is complete (the pack waits on it)
   int *d_cell_cnt2, *d_cell_off2, *d_cursor2, *d_cell_parts2, *d_cell_of2;   // the extras list E
+  int* d_iota; unsigned char* d_sel_flags; int* d_sel; int* d_sel_num; void* d_sel_tmp; size_t sel_tmp_bytes;   // target selection
+  int *d_item_beg, *d_item_pre;   // the rows form's table
 
   // ---- concurrent exchange (-c; see the top of the file) --------------------
   int* d_counts_mig;              // the compaction's counters (d_counts is the halo pack's)
@@ -1031,18 +1045,30 @@ public:
     prio_dirty = true; prio_now = false;
     interior_done = false; interior_np = 0;
     d_cell_cnt2 = d_cell_off2 = d_cursor2 = d_cell_parts2 = d_cell_of2 = NULL;
+    d_iota = NULL; d_sel_flags = NULL; d_sel = NULL; d_sel_num = NULL; d_sel_tmp = NULL; sel_tmp_bytes = 0;
+    d_item_beg = NULL; d_item_pre = NULL;
     for (int k = 0; k < LAT_KINDS; k++)
       for (int par = 0; par < 2; par++)
         for (int d = 0; d < NUM_DIRS; d++) env_t[k][par][d] = 0;
   }
 
+  static int interiorLayers() {
+    static const int layers = getenv("SPH_INTERIOR_LAYERS") ? std::max(1, atoi(getenv("SPH_INTERIOR_LAYERS"))) : 2;
+    return layers;
+  }
+  // SPH_INTERIOR_ROWS=1: the passes map threads to targets through a row table (no flags, no select).
+  static bool interiorRows() {
+    static const bool rows = (getenv("SPH_INTERIOR_ROWS") != nullptr);
+    return rows;
+  }
   static bool interiorFirstOn() {
     static const bool on = (getenv("SPH_INTERIOR_FIRST") != nullptr);
     static bool layers_set = false;
     if (on && !layers_set) {
       layers_set = true;
-      const int layers = getenv("SPH_INTERIOR_LAYERS") ? atoi(getenv("SPH_INTERIOR_LAYERS")) : 2;
-      sphSetInteriorLayers(layers < 1 ? 1 : layers);
+      const int layers = interiorLayers();
+      sphSetInteriorLayers(layers);
+      if (CkMyPe() == 0 && interiorRows()) CkPrintf("  interior-first: rows form (row tables, no select)\n");
       if (CkMyPe() == 0) CkPrintf("  interior-first: %d boundary layer(s) per side%s\n", layers, layers == 1 ? " (TIMING EXPERIMENT: cell-2 targets miss the migrants)" : "");
     }
     return on;
@@ -1097,6 +1123,18 @@ public:
     hapiCheck(hapiMalloc((void**)&d_cursor2, sizeof(int) * ncells));
     hapiCheck(hapiMalloc((void**)&d_cell_parts2, sizeof(int) * part_capacity));
     hapiCheck(hapiMalloc((void**)&d_cell_of2, sizeof(int) * part_capacity));
+    if (interiorFirstOn()) {
+      hapiCheck(hapiMalloc((void**)&d_iota, sizeof(int) * part_capacity));
+      hapiCheck(hapiMalloc((void**)&d_sel_flags, (size_t)part_capacity));
+      hapiCheck(hapiMalloc((void**)&d_sel, sizeof(int) * part_capacity));
+      hapiCheck(hapiMalloc((void**)&d_sel_num, sizeof(int)));
+      sel_tmp_bytes = sphSelectTempBytes(part_capacity);
+      hapiCheck(hapiMalloc((void**)&d_sel_tmp, std::max(sel_tmp_bytes, (size_t)256)));
+      sphIota(part_capacity, d_iota, compute_stream);
+      const int max_items = 3 * (ncy + 2) * (ncz + 2) + 2;
+      hapiCheck(hapiMalloc((void**)&d_item_beg, sizeof(int) * max_items));
+      hapiCheck(hapiMalloc((void**)&d_item_pre, sizeof(int) * max_items));
+    }
     hapiCheck(hapiMalloc((void**)&d_pos4, sizeof(float4) * part_capacity));
     hapiCheck(hapiMalloc((void**)&d_vel4, sizeof(float4) * part_capacity));
     hapiCheck(hapiMalloc((void**)&d_type8, (size_t)part_capacity));
@@ -1155,6 +1193,8 @@ public:
     hapiFree(d_cursor); hapiFree(d_cell_parts); hapiFree(d_cell_of);
     hapiFree(d_cell_cnt2); hapiFree(d_cell_off2); hapiFree(d_cursor2); hapiFree(d_cell_parts2); hapiFree(d_cell_of2);
     d_cell_cnt2 = d_cell_off2 = d_cursor2 = d_cell_parts2 = d_cell_of2 = NULL;
+    if (d_sel_flags) { hapiFree(d_iota); hapiFree(d_sel_flags); hapiFree(d_sel); hapiFree(d_sel_num); hapiFree(d_sel_tmp); hapiFree(d_item_beg); hapiFree(d_item_pre); }
+    d_iota = NULL; d_sel_flags = NULL; d_sel = NULL; d_sel_num = NULL; d_sel_tmp = NULL; d_item_beg = NULL; d_item_pre = NULL;
     hapiFree(d_pos4); hapiFree(d_vel4); hapiFree(d_type8); hapiFree(d_scan_tmp);
     hapiFree(d_drho); hapiFree(d_ax); hapiFree(d_ay); hapiFree(d_az);
     hapiFree(d_stats); hapiFree(d_check);
@@ -2085,9 +2125,16 @@ public:
           ncells, d_cell_cnt2, d_cell_off2, d_cursor2, d_cell_parts2, d_cell_of2,
           d_scan_tmp, scan_tmp_bytes, compute_stream);
       invokeLayout(d_parts[cur] + n0, d_cell_parts2, nx, d_pos4 + n0, d_vel4 + n0, d_type8 + n0, compute_stream);
-      invokeForcesTwoList(ntot, np, n0, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_cell_off, d_cell_cnt,
-          d_cell_parts2, d_cell_of2, d_cell_off2, d_cell_cnt2, d_pos4, d_vel4, d_type8,
-          smooth_h, pmass, sound_c0, gravity, d_drho, d_ax, d_ay, d_az, compute_stream);
+      if (interiorRows())
+        invokeForcesTwoListRows(ntot, np, n0, ncx, ncy, ncz, interiorLayers(), d_cell_parts, d_cell_of, d_cell_off,
+            d_cell_cnt, d_cell_parts2, d_cell_of2, d_cell_off2, d_cell_cnt2, d_pos4, d_vel4, d_type8,
+            smooth_h, pmass, sound_c0, gravity, d_drho, d_ax, d_ay, d_az, d_item_beg, d_item_pre, compute_stream);
+      else
+        invokeForcesTwoList(ntot, np, n0, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_cell_off, d_cell_cnt,
+            d_cell_parts2, d_cell_of2, d_cell_off2, d_cell_cnt2, d_pos4, d_vel4, d_type8,
+            smooth_h, pmass, sound_c0, gravity, d_drho, d_ax, d_ay, d_az,
+            d_iota, d_sel_flags, d_sel, d_sel_num, d_sel_tmp, sel_tmp_bytes, compute_stream);
+      splitStats("boundary", ntot);
       cells_valid = false;   // L alone is not the full list
       interior_done = false;
     } else {
@@ -2246,6 +2293,18 @@ public:
   // need no neighbour. Not before a step that sorts the locals (the sort
   // permutes the indices the results are stored by), not with -c (its own
   // schedule), not for the predictor-corrector (two evaluations).
+  // SPH_SPLIT_STATS=1: the targets of each pass (rows form) for a few patches at the stats steps.
+  void splitStats(const char* pass, int n_entries) {
+    static const bool on = (getenv("SPH_SPLIT_STATS") != nullptr);
+    if (!on || !interiorRows() || !isStatsIter() || ((x + y + z) % 5) != 0) return;
+    const int L = interiorLayers();
+    const int nitems = (pass[0] == 'i') ? (ncy - 2 * L) * (ncz - 2 * L) : 3 * ncy * ncz;
+    int total = 0;
+    hapiCheck(cudaStreamSynchronize(compute_stream));
+    hapiCheck(cudaMemcpy(&total, d_item_pre + nitems, sizeof(int), cudaMemcpyDeviceToHost));
+    CkPrintf("[SPLIT] patch (%d,%d,%d) step %d %s: %d targets of %d entries (np %d, cells %dx%dx%d)\n",
+        x, y, z, my_iter, pass, total, n_entries, np, ncx, ncy, ncz);
+  }
   void interiorPass() {
     static const bool on = (getenv("SPH_INTERIOR_FIRST") != nullptr);
     if (!on || concurrent_x || integrator != 0 || nl_freq != 1 || !step_active || np <= 0) return;
@@ -2266,10 +2325,16 @@ public:
         ncells, d_cell_cnt, d_cell_off, d_cursor, d_cell_parts, d_cell_of,
         d_scan_tmp, scan_tmp_bytes, compute_stream);
     invokeLayout(d_parts[cur], d_cell_parts, np, d_pos4, d_vel4, d_type8, compute_stream);
-    invokeForces(1, np, np, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_cell_off,
-        d_cell_cnt, d_pos4, d_vel4, d_type8, smooth_h, pmass, sound_c0, gravity,
-        d_drho, d_ax, d_ay, d_az, compute_stream);
+    if (interiorRows())
+      invokeForcesInteriorRows(np, ncx, ncy, ncz, interiorLayers(), d_cell_parts, d_cell_of, d_cell_off, d_cell_cnt,
+          d_pos4, d_vel4, d_type8, smooth_h, pmass, sound_c0, gravity, d_drho, d_ax, d_ay, d_az,
+          d_item_beg, d_item_pre, compute_stream);
+    else
+      invokeForcesInteriorSel(np, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_cell_off, d_cell_cnt,
+          d_pos4, d_vel4, d_type8, smooth_h, pmass, sound_c0, gravity, d_drho, d_ax, d_ay, d_az,
+          d_iota, d_sel_flags, d_sel, d_sel_num, d_sel_tmp, sel_tmp_bytes, compute_stream);
     if (batch_compute) hapiSubmitBatchEnd();
+    splitStats("interior", np);
     cells_valid = false;
     interior_done = true;
     interior_np = np;

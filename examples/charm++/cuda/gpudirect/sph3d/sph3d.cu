@@ -1,6 +1,8 @@
 // CUB first: converse.h defines ALIGN_BYTES as a macro, which is also the name
 // of a member constant in CUB's alignment traits.
 #include <cub/device/device_scan.cuh>
+#include <cub/device/device_select.cuh>
+#include <cub/block/block_scan.cuh>
 #include "hapi.h"
 #include "sph3d.h"
 
@@ -154,7 +156,10 @@ __global__ void eosKernel(Particle* parts, int n, RealType rho0, RealType c0,
 // TIMING EXPERIMENT only -- cell-2 targets then miss the migrants' pairs.
 __constant__ int c_interior_lo = 3;
 __device__ __forceinline__ bool cellIsInterior(int cx, int cy, int cz, int ncx, int ncy, int ncz) {
-  const int lo = c_interior_lo, hi = lo - 2;   // lo = layers + 1; the high side is nc - layers + 1
+  // lo = layers + 1; the interior is [lo, nc - layers] per dimension: migrants land in cells 1 and nc,
+  // so the cells next to them (2 and nc-1) are boundary too. (Until 2026-10-11 the high side was
+  // nc - layers + 1: cell nc-1 targets were computed before their high-side migrants arrived.)
+  const int lo = c_interior_lo, hi = lo - 1;
   return cx >= lo && cx <= ncx - hi && cy >= lo && cy <= ncy - hi && cz >= lo && cz <= ncz - hi;
 }
 void sphSetInteriorLayers(int layers) {
@@ -207,20 +212,120 @@ __device__ __forceinline__ void accumulatePairs(const TargetState& pi, const flo
 // since (entries [n0, n_total): the migrants, which are targets, and the
 // ghosts, which are sources only). A target in a non-interior cell gathers
 // from both lists' runs of each stencil cell.
+// Target selection for the split passes: the subsets are sparse in cell
+// order (the boundary cells sit in every row of the patch), so a pass over
+// all entries exits most of its warps at once and the active ones touch the
+// layout sparsely (ncu: the boundary pass at 44% occupancy, 46% SM throughput,
+// 76% L2 hits against 62 / 71 / 88 for the full pass). Each pass first
+// compacts its targets, in cell order, with CUB's DeviceSelect::Flagged and
+// runs one thread per selected entry.
+__global__ void flagInteriorKernel(int n, int n_local, int ncx, int ncy, int ncz,
+    const int* __restrict__ cell_parts, const int* __restrict__ cell_of, unsigned char* flags) {
+  const int k = blockIdx.x * blockDim.x + threadIdx.x;
+  if (k >= n) return;
+  const int i = cell_parts[k];
+  unsigned char f = 0;
+  if (i < n_local) {
+    const int c = cell_of[i];
+    f = cellIsInterior(c % (ncx + 2), (c / (ncx + 2)) % (ncy + 2), c / ((ncx + 2) * (ncy + 2)), ncx, ncy, ncz) ? 1 : 0;
+  }
+  flags[k] = f;
+}
+__global__ void flagBoundaryTwoListKernel(int n_total, int n_local, int n0, int ncx, int ncy, int ncz,
+    const int* __restrict__ cell_parts, const int* __restrict__ cell_of,
+    const int* __restrict__ cell_parts2, const int* __restrict__ cell_of2, unsigned char* flags) {
+  const int k = blockIdx.x * blockDim.x + threadIdx.x;
+  if (k >= n_total) return;
+  int i, c;
+  if (k < n0) { i = cell_parts[k]; c = cell_of[i]; }
+  else { const int k2 = k - n0; i = n0 + cell_parts2[k2]; c = cell_of2[cell_parts2[k2]]; }
+  unsigned char f = 0;
+  if (i < n_local)
+    f = cellIsInterior(c % (ncx + 2), (c / (ncx + 2)) % (ncy + 2), c / ((ncx + 2) * (ncy + 2)), ncx, ncy, ncz) ? 0 : 1;
+  flags[k] = f;
+}
+
+// Row tables (the "rows" form of the split passes). The layout is in cell order and a cell row (fixed
+// cy, cz) is contiguous in it, so each pass's targets are a few entry RANGES per row: the interior pass
+// takes cells [lo, ncx-layers] of every interior row of the locals' list; the boundary pass takes the
+// whole local x-range of every boundary row, the two x-end segments of every interior row (list L), and
+// the local x-range of every row of the extras list E (its migrants; the ghosts sit in ghost cells and
+// ghost rows). One block builds the table (begin entry + exclusive prefix of counts per item) and the
+// forces kernel maps thread t to its entry by a binary search over the prefix: no pass over the
+// entries, perfectly dense threads. nitems = (ncy-2L)(ncz-2L) for the interior, 3 ncy ncz for the boundary.
+__device__ __forceinline__ int rowOf(const int* __restrict__ pre, int n, int t) {
+  int lo = 0, hi = n;   // pre[lo] <= t < pre[hi]
+  while (hi - lo > 1) { const int mid = (lo + hi) >> 1; if (pre[mid] <= t) lo = mid; else hi = mid; }
+  return lo;
+}
+__global__ void rowTableKernel(int pass, int ncx, int ncy, int ncz, int layers,
+    const int* __restrict__ cell_off, const int* __restrict__ cell_cnt,
+    const int* __restrict__ cell_off2, const int* __restrict__ cell_cnt2, int n0,
+    int* item_beg, int* item_pre, int nitems) {
+  typedef cub::BlockScan<int, 1024> Scan;
+  __shared__ typename Scan::TempStorage tmp;
+  const int lo = layers + 1, sx = ncx + 2;
+  auto cellId = [&](int cx, int cy, int cz) { return (cz * (ncy + 2) + cy) * sx + cx; };
+  int carry = 0;
+  for (int base = 0; base < nitems; base += blockDim.x) {
+    const int j = base + threadIdx.x;
+    int beg = 0, cnt = 0;
+    if (j < nitems) {
+      if (pass == 1) {
+        const int ry = ncy - 2 * layers;
+        const int cy = lo + j % ry, cz = lo + j / ry;
+        const int ca = cellId(lo, cy, cz), cb = cellId(ncx - layers, cy, cz);
+        beg = cell_off[ca]; cnt = cell_off[cb] + cell_cnt[cb] - beg;
+      } else {
+        const int R1 = 2 * ncy * ncz;
+        if (j < R1) {
+          // Segment-major within a plane: a plane's low x-ends of consecutive
+          // rows come together, then its high x-ends, so consecutive blocks
+          // share stencil planes (alternating low/high ends of one row put two
+          // far-apart stencils in every block).
+          const int cz = 1 + j / (2 * ncy), rem = j % (2 * ncy);
+          const int seg = rem / ncy, cy = 1 + rem % ncy;
+          const bool brow = (cy < lo || cy > ncy - layers || cz < lo || cz > ncz - layers);
+          int xa, xb;
+          if (brow) { xa = 1; xb = seg ? 0 : ncx; }   // the whole local range, one segment only
+          else if (seg == 0) { xa = 1; xb = lo - 1; }
+          else { xa = ncx - layers + 1; xb = ncx; }
+          if (xb >= xa) { const int ca = cellId(xa, cy, cz), cb = cellId(xb, cy, cz); beg = cell_off[ca]; cnt = cell_off[cb] + cell_cnt[cb] - beg; }
+        } else {
+          const int r = j - R1;
+          const int cy = 1 + r % ncy, cz = 1 + r / ncy;
+          const int ca = cellId(1, cy, cz), cb = cellId(ncx, cy, cz);
+          beg = n0 + cell_off2[ca]; cnt = cell_off2[cb] + cell_cnt2[cb] - cell_off2[ca];
+        }
+      }
+    }
+    int pre = 0, total = 0;
+    Scan(tmp).ExclusiveSum(cnt, pre, total);
+    __syncthreads();
+    if (j < nitems) { item_beg[j] = beg; item_pre[j] = carry + pre; }
+    carry += total;
+    __syncthreads();
+  }
+  if (threadIdx.x == 0) item_pre[nitems] = carry;
+}
+
 __global__ void forcesTwoListKernel(int n_total, int n_local, int n0, int ncx, int ncy, int ncz,
     const int* __restrict__ cell_parts, const int* __restrict__ cell_of, const int* __restrict__ cell_off,
     const int* __restrict__ cell_cnt, const int* __restrict__ cell_parts2, const int* __restrict__ cell_of2,
     const int* __restrict__ cell_off2, const int* __restrict__ cell_cnt2, const float4* __restrict__ pos4,
     const float4* __restrict__ vel4, const unsigned char* __restrict__ type8, RealType h, RealType mass,
-    RealType c0, RealType gravity, RealType* drho, RealType* ax, RealType* ay, RealType* az) {
-  const int k = blockIdx.x * blockDim.x + threadIdx.x;
-  if (k >= n_total) return;
+    RealType c0, RealType gravity, RealType* drho, RealType* ax, RealType* ay, RealType* az,
+    const int* __restrict__ sel, const int* __restrict__ d_num,
+    const int* __restrict__ item_beg, const int* __restrict__ item_pre, int nitems) {
+  const int t = blockIdx.x * blockDim.x + threadIdx.x;
+  int k;   // the entry: a local target in a boundary cell
+  if (item_pre != nullptr) { if (t >= item_pre[nitems]) return; const int j = rowOf(item_pre, nitems, t); k = item_beg[j] + (t - item_pre[j]); }
+  else { if (t >= *d_num) return; k = sel[t]; }
   int i, ci;
   if (k < n0) { i = cell_parts[k]; ci = cell_of[i]; }
   else { const int k2 = k - n0; i = n0 + cell_parts2[k2]; ci = cell_of2[cell_parts2[k2]]; }
-  if (i >= n_local) return;   // a ghost
+  if (i >= n_local) return;   // never for a row item; kept as the guard it is
   const int cx = ci % (ncx + 2), cy = (ci / (ncx + 2)) % (ncy + 2), cz = ci / ((ncx + 2) * (ncy + 2));
-  if (cellIsInterior(cx, cy, cz, ncx, ncy, ncz)) return;   // done by the interior pass
   TargetState pi;
   { const float4 a = pos4[k], b = vel4[k]; pi.x = a.x; pi.y = a.y; pi.z = a.z; pi.rho = a.w;
     pi.vx = b.x; pi.vy = b.y; pi.vz = b.z; pi.p = b.w; pi.type = type8[k]; }
@@ -236,8 +341,14 @@ __global__ void forcesTwoListKernel(int n_total, int n_local, int n0, int ncx, i
       for (int ox = -1; ox <= 1; ox++) {
         const int xx = cx + ox; if (xx < 0 || xx > ncx + 1) continue;
         const int c = (zz * (ncy + 2) + yy) * (ncx + 2) + xx;
-        accumulatePairs(pi, pos4, vel4, cell_off[c], cell_off[c] + cell_cnt[c], h, inv_h, support2, eta2h2, inv_rhoi2, mass, c0, acc);
-        accumulatePairs(pi, pos4, vel4, n0 + cell_off2[c], n0 + cell_off2[c] + cell_cnt2[c], h, inv_h, support2, eta2h2, inv_rhoi2, mass, c0, acc);
+        // One inlined pair body for both lists (two inlined copies doubled the
+        // code and the boundary pass ran at 1.6x its share of the full pass).
+#pragma unroll 1
+        for (int l = 0; l < 2; l++) {
+          const int beg = l ? n0 + cell_off2[c] : cell_off[c];
+          const int cnt = l ? cell_cnt2[c] : cell_cnt[c];
+          if (cnt > 0) accumulatePairs(pi, pos4, vel4, beg, beg + cnt, h, inv_h, support2, eta2h2, inv_rhoi2, mass, c0, acc);
+        }
       }
     }
   }
@@ -252,12 +363,16 @@ __global__ void forcesKernel(int n_total, int n_local, int ncx,
     const int* __restrict__ cell_cnt, const float4* __restrict__ pos4,
     const float4* __restrict__ vel4, const unsigned char* __restrict__ type8,
     RealType h, RealType mass, RealType c0, RealType gravity, RealType* drho,
-    RealType* ax, RealType* ay, RealType* az, int mode) {
-  const int k = blockIdx.x * blockDim.x + threadIdx.x;
-  if (k >= n_total) return;
+    RealType* ax, RealType* ay, RealType* az, int mode,
+    const int* __restrict__ sel, const int* __restrict__ d_num,
+    const int* __restrict__ item_beg, const int* __restrict__ item_pre, int nitems) {
+  int k = blockIdx.x * blockDim.x + threadIdx.x;
+  if (item_pre != nullptr) { if (k >= item_pre[nitems]) return; const int j = rowOf(item_pre, nitems, k); k = item_beg[j] + (k - item_pre[j]); }
+  else if (sel != nullptr) { if (k >= *d_num) return; k = sel[k]; }   // one thread per selected entry
+  else if (k >= n_total) return;
   const int i = cell_parts[k];
   if (i >= n_local) return;   // a ghost: a source, never a sink
-  if (mode != 0) {
+  if (mode != 0 && sel == nullptr && item_pre == nullptr) {
     const int c0i = cell_of[i];
     const int ccx = c0i % (ncx + 2), ccy = (c0i / (ncx + 2)) % (ncy + 2), ccz = c0i / ((ncx + 2) * (ncy + 2));
     const bool inner = cellIsInterior(ccx, ccy, ccz, ncx, ncy, ncz);
@@ -875,7 +990,79 @@ void invokeForces(int mode, int n_total, int n_local, int ncx, int ncy, int ncz,
   hapiSubmit(s, [=]() {
     forcesKernel<<<(n_total + fb - 1) / fb, fb, 0, s>>>(n_total, n_local, ncx, ncy,
         ncz, d_cell_parts, d_cell_of, d_off, d_cnt, d_pos4, d_vel4, d_type8, h, mass,
-        c0, gravity, d_drho, d_ax, d_ay, d_az, mode);
+        c0, gravity, d_drho, d_ax, d_ay, d_az, mode, (const int*)nullptr, (const int*)nullptr, (const int*)nullptr, (const int*)nullptr, 0);
+  });
+  SPH_PEEK();
+}
+
+size_t sphSelectTempBytes(int n) {
+  size_t bytes = 0;
+  const int* it = NULL; unsigned char* f = NULL; int* o = NULL; int* c = NULL;
+  hapiCheck(cub::DeviceSelect::Flagged(NULL, bytes, it, f, o, c, n));
+  return bytes;
+}
+__global__ void iotaKernel(int n, int* d) {
+  const int k = blockIdx.x * blockDim.x + threadIdx.x;
+  if (k < n) d[k] = k;
+}
+void sphIota(int n, int* d, cudaStream_t s) {
+  if (n <= 0) return;
+  hapiSubmit(s, [=]() { iotaKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(n, d); });
+  SPH_PEEK();
+}
+
+// The interior pass over the locals' list, one thread per interior target.
+void invokeForcesInteriorSel(int n, int ncx, int ncy, int ncz, const int* d_cell_parts, const int* d_cell_of,
+    const int* d_off, const int* d_cnt, const float4* d_pos4, const float4* d_vel4, const unsigned char* d_type8,
+    RealType h, RealType mass, RealType c0, RealType gravity, RealType* d_drho, RealType* d_ax, RealType* d_ay,
+    RealType* d_az, const int* d_iota, unsigned char* d_flags, int* d_sel, int* d_num, void* d_tmp,
+    size_t tmp_bytes, cudaStream_t s) {
+  if (n <= 0) return;
+  hapiSubmit(s, [=]() {
+    flagInteriorKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(n, n, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_flags);
+    size_t bytes = tmp_bytes;
+    hapiCheck(cub::DeviceSelect::Flagged(d_tmp, bytes, d_iota, d_flags, d_sel, d_num, n, s));
+    const int fb = 128;
+    forcesKernel<<<(n + fb - 1) / fb, fb, 0, s>>>(n, n, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_off, d_cnt,
+        d_pos4, d_vel4, d_type8, h, mass, c0, gravity, d_drho, d_ax, d_ay, d_az, 1, d_sel, d_num, (const int*)nullptr, (const int*)nullptr, 0);
+  });
+  SPH_PEEK();
+}
+
+// The rows form of the interior pass.
+void invokeForcesInteriorRows(int n, int ncx, int ncy, int ncz, int layers, const int* d_cell_parts,
+    const int* d_cell_of, const int* d_off, const int* d_cnt, const float4* d_pos4, const float4* d_vel4,
+    const unsigned char* d_type8, RealType h, RealType mass, RealType c0, RealType gravity, RealType* d_drho,
+    RealType* d_ax, RealType* d_ay, RealType* d_az, int* d_item_beg, int* d_item_pre, cudaStream_t s) {
+  const int nitems = (ncy - 2 * layers) * (ncz - 2 * layers);
+  if (n <= 0 || nitems <= 0) return;
+  hapiSubmit(s, [=]() {
+    rowTableKernel<<<1, 1024, 0, s>>>(1, ncx, ncy, ncz, layers, d_off, d_cnt, (const int*)nullptr, (const int*)nullptr, 0,
+        d_item_beg, d_item_pre, nitems);
+    const int fb = 128;
+    forcesKernel<<<(n + fb - 1) / fb, fb, 0, s>>>(n, n, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_off, d_cnt,
+        d_pos4, d_vel4, d_type8, h, mass, c0, gravity, d_drho, d_ax, d_ay, d_az, 1,
+        (const int*)nullptr, (const int*)nullptr, d_item_beg, d_item_pre, nitems);
+  });
+  SPH_PEEK();
+}
+
+// The rows form of the boundary pass over the lists L and E.
+void invokeForcesTwoListRows(int n_total, int n_local, int n0, int ncx, int ncy, int ncz, int layers,
+    const int* d_cell_parts, const int* d_cell_of, const int* d_off, const int* d_cnt,
+    const int* d_cell_parts2, const int* d_cell_of2, const int* d_off2, const int* d_cnt2,
+    const float4* d_pos4, const float4* d_vel4, const unsigned char* d_type8, RealType h,
+    RealType mass, RealType c0, RealType gravity, RealType* d_drho, RealType* d_ax,
+    RealType* d_ay, RealType* d_az, int* d_item_beg, int* d_item_pre, cudaStream_t s) {
+  const int nitems = 3 * ncy * ncz;
+  if (n_total <= 0) return;
+  hapiSubmit(s, [=]() {
+    rowTableKernel<<<1, 1024, 0, s>>>(2, ncx, ncy, ncz, layers, d_off, d_cnt, d_off2, d_cnt2, n0, d_item_beg, d_item_pre, nitems);
+    const int fb = 128;
+    forcesTwoListKernel<<<(n_total + fb - 1) / fb, fb, 0, s>>>(n_total, n_local, n0, ncx, ncy, ncz,
+        d_cell_parts, d_cell_of, d_off, d_cnt, d_cell_parts2, d_cell_of2, d_off2, d_cnt2,
+        d_pos4, d_vel4, d_type8, h, mass, c0, gravity, d_drho, d_ax, d_ay, d_az,
+        (const int*)nullptr, (const int*)nullptr, d_item_beg, d_item_pre, nitems);
   });
   SPH_PEEK();
 }
@@ -885,13 +1072,19 @@ void invokeForcesTwoList(int n_total, int n_local, int n0, int ncx, int ncy, int
     const int* d_cell_parts2, const int* d_cell_of2, const int* d_off2, const int* d_cnt2,
     const float4* d_pos4, const float4* d_vel4, const unsigned char* d_type8, RealType h,
     RealType mass, RealType c0, RealType gravity, RealType* d_drho, RealType* d_ax,
-    RealType* d_ay, RealType* d_az, cudaStream_t s) {
+    RealType* d_ay, RealType* d_az, const int* d_iota, unsigned char* d_flags, int* d_sel, int* d_num,
+    void* d_tmp, size_t tmp_bytes, cudaStream_t s) {
   if (n_total <= 0) return;
   hapiSubmit(s, [=]() {
+    flagBoundaryTwoListKernel<<<nblocks(n_total), BLOCK_1D, 0, s>>>(n_total, n_local, n0, ncx, ncy, ncz,
+        d_cell_parts, d_cell_of, d_cell_parts2, d_cell_of2, d_flags);
+    size_t bytes = tmp_bytes;
+    hapiCheck(cub::DeviceSelect::Flagged(d_tmp, bytes, d_iota, d_flags, d_sel, d_num, n_total, s));
     const int fb = 128;
     forcesTwoListKernel<<<(n_total + fb - 1) / fb, fb, 0, s>>>(n_total, n_local, n0, ncx, ncy, ncz,
         d_cell_parts, d_cell_of, d_off, d_cnt, d_cell_parts2, d_cell_of2, d_off2, d_cnt2,
-        d_pos4, d_vel4, d_type8, h, mass, c0, gravity, d_drho, d_ax, d_ay, d_az);
+        d_pos4, d_vel4, d_type8, h, mass, c0, gravity, d_drho, d_ax, d_ay, d_az, d_sel, d_num,
+        (const int*)nullptr, (const int*)nullptr, 0);
   });
   SPH_PEEK();
 }

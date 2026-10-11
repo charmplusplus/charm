@@ -1,18 +1,34 @@
 #!/bin/bash
-# n2_rest.sh <jobid>: the rest of allocation 3 -- LeanMD with a vmm pool, the 3% floor pair, the periodic sort, 25M.
+# n2_rest.sh <jobid>: the rest of job 22797719 after the -c pup fix (2026-10-10): kernels-only sync trace (user: "capture a
+# sync LB trace as well"), -c async smoke, -c async 2000, sync control 2000, -c sync 2000, kernels-only traces of -c in
+# both modes. Guards on the time left; releases the node at the end.
 JID=$1; D=/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect/sph3d
-echo "rest start $(date +%T) left $(squeue -j $JID -h -o %L)"
-$D/n2_leanmd_pool.sh $JID
-export POOL_ALLOC=vmm LCI_LIB=/u/bhosale/lci/build-cuda/lib
-DIFF_FLAGS= LBF=100 LBB=100 LBLAG=50 XFLAGS="+LBMetisMinGain 0.03" TAGPFX=g3 $D/n2_final2.sh $JID "8 4 8" 2000 syncT asyncT
-echo "floor pair done $(date +%T) left $(squeue -j $JID -h -o %L)"
-SPH_SORT_EVERY=100 DIFF_FLAGS= LBF=100 LBB=100 LBLAG=50 XFLAGS="+LBMetisMinGain 0.03" TAGPFX=s100g3 $D/n2_final2.sh $JID "8 4 8" 2000 syncT
-echo "sort arm done $(date +%T) left $(squeue -j $JID -h -o %L)"
-export NODES=2 NP=8
-for ARM in none syncT asyncT; do
-  LBM=${ARM%T}; EX=""; [ "$ARM" != "$LBM" ] && EX="+LBMetisHostByMsgs +LBMetisMinGain 0.03"
-  TAG=f25M_p128_${ARM}
-  DIFF_FLAGS= POOL=16384 LB=$LBM LBDEBUG=1 $D/run3d.sh $JID $TAG -X 1.5 -Y 0.5 -Z 2.5 -w 1.0 -t 2 -s 0.0035 -V 10 -x 4 -y 4 -z 8 -r 2 -e 0.05 -i 2000 -S 25 -k 1 $EX > /dev/null 2>&1
-  L=$D/logs/$TAG.log; echo "$(date +%T) $TAG: $(grep -o 'rc=[0-9]*' $L | tail -1) checks=$(grep -c 'check ok' $L) | whole-run $(grep 'Average iteration' $L | sed -E 's/.*: ([0-9.]+) ms.*/\1/') ms"
-done
-echo "rest done $(date +%T) left $(squeue -j $JID -h -o %L)"
+left_s() { squeue -j $JID -h -o %L | awk -F: '{if(NF==3) print $1*3600+$2*60+$3; else if(NF==2) print $1*60+$2; else print $1}'; }
+XF="+LBMetisMinGain 0.03 +LBMetisMaxCutRise 0.1"
+run_arm() {  # <pfx> <steps> <mode sync|async> <extra app args> <env...>
+  local pfx=$1 ns=$2 mode=$3 extra=$4; shift 4
+  local need=$(( ns > 500 ? 150 : 60 ))
+  [ "$(left_s)" -gt $need ] || { echo "skip $pfx: $(left_s) s left"; return 1; }
+  local P=25 LAG=10; [ $mode = sync ] && { P=100; LAG=50; }
+  env "$@" DIFF_FLAGS= LBF=$P LBB=$P LBLAG=$LAG XFLAGS="$XF $extra" TAGPFX=${pfx}_ POOL=32768 bash $D/n2_final2.sh $JID "8 4 8" $ns ${mode}T 2>&1 | grep -v "^HAPI\[" | cut -c1-200
+  L=$(ls -t $D/logs/${pfx}_256_${ns}_p${P}_${mode}T_*.log | head -1)
+  grep -E "CORRUPTION|Abort|abort|Fatal|Segmentation|did not consume|overflowed|expected|ERROR" $L | head -3 | cut -c1-220
+  grep -A12 "^Message latency" $L | grep -E "halo|migration" | head -6
+  grep -q "rc=0" $L
+}
+trace() {  # <mode> <extra app args>
+  [ "$(left_s)" -gt 70 ] || { echo "skip trace $1 $2: $(left_s) s left"; return 1; }
+  GT_NOCOPY=1 XTRA_APP="$2" bash $D/n2_gputrace.sh $JID 200 $1 2>&1 | grep -v "^HAPI\[" | cut -c1-200
+}
+echo "=== rest chain start $(date +%T), left $(squeue -j $JID -h -o %L)"
+trace sync ""
+run_arm Cs 200 async "-c"; okCs=$?
+if [ $okCs = 0 ]; then run_arm C 2000 async "-c"; okC=$?; else echo "C smoke failed again: no long -c arms"; okC=1; fi
+run_arm s 2000 sync ""; oks=$?
+[ $okC = 0 ] && { run_arm Sc 2000 sync "-c"; okSc=$?; }
+[ $okC = 0 ] && trace async "-c"
+[ "${okSc:-1}" = 0 ] && trace sync "-c"
+wait
+for T in $(ls -td /scratch/mzu/bhosale/gputrace/gk200_* 2>/dev/null | head -4); do echo "== $(basename $T)"; python3 $D/gap_report.py $T/trace_last1s.json 5 2>&1 | grep -E "message latency|halo |migration |largest gap" | cut -c1-160; done
+echo "=== rest chain done $(date +%T), left $(squeue -j $JID -h -o %L); rc ok: Cs=$okCs C=$okC s=$oks Sc=${okSc:-skipped}"
+echo "=== node KEPT: release only when the user says so"
