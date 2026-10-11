@@ -206,7 +206,10 @@ int processAst(xi::AstChildren<xi::Module> *m, const bool chareNames,
   // set globals based on input params
   fortranMode = fortranMode_;
   internalMode = internalMode_;
-  cur_file = origFile = origFile_;
+  origFile = origFile_;
+  // Without -orig-file, name the input file (as readFile does) so that #line
+  // directives and diagnostics never print a NULL file name.
+  cur_file = (origFile != NULL) ? origFile : (fname_ != NULL ? fname_ : "STDIN");
   fname = fname_;
 
   if (!m) return 0;
