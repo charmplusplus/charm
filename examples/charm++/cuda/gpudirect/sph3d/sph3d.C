@@ -10,9 +10,34 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstdint>
+#include <cstring>
 #include <unistd.h>
 #include <time.h>
 #include <atomic>
+#include <signal.h>
+#include <execinfo.h>
+// Fault handler (every process, installed at load): the open async segfault (4 in ~51 arms) has left nothing but
+// srun's "Segmentation fault" line, because the arms run with core dumps off (the /u quota) and without gdb. This
+// prints the faulting address and a raw backtrace (module+offset; resolve with addr2line -e sph3d) to stderr, then
+// re-raises with the default action so srun still reports the task. SPH_NO_SEGV_HANDLER=1 disables it.
+static void sphFaultHandler(int sig, siginfo_t* si, void*) {
+  void* frames[64];
+  const int n = backtrace(frames, 64);
+  char head[160];
+  const int len = snprintf(head, sizeof head, "\n[SPH FAULT] signal %d addr %p pid %d: %d frames\n", sig, si ? si->si_addr : NULL, (int)getpid(), n);
+  if (len > 0) { ssize_t r = write(2, head, (size_t)len); (void)r; }
+  backtrace_symbols_fd(frames, n, 2);
+  signal(sig, SIG_DFL);
+  raise(sig);
+}
+static struct SphFaultInstaller {
+  SphFaultInstaller() {
+    if (getenv("SPH_NO_SEGV_HANDLER")) return;
+    struct sigaction sa; memset(&sa, 0, sizeof sa);
+    sa.sa_sigaction = sphFaultHandler; sa.sa_flags = SA_SIGINFO | SA_RESETHAND;
+    sigaction(SIGSEGV, &sa, NULL); sigaction(SIGBUS, &sa, NULL); sigaction(SIGABRT, &sa, NULL);
+  }
+} sphFaultInstaller;
 
 // The runtime's +gputrace hook for application message flights (ck-core/cknvtx.h,
 // which the install does not ship): an L record per message when the trace is on.

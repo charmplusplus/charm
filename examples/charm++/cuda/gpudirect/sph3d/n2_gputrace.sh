@@ -5,18 +5,19 @@
 # runtime's own GPU timeline (+gputrace: CUPTI kernels + entry methods + idle, LB unaffected), then one merged
 # Perfetto trace of the last second per arm. Files: /scratch/mzu/bhosale/gputrace/<tag>/.
 JID=$1; NS=$2; shift 2
+set -- ${GDIMS:-8 4 8} "$@"; GX=$1; GY=$2; GZ=$3; shift 3   # env GDIMS="4 4 8" for other patch grids (default 256 patches)
 D=/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect/sph3d
 export NODES=2 NP=8 POOL_ALLOC=vmm LCI_LIB=/u/bhosale/lci/build-cuda/lib SPH_SORT_EVERY=100 POOL=32768
 for ARM in "$@"; do
   PFX=gt; [ -n "$GT_NOCOPY" ] && PFX=gk   # gk = kernels-only trace
-  TAG=${PFX}${NS}_${ARM}_$(date +%H%M%S); OUT=/scratch/mzu/bhosale/gputrace/$TAG; mkdir -p $OUT
+  TAG=${PFX}${NS}_${ARM}_$((GX*GY*GZ))_$(date +%H%M%S); OUT=/scratch/mzu/bhosale/gputrace/$TAG; mkdir -p $OUT
   NOCOPY=${GT_NOCOPY:+ +gputracenocopy}
   BASE=$(echo $ARM | sed 's/[OSH]*$//'); ENVX=""   # arm suffix: O = CUPTI load build off-thread, S = strategy off-thread
   [[ $ARM == *O* ]] && ENVX="$ENVX CHARM_LB_CUPTI_OFFTHREAD=near"
   [[ $ARM == *S* ]] && ENVX="$ENVX CHARM_LB_STRATEGY_THREAD=near"
   [[ $ARM == *H* ]] && ENVX="$ENVX CHARM_LB_HELPER=near"
   case $BASE in async) P=25; LAG=10;; *) P=100; LAG=50;; esac
-  env $ENVX DIFF_FLAGS= LBF=$P LBB=$P LBLAG=$LAG LB=$BASE LBDEBUG=1 TMO=${TMO:-600} $D/run3d.sh $JID $TAG -X 1.5 -Y 0.5 -Z 2.5 -w 1.0 -t 2 -s 0.0022 -V 10 -x 8 -y 4 -z 8 -r 2 -e 0.05 -i $NS -S 25 -k 1 \
+  env $ENVX DIFF_FLAGS= LBF=$P LBB=$P LBLAG=$LAG LB=$BASE LBDEBUG=1 TMO=${TMO:-600} $D/run3d.sh $JID $TAG -X 1.5 -Y 0.5 -Z 2.5 -w 1.0 -t 2 -s 0.0022 -V 10 -x $GX -y $GY -z $GZ -r 2 -e 0.05 -i $NS -S 25 -k 1 \
     $XTRA_APP +LBMetisHostByMsgs +LBMetisMinGain 0.03 +LBMetisMaxCutRise 0.1 +gputrace $OUT$NOCOPY > /dev/null 2>&1
   L=$D/logs/$TAG.log
   echo "$(date +%T) $TAG: $(grep -o 'rc=[0-9]*' $L | tail -1) checks=$(grep -c 'check ok' $L) whole-run $(grep 'Average iteration' $L | sed -E 's/.*: ([0-9.]+) ms.*/\1/') ms | files: $(ls $OUT | grep -c '\.proc$') proc, $(ls $OUT | grep -c '\.pe[0-9]*$') pe; $(du -sh $OUT | cut -f1)"

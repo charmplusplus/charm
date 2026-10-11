@@ -492,6 +492,32 @@ static void ipcHandleOpen();
 static constexpr uint64_t HAPI_CUPTI_NO_OBJECT =
     GpuObjectTokenTable::noObjectToken();
 
+// CHARM_LB_CUPTI_SOFT_FLUSH=1: the non-forced flush at the LB window close (see hapiPrepareCuptiLoads); the default
+// is the forced flush with retired buffers quarantined (hapiCuptiRetireBuffer).
+static bool hapiCuptiForcedFlush() {
+  static const bool soft = (getenv("CHARM_LB_CUPTI_SOFT_FLUSH") != nullptr);
+  return !soft;
+}
+
+// Buffers CUPTI handed back are not freed at the drain that parsed them. The forced flush returns buffers that still
+// hold incomplete records (cupti_activity.h), and CUPTI completes such a record later, from inside a subsequent CUDA
+// call of any thread, by writing into that buffer: freeing it at the drain put those writes into freed memory (the
+// +LBAsync segfault in CUPTI's launch intercept, job 22808905 backtraces; silent heap corruption when glibc kept the
+// chunk mapped). A retired buffer is kept for two more drains (hundreds of ms at any LB period; the late writes
+// come within the kernel's completion), then freed. Only the drain touches this (cupti_prepare_lock_).
+struct RetiredCuptiBuffer { uint8_t* buffer; uint64_t drain; };
+static std::deque<RetiredCuptiBuffer> g_cupti_retired;
+static uint64_t g_cupti_drain = 0;
+static void hapiCuptiRetireBuffer(uint8_t* buffer) {
+  if (buffer != nullptr) g_cupti_retired.push_back({buffer, g_cupti_drain});
+}
+static void hapiCuptiFreeRetired(uint64_t keep_drains) {
+  while (!g_cupti_retired.empty() && g_cupti_retired.front().drain + keep_drains <= g_cupti_drain) {
+    free(g_cupti_retired.front().buffer);
+    g_cupti_retired.pop_front();
+  }
+}
+
 static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords) {
   // CUPTI writes activity records straight into this buffer and has no way to
   // tell us the allocation failed: hand it NULL and it writes through a null
@@ -505,7 +531,11 @@ static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t
   // flush (CHARM_LB_CUPTI_SOFT_FLUSH) leaves behind -- at 256 KB that is a
   // fraction of a percent, so a soft flush can replace the forced one and its
   // device drain at the LB window close (see hapiPrepareCuptiLoads).
-  static const size_t first = getenv("CHARM_LB_CUPTI_BUFKB") ? (size_t)atoi(getenv("CHARM_LB_CUPTI_BUFKB")) * 1024 : 5*1024*1024;
+  // Soft-flush mode: a buffer that holds any incomplete record is withheld until a later close, so the buffer must
+  // be small or the window's tail is missing (256 KB = up to 4 steps of a 10-step sph3d window: every process's load
+  // jumped by a random fraction each window and MetisLB re-mapped at all 80 events, 46.2 vs 40.5 ms/step).
+  static const size_t first = getenv("CHARM_LB_CUPTI_BUFKB") ? (size_t)atoi(getenv("CHARM_LB_CUPTI_BUFKB")) * 1024
+                              : (hapiCuptiForcedFlush() ? 5*1024*1024 : 16*1024);
   const size_t sizes[] = {first, 1024*1024, 256*1024};
   for (size_t s : sizes) {
     *buffer = (uint8_t *)malloc(s);
@@ -1146,9 +1176,27 @@ void hapiProcessCuptiBuffers() {
     uint32_t           correlation_id;
     GpuLaunchSignature launch;
     LBKernelRecord     rec;
+    bool               carried;           // parked at the previous drain already
   };
-  std::vector<PendingKernel> pending;
-  pending.reserve(gm.cupti_pending_hint_);
+  // Carried over from the previous drain: with the default (non-forced) flush a buffer that holds any incomplete
+  // record stays with CUPTI until a later close, so a kernel record and the correlation record that names it can
+  // be delivered one drain apart, in either order. A kernel without its correlation is parked once more, and the
+  // previous drain's correlation maps live for one more drain. Only this function touches these (under
+  // cupti_prepare_lock_).
+  static std::vector<PendingKernel> carried;
+  static std::unordered_map<uint32_t, uint64_t> prev_object_corr, prev_work_tag_corr;
+  g_cupti_drain++;
+  hapiCuptiFreeRetired(2);
+  std::vector<PendingKernel> pending = std::move(carried);
+  carried.clear();
+  for (PendingKernel& p : pending) p.carried = true;
+  pending.reserve(pending.size() + gm.cupti_pending_hint_);
+  auto findObjectCorr = [&](uint32_t id) -> const uint64_t* {
+    auto it = gm.cupti_object_correlation_db_.find(id);
+    if (it != gm.cupti_object_correlation_db_.end()) return &it->second;
+    auto pv = prev_object_corr.find(id);
+    return pv != prev_object_corr.end() ? &pv->second : nullptr;
+  };
 
   // Runtime API records: the host time each call took, per object where the
   // correlation names one. Like kernels, a record can precede its correlation
@@ -1246,6 +1294,14 @@ void hapiProcessCuptiBuffers() {
       gm.cupti_work_tag_correlation_db_.erase(work_tag);
       return true;
     }
+    auto prev_tag = prev_work_tag_corr.find(correlation_id);
+    if (prev_tag != prev_work_tag_corr.end()) {
+      rec.has_explicit_work_tag = true;
+      rec.kernel_key.workBucket = gpuStableWorkBucket(launch, true, prev_tag->second);
+      gm.cupti_tagged_kernel_classes_.insert(rec.kernel_key.kernelClass);
+      prev_work_tag_corr.erase(prev_tag);
+      return true;
+    }
 
     // No tag found yet. Whether that is final depends on what is known about
     // this kernel class, because a tag record can be in a buffer this drain has
@@ -1296,7 +1352,7 @@ void hapiProcessCuptiBuffers() {
     // A buffer CUPTI never wrote to (or one it handed back empty) has nothing
     // to parse, and passing it on would dereference whatever came back.
     if (item.buffer == NULL || item.validSize == 0) {
-      free(item.buffer);
+      hapiCuptiRetireBuffer(item.buffer);
       continue;
     }
 
@@ -1360,14 +1416,13 @@ void hapiProcessCuptiBuffers() {
         // The correlation stays in the table: the launch's own API record
         // shares the id and may still be coming. Everything left is dropped
         // when the drain ends.
-        auto object = gm.cupti_object_correlation_db_.find(kernel->correlationId);
+        const uint64_t* object = findObjectCorr(kernel->correlationId);
         if (g_trace != nullptr)
-          hapiTraceKernel(kernel, object != gm.cupti_object_correlation_db_.end() ? object->second
-                                                                                   : HAPI_CUPTI_NO_OBJECT);
-        if (bucket_settled && object != gm.cupti_object_correlation_db_.end()) {
-          fileKernel(rec, object->second);
+          hapiTraceKernel(kernel, object != nullptr ? *object : HAPI_CUPTI_NO_OBJECT);
+        if (bucket_settled && object != nullptr) {
+          fileKernel(rec, *object);
         } else {
-          pending.push_back({kernel->correlationId, launch, rec});
+          pending.push_back({kernel->correlationId, launch, rec, false});
           deferred++;
         }
       }
@@ -1424,9 +1479,9 @@ void hapiProcessCuptiBuffers() {
           if (use.poll) {
             api_unattributed_s += seconds;
           } else {
-            auto object = gm.cupti_object_correlation_db_.find(api->correlationId);
-            if (object != gm.cupti_object_correlation_db_.end())
-              apiByToken[object->second] += seconds;
+            const uint64_t* object = findObjectCorr(api->correlationId);
+            if (object != nullptr)
+              apiByToken[*object] += seconds;
             else
               pendingApi.push_back({api->correlationId, seconds});
           }
@@ -1434,24 +1489,24 @@ void hapiProcessCuptiBuffers() {
       }
     }
 
-    free(item.buffer);
+    hapiCuptiRetireBuffer(item.buffer);
   }
 
   // Second pass: correlations that arrived in a later buffer are now known.
   for (PendingKernel& pending_kernel : pending) {
+    const uint64_t* object = findObjectCorr(pending_kernel.correlation_id);
+    // Its correlation record may still be in a buffer CUPTI has not delivered: park it once more.
+    if (object == nullptr && !pending_kernel.carried) { carried.push_back(pending_kernel); continue; }
     if (scaling)
       applyWorkTag(pending_kernel.correlation_id, pending_kernel.launch,
                    pending_kernel.rec, /*last_chance=*/true);
-
-    auto object =
-        gm.cupti_object_correlation_db_.find(pending_kernel.correlation_id);
-    if (object == gm.cupti_object_correlation_db_.end()) {
+    if (object == nullptr) {
       gm.cupti_unattributed_kernels_.push_back(pending_kernel.rec);
       unattributed++;
       continue;
     }
 
-    fileKernel(pending_kernel.rec, object->second);
+    fileKernel(pending_kernel.rec, *object);
   }
 
   // API records whose correlation arrived later, then every token to its
@@ -1459,9 +1514,9 @@ void hapiProcessCuptiBuffers() {
   // event, say -- belongs to no object; it still occupied the driver and is
   // in the intervals, so the launch term counts it, but nobody is charged.
   for (const PendingApi& p : pendingApi) {
-    auto object = gm.cupti_object_correlation_db_.find(p.correlation_id);
-    if (object == gm.cupti_object_correlation_db_.end()) api_unattributed_s += p.seconds;
-    else apiByToken[object->second] += p.seconds;
+    const uint64_t* object = findObjectCorr(p.correlation_id);
+    if (object == nullptr) api_unattributed_s += p.seconds;
+    else apiByToken[*object] += p.seconds;
   }
   for (const auto& kv : apiByToken) {
     auto memo = resolved_tokens.find(kv.first);
@@ -1512,8 +1567,10 @@ void hapiProcessCuptiBuffers() {
   // force-flush before draining, so any kernel that was going to arrive has
   // arrived; whatever is left over is non-kernel traffic and would otherwise
   // accumulate without bound.
-  size_t object_corr_dropped = gm.cupti_object_correlation_db_.size();
-  size_t work_tags_dropped = gm.cupti_work_tag_correlation_db_.size();
+  size_t object_corr_dropped = prev_object_corr.size();
+  size_t work_tags_dropped = prev_work_tag_corr.size();
+  prev_object_corr = std::move(gm.cupti_object_correlation_db_);
+  prev_work_tag_corr = std::move(gm.cupti_work_tag_correlation_db_);
   gm.cupti_object_correlation_db_.clear();
   gm.cupti_work_tag_correlation_db_.clear();
 
@@ -1965,10 +2022,17 @@ void hapiPrepareCuptiLoads(uint64_t epoch) {
   // (sph3d interior-first: 32 patches' forces queued ahead) turned the window
   // close into a 135-250 ms all-GPU stall (job 22799507). The loads then lag
   // by at most <ms>.
-  static const bool softFlush = (getenv("CHARM_LB_CUPTI_SOFT_FLUSH") != nullptr);
+  // The forced flush at a window close returns buffers that still hold incomplete records (cupti_activity.h: it is
+  // "suggested ... before the termination of the profiling session"), and CUPTI completes such a record later, from
+  // inside a subsequent CUDA call of ANY thread, by writing into the buffer. Freeing those buffers at the drain was the
+  // +LBAsync segfault (6 in ~57 sph3d arms, all within 30 steps of an LB event; job 22808905 backtraces: cudaLaunchKernel
+  // -> libcupti at the window close). Since 2026-10-11 the drain quarantines retired buffers for two drains
+  // (hapiCuptiRetireBuffer) and the forced flush stays the default: it is what gives the balancer the whole window
+  // minus the kernels still running. CHARM_LB_CUPTI_SOFT_FLUSH=1 selects the non-forced flush instead, with 16 KB
+  // buffers and the carried-over correlations of hapiProcessCuptiBuffers; it withholds the open buffer each close.
   static const bool periodic = (getenv("CHARM_LB_CUPTI_PERIODIC") != nullptr);
   if (hapiCuptiTracingActive() && !periodic)
-    CUPTI_SAFE_CALL(cuptiActivityFlushAll(softFlush ? 0 : CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
+    CUPTI_SAFE_CALL(cuptiActivityFlushAll(hapiCuptiForcedFlush() ? CUPTI_ACTIVITY_FLAG_FLUSH_FORCED : 0));
   const double t1 = timeIt ? CmiWallTimer() : 0.0;
   hapiProcessCuptiBuffers();
   const double t2 = timeIt ? CmiWallTimer() : 0.0;
