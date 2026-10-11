@@ -432,6 +432,9 @@ bool hapiDevPoolOn();
 // device. Streams are never destroyed; the pool is bounded by peak concurrency.
 hapiStream_t hapiAcquireStream();
 void hapiReleaseStream(hapiStream_t stream);
+// The same, at the device's greatest stream priority: for the chares whose kernels other GPUs wait
+// on (sph3d's border patches). Its own free list; released with hapiReleaseStream like any other.
+hapiStream_t hapiAcquirePriorityStream();
 // The device a pooled stream belongs to, or -1 if it is not one of ours.
 int hapiStreamDeviceOf(hapiStream_t stream);
 

@@ -5889,8 +5889,43 @@ int hapiStreamDeviceOf(hapiStream_t stream) {
 
 int hapiGetDeviceNum() { return CpvAccess(my_device); }
 
+// Priority application streams (hapiAcquirePriorityStream): their own per-device free list, and
+// hapi_stream_prio remembers which streams are priority ones so a release returns them to it.
+static std::unordered_map<int, std::vector<hapiStream_t>> hapi_stream_free_prio;
+static std::unordered_set<void*> hapi_stream_prio;
+hapiStream_t hapiAcquirePriorityStream() {
+  const int dev = CpvAccess(my_device);
+  {
+    std::lock_guard<std::mutex> lk(hapi_stream_pool_lock);
+    auto it = hapi_stream_free_prio.find(dev);
+    if (it != hapi_stream_free_prio.end() && !it->second.empty()) {
+      hapiStream_t s = it->second.back();
+      it->second.pop_back();
+      return s;
+    }
+  }
+  hapiStream_t s;
+  int prev = -1;
+  hapiCheck(hapiGetDevice(&prev));
+  if (prev != dev) hapiCheck(hapiSetDevice(dev));
+  int least = 0, greatest = 0;
+  hapiCheck(cudaDeviceGetStreamPriorityRange(&least, &greatest));
+  hapiCheck(cudaStreamCreateWithPriority((cudaStream_t*)&s, cudaStreamNonBlocking, greatest));
+  if (prev != dev) hapiCheck(hapiSetDevice(prev));
+  std::lock_guard<std::mutex> lk(hapi_stream_pool_lock);
+  hapi_stream_owner[(void*)s] = dev;
+  hapi_stream_prio.insert((void*)s);
+  return s;
+}
+
 void hapiReleaseStream(hapiStream_t stream) {
   if (stream == NULL) return;
+  if (hapi_stream_prio.count((void*)stream)) {
+    std::lock_guard<std::mutex> lk(hapi_stream_pool_lock);
+    auto it = hapi_stream_owner.find((void*)stream);
+    hapi_stream_free_prio[it != hapi_stream_owner.end() ? it->second : CpvAccess(my_device)].push_back(stream);
+    return;
+  }
   if (hapi_stream_cap > 0) {
     // A shared lane is never handed back for exclusive reuse: just unbind.
     std::lock_guard<std::mutex> lk(hapi_stream_pool_lock);

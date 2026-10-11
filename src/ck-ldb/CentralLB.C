@@ -96,7 +96,7 @@ struct StrategyJob {
 std::atomic<bool> g_strategyInFlight{false};
 
 bool strategyOffThreadCpus(cpu_set_t* set) {
-  static const char* spec = getenv("CHARM_LB_STRATEGY_THREAD");
+  static const char* spec = lbHelperSpec("CHARM_LB_STRATEGY_THREAD");
   return lbOffThreadCpus(spec, set);
 }
 
@@ -251,7 +251,7 @@ void CentralLB::CallLB()
     // on the shared helper thread instead of inline in this PE's entry method (the same knob and
     // FLUSH_ON_PE diagnostic as DistBaseLB). The build took 99 ms on one PE of sph3d at 98M (job
     // 22776188 trace), and with a halo exchange every other PE waited for it.
-    static const char* spec = getenv("CHARM_LB_CUPTI_OFFTHREAD");
+    static const char* spec = lbHelperSpec("CHARM_LB_CUPTI_OFFTHREAD");
     cpu_set_t cpus;
     if (lbOffThreadCpus(spec, &cpus)) {
       static const bool flushOnPe = (getenv("CHARM_LB_CUPTI_OFFTHREAD_FLUSH_ON_PE") != nullptr);

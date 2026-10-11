@@ -18,6 +18,14 @@
 //   anything else                   unpinned
 // Returns false for an unset, empty or "0" spec (no helper). Shared by the CUPTI load build
 // (CHARM_LB_CUPTI_OFFTHREAD, DistBaseLB.C) and the strategy (CHARM_LB_STRATEGY_THREAD, CentralLB.C).
+// One switch for everything the helper runs: CHARM_LB_HELPER=near|<cpulist>|1 turns on both the
+// CUPTI load build and the strategy; the older per-job names (CHARM_LB_CUPTI_OFFTHREAD,
+// CHARM_LB_STRATEGY_THREAD) still work alone, for bisecting.
+inline const char* lbHelperSpec(const char* perJobName) {
+  const char* all = getenv("CHARM_LB_HELPER");
+  return all != nullptr ? all : getenv(perJobName);
+}
+
 inline bool lbOffThreadCpus(const char* spec, cpu_set_t* set) {
   if (spec == nullptr || *spec == '\0' || strcmp(spec, "0") == 0) return false;
   CPU_ZERO(set);

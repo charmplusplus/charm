@@ -44,7 +44,7 @@ struct CuptiBuild {
 };
 
 bool cuptiOffThreadCpus(cpu_set_t* set) {
-  static const char* spec = getenv("CHARM_LB_CUPTI_OFFTHREAD");
+  static const char* spec = lbHelperSpec("CHARM_LB_CUPTI_OFFTHREAD");
   return lbOffThreadCpus(spec, set);   // LBOffThread.h: near | <cpulist> | 1
 }
 

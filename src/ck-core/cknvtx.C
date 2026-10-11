@@ -1,3 +1,4 @@
+#include <time.h>
 /* Entry-method and idle hooks for the +nvtx and +gputrace timeline tools; see cknvtx.h for the flags.
  * Every entry-method delivery (CkDeliverMessageFree / CkDeliverMessageReadonly) is bracketed. With +nvtx
  * that is an NVTX range named "Chare::entry" (a string registered once per entry index, per PE), coloured
@@ -82,6 +83,15 @@ static void attrInit(nvtxEventAttributes_t &a, nvtxStringHandle_t str, uint32_t 
   a.message.registered = str;
 }
 
+// The hooks' clock: CLOCK_REALTIME in ns, which is what cuptiGetTimestamp returns on this system
+// (the merge aligns processes by the header's realtime/CUPTI pair in any case). Not a CUPTI call:
+// cuptiGetTimestamp blocks while another thread flushes CUPTI's activity buffers, and with the LB
+// helper thread doing exactly that every window, receive hooks stalled 66-86 ms (job 22798528).
+static inline uint64_t hookNow() {
+  struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);
+  return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
+}
+
 static FILE* traceFile() {
   if (t_tr != nullptr || t_trFailed) return t_tr;
   char host[256] = "?";
@@ -105,7 +115,7 @@ static void idleEnd() {
   t_inIdle = false;
   if (_nvtxRanges) nvtxDomainRangePop(_nvtxDomain);
   if (_gpuTraceDir != nullptr && t_idleStart != 0) {
-    const uint64_t end = hapiTraceTimestamp();
+    const uint64_t end = hookNow();
     if (FILE* f = traceFile()) fprintf(f, "I %llu %llu\n", (unsigned long long)t_idleStart, (unsigned long long)end);
     t_idleStart = 0;
   }
@@ -130,7 +140,7 @@ void _nvtxBeginEntry(int ep, const void *msg, void *obj) {
         if (t_objNamed.insert(id).second) fprintf(f, "O %llu %lld\n", (unsigned long long)id, idx);
       }
     }
-    t_stack.push_back({hapiTraceTimestamp(), ep, idx});
+    t_stack.push_back({hookNow(), ep, idx});
   }
 }
 
@@ -139,10 +149,15 @@ void _nvtxEndEntry() {
   if (_gpuTraceDir != nullptr && !t_stack.empty()) {
     const TraceFrame fr = t_stack.back();
     t_stack.pop_back();
-    const uint64_t end = hapiTraceTimestamp();
+    const uint64_t end = hookNow();
     if (FILE* f = traceFile())
       fprintf(f, "E %llu %llu %d %lld\n", (unsigned long long)fr.start, (unsigned long long)end, fr.ep, fr.idx);
   }
+}
+
+void _nvtxTraceMsg(unsigned long long t_send, unsigned long long t_env, unsigned long long t_land, int kind, int tier) {
+  if (_gpuTraceDir == nullptr) return;
+  if (FILE* f = traceFile()) fprintf(f, "L %llu %llu %llu %d %d\n", t_send, t_env, t_land, kind, tier);
 }
 
 static void nvtxIdleBegin(void *) {
@@ -153,7 +168,7 @@ static void nvtxIdleBegin(void *) {
     attrInit(a, _nvtxIdleStr, kIdleColor);
     nvtxDomainRangePushEx(_nvtxDomain, &a);
   }
-  if (_gpuTraceDir != nullptr) t_idleStart = hapiTraceTimestamp();
+  if (_gpuTraceDir != nullptr) t_idleStart = hookNow();
 }
 static void nvtxIdleEnd(void *) { idleEnd(); }
 
