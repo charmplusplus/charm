@@ -142,17 +142,127 @@ __global__ void eosKernel(Particle* parts, int n, RealType rho0, RealType c0,
 // -- 2x to 5x slower, and worse as the compaction scrambles the array (the
 // sort of the locals used to buy this coherence for the whole array; it is
 // no longer needed). Results go back by the original index.
+// mode: 0 every local target; 1 the INTERIOR targets only (cells 3..nc-2 in
+// every dimension: their stencil, cells 2..nc-1, holds survivors alone -- the
+// migrants of the step land in cell 1 and the ghosts in cells 0 and nc+1 --
+// so they can be computed before the exchange arrives, over a locals-only
+// cell list built at the end of the previous step); 2 the complement (the
+// boundary layers), after the halos, over the full list. The two passes
+// write disjoint targets of the same drho/ax/ay/az arrays.
+// SPH_INTERIOR_LAYERS (default 2): boundary layers per side. 2 is the exact
+// choice (the migrants land in cell 1, so cell 2 must wait for them); 1 is a
+// TIMING EXPERIMENT only -- cell-2 targets then miss the migrants' pairs.
+__constant__ int c_interior_lo = 3;
+__device__ __forceinline__ bool cellIsInterior(int cx, int cy, int cz, int ncx, int ncy, int ncz) {
+  const int lo = c_interior_lo, hi = lo - 2;   // lo = layers + 1; the high side is nc - layers + 1
+  return cx >= lo && cx <= ncx - hi && cy >= lo && cy <= ncy - hi && cz >= lo && cz <= ncz - hi;
+}
+void sphSetInteriorLayers(int layers) {
+  const int lo = layers + 1;
+  hapiCheck(cudaMemcpyToSymbol(c_interior_lo, &lo, sizeof(int)));
+}
+
+struct TargetState { RealType x, y, z, vx, vy, vz, rho, p; int type; };
+struct PairAccum { RealType adrho, aax, aay, aaz; };
+
+// The pair loop over one run [beg, end) of a cell-ordered (pos4, vel4) stream.
+__device__ __forceinline__ void accumulatePairs(const TargetState& pi, const float4* __restrict__ pos4,
+    const float4* __restrict__ vel4, int beg, int end, RealType h, RealType inv_h, RealType support2,
+    RealType eta2h2, RealType inv_rhoi2, RealType mass, RealType c0, PairAccum& acc) {
+  for (int k = beg; k < end; k++) {
+    const float4 pj = __ldg(&pos4[k]);   // x y z rho
+    const RealType dx = pi.x - pj.x, dy = pi.y - pj.y, dz = pi.z - pj.z;
+    const RealType r2 = dx * dx + dy * dy + dz * dz;
+    if (r2 >= support2 || r2 < 1e-16f) continue;
+    const float4 vj = __ldg(&vel4[k]);   // vx vy vz p
+    const RealType rhoj = pj.w, pj_p = vj.w;
+    const RealType rinv = rsqrtf(r2);
+    const RealType r = r2 * rinv;
+    const RealType gw = wendlandDW(r * inv_h, inv_h) * rinv;   // dW/dr / r
+    const RealType gwx = gw * dx, gwy = gw * dy, gwz = gw * dz;
+    const RealType inv_rhoj = 1.0f / rhoj;
+    const RealType inv_r2e = 1.0f / (r2 + eta2h2);
+    const RealType dvx = pi.vx - vj.x, dvy = pi.vy - vj.y, dvz = pi.vz - vj.z;
+    acc.adrho += mass * (dvx * gwx + dvy * gwy + dvz * gwz);
+    const RealType rdotg = -(dx * gwx + dy * gwy + dz * gwz);
+    acc.adrho += 2.0f * DELTA_SPH * h * c0 * (mass * inv_rhoj) * (rhoj - pi.rho) * rdotg * inv_r2e;
+    if (pi.type == PTYPE_FLUID) {
+      const RealType vdotr = dvx * dx + dvy * dy + dvz * dz;
+      RealType visc = 0.0f;
+      if (vdotr < 0.0f) {
+        const RealType mu = h * vdotr * inv_r2e;
+        visc = -VISC_ALPHA * c0 * mu * (2.0f / (pi.rho + rhoj));
+      }
+      const RealType term = pi.p * inv_rhoi2 + pj_p * inv_rhoj * inv_rhoj + visc;
+      acc.aax -= mass * term * gwx;
+      acc.aay -= mass * term * gwy;
+      acc.aaz -= mass * term * gwz;
+    }
+  }
+}
+
+// The boundary pass over two lists (interior-first, sph3d.C): the locals'
+// list L from the end of the previous step (entries [0, n0) of the streams,
+// targets = the survivors) and the EXTRAS list E over the particles appended
+// since (entries [n0, n_total): the migrants, which are targets, and the
+// ghosts, which are sources only). A target in a non-interior cell gathers
+// from both lists' runs of each stencil cell.
+__global__ void forcesTwoListKernel(int n_total, int n_local, int n0, int ncx, int ncy, int ncz,
+    const int* __restrict__ cell_parts, const int* __restrict__ cell_of, const int* __restrict__ cell_off,
+    const int* __restrict__ cell_cnt, const int* __restrict__ cell_parts2, const int* __restrict__ cell_of2,
+    const int* __restrict__ cell_off2, const int* __restrict__ cell_cnt2, const float4* __restrict__ pos4,
+    const float4* __restrict__ vel4, const unsigned char* __restrict__ type8, RealType h, RealType mass,
+    RealType c0, RealType gravity, RealType* drho, RealType* ax, RealType* ay, RealType* az) {
+  const int k = blockIdx.x * blockDim.x + threadIdx.x;
+  if (k >= n_total) return;
+  int i, ci;
+  if (k < n0) { i = cell_parts[k]; ci = cell_of[i]; }
+  else { const int k2 = k - n0; i = n0 + cell_parts2[k2]; ci = cell_of2[cell_parts2[k2]]; }
+  if (i >= n_local) return;   // a ghost
+  const int cx = ci % (ncx + 2), cy = (ci / (ncx + 2)) % (ncy + 2), cz = ci / ((ncx + 2) * (ncy + 2));
+  if (cellIsInterior(cx, cy, cz, ncx, ncy, ncz)) return;   // done by the interior pass
+  TargetState pi;
+  { const float4 a = pos4[k], b = vel4[k]; pi.x = a.x; pi.y = a.y; pi.z = a.z; pi.rho = a.w;
+    pi.vx = b.x; pi.vy = b.y; pi.vz = b.z; pi.p = b.w; pi.type = type8[k]; }
+  const RealType inv_h = 1.0f / h;
+  const RealType support2 = (KERNEL_SUPPORT * h) * (KERNEL_SUPPORT * h);
+  const RealType eta2h2 = ETA2 * h * h;
+  const RealType inv_rhoi2 = 1.0f / (pi.rho * pi.rho);
+  PairAccum acc = {0.0f, 0.0f, 0.0f, 0.0f};
+  for (int oz = -1; oz <= 1; oz++) {
+    const int zz = cz + oz; if (zz < 0 || zz > ncz + 1) continue;
+    for (int oy = -1; oy <= 1; oy++) {
+      const int yy = cy + oy; if (yy < 0 || yy > ncy + 1) continue;
+      for (int ox = -1; ox <= 1; ox++) {
+        const int xx = cx + ox; if (xx < 0 || xx > ncx + 1) continue;
+        const int c = (zz * (ncy + 2) + yy) * (ncx + 2) + xx;
+        accumulatePairs(pi, pos4, vel4, cell_off[c], cell_off[c] + cell_cnt[c], h, inv_h, support2, eta2h2, inv_rhoi2, mass, c0, acc);
+        accumulatePairs(pi, pos4, vel4, n0 + cell_off2[c], n0 + cell_off2[c] + cell_cnt2[c], h, inv_h, support2, eta2h2, inv_rhoi2, mass, c0, acc);
+      }
+    }
+  }
+  drho[i] = acc.adrho;
+  if (pi.type == PTYPE_FLUID) { ax[i] = acc.aax; ay[i] = acc.aay; az[i] = acc.aaz - gravity; }
+  else { ax[i] = 0.0f; ay[i] = 0.0f; az[i] = 0.0f; }
+}
+
 __global__ void forcesKernel(int n_total, int n_local, int ncx,
     int ncy, int ncz, const int* __restrict__ cell_parts,
     const int* __restrict__ cell_of, const int* __restrict__ cell_off,
     const int* __restrict__ cell_cnt, const float4* __restrict__ pos4,
     const float4* __restrict__ vel4, const unsigned char* __restrict__ type8,
     RealType h, RealType mass, RealType c0, RealType gravity, RealType* drho,
-    RealType* ax, RealType* ay, RealType* az) {
+    RealType* ax, RealType* ay, RealType* az, int mode) {
   const int k = blockIdx.x * blockDim.x + threadIdx.x;
   if (k >= n_total) return;
   const int i = cell_parts[k];
   if (i >= n_local) return;   // a ghost: a source, never a sink
+  if (mode != 0) {
+    const int c0i = cell_of[i];
+    const int ccx = c0i % (ncx + 2), ccy = (c0i / (ncx + 2)) % (ncy + 2), ccz = c0i / ((ncx + 2) * (ncy + 2));
+    const bool inner = cellIsInterior(ccx, ccy, ccz, ncx, ncy, ncz);
+    if ((mode == 1) != inner) return;
+  }
 
   struct { RealType x, y, z, vx, vy, vz, rho, p; int type; } pi;
   {
@@ -753,7 +863,7 @@ void invokeLayout(const Particle* d_parts, const int* d_cell_parts, int n,
   SPH_PEEK();
 }
 
-void invokeForces(int n_total, int n_local, int ncx, int ncy, int ncz,
+void invokeForces(int mode, int n_total, int n_local, int ncx, int ncy, int ncz,
     const int* d_cell_parts, const int* d_cell_of, const int* d_off,
     const int* d_cnt, const float4* d_pos4, const float4* d_vel4,
     const unsigned char* d_type8, RealType h, RealType mass, RealType c0,
@@ -765,7 +875,23 @@ void invokeForces(int n_total, int n_local, int ncx, int ncy, int ncz,
   hapiSubmit(s, [=]() {
     forcesKernel<<<(n_total + fb - 1) / fb, fb, 0, s>>>(n_total, n_local, ncx, ncy,
         ncz, d_cell_parts, d_cell_of, d_off, d_cnt, d_pos4, d_vel4, d_type8, h, mass,
-        c0, gravity, d_drho, d_ax, d_ay, d_az);
+        c0, gravity, d_drho, d_ax, d_ay, d_az, mode);
+  });
+  SPH_PEEK();
+}
+
+void invokeForcesTwoList(int n_total, int n_local, int n0, int ncx, int ncy, int ncz,
+    const int* d_cell_parts, const int* d_cell_of, const int* d_off, const int* d_cnt,
+    const int* d_cell_parts2, const int* d_cell_of2, const int* d_off2, const int* d_cnt2,
+    const float4* d_pos4, const float4* d_vel4, const unsigned char* d_type8, RealType h,
+    RealType mass, RealType c0, RealType gravity, RealType* d_drho, RealType* d_ax,
+    RealType* d_ay, RealType* d_az, cudaStream_t s) {
+  if (n_total <= 0) return;
+  hapiSubmit(s, [=]() {
+    const int fb = 128;
+    forcesTwoListKernel<<<(n_total + fb - 1) / fb, fb, 0, s>>>(n_total, n_local, n0, ncx, ncy, ncz,
+        d_cell_parts, d_cell_of, d_off, d_cnt, d_cell_parts2, d_cell_of2, d_off2, d_cnt2,
+        d_pos4, d_vel4, d_type8, h, mass, c0, gravity, d_drho, d_ax, d_ay, d_az);
   });
   SPH_PEEK();
 }

@@ -251,7 +251,7 @@ extern void invokeGather(const Particle*, const int*, int, Particle*, cudaStream
 extern void invokeLayout(const Particle*, const int*, int, float4*, float4*,
     unsigned char*, cudaStream_t);
 extern void invokeEOS(Particle*, int, RealType, RealType, int*, cudaStream_t);
-extern void invokeForces(int, int, int, int, int, const int*, const int*,
+extern void invokeForces(int, int, int, int, int, int, const int*, const int*,
     const int*, const int*, const float4*, const float4*, const unsigned char*,
     RealType, RealType, RealType, RealType, RealType*, RealType*, RealType*,
     RealType*, cudaStream_t);
@@ -261,6 +261,11 @@ extern void invokeIntegrateLeavers(bool, const Particle*, int, RealType, RealTyp
     RealType, RealType*, RealType*, RealType*, RealType*, RealType, RealType,
     RealType, RealType, RealType, RealType, Particle**, Particle*, int*, int,
     cudaStream_t);
+extern void sphSetInteriorLayers(int);
+extern void invokeForcesTwoList(int, int, int, int, int, int, const int*, const int*, const int*,
+    const int*, const int*, const int*, const int*, const int*, const float4*, const float4*,
+    const unsigned char*, RealType, RealType, RealType, RealType, RealType*, RealType*, RealType*,
+    RealType*, cudaStream_t);
 extern void invokePredict(const Particle*, Particle*, int, RealType, RealType,
     RealType, const RealType*, const RealType*, const RealType*, const RealType*,
     cudaStream_t);
@@ -868,6 +873,29 @@ class Patch : public CBase_Patch {
   cudaStream_t compute_stream, comm_stream;
   cudaEvent_t halo_done;
 
+  // ---- interior-first forces (SPH_INTERIOR_FIRST=1, old protocol) ---------
+  // At the end of a step the survivors' interior forces (cells 3..nc-2, no
+  // dependency on any neighbour) are computed over a locals-only cell list
+  // while the migration round and the next halo are in flight; the next
+  // step's forces then run the boundary layers only, over the full list.
+  bool interior_done;
+  int interior_np;                // the survivors the locals' list L was built over
+  // The interior pass runs on its own normal-priority stream while the
+  // pack / boundary / integrate chain runs on compute_stream at the device's
+  // highest priority: a neighbour's halo pack queued behind its 0.85 ms
+  // interior kernel arrived late enough to cancel the overlap (job 22801886).
+  // v4: the forces (interior, then boundary) and the integrate stay serialized on
+  // compute_stream, one patch kernel at a time on the GPU as in the plain
+  // schedule (v3 ran interior and boundary kernels of different patches
+  // concurrently, 1.57 in flight, and the cache-bound forces lost what the
+  // idle gave); only the halo pack goes on pack_stream at the device's highest
+  // priority, so it is never queued behind an interior kernel. The integrate
+  // waits for the pack's read of the positions (pack_ev).
+  cudaStream_t pack_stream;
+  cudaEvent_t pack_ev;            // the pack has read the positions
+  cudaEvent_t compact_ev;         // the compaction is complete (the pack waits on it)
+  int *d_cell_cnt2, *d_cell_off2, *d_cursor2, *d_cell_parts2, *d_cell_of2;   // the extras list E
+
   // ---- concurrent exchange (-c; see the top of the file) --------------------
   int* d_counts_mig;              // the compaction's counters (d_counts is the halo pack's)
   int* h_counts_mig;
@@ -927,6 +955,7 @@ public:
     freeDevice();
     hapiReleaseStream(compute_stream);
     hapiReleaseStream(comm_stream);
+    if (pack_stream != NULL) { hapiReleaseStream(pack_stream); eventPool().give(pack_ev); eventPool().give(compact_ev); }
     eventPool().give(halo_done);
   }
 
@@ -1000,13 +1029,33 @@ public:
     pup_id_sum = 0; pup_n = 0; pup_check_due = false;
     d_aud_cnt = d_aud_sum = d_aud_sum2 = NULL; h_aud = NULL; d_find = NULL;
     prio_dirty = true; prio_now = false;
+    interior_done = false; interior_np = 0;
+    d_cell_cnt2 = d_cell_off2 = d_cursor2 = d_cell_parts2 = d_cell_of2 = NULL;
     for (int k = 0; k < LAT_KINDS; k++)
       for (int par = 0; par < 2; par++)
         for (int d = 0; d < NUM_DIRS; d++) env_t[k][par][d] = 0;
   }
 
+  static bool interiorFirstOn() {
+    static const bool on = (getenv("SPH_INTERIOR_FIRST") != nullptr);
+    static bool layers_set = false;
+    if (on && !layers_set) {
+      layers_set = true;
+      const int layers = getenv("SPH_INTERIOR_LAYERS") ? atoi(getenv("SPH_INTERIOR_LAYERS")) : 2;
+      sphSetInteriorLayers(layers < 1 ? 1 : layers);
+      if (CkMyPe() == 0) CkPrintf("  interior-first: %d boundary layer(s) per side%s\n", layers, layers == 1 ? " (TIMING EXPERIMENT: cell-2 targets miss the migrants)" : "");
+    }
+    return on;
+  }
   void createCudaEntities() {
     compute_stream = hapiAcquireStream();
+    if (interiorFirstOn()) {
+      pack_stream = hapiAcquirePriorityStream();
+      pack_ev = eventPool().take();
+      compact_ev = eventPool().take();
+    } else {
+      pack_stream = NULL; pack_ev = compact_ev = NULL;
+    }
     comm_stream = hapiAcquireStream();
     halo_done = eventPool().take();
   }
@@ -1043,6 +1092,11 @@ public:
     hapiCheck(hapiMalloc((void**)&d_cursor, sizeof(int) * ncells));
     hapiCheck(hapiMalloc((void**)&d_cell_parts, sizeof(int) * part_capacity));
     hapiCheck(hapiMalloc((void**)&d_cell_of, sizeof(int) * part_capacity));
+    hapiCheck(hapiMalloc((void**)&d_cell_cnt2, sizeof(int) * ncells));
+    hapiCheck(hapiMalloc((void**)&d_cell_off2, sizeof(int) * ncells));
+    hapiCheck(hapiMalloc((void**)&d_cursor2, sizeof(int) * ncells));
+    hapiCheck(hapiMalloc((void**)&d_cell_parts2, sizeof(int) * part_capacity));
+    hapiCheck(hapiMalloc((void**)&d_cell_of2, sizeof(int) * part_capacity));
     hapiCheck(hapiMalloc((void**)&d_pos4, sizeof(float4) * part_capacity));
     hapiCheck(hapiMalloc((void**)&d_vel4, sizeof(float4) * part_capacity));
     hapiCheck(hapiMalloc((void**)&d_type8, (size_t)part_capacity));
@@ -1099,6 +1153,8 @@ public:
     hapiFree(d_halo_idx); hapiFree(d_halo_idx_ptrs); hapiFree(d_halo_cnt);
     hapiFree(d_counts); hapiFree(d_cell_cnt); hapiFree(d_cell_off);
     hapiFree(d_cursor); hapiFree(d_cell_parts); hapiFree(d_cell_of);
+    hapiFree(d_cell_cnt2); hapiFree(d_cell_off2); hapiFree(d_cursor2); hapiFree(d_cell_parts2); hapiFree(d_cell_of2);
+    d_cell_cnt2 = d_cell_off2 = d_cursor2 = d_cell_parts2 = d_cell_of2 = NULL;
     hapiFree(d_pos4); hapiFree(d_vel4); hapiFree(d_type8); hapiFree(d_scan_tmp);
     hapiFree(d_drho); hapiFree(d_ax); hapiFree(d_ay); hapiFree(d_az);
     hapiFree(d_stats); hapiFree(d_check);
@@ -1160,10 +1216,11 @@ public:
     p | n_leaver_ghosts; p | lg_pending; p | open_ref; p | np_base; p | mig_known; p | ghost_base;
     p | prologue; p | xpack_pending; p | n_expect_mig_cur; p | mig_env_n; p | mig_env_total;
     p | xsend_pending; p | xsend_ref; p | xsend_adv; p | xsend_halo;
+    p | interior_done; p | interior_np;
     p | pup_check_due;
     p | halo_staged; p | mig_staged; p | mig_seen; p | halo_seen; p | mig_consumed; p | halo_consumed;
     p | mig_landed; p | halo_landed; p | done_sent; p | halo_expect_known; p | parked_midstep; p | sync_park_due;
-    if (p.isUnpacking()) prio_dirty = true;
+    if (p.isUnpacking()) { prio_dirty = true; interior_done = false; }
     _sdag_pup(p);
     p | recv_count;
     p | outstanding_sends;
@@ -1174,6 +1231,7 @@ public:
     if (!p.isUnpacking()) {
       sphDrainSync(compute_stream);
       sphDrainSync(comm_stream);
+      if (pack_stream != NULL) sphDrainSync(pack_stream);
       if (pup_check) {
         // The locals' identity before the pack (ghosts excluded), carried
         // across and re-checked right after the unpack: a corruption inside
@@ -1674,9 +1732,14 @@ public:
         getenv("SPH_SORT_EVERY") ? atoi(getenv("SPH_SORT_EVERY")) : (sort_locals ? 1 : 0);
     if (batch_halo) hapiSubmitBatchBegin();
     // The migrants appended last step landed on comm_stream; everything below
-    // reads them on compute_stream.
+    // reads them on compute_stream -- or, with the interior pass queued ahead
+    // on compute_stream, the pack reads them on pack_stream (highest priority)
+    // after the compaction, so it is not delayed behind the interior kernel.
+    const bool pack_prio = interior_done && pack_stream != NULL;
+    cudaStream_t ps = pack_prio ? pack_stream : compute_stream;
     hapiSubmitEventRecord((void*)halo_done, comm_stream);
-    sphSubmitWaitEvent(compute_stream, halo_done);
+    sphSubmitWaitEvent(ps, halo_done);
+    if (pack_prio) { hapiSubmitEventRecord((void*)compact_ev, compute_stream); sphSubmitWaitEvent(ps, compact_ev); }
     if (rebuild_step) {
       // Optional sort of the locals into cell order (see above), BEFORE the
       // pack records its index lists, so the lists survive until the
@@ -1691,15 +1754,16 @@ public:
       }
       invokePackHalo(d_parts[cur], np, x0, y0, z0, x1, y1, z1, cell_size,
           d_halo_ptrs, d_halo_idx_ptrs, d_counts, exch_capacity, valid_mask,
-          /*counts_zeroed=*/false, compute_stream);
+          /*counts_zeroed=*/false, ps);
       sphSubmitMemcpy(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
-          cudaMemcpyDeviceToHost, compute_stream);
+          cudaMemcpyDeviceToHost, ps);
     } else {
       invokePackHaloByIndex(d_parts[cur], d_halo_ptrs, d_halo_idx, d_halo_cnt,
-          exch_capacity, exch_slots, compute_stream);
+          exch_capacity, exch_slots, ps);
     }
+    if (pack_prio) hapiSubmitEventRecord((void*)pack_ev, ps);
     halo_pending = true;
-    hapiAddCallback(compute_stream,
+    hapiAddCallback(ps,
         CkCallback(CkIndex_Patch::haloPacked(), thisProxy[thisIndex]));
     if (batch_halo) hapiSubmitBatchEnd();
   }
@@ -2009,18 +2073,37 @@ public:
     if (isStatsIter()) { check_ghosts = true; runCheck(stepCheckTol()); check_ghosts = false; idAuditPass(); }
 
     const int ntot = np + n_ghost;
-    // A rebuild step builds the window's cell list over the sorted locals and
-    // the ghosts; a chare that migrated inside a window rebuilds it locally.
-    if (rebuild_step || !cells_valid) {
-      invokeCellBuild(d_parts[cur], ntot, x0, y0, z0, inv_csize, ncx, ncy, ncz,
-          ncells, d_cell_cnt, d_cell_off, d_cursor, d_cell_parts, d_cell_of,
+    if (interior_done) {
+      // The interior pass (end of the previous step) left the locals' list L
+      // and their cell-ordered streams in [0, interior_np). Build the EXTRAS
+      // list E over what was appended since (migrants, then ghosts) into
+      // [interior_np, ntot) of the same streams, and run the boundary layers
+      // over both lists. No full rebuild.
+      const int n0 = interior_np, nx = ntot - n0;
+      sphSubmitWaitEvent(compute_stream, pack_ev);   // the pack's read of the positions is done before the integrate below
+      invokeCellBuild(d_parts[cur] + n0, nx, x0, y0, z0, inv_csize, ncx, ncy, ncz,
+          ncells, d_cell_cnt2, d_cell_off2, d_cursor2, d_cell_parts2, d_cell_of2,
           d_scan_tmp, scan_tmp_bytes, compute_stream);
-      cells_valid = true;
+      invokeLayout(d_parts[cur] + n0, d_cell_parts2, nx, d_pos4 + n0, d_vel4 + n0, d_type8 + n0, compute_stream);
+      invokeForcesTwoList(ntot, np, n0, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_cell_off, d_cell_cnt,
+          d_cell_parts2, d_cell_of2, d_cell_off2, d_cell_cnt2, d_pos4, d_vel4, d_type8,
+          smooth_h, pmass, sound_c0, gravity, d_drho, d_ax, d_ay, d_az, compute_stream);
+      cells_valid = false;   // L alone is not the full list
+      interior_done = false;
+    } else {
+      // A rebuild step builds the window's cell list over the sorted locals and
+      // the ghosts; a chare that migrated inside a window rebuilds it locally.
+      if (rebuild_step || !cells_valid) {
+        invokeCellBuild(d_parts[cur], ntot, x0, y0, z0, inv_csize, ncx, ncy, ncz,
+            ncells, d_cell_cnt, d_cell_off, d_cursor, d_cell_parts, d_cell_of,
+            d_scan_tmp, scan_tmp_bytes, compute_stream);
+        cells_valid = true;
+      }
+      invokeLayout(d_parts[cur], d_cell_parts, ntot, d_pos4, d_vel4, d_type8, compute_stream);
+      invokeForces(0, ntot, np, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_cell_off,
+          d_cell_cnt, d_pos4, d_vel4, d_type8, smooth_h, pmass, sound_c0, gravity,
+          d_drho, d_ax, d_ay, d_az, compute_stream);
     }
-    invokeLayout(d_parts[cur], d_cell_parts, ntot, d_pos4, d_vel4, d_type8, compute_stream);
-    invokeForces(ntot, np, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_cell_off,
-        d_cell_cnt, d_pos4, d_vel4, d_type8, smooth_h, pmass, sound_c0, gravity,
-        d_drho, d_ax, d_ay, d_az, compute_stream);
 
     if (!pc_step) {
       // On a migration step that is not reporting, the integration and the
@@ -2142,7 +2225,7 @@ public:
       cells_valid = true;
     }
     invokeLayout(d_parts[1 - cur], d_cell_parts, ntot, d_pos4, d_vel4, d_type8, compute_stream);
-    invokeForces(ntot, np, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_cell_off,
+    invokeForces(0, ntot, np, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_cell_off,
         d_cell_cnt, d_pos4, d_vel4, d_type8, smooth_h, pmass, sound_c0, gravity,
         d_drho, d_ax, d_ay, d_az, compute_stream);
     const bool fused = migrate_step && !isStatsIter();
@@ -2159,6 +2242,39 @@ public:
   }
 
   // ---- migration -----------------------------------------------------------
+  // The interior forces of the next step, now: the survivors' interior cells
+  // need no neighbour. Not before a step that sorts the locals (the sort
+  // permutes the indices the results are stored by), not with -c (its own
+  // schedule), not for the predictor-corrector (two evaluations).
+  void interiorPass() {
+    static const bool on = (getenv("SPH_INTERIOR_FIRST") != nullptr);
+    if (!on || concurrent_x || integrator != 0 || nl_freq != 1 || !step_active || np <= 0) return;
+    static const int sort_every =
+        getenv("SPH_SORT_EVERY") ? atoi(getenv("SPH_SORT_EVERY")) : (getenv("SPH_SORT") ? 1 : 0);
+    const int next = my_iter + 1;
+    if (sort_every > 0 && (next % sort_every) == 0) return;
+    // Not into the LB window close either: the balancer's forced CUPTI flush
+    // returns only once every queued kernel has completed and blocks the
+    // process's CUDA calls meanwhile, so a deep queue there drains and starves
+    // the GPU (135-250 ms per window, job 22799507). A shallow queue at that
+    // moment costs one step of overlap per window.
+    if (isLBIter(my_iter) || isLBIter(next)) return;
+    if (ncx < 6 || ncy < 6 || ncz < 6) return;   // no interior cell at all
+    static const bool batch_compute = (getenv("SPH_NO_BATCH_COMPUTE") == nullptr);
+    if (batch_compute) hapiSubmitBatchBegin();
+    invokeCellBuild(d_parts[cur], np, x0, y0, z0, inv_csize, ncx, ncy, ncz,
+        ncells, d_cell_cnt, d_cell_off, d_cursor, d_cell_parts, d_cell_of,
+        d_scan_tmp, scan_tmp_bytes, compute_stream);
+    invokeLayout(d_parts[cur], d_cell_parts, np, d_pos4, d_vel4, d_type8, compute_stream);
+    invokeForces(1, np, np, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_cell_off,
+        d_cell_cnt, d_pos4, d_vel4, d_type8, smooth_h, pmass, sound_c0, gravity,
+        d_drho, d_ax, d_ay, d_az, compute_stream);
+    if (batch_compute) hapiSubmitBatchEnd();
+    cells_valid = false;
+    interior_done = true;
+    interior_np = np;
+  }
+
   void sendLeavers() {
     PhaseScope _ps(PH_SEND_LEAVERS);
     const bool moved = isActive() && migrate_step;
@@ -2169,6 +2285,7 @@ public:
                 "(face slot %d) at step %d; increase -e\n", x, y, z, exch_capacity, my_iter);
       cur = 1 - cur;
       np = h_counts[STAY];
+      interiorPass();
     }
     // The ghost layout lives until the window ends; a migrate step ends it.
     if (migrate_step) { n_ghost = 0; ghost_alloc = 0; }
@@ -2400,7 +2517,7 @@ public:
         d_scan_tmp, scan_tmp_bytes, compute_stream);
     cells_valid = true;
     invokeLayout(d_parts[cur], d_cell_parts, ntot, d_pos4, d_vel4, d_type8, compute_stream);
-    invokeForces(ntot, np, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_cell_off,
+    invokeForces(0, ntot, np, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_cell_off,
         d_cell_cnt, d_pos4, d_vel4, d_type8, smooth_h, pmass, sound_c0, gravity,
         d_drho, d_ax, d_ay, d_az, compute_stream);
     if (!isStatsIter()) {

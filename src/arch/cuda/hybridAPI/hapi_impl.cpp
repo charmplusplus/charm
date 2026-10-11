@@ -499,7 +499,14 @@ static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t
   // later, so the fault surfaces inside cuptiActivityGetNextRecord with nothing
   // left to say where it came from. Step down to a smaller buffer before giving
   // up, and if even that fails, say so here.
-  static const size_t sizes[] = {5*1024*1024, 1024*1024, 256*1024};
+  // CHARM_LB_CUPTI_BUFKB=<kb>: a smaller first buffer. A buffer is delivered
+  // when it fills (or at a flush); with the 5 MB default the last, open buffer
+  // of a window holds up to ~10% of its records, which is what the non-forced
+  // flush (CHARM_LB_CUPTI_SOFT_FLUSH) leaves behind -- at 256 KB that is a
+  // fraction of a percent, so a soft flush can replace the forced one and its
+  // device drain at the LB window close (see hapiPrepareCuptiLoads).
+  static const size_t first = getenv("CHARM_LB_CUPTI_BUFKB") ? (size_t)atoi(getenv("CHARM_LB_CUPTI_BUFKB")) * 1024 : 5*1024*1024;
+  const size_t sizes[] = {first, 1024*1024, 256*1024};
   for (size_t s : sizes) {
     *buffer = (uint8_t *)malloc(s);
     if (*buffer != NULL) {
@@ -765,6 +772,11 @@ void hapiCuptiStartTracing() {
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL));
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_RUNTIME));
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION));
+  if (const char* per = getenv("CHARM_LB_CUPTI_PERIODIC")) {   // see hapiPrepareCuptiLoads
+    const int ms = atoi(per) > 0 ? atoi(per) : 10;
+    CUPTI_SAFE_CALL(cuptiActivityFlushPeriod((uint32_t)ms));
+    if (CmiMyPe() == 0) CmiPrintf("HAPI> CUPTI buffers delivered every %d ms; no forced flush at the LB window close\n", ms);
+  }
   // Opt-in: what share of device time is runtime copies rather than object
   // kernels. Off by default so the record volume of a normal run is unchanged.
   if (hapiCuptiTraceMemcpy()) {
@@ -1939,8 +1951,24 @@ void hapiPrepareCuptiLoads(uint64_t epoch) {
   // Only flush while CUPTI is attached: an application driving its own
   // instrumentation window may already have switched tracing off, and its stop
   // path flushed on the way out, so there is nothing left to pull.
-  if (hapiCuptiTracingActive())
-    CUPTI_SAFE_CALL(cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
+  // CHARM_LB_CUPTI_SOFT_FLUSH: flush only the buffers CUPTI has completed (no
+  // forced device synchronisation). The forced flush stalls every CUDA call of
+  // the process, on every thread, for its duration -- under +LBAsync that is
+  // every PE mid-step, every window (sph3d: 5-60 ms send stalls clustered
+  // after LB triggers, job 22799507). The records of a still-open buffer then
+  // reach the balancer one window late, which is a lag it can live with.
+  // CHARM_LB_CUPTI_PERIODIC=<ms>: CUPTI delivers its buffers on its own thread
+  // every <ms> (cuptiActivityFlushPeriod, set at attach), so the window close
+  // parses what has arrived and forces nothing: the forced flush returns only
+  // once every queued kernel has completed, and while it waits every CUDA call
+  // of the process blocks in CUPTI's launch callbacks, so a deep GPU queue
+  // (sph3d interior-first: 32 patches' forces queued ahead) turned the window
+  // close into a 135-250 ms all-GPU stall (job 22799507). The loads then lag
+  // by at most <ms>.
+  static const bool softFlush = (getenv("CHARM_LB_CUPTI_SOFT_FLUSH") != nullptr);
+  static const bool periodic = (getenv("CHARM_LB_CUPTI_PERIODIC") != nullptr);
+  if (hapiCuptiTracingActive() && !periodic)
+    CUPTI_SAFE_CALL(cuptiActivityFlushAll(softFlush ? 0 : CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
   const double t1 = timeIt ? CmiWallTimer() : 0.0;
   hapiProcessCuptiBuffers();
   const double t2 = timeIt ? CmiWallTimer() : 0.0;
