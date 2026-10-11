@@ -447,6 +447,73 @@ __global__ void packHaloByIndexKernel(const Particle* parts, Particle** bufs,
   bufs[d][k] = parts[idx[off + k]];
 }
 
+// ---- concurrent exchange (-c, sph3d.C) ----------------------------------
+// After the compaction, append this step's leavers (the per-direction
+// migration buffers, valid directions only) behind the survivors as ghosts,
+// in direction order, and keep a copy in a side buffer: the sender still
+// needs them as ghosts next step, since their new owner cannot send them
+// back before it has them. One thread per exchange slot; the survivor count
+// is read from the device counters so no host round trip sits between the
+// compaction and this.
+__global__ void gatherLeaverGhostsKernel(Particle** bufs, const int* counts,
+    Particle* parts, Particle* side, int cap_face, int nslots, int valid_mask) {
+  const int t = blockIdx.x * blockDim.x + threadIdx.x;
+  if (t >= nslots) return;
+  int off = 0, d;
+  for (d = 0; d < NUM_DIRS; d++) {
+    if (d == STAY) continue;
+    const int cap = dirCap(d, cap_face);
+    if (t < off + cap) break;
+    off += cap;
+  }
+  if (d >= NUM_DIRS || !((valid_mask >> d) & 1)) return;
+  const int k = t - off;
+  if (k >= counts[d]) return;
+  int prefix = 0;
+  for (int e = 0; e < d; e++) if (e != STAY && ((valid_mask >> e) & 1)) prefix += counts[e];
+  const Particle q = bufs[d][k];
+  parts[counts[STAY] + prefix + k] = q;
+  side[prefix + k] = q;
+}
+
+// The halo pack of the concurrent exchange: runs over the survivors AND the
+// leaver ghosts appended behind them (n from the device counters, as above).
+// Same face rule as packHaloKernel; a leaver is excluded from the halo of the
+// direction whose box it is in, because that partner receives it as a
+// migrant, and included everywhere else it is within support, where it is a
+// ghost that only this patch can still supply this step.
+__global__ void packHaloConcurrentKernel(const Particle* parts,
+    const int* mig_counts, int valid_mask_mig,
+    RealType x0, RealType y0, RealType z0, RealType x1, RealType y1, RealType z1,
+    RealType support, Particle** bufs, int** idx, int* counts, int cap_face,
+    int valid_mask) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  int n = mig_counts[STAY];
+  for (int e = 0; e < NUM_DIRS; e++) if (e != STAY && ((valid_mask_mig >> e) & 1)) n += mig_counts[e];
+  if (i >= n) return;
+  const Particle p = parts[i];
+  const bool nx0 = (p.x - x0) < support, nx1 = (x1 - p.x) < support;
+  const bool ny0 = (p.y - y0) < support, ny1 = (y1 - p.y) < support;
+  const bool nz0 = (p.z - z0) < support, nz1 = (z1 - p.z) < support;
+  if (!(nx0 | nx1 | ny0 | ny1 | nz0 | nz1)) return;
+  int sx = 0, sy = 0, sz = 0;
+  if (p.x < x0) sx = -1; else if (p.x >= x1) sx = 1;
+  if (p.y < y0) sy = -1; else if (p.y >= y1) sy = 1;
+  if (p.z < z0) sz = -1; else if (p.z >= z1) sz = 1;
+  const int owner = dirIndex(sx, sy, sz);   // STAY for a survivor
+  for (int d = 0; d < NUM_DIRS; d++) {
+    if (!((valid_mask >> d) & 1) || d == owner) continue;
+    const int dx = dirSX(d), dy = dirSY(d), dz = dirSZ(d);
+    const bool okx = dx == 0 || (dx < 0 ? nx0 : nx1);
+    const bool oky = dy == 0 || (dy < 0 ? ny0 : ny1);
+    const bool okz = dz == 0 || (dz < 0 ? nz0 : nz1);
+    if (!(okx && oky && okz)) continue;
+    const int slot = atomicAdd(&counts[d], 1);
+    if (slot < dirCap(d, cap_face)) { bufs[d][slot] = p; idx[d][slot] = i; }
+    else atomicAdd(&counts[ERR_COUNTER], 1);
+  }
+}
+
 // After an in-place integration, move out anything that left the box and
 // compact what stays (placeParticle). Used on the reporting steps; elsewhere
 // the integration and this are one kernel.
@@ -456,6 +523,41 @@ __global__ void markLeaversKernel(const Particle* parts, int n_local,
   const int i = blockIdx.x * blockDim.x + threadIdx.x;
   if (i >= n_local) return;
   placeParticle(parts[i], x0, y0, z0, x1, y1, z1, bufs, stay, counts, cap_face);
+}
+
+// SPH_ID_AUDIT: per id-bucket count, sum of ids and sum of squared ids (mod
+// 2^64) over the locals; the differences against the initial reference solve
+// for the one duplicated and the one lost id exactly (Main::idAudit).
+#define ID_AUDIT_BUCKETS 4096
+__global__ void idBucketKernel(const Particle* parts, int n_local, unsigned long long* cnt,
+    unsigned long long* sum, unsigned long long* sum2) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= n_local) return;
+  const unsigned long long id = (unsigned long long)(unsigned)parts[i].id;
+  const int b = (int)(id & (ID_AUDIT_BUCKETS - 1));
+  atomicAdd(&cnt[b], 1ull); atomicAdd(&sum[b], id); atomicAdd(&sum2[b], id * id);
+}
+__global__ void findIdKernel(const Particle* parts, int n, int id, int* out) {
+  const int i = blockIdx.x * blockDim.x + threadIdx.x;
+  if (i >= n) return;
+  if (parts[i].id == id) atomicMin(out, i);
+}
+void invokeIdBuckets(const Particle* d_parts, int n_local, unsigned long long* d_cnt,
+    unsigned long long* d_sum, unsigned long long* d_sum2, cudaStream_t s) {
+  sphSubmitMemset(d_cnt, 0, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, s);
+  sphSubmitMemset(d_sum, 0, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, s);
+  sphSubmitMemset(d_sum2, 0, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, s);
+  if (n_local <= 0) return;
+  hapiSubmit(s, [=]() {
+    idBucketKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, d_cnt, d_sum, d_sum2);
+  });
+  SPH_PEEK();
+}
+void invokeFindId(const Particle* d_parts, int n, int id, int* d_out, cudaStream_t s) {
+  sphSubmitMemset(d_out, 0x7f, sizeof(int), s);
+  if (n <= 0) return;
+  hapiSubmit(s, [=]() { findIdKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(d_parts, n, id, d_out); });
+  SPH_PEEK();
 }
 
 // Diagnostics: fluid count, summed density, kinetic energy, max speed and the
@@ -746,6 +848,31 @@ void invokePackHaloByIndex(const Particle* d_parts, Particle** d_bufs,
   hapiSubmit(s, [=]() {
     packHaloByIndexKernel<<<nblocks(nslots), BLOCK_1D, 0, s>>>(d_parts, d_bufs,
         d_idx, d_halo_cnt, cap_face, nslots);
+  });
+  SPH_PEEK();
+}
+
+void invokeGatherLeaverGhosts(Particle** d_bufs, const int* d_counts, Particle* d_parts,
+    Particle* d_side, int cap_face, int nslots, int valid_mask, cudaStream_t s) {
+  if (nslots <= 0) return;
+  hapiSubmit(s, [=]() {
+    gatherLeaverGhostsKernel<<<nblocks(nslots), BLOCK_1D, 0, s>>>(d_bufs, d_counts,
+        d_parts, d_side, cap_face, nslots, valid_mask);
+  });
+  SPH_PEEK();
+}
+
+// n_max bounds the launch (the kernel reads the exact count from the device).
+void invokePackHaloConcurrent(const Particle* d_parts, const int* d_mig_counts,
+    int n_max, RealType x0, RealType y0, RealType z0, RealType x1, RealType y1,
+    RealType z1, RealType support, Particle** d_bufs, int** d_idx_bufs,
+    int* d_counts, int cap_face, int valid_mask, cudaStream_t s) {
+  sphSubmitMemset(d_counts, 0, sizeof(int) * NUM_COUNTERS, s);
+  if (n_max <= 0) return;
+  hapiSubmit(s, [=]() {
+    packHaloConcurrentKernel<<<nblocks(n_max), BLOCK_1D, 0, s>>>(d_parts, d_mig_counts,
+        valid_mask, x0, y0, z0, x1, y1, z1, support, d_bufs, d_idx_bufs, d_counts,
+        cap_face, valid_mask);
   });
   SPH_PEEK();
 }

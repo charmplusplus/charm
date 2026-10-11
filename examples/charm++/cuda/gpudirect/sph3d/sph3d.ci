@@ -34,6 +34,7 @@ mainmodule sph3d {
   readonly int lattice_ny;
   readonly int part_capacity;
   readonly int exch_capacity;   // face slot; edges and corners are smaller
+  readonly int concurrent_x;    // -c: halo and migration of a step sent together (one wait per step)
   readonly int stats_freq;
 
   readonly int nl_freq;            // neighbour-list window (-k): cell list, halo
@@ -55,6 +56,9 @@ mainmodule sph3d {
     entry void stepStats(CkReductionMsg* msg);
     entry [reductiontarget] void allDone();
     entry [reductiontarget] void profDone();
+    entry void latDone(CkReductionMsg* msg);
+    entry void watchdog();
+    entry void idAudit(CkReductionMsg* msg);
   };
 
   array [3D] Patch {
@@ -68,12 +72,30 @@ mainmodule sph3d {
     entry void sendDone();
     entry void sendsDrained();
 
-    entry void receiveHalo(int ref, int dir, int n, int m,
+    // ts: the sender's hapiTraceTimestamp() at the send, for the message
+    // latency (envelope and payload) that the receiver records.
+    entry void receiveHalo(int ref, int dir, int n, long long ts, int m,
                            nocopydevice Particle parts[m]);
-    entry void receiveHalo2(int ref, int dir, int n, int m,
+    entry void receiveHalo2(int ref, int dir, int n, long long ts, int m,
                             nocopydevice Particle parts[m]);
-    entry void receiveParticles(int ref, int dir, int adv, int n, int m,
+    entry void receiveParticles(int ref, int dir, int adv, int n, long long ts, int m,
                                 nocopydevice Particle parts[m]);
+    entry void exchangePacked();
+    // The concurrent exchange's receives are plain entries: the payload is in
+    // this patch's slot or ghost region when the body runs, the body only
+    // records the arrival, and the step waits on migrantsDone / halosDone,
+    // which the last arrival (or the opening of the step) sends. No device
+    // message is ever buffered in the SDAG, which the runtime's migration
+    // path does not support (ckrdmadevice.C: "no device-zerocopy message is
+    // buffered at migration time").
+    entry void receiveHaloC(int ref, int dir, int n, long long ts, int m,
+                            nocopydevice Particle parts[m]);
+    entry void receiveParticlesC(int ref, int dir, int adv, int n, long long ts, int m,
+                                 nocopydevice Particle parts[m]);
+    entry void migrantsDone(int ref);
+    entry void halosDone(int ref);
+    entry void dumpState();      // SPH_STUCK_SECONDS: every patch prints what it waits for
+    entry void dumpId(int id);   // SPH_ID_AUDIT: every holder of this id prints itself
 
     // Same phase order as sph2d.ci (the halo is consumed before the migration
     // send, which is what lets d_recv_halo have one slot per direction while
@@ -85,26 +107,44 @@ mainmodule sph3d {
       serial { my_iter++; startHalo(); }
       when haloPacked() serial { sendHalo(); }
       for (recv_count = 0; recv_count < n_expect; recv_count++) {
-        when receiveHalo[my_iter](int ref, int dir, int n, int m,
+        when receiveHalo[my_iter](int ref, int dir, int n, long long ts, int m,
                                   nocopydevice Particle parts[m])
-          serial { appendGhosts(dir, n); }
+          serial { noteLanded(0, ref, dir, ts); appendGhosts(dir, n); }
       }
       serial { computeForces(); }
       if (pc_step) {
         when haloPacked2() serial { sendHalo2(); }
         for (recv_count = 0; recv_count < n_expect; recv_count++) {
-          when receiveHalo2[my_iter](int ref, int dir, int n, int m,
+          when receiveHalo2[my_iter](int ref, int dir, int n, long long ts, int m,
                                      nocopydevice Particle parts[m])
-            serial { appendGhosts2(dir, n); }
+            serial { noteLanded(2, ref, dir, ts); appendGhosts2(dir, n); }
         }
         serial { correct(); }
       }
       when leaversPacked() serial { sendLeavers(); }
       for (recv_count = 0; recv_count < n_expect_mig; recv_count++) {
-        when receiveParticles[my_iter](int ref, int dir, int adv, int n, int m,
+        when receiveParticles[my_iter](int ref, int dir, int adv, int n, long long ts, int m,
                                        nocopydevice Particle parts[m])
-          serial { appendParticles(ref, dir, n); }
+          serial { noteLanded(1, ref, dir, ts); appendParticles(ref, dir, n); }
       }
+      serial { gateStepDrain(); }
+      when sendsDrained() serial { endOfStep(); }
+    };
+
+    // The concurrent exchange (-c): the halo and the migration of a step are
+    // sent together at the end of the previous step, so a step is one wait
+    // for both instead of two in sequence (see sph3d.C "CONCURRENT EXCHANGE").
+    // The migrants are consumed first: their advertisements say which halos
+    // to expect. Step 1's exchange comes from a prologue pack of the initial
+    // state.
+    entry void runStepC() {
+      serial { my_iter++; beginStepC(); }
+      if (my_iter == 1) {
+        when exchangePacked() serial { sendExchange(); }
+      }
+      when migrantsDone[my_iter](int ref) serial { mergeMigrantsC(); }
+      when halosDone[my_iter](int ref) serial { mergeHalosC(); parkOrComputeC(); }
+      when exchangePacked() serial { sendExchange(); }
       serial { gateStepDrain(); }
       when sendsDrained() serial { endOfStep(); }
     };

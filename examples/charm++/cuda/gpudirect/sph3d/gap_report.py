@@ -7,6 +7,18 @@ import json, sys, collections
 f = sys.argv[1]; minms = float(sys.argv[2]) if len(sys.argv) > 2 else 5.0
 ev = json.load(open(f))['traceEvents']
 X = [e for e in ev if e['ph'] == 'X']
+# application message latencies (instant events from the L records), by kind and tier
+M = [e for e in ev if e['ph'] == 'i' and e.get('cat') == 'msg']
+if M:
+    TIER = {0: 'same process', 1: 'same node', 2: 'other node'}
+    print('message latency, sent -> payload usable (envelope in brackets), ms:')
+    for kind in ('halo', 'migration', 'halo2'):
+        for tier in (0, 1, 2):
+            v = sorted(e['args']['lat_ms'] for e in M if e['name'] == kind and e['args']['tier'] == tier)
+            if not v: continue
+            w = sorted(e['args']['env_ms'] for e in M if e['name'] == kind and e['args']['tier'] == tier)
+            q = lambda a, p: a[min(len(a) - 1, int(p * len(a)))]
+            print(f'  {kind:9s} {TIER[tier]:12s} n={len(v):6d}  p50 {q(v, .5):6.2f} [{q(w, .5):5.2f}]  p90 {q(v, .9):6.2f} [{q(w, .9):5.2f}]  max {v[-1]:6.2f} [{w[-1]:5.2f}]')
 byrank = collections.defaultdict(list)
 for e in X: byrank[e['pid']].append(e)
 big = []

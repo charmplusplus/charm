@@ -11,6 +11,13 @@
 #include <cstdlib>
 #include <cstdint>
 #include <unistd.h>
+#include <time.h>
+#include <atomic>
+
+// The runtime's +gputrace hook for application message flights (ck-core/cknvtx.h,
+// which the install does not ship): an L record per message when the trace is on.
+extern std::atomic<bool> _nvtxOn;
+extern void _nvtxTraceMsg(unsigned long long t_send, unsigned long long t_env, unsigned long long t_land, int kind, int tier);
 
 // A 3D port of sph2d.C. The runtime machinery -- submitter queue, stream-less
 // sends from completion callbacks, pinned and event pools, direct halo landing,
@@ -39,6 +46,43 @@
 // The second exchange has its own entry methods, send and staging buffers: a
 // partner can post its second exchange before this patch has consumed its
 // first, and the first exchange's send buffer may still be being read.
+//
+// CONCURRENT EXCHANGE (-c, Euler-Cromer with -k 1). The two rounds of a step,
+// the halo before the forces and the migration after the integration, are
+// each a barrier on 26 partners; with one patch kernel at a time per GPU the
+// 2000-step timeline (job 22796600) showed every GPU idle 18-20% of the time
+// in 1-5 ms waits at those boundaries, with the partner GPUs busy. Here the
+// migration of step t and the halo of step t+1 leave together, at the end of
+// step t, so a step waits once for both. What makes that possible:
+//   - the halo of step t+1 is packed from the survivors plus this patch's own
+//     leavers (positions at t+1), not from the migrants about to arrive: a
+//     leaver stays this patch's ghost for one step (the new owner cannot send
+//     it back before it has it) and is sent to every other partner within
+//     support of it, but not to the partner whose box it is in, which gets it
+//     as a migrant;
+//   - the migrants are consumed first (their advertisements say which halos to
+//     expect), then the leaver ghosts are placed behind them, then the halos
+//     land behind those (directly once every migration envelope of the step is
+//     known, otherwise staged in a per-parity slot and copied);
+//   - the activity advertised for step t+1 is decided before the incoming
+//     migrants are known: ACTIVE is exact (a neighbour with fluid at t is the
+//     only source of them), FLUID is widened by that same condition, so the
+//     active region is one patch ring wider at the front;
+//   - the quiet-edge bookkeeping (xchg_step, xchg_min, edgeSkipsC) is the same
+//     proof shifted by one step: a message for step s describes step s.
+// Step 1's exchange is a prologue pack of the initial state. Every exchange
+// message carries the sender's clock for the latency summary (Main::latDone)
+// and the +gputrace L records.
+
+// The message timestamps on the same clock as the +gputrace records (CUPTI's
+// timestamp is CLOCK_REALTIME in ns on Delta; the merge aligns by the header
+// pair anyway), without a CUPTI call: cuptiGetTimestamp blocked for 66-86 ms
+// in receive hooks while the helper thread flushed CUPTI (job 22798528
+// asyncH trace), and every send and receive calls this.
+static inline long long sphNowNs() {
+  struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);
+  return (long long)ts.tv_sec * 1000000000LL + ts.tv_nsec;
+}
 
 static inline void sphSubmitMemcpy(void* dst, const void* src, size_t n, cudaMemcpyKind k, cudaStream_t s) {
   hapiSubmit(s, [=]() { hapiCheck(cudaMemcpyAsync(dst, src, n, k, s)); });
@@ -58,6 +102,26 @@ static inline CkDeviceBuffer sphSendBuffer(const void* ptr, const CkCallback& cb
   static const bool tag = getenv("SPH_SEND_STREAM") != nullptr;
   return tag ? CkDeviceBuffer(ptr, cb, s) : CkDeviceBuffer(ptr, cb);
 }
+
+// SPH_SEND_WARN_MS=N: a send loop (26 or 52 device sends) that takes longer
+// than N ms prints which send took the time -- the kernels-only async trace
+// (job 22798305) had one 41 ms leaversPacked entry on a PE, i.e. a send call
+// blocking inside the runtime.
+static const double send_warn_ms = getenv("SPH_SEND_WARN_MS") ? atof(getenv("SPH_SEND_WARN_MS")) : 0.0;
+struct SendTimer {
+  double t0 = 0.0, worst = 0.0; int worst_d = -1, n = 0;
+  void begin() { if (send_warn_ms > 0) t0 = CkWallTimer(); }
+  void end(int d) {
+    if (send_warn_ms <= 0) return;
+    const double dt = (CkWallTimer() - t0) * 1000.0; n++;
+    if (dt > worst) { worst = dt; worst_d = d; }
+  }
+  void report(const char* what, int px, int py, int pz, int it, double total_ms, int tier) const {
+    if (send_warn_ms > 0 && total_ms > send_warn_ms)
+      CkPrintf("[SENDSTALL] pe %d patch (%d,%d,%d) step %d: %s took %.1f ms for %d sends, worst %.1f ms to direction %d (tier %d: 0 same process, 1 same node, 2 other node)\n",
+               CkMyPe(), px, py, pz, it, what, total_ms, n, worst, worst_d, tier);
+  }
+};
 
 // Pinned landing pads and ordering events are recycled, never returned to the
 // driver (cudaMallocHost/cudaFreeHost and event create/destroy synchronize the
@@ -177,6 +241,7 @@ EventPool& eventPool() {
 /* readonly */ int integrator;
 /* readonly */ RealType verlet_margin;
 /* readonly */ RealType cell_size;
+/* readonly */ int concurrent_x;
 
 extern size_t sphScanTempBytes(int);
 extern void invokeCellBuild(const Particle*, int, RealType, RealType, RealType,
@@ -210,6 +275,16 @@ extern void invokePackHaloByIndex(const Particle*, Particle**, const int*,
 extern void invokeMarkLeavers(const Particle*, int, RealType, RealType, RealType,
     RealType, RealType, RealType, Particle**, Particle*, int*, int, bool,
     cudaStream_t);
+extern void invokeGatherLeaverGhosts(Particle**, const int*, Particle*, Particle*, int, int,
+    int, cudaStream_t);
+extern void invokePackHaloConcurrent(const Particle*, const int*, int, RealType, RealType,
+    RealType, RealType, RealType, RealType, RealType, Particle**, int**, int*, int, int,
+    cudaStream_t);
+extern void invokeIdBuckets(const Particle*, int, unsigned long long*, unsigned long long*,
+    unsigned long long*, cudaStream_t);
+extern void invokeFindId(const Particle*, int, int, int*, cudaStream_t);
+#define ID_AUDIT_BUCKETS 4096
+static const bool id_audit_on = (getenv("SPH_ID_AUDIT") != nullptr);
 extern void invokeStats(const Particle*, int, RealType*, cudaStream_t);
 extern void invokeCheck(const Particle*, int, RealType, RealType, RealType,
     RealType, RealType, RealType, RealType, RealType, RealType,
@@ -254,6 +329,31 @@ static inline int peTier(int pe) {
   return CmiPeOnSamePhysicalNode(pe, CkMyPe()) ? 1 : 2;
 }
 
+// ---- message latency ---------------------------------------------------------
+// Every exchange message carries the sender's hapiTraceTimestamp(); the
+// receiver notes the envelope's arrival (the post hook that picks the landing
+// buffer) and the moment the payload is usable (the SDAG body). Per PE, kind
+// (0 halo, 1 migration, 2 predicted halo) and tier of the partner's PE (same
+// process / same node / other node): count, sums, max and a quarter-octave
+// log histogram of microseconds, reduced at the end into Main::latDone's
+// percentiles. With +gputrace every message is also an L record of the PE's
+// trace file. Cross-node clocks agree to NTP, so tier 2 carries that error.
+#define LAT_KINDS 3
+#define LAT_BINS 96   // 2^(96/4) us = 16.8 s
+struct LatStats {
+  int hist[LAT_KINDS][3][LAT_BINS] = {};    // payload usable
+  int ehist[LAT_KINDS][3][LAT_BINS] = {};   // envelope arrived (the transport alone)
+  long n[LAT_KINDS][3] = {};
+  double sum[LAT_KINDS][3] = {}, esum[LAT_KINDS][3] = {}, mx[LAT_KINDS][3] = {};
+};
+static thread_local LatStats g_lat;
+static inline int latBin(double us) {
+  if (us < 1.0) return 0;
+  const int b = (int)(4.0 * std::log2(us));
+  return b < 0 ? 0 : b >= LAT_BINS ? LAT_BINS - 1 : b;
+}
+static inline double latBinUpperMs(int b) { return std::exp2((b + 1) / 4.0) / 1000.0; }
+
 class Main : public CBase_Main {
   double start_time;
   double last_report_t = 0.0;
@@ -277,11 +377,12 @@ public:
     first_lb = 99999; lb_freq = 0; async_lb = 0; lb_wait_lag = 3;
     stats_freq = 200;
     nl_freq = 1; integrator = 0; verlet_margin = 0.0f;
+    concurrent_x = 0;
     RealType headroom = 2.0f;
     RealType exch_frac = 0.1f;
 
     int c;
-    while ((c = getopt(m->argc, m->argv, "X:Y:Z:x:y:z:s:w:t:V:i:u:f:b:l:ar:e:S:k:pm:")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "X:Y:Z:x:y:z:s:w:t:V:i:u:f:b:l:ar:e:S:k:pm:c")) != -1) {
       switch (c) {
         case 'X': dom_lx = atof(optarg); break;
         case 'Y': dom_ly = atof(optarg); break;
@@ -305,6 +406,7 @@ public:
         case 'k': nl_freq = atoi(optarg); break;
         case 'p': integrator = 1; break;
         case 'm': verlet_margin = atof(optarg); break;
+        case 'c': concurrent_x = 1; break;
         default:
           CkPrintf("Usage: sph3d [-X tank length] [-Y tank depth] [-Z tank height]\n"
                    "  -x -y -z [chares along each axis] -s [particle spacing]\n"
@@ -315,7 +417,8 @@ public:
                    "  -a (async LB, needs +LBAsync) -l [wait lag]\n"
                    "  -r [capacity headroom] -e [face exchange buffer fraction]\n"
                    "  -p (predictor-corrector, two force evaluations per step)\n"
-                   "  -k [neighbour-list window, steps] -m [Verlet margin, in h]\n");
+                   "  -k [neighbour-list window, steps] -m [Verlet margin, in h]\n"
+                   "  -c (concurrent exchange: halo and migration sent together; needs -k 1, Euler-Cromer)\n");
           CkExit();
       }
     }
@@ -323,6 +426,8 @@ public:
 
     if (nl_freq < 1) CkAbort("-k (%d) must be at least 1\n", nl_freq);
     if (verlet_margin < 0.0f) CkAbort("-m (%g) must not be negative\n", verlet_margin);
+    if (concurrent_x && (nl_freq != 1 || integrator != 0))
+      CkAbort("-c (concurrent exchange) needs -k 1 and the Euler-Cromer integrator (no -p)\n");
 
     wall_t = 3.0f * spacing;
     smooth_h = 1.3f * spacing;
@@ -404,6 +509,9 @@ public:
     CkPrintf("  iterations %d (+%d warmup), first LB %d, LB period %d%s\n",
              n_iters, warmup_iters, first_lb, lb_freq,
              async_lb ? ", async" : "");
+    if (concurrent_x)
+      CkPrintf("  concurrent exchange: a step's halo and the previous step's migration "
+               "leave together, one wait per step\n");
 
     patch_proxy = CProxy_Patch::ckNew(n_chares_x, n_chares_y, n_chares_z);
     prof_proxy = CProxy_HostProfGroup::ckNew();
@@ -429,6 +537,66 @@ public:
              ref_bnd_sum);
     start_time = CkWallTimer();
     patch_proxy.iterate();
+    // SPH_STUCK_SECONDS=N: if no stats report arrives for N s, every patch
+    // prints the state of its step (a hang diagnostic; one line per patch).
+    static const int stuck_s = getenv("SPH_STUCK_SECONDS") ? atoi(getenv("SPH_STUCK_SECONDS")) : 0;
+    if (stuck_s > 0) thisProxy.watchdog();
+  }
+
+  // SPH_ID_AUDIT: per-bucket (count, sum id, sum id^2) of every local particle,
+  // reduced at each stats step. Against the first audit's reference, a bucket
+  // whose count moved by +1/-1 names the duplicated / lost id by its sum
+  // difference; a bucket with the count unchanged and the sums changed holds
+  // both: x - y = dsum, x^2 - y^2 = dsum2, so x + y = dsum2 / dsum. The holders
+  // then print themselves (Patch::dumpId).
+  std::vector<unsigned long long> ref_cnt, ref_sum, ref_sum2;
+  int corrupt_step = -1;   // SPH_ID_AUDIT: checkState defers its abort to the audit of that step
+  void idAudit(CkReductionMsg* msg) {
+    int nt; CkReduction::tupleElement* t; msg->toTuple(&t, &nt);
+    const unsigned long long* cnt = (const unsigned long long*)t[0].data;
+    const unsigned long long* sum = (const unsigned long long*)t[1].data;
+    const unsigned long long* sum2 = (const unsigned long long*)t[2].data;
+    const int step = *(const int*)t[3].data;
+    if (ref_cnt.empty()) {
+      ref_cnt.assign(cnt, cnt + ID_AUDIT_BUCKETS); ref_sum.assign(sum, sum + ID_AUDIT_BUCKETS);
+      ref_sum2.assign(sum2, sum2 + ID_AUDIT_BUCKETS);
+      CkPrintf("[IDAUDIT] reference taken at step %d\n", step);
+    } else {
+      int bad = 0;
+      for (int b = 0; b < ID_AUDIT_BUCKETS; b++) {
+        if (cnt[b] == ref_cnt[b] && sum[b] == ref_sum[b] && sum2[b] == ref_sum2[b]) continue;
+        bad++;
+        const long long dc = (long long)(cnt[b] - ref_cnt[b]);
+        const long long ds = (long long)(sum[b] - ref_sum[b]);
+        const long long ds2 = (long long)(sum2[b] - ref_sum2[b]);
+        if (dc == 1) { CkPrintf("[IDAUDIT] step %d bucket %d: one extra particle, id %lld (duplicated)\n", step, b, ds); patch_proxy.dumpId((int)ds); }
+        else if (dc == -1) { CkPrintf("[IDAUDIT] step %d bucket %d: one particle missing, id %lld (lost)\n", step, b, -ds); patch_proxy.dumpId((int)-ds); }
+        else if (dc == 0 && ds != 0 && ds2 % ds == 0) {
+          const long long xy = ds2 / ds, x = (xy + ds) / 2, y = (xy - ds) / 2;
+          CkPrintf("[IDAUDIT] step %d bucket %d: id %lld duplicated, id %lld lost\n", step, b, x, y);
+          patch_proxy.dumpId((int)x); patch_proxy.dumpId((int)y);
+        } else CkPrintf("[IDAUDIT] step %d bucket %d: dcount %lld dsum %lld dsum2 %lld (more than one change)\n", step, b, dc, ds, ds2);
+        if (bad >= 8) break;
+      }
+      if (bad == 0) CkPrintf("[IDAUDIT] step %d: identical to the reference\n", step);
+      if (corrupt_step == step) {
+        CkPrintf("[IDAUDIT] the identity check failed at step %d; exiting in 5 s after the holders printed\n", step);
+        CcdCallFnAfter([](void*, double) { CkAbort("CORRUPTION (audited above)\n"); }, nullptr, 5000.0);
+      }
+    }
+    delete[] t; delete msg;
+  }
+
+  int watchdog_seen = -1;
+  void watchdog() {
+    static const int stuck_s = getenv("SPH_STUCK_SECONDS") ? atoi(getenv("SPH_STUCK_SECONDS")) : 0;
+    if (watchdog_seen == stat_count && stat_count >= 0 && CkWallTimer() - start_time > stuck_s) {
+      CkPrintf("[STUCK] no stats report for %d s after step %d: dumping every patch's state\n", stuck_s, stat_count * stats_freq);
+      patch_proxy.dumpState();
+      return;   // once
+    }
+    watchdog_seen = stat_count;
+    CcdCallFnAfter([](void* m, double) { ((Main*)m)->thisProxy.watchdog(); }, this, stuck_s * 1000.0);
   }
 
   void stepStats(CkReductionMsg* msg) {
@@ -512,10 +680,18 @@ public:
               "none left the domain.\n",
               step, sum_np, n_total_particles, n_fl, ref_n_fluid);
 
-    if (id_sum != ref_id_sum)
+    if (id_sum != ref_id_sum) {
+      if (id_audit_on && corrupt_step < 0) {
+        corrupt_step = step;
+        CkPrintf("CORRUPTION at step %d: the particle identity checksum changed, %016llx (expected %016llx), "
+                 "with the count right (%ld); waiting for the identity audit of this step\n",
+                 step, id_sum, ref_id_sum, sum_np);
+        return;
+      }
       CkAbort("CORRUPTION at step %d: the particle identity checksum changed, "
               "%016llx (expected %016llx), with the count right (%ld).\n",
               step, id_sum, ref_id_sum, sum_np);
+    }
   }
 
   void allDone() {
@@ -528,6 +704,44 @@ public:
     prof_proxy.report(CkCallback(CkReductionTarget(Main, profDone), main_proxy));
   }
   void profDone() { CkExit(); }
+
+  // hist | n | sum | envelope sum | max, over every PE (HostProfGroup::report).
+  void latDone(CkReductionMsg* msg) {
+    int nt;
+    CkReduction::tupleElement* t;
+    msg->toTuple(&t, &nt);
+    const int* hist = (const int*)t[0].data;
+    const int* ehist = (const int*)t[1].data;
+    const long* cnt = (const long*)t[2].data;
+    const double* sum = (const double*)t[3].data;
+    const double* esum = (const double*)t[4].data;
+    const double* mx = (const double*)t[5].data;
+    static const char* const kind_name[LAT_KINDS] = {"halo", "migration", "halo2"};
+    static const char* const tier_name[3] = {"same process", "same node", "other node"};
+    CkPrintf("Message latency, ms: envelope = sent -> arrived on the receiver's PE (the transport);"
+             " usable = sent -> payload consumed by the step (includes the receiver's own wait)\n");
+    for (int k = 0; k < LAT_KINDS; k++) {
+      for (int tier = 0; tier < 3; tier++) {
+        const int i = k * 3 + tier;
+        if (cnt[i] == 0) continue;
+        double pct[3] = {0, 0, 0}, ep[3] = {0, 0, 0};
+        const double want[3] = {0.5, 0.9, 0.99};
+        long acc = 0, eacc = 0; int w = 0, ew = 0;
+        for (int b = 0; b < LAT_BINS; b++) {
+          acc += hist[i * LAT_BINS + b];
+          eacc += ehist[i * LAT_BINS + b];
+          while (w < 3 && acc >= want[w] * cnt[i]) pct[w++] = latBinUpperMs(b);
+          while (ew < 3 && eacc >= want[ew] * cnt[i]) ep[ew++] = latBinUpperMs(b);
+        }
+        CkPrintf("  %-9s %-12s n=%9ld  envelope mean %6.3f p50 %6.3f p90 %6.3f p99 %7.3f | usable mean %7.3f p50 %7.3f p90 %7.3f p99 %8.3f max %8.3f\n",
+                 kind_name[k], tier_name[tier], cnt[i], esum[i] / cnt[i] / 1000.0, ep[0], ep[1], ep[2],
+                 sum[i] / cnt[i] / 1000.0, pct[0], pct[1], pct[2], mx[i] / 1000.0);
+      }
+    }
+    delete[] t;
+    delete msg;
+    CkExit();
+  }
 };
 
 class HostProfGroup : public CBase_HostProfGroup {
@@ -550,7 +764,17 @@ class HostProfGroup : public CBase_HostProfGroup {
                     h.recv_bytes[1] / 1e6, h.recv_bytes[2] / 1e6);
       CkPrintf("%s", line);
     }
-    contribute(cb);
+    LatStats& L = g_lat;
+    CkReduction::tupleElement tuple[] = {
+        CkReduction::tupleElement(sizeof(int) * LAT_KINDS * 3 * LAT_BINS, &L.hist[0][0][0], CkReduction::sum_int),
+        CkReduction::tupleElement(sizeof(int) * LAT_KINDS * 3 * LAT_BINS, &L.ehist[0][0][0], CkReduction::sum_int),
+        CkReduction::tupleElement(sizeof(long) * LAT_KINDS * 3, &L.n[0][0], CkReduction::sum_long),
+        CkReduction::tupleElement(sizeof(double) * LAT_KINDS * 3, &L.sum[0][0], CkReduction::sum_double),
+        CkReduction::tupleElement(sizeof(double) * LAT_KINDS * 3, &L.esum[0][0], CkReduction::sum_double),
+        CkReduction::tupleElement(sizeof(double) * LAT_KINDS * 3, &L.mx[0][0], CkReduction::max_double)};
+    CkReductionMsg* m = CkReductionMsg::buildFromTuple(tuple, 6);
+    m->setCallback(CkCallback(CkIndex_Main::latDone(NULL), main_proxy));
+    contribute(m);
   }
 };
 
@@ -644,6 +868,46 @@ class Patch : public CBase_Patch {
   cudaStream_t compute_stream, comm_stream;
   cudaEvent_t halo_done;
 
+  // ---- concurrent exchange (-c; see the top of the file) --------------------
+  int* d_counts_mig;              // the compaction's counters (d_counts is the halo pack's)
+  int* h_counts_mig;
+  Particle* d_leaver_ghosts;      // this step's leavers, this patch's ghosts next step
+  int n_leaver_ghosts;
+  bool lg_pending;                // they are only in the side buffer so far
+  int open_ref;                   // the step whose exchange may land now
+  int np_base;                    // survivors before that step's migrants
+  bool mig_known;                 // every migration envelope of that step has arrived
+  int ghost_base;                 // where that step's ghosts start (np_base + its migrants), frozen when mig_known:
+                                  // the per-step totals are erased at the merge, and a halo landing directly after
+                                  // that computed its base from a zero and overwrote the migrants (job 22799507)
+  bool prologue;                  // step 1's exchange is being packed from the initial state
+  bool xpack_pending;             // compaction + pack submitted, exchange not yet sent
+  int n_expect_mig_cur;           // this step's expectation (n_expect_mig moves on at the send)
+  bool xsend_pending;             // exchange packed and the step opened, sends deferred past a park
+  int xsend_ref, xsend_adv;       // what the deferred sends carry
+  bool xsend_halo;
+  unsigned long long pup_id_sum, pup_n;   // SPH_PUP_CHECK: this patch's locals before the pack, re-checked after the unpack
+  bool pup_check_due;                     // landed: compare at the first step boundary (the device unpack is asynchronous)
+  unsigned long long *d_aud_cnt, *d_aud_sum, *d_aud_sum2, *h_aud;   // SPH_ID_AUDIT buffers
+  int* d_find;
+  std::map<int, int> mig_env_n, mig_env_total;             // per step: envelopes, particles
+  std::map<int, int> mig_landed, halo_landed;              // per step: directions whose payload has landed (the plain
+                                                           // entry bodies set them; a replayed body is a no-op)
+  std::map<int, int> done_sent;                            // per step: bit 0 migrantsDone sent, bit 1 halosDone sent
+  bool halo_expect_known;                                  // this step's halo expectation is set (after the migrants)
+  bool parked_midstep, sync_park_due;                      // the LB park sits after the receives, before the forces
+  std::map<int, int> mig_consumed, halo_consumed;          // (kept for the pup layout; unused by the signal scheme)
+                                                           // a replayed message is a second message object next to the
+                                                           // one pupped with the element (job 22799507, step 625: six
+                                                           // migrants appended twice, the real message left unconsumed)
+  std::map<int, int> mig_seen, halo_seen;                  // per step: directions whose hook already ran (bitmask):
+                                                           // the runtime re-invokes a landing hook when it bounces and
+                                                           // replays a device receive around a migration (job 22799507:
+                                                           // 42 particles announced, 21 appended, step 701)
+  std::map<int, std::map<int, int>> halo_staged, mig_staged;   // per step: dir -> staged count
+  bool prio_dirty, prio_now;      // SPH_PRIO_BORDER: border patches at high stream priority
+  long long env_t[LAT_KINDS][2][NUM_DIRS];   // envelope arrival: kind, step parity, direction
+
 public:
   Patch() {
     usesAtSync = true;
@@ -728,6 +992,17 @@ public:
     d_drho = d_ax = d_ay = d_az = d_stats = NULL;
     d_check = NULL;
     h_counts = NULL; h_halo_cnt = NULL; h_stats = NULL; h_check = NULL;
+    d_counts_mig = NULL; h_counts_mig = NULL; d_leaver_ghosts = NULL;
+    n_leaver_ghosts = 0; lg_pending = false; open_ref = 0; np_base = 0;
+    mig_known = false; ghost_base = 0; prologue = false; xpack_pending = false; n_expect_mig_cur = 0;
+    xsend_pending = false; xsend_ref = 0; xsend_adv = 0; xsend_halo = false;
+    halo_expect_known = false; parked_midstep = false; sync_park_due = false;
+    pup_id_sum = 0; pup_n = 0; pup_check_due = false;
+    d_aud_cnt = d_aud_sum = d_aud_sum2 = NULL; h_aud = NULL; d_find = NULL;
+    prio_dirty = true; prio_now = false;
+    for (int k = 0; k < LAT_KINDS; k++)
+      for (int par = 0; par < 2; par++)
+        for (int d = 0; d < NUM_DIRS; d++) env_t[k][par][d] = 0;
   }
 
   void createCudaEntities() {
@@ -743,8 +1018,17 @@ public:
     hapiCheck(hapiMalloc((void**)&d_parts[1], pcap));
     hapiCheck(hapiMalloc((void**)&d_send_halo, ecap));
     hapiCheck(hapiMalloc((void**)&d_send_halo2, ecap));
-    hapiCheck(hapiMalloc((void**)&d_recv_halo, ecap));
+    hapiCheck(hapiMalloc((void**)&d_recv_halo, 2 * ecap));   // two parities (-c)
     hapiCheck(hapiMalloc((void**)&d_recv_halo2, ecap));
+    hapiCheck(hapiMalloc((void**)&d_leaver_ghosts, ecap));
+    hapiCheck(hapiMalloc((void**)&d_counts_mig, sizeof(int) * NUM_COUNTERS));
+    if (id_audit_on) {
+      hapiCheck(hapiMalloc((void**)&d_aud_cnt, sizeof(unsigned long long) * ID_AUDIT_BUCKETS));
+      hapiCheck(hapiMalloc((void**)&d_aud_sum, sizeof(unsigned long long) * ID_AUDIT_BUCKETS));
+      hapiCheck(hapiMalloc((void**)&d_aud_sum2, sizeof(unsigned long long) * ID_AUDIT_BUCKETS));
+      hapiCheck(hapiMalloc((void**)&d_find, sizeof(int)));
+      h_aud = takePinned<unsigned long long>(3 * ID_AUDIT_BUCKETS);
+    }
     hapiCheck(hapiMalloc((void**)&d_send_mig, ecap));
     hapiCheck(hapiMalloc((void**)&d_recv_mig, 2 * ecap));
     hapiCheck(hapiMalloc((void**)&d_halo_ptrs, sizeof(Particle*) * NUM_DIRS));
@@ -772,12 +1056,13 @@ public:
     hapiCheck(hapiMalloc((void**)&d_check,
         sizeof(unsigned long long) * NUM_CHECKS));
     h_counts = takePinned<int>(NUM_COUNTERS);
+    h_counts_mig = takePinned<int>(NUM_COUNTERS);
     h_halo_cnt = takePinned<int>(NUM_DIRS);
     h_stats = takePinned<RealType>(8);
     h_check = takePinned<unsigned long long>(NUM_CHECKS);
     for (int i = 0; i < 8; i++) h_stats[i] = 0;
     for (int i = 0; i < NUM_CHECKS; i++) h_check[i] = 0;
-    for (int i = 0; i < NUM_COUNTERS; i++) h_counts[i] = 0;
+    for (int i = 0; i < NUM_COUNTERS; i++) { h_counts[i] = 0; h_counts_mig[i] = 0; }
     for (int i = 0; i < NUM_DIRS; i++) h_halo_cnt[i] = 0;
 
     // Per-direction bases (STAY's entry is unused). Written on compute_stream,
@@ -817,7 +1102,15 @@ public:
     hapiFree(d_pos4); hapiFree(d_vel4); hapiFree(d_type8); hapiFree(d_scan_tmp);
     hapiFree(d_drho); hapiFree(d_ax); hapiFree(d_ay); hapiFree(d_az);
     hapiFree(d_stats); hapiFree(d_check);
+    hapiFree(d_leaver_ghosts); hapiFree(d_counts_mig);
+    d_leaver_ghosts = NULL; d_counts_mig = NULL;
+    if (id_audit_on) {
+      hapiFree(d_aud_cnt); hapiFree(d_aud_sum); hapiFree(d_aud_sum2); hapiFree(d_find);
+      givePinned(h_aud, 3 * ID_AUDIT_BUCKETS);
+      d_aud_cnt = d_aud_sum = d_aud_sum2 = NULL; d_find = NULL; h_aud = NULL;
+    }
     givePinned(h_counts, NUM_COUNTERS);
+    givePinned(h_counts_mig, NUM_COUNTERS); h_counts_mig = NULL;
     givePinned(h_halo_cnt, NUM_DIRS);
     givePinned(h_stats, 8);
     givePinned(h_check, NUM_CHECKS);
@@ -864,16 +1157,35 @@ public:
     p | n_ghost;
     p | ghost_alloc; p | halo_open; p | pc_open; p | halo_direct; p | halo_direct2;
     p | rebuild_step; p | migrate_step; p | pc_step; p | pc_pending;
+    p | n_leaver_ghosts; p | lg_pending; p | open_ref; p | np_base; p | mig_known; p | ghost_base;
+    p | prologue; p | xpack_pending; p | n_expect_mig_cur; p | mig_env_n; p | mig_env_total;
+    p | xsend_pending; p | xsend_ref; p | xsend_adv; p | xsend_halo;
+    p | pup_check_due;
+    p | halo_staged; p | mig_staged; p | mig_seen; p | halo_seen; p | mig_consumed; p | halo_consumed;
+    p | mig_landed; p | halo_landed; p | done_sent; p | halo_expect_known; p | parked_midstep; p | sync_park_due;
+    if (p.isUnpacking()) prio_dirty = true;
     _sdag_pup(p);
     p | recv_count;
     p | outstanding_sends;
     p | draining;
     p | halo_pending; p | halo_pending2; p | mig_pending;
 
+    static const bool pup_check = (getenv("SPH_PUP_CHECK") != nullptr);
     if (!p.isUnpacking()) {
       sphDrainSync(compute_stream);
       sphDrainSync(comm_stream);
+      if (pup_check) {
+        // The locals' identity before the pack (ghosts excluded), carried
+        // across and re-checked right after the unpack: a corruption inside
+        // the migration path is then caught at the patch it happened to.
+        check_ghosts = false;
+        runCheck(1e30f);
+        hapiCheck(sphDrainSync(compute_stream));
+        pup_id_sum = h_check[CHK_ID_SUM];
+        pup_n = h_check[CHK_N_FLUID] + h_check[CHK_N_BOUND];
+      }
     }
+    p | pup_id_sum; p | pup_n;
     if (p.isUnpacking()) {
       setupGeometry();
       allocDevice();
@@ -881,6 +1193,7 @@ public:
     }
 
     PUParray(p, h_counts, NUM_COUNTERS);
+    PUParray(p, h_counts_mig, NUM_COUNTERS);
     PUParray(p, h_halo_cnt, NUM_DIRS);
     PUParray(p, h_stats, 8);
     PUParray(p, h_check, NUM_CHECKS);
@@ -894,6 +1207,14 @@ public:
       // in the other buffer, h_counts[STAY] of them.
       p((RealType*)d_parts[1 - cur],
         (size_t)std::max(h_counts[STAY], 0) * per, PUP::PUPMode::DEVICE);
+    } else if (concurrent_x) {
+      // Locals so far, the slots the rest of this step's migrants will fill,
+      // the leaver ghosts and the halos landed directly behind them.
+      // (find, not operator[]: an insertion here would make the sizing and
+      // packing passes disagree by one map entry)
+      auto mt = mig_env_total.find(open_ref);
+      const int live = std::max(np, np_base + (mt == mig_env_total.end() ? 0 : mt->second)) + ghost_alloc;
+      p((RealType*)d_parts[cur], (size_t)live * per, PUP::PUPMode::DEVICE);
     } else {
       p((RealType*)d_parts[cur], (size_t)(np + std::max(n_ghost, ghost_alloc)) * per,
         PUP::PUPMode::DEVICE);
@@ -915,6 +1236,46 @@ public:
       }
     }
 
+    if (concurrent_x) {
+      // Staged exchange slots not yet consumed: a partner's messages that
+      // landed before their step opened or before its migrants were known.
+      for (auto& st : halo_staged)
+        for (auto& dn : st.second)
+          if (dn.second > 0)
+            p((RealType*)(d_recv_halo + (size_t)(st.first & 1) * exch_slots + dirOffset(dn.first, exch_capacity)),
+              (size_t)dn.second * per, PUP::PUPMode::DEVICE);
+      for (auto& st : mig_staged)
+        for (auto& dn : st.second)
+          if (dn.second > 0)
+            p((RealType*)(d_recv_mig + (size_t)(st.first & 1) * exch_slots + dirOffset(dn.first, exch_capacity)),
+              (size_t)dn.second * per, PUP::PUPMode::DEVICE);
+      if (lg_pending && n_leaver_ghosts > 0)
+        p((RealType*)d_leaver_ghosts, (size_t)n_leaver_ghosts * per, PUP::PUPMode::DEVICE);
+      if (xpack_pending || xsend_pending) {
+        // Compaction and pack done, exchange not sent: the survivors and the
+        // leaver ghosts behind them (not swapped in yet), and the send slots.
+        // Deferred sends (xsend_pending): the swap has happened, the live
+        // range above has the survivors; only the send slots are owed.
+        int L = 0;
+        for (int d = 0; d < NUM_DIRS; d++) if (d != STAY && valid_dir[d]) L += h_counts_mig[d];
+        if (xpack_pending && !prologue) {
+          const int S = h_counts_mig[STAY];
+          p((RealType*)d_parts[1 - cur], (size_t)(S + L) * per, PUP::PUPMode::DEVICE);
+          // The side copy too (the gather wrote both): restoring it with a
+          // D2D copy on compute_stream could run before the runtime's device
+          // unpack of the line above has landed.
+          if (L > 0) p((RealType*)d_leaver_ghosts, (size_t)L * per, PUP::PUPMode::DEVICE);
+        }
+        for (int d = 0; d < NUM_DIRS; d++) {
+          if (d == STAY || !valid_dir[d]) continue;
+          if (h_counts_mig[d] > 0)
+            p((RealType*)(d_send_mig + dirOffset(d, exch_capacity)), (size_t)h_counts_mig[d] * per, PUP::PUPMode::DEVICE);
+          if (h_counts[d] > 0)
+            p((RealType*)(d_send_halo + dirOffset(d, exch_capacity)), (size_t)h_counts[d] * per, PUP::PUPMode::DEVICE);
+        }
+      }
+    }
+
     // A packed-but-unsent send buffer, each direction's filled prefix only.
     if (halo_pending || halo_pending2 || mig_pending) {
       Particle* base = halo_pending ? d_send_halo
@@ -929,6 +1290,27 @@ public:
           PUP::PUPMode::DEVICE);
       }
     }
+    // The device unpack lands asynchronously; the comparison runs at the first
+    // step boundary on the destination (pupCheckLanded), not here.
+    if (pup_check && p.isUnpacking() && !mig_pending && !xpack_pending) pup_check_due = true;
+  }
+
+  void pupCheckLanded(const char* where) {
+    if (!pup_check_due) return;
+    pup_check_due = false;
+    hapiSubmitDrain();
+    hapiCheck(cudaDeviceSynchronize());
+    check_ghosts = false;
+    runCheck(1e30f);
+    hapiCheck(sphDrainSync(compute_stream));
+    const unsigned long long n_now = h_check[CHK_N_FLUID] + h_check[CHK_N_BOUND];
+    if (h_check[CHK_ID_SUM] != pup_id_sum || n_now != pup_n)
+      CkAbort("PUP CORRUPTION: patch (%d,%d,%d) on PE %d at %s step %d: id sum %016llx / %llu locals, "
+              "packed with %016llx / %llu (np %d base %d ghost_alloc %d n_ghost %d open_ref %d mig_known %d "
+              "xpack %d xsend %d lg_pending %d prologue %d staged halos %zu migs %zu direct %zu)\n",
+              x, y, z, CkMyPe(), where, my_iter, h_check[CHK_ID_SUM], n_now, pup_id_sum, pup_n, np, np_base,
+              ghost_alloc, n_ghost, open_ref, (int)mig_known, (int)xpack_pending, (int)xsend_pending,
+              (int)lg_pending, (int)prologue, halo_staged.size(), mig_staged.size(), halo_direct.size());
   }
 
   // Lattice sites at (i + 1/2) spacing; wall, column or air by position.
@@ -1141,8 +1523,52 @@ public:
     if (it != arrived.end()) arrived.erase(it);
   }
 
+  // The next step, in whichever exchange mode; between steps is where the
+  // priority of the compute stream can change (nothing is queued on it).
+  void startStep() {
+    pupCheckLanded("startStep");
+    if (prio_dirty) updatePriority();
+    if (concurrent_x) thisProxy[thisIndex].runStepC();
+    else thisProxy[thisIndex].runStep();
+  }
+
+  // SPH_PRIO_BORDER=1: a patch with a partner on another GPU runs its kernels
+  // on a stream at the device's highest priority, so the halos other GPUs
+  // wait for are produced before the interior patches' work. Re-evaluated
+  // after every migration (the partner map changes).
+  void updatePriority() {
+    prio_dirty = false;
+    static const bool on = (getenv("SPH_PRIO_BORDER") != nullptr);
+    if (!on) return;
+    bool border = false;
+    for (int d = 0; d < NUM_DIRS && !border; d++)
+      if (valid_dir[d] &&
+          peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[d], nbr_y[d], nbr_z[d]))) != 0)
+        border = true;
+    if (border == prio_now) return;
+    cudaStream_t ns = border ? hapiAcquirePriorityStream() : hapiAcquireStream();
+    hapiSubmitEventRecord((void*)halo_done, compute_stream);
+    sphSubmitWaitEvent(ns, halo_done);
+    hapiReleaseStream(compute_stream);
+    compute_stream = ns;
+    prio_now = border;
+  }
+
   void iterate() {
     PhaseScope _ps(PH_ITERATE);
+    if (concurrent_x) {
+      // The park (AtSync, or AtSyncWait at the lag) happens inside the next
+      // step, after its receives and before its forces (parkOrComputeC):
+      // nothing of this patch's is then in flight and nothing is buffered.
+      if (isLBIter(my_iter) && !lb_waiting && !sync_park_due) {
+        lb_start_iter = my_iter;
+        lb_t0 = CkWallTimer();
+        if (!async_lb) sync_park_due = true;
+        else { AtSyncStart(); lb_waiting = true; }
+      }
+      startStep();
+      return;
+    }
     if (isLBIter(my_iter) && !lb_waiting) {
       lb_start_iter = my_iter;
       lb_t0 = CkWallTimer();
@@ -1152,7 +1578,7 @@ public:
       }
       AtSyncStart();
       lb_waiting = true;
-      thisProxy[thisIndex].runStep();
+      startStep();
     } else if (lb_waiting && my_iter >= lb_start_iter + lb_wait_lag) {
       lb_waiting = false;
       if (x == 0 && y == 0 && z == 0)
@@ -1160,7 +1586,7 @@ public:
                  lb_start_iter, CkWallTimer() - lb_t0);
       AtSyncWait();
     } else {
-      thisProxy[thisIndex].runStep();
+      startStep();
     }
   }
 
@@ -1169,7 +1595,36 @@ public:
       CkPrintf("  LB at step %d: resumed %.3f s after %s; patch (0,0,0) now on PE %d\n",
                lb_start_iter, CkWallTimer() - lb_t0,
                async_lb ? "AtSyncStart" : "AtSync", CkMyPe());
-    thisProxy[thisIndex].runStep();
+    prio_dirty = true;
+    if (parked_midstep) {   // -c: resume the step where it parked (parkOrComputeC)
+      parked_midstep = false;
+      if (prio_dirty) updatePriority();
+      computeForcesC();
+      return;
+    }
+    if (xsend_pending) sendExchangeMsgs();   // deferred past the park (see sendExchange)
+    startStep();
+  }
+
+  int stallTier(int worst_d) const {
+    if (send_warn_ms <= 0 || worst_d < 0) return -1;
+    const int d = worst_d % 100;
+    return peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[d], nbr_y[d], nbr_z[d])));
+  }
+
+  // The latency of one exchange message, at the moment its payload is usable.
+  void noteLanded(int kind, int ref, int dir, long long ts) {
+    const long long now = sphNowNs();
+    const long long te = env_t[kind][ref & 1][dir];
+    const int tier = peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[dir], nbr_y[dir], nbr_z[dir])));
+    const double us = (now - ts) / 1000.0, eus = (te - ts) / 1000.0;
+    LatStats& L = g_lat;
+    L.n[kind][tier]++; L.sum[kind][tier] += us; L.esum[kind][tier] += eus;
+    if (us > L.mx[kind][tier]) L.mx[kind][tier] = us;
+    L.hist[kind][tier][latBin(us)]++;
+    L.ehist[kind][tier][latBin(eus)]++;
+    if (_nvtxOn.load(std::memory_order_relaxed))
+      _nvtxTraceMsg((unsigned long long)ts, (unsigned long long)te, (unsigned long long)now, kind, tier);
   }
 
   // ---- phase 1: pressure, then halo ----------------------------------------
@@ -1273,6 +1728,8 @@ public:
                   "change at a migration, which only happens at the window's "
                   "end\n", x, y, z, my_iter, d);
     }
+    const long long ts = sphNowNs();
+    SendTimer st; const double tloop = send_warn_ms > 0 ? CkWallTimer() : 0.0;
     for (int d = 0; d < NUM_DIRS; d++) {
       if (!halo_peer[d]) continue;
       const int cnt = h_halo_cnt[d];
@@ -1280,28 +1737,32 @@ public:
         const int tier = peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[d], nbr_y[d], nbr_z[d])));
         g_hprof.sent[tier]++; g_hprof.sent_bytes[tier] += (long)cnt * sizeof(Particle);
       }
-      thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveHalo(my_iter, flipDir(d), cnt, cnt,
+      st.begin();
+      thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveHalo(my_iter, flipDir(d), cnt, ts, cnt,
           (outstanding_sends++, sphSendBuffer(
            d_send_halo + dirOffset(d, exch_capacity),
            sendDoneCb(),
            comm_stream)));
+      st.end(d);
     }
+    st.report("sendHalo", x, y, z, my_iter, send_warn_ms > 0 ? (CkWallTimer() - tloop) * 1000.0 : 0.0, stallTier(st.worst_d));
   }
 
   // A halo for THIS step lands straight in its ghost slot when that slot is
   // known and free (see sph2d.C receiveHalo). On a rebuild step the slot is
   // handed out in arrival order and recorded; inside a window it is the
   // recorded one, and the count has to match.
-  void receiveHalo(int ref, int dir, int n, int& m, Particle*& parts,
+  void receiveHalo(int ref, int dir, int n, long long ts, int& m, Particle*& parts,
       CkDeviceBufferPost* devicePost) {
     PhaseScope _ps(PH_RECV_HALO);
+    env_t[0][ref & 1][dir] = sphNowNs();
     if (host_profile_on) {
       const int tier = peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[dir], nbr_y[dir], nbr_z[dir])));
       g_hprof.recv[tier]++; g_hprof.recv_bytes[tier] += (long)n * sizeof(Particle);
     }
-    parts = d_recv_halo + dirOffset(dir, exch_capacity);
     static const bool direct_ok = (getenv("SPH_NO_DIRECT_HALO") == nullptr);
     static const bool ordered = (getenv("SPH_HALO_ORDERED") != nullptr);
+    parts = d_recv_halo + dirOffset(dir, exch_capacity);
     if (direct_ok && halo_open && ref == my_iter && n > 0 &&
         halo_direct.find(dir) == halo_direct.end()) {
       if (rebuild_step) {
@@ -1319,6 +1780,164 @@ public:
       }
     }
     devicePost[0].hapi_stream = comm_stream;
+  }
+
+  // ---- concurrent exchange: the receive hooks and bodies ---------------------
+  // Hook (landing buffer): straight into the ghost region once this step's
+  // migrants are all known (their total fixes where the ghosts start),
+  // otherwise into the parity slot. Idempotent per (step, direction): the
+  // runtime re-invokes the hook when it replays a buffered receive.
+  void receiveHaloC(int ref, int dir, int n, long long ts, int& m, Particle*& parts,
+      CkDeviceBufferPost* devicePost) {
+    PhaseScope _ps(PH_RECV_HALO);
+    env_t[0][ref & 1][dir] = sphNowNs();
+    static const bool direct_ok = (getenv("SPH_NO_DIRECT_HALO") == nullptr);
+    static const bool ordered = (getenv("SPH_HALO_ORDERED") != nullptr);
+    parts = d_recv_halo + (size_t)(ref & 1) * exch_slots + dirOffset(dir, exch_capacity);
+    const int bit = 1 << dir;
+    if (halo_seen[ref] & bit) {
+      auto landed = halo_direct.find(dir);
+      if (ref == open_ref && landed != halo_direct.end()) {
+        parts = d_parts[cur] + ghost_base + landed->second;
+        devicePost[0].buffer_free = !ordered;
+      }
+      devicePost[0].hapi_stream = comm_stream;
+      return;
+    }
+    halo_seen[ref] |= bit;
+    halo_staged[ref][dir] = n;   // every direction: the merge walks this
+    if (direct_ok && halo_open && ref == open_ref && mig_known && n > 0 &&
+        ghost_cnt[dir] < 0 && halo_direct.find(dir) == halo_direct.end()) {
+      const int base = ghost_base;
+      if (base + ghost_alloc + n <= part_capacity) {
+        parts = d_parts[cur] + base + ghost_alloc;
+        ghost_off[dir] = ghost_alloc; ghost_cnt[dir] = n;
+        halo_direct[dir] = ghost_alloc;
+        ghost_alloc += n;
+        devicePost[0].buffer_free = !ordered;
+      }
+    }
+    devicePost[0].hapi_stream = comm_stream;
+  }
+  // Body (payload usable): record it; the last one the step waits for sends halosDone.
+  void receiveHaloC(int ref, int dir, int n, long long ts, int m, Particle* parts) {
+    const int bit = 1 << dir;
+    if (halo_landed[ref] & bit) return;   // a replayed delivery
+    halo_landed[ref] |= bit;
+    noteLanded(0, ref, dir, ts);
+    if (ref == my_iter && halo_expect_known) checkHalosDone(ref);
+  }
+  void receiveParticlesC(int ref, int dir, int adv, int n, long long ts, int& m,
+      Particle*& parts, CkDeviceBufferPost* devicePost) {
+    PhaseScope _ps(PH_RECV_PARTS);
+    env_t[1][ref & 1][dir] = sphNowNs();
+    if (ref > my_iter + ADV_LEVEL_CAP)
+      CkAbort("Patch (%d,%d,%d) at step %d: migration from step %d -- a partner ran more than %d steps ahead\n",
+              x, y, z, my_iter, ref, ADV_LEVEL_CAP);
+    nbr_adv[dir][ref % ADV_RING] = adv;
+    const int bit = 1 << dir;
+    if (!(mig_seen[ref] & bit)) {
+      mig_seen[ref] |= bit;
+      mig_env_n[ref]++;
+      mig_env_total[ref] += n;
+      mig_staged[ref][dir] = n;
+      if (ref == open_ref && mig_env_n[ref] == n_expect_mig) { mig_known = true; ghost_base = np_base + mig_env_total[ref]; }
+    }
+    parts = d_recv_mig + (size_t)(ref & 1) * exchSlots(exch_capacity) + dirOffset(dir, exch_capacity);
+    devicePost[0].hapi_stream = comm_stream;
+  }
+  void receiveParticlesC(int ref, int dir, int adv, int n, long long ts, int m, Particle* parts) {
+    const int bit = 1 << dir;
+    if (mig_landed[ref] & bit) return;
+    mig_landed[ref] |= bit;
+    noteLanded(1, ref, dir, ts);
+    if (ref == open_ref) checkMigrantsDone(ref);
+  }
+  static int popcount27(int v) { return __builtin_popcount((unsigned)v); }
+  void checkMigrantsDone(int ref) {
+    if (ref != open_ref || (done_sent[ref] & 1)) return;
+    if (popcount27(mig_landed[ref]) != n_expect_mig) return;
+    done_sent[ref] |= 1;
+    thisProxy[thisIndex].migrantsDone(ref);
+  }
+  void checkHalosDone(int ref) {
+    if (ref != my_iter || !halo_expect_known || (done_sent[ref] & 2)) return;
+    if (popcount27(halo_landed[ref]) != n_expect) return;
+    done_sent[ref] |= 2;
+    thisProxy[thisIndex].halosDone(ref);
+  }
+  // Every migrant of this step has landed: append them, in direction order,
+  // place the leaver ghosts behind them, and set the halo expectation.
+  void mergeMigrantsC() {
+    PhaseScope _ps(PH_APPEND_PARTS);
+    auto st = mig_staged.find(my_iter);
+    for (int d = 0; d < NUM_DIRS; d++) {
+      if (!(mig_landed[my_iter] & (1 << d))) continue;
+      const int n = (st != mig_staged.end() && st->second.count(d)) ? st->second[d] : 0;
+      parts_arrived[my_iter]++;
+      xchg_step[d] = my_iter - 1;
+      xchg_min[d] = std::min(my_level_next, ADV_LEVEL(nbr_adv[d][my_iter % ADV_RING]));
+      if (n == 0) continue;
+      if (np + n > part_capacity)
+        CkAbort("Patch (%d,%d,%d): %d particles exceed capacity %d at step %d; increase headroom (-r)\n",
+                x, y, z, np + n, part_capacity, my_iter);
+      sphSubmitMemcpy(d_parts[cur] + np,
+          d_recv_mig + (size_t)(my_iter & 1) * exchSlots(exch_capacity) + dirOffset(d, exch_capacity),
+          sizeof(Particle) * n, cudaMemcpyDeviceToDevice, comm_stream);
+      np += n;
+      n_fluid += n;
+    }
+    mig_staged.erase(my_iter); mig_landed.erase(my_iter);
+    expectHalos();
+    halo_expect_known = true;
+    checkHalosDone(my_iter);
+  }
+  // Every halo of this step has landed: copy the staged ones behind the
+  // leaver ghosts (the direct ones are in place).
+  void mergeHalosC() {
+    PhaseScope _ps(PH_APPEND_GHOSTS);
+    auto st = halo_staged.find(my_iter);
+    for (int d = 0; d < NUM_DIRS; d++) {
+      if (!(halo_landed[my_iter] & (1 << d))) continue;
+      halo_arrived[my_iter]++;
+      const int n = (st != halo_staged.end() && st->second.count(d)) ? st->second[d] : 0;
+      auto landed = halo_direct.find(d);
+      if (landed != halo_direct.end()) { halo_direct.erase(landed); if (step_active) n_ghost += n; continue; }
+      if (n == 0) { ghost_off[d] = ghost_alloc; ghost_cnt[d] = 0; continue; }
+      if (!step_active) continue;   // an active partner's boundary; nothing here moves
+      if (np + ghost_alloc + n > part_capacity)
+        CkAbort("Patch (%d,%d,%d): %d particles+ghosts exceed capacity %d at step %d; increase headroom (-r)\n",
+                x, y, z, np + ghost_alloc + n, part_capacity, my_iter);
+      sphSubmitMemcpy(d_parts[cur] + np + ghost_alloc,
+          d_recv_halo + (size_t)(my_iter & 1) * exch_slots + dirOffset(d, exch_capacity),
+          sizeof(Particle) * n, cudaMemcpyDeviceToDevice, comm_stream);
+      ghost_off[d] = ghost_alloc; ghost_cnt[d] = n;
+      ghost_alloc += n;
+      n_ghost += n;
+    }
+    halo_staged.erase(my_iter); halo_landed.erase(my_iter); halo_seen.erase(my_iter);
+    done_sent.erase(my_iter);
+    halo_expect_known = false;
+  }
+  // The LB park, after the receives and before the forces: this patch has
+  // nothing in flight and nothing buffered (its own exchange goes out only
+  // after the forces), so a move here is the case the runtime handles.
+  void parkOrComputeC() {
+    if (async_lb && lb_waiting && my_iter - 1 >= lb_start_iter + lb_wait_lag) {
+      lb_waiting = false;
+      if (x == 0 && y == 0 && z == 0)
+        CkPrintf("  LB at step %d: AtSyncWait entered %.3f s after AtSyncStart\n", lb_start_iter, CkWallTimer() - lb_t0);
+      parked_midstep = true;
+      AtSyncWait();
+      return;
+    }
+    if (!async_lb && sync_park_due) {
+      sync_park_due = false;
+      parked_midstep = true;
+      AtSync();
+      return;
+    }
+    computeForcesC();
   }
 
   void appendGhosts(int dir, int n) {
@@ -1387,7 +2006,7 @@ public:
     hapiSubmitEventRecord((void*)halo_done, comm_stream);
     sphSubmitWaitEvent(compute_stream, halo_done);
 
-    if (isStatsIter()) { check_ghosts = true; runCheck(stepCheckTol()); check_ghosts = false; }
+    if (isStatsIter()) { check_ghosts = true; runCheck(stepCheckTol()); check_ghosts = false; idAuditPass(); }
 
     const int ntot = np + n_ghost;
     // A rebuild step builds the window's cell list over the sorted locals and
@@ -1458,10 +2077,11 @@ public:
   void sendHalo2() {
     PhaseScope _ps(PH_PC);
     halo_pending2 = false;
+    const long long ts = sphNowNs();
     for (int d = 0; d < NUM_DIRS; d++) {
       if (!halo_peer[d]) continue;
       const int cnt = h_halo_cnt[d];
-      thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveHalo2(my_iter, flipDir(d), cnt, cnt,
+      thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveHalo2(my_iter, flipDir(d), cnt, ts, cnt,
           (outstanding_sends++, sphSendBuffer(
            d_send_halo2 + dirOffset(d, exch_capacity),
            sendDoneCb(),
@@ -1472,9 +2092,10 @@ public:
   // The predicted ghosts land in the same slots of the OTHER buffer. The slot
   // is known once this step's first exchange from that direction has been
   // posted; before that (or for a later step) the message is staged.
-  void receiveHalo2(int ref, int dir, int n, int& m, Particle*& parts,
+  void receiveHalo2(int ref, int dir, int n, long long ts, int& m, Particle*& parts,
       CkDeviceBufferPost* devicePost) {
     PhaseScope _ps(PH_PC);
+    env_t[2][ref & 1][dir] = sphNowNs();
     parts = d_recv_halo2 + dirOffset(dir, exch_capacity);
     static const bool direct_ok = (getenv("SPH_NO_DIRECT_HALO") == nullptr);
     static const bool ordered = (getenv("SPH_HALO_ORDERED") != nullptr);
@@ -1570,6 +2191,8 @@ public:
       my_level_next = std::min(ADV_LEVEL_CAP, 1 + lo);
     }
     const int adv_out = my_adv_next | (my_level_next << ADV_LEVEL_SHIFT);
+    const long long ts = sphNowNs();
+    SendTimer st; const double tloop = send_warn_ms > 0 ? CkWallTimer() : 0.0;
 
     for (int d = 0; d < NUM_DIRS; d++) {
       if (d == STAY) continue;
@@ -1596,18 +2219,22 @@ public:
         const int tier = peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[d], nbr_y[d], nbr_z[d])));
         g_hprof.sent[tier]++; g_hprof.sent_bytes[tier] += (long)cnt * sizeof(Particle);
       }
+      st.begin();
       thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveParticles(my_iter, flipDir(d),
-          adv_out, cnt, cnt,
+          adv_out, cnt, ts, cnt,
           (outstanding_sends++, sphSendBuffer(
            d_send_mig + dirOffset(d, exch_capacity),
            sendDoneCb(),
            comm_stream)));
+      st.end(d);
     }
+    st.report("sendLeavers", x, y, z, my_iter, send_warn_ms > 0 ? (CkWallTimer() - tloop) * 1000.0 : 0.0, stallTier(st.worst_d));
   }
 
-  void receiveParticles(int ref, int dir, int adv, int n, int& m,
+  void receiveParticles(int ref, int dir, int adv, int n, long long ts, int& m,
       Particle*& parts, CkDeviceBufferPost* devicePost) {
     PhaseScope _ps(PH_RECV_PARTS);
+    env_t[1][ref & 1][dir] = sphNowNs();
     if (host_profile_on) {
       const int tier = peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[dir], nbr_y[dir], nbr_z[dir])));
       g_hprof.recv[tier]++; g_hprof.recv_bytes[tier] += (long)n * sizeof(Particle);
@@ -1643,6 +2270,319 @@ public:
         sizeof(Particle) * n, cudaMemcpyDeviceToDevice, comm_stream);
     np += n;
     n_fluid += n;
+  }
+
+  // ---- concurrent exchange (-c) --------------------------------------------
+  // The quiet-edge proof shifted by one step: a message for step s describes
+  // s, so the last exchange over this edge (ref xchg_step+1) covered
+  // xchg_min steps after itself.
+  bool edgeSkipsC(int d, int s) const {
+    return valid_dir[d] && s > xchg_step[d] + 1 && s - xchg_step[d] - 1 <= xchg_min[d];
+  }
+  int expectMigC(int s) const {
+    int n = 0;
+    for (int d = 0; d < NUM_DIRS; d++)
+      if (valid_dir[d] && !edgeSkipsC(d, s)) n++;
+    return n;
+  }
+
+  void beginStepC() {
+    PhaseScope _ps(PH_START_HALO);
+    rebuild_step = true; migrate_step = true; pc_step = false;
+    my_adv = my_adv_next;
+    step_active = (my_adv & ADV_ACTIVE) != 0;
+    cells_valid = false;
+    n_expect = 0;
+    if (my_iter == 1) {
+      // Prologue: open step 1 and pack its exchange from the initial state.
+      open_ref = 1; np_base = np;
+      n_leaver_ghosts = 0; lg_pending = false; ghost_alloc = 0; n_ghost = 0;
+      for (int d = 0; d < NUM_DIRS; d++) { ghost_off[d] = 0; ghost_cnt[d] = -1; }
+      n_expect_mig = expectMigC(1);
+      mig_known = (mig_env_n[1] == n_expect_mig);
+      if (mig_known) ghost_base = np_base + mig_env_total[1];
+      halo_open = step_active;
+      prologue = true;
+    }
+    n_expect_mig_cur = n_expect_mig;
+    halo_expect_known = false;
+    if (my_iter != 1) checkMigrantsDone(my_iter);
+    if (my_iter == 1) {
+      xpack_pending = true;
+      for (int i = 0; i < NUM_COUNTERS; i++) h_counts_mig[i] = 0;
+      h_counts_mig[STAY] = np;
+      if (np > 0) {
+        invokePackHalo(d_parts[cur], np, x0, y0, z0, x1, y1, z1, cell_size,
+            d_halo_ptrs, d_halo_idx_ptrs, d_counts, exch_capacity, valid_mask,
+            /*counts_zeroed=*/false, compute_stream);
+        sphSubmitMemcpy(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
+            cudaMemcpyDeviceToHost, compute_stream);
+        hapiAddCallback(compute_stream,
+            CkCallback(CkIndex_Patch::exchangePacked(), thisProxy[thisIndex]));
+      } else {
+        for (int i = 0; i < NUM_COUNTERS; i++) h_counts[i] = 0;
+        thisProxy[thisIndex].exchangePacked();
+      }
+    }
+  }
+
+  // Every migrant of this step is in (np = np_base + their total): place the
+  // leaver ghosts behind them, and decide which halos to expect from the
+  // advertisements they carried.
+  void expectHalos() {
+    PhaseScope _ps(PH_START_HALO);
+    if (!mig_known)
+      CkAbort("Patch (%d,%d,%d) step %d: migrants consumed but envelopes not all known\n", x, y, z, my_iter);
+    if (np != np_base + mig_env_total[my_iter] || np != ghost_base)
+      CkAbort("Patch (%d,%d,%d) step %d: %d locals but %d + %d expected (ghost base %d)\n", x, y, z, my_iter,
+              np, np_base, mig_env_total[my_iter], ghost_base);
+    if (n_leaver_ghosts > 0) {
+      if (np + n_leaver_ghosts > part_capacity)
+        CkAbort("Patch (%d,%d,%d): %d particles+ghosts exceed capacity %d at step %d; increase headroom (-r)\n",
+                x, y, z, np + n_leaver_ghosts, part_capacity, my_iter);
+      sphSubmitMemcpy(d_parts[cur] + np, d_leaver_ghosts, sizeof(Particle) * n_leaver_ghosts,
+          cudaMemcpyDeviceToDevice, comm_stream);
+    }
+    lg_pending = false;
+    mig_env_n.erase(my_iter); mig_env_total.erase(my_iter); mig_seen.erase(my_iter); mig_consumed.erase(my_iter);
+    done_sent[my_iter] |= 1;
+    n_expect = 0;
+    for (int d = 0; d < NUM_DIRS; d++) {
+      halo_peer[d] = valid_dir[d] && !edgeSkipsC(d, my_iter) && (nbrAdv(d, my_iter) & ADV_ACTIVE);
+      if (halo_peer[d]) n_expect++;
+    }
+  }
+
+  // Forces and integration, then the compaction, the leaver ghosts, the pack
+  // of the next step's halo and the counts, all on compute_stream; the
+  // callback is exchangePacked.
+  void computeForcesC() {
+    PhaseScope _ps(PH_COMPUTE);
+    halo_open = false;
+    xpack_pending = true;
+    static const bool batch_compute = (getenv("SPH_NO_BATCH_COMPUTE") == nullptr);
+    if (batch_compute) hapiSubmitBatchBegin();
+    hapiSubmitEventRecord((void*)halo_done, comm_stream);
+    sphSubmitWaitEvent(compute_stream, halo_done);
+    if (!step_active) {
+      // Nothing moves: no leavers, the exchange is the current boundary.
+      if (isStatsIter()) {
+        runCheck(0.0f);
+        idAuditPass();
+        invokeStats(d_parts[cur], np, d_stats, compute_stream);
+        sphSubmitMemcpy(h_stats, d_stats, sizeof(RealType) * 8, cudaMemcpyDeviceToHost, compute_stream);
+      }
+      for (int i = 0; i < NUM_COUNTERS; i++) h_counts_mig[i] = 0;
+      h_counts_mig[STAY] = np;
+      if (np > 0) {
+        invokePackHalo(d_parts[cur], np, x0, y0, z0, x1, y1, z1, cell_size,
+            d_halo_ptrs, d_halo_idx_ptrs, d_counts, exch_capacity, valid_mask,
+            /*counts_zeroed=*/false, compute_stream);
+        sphSubmitMemcpy(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
+            cudaMemcpyDeviceToHost, compute_stream);
+        hapiAddCallback(compute_stream,
+            CkCallback(CkIndex_Patch::exchangePacked(), thisProxy[thisIndex]));
+      } else {
+        for (int i = 0; i < NUM_COUNTERS; i++) h_counts[i] = 0;
+        if (isStatsIter())
+          hapiAddCallback(compute_stream,
+              CkCallback(CkIndex_Patch::exchangePacked(), thisProxy[thisIndex]));
+        else
+          thisProxy[thisIndex].exchangePacked();
+      }
+      if (batch_compute) hapiSubmitBatchEnd();
+      return;
+    }
+    if (isStatsIter()) { check_ghosts = true; runCheck(0.0f); check_ghosts = false; idAuditPass(); }
+    const int ntot = np + n_ghost;
+    invokeCellBuild(d_parts[cur], ntot, x0, y0, z0, inv_csize, ncx, ncy, ncz,
+        ncells, d_cell_cnt, d_cell_off, d_cursor, d_cell_parts, d_cell_of,
+        d_scan_tmp, scan_tmp_bytes, compute_stream);
+    cells_valid = true;
+    invokeLayout(d_parts[cur], d_cell_parts, ntot, d_pos4, d_vel4, d_type8, compute_stream);
+    invokeForces(ntot, np, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_cell_off,
+        d_cell_cnt, d_pos4, d_vel4, d_type8, smooth_h, pmass, sound_c0, gravity,
+        d_drho, d_ax, d_ay, d_az, compute_stream);
+    if (!isStatsIter()) {
+      invokeIntegrateLeavers(false, d_parts[cur], np, sim_dt, rho0, sound_c0,
+          d_drho, d_ax, d_ay, d_az, x0, y0, z0, x1, y1, z1, d_mig_ptrs,
+          d_parts[1 - cur], d_counts_mig, exch_capacity, compute_stream);
+    } else {
+      invokeIntegrate(d_parts[cur], np, sim_dt, rho0, sound_c0, d_drho, d_ax,
+          d_ay, d_az, NULL, compute_stream);
+      invokeStats(d_parts[cur], np, d_stats, compute_stream);
+      sphSubmitMemcpy(h_stats, d_stats, sizeof(RealType) * 8, cudaMemcpyDeviceToHost, compute_stream);
+      invokeMarkLeavers(d_parts[cur], np, x0, y0, z0, x1, y1, z1, d_mig_ptrs,
+          d_parts[1 - cur], d_counts_mig, exch_capacity, /*counts_zeroed=*/false, compute_stream);
+    }
+    invokeGatherLeaverGhosts(d_mig_ptrs, d_counts_mig, d_parts[1 - cur], d_leaver_ghosts,
+        exch_capacity, exch_slots, valid_mask, compute_stream);
+    invokePackHaloConcurrent(d_parts[1 - cur], d_counts_mig, np, x0, y0, z0, x1, y1, z1,
+        cell_size, d_halo_ptrs, d_halo_idx_ptrs, d_counts, exch_capacity, valid_mask,
+        compute_stream);
+    sphSubmitMemcpy(h_counts_mig, d_counts_mig, sizeof(int) * NUM_COUNTERS,
+        cudaMemcpyDeviceToHost, compute_stream);
+    sphSubmitMemcpy(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
+        cudaMemcpyDeviceToHost, compute_stream);
+    hapiAddCallback(compute_stream,
+        CkCallback(CkIndex_Patch::exchangePacked(), thisProxy[thisIndex]));
+    if (batch_compute) hapiSubmitBatchEnd();
+  }
+
+  // The exchange for the next step (or, in the prologue, for step 1): swap in
+  // the survivors, decide the activity and the quiet level it advertises,
+  // open the next step's landings, and send the migrants and the halo on
+  // every edge that is not quiet.
+  void sendExchange() {
+    PhaseScope _ps(PH_SEND_LEAVERS);
+    xpack_pending = false;
+    const bool pro = prologue;   // step 1's exchange: the step is already open (beginStepC)
+    const int ref = pro ? my_iter : my_iter + 1;
+    if (h_counts[ERR_COUNTER] > 0 || h_counts_mig[ERR_COUNTER] > 0)
+      CkAbort("Patch (%d,%d,%d): the exchange overflowed a per-direction buffer "
+              "(face slot %d) at step %d; increase -e\n", x, y, z, exch_capacity, my_iter);
+    int leavers_valid = 0, leavers_lost = 0;
+    if (!pro && step_active) {
+      cur = 1 - cur;
+      np = h_counts_mig[STAY];
+      for (int d = 0; d < NUM_DIRS; d++) {
+        if (d == STAY) continue;
+        if (valid_dir[d]) leavers_valid += h_counts_mig[d];
+        else leavers_lost += h_counts_mig[d];   // tunnelled through the tank wall
+      }
+      n_fluid -= leavers_valid + leavers_lost;   // every leaver is fluid
+      escaped += leavers_lost;
+    }
+    prologue = false;
+    n_leaver_ghosts = leavers_valid;
+    lg_pending = n_leaver_ghosts > 0;
+
+    // Next step's activity, before its migrants are known (see the top). In
+    // the prologue the step-1 activity is the seed that beginStepC already
+    // applied: recomputing it here from neighbours' advertisements that may
+    // or may not have arrived yet made an inactive patch open direct landings
+    // it then refused to consume (job 22798305, sync smoke).
+    static const bool quiet_skip = (getenv("SPH_NO_QUIET_SKIP") == nullptr);
+    if (!pro) {
+      const bool nbr_fluid = anyNbrAdvFluid(my_iter);
+      my_adv_next = ((n_fluid > 0 || nbr_fluid) ? ADV_FLUID : 0) |
+          ((np > 0 && (n_fluid > 0 || nbr_fluid)) ? ADV_ACTIVE : 0);
+      my_level_next = 0;
+      if (quiet_skip && !(my_adv_next & ADV_ACTIVE) && !anyNbrAdvActive(my_iter)) {
+        int lo = ADV_LEVEL_CAP;
+        for (int d = 0; d < NUM_DIRS; d++)
+          if (valid_dir[d]) lo = std::min(lo, nbrLevel(d, my_iter));
+        my_level_next = std::min(ADV_LEVEL_CAP, 1 + lo);
+      }
+    }
+    const int adv_out = my_adv_next | (my_level_next << ADV_LEVEL_SHIFT);
+
+    // Open the next step's landings (in the prologue, step 1 is open already
+    // and its halos may have landed directly during the pack).
+    if (!pro) {
+      if (!halo_direct.empty())
+        CkAbort("Patch (%d,%d,%d) step %d: a directly landed halo was never consumed\n", x, y, z, my_iter);
+      open_ref = ref; np_base = np;
+      ghost_alloc = n_ghost = n_leaver_ghosts;
+      for (int d = 0; d < NUM_DIRS; d++) { ghost_off[d] = 0; ghost_cnt[d] = -1; }
+      n_expect_mig = expectMigC(ref);
+      mig_known = (mig_env_n[ref] == n_expect_mig);
+      if (mig_known) ghost_base = np_base + mig_env_total[ref];
+    }
+    halo_open = (my_adv_next & ADV_ACTIVE) != 0;
+    if (pro) { n_expect_mig = expectMigC(ref); mig_known = (mig_env_n[ref] == n_expect_mig); if (mig_known) ghost_base = np_base + mig_env_total[ref]; }
+    checkMigrantsDone(ref);
+
+    xsend_ref = ref; xsend_adv = adv_out; xsend_halo = halo_open;
+    // The step before a park (AtSyncWait at the lag, or the sync AtSync) sends
+    // nothing: a parked element with a move pending bounces device receives
+    // until it has moved, and it only moves once nothing is in flight into it,
+    // so exchanges sent to parked neighbours deadlocked the first LB (job
+    // 22798305: every patch either parked with its step-36 exchange received
+    // or draining 2-9 sends to parked ones). ResumeFromSync sends them.
+    sendExchangeMsgs();   // (the park is inside the step now: parkOrComputeC)
+  }
+
+  void sendExchangeMsgs() {
+    PhaseScope _ps(PH_SEND_LEAVERS);
+    xsend_pending = false;
+    const int ref = xsend_ref, adv_out = xsend_adv;
+    const bool send_halo = xsend_halo;
+    const long long ts = sphNowNs();
+    SendTimer st; const double tloop = send_warn_ms > 0 ? CkWallTimer() : 0.0;
+    for (int d = 0; d < NUM_DIRS; d++) {
+      if (d == STAY || !valid_dir[d]) continue;
+      if (edgeSkipsC(d, ref)) {
+        if (h_counts_mig[d] > 0)
+          CkAbort("Patch (%d,%d,%d) step %d: %d particle(s) bound for a quiet edge "
+                  "(direction %d); the quiet-level proof is broken\n", x, y, z, my_iter, h_counts_mig[d], d);
+        n_skipped++;
+        continue;
+      }
+      const int cm = h_counts_mig[d];
+      const int ch = send_halo ? h_counts[d] : 0;
+      if (host_profile_on) {
+        const int tier = peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[d], nbr_y[d], nbr_z[d])));
+        g_hprof.sent[tier] += send_halo ? 2 : 1;
+        g_hprof.sent_bytes[tier] += (long)(cm + ch) * sizeof(Particle);
+      }
+      st.begin();
+      thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveParticlesC(ref, flipDir(d), adv_out, cm, ts, cm,
+          (outstanding_sends++, sphSendBuffer(d_send_mig + dirOffset(d, exch_capacity), sendDoneCb(), comm_stream)));
+      st.end(d);
+      if (send_halo) {
+        st.begin();
+        thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveHaloC(ref, flipDir(d), ch, ts, ch,
+            (outstanding_sends++, sphSendBuffer(d_send_halo + dirOffset(d, exch_capacity), sendDoneCb(), comm_stream)));
+        st.end(d + 100);
+      }
+    }
+    st.report("sendExchange", x, y, z, my_iter, send_warn_ms > 0 ? (CkWallTimer() - tloop) * 1000.0 : 0.0, stallTier(st.worst_d));
+  }
+
+  // The audit's bucket pass over this step's locals, at the point of the
+  // official check; the sums reach the host by endOfStep, which contributes them.
+  void idAuditPass() {
+    if (!id_audit_on) return;
+    invokeIdBuckets(d_parts[cur], np, d_aud_cnt, d_aud_sum, d_aud_sum2, compute_stream);
+    sphSubmitMemcpy(h_aud, d_aud_cnt, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, cudaMemcpyDeviceToHost, compute_stream);
+    sphSubmitMemcpy(h_aud + ID_AUDIT_BUCKETS, d_aud_sum, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, cudaMemcpyDeviceToHost, compute_stream);
+    sphSubmitMemcpy(h_aud + 2 * ID_AUDIT_BUCKETS, d_aud_sum2, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, cudaMemcpyDeviceToHost, compute_stream);
+  }
+
+  void dumpId(int id) {
+    if (!id_audit_on) return;
+    const int n = np + n_ghost;
+    invokeFindId(d_parts[cur], n, id, d_find, compute_stream);
+    int* h = takePinned<int>(1);
+    sphSubmitMemcpy(h, d_find, sizeof(int), cudaMemcpyDeviceToHost, compute_stream);
+    hapiCheck(sphDrainSync(compute_stream));
+    const int idx = *h;
+    if (idx < n) {
+      Particle q;
+      sphSubmitMemcpy(&q, d_parts[cur] + idx, sizeof(Particle), cudaMemcpyDeviceToHost, compute_stream);
+      hapiCheck(sphDrainSync(compute_stream));
+      CkPrintf("[IDAUDIT] id %d: patch (%d,%d,%d) PE %d step %d index %d of np %d (%s) pos %.5f %.5f %.5f box [%.4f,%.4f)x[%.4f,%.4f)x[%.4f,%.4f) type %d\n",
+               id, x, y, z, CkMyPe(), my_iter, idx, np, idx < np ? "LOCAL" : "ghost", q.x, q.y, q.z, x0, x1, y0, y1, z0, z1, q.type);
+    }
+    givePinned(h, 1);
+  }
+
+  void dumpState() {
+    int staged_h = 0, staged_m = 0;
+    for (auto& st : halo_staged) staged_h += (int)st.second.size();
+    for (auto& st : mig_staged) staged_m += (int)st.second.size();
+    int got_h = 0, got_m = 0;
+    { auto it = halo_landed.find(my_iter); if (it != halo_landed.end()) got_h = popcount27(it->second); }
+    { auto it = mig_landed.find(my_iter); if (it != mig_landed.end()) got_m = popcount27(it->second); }
+    int env_n = 0, env_tot = 0;
+    { auto it = mig_env_n.find(open_ref); if (it != mig_env_n.end()) env_n = it->second; }
+    { auto it = mig_env_total.find(open_ref); if (it != mig_env_total.end()) env_tot = it->second; }
+    CkPrintf("[STUCK] patch (%d,%d,%d) pe %d step %d active %d open_ref %d np %d base %d | halos got %d of %d (direct %d, staged %d) "
+             "| migrants got %d of %d (envelopes %d, %d parts, known %d, staged %d) | sends out %d draining %d xpack %d xsend_deferred %d prologue %d lb_wait %d\n",
+             x, y, z, CkMyPe(), my_iter, (int)step_active, open_ref, np, np_base, got_h, n_expect, (int)halo_direct.size(), staged_h,
+             got_m, concurrent_x ? n_expect_mig_cur : n_expect_mig, env_n, env_tot, (int)mig_known, staged_m,
+             outstanding_sends, (int)draining, (int)xpack_pending, (int)xsend_pending, (int)prologue, (int)lb_waiting);
   }
 
   // ---- end of step ---------------------------------------------------------
@@ -1688,7 +2628,7 @@ public:
     PhaseScope _ps(PH_END_STEP);
     checkArrivals(halo_arrived, "halo", n_expect);
     checkArrivals(halo_arrived2, "predicted halo", pc_step ? n_expect : 0);
-    checkArrivals(parts_arrived, "migration", n_expect_mig);
+    checkArrivals(parts_arrived, "migration", concurrent_x ? n_expect_mig_cur : n_expect_mig);
     const bool reporting = isStatsIter();
     long sum_np = 0, max_np = 0, esc = escaped, n_active = isActive() ? 1 : 0;
     double sum_rho = 0, sum_ke = 0, n_fluid_d = 0, vmax = 0, front = 0;
@@ -1731,6 +2671,19 @@ public:
       CkReductionMsg* msg = CkReductionMsg::buildFromTuple(tuple, 14);
       msg->setCallback(CkCallback(CkIndex_Main::stepStats(NULL), main_proxy));
       contribute(msg);
+      if (id_audit_on) {
+        // (the bucket pass ran at the official check; its D2H completed with the step's stream work)
+        hapiCheck(sphDrainSync(compute_stream));
+        int st = my_iter;
+        CkReduction::tupleElement at[] = {
+            CkReduction::tupleElement(sizeof(unsigned long long) * ID_AUDIT_BUCKETS, h_aud, CkReduction::sum_ulong_long),
+            CkReduction::tupleElement(sizeof(unsigned long long) * ID_AUDIT_BUCKETS, h_aud + ID_AUDIT_BUCKETS, CkReduction::sum_ulong_long),
+            CkReduction::tupleElement(sizeof(unsigned long long) * ID_AUDIT_BUCKETS, h_aud + 2 * ID_AUDIT_BUCKETS, CkReduction::sum_ulong_long),
+            CkReduction::tupleElement(sizeof(int), &st, CkReduction::max_int)};
+        CkReductionMsg* am = CkReductionMsg::buildFromTuple(at, 4);
+        am->setCallback(CkCallback(CkIndex_Main::idAudit(NULL), main_proxy));
+        contribute(am);
+      }
     }
 
     if (my_iter < warmup_iters + n_iters) {

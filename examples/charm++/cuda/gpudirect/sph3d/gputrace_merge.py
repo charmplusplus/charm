@@ -4,7 +4,8 @@
 Join the +gputrace files of one run into one Chrome/Perfetto trace (open at https://ui.perfetto.dev):
   gputrace.<host>.<pid>.proc   the process's CUPTI records: K kernel, M memcpy, S memset, N kernel names,
                                T object token -> LB object id; header carries a (realtime, CUPTI) clock pair
-  gputrace.<host>.<pid>.pe<N>  the PE's E entry-method and I idle ranges, P entry names, O element id -> index
+  gputrace.<host>.<pid>.pe<N>  the PE's E entry-method and I idle ranges, P entry names, O element id -> index,
+                               L message flights (send, envelope, landed, kind, tier) from the application
 One process row per rank (ordered by first PE) with a thread per GPU stream and per PE. Every record is on the
 CUPTI clock; the clock pair lines processes on different nodes up to the nodes' clock agreement (NTP).
 --last 1.0 keeps the final second of GPU activity (about 20 sph3d steps), --window is seconds since the
@@ -13,8 +14,13 @@ Two counter tracks per GPU, from the kernel records in --bin ms bins (default 1)
 at least one kernel running) and "GPUd kernels in flight" (time-weighted mean concurrency); the per-GPU means over the
 window are printed. Copies are not counted. --no-util leaves them out.
 A PE row shows only its entry methods: the empty space between them is the PE's idle time. --idle also
-draws the runtime's idle ranges as events (gap_report.py reads them from the files either way)."""
+draws the runtime's idle ranges as events (gap_report.py reads them from the files either way).
+Application message records (L) become per-rank counter tracks "msg latency ms <tier>" (payload usable minus
+sent, one point per message at its landing time; tiers: same process / same node / other node) and instant
+events on the PE row; gap_report.py prints their distribution."""
 import argparse, glob, json, os, re, sys
+TIER = {0: 'same process', 1: 'same node', 2: 'other node'}
+KIND = {0: 'halo', 1: 'migration', 2: 'halo2'}
 
 COPY = {0: 'memcpy', 1: 'HtoD', 2: 'DtoH', 3: 'HtoA', 4: 'AtoH', 5: 'AtoA', 6: 'AtoD', 7: 'DtoA', 8: 'DtoD', 9: 'HtoH', 10: 'PtoP'}
 
@@ -195,6 +201,16 @@ def main():
                                   'name': epnames.get(int(ep), f'ep {ep}')}
                             if int(idx) >= 0: ev['args'] = {'idx': idx3(idx)}
                             emit(ev); n += 1
+                        elif c == 'L':
+                            _, ts, te, tl, kind, tier = line.split()
+                            ts = int(ts) + off; tl = int(tl) + off; te = int(te) + off
+                            if not keep(tl, tl): continue
+                            emit({'ph': 'C', 'name': f'msg latency ms {TIER.get(int(tier), tier)}', 'pid': rank, 'ts': (tl - base) / 1000.0,
+                                  'args': {'ms': round((tl - ts) / 1e6, 3)}})
+                            emit({'ph': 'i', 'cat': 'msg', 'pid': rank, 'tid': pe, 'ts': (tl - base) / 1000.0, 's': 't',
+                                  'name': KIND.get(int(kind), 'msg'),
+                                  'args': {'lat_ms': round((tl - ts) / 1e6, 3), 'env_ms': round((te - ts) / 1e6, 3), 'tier': int(tier)}})
+                            n += 1
                         elif c == 'I':
                             if not a.idle: continue
                             _, s, e = line.split()

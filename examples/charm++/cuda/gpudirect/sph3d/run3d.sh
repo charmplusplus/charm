@@ -26,7 +26,7 @@ SRUN="srun --jobid=$JID --overlap --mpi=cray_shasta -N $NODES -n $NP --ntasks-pe
 LOG=$DIR/logs/$TAG.log
 echo "[run3d] $(date +%T) tag=$TAG nodes=$NODES np=$NP pool=$POOL alloc=${POOL_ALLOC:-buddy} lci=${LCI_LIB:-install} LB=${LB:-none} args: $* $lbargs" | tee $LOG
 env X=1 PES=4 timeout ${TMO:-900} $SRUN --chdir=$DIR stdbuf -oL -eL ${SPH_WRAP:-$DIR/numa_wrap_sph.sh} ./sph3d "$@" $lbargs \
-  +gpushm +gpupool +gpupoolsize $POOL ${POOLX:-} +gpuipceventpool 256 +ppn 4 >> $LOG 2>&1
+  +gpushm +gpupool +gpupoolsize $POOL ${POOLX:-} +gpuipceventpool ${IPCEV:-256} +ppn 4 >> $LOG 2>&1
 RC=$?
 # srun's status is lost behind stdbuf/numa_wrap in some failures: a step that was cancelled for a task
 # failure, or never printed its final average, is a failure whatever the pipeline said (job 22768193).
