@@ -643,9 +643,19 @@ public:
   /// Home mapping. One home per element, computable from the index or from the id
   /// alike, on any PE, under the current process count. Packed-index arrays use the
   /// array map, as before; hashed-kind arrays hash the index to a process.
+  /// The key selects the process (key mod processes); the quotient, which is
+  /// independent of the remainder, selects the rank within it, so a process's homes
+  /// spread over its PEs instead of all sitting on rank 0 (in a single process they
+  /// spread over every PE). Both are recomputed under the current topology, so a
+  /// restart with any process or PE count rebuilds the directories at the new homes;
+  /// nothing about the home is stored in a checkpoint. More +objid_expand means more
+  /// keys per process and therefore a more even spread over its ranks.
   static int hashedHomePe(CmiUInt8 key)
   {
-    return CMK_RANK_0(CkNodeFirst((int)(key % (CmiUInt8)CkNumNodes())));
+    const CmiUInt8 nodes = (CmiUInt8)CkNumNodes();
+    const int node = (int)(key % nodes);
+    const int rank = (int)((key / nodes) % (CmiUInt8)CkNodeSize(node));
+    return CMK_RANK_0(CkNodeFirst(node) + rank);
   }
   int homePe(const CkArrayIndex& idx) const
   {
