@@ -1,4 +1,8 @@
-//#include "debug-conv.h"
+#include "conv-autoconfig.h" /* for CMK_RECONVERSE */
+#if CMK_RECONVERSE
+/* Classic converse.h includes debug-conv.h; reconverse's does not. */
+#include "debug-conv.h"
+#endif
 #include "pup.h"
 
 #include "register.h"
