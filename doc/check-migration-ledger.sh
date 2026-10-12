@@ -6,7 +6,8 @@
 # when this passes with every remaining delta row tombstone/superseded.
 # Usage: doc/check-migration-ledger.sh [reviewed-ref] [branch-ref]
 set -e
-REVIEWED=${1:-origin/reviewed-with-reconverse}
+# The reviewed line was formerly reviewed-with-reconverse; pass that name as $1 until the rename lands.
+REVIEWED=${1:-origin/recharm}
 BRANCH=${2:-origin/reconverse-specific-build}
 LEDGER=$(dirname "$0")/reconverse-migration-ledger.tsv
 fail=0
