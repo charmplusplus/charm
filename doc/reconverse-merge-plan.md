@@ -124,7 +124,7 @@ PEs per GPU. NVIDIA at 32 queues is unmeasured and is Anvil's to answer.
 | 17 | Investigate sanctioned **HPC-site runners** (OLCF/NCSA) for CI; until then reviewers run on machines of choice (PR template field) | |
 | 18 | 2-node InfiniBand test tier on Anvil (inside allocation, `-N 2`, `--mpi=pmi2`) | network tests need multinode jobs, not login nodes. Prerequisite found and fixed 09-01: multi-node reconverse hung in `CmiCheckAffinity` whenever physical node 0 held exactly one PE (reconverse**#212**, pinned in via **#3959**). Until then no 2-node reconverse run had ever succeeded on Anvil |
 | 19 | Record-replay follow-ups: CkExit flush hook; threaded-entry replay validation | |
-| 20 | Rename `reviewed-with-reconverse` → `main` | at NAMD + ChaNGa parity |
+| 20 | Rename `recharm` (formerly `reviewed-with-reconverse`) → `main` | at NAMD + ChaNGa parity |
 
 ## Closure guarantee (mechanical)
 
