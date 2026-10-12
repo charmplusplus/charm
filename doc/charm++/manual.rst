@@ -13531,6 +13531,13 @@ message priority type is not bit vector. Therefore, the user needs to
 specify prio-type to be a data type long enough to hold the msg
 priorities in your application for eg: ``--with-prio-type=int``.
 
+On reconverse builds, ``--enable-randomized-msgq`` is rejected at
+configure time; randomization is selected at run time instead. Run the
+program with ``+randomized_msgq``, and add ``+randomized_seed <N>`` to
+repeat the same random draws. Every message source is then drained into
+one pool, and messages run in uniformly random order; priorities, FIFO
+order and ``[expedited]`` are not respected.
+
 CharmDebug
 ^^^^^^^^^^
 

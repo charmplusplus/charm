@@ -283,6 +283,10 @@ else()
   set(CMK_RECONVERSE 0)
 endif()
 
+if(RECONVERSE AND RANDOMIZED_MSGQ)
+  message(FATAL_ERROR "--enable-randomized-msgq is a classic Converse build option and does nothing on reconverse. Reconverse randomizes at run time instead: run the program with +randomized_msgq (and +randomized_seed <N> to repeat the draws).")
+endif()
+
 if(${AMPI_MPICH_TESTS})
   add_definitions(-DAMPI_ERRHANDLER_RETURN=1)
   set(BUILD_MPICH_TESTS true)
