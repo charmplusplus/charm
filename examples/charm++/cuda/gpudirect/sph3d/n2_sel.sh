@@ -5,7 +5,7 @@
 # ncu profile of the two selected kernels in a short noLB run. Keeps the node.
 JID=$1; D=/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect/sph3d
 XF="+LBMetisMinGain 0.03 +LBMetisMaxCutRise 0.1"
-run_arm() { local pfx=$1 ns=$2 mode=$3 extra=$4; shift 4; local P=${PER:-25} LAG=${LAGV:-10}; [ $mode = sync ] && { P=100; LAG=50; }
+run_arm() { local pfx=$1 ns=$2 mode=$3 extra=$4; shift 4; local P=${PER:-25} LAG=${LAGV:-10}   # same period and lag for sync and async (2026-10-11 rule: never async@25 vs sync@100)
   env "$@" TMO=400 DIFF_FLAGS= LBF=$P LBB=$P LBLAG=$LAG XFLAGS="${XFO:-$XF} $extra" TAGPFX=${pfx}_ POOL=32768 bash $D/n2_final2.sh $JID "8 4 8" $ns ${mode}T 2>&1 | grep -v "^HAPI\[" | cut -c1-200
   L=$(ls -t $D/logs/${pfx}_256_${ns}_p${P}_${mode}T_*.log | head -1); grep -E "CORRUPTION|Reason:|Fatal|Segmentation|expected|STUCK\] no" $L | head -3 | cut -c1-300; grep -c SENDSTALL $L | sed "s/^/  send stalls over 5 ms: /"; grep -iE "MIGSTATS|migration (path|time)" $L | head -3 | cut -c1-200; grep -q "rc=0" $L; }
 echo "=== sel chain start $(date +%T), left $(squeue -j $JID -h -o %L), binary $(ls -la --time-style=+%H:%M $D/sph3d | awk '{print $6}')"

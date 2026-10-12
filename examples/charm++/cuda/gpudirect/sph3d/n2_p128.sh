@@ -12,7 +12,7 @@ left_s() { squeue -j $JID -h -o %L | awk -F: '{if(NF==3) print $1*3600+$2*60+$3;
 run_arm() {  # <pfx> <"gx gy gz"> <steps> <sync|async> <extra app args> <env...>
   local pfx=$1 g="$2" ns=$3 mode=$4 extra=$5; shift 5
   set -- $g "$@"; local np=$(($1*$2*$3)); shift 3
-  local P=25 LAG=10; [ $mode = sync ] && { P=100; LAG=50; }
+  local P=25 LAG=10   # same period and lag for sync and async (2026-10-11 rule: never async@25 vs sync@100)
   local need=$(( ns > 500 ? 170 : 70 )); [ "$(left_s)" -gt $need ] || { echo "skip $pfx: $(left_s) s left"; return 1; }
   env "$@" TMO=300 DIFF_FLAGS= LBF=$P LBB=$P LBLAG=$LAG XFLAGS="$XF $extra" TAGPFX=${pfx}_ POOL=32768 bash $D/n2_final2.sh $JID "$g" $ns ${mode}T 2>&1 | grep -v "^HAPI\[" | cut -c1-200
   L=$(ls -t $D/logs/${pfx}_${np}_${ns}_p${P}_${mode}T_*.log | head -1)

@@ -11,7 +11,7 @@ ulimit -c 0
 POOL=${POOL:-8192}
 COST=/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect/sph2d/lbcost.delta-a40.conf
 DIFF_FLAGS=${DIFF_FLAGS-"+balancer DiffusionLB +LBDiffusionCommOn"}   # DIFF_FLAGS= (empty) runs MetisLB alone at every event
-MD="+balancer MetisLB $DIFF_FLAGS +LBCostConfig $COST +LBDebug ${LBDEBUG:-1}"
+MD="+balancer ${LB_BAL:-MetisLB} $DIFF_FLAGS +LBCostConfig $COST +LBDebug ${LBDEBUG:-1}"   # LB_BAL=DiffusionLB DIFF_FLAGS="+LBDiffusionCommOn": Diffusion alone
 case ${LB:-none} in
   none)  lbargs="-f 99999";;
   sync)  lbargs="-f ${LBF:-100} -b ${LBB:-100} $MD";;
@@ -25,8 +25,8 @@ if [ -n "$LCI_LIB" ]; then export LD_PRELOAD=$LCI_LIB/liblci.so LD_LIBRARY_PATH=
 SRUN="srun --jobid=$JID --overlap --mpi=cray_shasta -N $NODES -n $NP --ntasks-per-node=$PPN ${NODELIST:+-w $NODELIST} --gpus-per-node=${GPUS:-4} --cpus-per-task=$((64/PPN)) --cpu-bind=none --exact --kill-on-bad-exit=1"
 LOG=$DIR/logs/$TAG.log
 echo "[run3d] $(date +%T) tag=$TAG nodes=$NODES np=$NP pool=$POOL alloc=${POOL_ALLOC:-buddy} lci=${LCI_LIB:-install} LB=${LB:-none} args: $* $lbargs" | tee $LOG
-env X=1 PES=4 timeout ${TMO:-900} $SRUN --chdir=$DIR stdbuf -oL -eL ${SPH_WRAP:-$DIR/numa_wrap_sph.sh} ./sph3d "$@" $lbargs \
-  +gpushm +gpupool +gpupoolsize $POOL ${POOLX:-} +gpuipceventpool ${IPCEV:-256} +ppn 4 >> $LOG 2>&1
+env X=1 PES=${PES:-4} timeout ${TMO:-900} $SRUN --chdir=$DIR stdbuf -oL -eL ${SPH_WRAP:-$DIR/numa_wrap_sph.sh} ./sph3d "$@" $lbargs \
+  +gpushm +gpupool +gpupoolsize $POOL ${POOLX:-} +gpuipceventpool ${IPCEV:-256} +ppn ${PES:-4} >> $LOG 2>&1
 RC=$?
 # srun's status is lost behind stdbuf/numa_wrap in some failures: a step that was cancelled for a task
 # failure, or never printed its final average, is a failure whatever the pipeline said (job 22768193).

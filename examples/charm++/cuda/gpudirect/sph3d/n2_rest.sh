@@ -9,7 +9,7 @@ run_arm() {  # <pfx> <steps> <mode sync|async> <extra app args> <env...>
   local pfx=$1 ns=$2 mode=$3 extra=$4; shift 4
   local need=$(( ns > 500 ? 150 : 60 ))
   [ "$(left_s)" -gt $need ] || { echo "skip $pfx: $(left_s) s left"; return 1; }
-  local P=25 LAG=10; [ $mode = sync ] && { P=100; LAG=50; }
+  local P=25 LAG=10   # same period and lag for sync and async (2026-10-11 rule: never async@25 vs sync@100)
   env "$@" DIFF_FLAGS= LBF=$P LBB=$P LBLAG=$LAG XFLAGS="$XF $extra" TAGPFX=${pfx}_ POOL=32768 bash $D/n2_final2.sh $JID "8 4 8" $ns ${mode}T 2>&1 | grep -v "^HAPI\[" | cut -c1-200
   L=$(ls -t $D/logs/${pfx}_256_${ns}_p${P}_${mode}T_*.log | head -1)
   grep -E "CORRUPTION|Abort|abort|Fatal|Segmentation|did not consume|overflowed|expected|ERROR" $L | head -3 | cut -c1-220

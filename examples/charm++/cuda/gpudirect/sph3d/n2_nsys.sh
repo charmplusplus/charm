@@ -8,7 +8,7 @@ D=/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect/sph3d
 export NODES=2 NP=8 POOL_ALLOC=vmm LCI_LIB=/u/bhosale/lci/build-cuda/lib SPH_SORT_EVERY=100 POOL=32768
 TAG=nsys${NS}_${ARM}_$(date +%H%M%S); OUT=/scratch/mzu/bhosale/nsys/$TAG; mkdir -p $OUT
 export SPH_WRAP=$D/numa_wrap_sph_nsys.sh SPH_NSYS_DIR=$OUT
-case $ARM in async) P=25; LAG=10;; *) P=100; LAG=50;; esac
+P=${PER:-25}; LAG=${LAGV:-10}   # same period and lag for every arm (2026-10-11 rule: never async@25 vs sync@100)
 DIFF_FLAGS= LBF=$P LBB=$P LBLAG=$LAG LB=$ARM LBDEBUG=1 TMO=${TMO:-900} $D/run3d.sh $JID $TAG -X 1.5 -Y 0.5 -Z 2.5 -w 1.0 -t 2 -s 0.0022 -V 10 -x 8 -y 4 -z 8 -r 2 -e 0.05 -i $NS -S 25 -k 1 \
   +LBMetisHostByMsgs +LBMetisMinGain 0.03 +LBMetisMaxCutRise 0.1 +nvtx "$@" > /dev/null 2>&1
 L=$D/logs/$TAG.log

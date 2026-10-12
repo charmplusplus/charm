@@ -1,7 +1,7 @@
 #!/bin/bash
 # n2_final.sh <jobid> <patches: "8 4 8"|"4 4 8"> <steps> <arm>...   arm = none | sync | async | syncT | asyncT  (T = +LBMetisHostByMsgs)
 JID=$1; G=$2; NS=$3; shift 3
-export NODES=2 NP=8 POOL_ALLOC=vmm LCI_LIB=/u/bhosale/lci/build-cuda/lib
+export NODES=2 NP=8 POOL_ALLOC=vmm LCI_LIB=/u/bhosale/lci/build-cuda/lib SPH_SORT_EVERY=${SPH_SORT_EVERY:-100}   # the 10-08 configuration sorts every 100 steps; every chain from 10-10 to 10-11 14:00 ran WITHOUT it (sort off by default in sph3d.C)
 D=/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect/sph3d
 set -- $G "$@"; GX=$1; GY=$2; GZ=$3; shift 3
 NPATCH=$((GX*GY*GZ))

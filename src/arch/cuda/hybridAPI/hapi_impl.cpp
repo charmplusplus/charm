@@ -502,11 +502,16 @@ static constexpr uint64_t HAPI_CUPTI_NO_OBJECT =
 // done. A PE blocks at most for the flush (~3 ms per window). Nested submits on one thread hold one read lock.
 static pthread_rwlock_t g_cupti_flush_gate = PTHREAD_RWLOCK_INITIALIZER;
 static thread_local int t_cupti_gate_depth = 0;
+static bool hapiCuptiGateOn() {   // CHARM_LB_CUPTI_NOGATE=1: the pre-gate behaviour, for A/B timing only
+  static const bool off = (getenv("CHARM_LB_CUPTI_NOGATE") != nullptr);
+  return !off;
+}
 struct CuptiGateShared {
-  CuptiGateShared() { if (t_cupti_gate_depth++ == 0) pthread_rwlock_rdlock(&g_cupti_flush_gate); }
-  ~CuptiGateShared() { if (--t_cupti_gate_depth == 0) pthread_rwlock_unlock(&g_cupti_flush_gate); }
+  CuptiGateShared() { if (hapiCuptiGateOn() && t_cupti_gate_depth++ == 0) pthread_rwlock_rdlock(&g_cupti_flush_gate); }
+  ~CuptiGateShared() { if (hapiCuptiGateOn() && --t_cupti_gate_depth == 0) pthread_rwlock_unlock(&g_cupti_flush_gate); }
 };
 void hapiCuptiFlushGated(uint32_t flag) {
+  if (!hapiCuptiGateOn()) { CUPTI_SAFE_CALL(cuptiActivityFlushAll(flag)); return; }
   if (t_cupti_gate_depth > 0) CmiAbort("hapiCuptiFlushGated: called from inside a gated launch");
   pthread_rwlock_wrlock(&g_cupti_flush_gate);
   const CUptiResult r = cuptiActivityFlushAll(flag);
