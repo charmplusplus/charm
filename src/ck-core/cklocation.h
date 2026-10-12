@@ -381,10 +381,11 @@ void pupLayout(PUP::er& p);
 /// Hash key of an index, in [0, 2^keyBits): a pure function of the index bytes.
 CmiUInt8 indexHashKey(const CkArrayIndex& idx);
 
-/// Size (log2) of the first tranche a process asks the allocator for when it has
-/// none: after a restart, or when a tranche smaller than this ran out. Grants double
-/// from here up to the allocator's cap, so a restart costs each inserting process
-/// 2^16 numbers, not a fixed fraction of the pool.
+/// Size (log2) of the first tranche the allocator grants a process that has none
+/// (after a restart), unless 1/64 of its cap (region / (8 * processes)) is smaller:
+/// then that, so a restart on which every process inserts costs the pool at most
+/// 1/512 of itself at any process count. Grants double from the first one up to the
+/// cap (CkLocMgr::requestTranche).
 constexpr int FIRST_GRANT_LOG2 = 16;
 
 /// A process's current tranche of unique numbers for one array: [cursor, end),

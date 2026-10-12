@@ -42,6 +42,7 @@ class Main : public CBase_Main
 {
   std::map<int, CmiUInt8> ids;  // index -> element id; pupped with the checkpoint
   int gen = 0;                  // restarts so far; pupped: the chain's generation
+  CmiUInt8 lastMin = 0;  // lowest allocator number of the previous generation's new ids
   int nNew = 0;
   int pongs = 0;
   bool pinged = false;  // this run has pinged: the next checkpointed() ends the run
@@ -114,6 +115,7 @@ public:
     const CmiUInt8 mask = ((CmiUInt8)1 << U) - 1;
     const CmiUInt8 half = (CmiUInt8)1 << (U - 1);
     std::set<CmiUInt8> seen;
+    CmiUInt8 minNew = ~(CmiUInt8)0;
     for (auto& e : ids)
     {
       CkEnforceMsg(seen.insert(e.second).second, "two elements share an id");
@@ -121,7 +123,16 @@ public:
         CkAbort("restart: new element %d has unique part %llu below 2^%d: not from"
                 " the allocator\n",
                 e.first, (unsigned long long)(e.second & mask), U - 1);
+      if (e.first >= newBase() && (e.second & mask) < minNew) minNew = e.second & mask;
     }
+    // How much of the allocator's pool the previous restart cost: the grants it
+    // handed out lie between the two generations' lowest new numbers.
+    if (gen >= 2)
+      CkPrintf("Generation %d: the previous restart consumed %llu of the pool's %llu"
+               " (lowest new number %llu, was %llu)\n",
+               gen, (unsigned long long)(minNew - lastMin), (unsigned long long)half,
+               (unsigned long long)minNew, (unsigned long long)lastMin);
+    lastMin = minNew;
     CkPrintf("All %d ids distinct; the %d new ids came from the allocator; pinging"
              " every element\n",
              (int)ids.size(), nElements);
@@ -153,6 +164,7 @@ public:
   {
     p | ids;
     p | gen;
+    p | lastMin;
   }
 };
 

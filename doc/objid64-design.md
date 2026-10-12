@@ -184,17 +184,28 @@ text above:
   _nodeLock. At most one spare is held; the request goes out when half of the
   current tranche is used, and again whenever a process is exhausted.
 - The allocator hands out the pool bottom up in powers of two: the requester asks
-  for twice its current tranche, or for 2^16 (FIRST_GRANT_LOG2) when it has none;
-  PE 0 clamps between 2^16 and region / (8 * processes). A zero-length grant means
+  for twice its current tranche, or for a first grant when it has none; PE 0 clamps
+  to a floor and a cap. The cap is region / (8 * processes). The floor, which is the
+  first grant after a restart, is 2^16 (FIRST_GRANT_LOG2) or cap / 64, whichever is
+  smaller, so a restart on which every process inserts costs the pool at most
+  processes * cap / 64 = region / 512 at any process count. A zero-length grant means
   the pool is spent and the requester aborts with a message naming setBounds,
   +objid_expand and CMK_OBJID_COLLECTION_BITS. (Until 2026-10-10 the floor was the
   launch share, which is 8x the cap, so every grant was the cap and each restart in
-  a chain of restarts spent 1/8 of the pool: the ninth aborted. Aditya's review of
-  #4021.)
+  a chain of restarts spent 1/8 of the pool: the ninth aborted. Until 2026-10-12 the
+  floor was a flat 2^16, which equals the cap from 8192 processes up at the default
+  expand factor, with the same result there. Aditya's reviews of #4021.) A later
+  improvement, not done: at restart, move the allocator cursor down to just above the
+  highest allocator-region number held by a restored element (one max-reduction), so
+  repeated restarts cost only what is actually in use.
 - Restart does not wait for grants, and does not request any: a restored CkLocMgr
   (restoredFromCheckpoint, set in its pup) starts with an empty tranche, and the
-  first insertion on a process asks the allocator for 2^16 numbers and is deferred
-  until the grant arrives. A process that never inserts after the restart costs the
+  first insertion on a process asks the allocator for its first grant and is deferred
+  until the grant arrives. So after every restart the first insertion on each process
+  is asynchronous: a local [inline] insert returns before the element exists and
+  ckLocal() is null until the grant lands (a one-time note says so). This is a
+  deliberate trade against goal G5, confined to restarts; the manual (PR 2) must say
+  so. A process that never inserts after the restart costs the
   pool nothing. Per-process cursors are not checkpointed at all; only the allocator
   cursor is. An array created after a restart is not restored, so it takes its share
   of its own (untouched) initial region as at launch, split by the current process

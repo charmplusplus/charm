@@ -2550,9 +2550,10 @@ bool CkLocMgr::mintUnique(CmiUInt8& u)
     {
       t->requested = true;
       send = true;
-      // Twice the current tranche; a process with none yet (after a restart) starts
-      // small and doubles from there.
-      want = t->len ? floorLog2(t->len) + 1 : ck::objid::FIRST_GRANT_LOG2;
+      // Twice the current tranche; a process with none yet (after a restart) asks
+      // for 0, which the allocator reads as "the first grant", whose size it sets
+      // from the pool and the process count (requestTranche), and doubles from there.
+      want = t->len ? floorLog2(t->len) + 1 : 0;
     }
     if (std::find(t->waitingPes.begin(), t->waitingPes.end(), CkMyPe()) == t->waitingPes.end())
       t->waitingPes.push_back(CkMyPe());
@@ -2563,11 +2564,16 @@ bool CkLocMgr::mintUnique(CmiUInt8& u)
 }
 
 // PE 0: hand out the next tranche. Sizes are powers of two: what the requester asks
-// for (twice its current tranche), at least 2^FIRST_GRANT_LOG2 and at most a cap
-// that leaves every process several more grants. The floor must stay well below
-// the cap, or the doubling never takes effect and every grant is a fixed fraction
-// of the pool: with the launch share as the floor, a restart cost 1/8 of the pool
-// and the ninth restart in a chain aborted (Aditya's review of #4021).
+// for (twice its current tranche), at least a floor and at most a cap that leaves
+// every process several more grants. The floor is the first grant after a restart
+// (the requester asks for 0): 2^FIRST_GRANT_LOG2, or 1/64 of the cap when that is
+// smaller, so that a restart on which every process inserts costs the pool at most
+// 1/512 of itself (processes x cap/64 = region / 512) however many processes there
+// are. The floor must stay well below the cap, or the doubling never takes effect
+// and every grant is a fixed fraction of the pool: with the launch share as the
+// floor a restart cost 1/8 of the pool and the ninth restart in a chain aborted;
+// with a flat 2^16 the same happened from 8192 processes up, where the cap is 2^16
+// (Aditya's reviews of #4021). +objid_tranche_log2 caps both for tests.
 void CkLocMgr::requestTranche(int node, int wantLog2)
 {
   CkAssert(CkMyPe() == 0);
@@ -2575,8 +2581,10 @@ void CkLocMgr::requestTranche(int node, int wantLog2)
   const CmiUInt8 region = (CmiUInt8)1 << (l.uniqueBits - 1);
   int capLog2 = floorLog2(region / (8 * (CmiUInt8)CkNumNodes()));
   if (capLog2 < 0) capLog2 = 0;
-  if (l.trancheLog2Cap > 0 && capLog2 > l.trancheLog2Cap) capLog2 = l.trancheLog2Cap;
   int minLog2 = ck::objid::FIRST_GRANT_LOG2;
+  if (minLog2 > capLog2 - 6) minLog2 = capLog2 - 6;
+  if (minLog2 < 0) minLog2 = 0;
+  if (l.trancheLog2Cap > 0 && capLog2 > l.trancheLog2Cap) capLog2 = l.trancheLog2Cap;
   if (minLog2 > capLog2) minLog2 = capLog2;
   int log2 = wantLog2;
   if (log2 < minLog2) log2 = minLog2;
@@ -3235,11 +3243,13 @@ void CkLocMgr::multiHop(CkArrayMessage* msg)
   {  // Send a routing message letting original sender know new element location
     DEBS((AA "Sending update back to %d for element %" PRIu64 "\n" AB, srcPe,
           msg->array_element_id()));
-    // Under CMK_GLOBAL_LOCATION_UPDATE a migration is announced to every PE before
-    // it is acted on, so a forward is never due to a stale entry after a move; it is
-    // a cold send through the home (routine for an element that does not live at its
-    // home), a demand creation, or a send that raced an announced move. All of these
-    // are repaired the same way, so there is nothing to assert here.
+    // Under CMK_GLOBAL_LOCATION_UPDATE a forward is routine, not a chain to assert
+    // on: a cold send through the home (for an element that does not live at its
+    // home), a demand creation, a send that raced an announced move, or a stale entry
+    // after a move. Only balancers derived from CentralLB announce a move to every
+    // PE before acting on it (UpdateLocation); the TreeLB-based ones (GreedyLB,
+    // RefineLB, RotateLB, ...) are announced by the emigrate broadcast, which can
+    // land after the program has resumed. All of these are repaired the same way.
     cache->requestLocation(msg->array_element_id(), srcPe);
   }
 }
