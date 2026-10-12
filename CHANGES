@@ -57,6 +57,9 @@ New on this line since the split from classic:
 
 Known gaps in the alpha:
 
+- AMPI is not yet ported to reconverse; Windows multicore is not yet
+  available.
+
 - CCS, CharmDebug, PythonCCS and the liveViz server are not yet
   available on reconverse; the port is in progress.
 
