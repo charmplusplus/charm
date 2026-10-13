@@ -6,11 +6,17 @@ but it can use the CcsSendReply function.
 #ifndef CONV_CCS_H
 #define CONV_CCS_H
 
-#include "converse.h" /* for CMK_CCS_AVAILABLE and CmiHandler */
+#include "conv-autoconfig.h" /* for CMK_CCS_AVAILABLE */
+#include "converse.h" /* for CmiHandler */
 #include "sockRoutines.h"
 #include "ccs-server.h" /*for CcsSecAttr*/
 
 #include "ckhashtable.h"
+
+/* Reconverse has no charmrun, so PE 0 hosts the CCS server socket. */
+#if CMK_RECONVERSE && !defined(NODE_0_IS_CONVHOST)
+#define NODE_0_IS_CONVHOST 1
+#endif
 
 #ifdef __cplusplus
 extern "C" {

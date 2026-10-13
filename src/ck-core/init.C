@@ -1345,6 +1345,15 @@ void _initCharm(int unused_argc, char **argv)
     }
   });
 
+#if CMK_RECONVERSE && CMK_CCS_AVAILABLE
+	// Reconverse's ConverseInit does not set up CCS (CCS lives in charm's
+	// src/conv-ccs, above reconverse), so every PE initializes it here,
+	// before any module registers a CCS handler. With ++server or
+	// ++server-port, PE 0 also opens the CCS server socket and polls it
+	// from a CcdPERIODIC callback.
+	CcsInit(argv);
+#endif
+
 	CkpvInitialize(size_t *, _offsets);
 #if CMK_ERROR_CHECKING
 	CkpvInitialize(void *, _nokeepMsgInFlight);
