@@ -7,7 +7,9 @@
 #include "conv-ccs.h"
 #include "ccs-server.h"
 #include "sockRoutines.h"
+#if !CMK_RECONVERSE /* reconverse declares its queue API in converse.h */
 #include "queueing.h"
+#endif
 
 #ifdef _WIN32
 # include <io.h>
@@ -113,7 +115,13 @@ void CcsSetMergeFn(const char *name, CmiReduceMergeFn newMerge) {
     CmiAbort("[%d] CCS: Unknown CCS handler name %s.\n",CmiMyPe(),name);
   }
   rec->mergeFn=newMerge;
+#if CMK_RECONVERSE
+  /* redID only serves CmiListReduce (multicast requests), which reconverse
+     does not provide; see CcsReply. */
+  rec->redID=0;
+#else
   rec->redID=CmiGetGlobalReduction();
+#endif
 }
 
 void * CcsMerge_concat(int *size,void *local,void **remote,int n) {

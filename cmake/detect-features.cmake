@@ -15,10 +15,6 @@ set(CMK_CCS_AVAILABLE 1)
 if(${NETWORK} STREQUAL "pami" OR ${NETWORK} STREQUAL "pamilrts")
   set(CMK_CCS_AVAILABLE 0)
 endif()
-if(RECONVERSE)
-  # CCS is not ported to reconverse yet.
-  set(CMK_CCS_AVAILABLE 0)
-endif()
 
 set(CMK_NO_PARTITIONS 0)
 if(${NETWORK} STREQUAL "netlrts" OR ${NETWORK} STREQUAL "multicore" OR ${NETWORK} STREQUAL "pami")

@@ -13,6 +13,14 @@
 #endif
 
 #if CMK_CCS_AVAILABLE
+#if CMK_RECONVERSE
+/* Reconverse builds have no Converse debugger (src/conv-core/debug-conv.C),
+   which owns the conditional-delivery state on classic builds. Conditional
+   delivery is never active here. */
+int _conditionalDelivery = 0;
+int conditionalPipe[2] = {0, 0};
+#endif
+
 void CcsHandleRequest(CcsImplHeader *hdr,const char *reqData);
 
 void req_fw_handler(char *msg)
@@ -92,7 +100,11 @@ int CcsReply(CcsImplHeader *rep,int repLen,const void *repData) {
       CkReduce(msg, len, fn->mergeFn);
     } else {
       /* CCS Multicast */
+#if CMK_RECONVERSE
+      CmiAbort("CCS multicast requests need CmiListReduce, which reconverse does not provide\n");
+#else
       CmiListReduce(-repPE, (int*)(rep+1), msg, len, fn->mergeFn, fn->redID);
+#endif
     }
   } else {
     if (_conditionalDelivery == 0) CcsImpl_reply(rep, repLen, repData);
@@ -133,6 +145,10 @@ void ccs_getinfo(char *msg)
 
 ///////////////////////////////// middle-debug.C
 #endif
+
+/* The Converse debugger (freeze, notifications) needs debug-conv.C and the
+   charmdebug memory module, which reconverse builds do not have. */
+#if !CMK_RECONVERSE
 #if ! CMK_HAS_GETPID
 typedef int pid_t;
 #endif
@@ -219,3 +235,5 @@ void CpdNotify(int type, ...) {
   }
   va_end(list);
 }
+
+#endif /* !CMK_RECONVERSE */
