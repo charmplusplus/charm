@@ -166,6 +166,10 @@ CkErrStream ckerr;
 CkInStream  ckin;
 
 CkpvDeclare(void*,       _currentChare);
+#if CMK_ERROR_CHECKING
+CkpvExtern(void *, _nokeepMsgInFlight);
+CkpvExtern(int, _nokeepEpInFlight);
+#endif
 CkpvDeclare(int,         _currentChareType);
 CkpvDeclare(CkGroupID,   _currentGroup);
 CkpvDeclare(void*,       _currentNodeGroupObj);
@@ -1338,6 +1342,12 @@ void _initCharm(int unused_argc, char **argv)
   });
 
 	CkpvInitialize(size_t *, _offsets);
+#if CMK_ERROR_CHECKING
+	CkpvInitialize(void *, _nokeepMsgInFlight);
+	CkpvAccess(_nokeepMsgInFlight) = NULL;
+	CkpvInitialize(int, _nokeepEpInFlight);
+	CkpvAccess(_nokeepEpInFlight) = -1;
+#endif
 	CkpvAccess(_offsets) = new size_t[32];
 	CkpvInitialize(PtrQ*,_buffQ);
 	CkpvInitialize(PtrVec*,_bocInitVec);

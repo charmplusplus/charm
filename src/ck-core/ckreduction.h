@@ -702,6 +702,7 @@ private:
 	void startReduction(int number,int srcPE);
 	void addContribution(CkReductionMsg *m);
 	void finishReduction(void);
+  void maybeCompleteObligationFreeRound();
   void checkIsActive();
   void informParentInactive();
   void checkAndAddToInactiveList(int id, int red_no);

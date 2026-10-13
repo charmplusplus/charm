@@ -8,7 +8,16 @@
 #include "charm++.h"
 #include "envelope.h"
 
-#if COSMO_STATS > 0
+// The request/reply counters are always compiled in. The registration and
+// entry-method stubs of CkCacheManager<CmiUInt8> live in libmoduleCkCache,
+// so an application-side macro (COSMO_STATS) that added the counter fields
+// would change the class layout in the application but not in the
+// library. The counters are a few integer increments per request.
+#ifndef CKCACHE_STATS
+#define CKCACHE_STATS 1
+#endif
+
+#if COSMO_STATS > 0 || defined(CKCACHE_STATS)
 #include <fstream>
 #endif
 
@@ -225,7 +234,7 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
   /// with support for writeback
   std::vector<CkGroupID> locMgrWB;
 
-#if COSMO_STATS > 0
+#if COSMO_STATS > 0 || defined(CKCACHE_STATS)
   /// particles arrived from remote processors, this counts only the entries in the cache
   CmiUInt8 dataArrived;
   /// particles arrived from remote processors, this counts the real
@@ -339,7 +348,7 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
     chunkAck = NULL;
     chunkWeight = NULL;
     storedData = 0;
-#if COSMO_STATS > 0
+#if COSMO_STATS > 0 || defined(CKCACHE_STATS)
     dataArrived = 0;
     dataTotalArrived = 0;
     dataMisses = 0;
@@ -363,7 +372,7 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
     CkAssert(chunkAck[chunk] > 0);
     p = cacheTable[chunk].find(what);
     CkCacheEntry<CkCacheKey> *e;
-#if COSMO_STATS > 0
+#if COSMO_STATS > 0 || defined(CKCACHE_STATS)
     totalDataRequested++;
 #endif
     if (p != cacheTable[chunk].end()) {
@@ -399,6 +408,9 @@ class CkCacheManager : public CBase_CkCacheManager<CkCacheKey> {
 
     e->requestorVec.push_back(req);
     outStandingRequests[what] = chunk;
+#if COSMO_STATS > 0 || defined(CKCACHE_STATS)
+    dataMisses++;
+#endif
 #if COSMO_STATS > 1
     e->misses++;
 #endif
@@ -442,6 +454,10 @@ inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkC
     p = cacheTable[chunk].find(key);
     CkAssert(p != cacheTable[chunk].end());
     CkCacheEntry<CkCacheKey> *e = p->second;
+#if COSMO_STATS > 0 || defined(CKCACHE_STATS)
+    dataArrived++;          // one reply message
+    dataTotalArrived++;
+#endif
     if (msg != NULL) {
       e->data = e->type->unpack(msg, chunk, e->home);
     }
@@ -509,7 +525,7 @@ inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkC
         mgr->iterate(localCharesWB);
       }
 
-#if COSMO_STATS > 0
+#if COSMO_STATS > 0 || defined(CKCACHE_STATS)
       dataArrived = 0;
       dataTotalArrived = 0;
       dataMisses = 0;
@@ -547,8 +563,10 @@ inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkC
         //CkPrintf("[%d] CkCache::cacheSync group %d ack %d ackWb %d\n", CkMyPe(), this->thisgroup.idx, chunkAck[i], chunkAckWB[i]);
       }
       
-#if COSMO_STATS > 0
-      CmiResetMaxMemory();
+#if COSMO_STATS > 0 || defined(CKCACHE_STATS)
+#if !CMK_RECONVERSE
+      CmiResetMaxMemory();     // not provided by reconverse
+#endif
 #endif
     }
 
@@ -585,7 +603,7 @@ inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkC
       // TODO: if chunks are held back due to restrictions, here is a
       // good position to release them
 
-#if COSMO_STATS > 0
+#if COSMO_STATS > 0 || defined(CKCACHE_STATS)
       if (maxData < storedData) maxData = storedData;
 #endif
 
@@ -608,7 +626,7 @@ inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkC
   
   template<class CkCacheKey>
   void CkCacheManager<CkCacheKey>::collectStatistics(CkCallback cb) {
-#if COSMO_STATS > 0
+#if COSMO_STATS > 0 || defined(CKCACHE_STATS)
     CkCacheStatistics cs(dataArrived, dataTotalArrived,
         dataMisses, dataLocal, dataError, totalDataRequested,
         maxData, CkMyPe());

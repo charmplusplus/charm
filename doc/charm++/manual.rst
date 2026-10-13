@@ -701,6 +701,16 @@ chare; and the remote chare’s modifications will be lost after the
 remote method returns- Charm++ always uses call-by-value, even for
 arrays and structures.
 
+Treat array parameters as read-only. The runtime owns the buffer they
+point into (marshalled entry methods are ``nokeep`` unless they are
+``threaded``; see :numref:`attributes`), and for a broadcast it delivers
+**one** buffer per process: every receiving object in that process (each
+group branch, each local array element) gets the same pointer, possibly
+on different PEs at the same time. A write into an array parameter is
+therefore seen by the other receivers of the broadcast and is a data race
+across PEs. Only a message you own (section :numref:`messages`) is yours
+to modify.
+
 This also means the data must be copied on the sending side, and to be
 kept must be copied again at the receive side. Especially for large
 arrays, this is less efficient than messages, as described in the next
@@ -3304,6 +3314,22 @@ charm/lib, named as *libcldb-foo.a*, where *foo* is the strategy name
 used above. Now one can use **-balance foo** as compile time option to
 **charmc** to link with the *foo* seed load balancer.
 
+Global Location Update
+~~~~~~~~~~~~~~~~~~~~~~
+
+When Charm++ is built with the ``CMK_GLOBAL_LOCATION_UPDATE`` option(``-DCMK_GLOBAL_LOCATION_UPDATE=1``), the
+runtime broadcasts updated object locations to all processors during each load
+balancing step. This eliminates the need for hop-count-based location discovery
+after migrations.
+
+.. important::
+
+   With ``CMK_GLOBAL_LOCATION_UPDATE`` enabled, **object migrations must
+   occur during global load balancing steps**. Anytime migration (e.g., via
+   ``migrateMe()``) is not supported in this mode. Applications must use the
+   ``AtSync()`` method to trigger load balancing.
+
+
 .. _lbexample:
 
 Simple Load Balancer Usage Example - Automatic with Sync LB
@@ -4267,7 +4293,13 @@ threaded
    entry methods run in their own non-preemptible threads. These entry
    methods may perform blocking operations, such as calls to a sync
    entry method, or explicitly suspending themselves. For more details,
-   refer to section :numref:`threaded`.
+   refer to section :numref:`threaded`. Because the thread may outlive
+   the call that started it, a threaded entry method with marshalled
+   parameters is *not* ``nokeep`` by default: each receiver gets a
+   private copy of the parameters, valid until the thread ends. Adding
+   ``nokeep`` explicitly (``[threaded, nokeep]``) shares one buffer among
+   the receivers in a process instead, still valid until the thread ends,
+   with the read-only rule described under ``nokeep``.
 
 sync
    entry methods are special in that calls to them are blocking-they do
@@ -4296,15 +4328,26 @@ exclusive
    ``benchmarks/charm++/pingpong``.
 
 nokeep
-   entry methods take only a message as their lone argument, and the
-   memory buffer for this message is managed by the Charm++ runtime
-   system rather than by the user. This means that the user has to
-   guarantee that the message will not be buffered for later usage or be
-   freed in the user code. Additionally, users are not allowed to modify
-   the contents of a nokeep message, since for a broadcast the same
-   message can be reused for all entry method invocations on each PE. If
-   a user frees the message or modifies its contents, a runtime error
-   may result. An example can be found in
+   entry methods do not own their incoming message: the Charm++ runtime
+   system frees it when the method returns. The method must not free the
+   message, keep a pointer into it past its return, or modify it. The
+   last rule matters because a broadcast to a ``nokeep`` entry method
+   delivers a single buffer per process, shared by every receiver in that
+   process (each group branch on each PE, every local array element); a
+   write would be seen by the other receivers and races with them across
+   PEs. In return the runtime never copies the message for delivery: a
+   broadcast costs one buffer per process instead of one per receiver.
+
+   Entry methods with marshalled parameters are ``nokeep`` automatically
+   (the user never sees the message and cannot free it), except
+   ``threaded`` ones, see above. Entry methods taking a message are
+   ``nokeep`` only when the ``nokeep`` attribute is specified; without it, each receiver
+   of a broadcast gets its own copy of the message and owns it. Freeing a
+   ``nokeep`` message during the call is an error; builds with error
+   checking (the default without ``--with-production``) abort with a
+   message naming the entry method. Modifying the contents of a
+   ``nokeep`` message is also an error, which the runtime does not
+   detect. An example can be found in
    ``examples/charm++/histogram_group``.
 
 notrace
@@ -6343,7 +6386,7 @@ CkArrayMap and defines these virtual methods:
 
 .. code-block:: c++
 
-    class CkArrayMap : public Group {
+    class CkArrayMap : public IrrGroup {
     public:
       // ...
 
@@ -6352,6 +6395,9 @@ CkArrayMap and defines these virtual methods:
       // Return the home processor number for this element of this array
       virtual int procNum(int arrayHdl,const CkArrayIndex &element);
     };
+
+CkArrayMap derives from IrrGroup, not Group, so a map class cannot
+contribute to a reduction.
 
 For example, a simple 1D blockmapping scheme. Actual mapping is handled
 in the procNum function.
@@ -6396,6 +6442,25 @@ map object named BlockMap:
     CkArrayOptions opts(nElements);
     opts.setMap(myMap);
     a1=CProxy_A1::ckNew(parameters,opts);
+
+Creating the map and the array together like this is safe only during
+program initialization, where every PE replays the creations in order
+before any other message runs. Later in the run the array creation can
+reach a PE before the map group's branch exists there, and the array
+constructor aborts with "ERROR! Local branch of array map is NULL!";
+the race grows likelier with the PE count. Name the map as a creation
+dependence, as for groups (Section :numref:`sec:groups/creation`):
+
+.. code-block:: c++
+
+    CkEntryOptions e_opts;                 // after opts.setMap(myMap)
+    e_opts.setGroupDepID(opts.getMap());   // buffer the array creation
+    a1 = CProxy_A1::ckNew(parameters, opts, &e_opts);
+
+The runtime declares this dependence itself for the location manager it
+creates with a new array, so a plain setMap is already ordered. The
+exception is bindTo with a newly created map: bindTo reuses the bound-to
+array's location manager and skips that chain.
 
 A very basic example which also demonstrates how initial elements are created
 may be found in ``examples/charm++/array_map``

@@ -9,11 +9,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Detect whether the pull request changes anything outside doc/.
+  # Documentation-only PRs skip the build/test matrix below: each gated job
+  # reports "skipped", which satisfies required status checks, and only the
+  # doc job does real work. merge_group events (the merge queue) always run
+  # the full matrix, so the final gate before landing is unchanged.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      non_doc: ${{ steps.filter.outputs.non_doc }}
+    steps:
+    - uses: actions/checkout@v4
+      if: ${{ github.event_name == 'pull_request' }}
+      with:
+        fetch-depth: 0
+    - name: Check for changes outside doc/
+      id: filter
+      run: |
+        if [ "${{ github.event_name }}" = "pull_request" ]; then
+          base=$(git merge-base "origin/${{ github.base_ref }}" HEAD)
+          if git diff --name-only "$base" HEAD | grep -v '^doc/' | grep -q .; then
+            echo "non_doc=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "non_doc=false" >> "$GITHUB_OUTPUT"
+          fi
+        else
+          echo "non_doc=true" >> "$GITHUB_OUTPUT"
+        fi
+
   buildold_netlrts-linux-x86_64:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 90
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Run build
       run: ./buildold all-test netlrts-linux-x86_64 -g -j4 --with-production
     - name: test
@@ -24,9 +54,11 @@ jobs:
       run: make -C netlrts-linux-x86_64/tmp testp TESTOPTS="++local" P=3
 
   changa_netlrts-linux-x86_64:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     runs-on: ubuntu-latest 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build-charm++
       run: ./build ChaNGa netlrts-linux-x86_64 -g -j4 --with-production
     - name: build-changa
@@ -42,11 +74,13 @@ jobs:
         make test
 
   cuda_netlrts-linux-x86_64_buildonly:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     # Buildonly test, as CUDA needs an actual device to run.
     timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build
       run: |
         sudo apt-get update
@@ -59,9 +93,8 @@ jobs:
   doc:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
-    -
-      uses: actions/setup-python@v4
+    - uses: actions/checkout@v5
+    - uses: actions/setup-python@v6
       with:
         python-version: '3.x'
     - name: Install prerequisites
@@ -72,10 +105,12 @@ jobs:
         make html
 
   mpi-linux-x86_64:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 90
     runs-on: ubuntu-22.04  #  ubuntu-latest does not work
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: install-prerequisites
       run: sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
     - name: build
@@ -88,10 +123,12 @@ jobs:
     #  run: make -C mpi-linux-x86_64-smp/tmp testp P=4 TESTOPTS="+setcpuaffinity ++ppn 2"
 
   mpi-linux-x86_64_syncft:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 90
     runs-on: ubuntu-22.04  #  ubuntu-latest does not work
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: install-prerequisites
       run: sudo apt-get update && sudo apt-get install -y mpich libmpich-dev
     - name: build
@@ -100,10 +137,12 @@ jobs:
       run: make -C mpi-linux-x86_64-syncft/tmp mpisyncfttest
 
   multicore-darwin-x86_64_projections:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 60
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build-only
       run: ./build LIBS multicore-darwin-x86_64 -g -j3 --with-production --enable-tracing
 #    - name: test
@@ -125,7 +164,7 @@ jobs:
   #   timeout-minutes: 60
   #   runs-on: macos-latest
   #   steps:
-  #   - uses: actions/checkout@v4
+  #   - uses: actions/checkout@v5
   #   - name: build
   #     run: ./build LIBS multicore-darwin-arm8 -g -j3 --with-production --enable-tracing
   #   - name: test
@@ -143,6 +182,8 @@ jobs:
   #       for f in $files; do echo $f; pushd .; cd $(dirname $f); $proj --exit $(basename $f); popd; done
 
   namd_netlrts-linux-x86_64:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     # Since NAMD requires a secret to download its source from Gitlab, CI builds from outside PPL
     # always fail in this test since the secret is not available.
     env:
@@ -150,7 +191,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: install-prerequisites
       if: ${{ env.namd_secret != '' }}
       run: |
@@ -179,7 +220,7 @@ jobs:
     - name: Cache apoa1 files
       if: ${{ env.namd_secret != '' }}
       id: cache-apoa1-files
-      uses: actions/cache@v3
+      uses: actions/cache@v5
       with:
         path: ~/namddata/apoa1
         key: namd-apoa1-files
@@ -202,10 +243,12 @@ jobs:
 
 # FIXME: darwin tests all fail
   netlrts-darwin-x86_64:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 60
-    runs-on: macos-13
+    runs-on: macos-15-intel
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build-only
       run: ./build all-test netlrts-darwin-x86_64 --build-shared --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
       # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
@@ -219,7 +262,7 @@ jobs:
   #   timeout-minutes: 60
   #   runs-on: macos-latest
   #   steps:
-  #   - uses: actions/checkout@v4
+  #   - uses: actions/checkout@v5
   #   - name: build
   #     run: ./build all-test netlrts-darwin-arm8 --build-shared --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
   #     # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
@@ -229,10 +272,12 @@ jobs:
   #     run: make -C netlrts-darwin-arm8/tmp testp P=2 TESTOPTS="++local"
 
   netlrts-linux-i386:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: install-prerequisites
       run: |
         sudo dpkg --add-architecture i386
@@ -247,10 +292,12 @@ jobs:
       run: make -C netlrts-linux-i386/tmp testp P=2 TESTOPTS="++local"
 
   netlrts-linux-x86_64:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build
       run: ./build all-test netlrts-linux-x86_64 --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
       # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
@@ -260,10 +307,12 @@ jobs:
       run: make -C netlrts-linux-x86_64/tmp testp P=2 TESTOPTS="++local"
 
   netlrts-linux-x86_64_smp:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build
       run: ./build all-test netlrts-linux-x86_64 smp --with-production --enable-error-checking --enable-lbuserdata -j3 -g -Werror=vla
       # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
@@ -273,22 +322,26 @@ jobs:
       run: make -C netlrts-linux-x86_64-smp/tmp testp P=4 TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle ++ppn 2"
 
   netlrts-linux-x86_64_syncft:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 90
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: build
       run: ./build all-test netlrts-linux-x86_64 syncft -j2 -g
     - name: test
       run: make -C netlrts-linux-x86_64-syncft/tmp syncfttest TESTOPTS="++local"
 
   shellcheck:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     # See https://github.com/koalaman/shellcheck/wiki
     # for explanations of ShellCheck error codes
     timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: ShellCheck
       run: |
         # TODO: add more scripts
@@ -303,11 +356,13 @@ jobs:
           src/arch/mpi-win-x86_64/charmrun \
 
   spack_ubuntu-latest:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     #removed macos target and branch protection until macos ci testing is fixed
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: Install Spack
       run: |
         pwd
@@ -350,16 +405,18 @@ jobs:
         spack install --test root charmpp@main
 
   ucx-linux-x86_64_openpmix:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 60
     runs-on: ubuntu-22.04
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v5
     # Uncomment the lines below to set up a tmate session for debugging.
     # See https://github.com/marketplace/actions/debugging-with-tmate for details.
     # This can't be enabled all the time as the tmate session will wait for a user to connect before running
     # the build.
     #- name: Tmate session for debugging
-    #  uses: mxschmitt/action-tmate@v2
+    #  uses: mxschmitt/action-tmate@v3
     - name: install-prerequisites
       run: |
         sudo apt-get update
@@ -392,13 +449,15 @@ jobs:
         make -C ucx-linux-x86_64-openpmix/examples test
 
   verbs-linux-x86_64_smp:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     # Buildonly test, as the machine layer needs an actual device to run.
     # Also test packaging a tarball and building from it.
     # Since it is buildonly, test both build and buildold with the tarball.
     timeout-minutes: 45
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - name: install-prerequisites
       run: |
         sudo apt-get update
@@ -419,7 +478,61 @@ jobs:
         # TODO: this should build tests with "-charm-shared". See #2735 on why this is not done currently.
         ./buildold all-test verbs-linux-x86_64 -j4 -g --build-shared
 
+  # ARM64 Linux jobs, moved from CircleCI when it was turned off for the
+  # project (2026-08-27). Native arm64 runners; configs mirror the old
+  # CircleCI arm.medium jobs.
+  netlrts-linux-arm8:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04-arm
+    steps:
+    - uses: actions/checkout@v5
+    - name: build
+      run: ./build all-test netlrts-linux-arm8 --with-production --enable-error-checking --enable-lbuserdata -j4 -g -Werror=vla
+    - name: test
+      run: make -C netlrts-linux-arm8/tmp test TESTOPTS="++local"
+    - name: testp P=2
+      run: make -C netlrts-linux-arm8/tmp testp P=2 TESTOPTS="++local"
+
+  netlrts-linux-arm8_smp:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
+    timeout-minutes: 60
+    runs-on: ubuntu-24.04-arm
+    steps:
+    - uses: actions/checkout@v5
+    - name: build
+      run: ./build all-test netlrts-linux-arm8 smp --with-production --enable-error-checking --enable-lbuserdata -j4 -g -Werror=vla
+    - name: test
+      run: make -C netlrts-linux-arm8-smp/tmp test TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle"
+    - name: testp P=4 PPN=2
+      run: make -C netlrts-linux-arm8-smp/tmp testp P=4 TESTOPTS="++local +setcpuaffinity +CmiSleepOnIdle ++ppn 2"
+
+  mpi-linux-arm8:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
+    timeout-minutes: 90
+    runs-on: ubuntu-24.04-arm
+    env:
+      # The runner has 4 vCPUs; let Open MPI oversubscribe for wider test shapes.
+      OMPI_MCA_rmaps_base_oversubscribe: "true"
+    steps:
+    - uses: actions/checkout@v5
+    - name: install-prerequisites
+      # openmpi, as the retired CircleCI job used: Ubuntu 24.04's mpich is
+      # built on the ch4:ucx device, which crashes at startup on these runners.
+      run: sudo apt-get update && sudo apt-get install -y libopenmpi-dev openmpi-bin
+    - name: build
+      run: ./build all-test mpi-linux-arm8 --with-production --enable-error-checking --enable-lbuserdata -j4 -g -Werror=vla
+    - name: test
+      run: make -C mpi-linux-arm8/tmp test
+    - name: testp P=2
+      run: make -C mpi-linux-arm8/tmp testp P=2
+
   netlrts-win-x86_64_mingw64:
+    needs: changes
+    if: ${{ needs.changes.outputs.non_doc == 'true' }}
     timeout-minutes: 90
 
     runs-on: windows-latest
@@ -428,7 +541,7 @@ jobs:
         shell: msys2 {0}
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
     - uses: msys2/setup-msys2@v2
       with:
         msystem: MINGW64

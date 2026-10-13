@@ -4,6 +4,7 @@
  */
 #include "charm++.h"
 #include "collidecharm_impl.h"
+#include <iostream>
 
 #define COLLIDE_TRACE 0
 #if COLLIDE_TRACE
@@ -49,6 +50,17 @@ CkGroupID CollideDistributedClient(CkCallback clientCb)
 {
   CProxy_distributedCollideClient cl = CProxy_distributedCollideClient::ckNew(clientCb);
   return cl;
+}
+
+/// Call this on all processors at restart to reinitialize the Collision client
+/// with correct clientFn and clientParam.
+void CollideSerialClientRestart(
+  CollideHandle h,
+  CollisionClientFn clientFn,
+  void *clientParam )
+{
+  CProxy_collideMgr mgr(h);
+  mgr.ckLocalBranch()->reinitClient(clientFn, clientParam);
 }
 
 /// Create a collider group to contribute objects to.
@@ -329,7 +341,7 @@ static const char * voxName(const CkIndex3D &idx,char *buf,int n) {
 collideMgr::collideMgr(const CollideGrid3d &gridMap_,
     const CProxy_collideClient &client_,
     const CProxy_collideVoxel &voxels)
-  :thisproxy(thisgroup), voxelProxy(voxels),
+  :voxelProxy(voxels),
   gridMap(gridMap_), client(client_), aggregator(gridMap,this)
 {
   steps=0;
@@ -338,6 +350,27 @@ collideMgr::collideMgr(const CollideGrid3d &gridMap_,
   msgsSent=msgsRecvd=0;
   totalLocalVoxels = -1;
   collisionStarted = false;
+}
+
+collideMgr::collideMgr(CkMigrateMessage* m) :
+  CBase_collideMgr(m),
+  gridMap(CollideGrid3d(CkVector3d(0, 0, 0),CkVector3d(2, 100, 2))),
+  aggregator(gridMap,this)
+{
+  steps=0;
+  nContrib=0;
+  contribCount=0;
+  msgsSent=msgsRecvd=0;
+  totalLocalVoxels = -1;
+  collisionStarted = false;
+}
+
+// Reinitialize collideClient's state on restart
+void collideMgr::reinitClient(
+  CollisionClientFn clientFn,
+  void *clientParam )
+{
+  client.ckLocalBranch()->setClient(clientFn, clientParam);
 }
 
 //Maintain contributor registration count
@@ -417,7 +450,8 @@ void collideMgr::tryAdvance(void)
       steps++;
       contribCount=0;
       msgsSent=msgsRecvd=0;
-      contribute(CkCallback(CkReductionTarget(collideMgr,reductionFinished), thisProxy[0]));
+      CProxy_collideMgr proxy(ckGetGroupID());
+      contribute(CkCallback(CkReductionTarget(collideMgr,reductionFinished), proxy[0]));
     }
 }
 
@@ -426,8 +460,9 @@ void collideMgr::reductionFinished(void)
 {
   CM_STATUS("collideMgr::reductionFinished");
   //Broadcast Collision start:
-  thisProxy.determineNumVoxels();
-  voxelProxy.initiateCollision(thisProxy);
+  CProxy_collideMgr proxy(ckGetGroupID());
+  proxy.determineNumVoxels();
+  voxelProxy.initiateCollision(proxy);
 }
 
 void collideMgr::checkRegistrationComplete() {
@@ -586,6 +621,10 @@ void collideVoxel::startCollision(int step,
   CC_STATUS("} startCollision");
 }
 
+collideClient::collideClient() {}
+
+collideClient::collideClient(CkMigrateMessage* m) : Group(m) {}
+
 collideClient::~collideClient() {}
 
 /********************** serialCollideClient *****************/
@@ -594,6 +633,13 @@ serialCollideClient::serialCollideClient(void) {
   clientParam=NULL;
   clientCb = CkCallback(CkCallback::ignore);
   useCb = false;
+}
+
+serialCollideClient::serialCollideClient(CkMigrateMessage* m) : collideClient(m)
+{
+  clientFn = NULL;
+  clientParam = NULL;
+  clientCb = CkCallback(CkCallback::ignore);
 }
 
 serialCollideClient::serialCollideClient(CkCallback clientCb_) {
@@ -626,8 +672,9 @@ void serialCollideClient::reductionDone(CkReductionMsg *msg)
 {
   int nColl=msg->getSize()/sizeof(Collision);
   CM_STATUS("serialCollideClient with "<<nColl<<" collisions");
-  if (clientFn!=NULL) //User wants Collisions on node 0
+  if (clientFn!=NULL) {//User wants Collisions on node 0
     (clientFn)(clientParam,nColl,(Collision *)msg->getData());
+  }
   else //FIXME: never registered a client
     CkAbort("Forgot to call serialCollideClient::setClient!\n");
   delete msg;

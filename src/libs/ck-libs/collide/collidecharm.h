@@ -9,6 +9,9 @@
 #include "collide_util.h"
 #include "collidecharm.decl.h"
 
+/// This client function is called on PE 0 with a Collision list
+typedef void (*CollisionClientFn)(void *param,int nColl,Collision *colls);
+
 /********************** collideClient *****************
   A place for the assembled Collision lists to go.
   Each voxel calls this "Collisions" method with their
@@ -22,16 +25,17 @@
   */
 class collideClient : public Group {
   public:
+    collideClient();
+    collideClient(CkMigrateMessage* m);
     virtual ~collideClient();
     virtual void collisions(int step,CollisionList &colls) =0;
+    virtual void setClient(CollisionClientFn clientFn,
+        void *clientParam) = 0;
 };
 
 /********************** serialCollideClient *****************
   Reduces the Collision list down to processor 0.
   */
-/// This client function is called on PE 0 with a Collision list
-typedef void (*CollisionClientFn)(void *param,int nColl,Collision *colls);
-
 /// Call this on processor 0 to build a Collision client that
 ///  just calls this serial routine on processor 0 with the final,
 ///  complete Collision list.
@@ -46,6 +50,13 @@ CkGroupID CollideDistributedClient(CkCallback clientCb);
 
 /****************** Collision Interface ******************/
 typedef CkGroupID CollideHandle;
+
+/// Call this on all processors at restart to reinitialize the Collision client
+/// with the correct clientFn and clientParam.
+void CollideSerialClientRestart(
+  CollideHandle h,
+  CollisionClientFn clientFn,
+  void *clientParam );
 
 /// Create a collider group to contribute objects to.
 ///  Should be called on processor 0.

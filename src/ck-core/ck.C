@@ -19,6 +19,10 @@ clients, including the rest of Charm++, are actually C++.
 #ifndef CMK_CHARE_USE_PTR
 #include <map>
 CkpvDeclare(std::vector<void *>, chare_objs);
+#if CMK_ERROR_CHECKING
+CkpvExtern(void *, _nokeepMsgInFlight);  // see CkFreeMsg (msgalloc.C)
+CkpvExtern(int, _nokeepEpInFlight);
+#endif
 CkpvDeclare(std::vector<int>, chare_types);
 CkpvDeclare(std::vector<VidBlock *>, vidblocks);
 CksvExtern(ObjNumRdmaOpsMap, pendingZCOps);
@@ -653,11 +657,33 @@ CkLocRec *CkActiveLocRec(void) {
 /******************** Basic support *****************/
 void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
+  if (msg != NULL && UsrToEnv(msg)->isPacked())
+  { /* A stored array broadcast is kept packed (CkArray::recvBroadcast) */
+    envelope *env = UsrToEnv(msg);
+    CkUnpackMessage(&env);
+    msg = EnvToUsr(env);
+  }
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
   const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
+#if CMK_ERROR_CHECKING
+  void *prevNokeepMsg = CkpvAccess(_nokeepMsgInFlight);
+  int prevNokeepEp = CkpvAccess(_nokeepEpInFlight);
+  // Excluded: zerocopy messages (the generated code and ckrdma.C free them
+  // themselves as part of the protocol), and the runtime's own CkMessage*
+  // entries (msgIdx == -1: CkArray::recvNoKeep*Broadcast forwards the message
+  // to the elements and frees it on the last delivery, see recvBroadcast).
+  if (_entryTable[epIdx]->noKeep && msg != NULL &&
+      _entryTable[epIdx]->msgIdx != -1 &&
+      CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_REG_NO_ZC_MSG)
+  { CkpvAccess(_nokeepMsgInFlight) = msg; CkpvAccess(_nokeepEpInFlight) = epIdx; }
+#endif
   CkInvokeEP((Chare*)obj, epIdx, msg);
+#if CMK_ERROR_CHECKING
+  CkpvAccess(_nokeepMsgInFlight) = prevNokeepMsg;
+  CkpvAccess(_nokeepEpInFlight) = prevNokeepEp;
+#endif
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -681,17 +707,33 @@ void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
     deliverMsg=(void *)msg;
   } else
   { /* Method needs a copy of the message to keep/delete */
-    void *oldMsg=(void *)msg;
-    deliverMsg=CkCopyMsg(&oldMsg);
+    if (UsrToEnv(msg)->isPacked())
+    { /* Copy the bytes and unpack only the copy; the source stays packed */
+      deliverMsg=CkCopyPackedMsg(msg);
+    } else {
+      void *oldMsg=(void *)msg;
+      deliverMsg=CkCopyMsg(&oldMsg);
 #if CMK_ERROR_CHECKING
-    if (oldMsg!=msg)
-      CkAbort("CkDeliverMessageReadonly: message pack/unpack changed message pointer!");
+      if (oldMsg!=msg)
+        CkAbort("CkDeliverMessageReadonly: message pack/unpack changed message pointer!");
 #endif
+    }
   }
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, (void*)msg);
 #endif
+#if CMK_ERROR_CHECKING
+  void *prevNokeepMsg = CkpvAccess(_nokeepMsgInFlight);
+  int prevNokeepEp = CkpvAccess(_nokeepEpInFlight);
+  if (_entryTable[epIdx]->noKeep && _entryTable[epIdx]->msgIdx != -1 &&
+      CMI_ZC_MSGTYPE(UsrToEnv(deliverMsg)) == CMK_REG_NO_ZC_MSG)
+  { CkpvAccess(_nokeepMsgInFlight) = deliverMsg; CkpvAccess(_nokeepEpInFlight) = epIdx; }
+#endif
   CkInvokeEP((Chare*)obj, epIdx, deliverMsg);
+#if CMK_ERROR_CHECKING
+  CkpvAccess(_nokeepMsgInFlight) = prevNokeepMsg;
+  CkpvAccess(_nokeepEpInFlight) = prevNokeepEp;
+#endif
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -2728,12 +2770,20 @@ private:
   void flushLog(int verbose=1) {
     if (verbose) CkPrintf("[%d] flushing log\n", CkMyPe());
     fprintf(f, "%s", buffer.data());
+    fflush(f);  // make records survive a killed/hung run (the main use case)
     curpos=0;
   }
   virtual bool process(envelope **envptr,CkCoreState *ck) {
     if ((*envptr)->getEvent()) {
+      // Pack only when a CRC/checksum over the packed bytes is required.
+      // The logged header fields are all valid on an unpacked envelope, and
+      // the pack/unpack round trip swaps the envelope out from under senders
+      // that retain a pointer to it -- CkArrayBroadcaster keeps the broadcast
+      // envelope for multi-element delivery, so packing here segfaulted any
+      // program using array broadcasts under +record (issue #3940).
+      const bool needPacked = _recplay_crc || _recplay_checksum;
       bool wasPacked = (*envptr)->isPacked();
-      if (!wasPacked) CkPackMessage(envptr);
+      if (needPacked && !wasPacked) CkPackMessage(envptr);
       envelope *env = *envptr;
       unsigned int crc1=0, crc2=0;
       if (_recplay_crc) {
@@ -2745,8 +2795,11 @@ private:
         crc2 = checksum_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
       }
       curpos+=snprintf(&buffer[curpos],buffer.size() - curpos,"%d %d %d %d %x %x %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2, env->getEpIdx());
-      if (curpos > _recplay_logsize-128) flushLog();
-      if (!wasPacked) CkUnpackMessage(envptr);
+      // Quiet flush: with a small +recplay-logsize (continuous flushing, for
+      // recording runs that will be killed at a hang) the per-flush banner
+      // would flood the output.
+      if (curpos > _recplay_logsize-128) flushLog(0);
+      if (needPacked && !wasPacked) CkUnpackMessage(envptr);
     }
     return true;
   }
@@ -2806,11 +2859,22 @@ class CkMessageReplay : public CkMessageWatcher {
 	FILE *lbFile;
 	/// Read the next message we need from the file:
 	void getNext(void) {
-	  if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) CkAbort("CkMessageReplay> Syntax error reading replay file");
+	  // A truncated log (recorder killed mid-run -- the normal case when
+	  // recording a hang) is treated like the "-1 -1 -1" end sentinel: this
+	  // PE holds all further messages at the recorded frontier instead of
+	  // aborting the whole replay. An empty log (e.g. an SMP comm thread
+	  // that recorded nothing before being killed) is the same case.
+	  if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) {
+	    CkPrintf("[%d] CkMessageReplay> log ended without sentinel (truncated record?); holding all further messages\n", CkMyPe());
+	    nextPE=nextSize=nextEvent=-1;
+	    return;
+	  }
 	  if (nextSize > 0) {
 	    // We are reading a regular message
 	    if (4!=fscanf(f,"%d%x%x%d", &nexttype,&crc1,&crc2,&nextEP)) {
-	      CkAbort("CkMessageReplay> Syntax error reading replay file");
+	      CkPrintf("[%d] CkMessageReplay> log ended mid-record (truncated record?); holding all further messages\n", CkMyPe());
+	      nextPE=nextSize=nextEvent=-1;
+	      return;
 	    }
             REPLAYDEBUG("getNext: "<<nextPE<<" " << nextSize << " " << nextEvent)
 	  } else if (nextSize == -2) {
@@ -2930,8 +2994,13 @@ public:
 
 private:
 	virtual bool process(envelope **envptr,CkCoreState *ck) {
+          // Same rule as CkMessageRecorder::process (#3940): pack only when a
+          // CRC/checksum over packed bytes will be computed. The swap
+          // corrupts envelopes that other code retains a pointer to
+          // (CkArrayBroadcaster), and matching needs no packing.
+          const bool needPacked = _recplay_crc || _recplay_checksum;
           bool wasPacked = (*envptr)->isPacked();
-          if (!wasPacked) CkPackMessage(envptr);
+          if (needPacked && !wasPacked) CkPackMessage(envptr);
           envelope *env = *envptr;
 	  //CkAssert(*(int*)env == 0x34567890);
 	  REPLAYDEBUG("ProcessMessage message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent() <<" " <<env->getMsgtype() <<" " <<env->getMsgIdx() << " ep:" << env->getEpIdx());
@@ -2940,13 +3009,22 @@ private:
 			REPLAYDEBUG("Executing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
 			getNext(); /* Advance over this message */
 			flush(); /* try to process queued-up stuff */
-    			if (!wasPacked) CkUnpackMessage(envptr);
+    			if (needPacked && !wasPacked) CkUnpackMessage(envptr);
 			return true;
 		}
 #if CMK_SMP
-                else if (env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg) {
+                else if (env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg
+                         || env->getMsgtype()==BocBcastMsg || env->getMsgtype()==ArrayBcastMsg) {
                          // try next rank, we can't just buffer the msg and left
-                         // we need to keep unprocessed msg on the fly
+                         // we need to keep unprocessed msg on the fly.
+                         // BocBcastMsg/ArrayBcastMsg belong here too (#3940): they ride
+                         // the node queue and are claimed by an arbitrary rank, which
+                         // then performs the within-node fan-out with its own
+                         // srcPe/event stamps (_processBocBcastMsg ->
+                         // _sendMsgBranchWithinNode). Buffering one at the wrong rank
+                         // both strands the original and suppresses the fan-out the
+                         // other ranks' logs expect -- the replay stalls with no
+                         // diagnostic. Bouncing lets the recorded winner claim it.
                         int nextpe = CkMyPe()+1;
                         if (nextpe == CkNodeFirst(CkMyNode())+CkMyNodeSize())
                         nextpe = CkNodeFirst(CkMyNode());

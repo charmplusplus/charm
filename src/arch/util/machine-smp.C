@@ -463,9 +463,32 @@ static void CmiStartThreads(char **argv)
   int numThreads = 0;
 #endif
 
-  for (i=start; i<=end; i++) {        
+  for (i=start; i<=end; i++) {
     pthread_attr_init(&attr);
     pthread_attr_setscope(&attr, PTHREAD_SCOPE_SYSTEM);
+    {
+      // macOS gives secondary pthreads only 512 KB of stack by default, which
+      // can overflow for large stack frames, causing SIGBUS in SMP mode. Match
+      // the 8 MB main-thread default there. Other platforms inherit the system
+      // default (RLIMIT_STACK), so we leave it untouched. Tunable on any
+      // platform via the CHARM_PE_STACKSIZE env var (in bytes; 0 = leave the
+      // platform default).
+      size_t pe_stacksize = 0;
+#if defined(__APPLE__)
+      pe_stacksize = (size_t)8 * 1024 * 1024;
+#endif
+      const char *pe_stacksize_env = getenv("CHARM_PE_STACKSIZE");
+      if (pe_stacksize_env != NULL) {
+        pe_stacksize = (size_t)strtoul(pe_stacksize_env, NULL, 0);
+      }
+      if (pe_stacksize > 0) {
+        int r = pthread_attr_setstacksize(&attr, pe_stacksize);
+        if (r != 0) {
+          errno = r;
+          PerrorExit("pthread_attr_setstacksize");
+        }
+      }
+    }
     ok = pthread_create(&pid, &attr, call_startfn, (void *)i);
     if (ok!=0){
       CmiPrintf("CmiStartThreads: %s(%d)\n", strerror(errno), errno);

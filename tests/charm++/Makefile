@@ -34,6 +34,7 @@ DIRS = \
   amr_1d_random \
   amr_1d_simple \
   anytime_migration \
+  anytime_bcastred \
 
 FTDIRS = \
   jacobi3d \
@@ -48,6 +49,7 @@ NONSCALEDIRS = \
   sparse \
   charmxi_parsing \
   anytime_migration \
+  anytime_bcastred \
 
 TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
 

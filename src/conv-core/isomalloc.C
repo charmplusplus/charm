@@ -157,6 +157,11 @@ static inline void * call_mmap_fixed(void * addr, size_t len)
 {
   return VirtualAlloc(addr, len, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 }
+static inline void * call_mmap_probe(void * addr, size_t len)
+{
+  /* VirtualAlloc fails instead of replacing an existing allocation */
+  return call_mmap_fixed(addr, len);
+}
 static inline void * call_mmap_anywhere(size_t len)
 {
   return call_mmap_fixed(nullptr, len);
@@ -210,6 +215,25 @@ static inline void * call_mmap_fixed(void * addr, size_t len)
 {
   return call_mmap(addr, len, MAP_FIXED);
 }
+/**
+ * Tries to map this address without replacing an existing mapping.
+ * MAP_FIXED silently replaces whatever is mapped at addr, which destroys
+ * memory that is in use (e.g. the system allocator's heap on macOS >= 26),
+ * so it must not be used to probe whether an address is free. Callers must
+ * check that the returned address equals addr: without MAP_FIXED_NOREPLACE
+ * or MAP_EXCL the address is only a hint and the kernel returns a different
+ * address if addr is in use.
+ */
+static inline void * call_mmap_probe(void * addr, size_t len)
+{
+#if defined(MAP_FIXED_NOREPLACE)
+  return call_mmap(addr, len, MAP_FIXED_NOREPLACE);
+#elif defined(MAP_EXCL)
+  return call_mmap(addr, len, MAP_FIXED | MAP_EXCL);
+#else
+  return call_mmap(addr, len, 0);
+#endif
+}
 static inline void * call_mmap_anywhere(size_t len)
 {
   return call_mmap((void *)0, len, 0);
@@ -246,6 +270,11 @@ static constexpr void * const mmap_fail = nullptr;
 static void * call_mmap_fixed(void * addr, size_t len)
 {
   CmiAbort("isomalloc.C: mmap_fixed should never be called here.");
+  return nullptr;
+}
+static void * call_mmap_probe(void * addr, size_t len)
+{
+  CmiAbort("isomalloc.C: mmap_probe should never be called here.");
   return nullptr;
 }
 static void * call_mmap_anywhere(size_t len)
@@ -368,13 +397,18 @@ static uint8_t * get_space_partition(uint8_t * start, uint8_t * end, int myunit,
   */
 static int bad_location(uint8_t * loc)
 {
-  void * addr = call_mmap_fixed(loc, slotsize);
-  if (addr == mmap_fail || addr != loc)
+  void * addr = call_mmap_probe(loc, slotsize);
+  if (addr == mmap_fail)
   {
     DEBUG_PRINT("[%d] Skipping unmappable space at %p\n", CmiMyPe(), loc);
     return 1; /*No good*/
   }
   call_munmap(addr, slotsize);
+  if (addr != loc)
+  {
+    DEBUG_PRINT("[%d] Skipping space in use at %p\n", CmiMyPe(), loc);
+    return 1; /*No good*/
+  }
   return 0; /*This works*/
 }
 

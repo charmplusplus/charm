@@ -218,6 +218,7 @@ SumLogPool::~SumLogPool()
   delete[] epInfo;
   delete[] cpuTime;
   delete[] numExecutions;
+  delete[] msgBytes;
 }
 
 void SumLogPool::addEventType(int eventType, double time)
@@ -272,6 +273,7 @@ void SumLogPool::initMem()
 
    cpuTime = NULL;
    numExecutions = NULL;
+   msgBytes = NULL;
    if (sumDetail) {
        cpuTime = new double[poolSize*epInfoSize];
        _MEMCHECK(cpuTime);
@@ -279,6 +281,9 @@ void SumLogPool::initMem()
        numExecutions = new int[poolSize*epInfoSize];
        _MEMCHECK(numExecutions);
        memset(numExecutions, 0, poolSize*epInfoSize*sizeof(int));
+       msgBytes = new CmiUInt8[poolSize*epInfoSize];
+       _MEMCHECK(msgBytes);
+       memset(msgBytes, 0, poolSize*epInfoSize*sizeof(CmiUInt8));
 
 //         int i, e;
 //         for(i=0; i<poolSize; i++) {
@@ -453,6 +458,30 @@ void SumLogPool::write(void)
         }
         if (count > 1) fprintf(sdfp, "+%d", count);
         fprintf(sdfp, "\n");
+        // Write out msgBytes
+        // Run length encoding (RLE) along EP axis
+        fprintf(sdfp, "MsgBytesPerEPperInterval ");
+        CmiUInt8 lastBytes = getMsgBytes(0,0);
+        count=0;
+        fprintf(sdfp, "%llu", (unsigned long long)lastBytes);
+        for(e=0; e<_numEntries; e++) {
+            for(i=0; i<numBins; i++) {
+
+                CmiUInt8 u = getMsgBytes(i, e);
+                if (lastBytes == u) {
+                    count++;
+                } else {
+
+                    if (count > 1) fprintf(sdfp, "+%d", count);
+                    fprintf(sdfp, " %llu", (unsigned long long)u);
+                    lastBytes = u;
+                    count = 1;
+                }
+            }
+        }
+        if (count > 1) fprintf(sdfp, "+%d", count);
+        fprintf(sdfp, "\n");
+
         // Write out numExecutions
         // Run length encoding (RLE) along EP axis
         fprintf(sdfp, "EPCallTimePerInterval ");
@@ -525,7 +554,8 @@ void SumLogPool::setEp(int epidx, double time)
 
 // Called once from endExecute, endPack, etc. this function updates
 // the sumDetail intervals.
-void SumLogPool::updateSummaryDetail(int epIdx, double startTime, double endTime)
+void SumLogPool::updateSummaryDetail(int epIdx, double startTime, double endTime,
+                                     CmiUInt8 bytes)
 {
         if (epIdx >= epInfoSize) {
             CmiAbort("Too many entry points!!\n");
@@ -557,7 +587,10 @@ void SumLogPool::updateSummaryDetail(int epIdx, double startTime, double endTime
             CmiAbort("Error: end time of EP is less than start time\n");
         }
 
+        // startingBinIdx has been walked forward to the bin the execution ended
+        // in; count the message, and its size, where the run is counted.
         incNumExecutions(startingBinIdx, epIdx);
+        addToMsgBytes(startingBinIdx, epIdx, bytes);
 }
 
 // Shrinks pool[], cpuTime[], and numExecutions[]
@@ -576,12 +609,14 @@ void SumLogPool::shrink(void)
      for (int e=0; e < epInfoSize; e++) {
          setCPUtime(i, e, getCPUtime(i*2, e) + getCPUtime(i*2+1, e));
          setNumExecutions(i, e, getNumExecutions(i*2, e) + getNumExecutions(i*2+1, e));
+         setMsgBytes(i, e, getMsgBytes(i*2, e) + getMsgBytes(i*2+1, e));
      }
   }
   // zero out the remaining intervals
   if (sumDetail) {
     memset(&cpuTime[entries*epInfoSize], 0, (numBins-entries)*epInfoSize*sizeof(double));
     memset(&numExecutions[entries*epInfoSize], 0, (numBins-entries)*epInfoSize*sizeof(int));
+    memset(&msgBytes[entries*epInfoSize], 0, (numBins-entries)*epInfoSize*sizeof(CmiUInt8));
   }
   numBins = entries;
   CkpvAccess(binSize) *= 2;
@@ -647,6 +682,7 @@ TraceSummary::TraceSummary(char **argv):msgNum(0),binStart(0.0),idleStart(0.0),
   _logPool = new SumLogPool(CkpvAccess(traceRoot));
   // assume invalid entry point on start
   execEp=INVALIDEP;
+  execMsgBytes = 0;
   inIdle = 0;
   inExec = 0;
   depth = 0;
@@ -685,7 +721,9 @@ void TraceSummary::beginExecute(envelope *e, void *obj)
     beginExecute(-1,-1,_threadEP,-1);
   }
   else {
-    beginExecute(-1,-1,e->getEpIdx(),-1);
+    // the message length is passed on so that summary detail can record how
+    // many bytes an entry method received, not only how many messages
+    beginExecute(-1,-1,e->getEpIdx(),-1,e->getTotalsize());
   }  
 }
 
@@ -725,6 +763,7 @@ void TraceSummary::beginExecute(int event,int msgType,int ep,int srcPe, int mlen
 */
   
   execEp=ep;
+  execMsgBytes=(mlen > 0) ? (CmiUInt8)mlen : 0;
   double t = TraceTimer();
   //CmiPrintf("start: %f \n", start);
   
@@ -796,9 +835,10 @@ void TraceSummary::endExecute()
   binTime += t - ts;
 
   if (sumDetail && execEp >= 0 )
-      _logPool->updateSummaryDetail(execEp, start, t);
+      _logPool->updateSummaryDetail(execEp, start, t, execMsgBytes);
 
   execEp = INVALIDEP;
+  execMsgBytes = 0;
 }
 
 void TraceSummary::endExecute(char *msg){
