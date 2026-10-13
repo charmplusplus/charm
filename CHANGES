@@ -60,8 +60,10 @@ Known gaps in the alpha:
 - AMPI is not yet ported to reconverse; Windows multicore is not yet
   available.
 
-- CCS, CharmDebug, PythonCCS and the liveViz server are not yet
-  available on reconverse; the port is in progress.
+- CCS (and with it PythonCCS and the liveViz server) works on
+  reconverse (#4037), except CCS multicast requests, which abort
+  with a message. The CCS core moves from charm into reconverse
+  before the beta (reconverse #278). CharmDebug is not available.
 
 - MPI interoperation (user-driven interop) is not supported.
 
