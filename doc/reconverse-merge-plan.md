@@ -124,7 +124,7 @@ PEs per GPU. NVIDIA at 32 queues is unmeasured and is Anvil's to answer.
 | 17 | Investigate sanctioned **HPC-site runners** (OLCF/NCSA) for CI; until then reviewers run on machines of choice (PR template field) | |
 | 18 | 2-node InfiniBand test tier on Anvil (inside allocation, `-N 2`, `--mpi=pmi2`) | network tests need multinode jobs, not login nodes. Prerequisite found and fixed 09-01: multi-node reconverse hung in `CmiCheckAffinity` whenever physical node 0 held exactly one PE (reconverse**#212**, pinned in via **#3959**). Until then no 2-node reconverse run had ever succeeded on Anvil |
 | 19 | Record-replay follow-ups: CkExit flush hook; threaded-entry replay validation | |
-| 20 | Rename `reviewed-with-reconverse` → `main` | at NAMD + ChaNGa parity |
+| 20 | Rename `recharm` (formerly `reviewed-with-reconverse`) → `main` | at NAMD + ChaNGa parity |
 
 ## Closure guarantee (mechanical)
 
@@ -179,9 +179,13 @@ freeze tag on main. Order:
    source tarball at `archive/refs/tags/v8.1.0.tar.gz` is the download;
    no tarball is hosted on the website (Kale, 2026-10-08). The tag and
    Release happen before the announcement email, which cites them.
-4. Rename `main` -> `classic` (protection moves with it) and set the
-   DEFAULT branch to `reviewed-with-reconverse` (Kale reconfirmed the
-   rename 2026-09-30). Deliberately do NOT
+4. After the v8.1.0 tag, in one step: rename `main` -> `classic`
+   (protection moves with it), rename `reviewed-with-reconverse` ->
+   `recharm`, and set `recharm` as the DEFAULT branch (Kale reconfirmed
+   the rename 2026-09-30; name `recharm` decided 2026-10-12). The
+   reconverse workflows list both names in their branch triggers, and
+   `doc/check-migration-ledger.sh` defaults to `origin/recharm`, so that
+   change must merge before the rename. Deliberately do NOT
    rename this line to `main` yet (amendment, Kale 2026-08-28): with no
    branch named `main`, every stale consumer -- old clones pulling,
    scripts pinned to origin/main -- fails loudly ("couldn't find remote
@@ -190,11 +194,12 @@ freeze tag on main. Order:
    the ones left open move to `classic` with the branch, by decision.
 5. Announcement to users: `main` no longer exists; classic dependents
    run `git checkout classic`; new development and releases are on the
-   default branch `reviewed-with-reconverse`.
+   default branch `recharm` (formerly `reviewed-with-reconverse`).
 5a. Adopting the name `main` for this line happens later as its own
    small, announced event, once the loud-failure window has done its
-   job. Until then the reconverse workflows' branch triggers need no
-   changes, and the deleted classic ci.yaml could never have fired
+   job. At that point the reconverse workflows' branch triggers gain
+   `main` (and drop `reviewed-with-reconverse`), and the deleted classic
+   ci.yaml could never have fired
    anyway (its `branches: [main]` matches nothing here).
 6. Release: a release tag on the new main when the group deems it
    ready. Releasing does not require waiting for anything beyond this
