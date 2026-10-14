@@ -1222,6 +1222,7 @@ void InitCallTable::enumerateInitCalls()
 
 CpvCExtern(int, cpdSuspendStartup);
 void CpdFreeze(void);
+void CcsBuiltinsInit(char **argv); /* src/conv-ccs/ccs-builtins.C */
 
 extern int _dummy_dq;
 
@@ -1346,12 +1347,11 @@ void _initCharm(int unused_argc, char **argv)
   });
 
 #if CMK_RECONVERSE && CMK_CCS_AVAILABLE
-	// Reconverse's ConverseInit does not set up CCS (CCS lives in charm's
-	// src/conv-ccs, above reconverse), so every PE initializes it here,
-	// before any module registers a CCS handler. With ++server or
-	// ++server-port, PE 0 also opens the CCS server socket and polls it
-	// from a CcdPERIODIC callback.
-	CcsInit(argv);
+	// CCS itself is initialized by reconverse's ConverseInit on every PE.
+	// Charm++'s builtin CCS handlers (the CpdList introspection in
+	// src/conv-ccs/ccs-builtins.C) register here, where classic Converse's
+	// CcsInit registers them.
+	CcsBuiltinsInit(argv);
 #endif
 
 	CkpvInitialize(size_t *, _offsets);
