@@ -12,6 +12,10 @@ Charm++ is distributed from its GitHub repository. To download it, run:
 
    $ git clone https://github.com/charmplusplus/charm
 
+Reconverse, the runtime layer beneath Charm++, is a git submodule of
+this repository; the build initializes it, so nothing else needs to be
+fetched. (``git clone --recurse-submodules`` does the same up front.)
+
 
 To build Charm++, use the following commands:
 
