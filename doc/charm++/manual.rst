@@ -11694,11 +11694,8 @@ Appendix
 Installing Charm++
 ------------------
 
-Charm++ can be installed manually from the source code or using a
-precompiled binary package. We also provide a source code package for
-the *Spack* package manager. Building from the source code provides more
-flexibility, since one can choose the options as desired. However, a
-precompiled binary may be slightly easier to get running.
+Charm++ is built from source. We also provide a source code package for
+the *Spack* package manager.
 
 Manual installation
 ~~~~~~~~~~~~~~~~~~~
@@ -11706,20 +11703,10 @@ Manual installation
 Downloading Charm++
 ^^^^^^^^^^^^^^^^^^^
 
-Charm++ can be downloaded using one of the following methods:
-
--  From the Charm++ website - The current stable version (source code and
-   binaries) can be downloaded from our website at
-   *https://charm.cs.illinois.edu/software*.
-
--  From source archive - The latest development version of Charm++ can
-   be downloaded from our source archive using *git clone
-   https://github.com/charmplusplus/charm*.
-
-If you download the source code from the website, you will have to
-unpack it using a tool capable of extracting gzip’d tar files, such as
-tar (on Unix) or WinZIP (under Windows). Charm++ will be extracted to a
-directory called ``charm``.
+Charm++ is distributed from its GitHub repository,
+https://github.com/charmplusplus/charm. Clone it with ``git clone
+https://github.com/charmplusplus/charm``; the checkout is a directory
+called ``charm``. Releases are tagged in the same repository.
 
 .. _sec:manualinstall:
 
@@ -11800,10 +11787,6 @@ appropriate choices for the build one wants to perform.
    Cray XC40                                                        ``./build charm++ gni-crayxc --with-production -j8``
    Cray Shasta                                                      ``./build charm++ ofi-crayshasta --with-production -j8``
    ================================================================ =====================================================================
-
-As mentioned earlier, one can also build Charm++ using the precompiled
-binary in a manner similar to what is used for installing any common
-software.
 
 When a Charm++ build folder has already been generated, it is possible
 to perform incremental rebuilds by invoking ``make`` from the ``tmp``

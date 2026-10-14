@@ -6,14 +6,7 @@ This section gives a concise overview of running your first Charm++ application.
 Installing Charm++
 ------------------
 
-To download the latest Charm++ release, run:
-
-.. code-block:: console
-
-   $ wget https://charm.cs.illinois.edu/distrib/charm-latest.tar.gz
-   $ tar xzf charm-latest.tar.gz
-
-To download the development version of Charm++, run:
+Charm++ is distributed from its GitHub repository. To download it, run:
 
 .. code-block:: console
 
