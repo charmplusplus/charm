@@ -18,12 +18,12 @@ To build Charm++, use the following commands:
 .. code-block:: console
 
    $ cd charm
-   $ ./build charm++ netlrts-linux-x86_64 --with-production -j4
+   $ ./build charm++ reconverse-linux-x86_64 --with-production -j4
 
-This is the recommended version to install Charm++ on Linux systems.
-For macOS, substitute "linux" with "darwin", and on ARM64 machines,
-replace "x86_64" with "arm8". For advanced compilation options,
-please see Section :numref:`sec:install` of the manual.
+This is the recommended build on Linux systems. On ARM64 machines,
+replace "x86_64" with "arm8"; on macOS, use ``reconverse-darwin-arm8``.
+For advanced compilation options, please see Section
+:numref:`sec:install` of the manual.
 
 
 Parallel "Hello World" with Charm++
@@ -143,23 +143,20 @@ Section :numref:`sec:compile` for more information about ``charmc``.
 Running the Example
 '''''''''''''''''''
 
-Charm++ applications are started via ``charmrun``,
-which is automatically created by the ``charmc`` command above.
-Please see Section :numref:`sec:run` for more information about ``charmrun``.
+A Charm++ application is an ordinary executable. The number of
+processing elements (PEs) it runs on is given on its command line with
+``+pe``. Please see Section :numref:`sec:reconverseinstall` of the
+manual for running on more than one process or node.
 
-To run the application on two processors, use the following command:
+To run the application on two PEs, use the following command:
 
 .. code-block:: console
 
-   $ ./charmrun +p2 ./hello
-   Charmrun> scalable start enabled.
-   Charmrun> started all node programs in 1.996 seconds.
-   Charm++> Running in non-SMP mode: 1 processes (PEs)
-   Converse/Charm++ Commit ID: v6.9.0-172-gd31997cce
-   Charm++> scheduler running in netpoll mode.
+   $ ./hello +pe 2
+   Reconverse> Starting Reconverse with 1 process, 2 PEs (1 PE = 1 thread), and 2 PEs per process
    CharmLB> Load balancer assumes all CPUs are same.
-   Charm++> Running on 1 hosts (1 sockets x 4 cores x 2 PUs = 8-way SMP)
-   Charm++> cpu topology info is gathered in 0.000 seconds.
+   Charm++> cpu topology info is gathered in 0.002 seconds.
+   CharmLB> Load balancing instrumentation for communication is off.
    Running Hello on 2 processors with 8 elements.
    PE 0 says: Hello world from element 0.
    PE 0 says: Hello world from element 1.
@@ -169,8 +166,7 @@ To run the application on two processors, use the following command:
    PE 1 says: Hello world from element 5.
    PE 1 says: Hello world from element 6.
    PE 1 says: Hello world from element 7.
-   All done
-   [Partition 0][Node 0] End of program
+   All done.
 
 
 Where to go From Here
