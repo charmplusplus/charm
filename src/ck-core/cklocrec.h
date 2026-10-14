@@ -17,15 +17,15 @@ private:
   CmiUInt8 id;
   bool *deletedMarker; /// Set this if we're deleted during processing
   bool running; /// True when inside a startTiming/stopTiming pair
+  CkSyncBarrier* syncBarrier;
+  LDObjHandle ldHandle;
 #if CMK_LBDB_ON
   bool  asyncMigrate;  /// if readyMove is inited
   bool  readyMigrate;    /// status whether it is ready to migrate
   bool  enable_measure;
   int  nextPe;              /// next migration dest processor
-  CkSyncBarrier* syncBarrier;
   LBManager *lbmgr;
   MetaBalancer *the_metalb;
-  LDObjHandle ldHandle;
 #endif
 
 public:
@@ -63,7 +63,6 @@ public:
 public:
   inline LBManager *getLBMgr(void) const {return lbmgr;}
   inline MetaBalancer *getMetaBalancer(void) const {return the_metalb;}
-  inline const LDObjHandle& getLdHandle() const{ return ldHandle; }
   static void staticMigrate(LDObjHandle h, int dest);
   static void staticMetaLBResumeWaitingChares(LDObjHandle h, int lb_ideal_period);
   static void staticMetaLBCallLBOnChares(LDObjHandle h);
@@ -80,6 +79,7 @@ public:
 #else
   void AsyncMigrate(bool use){};
 #endif
+  inline const LDObjHandle& getLdHandle() const{ return ldHandle; }
 };
 
 #endif // CK_LOC_REC_H
