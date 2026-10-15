@@ -18,11 +18,6 @@ void handler(char *msg)
 void user_main(int argc, char **argv)
 {
   int i;
-#if CMK_RECONVERSE
-  // Reconverse's ConverseInit does not initialize CCS; a pure Converse
-  // program does it itself before registering handlers.
-  CcsInit(argv);
-#endif
   CcsRegisterHandler("ping2", (CmiHandler)handler);
   CcsRegisterHandler("ping", (CmiHandler)handler);
   CmiPrintf("CCS Handlers registered.  Waiting for net requests...\n");

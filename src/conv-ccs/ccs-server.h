@@ -20,7 +20,6 @@ the reply socket is for the original machine).
 #ifndef CCS_SERVER_H
 #define CCS_SERVER_H
 
-#include "conv-autoconfig.h" /* for CMK_CCS_AVAILABLE */
 #include "sockRoutines.h"
 
 #ifdef __cplusplus
