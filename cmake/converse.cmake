@@ -364,6 +364,10 @@ if(RECONVERSE)
     # conv-autoconfig.h. memory-isomalloc.h and cmitls.h include it.
     list(REMOVE_ITEM conv-core-h-to-install src/conv-core/conv-config.h)
     list(APPEND conv-core-h-to-install src/conv-core/reconverse-compat/conv-config.h)
+    # Classic Converse thread-migration API that reconverse lacks; TCharm and
+    # AMPI include it, and libmoduletcharm carries the definitions
+    # (src/conv-core/reconverse-compat/reconverse-compat.C).
+    list(APPEND conv-core-h-to-install src/conv-core/reconverse-compat/reconverse-compat.h)
 endif()
 
 # The CCS headers: classic installs its own; reconverse builds get
