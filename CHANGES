@@ -34,6 +34,9 @@ Runtime:
 - +glibc_tuned_malloc: opt-in glibc malloc tuning for processes with
   many PEs, Linux only (reconverse #275).
 
+- Scheduler order: a PE takes node-level work before its own queued
+  work, the order classic used (reconverse #268, #274).
+
 - GPU support on reconverse: portable HAPI core (#3951),
   device-to-device communication (#3955), device zerocopy with
   register-once buffers (#3960, #3961), GPU-aware load balancer (#3968).
