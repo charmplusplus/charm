@@ -1077,8 +1077,9 @@ endforeach()
 configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 
 
-# TCharm (not yet ported to reconverse builds)
-if(NOT RECONVERSE)
+# TCharm. On reconverse, TCharm threads do not migrate: libmoduletcharm also
+# carries the stubs for the Converse migration API that reconverse lacks
+# (src/conv-core/reconverse-compat), and TCharm runs as with +tcharm_nomig.
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
 set(tcharm-h-sources
     src/libs/ck-libs/tcharm/tcharm.h
@@ -1091,7 +1092,11 @@ if(CMK_CAN_LINK_FORTRAN)
         src/libs/ck-libs/tcharm/tcharmf.h
     )
 endif()
-add_library(moduletcharm src/libs/ck-libs/tcharm/tcharm.C ${tcharm-h-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h)
+set(tcharm-cxx-sources src/libs/ck-libs/tcharm/tcharm.C)
+if(RECONVERSE)
+    list(APPEND tcharm-cxx-sources src/conv-core/reconverse-compat/reconverse-compat.C)
+endif()
+add_library(moduletcharm ${tcharm-cxx-sources} ${tcharm-h-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h)
 add_library(moduletcharmmain src/libs/ck-libs/tcharm/tcharmmain.C ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
 add_library(tcharm-compat ${tcharm-c-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
 
@@ -1106,7 +1111,6 @@ endforeach(f)
 add_dependencies(moduletcharmmain ck)
 add_dependencies(moduletcharm ck)
 add_dependencies(tcharm-compat ck)
-endif()
 
 if(${TARGET} STREQUAL "AMPI" OR (${TARGET} STREQUAL "LIBS" AND NOT BUILD_CHANGA))
   add_subdirectory(src/libs/ck-libs/ampi)
