@@ -15,7 +15,9 @@
 #include "debug-conv++.h"
 #include "conv-ccs.h"
 #include "sockRoutines.h"
+#if !CMK_RECONVERSE /* reconverse declares its queue API in converse.h */
 #include "queueing.h"
+#endif
 #include "ccs-builtins.h"
 
 #ifdef __MINGW_H

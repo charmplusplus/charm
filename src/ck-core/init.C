@@ -1231,6 +1231,7 @@ void InitCallTable::enumerateInitCalls()
 
 CpvCExtern(int, cpdSuspendStartup);
 void CpdFreeze(void);
+void CcsBuiltinsInit(char **argv); /* src/conv-ccs/ccs-builtins.C */
 
 extern int _dummy_dq;
 
@@ -1353,6 +1354,14 @@ void _initCharm(int unused_argc, char **argv)
       CkAbort("Unhandled C++ exception in user code.\n");
     }
   });
+
+#if CMK_RECONVERSE && CMK_CCS_AVAILABLE
+	// CCS itself is initialized by reconverse's ConverseInit on every PE.
+	// Charm++'s builtin CCS handlers (the CpdList introspection in
+	// src/conv-ccs/ccs-builtins.C) register here, where classic Converse's
+	// CcsInit registers them.
+	CcsBuiltinsInit(argv);
+#endif
 
 	CkpvInitialize(size_t *, _offsets);
 #if CMK_ERROR_CHECKING

@@ -140,12 +140,21 @@ set(conv-util-h-sources
 )
 
 if(RECONVERSE)
-  # Reconverse builds: no mempool/sockRoutines (machine-layer helpers the
-  # reconverse comm backend replaces) and no persist-comm (reconverse
-  # implements persistent communication itself; the legacy machine-layer
-  # implementation needs machine-persistent.h and would collide with
-  # libreconverse's entry points). conv-perf and TopoManager ride along here
-  # because there is no classic converse library to hold them.
+  # debug-conv++.C (the CpdList accessors behind the ccs_list_* builtins) and
+  # ccs-builtins.C (those builtins) compile from copies: in their source
+  # directories their #include "converse.h" / "conv-ccs.h" would find the
+  # classic headers next to them instead of reconverse's.
+  configure_file(src/conv-core/debug-conv++.C
+      ${CMAKE_BINARY_DIR}/src/conv-core/debug-conv++.C COPYONLY)
+  configure_file(src/conv-ccs/ccs-builtins.C
+      ${CMAKE_BINARY_DIR}/src/conv-ccs/ccs-builtins.C COPYONLY)
+  # Reconverse builds: no mempool (a machine-layer helper the reconverse
+  # comm backend replaces), no persist-comm (reconverse implements
+  # persistent communication itself; the legacy machine-layer implementation
+  # needs machine-persistent.h and would collide with libreconverse's entry
+  # points), and no CCS core or sockRoutines (libreconverse has them; only
+  # the Charm++ CCS builtins stay here). conv-perf and TopoManager ride
+  # along here because there is no classic converse library to hold them.
   set(conv-util-cxx-sources
       ${CMAKE_BINARY_DIR}/include/commitid.C
       src/util/cmirdmautils.C
@@ -166,6 +175,8 @@ if(RECONVERSE)
       src/util/topomanager/TopoManager.C
       src/util/spanningTree.C
       ${conv-perf-cxx-sources}
+      ${CMAKE_BINARY_DIR}/src/conv-ccs/ccs-builtins.C
+      ${CMAKE_BINARY_DIR}/src/conv-core/debug-conv++.C
   )
 else()
   # Classic builds: exactly mainline's list; these compile into libconverse.
@@ -285,8 +296,10 @@ if(RECONVERSE)
       src/util/topomanager
       ${CMAKE_BINARY_DIR}/include)
 
+  # ccs-client (the library a CCS client program links) is reconverse's
+  # target; it lands in lib/ with the other archives.
   add_custom_target(converse)
-  add_dependencies(converse reconverse topomanager charm_cxx_utils)
+  add_dependencies(converse reconverse topomanager charm_cxx_utils ccs-client)
 else()
   # Classic builds: the converse library, exactly as mainline builds it.
   add_library(converse
@@ -347,9 +360,17 @@ if(RECONVERSE)
     list(REMOVE_ITEM conv-core-h-to-install src/conv-core/taskqueue.h)
 endif()
 
+# The CCS headers: classic installs its own; reconverse builds get
+# reconverse's conv-ccs.h, ccs-server.h, ccs-auth.h, sockRoutines.h and
+# ccs-client.h from cmake/reconverse, and only ccs-builtins.h from here.
+set(conv-ccs-h-to-install ${conv-ccs-h-sources})
+if(RECONVERSE)
+    set(conv-ccs-h-to-install src/conv-ccs/ccs-builtins.h)
+endif()
+
 foreach(filename
     ${conv-core-h-to-install}
-    ${conv-ccs-h-sources}
+    ${conv-ccs-h-to-install}
     ${conv-perf-h-sources}
     ${conv-util-h-sources}
     ${conv-ldb-h-sources}

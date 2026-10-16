@@ -20,7 +20,7 @@ name: reconverse-cuda
 
 on:
   push:
-    branches: [reviewed-with-reconverse, objid-redesign]
+    branches: [reviewed-with-reconverse, recharm, objid-redesign]
     paths:
       - 'src/arch/cuda/**'
       # NOT 'tests/charm++/cuda/**' or 'examples/charm++/cuda/**': in GitHub's
@@ -56,7 +56,7 @@ on:
       - '.github/workflows/reconverse-cuda.yaml'
   pull_request:
     # objid-pr*: the PRs stacked on objid-redesign (their base is the previous PR's branch)
-    branches: [reviewed-with-reconverse, objid-redesign, 'objid-pr*']
+    branches: [reviewed-with-reconverse, recharm, objid-redesign, 'objid-pr*']
     paths:
       - 'src/arch/cuda/**'
       # NOT 'tests/charm++/cuda/**' or 'examples/charm++/cuda/**': in GitHub's

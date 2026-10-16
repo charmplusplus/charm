@@ -98,3 +98,9 @@ configure_file(${_reconverse_src}/include/persistent.h ${CMAKE_BINARY_DIR}/inclu
 # that this copy does not include converse.h itself, so anything including it
 # directly has to include converse.h first.
 configure_file(${_reconverse_src}/include/taskqueue.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+# CCS lives in libreconverse: the server-side API (conv-ccs.h and what it
+# includes) and the client-side header for programs linking ccs-client.
+# cmake/converse.cmake keeps the classic copies out of the include tree.
+foreach(_h conv-ccs.h ccs-server.h ccs-auth.h sockRoutines.h ccs-client.h)
+  configure_file(${_reconverse_src}/include/${_h} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
+endforeach()

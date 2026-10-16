@@ -4,10 +4,9 @@ Building and Running AMPI Programs
 Installing AMPI
 ---------------
 
-AMPI is included in the source distribution of Charm++. To get the
-latest sources from PPL, visit: https://charm.cs.illinois.edu/software
-
-and follow the download links. Then build Charm++ and AMPI from source.
+AMPI is included in the source distribution of Charm++, which is at
+https://github.com/charmplusplus/charm. Clone it, then build Charm++ and
+AMPI from source.
 
 The build script for Charm++ is called ``build``. The syntax for this
 script is:

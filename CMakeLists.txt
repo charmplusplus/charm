@@ -28,7 +28,7 @@ if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.17)
 endif()
 
 # Fortran is optional, so don't include it in LANGUAGES here
-project(Charm++ LANGUAGES CXX C ASM VERSION 8.0.1)
+project(Charm++ LANGUAGES CXX C ASM VERSION 9.0.0)
 
 find_package(Threads)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
@@ -281,6 +281,10 @@ if(${RECONVERSE})
   set(CMK_RECONVERSE 1)
 else()
   set(CMK_RECONVERSE 0)
+endif()
+
+if(RECONVERSE AND RANDOMIZED_MSGQ)
+  message(FATAL_ERROR "--enable-randomized-msgq is a classic Converse build option and does nothing on reconverse. Reconverse randomizes at run time instead: run the program with +randomized_msgq (and +randomized_seed <N> to repeat the draws).")
 endif()
 
 if(${AMPI_MPICH_TESTS})
