@@ -61,6 +61,13 @@ void CmiPrintStackTrace(int nSkip)
 #endif
 }
 
+CmmTable CmmPup(pup_er p, CmmTable t, CmmPupMessageFn msgpup)
+{
+  CmiAbort("CmmPup: packing a message table (migration or checkpointing of "
+           "a TCharm client) is not supported on reconverse.\n");
+  return t;
+}
+
 /* Isomalloc: every context is the null context; memory comes from the
    ordinary heap and does not migrate. */
 

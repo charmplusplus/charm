@@ -18,6 +18,7 @@
       nothing.
     - CthStackOffset and CthPointer are the identity on addresses, which is
       correct for a thread whose stack never moves.
+    - CmmPup aborts (see below).
 
   The four declarations at the end are functions libreconverse defines (with
   C++ linkage) but its converse.h does not declare.
@@ -28,6 +29,7 @@
 #define RECONVERSE_COMPAT_H
 
 #include <stddef.h>
+#include "pup_c.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,6 +59,12 @@ void CthInterceptionsDeactivatePush(CthThread th);
 void CthInterceptionsDeactivatePop(CthThread th);
 int  CthInterceptionsTemporarilyActivateStart(CthThread th);
 void CthInterceptionsTemporarilyActivateEnd(CthThread th, int old);
+
+/* Reconverse's message manager (CmmTable) has no pup routine. CmmPup aborts:
+   its only callers pack a TCharm client's pending messages for migration or
+   checkpointing, which TCharm does not support on reconverse. */
+typedef void (*CmmPupMessageFn)(pup_er p, void **msg);
+CmmTable CmmPup(pup_er p, CmmTable t, CmmPupMessageFn msgpup);
 
 #ifdef __cplusplus
 }
