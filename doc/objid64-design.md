@@ -80,10 +80,14 @@ creates arrays in a loop reaches 4,096 after ~1,500 arrays; the existing abort i
 ObjID constructor (objid.h:56) names the flag. Recycling CkGroupID is a separate
 improvement (to file).
 
-AMPI (when supported): --ampi-only currently sets C = 29 (buildcmake:619). With
-C = 24: payload 37; AMPI's own rank arrays are 1D bounded, hence packed-kind, so
-the hashed kind is unused by AMPI itself, and U = 37 - H still leaves a usable
-unique space at any scale. Decide the exact C when AMPI lands.
+AMPI (when supported): --ampi-only currently sets C = 29 (buildcmake:619).
+Corrected 2026-10-15: AMPI's arrays are NOT bounded today (no setBounds anywhere in
+ampi.C or tcharm.C; createNewChildAmpiSync uses setNumInitial(0)), so under this
+design every AMPI array is hashed-kind, and a C = 29 build has a 32-bit payload that
+fails the U >= 16 startup check beyond 8,192 processes. Decided 2026-10-16
+(section 12): AMPI arrays get bounds, and a tag-marked wide-collection kind (tag
+001, 24 collection bits, 37 payload bits, opt-in per array) replaces the C = 29
+build; it lands as objid PR 1d.
 
 ObjID API: getCollectionID() unchanged in meaning; getElementID() returns the
 49-bit payload (this is what CkArrayMessage::array_element_id() and the location
@@ -418,6 +422,11 @@ reason (it carries the LB handle and timing state that only the owning PE uses).
 
 ### 7.2 The shared table
 
+Follow-up filed as charm #4040 (2026-10-13): a per-array "full-length" hashed kind
+(49 unique bits, no home key, id home = hash(id), index home holding only the
+index -> id binding) is a split of this table into an index table and an id table,
+and lands with or after PR 3, not before.
+
 One object per process per CkLocMgr, reached through a CksvAccess map keyed by
 locmgr gid. Created by whichever rank constructs its CkLocMgr branch first
 (double-checked under a CmiNodeLock, since group creation runs on all ranks
@@ -702,3 +711,151 @@ Q4 (withdrawn 2026-09-29 22:26.) The question asked about ids stored across LB
    in application state needs auditing.
 Q5 Is rank 0 of the home process as the interim directory PE (PR 1) acceptable for
    his runs, or does he need PR 3 before the AMR work can use this?
+
+## 12. Wide-collection kind: collection capacity for AMPI and other many-array users
+
+Status: decided 2026-10-16 (Kale), design only, no code yet. Lands as objid PR 1d
+after PR 1 (#4015) merges, or inside PR 3 if 1d would otherwise wait on it. The
+AMPI-side items (12.5) are scheduled by Kale with the AMPI regression work, not here.
+
+### 12.1 Facts the design rests on
+
+1. The COLLECTION field holds the CkGroupID index of the array's CkLocMgr
+   (cklocation.C:99 names it locMgrGid). It is the ordinary group id: one counter
+   on PE 0 (`_numGroups`, ck.C:993) shared by every group and every array, and
+   arrays are always created on PE 0 (CkCreateArray asserts CkMyPe() == 0,
+   ckarray.C:649; ckNew from another PE is forwarded). Each array consumes about
+   three ids (CkArray, CkLocMgr, CkLocCache; map and mcast managers when made), so
+   C = 12 is ~1,300 arrays, not 4,096.
+2. Only the id's owner decodes the collection field from the id. Delivery never
+   does: the envelope carries the CkArray gid separately (`getArrayMgr()`, used in
+   ck.C:1336 and cklocation.C:1620), and the location tables key on the payload.
+   The decoders are UpdateLocation under CMK_GLOBAL_LOCATION_UPDATE
+   (cklocation.C:99), the LB migration records, and checkpoint restore. A change
+   to how the collection field is read therefore costs nothing on the send or
+   receive path.
+3. AMPI creates one chare array per communicator, and per-rank communicators are
+   inherent in MPI, not an artifact of one call site: MPI_COMM_SELF (createCommSelf,
+   ampi.C:1164, one array per rank via MPI_Comm_split with color = own rank),
+   MPI_Comm_dup of SELF (PETSc does one per rank in PetscInitialize), the
+   communicators behind neighborhood collectives and Cartesian/graph topologies,
+   and user splits with many colors. V virtual ranks therefore cost O(V)
+   collections, times the number of such communicators per rank. Special-casing
+   any one of them on the AMPI side does not change the order (Kale, 2026-10-16),
+   so the runtime must hold millions of collections, and the current answer, the
+   --ampi-only build with C = 29, is a per-build layout that nothing else uses.
+4. AMPI's arrays carry no bounds: no setBounds call exists in ampi.C or tcharm.C,
+   and createNewChildAmpiSync (ampi.C:2258) uses setNumInitial(0). Under this
+   design they are all hashed-kind. Whatever the collection width, that is wrong
+   for them: with 37 payload bits (12.2) the hashed kind leaves U = 37 - H unique
+   bits, 20 at 8,192 processes, and the startup check (section 3.1) would fail
+   first at Frontier scale. Their index is a rank in the parent communicator, so
+   bounds = communicator size always holds; see 12.5.
+5. The three TYPE_TAG bits are free (section 1). #4040's full-length kind needs no
+   tag (its kind is known from the collection, like the hashed kind). A tag is only
+   needed where the decoder must know something BEFORE it can look the collection
+   up, which is exactly the case for a per-array collection width.
+6. Charm++ sections (cksection.h, CkMulticast) are the runtime's own subset
+   mechanism and consume no collection ids: a section is identified by the array's
+   gid plus a cookie (creator PE, pointer to that PE's mCastEntry, reduction
+   number) and carries an explicit element-index list; it exists for multicast and
+   reduction only and is delivered by delegation, not by element id. So a section
+   is what an MPI communicator's collective side maps to, but not its point-to-point
+   side (a rank in a communicator is a different array element today). AMPI could
+   in principle represent communicators as sections over one world array, which
+   would remove the O(V) arrays; that is an AMPI redesign and is not pursued. The
+   wide kind is cheaper and is useful to any library that makes many small arrays.
+
+### 12.2 The layout: a tag-marked wide-collection kind
+
+Per array, chosen at creation by `CkArrayOptions::setWideCollection()`:
+
+    tag 000 (standard)   bit 60..49 COLLECTION C = 12     bit 48..0  PAYLOAD 49
+    tag 001 (wide)       bit 60..37 COLLECTION W = 24     bit 36..0  PAYLOAD 37
+
+The standard layout is bit-identical to today's, so existing ids and 9.0-beta
+checkpoints are untouched, and an application that never opts in sees no change.
+The wide layout is for arrays that are many and small. Its 37-bit payload covers
+the packed kind up to 2^37 elements, which includes any world-size array; for the
+hashed kind it leaves too few unique bits at scale (12.1 item 4), so the wide kind
+REQUIRES bounds and aborts at creation without them, with a message naming
+setBounds. W = 24 is 16.7 million collections: a million ranks with 16
+per-rank communicators each. The practical ceiling is lower and is not the id:
+every array still instantiates a CkLocMgr and CkArray branch on every PE, so a
+million arrays cost on the order of a gigabyte per PE. That cost exists today in
+AMPI and is independent of this design.
+
+Decode: `getCollectionID()` reads the tag, then shifts by 49 or 37; one predictable
+branch at the decode sites of 12.1 item 2. The hashed kind's per-collection
+state (section 3) and the packed compressor read the payload width from the
+CkLocMgr, which knows its own kind, so they do not need the tag.
+
+Tag values used: 1 of 8; #4040 needs none. Interaction with #4040: orthogonal. Wide
+is a collection-field property; the payload kind (packed, hashed, full-length)
+stays a collection property. Wide + full-length would mean 37 unique bits; the
+option rejects the combination.
+
+### 12.3 Collection numbers instead of group ids
+
+With the wide kind the field no longer holds a CkGroupID index. It holds a dense
+"collection number" assigned on PE 0 in CkCreateArray (ckarray.C:647), from two
+counters: standard numbers in [1, 2^12) and wide numbers in [2^12, 2^24), so a
+program that makes 100,000 wide arrays never pushes a standard array past 4,095.
+The number travels in the CkLocMgr constructor message and is registered in every
+PE's vector of CkLocMgr pointers when the branch is created; the decoders of 12.1
+item 2 index that vector instead of the group hash table, which is faster than
+today. Group ids are still consumed by every array as before, but cap nothing.
+
+Standard arrays gain from this alone: the field counts arrays, not groups, so
+C = 12 holds 4,096 arrays (3x today) with no layout change. This part belongs in
+PR 3's rewrite of the per-PE tables (section 7.1) if 1d has not landed first.
+
+### 12.4 Opt-in, with a creation-time suggestion
+
+Wide is opt-in (Kale, 2026-10-16): automatic selection would change the ids of
+every existing bounded array and the checkpoint format for every application, for
+a problem only many-array libraries have. The runtime points the user at it:
+
+- When the standard counter passes half its range (2,048 arrays), PE 0 prints
+  once: "N chare arrays created; a program that creates many small bounded arrays
+  can use CkArrayOptions::setWideCollection() (16.7 million collections) instead
+  of rebuilding with -DCMK_OBJID_COLLECTION_BITS". Printed once per run, not per
+  array, so it costs nothing in the common case.
+- At 4,096 the existing abort in objid.h names the same option, replacing its
+  current advice to rebuild with a larger C.
+- Creating a wide array without bounds aborts with the setBounds message (12.2).
+
+### 12.5 AMPI side
+
+1. Bounds on every AMPI array (mandatory): `opts.setBounds(CkArrayIndex1D(size))`
+   in createNewChildAmpiSync and in the world/parent creation in ampiInit, size =
+   the communicator's rank count. A dozen lines. Makes AMPI arrays packed-kind and
+   retires the hashed-kind startup check and tranche machinery for them.
+2. `opts.setWideCollection()` at the same call sites.
+3. Drop the `-DCMK_OBJID_COLLECTION_BITS=29` line from buildcmake's --ampi-only
+   block once 1 + 2 are in; the special build is then unnecessary.
+
+Scheduling is Kale's, alongside the AMPI regression work; items 1 and 2 are
+independent of each other in the sense that 1 is correct and useful on its own,
+while 2 needs PR 1d. This session does not edit src/libs/ck-libs/ampi or buildcmake.
+
+### 12.6 Checkpoint and restart
+
+CkLocMgr pups its kind flag and collection number next to `bounds`
+(cklocation.C:2616); stored ids carry the tag, so restore decodes them with the
+right width as long as the restoring build has the same W. pupLayout
+(cklocation.C:2363) gains W next to C, so a mismatch is a clear abort, not a
+misdecode. Restore re-registers each CkLocMgr under its stored number, so the
+vectors of 12.3 are rebuilt exactly; shrink/expand (section 6) is unaffected
+because the number is per collection, not per PE.
+
+### 12.7 Scope of PR 1d
+
+objid.h (two layouts, tag-aware accessors, the constructor takes a kind and a
+number instead of a gid); the ~10 `ck::ObjID(gid, eid)` construction sites in
+cklocation.h/.C; the collection-number counters and per-PE vector; CkArrayOptions
+(setWideCollection, pup) and the CkLocMgr constructor message and pup; the
+creation-time message and the two aborts; a tests/charm++/objid_wide test (100k
+wide arrays and a few standard ones, ids decode, insertion, migration under
++balancer, checkpoint and restart, the two aborts); design sections 1 and 2
+updated for the second layout. Two to three days.
