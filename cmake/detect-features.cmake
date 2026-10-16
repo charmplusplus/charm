@@ -127,6 +127,12 @@ elseif(CMK_HAS_ELF_H AND (CHARM_CPU STREQUAL "i386" OR CHARM_CPU STREQUAL "x86_6
 else()
   set(CMK_SUPPORTS_TLSGLOBALS 0)
 endif()
+if(RECONVERSE)
+  # -tlsglobals needs the runtime to switch the TLS segment between user-level
+  # threads, which reconverse does not do; the compile flags alone would build
+  # programs whose AMPI ranks share their "privatized" globals.
+  set(CMK_SUPPORTS_TLSGLOBALS 0)
+endif()
 
 if(CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY AND CMK_CAN_GET_BINARY_PATH)
   set(CMK_SUPPORTS_FSGLOBALS 1)

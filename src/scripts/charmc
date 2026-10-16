@@ -1565,6 +1565,21 @@ else
 	BAL_OBJ=("-lldb-$BALANCE" -lconverse)
 fi
 
+# Reconverse links no memory or thread library: libreconverse uses the OS
+# allocator, has one user-level thread implementation, and has no isomalloc
+# (so no thread migration). Say so rather than drop the request silently.
+if [[ "$CMK_RECONVERSE" = "1" ]]
+then
+  if [[ "$MEMORY" != 'default' ]]
+  then
+    Warning "Warning: -memory $MEMORY is ignored on reconverse, which uses the OS allocator and has no isomalloc (thread migration is not available)."
+  fi
+  if [[ "$THREAD" != 'default' ]]
+  then
+    Warning "Warning: -thread $THREAD is ignored on reconverse, which has a single user-level thread implementation."
+  fi
+fi
+
 # Check for valid choice of MEMORY
 
 # Set the default expansions of unprefixed variants
