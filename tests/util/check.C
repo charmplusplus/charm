@@ -40,8 +40,10 @@ void check_test(int argc, char** argv) {
   CmiUInt2 uint2;
   CmiUInt4 uint4;
   CmiUInt8 uint8;
+#if !CMK_RECONVERSE /* reconverse's converse.h has no CmiFloat4/CmiFloat8 */
   CmiFloat4 float4;
   CmiFloat8 float8;
+#endif
 
   if (CmiMyPe()!=0) return;
 
@@ -78,6 +80,7 @@ void check_test(int argc, char** argv) {
     exit(1);
   }
 
+#if !CMK_RECONVERSE
   if (sizeof(float4) != 4) {
     CmiPrintf("Error: sizeof(CmiFloat4) is %zu!\n",sizeof(float4));
     exit(1);
@@ -86,6 +89,7 @@ void check_test(int argc, char** argv) {
     CmiPrintf("Error: sizeof(CmiFloat8) is %zu!\n",sizeof(float8));
     exit(1);
   }
+#endif
 
   // Test for changes in CkEnvelopeType
   // If the test below fails, it means the CkEnvelopeType enum was modified.
