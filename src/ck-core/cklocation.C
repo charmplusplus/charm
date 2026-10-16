@@ -2458,6 +2458,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
   DEBC((AA "Creating new location manager %d\n" AB, thisgroup.idx));
 
   duringMigration = false;
+  duringDestruction = false;
 
   // Register with the map object
   mapID = opts.getMap();
@@ -2507,6 +2508,7 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
     : IrrGroup(m), thisProxy(thisgroup), thislocalproxy(thisgroup, CkMyPe())
 {
   duringMigration = false;
+  duringDestruction = false;
 }
 
 CkLocMgr::~CkLocMgr()
