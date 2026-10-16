@@ -1,6 +1,5 @@
 DIRS = \
   pingpong \
-  queueperf \
   xcastredn \
   migrate \
   taskSpawn \
@@ -13,7 +12,6 @@ TESTDIRS = $(DIRS)
 
 NONSCALEDIRS = \
   pingpong \
-  queueperf \
   migrate \
 
 TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
