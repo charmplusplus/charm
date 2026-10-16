@@ -365,8 +365,12 @@ class Prober : public CBase_Prober
         const CmiUInt8 key = ck::objid::indexHashKey(idx);
         if (key != (id >> l.uniqueBits)) failHere(e, "indexHashKey != id >> uniqueBits", key, id >> l.uniqueBits);
         if (key >> l.keyBits) failHere(e, "indexHashKey has more than keyBits bits", key, l.keyBits);
-        const int expect = CkNodeFirst((int)(key % (CmiUInt8)CkNumNodes()));
-        if (hm->homePe(id) != expect) failHere(e, "homePe(id) != CkNodeFirst(key % nodes)", hm->homePe(id), expect);
+        // The home process is key % nodes; the rank within it is the quotient mod the
+        // node size (design 3.3), so homes spread over a process's PEs.
+        const CmiUInt8 nodes = (CmiUInt8)CkNumNodes();
+        const int node = (int)(key % nodes);
+        const int expect = CkNodeFirst(node) + (int)((key / nodes) % (CmiUInt8)CkNodeSize(node));
+        if (hm->homePe(id) != expect) failHere(e, "homePe(id) != CkNodeFirst(key % nodes) + (key / nodes) % nodeSize", hm->homePe(id), expect);
       }
     }
     if (bad)

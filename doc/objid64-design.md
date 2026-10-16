@@ -234,14 +234,23 @@ is a pure function of the index and returns < 2^H.
     homeProc(id)  = ObjID::hashKey(payload) % CkNumNodes()
     homeProc(idx) = indexHashKey(idx)        % CkNumNodes()      // identical by construction
     PR 1 directory PE: homePe(x) = CkNodeFirst(homeProc(x))      // rank 0 of the process
+    since 2026-10-12:  homePe(x) = CkNodeFirst(homeProc(x)) + (key / CkNumNodes()) % CkNodeSize(homeProc(x))
+                       // the quotient spreads a process's homes over its ranks
     PR 3: the process's shared table; requests go to the process (node queue)
 
 CkArrayMap::homePe is NOT consulted for hashed-kind arrays (it defaulted to procNum;
 only CldMap overrides it in the tree). procNum is still used for placement
 (findInitialHostPe, populateInitial). This is the one user-visible semantic change
-for hashed-kind arrays: the directory PE is rank 0 of a hashed process rather than
-procNum(idx). The cost profile is unchanged: a source without an id already round-
+for hashed-kind arrays: the directory PE is a hashed PE of a hashed process rather
+than procNum(idx). The cost profile is unchanged: a source without an id already round-
 trips to the home before the first send (bufferForLocation -> requestLocation(idx)).
+Until 2026-10-12 the directory PE was rank 0 of the process, which concentrated every
+hashed-kind home of a single-process run on PE 0 (1.62x on unbounded cold sends,
+doc/objid64-perf.md); the rank chosen from the key's quotient removes that without a
+shared table. Nothing about the home is checkpointed, so the change is invisible to
+restart. The spread is limited by keys per process (2^H / processes): with the default
+expand factor there are 8 to 16 keys per process, so at most that many ranks of a
+process serve as homes; +objid_expand raises it.
 
 ### 3.4 Reverse lookup
 
@@ -270,7 +279,8 @@ creation; a buffer-kind message never recovers the index.
     int CkLocMgr::homePe(const CkArrayIndex& idx) const   // exists; semantics per kind
     int CkLocMgr::homePe(CmiUInt8 id) const               // exists but dead; becomes live:
         compressor ? homePe(compressor->decompress(id))
-                   : CkNodeFirst(ObjID::hashKey(id) % CkNumNodes())
+                   : hashedHomePe(ObjID::hashKey(id))        // 3.3: process from the
+                                                            // remainder, rank from the quotient
 
 CkLocCache gets a back-pointer `CkLocMgr* mgr` (set by CkLocMgr's constructor and by
 its pup; the cache is created first, ckarray.C:653-660; bound arrays share both).
