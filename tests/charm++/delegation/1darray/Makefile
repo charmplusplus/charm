@@ -18,7 +18,10 @@ hello.o: hello.C hello.decl.h
 	$(CHARMC) -c hello.C
 
 test: all
-	$(call run, hello +p4 10)
+	$(call run, ./hello +p4 10)
 
 testp: all
-	$(call run, hello +p$(P) $$(( $(P) * 8 )) )
+	$(call run, ./hello +p$(P) $$(( $(P) * 8 )) )
+
+smptest: all
+	$(call run, ./hello +p4 10 ++ppn 2)

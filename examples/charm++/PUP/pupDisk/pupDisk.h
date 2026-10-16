@@ -78,7 +78,7 @@ public:
   void write();
   void writeDone();
   void verify();
-  void acceptData(someData &inData);
+  void acceptData(const someData &inData);
  private:
   someData *myData;
   int howBig;
@@ -92,7 +92,7 @@ public:
   pupDisk(int _howbig, int _numElements, int _maxFiles);
   ~pupDisk(){ ;}
   void read(int sender);
-  void write(int sender, someData &data);
+  void write(int sender, const someData &data);
   void diskWrite();
   bool diskRead(int sender);
  private:
