@@ -44,6 +44,7 @@ public:
 };
 static TCharmTraceLibList tcharm_tracelibs;
 static bool tcharm_nomig=false;
+static bool tcharm_nomigWarned=false;
 bool tcharm_nothreads=false;
 #ifndef TCHARM_STACKSIZE_DEFAULT
 #define TCHARM_STACKSIZE_DEFAULT 1048576 /*Default stack size is 1MB*/
@@ -376,10 +377,21 @@ TCharm::~TCharm()
   delete initMsg;
 }
 
+// Called when a thread asks to migrate and the build has no migratable
+// threads. PE 0 prints the warning the first time this happens on it, so a
+// run prints it at most once.
+static void warnNoMigration()
+{
+	if (CkMyPe()==0 && !tcharm_nomigWarned) {
+		tcharm_nomigWarned = true;
+		CkPrintf("Warning> thread migration is not supported in this build; ranks will not migrate.\n");
+	}
+}
+
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrateTo(int destPE) noexcept {
 	if (destPE==CkMyPe()) return this;
 	if (CthMigratable() == 0) {
-	    CkPrintf("Warning> thread migration is not supported!\n");
+	    warnNoMigration();
             return this;
         }
 	asyncMigrate = true;
@@ -802,8 +814,7 @@ CLINKAGE void TCHARM_Migrate()
 {
 	TCHARMAPI("TCHARM_Migrate");
 	if (CthMigratable() == 0) {
-	  if(CkMyPe() == 0)
-	    CkPrintf("Warning> thread migration is not supported!\n");
+	  warnNoMigration();
           return;
         }
 	TCharm * unused = TCharm::get()->migrate();
