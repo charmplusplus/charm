@@ -699,6 +699,12 @@ never merged to the reviewed line without 1b. The gate:
    and checkpoint/restart where it does. On the Mac and on one Linux cluster
    (Anvil). CI's subset is not enough for this merge.
 
+Gate met 2026-10-17: items 1 and 2 done (#4028 merged 2026-10-09; #4021, carrying
+1b and 1c, merged 2026-10-17); items 3 and 4 recorded in objid64-gate-2026-10-16.md
+(ChaNGa at 262,144 pieces on Anvil, 1 to 2 nodes, energies and snapshots identical
+to the baseline; the sweep's one real defect became #4044, merged). #4015 left draft
+the same day.
+
 Then #4015 (objid-redesign -> reviewed-with-reconverse) leaves draft and merges.
 PR 2 (manual) follows as a small PR straight to the reviewed line. PR 3 and PR 4
 are their own PRs against the reviewed line after PR 1 is in, not passengers on
