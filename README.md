@@ -270,7 +270,7 @@ netlrts-linux-x86_64/
    |
    ---  bin/             # all executables
    |
-   ---  doc/             # documentations
+   ---  doc/             # documentations (doc/internals/ for how the runtime works inside)
    |
    ---  include/         # header files
    |
