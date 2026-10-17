@@ -18,12 +18,14 @@ bcastred.decl.h: bcastred.ci
 test: bcastred
 	$(call run, ./bcastred +p2)
 	$(call run, ./bcastred +p2 -n 8 -i 200 -m 1 -c 8 )
+	$(call run, ./bcastred +p2 -n 8 -i 200 -m 1 -c 8 -u )
 
 # Scaling run. The ring is sized by -n, independently of the PE count, so any
 # P works; the migration targets are what actually vary with P.
 testp: bcastred
 	$(call run, ./bcastred +p$(P))
 	$(call run, ./bcastred +p$(P) -n 8 -i 200 -m 1 -c 8 )
+	$(call run, ./bcastred +p$(P) -n 8 -i 200 -m 1 -c 8 -u )
 
 # The interesting case for an anytime-migration test: with more than one PE
 # per process, elements migrate within a process as well as between them.
@@ -31,6 +33,7 @@ testp: bcastred
 smptest: bcastred
 	$(call run, ./bcastred +p2 ++ppn 2)
 	$(call run, ./bcastred +p4 ++ppn 2 -n 8 -i 200 -m 1 -c 8 )
+	$(call run, ./bcastred +p4 ++ppn 2 -n 8 -i 200 -m 1 -c 8 -u )
 
 clean:
 	rm -rf *.decl.h *.def.h bcastred charmrun

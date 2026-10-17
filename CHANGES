@@ -47,6 +47,20 @@ New on this line since the split from classic:
   per-PE element id overflow instead of reusing ids (#4016); design
   documents in doc/ (#4015).
 
+- 64-bit object ids, part 1 (#4015: #4017, #4028, #4021, #4039). An
+  element id no longer stores a home PE. Arrays with bounds pack
+  their index into 49 bits (was 16), so a bounded array of any size
+  up to 2^49 elements is addressed by id; arrays without bounds get
+  ids from per-process tranches with refills from an allocator on
+  PE 0, replacing the per-PE counter that aborted at 65,535
+  elements. Delivery by id never needs the index on the sender's
+  PE. Ids are stable across checkpoint and restart, including
+  restart with a different process count. New tests objid_bound,
+  objid_home, objid_insert, objid_sections, objid_tranche and
+  unbounded_restart. A checkpoint written before this change cannot
+  be restored after it: the id layout and the checkpoint format
+  changed, and the restart aborts with a layout mismatch message.
+
 - Broadcasts and [nokeep] entry methods: fixes for message reuse and
   copies (#4000-#4012). Checkpoint restart no longer hangs with more
   than one process and more than one PE per process (#4019). The
