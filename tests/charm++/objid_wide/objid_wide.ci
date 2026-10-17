@@ -1,0 +1,27 @@
+mainmodule objid_wide {
+  initnode void unbufferStdout(void);
+  readonly CProxy_Main mainProxy;
+  readonly std::vector<CProxy_Elem> arrays;
+  readonly int nWide;
+  readonly int nStd;
+  readonly int lbMode;
+
+  mainchare [migratable] Main {
+    entry Main(CkArgMsg* m);
+    entry void reportId(int a, int i, CmiUInt8 id, int pe);
+    entry void pongDone(int a, int i);
+    entry void qdDone();
+    entry void resumed(int a, int i);
+    entry void checkpointed();
+  };
+
+  array [1D] Elem {
+    entry Elem(int a);
+    entry void identify();
+    entry void startPing(int round);
+    entry void ping(int round, int sa, int si, CmiUInt8 sid);
+    entry void pong(int round, int ra, int ri, CmiUInt8 rid);
+    entry void migrateNow();
+    entry void doSync();
+  };
+};

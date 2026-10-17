@@ -5,20 +5,27 @@
 #include "converse.h"
 #include "pup.h"
 
-// The 64-bit object id layout is: 3 type tag bits + COLLECTION bits + PAYLOAD bits,
-// most significant first.
+// The 64-bit object id has two layouts, told apart by the 3 type tag bits at the top
+// (most significant first):
 //
-//   - COLLECTION identifies the chare array (its CkGroupID). The default is 12 bits;
-//     override with -DCMK_OBJID_COLLECTION_BITS=N at build time (an AMPI build, which
-//     creates one array per virtual rank, needs more).
+//   tag 000 (standard)   COLLECTION C bits (default 12)   PAYLOAD 64 - 3 - C bits (49)
+//   tag 001 (wide)       COLLECTION 24 bits               PAYLOAD 37 bits
+//
+//   - COLLECTION is the array's collection number: a dense number handed out on PE 0
+//     when the array is created (CkCreateArray), standard numbers in [1, 2^12) and
+//     wide numbers in [2^12, 2^24). The standard width C can be overridden with
+//     -DCMK_OBJID_COLLECTION_BITS=N at build time; the wide width is fixed.
 //   - PAYLOAD identifies the element within the array. Its meaning is decided per
 //     array by CkLocMgr, not here: for an array with bounds that fit, it is the
 //     packed index; otherwise it is a hash key of the index followed by a number
 //     that is unique within the array (see cklocation.h, ck::objid::Layout).
-//   - The type tag bits are reserved and unused.
+//   - The wide layout is opt-in per array (CkArrayOptions::setWideCollection) for
+//     programs that create many small arrays (AMPI: one per communicator). It
+//     requires bounds, since 37 payload bits are too few for hashed ids at scale.
 //
 // No PE number is stored in the id. The home of an element is computed from the
-// id, or from the index, by CkLocMgr (design: doc/objid64-design.md).
+// id, or from the index, by CkLocMgr (design: doc/objid64-design.md, section 12 for
+// the wide layout).
 
 #ifndef CMK_OBJID_COLLECTION_BITS
 #define CMK_OBJID_COLLECTION_BITS 12
@@ -26,6 +33,9 @@
 
 #define CMK_OBJID_TYPE_TAG_BITS   3
 #define CMK_OBJID_PAYLOAD_BITS    (64 - CMK_OBJID_COLLECTION_BITS - CMK_OBJID_TYPE_TAG_BITS)
+
+#define CMK_OBJID_WIDE_COLLECTION_BITS 24
+#define CMK_OBJID_WIDE_PAYLOAD_BITS    (64 - CMK_OBJID_WIDE_COLLECTION_BITS - CMK_OBJID_TYPE_TAG_BITS)
 
 // Sanity checks:
 static_assert(CMK_OBJID_COLLECTION_BITS > 0,
@@ -42,50 +52,65 @@ namespace ck {
  */
 class ObjID {
     public:
+        enum bits {
+          PAYLOAD_BITS         = CMK_OBJID_PAYLOAD_BITS,
+          COLLECTION_BITS      = CMK_OBJID_COLLECTION_BITS,
+          TYPE_TAG_BITS        = CMK_OBJID_TYPE_TAG_BITS,
+          WIDE_PAYLOAD_BITS    = CMK_OBJID_WIDE_PAYLOAD_BITS,
+          WIDE_COLLECTION_BITS = CMK_OBJID_WIDE_COLLECTION_BITS
+        };
+        enum tags : CmiUInt8 {
+          TAG_STANDARD = 0,
+          TAG_WIDE     = 1
+        };
+        enum masks : CmiUInt8 {
+          PAYLOAD_MASK         = ((1ULL << PAYLOAD_BITS) - 1),
+          COLLECTION_MASK      = (((1ULL << COLLECTION_BITS) - 1) << PAYLOAD_BITS),
+          TYPE_TAG_MASK        = (((1ULL << TYPE_TAG_BITS) - 1) << (64 - TYPE_TAG_BITS)),
+          WIDE_PAYLOAD_MASK    = ((1ULL << WIDE_PAYLOAD_BITS) - 1),
+          WIDE_COLLECTION_MASK = (((1ULL << WIDE_COLLECTION_BITS) - 1) << WIDE_PAYLOAD_BITS),
+          WIDE_TAG             = (TAG_WIDE << (64 - TYPE_TAG_BITS))
+        };
+        /// Collection numbers: standard arrays take [1, STANDARD_LIMIT), wide arrays
+        /// [STANDARD_LIMIT, WIDE_LIMIT), so a program with many wide arrays never
+        /// pushes a standard array out of its range.
+        enum limits : CmiUInt8 {
+          STANDARD_LIMIT = (1ULL << COLLECTION_BITS),
+          WIDE_LIMIT     = (1ULL << WIDE_COLLECTION_BITS),
+          // A build with C >= 24 (an AMPI build with -DCMK_OBJID_COLLECTION_BITS=29)
+          // has no room above the standard range; wide numbers then start at 1 and
+          // are told apart from standard ones by the tag alone.
+          WIDE_FIRST     = (STANDARD_LIMIT < WIDE_LIMIT) ? STANDARD_LIMIT : 1
+        };
+
         ObjID(): id(0) {}
         ///
         ObjID(const CmiUInt8 id_) : id(id_) { }
-        ObjID(const CkGroupID gid, const CmiUInt8 eid)
-            : id( ((CmiUInt8)gid.idx << PAYLOAD_BITS) | eid)
+        /// An element id from its array's collection number and kind and the
+        /// element payload. The number is in range by construction (CkCreateArray
+        /// hands them out and aborts at the limit); the payload is by the
+        /// compressor or the hashed-kind minting, so both are only asserted here.
+        ObjID(const CmiUInt8 collection, const CmiUInt8 eid, const bool wide)
+            : id(wide ? (WIDE_TAG | (collection << WIDE_PAYLOAD_BITS) | eid)
+                      : ((collection << PAYLOAD_BITS) | eid))
         {
-          if ((CmiUInt8)gid.idx > (COLLECTION_MASK >> PAYLOAD_BITS))
-          {
-            CmiAbort(
-                "\nError> ObjID ran out of collection bits: too many chare collections"
-                " (gid %" PRIx64 ", limit %" PRIx64 " with %u bits). Rebuild Charm++ with"
-                " -DCMK_OBJID_COLLECTION_BITS=N for a larger N.\n",
-                (CmiUInt8)gid.idx, (CmiUInt8)(COLLECTION_MASK >> PAYLOAD_BITS),
-                COLLECTION_BITS);
-          }
-          if (eid > PAYLOAD_MASK)
-          {
-            CmiAbort(
-                "\nError> ObjID element payload %" PRIx64 " exceeds %u bits (limit %" PRIx64
-                "). Rebuild Charm++ with a smaller -DCMK_OBJID_COLLECTION_BITS=N.\n",
-                eid, PAYLOAD_BITS, (CmiUInt8)PAYLOAD_MASK);
-          }
+          CmiAssert(wide ? (collection < WIDE_LIMIT && eid <= WIDE_PAYLOAD_MASK)
+                         : (collection < STANDARD_LIMIT && eid <= PAYLOAD_MASK));
         }
 
-        /// The chare array this element belongs to
-        inline CkGroupID getCollectionID() const {
-            CkGroupID gid;
-            gid.idx = (id & COLLECTION_MASK) >> PAYLOAD_BITS;
-            return gid;
+        /// Wide layout (tag 001)?
+        inline bool isWide() const { return (id & TYPE_TAG_MASK) == WIDE_TAG; }
+        /// The collection number of the chare array this element belongs to
+        inline CmiUInt8 getCollectionNumber() const {
+            return isWide() ? ((id & WIDE_COLLECTION_MASK) >> WIDE_PAYLOAD_BITS)
+                            : ((id & COLLECTION_MASK) >> PAYLOAD_BITS);
         }
         /// The element payload: everything location management keys on
-        inline CmiUInt8 getElementID() const { return id & PAYLOAD_MASK; }
-        inline CmiUInt8 getID() const { return id & (COLLECTION_MASK | PAYLOAD_MASK); }
-
-        enum bits {
-          PAYLOAD_BITS    = CMK_OBJID_PAYLOAD_BITS,
-          COLLECTION_BITS = CMK_OBJID_COLLECTION_BITS,
-          TYPE_TAG_BITS   = CMK_OBJID_TYPE_TAG_BITS
-        };
-        enum masks : CmiUInt8 {
-          PAYLOAD_MASK    = ((1ULL << PAYLOAD_BITS) - 1),
-          COLLECTION_MASK = (((1ULL << COLLECTION_BITS) - 1) << PAYLOAD_BITS),
-          TYPE_TAG_MASK   = (((1ULL << TYPE_TAG_BITS) - 1) << (PAYLOAD_BITS + COLLECTION_BITS))
-        };
+        inline CmiUInt8 getElementID() const {
+            return id & (isWide() ? (CmiUInt8)WIDE_PAYLOAD_MASK : (CmiUInt8)PAYLOAD_MASK);
+        }
+        /// The whole id, tag included (two ids are the same element iff equal)
+        inline CmiUInt8 getID() const { return id; }
 
     private:
 
