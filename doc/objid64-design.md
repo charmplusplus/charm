@@ -11,6 +11,10 @@ hashed payload is home key (width set per run from the process count and an
 expand factor) plus a unique number handed out in tranches, no creator field; explicit bounds only, warn otherwise;
 staged PRs; chares stay bound to individual PEs; drone mode is orthogonal.
 
+Terminology: a *process* is an OS process, what Converse calls a node and counts
+with CkNumNodes(); a *PE* is a worker thread, counted by CkNumPes(). Nothing in
+this document is keyed on PEs except the per-PE tables named as such.
+
 ## 0. Goals
 
 G1 A compressible (bounded, packable) index uses 49 payload bits instead of 16.
@@ -60,16 +64,23 @@ Field by field:
         the packed index, up to 49 bits (FixedArrayIndexCompressor budget)
 
     PAYLOAD, hashed kind (no compressor):        widths fixed PER RUN, not per build
-        top H bits   HOMEKEY   H = ceil(log2(numProcs * expandFactor)), clamped to [1, 24]
+        top H bits   HOMEKEY   H = ceil(log2(processes * expandFactor)), at most 24
         low U bits   UNIQUE    U = 49 - H; a number unique within the collection,
                                handed out in tranches (section 3.1); no creator field
 
-Revised 2026-09-29 18:12 (Kale): the creator | counter split is gone. H is computed
-at first launch from CkNumNodes() and the expand factor (+objid_expand F, default 8;
-Kale's presumed ceiling on expansion), stored in the checkpoint, and reused by every
-restart, because keys are embedded in live ids. If a restart has more than 2^H
-processes it still works (home = key % numProcs is always defined); only the
-directory spread is limited to 2^H processes, and the runtime prints a warning.
+H is computed at first launch from the process count and the expand factor,
+stored in the checkpoint, and reused by every restart, because keys are embedded
+in live ids. The expand factor (+objid_expand F, default 8) is headroom for
+shrink/expand: the key space holds at least F times the launch-time process
+count, so a restart can grow to that many processes and every process still owns
+home keys. It has nothing to do with PEs per process, although since the
+directory PE is chosen from the key within the home process (3.3), the keys per
+process, about F, also bound how many PEs of a process serve as homes. If a
+restart has more than 2^H processes it still works (home = key % processes is
+always defined); only the directory spread is limited to 2^H processes, and the
+runtime prints a warning. The code floors H at 1, which only a single process
+with +objid_expand 1 would reach. (Decided 2026-09-29: this replaced a creator |
+counter split of the unique number.)
 
 CMK_OBJID_HOME_BITS is removed. Build-time static_asserts: 1 <= C <= 40. Runtime
 checks at startup and restart: H >= 1, U >= 16.
@@ -138,8 +149,8 @@ Unchanged mechanism, wider budget:
 - CkLocMgr::lookupID (cklocation.h:572, 597): `id = compressor->compress(idx)`.
   The home is no longer added; the two CmiAssertMsg on home/id size go.
 - lookupIdx for this kind = decompress (unchanged).
-- Home: homeProc(idx) = CkNodeOf(map->homePe(mapHandle, idx)); homeProc(id) =
-  homeProc(decompress(id)). Directory PE (PR 1) = map->homePe(idx) exactly as today,
+- Home: homeProcess(idx) = CkNodeOf(map->homePe(mapHandle, idx)); homeProcess(id) =
+  homeProcess(decompress(id)). Directory PE (PR 1) = map->homePe(idx) exactly as today,
   so compressible arrays see no behavioural change in PR 1 beyond the wider budget --
   except the sender-repair rule of 4.3, which applies to both kinds: a forwarded delivery
   now teaches the sender the location (measured in doc/objid64-perf.md).
@@ -173,7 +184,7 @@ created under a CmiNodeLock when the CkLocMgr branch is constructed. The per-PE
 
 Unique space [0, 2^U) per collection:
 - Initial region [0, 2^(U-1)): at first launch process p owns [p*S, (p+1)*S) with
-  S = 2^(U-1-ceil(log2 numProcs)); no message needed, so populateInitial and any
+  S = 2^(U-1-ceil(log2 processes)); no message needed, so populateInitial and any
   insertion in the array's constructor phase mint immediately on every process.
 - Allocator region [2^(U-1), 2^U): handed out top-down by the allocator, which is
   the CkLocMgr branch on PE 0 (its cursor `trancheTop` is pupped there; PE 0's
@@ -268,10 +279,10 @@ is a pure function of the index and returns < 2^H.
 
 ### 3.3 Home
 
-    homeProc(id)  = ObjID::hashKey(payload) % CkNumNodes()
-    homeProc(idx) = indexHashKey(idx)        % CkNumNodes()      // identical by construction
-    PR 1 directory PE: homePe(x) = CkNodeFirst(homeProc(x))      // rank 0 of the process
-    since 2026-10-12:  homePe(x) = CkNodeFirst(homeProc(x)) + (key / CkNumNodes()) % CkNodeSize(homeProc(x))
+    homeProcess(id)  = ObjID::hashKey(payload) % CkNumNodes()
+    homeProcess(idx) = indexHashKey(idx)        % CkNumNodes()      // identical by construction
+    PR 1 directory PE: homePe(x) = CkNodeFirst(homeProcess(x))      // rank 0 of the process
+    since 2026-10-12:  homePe(x) = CkNodeFirst(homeProcess(x)) + (key / CkNumNodes()) % CkNodeSize(homeProcess(x))
                        // the quotient spreads a process's homes over its ranks
     PR 3: the process's shared table; requests go to the process (node queue)
 
@@ -431,7 +442,7 @@ restored verbatim (restore/resume already call insertID(idx, id), cklocation.C:3
 
 Layout persists: `ck::objid::Layout {H, U}` is written by PE 0 with the readonly/
 group data and restored before any locmgr is unpacked; a restart never recomputes H.
-If newNumProcs > 2^H the runtime warns that directory spread is limited.
+If the new process count > 2^H the runtime warns that directory spread is limited.
 
 Directories are rebuilt, not restored: resume/restore call createLocal with
 notifyHome = true on every restart path, so each restored element registers at its
