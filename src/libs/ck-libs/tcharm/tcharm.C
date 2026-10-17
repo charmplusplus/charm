@@ -44,6 +44,7 @@ public:
 };
 static TCharmTraceLibList tcharm_tracelibs;
 static bool tcharm_nomig=false;
+static bool tcharm_nomigWarned=false;
 bool tcharm_nothreads=false;
 #ifndef TCHARM_STACKSIZE_DEFAULT
 #define TCHARM_STACKSIZE_DEFAULT 1048576 /*Default stack size is 1MB*/
@@ -105,6 +106,11 @@ void TCharm::procInit()
   // called on every pe to eat these arguments
   char **argv=CkGetArgv();
   tcharm_nomig=CmiGetArgFlagDesc(argv,"+tcharm_nomig","Disable migration support (debugging)");
+#if CMK_RECONVERSE
+  // Reconverse has no migratable threads or isomalloc: TCharm threads are
+  // plain CthCreate threads, so the non-migratable mode is the only mode.
+  tcharm_nomig=true;
+#endif
   tcharm_nothreads=CmiGetArgFlagDesc(argv,"+tcharm_nothread","Disable thread support (debugging)");
   tcharm_nothreads=(CmiGetArgFlagDesc(argv,"+tcharm_nothreads",NULL)) ? true : tcharm_nothreads;
   char *traceLibName=NULL;
@@ -133,7 +139,9 @@ void TCharm::procInit()
     CmiGetArgIntDesc(argv, "+vp", &ignored, nullptr);
   }
   if (CkMyPe()==0) { // Echo various debugging options:
+#if !CMK_RECONVERSE
     if (tcharm_nomig) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
+#endif
     if (tcharm_nothreads) CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
   }
   if (!CkpvAccess(mapCreated)) {
@@ -254,7 +262,11 @@ void TCharm::pup(PUP::er &p) {
   if (!p.isSizing() && !isStopped && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
 	CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
   }	
+#if CMK_RECONVERSE
+  if (!p.isSizing()) CkAbort("TCharm threads cannot migrate or be checkpointed on reconverse.\n");
+#else
   if (tcharm_nomig && !p.isSizing()) CkAbort("Cannot migrate with the +tcharm_nomig option!\n");
+#endif
 #endif
 
   //This seekBlock allows us to reorder the packing/unpacking--
@@ -365,10 +377,21 @@ TCharm::~TCharm()
   delete initMsg;
 }
 
+// Called when a thread asks to migrate and the build has no migratable
+// threads. PE 0 prints the warning the first time this happens on it, so a
+// run prints it at most once.
+static void warnNoMigration()
+{
+	if (CkMyPe()==0 && !tcharm_nomigWarned) {
+		tcharm_nomigWarned = true;
+		CkPrintf("Warning> thread migration is not supported in this build; ranks will not migrate.\n");
+	}
+}
+
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrateTo(int destPE) noexcept {
 	if (destPE==CkMyPe()) return this;
 	if (CthMigratable() == 0) {
-	    CkPrintf("Warning> thread migration is not supported!\n");
+	    warnNoMigration();
             return this;
         }
 	asyncMigrate = true;
@@ -791,8 +814,7 @@ CLINKAGE void TCHARM_Migrate()
 {
 	TCHARMAPI("TCHARM_Migrate");
 	if (CthMigratable() == 0) {
-	  if(CkMyPe() == 0)
-	    CkPrintf("Warning> thread migration is not supported!\n");
+	  warnNoMigration();
           return;
         }
 	TCharm * unused = TCharm::get()->migrate();
