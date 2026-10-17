@@ -5,11 +5,21 @@
 #include "converse.h"
 #include "pup.h"
 
-// The 64-bit object id has two layouts, told apart by the 3 type tag bits at the top
-// (most significant first):
+// The 64-bit object id has two layouts, told apart by the 3 type tag bits at the top:
 //
-//   tag 000 (standard)   COLLECTION C bits (default 12)   PAYLOAD 64 - 3 - C bits (49)
-//   tag 001 (wide)       COLLECTION 24 bits               PAYLOAD 37 bits
+//   bit   63 62 61 | 60                      49 | 48                          0
+//        +---------+----------------------------+------------------------------+
+//        |  0 0 0  |   COLLECTION   (C = 12)    |      PAYLOAD   (64-3-C = 49) |  standard
+//        +---------+----------------------------+------------------------------+
+//
+//   bit   63 62 61 | 60                      37 | 36            0
+//        +---------+----------------------------+----------------+
+//        |  0 0 1  |   COLLECTION   (24)        |  PAYLOAD (37)  |  wide
+//        +---------+----------------------------+----------------+
+//
+//   PAYLOAD, array with bounds (packed kind, either layout): the index, packed.
+//   PAYLOAD, array without bounds (hashed kind, standard layout only):
+//        | HOME KEY (H bits, H fixed per run) | UNIQUE NUMBER (49 - H bits) |
 //
 //   - COLLECTION is the array's collection number: a dense number handed out on PE 0
 //     when the array is created (CkCreateArray), standard numbers in [1, 2^12) and

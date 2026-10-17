@@ -6412,6 +6412,16 @@ both for bulk insertion, and if dynamic insertion is used to create the initial 
 In the latter case, after the initial elements have been inserted and ``doneInserting`` is
 called, the initialization callback will be invoked once all insertions have completed.
 
+Two further options concern the element ids described in :ref:`element ids`.
+``opts.setBounds(...)`` fixes the array's index space, which lets the runtime
+pack an element's index into its id; every constructor of CkArrayOptions
+that takes a size sets the bounds to that size, so ``setBounds`` is needed
+only for an array created with an empty CkArrayOptions whose index space is
+nevertheless known. ``opts.setWideCollection()`` gives the array an id
+layout with room for 16.7 million arrays instead of 4,095, for programs
+that create very many small arrays; such an array must have bounds that
+pack into 37 bits.
+
 .. _array map:
 
 Initial Placement Using Map Objects
@@ -6754,6 +6764,100 @@ further configure array characteristics.
 
 A demonstration of asynchronous array creation can be found in
 ``examples/charm++/hello/darray``.
+
+.. _element ids:
+
+Element Ids
+~~~~~~~~~~~
+
+Every array element has a 64-bit id, ``ck::ObjID``. The runtime keys
+message delivery, its location tables and checkpoints on it; a program
+can read it with ``ArrayElement::ckGetID()`` but never constructs one.
+The id has two layouts, told apart by its top three bits:
+
+.. code-block:: none
+
+   bit   63 62 61 | 60                      49 | 48                          0
+        +---------+----------------------------+------------------------------+
+        |  0 0 0  |   COLLECTION   (12 bits)   |      PAYLOAD   (49 bits)     |  standard layout
+        +---------+----------------------------+------------------------------+
+
+   bit   63 62 61 | 60                      37 | 36            0
+        +---------+----------------------------+----------------+
+        |  0 0 1  |   COLLECTION   (24 bits)   | PAYLOAD (37 b) |  wide layout
+        +---------+----------------------------+----------------+
+
+   PAYLOAD of an array with bounds (packed kind, either layout):
+        +----------------------------------------------------------------------+
+        |              the element's index, packed into the field              |
+        +----------------------------------------------------------------------+
+
+   PAYLOAD of an array without bounds (hashed kind, standard layout only):
+        +-----------------------+----------------------------------------------+
+        |   HOME KEY (H bits)   |        UNIQUE NUMBER (49 - H bits)           |
+        +-----------------------+----------------------------------------------+
+
+**Tag.** Three bits name the layout: ``000`` is the standard layout and
+``001`` the wide layout. The other six values are reserved.
+
+**Collection.** The number of the chare array the element belongs to.
+PE 0 assigns it when the array is created, densely and never reused, so
+a program that creates arrays in a loop uses one number per array.
+Standard numbers run from 1 to 4,095 and wide numbers from 4,096 to
+16,777,215. An array bound to another with ``bindTo`` has its own number
+but shares the other array's layout. The width of the standard field is a
+build-time constant, ``-DCMK_OBJID_COLLECTION_BITS`` (default 12); the
+wide field is fixed at 24 bits.
+
+**Payload.** What the payload means is decided per array, by the array's
+location manager, from whether the array has bounds:
+
+- *Packed kind.* An array whose bounds fit in the payload (49 bits in the
+  standard layout, 37 in the wide layout) stores the element's index
+  itself, packed by ``FixedArrayIndexCompressor``. Every constructor of
+  ``CkArrayOptions`` that takes a size sets the bounds to that size, so
+  almost every array is of this kind; a 3D array of 65,536\ :sup:`3`
+  elements needs 48 bits. An array with no size, created with an empty
+  ``CkArrayOptions`` for dynamic insertion, gets bounds only from
+  ``setBounds``.
+- *Hashed kind.* An array without usable bounds mints a payload per element:
+  a home key, which is a hash of the index, followed by a number that is
+  unique within the array. The runtime hands unique numbers to each
+  process in tranches, refilled from an allocator on PE 0, so inserting an
+  element never involves another process. The key width *H* is
+  :math:`\lceil \log_2(\text{processes} \times F) \rceil`, clamped to
+  [1, 24], where *F* is the expansion factor ``+objid_expand`` (default 8,
+  the most a restart may grow the process count by while keeping the
+  directory spread over every process). *H* is fixed for the run, stored in
+  the checkpoint and reused by every restart from it.
+
+**Home.** The home PE of an element, where the location directory entry
+for it lives, is computed from the id or the index, never stored in the
+id, so ids survive migration, checkpoint and restart with a different
+number of processes. For a packed-kind array the home is what the array's
+map returns from ``homePe(index)``, as before. For a hashed-kind array the
+map's ``homePe`` is not consulted: the home process is the home key modulo
+the number of processes, and the PE within that process is chosen from the
+key's quotient so that a process's homes are spread over its PEs. The map's
+``procNum`` still decides where elements are placed.
+
+**Wide layout.** An array created with ``CkArrayOptions::setWideCollection()``
+takes a number from the 24-bit range, for programs that create many small
+arrays (AMPI creates one per communicator). It must have bounds that pack
+into 37 bits, and creating one without aborts. The layout is opt-in: it
+changes the ids and the checkpoint format of the arrays that use it, and
+only many-array programs need it. When a program has created 2,048
+standard arrays, PE 0 prints a suggestion naming the option once; at 4,095
+the next creation aborts naming it and the build flag.
+
+**Checkpoints.** A checkpoint records both field widths, and a build with
+different widths refuses to restore it. Ids in a checkpoint are restored
+unchanged, including under a different number of processes. Element ids
+compare equal exactly when the whole 64-bit word is equal; the collection
+number, the payload and the layout can be read with
+``getCollectionNumber()``, ``getElementID()`` and ``isWide()``.
+
+The design record is ``doc/objid64-design.md`` in the source tree.
 
 .. _user-defined array index type:
 
