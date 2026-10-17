@@ -1573,10 +1573,12 @@ then
   if [[ "$MEMORY" != 'default' ]]
   then
     Warning "Warning: -memory $MEMORY is ignored on reconverse, which uses the OS allocator and has no isomalloc (thread migration is not available)."
+    MEMORY='default'
   fi
   if [[ "$THREAD" != 'default' ]]
   then
     Warning "Warning: -thread $THREAD is ignored on reconverse, which has a single user-level thread implementation."
+    THREAD='default'
   fi
 fi
 
