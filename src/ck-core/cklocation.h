@@ -362,16 +362,18 @@ struct Layout
   int uniqueBits = 0;
   int expandFactor = 8;
   int nodesAtLaunch = 0;
+  int trancheLog2Cap = 0;  // +objid_tranche_log2: cap on tranche sizes (testing); 0 = none
   void pup(PUP::er& p)
   {
     p | keyBits;
     p | uniqueBits;
     p | expandFactor;
     p | nodesAtLaunch;
+    p | trancheLog2Cap;
   }
 };
 /// Called once per process (rank 0) before any chare array exists.
-void initLayout(int expandFactor);
+void initLayout(int expandFactor, int trancheLog2Cap);
 const Layout& getLayout();
 /// Checkpoint the layout with the readonlies; on restore it replaces the
 /// startup layout of this process (called by CkPupROData).
@@ -379,12 +381,27 @@ void pupLayout(PUP::er& p);
 /// Hash key of an index, in [0, 2^keyBits): a pure function of the index bytes.
 CmiUInt8 indexHashKey(const CkArrayIndex& idx);
 
-/// A process's current tranche of unique numbers for one array: [cursor, end).
+/// Size (log2) of the first tranche the allocator grants a process that has none
+/// (after a restart), unless 1/64 of its cap (region / (8 * processes)) is smaller:
+/// then that, so a restart on which every process inserts costs the pool at most
+/// 1/512 of itself at any process count. Grants double from the first one up to the
+/// cap (CkLocMgr::requestTranche).
+constexpr int FIRST_GRANT_LOG2 = 16;
+
+/// A process's current tranche of unique numbers for one array: [cursor, end),
+/// plus the spare tranche the allocator granted for when it runs out. The fast path
+/// (CkLocMgr::mintUnique) touches only the three atomics; everything else is read
+/// and written under _nodeLock.
 struct Tranche
 {
-  std::atomic<CmiUInt8> cursor;
-  CmiUInt8 end;
-  Tranche(CmiUInt8 begin, CmiUInt8 end_) : cursor(begin), end(end_) {}
+  std::atomic<CmiUInt8> cursor{0};
+  std::atomic<CmiUInt8> end{0};
+  std::atomic<CmiUInt8> refillAt{~(CmiUInt8)0};  // cursor value at which to ask for the next
+  CmiUInt8 len = 0;                            // length of the current tranche
+  CmiUInt8 nextBase = 0, nextLen = 0;          // the spare, installed by grantTranche
+  bool haveNext = false;
+  bool requested = false;                      // a requestTranche is in flight
+  std::vector<int> waitingPes;                 // PEs holding deferred insertions
 };
 }  // namespace objid
 }  // namespace ck
@@ -401,10 +418,6 @@ private:
   using Listener = std::function<void(CmiUInt8, int)>;
   std::list<Listener> listeners;
 
-  // Elements this PE has already asked the home about, so a stream of sends to an
-  // element whose location is unknown costs one request rather than one per message.
-  std::unordered_set<CmiUInt8> pendingLocReqs;
-
   // The location manager this cache serves (created one-to-one with it; bound arrays
   // share both). Needed to compute the home of an id, which is not stored in the id.
   CkLocMgr* mgr = nullptr;
@@ -418,15 +431,6 @@ public:
   void setManager(CkLocMgr* m) { mgr = m; }
 
   void requestLocation(CmiUInt8 id);
-  // Ask the home where an element lives, at most once until the answer arrives.
-  // Forwarding a message via the home teaches this PE nothing, so without this a
-  // sender keeps paying the detour on every send.
-  void requestLocationOnce(CmiUInt8 id)
-  {
-    if (locMap.find(id) != locMap.end()) return;
-    if (!pendingLocReqs.insert(id).second) return;
-    requestLocation(id);
-  }
 
   // Entry methods for updating location tables across PEs
   void requestLocation(CmiUInt8 id, int peToTell);
@@ -541,6 +545,10 @@ private:
   // shared by all its PEs (see ck::objid::Tranche); resolved on first use.
   ck::objid::Tranche* tranche;
   ck::objid::Tranche* getTranche();
+  // Unpacked from a checkpoint: this process's share of the initial region is spent
+  // (the restored ids came from it), so the first tranche comes from the allocator.
+  // An array created after a restart is not restored and takes its share as usual.
+  bool restoredFromCheckpoint;
 
   /// This flag is set while we delete an old copy of a migrator
   bool duringMigration;
@@ -553,8 +561,24 @@ private:
 
   bool checkInBounds(const CkArrayIndex& idx) const;
 
-  // Get a new ID based on the ID generation scheme
-  CmiUInt8 getNewObjectID(const CkArrayIndex& idx);
+  // Get a new ID based on the ID generation scheme. False when the hashed kind has
+  // no unique number to give right now (tranche exhausted, refill not yet here).
+  bool tryNewObjectID(const CkArrayIndex& idx, CmiUInt8& id);
+  // Take the next unique number from this process's tranche; false if exhausted,
+  // in which case a refill has been requested and this PE is registered to be woken.
+  bool mintUnique(CmiUInt8& u);
+  void requestTrancheFromAllocator(int wantLog2);
+  // Allocator state (PE 0's branch is the allocator; other branches carry a copy
+  // that is never used): [allocNext, allocEnd) is the unhanded part of the pool.
+  CmiUInt8 allocNext, allocEnd;
+  struct DeferredInsertion
+  {
+    CkGroupID mgr;  // looked up at resume: the array may have been destroyed meanwhile
+    CkArrayMessage* msg;
+    CkArrayIndex idx;
+    int listenerData[CK_ARRAYLISTENER_MAXLEN];
+  };
+  std::vector<DeferredInsertion> deferredInsertions;  // this PE's, waiting for a tranche
 
   // Insert the ID into the idx2id table
   inline void insertID(const CkArrayIndex& idx, const CmiUInt8 id)
@@ -619,9 +643,19 @@ public:
   /// Home mapping. One home per element, computable from the index or from the id
   /// alike, on any PE, under the current process count. Packed-index arrays use the
   /// array map, as before; hashed-kind arrays hash the index to a process.
+  /// The key selects the process (key mod processes); the quotient, which is
+  /// independent of the remainder, selects the rank within it, so a process's homes
+  /// spread over its PEs instead of all sitting on rank 0 (in a single process they
+  /// spread over every PE). Both are recomputed under the current topology, so a
+  /// restart with any process or PE count rebuilds the directories at the new homes;
+  /// nothing about the home is stored in a checkpoint. More +objid_expand means more
+  /// keys per process and therefore a more even spread over its ranks.
   static int hashedHomePe(CmiUInt8 key)
   {
-    return CMK_RANK_0(CkNodeFirst((int)(key % (CmiUInt8)CkNumNodes())));
+    const CmiUInt8 nodes = (CmiUInt8)CkNumNodes();
+    const int node = (int)(key % nodes);
+    const int rank = (int)((key / nodes) % (CmiUInt8)CkNodeSize(node));
+    return CMK_RANK_0(CkNodeFirst(node) + rank);
   }
   int homePe(const CkArrayIndex& idx) const
   {
@@ -715,7 +749,6 @@ public:
   /// Returns false when none applies.
   bool recoverIndex(CmiUInt8 id, CkArrayIndex& idx, bool scanAtHome) const;
 
-  void requestLocationOnce(CmiUInt8 id) { cache->requestLocationOnce(id); }
   /// Ask the home of idx for its location by index, whether or not this PE already
   /// holds an id for it. The home buffers the request until the element exists, so
   /// this is the request to pair with a demand-creation request.
@@ -834,6 +867,15 @@ public:
   void updateLocationFromLB(CmiUInt8 id, int pe);
 #endif
   void reclaimRemote(const CkArrayIndex& idx, int deletedOnPe);
+
+  // Tranche allocator (design section 3.1). The allocator is this group's branch on
+  // PE 0; it hands out tranches of the upper half of the unique space, bottom up.
+  void requestTranche(int node, int wantLog2);           // on PE 0
+  void grantTranche(CmiUInt8 base, CmiUInt8 len);        // on rank 0 of the requesting process
+  void resumeDeferredInsertions();                       // on a PE that deferred insertions
+  // Hold an insertion until this process has a tranche again (see mintUnique).
+  void deferInsertion(CkArray* mgr, CkArrayMessage* msg, const CkArrayIndex& idx,
+                      const int listenerData[CK_ARRAYLISTENER_MAXLEN]);
   void dummyAtSync(void);
 
   /// return a list of migratables in this local record

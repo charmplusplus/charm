@@ -188,15 +188,33 @@ text above:
   _nodeLock. At most one spare is held; the request goes out when half of the
   current tranche is used, and again whenever a process is exhausted.
 - The allocator hands out the pool bottom up in powers of two: the requester asks
-  for twice its current tranche; PE 0 clamps between the initial tranche size and
-  region / (8 * processes). A zero-length grant means the pool is spent and the
-  requester aborts with a message naming setBounds, +objid_expand and
-  CMK_OBJID_COLLECTION_BITS.
-- Restart does not wait for grants: the restored layout is marked afterRestart,
-  getTranche then starts empty and sends the request (rank 0 does this from
-  CkLocMgr::pup, so it is usually answered before user code inserts), and any
-  insertion that comes first is simply deferred. Per-process cursors are not
-  checkpointed at all; only the allocator cursor is.
+  for twice its current tranche, or for a first grant when it has none; PE 0 clamps
+  to a floor and a cap. The cap is region / (8 * processes). The floor, which is the
+  first grant after a restart, is 2^16 (FIRST_GRANT_LOG2) or cap / 64, whichever is
+  smaller, so a restart on which every process inserts costs the pool at most
+  processes * cap / 64 = region / 512 at any process count. A zero-length grant means
+  the pool is spent and the requester aborts with a message naming setBounds,
+  +objid_expand and CMK_OBJID_COLLECTION_BITS. (Until 2026-10-10 the floor was the
+  launch share, which is 8x the cap, so every grant was the cap and each restart in
+  a chain of restarts spent 1/8 of the pool: the ninth aborted. Until 2026-10-12 the
+  floor was a flat 2^16, which equals the cap from 8192 processes up at the default
+  expand factor, with the same result there. Aditya's reviews of #4021.) A later
+  improvement, not done: at restart, move the allocator cursor down to just above the
+  highest allocator-region number held by a restored element (one max-reduction), so
+  repeated restarts cost only what is actually in use.
+- Restart does not wait for grants, and does not request any: a restored CkLocMgr
+  (restoredFromCheckpoint, set in its pup) starts with an empty tranche, and the
+  first insertion on a process asks the allocator for its first grant and is deferred
+  until the grant arrives. So after every restart the first insertion on each process
+  is asynchronous: a local [inline] insert returns before the element exists and
+  ckLocal() is null until the grant lands (a one-time note says so). This is a
+  deliberate trade against goal G5, confined to restarts; the manual (PR 2) must say
+  so. A process that never inserts after the restart costs the
+  pool nothing. Per-process cursors are not checkpointed at all; only the allocator
+  cursor is. An array created after a restart is not restored, so it takes its share
+  of its own (untouched) initial region as at launch, split by the current process
+  count rather than the launch count (after an expand the launch share would run
+  into the allocator's half).
 - `+objid_tranche_log2 N` caps every tranche at 2^N numbers so tests can see refills
   and deferral at small scale; it is pupped with the layout.
 
@@ -220,14 +238,23 @@ is a pure function of the index and returns < 2^H.
     homeProc(id)  = ObjID::hashKey(payload) % CkNumNodes()
     homeProc(idx) = indexHashKey(idx)        % CkNumNodes()      // identical by construction
     PR 1 directory PE: homePe(x) = CkNodeFirst(homeProc(x))      // rank 0 of the process
+    since 2026-10-12:  homePe(x) = CkNodeFirst(homeProc(x)) + (key / CkNumNodes()) % CkNodeSize(homeProc(x))
+                       // the quotient spreads a process's homes over its ranks
     PR 3: the process's shared table; requests go to the process (node queue)
 
 CkArrayMap::homePe is NOT consulted for hashed-kind arrays (it defaulted to procNum;
 only CldMap overrides it in the tree). procNum is still used for placement
 (findInitialHostPe, populateInitial). This is the one user-visible semantic change
-for hashed-kind arrays: the directory PE is rank 0 of a hashed process rather than
-procNum(idx). The cost profile is unchanged: a source without an id already round-
+for hashed-kind arrays: the directory PE is a hashed PE of a hashed process rather
+than procNum(idx). The cost profile is unchanged: a source without an id already round-
 trips to the home before the first send (bufferForLocation -> requestLocation(idx)).
+Until 2026-10-12 the directory PE was rank 0 of the process, which concentrated every
+hashed-kind home of a single-process run on PE 0 (1.62x on unbounded cold sends,
+doc/objid64-perf.md); the rank chosen from the key's quotient removes that without a
+shared table. Nothing about the home is checkpointed, so the change is invisible to
+restart. The spread is limited by keys per process (2^H / processes): with the default
+expand factor there are 8 to 16 keys per process, so at most that many ranks of a
+process serve as homes; +objid_expand raises it.
 
 ### 3.4 Reverse lookup
 
@@ -256,7 +283,8 @@ creation; a buffer-kind message never recovers the index.
     int CkLocMgr::homePe(const CkArrayIndex& idx) const   // exists; semantics per kind
     int CkLocMgr::homePe(CmiUInt8 id) const               // exists but dead; becomes live:
         compressor ? homePe(compressor->decompress(id))
-                   : CkNodeFirst(ObjID::hashKey(id) % CkNumNodes())
+                   : hashedHomePe(ObjID::hashKey(id))        // 3.3: process from the
+                                                            // remainder, rank from the quotient
 
 CkLocCache gets a back-pointer `CkLocMgr* mgr` (set by CkLocMgr's constructor and by
 its pup; the cache is created first, ckarray.C:653-660; bound arrays share both).
@@ -331,7 +359,7 @@ receiver's cached epoch + 1 as today (:106).
 As implemented (PR 1a fixes, 2026-10-09, after Aditya's review of #4017): the
 synchronous update stays, through CkLocMgr::updateLocationFromLB(id, pe), so every
 PE but the source addresses the element at its destination before the move is acted
-on (the CentralLB invariant; multiHop asserts in this mode). The balancer's decision
+on (the CentralLB invariant). The balancer's decision
 (MigrateInfo) does not carry the element's epoch, so the entry is counted from the
 receiver's cache as before; that count never exceeds the true epoch (both advance by
 one per migration, and a bystander's starts no higher), so the destination's insert
@@ -381,7 +409,7 @@ PE count).
 Tranches: the allocator cursor `trancheTop` is part of the PE 0 CkLocMgr branch's
 pup, so it is restored on every restart path (same count or shrink/expand). Every
 process discards its pre-restart tranche and obtains a fresh one from the allocator
-before user code resumes (section 3.1). The initial region is considered fully
+at its first insertion after the restart (section 3.1). The initial region is considered fully
 consumed after the first launch; the allocator never hands out from it. This
 replaces the per-PE `p | idCounter`, which under shrink/expand is restored from
 PE 0's copy on every PE and can collide.

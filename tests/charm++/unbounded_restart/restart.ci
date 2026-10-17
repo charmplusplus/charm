@@ -1,11 +1,12 @@
 mainmodule restart {
   readonly CProxy_Main mainProxy;
   readonly CProxy_Elem arrProxy;
-  mainchare Main {
+  initnode void unbufferStdout(void);
+  mainchare [migratable] Main {
     entry Main(CkArgMsg *m);
-    entry [reductiontarget] void ready();
+    entry void reportId(int idx, CmiUInt8 id);
     entry void checkpointed();
-    entry [reductiontarget] void done();
+    entry void pong(int idx, CmiUInt8 id, int pe);
   };
   array [1D] Elem {
     entry Elem();
