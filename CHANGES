@@ -1,10 +1,12 @@
 This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 ================================================================================
-What's new in Charm++ 9.0.0 (alpha)
+What's new in Charm++ 9.0.0-alpha1
 ================================================================================
 
-(Draft: section to be completed at the 9.0.0-alpha1 tag.)
+First pre-release of the 9.0 line. Alpha tags are cut from the
+'recharm' branch as work lands; the gaps listed at the end of this
+section close in later alphas and the beta.
 
 Charm++ 9.0 runs on reconverse, a new implementation of Converse,
 included as the contrib/reconverse submodule (#3944, #3969). The
@@ -22,7 +24,18 @@ Runtime:
 - Programs start without charmrun: './app +pe N' runs N PEs in one
   process; multi-process runs use lcrun (or srun / mpirun), with +pe
   giving the total PE count. There is no communication thread, so
-  every core can run a worker PE.
+  every core can run a worker PE. The manual's Running chapter
+  describes the reconverse launch options (#4043).
+
+- CCS: the server, handler registry and request forwarding live in
+  reconverse (reconverse #280); charm keeps the CCS builtins, liveViz
+  and PythonCCS on top of them (#4037, #4042).
+
+- +glibc_tuned_malloc: opt-in glibc malloc tuning for processes with
+  many PEs, Linux only (reconverse #275).
+
+- Scheduler order: a PE takes node-level work before its own queued
+  work, the order classic used (reconverse #268, #274).
 
 - GPU support on reconverse: portable HAPI core (#3951),
   device-to-device communication (#3955), device zerocopy with
@@ -36,7 +49,9 @@ New on this line since the split from classic:
 
 - Broadcasts and [nokeep] entry methods: fixes for message reuse and
   copies (#4000-#4012). Checkpoint restart no longer hangs with more
-  than one process and more than one PE per process (#4019).
+  than one process and more than one PE per process (#4019). The
+  location manager initializes its destruction flag, so deleting an
+  array element no longer leaves a stale entry at its home (#4044).
 
 - CkTreeCacheManager, a process-shared tree store with CkCache's
   protocol (#4013, #4014).
@@ -60,10 +75,7 @@ Known gaps in the alpha:
 - AMPI is not yet ported to reconverse; Windows multicore is not yet
   available.
 
-- CCS (and with it PythonCCS and the liveViz server) works on
-  reconverse (#4037), except CCS multicast requests, which abort
-  with a message. The CCS core moves from charm into reconverse
-  before the beta (reconverse #278). CharmDebug is not available.
+- CharmDebug is not available.
 
 - MPI interoperation (user-driven interop) is not supported.
 
