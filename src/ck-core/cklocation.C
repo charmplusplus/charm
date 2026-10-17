@@ -48,6 +48,13 @@ CkpvExtern(int, currentChareIdx);
 CpvExtern(void*, CkGridObject);
 #endif
 
+// Per-PE registries of location managers by collection number (ck::objid::
+// registerLocMgr / lookupLocMgr), one per id layout; initialized with the
+// migratable-object state in _CkMigratable_initInfoInit.
+typedef std::vector<CkLocMgr*> LocMgrRegistry;
+CkpvStaticDeclare(LocMgrRegistry, _objidLocMgrsStandard);
+CkpvStaticDeclare(LocMgrRegistry, _objidLocMgrsWide);
+
 #define ARRAY_DEBUG_OUTPUT 0
 
 #if ARRAY_DEBUG_OUTPUT
@@ -96,10 +103,9 @@ int _messageBufferingThreshold;
 void UpdateLocation(MigrateInfo& migData)
 {
   const ck::ObjID oid(migData.obj.id);
-  const CkGroupID locMgrGid = oid.getCollectionID();
-  if (locMgrGid.idx == 0)
+  CkLocMgr* mgr = ck::objid::lookupLocMgr(oid.getCollectionNumber(), oid.isWide());
+  if (mgr == nullptr)
     return;
-  CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(locMgrGid);
   mgr->updateLocationFromLB(oid.getElementID(), migData.to_pe);
 }
 #  endif
@@ -1697,6 +1703,8 @@ CkpvDeclare(CkMigratable_initInfo, mig_initInfo);
 void _CkMigratable_initInfoInit(void)
 {
   CkpvInitialize(CkMigratable_initInfo, mig_initInfo);
+  CkpvInitialize(LocMgrRegistry, _objidLocMgrsStandard);
+  CkpvInitialize(LocMgrRegistry, _objidLocMgrsWide);
 #if CMK_OUT_OF_CORE
   _CkMigratable_prefetchInit();
 #endif
@@ -2106,7 +2114,7 @@ CkLocRec::CkLocRec(CkLocMgr* mgr, bool fromMigration, bool ignoreArrival,
   if (_lb_args.metaLbOn())
     the_metalb = mgr->getMetaBalancer();
 #  if CMK_GLOBAL_LOCATION_UPDATE
-  id_ = ck::ObjID(mgr->getGroupID(), id_).getID();
+  id_ = mgr->makeID(id_).getID();
 #  endif
   ldHandle = lbmgr->RegisterObj(mgr->getOMHandle(), id_, (void*)this, 1);
   if (fromMigration)
@@ -2368,6 +2376,19 @@ void pupLayout(PUP::er& p)
     CkAbort("Checkpoint has no object id layout record (written by a Charm++ build"
             " before the 64-bit object id redesign, or corrupt); this build cannot"
             " restore it.\n");
+  // The field widths of both layouts: ids restored from the checkpoint were cut
+  // with them, so a build with other widths must not misdecode them.
+  int collectionBits = ObjID::bits::COLLECTION_BITS;
+  int wideCollectionBits = ObjID::bits::WIDE_COLLECTION_BITS;
+  p | collectionBits;
+  p | wideCollectionBits;
+  if (p.isUnpacking() && (collectionBits != ObjID::bits::COLLECTION_BITS ||
+                          wideCollectionBits != ObjID::bits::WIDE_COLLECTION_BITS))
+    CkAbort("Checkpoint was written by a Charm++ build with %d collection bits in"
+            " element ids (%d wide); this build has %d (%d wide). Restore it with a"
+            " build of the same -DCMK_OBJID_COLLECTION_BITS.\n",
+            collectionBits, wideCollectionBits, (int)ObjID::bits::COLLECTION_BITS,
+            (int)ObjID::bits::WIDE_COLLECTION_BITS);
   if (p.isUnpacking())
   {
     Layout restored;
@@ -2418,6 +2439,71 @@ CmiUInt8 indexHashKey(const CkArrayIndex& idx)
   h = mix64(h);
   const int keyBits = CksvAccess(_objidLayout).keyBits;
   return h >> (64 - keyBits);
+}
+
+// Collection numbers are handed out on PE 0 only (CkCreateArray runs there), so
+// plain statics suffice; a restart bumps them past every restored number.
+static CmiUInt8 _nextStandardCollection = 1;
+static CmiUInt8 _nextWideCollection = ObjID::limits::WIDE_FIRST;
+static bool _wideSuggestionPrinted = false;
+
+CmiUInt8 nextCollectionNumber(bool wide)
+{
+  CkAssert(CkMyPe() == 0);
+  if (wide)
+  {
+    if (_nextWideCollection >= ObjID::limits::WIDE_LIMIT)
+      CkAbort("Charm++ ran out of wide-collection numbers: %" PRIu64 " chare arrays with"
+              " setWideCollection() exist (the limit with %d collection bits).\n",
+              (CmiUInt8)ObjID::limits::WIDE_LIMIT - ObjID::limits::WIDE_FIRST,
+              (int)ObjID::bits::WIDE_COLLECTION_BITS);
+    return _nextWideCollection++;
+  }
+  if (_nextStandardCollection >= ObjID::limits::STANDARD_LIMIT)
+    CkAbort("Charm++ ran out of collection numbers: %" PRIu64 " chare arrays exist (the"
+            " limit with %d collection bits). Create small bounded arrays with"
+            " CkArrayOptions::setWideCollection(), or rebuild with"
+            " -DCMK_OBJID_COLLECTION_BITS=N.\n",
+            (CmiUInt8)ObjID::limits::STANDARD_LIMIT - 1, (int)ObjID::bits::COLLECTION_BITS);
+  if (!_wideSuggestionPrinted && _nextStandardCollection >= ObjID::limits::STANDARD_LIMIT / 2)
+  {
+    _wideSuggestionPrinted = true;
+    CkPrintf("Charm++> %" PRIu64 " chare arrays created, half of the %" PRIu64 " that element"
+             " ids can name with %d collection bits. A program that creates many small"
+             " bounded arrays can create them with CkArrayOptions::setWideCollection()"
+             " (%" PRIu64 " collections) instead of rebuilding with"
+             " -DCMK_OBJID_COLLECTION_BITS.\n",
+             _nextStandardCollection, (CmiUInt8)ObjID::limits::STANDARD_LIMIT - 1,
+             (int)ObjID::bits::COLLECTION_BITS,
+             (CmiUInt8)ObjID::limits::WIDE_LIMIT - ObjID::limits::WIDE_FIRST);
+  }
+  return _nextStandardCollection++;
+}
+
+void noteRestoredCollection(CmiUInt8 number, bool wide)
+{
+  if (CkMyPe() != 0) return;
+  CmiUInt8& next = wide ? _nextWideCollection : _nextStandardCollection;
+  if (number >= next) next = number + 1;
+}
+
+// One registry per PE: two vectors (standard, wide) indexed by collection number.
+// A restart re-registers every manager from its pup, so the vectors match the
+// numbers in restored ids.
+void registerLocMgr(CkLocMgr* mgr)
+{
+  const bool wide = mgr->isWideCollection();
+  const CmiUInt8 n = mgr->getCollectionNumber();
+  if (n == 0) return;  // a manager created without CkCreateArray (none today)
+  LocMgrRegistry& reg = wide ? CkpvAccess(_objidLocMgrsWide) : CkpvAccess(_objidLocMgrsStandard);
+  if (reg.size() <= n) reg.resize(n + 1, nullptr);
+  reg[n] = mgr;
+}
+
+CkLocMgr* lookupLocMgr(CmiUInt8 number, bool wide)
+{
+  LocMgrRegistry& reg = wide ? CkpvAccess(_objidLocMgrsWide) : CkpvAccess(_objidLocMgrsStandard);
+  return number < reg.size() ? reg[number] : nullptr;
 }
 
 }  // namespace objid
@@ -2746,6 +2832,10 @@ void CkLocCache::insert(CmiUInt8 id, int epoch)
 /*************************** LocMgr: CREATION *****************************/
 CkLocMgr::CkLocMgr(CkArrayOptions opts)
     : bounds(opts.getBounds()),
+      wideCollection(opts.isWideCollection()),
+      collectionNumber(opts.getCollectionNumber()),
+      payloadBits(opts.isWideCollection() ? (int)ck::ObjID::bits::WIDE_PAYLOAD_BITS
+                                          : (int)ck::ObjID::bits::PAYLOAD_BITS),
       tranche(nullptr),
       restoredFromCheckpoint(false),
       allocNext(0),
@@ -2772,8 +2862,25 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
     CkAbort("ERROR! Local branch of location cache is NULL!\n");
   cache->setManager(this);
 
+  ck::objid::registerLocMgr(this);
+
   // Figure out the mapping from indices to object IDs if one is possible
-  compressor = ck::FixedArrayIndexCompressor::make(bounds);
+  compressor = ck::FixedArrayIndexCompressor::make(bounds, payloadBits);
+  if (wideCollection && compressor == nullptr)
+  {
+    // The wide layout's 37-bit payload is too narrow for hashed ids at scale
+    // (design 12.2), so a wide array must pack its index.
+    const unsigned int need = ck::FixedArrayIndexCompressor::bitsNeeded(bounds);
+    if (need == 0)
+      CkAbort("Chare array (location manager %d) has setWideCollection() but no bounds."
+              " A wide-collection array packs its index into element ids, so it needs"
+              " CkArrayOptions::setBounds(...) with its full index space.\n",
+              thisgroup.idx);
+    CkAbort("Chare array (location manager %d) has setWideCollection() and bounds that"
+            " need %u bits to pack its index, but a wide-collection id holds %d. Use"
+            " smaller bounds, or the standard layout (%d bits) without it.\n",
+            thisgroup.idx, need, payloadBits, (int)ck::ObjID::bits::PAYLOAD_BITS);
+  }
   if (compressor == nullptr)
   {
     // The allocator's pool: the upper half of the unique space. Only PE 0's branch
@@ -2793,7 +2900,7 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
       CkPrintf("Charm++> Note: chare array (location manager %d) has bounds that need %u"
                " bits to pack its index, but element ids hold %d; elements use hashed"
                " ids and an index map.\n",
-               thisgroup.idx, need, (int)ck::ObjID::bits::PAYLOAD_BITS);
+               thisgroup.idx, need, payloadBits);
     else if (opts.getNumInitial().dimension > 0 || opts.getEnd().dimension > 0)
       CkPrintf("Charm++> Note: chare array (location manager %d) was given an initial"
                " size but no bounds, so its index is not packed into element ids;"
@@ -2840,6 +2947,9 @@ void CkLocMgr::pup(PUP::er& p)
   p | mapHandle;
   p | cacheID;
   p | bounds;
+  p | wideCollection;
+  p | collectionNumber;
+  p | payloadBits;
   // The allocator's state (meaningful on PE 0, whose copy every PE restores after a
   // shrink/expand). Per-process tranches are not checkpointed: after any restart a
   // process starts empty and takes its first tranche from the allocator, so ids
@@ -2868,7 +2978,9 @@ void CkLocMgr::pup(PUP::er& p)
       CkAbort("ERROR! Local branch of location cache is NULL!");
     cache->setManager(this);
 
-    compressor = ck::FixedArrayIndexCompressor::make(bounds);
+    compressor = ck::FixedArrayIndexCompressor::make(bounds, payloadBits);
+    ck::objid::registerLocMgr(this);
+    ck::objid::noteRestoredCollection(collectionNumber, wideCollection);
     tranche = nullptr;
     // A location manager is only ever unpacked at a restart. The process's first
     // tranche is requested by the first insertion that needs one (getTranche).
