@@ -26,6 +26,28 @@ G7 Every capacity limit aborts with a message naming the build flag to raise.
 
 ## 1. Id layout (src/ck-core/objid.h)
 
+    bit   63 62 61 | 60                      49 | 48                          0
+         +---------+----------------------------+------------------------------+
+         |  0 0 0  |   COLLECTION   (C = 12)    |      PAYLOAD   (64-3-C = 49) |  standard layout
+         +---------+----------------------------+------------------------------+
+
+    bit   63 62 61 | 60                      37 | 36            0
+         +---------+----------------------------+----------------+
+         |  0 0 1  |   COLLECTION   (24)        |  PAYLOAD (37)  |  wide layout (PR 1d, section 12)
+         +---------+----------------------------+----------------+
+
+    PAYLOAD of an array with bounds (packed kind, either layout; section 2):
+         +----------------------------------------------------------------------+
+         |              the element's index, packed into the field              |
+         +----------------------------------------------------------------------+
+
+    PAYLOAD of an array without bounds (hashed kind, standard layout only; section 3):
+         +-----------------------+----------------------------------------------+
+         |   HOME KEY (H bits)   |        UNIQUE NUMBER (49 - H bits)           |
+         +-----------------------+----------------------------------------------+
+
+Field by field:
+
     bit 63..61  TYPE_TAG        3   000 = standard layout, 001 = wide layout (PR 1d, section 12)
     bit 60..49  COLLECTION      C   default 12   -DCMK_OBJID_COLLECTION_BITS (build time)
     bit 48..0   PAYLOAD         64-3-C = 49
