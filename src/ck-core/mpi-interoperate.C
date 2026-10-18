@@ -23,6 +23,7 @@ extern void LrtsDrainResources(); /* used when exit */
 extern bool _ringexit;		    // for charm exit
 extern int _ringtoken;
 extern void _initCharm(int unused_argc, char **argv);
+extern void _registerTraceInitHook();
 extern void _sendReadonlies();
 void CommunicationServerThread(int sleepTime);
 extern int CharmLibInterOperate;
@@ -110,18 +111,13 @@ void _libExitHandler(envelope *env)
 // initializes the runtime, but does not start the scheduler or send readonlies.
 // It returns control the main after main chares have been created.
 void CharmBeginInit(int argc, char** argv) {
-#if (!defined CMK_USE_LRTS || !CMK_USE_LRTS) && !CMK_RECONVERSE
+#if !CMK_USE_LRTS && !CMK_RECONVERSE
   CmiAbort("Interop is not supported in non-LRTS machine layers.");
 #endif
 
   userDrivenMode = 1;
   CharmLibInterOperate = true;
-#if CMK_TRACE_ENABLED && CMK_RECONVERSE
-  // Interop bypasses charm_main, which is where the trace-init hook is
-  // normally handed to reconverse's ConverseInit; without it the trace array
-  // is never created and _initCharm dereferences a null CkpvAccess(_traces).
-  registerTraceInit(traceInit);
-#endif
+  _registerTraceInitHook();
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
 }
 
@@ -157,6 +153,13 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
     CmiAbort("mpi-interoperate not supported in this machine layer; did you mean to use CharmInit?");
   }
 #endif
+#if CMK_RECONVERSE
+  // Reconverse has no communicator to hand Charm++, so userComm would be
+  // silently ignored; only the user-driven form (CharmInit) works.
+  if(!userDrivenMode) {
+    CmiAbort("MPI interop is not supported on reconverse yet; did you mean to use CharmInit?");
+  }
+#endif
 
 #if CMK_CONVERSE_MPI
   if(!userDrivenMode) {
@@ -165,6 +168,7 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
 #endif
 
   CharmLibInterOperate = true;
+  _registerTraceInitHook();
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
   StartInteropScheduler();
 }
