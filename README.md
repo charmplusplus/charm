@@ -270,7 +270,7 @@ netlrts-linux-x86_64/
    |
    ---  bin/             # all executables
    |
-   ---  doc/             # documentations
+   ---  doc/             # documentations (doc/internals/ for how the runtime works inside)
    |
    ---  include/         # header files
    |
@@ -369,7 +369,9 @@ GitHub provides a detailed tutorial on creating pull requests
 (https://docs.github.com/en/pull-requests/collaborating-with-pull-requests). 
 
 Each pull request must pass code review and CI tests before it can be merged by someone on
-the core development team.
+the core development team. A pull request that changes how a subsystem works also updates
+that subsystem's chapter in [doc/internals/](doc/internals/README.md), or adds the chapter
+to the list there if none exists yet.
 Our wiki contains additional information about pull requests
 (https://github.com/charmplusplus/charm/wiki/Working-with-Pull-Requests).
 
@@ -377,6 +379,9 @@ Our wiki contains additional information about pull requests
 ## For More Information
 
 The Charm++ documentation is at https://charm.readthedocs.io/
+
+How the runtime works inside, for people who work on the runtime itself,
+is described chapter by chapter in [doc/internals/](doc/internals/README.md).
 
 The Charm++ web page, with more information, more programs,
 and the latest version of Charm++, is at https://charmplusplus.org
