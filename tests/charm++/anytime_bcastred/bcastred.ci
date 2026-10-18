@@ -8,6 +8,7 @@ mainmodule bcastred {
   readonly int gSeed;
   readonly int verbose;
   readonly int useP2P;
+  readonly int unbounded;
 
   mainchare Main {
     entry Main(CkArgMsg*);

@@ -1,0 +1,49 @@
+mainmodule objid_bound {
+  initnode void unbufferStdout(void);
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_A aProxy;
+  readonly CProxy_B bProxy;
+  readonly CProxy_C cProxy;
+  readonly int nElems;
+  readonly int nRounds;
+  readonly int lbMode;
+  readonly int useC;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void roundSum(long long sum);
+    entry void qdDone();
+    entry [reductiontarget] void resumed(long long roundSum);
+    entry [reductiontarget] void statsA(long long migrations);
+    entry [reductiontarget] void statsB(long long migrations);
+    entry void checkProgress();
+    entry void cCreated(int idx, int pe);
+    entry void cStats(int idx, int pokes, long long migrations);
+  };
+
+  array [1D] A {
+    entry A();
+    entry void step(int r);
+    entry void fromB(int r, int srcIdx, int srcPe, long long val);
+    entry void pokeAck(int r, int cIdx, int cPe);
+    entry void migrateNow(int r);
+    entry void report();
+    entry void dumpState();
+  };
+
+  array [1D] B {
+    entry B();
+    entry void fromA(int r, int srcIdx, int srcPe, long long val);
+    entry void report();
+    entry void dumpState();
+  };
+
+  // Never inserted: every element is demand-created by its first poke,
+  // which arrives on a PE where the bound sibling A[i] (and B[i]) lives.
+  array [1D] C {
+    entry C();
+    entry [createhome] void poke(int r, int senderPe);
+    entry void report();
+    entry void dumpState();
+  };
+};

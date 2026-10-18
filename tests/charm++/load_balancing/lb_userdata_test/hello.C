@@ -25,6 +25,12 @@ public:
     if (m->argc > 3) lbstep = atoi(m->argv[3]);
     delete m;
 
+#if !CMK_LB_USER_DATA
+    CkPrintf("CMK_LB_USER_DATA is not enabled in this build; skipping the test.\n");
+    CkExit();
+    return;
+#endif
+
     //Start the computation
     CkPrintf("Running Hello on %d processors for %d elements for %d steps lb %d\n",
 	     CkNumPes(),nElements, nSteps, lbstep);

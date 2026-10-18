@@ -1,3 +1,5 @@
+-include ../../include/conv-mach-opt.mak
+
 DIRS = \
   commbench \
   cthtest \
@@ -5,6 +7,17 @@ DIRS = \
   pingpong \
   randomttl \
   kNeighbors \
+
+# Not applicable on reconverse: commbench is C, and reconverse's converse.h
+# declares the Converse API without CLINKAGE, so libreconverse exports it with
+# C++ linkage and C objects do not link (tracked in charm #4035).
+ifeq ($(CMK_GDIR),reconverse)
+RECONVERSE_NA = \
+  commbench \
+
+endif
+
+DIRS := $(filter-out $(RECONVERSE_NA),$(DIRS))
 
 TESTDIRS = $(DIRS)
 

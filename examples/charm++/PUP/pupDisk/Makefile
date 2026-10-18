@@ -12,7 +12,7 @@ pupDisk.decl.h: pupDisk.ci
 	$(CHARMC)  pupDisk.ci
 
 clean:
-	rm -f *.decl.h *.def.h conv-host *.o pupDisk charmrun
+	rm -f *.decl.h *.def.h conv-host *.o pupDisk charmrun diskfile.*
 
 pupDisk.o: pupDisk.C pupDisk.h someData.h pupDisk.decl.h
 	$(CHARMC) -c pupDisk.C

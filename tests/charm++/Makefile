@@ -8,7 +8,6 @@ DIRS = \
   load_balancing \
   chkpt \
   delegation \
-  queue \
   sdag \
   ckAllocSysMsgTest \
   method_templates \
@@ -35,20 +34,23 @@ DIRS = \
   amr_1d_simple \
   anytime_migration \
   unbounded_migration \
+  unbounded_restart \
   anytime_bcastred \
+  objid_home \
+  objid_insert \
+  objid_sections \
+  objid_bound \
+  objid_tranche \
   qd \
 
 FTDIRS = \
   jacobi3d \
   jacobi3d-sdag \
 
-# Not applicable on reconverse: queue tests classic's Cqs API, which the
-# reconverse build does not compile (reconverse has its own queue and its own
-# test for it); longIdle needs CcdCallOnConditionOnPE, which reconverse does
-# not provide.
+# Not applicable on reconverse: longIdle needs CcdCallOnConditionOnPE, which
+# reconverse does not provide.
 ifeq ($(CMK_GDIR),reconverse)
 RECONVERSE_NA = \
-  queue \
   longIdle \
 
 endif
@@ -57,7 +59,6 @@ TESTDIRS = $(filter-out $(FTDIRS) $(RECONVERSE_NA),$(DIRS))
 
 NONSCALEDIRS = \
   alignment \
-  queue \
   sdag \
   sparse \
   charmxi_parsing \

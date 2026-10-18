@@ -87,25 +87,21 @@ int _messageBufferingThreshold;
 #if CMK_LBDB_ON
 
 #  if CMK_GLOBAL_LOCATION_UPDATE
+// Called by the load balancer on every PE but the source, for each migration it
+// decided, before the move is acted on (CentralLB::ReceiveMigration): from here on
+// this PE addresses the element at its destination, so no message takes an extra
+// hop (which CkLocMgr::multiHop asserts against in this mode). Keyed by id: the
+// index is not recoverable on a PE that has never seen a hashed-kind element, and
+// is not needed.
 void UpdateLocation(MigrateInfo& migData)
 {
-  CkGroupID locMgrGid = ck::ObjID(migData.obj.id).getCollectionID();
+  const ck::ObjID oid(migData.obj.id);
+  const CkGroupID locMgrGid = oid.getCollectionID();
   if (locMgrGid.idx == 0)
-  {
     return;
-  }
-  CkLocMgr* localLocMgr = (CkLocMgr*)CkLocalBranch(locMgrGid);
-  CkLocCache *cache = (CkLocCache *)CkLocalBranch(localLocMgr->getLocationCache());
-
-  CmiUInt8 elementID = ck::ObjID(migData.obj.id).getElementID();
-  CkArrayIndex idx = localLocMgr->lookupIdx(elementID);
-
-  CkLocEntry entry;
-  entry.id = elementID;
-  entry.pe = migData.to_pe;
-  entry.epoch = cache->getEpoch(elementID) + 1;
-
-  localLocMgr->updateLocation(idx, entry);}
+  CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(locMgrGid);
+  mgr->updateLocationFromLB(oid.getElementID(), migData.to_pe);
+}
 #  endif
 
 #endif
@@ -2342,53 +2338,352 @@ void CkLocMgr::flushLocalRecs(void)
 // All records are local records after the 64bit ID update
 void CkLocMgr::flushAllRecs(void) { flushLocalRecs(); }
 
+/*************************** Object id layout and tranches **************************/
+// One copy per process; written by rank 0 at startup and by the checkpoint restore,
+// read by every PE after the node barriers that follow both.
+CksvDeclare(ck::objid::Layout, _objidLayout);
+
+namespace ck {
+namespace objid {
+
+static int ceilLog2(CmiUInt8 n)
+{
+  int b = 0;
+  while (((CmiUInt8)1 << b) < n) ++b;
+  return b;
+}
+
+const Layout& getLayout() { return CksvAccess(_objidLayout); }
+
+// Precedes the layout in a checkpoint, so that a checkpoint written without one
+// (by a build before the 64-bit object id redesign) fails here, not by misreading
+// what follows as readonly messages.
+static const int LAYOUT_MARKER = 0x4F424A31;  // "OBJ1"
+
+void pupLayout(PUP::er& p)
+{
+  int marker = LAYOUT_MARKER;
+  p | marker;
+  if (p.isUnpacking() && marker != LAYOUT_MARKER)
+    CkAbort("Checkpoint has no object id layout record (written by a Charm++ build"
+            " before the 64-bit object id redesign, or corrupt); this build cannot"
+            " restore it.\n");
+  if (p.isUnpacking())
+  {
+    Layout restored;
+    restored.pup(p);
+    CmiLock(CksvAccess(_nodeLock));
+    CksvAccess(_objidLayout) = restored;
+    CmiUnlock(CksvAccess(_nodeLock));
+  }
+  else
+  {
+    Layout current = getLayout();
+    current.pup(p);
+  }
+}
+
+void initLayout(int expandFactor, int trancheLog2Cap)
+{
+  CksvInitialize(Layout, _objidLayout);
+  Layout& l = CksvAccess(_objidLayout);
+  if (expandFactor < 1) expandFactor = 1;
+  l.expandFactor = expandFactor;
+  l.trancheLog2Cap = trancheLog2Cap > 0 ? trancheLog2Cap : 0;
+  l.nodesAtLaunch = CkNumNodes();
+  int keyBits = ceilLog2((CmiUInt8)CkNumNodes() * (CmiUInt8)expandFactor);
+  if (keyBits < 1) keyBits = 1;
+  if (keyBits > 24) keyBits = 24;
+  l.keyBits = keyBits;
+  l.uniqueBits = ObjID::bits::PAYLOAD_BITS - keyBits;
+  // A layout too narrow for hashed ids is rejected when the first hashed-kind array
+  // asks for a tranche (CkLocMgr::getTranche), not here: a run with only packed
+  // arrays never needs the unique bits.
+}
+
+static inline CmiUInt8 mix64(CmiUInt8 z)
+{
+  // splitmix64 finalizer
+  z += 0x9e3779b97f4a7c15ULL;
+  z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+  z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+  return z ^ (z >> 31);
+}
+
+CmiUInt8 indexHashKey(const CkArrayIndex& idx)
+{
+  CmiUInt8 h = 0x243f6a8885a308d3ULL ^ ((CmiUInt8)idx.nInts << 8) ^ (CmiUInt8)idx.dimension;
+  for (int i = 0; i < idx.nInts; ++i)
+    h = mix64(h ^ (CmiUInt8)(unsigned int)idx.index[i]);
+  h = mix64(h);
+  const int keyBits = CksvAccess(_objidLayout).keyBits;
+  return h >> (64 - keyBits);
+}
+
+}  // namespace objid
+}  // namespace ck
+
+// One tranche per process per location manager, shared by the process's PEs.
+using TrancheTable = std::unordered_map<int, ck::objid::Tranche*>;
+CksvDeclare(TrancheTable*, _objidTranches);
+
+static int floorLog2(CmiUInt8 n)
+{
+  int b = -1;
+  while (n) { ++b; n >>= 1; }
+  return b < 0 ? 0 : b;
+}
+
+// Size of a process's initial tranche: the lower half of the unique space split
+// evenly among the processes present at launch. The upper half is the allocator's
+// pool for refills and for every process after a restart. Divided by the current
+// process count, not the launch count: an array created after an expand splits its
+// (untouched) initial region among the processes that exist now, and a larger launch
+// share would run into the allocator's half. +objid_tranche_log2 caps it (and every
+// grant) for tests that need to see refills.
+static CmiUInt8 initialTrancheSize(const ck::objid::Layout& l)
+{
+  int shareBits = l.uniqueBits - 1 - ck::objid::ceilLog2((CmiUInt8)CkNumNodes());
+  if (l.trancheLog2Cap > 0 && shareBits > l.trancheLog2Cap) shareBits = l.trancheLog2Cap;
+  return shareBits > 0 ? ((CmiUInt8)1 << shareBits) : 1;
+}
+
+ck::objid::Tranche* CkLocMgr::getTranche()
+{
+  if (tranche) return tranche;
+  CmiLock(CksvAccess(_nodeLock));
+  TrancheTable*& table = CksvAccess(_objidTranches);
+  if (table == nullptr) table = new TrancheTable();
+  auto itr = table->find(thisgroup.idx);
+  if (itr == table->end())
+  {
+    const ck::objid::Layout& l = ck::objid::getLayout();
+    if (l.uniqueBits < 16)
+      CkAbort("Object id layout: %d processes x expand factor %d need %d home key bits,"
+              " leaving %d unique bits of the %d-bit payload (minimum 16) for chare"
+              " array %d, whose index is not packed into ids. Lower +objid_expand,"
+              " give the array bounds, or rebuild with fewer"
+              " -DCMK_OBJID_COLLECTION_BITS.\n",
+              l.nodesAtLaunch, l.expandFactor, l.keyBits, l.uniqueBits,
+              (int)ck::ObjID::bits::PAYLOAD_BITS, thisgroup.idx);
+    ck::objid::Tranche* t = new ck::objid::Tranche();
+    if (!restoredFromCheckpoint)
+    {
+      // A new array: this process's share of the initial region, no message needed.
+      const CmiUInt8 size = initialTrancheSize(l);
+      const CmiUInt8 begin = (CmiUInt8)CkMyNode() * size;
+      t->len = size;
+      t->cursor.store(begin, std::memory_order_relaxed);
+      t->end.store(begin + size, std::memory_order_release);
+      t->refillAt.store(begin + size / 2, std::memory_order_relaxed);
+    }
+    // Restored from a checkpoint: the initial region is spent (the restored ids came
+    // from it). Start empty; the first insertion on this process asks the allocator
+    // (mintUnique) and is deferred until the grant arrives. Asking here, for every
+    // process at every restart, would spend a grant per process per restart whether
+    // or not anything is ever inserted.
+    itr = table->emplace(thisgroup.idx, t).first;
+  }
+  tranche = itr->second;
+  CmiUnlock(CksvAccess(_nodeLock));
+  return tranche;
+}
+
+void CkLocMgr::requestTrancheFromAllocator(int wantLog2)
+{
+  thisProxy[0].requestTranche(CkMyNode(), wantLog2);
+}
+
+bool CkLocMgr::mintUnique(CmiUInt8& u)
+{
+  ck::objid::Tranche* t = getTranche();
+  CmiNodeLock lock = CksvAccess(_nodeLock);
+  for (;;)
+  {
+    // Read end before bumping the cursor: a tranche is installed by storing the
+    // cursor first and the end (release) second, so a number taken after an end we
+    // saw is in that tranche, and a number from an older cursor fails the test and
+    // is merely wasted, never reused.
+    const CmiUInt8 e = t->end.load(std::memory_order_acquire);
+    u = t->cursor.fetch_add(1, std::memory_order_relaxed);
+    if (u < e)
+    {
+      if (u >= t->refillAt.load(std::memory_order_relaxed))
+      {
+        // Half of the tranche is used: ask for the next one, once.
+        bool send = false;
+        int want = 0;
+        CmiLock(lock);
+        if (!t->haveNext && !t->requested)
+        {
+          t->requested = true;
+          send = true;
+          want = floorLog2(t->len) + 1;
+        }
+        t->refillAt.store(~(CmiUInt8)0, std::memory_order_relaxed);
+        CmiUnlock(lock);
+        if (send) requestTrancheFromAllocator(want);
+      }
+      return true;
+    }
+    // Exhausted. Under the lock: swap in the spare if it is here, else make sure a
+    // request is in flight and register this PE to be woken by the grant.
+    CmiLock(lock);
+    if (t->cursor.load(std::memory_order_relaxed) < t->end.load(std::memory_order_relaxed))
+    {
+      CmiUnlock(lock);  // another PE installed the spare meanwhile
+      continue;
+    }
+    if (t->haveNext)
+    {
+      t->len = t->nextLen;
+      t->haveNext = false;
+      t->cursor.store(t->nextBase, std::memory_order_relaxed);
+      t->end.store(t->nextBase + t->nextLen, std::memory_order_release);
+      t->refillAt.store(t->nextBase + t->nextLen / 2, std::memory_order_relaxed);
+      CmiUnlock(lock);
+      continue;
+    }
+    bool send = false;
+    int want = 0;
+    if (!t->requested)
+    {
+      t->requested = true;
+      send = true;
+      // Twice the current tranche; a process with none yet (after a restart) asks
+      // for 0, which the allocator reads as "the first grant", whose size it sets
+      // from the pool and the process count (requestTranche), and doubles from there.
+      want = t->len ? floorLog2(t->len) + 1 : 0;
+    }
+    if (std::find(t->waitingPes.begin(), t->waitingPes.end(), CkMyPe()) == t->waitingPes.end())
+      t->waitingPes.push_back(CkMyPe());
+    CmiUnlock(lock);
+    if (send) requestTrancheFromAllocator(want);
+    return false;
+  }
+}
+
+// PE 0: hand out the next tranche. Sizes are powers of two: what the requester asks
+// for (twice its current tranche), at least a floor and at most a cap that leaves
+// every process several more grants. The floor is the first grant after a restart
+// (the requester asks for 0): 2^FIRST_GRANT_LOG2, or 1/64 of the cap when that is
+// smaller, so that a restart on which every process inserts costs the pool at most
+// 1/512 of itself (processes x cap/64 = region / 512) however many processes there
+// are. The floor must stay well below the cap, or the doubling never takes effect
+// and every grant is a fixed fraction of the pool: with the launch share as the
+// floor a restart cost 1/8 of the pool and the ninth restart in a chain aborted;
+// with a flat 2^16 the same happened from 8192 processes up, where the cap is 2^16
+// (Aditya's reviews of #4021). +objid_tranche_log2 caps both for tests.
+void CkLocMgr::requestTranche(int node, int wantLog2)
+{
+  CkAssert(CkMyPe() == 0);
+  const ck::objid::Layout& l = ck::objid::getLayout();
+  const CmiUInt8 region = (CmiUInt8)1 << (l.uniqueBits - 1);
+  int capLog2 = floorLog2(region / (8 * (CmiUInt8)CkNumNodes()));
+  if (capLog2 < 0) capLog2 = 0;
+  int minLog2 = ck::objid::FIRST_GRANT_LOG2;
+  if (minLog2 > capLog2 - 6) minLog2 = capLog2 - 6;
+  if (minLog2 < 0) minLog2 = 0;
+  if (l.trancheLog2Cap > 0 && capLog2 > l.trancheLog2Cap) capLog2 = l.trancheLog2Cap;
+  if (minLog2 > capLog2) minLog2 = capLog2;
+  int log2 = wantLog2;
+  if (log2 < minLog2) log2 = minLog2;
+  if (log2 > capLog2) log2 = capLog2;
+  CmiUInt8 len = (CmiUInt8)1 << log2;
+  if (allocNext + len > allocEnd) len = allocEnd - allocNext;
+  const CmiUInt8 base = allocNext;
+  allocNext += len;
+  thisProxy[CkNodeFirst(node)].grantTranche(base, len);
+}
+
+// Rank 0 of the requesting process: install the spare and wake the PEs that
+// deferred insertions while waiting for it.
+void CkLocMgr::grantTranche(CmiUInt8 base, CmiUInt8 len)
+{
+  ck::objid::Tranche* t = getTranche();
+  CmiNodeLock lock = CksvAccess(_nodeLock);
+  CmiLock(lock);
+  if (len == 0)
+  {
+    CmiUnlock(lock);
+    const ck::objid::Layout& l = ck::objid::getLayout();
+    CkAbort("Chare array (location manager %d) has used all 2^%d unique element ids"
+            " available to it in this run (its index is not packed into ids). Give the"
+            " array bounds (CkArrayOptions::setBounds), lower +objid_expand, or rebuild"
+            " with fewer -DCMK_OBJID_COLLECTION_BITS.\n",
+            thisgroup.idx, l.uniqueBits);
+  }
+  CkAssert(!t->haveNext);
+  CkAssert(base >= t->end.load(std::memory_order_relaxed));
+  t->nextBase = base;
+  t->nextLen = len;
+  t->haveNext = true;
+  t->requested = false;
+  std::vector<int> wake;
+  wake.swap(t->waitingPes);
+  CmiUnlock(lock);
+  for (int pe : wake) thisProxy[pe].resumeDeferredInsertions();
+}
+
+void CkLocMgr::deferInsertion(CkArray* mgr, CkArrayMessage* msg, const CkArrayIndex& idx,
+                              const int listenerData[CK_ARRAYLISTENER_MAXLEN])
+{
+  // Once per process (a static shared by its PEs); informational.
+  static std::atomic<bool> warned{false};
+  if (!warned.exchange(true))
+  {
+    const ck::objid::Layout& l = ck::objid::getLayout();
+    ck::objid::Tranche* t = getTranche();
+    CmiLock(CksvAccess(_nodeLock));
+    const CmiUInt8 len = t->len;
+    CmiUnlock(CksvAccess(_nodeLock));
+    if (len == 0)
+      CkPrintf("Charm++> Note: PE %d deferred an insertion into chare array (location"
+               " manager %d): this process's first tranche of element ids after the"
+               " restart has not arrived yet. The element is created when it does;"
+               " until then ckLocal() is null even for a local insert.\n",
+               CkMyPe(), thisgroup.idx);
+    else
+      CkPrintf("Charm++> Note: PE %d deferred an insertion into chare array (location"
+               " manager %d): this process used its tranche of element ids before the"
+               " next one arrived. The element is created when it does; until then"
+               " ckLocal() is null even for a local insert. Lower +objid_expand (%d) for"
+               " larger tranches (initial tranche: %" PRIu64 " ids).\n",
+               CkMyPe(), thisgroup.idx, l.expandFactor, initialTrancheSize(l));
+  }
+  DeferredInsertion d;
+  d.mgr = mgr->ckGetGroupID();
+  d.msg = msg;
+  d.idx = idx;
+  for (int i = 0; i < CK_ARRAYLISTENER_MAXLEN; ++i) d.listenerData[i] = listenerData[i];
+  deferredInsertions.push_back(d);
+}
+
+void CkLocMgr::resumeDeferredInsertions()
+{
+  std::vector<DeferredInsertion> work;
+  work.swap(deferredInsertions);
+  for (DeferredInsertion& d : work)
+  {
+    CkArray* mgr = static_cast<CkArray*>(CkLocalBranch(d.mgr));
+    if (mgr == nullptr)
+    {
+      // The array was destroyed while the insertion waited for a tranche.
+      CkFreeMsg(d.msg);
+      continue;
+    }
+    mgr->insertElement(d.msg, d.idx, d.listenerData);
+  }
+}
+
 /*************************** LocCache **************************/
 const CkLocEntry CkLocEntry::nullEntry = CkLocEntry();
 void CkLocCache::pup(PUP::er& p)
 {
-#if __FAULT__
-  if (!p.isUnpacking())
-  {
-    /**
-     * pack the indexes of elements which have their homes on this processor
-     * but dont exist on it.. needed for broadcast after a restart
-     * indexes of local elements dont need to be packed since they will be
-     * recreated later anyway
-     */
-    std::vector<CkLocEntry> entries;
-    for (const auto& itr : locMap)
-    {
-      if (homePe(itr.first) == CmiMyPe() && itr.second.pe != CmiMyPe())
-      {
-        entries.push_back(itr.second);
-      }
-    }
-
-    int count = entries.size();
-    p | count;
-    for (int i = 0; i < count; i++)
-    {
-      p | entries[i];
-    }
-  }
-  else
-  {
-    int count;
-    p | count;
-    for (int i = 0; i < count; i++)
-    {
-      CkLocEntry e;
-      p | e;
-      e.epoch = 0;
-      updateLocation(e);
-      if (homePe(e.id) != CkMyPe())
-      {
-        thisProxy[homePe(e.id)].updateLocation(e);
-      }
-      CkAssert(getPe(e.id) == e.pe);
-    }
-  }
-#endif
+  // Nothing to checkpoint: every location entry is rebuilt after a restart by the
+  // restored elements registering with their homes (CkLocMgr::restore/resume), and
+  // the manager back-pointer is re-set by CkLocMgr::pup. (The former __FAULT__
+  // branch shipped the home's remote entries, encoded against the old PE count.)
 }
 
 void CkLocCache::requestLocation(CmiUInt8 id)
@@ -2451,7 +2746,10 @@ void CkLocCache::insert(CmiUInt8 id, int epoch)
 /*************************** LocMgr: CREATION *****************************/
 CkLocMgr::CkLocMgr(CkArrayOptions opts)
     : bounds(opts.getBounds()),
-      idCounter(1),
+      tranche(nullptr),
+      restoredFromCheckpoint(false),
+      allocNext(0),
+      allocEnd(0),
       thisProxy(thisgroup),
       thislocalproxy(thisgroup, CkMyPe())
 {
@@ -2472,28 +2770,36 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
   cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
   if (cache == nullptr)
     CkAbort("ERROR! Local branch of location cache is NULL!\n");
+  cache->setManager(this);
 
   // Figure out the mapping from indices to object IDs if one is possible
   compressor = ck::FixedArrayIndexCompressor::make(bounds);
+  if (compressor == nullptr)
+  {
+    // The allocator's pool: the upper half of the unique space. Only PE 0's branch
+    // hands it out, but every branch starts with the same value so a shrink/expand
+    // restart, which restores PE 0's copy everywhere, changes nothing.
+    const int U = ck::objid::getLayout().uniqueBits;
+    allocNext = (CmiUInt8)1 << (U - 1);
+    allocEnd = (CmiUInt8)1 << U;
+  }
   if (compressor == nullptr && CkMyPe() == 0)
   {
     // Say so once: without a compressor the array pays for an index<->id map and
-    // a per-PE id counter. The sized CkArrayOptions constructors set bounds, but
-    // setNumInitial/setEnd do not, so this is easy to get by accident.
+    // hashed ids handed out in tranches. The sized CkArrayOptions constructors set
+    // bounds, but setNumInitial/setEnd do not, so this is easy to get by accident.
     const unsigned int need = ck::FixedArrayIndexCompressor::bitsNeeded(bounds);
     if (need > 0)
       CkPrintf("Charm++> Note: chare array (location manager %d) has bounds that need %u"
-               " bits to pack its index, but element ids hold %d; elements use per-PE"
-               " counter ids (limit %" PRIu64 " per PE per array) and an index map.\n",
-               thisgroup.idx, need, (int)CMK_OBJID_ELEMENT_BITS,
-               (CmiUInt8)ck::ObjID::masks::ELEMENT_MASK);
+               " bits to pack its index, but element ids hold %d; elements use hashed"
+               " ids and an index map.\n",
+               thisgroup.idx, need, (int)ck::ObjID::bits::PAYLOAD_BITS);
     else if (opts.getNumInitial().dimension > 0 || opts.getEnd().dimension > 0)
       CkPrintf("Charm++> Note: chare array (location manager %d) was given an initial"
                " size but no bounds, so its index is not packed into element ids;"
-               " elements use per-PE counter ids (limit %" PRIu64 " per PE per array)"
-               " and an index map. Call CkArrayOptions::setBounds(...) if the index"
-               " space is fixed.\n",
-               thisgroup.idx, (CmiUInt8)ck::ObjID::masks::ELEMENT_MASK);
+               " elements use hashed ids and an index map. Call"
+               " CkArrayOptions::setBounds(...) if the index space is fixed.\n",
+               thisgroup.idx);
   }
 
   // Find and register with the load balancer
@@ -2534,7 +2840,17 @@ void CkLocMgr::pup(PUP::er& p)
   p | mapHandle;
   p | cacheID;
   p | bounds;
-  p | idCounter;
+  // The allocator's state (meaningful on PE 0, whose copy every PE restores after a
+  // shrink/expand). Per-process tranches are not checkpointed: after any restart a
+  // process starts empty and takes its first tranche from the allocator, so ids
+  // minted after the checkpoint can never collide with ids minted after the restart.
+  p | allocNext;
+  p | allocEnd;
+  if (p.isPacking() && !deferredInsertions.empty())
+    CkAbort("Checkpointing chare array (location manager %d) on PE %d while %d insertions"
+            " are waiting for a tranche of element ids; they would be lost. Checkpoint"
+            " after the insertions complete (quiescence), or lower +objid_expand.\n",
+            thisgroup.idx, CkMyPe(), (int)deferredInsertions.size());
   if (p.isUnpacking())
   {
     thisProxy = thisgroup;
@@ -2550,8 +2866,13 @@ void CkLocMgr::pup(PUP::er& p)
     cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
     if (cache == nullptr)
       CkAbort("ERROR! Local branch of location cache is NULL!");
+    cache->setManager(this);
 
     compressor = ck::FixedArrayIndexCompressor::make(bounds);
+    tranche = nullptr;
+    // A location manager is only ever unpacked at a restart. The process's first
+    // tranche is requested by the first insertion that needs one (getTranche).
+    restoredFromCheckpoint = true;
   }
 
 #if CMK_LBDB_ON
@@ -2661,31 +2982,26 @@ void CkLocMgr::processAfterActiveRgetsCompleted(CmiUInt8 id)
   }
 }
 
-CmiUInt8 CkLocMgr::getNewObjectID(const CkArrayIndex& idx)
+bool CkLocMgr::tryNewObjectID(const CkArrayIndex& idx, CmiUInt8& id)
 {
-  CmiUInt8 id;
   if (!lookupID(idx, id))
   {
-    // Without a compressor each PE mints ids from its own counter in the element
-    // field. Past the field's width the counter would carry into the home field and
-    // the id would silently collide with another PE's; stop here instead.
-    if (idCounter > ck::ObjID::masks::ELEMENT_MASK)
-      // Keep this under 255 characters: reconverse's CmiAbort formats into a 256-byte
-      // buffer and drops the rest.
-      CkAbort("PE %d created %" PRIu64 " elements of chare array (locmgr %d) with an"
-              " unpacked index: per-PE limit. Fix: insert from more PEs, or"
-              " CkArrayOptions::setBounds so the index packs into ids, or rebuild with"
-              " fewer -DCMK_OBJID_COLLECTION_BITS.\n",
-              CkMyPe(), (CmiUInt8)ck::ObjID::masks::ELEMENT_MASK, thisgroup.idx);
-    id = idCounter++ + ((CmiUInt8)CkMyPe() << CMK_OBJID_ELEMENT_BITS);
+    // Hashed kind: the top bits are the index's hash key (so the home is
+    // computable from the id), the low bits a number unique within the array,
+    // taken from this process's tranche.
+    CmiUInt8 u;
+    if (!mintUnique(u)) return false;
+    const ck::objid::Layout& l = ck::objid::getLayout();
+    id = (ck::objid::indexHashKey(idx) << l.uniqueBits) | u;
     insertID(idx, id);
   }
-  return id;
+  return true;
 }
 
 CkLocRec* CkLocMgr::registerNewElement(const CkArrayIndex& idx)
 {
-  CmiUInt8 id = getNewObjectID(idx);
+  CmiUInt8 id;
+  if (!tryNewObjectID(idx, id)) return nullptr;
   CkLocRec* rec = elementNrec(id);
   if (rec == nullptr)
   {
@@ -2764,20 +3080,69 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
   CkAssert(peToTell != CkMyPe());
 
   CmiUInt8 id;
-  if (lookupID(idx, id))
+  if (lookupID(idx, id) && cache->getPe(id) != -1)
   {
-    // We found the ID so update the location for peToTell
+    // We know the id and where it lives: answer now.
     thisProxy[peToTell].updateLocation(idx, cache->getLocationEntry(id));
     return true;
   }
-  else
-  {
-    // We don't know the ID so buffer the location request
-    DEBN(("%d Buffering ID/location req for %s\n", CkMyPe(), idx2str(idx)));
-    bufferedLocationRequests[idx].push_back(peToTell);
-    return false;
-  }
+  // Either the index has no id yet (hashed kind: the element was never created), or
+  // the id is known but its location is not (packed kind, whose ids exist before
+  // the element does; or an element deleted since, whose idx -> id binding is
+  // kept). Answering with the null entry would teach peToTell a location of -1 and
+  // an id of 0, so hold the request: updateLocation answers it once the element
+  // registers here.
+  DEBN(("%d Buffering ID/location req for %s\n", CkMyPe(), idx2str(idx)));
+  bufferedLocationRequests[idx].push_back(peToTell);
+  return false;
 }
+
+bool CkLocMgr::recoverIndex(CmiUInt8 id, CkArrayIndex& idx, bool scanAtHome) const
+{
+  if (compressor)
+  {
+    idx = compressor->decompress(id);
+    return true;
+  }
+  if (CkLocRec* rec = elementNrec(id))
+  {
+    idx = rec->getIndex();
+    return true;
+  }
+  if (!scanAtHome || homePe(id) != CkMyPe())
+    return false;
+  // Hashed kind, at the home, no record: the element was deleted (reclaimRemote
+  // keeps the home's idx -> id binding for exactly this reason) or never existed
+  // here. A linear scan, acceptable because only the demand creation of a deleted
+  // element reaches it; delivery never does (design section 3.4).
+  for (const auto& kv : idx2id)
+    if (kv.second == id)
+    {
+      idx = kv.first;
+      return true;
+    }
+  return false;
+}
+
+#if CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
+void CkLocMgr::updateLocationFromLB(CmiUInt8 id, int pe)
+{
+  CkLocEntry e;
+  e.id = id;
+  e.pe = pe;
+  // The balancer's decision does not carry the element's epoch. Count this
+  // migration from what this PE last heard (a bystander that never heard of the
+  // element starts at 0): that is at most the element's true epoch after the move
+  // (design section 4.2a), so the destination's insert and the emigrating PE's
+  // broadcast, which carry the true epoch, still apply over this entry.
+  e.epoch = cache->getEpoch(id) + 1;
+  CkArrayIndex idx;
+  if (recoverIndex(id, idx, false))
+    updateLocation(idx, e);  // also binds idx -> id and fires the index listeners
+  else
+    cache->updateLocation(e);
+}
+#endif
 
 void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
 {
@@ -2880,9 +3245,13 @@ void CkLocMgr::multiHop(CkArrayMessage* msg)
   {  // Send a routing message letting original sender know new element location
     DEBS((AA "Sending update back to %d for element %" PRIu64 "\n" AB, srcPe,
           msg->array_element_id()));
-    #if CMK_GLOBAL_LOCATION_UPDATE
-    CkAssert(false && "Hop-count based location update should not occur with CMK_GLOBAL_LOCATION_UPDATE; all migrations must happen at load balancing steps via AtSync()");
-    #endif
+    // Under CMK_GLOBAL_LOCATION_UPDATE a forward is routine, not a chain to assert
+    // on: a cold send through the home (for an element that does not live at its
+    // home), a demand creation, a send that raced an announced move, or a stale entry
+    // after a move. Only balancers derived from CentralLB announce a move to every
+    // PE before acting on it (UpdateLocation); the TreeLB-based ones (GreedyLB,
+    // RefineLB, RotateLB, ...) are announced by the emigrate broadcast, which can
+    // land after the program has resumed. All of these are repaired the same way.
     cache->requestLocation(msg->array_element_id(), srcPe);
   }
 }
@@ -3159,11 +3528,16 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   cache->recordEmigration(id, toPe);
   informHome(idx, toPe);
 
-#if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
-  DEBM((AA "Global location update. idx %s "
-           "assigned to %d \n" AB,
-        idx2str(idx), toPe));
-  thisProxy.updateLocation(id, toPe);
+#if CMK_GLOBAL_LOCATION_UPDATE
+  // Every PE already recorded this move before it was acted on (UpdateLocation,
+  // from the balancer's decision), with an epoch counted from its own cache. This
+  // broadcast carries the element's true epoch (the entry recordEmigration just
+  // advanced), so a bystander whose count fell short cannot have the entry
+  // overwritten by an older reply still in flight. The home was told above and
+  // ignores the duplicate by epoch. Cost: one group broadcast per migration, in
+  // this build mode only.
+  DEBM((AA "Global location update. idx %s assigned to %d \n" AB, idx2str(idx), toPe));
+  thisProxy.updateLocation(idx, cache->getLocationEntry(id));
 #endif
 
   CK_MAGICNUMBER_CHECK
@@ -3352,7 +3726,8 @@ void CkLocMgr::restore(const CkArrayIndex& idx, CmiUInt8 id, PUP::er& p)
 {
   insertID(idx, id);
 
-  CkLocRec* rec = createLocal(idx, false, false, false);
+  // Directories are rebuilt from the restored elements, so tell the home.
+  CkLocRec* rec = createLocal(idx, false, false, true);
 
   // Create the new elements as we unpack the message
   pupElementsFor(p, rec, CkElementCreation_restore);
