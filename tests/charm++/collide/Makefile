@@ -2,12 +2,12 @@
 CHARMC=../../../bin/charmc $(OPTS)
 
 # The Collide library is a module that the charm++ build target alone does not
-# produce (the all-test target does). Without it, this test is a no-op.
+# produce (`./build LIBS` does). Without it, this test is a no-op.
 COLLIDE_LIB := $(wildcard ../../../lib/libmodulecollidecharm.a)
 
 ifeq ($(COLLIDE_LIB),)
 all test smptest:
-	@echo "collide: skipped, libmodulecollidecharm.a is not in this build (built by the all-test target)"
+	@echo "collide: skipped, libmodulecollidecharm.a is not in this build (built by ./build LIBS)"
 else
 all: collide_test
 
