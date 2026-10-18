@@ -34,7 +34,13 @@ DIRS = \
   amr_1d_simple \
   anytime_migration \
   unbounded_migration \
+  unbounded_restart \
   anytime_bcastred \
+  objid_home \
+  objid_insert \
+  objid_sections \
+  objid_bound \
+  objid_tranche \
   qd \
 
 FTDIRS = \
