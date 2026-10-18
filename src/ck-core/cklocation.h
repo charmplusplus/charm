@@ -541,6 +541,14 @@ private:
   CkArrayIndex bounds;
   ck::ArrayIndexCompressor* compressor;
   IdxIdMap idx2id;    // Explicit map for non-compressible case
+  // Hashed kind: ids this PE once bound to an index that has since been bound to a
+  // newer id. An element deleted and re-created on a PE that never saw its index
+  // gets a fresh id (the home no longer coincides with the map's PE, so this is
+  // ordinary since PR 1), and PEs that cached the old id keep sending to it. The
+  // home resolves such a message through this table (recoverIndex). It grows by
+  // one entry per re-creation under a new id this PE learns of; it is never
+  // pruned, since no PE knows which others still hold the old id.
+  std::unordered_map<CmiUInt8, CkArrayIndex> retiredIds;
   // Non-compressible case: this process's tranche of unique numbers for this array,
   // shared by all its PEs (see ck::objid::Tranche); resolved on first use.
   ck::objid::Tranche* tranche;
@@ -585,7 +593,12 @@ private:
   {
     if (compressor)
       return;
-    idx2id[idx] = id;
+    auto ins = idx2id.emplace(idx, id);
+    if (!ins.second && ins.first->second != id)
+    {
+      retiredIds[ins.first->second] = idx;
+      ins.first->second = id;
+    }
   }
 
   // Insert elements after migration
@@ -743,9 +756,10 @@ public:
   }
 
   /// id -> index where it can be had without a message: the compressor, or a local
-  /// record; with scanAtHome, also (hashed kind, at the home) the home's own
-  /// idx -> id bindings, which outlive the element. That last is a linear scan,
-  /// reached only by the demand creation of a deleted element, never by delivery.
+  /// record, or an id this PE has seen retired (retiredIds); with scanAtHome, also
+  /// (hashed kind, at the home) the home's own idx -> id bindings, which outlive
+  /// the element. That last is a linear scan, reached only for a message to a
+  /// deleted element that arrives at its home, never by ordinary delivery.
   /// Returns false when none applies.
   bool recoverIndex(CmiUInt8 id, CkArrayIndex& idx, bool scanAtHome) const;
 

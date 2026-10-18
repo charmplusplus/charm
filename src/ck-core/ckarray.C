@@ -2016,6 +2016,36 @@ void CkArray::handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t ty
   const int home = locMgr->homePe(id);
   const int ifNotThere = msg->array_ifNotThere();
 
+  // At the home, every id ever bound here is resolvable to its index. If that index
+  // has since been re-created under a newer id (hashed kind: the new element was
+  // inserted on a PE that had never seen the index), re-address the message to the
+  // current id and teach the original sender the new binding, so its later sends go
+  // direct. If the index is simply without an element, wait by index: the index
+  // listener fires when any element of that index registers, whatever its id.
+  if (CkMyPe() == home)
+  {
+    CkArrayIndex idx;
+    if (locMgr->recoverIndex(id, idx, true))
+    {
+      CmiUInt8 current;
+      if (locMgr->lookupID(idx, current) && current != id)
+      {
+        env->setRecipientID(ck::ObjID(thisgroup, current));
+        const int srcPe = msg->array_getSrcPe();
+        if (srcPe != CkMyPe())
+          locMgr->requestLocation(idx, srcPe);
+        recvMsg(msg, current, type, opts);
+        return;
+      }
+      if (ifNotThere == CkArray_IfNotThere_buffer)
+      {
+        env->setRecipientID(0);
+        bufferForLocation(msg, idx);
+        return;
+      }
+    }
+  }
+
   if (ifNotThere != CkArray_IfNotThere_buffer)
   {
     // Demand creation. The index-keyed path knows how to get the element created
