@@ -10,6 +10,7 @@ on 2026-09-29: stay at 64 bits; C = 12 build-time (AMPI may need 21 or 24); the
 hashed payload is home key (width set per run from the process count and an
 expand factor) plus a unique number handed out in tranches, no creator field; explicit bounds only, warn otherwise;
 staged PRs; chares stay bound to individual PEs; drone mode is orthogonal.
+Section 13 is the decision log; the main text describes the design as it stands.
 
 Terminology: a *process* is an OS process, what Converse calls a node and counts
 with CkNumNodes(); a *PE* is a worker thread, counted by CkNumPes(). Nothing in
@@ -79,17 +80,15 @@ process, about F, also bound how many PEs of a process serve as homes. If a
 restart has more than 2^H processes it still works (home = key % processes is
 always defined); only the directory spread is limited to 2^H processes, and the
 runtime prints a warning. The code floors H at 1, which only a single process
-with +objid_expand 1 would reach. (Decided 2026-09-29: this replaced a creator |
-counter split of the unique number.)
+with +objid_expand 1 would reach.
 
 CMK_OBJID_HOME_BITS is removed. Build-time static_asserts: 1 <= C <= 40. Runtime
 checks at startup and restart: H >= 1, U >= 16.
 
-The three TYPE_TAG bits stay reserved (Kale, 2026-09-29 22:33): they were meant for
-a universal object handle (analysis section 7). Since PR 1d (2026-10-17) one value is
-used: tag 001 marks the wide layout, which a decoder must know before it can find
-the collection (section 12). The other six values stay free; they are not reclaimed
-for capacity.
+The three TYPE_TAG bits stay reserved: they were meant for a universal object
+handle (analysis section 7). One value is used: tag 001 marks the wide layout,
+which a decoder must know before it can find the collection (section 12). The
+other six values stay free; they are not reclaimed for capacity.
 
 Which kind a payload is comes from the collection: every PE's CkLocMgr branch knows
 whether its array has a compressor. ObjID itself does not need a kind bit.
@@ -108,7 +107,7 @@ to 2^49 (1D 5.6e14; 3D 65536^3 needs 48). Hashed-kind capacity per array per run
 
 The initial tranche is half of the unique space divided by the process count
 (section 3.1); the other half is the allocator's pool for refills and for every
-process after a restart. The small-process validation case (Kale's concern) is
+process after a restart. The small-process validation case is
 solved: at 2 processes an array can hold trillions of elements. At full Frontier
 scale the initial tranche is small, and its size is governed by the expand factor,
 so the factor is a command-line choice, not a build constant.
@@ -121,11 +120,11 @@ recycled: a program that creates arrays in a loop reaches 4,095 standard arrays 
 aborts with a message naming setWideCollection and the build flag (12.4).
 
 AMPI (when supported): --ampi-only currently sets C = 29 (buildcmake:619).
-Corrected 2026-10-15: AMPI's arrays are NOT bounded today (no setBounds anywhere in
+AMPI's arrays are not bounded today (no setBounds anywhere in
 ampi.C or tcharm.C; createNewChildAmpiSync uses setNumInitial(0)), so under this
 design every AMPI array is hashed-kind, and a C = 29 build has a 32-bit payload that
-fails the U >= 16 startup check beyond 8,192 processes. Decided 2026-10-16
-(section 12): AMPI arrays get bounds, and a tag-marked wide-collection kind (tag
+fails the U >= 16 startup check beyond 8,192 processes. Therefore
+(section 12) AMPI arrays get bounds, and a tag-marked wide-collection kind (tag
 001, 24 collection bits, 37 payload bits, opt-in per array) replaces the C = 29
 build; implemented as objid PR 1d (2026-10-17).
 
@@ -281,8 +280,7 @@ is a pure function of the index and returns < 2^H.
 
     homeProcess(id)  = ObjID::hashKey(payload) % CkNumNodes()
     homeProcess(idx) = indexHashKey(idx)        % CkNumNodes()      // identical by construction
-    PR 1 directory PE: homePe(x) = CkNodeFirst(homeProcess(x))      // rank 0 of the process
-    since 2026-10-12:  homePe(x) = CkNodeFirst(homeProcess(x)) + (key / CkNumNodes()) % CkNodeSize(homeProcess(x))
+    homePe(x)        = CkNodeFirst(homeProcess(x)) + (key / CkNumNodes()) % CkNodeSize(homeProcess(x))
                        // the quotient spreads a process's homes over its ranks
     PR 3: the process's shared table; requests go to the process (node queue)
 
@@ -292,11 +290,11 @@ only CldMap overrides it in the tree). procNum is still used for placement
 for hashed-kind arrays: the directory PE is a hashed PE of a hashed process rather
 than procNum(idx). The cost profile is unchanged: a source without an id already round-
 trips to the home before the first send (bufferForLocation -> requestLocation(idx)).
-Until 2026-10-12 the directory PE was rank 0 of the process, which concentrated every
-hashed-kind home of a single-process run on PE 0 (1.62x on unbounded cold sends,
-doc/objid64-perf.md); the rank chosen from the key's quotient removes that without a
-shared table. Nothing about the home is checkpointed, so the change is invisible to
-restart. The spread is limited by keys per process (2^H / processes): with the default
+The rank chosen from the key's quotient spreads a process's homes over its ranks
+without a shared table, so a single-process run does not concentrate every
+hashed-kind home on PE 0 (rank 0 as the directory PE cost 1.62x on unbounded cold
+sends, doc/objid64-perf.md). Nothing about the home is checkpointed, so the choice
+of rank is invisible to restart. The spread is limited by keys per process (2^H / processes): with the default
 expand factor there are 8 to 16 keys per process, so at most that many ranks of a
 process serve as homes; +objid_expand raises it.
 
@@ -310,7 +308,7 @@ deliverInline's bound-sibling demand creation (ckarray.C:1959; the sibling's rec
 is local, so the record branch serves) and the LB UpdateLocation path (rewritten,
 section 4.4).
 
-One scan survives, off the delivery path (PR 1a fixes, 2026-10-09):
+One scan survives, off the delivery path:
 CkLocMgr::recoverIndex(id, idx, scanAtHome). Demand creation needs the index (the
 home approves by index; createhere creates at the original sender), and a message
 can reach a PE by id for an element that has no record there: a deleted element
@@ -345,7 +343,7 @@ homePe(idx) for both kinds, no second registration exists and the creator holds
 no special entry. reclaimRemote keeps the idx -> id binding (as today, so late
 messages are not stranded) and erases the location.
 
-### 4.2a Epochs (Kale's question, 2026-09-29 22:36)
+### 4.2a Epochs
 
 The epoch mechanism carries over unchanged in meaning: it is a per-element migration
 counter, not a property of the home. It lives in the element's location entry at its
@@ -389,8 +387,8 @@ bufferForLocation on the source PE keep their index-keyed shape.
 Multi-hop repair (multiHop -> cache->requestLocation(id, srcPe)): now fired by the
 fast delivery path for ANY forwarded message (hops >= 1; recvMsg counts a hop per
 forwarding PE, a direct delivery arrives with 0), so a sender learns the location from
-the first forwarded delivery, cold or one-hop stale; the explicit requestLocationOnce
-of the first 1a draft is gone (PR 1b, 2026-10-01; numbers in doc/objid64-perf.md).
+the first forwarded delivery, cold or one-hop stale; no explicit requestLocationOnce
+is needed for this (numbers in doc/objid64-perf.md).
 
 ### 4.4 Load balancer global update (CMK_GLOBAL_LOCATION_UPDATE)
 
@@ -400,7 +398,7 @@ Never calls lookupIdx on a PE that has no record. The entry's epoch must be the
 element's true epoch, sent by the emigrating PE (section 4.2a), not each
 receiver's cached epoch + 1 as today (:106).
 
-As implemented (PR 1a fixes, 2026-10-09, after Aditya's review of #4017): the
+As implemented: the
 synchronous update stays, through CkLocMgr::updateLocationFromLB(id, pe), so every
 PE but the source addresses the element at its destination before the move is acted
 on (the CentralLB invariant). The balancer's decision
@@ -464,7 +462,7 @@ message when a grant cannot be made).
 
 ## 7. Process-level directory and cache (PR 3)
 
-Analysis added 2026-09-29 18:22 at Kale's request: which tables stay per PE, and how
+This section analyzes which tables stay per PE, and how
 the shared table is kept race-free.
 
 ### 7.1 Tables today (all per PE) and where they go
@@ -494,7 +492,7 @@ reason (it carries the LB handle and timing state that only the owning PE uses).
 
 ### 7.2 The shared table
 
-Follow-up filed as charm #4040 (2026-10-13): a per-array "full-length" hashed kind
+Follow-up charm #4040: a per-array "full-length" hashed kind
 (49 unique bits, no home key, id home = hash(id), index home holding only the
 index -> id binding) is a split of this table into an index table and an id table,
 and lands with or after PR 3, not before.
@@ -592,7 +590,7 @@ one shared write per migration per process touched instead of per PE. Measure on
 contention (all ranks sending to the same 1,000 elements), and a migration-heavy
 run (megatest 4x8 x3, anytime_migration) for correctness under R1-R6.
 
-### 7.6 Shortcuts the shared table must provide (Kale, 2026-09-30)
+### 7.6 Shortcuts the shared table must provide
 
 The point of the shared table is that a PE never asks the home about anything it
 could learn from its own process. Stated as guarantees, so PR 3 can be tested
@@ -638,7 +636,7 @@ in PR 3 the shared idx2id is filled by every creation and immigration on any ran
 of the process. The per-PE read cache in front of it (R7) is fill-on-miss and
 never invalidated, which is sound because a binding never changes.
 
-### 7.7 Bounded caches (Kale, 2026-10-01)
+### 7.7 Bounded caches
 
 Every fill-only table above grows with the number of distinct elements a PE or a
 process has ever addressed, and a long-running program that keeps migrating and
@@ -717,7 +715,7 @@ PR 5  (optional, later) Id-carrying CkCallback variant. CkCallback's array form
       by id directly; it is the first user of a kind field in the tag bits if
       callbacks to chares and groups are ever folded into the same handle.
 
-### 9.1 Merge gate into the reviewed line (Kale, 2026-10-09)
+### 9.1 Merge gate into the reviewed line
 
 The redesign is not merged into reviewed-with-reconverse all at once. The cut is
 PR 1 as a whole: 1a (#4017, merged into objid-redesign 2026-10-09), its fixes
@@ -775,14 +773,14 @@ Q1 Which shrink/expand path is in use on rate-aware-gpu-lb: the ckcheckpoint.C
    CkResumeRestartMain route (+shrinkexpand, Cmi_myoldpe) or something newer? Does
    the LB database survive a restart (ids held across it)?
 Q2 The AMR index: custom CkArrayIndexT with how many ints (CK_ARRAYINDEX_MAXLEN)?
-   (Kale, 2026-09-29 22:26: the initial insertion burst is not large and fits the
+   (The initial insertion burst is not large and fits the
    initial tranche; it is the refinements afterwards that add chares, and those run
    between steps, where a tranche refill has time to land. So the deferred-insert
    fallback of 3.1 should stay unreached in AMR; the index width is still open.)
 Q3 Does any device or LB code read ObjID home bits or assume home == creator PE?
    (Audit on the reviewed line says no; his branch adds handleUnknownByID and
    emigrateIntraProcess, both id-keyed.)
-Q4 (withdrawn 2026-09-29 22:26.) The question asked about ids stored across LB
+Q4 (withdrawn.) The question asked about ids stored across LB
    steps; ids never change within a run, today or in this design, so that part was
    moot. The only case where an id changes today is a restart with a different PE
    count for a compressible array (analysis D4), and this design removes it. Nothing
@@ -820,7 +818,7 @@ Implementation notes are marked "(1d)" below where the code settled a detail.
    communicators behind neighborhood collectives and Cartesian/graph topologies,
    and user splits with many colors. V virtual ranks therefore cost O(V)
    collections, times the number of such communicators per rank. Special-casing
-   any one of them on the AMPI side does not change the order (Kale, 2026-10-16),
+   any one of them on the AMPI side does not change the order,
    so the runtime must hold millions of collections, and the current answer, the
    --ampi-only build with C = 29, is a per-build layout that nothing else uses.
 4. AMPI's arrays carry no bounds: no setBounds call exists in ampi.C or tcharm.C,
@@ -905,7 +903,7 @@ PR 3's rewrite of the per-PE tables (section 7.1) if 1d has not landed first.
 
 ### 12.4 Opt-in, with a creation-time suggestion
 
-Wide is opt-in (Kale, 2026-10-16): automatic selection would change the ids of
+Wide is opt-in: automatic selection would change the ids of
 every existing bounded array and the checkpoint format for every application, for
 a problem only many-array libraries have. The runtime points the user at it:
 
@@ -961,3 +959,23 @@ restart at the same and a smaller PE count with ids compared and counters checke
 the four abort and suggestion cases by grep). Sections 1, 2 and 12 updated. One day
 of code; the gate is the objid test set, chkpt, megatest and pingpong on the Mac
 (prod and Debug builds) and Anvil.
+
+## 13. Decision log
+
+- 2026-09-29 (Kale): hashed payload is home key plus a unique number in tranches, replacing a creator | counter split of the unique number; section 1.
+- 2026-09-29 (Kale): the three TYPE_TAG bits stay reserved and unused, not reclaimed for capacity; section 1.
+- 2026-09-29 (Kale): epochs carry over unchanged in meaning; section 4.2a added.
+- 2026-09-29 (Kale): AMR's initial insertion burst fits the initial tranche (Q2 answered); Q4 withdrawn as moot; section 11.
+- 2026-09-29 (Kale): per-PE versus per-process table analysis; section 7 introduction added.
+- 2026-09-30 (Kale): shortcuts S1 onward that the shared table must provide; section 7.6 added.
+- 2026-10-01 (Kale): bounded caches for fill-only tables; section 7.7 added.
+- 2026-10-01 (PR 1b): multi-hop repair fires on any forwarded message, replacing the explicit requestLocationOnce of the first 1a draft; section 4.3.
+- 2026-10-09 (PR 1a fixes, Aditya's review of #4017): CkLocMgr::recoverIndex added as the one scan off the delivery path; section 3.4.
+- 2026-10-09 (PR 1a fixes, Aditya's review of #4017): synchronous LB location update kept through updateLocationFromLB, with a true-epoch broadcast from the emigrating PE; section 4.4.
+- 2026-10-09 (Kale): merge gate into the reviewed line is PR 1 as a whole; section 9.1 added.
+- 2026-10-12: directory PE chosen from the key's quotient within the home process, replacing rank 0 of the process (1.62x on unbounded cold sends); section 3.3.
+- 2026-10-13: per-array full-length hashed kind filed as charm #4040, to land with or after PR 3; section 7.2.
+- 2026-10-15: AMPI's arrays found unbounded (hashed-kind under this design), correcting the assumption that the C = 29 build suffices; section 1.
+- 2026-10-16 (Kale): AMPI arrays get bounds and a tag-marked wide-collection kind replaces the C = 29 build, as objid PR 1d; sections 1 and 12.
+- 2026-10-16 (Kale): wide collection is opt-in per array, not selected automatically; section 12.4.
+- 2026-10-17 (PR 1d): tag value 001 marks the wide layout; the other six tag values stay free; sections 1 and 12.
