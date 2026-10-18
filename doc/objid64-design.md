@@ -303,10 +303,29 @@ CkLocMgr::recoverIndex(id, idx, scanAtHome). Demand creation needs the index (th
 home approves by index; createhere creates at the original sender), and a message
 can reach a PE by id for an element that has no record there: a deleted element
 whose id and stale location the sender still held. The compressor or a local record
-serve first; failing both, the home of a hashed-kind element scans its own idx -> id
-bindings (kept by reclaimRemote for exactly this reason), and a non-home PE hands
-the message to the home. handleUnknownByID uses it only for messages that ask for
-creation; a buffer-kind message never recovers the index.
+serve first; then the PE's table of retired ids (below); failing those, the home of
+a hashed-kind element scans its own idx -> id bindings (kept by reclaimRemote for
+exactly this reason), and a non-home PE hands the message to the home.
+
+Re-creation under a new id. An element inserted without a PE argument lands on
+the map's PE, which for the hashed kind is not its home (section 3.3), so a deleted
+index re-created on a PE that never saw it gets a fresh unique number, and every
+PE that cached the old id (the old element's host, any earlier sender) keeps
+sending to an id that no element has. The home keeps a table of retired ids:
+whenever a PE rebinds an index to a different id (CkLocMgr::insertID), it records
+old id -> index in `retiredIds`. At the home, handleUnknownByID recovers the index
+for any id it ever bound, and if the index is now bound to a newer id, re-addresses
+the message to it, forwards it, and sends the original sender the new binding by
+index, so its later sends go direct; if the index has no element at all, the
+message waits by index, and the index listener releases it whichever id the next
+element of that index gets. A location request by id for a retired id
+(CkLocCache::requestLocation, a large message buffered at its sender) is answered
+the same way, by index; the asking PE's updateLocation then releases the messages
+it held under the old id toward the new location, where they take the same route
+through the home. The table is never pruned (no PE knows which others still hold an
+old id); it grows by one entry per re-creation under a new id that the PE learns of.
+Found 2026-10-18 by tests/charm++/amr_1d_simple at 4, 7 and 8 PEs, where the
+map's PE and the home of the re-created index differ.
 
 ## 4. Location manager and delivery
 
@@ -944,3 +963,4 @@ updated for the second layout. Two to three days.
 - 2026-10-15: AMPI's arrays found unbounded (hashed-kind under this design), correcting the assumption that the C = 29 build suffices; section 1.
 - 2026-10-16 (Kale): AMPI arrays get bounds and a tag-marked wide-collection kind replaces the C = 29 build, as objid PR 1d; sections 1 and 12.
 - 2026-10-16 (Kale): wide collection is opt-in per array, not selected automatically; section 12.4.
+- 2026-10-18 (fix after #4015): a deleted index re-created on a PE that never saw it gets a new id; the home keeps a retired-id table and re-addresses messages sent to the old id; section 3.4.
