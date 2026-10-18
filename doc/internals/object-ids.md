@@ -104,6 +104,7 @@ one shared table per process).
 | `CkLocMgr::hash` | id | `CkLocRec*` (index, LB handle, timing) | the PE that holds the element |
 | `CkLocCache::locMap` | id | {pe, epoch} | every PE that has heard where the element is; authoritative at the home |
 | `CkLocMgr::idx2id` | index | id | hashed kind only: the PE that created or holds the element, and the home |
+| `CkLocMgr::retiredIds` | id | index | hashed kind only: a PE that rebound an index to a newer id keeps the old id here, so the home can re-address messages sent to it |
 | `CkArray::bufferedIDMsgs` and siblings | id or index | messages waiting for a location | the sending PE |
 
 Delivery by id: a message carries the element id. The sender looks the id up in
@@ -127,9 +128,19 @@ balancer's global update path (`CMK_GLOBAL_LOCATION_UPDATE`, off in every build)
 finds the array from the id's collection number (the group id of its location
 manager before PR 1d; a per-PE registry of location managers by number after).
 
-Deletion: the home drops the directory entry; a message that still reaches a PE
-by id for a deleted element is handed to the home, which recovers the index from
-its own bindings only when the message asks for demand creation.
+Deletion: the home drops the directory entry but keeps the index-to-id binding;
+a message that still reaches a PE by id for a deleted element is handed to the
+home, which recovers the index from its own bindings and holds the message by
+index until an element of that index exists again (or creates one, if the message
+asks for demand creation).
+
+Re-creation under a new id: an element inserted without a PE argument lands on
+the map's PE, which for the hashed kind is not its home, so a deleted index
+re-created on a PE that never saw it gets a fresh unique number. PEs that cached
+the old id keep sending to it. Any PE that rebinds an index to a different id
+records the old id in `retiredIds`; the home uses that table to re-address such a
+message to the current id and to send the original sender the new binding by
+index. The table is never pruned.
 
 ## 4. Unique numbers for the hashed kind
 
