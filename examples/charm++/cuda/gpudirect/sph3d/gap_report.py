@@ -21,15 +21,19 @@ if M:
             print(f'  {kind:9s} {TIER[tier]:12s} n={len(v):6d}  p50 {q(v, .5):6.2f} [{q(w, .5):5.2f}]  p90 {q(v, .9):6.2f} [{q(w, .9):5.2f}]  max {v[-1]:6.2f} [{w[-1]:5.2f}]')
 byrank = collections.defaultdict(list)
 for e in X: byrank[e['pid']].append(e)
+# kernels per GPU, keyed (rank, device): a process can drive several devices
+bygpu = collections.defaultdict(list)
+for e in X:
+    if e['cat'] == 'kernel': bygpu[(e['pid'], e.get('args', {}).get('device', 0))].append((e['ts'], e['ts'] + e['dur']))
 big = []
-for r in sorted(byrank):
-    ks = sorted(((e['ts'], e['ts'] + e['dur']) for e in byrank[r] if e['cat'] == 'kernel'))
+for r in sorted(bygpu):
+    ks = sorted(bygpu[r])
     if not ks: continue
     gs = []; cur_end = ks[0][1]
     for s, e in ks[1:]:
         if s > cur_end + minms * 1000: gs.append((cur_end, s))
         cur_end = max(cur_end, e)
-    print(f'rank {r}: gaps >{minms:.0f} ms: ' + ', '.join(f'{s/1000:.0f}+{(e-s)/1000:.1f}' for s, e in gs) + (' (none)' if not gs else ''))
+    print(f'rank {r[0]} GPU{r[1]}: gaps >{minms:.0f} ms: ' + ', '.join(f'{s/1000:.0f}+{(e-s)/1000:.1f}' for s, e in gs) + (' (none)' if not gs else ''))
     if gs: big.append(max(gs, key=lambda g: g[1] - g[0]))
 if big:
     lens = sorted((e - s) / 1000 for s, e in big)

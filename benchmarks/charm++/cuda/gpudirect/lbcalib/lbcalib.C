@@ -51,12 +51,13 @@
 /* readonly */ int n_iters;
 /* readonly */ int warmup_iters;
 
-enum Tier { TIER_INTRA_PROCESS = 0, TIER_IPC_SAME_GPU, TIER_IPC_CROSS_GPU,
-            TIER_INTER_NODE, TIER_COUNT };
+enum Tier { TIER_INTRA_PROCESS = 0, TIER_INTRA_PROCESS_PEER, TIER_IPC_SAME_GPU,
+            TIER_IPC_CROSS_GPU, TIER_INTER_NODE, TIER_COUNT };
 
 static const char* tierName(int t) {
   switch (t) {
     case TIER_INTRA_PROCESS: return "intra_process";
+    case TIER_INTRA_PROCESS_PEER: return "intra_process_peer";
     case TIER_IPC_SAME_GPU:  return "ipc_same_gpu";
     case TIER_IPC_CROSS_GPU: return "ipc_cross_gpu";
     case TIER_INTER_NODE:    return "inter_node";
@@ -129,7 +130,7 @@ class Main : public CBase_Main {
         case 'D': migDevMax = (size_t)atol(optarg) << 20; break;
         default: CkAbort("usage: lbcalib [-s min] [-x max] [-i iters] [-w warmup] [-o out.conf] "
                          "[-b migration batch] [-r migration round trips] "
-                         "[-M migration tier 0..3] "
+                         "[-M migration tier 0..4] "
                          "[-H max host MB per object] [-D max device MB per object]\n");
       }
     }
@@ -198,7 +199,7 @@ class Main : public CBase_Main {
       for (int j = i + 1; j < n; j++) {
         const Placement &a = place[i], &b = place[j];
         int t;
-        if (a.process == b.process)      t = TIER_INTRA_PROCESS;
+        if (a.process == b.process)      t = (a.device == b.device) ? TIER_INTRA_PROCESS : TIER_INTRA_PROCESS_PEER;
         else if (a.host != b.host)       t = TIER_INTER_NODE;
         else if (a.device == b.device)   t = TIER_IPC_SAME_GPU;
         else                             t = TIER_IPC_CROSS_GPU;

@@ -54,8 +54,13 @@ struct Result { double us_per_call; double calls_per_s; };
 // background > 0: only thread 0 is measured; the other `threads-1` are untimed callers issuing a
 // launch and an event record in a loop until thread 0 finishes -- the submitter's real situation in
 // stage 1, where the PEs still call the driver for their own kernels and event records.
-static Result run(int threads, int streamsPerThread, Op op, bool cupti, int perBurst, int bursts,
-                  int baseCore, int dev, bool background = false) {
+// devices > 1: thread t drives device dev + (t % devices) -- several GPUs in ONE process, the
+// (1,4,4) layout's shape, against the same thread count on one device and against separate
+// processes (run several copies with CUDA_VISIBLE_DEVICES).
+// cupti: 0 off, 1 activity records only (RUNTIME + CONCURRENT_KERNEL), 2 records + the per-call external
+// correlation push/pop (hapi's per-entry attribution).
+static Result run(int threads, int streamsPerThread, Op op, int cupti, int perBurst, int bursts,
+                  int baseCore, int dev, bool background = false, int devices = 1) {
   static std::atomic<bool> bgStop; bgStop.store(false);
   std::vector<double> busy(threads, 0.0);
   std::atomic<int> ready{0}; std::atomic<bool> go{false};
@@ -63,7 +68,7 @@ static Result run(int threads, int streamsPerThread, Op op, bool cupti, int perB
   for (int t = 0; t < threads; t++) pool.emplace_back([&, t]() {
     cpu_set_t set; CPU_ZERO(&set); CPU_SET(baseCore + t, &set);
     pthread_setaffinity_np(pthread_self(), sizeof(set), &set);
-    CK(cudaSetDevice(dev));
+    CK(cudaSetDevice(dev + (devices > 1 ? t % devices : 0)));
     std::vector<cudaStream_t> S(streamsPerThread);
     for (auto& s : S) CK(cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking));
     int* sink = nullptr; char* a = nullptr; char* b = nullptr;
@@ -92,12 +97,12 @@ static Result run(int threads, int streamsPerThread, Op op, bool cupti, int perB
       const auto t0 = std::chrono::steady_clock::now();
       for (int i = 0; i < perBurst; i++) {
         cudaStream_t s = S[i % streamsPerThread];
-        if (cupti) cuptiActivityPushExternalCorrelationId(CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, (uint64_t)(t * 1000003 + i));
+        if (cupti == 2) cuptiActivityPushExternalCorrelationId(CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, (uint64_t)(t * 1000003 + i));
         if (op == LAUNCH) nop<<<1, 1, 0, s>>>(sink);
         else if (op == MEMCPY) cudaMemcpyAsync(b, a, 24 * 1024, cudaMemcpyDeviceToDevice, s);
         else if (op == FLAG) cuMemsetD32Async((CUdeviceptr)p_flag, (unsigned)i + 1, 1, (CUstream)s);
         else cudaEventRecord(ev, s);
-        if (cupti) { uint64_t id; cuptiActivityPopExternalCorrelationId(CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, &id); }
+        if (cupti == 2) { uint64_t id; cuptiActivityPopExternalCorrelationId(CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, &id); }
       }
       mine += std::chrono::duration<double>(std::chrono::steady_clock::now() - t0).count();
       for (auto& s : S) CK(cudaStreamSynchronize(s));
@@ -124,31 +129,42 @@ int main(int argc, char** argv) {
   const int dev = argc > 1 ? atoi(argv[1]) : 0;
   const int perBurst = argc > 2 ? atoi(argv[2]) : 2000;
   const int bursts = argc > 3 ? atoi(argv[3]) : 20;
+  const int devices = argc > 4 ? atoi(argv[4]) : 1;   // > 1: the multi-device shapes (one process, D GPUs)
   const int baseCore = getenv("LAUNCHCOST_BASE_CORE") ? atoi(getenv("LAUNCHCOST_BASE_CORE")) : sched_getcpu();
-  CK(cudaSetDevice(dev)); CK(cudaFree(0));
-  printf("# device %d, %d calls x %d bursts per thread, cores from %d, CUDA_DEVICE_MAX_CONNECTIONS=%s\n",
-         dev, perBurst, bursts, baseCore, getenv("CUDA_DEVICE_MAX_CONNECTIONS") ? getenv("CUDA_DEVICE_MAX_CONNECTIONS") : "(default 8)");
-  printf("%-8s %-7s %-22s %12s %16s\n", "cupti", "op", "shape", "us/call", "calls/s (all)");
-  for (int pass = 0; pass < 2; pass++) {
-    const bool cupti = pass == 1;
-    if (cupti) cuptiOn();
+  for (int d = 0; d < devices; d++) { CK(cudaSetDevice(dev + d)); CK(cudaFree(0)); }   // contexts up front
+  CK(cudaSetDevice(dev));
+  printf("# device %d (%d device(s)), %d calls x %d bursts per thread, cores from %d, CUDA_DEVICE_MAX_CONNECTIONS=%s\n",
+         dev, devices, perBurst, bursts, baseCore, getenv("CUDA_DEVICE_MAX_CONNECTIONS") ? getenv("CUDA_DEVICE_MAX_CONNECTIONS") : "(default 8)");
+  printf("%-8s %-7s %-34s %12s %16s\n", "cupti", "op", "shape", "us/call", "calls/s (all)");
+  const int passes = devices > 1 ? 3 : 2;   // multi-device: off, records only, records + push/pop
+  for (int pass = 0; pass < passes; pass++) {
+    const int cupti = devices > 1 ? pass : (pass == 1 ? 2 : 0);
+    if (pass == 1) cuptiOn();
     for (Op op : {LAUNCH, MEMCPY, FLAG, EVENT}) {
-      struct { int t, s; const char* name; } shapes[] = {
-        {1, 1, "1 thread x 1 stream"}, {1, 8, "1 thread x 8 streams"},
-        {2, 1, "2 threads x 1 stream"}, {4, 1, "4 threads x 1 stream"}, {8, 1, "8 threads x 1 stream"}};
-      for (auto& sh : shapes) {
-        const Result r = run(sh.t, sh.s, op, cupti, perBurst, bursts, baseCore, dev);
-        printf("%-8s %-7s %-22s %12.2f %16.0f\n", cupti ? "on" : "off", op == LAUNCH ? "launch" : op == MEMCPY ? "memcpy" : op == FLAG ? "flag" : "event",
+      struct Shape { int t, s, d; const char* name; };
+      const Shape one[] = {
+        {1, 1, 1, "1 thread x 1 stream"}, {1, 8, 1, "1 thread x 8 streams"},
+        {2, 1, 1, "2 threads x 1 stream"}, {4, 1, 1, "4 threads x 1 stream"}, {8, 1, 1, "8 threads x 1 stream"}};
+      const Shape many[] = {   // the process/GPU split: 4 PEs per device, 1 or D devices in the process
+        {4, 1, 1, "4 threads x 1 device"}, {4 * devices, 1, 1, "4D threads x 1 device"},
+        {devices, 1, devices, "D threads x D devices (1 each)"}, {4 * devices, 1, devices, "4D threads x D devices (4 each)"}};
+      const Shape* shapes = devices > 1 ? many : one;
+      const int nShapes = devices > 1 ? 4 : 5;
+      for (int i = 0; i < nShapes; i++) {
+        const Shape& sh = shapes[i];
+        const Result r = run(sh.t, sh.s, op, cupti, perBurst, bursts, baseCore, dev, false, sh.d);
+        printf("%-8s %-7s %-34s %12.2f %16.0f\n", cupti == 0 ? "off" : cupti == 1 ? "rec" : "on", op == LAUNCH ? "launch" : op == MEMCPY ? "memcpy" : op == FLAG ? "flag" : "event",
                sh.name, r.us_per_call, r.calls_per_s);
         fflush(stdout);
       }
     }
   }
+  if (devices > 1) { cuptiActivityFlushAll(0); printf("# cupti bytes delivered: %llu\n", g_records.load()); return 0; }
   // CUPTI is on from the second pass: one measured caller among K background callers.
   printf("# measured thread 0 only; the others issue launch + event record in a loop, untimed\n");
   for (Op op : {MEMCPY, FLAG})
     for (int bg : {0, 1, 2, 4, 7}) {
-      const Result r = run(1 + bg, 1, op, true, perBurst, bursts, baseCore, dev, bg > 0);
+      const Result r = run(1 + bg, 1, op, 2, perBurst, bursts, baseCore, dev, bg > 0);
       char name[64]; snprintf(name, sizeof(name), "1 timed + %d background", bg);
       printf("%-8s %-7s %-22s %12.2f %16.0f\n", "on", op == MEMCPY ? "memcpy" : "flag", name, r.us_per_call, r.calls_per_s);
       fflush(stdout);

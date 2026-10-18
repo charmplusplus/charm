@@ -105,25 +105,31 @@ inline void givePinned(T* p, size_t count) {
 class EventPool {
  public:
   EventPool() : lock_(CmiCreateLock()) {}
+  // One free list per device: an event is valid only on the device it was created on, and the
+  // PEs of a process can drive different devices. Created with the calling PE's device current.
   cudaEvent_t take() {
+    const int dev = hapiGetDeviceNum();
     CmiLock(lock_);
     cudaEvent_t e;
-    if (free_.empty()) {
+    std::vector<cudaEvent_t>& free = free_[dev];
+    if (free.empty()) {
       hapiCheck(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
+      owner_[e] = dev;
     } else {
-      e = free_.back();
-      free_.pop_back();
+      e = free.back();
+      free.pop_back();
     }
     CmiUnlock(lock_);
     return e;
   }
   void give(cudaEvent_t e) {
     CmiLock(lock_);
-    free_.push_back(e);
+    free_[owner_[e]].push_back(e);
     CmiUnlock(lock_);
   }
  private:
-  std::vector<cudaEvent_t> free_;
+  std::map<int, std::vector<cudaEvent_t>> free_;
+  std::map<cudaEvent_t, int> owner_;
   CmiNodeLock lock_;
 };
 EventPool& eventPool() {

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <vector>
 #include <map>
+#include <mutex>
 #include <climits>
 #include <malloc.h>
 #include <cstdio>
@@ -152,6 +153,11 @@ struct SendTimer {
 // driver (cudaMallocHost/cudaFreeHost and event create/destroy synchronize the
 // device; see sph2d.C). Process-wide pools, one lock each.
 namespace {
+// Pinned host blocks, pooled PER PE. A process can span several NUMA domains (one per GPU it
+// drives, with the PEs of each GPU pinned to that domain), and cudaMallocHost places a slab's
+// pages on the calling thread's domain: a process-wide pool handed any PE blocks first touched
+// anywhere in the process. Each PE grows its own slabs, and a block given back from another PE
+// returns to the slab owner's list (the registry below), so blocks stay on their domain.
 class PinnedBlockPool {
  public:
   explicit PinnedBlockPool(size_t bytes)
@@ -170,25 +176,39 @@ class PinnedBlockPool {
     free_.push_back(p);
     CmiUnlock(lock_);
   }
+  size_t bytes() const { return bytes_; }
  private:
-  void grow() {
-    const size_t n = 1024;
-    char* slab = NULL;
-    hapiCheck(hapiMallocHost((void**)&slab, bytes_ * n));
-    free_.reserve(free_.size() + n);
-    for (size_t i = 0; i < n; i++) free_.push_back(slab + i * bytes_);
-  }
+  void grow();
   size_t bytes_;
   std::vector<void*> free_;
   CmiNodeLock lock_;
 };
+// Slab registry: base address -> (owner pool, extent), for routing a give to the owner.
+static std::mutex g_slab_lock;   // a std::mutex: usable before Converse initialises the lock API
+static std::map<char*, std::pair<PinnedBlockPool*, size_t>> g_slabs;
+void PinnedBlockPool::grow() {
+  const size_t n = 1024;
+  char* slab = NULL;
+  hapiCheck(hapiMallocHost((void**)&slab, bytes_ * n));
+  free_.reserve(free_.size() + n);
+  for (size_t i = 0; i < n; i++) free_.push_back(slab + i * bytes_);
+  std::lock_guard<std::mutex> lk(g_slab_lock);
+  g_slabs[slab] = std::make_pair(this, bytes_ * n);
+}
+static PinnedBlockPool* pinnedSlabOwner(void* p) {
+  std::lock_guard<std::mutex> lk(g_slab_lock);
+  PinnedBlockPool* owner = NULL;
+  auto it = g_slabs.upper_bound((char*)p);
+  if (it != g_slabs.begin()) {
+    --it;
+    if ((char*)p >= it->first && (char*)p < it->first + it->second.second) owner = it->second.first;
+  }
+  return owner;
+}
 PinnedBlockPool& pinnedPool(size_t bytes) {
-  static CmiNodeLock lock = CmiCreateLock();
-  static std::map<size_t, PinnedBlockPool*> pools;
-  CmiLock(lock);
+  static thread_local std::map<size_t, PinnedBlockPool*> pools;   // this PE's
   PinnedBlockPool*& p = pools[bytes];
   if (p == NULL) p = new PinnedBlockPool(bytes);
-  CmiUnlock(lock);
   return *p;
 }
 template <typename T>
@@ -197,31 +217,38 @@ inline T* takePinned(size_t count) {
 }
 template <typename T>
 inline void givePinned(T* p, size_t count) {
-  pinnedPool(sizeof(T) * count).give((void*)p);
+  PinnedBlockPool* owner = pinnedSlabOwner((void*)p);
+  (owner != NULL ? *owner : pinnedPool(sizeof(T) * count)).give((void*)p);
 }
 
 class EventPool {
  public:
   EventPool() : lock_(CmiCreateLock()) {}
+  // One free list per device: an event is valid only on the device it was created on, and the
+  // PEs of a process can drive different devices. Created with the calling PE's device current.
   cudaEvent_t take() {
+    const int dev = hapiGetDeviceNum();
     CmiLock(lock_);
     cudaEvent_t e;
-    if (free_.empty()) {
+    std::vector<cudaEvent_t>& free = free_[dev];
+    if (free.empty()) {
       hapiCheck(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
+      owner_[e] = dev;
     } else {
-      e = free_.back();
-      free_.pop_back();
+      e = free.back();
+      free.pop_back();
     }
     CmiUnlock(lock_);
     return e;
   }
   void give(cudaEvent_t e) {
     CmiLock(lock_);
-    free_.push_back(e);
+    free_[owner_[e]].push_back(e);
     CmiUnlock(lock_);
   }
  private:
-  std::vector<cudaEvent_t> free_;
+  std::map<int, std::vector<cudaEvent_t>> free_;
+  std::map<cudaEvent_t, int> owner_;
   CmiNodeLock lock_;
 };
 EventPool& eventPool() {
@@ -368,10 +395,16 @@ struct PhaseScope {
   PhaseScope(int p) : ph(p), t0(host_profile_on ? CkWallTimer() : 0.0) {}
   ~PhaseScope() { if (host_profile_on) { g_hprof.t[ph] += CkWallTimer() - t0; g_hprof.n[ph]++; } }
 };
+// 0 = same GPU, 1 = another GPU on this host (another device of this process, or another
+// process), 2 = another host. A process can drive several GPUs, so "same process" is not
+// "same GPU": the device decides.
 static inline int peTier(int pe) {
   if (pe < 0) return 2;
-  if (CmiNodeOf(pe) == CmiMyNode()) return 0;
-  return CmiPeOnSamePhysicalNode(pe, CkMyPe()) ? 1 : 2;
+  // By the physical node and the host-local device index, whatever the process layout: the
+  // earlier form went through the process (CmiNodeOf / CmiPeOnSamePhysicalNode) and counted the
+  // other devices of a multi-device process as "other node" (2026-10-17).
+  if (CmiPhysicalNodeID(pe) != CmiPhysicalNodeID(CkMyPe())) return 2;
+  return hapiDeviceIndexOfPe(pe) == hapiMyDeviceIndex() ? 0 : 1;
 }
 
 // ---- message latency ---------------------------------------------------------
@@ -1091,7 +1124,7 @@ public:
   }
   static bool interiorFirstOn() {
     static const bool on = (getenv("SPH_INTERIOR_FIRST") != nullptr);
-    static bool layers_set = false;
+    static thread_local bool layers_set = false;   // per PE: the symbol lives on each PE's device
     if (on && !layers_set) {
       layers_set = true;
       const int layers = interiorLayers();
@@ -1739,10 +1772,10 @@ public:
   }
 
   // The latency of one exchange message, at the moment its payload is usable.
-  void noteLanded(int kind, int ref, int dir, long long ts) {
+  void noteLanded(int kind, int ref, int dir, long long ts, int src) {
     const long long now = sphNowNs();
     const long long te = env_t[kind][ref & 1][dir];
-    const int tier = peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[dir], nbr_y[dir], nbr_z[dir])));
+    const int tier = peTier(src);   // the sender's PE from the message: exact, unlike the location cache
     const double us = (now - ts) / 1000.0, eus = (te - ts) / 1000.0;
     LatStats& L = g_lat;
     L.n[kind][tier]++; L.sum[kind][tier] += us; L.esum[kind][tier] += eus;
@@ -1870,7 +1903,7 @@ public:
         g_hprof.sent[tier]++; g_hprof.sent_bytes[tier] += (long)cnt * sizeof(Particle);
       }
       st.begin();
-      thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveHalo(my_iter, flipDir(d), cnt, ts, cnt,
+      thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveHalo(my_iter, flipDir(d), cnt, ts, CkMyPe(), cnt,
           (outstanding_sends++, sphSendBuffer(
            d_send_halo + dirOffset(d, exch_capacity),
            sendDoneCb(),
@@ -1884,12 +1917,12 @@ public:
   // known and free (see sph2d.C receiveHalo). On a rebuild step the slot is
   // handed out in arrival order and recorded; inside a window it is the
   // recorded one, and the count has to match.
-  void receiveHalo(int ref, int dir, int n, long long ts, int& m, Particle*& parts,
+  void receiveHalo(int ref, int dir, int n, long long ts, int src, int& m, Particle*& parts,
       CkDeviceBufferPost* devicePost) {
     PhaseScope _ps(PH_RECV_HALO);
     env_t[0][ref & 1][dir] = sphNowNs();
     if (host_profile_on) {
-      const int tier = peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[dir], nbr_y[dir], nbr_z[dir])));
+      const int tier = peTier(src);
       g_hprof.recv[tier]++; g_hprof.recv_bytes[tier] += (long)n * sizeof(Particle);
     }
     static const bool direct_ok = (getenv("SPH_NO_DIRECT_HALO") == nullptr);
@@ -1919,7 +1952,7 @@ public:
   // migrants are all known (their total fixes where the ghosts start),
   // otherwise into the parity slot. Idempotent per (step, direction): the
   // runtime re-invokes the hook when it replays a buffered receive.
-  void receiveHaloC(int ref, int dir, int n, long long ts, int& m, Particle*& parts,
+  void receiveHaloC(int ref, int dir, int n, long long ts, int src, int& m, Particle*& parts,
       CkDeviceBufferPost* devicePost) {
     PhaseScope _ps(PH_RECV_HALO);
     env_t[0][ref & 1][dir] = sphNowNs();
@@ -1952,14 +1985,14 @@ public:
     devicePost[0].hapi_stream = comm_stream;
   }
   // Body (payload usable): record it; the last one the step waits for sends halosDone.
-  void receiveHaloC(int ref, int dir, int n, long long ts, int m, Particle* parts) {
+  void receiveHaloC(int ref, int dir, int n, long long ts, int src, int m, Particle* parts) {
     const int bit = 1 << dir;
     if (halo_landed[ref] & bit) return;   // a replayed delivery
     halo_landed[ref] |= bit;
-    noteLanded(0, ref, dir, ts);
+    noteLanded(0, ref, dir, ts, src);
     if (ref == my_iter && halo_expect_known) checkHalosDone(ref);
   }
-  void receiveParticlesC(int ref, int dir, int adv, int n, long long ts, int& m,
+  void receiveParticlesC(int ref, int dir, int adv, int n, long long ts, int src, int& m,
       Particle*& parts, CkDeviceBufferPost* devicePost) {
     PhaseScope _ps(PH_RECV_PARTS);
     env_t[1][ref & 1][dir] = sphNowNs();
@@ -1978,11 +2011,11 @@ public:
     parts = d_recv_mig + (size_t)(ref & 1) * exchSlots(exch_capacity) + dirOffset(dir, exch_capacity);
     devicePost[0].hapi_stream = comm_stream;
   }
-  void receiveParticlesC(int ref, int dir, int adv, int n, long long ts, int m, Particle* parts) {
+  void receiveParticlesC(int ref, int dir, int adv, int n, long long ts, int src, int m, Particle* parts) {
     const int bit = 1 << dir;
     if (mig_landed[ref] & bit) return;
     mig_landed[ref] |= bit;
-    noteLanded(1, ref, dir, ts);
+    noteLanded(1, ref, dir, ts, src);
     if (ref == open_ref) checkMigrantsDone(ref);
   }
   static int popcount27(int v) { return __builtin_popcount((unsigned)v); }
@@ -2242,7 +2275,7 @@ public:
     for (int d = 0; d < NUM_DIRS; d++) {
       if (!halo_peer[d]) continue;
       const int cnt = h_halo_cnt[d];
-      thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveHalo2(my_iter, flipDir(d), cnt, ts, cnt,
+      thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveHalo2(my_iter, flipDir(d), cnt, ts, CkMyPe(), cnt,
           (outstanding_sends++, sphSendBuffer(
            d_send_halo2 + dirOffset(d, exch_capacity),
            sendDoneCb(),
@@ -2253,7 +2286,7 @@ public:
   // The predicted ghosts land in the same slots of the OTHER buffer. The slot
   // is known once this step's first exchange from that direction has been
   // posted; before that (or for a later step) the message is staged.
-  void receiveHalo2(int ref, int dir, int n, long long ts, int& m, Particle*& parts,
+  void receiveHalo2(int ref, int dir, int n, long long ts, int src, int& m, Particle*& parts,
       CkDeviceBufferPost* devicePost) {
     PhaseScope _ps(PH_PC);
     env_t[2][ref & 1][dir] = sphNowNs();
@@ -2434,7 +2467,7 @@ public:
       }
       st.begin();
       thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveParticles(my_iter, flipDir(d),
-          adv_out, cnt, ts, cnt,
+          adv_out, cnt, ts, CkMyPe(), cnt,
           (outstanding_sends++, sphSendBuffer(
            d_send_mig + dirOffset(d, exch_capacity),
            sendDoneCb(),
@@ -2444,12 +2477,12 @@ public:
     st.report("sendLeavers", x, y, z, my_iter, send_warn_ms > 0 ? (CkWallTimer() - tloop) * 1000.0 : 0.0, stallTier(st.worst_d));
   }
 
-  void receiveParticles(int ref, int dir, int adv, int n, long long ts, int& m,
+  void receiveParticles(int ref, int dir, int adv, int n, long long ts, int src, int& m,
       Particle*& parts, CkDeviceBufferPost* devicePost) {
     PhaseScope _ps(PH_RECV_PARTS);
     env_t[1][ref & 1][dir] = sphNowNs();
     if (host_profile_on) {
-      const int tier = peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[dir], nbr_y[dir], nbr_z[dir])));
+      const int tier = peTier(src);
       g_hprof.recv[tier]++; g_hprof.recv_bytes[tier] += (long)n * sizeof(Particle);
     }
     // A partner can run ahead only over a quiet edge, by at most its level;
@@ -2740,12 +2773,12 @@ public:
         g_hprof.sent_bytes[tier] += (long)(cm + ch) * sizeof(Particle);
       }
       st.begin();
-      thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveParticlesC(ref, flipDir(d), adv_out, cm, ts, cm,
+      thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveParticlesC(ref, flipDir(d), adv_out, cm, ts, CkMyPe(), cm,
           (outstanding_sends++, sphSendBuffer(d_send_mig + dirOffset(d, exch_capacity), sendDoneCb(), comm_stream)));
       st.end(d);
       if (send_halo) {
         st.begin();
-        thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveHaloC(ref, flipDir(d), ch, ts, ch,
+        thisProxy(nbr_x[d], nbr_y[d], nbr_z[d]).receiveHaloC(ref, flipDir(d), ch, ts, CkMyPe(), ch,
             (outstanding_sends++, sphSendBuffer(d_send_halo + dirOffset(d, exch_capacity), sendDoneCb(), comm_stream)));
         st.end(d + 100);
       }

@@ -126,7 +126,7 @@ def main():
                     s = int(s) + off; e = int(e) + off
                     if not keep(s, e): continue
                     ev = {'ph': 'X', 'cat': 'kernel', 'pid': rank, 'ts': (s - base) / 1000.0, 'dur': (e - s) / 1000.0,
-                          'name': names.get(int(nid), f'kernel {nid}'), 'args': {'stream': int(st)}}
+                          'name': names.get(int(nid), f'kernel {nid}'), 'args': {'stream': int(st), 'device': int(dev)}}
                     oid = tokens.get(int(tok))
                     if oid is not None and oid in objidx: ev['args']['idx'] = idx3(objidx[oid])
                     gpu[(int(dev), int(st))].append(ev); n += 1
@@ -135,7 +135,7 @@ def main():
                     s = int(s) + off; e = int(e) + off
                     if not keep(s, e): continue
                     gpu[(int(dev), int(st))].append({'ph': 'X', 'cat': 'memcpy' if c == 'M' else 'memset', 'pid': rank, 'ts': (s - base) / 1000.0,
-                          'dur': (e - s) / 1000.0, 'name': COPY.get(int(kind), 'memcpy') if c == 'M' else 'memset', 'args': {'bytes': int(nb), 'stream': int(st)}})
+                          'dur': (e - s) / 1000.0, 'name': COPY.get(int(kind), 'memcpy') if c == 'M' else 'memset', 'args': {'bytes': int(nb), 'stream': int(st), 'device': int(dev)}})
                     n += 1
         if not a.no_util:
             # Per-GPU utilization counters from the kernel intervals: sweep the starts and ends, spread each constant-

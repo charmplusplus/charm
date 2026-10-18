@@ -73,12 +73,14 @@ mainmodule sph3d {
     entry void sendsDrained();
 
     // ts: the sender's hapiTraceTimestamp() at the send, for the message
-    // latency (envelope and payload) that the receiver records.
-    entry void receiveHalo(int ref, int dir, int n, long long ts, int m,
+    // latency (envelope and payload) that the receiver records; src: the sender's PE, so the
+    // receiver tiers the message exactly (the location cache misses the in-process
+    // partners of a multi-device process).
+    entry void receiveHalo(int ref, int dir, int n, long long ts, int src, int m,
                            nocopydevice Particle parts[m]);
-    entry void receiveHalo2(int ref, int dir, int n, long long ts, int m,
+    entry void receiveHalo2(int ref, int dir, int n, long long ts, int src, int m,
                             nocopydevice Particle parts[m]);
-    entry void receiveParticles(int ref, int dir, int adv, int n, long long ts, int m,
+    entry void receiveParticles(int ref, int dir, int adv, int n, long long ts, int src, int m,
                                 nocopydevice Particle parts[m]);
     entry void exchangePacked();
     // The concurrent exchange's receives are plain entries: the payload is in
@@ -88,9 +90,9 @@ mainmodule sph3d {
     // message is ever buffered in the SDAG, which the runtime's migration
     // path does not support (ckrdmadevice.C: "no device-zerocopy message is
     // buffered at migration time").
-    entry void receiveHaloC(int ref, int dir, int n, long long ts, int m,
+    entry void receiveHaloC(int ref, int dir, int n, long long ts, int src, int m,
                             nocopydevice Particle parts[m]);
-    entry void receiveParticlesC(int ref, int dir, int adv, int n, long long ts, int m,
+    entry void receiveParticlesC(int ref, int dir, int adv, int n, long long ts, int src, int m,
                                  nocopydevice Particle parts[m]);
     entry void migrantsDone(int ref);
     entry void halosDone(int ref);
@@ -107,25 +109,25 @@ mainmodule sph3d {
       serial { my_iter++; startHalo(); }
       when haloPacked() serial { sendHalo(); }
       for (recv_count = 0; recv_count < n_expect; recv_count++) {
-        when receiveHalo[my_iter](int ref, int dir, int n, long long ts, int m,
+        when receiveHalo[my_iter](int ref, int dir, int n, long long ts, int src, int m,
                                   nocopydevice Particle parts[m])
-          serial { noteLanded(0, ref, dir, ts); appendGhosts(dir, n); }
+          serial { noteLanded(0, ref, dir, ts, src); appendGhosts(dir, n); }
       }
       serial { computeForces(); }
       if (pc_step) {
         when haloPacked2() serial { sendHalo2(); }
         for (recv_count = 0; recv_count < n_expect; recv_count++) {
-          when receiveHalo2[my_iter](int ref, int dir, int n, long long ts, int m,
+          when receiveHalo2[my_iter](int ref, int dir, int n, long long ts, int src, int m,
                                      nocopydevice Particle parts[m])
-            serial { noteLanded(2, ref, dir, ts); appendGhosts2(dir, n); }
+            serial { noteLanded(2, ref, dir, ts, src); appendGhosts2(dir, n); }
         }
         serial { correct(); }
       }
       when leaversPacked() serial { sendLeavers(); }
       for (recv_count = 0; recv_count < n_expect_mig; recv_count++) {
-        when receiveParticles[my_iter](int ref, int dir, int adv, int n, long long ts, int m,
+        when receiveParticles[my_iter](int ref, int dir, int adv, int n, long long ts, int src, int m,
                                        nocopydevice Particle parts[m])
-          serial { noteLanded(1, ref, dir, ts); appendParticles(ref, dir, n); }
+          serial { noteLanded(1, ref, dir, ts, src); appendParticles(ref, dir, n); }
       }
       serial { gateStepDrain(); }
       when sendsDrained() serial { endOfStep(); }

@@ -11,7 +11,8 @@ def load(f):
     K = collections.defaultdict(list); E = collections.defaultdict(list); M = []
     for e in ev:
         if e['ph'] == 'X':
-            if e['cat'] == 'kernel': K[e['pid']].append((e['ts'], e['ts'] + e['dur'], e['name']))
+            # one series per GPU: (rank, device) -- a process can drive several devices
+            if e['cat'] == 'kernel': K[(e['pid'], e.get('args', {}).get('device', 0))].append((e['ts'], e['ts'] + e['dur'], e['name']))
             elif e['cat'] == 'entry': E[e['pid']].append((e['ts'], e['ts'] + e['dur'], e['name'].split('::')[-1]))
         elif e['ph'] == 'i' and e.get('cat') == 'msg': M.append(e)
     for v in K.values(): v.sort()
