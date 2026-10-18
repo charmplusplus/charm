@@ -3,28 +3,16 @@
 set(conv-core-h-sources
     src/util/cmitls.h
     src/conv-core/cmipool.h
-    src/conv-core/cmishmem.h
-    src/conv-core/cmidemangle.h
     src/conv-core/conv-config.h
-    src/conv-core/conv-cpath.h
-    src/conv-core/conv-cpm.h
     src/conv-core/conv-header.h
     src/conv-core/conv-ooc.h
-    src/conv-core/conv-qd.h
-    src/conv-core/conv-random.h
     src/conv-core/conv-rdmadevice.h
     src/conv-core/conv-taskQ.h
     src/conv-core/conv-trace.h
-    src/conv-core/cpthreads.h
     src/conv-core/debug-conv++.h
     src/conv-core/debug-conv.h
-    src/conv-core/hrctimer.h
-    src/conv-core/mem-arena.h
-    src/conv-core/memory-gnu-threads.h
     src/conv-core/memory-isomalloc.h
-    src/conv-core/msgq.h
     src/conv-core/queueing.h
-    src/conv-core/quiescence.h
 )
 
 # conv-ccs
@@ -133,7 +121,6 @@ set(conv-partition-cxx-sources
 
 # conv-ldb
 set(conv-ldb-h-sources
-    src/conv-ldb/graphdefs.h
     src/conv-ldb/topology.h
 )
 
