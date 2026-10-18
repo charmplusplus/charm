@@ -1044,7 +1044,8 @@ struct CuptiHookGuard {
 // trace them by default. leanmd issues one per local device receive -- ~6000 a
 // step per process -- so the question "is the unexplained fraction of the step
 // idle GPU, or GPU busy with work T_g structurally cannot see" turns on exactly
-// this number. Gated on CHARM_CUPTI_MEMCPY so a default run is unperturbed.
+// this number. Off by default so a default run is unperturbed; the +gputrace
+// timeline turns the copy records on.
 // File-scope rather than a GPUManager field on purpose: gpumanager.h is
 // included everywhere and changing it forces a full rebuild of every app.
 static std::atomic<uint64_t> g_cupti_memcpy_n{0};
@@ -1148,11 +1149,10 @@ void hapiTraceCopies(bool) {}
 #endif
 
 bool hapiCuptiTraceMemcpy() {
-  static const bool on = (getenv("CHARM_CUPTI_MEMCPY") != nullptr);
 #ifdef CMK_LBDB_ON
   if (g_trace != nullptr) return g_trace_copies;   // the +gputrace timeline wants the copies too, unless +gputracenocopy
 #endif
-  return on;
+  return false;
 }
 
 void hapiCuptiStartTracing() {
@@ -3820,26 +3820,13 @@ static thread_local bool hapi_is_submitter_thread = false;
 void hapiSubmitThread(int k) {
   HapiSubmitState* st = hapi_submit;
   hapi_is_submitter_thread = true;
-  // A thread inherits its creator's affinity -- one PE's core. Widen it, or the
-  // submitter time-slices with that PE. CHARM_GPU_SUBMIT_CPUS=<first>-<last>
-  // names the cores (e.g. the rank's idle ones); default: any CPU.
+  // A thread inherits its creator's affinity -- one PE's core. Widen it to any
+  // CPU, or the submitter time-slices with that PE.
   cpu_set_t set; CPU_ZERO(&set);
-  int lo = 0, hi = CPU_SETSIZE - 1;
-  if (const char* e = getenv("CHARM_GPU_SUBMIT_CPUS")) {
-    if (strncmp(e, "near", 4) == 0) {           // idle half of the creating PE's 16-core domain
-      const int base = (sched_getcpu() / 16) * 16; lo = base + 8; hi = base + 15;
-    } else if (sscanf(e, "%d-%d", &lo, &hi) != 2) { lo = 0; hi = CPU_SETSIZE - 1; }
-  }
-  for (int c = lo; c <= hi && c < CPU_SETSIZE; c++) CPU_SET(c, &set);
+  for (int c = 0; c < CPU_SETSIZE; c++) CPU_SET(c, &set);
   sched_setaffinity(0, sizeof(set), &set);
   if (cudaSetDevice(st->device) != cudaSuccess) { fprintf(stderr, "HAPI submitter: cudaSetDevice failed\n"); abort(); }
   unsigned idle = 0;
-  // CHARM_GPU_SUBMIT_STATS: every ~2 s, how busy this submitter is, what a copy
-  // and a flag write cost it, and the deepest backlog it found in any PE's ring.
-  static const bool stats = (getenv("CHARM_GPU_SUBMIT_STATS") != nullptr);
-  typedef std::chrono::steady_clock clk;
-  clk::time_point winStart = clk::now();
-  double busyCopy = 0, busyFlag = 0; unsigned long nCopy = 0, nFlag = 0; uint32_t maxDepth = 0;
   for (;;) {
     bool any = false;
     for (int r = 0; r < st->npes; r++) {
@@ -3847,24 +3834,7 @@ void hapiSubmitThread(int k) {
       const uint32_t h = ring.head.load(std::memory_order_relaxed);
       uint32_t n = ring.tail.load(std::memory_order_acquire) - h;
       if (n == 0) continue;
-      if (stats && n > maxDepth) maxDepth = n;
       if (n > 4) n = 4;                          // a few per PE, then the next PE: breadth-first
-      if (stats) {
-        for (uint32_t i = 0; i < n; i++) {
-          HapiSubmitOp& op = ring.ops[(h + i) & (HAPI_SUBMIT_RING - 1)];
-          const clk::time_point t0 = clk::now();
-          hapiSubmitIssue(op);
-          const double d = std::chrono::duration<double>(clk::now() - t0).count();
-          if (op.kind == HAPI_SUBMIT_FLAG) { busyFlag += d; nFlag++; } else { busyCopy += d; nCopy++; }
-        }
-        const double win = std::chrono::duration<double>(clk::now() - winStart).count();
-        if (win > 2.0) {
-          fprintf(stderr, "[submit %d dev %d] %.0f ops/s, busy %.0f%% (copies+launches+events %lu x %.2f us, flags %lu x %.2f us), deepest ring %u, cpu %d\n",
-                  k, st->device, (nCopy + nFlag) / win, 100.0 * (busyCopy + busyFlag) / win, nCopy,
-                  nCopy ? 1e6 * busyCopy / nCopy : 0.0, nFlag, nFlag ? 1e6 * busyFlag / nFlag : 0.0, maxDepth, sched_getcpu());
-          winStart = clk::now(); busyCopy = busyFlag = 0; nCopy = nFlag = 0; maxDepth = 0;
-        }
-      } else
       for (uint32_t i = 0; i < n; i++) hapiSubmitIssue(ring.ops[(h + i) & (HAPI_SUBMIT_RING - 1)]);
       ring.head.store(h + n, std::memory_order_release);
       st->issued[k].fetch_add(n, std::memory_order_relaxed);
@@ -5000,15 +4970,6 @@ bool hapiIpcExportBuffer(const void* ptr, hapiIpcMemHandle_t* handle,
   }
 
   csv_gpu_manager.ipc_export_cache.emplace(base_ptr, new_handle);
-  // Whether a handle names an allocation or the segment containing it decides
-  // the whole import protocol, and the handle is opaque, so the only way to ask
-  // is to log identity against address and compare. Fresh GetMemHandle calls
-  // only: a cache hit re-serves bytes this already printed.
-  if (getenv("CHARM_IPC_IDENT") != nullptr) {
-    CmiPrintf("[%d] IPCEXPORT base=%p size=%zu hh=%016zx\n", CmiMyPe(),
-              base_ptr, alloc_size, hapiIpcMemHandleHash()(new_handle));
-    fflush(stdout);
-  }
   *handle = new_handle;
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.ipc_cache_lock);
@@ -5090,15 +5051,6 @@ void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle, int src_process,
     // that the key above did not find; an invalid handle means the sender's
     // allocation is gone.
     csv_gpu_manager.ipc_import_last_err = (int)err;
-    if (getenv("CHARM_IPC_DEBUG") != nullptr) {
-      CmiPrintf("[%d] IPCFAIL %s(%d) want proc=%d base=%p ; holds %zu\n",
-                CmiMyPe(), cudaGetErrorName((cudaError_t)err), (int)err,
-                src_process, src_base, cache.size());
-      for (const auto& kv : cache)
-        CmiPrintf("[%d]   held proc=%d base=%p mapped=%p\n", CmiMyPe(),
-                  kv.first.first, kv.first.second, kv.second.mapped);
-      fflush(stdout);
-    }
     cudaGetLastError();
 #if CMK_SMP
     CmiUnlock(csv_gpu_manager.ipc_cache_lock);
@@ -5147,11 +5099,7 @@ void hapiIpcInvalidateExport(const void* ptr) {
 #if CMK_SMP
   CmiLock(csv_gpu_manager.ipc_cache_lock);
 #endif
-  const size_t erased = csv_gpu_manager.ipc_export_cache.erase((const void*)base);
-  if (erased != 0 && getenv("CHARM_IPC_IDENT") != nullptr) {
-    CmiPrintf("[%d] IPCINVAL base=%p\n", CmiMyPe(), base);
-    fflush(stdout);
-  }
+  csv_gpu_manager.ipc_export_cache.erase((const void*)base);
 #if CMK_SMP
   CmiUnlock(csv_gpu_manager.ipc_cache_lock);
 #endif
@@ -5632,16 +5580,14 @@ HapiDevPoolArena& hapiDevPoolNewVmmHeapLocked(int dev) {
   // heap at their first cross-node migrations. The hint is a slot of
   // `reserve` bytes at 1 TiB + (process x devices + device) x reserve; the
   // driver may still place the range elsewhere, and then says so.
-  // CHARM_VMM_HEAP_SLOT=0 leaves the placement to the driver (for comparison).
-  static const bool useSlot = []() { const char* e = getenv("CHARM_VMM_HEAP_SLOT"); return !(e && atoi(e) == 0); }();
   const uintptr_t slot = (uintptr_t)CmiMyNode() * (uintptr_t)std::max(1, gm.device_count) + (uintptr_t)dev;
-  const CUdeviceptr hint = useSlot ? (CUdeviceptr)(((uintptr_t)1 << 40) + slot * (uintptr_t)reserve) : 0;
+  const CUdeviceptr hint = (CUdeviceptr)(((uintptr_t)1 << 40) + slot * (uintptr_t)reserve);
   CUdeviceptr base = 0;
   r = cuMemAddressReserve(&base, reserve, 0, hint, 0);
   if (r != CUDA_SUCCESS)
     CmiAbort("HAPI> [%d] device pool (vmm): cuMemAddressReserve of %zu MB failed: %s",
              CmiMyPe(), reserve >> 20, hapiCuErrName(r));
-  if (useSlot && base != hint)
+  if (base != hint)
     CmiPrintf("HAPI> [%d] device pool (vmm): the driver placed the heap at %p, not at the "
               "per-process slot %p; foreign pointers may collide with local blocks\n",
               CmiMyPe(), (void*)(uintptr_t)base, (void*)(uintptr_t)hint);
@@ -5868,12 +5814,7 @@ void hapiLBDevicePool(size_t* poolFree, int* pesOnDevice) {
 
 size_t hapiLBDevicePoolCapacity() {
   if (!CsvAccess(gpu_manager).device_pool_on) return 0;
-  // CHARM_GPU_POOL_CAP_MB stands for a device of that size (hapiLBDeviceMemory).
-  static const size_t cap = []() {
-    const char* s = getenv("CHARM_GPU_POOL_CAP_MB");
-    return s ? (size_t)atol(s) << 20 : (size_t)0;
-  }();
-  return cap > 0 ? cap : hapiDevPoolCapacityOn(CpvAccess(my_device_id));
+  return hapiDevPoolCapacityOn(CpvAccess(my_device_id));
 }
 
 void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
@@ -5889,19 +5830,6 @@ void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
     // device bytes are shared by every process on the device.
     *poolFree = hapiDevPoolFreeBytesOn(CpvAccess(my_device_id));
     *arenaBytes = hapiDevPoolGrowthBytes();   // an arena, or a vmm chunk
-    // CHARM_GPU_POOL_CAP_MB: a device of that size, for exercising the memory
-    // contract on a device with memory to spare. The pool may hand out at most
-    // that much in this process, and the device offers nothing beyond it. The
-    // balancer's stats and the admission gate both read it here.
-    static const size_t cap = []() {
-      const char* s = getenv("CHARM_GPU_POOL_CAP_MB");
-      return s ? (size_t)atol(s) << 20 : (size_t)0;
-    }();
-    if (cap > 0) {
-      const size_t used = hapiDevPoolUsedBytesOn(CpvAccess(my_device_id));
-      *poolFree = used < cap ? cap - used : 0;
-      *devFree = 0;
-    }
   } else if (csv_gpu_manager.use_shm) {
     DeviceManager* dm = csv_gpu_manager.device_map[CmiMyPe()];
     *poolFree = dm->get_lb_buffer_free_size();
@@ -5910,13 +5838,7 @@ void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
     *poolFree = 0;
     *arenaBytes = 0;
   }
-  static const int slotOverride = []() {
-    const char* s = getenv("CHARM_LB_IPC_SLOTS");
-    return s ? atoi(s) : -1;
-  }();
-  if (slotOverride >= 0) {
-    *ipcSlots = slotOverride;
-  } else if (csv_gpu_manager.use_shm) {
+  if (csv_gpu_manager.use_shm) {
     const int slice = csv_gpu_manager.hapi_ipc_event_pool_size_pe;
     *ipcSlots = slice >= 4 ? slice * 3 / 4 : (slice > 0 ? 1 : 0);
   } else {

@@ -349,7 +349,7 @@ void testHandoffMovesNoBytes()
   int pr = 0;
   expect(plan(sc, batchOf, &pr) == 1 && pr == 0, test, "a handoff was batched");
 
-  // With the handoff disabled the same moves stage (CHARM_NO_INTRAPROC_MIGRATE).
+  // With the handoff disabled the same moves stage.
   sc.topo.handoff = false;
   expect(sc.verify() == 10, test, "a 2 MB payload fit a 1 MB pool");
 }

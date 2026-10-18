@@ -77,8 +77,7 @@ void DiffusionLB::AcrossNodeLB()
   // against 163) and more detached pieces (10 against 2). A scratch-remap
   // beats both there (1.02, cut -16%, 0 pieces; +LBDiffusionRemapAbove), so
   // that stays the tool for deep plans on a stencil; leanmd's remap is a
-  // MetisLB its cut gate refuses. CHARM_DIFFUSION_SHED=excess restores the
-  // excess rule.
+  // MetisLB its cut gate refuses.
   {
     const double fair = avgNborLoad();
     const double excess = my_load - fair;
@@ -88,22 +87,12 @@ void DiffusionLB::AcrossNodeLB()
       if (q > 0.0) planOut += q;
       else planIn -= q;
     }
-    static const bool shedExcess = []() {
-      const char* v = getenv("CHARM_DIFFUSION_SHED");
-      return v != NULL && strcmp(v, "excess") == 0;
-    }();
-    if (shedExcess)
-    {
-      my_loadAfterTransfer = (excess > 0.0) ? excess : 0.0;
-      if (my_load <= fair * (1.0 + effMinImbalance)) my_loadAfterTransfer = 0.0;
-    }
-    else
-      my_loadAfterTransfer = (planOut < my_load) ? planOut : my_load;
+    my_loadAfterTransfer = (planOut < my_load) ? planOut : my_load;
     if (_lb_args.debug() > 1)
       CkPrintf("[node %d] AcrossNodeLB: my_load=%f fair=%f shedding=%f (floor %.3f) "
-               "plan out=%f in=%f excess=%f rule=%s\n",
+               "plan out=%f in=%f excess=%f\n",
                myNodeId, my_load, fair, my_loadAfterTransfer, effMinImbalance, planOut,
-               planIn, excess, shedExcess ? "excess" : "plan");
+               planIn, excess);
 
     // The receiver check in the dimension NOT being diffused (DiffusionMetric.h).
     // Both terms are read as seconds of step time. The step the plan brings
@@ -383,8 +372,7 @@ void DiffusionLB::migMaybeDone()
     // reductions in CollectStats, a PE 0 gather in ProcessFinalStats -- so
     // they still go through the PE 0 barrier. Otherwise the moves start
     // neighbour-locally, see maybeStartMigrations.
-    if (diffusionGlobalPhases() || step() == LBSimulation::dumpStep ||
-        _lb_args.debug() > 0)
+    if (step() == LBSimulation::dumpStep || _lb_args.debug() > 0)
       thisProxy[0].withinDone();
     else
     {

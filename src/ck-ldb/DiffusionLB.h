@@ -193,8 +193,7 @@ public:
   // The neighbour graph survives across LB steps: topology-derived and
   // comm-derived neighbourhoods change slowly, and rebuilding the graph is the
   // most expensive phase of a step. Set once the first step's rounds start
-  // (the graph is final by then); CHARM_DIFFUSION_GRAPH_REBUILD=1 restores a
-  // rebuild every step.
+  // (the graph is final by then).
   bool hs_graphCached;
   void statsAssembled();
   void startStrategy();

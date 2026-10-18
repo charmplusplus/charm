@@ -20,30 +20,13 @@
 // the strategy pays all 40 even when the load is already even. On a GPU-bound
 // run where diffusion wants to move ~1% of the load, that is the single largest
 // cost of load balancing -- larger than the migration it decides on.
-// CHARM_LB_DIFFUSION_ITERS overrides it so the trade can be measured.
-inline int diffusionIterations()
-{
-  static const int n = []() {
-    const char* s = getenv("CHARM_LB_DIFFUSION_ITERS");
-    const int v = s ? atoi(s) : 40;
-    return v > 0 ? v : 40;
-  }();
-  return n;
-}
+inline int diffusionIterations() { return 40; }
 
 // Diffusion rounds stop once no node wants to shift more than this fraction of
 // its own load. Measured on a GPU-bound run, diffusion asks to move ~1.6% on the
 // first round and converges immediately after, so the fixed 40 rounds were
 // almost entirely wasted. The default is THRESHOLD (DiffusionLB.C) percent.
-inline double diffusionPseudoConvergeRatio()
-{
-  static const double r = []() {
-    const char* s = getenv("CHARM_LB_DIFFUSION_CONVERGE");
-    const double v = s ? atof(s) : 0.02;
-    return v > 0.0 ? v : 0.02;
-  }();
-  return r;
-}
+inline double diffusionPseudoConvergeRatio() { return 0.02; }
 
 // What the pseudo rounds reveal about the step before any object moves, summed
 // over the nodes on PE 0. Enough to tell a one-hop plan from a multi-hop one:

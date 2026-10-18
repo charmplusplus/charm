@@ -63,13 +63,8 @@ static void lbinit()
 }
 
 // Below this many PEs a broadcast beats building a scatter tree, so the peer
-// decision path falls back to one. CHARM_LB_SCATTER_THRESHOLD overrides it,
-// which is the only way to exercise the scatter path on a small run.
-static int broadcastThreshold = []() {
-  const char* env = getenv("CHARM_LB_SCATTER_THRESHOLD");
-  const int v = (env != nullptr) ? atoi(env) : 0;
-  return (v > 0) ? v : 32;
-}();
+// decision path falls back to one.
+static const int broadcastThreshold = 32;
 
 static void getPredictedLoadWithMsg(BaseLB::LDStats* stats, int count, 
 		             LBMigrateMsg *, LBInfo &info, int considerComm);
@@ -248,20 +243,17 @@ void CentralLB::CallLB()
   if (!hapiCuptiArrive((uint64_t)step(), hapiDeviceGroupSize())) return;   // per process (see DistBaseLB)
   {
     // CHARM_LB_CUPTI_OFFTHREAD=near | <cpulist> | 1: the window's CUPTI flush, parse and normalise
-    // on the shared helper thread instead of inline in this PE's entry method (the same knob and
-    // FLUSH_ON_PE diagnostic as DistBaseLB). The build took 99 ms on one PE of sph3d at 98M (job
-    // 22776188 trace), and with a halo exchange every other PE waited for it.
+    // on the shared helper thread instead of inline in this PE's entry method (the same knob as
+    // DistBaseLB). The build took 99 ms on one PE of sph3d at 98M (job 22776188 trace), and with
+    // a halo exchange every other PE waited for it.
     static const char* spec = lbHelperSpec("CHARM_LB_CUPTI_OFFTHREAD");
     cpu_set_t cpus;
     if (lbOffThreadCpus(spec, &cpus)) {
-      static const bool flushOnPe = (getenv("CHARM_LB_CUPTI_OFFTHREAD_FLUSH_ON_PE") != nullptr);
       static bool announced = false;
       if (!announced) {
         announced = true;
         CmiPrintf("CharmLB> PE %d: CUPTI load build on the helper thread (CHARM_LB_CUPTI_OFFTHREAD=%s)\n", CkMyPe(), spec);
       }
-      if (flushOnPe && hapiCuptiTracingActive())
-        hapiCuptiFlushGated(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
       CuptiBuildJob* bj = new CuptiBuildJob(thisgroup, hapiDeviceGroupFirstPe(), hapiDeviceGroupSize());
       const int dev = hapiMyDeviceIndex();
       lbHelperSubmit(cpus, [bj, dev]() { hapiPrepareCuptiLoadsDevice(HAPI_CUPTI_EPOCH_LB_ROUND, dev); bj->done.store(true, std::memory_order_release); }, dev < 0 ? 0 : dev);
@@ -285,14 +277,7 @@ void CentralLB::gpuLoadsReady()
 #if CMK_LBDB_ON
 #if CMK_CUDA
   lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
-  {
-    const GPUManager& gm = CsvAccess(gpu_manager);
-    // CHARM_LB_NO_DRIVER_SPLIT: leave the driver time inside the host load and
-    // carry no launch term -- the pre-split behaviour, for A/B runs.
-    static const bool noSplit = (getenv("CHARM_LB_NO_DRIVER_SPLIT") != nullptr);
-    static const std::unordered_map<LDObjKey, double, LDObjKeyHash> noApi;
-    lbmgr->SetObjDriverLoad(noSplit ? noApi : gm.cupti_obj_api_raw_, hapiCuptiDriverScale());
-  }
+  lbmgr->SetObjDriverLoad(CsvAccess(gpu_manager).cupti_obj_api_raw_, hapiCuptiDriverScale());
   if (_lb_args.gpuScaling())
     lbmgr->SetObjGPUCosts(CsvAccess(gpu_manager).cupti_obj_epoch_costs_);
 #endif
@@ -1941,9 +1926,8 @@ LBMigrateMsg* CentralLB::strategyFinish(LDStats* stats)
   // Memory contract: every strategy's output passes through the verifier,
   // memory-aware or not. Moves that would violate a device's headroom are
   // refused (the object stays home -- always feasible); strategies that plan
-  // with the ledger produce plans that pass untouched. CHARM_LB_NO_MEMVERIFY
-  // is the escape hatch for A/B measurement.
-  if (getenv("CHARM_LB_NO_MEMVERIFY") == NULL) {
+  // with the ledger produce plans that pass untouched.
+  {
     std::vector<ContractVerifier::Move> cvMoves;
     for (int i = 0; i < (int)stats->objData.size(); i++) {
       if (!stats->objData[i].migratable) continue;

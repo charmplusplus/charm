@@ -46,7 +46,7 @@ void DiffusionLB::findNBors(int do_again)
     // expensive phase of a step; the graph it produces changes slowly, so a
     // step that already has one skips straight to the rounds. One node kicks
     // the strategy -- startStrategy must run exactly once.
-    if (hs_graphCached && getenv("CHARM_DIFFUSION_GRAPH_REBUILD") == NULL)
+    if (hs_graphCached)
     {
         // The graph is reused, but which of its edges this node actually
         // borders is not: that follows the objects, and nborFlowAdjacent

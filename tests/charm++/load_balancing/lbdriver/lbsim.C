@@ -49,9 +49,7 @@
  *
  * DiffusionLB's own flags apply, since it reads them from the same place:
  * +LBDiffusionNumNbors, +LBDiffusionMaxMoveFrac, +LBDiffusionMinImbalance,
- * +LBDiffusionBeta, +LBCostConfig, +LBnoMST, +LBDebug, and the environment
- * knobs CHARM_LB_DIFFUSION_ITERS, CHARM_LB_DIFFUSION_CONVERGE,
- * CHARM_DIFFUSION_GRAPH_REBUILD. +LBDiffusionCommOn is assumed: there are no
+ * +LBDiffusionBeta, +LBCostConfig, +LBnoMST, +LBDebug. +LBDiffusionCommOn is assumed: there are no
  * object positions here, so only the communication metric applies.
  *
  * Writes lbsim.json in lbdriver.json's format (plot_map.py, analyze.py read
@@ -67,7 +65,7 @@
  *                      parts to the owners they overlap most, migrate once
  *   LBSIM_SHED=excess  across-node phase sheds the node's own excess over the
  *                      neighbourhood mean (the chare's former rule) instead of
- *                      the plan's outflow (its rule now, CHARM_DIFFUSION_SHED);
+ *                      the plan's outflow (its rule now);
  *                      =plan is the outflow rule with the fine per-edge floor
  *                      (LBSIM_LOCAL_FLOOR) in the rounds, which the chare does
  *                      not do -- it plans at its own floor
@@ -87,7 +85,7 @@
  *   LBSIM_GLOBAL_FLOOR=0
  *                      withhold the job-wide mean load from the rounds, so the
  *                      floor is the purely local one the chare used before
- *                      (mirrors CHARM_DIFFUSION_GLOBAL_FLOOR=0)
+ *                      (the chare always uses the job-wide mean now)
  *   LBSIM_VECTOR=host|device|cross
  *                      a second load dimension per object (device time beside
  *                      host time; see Grid::weightsVector). The step then
@@ -535,7 +533,7 @@ static int pseudoRounds(std::vector<VNode>& nodes, double effMinImbalance, bool 
   // (pseudoLoadContribute); here every node's load is already in hand. It is
   // what the decision floor is held against once a node's own neighbourhood
   // looks flat -- see the floor note in DiffusionFlow.h. LBSIM_GLOBAL_FLOOR=0
-  // withholds it, mirroring CHARM_DIFFUSION_GLOBAL_FLOOR=0.
+  // withholds it (the chare always uses it).
   double globalAvgLoad = 0.0;
   {
     const char* v = getenv("LBSIM_GLOBAL_FLOOR");
@@ -1764,7 +1762,7 @@ static void lbsimRun(int argc, char** argv)
 
       // Neighbour graph: built once, kept across steps; the adjacency the flow
       // rule reads is recounted every step.
-      if (!graphBuilt || getenv("CHARM_DIFFUSION_GRAPH_REBUILD") != NULL)
+      if (!graphBuilt)
       {
         buildGraph(nodes);
         graphBuilt = true;

@@ -418,19 +418,12 @@ void MetisLB::work(LDStats* stats)
     costCfgTried = true;
     if (_lb_args.costConfig() != NULL) costCfg.load(_lb_args.costConfig());
   }
-  // Experiment knob (CHARM_METIS_EDGE=msgs): weigh an uncalibrated cut by
-  // message count rather than bytes. A leanmd pair compute's messages grow
-  // with its particle count and so does its load, so a byte-weighted cut
-  // prefers to move the light computes and needs more of them for the same
-  // load. Measured on leanmd 8x8x8 in alternation with DiffusionLB: no
-  // change (steps 22-40 at 226-234 ms against 195-205), like the calibrated
-  // table, k-way, more partitions and the tolerance in either direction.
-  static const bool edgeMsgs = [] {
-    const char* e = getenv("CHARM_METIS_EDGE");
-    return e != NULL && strcmp(e, "msgs") == 0;
-  }();
+  // An uncalibrated cut is weighed by bytes. Weighing it by message count,
+  // direct k-way, more partitions and the tolerance in either direction were
+  // all measured on leanmd 8x8x8 in alternation with DiffusionLB: no change
+  // (steps 22-40 at 226-234 ms against 195-205).
   auto edgeCost = [&](const EdgeSum& e, DiffusionTier t) -> double {
-    if (!costCfg.calibrated) return edgeMsgs ? (double)e.msgs : (double)e.bytes;
+    if (!costCfg.calibrated) return (double)e.bytes;
     return costCfg.tier[t].alpha * (double)e.msgs + costCfg.tier[t].beta * (double)e.bytes;
   };
 
@@ -514,13 +507,6 @@ void MetisLB::work(LDStats* stats)
   // compare those figures with DiffusionLB's per-neighbour bytes: those are
   // sender-side records keyed by the receiver's last-known PE, stale for an
   // object that just moved, and undercount the traffic to migrated objects.
-  {
-    static const int ncuts = getenv("CHARM_METIS_NCUTS") ? atoi(getenv("CHARM_METIS_NCUTS")) : 0;
-    static const int niter = getenv("CHARM_METIS_NITER") ? atoi(getenv("CHARM_METIS_NITER")) : 0;
-    if (ncuts > 0) options[METIS_OPTION_NCUTS] = ncuts;
-    if (niter > 0) options[METIS_OPTION_NITER] = niter;
-  }
-
   // Edges to fixed objects the last partitionSubset call kept (see below).
   long long lastFixedEdges = 0;
 
@@ -696,16 +682,13 @@ void MetisLB::work(LDStats* stats)
             tpwgtsAll[(size_t)p * nconAll + c] = (*tpwgts)[(size_t)p * ncon_in + c];
     }
     std::vector<idx_t> partsAll(nAll, 0);
-    // Direct k-way (CHARM_METIS_KWAY) against recursive bisection. On a ring
-    // of GPUs with a gradient the balancing flow is a chain around the ring,
-    // each hop carried by the objects that straddle that boundary at no new
-    // cut; a bisection has to balance its two halves in one move across the
-    // two half-boundaries, whose straddlers do not carry enough, and takes
-    // interior objects at two cut edges each. Measured on leanmd 8x8x8:
-    // the same cut (460-465 MB against 476-528 MB) and the same steps
-    // (228-253 ms); the dense GPU holds no straddlers under the local compute
-    // map, so the chain was not available to either method.
-    static const bool kway = (getenv("CHARM_METIS_KWAY") != NULL);
+    // Recursive bisection. Direct k-way was measured against it on leanmd
+    // 8x8x8: the same cut (460-465 MB against 476-528 MB) and the same steps
+    // (228-253 ms). On a ring of GPUs with a gradient the balancing flow is a
+    // chain around the ring, each hop carried by the objects that straddle
+    // that boundary at no new cut, which a bisection cannot use; the dense GPU
+    // held no straddlers under the local compute map, so the chain was not
+    // available to either method.
     real_t* tp = anchored ? tpwgtsAll.data()
                           : (tpwgts ? const_cast<real_t*>(tpwgts->data()) : nullptr);
     // METIS checks nothing: an index out of range, a neighbour listed twice
@@ -755,7 +738,7 @@ void MetisLB::work(LDStats* stats)
         FILE* f = fopen(path, "w");
         if (f != nullptr)
         {
-          fprintf(f, "%d %d %zu %d %d\n", (int)nAll, (int)nconAll, adjncy.size(), (int)nparts, kway ? 1 : 0);
+          fprintf(f, "%d %d %zu %d %d\n", (int)nAll, (int)nconAll, adjncy.size(), (int)nparts, 0);
           for (idx_t u = 0; u <= nAll; u++) fprintf(f, "%d ", (int)xadj[u]); fprintf(f, "\n");
           for (size_t j = 0; j < adjncy.size(); j++) fprintf(f, "%d ", (int)adjncy[j]); fprintf(f, "\n");
           for (size_t j = 0; j < adjwgt.size(); j++) fprintf(f, "%d ", (int)adjwgt[j]); fprintf(f, "\n");
@@ -769,14 +752,9 @@ void MetisLB::work(LDStats* stats)
         }
       }
     }
-    if (kway)
-      METIS_PartGraphKway(&nv_arg, &ncon, xadj.data(), adjncy.data(), lvwgt.data(),
-                          nullptr, adjwgt.data(), &np, tp, ubvec.data(), options.data(),
-                          &edgecut, partsAll.data());
-    else
-      METIS_PartGraphRecursive(&nv_arg, &ncon, xadj.data(), adjncy.data(), lvwgt.data(),
-                               nullptr, adjwgt.data(), &np, tp, ubvec.data(), options.data(),
-                               &edgecut, partsAll.data());
+    METIS_PartGraphRecursive(&nv_arg, &ncon, xadj.data(), adjncy.data(), lvwgt.data(),
+                             nullptr, adjwgt.data(), &np, tp, ubvec.data(), options.data(),
+                             &edgecut, partsAll.data());
     std::copy(partsAll.begin(), partsAll.begin() + nv, parts.begin());
     if (anchorsPinned) *anchorsPinned = false;
     if (anchored)

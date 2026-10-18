@@ -20,7 +20,7 @@
 // had left, and a device the balancer kept feeding converged on full. sph2d
 // strong, N=1: the GPU that collects the idle patches went 20 GB free -> 2 GB
 // -> 600 MB -> under 80 MB over four steps, where an 11 MB block no longer
-// fits by shape; gated landings then waited out CHARM_LB_GATE_TIMEOUT (120 s)
+// fits by shape; gated landings then waited out the admission timeout (120 s)
 // and ungated ones grew the pool (jobs 22244226, 22245278). Measured against
 // capacity the reserve is the same at every step, so the device comes to rest
 // with it free. A capacity of 0 means the producer did not report one (an old

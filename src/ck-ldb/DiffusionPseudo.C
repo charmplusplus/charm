@@ -174,13 +174,8 @@ void DiffusionLB::PseudoLoadBalancing()
   // neighbour's room in the other dimension is enforced.
 
   // The job-wide mean, gathered once before the rounds, is what keeps the floor
-  // from stopping a plan that has to cross a gradient. CHARM_DIFFUSION_GLOBAL_FLOOR=0
-  // withholds it and restores the purely local floor, for an A/B on one binary.
-  static const bool globalFloor = []() {
-    const char* v = getenv("CHARM_DIFFUSION_GLOBAL_FLOOR");
-    return v == NULL || strcmp(v, "0") != 0;
-  }();
-  const double globalAvg = globalFloor ? pseudoGlobalAvg : 0.0;
+  // from stopping a plan that has to cross a gradient.
+  const double globalAvg = pseudoGlobalAvg;
 
   std::vector<double> thisRoundToSend;
   diffusionRoundFlows(my_load, my_pseudo_load, effMinImbalance, _lb_args.diffusionBeta(),

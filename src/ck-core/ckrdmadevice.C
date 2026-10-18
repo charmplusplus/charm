@@ -225,27 +225,7 @@ CkpvDeclare(DeviceRecvAdmissionMap*, device_recv_admission);
 struct StagedLanding {
   hapiEvent_t ready;
   size_t cnt;
-  const void* src;        // CHARM_STAGE_VERIFY: the address the pull read
-  unsigned long long sum; // CHARM_STAGE_VERIFY: checksum of the landing after the pull
-  bool verified;
 };
-static inline bool stageVerifyOn()
-{
-  static const bool on = (getenv("CHARM_STAGE_VERIFY") != nullptr);
-  return on;
-}
-// Synchronous device-to-host checksum, verification only.
-static unsigned long long stageChecksum(const void* dptr, size_t cnt)
-{
-  std::vector<unsigned char> h(cnt);
-  if (cudaMemcpy(h.data(), dptr, cnt, cudaMemcpyDefault) != cudaSuccess) {
-    cudaGetLastError();
-    return ~0ULL;
-  }
-  unsigned long long sum = 1469598103934665603ULL;
-  for (size_t i = 0; i < cnt; i++) sum = (sum ^ h[i]) * 1099511628211ULL;
-  return sum;
-}
 typedef std::unordered_map<const void*, StagedLanding> StagedLandingMap;
 // Stamped into comm_offset of a rewritten descriptor (unused when the protocol
 // is NONE). A pointer alone does not identify a landing: `ptr` in an incoming
@@ -428,26 +408,8 @@ void CkDeviceRecvAdmissionReplay(CmiUInt8 id)
     CmiPushPE(CmiMyRank(), envs[k]);
 }
 
-// Receive-side envelope accounting, on only under CHARM_ZC_LEAKDBG. One copy
-// is made per device receive and one free is expected per copy.
-std::atomic<long> g_zc_copies{0}, g_zc_frees{0};
-std::atomic<long> g_zc_meta{0}, g_zc_metafree{0}, g_zc_empty{0}, g_zc_real{0};
 // Receives parked for a dependency still running, and the most parked at once.
 static long g_recv_parked = 0, g_recv_parked_max = 0;
-bool zcLeakDbg() {
-  static const bool on = getenv("CHARM_ZC_LEAKDBG") != NULL;
-  return on;
-}
-void zcLeakReport(const char* where) {
-  if (!zcLeakDbg()) return;
-  const long c = g_zc_copies.load(), f = g_zc_frees.load();
-  if (c % 20000 != 0 || c == 0) return;
-  CmiPrintf("[ZCLEAK %d] %s: env %ld/%ld live %ld | meta %ld/%ld live %ld | "
-            "ops empty %ld real %ld | parked %ld (max %ld at once)\n", CkMyPe(), where, c, f, c - f,
-            g_zc_meta.load(), g_zc_metafree.load(),
-            g_zc_meta.load() - g_zc_metafree.load(),
-            g_zc_empty.load(), g_zc_real.load(), g_recv_parked, g_recv_parked_max);
-}
 
 void CkRdmaDeviceMsgFreed(void* env)
 {
@@ -455,7 +417,6 @@ void CkRdmaDeviceMsgFreed(void* env)
   if (holds == NULL || holds->empty()) return;
   auto it = holds->find(env);
   if (it == holds->end()) return;
-  if (zcLeakDbg()) g_zc_frees.fetch_add(1);
   // The map is keyed by envelope ADDRESS, and the allocator recycles
   // addresses. A held message freed through a path that does not run this
   // hook -- any raw CmiFree, of which the runtime has many -- leaves its
@@ -881,29 +842,11 @@ void CkRdmaDeviceRecvHandler(void* data, void* msg)
       // A staged pull for a parked message (CkRdmaDeviceStageParked): the
       // senders are complete, the payload sits in landing buffers, and the
       // message itself is delivered when its element lands.
-      if (stageVerifyOn()) {
-        StagedLandingMap& landings = *CkpvAccess(staged_landings);
-        for (int k = 0; k < info->n_ops; k++) {
-          // ops are laid out after the info block, live ones only were counted,
-          // so walk by address: every op whose dest is a registered landing
-          DeviceRdmaOp* o = (DeviceRdmaOp*)((char*)info + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * k);
-          auto lit = landings.find(o->dest_ptr);
-          if (lit == landings.end()) continue;
-          const unsigned long long land_sum = stageChecksum(o->dest_ptr, lit->second.cnt);
-          const unsigned long long src_sum = lit->second.src ? stageChecksum(lit->second.src, lit->second.cnt) : 0;
-          lit->second.sum = land_sum;
-          lit->second.verified = true;
-          if (lit->second.src && src_sum != land_sum)
-            CmiPrintf("[STAGE-VERIFY %d] pull mismatch: landing %p (%zu B) sum %llx != source %p sum %llx\n",
-                      CkMyPe(), o->dest_ptr, lit->second.cnt, land_sum, lit->second.src, src_sum);
-        }
-      }
       deviceRecvWatchDrop(info);
       CmiFree(info);
       return;
     }
     QdCreate(1);
-    if (zcLeakDbg()) g_zc_metafree.fetch_add(1);
 
     // The receive is complete here, which is the moment the application can
     // act on it, so this is the interval worth charging to the transport.
@@ -1034,36 +977,12 @@ static inline int CmiMyNodeRankLocal() {
 // getenv is a linear strncmp walk of the environment and a miss -- which is the
 // normal case for these -- scans all of it: measured at 770ns with 93 variables
 // and 950ns with 243, the sort of environment a batch scheduler hands out. The
-// staged path reads these nine times per message (five ipcDebugSync calls plus
-// four direct checks across send and receive), so leaving them uncached spent
-// 7-9us per message doing nothing. Read them through these accessors; do not
-// call getenv on this path.
-static inline bool ipcDebugOn() {
-  static const bool on = (getenv("CHARM_DEBUG_IPC_RECV") != nullptr);
-  return on;
-}
-
+// staged path reads this several times per message, so leaving it uncached
+// spent microseconds per message doing nothing. Read it through this accessor;
+// do not call getenv on this path.
 static inline bool zcValidateOn() {
   static const bool on = (getenv("CHARM_ZC_VALIDATE") != nullptr);
   return on;
-}
-
-// TEMPORARY (CHARM_DEBUG_IPC_RECV): synchronize after each individual CUDA
-// operation on the shm/IPC path and abort naming the exact step that failed.
-// Illegal-access errors are sticky and asynchronous, so without this they
-// surface at whatever call happens to be checked next -- which is how the same
-// fault has been reported from three unrelated lines. With it, the first
-// failing operation identifies itself.
-static inline void ipcDebugSync(const char* step, hapiStream_t stream) {
-  if (!ipcDebugOn()) return;
-  hapiSubmitDrain();   // the step being checked may still be in a submitter ring
-  hapiError_t err = ckSubmitDrainThenSync(stream);
-  if (err != hapiSuccess) {
-    CmiPrintf("[%d] IPC step '%s' FAILED: %s\n", CmiMyPe(), step,
-              cudaGetErrorString(err));
-    fflush(stdout);
-    CmiAbort("IPC debug: step '%s' failed", step);
-  }
 }
 
 // Per-process tally of how device zerocopy receives actually resolved, enabled
@@ -1147,12 +1066,9 @@ void zcRecordRecvTime(int slot, size_t bytes, double seconds)
 // receiver is still waiting on is therefore harmless: that wait already
 // captured the earlier record. The ring only needs to be large enough that
 // re-use does not add false dependencies, not for correctness.
+static const int kMemcpyEventRing = 1024;
 static hapiEvent_t* ckDeviceMemcpyEventRing() {
-  static const int ring_size = []() {
-    const char* s = getenv("CHARM_ZC_MEMCPY_EVENTS");
-    const int n = s ? atoi(s) : 1024;
-    return n > 0 ? n : 1024;
-  }();
+  static const int ring_size = kMemcpyEventRing;
   static thread_local hapiEvent_t* ring = nullptr;
   static thread_local int next = 0;
   if (ring == nullptr) {
@@ -1170,11 +1086,7 @@ static hapiEvent_t* ckDeviceMemcpyEventRing() {
 
 void* ckDeviceRecordMemcpyEvent(hapiStream_t stream) {
   hapiSubmitDrain();   // recorded directly and QUERIED by the receiver: it must follow the queued work
-  static const int ring_size = []() {
-    const char* s = getenv("CHARM_ZC_MEMCPY_EVENTS");
-    const int n = s ? atoi(s) : 1024;
-    return n > 0 ? n : 1024;
-  }();
+  static const int ring_size = kMemcpyEventRing;
   static thread_local int next = 0;
   hapiEvent_t* ring = ckDeviceMemcpyEventRing();
   if (ring == nullptr) return NULL;
@@ -1224,25 +1136,6 @@ static const void* deviceIpcResolveSource(CkDeviceBuffer& source, CkDeviceBuffer
       hapi_ipc_device_info& device_info =
         csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
 
-      // TEMPORARY: locate the invalid pointer behind the illegal access seen in
-      // the first cross-process ghost exchange. Prints the peer mapping and the
-      // pool sizes actually backing the indices used just below, so a null peer
-      // buffer, an out-of-range index, or a desynchronised event pool is
-      // visible directly rather than inferred.
-      if (ipcDebugOn()) {
-        CmiPrintf("[%d] IPC recv: dev_idx=%d (infos=%zu) ev_idx=%d "
-                  "(src_pool=%zu dst_pool=%zu flags=%zu) peer_buf=%p "
-                  "off=%zu dest=%p cnt=%zu src_pe=%d\n",
-                  CkMyPe(), source.device_idx,
-                  csv_gpu_manager.hapi_ipc_device_infos.size(),
-                  source.event_idx,
-                  device_info.src_event_pool.size(),
-                  device_info.dst_event_pool.size(),
-                  device_info.event_pool_flags.size(),
-                  device_info.buffer, (size_t)source.comm_offset,
-                  (void*)dest.ptr, (size_t)dest.cnt, source.src_pe);
-        fflush(stdout);
-      }
 
       // 0. Resolve where the bytes actually are.
       //
@@ -1297,7 +1190,6 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
   // The slot is released when this copy completes: the caller recorded it in
   // the op, and CkRdmaDeviceRecvHandler raises its dst_flag then.
   hapiSubmitMemcpyAsync((void*)dest.ptr, src_addr, dest.cnt, cudaMemcpyDefault, recv_stream);
-  ipcDebugSync("recv 2: peer copy -> dest", recv_stream);
 }
 
 
@@ -1494,9 +1386,8 @@ static bool deviceRecvDestinationReady(DeviceRecvPending& p, bool may_query)
 // release, delivery, source callback, migration interlocks -- is untouched;
 // only how the bytes move changed.
 //
-// A batch flushes when it is full, when it has aged CHARM_GPU_RECV_BATCH_USEC
-// microseconds (default 500; 0 restores one copy and one completion per op),
-// or as soon as the PE goes idle -- so a landing waits at most for the rest of
+// A batch flushes when it is full, when it has aged 500 microseconds, or as
+// soon as the PE goes idle -- so a landing waits at most for the rest of
 // the burst it arrived in, and never when there is nothing to wait for.
 struct DeviceRecvBatchEntry {
   DeviceRdmaOp* op;
@@ -1511,14 +1402,7 @@ struct DeviceRecvBatch {
 };
 static const size_t kRecvBatchMax = 256;
 
-static int deviceRecvBatchUsec()
-{
-  static const int usec = [] {
-    const char* s = getenv("CHARM_GPU_RECV_BATCH_USEC");
-    return s ? atoi(s) : 500;
-  }();
-  return usec;
-}
+static int deviceRecvBatchUsec() { return 500; }
 
 // Behind the batch's copies on the receive stream: every op of it has landed.
 static void deviceRecvBatchDone(void* arg, void*)
@@ -1626,15 +1510,6 @@ static void deviceRecvIssue(DeviceRecvPending& p)
     // The pull's completion was the source condition; copy the landing into
     // the posted buffer and free it behind that copy.
     const StagedLanding& sl = p.sl;
-    if (stageVerifyOn()) {
-      const unsigned long long now = stageChecksum(source.ptr, sl.cnt);
-      if (!sl.verified)
-        CmiPrintf("[STAGE-VERIFY %d] delivered before the pull's completion was seen: landing %p\n",
-                  CkMyPe(), source.ptr);
-      else if (now != sl.sum)
-        CkAbort("[STAGE-VERIFY %d] landing %p (%zu B) changed between pull and delivery: %llx -> %llx",
-                CkMyPe(), source.ptr, sl.cnt, sl.sum, now);
-    }
     hapiSubmitMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt, cudaMemcpyDefault, rs);
     hapiAddCallback(rs, CkCallback(stagedLandingFreeFn,
                                    (void*)new StagedLandingFree{(void*)source.ptr, sl.ready}));
@@ -2387,7 +2262,7 @@ extern "C" void* device_restage_req_bridge(void* arg)
   // plausible but wrong ghost in one element, far from here.
   //
   // A null event on the unstaged path means the sender blocked at send time
-  // (CHARM_ZC_MEMCPY_SYNC, or no event was free), so the data is already there.
+  // (no event was free), so the data is already there.
   hapiEvent_t src_ready = NULL;
   bool src_needs_full_sync = false;
   if (req->src_staged && csv_gpu_manager.use_shm) {
@@ -2421,8 +2296,8 @@ extern "C" void* device_restage_req_bridge(void* arg)
     // case still drains the device. It fires only under slot exhaustion; the
     // fix for it is a free slot, not a different wait.
     if (src_needs_full_sync) { hapiSubmitDrain(); hapiCheck(cudaDeviceSynchronize()); }
-    // Otherwise the sender blocked at send time (CHARM_ZC_MEMCPY_SYNC, or no
-    // event was free on the unstaged path), so the bytes are already there.
+    // Otherwise the sender blocked at send time (no event was free on the
+    // unstaged path), so the bytes are already there.
     issueDeviceRestagePut(req, src_ptr);
   } else if (hapiDevPoolOn()) {
     // +gpupool: nothing to stage into, and no need. The only same-node
@@ -2805,7 +2680,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // FIXME: Reuse the old message instead of creating a new one
   void* old_msg = EnvToUsr(env);
   envelope* new_env = UsrToEnv(CkCopyMsg(&old_msg));
-  if (zcLeakDbg()) { g_zc_copies.fetch_add(1); zcLeakReport("issue"); }
 
   // Retarget the copied message's device buffers to the buffers this receiver
   // posted. The transfers below land in arrPtrs[], but the copy still carries
@@ -2857,7 +2731,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // Allocate and fill in metadata for this zerocopy operation
   void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * numops);
   CmiEnforce(rdma_data);
-  if (zcLeakDbg()) g_zc_meta.fetch_add(1);
   DeviceRdmaInfo* rdma_info = (DeviceRdmaInfo*)rdma_data;
   rdma_info->n_ops = numops;
   // Timed tally: zero posted time means "not measuring", so the completion path
@@ -2972,7 +2845,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // is in -- the same count the asynchronous completions drive. There is no
     // QdProcess to balance: nothing was created for this op.
     if (source.cnt == 0) {
-      if (zcLeakDbg()) g_zc_empty.fetch_add(1);
       rdma_info->counter++;
       if (rdma_info->counter == rdma_info->n_ops) {
         QdCreate(1);
@@ -3012,7 +2884,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // stages IPC info when it isn't certain MEMCPY suffices and RDMA can be
     // ruled out, so an unconfirmed-destination send still leaves
     // source.device_idx valid for the IPC branch below.
-    if (zcLeakDbg()) g_zc_real.fetch_add(1);
     zcStatsCount(mode);
     // Every op of one receive comes from the same sender and so resolves the
     // same way; recording it per op just avoids a second mode computation.
@@ -3259,7 +3130,6 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   // thousands of messages a second, and the process is killed for memory long
   // before the run ends.
   if (completed_inline) {
-    if (zcLeakDbg()) g_zc_metafree.fetch_add(1);
     deviceRecvWatchDrop(rdma_info);
     CmiFree(rdma_data);
   }
@@ -3421,16 +3291,7 @@ bool CkRdmaDeviceStageParked(envelope* env)
     hapiAddCallback(st, CkCallback(CkRdmaDeviceRecvHandler, &op));
     hapiEvent_t ready = stagingEventTake();
     hapiCheck(hapiEventRecord(ready, st));
-    const void* src_addr = nullptr;
-    if (stageVerifyOn()) {
-      if (mode == CkNcpyModeDevice::MEMCPY) src_addr = source.ptr;
-      else if (sender_exported && source.ipc_protocol == CmiIpcProtocol::DIRECT) {
-        void* base = hapiIpcImportBuffer(source.ipc_handle, CmiNodeOf(srcPe), source.ipc_base,
-                                         source.ipc_offset + (size_t)source.cnt);
-        if (base) src_addr = (const char*)base + source.ipc_offset;
-      }
-    }
-    landings[land[i]] = StagedLanding{ready, (size_t)source.cnt, src_addr, 0ULL, false};
+    landings[land[i]] = StagedLanding{ready, (size_t)source.cnt};
   }
 
   // Pass 4: the descriptors now name the landing buffers, as a process-local
@@ -3704,13 +3565,7 @@ static int claimFreeIpcEvent(int cpv_my_device_id, const size_t comm_offset,
 // loop. That is how the deferrable send path asks (ipcPrepareBuffers, the IPC
 // slot queue below it): a PE that spins here receives nothing, and receiving
 // is what releases every other PE's slots.
-static double ipcSlotTimeoutSecs() {
-  static const double timeout_s = []() {
-    const char* s = getenv("CHARM_IPC_SLOT_TIMEOUT");
-    return s ? atof(s) : 60.0;
-  }();
-  return timeout_s;
-}
+static double ipcSlotTimeoutSecs() { return 60.0; }
 
 static bool acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
                                bool is_lb_buffer, bool direct,
@@ -3719,18 +3574,15 @@ static bool acquireIpcSendSlot(DeviceManager* dm, int cpv_my_device_id,
                                int* out_event_idx, bool wait) {
   const double timeout_s = ipcSlotTimeoutSecs();
 
-  // CHARM_IPC_LAZY_RECLAIM=1 takes the reclaim scan off the fast path (try
-  // first, reclaim only on failure). Opt-in rather than default: see the
+  // The reclaim scan stays on the fast path (reclaim, then try): see the
   // discussion at CkRdmaDeviceAllocLbBuffer -- other allocators of this buffer
   // depend on the sweep running often, and the scan is cheap enough now that
-  // dst_flag is a plain atomic that removing it from the send path buys much
-  // less than it did.
-  static const bool lazy = (getenv("CHARM_IPC_LAZY_RECLAIM") != nullptr);
+  // dst_flag is a plain atomic that taking it off the send path buys little.
 
   double wait_start = 0.0;
   bool waiting = false;
   int attempts = 0;
-  bool first = lazy;
+  bool first = false;
   // Which resource came up short last time, so the next reclaim knows whether
   // one slot is enough (event pool drained) or it must sweep for bytes (comm
   // buffer drained). Always set by the attempt that precedes each reclaim, so
@@ -4129,8 +3981,8 @@ static bool ipcPrepareBuffers(int dest_pe, int numops, CkDeviceBuffer** buffers,
 // parked, as it is for a deferred network send.
 //
 // The three-argument prepare (sync entries) and the correction paths keep the
-// blocking acquire. CHARM_IPC_SLOT_TIMEOUT (default 60 s) is a warning here,
-// since the wait makes progress; CHARM_DEBUG_IPCQ traces each park and send.
+// blocking acquire. The slot timeout (60 s) is a warning here, since the wait
+// makes progress.
 struct CkIpcSlotQueue {
   std::deque<CkDeviceDeferredSend*> queue;
   std::vector<hapiEvent_t> spareEvents;
@@ -4141,12 +3993,6 @@ struct CkIpcSlotQueue {
   size_t maxDepth = 0;
 };
 static thread_local CkIpcSlotQueue ipc_slot_queue;
-
-static inline bool ipcQueueDbg()
-{
-  static const bool on = (getenv("CHARM_DEBUG_IPCQ") != nullptr);
-  return on;
-}
 
 static hapiEvent_t ipcTakeProducerEvent()
 {
@@ -4291,10 +4137,6 @@ static void ipcSlotPump(void*, double)
     q.queue.pop_front();
     for (hapiEvent_t e : p->producerEvents)
       if (e != nullptr) q.spareEvents.push_back(e);  // its wait is enqueued
-    if (ipcQueueDbg())
-      CmiPrintf("[IPCQ %d] send %zu bytes to PE %d after %.2f ms; %zu still parked\n",
-                CkMyPe(), p->bytes, p->destPe,
-                (CkWallTimer() - p->parkedAt) * 1e3, q.queue.size());
     QdProcess(1);
     deviceDeferredPublish(p);
   }
@@ -4448,19 +4290,6 @@ static bool ipcPrepareBuffers(int dest_pe, int numops, CkDeviceBuffer** buffers,
     buffers[i]->event_idx = acquired_event_idx;
     buffers[i]->sender_prepared = true;
 
-    // TEMPORARY: paired with the receive-side print, so the indices and
-    // offsets the sender publishes can be compared against what the receiver
-    // resolves them to.
-    if (ipcDebugOn()) {
-      CmiPrintf("[%d] IPC send: dev_idx=%d ev_idx=%d off=%zu cnt=%zu "
-                "src_ptr=%p comm_base=%p alloc=%p is_lb=%d dest_pe=%d\n",
-                CkMyPe(), buffers[i]->device_idx, buffers[i]->event_idx,
-                (size_t)buffers[i]->comm_offset, (size_t)buffers[i]->cnt,
-                buffers[i]->ptr,
-                dm->comm_buffer ? (void*)dm->comm_buffer->base_ptr : nullptr,
-                alloc_comm_buffer, (int)is_lb_buffer, dest_pe);
-      fflush(stdout);
-    }
 
     // Initiate transfer from source buffer to device comm buffer. A direct
     // transfer has no comm buffer to fill -- that saved copy is the point of
@@ -4485,7 +4314,6 @@ static bool ipcPrepareBuffers(int dest_pe, int numops, CkDeviceBuffer** buffers,
       }
       hapiCheck(hapiMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
             cudaMemcpyDefault, buffers[i]->hapi_stream));
-      ipcDebugSync("send 1: stage src -> comm_buffer", buffers[i]->hapi_stream);
 
       // The completion callback's contract is "the source buffer is safe to
       // reuse", and for a staged send that is the moment the staging copy
@@ -4531,7 +4359,6 @@ static bool ipcPrepareBuffers(int dest_pe, int numops, CkDeviceBuffer** buffers,
           my_device_idx * 100000 + buffers[i]->event_idx));
       ipcPublishSrcReady(my_device_idx, buffers[i]->event_idx, buffers[i]->hapi_stream);
     }
-    ipcDebugSync("send 2: record own src_event", buffers[i]->hapi_stream);
   }
   return true;
 }
@@ -4576,14 +4403,9 @@ void CkRdmaDeviceSendWhenReady(CkDeviceDeferredSend* pending, void* msg,
     if (!q.reported) {
       q.reported = true;
       CmiPrintf("[%d] device sends wait for CUDA IPC event slots: parked in "
-                "order and retried from the scheduler (CHARM_DEBUG_IPCQ "
-                "traces each)\n", CkMyPe());
+                "order and retried from the scheduler\n", CkMyPe());
       fflush(stdout);
     }
-    if (ipcQueueDbg())
-      CmiPrintf("[IPCQ %d] park %zu bytes to PE %d; depth %zu, %d slots busy\n",
-                CkMyPe(), pending->bytes, pending->destPe, q.queue.size(),
-                CkRdmaDeviceBusyIpcSlots());
     ipcSlotPumpSchedule(0.05);
     return;
   }
@@ -4735,7 +4557,6 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
     // sender on every such send -- and same-process is the common case, so
     // that stall dominated. Record an event instead and let the receiver's
     // stream wait on it: identical ordering, no host block, no extra copy.
-    // Set CHARM_ZC_MEMCPY_SYNC to restore the blocking behaviour.
     // A same-process memcpy send leaves the payload in the application's buffer
     // for the receiver to copy out of, exactly as the inter-node path leaves it
     // for the network to read. Migration frees and reallocates that buffer, so
@@ -4752,12 +4573,9 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
       }
     }
 
-    static const bool force_sync = (getenv("CHARM_ZC_MEMCPY_SYNC") != nullptr);
     for (int i = 0; i < numops; i++) {
       if (buffers[i]->cnt == 0) continue;
-      if (force_sync) {
-        ckSubmitDrainThenSync(buffers[i]->hapi_stream);
-      } else {
+      {
         // The receiver gates its copy on this on the host (DeviceRecvPending):
         // a pinned flag it reads with a plain load, or, when this ring has no
         // slot, the event it queries. A send made without a stream carries

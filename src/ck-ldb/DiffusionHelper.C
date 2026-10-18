@@ -324,13 +324,7 @@ void DiffusionLB::computeNodeMemory()
   }
   if (devFree == std::numeric_limits<size_t>::max()) return;
   const bool pooled = arena > 0;
-  static const bool creditGrowth = (getenv("CHARM_LB_MEM_CREDIT_GROWTH") != NULL);
   size_t reach = pooled ? poolFree : devFree;
-  if (pooled && creditGrowth) reach += devFree / arena * arena;
-  if (const char* cap = getenv("CHARM_LB_MEM_CAP_MB")) {
-    reach = std::min(reach, (size_t)atol(cap) << 20);
-    poolCapacity = std::min(poolCapacity, (size_t)atol(cap) << 20);
-  }
 
   double sigmaMax = 0.0;
   const int slot = CkpvAccess(_lb_obj_index);

@@ -20,9 +20,7 @@
 //        fabric whole, which has a ceiling (hapiDevPoolNewArenaLocked). A plan
 //        that does not fit the arenas is split into more batches or refused,
 //        visibly; growth is left to the application's own allocations.
-//        CHARM_LB_MEM_CREDIT_GROWTH restores the old credit (the device's free
-//        bytes in whole arenas), for A/B only. Without the pool, free device
-//        memory.
+//        Without the pool, free device memory.
 //   C_g  under +gpupool, the pool's capacity on g: every byte its arenas
 //        span, free or not. The reserve below is measured against it.
 //   H_g  T_g - eps*C_g - L_g - sigma_max(g): final placement is planned against
@@ -89,10 +87,7 @@ public:
   }
   // Whether a move within one process and one device hands the chare over
   // without serializing it (CkLocMgr::emigrateIntraProcess).
-  virtual bool intraProcessHandoff() const {
-    static const bool off = (getenv("CHARM_NO_INTRAPROC_MIGRATE") != NULL);
-    return !off;
-  }
+  virtual bool intraProcessHandoff() const { return true; }
   static const LBMemoryTopology& runtime() {
     static const LBMemoryTopology t;
     return t;
@@ -174,11 +169,6 @@ public:
       }
     }
 
-    // Environment override for adversarial testing: cap what every device can
-    // reach at CHARM_LB_MEM_CAP_MB regardless of what it reports.
-    const char* capEnv = getenv("CHARM_LB_MEM_CAP_MB");
-    const size_t cap = capEnv ? (size_t)atol(capEnv) << 20 : SIZE_MAX;
-    static const bool creditGrowth = (getenv("CHARM_LB_MEM_CREDIT_GROWTH") != NULL);
     for (int d = 0; d < (int)devices_.size(); d++) {
       Device& dev = devices_[d];
       if (arena[d] > 0) {
@@ -186,12 +176,9 @@ public:
         pooled_ = true;
         dev.reach = poolSum[d];  // the arenas the pool has; no growth (T_g)
         dev.capacity = poolCap[d];
-        if (creditGrowth) dev.reach += (devFree[d] / arena[d]) * arena[d];
       } else {
         dev.reach = devFree[d];
       }
-      dev.reach = std::min(dev.reach, cap);
-      dev.capacity = std::min(dev.capacity, cap);  // a device of that size
       if (dev.pooled) dev.stagingFree = dev.reach;
     }
 
@@ -422,8 +409,7 @@ private:
 // no work, and refusing by size alone (every footprint equal) dropped active
 // and idle arrivals alike, leaving the device that collects the idle ones
 // short of the load it was planned to carry. Equal densities fall back to the
-// larger footprint, then the object index, so the outcome is deterministic.
-// CHARM_LB_MEMVERIFY_LARGEST_FIRST restores largest-first, for A/B only. A
+// larger footprint, then the object index, so the outcome is deterministic. A
 // move whose payload no batch could ever stage is refused first. A refused
 // move keeps its chare where it is, which is always feasible. Returns the
 // number of refused moves; refused entries have to_pe set back to from_pe.
@@ -478,8 +464,6 @@ public:
       net[s] -= f;
       arrivals[d].push_back((int)k);
     }
-    static const bool largestFirst =
-        (getenv("CHARM_LB_MEMVERIFY_LARGEST_FIRST") != NULL);
     auto loadOf = [&](int k) {
       const LDObjData& od = stats->objData[moves[k].obj];
       double l = (double)od.wallTime;
@@ -491,12 +475,10 @@ public:
     for (int g = 0; g < D; g++)
       std::sort(arrivals[g].begin(), arrivals[g].end(), [&](int a, int b) {
         const size_t fa = model.footprint(moves[a].obj), fb = model.footprint(moves[b].obj);
-        if (!largestFirst) {
-          // load/footprint ascending, cross-multiplied so a move without a
-          // footprint -- which refusing would free nothing for -- sorts last.
-          const double da = loadOf(a) * (double)fb, db = loadOf(b) * (double)fa;
-          if (da != db) return da < db;
-        }
+        // load/footprint ascending, cross-multiplied so a move without a
+        // footprint -- which refusing would free nothing for -- sorts last.
+        const double da = loadOf(a) * (double)fb, db = loadOf(b) * (double)fa;
+        if (da != db) return da < db;
         if (fa != fb) return fa > fb;
         return moves[a].obj < moves[b].obj;
       });
@@ -541,8 +523,6 @@ public:
 // batches, and batchOf[i] for every object whose to != from. A move that
 // cannot run in any batch -- which I-final with its sigma_max holdback should
 // rule out -- is refused (to_proc reset to from_proc) and counted in *refused.
-// CHARM_LB_FORCE_BATCHES=N round-robins moves into N batches regardless --
-// the protocol-test knob.
 // ---------------------------------------------------------------------------
 class LBBatchPlanner {
 public:
@@ -556,13 +536,6 @@ public:
     for (int i = 0; i < (int)stats->objData.size(); i++)
       if (stats->to_proc[i] != stats->from_proc[i]) moved.push_back(i);
     if (moved.empty()) return 1;
-
-    const char* force = getenv("CHARM_LB_FORCE_BATCHES");
-    if (force != NULL && atoi(force) > 1) {
-      int n = atoi(force);
-      for (size_t k = 0; k < moved.size(); k++) batchOf[moved[k]] = (int)k % n;
-      return n;
-    }
 
     LBMemoryModel model;
     model.build(stats, topo);

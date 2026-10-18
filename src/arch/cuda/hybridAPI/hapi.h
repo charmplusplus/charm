@@ -488,7 +488,6 @@ size_t hapiDevPoolArenaSize();
 //   ipcSlots    CUDA IPC event slots this PE may spend on migrations in one
 //               batch: three quarters of its slice, since application sends
 //               draw on the same slots. 0 when there is no IPC slot pool.
-//               CHARM_LB_IPC_SLOTS overrides it.
 void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
                         int* ipcSlots);
 // Under +gpupool, the capacity of this process's pool on the calling PE's

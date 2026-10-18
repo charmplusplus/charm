@@ -73,10 +73,6 @@ CpvExtern(void*, CkGridObject);
 //                           landing, parked/staged messages, forwards.
 //   CHARM_PRINTF_TS=1       a wall-clock prefix on every printed line, so the
 //                           prints of all PEs and processes lie on one timeline.
-//   CHARM_DEBUG_SLOWEM=<ms> every entry-method invocation longer than <ms>,
-//                           with element and entry name (cklocation.C).
-//   CHARM_STAGE_VERIFY=1    checksum each staged landing buffer at the pull
-//                           and at delivery; abort on a change (ckrdmadevice.C).
 //   +LBDebug 1              per-PE host load the balancer received ([PELOAD]).
 static inline bool migDbg() {
   static const bool on = (getenv("CHARM_DEBUG_MIGRATE") != nullptr);
@@ -120,25 +116,9 @@ static inline bool migDbg() {
 // planner did (LBMemoryContract.h): growing the pool is not credited, since
 // growth is a whole arena or nothing and at 2+ nodes every arena is
 // registered with the fabric, which has a ceiling (hapiDevPoolNewArenaLocked).
-// CHARM_LB_MEM_CREDIT_GROWTH restores the old credit, for A/B only.
-//
-// CHARM_LB_NO_ADMISSION_GATE turns it off; CHARM_DEBUG_GATE traces it. To see
-// it defer on a device with memory to spare, CHARM_GPU_POOL_CAP_MB shrinks the
-// device the balancer and the gate both see (hapiLBDeviceMemory).
 static std::atomic<size_t> ck_pending_pack_bytes{0};
 
-static inline bool ckAdmissionGateOn()
-{
-  static const bool on =
-      CkDevicePoolOn() && getenv("CHARM_LB_NO_ADMISSION_GATE") == nullptr;
-  return on;
-}
-
-static inline bool ckGateDbg()
-{
-  static const bool on = (getenv("CHARM_DEBUG_GATE") != nullptr);
-  return on;
-}
+static inline bool ckAdmissionGateOn() { return CkDevicePoolOn(); }
 
 static inline size_t ckPoolBlock(size_t bytes)
 {
@@ -152,9 +132,7 @@ static inline size_t ckPoolBlock(size_t bytes)
 // move onto the same device, which is a handoff.
 static size_t ckStagedBytes(CkLocRec* rec, int toPe)
 {
-  static const bool intraProcDisabled =
-      (getenv("CHARM_NO_INTRAPROC_MIGRATE") != nullptr);
-  if (!intraProcDisabled && CmiNodeOf(toPe) == CkMyNode() &&
+  if (CmiNodeOf(toPe) == CkMyNode() &&
       hapiDeviceForPe(toPe) == hapiDeviceForPe(CkMyPe()))
     return 0;
   return ckPoolBlock(rec->lbGpuPupSize);
@@ -187,12 +165,10 @@ static void ckClearPendingPack(CkLocRec* rec)
 static bool ckLandingAdmissible(size_t size, size_t footprint, size_t* reachOut,
                                 size_t* floorOut)
 {
-  static const bool creditGrowth = (getenv("CHARM_LB_MEM_CREDIT_GROWTH") != nullptr);
   size_t devFree = 0, poolFree = 0, arena = 0;
   int slots = 0;
   hapiLBDeviceMemory(&devFree, &poolFree, &arena, &slots);
-  size_t reach = poolFree;
-  if (creditGrowth) reach += (arena > 0 ? devFree / arena * arena : devFree);
+  const size_t reach = poolFree;
   const size_t floor = ck_pending_pack_bytes.load();
   *reachOut = reach;
   *floorOut = floor;
@@ -254,8 +230,7 @@ static bool ckTakeLandingSet(int size, const std::vector<CmiUInt8>& blocks,
 // rule lives in LBMigrateWindow.h, so the two are one number.
 //
 // CHARM_LB_MIGRATE_WINDOW (moves) and CHARM_LB_MIGRATE_WINDOW_MB override the
-// two bounds; CHARM_LB_NO_MIGRATE_WINDOW turns it off; CHARM_DEBUG_WINDOW
-// traces it against the pool's reach less the gate's floor.
+// two bounds.
 struct CkMigrateWindow
 {
   struct Entry { size_t bytes; bool packed; };
@@ -267,18 +242,7 @@ struct CkMigrateWindow
 };
 static thread_local CkMigrateWindow ck_window;  // one per PE
 
-static inline bool ckWindowOn()
-{
-  static const bool on =
-      CkDevicePoolOn() && getenv("CHARM_LB_NO_MIGRATE_WINDOW") == nullptr;
-  return on;
-}
-
-static inline bool ckWindowDbg()
-{
-  static const bool on = (getenv("CHARM_DEBUG_WINDOW") != nullptr);
-  return on;
-}
+static inline bool ckWindowOn() { return CkDevicePoolOn(); }
 
 static void ckWindowLimits(int* moves, size_t* bytes)
 {
@@ -303,21 +267,6 @@ static void ckWindowLimits(int* moves, size_t* bytes)
   *bytes = lbLandingWindowBytes(capacity > poolFree ? capacity : poolFree, (size_t)pes);
 }
 
-static void ckWindowTrace(const char* what, CmiUInt8 id, size_t moveBytes)
-{
-  if (!ckWindowDbg()) return;
-  int maxMoves;
-  size_t maxBytes;
-  ckWindowLimits(&maxMoves, &maxBytes);
-  size_t reach = 0, floor = 0;
-  ckLandingAdmissible(0, 0, &reach, &floor);
-  CkPrintf("[WINDOW %d] %s id=%llu (%zu bytes): in flight %zu move(s) / %zu bytes of "
-           "%d / %zu; queued %zu; pool reach less floor %lld\n",
-           CkMyPe(), what, (unsigned long long)id, moveBytes, ck_window.inflight.size(),
-           ck_window.bytes, maxMoves, maxBytes, ck_window.queue.size(),
-           (long long)reach - (long long)floor);
-}
-
 // Takes a place for a move of `bytes` if there is one. The first move always
 // goes, so a payload larger than the byte bound still moves, alone.
 static bool ckWindowTake(CmiUInt8 id, size_t bytes)
@@ -330,7 +279,6 @@ static bool ckWindowTake(CmiUInt8 id, size_t bytes)
   if (!empty && ck_window.bytes + bytes > maxBytes) return false;
   ck_window.inflight[id] = CkMigrateWindow::Entry{bytes, false};
   ck_window.bytes += bytes;
-  ckWindowTrace("admit", id, bytes);
   return true;
 }
 
@@ -344,7 +292,6 @@ static void ckWindowGiveBack(CmiUInt8 id, bool onlyIfUnpacked)
   ck_window.bytes -= it->second.bytes;
   const size_t bytes = it->second.bytes;
   ck_window.inflight.erase(it);
-  ckWindowTrace("release", id, bytes);
   if (!ck_window.queue.empty() && !ck_window.pumpScheduled) {
     ck_window.pumpScheduled = true;
     CcdCallFnAfter(ckWindowPump, nullptr, 0.0);  // not from inside emigrate
@@ -2538,9 +2485,6 @@ void CkMigratable::recordLBSizes(bool forStep)
       if (footprint < ps.gpu_size()) footprint = ps.gpu_size();
       *(size_t*)ud = footprint;
     }
-    if (getenv("CHARM_DEBUG_GPU_FOOTPRINT") != NULL)
-      CkPrintf("[%d] LB footprint: idx=%d ud=%p fp=%zu pup=%zu\n",
-               CkMyPe(), udIdx, ud, footprint, ps.gpu_size());
   }
   #endif
   }
@@ -3109,13 +3053,6 @@ CkLocRec* CkFindDeviceRecvElement(CkGroupID aid, CmiUInt8 id)
 // mid-window carries its wait state -- lbStepPending, waitParked, lbWaitEpoch --
 // in CkMigratable::pup, calls AtSyncWait() on its new PE, and finds the step
 // already over there, which is the case that path already handles.
-//
-// CHARM_LB_MIGRATE_AT_PARK_ONLY restores the old behaviour for bisecting.
-static bool migrateAtParkOnly()
-{
-  static const bool on = (getenv("CHARM_LB_MIGRATE_AT_PARK_ONLY") != nullptr);
-  return on;
-}
 
 extern "C" void _deferredMigrateHandler(void* arg)
 {
@@ -3125,8 +3062,6 @@ extern "C" void _deferredMigrateHandler(void* arg)
   if (rec != NULL) {
     bool movable = (rec->outstandingDeviceSends == 0);
 #if CMK_LBDB_ON
-    if (_lb_args.lbAsync() && migrateAtParkOnly() && !rec->deviceRecvParked)
-      movable = false;
     // The application's safe-to-pack window still governs. This kick is a
     // runtime-side zero crossing, not a point the application declared safe,
     // and emigrating from here would walk straight past the readyMigrate gate
@@ -3186,13 +3121,7 @@ void CkLocRec::noteDeviceSendDone()
     DeferredMigrateMsg* m = (DeferredMigrateMsg*)CmiAlloc(sizeof(DeferredMigrateMsg));
     m->mgrGid = myLocMgr->ckGetGroupID();
     // Hold new device receives until the kick runs (see migrateKickHeld).
-    // Not under the park-only bisect knob: there the element must run on to
-    // its park, and holding its receives would stop it getting there.
-#if CMK_LBDB_ON
-    if (!(_lb_args.lbAsync() && migrateAtParkOnly())) migrateKickHeld = true;
-#else
     migrateKickHeld = true;
-#endif
     m->id = getID();
     m->toPe = toPe;
     ckPostKick(m);
@@ -3292,23 +3221,10 @@ bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
   }
 #endif
 
-  // CHARM_DEBUG_SLOWEM=<ms>: print every entry invocation that ran longer.
-  static const double slowEmMs = []() {
-    const char* e = getenv("CHARM_DEBUG_SLOWEM");
-    return e ? atof(e) : -1.0;
-  }();
-  const double tSlow = (slowEmMs > 0.0) ? CmiWallTimer() : 0.0;
   if (doFree)
     CkDeliverMessageFree(epIdx, msg, obj);
   else /* !doFree */
     CkDeliverMessageReadonly(epIdx, msg, obj);
-  if (slowEmMs > 0.0) {
-    const double dt = (CmiWallTimer() - tSlow) * 1e3;
-    if (dt > slowEmMs)
-      CmiPrintf("[SLOWEM %d] elem %s ep=%d %s dt=%.1f ms\n", CkMyPe(),
-                isDeleted ? "(deleted)" : idx2str(idx), epIdx,
-                _entryTable[epIdx]->name ? _entryTable[epIdx]->name : "?", dt);
-  }
 
 #if CMK_TRACE_ENABLED
   if (msg)
@@ -3378,13 +3294,7 @@ void CkLocRec::staticMigrate(LDObjHandle h, int dest)
 //
 // The kick now goes to the urgent queue (ckPostKick), and a busy element gets
 // no kick at all until its zero crossing; see there.
-//
-// CHARM_LB_MIGRATE_INLINE=1 restores the inline emigrate for bisecting.
-static bool lbMigrateDeferred()
-{
-  static const bool inlineMoves = (getenv("CHARM_LB_MIGRATE_INLINE") != nullptr);
-  return _lb_args.lbAsync() && !inlineMoves;
-}
+static bool lbMigrateDeferred() { return _lb_args.lbAsync(); }
 
 static void ckPostDeferredMigrate(CkLocMgr* mgr, CmiUInt8 id, int toPe)
 {
@@ -3420,7 +3330,6 @@ void CkLocRec::recvMigrate(int toPe)
       q.id = getID();
       q.toPe = toPe;
       ck_window.queue.push_back(q);
-      ckWindowTrace("queue", getID(), bytes);
       return;
     }
   }
@@ -3436,7 +3345,7 @@ void CkLocRec::recvMigrate(int toPe)
     // re-buffers into nextPe through this function if the window has closed.
     if (lbMigrateDeferred())
     {
-      if (outstandingDeviceSends > 0 && !migrateAtParkOnly())
+      if (outstandingDeviceSends > 0)
       {
         // Busy: a kick now would only find it busy and re-arm (1225 of 3407
         // kicks in one run did exactly that). Record the move; the zero
@@ -3446,8 +3355,7 @@ void CkLocRec::recvMigrate(int toPe)
       }
       // Quiet now: hold new device receives until the kick runs, so it finds
       // the element still quiet (see migrateKickHeld).
-      if (!(_lb_args.lbAsync() && migrateAtParkOnly()))
-        migrateKickHeld = true;
+      migrateKickHeld = true;
       ckPostDeferredMigrate(myLocMgr, getID(), toPe);
       return;
     }
@@ -4354,10 +4262,7 @@ void CkLocMgr::releaseLandingSet(CmiUInt8 id)
   auto it = landingSets.find(id);
   if (it == landingSets.end()) return;
   size_t left = 0;
-  for (auto& e : it->second) { left += e.first; CkDeviceFree(e.second); }
-  if (ckGateDbg())
-    CkPrintf("[GATE %d] unpacked id=%llu: %zu block(s) / %zu bytes of its landing set "
-             "unused, freed\n", CkMyPe(), (unsigned long long)id, it->second.size(), left);
+  for (auto& e : it->second) CkDeviceFree(e.second);
   landingSets.erase(it);
   ck_admit_from = "releaseLandingSet";
   if (!deferredLandings.empty()) admitLandings();
@@ -4375,21 +4280,14 @@ void CkLocMgr::admitLandings()
   if (admittingLandings) {
     admitLandingsAgain = true;
     // Not expected any more (enqueueNcpyMessage no longer runs a completed
-    // zero-copy message inline); say so once per PE if it happens, every time
-    // under CHARM_DEBUG_GATE.
+    // zero-copy message inline); say so once per PE if it happens.
     static thread_local bool said = false;
-    if (ckGateDbg() || !said) {
+    if (!said) {
       said = true;
       CkPrintf("[%d] WARNING: admitLandings re-entered from %s inside %s (%zu deferred): a "
                "message ran inside another entry method; deferring the round\n",
                CkMyPe(), ck_admit_from, ck_admit_outer, deferredLandings.size());
     }
-    // CHARM_LB_GATE_REENTRY_ABORT: stop here, so a debugger shows the whole
-    // nested stack (what ran the unpack inside the admission).
-    static const bool abortOnReentry = getenv("CHARM_LB_GATE_REENTRY_ABORT") != nullptr;
-    if (abortOnReentry)
-      CkAbort("PE %d: admitLandings re-entered from %s inside %s", CkMyPe(),
-              ck_admit_from, ck_admit_outer);
     return;
   }
   admittingLandings = true;
@@ -4413,26 +4311,18 @@ void CkLocMgr::admitLandingsLoop()
     // waiting on the other's landing. Take it anyway: the allocation either
     // succeeds or fails the way it did before the gate existed, rather than
     // hanging the job.
-    static const double timeout = []() {
-      const char* s = getenv("CHARM_LB_GATE_TIMEOUT");
-      return s ? atof(s) : 120.0;
-    }();
+    static const double timeout = 120.0;
     const bool expired = (CkWallTimer() - d.since) > timeout;
     if (expired && !d.warned)
       CkPrintf("[%d] WARNING: admitting a %d-byte migration landing (+%zu bytes of "
-               "element state) after %.0f s without the admission gate's guarantee "
-               "(CHARM_LB_GATE_TIMEOUT)\n", CkMyPe(), d.size, d.footprint, timeout);
+               "element state) after %.0f s without the admission gate's guarantee\n",
+               CkMyPe(), d.size, d.footprint, timeout);
     if (!expired &&
         !ckLandingAdmissible((size_t)d.size, d.footprint, &reach, &floor)) {
       const double waited = CkWallTimer() - d.since;
-      if (ckGateDbg() && !d.reported)
-        CkPrintf("[GATE %d] defer id=%llu from PE %d: landing %zu + state %zu in %zu "
-                 "block size(s), pool free %zu, floor %zu (by bytes)\n", CkMyPe(),
-                 (unsigned long long)d.id, d.srcPe, ckPoolBlock((size_t)d.size),
-                 d.footprint, d.blocks.size() / 2, reach, floor);
       if (!d.reported && landingDeferrals++ == 0)
         CkPrintf("[%d] memory contract: a migration landing waits for device memory "
-                 "(admission gate; CHARM_DEBUG_GATE traces each)\n", CkMyPe());
+                 "(admission gate)\n", CkMyPe());
       d.reported = true;
       if (waited > 30.0 && !d.warned) {
         d.warned = true;
@@ -4460,14 +4350,9 @@ void CkLocMgr::admitLandingsLoop()
     char* arena = nullptr;
     std::multimap<size_t, void*> set;
     if (!expired && !ckTakeLandingSet(d.size, d.blocks, &arena, set)) {
-      if (ckGateDbg() && !d.reported)
-        CkPrintf("[GATE %d] defer id=%llu from PE %d: landing %zu + state %zu fit by "
-                 "bytes (pool free %zu) but not by block shape\n", CkMyPe(),
-                 (unsigned long long)d.id, d.srcPe, ckPoolBlock((size_t)d.size),
-                 d.footprint, reach);
       if (!d.reported && landingDeferrals++ == 0)
         CkPrintf("[%d] memory contract: a migration landing waits for device memory "
-                 "(admission gate; CHARM_DEBUG_GATE traces each)\n", CkMyPe());
+                 "(admission gate)\n", CkMyPe());
       d.reported = true;
       if (!landingRetryScheduled) {
         landingRetryScheduled = true;
@@ -4493,10 +4378,6 @@ void CkLocMgr::admitLandingsLoop()
     }
     grantedLandings[d.id] = arena;
     if (!set.empty()) landingSets[d.id] = std::move(set);
-    if (ckGateDbg() && d.reported)
-      CkPrintf("[GATE %d] admit id=%llu after %.1f ms (landing %d + %zu block(s) of "
-               "state taken)\n", CkMyPe(), (unsigned long long)d.id,
-               (CkWallTimer() - d.since) * 1e3, d.size, landingSets[d.id].size());
     if (d.size == 0) {
       // Nothing to pull: this landing only reserves the arriving element's
       // blocks, and the element's own message is what waits for it, parked
@@ -4756,14 +4637,9 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   // last transfer completes.
   // Under the split barrier this used to additionally require the element to be
   // parked. It does not: the count above is the safety condition, and the park
-  // only guarantees it is reached. See migrateAtParkOnly, which restores the
-  // old behaviour. An element that never goes quiet while running still moves
-  // at its park, which is where AtSyncWait re-drives this.
-  if (rec->outstandingDeviceSends > 0
-#if CMK_LBDB_ON
-      || (_lb_args.lbAsync() && migrateAtParkOnly() && !rec->deviceRecvParked)
-#endif
-     )
+  // only guarantees it is reached. An element that never goes quiet while
+  // running still moves at its park, which is where AtSyncWait re-drives this.
+  if (rec->outstandingDeviceSends > 0)
   {
     if (getenv("CHARM_DEBUG_MIGRATE"))
       CmiPrintf("[DEFER-MIG %d] elem %s id=%llu count=%d parked=%d toPe=%d\n", CkMyPe(),
@@ -4840,11 +4716,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   // GPU-resident data is only carried along when the destination PE is mapped
   // to the same physical GPU as the source, because raw device pointers are
   // only directly usable in that case.
-  // Escape hatch for bisecting migration problems: setting
-  // CHARM_NO_INTRAPROC_MIGRATE forces the packed path for every migration.
-  static const bool intraProcDisabled =
-      (getenv("CHARM_NO_INTRAPROC_MIGRATE") != nullptr);
-  if (!intraProcDisabled && CmiNodeOf(CkMyPe()) == CmiNodeOf(toPe))
+  if (CmiNodeOf(CkMyPe()) == CmiNodeOf(toPe))
   {
     bool sameGpuRequirementMet = (gpuBufSize == 0);
 #if CMK_CUDA
@@ -5164,14 +5036,9 @@ static inline bool ckMigrateArenaMode()
   return on;
 }
 // Whether a migration arena comes from the device pool (CkDeviceMalloc) and goes
-// back to it, instead of hapiMalloc/hapiFree. +gpupool implies it; otherwise
-// off by default: the pool is optional, and this path has to keep working
-// exactly as before without it.
-static inline bool ckMigrateArenaFromPool()
-{
-  static const bool on = (getenv("CHARM_MIGRATE_POOL") != nullptr) || CkDevicePoolOn();
-  return on;
-}
+// back to it, instead of hapiMalloc/hapiFree: under +gpupool. The pool is
+// optional, and without it this path keeps working exactly as before.
+static inline bool ckMigrateArenaFromPool() { return CkDevicePoolOn(); }
 
 // Per-PE non-blocking stream for migration payload landings in arena mode.
 static hapiStream_t ckLandingStream()
@@ -5191,10 +5058,9 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
   if (ckMigrateArenaMode()) {
     // The arena: the chare's storage, not a landing block, so it comes from
     // ordinary device memory -- pool memory is transient by contract.
-    // Optional: the arena from the device pool (host-side buddy allocation, no
-    // cudaMalloc and later no cudaFree) rather than a fresh device allocation.
-    // CHARM_MIGRATE_POOL selects it; the default is the allocation it always
-    // was, so a run without the pool is unchanged.
+    // Under +gpupool the arena comes from the device pool (host-side buddy
+    // allocation, no cudaMalloc and later no cudaFree) rather than a fresh
+    // device allocation; without the pool it is the allocation it always was.
     data = nullptr;
     // Charged to nobody here; immigrate charges it to the element it becomes
     // storage for, once that element exists.
@@ -5252,16 +5118,13 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
   // Measured on 4 A40s, arena mode, -lblag 8, direct IPC, 32 paired runs
   // alternating host wait and no wait: 32 of 32 exact each way.
   //
-  // CHARM_LB_LANDING_HOST_WAIT=1 puts the host wait back in every mode, for
-  // bisecting if a landing corruption ever reappears. CHARM_LB_POOL_EVENT_GATE
-  // is the recycled-block gate's opt-in; without it the recycled-block path
-  // keeps the host wait, which is the behaviour that has never failed.
+  // CHARM_LB_POOL_EVENT_GATE is the recycled-block gate's opt-in; without it
+  // the recycled-block path keeps the host wait, which is the behaviour that
+  // has never failed.
   //
   // Note for anyone debugging in this window: added synchronization hides the
   // failure, so probes placed inside it are worthless. Use failure-path-only
   // probes.
-  static const bool landingHostWait =
-      (getenv("CHARM_LB_LANDING_HOST_WAIT") != nullptr);
   static const bool poolEventGate =
       (getenv("CHARM_LB_POOL_EVENT_GATE") != nullptr);
   // Arena mode lands on a per-PE non-blocking stream. Stream 0 is one per
@@ -5271,7 +5134,7 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
   // Arena mode has nothing to order (see above); the recycled-block modes
   // keep stream 0 and their gate.
   hapiStream_t landing = (cudaStream_t)0;
-  if (landingHostWait || (dm_for_gate != NULL && !poolEventGate))
+  if (dm_for_gate != NULL && !poolEventGate)
     hapiCheck(cudaStreamSynchronize((cudaStream_t)0));
   else if (dm_for_gate != NULL)
     CkRdmaDeviceGateLbBuffer(dm_for_gate, (cudaStream_t)0);
@@ -5342,7 +5205,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   {
     // Device state but no payload: nothing else holds this message back, so
     // park it until the gate has reserved the element's blocks; admitLandings
-    // releases it. CHARM_LB_GATE_TIMEOUT still admits without a guarantee if
+    // releases it. The admission timeout still admits without a guarantee if
     // the pool never frees, so this cannot wedge a run.
     bufferedHostMigrateMsgs[msg->id] = msg;
     noteImmigrationInFlight(msg->id);

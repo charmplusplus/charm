@@ -52,12 +52,7 @@
 // are acked, because every LoadReceived that targets a PE of this node was
 // issued by this node's rank0PE (see migMaybeDone). Under +LBAsync each hop made
 // every node wait for the slowest before issuing a single move, while the
-// application kept running around it. Both are now node-local;
-// CHARM_DIFFUSION_GLOBAL_PHASES=1 restores the PE 0 barriers for bisecting.
-static bool diffusionGlobalPhases() {
-  static const bool on = (getenv("CHARM_DIFFUSION_GLOBAL_PHASES") != nullptr);
-  return on;
-}
+// application kept running around it. Both are now node-local.
 
 #include "DiffusionCostModel.h"
 
@@ -1268,8 +1263,7 @@ void DiffusionLB::proceedAfterPlan()
     thisProxy[0].planReport(my_load, my_pseudo_load, in, out);
     return;
   }
-  if (diffusionGlobalPhases()) thisProxy[0].roundsDone();
-  else AcrossNodeLB();
+  AcrossNodeLB();
 }
 
 // PE 0: one report per node, then the verdict to every PE.
@@ -1313,8 +1307,7 @@ void DiffusionLB::planVerdict(int remap, CkGroupID gid)
     return;
   }
   if (thisIndex != rank0PE) return;
-  if (diffusionGlobalPhases()) thisProxy[0].roundsDone();
-  else AcrossNodeLB();
+  AcrossNodeLB();
 }
 
 // This PE's part of the hand-off. The central balancer takes the step from

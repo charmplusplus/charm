@@ -73,7 +73,6 @@ void cuptiWorkerSubmit(CuptiBuild* b, const cpu_set_t& cpus) {
     w.started = true;
     std::thread([cpus]() {
       sched_setaffinity(0, sizeof(cpus), &cpus);
-      static const bool timeIt = (getenv("CHARM_LB_CUPTI_OFFTHREAD_TIME") != nullptr);
       CuptiWorker& w = g_cuptiWorker;
       for (;;) {
         CuptiBuild* job;
@@ -83,13 +82,7 @@ void cuptiWorkerSubmit(CuptiBuild* b, const cpu_set_t& cpus) {
           job = w.job;
           w.job = nullptr;
         }
-        const auto t0 = std::chrono::steady_clock::now();
         hapiPrepareCuptiLoads();
-        if (timeIt) {
-          const double ms = std::chrono::duration<double, std::milli>(
-              std::chrono::steady_clock::now() - t0).count();
-          fprintf(stderr, "[LBCUPTI helper first-pe=%d cpu=%d] total=%.1f ms\n", job->first, sched_getcpu(), ms);
-        }
         job->done.store(true, std::memory_order_release);
       }
     }).detach();
@@ -199,23 +192,10 @@ void DistBaseLB::barrierDone() {
       b->first = hapiDeviceGroupFirstPe();
       b->count = hapiDeviceGroupSize();
       b->dev = hapiMyDeviceIndex();
-      // CHARM_LB_CUPTI_OFFTHREAD_FLUSH_ON_PE: pull the records on this PE and
-      // leave only the parsing to the helper (diagnostic: which half matters).
-      static const bool flushOnPe = (getenv("CHARM_LB_CUPTI_OFFTHREAD_FLUSH_ON_PE") != nullptr);
-      if (flushOnPe && hapiCuptiTracingActive())
-        hapiCuptiFlushGated(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
       lbHelperSubmit(cpus, [b]() {
         hapiPrepareCuptiLoadsDevice(HAPI_CUPTI_EPOCH_LB_ROUND, b->dev);
         b->done.store(true, std::memory_order_release);
       }, b->dev < 0 ? 0 : b->dev);
-      // CHARM_LB_CUPTI_OFFTHREAD_STALL_MS (diagnostic): hold this PE for that long
-      // anyway, as the on-PE build did, to tell "the PE is free" apart from
-      // "the PEs stay in phase".
-      static const int stallMs = getenv("CHARM_LB_CUPTI_OFFTHREAD_STALL_MS") ? atoi(getenv("CHARM_LB_CUPTI_OFFTHREAD_STALL_MS")) : 0;
-      if (stallMs > 0) {
-        const double until = CkWallTimer() + stallMs * 1e-3;
-        while (CkWallTimer() < until) {}
-      }
       CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, (void*)b);
       return;
     }
@@ -235,26 +215,9 @@ void DistBaseLB::barrierDone() {
 void DistBaseLB::gpuLoadsReady() {
 #if CMK_LBDB_ON
 #if CMK_CUDA
-  // CHARM_LB_STALL_ALL_MS (diagnostic): hold EVERY PE here for that long. With
-  // CHARM_LB_CUPTI_OFFTHREAD_STALL_MS (one PE per process) it separates "a pause
-  // helps" from "a pause on ONE PE, which breaks the PEs' phase, helps".
-  {
-    static const int allMs = getenv("CHARM_LB_STALL_ALL_MS") ? atoi(getenv("CHARM_LB_STALL_ALL_MS")) : 0;
-    if (allMs > 0) {
-      const double until = CkWallTimer() + allMs * 1e-3;
-      while (CkWallTimer() < until) {}
-    }
-  }
   // Every PE picks up the normalized loads for its own objects.
   lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
-  {
-    const GPUManager& gm = CsvAccess(gpu_manager);
-    // CHARM_LB_NO_DRIVER_SPLIT: leave the driver time inside the host load and
-    // carry no launch term -- the pre-split behaviour, for A/B runs.
-    static const bool noSplit = (getenv("CHARM_LB_NO_DRIVER_SPLIT") != nullptr);
-    static const std::unordered_map<LDObjKey, double, LDObjKeyHash> noApi;
-    lbmgr->SetObjDriverLoad(noSplit ? noApi : gm.cupti_obj_api_raw_, hapiCuptiDriverScale());
-  }
+  lbmgr->SetObjDriverLoad(CsvAccess(gpu_manager).cupti_obj_api_raw_, hapiCuptiDriverScale());
   if (_lb_args.gpuScaling())
     lbmgr->SetObjGPUCosts(CsvAccess(gpu_manager).cupti_obj_epoch_costs_);
 #endif
