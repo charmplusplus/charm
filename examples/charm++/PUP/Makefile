@@ -3,6 +3,9 @@ CHARMC=../../../bin/charmc $(OPTS)
 
 DIRS = \
   STLPUP \
+  HeapPUP \
+  seekBlock \
+  pupDisk \
 
 TESTDIRS = $(DIRS)
 

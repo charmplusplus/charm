@@ -47,7 +47,7 @@ public:
 		int onPE=arrMgr->lastKnown(idx);
 		if (onPE==CkMyPe()) 
 		{ //Send to local element
-			arrMgr->deliver((CkMessage *)m, CkDeliver_queue);
+			arrMgr->sendMsg((CkArrayMessage *)m, idx, CkDeliver_queue);
 		} else 
 		{ //Forward to remote element
 			ckout<<"DelegateMgr> Sending message for "<<idx.data()[0]<<" to "<<onPE<<endl;
@@ -67,8 +67,8 @@ public:
 		envelope *msg=(envelope *)CmiAlloc(nBytes);
 		memcpy(msg,env,nBytes);
 		CkUnpackMessage(&msg);
-		CProxy_CkArray ap(msg->getsetArrayMgr());
-		ap.ckLocalBranch()->deliver((CkMessage *)EnvToUsr(msg),CkDeliver_inline);
+		CProxy_CkArray ap(msg->getArrayMgr());
+		ap.ckLocalBranch()->sendMsg((CkArrayMessage *)EnvToUsr(msg), idx, CkDeliver_inline);
 	}
 };
 

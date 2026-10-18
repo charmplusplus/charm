@@ -2,6 +2,12 @@
 -include ../../../include/conv-mach-opt.mak
 CHARMC=../../../bin/charmc $(OPTS)
 
+# Two partitions need at least two processes. On reconverse +p<n> through
+# testrun starts one process with n PEs, so ask for two.
+ifeq ($(CMK_GDIR),reconverse)
+RUN_PROCS = TESTRUN_PROCS=2
+endif
+
 OBJS = hello.o
 
 all: hello
@@ -22,7 +28,7 @@ test: all
 ifeq ($(CMK_NO_PARTITIONS),1)
 	@echo "Skipping test since build does not support partitions"
 else
-	$(call run, ./hello +p4 10 2 +partitions 2)
+	$(RUN_PROCS) $(call run, ./hello +p4 10 2 +partitions 2)
 endif
 
 testp: all
