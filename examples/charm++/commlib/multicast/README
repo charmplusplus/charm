@@ -1,6 +1,0 @@
-Multicast in Charm with commlib.
-
-Demonstrates usage of commlib multicast strategies (DirectMulticastStrategy,
-RingMulticastStrategy, MultiRingMulticast). Two chare arrays are created, and
-a multicast from one to the other is performed.
-
