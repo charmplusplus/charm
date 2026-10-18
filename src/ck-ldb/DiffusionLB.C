@@ -112,7 +112,9 @@ static bool diffusionTimingExitRegistered = false;
 // of the process by loadDimVerdict; -1 until the first verdict. The node's
 // own side and PE count follow it, for the step-time mode.
 int diffusionLoadDimDevice = -1;
-int diffusionNodeDeviceBound = 0;
+// Per PE thread: with several diffusion nodes (devices) in one process, each node's rank-0 PE
+// holds its own verdict; every reader runs on that PE.
+thread_local int diffusionNodeDeviceBound = 0;
 int diffusionPpn = 1;
 
 static void printDiffusionTimingAtExit() {
@@ -168,6 +170,15 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   // how any of them is reached. It does NOT make the PEs of a logical node
   // share a device, so +LBDiffusionGpuDim results under it are not meaningful.
   nodeSize = CkNodeSize(0);
+#if CMK_CUDA
+  // A diffusion node is a DEVICE. With several devices per process the PEs of one device (a
+  // contiguous block under HAPI's block map) form a node: the across-node machinery then balances
+  // devices for every process/GPU split, each node's rank-0 PE reports its own device's memory,
+  // and the within-node phase keeps its premise that the PEs of a node share a device. The tier
+  // between two nodes of one process is the peer-copy tier (DiffusionCostConfig::tierBetween).
+  if (hapiDevicesPerProcess() > 1 && hapiDeviceMapIsBlock() && hapiPesPerDevice() > 0)
+    nodeSize = hapiPesPerDevice();
+#endif
   {
     const char* s = getenv("CHARM_DIFFUSION_NODE_SIZE");
     if (s != NULL)
@@ -431,6 +442,9 @@ void DiffusionLB::loadDimReport(double sumHost, double maxHost, double sumDev, d
   loadDimCrit.merge(c);
   if (++loadDimReports < numNodes) return;
   loadDimReports = 0;
+  // One CUDA context per device-node, so the driver term is spread over numNodes contexts: each
+  // report counted one (c.procs = 1). Counting processes instead quadrupled the launch share of a
+  // process driving four devices (12% against 3%, job 22821909).
 
   const int mode = lbResolveLoadMode(loadDimCrit);
   if (_lb_args.debug() > 0)

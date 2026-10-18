@@ -6,12 +6,16 @@
 
 #include "DiffusionCostModel.h"
 #include "charm++.h"
+#if CMK_CUDA
+#include "hapi.h"
+#endif
 
 const char* DiffusionCostConfig::tierName(DiffusionTier t)
 {
   switch (t)
   {
     case DIFF_TIER_INTRA_PROCESS: return "intra_process";
+    case DIFF_TIER_INTRA_PROCESS_PEER: return "intra_process_peer";
     case DIFF_TIER_IPC_SAME_GPU: return "ipc_same_gpu";
     case DIFF_TIER_IPC_CROSS_GPU: return "ipc_cross_gpu";
     case DIFF_TIER_INTER_NODE: return "inter_node";
@@ -30,6 +34,15 @@ static int diffCfgDevicesPerHost = 0;
 
 static int diffDeviceOfPe(int pe)
 {
+#if CMK_CUDA
+  // The runtime's own mapping first: exact for this process's PEs and the mapping's formula for
+  // every other process, for any process/GPU split. The config arithmetic below is the fallback
+  // for a build whose HAPI has not mapped yet.
+  {
+    const int d = hapiDeviceIndexOfPe(pe);
+    if (d >= 0) return d;
+  }
+#endif
   if (diffCfgDevicesPerHost <= 0) return -1;
   const int host = CmiPhysicalNodeID(pe);
   const int pesHere = CmiNumPesOnPhysicalNode(host);
@@ -40,11 +53,25 @@ static int diffDeviceOfPe(int pe)
 
 DiffusionTier DiffusionCostConfig::tierBetween(int pe1, int pe2)
 {
-  if (CmiNodeOf(pe1) == CmiNodeOf(pe2)) return DIFF_TIER_INTRA_PROCESS;
   if (!CmiPeOnSamePhysicalNode(pe1, pe2)) return DIFF_TIER_INTER_NODE;
   const int d1 = diffDeviceOfPe(pe1), d2 = diffDeviceOfPe(pe2);
+  if (CmiNodeOf(pe1) == CmiNodeOf(pe2))
+  {
+    // One process: a memcpy on one device, a peer copy between two of its devices. An unknown
+    // device (no mapping yet) is taken as the same one, the historical answer.
+    return (d1 >= 0 && d2 >= 0 && d1 != d2) ? DIFF_TIER_INTRA_PROCESS_PEER
+                                            : DIFF_TIER_INTRA_PROCESS;
+  }
   if (d1 >= 0 && d1 == d2) return DIFF_TIER_IPC_SAME_GPU;
   return DIFF_TIER_IPC_CROSS_GPU;
+}
+
+DiffusionTier DiffusionCostConfig::tierBetween(int pe1, int pe2, uint64_t dev1, uint64_t dev2)
+{
+  if (!CmiPeOnSamePhysicalNode(pe1, pe2)) return DIFF_TIER_INTER_NODE;
+  if (CmiNodeOf(pe1) == CmiNodeOf(pe2))
+    return (dev1 != dev2) ? DIFF_TIER_INTRA_PROCESS_PEER : DIFF_TIER_INTRA_PROCESS;
+  return (dev1 == dev2) ? DIFF_TIER_IPC_SAME_GPU : DIFF_TIER_IPC_CROSS_GPU;
 }
 
 bool DiffusionCostConfig::load(const char* path)
@@ -111,6 +138,15 @@ bool DiffusionCostConfig::load(const char* path)
   }
   fclose(f);
 
+  // Tables written before the peer tier existed do not name it. A same-process peer copy crosses
+  // the same PCIe link as a cross-process cross-GPU transfer, so that tier stands in until
+  // lbcalib measures it (the loader still insists on the cross-GPU tier itself below).
+  const bool peerGiven = seen[DIFF_TIER_INTRA_PROCESS_PEER][0] && seen[DIFF_TIER_INTRA_PROCESS_PEER][1];
+  if (!peerGiven)
+  {
+    tier[DIFF_TIER_INTRA_PROCESS_PEER] = tier[DIFF_TIER_IPC_CROSS_GPU];
+    seen[DIFF_TIER_INTRA_PROCESS_PEER][0] = seen[DIFF_TIER_INTRA_PROCESS_PEER][1] = true;
+  }
   for (int t = 0; t < DIFF_TIER_COUNT; t++)
   {
     if (!seen[t][0] || !seen[t][1])
@@ -136,6 +172,9 @@ bool DiffusionCostConfig::load(const char* path)
     CkPrintf("CharmLB> DiffusionLB cost model loaded from '%s'"
              " (devices_per_host=%d, placement lifetime %.1f intervals)\n",
              path, diffCfgDevicesPerHost, placementLifetimeIntervals);
+    if (!peerGiven)
+      CkPrintf("CharmLB>   intra_process_peer not in the table: priced as ipc_cross_gpu until "
+               "lbcalib measures it\n");
     for (int t = 0; t < DIFF_TIER_COUNT; t++)
       CkPrintf("CharmLB>   %-14s alpha=%.6es beta=%.6es/byte\n",
                tierName((DiffusionTier)t), tier[t].alpha, tier[t].beta);

@@ -54,6 +54,7 @@ CLBStatsMsg* DiffusionLB::AssembleStats()
   hapiLBDeviceMemory(&statsMsg->gpu_mem_remaining, &statsMsg->pool_buff_mem_remaining,
                      &statsMsg->gpu_pool_arena_bytes, &statsMsg->gpu_ipc_slots);
   statsMsg->gpu_pool_capacity_bytes = hapiLBDevicePoolCapacity();
+  statsMsg->gpu_device_id = hapiMyDevice();
 #endif
 
   return statsMsg;
@@ -394,6 +395,7 @@ void DiffusionLB::AddToList(CLBStatsMsg* m, int rank)
   procStat.gpu_pool_arena_bytes = m->gpu_pool_arena_bytes;
   procStat.gpu_pool_capacity_bytes = m->gpu_pool_capacity_bytes;
   procStat.gpu_ipc_slots = m->gpu_ipc_slots;
+  procStat.gpu_device_id = m->gpu_device_id;
 #endif
 }
 

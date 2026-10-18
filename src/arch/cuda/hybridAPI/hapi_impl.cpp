@@ -16,6 +16,8 @@
 #include <mutex>
 #include <chrono>
 #include <thread>
+#include <condition_variable>
+#include <functional>
 #include <pthread.h>
 #include <unistd.h>
 #include <cxxabi.h>
@@ -107,6 +109,8 @@ struct hapiCallbackMessage {
 
 #ifndef HAPI_CUDA_CALLBACK
 void* (*hapiDeviceWorkBegin)() = nullptr;
+// Pool segments register with the fabric at the mapping (set by ck-core; see the device pool below).
+void (*hapiDevPoolSegmentHook)(void* base, size_t bytes, size_t unit, int device) = nullptr;
 void (*hapiDeviceWorkEnd)(void* token) = nullptr;
 
 typedef struct hapiEvent {
@@ -500,25 +504,345 @@ static constexpr uint64_t HAPI_CUPTI_NO_OBJECT =
 // through hapiSubmitIssue / hapiSubmitClosure / hapiSubmitEventRecord / hapiSubmitMemcpyAsync, so those take the gate
 // shared and the flush takes it exclusive: no launch is in flight while CUPTI flushes, and none starts until it is
 // done. A PE blocks at most for the flush (~3 ms per window). Nested submits on one thread hold one read lock.
-static pthread_rwlock_t g_cupti_flush_gate = PTHREAD_RWLOCK_INITIALIZER;
+// One gate per device of the process, held shared by that device's PEs for their launches; the flush takes every
+// gate. There is no per-device flush: cuptiActivityFlush(context, stream, flag) is deprecated and "CONTEXT and
+// STREAMID will be ignored" (cupti_activity.h), so a window close flushes the process, and the close is one per
+// process per LB event (hapiDeviceGroupSize).
+// The gates PREFER THE WRITER. glibc's default rwlock prefers readers: new readers keep acquiring while a writer
+// waits, so the flush's write lock waited for a moment with no launch in flight on that device -- ~3.5 ms per gate
+// with four PEs launching every ~60 us, taken for every device in turn: 5 ms in a one-device process, 14.5 ms in a
+// four-device one, independent of buffer sizes, with the PEs' own gate waits at zero (jobs 22866653, 22868252).
+// With writer preference a waiting flush stops new launches at once and gets the gate when the in-flight ones
+// finish (microseconds); the PEs then wait for the flush call itself. Our readers never recurse at the lock level
+// (one read lock per thread, t_cupti_gate_depth), which the NONRECURSIVE kind requires.
+#define HAPI_CUPTI_MAX_GATES 32
+// HAPI_CUPTI_FLUSH_FORCED (build-time): 0, the default since 2026-10-17, is the NON-forced flush at the window close --
+// complete buffers only, no gate taken, the open buffer per thread withheld and its tail extrapolated by the coverage
+// scale (hapiNormalizeCuptiLoads). 1 is the forced flush behind the gates, the behaviour of 2026-10-11..17: every
+// launch of the process stopped for the call (~15 ms per LB event in a four-GPU process, the gputrace of job 22953167).
+#ifndef HAPI_CUPTI_FLUSH_FORCED
+#define HAPI_CUPTI_FLUSH_FORCED 0
+#endif
+#define HAPI_CUPTI_GATE_INIT PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP
+static pthread_rwlock_t g_cupti_flush_gates[HAPI_CUPTI_MAX_GATES] = {
+  HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT,
+  HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT,
+  HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT,
+  HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT,
+  HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT,
+  HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT,
+  HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT,
+  HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT, HAPI_CUPTI_GATE_INIT};
+// The last gated flush, for the close's timing line (CHARM_LB_CUPTI_TIME): the wait for the gates, the
+// cuptiActivityFlushAll call, and the buffers it delivered through cuptiBufferCompleted.
+struct CuptiFlushProf { double gate_s = 0.0, call_s = 0.0; uint32_t cbs = 0; uint64_t cb_bytes = 0; };
+static CuptiFlushProf g_cupti_flush_prof;
+static bool g_cupti_flush_counting = false;   // set by the flushing thread around the call; read under cupti_queue_lock_
+static uint32_t g_cupti_flush_cbs = 0;
+static uint64_t g_cupti_flush_cb_bytes = 0;
+static thread_local int t_cupti_gate_dev = 0;   // this thread's device (local index); set per PE in hapiMapping
+// The window a drain covers, in the CUPTI clock: from the previous LB window close to this one (stamped in
+// hapiPrepareCuptiLoadsImpl just before its flush). Records that ended before the window belong to the previous
+// one and are dropped by the sweep; a kernel straddling the start is clipped to it.
+static uint64_t g_cupti_window_prev_ns = 0, g_cupti_window_close_ns = 0;
+// Per-thread coverage of the window, this drain: the last runtime-API record each thread delivered. With the
+// non-forced flush each thread's OPEN activity buffer is withheld until it fills, so a thread's records end
+// somewhere before the close -- a random fraction of a buffer per thread (up to 64 KB, ~3 sph3d steps of a
+// 25-step window). The thread's objects' loads are scaled by window / covered span (hapiNormalizeCuptiLoads):
+// a steady load extrapolated over the tail it has not reported yet. Under the forced flush the coverage is the
+// whole window and the scale 1. Statistics of the last normalisation, for the timed close line.
+static std::unordered_map<uint32_t, uint64_t> g_cupti_cover_end;    // thread -> last API record end this drain
+static std::unordered_map<uint32_t, double> g_cupti_cover_scale;    // thread -> window / covered
+static std::unordered_map<LDObjKey, uint32_t, LDObjKeyHash> g_cupti_obj_thread;   // object -> thread of its launches
+static double g_cupti_cover_min = 1.0, g_cupti_cover_scale_max = 1.0;
+static size_t g_cupti_cover_threads = 0, g_cupti_cover_capped = 0;
 static thread_local int t_cupti_gate_depth = 0;
-struct CuptiGateShared {
-  CuptiGateShared() { if (t_cupti_gate_depth++ == 0) pthread_rwlock_rdlock(&g_cupti_flush_gate); }
-  ~CuptiGateShared() { if (--t_cupti_gate_depth == 0) pthread_rwlock_unlock(&g_cupti_flush_gate); }
+// CHARM_LB_CUPTI_TIME: the window close prints its phase timings (see hapiPrepareCuptiLoadsImpl).
+static bool hapiCuptiTimeIt() { static const bool t = (getenv("CHARM_LB_CUPTI_TIME") != nullptr); return t; }
+
+// Entry-span log: which LB object each thread was running, and when.
+//
+// Replaces the CUPTI external-correlation push at every entry method start and the pop at its
+// end. Measured 2026-10-12 (job 22849462, sph3d 256 patches on two nodes, ~600 pushes per PE per
+// step): the pair cost 0.5-4 us in a 4-PE process and 2.5-15 us in a 16-PE process, 4.5-10 ms of
+// every step on the (1,4,4) layout against 0.4-3 ms on (4,1,4) -- the one-process layout's whole
+// steady-state penalty. CUPTI keeps the per-thread correlation stacks behind one process-wide
+// lock, so the cost grows with the threads in the process. Here the thread appends a span
+// {start, end, token} to its own log (two CUPTI timestamps and a vector push under its own,
+// uncontended mutex), and the window close joins each runtime API record to the span of its
+// thread that contains the record's start; the API record's correlation id then names the kernel
+// exactly as the external-correlation record did (same tables, same deferral, same carry-over).
+// Spans nest (an entry delivered inline inside another); the innermost wins, and `parent_delta`
+// points back at the enclosing span. The work-tag lane (CUSTOM0, kernel scaling) is the same
+// mechanism on a second lane.
+struct CuptiEntrySpan { uint64_t start, end; uint64_t token; uint32_t parent_delta, pad; };
+struct CuptiEntryLane {
+  std::vector<CuptiEntrySpan> spans;
+  std::vector<uint32_t> open;   // indices of the open spans, innermost last (ascending)
+  uint64_t pruned = 0;          // spans dropped from the front so far: absolute index = pruned + local
+  uint32_t gen = 0;             // bumped by a compacting prune: the copies rebuild
 };
+struct CuptiEntryLog {
+  std::mutex m;
+  CuptiEntryLane obj, tag;
+  uint64_t arrivals[3] = {0, 0, 0};    // the owner's last window-close arrivals: the prune horizon
+  int narrivals = 0;
+};
+static thread_local CuptiEntryLog* t_cupti_entry_log = nullptr;
+static std::mutex g_cupti_entry_logs_lock;
+static std::unordered_map<uint32_t, CuptiEntryLog*> g_cupti_entry_logs;   // by OS thread id (gettid), as the API records name threads
+// The span clock. cuptiGetTimestamp goes through CUPTI (measured 15:16 job 22849462: 6.2 us per
+// open+close pair in the 16-PE process, no better than the push/pop it replaced), so spans are
+// stamped with clock_gettime on the clock CUPTI's timestamps follow, plus the offset between the
+// two measured at tracing start and refreshed at every window-close arrival. The clock is the
+// candidate whose offset is smallest at calibration; if none is within 10 ms CUPTI's own clock is
+// used directly (correct, slow).
+static std::atomic<int> g_cupti_span_clock{-1};        // clockid_t, or -1: cuptiGetTimestamp directly
+static std::atomic<int64_t> g_cupti_span_offset{0};    // cupti_ns - clock_ns
+static inline uint64_t hapiClockNs(clockid_t c) {
+  struct timespec ts;
+  clock_gettime(c, &ts);
+  return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
+}
+// The offset of CUPTI's clock from clock c: the tightest of five brackets.
+static bool hapiCuptiClockOffset(clockid_t c, int64_t& off) {
+  uint64_t spread = UINT64_MAX;
+  for (int i = 0; i < 5; i++) {
+    const uint64_t a = hapiClockNs(c);
+    uint64_t ct = 0;
+    if (cuptiGetTimestamp(&ct) != CUPTI_SUCCESS) return false;
+    const uint64_t b = hapiClockNs(c);
+    if (b - a < spread) { spread = b - a; off = (int64_t)ct - (int64_t)((a + b) / 2); }
+  }
+  return true;
+}
+static void hapiCuptiCalibrateSpanClock(bool first) {
+  if (!first) {   // refresh the offset of the clock already chosen
+    const int c = g_cupti_span_clock.load(std::memory_order_relaxed);
+    int64_t off = 0;
+    if (c >= 0 && hapiCuptiClockOffset((clockid_t)c, off)) g_cupti_span_offset.store(off, std::memory_order_relaxed);
+    return;
+  }
+  const clockid_t cands[] = {CLOCK_MONOTONIC_RAW, CLOCK_MONOTONIC, CLOCK_BOOTTIME, CLOCK_REALTIME};
+  int best = -1; int64_t bestOff = 0;
+  for (clockid_t c : cands) {
+    int64_t off = 0;
+    if (!hapiCuptiClockOffset(c, off)) continue;
+    if (best < 0 || llabs(off) < llabs(bestOff)) { best = (int)c; bestOff = off; }
+  }
+  if (best < 0 || llabs(bestOff) > 10000000) { best = -1; bestOff = 0; }
+  g_cupti_span_offset.store(bestOff, std::memory_order_relaxed);
+  g_cupti_span_clock.store(best, std::memory_order_relaxed);
+  if (hapiCuptiTimeIt() || _lb_args.debug() > 1)
+    CmiPrintf("[LBCUPTI pe=%d] span clock: %s, offset %lld ns\n", CmiMyPe(),
+              best == CLOCK_MONOTONIC_RAW ? "CLOCK_MONOTONIC_RAW" : best == CLOCK_MONOTONIC ? "CLOCK_MONOTONIC" :
+              best == CLOCK_BOOTTIME ? "CLOCK_BOOTTIME" : best == CLOCK_REALTIME ? "CLOCK_REALTIME" : "cuptiGetTimestamp (no clock within 10 ms)",
+              (long long)bestOff);
+}
+static inline uint64_t hapiCuptiSpanNow() {
+  const int c = g_cupti_span_clock.load(std::memory_order_relaxed);
+  if (c < 0) { uint64_t t = 0; cuptiGetTimestamp(&t); return t; }
+  return (uint64_t)((int64_t)hapiClockNs((clockid_t)c) + g_cupti_span_offset.load(std::memory_order_relaxed));
+}
+static CuptiEntryLog& hapiCuptiEntryLog() {
+  CuptiEntryLog* L = t_cupti_entry_log;
+  if (L == nullptr) {
+    L = new CuptiEntryLog;
+    std::lock_guard<std::mutex> g(g_cupti_entry_logs_lock);
+    g_cupti_entry_logs[(uint32_t)syscall(SYS_gettid)] = L;
+    t_cupti_entry_log = L;
+  }
+  return *L;
+}
+static inline void hapiCuptiLaneOpen(CuptiEntryLane& ln, uint64_t token) {   // owner, under the log's mutex
+  const uint64_t t = hapiCuptiSpanNow();
+  const uint32_t idx = (uint32_t)ln.spans.size();
+  const uint32_t pd = ln.open.empty() ? 0 : idx - ln.open.back();
+  ln.spans.push_back({t, 0, token, pd, 0});
+  ln.open.push_back(idx);
+}
+// One clock read per entry: an outermost span has no end stamp and runs until the next span starts
+// on its thread (nothing launches a kernel between entries; the polls there are not attributed
+// anyway). Only a nested span is stamped at its close, because its parent resumes. On a node whose
+// TSC the kernel distrusts the clocksource is HPET (gpub090, 2026-10-12): 1.7 us per read, serialised
+// node-wide, so the reads per entry are what the span log costs there.
+static inline void hapiCuptiLaneClose(CuptiEntryLane& ln) {   // owner, under the log's mutex
+  if (ln.open.empty()) return;
+  const uint32_t idx = ln.open.back();
+  ln.open.pop_back();
+  if (!ln.open.empty() && idx < ln.spans.size()) ln.spans[idx].end = hapiCuptiSpanNow();
+}
+// Drop what no later drain can ask about: the spans closed before the owner's arrival two windows
+// ago (a record is delivered at most one drain late). Owner, under the log's mutex.
+static void hapiCuptiLanePrune(CuptiEntryLane& ln, uint64_t cutoff) {
+  // Keep from the last span that started before the cutoff (it may still cover times after it).
+  size_t k = std::lower_bound(ln.spans.begin(), ln.spans.end(), cutoff,
+                              [](const CuptiEntrySpan& sp, uint64_t t) { return sp.start < t; }) - ln.spans.begin();
+  if (k > 0) k--;
+  // Keep that span's whole nesting context: a record in the gap after a nested span closed is held by
+  // an ancestor, so the kept prefix starts at the outermost CLOSED ancestor (an open one is kept by the
+  // compaction below; everything a kept span can point at is then kept, by the stack discipline).
+  for (;;) {
+    const CuptiEntrySpan& sp = ln.spans[k];
+    if (sp.parent_delta == 0 || sp.parent_delta > k) break;
+    const size_t p = k - sp.parent_delta;
+    if (std::binary_search(ln.open.begin(), ln.open.end(), (uint32_t)p)) break;
+    k = p;
+  }
+  if (k == 0) return;
+  // Spans below k that are still open are kept, moved to the front in their order (the open stack is
+  // ascending); everything else below k goes. Before this the prune stopped at the first open span,
+  // so one entry left open for the run (a suspended thread, a lost pop) pinned the whole log and the
+  // drains copied all of it every close: the parse of the same records grew 9 -> 38 ms over 1000
+  // steps (job 22856533). Compaction renumbers, so the copies rebuild from scratch once (gen).
+  size_t nOpenBelow = 0;
+  while (nOpenBelow < ln.open.size() && ln.open[nOpenBelow] < k) nOpenBelow++;
+  if (nOpenBelow == 0) {
+    ln.spans.erase(ln.spans.begin(), ln.spans.begin() + k);
+    for (uint32_t& i : ln.open) i -= (uint32_t)k;
+    ln.pruned += k;
+    return;
+  }
+  std::vector<CuptiEntrySpan> kept;
+  kept.reserve(nOpenBelow + (ln.spans.size() - k));
+  for (size_t j = 0; j < nOpenBelow; j++) {
+    CuptiEntrySpan sp = ln.spans[ln.open[j]];
+    sp.parent_delta = (j == 0) ? 0 : 1;   // an open span's parent is the open span beneath it
+    kept.push_back(sp);
+  }
+  for (size_t i = k; i < ln.spans.size(); i++) {
+    CuptiEntrySpan sp = ln.spans[i];
+    const size_t newIdx = nOpenBelow + (i - k);
+    if (sp.parent_delta != 0) {
+      const size_t parentOld = i - sp.parent_delta;
+      if (parentOld < k) {
+        // A parent below k is one of the kept open spans (a closed parent closes after its children,
+        // so a child kept above k with a closed parent below k cannot exist) -- or it was dropped.
+        const size_t j = std::lower_bound(ln.open.begin(), ln.open.begin() + nOpenBelow, (uint32_t)parentOld) - ln.open.begin();
+        sp.parent_delta = (j < nOpenBelow && ln.open[j] == (uint32_t)parentOld) ? (uint32_t)(newIdx - j) : 0;
+      }
+    }
+    kept.push_back(sp);
+  }
+  for (size_t j = 0; j < ln.open.size(); j++)
+    ln.open[j] = (j < nOpenBelow) ? (uint32_t)j : (uint32_t)(nOpenBelow + (ln.open[j] - k));
+  ln.spans.swap(kept);
+  ln.pruned += k - nOpenBelow;
+  ln.gen++;
+}
+// The drain's copy of one lane, kept between drains and brought up to date incrementally: the spans
+// the owner pruned are dropped from the front, the spans logged since the last copy are appended,
+// and the copy restarts from the earliest span that was still open at the last copy (its end may
+// have been stamped since). The four device closes of one LB event each drain within milliseconds,
+// so the second to fourth copy kilobytes, not every thread's whole log (16 x ~1.5 MB per drain,
+// measured 2026-10-12 as the bulk of the close under the span log). Caller holds the owner's mutex.
+struct CuptiLaneCopy {
+  std::vector<CuptiEntrySpan> spans;
+  uint64_t base = 0;                   // absolute index of spans[0]
+  uint32_t gen = 0;                    // the lane generation this copy follows
+  std::vector<uint32_t> open_at_copy;  // local indices of the spans open at the last copy: the only ones that can change
+};
+static std::atomic<uint64_t> g_cupti_snap_bytes{0}, g_cupti_snap_ns{0};   // this drain's copies (CHARM_LB_CUPTI_TIME)
+static void hapiCuptiLaneRefresh(const CuptiEntryLane& ln, CuptiLaneCopy& cp) {
+  const bool timeIt = hapiCuptiTimeIt();
+  const uint64_t t0 = timeIt ? hapiClockNs(CLOCK_MONOTONIC) : 0;
+  const uint64_t abs_begin = ln.pruned;
+  size_t copied = 0;
+  if (cp.gen != ln.gen || abs_begin < cp.base) {   // compacted (or a new lane): rebuild
+    cp.spans.assign(ln.spans.begin(), ln.spans.end());
+    cp.base = abs_begin;
+    cp.gen = ln.gen;
+    copied = cp.spans.size();
+  } else {
+    const uint64_t drop = abs_begin - cp.base;
+    if (drop >= cp.spans.size()) cp.spans.clear();
+    else if (drop > 0) cp.spans.erase(cp.spans.begin(), cp.spans.begin() + drop);
+    cp.base = abs_begin;
+    // Only a span that was open at the last copy can have changed since (its end stamp); closed
+    // spans never change, so the rest of the copy stands and only the new spans are appended.
+    for (uint32_t oi : cp.open_at_copy) {
+      if (oi < drop) continue;
+      const size_t li = oi - drop;
+      if (li < cp.spans.size() && li < ln.spans.size()) cp.spans[li].end = ln.spans[li].end;
+    }
+    const size_t have = cp.spans.size();
+    if (have < ln.spans.size()) {
+      cp.spans.insert(cp.spans.end(), ln.spans.begin() + have, ln.spans.end());
+      copied = ln.spans.size() - have;
+    } else if (have > ln.spans.size()) {
+      cp.spans.resize(ln.spans.size());
+    }
+  }
+  cp.open_at_copy.assign(ln.open.begin(), ln.open.end());
+  if (timeIt) {
+    g_cupti_snap_bytes.fetch_add(copied * sizeof(CuptiEntrySpan), std::memory_order_relaxed);
+    g_cupti_snap_ns.fetch_add(hapiClockNs(CLOCK_MONOTONIC) - t0, std::memory_order_relaxed);
+  }
+}
+// Reader, on a copy of one lane: the innermost span containing time t, or NULL when t is before the
+// first span or inside a closed nested span whose ancestors are gone. `cursor` is the caller's last
+// hit for this lane: a thread's records arrive in time order, so the next span is usually the same
+// one or a few ahead, and the binary search is the fallback.
+static const CuptiEntrySpan* hapiCuptiSpanAt(const std::vector<CuptiEntrySpan>& snap, uint64_t t, size_t& cursor) {
+  if (snap.empty() || t < snap.front().start) return nullptr;
+  size_t lo = cursor < snap.size() ? cursor : 0;
+  if (snap[lo].start <= t) {
+    int steps = 0;
+    while (lo + 1 < snap.size() && snap[lo + 1].start <= t && ++steps < 64) lo++;
+    if (lo + 1 < snap.size() && snap[lo + 1].start <= t) lo = 0;   // far ahead: search
+  } else {
+    lo = 0;
+  }
+  if (lo == 0) {
+    size_t hi = snap.size();   // the last span with start <= t
+    while (hi - lo > 1) {
+      const size_t mid = (lo + hi) / 2;
+      if (snap[mid].start <= t) lo = mid; else hi = mid;
+    }
+  }
+  cursor = lo;
+  for (;;) {
+    const CuptiEntrySpan& sp = snap[lo];
+    if (sp.end == 0 || sp.end >= t) return &sp;
+    if (sp.parent_delta == 0 || sp.parent_delta > lo) return nullptr;   // closed before t: only an ancestor can hold it
+    lo -= sp.parent_delta;
+  }
+}
+struct CuptiGateShared {
+  CuptiGateShared() { if (t_cupti_gate_depth++ == 0) pthread_rwlock_rdlock(&g_cupti_flush_gates[t_cupti_gate_dev]); }
+  ~CuptiGateShared() { if (--t_cupti_gate_depth == 0) pthread_rwlock_unlock(&g_cupti_flush_gates[t_cupti_gate_dev]); }
+};
+static int hapiCuptiGateCount() {
+  const int n = CsvAccess(gpu_manager).device_count;
+  return n < 1 ? 1 : (n > HAPI_CUPTI_MAX_GATES ? HAPI_CUPTI_MAX_GATES : n);
+}
 void hapiCuptiFlushGated(uint32_t flag) {
   if (t_cupti_gate_depth > 0) CmiAbort("hapiCuptiFlushGated: called from inside a gated launch");
-  pthread_rwlock_wrlock(&g_cupti_flush_gate);
+  const bool timeIt = hapiCuptiTimeIt();
+  // The gate exists for the FORCED flush, which takes every thread's open buffer from under its launch intercept
+  // (the +LBAsync segfault, job 22809309). The non-forced flush returns only buffers whose records are complete --
+  // what CUPTI's own worker thread does concurrently with launches by design -- and takes no gate: its call still
+  // waits for the device queues to drain (13.7 ms in a four-GPU process, soft14 arm of job 22953167), but on the
+  // helper thread with the PEs launching through it, that wait stalls nobody.
+  const bool gate = (flag & CUPTI_ACTIVITY_FLAG_FLUSH_FORCED) != 0;
+  const int n = gate ? hapiCuptiGateCount() : 0;
+  const double t0 = timeIt ? CmiWallTimer() : 0.0;
+  for (int d = 0; d < n; d++) pthread_rwlock_wrlock(&g_cupti_flush_gates[d]);
+  const double t1 = timeIt ? CmiWallTimer() : 0.0;
+  if (timeIt) {
+    std::lock_guard<std::mutex> lk(CsvAccess(gpu_manager).cupti_queue_lock_);
+    g_cupti_flush_counting = true; g_cupti_flush_cbs = 0; g_cupti_flush_cb_bytes = 0;
+  }
   const CUptiResult r = cuptiActivityFlushAll(flag);
-  pthread_rwlock_unlock(&g_cupti_flush_gate);
+  if (timeIt) {
+    const double t2 = CmiWallTimer();
+    std::lock_guard<std::mutex> lk(CsvAccess(gpu_manager).cupti_queue_lock_);
+    g_cupti_flush_counting = false;
+    g_cupti_flush_prof.gate_s = t1 - t0; g_cupti_flush_prof.call_s = t2 - t1;
+    g_cupti_flush_prof.cbs = g_cupti_flush_cbs; g_cupti_flush_prof.cb_bytes = g_cupti_flush_cb_bytes;
+  }
+  for (int d = n - 1; d >= 0; d--) pthread_rwlock_unlock(&g_cupti_flush_gates[d]);
   CUPTI_SAFE_CALL(r);
-}
-
-// CHARM_LB_CUPTI_SOFT_FLUSH=1: the non-forced flush at the LB window close (see hapiPrepareCuptiLoads); the default
-// is the forced flush with retired buffers quarantined (hapiCuptiRetireBuffer).
-static bool hapiCuptiForcedFlush() {
-  static const bool soft = (getenv("CHARM_LB_CUPTI_SOFT_FLUSH") != nullptr);
-  return !soft;
 }
 
 // Buffers CUPTI handed back are not freed at the drain that parsed them. The forced flush returns buffers that still
@@ -527,17 +851,41 @@ static bool hapiCuptiForcedFlush() {
 // +LBAsync segfault in CUPTI's launch intercept, job 22808905 backtraces; silent heap corruption when glibc kept the
 // chunk mapped). A retired buffer is kept for two more drains (hundreds of ms at any LB period; the late writes
 // come within the kernel's completion), then freed. Only the drain touches this (cupti_prepare_lock_).
-struct RetiredCuptiBuffer { uint8_t* buffer; uint64_t drain; };
+struct RetiredCuptiBuffer { uint8_t* buffer; size_t size; uint64_t drain; };
 static std::deque<RetiredCuptiBuffer> g_cupti_retired;
 static uint64_t g_cupti_drain = 0;
-static void hapiCuptiRetireBuffer(uint8_t* buffer) {
-  if (buffer != nullptr) g_cupti_retired.push_back({buffer, g_cupti_drain});
+// Out of quarantine, a buffer goes back to CUPTI through cuptiBufferRequested rather than to
+// free(): a 5 MB buffer is above glibc's mmap threshold, so free() unmapped it and the next
+// request mapped a fresh one that CUPTI then page-faulted in record by record, during the steps
+// after every window close. In one process driving four devices those faults are 16 PE threads'
+// worth on one address space, and the steps after each close ran ~4 ms slower for a block
+// (job 22846356). A reused buffer is already mapped and touched.
+static std::mutex g_cupti_free_lock;
+static std::vector<std::pair<uint8_t*, size_t>> g_cupti_free;
+static void hapiCuptiRetireBuffer(uint8_t* buffer, size_t size) {
+  if (buffer != nullptr) g_cupti_retired.push_back({buffer, size, g_cupti_drain});
 }
+// Buffers leave quarantine ZEROED: CUPTI_ACTIVITY_ATTR_ZEROED_OUT_ACTIVITY_BUFFER is set (hapiAttach), so CUPTI
+// takes every buffer cuptiBufferRequested hands it as already zero and skips its own memset -- which it did "in the
+// main thread", i.e. inside the gated flush call: 0.3 ms per 1 MB buffer, 5 ms of the (1,4,4) close's 16 ms flush
+// (job 22953167 arrivals: one buffer every 0.3 ms, 0.04 ms at 64 KB). The memset runs here instead, on the drain's
+// thread (the LB helper), outside g_cupti_free_lock so a PE whose buffer fills mid-window does not wait on it.
 static void hapiCuptiFreeRetired(uint64_t keep_drains) {
-  while (!g_cupti_retired.empty() && g_cupti_retired.front().drain + keep_drains <= g_cupti_drain) {
-    free(g_cupti_retired.front().buffer);
-    g_cupti_retired.pop_front();
+  std::vector<std::pair<uint8_t*, size_t>> out;
+  {
+    std::lock_guard<std::mutex> lk(g_cupti_free_lock);
+    // Never free()d while the run lasts: a buffer CUPTI once held may still be written by it (the forced flush's
+    // incomplete records; the 2026-10-12 "free(): corrupted unsorted chunks" with a timed quarantine), and the
+    // working set is bounded by what CUPTI asked for (~3 buffers per thread), so the free list just keeps them.
+    while (!g_cupti_retired.empty() && g_cupti_retired.front().drain + keep_drains <= g_cupti_drain) {
+      out.emplace_back(g_cupti_retired.front().buffer, g_cupti_retired.front().size);
+      g_cupti_retired.pop_front();
+    }
   }
+  if (out.empty()) return;
+  for (auto& b : out) memset(b.first, 0, b.second);
+  std::lock_guard<std::mutex> lk(g_cupti_free_lock);
+  for (auto& b : out) g_cupti_free.push_back(b);
 }
 
 static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords) {
@@ -547,21 +895,34 @@ static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t
   // later, so the fault surfaces inside cuptiActivityGetNextRecord with nothing
   // left to say where it came from. Step down to a smaller buffer before giving
   // up, and if even that fails, say so here.
-  // CHARM_LB_CUPTI_BUFKB=<kb>: a smaller first buffer. A buffer is delivered
-  // when it fills (or at a flush); with the 5 MB default the last, open buffer
-  // of a window holds up to ~10% of its records, which is what the non-forced
-  // flush (CHARM_LB_CUPTI_SOFT_FLUSH) leaves behind -- at 256 KB that is a
-  // fraction of a percent, so a soft flush can replace the forced one and its
-  // device drain at the LB window close (see hapiPrepareCuptiLoads).
-  // Soft-flush mode: a buffer that holds any incomplete record is withheld until a later close, so the buffer must
-  // be small or the window's tail is missing (256 KB = up to 4 steps of a 10-step sph3d window: every process's load
-  // jumped by a random fraction each window and MetisLB re-mapped at all 80 events, 46.2 vs 40.5 ms/step).
+  // CHARM_LB_CUPTI_BUFKB=<kb>: the buffer size. CUPTI keeps one activity buffer per thread
+  // (CUPTI_ACTIVITY_ATTR_PER_THREAD_ACTIVITY_BUFFER defaults to 1) and the forced flush at the window close
+  // hands back every thread's buffer, full or not, each replaced by a fresh one that CUPTI zeroes before
+  // writing: at the 5 MB default of 2026-10-12 that was 80 MB of buffers per flush in a 16-PE process. A PE
+  // writes ~0.6 MB of records per 25-step sph3d window; a buffer that fills is delivered early and parsed at
+  // the next close, so 1 MB (the default since 2026-10-13) loses nothing. The non-forced flush is not an option:
+  // it withholds every buffer with an incomplete record, so the window's tail went missing (256 KB = up to 4 steps
+  // of a 10-step sph3d window: every process's load jumped by a random fraction each window and MetisLB re-mapped
+  // at all 80 events, 46.2 vs 40.5 ms/step) and at 16 KB the flush itself took 71 ms per drain.
+  // Non-forced flush (HAPI_CUPTI_FLUSH_FORCED 0): the open buffer per thread is the window's unreported tail, so
+  // 64 KB (~3 sph3d steps of a 25-step window; the coverage scale of hapiNormalizeCuptiLoads extrapolates it).
   static const size_t first = getenv("CHARM_LB_CUPTI_BUFKB") ? (size_t)atoi(getenv("CHARM_LB_CUPTI_BUFKB")) * 1024
-                              : (hapiCuptiForcedFlush() ? 5*1024*1024 : 16*1024);
+                              : (HAPI_CUPTI_FLUSH_FORCED ? 1024*1024 : 64*1024);
+  {
+    std::lock_guard<std::mutex> lk(g_cupti_free_lock);
+    if (!g_cupti_free.empty()) {
+      *buffer = g_cupti_free.back().first;
+      *size = g_cupti_free.back().second;
+      *maxNumRecords = 0;
+      g_cupti_free.pop_back();
+      return;
+    }
+  }
   const size_t sizes[] = {first, 1024*1024, 256*1024};
   for (size_t s : sizes) {
     *buffer = (uint8_t *)malloc(s);
     if (*buffer != NULL) {
+      memset(*buffer, 0, s);   // fault the pages in here, once, not under CUPTI's record writes
       *size = s;
       *maxNumRecords = 0;
       return;
@@ -576,7 +937,8 @@ static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t streamId,
   GPUManager& gm = CsvAccess(gpu_manager);
 
   std::lock_guard<std::mutex> lk(gm.cupti_queue_lock_);
-  gm.cupti_buffer_queue_.push({buffer, validSize});
+  gm.cupti_buffer_queue_.push({buffer, validSize, size, (void*)ctx});
+  if (g_cupti_flush_counting) { g_cupti_flush_cbs++; g_cupti_flush_cb_bytes += validSize; }
 }
 
 // Populate DeviceManager with device attributes needed to compute per-kernel
@@ -767,8 +1129,11 @@ void hapiTraceStart(const char* dir) {
 
 void hapiTraceStop() {
   if (g_trace == nullptr) return;
-  if (hapiCuptiTracingActive()) hapiCuptiFlushGated(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
-  hapiProcessCuptiBuffers();   // the records queued since the last LB step
+  if (hapiCuptiTracingActive()) hapiCuptiFlushGated(HAPI_CUPTI_FLUSH_FORCED ? CUPTI_ACTIVITY_FLAG_FLUSH_FORCED : 0);
+  {   // the records queued since the last LB step; the drain thread may be in the parse
+    std::lock_guard<std::mutex> lk(CsvAccess(gpu_manager).cupti_prepare_lock_);
+    hapiProcessCuptiBuffers();
+  }
   std::lock_guard<std::mutex> lk(g_trace_lock);
   fclose(g_trace);
   g_trace = nullptr;
@@ -810,24 +1175,49 @@ void hapiCuptiStartTracing() {
               gm.cupti_tracing_users_, (int)gm.cupti_tracing_active_.load(), (int)gm.cupti_initialized_);
   if (gm.cupti_tracing_active_.load(std::memory_order_relaxed)) return;
 
+  const double tAttach = hapiCuptiTimeIt() ? CmiWallTimer() : 0.0;
   if (!gm.cupti_initialized_) {
     cudaDeviceSynchronize();
     CUPTI_SAFE_CALL(
         cuptiActivityRegisterCallbacks(cuptiBufferRequested, cuptiBufferCompleted));
+    // API records name their thread by the OS id (gettid), the id the mapping recorded per PE.
+    CUPTI_SAFE_CALL(cuptiSetThreadIdType(CUPTI_ACTIVITY_THREAD_ID_TYPE_SYSTEM));
     gm.cupti_initialized_ = true;
   }
 
-  // RUNTIME must stay enabled alongside the kernel records even though nothing
-  // consumes its records directly: EXTERNAL_CORRELATION records are only
-  // emitted for correlation IDs generated by runtime-API tracking, so without
-  // it every kernel arrives unattributed and the balancer sees zero GPU load.
+  // RUNTIME records carry the launch's thread id and correlation id: the window
+  // close joins them to the entry-span log (CuptiEntryLog) and the kernel record
+  // with the same correlation id gets the object. Without them every kernel
+  // arrives unattributed and the balancer sees zero GPU load. (The
+  // EXTERNAL_CORRELATION kind and its per-entry push/pop are gone, see the log.)
+  {   // our buffers arrive zeroed (fresh: memset in cuptiBufferRequested; recycled: hapiCuptiFreeRetired), so CUPTI
+      // must not zero them again inside the flush call (cupti_activity.h: "a few stalls may appear in critical path
+      // because CUPTI will zero out the buffer in the main thread"; measured 0.3 ms per 1 MB buffer, job 22953167).
+    static bool zeroed_set = false;
+    if (!zeroed_set) {
+      zeroed_set = true;
+      uint8_t zeroed = 1;
+      size_t sz = sizeof(zeroed);
+      CUPTI_SAFE_CALL(cuptiActivitySetAttribute(CUPTI_ACTIVITY_ATTR_ZEROED_OUT_ACTIVITY_BUFFER, &sz, &zeroed));
+    }
+  }
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL));
   CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_RUNTIME));
-  CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION));
-  if (const char* per = getenv("CHARM_LB_CUPTI_PERIODIC")) {   // see hapiPrepareCuptiLoads
-    const int ms = atoi(per) > 0 ? atoi(per) : 10;
-    CUPTI_SAFE_CALL(cuptiActivityFlushPeriod((uint32_t)ms));
-    if (CmiMyPe() == 0) CmiPrintf("HAPI> CUPTI buffers delivered every %d ms; no forced flush at the LB window close\n", ms);
+  // CUPTI's worker thread reads the device-side profiling buffers (the kernel timestamps) back to the host and
+  // delivers full activity buffers on its own heuristics; cuptiActivityFlushPeriod(ms) fixes its period.
+  // CHARM_LB_CUPTI_PERIODIC=<ms> sets one (0 / unset = the heuristics). A 10 ms period was tried as the cure for the
+  // forced flush call at the window close and changed nothing (15.9 vs 14.4 ms, job 22953167): that call is the GPU
+  // queue drain plus the buffer zeroing (see hapiCuptiFreeRetired), not deferred readback work.
+  {
+    static bool period_set = false;
+    if (!period_set) {
+      period_set = true;
+      const char* per = getenv("CHARM_LB_CUPTI_PERIODIC");
+      const int ms = per ? atoi(per) : 0;
+      if (ms > 0) CUPTI_SAFE_CALL(cuptiActivityFlushPeriod((uint32_t)ms));
+      if (CmiMyPe() == 0 && hapiCuptiTimeIt())
+        CmiPrintf("HAPI> CUPTI worker flush period %d ms%s\n", ms, ms > 0 ? "" : " (CUPTI heuristics)");
+    }
   }
   // Opt-in: what share of device time is runtime copies rather than object
   // kernels. Off by default so the record volume of a normal run is unchanged.
@@ -850,7 +1240,11 @@ void hapiCuptiStartTracing() {
   for (CUpti_CallbackId cbid : no_record)
     CUPTI_SAFE_CALL(cuptiActivityEnableRuntimeApi(cbid, 0));
 
+  hapiCuptiCalibrateSpanClock(g_cupti_span_clock.load(std::memory_order_relaxed) == -1 && g_cupti_span_offset.load() == 0);
   gm.cupti_tracing_active_.store(true, std::memory_order_relaxed);
+  if (tAttach != 0.0)
+    CmiPrintf("[LBCUPTI pe=%d] attach %.3fs (device sync, register, enable; %d device(s) in this process)\n",
+              CmiMyPe(), CmiWallTimer() - tAttach, gm.device_count);
 }
 
 void hapiCuptiStopTracing() {
@@ -1180,56 +1574,271 @@ static int computeKernelSMs(const DeviceManager& dm,
   return sms_used;
 }
 
-void hapiProcessCuptiBuffers() {
-  GPUManager& gm = CsvAccess(gpu_manager);
-  hapiPopulateDeviceProps(gm);  // lazy: device_managers is ready by now
+// A kernel record can be parsed before the correlation records that name it:
+// correlation and kernel records are queued at different points in the
+// launch's life and land in buffers that complete independently. Only those
+// kernels are parked for a second pass; one whose correlations are already
+// known is filed immediately, so the common case never holds two copies of
+// every record. The launch signature rides along with a parked kernel because
+// it is needed to rebucket if a work tag turns up, but it is deliberately not
+// stored in LBKernelRecord: there is one of those per launch.
+struct CuptiPendingKernel {
+  uint32_t           correlation_id;
+  GpuLaunchSignature launch;
+  LBKernelRecord     rec;
+  bool               carried;           // parked at the previous drain already
+};
+struct CuptiPendingApi { uint32_t correlation_id; double seconds; };
+struct CuptiResolvedToken { LDObjKey key{}; bool valid = false; };
+struct CuptiCbidUse { uint64_t count = 0; double seconds = 0.0; bool poll = false; bool known = false; };
 
-  const bool scaling = _lb_args.gpuScaling();
-
-  // A kernel record can be parsed before the correlation records that name it:
-  // correlation and kernel records are queued at different points in the
-  // launch's life and land in buffers that complete independently. Only those
-  // kernels are parked for a second pass; one whose correlations are already
-  // known is filed immediately, so the common case never holds two copies of
-  // every record. The launch signature rides along with a parked kernel because
-  // it is needed to rebucket if a work tag turns up, but it is deliberately not
-  // stored in LBKernelRecord: there is one of those per launch.
-  struct PendingKernel {
-    uint32_t           correlation_id;
-    GpuLaunchSignature launch;
-    LBKernelRecord     rec;
-    bool               carried;           // parked at the previous drain already
-  };
-  // Carried over from the previous drain: with the default (non-forced) flush a buffer that holds any incomplete
-  // record stays with CUPTI until a later close, so a kernel record and the correlation record that names it can
-  // be delivered one drain apart, in either order. A kernel without its correlation is parked once more, and the
-  // previous drain's correlation maps live for one more drain. Only this function touches these (under
-  // cupti_prepare_lock_).
-  static std::vector<PendingKernel> carried;
-  static std::unordered_map<uint32_t, uint64_t> prev_object_corr, prev_work_tag_corr;
-  g_cupti_drain++;
-  hapiCuptiFreeRetired(2);
-  std::vector<PendingKernel> pending = std::move(carried);
-  carried.clear();
-  for (PendingKernel& p : pending) p.carried = true;
-  pending.reserve(pending.size() + gm.cupti_pending_hint_);
-  auto findObjectCorr = [&](uint32_t id) -> const uint64_t* {
-    auto it = gm.cupti_object_correlation_db_.find(id);
-    if (it != gm.cupti_object_correlation_db_.end()) return &it->second;
-    auto pv = prev_object_corr.find(id);
-    return pv != prev_object_corr.end() ? &pv->second : nullptr;
-  };
-
-  // Runtime API records: the host time each call took, per object where the
-  // correlation names one. Like kernels, a record can precede its correlation
-  // and is parked for the second pass. A new drain is a new round.
-  gm.cupti_obj_api_raw_.clear();
-  gm.cupti_api_total_ = 0.0;
-  struct PendingApi { uint32_t correlation_id; double seconds; };
-  std::vector<PendingApi> pendingApi;
+// The parse state of ONE shard. CUPTI delivers its buffers with no context (the ctx argument of
+// the completion callback is null), so the buffers of a drain are dealt round-robin over as many
+// shards as the process has devices, and each shard's buffers are parsed on their own thread
+// (pass 1). A kernel or API record and the correlation record that names it can then sit in
+// different shards, so whatever pass 1 could not resolve from its own shard is resolved in a
+// serial pass 2 that looks across every shard. One process driving four devices parsed four
+// devices' records on one thread at every window close (16 ms against 4, job 22821909).
+//
+// Carried over from the previous drain: a kernel record and its correlation can also be
+// delivered one drain apart, in either order. A kernel without its correlation is parked once
+// more, and the previous drain's correlation maps live for one more drain.
+struct CuptiParseShard {
+  std::unordered_map<uint32_t, uint64_t> object_corr, work_tag_corr;             // this drain
+  std::unordered_map<uint32_t, uint32_t> thread_corr;   // correlation -> launching thread (the API record's), this drain
+  std::unordered_map<uint32_t, uint64_t> cover_end;     // thread -> last API record end seen in this shard's buffers
+  std::unordered_map<LDObjKey, uint32_t, LDObjKeyHash> obj_thread;   // object -> thread that launched its kernels
+  std::unordered_map<uint32_t, uint64_t> prev_object_corr, prev_work_tag_corr;   // the one before
+  std::vector<CuptiPendingKernel> carried;
+  uint32_t pending_hint = 0;
+  // Knowledge shared by every shard: seeded from the GPUManager at the start of a drain, unioned
+  // back at the merge.
+  std::unordered_set<uint64_t> tagged_classes, untagged_classes;
+  // One drain's results, moved into the GPUManager at the merge.
+  std::unordered_map<LDObjKey, std::vector<LBKernelRecord>, LDObjKeyHash> obj_kernel_records;
+  std::vector<LBKernelRecord> unattributed_kernels;
+  std::unordered_map<uint64_t, std::string> kernel_names;
+  std::unordered_map<LDObjKey, double, LDObjKeyHash> obj_api_raw;
+  double api_total = 0.0;
+  std::unordered_map<int, double> api_total_dev;
+  std::vector<GPUManager::ApiInterval> api_intervals;
+  std::vector<std::pair<uint8_t*, size_t>> retired;   // buffers parsed, to quarantine (the caller holds the lock)
+  // Between pass 1 and pass 2 of one drain.
+  std::vector<CuptiPendingKernel> pending;
+  std::vector<CuptiPendingApi> pendingApi;
   std::unordered_map<uint64_t, double> apiByToken;
+  std::unordered_map<uint64_t, CuptiResolvedToken> resolved_tokens;
+  std::vector<CuptiCbidUse> byCbid;
   double api_unattributed_s = 0.0;
-  uint32_t api_count = 0;
+  uint32_t api_count = 0, kernel_count = 0, object_corr_count = 0, work_tag_count = 0,
+           invalid_duration_count = 0, hash_collision_count = 0, attributed = 0, unattributed = 0,
+           unresolved_token = 0, deferred = 0, lost_work_tags = 0;
+};
+static std::vector<CuptiParseShard> g_cupti_shards;   // under cupti_prepare_lock_
+// The drains' copies of the entry-span logs (CuptiEntryLog), by OS thread id, kept between drains
+// and refreshed incrementally (hapiCuptiLaneRefresh); std::map keeps the entries where they are
+// while shards hold pointers.
+struct CuptiLaneSnap { CuptiLaneCopy obj, tag; bool taken = false; };
+struct CuptiLaneCursor { const CuptiLaneSnap* sn = nullptr; size_t obj = 0, tag = 0; };   // one shard's position in a thread's copy
+static std::map<uint32_t, CuptiLaneSnap> g_cupti_snaps;
+static std::mutex g_cupti_snaps_lock;
+
+// Persistent parse workers: a thread that has called into CUPTI keeps per-thread tracing state
+// (a fresh thread per LB step cost leanmd 115 -> 132 ms a step over four steps), so the same
+// threads serve every close. Worker i parses shard i+1; shard 0 is parsed by the caller.
+struct CuptiParseWorker {
+  std::mutex m;
+  std::condition_variable cv;
+  std::function<void()> job;
+  bool has_job = false;
+  std::thread thread;
+};
+static std::vector<CuptiParseWorker*> g_cupti_workers;   // under cupti_prepare_lock_; never destroyed
+static std::mutex g_cupti_workers_done_m;
+static std::condition_variable g_cupti_workers_done_cv;
+static int g_cupti_workers_pending = 0;
+static void hapiCuptiWorkerRun(size_t i, std::function<void()> job) {
+  while (g_cupti_workers.size() <= i) {
+    CuptiParseWorker* w = new CuptiParseWorker;
+    w->thread = std::thread([w]() {
+      for (;;) {
+        std::function<void()> j;
+        {
+          std::unique_lock<std::mutex> lk(w->m);
+          w->cv.wait(lk, [w] { return w->has_job; });
+          j = std::move(w->job);
+          w->has_job = false;
+        }
+        j();
+        {
+          std::lock_guard<std::mutex> lk(g_cupti_workers_done_m);
+          g_cupti_workers_pending--;
+        }
+        g_cupti_workers_done_cv.notify_all();
+      }
+    });
+    w->thread.detach();
+    g_cupti_workers.push_back(w);
+  }
+  CuptiParseWorker* w = g_cupti_workers[i];
+  {
+    std::lock_guard<std::mutex> lk(g_cupti_workers_done_m);
+    g_cupti_workers_pending++;
+  }
+  {
+    std::lock_guard<std::mutex> lk(w->m);
+    w->job = std::move(job);
+    w->has_job = true;
+  }
+  w->cv.notify_one();
+}
+static void hapiCuptiWorkersWait() {
+  std::unique_lock<std::mutex> lk(g_cupti_workers_done_m);
+  g_cupti_workers_done_cv.wait(lk, [] { return g_cupti_workers_pending == 0; });
+}
+
+// The object correlation for `id`, in this shard (this drain, then the previous one), then, when
+// `all` is given (pass 2), in every other shard.
+static const uint64_t* cuptiFindObjectCorr(CuptiParseShard& sh, uint32_t id, std::vector<CuptiParseShard>* all) {
+  auto it = sh.object_corr.find(id);
+  if (it != sh.object_corr.end()) return &it->second;
+  auto pv = sh.prev_object_corr.find(id);
+  if (pv != sh.prev_object_corr.end()) return &pv->second;
+  if (all != nullptr)
+    for (CuptiParseShard& o : *all) {
+      if (&o == &sh) continue;
+      auto i2 = o.object_corr.find(id);
+      if (i2 != o.object_corr.end()) return &i2->second;
+      auto p2 = o.prev_object_corr.find(id);
+      if (p2 != o.prev_object_corr.end()) return &p2->second;
+    }
+  return nullptr;
+}
+
+static uint32_t cuptiThreadOfCorr(CuptiParseShard& sh, uint32_t corr, std::vector<CuptiParseShard>* all) {
+  auto it = sh.thread_corr.find(corr);
+  if (it != sh.thread_corr.end()) return it->second;
+  if (all != nullptr)
+    for (CuptiParseShard& o : *all) {
+      auto j = o.thread_corr.find(corr);
+      if (j != o.thread_corr.end()) return j->second;
+    }
+  return 0;
+}
+
+static void cuptiFileKernel(GPUManager& gm, CuptiParseShard& sh, const LBKernelRecord& rec, uint64_t object_token,
+                            uint32_t launch_thread) {
+  if (object_token == HAPI_CUPTI_NO_OBJECT) {
+    sh.unattributed_kernels.push_back(rec);
+    sh.unattributed++;
+    return;
+  }
+  // Resolve each distinct token once rather than once per kernel record. A
+  // round holds far more kernels than objects, and this lock is the same one
+  // every entry method needs, so taking it per record would both dominate the
+  // drain and stall PEs that are still running.
+  auto memo = sh.resolved_tokens.find(object_token);
+  if (memo == sh.resolved_tokens.end()) {
+    CuptiResolvedToken entry;
+    {
+      std::lock_guard<std::mutex> token_lock(gm.cupti_object_token_lock_);
+      entry.valid = gm.cupti_object_tokens_.resolve(object_token, entry.key);
+    }
+    memo = sh.resolved_tokens.emplace(object_token, entry).first;
+  }
+  if (!memo->second.valid) {
+    sh.unattributed_kernels.push_back(rec);
+    sh.unattributed++;
+    sh.unresolved_token++;
+    return;
+  }
+  sh.obj_kernel_records[memo->second.key].push_back(rec);
+  if (launch_thread != 0) sh.obj_thread[memo->second.key] = launch_thread;
+  sh.attributed++;
+}
+
+// Applies the work tag for this launch, if one has been parsed. Returns false
+// when the tag may still be in an unparsed buffer, in which case the bucket
+// is not settled and the kernel must be parked until the whole drain is done.
+// With `all` (pass 2) the tag is also looked for in the other shards.
+static bool cuptiApplyWorkTag(CuptiParseShard& sh, std::vector<CuptiParseShard>* all, uint32_t correlation_id,
+                              const GpuLaunchSignature& launch, LBKernelRecord& rec, bool last_chance) {
+  // Already resolved during the parse loop. Without this the second pass
+  // would look the tag up again, fail to find the entry it consumed itself,
+  // and condemn a correctly tagged kernel as unmodelable.
+  if (rec.has_explicit_work_tag) return true;
+
+  auto take = [&](std::unordered_map<uint32_t, uint64_t>& m) {
+    auto it = m.find(correlation_id);
+    if (it == m.end()) return false;
+    rec.has_explicit_work_tag = true;
+    rec.kernel_key.workBucket = gpuStableWorkBucket(launch, true, it->second);
+    sh.tagged_classes.insert(rec.kernel_key.kernelClass);
+    m.erase(it);
+    return true;
+  };
+  if (take(sh.work_tag_corr) || take(sh.prev_work_tag_corr)) return true;
+  if (all != nullptr)
+    for (CuptiParseShard& o : *all)
+      if (&o != &sh && (take(o.work_tag_corr) || take(o.prev_work_tag_corr))) return true;
+
+  // No tag found yet. Whether that is final depends on what is known about
+  // this kernel class, because a tag record can be in a buffer this drain has
+  // not parsed. Deciding per class rather than per application matters: an
+  // application that tags one kernel usually leaves its others untagged, and
+  // parking all of them would give back the fast path this drain exists to
+  // preserve.
+  const uint64_t kernelClass = rec.kernel_key.kernelClass;
+  if (!last_chance) {
+    // Confirmed untagged by a previous full drain: nothing to wait for.
+    if (sh.untagged_classes.count(kernelClass) != 0) return true;
+    // Either known-tagged (so this is a missing tag, or one still unparsed)
+    // or never seen before (so its first instance must not be committed to
+    // the untagged bucket on incomplete information). Both need the full
+    // drain first.
+    return false;
+  }
+
+  // Every buffer has been parsed, so the absence is real. A legitimately
+  // untagged class keeps the automatic launch-signature bucket and is
+  // remembered so its later instances stay on the fast path.
+  if (sh.tagged_classes.count(kernelClass) == 0) {
+    sh.untagged_classes.insert(kernelClass);
+    return true;
+  }
+
+  // The class has been seen tagged, so the tag went missing. The automatic
+  // bucket is guaranteed by the hasExplicitTag discriminator to be a
+  // different key from the one its tagged siblings use, and filing it there
+  // would blend unrelated work sizes into a bucket the estimator treats as
+  // one comparable population. Mark it unmodelable instead.
+  rec.unmodelable = true;
+  sh.lost_work_tags++;
+  return true;
+}
+
+// Pass 1, one shard, its own thread: every record of its buffers, resolved against this shard
+// alone; what needs another shard waits in sh.pending / sh.pendingApi for pass 2.
+static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::vector<CuptiBufferItem>& items,
+                                     const std::unordered_map<uint32_t, int>& devByThread, bool scaling) {
+  sh.pending = std::move(sh.carried);
+  sh.carried.clear();
+  for (CuptiPendingKernel& p : sh.pending) p.carried = true;
+  sh.pending.reserve(sh.pending.size() + sh.pending_hint);
+  sh.pendingApi.clear();
+  sh.apiByToken.clear();
+  sh.resolved_tokens.clear();
+  sh.thread_corr.clear();
+  sh.cover_end.clear();
+  sh.byCbid.assign(CUPTI_RUNTIME_TRACE_CBID_SIZE + 1, CuptiCbidUse());
+  sh.api_unattributed_s = 0.0;
+  sh.api_count = sh.kernel_count = sh.object_corr_count = sh.work_tag_count = 0;
+  sh.invalid_duration_count = sh.hash_collision_count = sh.attributed = sh.unattributed = 0;
+  sh.unresolved_token = sh.deferred = sh.lost_work_tags = 0;
+  auto devOfThread = [&](uint32_t tid) -> int {
+    auto it = devByThread.find(tid);
+    return it != devByThread.end() ? it->second : -1;
+  };
   // Most runtime records are the scheduler polling an event between entry
   // methods -- millions per window on a GPU-bound step, at a microsecond
   // each. They never belong to an object, so they skip the correlation
@@ -1243,138 +1852,49 @@ void hapiProcessCuptiBuffers() {
   // hash lookup per record is seconds. Callback ids are small integers, and
   // records arrive in long runs from one thread, so a one-entry thread cache
   // almost always hits.
-  struct CbidUse { uint64_t count = 0; double seconds = 0.0; bool poll = false; bool known = false; };
-  std::vector<CbidUse> byCbid(CUPTI_RUNTIME_TRACE_CBID_SIZE + 1);
   struct LastInterval { size_t idx = SIZE_MAX; uint64_t start = 0; };  // SIZE_MAX: none yet
   std::unordered_map<uint32_t, LastInterval> lastByThread;
+  // The entry-span logs of the threads whose API records this drain reads, each copied once per
+  // close under its owner's mutex (the owner keeps appending while we parse; every record here was
+  // made before the flush, so its span is already in the copy, open or closed). The copies are
+  // shared by the shards (g_cupti_snaps, node-stable); this shard caches the pointers it uses.
+  std::map<uint32_t, CuptiLaneCursor> mySnaps;   // node-stable: curSnap points into it
+  uint32_t curTid = 0;
+  CuptiLaneCursor* curSnap = nullptr;
+  auto snapOf = [&](uint32_t tid) -> CuptiLaneCursor& {
+    if (curSnap != nullptr && curTid == tid) return *curSnap;
+    CuptiLaneCursor& cur = mySnaps[tid];
+    curTid = tid;
+    curSnap = &cur;
+    if (cur.sn != nullptr) return cur;
+    std::lock_guard<std::mutex> sg(g_cupti_snaps_lock);
+    CuptiLaneSnap& sn = g_cupti_snaps[tid];
+    if (!sn.taken) {
+      sn.taken = true;
+      CuptiEntryLog* L = nullptr;
+      {
+        std::lock_guard<std::mutex> g(g_cupti_entry_logs_lock);
+        auto it = g_cupti_entry_logs.find(tid);
+        if (it != g_cupti_entry_logs.end()) L = it->second;
+      }
+      if (L != nullptr) {
+        std::lock_guard<std::mutex> g(L->m);
+        hapiCuptiLaneRefresh(L->obj, sn.obj);
+        if (scaling) hapiCuptiLaneRefresh(L->tag, sn.tag);
+      }
+    }
+    cur.sn = &sn;
+    return cur;
+  };
   uint32_t cachedThread = 0;
   LastInterval* cachedLast = nullptr;
   const uint64_t kCoalesceNs = 2000;
 
-  uint32_t kernel_count = 0;
-  uint32_t object_corr_count = 0;
-  uint32_t work_tag_count = 0;
-  uint32_t invalid_duration_count = 0;
-  uint32_t hash_collision_count = 0;
-  uint32_t attributed = 0;
-  uint32_t unattributed = 0;
-  uint32_t unresolved_token = 0;
-  uint32_t deferred = 0;
-  uint32_t lost_work_tags = 0;
-
-  // Resolve each distinct token once rather than once per kernel record. A
-  // round holds far more kernels than objects, and this lock is the same one
-  // every entry method needs, so taking it per record would both dominate the
-  // drain and stall PEs that are still running.
-  struct ResolvedToken {
-    LDObjKey key{};
-    bool valid = false;
-  };
-  std::unordered_map<uint64_t, ResolvedToken> resolved_tokens;
-
-  auto fileKernel = [&](const LBKernelRecord& rec, uint64_t object_token) {
-    if (object_token == HAPI_CUPTI_NO_OBJECT) {
-      gm.cupti_unattributed_kernels_.push_back(rec);
-      unattributed++;
-      return;
-    }
-    auto memo = resolved_tokens.find(object_token);
-    if (memo == resolved_tokens.end()) {
-      ResolvedToken entry;
-      {
-        std::lock_guard<std::mutex> token_lock(gm.cupti_object_token_lock_);
-        entry.valid = gm.cupti_object_tokens_.resolve(object_token, entry.key);
-      }
-      memo = resolved_tokens.emplace(object_token, entry).first;
-    }
-    if (!memo->second.valid) {
-      gm.cupti_unattributed_kernels_.push_back(rec);
-      unattributed++;
-      unresolved_token++;
-      return;
-    }
-    gm.cupti_obj_kernel_records_[memo->second.key].push_back(rec);
-    attributed++;
-  };
-
-  // Applies the work tag for this launch, if one has been parsed. Returns false
-  // when the tag may still be in an unparsed buffer, in which case the bucket
-  // is not settled and the kernel must be parked until the whole drain is done.
-  auto applyWorkTag = [&](uint32_t correlation_id, const GpuLaunchSignature& launch,
-                          LBKernelRecord& rec, bool last_chance) {
-    // Already resolved during the parse loop. Without this the second pass
-    // would look the tag up again, fail to find the entry it consumed itself,
-    // and condemn a correctly tagged kernel as unmodelable.
-    if (rec.has_explicit_work_tag) return true;
-
-    auto work_tag = gm.cupti_work_tag_correlation_db_.find(correlation_id);
-    if (work_tag != gm.cupti_work_tag_correlation_db_.end()) {
-      rec.has_explicit_work_tag = true;
-      rec.kernel_key.workBucket =
-          gpuStableWorkBucket(launch, true, work_tag->second);
-      gm.cupti_tagged_kernel_classes_.insert(rec.kernel_key.kernelClass);
-      gm.cupti_work_tag_correlation_db_.erase(work_tag);
-      return true;
-    }
-    auto prev_tag = prev_work_tag_corr.find(correlation_id);
-    if (prev_tag != prev_work_tag_corr.end()) {
-      rec.has_explicit_work_tag = true;
-      rec.kernel_key.workBucket = gpuStableWorkBucket(launch, true, prev_tag->second);
-      gm.cupti_tagged_kernel_classes_.insert(rec.kernel_key.kernelClass);
-      prev_work_tag_corr.erase(prev_tag);
-      return true;
-    }
-
-    // No tag found yet. Whether that is final depends on what is known about
-    // this kernel class, because a tag record can be in a buffer this drain has
-    // not parsed. Deciding per class rather than per application matters: an
-    // application that tags one kernel usually leaves its others untagged, and
-    // parking all of them would give back the fast path this drain exists to
-    // preserve.
-    const uint64_t kernelClass = rec.kernel_key.kernelClass;
-    if (!last_chance) {
-      // Confirmed untagged by a previous full drain: nothing to wait for.
-      if (gm.cupti_untagged_kernel_classes_.count(kernelClass) != 0) return true;
-      // Either known-tagged (so this is a missing tag, or one still unparsed)
-      // or never seen before (so its first instance must not be committed to
-      // the untagged bucket on incomplete information). Both need the full
-      // drain first.
-      return false;
-    }
-
-    // Every buffer has been parsed, so the absence is real. A legitimately
-    // untagged class keeps the automatic launch-signature bucket and is
-    // remembered so its later instances stay on the fast path.
-    if (gm.cupti_tagged_kernel_classes_.count(kernelClass) == 0) {
-      gm.cupti_untagged_kernel_classes_.insert(kernelClass);
-      return true;
-    }
-
-    // The class has been seen tagged, so the tag went missing. The automatic
-    // bucket is guaranteed by the hasExplicitTag discriminator to be a
-    // different key from the one its tagged siblings use, and filing it there
-    // would blend unrelated work sizes into a bucket the estimator treats as
-    // one comparable population. Mark it unmodelable instead.
-    rec.unmodelable = true;
-    lost_work_tags++;
-    return true;
-  };
-
-  while (true) {
-    CuptiBufferItem item;
-
-    // Pop one buffer from the queue
-    {
-      std::lock_guard<std::mutex> lk(gm.cupti_queue_lock_);
-      if (gm.cupti_buffer_queue_.empty()) break;
-      item = gm.cupti_buffer_queue_.front();
-      gm.cupti_buffer_queue_.pop();
-    }
-
+  for (CuptiBufferItem& item : items) {
     // A buffer CUPTI never wrote to (or one it handed back empty) has nothing
     // to parse, and passing it on would dereference whatever came back.
     if (item.buffer == NULL || item.validSize == 0) {
-      hapiCuptiRetireBuffer(item.buffer);
+      sh.retired.push_back({item.buffer, item.size});
       continue;
     }
 
@@ -1384,18 +1904,18 @@ void hapiProcessCuptiBuffers() {
       if (record->kind == CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION) {
         CUpti_ActivityExternalCorrelation *corr = (CUpti_ActivityExternalCorrelation *)record;
         if (corr->externalKind == CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN) {
-          object_corr_count++;
-          gm.cupti_object_correlation_db_[corr->correlationId] = corr->externalId;
+          sh.object_corr_count++;
+          sh.object_corr[corr->correlationId] = corr->externalId;
         }
-        else if (_lb_args.gpuScaling() &&
+        else if (scaling &&
                  corr->externalKind == CUPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0) {
-          work_tag_count++;
-          gm.cupti_work_tag_correlation_db_[corr->correlationId] = corr->externalId;
+          sh.work_tag_count++;
+          sh.work_tag_corr[corr->correlationId] = corr->externalId;
         }
       }
       else if (record->kind == CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL ||
                record->kind == CUPTI_ACTIVITY_KIND_KERNEL) {
-        kernel_count++;
+        sh.kernel_count++;
         CUpti_ActivityKernel4 *kernel = (CUpti_ActivityKernel4 *)record;
 
         DeviceManager* dm = findDeviceManager(gm, kernel->deviceId);
@@ -1405,7 +1925,7 @@ void hapiProcessCuptiBuffers() {
         rec.end_ns    = kernel->end;
         rec.device_id = kernel->deviceId;
         rec.sms_used  = dm ? computeKernelSMs(*dm, kernel) : 1;
-        if (rec.end_ns <= rec.start_ns) invalid_duration_count++;
+        if (rec.end_ns <= rec.start_ns) sh.invalid_duration_count++;
         else g_cupti_kernel_ns.fetch_add(rec.end_ns - rec.start_ns,
                                          std::memory_order_relaxed);
 
@@ -1425,27 +1945,26 @@ void hapiProcessCuptiBuffers() {
 
           if (_lb_args.debug() > 0) {
             const char* kernel_name = kernel->name != nullptr ? kernel->name : "";
-            auto inserted = gm.cupti_kernel_names_.emplace(
-                rec.kernel_key.kernelClass, kernel_name);
+            auto inserted = sh.kernel_names.emplace(rec.kernel_key.kernelClass, kernel_name);
             if (!inserted.second && inserted.first->second != kernel_name)
-              hash_collision_count++;
+              sh.hash_collision_count++;
           }
 
           bucket_settled =
-              applyWorkTag(kernel->correlationId, launch, rec, /*last_chance=*/false);
+              cuptiApplyWorkTag(sh, nullptr, kernel->correlationId, launch, rec, /*last_chance=*/false);
         }
 
         // The correlation stays in the table: the launch's own API record
         // shares the id and may still be coming. Everything left is dropped
         // when the drain ends.
-        const uint64_t* object = findObjectCorr(kernel->correlationId);
+        const uint64_t* object = cuptiFindObjectCorr(sh, kernel->correlationId, nullptr);
         if (g_trace != nullptr)
           hapiTraceKernel(kernel, object != nullptr ? *object : HAPI_CUPTI_NO_OBJECT);
         if (bucket_settled && object != nullptr) {
-          fileKernel(rec, *object);
+          cuptiFileKernel(gm, sh, rec, *object, cuptiThreadOfCorr(sh, kernel->correlationId, nullptr));
         } else {
-          pending.push_back({kernel->correlationId, launch, rec, false});
-          deferred++;
+          sh.pending.push_back({kernel->correlationId, launch, rec, false});
+          sh.deferred++;
         }
       }
       else if (record->kind == CUPTI_ACTIVITY_KIND_MEMCPY) {
@@ -1470,10 +1989,11 @@ void hapiProcessCuptiBuffers() {
       else if (record->kind == CUPTI_ACTIVITY_KIND_RUNTIME) {
         const CUpti_ActivityAPI* api = (const CUpti_ActivityAPI*)record;
         if (api->end > api->start) {
-          api_count++;
+          sh.api_count++;
           const double seconds = (double)(api->end - api->start) / 1.0e9;
-          gm.cupti_api_total_ += seconds;
-          CbidUse& use = byCbid[api->cbid < byCbid.size() ? api->cbid : byCbid.size() - 1];
+          sh.api_total += seconds;
+          sh.api_total_dev[devOfThread(api->threadId)] += seconds;
+          CuptiCbidUse& use = sh.byCbid[api->cbid < sh.byCbid.size() ? api->cbid : sh.byCbid.size() - 1];
           if (!use.known) {
             use.known = true;
             const char* name = nullptr;
@@ -1483,86 +2003,110 @@ void hapiProcessCuptiBuffers() {
           }
           use.count++;
           use.seconds += seconds;
+          {
+            uint64_t& ce = sh.cover_end[api->threadId];
+            if (api->end > ce) ce = api->end;
+          }
+          if (!use.poll) {   // the span this thread was in when the call began names the object (and the work tag)
+            sh.thread_corr[api->correlationId] = api->threadId;
+            CuptiLaneCursor& cur = snapOf(api->threadId);
+            if (const CuptiEntrySpan* sp = hapiCuptiSpanAt(cur.sn->obj.spans, api->start, cur.obj)) {
+              sh.object_corr_count++;
+              sh.object_corr[api->correlationId] = sp->token;
+            }
+            if (scaling)
+              if (const CuptiEntrySpan* sp = hapiCuptiSpanAt(cur.sn->tag.spans, api->start, cur.tag)) {
+                sh.work_tag_count++;
+                sh.work_tag_corr[api->correlationId] = sp->token;
+              }
+          }
           if (cachedLast == nullptr || cachedThread != api->threadId) {
             cachedThread = api->threadId;
             cachedLast = &lastByThread[api->threadId];
           }
           LastInterval& last = *cachedLast;
-          if (last.idx != SIZE_MAX && last.idx < gm.cupti_api_intervals_.size() &&
+          if (last.idx != SIZE_MAX && last.idx < sh.api_intervals.size() &&
               api->start >= last.start &&
-              api->start <= gm.cupti_api_intervals_[last.idx].second + kCoalesceNs) {
-            auto& iv = gm.cupti_api_intervals_[last.idx];
-            if (api->end > iv.second) iv.second = api->end;
+              api->start <= sh.api_intervals[last.idx].end + kCoalesceNs) {
+            auto& iv = sh.api_intervals[last.idx];
+            if (api->end > iv.end) iv.end = api->end;
           } else {
-            last.idx = gm.cupti_api_intervals_.size();
+            last.idx = sh.api_intervals.size();
             last.start = api->start;
-            gm.cupti_api_intervals_.emplace_back(api->start, api->end);
+            sh.api_intervals.push_back({api->start, api->end, devOfThread(api->threadId)});
           }
           if (use.poll) {
-            api_unattributed_s += seconds;
+            sh.api_unattributed_s += seconds;
           } else {
-            const uint64_t* object = findObjectCorr(api->correlationId);
+            const uint64_t* object = cuptiFindObjectCorr(sh, api->correlationId, nullptr);
             if (object != nullptr)
-              apiByToken[*object] += seconds;
+              sh.apiByToken[*object] += seconds;
             else
-              pendingApi.push_back({api->correlationId, seconds});
+              sh.pendingApi.push_back({api->correlationId, seconds});
           }
         }
       }
     }
 
-    hapiCuptiRetireBuffer(item.buffer);
+    sh.retired.push_back({item.buffer, item.size});
   }
+}
 
-  // Second pass: correlations that arrived in a later buffer are now known.
-  for (PendingKernel& pending_kernel : pending) {
-    const uint64_t* object = findObjectCorr(pending_kernel.correlation_id);
+// Pass 2, serial, every shard: what pass 1 could not resolve from its own shard, against all of
+// them; then the API attribution, the bookkeeping and the carry-over to the next drain.
+static void hapiParseCuptiShardPass2(GPUManager& gm, CuptiParseShard& sh, std::vector<CuptiParseShard>& all,
+                                     bool scaling, int shardIdx) {
+  // Second pass: correlations that arrived in a later buffer, or in another shard, are now known.
+  for (CuptiPendingKernel& pending_kernel : sh.pending) {
+    const uint64_t* object = cuptiFindObjectCorr(sh, pending_kernel.correlation_id, &all);
     // Its correlation record may still be in a buffer CUPTI has not delivered: park it once more.
-    if (object == nullptr && !pending_kernel.carried) { carried.push_back(pending_kernel); continue; }
+    if (object == nullptr && !pending_kernel.carried) { sh.carried.push_back(pending_kernel); continue; }
     if (scaling)
-      applyWorkTag(pending_kernel.correlation_id, pending_kernel.launch,
-                   pending_kernel.rec, /*last_chance=*/true);
+      cuptiApplyWorkTag(sh, &all, pending_kernel.correlation_id, pending_kernel.launch,
+                        pending_kernel.rec, /*last_chance=*/true);
     if (object == nullptr) {
-      gm.cupti_unattributed_kernels_.push_back(pending_kernel.rec);
-      unattributed++;
+      sh.unattributed_kernels.push_back(pending_kernel.rec);
+      sh.unattributed++;
       continue;
     }
-
-    fileKernel(pending_kernel.rec, *object);
+    cuptiFileKernel(gm, sh, pending_kernel.rec, *object, cuptiThreadOfCorr(sh, pending_kernel.correlation_id, &all));
   }
+  sh.pending.clear();
 
   // API records whose correlation arrived later, then every token to its
   // object. A call made outside any entry method -- the scheduler polling an
   // event, say -- belongs to no object; it still occupied the driver and is
   // in the intervals, so the launch term counts it, but nobody is charged.
-  for (const PendingApi& p : pendingApi) {
-    const uint64_t* object = findObjectCorr(p.correlation_id);
-    if (object == nullptr) api_unattributed_s += p.seconds;
-    else apiByToken[*object] += p.seconds;
+  for (const CuptiPendingApi& p : sh.pendingApi) {
+    const uint64_t* object = cuptiFindObjectCorr(sh, p.correlation_id, &all);
+    if (object == nullptr) sh.api_unattributed_s += p.seconds;
+    else sh.apiByToken[*object] += p.seconds;
   }
-  for (const auto& kv : apiByToken) {
-    auto memo = resolved_tokens.find(kv.first);
-    if (memo == resolved_tokens.end()) {
-      ResolvedToken entry;
+  sh.pendingApi.clear();
+  for (const auto& kv : sh.apiByToken) {
+    auto memo = sh.resolved_tokens.find(kv.first);
+    if (memo == sh.resolved_tokens.end()) {
+      CuptiResolvedToken entry;
       {
         std::lock_guard<std::mutex> token_lock(gm.cupti_object_token_lock_);
         entry.valid = gm.cupti_object_tokens_.resolve(kv.first, entry.key);
       }
-      memo = resolved_tokens.emplace(kv.first, entry).first;
+      memo = sh.resolved_tokens.emplace(kv.first, entry).first;
     }
-    if (memo->second.valid) gm.cupti_obj_api_raw_[memo->second.key] += kv.second;
-    else api_unattributed_s += kv.second;
+    if (memo->second.valid) sh.obj_api_raw[memo->second.key] += kv.second;
+    else sh.api_unattributed_s += kv.second;
   }
+  sh.apiByToken.clear();
   if (_lb_args.debug() > 1) {
-    CmiPrintf("HAPI[pe=%d]: runtime API records=%u total=%.6fs unattributed=%.6fs "
-              "objects=%zu intervals=%zu\n", CmiMyPe(), api_count, gm.cupti_api_total_,
-              api_unattributed_s, gm.cupti_obj_api_raw_.size(), gm.cupti_api_intervals_.size());
+    CmiPrintf("HAPI[pe=%d] shard %d: runtime API records=%u total=%.6fs unattributed=%.6fs "
+              "objects=%zu intervals=%zu\n", CmiMyPe(), shardIdx, sh.api_count, sh.api_total,
+              sh.api_unattributed_s, sh.obj_api_raw.size(), sh.api_intervals.size());
     // Where the driver time went, by call: the few calls that carry most of it.
-    std::vector<std::pair<uint32_t, CbidUse>> top;
-    for (uint32_t c = 0; c < byCbid.size(); c++)
-      if (byCbid[c].count > 0) top.emplace_back(c, byCbid[c]);
-    std::sort(top.begin(), top.end(), [](const std::pair<uint32_t, CbidUse>& a,
-                                         const std::pair<uint32_t, CbidUse>& b) {
+    std::vector<std::pair<uint32_t, CuptiCbidUse>> top;
+    for (uint32_t c = 0; c < sh.byCbid.size(); c++)
+      if (sh.byCbid[c].count > 0) top.emplace_back(c, sh.byCbid[c]);
+    std::sort(top.begin(), top.end(), [](const std::pair<uint32_t, CuptiCbidUse>& a,
+                                         const std::pair<uint32_t, CuptiCbidUse>& b) {
       return a.second.seconds > b.second.seconds;
     });
     std::string line;
@@ -1576,53 +2120,191 @@ void hapiProcessCuptiBuffers() {
                top[i].second.seconds);
       line += buf;
     }
-    CmiPrintf("HAPI[pe=%d]: runtime API by call:%s\n", CmiMyPe(), line.c_str());
+    CmiPrintf("HAPI[pe=%d] shard %d: runtime API by call:%s\n", CmiMyPe(), shardIdx, line.c_str());
   }
 
   // Size next round's parked vector from this one: the straggler count is a
   // property of how CUPTI is batching buffers, which changes slowly.
-  gm.cupti_pending_hint_ = deferred;
+  sh.pending_hint = sh.deferred;
+
+  // A lost work tag is not just a lost sample: it would otherwise file the
+  // kernel under a bucket its tagged siblings never use, so report it at the
+  // first debug level rather than burying it with the bookkeeping counters.
+  if (_lb_args.debug() > 0 && sh.lost_work_tags > 0) {
+    CmiPrintf("HAPI[pe=%d]: %u kernel record(s) of a tagged class arrived with "
+              "no work tag and were excluded from the scaling model\n",
+              CmiMyPe(), sh.lost_work_tags);
+  }
+
+  if (_lb_args.debug() > 1) {
+    CmiPrintf("HAPI[pe=%d] shard %d: hapiProcessCuptiBuffers kernels=%u "
+              "object_correlations=%u work_tags=%u attributed=%u "
+              "unattributed=%u deferred=%u invalid_durations=%u "
+              "unresolved_tokens=%u hash_collisions=%u lost_work_tags=%u "
+              "objects=%zu object_corr_dropped=%zu work_tags_dropped=%zu\n",
+              CmiMyPe(), shardIdx, sh.kernel_count, sh.object_corr_count, sh.work_tag_count,
+              sh.attributed, sh.unattributed, sh.deferred, sh.invalid_duration_count,
+              sh.unresolved_token, sh.hash_collision_count, sh.lost_work_tags,
+              sh.obj_kernel_records.size(), sh.prev_object_corr.size(),
+              sh.prev_work_tag_corr.size());
+  }
+}
+
+// The drain: every queued buffer, dealt round-robin over one shard per device, pass 1 of each
+// shard on its own thread (shard 0 on this one), pass 2 serial, then the merge. Called with
+// cupti_prepare_lock_ held.
+// Phase times of the last drain (CHARM_LB_CUPTI_TIME only), read by the close's timing print.
+static double g_cupti_drain_prof[4] = {0, 0, 0, 0};   // retire, pass 1, pass 2, merge
+static size_t g_cupti_drain_bufs = 0;        // buffers this drain took from the queue, and their records' bytes
+static uint64_t g_cupti_drain_valid_kb = 0;
+void hapiProcessCuptiBuffers() {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  hapiPopulateDeviceProps(gm);  // lazy: device_managers is ready by now
+  const bool scaling = _lb_args.gpuScaling();
+  static const bool timeIt = (getenv("CHARM_LB_CUPTI_TIME") != nullptr);
+  const double p0 = timeIt ? CmiWallTimer() : 0.0;
+  g_cupti_drain++;
+  hapiCuptiFreeRetired(2);
+  g_cupti_cover_end.clear();
+  const double p1 = timeIt ? CmiWallTimer() : 0.0;
+
+  const size_t nShards = (size_t)std::max(1, gm.device_count);
+  if (g_cupti_shards.size() < nShards) g_cupti_shards.resize(nShards);
+  std::vector<std::vector<CuptiBufferItem>> items(g_cupti_shards.size());
+  {
+    std::lock_guard<std::mutex> lk(gm.cupti_queue_lock_);
+    size_t i = 0;
+    uint64_t valid = 0;
+    while (!gm.cupti_buffer_queue_.empty()) {
+      valid += gm.cupti_buffer_queue_.front().validSize;
+      items[i % nShards].push_back(gm.cupti_buffer_queue_.front());
+      gm.cupti_buffer_queue_.pop();
+      i++;
+    }
+    g_cupti_drain_bufs = i;
+    g_cupti_drain_valid_kb = valid >> 10;
+  }
+  std::unordered_map<uint32_t, int> devByThread;
+  {
+    std::lock_guard<std::mutex> tl(gm.cupti_thread_device_lock_);
+    devByThread = gm.cupti_thread_device_;
+  }
+  for (auto& kv : g_cupti_snaps) kv.second.taken = false;   // the copies persist; each drain refreshes them incrementally
+  g_cupti_snap_bytes.store(0, std::memory_order_relaxed);
+  g_cupti_snap_ns.store(0, std::memory_order_relaxed);
+  // Every registered thread's entry-span log is copied/refreshed here, in parallel on the parse workers (one
+  // lane per worker in turn), so pass 1 finds every copy ready. Taken first-come by the shards, the copies were
+  // made one at a time under g_cupti_snaps_lock while the other shards waited (15 MB per close in a 16-PE
+  // process, 1.8 ms, job 22868252). A thread with records but no registered log still goes through snapOf.
+  {
+    std::vector<std::pair<uint32_t, CuptiEntryLog*>> logs;
+    {
+      std::lock_guard<std::mutex> g(g_cupti_entry_logs_lock);
+      logs.assign(g_cupti_entry_logs.begin(), g_cupti_entry_logs.end());
+    }
+    std::vector<CuptiLaneSnap*> snaps(logs.size());
+    {
+      std::lock_guard<std::mutex> sg(g_cupti_snaps_lock);
+      for (size_t i = 0; i < logs.size(); i++) {
+        CuptiLaneSnap& sn = g_cupti_snaps[logs[i].first];   // std::map: the pointer stays valid
+        sn.taken = true;
+        snaps[i] = &sn;
+      }
+    }
+    auto refreshLanes = [&logs, &snaps, scaling, nShards](size_t w) {
+      for (size_t i = w; i < logs.size(); i += nShards) {
+        CuptiEntryLog* L = logs[i].second;
+        std::lock_guard<std::mutex> g(L->m);
+        hapiCuptiLaneRefresh(L->obj, snaps[i]->obj);
+        if (scaling) hapiCuptiLaneRefresh(L->tag, snaps[i]->tag);
+      }
+    };
+    for (size_t i = 1; i < nShards; i++) hapiCuptiWorkerRun(i - 1, [&refreshLanes, i]() { refreshLanes(i); });
+    refreshLanes(0);
+    hapiCuptiWorkersWait();
+  }
+  // Every shard starts from the class knowledge the process has so far.
+  for (CuptiParseShard& sh : g_cupti_shards) {
+    sh.tagged_classes = gm.cupti_tagged_kernel_classes_;
+    sh.untagged_classes = gm.cupti_untagged_kernel_classes_;
+  }
+  for (size_t i = 1; i < g_cupti_shards.size(); i++) {
+    CuptiParseShard* sh = &g_cupti_shards[i];
+    std::vector<CuptiBufferItem>* its = &items[i];
+    hapiCuptiWorkerRun(i - 1, [&gm, sh, its, &devByThread, scaling]() {
+      hapiParseCuptiShardPass1(gm, *sh, *its, devByThread, scaling);
+    });
+  }
+  hapiParseCuptiShardPass1(gm, g_cupti_shards[0], items[0], devByThread, scaling);
+  hapiCuptiWorkersWait();
+  const double p2 = timeIt ? CmiWallTimer() : 0.0;
+  for (size_t i = 0; i < g_cupti_shards.size(); i++)
+    hapiParseCuptiShardPass2(gm, g_cupti_shards[i], g_cupti_shards, scaling, (int)i);
+  const double p3 = timeIt ? CmiWallTimer() : 0.0;
 
   // Every entry method pushes a correlation ID, and CUPTI emits a record for
   // each runtime call made under it -- memcpys, syncs and so on, not just
   // kernel launches. Those never match a kernel record. We device-sync and
   // force-flush before draining, so any kernel that was going to arrive has
   // arrived; whatever is left over is non-kernel traffic and would otherwise
-  // accumulate without bound.
-  size_t object_corr_dropped = prev_object_corr.size();
-  size_t work_tags_dropped = prev_work_tag_corr.size();
-  prev_object_corr = std::move(gm.cupti_object_correlation_db_);
-  prev_work_tag_corr = std::move(gm.cupti_work_tag_correlation_db_);
-  gm.cupti_object_correlation_db_.clear();
-  gm.cupti_work_tag_correlation_db_.clear();
+  // accumulate without bound. (After pass 2 of every shard: a shard's pass 2
+  // reads the others' current maps.)
+  for (CuptiParseShard& sh : g_cupti_shards) {
+    sh.prev_object_corr = std::move(sh.object_corr);
+    sh.prev_work_tag_corr = std::move(sh.work_tag_corr);
+    sh.object_corr.clear();
+    sh.work_tag_corr.clear();
+  }
 
-  // A lost work tag is not just a lost sample: it would otherwise file the
-  // kernel under a bucket its tagged siblings never use, so report it at the
-  // first debug level rather than burying it with the bookkeeping counters.
-  if (_lb_args.debug() > 0 && lost_work_tags > 0) {
-    CmiPrintf("HAPI[pe=%d]: %u kernel record(s) of a tagged class arrived with "
-              "no work tag and were excluded from the scaling model\n",
-              CmiMyPe(), lost_work_tags);
+  // Merge.
+  for (CuptiParseShard& sh : g_cupti_shards) {
+    for (auto& kv : sh.obj_kernel_records) {
+      auto& dst = gm.cupti_obj_kernel_records_[kv.first];
+      if (dst.empty()) dst = std::move(kv.second);
+      else dst.insert(dst.end(), kv.second.begin(), kv.second.end());
+    }
+    sh.obj_kernel_records.clear();
+    gm.cupti_unattributed_kernels_.insert(gm.cupti_unattributed_kernels_.end(),
+                                          sh.unattributed_kernels.begin(), sh.unattributed_kernels.end());
+    sh.unattributed_kernels.clear();
+    gm.cupti_tagged_kernel_classes_.insert(sh.tagged_classes.begin(), sh.tagged_classes.end());
+    gm.cupti_untagged_kernel_classes_.insert(sh.untagged_classes.begin(), sh.untagged_classes.end());
+    for (auto& kv : sh.kernel_names) gm.cupti_kernel_names_.emplace(kv.first, kv.second);
+    sh.kernel_names.clear();
+    for (auto& kv : sh.obj_api_raw) gm.cupti_obj_api_raw_acc_[kv.first] += kv.second;
+    sh.obj_api_raw.clear();
+    for (auto& kv : sh.obj_thread) g_cupti_obj_thread[kv.first] = kv.second;
+    sh.obj_thread.clear();
+    for (auto& kv : sh.cover_end) {
+      uint64_t& ce = g_cupti_cover_end[kv.first];
+      if (kv.second > ce) ce = kv.second;
+    }
+    sh.cover_end.clear();
+    gm.cupti_api_total_acc_ += sh.api_total;
+    sh.api_total = 0.0;
+    for (auto& kv : sh.api_total_dev) gm.cupti_api_total_dev_acc_[kv.first] += kv.second;
+    sh.api_total_dev.clear();
+    gm.cupti_api_intervals_acc_.insert(gm.cupti_api_intervals_acc_.end(),
+                                       sh.api_intervals.begin(), sh.api_intervals.end());
+    sh.api_intervals.clear();
+    for (auto& b : sh.retired) hapiCuptiRetireBuffer(b.first, b.second);
+    sh.retired.clear();
+    gm.cupti_pending_hint_ = std::max(gm.cupti_pending_hint_, sh.pending_hint);
+  }
+  if (timeIt) {
+    const double p4 = CmiWallTimer();
+    g_cupti_drain_prof[0] = p1 - p0; g_cupti_drain_prof[1] = p2 - p1;
+    g_cupti_drain_prof[2] = p3 - p2; g_cupti_drain_prof[3] = p4 - p3;
   }
 
   if (_lb_args.debug() > 1) {
-    CmiPrintf("HAPI[pe=%d]: hapiProcessCuptiBuffers kernels=%u "
-              "object_correlations=%u work_tags=%u attributed=%u "
-              "unattributed=%u deferred=%u invalid_durations=%u "
-              "unresolved_tokens=%u hash_collisions=%u lost_work_tags=%u "
-              "objects=%zu object_corr_dropped=%zu work_tags_dropped=%zu\n",
-              CmiMyPe(), kernel_count, object_corr_count, work_tag_count,
-              attributed, unattributed, deferred, invalid_duration_count,
-              unresolved_token, hash_collision_count, lost_work_tags,
-              gm.cupti_obj_kernel_records_.size(), object_corr_dropped,
-              work_tags_dropped);
     // Cumulative, not per drain: kernel device time CUPTI saw at all, against
     // the copies no object owns. Compare the first against the balancer's T_g
     // to see how much of what it CAN see it actually attributes, and the second
     // against the interval to see whether the rest of the step is idle GPU.
-    CmiPrintf("HAPI[pe=%d]: cupti-device-total kernel_s=%.6f memcpy_n=%llu "
+    CmiPrintf("HAPI[pe=%d]: drain over %zu shard(s); cupti-device-total kernel_s=%.6f memcpy_n=%llu "
               "memcpy_s=%.6f memcpy_GB=%.3f\n",
-              CmiMyPe(),
+              CmiMyPe(), g_cupti_shards.size(),
               (double)g_cupti_kernel_ns.load() / 1.0e9,
               (unsigned long long)g_cupti_memcpy_n.load(),
               (double)g_cupti_memcpy_ns.load() / 1.0e9,
@@ -1649,36 +2331,165 @@ void hapiProcessCuptiBuffers() {
 // process, so the timeline for that device is already complete here. If
 // several processes share one GPU, each sees only its own kernels and the
 // contention between processes is not modelled.
-void hapiNormalizeCuptiLoads() {
+// Which device (global index) each object's kernels last ran on, so a device's close can drop
+// the loads of its own objects before rebuilding them (an object with no record this round has
+// no GPU load) and leave the other devices' loads alone.
+static std::unordered_map<LDObjKey, uint32_t, LDObjKeyHash> g_cupti_obj_device;   // under cupti_prepare_lock_
+// onlyDevice: the global device index whose kernels this call normalises (-1: every device).
+void hapiNormalizeCuptiLoads(int onlyDevice) {
   GPUManager& gm = CsvAccess(gpu_manager);
-  gm.cupti_obj_norm_load_.clear();
-  gm.cupti_obj_epoch_costs_.clear();
-
-  // The driver's busy time this round: the union of every runtime-API
-  // interval from every thread of the process. The per-thread sums cannot be
-  // it -- eight threads waiting on one lock each count the same wait -- and
-  // the union is exactly the time the serialised driver had a call in hand.
-  // One context per process is assumed; a process driving several devices
-  // merges their contexts here and over-states nothing but their overlap.
-  {
-    auto& iv = gm.cupti_api_intervals_;
-    std::sort(iv.begin(), iv.end());
-    uint64_t busy_ns = 0, cur_lo = 0, cur_hi = 0;
-    bool open = false;
-    for (const auto& s : iv) {
-      if (!open || s.first > cur_hi) {
-        if (open) busy_ns += cur_hi - cur_lo;
-        cur_lo = s.first;
-        cur_hi = s.second;
-        open = true;
-      } else if (s.second > cur_hi) {
-        cur_hi = s.second;
-      }
+  // Coverage scales (see g_cupti_cover_end): window / the span each thread reported, from the previous close
+  // to its last API record; 1 for a thread that reported the whole window. A thread that reported less than
+  // half of it is capped at 2x and counted (capped=) -- a load extrapolated over more than half a window is a
+  // guess, and the next close has the rest.
+  g_cupti_cover_scale.clear();
+  g_cupti_cover_min = 1.0; g_cupti_cover_scale_max = 1.0; g_cupti_cover_threads = 0; g_cupti_cover_capped = 0;
+  const uint64_t win_prev = g_cupti_window_prev_ns, win_close = g_cupti_window_close_ns;
+  if (win_prev > 0 && win_close > win_prev) {
+    const double win = (double)(win_close - win_prev);
+    for (const auto& kv : g_cupti_cover_end) {
+      if (kv.second <= win_prev) continue;
+      double cov = (double)(std::min(kv.second, win_close) - win_prev) / win;
+      if (cov < 0.5) { cov = 0.5; g_cupti_cover_capped++; }
+      if (cov < g_cupti_cover_min) g_cupti_cover_min = cov;
+      const double sc = cov < 1.0 ? 1.0 / cov : 1.0;
+      g_cupti_cover_scale[kv.first] = sc;
+      if (sc > g_cupti_cover_scale_max) g_cupti_cover_scale_max = sc;
+      g_cupti_cover_threads++;
     }
-    if (open) busy_ns += cur_hi - cur_lo;
-    gm.cupti_driver_busy_ = (double)busy_ns / 1.0e9;
-    iv.clear();
-    iv.shrink_to_fit();
+  }
+  auto scaleOfObj = [](const LDObjKey& k) -> double {
+    auto t = g_cupti_obj_thread.find(k);
+    if (t == g_cupti_obj_thread.end()) return 1.0;
+    auto sc = g_cupti_cover_scale.find(t->second);
+    return sc == g_cupti_cover_scale.end() ? 1.0 : sc->second;
+  };
+  std::unordered_map<int, double> scaleOfDev;   // a device's mean thread scale, for its driver-busy union
+  if (!g_cupti_cover_scale.empty()) {
+    std::unordered_map<int, std::pair<double, int>> acc;
+    std::lock_guard<std::mutex> tl(gm.cupti_thread_device_lock_);
+    for (const auto& kv : g_cupti_cover_scale) {
+      auto d = gm.cupti_thread_device_.find(kv.first);
+      if (d == gm.cupti_thread_device_.end()) continue;
+      acc[d->second].first += kv.second; acc[d->second].second++;
+    }
+    for (const auto& kv : acc) scaleOfDev[kv.first] = kv.second.first / kv.second.second;
+  }
+  auto devScale = [&scaleOfDev](int dev) -> double {
+    auto it = scaleOfDev.find(dev);
+    return it == scaleOfDev.end() ? 1.0 : it->second;
+  };
+  // The driver's busy time this round: the union of every runtime-API interval from the threads of a
+  // device's PEs. The per-thread sums cannot be it -- eight threads waiting on one lock each count
+  // the same wait -- and the union is exactly the time the serialised driver had a call in hand. A
+  // process driving several devices has one driver per context, so each device-node's launch term is
+  // the union of ITS PE threads' calls; the process-wide figures are the fallback and the debug print.
+  {
+    auto unionOf = [](std::vector<std::pair<uint64_t, uint64_t>>& iv) -> double {
+      std::sort(iv.begin(), iv.end());
+      uint64_t busy_ns = 0, cur_lo = 0, cur_hi = 0;
+      bool open = false;
+      for (const auto& s : iv) {
+        if (!open || s.first > cur_hi) {
+          if (open) busy_ns += cur_hi - cur_lo;
+          cur_lo = s.first;
+          cur_hi = s.second;
+          open = true;
+        } else if (s.second > cur_hi) {
+          cur_hi = s.second;
+        }
+      }
+      if (open) busy_ns += cur_hi - cur_lo;
+      return (double)busy_ns / 1.0e9;
+    };
+    if (onlyDevice < 0) {
+    std::vector<std::pair<uint64_t, uint64_t>> all;
+    std::unordered_map<int, std::vector<std::pair<uint64_t, uint64_t>>> byDev;
+    all.reserve(gm.cupti_api_intervals_acc_.size());
+    for (const auto& s : gm.cupti_api_intervals_acc_) {
+      all.emplace_back(s.start, s.end);
+      byDev[s.device].emplace_back(s.start, s.end);
+    }
+    gm.cupti_driver_busy_dev_.clear();
+    gm.cupti_driver_busy_ = 0.0;
+    for (auto& kv : byDev) {
+      const double b = unionOf(kv.second) * devScale(kv.first);
+      gm.cupti_driver_busy_dev_[kv.first] = b;
+      gm.cupti_driver_busy_ += b;
+    }
+    if (byDev.empty()) gm.cupti_driver_busy_ = unionOf(all);
+    gm.cupti_api_intervals_acc_.clear();
+    gm.cupti_api_intervals_acc_.shrink_to_fit();
+    gm.cupti_api_intervals_.clear();
+    // Publish this round's API attribution (scaled by each object's thread coverage) and reset the accumulators.
+    gm.cupti_obj_api_raw_ = std::move(gm.cupti_obj_api_raw_acc_);
+    gm.cupti_obj_api_raw_acc_.clear();
+    for (auto& kv : gm.cupti_obj_api_raw_) kv.second *= scaleOfObj(kv.first);
+    gm.cupti_api_total_ = gm.cupti_api_total_acc_;
+    gm.cupti_api_total_acc_ = 0.0;
+    gm.cupti_api_total_dev_ = std::move(gm.cupti_api_total_dev_acc_);
+    gm.cupti_api_total_dev_acc_.clear();
+    } else {
+      // This device's close publishes ITS intervals, total and objects' API time and leaves the other
+      // devices' in the accumulators for their own closes. Before this every device's close published
+      // and reset the process-wide accumulators, so in a process driving four devices the first close
+      // of an LB event took everything and the other three found nothing: their launch terms were zero
+      // ("launch 0%" against the control's 4%, job 22856533).
+      std::vector<std::pair<uint64_t, uint64_t>> mine;
+      {
+        auto& acc = gm.cupti_api_intervals_acc_;
+        size_t w = 0;
+        for (size_t i = 0; i < acc.size(); i++) {
+          if (acc[i].device == onlyDevice) mine.emplace_back(acc[i].start, acc[i].end);
+          else acc[w++] = acc[i];
+        }
+        acc.resize(w);
+      }
+      gm.cupti_driver_busy_dev_[onlyDevice] = unionOf(mine);
+      {
+        auto it = gm.cupti_api_total_dev_acc_.find(onlyDevice);
+        gm.cupti_api_total_dev_[onlyDevice] = (it != gm.cupti_api_total_dev_acc_.end()) ? it->second : 0.0;
+        if (it != gm.cupti_api_total_dev_acc_.end()) gm.cupti_api_total_dev_acc_.erase(it);
+      }
+      gm.cupti_driver_busy_ = 0.0;
+      for (const auto& kv : gm.cupti_driver_busy_dev_) gm.cupti_driver_busy_ += kv.second;
+      gm.cupti_api_total_ = 0.0;
+      for (const auto& kv : gm.cupti_api_total_dev_) gm.cupti_api_total_ += kv.second;
+      gm.cupti_api_total_acc_ = 0.0;
+      for (const auto& kv : gm.cupti_api_total_dev_acc_) gm.cupti_api_total_acc_ += kv.second;
+      // Objects: this device's by the last sweep (g_cupti_obj_device, read before this close clears
+      // its entries below) and any object no device has claimed (host-only work, or never swept) are
+      // published now, this device's previous round replaced; the other devices' stay accumulating.
+      // What the other devices published stays in the map until they publish again -- a PE reads only
+      // its own objects (LBDatabase::SetObjDriverLoad).
+      for (auto it = gm.cupti_obj_api_raw_.begin(); it != gm.cupti_obj_api_raw_.end();) {
+        auto d = g_cupti_obj_device.find(it->first);
+        if (d != g_cupti_obj_device.end() && d->second == (uint32_t)onlyDevice) it = gm.cupti_obj_api_raw_.erase(it);
+        else ++it;
+      }
+      for (auto it = gm.cupti_obj_api_raw_acc_.begin(); it != gm.cupti_obj_api_raw_acc_.end();) {
+        auto d = g_cupti_obj_device.find(it->first);
+        if (d == g_cupti_obj_device.end() || d->second == (uint32_t)onlyDevice) {
+          gm.cupti_obj_api_raw_[it->first] = it->second;
+          it = gm.cupti_obj_api_raw_acc_.erase(it);
+        } else ++it;
+      }
+      gm.cupti_api_intervals_.clear();
+    }
+  }
+
+  if (onlyDevice < 0) {
+    gm.cupti_obj_norm_load_.clear();
+    gm.cupti_obj_epoch_costs_.clear();
+    g_cupti_obj_device.clear();
+  } else {
+    for (auto it = g_cupti_obj_device.begin(); it != g_cupti_obj_device.end();) {
+      if (it->second == (uint32_t)onlyDevice) {
+        gm.cupti_obj_norm_load_.erase(it->first);
+        gm.cupti_obj_epoch_costs_.erase(it->first);
+        it = g_cupti_obj_device.erase(it);
+      } else ++it;
+    }
   }
 
   const bool scaling = _lb_args.gpuScaling();
@@ -1696,17 +2507,27 @@ void hapiNormalizeCuptiLoads() {
     // numbers can also be aggregated per kernel identity.
     double   demand;
   };
+  // A record that ended before this window (the previous window's tail, delivered now) is dropped; one that
+  // straddles the window's start is clipped to it. (Nothing is clipped at the close: a kernel still running at
+  // the flush is reported whole when its record completes, in the next drain, and clipped there.)
   std::unordered_map<uint32_t, std::vector<SweepKernel>> byDevice;
   for (const auto& kv : gm.cupti_obj_kernel_records_) {
     for (const LBKernelRecord& k : kv.second) {
       if (k.end_ns <= k.start_ns) continue;
-      byDevice[k.device_id].push_back({kv.first, k.start_ns, k.end_ns, k.sms_used,
+      if (onlyDevice >= 0 && k.device_id != (uint32_t)onlyDevice) continue;
+      if (win_prev > 0 && k.end_ns <= win_prev) continue;
+      const uint64_t start = (win_prev > 0 && k.start_ns < win_prev) ? win_prev : k.start_ns;
+      g_cupti_obj_device[kv.first] = k.device_id;
+      byDevice[k.device_id].push_back({kv.first, start, k.end_ns, k.sms_used,
                                        true, k.kernel_key, k.unmodelable, 0.0});
     }
   }
   for (const LBKernelRecord& k : gm.cupti_unattributed_kernels_) {
     if (k.end_ns <= k.start_ns) continue;
-    byDevice[k.device_id].push_back({LDObjKey{}, k.start_ns, k.end_ns, k.sms_used,
+    if (onlyDevice >= 0 && k.device_id != (uint32_t)onlyDevice) continue;
+    if (win_prev > 0 && k.end_ns <= win_prev) continue;
+    const uint64_t start = (win_prev > 0 && k.start_ns < win_prev) ? win_prev : k.start_ns;
+    byDevice[k.device_id].push_back({LDObjKey{}, start, k.end_ns, k.sms_used,
                                      false, GpuKernelKey{}, true, 0.0});
   }
 
@@ -1733,16 +2554,25 @@ void hapiNormalizeCuptiLoads() {
   // kernels with no owner, and the wall time the device had any work at all.
   double sweep_attr_demand = 0.0, sweep_unattr_demand = 0.0, sweep_busy_s = 0.0;
   size_t sweep_unattr_kernels = gm.cupti_unattributed_kernels_.size();
+  // Each device's sweep -- the sort of its kernels' events and the proportional split of every interval --
+  // is independent of the others', so a process driving several devices runs them in parallel on the parse
+  // workers (serially they were 5.1 ms of the (1,4,4) close against 1.4 in the one-device control, job
+  // 22868252). The per-object accumulation below stays serial.
+  struct SweepJob { uint32_t device; std::vector<SweepKernel>* kernels; int total_sms; DeviceManager* dm; double busy_s; };
+  std::vector<SweepJob> jobs;
   for (auto& kv : byDevice) {
-    std::vector<SweepKernel>& kernels = kv.second;
-    if (kernels.empty()) continue;
-
+    if (kv.second.empty()) continue;
     DeviceManager* dm = findDeviceManager(gm, kv.first);
-    int total_sms = (dm != nullptr) ? dm->multi_processor_count : 0;
+    const int total_sms = (dm != nullptr) ? dm->multi_processor_count : 0;
     if (total_sms <= 0) continue;  // unknown device size -- cannot normalize
-    total_kernels += kernels.size();
+    total_kernels += kv.second.size();
     devices_normalized++;
-
+    jobs.push_back({kv.first, &kv.second, total_sms, dm, 0.0});
+  }
+  auto sweepDevice = [](SweepJob& job) {
+    std::vector<SweepKernel>& kernels = *job.kernels;
+    const int total_sms = job.total_sms;
+    double sweep_busy_s = 0.0;
     // Two events per kernel. END sorts before START on a tie so a kernel
     // ending at instant t does not briefly count alongside one starting at t.
     struct Event { uint64_t time; int kind; int kidx; };  // kind: 0=END, 1=START
@@ -1852,12 +2682,23 @@ void hapiNormalizeCuptiLoads() {
       else              active.erase(ev.kidx);
       t_prev = ev.time;
     }
+    job.busy_s = sweep_busy_s;
+  };
+  for (size_t i = 1; i < jobs.size(); i++) hapiCuptiWorkerRun(i - 1, [&sweepDevice, &jobs, i]() { sweepDevice(jobs[i]); });
+  if (!jobs.empty()) sweepDevice(jobs[0]);
+  hapiCuptiWorkersWait();
+
+  for (SweepJob& job : jobs) {
+    std::vector<SweepKernel>& kernels = *job.kernels;
+    DeviceManager* dm = job.dm;
+    const int total_sms = job.total_sms;
+    sweep_busy_s += job.busy_s;
 
     for (const SweepKernel& k : kernels) {
       if (k.demand <= 0.0) continue;
       if (!k.attributed) { sweep_unattr_demand += k.demand; continue; }
       sweep_attr_demand += k.demand;
-      gm.cupti_obj_norm_load_[k.obj_key] += k.demand;
+      gm.cupti_obj_norm_load_[k.obj_key] += k.demand * scaleOfObj(k.obj_key);
     }
 
     // CHARM_GPU_LOAD_OBJDUMP: one line per object this device charged. Beside
@@ -1881,7 +2722,7 @@ void hapiNormalizeCuptiLoads() {
       for (const auto& tv : tallies)
         CmiPrintf("[gpu-objdump pe=%d dev=%u om=%d obj=%llu kernels=%d elapsed_s=%.6f "
                   "isolated_s=%.6f demand_s=%.6f]\n",
-                  CmiMyPe(), (unsigned)kv.first, (int)tv.first.omID().id.idx,
+                  CmiMyPe(), (unsigned)job.device, (int)tv.first.omID().id.idx,
                   (unsigned long long)tv.first.objID(), tv.second.kernels,
                   tv.second.elapsed, tv.second.isolated, tv.second.demand);
     }
@@ -2001,64 +2842,113 @@ void hapiNormalizeCuptiLoads() {
 // reads its own objects out of it, and the work itself must be done by one
 // thread; holding the lock across both gives the readers their ordering without
 // a barrier that every PE has to reach.
+// The window close is per PROCESS: the last of its PEs to arrive flushes once, parses once and builds every
+// device's loads. It was per device group (the PEs of one device) from 2026-10-12 to 10-13 on the premise that
+// cuptiActivityFlush(context) flushes one context; it is deprecated and flushes the process (cupti_activity.h),
+// so a four-device process paid four process-wide forced flushes per LB event (12-17 ms each against 1-6 ms in
+// a one-device process, job 22866653) and three closers waited for the first one's parse. The balancers' arrival
+// count and gpuLoadsReady fan-out use these two.
+int hapiDeviceGroupSize() { return CmiMyNodeSize(); }
+int hapiDeviceGroupFirstPe() { return CmiNodeFirst(CmiMyNode()); }
+int hapiMyDeviceIndex() { return CpvAccess(my_device_id); }
+struct CuptiArrival { uint64_t epoch = 0; int count = 0; };
+static CuptiArrival g_cupti_arrival;   // the process's, under cupti_arrive_lock_
 bool hapiCuptiArrive(uint64_t epoch, int expected) {
   GPUManager& gm = CsvAccess(gpu_manager);
+  if (CuptiEntryLog* L = t_cupti_entry_log) {   // this PE's entry-span log: drop what no later drain can ask about
+    hapiCuptiCalibrateSpanClock(false);
+    const uint64_t now = hapiCuptiSpanNow();
+    std::lock_guard<std::mutex> g(L->m);
+    const uint64_t cutoff = L->narrivals >= 2 ? L->arrivals[(L->narrivals - 2) % 3] : 0;
+    L->arrivals[L->narrivals % 3] = now;
+    L->narrivals++;
+    if (cutoff != 0) {
+      hapiCuptiLanePrune(L->obj, cutoff);
+      hapiCuptiLanePrune(L->tag, cutoff);
+    }
+    if (hapiCuptiTimeIt() && (L->narrivals == 2 || L->narrivals % 10 == 0))
+      CmiPrintf("[LBCUPTI pe=%d] log: arrival %d spans=%zu open=%zu bottom_open=%u pruned=%llu gen=%u\n", CmiMyPe(),
+                L->narrivals, L->obj.spans.size(), L->obj.open.size(), L->obj.open.empty() ? 0u : L->obj.open.front(),
+                (unsigned long long)L->obj.pruned, L->obj.gen);
+  }
   std::lock_guard<std::mutex> lk(gm.cupti_arrive_lock_);
+  CuptiArrival& a = g_cupti_arrival;
   // A new round resets the count. Rounds are strictly sequential -- a step
   // completes on a job-wide barrier before the next can start -- so a stale
   // count from a previous epoch can only mean that epoch is over.
-  if (gm.cupti_arrive_epoch_ != epoch) {
-    gm.cupti_arrive_epoch_ = epoch;
-    gm.cupti_arrive_count_ = 0;
+  if (a.epoch != epoch) {
+    a.epoch = epoch;
+    a.count = 0;
   }
-  gm.cupti_arrive_count_++;
-  if (gm.cupti_arrive_count_ < expected) return false;
-  gm.cupti_arrive_count_ = 0;
+  a.count++;
+  if (a.count < expected) return false;
+  a.count = 0;
   return true;
 }
 
-void hapiPrepareCuptiLoads(uint64_t epoch) {
+// Per device: the ready flag and epoch of each device group's last build.
+static bool g_cupti_dev_ready[HAPI_CUPTI_MAX_GATES] = {};
+static uint64_t g_cupti_dev_epoch[HAPI_CUPTI_MAX_GATES] = {};
+static void hapiPrepareCuptiLoadsImpl(uint64_t epoch, int dev);
+void hapiPrepareCuptiLoads(uint64_t epoch) { hapiPrepareCuptiLoadsImpl(epoch, -1); }
+// The process's window close, whichever device the arriving PE drives (see hapiDeviceGroupSize): one flush,
+// one parse, every device's loads. The per-device path of hapiPrepareCuptiLoadsImpl (dev >= 0: parse, then
+// normalise and drop one device's records) stays for a CUPTI that flushes one context.
+void hapiPrepareCuptiLoadsDevice(uint64_t epoch, int dev) {
+  (void)dev;
+  hapiPrepareCuptiLoadsImpl(epoch, -1);
+}
+// Already built for this epoch or a later one? A sampler that is behind its process-mates reads
+// their fresher loads rather than paying for a rebuild; an LB round always wins this comparison
+// and rebuilds exactly once. Caller holds cupti_prepare_lock_.
+static bool hapiCuptiLoadsBuilt(GPUManager& gm, uint64_t epoch, int dev) {
+  if (dev < 0) return gm.cupti_loads_ready_ && epoch <= gm.cupti_loads_epoch_;
+  return g_cupti_dev_ready[dev] && epoch <= g_cupti_dev_epoch[dev];
+}
+
+static void hapiPrepareCuptiLoadsImpl(uint64_t epoch, int dev) {
   GPUManager& gm = CsvAccess(gpu_manager);
-  std::lock_guard<std::mutex> lk(gm.cupti_prepare_lock_);
-  // Already built for this epoch or a later one. A sampler that is behind its
-  // process-mates reads their fresher loads rather than paying for a rebuild;
-  // an LB round always wins this comparison and rebuilds exactly once.
-  if (gm.cupti_loads_ready_ && epoch <= gm.cupti_loads_epoch_) return;
+  {
+    std::lock_guard<std::mutex> lk(gm.cupti_prepare_lock_);
+    if (hapiCuptiLoadsBuilt(gm, epoch, dev)) return;
+  }
+  // The flush runs OUTSIDE cupti_prepare_lock_: the forced flush of a device's context waits for
+  // that device's queued kernels (13-43 ms under +LBAsync, sph3d two nodes, job 22853463), and the
+  // device groups of one process close within milliseconds of each other on their own helper lanes.
+  // Serialised under the lock, four closes took 4 x (flush + parse) ~ 95 ms per LB event against ~20
+  // in a one-device process, the whole of the (1,4,4) layout's remaining async penalty (the lag
+  // window ran 0.441 s against 0.373). The four flushes then waited concurrently and the parses
+  // serialised -- but cuptiActivityFlush(context) is deprecated and flushes the PROCESS, so those were four
+  // process-wide forced flushes of 12-17 ms each in a 16-PE process (1-6 ms in a 4-PE one), the first closer
+  // parsed everything and the other three waited 11-22 ms for it (job 22866653). Since 2026-10-13 the close is
+  // one per process (hapiDeviceGroupSize): one flush, one parse, every device's loads.
 
   const bool timeIt = (getenv("CHARM_LB_CUPTI_TIME") != nullptr);
   const double t0 = timeIt ? CmiWallTimer() : 0.0;
   // Only flush while CUPTI is attached: an application driving its own
   // instrumentation window may already have switched tracing off, and its stop
   // path flushed on the way out, so there is nothing left to pull.
-  // CHARM_LB_CUPTI_SOFT_FLUSH: flush only the buffers CUPTI has completed (no
-  // forced device synchronisation). The forced flush stalls every CUDA call of
-  // the process, on every thread, for its duration -- under +LBAsync that is
-  // every PE mid-step, every window (sph3d: 5-60 ms send stalls clustered
-  // after LB triggers, job 22799507). The records of a still-open buffer then
-  // reach the balancer one window late, which is a lag it can live with.
-  // CHARM_LB_CUPTI_PERIODIC=<ms>: CUPTI delivers its buffers on its own thread
-  // every <ms> (cuptiActivityFlushPeriod, set at attach), so the window close
-  // parses what has arrived and forces nothing: the forced flush returns only
-  // once every queued kernel has completed, and while it waits every CUDA call
-  // of the process blocks in CUPTI's launch callbacks, so a deep GPU queue
-  // (sph3d interior-first: 32 patches' forces queued ahead) turned the window
-  // close into a 135-250 ms all-GPU stall (job 22799507). The loads then lag
-  // by at most <ms>.
-  // The forced flush at a window close returns buffers that still hold incomplete records (cupti_activity.h: it is
-  // "suggested ... before the termination of the profiling session"), and CUPTI completes such a record later, from
-  // inside a subsequent CUDA call of ANY thread, by writing into the buffer. Freeing those buffers at the drain was the
-  // +LBAsync segfault (6 in ~57 sph3d arms, all within 30 steps of an LB event; job 22808905 backtraces: cudaLaunchKernel
-  // -> libcupti at the window close). Since 2026-10-11 the drain quarantines retired buffers for two drains
-  // (hapiCuptiRetireBuffer) and the forced flush stays the default: it is what gives the balancer the whole window
-  // minus the kernels still running. CHARM_LB_CUPTI_SOFT_FLUSH=1 selects the non-forced flush instead, with 16 KB
-  // buffers and the carried-over correlations of hapiProcessCuptiBuffers; it withholds the open buffer each close.
-  static const bool periodic = (getenv("CHARM_LB_CUPTI_PERIODIC") != nullptr);
-  if (hapiCuptiTracingActive() && !periodic)
-    hapiCuptiFlushGated(hapiCuptiForcedFlush() ? CUPTI_ACTIVITY_FLAG_FLUSH_FORCED : 0);
+  // The flush is the non-forced one by default (HAPI_CUPTI_FLUSH_FORCED 0): CUPTI hands over the buffers whose
+  // records are complete, as its own worker thread does concurrently with launches, so no gate is taken and no
+  // launch waits; the open buffer per thread (64 KB, cuptiBufferRequested) is the window's unreported tail, which
+  // hapiNormalizeCuptiLoads extrapolates per thread from the window stamped below. The forced flush (1) returns
+  // every buffer including those with incomplete records, which CUPTI still writes later from another thread's CUDA
+  // call: hence the quarantine (hapiCuptiRetireBuffer) and the gates, and the all-GPU stop at every close that the
+  // gates cost a multi-GPU process (~15 ms per LB event, job 22953167).
+  {   // this window ends here, in the CUPTI clock (the records' clock)
+    uint64_t now = 0;
+    cuptiGetTimestamp(&now);
+    g_cupti_window_prev_ns = g_cupti_window_close_ns;
+    g_cupti_window_close_ns = now;
+  }
+  if (hapiCuptiTracingActive()) hapiCuptiFlushGated(HAPI_CUPTI_FLUSH_FORCED ? CUPTI_ACTIVITY_FLAG_FLUSH_FORCED : 0);
   const double t1 = timeIt ? CmiWallTimer() : 0.0;
+  std::unique_lock<std::mutex> lk(gm.cupti_prepare_lock_);
+  const double t1b = timeIt ? CmiWallTimer() : 0.0;   // the wait on the lock (the other device closers' parses)
+  if (hapiCuptiLoadsBuilt(gm, epoch, dev)) return;   // built meanwhile (the process-wide path)
   hapiProcessCuptiBuffers();
   const double t2 = timeIt ? CmiWallTimer() : 0.0;
-  hapiNormalizeCuptiLoads();
+  hapiNormalizeCuptiLoads(dev < 0 ? -1 : gm.device_managers[dev].global_index);
   // Close the measurement window exactly where it was read. These records were
   // just consumed; anything recorded from here on belongs to the next round.
   //
@@ -2070,19 +2960,62 @@ void hapiPrepareCuptiLoads(uint64_t epoch) {
   // the interval. That is a feedback loop between migration count and measured
   // load, and it is what made the GPU load dimension swing round to round even
   // after per-kernel attribution was fixed.
-  gm.cupti_obj_kernel_records_.clear();
-  gm.cupti_unattributed_kernels_.clear();
+  if (dev < 0) {
+    gm.cupti_obj_kernel_records_.clear();
+    gm.cupti_unattributed_kernels_.clear();
+  } else {
+    // This device's records only; the others' belong to their own close.
+    const uint32_t gidx = (uint32_t)gm.device_managers[dev].global_index;
+    for (auto it = gm.cupti_obj_kernel_records_.begin(); it != gm.cupti_obj_kernel_records_.end();) {
+      auto& v = it->second;
+      v.erase(std::remove_if(v.begin(), v.end(), [gidx](const LBKernelRecord& k) { return k.device_id == gidx; }), v.end());
+      if (v.empty()) it = gm.cupti_obj_kernel_records_.erase(it); else ++it;
+    }
+    auto& u = gm.cupti_unattributed_kernels_;
+    u.erase(std::remove_if(u.begin(), u.end(), [gidx](const LBKernelRecord& k) { return k.device_id == gidx; }), u.end());
+  }
   if (timeIt) {
     const double t3 = CmiWallTimer();
-    CmiPrintf("[LBCUPTI pe=%d] flush=%.3fs process=%.3fs normalize=%.3fs total=%.3fs\n",
-              CmiMyPe(), t1 - t0, t2 - t1, t3 - t2, t3 - t0);
+    CmiPrintf("[LBCUPTI pe=%d] flush=%.3fs process=%.3fs normalize=%.3fs total=%.3fs shards=%zu free=%zu"
+              " wait=%.3fs retire=%.3fs pass1=%.3fs pass2=%.3fs merge=%.3fs snap=%.3fs/%lluKB bufs=%zu/%lluKB"
+              " gate=%.3fs call=%.3fs cbs=%u/%lluKB cover=%.2f scale=%.2f threads=%zu capped=%zu\n",
+              CmiMyPe(), t1 - t0, t2 - t1, t3 - t2, t3 - t0, g_cupti_shards.size(), g_cupti_free.size(),
+              t1b - t1, g_cupti_drain_prof[0], g_cupti_drain_prof[1], g_cupti_drain_prof[2], g_cupti_drain_prof[3],
+              (double)g_cupti_snap_ns.load(std::memory_order_relaxed) / 1.0e9,
+              (unsigned long long)(g_cupti_snap_bytes.load(std::memory_order_relaxed) >> 10),
+              g_cupti_drain_bufs, (unsigned long long)g_cupti_drain_valid_kb,
+              g_cupti_flush_prof.gate_s, g_cupti_flush_prof.call_s, g_cupti_flush_prof.cbs,
+              (unsigned long long)(g_cupti_flush_prof.cb_bytes >> 10), g_cupti_cover_min, g_cupti_cover_scale_max,
+              g_cupti_cover_threads, g_cupti_cover_capped);
+    for (const auto& kv : gm.cupti_api_total_dev_) {
+      auto b = gm.cupti_driver_busy_dev_.find(kv.first);
+      CmiPrintf("[LBCUPTI pe=%d]   device %d: api total %.4fs busy %.4fs\n", CmiMyPe(), kv.first, kv.second,
+                b != gm.cupti_driver_busy_dev_.end() ? b->second : 0.0);
+    }
+    {   // this drain's record counts
+      uint64_t apiN = 0, kerN = 0;
+      for (const auto& sh : g_cupti_shards) { apiN += sh.api_count; kerN += sh.kernel_count; }
+      CmiPrintf("[LBCUPTI pe=%d]   records api=%llu kernels=%llu\n", CmiMyPe(), (unsigned long long)apiN,
+                (unsigned long long)kerN);
+    }
     fflush(stdout);
   }
 
-  gm.cupti_loads_ready_ = true;
-  gm.cupti_loads_epoch_ = epoch;
+  if (dev < 0) {
+    gm.cupti_loads_ready_ = true;
+    gm.cupti_loads_epoch_ = epoch;
+  } else {
+    g_cupti_dev_ready[dev] = true;
+    g_cupti_dev_epoch[dev] = epoch;
+  }
 }
 
+// The process's round is over: its loads may be rebuilt next round. The close is per process (see
+// hapiDeviceGroupSize); the device argument names the caller's device and is not used.
+void hapiClearCuptiDataDevice(int dev) {
+  (void)dev;
+  hapiClearCuptiData();
+}
 void hapiClearCuptiData() {
   GPUManager& gm = CsvAccess(gpu_manager);
   // Same lock as hapiPrepareCuptiLoads: this drops the maps that function
@@ -2090,6 +3023,8 @@ void hapiClearCuptiData() {
   std::lock_guard<std::mutex> lk(gm.cupti_prepare_lock_);
   gm.cupti_loads_ready_ = false;
   gm.cupti_loads_epoch_ = 0;
+  for (int d = 0; d < HAPI_CUPTI_MAX_GATES; d++) { g_cupti_dev_ready[d] = false; g_cupti_dev_epoch[d] = 0; }
+  g_cupti_obj_device.clear();
 
   gm.cupti_obj_kernel_records_.clear();
   gm.cupti_unattributed_kernels_.clear();
@@ -2099,9 +3034,31 @@ void hapiClearCuptiData() {
   gm.cupti_api_intervals_.clear();
   gm.cupti_api_total_ = 0.0;
   gm.cupti_driver_busy_ = 0.0;
+  g_cupti_shards.clear();
+  gm.cupti_obj_api_raw_acc_.clear();
+  gm.cupti_api_total_acc_ = 0.0;
+  gm.cupti_api_intervals_acc_.clear();
+  gm.cupti_api_total_dev_acc_.clear();
+  gm.cupti_driver_busy_dev_.clear();
+  gm.cupti_api_total_dev_.clear();
   // Correlation maps are drained alongside the CUPTI buffers in
   // hapiProcessCuptiBuffers. Do not clear the object-token table: later epochs
   // must reuse the same token for the same full LB identity.
+}
+
+// The factor that turns an object's raw runtime-API time into its share of the serialised driver:
+// the union of this PE's device's API intervals over the summed API time of that device's threads.
+// A process can drive several devices; each device-node's launch term is its own driver's. Falls
+// back to the process-wide ratio when the device has no record this round.
+double hapiCuptiDriverScale() {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  std::lock_guard<std::mutex> lk(gm.cupti_prepare_lock_);
+  const int dev = CpvAccess(my_device);
+  auto t = gm.cupti_api_total_dev_.find(dev);
+  auto b = gm.cupti_driver_busy_dev_.find(dev);
+  if (t != gm.cupti_api_total_dev_.end() && b != gm.cupti_driver_busy_dev_.end() && t->second > 0.0)
+    return b->second / t->second;
+  return gm.cupti_api_total_ > 0.0 ? gm.cupti_driver_busy_ / gm.cupti_api_total_ : 0.0;
 }
 
 #endif
@@ -2168,12 +3125,17 @@ static void hapiExitCsv() {
 // TODO: Support custom mappings
 static void hapiMapping(char** argv) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-  Mapping map_type = Mapping::RoundRobin; // Default is round robin
+  // Default: round robin with one device per process (unchanged), block as soon as a process
+  // drives several devices, so each device owns a contiguous run of PEs (what the array map and
+  // DiffusionLB's node addressing assume). +gpumap overrides either way.
+  Mapping map_type = Mapping::RoundRobin;
+  bool map_explicit = false;
   char* gpumap = NULL;
 
   // Process +gpumap
   if (CmiGetArgStringDesc(argv, "+gpumap", &gpumap,
         "define pe to gpu device mapping")) {
+    map_explicit = true;
     if (CmiMyPe() == 0) {
       CmiPrintf("HAPI> PE-GPU mapping: %s\n", gpumap);
     }
@@ -2190,8 +3152,15 @@ static void hapiMapping(char** argv) {
     }
   }
 
-  // No mapping specified, user assumes responsibility
-  csv_gpu_manager.map_type = map_type;
+  // +gpudevs G: devices per process, instead of deriving it as visible devices / processes on
+  // the host. Every process on a host must agree (the shared-memory IPC layout is indexed by it).
+  int want_devs = 0;
+  const bool have_devs = CmiGetArgIntDesc(argv, "+gpudevs", &want_devs,
+        "GPU devices per process (default: visible devices / processes per host)");
+
+  // Rank 0 alone publishes the map type: it may switch it to block below, and a slower PE writing
+  // its own parse here afterwards would undo that before the barrier.
+  if (CmiMyRank() == 0) csv_gpu_manager.map_type = map_type;
 
   if (map_type == Mapping::None) {
     if (CmiMyPe() == 0) {
@@ -2203,9 +3172,6 @@ static void hapiMapping(char** argv) {
   CmiAssert(map_type != Mapping::None);
 
   if (CmiMyRank() == 0) {
-    printf("number of physical nodes is %d\n", CmiNumPhysicalNodes());
-    printf("number of nodes is %d\n", CmiNumNodes());
-    printf("my rank is %d\n", CmiMyRank());
     // Count number of GPU devices used by each process
     int visible_device_count;
     hapiCheck(hapiGetDeviceCount(&visible_device_count));
@@ -2213,88 +3179,113 @@ static void hapiMapping(char** argv) {
       CmiAbort("Unable to perform PE-GPU mapping, no GPUs found!");
     }
 
+    const int procs_per_host = CmiNumNodes() / CmiNumPhysicalNodes();
+    const int node_size = CmiNodeSize(CmiMyNode());
     int& device_count = csv_gpu_manager.device_count;
-    device_count = visible_device_count / (CmiNumNodes() / CmiNumPhysicalNodes());//?????
-    ckout<<"device count "<<device_count<<endl;
+    device_count = have_devs ? want_devs : visible_device_count / procs_per_host;
+    if (have_devs && (want_devs < 1 || want_devs > visible_device_count)) {
+      CmiAbort("HAPI> +gpudevs %d: this host has %d visible device(s)", want_devs,
+               visible_device_count);
+    }
 
     // Handle the case where the number of GPUs per process are larger than
     // the number of PEs per process. This is needed because we currently don't
     // support each PE using more than one device.
-    if (device_count > CmiNodeSize(CmiMyNode())) {
+    if (device_count > node_size) {
       if (CmiMyPe() == 0) {
         CmiPrintf("HAPI> Found more GPU devices (%d) than PEs (%d) per process, "
-            "limiting to %d device(s) per process\n", device_count,
-            CmiNodeSize(CmiMyNode()), CmiNodeSize(CmiMyNode()));
+            "limiting to %d device(s) per process\n", device_count, node_size, node_size);
       }
-      device_count = CmiNodeSize(CmiMyNode());
+      device_count = node_size;
     }
 
-    // We also need to handle the case where the number of GPUs are less than the 
-    // number of processes launched on a physical node. Thus multiple processes can
-    // share a GPU. In this case device_count would be 0, but instead, we will assign
-    // at least one gpu to each process
-    if(device_count == 0) {
+    // More processes on the host than devices: device_count comes out 0, and the processes
+    // share the devices (the modulo below).
+    if (device_count == 0) {
       device_count = 1;
     }
-    // Count number of PEs per device
-    csv_gpu_manager.pes_per_device = CmiNodeSize(CmiMyNode()) / device_count;
+
+    // Every device gets the same number of PEs. An uneven split would leave the IPC event pool
+    // (sized per device as pool_per_pe * pes_per_device) short for the larger groups.
+    if (node_size % device_count != 0) {
+      CmiAbort("HAPI> %d PE(s) per process over %d device(s): the PE count per process must be "
+               "a multiple of the device count (+ppn, +gpudevs)", node_size, device_count);
+    }
+    csv_gpu_manager.pes_per_device = node_size / device_count;
 
     // Count number of devices on a physical node
     csv_gpu_manager.device_count_on_physical_node = visible_device_count;
 
-    // Create a DeviceManager per GPU device
-    std::vector<DeviceManager>& device_managers = csv_gpu_manager.device_managers;
-    if(map_type == Mapping::RoundRobin) {
-      for (int i = 0; i < device_count; i++) {
-        device_managers.emplace_back(i, (device_count * CmiMyNodeRankLocal() + i) % visible_device_count);
-      }
-    }
-    else if(map_type == Mapping::Block)
-    {
-      for (int i = 0; i < device_count; i++) {
-        device_managers.emplace_back(i, (CmiMyNodeRankLocal() * visible_device_count + i)/(CmiNumNodes() / CmiNumPhysicalNodes()));
-      }
-    }
-    else
-    {
-      CmiAbort("Unsupported mapping type!");
-    }
-  }
+    if (!map_explicit && device_count > 1) csv_gpu_manager.map_type = Mapping::Block;
 
-  if (CmiMyPe() == 0) {
-    CmiPrintf("HAPI> Config: %d device(s) per process, %d PE(s) per device, %d device(s) per host\n",
-        csv_gpu_manager.device_count, csv_gpu_manager.pes_per_device,
-        csv_gpu_manager.device_count_on_physical_node);
+    // The devices this process drives: a contiguous run, device_count * local rank onward, the
+    // same for both PE rules. (The old Block formula, (rank * visible + i) / processes_per_host,
+    // collapsed onto one device whenever both the process count and the device count were above
+    // one.) The modulo lets more processes than devices share them.
+    std::vector<DeviceManager>& device_managers = csv_gpu_manager.device_managers;
+    for (int i = 0; i < device_count; i++) {
+      device_managers.emplace_back(i, (device_count * CmiMyNodeRankLocal() + i) % visible_device_count);
+    }
   }
 
   CmiNodeBarrier();
+  map_type = csv_gpu_manager.map_type;
 
-  // Perform mapping and set device representative PE
+  if (CmiMyPe() == 0) {
+    CmiPrintf("HAPI> Config: %d process(es) per host, %d device(s) per process, %d PE(s) per device, "
+        "%d device(s) per host, PE-device map %s\n",
+        CmiNumNodes() / CmiNumPhysicalNodes(), csv_gpu_manager.device_count,
+        csv_gpu_manager.pes_per_device, csv_gpu_manager.device_count_on_physical_node,
+        map_type == Mapping::Block ? "block" : "roundrobin");
+  }
+  if (CmiMyRank() == 0 && csv_gpu_manager.device_count > 1) {
+    const std::vector<DeviceManager>& dms = csv_gpu_manager.device_managers;
+    CmiPrintf("HAPI> [%d] process %d drives devices %d-%d\n", CmiMyPe(), CmiMyNode(),
+              dms.front().global_index, dms.back().global_index);
+  }
+
+  // Perform mapping and set device representative PE. The representative is the first PE of
+  // each device: it creates the device's arena, IPC handle, comm buffer and peer access.
   int my_rank = CmiMyRank();
   int& cpv_my_device = CpvAccess(my_device);
   int& cpv_my_device_id = CpvAccess(my_device_id);
   bool& cpv_device_rep = CpvAccess(device_rep);
 
   switch (map_type) {
-    case Mapping::Block:{
-      cpv_my_device_id   = (my_rank*csv_gpu_manager.device_count) / CmiNodeSize(CmiMyNode());
+    case Mapping::Block: {
+      // PEs 0..K-1 on device 0, K..2K-1 on device 1, ...
+      cpv_my_device_id   = my_rank / csv_gpu_manager.pes_per_device;
       cpv_my_device      = csv_gpu_manager.device_managers[cpv_my_device_id].global_index;
-      if (my_rank < csv_gpu_manager.device_count) cpv_device_rep = true;
+      cpv_device_rep     = (my_rank % csv_gpu_manager.pes_per_device == 0);
       firstRankForDevice = cpv_my_device;
     }
       break;
     case Mapping::RoundRobin: {
+      // PE r on device r % G: the first G ranks are one per device.
       cpv_my_device_id   = my_rank % csv_gpu_manager.device_count;
       cpv_my_device      = csv_gpu_manager.device_managers[cpv_my_device_id].global_index;
-      if (my_rank < csv_gpu_manager.device_count) cpv_device_rep = true;
+      cpv_device_rep     = (my_rank < csv_gpu_manager.device_count);
       firstRankForDevice = cpv_my_device;
     }
       break;
-    default:  
+    default:
       CmiAbort("Unsupported mapping type!");
   }
-  
+
   hapiCheck(hapiSetDevice(cpv_my_device));
+#ifdef CMK_LBDB_ON
+  {
+    // This PE thread's OS id: the CUPTI runtime-API records name the thread, and its API time
+    // belongs to this device's driver share (hapiNormalizeCuptiLoads).
+    std::lock_guard<std::mutex> lk(csv_gpu_manager.cupti_thread_device_lock_);
+    csv_gpu_manager.cupti_thread_device_[(uint32_t)syscall(SYS_gettid)] = cpv_my_device;
+  }
+  // This PE's flush gate (its device's).
+  if (cpv_my_device_id >= 0 && cpv_my_device_id < HAPI_CUPTI_MAX_GATES) {
+    t_cupti_gate_dev = cpv_my_device_id;
+    if (cpv_device_rep) cudaFree(0);   // the primary context exists from here on
+  }
+#endif
 
   // Pinned-flag completion is the default; +gpueventquery asks for the old
   // cudaEventQuery path instead. The flag WRITE goes on the copy engine
@@ -2781,10 +3772,12 @@ std::once_flag hapi_submit_once;
 static thread_local uint64_t hapi_submit_pushed_token = 0;
 static inline void hapiSubmitSetCorrelation(uint64_t token) {
   if (token == hapi_submit_pushed_token) return;
-  if (hapi_submit_pushed_token != 0) {
-    uint64_t id; cuptiActivityPopExternalCorrelationId(CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, &id);
-  }
-  if (token != 0) cuptiActivityPushExternalCorrelationId(CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, token);
+#ifdef CMK_LBDB_ON
+  CuptiEntryLog& L = hapiCuptiEntryLog();
+  std::lock_guard<std::mutex> g(L.m);
+  if (hapi_submit_pushed_token != 0) hapiCuptiLaneClose(L.obj);
+  if (token != 0) hapiCuptiLaneOpen(L.obj, token);
+#endif
   hapi_submit_pushed_token = token;
 }
 
@@ -3646,7 +4639,9 @@ static void ipcHandleCreate() {
         const int shm_index = csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id;
         if (!hapiDevPoolVmmPublish(cpv_my_device_id, pe_entry, shm_index, &pe_entry->handle))
           CmiAbort("HAPI> [%d] device pool (vmm): no heap to publish", CmiMyPe());
+        CmiLock(csv_gpu_manager.ipc_cache_lock);   // several reps per process seed this concurrently
         csv_gpu_manager.ipc_export_cache[(const void*)base] = pe_entry->handle;
+        CmiUnlock(csv_gpu_manager.ipc_cache_lock);
         pe_entry->valid = 1;
         CmiPrintf("HAPI> [%d] device pool (vmm) heap %p (%zu MB mapped of %zu MB) published "
                   "for pre-open, %d chunk descriptor(s)\n", CmiMyPe(), base, extent >> 20,
@@ -3656,7 +4651,9 @@ static void ipcHandleCreate() {
         pe_entry->base = base;
         pe_entry->extent = extent;
         // Our own export, seeded: the first send from this arena finds it.
+        CmiLock(csv_gpu_manager.ipc_cache_lock);   // several reps per process seed this concurrently
         csv_gpu_manager.ipc_export_cache[(const void*)base] = pe_entry->handle;
+        CmiUnlock(csv_gpu_manager.ipc_cache_lock);
         pe_entry->valid = 1;
         CmiPrintf("HAPI> [%d] device pool arena %p (%zu MB) published for pre-open\n",
                   CmiMyPe(), base, extent >> 20);
@@ -3839,6 +4836,40 @@ static const char* hapiCuErrNameIpc(CUresult r) {
   return s ? s : "CUDA_ERROR_?";
 }
 
+// cuMemSetAccess for every device this process drives, the owner first: one descriptor per
+// local device. A same-process send between two of the process's GPUs reads the source from
+// the destination's device, and peer access (cudaDeviceEnablePeerAccess) does not cover vmm
+// mappings. Where the whole set is refused (a pair without P2P) the owner alone is granted, so
+// a one-device process behaves exactly as before.
+static CUresult hapiVmmSetAccessAllLocal(CUdeviceptr at, size_t bytes, int owner_dev,
+                                         const char* what) {
+  const std::vector<DeviceManager>& dms = CsvAccess(gpu_manager).device_managers;
+  std::vector<CUmemAccessDesc> acc;
+  auto add = [&](int dev) {
+    for (const CUmemAccessDesc& a : acc) if (a.location.id == dev) return;
+    CUmemAccessDesc d;
+    memset(&d, 0, sizeof(d));
+    d.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    d.location.id = dev;
+    d.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+    acc.push_back(d);
+  };
+  add(owner_dev);
+  for (const DeviceManager& dm : dms) add(dm.global_index);
+  CUresult r = cuMemSetAccess(at, bytes, acc.data(), acc.size());
+  if (r != CUDA_SUCCESS && acc.size() > 1) {
+    static bool said = false;
+    if (!said) {
+      said = true;
+      CmiPrintf("HAPI> [%d] %s: cuMemSetAccess for %zu devices: %s; granting the owner (device "
+                "%d) only -- same-process cross-device reads of this memory will fault\n",
+                CmiMyPe(), what, acc.size(), hapiCuErrNameIpc(r), owner_dev);
+    }
+    r = cuMemSetAccess(at, bytes, acc.data(), 1);
+  }
+  return r;
+}
+
 // Map the peer heap named by `handle` (a HapiVmmIpcHandle) and return where
 // its base is reachable from this process; every chunk the owner has
 // published is mapped, so any offset into it addresses. Called with
@@ -3907,12 +4938,9 @@ static void* hapiVmmImportLocked(const hapiIpcMemHandle_t& handle, int src_proce
     if (r != CUDA_SUCCESS)
       CmiAbort("HAPI> [%d] vmm import: cuMemMap(chunk %zu): %s", CmiMyPe(), m.mapped,
                hapiCuErrNameIpc(r));
-    CUmemAccessDesc acc;
-    memset(&acc, 0, sizeof(acc));
-    acc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
-    acc.location.id = cur_dev;
-    acc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
-    r = cuMemSetAccess(at, m.chunk, &acc, 1);
+    // The import cache is process-wide: a PE on another of this process's devices reuses
+    // this mapping, so every local device gets access, not only the importing PE's.
+    r = hapiVmmSetAccessAllLocal(at, m.chunk, cur_dev, "vmm import");
     if (r != CUDA_SUCCESS)
       CmiAbort("HAPI> [%d] vmm import: cuMemSetAccess(chunk %zu) from device %d: %s (peer "
                "access between the devices is required)", CmiMyPe(), m.mapped, cur_dev,
@@ -4238,6 +5266,31 @@ struct HapiVmmAlloc;   // below, after the registration check it uses
 struct HapiDevPoolArena { HapiRangeAlloc* alloc; uintptr_t start, end; int device; };
 std::vector<HapiDevPoolArena> hapi_devpool_arenas;
 std::mutex hapi_devpool_mutex;
+// Segments the pool maps are handed to ck-core (hapi.h) once the pool lock is released: it registers
+// them with the fabric there and then, instead of at the first off-node transfer out of each one.
+// Measured (job 22856533, sph3d two nodes): a 256 MB chunk run registers in 10 ms (median; 268 max)
+// and the one-process-per-node layout met ~150 of them per process inside its first LB event, which
+// is where its 0.8 s Metis window over the control's came from. Deferred to the lock's release
+// because the registration takes milliseconds and must not hold the pool.
+struct HapiDevPoolPendingSegment { void* base; size_t bytes, unit; int device; };
+static thread_local std::vector<HapiDevPoolPendingSegment> t_devpool_pending_segments;
+static void hapiDevPoolRunSegmentHook() {
+  if (t_devpool_pending_segments.empty()) return;
+  std::vector<HapiDevPoolPendingSegment> v;
+  v.swap(t_devpool_pending_segments);
+  if (hapiDevPoolSegmentHook == nullptr) return;   // ck not up yet: the lazy registration path stands
+  for (const HapiDevPoolPendingSegment& sg : v) hapiDevPoolSegmentHook(sg.base, sg.bytes, sg.unit, sg.device);
+}
+// The pool lock; segments mapped under it reach the registration hook once it is released.
+struct HapiDevPoolLock {
+  std::unique_lock<std::mutex> lk;
+  HapiDevPoolLock() : lk(hapi_devpool_mutex) {}
+  // Segments mapped under this lock reach the registration hook once it is released.
+  ~HapiDevPoolLock() {
+    if (lk.owns_lock()) lk.unlock();
+    hapiDevPoolRunSegmentHook();
+  }
+};
 // Buffers the packer is reading: ptr -> the stream those reads are on. An
 // ordered map, because what the packer notes and what comes back to be freed
 // are not always the same pointer: a migration arena carved from the pool holds
@@ -4375,6 +5428,7 @@ HapiDevPoolArena& hapiDevPoolNewArenaLocked(size_t need, int dev) {
   ar.end = ar.start + bytes;
   ar.device = dev;
   hapi_devpool_arenas.push_back(ar);
+  t_devpool_pending_segments.push_back({(void*)ar.start, bytes, bytes, dev});
   CmiPrintf("HAPI> [%d] device pool: arena %zu of %zu MB at %p on device %d "
             "(CK_GPU_ARENA_MB)\n", CmiMyPe(), hapi_devpool_arenas.size(),
             bytes >> 20, (void*)ar.start, dev);
@@ -4424,6 +5478,7 @@ struct HapiVmmAlloc : HapiRangeAlloc {
     const size_t chunk = heap.chunkBytes();
     const size_t n = bytes / chunk;
     size_t held = hapiDevPoolHeldLocked();
+    size_t mapped = 0;   // chunks of this call that are mapped: handed to the segment hook as one run
     for (size_t i = 0; i < n; i++) {
       if (handles.size() >= HAPI_VMM_MAX_CHUNKS)
         CmiAbort("HAPI> [%d] device pool (vmm): %zu chunks of %zu MB mapped, the shared "
@@ -4471,17 +5526,13 @@ struct HapiVmmAlloc : HapiRangeAlloc {
                   chunk >> 20, hapiCuErrName(r), cudaDev, extent() >> 20, freeMem >> 20,
                   totalMem >> 20, gran >> 10, (unsigned)prop.requestedHandleTypes,
                   (int)prop.allocFlags.gpuDirectRDMACapable);
+        if (mapped) t_devpool_pending_segments.push_back({(void*)addr, mapped * chunk, chunk, dev});
         return false;   // the heap stays as it was; the caller reports OOM
       }
       r = cuMemMap(at, chunk, 0, h, 0);
       if (r != CUDA_SUCCESS)
         CmiAbort("HAPI> [%d] device pool (vmm): cuMemMap failed: %s", CmiMyPe(), hapiCuErrName(r));
-      CUmemAccessDesc acc;
-      memset(&acc, 0, sizeof(acc));
-      acc.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
-      acc.location.id = cudaDev;
-      acc.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
-      r = cuMemSetAccess(at, chunk, &acc, 1);
+      r = hapiVmmSetAccessAllLocal(at, chunk, cudaDev, "device pool (vmm)");
       if (r != CUDA_SUCCESS)
         CmiAbort("HAPI> [%d] device pool (vmm): cuMemSetAccess failed: %s", CmiMyPe(), hapiCuErrName(r));
       int fd = -1;
@@ -4493,12 +5544,14 @@ struct HapiVmmAlloc : HapiRangeAlloc {
       }
       handles.push_back(h);
       fds.push_back(fd);   // kept open for the run: peers duplicate it with pidfd_getfd
+      mapped++;
       held += chunk;
       if (shm != nullptr) {
         shm->fds[handles.size() - 1] = fd;
         __atomic_store_n(&shm->n_chunks, (int)handles.size(), __ATOMIC_RELEASE);
       }
     }
+    if (mapped) t_devpool_pending_segments.push_back({(void*)addr, mapped * chunk, chunk, dev});
     return true;
   }
 
@@ -4638,7 +5691,7 @@ void* hapiDevPoolMallocImpl(size_t size, int dev, bool grow) {
   void* q = nullptr;
   size_t held = 0;
   {
-    std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+    HapiDevPoolLock g;
     hapiDevPoolReapLocked();
     HapiDevPoolArena* from = nullptr;
     for (auto& ar : hapi_devpool_arenas) {
@@ -4749,14 +5802,14 @@ void hapiPreallocBegin(std::multimap<size_t, void*>* set) { hapi_prealloc_curren
 void hapiPreallocEnd() { hapi_prealloc_current = nullptr; }
 
 bool hapiDevPoolBlockSize(const void* ptr, size_t* size) {
-  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolLock g;
   HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(ptr);
   if (ar == nullptr) return false;
   return ar->alloc->blockSize(ptr, size);
 }
 
 size_t hapiDevPoolFreeBytes() {
-  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolLock g;
   hapiDevPoolReapLocked();   // parked blocks whose reads retired are free again
   size_t free = 0;
   for (auto& ar : hapi_devpool_arenas) free += ar.alloc->freeBytes();
@@ -4764,7 +5817,7 @@ size_t hapiDevPoolFreeBytes() {
 }
 
 size_t hapiDevPoolFreeBytesOn(int device) {
-  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolLock g;
   hapiDevPoolReapLocked();
   size_t free = 0;
   for (auto& ar : hapi_devpool_arenas)
@@ -4773,7 +5826,7 @@ size_t hapiDevPoolFreeBytesOn(int device) {
 }
 
 size_t hapiDevPoolUsedBytesOn(int device) {
-  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolLock g;
   hapiDevPoolReapLocked();
   size_t used = 0;
   for (auto& ar : hapi_devpool_arenas)
@@ -4783,7 +5836,7 @@ size_t hapiDevPoolUsedBytesOn(int device) {
 }
 
 size_t hapiDevPoolCapacityOn(int device) {
-  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolLock g;
   size_t cap = 0;
   for (auto& ar : hapi_devpool_arenas)
     if (ar.device == device) cap += (size_t)(ar.end - ar.start);
@@ -4876,7 +5929,7 @@ void hapiDevPoolFree(void* ptr) {
   // Not hapiRecordFree: a pool block's base is never cudaFree'd, and dropping
   // the IPC export by its address would drop the whole arena's.
   hapiRecordForget(ptr);
-  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolLock g;
   HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(ptr);
   if (!ar) CmiAbort("hapiDevPoolFree: pointer is not from the device pool");
   // The block's full extent, from the allocator's own record of it: every
@@ -4938,12 +5991,12 @@ void hapiDevPoolFree(void* ptr) {
 }
 
 bool hapiDevPoolContains(const void* ptr) {
-  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolLock g;
   return hapiDevPoolArenaOfLocked(ptr) != nullptr;
 }
 
 bool hapiDevPoolArenaOf(const void* ptr, void** base, size_t* extent) {
-  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolLock g;
   HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(ptr);
   if (ar == nullptr) return false;
   *base = (void*)ar->start;
@@ -4952,7 +6005,7 @@ bool hapiDevPoolArenaOf(const void* ptr, void** base, size_t* extent) {
 }
 
 bool hapiDevPoolSegmentOf(const void* ptr, size_t cnt, void** base, size_t* extent) {
-  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolLock g;
   HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(ptr);
   if (ar == nullptr) return false;
   if (!ar->alloc->vmm()) {
@@ -4990,7 +6043,7 @@ bool hapiDevPoolSegmentOf(const void* ptr, size_t cnt, void** base, size_t* exte
 }
 
 void hapiDevPoolEnsureArena(int dev, void** base, size_t* extent) {
-  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolLock g;
   if (CsvAccess(gpu_manager).device_pool_backend == 1) {
     HapiDevPoolArena* ar = hapiDevPoolVmmArenaLocked(dev);
     if (ar == nullptr) ar = &hapiDevPoolNewVmmHeapLocked(dev);   // maps the startup budget
@@ -5013,7 +6066,7 @@ void hapiDevPoolEnsureArena(int dev, void** base, size_t* extent) {
 // the chunk descriptors from, and the synthetic handle a send carries.
 bool hapiDevPoolVmmPublish(int dev, hapi_pool_shm_entry* e, int shm_index,
                            hapiIpcMemHandle_t* handle) {
-  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolLock g;
   HapiDevPoolArena* ar = hapiDevPoolVmmArenaLocked(dev);
   if (ar == nullptr) return false;
   HapiVmmAlloc* v = (HapiVmmAlloc*)ar->alloc;
@@ -5029,7 +6082,7 @@ bool hapiDevPoolVmmPublish(int dev, hapi_pool_shm_entry* e, int shm_index,
 
 // The synthetic handle for a pointer in this process's vmm heap, for a send.
 bool hapiDevPoolVmmHandleOf(const void* ptr, hapiIpcMemHandle_t* handle, void** base) {
-  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolLock g;
   HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(ptr);
   if (ar == nullptr || !ar->alloc->vmm()) return false;
   HapiVmmAlloc* v = (HapiVmmAlloc*)ar->alloc;
@@ -5041,7 +6094,7 @@ bool hapiDevPoolVmmHandleOf(const void* ptr, hapiIpcMemHandle_t* handle, void** 
 }
 
 void hapiDevPoolNoteRead(const void* ptr, hapiStream_t stream) {
-  std::lock_guard<std::mutex> g(hapi_devpool_mutex);
+  HapiDevPoolLock g;
   if (hapiDevPoolArenaOfLocked(ptr) == nullptr) return;   // not ours; nothing to order
   // The null stream is the legacy default: recording on it is legal and orders
   // behind everything blocking, which is the safe reading.
@@ -6152,6 +7205,11 @@ static inline void hapiCuptiSyncGeneration(GPUManager& gm) {
     cupti_seen_generation = gm.cupti_generation_;
     cupti_pushed_depth = 0;
     cupti_tag_pushed_depth = 0;
+    if (CuptiEntryLog* L = t_cupti_entry_log) {   // the spans those pushes opened belong to the detached tracing
+      std::lock_guard<std::mutex> g(L->m);
+      L->obj.open.clear();
+      L->tag.open.clear();
+    }
   }
 }
 
@@ -6195,8 +7253,11 @@ uint64_t hapiCuptiPushObjCorrelation() {
     // here) acquisitions rather than one per entry method.
     // Joined the step already: leave it unattributed for the rest of the round.
     if (cupti_joined_objects.find(key) != cupti_joined_objects.end()) {
-      CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
-          CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, HAPI_CUPTI_NO_OBJECT));
+      {
+        CuptiEntryLog& L = hapiCuptiEntryLog();
+        std::lock_guard<std::mutex> g(L.m);
+        hapiCuptiLaneOpen(L.obj, HAPI_CUPTI_NO_OBJECT);
+      }
       ++cupti_pushed_depth;
       return HAPI_CUPTI_NO_OBJECT;
     }
@@ -6215,11 +7276,14 @@ uint64_t hapiCuptiPushObjCorrelation() {
     }
   }
 
-  // Always push, even with the sentinel, so that the matching pop always has
-  // something to remove; an unbalanced stack would mis-attribute every
+  // Always open a span, even with the sentinel, so that the matching pop always
+  // has something to close; an unbalanced stack would mis-attribute every
   // subsequent kernel.
-  CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
-      CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, object_token));
+  {
+    CuptiEntryLog& L = hapiCuptiEntryLog();
+    std::lock_guard<std::mutex> g(L.m);
+    hapiCuptiLaneOpen(L.obj, object_token);
+  }
   ++cupti_pushed_depth;
   hapiSubmitSetToken(object_token);
 
@@ -6244,9 +7308,11 @@ void hapiCuptiPopObjCorrelation() {
   if (!gm.cupti_tracing_active_.load(std::memory_order_seq_cst) && !gm.cupti_initialized_) return;
   --cupti_pushed_depth;
 
-  uint64_t tag;
-  CUPTI_SAFE_CALL(cuptiActivityPopExternalCorrelationId(
-      CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN, &tag));
+  {
+    CuptiEntryLog& L = hapiCuptiEntryLog();
+    std::lock_guard<std::mutex> g(L.m);
+    hapiCuptiLaneClose(L.obj);
+  }
 }
 
 bool hapiCuptiPushKernelTag(uint64_t workTag) {
@@ -6258,8 +7324,11 @@ bool hapiCuptiPushKernelTag(uint64_t workTag) {
   if (!gm.cupti_tracing_active_.load(std::memory_order_seq_cst)) return false;
   hapiCuptiSyncGeneration(gm);
 
-  CUPTI_SAFE_CALL(cuptiActivityPushExternalCorrelationId(
-      CUPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0, workTag));
+  {
+    CuptiEntryLog& L = hapiCuptiEntryLog();
+    std::lock_guard<std::mutex> g(L.m);
+    hapiCuptiLaneOpen(L.tag, workTag);
+  }
   ++cupti_tag_pushed_depth;
   return true;
 }
@@ -6272,9 +7341,9 @@ void hapiCuptiPopKernelTag() {
   if (!gm.cupti_tracing_active_.load(std::memory_order_seq_cst) && !gm.cupti_initialized_) return;
   --cupti_tag_pushed_depth;
 
-  uint64_t tag;
-  CUPTI_SAFE_CALL(cuptiActivityPopExternalCorrelationId(
-      CUPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0, &tag));
+  CuptiEntryLog& L = hapiCuptiEntryLog();
+  std::lock_guard<std::mutex> g(L.m);
+  hapiCuptiLaneClose(L.tag);
 }
 
 // Lightweight HAPI, to be invoked after data transfer or kernel execution.
@@ -6450,6 +7519,25 @@ uint64_t hapiMyDevice() {
 int hapiDeviceForPe(int pe) {
   return CpvAccessOther(my_device, CmiRankOf(pe));
 }
+
+// The device (index on its host) ANY PE of the job drives: exact for a PE of this process, by the
+// mapping's own formula for every other process (every process has the same PE count and device
+// count: the shared-memory IPC layout on a host is indexed by both). -1 before the mapping ran.
+// The balancers price a transfer between two PEs by this: same device, another device of the same
+// process (a peer copy), another process on the host (IPC), another host.
+int hapiDeviceIndexOfPe(int pe) {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  if (gm.device_managers.empty() || gm.pes_per_device <= 0) return -1;
+  if (CmiNodeOf(pe) == CmiMyNode()) return CpvAccessOther(my_device, CmiRankOf(pe));
+  const int G = gm.device_count, K = gm.pes_per_device;
+  const int visible = gm.device_count_on_physical_node > 0 ? gm.device_count_on_physical_node : 1;
+  const int rank = CmiRankOf(pe);
+  const int local = (gm.map_type == Mapping::Block) ? rank / K : rank % G;
+  return (G * CmiNodeRankLocal(pe) + local) % visible;
+}
+int hapiPesPerDevice() { return CsvAccess(gpu_manager).pes_per_device; }
+int hapiDevicesPerProcess() { return CsvAccess(gpu_manager).device_count; }
+bool hapiDeviceMapIsBlock() { return CsvAccess(gpu_manager).map_type == Mapping::Block; }
 
 #ifdef CMK_LBDB_ON
 const GpuDeviceDescriptor& hapiMyDeviceDescriptor() {

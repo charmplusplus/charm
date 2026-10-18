@@ -526,9 +526,7 @@ void MetaBalancer::ContributeStats(int it_n) {
     lbmanager->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
     {
       const GPUManager& gm = CsvAccess(gpu_manager);
-      lbmanager->SetObjDriverLoad(
-          gm.cupti_obj_api_raw_,
-          gm.cupti_api_total_ > 0.0 ? gm.cupti_driver_busy_ / gm.cupti_api_total_ : 0.0);
+      lbmanager->SetObjDriverLoad(gm.cupti_obj_api_raw_, hapiCuptiDriverScale());
     }
     lb_data[METALB_DEV_BASE] = metalbDevIdToSlot(metalbMyDeviceId());
     lb_data[METALB_DEV_BASE + 1] = lbmanager->GetTotalObjGPULoad();

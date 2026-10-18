@@ -1348,7 +1348,7 @@ int LBManager::ProcessorSpeed()
 int LBManager::ProcessorGPUSpeed()
 {
 #if CMK_CUDA
-  static int gpuSpeed = -1; // Cache the result
+  static thread_local int gpuSpeed = -1; // per PE: the PEs of one process can drive different devices
   
   if (gpuSpeed != -1) {
     return gpuSpeed;

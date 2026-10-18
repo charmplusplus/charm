@@ -245,7 +245,7 @@ void CentralLB::CallLB()
   // whole process, and a drain by the first arrival dropped every kernel the
   // other PEs' objects were still finishing. See DistBaseLB::barrierDone for
   // the measurement. The earlier arrivals continue from gpuLoadsReady.
-  if (!hapiCuptiArrive((uint64_t)step(), CkNodeSize(CkMyNode()))) return;
+  if (!hapiCuptiArrive((uint64_t)step(), hapiDeviceGroupSize())) return;   // per process (see DistBaseLB)
   {
     // CHARM_LB_CUPTI_OFFTHREAD=near | <cpulist> | 1: the window's CUPTI flush, parse and normalise
     // on the shared helper thread instead of inline in this PE's entry method (the same knob and
@@ -262,15 +262,16 @@ void CentralLB::CallLB()
       }
       if (flushOnPe && hapiCuptiTracingActive())
         hapiCuptiFlushGated(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
-      CuptiBuildJob* bj = new CuptiBuildJob(thisgroup, CkNodeFirst(CkMyNode()), CkNodeSize(CkMyNode()));
-      lbHelperSubmit(cpus, [bj]() { hapiPrepareCuptiLoads(); bj->done.store(true, std::memory_order_release); });
+      CuptiBuildJob* bj = new CuptiBuildJob(thisgroup, hapiDeviceGroupFirstPe(), hapiDeviceGroupSize());
+      const int dev = hapiMyDeviceIndex();
+      lbHelperSubmit(cpus, [bj, dev]() { hapiPrepareCuptiLoadsDevice(HAPI_CUPTI_EPOCH_LB_ROUND, dev); bj->done.store(true, std::memory_order_release); }, dev < 0 ? 0 : dev);
       CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, (void*)bj);
       return;
     }
   }
-  hapiPrepareCuptiLoads();
-  const int first = CkNodeFirst(CkMyNode());
-  for (int r = 0; r < CkNodeSize(CkMyNode()); r++)
+  hapiPrepareCuptiLoadsDevice(HAPI_CUPTI_EPOCH_LB_ROUND, hapiMyDeviceIndex());
+  const int first = hapiDeviceGroupFirstPe();
+  for (int r = 0; r < hapiDeviceGroupSize(); r++)
     thisProxy[first + r].gpuLoadsReady();
 #else
   thisProxy [CkMyPe()].ProcessAtSync();
@@ -290,9 +291,7 @@ void CentralLB::gpuLoadsReady()
     // carry no launch term -- the pre-split behaviour, for A/B runs.
     static const bool noSplit = (getenv("CHARM_LB_NO_DRIVER_SPLIT") != nullptr);
     static const std::unordered_map<LDObjKey, double, LDObjKeyHash> noApi;
-    lbmgr->SetObjDriverLoad(noSplit ? noApi : gm.cupti_obj_api_raw_,
-                            gm.cupti_api_total_ > 0.0 ? gm.cupti_driver_busy_ / gm.cupti_api_total_
-                                                      : 0.0);
+    lbmgr->SetObjDriverLoad(noSplit ? noApi : gm.cupti_obj_api_raw_, hapiCuptiDriverScale());
   }
   if (_lb_args.gpuScaling())
     lbmgr->SetObjGPUCosts(CsvAccess(gpu_manager).cupti_obj_epoch_costs_);
@@ -1747,8 +1746,8 @@ void CentralLB::MigrationDoneImpl (int balancing)
   LBTurnInstrumentOn();
 
 #if CMK_CUDA
-  if (CmiMyRank() == 0)
-    hapiClearCuptiData();
+  if (CkMyPe() == hapiDeviceGroupFirstPe())
+    hapiClearCuptiDataDevice(hapiMyDeviceIndex());
 #endif
   // Increment to next step
   lbmgr->incStep();

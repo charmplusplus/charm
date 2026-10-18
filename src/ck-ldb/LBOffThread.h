@@ -10,6 +10,7 @@
 #include <functional>
 #include <mutex>
 #include <thread>
+#include <vector>
 
 // CPU set for an LB helper thread, from a spec string:
 //   near[:<domain>:<first>-<last>]  the idle cores of the calling PE's NUMA domain (default 16-core
@@ -61,22 +62,33 @@ inline bool lbOffThreadCpus(const char* spec, cpu_set_t* set) {
 // behind (DistBaseLB.C). The state is heap-allocated and never destroyed, on purpose: a static
 // condition_variable is destroyed by exit() while the detached helper waits on it, and
 // pthread_cond_destroy then blocks every process in __run_exit_handlers (job 22284602).
+// One helper per LANE: a process driving several devices has one device group per device, each
+// with its own CUPTI build and strategy per round, and one thread serialised them (lane = the
+// device index; a one-device process uses lane 0 only, as before).
 struct LBHelper {
   std::mutex m;
   std::condition_variable cv;
   std::deque<std::function<void()>> jobs;
   bool started = false;
-  static LBHelper& get() { static LBHelper& h = *new LBHelper; return h; }
+  static LBHelper& lane(int i) {
+    static std::mutex* lanes_m = new std::mutex;
+    static std::vector<LBHelper*>* lanes = new std::vector<LBHelper*>;
+    std::lock_guard<std::mutex> lk(*lanes_m);
+    if (i < 0) i = 0;
+    while ((int)lanes->size() <= i) lanes->push_back(new LBHelper);
+    return *(*lanes)[i];
+  }
+  static LBHelper& get() { return lane(0); }
 };
 
-inline void lbHelperSubmit(const cpu_set_t& cpus, std::function<void()> job) {
-  LBHelper& h = LBHelper::get();
+inline void lbHelperSubmit(const cpu_set_t& cpus, std::function<void()> job, int laneIdx = 0) {
+  LBHelper& h = LBHelper::lane(laneIdx);
   std::unique_lock<std::mutex> lk(h.m);
   if (!h.started) {
     h.started = true;
-    std::thread([cpus]() {
+    std::thread([cpus, laneIdx]() {
       sched_setaffinity(0, sizeof(cpus), &cpus);
-      LBHelper& h = LBHelper::get();
+      LBHelper& h = LBHelper::lane(laneIdx);
       for (;;) {
         std::function<void()> job;
         {

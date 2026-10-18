@@ -80,7 +80,7 @@ struct LBCriticality
   double sumDrv = 0.0, maxDrv = 0.0;
   int pes = 0;    // P: PEs the host dimension is spread over
   int gpus = 0;   // G: devices the device dimension is spread over
-  int procs = 0;  // processes (CUDA contexts) the driver time is spread over
+  int procs = 0;  // CUDA contexts the driver time is spread over: one per (process, device) pair
   // Wall time of the balancing interval, the longest any PE saw. What the
   // two measured loads are held against: alpha says which of them is the
   // larger relative to its resources, and nothing about whether either is
@@ -281,18 +281,24 @@ static inline void lbPrintExplained(const char* who, const LBCriticality& c)
 static inline LBCriticality lbCriticalityOf(const BaseLB::LDStats* stats)
 {
   LBCriticality c;
+  // The driver term is spread over CUDA CONTEXTS, one per (process, device): a process driving four
+  // devices has four drivers, not one. Counting processes gave such a process a quarter of the
+  // contexts and quadrupled its launch share ("launch 18%" against the control's 5% on leanmd and
+  // 15% against 4% on sph3d, job 22953717) -- DiffusionLB's distributed form counts one per
+  // device-node already (DiffusionLB::loadDimReport). gpu_device_id is job-global (physical node
+  // << 32 | device), so the pair is (process, that id).
   std::unordered_set<uint64_t> devices;
-  std::unordered_set<int> processes;
+  std::unordered_set<uint64_t> contexts;
   for (int pe = 0; pe < stats->nprocs(); pe++)
   {
     if (!stats->procs[pe].available) continue;
     c.pes++;
     devices.insert(stats->procs[pe].gpu_device_id);
-    processes.insert(CmiNodeOf(pe));
+    contexts.insert((static_cast<uint64_t>(CmiNodeOf(pe)) << 48) ^ stats->procs[pe].gpu_device_id);
     c.period = std::max(c.period, (double)stats->procs[pe].total_walltime);
   }
   c.gpus = (int)devices.size();
-  c.procs = (int)processes.size();
+  c.procs = (int)contexts.size();
   for (size_t i = 0; i < stats->objData.size(); i++)
   {
     const LDObjData& o = stats->objData[i];

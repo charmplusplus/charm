@@ -410,6 +410,11 @@ void hapiDevPoolEnsureArena(int device, void** base, size_t* extent);
 void hapiDevPoolNoteRead(const void* ptr, hapiStream_t stream);
 // +gpupool: the pool is the runtime's own allocation policy (see gpumanager.h).
 bool hapiDevPoolOn();
+// Set by ck-core at startup. A segment the pool has just mapped -- a run of vmm chunks, or a buddy
+// arena -- as (base, bytes, unit, device), unit being what the fabric registers (one chunk, or the
+// arena). Called on the thread that mapped it, with the pool lock released; ck registers the units
+// there and then, so no transfer later pays for the registration.
+extern void (*hapiDevPoolSegmentHook)(void* base, size_t bytes, size_t unit, int device);
 
 // Per-device pool of non-blocking streams, with ownership.
 //
@@ -563,6 +568,17 @@ class hapiCuptiKernelTagScope {
 };
 
 void hapiProcessCuptiBuffers();
+// This PE's device's driver share per second of its objects' runtime-API time (LBDatabase::SetObjDriverLoad).
+double hapiCuptiDriverScale();
+// The window close is per process (hapiDeviceGroupSize is the process's PE count, hapiDeviceGroupFirstPe its
+// first PE): the balancers' arrival count and gpuLoadsReady fan-out, this PE's device index, the build of the
+// process's loads, and the end of its round. A per-device close is not possible: cuptiActivityFlush ignores its
+// context argument (see the flush gate in hapi_impl.cpp).
+int hapiDeviceGroupSize();
+int hapiDeviceGroupFirstPe();
+int hapiMyDeviceIndex();
+void hapiPrepareCuptiLoadsDevice(uint64_t epoch, int dev);
+void hapiClearCuptiDataDevice(int dev);
 
 // Epoch a load balancer passes to hapiPrepareCuptiLoads: larger than any
 // sampling epoch, so an LB round always rebuilds on top of whatever the
@@ -585,7 +601,7 @@ void hapiPrepareCuptiLoads(uint64_t epoch = HAPI_CUPTI_EPOCH_LB_ROUND);
 // cuptiActivityFlushAll with no chare launch in flight (the flush gate, hapi_impl.cpp). Any flush while kernels
 // may be launched from other threads must go through this.
 void hapiCuptiFlushGated(uint32_t flag);
-void hapiNormalizeCuptiLoads();
+void hapiNormalizeCuptiLoads(int onlyDevice = -1);
 void hapiClearCuptiData();
 
 // Arrival gate in front of hapiPrepareCuptiLoads for a load-balancing round.

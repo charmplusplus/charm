@@ -40,6 +40,7 @@ namespace {
 struct CuptiBuild {
   CkGroupID gid;
   int first, count;
+  int dev = -1;   // the device group whose window this build closes
   std::atomic<bool> done{false};
 };
 
@@ -187,20 +188,26 @@ void DistBaseLB::barrierDone() {
   // load for all of its objects at every step, and the balancer spent every
   // step filling a hole that was never there. The earlier arrivals return here
   // and continue from gpuLoadsReady once the build is done.
-  if (!hapiCuptiArrive((uint64_t)step(), CkNodeSize(CkMyNode()))) return;
+  // Per process (hapiDeviceGroupSize is its PE count): CUPTI flushes the process whatever context is
+  // named, so the last PE of the process closes the window for all its devices at once.
+  if (!hapiCuptiArrive((uint64_t)step(), hapiDeviceGroupSize())) return;
   {
     cpu_set_t cpus;
     if (cuptiOffThreadCpus(&cpus)) {
       CuptiBuild* b = new CuptiBuild;
       b->gid = thisgroup;
-      b->first = CkNodeFirst(CkMyNode());
-      b->count = CkNodeSize(CkMyNode());
+      b->first = hapiDeviceGroupFirstPe();
+      b->count = hapiDeviceGroupSize();
+      b->dev = hapiMyDeviceIndex();
       // CHARM_LB_CUPTI_OFFTHREAD_FLUSH_ON_PE: pull the records on this PE and
       // leave only the parsing to the helper (diagnostic: which half matters).
       static const bool flushOnPe = (getenv("CHARM_LB_CUPTI_OFFTHREAD_FLUSH_ON_PE") != nullptr);
       if (flushOnPe && hapiCuptiTracingActive())
         hapiCuptiFlushGated(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED);
-      cuptiWorkerSubmit(b, cpus);
+      lbHelperSubmit(cpus, [b]() {
+        hapiPrepareCuptiLoadsDevice(HAPI_CUPTI_EPOCH_LB_ROUND, b->dev);
+        b->done.store(true, std::memory_order_release);
+      }, b->dev < 0 ? 0 : b->dev);
       // CHARM_LB_CUPTI_OFFTHREAD_STALL_MS (diagnostic): hold this PE for that long
       // anyway, as the on-PE build did, to tell "the PE is free" apart from
       // "the PEs stay in phase".
@@ -213,9 +220,9 @@ void DistBaseLB::barrierDone() {
       return;
     }
   }
-  hapiPrepareCuptiLoads();
-  const int first = CkNodeFirst(CkMyNode());
-  for (int r = 0; r < CkNodeSize(CkMyNode()); r++)
+  hapiPrepareCuptiLoadsDevice(HAPI_CUPTI_EPOCH_LB_ROUND, hapiMyDeviceIndex());
+  const int first = hapiDeviceGroupFirstPe();
+  for (int r = 0; r < hapiDeviceGroupSize(); r++)
     thisProxy[first + r].gpuLoadsReady();
 #else
   gpuLoadsReady();
@@ -246,9 +253,7 @@ void DistBaseLB::gpuLoadsReady() {
     // carry no launch term -- the pre-split behaviour, for A/B runs.
     static const bool noSplit = (getenv("CHARM_LB_NO_DRIVER_SPLIT") != nullptr);
     static const std::unordered_map<LDObjKey, double, LDObjKeyHash> noApi;
-    lbmgr->SetObjDriverLoad(noSplit ? noApi : gm.cupti_obj_api_raw_,
-                            gm.cupti_api_total_ > 0.0 ? gm.cupti_driver_busy_ / gm.cupti_api_total_
-                                                      : 0.0);
+    lbmgr->SetObjDriverLoad(noSplit ? noApi : gm.cupti_obj_api_raw_, hapiCuptiDriverScale());
   }
   if (_lb_args.gpuScaling())
     lbmgr->SetObjGPUCosts(CsvAccess(gpu_manager).cupti_obj_epoch_costs_);
@@ -530,8 +535,8 @@ void DistBaseLB::MigrationDone(int balancing) {
   // Drop the kernel records this round's loads were derived from, so the next
   // round measures the next interval rather than everything since startup
   // (mirrors CentralLB::ProcessMigrationDecision).
-  if (CmiMyRank() == 0)
-    hapiClearCuptiData();
+  if (CkMyPe() == hapiDeviceGroupFirstPe())
+    hapiClearCuptiDataDevice(hapiMyDeviceIndex());
 #endif
 
   // Settle before resuming.

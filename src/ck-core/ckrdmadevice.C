@@ -53,6 +53,8 @@
 #include "buddy_allocator.h"
 #include <mutex>
 #include <map>
+#include <set>
+#include <condition_variable>
 
 #define CMK_GPU_COMM 1
 
@@ -305,10 +307,13 @@ static void ckDeviceWorkEnd(void* token)
   delete t;
 }
 
+static void ckRegisterPoolSegments(void* base, size_t bytes, size_t unit, int dev);   // below, with the arena registrations
+
 void CkRdmaDeviceRegistrationCacheInit()
 {
   hapiDeviceWorkBegin = ckDeviceWorkBegin;
   hapiDeviceWorkEnd = ckDeviceWorkEnd;
+  hapiDevPoolSegmentHook = ckRegisterPoolSegments;   // pool segments register at the mapping
   CkpvInitialize(DeviceMrCache*, device_mr_cache);
   CkpvAccess(device_mr_cache) = deviceMrCacheEnabled() ? new DeviceMrCache() : NULL;
   CkpvInitialize(DeviceRecvHoldMap*, device_recv_holds);
@@ -489,7 +494,66 @@ void CkRdmaDeviceMsgFreed(void* env)
 // the vmm backend (hapiDevPoolSegmentOf). Keyed by (base, extent); created on
 // first use; marked no-dereg so no completion path can ever release it.
 static std::mutex g_deviceArenaRegLock;
+static std::condition_variable g_deviceArenaRegCv;
 static std::map<std::pair<uintptr_t, size_t>, CmiNcpyBuffer> g_deviceArenaRegs;
+static std::set<std::pair<uintptr_t, size_t>> g_deviceArenaRegBusy;   // registrations in flight, lock released
+
+// Registers [base, base+extent) with the fabric once for the process and returns its descriptor;
+// true when this call did the registering (ms_out: how long it took). The fabric call runs with the
+// lock RELEASED: it costs milliseconds per chunk and a process whose PEs first touch many chunks at
+// once (a one-process-per-node layout at its Metis event: ~150 chunk runs per process, job
+// 22856533) would otherwise register them one after another, every PE queued on this mutex.
+// Concurrent registrations of DIFFERENT chunks proceed together; a second requester of a chunk
+// already in flight waits for that one registration.
+static bool registerPoolSegmentOnce(void* base, size_t extent, CmiNcpyBuffer* out, double* ms_out)
+{
+  std::unique_lock<std::mutex> lk(g_deviceArenaRegLock);
+  const auto key = std::make_pair((uintptr_t)base, extent);
+  auto it = g_deviceArenaRegs.find(key);
+  if (it == g_deviceArenaRegs.end() && g_deviceArenaRegBusy.count(key)) {
+    g_deviceArenaRegCv.wait(lk, [&] { return !g_deviceArenaRegBusy.count(key); });
+    it = g_deviceArenaRegs.find(key);
+  }
+  bool registered = false;
+  if (it == g_deviceArenaRegs.end()) {
+    g_deviceArenaRegBusy.insert(key);
+    lk.unlock();
+    const double t0 = CmiWallTimer();
+    CmiNcpyBuffer reg(base, extent, CMK_BUFFER_REG, CMK_BUFFER_NODEREG);  // the one registration
+    if (ms_out) *ms_out = (CmiWallTimer() - t0) * 1.0e3;
+    lk.lock();
+    it = g_deviceArenaRegs.emplace(key, reg).first;
+    g_deviceArenaRegBusy.erase(key);
+    g_deviceArenaRegCv.notify_all();
+    registered = true;
+  }
+  if (out) *out = it->second;
+  return registered;
+}
+
+// hapiDevPoolSegmentHook: the pool has just mapped [base, base+bytes) in units of `unit` (a vmm chunk,
+// or the whole buddy arena). Register every unit now, on the mapping thread with the pool lock
+// released, so that no transfer later pays the 10 ms per chunk at its first use -- for the
+// one-process-per-node layout that was ~150 registrations inside its first LB event (job 22856533).
+// One node holds no off-node peer, and nothing is registered there, as before.
+static void ckRegisterPoolSegments(void* base, size_t bytes, size_t unit, int dev)
+{
+  if (CmiNumPhysicalNodes() <= 1 || unit == 0) return;
+  const double t0 = CmiWallTimer();
+  size_t n = 0;
+  double mx = 0.0;
+  for (size_t off = 0; off < bytes; off += unit) {
+    double ms = 0.0;
+    if (registerPoolSegmentOnce((char*)base + off, std::min(unit, bytes - off), NULL, &ms)) {
+      n++;
+      if (ms > mx) mx = ms;
+    }
+  }
+  if (n > 0)
+    CmiPrintf("[%d] device pool: %zu %s of %zu MB on device %d registered for RDMA at the mapping "
+              "(%.2f s, max %.1f ms each)\n", CmiMyPe(), n,
+              hapiDevPoolIsVmm() ? "chunk runs" : "arenas", unit >> 20, dev, CmiWallTimer() - t0, mx);
+}
 
 static bool acquireArenaRegistration(const void* ptr, size_t cnt, CmiNcpyBuffer* out)
 {
@@ -498,16 +562,10 @@ static bool acquireArenaRegistration(const void* ptr, size_t cnt, CmiNcpyBuffer*
   size_t extent = 0;
   if (!hapiDevPoolSegmentOf(ptr, cnt, &base, &extent)) return false;
 
-  std::lock_guard<std::mutex> lk(g_deviceArenaRegLock);
-  const auto key = std::make_pair((uintptr_t)base, extent);
-  auto it = g_deviceArenaRegs.find(key);
-  if (it == g_deviceArenaRegs.end()) {
-    CmiNcpyBuffer reg(base, extent, CMK_BUFFER_REG, CMK_BUFFER_NODEREG);  // the one registration
-    it = g_deviceArenaRegs.emplace(key, reg).first;
-    CmiPrintf("[%d] device pool: %s %p (%zu MB) registered once for RDMA\n",
-              CmiMyPe(), hapiDevPoolIsVmm() ? "chunk run" : "arena", base, extent >> 20);
-  }
-  *out = it->second;
+  double ms = 0.0;
+  if (registerPoolSegmentOnce(base, extent, out, &ms))
+    CmiPrintf("[%d] device pool: %s %p (%zu MB) registered once for RDMA (%.1f ms)\n",
+              CmiMyPe(), hapiDevPoolIsVmm() ? "chunk run" : "arena", base, extent >> 20, ms);
   // The registration covers the arena; the transfer is the buffer.
   out->ptr = ptr;
   out->cnt = cnt;
@@ -631,6 +689,7 @@ struct ZcModeStats {
   std::atomic<long> batch_ops{0};
   std::atomic<long> batch_max{0};
   std::atomic<long> batch_fallback{0};
+  std::atomic<long> batch_us{0};   // host time inside the batched copy call (and its fallback)
   // Host time (us) the PEs of this process spent inside the per-message paths:
   // preparing a send (CkRdmaDeviceOnSender), admitting and issuing a receive
   // (CkRdmaDeviceIssueRgets), and completing ops (CkRdmaDeviceRecvHandler).
@@ -679,9 +738,9 @@ struct ZcModeStats {
     const long bf = batch_flushes.load();
     if (bf > 0)
       fprintf(stderr, "[zc-batch] pid=%d batches=%ld ops=%ld mean_ops=%.1f max_ops=%ld "
-                      "fallbacks=%ld\n",
+                      "fallbacks=%ld call_us_total=%ld call_us_mean=%.1f\n",
               (int)getpid(), bf, batch_ops.load(), (double)batch_ops.load() / bf,
-              batch_max.load(), batch_fallback.load());
+              batch_max.load(), batch_fallback.load(), batch_us.load(), (double)batch_us.load() / bf);
     fflush(stderr);
   }
 };
@@ -901,7 +960,7 @@ CkDeviceStatus CkDevicePersistent::get(CkDevicePersistent& src) {
 
   // Perform get
   if (mode == CkNcpyModeDevice::MEMCPY) {
-    hapiMemcpyAsync((void*)ptr, src.ptr, cnt, hapiMemcpyDeviceToDevice, hapi_stream);
+    hapiMemcpyAsync((void*)ptr, src.ptr, cnt, cudaMemcpyDefault, hapi_stream);
   } else if (mode == CkNcpyModeDevice::IPC) {
     if (!src.ipc_open) {
       hapiCheck(hapiIpcOpenMemHandle(&src.ipc_ptr, src.hapi_ipc_handle,
@@ -934,7 +993,7 @@ CkDeviceStatus CkDevicePersistent::put(CkDevicePersistent& dst) {
 
   // Perform put
   if (mode == CkNcpyModeDevice::MEMCPY) {
-    hapiMemcpyAsync((void*)dst.ptr, ptr, cnt, hapiMemcpyDeviceToDevice, hapi_stream);
+    hapiMemcpyAsync((void*)dst.ptr, ptr, cnt, cudaMemcpyDefault, hapi_stream);
   } else if (mode == CkNcpyModeDevice::IPC) {
     if (!dst.ipc_open) {
       hapiCheck(hapiIpcOpenMemHandle(&dst.ipc_ptr, dst.hapi_ipc_handle,
@@ -1487,6 +1546,7 @@ static void deviceRecvBatchFlush()
   // The arrays belong to the batch, which lives until its completion handler
   // frees it, so the closure may run later (submit mode) and still read them.
   hapiSubmit(rs, [=]() {
+    const double tb0 = zcStatsOnFast() ? CkWallTimer() : 0.0;
     cudaError_t err = cudaErrorNotSupported;
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 12080
     if (n > 1) {
@@ -1513,6 +1573,8 @@ static void deviceRecvBatchFlush()
       for (size_t i = 0; i < n; i++)
         hapiCheck(cudaMemcpyAsync(b->dsts[i], b->srcs[i], b->sizes[i], cudaMemcpyDefault, rs));
     }
+    if (tb0 != 0.0)
+      zc_mode_stats.batch_us.fetch_add((long)((CkWallTimer() - tb0) * 1e6), std::memory_order_relaxed);
   });
   hapiAddCallback(rs, CkCallback(deviceRecvBatchDone, (void*)b));
 }
@@ -2425,7 +2487,7 @@ extern "C" void* device_restage_req_bridge(void* arg)
       { hapiSubmitDrain(); hapiCheck(cudaDeviceSynchronize()); }
 
     hapiCheck(hapiMemcpyAsync(staged, src_ptr, req->cnt,
-                              hapiMemcpyDeviceToDevice, hapiStreamPerThread));
+                              cudaMemcpyDefault, hapiStreamPerThread));
 
     const int device_idx =
         csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id;
@@ -4422,7 +4484,7 @@ static bool ipcPrepareBuffers(int dest_pe, int numops, CkDeviceBuffer** buffers,
         }
       }
       hapiCheck(hapiMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
-            hapiMemcpyDeviceToDevice, buffers[i]->hapi_stream));
+            cudaMemcpyDefault, buffers[i]->hapi_stream));
       ipcDebugSync("send 1: stage src -> comm_buffer", buffers[i]->hapi_stream);
 
       // The completion callback's contract is "the source buffer is safe to

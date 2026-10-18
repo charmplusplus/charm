@@ -853,6 +853,15 @@ void MetisLB::work(LDStats* stats)
   std::vector<int> groupOfPe(parr->procs.size(), -1);
   for (idx_t g = 0; g < nGroups; g++)
     for (int pe : grpPes[g]) groupOfPe[pe] = (int)g;
+  // Where the groups sit: the process and the physical node of each, as the predicates the cut
+  // pricing relies on see them (a multi-device process puts several groups in one process).
+  if (_lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
+    for (idx_t g = 0; g < nGroups; g++)
+      if (!grpPes[g].empty())
+        CkPrintf("[%d] MetisLB group %d: %d PE(s) %d-%d, process %d, physical node %d, device id %llx\n",
+                 CkMyPe(), (int)g, (int)grpPes[g].size(), grpPes[g].front(), grpPes[g].back(),
+                 CmiNodeOf(grpPes[g].front()), CmiPhysicalNodeID(grpPes[g].front()),
+                 (unsigned long long)stats->procs[grpPes[g].front()].gpu_device_id);
 
   // Relative PE speed. normalize_speed() has already scaled these against the
   // fastest PE but has not touched any object's measured load, so the work
@@ -1510,7 +1519,7 @@ void MetisLB::work(LDStats* stats)
           {
             const int q = peUnder(nb.first, fresh);
             const double us = (p < 0 || q < 0) ? 5.5
-                              : (CmiNodeOf(p) == CmiNodeOf(q)) ? 3.3
+                              : (stats->procs[p].gpu_device_id == stats->procs[q].gpu_device_id) ? 3.3
                               : CmiPeOnSamePhysicalNode(p, q) ? 1.6 : 5.5;
             hw[i] += us * 1e-6 * (double)nb.second.msgs;
           }
@@ -1540,7 +1549,8 @@ void MetisLB::work(LDStats* stats)
               if (nb.first <= i) continue;
               const int q = peUnder(nb.first, fresh);
               if (q < 0 || q >= nPe || groupOfPe[q] < 0 || p == q) continue;
-              const double e = edgeCost(nb.second, DiffusionCostConfig::tierBetween(p, q));
+              const double e = edgeCost(nb.second, DiffusionCostConfig::tierBetween(
+                  p, q, stats->procs[p].gpu_device_id, stats->procs[q].gpu_device_id));
               peHost[p] += e / peSpeed[p];
               peHost[q] += e / peSpeed[q];
             }
@@ -1576,7 +1586,8 @@ void MetisLB::work(LDStats* stats)
           if (nb.first <= i) continue;
           const int q = peUnder(nb.first, fresh);
           if (p < 0 || q < 0 || p == q) continue;
-          c += edgeCost(nb.second, DiffusionCostConfig::tierBetween(p, q));
+          c += edgeCost(nb.second, DiffusionCostConfig::tierBetween(
+                   p, q, stats->procs[p].gpu_device_id, stats->procs[q].gpu_device_id));
         }
       }
       return c;
@@ -1622,6 +1633,37 @@ void MetisLB::work(LDStats* stats)
       return c;
     };
     const double crossOld = crossCut(false), crossNew = crossCut(true);
+    // Reported: how the cross-group traffic splits by HOST under each mapping, in messages per
+    // interval -- the part of the cut that crosses the network against the part that stays on a
+    // host. METIS is priced per edge, not per pair of parts, so this split is not steered; it is
+    // what the partition and the relabel happened to produce.
+    auto hostSplit = [&](bool fresh, double& sameHost, double& otherHost) {
+      sameHost = otherHost = 0.0;
+      for (int i = 0; i < numVertices; i++)
+      {
+        const int p = peUnder(i, fresh);
+        const int gp = (p >= 0 && p < (int)groupOfPe.size()) ? groupOfPe[p] : -1;
+        for (const auto& nb : adj[i])
+        {
+          if (nb.first <= i) continue;
+          const int q = peUnder(nb.first, fresh);
+          const int gq = (q >= 0 && q < (int)groupOfPe.size()) ? groupOfPe[q] : -1;
+          if (gp == gq || p < 0 || q < 0) continue;
+          if (CmiPhysicalNodeID(p) == CmiPhysicalNodeID(q)) sameHost += (double)nb.second.msgs;
+          else otherHost += (double)nb.second.msgs;
+        }
+      }
+    };
+    if (_lb_args.debug() > 0 && CkMyPe() == cur_ld_balancer)
+    {
+      double shOld, ohOld, shNew, ohNew;
+      hostSplit(false, shOld, ohOld);
+      hostSplit(true, shNew, ohNew);
+      CkPrintf("[%d] MetisLB cross-group messages by host: same-host %.0f -> %.0f, cross-host %.0f -> %.0f "
+               "(cross-host share %.0f%% -> %.0f%%)\n", CkMyPe(), shOld, shNew, ohOld, ohNew,
+               (shOld + ohOld) > 0 ? 100.0 * ohOld / (shOld + ohOld) : 0.0,
+               (shNew + ohNew) > 0 ? 100.0 * ohNew / (shNew + ohNew) : 0.0);
+    }
     const double maxRise = metisMaxCutRise();
     const bool local = crossNew <= crossOld * (1.0 + maxRise) * (1.0 + 1e-9);
     const bool worth = moving > 0 && local && gain >= minGain;

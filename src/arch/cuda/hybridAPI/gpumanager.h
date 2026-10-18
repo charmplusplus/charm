@@ -76,6 +76,8 @@ static_assert(ATOMIC_BOOL_LOCK_FREE == 2,
 struct CuptiBufferItem {
   uint8_t* buffer;
   size_t validSize;
+  size_t size;   // the allocation
+  void* ctx;     // the CUcontext the records belong to: the close parses one context per thread
 };
 #endif
 
@@ -379,6 +381,22 @@ struct GPUManager {
   double cupti_driver_busy_ = 0.0;  // seconds with at least one call in flight
   // Every API record's interval this round, for the union.
   std::vector<std::pair<uint64_t, uint64_t>> cupti_api_intervals_;
+  // Accumulated between window closes by every drain (the drain thread's periodic ones and the
+  // close's), published into the three fields above by hapiNormalizeCuptiLoads: a PE reading
+  // cupti_obj_api_raw_ or cupti_driver_busy_ after a close never sees a later drain's partial round.
+  std::unordered_map<LDObjKey, double, LDObjKeyHash> cupti_obj_api_raw_acc_;
+  double cupti_api_total_acc_ = 0.0;
+  struct ApiInterval { uint64_t start, end; int device; };
+  std::vector<ApiInterval> cupti_api_intervals_acc_;
+  std::unordered_map<int, double> cupti_api_total_dev_acc_;
+  // Per device the process drives (index on the host): the union of its PE threads' API intervals
+  // and their summed API time, this round. A process can drive several devices, and each
+  // device-node's launch term is its own driver's share, not the whole process's.
+  std::unordered_map<int, double> cupti_driver_busy_dev_;
+  std::unordered_map<int, double> cupti_api_total_dev_;
+  // OS thread id -> device index, for the PE threads: CUPTI's API records name the thread.
+  std::unordered_map<uint32_t, int> cupti_thread_device_;
+  std::mutex cupti_thread_device_lock_;
 
   // Full object identity -> this epoch's per-kernel summary. Built alongside
   // cupti_obj_norm_load_ and read by every PE in the process, so like that map

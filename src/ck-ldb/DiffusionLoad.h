@@ -60,7 +60,7 @@ extern int diffusionLoadDimDevice;
 // approximate under the CHARM_DIFFUSION_NODE_SIZE test hook, where several
 // logical nodes share a process; the simulator sets them per virtual node
 // before each node's decisions.
-extern int diffusionNodeDeviceBound;
+extern thread_local int diffusionNodeDeviceBound;
 extern int diffusionPpn;
 
 static inline int diffusionLoadMode()

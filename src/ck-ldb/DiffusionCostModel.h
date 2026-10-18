@@ -42,7 +42,8 @@
 // benchmark measures.
 enum DiffusionTier
 {
-  DIFF_TIER_INTRA_PROCESS = 0,  // same process: device-to-device memcpy
+  DIFF_TIER_INTRA_PROCESS = 0,  // same process, same device: device-to-device memcpy
+  DIFF_TIER_INTRA_PROCESS_PEER, // same process, different devices: a peer copy over PCIe/NVLink
   DIFF_TIER_IPC_SAME_GPU,       // separate processes sharing one device
   DIFF_TIER_IPC_CROSS_GPU,      // separate processes, different devices, one host
   DIFF_TIER_INTER_NODE,         // separate hosts: network RDMA
@@ -97,6 +98,9 @@ public:
   // memcpy; same host splits on whether the two processes drive the same device;
   // otherwise the network.
   static DiffusionTier tierBetween(int pe1, int pe2);
+  // The same for a balancer that holds every PE's device identity (ProcStats::gpu_device_id, as
+  // hapiMyDevice() stamps it): no mapping arithmetic, and exact for PEs on any host.
+  static DiffusionTier tierBetween(int pe1, int pe2, uint64_t dev1, uint64_t dev2);
 
   static const char* tierName(DiffusionTier t);
 };
