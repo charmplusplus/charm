@@ -637,14 +637,6 @@ if [[ $opt_network == "mpi" && $my_os == "win" ]]; then
   exit 1
 fi
 
-# Special handling for Windows compiler
-if [[ $my_os == "win" && ( -z $opt_CC || $opt_CC == "msvc" ) ]]; then
-  # Need to use unix2nt_cc on Windows/Cygwin
-  opt_CC="$(realpath "$my_srcdir")/src/arch/win/unix2nt_cc"
-  opt_CXX="$opt_CC"
-  opt_FC=
-fi
-
 [[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'
 
 if [[ $VERBOSE -eq 1 ]]; then

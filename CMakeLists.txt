@@ -516,12 +516,7 @@ endif()
 
 set(CMK_CHARM4PY 0)
 if(${TARGET} STREQUAL "charm4py")
-  set(CMK_CHARM4PY 1)
-  # Create libcharm.so for Charm4py
-  add_compile_options(-build-shared)
-  set(BUILDOPTS "${BUILDOPTS} -build-shared")
-  set(OPTS "${OPTS} -build-shared")
-  set(OPTSATBUILDTIME "${OPTSATBUILDTIME} -build-shared")
+  message(FATAL_ERROR "TARGET=charm4py is not available on reconverse yet (charm4py on reconverse is a separate workstream)")
 endif()
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
@@ -534,12 +529,6 @@ endif()
 # Identify arch/network-specific paths
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/gdir_link)
   file(STRINGS src/arch/${NETWORK}/gdir_link GDIR)
-elseif(${NETWORK} MATCHES "gni-")
-  set(GDIR "gni")
-elseif(${NETWORK} MATCHES "mpi-cray")
-  set(GDIR "mpi")
-elseif(${NETWORK} MATCHES "ofi-cray")
-  set(GDIR "ofi")
 else()
   set(GDIR ${NETWORK})
 endif()
@@ -774,11 +763,6 @@ if(BUILD_CUDA OR BUILD_HIP)
 
 endif()
 
-if(LRTS_PMI)
-  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-${LRTS_PMI}.sh include/ COPYONLY)
-  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-${LRTS_PMI}.h include/ COPYONLY)
-endif()
-
 # Header files
 configure_file(src/arch/${VDIR}/conv-mach.h                  include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-common.h            include/ COPYONLY)
@@ -1006,9 +990,6 @@ if (NOT CMK_WINDOWS)
   file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
 endif()
 
-if(LRTS_PMI)
-  file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${LRTS_PMI}.sh\n")
-endif()
 
 # Create conv-mach-opt.h
 set(optfile_h ${CMAKE_BINARY_DIR}/include/conv-mach-opt.h)
@@ -1026,9 +1007,6 @@ if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NET
     file(APPEND ${optfile_h} "#include \"cc-${CMK_COMPILER}.h\"\n")
 endif()
 
-if(LRTS_PMI)
-  file(APPEND ${optfile_h} "#include \"conv-mach-${LRTS_PMI}.h\"\n")
-endif()
 
 # Create conv-mach-opt.mak
 set(optfile_mak ${CMAKE_BINARY_DIR}/include/conv-mach-opt.mak)

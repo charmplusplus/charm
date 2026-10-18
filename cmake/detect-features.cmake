@@ -30,9 +30,6 @@ endif()
 
 # CMA
 set(CMK_USE_CMA ${CMK_HAS_CMA})
-if(NETWORK STREQUAL "multicore")
-  set(CMK_USE_CMA 0)
-endif()
 # Reconverse has no CMA transport: its conv-rdma.cpp compiles the CMA paths
 # only under a CMK_USE_CMA it never defines, and it does not parse
 # +noCMAForZC. Leaving CMK_USE_CMA on for a reconverse build compiles dead
