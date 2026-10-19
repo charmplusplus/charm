@@ -41,6 +41,7 @@ DIRS = \
   objid_sections \
   objid_bound \
   objid_tranche \
+  collide \
   qd \
 
 FTDIRS = \

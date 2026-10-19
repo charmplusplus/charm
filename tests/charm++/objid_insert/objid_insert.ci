@@ -6,6 +6,7 @@ mainmodule objid_insert {
   readonly int bounded;
   readonly int nonHomeOnly;
   readonly int destroySeed;
+  readonly int doFresh;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
@@ -21,7 +22,8 @@ mainmodule objid_insert {
   group Inserter {
     entry Inserter();
     entry void phase1();
-    entry void sendPings(int round, std::vector<int> xs, std::vector<int> ys);
+    entry void sendPings(int round, int freshOpen, std::vector<int> xs, std::vector<int> ys);
+    entry void reinsertFresh(std::vector<int> xs, std::vector<int> ys);
     entry void sendDemand(std::vector<int> xs, std::vector<int> ys, std::vector<char> here);
     entry void dumpState();
   };
@@ -34,6 +36,7 @@ mainmodule objid_insert {
     entry [createhere] void reviveHere(int fromPe);
     entry void migrateNow(int seed);
     entry void maybeDie(int seed);
+    entry void dieIfFresh();
     entry void report();
     entry void dumpState();
   };
