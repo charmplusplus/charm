@@ -541,13 +541,14 @@ private:
   CkArrayIndex bounds;
   ck::ArrayIndexCompressor* compressor;
   IdxIdMap idx2id;    // Explicit map for non-compressible case
-  // Hashed kind: ids this PE once bound to an index that has since been bound to a
-  // newer id. An element deleted and re-created on a PE that never saw its index
-  // gets a fresh id (the home no longer coincides with the map's PE, so this is
-  // ordinary since PR 1), and PEs that cached the old id keep sending to it. The
-  // home resolves such a message through this table (recoverIndex). It grows by
-  // one entry per re-creation under a new id this PE learns of; it is never
-  // pruned, since no PE knows which others still hold the old id.
+  // Hashed kind: ids that no longer name a live element, by index: an id this PE
+  // once bound to an index since bound to a newer id (insertID), and, at the home,
+  // the id of every element of its that died (reclaimRemote). An element deleted
+  // and re-created on a PE that never saw its index gets a fresh id (the home no
+  // longer coincides with the map's PE, so this is ordinary since PR 1), and PEs
+  // that cached the old id keep sending to it; recoverIndex resolves such a
+  // message through this table, in constant time, wherever it lands. It grows like
+  // idx2id and like it is never pruned: no PE knows which others still hold an id.
   std::unordered_map<CmiUInt8, CkArrayIndex> retiredIds;
   // Non-compressible case: this process's tranche of unique numbers for this array,
   // shared by all its PEs (see ck::objid::Tranche); resolved on first use.
@@ -756,12 +757,9 @@ public:
   }
 
   /// id -> index where it can be had without a message: the compressor, or a local
-  /// record, or an id this PE has seen retired (retiredIds); with scanAtHome, also
-  /// (hashed kind, at the home) the home's own idx -> id bindings, which outlive
-  /// the element. That last is a linear scan, reached only for a message to a
-  /// deleted element that arrives at its home, never by ordinary delivery.
-  /// Returns false when none applies.
-  bool recoverIndex(CmiUInt8 id, CkArrayIndex& idx, bool scanAtHome) const;
+  /// record, or an id that died or was rebound here (retiredIds; at the home that
+  /// covers every element of its that ever died). Returns false when none applies.
+  bool recoverIndex(CmiUInt8 id, CkArrayIndex& idx) const;
 
   /// Ask the home of idx for its location by index, whether or not this PE already
   /// holds an id for it. The home buffers the request until the element exists, so
@@ -881,6 +879,7 @@ public:
   void updateLocationFromLB(CmiUInt8 id, int pe);
 #endif
   void reclaimRemote(const CkArrayIndex& idx, int deletedOnPe);
+  void noteDead(const CkArrayIndex& idx, CmiUInt8 id);
 
   // Tranche allocator (design section 3.1). The allocator is this group's branch on
   // PE 0; it hands out tranches of the upper half of the unique space, bottom up.

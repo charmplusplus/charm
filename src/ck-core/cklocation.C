@@ -2710,7 +2710,7 @@ void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
   // index: that reply carries the current id, or waits until the element exists.
   // Otherwise the request is dropped, as before.
   CkArrayIndex idx;
-  if (mgr && mgr->recoverIndex(id, idx, true))
+  if (mgr && mgr->recoverIndex(id, idx))
     mgr->requestLocation(idx, peToTell);
 }
 
@@ -3102,7 +3102,7 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
   return false;
 }
 
-bool CkLocMgr::recoverIndex(CmiUInt8 id, CkArrayIndex& idx, bool scanAtHome) const
+bool CkLocMgr::recoverIndex(CmiUInt8 id, CkArrayIndex& idx) const
 {
   if (compressor)
   {
@@ -3114,28 +3114,13 @@ bool CkLocMgr::recoverIndex(CmiUInt8 id, CkArrayIndex& idx, bool scanAtHome) con
     idx = rec->getIndex();
     return true;
   }
+  // Hashed kind: an id that died or was rebound here (see retiredIds).
+  auto r = retiredIds.find(id);
+  if (r != retiredIds.end())
   {
-    // Hashed kind: an id this PE bound to an index that was since re-created under
-    // a newer id (see retiredIds).
-    auto r = retiredIds.find(id);
-    if (r != retiredIds.end())
-    {
-      idx = r->second;
-      return true;
-    }
+    idx = r->second;
+    return true;
   }
-  if (!scanAtHome || homePe(id) != CkMyPe())
-    return false;
-  // Hashed kind, at the home, no record: the element was deleted (reclaimRemote
-  // keeps the home's idx -> id binding for exactly this reason) or never existed
-  // here. A linear scan, acceptable because only a message to a deleted element
-  // that reaches its home gets here; ordinary delivery never does (design section 3.4).
-  for (const auto& kv : idx2id)
-    if (kv.second == id)
-    {
-      idx = kv.first;
-      return true;
-    }
   return false;
 }
 
@@ -3152,7 +3137,7 @@ void CkLocMgr::updateLocationFromLB(CmiUInt8 id, int pe)
   // broadcast, which carry the true epoch, still apply over this entry.
   e.epoch = cache->getEpoch(id) + 1;
   CkArrayIndex idx;
-  if (recoverIndex(id, idx, false))
+  if (recoverIndex(id, idx))
     updateLocation(idx, e);  // also binds idx -> id and fires the index listeners
   else
     cache->updateLocation(e);
@@ -3179,10 +3164,11 @@ void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
   // Update the location information
   cache->updateLocation(e);
 
-  // Messages this PE holds for the retired id are released toward e.pe; they are
-  // not the new element's and get re-addressed at its home (CkArray::handleUnknownByID).
+  // Messages this PE holds for the retired id go to the new element: re-addressed
+  // here, where both ids are known, so they take no detour through the home and
+  // cannot wait for a location of the old id that nothing will report.
   if (hasRetired)
-    cache->notifyListeners(retired, e.pe);
+    for (auto& m : managers) m.second->releaseRetiredMsgs(retired, e.id, e.pe);
 
   // Any location requests that we had to buffer because we didn't know how the index
   // mapped to the id can now be replied to.
@@ -3219,7 +3205,9 @@ void CkLocMgr::reclaim(CkLocRec* rec)
   if (!duringMigration)
   {  // This is a local element dying a natural death
     int home = homePe(rec->getIndex());
-    if (home != CkMyPe())
+    if (home == CkMyPe())
+      noteDead(rec->getIndex(), rec->getID());
+    else
 #if CMK_MEM_CHECKPOINT
       if (!CkInRestarting())  // all array elements are removed anyway
 #endif
@@ -3227,6 +3215,16 @@ void CkLocMgr::reclaim(CkLocRec* rec)
           thisProxy[home].reclaimRemote(rec->getIndex(), CkMyPe());
   }
   delete rec;
+}
+
+// At the home, hashed kind: an element of ours died (here, or on deletedOnPe via
+// reclaimRemote). Record id -> idx, so a message for the dead element that reaches
+// its home by id recovers the index without a scan (recoverIndex); the idx -> id
+// binding itself is kept, and the entry stays correct if the element comes back
+// under this id or another.
+void CkLocMgr::noteDead(const CkArrayIndex& idx, CmiUInt8 id)
+{
+  if (!compressor) retiredIds[id] = idx;
 }
 
 // TODO: Rename to something more basic. This is just clearing entries from the
@@ -3242,6 +3240,7 @@ void CkLocMgr::reclaimRemote(const CkArrayIndex& idx, int deletedOnPe)
   // Delete the ID from location caching. Do not delete the idx to id mapping because
   // that remains constant and we don't want messages to end up stranded because they
   // can't figure out their index.
+  noteDead(idx, id);
   cache->erase(id);
 }
 
