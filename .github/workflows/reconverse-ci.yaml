@@ -59,6 +59,7 @@ env:
     tests/charm++/zerocopy/dereg_and_nodereg
     tests/charm++/zerocopy/zc_post_async
     tests/charm++/zerocopy/pup_buffer
+    examples/charm++/user-driven-interop
 
 jobs:
 
