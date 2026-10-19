@@ -157,7 +157,16 @@ target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../uti
 add_library(mpi-mainmodule mpi-mainmodule.C)
 add_dependencies(mpi-mainmodule ck)
 
+if(CMK_CAN_LINK_FORTRAN)
+    # The Fortran program entry: mainf.f90 calls charm_main_fortran_wrapper
+    # (init.C, in libck), so it builds on reconverse too. charmc links it
+    # (-lckmainf) for every Fortran main, including AMPI's ampif90.
+    add_library(ckmainf mainf.f90)
+endif()
+
 if(NOT RECONVERSE AND CMK_CAN_LINK_FORTRAN)
+    # charmf.C needs memory-isomalloc.h and CmiFloat8, which reconverse does
+    # not provide yet; the Charm++ Fortran bindings and f90charm wait.
     add_library(ckf charmf.C charmmod.f90 charmf.h)
     add_dependencies(ckf ck)
     add_custom_command(TARGET ckf
@@ -165,7 +174,6 @@ if(NOT RECONVERSE AND CMK_CAN_LINK_FORTRAN)
         COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/charm.mod ${CMAKE_BINARY_DIR}/include/
         VERBATIM
     )
-    add_library(ckmainf mainf.f90)
 
     add_library(f90charm ../langs/f90charm/f90main.C ${CMAKE_BINARY_DIR}/include/f90main.decl.h)
     add_dependencies(f90charm ck)

@@ -3,7 +3,8 @@
 set(conv-core-h-sources
     src/util/cmitls.h
     src/conv-core/cmipool.h
-    src/conv-core/conv-config.h
+    src/libs/ck-libs/tcharm/reconverse-compat/conv-config.h
+    src/libs/ck-libs/tcharm/reconverse-compat/reconverse-compat.h
     src/conv-core/conv-header.h
     src/conv-core/conv-ooc.h
     src/conv-core/conv-rdmadevice.h
