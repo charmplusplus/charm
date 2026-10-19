@@ -49,7 +49,7 @@ CpvExtern(void*, CkGridObject);
 #endif
 
 // Per-PE registries of location managers by collection number (ck::objid::
-// registerLocMgr / lookupLocMgr), one per id layout; initialized with the
+// registerLocMgr / unregisterLocMgr / lookupLocMgr), one per id layout; initialized with the
 // migratable-object state in _CkMigratable_initInfoInit.
 typedef std::vector<CkLocMgr*> LocMgrRegistry;
 CkpvStaticDeclare(LocMgrRegistry, _objidLocMgrsStandard);
@@ -2500,6 +2500,16 @@ void registerLocMgr(CkLocMgr* mgr)
   reg[n] = mgr;
 }
 
+// Only this manager's own slot: a number is never reused, so no later manager
+// can have taken it, but the check keeps a double destruction harmless.
+void unregisterLocMgr(CkLocMgr* mgr)
+{
+  const bool wide = mgr->isWideCollection();
+  const CmiUInt8 n = mgr->getCollectionNumber();
+  LocMgrRegistry& reg = wide ? CkpvAccess(_objidLocMgrsWide) : CkpvAccess(_objidLocMgrsStandard);
+  if (n < reg.size() && reg[n] == mgr) reg[n] = nullptr;
+}
+
 CkLocMgr* lookupLocMgr(CmiUInt8 number, bool wide)
 {
   LocMgrRegistry& reg = wide ? CkpvAccess(_objidLocMgrsWide) : CkpvAccess(_objidLocMgrsStandard);
@@ -2932,6 +2942,7 @@ CkLocMgr::~CkLocMgr()
   lbmgr->UnregisterOM(myLBHandle);
 #endif
   map->unregisterArray(mapHandle);
+  ck::objid::unregisterLocMgr(this);
 }
 
 void CkLocMgr::pup(PUP::er& p)

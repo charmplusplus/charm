@@ -908,8 +908,9 @@ per-PE object map on the whole id word. Each CkArray takes one number from the
 counter of its layout (a bound array takes the layout of the manager it binds to,
 whatever its own option says); the CkLocMgr records the number of the array that
 created it and uses it for load-balancer object ids and for the per-PE registry
-(two vectors, standard and wide, ck::objid::registerLocMgr / lookupLocMgr), which
-UpdateLocation consults under CMK_GLOBAL_LOCATION_UPDATE. In a build with C >= 24
+(two vectors, standard and wide, ck::objid::registerLocMgr / lookupLocMgr; the
+destructor clears the slot), which UpdateLocation consults under
+CMK_GLOBAL_LOCATION_UPDATE. In a build with C >= 24
 (the --ampi-only C = 29 build) the wide range starts at 1 and the two kinds are told
 apart by the tag alone. On a restart every CkArray and CkLocMgr pup re-registers its
 number and PE 0 moves the counters past every restored number

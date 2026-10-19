@@ -389,7 +389,9 @@ CmiUInt8 nextCollectionNumber(bool wide);
 void noteRestoredCollection(CmiUInt8 number, bool wide);
 /// Per-PE registry of location managers by (kind, number of the primary array),
 /// for the decoders that have an id and need its manager (UpdateLocation).
+/// ~CkLocMgr unregisters, so a destroyed manager leaves no dangling pointer.
 void registerLocMgr(CkLocMgr* mgr);
+void unregisterLocMgr(CkLocMgr* mgr);
 CkLocMgr* lookupLocMgr(CmiUInt8 number, bool wide);
 
 /// Size (log2) of the first tranche the allocator grants a process that has none

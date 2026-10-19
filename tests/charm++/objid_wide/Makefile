@@ -19,6 +19,12 @@ test: objid_wide
 	$(call run, ./objid_wide +p4 +restart ckptlog )
 	$(call run, ./objid_wide +p2 +restart ckptlog )
 	-rm -rf ckptlog
+	$(call run, ./objid_wide +p4 -wide 1000 -bound )
+	$(call run, ./objid_wide +p4 -wide 1000 -bound -lb +balancer GreedyLB )
+	$(call run, ./objid_wide +p4 -wide 1000 -bound -ckpt )
+	$(call run, ./objid_wide +p4 +restart ckptlog )
+	$(call run, ./objid_wide +p2 +restart ckptlog )
+	-rm -rf ckptlog
 	./objid_wide +p4 -abort nobounds 2>&1 | grep -q "but no bounds"
 	./objid_wide +p4 -abort bigbounds 2>&1 | grep -q "bits to pack its index, but a wide-collection"
 	./objid_wide +p4 -wide 10 -standard 2100 2>&1 | grep -q "chare arrays created, half of the"

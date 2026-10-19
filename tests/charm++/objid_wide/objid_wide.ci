@@ -5,6 +5,7 @@ mainmodule objid_wide {
   readonly int nWide;
   readonly int nStd;
   readonly int lbMode;
+  readonly int boundMode;
 
   mainchare [migratable] Main {
     entry Main(CkArgMsg* m);

@@ -10,6 +10,13 @@
 //   - The program creates -wide N wide arrays (default 20000, well past the
 //     4095 standard numbers) and -standard M standard arrays (default 3), each
 //     a bounded 1D array of 8 elements, so the payload is the packed index.
+//   - -bound: one more array per array above, bound to it (bindTo), created
+//     with the OPPOSITE layout option: a bound array takes the layout of the
+//     array it binds to, whatever its own option says, and still gets its own
+//     collection number. Bound arrays follow their manager through every
+//     phase: only the manager's elements call migrateMe / AtSync, and every
+//     identity pass checks that each bound element sits on its sibling's PE.
+//     Array a's bound partner is array a + (N + M).
 //
 // Phases, driven by Main with counted messages:
 //   1. Identity: every element reports (a, i, id, PE). Main checks the layout
@@ -30,7 +37,7 @@
 //      CkArrayOptions; CkArrayOptions(n) sets bounds n), and a
 //      wide 2D array whose bounds need 40 bits; both must abort at creation.
 //
-// Run: ./objid_wide +p4 [-wide N] [-standard M] [-lb +balancer GreedyLB] [-ckpt]
+// Run: ./objid_wide +p4 [-wide N] [-standard M] [-bound] [-lb +balancer GreedyLB] [-ckpt]
 //      ./objid_wide +p2 +restart ckptlog
 
 #include <algorithm>
@@ -49,18 +56,24 @@ void unbufferStdout(void) { setvbuf(stdout, NULL, _IONBF, 0); }
 /*readonly*/ int nWide;
 /*readonly*/ int nStd;
 /*readonly*/ int lbMode;
+/*readonly*/ int boundMode;
 
 static const int nPer = 8;  // elements per array
 static const int nNewWide = 10, nNewStd = 2;  // arrays created after a restart
 
-static inline int nTotal() { return nWide + nStd; }
+// Arrays [0, nBase) own their location manager: wide first, then standard.
+// With -bound, arrays [nBase, 2 nBase) are bound to them, in the same order.
+static inline int nBase() { return nWide + nStd; }
+static inline int nTotal() { return boundMode ? 2 * nBase() : nBase(); }
+static inline bool isWide(int a) { return a % nBase() < nWide; }
+static inline bool isBound(int a) { return a >= nBase(); }
 
 // Checks that `id` is the id of element si of array sa (one of `arrays`), using
 // this PE's branch of that array.
 static void checkPeerId(const char* what, int sa, int si, CmiUInt8 idWord)
 {
   ck::ObjID id(idWord);
-  const bool wide = sa < nWide;
+  const bool wide = isWide(sa);
   ck::ObjID expect = arrays[sa].ckLocalBranch()->makeID(si);
   if (id.isWide() != wide || (int)id.getElementID() != si || id != expect)
     CkAbort("objid_wide: %s: id 0x%llx of array %d element %d on PE %d does not decode"
@@ -106,6 +119,7 @@ public:
     CmiGetArgInt(m->argv, "-wide", &nWide);
     CmiGetArgInt(m->argv, "-standard", &nStd);
     lbMode = CmiGetArgFlag(m->argv, "-lb") ? 1 : 0;
+    boundMode = CmiGetArgFlag(m->argv, "-bound") ? 1 : 0;
     ckptMode = CmiGetArgFlag(m->argv, "-ckpt") != 0;
     CmiGetArgString(m->argv, "-abort", &abortCase);
     delete m;
@@ -139,16 +153,26 @@ public:
 
     CkEnforce(nWide >= 0 && nStd >= 0 && nTotal() >= 1);
     CkEnforce(CkNumPes() >= 2);  // phase 3 migrates
-    CkPrintf("objid_wide: %d PEs, %d wide + %d standard arrays of %d elements, mode %s%s\n",
+    CkPrintf("objid_wide: %d PEs, %d wide + %d standard arrays of %d elements%s, mode %s%s\n",
              CkNumPes(), nWide, nStd, nPer,
+             boundMode ? ", each with a bound partner" : "",
              lbMode ? "load balancer (AtSync)" : "manual (migrateMe)",
              ckptMode ? ", checkpoint at the end" : "");
     arrays.reserve(nTotal());
-    for (int a = 0; a < nTotal(); a++)
+    for (int a = 0; a < nBase(); a++)
     {
       CkArrayOptions opts(nPer);
       opts.setBounds(nPer);
-      if (a < nWide) opts.setWideCollection();
+      if (isWide(a)) opts.setWideCollection();
+      arrays.push_back(CProxy_Elem::ckNew(a, opts));
+    }
+    // Bound partners ask for the opposite layout; the manager's must win.
+    for (int a = nBase(); a < nTotal(); a++)
+    {
+      CkArrayOptions opts(nPer);
+      opts.setBounds(nPer);
+      if (!isWide(a)) opts.setWideCollection();
+      opts.bindTo(arrays[a - nBase()]);
       arrays.push_back(CProxy_Elem::ckNew(a, opts));
     }
     lap("arrays created");
@@ -225,9 +249,10 @@ public:
     std::set<CmiUInt8> words;
     std::vector<CmiUInt8> wideNums;
     CmiUInt8 maxStd = 0;
+    checkBoundPes();
     for (int a = 0; a < nTotal(); a++)
     {
-      const bool wide = a < nWide;
+      const bool wide = isWide(a);
       CmiUInt8 num = checkArray(a, wide, &cur[(size_t)a * nPer]);
       if (!numbers.insert(num | (wide ? (1ULL << 40) : 0)).second)
         CkAbort("objid_wide: array %d has collection number %llu, already taken\n", a,
@@ -244,10 +269,11 @@ public:
       if (wideNums[j] != wideNums[j - 1] + 1)
         CkAbort("objid_wide: wide collection numbers not dense: %llu then %llu\n",
                 (unsigned long long)wideNums[j - 1], (unsigned long long)wideNums[j]);
-    CkPrintf("objid_wide: identity OK: %d wide + %d standard arrays, %d distinct"
+    CkPrintf("objid_wide: identity OK: %d wide + %d standard arrays%s, %d distinct"
              " collection numbers, %d distinct id words; wide numbers %llu..%llu"
              " (WIDE_FIRST %llu), max standard number %llu\n",
-             nWide, nStd, (int)numbers.size(), (int)words.size(),
+             nWide, nStd, boundMode ? " (half of them bound)" : "", (int)numbers.size(),
+             (int)words.size(),
              wideNums.empty() ? 0ULL : (unsigned long long)wideNums.front(),
              wideNums.empty() ? 0ULL : (unsigned long long)wideNums.back(),
              (unsigned long long)ck::ObjID::limits::WIDE_FIRST,
@@ -268,6 +294,19 @@ public:
       ids = cur;
     lap("phase 1 (identity) done");
     pingAll();
+  }
+
+  // Every bound element is on the PE of the element it is bound to (pe1 holds
+  // the PEs of the identity pass just completed).
+  void checkBoundPes()
+  {
+    for (int a = nBase(); a < nTotal(); a++)
+      for (int i = 0; i < nPer; i++)
+        if (pe1[(size_t)a * nPer + i] != pe1[(size_t)(a - nBase()) * nPer + i])
+          CkAbort("objid_wide: bound element (%d, %d) is on PE %d, its sibling (%d, %d)"
+                  " on PE %d\n",
+                  a, i, pe1[(size_t)a * nPer + i], a - nBase(), i,
+                  pe1[(size_t)(a - nBase()) * nPer + i]);
   }
 
   // ---- phase 2: point-to-point ----
@@ -300,15 +339,17 @@ public:
   }
 
   // ---- phase 3: migration ----
+  // Only the arrays that own their location manager migrate or sync; a bound
+  // partner moves with its sibling's location record.
   void migrateAll()
   {
     if (lbMode)
     {
       resumes = 0;
-      for (auto& ap : arrays) ap.doSync();
+      for (int a = 0; a < nBase(); a++) arrays[a].doSync();
       return;
     }
-    for (auto& ap : arrays) ap.migrateNow();
+    for (int a = 0; a < nBase(); a++) arrays[a].migrateNow();
     CkStartQD(CkCallback(CkIndex_Main::qdDone(), thisProxy));
   }
 
@@ -320,8 +361,8 @@ public:
 
   void resumed(int a, int i)
   {
-    CkEnforce(lbMode && a >= 0 && a < nTotal() && i >= 0 && i < nPer);
-    if (++resumes < nTotal() * nPer) return;
+    CkEnforce(lbMode && a >= 0 && a < nBase() && i >= 0 && i < nPer);
+    if (++resumes < nBase() * nPer) return;
     lap("phase 3 (AtSync) all resumed");
     pingAll();
   }
@@ -340,6 +381,7 @@ public:
 
   void finishMigrationCheck()
   {
+    checkBoundPes();
     moved = 0;
     for (size_t k = 0; k < cur.size(); k++)
     {
@@ -405,7 +447,7 @@ public:
     for (int a2 = 0; a2 < nTotal(); a2++)
     {
       CmiUInt8 n = ck::ObjID(ids[(size_t)a2 * nPer]).getCollectionNumber();
-      if (a2 < nWide) maxW = std::max(maxW, n);
+      if (isWide(a2)) maxW = std::max(maxW, n);
       else maxS = std::max(maxS, n);
     }
     std::set<CmiUInt8> words(ids.begin(), ids.end());
@@ -446,7 +488,7 @@ class Elem : public CBase_Elem
   int lastPing = -1, lastPong = -1;
 
 public:
-  Elem(int a) : myA(a) { usesAtSync = lbMode != 0; }
+  Elem(int a) : myA(a) { usesAtSync = lbMode != 0 && !isBound(a); }
   Elem(CkMigrateMessage* m) : CBase_Elem(m) {}
 
   void pup(PUP::er& p)
@@ -487,13 +529,13 @@ public:
 
   void migrateNow()
   {
-    CkEnforce(!lbMode);
+    CkEnforce(!lbMode && !isBound(myA));
     migrateMe((CkMyPe() + 1) % CkNumPes());  // last action
   }
 
   void doSync()
   {
-    CkEnforce(lbMode);
+    CkEnforce(lbMode && !isBound(myA));
     AtSync();
   }
 
