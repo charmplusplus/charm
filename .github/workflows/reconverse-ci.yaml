@@ -48,6 +48,9 @@ env:
   # dynamic_insertion and dynamic_insertion_deletion entered 2026-10-18: a
   # deleted index re-created on another PE (amr_1d_simple at 4 PEs) caught the
   # retired-id defect of the 64-bit id redesign that the tier had missed.
+  # objid_insert and objid_wide entered 2026-10-19 with the merge of the id
+  # redesign (PR 1d): objid_insert reproduces that defect deterministically
+  # (phase 7), objid_wide covers the wide-collection layout.
   TEST_DIRS: >-
     tests/charm++/megatest
     tests/charm++/simplearrayhello
@@ -55,6 +58,8 @@ env:
     tests/charm++/amr_1d_simple
     tests/charm++/dynamic_insertion
     tests/charm++/dynamic_insertion_deletion
+    tests/charm++/objid_insert
+    tests/charm++/objid_wide
     tests/charm++/anytime_bcastred
     tests/charm++/qd
     tests/charm++/within_node_bcast
