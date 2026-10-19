@@ -2046,7 +2046,7 @@ void CkArray::handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t ty
       CmiUInt8 current;
       if (locMgr->lookupID(idx, current) && current != id)
       {
-        env->setRecipientID(ck::ObjID(thisgroup, current));
+        env->setRecipientID(makeID(current));
         const int srcPe = msg->array_getSrcPe();
         if (CkMyPe() == home && srcPe != CkMyPe())
           locMgr->requestLocation(idx, srcPe);
@@ -2299,7 +2299,7 @@ void CkArray::releaseRetiredMsgs(CmiUInt8 oldId, CmiUInt8 newId, int pe)
   for (CkArrayMessage* msg : it->second)
   {
     CkAssert(msg->array_element_id() == oldId);
-    UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, newId));
+    UsrToEnv(msg)->setRecipientID(makeID(newId));
     sendToPe(msg, pe, CkDeliver_queue);
   }
   bufferedIDMsgs.erase(it);
