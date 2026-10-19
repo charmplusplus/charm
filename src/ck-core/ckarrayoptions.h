@@ -84,6 +84,8 @@ class CkArrayOptions {
   bool disableNotifyChildInRed;  // Child elements are not notified when reduction starts
   bool broadcastViaScheduler;    // broadcast inline or through scheduler
   bool sectionAutoDelegate;      // Create a mCastMgr and auto-delegate all sections
+  bool wideCollection;           // Element ids use the wide-collection layout (objid.h)
+  CmiUInt8 collectionNumber;     // Assigned on PE 0 by CkCreateArray; 0 until then
 
   enum class InsertionType : char {
     UNSET,
@@ -268,6 +270,14 @@ class CkArrayOptions {
     sectionAutoDelegate = b;
     return *this;
   }
+  /// Element ids use the wide-collection layout: 24 collection bits (16.7 million
+  /// arrays) and a 37-bit payload, for programs that create many small arrays. The
+  /// array must have bounds that pack into 37 bits (setBounds); creation aborts
+  /// otherwise. An array bound to another (bindTo) takes that array's layout.
+  CkArrayOptions& setWideCollection(bool b = true) {
+    wideCollection = b;
+    return *this;
+  }
   CkArrayOptions& setReductionClient(CkCallback cb) {
     reductionClient = cb;
     return *this;
@@ -288,6 +298,13 @@ class CkArrayOptions {
   const CkGroupID& getMcastManager(void) const { return mCastMgr; }
   const CkGroupID& getLocationCache(void) const { return locCache; }
   bool isSectionAutoDelegated(void) const { return sectionAutoDelegate; }
+  bool isWideCollection(void) const { return wideCollection; }
+  CmiUInt8 getCollectionNumber(void) const { return collectionNumber; }
+  // Used by CkCreateArray (PE 0) once the number is assigned and the kind settled
+  void setCollection(CmiUInt8 number, bool wide) {
+    collectionNumber = number;
+    wideCollection = wide;
+  }
   const CkCallback &getInitCallback(void) const {return initCallback;}
   int getListeners(void) const { return arrayListeners.size(); }
   CkArrayListener* getListener(int listenerNum) {

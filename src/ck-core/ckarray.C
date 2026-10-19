@@ -649,6 +649,19 @@ static CkArrayID CkCreateArray(CkArrayMessage* m, int ctor, CkArrayOptions opts)
   CkAssert(CkMyPe() == 0);
 
   CkGroupID locMgr = opts.getLocationManager();
+  // The id layout is the location manager's: an array bound to another (bindTo)
+  // takes that array's layout whatever its own option says. Each array then gets
+  // its own collection number from the counter of that layout.
+  bool wide = opts.isWideCollection();
+  if (!locMgr.isZero())
+  {
+    CkLocMgr* mgr = CProxy_CkLocMgr(locMgr).ckLocalBranch();
+    if (mgr == nullptr)
+      CkAbort("CkCreateArray: the location manager (group %d) this array binds to has"
+              " no branch on PE 0 yet\n", locMgr.idx);
+    wide = mgr->isWideCollection();
+  }
+  opts.setCollection(ck::objid::nextCollectionNumber(wide), wide);
   if (locMgr.isZero())
   {  // Create a new location manager
     CkGroupID locCache;
@@ -869,6 +882,8 @@ void _ckArrayInit(void)
 CkArray::CkArray(CkArrayOptions&& opts, CkMarshalledMessage&& initMsg)
     : locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
       locMgrID(opts.getLocationManager()),
+      collectionNumber(opts.getCollectionNumber()),
+      wideCollection(opts.isWideCollection()),
       mCastMgrID(opts.getMcastManager()),
       sectionAutoDelegate(opts.isSectionAutoDelegated()),
       initCallback(opts.getInitCallback()),
@@ -878,6 +893,7 @@ CkArray::CkArray(CkArrayOptions&& opts, CkMarshalledMessage&& initMsg)
       isInserting(true),
       numPesInited(0)
 {
+  CkAssert(wideCollection == locMgr->isWideCollection());
   // Register with our location manager
   locMgr->addManager(thisgroup, this);
   locMgr->addLocationListener([=](CmiUInt8 id, int pe) { this->sendBufferedMsgs(id, pe); });
@@ -948,6 +964,8 @@ void CkArray::pup(PUP::er& p)
   CkReductionMgr::pup(p);
   p | numInitial;
   p | locMgrID;
+  p | collectionNumber;
+  p | wideCollection;
   p | mCastMgrID;
   p | sectionAutoDelegate;
   p | initCallback;
@@ -960,6 +978,7 @@ void CkArray::pup(PUP::er& p)
   {
     thisProxy = thisgroup;
     locMgr = CProxy_CkLocMgr::ckLocalBranch(locMgrID);
+    ck::objid::noteRestoredCollection(collectionNumber, wideCollection);
     locMgr->addManager(thisgroup, this);
     locMgr->addLocationListener([=](CmiUInt8 id, int pe) { this->sendBufferedMsgs(id, pe); });
     locMgr->addIndexListener([=](const CkArrayIndex& idx, CmiUInt8 id, int pe) { this->sendBufferedMsgs(idx, id, pe); });
@@ -1831,7 +1850,7 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
   if (locMgr->lookupID(idx, id))
   {
     // We know the ID, so fill in the rest of the envelope to allow for sending
-    env->setRecipientID(ck::ObjID(thisgroup, id));
+    env->setRecipientID(makeID(id));
     int dest = locMgr->whichPe(id);
     if (dest != -1)
     {
@@ -1906,7 +1925,7 @@ void CkArray::recordSend(const CmiUInt8 id, const unsigned int bytes, int pe, co
     // LB deals in IDs with collection information only when CMK_GLOBAL_LOCATION_UPDATE
     // is enabled, so add the group information if so.
 #  if CMK_GLOBAL_LOCATION_UPDATE
-    const CmiUInt8 lbObjId = ck::ObjID(thisgroup, id).getID();
+    const CmiUInt8 lbObjId = makeID(id).getID();
 #  else
     const CmiUInt8 lbObjId = id;
 #  endif
@@ -2027,7 +2046,7 @@ void CkArray::handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t ty
       CmiUInt8 current;
       if (locMgr->lookupID(idx, current) && current != id)
       {
-        env->setRecipientID(ck::ObjID(thisgroup, current));
+        env->setRecipientID(makeID(current));
         const int srcPe = msg->array_getSrcPe();
         if (CkMyPe() == home && srcPe != CkMyPe())
           locMgr->requestLocation(idx, srcPe);
@@ -2280,7 +2299,7 @@ void CkArray::releaseRetiredMsgs(CmiUInt8 oldId, CmiUInt8 newId, int pe)
   for (CkArrayMessage* msg : it->second)
   {
     CkAssert(msg->array_element_id() == oldId);
-    UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, newId));
+    UsrToEnv(msg)->setRecipientID(makeID(newId));
     sendToPe(msg, pe, CkDeliver_queue);
   }
   bufferedIDMsgs.erase(it);
@@ -2293,7 +2312,7 @@ void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id, int pe)
   sendBufferedMsgs(id, pe);
   for (CkArrayMessage* msg : bufferedIndexMsgs[idx])
   {
-    UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, id));
+    UsrToEnv(msg)->setRecipientID(makeID(id));
     // TODO: Is deliver_queue right?
     sendToPe(msg, pe, CkDeliver_queue);
   }
@@ -2301,7 +2320,7 @@ void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id, int pe)
 
   for (CkArrayMessage* msg : bufferedCreationMsgs[idx])
   {
-    UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, id));
+    UsrToEnv(msg)->setRecipientID(makeID(id));
     // TODO: Is deliver_queue right?
     sendToPe(msg, pe, CkDeliver_queue);
   }
