@@ -560,6 +560,10 @@ private:
   CmiUInt8 collectionNumber;
   int payloadBits;
   IdxIdMap idx2id;    // Explicit map for non-compressible case
+  // Hashed kind: ids that no longer name a live element -> index: an id this PE
+  // rebound to a newer one (insertID) and, at the home, every dead element's id
+  // (noteDead). Never pruned, like idx2id. doc/internals/object-ids.md, section 3.
+  std::unordered_map<CmiUInt8, CkArrayIndex> retiredIds;
   // Non-compressible case: this process's tranche of unique numbers for this array,
   // shared by all its PEs (see ck::objid::Tranche); resolved on first use.
   ck::objid::Tranche* tranche;
@@ -604,7 +608,12 @@ private:
   {
     if (compressor)
       return;
-    idx2id[idx] = id;
+    auto ins = idx2id.emplace(idx, id);
+    if (!ins.second && ins.first->second != id)
+    {
+      retiredIds[ins.first->second] = idx;
+      ins.first->second = id;
+    }
   }
 
   // Insert elements after migration
@@ -769,11 +778,9 @@ public:
   }
 
   /// id -> index where it can be had without a message: the compressor, or a local
-  /// record; with scanAtHome, also (hashed kind, at the home) the home's own
-  /// idx -> id bindings, which outlive the element. That last is a linear scan,
-  /// reached only by the demand creation of a deleted element, never by delivery.
-  /// Returns false when none applies.
-  bool recoverIndex(CmiUInt8 id, CkArrayIndex& idx, bool scanAtHome) const;
+  /// record, or an id that died or was rebound here (retiredIds; at the home that
+  /// covers every element of its that ever died). Returns false when none applies.
+  bool recoverIndex(CmiUInt8 id, CkArrayIndex& idx) const;
 
   /// Ask the home of idx for its location by index, whether or not this PE already
   /// holds an id for it. The home buffers the request until the element exists, so
@@ -893,6 +900,7 @@ public:
   void updateLocationFromLB(CmiUInt8 id, int pe);
 #endif
   void reclaimRemote(const CkArrayIndex& idx, int deletedOnPe);
+  void noteDead(const CkArrayIndex& idx, CmiUInt8 id);
 
   // Tranche allocator (design section 3.1). The allocator is this group's branch on
   // PE 0; it hands out tranches of the upper half of the unique space, bottom up.

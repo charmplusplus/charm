@@ -29,3 +29,9 @@ hello.o: hello.C hello.decl.h
 
 test: all
 	$(call run, ./hello +p4 10 100 10 +balancer TestUserDataLB )
+
+testp: all
+	$(call run, ./hello +p$(P) 10 100 10 +balancer TestUserDataLB )
+
+smptest: all
+	$(call run, ./hello +p4 10 100 10 +balancer TestUserDataLB ++ppn 2 )

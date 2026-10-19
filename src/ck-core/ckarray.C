@@ -2035,6 +2035,33 @@ void CkArray::handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t ty
   const int home = locMgr->homePe(id);
   const int ifNotThere = msg->array_ifNotThere();
 
+  // Hashed kind, an id this PE knows as dead or rebound (retiredIds): re-address to
+  // the index's current id if there is a newer one; at the home, teach the sender by
+  // index, and hold a message for an index without an element until one registers.
+  // doc/internals/object-ids.md, section 3.
+  {
+    CkArrayIndex idx;
+    if (locMgr->recoverIndex(id, idx))
+    {
+      CmiUInt8 current;
+      if (locMgr->lookupID(idx, current) && current != id)
+      {
+        env->setRecipientID(ck::ObjID(thisgroup, current));
+        const int srcPe = msg->array_getSrcPe();
+        if (CkMyPe() == home && srcPe != CkMyPe())
+          locMgr->requestLocation(idx, srcPe);
+        recvMsg(msg, current, type, opts);
+        return;
+      }
+      if (CkMyPe() == home && ifNotThere == CkArray_IfNotThere_buffer)
+      {
+        env->setRecipientID(0);
+        bufferForLocation(msg, idx);
+        return;
+      }
+    }
+  }
+
   if (ifNotThere != CkArray_IfNotThere_buffer)
   {
     // Demand creation. The index-keyed path knows how to get the element created
@@ -2044,7 +2071,7 @@ void CkArray::handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t ty
     // there. Parking it here would wait for a location that nothing will ever
     // report, since the element does not exist.
     CkArrayIndex idx;
-    if (locMgr->recoverIndex(id, idx, true))
+    if (locMgr->recoverIndex(id, idx))
     {
       handleUnknown(msg, idx, type, opts);
       return;
@@ -2263,6 +2290,19 @@ void CkArray::sendBufferedMsgs(CmiUInt8 id, int pe)
   bufferedIDMsgs.erase(id);
 
   CkAssert(bufferedIDMsgs.find(id) == bufferedIDMsgs.end());
+}
+
+void CkArray::releaseRetiredMsgs(CmiUInt8 oldId, CmiUInt8 newId, int pe)
+{
+  auto it = bufferedIDMsgs.find(oldId);
+  if (it == bufferedIDMsgs.end()) return;
+  for (CkArrayMessage* msg : it->second)
+  {
+    CkAssert(msg->array_element_id() == oldId);
+    UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, newId));
+    sendToPe(msg, pe, CkDeliver_queue);
+  }
+  bufferedIDMsgs.erase(it);
 }
 
 void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id, int pe)

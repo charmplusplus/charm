@@ -22,7 +22,7 @@ bool TestUserDataLB::QueryBalanceNow(int _step) {
 void TestUserDataLB::work(LDStats* stats) {
   CkPrintf("[%d] TestUserDataLB work\n", CkMyPe());
   stats->makeCommHash();
-  for (int i = 0; i < stats->n_objs; i++) {
+  for (size_t i = 0; i < stats->objData.size(); i++) {
     LDObjData &odata = stats->objData[i];
   #if CMK_LB_USER_DATA
     LBUserDataStruct* udata = (LBUserDataStruct *)odata.getUserData(
