@@ -541,14 +541,9 @@ private:
   CkArrayIndex bounds;
   ck::ArrayIndexCompressor* compressor;
   IdxIdMap idx2id;    // Explicit map for non-compressible case
-  // Hashed kind: ids that no longer name a live element, by index: an id this PE
-  // once bound to an index since bound to a newer id (insertID), and, at the home,
-  // the id of every element of its that died (reclaimRemote). An element deleted
-  // and re-created on a PE that never saw its index gets a fresh id (the home no
-  // longer coincides with the map's PE, so this is ordinary since PR 1), and PEs
-  // that cached the old id keep sending to it; recoverIndex resolves such a
-  // message through this table, in constant time, wherever it lands. It grows like
-  // idx2id and like it is never pruned: no PE knows which others still hold an id.
+  // Hashed kind: ids that no longer name a live element -> index: an id this PE
+  // rebound to a newer one (insertID) and, at the home, every dead element's id
+  // (noteDead). Never pruned, like idx2id. doc/internals/object-ids.md, section 3.
   std::unordered_map<CmiUInt8, CkArrayIndex> retiredIds;
   // Non-compressible case: this process's tranche of unique numbers for this array,
   // shared by all its PEs (see ck::objid::Tranche); resolved on first use.

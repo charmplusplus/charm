@@ -2016,14 +2016,10 @@ void CkArray::handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t ty
   const int home = locMgr->homePe(id);
   const int ifNotThere = msg->array_ifNotThere();
 
-  // Hashed kind: an id this PE knows to be dead or rebound (retiredIds: at the home,
-  // every element of its that died; elsewhere, every rebinding this PE learned of)
-  // resolves to its index. If that index has since been re-created under a newer id
-  // (the new element was inserted on a PE that had never seen the index), re-address
-  // the message to the current id; the home also teaches the original sender the
-  // new binding, so its later sends go direct. At the home, if the index is simply
-  // without an element, wait by index: the index listener fires when any element of
-  // that index registers, whatever its id.
+  // Hashed kind, an id this PE knows as dead or rebound (retiredIds): re-address to
+  // the index's current id if there is a newer one; at the home, teach the sender by
+  // index, and hold a message for an index without an element until one registers.
+  // doc/internals/object-ids.md, section 3.
   {
     CkArrayIndex idx;
     if (locMgr->recoverIndex(id, idx))

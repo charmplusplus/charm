@@ -2705,10 +2705,8 @@ void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
     thisProxy[peToTell].updateLocation(itr->second);
     return;
   }
-  // No location for this id: the element was deleted, or re-created under a newer
-  // id. If the index is recoverable here (the home keeps its bindings), answer by
-  // index: that reply carries the current id, or waits until the element exists.
-  // Otherwise the request is dropped, as before.
+  // No location: the element died or was re-created under a newer id. Answer by
+  // index where the index is recoverable (always at the home); else drop, as before.
   CkArrayIndex idx;
   if (mgr && mgr->recoverIndex(id, idx))
     mgr->requestLocation(idx, peToTell);
@@ -3164,9 +3162,7 @@ void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
   // Update the location information
   cache->updateLocation(e);
 
-  // Messages this PE holds for the retired id go to the new element: re-addressed
-  // here, where both ids are known, so they take no detour through the home and
-  // cannot wait for a location of the old id that nothing will report.
+  // Messages held under the retired id: re-address to e.id here, where both are known.
   if (hasRetired)
     for (auto& m : managers) m.second->releaseRetiredMsgs(retired, e.id, e.pe);
 
@@ -3217,11 +3213,8 @@ void CkLocMgr::reclaim(CkLocRec* rec)
   delete rec;
 }
 
-// At the home, hashed kind: an element of ours died (here, or on deletedOnPe via
-// reclaimRemote). Record id -> idx, so a message for the dead element that reaches
-// its home by id recovers the index without a scan (recoverIndex); the idx -> id
-// binding itself is kept, and the entry stays correct if the element comes back
-// under this id or another.
+// Home, hashed kind: an element of ours died (here, or on deletedOnPe). Record
+// id -> idx so recoverIndex needs no scan; the idx -> id binding itself is kept.
 void CkLocMgr::noteDead(const CkArrayIndex& idx, CmiUInt8 id)
 {
   if (!compressor) retiredIds[id] = idx;
