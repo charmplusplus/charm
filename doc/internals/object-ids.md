@@ -125,8 +125,8 @@ Migration: the element's record moves with it; the new PE registers the location
 at the home (an epoch counter orders updates from the same element, so a late
 message from an earlier migration cannot overwrite a newer location). The load
 balancer's global update path (`CMK_GLOBAL_LOCATION_UPDATE`, off in every build)
-finds the array from the id's collection number (the group id of its location
-manager before PR 1d; a per-PE registry of location managers by number after).
+finds the location manager from the migration record's object-manager id, which
+is the manager's group id, and the element from the id's payload.
 
 Deletion: the home drops the directory entry but keeps the index-to-id binding
 and records the dead id in `retiredIds` (`CkLocMgr::noteDead`, from `reclaim` when

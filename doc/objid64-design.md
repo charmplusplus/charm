@@ -911,10 +911,11 @@ share a location manager but need distinct recipient ids, because delivery keys 
 per-PE object map on the whole id word. Each CkArray takes one number from the
 counter of its layout (a bound array takes the layout of the manager it binds to,
 whatever its own option says); the CkLocMgr records the number of the array that
-created it and uses it for load-balancer object ids and for the per-PE registry
-(two vectors, standard and wide, ck::objid::registerLocMgr / lookupLocMgr; the
-destructor clears the slot), which UpdateLocation consults under
-CMK_GLOBAL_LOCATION_UPDATE. In a build with C >= 24
+created it and uses it for load-balancer object ids (CkLocMgr::makeID, also in
+CkArray::recordSend, so a bound array's traffic is charged to the LB object its
+elements registered under). UpdateLocation (CMK_GLOBAL_LOCATION_UPDATE) finds the
+manager from the migration record's object-manager id, which is the CkLocMgr's
+group id; there is no registry of managers by number. In a build with C >= 24
 (the --ampi-only C = 29 build) the wide range starts at 1 and the two kinds are told
 apart by the tag alone. On a restart every CkArray and CkLocMgr pup re-registers its
 number and PE 0 moves the counters past every restored number
@@ -972,7 +973,7 @@ payload and the kind; the two hot-path aborts became CmiAsserts, since numbers a
 in range by construction and payloads by the compressor or the minting); the 6
 construction sites (ckarray.C x4, ckarray.h ckGetID, cklocation.C LB id) go through
 CkArray::makeID / CkLocMgr::makeID; FixedArrayIndexCompressor::make takes the
-payload width; the counters, the registry and noteRestoredCollection in
+payload width; the counters and noteRestoredCollection in
 cklocation.C's ck::objid namespace; CkArrayOptions (setWideCollection,
 setCollection, pup); CkLocMgr and CkArray constructors and pups; the creation-time
 suggestion at 2,048 and the aborts at 4,096 standard / 2^24 wide / wide without
@@ -1005,3 +1006,4 @@ of code; the gate is the objid test set, chkpt, megatest and pingpong on the Mac
 - 2026-10-17 (PR 1d): tag value 001 marks the wide layout; the other six tag values stay free; sections 1 and 12.
 - 2026-10-18 (fix after #4015): a deleted index re-created on a PE that never saw it gets a new id; the home keeps a retired-id table and re-addresses messages sent to the old id; section 3.4.
 - 2026-10-19 (#4057 review, Aditya): the home records every dead element's id in the retired-id table, so the index scan is gone; a PE that releases messages held under an old id re-addresses them itself; objid_insert phase 7; section 3.4.
+- 2026-10-19 (#4058 review, Ritvik, fixed forward after the merge): the LB comm record of a bound array uses the manager's id; the ObjID constructor's range check is always on; checkpoint layout marker OBJ2; the per-PE registry of managers is gone (UpdateLocation uses the record's object-manager id); objid_wide's grep cases run through testrun; advice text follows the layout widths; section 12.
