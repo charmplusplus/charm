@@ -113,7 +113,7 @@ reason() { [[ $1 -ne 0 ]] && grep -m1 -oE 'Reason:.*|what\(\):.*' "$2" 2>/dev/nu
 if [[ $# -gt 0 ]]; then
   DIRS=("$@")
 else
-  mapfile -t DIRS < <(awk '/TEST_DIRS: >-/{f=1;next} f&&/^    tests\//{print $1;next} f{exit}' .github/workflows/reconverse-ci.yaml)
+  mapfile -t DIRS < <(awk '/TEST_DIRS: >-/{f=1;next} f&&/^    (tests|examples)\//{print $1;next} f{exit}' .github/workflows/reconverse-ci.yaml)
 fi
 [[ ${#DIRS[@]} -gt 0 ]] || { echo "no test directories" >&2; exit 2; }
 
