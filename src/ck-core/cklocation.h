@@ -381,6 +381,19 @@ void pupLayout(PUP::er& p);
 /// Hash key of an index, in [0, 2^keyBits): a pure function of the index bytes.
 CmiUInt8 indexHashKey(const CkArrayIndex& idx);
 
+/// Collection numbers (objid.h): the next one for a new array, standard or wide.
+/// PE 0 only (CkCreateArray). Prints the wide-collection suggestion once when the
+/// standard range is half used, aborts when either range is exhausted.
+CmiUInt8 nextCollectionNumber(bool wide);
+/// A restart restores arrays with their numbers: keep the counters above them.
+void noteRestoredCollection(CmiUInt8 number, bool wide);
+/// Per-PE registry of location managers by (kind, number of the primary array),
+/// for the decoders that have an id and need its manager (UpdateLocation).
+/// ~CkLocMgr unregisters, so a destroyed manager leaves no dangling pointer.
+void registerLocMgr(CkLocMgr* mgr);
+void unregisterLocMgr(CkLocMgr* mgr);
+CkLocMgr* lookupLocMgr(CmiUInt8 number, bool wide);
+
 /// Size (log2) of the first tranche the allocator grants a process that has none
 /// (after a restart), unless 1/64 of its cap (region / (8 * processes)) is smaller:
 /// then that, so a restart on which every process inserts costs the pool at most
@@ -540,6 +553,12 @@ private:
   // depending on if the bounds of this array are compressible into a 64bit ID.
   CkArrayIndex bounds;
   ck::ArrayIndexCompressor* compressor;
+  // Id layout of this array (objid.h): wide-collection or standard, the collection
+  // number of the array that created this manager (bound arrays have their own
+  // numbers but share the layout), and the payload width that follows from the kind.
+  bool wideCollection;
+  CmiUInt8 collectionNumber;
+  int payloadBits;
   IdxIdMap idx2id;    // Explicit map for non-compressible case
   // Non-compressible case: this process's tranche of unique numbers for this array,
   // shared by all its PEs (see ck::objid::Tranche); resolved on first use.
@@ -636,6 +655,13 @@ public:
   bool isLocMgr(void) { return true; }
 
   CkGroupID getLocationCache() const { return cacheID; }
+
+  bool isWideCollection() const { return wideCollection; }
+  CmiUInt8 getCollectionNumber() const { return collectionNumber; }
+  int getPayloadBits() const { return payloadBits; }
+  /// The id of an element of this manager's primary array, from its payload (used
+  /// for load balancer object ids; CkArray::makeID gives the per-array id).
+  ck::ObjID makeID(CmiUInt8 eid) const { return ck::ObjID(collectionNumber, eid, wideCollection); }
 
   CkLocRec* registerNewElement(const CkArrayIndex& idx);
 

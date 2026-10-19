@@ -378,7 +378,10 @@ namespace ck {
       return sum;
     }
 
-    static FixedArrayIndexCompressor* make(const CkArrayIndex &bounds) {
+    /// @arg payloadBits is the element payload width of the array's id layout
+    /// (ck::ObjID::PAYLOAD_BITS, or WIDE_PAYLOAD_BITS for a wide-collection array).
+    static FixedArrayIndexCompressor* make(const CkArrayIndex &bounds,
+                                           unsigned int payloadBits = CMK_OBJID_PAYLOAD_BITS) {
       if (bounds.nInts == 0)
         return NULL;
 
@@ -391,10 +394,10 @@ namespace ck {
         bits[i] = bitCount(bound);
       }
 
-      if (bitsNeeded(bounds) > CMK_OBJID_PAYLOAD_BITS)
+      if (bitsNeeded(bounds) > payloadBits)
         return NULL;
 
-      return new FixedArrayIndexCompressor(dims, bits);
+      return new FixedArrayIndexCompressor(dims, bits, payloadBits);
     }
 
     /// Pack the bits of @arg idx into an ObjID
@@ -412,9 +415,9 @@ namespace ck {
         eid = (eid << numBits) | thisDim;
       }
 
-      CmiAssertMsg(eid <= ck::ObjID::masks::PAYLOAD_MASK,
+      CmiAssertMsg(eid <= payloadMask,
                    "eid is too big! (eid: %" PRIx64 ", max: %" PRIx64 ")", eid,
-                   (CmiUInt8)ck::ObjID::masks::PAYLOAD_MASK);
+                   payloadMask);
 
       return eid;
     }
@@ -446,9 +449,10 @@ namespace ck {
     }
 
   private:
-    FixedArrayIndexCompressor(char dims, char* bits)
-      : dims(dims)
+    FixedArrayIndexCompressor(char dims, char* bits, unsigned int payloadBits)
+      : payloadMask(((CmiUInt8)1 << payloadBits) - 1), dims(dims)
       { for (int i = 0; i < dims; i++) bitsPerDim[i] = bits[i]; }
+    CmiUInt8 payloadMask;
     char bitsPerDim[6];
     char dims;
 

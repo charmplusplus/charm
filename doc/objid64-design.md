@@ -53,9 +53,13 @@ G7 Every capacity limit aborts with a message naming the build flag to raise.
 
 Field by field:
 
-    bit 63..61  TYPE_TAG        3   (unchanged)
+    bit 63..61  TYPE_TAG        3   000 = standard layout, 001 = wide layout (PR 1d, section 12)
     bit 60..49  COLLECTION      C   default 12   -DCMK_OBJID_COLLECTION_BITS (build time)
     bit 48..0   PAYLOAD         64-3-C = 49
+
+    wide layout (tag 001, opt-in per array with CkArrayOptions::setWideCollection()):
+    bit 60..37  COLLECTION      24  fixed
+    bit 36..0   PAYLOAD         37  packed index only (bounds required)
 
     PAYLOAD, packed-index kind (array has a compressor):
         the packed index, up to 49 bits (FixedArrayIndexCompressor budget)
@@ -81,10 +85,10 @@ with +objid_expand 1 would reach.
 CMK_OBJID_HOME_BITS is removed. Build-time static_asserts: 1 <= C <= 40. Runtime
 checks at startup and restart: H >= 1, U >= 16.
 
-The three TYPE_TAG bits stay reserved and unused: they were
-meant for a universal object handle (analysis section 7); a use may turn up in a
-corner of the system, or inside this scheme, e.g. to mark a kind of payload. They
-are not reclaimed for capacity.
+The three TYPE_TAG bits stay reserved: they were meant for a universal object
+handle (analysis section 7). One value is used: tag 001 marks the wide layout,
+which a decoder must know before it can find the collection (section 12). The
+other six values stay free; they are not reclaimed for capacity.
 
 Which kind a payload is comes from the collection: every PE's CkLocMgr branch knows
 whether its array has a compressor. ObjID itself does not need a kind bit.
@@ -108,10 +112,12 @@ solved: at 2 processes an array can hold trillions of elements. At full Frontier
 scale the initial tranche is small, and its size is governed by the expand factor,
 so the factor is a command-line choice, not a build constant.
 
-Collection ids are a global counter and are not recycled today, so a program that
-creates arrays in a loop reaches 4,096 after ~1,500 arrays; the existing abort in the
-ObjID constructor (objid.h:56) names the flag. Recycling CkGroupID is a separate
-improvement (to file).
+The COLLECTION field holds a collection number, not a group id (since PR 1d; before
+it the CkArray's CkGroupID, which counted every group in the program, so 4,096 was
+reached after ~1,500 arrays). Numbers are dense, assigned per CkArray on PE 0 in
+CkCreateArray from two counters (standard, wide; section 12.3), and are not
+recycled: a program that creates arrays in a loop reaches 4,095 standard arrays and
+aborts with a message naming setWideCollection and the build flag (12.4).
 
 AMPI (when supported): --ampi-only currently sets C = 29 (buildcmake:619).
 AMPI's arrays are not bounded today (no setBounds anywhere in
@@ -120,12 +126,14 @@ design every AMPI array is hashed-kind, and a C = 29 build has a 32-bit payload 
 fails the U >= 16 startup check beyond 8,192 processes. Therefore
 (section 12) AMPI arrays get bounds, and a tag-marked wide-collection kind (tag
 001, 24 collection bits, 37 payload bits, opt-in per array) replaces the C = 29
-build; it lands as objid PR 1d.
+build; implemented as objid PR 1d (2026-10-17).
 
-ObjID API: getCollectionID() unchanged in meaning; getElementID() returns the
-49-bit payload (this is what CkArrayMessage::array_element_id() and the location
-tables key on); getHomeID() is deleted (its only reader was CkLocCache::homePe,
-cklocation.h:378). New: a process-wide `ck::objid::Layout {H, U}` set at startup
+ObjID API (as of PR 1d): the constructor takes (collection number, payload, wide);
+isWide() reads the tag; getCollectionNumber() and getElementID() shift by the
+layout's widths (one predictable branch); getElementID() is what
+CkArrayMessage::array_element_id() and the location tables key on; getID() is the
+whole word, tag included (delivery keys the per-PE object map on it). getHomeID()
+is deleted (its only reader was CkLocCache::homePe, cklocation.h:378). New: a process-wide `ck::objid::Layout {H, U}` set at startup
 or restored at restart; helpers hashKey(payload) = payload >> U,
 unique(payload) = payload & ((1<<U)-1), makeHashed(key, unique). Constructor abort
 messages updated to name the payload split.
@@ -134,7 +142,9 @@ messages updated to name the payload split.
 
 Unchanged mechanism, wider budget:
 - FixedArrayIndexCompressor::make (ckarrayindex.h:367): budget test becomes
-  `sum > ck::ObjID::bits::PAYLOAD_BITS`. compress() bound check likewise.
+  `sum > ck::ObjID::bits::PAYLOAD_BITS`. compress() bound check likewise. (1d: the
+  budget is a parameter, the array's payload width: 49 for the standard layout, 37
+  for a wide-collection array; CkLocMgr passes its own.)
 - CkLocMgr::lookupID (cklocation.h:572, 597): `id = compressor->compress(idx)`.
   The home is no longer added; the two CmiAssertMsg on home/id size go.
 - lookupIdx for this kind = decompress (unchanged).
@@ -799,9 +809,10 @@ Q5 Is rank 0 of the home process as the interim directory PE (PR 1) acceptable f
 
 ## 12. Wide-collection kind: collection capacity for AMPI and other many-array users
 
-Status: decided 2026-10-16 (Kale), design only, no code yet. Lands as objid PR 1d
-after PR 1 (#4015) merges, or inside PR 3 if 1d would otherwise wait on it. The
-AMPI-side items (12.5) are scheduled by Kale with the AMPI regression work, not here.
+Status: decided 2026-10-16 (Kale); implemented 2026-10-17 on branch objid-pr1d-wide
+(PR 1d, into objid-redesign after PR 1 #4015; target: before beta1). The AMPI-side
+items (12.5) are scheduled by Kale with the AMPI regression work, not here.
+Implementation notes are marked "(1d)" below where the code settled a detail.
 
 ### 12.1 Facts the design rests on
 
@@ -891,6 +902,21 @@ PE's vector of CkLocMgr pointers when the branch is created; the decoders of 12.
 item 2 index that vector instead of the group hash table, which is faster than
 today. Group ids are still consumed by every array as before, but cap nothing.
 
+(1d) The number is per CkArray, not per CkLocMgr: arrays bound together (bindTo)
+share a location manager but need distinct recipient ids, because delivery keys the
+per-PE object map on the whole id word. Each CkArray takes one number from the
+counter of its layout (a bound array takes the layout of the manager it binds to,
+whatever its own option says); the CkLocMgr records the number of the array that
+created it and uses it for load-balancer object ids and for the per-PE registry
+(two vectors, standard and wide, ck::objid::registerLocMgr / lookupLocMgr; the
+destructor clears the slot), which UpdateLocation consults under
+CMK_GLOBAL_LOCATION_UPDATE. In a build with C >= 24
+(the --ampi-only C = 29 build) the wide range starts at 1 and the two kinds are told
+apart by the tag alone. On a restart every CkArray and CkLocMgr pup re-registers its
+number and PE 0 moves the counters past every restored number
+(ck::objid::noteRestoredCollection), so arrays created after the restart get fresh
+numbers; the counters themselves are not checkpointed.
+
 Standard arrays gain from this alone: the field counts arrays, not groups, so
 C = 12 holds 4,096 arrays (3x today) with no layout change. This part belongs in
 PR 3's rewrite of the per-PE tables (section 7.1) if 1d has not landed first.
@@ -926,24 +952,33 @@ while 2 needs PR 1d. This session does not edit src/libs/ck-libs/ampi or buildcm
 
 ### 12.6 Checkpoint and restart
 
-CkLocMgr pups its kind flag and collection number next to `bounds`
-(cklocation.C:2616); stored ids carry the tag, so restore decodes them with the
-right width as long as the restoring build has the same W. pupLayout
-(cklocation.C:2363) gains W next to C, so a mismatch is a clear abort, not a
-misdecode. Restore re-registers each CkLocMgr under its stored number, so the
+CkLocMgr pups its kind flag, collection number and payload width next to `bounds`
+(cklocation.C:2616), and CkArray pups its number and flag; stored ids carry the
+tag, so restore decodes them with the right width as long as the restoring build
+has the same W. pupLayout (cklocation.C:2363) records C and W after the marker and
+aborts on a mismatch naming -DCMK_OBJID_COLLECTION_BITS (1d: before this, a restore
+by a build with another C was not detected at all). Restore re-registers each CkLocMgr under its stored number, so the
 vectors of 12.3 are rebuilt exactly; shrink/expand (section 6) is unaffected
 because the number is per collection, not per PE.
 
-### 12.7 Scope of PR 1d
+### 12.7 Scope of PR 1d (as implemented 2026-10-17)
 
-objid.h (two layouts, tag-aware accessors, the constructor takes a kind and a
-number instead of a gid); the ~10 `ck::ObjID(gid, eid)` construction sites in
-cklocation.h/.C; the collection-number counters and per-PE vector; CkArrayOptions
-(setWideCollection, pup) and the CkLocMgr constructor message and pup; the
-creation-time message and the two aborts; a tests/charm++/objid_wide test (100k
-wide arrays and a few standard ones, ids decode, insertion, migration under
-+balancer, checkpoint and restart, the two aborts); design sections 1 and 2
-updated for the second layout. Two to three days.
+objid.h (two layouts, tag-aware accessors, the constructor takes a number, a
+payload and the kind; the two hot-path aborts became CmiAsserts, since numbers are
+in range by construction and payloads by the compressor or the minting); the 6
+construction sites (ckarray.C x4, ckarray.h ckGetID, cklocation.C LB id) go through
+CkArray::makeID / CkLocMgr::makeID; FixedArrayIndexCompressor::make takes the
+payload width; the counters, the registry and noteRestoredCollection in
+cklocation.C's ck::objid namespace; CkArrayOptions (setWideCollection,
+setCollection, pup); CkLocMgr and CkArray constructors and pups; the creation-time
+suggestion at 2,048 and the aborts at 4,096 standard / 2^24 wide / wide without
+bounds / wide bounds over 37 bits; pupLayout's width check; the objid_wide test
+(thousands of wide arrays plus standard ones: id decode and density, point-to-point
+by index across arrays, migration with and without a balancer, checkpoint and
+restart at the same and a smaller PE count with ids compared and counters checked,
+the four abort and suggestion cases by grep). Sections 1, 2 and 12 updated. One day
+of code; the gate is the objid test set, chkpt, megatest and pingpong on the Mac
+(prod and Debug builds) and Anvil.
 
 ## 13. Decision log
 
@@ -963,4 +998,5 @@ updated for the second layout. Two to three days.
 - 2026-10-15: AMPI's arrays found unbounded (hashed-kind under this design), correcting the assumption that the C = 29 build suffices; section 1.
 - 2026-10-16 (Kale): AMPI arrays get bounds and a tag-marked wide-collection kind replaces the C = 29 build, as objid PR 1d; sections 1 and 12.
 - 2026-10-16 (Kale): wide collection is opt-in per array, not selected automatically; section 12.4.
+- 2026-10-17 (PR 1d): tag value 001 marks the wide layout; the other six tag values stay free; sections 1 and 12.
 - 2026-10-18 (fix after #4015): a deleted index re-created on a PE that never saw it gets a new id; the home keeps a retired-id table and re-addresses messages sent to the old id; section 3.4.

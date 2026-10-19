@@ -391,7 +391,7 @@ public:
   // for _PIPELINED_ALLREDUCE_, assembler entry method
   inline void defrag(CkReductionMsg* msg);
   inline const CkArrayID& ckGetArrayID(void) const { return thisArrayID; }
-  inline ck::ObjID ckGetID(void) const { return ck::ObjID(thisArrayID, myRec->getID()); }
+  inline ck::ObjID ckGetID(void) const;  // defined after CkArray below
 
   inline int ckGetArraySize(void) const { return numInitialElements; }
 
@@ -657,6 +657,10 @@ class CkArray : public CkReductionMgr
   CkMagicNumber<ArrayElement> magic;  // To detect heap corruption
   CkLocMgr* locMgr;
   CkGroupID locMgrID;
+  // This array's collection number and id layout (objid.h), assigned on PE 0 by
+  // CkCreateArray; the layout is the location manager's (a bound array shares it).
+  CmiUInt8 collectionNumber;
+  bool wideCollection;
   CkGroupID mCastMgrID;
   bool sectionAutoDelegate;
   CkCallback initCallback;
@@ -682,6 +686,10 @@ public:
 
   // Access & information routines
   inline CkLocMgr* getLocMgr(void) { return locMgr; }
+  inline CmiUInt8 getCollectionNumber(void) const { return collectionNumber; }
+  inline bool isWideCollection(void) const { return wideCollection; }
+  /// The id of this array's element with the given payload
+  inline ck::ObjID makeID(CmiUInt8 eid) const { return ck::ObjID(collectionNumber, eid, wideCollection); }
   inline const CkArrayIndex& getNumInitial(void) const { return numInitial; }
   inline int homePe(const CkArrayIndex& idx) const { return locMgr->homePe(idx); }
   inline int procNum(const CkArrayIndex& idx) const { return locMgr->procNum(idx); }
@@ -905,6 +913,8 @@ public:
 
   static bool isIrreducible() { return true; }
 };
+
+inline ck::ObjID ArrayElement::ckGetID(void) const { return thisArray->makeID(myRec->getID()); }
 
 // Maintain old name of former parent class for backwards API compatibility
 // with usage in maps' populateInitial()
