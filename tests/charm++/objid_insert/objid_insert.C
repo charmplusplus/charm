@@ -45,6 +45,23 @@
 //           index; only the home can (section 3.4). Each must be created
 //           exactly once, at its home. Then phase 2 over everything and a
 //           final count.
+//  Phase 7  Re-creation under a new id (needs 3 or more PEs). Phase 1 also
+//           inserts K "fresh" elements (700+pe,k) on each PE. One PE per fresh
+//           index, freshPe(x,y) (neither its inserter nor its home), never
+//           sends to it, and fresh elements never migrate or die in phase 5,
+//           so that PE never learns the index's id. Phase 7 destroys every
+//           fresh element, then freshPe(x,y) inserts (x,y) locally: in the
+//           hashed kind that PE has no idx -> id binding and mints a NEW id
+//           (main enforces it differs from the old one; in the packed kind it
+//           must be equal), while every other PE still holds the old id and a
+//           stale location. Then every PE pings every element, so each old-id
+//           holder's message lands on a PE with no element for that id and
+//           must reach the new one: forwarded to the home and re-addressed
+//           there by default, or, under +messageBufferingThreshold 0 (every
+//           message counts as large), held where it lands until the home's
+//           reply by index names the new id, and re-addressed there
+//           (CkLocMgr::retiredIds, CkArray::releaseRetiredMsgs). A second ping
+//           round runs over the bindings the first one taught.
 //           Re-creation by createhere is NOT tested: it fails for two reasons
 //           that predate the redesign and are out of its scope. The creating
 //           PE's insertElement follows its own stale location entry for the
@@ -54,6 +71,8 @@
 //           (debug builds assert in CkLocCache::insert on the creating PE).
 //
 // Options: -b packed kind; -k K elements per PE per pattern (default 16);
+//          +messageBufferingThreshold 0 (runtime option): every message is held
+//             at a PE without the element instead of being forwarded;
 //          -n phase 4 and 6 createhome senders exclude the home PE (needs
 //             2 or more PEs);
 //          -w watchdog stall seconds (default 60, 0 disables);
@@ -91,6 +110,7 @@
 /* readonly */ int bounded;
 /* readonly */ int nonHomeOnly;
 /* readonly */ int destroySeed;
+/* readonly */ int doFresh;  // phase 7 runs (3 or more PEs)
 
 static unsigned long long mix64(unsigned long long z) {
   z += 0x9e3779b97f4a7c15ULL;
@@ -111,8 +131,9 @@ static bool diesAt(int x, int y, int seed) { return (mixIdx(x, y, seed) >> 7) & 
 
 // How an index is (re)created in a demand phase, from the index alone, so that
 // every PE and the element itself agree without a message.
-enum Kind { INSERTED, CREATEHOME, CREATEHERE };
+enum Kind { INSERTED, CREATEHOME, CREATEHERE, FRESH };
 static Kind kindOf(int x) {
+  if (x >= 700) return FRESH;  // (700+pe,k), inserted in phase 1, re-inserted in phase 7
   if (x >= 500) return CREATEHERE;
   if (x >= 300) return CREATEHOME;
   return INSERTED;  // (pe,k) and (pe+100,k), inserted in phase 1
@@ -122,6 +143,13 @@ static Kind kindOf(int x) {
 static bool createsHere(int x, int y) { return kindOf(x) == CREATEHERE; }
 static int homeOf(int x, int y) {
   return arrProxy.ckLocMgr()->homePe(CkArrayIndex2D(x, y));
+}
+// Phase 7: the PE that never addresses fresh index (x,y) before re-inserting it
+// there: not its inserter (x-700) and not its home, which always knows the id.
+static int freshPe(int x, int y) {
+  int P = CkNumPes(), ins = x - 700, h = homeOf(x, y), f = (ins + 1) % P;
+  while (f == ins || f == h) f = (f + 1) % P;
+  return f;
 }
 // The single PE that sends a createhere message to (x,y): the PE after its home.
 static int hereSender(int x, int y) { return (homeOf(x, y) + 1) % CkNumPes(); }
@@ -141,7 +169,8 @@ static void abortFire(void* arg, double t) {
   CkAbort("objid_insert: hung (state dumped above)");
 }
 
-enum Action { PING, MIGRATE, REVIVE, REVIVE_HERE, REVIVE_DEAD, REPORT, DESTROY, DONE };
+enum Action { PING, MIGRATE, REVIVE, REVIVE_HERE, REVIVE_DEAD, REPORT, DESTROY,
+              DESTROY_FRESH, REINSERT_FRESH, DONE };
 struct Step { Action a; int seed; const char* what; };
 
 class Main : public CBase_Main {
@@ -152,6 +181,8 @@ class Main : public CBase_Main {
   std::set<Key> live;
   std::map<Key, int> expRevives;  // demand-created elements: revives expected
   std::vector<Key> dead;          // destroyed in phase 5, revived in phase 6
+  std::map<Key, CmiUInt8> oldFreshIds;  // phase 7: ids before the re-insertion
+  bool freshOpen = false;         // phase 7: freshPe(x,y) sends to (x,y) too
   std::vector<Key> pendingDemand; // targets of the demand step in progress
   std::vector<Step> script;
   size_t cur = 0;
@@ -176,8 +207,9 @@ public:
     delete m;
     P = CkNumPes();
     CkEnforce(K >= 1 && K <= 1024);
-    CkEnforce(P <= 500);  // indices 500+pe must stay inside 1024 bounds
+    CkEnforce(P <= 300);  // indices 700+pe must stay inside 1024 bounds
     if (nonHomeOnly) CkEnforce(P >= 2);  // someone other than the home must send
+    doFresh = P >= 3 ? 1 : 0;  // freshPe must differ from the inserter and the home
     CkPrintf("objid_insert: %d PEs, %d processes, K=%d, %s kind%s%s\n", P,
              CkNumNodes(), K, bounded ? "packed (setBounds 1024x1024)" : "hashed (unbounded)",
              doDemand ? "" : ", demand creation skipped (-D)",
@@ -214,6 +246,14 @@ public:
     if (doDemand) {
       script.push_back({REVIVE_DEAD, 0, "re-creation of destroyed elements"});
       script.push_back({PING, 0, "sends after re-creation"});
+    }
+    if (doFresh) {
+      script.push_back({DESTROY_FRESH, 0, "destroy the fresh elements"});
+      script.push_back({REINSERT_FRESH, 0, "re-insertion on a PE that never saw the index"});
+      script.push_back({PING, 0, "sends with old ids"});
+      script.push_back({PING, 0, "sends after the old ids were re-bound"});
+    } else {
+      CkPrintf("objid_insert: fewer than 3 PEs, phase 7 (re-creation under a new id) skipped\n");
     }
     script.push_back({REPORT, 0, "final report"});
     script.push_back({DONE, 0, "done"});
@@ -275,7 +315,7 @@ public:
   void quiescent() {
     progress();
     if (cur == (size_t)-1) {
-      CkEnforce(regs.size() == (size_t)(2 * K * P));
+      CkEnforce(regs.size() == (size_t)((2 + doFresh) * K * P));
       for (int pe = 0; pe < P; pe++)
         for (int k = 0; k < K; k++) {
           auto a = regs.find(Key(pe, k));
@@ -283,6 +323,10 @@ public:
           CkEnforce(a != regs.end() && b != regs.end());
           CkEnforce(a->second.pe == pe);
           CkEnforce(b->second.pe == (pe + 1) % P);
+          if (doFresh) {
+            auto f = regs.find(Key(pe + 700, k));
+            CkEnforce(f != regs.end() && f->second.pe == pe);
+          }
         }
       CkPrintf("objid_insert: phase 1 ok, %zu elements, ids distinct\n", regs.size());
       cur = 0;
@@ -291,7 +335,44 @@ public:
     }
     Step& s = script[cur];
     if (s.a == REVIVE || s.a == REVIVE_HERE || s.a == REVIVE_DEAD) checkDemand(s.what);
+    if (s.a == REINSERT_FRESH) checkReinsertion();
     next();
+  }
+
+  // Phase 7, after the re-insertion is quiescent: every fresh element exists
+  // again, on its freshPe, and in the hashed kind under a NEW id (the proof that
+  // the re-creating PE had never seen the index); in the packed kind the id is
+  // a function of the index and must be the same.
+  void checkReinsertion() {
+    for (auto& e : oldFreshIds) {
+      const Key& key = e.first;
+      auto it = regs.find(key);
+      if (it == regs.end()) {
+        CkPrintf("objid_insert FAIL: phase 7: (%d,%d) was not re-inserted\n", key.first,
+                 key.second);
+        CkAbort("re-insertion lost");
+      }
+      int want = freshPe(key.first, key.second);
+      CkEnforce(it->second.demand == 0);
+      if (it->second.pe != want) {
+        CkPrintf("objid_insert FAIL: phase 7: (%d,%d) re-inserted on PE %d, expected %d\n",
+                 key.first, key.second, it->second.pe, want);
+        CkAbort("re-insertion on the wrong PE");
+      }
+      bool same = it->second.id == e.second;
+      if (same != (bounded != 0)) {
+        CkPrintf("objid_insert FAIL: phase 7: (%d,%d) re-inserted on PE %d with id %llx, "
+                 "old id %llx: %s\n", key.first, key.second, it->second.pe,
+                 (unsigned long long)it->second.id, (unsigned long long)e.second,
+                 bounded ? "a packed id must not change"
+                         : "the fresh PE reused the old id, so it had seen the index");
+        CkAbort("re-insertion id");
+      }
+    }
+    CkPrintf("objid_insert: phase 7: %zu fresh elements re-inserted, %s\n",
+             oldFreshIds.size(), bounded ? "ids unchanged (packed)" : "all under new ids");
+    arrProxy.doneInserting();
+    freshOpen = true;
   }
 
   void next() { cur++; runStep(); }
@@ -322,7 +403,7 @@ public:
         for (auto& e : live) { xs.push_back(e.first); ys.push_back(e.second); }
         CkPrintf("objid_insert: round %d (%s) over %zu elements\n", round, s.what,
                  live.size());
-        inserterProxy.sendPings(round, xs, ys);
+        inserterProxy.sendPings(round, freshOpen ? 1 : 0, xs, ys);
         break;
       }
       case MIGRATE:
@@ -350,10 +431,35 @@ public:
       case REPORT:
         arrProxy.report();
         break;
+      case DESTROY_FRESH: {
+        for (auto it = live.begin(); it != live.end();)
+          if (kindOf(it->first) == FRESH) {
+            oldFreshIds[*it] = regs[*it].id;
+            ids.erase(regs[*it].id);
+            regs.erase(*it);
+            it = live.erase(it);
+          } else {
+            ++it;
+          }
+        CkEnforce(oldFreshIds.size() == (size_t)(K * P));
+        CkPrintf("objid_insert: destroying the %zu fresh elements\n", oldFreshIds.size());
+        arrProxy.dieIfFresh();
+        CkStartQD(CkCallback(CkIndex_Main::quiescent(), thisProxy));
+        break;
+      }
+      case REINSERT_FRESH: {
+        std::vector<int> xs, ys;
+        for (auto& e : oldFreshIds) { xs.push_back(e.first.first); ys.push_back(e.first.second); }
+        CkPrintf("objid_insert: re-inserting %zu fresh elements, each on a PE that never "
+                 "addressed it\n", xs.size());
+        inserterProxy.reinsertFresh(xs, ys);
+        CkStartQD(CkCallback(CkIndex_Main::quiescent(), thisProxy));
+        break;
+      }
       case DESTROY: {
         size_t before = live.size();
         for (auto it = live.begin(); it != live.end();)
-          if (diesAt(it->first, it->second, s.seed)) {
+          if (kindOf(it->first) != FRESH && diesAt(it->first, it->second, s.seed)) {
             // Forget the element: a re-creation registers afresh, and in the
             // packed kind with the same id.
             dead.push_back(*it);
@@ -380,12 +486,19 @@ public:
     }
   }
 
+  // Senders of a ping round to (x,y): every PE, except that freshPe(x,y) leaves
+  // a fresh element alone until it has re-inserted it (phase 7).
+  int pingSenders(const Key& key) const {
+    return (kindOf(key.first) == FRESH && !freshOpen) ? P - 1 : P;
+  }
+
   void pingDone(int nElems, int nPings) {
     progress();
-    if (nElems != (int)live.size() || nPings != (int)live.size() * P) {
+    int want = 0;
+    for (auto& e : live) want += pingSenders(e);
+    if (nElems != (int)live.size() || nPings != want) {
       CkPrintf("objid_insert FAIL: round %d: %d elements reported %d pings, expected "
-               "%zu elements, %zu pings\n", round, nElems, nPings, live.size(),
-               live.size() * P);
+               "%zu elements, %d pings\n", round, nElems, nPings, live.size(), want);
       CkAbort("ping count mismatch");
     }
     next();
@@ -438,12 +551,31 @@ public:
       CkEnforce(arrProxy(me, k).ckLocal() != nullptr);
     }
     for (int k = 0; k < K; k++) arrProxy(me + 100, k).insert(0, (me + 1) % P);
+    if (doFresh)
+      for (int k = 0; k < K; k++) arrProxy(me + 700, k).insert(0, me);
     contribute(CkCallback(CkReductionTarget(Main, phase1Done), mainProxy));
   }
 
-  void sendPings(int round, std::vector<int> xs, std::vector<int> ys) {
+  void sendPings(int round, int freshOpen, std::vector<int> xs, std::vector<int> ys) {
     lastRound = round;
-    for (size_t i = 0; i < xs.size(); i++) arrProxy(xs[i], ys[i]).ping(round, CkMyPe());
+    for (size_t i = 0; i < xs.size(); i++) {
+      int x = xs[i], y = ys[i];
+      // Phase 7: this PE must not learn a fresh index's id before re-inserting it.
+      if (kindOf(x) == FRESH && !freshOpen && CkMyPe() == freshPe(x, y)) continue;
+      arrProxy(x, y).ping(round, CkMyPe());
+    }
+  }
+
+  // Phase 7: a local insertion on the PE that never addressed the index. Local,
+  // so the id is minted here (CkLocMgr::tryNewObjectID) and not on a PE that
+  // still holds the old binding.
+  void reinsertFresh(std::vector<int> xs, std::vector<int> ys) {
+    for (size_t i = 0; i < xs.size(); i++) {
+      int x = xs[i], y = ys[i];
+      if (CkMyPe() != freshPe(x, y)) continue;
+      arrProxy(x, y).insert(1, CkMyPe());
+      CkEnforce(arrProxy(x, y).ckLocal() != nullptr);
+    }
   }
 
   void sendDemand(std::vector<int> xs, std::vector<int> ys, std::vector<char> here) {
@@ -471,6 +603,7 @@ class Elem : public CBase_Elem {
   int demand = 0;
   int migrations = 0;
   int lastRound = 0;
+  int reinserted = 0;  // phase 7's second incarnation: every PE pings it
 
   void registerMe() {
     mainProxy.registerElem(thisIndex.x, thisIndex.y, ckGetID().getElementID(), CkMyPe(),
@@ -490,8 +623,13 @@ class Elem : public CBase_Elem {
   }
 
 public:
+  // origin 0: phase 1 insertion; 1: phase 7 re-insertion on freshPe.
   Elem(int origin) : reviveFrom(CkNumPes(), 0) {
-    CkEnforce(thisIndex.x < 300);
+    CkEnforce(thisIndex.x < 300 || kindOf(thisIndex.x) == FRESH);
+    if (origin == 1) {
+      CkEnforce(kindOf(thisIndex.x) == FRESH && CkMyPe() == freshPe(thisIndex.x, thisIndex.y));
+      reinserted = 1;
+    }
     registerMe();
   }
   // Demand creation (phases 4, 4b, 6): on the home PE for createhome, on the one
@@ -517,6 +655,7 @@ public:
     p | demand;
     p | migrations;
     p | lastRound;
+    p | reinserted;
   }
 
   void ping(int round, int fromPe) {
@@ -531,7 +670,9 @@ public:
     seen[fromPe] = 1;
     int n = 0;
     for (char c : seen) n += c;
-    if (n == CkNumPes()) {
+    // A fresh element's first incarnation is never pinged by its freshPe.
+    int want = (kindOf(thisIndex.x) == FRESH && !reinserted) ? CkNumPes() - 1 : CkNumPes();
+    if (n == want) {
       pending.erase(round);
       lastRound = round;
       int v[2] = {1, n};
@@ -545,6 +686,7 @@ public:
 
   void migrateNow(int seed) {
     if (CkNumPes() < 2) return;
+    if (kindOf(thisIndex.x) == FRESH) return;  // must never live on its freshPe
     migrations++;
     migrateMe(migDest(thisIndex.x, thisIndex.y, seed, CkMyPe()));  // last action
   }
@@ -554,7 +696,12 @@ public:
     // A direct ckDestroy() here crashes in broadcast delivery (null CkLocRec in
     // CkLocRec::invokeEntry, called from CkArrayBroadcaster::attemptDelivery),
     // on the pre-redesign runtime as well.
-    if (diesAt(thisIndex.x, thisIndex.y, seed)) thisProxy[thisIndex].ckDestroy();
+    if (kindOf(thisIndex.x) != FRESH && diesAt(thisIndex.x, thisIndex.y, seed))
+      thisProxy[thisIndex].ckDestroy();
+  }
+
+  void dieIfFresh() {
+    if (kindOf(thisIndex.x) == FRESH) thisProxy[thisIndex].ckDestroy();
   }
 
   void report() {

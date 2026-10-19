@@ -44,11 +44,17 @@ env:
   # they are the tests that caught both bugs. zerocopy/zc_post_modify_size
   # stays out until reconverse #223 (2-process data mismatch) is fixed, and
   # zerocopy/large_p2p (a 2 GiB transfer, kept out of zerocopy/Makefile's own
-  # test target as well) does not fit a hosted runner.
+  # test target as well) does not fit a hosted runner. amr_1d_simple,
+  # dynamic_insertion and dynamic_insertion_deletion entered 2026-10-18: a
+  # deleted index re-created on another PE (amr_1d_simple at 4 PEs) caught the
+  # retired-id defect of the 64-bit id redesign that the tier had missed.
   TEST_DIRS: >-
     tests/charm++/megatest
     tests/charm++/simplearrayhello
     tests/charm++/anytime_migration
+    tests/charm++/amr_1d_simple
+    tests/charm++/dynamic_insertion
+    tests/charm++/dynamic_insertion_deletion
     tests/charm++/anytime_bcastred
     tests/charm++/qd
     tests/charm++/within_node_bcast
