@@ -6412,6 +6412,15 @@ both for bulk insertion, and if dynamic insertion is used to create the initial 
 In the latter case, after the initial elements have been inserted and ``doneInserting`` is
 called, the initialization callback will be invoked once all insertions have completed.
 
+``opts.setBounds(...)`` fixes the array's index space. Every constructor of
+CkArrayOptions that takes a size sets the bounds to that size, so ``setBounds``
+is needed only for an array created with an empty CkArrayOptions whose index
+space is nevertheless known; the runtime addresses the elements of a bounded
+array more cheaply. ``opts.setWideCollection()`` is for programs that create
+very many small arrays (AMPI creates one per communicator): the runtime can
+then name 16.7 million arrays instead of 4,095. Such an array must have bounds,
+and the program is told when it reaches 2,048 arrays and could use the option.
+
 .. _array map:
 
 Initial Placement Using Map Objects

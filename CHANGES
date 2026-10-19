@@ -61,6 +61,17 @@ New on this line since the split from classic:
   be restored after it: the id layout and the checkpoint format
   changed, and the restart aborts with a layout mismatch message.
 
+- 64-bit object ids, part 1d: the wide-collection layout. A chare
+  array created with CkArrayOptions::setWideCollection() gets element
+  ids with 24 collection bits (16.7 million arrays) and a 37-bit
+  packed index, for programs that create many small arrays (AMPI:
+  one per communicator); such an array must have bounds. The
+  collection field of every id now counts arrays, not groups, so the
+  standard layout names 4,095 arrays instead of about 1,300; at 2,048
+  the runtime suggests setWideCollection once, and at the limit it
+  aborts naming it. A checkpoint records both field widths and a
+  build with different widths refuses to restore it.
+
 - Broadcasts and [nokeep] entry methods: fixes for message reuse and
   copies (#4000-#4012). Checkpoint restart no longer hangs with more
   than one process and more than one PE per process (#4019). The

@@ -28,7 +28,16 @@ endif
 FTDIRS = \
   jacobi3d
 
-TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
+# Not applicable on reconverse: reconverse has no isomalloc or migratable
+# threads, so AMPI ranks cannot migrate or be checkpointed.
+ifeq ($(CMK_GDIR),reconverse)
+RECONVERSE_NA = \
+  migration \
+  chkpt \
+
+endif
+
+TESTDIRS = $(filter-out $(FTDIRS) $(RECONVERSE_NA),$(DIRS))
 
 TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
 
