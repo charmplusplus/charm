@@ -16,6 +16,9 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #include "tcharmc.h"
 #include "cklists.h"
 #include "memory-isomalloc.h"
+#if CMK_RECONVERSE
+#include "reconverse-compat.h"
+#endif
 
 #include "cmitls.h"
 
@@ -207,6 +210,8 @@ class TCharm: public CBase_TCharm
 
 	//Block, migrate to destPE, and resume
 	CMI_WARN_UNUSED_RESULT TCharm * migrateTo(int destPE) noexcept;
+	//Hides CkMigratable::setMigratable: forced to 0 when threads cannot migrate
+	void setMigratable(int mig) noexcept;
 
 	//Thread finished running
 	void done(int exitcode) noexcept;
