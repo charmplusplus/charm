@@ -106,6 +106,8 @@ void CkArrayOptions::init() {
   disableNotifyChildInRed = !_isNotifyChildInRed;
   broadcastViaScheduler = false;
   sectionAutoDelegate = true;
+  wideCollection = false;
+  collectionNumber = 0;
 }
 
 CkArrayOptions& CkArrayOptions::setStaticInsertion(bool b) {
@@ -199,6 +201,8 @@ void CkArrayOptions::pup(PUP::er& p) {
   p | insertionType;
   p | broadcastViaScheduler;
   p | sectionAutoDelegate;
+  p | wideCollection;
+  p | collectionNumber;
 }
 
 CkArrayListener::CkArrayListener(int nInts_) : nInts(nInts_) { dataOffset = -1; }
