@@ -25,10 +25,10 @@ test: objid_wide
 	$(call run, ./objid_wide +p4 +restart ckptlog )
 	$(call run, ./objid_wide +p2 +restart ckptlog )
 	-rm -rf ckptlog
-	./objid_wide +p4 -abort nobounds 2>&1 | grep -q "but no bounds"
-	./objid_wide +p4 -abort bigbounds 2>&1 | grep -q "bits to pack its index, but a wide-collection"
-	./objid_wide +p4 -wide 10 -standard 2100 2>&1 | grep -q "chare arrays created, half of the"
-	./objid_wide +p4 -wide 10 -standard 4200 2>&1 | grep -q "ran out of collection numbers"
+	$(call run, ./objid_wide +p4 -abort nobounds) 2>&1 | grep -q "but no bounds"
+	$(call run, ./objid_wide +p4 -abort bigbounds) 2>&1 | grep -q "bits to pack its index, but a wide-collection"
+	$(call run, ./objid_wide +p4 -wide 10 -standard 2100) 2>&1 | grep -q "chare arrays created, half of the"
+	$(call run, ./objid_wide +p4 -wide 10 -standard 4200) 2>&1 | grep -q "ran out of collection numbers"
 
 smptest: test
 
