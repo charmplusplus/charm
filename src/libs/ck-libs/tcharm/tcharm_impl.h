@@ -210,6 +210,8 @@ class TCharm: public CBase_TCharm
 
 	//Block, migrate to destPE, and resume
 	CMI_WARN_UNUSED_RESULT TCharm * migrateTo(int destPE) noexcept;
+	//Hides CkMigratable::setMigratable: forced to 0 when threads cannot migrate
+	void setMigratable(int mig) noexcept;
 
 	//Thread finished running
 	void done(int exitcode) noexcept;

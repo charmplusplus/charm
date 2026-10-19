@@ -225,6 +225,13 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   threadInfo.numElements=initMsg->numElements;
   nUd=0;
   usesAtSync=true;
+#if CMK_LBDB_ON
+  // Without migratable threads the element cannot be packed (see pup), so
+  // no balancer may select it, whatever path triggers the balancing step
+  // (AtSync from migrate(), async_migrate(), or a user AtSync). This also
+  // covers the arrays bound to this one: they share the location record.
+  if (tcharm_nomig) CkMigratable::setMigratable(0);
+#endif
   run();
 }
 
@@ -457,10 +464,23 @@ void TCharm::run() noexcept
   	  start();
 }
 
+// Hides CkMigratable::setMigratable (not virtual; callers hold a TCharm*):
+// a client such as AMPI_Set_migratable(1) must not re-enable migration of an
+// element whose thread cannot be packed.
+void TCharm::setMigratable(int mig) noexcept
+{
+  if (tcharm_nomig) mig = 0;
+  CkMigratable::setMigratable(mig);
+}
+
 //Go to sync, block, possibly migrate, and then resume
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrate() noexcept
 {
 #if CMK_LBDB_ON
+  if (CthMigratable() == 0) {
+    warnNoMigration();
+    return this;
+  }
   DBG("going to sync");
   AtSync();
   return stop();
@@ -474,6 +494,10 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrate() noexcept
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::async_migrate() noexcept
 {
 #if CMK_LBDB_ON
+  if (CthMigratable() == 0) {
+    warnNoMigration();
+    return this;
+  }
   DBG("going to sync at async mode");
   ReadyMigrate(false);
   asyncMigrate = true;
@@ -813,10 +837,6 @@ CLINKAGE void *TCHARM_Get_global(int globalID)
 CLINKAGE void TCHARM_Migrate()
 {
 	TCHARMAPI("TCHARM_Migrate");
-	if (CthMigratable() == 0) {
-	  warnNoMigration();
-          return;
-        }
 	TCharm * unused = TCharm::get()->migrate();
 }
 FORTRAN_AS_C(TCHARM_MIGRATE,TCHARM_Migrate,tcharm_migrate,(void),())
