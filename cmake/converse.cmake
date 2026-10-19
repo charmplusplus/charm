@@ -358,6 +358,16 @@ if(RECONVERSE)
     # TaskQueue layout Charm++ compiles against has to be the one libreconverse
     # was built with.
     list(REMOVE_ITEM conv-core-h-to-install src/conv-core/taskqueue.h)
+    # The classic conv-config.h includes machine-layer headers (conv-common.h)
+    # that do not exist on reconverse. Install the reconverse version, which
+    # pulls the configuration from charm-config.h, conv-mach-opt.h and
+    # conv-autoconfig.h. memory-isomalloc.h and cmitls.h include it.
+    list(REMOVE_ITEM conv-core-h-to-install src/conv-core/conv-config.h)
+    list(APPEND conv-core-h-to-install src/libs/ck-libs/tcharm/reconverse-compat/conv-config.h)
+    # Classic Converse thread-migration API that reconverse lacks; TCharm and
+    # AMPI include it, and libmoduletcharm carries the definitions
+    # (src/libs/ck-libs/tcharm/reconverse-compat/reconverse-compat.C).
+    list(APPEND conv-core-h-to-install src/libs/ck-libs/tcharm/reconverse-compat/reconverse-compat.h)
 endif()
 
 # The CCS headers: classic installs its own; reconverse builds get

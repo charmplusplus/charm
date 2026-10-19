@@ -7,6 +7,10 @@ set -o posix -o pipefail
 progname="$(basename "$0")"
 progdir="$(dirname "$0")"
 
+# Substituted when Charm++ is configured: 1 on reconverse builds, which have
+# no charmrun and launch a program directly with +pe.
+reconverse="@CMK_RECONVERSE@"
+
 verbose=0
 num_ranks=1
 num_hosts=0
@@ -28,7 +32,14 @@ usage() {
   echo "    --host <host1,host2,...>  Comma-separated list of hosts"
   echo "    -vr|--vr                  Use virtual ranks"
   echo
-  echo "Other options will be passed unmodified to charmrun."
+  if [[ "$reconverse" = "1" ]]; then
+    echo "This is a reconverse build: the program runs as one process,"
+    echo "\"<program> +pe <#ranks>\" (with -vr: \"+vp<#ranks> +pe 1\")."
+    echo "For several processes, launch the program directly, e.g."
+    echo "    lcrun -n <#processes> <program> +pe <#PEs> [+vp<#ranks>]"
+  else
+    echo "Other options will be passed unmodified to charmrun."
+  fi
 }
 
 
@@ -97,6 +108,48 @@ processArgs() {
 
 processArgs "$@"
 
+runCmd() {
+  [[ $verbose == 1 ]] && echo "$progname: Executing" "$@" 1>&2
+  "$@"
+}
+
+if [[ "$reconverse" = "1" ]]; then
+  if [[ -n $hosts ]]; then
+    echo "$progname error: --host is not supported on reconverse builds; launch multi-process runs with lcrun or srun, e.g. lcrun -n <#processes> <program> +pe <#PEs>"
+    exit 1
+  fi
+  if [[ ${#cmd[@]} -eq 0 ]]; then
+    echo "$progname error: no program given"
+    exit 1
+  fi
+  # charmrun finds a program named without a path in the current directory;
+  # do the same, since the program is executed directly here.
+  if [[ "${cmd[0]}" != */* && -x "${cmd[0]}" ]]; then
+    cmd[0]="./${cmd[0]}"
+  fi
+  # Drop charmrun options (++name): there is no charmrun to take them, and
+  # the program would see them as arguments. ++quiet is passed to the
+  # program, which takes it as the classic machine layers do; ++local
+  # describes what this launch does anyway; others get a warning.
+  args=()
+  for a in "${cmd[@]}"; do
+    case "$a" in
+      ++quiet) args+=("$a") ;;
+      ++local) ;;
+      ++*) echo "$progname warning: charmrun option $a ignored on reconverse" 1>&2 ;;
+      *) args+=("$a") ;;
+    esac
+  done
+  cmd=("${args[@]}")
+  if [[ $virtual_ranks == 0 ]]; then
+    cmd+=(+pe "$num_ranks")
+  else
+    cmd+=("+vp$num_ranks" +pe 1)
+  fi
+  runCmd "${cmd[@]}"
+  exit $?
+fi
+
 handle_hosts
 
 if [[ $verbose == 0 ]]; then
@@ -114,11 +167,6 @@ if [[ $virtual_ranks == 0 ]]; then
 else
   cmd+=("+vp$num_ranks" "+p$num_hosts")
 fi
-
-runCmd() {
-  [[ $verbose == 1 ]] && echo "$progname: Executing" "$@" 1>&2
-  "$@"
-}
 
 runCmd "$progdir/charmrun" "${charmrun_args[@]}" "${cmd[@]}"
 status=$?
