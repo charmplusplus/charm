@@ -1925,7 +1925,9 @@ void CkArray::recordSend(const CmiUInt8 id, const unsigned int bytes, int pe, co
     // LB deals in IDs with collection information only when CMK_GLOBAL_LOCATION_UPDATE
     // is enabled, so add the group information if so.
 #  if CMK_GLOBAL_LOCATION_UPDATE
-    const CmiUInt8 lbObjId = makeID(id).getID();
+    // The id the element registered with the LB (CkLocRec): the manager's, which
+    // differs from this array's for a bound array.
+    const CmiUInt8 lbObjId = locMgr->makeID(id).getID();
 #  else
     const CmiUInt8 lbObjId = id;
 #  endif

@@ -97,15 +97,18 @@ class ObjID {
         ///
         ObjID(const CmiUInt8 id_) : id(id_) { }
         /// An element id from its array's collection number and kind and the
-        /// element payload. The number is in range by construction (CkCreateArray
-        /// hands them out and aborts at the limit); the payload is by the
-        /// compressor or the hashed-kind minting, so both are only asserted here.
+        /// element payload. Checked in every build: a payload out of range (an index
+        /// outside the array's bounds) would otherwise land in another array's field.
         ObjID(const CmiUInt8 collection, const CmiUInt8 eid, const bool wide)
             : id(wide ? (WIDE_TAG | (collection << WIDE_PAYLOAD_BITS) | eid)
                       : ((collection << PAYLOAD_BITS) | eid))
         {
-          CmiAssert(wide ? (collection < WIDE_LIMIT && eid <= WIDE_PAYLOAD_MASK)
-                         : (collection < STANDARD_LIMIT && eid <= PAYLOAD_MASK));
+          if (wide ? (collection >= WIDE_LIMIT || eid > WIDE_PAYLOAD_MASK)
+                   : (collection >= STANDARD_LIMIT || eid > PAYLOAD_MASK))
+            CmiAbort("Element id out of range: collection %llu, payload 0x%llx, %s layout"
+                     " (an array index outside the array's bounds?)\n",
+                     (unsigned long long)collection, (unsigned long long)eid,
+                     wide ? "wide" : "standard");
         }
 
         /// Wide layout (tag 001)?
@@ -115,9 +118,13 @@ class ObjID {
             return isWide() ? ((id & WIDE_COLLECTION_MASK) >> WIDE_PAYLOAD_BITS)
                             : ((id & COLLECTION_MASK) >> PAYLOAD_BITS);
         }
-        /// The element payload: everything location management keys on
+        /// The element payload: everything location management keys on. The mask
+        /// comes from a table indexed by the tag, so delivery does not branch here.
         inline CmiUInt8 getElementID() const {
-            return id & (isWide() ? (CmiUInt8)WIDE_PAYLOAD_MASK : (CmiUInt8)PAYLOAD_MASK);
+            static constexpr CmiUInt8 masks[1 << TYPE_TAG_BITS] = {
+                PAYLOAD_MASK, WIDE_PAYLOAD_MASK, PAYLOAD_MASK, PAYLOAD_MASK,
+                PAYLOAD_MASK, PAYLOAD_MASK,      PAYLOAD_MASK, PAYLOAD_MASK};
+            return id & masks[id >> (64 - TYPE_TAG_BITS)];
         }
         /// The whole id, tag included (two ids are the same element iff equal)
         inline CmiUInt8 getID() const { return id; }
