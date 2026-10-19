@@ -298,34 +298,38 @@ deliverInline's bound-sibling demand creation (ckarray.C:1959; the sibling's rec
 is local, so the record branch serves) and the LB UpdateLocation path (rewritten,
 section 4.4).
 
-One scan survives, off the delivery path:
-CkLocMgr::recoverIndex(id, idx, scanAtHome). Demand creation needs the index (the
-home approves by index; createhere creates at the original sender), and a message
-can reach a PE by id for an element that has no record there: a deleted element
-whose id and stale location the sender still held. The compressor or a local record
-serve first; then the PE's table of retired ids (below); failing those, the home of
-a hashed-kind element scans its own idx -> id bindings (kept by reclaimRemote for
-exactly this reason), and a non-home PE hands the message to the home.
+No scan survives. CkLocMgr::recoverIndex(id, idx) answers from the compressor,
+a local record, or the PE's table of retired ids (below), all constant time, and
+returns false otherwise. Demand creation needs the index (the home approves by
+index; createhere creates at the original sender), and a message can reach a PE
+by id for an element that has no record there: a deleted element whose id and
+stale location the sender still held. The home can always recover such an index,
+because it records every death of an element it is home for; a non-home PE that
+cannot hands the message to the home.
 
 Re-creation under a new id. An element inserted without a PE argument lands on
 the map's PE, which for the hashed kind is not its home (section 3.3), so a deleted
 index re-created on a PE that never saw it gets a fresh unique number, and every
 PE that cached the old id (the old element's host, any earlier sender) keeps
-sending to an id that no element has. The home keeps a table of retired ids:
-whenever a PE rebinds an index to a different id (CkLocMgr::insertID), it records
-old id -> index in `retiredIds`. At the home, handleUnknownByID recovers the index
-for any id it ever bound, and if the index is now bound to a newer id, re-addresses
-the message to it, forwards it, and sends the original sender the new binding by
-index, so its later sends go direct; if the index has no element at all, the
-message waits by index, and the index listener releases it whichever id the next
-element of that index gets. A location request by id for a retired id
-(CkLocCache::requestLocation, a large message buffered at its sender) is answered
-the same way, by index; the asking PE's updateLocation then releases the messages
-it held under the old id toward the new location, where they take the same route
-through the home. The table is never pruned (no PE knows which others still hold an
-old id); it grows by one entry per re-creation under a new id that the PE learns of.
-Found 2026-10-18 by tests/charm++/amr_1d_simple at 4, 7 and 8 PEs, where the
-map's PE and the home of the re-created index differ.
+sending to an id that no element has. Each PE keeps a table `retiredIds` of ids
+that no longer name a live element, by index: an id the PE rebound to a different
+id (CkLocMgr::insertID), and, at the home, the id of every element of its that
+died (CkLocMgr::noteDead, from reclaim for a local death and reclaimRemote for a
+remote one); the idx -> id binding itself is kept, as before. A message for such
+an id, wherever it lands (CkArray::handleUnknownByID), is re-addressed to the
+index's current id when there is a newer one and forwarded; the home also sends
+the original sender the new binding by index, so its later sends go direct. At
+the home, if the index has no element at all, the message waits by index, and the
+index listener releases it whichever id the next element of that index gets. A
+location request by id for a retired id (CkLocCache::requestLocation, a large
+message held where it landed) is answered the same way, by index; the asking PE's
+updateLocation then re-addresses the messages it held under the old id to the new
+one (CkArray::releaseRetiredMsgs) and sends them to the new location directly.
+The table grows like idx2id and like it is never pruned (no PE knows which others
+still hold an old id). Found 2026-10-18 by tests/charm++/amr_1d_simple at 4, 7
+and 8 PEs, where the map's PE and the home of the re-created index differ;
+tests/charm++/objid_insert phase 7 reproduces it deterministically, with and
+without +messageBufferingThreshold 0.
 
 ## 4. Location manager and delivery
 
@@ -964,3 +968,4 @@ updated for the second layout. Two to three days.
 - 2026-10-16 (Kale): AMPI arrays get bounds and a tag-marked wide-collection kind replaces the C = 29 build, as objid PR 1d; sections 1 and 12.
 - 2026-10-16 (Kale): wide collection is opt-in per array, not selected automatically; section 12.4.
 - 2026-10-18 (fix after #4015): a deleted index re-created on a PE that never saw it gets a new id; the home keeps a retired-id table and re-addresses messages sent to the old id; section 3.4.
+- 2026-10-19 (#4057 review, Aditya): the home records every dead element's id in the retired-id table, so the index scan is gone; a PE that releases messages held under an old id re-addresses them itself; objid_insert phase 7; section 3.4.
