@@ -43,6 +43,27 @@ CAMPI_MAIN(argc, argv)
     }
   }
 
+  // Per-call cost: 10000 round trips of 8 bytes between ranks 0 and 1.
+  {
+    const int reps = 10000;
+    char b[8] = {0};
+    MPI_Barrier(MPI_COMM_WORLD);
+    double t0 = MPI_Wtime();
+    for (int i = 0; i < reps; i++) {
+      if (rank == 0) {
+        MPI_Send(b, 8, MPI_CHAR, 1, 9, MPI_COMM_WORLD);
+        MPI_Recv(b, 8, MPI_CHAR, 1, 9, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      } else if (rank == 1) {
+        MPI_Recv(b, 8, MPI_CHAR, 0, 9, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        MPI_Send(b, 8, MPI_CHAR, 0, 9, MPI_COMM_WORLD);
+      }
+    }
+    double t = MPI_Wtime() - t0;
+    if (rank == 0)
+      printf("campi pingpong: 8-byte one-way latency %.3f us (%d round trips)\n",
+             t * 1e6 / (2.0 * reps), reps);
+  }
+
   long total = 0;
   MPI_Allreduce(&errors, &total, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
   int ranksum = 0;

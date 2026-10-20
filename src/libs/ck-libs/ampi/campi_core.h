@@ -3,10 +3,12 @@
  * replacements for AMPI's blocking calls. Requires C++20 (<coroutine>).
  *
  * An AMPI rank in campi mode is a C++20 coroutine instead of a user-level
- * thread. Every call that would block a thread-based rank is a coroutine
- * here, awaited with co_await: it posts AMPI's nonblocking variant and
- * suspends until AMPI's delivery code wakes the rank (TCharm::resume, which
- * campi redirects from CthAwaken to a coroutine resume).
+ * thread. Every call that would block a thread-based rank is awaited with
+ * co_await here: it posts AMPI's nonblocking variant and suspends until
+ * AMPI's delivery code wakes the rank (TCharm::resume, which campi redirects
+ * from CthAwaken to a coroutine resume). The simple calls return a
+ * request_awaiter (no coroutine frame); calls with internal awaited loops
+ * (Init, Finalize, Scan, Exscan, communicator creation) are tasks.
  *
  * Applications normally include campi.h (this header plus macros that
  * redirect the blocking MPI names to co_await expressions) and define their
@@ -32,6 +34,10 @@ struct Rank; // per-rank record, defined in campi.C
 [[noreturn]] void abort_unhandled_exception() noexcept;
 // Record h as the frame to resume when the running rank is next woken.
 void set_resume_point(std::coroutine_handle<> h) noexcept;
+class request_awaiter;
+// Same, for a rank blocked in a request_awaiter: on each wake-up campi first
+// calls w->poll() and resumes h only once w's requests are complete.
+void set_resume_point(std::coroutine_handle<> h, request_awaiter *w) noexcept;
 
 /* ---------------- task<T>: the rank's coroutine type ---------------- */
 
@@ -150,47 +156,107 @@ struct ready_int {
 
 /* ---------------- request completion ---------------- */
 
-task<int> Wait(MPI_Request *req, MPI_Status *sts);
-task<int> Waitall(int n, MPI_Request *reqs, MPI_Status *sts);
-inline task<int> wait(MPI_Request *req, MPI_Status *sts) { return Wait(req, sts); }
-inline task<int> waitall(int n, MPI_Request *reqs, MPI_Status *sts) { return Waitall(n, reqs, sts); }
+// The awaitable for every blocking call that is "post the nonblocking
+// variant, wait for its request(s), finish": Send, Recv, Wait, Waitall,
+// Sendrecv and the plain collectives. It is a plain object, not a coroutine,
+// so a call allocates no coroutine frame; it lives in the awaiting
+// coroutine's frame while the rank is suspended.
+//  - The factory function (Send, Recv, ...) posts the request(s).
+//  - await_ready: true if posting failed or the requests are complete.
+//  - await_suspend: marks the requests blocked (as their wait() does before
+//    it suspends a thread) and records the resume point with this object.
+//  - On each wake-up campi_resume calls poll(), which clears the blocked
+//    bookkeeping and, if the requests are still incomplete, marks them
+//    blocked again and leaves the rank suspended (wake-ups may be spurious).
+//  - await_resume: MPI_Wait/MPI_Waitall on the completed request(s).
+// The object holds no pointers into itself, so it may be copied freely
+// before it is awaited.
+class [[nodiscard]] request_awaiter {
+ public:
+  enum kind : unsigned char { WAIT_ONE, WAIT_ALL, SENDRECV };
+
+  // Wait on n requests: own_ (ext == nullptr) or the caller's array ext.
+  request_awaiter(kind k, int n, MPI_Request *ext, MPI_Status *sts) noexcept
+      : ext_(ext), sts_(sts), n_(n), kind_(k) {
+    own_[0] = own_[1] = MPI_REQUEST_NULL;
+  }
+  // Posting failed with error code e: complete at once with result e.
+  static request_awaiter failed(int e) noexcept {
+    request_awaiter w(WAIT_ONE, 0, nullptr, nullptr);
+    w.err_ = e;
+    return w;
+  }
+
+  MPI_Request *own() noexcept { return own_; }
+  void set_error(int e) noexcept { err_ = e; }
+
+  bool await_ready() noexcept;
+  void await_suspend(std::coroutine_handle<> h) noexcept;
+  int await_resume() noexcept;
+  bool poll() noexcept; // called by campi_resume on a wake-up; true: complete
+
+ private:
+  MPI_Request *reqs() noexcept { return ext_ ? ext_ : own_; }
+  bool done() noexcept;
+  void block() noexcept;
+  void unblock() noexcept;
+
+  MPI_Request own_[2];
+  MPI_Request *ext_;
+  MPI_Status *sts_;
+  int n_;
+  int err_ = MPI_SUCCESS;
+  kind kind_;
+};
+
+request_awaiter Wait(MPI_Request *req, MPI_Status *sts);
+request_awaiter Waitall(int n, MPI_Request *reqs, MPI_Status *sts);
+inline request_awaiter wait(MPI_Request *req, MPI_Status *sts) { return Wait(req, sts); }
+inline request_awaiter waitall(int n, MPI_Request *reqs, MPI_Status *sts) {
+  return Waitall(n, reqs, sts);
+}
 
 /* ---------------- blocking point-to-point ---------------- */
 
-task<int> Send(const void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm);
-task<int> Ssend(const void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm);
-task<int> Recv(void *buf, int count, MPI_Datatype type, int src, int tag, MPI_Comm comm,
-               MPI_Status *sts);
-task<int> Sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
-                   void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
-                   MPI_Comm comm, MPI_Status *sts);
+request_awaiter Send(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                     MPI_Comm comm);
+request_awaiter Ssend(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                      MPI_Comm comm);
+request_awaiter Recv(void *buf, int count, MPI_Datatype type, int src, int tag, MPI_Comm comm,
+                     MPI_Status *sts);
+request_awaiter Sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
+                         void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
+                         MPI_Comm comm, MPI_Status *sts);
 
 /* ---------------- blocking collectives ---------------- */
 
-task<int> Barrier(MPI_Comm comm);
-task<int> Bcast(void *buf, int count, MPI_Datatype type, int root, MPI_Comm comm);
-task<int> Reduce(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
-                 int root, MPI_Comm comm);
-task<int> Allreduce(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
-                    MPI_Comm comm);
-task<int> Gather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
-                 MPI_Datatype rtype, int root, MPI_Comm comm);
-task<int> Gatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
-                  const int *rcounts, const int *displs, MPI_Datatype rtype, int root,
-                  MPI_Comm comm);
-task<int> Allgather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
-                    MPI_Datatype rtype, MPI_Comm comm);
-task<int> Allgatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
-                     const int *rcounts, const int *displs, MPI_Datatype rtype, MPI_Comm comm);
-task<int> Scatter(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
-                  MPI_Datatype rtype, int root, MPI_Comm comm);
-task<int> Scatterv(const void *sbuf, const int *scounts, const int *displs, MPI_Datatype stype,
-                   void *rbuf, int rcount, MPI_Datatype rtype, int root, MPI_Comm comm);
-task<int> Alltoall(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
-                   MPI_Datatype rtype, MPI_Comm comm);
-task<int> Alltoallv(const void *sbuf, const int *scounts, const int *sdispls,
-                    MPI_Datatype stype, void *rbuf, const int *rcounts, const int *rdispls,
-                    MPI_Datatype rtype, MPI_Comm comm);
+request_awaiter Barrier(MPI_Comm comm);
+request_awaiter Bcast(void *buf, int count, MPI_Datatype type, int root, MPI_Comm comm);
+request_awaiter Reduce(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
+                       int root, MPI_Comm comm);
+request_awaiter Allreduce(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
+                          MPI_Comm comm);
+request_awaiter Gather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
+                       MPI_Datatype rtype, int root, MPI_Comm comm);
+request_awaiter Gatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                        const int *rcounts, const int *displs, MPI_Datatype rtype, int root,
+                        MPI_Comm comm);
+request_awaiter Allgather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                          int rcount, MPI_Datatype rtype, MPI_Comm comm);
+request_awaiter Allgatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                           const int *rcounts, const int *displs, MPI_Datatype rtype,
+                           MPI_Comm comm);
+request_awaiter Scatter(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                        int rcount, MPI_Datatype rtype, int root, MPI_Comm comm);
+request_awaiter Scatterv(const void *sbuf, const int *scounts, const int *displs,
+                         MPI_Datatype stype, void *rbuf, int rcount, MPI_Datatype rtype,
+                         int root, MPI_Comm comm);
+request_awaiter Alltoall(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                         int rcount, MPI_Datatype rtype, MPI_Comm comm);
+request_awaiter Alltoallv(const void *sbuf, const int *scounts, const int *sdispls,
+                          MPI_Datatype stype, void *rbuf, const int *rcounts,
+                          const int *rdispls, MPI_Datatype rtype, MPI_Comm comm);
+// Scan and Exscan await a loop of internal sendrecvs: they stay tasks.
 task<int> Scan(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
                MPI_Comm comm);
 task<int> Exscan(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,

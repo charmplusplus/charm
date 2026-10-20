@@ -15,7 +15,9 @@
  *    delivery code, which a thread-based rank never observes.
  *  - Awaitables: blocking MPI calls as "post the nonblocking variant, then
  *    suspend until the request completes", mirroring what the request's
- *    wait() does before it blocks a thread.
+ *    wait() does before it blocks a thread. The simple calls return a
+ *    request_awaiter (no coroutine frame); a rank blocked in one is polled
+ *    by campi_resume and resumed only when its requests are complete.
  *  - Init/Finalize and communicator creation.
  */
 #include "ampiimpl.h"
@@ -54,6 +56,7 @@ struct Rank {
   TCharm *tc = nullptr;
   ampiParent *parent = nullptr;
   std::coroutine_handle<> h;                          // frame to resume next
+  request_awaiter *waiter = nullptr; // h is blocked in this awaiter: poll it first
   std::coroutine_handle<detail::promise<int>> root;   // the rank's main
   bool running = false;        // inside campi_resume for this rank
   bool resumePending = false;  // woken while running
@@ -95,6 +98,15 @@ void set_resume_point(std::coroutine_handle<> h) noexcept {
   if (r == nullptr)
     CkAbort("campi: co_await on a campi awaitable outside a campi rank");
   r->h = h;
+  r->waiter = nullptr;
+}
+
+void set_resume_point(std::coroutine_handle<> h, request_awaiter *w) noexcept {
+  Rank *r = current();
+  if (r == nullptr)
+    CkAbort("campi: co_await on a campi awaitable outside a campi rank");
+  r->h = h;
+  r->waiter = w;
 }
 
 /* ====================== resume / wake ====================== */
@@ -141,6 +153,7 @@ static void finish_rank(Rank *r) {
   r->root.destroy();
   r->root = {};
   r->h = {};
+  r->waiter = nullptr;
   r->finished = true;
   AMPI_Exit(r->exitCode); // contributes to TCharm's exit reduction; returns in campi mode
 }
@@ -171,10 +184,15 @@ static void campi_resume(Rank *r) {
     r->tc->getCkLocRec()->startTiming();
 #endif
 
-    std::coroutine_handle<> h = std::exchange(r->h, {});
-    CAMPI_DBG("resume rank %d\n", r->tc->getElement());
-    h.resume(); // runs until the rank suspends at an awaitable or main returns
-    CAMPI_DBG("rank %d suspended (done %d)\n", r->tc->getElement(), (int)r->root.done());
+    // A rank blocked in a request_awaiter stays suspended (r->h kept) until
+    // its requests complete; poll() redoes the blocked bookkeeping.
+    if (r->waiter == nullptr || r->waiter->poll()) {
+      r->waiter = nullptr;
+      std::coroutine_handle<> h = std::exchange(r->h, {});
+      CAMPI_DBG("resume rank %d\n", r->tc->getElement());
+      h.resume(); // runs until the rank suspends at an awaitable or main returns
+      CAMPI_DBG("rank %d suspended (done %d)\n", r->tc->getElement(), (int)r->root.done());
+    }
 
     r->initDone = CtvAccess(ampiInitDone);
     r->finalized = CtvAccess(ampiFinalized);
@@ -283,156 +301,197 @@ static int mark_blocked(ampiParent *p, MPI_Request idx, bool blocked) {
   return n;
 }
 
-task<int> Wait(MPI_Request *req, MPI_Status *sts) {
-  if (*req != MPI_REQUEST_NULL) {
-    ampiParent *p = getAmpiParent();
-    while (!req_done(p, *req)) {
-      CkAssert(p->numBlockedReqs == 0);
-      AmpiReqType t = lookup(p, *req)->getType();
-      p->numBlockedReqs = mark_blocked(p, *req, true);
-      CAMPI_DBG("rank %d waits on request %d (type %d)\n", TCHARM_Element(), *req, (int)t);
-      // IReq/SendReq/SsendReq::wait block via blockOnRecv,
-      // RednReq/GatherReq/GathervReq::wait via blockOnColl.
-      if (is_coll_req(t)) p->resumeOnColl = true;
-      else p->resumeOnRecv = true;
-      co_await suspend(); // woken by resumeThreadIfReady / irednResult
-      p = getAmpiParent();
-      mark_blocked(p, *req, false);
-      p->resumeOnRecv = false;
-      p->resumeOnColl = false;
-      p->numBlockedReqs = 0;
-    }
-  }
-  co_return MPI_Wait(req, sts); // the request is complete: does not block
+/* ---- request_awaiter: the frame-free awaitable of the simple calls ---- */
+
+bool request_awaiter::done() noexcept {
+  ampiParent *p = getAmpiParent();
+  MPI_Request *r = reqs();
+  for (int i = 0; i < n_; i++)
+    if (!req_done(p, r[i])) return false;
+  return true;
 }
 
-task<int> Waitall(int n, MPI_Request *reqs, MPI_Status *sts) {
+// As the request's wait() (WAIT_ONE) or ampiParent::waitall (WAIT_ALL,
+// SENDRECV) does before it suspends a thread.
+void request_awaiter::block() noexcept {
   ampiParent *p = getAmpiParent();
-  for (;;) {
-    bool all = true;
-    for (int i = 0; i < n; i++)
-      if (!req_done(p, reqs[i])) { all = false; break; }
-    if (all) break;
-    // as ampiParent::waitall: count the incomplete requests, block once
-    CkAssert(p->numBlockedReqs == 0);
+  MPI_Request *r = reqs();
+  CkAssert(p->numBlockedReqs == 0);
+  if (kind_ == WAIT_ONE) {
+    AmpiReqType t = lookup(p, r[0])->getType();
+    p->numBlockedReqs = mark_blocked(p, r[0], true);
+    CAMPI_DBG("rank %d waits on request %d (type %d)\n", TCHARM_Element(), r[0], (int)t);
+    // IReq/SendReq/SsendReq::wait block via blockOnRecv,
+    // RednReq/GatherReq/GathervReq::wait via blockOnColl.
+    if (is_coll_req(t)) p->resumeOnColl = true;
+    else p->resumeOnRecv = true;
+  } else {
     int blocked = 0;
-    for (int i = 0; i < n; i++)
-      if (!req_done(p, reqs[i])) blocked += mark_blocked(p, reqs[i], true);
+    for (int i = 0; i < n_; i++)
+      if (!req_done(p, r[i])) blocked += mark_blocked(p, r[i], true);
     p->numBlockedReqs = blocked;
-    CAMPI_DBG("rank %d waits on %d of %d requests\n", TCHARM_Element(), blocked, n);
+    CAMPI_DBG("rank %d waits on %d of %d requests\n", TCHARM_Element(), blocked, n_);
     p->resumeOnRecv = true;
     p->resumeOnColl = true; // a collective request's completion (irednResult) checks this flag
-    co_await suspend();
-    p = getAmpiParent();
-    for (int i = 0; i < n; i++)
-      if (reqs[i] != MPI_REQUEST_NULL) mark_blocked(p, reqs[i], false);
-    p->resumeOnRecv = false;
-    p->resumeOnColl = false;
-    p->numBlockedReqs = 0;
   }
-  co_return MPI_Waitall(n, reqs, sts); // all complete: does not block
+}
+
+void request_awaiter::unblock() noexcept {
+  ampiParent *p = getAmpiParent();
+  MPI_Request *r = reqs();
+  for (int i = 0; i < n_; i++)
+    if (r[i] != MPI_REQUEST_NULL) mark_blocked(p, r[i], false);
+  p->resumeOnRecv = false;
+  p->resumeOnColl = false;
+  p->numBlockedReqs = 0;
+}
+
+bool request_awaiter::await_ready() noexcept {
+  return err_ != MPI_SUCCESS || done();
+}
+
+void request_awaiter::await_suspend(std::coroutine_handle<> h) noexcept {
+  block();
+  set_resume_point(h, this);
+}
+
+bool request_awaiter::poll() noexcept {
+  unblock();
+  if (done()) return true;
+  block(); // a spurious wake-up: stay suspended
+  return false;
+}
+
+int request_awaiter::await_resume() noexcept {
+  if (err_ != MPI_SUCCESS) return err_;
+  switch (kind_) { // the requests are complete: these do not block
+    case WAIT_ONE: return MPI_Wait(reqs(), sts_);
+    case WAIT_ALL: return MPI_Waitall(n_, reqs(), sts_);
+    case SENDRECV: default: {
+      MPI_Status st[2];
+      int e = MPI_Waitall(2, own_, st);
+      if (sts_ != MPI_STATUS_IGNORE) *sts_ = st[0];
+      return e;
+    }
+  }
+}
+
+request_awaiter Wait(MPI_Request *req, MPI_Status *sts) {
+  return request_awaiter(request_awaiter::WAIT_ONE, 1, req, sts);
+}
+
+request_awaiter Waitall(int n, MPI_Request *reqs, MPI_Status *sts) {
+  return request_awaiter(request_awaiter::WAIT_ALL, n, reqs, sts);
 }
 
 /* ====================== point-to-point ====================== */
 
-task<int> Send(const void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm) {
-  MPI_Request req;
-  int e = MPI_Isend(buf, count, type, dest, tag, comm, &req);
-  if (e != MPI_SUCCESS) co_return e;
-  co_return co_await Wait(&req, MPI_STATUS_IGNORE);
+// Post one request with call (which names it req), then wait on it.
+#define CAMPI_POST_AND_WAIT(call, sts)                                 \
+  request_awaiter w(request_awaiter::WAIT_ONE, 1, nullptr, (sts));     \
+  MPI_Request *req = w.own();                                          \
+  int e = (call);                                                      \
+  if (e != MPI_SUCCESS) return request_awaiter::failed(e);             \
+  return w;
+
+request_awaiter Send(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                     MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Isend(buf, count, type, dest, tag, comm, req), MPI_STATUS_IGNORE)
 }
 
-task<int> Ssend(const void *buf, int count, MPI_Datatype type, int dest, int tag, MPI_Comm comm) {
-  MPI_Request req;
-  int e = MPI_Issend(buf, count, type, dest, tag, comm, &req);
-  if (e != MPI_SUCCESS) co_return e;
-  co_return co_await Wait(&req, MPI_STATUS_IGNORE);
+request_awaiter Ssend(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                      MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Issend(buf, count, type, dest, tag, comm, req), MPI_STATUS_IGNORE)
 }
 
-task<int> Recv(void *buf, int count, MPI_Datatype type, int src, int tag, MPI_Comm comm,
-               MPI_Status *sts) {
-  MPI_Request req;
-  int e = MPI_Irecv(buf, count, type, src, tag, comm, &req);
-  if (e != MPI_SUCCESS) co_return e;
-  co_return co_await Wait(&req, sts);
+request_awaiter Recv(void *buf, int count, MPI_Datatype type, int src, int tag, MPI_Comm comm,
+                     MPI_Status *sts) {
+  CAMPI_POST_AND_WAIT(MPI_Irecv(buf, count, type, src, tag, comm, req), sts)
 }
 
-task<int> Sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
-                   void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
-                   MPI_Comm comm, MPI_Status *sts) {
-  MPI_Request reqs[2];
+request_awaiter Sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
+                         void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
+                         MPI_Comm comm, MPI_Status *sts) {
+  request_awaiter w(request_awaiter::SENDRECV, 2, nullptr, sts);
+  MPI_Request *reqs = w.own();
   int e = MPI_Irecv(rbuf, rcount, rtype, src, rtag, comm, &reqs[0]);
-  if (e != MPI_SUCCESS) co_return e;
+  if (e != MPI_SUCCESS) return request_awaiter::failed(e);
   e = MPI_Isend(sbuf, scount, stype, dest, stag, comm, &reqs[1]);
-  if (e != MPI_SUCCESS) co_return e;
-  MPI_Status st[2];
-  e = co_await Waitall(2, reqs, st);
-  if (sts != MPI_STATUS_IGNORE) *sts = st[0];
-  co_return e;
+  if (e != MPI_SUCCESS) return request_awaiter::failed(e);
+  return w;
 }
 
 /* ====================== collectives ====================== */
 
-#define CAMPI_POST_AND_WAIT(call)               \
-  MPI_Request req;                              \
-  int e = (call);                               \
-  if (e != MPI_SUCCESS) co_return e;            \
-  co_return co_await Wait(&req, MPI_STATUS_IGNORE);
-
-task<int> Barrier(MPI_Comm comm) {
-  CAMPI_POST_AND_WAIT(MPI_Ibarrier(comm, &req))
+request_awaiter Barrier(MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ibarrier(comm, req), MPI_STATUS_IGNORE)
 }
-task<int> Bcast(void *buf, int count, MPI_Datatype type, int root, MPI_Comm comm) {
-  CAMPI_POST_AND_WAIT(MPI_Ibcast(buf, count, type, root, comm, &req))
+request_awaiter Bcast(void *buf, int count, MPI_Datatype type, int root, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ibcast(buf, count, type, root, comm, req), MPI_STATUS_IGNORE)
 }
-task<int> Reduce(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
-                 int root, MPI_Comm comm) {
-  CAMPI_POST_AND_WAIT(MPI_Ireduce(sbuf, rbuf, count, type, op, root, comm, &req))
+request_awaiter Reduce(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
+                       int root, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ireduce(sbuf, rbuf, count, type, op, root, comm, req),
+                      MPI_STATUS_IGNORE)
 }
-task<int> Allreduce(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
-                    MPI_Comm comm) {
-  CAMPI_POST_AND_WAIT(MPI_Iallreduce(sbuf, rbuf, count, type, op, comm, &req))
+request_awaiter Allreduce(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
+                          MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Iallreduce(sbuf, rbuf, count, type, op, comm, req),
+                      MPI_STATUS_IGNORE)
 }
-task<int> Gather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
-                 MPI_Datatype rtype, int root, MPI_Comm comm) {
-  CAMPI_POST_AND_WAIT(MPI_Igather(sbuf, scount, stype, rbuf, rcount, rtype, root, comm, &req))
+request_awaiter Gather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
+                       MPI_Datatype rtype, int root, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Igather(sbuf, scount, stype, rbuf, rcount, rtype, root, comm, req),
+                      MPI_STATUS_IGNORE)
 }
-task<int> Gatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
-                  const int *rcounts, const int *displs, MPI_Datatype rtype, int root,
-                  MPI_Comm comm) {
+request_awaiter Gatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                        const int *rcounts, const int *displs, MPI_Datatype rtype, int root,
+                        MPI_Comm comm) {
   CAMPI_POST_AND_WAIT(MPI_Igatherv(sbuf, scount, stype, rbuf, rcounts, displs, rtype, root,
-                                   comm, &req))
+                                   comm, req),
+                      MPI_STATUS_IGNORE)
 }
-task<int> Allgather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
-                    MPI_Datatype rtype, MPI_Comm comm) {
-  CAMPI_POST_AND_WAIT(MPI_Iallgather(sbuf, scount, stype, rbuf, rcount, rtype, comm, &req))
+request_awaiter Allgather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                          int rcount, MPI_Datatype rtype, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Iallgather(sbuf, scount, stype, rbuf, rcount, rtype, comm, req),
+                      MPI_STATUS_IGNORE)
 }
-task<int> Allgatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
-                     const int *rcounts, const int *displs, MPI_Datatype rtype, MPI_Comm comm) {
+request_awaiter Allgatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                           const int *rcounts, const int *displs, MPI_Datatype rtype,
+                           MPI_Comm comm) {
   CAMPI_POST_AND_WAIT(MPI_Iallgatherv(sbuf, scount, stype, rbuf, rcounts, displs, rtype, comm,
-                                      &req))
+                                      req),
+                      MPI_STATUS_IGNORE)
 }
-task<int> Scatter(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
-                  MPI_Datatype rtype, int root, MPI_Comm comm) {
-  CAMPI_POST_AND_WAIT(MPI_Iscatter(sbuf, scount, stype, rbuf, rcount, rtype, root, comm, &req))
+request_awaiter Scatter(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                        int rcount, MPI_Datatype rtype, int root, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Iscatter(sbuf, scount, stype, rbuf, rcount, rtype, root, comm, req),
+                      MPI_STATUS_IGNORE)
 }
-task<int> Scatterv(const void *sbuf, const int *scounts, const int *displs, MPI_Datatype stype,
-                   void *rbuf, int rcount, MPI_Datatype rtype, int root, MPI_Comm comm) {
+request_awaiter Scatterv(const void *sbuf, const int *scounts, const int *displs,
+                         MPI_Datatype stype, void *rbuf, int rcount, MPI_Datatype rtype,
+                         int root, MPI_Comm comm) {
   CAMPI_POST_AND_WAIT(MPI_Iscatterv(sbuf, scounts, displs, stype, rbuf, rcount, rtype, root,
-                                    comm, &req))
+                                    comm, req),
+                      MPI_STATUS_IGNORE)
 }
-task<int> Alltoall(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
-                   MPI_Datatype rtype, MPI_Comm comm) {
-  CAMPI_POST_AND_WAIT(MPI_Ialltoall(sbuf, scount, stype, rbuf, rcount, rtype, comm, &req))
+request_awaiter Alltoall(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                         int rcount, MPI_Datatype rtype, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ialltoall(sbuf, scount, stype, rbuf, rcount, rtype, comm, req),
+                      MPI_STATUS_IGNORE)
 }
-task<int> Alltoallv(const void *sbuf, const int *scounts, const int *sdispls,
-                    MPI_Datatype stype, void *rbuf, const int *rcounts, const int *rdispls,
-                    MPI_Datatype rtype, MPI_Comm comm) {
+request_awaiter Alltoallv(const void *sbuf, const int *scounts, const int *sdispls,
+                          MPI_Datatype stype, void *rbuf, const int *rcounts,
+                          const int *rdispls, MPI_Datatype rtype, MPI_Comm comm) {
   CAMPI_POST_AND_WAIT(MPI_Ialltoallv(const_cast<void *>(sbuf), const_cast<int *>(scounts),
                                      const_cast<int *>(sdispls), stype, rbuf,
                                      const_cast<int *>(rcounts), const_cast<int *>(rdispls),
-                                     rtype, comm, &req))
+                                     rtype, comm, req),
+                      MPI_STATUS_IGNORE)
 }
+
+#undef CAMPI_POST_AND_WAIT
+
 // AMPI's MPI_Iscan and MPI_Iexscan call the blocking MPI_Scan/MPI_Exscan, so
 // campi runs their recursive-doubling algorithms itself, awaiting each
 // internal sendrecv (ampi::sendrecv: irecv + send + waitall).
@@ -521,8 +580,6 @@ task<int> Exscan(const void *sendbuf, void *recvbuf, int count, MPI_Datatype dat
   }
   co_return MPI_SUCCESS;
 }
-
-#undef CAMPI_POST_AND_WAIT
 
 /* ====================== communicator creation ====================== */
 
