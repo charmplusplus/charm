@@ -20,6 +20,7 @@ mainmodule leanmd {
   readonly int densityReportFreq; // -densityreport: steps between density reports
   readonly int asyncLb;        // -lbasync: split the barrier and overlap the step
   readonly int lbLag;          // -lblag: steps between the two halves
+  readonly int useChannels;    // -channels: positions, forces and migrants through persistent device channels
 
   //central controller chare
   mainchare [migratable] Main {
@@ -80,9 +81,28 @@ mainmodule leanmd {
     // Atoms that crossed into my cell, likewise.
     entry void receiveMigrants(int ref, int ordinal, int n, int m, nocopydevice Particle parts[m]);
 
+    // -channels. At startup each compute hands me the channel of its position
+    // slot and each neighbour the channel of its migrant slot; every step a put
+    // into one of my force or migrant slots announces itself through these
+    // (the message's reference number is the step).
+    entry void takePosChannel(CkArrayIndex6D who, CkDeviceChannel ch);
+    entry void takeMigrantChannel(int num, CkDeviceChannel ch);
+    entry void forceArrived(CkDataMsg* m);
+    entry void migrantsArrived(CkDataMsg* m);
+
     //function to perform iterations for Cells
     entry void run() {
       serial { allocateDevice(); }
+      if (useChannels) {
+        // Startup handshake: a position channel from each of my computes, a
+        // migrant channel from each neighbour. Puts start once all are held.
+        for (chanCount = 0; chanCount < inbrs; chanCount++) {
+          when takePosChannel(CkArrayIndex6D who, CkDeviceChannel ch) serial { holdPosChannel(who, ch); }
+        }
+        for (chanCount = 0; chanCount < inbrs - 1; chanCount++) {
+          when takeMigrantChannel(int num, CkDeviceChannel ch) serial { migOut[num] = ch; }
+        }
+      }
 
       if (thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0) serial {
         stepTime = CkWallTimer();
@@ -95,8 +115,12 @@ mainmodule leanmd {
 
         //one force array back from each of my computes, folded in on the device
         for(forceCount = 0; forceCount < inbrs; forceCount++) {
-          when receiveForces[stepCount](int ref, int ordinal, int sourcePe, double readyMs, int n, nocopydevice vec3 f[n])
-            serial { accumulateForce(ordinal, sourcePe, readyMs, n, f); }
+          if (useChannels) {
+            when forceArrived[stepCount](CkDataMsg* m) serial { forceArrival(m); }
+          } else {
+            when receiveForces[stepCount](int ref, int ordinal, int sourcePe, double readyMs, int n, nocopydevice vec3 f[n])
+              serial { accumulateForce(ordinal, sourcePe, readyMs, n, f); }
+          }
         }
 
         //update properties of atoms using new force values
@@ -104,6 +128,8 @@ mainmodule leanmd {
         when integrateDone() serial {
           if (stepCount == 1) energy[0] = *h_energy;
           else if (stepCount == finalStepCount) energy[1] = *h_energy;
+          // The fold has read every force slot: the computes may write them again.
+          if (useChannels) releaseForceSlots();
         }
 
         if ((stepCount %  MIGRATE_STEPCOUNT) == 0) {
@@ -113,8 +139,12 @@ mainmodule leanmd {
 
           //receive particles from my neighbors; the self bucket never travels
           for(updateCount = 0; updateCount < inbrs - 1; updateCount++) {
-            when receiveMigrants[stepCount](int ref, int ordinal, int n, int m, nocopydevice Particle parts[m])
-              serial { appendMigrants(ordinal, n, parts); }
+            if (useChannels) {
+              when migrantsArrived[stepCount](CkDataMsg* m) serial { migrantArrival(m); }
+            } else {
+              when receiveMigrants[stepCount](int ref, int ordinal, int n, int m, nocopydevice Particle parts[m])
+                serial { appendMigrants(ordinal, n, parts); }
+            }
           }
         }
 
@@ -204,17 +234,42 @@ mainmodule leanmd {
     // what the CkSectionInfo cookie used to do.
     entry void calculateForces(int ref, int ord, int cx, int cy, int cz, int n, nocopydevice vec3 pos[n]);
 
+    // -channels: a cell hands me the channel of the force slot it keeps for me;
+    // a cell's put into one of my position slots announces itself here (the
+    // message's reference number is the step).
+    entry void takeForceChannel(int cx, int cy, int cz, CkDeviceChannel ch);
+    entry void posArrived(CkDataMsg* m);
+    entry void slotCopyDone();
+
     entry void run() {
+      if (useChannels) {
+        // Startup handshake: my position slots go to my cells, their force slots come to me.
+        serial { allocateChannels(); }
+        for (chanCount = 0; chanCount < nForceChannels; chanCount++) {
+          when takeForceChannel(int cx, int cy, int cz, CkDeviceChannel ch) serial { forceOut[slotFor(cx, cy, cz)] = ch; }
+        }
+      }
       for (stepCount = 1; stepCount <= finalStepCount; stepCount++) {
         //self interaction check
-        if (thisIndex.x1==thisIndex.x2 && thisIndex.y1==thisIndex.y2 && thisIndex.z1==thisIndex.z2)
-          when calculateForces[stepCount](int ref, int ord, int cx, int cy, int cz, int n, nocopydevice vec3 pos[n])
-            serial { launchForces(); }
-        else
+        if (thisIndex.x1==thisIndex.x2 && thisIndex.y1==thisIndex.y2 && thisIndex.z1==thisIndex.z2) {
+          if (useChannels) {
+            when posArrived[stepCount](CkDataMsg* m) serial { posArrival(m); launchForces(); }
+          } else {
+            when calculateForces[stepCount](int ref, int ord, int cx, int cy, int cz, int n, nocopydevice vec3 pos[n])
+              serial { launchForces(); }
+          }
+        } else {
           //receive positions from two cells
-          when calculateForces[stepCount](int ref1, int ord1, int cx1, int cy1, int cz1, int n1, nocopydevice vec3 pos1[n1])
-          when calculateForces[stepCount](int ref2, int ord2, int cx2, int cy2, int cz2, int n2, nocopydevice vec3 pos2[n2])
-            serial { launchForces(); }
+          if (useChannels) {
+            when posArrived[stepCount](CkDataMsg* m1)
+            when posArrived[stepCount](CkDataMsg* m2)
+              serial { posArrival(m1); posArrival(m2); launchForces(); }
+          } else {
+            when calculateForces[stepCount](int ref1, int ord1, int cx1, int cy1, int cz1, int n1, nocopydevice vec3 pos1[n1])
+            when calculateForces[stepCount](int ref2, int ord2, int cx2, int cy2, int cz2, int n2, nocopydevice vec3 pos2[n2])
+              serial { launchForces(); }
+          }
+        }
 
         when forcesReady() serial { sendForces(); }
 

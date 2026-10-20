@@ -26,8 +26,13 @@ struct Container {
 
   ~Container() {
     hapiCheck(cudaFreeHost(h_remote_data));
-    hapiCheck(cudaFree(d_local_data));
-    hapiCheck(cudaFree(d_remote_data));
+    if (CkDevicePoolOn()) {
+      CkDeviceFree(d_local_data);
+      CkDeviceFree(d_remote_data);
+    } else {
+      hapiCheck(cudaFree(d_local_data));
+      hapiCheck(cudaFree(d_remote_data));
+    }
     hapiCheck(cudaStreamDestroy(stream));
   }
 
@@ -39,10 +44,18 @@ struct Container {
     // Data on GPU device do not migrate
   }
 
+  // Device buffers follow the runtime's allocation policy: from the pool under
+  // +gpupool (which is how the vmm and buddy export paths of the persistent
+  // endpoints get exercised), plain cudaMalloc otherwise.
   void init() {
     hapiCheck(cudaMallocHost(&h_remote_data, sizeof(double) * block_size));
-    hapiCheck(cudaMalloc(&d_local_data, sizeof(double) * block_size));
-    hapiCheck(cudaMalloc(&d_remote_data, sizeof(double) * block_size));
+    if (CkDevicePoolOn()) {
+      d_local_data = (double*)CkDeviceMalloc(sizeof(double) * block_size);
+      d_remote_data = (double*)CkDeviceMalloc(sizeof(double) * block_size);
+    } else {
+      hapiCheck(cudaMalloc(&d_local_data, sizeof(double) * block_size));
+      hapiCheck(cudaMalloc(&d_remote_data, sizeof(double) * block_size));
+    }
     hapiCheck(cudaStreamCreate(&stream));
   }
 

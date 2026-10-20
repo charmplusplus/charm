@@ -8,7 +8,7 @@
 L=/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect/leanmd; RL=$L/ranklogs
 cd $L || exit 1; ulimit -c 0
 export LD_LIBRARY_PATH="/u/bhosale/charm-reconverse/multicore-linux-x86_64-cuda/lib:/u/bhosale/lci_install/lib64:$LD_LIBRARY_PATH"
-export FI_MR_CACHE_MONITOR=disabled PMI_MAX_KVS_ENTRIES=1024
+export FI_MR_CACHE_MONITOR=uffd PMI_MAX_KVS_ENTRIES=1024
 J=$1; REPS=${2:-3}
 D="+balancer DiffusionLB +LBDiffusionCommOn +LBDiffusionGpuDim"
 # 140 steps, first LB at 20, period 40 -> LB at 20, 60, 100: three decisions.

@@ -99,7 +99,7 @@ enum ComputeMapMode { COMPUTEMAP_RR = 0, COMPUTEMAP_LOCAL };
 // Steps a chare keeps running between AtSyncStart() and AtSyncWait() under
 // -lbasync. This is the whole overlap window: the strategy runs during it, and
 // nothing migrates until the park at the end. 0 reproduces the unsplit barrier.
-#define DEFAULT_LB_LAG          1
+#define DEFAULT_LB_LAG          16   // the measured best at period 20 (2026-09)
 // Steps before a balancing step that LB instrumentation is left on for. Only
 // these are measured, so this is the window the balancer actually decides from
 // (Compute::updateInstrumentation).
@@ -212,6 +212,9 @@ extern /* readonly */ int densityReportFreq; // -densityreport: steps between re
 // overlaps the simulation. Needs +LBAsync on the command line to mean anything.
 extern /* readonly */ int asyncLb;
 extern /* readonly */ int lbLag;  // -lblag: steps between the two halves
+// -channels: positions, forces and migrants go through persistent device
+// channels (CkDeviceChannel) instead of per-message zero-copy entries.
+extern /* readonly */ int useChannels;
 
 // LEANMD_ATOM_PCT=<1..100> scales every cell's atom count (default 100): a
 // smaller problem on the SAME cells and computes. The object count, the

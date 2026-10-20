@@ -1,3 +1,4 @@
+#include <vector>
 #ifndef __COMPUTE_H__
 #define __COMPUTE_H__
 
@@ -55,6 +56,13 @@ class Compute : public CBase_Compute {
     int pendingForceSends;
     int ackCount;   // SDAG loop counter for draining them
 
+    // -channels: my two position slots as channels (receiver side) and the
+    // force slots my cells keep for me (sender side).
+    CkDeviceChannel posCh[2];
+    CkDeviceChannel forceOut[2];
+    int chanCount;
+    int nForceChannels;   // 1 for a self-compute, else 2
+
     // ---- split load balancing barrier (-lbasync); see Cell.h ----
     int lbBlocked;
     int lbWaitPending;
@@ -72,9 +80,16 @@ class Compute : public CBase_Compute {
     Compute(CkMigrateMessage *msg);
     ~Compute();
     void pup(PUP::er &p);
+    void ckJustMigrated();
+    void slotCopyDone();
+    std::vector<void*> arrivedSlots;   // slot buffers that arrived with the pup, freed after the regrowth copy
+    bool arrivedByPup = false;         // set by the unpack; a pointer handoff leaves it false
 
     void launchForces();
     void sendForces();
+    // -channels
+    void allocateChannels();
+    void posArrival(CkDataMsg* m);
 
     void lbBegin();
     bool lbWaitDue() const;

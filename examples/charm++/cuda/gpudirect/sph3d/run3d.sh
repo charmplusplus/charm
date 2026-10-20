@@ -8,16 +8,14 @@
 JID=$1; TAG=$2; shift 2
 DIR=${SPH_DIR:-/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect/sph3d}
 export LD_LIBRARY_PATH=/u/bhosale/charm-reconverse/lib:/u/bhosale/charm-reconverse/multicore-linux-x86_64-cuda/lib:/u/bhosale/lci_install/lib64:$LD_LIBRARY_PATH
-export FI_MR_CACHE_MONITOR=disabled PMI_MAX_KVS_ENTRIES=8192 CUDA_DEVICE_ORDER=PCI_BUS_ID
+export FI_MR_CACHE_MONITOR=uffd PMI_MAX_KVS_ENTRIES=8192 CUDA_DEVICE_ORDER=PCI_BUS_ID
 ulimit -c 0
 POOL=${POOL:-8192}
-COST=/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect/sph2d/lbcost.delta-a40.conf
-DIFF_FLAGS=${DIFF_FLAGS-"+balancer DiffusionLB +LBDiffusionCommOn"}   # DIFF_FLAGS= (empty) runs MetisLB alone at every event
-MD="+balancer ${LB_BAL:-MetisLB} $DIFF_FLAGS +LBCostConfig $COST +LBDebug ${LBDEBUG:-1}"   # LB_BAL=DiffusionLB DIFF_FLAGS="+LBDiffusionCommOn": Diffusion alone
+MD="+LBDebug ${LBDEBUG:-1} ${XFLAGS:-}"   # 2026-10-18: the runtime picks the strategy, cost table and floors; XFLAGS only for experiments
 case ${LB:-none} in
   none)  lbargs="-f 99999";;
-  sync)  lbargs="-f ${LBF:-100} -b ${LBB:-100} $MD";;
-  async) lbargs="-f ${LBF:-100} -b ${LBB:-100} -a -l ${LBLAG:-50} $MD +LBAsync";;
+  sync)  lbargs="-f ${LBF:-25} -b ${LBB:-25} -A $MD";;
+  async) lbargs="-f ${LBF:-25} -b ${LBB:-25} -a -l ${LBLAG:-10} $MD";;   # period 25, lag 10 = the measured best (2026-10-09)
 esac
 NODES=${NODES:-1}
 PPN=${PPN:-4}

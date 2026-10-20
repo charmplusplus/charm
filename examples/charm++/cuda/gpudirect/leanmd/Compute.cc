@@ -274,6 +274,10 @@ int Compute::slotFor(int cx, int cy, int cz) const {
 // risk belongs to the same slot and is already spent.
 void Compute::ensureSlot(int s, int n) {
   if (n <= cap[s]) return;
+  // A channel's destination is fixed: the slot was sized for the fullest cell
+  // at allocateChannels and cannot follow a message.
+  if (useChannels && cap[s] > 0)
+    CkAbort("Compute: %d atoms exceed the position slot's %d under -channels\n", n, cap[s]);
   AllocTimer _t;
   const int newcap = n + n / 4 + 64;
 
@@ -290,6 +294,32 @@ void Compute::ensureSlot(int s, int n) {
     poolEnergyPartial = CkDevicePoolOn();
   }
   cap[s] = newcap;
+}
+
+// -channels: fixed-size position slots as channels, handed to my cells.
+void Compute::allocateChannels() {
+  ensureDevice();
+  nForceChannels = selfCompute ? 1 : 2;
+  const int c = 2 * maxCellParts + 64;   // the cells' own sizing (Cell::allocateDevice)
+  for (int s = 0; s < (selfCompute ? 1 : 2); s++) {
+    ensureSlot(s, c);
+    const int* cell = (s == 0) ? cellA : cellB;
+    cellIdx[s][0] = cell[0]; cellIdx[s][1] = cell[1]; cellIdx[s][2] = cell[2];
+    posCh[s] = CkDeviceChannel(d_pos[s], sizeof(vec3) * (size_t)cap[s],
+                               CkCallback(CkIndex_Compute::posArrived(NULL), thisProxy[thisIndex]));
+    posCh[s].open();
+    cellArray(cell[0], cell[1], cell[2]).takePosChannel(thisIndex, posCh[s]);
+  }
+}
+
+// A cell's positions landed in one of my slots: the event names which.
+void Compute::posArrival(CkDataMsg* m) {
+  const CkDeviceChannelEvent* peek = (const CkDeviceChannelEvent*)m->getData();
+  const int s = (peek->channel == posCh[0].id()) ? 0 : 1;
+  const CkDeviceChannelEvent* e = posCh[s].event(m);
+  delete m;
+  if (e == NULL) CkAbort("Compute: a control event reached posArrived\n");
+  nPart[s] = (int)(e->bytes / sizeof(vec3));
 }
 
 void Compute::freeDevice() {
@@ -462,6 +492,17 @@ void Compute::sendForces() {
 
   CkCallback sentCb(CkIndex_Compute::forceSendDone(), thisProxy[thisIndex]);
 
+  if (useChannels) {
+    // The force arrays go into the cells' slots for me; forcesReady says the
+    // kernel that read my position slots has finished, so the cells may fill
+    // them again.
+    for (int s = 0; s < (selfCompute ? 1 : 2); s++) {
+      forceOut[s].put(d_force[s], sizeof(vec3) * (size_t)nPart[s], stream, sentCb, (uint64_t)stepCount);
+      posCh[s].release();
+    }
+    return;
+  }
+
   // From forcesReady: the force arrays are complete, so no stream is tagged
   // (leanmdSendBuffer) and the runtime marks nothing per send.
   cellArray(cellIdx[0][0], cellIdx[0][1], cellIdx[0][2])
@@ -475,6 +516,62 @@ void Compute::sendForces() {
 }
 
 //pack important information if I am moving
+
+// Right after a move: the force channels this Compute holds (sender copies)
+// ask for their receivers' endpoints now, so the first put of the next step
+// does not wait a round trip.
+// After a move under -channels: the slots arrive holding only the live
+// positions; here they are re-grown to the channel's capacity (the cells'
+// sizing, fixed for the run), the live positions copied over on this chare's
+// stream, and the channels reopened on the new buffers. The arrived buffers
+// are released once the copies have completed (slotCopyDone). The force
+// channels this Compute holds ask for their receivers' endpoints now rather
+// than at the next put.
+void Compute::ckJustMigrated() {
+  CBase_Compute::ckJustMigrated();
+  if (!useChannels) return;
+  // A move within the process is a pointer handoff: nothing was packed, the
+  // slots and their channels are intact and re-registered by the runtime
+  // (the sender copies re-resolve). Regrowing and reopening here as well
+  // gave the channel a third generation on a fresh buffer that its sender
+  // never learned of, and freed the one the sender was still writing
+  // (hung 2 of 2 at 16x8x8 on 2026-10-19).
+  if (!arrivedByPup) {
+    for (int s = 0; s < (selfCompute ? 1 : 2); s++) forceOut[s].resolve();
+    return;
+  }
+  arrivedByPup = false;
+  ensureDevice();
+  const int c = 2 * maxCellParts + 64;   // Cell::allocateDevice's sizing, as in allocateChannels
+  for (int s = 0; s < (selfCompute ? 1 : 2); s++) {
+    vec3* oldPos = d_pos[s];
+    const int live = cap[s];
+    hapiCheck(hapiMalloc((void**)&d_pos[s], sizeof(vec3) * c));
+    hapiCheck(hapiMalloc((void**)&d_force[s], sizeof(vec3) * c));
+    poolPos[s] = poolForce[s] = CkDevicePoolOn();
+    if (s == 0) {
+      hapiCheck(hapiMalloc((void**)&d_energyPartial, sizeof(double) * c));
+      poolEnergyPartial = CkDevicePoolOn();
+    }
+    cap[s] = c;
+    if (oldPos != NULL) {
+      if (live > 0)
+        hapiCheck(cudaMemcpyAsync(d_pos[s], oldPos, sizeof(vec3) * (size_t)live, cudaMemcpyDeviceToDevice, stream));
+      arrivedSlots.push_back(oldPos);
+    }
+    posCh[s].reopen(d_pos[s]);
+    forceOut[s].resolve();
+  }
+  if (!arrivedSlots.empty())
+    hapiAddCallback(stream, CkCallback(CkIndex_Compute::slotCopyDone(), thisProxy[thisIndex]));
+}
+
+// The copies out of the arrived slots have completed on this chare's stream.
+void Compute::slotCopyDone() {
+  for (void* b : arrivedSlots) hapiFreeMigratable(b);
+  arrivedSlots.clear();
+}
+
 void Compute::pup(PUP::er &p) {
   CBase_Compute::pup(p);
   __sdag_pup(p);
@@ -551,19 +648,50 @@ void Compute::pup(PUP::er &p) {
   // then adopt the new capacities once the walk is done.
   const int sentCap[2] = {cap[0], cap[1]};
   int newCap[2] = {cap[0], cap[1]};
+  // Under -channels the channels travel first: the position channel knows,
+  // from its sender's closing ack, whether a put landed whose event is still
+  // queued, and how large it is; the slot pup below is sized by that.
+  if (useChannels)
+    for (int s = 0; s < 2; s++) { p | posCh[s]; p | forceOut[s]; }
   for (int s = 0; s < 2; s++) {
     if (sentCap[s] <= 0) continue;
-    const size_t live = (nPart[s] > 0) ? (size_t)nPart[s] : (size_t)sentCap[s];
-    p.pup_buffer_device(d_pos[s], live);
-    p.pup_buffer_device(d_force[s], live);
+    size_t live;
+    if (useChannels) {
+      // Live positions only: the last taken put, or the untaken one that
+      // landed while this chare was closing (unknown size -> the whole slot).
+      // Forces and energy partials are regenerated every step and stay behind;
+      // the slots are re-grown to the channel's capacity in ckJustMigrated().
+      const size_t unseen = posCh[s].unseenBytes();
+      size_t n = (nPart[s] > 0) ? (size_t)nPart[s] : 0;
+      if (unseen == SIZE_MAX) n = (size_t)sentCap[s];
+      else n = std::max(n, (unseen + sizeof(vec3) - 1) / sizeof(vec3));
+      if (n > (size_t)sentCap[s]) n = (size_t)sentCap[s];
+      if (n == 0) n = 1;   // a zero-length device pup rebinds a pointer to nothing; keep one entry
+      live = n;
+      p.pup_buffer_device(d_pos[s], live);
+    } else {
+      live = (nPart[s] > 0) ? (size_t)nPart[s] : (size_t)sentCap[s];
+      p.pup_buffer_device(d_pos[s], live);
+      p.pup_buffer_device(d_force[s], live);
+    }
     newCap[s] = (int)live;
   }
-  if (sentCap[0] > 0) p.pup_buffer_device(d_energyPartial, (size_t)sentCap[0]);
+  if (!useChannels && sentCap[0] > 0) p.pup_buffer_device(d_energyPartial, (size_t)sentCap[0]);
   if (p.isUnpacking()) {
     cap[0] = newCap[0]; cap[1] = newCap[1];
     // Rebound into the runtime's migration arena, not taken from the pool.
     poolPos[0] = poolPos[1] = poolForce[0] = poolForce[1] = false;
     poolEnergyPartial = false;
+    if (useChannels) {
+      d_force[0] = d_force[1] = NULL;
+      d_energyPartial = NULL;
+      // Control events for the channels queue until they reopen on the
+      // re-grown slots in ckJustMigrated() -- an ordinary entry context, not
+      // the unpack, which can run inside the device poll's own callback.
+      for (int s = 0; s < (selfCompute ? 1 : 2); s++)
+        if (sentCap[s] > 0) posCh[s].arriving();
+      arrivedByPup = true;
+    }
   }
 
   // d_energyScalar and h_energy deliberately do not travel: both are written

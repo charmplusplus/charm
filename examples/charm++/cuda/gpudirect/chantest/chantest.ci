@@ -1,0 +1,23 @@
+mainmodule chantest {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Elem elem_proxy;
+  readonly int block_size;
+  readonly int n_iters;
+  readonly int lb_period;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void ready();
+    entry [reductiontarget] void iterDone(int migrated);
+    entry [reductiontarget] void lbDone(int migrated);
+  };
+
+  array [1D] Elem {
+    entry Elem();
+    entry void setup();
+    entry void takeChannel(CkDeviceChannel ch);
+    entry void step(int iter);
+    entry void arrived(CkDataMsg* m);
+    entry void doLB();
+  };
+};

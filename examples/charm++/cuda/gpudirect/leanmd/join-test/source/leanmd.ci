@@ -1,0 +1,269 @@
+mainmodule leanmd {
+  include "pup_stl.h";
+
+  readonly CProxy_Main mainProxy;       //central controller
+  readonly CProxy_Cell cellArray;     //array that houses atoms
+  readonly CProxy_Compute computeArray; //computational kernels
+  readonly CProxy_StreamPool streamPool; //per-PE pool of CUDA streams
+
+  readonly int cellArrayDimX;		// X dimension of the Cell array
+  readonly int cellArrayDimY;		// Y dimension of the Cell array
+  readonly int cellArrayDimZ;		// Y dimension of the Cell array
+  readonly int finalStepCount;		// number of steps in the simulaion
+  readonly int firstLdbStep;		// begin load balancing after this many steps
+  readonly int ldbPeriod;		// load balancing period
+  readonly int checkptFreq;     // do FT every period
+  readonly int checkptStrategy; // choose the checkpoint strategy
+  readonly std::string logs;   // log file for checkpointing
+  readonly int densityMode;    // -density: atom count profile across cells
+  readonly int computeMapMode; // -computemap: where Computes are first placed
+  readonly int maxCellParts;   // atoms in the fullest cell, sizes device buffers
+  readonly int densityReportFreq; // -densityreport: steps between density reports
+  readonly int asyncLb;        // -lbasync: split the barrier and overlap the step
+  readonly int lbLag;          // -lblag: steps between the two halves
+
+  //central controller chare
+  mainchare [migratable] Main {
+    entry Main(CkArgMsg* msg);
+    entry [reductiontarget] void energySum(double iE, double fE);  //reduction of potential energy
+    // Atoms per x-slab, summed over all cells. x is the axis the density
+    // profiles vary along, so this is what says whether a profile survives.
+    entry [reductiontarget] void densityReport(int n, int counts[n]);
+
+    // called when computes have been created
+    entry [reductiontarget] void run() {
+      serial {
+        computeArray.doneInserting();
+        CkPrintf("Computes: %d .... created\n", (NUM_NEIGHBORS/2+1)*cellArrayDimX*cellArrayDimY*cellArrayDimZ);
+        CkPrintf("Starting simulation .... \n\n");
+        cellArray.run();
+        computeArray.run();
+        startBenchmarkTime = CkWallTimer();
+      }
+      //receive intial and final energies and compare
+      when energySum(double iE1, double fE1) when energySum(double iE2, double fE2) serial {
+        // Printed unconditionally: a conserved-but-zero energy would pass the
+        // test below while meaning the forces never fired.
+        CkPrintf("Energy: initial %.10E  final %.10E  drift %.3E\n",
+                 iE1 + iE2, fE1 + fE2, fabs(fE1 + fE2 - iE1 - iE2));
+        if(fabs(fE1 + fE2 - iE1 - iE2) > ENERGY_VAR) {
+          CkPrintf("Energy value has varied significantly from %E to %E\n", iE1 + iE2, fE1 + fE2);
+          CkPrintf("\nEnergy conservation test failed for maximum allowed variation of %E units.\nSIMULATION UNSUCCESSFULL\n",ENERGY_VAR);
+        } else {
+          CkPrintf("\nEnergy conservation test passed for maximum allowed variation of %E units.\nSIMULATION SUCCESSFULL \n",ENERGY_VAR);
+        }
+        CkPrintf("Total application time %f s\n", (CkWallTimer() - startBenchmarkTime));
+        CkExit();
+      }
+    };
+  };
+
+  group CellMap {
+    entry CellMap(int cell_x, int cell_y, int cell_z);
+  }
+
+  group StreamPool {
+    entry StreamPool();
+  }
+
+  //chares to house atoms
+  array [3D] Cell {
+    entry Cell();
+    entry void createComputes();    //call to insert computes that I need
+    entry void ResumeFromSync();    //resume from here after load balancing
+    entry [reductiontarget] void startCheckpoint(); //reduction to start checkpointing
+    entry void recvCheckPointDone();  //checkpointing done, resume application
+
+    // GPU completion signals: raised from hapiAddCallback when the work enqueued
+    // on this cell's stream has actually run.
+    entry void positionsReady();
+    entry void integrateDone();
+    entry void binDone();
+
+    // Forces from one of my computes, landing straight in device memory.
+    entry void receiveForces(int ref, int ordinal, int sourcePe, double readyMs, int n, nocopydevice vec3 f[n]);
+    // Atoms that crossed into my cell, likewise.
+    entry void receiveMigrants(int ref, int ordinal, int n, int m, nocopydevice Particle parts[m]);
+
+    //function to perform iterations for Cells
+    entry void run() {
+      serial { allocateDevice(); }
+
+      if (thisIndex.x==0 && thisIndex.y==0 && thisIndex.z==0) serial {
+        stepTime = CkWallTimer();
+      }
+
+      for(stepCount = 1; stepCount <= finalStepCount; stepCount++) {
+        //zero the accumulator and pull this step's positions off the particle array
+        serial { beginStep(); }
+        when positionsReady() serial { sendPositions(); }
+
+        //one force array back from each of my computes, folded in on the device
+        for(forceCount = 0; forceCount < inbrs; forceCount++) {
+          when receiveForces[stepCount](int ref, int ordinal, int sourcePe, double readyMs, int n, nocopydevice vec3 f[n])
+            serial { accumulateForce(ordinal, sourcePe, readyMs, n, f); }
+        }
+
+        //update properties of atoms using new force values
+        serial { integrate(); }
+        when integrateDone() serial {
+          if (stepCount == 1) energy[0] = *h_energy;
+          else if (stepCount == finalStepCount) energy[1] = *h_energy;
+        }
+
+        if ((stepCount %  MIGRATE_STEPCOUNT) == 0) {
+          //sort atoms into per-neighbour buckets on the device
+          serial { binParticles(); }
+          when binDone() serial { sendMigrants(); }
+
+          //receive particles from my neighbors; the self bucket never travels
+          for(updateCount = 0; updateCount < inbrs - 1; updateCount++) {
+            when receiveMigrants[stepCount](int ref, int ordinal, int n, int m, nocopydevice Particle parts[m])
+              serial { appendMigrants(ordinal, n, parts); }
+          }
+        }
+
+        // After the exchange, so the counts are this step's.
+        if (densityReportFreq > 0 && (stepCount % densityReportFreq) == 0) {
+          serial { reportDensity(); }
+        }
+
+        if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) serial {
+          CkPrintf("Step %d Benchmark Time %lf ms/step\n",
+          stepCount, ((CkWallTimer() - stepTime))*1000);
+          stepTime = CkWallTimer();
+        }
+
+        //periodically call load balancer
+        if (stepCount >= firstLdbStep && (stepCount - firstLdbStep) % ldbPeriod == 0) {
+          if (asyncLb) {
+            // The split barrier: join the step and carry on. The strategy runs
+            // over the next lbLag steps; nothing migrates until the park below.
+            serial { lbBegin(); }
+            // Stopped at MetaBalancer's tentative count -- not iterating, and
+            // handed back through ResumeFromSync once the count is agreed.
+            if (lbBlocked) { when ResumeFromSync() { } }
+          } else {
+            serial { AtSync(); }
+            when ResumeFromSync() { }
+          }
+        }
+
+        // The other half, lbLag steps on -- after the start, so -lblag 0
+        // degrades to the unsplit barrier. This is where the element goes quiet
+        // and the step's migrations are allowed to happen.
+        if (lbWaitDue()) {
+          serial { lbWaitPending = 0; lbBlocked = 0; AtSyncWait(); }
+          when ResumeFromSync() { }
+        }
+
+        //periodically checkpointing
+        if (stepCount % checkptFreq == 0) {
+          serial {
+            //coordinate to start checkpointing
+            if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0)
+              CkPrintf("[%d] CHECKPOINT at step %d\n", CkMyPe(), stepCount);
+            contribute(CkCallback(CkReductionTarget(Cell,startCheckpoint),thisProxy(0,0,0)));
+          }
+          if (thisIndex.x == 0 && thisIndex.y == 0 && thisIndex.z == 0) {
+            when startCheckpoint() serial {
+              CkCallback cb(CkIndex_Cell::recvCheckPointDone(),thisProxy);
+              if (checkptStrategy == 0) CkStartCheckpoint(logs.c_str(), cb);
+              else CkStartMemCheckpoint(cb);
+            }
+          }
+          when recvCheckPointDone() { }
+        }
+
+#if CMK_MEM_CHECKPOINT
+
+        //kill one of processes to demonstrate fault tolerance
+        if (stepCount == 60 && thisIndex.x == 1 && thisIndex.y == 1 && thisIndex.z == 0) serial {
+          if (CkHasCheckpoints()) {
+            CkPrintf("CkDieNow step 60\n");
+            CkDieNow();
+          }
+        }
+#endif
+      }
+
+      //everything done, reduction on kinetic energy
+      serial { contribute(2*sizeof(double), energy,CkReduction::sum_double, CkCallback(CkReductionTarget(Main,energySum),mainProxy)); }
+    };
+  };
+
+  //chares that do force computations for pair of cells
+  array [6D] Compute {
+    entry Compute();
+    entry void ResumeFromSync();
+    entry void forcesReady();
+    // One per force send, from the runtime, once the receiving cell has pulled
+    // d_force. run() drains these at the end of every step: the buffer is owned
+    // by this chare, and the next step's kernels rewrite it while migration on a
+    // balancing step frees it outright -- either one while a cell is still
+    // pulling faults on the device or silently corrupts the forces it read.
+    entry void forceSendDone();
+
+    // Positions from one of my two cells, landing straight in device memory. The
+    // post entry method routes it to a slot by the sender's coordinates, which is
+    // what the CkSectionInfo cookie used to do.
+    entry void calculateForces(int ref, int ord, int cx, int cy, int cz, int n, nocopydevice vec3 pos[n]);
+
+    entry void run() {
+      for (stepCount = 1; stepCount <= finalStepCount; stepCount++) {
+        //self interaction check
+        if (thisIndex.x1==thisIndex.x2 && thisIndex.y1==thisIndex.y2 && thisIndex.z1==thisIndex.z2)
+          when calculateForces[stepCount](int ref, int ord, int cx, int cy, int cz, int n, nocopydevice vec3 pos[n])
+            serial { launchForces(); }
+        else
+          //receive positions from two cells
+          when calculateForces[stepCount](int ref1, int ord1, int cx1, int cy1, int cz1, int n1, nocopydevice vec3 pos1[n1])
+          when calculateForces[stepCount](int ref2, int ord2, int cx2, int cy2, int cz2, int n2, nocopydevice vec3 pos2[n2])
+            serial { launchForces(); }
+
+        when forcesReady() serial { sendForces(); }
+
+        // Wait until the cells have finished pulling the force arrays. A device
+        // zerocopy send is a pull: the cell reads d_force out of this chare's
+        // memory some time after the send returns, and nothing else orders that
+        // read against what this chare does next. The next iteration's
+        // invokeZeroForces rewrites d_force, and on a balancing step migration
+        // frees it -- so both have to wait here.
+        //
+        // Waiting only on balancing steps was enough while every cross-process
+        // send was staged through the runtime's communication buffer, because
+        // that staging copy is enqueued on this chare's own stream and so
+        // orders the next step's kernels behind it for free. The direct CUDA
+        // IPC transport hands the cell this buffer itself, and then the
+        // completion callback is the only thing standing between the two.
+        for (ackCount = 0; ackCount < pendingForceSends; ackCount++) {
+          when forceSendDone() { }
+        }
+        serial {
+          if (joinTrace(stepCount) && tracePe == CkMyPe())
+            CkPrintf("[join-ack] step=%d pe=%d c=%d,%d,%d,%d,%d,%d ack_ms=%.3f\n", stepCount, CkMyPe(), thisIndex.x1,thisIndex.y1,thisIndex.z1,thisIndex.x2,thisIndex.y2,thisIndex.z2, 1000*(CkWallTimer()-traceSent));
+        }
+
+        //periodically call load balancer
+        if (stepCount >= firstLdbStep && (stepCount - firstLdbStep) % ldbPeriod== 0) {
+          if (asyncLb) {
+            serial { lbBegin(); }
+            if (lbBlocked) { when ResumeFromSync() { } }
+          } else {
+            serial { AtSync();}
+            when ResumeFromSync() { }
+          }
+        }
+
+        // See Cell::run. The force sends are drained just above, so this park
+        // is a point where nothing is reading d_force and the chare can move.
+        if (lbWaitDue()) {
+          serial { lbWaitPending = 0; lbBlocked = 0; AtSyncWait(); }
+          when ResumeFromSync() { }
+        }
+      }
+      //everything done, reduction on potential energy
+      serial { contribute(2*sizeof(double),energy, CkReduction::sum_double, CkCallback(CkReductionTarget(Main,energySum),mainProxy)); }
+    };
+  };
+};

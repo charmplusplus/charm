@@ -23,7 +23,9 @@ mainmodule jacobi3d {
   readonly int warmup_iters;
   readonly bool use_zerocopy;
   readonly bool use_persistent;
+  readonly bool use_channels;
   readonly bool print_elements;
+  readonly bool verbose;
 
   message PersistentMsg;
 
@@ -32,13 +34,16 @@ mainmodule jacobi3d {
     entry [reductiontarget] void initDone();
     entry void startIter();
     entry [reductiontarget] void warmupDone();
-    entry [reductiontarget] void allDone();
+    entry [reductiontarget] void allDone(double checksum);
   };
 
   array [3D] Block {
     entry Block(void);
     entry void init();
     entry void initRecv(int dir, CkDevicePersistent p_buf);
+    entry void initRecvCh(int parity, int dir, CkDeviceChannel ch);
+    entry void recvGhostCh(CkDataMsg* m);
+    entry void sendDone(CkDataMsg* m);   // a send's source has been read; the reference number is the iteration
     entry void packGhostsDone();
     entry void recvGhostZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
     entry void recvGhostP(PersistentMsg* msg);
@@ -57,6 +62,15 @@ mainmodule jacobi3d {
           }
         }
       }
+      if (use_channels) {
+        // Two channels per neighbour (one per iteration parity): a neighbour
+        // puts iteration i+1 while this block still reads iteration i.
+        for (remote_count = 0; remote_count < 2 * neighbors; remote_count++) {
+          when initRecvCh(int parity, int dir, CkDeviceChannel ch) serial {
+            ch_send[parity][dir] = ch;
+          }
+        }
+      }
 
       serial {
         contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
@@ -64,12 +78,30 @@ mainmodule jacobi3d {
     }
 
     entry void run() {
+      // The send buffers may be written again only once every send that
+      // read them has drained: zero-copy sends of the previous iteration
+      // (one set of buffers), channel puts of the iteration before last
+      // (two sets, by parity). Each send's source callback carries its
+      // iteration as the reference number.
+      serial { trace("run: waiting for the previous sends to drain"); }
+      if (use_zerocopy && my_iter > 0) {
+        for (remote_count = 0; remote_count < neighbors; remote_count++) {
+          when sendDone[my_iter - 1](CkDataMsg* m) serial { delete m; }
+        }
+      }
+      if (use_channels && my_iter > 1) {
+        for (remote_count = 0; remote_count < neighbors; remote_count++) {
+          when sendDone[my_iter - 2](CkDataMsg* m) serial { delete m; }
+        }
+      }
       // Pack and send ghost data to neighbors
       serial {
+        trace("pack");
         packGhosts();
       }
 
       when packGhostsDone() serial {
+        trace("send");
         sendGhosts();
       }
 
@@ -85,6 +117,10 @@ mainmodule jacobi3d {
           when recvGhostP[my_iter](PersistentMsg* msg) serial {
             processGhostP(msg);
           }
+        } else if (use_channels) {
+          when recvGhostCh[my_iter](CkDataMsg* m) serial {
+            processGhostCh(m);
+          }
         } else {
           when recvGhostReg[my_iter](int ref, int dir, int w, DataType buf[w]) {
             serial {
@@ -96,11 +132,13 @@ mainmodule jacobi3d {
 
       // Perform Jacobian update
       serial {
+        trace("all ghosts in; update");
         update();
       }
 
       // Iteration complete
       when updateDone() serial {
+        if (use_channels) releaseGhosts();   // the unpacking kernels ran before the update
         if (print_elements) {
           if (x == 0 && y == 0 && z == 0) {
             CkPrintf("Printing iteration %d\n", my_iter);

@@ -1,0 +1,35 @@
+mainmodule channel {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Block block_proxy;
+  readonly size_t max_size;
+  readonly int n_iters;
+  readonly int n_iters_large;
+  readonly int warmup_iters;
+  readonly int n_rate;
+  readonly int n_rate_large;
+  readonly int use_get;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void ready();
+    entry void result(int mode, size_t size, double us, double issue_us, double recv_us);
+  };
+
+  array [1D] Block {
+    entry Block();
+    entry void init();
+    entry void takeChannel(CkDeviceChannel ch);
+    entry void takeSendEp(CkDevicePersistent ep);
+    // The receiver-pull variant (-g): the sender announces, the receiver gets.
+    entry void pullReady(size_t n);
+    entry void pulled();
+    entry void start(int mode, size_t size);
+    // The per-message device zero-copy path: a nocopydevice entry.
+    entry void recvZC(size_t n, nocopydevice char data[n]);
+    // The channel path: the receiver's arrival entry.
+    entry void arrived(CkDataMsg* m);
+    // Sender-side completion of either path (the source may be reused).
+    entry void sent();
+    entry void rateDone(double recv_us);
+  };
+};

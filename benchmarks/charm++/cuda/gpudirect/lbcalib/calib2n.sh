@@ -8,7 +8,7 @@
 JID=$1; [ -z "$JID" ] && { echo "usage: calib2n.sh <JOBID>"; exit 1; }
 D=/u/bhosale/charm-reconverse/benchmarks/charm++/cuda/gpudirect/lbcalib
 export LD_LIBRARY_PATH=/u/bhosale/charm-reconverse/multicore-linux-x86_64-cuda/lib:/u/bhosale/lci_install/lib64:$LD_LIBRARY_PATH
-export FI_MR_CACHE_MONITOR=disabled PMI_MAX_KVS_ENTRIES=8192; ulimit -c 0
+export FI_MR_CACHE_MONITOR=uffd PMI_MAX_KVS_ENTRIES=8192; ulimit -c 0
 SRUN="srun --jobid=$JID --mpi=cray_shasta -N 2 -n 8 --ntasks-per-node=4 --gpus-per-node=4 --cpus-per-task=16 --cpu-bind=none --exact --kill-on-bad-exit=1"
 cd $D || exit 1
 run() { # <tag> <extra args>

@@ -452,7 +452,10 @@ public:
     rho0 = 1000.0f;
     gravity = 9.81f;
     n_iters = 1000; warmup_iters = 10;
-    first_lb = 99999; lb_freq = 0; async_lb = 0; lb_wait_lag = 3;
+    // Defaults = the measured best (2026-10-09, 98M on 8 A40s): balance every 25
+    // steps, asynchronously, lag 10. -f 99999 turns balancing off; -A runs the
+    // unsplit barrier.
+    first_lb = 25; lb_freq = 25; async_lb = 1; lb_wait_lag = 10;
     stats_freq = 200;
     nl_freq = 1; integrator = 0; verlet_margin = 0.0f;
     concurrent_x = 0;
@@ -460,7 +463,7 @@ public:
     RealType exch_frac = 0.1f;
 
     int c;
-    while ((c = getopt(m->argc, m->argv, "X:Y:Z:x:y:z:s:w:t:V:i:u:f:b:l:ar:e:S:k:pm:c")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "X:Y:Z:x:y:z:s:w:t:V:i:u:f:b:l:aAr:e:S:k:pm:c")) != -1) {
       switch (c) {
         case 'X': dom_lx = atof(optarg); break;
         case 'Y': dom_ly = atof(optarg); break;
@@ -478,6 +481,7 @@ public:
         case 'b': lb_freq = atoi(optarg); break;
         case 'l': lb_wait_lag = atoi(optarg); break;
         case 'a': async_lb = 1; break;
+        case 'A': async_lb = 0; break;
         case 'r': headroom = atof(optarg); break;
         case 'e': exch_frac = atof(optarg); break;
         case 'S': stats_freq = atoi(optarg); break;
@@ -522,11 +526,12 @@ public:
     const RealType dt_g = 0.25f * std::sqrt(smooth_h / gravity);
     sim_dt = std::min(dt_c, dt_g);
 
-    if (async_lb && !_lb_args.lbAsync()) {
-      CkPrintf("[WARN] -a ignored: async LB needs +LBAsync on the command "
-               "line. Running the unsplit AtSync barrier instead.\n");
-      async_lb = 0;
-    }
+    // -f 99999 means no balancing at all: no period, no split barrier (the lag
+    // check below would otherwise reject the defaults).
+    if (first_lb >= 99999) { lb_freq = 0; async_lb = 0; }
+    // -a: the runtime's asynchronous balancing follows the application's
+    // choice; no +LBAsync needed on the command line.
+    if (async_lb) CkLBSetAsync(true);
     // The lag must close the window before the NEXT trigger (see sph2d.C).
     if (async_lb && lb_freq > 0) {
       int gap_after_first = lb_freq - (first_lb % lb_freq);
@@ -1830,7 +1835,7 @@ public:
     // keeps the reads coherent for a cost that does not register.
     static const bool sort_locals = (getenv("SPH_SORT") != nullptr);
     static const int sort_every =
-        getenv("SPH_SORT_EVERY") ? atoi(getenv("SPH_SORT_EVERY")) : (sort_locals ? 1 : 0);
+        getenv("SPH_SORT_EVERY") ? atoi(getenv("SPH_SORT_EVERY")) : 100 /* default since 2026-10-18: without a periodic sort the GPU work grows 21% over 2000 steps */;
     if (batch_halo) hapiSubmitBatchBegin();
     // The migrants appended last step landed on comm_stream; everything below
     // reads them on compute_stream -- or, with the interior pass queued ahead
@@ -2373,7 +2378,7 @@ public:
     static const bool on = (getenv("SPH_INTERIOR_FIRST") != nullptr);
     if (!on || concurrent_x || integrator != 0 || nl_freq != 1 || !step_active || np <= 0) return;
     static const int sort_every =
-        getenv("SPH_SORT_EVERY") ? atoi(getenv("SPH_SORT_EVERY")) : (getenv("SPH_SORT") ? 1 : 0);
+        getenv("SPH_SORT_EVERY") ? atoi(getenv("SPH_SORT_EVERY")) : 100;
     const int next = my_iter + 1;
     if (sort_every > 0 && (next % sort_every) == 0) return;
     // Not into the LB window close either: the balancer's forced CUPTI flush

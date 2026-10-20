@@ -110,6 +110,16 @@ private:
   double*   h_energy;      // pinned, one double
   cudaStream_t stream;
 
+  // -channels. Receiver side: my inbrs force slots (one per compute) and inbrs
+  // migrant slots (one per neighbour) as channels. Sender side: the computes'
+  // position slots and the neighbours' migrant slots I put into. chanIdx maps a
+  // channel id to its slot for the arrival events; *Held marks a slot taken and
+  // not yet released.
+  std::vector<CkDeviceChannel> forceCh, migCh, posOut, migOut;
+  std::vector<char> forceHeld, migHeld;
+  std::map<uint64_t, int> chanIdx;
+  int chanCount;
+
   void allocateDevice();
   void freeDevice();
 
@@ -139,6 +149,12 @@ public:
                      CkDeviceBufferPost* devicePost);
   void receiveMigrants(int ref, int ordinal, int n, int& m, Particle*& parts,
                        CkDeviceBufferPost* devicePost);
+  // -channels
+  void holdPosChannel(const CkArrayIndex6D& who, const CkDeviceChannel& ch);
+  void forceArrival(CkDataMsg* m);
+  void migrantArrival(CkDataMsg* m);
+  void releaseForceSlots();
+  void releaseMigrantSlots();
 };
 
 #endif

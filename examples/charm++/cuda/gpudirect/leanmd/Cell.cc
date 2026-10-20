@@ -166,6 +166,40 @@ void Cell::allocateDevice() {
   // The device array is the live state from here on.
   particles.clear();
   particles.shrink_to_fit();
+
+  if (useChannels) {
+    // My landing slots as channels, handed to the chares that put into them.
+    forceCh.assign(inbrs, CkDeviceChannel());
+    migCh.assign(inbrs, CkDeviceChannel());
+    posOut.assign(inbrs, CkDeviceChannel());
+    migOut.assign(inbrs, CkDeviceChannel());
+    forceHeld.assign(inbrs, 0);
+    migHeld.assign(inbrs, 0);
+    for (int num = 0; num < inbrs; num++) {
+      forceCh[num] = CkDeviceChannel(d_recv_force + (size_t)num * part_capacity,
+                                     sizeof(vec3) * (size_t)part_capacity,
+                                     CkCallback(CkIndex_Cell::forceArrived(NULL), thisProxy[thisIndex]));
+      forceCh[num].open();
+      chanIdx[forceCh[num].id()] = num;
+      computeArray[computesList[num]].takeForceChannel(thisIndex.x, thisIndex.y, thisIndex.z, forceCh[num]);
+    }
+    for (int k = 0; k < inbrs; k++) {
+      if (k == SELF_NBR) continue;
+      migCh[k] = CkDeviceChannel(d_recv_parts + (size_t)k * exch_capacity,
+                                 sizeof(Particle) * (size_t)exch_capacity,
+                                 CkCallback(CkIndex_Cell::migrantsArrived(NULL), thisProxy[thisIndex]));
+      migCh[k].open();
+      chanIdx[migCh[k].id()] = k;
+      // Slot k is fed by the neighbour at offset d(k) (sendMigrants tags its
+      // bucket num with the mirrored ordinal (inbrs-1)-num, and the mirror of
+      // (inbrs-1)-k is k); from that neighbour's side I am its bucket (inbrs-1)-k.
+      const int dx = k / (NBRS_Y * NBRS_Z)            - KAWAY_X;
+      const int dy = (k % (NBRS_Y * NBRS_Z)) / NBRS_Z - KAWAY_Y;
+      const int dz = k % NBRS_Z                       - KAWAY_Z;
+      cellArray(WRAP_X(thisIndex.x+dx), WRAP_Y(thisIndex.y+dy), WRAP_Z(thisIndex.z+dz))
+          .takeMigrantChannel((inbrs - 1) - k, migCh[k]);
+    }
+  }
 }
 
 void Cell::freeDevice() {
@@ -267,6 +301,15 @@ void Cell::beginStep() {
 // the load balancer's communication graph needs to see anyway.
 void Cell::sendPositions() {
   if (joinTrace(stepCount)) { traceStart = CkWallTimer(); traceFirst = 0; }
+  if (useChannels) {
+    // The gather that ran before positionsReady is ordered behind the appends
+    // of the last exchange on this stream, so those migrant slots are consumed.
+    releaseMigrantSlots();
+    for (int num = 0; num < inbrs; num++)
+      posOut[num].put(d_pos, sizeof(vec3) * (size_t)myNumParts, stream,
+                      CkCallback(CkCallback::ignore), (uint64_t)stepCount);
+    return;
+  }
   for (int num = 0; num < inbrs; num++)
     computeArray[computesList[num]].calculateForces(
         stepCount, num, thisIndex.x, thisIndex.y, thisIndex.z, myNumParts,
@@ -371,6 +414,13 @@ void Cell::sendMigrants() {
 
     // Tag with the mirrored ordinal, so the receiver can use it directly as a
     // landing slot: two different neighbours never mirror to the same value.
+    if (useChannels) {
+      // Bucket num goes to the neighbour's slot through the channel it handed me
+      // (migOut[num]); cnt may be 0, which is a notification with no bytes.
+      migOut[num].put(d_send_parts + (size_t)num * exch_capacity, sizeof(Particle) * (size_t)cnt,
+                      stream, CkCallback(CkCallback::ignore), (uint64_t)stepCount);
+      continue;
+    }
     cellArray(WRAP_X(thisIndex.x+dx), WRAP_Y(thisIndex.y+dy), WRAP_Z(thisIndex.z+dz))
         .receiveMigrants(stepCount, (inbrs - 1) - num, cnt, std::max(cnt, 1),
                          leanmdSendBuffer(d_send_parts + (size_t)num * exch_capacity,
@@ -396,6 +446,54 @@ void Cell::appendMigrants(int ordinal, int n, Particle* parts) {
   // them, so each lands on its own stretch of the array.
   invokeAppendParticles(d_particles, myNumParts, parts, n, stream);
   myNumParts += n;
+}
+
+// ---------------------------------------------------------------- -channels
+
+void Cell::holdPosChannel(const CkArrayIndex6D& who, const CkDeviceChannel& ch) {
+  for (int num = 0; num < inbrs; num++) {
+    if (computesList[num] == who) { posOut[num] = ch; return; }
+  }
+  CkAbort("Cell (%d,%d,%d): a position channel from a compute that is not one of mine\n",
+          thisIndex.x, thisIndex.y, thisIndex.z);
+}
+
+// A compute's forces landed in my slot for it: the event names the channel.
+void Cell::forceArrival(CkDataMsg* m) {
+  const CkDeviceChannelEvent* peek = (const CkDeviceChannelEvent*)m->getData();
+  auto it = chanIdx.find(peek->channel);
+  if (it == chanIdx.end()) CkAbort("Cell: a force event for a channel that is not mine\n");
+  const int num = it->second;
+  const CkDeviceChannelEvent* e = forceCh[num].event(m);
+  delete m;
+  if (e == NULL) CkAbort("Cell: a control event reached forceArrived\n");
+  forceHeld[num] = 1;
+  if (leanmdUnfused())
+    invokeAccumulateForces(d_force, d_recv_force + (size_t)num * part_capacity,
+                           (int)(e->bytes / sizeof(vec3)), stream);
+}
+
+void Cell::releaseForceSlots() {
+  for (int num = 0; num < inbrs; num++)
+    if (forceHeld[num]) { forceCh[num].release(); forceHeld[num] = 0; }
+}
+
+// A neighbour's migrants landed in my slot for it.
+void Cell::migrantArrival(CkDataMsg* m) {
+  const CkDeviceChannelEvent* peek = (const CkDeviceChannelEvent*)m->getData();
+  auto it = chanIdx.find(peek->channel);
+  if (it == chanIdx.end()) CkAbort("Cell: a migrant event for a channel that is not mine\n");
+  const int k = it->second;
+  const CkDeviceChannelEvent* e = migCh[k].event(m);
+  delete m;
+  if (e == NULL) CkAbort("Cell: a control event reached migrantsArrived\n");
+  migHeld[k] = 1;
+  appendMigrants(k, (int)(e->bytes / sizeof(Particle)), d_recv_parts + (size_t)k * exch_capacity);
+}
+
+void Cell::releaseMigrantSlots() {
+  for (int k = 0; k < inbrs; k++)
+    if (migHeld[k]) { migCh[k].release(); migHeld[k] = 0; }
 }
 
 //pack important data when I move/checkpoint

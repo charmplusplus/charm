@@ -26,6 +26,7 @@
 /* readonly */ int densityReportFreq;
 /* readonly */ int asyncLb;
 /* readonly */ int lbLag;
+/* readonly */ int useChannels;
 
 // Entry point of Charm++ application
 Main::Main(CkArgMsg* m) {
@@ -69,12 +70,18 @@ Main::Main(CkArgMsg* m) {
     densityReportFreq = 0;
     CmiGetArgIntDesc(m->argv, "-densityreport", &densityReportFreq,
                      "report atoms per x-slab every N steps (0 = off)");
-    asyncLb = CmiGetArgFlagDesc(m->argv, "-lbasync",
-                                "overlap the balancing step with the simulation "
-                                "(needs +LBAsync)") ? 1 : 0;
+    // Asynchronous balancing is the default (it ties or beats the unsplit
+    // barrier at every size measured); -lbsync runs the unsplit barrier. The
+    // runtime follows the application's choice: no +LBAsync.
+    CmiGetArgFlagDesc(m->argv, "-lbasync", "(default) overlap the balancing step with the simulation");
+    asyncLb = CmiGetArgFlagDesc(m->argv, "-lbsync", "balance at an unsplit barrier instead") ? 0 : 1;
+    if (asyncLb) CkLBSetAsync(true);
     lbLag = DEFAULT_LB_LAG;
     CmiGetArgIntDesc(m->argv, "-lblag", &lbLag,
                      "steps to keep running between AtSyncStart and AtSyncWait");
+    useChannels = CmiGetArgFlagDesc(m->argv, "-channels",
+                                    "positions, forces and migrants through persistent "
+                                    "device channels") ? 1 : 0;
     m->argc = CmiGetArgc(m->argv);
   }
 

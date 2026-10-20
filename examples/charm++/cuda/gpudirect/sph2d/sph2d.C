@@ -221,13 +221,16 @@ public:
     // patch crossing into a constant and is the way to get a load that keeps
     // moving inside a run of a few tens of thousands of steps.
     n_iters = 4000; warmup_iters = 10;
-    first_lb = 99999; lb_freq = 0; async_lb = 0; lb_wait_lag = 3;
+    // Defaults = the measured best on the moving load (2026-09-13): every 2000
+    // steps, asynchronously, lag 1800. -f 99999 turns balancing off; -A runs the
+    // unsplit barrier.
+    first_lb = 2000; lb_freq = 2000; async_lb = 1; lb_wait_lag = 1800;
     stats_freq = 200;
     RealType headroom = 4.0f;
     RealType exch_frac = 0.25f;
 
     int c;
-    while ((c = getopt(m->argc, m->argv, "X:Y:x:y:s:w:t:V:i:u:f:b:l:ar:e:S:")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "X:Y:x:y:s:w:t:V:i:u:f:b:l:aAr:e:S:")) != -1) {
       switch (c) {
         case 'X': dom_lx = atof(optarg); break;
         case 'Y': dom_ly = atof(optarg); break;
@@ -243,6 +246,7 @@ public:
         case 'b': lb_freq = atoi(optarg); break;
         case 'l': lb_wait_lag = atoi(optarg); break;
         case 'a': async_lb = 1; break;
+        case 'A': async_lb = 0; break;
         case 'r': headroom = atof(optarg); break;
         case 'e': exch_frac = atof(optarg); break;
         case 'S': stats_freq = atoi(optarg); break;
@@ -282,11 +286,12 @@ public:
     const RealType dt_g = 0.25f * std::sqrt(smooth_h / gravity);
     sim_dt = std::min(dt_c, dt_g);
 
-    if (async_lb && !_lb_args.lbAsync()) {
-      CkPrintf("[WARN] -a ignored: async LB needs +LBAsync on the command "
-               "line. Running the unsplit AtSync barrier instead.\n");
-      async_lb = 0;
-    }
+    // -f 99999 means no balancing at all: no period, no split barrier (the lag
+    // check below would otherwise reject the defaults).
+    if (first_lb >= 99999) { lb_freq = 0; async_lb = 0; }
+    // -a: the runtime's asynchronous balancing follows the application's
+    // choice; no +LBAsync needed on the command line.
+    if (async_lb) CkLBSetAsync(true);
     // The lag must close the window before the NEXT trigger, and the first LB
     // need not sit on a period boundary: with -f 1000 -b 2000 the triggers are
     // 1000, 2000, 4000, 6000, so the shortest gap is 1000, not lb_freq. A lag

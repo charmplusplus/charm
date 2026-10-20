@@ -191,16 +191,19 @@ public:
     coupling = 1e-3;
     double headroom = 12.0;
     double exch_frac = 0.05;
-    first_lb = 10;
-    lb_freq = 9999;
-    async_lb = 0;
-    lb_wait_lag = 3;
+    // Defaults = the measured best (lb2node recipe): every 50 iterations,
+    // asynchronously, lag 40. -f 99999 turns balancing off; -A runs the unsplit
+    // barrier.
+    first_lb = 50;
+    lb_freq = 50;
+    async_lb = 1;
+    lb_wait_lag = 40;
     stats_freq = 1;
     print_parts = false;
     stats_iter = 0;
 
     int c;
-    while ((c = getopt(m->argc, m->argv, "W:H:w:h:p:i:u:j:d:F:s:v:t:T:q:f:b:r:x:c:Pal:")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "W:H:w:h:p:i:u:j:d:F:s:v:t:T:q:f:b:r:x:c:PaAl:")) != -1) {
       switch (c) {
         case 'W': grid_width = atoi(optarg); break;
         case 'H': grid_height = atoi(optarg); break;
@@ -224,6 +227,7 @@ public:
         case 'c': stats_freq = atoi(optarg); break;
         case 'P': print_parts = true; break;
         case 'a': async_lb = 1; break;
+        case 'A': async_lb = 0; break;
         case 'l': lb_wait_lag = atoi(optarg); break;
         default:
           CkPrintf(
@@ -235,7 +239,7 @@ public:
               "  -v [drift velocity, cells/time]\n"
               "  -t [thermal velocity] -T [dt override] -q [field coupling strength]\n"
               "  -f [first LB iteration] -b [LB frequency]\n"
-              "  -a (async LB: overlap the step; needs +LBAsync) -l [wait lag]\n"
+              "  -a (async LB: overlap the step) -l [wait lag]\n"
               "  -r [particle capacity headroom] -x [exchange buffer fraction]\n"
               "  -c [stats frequency, 0 disables] -P (print final particle counts)\n",
               m->argv[0]);
@@ -258,11 +262,11 @@ public:
     // an AtSyncStart() with no step due calls ResumeFromSync() inline *and*
     // returns, so a patch written to the split pattern would drive runStep
     // twice. Fall back rather than let that happen.
-    if (async_lb && !_lb_args.lbAsync()) {
-      CkPrintf("[WARN] -a ignored: async LB needs +LBAsync on the command "
-               "line. Running the unsplit AtSync barrier instead.\n");
-      async_lb = 0;
-    }
+    // -f 99999 means no balancing at all (no period, no split barrier).
+    if (first_lb >= 99999) { lb_freq = 0; async_lb = 0; }
+    // -a: the runtime's asynchronous balancing follows the application's
+    // choice; no +LBAsync needed on the command line.
+    if (async_lb) CkLBSetAsync(true);
     if (async_lb && (lb_wait_lag < 1 || lb_wait_lag >= lb_freq)) {
       CkAbort("-l (%d) must be in [1, lb_freq): the wait must land before "
               "the next AtSyncStart\n", lb_wait_lag);

@@ -1,0 +1,21 @@
+mainmodule sendcost {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Peer peer_proxy;
+  readonly int n_burst;
+  readonly int n_pingpong;
+  initproc void sendcost_init(void);
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void ready();
+    entry void result(int mode, double a, double b, double c);
+  };
+  group Peer {
+    entry Peer();
+    entry void init();
+    entry void start(int mode);
+    entry void ping(int seq);
+    entry void pong(int seq);
+    entry void burstDone(double recv_us);
+    entry void count();
+  };
+};
