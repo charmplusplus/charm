@@ -74,6 +74,38 @@ DiffusionTier DiffusionCostConfig::tierBetween(int pe1, int pe2, uint64_t dev1, 
   return (dev1 == dev2) ? DIFF_TIER_IPC_SAME_GPU : DIFF_TIER_IPC_CROSS_GPU;
 }
 
+bool DiffusionCostConfig::loadBuiltin(const char* why)
+{
+  // benchmarks/charm++/cuda/gpudirect/lbcalib/lbcost.2n.same.conf (64 PEs, 4 devices
+  // per host, 64 B .. 4 MB, 200 timed iterations): alpha seconds per message,
+  // beta seconds per byte. The intra-process peer tier was not measured there
+  // and takes the cross-GPU IPC figures, as load() does for a file without it.
+  diffCfgDevicesPerHost = 4;
+  tier[DIFF_TIER_INTRA_PROCESS].alpha = 1.678710824e-05;
+  tier[DIFF_TIER_INTRA_PROCESS].beta = 3.662691025e-12;
+  tier[DIFF_TIER_IPC_SAME_GPU].alpha = 1.678710824e-05;
+  tier[DIFF_TIER_IPC_SAME_GPU].beta = 3.662691025e-12;
+  tier[DIFF_TIER_IPC_CROSS_GPU].alpha = 2.939249885e-05;
+  tier[DIFF_TIER_IPC_CROSS_GPU].beta = 3.975763403e-11;
+  tier[DIFF_TIER_INTRA_PROCESS_PEER] = tier[DIFF_TIER_IPC_CROSS_GPU];
+  tier[DIFF_TIER_INTER_NODE].alpha = 5.194932493e-05;
+  tier[DIFF_TIER_INTER_NODE].beta = 5.420668311e-11;
+  migrateAlpha = 5.601924047e-05;
+  migrateBetaHost = 3.766762051e-10;
+  migrateBetaDevice = 4.329692668e-11;
+  calibrated = true;
+  if (CkMyPe() == 0)
+    CkPrintf("CharmLB> transfer-cost model: built-in table (Delta A40, lbcalib 2026-09-15)%s%s; "
+             "+LBCostConfig <file> overrides it\n", why ? " " : "", why ? why : "");
+  return true;
+}
+
+void DiffusionCostConfig::loadDefault(const char* path)
+{
+  if (path != NULL && path[0] != '\0' && load(path)) return;
+  loadBuiltin(path != NULL && path[0] != '\0' ? "because the named file did not load" : NULL);
+}
+
 bool DiffusionCostConfig::load(const char* path)
 {
   calibrated = false;

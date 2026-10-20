@@ -149,8 +149,7 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   if (!costCfgLoadAttempted)
   {
     costCfgLoadAttempted = true;
-    if (_lb_args.costConfig() != NULL)
-      diffusionCostCfg.load(_lb_args.costConfig());
+    diffusionCostCfg.loadDefault(_lb_args.costConfig());
   }
 
   // Node decomposition. A Charm node is a process, so a single-process build

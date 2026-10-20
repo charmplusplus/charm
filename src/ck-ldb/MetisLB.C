@@ -60,8 +60,16 @@ static bool metisHostByMsgs()
 {
   static int on = -1;
   if (on < 0)
-    on = CmiGetArgFlagDesc(CkGetArgv(), "+LBMetisHostByMsgs",
-                           "MetisLB: host weights from message counts, not measured time") ? 1 : 0;
+  {
+    // Default since 2026-10-18 (it was measured better on sph3d and leanmd's
+    // host time is message handling too); +LBMetisHostByTime restores the
+    // measured wallTime weights.
+    const bool byTime = CmiGetArgFlagDesc(CkGetArgv(), "+LBMetisHostByTime",
+                           "MetisLB: host weights from measured host time instead of message counts");
+    CmiGetArgFlagDesc(CkGetArgv(), "+LBMetisHostByMsgs",
+                      "(default) MetisLB: host weights from message counts, not measured time");
+    on = byTime ? 0 : 1;
+  }
   return on == 1;
 }
 static bool metisRemapOn();
@@ -132,7 +140,10 @@ static bool metisRemapOn()
 static double metisMinGain()
 {
   static const double frac = []() {
-    double f = _lb_args.diffusionMinImbalance();
+    // 3% of the current bound: MetisLB's decision is priced (communication and
+    // migration included), so a small real fall is worth taking; sph3d's 10-20%
+    // drift was missed at 10% (2026-10-08). DiffusionLB keeps its own floor.
+    double f = 0.03;
     CmiGetArgDoubleDesc(CkGetArgv(), "+LBMetisMinGain", &f,
                         "MetisLB: least fall in the step bound, as a fraction of the current "
                         "bound, for a new mapping to be applied (default: +LBDiffusionMinImbalance)");
@@ -416,7 +427,7 @@ void MetisLB::work(LDStats* stats)
   if (!costCfgTried)
   {
     costCfgTried = true;
-    if (_lb_args.costConfig() != NULL) costCfg.load(_lb_args.costConfig());
+    costCfg.loadDefault(_lb_args.costConfig());
   }
   // An uncalibrated cut is weighed by bytes. Weighing it by message count,
   // direct k-way, more partitions and the tolerance in either direction were
@@ -1643,7 +1654,13 @@ void MetisLB::work(LDStats* stats)
                (shNew + ohNew) > 0 ? 100.0 * ohNew / (shNew + ohNew) : 0.0);
     }
     const double maxRise = metisMaxCutRise();
-    const bool local = crossNew <= crossOld * (1.0 + maxRise) * (1.0 + 1e-9);
+    // Priced (a cost table is always present now): the bound already carries
+    // every edge's cost at its tier and the migration amortised over the
+    // placement's lifetime, so a mapping is applied when the priced bound falls
+    // by the floor, whatever the raw cut does. The raw-cut ceiling only guards
+    // the uncalibrated case, where bytes and seconds cannot be compared.
+    const bool local = costCfg.calibrated ||
+                       crossNew <= crossOld * (1.0 + maxRise) * (1.0 + 1e-9);
     const bool worth = moving > 0 && local && gain >= minGain;
     const char* verdict = moving == 0        ? "nothing moves"
                           : !local           ? "raises the cross-group cut, current mapping kept"
@@ -1660,7 +1677,7 @@ void MetisLB::work(LDStats* stats)
       cutOld = cutCost(false);
       cutNew = cutCost(true);
     }
-    if ((_lb_args.debug() > 0 || !worth) && CkMyPe() == cur_ld_balancer)
+    if (CkMyPe() == cur_ld_balancer)
     {
       if (costCfg.calibrated)
         CkPrintf("[%d] MetisLB priced: step bound %.6f -> %.6f, comm and migration included "

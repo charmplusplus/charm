@@ -24,6 +24,9 @@
 #include "json.hpp"
 
 CkGroupID _lbmgr;
+// CkLBSetAsync before the LBManager group exists (see LBMgrInit): remembered here.
+static bool lbmgrCreated = false;
+static int pendingAsyncRequest = -1;
 
 CkpvDeclare(LBUserDataLayout, lbobjdatalayout);
 CkpvDeclare(int, _lb_obj_index);
@@ -173,6 +176,10 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
 {
 #if CMK_LBDB_ON
   _lbmgr = CProxy_LBManager::ckNew();
+  lbmgrCreated = true;
+  // An application main chare that ran before this one asked for asynchronous
+  // balancing: tell every PE now that the group exists.
+  if (pendingAsyncRequest >= 0) CProxy_LBManager(_lbmgr).setAsyncMode(pendingAsyncRequest != 0);
 
   // runtime specified load balancer
   if (!lbRegistry.runtime_lbs.empty())
@@ -192,6 +199,22 @@ LBMgrInit::LBMgrInit(CkArgMsg* m)
     {
       createLoadBalancer(balancer);
     }
+  }
+  else
+  {
+    // No balancer named anywhere: the strategy the GPU applications measured
+    // best, when its parts are linked in. MetisLB partitions once (its priced
+    // decision applies the mapping only when the step bound falls), then
+    // DiffusionLB refines at every later step. An application that wants
+    // something else names it with +balancer.
+    const bool haveMetis = lbRegistry.search("MetisLB") != NULL;
+    const bool haveDiffusion = lbRegistry.search("DiffusionLB") != NULL;
+    if (haveMetis) createLoadBalancer("MetisLB");
+    if (haveDiffusion) createLoadBalancer("DiffusionLB");
+    if (CkMyPe() == 0 && (haveMetis || haveDiffusion))
+      CkPrintf("CharmLB> default strategy: %s%s%s (no +balancer given)\n",
+               haveMetis ? "MetisLB once" : "", haveMetis && haveDiffusion ? ", then " : "",
+               haveDiffusion ? "DiffusionLB at every later step" : "");
   }
 
   // simulation mode
@@ -440,6 +463,7 @@ void _loadbalancerInit()
   // zerocopy can opt out of the forcing with CHARM_LB_ASYNC_NO_PEER_DECISION=1.
   if (_lb_args.lbAsync() && getenv("CHARM_LB_ASYNC_NO_PEER_DECISION") == NULL)
     _lb_args.lbPeerDecision() = true;
+  _lb_args.asyncFromFlag() = _lb_args.lbAsync();
 
   // force a global barrier after migration done
   _lb_args.syncResume() = CmiGetArgFlagDesc(
@@ -515,8 +539,12 @@ void _loadbalancerInit()
   // DiffusionLB tuning. +LBDiffusionCommOn selects the communication-aware object
   // metric (MetricComm) over the geometric one (MetricCentroid); without it the
   // strategy silently degrades to centroid-based selection.
-  _lb_args.diffusionCommOn() = CmiGetArgFlagDesc(
-      argv, "+LBDiffusionCommOn", "DiffusionLB uses the communication graph to pick objects");
+  // The communication-aware metric is the default (2026-10-18); the centroid
+  // metric needs application-registered positions and is opt-in.
+  CmiGetArgFlagDesc(argv, "+LBDiffusionCommOn",
+                    "(default) DiffusionLB uses the communication graph to pick objects");
+  _lb_args.diffusionCommOn() = !CmiGetArgFlagDesc(
+      argv, "+LBDiffusionCentroid", "DiffusionLB picks objects by centroid distance instead");
   _lb_args.noMST() =
       CmiGetArgFlagDesc(argv, "+LBnoMST", "DiffusionLB skips MST neighbor construction");
   CmiGetArgIntDesc(argv, "+LBDiffusionNumNbors", &_lb_args.diffusionNumNbors(),
@@ -704,6 +732,7 @@ void LBManager::setTimer()
 void LBManager::init(void)
 {
   mystep = 0;
+  lbEventsDone = 0;
   new_ld_balancer = 0;
   lb_in_progress = false;
   chare_count = 0;
@@ -1016,6 +1045,43 @@ void LBManager::addLoadbalancer(BaseLB* lb, int seq)
 }
 
 // switch strategy in order
+// Asynchronous balancing requested by the application (CkLBSetAsync). The
+// settings +LBAsync derives at startup are derived here the same way; the
+// process-wide _lb_args is shared by every PE of the process, so one branch per
+// process would do, but every branch runs it so the order of arrival is moot.
+void LBManager::setAsyncMode(bool on)
+{
+  if (_lb_args.asyncFromFlag()) return;   // the command line already decided
+  const bool was = _lb_args.lbAsync();
+  _lb_args.lbAsync() = on;
+  if (on)
+  {
+    if (getenv("CHARM_LB_ASYNC_NO_PEER_DECISION") == NULL) _lb_args.lbPeerDecision() = true;
+    _lb_args.syncResume() = true;
+  }
+  (void)was;
+}
+
+void CkLBSetAsync(bool on)
+{
+  // This process at once (the caller's PEs share _lb_args), every other PE by
+  // broadcast once the group exists.
+  if (!_lb_args.asyncFromFlag())
+  {
+    _lb_args.lbAsync() = on;
+    if (on)
+    {
+      if (getenv("CHARM_LB_ASYNC_NO_PEER_DECISION") == NULL) _lb_args.lbPeerDecision() = true;
+      _lb_args.syncResume() = true;
+    }
+  }
+  if (CkMyPe() == 0)
+    CmiPrintf("CharmLB> asynchronous balancing %s by the application%s\n", on ? "on" : "off",
+              _lb_args.asyncFromFlag() ? " (the command line's +LBAsync already decided)" : "");
+  if (lbmgrCreated) CProxy_LBManager(_lbmgr).setAsyncMode(on);
+  else pendingAsyncRequest = on ? 1 : 0;
+}
+
 void LBManager::nextLoadbalancer(int seq)
 {
   if (seq == -1) return;  // -1 means this is the only LB
@@ -1028,6 +1094,15 @@ void LBManager::nextLoadbalancer(int seq)
   {
     if (currentLBIndex == loadbalancers.size()) currentLBIndex--;  // keep using the last one
   }
+  // The default chain (a global partitioner first, a diffusive refiner after):
+  // the partitioner is asked again every fourth event. Its priced decision
+  // applies a new mapping only when the step bound falls by the floor, so on a
+  // balanced run it costs one evaluation and moves nothing; on a run whose load
+  // drifts in a way local moves do not follow (sph3d: 10-20% over 2000 steps)
+  // it is what catches the drift. The step count is the same on every PE, so
+  // every PE makes the same choice.
+  // (The periodic MetisLB re-evaluation of the default chain is decided in
+  // ResumeClients, which every strategy reaches; DiffusionLB never comes here.)
   if (seq != currentLBIndex)
   {
     loadbalancers[seq]->turnOff();
@@ -1169,6 +1244,25 @@ void LBManager::ResetAdaptive()
 
 void LBManager::ResumeClients()
 {
+  // One balancing event has ended on this PE. In the default chain (MetisLB
+  // first, DiffusionLB after) the partitioner is asked again every fourth
+  // event: priced, it moves nothing on a balanced run and catches the drift
+  // local moves do not follow (sph3d). DiffusionLB never calls
+  // nextLoadbalancer, so the switch is made here, on every PE alike.
+  if (loadbalancers.size() == 2 && loadbalancers[0] != NULL && loadbalancers[1] != NULL &&
+      strcmp(loadbalancers[0]->lbName(), "MetisLB") == 0)
+  {
+    lbEventsDone++;
+    const int want = (lbEventsDone % 4 == 0) ? 0 : 1;
+    if (want != currentLBIndex)
+    {
+      loadbalancers[currentLBIndex]->turnOff();
+      currentLBIndex = want;
+      loadbalancers[currentLBIndex]->turnOn();
+      if (CkMyPe() == 0 && want == 0)
+        CmiPrintf("CharmLB> event %d: MetisLB re-evaluates at the next step\n", lbEventsDone);
+    }
+  }
 #if CMK_LBDB_ON
   resume_epoch++;
   if (_lb_args.metaLbOn())

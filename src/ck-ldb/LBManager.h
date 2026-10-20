@@ -89,6 +89,7 @@ class CkLBArgs
   double _lb_targetRatio;  // Specifies the target load ratio for LBs that aim for a
                            // particular load ratio
   bool _lb_async;              // AtSyncStart returns without waiting for the step
+  bool _lb_asyncFromFlag;      // +LBAsync was on the command line (so an application's request changes nothing)
   bool _lb_peerDecision;       // Scatter the LB decision instead of broadcasting it
   bool _lb_metaLbOn;
   bool _lb_metaLbGpuTrigger;   // MetaLB: trigger on per-device GPU imbalance
@@ -114,7 +115,7 @@ class CkLBArgs
     _lb_diffgpudim = false;
     _lb_diffhostdim = false;
     _lb_shedEps = 0.10;
-    _lb_diffMinImbalance = 0.10;
+    _lb_diffMinImbalance = 0.10;   // DiffusionLB's floor: 0.03 made it over-move on sph2d's moving load (1.86 vs 1.66 ms/step, 2026-10-18); MetisLB has its own floor
     _lb_diffMaxMoveFrac = 1.0;
     _lb_loadVectorAbove = 0.5;
     _lb_gpuScaling = false;
@@ -127,6 +128,7 @@ class CkLBArgs
     _lb_maxDistPhases = 10;
     _lb_targetRatio = 1.05;
     _lb_async = false;
+    _lb_asyncFromFlag = false;
     _lb_peerDecision = false;
     _lb_metaLbOn = false;
     _lb_metaLbGpuTrigger = false;
@@ -170,6 +172,7 @@ class CkLBArgs
   inline int& maxDistPhases() { return _lb_maxDistPhases; }
   inline double& targetRatio() { return _lb_targetRatio; }
   inline bool& lbAsync() { return _lb_async; }
+  inline bool& asyncFromFlag() { return _lb_asyncFromFlag; }
   inline bool& lbPeerDecision() { return _lb_peerDecision; }
   inline bool& metaLbOn() { return _lb_metaLbOn; }
   inline bool& metaLbGpuTrigger() { return _lb_metaLbGpuTrigger; }
@@ -219,6 +222,11 @@ class CkLBOptions
 #include "LBManager.decl.h"
 
     extern CkGroupID _lbmgr;
+// An application that implements the split barrier (AtSyncStart / AtSyncWait)
+// turns asynchronous balancing on from its main chare with this, instead of
+// requiring +LBAsync on the command line. Broadcast to every PE; it must be
+// called before the first balancing step.
+void CkLBSetAsync(bool on);
 
 CkpvExtern(bool, lbmanagerInited);
 
@@ -718,6 +726,7 @@ class LBManager : public CBase_LBManager
 
   void LocalBarrierOn(void);
   void LocalBarrierOff(void);
+  void setAsyncMode(bool on);   // entry: see CkLBSetAsync
   void ResumeClients();
   static int ProcessorSpeed();
   static int ProcessorGPUSpeed();
@@ -779,6 +788,7 @@ class LBManager : public CBase_LBManager
   const char* loadbalancer(int seq);
 
   inline int step() { return mystep; }
+  int lbEventsDone;   // balancing events completed here (see nextLoadbalancer)
   inline void incStep() { mystep++; }
 };
 

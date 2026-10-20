@@ -93,6 +93,13 @@ public:
   // false (leaving calibrated == false) if the file cannot be read or omits a
   // required key; the reason is printed once on PE 0.
   bool load(const char* path);
+  // The table lbcalib measured on Delta (A40 x4 per host, Slingshot), 2026-09-15:
+  // the runtime's default when no +LBCostConfig names a file, so every balancer
+  // prices communication and migration without being told to. A file still
+  // overrides it (a different machine).
+  bool loadBuiltin(const char* why);
+  // Either the file named by +LBCostConfig (when it loads) or the built-in table.
+  void loadDefault(const char* path);
 
   // Resolves which tier a transfer between two PEs would use. Same process is a
   // memcpy; same host splits on whether the two processes drive the same device;
