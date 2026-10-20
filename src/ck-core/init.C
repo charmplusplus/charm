@@ -84,6 +84,12 @@ never be excluded...
 #if CMK_CUDA || CMK_HIP
 #include "hapi_impl.h"
 #include "ckrdmadevice.h"
+extern int device_channel_probe_handler;              // ckrdmadevice.C: the watchdog's owner probe
+extern int device_channel_signal_handler;             // ckrdmadevice.C: a put's immediate data, bridged from the network thread
+extern "C" void* device_channel_signal_bridge(void*);
+extern int device_channel_slotrelease_handler;        // ckrdmadevice.C: free a signal slot once its acked last put was taken
+extern "C" void* device_channel_slotrelease_bridge(void*);
+extern "C" void* device_channel_probe_bridge(void*);
 
 extern void (*hapiInvokeCallback)(void*, void*);
 extern void CUDACallbackManager(void*, void*);
@@ -1496,6 +1502,15 @@ void _initCharm(int unused_argc, char **argv)
   device_restage_put_done_handler = CmiRegisterHandler((CmiHandler) device_restage_put_done_bridge);
   device_forward_redirect_handler = CmiRegisterHandler((CmiHandler) device_forward_redirect_bridge);
   _deferredMigrateHandlerIdx = CmiRegisterHandler((CmiHandler) _deferredMigrateHandler);
+  device_channel_credit_handler = CmiRegisterHandler((CmiHandler) device_channel_credit_bridge);
+  device_channel_closing_handler = CmiRegisterHandler((CmiHandler) device_channel_closing_bridge);
+  device_channel_closeack_handler = CmiRegisterHandler((CmiHandler) device_channel_closeack_bridge);
+  device_channel_resolved_handler = CmiRegisterHandler((CmiHandler) device_channel_resolved_bridge);
+  device_channel_done_handler = CmiRegisterHandler((CmiHandler) device_channel_done_bridge);
+  device_channel_probe_handler = CmiRegisterHandler((CmiHandler) device_channel_probe_bridge);
+  device_channel_signal_handler = CmiRegisterHandler((CmiHandler) device_channel_signal_bridge);
+  device_channel_slotrelease_handler = CmiRegisterHandler((CmiHandler) device_channel_slotrelease_bridge);
+  CkRdmaDeviceChannelInit();
   CkpvInitialize(CkLocRec*, _currentLocRec);
   CkpvAccess(_currentLocRec) = NULL;
   CkRdmaDeviceRegistrationCacheInit();

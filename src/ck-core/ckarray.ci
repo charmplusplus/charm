@@ -46,6 +46,9 @@ module CkArray {
     //Calls destructor:
     entry void ckDestroy(void);
     entry void recvBroadcast(CkMessage *);
+    // Runtime control events of the persistent device channels this element
+    // receives on (a sender's resolve), delivered wherever the element lives.
+    entry void ckDeviceChannelControl(CkMessage *);
     // CMK_MEM_CHECKPOINT
     entry void inmem_checkpoint(CkArrayCheckPTReqMessage *);
     // _PIPELINED_ALLREDUCE_

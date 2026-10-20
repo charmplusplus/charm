@@ -531,6 +531,17 @@ void ArrayElement::CkAbort(const char* format, ...) const
 
 void ArrayElement::recvBroadcast(CkMessage* m) {}
 
+// A persistent device channel's control event (ckrdmadevice.C), addressed to
+// this element so it follows it through migration.
+void ArrayElement::ckDeviceChannelControl(CkMessage* m)
+{
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+  CkDeviceChannelControl((void*)m);
+#else
+  CkFreeMsg(m);
+#endif
+}
+
 #if CMK_CHARM4PY
 
 ArrayElemExt::ArrayElemExt(void* impl_msg)

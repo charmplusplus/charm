@@ -1,3 +1,4 @@
+#include <map>
 #ifndef _CKRDMADEVICE_H_
 #define _CKRDMADEVICE_H_
 
@@ -11,20 +12,56 @@
 #define CkNcpyModeDevice CmiNcpyModeDevice
 #define CkDeviceStatus CmiDeviceStatus
 
+// A persistent device endpoint (the "Direct API"): a device buffer exported once
+// by its owner with open(), then read or written repeatedly by a peer holding a
+// copy of the endpoint, with get()/put() carrying no metadata beyond the two
+// endpoints. Copies reach the peers by pup. Three transports, chosen by where
+// the two PEs are: a stream memcpy inside one process; a device-to-device copy
+// through the process-wide IPC import cache on the same host, so pool and vmm
+// memory export like any other allocation; and a one-sided RDMA put or get
+// between hosts, with the registration taken once at open(). Completion is
+// delivered through the two endpoints' callbacks, fired by the initiator once
+// the bytes are in place (a CkCallback to a chare is a message, so the passive
+// side's reaches it wherever it lives).
+//
+// The caller orders the data: a put ships what hapi_stream has produced when
+// the copy, or the RDMA write, runs; a get reads what the peer's buffer holds at
+// that moment, so the peer must have finished writing it. The owner must not
+// free or overwrite a buffer a peer may still be reading; the callbacks are
+// what say when a transfer is over.
 struct CkDevicePersistent {
   const void* ptr;
   size_t cnt;
   CkCallback cb;
   void* cb_msg;
-  hapiStream_t hapi_stream;
+  hapiStream_t hapi_stream = hapiStreamPerThread;
 
   int pe;
+  // Same-host, other-process transport: the export of the allocation holding
+  // ptr as hapiIpcExportBuffer hands it out. The handle names the allocation
+  // (or the owner's vmm heap); ptr sits ipc_offset past its base, which is
+  // ipc_base in the owner's address space. A peer resolves it through the
+  // import cache, never with its own cudaIpcOpenMemHandle: one open maps a
+  // whole region, and a second mapping of a region the cache already holds is
+  // refused (cudaErrorAlreadyMapped).
   hapiIpcMemHandle_t hapi_ipc_handle;
-  void* ipc_ptr;
-  bool ipc_open; // Used only by the remote chare
+  size_t ipc_offset;
+  void* ipc_base;
+  bool ipc_exported;
+  void* ipc_ptr;   // the peer's view of ptr once imported
+  bool ipc_open;   // used only by the remote chare
+  // Cross-host transport: the RDMA registration of [ptr, ptr+cnt), taken at
+  // open() when the job spans more than one host (the arena's one registration
+  // under +gpupool). Travels in the pup so a peer can name this buffer in a
+  // one-sided put or get.
+  CmiNcpyBuffer rdma;
+  bool rdma_registered;
+  bool rdma_owned;   // this endpoint's own registration, retired at close()
 
   CkDevicePersistent() : ptr(nullptr), cnt(0), cb(CkCallback(CkCallback::ignore)),
-                         cb_msg(nullptr), pe(-1), ipc_ptr(nullptr), ipc_open(false) {}
+                         cb_msg(nullptr), pe(-1), ipc_offset(0), ipc_base(nullptr),
+                         ipc_exported(false), ipc_ptr(nullptr), ipc_open(false),
+                         rdma_registered(false), rdma_owned(false) {}
 
   explicit CkDevicePersistent(const void* ptr_, size_t cnt_)
     : ptr(ptr_), cnt(cnt_), cb(CkCallback(CkCallback::ignore)) {
@@ -49,7 +86,12 @@ struct CkDevicePersistent {
   }
 
   void init();
+  // Export (and, across hosts, register) the buffer; the owner calls it once
+  // before sending copies of the endpoint to its peers.
   void open();
+  // Owner: retire the export and an owned registration, before the buffer is
+  // freed. Peer copy: forget the imported view (the mapping stays with the
+  // import cache, which other transfers into the same region keep using).
   void close();
   void set_msg(void* msg);
 
@@ -61,6 +103,256 @@ struct CkDevicePersistent {
   CkDeviceStatus get(CkDevicePersistent& src);
   CkDeviceStatus put(CkDevicePersistent& dst);
 };
+
+// What the receiver's `arrived` entry gets as the payload of a CkDataMsg. A DATA
+// event is a put: which channel, which put, how many bytes. A RESOLVE event is a
+// sender asking for the channel's current endpoint; CkDeviceChannel::event()
+// answers it and hands the application nothing.
+struct CkDeviceChannelEvent {
+  // ANNOUNCE: a put on the cross-host tier; the receiver reads the bytes itself
+  // (an RDMA read beat the sender's write at every size on Slingshot, 2026-10-18)
+  // and the application sees a DATA event once they are in place.
+  enum Kind : int { DATA = 1, RESOLVE = 2, ANNOUNCE = 3 };
+  int kind;
+  uint64_t channel;
+  uint64_t generation;
+  uint64_t seq;
+  size_t bytes;
+  int sender_pe;
+  uint64_t sender_token;
+  uint64_t tag;   // the sender's put() tag; also the message's reference number
+};
+
+class CkDataMsg;
+class CkLocRec;
+
+// A persistent channel: one fixed destination buffer on the receiver, exported
+// and registered once by open(). The receiver keeps its object; copies reach
+// the senders by pup, as an entry-method argument. A sender writes with put(),
+// which carries nothing but the bytes and a sequence number, in whichever of
+// the three transports the two PEs call for (CkDevicePersistent above). The
+// receiver's `arrived` callback fires once the bytes are in place -- a
+// CkCallback to a chare, so it follows the receiver wherever it lives -- with a
+// CkDataMsg holding a CkDeviceChannelEvent.
+//
+// The sender must not overwrite the buffer while the receiver may still read
+// it. The receiver calls release() after consuming a put (once the kernels that
+// read it are ordered behind it), which credits the sender; a put issued before
+// the credit for the previous one arrived is queued, one deep, and issued when
+// it does, never blocking the PE. Overlapping two puts means two channels on
+// two buffers. One sender per channel.
+//
+// Migration, without application re-exchange. A sender resolves the channel
+// before its first put: a RESOLVE event to the receiver's entry (so it reaches
+// the receiver wherever it lives), answered with the current endpoint, its
+// generation and whether the buffer is free. When the receiving element is
+// chosen to migrate, the runtime tells every resolved sender the channel is
+// closing and the element stands down until each has acknowledged -- a sender
+// acknowledges once it has no put in flight -- so no put ever lands in a buffer
+// that is being freed (CkRdmaDeviceChannelsBeforeMigrate, from emigrate). The
+// receiver re-opens at its new home with reopen(new buffer) in its pup, which
+// bumps the generation; the senders' next put re-resolves. A put's bytes that
+// landed before the pack are in the buffer the application pups, as its other
+// device state; its notification is forwarded to the new home. A sender element
+// itself cannot migrate while one of its puts is in flight (the put counts as
+// an outstanding device send), and a migrated sender re-resolves before its
+// next put.
+class CkDeviceChannel {
+public:
+  CkDeviceChannel();
+  // Receiver side: the destination buffer, its capacity, and the entry that
+  // learns of each put. The entry takes a CkDataMsg*, hands it to event() and
+  // deletes it. Open the channel inside an entry method or constructor of the
+  // receiving element.
+  CkDeviceChannel(void* dst, size_t capacity, const CkCallback& arrived);
+  CkDeviceChannel(const CkDeviceChannel& o);
+  CkDeviceChannel& operator=(const CkDeviceChannel& o);
+  ~CkDeviceChannel();
+
+  // Receiver side.
+  void open();                 // export and register the buffer; assign the channel id
+  void reopen(void* new_dst);  // after migration: the same channel on the new buffer
+  void close();                // retire the export and registration, before the buffer goes
+  // The put described by the message `arrived` delivered (the message stays the
+  // caller's), or NULL for an event the runtime consumed (a resolve).
+  const CkDeviceChannelEvent* event(CkDataMsg* m);
+  // The buffer may be overwritten: credit the sender.
+  void release();
+  // A holder copy: ask for the receiver's current endpoint now (e.g. right after
+  // the holding element migrated), instead of at the next put.
+  void resolve();
+  // The owning element's pup, on unpack: the channel arrived and reopens later.
+  void arriving();
+
+  // Sender side: write bytes of src, produced on stream, into the buffer.
+  // src_done fires when src may be reused. tag travels in the event and is set
+  // as the reference number of the message `arrived` receives, so an SDAG
+  // `when arrived[step](CkDataMsg* m)` matches puts by step.
+  CkDeviceStatus put(const void* src, size_t bytes, hapiStream_t stream,
+                     const CkCallback& src_done = CkCallback(CkCallback::ignore),
+                     uint64_t tag = 0);
+  bool putQueued() const { return pending.valid; }
+
+  uint64_t id() const { return channel_id; }
+  uint64_t gen() const { return generation; }
+  size_t capacity() const { return cap; }
+  // Owner, at pack time: bytes of a put that landed after the last one taken
+  // (its event is still queued), learned from the sender's closing ack; 0 when
+  // nothing is outstanding; SIZE_MAX when unknown (the sender's copy had left
+  // its PE): the pup must then carry the whole buffer.
+  size_t unseenBytes() const { return landed_unseen; }
+  int ownerPe() const { return dst.pe; }
+  void pup(PUP::er& p);
+
+  // Runtime side (the converse handlers below).
+  void onCredit(uint64_t seq, uint64_t epoch_);
+  void onClosing(uint64_t gen_, int owner_pe, uint64_t epoch_);
+  void onResolved(const CkDevicePersistent& ep, uint64_t gen_, int owner_pe, bool free, uint64_t epoch_,
+                  int credit_pe = -1, int credit_slot = -1, int signal_slot_ = -1,
+                  const CmiNcpyBuffer* signal_hdr_ = NULL);
+  void retireSignalSlot();     // owner: give the slot of the current resolution back
+  void stashSignalSlot();      // owner: keep it for the closing ack to release (pack, or a reply before the ack)
+  void pollShmCredit();        // sender: take credits the owner granted through shared memory
+  void retireCreditSlot();     // owner: give the slot of the current resolution back
+  void onCloseAck(int pe, uint64_t token, uint64_t last_seq, uint64_t last_bytes);
+  void onSrcDone(uint64_t seq);
+  void onDone(uint64_t seq);   // the receiver finished reading put `seq`
+  void onAnnounce(const CkDeviceChannelEvent& ev, const CkDevicePersistent& src);
+  void startPull();
+  void onPulled();
+  void sendCloseAck();
+  // Element ids are unique only within one location manager (one array, or
+  // bound arrays): an element is (manager, id).
+  bool ownedBy(int mgr_idx, CmiUInt8 element) const {
+    return is_owner && owner_known && owner_id == element && owner_mgr.idx == mgr_idx;
+  }
+  CmiUInt8 ownerElement() const { return owner_id; }
+  void closingForMigration(CkLocRec* rec);
+  void packForMigration();
+  // One line of state when something is stuck (CHARM_DEBUG_MIGRATE scan).
+  void describeStall(const char* role) const;
+  // The element moved to another PE of this process without a pup (the
+  // intra-process handoff): the object is the same, the buffer and its exports
+  // stay valid, only the per-PE registrations move.
+  void leaveForHandoff();
+  void arriveFromHandoff();
+
+private:
+  void issue(const void* src, size_t bytes, hapiStream_t stream, const CkCallback& src_done,
+             uint64_t tag);
+  void requestResolve();
+  void replyResolve(int pe, uint64_t token);
+  void takeOver(const CkDeviceChannel& o);
+  void registerOwner();
+  void unregisterOwner();
+
+  CkDevicePersistent dst;   // the receiver's buffer, exported/registered by open()
+  CkCallback arrived;
+  CkCallback control;       // where runtime events (a resolve) go: the element's own entry, or `arrived`
+  uint64_t channel_id;
+  uint64_t generation;      // bumped by every (re)open of the receiver's buffer
+  size_t cap;
+  // Receiver (owner) side.
+  bool is_owner;
+  CmiUInt8 owner_id;        // the receiving element, for the migration hook
+  bool owner_known;         // opened inside an array element's entry (ids may be 0)
+  CkGroupID owner_mgr;      // its location manager
+  bool busy;                // a put taken and not yet released
+  uint64_t taken_seq;       // the last put taken by event()
+  // Same-host, other-process pairs signal through shared memory instead of
+  // transport messages (see device_channel_shm in ckrdmadevice.C). Owner: the
+  // credit slot it granted to the current sender; sender: where to read its
+  // credits, and how many it has consumed from that word.
+  int credit_slot_pe;       // owner: node-local PE whose area holds the slot (-1: message credits)
+  int credit_slot;          // owner: the slot
+  int credit_shm_pe;        // sender: the owner's area (-1: message credits)
+  int credit_shm_slot;      // sender: the slot
+  uint32_t credits_seen;    // sender: credits already taken from the word
+  bool shm_waiting;         // sender: listed for the per-PE credit poll (a put is queued)
+  // Cross-host pairs: the note rides on the data write as immediate data
+  // (ckrdmadevice.C, chan_signal_*). Owner: the slot it granted; sender: the
+  // slot and the owner process's header region for the per-put header write.
+  int owner_signal_slot;
+  int signal_slot;
+  int departed_signal_slot; // owner: the slot it held when it packed (or re-resolved before the ack); freed where it
+  int departed_signal_pe;   //   was granted once the sender's acked last put has been taken there
+  CmiNcpyBuffer signal_hdr;
+  size_t landed_unseen;     // see unseenBytes()
+  size_t last_put_bytes;    // sender: bytes of the last put issued (carried by the closing ack)
+  int sender_pe;            // the resolved sender: where credits and closings go
+  uint64_t sender_token;
+  bool sender_known;
+  uint64_t closing_gen;     // generation under which a migration is pending (closings sent), 0 if none
+  bool closing_sent;        // a closing to the current sender is awaiting its ack
+  bool sender_closed;       // the current sender acked a closing and has not resolved since
+  bool sender_pulls;        // the resolved sender announces and this side reads (no credits needed)
+  // Announces waiting for the buffer, the read in progress, and its source.
+  struct Queued { CkDeviceChannelEvent ev; CkDevicePersistent src; };
+  std::vector<Queued> pulls;
+  bool pulling;
+  CkDeviceChannelEvent pull_ev;
+  CkDevicePersistent pull_src;
+  bool resolved_during_closing;   // a resolve was answered while that closing was in flight: close the new resolution on the ack
+  uint64_t epoch;           // owner: resolves answered so far; each Resolved, Closing and Credit names the resolution it belongs to.
+                            // sender: the resolution the current endpoint came from
+  CkLocRec* closing_rec;    // the element standing down for the pending migration
+  struct Waiting { int pe; uint64_t token; };
+  std::vector<Waiting> waiting;   // resolves received while migrating, answered after reopen
+  CkDeviceChannelEvent last;
+  bool have_last;
+  // Sender (holder) side.
+  bool resolved, resolving;
+  uint64_t send_seq;
+  int credits;
+  int uncredited;           // sender, put mode: puts issued under this resolution not yet credited back
+  bool pull_mode;           // sender: the resolved home is on another host, puts are announced and read
+  std::map<uint64_t, CkCallback> done_cbs;   // sender: source-done callbacks awaiting the receiver's DONE
+  uint64_t closed_epoch;    // sender: the newest resolution a closing was acked for; a Resolved or Credit of it (or older) is stale
+  int in_flight;
+  bool close_ack_due;
+  int close_ack_pe;
+  uint64_t my_token;        // this copy's entry in its PE's token table, 0 if none
+  CkLocRec* sender_rec;     // the sending element, charged with the puts in flight
+  CmiUInt8 holder_elem;     // that element's id, for the handoff hooks
+  CkGroupID holder_mgr;     // and its location manager
+  bool holder_known;
+  struct Pending {
+    const void* src;
+    size_t bytes;
+    hapiStream_t stream;
+    CkCallback done;
+    uint64_t tag;
+    bool valid;
+  } pending;
+  CkDevicePersistent src_ep;   // the source endpoint of the last put, reused while (src, bytes) hold
+};
+
+// Converse handlers of the channel protocol (credit, closing, close-ack,
+// resolve reply); registered in init.C.
+extern "C" void* device_channel_credit_bridge(void* arg);
+extern "C" void* device_channel_closing_bridge(void* arg);
+extern "C" void* device_channel_closeack_bridge(void* arg);
+extern "C" void* device_channel_resolved_bridge(void* arg);
+extern int device_channel_credit_handler;
+extern int device_channel_closing_handler;
+extern int device_channel_closeack_handler;
+extern int device_channel_resolved_handler;
+extern int device_channel_done_handler;
+extern "C" void* device_channel_done_bridge(void* arg);
+void CkRdmaDeviceChannelInit();
+// ArrayElement::ckDeviceChannelControl: a control event for one of this element's channels.
+void CkDeviceChannelControl(void* msg);
+// Migration hooks, from CkLocMgr::emigrate: tell the senders of the channels
+// this element owns to stop and stand the element down until they have (raises
+// outstandingDeviceSends per awaited ack); then, once past the stand-down,
+// retire the channels' exports before the pack.
+void CkRdmaDeviceChannelsBeforeMigrate(CkLocRec* rec);
+void CkRdmaDeviceChannelsPack(CkLocRec* rec);
+// The intra-process handoff (CkLocMgr::emigrateIntraProcess / immigrateIntraProcess):
+// the element's channel objects move with it unpacked, so their per-PE table
+// entries leave the old PE and are made on the new one.
+void CkRdmaDeviceChannelsLeaving(CkLocRec* rec);
+void CkRdmaDeviceChannelsArrived(CkLocRec* rec);
 
 struct CkDeviceBufferPost {
   // CUDA stream for device transfers

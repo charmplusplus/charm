@@ -4547,6 +4547,11 @@ bool CkLocMgr::emigrateIntraProcess(CkLocRec* rec, int toPe)
 
   DEBM((AA "Intra-process migrating index %s to %d\n" AB, idx2str(idx), toPe));
 
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+  // The element's persistent channels move with it unpacked: their entries in
+  // this PE's tables go now, and are made again on the destination.
+  CkRdmaDeviceChannelsLeaving(rec);
+#endif
   thisProxy[toPe].immigrateIntraProcess(msg);
 
   // Detach from this PE's array managers and location tables. Do NOT delete
@@ -4607,6 +4612,10 @@ void CkLocMgr::immigrateIntraProcess(CkArrayElementIntraProcessMigrateMessage* m
     mit->second->putEltInArrMgr(msg->id, elt);
     elt->ckFinalizeIntraProcessMigrate(rec, msg->barrierEpoch);
   }
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+  // Its persistent channels register on this PE before any entry method runs.
+  CkRdmaDeviceChannelsArrived(rec);
+#endif
 
 #if CMK_LBDB_ON
   // The element is registered here: retire its entry in the source's move
@@ -4639,6 +4648,12 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   // parked. It does not: the count above is the safety condition, and the park
   // only guarantees it is reached. An element that never goes quiet while
   // running still moves at its park, which is where AtSyncWait re-drives this.
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+  // Persistent channels this element receives on: their senders are told the
+  // channel is closing, and each awaited ack counts as an outstanding device
+  // send below, so no put lands in a buffer the pack is about to free.
+  CkRdmaDeviceChannelsBeforeMigrate(rec);
+#endif
   if (rec->outstandingDeviceSends > 0)
   {
     if (getenv("CHARM_DEBUG_MIGRATE"))
@@ -4743,6 +4758,14 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
     }
 #endif
   }
+
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+  // The channels' exports and registrations go with the buffers the pack is
+  // about to free; the element reopens them on its new buffers in its pup. A
+  // handoff above kept them (same process, same buffer) and moved only the
+  // per-PE registrations.
+  CkRdmaDeviceChannelsPack(rec);
+#endif
 
   // Anything the intra-process handoff above did not take stages from here --
   // including a move within this process onto a different GPU. See the note on

@@ -432,6 +432,7 @@ private:
 public:
   void inmem_checkpoint(CkArrayCheckPTReqMessage* m);
   void recvBroadcast(CkMessage*);
+  void ckDeviceChannelControl(CkMessage*);
 
 #if CMK_GRID_QUEUE_AVAILABLE
 public:

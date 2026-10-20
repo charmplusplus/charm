@@ -6772,6 +6772,48 @@ void hapiDumpFlagState() {
 #endif
 }
 
+// For the channel watchdog (ckrdmadevice.C): what this PE's poll is waiting
+// on. One summary line, then up to max_streams streams with queued entries:
+// the head entry's kind, its sequence against the slot's current value, and
+// whether the stream itself is idle. A flag entry whose slot never reaches its
+// sequence on an idle stream is a write that never landed; a busy stream is
+// blocked ahead of it.
+extern "C" void hapiDumpEventQueues(int max_streams) {
+#ifndef HAPI_CUDA_CALLBACK
+  hapiEventQueues& queues = CpvAccess(hapi_event_queue);
+  int nonempty = 0;
+  for (auto& e : queues) if (!e.second.empty()) nonempty++;
+  CmiPrintf("[HAPI-QUEUES %d] n_hapi_events=%d flag_inflight=%d streams=%zu with_entries=%d flagpoll=%d my_device=%d\n",
+            CmiMyPe(), CpvAccess(n_hapi_events), CpvAccess(hapi_flag_inflight), queues.size(), nonempty,
+            (int)hapi_use_flag_poll, CpvAccess(my_device));
+  int shown = 0;
+  for (size_t qi = 0; qi < queues.size() && shown < max_streams; qi++) {
+    auto& e = queues[qi];
+    if (e.second.empty()) continue;
+    shown++;
+    const hapiEvent& h = e.second.front();
+    unsigned slotval = 0; int busy = -1; const char* kind = "event"; const char* evq = "-";
+    if (h.event == NULL) {
+      kind = "flag";
+      const size_t idx = h.flag_seq & (HAPI_FLAG_SLOTS - 1);
+      slotval = *((volatile uint32_t*)CpvAccess(hapi_flag_slots) + idx * HAPI_FLAG_STRIDE);
+      busy = CpvAccess(hapi_flag_busy)[idx];
+    } else {
+      const cudaError_t r = cudaEventQuery(h.event);
+      evq = (r == cudaSuccess) ? "done" : (r == cudaErrorNotReady) ? "pending" : cudaGetErrorName(r);
+      cudaGetLastError();
+    }
+    const cudaError_t q = cudaStreamQuery(e.first);
+    cudaGetLastError();
+    CmiPrintf("[HAPI-QUEUES %d] stream %p dev %d: %zu queued; head %s seq %u slot=%u busy=%d event=%s; stream %s\n",
+              CmiMyPe(), (void*)e.first, hapiStreamDeviceOf(e.first), e.second.size(), kind, (unsigned)h.flag_seq,
+              slotval, busy, evq, (q == cudaSuccess) ? "idle" : (q == cudaErrorNotReady) ? "busy" : cudaGetErrorName(q));
+  }
+#else
+  (void)max_streams;
+#endif
+}
+
 void hapiPollEvents(void* param) {
 #ifndef HAPI_CUDA_CALLBACK
   if (CpvAccess(n_hapi_events) <= 0) return;

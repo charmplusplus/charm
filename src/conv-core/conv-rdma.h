@@ -58,6 +58,13 @@ void CmiIssueRget(NcpyOperationInfo *ncpyOpInfo);
  */
 
 void CmiIssueRput(NcpyOperationInfo *ncpyOpInfo);
+// RDMA write with immediate data: the target's handler (set once per process) gets
+// the 16-bit tag and the bytes written when the data has landed.
+void CmiIssueRputSignal(NcpyOperationInfo *ncpyOpInfo, uint32_t tag);
+void CmiSetRputSignalHandler(void (*handler)(int rank, uint32_t tag, size_t size));
+// A small one-sided write with no record and no acknowledgement (see conv-rdma.cpp).
+void CmiRdmaPutRaw(int destPe, const void *src, size_t bytes, const void *srcLayerInfo,
+                   void *dest, const void *destLayerInfo);
 
 void CmiDeregisterMem(const void *ptr, void *info, int pe,
                       unsigned short int mode);
