@@ -199,6 +199,7 @@ task<int> Exscan(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI
 /* ---------------- communicator creation ---------------- */
 
 task<int> Comm_split(MPI_Comm comm, int color, int key, MPI_Comm *newcomm);
+task<int> Comm_dup(MPI_Comm comm, MPI_Comm *newcomm);
 task<int> Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm *newcomm);
 
 /* ---------------- startup, shutdown, migration ---------------- */

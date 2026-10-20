@@ -1,0 +1,159 @@
+// campi test: communicator creation (split, dup), Sendrecv, Gather/Scatter,
+// Waitall with several outstanding Irecvs, other collectives, and nested
+// campi::task helpers that block (resume of the innermost frame).
+#include <algorithm>
+#include <cstdio>
+#include <vector>
+#include "mpi.h"
+#include "campi.h"
+
+// Nested helper: a blocking receive one level down.
+static campi::task<int> recv_one(int src, int tag, MPI_Comm comm) {
+  int v = -1;
+  MPI_Recv(&v, 1, MPI_INT, src, tag, comm, MPI_STATUS_IGNORE);
+  co_return v;
+}
+
+// Two levels down, with blocking calls before and after the inner await.
+static campi::task<int> ring_sum(int rank, int size, MPI_Comm comm) {
+  int right = (rank + 1) % size, left = (rank + size - 1) % size;
+  MPI_Request r;
+  MPI_Isend(&rank, 1, MPI_INT, right, 77, comm, &r);
+  int got = co_await recv_one(left, 77, comm);
+  MPI_Wait(&r, MPI_STATUS_IGNORE);
+  int sum = 0;
+  MPI_Allreduce(&got, &sum, 1, MPI_INT, MPI_SUM, comm);
+  co_return sum;
+}
+
+CAMPI_MAIN(argc, argv)
+{
+  MPI_Init(&argc, &argv);
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  long myerr = 0;
+#define C(c)                                                                  \
+  do {                                                                        \
+    if (!(c)) { myerr++; printf("rank %d: check failed at line %d: %s\n",     \
+                                rank, __LINE__, #c); }                        \
+  } while (0)
+
+  // 1. Sendrecv around a ring
+  {
+    int right = (rank + 1) % size, left = (rank + size - 1) % size, in = -1;
+    MPI_Status st;
+    MPI_Sendrecv(&rank, 1, MPI_INT, right, 1, &in, 1, MPI_INT, left, 1, MPI_COMM_WORLD, &st);
+    C(in == left && st.MPI_SOURCE == left && st.MPI_TAG == 1);
+  }
+
+  // 2. Waitall with several outstanding Irecvs (posted before the sends)
+  {
+    const int K = 4;
+    std::vector<int> in(size * K, -1), out(K);
+    std::vector<MPI_Request> reqs;
+    for (int src = 0; src < size; src++)
+      for (int k = 0; k < K; k++) {
+        reqs.emplace_back();
+        MPI_Irecv(&in[src * K + k], 1, MPI_INT, src, 100 + k, MPI_COMM_WORLD, &reqs.back());
+      }
+    MPI_Barrier(MPI_COMM_WORLD);
+    for (int dst = 0; dst < size; dst++)
+      for (int k = 0; k < K; k++) {
+        out[k] = rank * 1000 + k;
+        MPI_Send(&out[k], 1, MPI_INT, dst, 100 + k, MPI_COMM_WORLD);
+      }
+    MPI_Waitall((int)reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
+    for (int src = 0; src < size; src++)
+      for (int k = 0; k < K; k++) C(in[src * K + k] == src * 1000 + k);
+  }
+
+  // 3. Gather / Scatter / Bcast / Reduce / Allgather / Alltoall / Scan
+  {
+    std::vector<int> all(size, -1);
+    MPI_Gather(&rank, 1, MPI_INT, all.data(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+    if (rank == 0) for (int i = 0; i < size; i++) C(all[i] == i);
+    std::vector<int> sc(size);
+    for (int i = 0; i < size; i++) sc[i] = 10 * i + 3;
+    int mine = -1;
+    MPI_Scatter(sc.data(), 1, MPI_INT, &mine, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    C(mine == 10 * rank + 3);
+    int b = (rank == 0) ? 4242 : 0;
+    MPI_Bcast(&b, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    C(b == 4242);
+    int red = 0;
+    MPI_Reduce(&rank, &red, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+    if (rank == 0) C(red == size * (size - 1) / 2);
+    std::fill(all.begin(), all.end(), -1);
+    MPI_Allgather(&rank, 1, MPI_INT, all.data(), 1, MPI_INT, MPI_COMM_WORLD);
+    for (int i = 0; i < size; i++) C(all[i] == i);
+    std::vector<int> a2aout(size), a2ain(size, -1);
+    for (int i = 0; i < size; i++) a2aout[i] = rank * 100 + i;
+    MPI_Alltoall(a2aout.data(), 1, MPI_INT, a2ain.data(), 1, MPI_INT, MPI_COMM_WORLD);
+    for (int i = 0; i < size; i++) C(a2ain[i] == i * 100 + rank);
+    int sc_in = 1, sc_out = 0;
+    MPI_Scan(&sc_in, &sc_out, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    C(sc_out == rank + 1);
+    int ex_out = -1;
+    MPI_Exscan(&sc_in, &ex_out, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+    if (rank > 0) C(ex_out == rank);
+    // Gatherv: rank i contributes i+1 copies of i
+    std::vector<int> gv_in(rank + 1, rank), counts(size), displs(size);
+    int tot = 0;
+    for (int i = 0; i < size; i++) { counts[i] = i + 1; displs[i] = tot; tot += i + 1; }
+    std::vector<int> gv_out(tot, -1);
+    MPI_Gatherv(gv_in.data(), rank + 1, MPI_INT, gv_out.data(), counts.data(), displs.data(),
+                MPI_INT, 0, MPI_COMM_WORLD);
+    if (rank == 0)
+      for (int i = 0; i < size; i++)
+        for (int j = 0; j < i + 1; j++) C(gv_out[displs[i] + j] == i);
+  }
+
+  // 4. Comm_split into even/odd ranks, ordered by descending world rank
+  MPI_Comm half;
+  {
+    MPI_Comm_split(MPI_COMM_WORLD, rank % 2, -rank, &half);
+    int hr, hs;
+    MPI_Comm_rank(half, &hr);
+    MPI_Comm_size(half, &hs);
+    int expect_size = (size / 2) + ((size % 2) && (rank % 2 == 0) ? 1 : 0);
+    C(hs == expect_size);
+    std::vector<int> members(hs, -1);
+    MPI_Allgather(&rank, 1, MPI_INT, members.data(), 1, MPI_INT, half);
+    for (int i = 0; i + 1 < hs; i++) C(members[i] > members[i + 1]);
+    C(members[hr] == rank);
+  }
+
+  // 5. Comm_dup of the split communicator; traffic on it stays separate
+  {
+    MPI_Comm dup;
+    MPI_Comm_dup(half, &dup);
+    int hr, hs, dr, ds;
+    MPI_Comm_rank(half, &hr); MPI_Comm_size(half, &hs);
+    MPI_Comm_rank(dup, &dr);  MPI_Comm_size(dup, &ds);
+    C(hr == dr && hs == ds && dup != half);
+    int s1 = 0, s2 = 0;
+    MPI_Allreduce(&rank, &s1, 1, MPI_INT, MPI_SUM, half);
+    MPI_Allreduce(&rank, &s2, 1, MPI_INT, MPI_SUM, dup);
+    C(s1 == s2);
+    MPI_Comm_free(&dup);
+  }
+
+  // 6. Nested tasks with blocking calls, on world and on the split comm
+  {
+    int s = co_await ring_sum(rank, size, MPI_COMM_WORLD);
+    C(s == size * (size - 1) / 2);
+    int hr, hs;
+    MPI_Comm_rank(half, &hr); MPI_Comm_size(half, &hs);
+    int s2 = co_await ring_sum(hr, hs, half);
+    C(s2 == hs * (hs - 1) / 2);
+  }
+  MPI_Comm_free(&half);
+
+  long total = 0;
+  MPI_Allreduce(&myerr, &total, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
+  if (rank == 0)
+    printf("campi until: %d ranks, errors=%ld: %s\n", size, total, total == 0 ? "PASSED" : "FAILED");
+  MPI_Finalize();
+  co_return total == 0 ? 0 : 1;
+}

@@ -57,6 +57,7 @@
 #undef MPI_Scan
 #undef MPI_Exscan
 #undef MPI_Comm_split
+#undef MPI_Comm_dup
 #undef MPI_Comm_create
 #undef AMPI_Migrate
 
@@ -84,6 +85,7 @@
 #define MPI_Scan(...)        CAMPI_AWAIT(::campi::Scan(__VA_ARGS__))
 #define MPI_Exscan(...)      CAMPI_AWAIT(::campi::Exscan(__VA_ARGS__))
 #define MPI_Comm_split(...)  CAMPI_AWAIT(::campi::Comm_split(__VA_ARGS__))
+#define MPI_Comm_dup(...)    CAMPI_AWAIT(::campi::Comm_dup(__VA_ARGS__))
 #define MPI_Comm_create(...) CAMPI_AWAIT(::campi::Comm_create(__VA_ARGS__))
 #define AMPI_Migrate(...)    CAMPI_AWAIT(::campi::Migrate(__VA_ARGS__))
 

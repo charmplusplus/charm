@@ -2599,7 +2599,12 @@ void ampi::intercommMergePhase1(MPI_Comm nextIntraComm) noexcept {
 void ampi::topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newComm) noexcept
 {
   split(0, rank, newComm, parent->getCommStruct(comm).getType());
+  topoDupFinish(topoType, comm, newComm);
+}
 
+// The part of topoDup after the split (shared with campi::Comm_dup)
+void ampi::topoDupFinish(int topoType, MPI_Comm comm, MPI_Comm *newComm) noexcept
+{
   if (topoType != MPI_UNDEFINED) {
     ampiParent *disParent = getAmpiParent();
     ampiTopology *topo = disParent->getCommStruct(comm).getTopology();

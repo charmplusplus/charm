@@ -538,6 +538,26 @@ task<int> Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest) {
   co_return MPI_SUCCESS;
 }
 
+// MPI_Comm_dup = ampi::topoDup (split + topology copy), attributes, barrier
+task<int> Comm_dup(MPI_Comm comm, MPI_Comm *newcomm) {
+  {
+    ampi *ptr = getAmpiInstance(comm);
+    int topoType, rank = ptr->getRank();
+    MPI_Topo_test(comm, &topoType);
+    const int before = ptr->getNumUnblocks();
+    ptr->splitPost(0, rank, getAmpiParent()->getCommStruct(comm).getType());
+    while (ptr->getNumUnblocks() == before) co_await suspend();
+    ptr->splitFinish(newcomm);
+    ptr->topoDupFinish(topoType, comm, newcomm);
+  }
+  ampiParent *parent = getAmpiParent();
+  auto &old_attr = parent->getAttributes(comm);
+  auto &new_attr = parent->getAttributes(*newcomm);
+  int ret = parent->dupUserAttributes(comm, old_attr, new_attr);
+  co_await Barrier(comm);
+  co_return ret;
+}
+
 // MPI_Comm_create for intracommunicators (a split, as in ampi.C)
 task<int> Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm *newcomm) {
   std::vector<int> vec = getAmpiParent()->group2vec(group);

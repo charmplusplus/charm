@@ -2897,6 +2897,7 @@ class ampi final : public CBase_ampi {
   inline bool opIsCommutative(MPI_Op op) const noexcept { return parent->opIsCommutative(op); }
   inline MPI_User_function* op2User_function(MPI_Op op) const noexcept { return parent->op2User_function(op); }
   void topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newcomm) noexcept;
+  void topoDupFinish(int topoType, MPI_Comm comm, MPI_Comm *newcomm) noexcept;
 
   inline AmpiRequestList& getReqs() noexcept { return parent->ampiReqs; }
   CkDDT *getDDT() noexcept {return &parent->myDDT;}
