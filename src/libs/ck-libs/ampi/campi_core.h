@@ -173,6 +173,28 @@ task<int> Reduce(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI
                  int root, MPI_Comm comm);
 task<int> Allreduce(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
                     MPI_Comm comm);
+task<int> Gather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
+                 MPI_Datatype rtype, int root, MPI_Comm comm);
+task<int> Gatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                  const int *rcounts, const int *displs, MPI_Datatype rtype, int root,
+                  MPI_Comm comm);
+task<int> Allgather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
+                    MPI_Datatype rtype, MPI_Comm comm);
+task<int> Allgatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                     const int *rcounts, const int *displs, MPI_Datatype rtype, MPI_Comm comm);
+task<int> Scatter(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
+                  MPI_Datatype rtype, int root, MPI_Comm comm);
+task<int> Scatterv(const void *sbuf, const int *scounts, const int *displs, MPI_Datatype stype,
+                   void *rbuf, int rcount, MPI_Datatype rtype, int root, MPI_Comm comm);
+task<int> Alltoall(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
+                   MPI_Datatype rtype, MPI_Comm comm);
+task<int> Alltoallv(const void *sbuf, const int *scounts, const int *sdispls,
+                    MPI_Datatype stype, void *rbuf, const int *rcounts, const int *rdispls,
+                    MPI_Datatype rtype, MPI_Comm comm);
+task<int> Scan(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
+               MPI_Comm comm);
+task<int> Exscan(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
+                 MPI_Comm comm);
 
 /* ---------------- communicator creation ---------------- */
 

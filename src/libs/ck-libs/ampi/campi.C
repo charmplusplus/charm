@@ -393,6 +393,135 @@ task<int> Allreduce(const void *sbuf, void *rbuf, int count, MPI_Datatype type, 
                     MPI_Comm comm) {
   CAMPI_POST_AND_WAIT(MPI_Iallreduce(sbuf, rbuf, count, type, op, comm, &req))
 }
+task<int> Gather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
+                 MPI_Datatype rtype, int root, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Igather(sbuf, scount, stype, rbuf, rcount, rtype, root, comm, &req))
+}
+task<int> Gatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                  const int *rcounts, const int *displs, MPI_Datatype rtype, int root,
+                  MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Igatherv(sbuf, scount, stype, rbuf, rcounts, displs, rtype, root,
+                                   comm, &req))
+}
+task<int> Allgather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
+                    MPI_Datatype rtype, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Iallgather(sbuf, scount, stype, rbuf, rcount, rtype, comm, &req))
+}
+task<int> Allgatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                     const int *rcounts, const int *displs, MPI_Datatype rtype, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Iallgatherv(sbuf, scount, stype, rbuf, rcounts, displs, rtype, comm,
+                                      &req))
+}
+task<int> Scatter(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
+                  MPI_Datatype rtype, int root, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Iscatter(sbuf, scount, stype, rbuf, rcount, rtype, root, comm, &req))
+}
+task<int> Scatterv(const void *sbuf, const int *scounts, const int *displs, MPI_Datatype stype,
+                   void *rbuf, int rcount, MPI_Datatype rtype, int root, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Iscatterv(sbuf, scounts, displs, stype, rbuf, rcount, rtype, root,
+                                    comm, &req))
+}
+task<int> Alltoall(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
+                   MPI_Datatype rtype, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ialltoall(sbuf, scount, stype, rbuf, rcount, rtype, comm, &req))
+}
+task<int> Alltoallv(const void *sbuf, const int *scounts, const int *sdispls,
+                    MPI_Datatype stype, void *rbuf, const int *rcounts, const int *rdispls,
+                    MPI_Datatype rtype, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ialltoallv(const_cast<void *>(sbuf), const_cast<int *>(scounts),
+                                     const_cast<int *>(sdispls), stype, rbuf,
+                                     const_cast<int *>(rcounts), const_cast<int *>(rdispls),
+                                     rtype, comm, &req))
+}
+// AMPI's MPI_Iscan and MPI_Iexscan call the blocking MPI_Scan/MPI_Exscan, so
+// campi runs their recursive-doubling algorithms itself, awaiting each
+// internal sendrecv (ampi::sendrecv: irecv + send + waitall).
+static task<int> sendrecv_internal(MPI_Comm comm, const void *sbuf, void *rbuf, int count,
+                                   MPI_Datatype type, int peer, int tag) {
+  ampi *ptr = getAmpiInstance(comm);
+  MPI_Request reqs[2];
+  ptr->irecv(rbuf, count, type, peer, tag, comm, &reqs[0]);
+  reqs[1] = ptr->send(tag, ptr->getRank(), sbuf, count, type, peer, comm, I_SEND);
+  co_return co_await Waitall(2, reqs, MPI_STATUSES_IGNORE);
+}
+
+task<int> Scan(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
+               MPI_Comm comm) {
+  // mirrors MPI_Scan in ampi.C
+  handle_MPI_BOTTOM((void *&)sendbuf, datatype, recvbuf, datatype);
+  if (sendbuf == MPI_IN_PLACE) sendbuf = recvbuf;
+  if (op == MPI_OP_NULL) co_return MPI_ERR_OP;
+  ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize();
+  int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
+  if (size == 1 && !getAmpiParent()->isInter(comm)) {
+    if (sendbuf != recvbuf) memcpy(recvbuf, sendbuf, blklen);
+    co_return MPI_SUCCESS;
+  }
+  int rank = ptr->getRank();
+  std::vector<char> tmp_buf(blklen);
+  std::vector<char> partial_scan(blklen);
+  if (sendbuf != recvbuf) memcpy(recvbuf, sendbuf, blklen);
+  memcpy(partial_scan.data(), sendbuf, blklen);
+  for (int mask = 0x1; mask < size; mask <<= 1) {
+    int dst = rank ^ mask;
+    if (dst < size) {
+      co_await sendrecv_internal(comm, partial_scan.data(), tmp_buf.data(), count, datatype,
+                                 dst, MPI_SCAN_TAG);
+      if (rank > dst) {
+        getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), partial_scan.data());
+        getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), recvbuf);
+      } else {
+        getAmpiParent()->applyOp(datatype, op, count, partial_scan.data(), tmp_buf.data());
+        memcpy(partial_scan.data(), tmp_buf.data(), blklen);
+      }
+    }
+  }
+  co_return MPI_SUCCESS;
+}
+
+task<int> Exscan(const void *sendbuf, void *recvbuf, int count, MPI_Datatype datatype, MPI_Op op,
+                 MPI_Comm comm) {
+  // mirrors MPI_Exscan in ampi.C, except that the mask advances also when
+  // dst >= size (ampi.C shifts it only inside "if (dst < size)", which never
+  // terminates for a rank whose partner is out of range, e.g. size 3)
+  handle_MPI_BOTTOM((void *&)sendbuf, datatype, recvbuf, datatype);
+  if (sendbuf == MPI_IN_PLACE) sendbuf = recvbuf;
+  if (op == MPI_OP_NULL) co_return MPI_ERR_OP;
+  ampi *ptr = getAmpiInstance(comm);
+  int size = ptr->getSize();
+  if (size == 1 && !getAmpiParent()->isInter(comm)) co_return MPI_SUCCESS;
+  int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
+  int rank = ptr->getRank();
+  std::vector<char> tmp_buf(blklen);
+  std::vector<char> partial_scan(blklen);
+  if (rank > 0 && sendbuf != recvbuf) memcpy(recvbuf, sendbuf, blklen);
+  memcpy(partial_scan.data(), sendbuf, blklen);
+  int flag = 0;
+  for (int mask = 0x1; mask < size; mask <<= 1) {
+    int dst = rank ^ mask;
+    if (dst < size) {
+      co_await sendrecv_internal(comm, partial_scan.data(), tmp_buf.data(), count, datatype,
+                                 dst, MPI_EXSCAN_TAG);
+      if (rank > dst) {
+        getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), partial_scan.data());
+        if (rank != 0) {
+          if (flag == 0) {
+            memcpy(recvbuf, tmp_buf.data(), blklen);
+            flag = 1;
+          } else {
+            getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), recvbuf);
+          }
+        }
+      } else {
+        getAmpiParent()->applyOp(datatype, op, count, partial_scan.data(), tmp_buf.data());
+        memcpy(partial_scan.data(), tmp_buf.data(), blklen);
+      }
+    }
+  }
+  co_return MPI_SUCCESS;
+}
+
 #undef CAMPI_POST_AND_WAIT
 
 /* ====================== communicator creation ====================== */

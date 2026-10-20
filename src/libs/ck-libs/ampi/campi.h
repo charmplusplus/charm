@@ -46,6 +46,16 @@
 #undef MPI_Bcast
 #undef MPI_Reduce
 #undef MPI_Allreduce
+#undef MPI_Gather
+#undef MPI_Gatherv
+#undef MPI_Allgather
+#undef MPI_Allgatherv
+#undef MPI_Scatter
+#undef MPI_Scatterv
+#undef MPI_Alltoall
+#undef MPI_Alltoallv
+#undef MPI_Scan
+#undef MPI_Exscan
 #undef MPI_Comm_split
 #undef MPI_Comm_create
 #undef AMPI_Migrate
@@ -63,6 +73,16 @@
 #define MPI_Bcast(...)       CAMPI_AWAIT(::campi::Bcast(__VA_ARGS__))
 #define MPI_Reduce(...)      CAMPI_AWAIT(::campi::Reduce(__VA_ARGS__))
 #define MPI_Allreduce(...)   CAMPI_AWAIT(::campi::Allreduce(__VA_ARGS__))
+#define MPI_Gather(...)      CAMPI_AWAIT(::campi::Gather(__VA_ARGS__))
+#define MPI_Gatherv(...)     CAMPI_AWAIT(::campi::Gatherv(__VA_ARGS__))
+#define MPI_Allgather(...)   CAMPI_AWAIT(::campi::Allgather(__VA_ARGS__))
+#define MPI_Allgatherv(...)  CAMPI_AWAIT(::campi::Allgatherv(__VA_ARGS__))
+#define MPI_Scatter(...)     CAMPI_AWAIT(::campi::Scatter(__VA_ARGS__))
+#define MPI_Scatterv(...)    CAMPI_AWAIT(::campi::Scatterv(__VA_ARGS__))
+#define MPI_Alltoall(...)    CAMPI_AWAIT(::campi::Alltoall(__VA_ARGS__))
+#define MPI_Alltoallv(...)   CAMPI_AWAIT(::campi::Alltoallv(__VA_ARGS__))
+#define MPI_Scan(...)        CAMPI_AWAIT(::campi::Scan(__VA_ARGS__))
+#define MPI_Exscan(...)      CAMPI_AWAIT(::campi::Exscan(__VA_ARGS__))
 #define MPI_Comm_split(...)  CAMPI_AWAIT(::campi::Comm_split(__VA_ARGS__))
 #define MPI_Comm_create(...) CAMPI_AWAIT(::campi::Comm_create(__VA_ARGS__))
 #define AMPI_Migrate(...)    CAMPI_AWAIT(::campi::Migrate(__VA_ARGS__))
