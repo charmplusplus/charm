@@ -3043,7 +3043,11 @@ MPI_Request ampi::send(int t, int sRank, const void* buf, int count, MPI_Datatyp
 
 void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx) noexcept
 {
-  AmpiMsg *msg = new (len, 0) AmpiMsg(0, MPI_REQUEST_NULL, t, sRank, len);
+  // The cast selects the (seq, sreq, tag, srcRank, len) constructor: with a
+  // plain int 0 the (sreq, tag, srcRank, len, comm) one is an exact match, which
+  // shifted every field (tag became -1 and the message never matched its
+  // request, so MPI_Ibarrier never completed with more than one rank).
+  AmpiMsg *msg = new (len, 0) AmpiMsg((CMK_REFNUM_TYPE)0, MPI_REQUEST_NULL, t, sRank, len);
   memcpy(msg->getData(), buf, len);
   CProxy_ampi pa(aid);
   pa[idx].generic(msg);
