@@ -1156,9 +1156,8 @@ void AMPI_threadstart(void *data)
   AMPI_Exit(ret);
 }
 
-/* TCharm Semaphore ID's for AMPI startup */
-#define AMPI_TCHARM_SEMAID 0x00A34100 /* __AMPI__ */
-#define AMPI_BARRIER_SEMAID 0x00A34200 /* __AMPI__ */
+/* TCharm Semaphore ID's for AMPI startup: AMPI_TCHARM_SEMAID and
+   AMPI_BARRIER_SEMAID are defined in ampiimpl.h (shared with campi.C). */
 
 // Create MPI_COMM_SELF from MPI_COMM_WORLD
 static void createCommSelf() noexcept {
@@ -1183,12 +1182,55 @@ CkpvExtern(ArrayObjMap, array_objs);
 // We remove objects from array_objs whose performance we don't really care about
 // (TCharm, ampiParent, MPI_COMM_SELF) in order to keep it smaller and faster
 // for those we do care about (MPI_COMM_WORLD and other communicators).
-static void removeUnimportantArrayObjsfromPeCache() noexcept {
+void removeUnimportantArrayObjsfromPeCache() noexcept {
   ampiParent* pptr = getAmpiParent();
   ArrayObjMap& arrayObjs = CkpvAccess(array_objs);
   arrayObjs.erase(pptr->getThread()->ckGetID().getID());
   arrayObjs.erase(pptr->ckGetID().getID());
   arrayObjs.erase(getAmpiInstance(MPI_COMM_SELF)->ckGetID().getID());
+}
+
+/*
+   The non-blocking steps of ampiInit, shared with campi::Init (campi.C),
+   which runs them with awaits in place of the blocking waits below.
+ */
+// Element 0 only: create the ampiPeMgr group and return the array options
+// for the ampiParent and MPI_COMM_WORLD ampi arrays.
+CkArrayOptions ampiInitRootArrayOptions(CkArrayID *threads, int *nchunks) noexcept
+{
+  STARTUP_DEBUG("ampiInit> creating ampiPeMgr group")
+  ampiPeMgrProxy = CProxy_ampiPeMgr::ckNew();
+
+  STARTUP_DEBUG("ampiInit> creating arrays")
+
+  // FIXME: Need to serialize global communicator allocation in one place.
+  //Allocate the next communicator
+  //Create and attach the ampiParent array
+  CkArrayOptions opts=TCHARM_Attach_start(threads,nchunks);
+  opts.setSectionAutoDelegate(false);
+  opts.setStaticInsertion(true);
+  opts.setAnytimeMigration(CkpvAccess(isMigrateToPeEnabled));
+  return opts;
+}
+
+// Every rank, once its MPI_COMM_WORLD ampi object exists: mark init done and
+// contribute to the allInitDone reduction (which sets ampiInitCallDone).
+ampiParent *ampiInitWorldLocal(ampi *ptr, int nchunks) noexcept
+{
+  CtvAccess(ampiInitDone)=true;
+  CtvAccess(ampiFinalized)=false;
+  STARTUP_DEBUG("ampiInit> complete")
+
+  ampiParent* pptr = getAmpiParent();
+  CkpvAccess(bikvs).universe_size = nchunks;
+  ptr->setCommName("MPI_COMM_WORLD");
+
+  pptr->ampiInitCallDone = 0;
+
+  CProxy_ampi cbproxy = ptr->getProxy();
+  CkCallback cb(CkReductionTarget(ampi, allInitDone), cbproxy[0]);
+  ptr->contribute(cb);
+  return pptr;
 }
 
 /*
@@ -1207,19 +1249,8 @@ static ampi *ampiInit(char **argv) noexcept
   CProxy_ampiParent parent;
   if (TCHARM_Element()==0) //the rank of a tcharm object
   { /* I'm responsible for building the arrays: */
-    STARTUP_DEBUG("ampiInit> creating ampiPeMgr group")
-    ampiPeMgrProxy = CProxy_ampiPeMgr::ckNew();
-
-    STARTUP_DEBUG("ampiInit> creating arrays")
-
-    // FIXME: Need to serialize global communicator allocation in one place.
-    //Allocate the next communicator
-    //Create and attach the ampiParent array
     CkArrayID threads;
-    opts=TCHARM_Attach_start(&threads,&_nchunks);
-    opts.setSectionAutoDelegate(false);
-    opts.setStaticInsertion(true);
-    opts.setAnytimeMigration(CkpvAccess(isMigrateToPeEnabled));
+    opts=ampiInitRootArrayOptions(&threads,&_nchunks);
 
     ck::future<CkArrayID> newAmpiFuture;
     CkCallback cb(newAmpiFuture.handle());
@@ -1248,19 +1279,7 @@ static ampi *ampiInit(char **argv) noexcept
 
   // Find our ampi object:
   ampi *ptr=(ampi *)TCharm::get()->semaGet(AMPI_TCHARM_SEMAID);
-  CtvAccess(ampiInitDone)=true;
-  CtvAccess(ampiFinalized)=false;
-  STARTUP_DEBUG("ampiInit> complete")
-
-  ampiParent* pptr = getAmpiParent();
-  CkpvAccess(bikvs).universe_size = _nchunks;
-  ptr->setCommName("MPI_COMM_WORLD");
-
-  pptr->ampiInitCallDone = 0;
-
-  CProxy_ampi cbproxy = ptr->getProxy();
-  CkCallback cb(CkReductionTarget(ampi, allInitDone), cbproxy[0]);
-  ptr->contribute(cb);
+  ampiParent* pptr = ampiInitWorldLocal(ptr, _nchunks);
 
   while (pptr->ampiInitCallDone != 1) {
     pptr = pptr->block();
@@ -1456,7 +1475,13 @@ void ampiParent::pup(PUP::er &p) noexcept {
 void ampiParent::prepareCtv() noexcept {
   thread=threads[thisIndex].ckLocal();
   if (thread==NULL) CkAbort("AMPIParent cannot find its thread!\n");
-  CtvAccessOther(thread->getThread(),ampiPtr) = this;
+  if (tcharm_campi) {
+    // No thread: every rank on this PE shares the scheduler thread's Ctvs,
+    // so record the parent in the rank record; campi installs it at resume.
+    campi_parent_attached(thread, this);
+  } else {
+    CtvAccessOther(thread->getThread(),ampiPtr) = this;
+  }
   STARTUP_DEBUG("ampiParent> found TCharm")
 }
 
@@ -2227,6 +2252,14 @@ class ampiSplitKey {
 /* "type" may indicate whether call is for a cartesian topology etc. */
 void ampi::split(int color,int key,MPI_Comm *dest, AmpiCommType type) noexcept
 {
+  splitPost(color, key, type);
+  ampi * dis = block(); //Resumed by ampi::registrationFinish
+  dis->splitFinish(dest);
+}
+
+// The two halves of split around its suspension (campi awaits in between)
+void ampi::splitPost(int color,int key, AmpiCommType type) noexcept
+{
   MPI_Comm nextComm = parent->getNextComm();
   ampiSplitKey splitKey(nextComm,color,key,myRank,type);
   int rootIdx=myComm->getIndexForRank(0);
@@ -2238,10 +2271,11 @@ void ampi::split(int color,int key,MPI_Comm *dest, AmpiCommType type) noexcept
     CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm->getProxy());
     contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
   }
+}
 
-  ampi * dis = block(); //Resumed by ampi::registrationFinish
-  nextComm = dis->parent->getNextComm()-1;
-  *dest=nextComm;
+void ampi::splitFinish(MPI_Comm *dest) noexcept
+{
+  *dest = parent->getNextComm()-1;
 }
 
 CLINKAGE
@@ -4346,11 +4380,12 @@ void FTN_NAME(MPI_EXIT,mpi_exit)(int *exitCode)
   AMPI_Exit(*exitCode);
 }
 
-AMPI_API_IMPL(int, MPI_Finalize, void)
+// MPI_Finalize except the final AMPI_Exit (shared with campi::Finalize).
+// A separate function so that the object created on the stack by the AMPI_API
+// call is destroyed before the call to AMPI_Exit(), which never returns.
+int ampiFinalizeBody() noexcept
 {
-  { // This brace is necessary here to make sure the object created on the stack
-    // by the AMPI_API call gets destroyed before the call to AMPI_Exit(), since
-    // AMPI_Exit() never returns.
+  {
   AMPI_API("AMPI_Finalize", "");
 
   ampiParent* parent = getAmpiParent();
@@ -4370,6 +4405,14 @@ AMPI_API_IMPL(int, MPI_Finalize, void)
 #endif
 
   }
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Finalize, void)
+{
+  int ret = ampiFinalizeBody();
+  if (ret != MPI_SUCCESS)
+    return ret;
 
   AMPI_Exit(0); // Never returns
   return MPI_SUCCESS;
