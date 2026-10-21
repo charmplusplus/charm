@@ -71,15 +71,18 @@ static void warnOnceAboutAslr(void)
   if (!CmiIsomallocAddressSpaceIsRandomized())
     return;
 
+  /* stderr, not stdout: when a migrated thread then crashes the process, a
+     piped stdout (the shape of a CI log) is discarded with it, and the one
+     line that explains the crash would be lost. */
 #if defined(__APPLE__)
-  CmiPrintf("Isomalloc> Warning: address space randomization is enabled, and "
+  CmiError("Isomalloc> Warning: address space randomization is enabled, and "
             "this job just created a migratable thread. Moving one between "
             "processes needs the program's code at the same address in both, "
             "and macOS cannot turn randomization off, so these threads must "
             "not migrate between processes here (migration between PEs of one "
             "process is fine).\n");
 #else
-  CmiPrintf("Isomalloc> Warning: address space randomization is enabled (or "
+  CmiError("Isomalloc> Warning: address space randomization is enabled (or "
             "could not be checked), and this job just created a migratable "
             "thread. Moving one between processes needs the program's code at "
             "the same address in both; run under `setarch -R`, or disable "
