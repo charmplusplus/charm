@@ -516,7 +516,12 @@ endif()
 
 set(CMK_CHARM4PY 0)
 if(${TARGET} STREQUAL "charm4py")
-  message(FATAL_ERROR "TARGET=charm4py is not available on reconverse yet (charm4py on reconverse is a separate workstream)")
+  set(CMK_CHARM4PY 1)
+  # Create libcharm.so for Charm4py
+  add_compile_options(-build-shared)
+  set(BUILDOPTS "${BUILDOPTS} -build-shared")
+  set(OPTS "${OPTS} -build-shared")
+  set(OPTSATBUILDTIME "${OPTSATBUILDTIME} -build-shared")
 endif()
 
 if(CMAKE_BUILD_TYPE MATCHES "Debug" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
@@ -915,16 +920,50 @@ if(${TARGET} STREQUAL "AMPI" OR (${TARGET} STREQUAL "LIBS" AND NOT BUILD_CHANGA)
   add_subdirectory(src/libs/ck-libs/ampi)
 endif()
 
-# Check that we are able to build and link an executable
-add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-if(RECONVERSE)
-  target_link_libraries(ckhello PRIVATE reconverse)
+# Charm4py
+if(${TARGET} STREQUAL "charm4py")
+  # Create libcharm.so for Charm4py
+  # add_compile_options(-build-shared)
+  file(WRITE empty.cpp "// This file left intentionally blank. It is used for the charm4py build.")
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+  add_library(charm SHARED empty.cpp)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -all_load -c++stl -shared")
+  else()
+    target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
+  endif()
+
+  if (${BUILD_CUDA})
+    target_link_libraries(charm cudart hybridapi)
+  endif()
+
+  if (${BUILD_HIP})
+    target_link_libraries(charm hiprtc hybridapi)
+  endif()
+
+  if(${TRACING})
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+      target_link_libraries(charm trace-summary trace-projections "-Llib/ -standalone -all_load -c++stl -shared")
+    else()
+      target_link_libraries(charm trace-summary trace-projections "-Llib/ -standalone -whole-archive -c++stl -shared")
+    endif()
+  endif()
+
+  add_dependencies(charm hwloc)
+
+else()
+  # Check that we are able to build and link an executable
+  add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
+  if(RECONVERSE)
+    target_link_libraries(ckhello PRIVATE reconverse)
+  endif()
+  set(ckhello_deps ck converse ckmain moduleNDMeshStreamer modulecompletion)
+  if(BUILD_CUDA OR BUILD_HIP)
+    list(APPEND ckhello_deps hybridapi)
+  endif()
+  add_dependencies(ckhello ${ckhello_deps})
 endif()
-set(ckhello_deps ck converse ckmain moduleNDMeshStreamer modulecompletion)
-if(BUILD_CUDA OR BUILD_HIP)
-  list(APPEND ckhello_deps hybridapi)
-endif()
-add_dependencies(ckhello ${ckhello_deps})
 
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)
