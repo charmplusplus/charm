@@ -42,8 +42,12 @@ endif()
 
 # Needed so that tlsglobals works correctly with --build-shared
 # See https://github.com/charmplusplus/charm/issues/3168 for details.
+# Not for charm4py: Python loads libcharm with dlopen, and initial-exec TLS
+# must then fit glibc's small static TLS reserve. Reconverse's thread-locals
+# (~23 KB) do not, and the load fails with "cannot allocate memory in static
+# TLS block". charm4py does not use tlsglobals (an AMPI feature).
 check_cxx_compiler_flag("-ftls-model=initial-exec" CMK_COMPILER_KNOWS_FTLS_MODEL)
-if(CMK_COMPILER_KNOWS_FTLS_MODEL AND NOT DISABLE_TLS)
+if(CMK_COMPILER_KNOWS_FTLS_MODEL AND NOT DISABLE_TLS AND NOT "${TARGET}" STREQUAL "charm4py")
   set(OPTS_CC "${OPTS_CC} -ftls-model=initial-exec")
   set(OPTS_CXX "${OPTS_CXX} -ftls-model=initial-exec")
   set(OPTS_LD "${OPTS_LD} -ftls-model=initial-exec")

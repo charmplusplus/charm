@@ -928,10 +928,19 @@ if(${TARGET} STREQUAL "charm4py")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
-  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -all_load -c++stl -shared")
+  if(RECONVERSE)
+    # `converse` is an aggregation (UTILITY) target on Reconverse builds and
+    # cannot be linked: libreconverse is the Converse layer (CCS core
+    # included), and charm_cxx_utils holds charm's utilities, TopoManager and
+    # the CCS builtins.
+    set(CHARM4PY_RUNTIME_TARGETS reconverse charm_cxx_utils)
   else()
-    target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
+    set(CHARM4PY_RUNTIME_TARGETS converse memory-default threads-default ldb-rand)
+  endif()
+  if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+    target_link_libraries(charm ck ${CHARM4PY_RUNTIME_TARGETS} "-Llib/ -standalone -all_load -c++stl -shared")
+  else()
+    target_link_libraries(charm ck ${CHARM4PY_RUNTIME_TARGETS} "-Llib/ -standalone -whole-archive -c++stl -shared")
   endif()
 
   if (${BUILD_CUDA})
