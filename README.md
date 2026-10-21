@@ -48,6 +48,14 @@ Committing the moved submodule pointer is what changes the pairing for
 everyone else. To build against a reconverse tree kept outside the
 Charm++ checkout, pass `--with-reconverse-dir=<path>` to `./build`.
 
+Unless you pass `--without-reconverse-fetch-lci`, a `reconverse-*` build
+fetches and builds LCI from source, and the LCI it pins needs Python 3.8
+or newer and CMake 3.21 or newer. With an older Python, configure fails
+with "Cannot find source file .../src/binding/generated/binding.cpp"; with
+an older CMake, it fails with "C_STANDARD is set to invalid value '17'".
+If your system's defaults are older, load a newer Python module and
+install a recent CMake with `pip install cmake`.
+
 
 ## Build Configuration
 
