@@ -1,6 +1,7 @@
 mainmodule migthread {
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry [reductiontarget] void done();
+    entry void threadSuspended();
+    entry void threadFinished();
   };
 };

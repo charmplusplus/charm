@@ -44,7 +44,6 @@ struct ThreadState {
 };
 
 std::vector<CthThread> threads;
-std::vector<CmiIsomallocContext> contexts;
 std::vector<ThreadState *> states;
 
 unsigned char expectedByte(int index, int i) {
@@ -71,7 +70,10 @@ void threadBody(void *arg) {
   for (int i = 0; i < kPayload; i++)
     st->payload[i] = expectedByte(st->index, i);
 
+  /* Tell Main this thread is ready to be packed. The send is a runtime
+     allocation, so it happens with the thread's heap switched out. */
   CthInterceptionsDeactivatePush(me);
+  mainProxy.threadSuspended();
   CthSuspend();
   CthInterceptionsDeactivatePop(me);
 
@@ -93,6 +95,7 @@ void threadBody(void *arg) {
 
   st->finished = true;
   CthInterceptionsDeactivatePush(me);
+  mainProxy.threadFinished();
   CthSuspend();
 }
 
@@ -121,7 +124,8 @@ CthThread roundTrip(CthThread t) {
 } // namespace
 
 class Main : public CBase_Main {
-  int pending;
+  int suspended = 0;
+  int finished = 0;
 
 public:
   Main(CkArgMsg *m) {
@@ -159,20 +163,24 @@ public:
       CthThread t = CthCreateMigratable(threadBody, st, 0, ctx);
       CthSetStrategyDefault(t);
 
-      contexts.push_back(ctx);
       states.push_back(st);
       threads.push_back(t);
     }
 
-    pending = kNumThreads;
+    /* Each thread runs up to its first suspend and reports in; the last one
+       to report starts the round trip. */
     for (int i = 0; i < kNumThreads; i++)
       CthAwaken(threads[i]);
+  }
 
-    /* Let each thread run up to its first suspend, then round-trip it. The
-       check runs from a scheduled callback so the threads have actually had
-       the processor. */
-    CcdCallFnAfter(
-        [](void *obj, double) { ((Main *)obj)->afterFirstRun(); }, this, 1.0);
+  void threadSuspended() {
+    if (++suspended == kNumThreads)
+      afterFirstRun();
+  }
+
+  void threadFinished() {
+    if (++finished == kNumThreads)
+      afterResume();
   }
 
   void afterFirstRun() {
@@ -187,9 +195,6 @@ public:
 
     for (int i = 0; i < kNumThreads; i++)
       CthAwaken(threads[i]);
-
-    CcdCallFnAfter([](void *obj, double) { ((Main *)obj)->afterResume(); }, this,
-                   1.0);
   }
 
   void afterResume() {
@@ -203,8 +208,6 @@ public:
     CkPrintf("migthread: all %d threads survived the round trip\n", kNumThreads);
     CkExit();
   }
-
-  void done() { CkExit(); }
 };
 
 #include "migthread.def.h"
