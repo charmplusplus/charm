@@ -735,7 +735,8 @@ struct CmiAddressSpaceRegionMsg
 /* Reconverse's node reduction carries whole messages and hands the root's
    copy to that message's handler, where classic Converse reduced a pupped
    struct and called a completion function. Same intersection, different
-   plumbing. */
+   plumbing. The runtime frees the children's contributions after this
+   returns; the merge owns only the local message. */
 static void * CmiAddressSpaceRegionMergeMsg(int * size, void * data,
                                             void ** contributions, int count)
 {
@@ -749,8 +750,6 @@ static void * CmiAddressSpaceRegionMergeMsg(int * size, void * data,
       local->s = remote->s;
     if (remote->e < local->e)
       local->e = remote->e;
-
-    CmiFree(contributions[i]);
   }
 
   return data;
