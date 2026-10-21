@@ -84,14 +84,14 @@ JID=$1; NODES=$2; APPS=${3:-leanmd sph2d}; KINDS=${4:-weak strong}; ARMS=${5:-no
 [ -z "$NODES" ] && { echo "usage: scale.sh <JOBID> <NODES> [APPS] [KINDS] [ARMS]"; exit 1; }
 export LD_LIBRARY_PATH=/u/bhosale/charm-reconverse/multicore-linux-x86_64-cuda/lib:/u/bhosale/lci_install/lib64:$LD_LIBRARY_PATH
 export FI_MR_CACHE_MONITOR=disabled PMI_MAX_KVS_ENTRIES=8192
-# CUDA_DEVICE_MAX_CONNECTIONS: hardware work channels per process. The driver
-# default is 8 and nothing in this tree set it, so every stream beyond the 8th
-# aliased onto a channel already in use. Measured on an A40 2026-09-20
-# (tests/util/streamorder): two dependent kernels from one stream park the
-# channel head and block an unrelated stream behind them, costing (Q/C + 1)xT
-# against 2xT, where Q is the number of CONCURRENTLY ACTIVE streams. 32 is the
-# driver maximum; it cuts Q/C fourfold for free. Set CONNECTIONS= to override.
-export CUDA_DEVICE_MAX_CONNECTIONS=${CONNECTIONS:-32}
+# CUDA_DEVICE_MAX_CONNECTIONS: hardware work queues per device. Since 2026-10-20
+# the runtime sets 32 itself (hapiPresetEnvironment, from charm_main) unless the
+# variable is already in the environment, and the HAPI Config banner names the
+# source. Measured on an A40 2026-09-20 (tests/util/streamorder): at the driver
+# default of 8, two dependent kernels from one stream park the queue head and
+# block an unrelated stream behind them, costing (Q/C + 1)xT against 2xT, where
+# Q is the number of CONCURRENTLY ACTIVE streams. Set CONNECTIONS= to override.
+[ -n "${CONNECTIONS:-}" ] && export CUDA_DEVICE_MAX_CONNECTIONS=$CONNECTIONS
 # LCI_LIB=<dir>: run against that directory's liblci.so instead of the one in
 # libreconverse's RPATH (/u/bhosale/lci_install/lib64, which beats
 # LD_LIBRARY_PATH, so the only way is LD_PRELOAD -- see lci-rcache-build).
@@ -311,7 +311,7 @@ run_sph2d() { local kind=$1 arm=$2
   grep -aE "Abort|Fatal|Out Of|out of memory|ran more than" $log 2>/dev/null | sed 's/^\[[0-9]*\] //' | sort -u | head -1 | cut -c1-150; }
 
 # ------------------------------------------------------------------ main ----
-echo "=== SCALING N=$NODES  apps=[$APPS] kinds=[$KINDS] arms=[$ARMS]  pool=${POOL_ALLOC:-buddy}  lci=${LCI_LIB:-install}  conn=$CUDA_DEVICE_MAX_CONNECTIONS  deadline ${DEADLINE_MIN}min"
+echo "=== SCALING N=$NODES  apps=[$APPS] kinds=[$KINDS] arms=[$ARMS]  pool=${POOL_ALLOC:-buddy}  lci=${LCI_LIB:-install}  conn=${CUDA_DEVICE_MAX_CONNECTIONS:-32 (runtime)}  deadline ${DEADLINE_MIN}min"
 echo "    leanmd $(date -r $LMD/leanmd +%m-%d_%H:%M)  sph2d $(date -r $SPH/sph2d +%m-%d_%H:%M)  cost $(basename $COSTCFG)  ${CPT} cores/rank  $(date +%T)"
 [ -z "$DRY" ] && printf "app\tkind\tarm\tnodes\tsize\tper_gpu\tmetric1\tmetric2\trc\n" > $SUM
 for kind in $KINDS; do

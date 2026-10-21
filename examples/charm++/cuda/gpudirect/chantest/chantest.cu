@@ -18,3 +18,15 @@ void invokeFillKernel(double* data, int count, double val, cudaStream_t stream) 
 
   hapiCheck(cudaPeekAtLastError());
 }
+
+__global__ void rampKernel(double* data, int count, double base) {
+  int ti = blockDim.x * blockIdx.x + threadIdx.x;
+  if (ti < count) data[ti] = base + ti;
+}
+
+void invokeRampKernel(double* data, int count, double base, cudaStream_t stream) {
+  dim3 block_dim(BLOCK_SIZE);
+  dim3 grid_dim((count + block_dim.x - 1) / block_dim.x);
+  rampKernel<<<grid_dim, block_dim, 0, stream>>>(data, count, base);
+  hapiCheck(cudaPeekAtLastError());
+}

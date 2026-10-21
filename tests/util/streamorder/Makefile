@@ -7,3 +7,6 @@ streamorder: streamorder.cu
 	$(NVCC) -O2 -arch=$(ARCH) -o $@ streamorder.cu -lcuda
 clean:
 	rm -f streamorder
+# In-process setenv placement check for the runtime's CUDA_DEVICE_MAX_CONNECTIONS preset.
+connpreset: connpreset.cu
+	$(NVCC) -O2 -arch=$(ARCH) -o $@ connpreset.cu -lcuda

@@ -4,6 +4,8 @@ mainmodule chantest {
   readonly int block_size;
   readonly int n_iters;
   readonly int lb_period;
+  readonly int async_path;
+  readonly int corrupt_stable;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
