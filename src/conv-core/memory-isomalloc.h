@@ -5,13 +5,10 @@ migratable heap allocation to arbitrary clients.
 #define CMK_MEMORY_ISOMALLOC_H
 
 #include <stddef.h>
-/* converse.h supplies CthThread, and under Reconverse it also declares
-   CmiIsomallocContext, CthMigratable and CthCreateMigratable, which the guards
-   below then skip; it has to come first for those guards to work. Angle
-   brackets, not quotes: this file sits next to the classic converse.h and
-   conv-config.h, and under Reconverse the headers that must win are the ones
-   on the include path, not the siblings. */
-#include <converse.h>
+/* converse.h supplies CthThread, and also declares CmiIsomallocContext,
+   CthMigratable and CthCreateMigratable, which the guards below then skip;
+   it has to come first for those guards to work. */
+#include "converse.h"
 #include "pup_c.h"
 
 #ifdef __cplusplus

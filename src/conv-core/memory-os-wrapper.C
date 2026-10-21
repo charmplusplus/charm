@@ -1,8 +1,4 @@
-/* conv-autoconfig.h rather than conv-config.h: it holds every macro this file
-   consults (CMK_DLL_USE_DLOPEN, CMK_HAS_RTLD_NEXT, CMK_HAS_*ALLOC), while the
-   conv-config.h next to this file is the classic one, which needs machine-layer
-   headers a Reconverse build does not have. */
-#include "conv-autoconfig.h"
+#include "conv-config.h"
 
 #if CMK_DLL_USE_DLOPEN && CMK_HAS_RTLD_NEXT
 

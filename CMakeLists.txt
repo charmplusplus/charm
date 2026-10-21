@@ -18,7 +18,6 @@ message("# The CMake build system may not support advanced build options. #")
 message("# Please let us know if you experience any problems by opening   #")
 message("# an issue on our GitHub (https://github.com/charmplusplus/charm)#")
 message("# with the below configuration information.                      #")
-message("# You can run './buildold' to use the previous build system.     #")
 message("##################################################################")
 
 cmake_policy(SET CMP0075 NEW)
@@ -108,7 +107,7 @@ endif()
 
 # Build options
 set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,reconverse,gni,ofi,pami,pamilrts,ucx,verbs")
-set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb,all-test")
+set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,ChaNGa,everylb")
 set(ARCH "" CACHE STRING "Target architecture, can be one of i386,x86_64,arm7,arm8,ppc64le") # By default, detect arch we are running on.
 
 function(charm_determine_arch output input)
@@ -535,75 +534,16 @@ endif()
 # Identify arch/network-specific paths
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/gdir_link)
   file(STRINGS src/arch/${NETWORK}/gdir_link GDIR)
-elseif(${NETWORK} MATCHES "gni-")
-  set(GDIR "gni")
-elseif(${NETWORK} MATCHES "mpi-cray")
-  set(GDIR "mpi")
-elseif(${NETWORK} MATCHES "ofi-cray")
-  set(GDIR "ofi")
 else()
   set(GDIR ${NETWORK})
 endif()
 
 set(VDIR ${CHARM_PLATFORM})
 
-# Identify whether charmrun will be built
-set(CMK_BUILD_CHARMRUN 0)
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/charmrun)
-  set(CHARMRUN_DIR src/arch/${NETWORK})
-elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/charmrun)
-  set(CHARMRUN_DIR src/arch/${GDIR})
-elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/charmrun)
-  set(CHARMRUN_DIR src/arch/${VDIR})
-else()
-  set(CMK_BUILD_CHARMRUN 1)
-endif()
-if(RECONVERSE)
-  # Reconverse launches without charmrun (standalone ./pgm +pe N, or lcrun /
-  # srun for multi-process); charmrun.C also assumes the classic conv-config
-  # environment. Do not build it.
-  set(CMK_BUILD_CHARMRUN 0)
-endif()
-
-set(CHARMRUN_ELASTIC_DIR src/arch/common)
-set(CHARMRUN_HAPI_DIR src/arch/common)
-
 include(cmake/detect-features.cmake)
 include(cmake/ci-files.cmake)
 add_custom_target(ci-generated DEPENDS ${all-ci-outputs})
 
-
-if(${TARGET} STREQUAL "all-test")
-  add_custom_target(all-test ALL COMMAND $(MAKE) -C ${CMAKE_BINARY_DIR}/tmp all-test
-        COMMENT "Building all-test. This will take several minutes.")
-  add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
-        ampi_funcptr_shim ampi_funcptr_shim_main
-        ampi_funcptr_loader ampi_funcptr_loader_stub
-        converse conv-static ldb-rand
-        memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
-        ckqt tcharm-compat moduleNDMeshStreamer
-        create_symlinks moduleCkCache trace-converse moduleCommonLBs
-        moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
-        threads-default-tls ldb-neighbor ldb-workstealing
-        modulecollidecharm modulecollide memory-os memory-os-isomalloc)
-  if(CMK_HAS_MMAP)
-    add_dependencies(all-test memory-gnu-isomalloc)
-  endif()
-  if(CMK_CAN_LINK_FORTRAN)
-    add_dependencies(all-test moduleampif conv-utilf ckmainf
-        ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain)
-  endif()
-  if(CMK_SUPPORTS_FSGLOBALS)
-    add_dependencies(all-test ampi_globals_fs)
-  endif()
-  if(CMK_SUPPORTS_PIPGLOBALS)
-    add_dependencies(all-test ampi_globals_pip)
-  endif()
-  if(CMK_SUPPORTS_PIEGLOBALS)
-    add_dependencies(all-test ampi_globals_pie)
-  endif()
-  set(TARGET "LIBS")
-endif()
 
 configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @ONLY)
 
@@ -690,7 +630,6 @@ configure_file(src/arch/common/cc-iccstatic.sh               include/ COPYONLY)
 configure_file(src/arch/common/cc-iccstatic.h                include/ COPYONLY)
 configure_file(src/arch/common/cc-gcc.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-gcc.h                      include/ COPYONLY)
-configure_file(src/arch/common/cc-mpiopts.sh                 include/ COPYONLY)
 configure_file(src/arch/common/cc-msvc.h                     include/ COPYONLY)
 configure_file(src/arch/common/cc-msvc.sh                    include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-craype.sh           include/ COPYONLY)
@@ -721,7 +660,6 @@ configure_file(src/arch/common/conv-mach-persistent.sh       include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-persistent.h        include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-pgf90.sh            include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-pgf90.h             include/ COPYONLY)
-configure_file(src/arch/common/conv-mach-syncft.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-tsan.h              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-tsan.sh             include/ COPYONLY)
 configure_file(src/scripts/conv-config.sh                    include/ COPYONLY)
@@ -830,96 +768,11 @@ if(BUILD_CUDA OR BUILD_HIP)
 
 endif()
 
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-cxi.sh)
-  configure_file(src/arch/${VDIR}/conv-mach-cxi.sh         include/ COPYONLY)
-  configure_file(src/arch/${VDIR}/conv-mach-cxi.h          include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-slurmpmi2cray.sh)
-  configure_file(src/arch/${VDIR}/conv-mach-slurmpmi2cray.sh         include/ COPYONLY)
-  configure_file(src/arch/${VDIR}/conv-mach-slurmpmi2cray.h          include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-pxshm.sh)
-  configure_file(src/arch/${VDIR}/conv-mach-pxshm.sh         include/ COPYONLY)
-  configure_file(src/arch/${VDIR}/conv-mach-pxshm.h          include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-sysvshm.sh)
-  configure_file(src/arch/${VDIR}/conv-mach-sysvshm.sh       include/ COPYONLY)
-  configure_file(src/arch/${VDIR}/conv-mach-sysvshm.h        include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-pxshm.sh)
-  configure_file(src/arch/${GDIR}/conv-mach-pxshm.sh         include/ COPYONLY)
-  configure_file(src/arch/${GDIR}/conv-mach-pxshm.h          include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-hugepages.sh)
-  configure_file(src/arch/${GDIR}/conv-mach-hugepages.sh         include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-smp.sh)
-  configure_file(src/arch/${VDIR}/conv-mach-smp.sh           include/ COPYONLY)
-  configure_file(src/arch/${VDIR}/conv-mach-smp.h            include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-smp.sh)
-  configure_file(src/arch/${GDIR}/conv-mach-smp.sh           include/ COPYONLY)
-  configure_file(src/arch/${GDIR}/conv-mach-smp.h            include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-tcp.sh)
-  configure_file(src/arch/${GDIR}/conv-mach-tcp.sh           include/ COPYONLY)
-  configure_file(src/arch/${GDIR}/conv-mach-tcp.h            include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-local.sh)
-  configure_file(src/arch/${GDIR}/conv-mach-local.sh           include/ COPYONLY)
-  configure_file(src/arch/${GDIR}/conv-mach-local.h            include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-syncft.h)
-  configure_file(src/arch/${GDIR}/conv-mach-syncft.h            include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/machine-persistent.h)
-  configure_file(src/arch/${GDIR}/machine-persistent.h          include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/machine-persistent.C)
-  configure_file(src/arch/${GDIR}/machine-persistent.C          include/ COPYONLY)
-endif()
-
-if(LRTS_PMI)
-  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-${LRTS_PMI}.sh include/ COPYONLY)
-  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-${LRTS_PMI}.h include/ COPYONLY)
-endif()
-
-if(CMK_COMPILER STREQUAL "msvc")
-  configure_file(src/arch/win/unix2nt_cc                      bin/ COPYONLY)
-  configure_file(src/arch/win/unix2nt_ar                      bin/ COPYONLY)
-  configure_file(${CMAKE_SOURCE_DIR}/src/arch/win/unistd.h    include/ COPYONLY)
-endif()
-
 # Header files
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-common.h)
-  configure_file(src/arch/${GDIR}/conv-common.h                include/ COPYONLY)
-endif()
-if(EXISTS src/arch/${GDIR}/conv-common.sh)
-  configure_file(src/arch/${GDIR}/conv-common.sh               include/ COPYONLY)
-endif()
 configure_file(src/arch/${VDIR}/conv-mach.h                  include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-common.h            include/ COPYONLY)
 configure_file(src/arch/util/lrts-common.h                   include/ COPYONLY)
-configure_file(src/arch/util/cmiqueue.h                      include/ COPYONLY)
-configure_file(src/arch/util/lrtslock.h                      include/ COPYONLY)
 configure_file(src/arch/util/mempool.h                       include/ COPYONLY)
-configure_file(src/arch/util/machine.h                       include/ COPYONLY)
-configure_file(src/arch/util/machine-lrts.h                  include/ COPYONLY)
-configure_file(src/arch/util/machine-rdma.h                  include/ COPYONLY)
-configure_file(src/arch/util/machine-smp.h                   include/ COPYONLY)
-configure_file(src/arch/util/pcqueue.h                       include/ COPYONLY)
 configure_file(src/util/pup_c_functions.h                    include/ COPYONLY)
 
 set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
@@ -955,41 +808,6 @@ foreach(filename ${src-util-h-sources})
 endforeach()
 
 
-# proc_management
-if(${NETWORK} MATCHES "ucx" OR ${NETWORK} MATCHES "ofi")
-  # file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/proc_management/simple_pmi)
-
-  set(proc_management-sources
-  src/arch/util/proc_management/runtime-craypmi2.C
-  src/arch/util/proc_management/runtime-craypmi.C
-  src/arch/util/proc_management/runtime-pmi.C
-  src/arch/util/proc_management/runtime-pmix.C
-  src/arch/util/proc_management/runtime-codec.h
-  src/arch/util/proc_management/runtime-pmi2.C
-  src/arch/util/proc_management/runtime.h
-  )
-
-  set(proc_management-simple_pmi-sources
-  src/arch/util/proc_management/simple_pmi/pmi.h
-  src/arch/util/proc_management/simple_pmi/mpl.h
-  src/arch/util/proc_management/simple_pmi/simple_pmi.C
-  src/arch/util/proc_management/simple_pmi/simple_pmiutil.C
-  src/arch/util/proc_management/simple_pmi/simple_pmiutil.h
-  )
-
-  # FIXME: this should be in include/proc_management/
-  foreach(filename ${proc_management-sources})
-      configure_file(${filename} include/ COPYONLY)
-  endforeach()
-
-  if(${LRTS_PMI} MATCHES "simplepmi")
-    # FIXME: this should be in include/proc_management/simple_pmi
-    foreach(filename ${proc_management-simple_pmi-sources})
-      configure_file(${filename} include/ COPYONLY)
-    endforeach()
-  endif()
-endif()
-
 # Charmxi
 add_subdirectory(src/xlat-i)
 add_dependencies(charmxi create_symlinks)
@@ -999,11 +817,6 @@ include(cmake/hwloc.cmake)
 
 # Converse
 include(cmake/converse.cmake)
-if(NOT RECONVERSE)
-  add_subdirectory(src/QuickThreads)
-  add_subdirectory(src/util/boost-context)
-  add_subdirectory(src/conv-core)
-endif()
 
 # LIBS
 if(${TARGET} STREQUAL "LIBS")
@@ -1026,19 +839,7 @@ add_library(modulecompletion ${modulecompletion-cxx-sources} ${modulecompletion-
 configure_file(src/libs/ck-libs/completion/completion.h include/ COPYONLY)
 add_dependencies(modulecompletion ck)
 
-# Charmrun + testrun
-if(${CMK_BUILD_CHARMRUN})
-  add_subdirectory(src/util/charmrun-src)
-  add_dependencies(charmrun create_symlinks)
-elseif(DEFINED CHARMRUN_DIR)
-  configure_file(${CHARMRUN_DIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
-  if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_ELASTIC_DIR}/charmrun_elastic)
-    configure_file(${CHARMRUN_ELASTIC_DIR}/charmrun_elastic ${CMAKE_BINARY_DIR}/bin COPYONLY)
-  endif()
-  if(EXISTS ${CMAKE_SOURCE_DIR}/${CHARMRUN_HAPI_DIR}/charmrun_hapi)
-    configure_file(${CHARMRUN_HAPI_DIR}/charmrun_hapi ${CMAKE_BINARY_DIR}/bin COPYONLY)
-  endif()
-endif()
+# testrun
 configure_file(src/scripts/testrun bin/ COPYONLY)
 
 # Charm++ libraries
@@ -1077,13 +878,10 @@ endforeach()
 configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 
 
-# TCharm. On reconverse, libmoduletcharm also carries the stubs for the few
-# classic Converse functions reconverse lacks
-# (src/libs/ck-libs/tcharm/reconverse-compat); migratable threads come from
-# reconverse and isomalloc from libisomalloc (cmake/converse.cmake). The
-# directory lives under tcharm, not src/conv-core: the legacy buildold header
-# step flattens every file under src/conv-core into include/, and its
-# conv-config.h would replace the classic one.
+# TCharm. libmoduletcharm also carries the stubs for the few classic Converse
+# functions reconverse lacks (src/libs/ck-libs/tcharm/reconverse-compat);
+# migratable threads come from reconverse and isomalloc from libisomalloc
+# (cmake/converse.cmake).
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
 set(tcharm-h-sources
     src/libs/ck-libs/tcharm/tcharm.h
@@ -1168,9 +966,6 @@ else()
     target_link_libraries(ckhello PRIVATE reconverse)
   endif()
   set(ckhello_deps ck converse ckmain moduleNDMeshStreamer modulecompletion)
-  if(NOT RECONVERSE)
-    list(APPEND ckhello_deps ckqt conv-static)
-  endif()
   if(BUILD_CUDA OR BUILD_HIP)
     list(APPEND ckhello_deps hybridapi)
   endif()
@@ -1189,8 +984,8 @@ file(APPEND  ${optfile_sh} "CMK_COMPILER_SUFFIX=${CMK_COMPILER_SUFFIX}\n")
 if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-cray")
     file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/cc-${CMK_COMPILER}.sh\n")
     if(RECONVERSE)
-        # QuickThreads is not built under reconverse, but the cc-*.sh compiler
-        # files add -lckqt to CMK_LIBS. This file is sourced last by
+        # The cc-*.sh compiler files add -lckqt to CMK_LIBS, a library this
+        # build does not produce. This file is sourced last by
         # conv-config.sh (after conv-mach.sh has already sourced the compiler
         # file once), so stripping here is authoritative.
         file(APPEND ${optfile_sh} "CMK_LIBS=\"\${CMK_LIBS//-lckqt/}\"\n")
@@ -1248,9 +1043,6 @@ if (NOT CMK_WINDOWS)
   file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
 endif()
 
-if(LRTS_PMI)
-  file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${LRTS_PMI}.sh\n")
-endif()
 
 # Create conv-mach-opt.h
 set(optfile_h ${CMAKE_BINARY_DIR}/include/conv-mach-opt.h)
@@ -1268,9 +1060,6 @@ if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NET
     file(APPEND ${optfile_h} "#include \"cc-${CMK_COMPILER}.h\"\n")
 endif()
 
-if(LRTS_PMI)
-  file(APPEND ${optfile_h} "#include \"conv-mach-${LRTS_PMI}.h\"\n")
-endif()
 
 # Create conv-mach-opt.mak
 set(optfile_mak ${CMAKE_BINARY_DIR}/include/conv-mach-opt.mak)

@@ -1,2 +1,0 @@
-charmrun: sockRoutines.C sockRoutines.h ccs-server.C ccs-server.h sockRoutines-seq.o $(L)/libck.a $(CVLIBS)
-	cd charmrun-src ; $(MAKE) OPTS='$(OPTS) -Wno-error'

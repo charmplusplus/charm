@@ -19,10 +19,7 @@ Only built for Reconverse targets; the classic Converse build has all of this
 inside threads.C and isomalloc.C already.
  *************************************************************************/
 
-/* Angle brackets, not quotes: this file sits next to the classic converse.h,
-   and under Reconverse the converse.h that must win is the one on the include
-   path, not the sibling. */
-#include <converse.h>
+#include "converse.h"
 #include "conv-autoconfig.h"
 
 #if CMK_RECONVERSE
