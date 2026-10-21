@@ -218,6 +218,37 @@ jobs:
           cd ../megatest
           timeout 900 $B/_deps/lci-src/lcrun -n 2 ./megatest +pe 4
 
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Install prerequisites
+        run: pip3 install sphinx sphinx_rtd_theme
+      - name: Run sphinx
+        run: |
+          cd doc
+          make html
+
+  shellcheck:
+    # See https://github.com/koalaman/shellcheck/wiki
+    # for explanations of ShellCheck error codes
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: ShellCheck
+        run: |
+          # TODO: add more scripts
+          shellcheck \
+            build \
+            buildcmake \
+            package-tarball.sh \
+            relink.script \
+            src/scripts/commitid.sh \
+            src/scripts/testrun
   # AMPI tier (AMPI port stage 0): TCharm and AMPI build and run on reconverse
   # without thread migration. tests/ampi is driven by its own Makefile, which
   # on reconverse leaves out migration and chkpt (no isomalloc or migratable

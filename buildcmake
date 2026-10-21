@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Thin wrapper around CMake to start a build with a similar command line as ./buildold
+# Thin wrapper around CMake to start a Charm++ build
 
 set -o errexit
 # bash < 4.4 erroneously considers empty arrays to be unset
@@ -9,23 +9,17 @@ set -o errexit
 # Determine the location of this script
 my_srcdir="$(cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
-full_args=("$@")
-
 # Check that CMake is available and that the version is sufficiently new
 command -v cmake >/dev/null 2>&1 && rc=$? || rc=$?
 
 if [[ $rc -ne 0 ]]; then
-  echo "Warning: CMake unavailable, running ./buildold instead."
-  sleep 2
-  "$my_srcdir/buildold" "$@"
-  exit $?
+  echo "Error: CMake 3.12 or newer is required to build Charm++, and no cmake was found in PATH."
+  exit 1
 fi
 
 if [[ $(uname) == "MSYS"* || $(uname) == "MINGW"* ]]; then
-  echo "Warning: CMake build is not supported under MSYS, running ./buildold instead."
-  sleep 2
-  "$my_srcdir/buildold" "$@"
-  exit $?
+  echo "Error: building Charm++ under MSYS or MinGW is not supported."
+  exit 1
 fi
 
 cmake_version_major=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 1 -d'.')
@@ -33,11 +27,9 @@ cmake_version_minor=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 2 -d'.
 
 cmake_version_full=$(cmake --version | head -1 | cut -f 3 -d' ')
 
-if [[ $cmake_version_major -lt 3 || ($cmake_version_major -eq 3 && $cmake_version_minor -lt 4) ]]; then
-  echo "Warning: The CMake version on your system is too old (needed: 3.4.0 or later; available: $cmake_version_full), running ./buildold instead."
-  sleep 2
-  "$my_srcdir/buildold" "$@"
-  exit $?
+if [[ $cmake_version_major -lt 3 || ($cmake_version_major -eq 3 && $cmake_version_minor -lt 12) ]]; then
+  echo "Error: CMake 3.12 or newer is required to build Charm++ (available: $cmake_version_full)."
+  exit 1
 fi
 
 usage()
@@ -50,7 +42,7 @@ usage()
 
 help()
 {
-  "$my_srcdir/buildold" --help
+  usage
   exit 0
 }
 
@@ -641,18 +633,8 @@ if [[ $opt_network == "reconverse" ]]; then
 fi
 
 if [[ $opt_network == "mpi" && $my_os == "win" ]]; then
-  echo "Warning: CMake build is not supported with MPI on Windows, running ./buildold instead."
-  sleep 2
-  "$my_srcdir/buildold" "${full_args[@]}"
-  exit $?
-fi
-
-# Special handling for Windows compiler
-if [[ $my_os == "win" && ( -z $opt_CC || $opt_CC == "msvc" ) ]]; then
-  # Need to use unix2nt_cc on Windows/Cygwin
-  opt_CC="$(realpath "$my_srcdir")/src/arch/win/unix2nt_cc"
-  opt_CXX="$opt_CC"
-  opt_FC=
+  echo "Error: building Charm++ with MPI on Windows is not supported."
+  exit 1
 fi
 
 [[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'

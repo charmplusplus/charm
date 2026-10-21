@@ -1,1 +1,0 @@
-export REGULARPAGE=1
