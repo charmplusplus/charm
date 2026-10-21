@@ -80,6 +80,13 @@ add_subdirectory(${_reconverse_src} ${CMAKE_BINARY_DIR}/reconverse)
 
 set(BUILD_SHARED_LIBS ${_save_BUILD_SHARED_LIBS} CACHE INTERNAL "")
 
+# Charm4py's extension registers CCS handlers through CcsRegisterHandlerExt,
+# which libreconverse compiles only when CMK_CHARM4PY is defined; reconverse
+# is its own project and does not see Charm++'s configuration macros.
+if("${TARGET}" STREQUAL "charm4py")
+  target_compile_definitions(reconverse PRIVATE CMK_CHARM4PY=1)
+endif()
+
 configure_file(${_reconverse_src}/include/converse.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 configure_file(${_reconverse_src}/src/cldb.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 configure_file(${_reconverse_src}/include/charm-config.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)

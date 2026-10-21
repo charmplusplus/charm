@@ -1,1 +1,0 @@
-CMK_COMPILER='xlc'
