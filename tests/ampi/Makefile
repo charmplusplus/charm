@@ -28,11 +28,11 @@ endif
 FTDIRS = \
   jacobi3d
 
-# Not applicable on reconverse: reconverse has no isomalloc or migratable
-# threads, so AMPI ranks cannot migrate or be checkpointed.
+# Not yet run on reconverse: restarting from a checkpoint resumes each rank's
+# thread in a new process, and its stack holds return addresses into
+# libreconverse, which ASLR loads at a different address in every process.
 ifeq ($(CMK_GDIR),reconverse)
 RECONVERSE_NA = \
-  migration \
   chkpt \
 
 endif
