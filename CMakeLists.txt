@@ -157,6 +157,10 @@ option(CXI "Enable CXI (Cassini/Slingshot-11) extensions to OFI" OFF)
 
 # Advanced options:
 option(OOC "Compile with out of core support" OFF)
+option(NOLB "Build without the load balancing framework (conv-mach-nolb)" OFF)
+option(TSAN "Build with ThreadSanitizer (conv-mach-tsan)" OFF)
+option(PERFTOOLS "Build for Cray perftools (conv-mach-perftools)" OFF)
+option(CRAYPE "Cray programming environment flags (conv-mach-craype)" OFF)
 option(SYNCFT "Compile with Charm++ fault tolerance support" OFF)
 option(PAPI "Compile with PAPI performance counter support" OFF)
 
@@ -276,13 +280,12 @@ if(${NETWORK} STREQUAL "reconverse")
   set(RECONVERSE ON)
 endif()
 
-if(${RECONVERSE})
-  set(CMK_RECONVERSE 1)
-else()
-  set(CMK_RECONVERSE 0)
+if(NOT RECONVERSE)
+  message(FATAL_ERROR "This tree builds only on reconverse (classic Converse was removed in charm #4061); use the classic branch for netlrts/mpi/ucx/verbs/ofi/gni/pami/multicore builds.")
 endif()
+set(CMK_RECONVERSE 1)
 
-if(RECONVERSE AND RANDOMIZED_MSGQ)
+if(RANDOMIZED_MSGQ)
   message(FATAL_ERROR "--enable-randomized-msgq is a classic Converse build option and does nothing on reconverse. Reconverse randomizes at run time instead: run the program with +randomized_msgq (and +randomized_seed <N> to repeat the draws).")
 endif()
 
@@ -307,11 +310,7 @@ endif()
 if(${NETWORK} STREQUAL "multicore" OR ${NETWORK} STREQUAL "reconverse")
   set(CMK_SMP 1)
 endif()
-if(${NETWORK} STREQUAL "multicore")
-  set(CMK_MULTICORE 1)
-else()
-  set(CMK_MULTICORE 0)
-endif()
+set(CMK_MULTICORE 0)
 
 if(NOT ${CMK_COMPILER} STREQUAL "msvc")
   set(CMK_USE_ZLIB ${ZLIB})
@@ -343,11 +342,7 @@ IF(JPEG_FOUND)
   set(CMK_USE_LIBJPEG 1)
 ENDIF()
 
-if(NETWORK STREQUAL "pami" OR NETWORK STREQUAL "reconverse")
-  set(CMK_USE_LRTS 0)
-else()
-  set(CMK_USE_LRTS 1)
-endif()
+set(CMK_USE_LRTS 0)
 
 # Check for Python
 # PythonCCS requires Python v2.x and is the only target that uses this
@@ -486,20 +481,18 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-if(RECONVERSE)
-  # Reconverse has to be built with the same GPU support as Charm++, so that
-  # its GPU-aware loopback copies and LCI's GPUDirect registration are enabled.
-  # These must be set before the subdirectory is added.
-  if(BUILD_CUDA)
-    set(RECONVERSE_ENABLE_CUDA ON CACHE BOOL "Enable CUDA support in reconverse" FORCE)
-  endif()
-  if(BUILD_HIP)
-    set(RECONVERSE_ENABLE_HIP ON CACHE BOOL "Enable HIP support in reconverse" FORCE)
-  endif()
-  # This needs to be include before we set charmc as the linker
-  # but after CMAKE_LIBRARY_OUTPUT_DIRECTORY has been set
-  add_subdirectory(cmake/reconverse)
+# Reconverse has to be built with the same GPU support as Charm++, so that
+# its GPU-aware loopback copies and LCI's GPUDirect registration are enabled.
+# These must be set before the subdirectory is added.
+if(BUILD_CUDA)
+  set(RECONVERSE_ENABLE_CUDA ON CACHE BOOL "Enable CUDA support in reconverse" FORCE)
 endif()
+if(BUILD_HIP)
+  set(RECONVERSE_ENABLE_HIP ON CACHE BOOL "Enable HIP support in reconverse" FORCE)
+endif()
+# This needs to be include before we set charmc as the linker
+# but after CMAKE_LIBRARY_OUTPUT_DIRECTORY has been set
+add_subdirectory(cmake/reconverse)
 
 if (NOT CMK_MEMPOOL_CUTOFFNUM)
   set(CMK_MEMPOOL_CUTOFFNUM 28)
@@ -895,9 +888,7 @@ if(CMK_CAN_LINK_FORTRAN)
     )
 endif()
 set(tcharm-cxx-sources src/libs/ck-libs/tcharm/tcharm.C)
-if(RECONVERSE)
-    list(APPEND tcharm-cxx-sources src/libs/ck-libs/tcharm/reconverse-compat/reconverse-compat.C)
-endif()
+list(APPEND tcharm-cxx-sources src/libs/ck-libs/tcharm/reconverse-compat/reconverse-compat.C)
 add_library(moduletcharm ${tcharm-cxx-sources} ${tcharm-h-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h)
 add_library(moduletcharmmain src/libs/ck-libs/tcharm/tcharmmain.C ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
 add_library(tcharm-compat ${tcharm-c-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
@@ -926,16 +917,12 @@ if(${TARGET} STREQUAL "charm4py")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
-  if(RECONVERSE)
-    # `converse` is an aggregation (UTILITY) target on Reconverse builds and
-    # cannot be linked: libreconverse is the Converse layer (CCS core
-    # included), charm_cxx_utils holds charm's utilities, TopoManager and
-    # the CCS builtins, and isomalloc the init hook StartCharmExt registers
-    # (-standalone means charmc adds none of these itself).
-    set(CHARM4PY_RUNTIME_TARGETS reconverse charm_cxx_utils isomalloc)
-  else()
-    set(CHARM4PY_RUNTIME_TARGETS converse memory-default threads-default ldb-rand)
-  endif()
+  # `converse` is an aggregation (UTILITY) target on Reconverse builds and
+  # cannot be linked: libreconverse is the Converse layer (CCS core
+  # included), charm_cxx_utils holds charm's utilities, TopoManager and
+  # the CCS builtins, and isomalloc the init hook StartCharmExt registers
+  # (-standalone means charmc adds none of these itself).
+  set(CHARM4PY_RUNTIME_TARGETS reconverse charm_cxx_utils isomalloc)
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     target_link_libraries(charm ck ${CHARM4PY_RUNTIME_TARGETS} "-Llib/ -standalone -all_load -c++stl -shared")
   else()
@@ -963,9 +950,7 @@ if(${TARGET} STREQUAL "charm4py")
 else()
   # Check that we are able to build and link an executable
   add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-  if(RECONVERSE)
-    target_link_libraries(ckhello PRIVATE reconverse)
-  endif()
+  target_link_libraries(ckhello PRIVATE reconverse)
   set(ckhello_deps ck converse ckmain moduleNDMeshStreamer modulecompletion)
   if(BUILD_CUDA OR BUILD_HIP)
     list(APPEND ckhello_deps hybridapi)
@@ -984,14 +969,12 @@ file(APPEND  ${optfile_sh} "CMK_COMPILER_SUFFIX=${CMK_COMPILER_SUFFIX}\n")
 
 if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-cray")
     file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/cc-${CMK_COMPILER}.sh\n")
-    if(RECONVERSE)
-        # The cc-*.sh compiler files add -lckqt to CMK_LIBS, a library this
-        # build does not produce. This file is sourced last by
-        # conv-config.sh (after conv-mach.sh has already sourced the compiler
-        # file once), so stripping here is authoritative.
-        file(APPEND ${optfile_sh} "CMK_LIBS=\"\${CMK_LIBS//-lckqt/}\"\n")
-    endif()
-    if(RECONVERSE AND BUILD_CUDA)
+    # The cc-*.sh compiler files add -lckqt to CMK_LIBS, a library this
+    # build does not produce. This file is sourced last by
+    # conv-config.sh (after conv-mach.sh has already sourced the compiler
+    # file once), so stripping here is authoritative.
+    file(APPEND ${optfile_sh} "CMK_LIBS=\"\${CMK_LIBS//-lckqt/}\"\n")
+    if(BUILD_CUDA)
         # liblci.so uses the CUDA driver API directly, so every charmc-linked
         # binary needs -lcuda under reconverse+CUDA. Link against the toolkit
         # stub (standard NVIDIA practice for non-GPU build nodes); the real
@@ -1080,7 +1063,7 @@ endforeach(l)
 # Add options
 set(CUDA ${BUILD_CUDA}) # need CUDA to match conv-mach file name
 set(HIP ${BUILD_HIP})   # need HIP to match conv-mach file name
-foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA HIP PAPI CXI)
+foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA HIP PAPI CXI NOLB TSAN PERFTOOLS)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")
@@ -1088,6 +1071,10 @@ foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA HIP PAPI CXI)
         set(opts_enabled "${opts_enabled}${opt} ")
     endif()
 endforeach()
+if(CRAYPE)   # conv-mach-craype has only a .sh file
+    file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-craype.sh\n")
+    set(opts_enabled "${opts_enabled}CRAYPE ")
+endif()
 # Options that need no .h/.sh additions
 foreach(opt TRACING TRACING_COMMTHREAD ERROR_CHECKING LBUSERDATA QLOGIC
   BUILD_SHARED TASK_QUEUE DRONE_MODE LOCKLESS_QUEUE CHARMDEBUG CCS CONTROLPOINT

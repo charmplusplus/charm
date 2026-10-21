@@ -1,11 +1,3 @@
-# ckobjQ (object queues) and modifyScheduler reach into the classic
-# scheduler's queue internals; reconverse has no equivalent yet.
-if(RECONVERSE)
-  set(ck-classic-only-sources )
-else()
-  set(ck-classic-only-sources ckobjQ.C modifyScheduler.C)
-endif()
-
 set(ck-cxx-sources
     ../ck-cp/API-generator/cp_effects.C ../ck-cp/arrayRedistributor.C
     ../ck-cp/controlPoints.C ../ck-cp/pathHistory.C
@@ -33,7 +25,6 @@ set(ck-cxx-sources
     cklocation.C ckmemcheckpoint.C ckmulticast.C
     ckrdma.C ckrdmadevice.C ckreduction.C cksyncbarrier.C debug-charm.C
     debug-message.C init.C mpi-interoperate.C msgalloc.C
-    ${ck-classic-only-sources}
     qd.C register.C sdag.C waitqd.C
 )
 
@@ -162,19 +153,4 @@ if(CMK_CAN_LINK_FORTRAN)
     # (init.C, in libck), so it builds on reconverse too. charmc links it
     # (-lckmainf) for every Fortran main, including AMPI's ampif90.
     add_library(ckmainf mainf.f90)
-endif()
-
-if(NOT RECONVERSE AND CMK_CAN_LINK_FORTRAN)
-    # charmf.C needs memory-isomalloc.h and CmiFloat8, which reconverse does
-    # not provide yet; the Charm++ Fortran bindings and f90charm wait.
-    add_library(ckf charmf.C charmmod.f90 charmf.h)
-    add_dependencies(ckf ck)
-    add_custom_command(TARGET ckf
-        POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/charm.mod ${CMAKE_BINARY_DIR}/include/
-        VERBATIM
-    )
-
-    add_library(f90charm ../langs/f90charm/f90main.C ${CMAKE_BINARY_DIR}/include/f90main.decl.h)
-    add_dependencies(f90charm ck)
 endif()

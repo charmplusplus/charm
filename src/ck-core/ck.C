@@ -8,9 +8,6 @@ clients, including the rest of Charm++, are actually C++.
 */
 #include "ck.h"
 #include "trace.h"
-#if !CMK_RECONVERSE  /* reconverse has no converse-level queueing.h */
-#include "queueing.h"
-#endif
 
 #include "pathHistory.h"
 
@@ -1549,9 +1546,6 @@ void CkUnpackMessage(envelope **pEnv)
 #if CMK_OBJECT_QUEUE_AVAILABLE
 static int index_objectQHandler;
 #endif
-#if !CMK_RECONVERSE  /* token pool lives in ckobjQ.C, classic-only */
-int index_tokenHandler;
-#endif
 int index_skipCldHandler;
 
 void _skipCldHandler(void *converseMsg)
@@ -2203,11 +2197,6 @@ void _ckModuleInit(void) {
 	CmiAssignOnce(&index_skipCldHandler, CkRegisterHandler(_skipCldHandler));
 #if CMK_OBJECT_QUEUE_AVAILABLE
 	CmiAssignOnce(&index_objectQHandler, CkRegisterHandler(_ObjectQHandler));
-#endif
-#if !CMK_RECONVERSE  /* _TokenHandler/TokenPool live in ckobjQ.C, classic-only */
-	CmiAssignOnce(&index_tokenHandler, CkRegisterHandler(_TokenHandler));
-	CkpvInitialize(TokenPool*, _tokenPool);
-	CkpvAccess(_tokenPool) = new TokenPool;
 #endif
 }
 
