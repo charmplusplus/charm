@@ -77,10 +77,12 @@ static void warnOnceAboutAslr(void)
 #if defined(__APPLE__)
   CmiError("Isomalloc> Warning: address space randomization is enabled, and "
             "this job just created a migratable thread. Moving one between "
-            "processes needs the program's code at the same address in both, "
-            "and macOS cannot turn randomization off, so these threads must "
-            "not migrate between processes here (migration between PEs of one "
-            "process is fine).\n");
+            "processes needs the program's code at the same address in both. "
+            "macOS has no setarch; a launcher can start the processes with "
+            "randomization off (posix_spawn with _POSIX_SPAWN_DISABLE_ASLR, as "
+            "classic charmrun did), but lcrun does not, so under it these "
+            "threads must not migrate between processes (migration between "
+            "PEs of one process is fine).\n");
 #else
   CmiError("Isomalloc> Warning: address space randomization is enabled (or "
             "could not be checked), and this job just created a migratable "

@@ -36,8 +36,11 @@ RECONVERSE_NA = \
   chkpt \
 
 # The same holds for a rank migrating between processes. Linux runs turn ASLR
-# off (setarch -R); macOS cannot, so with more than one process (TESTRUN_PROCS)
-# leave out the tests whose ranks migrate. One process migrates fine.
+# off (setarch -R). macOS has no setarch; only a launcher that spawns the
+# processes with _POSIX_SPAWN_DISABLE_ASLR (as classic charmrun did) can turn
+# it off there, and lcrun does not, so with more than one process
+# (TESTRUN_PROCS) leave out the tests whose ranks migrate. One process
+# migrates fine.
 ifeq ($(CMK_MACOSX),1)
 ifneq ($(filter-out 0 1,$(TESTRUN_PROCS)),)
 RECONVERSE_NA += \
