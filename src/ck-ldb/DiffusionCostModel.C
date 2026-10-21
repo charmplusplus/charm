@@ -6,7 +6,7 @@
 
 #include "DiffusionCostModel.h"
 #include "charm++.h"
-#if CMK_CUDA
+#if CMK_GPU
 #include "hapi.h"
 #endif
 
@@ -34,7 +34,7 @@ static int diffCfgDevicesPerHost = 0;
 
 static int diffDeviceOfPe(int pe)
 {
-#if CMK_CUDA
+#if CMK_GPU
   // The runtime's own mapping first: exact for this process's PEs and the mapping's formula for
   // every other process, for any process/GPU split. The config arithmetic below is the fallback
   // for a build whose HAPI has not mapped yet.

@@ -229,7 +229,7 @@ void LBDatabase::GetObjData(LDObjData *dp)
 #if CMK_LB_CPUTIMER
       d.cpuTime *= f;
 #endif
-#if CMK_CUDA
+#if CMK_GPU
       d.driverTime *= f;
       if (!obj->hasGPUDeclared()) d.gpuTime *= f;
 #endif
@@ -326,7 +326,7 @@ void LBDatabase::ClearLoads(void)
         obj->lastCpuTime = obj->data.cpuTime;
 #endif
       }
-#if CMK_CUDA
+#if CMK_GPU
       // Unconditionally, unlike lastWallTime: an interval that measured no
       // GPU load reads back as 0, which is what it was.
       obj->lastGPUTime = obj->data.gpuTime;
@@ -426,7 +426,7 @@ void LBDatabase::SetObjJoinedStep(const LDObjHandle &_h, bool joined)
 
 void LBDatabase::EstObjGPULoad(const LDObjHandle &_h, double gputime)
 {
-#if CMK_CUDA
+#if CMK_GPU
 #if CMK_LBDB_ON
   LBObj *const obj = LbObj(_h);
 
@@ -435,6 +435,6 @@ void LBDatabase::EstObjGPULoad(const LDObjHandle &_h, double gputime)
   obj->setGPUDeclared(true);
 #endif
 #else
-    CmiAbort("LBDatabase::EstObjGPULoad called but CMK_CUDA is not set");
+    CmiAbort("LBDatabase::EstObjGPULoad called but CMK_GPU is not set");
 #endif
 }

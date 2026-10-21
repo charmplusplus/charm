@@ -11,7 +11,7 @@
 #include "TopoManager.h"
 #include "charm++.h"
 #include "ck.h"
-#if CMK_CUDA
+#if CMK_GPU
 void hapiCuptiObjectJoinedStep(const LDObjHandle&);
 void hapiCuptiObjectResumed(const LDObjHandle&);
 #endif
@@ -31,7 +31,7 @@ void hapiCuptiObjectResumed(const LDObjHandle&);
 #include <stdarg.h>
 #include <vector>
 
-#if CMK_CUDA || CMK_HIP
+#if CMK_GPU
 
 #include "hapi.h"
 
@@ -39,14 +39,14 @@ void hapiCuptiObjectResumed(const LDObjHandle&);
 // thread (+gpusubmit): it has to be in the driver before the wait means anything.
 static inline hapiError_t ckSubmitDrainThenSync(hapiStream_t stream) {
   hapiSubmitDrain();
-  return cudaStreamSynchronize(stream);
+  return hapiStreamSynchronize(stream);
 }
 #include "gpumanager.h"
 #include "LBMigrateWindow.h"
 
 CsvExtern(GPUManager, gpu_manager);
 
-#endif // CMK_CUDA || CMK_HIP
+#endif // CMK_GPU
 
 #if CMK_LBDB_ON
 #  include "LBManager.h"
@@ -80,7 +80,7 @@ static inline bool migDbg() {
   return on;
 }
 
-#if CMK_CUDA
+#if CMK_GPU
 // The landing admission gate (+gpupool). The memory contract plans each
 // balancer step so that every batch fits the devices; this is the runtime half
 // that keeps its assumption true. A staged arrival asks its destination for a
@@ -2102,7 +2102,7 @@ void CkMigratable::lbSetMeasurementClosed(bool closed)
   lbMeasurementClosed = closed;
 #if CMK_LBDB_ON
   myRec->getLBMgr()->SetObjJoinedStep(myRec->getLdHandle(), closed);
-#if CMK_CUDA
+#if CMK_GPU
   // This set is PE-local. An arrival must overwrite both a missing exclusion
   // on a new PE and a stale exclusion when returning to a previous PE.
   if (closed)
@@ -2216,7 +2216,7 @@ void CkMigratable::ckSuspendBarrierForDeferredDestroy()
 
 int CkMigratable::ckPrepareIntraProcessMigrate()
 {
-#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+#if CMK_GPU && CMK_GPU_COMM
   // Reallocates the element's device buffers just as the cross-PE path does,
   // so cached registrations for them have to go too.
   CkRdmaDeviceDropRegistrations(myRec);
@@ -2466,7 +2466,7 @@ void CkMigratable::recordLBSizes(bool forStep)
   if (usesAutoMeasure == false)
     UserSetLBLoad();
 
-  #ifdef CMK_CUDA
+  #ifdef CMK_GPU
   if (forStep) {
   PUP::sizer ps(PUP::er::IS_MIGRATION);
   // Sized as the pack ships it: Stable buffers go at the decision, so a move
@@ -2969,7 +2969,7 @@ CkLocRec::~CkLocRec()
   // element is being destroyed without having emigrated (emigrate clears the
   // tag when it consumes it). Retire locally or the step never resumes.
   if (lbLedgerStep >= 0) lbmgr->ledgerRetireLocal(getID(), "element destroyed");
-#if CMK_CUDA
+#if CMK_GPU
   ckClearPendingPack(this);
   // Destroyed without having packed: its window place goes back. A packed
   // payload keeps its place until the ack, after this record is gone.
@@ -3322,7 +3322,7 @@ void CkLocRec::recvMigrate(int toPe)
 {
 #if CMK_LBDB_ON
   if (migDecidedAt == 0.0) migDecidedAt = CkWallTimer();
-#if CMK_CUDA
+#if CMK_GPU
   // Its Stable device buffers go now, while it keeps stepping; the pack
   // skips them (PUP::DeviceLife::Stable). Only when the move is deferred:
   // a synchronous move packs right here.
@@ -3334,7 +3334,7 @@ void CkLocRec::recvMigrate(int toPe)
   // record so emigrate can tell the destination whom to ack.
   const int step = lbmgr->ledgerRecord(getID(), toPe);
   if (step >= 0) lbLedgerStep = step;
-#if CMK_CUDA
+#if CMK_GPU
   // Its payload is owed from here: the admission gate keeps it free.
   ckNotePendingPack(this, toPe);
   // And it waits its turn in this PE's migration window, if it stages. A move
@@ -3385,7 +3385,7 @@ void CkLocRec::recvMigrate(int toPe)
     nextPe = toPe;
 }
 
-#if CMK_CUDA
+#if CMK_GPU
 // Starts queued moves, in order, while the window has places for them.
 static void ckWindowPump(void*, double)
 {
@@ -4282,7 +4282,7 @@ bool did_inter_node_gpudirect_rdma(int srcPe, int dstPe) {
   }
 }
 
-#if CMK_CUDA
+#if CMK_GPU
 void CkLocMgr::sendGPUMsg(CmiUInt8 id)
 {
   if (ckAdmissionGateOn()) {
@@ -4561,7 +4561,7 @@ void CkLocMgr::finishGPUSend(CmiUInt8 id)
 #endif
     // Whoever takes this block next waits on this, instead of the host waiting
     // for the whole device. Staging rides the legacy default stream.
-    CkRdmaDeviceNoteLbBufferFreed(dm, (cudaStream_t)0);
+    CkRdmaDeviceNoteLbBufferFreed(dm, (hapiStream_t)0);
   }
   sendGPUBuffers.erase(it);
 }
@@ -4579,7 +4579,7 @@ bool CkLocMgr::emigrateIntraProcess(CkLocRec* rec, int toPe)
   int senderPes[CkLocRec::RECENT_SENDERS];
   const int nSenderPes = rec->nRecentSenders;
   for (int i = 0; i < nSenderPes; i++) senderPes[i] = rec->recentSenders[i];
-#if CMK_CUDA
+#if CMK_GPU
   if (rec->stable != nullptr) stableDiscard(rec);   // a handoff packs nothing
 #endif
 
@@ -4628,7 +4628,7 @@ bool CkLocMgr::emigrateIntraProcess(CkLocRec* rec, int toPe)
 
   DEBM((AA "Intra-process migrating index %s to %d\n" AB, idx2str(idx), toPe));
 
-#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+#if CMK_GPU && CMK_GPU_COMM
   // The element's persistent channels move with it unpacked: their entries in
   // this PE's tables go now, and are made again on the destination.
   CkRdmaDeviceChannelsLeaving(rec);
@@ -4694,7 +4694,7 @@ void CkLocMgr::immigrateIntraProcess(CkArrayElementIntraProcessMigrateMessage* m
     mit->second->putEltInArrMgr(msg->id, elt);
     elt->ckFinalizeIntraProcessMigrate(rec, msg->barrierEpoch);
   }
-#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+#if CMK_GPU && CMK_GPU_COMM
   // Its persistent channels register on this PE before any entry method runs.
   CkRdmaDeviceChannelsArrived(rec);
 #endif
@@ -4713,7 +4713,7 @@ void CkLocMgr::immigrateIntraProcess(CkArrayElementIntraProcessMigrateMessage* m
   delete msg;
 }
 
-#if CMK_CUDA
+#if CMK_GPU
 // Defined with the stable-snapshot code below immigrateGPU.
 static hapiStream_t ckMigrationStreamLocked(DeviceManager* dm);
 namespace { void ckStableCheckIssue(CkStableSnapshot* snap, CmiUInt8 id, hapiStream_t s); }
@@ -4737,7 +4737,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   // parked. It does not: the count above is the safety condition, and the park
   // only guarantees it is reached. An element that never goes quiet while
   // running still moves at its park, which is where AtSyncWait re-drives this.
-#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+#if CMK_GPU && CMK_GPU_COMM
   // Persistent channels this element receives on: their senders are told the
   // channel is closing, and each awaited ack counts as an outstanding device
   // send below, so no put lands in a buffer the pack is about to free.
@@ -4764,7 +4764,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   int senderPes[CkLocRec::RECENT_SENDERS];
   const int nSenderPes = rec->nRecentSenders;
   for (int i = 0; i < nSenderPes; i++) senderPes[i] = rec->recentSenders[i];
-#if CMK_CUDA
+#if CMK_GPU
   // What the element holds on the device now, before the pack frees it, as
   // blocks: the destination's admission gate takes exactly these on top of
   // the landing arena, since the unpack allocates them again there.
@@ -4781,7 +4781,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   }
 #endif
 
-#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+#if CMK_GPU && CMK_GPU_COMM
   // Those same buffers are about to be freed, so any registration cached for
   // them dies with them. Safe here and only here: the check above is what
   // guarantees nothing is reading them.
@@ -4808,7 +4808,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   // First pass: find size of migration message
   size_t bufSize, gpuBufSize;
   PUP::sizer p(PUP::er::IS_MIGRATION);
-#if CMK_CUDA
+#if CMK_GPU
   // Stable buffers shipped at the decision (recvMigrate -> stableSnapshot)
   // travel in their own payload: the pack walks past them. A snapshot for
   // another destination is a leftover of a decision that changed.
@@ -4823,7 +4823,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   gpuBufSize = 0;
   size_t nGpuBufs = 0;
   size_t gpuStableBytes = 0;
-#if CMK_CUDA
+#if CMK_GPU
   gpuBufSize = p.gpu_size();
   nGpuBufs = p.gpu_buf_count();
   gpuStableBytes = p.gpu_stable_size();
@@ -4842,11 +4842,11 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   {
     // Device state of either lifetime makes the device matter.
     bool sameGpuRequirementMet = (gpuBufSize + gpuStableBytes == 0);
-#if CMK_CUDA
+#if CMK_GPU
     if (gpuBufSize + gpuStableBytes > 0)
       sameGpuRequirementMet = (hapiDeviceForPe(CkMyPe()) == hapiDeviceForPe(toPe));
 #endif
-#if CMK_CUDA
+#if CMK_GPU
     // A handoff packs nothing. Released before the call, which consumes rec.
     CkLocRec* handedOff = sameGpuRequirementMet ? rec : nullptr;
     size_t owed = handedOff ? handedOff->pendingPackBytes : 0;
@@ -4854,12 +4854,12 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #endif
     if (sameGpuRequirementMet && emigrateIntraProcess(rec, toPe))
     {
-#if CMK_CUDA
+#if CMK_GPU
       ckWindowGiveBack(id, /*onlyIfUnpacked=*/false);
 #endif
       return;
     }
-#if CMK_CUDA
+#if CMK_GPU
     if (handedOff && owed > 0) {  // not handed over after all: it will pack
       handedOff->pendingPackBytes = owed;
       ck_pending_pack_bytes += owed;
@@ -4867,7 +4867,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #endif
   }
 
-#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+#if CMK_GPU && CMK_GPU_COMM
   // The channels' exports and registrations go with the buffers the pack is
   // about to free; the element reopens them on its new buffers in its pup. A
   // handoff above kept them (same process, same buffer) and moved only the
@@ -4890,7 +4890,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
 
   void* gpuMsg = nullptr;
-#if CMK_CUDA
+#if CMK_GPU
   hapiStream_t migStream = NULL;
 #endif
   // Allocate and pack into message
@@ -4913,7 +4913,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   rec->lbLedgerStep = -1;
 #endif
 
-#if CMK_CUDA
+#if CMK_GPU
   // The admission gate hung entirely off gpuBufSize > 0, so an element with
   // device state but nothing to copy out skipped it and landed with no
   // reservation: its unpack allocated from the arenas with growth allowed,
@@ -4927,7 +4927,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #endif
 
   {
-#if CMK_CUDA
+#if CMK_GPU
     if (gpuBufSize > 0) {
       GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
       if(csv_gpu_manager.use_shm) {
@@ -4976,7 +4976,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #endif
     tE2 = CmiWallTimer();
     PUP::toMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
-#if CMK_CUDA
+#if CMK_GPU
     p.gpuStream = (void*)migStream;
     p.deviceManifestOut = msg->gpuManifest;
     p.deviceManifestCap = nGpuBufs;
@@ -4997,7 +4997,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
           bufSize, p.size());
       CkAbort("Array element's pup routine has a direction mismatch.\n");
     }
-#if CMK_CUDA
+#if CMK_GPU
     // The same check for the device stream. Both totals matter and neither is
     // implied by the host size: gpu_size() sizes the device region the pack
     // copies into, and gpu_buf_count() sizes msg->gpuManifest, a host array
@@ -5023,7 +5023,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
       // The verdict comes by callback once the device has compared the hashes.
       if (p.stableHashOut != nullptr) ckStableCheckIssue(snap, id, migStream);
       else if (snap->hashes != nullptr) CkDeviceFree(snap->hashes);
-      if (snap->done != nullptr) hapiCheck(cudaEventDestroy((cudaEvent_t)snap->done));
+      if (snap->done != nullptr) hapiCheck(hapiEventDestroy((hapiEvent_t)snap->done));
       msg->hasStable = true;
       msg->stableGen = snap->gen;
       msg->stableBytes = (int)snap->bytes;
@@ -5042,7 +5042,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
 
-#if CMK_CUDA
+#if CMK_GPU
   // Complete the pack copies before destroying elements. On the migration
   // stream this waits for exactly those copies instead of the whole device;
   // the device-wide fallback covers the no-pool path, whose packing still
@@ -5066,7 +5066,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
       }
     } else {
       hapiSubmitDrain();   // cover copies still in a submitter ring
-      cudaDeviceSynchronize();
+      hapiDeviceSynchronize();
     }
   }
 #endif
@@ -5085,7 +5085,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   cache->recordEmigration(id, toPe);
   informHome(idx, toPe);
   informSenders(idx, id, senderPes, nSenderPes, toPe);
-#if CMK_CUDA
+#if CMK_GPU
   if (gpuBufSize > 0)
   {
     sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg, (void*)migStream,
@@ -5179,7 +5179,7 @@ void CkLocMgr::metaLBCallLB(CkLocRec* rec)
 // while staging frees the source at pack and keeps a step's footprint inside a
 // reserve the balancer can plan against.
 
-#if CMK_CUDA
+#if CMK_GPU
 // Arena mode (CHARM_MIGRATE_ARENA): the staged payload lands in one ordinary
 // device allocation that becomes the arriving chare's permanent storage --
 // pup_buffer_device rebinds pointers into it at unpack, and nothing is
@@ -5201,7 +5201,7 @@ static inline bool ckMigrateArenaFromPool() { return CkDevicePoolOn(); }
 static hapiStream_t ckLandingStream()
 {
   static thread_local hapiStream_t s = nullptr;
-  if (s == nullptr) hapiCheck(cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking));
+  if (s == nullptr) hapiCheck(hapiStreamCreateWithFlags(&s, hapiStreamNonBlocking));
   return s;
 }
 
@@ -5290,11 +5290,11 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
   // cross-process event: 245 ms median from dispatch to receipt on leanmd.
   // Arena mode has nothing to order (see above); the recycled-block modes
   // keep stream 0 and their gate.
-  hapiStream_t landing = (cudaStream_t)0;
+  hapiStream_t landing = (hapiStream_t)0;
   if (dm_for_gate != NULL && !poolEventGate)
-    hapiCheck(cudaStreamSynchronize((cudaStream_t)0));
+    hapiCheck(hapiStreamSynchronize((hapiStream_t)0));
   else if (dm_for_gate != NULL)
-    CkRdmaDeviceGateLbBuffer(dm_for_gate, (cudaStream_t)0);
+    CkRdmaDeviceGateLbBuffer(dm_for_gate, (hapiStream_t)0);
   else
     landing = ckLandingStream();
   receivedDeviceMsgs[id] = data;
@@ -5414,7 +5414,7 @@ void ckStableCheckIssue(CkStableSnapshot* snap, CmiUInt8 id, hapiStream_t s)
 {
   CkStableFlagRing& r = ck_stable_ring;
   if (r.flags == nullptr) {
-    hapiCheck(cudaMallocHost((void**)&r.flags, CK_STABLE_FLAGS * sizeof(unsigned long long)));
+    hapiCheck(hapiMallocHost((void**)&r.flags, CK_STABLE_FLAGS * sizeof(unsigned long long)));
     memset(r.busy, 0, sizeof(r.busy));
   }
   int slot = -1;
@@ -5425,20 +5425,20 @@ void ckStableCheckIssue(CkStableSnapshot* snap, CmiUInt8 id, hapiStream_t s)
   if (slot < 0) {   // every slot has a verdict pending: this one goes unchecked
     g_mig.stableChecksSkipped.fetch_add(1, std::memory_order_relaxed);
     CkDeviceFree(snap->hashes);
-    if (snap->done != nullptr) { hapiCheck(cudaEventDestroy((cudaEvent_t)snap->done)); snap->done = nullptr; }
+    if (snap->done != nullptr) { hapiCheck(hapiEventDestroy((hapiEvent_t)snap->done)); snap->done = nullptr; }
     return;
   }
   r.next = (slot + 1) % CK_STABLE_FLAGS;
   r.busy[slot] = 1;
   unsigned long long* flag = snap->hashes + 2 * snap->count;
   if (snap->done != nullptr) {
-    hapiCheck(cudaStreamWaitEvent((cudaStream_t)s, (cudaEvent_t)snap->done, 0));
-    hapiCheck(cudaEventDestroy((cudaEvent_t)snap->done));   // the wait captured it
+    hapiCheck(hapiStreamWaitEvent((hapiStream_t)s, (hapiEvent_t)snap->done, 0));
+    hapiCheck(hapiEventDestroy((hapiEvent_t)snap->done));   // the wait captured it
     snap->done = nullptr;
   }
   hapiHashCompareAsync(snap->hashes, snap->hashes + snap->count, snap->count, flag, s);
-  hapiCheck(cudaMemcpyAsync(&r.flags[slot], flag, sizeof(unsigned long long),
-                            cudaMemcpyDeviceToHost, (cudaStream_t)s));
+  hapiCheck(hapiMemcpyAsync(&r.flags[slot], flag, sizeof(unsigned long long),
+                            hapiMemcpyDeviceToHost, (hapiStream_t)s));
   CkStableCheck* c = new CkStableCheck{snap->hashes, snap->count, id, slot};
   g_mig.stableChecks.fetch_add(1, std::memory_order_relaxed);
   hapiAddCallback(s, CkCallback(ckStableCheckDone, (void*)c));
@@ -5500,13 +5500,13 @@ void CkLocMgr::stableSnapshot(CkLocRec* rec, int toPe)
             CkMyPe(), (unsigned long long)rec->getID(), bytes, count, p.gpu_copied(), p.manifestIdx);
   // A source outside the pool has no stream-ordered free: its copies must be
   // done before anything can free it. Rare (the pool is the backend here).
-  if (!p.deviceAllPool) hapiCheck(cudaStreamSynchronize((cudaStream_t)s));
+  if (!p.deviceAllPool) hapiCheck(hapiStreamSynchronize((hapiStream_t)s));
   // The pack's compare runs on whichever migration stream the pack takes:
   // it waits on this event for the snapshot's hashes.
   if (hashes != nullptr) {
-    cudaEvent_t ev = nullptr;
-    hapiCheck(cudaEventCreateWithFlags(&ev, cudaEventDisableTiming));
-    hapiCheck(cudaEventRecord(ev, (cudaStream_t)s));
+    hapiEvent_t ev = nullptr;
+    hapiCheck(hapiEventCreateWithFlags(&ev, hapiEventDisableTiming));
+    hapiCheck(hapiEventRecord(ev, (hapiStream_t)s));
     snap->done = (void*)ev;
   }
   rec->stable = snap;
@@ -5542,7 +5542,7 @@ void CkLocMgr::stableDiscard(CkLocRec* rec)
              (unsigned long long)rec->getID(), snap->gen, snap->toPe);
   thisProxy[snap->toPe].discardStable(rec->getID(), snap->gen);
   if (snap->hashes != nullptr) CkDeviceFree(snap->hashes);
-  if (snap->done != nullptr) hapiCheck(cudaEventDestroy((cudaEvent_t)snap->done));
+  if (snap->done != nullptr) hapiCheck(hapiEventDestroy((hapiEvent_t)snap->done));
   delete snap;
 }
 
@@ -5649,7 +5649,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
     }
     gpuMsg = it->second;
   }
-#if CMK_CUDA
+#if CMK_GPU
   else if (msg->needsLanding && grantedLandings.find(msg->id) == grantedLandings.end())
   {
     // Device state but no payload: nothing else holds this message back, so
@@ -5676,7 +5676,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   const CkArrayIndex& idx = msg->idx;
 
   PUP::fromMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
-#if CMK_CUDA
+#if CMK_GPU
   // Sender-recorded device manifest: every DEVICE-mode unpack call is checked
   // against it (see PUP::fromMem::deviceManifestIn). nGpuBufs is 0 for
   // migrations whose payload was not packed by toMem (the by-handle path).
@@ -5737,7 +5737,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   // Create the new elements as we unpack the message. What the unpack
   // allocates is the arriving element's, though its entry method is not what
   // is running.
-#if CMK_CUDA
+#if CMK_GPU
   hapiFootprintBegin(rec);
   {
     auto ls = landingSets.find(msg->id);   // the gate's landing set, if any
@@ -5745,7 +5745,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   }
 #endif
   pupElementsFor(p, rec, CkElementCreation_migrate);
-#if CMK_CUDA
+#if CMK_GPU
   hapiPreallocEnd();
   hapiFootprintEnd();
   // A payload landing's grant is retired when immigrateGPU takes its arena; a
@@ -5755,7 +5755,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   if (msg->needsLanding) grantedLandings.erase(msg->id);
   releaseLandingSet(msg->id);   // what the unpack did not take goes back
 #endif
-#if CMK_CUDA
+#if CMK_GPU
   // The unpack's copies must complete before the element runs, and the wait
   // also gates the free of gpuMsg below. But it does not need to be a
   // device-wide barrier, which is what the note here has always said and what
@@ -5775,7 +5775,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
     if (p.gpuStream != nullptr)
       hapiCheck(ckSubmitDrainThenSync((hapiStream_t)p.gpuStream));
     else
-      hapiCheck(cudaStreamSynchronize((cudaStream_t)0));
+      hapiCheck(hapiStreamSynchronize((hapiStream_t)0));
     if (migDbg())
       CkPrintf("[IMMIG %d] id=%llu unpack wait %.3f ms (%s)\n", CkMyPe(),
                (unsigned long long)msg->id, (CmiWallTimer() - tw0) * 1e3,
@@ -5783,7 +5783,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   }
 #endif
 
-#if CMK_CUDA
+#if CMK_GPU
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   // Only elements that actually carried device state allocated a comm-buffer
   // block above (gpuMsg stays null when msg->hasGPUMsg is false). Freeing
@@ -5825,7 +5825,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   // The landing write into this block and the unpack copies out of it are both
   // on the legacy default stream; record there so the next taker can order
   // itself behind them without the host waiting.
-  CkRdmaDeviceNoteLbBufferFreed(dm, (cudaStream_t)0);
+  CkRdmaDeviceNoteLbBufferFreed(dm, (hapiStream_t)0);
   }
   // The stable region: the element's storage now, like the arena, released
   // when its last rebound buffer goes.
@@ -5866,7 +5866,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
     zcPupIssueRgets(msg->id, this);
   }
   CpvAccess(newZCPupGets).clear();  // Clear this to reuse the vector
-#if CMK_CUDA
+#if CMK_GPU
   // The element-wise check catches wrong sizes; this catches an unpack that
   // asked for fewer device buffers than were packed -- also a direction
   // mismatch, just one the per-call check cannot see.

@@ -168,7 +168,7 @@ struct LBCriticality
 // time when that is the larger bound job-wide.
 static inline double lbObjGroupLoad(const LDObjData& o)
 {
-#if CMK_CUDA
+#if CMK_GPU
   return _lb_groupDimLaunch ? (double)o.driverTime : (double)o.gpuTime;
 #else
   return 0.0;
@@ -193,7 +193,7 @@ enum LBLoadMode
 
 static inline LBLoadDimOverride lbLoadDimOverride()
 {
-#if CMK_CUDA
+#if CMK_GPU
   if (_lb_args.diffusionGpuDim()) return LB_DIM_DEVICE;
   if (_lb_args.diffusionHostDim()) return LB_DIM_HOST;
   return LB_DIM_AUTO;
@@ -302,7 +302,7 @@ static inline LBCriticality lbCriticalityOf(const BaseLB::LDStats* stats)
   for (size_t i = 0; i < stats->objData.size(); i++)
   {
     const LDObjData& o = stats->objData[i];
-#if CMK_CUDA
+#if CMK_GPU
     c.addObject(o.wallTime, o.gpuTime, o.driverTime);
 #else
     c.addObject(o.wallTime, 0.0, 0.0);

@@ -5,7 +5,7 @@
 #include "ckcallback.h"
 #include "conv-rdmadevice.h"
 
-#if CMK_CUDA || CMK_HIP
+#if CMK_GPU
 #include "hapi_portable.h"
 #include <functional>
 
@@ -531,14 +531,14 @@ extern "C" {
   extern int device_restage_put_done_handler;
 }
 
-#endif // CMK_CUDA
+#endif // CMK_GPU
 
 // Returns and clears the device payload size recorded by the most recent
 // CkRdmaDeviceOnSender on this PE, so the LB communication graph can weight a
 // device zerocopy edge by what actually crosses the wire rather than by the
 // descriptor envelope. Returns 0 for a non-device send. Declared outside the
 // CUDA guard so the send path can call it without an #ifdef.
-#if CMK_CUDA || CMK_HIP
+#if CMK_GPU
 size_t CkRdmaDeviceTakePendingSendBytes();
 // Claimed IPC event slots for this PE, or -1 when shm IPC is not in use.
 int CkRdmaDeviceBusyIpcSlots();
@@ -598,8 +598,8 @@ void CkRdmaDeviceMarkMigrationPayload(bool sending);
 // about to write into it wait on those events (Gate). The ordering is then
 // exact, expressed on the device, and costs no host time. Events are reused
 // per (device, stream), so this allocates nothing per migration.
-void CkRdmaDeviceNoteLbBufferFreed(void* dm, cudaStream_t usedBy);
-void CkRdmaDeviceGateLbBuffer(void* dm, cudaStream_t consumer);
+void CkRdmaDeviceNoteLbBufferFreed(void* dm, hapiStream_t usedBy);
+void CkRdmaDeviceGateLbBuffer(void* dm, hapiStream_t consumer);
 #else
 inline size_t CkRdmaDeviceTakePendingSendBytes() { return 0; }
 inline int CkRdmaDeviceBusyIpcSlots() { return -1; }
@@ -610,8 +610,8 @@ inline void CkDeviceFree(void* ptr) {}
 inline bool CkRdmaDeviceStageParked(envelope* env) { return false; }
 inline bool CkDevicePoolOn() { return false; }
 inline void CkRdmaDeviceMarkMigrationPayload(bool sending) {}
-inline void CkRdmaDeviceNoteLbBufferFreed(void* dm, cudaStream_t usedBy) {}
-inline void CkRdmaDeviceGateLbBuffer(void* dm, cudaStream_t consumer) {}
+inline void CkRdmaDeviceNoteLbBufferFreed(void* dm, hapiStream_t usedBy) {}
+inline void CkRdmaDeviceGateLbBuffer(void* dm, hapiStream_t consumer) {}
 #endif
 
 #endif // _CKRDMADEVICE_H_

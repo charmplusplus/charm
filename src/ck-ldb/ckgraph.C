@@ -79,7 +79,7 @@ ObjGraph::ObjGraph(BaseLB::LDStats *stats) {
 
   for(int vert = 0; vert < stats->objData.size(); vert++) {
     vertices[vert].id         = vert;
-#if CMK_CUDA
+#if CMK_GPU
     vertices[vert].compLoad   = useGpuDim ? lbObjGroupLoad(stats->objData[vert])
                                           : stats->objData[vert].wallTime;
 #else

@@ -81,7 +81,7 @@ never be excluded...
 #endif
 
 #define CMK_GPU_COMM 1
-#if CMK_CUDA || CMK_HIP
+#if CMK_GPU
 #include "hapi_impl.h"
 #include "ckrdmadevice.h"
 extern int device_channel_probe_handler;              // ckrdmadevice.C: the watchdog's owner probe
@@ -695,7 +695,7 @@ static void _exitHandler(envelope *env)
       else
         CmiFree(env);
 
-#if CMK_CUDA || CMK_HIP
+#if CMK_GPU
       _nvtxExit();   // +gputrace: close this PE's trace file
       // Clean up HAPI
       hapiExit();
@@ -1495,7 +1495,7 @@ void _initCharm(int unused_argc, char **argv)
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
-#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+#if CMK_GPU && CMK_GPU_COMM
   loopback_handler = CmiRegisterHandler((CmiHandler) loopback_bridge);
   device_restage_req_handler = CmiRegisterHandler((CmiHandler) device_restage_req_bridge);
   device_restage_meta_handler = CmiRegisterHandler((CmiHandler) device_restage_meta_bridge);
@@ -1728,7 +1728,7 @@ void _initCharm(int unused_argc, char **argv)
         }
     }
 
-#if CMK_CUDA || CMK_HIP
+#if CMK_GPU
   // Perform HAPI initialization for GPU support
   hapiInit(argv);
   _nvtxStartTrace();   // +gputrace: open the sink once HAPI is up
@@ -1880,7 +1880,7 @@ int charm_main(int argc, char **argv)
   registerTraceInit(traceInit);
 #endif
 
-#if CMK_CUDA
+#if CMK_GPU
   // Before ConverseInit: the machine layer's LCI initialises the CUDA driver,
   // and the driver reads this process's environment then.
   hapiPresetEnvironment();

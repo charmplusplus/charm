@@ -21,15 +21,13 @@ virtual functions are defined here.
 
 #include "converse.h"
 #include "pup.h"
-#if CMK_CUDA
+#if CMK_GPU
 #include "hapi.h"
 #endif
 #include "ckhashtable.h"
-#include "conv-mach-cuda.h"
 
-#if CMK_CUDA
-#include <cuda_runtime.h>
-#include <cuda.h>
+#if CMK_GPU
+#include "hapi_portable.h"
 #include "hapi_impl.h"
 #endif
 
@@ -167,7 +165,7 @@ void PUP::sizer::bytes(void * p,size_t n,size_t itemSize,dataType t, PUPMode mod
     // so gpu_size() is the true extent of the packed region.
     gpuBytes = alignDeviceOffset(gpuBytes) + n * itemSize;
     gpuBufCount++;
-#if CMK_CUDA
+#if CMK_GPU
     // As pup_buffer_device: a source outside the pool forces emigrate's host
     // wait after packing.
     if (!hapiDevPoolContains(p)) deviceAllPool = false;
@@ -228,7 +226,7 @@ void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode
       // Each buffer starts at an aligned offset from the region base -- the
       // same rule the sizer counted with and fromMem (or the receiver's arena
       // layout) walks with.
-#if CMK_CUDA
+#if CMK_GPU
       // The bookkeeping pup_buffer_device does, for plain DEVICE-mode pups
       // too (pic2d, moe): a pool source is noted as read on the copy stream,
       // so a CkDeviceFree of it parks until the copy retires; anything else
@@ -239,10 +237,10 @@ void PUP::toMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode
       else deviceAllPool = false;
       gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
       if (gpuStream != nullptr)
-        cudaMemcpyAsync((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice,
-                        (cudaStream_t)gpuStream);
+        hapiMemcpyAsync((void *)gpuBuf, p, n, hapiMemcpyDeviceToDevice,
+                        (hapiStream_t)gpuStream);
       else
-        cudaMemcpy((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice);
+        hapiMemcpy((void *)gpuBuf, p, n, hapiMemcpyDeviceToDevice);
       gpuBuf += n;
       if (deviceManifestOut != nullptr)
       {
@@ -276,16 +274,16 @@ void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mo
   else
   {
     //CmiPrintf("[%d] Copying %zu bytes from GPU buffer to p=%p\n", CmiMyPe(), n, p);
-#if CMK_CUDA
+#if CMK_GPU
     deviceManifestCheck(n);
     // Mirror of the toMem walk: skip to the aligned offset the packer wrote
     // this buffer at before copying out.
     gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
     if (gpuStream != nullptr)
-      cudaMemcpyAsync(p, (const void *)gpuBuf, n, cudaMemcpyDeviceToDevice,
-                      (cudaStream_t)gpuStream);
+      hapiMemcpyAsync(p, (const void *)gpuBuf, n, hapiMemcpyDeviceToDevice,
+                      (hapiStream_t)gpuStream);
     else
-      cudaMemcpy(p, (const void *)gpuBuf, n, cudaMemcpyDeviceToDevice);
+      hapiMemcpy(p, (const void *)gpuBuf, n, hapiMemcpyDeviceToDevice);
     gpuBuf += n;
 #endif
   }
@@ -329,7 +327,7 @@ bool PUP::fromMem::deviceManifestCheck(size_t nBytes, DeviceLife life)
 
 void PUP::sizer::pup_buffer_device(void *&p, size_t n, size_t itemSize)
 {
-#if CMK_CUDA
+#if CMK_GPU
   if (!hapiDevPoolContains(p)) deviceAllPool = false;
 #endif
   bytes(p, n, itemSize, Tchar, PUPMode::DEVICE);
@@ -344,7 +342,7 @@ void PUP::sizer::pup_buffer_device(void *&p, size_t n, size_t itemSize, DeviceLi
     gpuStableBytes = alignDeviceOffset(gpuStableBytes) + n * itemSize;
     gpuStableCount++;
     if (stableSkip) {
-#if CMK_CUDA
+#if CMK_GPU
       if (!hapiDevPoolContains(p)) deviceAllPool = false;
 #endif
       gpuBufCount++;
@@ -366,15 +364,15 @@ void PUP::snapshot::pup_buffer_device(void *&p, size_t n, size_t itemSize, Devic
   n *= itemSize;
   gpuStableBytes = alignDeviceOffset(gpuStableBytes) + n;
   gpuStableCount++;
-#if CMK_CUDA
+#if CMK_GPU
   // The pool parks a free of this block until the copy (and the hash) retire.
   if (hapiDevPoolContains(p)) hapiDevPoolNoteRead(p, (hapiStream_t)gpuStream);
   else deviceAllPool = false;
   gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
   if (gpuStream != nullptr)
-    cudaMemcpyAsync((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice, (cudaStream_t)gpuStream);
+    hapiMemcpyAsync((void *)gpuBuf, p, n, hapiMemcpyDeviceToDevice, (hapiStream_t)gpuStream);
   else
-    cudaMemcpy((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice);
+    hapiMemcpy((void *)gpuBuf, p, n, hapiMemcpyDeviceToDevice);
   gpuBuf += n;
   if (manifestOut != nullptr) {
     if (manifestIdx >= manifestCap)
@@ -389,12 +387,12 @@ void PUP::snapshot::pup_buffer_device(void *&p, size_t n, size_t itemSize, Devic
 
 void PUP::snapshot::pup_device_order(void* producerStream)
 {
-#if CMK_CUDA
+#if CMK_GPU
   if (producerStream == nullptr || gpuStream == nullptr) return;
-  static thread_local cudaEvent_t ev = nullptr;
-  if (ev == nullptr) hapiCheck(cudaEventCreateWithFlags(&ev, cudaEventDisableTiming));
-  hapiCheck(cudaEventRecord(ev, (cudaStream_t)producerStream));
-  hapiCheck(cudaStreamWaitEvent((cudaStream_t)gpuStream, ev, 0));
+  static thread_local hapiEvent_t ev = nullptr;
+  if (ev == nullptr) hapiCheck(hapiEventCreateWithFlags(&ev, hapiEventDisableTiming));
+  hapiCheck(hapiEventRecord(ev, (hapiStream_t)producerStream));
+  hapiCheck(hapiStreamWaitEvent((hapiStream_t)gpuStream, ev, 0));
 #else
   (void)producerStream;
 #endif
@@ -402,9 +400,9 @@ void PUP::snapshot::pup_device_order(void* producerStream)
 
 void PUP::snapshot::pup_device_order_event(void* producerEvent)
 {
-#if CMK_CUDA
+#if CMK_GPU
   if (producerEvent == nullptr || gpuStream == nullptr) return;
-  hapiCheck(cudaStreamWaitEvent((cudaStream_t)gpuStream, (cudaEvent_t)producerEvent, 0));
+  hapiCheck(hapiStreamWaitEvent((hapiStream_t)gpuStream, (hapiEvent_t)producerEvent, 0));
 #else
   (void)producerEvent;
 #endif
@@ -412,7 +410,7 @@ void PUP::snapshot::pup_device_order_event(void* producerEvent)
 
 void PUP::toMem::pup_buffer_device(void *&p, size_t n, size_t itemSize)
 {
-#if CMK_CUDA
+#if CMK_GPU
   // Tell the pool this block is being read on the migration stream, so a free
   // of it parks until those reads retire instead of handing it straight out.
   // A block that is not the pool's cannot be ordered that way, and the host
@@ -433,7 +431,7 @@ void PUP::toMem::pup_buffer_device(void *&p, size_t n, size_t itemSize, DeviceLi
     return;
   }
   n *= itemSize;
-#if CMK_CUDA
+#if CMK_GPU
   if (hapiDevPoolContains(p)) hapiDevPoolNoteRead(p, (hapiStream_t)gpuStream);
   else deviceAllPool = false;
   if (deviceManifestOut != nullptr) {
@@ -450,17 +448,17 @@ void PUP::toMem::pup_buffer_device(void *&p, size_t n, size_t itemSize, DeviceLi
 
 void PUP::toMem::pup_device_order(void* producerStream)
 {
-#if CMK_CUDA
+#if CMK_GPU
   if (producerStream == nullptr) return;
   // One event per thread is enough: the record and the wait are issued back to
   // back on the host, and cudaStreamWaitEvent captures the event's state at
   // the time of the call, so a later re-record cannot disturb an earlier wait.
-  static thread_local cudaEvent_t ev = nullptr;
-  if (ev == nullptr) hapiCheck(cudaEventCreateWithFlags(&ev, cudaEventDisableTiming));
-  hapiCheck(cudaEventRecord(ev, (cudaStream_t)producerStream));
+  static thread_local hapiEvent_t ev = nullptr;
+  if (ev == nullptr) hapiCheck(hapiEventCreateWithFlags(&ev, hapiEventDisableTiming));
+  hapiCheck(hapiEventRecord(ev, (hapiStream_t)producerStream));
   // gpuStream null means the copies go on the legacy default stream; waiting
   // there is legal.
-  hapiCheck(cudaStreamWaitEvent((cudaStream_t)gpuStream, ev, 0));
+  hapiCheck(hapiStreamWaitEvent((hapiStream_t)gpuStream, ev, 0));
 #else
   (void)producerStream;
 #endif
@@ -468,9 +466,9 @@ void PUP::toMem::pup_device_order(void* producerStream)
 
 void PUP::toMem::pup_device_order_event(void* producerEvent)
 {
-#if CMK_CUDA
+#if CMK_GPU
   if (producerEvent == nullptr) return;
-  hapiCheck(cudaStreamWaitEvent((cudaStream_t)gpuStream, (cudaEvent_t)producerEvent, 0));
+  hapiCheck(hapiStreamWaitEvent((hapiStream_t)gpuStream, (hapiEvent_t)producerEvent, 0));
 #else
   (void)producerEvent;
 #endif
@@ -480,14 +478,14 @@ void PUP::toMem::pup_device_order_event(void* producerEvent)
 // wrote this buffer at.
 void PUP::fromMem::deviceTake(void *&p, size_t n, myByte*& cursor, myByte* base, size_t& rebound)
 {
-#if CMK_CUDA
+#if CMK_GPU
   cursor = base + alignDeviceOffset((size_t)(cursor - base));
   if (deviceRebind) {
     p = (void *)cursor;
     rebound++;
   } else {
-    cudaMalloc(&p, n);
-    cudaMemcpy(p, (const void *)cursor, n, cudaMemcpyDeviceToDevice);
+    hapiMallocRaw(&p, n);
+    hapiMemcpy(p, (const void *)cursor, n, hapiMemcpyDeviceToDevice);
   }
   cursor += n;
 #else
@@ -507,7 +505,7 @@ void PUP::fromMem::pup_buffer_device(void *&p, size_t n, size_t itemSize, Device
   buf += sizeof(pupCheckRec);
 #endif
   n *= itemSize;
-#if CMK_CUDA
+#if CMK_GPU
   // The sender's manifest says which region this buffer came in: the stable
   // region if the decision-time snapshot shipped it, the packed stream
   // otherwise -- a Stable declaration here with no snapshot behind it is the
@@ -737,7 +735,7 @@ void PUP::toDisk::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mod
   if (mode == PUPMode::HOST) {
     bytes(p, n, itemSize, t);
   } else if (mode == PUPMode::DEVICE) {
-#if CMK_CUDA
+#if CMK_GPU
     // For GPU mode, we assume p is a device pointer and copy directly
     int allocId = hapiCheckpoint(p, itemSize * n);
     //CmiPrintf("Alloc ID = %d\n", allocId);
@@ -769,7 +767,7 @@ void PUP::fromDisk::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode m
   if (mode == PUPMode::HOST) {
     bytes(p, n, itemSize, t);
   } else if (mode == PUPMode::DEVICE) {
-#if CMK_CUDA
+#if CMK_GPU
     // For GPU mode, we assume p is a device pointer and copy directly
     int allocId;
     CmiFread(&allocId,sizeof(int),1,F);

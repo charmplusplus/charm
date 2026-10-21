@@ -922,7 +922,7 @@ public:
   }
   size_t numImmigrationsInFlight() const { return inFlightImmigrations.size(); }
 
-#if CMK_CUDA
+#if CMK_GPU
   void sendGPUMsg(CmiUInt8 id);
   void immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, CkDeviceBufferPost* post);
   void immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe);

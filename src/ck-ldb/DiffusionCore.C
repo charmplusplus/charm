@@ -159,7 +159,7 @@ void DiffusionLB::AcrossNodeLB()
     }
   }
 
-#if CMK_CUDA
+#if CMK_GPU
   // The memory contract, planned here and held at the receiver. Every
   // across-node move stages, so each neighbour may take objects up to the
   // room it advertised with its loads, and this node's step may pack payloads

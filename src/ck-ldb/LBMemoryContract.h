@@ -467,7 +467,7 @@ public:
     auto loadOf = [&](int k) {
       const LDObjData& od = stats->objData[moves[k].obj];
       double l = (double)od.wallTime;
-#if CMK_CUDA
+#if CMK_GPU
       l += (double)od.gpuTime + (double)od.driverTime;
 #endif
       return l > 0.0 ? l : 0.0;

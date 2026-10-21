@@ -15,7 +15,10 @@
 #include "hapi_impl.h"
 #include "devicemanager.h"
 
+#if CMK_CUDA
 #include <cupti.h>
+#endif
+#include "hapi_trace_backend.h"
 #include <unordered_map>
 #include <queue>
 #include <mutex>
@@ -74,10 +77,11 @@ static_assert(ATOMIC_BOOL_LOCK_FREE == 2,
 
 #if CMK_LBDB_ON
 struct CuptiBufferItem {
-  uint8_t* buffer;
-  size_t validSize;
-  size_t size;   // the allocation
-  void* ctx;     // the CUcontext the records belong to: the close parses one context per thread
+  uint8_t* buffer;   // CUDA: a CUPTI activity buffer (null on HIP)
+  size_t validSize;  // CUDA: bytes of records in it; HIP: a records-times-size estimate for the drain's tally
+  size_t size;       // the allocation
+  void* ctx;         // the CUcontext the records belong to: the close parses one context per thread
+  HapiTraceBatch* batch;   // HIP: the converted records of one buffer callback (owned; freed by the parse); null on CUDA
 };
 #endif
 

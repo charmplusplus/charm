@@ -26,7 +26,7 @@
 #include "ck.h"
 #include "ckgraph.h"
 #include "envelope.h"
-#if CMK_CUDA
+#if CMK_GPU
 #include "hapi.h"
 #include "LBMemoryContract.h"
 #endif
@@ -164,7 +164,7 @@ DiffusionLB::DiffusionLB(const CkLBOptions& opt) : CBase_DiffusionLB(opt)
   // how any of them is reached. It does NOT make the PEs of a logical node
   // share a device, so +LBDiffusionGpuDim results under it are not meaningful.
   nodeSize = CkNodeSize(0);
-#if CMK_CUDA
+#if CMK_GPU
   // A diffusion node is a DEVICE. With several devices per process the PEs of one device (a
   // contiguous block under HAPI's block map) form a node: the across-node machinery then balances
   // devices for every process/GPU split, each node's rank-0 PE reports its own device's memory,
@@ -685,7 +685,7 @@ void DiffusionLB::WithinNodeLB()
     // The device dimension is then the smoother, real signal: equal device
     // work per PE keeps the per-PE driving cost even as well.
     bool onHost = true;
-#if CMK_CUDA
+#if CMK_GPU
     if (diffusionDeviceDim() || diffusionStepMode())
     {
       double maxPeHost = 0.0, nodeGpu = 0.0;

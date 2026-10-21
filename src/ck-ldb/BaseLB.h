@@ -67,7 +67,7 @@ public:
     // double utilization;
     int pe;			// processor id
     bool available;
-#if CMK_CUDA
+#if CMK_GPU
     // Device memory as the memory contract reads it (hapiLBDeviceMemory):
     // free device bytes; this process's free pool bytes on the device (or the
     // +gpulbbuffer region's, without the pool); the pool's arena quantum (0
@@ -90,7 +90,7 @@ public:
 #if CMK_LB_CPUTIMER
 		 total_cputime(0.0), bg_cputime(0.0),
 #endif
-#if CMK_CUDA
+#if CMK_GPU
 	   	 gpu_device_id(-1), gpu_total_sms(0),
 		 gpu_mem_remaining(0), pool_buff_mem_remaining(0),
 		 gpu_pool_arena_bytes(0), gpu_pool_capacity_bytes(0), gpu_ipc_slots(0),
@@ -117,7 +117,7 @@ public:
       }
       p|available; p|n_objs;
       if (_lb_args.lbversion()>=2) p|pe;
-#if CMK_CUDA
+#if CMK_GPU
       p|gpu_mem_remaining;
       p|pool_buff_mem_remaining;
       p|gpu_device_id;

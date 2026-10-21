@@ -48,7 +48,7 @@ CLBStatsMsg* DiffusionLB::AssembleStats()
   // statsMsg->n_comm = csz;
   lbmgr->GetCommData(statsMsg->commData.data());
 
-#if CMK_CUDA
+#if CMK_GPU
   // The device memory the node's rank 0 advertises and plans against
   // (computeNodeMemory).
   hapiLBDeviceMemory(&statsMsg->gpu_mem_remaining, &statsMsg->pool_buff_mem_remaining,
@@ -137,7 +137,7 @@ void DiffusionLB::BuildStats()
       nodeHostMax = std::max(nodeHostMax, (double)oData.wallTime);
       // Both per-group loads, separately: which one the group dimension
       // carries is this step's verdict, which these totals feed.
-#if CMK_CUDA
+#if CMK_GPU
       nodeDevSum += oData.gpuTime;
       nodeDevMax = std::max(nodeDevMax, (double)oData.gpuTime);
       nodeDrvSum += oData.driverTime;
@@ -213,7 +213,7 @@ void DiffusionLB::BuildStats()
     for (int i = 0; i < nobj; i++)
     {
       const LDObjData& od = nodeStats->objData[i];
-#if CMK_CUDA
+#if CMK_GPU
       const double g = od.gpuTime;
 #else
       const double g = 0.0;
@@ -304,7 +304,7 @@ void DiffusionLB::computeNodeMemory()
   objStaged.assign(n, 0.0);
   myMemHeadroom = myStagingCap = std::numeric_limits<double>::max();
   mySlots = 0;
-#if CMK_CUDA
+#if CMK_GPU
   size_t devFree = std::numeric_limits<size_t>::max(), poolFree = 0, arena = 0;
   size_t poolCapacity = 0;
   size_t legacyStaging = std::numeric_limits<size_t>::max();
@@ -383,7 +383,7 @@ void DiffusionLB::AddToList(CLBStatsMsg* m, int rank)
   procStat.pe_speed = m->pe_speed;  // important
   procStat.available = true;
   procStat.n_objs = m->objData.size();
-#if CMK_CUDA
+#if CMK_GPU
   procStat.gpu_mem_remaining = m->gpu_mem_remaining;
   procStat.pool_buff_mem_remaining = m->pool_buff_mem_remaining;
   procStat.gpu_pool_arena_bytes = m->gpu_pool_arena_bytes;

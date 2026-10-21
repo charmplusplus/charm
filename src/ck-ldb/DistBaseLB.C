@@ -9,8 +9,7 @@
 #include "DistBaseLB.h"
 #include "DistBaseLB.def.h"
 
-#if CMK_CUDA
-#include <cupti.h>
+#if CMK_GPU
 #include "gpumanager.h"
 #include "hapi.h"
 #include <atomic>
@@ -164,7 +163,7 @@ void DistBaseLB::barrierDone() {
     }
   }
 
-#if CMK_CUDA
+#if CMK_GPU
   // Turn the CUPTI kernel timeline into a per-object GPU load before
   // AssembleStats copies object data out of the LB database. Without this
   // LDObjData::gpuTime stays zero for every distributed strategy, so
@@ -214,7 +213,7 @@ void DistBaseLB::barrierDone() {
 // PE's share out, assemble its stats and start the strategy.
 void DistBaseLB::gpuLoadsReady() {
 #if CMK_LBDB_ON
-#if CMK_CUDA
+#if CMK_GPU
   // Every PE picks up the normalized loads for its own objects.
   lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
   lbmgr->SetObjDriverLoad(CsvAccess(gpu_manager).cupti_obj_api_raw_, hapiCuptiDriverScale());
@@ -282,7 +281,7 @@ void DistBaseLB::AssembleStats() {
 
   myStats.move = true;
 
-#if CMK_CUDA
+#if CMK_GPU
   hapiLBDeviceMemory(&myStats.gpu_mem_remaining, &myStats.pool_buff_mem_remaining,
                      &myStats.gpu_pool_arena_bytes, &myStats.gpu_ipc_slots);
   myStats.gpu_pool_capacity_bytes = hapiLBDevicePoolCapacity();
@@ -304,7 +303,7 @@ void DistBaseLB::AssembleStats() {
     for (const auto& o : myStats.objData) {
       sw += o.wallTime;
       if (o.wallTime > mw) mw = o.wallTime;
-#if CMK_CUDA
+#if CMK_GPU
       sg += o.gpuTime;
       if (o.gpuTime > mg) mg = o.gpuTime;
 #endif
@@ -494,7 +493,7 @@ void DistBaseLB::MigrationDone(int balancing) {
   // attribution, so a chare that has joined is still not billed.
   LBTurnInstrumentOn();
 
-#if CMK_CUDA
+#if CMK_GPU
   // Drop the kernel records this round's loads were derived from, so the next
   // round measures the next interval rather than everything since startup
   // (mirrors CentralLB::ProcessMigrationDecision).

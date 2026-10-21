@@ -18,7 +18,7 @@
 #include <map>
 #include <vector>
 
-#if CMK_CUDA
+#if CMK_GPU
 #include "gpumanager.h"
 #include "hapi.h"
 CsvExtern(GPUManager, gpu_manager);
@@ -62,7 +62,7 @@ static inline CmiUInt8 metalbSlotToDevId(double d) {
   return id;
 }
 
-#if CMK_CUDA
+#if CMK_GPU
 // The device this PE's work lands on.
 static CmiUInt8 metalbMyDeviceId() {
   return (CmiUInt8)hapiMyDevice();
@@ -461,7 +461,7 @@ void MetaBalancer::ContributeStats(int it_n) {
 
   // One device entry when this PE is reporting GPU load, none otherwise. Sized
   // up front so lb_data stays valid for the whole function.
-#if CMK_CUDA
+#if CMK_GPU
   const bool report_device = gpuTriggerOn();
 #else
   const bool report_device = false;
@@ -517,7 +517,7 @@ void MetaBalancer::ContributeStats(int it_n) {
   lb_data[STEP_IN_FLIGHT] = lb_step_in_flight_ ? 1.0 : 0.0;
   lb_data[METALB_NDEV_SLOT] = report_device ? 1.0 : 0.0;
 
-#if CMK_CUDA
+#if CMK_GPU
   if (report_device) {
     // Cumulative since the last hapiClearCuptiData, so what lands here is this
     // PE's share of its device's load over the whole window since the last LB
@@ -1297,7 +1297,7 @@ void MetaBalancer::TriggerAdaptiveReduction() {
     adaptive_struct.lb_iteration_no++;
     // Zero-initialized: the reducer reads every scalar slot, and the min-valued
     // ones below would otherwise merge whatever was on the stack.
-#if CMK_CUDA
+#if CMK_GPU
     const bool report_device = gpuTriggerOn();
 #else
     const bool report_device = false;
@@ -1311,7 +1311,7 @@ void MetaBalancer::TriggerAdaptiveReduction() {
     lb_data[MIN_OBJ_LOAD] = 0.0;
     lb_data[STEP_IN_FLIGHT] = lb_step_in_flight_ ? 1.0 : 0.0;
     lb_data[METALB_NDEV_SLOT] = report_device ? 1.0 : 0.0;
-#if CMK_CUDA
+#if CMK_GPU
     // An empty PE still sits on a device, and contributes zero to its load.
     // Reporting it keeps the device set complete even when every PE bound to a
     // device has been emptied out.

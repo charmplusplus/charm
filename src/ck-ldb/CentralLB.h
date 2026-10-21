@@ -245,7 +245,7 @@ public:
     return Strategy(stats);
   }
 
-#if CMK_CUDA
+#if CMK_GPU
   // Destination-dependent GPU cost prediction, shared by every centralized
   // strategy. Lives here rather than in one balancer so the estimator can be
   // developed and judged independently of whichever policy consumes it.
@@ -301,7 +301,7 @@ private:
 
   FutureModel *predicted_model;
 
-#if CMK_CUDA
+#if CMK_GPU
   GpuScalingModel gpuScalingModel_;
   uint64_t gpuScalingEpoch_;
   // Last epoch's shadow predictions, checked against what actually happened
@@ -338,7 +338,7 @@ public:
 
   int from_pe;
   int pe_speed;
-#if CMK_CUDA
+#if CMK_GPU
   size_t gpu_mem_remaining;
   size_t pool_buff_mem_remaining;
   size_t gpu_pool_arena_bytes;
@@ -364,7 +364,7 @@ public:
 public:
   CLBStatsMsg(int osz, int csz);
   CLBStatsMsg(): from_pe(0), pe_speed(0),
-#if CMK_CUDA
+#if CMK_GPU
 		 gpu_device_id(-1), gpu_total_sms(0),
 		 gpu_mem_remaining(0), pool_buff_mem_remaining(0),
 		 gpu_pool_arena_bytes(0), gpu_pool_capacity_bytes(0), gpu_ipc_slots(0),

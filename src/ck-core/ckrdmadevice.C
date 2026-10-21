@@ -59,7 +59,7 @@
 
 #define CMK_GPU_COMM 1
 
-#if CMK_CUDA || CMK_HIP
+#if CMK_GPU
 
 CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
   CmiEnforce((srcPe >= 0) && (srcPe <= CmiNumPes()));
@@ -95,7 +95,7 @@ CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
 // thread (+gpusubmit): it has to be in the driver before the wait means anything.
 static inline hapiError_t ckSubmitDrainThenSync(hapiStream_t stream) {
   hapiSubmitDrain();
-  return cudaStreamSynchronize(stream);
+  return hapiStreamSynchronize(stream);
 }
 #include "gpumanager.h"
 
@@ -333,13 +333,13 @@ void CkRdmaDeviceRegistrationCacheInit()
 static hapiStream_t stagingStream()
 {
   hapiStream_t& s = CkpvAccess(staging_stream);
-  if (s == nullptr) hapiCheck(cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking));
+  if (s == nullptr) hapiCheck(hapiStreamCreateWithFlags(&s, hapiStreamNonBlocking));
   return s;
 }
 static hapiStream_t restageWaitStream()
 {
   hapiStream_t& s = CkpvAccess(restage_wait_stream);
-  if (s == nullptr) hapiCheck(cudaStreamCreateWithFlags(&s, cudaStreamNonBlocking));
+  if (s == nullptr) hapiCheck(hapiStreamCreateWithFlags(&s, hapiStreamNonBlocking));
   return s;
 }
 static hapiEvent_t stagingEventTake()
@@ -1354,7 +1354,7 @@ CkDeviceStatus CkDevicePersistent::get(CkDevicePersistent& src) {
   CkNcpyModeDevice mode = findTransferModeDevice(src.pe, CkMyPe());
 
   if (mode == CkNcpyModeDevice::MEMCPY) {
-    hapiMemcpyAsync((void*)ptr, src.ptr, src.cnt, cudaMemcpyDefault, hapi_stream);
+    hapiMemcpyAsync((void*)ptr, src.ptr, src.cnt, hapiMemcpyDefault, hapi_stream);
     persistentStreamCallbacks(hapi_stream, src, *this);
   } else if (mode == CkNcpyModeDevice::IPC) {
     hapiMemcpyAsync((void*)ptr, persistentImport(src), src.cnt, hapiMemcpyDeviceToDevice,
@@ -1393,7 +1393,7 @@ CkDeviceStatus CkDevicePersistent::put(CkDevicePersistent& dst) {
   CkNcpyModeDevice mode = findTransferModeDevice(CkMyPe(), dst.pe);
 
   if (mode == CkNcpyModeDevice::MEMCPY) {
-    hapiMemcpyAsync((void*)dst.ptr, ptr, cnt, cudaMemcpyDefault, hapi_stream);
+    hapiMemcpyAsync((void*)dst.ptr, ptr, cnt, hapiMemcpyDefault, hapi_stream);
     persistentStreamCallbacks(hapi_stream, *this, dst);
   } else if (mode == CkNcpyModeDevice::IPC) {
     hapiMemcpyAsync(persistentImport(dst), ptr, cnt, hapiMemcpyDeviceToDevice, hapi_stream);
@@ -2254,7 +2254,7 @@ static void deviceChannelBatchFlush() {
   // The arrays belong to the batch, which lives until its completion handler
   // frees it, so the closure may run later (submit mode) and still read them.
   hapiSubmit(st, [=]() {
-    cudaError_t err = cudaErrorNotSupported;
+    hapiError_t err = hapiErrorNotSupported;
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 12080
     if (n > 1) {
       cudaMemcpyAttributes attr{};
@@ -2268,15 +2268,15 @@ static void deviceChannelBatchFlush() {
 #endif
     }
 #endif
-    if (err != cudaSuccess) {
+    if (err != hapiSuccess) {
       if (n > 1) {
-        cudaGetLastError();
+        hapiGetLastError();
         if (zcStatsOnFast()) zc_mode_stats.chan_batch_fallback.fetch_add(1, std::memory_order_relaxed);
       }
       // cudaMemcpyDefault: a destination may sit on another device (a peer's
       // buffer through its IPC import, or a receiver moved between GPUs).
       for (size_t i = 0; i < n; i++)
-        hapiCheck(cudaMemcpyAsync(b->dsts[i], b->srcs[i], b->sizes[i], cudaMemcpyDefault, st));
+        hapiCheck(hapiMemcpyAsync(b->dsts[i], b->srcs[i], b->sizes[i], hapiMemcpyDefault, st));
     }
   });
   hapiAddCallback(st, CkCallback(deviceChannelBatchDoneFn, (void*)b));
@@ -2839,8 +2839,8 @@ void CkDeviceChannel::describeStall(const char* role) const {
   // completion callback get lost?
   const char* stream_state = "-";
   if (in_flight > 0) {
-    const cudaError_t q = cudaStreamQuery(src_ep.hapi_stream);
-    stream_state = (q == cudaSuccess) ? "idle" : (q == cudaErrorNotReady) ? "busy" : cudaGetErrorName(q);
+    const hapiError_t q = hapiStreamQuery(src_ep.hapi_stream);
+    stream_state = (q == hapiSuccess) ? "idle" : (q == hapiErrorNotReady) ? "busy" : hapiGetErrorName(q);
   }
   CmiPrintf("[CHAN-STALL %d] %s channel %llx gen %llu owner_pe %d | sender: resolved=%d resolving=%d credits=%d "
             "in_flight=%d(stream %s, tier %s) pending=%d(tag %llu) close_ack_due=%d token=%llx seq=%llu epoch=%llu closed=%llu pull=%d | owner: is_owner=%d busy=%d pulls=%zu pulling=%d "
@@ -3713,7 +3713,7 @@ void* ckDeviceRecordMemcpyEvent(hapiStream_t stream) {
     // sticky error so it is not left for the next cudaPeekAtLastError in
     // application code, which would abort on a failure it did not cause and
     // which was already handled.
-    cudaGetLastError();
+    hapiGetLastError();
     return NULL;
   }
   return (void*)ev;
@@ -3804,7 +3804,7 @@ static void deviceIpcReceive(CkDeviceBuffer& source, CkDeviceBuffer& dest,
   // complete on the host, so nothing on recv_stream can block behind a sender.
   // The slot is released when this copy completes: the caller recorded it in
   // the op, and CkRdmaDeviceRecvHandler raises its dst_flag then.
-  hapiSubmitMemcpyAsync((void*)dest.ptr, src_addr, dest.cnt, cudaMemcpyDefault, recv_stream);
+  hapiSubmitMemcpyAsync((void*)dest.ptr, src_addr, dest.cnt, hapiMemcpyDefault, recv_stream);
 }
 
 
@@ -3894,10 +3894,10 @@ static void deviceRecvNoteDestination(DeviceRdmaOp& op, const CkDeviceBufferPost
   op.dst_event = NULL;
   if (post.buffer_free) return;
   hapiSubmitDrain();   // queued work on the posted stream must be in the driver before it is asked
-  const cudaError_t q = cudaStreamQuery(post.hapi_stream);
-  if (q == cudaSuccess) return;
-  if (q != cudaErrorNotReady) { hapiCheck(q); return; }
-  cudaGetLastError();   // NotReady is the answer, not an error to leave behind
+  const hapiError_t q = hapiStreamQuery(post.hapi_stream);
+  if (q == hapiSuccess) return;
+  if (q != hapiErrorNotReady) { hapiCheck(q); return; }
+  hapiGetLastError();   // NotReady is the answer, not an error to leave behind
   int rank = -1;
   uint32_t seq = 0;
   if (hapiFlagIssue(post.hapi_stream, &rank, &seq)) {
@@ -3911,7 +3911,7 @@ static void deviceRecvNoteDestination(DeviceRdmaOp& op, const CkDeviceBufferPost
   } else {
     // Another device's stream (a chare that moved between GPUs): our event
     // cannot be recorded on it. Settle it instead; rare and bounded.
-    cudaGetLastError();
+    hapiGetLastError();
     deviceRecvEventGive(ev);
     hapiCheck(ckSubmitDrainThenSync(post.hapi_stream));
   }
@@ -3937,10 +3937,10 @@ static const double kRecvQueryPeriod = 100e-6;
 
 static inline bool deviceRecvEventDone(hapiEvent_t ev)
 {
-  const cudaError_t q = cudaEventQuery(ev);
-  if (q == cudaSuccess) return true;
-  if (q != cudaErrorNotReady) hapiCheck(q);
-  cudaGetLastError();
+  const hapiError_t q = hapiEventQuery(ev);
+  if (q == hapiSuccess) return true;
+  if (q != hapiErrorNotReady) hapiCheck(q);
+  hapiGetLastError();
   return false;
 }
 
@@ -4046,7 +4046,7 @@ static void deviceRecvBatchFlush()
   // frees it, so the closure may run later (submit mode) and still read them.
   hapiSubmit(rs, [=]() {
     const double tb0 = zcStatsOnFast() ? CkWallTimer() : 0.0;
-    cudaError_t err = cudaErrorNotSupported;
+    hapiError_t err = hapiErrorNotSupported;
 #if defined(CUDART_VERSION) && CUDART_VERSION >= 12080
     if (n > 1) {
       cudaMemcpyAttributes attr{};
@@ -4062,15 +4062,15 @@ static void deviceRecvBatchFlush()
 #endif
     }
 #endif
-    if (err != cudaSuccess) {
+    if (err != hapiSuccess) {
       if (n > 1) {
-        cudaGetLastError();   // the refusal is answered by the loop below
+        hapiGetLastError();   // the refusal is answered by the loop below
         if (zcStatsOn()) zc_mode_stats.batch_fallback.fetch_add(1, std::memory_order_relaxed);
       }
       // cudaMemcpyDefault: source and destination may sit on different devices
       // (a peer's memory through its IPC import, or a chare moved between GPUs).
       for (size_t i = 0; i < n; i++)
-        hapiCheck(cudaMemcpyAsync(b->dsts[i], b->srcs[i], b->sizes[i], cudaMemcpyDefault, rs));
+        hapiCheck(hapiMemcpyAsync(b->dsts[i], b->srcs[i], b->sizes[i], hapiMemcpyDefault, rs));
     }
     if (tb0 != 0.0)
       zc_mode_stats.batch_us.fetch_add((long)((CkWallTimer() - tb0) * 1e6), std::memory_order_relaxed);
@@ -4085,7 +4085,7 @@ static void deviceRecvBatchAdd(void* dst, const void* src, size_t bytes,
 {
   if (deviceRecvBatchUsec() <= 0) {
     hapiStream_t rs = deviceRecvStream();
-    hapiSubmitMemcpyAsync(dst, src, bytes, cudaMemcpyDefault, rs);
+    hapiSubmitMemcpyAsync(dst, src, bytes, hapiMemcpyDefault, rs);
     hapiAddCallback(rs, CkCallback(done, (void*)op));
     return;
   }
@@ -4125,7 +4125,7 @@ static void deviceRecvIssue(DeviceRecvPending& p)
     // The pull's completion was the source condition; copy the landing into
     // the posted buffer and free it behind that copy.
     const StagedLanding& sl = p.sl;
-    hapiSubmitMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt, cudaMemcpyDefault, rs);
+    hapiSubmitMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt, hapiMemcpyDefault, rs);
     hapiAddCallback(rs, CkCallback(stagedLandingFreeFn,
                                    (void*)new StagedLandingFree{(void*)source.ptr, sl.ready}));
     if (stagedDbg())
@@ -4287,9 +4287,9 @@ static bool forwardRepairReadyOrPark(envelope* env, int newPe, int opts,
   if (ev == NULL) return true;
   // The overwhelmingly common case: the payload was produced long before its
   // target moved, so there is nothing to wait for and nothing to park.
-  const cudaError_t q = cudaEventQuery(ev);
-  if (q == cudaSuccess) return true;
-  if (q != cudaErrorNotReady) {
+  const hapiError_t q = hapiEventQuery(ev);
+  if (q == hapiSuccess) return true;
+  if (q != hapiErrorNotReady) {
     hapiCheck(q);   // a real failure: report it where it happened
     return true;
   }
@@ -4910,7 +4910,7 @@ extern "C" void* device_restage_req_bridge(void* arg)
     // IPC event slot. There is nothing to enqueue a wait against, so this one
     // case still drains the device. It fires only under slot exhaustion; the
     // fix for it is a free slot, not a different wait.
-    if (src_needs_full_sync) { hapiSubmitDrain(); hapiCheck(cudaDeviceSynchronize()); }
+    if (src_needs_full_sync) { hapiSubmitDrain(); hapiCheck(hapiDeviceSynchronize()); }
     // Otherwise the sender blocked at send time (no event was free on the
     // unstaged path), so the bytes are already there.
     issueDeviceRestagePut(req, src_ptr);
@@ -4940,7 +4940,7 @@ extern "C" void* device_restage_req_bridge(void* arg)
     if (src_ready)
       hapiCheck(hapiStreamWaitEvent(hapiStreamPerThread, src_ready, 0));
     else if (src_needs_full_sync)
-      { hapiSubmitDrain(); hapiCheck(cudaDeviceSynchronize()); }
+      { hapiSubmitDrain(); hapiCheck(hapiDeviceSynchronize()); }
     const int device_idx =
         csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id;
     hapi_ipc_device_info& my_device_info =
@@ -4974,10 +4974,10 @@ extern "C" void* device_restage_req_bridge(void* arg)
     if (src_ready)
       hapiCheck(hapiStreamWaitEvent(hapiStreamPerThread, src_ready, 0));
     else if (src_needs_full_sync)
-      { hapiSubmitDrain(); hapiCheck(cudaDeviceSynchronize()); }
+      { hapiSubmitDrain(); hapiCheck(hapiDeviceSynchronize()); }
 
     hapiCheck(hapiMemcpyAsync(staged, src_ptr, req->cnt,
-                              cudaMemcpyDefault, hapiStreamPerThread));
+                              hapiMemcpyDefault, hapiStreamPerThread));
 
     const int device_idx =
         csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id;
@@ -5512,11 +5512,11 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // buffer can be freed by an object that migrated away, and the destination
     // is whatever the (possibly just-migrated) receiver posted.
     if (zcValidateOn()) {
-      cudaPointerAttributes sattr{}, dattr{};
-      const cudaError_t serr = cudaPointerGetAttributes(&sattr, source.ptr);
-      const cudaError_t derr = cudaPointerGetAttributes(&dattr, (void*)dest.ptr);
-      const bool sbad = (serr != cudaSuccess || sattr.type == cudaMemoryTypeUnregistered);
-      const bool dbad = (derr != cudaSuccess || dattr.type == cudaMemoryTypeUnregistered);
+      hapiPointerAttributes sattr{}, dattr{};
+      const hapiError_t serr = hapiPointerGetAttributes(&sattr, source.ptr);
+      const hapiError_t derr = hapiPointerGetAttributes(&dattr, (void*)dest.ptr);
+      const bool sbad = (serr != hapiSuccess || sattr.type == hapiMemoryTypeUnregistered);
+      const bool dbad = (derr != hapiSuccess || dattr.type == hapiMemoryTypeUnregistered);
       // A staged IPC receive reads the sender's comm buffer through an imported
       // handle, never source.ptr, so source.ptr being unmapped here is the normal
       // cross-process case and says nothing. Only report it when this receive
@@ -5531,7 +5531,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
                   (void*)dest.ptr, dbad ? "BAD" : "ok", (int)dattr.type,
                   (size_t)dest.cnt, source.device_idx);
         fflush(stdout);
-        cudaGetLastError();  // clear so the report is not itself sticky
+        hapiGetLastError();  // clear so the report is not itself sticky
       }
     }
 
@@ -5899,7 +5899,7 @@ bool CkRdmaDeviceStageParked(envelope* env)
     if (mode == CkNcpyModeDevice::MEMCPY && !sender_exported) {
       if (source.memcpy_event != NULL)
         hapiCheck(hapiStreamWaitEvent(st, (hapiEvent_t)source.memcpy_event, 0));
-      hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt, cudaMemcpyDefault, st));
+      hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt, hapiMemcpyDefault, st));
     } else {
       deviceIpcReceive(source, dest, st, srcPe, mode);
     }
@@ -6334,7 +6334,7 @@ namespace {
 // only waits on events belonging to the consumer's own device, which is the
 // only wait that is valid anyway.
 struct LbRetireKey {
-  cudaStream_t stream;
+  hapiStream_t stream;
   int device;
   bool operator==(const LbRetireKey& o) const {
     return stream == o.stream && device == o.device;
@@ -6345,7 +6345,7 @@ struct LbRetireKeyHash {
     return std::hash<void*>()((void*)k.stream) ^ (std::hash<int>()(k.device) << 1);
   }
 };
-typedef std::unordered_map<LbRetireKey, cudaEvent_t, LbRetireKeyHash> LbRetireEvents;
+typedef std::unordered_map<LbRetireKey, hapiEvent_t, LbRetireKeyHash> LbRetireEvents;
 std::unordered_map<void*, LbRetireEvents> lb_retire_events;
 // A std::mutex, not a CmiNodeLock created on first use: "if NULL, create" races
 // when two PEs arrive together (see hapi_stream_pool_lock).
@@ -6353,38 +6353,38 @@ std::mutex lb_retire_lock;
 }  // namespace
 
 
-void CkRdmaDeviceNoteLbBufferFreed(void* dm_opaque, cudaStream_t usedBy) {
+void CkRdmaDeviceNoteLbBufferFreed(void* dm_opaque, hapiStream_t usedBy) {
   if (dm_opaque == NULL) return;
   lb_retire_lock.lock();
   int dev = -1;
-  hapiCheck(cudaGetDevice(&dev));
+  hapiCheck(hapiGetDevice(&dev));
   LbRetireEvents& evs = lb_retire_events[dm_opaque];
   const LbRetireKey key{usedBy, dev};
   auto it = evs.find(key);
   if (it == evs.end()) {
-    cudaEvent_t e;
+    hapiEvent_t e;
     // Disable timing: this event is only ever waited on, and a timing-enabled
     // event costs more to record.
-    hapiCheck(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
+    hapiCheck(hapiEventCreateWithFlags(&e, hapiEventDisableTiming));
     it = evs.emplace(key, e).first;
   }
   // Re-recording overwrites the previous capture, which is correct: work on one
   // stream is ordered, so the latest record subsumes every earlier one.
-  hapiCheck(cudaEventRecord(it->second, usedBy));
+  hapiCheck(hapiEventRecord(it->second, usedBy));
   lb_retire_lock.unlock();
 }
 
-void CkRdmaDeviceGateLbBuffer(void* dm_opaque, cudaStream_t consumer) {
+void CkRdmaDeviceGateLbBuffer(void* dm_opaque, hapiStream_t consumer) {
   if (dm_opaque == NULL) return;
   lb_retire_lock.lock();
   auto dit = lb_retire_events.find(dm_opaque);
   if (dit != lb_retire_events.end()) {
     int dev = -1;
-    hapiCheck(cudaGetDevice(&dev));
+    hapiCheck(hapiGetDevice(&dev));
     for (auto& kv : dit->second) {
       if (kv.first.device != dev) continue;   // another device's event
       if (kv.first.stream == consumer) continue;  // same stream, already ordered
-      hapiCheck(cudaStreamWaitEvent(consumer, kv.second, 0));
+      hapiCheck(hapiStreamWaitEvent(consumer, kv.second, 0));
     }
   }
   lb_retire_lock.unlock();
@@ -6628,7 +6628,7 @@ static hapiStream_t ipcDeferredStream()
 {
   CkIpcSlotQueue& q = ipc_slot_queue;
   if (q.stream == nullptr)
-    hapiCheck(cudaStreamCreateWithFlags(&q.stream, cudaStreamNonBlocking));
+    hapiCheck(hapiStreamCreateWithFlags(&q.stream, hapiStreamNonBlocking));
   return q.stream;
 }
 
@@ -6663,7 +6663,7 @@ static CkDeviceDeferredSend* ipcParkSend(int dest_pe, int numops,
       } else {
         // The buffer's stream is on another device (see the cross-device
         // record in ipcPrepareBuffers): settle it here instead, as that does.
-        cudaGetLastError();
+        hapiGetLastError();
         ipc_slot_queue.spareEvents.push_back(e);
         hapiCheck(ckSubmitDrainThenSync(b->hapi_stream));
       }
@@ -6916,19 +6916,19 @@ static bool ipcPrepareBuffers(int dest_pe, int numops, CkDeviceBuffer** buffers,
       // it is still being marshalled -- report that here rather than letting
       // it surface asynchronously somewhere unrelated.
       if (zcValidateOn()) {
-        cudaPointerAttributes sattr{};
-        const cudaError_t serr = cudaPointerGetAttributes(&sattr, buffers[i]->ptr);
-        if (serr != cudaSuccess || sattr.type == cudaMemoryTypeUnregistered) {
+        hapiPointerAttributes sattr{};
+        const hapiError_t serr = hapiPointerGetAttributes(&sattr, buffers[i]->ptr);
+        if (serr != hapiSuccess || sattr.type == hapiMemoryTypeUnregistered) {
           CmiPrintf("[%d] ZC SEND VALIDATE FAIL src=%p (type=%d err=%d) cnt=%zu "
                     "dest_pe=%d mode=IPC\n",
                     CkMyPe(), buffers[i]->ptr, (int)sattr.type, (int)serr,
                     (size_t)buffers[i]->cnt, dest_pe);
           fflush(stdout);
-          cudaGetLastError();
+          hapiGetLastError();
         }
       }
       hapiCheck(hapiMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
-            cudaMemcpyDefault, buffers[i]->hapi_stream));
+            hapiMemcpyDefault, buffers[i]->hapi_stream));
 
       // The completion callback's contract is "the source buffer is safe to
       // reuse", and for a staged send that is the moment the staging copy
@@ -7140,13 +7140,13 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
   {
     if (zcValidateOn()) {
       int cur_dev = -1;
-      cudaGetDevice(&cur_dev);
+      hapiGetDevice(&cur_dev);
       for (int i = 0; i < numops; i++) {
         if (buffers[i]->cnt == 0) continue;
-        cudaPointerAttributes sattr{};
-        const cudaError_t serr = cudaPointerGetAttributes(&sattr, buffers[i]->ptr);
-        const bool unmapped = (serr != cudaSuccess || sattr.type == cudaMemoryTypeUnregistered);
-        const bool wrong_dev = (!unmapped && sattr.type == cudaMemoryTypeDevice &&
+        hapiPointerAttributes sattr{};
+        const hapiError_t serr = hapiPointerGetAttributes(&sattr, buffers[i]->ptr);
+        const bool unmapped = (serr != hapiSuccess || sattr.type == hapiMemoryTypeUnregistered);
+        const bool wrong_dev = (!unmapped && sattr.type == hapiMemoryTypeDevice &&
                                 sattr.device != cur_dev);
         if (unmapped || wrong_dev) {
           CmiPrintf("[%d] ZC SEND VALIDATE FAIL src=%p %s (type=%d ptr_dev=%d "
@@ -7158,7 +7158,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
                     transfer_mode == CkNcpyModeDevice::MEMCPY ? "MEMCPY"
                       : (transfer_mode == CkNcpyModeDevice::IPC ? "IPC" : "RDMA"));
           fflush(stdout);
-          cudaGetLastError();
+          hapiGetLastError();
         }
       }
     }
@@ -7292,4 +7292,4 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
 #endif
   }
 }
-#endif // CMK_CUDA
+#endif // CMK_GPU

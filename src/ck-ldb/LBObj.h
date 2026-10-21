@@ -24,7 +24,7 @@ public:
     // model as garbage -- 10^16 bytes per object, a migration priced at 10^8
     // seconds -- and every priced decision refused to move anything.
     data.pupSize = 0;
-#if CMK_CUDA
+#if CMK_GPU
     data.gpuPupSize = 0;
 #endif
     Clear();
@@ -153,14 +153,14 @@ public:
   }
 
   inline void getGPUTime(LBRealType *w) {
-  #if CMK_CUDA
+  #if CMK_GPU
     *w = data.gpuTime;
   #else
-    CmiAbort("LBObj::getGPUTime called but CMK_CUDA is not set");
+    CmiAbort("LBObj::getGPUTime called but CMK_GPU is not set");
   #endif
   }
 
-#if CMK_CUDA
+#if CMK_GPU
   // The host time this object spent inside the CUDA driver is not host work:
   // it comes out of wallTime, what the per-PE dimension balances, and its
   // share of the process's driver busy time goes in as the launch load.
@@ -212,14 +212,14 @@ public:
 
   inline void setGPUTiming(LBRealType gputime)
   {
-  #if CMK_CUDA
+  #if CMK_GPU
     data.gpuTime = gputime;
   #else
-    CmiAbort("LBObj::setGPUTiming called but CMK_CUDA is not set");
+    CmiAbort("LBObj::setGPUTiming called but CMK_GPU is not set");
   #endif
   }
 
-#if CMK_CUDA
+#if CMK_GPU
   inline void setGPUCosts(const GpuObjectEpochCosts &costs) { data.gpuCosts = costs; }
   inline void clearGPUCosts() { data.gpuCosts.clear(); }
   inline const GpuObjectEpochCosts &getGPUCosts() const { return data.gpuCosts; }
@@ -232,10 +232,10 @@ public:
     data.pupSize = pup_encodeSize(obj_pup_size);
   }
   inline void setGPUPupSize(size_t obj_gpu_pup_size){
-  #if CMK_CUDA
+  #if CMK_GPU
     data.gpuPupSize = obj_gpu_pup_size;
   #else
-    CmiAbort("LBObj::setGPUPupSize called but CMK_CUDA is not set");
+    CmiAbort("LBObj::setGPUPupSize called but CMK_GPU is not set");
   #endif
   }
   

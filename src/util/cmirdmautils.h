@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stddef.h>
 
-#if CMK_CUDA
+#if CMK_GPU
 enum DeviceRecvType {
   DEVICE_RECV_TYPE_CHARM,
   DEVICE_RECV_TYPE_AMPI,
@@ -77,7 +77,7 @@ typedef struct DeviceRdmaOpMsg_ {
   char header[CmiMsgHeaderSizeBytes];
   DeviceRdmaOp* op;
 } DeviceRdmaOpMsg;
-#endif // CMK_CUDA
+#endif // CMK_GPU
 
 #ifdef __cplusplus
 extern "C" {

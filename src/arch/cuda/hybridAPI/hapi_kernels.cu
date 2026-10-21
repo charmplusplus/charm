@@ -1,7 +1,21 @@
-// Device kernels of the HAPI runtime. Compiled by nvcc into libhybridapi
-// beside hapi_impl.cpp (which the C++ compiler builds); keep the interface
-// extern "C" and free of CUDA types other than cudaStream_t.
+// Device kernels of the HAPI runtime. Compiled by the vendor's device compiler
+// (nvcc, or hipcc as HIP) into libhybridapi beside hapi_impl.cpp, which the
+// C++ compiler builds; neither sees the Charm++ headers, so the interface is
+// extern "C" with the stream as the only vendor type, named per vendor here.
+#if defined(__HIP_PLATFORM_AMD__) || defined(__HIPCC__)
+#include <hip/hip_runtime.h>
+#define hapiStream_t hipStream_t
+#define hapiMemsetAsync hipMemsetAsync
+// Wavefronts are 64 lanes wide, but the reductions below fold 32 lanes at a
+// time and index the per-warp scratch by threadIdx >> 5, which is correct on
+// either width: the XOR offsets stay inside a 32-lane half.
+#define HAPI_SHFL_XOR(v, o) __shfl_xor((v), (o))
+#else
 #include <cuda_runtime.h>
+#define hapiStream_t cudaStream_t
+#define hapiMemsetAsync cudaMemsetAsync
+#define HAPI_SHFL_XOR(v, o) __shfl_xor_sync(0xffffffffu, (v), (o))
+#endif
 #include <stdint.h>
 #include <stddef.h>
 
@@ -41,7 +55,7 @@ __global__ void hapiHashKernel(const unsigned char* p, size_t n, unsigned long l
       h ^= mix64((unsigned long long)p[i] + 0x9e3779b97f4a7c15ULL * (unsigned long long)(i + 1));
   }
   // Block reduction by XOR: warp shuffles, then one word per warp.
-  for (int o = 16; o > 0; o >>= 1) h ^= __shfl_xor_sync(0xffffffffu, h, o);
+  for (int o = 16; o > 0; o >>= 1) h ^= HAPI_SHFL_XOR(h, o);
   __shared__ unsigned long long s[32];
   const int lane = threadIdx.x & 31, wid = threadIdx.x >> 5;
   if (lane == 0) s[wid] = h;
@@ -49,7 +63,7 @@ __global__ void hapiHashKernel(const unsigned char* p, size_t n, unsigned long l
   if (wid == 0) {
     const int nwarps = (blockDim.x + 31) / 32;
     h = (lane < nwarps) ? s[lane] : 0ULL;
-    for (int o = 16; o > 0; o >>= 1) h ^= __shfl_xor_sync(0xffffffffu, h, o);
+    for (int o = 16; o > 0; o >>= 1) h ^= HAPI_SHFL_XOR(h, o);
     if (lane == 0) atomicXor(out, h);
   }
 }
@@ -65,8 +79,8 @@ __global__ void hapiHashCompareKernel(const unsigned long long* a, const unsigne
 }  // namespace
 
 extern "C" void hapiHashAsyncImpl(const void* p, size_t n, unsigned long long* d_out,
-                                  cudaStream_t stream) {
-  cudaMemsetAsync(d_out, 0, sizeof(unsigned long long), stream);
+                                  hapiStream_t stream) {
+  hapiMemsetAsync(d_out, 0, sizeof(unsigned long long), stream);
   if (n == 0) return;
   const int threads = 256;
   size_t units = ((((uintptr_t)p) & 7) == 0) ? (n + 7) / 8 : n;
@@ -77,10 +91,10 @@ extern "C" void hapiHashAsyncImpl(const void* p, size_t n, unsigned long long* d
 }
 
 extern "C" void hapiHashCompareImpl(const unsigned long long* a, const unsigned long long* b,
-                                    size_t count, unsigned long long* d_flag, cudaStream_t stream) {
+                                    size_t count, unsigned long long* d_flag, hapiStream_t stream) {
   // The flag starts at the maximum; a mismatch stores 1 + its index and the
   // minimum wins, so the host reads ~0 as "all equal".
-  cudaMemsetAsync(d_flag, 0xFF, sizeof(unsigned long long), stream);
+  hapiMemsetAsync(d_flag, 0xFF, sizeof(unsigned long long), stream);
   if (count == 0) return;
   const int threads = 256;
   const unsigned blocks = (unsigned)((count + threads - 1) / threads);

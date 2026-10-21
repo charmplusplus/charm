@@ -23,7 +23,7 @@
 
 #include "pup_stl.h"
 
-#if CMK_CUDA
+#if CMK_GPU
 #include "GpuScalingModel.h"
 #endif
 
@@ -219,7 +219,7 @@ public:
   void *getData(int idx) { return data.data()+idx; }
 };
 
-#if CMK_CUDA
+#if CMK_GPU
 // Per-kernel record captured via CUPTI, used for SM-utilization-normalized
 // GPU load attribution.
 //
@@ -259,7 +259,7 @@ struct LDObjData {
   // and GetCommData), so every strategy sees rates over the object's active
   // time; this is the window they came from, for diagnosis and the simulator.
   LBRealType windowTime;
-#if CMK_CUDA
+#if CMK_GPU
   // SM-utilization-normalized GPU load, in seconds of whole-device occupancy.
   // Computed in-process by hapiNormalizeCuptiLoads before the stats are sent.
   LBRealType gpuTime;
@@ -302,7 +302,7 @@ struct LDObjData {
   // An encoded approximation of the amount of data the object would pack;
   // call pup_decodeSize(pupSize) to get the actual approximate value
   CmiUInt2 pupSize;
-#if CMK_CUDA
+#if CMK_GPU
   size_t gpuPupSize;
 #endif
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
@@ -470,7 +470,7 @@ inline void LDObjData::pup(PUP::er &p) {
   // Version-gated like gpuCosts: an older dump has no such field.
   if (_lb_version > 5) p|windowTime;
   else if (p.isUnpacking()) windowTime = 0;
-#if CMK_CUDA
+#if CMK_GPU
   p|gpuTime;
   // Version-gated like gpuCosts: an older dump has no such field.
   if (_lb_version > 3) p|driverTime;
@@ -495,7 +495,7 @@ inline void LDObjData::pup(PUP::er &p) {
   }
 #endif
   p|pupSize;
-#if CMK_CUDA
+#if CMK_GPU
   p|gpuPupSize;
   // Version-gated so an older simulation dump loads with empty summaries
   // rather than misreading the stream.

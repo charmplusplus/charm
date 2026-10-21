@@ -2,7 +2,7 @@
 #include "conv-rdmadevice.h"
 #include "ck.h"
 
-#if CMK_CUDA || CMK_HIP
+#if CMK_GPU
 
 CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
   CmiEnforce((srcPe >= 0) && (srcPe <= CmiNumPes()));
@@ -43,4 +43,4 @@ void CmiInvokeRecvHandler(void* data) {
   rdmaDeviceRecvHandlerFn(data);
 }
 #endif // CMK_GPU_COMM
-#endif // CMK_CUDA
+#endif // CMK_GPU

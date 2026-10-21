@@ -9,7 +9,7 @@
 
 #define CMK_GPU_COMM 1
 
-#if CMK_CUDA || CMK_HIP
+#if CMK_GPU
 #include "hapi_portable.h"
 
 // Represents the mode of device-side zerocopy transfer
@@ -188,6 +188,6 @@ void CmiRecvDevice(DeviceRdmaOp* op, DeviceRecvType type);
 void CmiRdmaDeviceRecvInit(RdmaAckCallerFn fn);
 void CmiInvokeRecvHandler(void* data);
 #endif // CMK_GPU_COMM
-#endif // CMK_CUDA
+#endif // CMK_GPU
 
 #endif // _CONV_RDMADEVICE_H_

@@ -9,8 +9,8 @@
 #include <ck.h>
 #include "cksyncbarrier.h"
 
-#if CMK_CUDA
-#include <cuda_runtime.h>
+#if CMK_GPU
+#include "hapi_portable.h"
 #endif
 
 #include "DistributedLB.h"
@@ -249,7 +249,7 @@ void _loadbalancerInit()
   CkpvInitialize(LBUserDataLayout, lbobjdatalayout);
   CkpvInitialize(int, _lb_obj_index);
   CkpvAccess(_lb_obj_index) = -1;
-#if CMK_CUDA
+#if CMK_GPU
   // Per-object device footprint slot (the LB memory contract's producer
   // writes it at AtSync). Registered here, not in a balancer's initLB: every
   // balancer family -- central, tree, distributed -- reads it, and layout
@@ -482,7 +482,7 @@ void _loadbalancerInit()
         argv, "+LBNoSyncResume",
         "Let each PE resume its own objects as soon as its own migrations finish "
         "(unsafe with device zerocopy; see LBManager.C)");
-#if CMK_CUDA
+#if CMK_GPU
     // On a CUDA build this defaults ON, because without it a PE resumes its
     // objects while other PEs' location updates are still in flight, and those
     // objects then pick a device zerocopy transfer mode from a stale location.
@@ -1450,7 +1450,7 @@ int LBManager::ProcessorSpeed()
 
 int LBManager::ProcessorGPUSpeed()
 {
-#if CMK_CUDA
+#if CMK_GPU
   static thread_local int gpuSpeed = -1; // per PE: the PEs of one process can drive different devices
   
   if (gpuSpeed != -1) {
@@ -1459,7 +1459,7 @@ int LBManager::ProcessorGPUSpeed()
   
   // Check if GPU is available
   int deviceCount = 0;
-  if (cudaGetDeviceCount(&deviceCount) != cudaSuccess || deviceCount == 0) {
+  if (hapiGetDeviceCount(&deviceCount) != hapiSuccess || deviceCount == 0) {
     CmiAbort("LB> PE %d: No GPU available, GPU speed = 0\n", CkMyPe());
   }
   
@@ -1478,22 +1478,22 @@ int LBManager::ProcessorGPUSpeed()
   // the device this PE actually drives, which is what CpvAccess(my_device)
   // holds; keep the guess only as a fallback for a non-CUDA-aware build.
   int deviceId = CkMyPe() % deviceCount;
-#if CMK_CUDA
+#if CMK_GPU
   {
     int cur = -1;
-    if (cudaGetDevice(&cur) == cudaSuccess && cur >= 0 && cur < deviceCount)
+    if (hapiGetDevice(&cur) == hapiSuccess && cur >= 0 && cur < deviceCount)
       deviceId = cur;
   }
 #endif
 
   // Get device properties
-  cudaDeviceProp prop;
-  if (cudaGetDeviceProperties(&prop, deviceId) != cudaSuccess) {
+  hapiDeviceProp prop;
+  if (hapiGetDeviceProperties(&prop, deviceId) != hapiSuccess) {
     CmiAbort("LB> PE %d: Failed to get GPU device properties, GPU speed = 0\n", CkMyPe());
   }
 
   int clockRate = 0;
-  if (cudaDeviceGetAttribute(&clockRate, cudaDevAttrClockRate, deviceId) != cudaSuccess) {
+  if (hapiDeviceGetAttribute(&clockRate, hapiDevAttrClockRate, deviceId) != hapiSuccess) {
     CmiAbort("LB> PE %d: Failed to get GPU clock rate, GPU speed = 0\n", CkMyPe());
   }
   

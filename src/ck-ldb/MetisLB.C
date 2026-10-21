@@ -310,7 +310,7 @@ void MetisLB::work(LDStats* stats)
   // hardens METIS's soft tolerance into hard capacity compliance.
   int nConstraints = 1;
   bool memAware = false;
-#if CMK_CUDA
+#if CMK_GPU
   LBMemoryModel memModel;
   memModel.build(stats);
   if (memModel.numDevices() > 0)
@@ -332,7 +332,7 @@ void MetisLB::work(LDStats* stats)
   int slackIdx = -1;
   double slackUbvec = 1.1;
   double slackAlpha = 0.0;
-#if CMK_CUDA
+#if CMK_GPU
   {
     const LBCriticality crit = lbCriticalityOf(stats);
     if (lbLoadDimOverride() == LB_DIM_AUTO && crit.comparable(lbLoadVectorAbove()))
@@ -463,7 +463,7 @@ void MetisLB::work(LDStats* stats)
   const double crossRatio = (maxCross == 0) ? 0 : 256.0 / maxCross;
   const double intraRatio = (maxIntra == 0) ? 0 : 256.0 / maxIntra;
   double slackRatio = 0.0;
-#if CMK_CUDA
+#if CMK_GPU
   if (slackIdx >= 0)
   {
     double maxSlack = 0.0;
@@ -495,7 +495,7 @@ void MetisLB::work(LDStats* stats)
     // Floored at 1 throughout: METIS needs a positive weight to balance on,
     // and ceil() of a zero load is zero.
     w[0] = std::max((idx_t)1, (idx_t)ceil(ogr->vertices[i].getCompLoad() * crossRatio));
-#if CMK_CUDA
+#if CMK_GPU
     if (memAware) w[1] = memWeight(i);
     if (slackIdx >= 0)
       w[slackIdx] = std::max((idx_t)1, (idx_t)ceil(slackOf(i) * slackRatio));
@@ -886,7 +886,7 @@ void MetisLB::work(LDStats* stats)
     if (pe < 0 || pe >= (int)groupOfPe.size() || groupOfPe[pe] < 0) continue;
     fixedCross[groupOfPe[pe]] += ogr->vertices[i].getCompLoad() * crossRatio;
     fixedCpu[pe] += stats->objData[i].wallTime * intraRatio;
-#if CMK_CUDA
+#if CMK_GPU
     if (memAware) fixedMem[groupOfPe[pe]] += (double)memWeight(i);
     if (slackIdx >= 0) fixedSlack[groupOfPe[pe]] += slackOf(i) * slackRatio;
 #endif
@@ -901,7 +901,7 @@ void MetisLB::work(LDStats* stats)
   // The verifier still repairs whatever residue the tolerance leaves.
   std::vector<double> memCap(nGroups, 0.0);
   double memUbvec = 1.1;
-#if CMK_CUDA
+#if CMK_GPU
   if (memAware)
   {
     MemoryLedger memLedger;
@@ -1288,7 +1288,7 @@ void MetisLB::work(LDStats* stats)
   // stays under target; stop when no such move exists. Unexercised on a real
   // workload as of 12 Sep 2026: both measured applications sit at alpha ~ 0.2
   // on their slack dimension, where no group ever trips the check.
-#if CMK_CUDA
+#if CMK_GPU
   {
     const bool devBinds = ogr->deviceDim;
     const int nPe = (int)parr->procs.size();

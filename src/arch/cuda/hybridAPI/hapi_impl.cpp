@@ -27,10 +27,12 @@
 #include <fcntl.h>
 #include <sched.h>
 
+// The per-thread default stream on either vendor (set before the runtime
+// header is first included, which hapi_portable.h does).
 #define CUDA_API_PER_THREAD_DEFAULT_STREAM
-#include <cuda_runtime.h>
-#include <cuda.h>
-
+#define HIP_API_PER_THREAD_DEFAULT_STREAM
+#include "hapi_portable.h"   // the vendor table; defines CMK_CUDA or CMK_HIP
+#if CMK_CUDA
 // The versioned driver entry-point lookup arrived after CUDA 12.0, whose
 // runtime has only the unversioned one. Every lookup here asks for the 12.0
 // ABI, which is what the unversioned form resolves, so the two agree there.
@@ -38,10 +40,9 @@
 #define cudaGetDriverEntryPointByVersion(symbol, fn, version, flags, status) \
     cudaGetDriverEntryPoint(symbol, fn, flags, status)
 #endif
+#endif
 
-#include "hapi_portable.h"
 #include "converse.h"
-#include "conv-mach-opt.h" /* for CMK_CUDA */
 #include "ckrescale.h"
 #include "charm++.h"
 
@@ -65,12 +66,16 @@ bool hapiNvtxOn = false;   // +nvtx (ck-core/cknvtx.C) turns the HAPI ranges on
 #endif
 
 #if CMK_LBDB_ON
+#if CMK_CUDA
 #include <cupti.h>
 #include <cupti_runtime_cbid.h>
+#endif
+#include "hapi_trace_backend.h"
 #include "LBManager.h"
 #include "ck.h"
 #include "cklocrec.h"
 
+#if CMK_CUDA
 #define CUPTI_SAFE_CALL(call)                                              \
   do {                                                                     \
     CUptiResult _status = call;                                            \
@@ -80,6 +85,7 @@ bool hapiNvtxOn = false;   // +nvtx (ck-core/cknvtx.C) turns the HAPI ranges on
       CmiPrintf("HAPI CUPTI error: %s at %s:%d\n", errstr, __FILE__, __LINE__); \
     }                                                          \
   } while (0)
+#endif
 #endif
 
 #define SERVER_FIFO_TEMPLATE "/tmp/server_pipe_%ld"
@@ -192,7 +198,7 @@ static void hapiSubmitStart(int nsub, int device);   // submitter threads, defin
 static void hapiSubmitSetToken(uint64_t token);
 static void hapiSetStreamCap(int cap);
 static void hapiSetRecvPriority();
-typedef CUresult (*hapiStreamWriteValue32Fn)(CUstream, CUdeviceptr, cuuint32_t, unsigned int);
+typedef hapiDrvResult (*hapiStreamWriteValue32Fn)(hapiDrvStream, uintptr_t, uint32_t, unsigned int);
 static hapiStreamWriteValue32Fn hapi_stream_write_value32 = nullptr;
 CpvDeclare(uint32_t*, hapi_flag_slots);   // pinned host ring
 CpvDeclare(void*, hapi_flag_slots_dev);   // device alias of the ring
@@ -223,8 +229,18 @@ static void hapiIdleYield(void*) {
 // word into the slot's device alias. It goes through the fill path (a kernel
 // or the copy engine) rather than the front end's stream memop, and exists to
 // tell the two apart when a flag write never lands.
-typedef CUresult (*hapiMemsetD32AsyncFn)(CUdeviceptr, unsigned int, size_t, CUstream);
+typedef hapiDrvResult (*hapiMemsetD32AsyncFn)(uintptr_t, unsigned int, size_t, hapiDrvStream);
 static hapiMemsetD32AsyncFn hapi_memset_d32_async = nullptr;
+#if CMK_HIP
+// HIP has both writers as plain runtime calls (no driver entry point to look
+// up); these adapt them to the signatures above.
+static hipError_t hapiHipStreamWriteValue32(hipStream_t s, uintptr_t p, uint32_t v, unsigned int flags) {
+  return hipStreamWriteValue32(s, (void*)p, v, flags);
+}
+static hipError_t hapiHipMemsetD32Async(uintptr_t p, unsigned int v, size_t n, hipStream_t s) {
+  return hipMemsetD32Async((hipDeviceptr_t)p, (int)v, n, s);
+}
+#endif
 static bool hapi_flag_use_memset = false;
 // Completion-flag writes this process has issued (both flag paths, every
 // stream callback): printed at exit with CHARM_ZC_STATS, to put a number on
@@ -290,15 +306,15 @@ static void hapiTraceFlag(void* stream, uint32_t seq) {
 
 void hapiSubmitEventRecord(void* event, hapiStream_t stream);
 bool hapiSubmitOn();
-cudaError_t hapiEventRecordNoted(cudaEvent_t event, cudaStream_t stream, int note) {
+hapiError_t hapiEventRecordNoted(hapiEvent_t event, hapiStream_t stream, int note) {
   // Submit mode: behind the PE's queued work on this stream, never ahead of it.
-  if (hapiSubmitOn()) { hapiSubmitEventRecord((void*)event, (hapiStream_t)stream); return cudaSuccess; }
-  if (!hapi_trace_on) return cudaEventRecord(event, stream);
+  if (hapiSubmitOn()) { hapiSubmitEventRecord((void*)event, (hapiStream_t)stream); return hapiSuccess; }
+  if (!hapi_trace_on) return hapiEventRecordRaw(event, stream);
   // The lock spans the call so the generation the log assigns is the one the
   // driver saw: a wait logged after this record captured it, one before did not.
   CmiLock(hapi_trace_lock);
-  const cudaError_t r = cudaEventRecord(event, stream);
-  if (r == cudaSuccess) {
+  const hapiError_t r = hapiEventRecordRaw(event, stream);
+  if (r == hapiSuccess) {
     HapiTraceEvent& e = (*hapi_trace_events)[(void*)event];
     HapiTraceOp& op = hapiTracePush((void*)stream);
     op.kind = 'R'; op.ev = (void*)event; op.evgen = ++e.gen; op.seq = 0;
@@ -310,12 +326,12 @@ cudaError_t hapiEventRecordNoted(cudaEvent_t event, cudaStream_t stream, int not
   CmiUnlock(hapi_trace_lock);
   return r;
 }
-cudaError_t hapiStreamWaitEventNoted(cudaStream_t stream, cudaEvent_t event,
+hapiError_t hapiStreamWaitEventNoted(hapiStream_t stream, hapiEvent_t event,
                                      unsigned int flags, int note) {
-  if (!hapi_trace_on) return cudaStreamWaitEvent(stream, event, flags);
+  if (!hapi_trace_on) return hapiStreamWaitEventRaw(stream, event, flags);
   CmiLock(hapi_trace_lock);
-  const cudaError_t r = cudaStreamWaitEvent(stream, event, flags);
-  if (r == cudaSuccess) {
+  const hapiError_t r = hapiStreamWaitEventRaw(stream, event, flags);
+  if (r == hapiSuccess) {
     auto it = hapi_trace_events->find((void*)event);
     const uint64_t gen = (it == hapi_trace_events->end()) ? 0 : it->second.gen;
     HapiTraceOp& op = hapiTracePush((void*)stream);
@@ -387,14 +403,14 @@ static void hapiTraceWalk(void* stream, int depth, std::vector<void*>& path) {
       CkPrintf("[trace]%s  #%llu R ev=%p gen=%llu note=%d\n", ind, (unsigned long long)op.idx,
                op.ev, (unsigned long long)op.evgen, op.note);
     } else if (op.kind == 'W') {
-      const cudaError_t q = cudaEventQuery((cudaEvent_t)op.ev);
-      cudaGetLastError();
-      const char* qs = (q == cudaSuccess) ? "done" : (q == cudaErrorNotReady ? "NOT-READY" : "ERR");
+      const hapiError_t q = hapiEventQuery((hapiEvent_t)op.ev);
+      hapiGetLastError();
+      const char* qs = (q == hapiSuccess) ? "done" : (q == hapiErrorNotReady ? "NOT-READY" : "ERR");
       auto et = hapi_trace_events->find(op.ev);
       if (et == hapi_trace_events->end()) {
         CkPrintf("[trace]%s  #%llu W ev=%p note=%d EXTERNAL (recorded outside this process) latest-record query=%s\n",
                  ind, (unsigned long long)op.idx, op.ev, op.note, qs);
-        if (q == cudaErrorNotReady && follow == NULL) {
+        if (q == hapiErrorNotReady && follow == NULL) {
           CkPrintf("[trace]%s  -> blocked on an external record (see the peer's [trace] for note=%d)\n", ind, op.note);
           follow = (void*)1;  // resolved: external
         }
@@ -420,14 +436,14 @@ static void hapiTraceWalk(void* stream, int depth, std::vector<void*>& path) {
       const char* verdict =
           reached == 1 ? "SATISFIED (a later flag on that stream landed)" :
           reached == 0 ? "UNSATISFIED (that stream's next flag has not landed)" :
-          (!aliased ? (q == cudaSuccess ? "SATISFIED (event query done)" :
-                       q == cudaErrorNotReady ? "UNSATISFIED (event query not ready)" : "ERR") :
+          (!aliased ? (q == hapiSuccess ? "SATISFIED (event query done)" :
+                       q == hapiErrorNotReady ? "UNSATISFIED (event query not ready)" : "ERR") :
                       "UNKNOWN (re-recorded since, no flag after the record)");
       CkPrintf("[trace]%s  #%llu W ev=%p gen=%llu%s -> recorded on stream %p at #%llu (pe-rank %d, note %d): %s\n",
                ind, (unsigned long long)op.idx, op.ev, (unsigned long long)op.evgen,
                aliased ? " [RE-RECORDED since]" : "", rec->stream, (unsigned long long)rec->idx,
                rec->rank, rec->note, verdict);
-      const bool blocked = (reached == 0) || (reached == -1 && (aliased || q == cudaErrorNotReady));
+      const bool blocked = (reached == 0) || (reached == -1 && (aliased || q == hapiErrorNotReady));
       if (blocked && follow == NULL) follow = rec->stream;
     }
   }
@@ -615,7 +631,7 @@ static bool hapiCuptiClockOffset(clockid_t c, int64_t& off) {
   for (int i = 0; i < 5; i++) {
     const uint64_t a = hapiClockNs(c);
     uint64_t ct = 0;
-    if (cuptiGetTimestamp(&ct) != CUPTI_SUCCESS) return false;
+    ct = hapiTraceBackendTimestamp();
     const uint64_t b = hapiClockNs(c);
     if (b - a < spread) { spread = b - a; off = (int64_t)ct - (int64_t)((a + b) / 2); }
   }
@@ -646,7 +662,7 @@ static void hapiCuptiCalibrateSpanClock(bool first) {
 }
 static inline uint64_t hapiCuptiSpanNow() {
   const int c = g_cupti_span_clock.load(std::memory_order_relaxed);
-  if (c < 0) { uint64_t t = 0; cuptiGetTimestamp(&t); return t; }
+  if (c < 0) return hapiTraceBackendTimestamp();
   return (uint64_t)((int64_t)hapiClockNs((clockid_t)c) + g_cupti_span_offset.load(std::memory_order_relaxed));
 }
 static CuptiEntryLog& hapiCuptiEntryLog() {
@@ -821,7 +837,7 @@ static int hapiCuptiGateCount() {
   const int n = CsvAccess(gpu_manager).device_count;
   return n < 1 ? 1 : (n > HAPI_CUPTI_MAX_GATES ? HAPI_CUPTI_MAX_GATES : n);
 }
-void hapiCuptiFlushGated(uint32_t flag) {
+void hapiCuptiFlushGated(bool forced) {
   if (t_cupti_gate_depth > 0) CmiAbort("hapiCuptiFlushGated: called from inside a gated launch");
   const bool timeIt = hapiCuptiTimeIt();
   // The gate exists for the FORCED flush, which takes every thread's open buffer from under its launch intercept
@@ -829,7 +845,7 @@ void hapiCuptiFlushGated(uint32_t flag) {
   // what CUPTI's own worker thread does concurrently with launches by design -- and takes no gate: its call still
   // waits for the device queues to drain (13.7 ms in a four-GPU process, soft14 arm of job 22953167), but on the
   // helper thread with the PEs launching through it, that wait stalls nobody.
-  const bool gate = (flag & CUPTI_ACTIVITY_FLAG_FLUSH_FORCED) != 0;
+  const bool gate = forced;
   const int n = gate ? hapiCuptiGateCount() : 0;
   const double t0 = timeIt ? CmiWallTimer() : 0.0;
   for (int d = 0; d < n; d++) pthread_rwlock_wrlock(&g_cupti_flush_gates[d]);
@@ -838,7 +854,7 @@ void hapiCuptiFlushGated(uint32_t flag) {
     std::lock_guard<std::mutex> lk(CsvAccess(gpu_manager).cupti_queue_lock_);
     g_cupti_flush_counting = true; g_cupti_flush_cbs = 0; g_cupti_flush_cb_bytes = 0;
   }
-  const CUptiResult r = cuptiActivityFlushAll(flag);
+  hapiTraceBackendFlush(forced);
   if (timeIt) {
     const double t2 = CmiWallTimer();
     std::lock_guard<std::mutex> lk(CsvAccess(gpu_manager).cupti_queue_lock_);
@@ -847,7 +863,6 @@ void hapiCuptiFlushGated(uint32_t flag) {
     g_cupti_flush_prof.cbs = g_cupti_flush_cbs; g_cupti_flush_prof.cb_bytes = g_cupti_flush_cb_bytes;
   }
   for (int d = n - 1; d >= 0; d--) pthread_rwlock_unlock(&g_cupti_flush_gates[d]);
-  CUPTI_SAFE_CALL(r);
 }
 
 // Buffers CUPTI handed back are not freed at the drain that parsed them. The forced flush returns buffers that still
@@ -893,6 +908,7 @@ static void hapiCuptiFreeRetired(uint64_t keep_drains) {
   for (auto& b : out) g_cupti_free.push_back(b);
 }
 
+#if CMK_CUDA
 static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords) {
   // CUPTI writes activity records straight into this buffer and has no way to
   // tell us the allocation failed: hand it NULL and it writes through a null
@@ -942,9 +958,19 @@ static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t streamId,
   GPUManager& gm = CsvAccess(gpu_manager);
 
   std::lock_guard<std::mutex> lk(gm.cupti_queue_lock_);
-  gm.cupti_buffer_queue_.push({buffer, validSize, size, (void*)ctx});
+  gm.cupti_buffer_queue_.push({buffer, validSize, size, (void*)ctx, nullptr});
   if (g_cupti_flush_counting) { g_cupti_flush_cbs++; g_cupti_flush_cb_bytes += validSize; }
 }
+#else
+// A HIP backend (hapi_trace_rocprof.cpp) converts each buffer callback into a
+// HapiTraceBatch and queues it here.
+void hapiTraceBackendDeliver(HapiTraceBatch* batch, size_t approxBytes) {
+  GPUManager& gm = CsvAccess(gpu_manager);
+  std::lock_guard<std::mutex> lk(gm.cupti_queue_lock_);
+  gm.cupti_buffer_queue_.push({nullptr, approxBytes, 0, nullptr, batch});
+  if (g_cupti_flush_counting) { g_cupti_flush_cbs++; g_cupti_flush_cb_bytes += approxBytes; }
+}
+#endif
 
 // Populate DeviceManager with device attributes needed to compute per-kernel
 // SM usage from CUPTI records. Queried once per local device.
@@ -952,14 +978,14 @@ static void hapiPopulateDeviceProps(GPUManager& gm) {
   for (DeviceManager& dm : gm.device_managers) {
     if (dm.props_initialized) continue;
     int dev = dm.global_index;
-    cudaDeviceProp props;
-    hapiCheck(cudaGetDeviceProperties(&props, dev));
+    hapiDeviceProp props;
+    hapiCheck(hapiGetDeviceProperties(&props, dev));
 
     dm.multi_processor_count = props.multiProcessorCount;
     dm.max_threads_per_sm = props.maxThreadsPerMultiProcessor;
-#ifdef cudaDevAttrMaxBlocksPerMultiprocessor
-    hapiCheck(cudaDeviceGetAttribute(&dm.max_blocks_per_sm,
-                                     cudaDevAttrMaxBlocksPerMultiprocessor, dev));
+#ifdef hapiDevAttrMaxBlocksPerMultiprocessor
+    hapiCheck(hapiDeviceGetAttribute(&dm.max_blocks_per_sm,
+                                     hapiDevAttrMaxBlocksPerMultiprocessor, dev));
 #else
     dm.max_blocks_per_sm = 0;
 #endif
@@ -979,10 +1005,10 @@ static void hapiPopulateDeviceProps(GPUManager& gm) {
     // the only way left to ask. It can legitimately fail (on a MIG instance,
     // for one); a zero here is what selects the Unknown-source path below.
     int clock_khz = 0;
-    if (cudaDeviceGetAttribute(&clock_khz, cudaDevAttrClockRate, dev) !=
-        cudaSuccess) {
+    if (hapiDeviceGetAttribute(&clock_khz, hapiDevAttrClockRate, dev) !=
+        hapiSuccess) {
       clock_khz = 0;
-      cudaGetLastError();  // don't leave the failure for the next hapiCheck
+      hapiGetLastError();  // don't leave the failure for the next hapiCheck
     }
     descriptor.maxClockKHz = static_cast<uint32_t>(std::max(clock_khz, 0));
     descriptor.totalMemory = static_cast<uint64_t>(props.totalGlobalMem);
@@ -1070,7 +1096,7 @@ static FILE* g_trace = nullptr;
 static std::mutex g_trace_lock;
 static std::unordered_map<std::string, int> g_trace_names;
 
-uint64_t hapiTraceTimestamp() { uint64_t t = 0; cuptiGetTimestamp(&t); return t; }
+uint64_t hapiTraceTimestamp() { return hapiTraceBackendTimestamp(); }
 
 static void hapiTraceObject(uint64_t token, const LDObjKey& key) {
   std::lock_guard<std::mutex> lk(g_trace_lock);
@@ -1079,7 +1105,7 @@ static void hapiTraceObject(uint64_t token, const LDObjKey& key) {
           (unsigned long long)key.objID());
 }
 
-static void hapiTraceKernel(const CUpti_ActivityKernel4* k, uint64_t token) {
+static void hapiTraceKernel(const HapiTraceKernelRec* k, uint64_t token) {
   std::lock_guard<std::mutex> lk(g_trace_lock);
   if (g_trace == nullptr) return;
   const char* nm = k->name != nullptr ? k->name : "?";
@@ -1135,7 +1161,7 @@ void hapiTraceStart(const char* dir) {
 
 void hapiTraceStop() {
   if (g_trace == nullptr) return;
-  if (hapiCuptiTracingActive()) hapiCuptiFlushGated(HAPI_CUPTI_FLUSH_FORCED ? CUPTI_ACTIVITY_FLAG_FLUSH_FORCED : 0);
+  if (hapiCuptiTracingActive()) hapiCuptiFlushGated(HAPI_CUPTI_FLUSH_FORCED != 0);
   {   // the records queued since the last LB step; the drain thread may be in the parse
     std::lock_guard<std::mutex> lk(CsvAccess(gpu_manager).cupti_prepare_lock_);
     hapiProcessCuptiBuffers();
@@ -1160,36 +1186,17 @@ bool hapiCuptiTraceMemcpy() {
   return false;
 }
 
-void hapiCuptiStartTracing() {
-  // CHARM_LB_NO_CUPTI: never attach -- the host-side instrumentation alone,
-  // for measuring what the GPU tracing itself costs. The balancer then sees
-  // zero device load.
-  static const bool no_cupti = (getenv("CHARM_LB_NO_CUPTI") != nullptr);
-  if (no_cupti) return;
-  GPUManager& gm = CsvAccess(gpu_manager);
-  // Every PE thread reaches this through its own LBDatabase::TurnStatsOn, so
-  // the check and the enable must be one atomic step -- otherwise several
-  // threads each enable the same activity kinds.
-  std::lock_guard<std::mutex> lk(gm.cupti_tracing_lock_);
-  if (!cupti_pe_tracing) {
-    cupti_pe_tracing = true;
-    gm.cupti_tracing_users_++;
-  }
-  if (_lb_args.debug() > 1)
-    CmiPrintf("HAPI[pe=%d]: start tracing: users %d, active %d, attached %d\n", CmiMyPe(),
-              gm.cupti_tracing_users_, (int)gm.cupti_tracing_active_.load(), (int)gm.cupti_initialized_);
-  if (gm.cupti_tracing_active_.load(std::memory_order_relaxed)) return;
-
-  const double tAttach = hapiCuptiTimeIt() ? CmiWallTimer() : 0.0;
-  if (!gm.cupti_initialized_) {
-    cudaDeviceSynchronize();
-    CUPTI_SAFE_CALL(
-        cuptiActivityRegisterCallbacks(cuptiBufferRequested, cuptiBufferCompleted));
-    // API records name their thread by the OS id (gettid), the id the mapping recorded per PE.
-    CUPTI_SAFE_CALL(cuptiSetThreadIdType(CUPTI_ACTIVITY_THREAD_ID_TYPE_SYSTEM));
-    gm.cupti_initialized_ = true;
-  }
-
+#if CMK_CUDA
+// ---- the CUDA trace backend: CUPTI's activity API ----
+bool hapiTraceBackendAttach() {
+  CUPTI_SAFE_CALL(
+      cuptiActivityRegisterCallbacks(cuptiBufferRequested, cuptiBufferCompleted));
+  // API records name their thread by the OS id (gettid), the id the mapping recorded per PE.
+  CUPTI_SAFE_CALL(cuptiSetThreadIdType(CUPTI_ACTIVITY_THREAD_ID_TYPE_SYSTEM));
+  return true;
+}
+void hapiTraceBackendEarlyInit() {}
+void hapiTraceBackendEnable(bool trace_copies) {
   // RUNTIME records carry the launch's thread id and correlation id: the window
   // close joins them to the entry-span log (CuptiEntryLog) and the kernel record
   // with the same correlation id gets the object. Without them every kernel
@@ -1226,7 +1233,7 @@ void hapiCuptiStartTracing() {
   }
   // Opt-in: what share of device time is runtime copies rather than object
   // kernels. Off by default so the record volume of a normal run is unchanged.
-  if (hapiCuptiTraceMemcpy()) {
+  if (trace_copies) {
     CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_MEMCPY));
     CUPTI_SAFE_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_MEMSET));
   }
@@ -1244,6 +1251,48 @@ void hapiCuptiStartTracing() {
   };
   for (CUpti_CallbackId cbid : no_record)
     CUPTI_SAFE_CALL(cuptiActivityEnableRuntimeApi(cbid, 0));
+}
+void hapiTraceBackendFlush(bool forced) {
+  CUPTI_SAFE_CALL(cuptiActivityFlushAll(forced ? CUPTI_ACTIVITY_FLAG_FLUSH_FORCED : 0));
+}
+uint64_t hapiTraceBackendTimestamp() { uint64_t t = 0; cuptiGetTimestamp(&t); return t; }
+const char* hapiTraceBackendCallbackName(uint32_t cbid) {
+  const char* name = nullptr;
+  if (cuptiGetCallbackName(CUPTI_CB_DOMAIN_RUNTIME_API, cbid, &name) != CUPTI_SUCCESS) return nullptr;
+  return name;
+}
+uint32_t hapiTraceBackendCallbackIdCount() { return CUPTI_RUNTIME_TRACE_CBID_SIZE; }
+void hapiTraceBackendFinalize() { CUPTI_SAFE_CALL(cuptiFinalize()); }
+#endif
+
+void hapiCuptiStartTracing() {
+  // CHARM_LB_NO_CUPTI: never attach -- the host-side instrumentation alone,
+  // for measuring what the GPU tracing itself costs. The balancer then sees
+  // zero device load.
+  static const bool no_cupti = (getenv("CHARM_LB_NO_CUPTI") != nullptr);
+  if (no_cupti) return;
+  GPUManager& gm = CsvAccess(gpu_manager);
+  // Every PE thread reaches this through its own LBDatabase::TurnStatsOn, so
+  // the check and the enable must be one atomic step -- otherwise several
+  // threads each enable the same activity kinds.
+  std::lock_guard<std::mutex> lk(gm.cupti_tracing_lock_);
+  if (!cupti_pe_tracing) {
+    cupti_pe_tracing = true;
+    gm.cupti_tracing_users_++;
+  }
+  if (_lb_args.debug() > 1)
+    CmiPrintf("HAPI[pe=%d]: start tracing: users %d, active %d, attached %d\n", CmiMyPe(),
+              gm.cupti_tracing_users_, (int)gm.cupti_tracing_active_.load(), (int)gm.cupti_initialized_);
+  if (gm.cupti_tracing_active_.load(std::memory_order_relaxed)) return;
+
+  const double tAttach = hapiCuptiTimeIt() ? CmiWallTimer() : 0.0;
+  if (!gm.cupti_initialized_) {
+    hapiDeviceSynchronize();
+    if (!hapiTraceBackendAttach()) return;
+    gm.cupti_initialized_ = true;
+  }
+
+  hapiTraceBackendEnable(hapiCuptiTraceMemcpy());
 
   hapiCuptiCalibrateSpanClock(g_cupti_span_clock.load(std::memory_order_relaxed) == -1 && g_cupti_span_offset.load() == 0);
   gm.cupti_tracing_active_.store(true, std::memory_order_relaxed);
@@ -1289,12 +1338,12 @@ void hapiCuptiFinalize() {
   GPUManager& gm = CsvAccess(gpu_manager);
   if(gm.cupti_initialized_== false) return;
   if (_lb_args.debug() > 1) CmiPrintf("HAPI[pe=%d]: detaching CUPTI\n", CmiMyPe());
-  cudaDeviceSynchronize(); // Ensure all activity records are flushed
+  hapiDeviceSynchronize(); // Ensure all activity records are flushed
   gm.cupti_initialized_ = false;
   gm.cupti_tracing_active_.store(false, std::memory_order_seq_cst);
   ++gm.cupti_generation_;
 
-  CUPTI_SAFE_CALL(cuptiFinalize());
+  hapiTraceBackendFinalize();
 }
 #endif
 
@@ -1315,11 +1364,21 @@ void hapiCuptiFinalize() {
 // value already in the environment stays in force; the Config banner says which.
 static bool hapi_connections_from_env = false;
 void hapiPresetEnvironment() {
-  if (getenv("CUDA_DEVICE_MAX_CONNECTIONS") != nullptr) {
+  if (getenv(HAPI_HW_QUEUES_ENV) != nullptr) {
     hapi_connections_from_env = true;
   } else {
-    setenv("CUDA_DEVICE_MAX_CONNECTIONS", "32", 0);
+#if CMK_CUDA
+    // 32 hardware work queues per device instead of the driver's 8: over-decomposed
+    // runs put thousands of streams on them (measured 2026-10-20, +5% at leanmd 8x4x4).
+    setenv(HAPI_HW_QUEUES_ENV, "32", 0);
+#endif
+    // ROCm's default (GPU_MAX_HW_QUEUES) is left to the driver until measured there.
   }
+#if CMK_LBDB_ON
+  // The trace backend may need to register with the vendor runtime before its
+  // first call (rocprofiler-sdk does); nothing happens on CUDA.
+  hapiTraceBackendEarlyInit();
+#endif
 }
 
 // Called by all PEs in Charm++ layer init
@@ -1338,7 +1397,7 @@ void hapiInit(char** argv) {
     hapiStartMemoryDaemon(argv);
 #else
     int& cpv_my_device = CpvAccess(my_device);
-    hapiCheck(cudaSetDevice(cpv_my_device));
+    hapiCheck(hapiSetDevice(cpv_my_device));
 #endif
 
 #ifndef HAPI_CUDA_CALLBACK
@@ -1374,7 +1433,7 @@ void hapiStartMemoryDaemon(char** argv)
 
   int& cpv_my_device = CpvAccess(my_device);
   CkPrintf("Device = %i\n", cpv_my_device);
-  hapiCheck(cudaSetDevice(cpv_my_device));
+  hapiCheck(hapiSetDevice(cpv_my_device));
 
   if (CmiPhysicalRank(CmiMyPe()) != firstRankForDevice)
   {
@@ -1417,13 +1476,13 @@ int hapiCheckpoint(void* devPtr, int size) {
   char client_fifo_path[BUFFER_SIZE];
   sprintf(client_fifo_path, CLIENT_FIFO_TEMPLATE, pid);
 
-  cudaIpcMemHandle_t ipc_handle;
-  hapiCheck(cudaIpcGetMemHandle(&ipc_handle, devPtr));
+  hapiIpcMemHandle_t ipc_handle;
+  hapiCheck(hapiIpcGetMemHandle(&ipc_handle, devPtr));
 
   char msg_buf[BUFFER_SIZE];
   int offset = sprintf(msg_buf, "CKPT:%ld:%d:%d:", pid, CkMyPe(), size);
-  memcpy(msg_buf + offset, &ipc_handle, sizeof(cudaIpcMemHandle_t));
-  int total_size = offset + sizeof(cudaIpcMemHandle_t);
+  memcpy(msg_buf + offset, &ipc_handle, sizeof(hapiIpcMemHandle_t));
+  int total_size = offset + sizeof(hapiIpcMemHandle_t);
 
   hapiSendMemoryRequest(msg_buf, total_size);
 
@@ -1447,14 +1506,14 @@ void hapiRestore(void* devPtr, int size, int alloc_id) {
   hapiSendMemoryRequest(msg_buf, strlen(msg_buf) + 1);
 
   int client_fd = open(client_fifo_path, O_RDONLY);
-  cudaIpcMemHandle_t ipc_handle;
-  read(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
+  hapiIpcMemHandle_t ipc_handle;
+  read(client_fd, &ipc_handle, sizeof(hapiIpcMemHandle_t));
   close(client_fd);
 
   void* srcPtr;
-  hapiCheck(cudaIpcOpenMemHandle(&srcPtr, ipc_handle, cudaIpcMemLazyEnablePeerAccess));
-  hapiCheck(cudaMemcpy(devPtr, srcPtr, size, cudaMemcpyDeviceToDevice));
-  hapiCheck(cudaIpcCloseMemHandle(srcPtr));
+  hapiCheck(hapiIpcOpenMemHandle(&srcPtr, ipc_handle, hapiIpcMemLazyEnablePeerAccess));
+  hapiCheck(hapiMemcpy(devPtr, srcPtr, size, hapiMemcpyDeviceToDevice));
+  hapiCheck(hapiIpcCloseMemHandle(srcPtr));
 
   char free_msg[BUFFER_SIZE];
   sprintf(free_msg, "FREE:%ld:%d", pid, alloc_id);
@@ -1546,7 +1605,7 @@ static DeviceManager* findDeviceManager(GPUManager& gm, uint32_t device_id) {
 // (d) shared memory. Then:
 //   sms_used = min(num_sms, ceil(total_blocks / max_active_blocks_per_sm))
 static int computeKernelSMs(const DeviceManager& dm,
-                            const CUpti_ActivityKernel4* k) {
+                            const HapiTraceKernelRec* k) {
   if (!dm.props_initialized || dm.multi_processor_count <= 0) return 1;
 
   uint64_t threads_per_block =
@@ -1840,6 +1899,51 @@ static bool cuptiApplyWorkTag(CuptiParseShard& sh, std::vector<CuptiParseShard>*
   return true;
 }
 
+// The record walk of one queued buffer: CUPTI's activity records converted
+// one by one on CUDA; the batch a HIP backend already converted. The three
+// callbacks are the parse (hapiParseCuptiShardPass1).
+template <class FK, class FC, class FA>
+static void hapiTraceForEachRecord(CuptiBufferItem& item, FK&& onKernel, FC&& onCopy, FA&& onApi) {
+#if CMK_CUDA
+  if (item.batch == nullptr) {
+    CUpti_Activity* record = NULL;
+    while (cuptiActivityGetNextRecord(item.buffer, item.validSize, &record) == CUPTI_SUCCESS) {
+      if (record->kind == CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL ||
+          record->kind == CUPTI_ACTIVITY_KIND_KERNEL) {
+        const CUpti_ActivityKernel4* k = (const CUpti_ActivityKernel4*)record;
+        HapiTraceKernelRec r;
+        r.start = k->start; r.end = k->end;
+        r.deviceId = k->deviceId; r.streamId = k->streamId; r.correlationId = k->correlationId;
+        r.gridX = k->gridX; r.gridY = k->gridY; r.gridZ = k->gridZ;
+        r.blockX = k->blockX; r.blockY = k->blockY; r.blockZ = k->blockZ;
+        r.registersPerThread = k->registersPerThread;
+        r.staticSharedMemory = k->staticSharedMemory; r.dynamicSharedMemory = k->dynamicSharedMemory;
+        r.name = k->name;
+        onKernel(&r);
+      } else if (record->kind == CUPTI_ACTIVITY_KIND_MEMCPY) {
+        const CUpti_ActivityMemcpy* mc = (const CUpti_ActivityMemcpy*)record;
+        HapiTraceCopyRec r{'M', mc->deviceId, mc->streamId, mc->start, mc->end, mc->bytes, (int)mc->copyKind};
+        onCopy(&r);
+      } else if (record->kind == CUPTI_ACTIVITY_KIND_MEMSET) {
+        const CUpti_ActivityMemset* ms = (const CUpti_ActivityMemset*)record;
+        HapiTraceCopyRec r{'S', ms->deviceId, ms->streamId, ms->start, ms->end, ms->bytes, 0};
+        onCopy(&r);
+      } else if (record->kind == CUPTI_ACTIVITY_KIND_RUNTIME) {
+        const CUpti_ActivityAPI* api = (const CUpti_ActivityAPI*)record;
+        HapiTraceApiRec r{api->start, api->end, api->threadId, api->correlationId, (uint32_t)api->cbid};
+        onApi(&r);
+      }
+    }
+    return;
+  }
+#endif
+  if (item.batch != nullptr) {
+    for (const HapiTraceKernelRec& r : item.batch->kernels) onKernel(&r);
+    for (const HapiTraceCopyRec& r : item.batch->copies) onCopy(&r);
+    for (const HapiTraceApiRec& r : item.batch->apis) onApi(&r);
+  }
+}
+
 // Pass 1, one shard, its own thread: every record of its buffers, resolved against this shard
 // alone; what needs another shard waits in sh.pending / sh.pendingApi for pass 2.
 static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::vector<CuptiBufferItem>& items,
@@ -1853,7 +1957,7 @@ static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::v
   sh.resolved_tokens.clear();
   sh.thread_corr.clear();
   sh.cover_end.clear();
-  sh.byCbid.assign(CUPTI_RUNTIME_TRACE_CBID_SIZE + 1, CuptiCbidUse());
+  sh.byCbid.assign(hapiTraceBackendCallbackIdCount() + 1, CuptiCbidUse());
   sh.api_unattributed_s = 0.0;
   sh.api_count = sh.kernel_count = sh.object_corr_count = sh.work_tag_count = 0;
   sh.invalid_duration_count = sh.hash_collision_count = sh.attributed = sh.unattributed = 0;
@@ -1916,30 +2020,16 @@ static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::v
   for (CuptiBufferItem& item : items) {
     // A buffer CUPTI never wrote to (or one it handed back empty) has nothing
     // to parse, and passing it on would dereference whatever came back.
-    if (item.buffer == NULL || item.validSize == 0) {
+    if (item.batch == nullptr && (item.buffer == NULL || item.validSize == 0)) {
       sh.retired.push_back({item.buffer, item.size});
       continue;
     }
 
-    // Parse records in this buffer
-    CUpti_Activity *record = NULL;
-    while (cuptiActivityGetNextRecord(item.buffer, item.validSize, &record) == CUPTI_SUCCESS) {
-      if (record->kind == CUPTI_ACTIVITY_KIND_EXTERNAL_CORRELATION) {
-        CUpti_ActivityExternalCorrelation *corr = (CUpti_ActivityExternalCorrelation *)record;
-        if (corr->externalKind == CUPTI_EXTERNAL_CORRELATION_KIND_UNKNOWN) {
-          sh.object_corr_count++;
-          sh.object_corr[corr->correlationId] = corr->externalId;
-        }
-        else if (scaling &&
-                 corr->externalKind == CUPTI_EXTERNAL_CORRELATION_KIND_CUSTOM0) {
-          sh.work_tag_count++;
-          sh.work_tag_corr[corr->correlationId] = corr->externalId;
-        }
-      }
-      else if (record->kind == CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL ||
-               record->kind == CUPTI_ACTIVITY_KIND_KERNEL) {
+    // Parse the records of this buffer, whichever vendor's tracer produced
+    // them (hapiTraceForEachRecord converts as it walks).
+    hapiTraceForEachRecord(item,
+      [&](const HapiTraceKernelRec* kernel) {
         sh.kernel_count++;
-        CUpti_ActivityKernel4 *kernel = (CUpti_ActivityKernel4 *)record;
 
         DeviceManager* dm = findDeviceManager(gm, kernel->deviceId);
 
@@ -1989,28 +2079,18 @@ static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::v
           sh.pending.push_back({kernel->correlationId, launch, rec, false});
           sh.deferred++;
         }
-      }
-      else if (record->kind == CUPTI_ACTIVITY_KIND_MEMCPY) {
-        const CUpti_ActivityMemcpy* mc = (const CUpti_ActivityMemcpy*)record;
+      
+      },
+      [&](const HapiTraceCopyRec* mc) {
         if (g_trace != nullptr)
-          hapiTraceCopy('M', mc->deviceId, mc->streamId, mc->start, mc->end, mc->bytes, mc->copyKind);
+          hapiTraceCopy(mc->kind, mc->deviceId, mc->streamId, mc->start, mc->end, mc->bytes, mc->copyKind);
         if (mc->end > mc->start) {
           g_cupti_memcpy_n.fetch_add(1, std::memory_order_relaxed);
           g_cupti_memcpy_ns.fetch_add(mc->end - mc->start, std::memory_order_relaxed);
-          g_cupti_memcpy_bytes.fetch_add(mc->bytes, std::memory_order_relaxed);
+          if (mc->kind == 'M') g_cupti_memcpy_bytes.fetch_add(mc->bytes, std::memory_order_relaxed);
         }
-      }
-      else if (record->kind == CUPTI_ACTIVITY_KIND_MEMSET) {
-        const CUpti_ActivityMemset* ms = (const CUpti_ActivityMemset*)record;
-        if (g_trace != nullptr)
-          hapiTraceCopy('S', ms->deviceId, ms->streamId, ms->start, ms->end, ms->bytes, 0);
-        if (ms->end > ms->start) {
-          g_cupti_memcpy_n.fetch_add(1, std::memory_order_relaxed);
-          g_cupti_memcpy_ns.fetch_add(ms->end - ms->start, std::memory_order_relaxed);
-        }
-      }
-      else if (record->kind == CUPTI_ACTIVITY_KIND_RUNTIME) {
-        const CUpti_ActivityAPI* api = (const CUpti_ActivityAPI*)record;
+      },
+      [&](const HapiTraceApiRec* api) {
         if (api->end > api->start) {
           sh.api_count++;
           const double seconds = (double)(api->end - api->start) / 1.0e9;
@@ -2019,9 +2099,8 @@ static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::v
           CuptiCbidUse& use = sh.byCbid[api->cbid < sh.byCbid.size() ? api->cbid : sh.byCbid.size() - 1];
           if (!use.known) {
             use.known = true;
-            const char* name = nullptr;
-            if (cuptiGetCallbackName(CUPTI_CB_DOMAIN_RUNTIME_API, api->cbid, &name) == CUPTI_SUCCESS &&
-                name != nullptr)
+            const char* name = hapiTraceBackendCallbackName(api->cbid);
+            if (name != nullptr)
               use.poll = (strstr(name, "Query") != nullptr);
           }
           use.count++;
@@ -2068,8 +2147,9 @@ static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::v
               sh.pendingApi.push_back({api->correlationId, seconds});
           }
         }
-      }
-    }
+      
+      });
+    if (item.batch != nullptr) { delete item.batch; item.batch = nullptr; }
 
     sh.retired.push_back({item.buffer, item.size});
   }
@@ -2134,10 +2214,8 @@ static void hapiParseCuptiShardPass2(GPUManager& gm, CuptiParseShard& sh, std::v
     });
     std::string line;
     for (size_t i = 0; i < top.size() && i < 6; i++) {
-      const char* name = nullptr;
-      if (cuptiGetCallbackName(CUPTI_CB_DOMAIN_RUNTIME_API, top[i].first, &name) != CUPTI_SUCCESS ||
-          name == nullptr)
-        name = "?";
+      const char* name = hapiTraceBackendCallbackName(top[i].first);
+      if (name == nullptr) name = "?";
       char buf[160];
       snprintf(buf, sizeof buf, " %s x%llu %.3fs", name, (unsigned long long)top[i].second.count,
                top[i].second.seconds);
@@ -2959,12 +3037,11 @@ static void hapiPrepareCuptiLoadsImpl(uint64_t epoch, int dev) {
   // call: hence the quarantine (hapiCuptiRetireBuffer) and the gates, and the all-GPU stop at every close that the
   // gates cost a multi-GPU process (~15 ms per LB event, job 22953167).
   {   // this window ends here, in the CUPTI clock (the records' clock)
-    uint64_t now = 0;
-    cuptiGetTimestamp(&now);
+    const uint64_t now = hapiTraceBackendTimestamp();
     g_cupti_window_prev_ns = g_cupti_window_close_ns;
     g_cupti_window_close_ns = now;
   }
-  if (hapiCuptiTracingActive()) hapiCuptiFlushGated(HAPI_CUPTI_FLUSH_FORCED ? CUPTI_ACTIVITY_FLAG_FLUSH_FORCED : 0);
+  if (hapiCuptiTracingActive()) hapiCuptiFlushGated(HAPI_CUPTI_FLUSH_FORCED != 0);
   const double t1 = timeIt ? CmiWallTimer() : 0.0;
   std::unique_lock<std::mutex> lk(gm.cupti_prepare_lock_);
   const double t1b = timeIt ? CmiWallTimer() : 0.0;   // the wait on the lock (the other device closers' parses)
@@ -3255,15 +3332,15 @@ static void hapiMapping(char** argv) {
   map_type = csv_gpu_manager.map_type;
 
   if (CmiMyPe() == 0) {
-    const char* conn = getenv("CUDA_DEVICE_MAX_CONNECTIONS");
+    const char* conn = getenv(HAPI_HW_QUEUES_ENV);
     CmiPrintf("HAPI> Config: %d process(es) per host, %d device(s) per process, %d PE(s) per device, "
         "%d device(s) per host, PE-device map %s, %s hardware queue(s) per device (%s)\n",
         CmiNumNodes() / CmiNumPhysicalNodes(), csv_gpu_manager.device_count,
         csv_gpu_manager.pes_per_device, csv_gpu_manager.device_count_on_physical_node,
         map_type == Mapping::Block ? "block" : "roundrobin",
-        conn != nullptr ? conn : "8",
+        conn != nullptr ? conn : HAPI_HW_QUEUES_DRIVER_DEFAULT,
         conn == nullptr ? "driver default, the runtime did not run hapiPresetEnvironment"
-                        : hapi_connections_from_env ? "CUDA_DEVICE_MAX_CONNECTIONS from the environment"
+                        : hapi_connections_from_env ? HAPI_HW_QUEUES_ENV " from the environment"
                                                     : "runtime default");
   }
   if (CmiMyRank() == 0 && csv_gpu_manager.device_count > 1) {
@@ -3311,7 +3388,7 @@ static void hapiMapping(char** argv) {
   // This PE's flush gate (its device's).
   if (cpv_my_device_id >= 0 && cpv_my_device_id < HAPI_CUPTI_MAX_GATES) {
     t_cupti_gate_dev = cpv_my_device_id;
-    if (cpv_device_rep) cudaFree(0);   // the primary context exists from here on
+    if (cpv_device_rep) hapiFreeRaw(0);   // the primary context exists from here on
   }
 #endif
 
@@ -3346,33 +3423,38 @@ static void hapiMapping(char** argv) {
         "write completion flags with cuStreamWriteValue32 (front-end memop; "
         "DEADLOCK-PRONE under cross-process IPC -- for comparison only)");
   if (!want_event_query) {
+#if CMK_HIP
+    if (hapi_memset_d32_async == nullptr) hapi_memset_d32_async = hapiHipMemsetD32Async;
+    if (hapi_stream_write_value32 == nullptr) hapi_stream_write_value32 = hapiHipStreamWriteValue32;
+#else
     // Preferred writer, looked up first because it is the default.
     if (hapi_memset_d32_async == nullptr) {
       void* fn = nullptr;
       cudaDriverEntryPointQueryResult st = cudaDriverEntryPointSymbolNotFound;
       if (cudaGetDriverEntryPointByVersion("cuMemsetD32Async", &fn, 12000,
-                                           cudaEnableDefault, &st) == cudaSuccess &&
+                                           cudaEnableDefault, &st) == hapiSuccess &&
           st == cudaDriverEntryPointSuccess && fn != nullptr)
         hapi_memset_d32_async = (hapiMemsetD32AsyncFn)fn;
-      else cudaGetLastError();
+      else hapiGetLastError();
     }
     // Fallback / +gpustreamwrite opt-in writer.
     if (hapi_stream_write_value32 == nullptr) {
       void* fn = nullptr;
       cudaDriverEntryPointQueryResult status = cudaDriverEntryPointSymbolNotFound;
       if (cudaGetDriverEntryPointByVersion("cuStreamWriteValue32", &fn, 12000,
-                                           cudaEnableDefault, &status) == cudaSuccess &&
+                                           cudaEnableDefault, &status) == hapiSuccess &&
           status == cudaDriverEntryPointSuccess && fn != nullptr)
         hapi_stream_write_value32 = (hapiStreamWriteValue32Fn)fn;
-      else cudaGetLastError();
+      else hapiGetLastError();
     }
+#endif
   }
   if (!want_event_query &&
       (hapi_memset_d32_async != nullptr || hapi_stream_write_value32 != nullptr)) {
     hapi_use_flag_poll = true;
     uint32_t*& slots = CpvAccess(hapi_flag_slots);
     const size_t bytes = (size_t)HAPI_FLAG_SLOTS * HAPI_FLAG_STRIDE * sizeof(uint32_t);
-    hapiCheck(cudaHostAlloc((void**)&slots, bytes, cudaHostAllocPortable | cudaHostAllocMapped));
+    hapiCheck(hapiHostAlloc((void**)&slots, bytes, hapiHostAllocPortable | hapiHostAllocMapped));
     memset((void*)slots, 0, bytes);
     hapiCheck(hapiHostGetDevicePointer(&CpvAccess(hapi_flag_slots_dev), (void*)slots, 0));
     CpvAccess(hapi_flag_busy) = (unsigned char*)calloc(HAPI_FLAG_SLOTS, 1);
@@ -3383,15 +3465,15 @@ static void hapiMapping(char** argv) {
     // its entry point is present.
     bool memset_ok = false;
     if (hapi_memset_d32_async != nullptr) {
-      cudaStream_t ts;
-      hapiCheck(cudaStreamCreateWithFlags(&ts, cudaStreamNonBlocking));
-      const CUresult r = hapi_memset_d32_async((CUdeviceptr)CpvAccess(hapi_flag_slots_dev),
-                                               0x5A5A0001u, 1, (CUstream)ts);
-      if (r == CUDA_SUCCESS && cudaStreamSynchronize(ts) == cudaSuccess &&
+      hapiStream_t ts;
+      hapiCheck(hapiStreamCreateWithFlags(&ts, hapiStreamNonBlocking));
+      const hapiDrvResult r = hapi_memset_d32_async((uintptr_t)CpvAccess(hapi_flag_slots_dev),
+                                               0x5A5A0001u, 1, (hapiDrvStream)ts);
+      if (r == hapiDrvSuccess && hapiStreamSynchronize(ts) == hapiSuccess &&
           ((volatile uint32_t*)slots)[0] == 0x5A5A0001u) memset_ok = true;
-      cudaGetLastError();
+      hapiGetLastError();
       ((volatile uint32_t*)slots)[0] = 0;
-      cudaStreamDestroy(ts);
+      hapiStreamDestroy(ts);
     }
     if (want_stream_write && hapi_stream_write_value32 != nullptr) {
       hapi_flag_use_memset = false;
@@ -3461,7 +3543,7 @@ static void hapiMapping(char** argv) {
     CpvInitialize(uint32_t*, hapi_flag_probe);
     CpvInitialize(void*, hapi_flag_probe_dev);
     uint32_t*& pr = CpvAccess(hapi_flag_probe);
-    hapiCheck(cudaHostAlloc((void**)&pr, 256, cudaHostAllocPortable | cudaHostAllocMapped));
+    hapiCheck(hapiHostAlloc((void**)&pr, 256, hapiHostAllocPortable | hapiHostAllocMapped));
     memset((void*)pr, 0, 256);
     hapiCheck(hapiHostGetDevicePointer(&CpvAccess(hapi_flag_probe_dev), (void*)pr, 0));
     if (CmiMyPe() == 0) CmiPrintf("HAPI> stall trace on\n");
@@ -3821,23 +3903,23 @@ void hapiSubmitIssue(HapiSubmitOp& op) {
     for (uint32_t i = 0; i < op.value; i++) hapiSubmitIssue(op.batch[i]);
     delete[] op.batch;
   } else if (op.kind == HAPI_SUBMIT_EVENT) {
-    if (cudaEventRecord((cudaEvent_t)op.dst, (cudaStream_t)op.stream) != cudaSuccess) {
+    if (hapiEventRecordRaw((hapiEvent_t)op.dst, (hapiStream_t)op.stream) != hapiSuccess) {
       fprintf(stderr, "HAPI submitter: cudaEventRecord failed\n"); abort();
     }
   } else if (op.kind == HAPI_SUBMIT_MEMCPY) {
-    const cudaError_t e = cudaMemcpyAsync(op.dst, op.src, op.bytes, (cudaMemcpyKind)op.copyKind,
-                                          (cudaStream_t)op.stream);
-    if (e != cudaSuccess) {
+    const hapiError_t e = hapiMemcpyAsync(op.dst, op.src, op.bytes, (hapiMemcpyKind)op.copyKind,
+                                          (hapiStream_t)op.stream);
+    if (e != hapiSuccess) {
       fprintf(stderr, "HAPI submitter: cudaMemcpyAsync(%p <- %p, %zu) failed: %s\n", op.dst, op.src,
-              op.bytes, cudaGetErrorString(e));
+              op.bytes, hapiGetErrorString(e));
       abort();
     }
   } else {
-    const CUresult r = hapi_flag_use_memset
-        ? hapi_memset_d32_async((CUdeviceptr)op.dst, op.value, 1, (CUstream)op.stream)
-        : hapi_stream_write_value32((CUstream)op.stream, (CUdeviceptr)op.dst, op.value,
-                                    CU_STREAM_WRITE_VALUE_DEFAULT);
-    if (r != CUDA_SUCCESS) {
+    const hapiDrvResult r = hapi_flag_use_memset
+        ? hapi_memset_d32_async((uintptr_t)op.dst, op.value, 1, (hapiDrvStream)op.stream)
+        : hapi_stream_write_value32((hapiDrvStream)op.stream, (uintptr_t)op.dst, op.value,
+                                    hapiStreamWriteValueDefault);
+    if (r != hapiDrvSuccess) {
       fprintf(stderr, "HAPI submitter: completion-flag write failed (%d)\n", (int)r);
       abort();
     }
@@ -3853,7 +3935,7 @@ void hapiSubmitThread(int k) {
   cpu_set_t set; CPU_ZERO(&set);
   for (int c = 0; c < CPU_SETSIZE; c++) CPU_SET(c, &set);
   sched_setaffinity(0, sizeof(set), &set);
-  if (cudaSetDevice(st->device) != cudaSuccess) { fprintf(stderr, "HAPI submitter: cudaSetDevice failed\n"); abort(); }
+  if (hapiSetDevice(st->device) != hapiSuccess) { fprintf(stderr, "HAPI submitter: cudaSetDevice failed\n"); abort(); }
   unsigned idle = 0;
   for (;;) {
     bool any = false;
@@ -3950,7 +4032,7 @@ void hapiSubmitMemcpyAsync(void* dst, const void* src, size_t bytes, int kind, h
   op.kind = HAPI_SUBMIT_MEMCPY; op.stream = stream; op.dst = dst; op.src = src; op.bytes = bytes; op.copyKind = kind;
   if (hapiSubmitPush(op)) return;
   CuptiGateShared gate;
-  hapiCheck(cudaMemcpyAsync(dst, src, bytes, (cudaMemcpyKind)kind, (cudaStream_t)stream));
+  hapiCheck(hapiMemcpyAsync(dst, src, bytes, (hapiMemcpyKind)kind, (hapiStream_t)stream));
 }
 
 // The chare whose entry method this PE is running, as CUPTI knows it (0: none).
@@ -3977,7 +4059,7 @@ void hapiSubmitEventRecord(void* event, hapiStream_t stream) {
   op.kind = HAPI_SUBMIT_EVENT; op.stream = stream; op.dst = event;
   if (hapiSubmitPush(op)) return;
   CuptiGateShared gate;
-  hapiCheck(cudaEventRecord((cudaEvent_t)event, (cudaStream_t)stream));
+  hapiCheck(hapiEventRecordRaw((hapiEvent_t)event, (hapiStream_t)stream));
 }
 
 static void hapiSubmitSetToken(uint64_t token) { hapi_submit_cur_token = token; }
@@ -4005,7 +4087,7 @@ static std::queue<hapiEvent>& hapiQueueFor(hapiStream_t stream) {
   return queues.back().second;
 }
 
-void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
+void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
   // if(obj!=NULL)
   //   CmiAbort("non null without HAPI CUDA CALLBACK");
   // create CUDA event / get CUDA event from the pool and insert into stream
@@ -4041,11 +4123,11 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
     // seq means that work is complete.
     HapiSubmitOp flagOp{};
     flagOp.kind = HAPI_SUBMIT_FLAG; flagOp.value = seq; flagOp.stream = stream; flagOp.dst = (void*)slot_dev;
-    const CUresult res = hapiSubmitPush(flagOp) ? CUDA_SUCCESS : hapi_flag_use_memset
-        ? hapi_memset_d32_async((CUdeviceptr)slot_dev, seq, 1, (CUstream)stream)
-        : hapi_stream_write_value32((CUstream)stream, (CUdeviceptr)slot_dev,
-                                    seq, CU_STREAM_WRITE_VALUE_DEFAULT);
-    if (res != CUDA_SUCCESS)
+    const hapiDrvResult res = hapiSubmitPush(flagOp) ? hapiDrvSuccess : hapi_flag_use_memset
+        ? hapi_memset_d32_async((uintptr_t)slot_dev, seq, 1, (hapiDrvStream)stream)
+        : hapi_stream_write_value32((hapiDrvStream)stream, (uintptr_t)slot_dev,
+                                    seq, hapiStreamWriteValueDefault);
+    if (res != hapiDrvSuccess)
       CmiAbort("HAPI> %s failed (%d); rerun with +gpueventquery",
                hapi_flag_use_memset ? "cuMemsetD32Async" : "cuStreamWriteValue32", (int)res);
     hapi_flag_writes_total.fetch_add(1, std::memory_order_relaxed);
@@ -4117,12 +4199,12 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
   // Drop such an event and record on a fresh one instead: the pool must never
   // hand out an event that cannot be recorded.
   {
-    cudaError_t rec = hapiEventRecord(ev, stream);
-    if (rec != cudaSuccess) {
-      cudaGetLastError();               // do not leave it for a bystander
+    hapiError_t rec = hapiEventRecord(ev, stream);
+    if (rec != hapiSuccess) {
+      hapiGetLastError();               // do not leave it for a bystander
       if (!was_fresh) {
         hapiEventDestroy(ev);
-        cudaGetLastError();
+        hapiGetLastError();
 #if CMK_LBDB_ON
         hapiEventCreateWithFlags(&ev, hapiEventDefault);
 #else
@@ -4130,10 +4212,10 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
 #endif
         rec = hapiEventRecord(ev, stream);
       }
-      if (rec != cudaSuccess) {
-        cudaGetLastError();
+      if (rec != hapiSuccess) {
+        hapiGetLastError();
         CmiAbort("hapiAddCallback: cannot record a completion event on this "
-                 "stream (%s)", cudaGetErrorName(rec));
+                 "stream (%s)", hapiGetErrorName(rec));
       }
     }
   }
@@ -4461,10 +4543,21 @@ static void shmInit() {
 static void shmSetup() {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
-  // Set up shared memory file name
+  // Set up shared memory file name: per host, job and job step. A run killed
+  // by hand or by a timeout leaves its segment behind with live state (IPC
+  // event slots, the pool entry of dead processes), and a later step of the
+  // same host that opened it by the old host-only name hung before its first
+  // step with every PE idle (2026-10-21, job 23078963, after the channel
+  // segment had been given the same per-step name the night before).
   csv_gpu_manager.shm_name.assign("charm-hapi-host");
   int host_id = CmiPhysicalNodeID(CmiMyPe());
   csv_gpu_manager.shm_name.append(std::to_string(host_id));
+  {
+    const char* job = getenv("SLURM_JOB_ID");
+    const char* step = getenv("SLURM_STEP_ID");
+    csv_gpu_manager.shm_name.append("-" + (job ? std::string(job) : std::to_string((long)getppid())));
+    if (step) csv_gpu_manager.shm_name.append("-" + std::string(step));
+  }
   const char* shm_name = csv_gpu_manager.shm_name.c_str();
 
   // Calculate shared memory region size
@@ -4820,18 +4913,18 @@ static void hapiVmmMakeHandle(hapiIpcMemHandle_t* h, uint64_t base, uint64_t res
 // chunks it has published so far mapped at their own offsets. Grows as the
 // owner publishes more; never shrinks (the owner never unmaps).
 struct HapiVmmMirror {
-  CUdeviceptr base = 0;
+  uintptr_t base = 0;
   size_t reserve = 0, chunk = 0;
   int pid = -1, pidfd = -1;
   hapi_pool_shm_entry* entry = nullptr;
   size_t mapped = 0;   // chunks
-  std::vector<CUmemGenericAllocationHandle> handles;
+  std::vector<hapiMemGenericAllocationHandle> handles;
 };
 static std::map<std::pair<int, const void*>, HapiVmmMirror> hapi_vmm_mirrors;  // under ipc_cache_lock
 
-static const char* hapiCuErrNameIpc(CUresult r) {
+static const char* hapiCuErrNameIpc(hapiDrvResult r) {
   const char* s = nullptr;
-  cuGetErrorName(r, &s);
+  hapiDrvGetErrorName(r, &s);
   return s ? s : "CUDA_ERROR_?";
 }
 
@@ -4840,23 +4933,23 @@ static const char* hapiCuErrNameIpc(CUresult r) {
 // the destination's device, and peer access (cudaDeviceEnablePeerAccess) does not cover vmm
 // mappings. Where the whole set is refused (a pair without P2P) the owner alone is granted, so
 // a one-device process behaves exactly as before.
-static CUresult hapiVmmSetAccessAllLocal(CUdeviceptr at, size_t bytes, int owner_dev,
+static hapiDrvResult hapiVmmSetAccessAllLocal(uintptr_t at, size_t bytes, int owner_dev,
                                          const char* what) {
   const std::vector<DeviceManager>& dms = CsvAccess(gpu_manager).device_managers;
-  std::vector<CUmemAccessDesc> acc;
+  std::vector<hapiMemAccessDesc> acc;
   auto add = [&](int dev) {
-    for (const CUmemAccessDesc& a : acc) if (a.location.id == dev) return;
-    CUmemAccessDesc d;
+    for (const hapiMemAccessDesc& a : acc) if (a.location.id == dev) return;
+    hapiMemAccessDesc d;
     memset(&d, 0, sizeof(d));
-    d.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+    d.location.type = hapiMemLocationTypeDevice;
     d.location.id = dev;
-    d.flags = CU_MEM_ACCESS_FLAGS_PROT_READWRITE;
+    d.flags = hapiMemAccessFlagsProtReadWrite;
     acc.push_back(d);
   };
   add(owner_dev);
   for (const DeviceManager& dm : dms) add(dm.global_index);
-  CUresult r = cuMemSetAccess(at, bytes, acc.data(), acc.size());
-  if (r != CUDA_SUCCESS && acc.size() > 1) {
+  hapiDrvResult r = hapiDrvMemSetAccess(at, bytes, acc.data(), acc.size());
+  if (r != hapiDrvSuccess && acc.size() > 1) {
     static bool said = false;
     if (!said) {
       said = true;
@@ -4864,7 +4957,7 @@ static CUresult hapiVmmSetAccessAllLocal(CUdeviceptr at, size_t bytes, int owner
                 "%d) only -- same-process cross-device reads of this memory will fault\n",
                 CmiMyPe(), what, acc.size(), hapiCuErrNameIpc(r), owner_dev);
     }
-    r = cuMemSetAccess(at, bytes, acc.data(), 1);
+    r = hapiDrvMemSetAccess(at, bytes, acc.data(), 1);
   }
   return r;
 }
@@ -4900,8 +4993,8 @@ static void* hapiVmmImportLocked(const hapiIpcMemHandle_t& handle, int src_proce
     if (m.pidfd < 0)
       CmiAbort("HAPI> [%d] vmm import: pidfd_open(%d) failed (%s); the vmm backend needs "
                "Linux >= 5.6", CmiMyPe(), v.pid, strerror(errno));
-    CUresult r = cuMemAddressReserve(&m.base, m.reserve, 0, 0, 0);
-    if (r != CUDA_SUCCESS)
+    hapiDrvResult r = hapiDrvMemAddressReserve(&m.base, m.reserve, 0, 0, 0);
+    if (r != hapiDrvSuccess)
       CmiAbort("HAPI> [%d] vmm import: cuMemAddressReserve(%zu MB) for a peer heap: %s",
                CmiMyPe(), m.reserve >> 20, hapiCuErrNameIpc(r));
     it = hapi_vmm_mirrors.emplace(key, m).first;
@@ -4912,7 +5005,7 @@ static void* hapiVmmImportLocked(const hapiIpcMemHandle_t& handle, int src_proce
   HapiVmmMirror& m = it->second;
   const int published = __atomic_load_n(&m.entry->n_chunks, __ATOMIC_ACQUIRE);
   int cur_dev = 0;
-  if (m.mapped < (size_t)published) hapiCheck(cudaGetDevice(&cur_dev));
+  if (m.mapped < (size_t)published) hapiCheck(hapiGetDevice(&cur_dev));
   for (; m.mapped < (size_t)published; m.mapped++) {
     const int theirfd = m.entry->fds[m.mapped];
 #ifdef SYS_pidfd_getfd
@@ -4925,22 +5018,22 @@ static void* hapiVmmImportLocked(const hapiIpcMemHandle_t& handle, int src_proce
                "chunk descriptor could not be duplicated; this needs Linux >= 5.6 and "
                "ptrace permission over same-user processes (kernel.yama.ptrace_scope <= 1)",
                CmiMyPe(), m.pid, theirfd, strerror(errno));
-    CUmemGenericAllocationHandle h;
-    CUresult r = cuMemImportFromShareableHandle(&h, (void*)(uintptr_t)fd,
-                                                CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR);
-    if (r != CUDA_SUCCESS)
+    hapiMemGenericAllocationHandle h;
+    hapiDrvResult r = hapiDrvMemImportFromShareableHandle(&h, (void*)(uintptr_t)fd,
+                                                hapiMemHandleTypePosixFd);
+    if (r != hapiDrvSuccess)
       CmiAbort("HAPI> [%d] vmm import: cuMemImportFromShareableHandle(chunk %zu of process %d): %s",
                CmiMyPe(), m.mapped, src_process, hapiCuErrNameIpc(r));
     close(fd);
-    const CUdeviceptr at = m.base + (CUdeviceptr)(m.mapped * m.chunk);
-    r = cuMemMap(at, m.chunk, 0, h, 0);
-    if (r != CUDA_SUCCESS)
+    const uintptr_t at = m.base + (uintptr_t)(m.mapped * m.chunk);
+    r = hapiDrvMemMap(at, m.chunk, 0, h, 0);
+    if (r != hapiDrvSuccess)
       CmiAbort("HAPI> [%d] vmm import: cuMemMap(chunk %zu): %s", CmiMyPe(), m.mapped,
                hapiCuErrNameIpc(r));
     // The import cache is process-wide: a PE on another of this process's devices reuses
     // this mapping, so every local device gets access, not only the importing PE's.
     r = hapiVmmSetAccessAllLocal(at, m.chunk, cur_dev, "vmm import");
-    if (r != CUDA_SUCCESS)
+    if (r != hapiDrvSuccess)
       CmiAbort("HAPI> [%d] vmm import: cuMemSetAccess(chunk %zu) from device %d: %s (peer "
                "access between the devices is required)", CmiMyPe(), m.mapped, cur_dev,
                hapiCuErrNameIpc(r));
@@ -4991,7 +5084,7 @@ bool hapiIpcExportBuffer(const void* ptr, hapiIpcMemHandle_t* handle,
   if (err != hapiSuccess) {
     // Not an exportable allocation (managed or host-registered memory, for
     // instance). Clear the sticky error and let the caller stage instead.
-    cudaGetLastError();
+    hapiGetLastError();
 #if CMK_SMP
     CmiUnlock(csv_gpu_manager.ipc_cache_lock);
 #endif
@@ -5080,7 +5173,7 @@ void* hapiIpcImportBuffer(const hapiIpcMemHandle_t& handle, int src_process,
     // that the key above did not find; an invalid handle means the sender's
     // allocation is gone.
     csv_gpu_manager.ipc_import_last_err = (int)err;
-    cudaGetLastError();
+    hapiGetLastError();
 #if CMK_SMP
     CmiUnlock(csv_gpu_manager.ipc_cache_lock);
 #endif
@@ -5113,7 +5206,7 @@ int hapiIpcLastImportError() {
 
 const char* hapiIpcLastImportErrorName() {
   const int e = CsvAccess(gpu_manager).ipc_import_last_err;
-  return (e == 0) ? "none" : cudaGetErrorName((cudaError_t)e);
+  return (e == 0) ? "none" : hapiGetErrorName((hapiError_t)e);
 }
 
 void hapiIpcInvalidateExport(const void* ptr) {
@@ -5143,7 +5236,7 @@ void hapiIpcFlushImportCache() {
     // Borrowed mappings share the owner's pointer; only that one can be closed.
     if (!entry.second.owns_mapping) continue;
     if (hapiIpcCloseMemHandle(entry.second.mapped) != hapiSuccess)
-      cudaGetLastError();
+      hapiGetLastError();
   }
   csv_gpu_manager.ipc_import_cache.clear();
   // Exports name this process's own allocations, which migration also frees and
@@ -5274,7 +5367,7 @@ struct HapiDevPoolLock {
 // several sub-buffers, each noted on its own address, and its release is one
 // free of the arena base. The free has to find every note inside the block it
 // is freeing, which lower_bound over the block's range does.
-std::multimap<const void*, cudaStream_t> hapi_devpool_read_on;
+std::multimap<const void*, hapiStream_t> hapi_devpool_read_on;
 // Freed blocks waiting for their reads to retire before they can be reused --
 // one event per stream the reads were on (in practice one).
 // A block whose last readers may still be running: reusable once every flag
@@ -5284,7 +5377,7 @@ std::multimap<const void*, cudaStream_t> hapi_devpool_read_on;
 struct HapiDevPoolPending {
   void* ptr; int device;
   std::vector<std::pair<int, uint32_t>> flags;   // (rank, seq)
-  std::vector<cudaEvent_t> evs;
+  std::vector<hapiEvent_t> evs;
 };
 std::vector<HapiDevPoolPending> hapi_devpool_pending;
 // Spare events to record with, kept per device. A CUDA event belongs to the
@@ -5295,7 +5388,7 @@ std::vector<HapiDevPoolPending> hapi_devpool_pending;
 // hapi_devpool_mutex -- so a single list hands a PE freeing a device-1 block
 // an event created on device 0. That costs nothing until the first reuse,
 // which is why it survives one load-balancing step and fails on the next.
-std::map<int, std::vector<cudaEvent_t>> hapi_devpool_spare_events;
+std::map<int, std::vector<hapiEvent_t>> hapi_devpool_spare_events;
 
 size_t hapiDevPoolArenaBytes() {
   static size_t bytes = 0;
@@ -5326,21 +5419,21 @@ void hapiDevPoolReapLocked() {
     for (const auto& f : pd.flags)
       if (!hapiFlagLanded(f.first, f.second)) { done = false; break; }
     for (size_t k = 0; done && k < pd.evs.size(); k++) {   // fallback events only
-      cudaEvent_t ev = pd.evs[k];
-      const cudaError_t ev_state = cudaEventQuery(ev);
+      hapiEvent_t ev = pd.evs[k];
+      const hapiError_t ev_state = hapiEventQuery(ev);
       // A query records its verdict as this thread's last error, and the
       // application's next cudaPeekAtLastError would report our "not ready"
       // as its own kernel's failure. Clear that one code and nothing else: a
       // real fault is sticky and comes back from the query itself, so leaving
       // any other code in place keeps it visible to whoever checks next.
-      if (ev_state == cudaErrorNotReady) cudaGetLastError();
-      if (ev_state != cudaSuccess) { done = false; break; }
+      if (ev_state == hapiErrorNotReady) hapiGetLastError();
+      if (ev_state != hapiSuccess) { done = false; break; }
     }
     if (done) {
       HapiDevPoolArena* ar = hapiDevPoolArenaOfLocked(pd.ptr);
       if (ar) ar->alloc->free(pd.ptr);   // interface call: buddy or vmm
       auto& spares = hapi_devpool_spare_events[pd.device];
-      for (cudaEvent_t ev : pd.evs) spares.push_back(ev);
+      for (hapiEvent_t ev : pd.evs) spares.push_back(ev);
       pd = std::move(hapi_devpool_pending.back());
       hapi_devpool_pending.pop_back();
     } else {
@@ -5412,9 +5505,9 @@ HapiDevPoolArena& hapiDevPoolNewArenaLocked(size_t need, int dev) {
   return hapi_devpool_arenas.back();
 }
 
-const char* hapiCuErrName(CUresult r) {
+const char* hapiCuErrName(hapiDrvResult r) {
   const char* s = nullptr;
-  cuGetErrorName(r, &s);
+  hapiDrvGetErrorName(r, &s);
   return s ? s : "CUDA_ERROR_?";
 }
 
@@ -5425,8 +5518,8 @@ struct HapiVmmAlloc : HapiRangeAlloc {
   hapi_pool::RangeHeap heap;
   int dev;       // the pool's key: the process-local device index (my_device_id)
   int cudaDev;   // the CUDA ordinal the chunks live on (DeviceManager::global_index)
-  CUmemAllocationProp prop;
-  std::vector<CUmemGenericAllocationHandle> handles;
+  hapiMemAllocationProp prop;
+  std::vector<hapiMemGenericAllocationHandle> handles;
   std::vector<int> fds;
   hapi_pool_shm_entry* shm = nullptr;   // set by publish(); null without +gpushm
   int shm_index = -1;
@@ -5461,28 +5554,28 @@ struct HapiVmmAlloc : HapiRangeAlloc {
         CmiAbort("HAPI> [%d] device pool (vmm): %zu chunks of %zu MB mapped, the shared "
                  "table's limit; raise +gpupoolchunk", CmiMyPe(), handles.size(), chunk >> 20);
       hapiDevPoolCheckRegistrable(chunk, handles.size(), held, false);
-      const CUdeviceptr at = (CUdeviceptr)(addr + i * chunk);
-      CUmemGenericAllocationHandle h;
-      CUresult r = cuMemCreate(&h, chunk, &prop, 0);
-      if (r != CUDA_SUCCESS && handles.empty()) {
+      const uintptr_t at = (uintptr_t)(addr + i * chunk);
+      hapiMemGenericAllocationHandle h;
+      hapiDrvResult r = hapiDrvMemCreate(&h, chunk, &prop, 0);
+      if (r != hapiDrvSuccess && handles.empty()) {
         // The very first chunk: the failure is about the allocation
         // properties, not memory. Step down through the optional ones --
         // RDMA capability, then the exportable handle type -- and keep
         // whatever the driver accepts, saying so.
-        CUmemAllocationProp p2 = prop;
-        const CUresult first = r;
-        if (r != CUDA_SUCCESS && p2.allocFlags.gpuDirectRDMACapable) {
+        hapiMemAllocationProp p2 = prop;
+        const hapiDrvResult first = r;
+        if (r != hapiDrvSuccess && p2.allocFlags.gpuDirectRDMACapable) {
           p2.allocFlags.gpuDirectRDMACapable = 0;
-          r = cuMemCreate(&h, chunk, &p2, 0);
-          if (r == CUDA_SUCCESS)
+          r = hapiDrvMemCreate(&h, chunk, &p2, 0);
+          if (r == hapiDrvSuccess)
             CmiPrintf("HAPI> [%d] device pool (vmm): chunks are NOT GPUDirect-RDMA capable "
                       "(cuMemCreate with the flag: %s); inter-node sends from the pool "
                       "will not register\n", CmiMyPe(), hapiCuErrName(first));
         }
-        if (r != CUDA_SUCCESS && p2.requestedHandleTypes != CU_MEM_HANDLE_TYPE_NONE) {
-          p2.requestedHandleTypes = CU_MEM_HANDLE_TYPE_NONE;
-          r = cuMemCreate(&h, chunk, &p2, 0);
-          if (r == CUDA_SUCCESS) {
+        if (r != hapiDrvSuccess && p2.requestedHandleTypes != hapiMemHandleTypeNone) {
+          p2.requestedHandleTypes = hapiMemHandleTypeNone;
+          r = hapiDrvMemCreate(&h, chunk, &p2, 0);
+          if (r == hapiDrvSuccess) {
             exportable = false;
             CmiPrintf("HAPI> [%d] device pool (vmm): chunks are NOT exportable as file "
                       "descriptors (cuMemCreate with the handle type: %s); peers cannot map "
@@ -5490,13 +5583,13 @@ struct HapiVmmAlloc : HapiRangeAlloc {
                       hapiCuErrName(first));
           }
         }
-        if (r == CUDA_SUCCESS) prop = p2;
+        if (r == hapiDrvSuccess) prop = p2;
       }
-      if (r != CUDA_SUCCESS) {
+      if (r != hapiDrvSuccess) {
         size_t freeMem = 0, totalMem = 0;
-        cudaMemGetInfo(&freeMem, &totalMem);
+        hapiMemGetInfo(&freeMem, &totalMem);
         size_t gran = 0;
-        cuMemGetAllocationGranularity(&gran, &prop, CU_MEM_ALLOC_GRANULARITY_MINIMUM);
+        hapiDrvMemGetAllocationGranularity(&gran, &prop, hapiMemAllocGranularityMinimum);
         CmiPrintf("HAPI> [%d] device pool (vmm): cuMemCreate of a %zu MB chunk failed: %s "
                   "(cuda device %d, %zu MB mapped, %zu of %zu MB free on the device, minimum "
                   "granularity %zu KB, handle types 0x%x, rdma %d)\n", CmiMyPe(),
@@ -5506,16 +5599,16 @@ struct HapiVmmAlloc : HapiRangeAlloc {
         if (mapped) t_devpool_pending_segments.push_back({(void*)addr, mapped * chunk, chunk, dev});
         return false;   // the heap stays as it was; the caller reports OOM
       }
-      r = cuMemMap(at, chunk, 0, h, 0);
-      if (r != CUDA_SUCCESS)
+      r = hapiDrvMemMap(at, chunk, 0, h, 0);
+      if (r != hapiDrvSuccess)
         CmiAbort("HAPI> [%d] device pool (vmm): cuMemMap failed: %s", CmiMyPe(), hapiCuErrName(r));
       r = hapiVmmSetAccessAllLocal(at, chunk, cudaDev, "device pool (vmm)");
-      if (r != CUDA_SUCCESS)
+      if (r != hapiDrvSuccess)
         CmiAbort("HAPI> [%d] device pool (vmm): cuMemSetAccess failed: %s", CmiMyPe(), hapiCuErrName(r));
       int fd = -1;
       if (exportable) {
-        r = cuMemExportToShareableHandle(&fd, h, CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR, 0);
-        if (r != CUDA_SUCCESS)
+        r = hapiDrvMemExportToShareableHandle(&fd, h, hapiMemHandleTypePosixFd, 0);
+        if (r != hapiDrvSuccess)
           CmiAbort("HAPI> [%d] device pool (vmm): cuMemExportToShareableHandle failed: %s",
                    CmiMyPe(), hapiCuErrName(r));
       }
@@ -5570,32 +5663,30 @@ HapiDevPoolArena& hapiDevPoolNewVmmHeapLocked(int dev) {
   int cudaDev = dev;
   if (dev >= 0 && dev < (int)gm.device_managers.size())
     cudaDev = gm.device_managers[dev].global_index;
-  CUdevice cudev;
-  CUresult r = cuDeviceGet(&cudev, cudaDev);
-  if (r != CUDA_SUCCESS)
+  hapiDrvDevice cudev;
+  hapiDrvResult r = hapiDrvDeviceGet(&cudev, cudaDev);
+  if (r != hapiDrvSuccess)
     CmiAbort("HAPI> [%d] device pool (vmm): cuDeviceGet(%d): %s", CmiMyPe(), cudaDev, hapiCuErrName(r));
   int vmmOk = 0, fdOk = 0, rdmaOk = 0;
-  cuDeviceGetAttribute(&vmmOk, CU_DEVICE_ATTRIBUTE_VIRTUAL_MEMORY_MANAGEMENT_SUPPORTED, cudev);
-  cuDeviceGetAttribute(&fdOk, CU_DEVICE_ATTRIBUTE_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR_SUPPORTED, cudev);
-  cuDeviceGetAttribute(&rdmaOk, CU_DEVICE_ATTRIBUTE_GPU_DIRECT_RDMA_WITH_CUDA_VMM_SUPPORTED, cudev);
+  hapiDrvDeviceVmmSupport(cudev, &vmmOk, &fdOk, &rdmaOk);
   if (!vmmOk)
     CmiAbort("HAPI> [%d] device %d does not support CUDA virtual memory management; "
              "use +gpupoolalloc buddy", CmiMyPe(), dev);
-  CUmemAllocationProp prop;
+  hapiMemAllocationProp prop;
   memset(&prop, 0, sizeof(prop));
-  prop.type = CU_MEM_ALLOCATION_TYPE_PINNED;
-  prop.location.type = CU_MEM_LOCATION_TYPE_DEVICE;
+  prop.type = hapiMemAllocationTypePinned;
+  prop.location.type = hapiMemLocationTypeDevice;
   prop.location.id = cudaDev;
-  if (fdOk) prop.requestedHandleTypes = CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR;
+  if (fdOk) prop.requestedHandleTypes = hapiMemHandleTypePosixFd;
   if (rdmaOk) prop.allocFlags.gpuDirectRDMACapable = 1;   // registrable by the NIC
   size_t gran = 0;
-  r = cuMemGetAllocationGranularity(&gran, &prop, CU_MEM_ALLOC_GRANULARITY_RECOMMENDED);
-  if (r != CUDA_SUCCESS || gran == 0) gran = (size_t)2 << 20;
+  r = hapiDrvMemGetAllocationGranularity(&gran, &prop, hapiMemAllocGranularityRecommended);
+  if (r != hapiDrvSuccess || gran == 0) gran = (size_t)2 << 20;
   size_t chunk = hapi_pool::RangeHeap::roundUp(hapiDevPoolChunkBytesConfigured(), gran);
   size_t reserve = gm.device_pool_reserve_bytes;
   if (reserve == 0) {
     size_t total = 0;
-    cuDeviceTotalMem(&total, cudev);
+    hapiDrvDeviceTotalMem(&total, cudev);
     reserve = total * 2;
   }
   reserve = hapi_pool::RangeHeap::roundUp(reserve, chunk);
@@ -5610,10 +5701,10 @@ HapiDevPoolArena& hapiDevPoolNewVmmHeapLocked(int dev) {
   // `reserve` bytes at 1 TiB + (process x devices + device) x reserve; the
   // driver may still place the range elsewhere, and then says so.
   const uintptr_t slot = (uintptr_t)CmiMyNode() * (uintptr_t)std::max(1, gm.device_count) + (uintptr_t)dev;
-  const CUdeviceptr hint = (CUdeviceptr)(((uintptr_t)1 << 40) + slot * (uintptr_t)reserve);
-  CUdeviceptr base = 0;
-  r = cuMemAddressReserve(&base, reserve, 0, hint, 0);
-  if (r != CUDA_SUCCESS)
+  const uintptr_t hint = (uintptr_t)(((uintptr_t)1 << 40) + slot * (uintptr_t)reserve);
+  uintptr_t base = 0;
+  r = hapiDrvMemAddressReserve(&base, reserve, 0, hint, 0);
+  if (r != hapiDrvSuccess)
     CmiAbort("HAPI> [%d] device pool (vmm): cuMemAddressReserve of %zu MB failed: %s",
              CmiMyPe(), reserve >> 20, hapiCuErrName(r));
   if (base != hint)
@@ -5729,44 +5820,44 @@ void* hapiDevPoolMalloc(size_t size, int dev) {
 // hapiMalloc / hapiFree (hapi_portable.h): the pool when +gpupool is on,
 // cudaMalloc/cudaFree otherwise. The pool charges the footprint ledger
 // itself; the cudaMalloc path charges here.
-cudaError_t hapiMallocImpl(void** ptr, size_t size) {
+hapiError_t hapiMallocImpl(void** ptr, size_t size) {
   if (hapiDevPoolOn()) {
     // The pool is keyed by the process-local device index, the same key
     // CkDeviceMalloc passes (CpvAccess(my_device_id)); the CUDA ordinal is
     // the pool's business (hapiDevPoolNewVmmHeapLocked).
     *ptr = hapiDevPoolMalloc(size, CpvAccess(my_device_id));
-    return (*ptr != nullptr) ? cudaSuccess : cudaErrorMemoryAllocation;
+    return (*ptr != nullptr) ? hapiSuccess : hapiErrorMemoryAllocation;
   }
-  const cudaError_t e = cudaMalloc(ptr, size);
-  if (e == cudaSuccess) hapiRecordAlloc(*ptr, size);
+  const hapiError_t e = hapiMallocRaw(ptr, size);
+  if (e == hapiSuccess) hapiRecordAlloc(*ptr, size);
   return e;
 }
 
-cudaError_t hapiFreeImpl(void* ptr) {
-  if (ptr == nullptr) return cudaSuccess;
+hapiError_t hapiFreeImpl(void* ptr) {
+  if (ptr == nullptr) return hapiSuccess;
   // A pool block goes back to the pool (hapiDevPoolFree forgets its
   // attribution); anything else -- including allocations made before the
   // pool was switched on -- is a real cudaFree.
   if (hapiDevPoolOn() && hapiDevPoolContains(ptr)) {
     hapiDevPoolFree(ptr);
-    return cudaSuccess;
+    return hapiSuccess;
   }
   hapiRecordFree(ptr);
-  return cudaFree(ptr);
+  return hapiFreeRaw(ptr);
 }
 
 // Free ordered behind `stream`: a pool block is parked until the work queued
 // on the stream so far has retired (hapiDevPoolNoteRead); anything else is
 // cudaFree, which waits for the device.
-cudaError_t hapiFreeAsync(void* ptr, cudaStream_t stream) {
-  if (ptr == nullptr) return cudaSuccess;
+hapiError_t hapiFreeAsync(void* ptr, hapiStream_t stream) {
+  if (ptr == nullptr) return hapiSuccess;
   if (hapiDevPoolOn() && hapiDevPoolContains(ptr)) {
     hapiDevPoolNoteRead(ptr, stream);
     hapiDevPoolFree(ptr);
-    return cudaSuccess;
+    return hapiSuccess;
   }
   hapiRecordFree(ptr);
-  return cudaFree(ptr);
+  return hapiFreeRaw(ptr);
 }
 
 void* hapiDevPoolMallocNoGrow(size_t size, int dev) {
@@ -5850,7 +5941,7 @@ void hapiLBDeviceMemory(size_t* devFree, size_t* poolFree, size_t* arenaBytes,
                         int* ipcSlots) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   size_t freeMem = 0, totalMem = 0;
-  hapiCheck(cudaMemGetInfo(&freeMem, &totalMem));
+  hapiCheck(hapiMemGetInfo(&freeMem, &totalMem));
   *devFree = freeMem;
   if (csv_gpu_manager.device_pool_on) {
     // Chare state, migration payloads and landing arenas all come from this
@@ -5890,7 +5981,7 @@ void hapiDevPoolFree(void* ptr) {
   const bool known = ar->alloc->blockSize(ptr, &blkSize);
   const char* lo = (const char*)ptr;
   const char* hi = lo + (known ? blkSize : 1);
-  std::vector<cudaStream_t> streams;
+  std::vector<hapiStream_t> streams;
   for (auto it = hapi_devpool_read_on.lower_bound(ptr);
        it != hapi_devpool_read_on.end() && (const char*)it->first < hi;) {
     if (std::find(streams.begin(), streams.end(), it->second) == streams.end())
@@ -5909,31 +6000,31 @@ void hapiDevPoolFree(void* ptr) {
   // created for, so pairing the event with the arena records a device-0 event
   // on a device-1 stream and CUDA rejects it.
   int cur_dev = 0;
-  hapiCheck(cudaGetDevice(&cur_dev));
+  hapiCheck(hapiGetDevice(&cur_dev));
   HapiDevPoolPending pd; pd.ptr = ptr; pd.device = cur_dev;
   auto& spares = hapi_devpool_spare_events[cur_dev];
-  for (cudaStream_t st : streams) {
+  for (hapiStream_t st : streams) {
     int rank = -1;
     uint32_t seq = 0;
     if (hapiFlagIssue(st, &rank, &seq)) {   // the normal case: reaped by a plain load
       pd.flags.emplace_back(rank, seq);
       continue;
     }
-    cudaEvent_t ev;
+    hapiEvent_t ev;
     if (!spares.empty()) {
       ev = spares.back(); spares.pop_back();
     } else {
-      hapiCheck(cudaEventCreateWithFlags(&ev, cudaEventDisableTiming));
+      hapiCheck(hapiEventCreateWithFlags(&ev, hapiEventDisableTiming));
     }
-    const cudaError_t rec = cudaEventRecord(ev, st);
-    if (rec != cudaSuccess) {
-      int cur = -1; cudaGetDevice(&cur);
-      const cudaError_t sq = cudaStreamQuery(st);
-      const cudaError_t eq = cudaEventQuery(ev);
+    const hapiError_t rec = hapiEventRecordRaw(ev, st);
+    if (rec != hapiSuccess) {
+      int cur = -1; hapiGetDevice(&cur);
+      const hapiError_t sq = hapiStreamQuery(st);
+      const hapiError_t eq = hapiEventQuery(ev);
       CmiPrintf("[%d] devpool record failed: %s | ptr=%p arena_dev=%d cur_dev=%d "
                 "stream=%p (query %s) event=%p (query %s)\n",
-                CmiMyPe(), cudaGetErrorName(rec), ptr, ar->device, cur,
-                (void*)st, cudaGetErrorName(sq), (void*)ev, cudaGetErrorName(eq));
+                CmiMyPe(), hapiGetErrorName(rec), ptr, ar->device, cur,
+                (void*)st, hapiGetErrorName(sq), (void*)ev, hapiGetErrorName(eq));
       CmiAbort("devpool: cudaEventRecord failed");
     }
     pd.evs.push_back(ev);
@@ -6055,8 +6146,8 @@ void hapiDevPoolNoteRead(const void* ptr, hapiStream_t stream) {
   // parks on all of them.
   auto range = hapi_devpool_read_on.equal_range(ptr);
   for (auto it = range.first; it != range.second; ++it)
-    if (it->second == (cudaStream_t)stream) return;
-  hapi_devpool_read_on.emplace(ptr, (cudaStream_t)stream);
+    if (it->second == (hapiStream_t)stream) return;
+  hapi_devpool_read_on.emplace(ptr, (hapiStream_t)stream);
 }
 
 void hapiFreeMigratable(void* ptr) {
@@ -6110,15 +6201,15 @@ void hapiFreeMigratable(void* ptr) {
 }
 
 // Kernels live in hapi_kernels.cu (nvcc); this file is plain C++.
-extern "C" void hapiHashAsyncImpl(const void* p, size_t n, unsigned long long* d_out, cudaStream_t stream);
+extern "C" void hapiHashAsyncImpl(const void* p, size_t n, unsigned long long* d_out, hapiStream_t stream);
 extern "C" void hapiHashCompareImpl(const unsigned long long* a, const unsigned long long* b, size_t count,
-                                    unsigned long long* d_flag, cudaStream_t stream);
+                                    unsigned long long* d_flag, hapiStream_t stream);
 void hapiHashAsync(const void* ptr, size_t bytes, unsigned long long* d_out, hapiStream_t stream) {
-  hapiHashAsyncImpl(ptr, bytes, d_out, (cudaStream_t)stream);
+  hapiHashAsyncImpl(ptr, bytes, d_out, (hapiStream_t)stream);
 }
 void hapiHashCompareAsync(const unsigned long long* a, const unsigned long long* b, size_t count,
                           unsigned long long* d_flag, hapiStream_t stream) {
-  hapiHashCompareImpl(a, b, count, d_flag, (cudaStream_t)stream);
+  hapiHashCompareImpl(a, b, count, d_flag, (hapiStream_t)stream);
 }
 
 /*** Per-chare device footprint tracking (see hapi_portable.h) ***/
@@ -6747,22 +6838,22 @@ void hapiDumpFlagState() {
       // stream still has pending work while the GPU is idle, the stream is
       // blocked -- on a cudaStreamWaitEvent whose event never came, not on
       // anything the flag mechanism did.
-      const cudaError_t sq = cudaStreamQuery((cudaStream_t)entry.first);
-      cudaGetLastError();
+      const hapiError_t sq = hapiStreamQuery((hapiStream_t)entry.first);
+      hapiGetLastError();
       CkPrintf("[hapi] pe %d q%d stream %p depth %zu head=FLAG seq=%u "
                "slot[%u]=%u delta=%d write=%s stream=%s inflight=%d\n",
                CkMyPe(), qi, entry.first, q.size(), h.flag_seq,
                h.flag_seq & (HAPI_FLAG_SLOTS - 1), (uint32_t)*slot,
                (int)(h.flag_seq - (uint32_t)*slot),
                (*slot == h.flag_seq) ? "LANDED" : "NOT-LANDED",
-               sq == cudaSuccess ? "IDLE(all work done)"
-                 : (sq == cudaErrorNotReady ? "PENDING(blocked)" : "ERR"),
+               sq == hapiSuccess ? "IDLE(all work done)"
+                 : (sq == hapiErrorNotReady ? "PENDING(blocked)" : "ERR"),
                CpvAccess(hapi_flag_inflight));
     } else {
       CkPrintf("[hapi] pe %d q%d stream %p depth %zu head=EVENT query=%d\n",
                CkMyPe(), qi, entry.first, q.size(),
                (int)hapiEventQuery(h.event));
-      cudaGetLastError();
+      hapiGetLastError();
     }
     qi++;
   }
@@ -6775,21 +6866,21 @@ void hapiDumpFlagState() {
   {
     volatile uint32_t* pr = CpvAccess(hapi_flag_probe);
     uint32_t* prd = (uint32_t*)CpvAccess(hapi_flag_probe_dev);
-    cudaStream_t ps;
-    hapiCheck(cudaStreamCreateWithFlags(&ps, cudaStreamNonBlocking));
+    hapiStream_t ps;
+    hapiCheck(hapiStreamCreateWithFlags(&ps, hapiStreamNonBlocking));
     pr[0] = 0; pr[4] = 0;
-    CUresult r1 = hapi_stream_write_value32((CUstream)ps, (CUdeviceptr)prd, 0x11u,
-                                            CU_STREAM_WRITE_VALUE_DEFAULT);
-    CUresult r2 = hapi_memset_d32_async ? hapi_memset_d32_async((CUdeviceptr)(prd + 4), 0x22u, 1, (CUstream)ps)
-                                        : CUDA_ERROR_NOT_SUPPORTED;
+    hapiDrvResult r1 = hapi_stream_write_value32((hapiDrvStream)ps, (uintptr_t)prd, 0x11u,
+                                            hapiStreamWriteValueDefault);
+    hapiDrvResult r2 = hapi_memset_d32_async ? hapi_memset_d32_async((uintptr_t)(prd + 4), 0x22u, 1, (hapiDrvStream)ps)
+                                        : hapiDrvErrorNotSupported;
     const double t0 = CmiWallTimer();
-    while (CmiWallTimer() - t0 < 0.5 && !(pr[0] == 0x11u && (r2 != CUDA_SUCCESS || pr[4] == 0x22u))) {}
-    const cudaError_t sq = cudaStreamQuery(ps); cudaGetLastError();
+    while (CmiWallTimer() - t0 < 0.5 && !(pr[0] == 0x11u && (r2 != hapiDrvSuccess || pr[4] == 0x22u))) {}
+    const hapiError_t sq = hapiStreamQuery(ps); hapiGetLastError();
     CkPrintf("[probe] pe %d empty-stream memop=%s (issue rc %d) memset=%s (issue rc %d) stream=%s after %.0f ms\n",
              CkMyPe(), pr[0] == 0x11u ? "LANDED" : "NOT-LANDED", (int)r1,
-             r2 != CUDA_SUCCESS ? "n/a" : (pr[4] == 0x22u ? "LANDED" : "NOT-LANDED"), (int)r2,
-             sq == cudaSuccess ? "idle" : "PENDING", (CmiWallTimer() - t0) * 1e3);
-    cudaStreamDestroy(ps);
+             r2 != hapiDrvSuccess ? "n/a" : (pr[4] == 0x22u ? "LANDED" : "NOT-LANDED"), (int)r2,
+             sq == hapiSuccess ? "idle" : "PENDING", (CmiWallTimer() - t0) * 1e3);
+    hapiStreamDestroy(ps);
   }
   // Same probe, but enqueued BEHIND the stalled work on each pending stream:
   // a memop that lands proves the stream is not blocked at all, only its
@@ -6798,7 +6889,7 @@ void hapiDumpFlagState() {
     volatile uint32_t* pr = CpvAccess(hapi_flag_probe);
     uint32_t* prd = (uint32_t*)CpvAccess(hapi_flag_probe_dev);
     pr[8] = 0;
-    hapi_stream_write_value32((CUstream)st, (CUdeviceptr)(prd + 8), 0x33u, CU_STREAM_WRITE_VALUE_DEFAULT);
+    hapi_stream_write_value32((hapiDrvStream)st, (uintptr_t)(prd + 8), 0x33u, hapiStreamWriteValueDefault);
     const double t0 = CmiWallTimer();
     while (CmiWallTimer() - t0 < 0.2 && pr[8] != 0x33u) {}
     CkPrintf("[probe] pe %d memop behind stream %p: %s\n", CkMyPe(), st,
@@ -6840,15 +6931,15 @@ extern "C" void hapiDumpEventQueues(int max_streams) {
       slotval = *((volatile uint32_t*)CpvAccess(hapi_flag_slots) + idx * HAPI_FLAG_STRIDE);
       busy = CpvAccess(hapi_flag_busy)[idx];
     } else {
-      const cudaError_t r = cudaEventQuery(h.event);
-      evq = (r == cudaSuccess) ? "done" : (r == cudaErrorNotReady) ? "pending" : cudaGetErrorName(r);
-      cudaGetLastError();
+      const hapiError_t r = hapiEventQuery(h.event);
+      evq = (r == hapiSuccess) ? "done" : (r == hapiErrorNotReady) ? "pending" : hapiGetErrorName(r);
+      hapiGetLastError();
     }
-    const cudaError_t q = cudaStreamQuery(e.first);
-    cudaGetLastError();
+    const hapiError_t q = hapiStreamQuery(e.first);
+    hapiGetLastError();
     CmiPrintf("[HAPI-QUEUES %d] stream %p dev %d: %zu queued; head %s seq %u slot=%u busy=%d event=%s; stream %s\n",
               CmiMyPe(), (void*)e.first, hapiStreamDeviceOf(e.first), e.second.size(), kind, (unsigned)h.flag_seq,
-              slotval, busy, evq, (q == cudaSuccess) ? "idle" : (q == cudaErrorNotReady) ? "busy" : cudaGetErrorName(q));
+              slotval, busy, evq, (q == hapiSuccess) ? "idle" : (q == hapiErrorNotReady) ? "busy" : hapiGetErrorName(q));
   }
 #else
   (void)max_streams;
@@ -6880,21 +6971,21 @@ void hapiPollEvents(void* param) {
             (size_t)(hev.flag_seq & (HAPI_FLAG_SLOTS - 1)) * HAPI_FLAG_STRIDE;
         if (*slot != hev.flag_seq) break;
       } else {
-        const cudaError_t q = hapiEventQuery(hev.event);
+        const hapiError_t q = hapiEventQuery(hev.event);
         // A query records its verdict as this thread's last error. cudaErrorNot
         // Ready is this poll's own answer, not a fault of the application's, and
         // leaving it set means the next cudaPeekAtLastError in application code
         // reports a failure that never happened. Anything else is a real problem
         // with the queued event -- say so rather than silently treating it as
         // "not finished yet" and polling it forever.
-        if (q == cudaErrorNotReady) {
-          cudaGetLastError();
+        if (q == hapiErrorNotReady) {
+          hapiGetLastError();
           // this stream's later events cannot be complete; try the next stream
           break;
-        } else if (q != cudaSuccess) {
+        } else if (q != hapiSuccess) {
           // A queued event that cannot even be queried is not going to
           // complete; drop it rather than polling it forever.
-          cudaGetLastError();
+          hapiGetLastError();
           queue.pop();
           {
             const int d = hapiStreamDeviceOf(entry.first);
@@ -6973,10 +7064,10 @@ hapiStream_t hapiAcquireRuntimeStream(bool highPriority) {
   bool done = false;
   if (highPriority && hapi_recv_priority) {
     int least = 0, greatest = 0;
-    if (cudaDeviceGetStreamPriorityRange(&least, &greatest) == cudaSuccess &&
-        cudaStreamCreateWithPriority((cudaStream_t*)&s, cudaStreamNonBlocking, greatest) == cudaSuccess)
+    if (hapiDeviceGetStreamPriorityRange(&least, &greatest) == hapiSuccess &&
+        hapiStreamCreateWithPriority((hapiStream_t*)&s, hapiStreamNonBlocking, greatest) == hapiSuccess)
       done = true;
-    else cudaGetLastError();
+    else hapiGetLastError();
   }
   if (!done) hapiCheck(hapiStreamCreateNonBlocking(&s));
   if (prev != dev) hapiCheck(hapiSetDevice(prev));
@@ -7084,8 +7175,8 @@ hapiStream_t hapiAcquirePriorityStream() {
   hapiCheck(hapiGetDevice(&prev));
   if (prev != dev) hapiCheck(hapiSetDevice(dev));
   int least = 0, greatest = 0;
-  hapiCheck(cudaDeviceGetStreamPriorityRange(&least, &greatest));
-  hapiCheck(cudaStreamCreateWithPriority((cudaStream_t*)&s, cudaStreamNonBlocking, greatest));
+  hapiCheck(hapiDeviceGetStreamPriorityRange(&least, &greatest));
+  hapiCheck(hapiStreamCreateWithPriority((hapiStream_t*)&s, hapiStreamNonBlocking, greatest));
   if (prev != dev) hapiCheck(hapiSetDevice(prev));
   std::lock_guard<std::mutex> lk(hapi_stream_pool_lock);
   hapi_stream_owner[(void*)s] = dev;
@@ -7412,11 +7503,11 @@ bool hapiFlagIssue(hapiStream_t stream, int* rank, uint32_t* seq) {
       (uint32_t*)CpvAccess(hapi_flag_slots_dev) + (size_t)idx * HAPI_FLAG_STRIDE;
   HapiSubmitOp flagOp{};
   flagOp.kind = HAPI_SUBMIT_FLAG; flagOp.value = next; flagOp.stream = stream; flagOp.dst = (void*)slot_dev;
-  const CUresult res = hapiSubmitPush(flagOp) ? CUDA_SUCCESS : hapi_flag_use_memset
-      ? hapi_memset_d32_async((CUdeviceptr)slot_dev, next, 1, (CUstream)stream)
-      : hapi_stream_write_value32((CUstream)stream, (CUdeviceptr)slot_dev,
-                                  next, CU_STREAM_WRITE_VALUE_DEFAULT);
-  if (res != CUDA_SUCCESS)
+  const hapiDrvResult res = hapiSubmitPush(flagOp) ? hapiDrvSuccess : hapi_flag_use_memset
+      ? hapi_memset_d32_async((uintptr_t)slot_dev, next, 1, (hapiDrvStream)stream)
+      : hapi_stream_write_value32((hapiDrvStream)stream, (uintptr_t)slot_dev,
+                                  next, hapiStreamWriteValueDefault);
+  if (res != hapiDrvSuccess)
     CmiAbort("HAPI> %s failed (%d); rerun with +gpueventquery",
              hapi_flag_use_memset ? "cuMemsetD32Async" : "cuStreamWriteValue32", (int)res);
   hapi_flag_writes_total.fetch_add(1, std::memory_order_relaxed);
@@ -7509,9 +7600,9 @@ void hapiSendMemoryRequest(char* msg, int size)
 // }
 
 
-void hapiErrorDie(cudaError_t retCode, const char* code, const char* file, int line) {
-  if (retCode != cudaSuccess) {
-    fprintf(stderr, "Fatal CUDA Error [%d] %s at %s:%d\n", retCode, cudaGetErrorString(retCode), file, line);
+void hapiErrorDie(hapiError_t retCode, const char* code, const char* file, int line) {
+  if (retCode != hapiSuccess) {
+    fprintf(stderr, "Fatal CUDA Error [%d] %s at %s:%d\n", retCode, hapiGetErrorString(retCode), file, line);
     CmiAbort("Exit due to CUDA error");
   }
 }
@@ -7571,7 +7662,7 @@ int hapiMyDeviceTotalSMs() {
     // Fallback: query directly for just this device if the lazy population in
     // hapiProcessCuptiBuffers hasn't run yet.
     int count = 0;
-    cudaDeviceGetAttribute(&count, cudaDevAttrMultiProcessorCount,
+    hapiDeviceGetAttribute(&count, hapiDevAttrMultiProcessorCount,
                            dm.global_index);
     return count;
   }

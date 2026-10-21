@@ -64,7 +64,7 @@ void  CkFreeMsg(void *msg)
 {
   if (msg!=NULL) {
       envelope* env = UsrToEnv(msg);
-#if CMK_CUDA
+#if CMK_GPU
       // Only when the message is really about to die: an SDAG closure holds a
       // reference across buffering, and its CkFreeMsg merely drops the count.
       if (CmiGetReference(env) <= 1) CkRdmaDeviceMsgFreed((void*)env);

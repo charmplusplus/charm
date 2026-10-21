@@ -73,7 +73,7 @@ private:
   class ObjLoadGreater {
   public:
     inline bool operator() (const GObj *o1, const GObj *o2) const {
-#if CMK_CUDA
+#if CMK_GPU
       // Greedy packing is only as good as its ordering: placing the largest
       // items first is what keeps the bins even. Placement here is scored on
       // both dimensions, so order by whichever one binds for each object.

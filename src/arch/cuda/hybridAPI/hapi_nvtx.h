@@ -1,9 +1,15 @@
 #ifndef __HAPI_NVTX_H_
 #define __HAPI_NVTX_H_
 
-// NVTX ranges inside HAPI (callbacks, enqueue). Runtime-gated: hapiNvtxOn is set by the +nvtx
-// command-line flag (ck-core/cknvtx.C); without it every NVTXTracer is a no-op.
+// Timeline ranges inside HAPI (callbacks, enqueue): NVTX on CUDA, roctx on
+// HIP. Runtime-gated: hapiNvtxOn is set by the +nvtx command-line flag
+// (ck-core/cknvtx.C); without it every NVTXTracer is a no-op.
+#include "conv-mach-opt.h"
+#if CMK_HIP
+#include <rocprofiler-sdk-roctx/roctx.h>
+#else
 #include "nvtx3/nvToolsExt.h"
+#endif
 #include <cstring>
 #include <type_traits>
 
@@ -28,6 +34,15 @@ class NVTXTracer {
   public:
   NVTXTracer(const char* name, NVTXColor color) {
     if (!hapiNvtxOn) return;
+#if CMK_HIP
+    (void)color;   // roctx ranges carry a name only
+    roctxRangePushA(name);
+    pushed = true;
+  }
+  ~NVTXTracer() {
+    if (pushed) roctxRangePop();
+  }
+#else
     nvtxEventAttributes_t eventAttrib;
     memset(&eventAttrib, 0, sizeof eventAttrib);
     eventAttrib.version = NVTX_VERSION;
@@ -44,6 +59,7 @@ class NVTXTracer {
   ~NVTXTracer() {
     if (pushed) nvtxRangePop();
   }
+#endif
 };
 
 #endif // __HAPI_NVTX_H_

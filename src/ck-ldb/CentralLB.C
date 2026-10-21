@@ -13,8 +13,7 @@
 #include "LBMemoryContract.h"
 #include "LBOffThread.h"
 #include <atomic>
-#if CMK_CUDA
-#include <cupti.h>
+#if CMK_GPU
 #include "gpumanager.h"
 // extern void hapiProcessCuptiBuffers();
 // extern void hapiClearCuptiData();
@@ -143,7 +142,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   if (opt.getSeqNo() > 0 || (_lb_args.metaLbOn() && _lb_args.metaLbModelDir() != nullptr))
     turnOff();
 
-  #if CMK_CUDA
+  #if CMK_GPU
   // The footprint slot is registered once per PE in _loadbalancerInit; a
   // second claim here would leak layout space and desynchronize the index.
   if (CkpvAccess(_lb_obj_index) < 0) {
@@ -156,7 +155,7 @@ void CentralLB::initLB(const CkLBOptions &opt)
   statsMsgsList = NULL;
   statsData = NULL;
 
-#if CMK_CUDA
+#if CMK_GPU
   gpuScalingEpoch_ = 0;
   gpuScalingModel_.configure(_lb_args.gpuScalingAlphaMin(),
                              (uint64_t)_lb_args.gpuScalingMinSamples());
@@ -231,7 +230,7 @@ void CentralLB::CallLB()
     return;
   }
   
-#if CMK_CUDA
+#if CMK_GPU
   // Reduce the kernel timeline to one scalar load per object, while the records
   // are still local -- only those scalars are sent to the central LB.
   //
@@ -275,7 +274,7 @@ void CentralLB::CallLB()
 void CentralLB::gpuLoadsReady()
 {
 #if CMK_LBDB_ON
-#if CMK_CUDA
+#if CMK_GPU
   lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
   lbmgr->SetObjDriverLoad(CsvAccess(gpu_manager).cupti_obj_api_raw_, hapiCuptiDriverScale());
   if (_lb_args.gpuScaling())
@@ -456,7 +455,7 @@ void CentralLB::BuildStatsMsg()
   msg->pe_speed = myspeed;
 #endif
 
-#if CMK_CUDA
+#if CMK_GPU
   // printf("CMK_CUDA setting device is %ld\n", hapiMyDevice());
   msg->gpu_device_id = hapiMyDevice();
   msg->gpu_total_sms = hapiMyDeviceTotalSMs();
@@ -614,7 +613,7 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.bg_cputime = m->bg_cputime;
 #endif
   procStat.pe_speed = m->pe_speed;
-#if CMK_CUDA
+#if CMK_GPU
   procStat.gpu_device_id = m->gpu_device_id;
   procStat.gpu_total_sms = m->gpu_total_sms;
   procStat.gpu_mem_remaining = m->gpu_mem_remaining;
@@ -699,7 +698,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
       procStat.bg_cputime = m->bg_cputime;
 #endif
       procStat.pe_speed = m->pe_speed;
-#if CMK_CUDA
+#if CMK_GPU
       procStat.gpu_device_id = m->gpu_device_id;
       procStat.gpu_total_sms = m->gpu_total_sms;
       procStat.gpu_mem_remaining = m->gpu_mem_remaining;
@@ -773,7 +772,7 @@ void CentralLB::ReceiveStatsViaTree(CkMarshalledCLBStatsMessage &&msg)
 static LDHandle *loadBalancer_pointers;
 #endif
 
-#if CMK_CUDA
+#if CMK_GPU
 // Every registered device type this job currently has, one entry per PE that
 // reports one, so the reference policy can pick the most common.
 static void collectGpuTypes(const BaseLB::LDStats* stats,
@@ -1019,7 +1018,7 @@ void CentralLB::LoadBalance()
   removeCommDataOfDeletedObjs(statsData);
   preprocess(statsData);
 
-#if CMK_CUDA
+#if CMK_GPU
   // After the statistics are complete and before any strategy runs. Shadow
   // mode only: nothing here feeds placement.
   updateGpuScalingModel(statsData);
@@ -1107,7 +1106,7 @@ void CentralLB::ApplyDecision() {
   CpdHandleLBMessage(&migrateMsg);
 #endif
 
-#if CMK_CUDA
+#if CMK_GPU
   // Memory contract, I-batch: partition the decision so each batch fits what
   // every device can stage and land, and every PE's IPC slots. One batch (the
   // usual case) takes the unmodified path below; multiple batches are stashed
@@ -1730,7 +1729,7 @@ void CentralLB::MigrationDoneImpl (int balancing)
   // attribution, so a chare that has joined is still not billed.
   LBTurnInstrumentOn();
 
-#if CMK_CUDA
+#if CMK_GPU
   if (CkMyPe() == hapiDeviceGroupFirstPe())
     hapiClearCuptiDataDevice(hapiMyDeviceIndex());
 #endif
@@ -1922,7 +1921,7 @@ void CentralLB::strategyCompute(LDStats* stats)
 LBMigrateMsg* CentralLB::strategyFinish(LDStats* stats)
 {
 #if CMK_LBDB_ON
-#if CMK_CUDA
+#if CMK_GPU
   // Memory contract: every strategy's output passes through the verifier,
   // memory-aware or not. Moves that would violate a device's headroom are
   // refused (the object stays home -- always feasible); strategies that plan
@@ -2279,7 +2278,7 @@ void CentralLB::pup(PUP::er &p) {
     statsMsg->pup(p);
   }
   p | use_thread;
-#if CMK_CUDA
+#if CMK_GPU
   // Learning must survive checkpoint/restart and migration of the central PE,
   // or every restart throws away the calibration and falls back to the prior.
   gpuScalingModel_.pup(p);
@@ -2310,7 +2309,7 @@ CLBStatsMsg::~CLBStatsMsg() {
 void CLBStatsMsg::pup(PUP::er &p) {
   p|from_pe;
   p|pe_speed;
-#if CMK_CUDA
+#if CMK_GPU
   p|gpu_device_id;
   p|gpu_total_sms;
   p|gpu_mem_remaining;

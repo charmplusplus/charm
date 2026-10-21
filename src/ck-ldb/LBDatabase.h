@@ -9,7 +9,7 @@
 #include "LBComm.h"
 #include "LBMachineUtil.h"
 
-#if (CMK_CUDA || CMK_HIP) && CMK_LBDB_ON
+#if CMK_GPU && CMK_LBDB_ON
 // For hapiCuptiStartTracing/hapiCuptiStopTracing, called from TurnStatsOn/Off.
 void hapiCuptiStartTracing();
 void hapiCuptiStopTracing();
@@ -111,7 +111,7 @@ public:
     }
   }
 
-#if CMK_CUDA
+#if CMK_GPU
   // Companion to SetObjGPULoad for the driver. Each object's runtime-API time
   // (hapiProcessCuptiBuffers, contended as its PE saw it) comes out of its
   // host load, and scaled by `scale` -- the process's driver busy time over
@@ -190,13 +190,13 @@ public:
   // is what makes instrumented runs affordable.
   inline void TurnStatsOn(void)
        {statsAreOn = true; machineUtil.StatsOn();
-#if (CMK_CUDA || CMK_HIP) && CMK_LBDB_ON
+#if CMK_GPU && CMK_LBDB_ON
         hapiCuptiStartTracing();
 #endif
        }
   inline void TurnStatsOff(void)
        {statsAreOn = false; machineUtil.StatsOff();
-#if (CMK_CUDA || CMK_HIP) && CMK_LBDB_ON
+#if CMK_GPU && CMK_LBDB_ON
         hapiCuptiStopTracing();
 #endif
        }
@@ -267,7 +267,7 @@ public:
   // to report this PE's contribution to its device's load between LB rounds.
   inline LBRealType GetTotalObjGPULoad(void) const {
     LBRealType total = 0.0;
-#if CMK_CUDA
+#if CMK_GPU
     for (const LBObjEntry &e : objs)
       if (e.obj != nullptr) total += e.obj->data.gpuTime;
 #endif
@@ -299,7 +299,7 @@ public:
     // count toward the PE's background load.
     MeasuredObjTime(walltime, cputime);
 
-    #if CMK_CUDA
+    #if CMK_GPU
     MeasuredObjGPUTime(obj->data.gpuTime);
     #endif
   };

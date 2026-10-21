@@ -1,3 +1,4 @@
+#include "hapi_portable.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <cmath>
@@ -14,13 +15,11 @@
 #include <fcntl.h>
 #include <sched.h>
 
-#include <cuda_runtime.h>
-#include <cuda.h>
 
 #define CUDA_CHECK(call) do { \
-  cudaError_t err = call; \
-  if (err != cudaSuccess) { \
-    fprintf(stderr, "HAPI> CUDA call failed at %s:%d: %s\n", __FILE__, __LINE__, cudaGetErrorString(err)); \
+  hapiError_t err = call; \
+  if (err != hapiSuccess) { \
+    fprintf(stderr, "HAPI> CUDA call failed at %s:%d: %s\n", __FILE__, __LINE__, hapiGetErrorString(err)); \
   } \
 } while(0)
 
@@ -66,19 +65,19 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
       handle_start++; // Move past the found colon
     }
 
-    cudaIpcMemHandle_t ipc_handle;
-    memcpy(&ipc_handle, handle_start, sizeof(cudaIpcMemHandle_t));
+    hapiIpcMemHandle_t ipc_handle;
+    memcpy(&ipc_handle, handle_start, sizeof(hapiIpcMemHandle_t));
 
     void* client_ptr;
-    CUDA_CHECK(cudaIpcOpenMemHandle(&client_ptr, ipc_handle, cudaIpcMemLazyEnablePeerAccess));
+    CUDA_CHECK(hapiIpcOpenMemHandle(&client_ptr, ipc_handle, hapiIpcMemLazyEnablePeerAccess));
 
     std::pair<void*, size_t> allocation = std::make_pair((void*) NULL, size);
-    CUDA_CHECK(cudaMalloc((void**) &(allocation.first), size));
+    CUDA_CHECK(hapiMallocRaw((void**) &(allocation.first), size));
 
-    CUDA_CHECK(cudaMemcpy((void*) allocation.first, client_ptr, size, cudaMemcpyDeviceToDevice));
+    CUDA_CHECK(hapiMemcpy((void*) allocation.first, client_ptr, size, hapiMemcpyDeviceToDevice));
     hapiMemoryMap[allocId] = allocation;
 
-    CUDA_CHECK(cudaIpcCloseMemHandle(client_ptr));
+    CUDA_CHECK(hapiIpcCloseMemHandle(client_ptr));
     write(client_fd, &allocId, sizeof(int));
     allocId++;
   }
@@ -88,9 +87,9 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
     sscanf(buf, "GET:%ld:%d", &client_pid, &alloc_id);
 
     void* ptr = hapiMemoryMap[alloc_id].first;
-    cudaIpcMemHandle_t ipc_handle;
-    CUDA_CHECK(cudaIpcGetMemHandle(&ipc_handle, ptr));
-    write(client_fd, &ipc_handle, sizeof(cudaIpcMemHandle_t));
+    hapiIpcMemHandle_t ipc_handle;
+    CUDA_CHECK(hapiIpcGetMemHandle(&ipc_handle, ptr));
+    write(client_fd, &ipc_handle, sizeof(hapiIpcMemHandle_t));
   }
   else if (strcmp(command, "FREE") == 0)
   {
@@ -99,7 +98,7 @@ void hapiProcessMemoryRequest(int server_fd, int my_device, char* buf)
 
     auto it = hapiMemoryMap.find(alloc_id);
     if (it != hapiMemoryMap.end()) {
-      CUDA_CHECK(cudaFree(it->second.first));
+      CUDA_CHECK(hapiFreeRaw(it->second.first));
       hapiMemoryMap.erase(it);
     }
     write(client_fd, "\0", 1);
@@ -132,7 +131,7 @@ void hapiStartMemoryDaemon(int my_device) {
   printf("DAEMON: Starting daemon process PID=%d\n", getpid());
   
   // Set up the daemon's CUDA context
-  cudaSetDevice(my_device);
+  hapiSetDevice(my_device);
 
   char server_fifo[BUFFER_SIZE];
   sprintf(server_fifo, SERVER_FIFO_TEMPLATE, my_device);
@@ -215,7 +214,7 @@ void hapiStartMemoryDaemon(int my_device) {
             break;
           }
 
-          msg_len = header_len + sizeof(cudaIpcMemHandle_t);
+          msg_len = header_len + sizeof(hapiIpcMemHandle_t);
           if (data_in_stream < msg_len) {
             // Full message not yet received
             break;

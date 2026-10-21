@@ -10,7 +10,7 @@
 
 #include "charm++.h"
 #include "ShedLB.h"
-#if CMK_CUDA
+#if CMK_GPU
 #include "LBMemoryContract.h"
 #endif
 
@@ -40,7 +40,7 @@ namespace
 // silently treating every object as free.
 inline double objBytes(const LDObjData& od)
 {
-#if CMK_CUDA
+#if CMK_GPU
   const double b = (double)od.gpuPupSize;
   return b > 0.0 ? b : 1.0;
 #else
@@ -61,7 +61,7 @@ void ShedLB::work(LDStats* stats)
   // then its kernels and the PEs sharing a GPU are one bin. Otherwise host
   // time, one bin per PE.
   bool useGpu = false;
-#if CMK_CUDA
+#if CMK_GPU
   {
     double gpuTotal = 0.0;
     for (int i = 0; i < n_objs; i++)
@@ -81,7 +81,7 @@ void ShedLB::work(LDStats* stats)
       int b;
       if (useGpu)
       {
-#if CMK_CUDA
+#if CMK_GPU
         const uint64_t dev = stats->procs[pe].gpu_device_id;
         auto it = devToBin.find(dev);
         if (it == devToBin.end()) { b = (int)bins.size(); devToBin[dev] = b; bins.push_back(Bin()); }
@@ -115,7 +115,7 @@ void ShedLB::work(LDStats* stats)
     const int pe = stats->from_proc[i];
     if (pe < 0 || pe >= n_pes || peToBin[pe] < 0) continue;
     const int b = peToBin[pe];
-#if CMK_CUDA
+#if CMK_GPU
     const double load = useGpu ? od.gpuTime : od.wallTime;
 #else
     const double load = od.wallTime;
@@ -165,7 +165,7 @@ void ShedLB::work(LDStats* stats)
   // if it can hold what the object holds (the memory contract's I-final). The
   // two differ under the device pool -- a Compute stages its live prefix but
   // holds its capacity. Staging and IPC slots are the batch planner's.
-#if CMK_CUDA
+#if CMK_GPU
   LBMemoryModel memModel;
   memModel.build(stats);
   MemoryLedger ledger;
@@ -206,7 +206,7 @@ void ShedLB::work(LDStats* stats)
         if (b == h) continue;
         const double after = bins[b].load + c.load;
         if (!(after <= T && after > bestAfter)) continue;
-#if CMK_CUDA
+#if CMK_GPU
         if (!ledger.feasible(c.idx, stats->from_proc[c.idx], binPe[b]))
         {
           memRefusals++;
@@ -244,7 +244,7 @@ void ShedLB::work(LDStats* stats)
     const int dstPe = binPe[pickDst];
     if (dstPe != oldPe)
     {
-#if CMK_CUDA
+#if CMK_GPU
       ledger.commit(c.idx, oldPe, dstPe);
 #endif
       stats->to_proc[c.idx] = dstPe;
@@ -262,7 +262,7 @@ void ShedLB::work(LDStats* stats)
              "%d of %d objects moved, %.1f MB staged\n",
              nbins, useGpu ? "device" : "host", maxLoad / avg, after / avg,
              1.0 + eps, moves, (int)cands.size(), shedBytes / 1e6);
-#if CMK_CUDA
+#if CMK_GPU
     if (memRefusals > 0)
       CkPrintf("[ShedLB] %d destination check(s) refused because the bin could not "
                "hold the object\n", memRefusals);

@@ -538,7 +538,7 @@ void CkSectionID::pup(PUP::er &p) {
 
 /**** Tiny random API routines */
 
-#if CMK_CUDA || CMK_HIP
+#if CMK_GPU
 void CUDACallbackManager(void *fn, void *msg) {
   if (fn) {
     ((CkCallback*)fn)->send(msg);
@@ -668,7 +668,7 @@ inline Chare *_popObj(void) {
   }
 }
 
-#if CMK_LBDB_ON && (CMK_CUDA || CMK_HIP)
+#if CMK_LBDB_ON && CMK_GPU
 // Declared in hapi.h; forward-declared here to avoid pulling in the full HAPI
 // header this early in ck.C. These bracket the entry-method body so CUPTI
 // kernel records can be correlated back to the active migratable object,
@@ -706,7 +706,7 @@ void CkCallstackPush(Chare *obj) {
   _ckStopTiming();    // suspend timing of the previous obj
   _pushObj(obj);      // push the current object onto the stack
   _ckStartTiming();   // start timing the current obj
-#if CMK_LBDB_ON && (CMK_CUDA || CMK_HIP)
+#if CMK_LBDB_ON && CMK_GPU
   // After _pushObj, `obj` is the active chare. Push a CUPTI external
   // correlation ID (a token for its full LB key, or a sentinel when there is
   // no migratable owner) so every kernel
@@ -738,7 +738,7 @@ void CkCallstackUnwind(Chare *obj) {
 
 // pops ( obj ) from the stack (and manages timing)
 void CkCallstackPop(Chare *obj) {
-#if CMK_LBDB_ON && (CMK_CUDA || CMK_HIP)
+#if CMK_LBDB_ON && CMK_GPU
 #if CMK_GPU_COMM
   // The channel puts this entry method batched go out now, under its
   // correlation, so their copies are charged to it.
@@ -2768,13 +2768,13 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
 
 
 // HAPI support
-#if CMK_CUDA || CMK_HIP
+#if CMK_GPU
 #include "hapi.h"
 #endif
 
 void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid) 
 {
-  #if CMK_CUDA || CMK_HIP
+  #if CMK_GPU
   hapiStream_t stream_ptr = (hapiStream_t)stream;
   CkCallback callback(cb, (void *) fid);
   

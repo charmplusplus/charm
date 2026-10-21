@@ -264,7 +264,7 @@ static inline hapiError_t hapiFreeHost_Pool(void* ptr, bool pool) {
 // into the build's include directory, so its "#pragma once" cannot dedupe the
 // two copies -- it holds macros only, which redefine harmlessly. hapi.h has a
 // real include guard and so may define functions.
-#ifdef CMK_CUDA
+#if CMK_CUDA
 #include <cuda.h>  // driver API; CUDA builds link -lcuda for this one call
 static inline bool hapiMemGetAddressRange(void** base, size_t* size,
                                           const void* ptr) {
@@ -278,7 +278,7 @@ static inline bool hapiMemGetAddressRange(void** base, size_t* size,
 }
 #endif
 
-#ifdef CMK_HIP
+#if CMK_HIP
 static inline bool hapiMemGetAddressRange(void** base, size_t* size,
                                           const void* ptr) {
   hipDeviceptr_t hip_base = nullptr;
@@ -610,7 +610,7 @@ void hapiClearCuptiDataDevice(int dev);
 void hapiPrepareCuptiLoads(uint64_t epoch = HAPI_CUPTI_EPOCH_LB_ROUND);
 // cuptiActivityFlushAll with no chare launch in flight (the flush gate, hapi_impl.cpp). Any flush while kernels
 // may be launched from other threads must go through this.
-void hapiCuptiFlushGated(uint32_t flag);
+void hapiCuptiFlushGated(bool forced);
 void hapiNormalizeCuptiLoads(int onlyDevice = -1);
 void hapiClearCuptiData();
 
@@ -679,14 +679,14 @@ static inline uint64_t hapiTraceTimestamp() { return 0; }
 //
 // Only visible to the CUDA compiler: the <<<>>> launch syntax is not valid C++
 // for a host-only compiler, and hapi.h is included by both.
-#if defined(__CUDACC__)
+#if defined(__CUDACC__) || defined(__HIPCC__)
 template <typename Kernel, typename... Args>
 inline void hapiLaunchKernelWrapper(Kernel kernel, dim3 grid_dim, dim3 block_dim,
-                                    size_t shared_mem, cudaStream_t stream,
+                                    size_t shared_mem, hapiStream_t stream,
                                     Args... args) {
   kernel<<<grid_dim, block_dim, shared_mem, stream>>>(args...);
 }
-#endif // __CUDACC__
+#endif // __CUDACC__ || __HIPCC__
 
 #endif /* defined __cplusplus */
 

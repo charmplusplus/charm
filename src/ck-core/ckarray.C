@@ -535,7 +535,7 @@ void ArrayElement::recvBroadcast(CkMessage* m) {}
 // this element so it follows it through migration.
 void ArrayElement::ckDeviceChannelControl(CkMessage* m)
 {
-#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+#if CMK_GPU && CMK_GPU_COMM
   CkDeviceChannelControl((void*)m);
 #else
   CkFreeMsg(m);
@@ -2050,7 +2050,7 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
                  UsrToEnv(msg)->getTotalsize() + deviceBytes, pe, opts);
     }
 #endif
-#if CMK_CUDA
+#if CMK_GPU
     // A memcpy-prepared device payload is readable only inside this process.
     // If the message is leaving it -- a forward after the target moved --
     // re-prepare the payload as direct IPC in place (see the definition).

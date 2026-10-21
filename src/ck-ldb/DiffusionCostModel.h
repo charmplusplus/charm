@@ -167,7 +167,7 @@ public:
   {
     double hostBytes = (double)pup_decodeSize(o.pupSize);
     double devBytes = 0.0;
-#if CMK_CUDA
+#if CMK_GPU
     // What the pack ships: Stable buffers go at the decision, off this path.
     devBytes = (double)o.gpuPupSize;
 #endif

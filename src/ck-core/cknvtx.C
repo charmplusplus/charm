@@ -14,7 +14,28 @@
 #include "cknvtx.h"
 #if CMK_NVTX
 #include "hapi.h"
+#if CMK_HIP
+// roctx has ranges with a name and nothing else: no domains, colours or
+// payloads. The NVTX shapes this file uses are given roctx meanings here so the
+// hooks below read the same on both vendors.
+#include <rocprofiler-sdk-roctx/roctx.h>
+typedef void* nvtxDomainHandle_t;
+typedef const char* nvtxStringHandle_t;
+struct nvtxEventAttributes_t {
+  int version, size, colorType, messageType, payloadType;
+  uint32_t color;
+  struct { nvtxStringHandle_t registered; } message;
+  struct { long long llValue; } payload;
+};
+enum { NVTX_VERSION = 0, NVTX_EVENT_ATTRIB_STRUCT_SIZE = 0, NVTX_COLOR_ARGB = 0,
+       NVTX_MESSAGE_TYPE_REGISTERED = 0, NVTX_PAYLOAD_TYPE_INT64 = 0 };
+static inline nvtxDomainHandle_t nvtxDomainCreateA(const char*) { return nullptr; }
+static inline nvtxStringHandle_t nvtxDomainRegisterStringA(nvtxDomainHandle_t, const char* s) { return strdup(s); }
+static inline void nvtxDomainRangePushEx(nvtxDomainHandle_t, const nvtxEventAttributes_t* a) { roctxRangePushA(a->message.registered); }
+static inline void nvtxDomainRangePop(nvtxDomainHandle_t) { roctxRangePop(); }
+#else
 #include "nvtx3/nvToolsExt.h"
+#endif
 #include <algorithm>
 #include <cstdio>
 #include <cstring>

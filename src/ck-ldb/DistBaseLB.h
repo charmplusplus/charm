@@ -48,7 +48,7 @@ public:
     int pe_speed;
     bool available;
     bool move;
-#if CMK_CUDA
+#if CMK_GPU
     // This PE's device memory, the same five numbers CentralLB's ProcStats
     // carries (see hapiLBDeviceMemory, hapiLBDevicePoolCapacity).
     size_t gpu_mem_remaining = 0;

@@ -20,7 +20,7 @@
 #include <limits.h>
 #include <algorithm>
 #include <math.h>
-#if CMK_CUDA
+#if CMK_GPU
 #include <unordered_map>
 #endif
 
@@ -280,7 +280,7 @@ double GreedyRefineCentralGPULB::fillData(LDStats *stats,
     p.speed = stats->procs[pe].pe_speed;
     if (p.available) {
       availablePes++;
-      #ifndef CMK_CUDA
+      #ifndef CMK_GPU
         p.bgload = stats->procs[pe].bg_walltime;
         if (p.bgload > maxBGLoad) maxBGLoad = p.bgload;
       #else
@@ -315,7 +315,7 @@ double GreedyRefineCentralGPULB::fillData(LDStats *stats,
       GreedyRefineCentralGPULB::GProc &p = procs[pe];
       if (!p.available)
         CkAbort("GreedyRefineCentralGPULB: nonmigratable object on unavailable processor\n");
-#if CMK_CUDA
+#if CMK_GPU
       // GPU load is background for the PE's GPU group; CPU load is background
       // for the PE itself.
       p.bgload  += oData.gpuTime;
@@ -327,7 +327,7 @@ double GreedyRefineCentralGPULB::fillData(LDStats *stats,
       if (p.bgload > maxBGLoad) maxBGLoad = p.bgload;
 #endif
     } else {
-#if CMK_CUDA
+#if CMK_GPU
       // load -> GPU work (cross-group objective); cpuLoad -> CPU work (intra-group)
       obj.load    = oData.gpuTime;
       obj.cpuLoad = oData.wallTime;
@@ -441,7 +441,7 @@ void GreedyRefineCentralGPULB::work(LDStats *stats)
   int nmoves = 0;
   double greedyMaxLoad = 0;
 
-#if CMK_CUDA
+#if CMK_GPU
   // ---- Two-level GPU-aware path ----
   //
   // Outer: balance GPU load (GObj::load) across GPU groups. A GPU group is the
