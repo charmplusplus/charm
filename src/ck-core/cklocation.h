@@ -167,8 +167,30 @@ public:
   // the source, which also sends the request; the destination parks this
   // message until the gate has reserved those blocks (CkLocMgr::immigrate).
   bool needsLanding = false;
+  // The element's Stable device buffers (PUP::DeviceLife::Stable) were shipped
+  // at the balancer's decision as a separate payload (immigrateStable) and
+  // are not in this message's device stream: their manifest entries carry
+  // DEVICE_MANIFEST_STABLE, and the unpack rebinds them into that landing.
+  bool hasStable = false;
+  int stableGen = 0;
+  int stableBytes = 0;
+  int stableCount = 0;
   char* packData;
   size_t* gpuManifest;
+};
+
+// What the decision-time snapshot of an element's Stable device buffers
+// amounts to, on the source, from the snapshot to the pack that consumes it.
+struct CkStableSnapshot {
+  int toPe;
+  int gen;
+  void* block;                      // the copy (a pool block), freed at the destination's ack
+  size_t bytes;                     // the stable region's extent
+  size_t count;                     // Stable buffers in it
+  std::vector<size_t> manifest;     // their sizes, in walk order
+  unsigned long long* hashes;       // device: count words at the snapshot, count at the pack, one flag; or null
+  void* done;                       // cudaEvent_t after the snapshot's copies and hashes: the pack's compare waits on it
+  double takenAt;
 };
 
 /******************* Map object ******************/
@@ -296,6 +318,7 @@ public:
   // arena. The admission gate allocates exactly these before it grants.
   size_t footprint;
   std::vector<CmiUInt8> blocks;
+  double dispatchedAt = 0.0;   // when the payload send was issued (the window tally)
 
   GPUMigrateData()
       : toPe(-1), size(0), data(nullptr), stream(nullptr), footprint(0) {}
@@ -937,10 +960,33 @@ public:
   long landingDeferrals = 0;
   // The migration window's queue looks its moves up again when a place frees.
   CkLocRec* queuedMigrationRec(CmiUInt8 id) const { return elementNrec(id); }
+
+  // Stable device buffers shipped at the balancer's decision (PUP::DeviceLife::
+  // Stable). The source copies them into a pool block when the decision
+  // arrives (recvMigrate), sends that block as a zerocopy payload while the
+  // element keeps stepping, and the pack skips them; the destination keeps the
+  // landed block until the element's host message arrives and rebinds the
+  // buffers into it. A move that goes elsewhere after all discards it.
+  void stableSnapshot(CkLocRec* rec, int toPe);
+  void stableDiscard(CkLocRec* rec);
+  void immigrateStable(CmiUInt8& id, int& size, char*& data, int& srcPe, int& gen, CkDeviceBufferPost* post);
+  void immigrateStable(CmiUInt8 id, int size, char* data, int srcPe, int gen);
+  void finishStableSend(CmiUInt8 id, int gen);
+  void discardStable(CmiUInt8 id, int gen);
+  struct StableSend { void* block; size_t bytes; int toPe; int gen; };
+  std::map<std::pair<CmiUInt8, int>, StableSend> stableSends;   // source: the block, until the destination's ack
+  struct StableLanding { char* block; int size; int gen; };
+  std::unordered_map<CmiUInt8, StableLanding> stableLandings;  // destination: landed, waiting for the element
+  std::map<std::pair<CmiUInt8, int>, char*> receivedStableMsgs; // destination: posted, landing
+  std::unordered_map<CmiUInt8, int> stableDiscarded;            // destination: discard that generation when it lands
+  std::unordered_map<CmiUInt8, double> payloadLandedAt;        // destination: the window tally's landing stamp
 private:
   void dispatchGPUMsg(CmiUInt8 id);
 public:
 #endif
+  // The element left: tell the PEs that sent to it lately (CkLocRec::recentSenders)
+  // where it is now, so their next message goes there directly.
+  void informSenders(const CkArrayIndex& idx, CmiUInt8 id, const int* pes, int n, int toPe);
   void requestLocation(CmiUInt8 id);
   // See CkLocCache::requestLocationOnce.
   void requestLocationOnce(CmiUInt8 id) { cache->requestLocationOnce(id); }
@@ -960,6 +1006,12 @@ public:
 
 /// check the command line arguments to determine if we can use ConfigurableRRMap
 bool haveConfigurableRRMap();
+
+// The move window tally (CHARM_LB_MIGSTATS; MigStats in cklocation.C): the
+// channel protocol reports its two waits here, 0 = a sender held from the
+// closing to the next resolution, 1 = an owner from its closing to the ack.
+bool ckMigStatsOn();
+void ckMigStatChannel(int kind, double seconds);
 
 /*@}*/
 

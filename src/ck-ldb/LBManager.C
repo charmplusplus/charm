@@ -35,6 +35,12 @@ CkpvDeclare(int, _lb_obj_index);
 static std::atomic<int> _lb_obj_index_any{-1};
 int lbObjFootprintSlot() { return _lb_obj_index_any.load(std::memory_order_relaxed); }
 void lbSetObjFootprintSlot(int slot) { _lb_obj_index_any.store(slot, std::memory_order_relaxed); }
+// The rebuild-cost slot (CkMigratable::setObjRebuildCost): seconds the element
+// spends rebuilding, on arrival, the device state it leaves out of its pup.
+// Priced into every migration by DiffusionCostModel::migrateCost.
+CkpvDeclare(int, _lb_obj_rebuild_index);
+static std::atomic<int> _lb_obj_rebuild_any{-1};
+int lbObjRebuildSlot() { return _lb_obj_rebuild_any.load(std::memory_order_relaxed); }
 
 CkpvDeclare(bool, lbmanagerInited); /**< true if lbdatabase is inited */
 CkpvDeclare(int, _lbStepRequested);
@@ -250,6 +256,9 @@ void _loadbalancerInit()
   // claims must precede object registration.
   CkpvAccess(_lb_obj_index) = LBRegisterObjUserData(sizeof(size_t));
   lbSetObjFootprintSlot(CkpvAccess(_lb_obj_index));
+  CkpvInitialize(int, _lb_obj_rebuild_index);
+  CkpvAccess(_lb_obj_rebuild_index) = LBRegisterObjUserData(sizeof(double));
+  _lb_obj_rebuild_any.store(CkpvAccess(_lb_obj_rebuild_index), std::memory_order_relaxed);
 #endif
 
   char** argv = CkGetArgv();

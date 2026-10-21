@@ -15,6 +15,7 @@ extern "C" {
 
 
 // HAPI init & exit functions
+void hapiPresetEnvironment();   // process environment the driver reads at init; call before any CUDA call
 void hapiInit(char** argv);
 void hapiStartMemoryDaemon(char** argv);
 int hapiCheckpoint(void* devPtr, int size);

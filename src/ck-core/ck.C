@@ -675,6 +675,9 @@ inline Chare *_popObj(void) {
 // regardless of how the application launches its kernels.
 extern uint64_t hapiCuptiPushObjCorrelation();
 extern void     hapiCuptiPopObjCorrelation();
+#if CMK_GPU_COMM
+extern void CkRdmaDeviceChannelBatchFlush();   // ckrdmadevice.C: the entry method's batched channel puts
+#endif
 #endif
 
 // An array element is timed through its location record; a group branch
@@ -736,6 +739,11 @@ void CkCallstackUnwind(Chare *obj) {
 // pops ( obj ) from the stack (and manages timing)
 void CkCallstackPop(Chare *obj) {
 #if CMK_LBDB_ON && (CMK_CUDA || CMK_HIP)
+#if CMK_GPU_COMM
+  // The channel puts this entry method batched go out now, under its
+  // correlation, so their copies are charged to it.
+  CkRdmaDeviceChannelBatchFlush();
+#endif
   // Paired 1:1 with the push in CkCallstackPush.
   hapiCuptiPopObjCorrelation();
 #endif

@@ -2118,6 +2118,15 @@ void CkArray::deliverToElement(CkArrayMessage* msg, ArrayElement* elem)
   // If the message has multiple hops, trigger location updates to the message source.
   if (msg->array_hops() > 1)
     locMgr->multiHop(msg);
+  // Remember who sends to this element from elsewhere: told its new location
+  // when it leaves (CkLocMgr::informSenders).
+  {
+    const int srcPe = UsrToEnv(msg)->getSrcPe();
+    if (srcPe != CkMyPe() && srcPe >= 0) {
+      CkLocRec* rec = elem->getCkLocRec();
+      if (rec != NULL) rec->noteSender(srcPe);
+    }
+  }
 
   // Invoke the entry method
   elem->ckInvokeEntry(msg->array_ep(), (void*)msg, true);

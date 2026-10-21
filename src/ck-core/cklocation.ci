@@ -30,6 +30,9 @@ module CkLocation {
     entry [expedited] void finishGPUSend(CmiUInt8 id);
     entry [expedited] void requestLanding(CmiUInt8 id, int size, int srcPe, int n, CmiUInt8 blocks[n]);
     entry [expedited, threaded] void landingGranted(CmiUInt8 id);
+    entry [expedited] void immigrateStable(CmiUInt8 id, int size, nocopydevice char data[size], int srcPe, int gen);
+    entry [expedited] void finishStableSend(CmiUInt8 id, int gen);
+    entry [expedited] void discardStable(CmiUInt8 id, int gen);
 #endif
 #endif
     entry [expedited] void requestLocation(const CkArrayIndex& idx, int peToTell);

@@ -194,6 +194,7 @@ private:
   void ResumeFromSyncHelper();
   void recordLBSizes(bool forStep);
   void sampleMetaLBLoad();
+  double objRebuildSeconds = 0.0;
 public:
 
   void ReadyMigrate(bool ready);
@@ -201,7 +202,15 @@ public:
   void setMigratable(int migratable);
   void setPupSize(size_t obj_pup_size);
   void setGPUPupSize(size_t obj_gpu_pup_size);
+  // Seconds this element spends on arrival rebuilding device state it leaves
+  // out of its pup (a neighbour list, a cell table) instead of shipping it.
+  // The balancers price every move of it with this added, since the bytes
+  // it ships do not show it. Travels with the element.
+  void setObjRebuildCost(double seconds) { objRebuildSeconds = seconds; }
+  double getObjRebuildCost() const { return objRebuildSeconds; }
 #else
+  void setObjRebuildCost(double seconds) { (void)seconds; }
+  double getObjRebuildCost() const { return 0.0; }
   void AtSync(int waitForMigration=1) { ResumeFromSync();}
   enum class AtSyncStatus { Continue, Started, Blocked };
   AtSyncStatus AtSyncStart(int waitForMigration=1) { ResumeFromSync(); return AtSyncStatus::Continue; }

@@ -157,6 +157,19 @@ class CkLocRec;
 // itself cannot migrate while one of its puts is in flight (the put counts as
 // an outstanding device send), and a migrated sender re-resolves before its
 // next put.
+//
+// A sender never waits for the move (2026-10-20). A put made while its channel
+// is closed is copied to a staging buffer on the producing stream, the source
+// is released to the application once that copy has read it, and the staging
+// buffer is announced to the receiving element: an element message, which the
+// location manager parks and forwards, so it waits at the new home and is read
+// into the reopened buffer in put order (startPull). Every put behind it goes
+// the same way until the receiver's DONE has freed the last staging buffer,
+// so a direct put never races a read. The closing, its ack, the resolution,
+// the credit and the DONE travel as urgent messages: each hop costs the entry
+// method running at the destination, not the depth of its queue (which was
+// 50-400 ms at 448 objects per PE, and the whole loss of channels to zero-copy
+// under the asynchronous balancer: holds of 300-1100 ms per moved element).
 class CkDeviceChannel {
 public:
   CkDeviceChannel();
@@ -217,6 +230,7 @@ public:
   void onCloseAck(int pe, uint64_t token, uint64_t last_seq, uint64_t last_bytes);
   void onSrcDone(uint64_t seq);
   void onDone(uint64_t seq);   // the receiver finished reading put `seq`
+  void onStagedDone(uint64_t seq);   // the receiver read a staged put (its DONE): the balance moves
   void onAnnounce(const CkDeviceChannelEvent& ev, const CkDevicePersistent& src);
   void startPull();
   void onPulled();
@@ -240,6 +254,11 @@ public:
 private:
   void issue(const void* src, size_t bytes, hapiStream_t stream, const CkCallback& src_done,
              uint64_t tag);
+  // A put while the receiver is closed for migration, or behind such puts:
+  // copied to a staging buffer on the producing stream and announced to the
+  // receiving element wherever it lands (see issueStaged).
+  void issueStaged(const void* src, size_t bytes, hapiStream_t stream, const CkCallback& src_done,
+                   uint64_t tag);
   void requestResolve();
   void replyResolve(int pe, uint64_t token);
   void takeOver(const CkDeviceChannel& o);
@@ -278,7 +297,8 @@ private:
   int departed_signal_pe;   //   was granted once the sender's acked last put has been taken there
   CmiNcpyBuffer signal_hdr;
   size_t landed_unseen;     // see unseenBytes()
-  size_t last_put_bytes;    // sender: bytes of the last put issued (carried by the closing ack)
+  size_t last_put_bytes;    // sender: bytes of the last put written into the buffer (carried by the closing ack)
+  uint64_t last_direct_seq; // sender: that put's seq. Staged puts (announced, never written) are not the ack's business.
   int sender_pe;            // the resolved sender: where credits and closings go
   uint64_t sender_token;
   bool sender_known;
@@ -309,9 +329,11 @@ private:
   std::map<uint64_t, CkCallback> done_cbs;   // sender: source-done callbacks awaiting the receiver's DONE
   uint64_t closed_epoch;    // sender: the newest resolution a closing was acked for; a Resolved or Credit of it (or older) is stale
   int in_flight;
+  int staged_outstanding;   // sender: puts staged and announced, not yet read by the receiver (its DONE)
   bool close_ack_due;
   int close_ack_pe;
   uint64_t my_token;        // this copy's entry in its PE's token table, 0 if none
+  double closing_at;        // sender: when the closing of its resolution arrived (0: none held); owner: when it sent one
   CkLocRec* sender_rec;     // the sending element, charged with the puts in flight
   CmiUInt8 holder_elem;     // that element's id, for the handoff hooks
   CkGroupID holder_mgr;     // and its location manager
@@ -347,6 +369,8 @@ void CkDeviceChannelControl(void* msg);
 // outstandingDeviceSends per awaited ack); then, once past the stand-down,
 // retire the channels' exports before the pack.
 void CkRdmaDeviceChannelsBeforeMigrate(CkLocRec* rec);
+// From CkCallstackPop: launch the entry method's batched channel puts while it is still the attributed object.
+void CkRdmaDeviceChannelBatchFlush();
 void CkRdmaDeviceChannelsPack(CkLocRec* rec);
 // The intra-process handoff (CkLocMgr::emigrateIntraProcess / immigrateIntraProcess):
 // the element's channel objects move with it unpacked, so their per-PE table

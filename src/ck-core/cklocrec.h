@@ -4,6 +4,7 @@
 class CkArray;//Array manager
 class CkLocMgr;//Location manager
 class CkMigratable;//Migratable object
+struct CkStableSnapshot;//Stable device buffers shipped at the balancer's decision
 
 /**
  * A CkLocRec is our local representation of an array element.
@@ -63,6 +64,30 @@ public:
   bool migrateKickHeld = false;
   void noteDeviceSendPosted() { outstandingDeviceSends++; }
   void noteDeviceSendDone();
+  // The move window tally (CHARM_LB_MIGSTATS, see MigStats in cklocation.C):
+  // when the balancer's decision reached this element, and when emigrate
+  // first tried to take it (the stand-down for outstanding sends and channel
+  // closings starts there).
+  double migDecidedAt = 0.0;
+  double migFirstTryAt = 0.0;
+  // PEs whose messages this element took lately, from other PEs. When the
+  // element leaves they are told its new location directly (CkLocMgr::
+  // informSenders), so their next message goes to the new home instead of
+  // taking the forward from here and the repair that follows it.
+  enum { RECENT_SENDERS = 8 };
+  int recentSenders[RECENT_SENDERS];
+  int nRecentSenders = 0;
+  int recentSendersNext = 0;
+  inline void noteSender(int pe) {
+    for (int i = 0; i < nRecentSenders; i++) if (recentSenders[i] == pe) return;
+    if (nRecentSenders < RECENT_SENDERS) recentSenders[nRecentSenders++] = pe;
+    else { recentSenders[recentSendersNext] = pe; recentSendersNext = (recentSendersNext + 1) % RECENT_SENDERS; }
+  }
+  // Stable device buffers already shipped for the pending move (PUP::DeviceLife::Stable),
+  // or null. Owned by this record; consumed by emigrate, discarded by a move
+  // that goes elsewhere or by the destructor.
+  CkStableSnapshot* stable = nullptr;
+  int stableGen = 0;     // counts this element's snapshots (a discard names the one it means)
 
   //Creation and Destruction:
   CkLocRec(CkLocMgr *mgr,bool fromMigration,bool ignoreArrival, const CkArrayIndex &idx_, CmiUInt8 id);

@@ -230,6 +230,7 @@ extern "C" {
 
 // Provide a C++-only stub for this function's default parameter.
 void hapiAddCallback(hapiStream_t stream, const CkCallback& cb, void* cb_msg);
+long hapiFlagWritesIssued();   // completion-flag writes this process has issued so far (CHARM_ZC_STATS prints it at exit)
 // Device-work accounting hooks, set by the Charm++ runtime: a callback
 // registered from inside an element's entry method marks device work in
 // flight on that element until it fires, so the element is not treated as
@@ -362,6 +363,16 @@ void hapiArenaRegister(void* base, size_t extent, size_t liveBuffers,
 // applications using pup_buffer_device free every such buffer through this
 // instead of hapiFree.
 void hapiFreeMigratable(void* ptr);
+
+// Content hash of a device range, computed on `stream` into the device word
+// `d_out` (zeroed first; one 64-bit word per call). The check behind
+// PUP::DeviceLife::Stable: the migration runtime hashes each Stable buffer at
+// the balancer's decision and again at the pack, and hapiHashCompareAsync
+// writes into `d_flag` ~0 when every pair agrees or 1 + the first differing
+// index when not. Both are device work; nothing here waits.
+void hapiHashAsync(const void* ptr, size_t bytes, unsigned long long* d_out, hapiStream_t stream);
+void hapiHashCompareAsync(const unsigned long long* a, const unsigned long long* b, size_t count,
+                          unsigned long long* d_flag, hapiStream_t stream);
 
 /*** Device pool ***/
 // Device buffers from arenas: one large device allocation each, buddy-managed,

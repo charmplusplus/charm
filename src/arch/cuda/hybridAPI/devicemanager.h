@@ -31,6 +31,15 @@ struct DeviceManager {
   // streams the way null-stream memcpys do. Callers serialize creation with
   // this manager's lock.
   hapiStream_t migration_stream;
+  // Several of them, taken round robin by CkLocMgr::emigrate: each element's
+  // pack copies wait on that element's last-work event, and a stream wait
+  // holds everything queued after it on the same stream, so one element whose
+  // kernels are still running held every later pack behind it (the long tail
+  // of leanmd's 754 moves per balancing step). With a few streams a slow
+  // element holds only its own. Created lazily under the manager's lock.
+  enum { MIGRATION_STREAMS = 4 };
+  hapiStream_t migration_streams[MIGRATION_STREAMS];
+  int migration_stream_next;
 
 
 #ifdef CMK_LBDB_ON
@@ -48,13 +57,14 @@ struct DeviceManager {
 
   DeviceManager(int local_index_, int global_index_) :
     local_index(local_index_), global_index(global_index_), comm_buffer(nullptr),
-    migration_stream(NULL)
+    migration_stream(NULL), migration_stream_next(0)
 #ifdef CMK_LBDB_ON
     , multi_processor_count(0), max_threads_per_sm(0), max_blocks_per_sm(0),
       max_registers_per_sm(0), max_shared_mem_per_sm(0), warp_size(0),
       props_initialized(false)
 #endif
   {
+    for (int i = 0; i < MIGRATION_STREAMS; i++) migration_streams[i] = NULL;
 #if CMK_SMP
     lock = CmiCreateLock();
 #endif

@@ -149,6 +149,18 @@ static inline size_t alignDeviceOffset(size_t offset) {
   return (offset + (DEVICE_PUP_ALIGN - 1)) & ~(DEVICE_PUP_ALIGN - 1);
 }
 
+// Lifetime of a device buffer across a migration (pup_buffer_device).
+// Mutable, the default: copied at the pack, the state as it is when the
+// element leaves. Stable: the application promises the buffer is not written
+// between the balancer's decision and the pack, so the runtime ships it at
+// the decision while the element keeps stepping (CkLocMgr::stableSnapshot)
+// and the pack skips it; under CHARM_DEBUG_MIGRATE every Stable buffer is
+// hashed at both points and a change aborts the run. A buffer the element can
+// rebuild on arrival is simply left out of the pup.
+enum class DeviceLife : unsigned char { Mutable = 0, Stable = 1 };
+// Manifest entry bit: the buffer travelled in the stable region (snapshot).
+constexpr size_t DEVICE_MANIFEST_STABLE = ((size_t)1) << 63;
+
 static inline dataType getXlateDataType(signed char *a) { return Tchar; }
 #if CMK_SIGNEDCHAR_DIFF_CHAR
 static inline dataType getXlateDataType(char *a) { return Tchar; }
@@ -323,6 +335,15 @@ class er {
   virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize) {
     (void)p; (void)n; (void)itemSize;
   }
+  // With a lifetime (see DeviceLife). Mutable is exactly the call above.
+  template<class T>
+  void pup_buffer_device(T *&a, size_t nItems, DeviceLife life) {
+    pup_buffer_device((void *&)a, nItems, sizeof(T), life);
+  }
+  virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize, DeviceLife life) {
+    (void)life;
+    pup_buffer_device(p, n, itemSize);
+  }
   // Order this PUP::er's device copies behind the application's own device
   // work. Packing records an event on `producerStream` (a hapiStream_t) and
   // makes the migration stream wait on it -- on the device; the host does not
@@ -457,9 +478,21 @@ class sizer : public er {
 
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t);
   virtual void pup_buffer(void *&p, size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate);
+  // Stable buffers the walk visited (DeviceLife::Stable): their extent laid
+  // out as the stable region, and how many. Counted whether or not they are
+  // skipped from gpuBytes below.
+  size_t gpuStableBytes = 0;
+  size_t gpuStableCount = 0;
 
  public:
+  using er::pup_buffer_device;
   virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize);
+  virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize, DeviceLife life);
+  // The Stable buffers travel in a snapshot taken at the decision: they take a
+  // manifest entry here but no bytes of the packed stream (CkLocMgr::emigrate
+  // sets this when the snapshot exists; the LB sizing sets it to price what
+  // the pack ships).
+  bool stableSkip = false;
   //Write data to the given buffer
   sizer(const unsigned int purpose = 0) : er(IS_SIZING | purpose), nBytes(0), gpuBytes(0),
     gpuBufCount(0)
@@ -476,6 +509,32 @@ class sizer : public er {
   bool deviceAllPool = true;
   size_t gpu_size(void) const {return gpuBytes;}
   size_t gpu_buf_count(void) const {return gpuBufCount;}
+  size_t gpu_stable_size(void) const {return gpuStableBytes;}
+  size_t gpu_stable_count(void) const {return gpuStableCount;}
+};
+
+// The decision-time walk of a migrating element (CkLocMgr::stableSnapshot):
+// a sizer -- the element sees a sizing pass, which every pup already
+// tolerates any number of times -- that also copies every Stable device
+// buffer into `gpuNbuf` on `gpuStream`, laid out exactly as fromMem walks the
+// stable region, records their sizes in `manifestOut`, and hashes each one
+// into `hashOut[i]` when that is given.
+class snapshot : public sizer {
+  myByte *gpuBuf;
+  myByte *gpuOrigBuf;
+ public:
+  void* gpuStream = nullptr;          // hapiStream_t
+  size_t* manifestOut = nullptr;
+  size_t manifestIdx = 0;
+  size_t manifestCap = 0;
+  unsigned long long* hashOut = nullptr;   // device array, one word per Stable buffer
+  snapshot(void* gpuNbuf, const unsigned int purpose = 0)
+      : sizer(purpose), gpuBuf((myByte*)gpuNbuf), gpuOrigBuf((myByte*)gpuNbuf) {}
+  size_t gpu_copied(void) const { return (size_t)(gpuBuf - gpuOrigBuf); }
+  using sizer::pup_buffer_device;
+  virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize, DeviceLife life);
+  virtual void pup_device_order(void* producerStream);
+  virtual void pup_device_order_event(void* producerEvent);
 };
 
 template <class T>
@@ -575,7 +634,17 @@ class toMem : public mem {
   // is unnecessary; otherwise that wait stays.
   bool deviceAllPool = true;
 
+  // The Stable buffers were shipped by the decision-time snapshot: each takes
+  // a manifest entry (marked DEVICE_MANIFEST_STABLE) and no bytes here, and is
+  // hashed into stableHashOut[i] on gpuStream when that is given, for the
+  // check against the snapshot's hashes.
+  bool stableSkip = false;
+  unsigned long long* stableHashOut = nullptr;
+  size_t stableHashIdx = 0;
+
+  using er::pup_buffer_device;
   virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize);
+  virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize, DeviceLife life);
   virtual void pup_device_order(void* producerStream);
   virtual void pup_device_order_event(void* producerEvent);
 
@@ -632,12 +701,26 @@ class fromMem : public mem {
   // copies, not every other payload still landing on the default stream.
   void* gpuStream = nullptr;
 
+  // The stable region: where the decision-time snapshot landed. A buffer
+  // whose manifest entry carries DEVICE_MANIFEST_STABLE is rebound into (or
+  // copied out of) this region instead of the packed stream, walked with the
+  // same alignment rule. stableReboundCount tells the caller whether the
+  // region is the chare's storage now.
+  myByte* stableBuf = nullptr;
+  myByte* stableOrigBuf = nullptr;
+  size_t stableReboundCount = 0;
+
+  using er::pup_buffer_device;
   virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize);
+  virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize, DeviceLife life);
 
  protected:
   // Shared by bytes(DEVICE) and pup_buffer_device: the element-wise manifest
-  // check against the sender's recorded sizes.
-  void deviceManifestCheck(size_t nBytes);
+  // check against the sender's recorded sizes. Returns whether the sender
+  // packed this buffer in the stable region.
+  bool deviceManifestCheck(size_t nBytes, DeviceLife life = DeviceLife::Mutable);
+  // The unpack of one device buffer from a region: rebind or copy.
+  void deviceTake(void *&p, size_t n, myByte*& cursor, myByte* base, size_t& rebound);
   //Generic bottleneck: unpack n items of size itemSize from p.
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t);
   virtual void bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mode);

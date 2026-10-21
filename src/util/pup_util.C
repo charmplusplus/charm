@@ -295,19 +295,29 @@ void PUP::fromMem::bytes(void *p,size_t n,size_t itemSize,dataType t, PUPMode mo
 // buffers the pack pup wrote, in order and size. Divergence means the
 // application's pup routine branches differently between the two sides, and
 // every byte after this point would land at a wrong offset.
-void PUP::fromMem::deviceManifestCheck(size_t nBytes)
+bool PUP::fromMem::deviceManifestCheck(size_t nBytes, DeviceLife life)
 {
-  if (deviceManifestIn == nullptr) return;
+  if (deviceManifestIn == nullptr) return false;
   if (deviceManifestIdx >= deviceManifestCount)
-    CmiAbort("Device pup direction mismatch: unpack requested device "
-             "buffer %zu (%zu bytes), but the sender packed only %zu "
-             "device buffers",
+    CmiAbort("Device pup direction mismatch: unpack asked for device buffer #%zu "
+             "(%zu bytes) but the sender packed only %zu device buffers",
              deviceManifestIdx + 1, nBytes, deviceManifestCount);
-  if (deviceManifestIn[deviceManifestIdx] != nBytes)
-    CmiAbort("Device pup direction mismatch: device buffer %zu is %zu "
-             "bytes on unpack but the sender packed %zu bytes",
-             deviceManifestIdx + 1, nBytes, deviceManifestIn[deviceManifestIdx]);
+  const size_t entry = deviceManifestIn[deviceManifestIdx];
+  const bool stable = (entry & DEVICE_MANIFEST_STABLE) != 0;
+  const size_t packed = entry & ~DEVICE_MANIFEST_STABLE;
+  if (packed != nBytes)
+    CmiAbort("Device pup direction mismatch: unpack asked for %zu bytes for device "
+             "buffer #%zu but the sender packed %zu bytes",
+             nBytes, deviceManifestIdx + 1, packed);
+  // Packed from the stable region, unpacked as anything else: the pup is not
+  // symmetric about the lifetime, and the bytes would come from the wrong
+  // region.
+  if (stable && life != DeviceLife::Stable)
+    CmiAbort("Device pup direction mismatch: device buffer #%zu (%zu bytes) was shipped as "
+             "PUP::DeviceLife::Stable by the sender but the unpack does not declare it Stable",
+             deviceManifestIdx + 1, nBytes);
   deviceManifestIdx++;
+  return stable;
 }
 
 // ---- pup_buffer_device: the migration arena API ---------------------------
@@ -325,6 +335,81 @@ void PUP::sizer::pup_buffer_device(void *&p, size_t n, size_t itemSize)
   bytes(p, n, itemSize, Tchar, PUPMode::DEVICE);
 }
 
+// Stable: counted toward the stable region always; toward the packed stream
+// only when no snapshot ships it (stableSkip false). With stableSkip it still
+// takes a manifest entry, which keeps the unpack walk in step.
+void PUP::sizer::pup_buffer_device(void *&p, size_t n, size_t itemSize, DeviceLife life)
+{
+  if (life == DeviceLife::Stable) {
+    gpuStableBytes = alignDeviceOffset(gpuStableBytes) + n * itemSize;
+    gpuStableCount++;
+    if (stableSkip) {
+#if CMK_CUDA
+      if (!hapiDevPoolContains(p)) deviceAllPool = false;
+#endif
+      gpuBufCount++;
+      return;
+    }
+  }
+  pup_buffer_device(p, n, itemSize);
+}
+
+// The snapshot walk: Stable buffers are copied into the stable region and
+// hashed; everything else is sized as a plain sizer would (and ignored by the
+// caller).
+void PUP::snapshot::pup_buffer_device(void *&p, size_t n, size_t itemSize, DeviceLife life)
+{
+  if (life != DeviceLife::Stable) {
+    sizer::pup_buffer_device(p, n, itemSize);
+    return;
+  }
+  n *= itemSize;
+  gpuStableBytes = alignDeviceOffset(gpuStableBytes) + n;
+  gpuStableCount++;
+#if CMK_CUDA
+  // The pool parks a free of this block until the copy (and the hash) retire.
+  if (hapiDevPoolContains(p)) hapiDevPoolNoteRead(p, (hapiStream_t)gpuStream);
+  else deviceAllPool = false;
+  gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
+  if (gpuStream != nullptr)
+    cudaMemcpyAsync((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice, (cudaStream_t)gpuStream);
+  else
+    cudaMemcpy((void *)gpuBuf, p, n, cudaMemcpyDeviceToDevice);
+  gpuBuf += n;
+  if (manifestOut != nullptr) {
+    if (manifestIdx >= manifestCap)
+      CmiAbort("PUP stable snapshot overflow: the walk emitted Stable device buffer #%zu "
+               "but the sizing pass counted only %zu", manifestIdx + 1, manifestCap);
+    manifestOut[manifestIdx] = n;
+    if (hashOut != nullptr) hapiHashAsync(p, n, hashOut + manifestIdx, (hapiStream_t)gpuStream);
+    manifestIdx++;
+  }
+#endif
+}
+
+void PUP::snapshot::pup_device_order(void* producerStream)
+{
+#if CMK_CUDA
+  if (producerStream == nullptr || gpuStream == nullptr) return;
+  static thread_local cudaEvent_t ev = nullptr;
+  if (ev == nullptr) hapiCheck(cudaEventCreateWithFlags(&ev, cudaEventDisableTiming));
+  hapiCheck(cudaEventRecord(ev, (cudaStream_t)producerStream));
+  hapiCheck(cudaStreamWaitEvent((cudaStream_t)gpuStream, ev, 0));
+#else
+  (void)producerStream;
+#endif
+}
+
+void PUP::snapshot::pup_device_order_event(void* producerEvent)
+{
+#if CMK_CUDA
+  if (producerEvent == nullptr || gpuStream == nullptr) return;
+  hapiCheck(cudaStreamWaitEvent((cudaStream_t)gpuStream, (cudaEvent_t)producerEvent, 0));
+#else
+  (void)producerEvent;
+#endif
+}
+
 void PUP::toMem::pup_buffer_device(void *&p, size_t n, size_t itemSize)
 {
 #if CMK_CUDA
@@ -336,6 +421,31 @@ void PUP::toMem::pup_buffer_device(void *&p, size_t n, size_t itemSize)
   else deviceAllPool = false;
 #endif
   bytes(p, n, itemSize, Tchar, PUPMode::DEVICE);
+}
+
+// Stable with a snapshot already shipped: a manifest entry marks its place in
+// the walk, no bytes travel, and the buffer is hashed on the pack stream for
+// the check against the snapshot (CkLocMgr::emigrate reads the result).
+void PUP::toMem::pup_buffer_device(void *&p, size_t n, size_t itemSize, DeviceLife life)
+{
+  if (life != DeviceLife::Stable || !stableSkip) {
+    pup_buffer_device(p, n, itemSize);
+    return;
+  }
+  n *= itemSize;
+#if CMK_CUDA
+  if (hapiDevPoolContains(p)) hapiDevPoolNoteRead(p, (hapiStream_t)gpuStream);
+  else deviceAllPool = false;
+  if (deviceManifestOut != nullptr) {
+    if (deviceManifestIdx >= deviceManifestCap)
+      CmiAbort("PUP device manifest overflow: packing pass emitted device buffer #%zu "
+               "but the sizing pass counted only %zu. The pup routine does not emit the "
+               "same device buffers in both passes.\n",
+               deviceManifestIdx + 1, deviceManifestCap);
+    deviceManifestOut[deviceManifestIdx++] = n | DEVICE_MANIFEST_STABLE;
+  }
+  if (stableHashOut != nullptr) hapiHashAsync(p, n, stableHashOut + (stableHashIdx++), (hapiStream_t)gpuStream);
+#endif
 }
 
 void PUP::toMem::pup_device_order(void* producerStream)
@@ -365,7 +475,32 @@ void PUP::toMem::pup_device_order_event(void* producerEvent)
   (void)producerEvent;
 #endif
 }
+// One device buffer out of a region: rebind the pointer into it (arena mode)
+// or allocate and copy. The cursor skips to the aligned offset the packer
+// wrote this buffer at.
+void PUP::fromMem::deviceTake(void *&p, size_t n, myByte*& cursor, myByte* base, size_t& rebound)
+{
+#if CMK_CUDA
+  cursor = base + alignDeviceOffset((size_t)(cursor - base));
+  if (deviceRebind) {
+    p = (void *)cursor;
+    rebound++;
+  } else {
+    cudaMalloc(&p, n);
+    cudaMemcpy(p, (const void *)cursor, n, cudaMemcpyDeviceToDevice);
+  }
+  cursor += n;
+#else
+  (void)p; (void)n; (void)cursor; (void)base; (void)rebound;
+#endif
+}
+
 void PUP::fromMem::pup_buffer_device(void *&p, size_t n, size_t itemSize)
+{
+  pup_buffer_device(p, n, itemSize, DeviceLife::Mutable);
+}
+
+void PUP::fromMem::pup_buffer_device(void *&p, size_t n, size_t itemSize, DeviceLife life)
 {
 #ifdef CK_CHECK_PUP
   ((pupCheckRec *)buf)->check(Tchar, n);
@@ -373,16 +508,19 @@ void PUP::fromMem::pup_buffer_device(void *&p, size_t n, size_t itemSize)
 #endif
   n *= itemSize;
 #if CMK_CUDA
-  deviceManifestCheck(n);
-  gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
-  if (deviceRebind) {
-    p = (void *)gpuBuf;
-    deviceReboundCount++;
+  // The sender's manifest says which region this buffer came in: the stable
+  // region if the decision-time snapshot shipped it, the packed stream
+  // otherwise -- a Stable declaration here with no snapshot behind it is the
+  // ordinary case of a move that packed everything.
+  const bool stable = deviceManifestCheck(n, life);
+  if (stable) {
+    if (stableOrigBuf == nullptr)
+      CmiAbort("Device pup: device buffer #%zu (%zu bytes) was shipped in the stable region, "
+               "but no stable region landed for this element", deviceManifestIdx, n);
+    deviceTake(p, n, stableBuf, stableOrigBuf, stableReboundCount);
   } else {
-    cudaMalloc(&p, n);
-    cudaMemcpy(p, (const void *)gpuBuf, n, cudaMemcpyDeviceToDevice);
+    deviceTake(p, n, gpuBuf, gpuOrigBuf, deviceReboundCount);
   }
-  gpuBuf += n;
 #endif
 }
 

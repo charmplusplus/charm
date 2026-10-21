@@ -226,6 +226,11 @@ static void hapiIdleYield(void*) {
 typedef CUresult (*hapiMemsetD32AsyncFn)(CUdeviceptr, unsigned int, size_t, CUstream);
 static hapiMemsetD32AsyncFn hapi_memset_d32_async = nullptr;
 static bool hapi_flag_use_memset = false;
+// Completion-flag writes this process has issued (both flag paths, every
+// stream callback): printed at exit with CHARM_ZC_STATS, to put a number on
+// what a message path costs the copy engine (a channel put adds two).
+static std::atomic<long> hapi_flag_writes_total{0};
+long hapiFlagWritesIssued() { return hapi_flag_writes_total.load(std::memory_order_relaxed); }
 
 // ---- stall trace (+gpustalltrace) --------------------------------------------
 // A node-wide log of every event record, stream wait and flag issue that goes
@@ -1298,6 +1303,24 @@ void hapiCuptiFinalize() {
 #  error please disable CSD_NO_SCHEDLOOP to use HAPI
 #endif
 #endif
+
+// Hardware work queues per device. The driver default is 8, and every stream
+// beyond the eighth aliases onto a queue already in use: two dependent kernels
+// from one stream park that queue's head and block an unrelated stream behind
+// them, costing (Q/C + 1) x T instead of 2 x T for Q concurrently active
+// streams on C queues (tests/util/streamorder, A40, 2026-09-20). 32 is the
+// driver maximum and costs nothing. The driver reads CUDA_DEVICE_MAX_CONNECTIONS
+// when it initialises, so this runs from charm_main before ConverseInit, ahead
+// of the first CUDA call anywhere in the process (LCI's cuInit included). A
+// value already in the environment stays in force; the Config banner says which.
+static bool hapi_connections_from_env = false;
+void hapiPresetEnvironment() {
+  if (getenv("CUDA_DEVICE_MAX_CONNECTIONS") != nullptr) {
+    hapi_connections_from_env = true;
+  } else {
+    setenv("CUDA_DEVICE_MAX_CONNECTIONS", "32", 0);
+  }
+}
 
 // Called by all PEs in Charm++ layer init
 void hapiInit(char** argv) {
@@ -3232,11 +3255,16 @@ static void hapiMapping(char** argv) {
   map_type = csv_gpu_manager.map_type;
 
   if (CmiMyPe() == 0) {
+    const char* conn = getenv("CUDA_DEVICE_MAX_CONNECTIONS");
     CmiPrintf("HAPI> Config: %d process(es) per host, %d device(s) per process, %d PE(s) per device, "
-        "%d device(s) per host, PE-device map %s\n",
+        "%d device(s) per host, PE-device map %s, %s hardware queue(s) per device (%s)\n",
         CmiNumNodes() / CmiNumPhysicalNodes(), csv_gpu_manager.device_count,
         csv_gpu_manager.pes_per_device, csv_gpu_manager.device_count_on_physical_node,
-        map_type == Mapping::Block ? "block" : "roundrobin");
+        map_type == Mapping::Block ? "block" : "roundrobin",
+        conn != nullptr ? conn : "8",
+        conn == nullptr ? "driver default, the runtime did not run hapiPresetEnvironment"
+                        : hapi_connections_from_env ? "CUDA_DEVICE_MAX_CONNECTIONS from the environment"
+                                                    : "runtime default");
   }
   if (CmiMyRank() == 0 && csv_gpu_manager.device_count > 1) {
     const std::vector<DeviceManager>& dms = csv_gpu_manager.device_managers;
@@ -4020,6 +4048,7 @@ void recordEvent(cudaStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
     if (res != CUDA_SUCCESS)
       CmiAbort("HAPI> %s failed (%d); rerun with +gpueventquery",
                hapi_flag_use_memset ? "cuMemsetD32Async" : "cuStreamWriteValue32", (int)res);
+    hapi_flag_writes_total.fetch_add(1, std::memory_order_relaxed);
     hapiTraceFlag((void*)stream, seq);
     hapiEvent hev(NULL, cb, cb_msg, wr);
     hev.flag_seq = seq;
@@ -6080,6 +6109,18 @@ void hapiFreeMigratable(void* ptr) {
   hapiCheck(hapiFree(ptr));
 }
 
+// Kernels live in hapi_kernels.cu (nvcc); this file is plain C++.
+extern "C" void hapiHashAsyncImpl(const void* p, size_t n, unsigned long long* d_out, cudaStream_t stream);
+extern "C" void hapiHashCompareImpl(const unsigned long long* a, const unsigned long long* b, size_t count,
+                                    unsigned long long* d_flag, cudaStream_t stream);
+void hapiHashAsync(const void* ptr, size_t bytes, unsigned long long* d_out, hapiStream_t stream) {
+  hapiHashAsyncImpl(ptr, bytes, d_out, (cudaStream_t)stream);
+}
+void hapiHashCompareAsync(const unsigned long long* a, const unsigned long long* b, size_t count,
+                          unsigned long long* d_flag, hapiStream_t stream) {
+  hapiHashCompareImpl(a, b, count, d_flag, (cudaStream_t)stream);
+}
+
 /*** Per-chare device footprint tracking (see hapi_portable.h) ***/
 //
 // The producer behind the LB memory contract: every hapiMalloc/hapiFree made
@@ -7378,6 +7419,7 @@ bool hapiFlagIssue(hapiStream_t stream, int* rank, uint32_t* seq) {
   if (res != CUDA_SUCCESS)
     CmiAbort("HAPI> %s failed (%d); rerun with +gpueventquery",
              hapi_flag_use_memset ? "cuMemsetD32Async" : "cuStreamWriteValue32", (int)res);
+  hapi_flag_writes_total.fetch_add(1, std::memory_order_relaxed);
   hapiTraceFlag((void*)stream, next);
   hapiEvent hev(NULL, CkCallback(CkCallback::ignore), NULL, NULL, /*track=*/false);
   hev.flag_seq = next;

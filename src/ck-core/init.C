@@ -1880,6 +1880,12 @@ int charm_main(int argc, char **argv)
   registerTraceInit(traceInit);
 #endif
 
+#if CMK_CUDA
+  // Before ConverseInit: the machine layer's LCI initialises the CUDA driver,
+  // and the driver reads this process's environment then.
+  hapiPresetEnvironment();
+#endif
+
   ConverseInit(argc, argv, (CmiStartFn) _initCharm, 0, 0);
 
   return 0;

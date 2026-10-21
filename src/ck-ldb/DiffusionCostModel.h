@@ -1,6 +1,10 @@
 #ifndef _DIFFUSION_COST_MODEL_H
 #define _DIFFUSION_COST_MODEL_H
 
+// The per-object rebuild-cost slot (LBManager.C), read without any Ckpv so a
+// strategy helper thread can price with it too.
+int lbObjRebuildSlot();
+
 // Cost model for DiffusionLB's across-node phase.
 //
 // The across-node loop sheds load until its diffusion quota is met and never
@@ -115,6 +119,19 @@ public:
 // Evaluates one candidate move. Holds no state of its own: every figure comes
 // from the MetricComm arrays, which updateState keeps current as moves are
 // accepted, so a greedy loop sees the partition its earlier choices created.
+inline double lbObjRebuildSeconds(const LDObjData& o)
+{
+#if CMK_LB_USER_DATA
+  const int slot = lbObjRebuildSlot();
+  if (slot < 0) return 0.0;
+  const double v = *(const double*)const_cast<LDObjData&>(o).getUserData(slot);
+  return (v > 0.0 && v < 1e6) ? v : 0.0;   // unset slots read as whatever was there
+#else
+  (void)o;
+  return 0.0;
+#endif
+}
+
 class DiffusionCostModel
 {
 public:
@@ -151,10 +168,13 @@ public:
     double hostBytes = (double)pup_decodeSize(o.pupSize);
     double devBytes = 0.0;
 #if CMK_CUDA
+    // What the pack ships: Stable buffers go at the decision, off this path.
     devBytes = (double)o.gpuPupSize;
 #endif
+    // Plus what the element rebuilds on arrival instead of shipping
+    // (CkMigratable::setObjRebuildCost), which the bytes do not show.
     const double oneOff = cfg_.migrateAlpha + cfg_.migrateBetaHost * hostBytes +
-                          cfg_.migrateBetaDevice * devBytes;
+                          cfg_.migrateBetaDevice * devBytes + lbObjRebuildSeconds(o);
     const double k = (cfg_.placementLifetimeIntervals > 1.0)
                          ? cfg_.placementLifetimeIntervals
                          : 1.0;

@@ -732,7 +732,22 @@ if(BUILD_CUDA OR BUILD_HIP)
       message(STATUS "Found CUPTI: ${CUPTI_LIBRARY}")
     endif()
 
-    add_library(hybridapi ${hybridAPI-cxx-sources} $<TARGET_OBJECTS:ckrescale>)
+    # The runtime's own device kernels (hapi_kernels.cu) are compiled by nvcc
+    # directly, with its default architecture flags as the examples' kernels
+    # are (PTX the driver JIT-compiles once per GPU). Not through CMake's CUDA
+    # language: this project's CUDA "compiler" is charmc, which does not take
+    # nvcc's flags.
+    if(NOT CUDAToolkit_NVCC_EXECUTABLE)
+      set(CUDAToolkit_NVCC_EXECUTABLE nvcc)
+    endif()
+    set(hapi_kernels_src ${CMAKE_SOURCE_DIR}/src/arch/cuda/hybridAPI/hapi_kernels.cu)
+    set(hapi_kernels_obj ${CMAKE_BINARY_DIR}/hapi_kernels.o)
+    add_custom_command(OUTPUT ${hapi_kernels_obj}
+      COMMAND ${CUDAToolkit_NVCC_EXECUTABLE} -O3 -std=c++17 -Xcompiler -fPIC -c ${hapi_kernels_src} -o ${hapi_kernels_obj}
+      DEPENDS ${hapi_kernels_src}
+      COMMENT "nvcc hapi_kernels.cu")
+    set_source_files_properties(${hapi_kernels_obj} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
+    add_library(hybridapi ${hybridAPI-cxx-sources} ${hapi_kernels_obj} $<TARGET_OBJECTS:ckrescale>)
     target_compile_definitions(hybridapi PRIVATE CMK_NVTX=1)   # +nvtx gates the HAPI NVTX ranges (hapi_nvtx.h)
     target_include_directories(hybridapi PRIVATE "${CUDA_DIR}/include")
     add_dependencies(hybridapi ci-generated)
