@@ -432,12 +432,21 @@ inline void _TRACE_BEGIN_EXECUTE(envelope* env, void* obj)
 {
   _TRACE_ONLY(CkpvAccess(_traces)->beginExecute(env, obj));
 }
+#if CMK_TRACE_ENABLED
 inline void _TRACE_BEGIN_EXECUTE_DETAILED(int event, int msgType, int ep, int srcPe,
                                           int mLen, CmiObjId* idx, void* obj)
 {
   _TRACE_ONLY(
       CkpvAccess(_traces)->beginExecute(event, msgType, ep, srcPe, mLen, idx, obj));
 }
+#else
+/* A macro rather than an inline function, so the arguments are not evaluated.
+   The [local] and [inline] entry-method code charmxi generates passes
+   CpvAccess(curPeEvent), and trace-common.C initializes that Cpv only when
+   tracing is enabled; with Cpv as a per-thread pointer (reconverse), reading
+   an uninitialized one dereferences null. */
+#define _TRACE_BEGIN_EXECUTE_DETAILED(event, msgType, ep, srcPe, mLen, idx, obj) ((void)0)
+#endif
 inline void _TRACE_END_EXECUTE() { _TRACE_ONLY(CkpvAccess(_traces)->endExecute()); }
 inline void _TRACE_MESSAGE_RECV(void* env, int size)
 {
