@@ -929,9 +929,10 @@ if(${TARGET} STREQUAL "charm4py")
   if(RECONVERSE)
     # `converse` is an aggregation (UTILITY) target on Reconverse builds and
     # cannot be linked: libreconverse is the Converse layer (CCS core
-    # included), and charm_cxx_utils holds charm's utilities, TopoManager and
-    # the CCS builtins.
-    set(CHARM4PY_RUNTIME_TARGETS reconverse charm_cxx_utils)
+    # included), charm_cxx_utils holds charm's utilities, TopoManager and
+    # the CCS builtins, and isomalloc the init hook StartCharmExt registers
+    # (-standalone means charmc adds none of these itself).
+    set(CHARM4PY_RUNTIME_TARGETS reconverse charm_cxx_utils isomalloc)
   else()
     set(CHARM4PY_RUNTIME_TARGETS converse memory-default threads-default ldb-rand)
   endif()
