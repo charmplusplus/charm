@@ -101,11 +101,6 @@ int cpdInSystem=1; /*Start inside the system (until we start executing user code
 #endif
 
 #if CMK_RECONVERSE
-/* Reconverse has no memory module of its own, so its converse.h stubs the
-   reporting entry points out as macros. This file is the memory module those
-   stubs stand in for, so take the names back. */
-#undef CmiMemoryUsage
-CMK_TYPEDEF_UINT8 CmiMemoryUsage(void);
 /* Spellings Reconverse has under a different name, or not at all. */
 #ifndef CMK_THREADLOCAL
 #define CMK_THREADLOCAL thread_local
@@ -737,6 +732,9 @@ struct CmiMemUsageStruct {
     {MemusagePS, "ps"},
 };
 
+#if !CMK_RECONVERSE
+/* Reconverse's converse.h defines CmiMemoryUsage() as a macro for 0 in every
+   translation unit, so a definition here could never be reached. */
 CMK_TYPEDEF_UINT8 CmiMemoryUsage(void){
     int i;
     CMK_TYPEDEF_UINT8 memtotal = 0;
@@ -746,6 +744,7 @@ CMK_TYPEDEF_UINT8 CmiMemoryUsage(void){
     }
     return memtotal;
 }
+#endif
 
 const char *CmiMemoryUsageReporter(void){
     int i;

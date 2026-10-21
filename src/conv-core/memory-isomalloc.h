@@ -5,9 +5,8 @@ migratable heap allocation to arbitrary clients.
 #define CMK_MEMORY_ISOMALLOC_H
 
 #include <stddef.h>
-/* converse.h supplies CthThread, and also declares CmiIsomallocContext,
-   CthMigratable and CthCreateMigratable, which the guards below then skip;
-   it has to come first for those guards to work. */
+/* converse.h supplies CthThread and CmiIsomallocContext, and reconverse's
+   thread layer declares CthMigratable and CthCreateMigratable there. */
 #include "converse.h"
 #include "pup_c.h"
 
@@ -22,13 +21,6 @@ extern "C" {
 int CmiIsomallocEnabled(void);
 
 int CmiIsomallocInRange(void * addr);
-
-#ifndef CMI_ISOMALLOC_CONTEXT_DEFINED
-#define CMI_ISOMALLOC_CONTEXT_DEFINED 1
-typedef struct CmiIsomallocContext {
-  void * opaque;
-} CmiIsomallocContext;
-#endif
 
 typedef struct CmiIsomallocRegion {
   void * start, * end;
@@ -68,13 +60,6 @@ void CmiIsomallocGetRecordedHeap(CmiIsomallocContext ctx,
 /****** Converse Thread functionality that depends on Isomalloc ********/
 
 CthThread CthPup(pup_er, CthThread);
-
-/* Under Reconverse the thread layer owns these two and declares them itself,
-   with C++ linkage; redeclaring them here inside extern "C" would conflict. */
-#ifndef CMI_MIGRATABLE_THREADS_DECLARED
-int CthMigratable(void);
-CthThread CthCreateMigratable(CthVoidFn fn, void * arg, int size, CmiIsomallocContext ctx);
-#endif
 
 /****** Memory-Isomalloc: malloc wrappers for Isomalloc ********/
 
