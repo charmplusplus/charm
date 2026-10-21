@@ -207,6 +207,7 @@ double averageUtilizationInBuffer(compressedBuffer b);
 class TraceUtilization : public Trace {
  public:
   int execEp; // the currently executing EP
+  int execDepth; // nesting of beginExecute/endExecute pairs (array delivery nests one inside another)
   unsigned int epInfoSize;
   double start; // the start time for the currently executing EP
 
@@ -218,6 +219,7 @@ class TraceUtilization : public Trace {
 
   TraceUtilization() {
     execEp = TRACEON_EP;
+    execDepth = 0;
     cpuTime = NULL;
     lastBinUsed = -1;
     numBinsSent = 0;
