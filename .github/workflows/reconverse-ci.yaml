@@ -51,6 +51,7 @@ env:
   # objid_insert and objid_wide entered 2026-10-19 with the merge of the id
   # redesign (PR 1d): objid_insert reproduces that defect deterministically
   # (phase 7), objid_wide covers the wide-collection layout.
+  # examples/charm++/hello/local covers [local] entry methods (#4065).
   TEST_DIRS: >-
     tests/charm++/megatest
     tests/charm++/simplearrayhello
@@ -71,6 +72,7 @@ env:
     tests/charm++/zerocopy/zc_post_async
     tests/charm++/zerocopy/pup_buffer
     examples/charm++/user-driven-interop
+    examples/charm++/hello/local
 
 jobs:
 

@@ -10,8 +10,7 @@ hello: hello.c
 	$(CHARMC) -o hello hello.c $(OPTS)
 
 test: hello
-  ifneq (1,$(CMK_MULTICORE))
-    ifeq (1,$(CMK_MACOSX)) # Doesn't work on multicore-darwin (issue #3555)
+  ifeq (1,$(CMK_MACOSX))
 	    rm -rf log
 	    $(call run, +p4 ./hello +vp8 )
 	    -sync
@@ -22,7 +21,6 @@ test: hello
 	    $(call run, +p2 ./hello +vp8 )
 	    -sync
 	    $(call run, +p4 ./hello +vp8 +restart log )
-    endif
   endif
 
 clean:
