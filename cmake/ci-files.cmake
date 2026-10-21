@@ -121,8 +121,13 @@ foreach(in_f ${ci-files})
 
     set(all-ci-outputs ${all-ci-outputs} ${CMAKE_BINARY_DIR}/include/${ci-output} ${CMAKE_BINARY_DIR}/include/${ci-output-defh})
 
+    # charmxi sees only the macros passed here. A .ci file guards its device
+    # entries with CMK_GPU (either vendor); the vendor macro is passed too for
+    # the few vendor-specific entries.
     if(CUDA)
-        set(CUDA_OPT "-DCMK_CUDA=1")
+        set(CUDA_OPT "-DCMK_CUDA=1 -DCMK_GPU=1")
+    elseif(BUILD_HIP)
+        set(CUDA_OPT "-DCMK_HIP=1 -DCMK_GPU=1")
     endif()
 
     if(${ci-output} MATCHES "search.decl.h")

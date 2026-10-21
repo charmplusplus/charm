@@ -123,6 +123,17 @@
 #define CMK_CUDA                  0
 #endif
 
+#if !defined(CMK_HIP)
+#define CMK_HIP                   0
+#endif
+
+/* A GPU runtime (hybridAPI) is built in, on CUDA or on HIP. Runtime code that
+ * works on either vendor tests CMK_GPU; only vendor-specific code (the
+ * portability header, driver-level calls, the trace backend) tests CMK_CUDA
+ * or CMK_HIP. */
+#undef CMK_GPU
+#define CMK_GPU                   (CMK_CUDA || CMK_HIP)
+
 #ifndef CMI_QD
 #define CMI_QD (CMK_REPLAYSYSTEM)
 #endif
