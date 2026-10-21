@@ -11,6 +11,7 @@ module TraceUtilization {
 
     // The ccs handlers:
     entry void ccsRequestSumDetailCompressed(CkCcsRequestMsg *m);
+    entry void ccsRequestSts(CkCcsRequestMsg *m);
 
     entry void collectSumDetailData();
     entry void sumDetailDataCollected(CkReductionMsg *);
