@@ -109,7 +109,6 @@ FILES=()
 OBJECTFILES=()
 DELETE=()
 MAINOBJ=""
-GENCPM=()
 OPTIMIZE_MODE=""
 PRODUCTION_MODE=""
 USE_RELIABLE_CC=""
@@ -163,7 +162,7 @@ printUsage() {
     echo "        -balance <mode> -tracemode <mode> -memory <mode>"
     echo "        -modules <comma-separated list of C++ modules> -thread"
     echo "        -debug-script -count-tokens -default-to-aout -E -S -M"
-    echo "        -verbose -save -purify -cp <dest> -cpmod -gen-cpm <pkg>"
+    echo "        -verbose -save -purify -cp <dest> -cpmod"
     echo "        -swapglobals -tlsglobals -roseomptlsglobals"
     echo "        -use-reliable-cc -use-fastest-cc -use-new-std"
     echo "        -cc <new cc> -c++ <new CC> -ld <new ld> -ld++ <new LD>"
@@ -436,8 +435,6 @@ do
 		"ParFUM_TOPS") AddModules tcharmmain ParFUM ParFUM_TOPS ; AMPIMAIN="ParFUMmain";;
     "ParFUM") AddModules tcharmmain ParFUM ; AMPIMAIN="ParFUMmain";;
     "ParFUMf") AddModules tcharmmain ParFUM ; AMPIMAIN="ParFUMmain"; USE_F90_LIBRARIES="1" ;;
-		"mblock") AddModules tcharmmain mblock ;;
-		"mblockf") AddModules tcharmmain mblock ; USE_F90_LIBRARIES="1" ;;
 
 		"charm"|"charm++"|"charm++f"|"f90charm"|"converse"|"converse++")
 			PARADIGM="$1"
@@ -706,11 +703,6 @@ do
 
 	"-cpmod")
 		MODCOPIES=("$1" "${MODCOPIES[@]}")
-		shift
-		;;
-
-	"-gen-cpm")
-		GENCPM+=("$1")
 		shift
 		;;
 
@@ -1858,26 +1850,6 @@ Success() {
 	End 0
 }
 
-
-##############################################################################
-#
-# Preprocess the GEN-CPM files
-#
-##############################################################################
-
-Debug "Preprocessing GEN-CPM files"
-
-for FILE in "${GENCPM[@]}"
-do
-	BASE="$(stripExtension "$FILE")"
-	MYTMP="$(basename "$FILE").$$.TMP"
-	DELETE+=("$MYTMP.c" "$MYTMP.i")
-	DoNoErrCheck $RM "$BASE.cpm.h" "$MYTMP.c"
-	runCmd touch "$BASE.cpm.h"
-	runCmd cp -f "$FILE" "$MYTMP.c"
-	runCmd $CHARM_CPP_C "${CHARM_CPP_C_FLAGS[@]}" "$MYTMP.c" > "$MYTMP.i"
-	runCmd "$CHARMBIN/conv-cpm" "$MYTMP.i" "$BASE.cpm.h"
-done
 
 ##############################################################################
 #

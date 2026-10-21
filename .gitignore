@@ -64,3 +64,4 @@ tests/charm++/anytime_migration/migrate
 tests/charm++/megatest/megatest
 tests/charm++/migratable_threads/migthread
 tests/charm++/simplearrayhello/hello
+reconverse-darwin-arm8-*/
