@@ -995,3 +995,277 @@ tie the control under LB at 8x4x4; the 18:08 "138 vs 126" was one run each. 16x8
 channels 838.1 / 846.8 / 853.8: tie. after_ctl2.sh: 16x8x8 no-LB control x2 against channels' 1518-1521.
 
 **2026-10-19 23:34, no-LB control band (after_ctl2.sh):** 1505.1 1506.4 ms/step against channels' 1518.1-1520.5 (four runs) and the 18:14 control 1509.1. Node 23024413 held with the minutes left; nothing queued.
+
+**2026-10-20 10:40, the move window: five changes built, unvalidated (job 23047794 queued for one node).** From the
+discussion of live migration (GPU_INITIATED_COMM_IDEAS.md, idea 2) the parts that do not need GPU-initiated transport:
+1. Senders told the new location at emigrate: CkLocRec::recentSenders (the last 8 PEs whose messages the element took,
+   noted in CkArray::deliverToElement) get an updateLocation when it leaves (CkLocMgr::informSenders, both the packed
+   path and the handoff), so their next message goes to the new home instead of the forward and the repair.
+2. The channel protocol's two waits measured, not changed: the sender's hold (closing received -> resolution applied)
+   and the owner's close (closing sent -> ack), in the tally below. The redirect-before-arrival of the discussion is not
+   implementable as designed: the new home's channel buffer is only known once the element unpacks there.
+4. Four migration streams per device, round robin (DeviceManager::migration_streams): a pack's copies wait on that
+   element's event, and a stream wait holds everything queued behind it, so one slow element no longer holds every
+   later pack of the device.
+5. PUP::DeviceLife::Stable: pup_buffer_device(ptr, n, PUP::DeviceLife::Stable) declares a device buffer the element
+   does not write between the balancer's decision and the pack. recvMigrate (a deferred move, pool mode) runs a sizing
+   walk, copies the Stable buffers into one pool block laid out as the unpack's stable region (PUP::snapshot, a sizer
+   that copies) and ships the block as a zerocopy payload (immigrateStable) while the element keeps stepping; the
+   pack skips them (manifest entries with DEVICE_MANIFEST_STABLE). Under CHARM_DEBUG_MIGRATE only (user: not in the
+   steady path), each Stable buffer is hashed at both points (hapi_kernels.cu, nvcc-built into libhybridapi) and the
+   device compares: a change aborts naming the buffer (ckStableCheckDone); otherwise nothing is hashed. The
+   destination keeps the landed block (keyed by element and snapshot generation) until
+   the host message arrives, parks the message otherwise, and rebinds the Stable buffers into it as the arena is rebound.
+   A decision that changes, a handoff, or a destroyed element discards the snapshot (discardStable by generation).
+6. CkMigratable::setObjRebuildCost(seconds): priced into every move by DiffusionCostModel::migrateCost (used by
+   DiffusionLB and MetisLB) through a second LB user-data slot; the LB sizing (recordLBSizes) sizes a move by what the
+   pack ships (Stable buffers skipped), the footprint slot floors at the whole device state.
+Tally (CHARM_LB_MIGSTATS=1, [mig-window] lines at exit, per process): decide->try, stand-down, pack (device), ship
+(dispatch -> ack), land (payload landed -> unpacked), settle (ckJustMigrated), chan-hold, chan-close, snapshot lead.
+Tests: chantest -a (CkLocRec::recvMigrate under +LBAsync: the balancer's path without a balancer) with a Stable ramp and
+a Mutable iteration buffer verified after every arrival, and -x (the ramp rewritten after the decision: must abort);
+chantest/test_chantest_stable.sh. leanmd/logs/stable1_chain.sh: chantest, then leanmd 8x4x4 async on one node, new
+build zero-copy and channels x2 against leanmd.prev (the 2026-10-19 23:25 binary), with the tally.
+
+**2026-10-20 11:00, job 23047794 (gpub001, one node, 4 A40): the five changes validated; the move window measured.**
+chantest (memcpy and ipc transports; 24 iterations, a move every 3): plain, migrateMe moves, the balancer's path
+under +LBAsync (-a: CkLocRec::recvMigrate, the Stable ramp snapshotted at the decision and the Mutable iteration
+buffer packed, both rebound and verified after every arrival), all PASS, 14 snapshots per run; the broken promise
+(-a -x under CHARM_DEBUG_MIGRATE: the Stable buffer rewritten after the decision) aborted naming the buffer in both
+transports, as required. leanmd 8x4x4 async LB, 100 steps, mean42-100 ms/step (three runs each unless noted):
+| build | zero-copy | channels |
+|---|---|---|
+| previous (2026-10-19 23:25, leanmd.prev) | 230.6 239.5 238.0 | 226.4 219.0 231.7 |
+| this build | 225.5 225.1 233.1 | 206.5 208.2 210.6 |
+| this build, senders not told (ablation) | 222.5 | 209.0 206.8 |
+| this build, one migration stream (ablation) | 239.5 | 217.4 206.3 |
+Channels: the bands do not overlap, -8%. Zero-copy: a 3% lean, the bands touch (233.1 vs 230.6). The ablation at n=2
+(two more runs each queued as chain stable4) says the four migration streams carry most of the channel gain (one
+stream: 206-217) and the sender notification is within the band (not told: 207-209); the gain is in the migration
+path, where both items act. The tally (CHARM_LB_MIGSTATS=1, per process, this build): zero-copy pack (copies
+enqueued -> complete on the device) mean 2-95 ms by process, max 256 ms, and ship (dispatch -> ack) tracks it
+(45-96 ms mean) since the transfer waits for the pack's copies; land 0.05 ms; settle 0; decision -> first attempt
+17-115 ms mean (the lag). Channels: the sender's hold (closing received -> new resolution) 3-74 ms mean by process,
+max 339 ms -- the element's absence as its partner sees it -- of which the owner's closing -> ack is 1.5-3.6 ms mean
+(max 106 ms); stand-down 5-23 ms mean. So the window is the pack's wait for the element's device work and the
+transfer behind it, not the protocol's round trips: removing the closing ack (idea 2's remaining piece) would buy
+2-4 ms of a ~50 ms window per move. The pack stage, not the ack, is where the next gain is (the kick fires at the
+zero crossing of outstanding sends, while the element's last kernels may still be queued; four streams cut the
+head-of-line wait among elements, the element's own wait remains).
+**11:05, correction after chain stable4 (two more runs of each channel arm, and jacobi3d).** The three late runs were all
+slow together (previous build 208.2 then 222.4; one stream 208.3 then 218.0; senders not told 202.9 then 216.6), so the
+previous build's channel band is 208.2-231.7 over five runs and overlaps this build's 206.5-210.6: the channel
+result is a LEAN of about 5%, not the 8% written above, and the ablation cannot attribute it (one stream 206.3-218.0,
+senders not told 202.9-216.6, both inside the spread). Run-to-run spread at this size is ~10 ms on one node, so a
+difference under 5% needs more than five runs or a larger problem. What stands: no regression on either path, the
+Stable lifetime and the sender notification correct (chantest), and the window measured. jacobi3d 512^3 on one node
+(16 blocks): zero-copy 1633.7 us, channels 1412.6 us, checksums identical to last night's (8.762191026712e+06).
+Node 23047794 released 11:05 (user: "release the node after you are done"); the standard binaries leanmd, jacobi3d,
+chantest are this build; leanmd.prev (2026-10-19 23:25), leanmd.noinform and leanmd.onestream are the control and
+the two ablation variants. Nothing committed.
+
+### 2026-10-20 13:40: the runtime presets CUDA_DEVICE_MAX_CONNECTIONS=32; today's bands were 8 queues
+
+None of the leanmd, jacobi3d or chantest runs from 2026-10-18 to 2026-10-20 (the stable* chains, the after*/n2_*
+chains, both builds, both ablations) set `CUDA_DEVICE_MAX_CONNECTIONS` or `CHARM_LB_HELPER`: only scale.sh carried
+the 32-queue setting (since 2026-09-20) and only the sph3d runners enabled the LB helper thread. So every number in
+the two entries above is at the driver default of 8 hardware queues with the CUPTI load build and the strategy on a
+PE. The comparisons are like-for-like (both arms, both builds, the ablations), but the absolute numbers do not belong
+next to the September scaling series, and the 16x8x8 references of 2026-10-19 were two-node runs.
+
+Change: `hapiPresetEnvironment()` (hapi_impl.cpp) sets `CUDA_DEVICE_MAX_CONNECTIONS=32` unless the variable is
+already in the environment; `charm_main` (init.C) calls it before `ConverseInit`, because the machine layer's LCI
+calls `cuInit(0)` during ConverseInit and the driver reads the environment then. The HAPI Config banner now ends
+with `N hardware queue(s) per device (runtime default | CUDA_DEVICE_MAX_CONNECTIONS from the environment)`.
+scale.sh exports the variable only when `CONNECTIONS=` is given. Built 13:34-13:36 (hybridapi, ck, LB modules;
+leanmd, jacobi3d, chantest relinked and carry the symbol). The LB helper thread stays opt-in (`CHARM_LB_HELPER`):
+its last leanmd measurement (2026-09-21) was 3.4% slower with the cause never found.
+
+Unvalidated on hardware. `tests/util/streamorder/connpreset.cu` (built) measures the effective queue count after
+an in-process setenv placed before cuInit, after cuInit, or after the primary context exists; the next node runs
+`examples/charm++/cuda/gpudirect/leanmd/logs/conn1_chain.sh <jobid>`: connpreset (kill criterion: "before" must
+give 32), chantest, leanmd 8x4x4 async zc x3 / ch x3 at the preset plus a CONNECTIONS=8 pair as the same-session
+reference, 16x8x8 async zc x2 / ch x2 on one node, and if time allows the 16x8x8 no-LB pair.
+
+### 2026-10-20 15:30: job 23053532 (gpub002, 14:39-15:25): the preset validated; channels lose at 16x8x8 on one node
+
+**Placement check** (`tests/util/streamorder/connpreset`, rewritten: a two-stream pair no longer aliases on driver
+595.71.05, queues are assigned dynamically; the signal is 64 streams x 2 dependent kernels depth-first): setenv
+before cuInit = 32 queues (3.63 T, implied 24.3), after cuInit = 8 (8.98 T), after the context = 8. The driver reads
+the variable at cuInit, so charm_main (ahead of LCI's cuInit in ConverseInit) is the only correct place. Every
+leanmd/jacobi3d banner read "32 hardware queue(s) per device (runtime default)", and CONNECTIONS=8 read "from the
+environment".
+
+**leanmd 8x4x4 async, one node, mean42-100 ms/step:** 32 queues zc 203.3 / 217.8 / 219.1, ch 209.2 / 209.9 / 208.9;
+8 queues (same session) zc 223.8, ch 213.0; this morning at 8: zc 225.5 / 225.1 / 233.1, ch 206.5 / 208.2 / 210.6.
+Channels do not move with the queue count; zero-copy gains ~5% at 32, which closes most of its gap to channels here.
+The move window is unchanged (pack 1-93 ms means at both counts).
+
+**leanmd 16x8x8 async, one node (new; the 2026-10-19 16x8x8 runs were two nodes):** zc 1537.6 / 1548.7, ch 1624.5 /
+1567.6 (channels 1-6% behind). Pre-LB steps 1-20 tie (2401-2406); the quiet window after the Metis moves (25-40)
+nearly ties (zc 1585/1551, ch 1591/1587); the loss is in the Diffusion phase with moves in flight, where the channel
+arm's device time per interval is LOWER (28.1-28.7 s vs 28.5-29.8 s) while its steps are longer: waiting, not work.
+The channel arm's tallies: chan-hold 27,411 holds for 5,941 moves, 305 ms mean, 3.5 s max (worst process 782 ms
+mean in run 1, 1141 ms in run 2); stand-down 43-375 ms per move (zero-copy: 0); chan-close 56 ms mean. Sync balancer:
+zc 1626.5, ch 1672.1 (2.8% behind); no LB: zc 2882.1, ch 2947.1 (2.3% behind, one pair). jacobi3d 512^3: ch
+1416/1415 us at 32 and 1414 at 8, zc 1634/1676 at 32 and 1613 at 8, checksums identical.
+
+**Cause, from the code.** A channel move is a chain of message hops through scheduler queues that are 50-400 ms
+deep at 448 objects per PE: closing to every sender and an ack back before the owner may pack (stand-down); after
+the element lands, reopen on the new PE and the resolution back to the sender before a parked put can go. A put on
+a closed channel parks with the application's source pinned, and leanmd's cell then waits for forces from the
+compute that cannot run until the parked put is finally issued. Zero-copy forwards a message once through the
+location manager and never parks a sender. `CkRdmaDeviceChannelsBeforeMigrate` also runs before the runtime decides a
+move is a same-device handoff, where nothing is packed. (The CHARM_ZC_STATS pair, 15:18-15:22, was wasted: the
+channel put counters were never printed; fixed below.)
+
+**Implemented (uncommitted, built 15:30, NOT yet run on a node):**
+1. *No sender hold* (`CkDeviceChannel::issueStaged`): a put while the channel is closed (or behind such puts) is
+   copied to a pool staging buffer on the producing stream, the source is released to the application once the
+   copy has read it, and the staging buffer is announced to the receiving element -- an element message the
+   location manager parks and forwards -- which reads it into the reopened buffer in put order (`startPull` now
+   requires seq == taken_seq + 1). The receiver's DONE frees the staging buffer through a per-PE table keyed by
+   (token, seq) and the sender debits one credit (`onStagedDone`); every release credits, so the balance holds.
+   A put parked for a credit when the closing arrives is converted the same way. The sending element is charged
+   one outstanding device send per staged put until its DONE, so it does not move with one unread.
+2. *Urgent control messages*: closing, close-ack (and the blind ack), resolution, message credits and DONE go by
+   `CmiSyncSendAndFreeUrgent`; reconverse serves the urgent queue first in every scheduler iteration, whichever way
+   the message arrived. Each hop now costs the entry method running at the destination, not the queue depth. This
+   also covers the same-device handoff (its closing/ack round trip becomes ~1 entry method), so the handoff keeps
+   its handshake: skipping it would need the acks forwarded to the new PE for slot and credit retirement.
+3. The ack-free pack was NOT implemented: with urgent acks the stand-down is one entry method; removing the acks
+   needs deferred frees under the memory contract and a late-put forwarder, for little left to gain.
+4. `[chan-stats]` prints the channel put counters at exit under CHARM_ZC_STATS=1 (per tier mean us, queued,
+   staged, events).
+
+Validation (next node): chantest all arms (memcpy and ipc, lbx aborts), then leanmd 16x8x8 async one node zc x2 /
+ch x2 (target: the 1538-1549 vs 1568-1625 pair; the staged counters in the tally), 8x4x4 async zc x2 / ch x2 (the
+win there must survive), and the no-LB 16x8x8 pair with CHARM_ZC_STATS=1 for the 2.3% steady-state gap.
+
+### 2026-10-20 17:15: job 23058109 (gpub001, 16:21-17:12): the protocol change validated; the no-LB gap profiled
+
+**chantest:** all 8 arms pass on the 15:37 build (memcpy and ipc; plain, lb, lba; both lbx aborts), 14 moves each.
+**leanmd 16x8x8 async, one node, mean42-100 ms/step (this node runs ~5% slower than gpub002):** zero-copy 1639.4 /
+1579.5 / 1638.7, channels 1548.2 / 1638.9 / 1569.1. Before the change (gpub002, 15:00) channels were 1-6% behind on
+both pairs; now the bands overlap (channel means 2% lower): the loss is gone, a win is not demonstrable at this
+noise (single steps swing 800 ms; a 59-step mean carries ~2%). Per process 327-3,301 puts went out as staged
+announces (chan-stats "staged"), no CHAN-STALL line anywhere; stand-down rose to 173 ms mean because an element
+now also waits for its own staged puts to be read (they count as outstanding sends) before it may move.
+**leanmd 8x4x4 async:** zero-copy 209.8 / 206.4, channels 203.1 / 220.9: a tie (the 8x4x4 "win" of the morning was
+within this noise too). **No LB 16x8x8:** zero-copy 2884.9, channels 2946.5 (+2.1%; +2.3% on gpub002): the
+steady-state gap is reproducible and unrelated to migration. The fourth extra pair was cut at the user's request
+("stop doing repeat runs"): repeats past 3 per arm add nothing at this noise.
+
+**Profile (nsys, rank 0, 30 steps, no LB, channels; `/scratch/mzu/bhosale/nsys/conn2_ch/`):** cudaMemcpyAsync
+422,912 calls (7.0 us host each), cuMemsetD32Async 952,584 calls (2.8 us host each) = the completion-flag writes
+(+gpuflagmemset is the default flag path), on the GPU 952,840 memsets of 1.33 us = 56.5% of all copy-engine time,
+380,160 D2D memcpys of 20 KB (2.26 us) = 38%. Each channel put adds TWO stream callbacks (source done + arrival
+note, persistentStreamCallbacks) = two flag writes, and one unbatched memcpy. The zero-copy receive path batches its
+landings (one memcpy batch + one flag per batch, deviceRecvBatchDone) and adds one flag per send (ipcSrcReadyFn).
+Per PE per step that is ~1,750 puts x (2 flags + 1 copy) on the channel path: ~2.7% of the run on the copy engine
+and in stream serialization, the size of the gap. Candidates, not implemented: (a) one flag per put (fire src_done
+from the arrival-note callback: the copy's completion implies the source is done); (b) batch the puts a PE issues
+in one entry method into one memcpy batch + one flag, as the zero-copy receive path does.
+The zero-copy profile could not be written: under nsys with +nvtx the zero-copy run hangs after "Exit called" on
+every PE (twice; 420 s and 300 s timeouts; --duration=115 did not help), the channel run exits normally. Its log
+also shows "a 13200-byte device buffer is being sent over direct CUDA IPC with no completion callback" (leanmd's
+zero-copy path, pre-existing). Node released 17:12.
+
+### 2026-10-20 19:00: job 23063562 (gpub002, 18:26-): flags counted on both paths; the one-flag put; the nsys "hang"
+
+**Flag writes per process, 16x8x8 no LB, 30 steps, 421,376 messages:** channels 952,576 (2.26 per put), zero-copy
+305,294-344,367 (0.8 per message). **One-flag put** (`deviceChannelPutDoneFn`: on the stream tiers the source-done
+callback delivers the note too; across hosts the completion handler fires both without a flag): channels 537,856
+flags (1.28 per put), put host cost 10.8 -> 8.5 us, chantest 8/8, 16x8x8 async 1546.8 (zc on this node 1538-1549),
+8x4x4 async 216.1 -- but the no-LB mean is unchanged, 2584.3 vs 2588.2 with two flags vs zero-copy 2502.4: the
+flags were a cost, not the 3% gap. Built as leanmd.oneflag (the chain's leanmd untouched); libck and chantest
+carry it.
+**The nsys "hang" was not a hang.** The zero-copy application exits normally (all four ranks print their exit
+counters); nsys keeps draining the agent's trace for minutes afterwards (qdstrm files of 690-994 MB in the node's
+/tmp against an 87 MB channel report: the zero-copy path makes ~10x the CUDA API calls per message), and every
+timeout killed it mid-drain, leaving "incomplete or invalid" streams that QdstrmImporter refuses. Fix: fewer steps
+and a long allowance (conn3_zc10.sh: 10 steps, 1200 s). The chain's stack capture had matched nsys's own command
+line (it carries the app's arguments); c3_appstack.sh matches the process by name.
+
+### 2026-10-20 19:10: the zero-copy profile, like for like (rank 0, 10 steps, no LB), and the one-flag profile
+
+Reports: `/scratch/mzu/bhosale/nsys/conn3_{ch10,oneflag10,zc10}/rank_0.nsys-rep` (zero-copy's is 616 MB for 10 steps
+against 87 MB for 30 channel steps: 17.9 MILLION cudaEventQuery calls in 10 steps, the idle PEs polling events).
+| per 10 steps, rank 0 | channels, two flags | channels, one flag | zero-copy |
+|---|---|---|---|
+| kernels total | 4393.6 ms | 4384.4 ms | 4357.3 ms |
+| copy engine total | 779.8 ms | 599.7 ms | 401.5 ms |
+| memsets (flags) | 317,448 / 424.7 ms | 179,208 / 257.1 ms | 96,934 / 129.9 ms |
+| D2D copies (126,720 each) | 302.0 ms (2.38 us) | 290.0 ms | 232.5 ms (1.83 us, batched: 13,140 cudaMemcpyBatchAsync) |
+| host API total | 5.0 s | 4.6 s | 13.4 s (8.3 s of it cudaEventQuery while idle) |
+The kernels agree within 0.8%; the difference is the copy engine, flags first and unbatched copies second, and the
+one-flag put closes half of it on rank 0 -- yet the no-LB step time did not move (2584 vs 2588 vs zc 2502, 30-step
+runs), so rank 0's copy engine is not what sets the step. Rank 0 is the lightest rank under the density gradient
+(its PEs idle 95%); the step is set by rank 3's GPU. conn3_rank3.sh profiles rank 3 on both paths (19:09).
+
+### 2026-10-20 19:15: the busiest rank (rank 3, top of the density gradient), 10 steps, no LB
+
+`/scratch/mzu/bhosale/nsys/conn3_r3_{ch,zc,oneflag}/rank_3.nsys-rep`. Rank 3's force kernel averages 701 us (118 on
+rank 0) and its kernels fill the step (26.1 s per 10 steps on a 2.45 s step: the GPU is saturated); this rank sets
+the step.
+| rank 3, per 10 steps | channels (two flags) | zero-copy |
+|---|---|---|
+| kernels total | 26,132.8 ms | 26,128.8 ms (equal: no interference) |
+| copy engine total | 917.5 ms | 512.0 ms |
+| memsets (flags) | 317,448 / 458.3 ms (1.44 us) | 111,088 / 167.5 ms (1.51 us) |
+| D2D copies, 126,720 each | 393.0 ms (3.10 us each) | 286.8 ms (2.26 us each, batched) |
+So on the GPU that sets the step, channels spend 41 ms more per step on the copy engine, which is where the puts'
+chain (copy, flag, host poll, note, consumer's launch) runs: 2.9x the flag memsets and single copies 37% slower each
+than the batched ones. That is the 2-3% no-LB gap's size (75 ms of a 2.5 s step). The one-flag put takes out about
+half the memset part; the rest needs the puts batched the way the zero-copy receive path batches its landings
+(cudaMemcpyBatchAsync: 14,715 batches for 126,720 copies here). Host API time under nsys is distorted (stream
+creation 1.8 ms per call, batch calls 155 us) and the step means under nsys are not comparable.
+One-flag put on rank 3 (`conn3_r3_oneflag`): copy engine 713.4 ms per 10 steps (memsets 179,208 / 281.1 ms, copies
+368.3 ms at 2.91 us), kernels 26,108 ms (unchanged): halfway from 917.5 to zero-copy's 512.0. The standard leanmd
+and jacobi3d are relinked against the one-flag library (19:11); leanmd.oneflag is the same code. Next for the
+steady-state gap: batch a PE's puts (the copies, and one flag per batch). Node 23063562 released 19:11.
+
+### 2026-10-20 19:20: channel puts batched (built; validation queued as job 23067051, conn4_chain.sh)
+
+`deviceChannelBatchAdd/Flush` (ckrdmadevice.C): on the stream tiers (same process, same host) a put no longer issues
+its own copy and flag; it joins this PE's open batch on its producing stream (a cell's thirteen position puts, a
+compute's two force puts). The batch is one `cudaMemcpyBatchAsync` on that stream (one `cudaMemcpyAsync` per put if
+the driver refuses) with ONE completion flag, whose callback delivers every put's note and source-done. A batch
+flushes when the producing stream changes, at 256 puts, at every scheduler iteration and at idle, so it never
+outlives the entry method that opened it; the cross-host tier keeps its one-sided write. The one-flag merge of 17:30
+is subsumed (a batch of one). Expected on rank 3 per 10 steps: ~36k batches for 138k puts, flags ~77k against
+179k (one flag) / 317k (two) / 111k (zero-copy), copies at the batched rate (2.26 us). `[chan-stats]` prints
+batches, puts per batch, the largest, and refusals. chantest, the no-LB pair, the async ties and the rank-3 profile
+run on the next node; chain: leanmd/logs/conn4_chain.sh.
+
+### 2026-10-20 20:20: batched channel puts validated (job 23067051, gpub002)
+
+chantest 8/8. **No LB, 16x8x8, 30 steps, mean 11-30, same node and pair:** channels batched 2571.6 vs zero-copy
+2587.5 ms/step -- the first no-LB pair of the day with channels not behind (per-put 2947 vs 2882 at 16:42,
+one-flag 2584 vs 2502 at 18:29; zero-copy itself drifted 2502 -> 2588 on this node over two hours, so the earlier
+"3% gap" carried drift as well as cost). Per process: 125,184 batches for 414,720 puts (3.3 per batch: a compute's
+two force puts dominate, a cell's thirteen position puts make the largest, 27), no batched-copy refusals, flag
+writes 248,320 (two-flag 952,576, one-flag 537,856, zero-copy 307-344k), put host cost 10.8 -> 0.4 us.
+**Rank 3 profile, 10 steps, copy engine:** per-put 917.5, one-flag 713.4, batched 537.9, zero-copy 512.0 ms;
+memsets 89,352 (zc 111,088); D2D copies 331 ms at 2.61 us (zc 287 at 2.26); kernels identical (26.1 s).
+**Async, batched channels:** 16x8x8 1618.0, 8x4x4 229.8 ms/step; their zero-copy controls run next on this node
+(the node is ~3% slower than at 15:00-18:50, when zc was 1538-1549 and 203-219).
+
+### 2026-10-20 21:05: batching attributed to the element; the "hang" was a stale shared-memory segment
+
+**8x4x4 async with batching (20:18-20:27):** channels 229.8 / 232.1 vs zero-copy 198.4 / 209.0 (12% behind, where
+every earlier 8x4x4 pair tied); no-LB 8x4x4 tied (322.9 vs 323.7). The channel arm's balancer moved 20-30% more
+objects than the zero-copy arm's: a batch flushed from the scheduler loop launches its copies under no entry
+method, so the balancer's per-object device load no longer carried them. Fix: `CkRdmaDeviceChannelBatchFlush()`
+from `CkCallstackPop`, before the entry's CUPTI correlation is popped (only a batch opened inside an entry; one
+opened from a converse handler waits for the scheduler loop).
+**Then four runs in a row "hung" before step 1 (20:31-20:53), on three builds including the plain revert.** Stacks:
+every PE idle in the scheduler; channel debug: opens and resolutions complete, "first credit through shared
+memory", then nothing. Cause: the channel's shared-memory segment (`charm-chan-<host>-<job>`) is created once per
+JOB and relies on zero pages as its empty state; a step I killed by hand at 20:30 left it behind with live ring and
+credit state, and every later step opened it. `rm /dev/shm/charm-chan-*` on the node and the same binary ran. Now
+named per job STEP (`-<SLURM_STEP_ID>`). The flush-at-pop revert of 20:51 was undone; nothing was wrong with it.
+**Final build (20:56; chantest 8/8):** 8x4x4 async channels 209.5 vs zero-copy 219.4 (migrations 1360 vs 1243, the
+attribution restored); 16x8x8 async channels 1603.1 vs zero-copy 1663.3 (20:22 control, same node); no-LB 16x8x8
+batched 2571.6 vs 2587.5 (20:13); rank-3 copy engine 538 vs 512 ms per 10 steps. Node 23067051 released 21:03.
+Open: more than one pair per claim; the two-node and 16x8x8-two-node configurations on this protocol.
