@@ -35,6 +35,18 @@ ifeq ($(CMK_GDIR),reconverse)
 RECONVERSE_NA = \
   chkpt \
 
+# The same holds for a rank migrating between processes. Linux runs turn ASLR
+# off (setarch -R); macOS cannot, so with more than one process (TESTRUN_PROCS)
+# leave out the tests whose ranks migrate. One process migrates fine.
+ifeq ($(CMK_MACOSX),1)
+ifneq ($(filter-out 0 1,$(TESTRUN_PROCS)),)
+RECONVERSE_NA += \
+  migration \
+  megampi \
+  privatization \
+
+endif
+endif
 endif
 
 TESTDIRS = $(filter-out $(FTDIRS) $(RECONVERSE_NA),$(DIRS))

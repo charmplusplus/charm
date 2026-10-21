@@ -64,6 +64,9 @@ Substantially rewritten by Evan Ramos in 2019.
 #if CMK_HAS_ADDR_NO_RANDOMIZE
 #include <sys/personality.h>
 #endif
+#if CMK_RECONVERSE && defined(__APPLE__)
+#include <mach-o/dyld.h> /* _dyld_get_image_vmaddr_slide */
+#endif
 
 #include <unordered_map>
 #include <utility>
@@ -2613,6 +2616,19 @@ extern int num_workpes, total_pes;
    thread layer to consult (isomalloc-reconverse.C). */
 static int CmiIsomallocAslr = 0;
 
+static int CmiIsomallocReadAslr(void)
+{
+#if defined(__APPLE__)
+  /* macOS has no randomize_va_space; a nonzero slide on the main image means
+     the loader randomized the layout. */
+  return _dyld_get_image_vmaddr_slide(0) != 0;
+#else
+  /* 1 is randomized; -1 means randomize_va_space could not be read, which is
+     unknown and is treated as randomized so that the warning still fires. */
+  return read_randomflag() != 0;
+#endif
+}
+
 int CmiIsomallocAddressSpaceIsRandomized(void)
 {
   return CmiIsomallocAslr;
@@ -2623,7 +2639,7 @@ void CmiIsomallocInit(char ** argv)
 {
 #if CMK_RECONVERSE
   if (CmiMyRank() == 0)
-    CmiIsomallocAslr = (read_randomflag() == 1);
+    CmiIsomallocAslr = CmiIsomallocReadAslr();
 #endif
 
 #if CMK_CONVERSE_MPI && (CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING)

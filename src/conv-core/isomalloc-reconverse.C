@@ -71,11 +71,20 @@ static void warnOnceAboutAslr(void)
   if (!CmiIsomallocAddressSpaceIsRandomized())
     return;
 
+#if defined(__APPLE__)
   CmiPrintf("Isomalloc> Warning: address space randomization is enabled, and "
             "this job just created a migratable thread. Moving one between "
-            "processes needs the program's code at the same address in both; "
-            "run under `setarch -R`, or disable randomize_va_space, if these "
-            "threads will migrate.\n");
+            "processes needs the program's code at the same address in both, "
+            "and macOS cannot turn randomization off, so these threads must "
+            "not migrate between processes here (migration between PEs of one "
+            "process is fine).\n");
+#else
+  CmiPrintf("Isomalloc> Warning: address space randomization is enabled (or "
+            "could not be checked), and this job just created a migratable "
+            "thread. Moving one between processes needs the program's code at "
+            "the same address in both; run under `setarch -R`, or disable "
+            "randomize_va_space, if these threads will migrate.\n");
+#endif
 }
 
 static void * iso_permanentAllocAlign(CmiIsomallocContext ctx, size_t align,
