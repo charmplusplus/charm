@@ -115,11 +115,14 @@ static const CthIsomallocOps cmiIsomallocOps = {
   iso_contextActivate,
 };
 
-/* Present only when the program linked a memory module (charmc -memory ...).
-   Without one there is nothing to initialize and nothing intercepts malloc.
-   C++ linkage, to match memory.C's definition: Reconverse's converse.h does
-   not declare this, so memory.C defines it unmangled-by-extern-"C". */
-__attribute__((weak)) void CmiMemoryInit(char ** argv);
+/* Defined by the memory module, which is linked only when the program asked
+   for one (charmc -memory ...); without one there is nothing to initialize and
+   nothing intercepts malloc. A weak no-op stands in, and memory.C's definition
+   overrides it. A weak definition rather than a weak undefined reference
+   tested against null: Mach-O's linker does not accept an undefined weak
+   reference that nothing defines. C++ linkage, to match memory.C's
+   definition: Reconverse's converse.h does not declare this. */
+__attribute__((weak)) void CmiMemoryInit(char ** argv) {}
 
 /* stdio allocates a stream's buffer with malloc the first time the stream is
    written. With the isomalloc memory module linked, a process whose first
@@ -142,12 +145,10 @@ static void CmiIsomallocInitForReconverse(char ** argv)
   /* Before Isomalloc: the memory module owns the per-PE "which context is
      receiving mallocs" state that Isomalloc pushes and pops around its own
      bookkeeping allocations. */
-  if (CmiMemoryInit != NULL)
-  {
-    CmiMemoryInit(argv);
-    if (CmiMyRank() == 0)
-      CmiStdoutBufferOutsideIsomalloc();
-  }
+  CmiMemoryInit(argv);
+  /* Set by the isomalloc memory module's init above, on rank 0. */
+  if (CmiMyRank() == 0 && CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC))
+    CmiStdoutBufferOutsideIsomalloc();
 
   CmiIsomallocInit(argv);
   /* After init, so that CthMigratable() answers with a region that has
