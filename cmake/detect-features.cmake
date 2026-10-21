@@ -148,15 +148,6 @@ if(CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY AND CMK_CAN_GET_BINARY_PATH AND CMK_H
 else()
   set(CMK_SUPPORTS_PIEGLOBALS 0)
 endif()
-if(RECONVERSE)
-  # Reconverse has no isomalloc (AMPI port stage 0: ranks do not migrate).
-  # -memory isomalloc is therefore not available, and neither is -pieglobals,
-  # which copies each rank's code and data segments into an isomalloc region
-  # and aborts without one. The flags are read by charmc, ampiCC and
-  # tests/ampi/privatization. Linux detection alone would set both to 1.
-  set(CMK_SUPPORTS_MEMORY_ISOMALLOC 0)
-  set(CMK_SUPPORTS_PIEGLOBALS 0)
-endif()
 
 # Misc. flags
 set(CMK_LBID_64BIT 1)

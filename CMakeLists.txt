@@ -878,12 +878,10 @@ endforeach()
 configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 
 
-# TCharm. On reconverse, TCharm threads do not migrate: libmoduletcharm also
-# carries the stubs for the Converse migration API that reconverse lacks
-# (src/libs/ck-libs/tcharm/reconverse-compat), and TCharm runs as with
-# +tcharm_nomig. The directory lives under tcharm, not src/conv-core: the
-# legacy buildold header step flattens every file under src/conv-core into
-# include/, and its conv-config.h would replace the classic one.
+# TCharm. libmoduletcharm also carries the stubs for the few classic Converse
+# functions reconverse lacks (src/libs/ck-libs/tcharm/reconverse-compat);
+# migratable threads come from reconverse and isomalloc from libisomalloc
+# (cmake/converse.cmake).
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
 set(tcharm-h-sources
     src/libs/ck-libs/tcharm/tcharm.h
@@ -931,9 +929,10 @@ if(${TARGET} STREQUAL "charm4py")
   if(RECONVERSE)
     # `converse` is an aggregation (UTILITY) target on Reconverse builds and
     # cannot be linked: libreconverse is the Converse layer (CCS core
-    # included), and charm_cxx_utils holds charm's utilities, TopoManager and
-    # the CCS builtins.
-    set(CHARM4PY_RUNTIME_TARGETS reconverse charm_cxx_utils)
+    # included), charm_cxx_utils holds charm's utilities, TopoManager and
+    # the CCS builtins, and isomalloc the init hook StartCharmExt registers
+    # (-standalone means charmc adds none of these itself).
+    set(CHARM4PY_RUNTIME_TARGETS reconverse charm_cxx_utils isomalloc)
   else()
     set(CHARM4PY_RUNTIME_TARGETS converse memory-default threads-default ldb-rand)
   endif()

@@ -23,7 +23,7 @@ extern void LrtsDrainResources(); /* used when exit */
 extern bool _ringexit;		    // for charm exit
 extern int _ringtoken;
 extern void _initCharm(int unused_argc, char **argv);
-extern void _registerTraceInitHook();
+extern void _registerConverseInitHooks();
 extern void _sendReadonlies();
 void CommunicationServerThread(int sleepTime);
 extern int CharmLibInterOperate;
@@ -117,7 +117,7 @@ void CharmBeginInit(int argc, char** argv) {
 
   userDrivenMode = 1;
   CharmLibInterOperate = true;
-  _registerTraceInitHook();
+  _registerConverseInitHooks();
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
 }
 
@@ -168,7 +168,7 @@ void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
 #endif
 
   CharmLibInterOperate = true;
-  _registerTraceInitHook();
+  _registerConverseInitHooks();
   ConverseInit(argc, argv, (CmiStartFn)_initCharm, 1, 0);
   StartInteropScheduler();
 }

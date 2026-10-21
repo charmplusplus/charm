@@ -1880,16 +1880,24 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 }
 
-/* Hand converse the trace-init hook; reconverse's ConverseInit invokes it.
- * Classic convcore calls traceInit through its own path. Every Charm++ entry
- * into ConverseInit calls this -- charm_main, and the interop entry points
- * CharmBeginInit and CharmLibInit, which bypass charm_main -- since without
- * it the trace array is never created and _initCharm dereferences a null
- * CkpvAccess(_traces). */
-void _registerTraceInitHook()
+/* Hand converse the per-PE init hooks that reconverse's ConverseInit invokes
+ * and classic convcore calls through its own path (ConverseCommonInit).
+ * Every Charm++ entry into ConverseInit calls this -- charm_main, and the
+ * interop entry points CharmBeginInit and CharmLibInit, which bypass
+ * charm_main.
+ *  - traceInit: without it the trace array is never created and _initCharm
+ *    dereferences a null CkpvAccess(_traces).
+ *  - CmiIsomallocInit (via isomalloc-reconverse.C): has to run before
+ *    CthInit, which is the first thing that could ask for a migratable
+ *    thread stack. */
+void _registerConverseInitHooks()
 {
 #if CMK_TRACE_ENABLED && CMK_RECONVERSE
   registerTraceInit(traceInit);
+#endif
+#if CMK_RECONVERSE
+  extern void CmiIsomallocHookIntoReconverse(void);
+  CmiIsomallocHookIntoReconverse();
 #endif
 }
 
@@ -1898,7 +1906,7 @@ int charm_main(int argc, char **argv)
   int stack_top=0;
   memory_stack_top = &stack_top;
 
-  _registerTraceInitHook();
+  _registerConverseInitHooks();
 
   ConverseInit(argc, argv, (CmiStartFn) _initCharm, 0, 0);
 

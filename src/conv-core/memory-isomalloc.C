@@ -47,7 +47,7 @@ static int meta_inited = 0;
 
 static void meta_init(char **argv)
 {
-   if (CmiMyRank()==0) CmiMemoryIs_flag|=CMI_MEMORY_IS_ISOMALLOC;
+   if (CmiMyRank()==0) CmiMemorySetIs(CMI_MEMORY_IS_ISOMALLOC);
    CpvInitialize(struct CmiMemoryIsomallocState, isomalloc_state);
    CpvAccess(isomalloc_state).context.opaque = nullptr;
    CpvAccess(isomalloc_state).disabled = 0;
@@ -64,7 +64,13 @@ static bool meta_active()
     && CpvAccess(isomalloc_state).context.opaque
     && !CpvAccess(isomalloc_state).disabled
 #if CMK_HAS_TLS_VARIABLES
+#if CMK_RECONVERSE
+    /* Reconverse has no TLS-swapping thread flavor to make an exception for,
+       so the pthread test stands on its own. */
+    && isomalloc_thread
+#else
     && (isomalloc_thread || CmiThreadIs(CMI_THREAD_IS_TLS))
+#endif
 #endif
     ;
 }
