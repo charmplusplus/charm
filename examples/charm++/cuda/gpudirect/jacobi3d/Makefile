@@ -4,8 +4,17 @@ CHARM_DIR = ../../../../..
 CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
 CHARM_INC = -I$(CHARM_DIR)/include
 
+# The device compiler follows the build the runtime was made with (conv-mach-opt.mak):
+# nvcc for a CUDA build, hipcc as HIP for a HIP build (kernels in CUDA syntax compile
+# as HIP; the host side uses the hapi names of hapi_portable.h).
+-include $(CHARM_DIR)/include/conv-mach-opt.mak
+ifeq ($(BUILD_HIP),1)
+NVCC = hipcc
+NVCC_FLAGS = -x hip -c -std=c++17 -ffast-math $(OPTS) $(patsubst %,--offload-arch=%,$(subst ;, ,$(HIP_ARCHS)))
+else
 NVCC = nvcc
 NVCC_FLAGS = -c -std=c++11 -use_fast_math $(OPTS)
+endif
 LD_LIBS =
 
 TARGET = jacobi3d

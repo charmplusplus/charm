@@ -10,13 +10,13 @@ __global__ void fillKernel(double* data, int count, double val) {
   }
 }
 
-void invokeFillKernel(double* data, int count, double val, cudaStream_t stream) {
+void invokeFillKernel(double* data, int count, double val, hapiStream_t stream) {
   dim3 block_dim(BLOCK_SIZE);
   dim3 grid_dim((count + block_dim.x - 1) / block_dim.x);
 
   fillKernel<<<grid_dim, block_dim, 0, stream>>>(data, count, val);
 
-  hapiCheck(cudaPeekAtLastError());
+  hapiCheck(hapiPeekAtLastError());
 }
 
 __global__ void rampKernel(double* data, int count, double base) {
@@ -24,9 +24,9 @@ __global__ void rampKernel(double* data, int count, double base) {
   if (ti < count) data[ti] = base + ti;
 }
 
-void invokeRampKernel(double* data, int count, double base, cudaStream_t stream) {
+void invokeRampKernel(double* data, int count, double base, hapiStream_t stream) {
   dim3 block_dim(BLOCK_SIZE);
   dim3 grid_dim((count + block_dim.x - 1) / block_dim.x);
   rampKernel<<<grid_dim, block_dim, 0, stream>>>(data, count, base);
-  hapiCheck(cudaPeekAtLastError());
+  hapiCheck(hapiPeekAtLastError());
 }

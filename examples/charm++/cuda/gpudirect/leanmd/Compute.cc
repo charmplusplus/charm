@@ -44,12 +44,12 @@ inline bool asyncAllocOn() {
   static const bool on = (getenv("CHARM_MD_ASYNC_ALLOC") != nullptr);
   return on;
 }
-inline hapiError_t mdDevMalloc(void** p, size_t n, cudaStream_t s) {
-  if (asyncAllocOn() && s != NULL) return cudaMallocAsync(p, n, s);
+inline hapiError_t mdDevMalloc(void** p, size_t n, hapiStream_t s) {
+  if (asyncAllocOn() && s != NULL) return hapiMallocAsyncRaw(p, n, s);
   return hapiMalloc(p, n);
 }
-inline hapiError_t mdDevFree(void* p, cudaStream_t s) {
-  if (asyncAllocOn() && s != NULL) return cudaFreeAsync(p, s);
+inline hapiError_t mdDevFree(void* p, hapiStream_t s) {
+  if (asyncAllocOn() && s != NULL) return hapiFreeAsyncRaw(p, s);
   return hapiFree(p);
 }
 
@@ -203,13 +203,13 @@ class EventPool {
   EventPool() : lock_(CmiCreateLock()) {}
   // One free list per device: an event is valid only on the device it was created on, and the
   // PEs of a process can drive different devices. Created with the calling PE's device current.
-  cudaEvent_t take() {
+  hapiEvent_t take() {
     const int dev = hapiGetDeviceNum();
     CmiLock(lock_);
-    cudaEvent_t e;
-    std::vector<cudaEvent_t>& free = free_[dev];
+    hapiEvent_t e;
+    std::vector<hapiEvent_t>& free = free_[dev];
     if (free.empty()) {
-      hapiCheck(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
+      hapiCheck(hapiEventCreateWithFlags(&e, hapiEventDisableTiming));
       owner_[e] = dev;
     } else {
       e = free.back();
@@ -218,14 +218,14 @@ class EventPool {
     CmiUnlock(lock_);
     return e;
   }
-  void give(cudaEvent_t e) {
+  void give(hapiEvent_t e) {
     CmiLock(lock_);
     free_[owner_[e]].push_back(e);
     CmiUnlock(lock_);
   }
  private:
-  std::map<int, std::vector<cudaEvent_t>> free_;
-  std::map<cudaEvent_t, int> owner_;
+  std::map<int, std::vector<hapiEvent_t>> free_;
+  std::map<hapiEvent_t, int> owner_;
   CmiNodeLock lock_;
 };
 EventPool& eventPool() {
@@ -444,8 +444,8 @@ void Compute::launchForces() {
     invokeReduceDoubles(d_energyPartial, nA, d_energyScalar, stream);
     // Through the submitter like the launches it follows (see hapiSubmit): issued
     // directly it would overtake the queued reduce kernel and read a stale scalar.
-    double* const h = h_energy; double* const d = d_energyScalar; const cudaStream_t st = stream;
-    hapiSubmit(st, [=]() { hapiCheck(cudaMemcpyAsync(h, d, sizeof(double), cudaMemcpyDeviceToHost, st)); });
+    double* const h = h_energy; double* const d = d_energyScalar; const hapiStream_t st = stream;
+    hapiSubmit(st, [=]() { hapiCheck(hapiMemcpyAsync(h, d, sizeof(double), hapiMemcpyDeviceToHost, st)); });
   }
   // The last device work of this step that touches the pupped buffers. A
   // migration's pack copies wait for this event, not for the shared stream's
@@ -556,7 +556,7 @@ void Compute::ckJustMigrated() {
     cap[s] = c;
     if (oldPos != NULL) {
       if (live > 0)
-        hapiCheck(cudaMemcpyAsync(d_pos[s], oldPos, sizeof(vec3) * (size_t)live, cudaMemcpyDeviceToDevice, stream));
+        hapiCheck(hapiMemcpyAsync(d_pos[s], oldPos, sizeof(vec3) * (size_t)live, hapiMemcpyDeviceToDevice, stream));
       arrivedSlots.push_back(oldPos);
     }
     posCh[s].reopen(d_pos[s]);
@@ -612,8 +612,8 @@ void Compute::pup(PUP::er &p) {
   static const bool dbg = (getenv("CHARM_DEBUG_MIGRATE") != NULL);
   if (p.isPacking()) {
     if (dbg) {
-      const int ready = (lastWorkValid && cudaEventQuery(lastWork) == cudaSuccess) ? 1 : 0;
-      cudaGetLastError();
+      const int ready = (lastWorkValid && hapiEventQuery(lastWork) == hapiSuccess) ? 1 : 0;
+      hapiGetLastError();
       CkPrintf("[PACKORD %d] valid=%d ready=%d\n", CkMyPe(), (int)lastWorkValid, ready);
     }
     // lastWork is recorded through the submitter's queue; the pack must not wait

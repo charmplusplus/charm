@@ -471,14 +471,14 @@ __global__ void appendParticlesKernel(Particle* __restrict__ dst, int dstOffset,
 // must reach the driver in one order, and with the mode on that order is the
 // submitter's queue. Declared here rather than by including hapi.h, which this
 // nvcc translation unit otherwise does not need.
-void hapiSubmitClosure(cudaStream_t stream, void (*fn)(void*), const void* state, size_t bytes);
-template <class F> static inline void submitLaunch(cudaStream_t stream, F f) {
+void hapiSubmitClosure(hapiStream_t stream, void (*fn)(void*), const void* state, size_t bytes);
+template <class F> static inline void submitLaunch(hapiStream_t stream, F f) {
   hapiSubmitClosure(stream, [](void* p) { (*(F*)p)(); }, &f, sizeof(F));
 }
 
 void invokePairForce(const vec3* d_A, int nA, const vec3* d_B, int nB,
                      vec3* d_forceA, vec3 shift, double cutoffSq, bool selfInteract,
-                     double* d_energyPartial, cudaStream_t stream)
+                     double* d_energyPartial, hapiStream_t stream)
 {
   if (nA <= 0 || nB <= 0) return;
   // One block per atom of A -- see the decomposition note at the top.
@@ -492,7 +492,7 @@ void invokePairForce(const vec3* d_A, int nA, const vec3* d_B, int nB,
 void invokePairForceBoth(const vec3* d_A, int nA, const vec3* d_B, int nB,
                          vec3* d_forceA, vec3* d_forceB, vec3 shiftB,
                          double cutoffSq, double* d_energyPartial,
-                         cudaStream_t stream)
+                         hapiStream_t stream)
 {
   if (nA <= 0 || nB <= 0) return;
   submitLaunch(stream, [=]() {
@@ -502,7 +502,7 @@ void invokePairForceBoth(const vec3* d_A, int nA, const vec3* d_B, int nB,
 }
 
 void invokeSumForces(vec3* d_dst, const vec3* d_slots, int slots, int stride, int n,
-                     cudaStream_t stream)
+                     hapiStream_t stream)
 {
   if (n <= 0 || slots <= 0) return;
   const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;
@@ -512,7 +512,7 @@ void invokeSumForces(vec3* d_dst, const vec3* d_slots, int slots, int stride, in
 }
 
 void invokeGatherPositions(const Particle* d_p, vec3* d_pos, int n,
-                           cudaStream_t stream)
+                           hapiStream_t stream)
 {
   if (n <= 0) return;
   const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;
@@ -522,7 +522,7 @@ void invokeGatherPositions(const Particle* d_p, vec3* d_pos, int n,
 }
 
 void invokeReduceDoubles(const double* d_in, int n, double* d_out,
-                         cudaStream_t stream)
+                         hapiStream_t stream)
 {
   if (n <= 0) return;
   submitLaunch(stream, [=]() {
@@ -530,7 +530,7 @@ void invokeReduceDoubles(const double* d_in, int n, double* d_out,
   });
 }
 
-void invokeZeroForces(vec3* d_f, int n, cudaStream_t stream)
+void invokeZeroForces(vec3* d_f, int n, hapiStream_t stream)
 {
   if (n <= 0) return;
   const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;
@@ -540,7 +540,7 @@ void invokeZeroForces(vec3* d_f, int n, cudaStream_t stream)
 }
 
 void invokeAccumulateForces(vec3* d_dst, const vec3* d_src, int n,
-                            cudaStream_t stream)
+                            hapiStream_t stream)
 {
   if (n <= 0) return;
   const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;
@@ -550,7 +550,7 @@ void invokeAccumulateForces(vec3* d_dst, const vec3* d_src, int n,
 }
 
 void invokeIntegrate(Particle* d_p, const vec3* d_f, int n, double dtVel,
-                     double dtPos, double maxVelocity, cudaStream_t stream)
+                     double dtPos, double maxVelocity, hapiStream_t stream)
 {
   if (n <= 0) return;
   const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;
@@ -561,7 +561,7 @@ void invokeIntegrate(Particle* d_p, const vec3* d_f, int n, double dtVel,
 }
 
 void invokeKineticEnergy(const Particle* d_p, int n, double* d_partial, int nBlocks,
-                         cudaStream_t stream)
+                         hapiStream_t stream)
 {
   if (n <= 0) return;
   submitLaunch(stream, [=]() {
@@ -573,7 +573,7 @@ void invokeBinParticles(const Particle* d_p, int n, int cellX, int cellY, int ce
                         double cellSizeX, double cellSizeY, double cellSizeZ,
                         int dimX, int dimY, int dimZ, Particle* d_stay,
                         Particle* d_send, int exchCapacity, int* d_counts,
-                        cudaStream_t stream)
+                        hapiStream_t stream)
 {
   if (n <= 0) return;
   const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;
@@ -585,7 +585,7 @@ void invokeBinParticles(const Particle* d_p, int n, int cellX, int cellY, int ce
 }
 
 void invokeAppendParticles(Particle* d_dst, int dstOffset, const Particle* d_src,
-                           int n, cudaStream_t stream)
+                           int n, hapiStream_t stream)
 {
   if (n <= 0) return;
   const int blocks = (n + BLOCK_THREADS - 1) / BLOCK_THREADS;

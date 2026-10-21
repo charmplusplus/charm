@@ -13,7 +13,7 @@
 // scalars -- a kinetic energy, a particle count -- and the migration payload when a
 // chare actually moves.
 
-#include <cuda_runtime.h>
+#include "hapi_portable.h"   // the vendor table: cuda_runtime.h or hip_runtime.h
 
 struct vec3;
 struct Particle;
@@ -40,33 +40,33 @@ struct Particle;
 // cell pairs can fold them into one buffer.
 void invokePairForce(const vec3* d_A, int nA, const vec3* d_B, int nB,
                      vec3* d_forceA, vec3 shift, double cutoffSq, bool selfInteract,
-                     double* d_energyPartial, cudaStream_t stream);
+                     double* d_energyPartial, hapiStream_t stream);
 
 // Both directions of a two-cell pair in one launch; assigns both force arrays.
 void invokePairForceBoth(const vec3* d_A, int nA, const vec3* d_B, int nB,
                          vec3* d_forceA, vec3* d_forceB, vec3 shiftB,
                          double cutoffSq, double* d_energyPartial,
-                         cudaStream_t stream);
+                         hapiStream_t stream);
 
 // d_dst[i] = sum over `slots` landing slots of d_slots[k*stride + i], one launch.
 void invokeSumForces(vec3* d_dst, const vec3* d_slots, int slots, int stride, int n,
-                     cudaStream_t stream);
+                     hapiStream_t stream);
 
-void invokeZeroForces(vec3* d_f, int n, cudaStream_t stream);
+void invokeZeroForces(vec3* d_f, int n, hapiStream_t stream);
 
 // Extract positions from the device-resident Particle array, for sending.
 void invokeGatherPositions(const Particle* d_p, vec3* d_pos, int n,
-                           cudaStream_t stream);
+                           hapiStream_t stream);
 
 // Finish a partials array into one device scalar, so only 8 bytes go to host.
 void invokeReduceDoubles(const double* d_in, int n, double* d_out,
-                         cudaStream_t stream);
+                         hapiStream_t stream);
 
 // Fold one received force contribution into a Cell's accumulator. Replaces the
 // original's section reduction, which was host-side and would have forced every
 // force array back through host memory each step.
 void invokeAccumulateForces(vec3* d_dst, const vec3* d_src, int n,
-                            cudaStream_t stream);
+                            hapiStream_t stream);
 
 // Leapfrog update, on device, so the particle array is never read back.
 //
@@ -74,11 +74,11 @@ void invokeAccumulateForces(vec3* d_dst, const vec3* d_src, int n,
 // DEFAULT_DELTA * 1e-20 and position by plain DEFAULT_DELTA, because acceleration
 // is in m/s^2 while velocity is in A/fs.
 void invokeIntegrate(Particle* d_p, const vec3* d_f, int n, double dtVel,
-                     double dtPos, double maxVelocity, cudaStream_t stream);
+                     double dtPos, double maxVelocity, hapiStream_t stream);
 
 // Per-block partial kinetic energies; finish with invokeReduceDoubles.
 void invokeKineticEnergy(const Particle* d_p, int n, double* d_partial, int nBlocks,
-                         cudaStream_t stream);
+                         hapiStream_t stream);
 
 // Classify, wrap and compact particles for migration, replacing the host-side sort
 // in Cell::migrateParticles. Stayers land in d_stay, movers in bucket-major order
@@ -88,10 +88,10 @@ void invokeBinParticles(const Particle* d_p, int n, int cellX, int cellY, int ce
                         double cellSizeX, double cellSizeY, double cellSizeZ,
                         int dimX, int dimY, int dimZ, Particle* d_stay,
                         Particle* d_send, int exchCapacity, int* d_counts,
-                        cudaStream_t stream);
+                        hapiStream_t stream);
 
 // Append an arriving bucket to the tail of a Cell's particle array.
 void invokeAppendParticles(Particle* d_dst, int dstOffset, const Particle* d_src,
-                           int n, cudaStream_t stream);
+                           int n, hapiStream_t stream);
 
 #endif

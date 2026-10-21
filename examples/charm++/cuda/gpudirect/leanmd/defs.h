@@ -148,7 +148,7 @@ enum ComputeMapMode { COMPUTEMAP_RR = 0, COMPUTEMAP_LOCAL };
 // vec3 and dot() are used by both the host integrator and the device force kernels,
 // so every method has to be callable from both. Under nvcc that means annotating
 // them; under the host compiler the macro vanishes.
-#ifdef __CUDACC__
+#if defined(__CUDACC__) || defined(__HIPCC__)
 #define LEANMD_HD __host__ __device__
 #else
 #define LEANMD_HD
@@ -239,10 +239,10 @@ inline bool leanmdTagSends() {
   static const bool tag = getenv("LEANMD_SEND_STREAM") != nullptr;
   return tag;
 }
-inline CkDeviceBuffer leanmdSendBuffer(const void* ptr, cudaStream_t s) {
+inline CkDeviceBuffer leanmdSendBuffer(const void* ptr, hapiStream_t s) {
   return leanmdTagSends() ? CkDeviceBuffer(ptr, s) : CkDeviceBuffer(ptr);
 }
-inline CkDeviceBuffer leanmdSendBuffer(const void* ptr, const CkCallback& cb, cudaStream_t s) {
+inline CkDeviceBuffer leanmdSendBuffer(const void* ptr, const CkCallback& cb, hapiStream_t s) {
   return leanmdTagSends() ? CkDeviceBuffer(ptr, cb, s) : CkDeviceBuffer(ptr, cb);
 }
 

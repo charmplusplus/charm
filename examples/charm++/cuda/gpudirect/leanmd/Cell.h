@@ -108,7 +108,7 @@ private:
   int*      d_counts;
   int*      h_counts;      // pinned, inbrs ints, read after binning
   double*   h_energy;      // pinned, one double
-  cudaStream_t stream;
+  hapiStream_t stream;
 
   // -channels. Receiver side: my inbrs force slots (one per compute) and inbrs
   // migrant slots (one per neighbour) as channels. Sender side: the computes'

@@ -41,8 +41,8 @@ class Compute : public CBase_Compute {
     // is by definition not pool-owned on the PE it just arrived at.
     bool poolPos[2], poolForce[2], poolEnergyPartial, poolEnergyScalar;
     double* h_energy;       // pinned
-    cudaStream_t stream;
-    cudaEvent_t lastWork;   // recorded after this Compute's last device work of a step
+    hapiStream_t stream;
+    hapiEvent_t lastWork;   // recorded after this Compute's last device work of a step
     bool lastWorkValid;
 
     // Filled by the post entry method as messages land.

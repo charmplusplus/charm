@@ -26,8 +26,8 @@
 /* readonly */ int async_path;
 /* readonly */ int corrupt_stable;
 
-extern void invokeFillKernel(double*, int, double, cudaStream_t);
-extern void invokeRampKernel(double*, int, double, cudaStream_t);
+extern void invokeFillKernel(double*, int, double, hapiStream_t);
+extern void invokeRampKernel(double*, int, double, hapiStream_t);
 #define STABLE_BASE 7000.0
 
 struct Container {
@@ -38,33 +38,33 @@ struct Container {
   // at the new home): a Stable ramp and the Mutable iteration number.
   double* d_stable;
   double* d_iter;
-  cudaStream_t stream;
+  hapiStream_t stream;
 
   Container() : h_remote_data(nullptr), d_local_data(nullptr), d_remote_data(nullptr),
                 d_stable(nullptr), d_iter(nullptr), stream(nullptr) {}
 
   ~Container() {
-    if (h_remote_data) hapiCheck(cudaFreeHost(h_remote_data));
+    if (h_remote_data) hapiCheck(hapiFreeHost(h_remote_data));
     if (d_local_data) {
       if (CkDevicePoolOn()) { CkDeviceFree(d_local_data); CkDeviceFree(d_remote_data); }
-      else { hapiCheck(cudaFree(d_local_data)); hapiCheck(cudaFree(d_remote_data)); }
+      else { hapiCheck(hapiFreeRaw(d_local_data)); hapiCheck(hapiFreeRaw(d_remote_data)); }
     }
     // Either an allocation of ours or a pointer into the runtime's landing.
     if (d_stable) hapiFreeMigratable(d_stable);
     if (d_iter) hapiFreeMigratable(d_iter);
-    if (stream) hapiCheck(cudaStreamDestroy(stream));
+    if (stream) hapiCheck(hapiStreamDestroy(stream));
   }
 
   void init() {
-    hapiCheck(cudaMallocHost(&h_remote_data, sizeof(double) * block_size));
+    hapiCheck(hapiMallocHost(&h_remote_data, sizeof(double) * block_size));
     if (CkDevicePoolOn()) {
       d_local_data = (double*)CkDeviceMalloc(sizeof(double) * block_size);
       d_remote_data = (double*)CkDeviceMalloc(sizeof(double) * block_size);
     } else {
-      hapiCheck(cudaMalloc(&d_local_data, sizeof(double) * block_size));
-      hapiCheck(cudaMalloc(&d_remote_data, sizeof(double) * block_size));
+      hapiCheck(hapiMallocRaw(&d_local_data, sizeof(double) * block_size));
+      hapiCheck(hapiMallocRaw(&d_remote_data, sizeof(double) * block_size));
     }
-    hapiCheck(cudaStreamCreate(&stream));
+    hapiCheck(hapiStreamCreate(&stream));
   }
 
   // The two pup_buffer_device buffers: allocated at construction only; a
@@ -74,8 +74,8 @@ struct Container {
       d_stable = (double*)CkDeviceMalloc(sizeof(double) * block_size);
       d_iter = (double*)CkDeviceMalloc(sizeof(double) * block_size);
     } else {
-      hapiCheck(cudaMalloc(&d_stable, sizeof(double) * block_size));
-      hapiCheck(cudaMalloc(&d_iter, sizeof(double) * block_size));
+      hapiCheck(hapiMallocRaw(&d_stable, sizeof(double) * block_size));
+      hapiCheck(hapiMallocRaw(&d_iter, sizeof(double) * block_size));
     }
     invokeRampKernel(d_stable, block_size, STABLE_BASE, stream);
     invokeFillKernel(d_iter, block_size, -1.0, stream);
@@ -85,14 +85,14 @@ struct Container {
 
   // What the rebound buffers hold at the new home.
   bool verifyMigratable(int iter, const char*& what, int& bad_index, double& got) {
-    hapiCheck(cudaMemcpyAsync(h_remote_data, d_stable, sizeof(double) * block_size,
-                              cudaMemcpyDeviceToHost, stream));
-    hapiCheck(cudaStreamSynchronize(stream));
+    hapiCheck(hapiMemcpyAsync(h_remote_data, d_stable, sizeof(double) * block_size,
+                              hapiMemcpyDeviceToHost, stream));
+    hapiCheck(hapiStreamSynchronize(stream));
     for (int i = 0; i < block_size; i++)
       if (fabs(h_remote_data[i] - (STABLE_BASE + i)) > ERROR_TOLERANCE) { what = "stable"; bad_index = i; got = h_remote_data[i]; return false; }
-    hapiCheck(cudaMemcpyAsync(h_remote_data, d_iter, sizeof(double) * block_size,
-                              cudaMemcpyDeviceToHost, stream));
-    hapiCheck(cudaStreamSynchronize(stream));
+    hapiCheck(hapiMemcpyAsync(h_remote_data, d_iter, sizeof(double) * block_size,
+                              hapiMemcpyDeviceToHost, stream));
+    hapiCheck(hapiStreamSynchronize(stream));
     for (int i = 0; i < block_size; i++)
       if (fabs(h_remote_data[i] - (double)iter) > ERROR_TOLERANCE) { what = "iter"; bad_index = i; got = h_remote_data[i]; return false; }
     return true;
@@ -103,15 +103,15 @@ struct Container {
   void pup(PUP::er& p) {
     if (p.isUnpacking()) init();
     if (p.isPacking()) {
-      hapiCheck(cudaMemcpyAsync(h_remote_data, d_remote_data, sizeof(double) * block_size,
-                                cudaMemcpyDeviceToHost, stream));
-      hapiCheck(cudaStreamSynchronize(stream));
+      hapiCheck(hapiMemcpyAsync(h_remote_data, d_remote_data, sizeof(double) * block_size,
+                                hapiMemcpyDeviceToHost, stream));
+      hapiCheck(hapiStreamSynchronize(stream));
     }
     PUParray(p, h_remote_data, block_size);
     if (p.isUnpacking()) {
-      hapiCheck(cudaMemcpyAsync(d_remote_data, h_remote_data, sizeof(double) * block_size,
-                                cudaMemcpyHostToDevice, stream));
-      hapiCheck(cudaStreamSynchronize(stream));
+      hapiCheck(hapiMemcpyAsync(d_remote_data, h_remote_data, sizeof(double) * block_size,
+                                hapiMemcpyHostToDevice, stream));
+      hapiCheck(hapiStreamSynchronize(stream));
     }
     // The device copies (pack, or the decision-time snapshot) wait for this
     // stream's work on these buffers.
@@ -123,9 +123,9 @@ struct Container {
   void fill(double val) { invokeFillKernel(d_local_data, block_size, val, stream); }
 
   bool verify(double val, int& bad_index, double& got) {
-    hapiCheck(cudaMemcpyAsync(h_remote_data, d_remote_data, sizeof(double) * block_size,
-                              cudaMemcpyDeviceToHost, stream));
-    hapiCheck(cudaStreamSynchronize(stream));
+    hapiCheck(hapiMemcpyAsync(h_remote_data, d_remote_data, sizeof(double) * block_size,
+                              hapiMemcpyDeviceToHost, stream));
+    hapiCheck(hapiStreamSynchronize(stream));
     for (int i = 0; i < block_size; i++) {
       if (fabs(h_remote_data[i] - val) > ERROR_TOLERANCE) { bad_index = i; got = h_remote_data[i]; return false; }
     }
@@ -278,7 +278,7 @@ public:
       // After the decision's snapshot has been taken (its copies run on the
       // runtime's stream: let them finish so the rewrite is seen only by the
       // pack), before the pack.
-      hapiCheck(cudaDeviceSynchronize());
+      hapiCheck(hapiDeviceSynchronize());
       container.corruptStable();
     }
   }

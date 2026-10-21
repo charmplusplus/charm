@@ -159,10 +159,10 @@ void Cell::allocateDevice() {
   hapiCheck(hapiMallocHost((void**)&h_counts, sizeof(int) * inbrs));
   hapiCheck(hapiMallocHost((void**)&h_energy, sizeof(double)));
 
-  hapiCheck(cudaMemcpyAsync(d_particles, &particles[0],
+  hapiCheck(hapiMemcpyAsync(d_particles, &particles[0],
                             sizeof(Particle) * myNumParts,
-                            cudaMemcpyHostToDevice, stream));
-  hapiCheck(cudaStreamSynchronize(stream));
+                            hapiMemcpyHostToDevice, stream));
+  hapiCheck(hapiStreamSynchronize(stream));
   // The device array is the live state from here on.
   particles.clear();
   particles.shrink_to_fit();
@@ -351,8 +351,8 @@ void Cell::computeKineticEnergy() {
   invokeKineticEnergy(d_particles, myNumParts, d_kePartial, nb, stream);
   invokeReduceDoubles(d_kePartial, nb, d_energy, stream);
   {
-    double* const h = h_energy; double* const d = d_energy; const cudaStream_t st = stream;
-    hapiSubmit(st, [=]() { hapiCheck(cudaMemcpyAsync(h, d, sizeof(double), cudaMemcpyDeviceToHost, st)); });
+    double* const h = h_energy; double* const d = d_energy; const hapiStream_t st = stream;
+    hapiSubmit(st, [=]() { hapiCheck(hapiMemcpyAsync(h, d, sizeof(double), hapiMemcpyDeviceToHost, st)); });
   }
 }
 
@@ -378,16 +378,16 @@ void Cell::integrate() {
 // counts come back to the host.
 void Cell::binParticles() {
   {
-    int* const dc = d_counts; const size_t nb = sizeof(int) * inbrs; const cudaStream_t st = stream;
-    hapiSubmit(st, [=]() { hapiCheck(cudaMemsetAsync(dc, 0, nb, st)); });
+    int* const dc = d_counts; const size_t nb = sizeof(int) * inbrs; const hapiStream_t st = stream;
+    hapiSubmit(st, [=]() { hapiCheck(hapiMemsetAsync(dc, 0, nb, st)); });
   }
   invokeBinParticles(d_particles, myNumParts, thisIndex.x, thisIndex.y, thisIndex.z,
                      CELL_SIZE_X, CELL_SIZE_Y, CELL_SIZE_Z,
                      cellArrayDimX, cellArrayDimY, cellArrayDimZ,
                      d_stay, d_send_parts, exch_capacity, d_counts, stream);
   {
-    int* const hc = h_counts; int* const dc = d_counts; const size_t nb = sizeof(int) * inbrs; const cudaStream_t st = stream;
-    hapiSubmit(st, [=]() { hapiCheck(cudaMemcpyAsync(hc, dc, nb, cudaMemcpyDeviceToHost, st)); });
+    int* const hc = h_counts; int* const dc = d_counts; const size_t nb = sizeof(int) * inbrs; const hapiStream_t st = stream;
+    hapiSubmit(st, [=]() { hapiCheck(hapiMemcpyAsync(hc, dc, nb, hapiMemcpyDeviceToHost, st)); });
   }
   CkCallback* cb = new CkCallback(CkIndex_Cell::binDone(), thisProxy[thisIndex]);
   hapiAddCallback(stream, cb);

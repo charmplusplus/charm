@@ -33,19 +33,19 @@
 /* readonly */ bool verbose;
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
-    int block_height, int block_depth, cudaStream_t stream);
+    int block_height, int block_depth, hapiStream_t stream);
 extern void invokeGhostInitKernels(const std::vector<DataType*>& ghosts,
-    const std::vector<int>& ghost_counts, cudaStream_t stream);
+    const std::vector<int>& ghost_counts, hapiStream_t stream);
 extern void invokeBoundaryKernels(DataType* d_temperature, int block_width,
-    int block_height, int block_depth, bool bounds[], cudaStream_t stream);
+    int block_height, int block_depth, bool bounds[], hapiStream_t stream);
 extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
-    int block_width, int block_height, int block_depth, cudaStream_t stream);
+    int block_width, int block_height, int block_depth, hapiStream_t stream);
 extern void invokePackingKernels(DataType* d_temperature, DataType* d_ghosts[],
     bool bounds[], int block_width, int block_height, int block_depth,
-    cudaStream_t stream);
+    hapiStream_t stream);
 extern void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost,
     int dir, int block_width, int block_height, int block_depth,
-    cudaStream_t stream);
+    hapiStream_t stream);
 
 // The source callback of a send: re-issued to the block as sendDone(iter) with
 // the iteration as the message's reference number, which the SDAG `when`
@@ -273,18 +273,18 @@ class Block : public CBase_Block {
   DataType* sendBuf(int p, int dir) { return p ? d_send_ghosts_b[dir] : d_send_ghosts[dir]; }
   DataType* recvBuf(int p, int dir) { return p ? d_recv_ghosts_b[dir] : d_recv_ghosts[dir]; }
 
-  cudaStream_t compute_stream;
-  cudaStream_t comm_stream;
+  hapiStream_t compute_stream;
+  hapiStream_t comm_stream;
 
-  cudaEvent_t compute_event;
-  cudaEvent_t comm_event;
+  hapiEvent_t compute_event;
+  hapiEvent_t comm_event;
 
   bool bounds[DIR_COUNT];
 
   Block() {}
 
   ~Block() {
-    hapiCheck(cudaFreeHost(h_temperature));
+    hapiCheck(hapiFreeHost(h_temperature));
     hapiCheck(hapiFree(d_temperature));
     hapiCheck(hapiFree(d_new_temperature));
     if (use_zerocopy || use_persistent || use_channels) {
@@ -296,16 +296,16 @@ class Block : public CBase_Block {
       }
     } else {
       for (int i = 0; i < DIR_COUNT; i++) {
-        hapiCheck(cudaFreeHost(h_ghosts[i]));
+        hapiCheck(hapiFreeHost(h_ghosts[i]));
         hapiCheck(hapiFree(d_ghosts[i]));
       }
     }
 
-    hapiCheck(cudaStreamDestroy(compute_stream));
-    hapiCheck(cudaStreamDestroy(comm_stream));
+    hapiCheck(hapiStreamDestroy(compute_stream));
+    hapiCheck(hapiStreamDestroy(comm_stream));
 
-    hapiCheck(cudaEventDestroy(compute_event));
-    hapiCheck(cudaEventDestroy(comm_event));
+    hapiCheck(hapiEventDestroy(compute_event));
+    hapiCheck(hapiEventDestroy(comm_event));
   }
 
   void init() {
@@ -335,7 +335,7 @@ class Block : public CBase_Block {
     // Allocate memory and create CUDA entities. Device buffers come from the
     // runtime's pool (+gpupool): one registration and one IPC export for the
     // whole arena, instead of one per buffer on first use.
-    hapiCheck(cudaMallocHost((void**)&h_temperature,
+    hapiCheck(hapiMallocHost((void**)&h_temperature,
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
     hapiCheck(hapiMalloc((void**)&d_temperature,
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
@@ -355,17 +355,17 @@ class Block : public CBase_Block {
       }
     } else {
       for (int i = 0; i < DIR_COUNT; i++) {
-        hapiCheck(cudaMallocHost((void**)&h_ghosts[i], ghost_sizes[i]));
+        hapiCheck(hapiMallocHost((void**)&h_ghosts[i], ghost_sizes[i]));
         hapiCheck(hapiMalloc((void**)&d_ghosts[i], ghost_sizes[i]));
       }
     }
 
     // Create CUDA streams and events
-    hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
-    hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
+    hapiCheck(hapiStreamCreateWithPriority(&compute_stream, hapiStreamDefault, 0));
+    hapiCheck(hapiStreamCreateWithPriority(&comm_stream, hapiStreamDefault, -1));
 
-    hapiCheck(cudaEventCreateWithFlags(&compute_event, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&comm_event, cudaEventDisableTiming));
+    hapiCheck(hapiEventCreateWithFlags(&compute_event, hapiEventDisableTiming));
+    hapiCheck(hapiEventCreateWithFlags(&comm_event, hapiEventDisableTiming));
 
     // Create persistent buffers
     if (use_persistent) {
@@ -459,7 +459,7 @@ class Block : public CBase_Block {
         bounds, compute_stream);
 
 #if CUDA_SYNC
-    cudaStreamSynchronize(compute_stream);
+    hapiStreamSynchronize(compute_stream);
     thisProxy[thisIndex].initDone();
 #else
     // TODO: Support reduction callback in hapiAddCallback
@@ -488,8 +488,8 @@ class Block : public CBase_Block {
         y_surf_size, z_surf_size, z_surf_size};
       for (int i = 0; i < DIR_COUNT; i++) {
         if (!bounds[i]) {
-          hapiCheck(cudaMemcpyAsync(h_ghosts[i], d_ghosts[i], ghost_sizes[i],
-                cudaMemcpyDeviceToHost, comm_stream));
+          hapiCheck(hapiMemcpyAsync(h_ghosts[i], d_ghosts[i], ghost_sizes[i],
+                hapiMemcpyDeviceToHost, comm_stream));
         }
       }
     }
@@ -498,7 +498,7 @@ class Block : public CBase_Block {
       thisProxy[thisIndex].packGhostsDone();
     } else {
 #if CUDA_SYNC
-      cudaStreamSynchronize(comm_stream);
+      hapiStreamSynchronize(comm_stream);
       thisProxy[thisIndex].packGhostsDone();
 #else
       // Add asynchronous callback to be invoked when packing kernels and
@@ -647,8 +647,8 @@ class Block : public CBase_Block {
     d_ghost = d_ghosts[dir];
 
     memcpy(h_ghost, gh, size * sizeof(DataType));
-    hapiCheck(cudaMemcpyAsync(d_ghost, h_ghost, size * sizeof(DataType),
-          cudaMemcpyHostToDevice, comm_stream));
+    hapiCheck(hapiMemcpyAsync(d_ghost, h_ghost, size * sizeof(DataType),
+          hapiMemcpyHostToDevice, comm_stream));
     invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
         block_depth, comm_stream);
   }
@@ -656,8 +656,8 @@ class Block : public CBase_Block {
   void update() {
     // Operations in compute stream should only be executed when
     // operations in communication stream (transfers and unpacking) complete
-    hapiCheck(cudaEventRecord(comm_event, comm_stream));
-    hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
+    hapiCheck(hapiEventRecord(comm_event, comm_stream));
+    hapiCheck(hapiStreamWaitEvent(compute_stream, comm_event, 0));
 
     // Invoke GPU kernel for Jacobi computation
     invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
@@ -679,7 +679,7 @@ class Block : public CBase_Block {
         // Correctness: the interior summed on the host (the end only; the
         // cost is not timed).
         const size_t n = (size_t)(block_width+2) * (block_height+2) * (block_depth+2);
-        hapiCheck(cudaMemcpy(h_temperature, d_temperature, sizeof(DataType) * n, cudaMemcpyDeviceToHost));
+        hapiCheck(hapiMemcpy(h_temperature, d_temperature, sizeof(DataType) * n, hapiMemcpyDeviceToHost));
         double sum = 0.0;
         for (int k = 1; k <= block_depth; k++)
           for (int j = 1; j <= block_height; j++)
@@ -691,10 +691,10 @@ class Block : public CBase_Block {
   }
 
   void print() {
-    hapiCheck(cudaMemcpyAsync(h_temperature, d_temperature,
+    hapiCheck(hapiMemcpyAsync(h_temperature, d_temperature,
           sizeof(DataType) * (block_width+2)*(block_height+2)*(block_depth+2),
-          cudaMemcpyDeviceToHost, comm_stream));
-    cudaStreamSynchronize(comm_stream);
+          hapiMemcpyDeviceToHost, comm_stream));
+    hapiStreamSynchronize(comm_stream);
 
     CkPrintf("[%d,%d,%d]\n", x, y, z);
     for (int k = 0; k < block_depth+2; k++) {
