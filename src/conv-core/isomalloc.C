@@ -20,7 +20,11 @@ added by Ryan Mokos in July 2008 (no longer present, see mem-arena.C).
 Substantially rewritten by Evan Ramos in 2019.
  *************************************************************************/
 
-#include "converse.h"
+/* Angle brackets, not quotes: this file sits next to the classic converse.h,
+   and under Reconverse the converse.h that must win is the one on the include
+   path, not the sibling. */
+#include <converse.h>
+#include "conv-autoconfig.h"   /* CMK_RECONVERSE */
 #include "memory-isomalloc.h"
 #include "pup.h"
 #include "pup_stl.h"
@@ -696,6 +700,32 @@ struct CmiAddressSpaceRegionMsg
   CmiAddressSpaceRegion region;
 };
 
+#if CMK_RECONVERSE
+/* Reconverse's node reduction carries whole messages and hands the root's
+   copy to that message's handler, where classic Converse reduced a pupped
+   struct and called a completion function. Same intersection, different
+   plumbing. */
+static void * CmiAddressSpaceRegionMergeMsg(int * size, void * data,
+                                            void ** contributions, int count)
+{
+  auto local = &((CmiAddressSpaceRegionMsg *)data)->region;
+
+  for (int i = 0; i < count; ++i)
+  {
+    auto remote = &((CmiAddressSpaceRegionMsg *)contributions[i])->region;
+
+    if (remote->s > local->s)
+      local->s = remote->s;
+    if (remote->e < local->e)
+      local->e = remote->e;
+
+    CmiFree(contributions[i]);
+  }
+
+  return data;
+}
+#endif
+
 static std::atomic<bool> CmiIsomallocSyncHandlerDone{};
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
 extern void CommunicationServerThread(int sleepTime);
@@ -731,6 +761,18 @@ static void CmiIsomallocSyncReductionHandler(void * data)
 
   CmiIsomallocSyncHandlerDone = true;
 }
+#if CMK_RECONVERSE
+/* Root of the Reconverse node reduction: the message that arrives holds the
+   intersection of every node's usable range. */
+static void CmiIsomallocSyncReductionHandlerMsg(void * msg)
+{
+  IsoRegion = ((CmiAddressSpaceRegionMsg *)msg)->region;
+  CmiFree(msg);
+
+  CmiIsomallocSyncHandlerDone = true;
+}
+static int CmiIsomallocSyncReduceHandlerIdx;
+#endif
 static void CmiIsomallocSyncBroadcastHandler(void * msg)
 {
   const CmiAddressSpaceRegion region = ((CmiAddressSpaceRegionMsg *)msg)->region;
@@ -811,6 +853,9 @@ static void CmiIsomallocInitExtent(char ** argv)
 
   auto nosync = CmiGetArgFlagDesc(argv, "+no_isomalloc_sync", "disable global synchronization of isomalloc region");
   CmiAssignOnce(&CmiIsomallocSyncBroadcastHandlerIdx, CmiRegisterHandler(CmiIsomallocSyncBroadcastHandler));
+#if CMK_RECONVERSE
+  CmiAssignOnce(&CmiIsomallocSyncReduceHandlerIdx, CmiRegisterHandler(CmiIsomallocSyncReductionHandlerMsg));
+#endif
 
 #if __FAULT__
   if (CmiIsomallocRestart)
@@ -869,8 +914,18 @@ static void CmiIsomallocInitExtent(char ** argv)
       SYNC_DBG("Isomalloc> Node %d sending region for comparison: %" PRIx64 " %" PRIx64 "\n",
                CmiMyNode(), IsoRegion.s, IsoRegion.e);
 
+#if CMK_RECONVERSE
+      {
+        auto * red = (CmiAddressSpaceRegionMsg *)CmiAlloc(sizeof(CmiAddressSpaceRegionMsg));
+        CmiInitMsgHeader(red->converseHeader, sizeof(CmiAddressSpaceRegionMsg));
+        red->region = IsoRegion;
+        CmiSetHandler((char *)red, CmiIsomallocSyncReduceHandlerIdx);
+        CmiNodeReduce(red, sizeof(CmiAddressSpaceRegionMsg), CmiAddressSpaceRegionMergeMsg);
+      }
+#else
       CmiNodeReduceStruct(&IsoRegion, CmiAddressSpaceRegionPup, CmiAddressSpaceRegionMerge,
                           CmiIsomallocSyncReductionHandler, nullptr);
+#endif
 
       CmiIsomallocSyncWait(CmiIsomallocSyncHandlerDone);
 
@@ -2507,8 +2562,26 @@ int CmiIsomallocInRange(void * addr)
 extern int num_workpes, total_pes;
 #endif
 
+#if CMK_RECONVERSE
+/* Whether the kernel randomizes this process's address space, as read once at
+   initialization. Isomalloc itself is unaffected -- it negotiates its region --
+   but migrating a user-level thread is not, so the answer is published for the
+   thread layer to consult (isomalloc-reconverse.C). */
+static int CmiIsomallocAslr = 0;
+
+int CmiIsomallocAddressSpaceIsRandomized(void)
+{
+  return CmiIsomallocAslr;
+}
+#endif
+
 void CmiIsomallocInit(char ** argv)
 {
+#if CMK_RECONVERSE
+  if (CmiMyRank() == 0)
+    CmiIsomallocAslr = (read_randomflag() == 1);
+#endif
+
 #if CMK_CONVERSE_MPI && (CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING)
   if (num_workpes != total_pes)
   {

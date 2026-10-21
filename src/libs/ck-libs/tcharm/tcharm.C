@@ -106,11 +106,6 @@ void TCharm::procInit()
   // called on every pe to eat these arguments
   char **argv=CkGetArgv();
   tcharm_nomig=CmiGetArgFlagDesc(argv,"+tcharm_nomig","Disable migration support (debugging)");
-#if CMK_RECONVERSE
-  // Reconverse has no migratable threads or isomalloc: TCharm threads are
-  // plain CthCreate threads, so the non-migratable mode is the only mode.
-  tcharm_nomig=true;
-#endif
   tcharm_nothreads=CmiGetArgFlagDesc(argv,"+tcharm_nothread","Disable thread support (debugging)");
   tcharm_nothreads=(CmiGetArgFlagDesc(argv,"+tcharm_nothreads",NULL)) ? true : tcharm_nothreads;
   char *traceLibName=NULL;
@@ -139,9 +134,7 @@ void TCharm::procInit()
     CmiGetArgIntDesc(argv, "+vp", &ignored, nullptr);
   }
   if (CkMyPe()==0) { // Echo various debugging options:
-#if !CMK_RECONVERSE
     if (tcharm_nomig) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
-#endif
     if (tcharm_nothreads) CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
   }
   if (!CkpvAccess(mapCreated)) {
@@ -269,11 +262,7 @@ void TCharm::pup(PUP::er &p) {
   if (!p.isSizing() && !isStopped && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
 	CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
   }	
-#if CMK_RECONVERSE
-  if (!p.isSizing()) CkAbort("TCharm threads cannot migrate or be checkpointed on reconverse.\n");
-#else
   if (tcharm_nomig && !p.isSizing()) CkAbort("Cannot migrate with the +tcharm_nomig option!\n");
-#endif
 #endif
 
   //This seekBlock allows us to reorder the packing/unpacking--

@@ -1077,12 +1077,13 @@ endforeach()
 configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 
 
-# TCharm. On reconverse, TCharm threads do not migrate: libmoduletcharm also
-# carries the stubs for the Converse migration API that reconverse lacks
-# (src/libs/ck-libs/tcharm/reconverse-compat), and TCharm runs as with
-# +tcharm_nomig. The directory lives under tcharm, not src/conv-core: the
-# legacy buildold header step flattens every file under src/conv-core into
-# include/, and its conv-config.h would replace the classic one.
+# TCharm. On reconverse, libmoduletcharm also carries the stubs for the few
+# classic Converse functions reconverse lacks
+# (src/libs/ck-libs/tcharm/reconverse-compat); migratable threads come from
+# reconverse and isomalloc from libisomalloc (cmake/converse.cmake). The
+# directory lives under tcharm, not src/conv-core: the legacy buildold header
+# step flattens every file under src/conv-core into include/, and its
+# conv-config.h would replace the classic one.
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
 set(tcharm-h-sources
     src/libs/ck-libs/tcharm/tcharm.h

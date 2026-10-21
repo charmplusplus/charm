@@ -296,10 +296,44 @@ if(RECONVERSE)
       src/util/topomanager
       ${CMAKE_BINARY_DIR}/include)
 
+  # Isomalloc. Reconverse has migratable user-level threads but no way to
+  # give one a stack at an address every process agrees on, which is what
+  # migration needs; that is Isomalloc's job. It cannot live inside
+  # Reconverse because serializing a context is written against PUP, which
+  # belongs to this layer -- so it is built here and registered with
+  # Reconverse's thread layer through the CthIsomallocOps table (see
+  # isomalloc-reconverse.C). charmc links it into every program.
+  add_library(isomalloc STATIC
+      src/conv-core/isomalloc.C
+      src/conv-core/isomalloc-reconverse.C
+      src/conv-core/memory-isomalloc.h)
+  # Only the build include directory: adding src/conv-core or src/util would
+  # put the classic converse.h ahead of reconverse's.
+  target_include_directories(isomalloc PRIVATE ${CMAKE_BINARY_DIR}/include)
+  add_dependencies(isomalloc reconverse charm_cxx_utils)
+
+  # Memory modules. These define malloc/free and friends for the whole
+  # program, so they are linked only into programs that ask for one (charmc
+  # -memory isomalloc, which ampicc passes); otherwise the system allocator
+  # is left alone. Only the Isomalloc mode is built: it is the one AMPI needs,
+  # so that a rank's heap allocations land in its own migratable context.
+  add_library(memory-os-isomalloc STATIC src/conv-core/memory.C)
+  target_compile_definitions(memory-os-isomalloc PRIVATE
+      -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_ISOMALLOC)
+  target_include_directories(memory-os-isomalloc PRIVATE ${CMAKE_BINARY_DIR}/include)
+  add_dependencies(memory-os-isomalloc reconverse isomalloc)
+
+  # The wrapper resolves the real allocator through dlsym(RTLD_NEXT), so that
+  # a module that intercepts malloc still has something to fall back to.
+  add_library(memory-os-wrapper STATIC src/conv-core/memory-os-wrapper.C)
+  target_include_directories(memory-os-wrapper PRIVATE ${CMAKE_BINARY_DIR}/include)
+  add_dependencies(memory-os-wrapper reconverse)
+
   # ccs-client (the library a CCS client program links) is reconverse's
   # target; it lands in lib/ with the other archives.
   add_custom_target(converse)
-  add_dependencies(converse reconverse topomanager charm_cxx_utils ccs-client)
+  add_dependencies(converse reconverse topomanager charm_cxx_utils ccs-client
+      isomalloc memory-os-isomalloc memory-os-wrapper)
 else()
   # Classic builds: the converse library, exactly as mainline builds it.
   add_library(converse
@@ -364,8 +398,8 @@ if(RECONVERSE)
     # conv-autoconfig.h. memory-isomalloc.h and cmitls.h include it.
     list(REMOVE_ITEM conv-core-h-to-install src/conv-core/conv-config.h)
     list(APPEND conv-core-h-to-install src/libs/ck-libs/tcharm/reconverse-compat/conv-config.h)
-    # Classic Converse thread-migration API that reconverse lacks; TCharm and
-    # AMPI include it, and libmoduletcharm carries the definitions
+    # The few classic Converse declarations TCharm and AMPI use that
+    # reconverse lacks; libmoduletcharm carries the definitions
     # (src/libs/ck-libs/tcharm/reconverse-compat/reconverse-compat.C).
     list(APPEND conv-core-h-to-install src/libs/ck-libs/tcharm/reconverse-compat/reconverse-compat.h)
 endif()
