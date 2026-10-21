@@ -976,6 +976,19 @@ static void CmiIsomallocInitExtent(char ** argv)
 
         CsdSchedulePoll();
 
+#if CMK_RECONVERSE
+        /* Every program on reconverse initializes Isomalloc, and most never
+           create a migratable thread, so a job whose processes have no free
+           range in common (seen on macOS, where ASLR moves the heap and
+           libraries) runs with Isomalloc disabled rather than aborting. Every
+           node received this empty range above and leaves Isomalloc off. */
+        if (IsoRegion.s >= IsoRegion.e)
+          CmiPrintf("Isomalloc> Disabled: the processes have no free address range in "
+                    "common (%" PRIx64 " - %" PRIx64 "), so threads will not migrate.\n",
+                    IsoRegion.s, IsoRegion.e);
+        else if (CmiMyPe() == 0)
+          CmiPrintf("Isomalloc> Synchronized global address space.\n");
+#else
         if (IsoRegion.s >= IsoRegion.e)
           CmiAbort("Isomalloc> failed to find consolidated region: %" PRIx64 " - %" PRIx64 ".\n"
                    "Try running with +no_isomalloc_sync if you do not need this functionality.\n",
@@ -983,6 +996,7 @@ static void CmiIsomallocInitExtent(char ** argv)
 
         if (CmiMyPe() == 0)
           CmiPrintf("Isomalloc> Synchronized global address space.\n");
+#endif
 
         SYNC_DBG("Charm++> Consolidated Isomalloc memory region: %p - %p (%" PRId64 " MB).\n",
                  (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
