@@ -2605,6 +2605,10 @@ void CmiIsomallocContextEnableRandomAccess(CmiIsomallocContext ctx)
 void CmiIsomallocContextJustMigrated(CmiIsomallocContext ctx)
 {
   auto pool = (Mempool *)ctx.opaque;
+  /* A thread created without a context -- +tcharm_nomig, or a build with
+     Isomalloc disabled -- has nothing to restore. */
+  if (pool == nullptr)
+    return;
   pool->backend.JustMigrated();
 }
 

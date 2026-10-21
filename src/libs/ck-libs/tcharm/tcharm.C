@@ -408,6 +408,15 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrateTo(int destPE) noexcept {
 }
 void TCharm::ckJustMigrated() {
 	ArrayElement::ckJustMigrated();
+	// Arrival is the point at which the thread's Isomalloc context needs its
+	// page protections put back: unpacking maps the region read-write, so a
+	// context holding executable pages -- which is every rank under
+	// pieglobals, whose code segment lives in the context -- comes back
+	// non-executable, and the first instruction the resumed thread runs
+	// faults. Doing it here rather than in ResumeFromSync covers the
+	// asynchronous path too (TCHARM_Migrate_to / AMPI_Migrate_to_pe resume
+	// from right below, never passing through the sync barrier).
+	CmiIsomallocContextJustMigrated(CmiIsomallocGetThreadContext(getThread()));
     if (asyncMigrate) {
         asyncMigrate = false;
         resume();
@@ -416,6 +425,9 @@ void TCharm::ckJustMigrated() {
 
 void TCharm::ckJustRestored() {
 	ArrayElement::ckJustRestored();
+	// Restored from an in-memory checkpoint: the context was unpacked again,
+	// so its page protections need the same replay as on migration arrival.
+	CmiIsomallocContextJustMigrated(CmiIsomallocGetThreadContext(getThread()));
 }
 
 // If a Tcharm object is about to migrate it should be suspended first
@@ -531,9 +543,8 @@ void TCharm::ResumeFromSync()
 {
   DBG("thread resuming from sync");
 
-  CthThread th = getThread();
-  auto ctx = CmiIsomallocGetThreadContext(th);
-  CmiIsomallocContextJustMigrated(ctx);
+  // Page protections are restored on arrival (ckJustMigrated, ckJustRestored),
+  // which covers both the synchronous and asynchronous migration paths.
 
   if (resumeAfterMigrationCallback.isInvalid())
     start();
