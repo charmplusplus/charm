@@ -2450,7 +2450,7 @@ void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
 MPI_Comm ampi::commCreate(const std::vector<int>& vec, AmpiCommType type) noexcept {
   int rootIdx = vec[0];
   tmpVec = vec;
-  CkCallback cb(CkReductionTarget(ampi, commCreatePhase1), CkArrayIndex1D(rootIdx), myComm->getProxy());
+  CkCallback cb(CkIndex_ampi::commCreateReduced(NULL), CkArrayIndex1D(rootIdx), myComm->getProxy());
   int data[2] = { parent->getNextComm(), (int)type };
   contribute(sizeof(data), data, CkReduction::max_int, cb);
 
@@ -2468,6 +2468,13 @@ void ampi::insertNewChildAmpiElements(MPI_Comm nextComm, CProxy_ampi newAmpi, Am
     newAmpi[tmpVec[i]].insert(parentProxy, newCommStruct);
   }
   newAmpi.doneInserting(); // will call ampi::registrationFinish
+}
+
+void ampi::commCreateReduced(CkReductionMsg *msg) noexcept {
+  const int *data = (const int *)msg->getData();
+  const int nextComm = data[0], commType = data[1];
+  delete msg;
+  commCreatePhase1(nextComm, commType);
 }
 
 void ampi::commCreatePhase1(int nextComm, int commType) noexcept {
@@ -2523,11 +2530,17 @@ MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root
   if (thisIndex==root) { // not everybody gets the valid rvec
     tmpVec = remoteVec;
   }
-  CkCallback cb(CkReductionTarget(ampi, intercommCreatePhase1),CkArrayIndex1D(root),myComm->getProxy());
+  CkCallback cb(CkIndex_ampi::intercommCreateReduced(NULL),CkArrayIndex1D(root),myComm->getProxy());
   MPI_Comm nextinter = parent->getNextComm();
   contribute(sizeof(nextinter), &nextinter,CkReduction::max_int,cb);
   ampi * dis = block(); //Resumed by ampi::setRemoteProxyAndUnblock
   return dis->parent->getNextComm() - 1;
+}
+
+void ampi::intercommCreateReduced(CkReductionMsg *msg) noexcept {
+  const MPI_Comm nextInterComm = *(const MPI_Comm *)msg->getData();
+  delete msg;
+  intercommCreatePhase1(nextInterComm);
 }
 
 void ampi::intercommCreatePhase1(MPI_Comm nextInterComm) noexcept {
@@ -2558,13 +2571,19 @@ void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid 
   }
 
   int rootIdx=myComm->getIndexForRank(0);
-  CkCallback cb(CkReductionTarget(ampi, intercommMergePhase1),CkArrayIndex1D(rootIdx),myComm->getProxy());
+  CkCallback cb(CkIndex_ampi::intercommMergeReduced(NULL),CkArrayIndex1D(rootIdx),myComm->getProxy());
   MPI_Comm nextintra = parent->getNextComm();
   contribute(sizeof(nextintra), &nextintra,CkReduction::max_int,cb);
 
   ampi * dis = block(); //Resumed by ampi::registrationFinish
   MPI_Comm newcomm = dis->parent->getNextComm()-1;
   *ncomm=newcomm;
+}
+
+void ampi::intercommMergeReduced(CkReductionMsg *msg) noexcept {
+  const MPI_Comm nextIntraComm = *(const MPI_Comm *)msg->getData();
+  delete msg;
+  intercommMergePhase1(nextIntraComm);
 }
 
 void ampi::intercommMergePhase1(MPI_Comm nextIntraComm) noexcept {

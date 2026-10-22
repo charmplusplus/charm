@@ -2726,6 +2726,14 @@ class ampi final : public CBase_ampi {
 
   void splitPhase1(CkReductionMsg *msg) noexcept;
   void splitPhaseInter(CkReductionMsg *msg) noexcept;
+  // The reduction targets of communicator creation are threaded entry methods
+  // taking a CkReductionMsg, not [threaded,reductiontarget] entries: charmxi's
+  // reductiontarget wrapper calls the method directly, so it ran unthreaded
+  // and blocked the scheduler in createNewChildAmpiSync's future (which also
+  // trips CkCallstackPop's "object tracking mismatch" assertion).
+  void commCreateReduced(CkReductionMsg *msg) noexcept;
+  void intercommCreateReduced(CkReductionMsg *msg) noexcept;
+  void intercommMergeReduced(CkReductionMsg *msg) noexcept;
   void commCreatePhase1(int nextComm, int commType) noexcept;
   void registrationFinish() noexcept;
   void intercommCreatePhase1(MPI_Comm nextInterComm) noexcept;

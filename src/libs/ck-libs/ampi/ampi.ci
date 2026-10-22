@@ -8,7 +8,6 @@
 #define EXPEDITED_NOKEEP        [expedited,nokeep]
 #define EXPEDITED_REDN          [expedited,reductiontarget]
 #define EXPEDITED_THREADED      [expedited,threaded]
-#define EXPEDITED_THREADED_REDN [expedited,threaded,reductiontarget]
 #define EXPEDITED_SYNC          [expedited,sync]
 #define EXPEDITED_IGET          [expedited,iget]
 #else
@@ -17,7 +16,6 @@
 #define EXPEDITED_NOKEEP        [nokeep]
 #define EXPEDITED_REDN          [reductiontarget]
 #define EXPEDITED_THREADED      [threaded]
-#define EXPEDITED_THREADED_REDN [threaded,reductiontarget]
 #define EXPEDITED_IGET          [iget]
 #define EXPEDITED_SYNC          [sync]
 #endif
@@ -65,10 +63,10 @@ module ampi {
     entry EXPEDITED_NOKEEP void irednResult(CkReductionMsg *msg);
     entry EXPEDITED_THREADED void splitPhase1(CkReductionMsg *msg);
     entry EXPEDITED_THREADED void splitPhaseInter(CkReductionMsg *msg);
-    entry EXPEDITED_THREADED_REDN void commCreatePhase1(int nextComm, int commType);
+    entry EXPEDITED_THREADED void commCreateReduced(CkReductionMsg *msg);
     entry EXPEDITED void registrationFinish();
-    entry EXPEDITED_THREADED_REDN void intercommCreatePhase1(MPI_Comm nextInterComm);
-    entry EXPEDITED_THREADED_REDN void intercommMergePhase1(MPI_Comm nextIntraComm);
+    entry EXPEDITED_THREADED void intercommCreateReduced(CkReductionMsg *msg);
+    entry EXPEDITED_THREADED void intercommMergeReduced(CkReductionMsg *msg);
     entry EXPEDITED_THREADED void intercommMergeRemoteReady(MPI_Comm nextIntraComm);
     entry EXPEDITED void exchangeProxyForSplitLocal(int, CProxy_ampi);
     entry EXPEDITED void exchangeProxyForSplitRemote(int, CProxy_ampi);
