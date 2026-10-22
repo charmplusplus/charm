@@ -973,6 +973,13 @@ static void getAmpiBinaryPath() noexcept
 
 static void ampiNodeInit() noexcept
 {
+  /* Make this idempotent: on some reconverse paths the initnode calls can run
+     a second time, and the one-shot work below must not repeat (the
+     AMPI_threadstart_idx assertion would fire and a second AmpiReducer would
+     be registered, so PEs could disagree about reducer indices). */
+  if (ampi_nodeinit_has_been_called)
+    return;
+
   getAmpiBinaryPath();
 
 #if CMK_TRACE_ENABLED
