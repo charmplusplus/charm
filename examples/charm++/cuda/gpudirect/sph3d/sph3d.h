@@ -58,7 +58,7 @@ struct Particle {
 #define NUM_COUNTERS 28
 #define ERR_COUNTER 27
 
-#ifdef __CUDACC__
+#if defined(__CUDACC__) || defined(__HIPCC__)
 #define SPH_HD __host__ __device__
 #else
 #define SPH_HD

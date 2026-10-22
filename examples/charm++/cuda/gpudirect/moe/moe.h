@@ -1,7 +1,7 @@
 #ifndef __CUDA_GPUDIRECT_MOE_H_
 #define __CUDA_GPUDIRECT_MOE_H_
 
-#include <cuda_runtime.h>
+#include "hapi_portable.h"   // the vendor table: cuda_runtime.h or hip_runtime.h
 #include <cstddef>
 #include <cstdint>
 
@@ -10,8 +10,8 @@
 // runs), and the activation scratch the chunked expert step needs. An expert
 // computes on lane (index mod n_lanes) of whatever PE it is on.
 struct MoeGpu {
-  cudaStream_t stream;
-  void* blas;             // cublasHandle_t, opaque to the Charm++ side
+  hapiStream_t stream;
+  void* blas;             // the BLAS handle (hapi_blas.h), opaque to the Charm++ side
   float* h;               // [chunk x d_ff]   relu(x W1) for the current chunk
   float* dh;              // [chunk x d_ff]   dL/dh, overwritten by dL/dz
   float* dW1;             // [d_model x d_ff] gradient accumulators, Adam only
@@ -66,11 +66,11 @@ struct MoeCtx {
 int  moeBlasCreate(MoeGpu* g, bool tf32);      // 0 on success
 void moeBlasDestroy(MoeGpu* g);
 void moeInitUniform(float* p, size_t n, uint64_t seed, float bound,
-    cudaStream_t s);
+    hapiStream_t s);
 void moeGather(const float* x, const int* idx, float* out, int n_slots,
-    int dm, cudaStream_t s);
+    int dm, hapiStream_t s);
 void moeCombine(const float* recv, const int* pos, float* y, int n_tok,
-    int k, int dm, float w, cudaStream_t s);
+    int k, int dm, float w, hapiStream_t s);
 void moeZeroGrad(MoeGpu* g, int dm, int dff);
 // One source segment of an expert's step: forward, the self-similar backward,
 // and either the fused SGD update of W1/W2 or accumulation into dW1/dW2.
@@ -80,6 +80,6 @@ void moeAdamApply(MoeGpu* g, float* W1, float* m1, float* v1, float* W2,
     float* m2, float* v2, int dm, int dff, float lr, int t);
 // *d_out += sum(p[i]^2), in double, in a fixed order.
 void moeSumSqAdd(const float* p, size_t n, MoeGpu* g, double* d_out,
-    cudaStream_t s);
+    hapiStream_t s);
 
 #endif // __CUDA_GPUDIRECT_MOE_H_

@@ -18,6 +18,6 @@ RL=$D/ranklogs/$TAG; rm -rf $RL; mkdir -p $RL $D/logs; LOG=$D/logs/$TAG.log
 C="-x $GRID -c $((PES*NP)) -i $ITERS -w $WARM $MF +pe $((PES*NP)) +setcpuaffinity +gpushm +gpuipceventpool 256 +gpupool +gpupoolsize $POOL +gpupoolalloc vmm"
 SRUN="srun --jobid=$JID --overlap --mpi=cray_shasta -N $NODES -n $NP --ntasks-per-node=$PPN --gpus-per-node=$GPUS --cpus-per-task=$((64/PPN)) --cpu-bind=none --exact --kill-on-bad-exit=1"
 echo "[run_j3d] $(date +%T) tag=$TAG mode=${MODE:-zc} grid=$GRID blocks=$((PES*NP)) args: $C" | tee $LOG
-env PES=$PES GPP=$GPP RANKLOG_DIR=$RL timeout ${TMO:-300} $SRUN --chdir=$D stdbuf -oL -eL $W $D/jacobi3d $C "$@" >> $LOG 2>&1
+env PES=$PES GPP=$GPP RANKLOG_DIR=$RL timeout ${TMO:-300} $SRUN --chdir=$D stdbuf -oL -eL $W $D/${BIN:-jacobi3d} $C "$@" >> $LOG 2>&1
 rc=$?; echo "[run_j3d] rc=$rc $(date +%T)" >> $LOG
 exit $rc

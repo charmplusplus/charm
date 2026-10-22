@@ -2,7 +2,7 @@
 # run_lmd.sh <jobid> <tag> [extra leanmd args]: one leanmd run on an allocation with the process/GPU/PE split knobs of
 # sph3d's run3d.sh. Env: NODES (2), PPN (processes per node, 4), GPP (GPUs per process, GPUS/PPN), PES (PEs per process,
 # 8*GPP), LCIDEV=1 (+lci_ndevices GPP), LB=none|sync|async, GRID ("16 8 8"), STEPS (100), PERIOD (20), LAG (16), POOL (MB
-# per arena, 16384), POOL_ALLOC (vmm|buddy), TMO (s, 600), LBDEBUG (1), LMD_EXTRA (extra LB flags), CHANNELS=1 (-channels), BIN (binary in this dir, default leanmd). PPN=1 GPP=4 PES=32 is
+# per arena, 16384), POOL_ALLOC (vmm|buddy), TMO (s, 600), LBDEBUG (1), LMD_EXTRA (extra LB flags), CHANNELS=1 (-channels), BIN (binary in this dir, default leanmd), WRAP (pinning wrapper, default numa_wrap_lmd.sh; numa_wrap_lmd_nsys.sh traces rank LMD_NSYS_RANK into LMD_NSYS_DIR). PPN=1 GPP=4 PES=32 is
 # one process driving all four GPUs with 8 PEs each; PPN=4 GPP=1 PES=8 is the control. Rank logs: ranklogs/<tag>/.
 D=/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect/leanmd
 JID=$1; TAG=$2; shift 2
@@ -30,6 +30,6 @@ C="$GRID $STEPS $PERIOD $PERIOD -computemap local -density gradient +pe $((PES*N
 [ "${POOL_ALLOC:-buddy}" = vmm ] && C="$C +gpupoolalloc vmm"
 SRUN="srun --jobid=$JID --overlap --mpi=cray_shasta -N $NODES -n $NP --ntasks-per-node=$PPN --gpus-per-node=$GPUS --cpus-per-task=$((64/PPN)) --cpu-bind=none --exact --kill-on-bad-exit=1"
 echo "[run_lmd] $(date +%T) tag=$TAG nodes=$NODES np=$NP split=P${PPN}xG${GPP}xK$((PES/GPP)) pes/proc=$PES pool=$POOL alloc=${POOL_ALLOC:-buddy} LB=${LB:-none} args: $C $LBARGS $* $GPUMAP" | tee $LOG
-env PES=$PES GPP=$GPP RANKLOG_DIR=$RL timeout ${TMO:-600} $SRUN --chdir=$D stdbuf -oL -eL $D/numa_wrap_lmd.sh $D/${BIN:-leanmd} $C $LBARGS "$@" $GPUMAP >> $LOG 2>&1
+env PES=$PES GPP=$GPP RANKLOG_DIR=$RL timeout ${TMO:-600} $SRUN --chdir=$D stdbuf -oL -eL ${WRAP:-$D/numa_wrap_lmd.sh} $D/${BIN:-leanmd} $C $LBARGS "$@" $GPUMAP >> $LOG 2>&1
 rc=$?; echo "[run_lmd] rc=$rc $(date +%T)" >> $LOG
 exit $rc
