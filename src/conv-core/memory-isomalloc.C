@@ -64,13 +64,9 @@ static bool meta_active()
     && CpvAccess(isomalloc_state).context.opaque
     && !CpvAccess(isomalloc_state).disabled
 #if CMK_HAS_TLS_VARIABLES
-#if CMK_RECONVERSE
     /* Reconverse has no TLS-swapping thread flavor to make an exception for,
        so the pthread test stands on its own. */
     && isomalloc_thread
-#else
-    && (isomalloc_thread || CmiThreadIs(CMI_THREAD_IS_TLS))
-#endif
 #endif
     ;
 }

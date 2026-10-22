@@ -22,7 +22,6 @@ inside threads.C and isomalloc.C already.
 #include "converse.h"
 #include "conv-autoconfig.h"
 
-#if CMK_RECONVERSE
 
 #include "memory-isomalloc.h"
 #include "pup.h"
@@ -203,4 +202,3 @@ CmiIsomallocContext CmiIsomallocGetThreadContext(CthThread th)
   return CthGetIsomallocContext(th);
 }
 
-#endif /* CMK_RECONVERSE */
