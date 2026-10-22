@@ -148,9 +148,7 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
    * (D2D) completion from a host one, so a host-side buffer must carry a
    * definite null there rather than whatever was on the stack. */
   void clearDeviceRdmaOpInfo() {
-#if CMK_RECONVERSE
     deviceRdmaOpInfo = nullptr;
-#endif
   }
 
   CkNcpyBuffer() : CmiNcpyBuffer() { clearDeviceRdmaOpInfo(); }

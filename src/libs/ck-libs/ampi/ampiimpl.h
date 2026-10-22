@@ -2803,9 +2803,7 @@ class ampi final : public CBase_ampi {
                                  int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi arrProxy,
                                  MPI_Request reqIdx) noexcept;
   inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx, ampi* destPtr) const noexcept {
-#if CMK_MULTICORE
-    return true;
-#elif CMK_SMP
+#if CMK_SMP
     if (destPtr != NULL) return true;
     CkArray* localBranch = arrProxy.ckLocalBranch();
     int destPe = localBranch->lastKnown(CkArrayIndex1D(destIdx));
