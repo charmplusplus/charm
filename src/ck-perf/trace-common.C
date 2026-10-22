@@ -352,9 +352,6 @@ void TraceArray::traceEndOnCommThread() {
 #endif
 }
 
-#if CMK_MULTICORE
-extern int Cmi_commthread;
-#endif
 
 /*Install the beginIdle/endIdle condition handlers.*/
 void traceBegin(void) {
@@ -363,9 +360,6 @@ void traceBegin(void) {
   
 #if CMK_SMP_TRACE_COMMTHREAD
   //the first core of this node controls the condition of comm thread
-#if CMK_MULTICORE
-  if (Cmi_commthread)
-#endif
   if(CmiMyRank()==0){
 	if(CpvAccessOther(traceOn, CmiMyNodeSize())!=1){
 		CkpvAccessOther(_traces, CmiMyNodeSize())->traceBeginOnCommThread();		
@@ -386,9 +380,6 @@ void traceEnd(void) {
 
 #if CMK_SMP_TRACE_COMMTHREAD
 //the first core of this node controls the condition of comm thread
-#if CMK_MULTICORE
-  if (Cmi_commthread)
-#endif
   if(CmiMyRank()==0){
 	if(CkpvAccessOther(traceOn, CmiMyNodeSize())!=0){
 		CkpvAccessOther(_traces, CmiMyNodeSize())->traceEndOnCommThread();
@@ -409,9 +400,6 @@ void traceEnd(void) {
 
 void traceBeginComm(void) {
 #if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
-#if CMK_MULTICORE
-  if (Cmi_commthread)
-#endif
     if (CmiMyRank() == 0) {
       if (CkpvAccessOther(traceOn, CmiMyNodeSize()) != 1) {
         CkpvAccessOther(_traces, CmiMyNodeSize())->traceBeginOnCommThread();
@@ -423,9 +411,6 @@ void traceBeginComm(void) {
 
 void traceEndComm(void) {
 #if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
-#if CMK_MULTICORE
-  if (Cmi_commthread)
-#endif
     if (CmiMyRank() == 0) {
       if (CkpvAccessOther(traceOn, CmiMyNodeSize()) != 0) {
         CkpvAccessOther(_traces, CmiMyNodeSize())->traceEndOnCommThread();

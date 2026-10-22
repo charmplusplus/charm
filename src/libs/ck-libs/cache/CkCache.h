@@ -564,9 +564,6 @@ inline void CkCacheManager<CkCacheKey>::recvData(CkCacheKey key, void *data, CkC
       }
       
 #if COSMO_STATS > 0 || defined(CKCACHE_STATS)
-#if !CMK_RECONVERSE
-      CmiResetMaxMemory();     // not provided by reconverse
-#endif
 #endif
     }
 

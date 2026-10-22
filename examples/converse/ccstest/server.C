@@ -20,6 +20,7 @@ void user_main(int argc, char **argv)
   int i;
   CcsRegisterHandler("ping2", (CmiHandler)handler);
   CcsRegisterHandler("ping", (CmiHandler)handler);
+  CcsSetMergeFn("ping", CcsMerge_concat);
   CmiPrintf("CCS Handlers registered.  Waiting for net requests...\n");
 }
 

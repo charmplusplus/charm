@@ -1821,9 +1821,10 @@ class AmpiMsg final : public CMessage_AmpiMsg {
 
  public:
   AmpiMsg() noexcept : data(NULL) {}
-  AmpiMsg(int sreq, int t, int sRank, int l, MPI_Comm c) noexcept :
-    ssendReq(sreq), tag(t), srcRank(sRank), length(l), origLength(l), comm(c)
-  { /* only called from AmpiMsg::pup() since the refnum (seq) will get pup'ed by the runtime */ }
+  // There is deliberately no (sreq, tag, srcRank, len, comm) constructor: with
+  // a plain int 0 as the first argument it was an exact match and won over
+  // this one, shifting every field (tag became -1, so MPI_Ibarrier never
+  // completed with more than one rank). pup() uses this constructor too.
   AmpiMsg(CMK_REFNUM_TYPE seq, int sreq, int t, int sRank, int l) noexcept :
     ssendReq(sreq), tag(t), srcRank(sRank), length(l), origLength(l)
   { CkSetRefNum(this, seq); }
@@ -2829,9 +2830,7 @@ class ampi final : public CBase_ampi {
                                  int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi arrProxy,
                                  MPI_Request reqIdx) noexcept;
   inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx, ampi* destPtr) const noexcept {
-#if CMK_MULTICORE
-    return true;
-#elif CMK_SMP
+#if CMK_SMP
     if (destPtr != NULL) return true;
     CkArray* localBranch = arrProxy.ckLocalBranch();
     int destPe = localBranch->lastKnown(CkArrayIndex1D(destIdx));

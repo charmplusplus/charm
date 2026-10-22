@@ -1359,7 +1359,7 @@ void _initCharm(int unused_argc, char **argv)
     }
   });
 
-#if CMK_RECONVERSE && CMK_CCS_AVAILABLE
+#if CMK_CCS_AVAILABLE
 	// CCS itself is initialized by reconverse's ConverseInit on every PE.
 	// Charm++'s builtin CCS handlers (the CpdList introspection in
 	// src/conv-ccs/ccs-builtins.C) register here, where classic Converse's
@@ -1522,7 +1522,7 @@ void _initCharm(int unused_argc, char **argv)
  * the destination PE, so the handler exists to bounce it to the right one.
  * Reconverse-only -- classic ucx also sets CMK_GPU_COMM (see
  * arch/ucx/conv-common.h) but declares no loopback bridge. */
-#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM && CMK_RECONVERSE
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
   loopback_handler = CmiRegisterHandler((CmiHandler) loopback_bridge);
   device_dereg_handler = CmiRegisterHandler((CmiHandler) device_dereg_bridge);
   device_ack_handler = CmiRegisterHandler((CmiHandler) device_ack_bridge);
@@ -1702,7 +1702,7 @@ void _initCharm(int unused_argc, char **argv)
             int *pelist;
             int num;
             CmiGetPesOnPhysicalNode(0, &pelist, &num);
-#if !CMK_MULTICORE && !CMK_SMP_NO_COMMTHD
+#if !CMK_SMP_NO_COMMTHD
             // Count communication threads, if present
             // XXX: Assuming uniformity of node size here
             num += num/CmiMyNodeSize();
@@ -1892,13 +1892,11 @@ void _initCharm(int unused_argc, char **argv)
  *    thread stack. */
 void _registerConverseInitHooks()
 {
-#if CMK_TRACE_ENABLED && CMK_RECONVERSE
+#if CMK_TRACE_ENABLED
   registerTraceInit(traceInit);
 #endif
-#if CMK_RECONVERSE
   extern void CmiIsomallocHookIntoReconverse(void);
   CmiIsomallocHookIntoReconverse();
-#endif
 }
 
 int charm_main(int argc, char **argv)
