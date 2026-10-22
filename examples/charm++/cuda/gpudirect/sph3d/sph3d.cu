@@ -23,6 +23,16 @@ static inline void sphSubmitMemcpy(void* dst, const void* src, size_t n, cudaMem
 }
 
 #define BLOCK_1D 128
+#ifdef SPH_RANGE_LOOP
+// -DSPH_RANGE_LOOP: the body of packHaloKernel and layoutKernel inside the grid-stride loop Kokkos's RangePolicy wraps
+// around a functor (one iteration per thread, as there), to measure that wrapper alone.
+#define SPH_RANGE_BEGIN(n) const int sph_stride_ = blockDim.x * gridDim.x; \
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; i < (n); i = i < (n) - sph_stride_ ? i + sph_stride_ : (n)) {
+#define SPH_RANGE_END }
+#else
+#define SPH_RANGE_BEGIN(n) const int i = blockIdx.x * blockDim.x + threadIdx.x; if (i >= (n)) return; {
+#define SPH_RANGE_END }
+#endif
 static inline int nblocks(int n) { return (n + BLOCK_1D - 1) / BLOCK_1D; }
 
 // ---------------------------------------------------------------- kernel ----
@@ -89,12 +99,13 @@ __global__ void cellScatterKernel(const int* cell_of, int n, int* cursor,
 __global__ void layoutKernel(const Particle* __restrict__ parts,
     const int* __restrict__ cell_parts, int n, float4* __restrict__ pos4,
     float4* __restrict__ vel4, unsigned char* __restrict__ type8) {
-  const int k = blockIdx.x * blockDim.x + threadIdx.x;
-  if (k >= n) return;
+  SPH_RANGE_BEGIN(n)
+  const int k = i;
   const Particle p = parts[cell_parts[k]];
   pos4[k] = make_float4(p.x, p.y, p.z, p.rho);
   vel4[k] = make_float4(p.vx, p.vy, p.vz, p.p);
   type8[k] = (unsigned char)p.type;
+  SPH_RANGE_END
 }
 
 // Gather particles in cell order: dst[k] = src[cell_parts[k]]. Run on the
@@ -674,16 +685,14 @@ __global__ void packHaloKernel(const Particle* parts, int n_local,
     RealType x0, RealType y0, RealType z0, RealType x1, RealType y1, RealType z1,
     RealType support, Particle** bufs, int** idx, int* counts, int cap_face,
     int valid_mask) {
-  const int i = blockIdx.x * blockDim.x + threadIdx.x;
-  if (i >= n_local) return;
+  SPH_RANGE_BEGIN(n_local)
   const Particle p = parts[i];
   // near[axis][0] = near the low face, near[axis][1] = near the high face
   const bool nx0 = (p.x - x0) < support, nx1 = (x1 - p.x) < support;
   const bool ny0 = (p.y - y0) < support, ny1 = (y1 - p.y) < support;
   const bool nz0 = (p.z - z0) < support, nz1 = (z1 - p.z) < support;
   // Interior particles -- most of them -- go to nobody.
-  if (!(nx0 | nx1 | ny0 | ny1 | nz0 | nz1)) return;
-
+  if (nx0 | nx1 | ny0 | ny1 | nz0 | nz1)
   for (int d = 0; d < NUM_DIRS; d++) {
     // Only directions with a partner: a tank wall is three layers thick and
     // sits right at the face towards the outside, and counting it for a
@@ -698,6 +707,7 @@ __global__ void packHaloKernel(const Particle* parts, int n_local,
     if (slot < dirCap(d, cap_face)) { bufs[d][slot] = p; idx[d][slot] = i; }
     else atomicAdd(&counts[ERR_COUNTER], 1);
   }
+  SPH_RANGE_END
 }
 
 // Re-send the particles the rebuild chose, in the same order: one thread per

@@ -36,6 +36,22 @@
 #define POW_TEN_POS (1.0e10)
 
 #define BLOCK_THREADS 256
+// -DLMD_BLOCK_Y: the force kernel's threads along y (block (1,256,1)), as Kokkos's team kernels launch, to see whether
+// the block shape alone moves the step. The kernel body uses LMD_TID / LMD_BDIM for its thread index and block size.
+#ifdef LMD_BLOCK_Y
+#define LMD_TID threadIdx.y
+#define LMD_BDIM blockDim.y
+#define LMD_FORCE_BLOCK dim3(1, BLOCK_THREADS, 1)
+#else
+#define LMD_TID threadIdx.x
+#define LMD_BDIM blockDim.x
+#define LMD_FORCE_BLOCK BLOCK_THREADS
+#endif
+#ifdef LMD_DYN_SHMEM
+#define LMD_FORCE_SHMEM (4 * BLOCK_THREADS * sizeof(double) + 2064)
+#else
+#define LMD_FORCE_SHMEM 0
+#endif
 
 // Accumulate the force on one atom of A from every atom of B.
 //
@@ -160,10 +176,27 @@ __global__ void pairForceBothKernel(const vec3* A, int nA, const vec3* B, int nB
   const int blk = blockIdx.x;
   if (blk >= nA + nB) return;
 
+#ifdef LMD_DYN_SHMEM
+  // -DLMD_DYN_SHMEM: the four reduction arrays in dynamic shared memory, launched with the Kokkos team kernel's
+  // 8192 + 2064 bytes, to see whether dynamic shared memory alone moves the step.
+  extern __shared__ double lmd_dyn[];
+  double* sx = lmd_dyn;
+  double* sy = lmd_dyn + BLOCK_THREADS;
+  double* sz = lmd_dyn + 2 * BLOCK_THREADS;
+  double* se = lmd_dyn + 3 * BLOCK_THREADS;
+#else
   __shared__ double sx[BLOCK_THREADS];
   __shared__ double sy[BLOCK_THREADS];
   __shared__ double sz[BLOCK_THREADS];
   __shared__ double se[BLOCK_THREADS];
+#endif
+#ifdef LMD_SHMEM_PAD
+  // -DLMD_SHMEM_PAD=bytes: unused extra shared memory, to give this kernel the shared-memory footprint of its Kokkos
+  // TeamPolicy form (8192 + 2064 bytes of team-reduce reserve) and see whether the footprint alone moves the step.
+  __shared__ double pad[LMD_SHMEM_PAD / 8];
+  if (nA < 0) pad[LMD_TID] = 0.0;   // never true; keeps the array
+  if (nA < 0 && LMD_TID == 0) forceA[0].x = pad[1];
+#endif
 
   const bool onA = blk < nA;
   const int i = onA ? blk : blk - nA;
@@ -179,7 +212,7 @@ __global__ void pairForceBothKernel(const vec3* A, int nA, const vec3* B, int nB
 
   double fx = 0.0, fy = 0.0, fz = 0.0, en = 0.0;
 
-  for (int j = threadIdx.x; j < nOther; j += blockDim.x)
+  for (int j = LMD_TID; j < nOther; j += LMD_BDIM)
   {
     const vec3 pos_j = other[j];
 
@@ -206,25 +239,25 @@ __global__ void pairForceBothKernel(const vec3* A, int nA, const vec3* B, int nB
     }
   }
 
-  sx[threadIdx.x] = fx;
-  sy[threadIdx.x] = fy;
-  sz[threadIdx.x] = fz;
-  se[threadIdx.x] = en;
+  sx[LMD_TID] = fx;
+  sy[LMD_TID] = fy;
+  sz[LMD_TID] = fz;
+  se[LMD_TID] = en;
   __syncthreads();
 
-  for (int s = blockDim.x / 2; s > 0; s >>= 1)
+  for (int s = LMD_BDIM / 2; s > 0; s >>= 1)
   {
-    if (threadIdx.x < s)
+    if (LMD_TID < s)
     {
-      sx[threadIdx.x] += sx[threadIdx.x + s];
-      sy[threadIdx.x] += sy[threadIdx.x + s];
-      sz[threadIdx.x] += sz[threadIdx.x + s];
-      se[threadIdx.x] += se[threadIdx.x + s];
+      sx[LMD_TID] += sx[LMD_TID + s];
+      sy[LMD_TID] += sy[LMD_TID + s];
+      sz[LMD_TID] += sz[LMD_TID + s];
+      se[LMD_TID] += se[LMD_TID + s];
     }
     __syncthreads();
   }
 
-  if (threadIdx.x == 0)
+  if (LMD_TID == 0)
   {
     vec3* out = onA ? forceA : forceB;
     out[i].x = sx[0];
@@ -472,9 +505,33 @@ __global__ void appendParticlesKernel(Particle* __restrict__ dst, int dstOffset,
 // submitter's queue. Declared here rather than by including hapi.h, which this
 // nvcc translation unit otherwise does not need.
 void hapiSubmitClosure(hapiStream_t stream, void (*fn)(void*), const void* state, size_t bytes);
+#ifdef LMD_LAUNCH_TIMING
+// -DLMD_LAUNCH_TIMING: host wall time spent inside the launch closures, summed over the process's threads and reported
+// at exit; the same instrumentation sits in leanmd_kokkos.cpp so the two kernel files' launch paths can be compared.
+#include <atomic>
+#include <chrono>
+#include <cstdlib>
+static std::atomic<unsigned long long> lmd_launch_ns{0}, lmd_launch_n{0};
+static void lmdLaunchReport() {
+  unsigned long long ns = lmd_launch_ns.load(), n = lmd_launch_n.load();
+  std::fprintf(stderr, "[launch-timing] launches=%llu host_total_ms=%.1f mean_us=%.2f\n", n, ns / 1e6, n ? ns / 1e3 / n : 0.0);
+}
+template <class F> static inline void submitLaunch(hapiStream_t stream, F f) {
+  static bool registered = (std::atexit(lmdLaunchReport), true); (void)registered;
+  const auto t0 = std::chrono::steady_clock::now();
+#ifdef LMD_SETDEVICE
+  // Kokkos calls cudaSetDevice before every launch; this measures that call's cost on the hand-written path.
+  { int dev = 0; hapiGetDevice(&dev); hapiSetDevice(dev); }
+#endif
+  hapiSubmitClosure(stream, [](void* p) { (*(F*)p)(); }, &f, sizeof(F));
+  lmd_launch_ns.fetch_add(std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - t0).count(), std::memory_order_relaxed);
+  lmd_launch_n.fetch_add(1, std::memory_order_relaxed);
+}
+#else
 template <class F> static inline void submitLaunch(hapiStream_t stream, F f) {
   hapiSubmitClosure(stream, [](void* p) { (*(F*)p)(); }, &f, sizeof(F));
 }
+#endif
 
 void invokePairForce(const vec3* d_A, int nA, const vec3* d_B, int nB,
                      vec3* d_forceA, vec3 shift, double cutoffSq, bool selfInteract,
@@ -496,7 +553,7 @@ void invokePairForceBoth(const vec3* d_A, int nA, const vec3* d_B, int nB,
 {
   if (nA <= 0 || nB <= 0) return;
   submitLaunch(stream, [=]() {
-    pairForceBothKernel<<<nA + nB, BLOCK_THREADS, 0, stream>>>(
+    pairForceBothKernel<<<nA + nB, LMD_FORCE_BLOCK, LMD_FORCE_SHMEM, stream>>>(
         d_A, nA, d_B, nB, d_forceA, d_forceB, shiftB, cutoffSq, d_energyPartial);
   });
 }
