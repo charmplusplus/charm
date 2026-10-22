@@ -2357,6 +2357,13 @@ void ampi::registrationFinish() noexcept
 {
   CkAssert(numCommCreationsInProgress > 0);
   if (--numCommCreationsInProgress == 0) {
+    if (exchangeProxyOnFinish) {
+      // MPI_Intercomm_create: the ranks are resumed by
+      // ampi::setRemoteProxyAndUnblock once both groups' arrays exist.
+      exchangeProxyOnFinish = false;
+      parentProxy[0].ExchangeProxy(newInterProxy);
+      return;
+    }
     thisProxy.unblock(); //Matches suspends at end of ampi::commCreate, split, etc.
     if (unblockRemoteOnFinish) {
       // MPI_Intercomm_merge: the other group of the intercommunicator is a
@@ -2519,13 +2526,15 @@ MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root
   CkCallback cb(CkReductionTarget(ampi, intercommCreatePhase1),CkArrayIndex1D(root),myComm->getProxy());
   MPI_Comm nextinter = parent->getNextComm();
   contribute(sizeof(nextinter), &nextinter,CkReduction::max_int,cb);
-  ampi * dis = block(); //Resumed by ampi::registrationFinish
+  ampi * dis = block(); //Resumed by ampi::setRemoteProxyAndUnblock
   return dis->parent->getNextComm() - 1;
 }
 
 void ampi::intercommCreatePhase1(MPI_Comm nextInterComm) noexcept {
   setNumCommCreationsInProgress(1);
   CProxy_ampi newAmpi = createNewChildAmpiSync();
+  exchangeProxyOnFinish = true;
+  newInterProxy = newAmpi;
   const std::vector<int>& lgroup = myComm->getIndices();
   const ampiCommStruct newCommstruct = ampiCommStruct(nextInterComm,newAmpi,lgroup,tmpVec);
   for(int i=0;i<lgroup.size();i++){
@@ -2533,8 +2542,6 @@ void ampi::intercommCreatePhase1(MPI_Comm nextInterComm) noexcept {
     newAmpi[newIdx].insert(parentProxy,newCommstruct);
   }
   newAmpi.doneInserting(); // will call ampi::registrationFinish
-
-  parentProxy[0].ExchangeProxy(newAmpi);
 }
 
 void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid only at local root

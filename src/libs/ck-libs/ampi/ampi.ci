@@ -74,6 +74,7 @@ module ampi {
     entry EXPEDITED void exchangeProxyForSplitRemote(int, CProxy_ampi);
 
     entry EXPEDITED void setRemoteProxy(CProxy_ampi rproxy);
+    entry EXPEDITED void setRemoteProxyAndUnblock(CProxy_ampi rproxy);
     entry EXPEDITED_SYNC void winRemotePut(int orgtotalsize, char orgaddr[orgtotalsize], int orgcnt,
                                            MPI_Datatype orgtype, MPI_Aint targdisp, int targcnt,
                                            MPI_Datatype targtype, int winIndex);

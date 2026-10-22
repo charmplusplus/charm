@@ -2343,7 +2343,13 @@ class ampiParent final : public CBase_ampiParent {
   // exchange proxy info between two ampi proxies
   void ExchangeProxy(CProxy_ampi rproxy) noexcept {
     if(!isTmpRProxySet){ tmpRProxy=rproxy; isTmpRProxySet=true; }
-    else{ tmpRProxy.setRemoteProxy(rproxy); rproxy.setRemoteProxy(tmpRProxy); isTmpRProxySet=false; }
+    else{
+      // Both groups' new intercommunicator arrays are fully registered:
+      // give each its remote proxy, and only then resume its ranks.
+      tmpRProxy.setRemoteProxyAndUnblock(rproxy);
+      rproxy.setRemoteProxyAndUnblock(tmpRProxy);
+      isTmpRProxySet=false;
+    }
   }
 
   //Grab the next available split/group communicator
@@ -2668,6 +2674,11 @@ class ampi final : public CBase_ampi {
   bool unblockRemoteOnFinish{};
   void intercommMergeGroupArrived(MPI_Comm nextIntraComm) noexcept;
 
+  // Intercommunicator creation: the new array's proxy, sent to ampiParent 0
+  // for the proxy exchange once all of its elements are registered.
+  bool exchangeProxyOnFinish{};
+  CProxy_ampi newInterProxy;
+
   // Intercommunicator splitting:
   std::unordered_map<int, CProxy_ampi> splitRProxyMap;
 
@@ -2892,6 +2903,8 @@ class ampi final : public CBase_ampi {
   inline const CProxy_ampi &getProxy() const noexcept {return thisProxy;}
   inline const CProxy_ampi &getRemoteProxy() const noexcept {return remoteProxy;}
   inline void setRemoteProxy(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; }
+  // Matches the block() in ampi::intercommCreate
+  inline void setRemoteProxyAndUnblock(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; thread->resume(); }
   inline int getIndexForRank(int r) const noexcept {return myComm->getIndexForRank(r);}
   inline int getIndexForRemoteRank(int r) const noexcept {return myComm->getIndexForRemoteRank(r);}
   void findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const noexcept;
