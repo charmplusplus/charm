@@ -145,7 +145,7 @@ void TCharm::procInit()
     CmiGetArgIntDesc(argv, "+vp", &ignored, nullptr);
   }
   if (CkMyPe()==0) { // Echo various debugging options:
-    if (tcharm_nomig) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
+    if (tcharm_nomig && !tcharm_campi) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
     if (tcharm_campi) CmiPrintf("TCHARM> campi: ranks run as C++20 coroutines (no threads, no migration)\n");
     else if (tcharm_nothreads) CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
   }
