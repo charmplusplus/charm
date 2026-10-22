@@ -456,7 +456,7 @@ class Main : public CBase_Main {
 
 class Calib : public CBase_Calib {
   char *d_local = nullptr, *d_remote = nullptr;
-  cudaStream_t stream;
+  hapiStream_t stream;
   bool allocated = false, streamCreated = false;
   CkDeviceBuffer sendBuf;
   int peer = -1;
@@ -479,13 +479,13 @@ class Calib : public CBase_Calib {
 
   void init() {
     if (!allocated) {
-      hapiCheck(cudaMalloc(&d_local, max_size));
-      hapiCheck(cudaMalloc(&d_remote, max_size));
-      hapiCheck(cudaMemset(d_local, 'a', max_size));
-      hapiCheck(cudaMemset(d_remote, 'b', max_size));
+      hapiCheck(hapiMalloc(&d_local, max_size));
+      hapiCheck(hapiMalloc(&d_remote, max_size));
+      hapiCheck(hapiMemset(d_local, 'a', max_size));
+      hapiCheck(hapiMemset(d_remote, 'b', max_size));
       allocated = true;
     }
-    if (!streamCreated) { cudaStreamCreate(&stream); streamCreated = true; }
+    if (!streamCreated) { hapiStreamCreate(&stream); streamCreated = true; }
     sendBuf = CkDeviceBuffer(d_local);
     contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
   }
@@ -547,7 +547,7 @@ class Mover : public CBase_Mover {
       if (CkDevicePoolOn()) { dev = (char*)CkDeviceMalloc(d); devFromPool = true; }
       else hapiCheck(hapiMalloc((void**)&dev, d));
       if (dev == nullptr) CkAbort("lbcalib: could not allocate %zu device bytes for a mover\n", d);
-      hapiCheck(cudaMemset(dev, 'y', d));
+      hapiCheck(hapiMemset(dev, 'y', d));
     }
     main_proxy.moverReady();
   }

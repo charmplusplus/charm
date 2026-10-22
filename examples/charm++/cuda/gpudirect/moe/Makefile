@@ -10,9 +10,17 @@ CHARM_INC = -I$(CHARM_DIR)/include
 CUDA_DIR := $(shell sed -n 's/^CUDA_DIR="\(.*\)"/\1/p' $(CHARM_DIR)/include/conv-mach-opt.sh)
 MATHLIBS ?= $(subst /cuda/,/math_libs/,$(CUDA_DIR))
 
+# The device compiler and BLAS follow the build the runtime was made with (conv-mach-opt.mak), as leanmd's.
+-include $(CHARM_DIR)/include/conv-mach-opt.mak
+ifeq ($(BUILD_HIP),1)
+NVCC = hipcc
+NVCC_FLAGS = -x hip -c -std=c++17 -ffast-math $(OPTS) $(patsubst %,--offload-arch=%,$(subst ;, ,$(HIP_ARCHS)))
+LD_LIBS = -module EveryLB -module DiffusionLB -L$(ROCM_PATH)/lib -lhipblas -Wl,-rpath,$(ROCM_PATH)/lib
+else
 NVCC = nvcc
 NVCC_FLAGS = -c -std=c++17 -use_fast_math -gencode arch=compute_86,code=sm_86 $(OPTS) -I$(MATHLIBS)/include
 LD_LIBS = -module EveryLB -module DiffusionLB -L$(MATHLIBS)/lib64 -lcublas -Wl,-rpath,$(MATHLIBS)/lib64
+endif
 
 TARGET = moe
 all: $(TARGET)

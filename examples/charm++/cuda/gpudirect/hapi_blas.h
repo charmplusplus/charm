@@ -17,6 +17,7 @@
 #include <hipblas/hipblas.h>
 typedef hipblasHandle_t hapiBlasHandle_t;
 typedef hipblasStatus_t hapiBlasStatus_t;
+#define hapiBlasStatusSuccess HIPBLAS_STATUS_SUCCESS
 typedef hipblasOperation_t hapiBlasOperation_t;
 #define HAPI_BLAS_STATUS_SUCCESS HIPBLAS_STATUS_SUCCESS
 #define HAPI_BLAS_OP_N HIPBLAS_OP_N
@@ -41,6 +42,7 @@ static inline hapiBlasStatus_t hapiBlasSetMathModeTf32(hapiBlasHandle_t, bool) {
 #include <cublas_v2.h>
 typedef cublasHandle_t hapiBlasHandle_t;
 typedef cublasStatus_t hapiBlasStatus_t;
+#define hapiBlasStatusSuccess CUBLAS_STATUS_SUCCESS
 typedef cublasOperation_t hapiBlasOperation_t;
 #define HAPI_BLAS_STATUS_SUCCESS CUBLAS_STATUS_SUCCESS
 #define HAPI_BLAS_OP_N CUBLAS_OP_N

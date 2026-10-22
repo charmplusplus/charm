@@ -1,14 +1,14 @@
 #include "hapi.h"
 #include "moe.h"
-#include <cublas_v2.h>
+#include "../hapi_blas.h"
 #include <cstdio>
 #include <cstdlib>
 
 #define BLOCK_1D 256
 
 #define cublasCheck(x) do { \
-    cublasStatus_t st_ = (x); \
-    if (st_ != CUBLAS_STATUS_SUCCESS) { \
+    hapiBlasStatus_t st_ = (x); \
+    if (st_ != hapiBlasStatusSuccess) { \
       fprintf(stderr, "cuBLAS error %d at %s:%d\n", (int)st_, __FILE__, \
               __LINE__); \
       abort(); \
@@ -25,21 +25,20 @@ static inline int nblocks(size_t n) {
 // ---- cuBLAS ----
 
 int moeBlasCreate(MoeGpu* g, bool tf32) {
-  cublasHandle_t h;
-  if (cublasCreate(&h) != CUBLAS_STATUS_SUCCESS) return 1;
-  cublasCheck(cublasSetStream(h, g->stream));
+  hapiBlasHandle_t h;
+  if (hapiBlasCreate(&h) != hapiBlasStatusSuccess) return 1;
+  cublasCheck(hapiBlasSetStream(h, g->stream));
   // A fixed workspace: cuBLAS picks its algorithm from the workspace it has,
   // and the checksum comparison across placements needs every run of a given
   // shape to make the same choice.
-  cublasCheck(cublasSetWorkspace(h, g->workspace, g->workspace_bytes));
-  cublasCheck(cublasSetMathMode(h,
-      tf32 ? CUBLAS_TF32_TENSOR_OP_MATH : CUBLAS_DEFAULT_MATH));
+  cublasCheck(hapiBlasSetWorkspace(h, g->workspace, g->workspace_bytes));
+  cublasCheck(hapiBlasSetMathModeTf32(h, tf32));
   g->blas = (void*)h;
   return 0;
 }
 
 void moeBlasDestroy(MoeGpu* g) {
-  if (g->blas) cublasDestroy((cublasHandle_t)g->blas);
+  if (g->blas) hapiBlasDestroy((hapiBlasHandle_t)g->blas);
   g->blas = NULL;
 }
 
@@ -48,11 +47,11 @@ void moeBlasDestroy(MoeGpu* g) {
 // of the transposes in the other order, so the operands swap places and keep
 // their own transpose flags. The leading dimension of a row-major operand is
 // its column count as stored.
-static void gemm_rm(cublasHandle_t h, bool tA, bool tB, int m, int n, int k,
+static void gemm_rm(hapiBlasHandle_t h, bool tA, bool tB, int m, int n, int k,
     float alpha, const float* A, int lda, const float* B, int ldb, float beta,
     float* C, int ldc) {
-  cublasCheck(cublasSgemm(h, tB ? CUBLAS_OP_T : CUBLAS_OP_N,
-      tA ? CUBLAS_OP_T : CUBLAS_OP_N, n, m, k, &alpha, B, ldb, A, lda, &beta,
+  cublasCheck(hapiBlasSgemm(h, tB ? HAPI_BLAS_OP_T : HAPI_BLAS_OP_N,
+      tA ? HAPI_BLAS_OP_T : HAPI_BLAS_OP_N, n, m, k, &alpha, B, ldb, A, lda, &beta,
       C, ldc));
 }
 
@@ -175,32 +174,32 @@ __global__ void sumPartialsKernel(const double* partials, int n,
 // ---- wrappers ----
 
 void moeInitUniform(float* p, size_t n, uint64_t seed, float bound,
-    cudaStream_t s) {
+    hapiStream_t s) {
   initUniformKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(p, n,
       (unsigned long long)seed, bound);
-  hapiCheck(cudaPeekAtLastError());
+  hapiCheck(hapiPeekAtLastError());
 }
 
 void moeGather(const float* x, const int* idx, float* out, int n_slots,
-    int dm, cudaStream_t s) {
+    int dm, hapiStream_t s) {
   if (n_slots <= 0) return;
   size_t total = (size_t)n_slots * dm;
   gatherKernel<<<nblocks(total), BLOCK_1D, 0, s>>>(x, idx, out, total, dm);
-  hapiCheck(cudaPeekAtLastError());
+  hapiCheck(hapiPeekAtLastError());
 }
 
 void moeCombine(const float* recv, const int* pos, float* y, int n_tok,
-    int k, int dm, float w, cudaStream_t s) {
+    int k, int dm, float w, hapiStream_t s) {
   size_t total = (size_t)n_tok * dm;
   combineKernel<<<nblocks(total), BLOCK_1D, 0, s>>>(recv, pos, y, total, k,
       dm, w);
-  hapiCheck(cudaPeekAtLastError());
+  hapiCheck(hapiPeekAtLastError());
 }
 
 void moeZeroGrad(MoeGpu* g, int dm, int dff) {
   size_t bytes = sizeof(float) * (size_t)dm * dff;
-  hapiCheck(cudaMemsetAsync(g->dW1, 0, bytes, g->stream));
-  hapiCheck(cudaMemsetAsync(g->dW2, 0, bytes, g->stream));
+  hapiCheck(hapiMemsetAsync(g->dW1, 0, bytes, g->stream));
+  hapiCheck(hapiMemsetAsync(g->dW2, 0, bytes, g->stream));
 }
 
 // The expert's step over one source segment of n tokens, in chunks so the
@@ -218,7 +217,7 @@ void moeZeroGrad(MoeGpu* g, int dm, int dff) {
 void moeExpertChunks(MoeGpu* g, float* W1, float* W2, const float* x,
     float* y, int n, int dm, int dff, int chunk, float lr, float scale,
     bool adam) {
-  cublasHandle_t h = (cublasHandle_t)g->blas;
+  hapiBlasHandle_t h = (hapiBlasHandle_t)g->blas;
   for (int c0 = 0; c0 < n; c0 += chunk) {
     const int nc = (n - c0 < chunk) ? (n - c0) : chunk;
     const float* xc = x + (size_t)c0 * dm;
@@ -247,7 +246,7 @@ void moeExpertChunks(MoeGpu* g, float* W1, float* W2, const float* x,
           dff);
     }
   }
-  hapiCheck(cudaPeekAtLastError());
+  hapiCheck(hapiPeekAtLastError());
 }
 
 void moeAdamApply(MoeGpu* g, float* W1, float* m1, float* v1, float* W2,
@@ -260,12 +259,12 @@ void moeAdamApply(MoeGpu* g, float* W1, float* m1, float* v1, float* W2,
       lr, b1, b2, eps, c1, c2);
   adamKernel<<<nblocks(n), BLOCK_1D, 0, g->stream>>>(W2, m2, v2, g->dW2, n,
       lr, b1, b2, eps, c1, c2);
-  hapiCheck(cudaPeekAtLastError());
+  hapiCheck(hapiPeekAtLastError());
 }
 
 void moeSumSqAdd(const float* p, size_t n, MoeGpu* g, double* d_out,
-    cudaStream_t s) {
+    hapiStream_t s) {
   sumSqKernel<<<MOE_RED_BLOCKS, MOE_RED_THREADS, 0, s>>>(p, n, g->partials);
   sumPartialsKernel<<<1, 32, 0, s>>>(g->partials, MOE_RED_BLOCKS, d_out);
-  hapiCheck(cudaPeekAtLastError());
+  hapiCheck(hapiPeekAtLastError());
 }

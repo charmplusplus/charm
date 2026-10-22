@@ -110,21 +110,21 @@ static inline long long sphNowNs() {
   return (long long)ts.tv_sec * 1000000000LL + ts.tv_nsec;
 }
 
-static inline void sphSubmitMemcpy(void* dst, const void* src, size_t n, cudaMemcpyKind k, cudaStream_t s) {
-  hapiSubmit(s, [=]() { hapiCheck(cudaMemcpyAsync(dst, src, n, k, s)); });
+static inline void sphSubmitMemcpy(void* dst, const void* src, size_t n, hapiMemcpyKind k, hapiStream_t s) {
+  hapiSubmit(s, [=]() { hapiCheck(hapiMemcpyAsync(dst, src, n, k, s)); });
 }
-static inline void sphSubmitWaitEvent(cudaStream_t s, cudaEvent_t ev) {
+static inline void sphSubmitWaitEvent(hapiStream_t s, hapiEvent_t ev) {
   hapiSubmit(s, [=]() { hapiCheck(hapiStreamWaitEvent(s, ev, 0)); });
 }
-static inline cudaError_t sphDrainSync(cudaStream_t s) {
+static inline hapiError_t sphDrainSync(hapiStream_t s) {
   hapiSubmitDrain();
-  return cudaStreamSynchronize(s);
+  return hapiStreamSynchronize(s);
 }
 
 // Every device send is made from the completion callback of the kernel that
 // packed the buffer, so the buffer is complete when the send is issued.
 // SPH_SEND_STREAM=1 restores the stream-tagged contract for A/B.
-static inline CkDeviceBuffer sphSendBuffer(const void* ptr, const CkCallback& cb, cudaStream_t s) {
+static inline CkDeviceBuffer sphSendBuffer(const void* ptr, const CkCallback& cb, hapiStream_t s) {
   static const bool tag = getenv("SPH_SEND_STREAM") != nullptr;
   return tag ? CkDeviceBuffer(ptr, cb, s) : CkDeviceBuffer(ptr, cb);
 }
@@ -150,11 +150,11 @@ struct SendTimer {
 };
 
 // Pinned landing pads and ordering events are recycled, never returned to the
-// driver (cudaMallocHost/cudaFreeHost and event create/destroy synchronize the
+// driver (hapiMallocHost/hapiFreeHost and event create/destroy synchronize the
 // device; see sph2d.C). Process-wide pools, one lock each.
 namespace {
 // Pinned host blocks, pooled PER PE. A process can span several NUMA domains (one per GPU it
-// drives, with the PEs of each GPU pinned to that domain), and cudaMallocHost places a slab's
+// drives, with the PEs of each GPU pinned to that domain), and hapiMallocHost places a slab's
 // pages on the calling thread's domain: a process-wide pool handed any PE blocks first touched
 // anywhere in the process. Each PE grows its own slabs, and a block given back from another PE
 // returns to the slab owner's list (the registry below), so blocks stay on their domain.
@@ -226,13 +226,13 @@ class EventPool {
   EventPool() : lock_(CmiCreateLock()) {}
   // One free list per device: an event is valid only on the device it was created on, and the
   // PEs of a process can drive different devices. Created with the calling PE's device current.
-  cudaEvent_t take() {
+  hapiEvent_t take() {
     const int dev = hapiGetDeviceNum();
     CmiLock(lock_);
-    cudaEvent_t e;
-    std::vector<cudaEvent_t>& free = free_[dev];
+    hapiEvent_t e;
+    std::vector<hapiEvent_t>& free = free_[dev];
     if (free.empty()) {
-      hapiCheck(cudaEventCreateWithFlags(&e, cudaEventDisableTiming));
+      hapiCheck(hapiEventCreateWithFlags(&e, hapiEventDisableTiming));
       owner_[e] = dev;
     } else {
       e = free.back();
@@ -241,14 +241,14 @@ class EventPool {
     CmiUnlock(lock_);
     return e;
   }
-  void give(cudaEvent_t e) {
+  void give(hapiEvent_t e) {
     CmiLock(lock_);
     free_[owner_[e]].push_back(e);
     CmiUnlock(lock_);
   }
  private:
-  std::map<int, std::vector<cudaEvent_t>> free_;
-  std::map<cudaEvent_t, int> owner_;
+  std::map<int, std::vector<hapiEvent_t>> free_;
+  std::map<hapiEvent_t, int> owner_;
   CmiNodeLock lock_;
 };
 EventPool& eventPool() {
@@ -298,69 +298,69 @@ EventPool& eventPool() {
 extern size_t sphScanTempBytes(int);
 extern void invokeCellBuild(const Particle*, int, RealType, RealType, RealType,
     RealType, int, int, int, int, int*, int*, int*, int*, int*, void*, size_t,
-    cudaStream_t);
-extern void invokeGather(const Particle*, const int*, int, Particle*, cudaStream_t);
+    hapiStream_t);
+extern void invokeGather(const Particle*, const int*, int, Particle*, hapiStream_t);
 extern void invokeLayout(const Particle*, const int*, int, float4*, float4*,
-    unsigned char*, cudaStream_t);
-extern void invokeEOS(Particle*, int, RealType, RealType, int*, cudaStream_t);
+    unsigned char*, hapiStream_t);
+extern void invokeEOS(Particle*, int, RealType, RealType, int*, hapiStream_t);
 extern void invokeForces(int, int, int, int, int, int, const int*, const int*,
     const int*, const int*, const float4*, const float4*, const unsigned char*,
     RealType, RealType, RealType, RealType, RealType*, RealType*, RealType*,
-    RealType*, cudaStream_t);
+    RealType*, hapiStream_t);
 extern void invokeIntegrate(Particle*, int, RealType, RealType, RealType, RealType*,
-    RealType*, RealType*, RealType*, int*, cudaStream_t);
+    RealType*, RealType*, RealType*, int*, hapiStream_t);
 extern void invokeIntegrateLeavers(bool, const Particle*, int, RealType, RealType,
     RealType, RealType*, RealType*, RealType*, RealType*, RealType, RealType,
     RealType, RealType, RealType, RealType, Particle**, Particle*, int*, int,
-    cudaStream_t);
+    hapiStream_t);
 extern void sphSetInteriorLayers(int);
 extern size_t sphSelectTempBytes(int);
 extern void invokeForcesInteriorRows(int, int, int, int, int, const int*, const int*, const int*, const int*,
     const float4*, const float4*, const unsigned char*, RealType, RealType, RealType, RealType, RealType*,
-    RealType*, RealType*, RealType*, int*, int*, cudaStream_t);
+    RealType*, RealType*, RealType*, int*, int*, hapiStream_t);
 extern void invokeForcesTwoListRows(int, int, int, int, int, int, int, const int*, const int*, const int*,
     const int*, const int*, const int*, const int*, const int*, const float4*, const float4*,
     const unsigned char*, RealType, RealType, RealType, RealType, RealType*, RealType*, RealType*,
-    RealType*, int*, int*, cudaStream_t);
-extern void sphIota(int, int*, cudaStream_t);
+    RealType*, int*, int*, hapiStream_t);
+extern void sphIota(int, int*, hapiStream_t);
 extern void invokeMigrantScatter(int, int, int, int, int, int, const int*, const int*, const int*, const int*,
     const int*, const float4*, const float4*, const unsigned char*, RealType, RealType, RealType, RealType*,
-    RealType*, RealType*, RealType*, cudaStream_t);
+    RealType*, RealType*, RealType*, hapiStream_t);
 extern void invokeForcesInteriorSel(int, int, int, int, const int*, const int*, const int*, const int*,
     const float4*, const float4*, const unsigned char*, RealType, RealType, RealType, RealType, RealType*,
-    RealType*, RealType*, RealType*, const int*, unsigned char*, int*, int*, void*, size_t, cudaStream_t);
+    RealType*, RealType*, RealType*, const int*, unsigned char*, int*, int*, void*, size_t, hapiStream_t);
 extern void invokeForcesTwoList(int, int, int, int, int, int, const int*, const int*, const int*,
     const int*, const int*, const int*, const int*, const int*, const float4*, const float4*,
     const unsigned char*, RealType, RealType, RealType, RealType, RealType*, RealType*, RealType*,
-    RealType*, const int*, unsigned char*, int*, int*, void*, size_t, cudaStream_t);
+    RealType*, const int*, unsigned char*, int*, int*, void*, size_t, hapiStream_t);
 extern void invokePredict(const Particle*, Particle*, int, RealType, RealType,
     RealType, const RealType*, const RealType*, const RealType*, const RealType*,
-    cudaStream_t);
+    hapiStream_t);
 extern void invokeCorrect(Particle*, int, RealType, RealType, RealType,
     const RealType*, const RealType*, const RealType*, const RealType*, int*,
-    cudaStream_t);
+    hapiStream_t);
 extern void invokePackHalo(const Particle*, int, RealType, RealType, RealType,
     RealType, RealType, RealType, RealType, Particle**, int**, int*, int, int,
-    bool, cudaStream_t);
+    bool, hapiStream_t);
 extern void invokePackHaloByIndex(const Particle*, Particle**, const int*,
-    const int*, int, int, cudaStream_t);
+    const int*, int, int, hapiStream_t);
 extern void invokeMarkLeavers(const Particle*, int, RealType, RealType, RealType,
     RealType, RealType, RealType, Particle**, Particle*, int*, int, bool,
-    cudaStream_t);
+    hapiStream_t);
 extern void invokeGatherLeaverGhosts(Particle**, const int*, Particle*, Particle*, int, int,
-    int, cudaStream_t);
+    int, hapiStream_t);
 extern void invokePackHaloConcurrent(const Particle*, const int*, int, RealType, RealType,
     RealType, RealType, RealType, RealType, RealType, Particle**, int**, int*, int, int,
-    cudaStream_t);
+    hapiStream_t);
 extern void invokeIdBuckets(const Particle*, int, unsigned long long*, unsigned long long*,
-    unsigned long long*, cudaStream_t);
-extern void invokeFindId(const Particle*, int, int, int*, cudaStream_t);
+    unsigned long long*, hapiStream_t);
+extern void invokeFindId(const Particle*, int, int, int*, hapiStream_t);
 #define ID_AUDIT_BUCKETS 4096
 static const bool id_audit_on = (getenv("SPH_ID_AUDIT") != nullptr);
-extern void invokeStats(const Particle*, int, RealType*, cudaStream_t);
+extern void invokeStats(const Particle*, int, RealType*, hapiStream_t);
 extern void invokeCheck(const Particle*, int, RealType, RealType, RealType,
     RealType, RealType, RealType, RealType, RealType, RealType,
-    unsigned long long*, cudaStream_t, int);
+    unsigned long long*, hapiStream_t, int);
 
 // Exchange slot layout: the 26 directions laid end to end, each with its own
 // size (dirCap), slot STAY skipped. Offsets in particles. The index lists use
@@ -948,8 +948,8 @@ class Patch : public CBase_Patch {
   RealType* h_stats;
   unsigned long long* h_check;
 
-  cudaStream_t compute_stream, comm_stream;
-  cudaEvent_t halo_done;
+  hapiStream_t compute_stream, comm_stream;
+  hapiEvent_t halo_done;
 
   // ---- interior-first forces (SPH_INTERIOR_FIRST=1, old protocol) ---------
   // At the end of a step the survivors' interior forces (cells 3..nc-2, no
@@ -969,9 +969,9 @@ class Patch : public CBase_Patch {
   // idle gave); only the halo pack goes on pack_stream at the device's highest
   // priority, so it is never queued behind an interior kernel. The integrate
   // waits for the pack's read of the positions (pack_ev).
-  cudaStream_t pack_stream;
-  cudaEvent_t pack_ev;            // the pack has read the positions
-  cudaEvent_t compact_ev;         // the compaction is complete (the pack waits on it)
+  hapiStream_t pack_stream;
+  hapiEvent_t pack_ev;            // the pack has read the positions
+  hapiEvent_t compact_ev;         // the compaction is complete (the pack waits on it)
   int *d_cell_cnt2, *d_cell_off2, *d_cursor2, *d_cell_parts2, *d_cell_of2;   // the extras list E
   int* d_iota; unsigned char* d_sel_flags; int* d_sel; int* d_sel_num; void* d_sel_tmp; size_t sel_tmp_bytes;   // target selection
   int *d_item_beg, *d_item_pre;   // the rows form's table
@@ -1228,23 +1228,23 @@ public:
     Particle* hp[NUM_DIRS];
     for (int d = 0; d < NUM_DIRS; d++)
       hp[d] = d == STAY ? NULL : d_send_halo + dirOffset(d, exch_capacity);
-    sphSubmitMemcpy(d_halo_ptrs, hp, sizeof(hp), cudaMemcpyHostToDevice,
+    sphSubmitMemcpy(d_halo_ptrs, hp, sizeof(hp), hapiMemcpyHostToDevice,
         compute_stream);
     for (int d = 0; d < NUM_DIRS; d++)
       hp[d] = d == STAY ? NULL : d_send_halo2 + dirOffset(d, exch_capacity);
-    sphSubmitMemcpy(d_halo_ptrs2, hp, sizeof(hp), cudaMemcpyHostToDevice,
+    sphSubmitMemcpy(d_halo_ptrs2, hp, sizeof(hp), hapiMemcpyHostToDevice,
         compute_stream);
     for (int d = 0; d < NUM_DIRS; d++)
       hp[d] = d == STAY ? NULL : d_send_mig + dirOffset(d, exch_capacity);
-    sphSubmitMemcpy(d_mig_ptrs, hp, sizeof(hp), cudaMemcpyHostToDevice,
+    sphSubmitMemcpy(d_mig_ptrs, hp, sizeof(hp), hapiMemcpyHostToDevice,
         compute_stream);
     int* hi[NUM_DIRS];
     for (int d = 0; d < NUM_DIRS; d++)
       hi[d] = d == STAY ? NULL : d_halo_idx + dirOffset(d, exch_capacity);
-    sphSubmitMemcpy(d_halo_idx_ptrs, hi, sizeof(hi), cudaMemcpyHostToDevice,
+    sphSubmitMemcpy(d_halo_idx_ptrs, hi, sizeof(hi), hapiMemcpyHostToDevice,
         compute_stream);
     sphSubmitMemcpy(d_halo_cnt, h_halo_cnt, sizeof(int) * NUM_DIRS,
-        cudaMemcpyHostToDevice, compute_stream);
+        hapiMemcpyHostToDevice, compute_stream);
     hapiCheck(sphDrainSync(compute_stream));
   }
 
@@ -1363,7 +1363,7 @@ public:
     PUParray(p, h_check, NUM_CHECKS);
     if (p.isUnpacking())
       sphSubmitMemcpy(d_halo_cnt, h_halo_cnt, sizeof(int) * NUM_DIRS,
-          cudaMemcpyHostToDevice, compute_stream);
+          hapiMemcpyHostToDevice, compute_stream);
 
     const size_t per = sizeof(Particle) / sizeof(RealType);
     if (mig_pending) {
@@ -1463,7 +1463,7 @@ public:
     if (!pup_check_due) return;
     pup_check_due = false;
     hapiSubmitDrain();
-    hapiCheck(cudaDeviceSynchronize());
+    hapiCheck(hapiDeviceSynchronize());
     check_ghosts = false;
     runCheck(1e30f);
     hapiCheck(sphDrainSync(compute_stream));
@@ -1532,7 +1532,7 @@ public:
     seedActivity();
     if (np > 0)
       sphSubmitMemcpy(d_parts[cur], mine.data(),
-          sizeof(Particle) * np, cudaMemcpyHostToDevice, compute_stream);
+          sizeof(Particle) * np, hapiMemcpyHostToDevice, compute_stream);
     // Pressures once here; from now on every integrator sets them.
     invokeEOS(d_parts[cur], np, rho0, sound_c0, NULL, compute_stream);
 
@@ -1563,7 +1563,7 @@ public:
     invokeCheck(d_parts[cur], np, x0, y0, z0, x1, y1, z1, tol, rho0, sound_c0,
         d_check, compute_stream, check_ghosts ? n_ghost : 0);
     sphSubmitMemcpy(h_check, d_check,
-        sizeof(unsigned long long) * NUM_CHECKS, cudaMemcpyDeviceToHost,
+        sizeof(unsigned long long) * NUM_CHECKS, hapiMemcpyDeviceToHost,
         compute_stream);
   }
   RealType stepCheckTol() const { return rebuild_step ? 0.0f : support; }
@@ -1710,7 +1710,7 @@ public:
           peTier(thisProxy.ckLocMgr()->whichPe(CkArrayIndex3D(nbr_x[d], nbr_y[d], nbr_z[d]))) != 0)
         border = true;
     if (border == prio_now) return;
-    cudaStream_t ns = border ? hapiAcquirePriorityStream() : hapiAcquireStream();
+    hapiStream_t ns = border ? hapiAcquirePriorityStream() : hapiAcquireStream();
     hapiSubmitEventRecord((void*)halo_done, compute_stream);
     sphSubmitWaitEvent(ns, halo_done);
     hapiReleaseStream(compute_stream);
@@ -1842,7 +1842,7 @@ public:
     // on compute_stream, the pack reads them on pack_stream (highest priority)
     // after the compaction, so it is not delayed behind the interior kernel.
     const bool pack_prio = interior_done && pack_stream != NULL;
-    cudaStream_t ps = pack_prio ? pack_stream : compute_stream;
+    hapiStream_t ps = pack_prio ? pack_stream : compute_stream;
     hapiSubmitEventRecord((void*)halo_done, comm_stream);
     sphSubmitWaitEvent(ps, halo_done);
     if (pack_prio) { hapiSubmitEventRecord((void*)compact_ev, compute_stream); sphSubmitWaitEvent(ps, compact_ev); }
@@ -1862,7 +1862,7 @@ public:
           d_halo_ptrs, d_halo_idx_ptrs, d_counts, exch_capacity, valid_mask,
           /*counts_zeroed=*/false, ps);
       sphSubmitMemcpy(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
-          cudaMemcpyDeviceToHost, ps);
+          hapiMemcpyDeviceToHost, ps);
     } else {
       invokePackHaloByIndex(d_parts[cur], d_halo_ptrs, d_halo_idx, d_halo_cnt,
           exch_capacity, exch_slots, ps);
@@ -1889,7 +1889,7 @@ public:
       // The by-index packs of the rest of the window read the lengths from
       // the device; compute_stream order puts this copy ahead of them.
       sphSubmitMemcpy(d_halo_cnt, h_halo_cnt, sizeof(int) * NUM_DIRS,
-          cudaMemcpyHostToDevice, compute_stream);
+          hapiMemcpyHostToDevice, compute_stream);
     } else {
       for (int d = 0; d < NUM_DIRS; d++)
         if (halo_peer[d] != rebuild_peer[d])
@@ -2053,7 +2053,7 @@ public:
                 x, y, z, np + n, part_capacity, my_iter);
       sphSubmitMemcpy(d_parts[cur] + np,
           d_recv_mig + (size_t)(my_iter & 1) * exchSlots(exch_capacity) + dirOffset(d, exch_capacity),
-          sizeof(Particle) * n, cudaMemcpyDeviceToDevice, comm_stream);
+          sizeof(Particle) * n, hapiMemcpyDeviceToDevice, comm_stream);
       np += n;
       n_fluid += n;
     }
@@ -2080,7 +2080,7 @@ public:
                 x, y, z, np + ghost_alloc + n, part_capacity, my_iter);
       sphSubmitMemcpy(d_parts[cur] + np + ghost_alloc,
           d_recv_halo + (size_t)(my_iter & 1) * exch_slots + dirOffset(d, exch_capacity),
-          sizeof(Particle) * n, cudaMemcpyDeviceToDevice, comm_stream);
+          sizeof(Particle) * n, hapiMemcpyDeviceToDevice, comm_stream);
       ghost_off[d] = ghost_alloc; ghost_cnt[d] = n;
       ghost_alloc += n;
       n_ghost += n;
@@ -2128,7 +2128,7 @@ public:
                   x, y, z, np + ghost_alloc + n, part_capacity, my_iter);
         sphSubmitMemcpy(d_parts[cur] + np + ghost_alloc,
             d_recv_halo + dirOffset(dir, exch_capacity), sizeof(Particle) * n,
-            cudaMemcpyDeviceToDevice, comm_stream);
+            hapiMemcpyDeviceToDevice, comm_stream);
         ghost_off[dir] = ghost_alloc; ghost_cnt[dir] = n;
         ghost_alloc += n;
       }
@@ -2146,7 +2146,7 @@ public:
       } else {
         sphSubmitMemcpy(d_parts[cur] + np + ghost_off[dir],
             d_recv_halo + dirOffset(dir, exch_capacity), sizeof(Particle) * n,
-            cudaMemcpyDeviceToDevice, comm_stream);
+            hapiMemcpyDeviceToDevice, comm_stream);
       }
     }
   }
@@ -2162,7 +2162,7 @@ public:
         runCheck(stepCheckTol());
         invokeStats(d_parts[cur], np, d_stats, compute_stream);
         sphSubmitMemcpy(h_stats, d_stats, sizeof(RealType) * 8,
-            cudaMemcpyDeviceToHost, compute_stream);
+            hapiMemcpyDeviceToHost, compute_stream);
         hapiAddCallback(compute_stream,
             CkCallback(CkIndex_Patch::leaversPacked(), thisProxy[thisIndex]));
       } else {
@@ -2258,14 +2258,14 @@ public:
     if (isStatsIter()) {
       invokeStats(d_parts[cur], np, d_stats, compute_stream);
       sphSubmitMemcpy(h_stats, d_stats, sizeof(RealType) * 8,
-          cudaMemcpyDeviceToHost, compute_stream);
+          hapiMemcpyDeviceToHost, compute_stream);
     }
     if (migrate_step) {
       if (!leavers_done)
         invokeMarkLeavers(d_parts[cur], np, x0, y0, z0, x1, y1, z1, d_mig_ptrs,
             d_parts[1 - cur], d_counts, exch_capacity, fold_zero, compute_stream);
       sphSubmitMemcpy(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
-          cudaMemcpyDeviceToHost, compute_stream);
+          hapiMemcpyDeviceToHost, compute_stream);
       mig_pending = true;
     }
     hapiAddCallback(compute_stream,
@@ -2321,7 +2321,7 @@ public:
     } else {
       sphSubmitMemcpy(d_parts[1 - cur] + np + ghost_off[dir],
           d_recv_halo2 + dirOffset(dir, exch_capacity), sizeof(Particle) * n,
-          cudaMemcpyDeviceToDevice, comm_stream);
+          hapiMemcpyDeviceToDevice, comm_stream);
     }
   }
 
@@ -2369,8 +2369,8 @@ public:
     const int L = interiorLayers();
     const int nitems = (pass[0] == 'i') ? (ncy - 2 * L) * (ncz - 2 * L) : 3 * ncy * ncz;
     int total = 0;
-    hapiCheck(cudaStreamSynchronize(compute_stream));
-    hapiCheck(cudaMemcpy(&total, d_item_pre + nitems, sizeof(int), cudaMemcpyDeviceToHost));
+    hapiCheck(hapiStreamSynchronize(compute_stream));
+    hapiCheck(hapiMemcpy(&total, d_item_pre + nitems, sizeof(int), hapiMemcpyDeviceToHost));
     CkPrintf("[SPLIT] patch (%d,%d,%d) step %d %s: %d targets of %d entries (np %d, cells %dx%dx%d)\n",
         x, y, z, my_iter, pass, total, n_entries, np, ncx, ncy, ncz);
   }
@@ -2518,7 +2518,7 @@ public:
     sphSubmitMemcpy(d_parts[cur] + np,
         d_recv_mig + (size_t)(ref & 1) * exchSlots(exch_capacity) +
             dirOffset(dir, exch_capacity),
-        sizeof(Particle) * n, cudaMemcpyDeviceToDevice, comm_stream);
+        sizeof(Particle) * n, hapiMemcpyDeviceToDevice, comm_stream);
     np += n;
     n_fluid += n;
   }
@@ -2567,7 +2567,7 @@ public:
             d_halo_ptrs, d_halo_idx_ptrs, d_counts, exch_capacity, valid_mask,
             /*counts_zeroed=*/false, compute_stream);
         sphSubmitMemcpy(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
-            cudaMemcpyDeviceToHost, compute_stream);
+            hapiMemcpyDeviceToHost, compute_stream);
         hapiAddCallback(compute_stream,
             CkCallback(CkIndex_Patch::exchangePacked(), thisProxy[thisIndex]));
       } else {
@@ -2592,7 +2592,7 @@ public:
         CkAbort("Patch (%d,%d,%d): %d particles+ghosts exceed capacity %d at step %d; increase headroom (-r)\n",
                 x, y, z, np + n_leaver_ghosts, part_capacity, my_iter);
       sphSubmitMemcpy(d_parts[cur] + np, d_leaver_ghosts, sizeof(Particle) * n_leaver_ghosts,
-          cudaMemcpyDeviceToDevice, comm_stream);
+          hapiMemcpyDeviceToDevice, comm_stream);
     }
     lg_pending = false;
     mig_env_n.erase(my_iter); mig_env_total.erase(my_iter); mig_seen.erase(my_iter); mig_consumed.erase(my_iter);
@@ -2621,7 +2621,7 @@ public:
         runCheck(0.0f);
         idAuditPass();
         invokeStats(d_parts[cur], np, d_stats, compute_stream);
-        sphSubmitMemcpy(h_stats, d_stats, sizeof(RealType) * 8, cudaMemcpyDeviceToHost, compute_stream);
+        sphSubmitMemcpy(h_stats, d_stats, sizeof(RealType) * 8, hapiMemcpyDeviceToHost, compute_stream);
       }
       for (int i = 0; i < NUM_COUNTERS; i++) h_counts_mig[i] = 0;
       h_counts_mig[STAY] = np;
@@ -2630,7 +2630,7 @@ public:
             d_halo_ptrs, d_halo_idx_ptrs, d_counts, exch_capacity, valid_mask,
             /*counts_zeroed=*/false, compute_stream);
         sphSubmitMemcpy(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
-            cudaMemcpyDeviceToHost, compute_stream);
+            hapiMemcpyDeviceToHost, compute_stream);
         hapiAddCallback(compute_stream,
             CkCallback(CkIndex_Patch::exchangePacked(), thisProxy[thisIndex]));
       } else {
@@ -2662,7 +2662,7 @@ public:
       invokeIntegrate(d_parts[cur], np, sim_dt, rho0, sound_c0, d_drho, d_ax,
           d_ay, d_az, NULL, compute_stream);
       invokeStats(d_parts[cur], np, d_stats, compute_stream);
-      sphSubmitMemcpy(h_stats, d_stats, sizeof(RealType) * 8, cudaMemcpyDeviceToHost, compute_stream);
+      sphSubmitMemcpy(h_stats, d_stats, sizeof(RealType) * 8, hapiMemcpyDeviceToHost, compute_stream);
       invokeMarkLeavers(d_parts[cur], np, x0, y0, z0, x1, y1, z1, d_mig_ptrs,
           d_parts[1 - cur], d_counts_mig, exch_capacity, /*counts_zeroed=*/false, compute_stream);
     }
@@ -2672,9 +2672,9 @@ public:
         cell_size, d_halo_ptrs, d_halo_idx_ptrs, d_counts, exch_capacity, valid_mask,
         compute_stream);
     sphSubmitMemcpy(h_counts_mig, d_counts_mig, sizeof(int) * NUM_COUNTERS,
-        cudaMemcpyDeviceToHost, compute_stream);
+        hapiMemcpyDeviceToHost, compute_stream);
     sphSubmitMemcpy(h_counts, d_counts, sizeof(int) * NUM_COUNTERS,
-        cudaMemcpyDeviceToHost, compute_stream);
+        hapiMemcpyDeviceToHost, compute_stream);
     hapiAddCallback(compute_stream,
         CkCallback(CkIndex_Patch::exchangePacked(), thisProxy[thisIndex]));
     if (batch_compute) hapiSubmitBatchEnd();
@@ -2796,9 +2796,9 @@ public:
   void idAuditPass() {
     if (!id_audit_on) return;
     invokeIdBuckets(d_parts[cur], np, d_aud_cnt, d_aud_sum, d_aud_sum2, compute_stream);
-    sphSubmitMemcpy(h_aud, d_aud_cnt, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, cudaMemcpyDeviceToHost, compute_stream);
-    sphSubmitMemcpy(h_aud + ID_AUDIT_BUCKETS, d_aud_sum, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, cudaMemcpyDeviceToHost, compute_stream);
-    sphSubmitMemcpy(h_aud + 2 * ID_AUDIT_BUCKETS, d_aud_sum2, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, cudaMemcpyDeviceToHost, compute_stream);
+    sphSubmitMemcpy(h_aud, d_aud_cnt, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, hapiMemcpyDeviceToHost, compute_stream);
+    sphSubmitMemcpy(h_aud + ID_AUDIT_BUCKETS, d_aud_sum, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, hapiMemcpyDeviceToHost, compute_stream);
+    sphSubmitMemcpy(h_aud + 2 * ID_AUDIT_BUCKETS, d_aud_sum2, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, hapiMemcpyDeviceToHost, compute_stream);
   }
 
   void dumpId(int id) {
@@ -2806,12 +2806,12 @@ public:
     const int n = np + n_ghost;
     invokeFindId(d_parts[cur], n, id, d_find, compute_stream);
     int* h = takePinned<int>(1);
-    sphSubmitMemcpy(h, d_find, sizeof(int), cudaMemcpyDeviceToHost, compute_stream);
+    sphSubmitMemcpy(h, d_find, sizeof(int), hapiMemcpyDeviceToHost, compute_stream);
     hapiCheck(sphDrainSync(compute_stream));
     const int idx = *h;
     if (idx < n) {
       Particle q;
-      sphSubmitMemcpy(&q, d_parts[cur] + idx, sizeof(Particle), cudaMemcpyDeviceToHost, compute_stream);
+      sphSubmitMemcpy(&q, d_parts[cur] + idx, sizeof(Particle), hapiMemcpyDeviceToHost, compute_stream);
       hapiCheck(sphDrainSync(compute_stream));
       CkPrintf("[IDAUDIT] id %d: patch (%d,%d,%d) PE %d step %d index %d of np %d (%s) pos %.5f %.5f %.5f box [%.4f,%.4f)x[%.4f,%.4f)x[%.4f,%.4f) type %d\n",
                id, x, y, z, CkMyPe(), my_iter, idx, np, idx < np ? "LOCAL" : "ghost", q.x, q.y, q.z, x0, x1, y0, y1, z0, z1, q.type);

@@ -134,6 +134,44 @@ Cell::~Cell() { freeDevice(); hapiReleaseStream(stream); stream = NULL; }
 // Allocate every device buffer the cell will need, and upload the initial
 // particles. Capacities carry headroom because migration moves particles between
 // cells and an imbalanced run makes some of them grow.
+// Pinned host memory for the per-Cell read-backs (inbrs ints, one double), in
+// 256-byte chunks carved from slabs the process never frees -- see Compute.cc's
+// PinnedDoubles for why: cudaFreeHost/hipHostFree synchronize the device.
+namespace {
+class PinnedChunks {
+ public:
+  PinnedChunks() : lock_(CmiCreateLock()) {}
+  void* take() {
+    CmiLock(lock_);
+    if (free_.empty()) grow();
+    void* p = free_.back();
+    free_.pop_back();
+    CmiUnlock(lock_);
+    return p;
+  }
+  void give(void* p) {
+    CmiLock(lock_);
+    free_.push_back(p);
+    CmiUnlock(lock_);
+  }
+ private:
+  void grow() {
+    const size_t chunk = 256, n = 4096;
+    char* slab = nullptr;
+    hapiCheck(hapiMallocHost((void**)&slab, chunk * n));
+    free_.reserve(free_.size() + n);
+    for (size_t i = 0; i < n; i++) free_.push_back(slab + i * chunk);
+  }
+  std::vector<void*> free_;
+  CmiNodeLock lock_;
+};
+PinnedChunks& pinnedChunks() {
+  static PinnedChunks s;  // shared by the PEs of a process
+  return s;
+}
+void freeParticleVectorFn(void* param, void*) { delete (std::vector<Particle>*)param; }
+}  // namespace
+
 void Cell::allocateDevice() {
   stream = hapiAcquireStream();
 
@@ -156,16 +194,26 @@ void Cell::allocateDevice() {
   hapiCheck(hapiMalloc((void**)&d_kePartial, sizeof(double) * 64));
   hapiCheck(hapiMalloc((void**)&d_energy, sizeof(double)));
   hapiCheck(hapiMalloc((void**)&d_counts, sizeof(int) * inbrs));
-  hapiCheck(hapiMallocHost((void**)&h_counts, sizeof(int) * inbrs));
-  hapiCheck(hapiMallocHost((void**)&h_energy, sizeof(double)));
+  // Pinned host chunks from process-wide slabs that are never handed back
+  // (as Compute's PinnedDoubles): on Frontier a hipHostFree on a busy device
+  // took ~1 s per call (rocprofv3 --hip-runtime-trace, 2026-10-22), and
+  // each moved Cell paid two of them.
+  h_counts = (int*)pinnedChunks().take();
+  h_energy = (double*)pinnedChunks().take();
 
   hapiCheck(hapiMemcpyAsync(d_particles, &particles[0],
                             sizeof(Particle) * myNumParts,
                             hapiMemcpyHostToDevice, stream));
-  hapiCheck(hapiStreamSynchronize(stream));
-  // The device array is the live state from here on.
-  particles.clear();
-  particles.shrink_to_fit();
+  // The device array is the live state from here on. The host copy is
+  // released when the copy has read it (a stream callback), not by a
+  // synchronize here: on a shared or busy stream that wait was 13 ms on
+  // Frontier, inside the migration's unpack.
+  {
+    std::vector<Particle>* keep = new std::vector<Particle>(std::move(particles));
+    hapiAddCallback(stream, CkCallback(freeParticleVectorFn, (void*)keep));
+    particles.clear();
+    particles.shrink_to_fit();
+  }
 
   if (useChannels) {
     // My landing slots as channels, handed to the chares that put into them.
@@ -213,8 +261,8 @@ void Cell::freeDevice() {
   if (d_kePartial)   { hapiCheck(hapiFree(d_kePartial));   d_kePartial = NULL; }
   if (d_energy)      { hapiCheck(hapiFree(d_energy));      d_energy = NULL; }
   if (d_counts)      { hapiCheck(hapiFree(d_counts));      d_counts = NULL; }
-  if (h_counts)      { hapiCheck(hapiFreeHost(h_counts));  h_counts = NULL; }
-  if (h_energy)      { hapiCheck(hapiFreeHost(h_energy));  h_energy = NULL; }
+  if (h_counts)      { pinnedChunks().give(h_counts);  h_counts = NULL; }
+  if (h_energy)      { pinnedChunks().give(h_energy);  h_energy = NULL; }
 }
 
 //function to create my computes

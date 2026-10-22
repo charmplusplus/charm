@@ -1,25 +1,30 @@
 // CUB first: converse.h defines ALIGN_BYTES as a macro, which is also the name
 // of a member constant in CUB's alignment traits.
+#if defined(__HIP__)   // clang's HIP-language macro: no CMK_ name exists before hapi.h
+#include <hipcub/hipcub.hpp>         // CUB's API on ROCm
+namespace cub = hipcub;
+#else
 #include <cub/device/device_scan.cuh>
 #include <cub/device/device_select.cuh>
 #include <cub/block/block_scan.cuh>
+#endif
 #include "hapi.h"
 #include "sph3d.h"
 
 // See sph2d.cu: the kernels here are the same ones with a third coordinate.
 #ifdef SPH_PEEK_ERRORS
-#define SPH_PEEK() hapiCheck(cudaPeekAtLastError())
+#define SPH_PEEK() hapiCheck(hapiPeekAtLastError())
 #else
 #define SPH_PEEK() ((void)0)
 #endif
 #include <cstdio>
 #include <cstdlib>
 
-static inline void sphSubmitMemset(void* d, int v, size_t n, cudaStream_t s) {
-  hapiSubmit(s, [=]() { hapiCheck(cudaMemsetAsync(d, v, n, s)); });
+static inline void sphSubmitMemset(void* d, int v, size_t n, hapiStream_t s) {
+  hapiSubmit(s, [=]() { hapiCheck(hapiMemsetAsync(d, v, n, s)); });
 }
-static inline void sphSubmitMemcpy(void* dst, const void* src, size_t n, cudaMemcpyKind k, cudaStream_t s) {
-  hapiSubmit(s, [=]() { hapiCheck(cudaMemcpyAsync(dst, src, n, k, s)); });
+static inline void sphSubmitMemcpy(void* dst, const void* src, size_t n, hapiMemcpyKind k, hapiStream_t s) {
+  hapiSubmit(s, [=]() { hapiCheck(hapiMemcpyAsync(dst, src, n, k, s)); });
 }
 
 #define BLOCK_1D 128
@@ -175,7 +180,7 @@ __device__ __forceinline__ bool cellIsInterior(int cx, int cy, int cz, int ncx, 
 }
 void sphSetInteriorLayers(int layers) {
   const int lo = layers + 1;
-  hapiCheck(cudaMemcpyToSymbol(c_interior_lo, &lo, sizeof(int)));
+  hapiCheck(hapiMemcpyToSymbol(c_interior_lo, &lo, sizeof(int)));
 }
 
 struct TargetState { RealType x, y, z, vx, vy, vz, rho, p; int type; };
@@ -827,7 +832,7 @@ __global__ void findIdKernel(const Particle* parts, int n, int id, int* out) {
   if (parts[i].id == id) atomicMin(out, i);
 }
 void invokeIdBuckets(const Particle* d_parts, int n_local, unsigned long long* d_cnt,
-    unsigned long long* d_sum, unsigned long long* d_sum2, cudaStream_t s) {
+    unsigned long long* d_sum, unsigned long long* d_sum2, hapiStream_t s) {
   sphSubmitMemset(d_cnt, 0, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, s);
   sphSubmitMemset(d_sum, 0, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, s);
   sphSubmitMemset(d_sum2, 0, sizeof(unsigned long long) * ID_AUDIT_BUCKETS, s);
@@ -837,7 +842,7 @@ void invokeIdBuckets(const Particle* d_parts, int n_local, unsigned long long* d
   });
   SPH_PEEK();
 }
-void invokeFindId(const Particle* d_parts, int n, int id, int* d_out, cudaStream_t s) {
+void invokeFindId(const Particle* d_parts, int n, int id, int* d_out, hapiStream_t s) {
   sphSubmitMemset(d_out, 0x7f, sizeof(int), s);
   if (n <= 0) return;
   hapiSubmit(s, [=]() { findIdKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(d_parts, n, id, d_out); });
@@ -987,7 +992,7 @@ size_t sphScanTempBytes(int ncells) {
 void invokeCellBuild(const Particle* d_parts, int n, RealType x0, RealType y0,
     RealType z0, RealType inv_csize, int ncx, int ncy, int ncz, int ncells,
     int* d_cnt, int* d_off, int* d_cursor, int* d_cell_parts, int* d_cell_of,
-    void* d_scan_tmp, size_t scan_tmp_bytes, cudaStream_t s) {
+    void* d_scan_tmp, size_t scan_tmp_bytes, hapiStream_t s) {
   sphSubmitMemset(d_cnt, 0, sizeof(int) * ncells, s);
   if (n > 0)
     hapiSubmit(s, [=]() {
@@ -998,8 +1003,8 @@ void invokeCellBuild(const Particle* d_parts, int n, RealType x0, RealType y0,
     size_t bytes = scan_tmp_bytes;
     hapiCheck(cub::DeviceScan::ExclusiveSum(d_scan_tmp, bytes, d_cnt, d_off, ncells, s));
     // The scatter's cursor starts at each cell's offset.
-    hapiCheck(cudaMemcpyAsync(d_cursor, d_off, sizeof(int) * ncells,
-        cudaMemcpyDeviceToDevice, s));
+    hapiCheck(hapiMemcpyAsync(d_cursor, d_off, sizeof(int) * ncells,
+        hapiMemcpyDeviceToDevice, s));
   });
   if (n > 0)
     hapiSubmit(s, [=]() {
@@ -1010,7 +1015,7 @@ void invokeCellBuild(const Particle* d_parts, int n, RealType x0, RealType y0,
 }
 
 void invokeGather(const Particle* d_src, const int* d_cell_parts, int n,
-    Particle* d_dst, cudaStream_t s) {
+    Particle* d_dst, hapiStream_t s) {
   if (n <= 0) return;
   hapiSubmit(s, [=]() {
     gatherKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(d_src, d_cell_parts, n, d_dst);
@@ -1019,7 +1024,7 @@ void invokeGather(const Particle* d_src, const int* d_cell_parts, int n,
 }
 
 void invokeEOS(Particle* d_parts, int n, RealType rho0, RealType c0,
-    int* d_zero, cudaStream_t s) {
+    int* d_zero, hapiStream_t s) {
   if (n <= 0) return;
   hapiSubmit(s, [=]() {
     eosKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(d_parts, n, rho0, c0, d_zero, NUM_COUNTERS);
@@ -1028,7 +1033,7 @@ void invokeEOS(Particle* d_parts, int n, RealType rho0, RealType c0,
 }
 
 void invokeLayout(const Particle* d_parts, const int* d_cell_parts, int n,
-    float4* d_pos4, float4* d_vel4, unsigned char* d_type8, cudaStream_t s) {
+    float4* d_pos4, float4* d_vel4, unsigned char* d_type8, hapiStream_t s) {
   if (n <= 0) return;
   hapiSubmit(s, [=]() {
     layoutKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(d_parts, d_cell_parts, n, d_pos4,
@@ -1042,7 +1047,7 @@ void invokeForces(int mode, int n_total, int n_local, int ncx, int ncy, int ncz,
     const int* d_cnt, const float4* d_pos4, const float4* d_vel4,
     const unsigned char* d_type8, RealType h, RealType mass, RealType c0,
     RealType gravity, RealType* d_drho, RealType* d_ax, RealType* d_ay,
-    RealType* d_az, cudaStream_t s) {
+    RealType* d_az, hapiStream_t s) {
   if (n_local <= 0 || n_total <= 0) return;
   // SPH_FORCES_BLOCK: the forces kernel's block size (default 128).
   static const int fb = [] { const char* e = getenv("SPH_FORCES_BLOCK"); return e ? atoi(e) : BLOCK_1D; }();
@@ -1064,7 +1069,7 @@ __global__ void iotaKernel(int n, int* d) {
   const int k = blockIdx.x * blockDim.x + threadIdx.x;
   if (k < n) d[k] = k;
 }
-void sphIota(int n, int* d, cudaStream_t s) {
+void sphIota(int n, int* d, hapiStream_t s) {
   if (n <= 0) return;
   hapiSubmit(s, [=]() { iotaKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(n, d); });
   SPH_PEEK();
@@ -1075,7 +1080,7 @@ void invokeForcesInteriorSel(int n, int ncx, int ncy, int ncz, const int* d_cell
     const int* d_off, const int* d_cnt, const float4* d_pos4, const float4* d_vel4, const unsigned char* d_type8,
     RealType h, RealType mass, RealType c0, RealType gravity, RealType* d_drho, RealType* d_ax, RealType* d_ay,
     RealType* d_az, const int* d_iota, unsigned char* d_flags, int* d_sel, int* d_num, void* d_tmp,
-    size_t tmp_bytes, cudaStream_t s) {
+    size_t tmp_bytes, hapiStream_t s) {
   if (n <= 0) return;
   hapiSubmit(s, [=]() {
     flagInteriorKernel<<<nblocks(n), BLOCK_1D, 0, s>>>(n, n, ncx, ncy, ncz, d_cell_parts, d_cell_of, d_flags);
@@ -1092,7 +1097,7 @@ void invokeForcesInteriorSel(int n, int ncx, int ncy, int ncz, const int* d_cell
 void invokeForcesInteriorRows(int n, int ncx, int ncy, int ncz, int layers, const int* d_cell_parts,
     const int* d_cell_of, const int* d_off, const int* d_cnt, const float4* d_pos4, const float4* d_vel4,
     const unsigned char* d_type8, RealType h, RealType mass, RealType c0, RealType gravity, RealType* d_drho,
-    RealType* d_ax, RealType* d_ay, RealType* d_az, int* d_item_beg, int* d_item_pre, cudaStream_t s) {
+    RealType* d_ax, RealType* d_ay, RealType* d_az, int* d_item_beg, int* d_item_pre, hapiStream_t s) {
   const int nitems = (ncy - 2 * layers) * (ncz - 2 * layers);
   if (n <= 0 || nitems <= 0) return;
   hapiSubmit(s, [=]() {
@@ -1112,7 +1117,7 @@ void invokeForcesTwoListRows(int n_total, int n_local, int n0, int ncx, int ncy,
     const int* d_cell_parts2, const int* d_cell_of2, const int* d_off2, const int* d_cnt2,
     const float4* d_pos4, const float4* d_vel4, const unsigned char* d_type8, RealType h,
     RealType mass, RealType c0, RealType gravity, RealType* d_drho, RealType* d_ax,
-    RealType* d_ay, RealType* d_az, int* d_item_beg, int* d_item_pre, cudaStream_t s) {
+    RealType* d_ay, RealType* d_az, int* d_item_beg, int* d_item_pre, hapiStream_t s) {
   const int nitems = 3 * ncy * ncz;
   if (n_total <= 0) return;
   hapiSubmit(s, [=]() {
@@ -1129,7 +1134,7 @@ void invokeForcesTwoListRows(int n_total, int n_local, int n0, int ncx, int ncy,
 void invokeMigrantScatter(int n_total, int n_local, int n0, int ncx, int ncy, int ncz, const int* d_cell_parts,
     const int* d_off, const int* d_cnt, const int* d_cell_parts2, const int* d_cell_of2, const float4* d_pos4,
     const float4* d_vel4, const unsigned char* d_type8, RealType h, RealType mass, RealType c0,
-    RealType* d_drho, RealType* d_ax, RealType* d_ay, RealType* d_az, cudaStream_t s) {
+    RealType* d_drho, RealType* d_ax, RealType* d_ay, RealType* d_az, hapiStream_t s) {
   const int nx = n_total - n0;
   if (nx <= 0) return;
   hapiSubmit(s, [=]() {
@@ -1145,7 +1150,7 @@ void invokeForcesTwoList(int n_total, int n_local, int n0, int ncx, int ncy, int
     const float4* d_pos4, const float4* d_vel4, const unsigned char* d_type8, RealType h,
     RealType mass, RealType c0, RealType gravity, RealType* d_drho, RealType* d_ax,
     RealType* d_ay, RealType* d_az, const int* d_iota, unsigned char* d_flags, int* d_sel, int* d_num,
-    void* d_tmp, size_t tmp_bytes, cudaStream_t s) {
+    void* d_tmp, size_t tmp_bytes, hapiStream_t s) {
   if (n_total <= 0) return;
   hapiSubmit(s, [=]() {
     flagBoundaryTwoListKernel<<<nblocks(n_total), BLOCK_1D, 0, s>>>(n_total, n_local, n0, ncx, ncy, ncz,
@@ -1164,7 +1169,7 @@ void invokeForcesTwoList(int n_total, int n_local, int n0, int ncx, int ncy, int
 void invokePredict(const Particle* d_src, Particle* d_dst, int n_local,
     RealType dt2, RealType rho0, RealType c0, const RealType* d_drho,
     const RealType* d_ax, const RealType* d_ay, const RealType* d_az,
-    cudaStream_t s) {
+    hapiStream_t s) {
   if (n_local <= 0) return;
   hapiSubmit(s, [=]() {
     predictKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_src, d_dst, n_local, dt2,
@@ -1175,7 +1180,7 @@ void invokePredict(const Particle* d_src, Particle* d_dst, int n_local,
 
 void invokeCorrect(Particle* d_parts, int n_local, RealType dt, RealType rho0,
     RealType c0, const RealType* d_drho, const RealType* d_ax, const RealType* d_ay,
-    const RealType* d_az, int* d_zero, cudaStream_t s) {
+    const RealType* d_az, int* d_zero, hapiStream_t s) {
   if (n_local <= 0) return;
   hapiSubmit(s, [=]() {
     correctKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, dt, rho0,
@@ -1186,7 +1191,7 @@ void invokeCorrect(Particle* d_parts, int n_local, RealType dt, RealType rho0,
 
 void invokeIntegrate(Particle* d_parts, int n_local, RealType dt, RealType rho0,
     RealType c0, RealType* d_drho, RealType* d_ax, RealType* d_ay, RealType* d_az,
-    int* d_zero, cudaStream_t s) {
+    int* d_zero, hapiStream_t s) {
   if (n_local <= 0) return;
   hapiSubmit(s, [=]() {
     integrateKernel<<<nblocks(n_local), BLOCK_1D, 0, s>>>(d_parts, n_local, dt,
@@ -1201,7 +1206,7 @@ void invokeIntegrateLeavers(bool pc, const Particle* d_parts, int n_local,
     RealType dt, RealType rho0, RealType c0, RealType* d_drho, RealType* d_ax,
     RealType* d_ay, RealType* d_az, RealType x0, RealType y0, RealType z0,
     RealType x1, RealType y1, RealType z1, Particle** d_bufs, Particle* d_stay,
-    int* d_counts, int cap_face, cudaStream_t s) {
+    int* d_counts, int cap_face, hapiStream_t s) {
   sphSubmitMemset(d_counts, 0, sizeof(int) * NUM_COUNTERS, s);
   if (n_local <= 0) return;
   hapiSubmit(s, [=]() {
@@ -1221,7 +1226,7 @@ void invokeIntegrateLeavers(bool pc, const Particle* d_parts, int n_local,
 void invokePackHalo(const Particle* d_parts, int n_local, RealType x0,
     RealType y0, RealType z0, RealType x1, RealType y1, RealType z1,
     RealType support, Particle** d_bufs, int** d_idx_bufs, int* d_counts,
-    int cap_face, int valid_mask, bool counts_zeroed, cudaStream_t s) {
+    int cap_face, int valid_mask, bool counts_zeroed, hapiStream_t s) {
   if (!(counts_zeroed && n_local > 0)) sphSubmitMemset(d_counts, 0, sizeof(int) * NUM_COUNTERS, s);
   if (n_local > 0)
     hapiSubmit(s, [=]() {
@@ -1234,7 +1239,7 @@ void invokePackHalo(const Particle* d_parts, int n_local, RealType x0,
 
 void invokePackHaloByIndex(const Particle* d_parts, Particle** d_bufs,
     const int* d_idx, const int* d_halo_cnt, int cap_face, int nslots,
-    cudaStream_t s) {
+    hapiStream_t s) {
   if (nslots <= 0) return;
   hapiSubmit(s, [=]() {
     packHaloByIndexKernel<<<nblocks(nslots), BLOCK_1D, 0, s>>>(d_parts, d_bufs,
@@ -1244,7 +1249,7 @@ void invokePackHaloByIndex(const Particle* d_parts, Particle** d_bufs,
 }
 
 void invokeGatherLeaverGhosts(Particle** d_bufs, const int* d_counts, Particle* d_parts,
-    Particle* d_side, int cap_face, int nslots, int valid_mask, cudaStream_t s) {
+    Particle* d_side, int cap_face, int nslots, int valid_mask, hapiStream_t s) {
   if (nslots <= 0) return;
   hapiSubmit(s, [=]() {
     gatherLeaverGhostsKernel<<<nblocks(nslots), BLOCK_1D, 0, s>>>(d_bufs, d_counts,
@@ -1257,7 +1262,7 @@ void invokeGatherLeaverGhosts(Particle** d_bufs, const int* d_counts, Particle* 
 void invokePackHaloConcurrent(const Particle* d_parts, const int* d_mig_counts,
     int n_max, RealType x0, RealType y0, RealType z0, RealType x1, RealType y1,
     RealType z1, RealType support, Particle** d_bufs, int** d_idx_bufs,
-    int* d_counts, int cap_face, int valid_mask, cudaStream_t s) {
+    int* d_counts, int cap_face, int valid_mask, hapiStream_t s) {
   sphSubmitMemset(d_counts, 0, sizeof(int) * NUM_COUNTERS, s);
   if (n_max <= 0) return;
   hapiSubmit(s, [=]() {
@@ -1271,7 +1276,7 @@ void invokePackHaloConcurrent(const Particle* d_parts, const int* d_mig_counts,
 void invokeMarkLeavers(const Particle* d_parts, int n_local, RealType x0,
     RealType y0, RealType z0, RealType x1, RealType y1, RealType z1,
     Particle** d_bufs, Particle* d_stay, int* d_counts, int cap_face,
-    bool counts_zeroed, cudaStream_t s) {
+    bool counts_zeroed, hapiStream_t s) {
   if (!(counts_zeroed && n_local > 0)) sphSubmitMemset(d_counts, 0, sizeof(int) * NUM_COUNTERS, s);
   if (n_local > 0)
     hapiSubmit(s, [=]() {
@@ -1282,7 +1287,7 @@ void invokeMarkLeavers(const Particle* d_parts, int n_local, RealType x0,
 }
 
 void invokeStats(const Particle* d_parts, int n_local, RealType* d_out,
-    cudaStream_t s) {
+    hapiStream_t s) {
   sphSubmitMemset(d_out, 0, sizeof(RealType) * 8, s);
   if (n_local > 0)
     hapiSubmit(s, [=]() {
@@ -1293,11 +1298,11 @@ void invokeStats(const Particle* d_parts, int n_local, RealType* d_out,
 
 void invokeCheck(const Particle* d_parts, int n_local, RealType x0, RealType y0,
     RealType z0, RealType x1, RealType y1, RealType z1, RealType tol, RealType rho0,
-    RealType c0, unsigned long long* d_out, cudaStream_t s, int n_ghost) {
+    RealType c0, unsigned long long* d_out, hapiStream_t s, int n_ghost) {
   sphSubmitMemset(d_out, 0, sizeof(unsigned long long) * NUM_CHECKS, s);
   if (n_ghost > 0)
     hapiSubmit(s, [=]() {
-      hapiCheck(cudaMemsetAsync(d_out + 7, 0xff, sizeof(unsigned long long), s));
+      hapiCheck(hapiMemsetAsync(d_out + 7, 0xff, sizeof(unsigned long long), s));
       ghostCheckKernel<<<nblocks(n_ghost), BLOCK_1D, 0, s>>>(d_parts, n_local, n_ghost, d_out);
     });
   if (n_local > 0)

@@ -36,7 +36,7 @@ static inline bool hostSyncMode() {
 
 // Device buffers come from hapiMalloc/hapiFree, which are the device pool
 // under +gpupool (an arena the peers have already opened, no driver call, no
-// device sync) and cudaMalloc/cudaFree without it. The runtime owns the switch.
+// device sync) and hapiMalloc/hapiFree without it. The runtime owns the switch.
 
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Dispatcher disp_proxy;
@@ -480,8 +480,8 @@ class Dispatcher : public CBase_Dispatcher {
   // that stream's tail at send time. The comm stream's tail may be a landing
   // copy waiting on a remote PE, so the sends carry a stream of their own that
   // waits only on the event recorded right after the gather.
-  cudaStream_t send_stream;
-  cudaEvent_t ev_gather;
+  hapiStream_t send_stream;
+  hapiEvent_t ev_gather;
   // Which process's batch this branch owns, and whether it owns one at all:
   // only the first PE of a process dispatches. The other branches exist for
   // the compute context (lanes) the experts on their PE run in.
@@ -506,17 +506,17 @@ class Dispatcher : public CBase_Dispatcher {
     memset(&gpu, 0, sizeof(gpu));
     gpu.n_lanes = n_lanes;
     // See MoeCtx in moe.h for why communication has its own stream.
-    hapiCheck(cudaStreamCreateWithPriority(&gpu.comm.stream,
-        cudaStreamNonBlocking, -1));
+    hapiCheck(hapiStreamCreateWithPriority(&gpu.comm.stream,
+        hapiStreamNonBlocking, -1));
     hapiCheck(hapiMalloc((void**)&gpu.comm.partials,
         sizeof(double) * MOE_RED_BLOCKS));
-    hapiCheck(cudaStreamCreateWithPriority(&send_stream, cudaStreamNonBlocking,
+    hapiCheck(hapiStreamCreateWithPriority(&send_stream, hapiStreamNonBlocking,
         -1));
-    hapiCheck(cudaEventCreateWithFlags(&ev_gather, cudaEventDisableTiming));
+    hapiCheck(hapiEventCreateWithFlags(&ev_gather, hapiEventDisableTiming));
     const size_t wsz = (size_t)d_model * d_ff;
     for (int l = 0; l < n_lanes; l++) {
       MoeGpu& g = gpu.lanes[l];
-      hapiCheck(cudaStreamCreateWithPriority(&g.stream, cudaStreamNonBlocking,
+      hapiCheck(hapiStreamCreateWithPriority(&g.stream, hapiStreamNonBlocking,
           0));
       hapiCheck(hapiMalloc((void**)&g.h,
           sizeof(float) * (size_t)chunk_tokens * d_ff));
@@ -539,7 +539,7 @@ class Dispatcher : public CBase_Dispatcher {
       hapiCheck(hapiMalloc((void**)&g.partials,
           sizeof(double) * MOE_RED_BLOCKS));
       if (moeBlasCreate(&g, use_tf32 != 0))
-        CkAbort("cublasCreate failed on PE %d lane %d\n", CkMyPe(), l);
+        CkAbort("hapiBlasCreate failed on PE %d lane %d\n", CkMyPe(), l);
     }
 
     if (!active) {
@@ -555,7 +555,7 @@ class Dispatcher : public CBase_Dispatcher {
     // TK+2 rows: [TK] absorbs the one-row dummy a zero-token expert sends,
     // [TK+1] is held at zero for tokens dropped by the capacity factor.
     hapiCheck(hapiMalloc((void**)&d_recv, sizeof(float) * (TK + 2) * d_model));
-    hapiCheck(cudaMemset(d_recv + (TK + 1) * d_model, 0,
+    hapiCheck(hapiMemset(d_recv + (TK + 1) * d_model, 0,
         sizeof(float) * d_model));
     hapiCheck(hapiMalloc((void**)&d_y, sizeof(float) * n_tokens * d_model));
     hapiCheck(hapiMalloc((void**)&d_send_idx, sizeof(int) * TK));
@@ -573,7 +573,7 @@ class Dispatcher : public CBase_Dispatcher {
     // Unit-variance inputs, a pure function of (seed, PE, element)
     moeInitUniform(d_x, (size_t)n_tokens * d_model,
         hmix(hmix(moe_seed, 1000), dispId), sqrtf(3.0f), gpu.comm.stream);
-    hapiCheck(cudaStreamSynchronize(gpu.comm.stream));
+    hapiCheck(hapiStreamSynchronize(gpu.comm.stream));
     contribute(CkCallback(CkReductionTarget(Main, dispReady), main_proxy));
   }
 
@@ -686,11 +686,11 @@ class Dispatcher : public CBase_Dispatcher {
     // landing. d_recv_pos is read by the combine on the comm stream, which
     // runs only after every output of this step has landed there.
     hapiCheck(hapiMemcpyAsync(d_send_idx, h_send_idx, sizeof(int) * TK,
-        cudaMemcpyHostToDevice, send_stream));
+        hapiMemcpyHostToDevice, send_stream));
     hapiCheck(hapiMemcpyAsync(d_recv_pos, h_recv_pos, sizeof(int) * TK,
-        cudaMemcpyHostToDevice, send_stream));
+        hapiMemcpyHostToDevice, send_stream));
     moeGather(d_x, d_send_idx, d_send, (int)TK, d_model, send_stream);
-    hapiCheck(cudaEventRecord(ev_gather, send_stream));
+    hapiCheck(hapiEventRecord(ev_gather, send_stream));
     TRACE(2, "disp step %d gather issued", my_step);
     CkCallback* cb = new CkCallback(CkIndex_Dispatcher::gathered(),
         thisProxy[CkMyPe()]);
@@ -702,7 +702,7 @@ class Dispatcher : public CBase_Dispatcher {
   // carries a valid buffer; the expert lands it in the unused slab.
   void sendTokens() {
     const double ts0 = tnow();
-    hapiCheck(cudaStreamWaitEvent(send_stream, ev_gather, 0));
+    hapiCheck(hapiStreamWaitEvent(send_stream, ev_gather, 0));
     for (int e = 0; e < n_experts; e++) {
       const int n = counts[e];
       const int len = std::max(n, 1) * d_model;
@@ -743,10 +743,10 @@ class Dispatcher : public CBase_Dispatcher {
         1.0f / top_k, gpu.comm.stream);
     chk_due = checksum_freq > 0 && (my_step % checksum_freq == 0);
     if (chk_due) {
-      hapiCheck(cudaMemsetAsync(d_chk, 0, sizeof(double), gpu.comm.stream));
+      hapiCheck(hapiMemsetAsync(d_chk, 0, sizeof(double), gpu.comm.stream));
       moeSumSqAdd(d_y, (size_t)n_tokens * d_model, &gpu.comm, d_chk, gpu.comm.stream);
       hapiCheck(hapiMemcpyAsync(h_chk, d_chk, sizeof(double),
-          cudaMemcpyDeviceToHost, gpu.comm.stream));
+          hapiMemcpyDeviceToHost, gpu.comm.stream));
     }
     CkCallback* cb = new CkCallback(CkIndex_Dispatcher::combined(),
         thisProxy[CkMyPe()]);
@@ -828,19 +828,19 @@ class Expert : public CBase_Expert {
   float* y_seg;   // same layout, outputs
   double* d_chk;
   double* h_chk;
-  cudaEvent_t ev_start;
-  cudaEvent_t ev_end;
+  hapiEvent_t ev_start;
+  hapiEvent_t ev_end;
   // Recorded after the checksum's device-to-host copy. A pack reads h_chk on
   // the host, which the copy may still be writing; pup_device_order only
   // orders DEVICE-mode copies and leaves that host read racing. Losing it
   // costs one expert's slot in the w2 reduction, seen once in eight async
   // runs at Llama size as a deficit of exactly 1/64.
-  cudaEvent_t ev_chk;
+  hapiEvent_t ev_chk;
   // Same reason as the dispatcher's: the lane's tail at send time includes
   // other experts' queued GEMMs, and a landing that waited on it stalled the
   // receiver's comm stream for a remote expert's compute. This stream waits
   // only on ev_end, recorded after this expert's own kernels.
-  cudaStream_t send_stream;
+  hapiStream_t send_stream;
 
   Expert() {
     usesAtSync = true;
@@ -862,7 +862,7 @@ class Expert : public CBase_Expert {
     // still be in flight on the shared stream. Settle them before freeing.
     const double t0 = tnow();
     if (hostSyncMode() || !CkDevicePoolOn()) {
-      hapiCheck(cudaStreamSynchronize(lane()->stream));
+      hapiCheck(hapiStreamSynchronize(lane()->stream));
       TRACE(1, "expert %d dtor step %d phase %d synced after %.3f ms",
           thisIndex, my_step, phase, (tnow() - t0) * 1e3);
     } else {
@@ -877,10 +877,10 @@ class Expert : public CBase_Expert {
       TRACE(1, "expert %d dtor step %d phase %d stream-ordered", thisIndex,
           my_step, phase);
     }
-    hapiCheck(cudaEventDestroy(ev_start));
-    hapiCheck(cudaEventDestroy(ev_end));
-    hapiCheck(cudaEventDestroy(ev_chk));
-    hapiCheck(cudaStreamDestroy(send_stream));
+    hapiCheck(hapiEventDestroy(ev_start));
+    hapiCheck(hapiEventDestroy(ev_end));
+    hapiCheck(hapiEventDestroy(ev_chk));
+    hapiCheck(hapiStreamDestroy(send_stream));
     if (outstanding_sends != 0) {
       // A transport may still be reading a send buffer. Leak rather than pull
       // memory out from under it -- the pic2d convention.
@@ -904,7 +904,7 @@ class Expert : public CBase_Expert {
   // Never cached: a different object on every PE this expert lands on.
   MoeCtx* ctx() { return &disp_proxy.ckLocalBranch()->gpu; }
   MoeGpu* lane() { return &ctx()->lanes[thisIndex % n_lanes]; }
-  cudaStream_t commStream() { return ctx()->comm.stream; }
+  hapiStream_t commStream() { return ctx()->comm.stream; }
   size_t segStride() const { return (size_t)cap_src * d_model; }
   size_t wsz() const { return (size_t)d_model * d_ff; }
 
@@ -925,10 +925,10 @@ class Expert : public CBase_Expert {
   }
 
   void createEvents() {
-    hapiCheck(cudaEventCreate(&ev_start));
-    hapiCheck(cudaEventCreate(&ev_end));
-    hapiCheck(cudaEventCreateWithFlags(&ev_chk, cudaEventDisableTiming));
-    hapiCheck(cudaStreamCreateWithPriority(&send_stream, cudaStreamNonBlocking,
+    hapiCheck(hapiEventCreate(&ev_start));
+    hapiCheck(hapiEventCreate(&ev_end));
+    hapiCheck(hapiEventCreateWithFlags(&ev_chk, hapiEventDisableTiming));
+    hapiCheck(hapiStreamCreateWithPriority(&send_stream, hapiStreamNonBlocking,
         -1));
     ev_pending = false;
   }
@@ -942,10 +942,10 @@ class Expert : public CBase_Expert {
     moeInitUniform(W2, wsz(), hmix(hmix(moe_seed, 2), thisIndex),
         1.0f / sqrtf((float)d_ff), g->stream);
     if (use_adam) {
-      hapiCheck(cudaMemsetAsync(m1, 0, sizeof(float) * wsz(), g->stream));
-      hapiCheck(cudaMemsetAsync(v1, 0, sizeof(float) * wsz(), g->stream));
-      hapiCheck(cudaMemsetAsync(m2, 0, sizeof(float) * wsz(), g->stream));
-      hapiCheck(cudaMemsetAsync(v2, 0, sizeof(float) * wsz(), g->stream));
+      hapiCheck(hapiMemsetAsync(m1, 0, sizeof(float) * wsz(), g->stream));
+      hapiCheck(hapiMemsetAsync(v1, 0, sizeof(float) * wsz(), g->stream));
+      hapiCheck(hapiMemsetAsync(m2, 0, sizeof(float) * wsz(), g->stream));
+      hapiCheck(hapiMemsetAsync(v2, 0, sizeof(float) * wsz(), g->stream));
     }
     CkCallback* cb = new CkCallback(CkIndex_Expert::initDone(),
         thisProxy[thisIndex]);
@@ -966,7 +966,7 @@ class Expert : public CBase_Expert {
         // The original way: stop the host until every kernel queued on the
         // shared stream -- other experts' too -- has finished, so the pack
         // copies read final weights. Up to a full step of GEMMs, host-blocked.
-        hapiCheck(cudaStreamSynchronize(lane()->stream));
+        hapiCheck(hapiStreamSynchronize(lane()->stream));
         TRACE(1, "expert %d pack step %d phase %d synced after %.3f ms",
             thisIndex, my_step, phase, (tnow() - t0) * 1e3);
       } else {
@@ -1002,7 +1002,7 @@ class Expert : public CBase_Expert {
     // The checksum's copy into h_chk is asynchronous; wait for it before the
     // host reads it, or a migration here packs whatever was there before.
     if (p.isPacking() && h_chk && chk_due)
-      hapiCheck(cudaEventSynchronize(ev_chk));
+      hapiCheck(hapiEventSynchronize(ev_chk));
     double chk = (h_chk && chk_due) ? *h_chk : 0.0;
     p | chk;
     if (p.isUnpacking()) *h_chk = chk;
@@ -1137,9 +1137,9 @@ class Expert : public CBase_Expert {
   // such sample made every expert's first estimate the same 90 ms whatever
   // its token count.
   void sampleTiming() {
-    if (!ev_pending || cudaEventQuery(ev_end) != cudaSuccess) return;
+    if (!ev_pending || hapiEventQuery(ev_end) != hapiSuccess) return;
     float ms = 0.0f;
-    hapiCheck(cudaEventElapsedTime(&ms, ev_start, ev_end));
+    hapiCheck(hapiEventElapsedTime(&ms, ev_start, ev_end));
     ev_pending = false;
     gpu_last = ms * 1e-3;
     if (n_last > 0 && step_last > 1) {
@@ -1165,7 +1165,7 @@ class Expert : public CBase_Expert {
     if (n_tot > 0) {
       const double ti0 = tnow();
       int chunks = 0;
-      hapiCheck(cudaEventRecord(ev_start, g->stream));
+      hapiCheck(hapiEventRecord(ev_start, g->stream));
       if (use_adam) moeZeroGrad(g, d_model, d_ff);
       if (fuse_sources) {
         // One pass over all this expert's tokens instead of one per source.
@@ -1181,8 +1181,8 @@ class Expert : public CBase_Expert {
         for (int s = 0; s < n_disp; s++) {
           if (n_src[s] <= 0) continue;
           const size_t n = (size_t)n_src[s] * d_model;
-          hapiCheck(cudaMemcpyAsync(g->fx + off, x_seg + s * segStride(),
-              sizeof(float) * n, cudaMemcpyDeviceToDevice, g->stream));
+          hapiCheck(hapiMemcpyAsync(g->fx + off, x_seg + s * segStride(),
+              sizeof(float) * n, hapiMemcpyDeviceToDevice, g->stream));
           off += n;
         }
         chunks = (n_tot + chunk_tokens - 1) / chunk_tokens;
@@ -1194,8 +1194,8 @@ class Expert : public CBase_Expert {
         for (int s = 0; s < n_disp; s++) {
           if (n_src[s] <= 0) continue;
           const size_t n = (size_t)n_src[s] * d_model;
-          hapiCheck(cudaMemcpyAsync(y_seg + s * segStride(), g->fy + off,
-              sizeof(float) * n, cudaMemcpyDeviceToDevice, g->stream));
+          hapiCheck(hapiMemcpyAsync(y_seg + s * segStride(), g->fy + off,
+              sizeof(float) * n, hapiMemcpyDeviceToDevice, g->stream));
           off += n;
         }
       } else {
@@ -1212,18 +1212,18 @@ class Expert : public CBase_Expert {
       if (use_adam)
         moeAdamApply(g, W1, m1, v1, W2, m2, v2, d_model, d_ff,
             (float)learning_rate, ++adam_t);
-      hapiCheck(cudaEventRecord(ev_end, g->stream));
+      hapiCheck(hapiEventRecord(ev_end, g->stream));
       ev_pending = true;
       n_last = n_tot;
       step_last = my_step;
     }
     if (chk_due) {
-      hapiCheck(cudaMemsetAsync(d_chk, 0, sizeof(double), g->stream));
+      hapiCheck(hapiMemsetAsync(d_chk, 0, sizeof(double), g->stream));
       moeSumSqAdd(W1, wsz(), g, d_chk, g->stream);
       moeSumSqAdd(W2, wsz(), g, d_chk, g->stream);
       hapiCheck(hapiMemcpyAsync(h_chk, d_chk, sizeof(double),
-          cudaMemcpyDeviceToHost, g->stream));
-      hapiCheck(cudaEventRecord(ev_chk, g->stream));
+          hapiMemcpyDeviceToHost, g->stream));
+      hapiCheck(hapiEventRecord(ev_chk, g->stream));
     }
     if (n_tot > 0 || chk_due) {
       CkCallback* cb = new CkCallback(CkIndex_Expert::computeDone(),
@@ -1237,7 +1237,7 @@ class Expert : public CBase_Expert {
   void sendOutputs() {
     phase = 2;
     const double ts0 = tnow();
-    if (n_tot > 0) hapiCheck(cudaStreamWaitEvent(send_stream, ev_end, 0));
+    if (n_tot > 0) hapiCheck(hapiStreamWaitEvent(send_stream, ev_end, 0));
     for (int s = 0; s < n_disp; s++) {
       const int n = std::max(n_src[s], 0);
       const int len = std::max(n, 1) * d_model;

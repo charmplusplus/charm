@@ -4,8 +4,15 @@ CHARM_DIR = ../../../../..
 CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
 CHARM_INC = -I$(CHARM_DIR)/include
 
+# The device compiler follows the build the runtime was made with (conv-mach-opt.mak), as leanmd's.
+-include $(CHARM_DIR)/include/conv-mach-opt.mak
+ifeq ($(BUILD_HIP),1)
+NVCC = hipcc
+NVCC_FLAGS = -x hip -c -std=c++17 -ffast-math $(OPTS) $(patsubst %,--offload-arch=%,$(subst ;, ,$(HIP_ARCHS)))
+else
 NVCC = nvcc
 NVCC_FLAGS = -c -std=c++17 -use_fast_math $(OPTS)
+endif
 LD_LIBS = -module EveryLB -module DiffusionLB
 
 TARGET = sph3d
