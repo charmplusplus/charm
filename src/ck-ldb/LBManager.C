@@ -10,6 +10,9 @@
 
 #include "DistributedLB.h"
 #include "LBManager.h"
+#include "ckcallback-ccs.h"
+
+void LBObjLoadsCcsHandler(char* msg);
 #include "LBSimulation.h"
 #include "TreeLB.h"
 #include "topology.h"
@@ -553,6 +556,12 @@ void LBManager::init(void)
 #if CMK_LBDB_ON
   if (manualOn) TurnManualLBOn();
 #endif
+  objLoadsCollecting = false;
+  // Registered through the C-level table, which exists since ConverseInit:
+  // the CkCallback form broadcasts to the callback group, which is not
+  // created yet when this group is constructed.
+  if (CkMyPe() == 0) CcsRegisterHandler("LBObjLoads", (CmiHandler)LBObjLoadsCcsHandler);
+
   if (CkMyPe()==0 && _lb_args.traceComm() == 0 && !quietModeRequested)
       CkPrintf("CharmLB> Load balancing instrumentation for communication is off.\n");
 
@@ -564,6 +573,87 @@ void LBManager::init(void)
   {
     CkSyncBarrier::object()->addReceiver([this](void) { this->InvokeLB(); });
   }
+}
+
+/* CCS handler "LBObjLoads": a snapshot of the load database on every PE.
+
+   Reply, in the job's native byte order: int32 numPes, then one record per
+   PE in reduction order (the pe field says which):
+     int32 pe, double wallNow, double totalWall, double idleWall, int32 nObjs,
+     nObjs x { uint64 objId, int32 omGroupIdx, double objWall, uint8 migratable }
+   The times are the database's cumulative values since the last ClearLoads
+   (a load-balancing step); a client takes differences between snapshots. */
+/* Converse-level CCS handler on PE 0: take the reply token and hand the
+   request to the local LBManager branch. */
+void LBObjLoadsCcsHandler(char* msg)
+{
+  CcsDelayedReply token = CcsDelayReply();
+  CmiFree(msg);
+  LBManager::Object()->objLoadsRequest(token);
+}
+
+void LBManager::objLoadsRequest(const CcsDelayedReply& token)
+{
+  objLoadsReplies.push_back(token);
+  if (!objLoadsCollecting)
+  {
+    objLoadsCollecting = true;
+    thisProxy.collectObjLoads();
+  }
+}
+
+void LBManager::collectObjLoads()
+{
+  // Only a load balancer's constructor switches the instrumentation on;
+  // a program without one has it off. The first snapshot turns it on, so
+  // the client's differences are meaningful from the second one.
+  if (!lbdb_obj->StatsOn()) lbdb_obj->CollectStatsOn();
+  std::vector<char> buf;
+  auto put = [&buf](const void* p, size_t n) {
+    buf.insert(buf.end(), (const char*)p, (const char*)p + n);
+  };
+  int pe = CkMyPe();
+  double now = CkWallTimer();
+  LBRealType totalWall = 0, totalCpu = 0, idle = 0, bgWall = 0, bgCpu = 0;
+  lbdb_obj->GetTime(&totalWall, &totalCpu, &idle, &bgWall, &bgCpu);
+  double tw = totalWall, id = idle;
+  const auto& objs = lbdb_obj->getObjs();
+  int n = 0;
+  for (const auto& e : objs)
+    if (e.obj) n++;
+  put(&pe, sizeof(int));
+  put(&now, sizeof(double));
+  put(&tw, sizeof(double));
+  put(&id, sizeof(double));
+  put(&n, sizeof(int));
+  for (const auto& e : objs)
+  {
+    if (!e.obj) continue;
+    const LDObjData& d = e.obj->ObjData();
+    CmiUInt8 objId = d.objID();
+    int om = d.omID().id.idx;
+    double w = d.wallTime;
+    unsigned char mig = d.migratable ? 1 : 0;
+    put(&objId, sizeof(CmiUInt8));
+    put(&om, sizeof(int));
+    put(&w, sizeof(double));
+    put(&mig, 1);
+  }
+  contribute(buf.size(), buf.data(), CkReduction::concat,
+             CkCallback(CkIndex_LBManager::objLoadsCollected(NULL), thisProxy[0]));
+}
+
+void LBManager::objLoadsCollected(CkReductionMsg* m)
+{
+  int npes = CkNumPes();
+  std::vector<char> out(sizeof(int) + m->getSize());
+  memcpy(out.data(), &npes, sizeof(int));
+  memcpy(out.data() + sizeof(int), m->getData(), m->getSize());
+  for (const CcsDelayedReply& r : objLoadsReplies)
+    CcsSendDelayedReply(r, (int)out.size(), out.data());
+  objLoadsReplies.clear();
+  objLoadsCollecting = false;
+  delete m;
 }
 
 int LBManager::AddStartLBFn(std::function<void()> fn)
