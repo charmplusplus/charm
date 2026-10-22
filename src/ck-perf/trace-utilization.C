@@ -157,6 +157,25 @@ void TraceUtilizationBOC::ccsRequestSumDetailCompressed(CkCcsRequestMsg *m) {
 
 
 
+/** CCS handler "CkPerfSumDetail sts": reply with the sts text (the same
+    lines TraceUtilization::writeSts puts in <traceroot>.util.sts), so a
+    client can map the stream's entry-method indices to names without
+    access to the job's files. Empty reply if the text cannot be built. */
+void TraceUtilizationBOC::ccsRequestSts(CkCcsRequestMsg *m) {
+  char *text = NULL;
+  size_t len = 0;
+  FILE *f = open_memstream(&text, &len);
+  if (f != NULL) {
+    traceWriteSTS(f, 0);
+    fprintf(f, "END\n");
+    fclose(f);
+  }
+  CcsSendDelayedReply(m->reply, (int)len, text != NULL ? text : "");
+  free(text);
+  delete m;
+}
+
+
 void TraceUtilizationBOC::collectSumDetailData() {
   TraceUtilization* t = CkpvAccess(_trace);
 

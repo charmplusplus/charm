@@ -62,6 +62,9 @@ class TraceUtilizationInit : public Chare {
     
     CkPrintf("Trace Summary now listening in for CCS Client\n");
     CcsRegisterHandler("CkPerfSumDetail compressed", CkCallback(CkIndex_TraceUtilizationBOC::ccsRequestSumDetailCompressed(NULL), traceUtilizationGroupProxy[0])); 
+    // The entry-method names the stream's indices refer to, as sts text,
+    // so a client needs no copy of the .util.sts file.
+    CcsRegisterHandler("CkPerfSumDetail sts", CkCallback(CkIndex_TraceUtilizationBOC::ccsRequestSts(NULL), traceUtilizationGroupProxy[0]));
     
     CkPrintf("[%d] Setting up periodic startCollectData callback\n", CkMyPe());
     CcdCallOnConditionKeep(CcdPERIODIC_1second, collectUtilizationData, (void *)NULL);
@@ -351,6 +354,7 @@ class TraceUtilizationBOC : public CBase_TraceUtilizationBOC {
 
   /// Entry methods:
   void ccsRequestSumDetailCompressed(CkCcsRequestMsg *m);
+  void ccsRequestSts(CkCcsRequestMsg *m);
   void collectSumDetailData();
   void sumDetailDataCollected(CkReductionMsg *);
 
