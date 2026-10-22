@@ -293,7 +293,7 @@ void handleDirectApiCompletion(NcpyOperationInfo *info) {
 // Ack handler function which invokes the callback
 void CkRdmaDirectAckHandler(void *ack) {
 
-#if CMK_RECONVERSE && (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
   /* Inter-node device (D2D) transfers ride this same ack path, but their
    * completion bookkeeping is entirely different -- see ckrdmadevice.C. They
    * are recognised by the deviceRdmaOpInfo the device path attaches to the
@@ -609,7 +609,6 @@ void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, Ncp
                 (char *)(ncpyEmBufferInfo), // destRef
                 rootNode,
                 ncpyOpInfo
-#if CMK_RECONVERSE
                 // reconverse's setNcpyOpInfo takes one more argument than
                 // classic's: the device RDMA op info. This is a host-side
                 // operation, so it carries none. Leaving the argument off
@@ -617,7 +616,6 @@ void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, Ncp
                 // stack garbage into deviceRdmaOpInfo, which CUDA builds use
                 // to route acks to the device handler.
                 , nullptr
-#endif
                 );
 
   // set opMode

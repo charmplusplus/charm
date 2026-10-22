@@ -162,8 +162,7 @@ if [[ -z "$STANDALONE" ]]
 then
   [[ "$CMK_AMPI_WITH_ROMIO" = '1' ]] && ROMIO+=(-pthread)
 
-  # Reconverse has no isomalloc; charmc would warn on every link.
-  [[ "$CMK_SUPPORTS_MEMORY_ISOMALLOC" = '1' && "$CMK_RECONVERSE" != '1' ]] && ARGS=(-memory isomalloc "${ARGS[@]}")
+  [[ "$CMK_SUPPORTS_MEMORY_ISOMALLOC" = '1' ]] && ARGS=(-memory isomalloc "${ARGS[@]}")
   ARGS=(-module CommonLBs "${ARGS[@]}")
 fi
 

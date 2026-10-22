@@ -154,16 +154,7 @@ CpvDeclare(bool, device_rep); // Is this PE a device representative thread? (1 p
 CpvDeclare(int, my_node_rank_local);
 
 void hapiRefreshTopologyCache() {
-#if CMK_RECONVERSE
   CpvAccess(my_node_rank_local) = CmiNodeRankOnPhysicalNode(CmiMyNode());
-#else
-  // Classic Converse has no equivalent query and the line is frozen, so it
-  // keeps the arithmetic it has always used. That form assumes processes per
-  // host are uniform and that logical node numbering is contiguous and
-  // host-ordered; reconverse asks the machine layer instead (reconverse#211).
-  CpvAccess(my_node_rank_local) =
-      CmiNodeOf(CmiMyPe()) % (CmiNumNodes() / CmiNumPhysicalNodes());
-#endif
 }
 
 // HAPI internal function declarations

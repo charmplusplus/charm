@@ -1359,7 +1359,7 @@ void _initCharm(int unused_argc, char **argv)
     }
   });
 
-#if CMK_RECONVERSE && CMK_CCS_AVAILABLE
+#if CMK_CCS_AVAILABLE
 	// CCS itself is initialized by reconverse's ConverseInit on every PE.
 	// Charm++'s builtin CCS handlers (the CpdList introspection in
 	// src/conv-ccs/ccs-builtins.C) register here, where classic Converse's
@@ -1522,7 +1522,7 @@ void _initCharm(int unused_argc, char **argv)
  * the destination PE, so the handler exists to bounce it to the right one.
  * Reconverse-only -- classic ucx also sets CMK_GPU_COMM (see
  * arch/ucx/conv-common.h) but declares no loopback bridge. */
-#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM && CMK_RECONVERSE
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
   loopback_handler = CmiRegisterHandler((CmiHandler) loopback_bridge);
   device_dereg_handler = CmiRegisterHandler((CmiHandler) device_dereg_bridge);
   device_ack_handler = CmiRegisterHandler((CmiHandler) device_ack_bridge);
@@ -1702,7 +1702,7 @@ void _initCharm(int unused_argc, char **argv)
             int *pelist;
             int num;
             CmiGetPesOnPhysicalNode(0, &pelist, &num);
-#if !CMK_MULTICORE && !CMK_SMP_NO_COMMTHD
+#if !CMK_SMP_NO_COMMTHD
             // Count communication threads, if present
             // XXX: Assuming uniformity of node size here
             num += num/CmiMyNodeSize();
@@ -1880,17 +1880,23 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 }
 
-/* Hand converse the trace-init hook; reconverse's ConverseInit invokes it.
- * Classic convcore calls traceInit through its own path. Every Charm++ entry
- * into ConverseInit calls this -- charm_main, and the interop entry points
- * CharmBeginInit and CharmLibInit, which bypass charm_main -- since without
- * it the trace array is never created and _initCharm dereferences a null
- * CkpvAccess(_traces). */
-void _registerTraceInitHook()
+/* Hand converse the per-PE init hooks that reconverse's ConverseInit invokes
+ * and classic convcore calls through its own path (ConverseCommonInit).
+ * Every Charm++ entry into ConverseInit calls this -- charm_main, and the
+ * interop entry points CharmBeginInit and CharmLibInit, which bypass
+ * charm_main.
+ *  - traceInit: without it the trace array is never created and _initCharm
+ *    dereferences a null CkpvAccess(_traces).
+ *  - CmiIsomallocInit (via isomalloc-reconverse.C): has to run before
+ *    CthInit, which is the first thing that could ask for a migratable
+ *    thread stack. */
+void _registerConverseInitHooks()
 {
-#if CMK_TRACE_ENABLED && CMK_RECONVERSE
+#if CMK_TRACE_ENABLED
   registerTraceInit(traceInit);
 #endif
+  extern void CmiIsomallocHookIntoReconverse(void);
+  CmiIsomallocHookIntoReconverse();
 }
 
 int charm_main(int argc, char **argv)
@@ -1898,7 +1904,7 @@ int charm_main(int argc, char **argv)
   int stack_top=0;
   memory_stack_top = &stack_top;
 
-  _registerTraceInitHook();
+  _registerConverseInitHooks();
 
   ConverseInit(argc, argv, (CmiStartFn) _initCharm, 0, 0);
 
