@@ -16,9 +16,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #include "tcharmc.h"
 #include "cklists.h"
 #include "memory-isomalloc.h"
-#if CMK_RECONVERSE
 #include "reconverse-compat.h"
-#endif
 
 #include "cmitls.h"
 

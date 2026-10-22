@@ -10,7 +10,6 @@ libraries written in Charm for other languages.
 #include "charm-version-git.h"
 
 #include "charm-config.h" /* for CMK_FORTRAN symbols; classic aliases conv-config */
-#if CMK_RECONVERSE
 /* On reconverse charm-config.h is reconverse's own and does not carry the
    CMK_FORTRAN_USES_* macros; they are in conv-autoconfig.h (guarded, and
    already included by charm.h). Without it a unit that reaches this header
@@ -20,7 +19,6 @@ libraries written in Charm for other languages.
    Fortran compiler was found at configure time. */
 #include "conv-autoconfig.h"
 #include "converse.h"
-#endif
 
 /** Used to define a C language entry point*/
 #ifdef __cplusplus

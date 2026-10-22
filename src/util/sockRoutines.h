@@ -98,9 +98,7 @@
 #define __SOCK_ROUTINES_H
 
 #include "charm-config.h" /*<- for CMK_NO_SOCKETS*/
-#if CMK_RECONVERSE
 #include "converse.h"
-#endif
 
 #include <string.h> /* for memcmp */
 
