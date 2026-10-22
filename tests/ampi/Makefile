@@ -5,6 +5,7 @@ DIRS = \
   stacksize \
   migration \
   datatype \
+  collwake \
   privatization \
   jacobi3d \
   exit \
