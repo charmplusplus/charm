@@ -1,7 +1,7 @@
 #ifndef _CKRDMADEVICE_H_
 #define _CKRDMADEVICE_H_
 
-/* Two-runtime header (same pattern as conv-rdmadevice.h / cmirdmautils.h). */
+/* Charm++-level device zerocopy over conv-rdmadevice.h. */
 #include "charm-config.h"
 
 
