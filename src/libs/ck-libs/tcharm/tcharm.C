@@ -109,11 +109,6 @@ void TCharm::procInit()
   // called on every pe to eat these arguments
   char **argv=CkGetArgv();
   tcharm_nomig=CmiGetArgFlagDesc(argv,"+tcharm_nomig","Disable migration support (debugging)");
-#if CMK_RECONVERSE
-  // Reconverse has no migratable threads or isomalloc: TCharm threads are
-  // plain CthCreate threads, so the non-migratable mode is the only mode.
-  tcharm_nomig=true;
-#endif
   tcharm_nothreads=CmiGetArgFlagDesc(argv,"+tcharm_nothread","Disable thread support (debugging)");
   tcharm_nothreads=(CmiGetArgFlagDesc(argv,"+tcharm_nothreads",NULL)) ? true : tcharm_nothreads;
   // campi mode: the application registered a coroutine main (campi.h), which
@@ -150,9 +145,7 @@ void TCharm::procInit()
     CmiGetArgIntDesc(argv, "+vp", &ignored, nullptr);
   }
   if (CkMyPe()==0) { // Echo various debugging options:
-#if !CMK_RECONVERSE
     if (tcharm_nomig) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
-#endif
     if (tcharm_campi) CmiPrintf("TCHARM> campi: ranks run as C++20 coroutines (no threads, no migration)\n");
     else if (tcharm_nothreads) CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
   }
@@ -286,11 +279,7 @@ void TCharm::pup(PUP::er &p) {
   if (!p.isSizing() && !isStopped && !CmiMemoryIs(CMI_MEMORY_IS_ISOMALLOC)){
 	CkAbort("Cannot pup a running thread.  You must suspend before migrating.\n");
   }	
-#if CMK_RECONVERSE
-  if (!p.isSizing()) CkAbort("TCharm threads cannot migrate or be checkpointed on reconverse.\n");
-#else
   if (tcharm_nomig && !p.isSizing()) CkAbort("Cannot migrate with the +tcharm_nomig option!\n");
-#endif
 #endif
 
   //This seekBlock allows us to reorder the packing/unpacking--
@@ -425,6 +414,15 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrateTo(int destPE) noexcept {
 }
 void TCharm::ckJustMigrated() {
 	ArrayElement::ckJustMigrated();
+	// Arrival is the point at which the thread's Isomalloc context needs its
+	// page protections put back: unpacking maps the region read-write, so a
+	// context holding executable pages -- which is every rank under
+	// pieglobals, whose code segment lives in the context -- comes back
+	// non-executable, and the first instruction the resumed thread runs
+	// faults. Doing it here rather than in ResumeFromSync covers the
+	// asynchronous path too (TCHARM_Migrate_to / AMPI_Migrate_to_pe resume
+	// from right below, never passing through the sync barrier).
+	CmiIsomallocContextJustMigrated(CmiIsomallocGetThreadContext(getThread()));
     if (asyncMigrate) {
         asyncMigrate = false;
         resume();
@@ -433,6 +431,9 @@ void TCharm::ckJustMigrated() {
 
 void TCharm::ckJustRestored() {
 	ArrayElement::ckJustRestored();
+	// Restored from an in-memory checkpoint: the context was unpacked again,
+	// so its page protections need the same replay as on migration arrival.
+	CmiIsomallocContextJustMigrated(CmiIsomallocGetThreadContext(getThread()));
 }
 
 // If a Tcharm object is about to migrate it should be suspended first
@@ -552,9 +553,8 @@ void TCharm::ResumeFromSync()
 {
   DBG("thread resuming from sync");
 
-  CthThread th = getThread();
-  auto ctx = CmiIsomallocGetThreadContext(th);
-  CmiIsomallocContextJustMigrated(ctx);
+  // Page protections are restored on arrival (ckJustMigrated, ckJustRestored),
+  // which covers both the synchronous and asynchronous migration paths.
 
   if (resumeAfterMigrationCallback.isInvalid())
     start();

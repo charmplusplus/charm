@@ -2,26 +2,14 @@
   Classic Converse API that TCharm and AMPI use and reconverse does not
   provide, for reconverse builds only.
 
-  Reconverse has user-level threads but no thread migration: no isomalloc,
-  no migratable stacks, and no per-thread heap, globals or TLS switching
-  ("interceptions"). The functions declared here and in memory-isomalloc.h
-  are defined in reconverse-compat.C so that TCharm and AMPI build and run
-  without migration:
-    - CthMigratable() returns 0, so TCharm's migrateTo and TCHARM_Migrate
-      print "thread migration is not supported" and return.
-    - CthCreateMigratable creates an ordinary thread with CthCreate.
-    - CthPup aborts: a thread cannot be packed.
-    - CmiIsomallocContextCreate and CmiIsomallocGetThreadContext return a
-      context whose opaque pointer is null; allocations through a context
-      come from malloc and are not migratable.
-    - The interception and globals hooks (CthInterceptions*, CtgInit) do
-      nothing.
-    - CthStackOffset and CthPointer are the identity on addresses, which is
-      correct for a thread whose stack never moves.
+  Thread migration itself is not here: reconverse provides migratable
+  threads (CthCreateMigratable, CthPupThread, CthStackOffset, CthPointer,
+  the CthInterceptions* calls, CmiThreadIs, CtgInit), and Charm++'s
+  isomalloc library (src/conv-core/isomalloc.C, isomalloc-reconverse.C)
+  provides isomalloc and CthPup on top of it. What is left is:
     - CmmPup aborts (see below).
-
-  The four declarations at the end are functions libreconverse defines (with
-  C++ linkage) but its converse.h does not declare.
+    - Four functions libreconverse defines (with C++ linkage) but its
+      converse.h does not declare.
 
   Include after converse.h.
 */
@@ -35,34 +23,10 @@
 extern "C" {
 #endif
 
-/* Thread implementation flags, as in classic converse.h. CmiThreadIs
-   returns 0 for every flag: reconverse threads are fcontext threads with
-   their own malloc'd stack (no alias, stack-copy or TLS-switching flavor). */
-#define CMI_THREAD_IS_QT         (1<<1)
-#define CMI_THREAD_IS_CONTEXT    (1<<2)
-#define CMI_THREAD_IS_UJCONTEXT  (1<<3)
-#define CMI_THREAD_IS_PTHREADS   (1<<4)
-#define CMI_THREAD_IS_FIBERS     (1<<5)
-#define CMI_THREAD_IS_ALIAS      (1<<6)
-#define CMI_THREAD_IS_STACKCOPY  (1<<7)
-#define CMI_THREAD_IS_TLS        (1<<8)
-int CmiThreadIs(int flag);
-
-void CmiPrintStackTrace(int nSkip);
-
-size_t CthStackOffset(CthThread t, char *p);
-char  *CthPointer(CthThread t, size_t pos);
-
-void CtgInit(void);
-
-void CthInterceptionsDeactivatePush(CthThread th);
-void CthInterceptionsDeactivatePop(CthThread th);
-int  CthInterceptionsTemporarilyActivateStart(CthThread th);
-void CthInterceptionsTemporarilyActivateEnd(CthThread th, int old);
-
 /* Reconverse's message manager (CmmTable) has no pup routine. CmmPup aborts:
-   its only callers pack a TCharm client's pending messages for migration or
-   checkpointing, which TCharm does not support on reconverse. */
+   its only caller is mblock's MBlockChunk::pup, which packs a chunk's pending
+   messages, so an mblock chunk cannot migrate or be checkpointed on
+   reconverse. */
 typedef void (*CmmPupMessageFn)(pup_er p, void **msg);
 CmmTable CmmPup(pup_er p, CmmTable t, CmmPupMessageFn msgpup);
 

@@ -1565,16 +1565,20 @@ else
 	BAL_OBJ=("-lldb-$BALANCE" -lconverse)
 fi
 
-# Reconverse links no memory or thread library: libreconverse uses the OS
-# allocator, has one user-level thread implementation, and has no isomalloc
-# (so no thread migration). Say so rather than drop the request silently.
+# Reconverse links no thread library (libreconverse has one user-level thread
+# implementation) and only one memory module, isomalloc, which AMPI uses to
+# put each rank's heap in its migratable context; libreconverse otherwise uses
+# the OS allocator. Say so rather than drop any other request silently.
 if [[ "$CMK_RECONVERSE" = "1" ]]
 then
-  if [[ "$MEMORY" != 'default' ]]
-  then
-    Warning "Warning: -memory $MEMORY is ignored on reconverse, which uses the OS allocator and has no isomalloc (thread migration is not available)."
-    MEMORY='default'
-  fi
+  case "$MEMORY" in
+    'default'|'isomalloc'|'os-isomalloc')
+      ;;
+    *)
+      Warning "Warning: -memory $MEMORY is ignored on reconverse, which supports only -memory isomalloc."
+      MEMORY='default'
+      ;;
+  esac
   if [[ "$THREAD" != 'default' ]]
   then
     Warning "Warning: -thread $THREAD is ignored on reconverse, which has a single user-level thread implementation."
@@ -1640,7 +1644,16 @@ MAKE_LD="0"
 
 if [[ "$CMK_RECONVERSE" = "1" ]]
 then
-	CORE_LIBS=(-lreconverse -lcharm_cxx_utils "${TRACE_OBJ[@]}" -lm)
+	# libisomalloc registers itself with reconverse's thread layer
+	# (isomalloc-reconverse.C), and libck calls into it at startup.
+	CORE_LIBS=(-lisomalloc -lreconverse -lcharm_cxx_utils "${TRACE_OBJ[@]}" -lm)
+
+	# A memory module is linked only when one was asked for; otherwise the
+	# OS allocator is left alone.
+	if [[ "$MEMORY" != 'default' && "$BUILD_SHARE" = '0' && "$USER_INITIATED_SHARED" = '0' ]]
+	then
+	       MIDDLE_LIBS=("${MEM_OBJ[@]}" "${MIDDLE_LIBS[@]}")
+	fi
 else
 	CORE_LIBS=(-lconverse "${TRACE_OBJ[@]}" -lm)
 

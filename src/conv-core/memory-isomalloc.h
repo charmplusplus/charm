@@ -5,7 +5,10 @@ migratable heap allocation to arbitrary clients.
 #define CMK_MEMORY_ISOMALLOC_H
 
 #include <stddef.h>
-#include "conv-config.h"
+/* converse.h supplies CthThread and CmiIsomallocContext, and reconverse's
+   thread layer declares CthMigratable and CthCreateMigratable there. */
+#include "converse.h"
+#include "pup_c.h"
 
 #ifdef __cplusplus
 #include <vector>
@@ -18,10 +21,6 @@ extern "C" {
 int CmiIsomallocEnabled(void);
 
 int CmiIsomallocInRange(void * addr);
-
-typedef struct CmiIsomallocContext {
-  void * opaque;
-} CmiIsomallocContext;
 
 typedef struct CmiIsomallocRegion {
   void * start, * end;
@@ -60,9 +59,7 @@ void CmiIsomallocGetRecordedHeap(CmiIsomallocContext ctx,
 
 /****** Converse Thread functionality that depends on Isomalloc ********/
 
-int CthMigratable(void);
 CthThread CthPup(pup_er, CthThread);
-CthThread CthCreateMigratable(CthVoidFn fn, void * arg, int size, CmiIsomallocContext ctx);
 
 /****** Memory-Isomalloc: malloc wrappers for Isomalloc ********/
 

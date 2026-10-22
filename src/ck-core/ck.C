@@ -2325,6 +2325,10 @@ void StartCharmExt(int argc, char **argv) {
     strcpy(ext_args[i].data(), argv[i]);
     ext_argv[i] = ext_args[i].data();
   }
+  /* Same hand-off as charm_main: the trace and Isomalloc init hooks that
+     reconverse's ConverseInit invokes. */
+  extern void _registerConverseInitHooks();
+  _registerConverseInitHooks();
   ConverseInit(argc, ext_argv.data(), _initCharm, 0, 0);
 }
 

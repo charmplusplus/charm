@@ -218,10 +218,44 @@ jobs:
           cd ../megatest
           timeout 900 $B/_deps/lci-src/lcrun -n 2 ./megatest +pe 4
 
-  # AMPI tier (AMPI port stage 0): TCharm and AMPI build and run on reconverse
-  # without thread migration. tests/ampi is driven by its own Makefile, which
-  # on reconverse leaves out migration and chkpt (no isomalloc or migratable
-  # threads yet); they join this job with the migration stages. megatest is
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+      - name: Install prerequisites
+        run: pip3 install sphinx sphinx_rtd_theme
+      - name: Run sphinx
+        run: |
+          cd doc
+          make html
+
+  shellcheck:
+    # See https://github.com/koalaman/shellcheck/wiki
+    # for explanations of ShellCheck error codes
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: ShellCheck
+        run: |
+          # TODO: add more scripts
+          shellcheck \
+            build \
+            buildcmake \
+            package-tarball.sh \
+            relink.script \
+            src/scripts/commitid.sh \
+            src/scripts/testrun
+
+  # AMPI tier: TCharm and AMPI on reconverse, with migratable threads and
+  # isomalloc. tests/ampi is driven by its own Makefile, which on reconverse
+  # leaves out chkpt. A rank migrating between processes resumes on a stack
+  # holding return addresses into libreconverse, so the multi-process run
+  # disables ASLR (setarch -R; the launcher's children inherit it).
+  # migratable_threads packs and unpacks threads in one process. megatest is
   # run from the same build to show the AMPI build changes nothing for a
   # program that does not link TCharm.
   ampi-linux-x86_64:
@@ -243,7 +277,13 @@ jobs:
           set -e
           # lcrun's file PMI backend shares one fixed rendezvous dir per host; a run that dies mid-bootstrap poisons it and the next launch aborts or hangs (charm #3987, uiuc-hpc/lci#202).
           rm -rf "$HOME/.tmp/lct_pmi_file-"*
-          TESTRUN_PROCS=2 timeout 1800 make -C tests/ampi test
+          TESTRUN_PROCS=2 timeout 1800 setarch "$(uname -m)" -R make -C tests/ampi test
+      - name: migratable_threads
+        run: |
+          set -e
+          B=$PWD/reconverse-linux-x86_64
+          make -C tests/charm++/migratable_threads CHARMC=$B/bin/charmc
+          make -C tests/charm++/migratable_threads test
       - name: megatest from the AMPI build
         run: |
           set -e
