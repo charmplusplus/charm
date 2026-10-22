@@ -2356,8 +2356,15 @@ void ampi::splitPhase1(CkReductionMsg *msg) noexcept
 void ampi::registrationFinish() noexcept
 {
   CkAssert(numCommCreationsInProgress > 0);
-  if (--numCommCreationsInProgress == 0)
+  if (--numCommCreationsInProgress == 0) {
     thisProxy.unblock(); //Matches suspends at end of ampi::commCreate, split, etc.
+    if (unblockRemoteOnFinish) {
+      // MPI_Intercomm_merge: the other group of the intercommunicator is a
+      // separate chare array, blocked in ampi::intercommMerge too.
+      unblockRemoteOnFinish = false;
+      remoteProxy.unblock();
+    }
+  }
 }
 
 void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
@@ -2554,12 +2561,35 @@ void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid 
 }
 
 void ampi::intercommMergePhase1(MPI_Comm nextIntraComm) noexcept {
-  // gets called on two roots, first root creates the comm
-  if(tmpVec.size()==0) return;
+  // Called on both roots once every rank of that root's group has contributed.
+  // The root of the group that goes first (the only one with a non-empty
+  // tmpVec) creates the merged communicator; the other root tells it that its
+  // group has arrived, so that the creating root can resume both groups.
+  if (tmpVec.size() == 0) {
+    remoteProxy[myComm->getIndexForRemoteRank(0)].intercommMergeRemoteReady(nextIntraComm);
+    return;
+  }
+  intercommMergeGroupArrived(nextIntraComm);
+}
 
+void ampi::intercommMergeRemoteReady(MPI_Comm nextIntraComm) noexcept {
+  intercommMergeGroupArrived(nextIntraComm);
+}
+
+void ampi::intercommMergeGroupArrived(MPI_Comm nextIntraComm) noexcept {
+  // The two arrivals (local reduction, remote root's message) can come in
+  // either order. Only create the merged array, and so only resume any rank,
+  // after both groups' ranks are blocked in ampi::intercommMerge.
+  if (nextIntraComm > mergeNextComm) mergeNextComm = nextIntraComm;
+  if (++numMergeGroupsArrived < 2) return;
+  const MPI_Comm nextComm = mergeNextComm;
+  numMergeGroupsArrived = 0;
+  mergeNextComm = 0;
+
+  unblockRemoteOnFinish = true;
   setNumCommCreationsInProgress(1);
   CProxy_ampi newAmpi = createNewChildAmpiSync();
-  insertNewChildAmpiElements(nextIntraComm, newAmpi, COMM_INTRA);
+  insertNewChildAmpiElements(nextComm, newAmpi, COMM_INTRA);
 }
 
 void ampi::topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newComm) noexcept

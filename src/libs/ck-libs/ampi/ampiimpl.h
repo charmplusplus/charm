@@ -2660,6 +2660,14 @@ class ampi final : public CBase_ampi {
     numCommCreationsInProgress = x;
   }
 
+  // Intercommunicator merging (state kept on the root of the group that goes first):
+  // the merged array is created once both groups have contributed, and
+  // registrationFinish then resumes the remote group as well as the local one.
+  int numMergeGroupsArrived{};
+  MPI_Comm mergeNextComm{};
+  bool unblockRemoteOnFinish{};
+  void intercommMergeGroupArrived(MPI_Comm nextIntraComm) noexcept;
+
   // Intercommunicator splitting:
   std::unordered_map<int, CProxy_ampi> splitRProxyMap;
 
@@ -2711,6 +2719,7 @@ class ampi final : public CBase_ampi {
   void registrationFinish() noexcept;
   void intercommCreatePhase1(MPI_Comm nextInterComm) noexcept;
   void intercommMergePhase1(MPI_Comm nextIntraComm) noexcept;
+  void intercommMergeRemoteReady(MPI_Comm nextIntraComm) noexcept;
 
   void exchangeProxyForSplitLocal(int color, CProxy_ampi splitLocalProxy) noexcept {
     auto iter = splitRProxyMap.find(color);
