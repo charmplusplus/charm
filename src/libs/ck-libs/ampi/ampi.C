@@ -1188,7 +1188,13 @@ static void removeUnimportantArrayObjsfromPeCache() noexcept {
   ArrayObjMap& arrayObjs = CkpvAccess(array_objs);
   arrayObjs.erase(pptr->getThread()->ckGetID().getID());
   arrayObjs.erase(pptr->ckGetID().getID());
-  arrayObjs.erase(getAmpiInstance(MPI_COMM_SELF)->ckGetID().getID());
+  /* MPI_COMM_SELF resolves through ckLocal(), which answers null when that
+     element is not on this PE. AMPI_Migrate calls this the moment the rank
+     resumes on a new PE, and the element bound to it need not have arrived
+     yet. Nothing is lost by skipping it: this whole function is cache pruning,
+     and an element that is not here has nothing in this PE's cache to prune. */
+  ampi* self = getAmpiInstance(MPI_COMM_SELF);
+  if (self != NULL) arrayObjs.erase(self->ckGetID().getID());
 }
 
 /*
