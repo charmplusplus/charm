@@ -35,9 +35,7 @@ set(CMK_USE_CMA ${CMK_HAS_CMA})
 # +noCMAForZC. Leaving CMK_USE_CMA on for a reconverse build compiles dead
 # CMA branches into Charm++ and makes the zerocopy tests' +noCMAForZC runs
 # (guarded by CMK_USE_CMA in their Makefiles) abort with a usage error.
-if(RECONVERSE)
-  set(CMK_USE_CMA 0)
-endif()
+set(CMK_USE_CMA 0)
 
 
 # Misc. linker flags (mostly for Charm4py)
@@ -124,12 +122,10 @@ elseif(CMK_HAS_ELF_H AND (CHARM_CPU STREQUAL "i386" OR CHARM_CPU STREQUAL "x86_6
 else()
   set(CMK_SUPPORTS_TLSGLOBALS 0)
 endif()
-if(RECONVERSE)
-  # -tlsglobals needs the runtime to switch the TLS segment between user-level
-  # threads, which reconverse does not do; the compile flags alone would build
-  # programs whose AMPI ranks share their "privatized" globals.
-  set(CMK_SUPPORTS_TLSGLOBALS 0)
-endif()
+# -tlsglobals needs the runtime to switch the TLS segment between user-level
+# threads, which reconverse does not do; the compile flags alone would build
+# programs whose AMPI ranks share their "privatized" globals.
+set(CMK_SUPPORTS_TLSGLOBALS 0)
 
 if(CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY AND CMK_CAN_GET_BINARY_PATH)
   set(CMK_SUPPORTS_FSGLOBALS 1)

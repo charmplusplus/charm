@@ -11,3 +11,7 @@ CMK_LIBS="${CMK_LIBS//-lckqt/}"
 CMK_QT='generic64-light'
 
 CMK_SMP='1'
+
+# Application symbols in reconverse's stack traces (contrib/reconverse/src/backtrace.cpp).
+CMK_LD_FLAGS="$CMK_LD_FLAGS -rdynamic"
+CMK_LDXX_FLAGS="$CMK_LDXX_FLAGS -rdynamic"

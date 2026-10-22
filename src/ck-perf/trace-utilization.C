@@ -60,7 +60,12 @@ void TraceUtilization::beginExecute(envelope *e, void *obj)
 
 void TraceUtilization::beginExecute(int event,int msgType,int ep,int srcPe, int mlen, CmiObjId *idx, void *obj)
 {
-  if (execEp != INVALIDEP) {
+  // Array delivery traces twice: _invokeEntry in ck.C and the detailed
+  // begin in cklocation.C, one inside the other. Count the nesting, as
+  // trace-summary does, and attribute the time to the outer pair.
+  execDepth++;
+  if (execDepth > 1) return;
+  if (execEp != INVALIDEP && execEp != TRACEON_EP) {
     TRACE_WARN("Warning: TraceUtilization two consecutive BEGIN_PROCESSING!\n");
     return;
   }
@@ -72,6 +77,8 @@ void TraceUtilization::beginExecute(int event,int msgType,int ep,int srcPe, int 
 
 void TraceUtilization::endExecute(void)
 {
+  if (execDepth > 0) execDepth--;
+  if (execDepth > 0) return;
 
   if (execEp == TRACEON_EP) {
     // if trace just got turned on, then one expects to see this
@@ -148,6 +155,25 @@ void TraceUtilizationBOC::ccsRequestSumDetailCompressed(CkCcsRequestMsg *m) {
   delete m;
 }
 
+
+
+/** CCS handler "CkPerfSumDetail sts": reply with the sts text (the same
+    lines TraceUtilization::writeSts puts in <traceroot>.util.sts), so a
+    client can map the stream's entry-method indices to names without
+    access to the job's files. Empty reply if the text cannot be built. */
+void TraceUtilizationBOC::ccsRequestSts(CkCcsRequestMsg *m) {
+  char *text = NULL;
+  size_t len = 0;
+  FILE *f = open_memstream(&text, &len);
+  if (f != NULL) {
+    traceWriteSTS(f, 0);
+    fprintf(f, "END\n");
+    fclose(f);
+  }
+  CcsSendDelayedReply(m->reply, (int)len, text != NULL ? text : "");
+  free(text);
+  delete m;
+}
 
 
 void TraceUtilizationBOC::collectSumDetailData() {
@@ -298,10 +324,14 @@ CkReductionMsg *sumDetailCompressedReduction(int nMsg,CkReductionMsg **msgs){
     
     // Read first value from message. 
     // Make sure all messages have the same number of bins
+    // The pop must happen in every build: a CkAssert argument is not
+    // evaluated when error checking is off, which left the bin count of
+    // messages 1..n unread and shifted their parse by four bytes.
+    numBins_T binsInThisMsg = incomingMsgs[i].pop<numBins_T>();
     if(i==0)
-      numBins = incomingMsgs[i].pop<numBins_T>();
+      numBins = binsInThisMsg;
     else 
-      CkAssert( numBins ==  incomingMsgs[i].pop<numBins_T>() );
+      CkAssert( numBins == binsInThisMsg );
     
     // Read second value from message. 
     numProcsRepresentedInMessage[i] = incomingMsgs[i].pop<numProcs_T>();
