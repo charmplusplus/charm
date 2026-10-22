@@ -21,7 +21,7 @@ Substantially rewritten by Evan Ramos in 2019.
  *************************************************************************/
 
 #include "converse.h"
-#include "conv-autoconfig.h"   /* CMK_RECONVERSE */
+#include "conv-autoconfig.h"   /* CMK_HAS_MMAP and other feature tests */
 #include "memory-isomalloc.h"
 #include "pup.h"
 #include "pup_stl.h"
@@ -64,7 +64,7 @@ Substantially rewritten by Evan Ramos in 2019.
 #if CMK_HAS_ADDR_NO_RANDOMIZE
 #include <sys/personality.h>
 #endif
-#if CMK_RECONVERSE && defined(__APPLE__)
+#if defined(__APPLE__)
 #include <mach-o/dyld.h> /* _dyld_get_image_vmaddr_slide */
 #endif
 
@@ -734,7 +734,6 @@ struct CmiAddressSpaceRegionMsg
   CmiAddressSpaceRegion region;
 };
 
-#if CMK_RECONVERSE
 /* Reconverse's node reduction carries whole messages and hands the root's
    copy to that message's handler, where classic Converse reduced a pupped
    struct and called a completion function. Same intersection, different
@@ -757,7 +756,6 @@ static void * CmiAddressSpaceRegionMergeMsg(int * size, void * data,
 
   return data;
 }
-#endif
 
 static std::atomic<bool> CmiIsomallocSyncHandlerDone{};
 #if CMK_SMP && !CMK_SMP_NO_COMMTHD
@@ -794,7 +792,6 @@ static void CmiIsomallocSyncReductionHandler(void * data)
 
   CmiIsomallocSyncHandlerDone = true;
 }
-#if CMK_RECONVERSE
 /* Root of the Reconverse node reduction: the message that arrives holds the
    intersection of every node's usable range. */
 static void CmiIsomallocSyncReductionHandlerMsg(void * msg)
@@ -805,7 +802,6 @@ static void CmiIsomallocSyncReductionHandlerMsg(void * msg)
   CmiIsomallocSyncHandlerDone = true;
 }
 static int CmiIsomallocSyncReduceHandlerIdx;
-#endif
 static void CmiIsomallocSyncBroadcastHandler(void * msg)
 {
   const CmiAddressSpaceRegion region = ((CmiAddressSpaceRegionMsg *)msg)->region;
@@ -886,9 +882,7 @@ static void CmiIsomallocInitExtent(char ** argv)
 
   auto nosync = CmiGetArgFlagDesc(argv, "+no_isomalloc_sync", "disable global synchronization of isomalloc region");
   CmiAssignOnce(&CmiIsomallocSyncBroadcastHandlerIdx, CmiRegisterHandler(CmiIsomallocSyncBroadcastHandler));
-#if CMK_RECONVERSE
   CmiAssignOnce(&CmiIsomallocSyncReduceHandlerIdx, CmiRegisterHandler(CmiIsomallocSyncReductionHandlerMsg));
-#endif
 
 #if __FAULT__
   if (CmiIsomallocRestart)
@@ -947,7 +941,6 @@ static void CmiIsomallocInitExtent(char ** argv)
       SYNC_DBG("Isomalloc> Node %d sending region for comparison: %" PRIx64 " %" PRIx64 "\n",
                CmiMyNode(), IsoRegion.s, IsoRegion.e);
 
-#if CMK_RECONVERSE
       {
         auto * red = (CmiAddressSpaceRegionMsg *)CmiAlloc(sizeof(CmiAddressSpaceRegionMsg));
         CmiInitMsgHeader(red->converseHeader, sizeof(CmiAddressSpaceRegionMsg));
@@ -955,10 +948,6 @@ static void CmiIsomallocInitExtent(char ** argv)
         CmiSetHandler((char *)red, CmiIsomallocSyncReduceHandlerIdx);
         CmiNodeReduce(red, sizeof(CmiAddressSpaceRegionMsg), CmiAddressSpaceRegionMergeMsg);
       }
-#else
-      CmiNodeReduceStruct(&IsoRegion, CmiAddressSpaceRegionPup, CmiAddressSpaceRegionMerge,
-                          CmiIsomallocSyncReductionHandler, nullptr);
-#endif
 
       CmiIsomallocSyncWait(CmiIsomallocSyncHandlerDone);
 
@@ -975,7 +964,6 @@ static void CmiIsomallocInitExtent(char ** argv)
 
         CsdSchedulePoll();
 
-#if CMK_RECONVERSE
         /* Every program on reconverse initializes Isomalloc, and most never
            create a migratable thread, so a job whose processes have no free
            range in common (seen on macOS, where ASLR moves the heap and
@@ -987,15 +975,6 @@ static void CmiIsomallocInitExtent(char ** argv)
                     IsoRegion.s, IsoRegion.e);
         else if (CmiMyPe() == 0)
           CmiPrintf("Isomalloc> Synchronized global address space.\n");
-#else
-        if (IsoRegion.s >= IsoRegion.e)
-          CmiAbort("Isomalloc> failed to find consolidated region: %" PRIx64 " - %" PRIx64 ".\n"
-                   "Try running with +no_isomalloc_sync if you do not need this functionality.\n",
-                   IsoRegion.s, IsoRegion.e);
-
-        if (CmiMyPe() == 0)
-          CmiPrintf("Isomalloc> Synchronized global address space.\n");
-#endif
 
         SYNC_DBG("Charm++> Consolidated Isomalloc memory region: %p - %p (%" PRId64 " MB).\n",
                  (void *)IsoRegion.s, (void *)IsoRegion.e, (IsoRegion.e - IsoRegion.s) / meg);
@@ -2609,7 +2588,6 @@ int CmiIsomallocInRange(void * addr)
 extern int num_workpes, total_pes;
 #endif
 
-#if CMK_RECONVERSE
 /* Whether the kernel randomizes this process's address space, as read once at
    initialization. Isomalloc itself is unaffected -- it negotiates its region --
    but migrating a user-level thread is not, so the answer is published for the
@@ -2633,14 +2611,11 @@ int CmiIsomallocAddressSpaceIsRandomized(void)
 {
   return CmiIsomallocAslr;
 }
-#endif
 
 void CmiIsomallocInit(char ** argv)
 {
-#if CMK_RECONVERSE
   if (CmiMyRank() == 0)
     CmiIsomallocAslr = CmiIsomallocReadAslr();
-#endif
 
 #if CMK_CONVERSE_MPI && (CMK_MEM_CHECKPOINT || CMK_MESSAGE_LOGGING)
   if (num_workpes != total_pes)
