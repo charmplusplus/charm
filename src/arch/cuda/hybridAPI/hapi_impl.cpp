@@ -197,6 +197,7 @@ static bool hapi_use_flag_poll = false;
 static void hapiSubmitStart(int nsub, int device);   // submitter threads, defined with recordEvent
 static void hapiSubmitSetToken(uint64_t token);
 static void hapiSetStreamCap(int cap);
+static void hapiStreamCapAnnounce();   // prints the cap in force (the HIP default is 32), defined with the pool
 static void hapiSetRecvPriority();
 typedef hapiDrvResult (*hapiStreamWriteValue32Fn)(hapiDrvStream, uintptr_t, uint32_t, unsigned int);
 static hapiStreamWriteValue32Fn hapi_stream_write_value32 = nullptr;
@@ -237,7 +238,42 @@ static hapiMemsetD32AsyncFn hapi_memset_d32_async = nullptr;
 static hipError_t hapiHipStreamWriteValue32(hipStream_t s, uintptr_t p, uint32_t v, unsigned int flags) {
   return hipStreamWriteValue32(s, (void*)p, v, flags);
 }
+// hipMemsetD32Async's completion makes its own write visible but releases nothing else at system
+// scope: a kernel's or a small (blit) copy's writes queued before it can still sit in this device's
+// L2 when the flag lands, and a peer device or process that reads that memory on the signal reads the
+// old contents (MI250X, ROCm 7.14: a 32 KB fill or copy on device 0, the flag, a copy from a device-1
+// stream -- stale in 200 of 200 trials; chantest's ipc puts and +LBAsync snapshots). An event record
+// ahead of the memset carries the system-scope release (with hipEventDisableSystemFence the reads go
+// stale again), so one per device is recorded, never queried, before every flag. CUDA needs none.
+// +gpuflagkernel: the flag written by a one-thread kernel whose __threadfence_system() is the release
+// (hapi_kernels.cu), one launch per flag instead of an event record and a blit.
+extern "C" int hapiFlagKernelImpl(void* p, unsigned int v, void* stream);
+// The HIP default (Frontier 2026-10-22): validated on the cross-device stale-read repro (vmmtest/flag_kernel,
+// 0 of 200 stale for kernel- and copy-written data, against 200 of 200 for the memset without its fence
+// event), 11 us of host time per flag against 26 for the event record and the blit, and leanmd's balancer
+// arm 104 -> 84 ms/step. +gpuflagmemset restores the event-record-and-memset writer.
+static bool hapi_flag_kernel = true;
+static hipError_t hapiHipFlagKernelWrite(uintptr_t p, unsigned int v, size_t n, hipStream_t s) {
+  (void)n;
+  return (hipError_t)hapiFlagKernelImpl((void*)p, v, (void*)s);
+}
 static hipError_t hapiHipMemsetD32Async(uintptr_t p, unsigned int v, size_t n, hipStream_t s) {
+  if (hapi_flag_kernel) return hapiHipFlagKernelWrite(p, v, n, s);
+  thread_local std::vector<hipEvent_t> fence;   // per thread: PEs and submitters record their own
+  hipDevice_t dev = 0;
+  hipError_t r = hipStreamGetDevice(s, &dev);
+  if (r != hipSuccess) return r;
+  if ((size_t)dev >= fence.size()) fence.resize(dev + 1, nullptr);
+  if (fence[dev] == nullptr) {
+    int saved = 0;
+    hipGetDevice(&saved);
+    hipSetDevice(dev);
+    r = hipEventCreateWithFlags(&fence[dev], hipEventDisableTiming);
+    hipSetDevice(saved);
+    if (r != hipSuccess) { fence[dev] = nullptr; return r; }
+  }
+  r = hipEventRecord(fence[dev], s);
+  if (r != hipSuccess) return r;
   return hipMemsetD32Async((hipDeviceptr_t)p, (int)v, n, s);
 }
 #endif
@@ -696,6 +732,7 @@ static inline void hapiCuptiLaneClose(CuptiEntryLane& ln) {   // owner, under th
 // Drop what no later drain can ask about: the spans closed before the owner's arrival two windows
 // ago (a record is delivered at most one drain late). Owner, under the log's mutex.
 static void hapiCuptiLanePrune(CuptiEntryLane& ln, uint64_t cutoff) {
+  if (ln.spans.empty()) return;   // a lane nothing was logged in (the tag lane of an untagged run)
   // Keep from the last span that started before the cutoff (it may still cover times after it).
   size_t k = std::lower_bound(ln.spans.begin(), ln.spans.end(), cutoff,
                               [](const CuptiEntrySpan& sp, uint64_t t) { return sp.start < t; }) - ln.spans.begin();
@@ -2044,6 +2081,12 @@ static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::v
 
         GpuLaunchSignature launch;
         bool bucket_settled = true;
+        // The kernel's identity for the audit's unowned-by-kernel breakdown, scaling or not.
+        static const bool audit_names = (getenv("CHARM_GPU_LOAD_AUDIT") != nullptr);
+        if (audit_names && !scaling) {
+          rec.kernel_key.kernelClass = gpuStableKernelClass(kernel->name);
+          sh.kernel_names.emplace(rec.kernel_key.kernelClass, kernel->name != nullptr ? kernel->name : "");
+        }
         if (scaling) {
           launch.gridX = kernel->gridX;
           launch.gridY = kernel->gridY;
@@ -2056,7 +2099,7 @@ static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::v
           rec.kernel_key.kernelClass = gpuStableKernelClass(kernel->name);
           rec.kernel_key.workBucket = gpuStableWorkBucket(launch, false, 0);
 
-          if (_lb_args.debug() > 0) {
+          if (_lb_args.debug() > 0 || audit_names) {
             const char* kernel_name = kernel->name != nullptr ? kernel->name : "";
             auto inserted = sh.kernel_names.emplace(rec.kernel_key.kernelClass, kernel_name);
             if (!inserted.second && inserted.first->second != kernel_name)
@@ -2629,7 +2672,7 @@ void hapiNormalizeCuptiLoads(int onlyDevice) {
     if (win_prev > 0 && k.end_ns <= win_prev) continue;
     const uint64_t start = (win_prev > 0 && k.start_ns < win_prev) ? win_prev : k.start_ns;
     byDevice[k.device_id].push_back({LDObjKey{}, start, k.end_ns, k.sms_used,
-                                     false, GpuKernelKey{}, true, 0.0});
+                                     false, k.kernel_key, true, 0.0});   // the key names it in the audit
   }
 
   // Per-object accumulators. Components are gathered in a hash map and only
@@ -2934,6 +2977,20 @@ void hapiNormalizeCuptiLoads(int onlyDevice) {
               CmiMyPe(), gm.cupti_api_total_, gm.cupti_driver_busy_,
               (gm.cupti_driver_busy_ > 0.0) ? gm.cupti_api_total_ / gm.cupti_driver_busy_ : 0.0,
               window_s, (window_s > 0.0) ? gm.cupti_driver_busy_ / window_s : 0.0);
+    // The unowned work by kernel, named under +LBDebug 1: the runtime's own kernels, or an
+    // attribution that lost the launch (its API record, thread or span).
+    std::unordered_map<uint64_t, double> unowned_by_class;
+    for (SweepJob& job : jobs)
+      for (const SweepKernel& k : *job.kernels)
+        if (!k.attributed && k.demand > 0.0) unowned_by_class[k.kernel_key.kernelClass] += k.demand;
+    std::vector<std::pair<double, uint64_t>> top;
+    for (auto& kv : unowned_by_class) top.push_back({kv.second, kv.first});
+    std::sort(top.rbegin(), top.rend());
+    for (size_t i = 0; i < top.size() && i < 6; i++) {
+      auto it = gm.cupti_kernel_names_.find(top[i].second);
+      CmiPrintf("[gpu-audit pe=%d]   unowned %.6f s  %s\n", CmiMyPe(), top[i].first,
+                it != gm.cupti_kernel_names_.end() ? it->second.c_str() : "(class unnamed)");
+    }
     fflush(stdout);
   }
 }
@@ -3509,8 +3566,15 @@ static void hapiMapping(char** argv) {
   // +gpustreams N: cap on shared application streams per device (see the pool).
   {
     int cap = 0;
-    if (CmiGetArgIntDesc(argv, "+gpustreams", &cap, "application streams per GPU, shared by chares (0 = one per chare)") && cap > 0)
+#if CMK_HIP
+    if (CmiGetArgFlagDesc(argv, "+gpuflagmemset", "completion flags written by an event record and hipMemsetD32Async (the pre-2026-10-22 writer)"))
+      hapi_flag_kernel = false;
+    CmiGetArgFlagDesc(argv, "+gpuflagkernel", "completion flags written by a one-thread kernel with a system-scope fence (the HIP default)");
+    if (CmiMyPe() == 0) CmiPrintf("HAPI> Completion flags: %s\n", hapi_flag_kernel ? "written by a flag kernel (HIP default; +gpuflagmemset for the event record and memset)" : "written by an event record and a memset");
+#endif
+    if (CmiGetArgIntDesc(argv, "+gpustreams", &cap, "application streams per GPU, shared by chares (0 = one per chare)"))
       hapiSetStreamCap(cap);
+    else hapiStreamCapAnnounce();
   }
   // +gpusubmit: the runtime's own driver calls go through submitter threads
   // (+gpusubmitters N per GPU, default 1). Needs the pinned-flag path: a queued
@@ -4042,8 +4106,46 @@ static thread_local uint64_t hapi_submit_cur_token = 0;
 // submitter: fn(state) runs on the submitter thread. `bytes` of state are copied
 // into the queue entry, so it must be trivially copyable and at most
 // HAPI_SUBMIT_INLINE bytes. With the mode off it runs here, at once.
+// CHARM_ZC_STATS: where the host time of a completion callback and of an inline closure submit goes
+// (Frontier 2026-10-22: a same-host channel batch flush cost 54-76 us, a cross-host put's persistent
+// put 25-42 us, while the HIP calls themselves measure 1-4 us in isolation).
+namespace {
+struct HapiCostStats {
+  std::atomic<long> dev_n{0}, dev_us{0}, flag_n{0}, flag_us{0}, push_n{0}, push_us{0}, gate_n{0}, gate_us{0}, fn_n{0}, fn_us{0};
+  std::atomic<long> poll_n{0}, poll_us{0}, poll_max_us{0};   // hapiPollEvents, the scheduler-loop callback
+  static void addmax(std::atomic<long>& n, std::atomic<long>& us, std::atomic<long>& mx, double t0) {
+    const long d = (long)((CmiWallTimer() - t0) * 1e6); n.fetch_add(1, std::memory_order_relaxed); us.fetch_add(d, std::memory_order_relaxed);
+    long m = mx.load(std::memory_order_relaxed); while (d > m && !mx.compare_exchange_weak(m, d, std::memory_order_relaxed)) {}
+  }
+  static bool on() { static const bool v = getenv("CHARM_ZC_STATS") != nullptr; return v; }
+  static void print() {
+    HapiCostStats& c = get();
+    fprintf(stderr, "[hapi-cost] pid=%d callback: device lookup n=%ld (%.2f us), flag write n=%ld (%.2f us), queue push n=%ld (%.2f us); "
+            "inline submit: gate n=%ld (%.2f us), closure n=%ld (%.2f us); hapiPollEvents n=%ld (%.2f us, max %.2f ms)\n", (int)getpid(),
+            c.dev_n.load(), c.dev_n.load() ? c.dev_us.load() / (double)c.dev_n.load() : 0.0,
+            c.flag_n.load(), c.flag_n.load() ? c.flag_us.load() / (double)c.flag_n.load() : 0.0,
+            c.push_n.load(), c.push_n.load() ? c.push_us.load() / (double)c.push_n.load() : 0.0,
+            c.gate_n.load(), c.gate_n.load() ? c.gate_us.load() / (double)c.gate_n.load() : 0.0,
+            c.fn_n.load(), c.fn_n.load() ? c.fn_us.load() / (double)c.fn_n.load() : 0.0,
+            c.poll_n.load(), c.poll_n.load() ? c.poll_us.load() / (double)c.poll_n.load() : 0.0, c.poll_max_us.load() / 1e3);
+  }
+  static HapiCostStats& get() { static HapiCostStats* s = [] { HapiCostStats* p = new HapiCostStats; atexit(print); return p; }(); return *s; }
+  static void add(std::atomic<long>& n, std::atomic<long>& us, double t0) {
+    n.fetch_add(1, std::memory_order_relaxed); us.fetch_add((long)((CmiWallTimer() - t0) * 1e6), std::memory_order_relaxed);
+  }
+};
+}  // namespace
+
 void hapiSubmitClosure(hapiStream_t stream, void (*fn)(void*), const void* state, size_t bytes) {
-  if (hapi_submit == nullptr) { CuptiGateShared gate; fn(const_cast<void*>(state)); return; }
+  if (hapi_submit == nullptr) {
+    const bool cost = HapiCostStats::on();
+    double tc = cost ? CmiWallTimer() : 0.0;
+    CuptiGateShared gate;
+    if (cost) { HapiCostStats& c = HapiCostStats::get(); HapiCostStats::add(c.gate_n, c.gate_us, tc); tc = CmiWallTimer(); }
+    fn(const_cast<void*>(state));
+    if (cost) { HapiCostStats& c = HapiCostStats::get(); HapiCostStats::add(c.fn_n, c.fn_us, tc); }
+    return;
+  }
   if (bytes > HAPI_SUBMIT_INLINE) CmiAbort("hapiSubmitClosure: %zu bytes of state, at most %zu fit", bytes, HAPI_SUBMIT_INLINE);
   HapiSubmitOp op{};
   op.kind = HAPI_SUBMIT_CLOSURE; op.stream = stream; op.fn = fn; op.token = hapi_submit_cur_token;
@@ -4088,6 +4190,8 @@ static std::queue<hapiEvent>& hapiQueueFor(hapiStream_t stream) {
 }
 
 void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
+  const bool cost = HapiCostStats::on();
+  double tc = cost ? CmiWallTimer() : 0.0;
   // if(obj!=NULL)
   //   CmiAbort("non null without HAPI CUDA CALLBACK");
   // create CUDA event / get CUDA event from the pool and insert into stream
@@ -4102,6 +4206,7 @@ void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
   int prev_dev = -1;
   hapiCheck(hapiGetDevice(&prev_dev));
   const int use_dev = (stream_dev >= 0) ? stream_dev : prev_dev;
+  if (cost) { HapiCostStats& c = HapiCostStats::get(); HapiCostStats::add(c.dev_n, c.dev_us, tc); tc = CmiWallTimer(); }
 
   // Pinned-flag path (the default): no event object, no query later. Only for
   // a stream on this PE's own device -- the ring's device alias belongs to
@@ -4130,6 +4235,7 @@ void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
     if (res != hapiDrvSuccess)
       CmiAbort("HAPI> %s failed (%d); rerun with +gpueventquery",
                hapi_flag_use_memset ? "cuMemsetD32Async" : "cuStreamWriteValue32", (int)res);
+    if (cost) { HapiCostStats& c = HapiCostStats::get(); HapiCostStats::add(c.flag_n, c.flag_us, tc); tc = CmiWallTimer(); }
     hapi_flag_writes_total.fetch_add(1, std::memory_order_relaxed);
     hapiTraceFlag((void*)stream, seq);
     hapiEvent hev(NULL, cb, cb_msg, wr);
@@ -4137,6 +4243,7 @@ void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
     CpvAccess(hapi_flag_inflight)++;
     hapiQueueFor(stream).push(hev);
     CpvAccess(n_hapi_events)++;
+    if (cost) { HapiCostStats& c = HapiCostStats::get(); HapiCostStats::add(c.push_n, c.push_us, tc); }
     return;
   }
 
@@ -5054,7 +5161,6 @@ static void* hapiVmmImportLocked(const hapiIpcMemHandle_t& handle, int src_proce
     if (r != hapiDrvSuccess)
       CmiAbort("HAPI> [%d] vmm import: cuMemImportFromShareableHandle(chunk %zu of process %d): %s",
                CmiMyPe(), m.mapped, src_process, hapiCuErrNameIpc(r));
-    close(fd);
     const uintptr_t at = m.base + (uintptr_t)(m.mapped * m.chunk);
     r = hapiDrvMemMap(at, m.chunk, 0, h, 0);
     if (r != hapiDrvSuccess)
@@ -5063,6 +5169,9 @@ static void* hapiVmmImportLocked(const hapiIpcMemHandle_t& handle, int src_proce
     // The import cache is process-wide: a PE on another of this process's devices reuses
     // this mapping, so every local device gets access, not only the importing PE's.
     r = hapiVmmSetAccessAllLocal(at, m.chunk, cur_dev, "vmm import", m.entry->dev);
+    // Closed only after the grant: ROCm resolves the imported descriptor at hipMemSetAccess and
+    // refuses it with hipErrorInvalidValue once the fd is closed (ROCm 7.14, MI250X); CUDA does not care.
+    close(fd);
     if (r != hapiDrvSuccess)
       CmiAbort("HAPI> [%d] vmm import: cuMemSetAccess(chunk %zu) from device %d: %s (peer "
                "access between the devices is required)", CmiMyPe(), m.mapped, cur_dev,
@@ -6147,7 +6256,7 @@ bool hapiDevPoolVmmPublish(int dev, hapi_pool_shm_entry* e, int shm_index,
              "descriptors, so peers cannot map the heap; use +gpupoolalloc buddy",
              CmiMyPe(), dev);
   v->publish(e, shm_index);
-  e->dev = dev;
+  e->dev = v->cudaDev;   // the physical ordinal: importers compare it with their own devices
   hapiVmmMakeHandle(handle, (uint64_t)v->heap.base(), v->heap.reserveBytes(),
                     v->heap.chunkBytes(), e->pid, shm_index, CmiMyNode());
   return true;
@@ -6978,6 +7087,8 @@ extern "C" void hapiDumpEventQueues(int max_streams) {
 }
 
 void hapiPollEvents(void* param) {
+  struct PollTimer { double t0; ~PollTimer() { if (t0 != 0.0) { HapiCostStats& c = HapiCostStats::get(); HapiCostStats::addmax(c.poll_n, c.poll_us, c.poll_max_us, t0); } } }
+    poll_timer{HapiCostStats::on() ? CmiWallTimer() : 0.0};
 #ifndef HAPI_CUDA_CALLBACK
   if (CpvAccess(n_hapi_events) <= 0) return;
 
@@ -7067,7 +7178,16 @@ std::unordered_map<void*, int> hapi_stream_owner;
 // only a GPU-side ordering lane; the device has CUDA_DEVICE_MAX_CONNECTIONS
 // hardware channels (32 here), so leanmd's ~1,900 streams per GPU were already
 // sharing them, ~60 to a channel, in an order the driver chose. 0 = unbounded.
+// Frontier 2026-10-22: hipStreamCreate costs ~13 ms on ROCm 7.14 (20 us on CUDA), and the balancer's net
+// arrivals on a device each created one, blocking the destination PE for the whole burst (a channel move's
+// hold 184-206 ms, its destination-side landing 46 ms); 32 shared streams per device cut that to 111 / 2.6 ms
+// and the channel step from 146 to 109 ms. So HIP defaults to a cap of 32 (+gpustreams 0 restores one per
+// chare); CUDA keeps one stream per chare.
+#if CMK_HIP
+int hapi_stream_cap = 32;
+#else
 int hapi_stream_cap = 0;
+#endif
 struct HapiSharedStream { hapiStream_t stream; int bound; };
 std::map<int, std::vector<HapiSharedStream>> hapi_stream_shared;
 // Constructed before any PE thread exists. It used to be a CmiNodeLock created
@@ -7112,9 +7232,14 @@ static void hapiSetRecvPriority() {
   hapi_recv_priority = true;
 }
 
+static void hapiStreamCapAnnounce() {
+  if (hapi_stream_cap > 0 && CmiMyPe() == 0)
+    CmiPrintf("HAPI> Application streams: at most %d per GPU, shared by the chares bound to them (HIP default; +gpustreams N, 0 = one per chare)\n", hapi_stream_cap);
+}
 static void hapiSetStreamCap(int cap) {
+  if (cap < 0) cap = 0;
   if (hapi_stream_cap != cap && CmiMyPe() == 0)
-    CmiPrintf("HAPI> Application streams: at most %d per GPU, shared by the chares bound to them\n", cap);
+    CmiPrintf("HAPI> Application streams: %s%d per GPU%s\n", cap > 0 ? "at most " : "one per chare (", cap > 0 ? cap : 0, cap > 0 ? ", shared by the chares bound to them" : ")");
   hapi_stream_cap = cap;   // same value from every PE, before any chare exists
 }
 

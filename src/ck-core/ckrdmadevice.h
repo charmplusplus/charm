@@ -1,4 +1,5 @@
 #include <map>
+#include <vector>
 #ifndef _CKRDMADEVICE_H_
 #define _CKRDMADEVICE_H_
 
@@ -219,10 +220,11 @@ public:
 
   // Runtime side (the converse handlers below).
   void onCredit(uint64_t seq, uint64_t epoch_);
+  void creditedPut(uint64_t seq);
   void onClosing(uint64_t gen_, int owner_pe, uint64_t epoch_);
   void onResolved(const CkDevicePersistent& ep, uint64_t gen_, int owner_pe, bool free, uint64_t epoch_,
                   int credit_pe = -1, int credit_slot = -1, int signal_slot_ = -1,
-                  const CmiNcpyBuffer* signal_hdr_ = NULL);
+                  const CmiNcpyBuffer* signal_hdr_ = NULL, uint64_t taken_seq_ = 0);
   void retireSignalSlot();     // owner: give the slot of the current resolution back
   void stashSignalSlot();      // owner: keep it for the closing ack to release (pack, or a reply before the ack)
   void pollShmCredit();        // sender: take credits the owner granted through shared memory
@@ -245,6 +247,16 @@ public:
   void packForMigration();
   // One line of state when something is stuck (CHARM_DEBUG_MIGRATE scan).
   void describeStall(const char* role) const;
+  friend void CkRdmaDeviceChannelsStandDownWhy(CkLocRec* rec, int* own_inflight, int* own_pending, int* acks);
+  // The last events on this object (both roles), kept always and printed by
+  // describeStall: what a stall needs explained, without the full trace
+  // (CHARM_DEBUG_SIGNAL costs gigabytes per run and slows the race).
+  struct Hist { uint8_t kind; int32_t pe; int32_t slot; int32_t n; uint64_t seq; uint64_t epoch; double t; };
+  enum { HIST_N = 24 };
+  Hist hist[HIST_N];
+  uint32_t hist_n = 0;
+  void note(uint8_t kind, uint64_t seq, uint64_t epoch_, int pe = -1, int slot = -1, int n = 0);
+  void printHist(const char* role) const;
   // The element moved to another PE of this process without a pup (the
   // intra-process handoff): the object is the same, the buffer and its exports
   // stay valid, only the per-PE registrations move.
@@ -260,6 +272,7 @@ private:
   void issueStaged(const void* src, size_t bytes, hapiStream_t stream, const CkCallback& src_done,
                    uint64_t tag);
   void requestResolve();
+  void awaitShmCredit();
   void replyResolve(int pe, uint64_t token);
   void takeOver(const CkDeviceChannel& o);
   void registerOwner();
@@ -297,6 +310,7 @@ private:
   int departed_signal_pe;   //   was granted once the sender's acked last put has been taken there
   CmiNcpyBuffer signal_hdr;
   size_t landed_unseen;     // see unseenBytes()
+  uint64_t landed_seq;      // owner: the put those bytes are (from the close ack), 0 once taken
   size_t last_put_bytes;    // sender: bytes of the last put written into the buffer (carried by the closing ack)
   uint64_t last_direct_seq; // sender: that put's seq. Staged puts (announced, never written) are not the ack's business.
   int sender_pe;            // the resolved sender: where credits and closings go
@@ -330,6 +344,10 @@ private:
   uint64_t closed_epoch;    // sender: the newest resolution a closing was acked for; a Resolved or Credit of it (or older) is stale
   int in_flight;
   int staged_outstanding;   // sender: puts staged and announced, not yet read by the receiver (its DONE)
+  uint64_t acct_seq;        // sender: the last put the receiver had taken at the current resolution's reply; its free flag covers puts up to it
+  bool occupant_credit_due; // sender: the put held at that reply is still to be credited (the first credit of this resolution is its)
+  std::vector<uint64_t> direct_issued;   // sender: direct puts issued and not yet credited back, in order
+  std::vector<uint64_t> dones_seen;      // sender: staged puts the receiver read while this copy was unresolved, reconciled at the next resolution
   bool close_ack_due;
   int close_ack_pe;
   uint64_t my_token;        // this copy's entry in its PE's token table, 0 if none
@@ -369,6 +387,7 @@ void CkDeviceChannelControl(void* msg);
 // outstandingDeviceSends per awaited ack); then, once past the stand-down,
 // retire the channels' exports before the pack.
 void CkRdmaDeviceChannelsBeforeMigrate(CkLocRec* rec);
+void CkRdmaDeviceChannelsStandDownWhy(CkLocRec* rec, int* own_inflight, int* own_pending, int* acks);
 // From CkCallstackPop: launch the entry method's batched channel puts while it is still the attributed object.
 void CkRdmaDeviceChannelBatchFlush();
 void CkRdmaDeviceChannelsPack(CkLocRec* rec);

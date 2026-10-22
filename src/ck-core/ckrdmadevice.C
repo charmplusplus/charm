@@ -662,6 +662,11 @@ struct ZcModeStats {
   // puts had to wait for a credit or a resolution; the owner's taken events.
   std::atomic<long> put_n[3]{{0},{0},{0}};
   std::atomic<long> put_us[3]{{0},{0},{0}};
+  // Where a cross-host put's host time goes (issue): the source endpoint's open (export + registration),
+  // the persistent put (context, op info, the stream callback), and the same-host batch flush.
+  std::atomic<long> chan_open_n{0}, chan_open_us{0}, chan_rput_n{0}, chan_rput_us{0}, chan_flush_n{0}, chan_flush_us{0};
+  // The scheduler-loop polls (every iteration): total and the longest single call.
+  std::atomic<long> shmpoll_n{0}, shmpoll_us{0}, shmpoll_max{0}, recvpoll_n{0}, recvpoll_us{0}, recvpoll_max{0};
   std::atomic<long> put_pending{0};
   std::atomic<long> put_staged{0};    // puts staged and announced while the receiver was closed
   std::atomic<long> chan_batches{0};  // channel put batches flushed, their puts, the largest, batched-copy refusals
@@ -703,6 +708,13 @@ struct ZcModeStats {
                       "unresolved %ld (%.2f us); queued for a credit %ld, staged %ld; events taken %ld, notes as immediate data %ld\n",
               (int)getpid(), pn0, pn0 ? put_us[0].load() / (double)pn0 : 0.0, pn1, pn1 ? put_us[1].load() / (double)pn1 : 0.0,
               pn2, pn2 ? put_us[2].load() / (double)pn2 : 0.0, put_pending.load(), put_staged.load(), event_n.load(), signal_n.load());
+      fprintf(stderr, "[chan-poll] pid=%d shm note/credit poll n=%ld (%.2f us, max %.2f ms); pending-receive poll n=%ld (%.2f us, max %.2f ms)\n",
+              (int)getpid(), shmpoll_n.load(), shmpoll_n.load() ? shmpoll_us.load() / (double)shmpoll_n.load() : 0.0, shmpoll_max.load() / 1e3,
+              recvpoll_n.load(), recvpoll_n.load() ? recvpoll_us.load() / (double)recvpoll_n.load() : 0.0, recvpoll_max.load() / 1e3);
+      fprintf(stderr, "[chan-cost] pid=%d cross-host issue: open n=%ld (%.2f us), rput n=%ld (%.2f us); same-host batch flush n=%ld (%.2f us)\n",
+              (int)getpid(), chan_open_n.load(), chan_open_n.load() ? chan_open_us.load() / (double)chan_open_n.load() : 0.0,
+              chan_rput_n.load(), chan_rput_n.load() ? chan_rput_us.load() / (double)chan_rput_n.load() : 0.0,
+              chan_flush_n.load(), chan_flush_n.load() ? chan_flush_us.load() / (double)chan_flush_n.load() : 0.0);
     if (chan_batches.load() > 0)
       fprintf(stderr, "[chan-stats] pid=%d put batches %ld for %ld puts (%.1f per batch, largest %ld), batched-copy refusals %ld\n",
               (int)getpid(), chan_batches.load(), chan_batch_ops.load(), chan_batch_ops.load() / (double)chan_batches.load(),
@@ -813,6 +825,9 @@ struct ChanSignalMsg { char core[CmiMsgHeaderSizeBytes]; int slot; uint64_t size
 
 std::mutex chan_signal_lock;              // table allocation, process-wide
 ChanSignalEntry* chan_signal_table = nullptr;
+// CHARM_DEBUG_SIGNAL: the cross-host signal path alone (slots, headers, notes, resolutions and closings),
+// a few lines per put rather than the whole protocol trace of CHARM_DEBUG_MIGRATE.
+static bool chanSignalDebug() { static const bool on = getenv("CHARM_DEBUG_SIGNAL") != nullptr || getenv("CHARM_DEBUG_MIGRATE") != nullptr; return on; }
 ChanSignalHdr* chan_signal_hdr = nullptr; // the registered header region
 CmiNcpyBuffer chan_signal_hdr_region;     // its registration, pupped into Resolved replies
 std::vector<int> chan_signal_free;
@@ -869,6 +884,9 @@ static int chanSignalAlloc(const CkCallback& arrived, uint64_t channel, uint64_t
   e.last_seq = 0;                                                  // a sender's sequences start at 1
   e.final_seq = 0;
   e.used.store(true, std::memory_order_release);
+  if (chanSignalDebug())
+    CmiPrintf("[CHAN-HDR %d] slot %d allocated to channel %llx gen %llu for pe %d token %llx\n", CkMyPe(), slot,
+              (unsigned long long)channel, (unsigned long long)generation, sender_pe, (unsigned long long)sender_token);
   return slot;
 }
 static void chanSignalFree(int slot) {
@@ -886,6 +904,10 @@ static void chanSignalRelease(int slot, uint64_t final_seq) {
   if (slot <= 0 || slot >= CHAN_SIGNAL_SLOTS || !chan_signal_ready) return;
   ChanSignalEntry& e = chan_signal_table[slot];
   if (!e.used.load(std::memory_order_acquire)) return;
+  if (chanSignalDebug())
+    CmiPrintf("[CHAN-HDR %d] release slot %d (channel %llx): final_seq %llu, last_seq %llu -> %s\n", CkMyPe(), slot,
+              (unsigned long long)e.channel, (unsigned long long)final_seq, (unsigned long long)e.last_seq,
+              (final_seq == UINT64_MAX || final_seq == 0 || e.last_seq >= final_seq) ? "freed now" : "deferred");
   if (final_seq == UINT64_MAX || final_seq == 0 || e.last_seq >= final_seq) {
     chan_signal_release_now.fetch_add(1, std::memory_order_relaxed);
     chanSignalFree(slot);
@@ -941,10 +963,22 @@ extern "C" void* device_channel_signal_bridge(void* arg) {
     ChanSignalHdr& h = chan_signal_hdr[m->slot];
     const double t0 = CkWallTimer();
     uint64_t seq;
+    if (chanSignalDebug())
+      CmiPrintf("[CHAN-HDR %d] note for slot %d (channel %llx, from rank %d, %zu bytes): header seq %llu, last %llu\n", CkMyPe(),
+                m->slot, (unsigned long long)e.channel, m->rank, m->size, (unsigned long long)h.seq.load(), (unsigned long long)e.last_seq);
     while ((seq = h.seq.load(std::memory_order_acquire)) == e.last_seq) {
-      if (CkWallTimer() - t0 > 2.0)
-        CkAbort("CkDeviceChannel: the header of a put with signal never arrived (slot %d, channel %llx, seq still %llu)\n",
-                m->slot, (unsigned long long)e.channel, (unsigned long long)e.last_seq);
+      if (CkWallTimer() - t0 > 2.0) {
+        for (int d = -2; d <= 2; d++) {
+          const int sl = m->slot + d;
+          if (sl <= 0 || sl >= CHAN_SIGNAL_SLOTS) continue;
+          CmiPrintf("[CHAN-HDR %d]   slot %d: used %d channel %llx last_seq %llu final %llu header seq %llu bytes %u tag %u\n", CkMyPe(), sl,
+                    (int)chan_signal_table[sl].used.load(), (unsigned long long)chan_signal_table[sl].channel,
+                    (unsigned long long)chan_signal_table[sl].last_seq, (unsigned long long)chan_signal_table[sl].final_seq,
+                    (unsigned long long)chan_signal_hdr[sl].seq.load(), chan_signal_hdr[sl].bytes, chan_signal_hdr[sl].tag);
+        }
+        CkAbort("CkDeviceChannel: the header of a put with signal never arrived (slot %d, channel %llx, seq still %llu, header region %p)\n",
+                m->slot, (unsigned long long)e.channel, (unsigned long long)e.last_seq, (void*)chan_signal_hdr);
+      }
     }
     if (e.last_seq != 0 && (seq < e.last_seq || seq > e.last_seq + 1)) {
       (seq < e.last_seq ? chan_signal_seq_stale : chan_signal_seq_jumps).fetch_add(1, std::memory_order_relaxed);
@@ -1085,6 +1119,9 @@ void CkRdmaDeviceRecvHandler(void* data)
       return;
     }
     QdCreate(1);
+    { static const bool mt = getenv("CHARM_MIG_TRACE") != nullptr;
+      if (mt) { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);
+        CmiPrintf("[MIGT %d] landed id=0 ptr=%p t=%.6f\n", CkMyPe(), (const void*)ncpy_op_info->destPtr, ts.tv_sec + ts.tv_nsec * 1e-9); } }
 
     enqueueNcpyMessage(op->dest_pe, info->msg);
 
@@ -1315,6 +1352,9 @@ static void persistentRputReadyFn(void* param, void*) {
     h->bytes = ctx->hdr_bytes; h->tag = ctx->hdr_tag;
     h->seq.store(ctx->hdr_seq, std::memory_order_release);
     { static thread_local bool said = false; if (!said) { said = true; CmiPrintf("[CHAN-INIT %d] first put with immediate data (slot %d, %u bytes)\n", CkMyPe(), ctx->signal_slot, ctx->hdr_bytes); } }
+    if (chanSignalDebug())
+      CmiPrintf("[CHAN-HDR %d] put seq %llu: header to slot %d at %p (process of pe %d), %u bytes tag %u\n", CkMyPe(),
+                (unsigned long long)ctx->hdr_seq, ctx->signal_slot, ctx->hdr_dst, ctx->hdr_dst_pe, ctx->hdr_bytes, ctx->hdr_tag);
     CmiRdmaPutRaw(ctx->hdr_dst_pe, h, sizeof(ChanSignalHdr), ctx->hdr_src_layer, ctx->hdr_dst, ctx->hdr_dst_layer);
     CmiIssueRputSignal(ctx->info, (uint32_t)ctx->signal_slot);
     return;
@@ -1550,6 +1590,7 @@ struct DeviceChannelResolved {
   uint64_t epoch;   // this resolution's number; its credits and closing carry it
   int owner_pe;
   int free;
+  uint64_t taken_seq;   // the last put of this sender's in the buffer at the reply (free says whether it is still held)
   int desc_bytes;   // the pup of the receiver's endpoint follows the struct
   int dst_pe;       // addressed to; a misdelivery is printed at once
   int src_pe;
@@ -1563,6 +1604,11 @@ static bool deviceChannelDebug() {
   static const bool on = (getenv("CHARM_DEBUG_MIGRATE") != NULL);
   return on;
 }
+// CHARM_MIG_TRACE=1: one wall-clock line per hop of a channel's closing->resolution (the hold), by channel and
+// generation, for the same-node pairs an offline pass can compare (nodes' clocks differ by seconds).
+static inline bool chanMigTrace() { static const bool on = (getenv("CHARM_MIG_TRACE") != nullptr); return on; }
+#define MIGC(stage, ch, gen, pe) do { if (chanMigTrace()) { struct timespec ts_; clock_gettime(CLOCK_REALTIME, &ts_); \
+  CmiPrintf("[MIGC %d] %s ch=%llx gen=%llu pe=%d t=%.6f\n", CkMyPe(), stage, (unsigned long long)(ch), (unsigned long long)(gen), (int)(pe), ts_.tv_sec + ts_.tv_nsec * 1e-9); } } while (0)
 
 typedef std::unordered_map<uint64_t, CkDeviceChannel*> DeviceChannelTable;
 CkpvStaticDeclare(DeviceChannelTable*, device_channel_senders);
@@ -1577,7 +1623,8 @@ CkpvStaticDeclare(uint64_t, device_channel_counter);
 // step after the Metis wave with exactly this: a moved Compute's forceOut
 // resolved while its owner still held the previous put; the owner replied
 // (free=0) and then released, and the credit overtook the reply.
-typedef std::unordered_map<uint64_t, uint64_t> DeviceChannelEarlyCredits;
+struct DeviceChannelEarlyCredit { uint64_t epoch, seq; };
+typedef std::unordered_map<uint64_t, std::vector<DeviceChannelEarlyCredit>> DeviceChannelEarlyCredits;
 CkpvStaticDeclare(DeviceChannelEarlyCredits*, device_channel_early_credits);
 // Staging buffers of puts made while the receiver's channel was closed
 // (issueStaged), by (sender token, seq): freed by the receiver's DONE, which
@@ -1798,7 +1845,11 @@ void deviceChannelShmNoteFn(void* param, void*) {
 
 // This PE's scheduler-loop poll: notes other PEs wrote for it, and credits
 // its queued puts wait for.
+struct ZcPollTimer { double t0; std::atomic<long>* n; std::atomic<long>* us; std::atomic<long>* mx;
+  ~ZcPollTimer() { if (t0 == 0.0) return; const long d = (long)((CkWallTimer() - t0) * 1e6); n->fetch_add(1, std::memory_order_relaxed); us->fetch_add(d, std::memory_order_relaxed);
+    long m = mx->load(std::memory_order_relaxed); while (d > m && !mx->compare_exchange_weak(m, d, std::memory_order_relaxed)) {} } };
 void deviceChannelShmPoll(void*) {
+  ZcPollTimer zc_poll_timer{zcStatsOnFast() ? CkWallTimer() : 0.0, &zc_mode_stats.shmpoll_n, &zc_mode_stats.shmpoll_us, &zc_mode_stats.shmpoll_max};
   if (chan_shm_base == nullptr) return;
   ChanShmArea& a = chanShmArea(chanShmIndexOf(CkMyPe()));
   uint64_t tail = a.note_tail.load(std::memory_order_relaxed);
@@ -1819,10 +1870,16 @@ void deviceChannelShmPoll(void*) {
     }
   }
   std::vector<CkDeviceChannel*>& w = *CkpvAccess(device_channel_shm_waiters);
+  if (w.empty()) return;
+  // pollShmCredit may issue the queued put, and issue() unlists the copy
+  // (swap with the back, pop): walking the list itself while that happens
+  // read past its end once it was empty -- a garbage pointer polled next
+  // (segfault in pollShmCredit, 2026-10-22 14:12, c4_ach_5 step 150). Walk a
+  // copy, then drop what no longer waits.
+  std::vector<CkDeviceChannel*> walk(w);
+  for (CkDeviceChannel* c : walk) c->pollShmCredit();
   for (size_t i = 0; i < w.size();) {
-    CkDeviceChannel* c = w[i];
-    c->pollShmCredit();
-    if (!c->putQueued()) { w[i] = w.back(); w.pop_back(); } else i++;
+    if (!w[i]->putQueued()) { w[i] = w.back(); w.pop_back(); } else i++;
   }
 }
 void deviceChannelShmUnlist(CkDeviceChannel* c) {
@@ -2165,7 +2222,7 @@ extern "C" void* device_channel_resolved_bridge(void* arg) {
     const bool with_hdr = (m->hdr_bytes > 0 && m->signal_slot > 0);
     if (m->hdr_bytes > 0) p | hdr;
     c->onResolved(ep, m->generation, m->owner_pe, m->free != 0, m->epoch, m->credit_pe, m->credit_slot,
-                  m->signal_slot, with_hdr ? &hdr : NULL);
+                  m->signal_slot, with_hdr ? &hdr : NULL, m->taken_seq);
   } else {
     device_channel_resolved_dropped++;
     snprintf(device_channel_last_resolved_dropped, sizeof(device_channel_last_resolved_dropped),
@@ -2241,6 +2298,8 @@ static void deviceChannelBatchDoneFn(void* param, void* msg) {
 static void deviceChannelBatchFlush() {
   DeviceChannelBatch*& cur = CkpvAccess(device_channel_batch);
   if (cur == nullptr) return;
+  struct FlushTimer { double t0; ~FlushTimer() { if (t0 != 0.0) { zc_mode_stats.chan_flush_n.fetch_add(1, std::memory_order_relaxed);
+    zc_mode_stats.chan_flush_us.fetch_add((long)((CkWallTimer() - t0) * 1e6), std::memory_order_relaxed); } } } flush_timer{zcStatsOnFast() ? CkWallTimer() : 0.0};
   DeviceChannelBatch* b = cur;
   cur = nullptr;
   const size_t n = b->entries.size();
@@ -2266,6 +2325,15 @@ static void deviceChannelBatchFlush() {
       size_t fail_idx = 0;
       err = cudaMemcpyBatchAsync(b->dsts.data(), b->srcs.data(), b->sizes.data(), n, &attr, &attr_idx, 1, &fail_idx, st);
 #endif
+    }
+#elif CMK_HIP
+    // hipMemcpyBatchAsync (ROCm 7.14): the 12.8 signature, with the failure index; its per-copy
+    // attributes are not supported, one attribute for the batch is.
+    if (n > 1) {
+      hipMemcpyAttributes attr{};
+      attr.srcAccessOrder = hipMemcpySrcAccessOrderStream;
+      size_t attr_idx = 0, fail_idx = 0;
+      err = hipMemcpyBatchAsync(b->dsts.data(), const_cast<void**>(b->srcs.data()), b->sizes.data(), n, &attr, &attr_idx, 1, &fail_idx, st);
     }
 #endif
     if (err != hapiSuccess) {
@@ -2324,9 +2392,9 @@ void CkRdmaDeviceChannelBatchFlush() {
 CkDeviceChannel::CkDeviceChannel()
   : arrived(CkCallback(CkCallback::ignore)), control(CkCallback(CkCallback::ignore)),
     channel_id(0), generation(0), cap(0),
-    is_owner(false), owner_id(0), owner_known(false), busy(false), taken_seq(0), landed_unseen(0), last_put_bytes(0), last_direct_seq(0), credit_slot_pe(-1), credit_slot(-1), credit_shm_pe(-1), credit_shm_slot(-1), credits_seen(0), shm_waiting(false), owner_signal_slot(-1), departed_signal_slot(-1), departed_signal_pe(-1), signal_slot(-1), sender_pe(-1), sender_token(0),
+    is_owner(false), owner_id(0), owner_known(false), busy(false), taken_seq(0), landed_unseen(0), landed_seq(0), last_put_bytes(0), last_direct_seq(0), credit_slot_pe(-1), credit_slot(-1), credit_shm_pe(-1), credit_shm_slot(-1), credits_seen(0), shm_waiting(false), owner_signal_slot(-1), departed_signal_slot(-1), departed_signal_pe(-1), signal_slot(-1), sender_pe(-1), sender_token(0),
     sender_known(false), closing_gen(0), closing_sent(false), sender_closed(false), resolved_during_closing(false), epoch(0), closing_rec(NULL), sender_pulls(false), pulling(false), have_last(false),
-    resolved(false), resolving(false), send_seq(0), credits(0), uncredited(0), pull_mode(false), closed_epoch(0), in_flight(0), staged_outstanding(0),
+    resolved(false), resolving(false), send_seq(0), credits(0), uncredited(0), pull_mode(false), closed_epoch(0), in_flight(0), staged_outstanding(0), acct_seq(0), occupant_credit_due(false),
     close_ack_due(false), close_ack_pe(-1), my_token(0), closing_at(0.0), sender_rec(NULL), holder_elem(0), holder_known(false) {
   pending.valid = false;
   memset(&last, 0, sizeof(last));
@@ -2335,9 +2403,9 @@ CkDeviceChannel::CkDeviceChannel()
 CkDeviceChannel::CkDeviceChannel(void* dst_, size_t capacity, const CkCallback& arrived_)
   : dst(dst_, capacity), arrived(arrived_), control(CkCallback(CkCallback::ignore)),
     channel_id(0), generation(0), cap(capacity),
-    is_owner(false), owner_id(0), owner_known(false), busy(false), taken_seq(0), landed_unseen(0), last_put_bytes(0), last_direct_seq(0), credit_slot_pe(-1), credit_slot(-1), credit_shm_pe(-1), credit_shm_slot(-1), credits_seen(0), shm_waiting(false), owner_signal_slot(-1), departed_signal_slot(-1), departed_signal_pe(-1), signal_slot(-1), sender_pe(-1), sender_token(0),
+    is_owner(false), owner_id(0), owner_known(false), busy(false), taken_seq(0), landed_unseen(0), landed_seq(0), last_put_bytes(0), last_direct_seq(0), credit_slot_pe(-1), credit_slot(-1), credit_shm_pe(-1), credit_shm_slot(-1), credits_seen(0), shm_waiting(false), owner_signal_slot(-1), departed_signal_slot(-1), departed_signal_pe(-1), signal_slot(-1), sender_pe(-1), sender_token(0),
     sender_known(false), closing_gen(0), closing_sent(false), sender_closed(false), resolved_during_closing(false), epoch(0), closing_rec(NULL), sender_pulls(false), pulling(false), have_last(false),
-    resolved(false), resolving(false), send_seq(0), credits(0), uncredited(0), pull_mode(false), closed_epoch(0), in_flight(0), staged_outstanding(0),
+    resolved(false), resolving(false), send_seq(0), credits(0), uncredited(0), pull_mode(false), closed_epoch(0), in_flight(0), staged_outstanding(0), acct_seq(0), occupant_credit_due(false),
     close_ack_due(false), close_ack_pe(-1), my_token(0), closing_at(0.0), sender_rec(NULL), holder_elem(0), holder_known(false) {
   pending.valid = false;
   memset(&last, 0, sizeof(last));
@@ -2346,6 +2414,7 @@ CkDeviceChannel::CkDeviceChannel(void* dst_, size_t capacity, const CkCallback& 
 // A copy takes over the original's table entries: the usual shape is
 // `peer = param;` in an entry method, after which the parameter dies.
 void CkDeviceChannel::takeOver(const CkDeviceChannel& o) {
+  memcpy(hist, o.hist, sizeof(hist)); hist_n = o.hist_n;
   if (o.my_token != 0) (*CkpvAccess(device_channel_senders))[o.my_token] = this;
   if (o.is_owner && o.channel_id != 0) (*CkpvAccess(device_channel_owners))[o.channel_id] = this;
   if (o.is_owner && o.owner_known) deviceChannelElemAdd(o.owner_mgr, o.owner_id, this);
@@ -2354,12 +2423,12 @@ void CkDeviceChannel::takeOver(const CkDeviceChannel& o) {
 
 CkDeviceChannel::CkDeviceChannel(const CkDeviceChannel& o)
   : dst(o.dst), arrived(o.arrived), control(o.control), channel_id(o.channel_id), generation(o.generation),
-    cap(o.cap), is_owner(o.is_owner), owner_id(o.owner_id), owner_known(o.owner_known), owner_mgr(o.owner_mgr), busy(o.busy), taken_seq(o.taken_seq), landed_unseen(o.landed_unseen), last_put_bytes(o.last_put_bytes), last_direct_seq(o.last_direct_seq),
+    cap(o.cap), is_owner(o.is_owner), owner_id(o.owner_id), owner_known(o.owner_known), owner_mgr(o.owner_mgr), busy(o.busy), taken_seq(o.taken_seq), landed_unseen(o.landed_unseen), landed_seq(o.landed_seq), last_put_bytes(o.last_put_bytes), last_direct_seq(o.last_direct_seq),
     credit_slot_pe(o.credit_slot_pe), credit_slot(o.credit_slot), credit_shm_pe(o.credit_shm_pe), credit_shm_slot(o.credit_shm_slot), credits_seen(o.credits_seen), shm_waiting(false), owner_signal_slot(o.owner_signal_slot), departed_signal_slot(o.departed_signal_slot), departed_signal_pe(o.departed_signal_pe), signal_slot(o.signal_slot), signal_hdr(o.signal_hdr),
     sender_pe(o.sender_pe), sender_token(o.sender_token), sender_known(o.sender_known),
     closing_gen(o.closing_gen), closing_sent(o.closing_sent), sender_closed(o.sender_closed), resolved_during_closing(o.resolved_during_closing), epoch(o.epoch), closing_rec(o.closing_rec), sender_pulls(o.sender_pulls), pulls(o.pulls), pulling(o.pulling), pull_ev(o.pull_ev), pull_src(o.pull_src), waiting(o.waiting), last(o.last),
     have_last(o.have_last), resolved(o.resolved), resolving(o.resolving), send_seq(o.send_seq),
-    credits(o.credits), uncredited(o.uncredited), pull_mode(o.pull_mode), done_cbs(o.done_cbs), closed_epoch(o.closed_epoch), in_flight(o.in_flight), staged_outstanding(o.staged_outstanding), close_ack_due(o.close_ack_due),
+    credits(o.credits), uncredited(o.uncredited), pull_mode(o.pull_mode), done_cbs(o.done_cbs), closed_epoch(o.closed_epoch), in_flight(o.in_flight), staged_outstanding(o.staged_outstanding), acct_seq(o.acct_seq), occupant_credit_due(o.occupant_credit_due), direct_issued(o.direct_issued), dones_seen(o.dones_seen), close_ack_due(o.close_ack_due),
     close_ack_pe(o.close_ack_pe), my_token(o.my_token), closing_at(o.closing_at), sender_rec(o.sender_rec),
     holder_elem(o.holder_elem), holder_mgr(o.holder_mgr), holder_known(o.holder_known), pending(o.pending), src_ep(o.src_ep) {
   takeOver(o);
@@ -2368,13 +2437,13 @@ CkDeviceChannel::CkDeviceChannel(const CkDeviceChannel& o)
 CkDeviceChannel& CkDeviceChannel::operator=(const CkDeviceChannel& o) {
   if (this == &o) return *this;
   dst = o.dst; arrived = o.arrived; control = o.control; channel_id = o.channel_id; generation = o.generation;
-  cap = o.cap; is_owner = o.is_owner; owner_id = o.owner_id; owner_known = o.owner_known; owner_mgr = o.owner_mgr; busy = o.busy; taken_seq = o.taken_seq; landed_unseen = o.landed_unseen; last_put_bytes = o.last_put_bytes; last_direct_seq = o.last_direct_seq;
+  cap = o.cap; is_owner = o.is_owner; owner_id = o.owner_id; owner_known = o.owner_known; owner_mgr = o.owner_mgr; busy = o.busy; taken_seq = o.taken_seq; landed_unseen = o.landed_unseen; landed_seq = o.landed_seq; last_put_bytes = o.last_put_bytes; last_direct_seq = o.last_direct_seq;
   credit_slot_pe = o.credit_slot_pe; credit_slot = o.credit_slot; credit_shm_pe = o.credit_shm_pe; credit_shm_slot = o.credit_shm_slot; credits_seen = o.credits_seen;
   owner_signal_slot = o.owner_signal_slot; departed_signal_slot = o.departed_signal_slot; departed_signal_pe = o.departed_signal_pe; signal_slot = o.signal_slot; signal_hdr = o.signal_hdr;
   sender_pe = o.sender_pe; sender_token = o.sender_token; sender_known = o.sender_known;
   closing_gen = o.closing_gen; closing_sent = o.closing_sent; sender_closed = o.sender_closed; resolved_during_closing = o.resolved_during_closing; epoch = o.epoch; closing_rec = o.closing_rec; sender_pulls = o.sender_pulls; pulls = o.pulls; pulling = o.pulling; pull_ev = o.pull_ev; pull_src = o.pull_src; waiting = o.waiting; last = o.last;
   have_last = o.have_last; resolved = o.resolved; resolving = o.resolving; send_seq = o.send_seq;
-  credits = o.credits; uncredited = o.uncredited; pull_mode = o.pull_mode; done_cbs = o.done_cbs; closed_epoch = o.closed_epoch; in_flight = o.in_flight; staged_outstanding = o.staged_outstanding; close_ack_due = o.close_ack_due;
+  credits = o.credits; uncredited = o.uncredited; pull_mode = o.pull_mode; done_cbs = o.done_cbs; closed_epoch = o.closed_epoch; in_flight = o.in_flight; staged_outstanding = o.staged_outstanding; acct_seq = o.acct_seq; occupant_credit_due = o.occupant_credit_due; direct_issued = o.direct_issued; dones_seen = o.dones_seen; close_ack_due = o.close_ack_due;
   close_ack_pe = o.close_ack_pe; my_token = o.my_token; closing_at = o.closing_at; sender_rec = o.sender_rec;
   holder_elem = o.holder_elem; holder_mgr = o.holder_mgr; holder_known = o.holder_known; pending = o.pending; src_ep = o.src_ep;
   takeOver(o);
@@ -2451,6 +2520,7 @@ void CkDeviceChannel::reopen(void* new_dst) {
   }
   dst = CkDevicePersistent(new_dst, cap);
   generation++;
+  MIGC("reopen-ch", channel_id, generation - 1, sender_pe);
   dst.open();
   is_owner = true;
   // Every sender of the previous home was closed; they re-resolve.
@@ -2479,6 +2549,7 @@ void CkDeviceChannel::reopen(void* new_dst) {
 // Handoff, old PE: the object leaves with the element. Nothing is in flight
 // (the puts counted as outstanding sends; the senders were closed and acked).
 void CkDeviceChannel::leaveForHandoff() {
+  note(15, send_seq, epoch, CkMyPe(), credit_shm_slot, credits);
   if (is_owner) unregisterOwner();   // the export stays: same process, same buffer
   if (my_token != 0) {
     DeviceChannelTable* tab = CkpvAccess(device_channel_senders);
@@ -2502,7 +2573,8 @@ void CkDeviceChannel::leaveForHandoff() {
 // Handoff, new PE: the owned channel is the same buffer under a new
 // generation; its sender was closed and re-resolves.
 void CkDeviceChannel::arriveFromHandoff() {
-  if (getenv("CHARM_DEBUG_MIGRATE"))
+  note(16, send_seq, epoch, CkMyPe(), credit_shm_slot, credits);
+  if (getenv("CHARM_DEBUG_MIGRATE") || chanSignalDebug())
     CmiPrintf("[CHAN-HANDOFF %d] arrive channel %llx owner=%d gen=%llu obj=%p\n", CkMyPe(),
               (unsigned long long)channel_id, (int)is_owner, (unsigned long long)generation, (void*)this);
   if (!is_owner) return;
@@ -2577,7 +2649,9 @@ const CkDeviceChannelEvent* CkDeviceChannel::event(CkDataMsg* m) {
   have_last = true;
   busy = true;
   taken_seq = ev.seq;
+  note(10, ev.seq, epoch, ev.sender_pe, -1, (int)sender_known);
   landed_unseen = 0;
+  landed_seq = 0;
   if (zcStatsOnFast()) zc_mode_stats.event_n.fetch_add(1, std::memory_order_relaxed);
   return &last;
 }
@@ -2606,6 +2680,8 @@ void CkDeviceChannel::replyResolve(int pe, uint64_t token) {
     credit_slot = chanShmAllocCredit(channel_id, epoch);
     credit_slot_pe = (credit_slot >= 0) ? chanShmIndexOf(CkMyPe()) : -1;
   }
+  note(12, taken_seq, epoch, pe, credit_slot, (int)busy);
+  MIGC("reply-ch", channel_id, generation, pe);
   // Another host: the sender's puts signal a slot of this process. The
   // previous slot goes back only once that resolution was closed and acked
   // (a sender still under it may put again); otherwise it waits for the ack.
@@ -2616,10 +2692,11 @@ void CkDeviceChannel::replyResolve(int pe, uint64_t token) {
     static thread_local bool said = false;
     if (!said) { said = true; CmiPrintf("[CHAN-INIT %d] first cross-host reply: signal slot %d (table ready %d, free %zu)\n", CkMyPe(), owner_signal_slot, (int)chan_signal_ready, chan_signal_free.size()); }
   }
-  if (deviceChannelDebug())
-    CmiPrintf("[CHAN-RESOLVE %d] channel %llx gen %llu: resolution %llu to pe %d token %llx (free=%d, closing in flight=%d)\n",
+  if (deviceChannelDebug() || chanSignalDebug())
+    CmiPrintf("[CHAN-RESOLVE %d] channel %llx gen %llu: resolution %llu to pe %d token %llx (free=%d, closing in flight=%d, pulling=%d taken_seq=%llu pulls=%zu, signal slot %d, header region %p)\n",
               CkMyPe(), (unsigned long long)channel_id, (unsigned long long)generation, (unsigned long long)epoch,
-              pe, (unsigned long long)token, (int)!busy, (int)closing_sent);
+              pe, (unsigned long long)token, (int)!busy, (int)closing_sent, (int)pulling, (unsigned long long)taken_seq, pulls.size(),
+              owner_signal_slot, (void*)chan_signal_hdr);
   PUP::sizer sz;
   sz | dst;
   const size_t n = sz.size();
@@ -2632,6 +2709,19 @@ void CkDeviceChannel::replyResolve(int pe, uint64_t token) {
   m->owner_pe = CkMyPe();
   m->epoch = epoch;
   m->free = busy ? 0 : 1;
+  // The last of the sender's puts to have entered the buffer: taken_seq once event() took it;
+  // before that, a staged put read (pull_ev; onPulled set busy and sent its DONE) or a direct put
+  // that landed before the pack and came with the pup (landed_seq, from the close ack). The
+  // sender counts only puts after this one as still on their way.
+  m->taken_seq = taken_seq;
+  if (busy && !have_last) {
+    // A direct put that landed before the pack (the close ack's last_seq) or a staged put read
+    // but not yet taken; pull_ev is written by the first read only, so it is consulted only for
+    // the latter (an owner that never read a staged put sent its uninitialised seq as taken_seq,
+    // and the sender dropped the early credit it was holding: Frontier, 2026-10-22).
+    if (landed_unseen > 0 && landed_unseen != SIZE_MAX) { if (landed_seq > m->taken_seq) m->taken_seq = landed_seq; }
+    else if (pull_ev.seq > m->taken_seq) m->taken_seq = pull_ev.seq;
+  }
   m->desc_bytes = (int)n;
   m->dst_pe = pe;
   m->src_pe = CkMyPe();
@@ -2677,11 +2767,17 @@ void CkDeviceChannel::pollShmCredit() {
   const long n = chanShmReadCredit(credit_shm_pe, credit_shm_slot, channel_id, epoch);
   if (n < 0 || (uint32_t)n <= credits_seen) return;
   const uint32_t fresh = (uint32_t)n - credits_seen;
+  if (deviceChannelDebug() || chanSignalDebug())
+    CmiPrintf("[CHAN-CREDIT-RX %d] channel %llx token %llx: %u shm credit(s) from slot %d of area %d under epoch %llu (count %ld seen %u): credits %d pending %d\n",
+              CkMyPe(), (unsigned long long)channel_id, (unsigned long long)my_token, fresh, credit_shm_slot, credit_shm_pe,
+              (unsigned long long)epoch, n, credits_seen, credits, (int)pending.valid);
   credits_seen = (uint32_t)n;
+  note(6, 0, epoch, credit_shm_pe, credit_shm_slot, (int)fresh);
   deviceChannelProgress();
   for (uint32_t i = 0; i < fresh; i++) {
     credits++;
     if (uncredited > 0) uncredited--;
+    creditedPut(0);   // the slot carries no sequence: credits come in put order
   }
   if (pending.valid && credits > 0) {
     Pending p = pending;
@@ -2708,10 +2804,19 @@ void CkDeviceChannel::release() {
   // No resolved sender (it re-resolves after our migration and learns the
   // buffer is free then): nothing to credit.
   if (!sender_known) return;
+  note(11, last.seq, epoch, sender_pe, credit_slot, 0);
+  if (deviceChannelDebug() || chanSignalDebug())
+    CmiPrintf("[CHAN-CREDIT %d] channel %llx: release of put %llu credits pe %d token %llx under epoch %llu via %s (taken_seq %llu)\n",
+              CkMyPe(), (unsigned long long)channel_id, (unsigned long long)last.seq, sender_pe, (unsigned long long)sender_token,
+              (unsigned long long)epoch, credit_slot >= 0 ? "shm" : "msg", (unsigned long long)taken_seq);
   if (credit_slot >= 0) {
     // Same host, other process: one shared-memory increment, no message.
     { static thread_local bool said = false; if (!said) { said = true; CmiPrintf("[CHAN-INIT %d] first credit through shared memory (to pe %d)\n", CkMyPe(), sender_pe); } }
     chanShmArea(credit_slot_pe).credit[credit_slot].count.fetch_add(1, std::memory_order_acq_rel);
+    if (deviceChannelDebug() || chanSignalDebug())
+      CmiPrintf("[CHAN-CREDIT %d] channel %llx: release of put %llu credits pe %d token %llx under epoch %llu via shm slot %d of area %d (count now %u)\n",
+                CkMyPe(), (unsigned long long)channel_id, (unsigned long long)last.seq, sender_pe, (unsigned long long)sender_token,
+                (unsigned long long)epoch, credit_slot, credit_slot_pe, (unsigned)chanShmArea(credit_slot_pe).credit[credit_slot].count.load());
     if (zcStatsOnFast()) zc_mode_stats.credit_n[0].fetch_add(1, std::memory_order_relaxed);
     return;
   }
@@ -2738,6 +2843,8 @@ void CkDeviceChannel::release() {
 // outstanding device send until the ack. Once per generation.
 void CkDeviceChannel::closingForMigration(CkLocRec* rec) {
   if (!is_owner) return;
+  note(13, taken_seq, epoch, sender_pe, -1, (int)sender_known);
+  if (!closing_sent) MIGC("closing-tx", channel_id, generation, sender_pe);
   // The pending migration is noted on every owned channel, resolved sender or
   // not: a sender that resolves while the element stands down (for another
   // channel's ack) is closed at once from event(), or its put could land after
@@ -2749,7 +2856,7 @@ void CkDeviceChannel::closingForMigration(CkLocRec* rec) {
   resolved_during_closing = false;
   rec->noteDeviceSendPosted();
   if (ckMigStatsOn()) closing_at = CkWallTimer();
-  if (deviceChannelDebug())
+  if (deviceChannelDebug() || chanSignalDebug())
     CmiPrintf("[CHAN-CLOSE %d] channel %llx gen %llu: closing resolution %llu sent to pe %d token %llx; element %llu outstanding now %d\n",
               CkMyPe(), (unsigned long long)channel_id, (unsigned long long)generation, (unsigned long long)epoch, sender_pe,
               (unsigned long long)sender_token, (unsigned long long)rec->getID(), rec->outstandingDeviceSends);
@@ -2768,21 +2875,27 @@ void CkDeviceChannel::closingForMigration(CkLocRec* rec) {
 
 void CkDeviceChannel::onCloseAck(int pe, uint64_t token, uint64_t last_seq, uint64_t last_bytes) {
   deviceChannelProgress();
+  note(14, last_seq, epoch, pe, -1, (int)last_bytes);
   (void)pe; (void)token;
   // What the sender put last against what this side has taken: a put that
   // landed while the element was closing has its event still queued, and the
   // element's pup must carry those bytes (unseenBytes()). Not free until the
   // application takes and releases it.
   if (last_seq == UINT64_MAX) landed_unseen = SIZE_MAX;
-  else if (last_seq > taken_seq) { landed_unseen = (size_t)last_bytes; busy = true; }
-  if (deviceChannelDebug())
+  else if (last_seq > taken_seq) { landed_unseen = (size_t)last_bytes; landed_seq = last_seq; busy = true; }
+  if (deviceChannelDebug() || chanSignalDebug())
     CmiPrintf("[CHAN-CLOSE %d] channel %llx: ack from pe %d token %llx (owner=%d closing_gen %llu gen %llu sent=%d closed=%d)\n",
               CkMyPe(), (unsigned long long)channel_id, pe, (unsigned long long)token, (int)is_owner,
               (unsigned long long)closing_gen, (unsigned long long)generation, (int)closing_sent, (int)sender_closed);
-  // The slot of the closed resolution: whichever process granted it frees it
-  // once the acked last put has been taken there (or now, for a blind ack).
+  // The slots of the closed resolution: whichever process granted them frees them once the acked
+  // last put has been taken there (or now, for a blind ack). Both when both exist: a sender answered
+  // twice after a move (the pushed reply and its own request, 10 us apart) leaves the first reply's
+  // slot stashed and the second's current, and releasing only the stashed one left the current slot
+  // referenced, to be freed blind by the next reply's retireSignalSlot while the acked put's note was
+  // still on its way; the free list handed the same slot straight back and the allocation's reset
+  // wiped that put's header (Frontier, 2026-10-22: "the header of a put with signal never arrived").
   if (departed_signal_slot > 0) { deviceChannelSlotRelease(departed_signal_pe, departed_signal_slot, last_seq); departed_signal_slot = -1; departed_signal_pe = -1; }
-  else if (owner_signal_slot > 0 && is_owner) { deviceChannelSlotRelease(CkMyPe(), owner_signal_slot, last_seq); owner_signal_slot = -1; }
+  if (owner_signal_slot > 0 && is_owner) { deviceChannelSlotRelease(CkMyPe(), owner_signal_slot, last_seq); owner_signal_slot = -1; }
   if (!is_owner || !closing_sent) return;
   closing_sent = false;
   if (closing_at > 0.0) { ckMigStatChannel(1, CkWallTimer() - closing_at); closing_at = 0.0; }
@@ -2797,10 +2910,42 @@ void CkDeviceChannel::onCloseAck(int pe, uint64_t token, uint64_t last_seq, uint
   if (reclose && rec) closingForMigration(rec);
   else sender_closed = true;
   // The element stands down on this PE until this ack.
-  if (rec) rec->noteDeviceSendDone();
+  if (rec) rec->noteDeviceSendDone(/*urgentKick=*/true);   // the senders are held until this element lands
   else if (deviceChannelDebug())
     CmiPrintf("[CHAN-CLOSE %d] channel %llx: ack but element %llu not found here\n", CkMyPe(),
               (unsigned long long)channel_id, (unsigned long long)owner_id);
+}
+
+static const char* const chan_hist_names[] = {
+  "put", "pend", "staged", "resolve-req", "resolved", "credit-msg", "credit-shm", "closing-rx", "closeack-tx",
+  "srcdone", "taken", "release", "reply", "closing-tx", "closeack-rx", "handoff-leave", "handoff-arrive", "pack",
+  "unpack", "done-rx", "early-credit", "stale-credit"};
+void CkDeviceChannel::note(uint8_t kind, uint64_t seq, uint64_t epoch_, int pe, int slot, int n) {
+  Hist& h = hist[hist_n++ % HIST_N];
+  h.kind = kind; h.pe = pe; h.slot = slot; h.n = n; h.seq = seq; h.epoch = epoch_; h.t = CkWallTimer();
+}
+void CkDeviceChannel::printHist(const char* role) const {
+  char buf[2600]; int off = 0;
+  const uint32_t n = hist_n < (uint32_t)HIST_N ? hist_n : (uint32_t)HIST_N;
+  const unsigned nnames = sizeof(chan_hist_names) / sizeof(*chan_hist_names);
+  for (uint32_t i = 0; i < n; i++) {
+    const Hist& h = hist[(hist_n - n + i) % HIST_N];
+    off += snprintf(buf + off, sizeof(buf) - off, " [%s s%llu e%llu pe%d sl%d n%d @%.3f]",
+                    h.kind < nnames ? chan_hist_names[h.kind] : "?", (unsigned long long)h.seq,
+                    (unsigned long long)h.epoch, h.pe, h.slot, h.n, h.t);
+    if (off >= (int)sizeof(buf) - 80) break;
+  }
+  long raw_cnt = -1; unsigned long long raw_ch = 0, raw_ep = 0; int w_pe = -1, w_slot = -1;
+  if (!is_owner && credit_shm_slot >= 0) { w_pe = credit_shm_pe; w_slot = credit_shm_slot; }
+  if (is_owner && credit_slot >= 0) { w_pe = credit_slot_pe; w_slot = credit_slot; }
+  if (w_slot >= 0) {
+    const ChanShmCredit& c = chanShmArea(w_pe).credit[w_slot];
+    raw_ch = c.channel.load(std::memory_order_acquire); raw_ep = c.epoch.load(std::memory_order_acquire);
+    raw_cnt = (long)c.count.load(std::memory_order_acquire);
+  }
+  CmiPrintf("[CHAN-HIST %d] %s channel %llx token %llx: credit word (area %d slot %d): channel %llx epoch %llu count %ld, seen %u, credits %d; last %u events:%s\n",
+            CkMyPe(), role, (unsigned long long)channel_id, (unsigned long long)my_token, w_pe, w_slot, raw_ch, raw_ep, raw_cnt,
+            credits_seen, credits, n, buf);
 }
 
 void CkDeviceChannel::describeStall(const char* role) const {
@@ -2816,6 +2961,7 @@ void CkDeviceChannel::describeStall(const char* role) const {
               (int)sender_known, sender_pe, (unsigned long long)sender_token, (int)sender_closed, (int)closing_sent,
               (unsigned long long)closing_gen, waiting.size(), pulls.size(), (unsigned long long)taken_seq, landed_unseen,
               (int)resolved, credits, in_flight, (int)pending.valid, (unsigned long long)my_token);
+    printHist(role);
     return;
   }
   const bool sender_stuck = pending.valid || resolving || in_flight > 0 || close_ack_due || staged_outstanding > 0;
@@ -2859,11 +3005,14 @@ void CkDeviceChannel::describeStall(const char* role) const {
     CmiPrintf("[CHAN-STALL %d]   staged puts outstanding %d; queued announces %zu, head seq %llu, taken_seq %llu\n",
               CkMyPe(), staged_outstanding, pulls.size(),
               pulls.empty() ? 0ULL : (unsigned long long)pulls.front().ev.seq, (unsigned long long)taken_seq);
+  printHist(role);
 }
 
 // Past the stand-down, before the pack: the buffer is about to go.
 void CkDeviceChannel::packForMigration() {
   if (!is_owner) return;
+  note(17, taken_seq, epoch, sender_pe, credit_slot, (int)busy);
+  MIGC("pack-ch", channel_id, generation, sender_pe);
   retireCreditSlot();
   stashSignalSlot();
   dst.close();
@@ -2917,6 +3066,10 @@ CkDeviceStatus CkDeviceChannel::put(const void* src, size_t bytes, hapiStream_t 
   deviceChannelRecordSend(sender_rec, bytes, dst.pe, owner_known, owner_mgr, owner_id);
   // Closed by the receiver's migration, or still behind puts staged while it
   // was: the put goes as a staged announce, holding nothing here (issueStaged).
+  if (deviceChannelDebug())
+    CmiPrintf("[CHAN-PUT %d] channel %llx token %llx: put tag %llu: resolved %d resolving %d closed_epoch %llu credits %d staged %d pending %d\n",
+              CkMyPe(), (unsigned long long)channel_id, (unsigned long long)my_token, (unsigned long long)tag, (int)resolved,
+              (int)resolving, (unsigned long long)closed_epoch, credits, staged_outstanding, (int)pending.valid);
   if ((!resolved && closed_epoch > 0) || (resolved && staged_outstanding > 0)) {
     issueStaged(src, bytes, stream, src_done, tag);
     return CkDeviceStatus::incomplete;
@@ -2933,6 +3086,7 @@ CkDeviceStatus CkDeviceChannel::put(const void* src, size_t bytes, hapiStream_t 
     pending.done = src_done;
     pending.tag = tag;
     pending.valid = true;
+    note(1, send_seq, epoch, dst.pe, credit_shm_slot, credits);
     if (resolved && credit_shm_slot >= 0 && !shm_waiting) {
       shm_waiting = true;
       CkpvAccess(device_channel_shm_waiters)->push_back(this);
@@ -2968,6 +3122,7 @@ void CkDeviceChannel::requestResolve() {
     (*CkpvAccess(device_channel_senders))[my_token] = this;
   }
   resolving = true;
+  note(3, send_seq, epoch, dst.pe, -1, credits);
   CkDeviceChannelEvent ev;
   memset(&ev, 0, sizeof(ev));
   ev.kind = CkDeviceChannelEvent::RESOLVE;
@@ -2979,7 +3134,7 @@ void CkDeviceChannel::requestResolve() {
 
 void CkDeviceChannel::onResolved(const CkDevicePersistent& ep, uint64_t gen_, int owner_pe,
                                  bool free, uint64_t epoch_, int credit_pe, int credit_slot_,
-                                 int signal_slot_, const CmiNcpyBuffer* signal_hdr_) {
+                                 int signal_slot_, const CmiNcpyBuffer* signal_hdr_, uint64_t taken_seq_) {
   deviceChannelProgress();
   (void)owner_pe;
   // Messages between two PEs are not ordered: the closing of this resolution
@@ -3008,29 +3163,55 @@ void CkDeviceChannel::onResolved(const CkDevicePersistent& ep, uint64_t gen_, in
     { static thread_local int said = 0; if (said++ < 8 || deviceChannelDebug()) CmiPrintf("[CHAN-STALE %d] %s; ignored\n", CkMyPe(), device_channel_last_resolved_older); }
     return;
   }
-  // A resolution answered after a pushed one, while a put of the previous one
-  // is still uncredited: the free flag predates that put, so no credit now.
-  const bool put_uncredited = resolved && uncredited > 0;
-  bool early_credit = false;
+  // The buffer's one credit, reconciled by sequence number rather than reset. The reply's free
+  // flag describes the buffer as of the receiver's last take (taken_seq_), and the receiver's
+  // DONEs, credits and the reply itself reach this copy in any order (two nodes, 2026-10-22: a
+  // DONE sent before the reply delivered after it, a credit sent after both delivered first;
+  // leanmd stalled at the step after a migration in half its runs). So: a direct put the
+  // receiver had not taken at the reply will occupy the buffer (-1; its credit comes under this
+  // resolution); a staged put it read after the reply does the same when its DONE is seen, here
+  // if the DONE overtook the reply (dones_seen) or in onStagedDone otherwise; a release under
+  // this resolution that overtook it (an early credit) is +1 when it frees a put taken after
+  // the reply, or the put held at it. Everything up to taken_seq_ is the free flag's.
+  acct_seq = taken_seq_;
+  int c = free ? 1 : 0;
+  occupant_credit_due = !free;
+  {
+    std::vector<uint64_t> keep;
+    for (uint64_t sq : direct_issued) if (sq > acct_seq) { keep.push_back(sq); c--; }
+    direct_issued.swap(keep);
+  }
+  for (uint64_t sq : dones_seen) if (sq > acct_seq) c--;
+  dones_seen.clear();
+  int early_credit = 0;
   if (my_token != 0) {
     DeviceChannelEarlyCredits& early = *CkpvAccess(device_channel_early_credits);
     auto it = early.find(my_token);
     if (it != early.end()) {
-      early_credit = (it->second == epoch_);   // the owner released after this reply
-      if (it->second <= epoch_) early.erase(it);
+      std::vector<DeviceChannelEarlyCredit> keep;
+      for (const DeviceChannelEarlyCredit& ec : it->second) {
+        if (ec.epoch == epoch_ && (ec.seq > acct_seq || (ec.seq == acct_seq && !free))) {
+          c++; early_credit++;
+          if (ec.seq == acct_seq) occupant_credit_due = false;
+        } else if (ec.epoch > epoch_) keep.push_back(ec);   // of a resolution still to come
+      }
+      if (keep.empty()) early.erase(it); else it->second.swap(keep);
     }
   }
-  if (deviceChannelDebug())
-    CmiPrintf("[CHAN-RESOLVED %d] channel %llx token %llx: resolution %llu applied (held %llu resolved %d closed %llu, free %d, early %d, uncredited %d)\n",
+  note(4, taken_seq_, epoch_, owner_pe, credit_slot_, c);
+  MIGC("resolved-ch", channel_id, gen_, owner_pe);
+  if (deviceChannelDebug() || chanSignalDebug())
+    CmiPrintf("[CHAN-RESOLVED %d] channel %llx token %llx: resolution %llu applied (held %llu resolved %d closed %llu, free %d taken_seq %llu, early %d, direct puts in flight %zu, credits %d)\n",
               CkMyPe(), (unsigned long long)channel_id, (unsigned long long)my_token, (unsigned long long)epoch_,
-              (unsigned long long)epoch, (int)resolved, (unsigned long long)closed_epoch, (int)free, (int)early_credit, uncredited);
+              (unsigned long long)epoch, (int)resolved, (unsigned long long)closed_epoch, (int)free, (unsigned long long)acct_seq,
+              early_credit, direct_issued.size(), c);
   if (closing_at > 0.0) { ckMigStatChannel(0, CkWallTimer() - closing_at); closing_at = 0.0; }
   epoch = epoch_;
   dst = ep;
   generation = gen_;
   resolved = true;
   resolving = false;
-  credits = ((free && !put_uncredited) || early_credit) ? 1 : 0;
+  credits = c;
   credit_shm_pe = credit_pe;
   credit_shm_slot = credit_slot_;
   credits_seen = 0;
@@ -3051,18 +3232,39 @@ void CkDeviceChannel::onResolved(const CkDevicePersistent& ep, uint64_t gen_, in
     pending.valid = false;
     if (!pull_mode) { credits--; uncredited++; }
     issue(p.src, p.bytes, p.stream, p.done, p.tag);
+  } else if (pending.valid) {
+    // Parked before this resolution (put() lists a copy for the per-PE
+    // shared-memory credit poll only when it parks resolved): the credit comes
+    // through the word, and the owner's release can precede this reply's
+    // application (2026-10-22 13:53, two nodes: the owner replied busy at
+    // 29.077, released at 29.079, the reply applied at 29.116, and nobody read
+    // the word again -- a stall at step 151). List it, and read the word now.
+    awaitShmCredit();
   }
+}
+
+// A put is queued behind a credit that comes through shared memory: list this
+// copy for the per-PE poll and read the word once now.
+void CkDeviceChannel::awaitShmCredit() {
+  if (!pending.valid || !resolved || pull_mode || credit_shm_slot < 0) return;
+  if (!shm_waiting) {
+    shm_waiting = true;
+    CkpvAccess(device_channel_shm_waiters)->push_back(this);
+  }
+  pollShmCredit();
 }
 
 void CkDeviceChannel::onClosing(uint64_t gen_, int owner_pe, uint64_t epoch_) {
   deviceChannelProgress();
   (void)gen_;
-  if (deviceChannelDebug())
+  if (deviceChannelDebug() || chanSignalDebug())
     CmiPrintf("[CHAN-CLOSE %d] channel %llx: closing of resolution %llu received (current %llu resolved %d in_flight %d pending %d)\n",
               CkMyPe(), (unsigned long long)channel_id, (unsigned long long)epoch_, (unsigned long long)epoch,
               (int)resolved, in_flight, (int)pending.valid);
   if (epoch_ > closed_epoch) closed_epoch = epoch_;
   close_ack_pe = owner_pe;
+  note(7, send_seq, epoch_, owner_pe, -1, in_flight);
+  MIGC("closing-rx", channel_id, gen_, owner_pe);
   if (ckMigStatsOn() && closing_at == 0.0 && !(resolved && epoch_ < epoch)) closing_at = CkWallTimer();
   if (resolved && epoch_ < epoch) {
     // A closing of a resolution this copy already left behind: nothing of it is
@@ -3089,6 +3291,7 @@ void CkDeviceChannel::onClosing(uint64_t gen_, int owner_pe, uint64_t epoch_) {
 
 void CkDeviceChannel::sendCloseAck() {
   close_ack_due = false;
+  note(8, last_direct_seq, epoch, close_ack_pe, -1, in_flight);
   auto* m = deviceChannelMsg<DeviceChannelCloseAck>(device_channel_closeack_handler);
   m->channel = channel_id;
   m->token = my_token;
@@ -3105,6 +3308,7 @@ void CkDeviceChannel::onSrcDone(uint64_t seq) {
   deviceChannelProgress();
   (void)seq;
   if (in_flight > 0) in_flight--;
+  note(9, seq, epoch, -1, -1, in_flight);
   if (sender_rec) sender_rec->noteDeviceSendDone();
   if (close_ack_due && in_flight == 0) sendCloseAck();
 }
@@ -3167,6 +3371,10 @@ void CkDeviceChannel::onPulled() {
     CkLocRec* rec = mgr ? mgr->recForDeviceWork(owner_id) : NULL;
     if (rec) rec->noteDeviceSendDone();
   }
+  if (deviceChannelDebug())
+    CmiPrintf("[CHAN-PULLED %d] channel %llx: staged put %llu read from pe %d token %llx; DONE sent (epoch %llu taken_seq %llu)\n",
+              CkMyPe(), (unsigned long long)channel_id, (unsigned long long)pull_ev.seq, pull_ev.sender_pe,
+              (unsigned long long)pull_ev.sender_token, (unsigned long long)epoch, (unsigned long long)taken_seq);
   auto* d = deviceChannelMsg<DeviceChannelDone>(device_channel_done_handler);
   d->token = pull_ev.sender_token;
   d->channel = channel_id;
@@ -3182,6 +3390,8 @@ void CkDeviceChannel::onPulled() {
 void CkDeviceChannel::issue(const void* src, size_t bytes, hapiStream_t stream,
                             const CkCallback& src_done, uint64_t tag) {
   const uint64_t seq = ++send_seq;
+  note(0, seq, epoch, dst.pe, signal_slot, credits);
+  direct_issued.push_back(seq);
   last_put_bytes = bytes;
   last_direct_seq = seq;
   if (shm_waiting && !pending.valid) { deviceChannelShmUnlist(this); shm_waiting = false; }
@@ -3249,11 +3459,13 @@ void CkDeviceChannel::issue(const void* src, size_t bytes, hapiStream_t stream,
   // The source endpoint: kept across puts of the same buffer, so a cross-host
   // sender registers its source once.
   if (src_ep.ptr != src || src_ep.cnt != bytes) {
+    const double t0 = zcStatsOnFast() ? CkWallTimer() : 0.0;
     src_ep = CkDevicePersistent(src, bytes, stream);
     if (CmiNumPhysicalNodes() > 1 &&
         findTransferModeDevice(CkMyPe(), dst.pe) == CkNcpyModeDevice::RDMA) {
       src_ep.open();
     }
+    if (t0 != 0.0) { zc_mode_stats.chan_open_n.fetch_add(1, std::memory_order_relaxed); zc_mode_stats.chan_open_us.fetch_add((long)((CkWallTimer() - t0) * 1e6), std::memory_order_relaxed); }
   }
   src_ep.hapi_stream = stream;
   src_ep.cb = CkCallback(deviceChannelSrcDoneFn, (void*)new DeviceChannelSrcDone{my_token, seq, src_done});
@@ -3291,7 +3503,11 @@ void CkDeviceChannel::issue(const void* src, size_t bytes, hapiStream_t stream,
     dst.cb_msg = nullptr;
     return;
   }
-  src_ep.put(dst);
+  {
+    const double t0 = zcStatsOnFast() ? CkWallTimer() : 0.0;
+    src_ep.put(dst);
+    if (t0 != 0.0) { zc_mode_stats.chan_rput_n.fetch_add(1, std::memory_order_relaxed); zc_mode_stats.chan_rput_us.fetch_add((long)((CkWallTimer() - t0) * 1e6), std::memory_order_relaxed); }
+  }
 }
 
 // A put while the receiver's channel is closed (its element is migrating), or
@@ -3316,6 +3532,7 @@ void* CkDeviceMallocNoGrow(size_t size);
 
 void CkDeviceChannel::issueStaged(const void* src, size_t bytes, hapiStream_t stream,
                                   const CkCallback& src_done, uint64_t tag) {
+  note(2, send_seq, epoch, dst.pe, -1, staged_outstanding);
   if (my_token == 0) {
     my_token = deviceChannelToken();
     (*CkpvAccess(device_channel_senders))[my_token] = this;
@@ -3382,21 +3599,51 @@ void CkDeviceChannel::issueStaged(const void* src, size_t bytes, hapiStream_t st
 // the receiver's release of it will credit, so one credit is debited here.
 void CkDeviceChannel::onStagedDone(uint64_t seq) {
   deviceChannelProgress();
-  (void)seq;
+  note(19, seq, epoch, -1, -1, staged_outstanding);
+  if (deviceChannelDebug() || chanSignalDebug())
+    CmiPrintf("[CHAN-DONE-RX %d] channel %llx token %llx: staged put %llu read by the owner: credits %d staged %d pending %d resolved %d epoch %llu\n",
+              CkMyPe(), (unsigned long long)channel_id, (unsigned long long)my_token, (unsigned long long)seq, credits,
+              staged_outstanding, (int)pending.valid, (int)resolved, (unsigned long long)epoch);
   if (staged_outstanding > 0) staged_outstanding--;
-  credits--;
+  // The read took the buffer as a direct put would, until the receiver releases it (a credit).
+  // Unresolved: the next reply's free flag speaks for every put up to its taken_seq, so the
+  // DONE is kept and reconciled there. Resolved: a put read after the reply is debited here;
+  // one read before it was counted by its free flag.
+  if (!resolved) dones_seen.push_back(seq);
+  else if (seq > acct_seq) credits--;
   if (staged_outstanding == 0 && pending.valid && resolved && credits > 0) {
     Pending p = pending;
     pending.valid = false;
     credits--;
     uncredited++;
     issue(p.src, p.bytes, p.stream, p.done, p.tag);
+  } else if (staged_outstanding == 0 && pending.valid) {
+    awaitShmCredit();   // the parked put now waits for a credit that may come through shared memory
   }
+}
+
+// A credit under the current resolution frees one put: the one held at the reply first (not
+// in direct_issued, which the reply's reconciliation pruned), then the oldest direct put. seq
+// names it when the credit came as a message; 0 (shared memory) takes the put order.
+void CkDeviceChannel::creditedPut(uint64_t seq) {
+  if (occupant_credit_due && (seq == 0 || seq <= acct_seq)) { occupant_credit_due = false; return; }
+  occupant_credit_due = false;
+  if (direct_issued.empty()) return;
+  if (seq != 0) {
+    for (size_t i = 0; i < direct_issued.size(); i++)
+      if (direct_issued[i] == seq) { direct_issued.erase(direct_issued.begin() + i); return; }
+    if (seq < direct_issued.front()) return;   // a staged put's release: no direct put freed
+  }
+  direct_issued.erase(direct_issued.begin());
 }
 
 void CkDeviceChannel::onCredit(uint64_t seq, uint64_t epoch_) {
   deviceChannelProgress();
-  (void)seq;
+  note(5, seq, epoch_, -1, -1, credits);
+  if (deviceChannelDebug() || chanSignalDebug())
+    CmiPrintf("[CHAN-CREDIT-RX %d] channel %llx token %llx: credit for put %llu epoch %llu arrives: resolved %d resolving %d epoch %llu credits %d staged %d pending %d uncredited %d\n",
+              CkMyPe(), (unsigned long long)channel_id, (unsigned long long)my_token, (unsigned long long)seq, (unsigned long long)epoch_,
+              (int)resolved, (int)resolving, (unsigned long long)epoch, credits, staged_outstanding, (int)pending.valid, uncredited);
   if (pull_mode && resolved && epoch_ == epoch) return;   // the receiver reads when it is ready
   // A credit of another resolution (the owner released after it closed this
   // copy, or before it answered the current request) is already in the free
@@ -3404,8 +3651,9 @@ void CkDeviceChannel::onCredit(uint64_t seq, uint64_t epoch_) {
   // puts into one buffer.
   if (epoch_ > epoch && my_token != 0) {
     // Ahead of its resolution (see device_channel_early_credits).
-    (*CkpvAccess(device_channel_early_credits))[my_token] = epoch_;
+    (*CkpvAccess(device_channel_early_credits))[my_token].push_back(DeviceChannelEarlyCredit{epoch_, seq});
     device_channel_credits_early++;
+    note(20, seq, epoch_, -1, -1, credits);
     snprintf(device_channel_last_early, sizeof(device_channel_last_early),
              "channel %llx put %llu of resolution %llu while current %llu resolved %d resolving %d pending %d",
              (unsigned long long)channel_id, (unsigned long long)seq, (unsigned long long)epoch_,
@@ -3414,11 +3662,12 @@ void CkDeviceChannel::onCredit(uint64_t seq, uint64_t epoch_) {
   }
   if (!resolved || epoch_ != epoch) {
     device_channel_credits_refused++;
+    note(21, seq, epoch_, -1, -1, credits);
     snprintf(device_channel_last_refused, sizeof(device_channel_last_refused),
              "channel %llx put %llu of resolution %llu while current %llu resolved %d resolving %d pending %d credits %d",
              (unsigned long long)channel_id, (unsigned long long)seq, (unsigned long long)epoch_,
              (unsigned long long)epoch, (int)resolved, (int)resolving, (int)pending.valid, credits);
-    if (deviceChannelDebug())
+    if (deviceChannelDebug() || chanSignalDebug())
       CmiPrintf("[CHAN-STALE %d] channel %llx: credit for put %llu of resolution %llu dropped (current %llu, resolved %d)\n",
                 CkMyPe(), (unsigned long long)channel_id, (unsigned long long)seq, (unsigned long long)epoch_,
                 (unsigned long long)epoch, (int)resolved);
@@ -3427,6 +3676,7 @@ void CkDeviceChannel::onCredit(uint64_t seq, uint64_t epoch_) {
   }
   credits++;
   if (uncredited > 0) uncredited--;
+  creditedPut(seq);
   if (staged_outstanding > 0) return;   // the parked put follows the staged ones (onStagedDone)
   if (!pending.valid) return;
   Pending p = pending;
@@ -3461,6 +3711,7 @@ void CkDeviceChannel::pup(PUP::er& p) {
   p|send_seq;
   p|taken_seq;
   p|landed_unseen;
+  p|landed_seq;
   p|last_put_bytes;
   p|last_direct_seq;
   p|departed_signal_slot;
@@ -3499,12 +3750,14 @@ void CkDeviceChannel::pup(PUP::er& p) {
     closed_epoch = 0;   // a new token: nothing stale can reach this copy
     in_flight = 0;
     staged_outstanding = 0;   // a holder does not move with a staged put unread (it is an outstanding send)
+    acct_seq = 0; occupant_credit_due = false; direct_issued.clear(); dones_seen.clear();
     close_ack_due = false;
     close_ack_pe = -1;
     my_token = 0;
     credit_shm_slot = -1; credit_shm_pe = -1; credits_seen = 0; shm_waiting = false;
     credit_slot = -1; credit_slot_pe = -1;
     signal_slot = -1; owner_signal_slot = -1;
+    hist_n = 0; note(18, send_seq, epoch, CkMyPe());
     sender_rec = NULL;
     holder_elem = 0;
     holder_known = false;
@@ -3545,6 +3798,17 @@ void CkRdmaDeviceChannelsBeforeMigrate(CkLocRec* rec) {
   const int mgr = rec->getLocMgr()->ckGetGroupID().idx;
   for (auto& kv : tab)
     if (kv.second->ownedBy(mgr, id)) kv.second->closingForMigration(rec);
+}
+
+// What an element's stand-down waits for, counted at its first deferral (CHARM_LB_MIGSTATS): its own puts
+// in flight or staged (sender copies it holds), its puts parked for a credit, and its owned channels'
+// closings not yet acked.
+void CkRdmaDeviceChannelsStandDownWhy(CkLocRec* rec, int* own_inflight, int* own_pending, int* acks) {
+  *own_inflight = *own_pending = *acks = 0;
+  for (CkDeviceChannel* c : deviceChannelElemList(rec)) {
+    if (c->is_owner) { if (c->closing_sent && !c->sender_closed) (*acks)++; }
+    else { *own_inflight += c->in_flight + c->staged_outstanding; if (c->pending.valid) (*own_pending)++; }
+  }
 }
 
 void CkRdmaDeviceChannelsLeaving(CkLocRec* rec) {
@@ -4061,6 +4325,14 @@ static void deviceRecvBatchFlush()
                                  &attr, &attr_idx, 1, &fail_idx, rs);
 #endif
     }
+#elif CMK_HIP
+    if (n > 1) {   // as above: one attribute for the batch, the failure index reported
+      hipMemcpyAttributes attr{};
+      attr.srcAccessOrder = hipMemcpySrcAccessOrderStream;
+      size_t attr_idx = 0, fail_idx = 0;
+      err = hipMemcpyBatchAsync(b->dsts.data(), const_cast<void**>(b->srcs.data()), b->sizes.data(), n,
+                                &attr, &attr_idx, 1, &fail_idx, rs);
+    }
 #endif
     if (err != hapiSuccess) {
       if (n > 1) {
@@ -4186,6 +4458,7 @@ static void deviceRecvTryIssue(DeviceRecvPending&& pending)
 
 static void deviceRecvPendingPoll(void*)
 {
+  ZcPollTimer zc_poll_timer{zcStatsOnFast() ? CkWallTimer() : 0.0, &zc_mode_stats.recvpoll_n, &zc_mode_stats.recvpoll_us, &zc_mode_stats.recvpoll_max};
   std::vector<DeviceRecvPending*>& list = *CkpvAccess(device_recv_pending);
   if (list.empty()) return;
   const double now = CkWallTimer();
@@ -6706,6 +6979,8 @@ static void deviceDeferredPublish(CkDeviceDeferredSend* pending)
   CkpvAccess(_currentLocRec) = pending->owner;
   _ck_pending_device_send_bytes = pending->bytes;
   if (pending->sourceObject) CkCallstackPush(pending->sourceObject);
+  if (pending->migrationPayload && pending->parkedAt > 0.0 && ckMigStatsOn())
+    ckMigStatChannel(2, CkWallTimer() - pending->parkedAt);   // dispatch -> the payload message leaves
   pending->send();
   if (pending->sourceObject) CkCallstackPop(pending->sourceObject);
   _ck_pending_device_send_bytes = savedBytes;
@@ -7032,6 +7307,8 @@ void CkRdmaDeviceSendWhenReady(CkDeviceDeferredSend* pending, void* msg,
       streams.push_back(buffer.hapi_stream);
   }
   pending->remaining = streams.size();
+  // CHARM_LB_MIGSTATS: a migration payload's wait for its pack copies (ship-wait).
+  if (pending->migrationPayload && pending->parkedAt == 0.0 && ckMigStatsOn()) pending->parkedAt = CkWallTimer();
   const CkCallback cb(deviceSendProducerReady, pending);
   for (auto stream : streams) hapiAddCallback(stream, cb);
   // HAPI accounts for these callbacks in quiescence detection. The final one
@@ -7252,7 +7529,10 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers,
     }
 #else
   CkLocRec* sender_rec = CkpvAccess(_currentLocRec);
-  if (pending && numops > 0) *pending = new CkDeviceDeferredSend(sender_rec);
+  if (pending && numops > 0) {
+    *pending = new CkDeviceDeferredSend(sender_rec);
+    (*pending)->migrationPayload = ck_sending_migration_payload;
+  }
   for (int i = 0; i < numops; i++) {
     if (buffers[i]->cnt == 0) {
       // Empty: its descriptor keeps its place in the message's fixed-width

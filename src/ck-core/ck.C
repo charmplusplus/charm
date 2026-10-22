@@ -19,6 +19,10 @@ clients, including the rest of Charm++, are actually C++.
 
 #ifndef CMK_CHARE_USE_PTR
 #include <map>
+#include <unordered_map>
+#include <memory>
+#include <algorithm>
+#include <vector>
 CkpvDeclare(std::vector<void *>, chare_objs);
 CkpvDeclare(std::vector<int>, chare_types);
 CkpvDeclare(std::vector<VidBlock *>, vidblocks);
@@ -1425,9 +1429,39 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
  *
  * \addtogroup CriticalPathFramework
  */
+// CHARM_EP_TIMES=1: per-PE histogram of entry-method (handler) time by entry index, printed at exit
+// (count, total, max): what keeps a PE from serving its urgent queue (Frontier 2026-10-22: a migration's
+// expedited hops waited 30-46 ms at the destination).
+namespace {
+struct EpTimeRec { long n = 0; double total = 0.0, max = 0.0; };
+struct EpTimes {
+  std::unordered_map<int, EpTimeRec> by_ep;
+  static bool on() { static const bool v = getenv("CHARM_EP_TIMES") != nullptr; return v; }
+  static EpTimes& get() { static thread_local EpTimes* t = [] { EpTimes* p = new EpTimes; return p; }(); return *t; }
+  void print() const {
+    std::vector<std::pair<int, EpTimeRec>> v(by_ep.begin(), by_ep.end());
+    std::sort(v.begin(), v.end(), [](const std::pair<int, EpTimeRec>& a, const std::pair<int, EpTimeRec>& b) { return a.second.max > b.second.max; });
+    for (size_t i = 0; i < v.size() && i < 10; i++) {
+      const int ep = v[i].first;
+      const char* name = (ep >= 0 && ep < (int)_entryTable.size()) ? _entryTable[ep]->name : "?";
+      CmiPrintf("[ep-times %d] %-56s n=%ld total=%.1f ms max=%.2f ms mean=%.1f us\n", CkMyPe(), name,
+                v[i].second.n, v[i].second.total * 1e3, v[i].second.max * 1e3, v[i].second.n ? v[i].second.total / v[i].second.n * 1e6 : 0.0);
+    }
+  }
+};
+struct EpTimer {
+  double t0; int ep;
+  EpTimer(int e) : t0(CmiWallTimer()), ep(e) {}
+  ~EpTimer() { const double dt = CmiWallTimer() - t0; EpTimeRec& r = EpTimes::get().by_ep[ep]; r.n++; r.total += dt; if (dt > r.max) r.max = dt; }
+};
+}  // namespace
+void ckEpTimesPrint() { if (EpTimes::on()) EpTimes::get().print(); }
+static void ckEpTimesAtExit() { ckEpTimesPrint(); }
+
 void _processHandler(void *converseMsg,CkCoreState *ck)
 {
   envelope *env = (envelope *) converseMsg;
+  std::unique_ptr<EpTimer> ep_timer(EpTimes::on() ? new EpTimer(env->getEpIdx()) : nullptr);
 
   MESSAGE_PHASE_CHECK(env);
 

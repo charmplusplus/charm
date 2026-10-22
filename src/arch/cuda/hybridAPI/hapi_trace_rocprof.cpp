@@ -105,6 +105,17 @@ void bufferCallback(rocprofiler_context_id_t, rocprofiler_buffer_id_t, rocprofil
         if (it != g_rp.symbols.end()) { k.name = it->second.name.c_str(); k.registersPerThread = it->second.vgprs; }
         else k.name = "?";
       }
+      // The HIP runtime's own blit kernels (__amd_rocclr_fillBuffer*, __amd_rocclr_copyBuffer*): on AMD a
+      // memset or a device-to-device copy is a kernel dispatch, so every completion flag and channel put
+      // arrived here as a kernel nobody owns (unowned share 0.8 against the A40's 0.66, Frontier
+      // 2026-10-22). CUDA reports them as copy-engine records; they go the same way here, 'S' for a fill,
+      // 'M' for a copy, their size unknown.
+      if (strncmp(k.name, "__amd_rocclr_", 13) == 0) {
+        HapiTraceCopyRec c{strstr(k.name, "fill") ? 'S' : 'M', k.deviceId, k.streamId, k.start, k.end, 0, 0};
+        b->copies.push_back(c);
+        bytes += sizeof(*r);
+        continue;
+      }
       b->kernels.push_back(k);
       bytes += sizeof(*r);
     } else if (h->kind == ROCPROFILER_BUFFER_TRACING_HIP_RUNTIME_API) {
@@ -156,8 +167,19 @@ int toolInit(rocprofiler_client_finalize_t, void*) {
             != ROCPROFILER_STATUS_SUCCESS || name == nullptr)
       continue;
     g_rp.api_names[op] = name;
-    if (!isPollName(name)) g_rp.api_ops.push_back((rocprofiler_tracing_operation_t)op);
+    // Only the calls that dispatch work carry the correlation the attribution needs (the launching call's
+    // thread and entry-method span name the kernel's object); event records, stream waits, queries and
+    // device lookups were intercepted for nothing at 20-35 us each under seven PEs (Frontier 2026-10-22,
+    // ~1M flag-write event records per process per run). CHARM_TRACE_ALL_API=1 restores every call.
+    static const bool all_api = getenv("CHARM_TRACE_ALL_API") != nullptr;
+    const bool dispatches = strncmp(name, "hipLaunch", 9) == 0 || strncmp(name, "hipExtLaunch", 12) == 0 ||
+                            strncmp(name, "hipModuleLaunch", 15) == 0 || strncmp(name, "hipGraphLaunch", 14) == 0 ||
+                            strncmp(name, "hipMemcpy", 9) == 0 || strncmp(name, "hipMemset", 9) == 0 ||
+                            strncmp(name, "hipDrvMemcpy", 12) == 0 || strncmp(name, "hipExtModuleLaunch", 18) == 0;
+    if (!isPollName(name) && (all_api || dispatches)) g_rp.api_ops.push_back((rocprofiler_tracing_operation_t)op);
   }
+  fprintf(stderr, "[hapi-trace] HIP API operations traced: %zu of %u (%s)\n", g_rp.api_ops.size(), (unsigned)nops,
+          getenv("CHARM_TRACE_ALL_API") ? "every call but the polls" : "dispatching calls only; CHARM_TRACE_ALL_API=1 for every call");
   if (rocprofiler_create_context(&g_rp.ctx) != ROCPROFILER_STATUS_SUCCESS) return -1;
   if (rocprofiler_create_context(&g_rp.copy_ctx) != ROCPROFILER_STATUS_SUCCESS) return -1;
   // 1 MB buffers, delivered at 3/4 full and at every flush.
@@ -193,6 +215,13 @@ rocprofiler_tool_configure_result_t* toolConfigure(uint32_t, const char*, uint32
 void hapiTraceBackendEarlyInit() {
   static const bool no_trace = (getenv("CHARM_LB_NO_CUPTI") != nullptr);   // the same switch as on CUDA
   if (no_trace || g_rp.configured) return;
+  // rocprofiler-sdk's inline queue interposition (1.3, ROCm 7.14) parks one of its pool threads in an
+  // active wait per in-flight kernel (ROCPROFILER_ASYNC_SIGNAL_HANDLER_THREADS, default 4), and a barrier
+  // on another process's IPC event then starves the pool: every multi-process leanmd run hung within four
+  // steps on Frontier, 2026-10-22, with the PEs blocked on the queue's gate lock. The legacy intercept
+  // queue traces the same dispatches without it (60 steps, under 3% over no tracing); chosen here unless
+  // the environment already says otherwise.
+  setenv("ROCPROFILER_QUEUE_INTERPOSITION", "false", 0);
   const rocprofiler_status_t st = rocprofiler_force_configure(toolConfigure);
   if (st != ROCPROFILER_STATUS_SUCCESS)
     fprintf(stderr, "HAPI> rocprofiler-sdk registration failed (%d): the balancer will see no device load\n", (int)st);

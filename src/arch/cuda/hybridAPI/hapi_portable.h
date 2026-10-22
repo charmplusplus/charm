@@ -145,6 +145,8 @@
 #define hapiEventQuery(event) cudaEventQuery(event)
 #define hapiEventSynchronize cudaEventSynchronize
 #define hapiEventDestroy(event) cudaEventDestroy(event)
+#define hapiEventElapsedTime(ms, start, end) cudaEventElapsedTime(ms, start, end)
+#define hapiMemset(ptr, value, count) cudaMemset(ptr, value, count)
 #define hapiLaunchHostFunc(stream, func, args) \
     cudaLaunchHostFunc(stream, func, args)
 #define hapiLaunchKernelRaw cudaLaunchKernel
@@ -330,6 +332,8 @@ static inline hapiDrvResult hapiDrvMemGetAllocationGranularity(size_t* g, const 
 #define hapiEventQuery(event) hipEventQuery(event)
 #define hapiEventSynchronize hipEventSynchronize
 #define hapiEventDestroy(event) hipEventDestroy(event)
+#define hapiEventElapsedTime(ms, start, end) hipEventElapsedTime(ms, start, end)
+#define hapiMemset(ptr, value, count) hipMemset(ptr, value, count)
 #define hapiLaunchHostFunc(stream, func, args) \
     hipLaunchHostFunc(stream, func, args)
 #define hapiLaunchKernelRaw hipLaunchKernel

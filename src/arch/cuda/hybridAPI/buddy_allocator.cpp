@@ -192,7 +192,7 @@ namespace buddy {
           lb_ptr_size[ptr] = request;
 
           tmp->size = tmp->size - request;
-          tmp->ptr = tmp->ptr + request;
+          tmp->ptr = static_cast<char*>(tmp->ptr) + request;
 
           return ptr;
         }

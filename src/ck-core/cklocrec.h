@@ -63,7 +63,7 @@ public:
   // admitted: 28% of moves went at the first kick, median 2.5 s to move.
   bool migrateKickHeld = false;
   void noteDeviceSendPosted() { outstandingDeviceSends++; }
-  void noteDeviceSendDone();
+  void noteDeviceSendDone(bool urgentKick = false);
   // The move window tally (CHARM_LB_MIGSTATS, see MigStats in cklocation.C):
   // when the balancer's decision reached this element, and when emigrate
   // first tried to take it (the stand-down for outstanding sends and channel

@@ -79,6 +79,11 @@ static inline bool migDbg() {
   static const bool on = (getenv("CHARM_DEBUG_MIGRATE") != nullptr);
   return on;
 }
+// CHARM_MIG_TRACE=1: one line per hop of a device migration, with the wall clock (CLOCK_REALTIME, comparable
+// across the job's nodes to ~1 ms), for an offline per-hop breakdown of the ship and grant windows.
+static inline bool migTrace() { static const bool on = (getenv("CHARM_MIG_TRACE") != nullptr); return on; }
+static inline double migNow() { struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts); return ts.tv_sec + ts.tv_nsec * 1e-9; }
+#define MIGT(stage, id, ptr) do { if (migTrace()) CmiPrintf("[MIGT %d] %s id=%llu ptr=%p t=%.6f\n", CkMyPe(), stage, (unsigned long long)(id), (const void*)(ptr), migNow()); } while (0)
 
 #if CMK_GPU
 // The landing admission gate (+gpupool). The memory contract plans each
@@ -448,10 +453,14 @@ extern "C" void _deferredMigrateHandler(void* arg);
 // (2026-09-15, 5 runs each, with all three LB-step fixes in): urgent 123.6 s
 // mean (117.7-127.7), FIFO 119.1 s (115.2-123.1), against sync 121.4 s. FIFO is
 // the only async arm that beats sync, so the kick waits its turn.
-static void ckPostKick(DeferredMigrateMsg* m)
+// urgent: the count reached zero by a channel's closing ack (Frontier 2026-10-22). The owner's senders are
+// held from the closing to the new resolution, and the FIFO kick waited ~40 ms behind the PE's queue while
+// the acks took 3 ms -- the whole of the stand-down. The zero-copy path keeps the FIFO kick (above).
+static void ckPostKick(DeferredMigrateMsg* m, bool urgent = false)
 {
   CmiSetHandler(m, _deferredMigrateHandlerIdx);
-  CmiPushPE(CmiMyRank(), m);
+  if (urgent) CmiPushPEUrgent(CmiMyRank(), m);
+  else CmiPushPE(CmiMyRank(), m);
 }
 
 unsigned char& CkArrayMessage::array_hops(void)
@@ -3116,7 +3125,7 @@ extern "C" void _deferredMigrateHandler(void* arg)
   CmiFree(m);
 }
 
-void CkLocRec::noteDeviceSendDone()
+void CkLocRec::noteDeviceSendDone(bool urgentKick)
 {
   if (outstandingDeviceSends > 0) outstandingDeviceSends--;
   if (outstandingDeviceSends == 0 && pendingMigrateTo != -1)
@@ -3136,7 +3145,7 @@ void CkLocRec::noteDeviceSendDone()
     migrateKickHeld = true;
     m->id = getID();
     m->toPe = toPe;
-    ckPostKick(m);
+    ckPostKick(m, urgentKick);
   }
 }
 
@@ -3560,6 +3569,12 @@ struct MigStats {
   Stage settle;        // destination: unpacked -> ckJustMigrated returned
   Stage chanHold;      // channel sender: closing received -> the new resolution applied
   Stage chanClose;     // channel owner: closing sent -> its ack
+  Stage shipWait;      // payload: dispatched -> its message leaves (the pack copies' producer wait)
+  Stage grantWait;     // payload: landing requested -> granted and dispatched (the admission gate, two hops)
+  Stage rxLand;        // destination: payload envelope arrived (landing buffer taken) -> its entry runs after the rget
+  Stage sdOwnInflight; // at the first deferral: the element's own puts in flight (a count, not seconds)
+  Stage sdOwnPending;  //   its puts parked for a credit
+  Stage sdAcks;        //   its owned channels' closings not yet acked
   Stage snapshotLead;  // Stable snapshot taken -> the pack that skipped it
   std::atomic<long> snapshots{0}, snapshotBytes{0}, stableChecks{0}, stableChecksSkipped{0};
   ~MigStats() {
@@ -3577,6 +3592,12 @@ struct MigStats {
     settle.print("settle");
     chanHold.print("chan-hold");
     chanClose.print("chan-close");
+    shipWait.print("ship-wait");
+    grantWait.print("grant-wait");
+    rxLand.print("rx-land");
+    sdOwnInflight.print("sd-own-inflight");
+    sdOwnPending.print("sd-own-pending");
+    sdAcks.print("sd-acks");
     snapshotLead.print("snapshot");
     if (snapshots.load() > 0)
       fprintf(stderr, "[mig-window] pid=%d stable snapshots %ld (%.1f MB), checks %ld, skipped %ld\n",
@@ -3598,7 +3619,8 @@ bool ckMigStatsOn() { return migStatsOn(); }
 void ckMigStatChannel(int kind, double seconds)
 {
   if (kind == 0) g_mig.chanHold.add(seconds);
-  else g_mig.chanClose.add(seconds);
+  else if (kind == 1) g_mig.chanClose.add(seconds);
+  else g_mig.shipWait.add(seconds);
 }
 namespace {
 struct MigTimer {
@@ -4288,7 +4310,9 @@ void CkLocMgr::sendGPUMsg(CmiUInt8 id)
   if (ckAdmissionGateOn()) {
     // Ask for the landing first (see ckLandingAdmissible). The payload waits
     // in its pool block until the destination grants it.
-    const GPUMigrateData& gpuData = sendGPUBuffers[id];
+    GPUMigrateData& gpuData = sendGPUBuffers[id];
+    if (migStatsOn()) gpuData.requestedAt = CkWallTimer();
+    MIGT("req-send", id, nullptr);
     thisProxy[gpuData.toPe].requestLanding(id, gpuData.size, CkMyPe(),
                                            (int)gpuData.blocks.size(),
                                            gpuData.blocks.empty() ? nullptr
@@ -4313,6 +4337,7 @@ static thread_local const char* ck_admit_from = "?";
 static thread_local const char* ck_admit_outer = "?";
 void CkLocMgr::requestLanding(CmiUInt8 id, int size, int srcPe, int n, CmiUInt8* blocks)
 {
+  MIGT("req-recv", id, nullptr);
   DeferredLanding d;
   d.id = id;
   d.size = size;
@@ -4465,6 +4490,7 @@ void CkLocMgr::admitLandingsLoop()
         thisProxy[CkMyPe()].immigrate(m);
       }
     } else {
+      MIGT("grant-send", d.id, nullptr);
       thisProxy[d.srcPe].landingGranted(d.id);
     }
     deferredLandings.pop_front();
@@ -4475,7 +4501,11 @@ void CkLocMgr::dispatchGPUMsg(CmiUInt8 id)
 {
   if (migDbg())
     CkPrintf("[GPUSEND %d] dispatch id=%llu\n", CkMyPe(), (unsigned long long)id);
-  if (migStatsOn()) sendGPUBuffers[id].dispatchedAt = CkWallTimer();
+  MIGT("dispatch", id, nullptr);
+  if (migStatsOn()) {
+    sendGPUBuffers[id].dispatchedAt = CkWallTimer();
+    if (sendGPUBuffers[id].requestedAt > 0.0) g_mig.grantWait.add(sendGPUBuffers[id].dispatchedAt - sendGPUBuffers[id].requestedAt);
+  }
   auto gpuData = sendGPUBuffers[id];
 
   // No completion callback and no blocking wait. The previous
@@ -4537,6 +4567,7 @@ void CkLocMgr::dispatchGPUMsg(CmiUInt8 id)
 // source block this migration was holding can be released.
 void CkLocMgr::finishGPUSend(CmiUInt8 id)
 {
+  MIGT("ack-recv", id, nullptr);
   auto it = sendGPUBuffers.find(id);
   if (it == sendGPUBuffers.end()) return;
   if (migStatsOn() && it->second.dispatchedAt > 0.0)
@@ -4745,6 +4776,15 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #endif
   if (rec->outstandingDeviceSends > 0)
   {
+    // CHARM_LB_MIGSTATS: what the first deferral waits for -- the element's own puts (in flight on the
+    // device or parked for a credit) or its owned channels' unacked closings (counts, in the ms column).
+#if CMK_GPU && CMK_GPU_COMM
+    if (migStatsOn() && rec->migFirstTryAt == tE0) {
+      int own_inflight = 0, own_pending = 0, acks = 0;
+      CkRdmaDeviceChannelsStandDownWhy(rec, &own_inflight, &own_pending, &acks);
+      g_mig.sdOwnInflight.add(own_inflight * 1e-3); g_mig.sdOwnPending.add(own_pending * 1e-3); g_mig.sdAcks.add(acks * 1e-3);
+    }
+#endif
     if (getenv("CHARM_DEBUG_MIGRATE"))
       CmiPrintf("[DEFER-MIG %d] elem %s id=%llu count=%d parked=%d toPe=%d\n", CkMyPe(),
                 idx2str(rec->getIndex()), (unsigned long long)rec->getID(),
@@ -5302,12 +5342,19 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
   if (migDbg())
     CkPrintf("[GPUPOST %d] id=%llu size=%d srcPe=%d\n", CkMyPe(),
              (unsigned long long)id, size, srcPe);
+  if (migStatsOn()) payloadArrivedAt[id] = CkWallTimer();   // the envelope is here; the rget follows
+  MIGT("arrive", id, data);
 }
 
 
 
 void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe)
 {
+  MIGT("entry", id, data);
+  if (migStatsOn()) {
+    auto ra = payloadArrivedAt.find(id);
+    if (ra != payloadArrivedAt.end()) { g_mig.rxLand.add(CkWallTimer() - ra->second); payloadArrivedAt.erase(ra); }
+  }
   if (migDbg())
     CkPrintf("[GPURECV %d] id=%llu size=%d srcPe=%d\n", CkMyPe(),
              (unsigned long long)id, size, srcPe);

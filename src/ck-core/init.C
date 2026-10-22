@@ -664,6 +664,7 @@ static void _exitHandler(envelope *env)
       }
       break;
     case ReqStatMsg: // Request stats and warnings message
+      { extern void ckEpTimesPrint(); ckEpTimesPrint(); }   // CHARM_EP_TIMES: this PE's entry-method time histogram
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);

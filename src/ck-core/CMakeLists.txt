@@ -171,6 +171,12 @@ if(BUILD_CUDA)
   # NVTX3 is header-only (nvtx3/nvToolsExt.h); +nvtx ranges around entry methods, see cknvtx.C
   target_compile_definitions(ck PRIVATE CMK_NVTX=1)
   target_include_directories(ck PRIVATE "${CUDA_DIR}/include")
+elseif(BUILD_HIP)
+  # The same ranges through roctx (cknvtx.C's CMK_HIP branch); the library is on the link line
+  # with hybridapi's ranges. Without this an application's +gputrace hooks (_nvtxOn,
+  # _nvtxTraceMsg) do not link on HIP.
+  target_compile_definitions(ck PRIVATE CMK_NVTX=1)
+  target_include_directories(ck PRIVATE "${ROCM_PATH}/include")
 endif()
 target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager)
 

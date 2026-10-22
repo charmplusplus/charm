@@ -100,3 +100,17 @@ extern "C" void hapiHashCompareImpl(const unsigned long long* a, const unsigned 
   const unsigned blocks = (unsigned)((count + threads - 1) / threads);
   hapiHashCompareKernel<<<blocks, threads, 0, stream>>>(a, b, count, d_flag);
 }
+
+// A completion flag written by a one-thread kernel: the system-scope fence is the release that
+// hipMemsetD32Async lacks (the event record ahead of it in hapiHipMemsetD32Async), in one launch instead
+// of an event record and a blit (Frontier 2026-10-22, +gpuflagkernel).
+#if defined(__HIP_PLATFORM_AMD__) || defined(__HIP__)
+__global__ void hapiFlagKernel(unsigned int* p, unsigned int v) {
+  __threadfence_system();
+  __hip_atomic_store(p, v, __ATOMIC_RELEASE, __HIP_MEMORY_SCOPE_SYSTEM);
+}
+extern "C" int hapiFlagKernelImpl(void* p, unsigned int v, void* stream) {
+  hapiFlagKernel<<<1, 1, 0, (hipStream_t)stream>>>((unsigned int*)p, v);
+  return (int)hipGetLastError();
+}
+#endif

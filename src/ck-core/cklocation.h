@@ -319,6 +319,7 @@ public:
   size_t footprint;
   std::vector<CmiUInt8> blocks;
   double dispatchedAt = 0.0;   // when the payload send was issued (the window tally)
+  double requestedAt = 0.0;    // when its landing was requested (grant-wait)
 
   GPUMigrateData()
       : toPe(-1), size(0), data(nullptr), stream(nullptr), footprint(0) {}
@@ -980,6 +981,7 @@ public:
   std::map<std::pair<CmiUInt8, int>, char*> receivedStableMsgs; // destination: posted, landing
   std::unordered_map<CmiUInt8, int> stableDiscarded;            // destination: discard that generation when it lands
   std::unordered_map<CmiUInt8, double> payloadLandedAt;        // destination: the window tally's landing stamp
+  std::unordered_map<CmiUInt8, double> payloadArrivedAt;       // destination: the envelope's arrival (rx-land)
 private:
   void dispatchGPUMsg(CmiUInt8 id);
 public:
