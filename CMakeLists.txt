@@ -276,11 +276,9 @@ else()
   set(CMK_TASKQUEUE 0)
 endif()
 
-if(${NETWORK} STREQUAL "reconverse")
-  set(RECONVERSE ON)
-endif()
-
-if(NOT RECONVERSE)
+# Keyed on NETWORK, not the RECONVERSE option: -DRECONVERSE=ON with a classic
+# network would otherwise get through and fail later on a missing src/arch dir.
+if(NOT NETWORK STREQUAL "reconverse")
   message(FATAL_ERROR "This tree builds only on reconverse (classic Converse was removed in charm #4061); use the classic branch for netlrts/mpi/ucx/verbs/ofi/gni/pami/multicore builds.")
 endif()
 set(CMK_RECONVERSE 1)
