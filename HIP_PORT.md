@@ -78,3 +78,14 @@ kill on the node and hung every two-process run before its first channel use (bo
 line); it is now named per job and step like the channel segment.
 Observation for later: at 8x4x4 async the load audit charges two thirds of the device's busy time to no object
 on both builds (unowned_frac 0.66, occupancy 0.65-0.71).
+
+**MI100 (job 23104951, gpud01, 13:38-13:46, the HIP tree):** chantest's memcpy-transport arms pass (24 iterations, with and
+without a balancer). Its ipc-transport arms (two processes sharing device memory through the pool) aborted at the first
+pool import: `vmm import: cuMemSetAccess(chunk 0) from device N: hipErrorInvalidValue (peer access between the devices is
+required)`. HIP maps another device's physical memory into a device's address space only once peer access from that
+device to the memory's device is enabled, which CUDA's virtual-memory path never needed. The pool's shared-memory entry
+now carries the owner's device, and the import enables peer access from each local device to it before the mapping; a
+device that cannot reach it is left out of the grant. leanmd 4x4x4 in one process: step 1 took 5.3-5.5 s, then 50-65
+ms/step; the no-LB run made no step after step 6 (240 s timeout, no stacks taken), async LB ran 30 steps in 12 s, async
+with channels was at step 22 when the allocation ended. 8x4x4 and jacobi3d did not run. The second pass with the fix
+(the same arms, plus every process's stacks dumped after 90 s without a step) waits on the node, drained since 17:40.

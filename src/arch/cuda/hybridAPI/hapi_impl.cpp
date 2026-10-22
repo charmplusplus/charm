@@ -4933,12 +4933,42 @@ static const char* hapiCuErrNameIpc(hapiDrvResult r) {
 // the destination's device, and peer access (cudaDeviceEnablePeerAccess) does not cover vmm
 // mappings. Where the whole set is refused (a pair without P2P) the owner alone is granted, so
 // a one-device process behaves exactly as before.
+// phys_dev: the device whose physical memory this is (the exporter's, for an import; the owner's
+// otherwise). HIP maps another device's memory into a device's address space only once peer
+// access from that device to the memory's device is enabled (cuMemSetAccess alone is refused
+// with "peer access between the devices is required", MI100 2026-10-21), and a device that
+// cannot reach it is left out of the grant.
 static hapiDrvResult hapiVmmSetAccessAllLocal(uintptr_t at, size_t bytes, int owner_dev,
-                                         const char* what) {
+                                         const char* what, int phys_dev = -1) {
+  if (phys_dev < 0) phys_dev = owner_dev;
   const std::vector<DeviceManager>& dms = CsvAccess(gpu_manager).device_managers;
   std::vector<hapiMemAccessDesc> acc;
   auto add = [&](int dev) {
     for (const hapiMemAccessDesc& a : acc) if (a.location.id == dev) return;
+#if CMK_HIP
+    if (dev != phys_dev) {
+      int can = 0;
+      if (hapiDeviceCanAccessPeer(&can, dev, phys_dev) != hapiSuccess || !can) {
+        static bool said = false;
+        if (!said) {
+          said = true;
+          CmiPrintf("HAPI> [%d] %s: device %d cannot access device %d's memory as a peer; "
+                    "it is left out of the grant\n", CmiMyPe(), what, dev, phys_dev);
+        }
+        hapiGetLastError();
+        return;
+      }
+      int saved = 0;
+      hapiGetDevice(&saved);
+      hapiSetDevice(dev);
+      const hapiError_t pe = hapiDeviceEnablePeerAccess(phys_dev, 0);
+      if (pe != hapiSuccess && pe != hapiErrorPeerAccessAlreadyEnabled)
+        CmiPrintf("HAPI> [%d] %s: enabling peer access from device %d to device %d: %s\n",
+                  CmiMyPe(), what, dev, phys_dev, hapiGetErrorString(pe));
+      hapiGetLastError();
+      hapiSetDevice(saved);
+    }
+#endif
     hapiMemAccessDesc d;
     memset(&d, 0, sizeof(d));
     d.location.type = hapiMemLocationTypeDevice;
@@ -5032,7 +5062,7 @@ static void* hapiVmmImportLocked(const hapiIpcMemHandle_t& handle, int src_proce
                hapiCuErrNameIpc(r));
     // The import cache is process-wide: a PE on another of this process's devices reuses
     // this mapping, so every local device gets access, not only the importing PE's.
-    r = hapiVmmSetAccessAllLocal(at, m.chunk, cur_dev, "vmm import");
+    r = hapiVmmSetAccessAllLocal(at, m.chunk, cur_dev, "vmm import", m.entry->dev);
     if (r != hapiDrvSuccess)
       CmiAbort("HAPI> [%d] vmm import: cuMemSetAccess(chunk %zu) from device %d: %s (peer "
                "access between the devices is required)", CmiMyPe(), m.mapped, cur_dev,
@@ -6117,6 +6147,7 @@ bool hapiDevPoolVmmPublish(int dev, hapi_pool_shm_entry* e, int shm_index,
              "descriptors, so peers cannot map the heap; use +gpupoolalloc buddy",
              CmiMyPe(), dev);
   v->publish(e, shm_index);
+  e->dev = dev;
   hapiVmmMakeHandle(handle, (uint64_t)v->heap.base(), v->heap.reserveBytes(),
                     v->heap.chunkBytes(), e->pid, shm_index, CmiMyNode());
   return true;

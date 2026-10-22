@@ -107,6 +107,7 @@
 #define hapiPeekAtLastError cudaPeekAtLastError
 #define hapiGetErrorName cudaGetErrorName
 #define hapiGetErrorString(err) cudaGetErrorString(err)
+#define hapiErrorPeerAccessAlreadyEnabled cudaErrorPeerAccessAlreadyEnabled
 #define hapiSetDevice(dev) cudaSetDevice(dev)
 #define hapiGetDevice(dev) cudaGetDevice(dev)
 #define hapiGetDeviceCount(devCount) cudaGetDeviceCount(devCount)
@@ -130,6 +131,7 @@
 #define hapiMemcpyAsync cudaMemcpyAsync
 #define hapiMemcpy2DAsync cudaMemcpy2DAsync
 #define hapiMemsetAsync cudaMemsetAsync
+#define hapiMemcpyToSymbol(sym, src, n) cudaMemcpyToSymbol(sym, src, n)
 #define hapiStreamCreate(stream) cudaStreamCreate(stream)
 #define hapiStreamCreateNonBlocking(stream) \
     cudaStreamCreateWithFlags(stream, cudaStreamNonBlocking)
@@ -290,6 +292,7 @@ static inline hapiDrvResult hapiDrvMemGetAllocationGranularity(size_t* g, const 
 #define hapiPeekAtLastError hipPeekAtLastError
 #define hapiGetErrorName hipGetErrorName
 #define hapiGetErrorString(err) hipGetErrorString(err)
+#define hapiErrorPeerAccessAlreadyEnabled hipErrorPeerAccessAlreadyEnabled
 #define hapiSetDevice(dev) hipSetDevice(dev)
 #define hapiGetDevice(dev) hipGetDevice(dev)
 #define hapiGetDeviceCount(devCount) hipGetDeviceCount(devCount)
@@ -313,6 +316,7 @@ static inline hapiDrvResult hapiDrvMemGetAllocationGranularity(size_t* g, const 
 #define hapiMemcpyAsync hipMemcpyAsync
 #define hapiMemcpy2DAsync hipMemcpy2DAsync
 #define hapiMemsetAsync hipMemsetAsync
+#define hapiMemcpyToSymbol(sym, src, n) hipMemcpyToSymbol(HIP_SYMBOL(sym), src, n)
 #define hapiStreamCreate(stream) hipStreamCreate(stream)
 #define hapiStreamCreateNonBlocking(stream) \
     hipStreamCreateWithFlags(stream, hipStreamNonBlocking)
@@ -352,7 +356,7 @@ static inline hapiDrvResult hapiDrvDeviceTotalMem(size_t* bytes, hapiDrvDevice d
 // step-down (hapi_impl.cpp) keeps what the runtime accepts.
 static inline void hapiDrvDeviceVmmSupport(hapiDrvDevice d, int* vmm, int* fd, int* rdma) {
   *vmm = 0; *fd = 1; *rdma = 1;
-  hipDeviceGetAttribute(vmm, hipDeviceAttributeVirtualMemoryManagementSupported, (int)d);
+  if (hipDeviceGetAttribute(vmm, hipDeviceAttributeVirtualMemoryManagementSupported, (int)d) != hipSuccess) *vmm = 0;
 }
 static inline hapiDrvResult hapiDrvMemAddressReserve(uintptr_t* out, size_t size, size_t align,
                                                       uintptr_t hint, unsigned long long flags) {

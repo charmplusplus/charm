@@ -105,6 +105,7 @@ struct hapi_pool_shm_entry {
   int valid;
   int kind;       // 0: one cudaMalloc arena (buddy); 1: a vmm heap
   int pid;        // owner, for pidfd_getfd
+  int dev;        // owner's device index, for the peer access a HIP import needs
   size_t chunk_bytes;
   int n_chunks;
   int fds[HAPI_VMM_MAX_CHUNKS];
