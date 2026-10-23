@@ -15,6 +15,7 @@ test: scan
 	$(call run, ./scan +p1 +vp5)
 	$(call run, ./scan +p1 +vp7)
 	$(call run, ./scan +p2 +vp4)
+	$(call run, ./scan +p2 +vp5 +balancer RandCentLB)
 
 testp: scan
 	$(call run, ./scan +p$(P) +vp$(P) )

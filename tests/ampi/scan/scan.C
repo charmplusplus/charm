@@ -12,7 +12,13 @@
      - a communicator from MPI_Comm_split, so communicator ranks differ from
        world ranks;
      - MPI_Iscan / MPI_Iexscan completed by MPI_Wait, by an MPI_Test loop, and
-       by one MPI_Waitall over several outstanding scans.
+       by one MPI_Waitall over several outstanding scans;
+     - progress: MPI_Iscan must return without waiting for the other ranks
+       (rank 0 sends to rank 1 after its MPI_Iscan, and rank 1 enters the scan
+       only after receiving it), and a scan must advance while a rank is
+       blocked in MPI_Recv on something else (rank 0 waits for a message the
+       last rank sends only after its own scan has completed);
+     - with +balancer, an AMPI_Migrate while scans are outstanding.
 
    MPI_Exscan's recvbuf on rank 0 is undefined, so it is not checked there.
    The rank count that exposed the MPI_Exscan hang is 3 (any count that is not
@@ -227,6 +233,83 @@ static void runSuite(MPI_Comm comm, const char *commName, Ctx &x)
   }
 }
 
+static void progressTests(MPI_Comm comm, Ctx &x)
+{
+  int rank, size;
+  MPI_Comm_rank(comm, &rank);
+  MPI_Comm_size(comm, &size);
+  if (size < 2) return;
+  char how[128];
+
+  for (int ex = 0; ex <= 1; ex++) {
+    // (a) MPI_Iscan returns before the other ranks have entered the scan
+    Case c;
+    c.kind = K_AFFINE; c.count = 2; c.exclusive = ex;
+    fill(c, rank, x);
+    MPI_Request req;
+    int token = 0;
+    if (rank == 1) MPI_Recv(&token, 1, MPI_INT, 0, 77, comm, MPI_STATUS_IGNORE);
+    if (ex) MPI_Iexscan(c.send.data(), c.recv.data(), c.count, c.type, c.op, comm, &req);
+    else    MPI_Iscan(c.send.data(), c.recv.data(), c.count, c.type, c.op, comm, &req);
+    if (rank == 0) MPI_Send(&token, 1, MPI_INT, 1, 77, comm);
+    MPI_Wait(&req, MPI_STATUS_IGNORE);
+    snprintf(how, sizeof how, "%s returns before peers enter", ex ? "MPI_Iexscan" : "MPI_Iscan");
+    verify(c, rank, how, x);
+
+    // (b) the scan advances while rank 0 is blocked in MPI_Recv
+    fill(c, rank, x);
+    if (ex) MPI_Iexscan(c.send.data(), c.recv.data(), c.count, c.type, c.op, comm, &req);
+    else    MPI_Iscan(c.send.data(), c.recv.data(), c.count, c.type, c.op, comm, &req);
+    if (rank == 0) {
+      MPI_Recv(&token, 1, MPI_INT, size - 1, 78, comm, MPI_STATUS_IGNORE);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
+    } else {
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
+      if (rank == size - 1) MPI_Send(&token, 1, MPI_INT, 0, 78, comm);
+    }
+    snprintf(how, sizeof how, "%s progresses during MPI_Recv", ex ? "MPI_Iexscan" : "MPI_Iscan");
+    verify(c, rank, how, x);
+  }
+}
+
+#ifdef AMPI
+// Migrate while scans are outstanding (with +balancer, ranks move and their
+// posted scan requests are packed and unpacked).
+static void migrateTest(MPI_Comm comm, Ctx &x)
+{
+  int rank;
+  MPI_Comm_rank(comm, &rank);
+  std::vector<Case> cs(2);
+  MPI_Request reqs[2];
+  for (int j = 0; j < 2; j++) {
+    cs[j].kind = K_AFFINE; cs[j].count = 4; cs[j].exclusive = j;
+    fill(cs[j], rank, x);
+  }
+  // Rank 0 starts its scans only after AMPI_Migrate, so every other rank's
+  // scans are still waiting for rank 0's contribution while it migrates.
+  if (rank != 0) {
+    MPI_Iscan(cs[0].send.data(), cs[0].recv.data(), 4, MPI_INT, x.affineOp, comm, &reqs[0]);
+    MPI_Iexscan(cs[1].send.data(), cs[1].recv.data(), 4, MPI_INT, x.affineOp, comm, &reqs[1]);
+  }
+  int *pe, flag, before, after;
+  MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &pe, &flag);
+  before = *pe;
+  AMPI_Migrate(AMPI_INFO_LB_SYNC);
+  MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &pe, &flag);
+  after = *pe;
+  if (rank == 0) {
+    MPI_Iscan(cs[0].send.data(), cs[0].recv.data(), 4, MPI_INT, x.affineOp, comm, &reqs[0]);
+    MPI_Iexscan(cs[1].send.data(), cs[1].recv.data(), 4, MPI_INT, x.affineOp, comm, &reqs[1]);
+  }
+  MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+  int moved = (before != after), totalMoved = 0;
+  MPI_Reduce(&moved, &totalMoved, 1, MPI_INT, MPI_SUM, 0, comm);
+  if (rank == 0) printf("scan: %d ranks changed PE in AMPI_Migrate with scans outstanding\n", totalMoved);
+  verify(cs[0], rank, "MPI_Iscan across AMPI_Migrate", x);
+  verify(cs[1], rank, "MPI_Iexscan across AMPI_Migrate", x);
+}
+#endif
+
 int main(int argc, char **argv)
 {
   MPI_Init(&argc, &argv);
@@ -238,6 +321,10 @@ int main(int argc, char **argv)
   MPI_Op_create(affineCompose, 0, &x.affineOp);
 
   runSuite(MPI_COMM_WORLD, "WORLD", x);
+  progressTests(MPI_COMM_WORLD, x);
+#ifdef AMPI
+  migrateTest(MPI_COMM_WORLD, x);
+#endif
 
   // Reverse-ordered split: communicator rank differs from world rank.
   MPI_Comm sub;

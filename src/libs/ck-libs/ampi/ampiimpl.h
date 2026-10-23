@@ -1232,8 +1232,9 @@ enum AmpiReqType : uint8_t {
   AMPI_GATHER_REQ  = 6,
   AMPI_GATHERV_REQ = 7,
   AMPI_G_REQ       = 8,
+  AMPI_SCAN_REQ    = 9,
 #if CMK_CUDA
-  AMPI_GPU_REQ     = 9
+  AMPI_GPU_REQ     = 10
 #endif
 };
 
@@ -1717,6 +1718,63 @@ class GReq final : public AmpiRequest {
   void print() const noexcept override;
 };
 
+/// MPI_Iscan and MPI_Iexscan (MPI_Scan and MPI_Exscan wait on one).
+///
+/// The scan is the recursive-doubling exchange: in round k each rank
+/// exchanges its partial result with partner rank^(1<<k), if that rank
+/// exists. A round cannot start before the previous one has finished, so the
+/// request runs the rounds itself: it is the posted receive for its current
+/// round (tag MPI_SCAN_TAG or MPI_EXSCAN_TAG, src = partner), and when the
+/// partner's message is matched ampi::progressScan folds it in, sends the
+/// next round's partial result and posts the request again. The scan
+/// therefore advances as messages arrive, while the rank's thread computes
+/// or waits on other requests, not only inside MPI_Wait on this request.
+class ScanReq final : public AmpiRequest {
+ public:
+  MPI_Op op       = MPI_OP_NULL;
+  int rank        = 0;
+  int size        = 0;
+  int mask        = 1;     // current round: partner is rank^mask
+  bool exclusive  = false; // MPI_Iexscan
+  bool haveResult = false; // exclusive scan: buf already holds a value
+  std::vector<char> partial; // reduction over this rank's current subtree
+  std::vector<char> tmp;     // the partner's partial result
+
+  ScanReq(void *buf_, int count_, MPI_Datatype type_, MPI_Op op_, MPI_Comm comm_,
+          int rank_, int size_, bool exclusive_, int blklen, CkDDT *ddt_,
+          AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
+    : op(op_), rank(rank_), size(size_), exclusive(exclusive_),
+      partial(blklen), tmp(blklen)
+  {
+    buf   = buf_;
+    count = count_;
+    type  = type_;
+    comm  = comm_;
+    tag   = exclusive ? MPI_EXSCAN_TAG : MPI_SCAN_TAG;
+    AMPI_REQUEST_COMMON_INIT
+  }
+  ScanReq() =default;
+  ~ScanReq() =default;
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts) noexcept override;
+  bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
+  AmpiReqType getType() const noexcept override { return AMPI_SCAN_REQ; }
+  bool isUnmatched() const noexcept override { return !complete; }
+  void pup(PUP::er &p) noexcept override {
+    AmpiRequest::pup(p);
+    p|op;
+    p|rank;
+    p|size;
+    p|mask;
+    p|exclusive;
+    p|haveResult;
+    p|partial;
+    p|tmp;
+  }
+  void print() const noexcept override;
+};
+
 class AmpiRequestPool;
 
 class AmpiRequestList {
@@ -1843,7 +1901,10 @@ class AmpiMsg final : public CMessage_AmpiMsg {
   inline int getSsendReq() const noexcept { return ssendReq; }
   inline int getSeqIdx() const noexcept {
     // seqIdx is srcRank, unless this message was part of a collective
-    if (tag >= MPI_BCAST_TAG && tag <= MPI_ATA_TAG) {
+    // (Scan and exscan messages are ordered per sender like point-to-point
+    // ones; see ampi::getSeqNo.)
+    if (tag >= MPI_BCAST_TAG && tag <= MPI_ATA_TAG &&
+        tag != MPI_SCAN_TAG && tag != MPI_EXSCAN_TAG) {
       return COLL_SEQ_IDX;
     }
     else {
@@ -2656,6 +2717,7 @@ class ampi final : public CBase_ampi {
   friend class RednReq;
   friend class GatherReq;
   friend class GathervReq;
+  friend class ScanReq;
 
   ampiParent *parent;
   CProxy_ampiParent parentProxy;
@@ -2773,7 +2835,9 @@ class ampi final : public CBase_ampi {
   void insertNewChildAmpiElements(MPI_Comm newComm, CProxy_ampi newAmpi, AmpiCommType type) noexcept;
 
   inline void handleBlockedReq(AmpiRequest* req) noexcept {
-    if (req->isBlocked() && parent->numBlockedReqs != 0) {
+    // A ScanReq is matched once per round; progressScan does this when its
+    // last round completes.
+    if (req->isBlocked() && parent->numBlockedReqs != 0 && req->getType() != AMPI_SCAN_REQ) {
       parent->numBlockedReqs--;
     }
   }
@@ -2798,6 +2862,7 @@ class ampi final : public CBase_ampi {
     return static_blockOnColl(this);
   }
   inline void setBlockingReq(AmpiRequest *req) noexcept;
+  void progressScan(ScanReq* req, AmpiMsg* msg, bool deleteMsg) noexcept;
   inline AmpiRequestPool& getReqPool() const { return parent->reqPool; }
   CMI_WARN_UNUSED_RESULT inline ampi* blockOnIReq(void* buf, int count, MPI_Datatype type, int s,
                                                   int t, MPI_Comm comm, MPI_Status* sts) noexcept;
