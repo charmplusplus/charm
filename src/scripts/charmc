@@ -1552,6 +1552,14 @@ Debug "Finished with TRACEMODE=${TRACEMODE[*]} and BALANCE=$BALANCE..."
 
 BAL_OBJ=(-lreconverse)
 
+# libreconverse has only the rand seed balancer (cldb.rand.cpp); there are no
+# libldb-* libraries for -balance to select.
+if [[ "$BALANCE" != 'rand' ]]
+then
+  Warning "Warning: -balance $BALANCE is ignored on reconverse, which has only the rand seed balancer."
+  BALANCE='rand'
+fi
+
 # Reconverse links no thread library (libreconverse has one user-level thread
 # implementation) and only one memory module, isomalloc, which AMPI uses to
 # put each rank's heap in its migratable context; libreconverse otherwise uses
@@ -1569,8 +1577,6 @@ then
   Warning "Warning: -thread $THREAD is ignored on reconverse, which has a single user-level thread implementation."
   THREAD='default'
 fi
-
-# Check for valid choice of MEMORY
 
 # Set the default expansions of unprefixed variants
 case "$MEMORY" in
@@ -1595,19 +1601,6 @@ case "$MEMORY" in
      MEM_OBJ+=(-lmemory-os-wrapper)
   ;;
 esac
-
-# Check for valid choice of THREAD
-
-if [[ "$CHARM_SHARED" = '1' && -n "$CMK_LD_SHARED_THREAD" && "$THREAD" = "default" ]]
-then
-  THREAD="$CMK_LD_SHARED_THREAD"
-fi
-if [[ "$TLSGLOBALS" = '1' ]]
-then
-  THREAD="${THREAD%-tls}-tls"
-fi
-
-THREAD_OBJ=("-lthreads-${THREAD}")
 
 
 # Module name
@@ -2152,7 +2145,7 @@ esac
 
 ##############################################################################
 #
-# Confirm that TRACEMODE, BALANCE, MEMORY, THREAD exist
+# Confirm that TRACEMODE exists
 #
 ##############################################################################
 
