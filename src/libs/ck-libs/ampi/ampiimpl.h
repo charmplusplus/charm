@@ -2700,7 +2700,6 @@ class ampi final : public CBase_ampi {
   int numMergeGroupsArrived{};
   MPI_Comm mergeNextComm{};
   bool unblockRemoteOnFinish{};
-  void intercommMergeGroupArrived(MPI_Comm nextIntraComm) noexcept;
 
   // Intercommunicator creation: the new array's proxy, sent to ampiParent 0
   // for the proxy exchange once all of its elements are registered.
@@ -2754,19 +2753,15 @@ class ampi final : public CBase_ampi {
 
   void splitPhase1(CkReductionMsg *msg) noexcept;
   void splitPhaseInter(CkReductionMsg *msg) noexcept;
-  // The reduction targets of communicator creation are threaded entry methods
-  // taking a CkReductionMsg, not [threaded,reductiontarget] entries: charmxi's
-  // reductiontarget wrapper calls the method directly, so it ran unthreaded
-  // and blocked the scheduler in createNewChildAmpiSync's future (which also
-  // trips CkCallstackPop's "object tracking mismatch" assertion).
+  // The reduction targets of communicator creation are [threaded] entry
+  // methods taking a CkReductionMsg, like splitPhase1. They block in
+  // createNewChildAmpiSync's future, so they must run in their own thread.
   void commCreateReduced(CkReductionMsg *msg) noexcept;
   void intercommCreateReduced(CkReductionMsg *msg) noexcept;
   void intercommMergeReduced(CkReductionMsg *msg) noexcept;
   void commCreatePhase1(int nextComm, int commType) noexcept;
   void registrationFinish() noexcept;
-  void intercommCreatePhase1(MPI_Comm nextInterComm) noexcept;
-  void intercommMergePhase1(MPI_Comm nextIntraComm) noexcept;
-  void intercommMergeRemoteReady(MPI_Comm nextIntraComm) noexcept;
+  void intercommMergeGroupArrived(MPI_Comm nextIntraComm) noexcept;
 
   void exchangeProxyForSplitLocal(int color, CProxy_ampi splitLocalProxy) noexcept {
     auto iter = splitRProxyMap.find(color);

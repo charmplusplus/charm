@@ -67,7 +67,7 @@ module ampi {
     entry EXPEDITED void registrationFinish();
     entry EXPEDITED_THREADED void intercommCreateReduced(CkReductionMsg *msg);
     entry EXPEDITED_THREADED void intercommMergeReduced(CkReductionMsg *msg);
-    entry EXPEDITED_THREADED void intercommMergeRemoteReady(MPI_Comm nextIntraComm);
+    entry EXPEDITED_THREADED void intercommMergeGroupArrived(MPI_Comm nextIntraComm);
     entry EXPEDITED void exchangeProxyForSplitLocal(int, CProxy_ampi);
     entry EXPEDITED void exchangeProxyForSplitRemote(int, CProxy_ampi);
 

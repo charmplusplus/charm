@@ -2555,10 +2555,7 @@ MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root
 void ampi::intercommCreateReduced(CkReductionMsg *msg) noexcept {
   const MPI_Comm nextInterComm = *(const MPI_Comm *)msg->getData();
   delete msg;
-  intercommCreatePhase1(nextInterComm);
-}
 
-void ampi::intercommCreatePhase1(MPI_Comm nextInterComm) noexcept {
   setNumCommCreationsInProgress(1);
   CProxy_ampi newAmpi = createNewChildAmpiSync();
   exchangeProxyOnFinish = true;
@@ -2596,27 +2593,21 @@ void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid 
 }
 
 void ampi::intercommMergeReduced(CkReductionMsg *msg) noexcept {
-  const MPI_Comm nextIntraComm = *(const MPI_Comm *)msg->getData();
-  delete msg;
-  intercommMergePhase1(nextIntraComm);
-}
-
-void ampi::intercommMergePhase1(MPI_Comm nextIntraComm) noexcept {
   // Called on both roots once every rank of that root's group has contributed.
   // The root of the group that goes first (the only one with a non-empty
   // tmpVec) creates the merged communicator; the other root tells it that its
   // group has arrived, so that the creating root can resume both groups.
+  const MPI_Comm nextIntraComm = *(const MPI_Comm *)msg->getData();
+  delete msg;
   if (tmpVec.size() == 0) {
-    remoteProxy[myComm->getIndexForRemoteRank(0)].intercommMergeRemoteReady(nextIntraComm);
+    remoteProxy[myComm->getIndexForRemoteRank(0)].intercommMergeGroupArrived(nextIntraComm);
     return;
   }
   intercommMergeGroupArrived(nextIntraComm);
 }
 
-void ampi::intercommMergeRemoteReady(MPI_Comm nextIntraComm) noexcept {
-  intercommMergeGroupArrived(nextIntraComm);
-}
-
+// Entry method (from the other group's root) and local call (from
+// intercommMergeReduced) on the root of the group that goes first.
 void ampi::intercommMergeGroupArrived(MPI_Comm nextIntraComm) noexcept {
   // The two arrivals (local reduction, remote root's message) can come in
   // either order. Only create the merged array, and so only resume any rank,
