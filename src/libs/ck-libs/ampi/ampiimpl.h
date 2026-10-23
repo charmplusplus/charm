@@ -814,8 +814,8 @@ class groupStruct {
       return ranks;
     }
   }
-  int decRefCount() noexcept { return refCount--; }
-  int incRefCount() noexcept { return refCount++; }
+  int decRefCount() noexcept { return --refCount; } // returns the new count
+  int incRefCount() noexcept { return ++refCount; }
 };
 
 inline bool operator==(const groupStruct &g1, const groupStruct &g2) {
@@ -1247,7 +1247,11 @@ enum AmpiSendType : char {
   BLOCKING_SEND = 0,
   I_SEND = 1,
   BLOCKING_SSEND = 2,
-  I_SSEND = 3
+  I_SSEND = 3,
+  // Buffered sends always copy the data into a message and send it eagerly,
+  // so they complete without waiting for the matching receive.
+  BLOCKING_BSEND = 4,
+  I_BSEND = 5
 };
 
 #define MyAlign8(x) (((x)+7)&(~7))
@@ -2357,7 +2361,7 @@ class ampiParent final : public CBase_ampiParent {
   bool isInter(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_INTER); }
   bool isIntra(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_INTRA); }
   bool isGroup(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_GROUP); }
-  bool isInGroups(MPI_Group group) const noexcept { return (group>=0 && group<groups.size()); }
+  bool isInGroups(MPI_Group group) const noexcept { return (group>=0 && group<groups.size() && groups[group] != nullptr); }
 
   void pup(PUP::er &p) noexcept;
 
@@ -2412,27 +2416,43 @@ class ampiParent final : public CBase_ampiParent {
       return groups[group]->getRanks();
     }
   }
+  // Group handles are indices into groups[]. A freed group leaves a null slot
+  // (reused by later groups) so that the handles of other groups stay valid.
   inline MPI_Group saveGroupStruct(const std::vector<int>& vec) noexcept {
     if (vec.empty()) return MPI_GROUP_EMPTY;
-    for (int i=0; i<groups.size(); i++) {
-      if (vec == groups[i]->getRanks()) {
+    int freeSlot = -1;
+    for (int i=1; i<groups.size(); i++) { // slot 0 is MPI_GROUP_EMPTY
+      if (groups[i] == nullptr) {
+        if (freeSlot == -1) freeSlot = i;
+      }
+      else if (vec == groups[i]->getRanks()) {
         groups[i]->incRefCount();
         return i;
       }
     }
-    int idx = groups.size();
-    groups.resize(idx+1);
+    int idx = freeSlot;
+    if (idx == -1) {
+      idx = groups.size();
+      groups.resize(idx+1);
+    }
     groups[idx]=new groupStruct(vec);
     return (MPI_Group)idx;
   }
-  void freeGroupStruct(const MPI_Group group) noexcept {
-    if (group == MPI_GROUP_EMPTY || group == MPI_GROUP_NULL || hasComm(group)) {
-      return;
+  // Returns false if group is not a valid group handle.
+  bool freeGroupStruct(const MPI_Group group) noexcept {
+    if (group == MPI_GROUP_EMPTY || group == MPI_GROUP_NULL) {
+      return true;
+    }
+    if (!isInGroups(group)) {
+      // Internal handles that alias a live communicator (see comm2group) own
+      // no group object; anything else is not a valid group.
+      return hasComm(group);
     }
     if (groups[group]->decRefCount() == 0) {
       delete groups[group];
-      groups.remove(group);
+      groups[group] = nullptr;
     }
+    return true;
   }
   inline int getRank(const MPI_Group group) const noexcept {
     std::vector<int> vec = group2vec(group);
@@ -2450,12 +2470,23 @@ class ampiParent final : public CBase_ampiParent {
     comms.checkComm(comm);
   }
 
-  /// if intra-communicator, return comm, otherwise return null group
+  /// if intra-communicator, return comm, otherwise return null group.
+  /// The result aliases the communicator's number and owns no group object,
+  /// so it is valid only while comm exists and must not be passed to
+  /// MPI_Group_free: it is for internal use. MPI_Comm_group returns
+  /// commGroupHandle(comm) instead.
   inline MPI_Group comm2group(const MPI_Comm comm) const noexcept {
     if(isInter(comm)) return MPI_GROUP_NULL;   // we don't support inter-communicator in such functions
     const ampiCommStruct& s = comm2CommStruct(comm);
     if(comm!=MPI_COMM_WORLD && comm!=s.getComm()) CkAbort("Error in ampiParent::comm2group()");
     return (MPI_Group)(s.getComm());
+  }
+
+  /// A new reference to a group object holding comm's (local) group, owned
+  /// by the caller and independent of comm's lifetime (MPI_Comm_group).
+  inline MPI_Group commGroupHandle(const MPI_Comm comm) noexcept {
+    if (isInter(comm)) return MPI_GROUP_NULL; // as comm2group
+    return saveGroupStruct(comm2CommStruct(comm).getIndices());
   }
 
   inline int getRemoteSize(const MPI_Comm comm) const noexcept {
@@ -2814,6 +2845,8 @@ class ampi final : public CBase_ampi {
   }
   inline MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
                               MPI_Comm destcomm, CProxy_ampi arrproxy, AmpiSendType sendType, MPI_Request req) noexcept;
+  MPI_Request completedSendReq(const void* buf, int count, MPI_Datatype type, int rank,
+                               int t, MPI_Comm destcomm, MPI_Request reqIdx) noexcept;
   inline bool processSsendMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
   inline bool processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
   inline bool processSsendNcpyMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
