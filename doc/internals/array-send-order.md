@@ -1,58 +1,56 @@
-# Sending to an array element before the manager exists
+# Routing a send to an array element
 
-A send to a chare array element is routed on the sending PE: `CkSendMsgArray`
-(src/ck-core/ckarray.C) looks up the PE's copy of the array's manager group
-(`CkArray`, which holds the `CkLocMgr`) and asks it where the element is, then
-forwards the message to that PE or to the element's home. That lookup needs
-the manager group to exist on the sending PE.
+A message to a chare array element is routed on the sending PE. `CkSendMsgArray`
+(src/ck-core/ckarray.C) looks up the sending PE's copy of the array's manager
+group (`CkArray`, which holds the `CkLocMgr`), asks it where the element is,
+and forwards the message to that PE or to the element's home PE. The lookup
+needs the manager group to exist on the sending PE.
 
 An array manager is a group, created by a broadcast from the PE that called
-`ckNew`. Until every PE has processed that broadcast, a PE can hold a message
-that names the array (a `CkCallback` into it, a proxy in a marshalled
-parameter) before it holds the manager. Converse does not order messages
-between a pair of PEs, and reconverse in particular delivers two messages for
-one PE in either order when different threads take them off the network
-(contrib/reconverse/README.md, "Messages to one destination can be
-reordered"). So a group entry method on PE 2 can run, and send into the
-array, before PE 2 has created the array's manager.
+`ckNew`. Messages between two PEs are not delivered in order (Converse makes
+no such promise, and reconverse's shared per-process receive queue, drained by
+every PE thread, does reorder them), so a PE can receive a message that names
+an array, such as a `CkCallback` into it or a proxy in a marshalled parameter,
+before it has processed the broadcast that creates the array's manager. Both
+sides of array messaging allow for this.
 
-## The receive side already waits
+## Receiving for a group that does not exist yet
 
-A message that arrives for a group or an array manager that does not exist
-yet on the receiving PE is held in the group table
-(`_lookupGroupAndBufferIfNotThere`, src/ck-core/ck.C) and re-enqueued when
-`CkCreateLocalGroup` creates that group (`CkReadyEntry`). Array element
-messages arriving at a PE without the manager take the same path through
-`_processArrayEltMsg`.
+A message that arrives for a group, or for an array whose manager group is
+not yet created on the receiving PE, is held in that PE's group table
+(`_lookupGroupAndBufferIfNotThere`, src/ck-core/ck.C). When
+`CkCreateLocalGroup` creates the group, `CkReadyEntry` re-enqueues the held
+messages. Array element messages arriving at a PE without the manager take
+this path through `_processArrayEltMsg`.
 
-## The send side holds the message
+## Sending from a PE that has no manager yet
 
-`CkSendMsgArray` and `CkSendMsgArrayInline` do the same when the sending PE
-has no local branch of the manager: the send (entry index, message, element
-index, options) goes into a per-PE table keyed by the manager's group id
-(`deferredArraySends` in ckarray.C). `CkCreateLocalGroup` calls
+`CkSendMsgArray` and `CkSendMsgArrayInline` hold the send when the sending
+PE has no local branch of the manager. The send (entry index, message,
+element index, options) goes into a per-PE table keyed by the manager's group
+id (`deferredArraySends`, ckarray.C). `CkCreateLocalGroup` calls
 `_ckArrayFlushDeferredSends` after the new group is ready, and every held
-send for that group id is re-issued through `CkSendMsgArray`, in the order it
-was held. An inline send that was held is re-issued as a queued send; there
-is no manager to deliver inline to at the time of the call.
+send for that group id is re-issued through `CkSendMsgArray` in the order it
+was held. A held inline send is re-issued as a queued send, since there was
+no manager to deliver inline to when it was called.
 
-The table is per PE and keyed by group id, so a PE that creates many arrays
-pays one hash lookup per group creation and nothing else.
+The table is per PE and keyed by group id. A group creation costs one hash
+lookup in it, and nothing else.
 
 ## Quiescence
 
 A send counts toward quiescence (`CpvAccess(_qd)->create()`) in
-`_prepareOutgoingArrayMsg`, at the moment the message is actually handed to
-the machine layer, after the manager lookup. A held send is therefore not yet
-counted. Nothing is lost: the manager's creation broadcast was counted by
-`_createGroup` (`create(CkNumPes()-1)`) and is still unprocessed on this PE
-while the send is held. The flush runs inside the handler that processes that
-creation message, before control returns to the scheduler, so no quiescence
-sample can see the creation processed and the held send still uncounted.
+`_prepareOutgoingArrayMsg`, when the message is handed to the machine layer,
+which is after the manager lookup. A held send is therefore not counted yet.
+The manager's creation broadcast is counted by `_createGroup`
+(`create(CkNumPes()-1)`) and is unprocessed on this PE for as long as the send
+is held; the flush runs inside the handler that processes that broadcast,
+before control returns to the scheduler. So at every point where a
+quiescence sample can be taken, either the creation message or the re-issued
+send is counted as outstanding.
 
-A held send cannot wait forever: the manager's creation broadcast is a
-reliable message to every PE, and the flush is unconditional when it is
-processed. No timeout is needed.
+A held send cannot wait indefinitely: the creation broadcast reaches every
+PE, and the flush is unconditional when it is processed.
 
 ## Where in the source
 
@@ -62,4 +60,5 @@ processed. No timeout is needed.
 - src/ck-core/ck.C: `CkCreateLocalGroup` (calls the flush after
   `CkReadyEntry`), `_lookupGroupAndBufferIfNotThere`, `_processArrayEltMsg`,
   `_prepareOutgoingArrayMsg` (quiescence count), `_createGroup`.
-- First sighting and the ordering analysis: charm issue #4088.
+- contrib/reconverse/README.md, "Messages to one destination can be
+  reordered", for the delivery-order property this design allows for.
