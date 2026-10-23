@@ -21,6 +21,7 @@
 #include "hapi_trace_backend.h"
 #include <unordered_map>
 #include <queue>
+#include <deque>
 #include <mutex>
 #include <atomic>
 
@@ -432,7 +433,7 @@ struct GPUManager {
   // CUPTI-owned thread. That thread exists in non-SMP builds too, where the
   // Converse locks compile out, so this needs a real mutex rather than a
   // CmiNodeLock.
-  std::queue<CuptiBufferItem> cupti_buffer_queue_;
+  std::deque<CuptiBufferItem> cupti_buffer_queue_;   // a deque: the deferred close scans it without consuming (hapiCuptiCloseComplete)
   std::mutex cupti_queue_lock_;
 
   // PE-to-device mapping scheme, kept so later code (IPC handle exchange) can

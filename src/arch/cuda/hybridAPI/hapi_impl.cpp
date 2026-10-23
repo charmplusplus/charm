@@ -11,6 +11,7 @@
 #include <atomic>
 #include <vector>
 #include <deque>
+#include <type_traits>
 #include <set>
 #include <map>
 #include <mutex>
@@ -1004,16 +1005,141 @@ static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t streamId,
   GPUManager& gm = CsvAccess(gpu_manager);
 
   std::lock_guard<std::mutex> lk(gm.cupti_queue_lock_);
-  gm.cupti_buffer_queue_.push({buffer, validSize, size, (void*)ctx, nullptr});
+  gm.cupti_buffer_queue_.push_back({buffer, validSize, size, (void*)ctx, nullptr});
   if (g_cupti_flush_counting) { g_cupti_flush_cbs++; g_cupti_flush_cb_bytes += validSize; }
 }
 #else
 // A HIP backend (hapi_trace_rocprof.cpp) converts each buffer callback into a
 // HapiTraceBatch and queues it here.
+// ---- The deferred close ------------------------------------------------------------------------------------
+// At AtSync the window is only MARKED. Kernels issued before the mark may still be queued or running, and on
+// HIP the completion record of a kernel is written by ROCr's single async-signal thread, which on a loaded
+// GCD runs 20-50k records behind the device (Frontier 2026-10-23). A snapshot taken at the mark therefore
+// missed the tail of the window -- exactly the last steps of every element's sample under +LBAsync -- and
+// the most loaded process read a fifth to a half of its device load (DiffusionLB then moved 1,300-2,000
+// objects into it and the next window ran 136 ms/step against 75). The last PE to arrive now calls
+// hapiCuptiCloseBegin, keeps running, and polls hapiCuptiCloseComplete from its scheduler loop: each poll
+// flushes and scans what arrived, keeping the set of launches issued before the mark that have no completion
+// record yet. The window is complete when that set is empty, or when the handler has visibly passed the mark
+// (two consecutive deliveries with kernels and none ending before it: a launch whose packet was written
+// under an untraced call carries a correlation id of its own and never matches), or when the device has gone
+// quiet, or at the bound. Records of work issued after the mark are set aside for the next drain
+// (hapiProcessCuptiBuffers), so a round's accounting is exact and nothing is clipped. Under the barrier the
+// PEs wait anyway; under +LBAsync the application runs on and the strategy starts when the records are in.
+struct CuptiCloseWait {
+  bool active = false;
+  uint64_t mark = 0;               // the window close, in the records' clock
+  uint32_t corr_at_mark = 0;       // the largest correlation id of a call that began before the mark
+  double t0 = 0.0, last_poll = 0.0;
+  size_t scanned = 0;              // queue items already scanned
+  std::unordered_set<uint32_t> pending;        // launches before the mark without a completion record
+  std::unordered_set<uint32_t> unmatched_pre;  // completion records (id <= corr_at_mark) with no launch record:
+                                               // a packet written under an untraced call carries an id of its own
+  unsigned idle = 0, polls = 0, stall = 0;
+  size_t best_gap = (size_t)-1;     // the smallest (pending - unmatched_pre) seen: progress means pre-mark records still arrive
+  uint64_t launches = 0, kernels = 0, kernels_pre = 0, arrived_in_wait = 0;
+  bool timed_out = false;
+  double waited_ms = 0.0;          // the last close, for the timing print
+  size_t pending_at_end = 0, unmatched_at_end = 0;
+};
+static CuptiCloseWait g_cupti_close;
+static uint64_t g_cupti_mark_ns = 0;      // set while a deferred close is in progress or awaiting its drain
+static bool g_cupti_mark_set = false;
+static bool g_cupti_drain_deferred = false;   // this drain's records are complete to the mark: count them whole
+static bool hapiCuptiIsLaunchCbid(uint32_t cbid) {
+  static std::vector<signed char> cache;
+  const uint32_t n = hapiTraceBackendCallbackIdCount() + 1;
+  if (cache.size() < n) cache.resize(n, -1);
+  if (cbid >= n) return false;
+  if (cache[cbid] < 0) {
+    const char* name = hapiTraceBackendCallbackName(cbid);
+    cache[cbid] = (name != nullptr && strstr(name, "Launch") != nullptr) ? 1 : 0;
+  }
+  return cache[cbid] == 1;
+}
+void hapiCuptiCloseBegin() {
+  CuptiCloseWait& w = g_cupti_close;
+  w = CuptiCloseWait();
+  if (!hapiCuptiTracingActive()) return;
+  w.mark = hapiTraceBackendTimestamp();
+  w.t0 = CmiWallTimer();
+  w.last_poll = -1.0;
+  w.active = true;
+}
+// The window is complete when every launch issued before the mark is accounted for: matched by its own
+// completion record, or explained by a completion record of a pre-mark id that no launch record claims (the
+// packet of a launch written under an untraced call gets a correlation id of its own; the ids are one
+// counter, so an id at or below the last call that began before the mark names pre-mark work). The
+// runtime's completion handler delivers out of completion order by up to hundreds of ms on a loaded GCD
+// (Frontier 2026-10-23), so nothing short of this accounting says the tail is in. A device gone idle
+// (20 polls with no record) or the bound ends it too.
+bool hapiCuptiCloseComplete() {
+  CuptiCloseWait& w = g_cupti_close;
+  if (!w.active) return true;
+  static const double bound_ms = getenv("CHARM_CLOSE_WAIT_MS") ? atof(getenv("CHARM_CLOSE_WAIT_MS")) : 1000.0;
+  const double now = CmiWallTimer();
+  if (w.last_poll >= 0.0 && (now - w.last_poll) * 1000.0 < 1.0) return false;   // at most one flush per ms
+  const bool first = (w.last_poll < 0.0);
+  w.last_poll = now;
+  w.polls++;
+  hapiTraceBackendFlush(false);
+  GPUManager& gm = CsvAccess(gpu_manager);
+  uint64_t newKernels = 0;
+  {
+    std::lock_guard<std::mutex> lk(gm.cupti_queue_lock_);
+    // The API records are synchronous: after the first flush the largest pre-mark correlation id is known.
+    if (first)
+      for (size_t i = 0; i < gm.cupti_buffer_queue_.size(); i++) {
+        const HapiTraceBatch* b = gm.cupti_buffer_queue_[i].batch;
+        if (b == nullptr) continue;
+        for (const HapiTraceApiRec& a : b->apis)
+          if (a.start < w.mark && a.correlationId > w.corr_at_mark) w.corr_at_mark = a.correlationId;
+      }
+    for (; w.scanned < gm.cupti_buffer_queue_.size(); w.scanned++) {
+      const HapiTraceBatch* b = gm.cupti_buffer_queue_[w.scanned].batch;
+      if (b == nullptr) continue;   // CUDA: nothing to scan here
+      for (const HapiTraceApiRec& a : b->apis) {
+        if (a.start >= w.mark || !hapiCuptiIsLaunchCbid(a.cbid)) continue;
+        w.launches++;
+        if (a.correlationId > w.corr_at_mark) w.corr_at_mark = a.correlationId;
+        if (w.unmatched_pre.erase(a.correlationId) == 0) w.pending.insert(a.correlationId);
+      }
+      for (const HapiTraceKernelRec& k : b->kernels) {
+        newKernels++;
+        if (!first) w.arrived_in_wait++;
+        if (k.correlationId > w.corr_at_mark) continue;   // issued after the mark: the next round's
+        w.kernels_pre++;
+        if (w.pending.erase(k.correlationId) == 0) w.unmatched_pre.insert(k.correlationId);
+      }
+    }
+  }
+  w.kernels += newKernels;
+  // Done when every pre-mark launch is accounted for, or when the accounting stops making progress while
+  // records keep arriving: a launch whose packet was written under a call that began after the mark has a
+  // post-mark id, so a small residual gap is structural and never closes (300-900 of 130-200k launches per
+  // close, Frontier 2026-10-23; waiting for it timed out at the bound every time the device was busy, the
+  // LB step overran the lag and the elements parked).
+  bool done = false;
+  const size_t gap = w.pending.size() > w.unmatched_pre.size() ? w.pending.size() - w.unmatched_pre.size() : 0;
+  if (gap == 0) done = true;
+  else if (gap < w.best_gap) { w.best_gap = gap; w.stall = 0; w.idle = 0; }
+  else if (newKernels > 0) { w.idle = 0; if (++w.stall >= 10) done = true; }
+  else if (++w.idle >= 20) done = true;
+  if (!done && (now - w.t0) * 1000.0 >= bound_ms) { done = true; w.timed_out = true; }
+  if (!done) return false;
+  w.waited_ms = (CmiWallTimer() - w.t0) * 1000.0;
+  w.pending_at_end = w.pending.size();
+  w.unmatched_at_end = w.unmatched_pre.size();
+  w.active = false;
+  g_cupti_mark_ns = w.mark;
+  g_cupti_mark_set = true;
+  return true;
+}
+
 void hapiTraceBackendDeliver(HapiTraceBatch* batch, size_t approxBytes) {
   GPUManager& gm = CsvAccess(gpu_manager);
   std::lock_guard<std::mutex> lk(gm.cupti_queue_lock_);
-  gm.cupti_buffer_queue_.push({nullptr, approxBytes, 0, nullptr, batch});
+  gm.cupti_buffer_queue_.push_back({nullptr, approxBytes, 0, nullptr, batch});
   if (g_cupti_flush_counting) { g_cupti_flush_cbs++; g_cupti_flush_cb_bytes += approxBytes; }
 }
 #endif
@@ -1712,13 +1838,15 @@ static int computeKernelSMs(const DeviceManager& dm,
 // stored in LBKernelRecord: there is one of those per launch.
 struct CuptiPendingKernel {
   uint32_t           correlation_id;
+  uint32_t           enqueue_thread;   // the backend's thread id for the dispatch (HIP), 0 if unknown
   GpuLaunchSignature launch;
   LBKernelRecord     rec;
   bool               carried;           // parked at the previous drain already
 };
 struct CuptiPendingApi { uint32_t correlation_id; double seconds; };
 struct CuptiResolvedToken { LDObjKey key{}; bool valid = false; };
-struct CuptiCbidUse { uint64_t count = 0; double seconds = 0.0; bool poll = false; bool known = false; };
+struct CuptiCbidUse { uint64_t count = 0; double seconds = 0.0; bool launch = false;
+  bool poll = false; bool known = false; };
 
 // The parse state of ONE shard. CUPTI delivers its buffers with no context (the ctx argument of
 // the completion callback is null), so the buffers of a drain are dealt round-robin over as many
@@ -1758,9 +1886,24 @@ struct CuptiParseShard {
   std::unordered_map<uint64_t, CuptiResolvedToken> resolved_tokens;
   std::vector<CuptiCbidUse> byCbid;
   double api_unattributed_s = 0.0;
+  // Per launching thread, this drain: launch API records whose span named an object, a joined object
+  // (HAPI_CUPTI_NO_OBJECT) or nothing. For the per-thread attribution print (+LBDebug 2).
+  struct ThreadAttr { uint32_t owned = 0, joined = 0, miss = 0; };
+  std::unordered_map<uint32_t, ThreadAttr> perThread;
   uint32_t api_count = 0, kernel_count = 0, object_corr_count = 0, work_tag_count = 0,
            invalid_duration_count = 0, hash_collision_count = 0, attributed = 0, unattributed = 0,
            unresolved_token = 0, deferred = 0, lost_work_tags = 0;
+  uint32_t carried_out = 0, carried_in_resolved = 0, carried_in_lost = 0;   // kernels parked for the next drain
+  uint32_t api_corr_max = 0, carried_corr_min = UINT32_MAX, carried_corr_max = 0, carried_above_api = 0;
+  uint32_t carried_pe_thread = 0, carried_other_thread = 0;
+  uint32_t api_zero_dur = 0, api_launch_records = 0, copy_records = 0;
+  std::unordered_map<uint32_t, uint32_t> corr_cbid;          // correlation -> API function (debug > 1)
+  struct ApiBrief { uint32_t corr, cbid; uint64_t start, end; };
+  std::unordered_map<uint32_t, std::vector<ApiBrief>> api_by_thread;   // debug > 1: every record, in arrival order
+  int carried_examples = 0;
+  std::unordered_map<uint32_t, uint32_t> kernels_by_nonlaunch_cbid;   // kernels whose record is not a launch
+  std::unordered_map<uint32_t, uint32_t> carried_threads;
+  std::unordered_map<std::string, uint32_t> carried_names;
 };
 static std::vector<CuptiParseShard> g_cupti_shards;   // under cupti_prepare_lock_
 // The drains' copies of the entry-span logs (CuptiEntryLog), by OS thread id, kept between drains
@@ -1959,7 +2102,7 @@ static void hapiTraceForEachRecord(CuptiBufferItem& item, FK&& onKernel, FC&& on
         const CUpti_ActivityKernel4* k = (const CUpti_ActivityKernel4*)record;
         HapiTraceKernelRec r;
         r.start = k->start; r.end = k->end;
-        r.deviceId = k->deviceId; r.streamId = k->streamId; r.correlationId = k->correlationId;
+        r.deviceId = k->deviceId; r.streamId = k->streamId; r.correlationId = k->correlationId; r.threadId = 0;
         r.gridX = k->gridX; r.gridY = k->gridY; r.gridZ = k->gridZ;
         r.blockX = k->blockX; r.blockY = k->blockY; r.blockZ = k->blockZ;
         r.registersPerThread = k->registersPerThread;
@@ -1994,6 +2137,9 @@ static void hapiTraceForEachRecord(CuptiBufferItem& item, FK&& onKernel, FC&& on
 // alone; what needs another shard waits in sh.pending / sh.pendingApi for pass 2.
 static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::vector<CuptiBufferItem>& items,
                                      const std::unordered_map<uint32_t, int>& devByThread, bool scaling) {
+  if (_lb_args.debug() > 1)
+    CmiPrintf("HAPI[pe=%d] pass1 entry: carried=%zu prev_object_corr=%zu object_corr=%zu\n", CmiMyPe(),
+              sh.carried.size(), sh.prev_object_corr.size(), sh.object_corr.size());
   sh.pending = std::move(sh.carried);
   sh.carried.clear();
   for (CuptiPendingKernel& p : sh.pending) p.carried = true;
@@ -2008,6 +2154,12 @@ static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::v
   sh.api_count = sh.kernel_count = sh.object_corr_count = sh.work_tag_count = 0;
   sh.invalid_duration_count = sh.hash_collision_count = sh.attributed = sh.unattributed = 0;
   sh.unresolved_token = sh.deferred = sh.lost_work_tags = 0;
+  sh.carried_out = sh.carried_in_resolved = sh.carried_in_lost = 0;
+  sh.api_corr_max = 0; sh.carried_corr_min = UINT32_MAX; sh.carried_corr_max = 0; sh.carried_above_api = 0;
+  sh.carried_names.clear();
+  sh.carried_pe_thread = sh.carried_other_thread = 0; sh.carried_threads.clear();
+  sh.api_zero_dur = sh.api_launch_records = sh.copy_records = 0;
+  sh.corr_cbid.clear(); sh.kernels_by_nonlaunch_cbid.clear(); sh.api_by_thread.clear(); sh.carried_examples = 0;
   auto devOfThread = [&](uint32_t tid) -> int {
     auto it = devByThread.find(tid);
     return it != devByThread.end() ? it->second : -1;
@@ -2123,17 +2275,19 @@ static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::v
         // shares the id and may still be coming. Everything left is dropped
         // when the drain ends.
         const uint64_t* object = cuptiFindObjectCorr(sh, kernel->correlationId, nullptr);
+        if (_lb_args.debug() > 1) { auto cb = sh.corr_cbid.find(kernel->correlationId); if (cb != sh.corr_cbid.end()) sh.kernels_by_nonlaunch_cbid[cb->second]++; }
         if (g_trace != nullptr)
           hapiTraceKernel(kernel, object != nullptr ? *object : HAPI_CUPTI_NO_OBJECT);
         if (bucket_settled && object != nullptr) {
           cuptiFileKernel(gm, sh, rec, *object, cuptiThreadOfCorr(sh, kernel->correlationId, nullptr));
         } else {
-          sh.pending.push_back({kernel->correlationId, launch, rec, false});
+          sh.pending.push_back({kernel->correlationId, kernel->threadId, launch, rec, false});
           sh.deferred++;
         }
       
       },
       [&](const HapiTraceCopyRec* mc) {
+        sh.copy_records++;
         if (g_trace != nullptr)
           hapiTraceCopy(mc->kind, mc->deviceId, mc->streamId, mc->start, mc->end, mc->bytes, mc->copyKind);
         if (mc->end > mc->start) {
@@ -2143,6 +2297,7 @@ static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::v
         }
       },
       [&](const HapiTraceApiRec* api) {
+        if (api->end <= api->start) sh.api_zero_dur++;
         if (api->end > api->start) {
           sh.api_count++;
           const double seconds = (double)(api->end - api->start) / 1.0e9;
@@ -2152,22 +2307,32 @@ static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::v
           if (!use.known) {
             use.known = true;
             const char* name = hapiTraceBackendCallbackName(api->cbid);
-            if (name != nullptr)
+            if (name != nullptr) {
               use.poll = (strstr(name, "Query") != nullptr);
+              use.launch = (strstr(name, "Launch") != nullptr);
+            }
           }
           use.count++;
           use.seconds += seconds;
+          if (use.launch) sh.api_launch_records++;
           {
             uint64_t& ce = sh.cover_end[api->threadId];
             if (api->end > ce) ce = api->end;
           }
           if (!use.poll) {   // the span this thread was in when the call began names the object (and the work tag)
             sh.thread_corr[api->correlationId] = api->threadId;
+            if (api->correlationId > sh.api_corr_max) sh.api_corr_max = api->correlationId;
+            if (_lb_args.debug() > 1) {
+              if (!use.launch) sh.corr_cbid[api->correlationId] = api->cbid;
+              sh.api_by_thread[api->threadId].push_back({api->correlationId, api->cbid, api->start, api->end});
+            }
             CuptiLaneCursor& cur = snapOf(api->threadId);
+            const bool isLaunch = use.launch;
             if (const CuptiEntrySpan* sp = hapiCuptiSpanAt(cur.sn->obj.spans, api->start, cur.obj)) {
               sh.object_corr_count++;
               sh.object_corr[api->correlationId] = sp->token;
-            }
+              if (isLaunch) { CuptiParseShard::ThreadAttr& ta = sh.perThread[api->threadId]; if (sp->token == HAPI_CUPTI_NO_OBJECT) ta.joined++; else ta.owned++; }
+            } else if (isLaunch) sh.perThread[api->threadId].miss++;
             if (scaling)
               if (const CuptiEntrySpan* sp = hapiCuptiSpanAt(cur.sn->tag.spans, api->start, cur.tag)) {
                 sh.work_tag_count++;
@@ -2215,7 +2380,45 @@ static void hapiParseCuptiShardPass2(GPUManager& gm, CuptiParseShard& sh, std::v
   for (CuptiPendingKernel& pending_kernel : sh.pending) {
     const uint64_t* object = cuptiFindObjectCorr(sh, pending_kernel.correlation_id, &all);
     // Its correlation record may still be in a buffer CUPTI has not delivered: park it once more.
-    if (object == nullptr && !pending_kernel.carried) { sh.carried.push_back(pending_kernel); continue; }
+    if (object == nullptr && !pending_kernel.carried) {
+      sh.carried.push_back(pending_kernel); sh.carried_out++;
+      const uint32_t c = pending_kernel.correlation_id;
+      if (c < sh.carried_corr_min) sh.carried_corr_min = c;
+      if (c > sh.carried_corr_max) sh.carried_corr_max = c;
+      if (c > sh.api_corr_max) sh.carried_above_api++;
+      if (_lb_args.debug() > 1 && sh.carried_examples < 6) {   // where in the ringing thread's call sequence the dispatch fell
+        sh.carried_examples++;
+        auto it = sh.api_by_thread.find(pending_kernel.enqueue_thread);
+        const uint32_t c = pending_kernel.correlation_id;
+        const CuptiParseShard::ApiBrief *below = nullptr, *above = nullptr;
+        if (it != sh.api_by_thread.end())
+          for (const auto& a : it->second) {
+            if (a.corr < c && (below == nullptr || a.corr > below->corr)) below = &a;
+            if (a.corr > c && (above == nullptr || a.corr < above->corr)) above = &a;
+          }
+        auto nm = [](const CuptiParseShard::ApiBrief* a) { const char* n = a ? hapiTraceBackendCallbackName(a->cbid) : nullptr; return n ? n : "?"; };
+        auto kn = gm.cupti_kernel_names_.find(pending_kernel.rec.kernel_key.kernelClass);
+        CmiPrintf("HAPI[pe=%d] carried example: thread %u corr %u kernel %s dev_start %llu | below: corr %u %s end %+lld us | above: corr %u %s start %+lld us\n",
+                  CmiMyPe(), pending_kernel.enqueue_thread, c,
+                  kn != gm.cupti_kernel_names_.end() ? kn->second.substr(0, 24).c_str() : "?",
+                  (unsigned long long)pending_kernel.rec.start_ns,
+                  below ? below->corr : 0u, nm(below), below ? (long long)((int64_t)below->end - (int64_t)pending_kernel.rec.start_ns) / 1000 : 0LL,
+                  above ? above->corr : 0u, nm(above), above ? (long long)((int64_t)above->start - (int64_t)pending_kernel.rec.start_ns) / 1000 : 0LL);
+      }
+      {
+        const uint32_t t = pending_kernel.enqueue_thread;
+        bool pe = false;
+        if (t != 0) { std::lock_guard<std::mutex> g(g_cupti_entry_logs_lock); pe = g_cupti_entry_logs.count(t) > 0; }
+        if (pe) sh.carried_pe_thread++; else sh.carried_other_thread++;
+        sh.carried_threads[t]++;
+      }
+      if (_lb_args.debug() > 1) {
+        auto it = gm.cupti_kernel_names_.find(pending_kernel.rec.kernel_key.kernelClass);
+        sh.carried_names[it != gm.cupti_kernel_names_.end() ? it->second : std::string("?")]++;
+      }
+      continue;
+    }
+    if (pending_kernel.carried) { if (object != nullptr) sh.carried_in_resolved++; else sh.carried_in_lost++; }
     if (scaling)
       cuptiApplyWorkTag(sh, &all, pending_kernel.correlation_id, pending_kernel.launch,
                         pending_kernel.rec, /*last_chance=*/true);
@@ -2290,16 +2493,49 @@ static void hapiParseCuptiShardPass2(GPUManager& gm, CuptiParseShard& sh, std::v
   }
 
   if (_lb_args.debug() > 1) {
+    {
+      std::vector<std::pair<uint32_t, std::string>> top;
+      for (const auto& kv : sh.carried_names) top.push_back({kv.second, kv.first});
+      std::sort(top.rbegin(), top.rend());
+      std::string names;
+      for (size_t i = 0; i < top.size() && i < 4; i++) names += " " + std::to_string(top[i].first) + ":" + top[i].second.substr(0, 28);
+      std::vector<std::pair<uint32_t, uint32_t>> tt;
+      for (const auto& kv : sh.carried_threads) tt.push_back({kv.second, kv.first});
+      std::sort(tt.rbegin(), tt.rend());
+      std::string threads;
+      for (size_t i = 0; i < tt.size() && i < 5; i++) threads += " " + std::to_string(tt[i].second) + "x" + std::to_string(tt[i].first);
+      CmiPrintf("HAPI[pe=%d] shard %d: carried corr %u..%u vs api max %u, above_api=%u; pe_thread=%u other_thread=%u threads:%s;%s\n",
+                CmiMyPe(), shardIdx, sh.carried_corr_min == UINT32_MAX ? 0u : sh.carried_corr_min, sh.carried_corr_max,
+                sh.api_corr_max, sh.carried_above_api, sh.carried_pe_thread, sh.carried_other_thread, threads.c_str(), names.c_str());
+      {
+        std::vector<std::pair<uint32_t, uint32_t>> nl;
+        for (const auto& kv : sh.kernels_by_nonlaunch_cbid) nl.push_back({kv.second, kv.first});
+        std::sort(nl.rbegin(), nl.rend());
+        std::string names;
+        for (size_t i = 0; i < nl.size() && i < 6; i++) {
+          const char* nm = hapiTraceBackendCallbackName(nl[i].second);
+          names += " " + std::to_string(nl[i].first) + ":" + (nm ? nm : "?");
+        }
+        if (!nl.empty()) CmiPrintf("HAPI[pe=%d] shard %d: kernels whose record is a non-launch call:%s\n", CmiMyPe(), shardIdx, names.c_str());
+      }
+      CmiPrintf("HAPI[pe=%d] shard %d: records: api launch=%u zero_duration=%u kernels=%u copies=%u (launch - kernels - copies = %lld)\n",
+                CmiMyPe(), shardIdx, sh.api_launch_records, sh.api_zero_dur, sh.kernel_count, sh.copy_records,
+                (long long)sh.api_launch_records - (long long)sh.kernel_count - (long long)sh.copy_records);
+    }
+    for (const auto& kv : sh.perThread)
+      CmiPrintf("HAPI[pe=%d] shard %d: thread %u launches: owned=%u joined=%u nospan=%u\n", CmiMyPe(), shardIdx,
+                kv.first, kv.second.owned, kv.second.joined, kv.second.miss);
+    sh.perThread.clear();
     CmiPrintf("HAPI[pe=%d] shard %d: hapiProcessCuptiBuffers kernels=%u "
               "object_correlations=%u work_tags=%u attributed=%u "
               "unattributed=%u deferred=%u invalid_durations=%u "
               "unresolved_tokens=%u hash_collisions=%u lost_work_tags=%u "
-              "objects=%zu object_corr_dropped=%zu work_tags_dropped=%zu\n",
+              "objects=%zu object_corr_dropped=%zu work_tags_dropped=%zu carried_out=%u carried_in=%u/%u\n",
               CmiMyPe(), shardIdx, sh.kernel_count, sh.object_corr_count, sh.work_tag_count,
               sh.attributed, sh.unattributed, sh.deferred, sh.invalid_duration_count,
               sh.unresolved_token, sh.hash_collision_count, sh.lost_work_tags,
               sh.obj_kernel_records.size(), sh.prev_object_corr.size(),
-              sh.prev_work_tag_corr.size());
+              sh.prev_work_tag_corr.size(), sh.carried_out, sh.carried_in_resolved, sh.carried_in_lost);
   }
 }
 
@@ -2310,6 +2546,16 @@ static void hapiParseCuptiShardPass2(GPUManager& gm, CuptiParseShard& sh, std::v
 static double g_cupti_drain_prof[4] = {0, 0, 0, 0};   // retire, pass 1, pass 2, merge
 static size_t g_cupti_drain_bufs = 0;        // buffers this drain took from the queue, and their records' bytes
 static uint64_t g_cupti_drain_valid_kb = 0;
+// Moves the records that start at or after the mark from vec to out, keeping order.
+template <class V>
+static void hapiSplitAfterMark(V& vec, uint64_t mark, V& out) {
+  size_t keep = 0;
+  for (size_t i = 0; i < vec.size(); i++) {
+    if (vec[i].start >= mark) out.push_back(vec[i]);
+    else vec[keep++] = vec[i];
+  }
+  vec.resize(keep);
+}
 void hapiProcessCuptiBuffers() {
   GPUManager& gm = CsvAccess(gpu_manager);
   hapiPopulateDeviceProps(gm);  // lazy: device_managers is ready by now
@@ -2328,12 +2574,35 @@ void hapiProcessCuptiBuffers() {
     std::lock_guard<std::mutex> lk(gm.cupti_queue_lock_);
     size_t i = 0;
     uint64_t valid = 0;
+    // The deferred close: records of work issued after the mark belong to the next round and go back to the
+    // front of the queue; what this drain parses is complete to the mark and is counted whole.
+    g_cupti_drain_deferred = g_cupti_mark_set;
+    std::vector<CuptiBufferItem> after;
     while (!gm.cupti_buffer_queue_.empty()) {
-      valid += gm.cupti_buffer_queue_.front().validSize;
-      items[i % nShards].push_back(gm.cupti_buffer_queue_.front());
-      gm.cupti_buffer_queue_.pop();
+      CuptiBufferItem it = gm.cupti_buffer_queue_.front();
+      gm.cupti_buffer_queue_.pop_front();
+      if (g_cupti_mark_set && it.batch != nullptr) {
+        const uint64_t mark = g_cupti_mark_ns;
+        HapiTraceBatch* post = new HapiTraceBatch;
+        hapiSplitAfterMark(it.batch->kernels, mark, post->kernels);
+        hapiSplitAfterMark(it.batch->apis, mark, post->apis);
+        hapiSplitAfterMark(it.batch->copies, mark, post->copies);
+        if (post->kernels.empty() && post->apis.empty() && post->copies.empty()) { delete post; post = nullptr; }
+        if (post != nullptr) {
+          const size_t n_post = post->kernels.size() + post->apis.size() + post->copies.size();
+          const size_t n_pre = it.batch->kernels.size() + it.batch->apis.size() + it.batch->copies.size();
+          const size_t bytes_post = (n_pre + n_post) ? it.validSize * n_post / (n_pre + n_post) : 0;
+          after.push_back({nullptr, bytes_post, 0, nullptr, post});
+          it.validSize -= bytes_post;
+        }
+        if (it.batch->kernels.empty() && it.batch->apis.empty() && it.batch->copies.empty()) { delete it.batch; continue; }
+      }
+      valid += it.validSize;
+      items[i % nShards].push_back(it);
       i++;
     }
+    for (auto r = after.rbegin(); r != after.rend(); ++r) gm.cupti_buffer_queue_.push_front(*r);
+    if (g_cupti_mark_set) { g_cupti_mark_set = false; g_cupti_close.scanned = 0; }
     g_cupti_drain_bufs = i;
     g_cupti_drain_valid_kb = valid >> 10;
   }
@@ -2664,12 +2933,31 @@ void hapiNormalizeCuptiLoads(int onlyDevice) {
   // straddles the window's start is clipped to it. (Nothing is clipped at the close: a kernel still running at
   // the flush is reported whole when its record completes, in the next drain, and clipped there.)
   std::unordered_map<uint32_t, std::vector<SweepKernel>> byDevice;
+  // Every record counts once, whole, in the drain it arrives in. A record is never clipped to the window
+  // or dropped for ending before it: on HIP the dispatch record is written by ROCr's one async-signal
+  // thread after the kernel completes, and that thread falls behind the device by tens of thousands of
+  // records on a loaded GCD (Frontier 2026-10-23: 486,769 records, 11.5 s of kernel time per 200-step
+  // leanmd run arrived after the close they ended before). Dropping them read the most loaded process at
+  // a fifth to a half of its device load for the round, and the diffusion filled the hole with 1,300-2,000
+  // cross-node moves and a 136 ms/step window. Counted in the next drain the time lands one round late,
+  // which a steady rate does not notice; the audit still reports what arrived late (late_counted) and what
+  // started before the window (straddle).
+  // After a deferred close (HIP) every record of the drain was issued before the mark and the round owns it
+  // whole, straddling or not; nothing is late by construction (a record older than the previous mark can only
+  // follow a bound timeout, and is counted, not dropped). Without one (CUDA's forced flush) the original rule
+  // stands: a record that ended before this window is the previous window's tail delivered late and is
+  // dropped; one that straddles the start is clipped to it.
+  const bool whole = g_cupti_drain_deferred;
+  size_t late_n = 0, clip_n = 0; uint64_t late_ns = 0, clip_ns = 0;
+  auto noteLate = [&](const LBKernelRecord& k) { late_n++; late_ns += k.end_ns - k.start_ns; };
+  auto noteClip = [&](const LBKernelRecord& k, uint64_t start) { if (start > k.start_ns && k.end_ns > start) { clip_n++; clip_ns += start - k.start_ns; } };
   for (const auto& kv : gm.cupti_obj_kernel_records_) {
     for (const LBKernelRecord& k : kv.second) {
       if (k.end_ns <= k.start_ns) continue;
       if (onlyDevice >= 0 && k.device_id != (uint32_t)onlyDevice) continue;
-      if (win_prev > 0 && k.end_ns <= win_prev) continue;
-      const uint64_t start = (win_prev > 0 && k.start_ns < win_prev) ? win_prev : k.start_ns;
+      if (win_prev > 0 && k.end_ns <= win_prev) { noteLate(k); if (!whole) continue; }
+      const uint64_t start = (!whole && win_prev > 0 && k.start_ns < win_prev) ? win_prev : k.start_ns;
+      if (win_prev > 0 && k.start_ns < win_prev) noteClip(k, win_prev);
       g_cupti_obj_device[kv.first] = k.device_id;
       byDevice[k.device_id].push_back({kv.first, start, k.end_ns, k.sms_used,
                                        true, k.kernel_key, k.unmodelable, 0.0});
@@ -2678,8 +2966,9 @@ void hapiNormalizeCuptiLoads(int onlyDevice) {
   for (const LBKernelRecord& k : gm.cupti_unattributed_kernels_) {
     if (k.end_ns <= k.start_ns) continue;
     if (onlyDevice >= 0 && k.device_id != (uint32_t)onlyDevice) continue;
-    if (win_prev > 0 && k.end_ns <= win_prev) continue;
-    const uint64_t start = (win_prev > 0 && k.start_ns < win_prev) ? win_prev : k.start_ns;
+    if (win_prev > 0 && k.end_ns <= win_prev) { noteLate(k); if (!whole) continue; }
+    const uint64_t start = (!whole && win_prev > 0 && k.start_ns < win_prev) ? win_prev : k.start_ns;
+    if (win_prev > 0 && k.start_ns < win_prev) noteClip(k, win_prev);
     byDevice[k.device_id].push_back({LDObjKey{}, start, k.end_ns, k.sms_used,
                                      false, k.kernel_key, true, 0.0});   // the key names it in the audit
   }
@@ -2981,6 +3270,16 @@ void hapiNormalizeCuptiLoads(int onlyDevice) {
               sweep_unattr_demand, (seen > 0.0) ? sweep_unattr_demand / seen : 0.0,
               sweep_busy_s, (sweep_busy_s > 0.0) ? seen / sweep_busy_s : 0.0,
               window_s, (window_s > 0.0) ? sweep_busy_s / window_s : 0.0);
+    {   // the records the window could not use, and the copies (on HIP the blit kernels) the sweep never sees
+      static uint64_t s_last_copy_n = 0, s_last_copy_ns = 0;
+      const uint64_t cn = g_cupti_memcpy_n.load(std::memory_order_relaxed);
+      const uint64_t cns = g_cupti_memcpy_ns.load(std::memory_order_relaxed);
+      CmiPrintf("[gpu-audit pe=%d] window_rec_s=%.6f late=%zu/%.6fs straddle=%zu/%.6fs copies=%llu/%.6fs\n",
+                CmiMyPe(), (win_prev > 0 && win_close > win_prev) ? (double)(win_close - win_prev) / 1.0e9 : 0.0,
+                late_n, (double)late_ns / 1.0e9, clip_n, (double)clip_ns / 1.0e9,
+                (unsigned long long)(cn - s_last_copy_n), (double)(cns - s_last_copy_ns) / 1.0e9);
+      s_last_copy_n = cn; s_last_copy_ns = cns;
+    }
     CmiPrintf("[driver-audit pe=%d] api_total_s=%.6f driver_busy_s=%.6f "
               "contention=%.2f window_s=%.6f driver_util=%.3f\n",
               CmiMyPe(), gm.cupti_api_total_, gm.cupti_driver_busy_,
@@ -3102,8 +3401,8 @@ static void hapiPrepareCuptiLoadsImpl(uint64_t epoch, int dev) {
   // launch waits; the open buffer per thread (64 KB, cuptiBufferRequested) is then the window's unreported tail,
   // which hapiNormalizeCuptiLoads extrapolates per thread from the window stamped below -- over the process window,
   // not the element's, which is why it is no longer the default (see the define).
-  {   // this window ends here, in the CUPTI clock (the records' clock)
-    const uint64_t now = hapiTraceBackendTimestamp();
+  {   // this window ends here, in the CUPTI clock (the records' clock) -- at the mark when the close was deferred
+    const uint64_t now = g_cupti_mark_set ? g_cupti_mark_ns : hapiTraceBackendTimestamp();
     g_cupti_window_prev_ns = g_cupti_window_close_ns;
     g_cupti_window_close_ns = now;
   }
@@ -3142,6 +3441,11 @@ static void hapiPrepareCuptiLoadsImpl(uint64_t epoch, int dev) {
   }
   if (timeIt) {
     const double t3 = CmiWallTimer();
+    CmiPrintf("[LBCUPTI pe=%d] close wait=%.1fms polls=%u launches=%llu kernels_pre=%llu arrived_in_wait=%llu "
+              "unmatched launches=%zu kernels=%zu%s\n",
+              CmiMyPe(), g_cupti_close.waited_ms, g_cupti_close.polls, (unsigned long long)g_cupti_close.launches,
+              (unsigned long long)g_cupti_close.kernels_pre, (unsigned long long)g_cupti_close.arrived_in_wait,
+              g_cupti_close.pending_at_end, g_cupti_close.unmatched_at_end, g_cupti_close.timed_out ? " TIMED OUT" : "");
     CmiPrintf("[LBCUPTI pe=%d] flush=%.3fs process=%.3fs normalize=%.3fs total=%.3fs shards=%zu free=%zu"
               " wait=%.3fs retire=%.3fs pass1=%.3fs pass2=%.3fs merge=%.3fs snap=%.3fs/%lluKB bufs=%zu/%lluKB"
               " gate=%.3fs call=%.3fs cbs=%u/%lluKB cover=%.2f scale=%.2f threads=%zu capped=%zu\n",
@@ -3200,7 +3504,15 @@ void hapiClearCuptiData() {
   gm.cupti_api_intervals_.clear();
   gm.cupti_api_total_ = 0.0;
   gm.cupti_driver_busy_ = 0.0;
-  g_cupti_shards.clear();
+  // The shards are NOT dropped here. They carry two things across drains that a round boundary must not
+  // lose: the correlation table of the previous drain (prev_object_corr, prev_work_tag_corr) and the kernels
+  // parked for their launch record (carried). A kernel enqueued before the close and completed after it has
+  // its launch record in drain N and its dispatch record in drain N+1 -- the device backlog of the most loaded
+  // GCD at the close, 20-50k kernels per close on Frontier (2026-10-23, leanmd 16x8x8, two nodes) -- and
+  // dropping the shards at MigrationDone emptied both: every such kernel was parked once more and then
+  // discarded, the heaviest process attributed 2-10% of its kernels against the others' 20%, read a third
+  // of its load, and the diffusion filled the hole (1,890 cross-node moves, 136 ms/step for the window).
+  // Each drain resets its per-drain state at pass 1 and the merge empties what it took.
   gm.cupti_obj_api_raw_acc_.clear();
   gm.cupti_api_total_acc_ = 0.0;
   gm.cupti_api_intervals_acc_.clear();

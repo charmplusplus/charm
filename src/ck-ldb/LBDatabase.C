@@ -211,6 +211,7 @@ int LBDatabase::GetObjDataSz()
 // common horizon. Under the barrier the span is the window itself and nothing
 // changes. A load the application declared per interval (EstObjGPULoad) is
 // already a full-interval figure and is left alone.
+int ckLbParksSinceLast();   // cklocation.C: AtSyncWait parks on this PE since the last call
 void LBDatabase::GetObjData(LDObjData *dp)
 {
   LBRealType period = 0, cpu = 0;
@@ -245,14 +246,35 @@ void LBDatabase::GetObjData(LDObjData *dp)
   // Once per interval on PE 0 (the stats are read more than once per step);
   // the interval clock tells the reads of one step apart from the next.
   static thread_local double lastReported = -1.0;
-  if (_lb_args.debug() > 0 && scaled > 0 && CkMyPe() == 0 &&
-      (lastReported < 0.0 || period < lastReported || period - lastReported > 0.5)) {
-    lastReported = period;
+  const bool newInterval = (lastReported < 0.0 || period < lastReported || period - lastReported > 0.5);
+  if (_lb_args.debug() > 0 && scaled > 0 && CkMyPe() == 0 && newInterval) {
     CmiPrintf("[%d] LBDB: %d of %d migratable objects were measured over less of the "
               "%.3f s interval than they were active; loads and traffic scaled by "
               "%.2fx on average, %.2fx at most\n",
               CkMyPe(), scaled, counted, (double)period, sumScale / counted, maxScale);
   }
+  // Per PE, once per interval: how much of the interval this PE's objects' windows covered. A PE whose
+  // objects reopened late (parked at AtSyncWait until the step finished) samples a sliver and its loads,
+  // capped at kMaxSampleScale, read low: one process of eight attributed 2-10% of its kernels against the
+  // others' 18-25% (Frontier 2026-10-23, dbg3_async), and the diffusion filled the hole.
+  if (_lb_args.debug() > 1 && counted > 0 && newInterval) {
+    double sumWin = 0.0, minWin = 1e30, sumSpan = 0.0;
+    int zeroWin = 0, capped = 0;
+    for (int i = 0; i < objs.size(); i++) {
+      LBObj* obj = objs[i].obj;
+      if (!obj || !obj->data.migratable) continue;
+      const double w = obj->windowTime(), sp = obj->activeSpan();
+      sumWin += w; sumSpan += sp;
+      if (w < minWin) minWin = w;
+      if (w <= 0.0) zeroWin++;
+      if (obj->sampleScale() >= LBObj::kMaxSampleScale) capped++;
+    }
+    CmiPrintf("[%d] LBDB-span: objs=%d window mean %.3f min %.3f (zero %d) span mean %.3f of %.3f s; "
+              "scale mean %.2f max %.2f capped %d; parks %d\n",
+              CkMyPe(), counted, sumWin / counted, minWin, zeroWin, sumSpan / counted, (double)period,
+              sumScale / counted, maxScale, capped, ckLbParksSinceLast());
+  }
+  if (newInterval) lastReported = period;
 }
 
 // Traffic recorded while the sender's window was open, scaled to the interval

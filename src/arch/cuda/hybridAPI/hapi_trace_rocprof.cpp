@@ -22,6 +22,8 @@
 #include <rocprofiler-sdk/hip/runtime_api_id.h>
 #include <atomic>
 #include <mutex>
+#include <chrono>
+#include <thread>
 #include <string>
 #include <cstring>
 #include <cstdio>
@@ -51,6 +53,9 @@ struct RocprofState {
   std::unordered_map<uint64_t, int> agent_device;       // agent id handle -> HIP device ordinal
   std::vector<std::string> api_names;                   // by operation id
   std::vector<rocprofiler_tracing_operation_t> api_ops; // the operations traced (no polls)
+  std::atomic<uint64_t> kernel_records{0};              // kernel-dispatch records delivered so far
+  // The forced flush's settle (hapiTraceBackendFlush): rounds, time and records it recovered, for the timing print.
+  std::atomic<uint64_t> settle_rounds{0}, settle_ns{0}, settle_recovered{0}, settle_calls{0};
 };
 RocprofState g_rp;
 
@@ -75,7 +80,9 @@ void codeObjectCallback(rocprofiler_callback_tracing_record_t record, rocprofile
 
 // One buffer delivery -> one batch for the parse.
 void bufferCallback(rocprofiler_context_id_t, rocprofiler_buffer_id_t, rocprofiler_record_header_t** headers,
-                    size_t n, void*, uint64_t) {
+                    size_t n, void*, uint64_t drop_count) {
+  static uint64_t last_drop = 0;
+  if (drop_count != last_drop) { fprintf(stderr, "[hapi-trace] rocprofiler buffer drop_count=%llu\n", (unsigned long long)drop_count); last_drop = drop_count; }
   HapiTraceBatch* b = new HapiTraceBatch;
   size_t bytes = 0;
   for (size_t i = 0; i < n; i++) {
@@ -90,6 +97,7 @@ void bufferCallback(rocprofiler_context_id_t, rocprofiler_buffer_id_t, rocprofil
       k.deviceId = (uint32_t)deviceOfAgent(di.agent_id);
       k.streamId = (uint32_t)di.queue_id.handle;
       k.correlationId = (uint32_t)r->correlation_id.internal;
+      k.threadId = (uint32_t)r->thread_id;
       // rocprofiler reports the grid in work-items; the parse wants blocks.
       k.blockX = di.workgroup_size.x ? di.workgroup_size.x : 1;
       k.blockY = di.workgroup_size.y ? di.workgroup_size.y : 1;
@@ -117,6 +125,7 @@ void bufferCallback(rocprofiler_context_id_t, rocprofiler_buffer_id_t, rocprofil
         continue;
       }
       b->kernels.push_back(k);
+      g_rp.kernel_records.fetch_add(1, std::memory_order_relaxed);
       bytes += sizeof(*r);
     } else if (h->kind == ROCPROFILER_BUFFER_TRACING_HIP_RUNTIME_API) {
       auto* r = (rocprofiler_buffer_tracing_hip_api_record_t*)h->payload;
@@ -176,7 +185,11 @@ int toolInit(rocprofiler_client_finalize_t, void*) {
                             strncmp(name, "hipModuleLaunch", 15) == 0 || strncmp(name, "hipGraphLaunch", 14) == 0 ||
                             strncmp(name, "hipMemcpy", 9) == 0 || strncmp(name, "hipMemset", 9) == 0 ||
                             strncmp(name, "hipDrvMemcpy", 12) == 0 || strncmp(name, "hipExtModuleLaunch", 18) == 0;
-    if (!isPollName(name) && (all_api || dispatches)) g_rp.api_ops.push_back((rocprofiler_tracing_operation_t)op);
+    // CHARM_TRACE_POLLS=1 traces the polls as well (diagnostic: the HIP runtime writes a deferred dispatch
+    // packet under whatever call the thread is in, a poll included, and the dispatch then carries that
+    // call's correlation id).
+    static const bool polls_too = getenv("CHARM_TRACE_POLLS") != nullptr;
+    if ((polls_too || !isPollName(name)) && (all_api || dispatches)) g_rp.api_ops.push_back((rocprofiler_tracing_operation_t)op);
   }
   fprintf(stderr, "[hapi-trace] HIP API operations traced: %zu of %u (%s)\n", g_rp.api_ops.size(), (unsigned)nops,
           getenv("CHARM_TRACE_ALL_API") ? "every call but the polls" : "dispatching calls only; CHARM_TRACE_ALL_API=1 for every call");
@@ -248,10 +261,56 @@ void hapiTraceBackendEnable(bool trace_copies) {
   }
 }
 
-void hapiTraceBackendFlush(bool) {
+// rocprofiler_flush_buffer delivers what is in the buffer and waits only for its delivery thread. A
+// kernel's dispatch record is written by ROCr's async-signal handler thread once the completion signal
+// fires, and nothing waits for that thread: a kernel completed just before the window close can get its
+// record in the next drain, where the parse drops it (ended before the window). CUPTI's forced flush
+// has no equivalent here, so the forced flush settles instead: it re-flushes while kernel records keep
+// arriving, until a quiet gap or the bound (CHARM_HIP_SETTLE_US, default 2000). Measured before this
+// (Frontier 2026-10-22, two nodes, 80 closes): 13 records / 0.3 ms dropped with channels, 2156 / 76 ms
+// with zero-copy, out of 125 s of windows; with the settle (same shape, 80 closes): 137 records under
+// 0.1 ms. Kernels complete continuously on a busy GCD (~100 per ms), so the quiet gap rarely comes and
+// the settle runs to the bound: median 1.1 ms, p90 2.1 ms per close. The close runs on one PE per
+// process under +LBAsync while the others keep stepping, so the bound is what that one thread pays per
+// LB event. Off by default (CHARM_HIP_SETTLE_US=0): the handler's lag at the close is not milliseconds but
+// tens of thousands of records on a loaded GCD (the device backlog), which no settle can wait out; the parse
+// counts those records in the drain they arrive in instead (hapiNormalizeCuptiLoads). Three on/off pairs on
+// the zero-copy shape showed no gain from the settle (steps 121-200: 100.8/102.8/98.3 against 80.2/94.8/88.7).
+void hapiTraceBackendFlush(bool forced) {
   if (!g_rp.started) return;
-  rocprofiler_flush_buffer(g_rp.buf);
-  if (g_rp.copies_started) rocprofiler_flush_buffer(g_rp.copy_buf);
+  auto flushAll = [] {
+    rocprofiler_flush_buffer(g_rp.buf);
+    if (g_rp.copies_started) rocprofiler_flush_buffer(g_rp.copy_buf);
+  };
+  flushAll();
+  if (!forced) return;
+  static const long bound_us = getenv("CHARM_HIP_SETTLE_US") ? atol(getenv("CHARM_HIP_SETTLE_US")) : 0;   // off: see below
+  if (bound_us <= 0) return;
+  const auto t0 = std::chrono::steady_clock::now();
+  const uint64_t before = g_rp.kernel_records.load(std::memory_order_relaxed);
+  uint64_t last = before;
+  int quiet = 0;
+  uint64_t rounds = 0;
+  for (;;) {
+    std::this_thread::sleep_for(std::chrono::microseconds(100));
+    flushAll();
+    rounds++;
+    const uint64_t now = g_rp.kernel_records.load(std::memory_order_relaxed);
+    if (now == last) { if (++quiet >= 2) break; } else { quiet = 0; last = now; }
+    if (std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - t0).count() >= bound_us)
+      break;
+  }
+  const uint64_t ns = (uint64_t)std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now() - t0).count();
+  g_rp.settle_calls.fetch_add(1, std::memory_order_relaxed);
+  g_rp.settle_rounds.fetch_add(rounds, std::memory_order_relaxed);
+  g_rp.settle_ns.fetch_add(ns, std::memory_order_relaxed);
+  g_rp.settle_recovered.fetch_add(last - before, std::memory_order_relaxed);
+  static const bool timeIt = getenv("CHARM_LB_CUPTI_TIME") != nullptr;
+  if (timeIt)
+    fprintf(stderr, "[LBCUPTI] hip settle: rounds=%llu us=%llu recovered_kernel_records=%llu (totals: calls=%llu rounds=%llu us=%llu recovered=%llu)\n",
+            (unsigned long long)rounds, (unsigned long long)(ns / 1000), (unsigned long long)(last - before),
+            (unsigned long long)g_rp.settle_calls.load(), (unsigned long long)g_rp.settle_rounds.load(),
+            (unsigned long long)(g_rp.settle_ns.load() / 1000), (unsigned long long)g_rp.settle_recovered.load());
 }
 
 uint64_t hapiTraceBackendTimestamp() {

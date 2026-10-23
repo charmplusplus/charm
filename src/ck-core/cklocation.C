@@ -2776,6 +2776,11 @@ void CkMigratable::lbJoinStep(int waitForMigration)
 // The blocking half of the split. See the header for the contract.
 
 
+// Parks at AtSyncWait on this PE (the step had not finished when the element arrived): a parked element's
+// measurement window reopens only when the step finishes, so its sample shrinks by the park. Counted per PE for
+// the LBDB-span line (LBDatabase::GetObjData).
+static thread_local int s_lbParks = 0;
+int ckLbParksSinceLast() { const int n = s_lbParks; s_lbParks = 0; return n; }
 void CkMigratable::AtSyncWait()
 {
   if (!usesAtSync)
@@ -2796,6 +2801,7 @@ void CkMigratable::AtSyncWait()
     return;
   }
   waitParked = true;
+  s_lbParks++;
   myRec->deviceRecvParked = true;
   // The park is by definition a point the application has declared safe, so
   // re-assert readiness here. An application that narrows its safe window with

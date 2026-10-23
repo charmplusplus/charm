@@ -100,6 +100,32 @@ struct CuptiBuildJob {
   std::atomic<bool> done;
   CuptiBuildJob(CkGroupID g, int f, int c) : gid(g), first(f), count(c), done(false) {}
 };
+void cuptiBuildPoll(void* arg);
+// The deferred close (hapi.h): the window is marked at the last arrival; this poll waits from the scheduler
+// loop for the records of the work issued before the mark, then starts the build.
+struct CuptiCloseWaitJob { CkGroupID gid; int first, count, dev; };
+void cuptiCloseWaitPoll(void* arg) {
+  CuptiCloseWaitJob* w = (CuptiCloseWaitJob*)arg;
+  if (!hapiCuptiCloseComplete()) { CcdCallOnCondition(CcdSCHEDLOOP, cuptiCloseWaitPoll, arg); return; }
+  static const char* spec = lbHelperSpec("CHARM_LB_CUPTI_OFFTHREAD");
+  cpu_set_t cpus;
+  if (lbOffThreadCpus(spec, &cpus)) {
+    static bool announced = false;
+    if (!announced) {
+      announced = true;
+      CmiPrintf("CharmLB> PE %d: CUPTI load build on the helper thread (CHARM_LB_CUPTI_OFFTHREAD=%s)\n", CkMyPe(), spec);
+    }
+    CuptiBuildJob* bj = new CuptiBuildJob(w->gid, w->first, w->count);
+    const int dev = w->dev;
+    lbHelperSubmit(cpus, [bj, dev]() { hapiPrepareCuptiLoadsDevice(HAPI_CUPTI_EPOCH_LB_ROUND, dev); bj->done.store(true, std::memory_order_release); }, dev < 0 ? 0 : dev);
+    CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, (void*)bj);
+  } else {
+    hapiPrepareCuptiLoadsDevice(HAPI_CUPTI_EPOCH_LB_ROUND, w->dev);
+    CProxy_CentralLB proxy(w->gid);
+    for (int r = 0; r < w->count; r++) proxy[w->first + r].gpuLoadsReady();
+  }
+  delete w;
+}
 void cuptiBuildPoll(void* arg) {
   CuptiBuildJob* b = (CuptiBuildJob*)arg;
   if (!b->done.load(std::memory_order_acquire)) {
@@ -240,30 +266,12 @@ void CentralLB::CallLB()
   // other PEs' objects were still finishing. See DistBaseLB::barrierDone for
   // the measurement. The earlier arrivals continue from gpuLoadsReady.
   if (!hapiCuptiArrive((uint64_t)step(), hapiDeviceGroupSize())) return;   // per process (see DistBaseLB)
-  {
-    // CHARM_LB_CUPTI_OFFTHREAD=near | <cpulist> | 1: the window's CUPTI flush, parse and normalise
-    // on the shared helper thread instead of inline in this PE's entry method (the same knob as
-    // DistBaseLB). The build took 99 ms on one PE of sph3d at 98M (job 22776188 trace), and with
-    // a halo exchange every other PE waited for it.
-    static const char* spec = lbHelperSpec("CHARM_LB_CUPTI_OFFTHREAD");
-    cpu_set_t cpus;
-    if (lbOffThreadCpus(spec, &cpus)) {
-      static bool announced = false;
-      if (!announced) {
-        announced = true;
-        CmiPrintf("CharmLB> PE %d: CUPTI load build on the helper thread (CHARM_LB_CUPTI_OFFTHREAD=%s)\n", CkMyPe(), spec);
-      }
-      CuptiBuildJob* bj = new CuptiBuildJob(thisgroup, hapiDeviceGroupFirstPe(), hapiDeviceGroupSize());
-      const int dev = hapiMyDeviceIndex();
-      lbHelperSubmit(cpus, [bj, dev]() { hapiPrepareCuptiLoadsDevice(HAPI_CUPTI_EPOCH_LB_ROUND, dev); bj->done.store(true, std::memory_order_release); }, dev < 0 ? 0 : dev);
-      CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, (void*)bj);
-      return;
-    }
-  }
-  hapiPrepareCuptiLoadsDevice(HAPI_CUPTI_EPOCH_LB_ROUND, hapiMyDeviceIndex());
-  const int first = hapiDeviceGroupFirstPe();
-  for (int r = 0; r < hapiDeviceGroupSize(); r++)
-    thisProxy[first + r].gpuLoadsReady();
+  // Mark the window and wait, from the scheduler loop, for the records of the work issued before the mark
+  // (the deferred close, hapi.h); cuptiCloseWaitPoll then builds -- on the helper thread
+  // (CHARM_LB_CUPTI_OFFTHREAD=near | <cpulist> | 1) or inline -- and fans out gpuLoadsReady.
+  hapiCuptiCloseBegin();
+  CcdCallOnCondition(CcdSCHEDLOOP, cuptiCloseWaitPoll,
+                     (void*)new CuptiCloseWaitJob{thisgroup, hapiDeviceGroupFirstPe(), hapiDeviceGroupSize(), hapiMyDeviceIndex()});
 #else
   thisProxy [CkMyPe()].ProcessAtSync();
 #endif

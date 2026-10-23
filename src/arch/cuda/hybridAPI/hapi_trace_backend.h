@@ -16,6 +16,7 @@
 struct HapiTraceKernelRec {
   uint64_t start, end;              // device timestamps, ns, the backend's clock
   uint32_t deviceId, streamId, correlationId;
+  uint32_t threadId;                // the OS thread that enqueued the dispatch (0 if the backend has none)
   uint32_t gridX, gridY, gridZ;     // blocks
   uint32_t blockX, blockY, blockZ;  // threads per block
   uint32_t registersPerThread;

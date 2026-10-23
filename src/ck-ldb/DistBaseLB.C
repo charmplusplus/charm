@@ -90,6 +90,29 @@ void cuptiWorkerSubmit(CuptiBuild* b, const cpu_set_t& cpus) {
   w.cv.notify_one();
 }
 
+// The deferred close (hapi.h): the last arrival marks the window and this poll, from the scheduler loop, waits
+// for the records of the work issued before the mark; the build starts when they are in.
+struct CuptiCloseWaitCtx { CkGroupID gid; int first, count, dev; };
+void cuptiBuildPoll(void* arg);
+void cuptiCloseWaitPoll(void* arg) {
+  CuptiCloseWaitCtx* w = (CuptiCloseWaitCtx*)arg;
+  if (!hapiCuptiCloseComplete()) { CcdCallOnCondition(CcdSCHEDLOOP, cuptiCloseWaitPoll, arg); return; }
+  cpu_set_t cpus;
+  if (cuptiOffThreadCpus(&cpus)) {
+    CuptiBuild* b = new CuptiBuild;
+    b->gid = w->gid; b->first = w->first; b->count = w->count; b->dev = w->dev;
+    lbHelperSubmit(cpus, [b]() {
+      hapiPrepareCuptiLoadsDevice(HAPI_CUPTI_EPOCH_LB_ROUND, b->dev);
+      b->done.store(true, std::memory_order_release);
+    }, b->dev < 0 ? 0 : b->dev);
+    CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, (void*)b);
+  } else {
+    hapiPrepareCuptiLoadsDevice(HAPI_CUPTI_EPOCH_LB_ROUND, w->dev);
+    CProxy_DistBaseLB proxy(w->gid);
+    for (int r = 0; r < w->count; r++) proxy[w->first + r].gpuLoadsReady();
+  }
+  delete w;
+}
 void cuptiBuildPoll(void* arg) {
   CuptiBuild* b = (CuptiBuild*)arg;
   if (!b->done.load(std::memory_order_acquire)) {
@@ -183,26 +206,12 @@ void DistBaseLB::barrierDone() {
   // Per process (hapiDeviceGroupSize is its PE count): CUPTI flushes the process whatever context is
   // named, so the last PE of the process closes the window for all its devices at once.
   if (!hapiCuptiArrive((uint64_t)step(), hapiDeviceGroupSize())) return;
-  {
-    cpu_set_t cpus;
-    if (cuptiOffThreadCpus(&cpus)) {
-      CuptiBuild* b = new CuptiBuild;
-      b->gid = thisgroup;
-      b->first = hapiDeviceGroupFirstPe();
-      b->count = hapiDeviceGroupSize();
-      b->dev = hapiMyDeviceIndex();
-      lbHelperSubmit(cpus, [b]() {
-        hapiPrepareCuptiLoadsDevice(HAPI_CUPTI_EPOCH_LB_ROUND, b->dev);
-        b->done.store(true, std::memory_order_release);
-      }, b->dev < 0 ? 0 : b->dev);
-      CcdCallOnCondition(CcdSCHEDLOOP, cuptiBuildPoll, (void*)b);
-      return;
-    }
-  }
-  hapiPrepareCuptiLoadsDevice(HAPI_CUPTI_EPOCH_LB_ROUND, hapiMyDeviceIndex());
-  const int first = hapiDeviceGroupFirstPe();
-  for (int r = 0; r < hapiDeviceGroupSize(); r++)
-    thisProxy[first + r].gpuLoadsReady();
+  // Mark the window and wait, from the scheduler loop, for the records of the work issued before the mark
+  // (the deferred close, hapi.h); the build (helper thread or inline) and the fan-out follow in
+  // cuptiCloseWaitPoll. Immediate where there is nothing to wait for.
+  hapiCuptiCloseBegin();
+  CcdCallOnCondition(CcdSCHEDLOOP, cuptiCloseWaitPoll,
+                     (void*)new CuptiCloseWaitCtx{thisgroup, hapiDeviceGroupFirstPe(), hapiDeviceGroupSize(), hapiMyDeviceIndex()});
 #else
   gpuLoadsReady();
 #endif
