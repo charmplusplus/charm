@@ -13,6 +13,7 @@ DIRS = \
   chkpt \
   intercomm_merge \
   groupfree \
+  bsend \
 #  intercomm_coll \ # causes hangs in SMP mode
 
 ifeq (1,$(CMK_CAN_LINK_FORTRAN))

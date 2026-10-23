@@ -3080,7 +3080,8 @@ AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int coun
 
 void ampi::waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept
 {
-  if (*req != MPI_REQUEST_NULL && (sendType == BLOCKING_SEND || sendType == BLOCKING_SSEND)) {
+  if (*req != MPI_REQUEST_NULL && (sendType == BLOCKING_SEND || sendType == BLOCKING_SSEND ||
+                                   sendType == BLOCKING_BSEND)) {
     AmpiRequestList& reqList = getReqs();
     AmpiRequest& sreq = *reqList[*req];
     parent = sreq.wait(parent, MPI_STATUS_IGNORE);
@@ -3249,41 +3250,57 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int size = ddt->getSize(count);
   ampi *destPtr = arrProxy[destIdx].ckLocal();
+  const bool buffered = (sendType == BLOCKING_BSEND || sendType == I_BSEND);
 #if AMPI_PE_LOCAL_IMPL
   if (destPtr != nullptr && destPtr->parent != nullptr) {
+    if (buffered) {
+      // Copy into a message and deliver it inline, whatever its size
+      destPtr->generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, seq));
+      return completedSendReq(buf, count, type, rank, t, destcomm, reqIdx);
+    }
     // Complete message inline to PE-local destination VP
     return sendLocalMsg(t, sRank, buf, size, type, count, rank, destcomm,
                         seq, destPtr, sendType, reqIdx);
   }
 #endif
-  if (
+  // A buffered send must not wait for the receiver: it skips the synchronous
+  // and zero-copy paths below and sends a copy eagerly.
+  if (!buffered && (
 #if AMPI_NODE_LOCAL_IMPL
       (size >= AMPI_NODE_LOCAL_THRESHOLD && destLikelyWithinProcess(arrProxy, destIdx, destPtr)) ||
 #endif
-      (sendType == BLOCKING_SSEND || sendType == I_SSEND))
+      (sendType == BLOCKING_SSEND || sendType == I_SSEND)))
   {
     // Avoid sender- and receiver-side copies via zero copy direct API
     // (optimized for within-process transfers)
     return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm,
                        seq, arrProxy, destIdx, sendType, reqIdx, destPtr);
   }
+  if (!buffered) {
 #if AMPI_RDMA_IMPL
-  if (ddt->isContig() && size >= AMPI_RDMA_THRESHOLD) {
-    // Avoid sender-side copy via zero copy entry method API
-    return sendRdmaMsg(t, sRank, buf, size, type, destIdx,
-                       rank, destcomm, seq, arrProxy, reqIdx);
-  }
+    if (ddt->isContig() && size >= AMPI_RDMA_THRESHOLD) {
+      // Avoid sender-side copy via zero copy entry method API
+      return sendRdmaMsg(t, sRank, buf, size, type, destIdx,
+                         rank, destcomm, seq, arrProxy, reqIdx);
+    }
 #endif
-  if (size >= AMPI_SSEND_THRESHOLD) {
-    // Avoid sender- and receiver-side copies via zero copy direct API
-    return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm,
-                       seq, arrProxy, destIdx, sendType, reqIdx, destPtr);
+    if (size >= AMPI_SSEND_THRESHOLD) {
+      // Avoid sender- and receiver-side copies via zero copy direct API
+      return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm,
+                         seq, arrProxy, destIdx, sendType, reqIdx, destPtr);
+    }
   }
 
   // Send via normal Charm++ message with copies on both sender- and receiver-sides
   arrProxy[destIdx].generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, seq));
+  return completedSendReq(buf, count, type, rank, t, destcomm, reqIdx);
+}
 
-  if (reqIdx == MPI_REQUEST_NULL) { // Sends via generic() get a pre-completed send request
+// Sends via generic() get a pre-completed send request
+MPI_Request ampi::completedSendReq(const void* buf, int count, MPI_Datatype type, int rank,
+                                   int t, MPI_Comm destcomm, MPI_Request reqIdx) noexcept
+{
+  if (reqIdx == MPI_REQUEST_NULL) {
     reqIdx = postReq(parent->reqPool.newReq<SendReq>((void*)buf, count, type, rank, t, destcomm,
                                                      getDDT(), AMPI_REQ_COMPLETED));
   }
@@ -3293,7 +3310,6 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
     CkAssert(sreq.isPersistent());
     sreq.complete = true;
   }
-
   return reqIdx;
 }
 
@@ -4482,9 +4498,28 @@ AMPI_API_IMPL(int, MPI_Bsend, const void *buf, int count, MPI_Datatype datatype,
                               int dest, int tag, MPI_Comm comm)
 {
   AMPI_API("AMPI_Bsend", buf, count, datatype, dest, tag, comm);
-  // FIXME: we don't actually use the buffer set in MPI_Buffer_attach
-  //        for buffering of messages sent via MPI_Bsend
-  return MPI_Send(buf, count, datatype, dest, tag, comm);
+
+  handle_MPI_BOTTOM((void*&)buf, datatype);
+
+#if AMPI_ERROR_CHECKING
+  int ret = errorCheck("AMPI_Bsend", comm, 1, count, 1, datatype, 1, tag, 1, dest, 1, buf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+#if AMPIMSGLOG
+  if(msgLogRead){
+    return MPI_SUCCESS;
+  }
+#endif
+
+  // NOTE: the data is copied into a message allocated by the runtime, not
+  //       into the buffer given to MPI_Buffer_attach (which is only tracked
+  //       so that MPI_Buffer_detach can return it), so a Bsend never fails
+  //       for lack of attached buffer space.
+  ampi *ptr = getAmpiInstance(comm);
+  ptr->send(tag, ptr->getRank(), buf, count, datatype, dest, comm, BLOCKING_BSEND);
+  return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Buffer_attach, void *buffer, int size)
@@ -7596,7 +7631,35 @@ AMPI_API_IMPL(int, MPI_Ibsend, const void *buf, int count, MPI_Datatype type, in
                                int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPI_API("AMPI_Ibsend", buf, count, type, dest, tag, comm, request);
-  return MPI_Isend(buf, count, type, dest, tag, comm, request);
+
+  handle_MPI_BOTTOM((void*&)buf, type);
+
+#if AMPI_ERROR_CHECKING
+  int ret = errorCheck("AMPI_Ibsend", comm, 1, count, 1, type, 1, tag, 1, dest, 1, buf, 1);
+  if(ret != MPI_SUCCESS){
+    *request = MPI_REQUEST_NULL;
+    return ret;
+  }
+#endif
+
+#if AMPIMSGLOG
+  if(msgLogRead){
+    PUParray(*(getAmpiParent()->fromPUPer), (char *)request, sizeof(MPI_Request));
+    return MPI_SUCCESS;
+  }
+#endif
+
+  // The data is copied at once, so the request is already complete
+  ampi *ptr = getAmpiInstance(comm);
+  *request = ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm, I_BSEND);
+
+#if AMPIMSGLOG
+  if(msgLogWrite && record_msglog(getAmpiParent()->thisIndex)){
+    PUParray(*(getAmpiParent()->toPUPer), (char *)request, sizeof(MPI_Request));
+  }
+#endif
+
+  return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Irsend, const void *buf, int count, MPI_Datatype type, int dest,

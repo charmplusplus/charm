@@ -1247,7 +1247,11 @@ enum AmpiSendType : char {
   BLOCKING_SEND = 0,
   I_SEND = 1,
   BLOCKING_SSEND = 2,
-  I_SSEND = 3
+  I_SSEND = 3,
+  // Buffered sends always copy the data into a message and send it eagerly,
+  // so they complete without waiting for the matching receive.
+  BLOCKING_BSEND = 4,
+  I_BSEND = 5
 };
 
 #define MyAlign8(x) (((x)+7)&(~7))
@@ -2863,6 +2867,8 @@ class ampi final : public CBase_ampi {
   }
   inline MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
                               MPI_Comm destcomm, CProxy_ampi arrproxy, AmpiSendType sendType, MPI_Request req) noexcept;
+  MPI_Request completedSendReq(const void* buf, int count, MPI_Datatype type, int rank,
+                               int t, MPI_Comm destcomm, MPI_Request reqIdx) noexcept;
   inline bool processSsendMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
   inline bool processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
   inline bool processSsendNcpyMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
