@@ -1,0 +1,259 @@
+/* MPI_Scan, MPI_Exscan, MPI_Iscan and MPI_Iexscan, checked against a
+   prefix computed serially on every rank.
+
+   Each rank's input is a deterministic function of (rank, element), so every
+   rank can compute the inclusive or exclusive prefix over ranks 0..r on its
+   own. Covered:
+     - int and double, MPI_SUM and MPI_MAX, a few elements and a large count
+       (large enough to take AMPI's zero-copy send paths);
+     - a non-commutative user op (composition of affine maps mod a prime),
+       which checks that partial results are combined in rank order;
+     - MPI_IN_PLACE;
+     - a communicator from MPI_Comm_split, so communicator ranks differ from
+       world ranks;
+     - MPI_Iscan / MPI_Iexscan completed by MPI_Wait, by an MPI_Test loop, and
+       by one MPI_Waitall over several outstanding scans.
+
+   MPI_Exscan's recvbuf on rank 0 is undefined, so it is not checked there.
+   The rank count that exposed the MPI_Exscan hang is 3 (any count that is not
+   a power of two): run with +vp 3, 5, 6 and 7 as well as powers of two. */
+
+#include <mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <vector>
+
+/* No mutable globals: AMPI ranks are threads in one process and would share
+   them. Per-rank state lives in a Ctx passed down. */
+struct Ctx {
+  int worldRank;
+  int failures;
+  MPI_Op affineOp;
+};
+
+static const long long MODP = 1000003;
+
+/* Non-commutative op on pairs (a, b), each pair the map x -> a*x + b mod P.
+   inout = in followed by inout, i.e. the lower ranks' map is applied first. */
+static void affineCompose(void *invec, void *inoutvec, int *len, MPI_Datatype *dt)
+{
+  const int *in = (const int *)invec;
+  int *io = (int *)inoutvec;
+  for (int i = 0; i + 1 < *len; i += 2) {
+    long long a1 = in[i], b1 = in[i+1], a2 = io[i], b2 = io[i+1];
+    io[i]   = (int)((a1 * a2) % MODP);
+    io[i+1] = (int)((a2 * b1 + b2) % MODP);
+  }
+}
+
+static int ival(int rank, int i) { return ((rank * 7 + i * 3) % 11) - 5; }
+static double dval(int rank, int i) { return 0.5 * (((rank * 5 + i * 13) % 17) - 8); }
+static void affval(int rank, int i, int *pair)
+{
+  pair[0] = (rank * 31 + i * 7) % 1000 + 2;
+  pair[1] = (rank * 17 + i * 11) % 1000 + 1;
+}
+
+enum Kind { K_INT_SUM, K_INT_MAX, K_DBL_SUM, K_DBL_MAX, K_AFFINE, K_COUNT };
+static const char *kindName[] = {"int SUM", "int MAX", "double SUM", "double MAX", "affine (non-commutative)"};
+
+struct Case {
+  Kind kind;
+  int count;          // elements (for K_AFFINE: ints, i.e. 2 per map)
+  bool exclusive;
+  std::vector<char> send, recv, want;
+  MPI_Datatype type;
+  MPI_Op op;
+};
+
+static void fill(Case &c, int rank, const Ctx &x)
+{
+  bool isDouble = (c.kind == K_DBL_SUM || c.kind == K_DBL_MAX);
+  size_t esz = isDouble ? sizeof(double) : sizeof(int);
+  c.send.assign(c.count * esz, 0);
+  c.recv.assign(c.count * esz, 0);
+  c.want.assign(c.count * esz, 0);
+  c.type = isDouble ? MPI_DOUBLE : MPI_INT;
+  c.op = (c.kind == K_INT_SUM || c.kind == K_DBL_SUM) ? MPI_SUM
+       : (c.kind == K_AFFINE) ? x.affineOp : MPI_MAX;
+
+  int last = c.exclusive ? rank - 1 : rank;
+  if (c.kind == K_AFFINE) {
+    int *s = (int *)c.send.data(), *w = (int *)c.want.data();
+    for (int i = 0; i + 1 < c.count; i += 2) {
+      affval(rank, i, &s[i]);
+      long long a = 1, b = 0;              // identity map
+      for (int r = 0; r <= last; r++) {    // apply rank 0's map first
+        int p[2]; affval(r, i, p);
+        b = (p[0] * b + p[1]) % MODP;
+        a = (a * p[0]) % MODP;
+      }
+      w[i] = (int)a; w[i+1] = (int)b;
+    }
+    for (size_t i = 0; i < c.count * esz; i++) c.recv[i] = (char)0xA5;
+    return;
+  }
+  for (int i = 0; i < c.count; i++) {
+    if (isDouble) {
+      ((double *)c.send.data())[i] = dval(rank, i);
+      double acc = (c.kind == K_DBL_SUM) ? 0.0 : -1e300;
+      for (int r = 0; r <= last; r++)
+        acc = (c.kind == K_DBL_SUM) ? acc + dval(r, i) : (dval(r, i) > acc ? dval(r, i) : acc);
+      ((double *)c.want.data())[i] = acc;
+      ((double *)c.recv.data())[i] = -12345.0;
+    } else {
+      ((int *)c.send.data())[i] = ival(rank, i);
+      int acc = (c.kind == K_INT_SUM) ? 0 : -1000000;
+      for (int r = 0; r <= last; r++)
+        acc = (c.kind == K_INT_SUM) ? acc + ival(r, i) : (ival(r, i) > acc ? ival(r, i) : acc);
+      ((int *)c.want.data())[i] = acc;
+      ((int *)c.recv.data())[i] = -12345;
+    }
+  }
+}
+
+static void verify(const Case &c, int rank, const char *how, Ctx &x)
+{
+  if (c.exclusive && rank == 0) return;   // undefined on rank 0
+  bool isDouble = (c.kind == K_DBL_SUM || c.kind == K_DBL_MAX);
+  for (int i = 0; i < c.count; i++) {
+    bool ok;
+    double got, want;
+    if (isDouble) {
+      got = ((const double *)c.recv.data())[i];
+      want = ((const double *)c.want.data())[i];
+      ok = (got == want);   // sums of halves are exact
+    } else {
+      got = ((const int *)c.recv.data())[i];
+      want = ((const int *)c.want.data())[i];
+      ok = (got == want);
+    }
+    if (!ok) {
+      printf("FAIL: world rank %d (comm rank %d): %s %s count %d element %d = %g, expected %g\n",
+             x.worldRank, rank, how, kindName[c.kind], c.count, i, got, want);
+      fflush(stdout);
+      x.failures++;
+      return;
+    }
+  }
+}
+
+static void runSuite(MPI_Comm comm, const char *commName, Ctx &x)
+{
+  int rank, size;
+  MPI_Comm_rank(comm, &rank);
+  MPI_Comm_size(comm, &size);
+  const int counts[] = {1, 4, 20000};
+  char how[128];
+
+  for (int ex = 0; ex <= 1; ex++) {
+    for (int k = 0; k < K_COUNT; k++) {
+      for (int ci = 0; ci < 3; ci++) {
+        Case c;
+        c.kind = (Kind)k;
+        c.count = (k == K_AFFINE) ? 2 * counts[ci] : counts[ci];
+        c.exclusive = ex;
+
+        // Blocking
+        fill(c, rank, x);
+        if (ex) MPI_Exscan(c.send.data(), c.recv.data(), c.count, c.type, c.op, comm);
+        else    MPI_Scan(c.send.data(), c.recv.data(), c.count, c.type, c.op, comm);
+        snprintf(how, sizeof how, "%s %s", commName, ex ? "MPI_Exscan" : "MPI_Scan");
+        verify(c, rank, how, x);
+
+        // Blocking, MPI_IN_PLACE
+        fill(c, rank, x);
+        memcpy(c.recv.data(), c.send.data(), c.send.size());
+        if (ex) MPI_Exscan(MPI_IN_PLACE, c.recv.data(), c.count, c.type, c.op, comm);
+        else    MPI_Scan(MPI_IN_PLACE, c.recv.data(), c.count, c.type, c.op, comm);
+        snprintf(how, sizeof how, "%s %s IN_PLACE", commName, ex ? "MPI_Exscan" : "MPI_Scan");
+        verify(c, rank, how, x);
+
+        // Nonblocking + MPI_Wait
+        fill(c, rank, x);
+        MPI_Request req;
+        if (ex) MPI_Iexscan(c.send.data(), c.recv.data(), c.count, c.type, c.op, comm, &req);
+        else    MPI_Iscan(c.send.data(), c.recv.data(), c.count, c.type, c.op, comm, &req);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
+        snprintf(how, sizeof how, "%s %s+Wait", commName, ex ? "MPI_Iexscan" : "MPI_Iscan");
+        verify(c, rank, how, x);
+        if (req != MPI_REQUEST_NULL) {
+          printf("FAIL: world rank %d: request not MPI_REQUEST_NULL after MPI_Wait\n", x.worldRank);
+          x.failures++;
+        }
+
+        // Nonblocking + MPI_Test loop
+        fill(c, rank, x);
+        if (ex) MPI_Iexscan(c.send.data(), c.recv.data(), c.count, c.type, c.op, comm, &req);
+        else    MPI_Iscan(c.send.data(), c.recv.data(), c.count, c.type, c.op, comm, &req);
+        int flag = 0;
+        while (!flag) MPI_Test(&req, &flag, MPI_STATUS_IGNORE);
+        snprintf(how, sizeof how, "%s %s+Test", commName, ex ? "MPI_Iexscan" : "MPI_Iscan");
+        verify(c, rank, how, x);
+      }
+    }
+  }
+
+  // Several outstanding nonblocking scans, completed by one MPI_Waitall.
+  // Also mixes in a blocking scan while they are outstanding.
+  for (int iter = 0; iter < 3; iter++) {
+    std::vector<Case> cs(2 * K_COUNT);
+    std::vector<MPI_Request> reqs(cs.size());
+    for (size_t j = 0; j < cs.size(); j++) {
+      Case &c = cs[j];
+      c.kind = (Kind)(j % K_COUNT);
+      c.exclusive = (j >= K_COUNT);
+      int n = (iter == 2) ? 5000 : 3;
+      c.count = (c.kind == K_AFFINE) ? 2 * n : n;
+      fill(c, rank, x);
+      if (c.exclusive) MPI_Iexscan(c.send.data(), c.recv.data(), c.count, c.type, c.op, comm, &reqs[j]);
+      else             MPI_Iscan(c.send.data(), c.recv.data(), c.count, c.type, c.op, comm, &reqs[j]);
+    }
+    Case mid;
+    mid.kind = K_AFFINE; mid.count = 2; mid.exclusive = (iter == 1);
+    fill(mid, rank, x);
+    if (mid.exclusive) MPI_Exscan(mid.send.data(), mid.recv.data(), mid.count, mid.type, mid.op, comm);
+    else               MPI_Scan(mid.send.data(), mid.recv.data(), mid.count, mid.type, mid.op, comm);
+    snprintf(how, sizeof how, "%s blocking scan between I-scans (iter %d)", commName, iter);
+    verify(mid, rank, how, x);
+
+    MPI_Waitall((int)reqs.size(), reqs.data(), MPI_STATUSES_IGNORE);
+    for (size_t j = 0; j < cs.size(); j++) {
+      snprintf(how, sizeof how, "%s Waitall %s (iter %d)", commName,
+               cs[j].exclusive ? "MPI_Iexscan" : "MPI_Iscan", iter);
+      verify(cs[j], rank, how, x);
+    }
+  }
+}
+
+int main(int argc, char **argv)
+{
+  MPI_Init(&argc, &argv);
+  int size;
+  Ctx x;
+  x.failures = 0;
+  MPI_Comm_rank(MPI_COMM_WORLD, &x.worldRank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  MPI_Op_create(affineCompose, 0, &x.affineOp);
+
+  runSuite(MPI_COMM_WORLD, "WORLD", x);
+
+  // Reverse-ordered split: communicator rank differs from world rank.
+  MPI_Comm sub;
+  MPI_Comm_split(MPI_COMM_WORLD, x.worldRank % 2, size - x.worldRank, &sub);
+  runSuite(sub, "split", x);
+  MPI_Comm_free(&sub);
+
+  MPI_Op_free(&x.affineOp);
+
+  int total = 0;
+  MPI_Allreduce(&x.failures, &total, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  if (x.worldRank == 0) {
+    if (total == 0) printf("scan: all tests passed on %d ranks\n", size);
+    else            printf("scan: %d failures on %d ranks\n", total, size);
+    fflush(stdout);
+  }
+  MPI_Finalize();
+  return total == 0 ? 0 : 1;
+}

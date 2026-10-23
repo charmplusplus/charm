@@ -5681,7 +5681,7 @@ AMPI_API_IMPL(int, MPI_Exscan, const void* sendbuf, void* recvbuf, int count, MP
 #if AMPI_ERROR_CHECKING
   if(op == MPI_OP_NULL)
     return ampiErrhandler("AMPI_Exscan", MPI_ERR_OP);
-  int ret = errorCheck("AMPI_Excan", comm, 1, count, 1, datatype, 1, 0, 0, 0, 0, sendbuf, 1, recvbuf, 1);
+  int ret = errorCheck("AMPI_Exscan", comm, 1, count, 1, datatype, 1, 0, 0, 0, 0, sendbuf, 1, recvbuf, 1);
   if(ret != MPI_SUCCESS)
     return ret;
 #endif
@@ -5724,8 +5724,11 @@ AMPI_API_IMPL(int, MPI_Exscan, const void* sendbuf, void* recvbuf, int count, MP
         getAmpiParent()->applyOp(datatype, op, count, partial_scan.data(), tmp_buf.data());
         memcpy(partial_scan.data(), tmp_buf.data(), blklen);
       }
-      mask <<= 1;
     }
+    // Advance every round, whether or not the partner exists: when size is
+    // not a power of two some ranks have no partner in some round, and
+    // advancing only inside the branch looped forever (e.g. rank 2 of 3).
+    mask <<= 1;
   }
 
   return MPI_SUCCESS;
