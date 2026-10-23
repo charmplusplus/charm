@@ -683,7 +683,7 @@ int ampi::deleteWinInstance(MPI_Win win) noexcept {
 }
 
 int ampi::winGetGroup(WinStruct *win, MPI_Group *group) const noexcept {
-   *group = parent->comm2group(win->comm);
+   *group = parent->commGroupHandle(win->comm);
    return MPI_SUCCESS;
 }
 
@@ -1126,7 +1126,7 @@ AMPI_API_IMPL(int, MPI_Win_post, MPI_Group group, int assertion, MPI_Win win)
 
   int parentGroupSize;
   MPI_Group parentGroup;
-  MPI_Comm_group(winStruct->comm, &parentGroup);
+  parentGroup = getAmpiParent()->comm2group(winStruct->comm); // internal: no reference to free
   MPI_Group_size(parentGroup, &parentGroupSize);
 
   std::vector<int> parentGroupRanks(parentGroupSize);
@@ -1194,7 +1194,7 @@ AMPI_API_IMPL(int, MPI_Win_start, MPI_Group group, int assertion, MPI_Win win)
 
   int parentGroupSize;
   MPI_Group parentGroup;
-  MPI_Comm_group(winStruct->comm, &parentGroup);
+  parentGroup = getAmpiParent()->comm2group(winStruct->comm); // internal: no reference to free
   MPI_Group_size(parentGroup, &parentGroupSize);
 
   std::vector<int> subsetGroupRanks(parentGroupSize);
