@@ -27,8 +27,6 @@ Charm++ Documentation
    :numbered:
 
    tcharm/manual
-   mblock/manual
-   pose/manual
 
 .. toctree::
    :maxdepth: 1

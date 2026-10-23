@@ -23,7 +23,7 @@ $(BINARY): $(patsubst %.C,%.o,$(wildcard *.C))
 	$(CHARMC) $(CHARMCFLAGS) $<
 
 test: $(BINARY)
-	$(call run, ./$(BINARY) +p4 ++local 32)
+	$(call run, ./$(BINARY) +p4 32)
 
 testp: $(BINARY)
 	$(call run, ./$(BINARY) +p$(P) $$(( $(P) + 10 )) )
