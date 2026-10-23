@@ -973,6 +973,13 @@ static void getAmpiBinaryPath() noexcept
 
 static void ampiNodeInit() noexcept
 {
+  /* Make this idempotent: on some reconverse paths the initnode calls can run
+     a second time, and the one-shot work below must not repeat (the
+     AMPI_threadstart_idx assertion would fire and a second AmpiReducer would
+     be registered, so PEs could disagree about reducer indices). */
+  if (ampi_nodeinit_has_been_called)
+    return;
+
   getAmpiBinaryPath();
 
 #if CMK_TRACE_ENABLED
@@ -1188,7 +1195,13 @@ static void removeUnimportantArrayObjsfromPeCache() noexcept {
   ArrayObjMap& arrayObjs = CkpvAccess(array_objs);
   arrayObjs.erase(pptr->getThread()->ckGetID().getID());
   arrayObjs.erase(pptr->ckGetID().getID());
-  arrayObjs.erase(getAmpiInstance(MPI_COMM_SELF)->ckGetID().getID());
+  /* MPI_COMM_SELF resolves through ckLocal(), which answers null when that
+     element is not on this PE. AMPI_Migrate calls this the moment the rank
+     resumes on a new PE, and the element bound to it need not have arrived
+     yet. Nothing is lost by skipping it: this whole function is cache pruning,
+     and an element that is not here has nothing in this PE's cache to prune. */
+  ampi* self = getAmpiInstance(MPI_COMM_SELF);
+  if (self != NULL) arrayObjs.erase(self->ckGetID().getID());
 }
 
 /*
@@ -5090,7 +5103,24 @@ void ampi::irednResult(CkReductionMsg *msg) noexcept
   }
 #endif
 
-  if (parent->resumeOnColl && parent->numBlockedReqs==0) {
+  /* Resume only if this completion is one the thread is actually waiting for.
+     Two ways to get that wrong, and both were live:
+
+     A thread parked inside a *blocking* collective of its own sets
+     resumeOnColl and leaves numBlockedReqs at zero, so the old test fired for
+     any unrelated non-blocking collective that happened to finish first. It
+     resumed the thread, and the blocking collective returned without ever
+     writing its result. Its own completion arrives at rednResult; that is what
+     should wake it. parent->blockingReq is what distinguishes the two -- it is
+     set only while a blocking collective is outstanding.
+
+     And a thread parked in MPI_Waitall blocks through blockOnRecv, which sets
+     resumeOnRecv rather than resumeOnColl, so the old test never fired for it
+     at all and a Waitall on non-blocking collectives hung. MPI_Wait happened to
+     work only because RednReq::wait goes through blockOnColl instead. */
+  const bool waitingOnRequests =
+      (parent->resumeOnRecv || parent->resumeOnColl) && parent->blockingReq == NULL;
+  if (waitingOnRequests && parent->numBlockedReqs==0) {
     thread->resume();
   }
   // [nokeep] entry method, so do not delete msg
