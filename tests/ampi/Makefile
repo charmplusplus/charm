@@ -3,6 +3,7 @@
 DIRS = \
   megampi \
   ibarrier \
+  cas \
   stacksize \
   migration \
   datatype \

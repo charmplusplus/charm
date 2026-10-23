@@ -2971,8 +2971,8 @@ class ampi final : public CBase_ampi {
                                   int winIndex) noexcept;
   int winCompareAndSwap(const void *orgaddr, const void *compaddr, void *resaddr, MPI_Datatype type,
                         int rank, MPI_Aint targdisp, WinStruct *win) noexcept;
-  char* winLocalCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Datatype type,
-                               MPI_Aint targdisp, int winIndex) noexcept;
+  void winLocalCompareAndSwap(int size, char* sorgaddr, char* compaddr, char* resaddr,
+                              MPI_Aint targdisp, int winIndex) noexcept;
   AmpiMsg* winRemoteCompareAndSwap(int size, char *sorgaddr, char *compaddr, MPI_Datatype type,
                                    MPI_Aint targdisp, int winIndex) noexcept;
   void winSetName(WinStruct *win, const char *name) noexcept;
