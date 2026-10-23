@@ -573,12 +573,21 @@ static constexpr uint64_t HAPI_CUPTI_NO_OBJECT =
 // finish (microseconds); the PEs then wait for the flush call itself. Our readers never recurse at the lock level
 // (one read lock per thread, t_cupti_gate_depth), which the NONRECURSIVE kind requires.
 #define HAPI_CUPTI_MAX_GATES 32
-// HAPI_CUPTI_FLUSH_FORCED (build-time): 0, the default since 2026-10-17, is the NON-forced flush at the window close --
-// complete buffers only, no gate taken, the open buffer per thread withheld and its tail extrapolated by the coverage
-// scale (hapiNormalizeCuptiLoads). 1 is the forced flush behind the gates, the behaviour of 2026-10-11..17: every
-// launch of the process stopped for the call (~15 ms per LB event in a four-GPU process, the gputrace of job 22953167).
+// HAPI_CUPTI_FLUSH_FORCED (build-time): 1, the default since 2026-10-22, is the forced flush behind the gates at the
+// window close: every buffer delivered, the records complete, the coverage scale 1. 0 is the NON-forced flush, the
+// default from 2026-10-17 to 10-22: complete buffers only, no gate taken, the open buffer per thread (64 KB) withheld
+// and its tail extrapolated by the coverage scale (hapiNormalizeCuptiLoads). That tail is the last 2-5 steps of
+// leanmd 8x4x4 records per thread (cover 0.67-0.93 of the 20-step process window), and the scale is computed over the
+// process window while an element's own measurement window under +LBAsync is the few steps between its AtSyncWait
+// and its join (4 of 20 at lag 16): the withheld tail took half to all of an element's sample and the scale put back
+// 10-30%, differently per thread and per round. DiffusionLB then moved 700-2100 objects per run for the same
+// imbalance, and the channel transport, sensitive to the arrangement, ran 200-249 ms/step. Forced, with the same
+// window (gpub086, 2026-10-22): cover 1.00, 700-718 moves in every run, the explained device share 89-95%, channels
+// 199-200 ms/step -- the sync balancer's figures. The call costs 2-3 ms per close with one GPU per process and 12-14
+// ms against the non-forced call's 9-11 with four GPUs per process, no gate waits; the ~15 ms of job 22953167
+// (2026-10-17) that motivated the non-forced default was the whole close in that layout, not the forced flush's share.
 #ifndef HAPI_CUPTI_FLUSH_FORCED
-#define HAPI_CUPTI_FLUSH_FORCED 0
+#define HAPI_CUPTI_FLUSH_FORCED 1
 #endif
 #define HAPI_CUPTI_GATE_INIT PTHREAD_RWLOCK_WRITER_NONRECURSIVE_INITIALIZER_NP
 static pthread_rwlock_t g_cupti_flush_gates[HAPI_CUPTI_MAX_GATES] = {
@@ -962,8 +971,8 @@ static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t
   // it withholds every buffer with an incomplete record, so the window's tail went missing (256 KB = up to 4 steps
   // of a 10-step sph3d window: every process's load jumped by a random fraction each window and MetisLB re-mapped
   // at all 80 events, 46.2 vs 40.5 ms/step) and at 16 KB the flush itself took 71 ms per drain.
-  // Non-forced flush (HAPI_CUPTI_FLUSH_FORCED 0): the open buffer per thread is the window's unreported tail, so
-  // 64 KB (~3 sph3d steps of a 25-step window; the coverage scale of hapiNormalizeCuptiLoads extrapolates it).
+  // Under the non-forced flush (HAPI_CUPTI_FLUSH_FORCED 0) the open buffer per thread is the window's unreported
+  // tail, so 64 KB (~3 sph3d steps of a 25-step window; the coverage scale of hapiNormalizeCuptiLoads extrapolates it).
   static const size_t first = getenv("CHARM_LB_CUPTI_BUFKB") ? (size_t)atoi(getenv("CHARM_LB_CUPTI_BUFKB")) * 1024
                               : (HAPI_CUPTI_FLUSH_FORCED ? 1024*1024 : 64*1024);
   {
@@ -3086,13 +3095,13 @@ static void hapiPrepareCuptiLoadsImpl(uint64_t epoch, int dev) {
   // Only flush while CUPTI is attached: an application driving its own
   // instrumentation window may already have switched tracing off, and its stop
   // path flushed on the way out, so there is nothing left to pull.
-  // The flush is the non-forced one by default (HAPI_CUPTI_FLUSH_FORCED 0): CUPTI hands over the buffers whose
-  // records are complete, as its own worker thread does concurrently with launches, so no gate is taken and no
-  // launch waits; the open buffer per thread (64 KB, cuptiBufferRequested) is the window's unreported tail, which
-  // hapiNormalizeCuptiLoads extrapolates per thread from the window stamped below. The forced flush (1) returns
-  // every buffer including those with incomplete records, which CUPTI still writes later from another thread's CUDA
-  // call: hence the quarantine (hapiCuptiRetireBuffer) and the gates, and the all-GPU stop at every close that the
-  // gates cost a multi-GPU process (~15 ms per LB event, job 22953167).
+  // The flush is the forced one by default (HAPI_CUPTI_FLUSH_FORCED 1, 2026-10-22): it returns every buffer
+  // including those with incomplete records, which CUPTI still writes later from another thread's CUDA call: hence
+  // the quarantine (hapiCuptiRetireBuffer) and the gates. The non-forced flush (0) hands over the buffers whose
+  // records are complete, as CUPTI's own worker thread does concurrently with launches, so no gate is taken and no
+  // launch waits; the open buffer per thread (64 KB, cuptiBufferRequested) is then the window's unreported tail,
+  // which hapiNormalizeCuptiLoads extrapolates per thread from the window stamped below -- over the process window,
+  // not the element's, which is why it is no longer the default (see the define).
   {   // this window ends here, in the CUPTI clock (the records' clock)
     const uint64_t now = hapiTraceBackendTimestamp();
     g_cupti_window_prev_ns = g_cupti_window_close_ns;
