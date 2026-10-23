@@ -164,6 +164,50 @@ jobs:
           rm -rf "$HOME/.tmp/lct_pmi_file-"*
           for d in $TEST_DIRS; do TESTRUN_PROCS=2 gtimeout 900 make -C $d test; done
 
+  # Windows (NAMD's desktop users). MSVC driven from Cygwin through unix2nt_cc,
+  # as Charm++'s Windows builds always were. A Windows build is one process
+  # (reconverse has no communication backend there), so there is no lcrun
+  # step; RUN_PROCS= turns the two-process runs that some test Makefiles add
+  # (user-driven-interop) into single-process ones.
+  reconverse-win-x86_64:
+    timeout-minutes: 150
+    runs-on: windows-latest
+    defaults:
+      run:
+        # Cygwin's bash, with the MSVC environment set up below inherited;
+        # CHERE_INVOKING keeps the login shell in the checkout.
+        shell: C:\cygwin\bin\bash.exe --login --norc -eo pipefail -o igncr '{0}'
+    env:
+      CHERE_INVOKING: 1
+    steps:
+      # The build scripts run under bash, so they must be checked out with
+      # LF line endings; the runner's git converts to CRLF by default.
+      - name: check out with LF line endings
+        shell: pwsh
+        run: git config --global core.autocrlf false
+      - uses: actions/checkout@v5
+        with:
+          # reconverse is the contrib/reconverse submodule.
+          submodules: true
+      # cmake and make for the build, gcc-core for the cpp that preprocesses
+      # .ci files.
+      - uses: cygwin/cygwin-install-action@v4
+        with:
+          packages: cmake make gcc-core
+      # cl, link and ml64 (reconverse's fcontext sources are MASM).
+      - uses: ilammy/msvc-dev-cmd@v1
+      - name: build
+        run: ./build charm++ reconverse-win-x86_64 -j4 -g
+      - name: build tests
+        run: |
+          set -e
+          B=$PWD/reconverse-win-x86_64
+          for d in $TEST_DIRS; do make -C $d CHARMC=$B/bin/charmc; done
+      - name: test (single process)
+        run: |
+          set -e
+          for d in $TEST_DIRS; do make -C $d test RUN_PROCS=; done
+
   # Race/stress tier: error checking live (CkEnforce-heavy tests with teeth),
   # heavy anytime-migration stress (the #3939 regression class), QD settles,
   # both process shapes. This is the job that hunts the bug class this line's
