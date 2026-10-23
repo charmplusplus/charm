@@ -1177,6 +1177,8 @@ static void createCommSelf() noexcept {
   MPI_Comm_group(MPI_COMM_WORLD, &worldGroup);
   MPI_Group_incl(worldGroup, 1, ranks, &selfGroup);
   MPI_Comm_create(MPI_COMM_WORLD, selfGroup, &selfComm);
+  MPI_Group_free(&selfGroup);
+  MPI_Group_free(&worldGroup);
   MPI_Comm_set_name(selfComm, "MPI_COMM_SELF");
 
   CkAssert(selfComm == MPI_COMM_SELF);
@@ -10253,7 +10255,7 @@ AMPI_API_IMPL(int, MPI_Error_string, int errorcode, char *errorstring, int *resu
 AMPI_API_IMPL(int, MPI_Comm_group, MPI_Comm comm, MPI_Group *group)
 {
   AMPI_API("AMPI_Comm_Group", comm, group);
-  *group = getAmpiParent()->comm2group(comm);
+  *group = getAmpiParent()->commGroupHandle(comm);
   return MPI_SUCCESS;
 }
 
@@ -10382,7 +10384,8 @@ AMPI_API_IMPL(int, MPI_Group_free, MPI_Group *group)
   AMPI_API("AMPI_Group_free", group, *group);
   ampiParent *ptr = getAmpiParent();
   if (*group != MPI_GROUP_EMPTY && *group != MPI_GROUP_NULL) {
-    ptr->freeGroupStruct(*group);
+    if (!ptr->freeGroupStruct(*group))
+      return ampiErrhandler("AMPI_Group_free", MPI_ERR_GROUP);
   }
   *group = MPI_GROUP_NULL;
   return MPI_SUCCESS;
@@ -10417,7 +10420,7 @@ AMPI_API_IMPL(int, MPI_Comm_create, MPI_Comm comm, MPI_Group group, MPI_Comm* ne
     else{
       /* use rank in 'comm' of the 0th rank in 'group'
        * as identical 'color' of all ranks in 'group' */
-      MPI_Comm_group(comm, &group_of_comm);
+      group_of_comm = getAmpiParent()->comm2group(comm); // internal: no reference to free
       zero = 0;
       MPI_Group_translate_ranks(group, 1, &zero, group_of_comm, &color);
       key = rank_in_group;

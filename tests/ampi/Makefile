@@ -11,6 +11,7 @@ DIRS = \
   jacobi3d \
   exit \
   chkpt \
+  groupfree \
   bsend \
 #  intercomm_coll \ # causes hangs in SMP mode
 
