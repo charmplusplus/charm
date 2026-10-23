@@ -1,13 +1,36 @@
 mainmodule threaded_redn {
+  readonly CProxy_Main mainProxy;
+  readonly int nElements;
+
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry [threaded, reductiontarget] void sumDone(int sum);
+    entry [reductiontarget] void bcastDone(int n);
+    entry [reductiontarget] void vecDone(int n);
+    entry [reductiontarget] void groupDone(int n);
+    entry [reductiontarget] void templDone(int n);
     entry [reductiontarget] void allDone();
   };
   array [1D] Worker {
     entry Worker();
     entry void contributeValue();
+    entry void contributeBcast();
+    entry void contributeVec();
+    entry [threaded, reductiontarget] void bcastSum(int sum);
+    entry [threaded, reductiontarget, nokeep] void vecSum(int n, int v[n]);
     entry void fillFuture(CkFuture f);
     entry void finish();
   };
+  group Counter {
+    entry Counter();
+    entry void contributeValue();
+    entry [threaded, reductiontarget] void sumDone(int sum);
+  };
+  // Not named T: the generated section proxy declares its own template <typename T>.
+  template <typename U> array [1D] Templ {
+    entry Templ();
+    entry void contributeValue();
+    entry [threaded, reductiontarget] void sumDone(U sum);
+  };
+  array [1D] Templ<int>;
 };
