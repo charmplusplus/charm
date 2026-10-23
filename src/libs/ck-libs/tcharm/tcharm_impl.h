@@ -77,6 +77,16 @@ class TCharmInitMsg : public CMessage_TCharmInitMsg {
 
 extern bool tcharm_nothreads;
 
+// campi (coroutine AMPI): the ranks are C++20 coroutines run on the scheduler's
+// own thread instead of TCharm threads. libampi's campi.C installs these hooks
+// (before TCharm::procInit runs) when the application registers a coroutine
+// main; tcharm itself never refers to campi symbols.
+extern bool tcharm_campi;
+typedef void (*TCharmCampiStartFn)(TCharm *tc);
+typedef void (*TCharmCampiResumeFn)(void *rank);
+extern TCharmCampiStartFn tcharm_campi_start_fn;
+extern TCharmCampiResumeFn tcharm_campi_resume_fn;
+
 //Thread-local variables:
 CtvExtern(TCharm *,_curTCharm);
 
@@ -103,6 +113,8 @@ class TCharm: public CBase_TCharm
 
 	TCharmInitMsg *initMsg; //Thread initialization data
 	double timeOffset; //Value to add to CkWallTimer to get my clock
+
+	void *campiRank; // campi mode: this element's rank record (campi.C); not pupped
 
 	// Called from ResumeFromSync so TCharm users can do things before start()
 	CkCallback resumeAfterMigrationCallback;
@@ -241,6 +253,8 @@ class TCharm: public CBase_TCharm
 
 	//As above, but start/stop the thread itself, too.
 	CMI_WARN_UNUSED_RESULT TCharm * stop() noexcept { //Blocks; will not return until "start" called.
+		if (tcharm_campi)
+			CkAbort("campi: blocking call on an incomplete request from non-coroutine code\n");
 		#if CMK_ERROR_CHECKING
 		if (tid != CthSelf())
 			CkAbort("Called TCharm::stop from outside TCharm thread!\n");
@@ -277,8 +291,17 @@ class TCharm: public CBase_TCharm
 	void start() noexcept {
 		isStopped=false; // do not migrate while running
 		DBG("thread resuming soon");
+		if (tcharm_campi) { // no thread: wake the rank's coroutine instead
+			tcharm_campi_resume_fn(campiRank);
+			return;
+		}
 		CthAwaken(tid);
 	}
+
+	// campi support (see tcharm_campi above)
+	inline void *getCampiRank() const noexcept { return campiRank; }
+	inline void setCampiRank(void *r) noexcept { campiRank = r; }
+	inline void setStopped(bool s) noexcept { isStopped = s; }
 
 	//Aliases:
 	inline CMI_WARN_UNUSED_RESULT TCharm * suspend() noexcept {

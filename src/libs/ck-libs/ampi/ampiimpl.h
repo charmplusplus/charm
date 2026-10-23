@@ -2655,6 +2655,7 @@ class ampi final : public CBase_ampi {
   CProxy_ampi remoteProxy; // valid only for intercommunicator
   CkPupPtrVec<win_obj> winObjects;
   int numCommCreationsInProgress{};
+  int numUnblocks{}; // count of unblock() calls (comm creation done), for campi
   void setNumCommCreationsInProgress(int x)
   {
     CkAssert(numCommCreationsInProgress == 0);
@@ -2690,8 +2691,10 @@ class ampi final : public CBase_ampi {
   void setInitDoneFlag() noexcept;
 
   inline void unblock() noexcept {
+    ++numUnblocks; // lets campi tell this wake-up from others (not pupped)
     thread->resume();
   }
+  int getNumUnblocks() const noexcept { return numUnblocks; }
 
   void injectMsg(int size, char* buf) noexcept;
   void genericSync(AmpiMsg *) noexcept;
@@ -2861,6 +2864,8 @@ class ampi final : public CBase_ampi {
   int intercomm_ibcast(int root, void* buf, int count, MPI_Datatype type, MPI_Comm intercomm, MPI_Request *request) noexcept;
   static void bcastraw(void* buf, int len, CkArrayID aid) noexcept;
   void split(int color,int key,MPI_Comm *dest, AmpiCommType type) noexcept;
+  void splitPost(int color,int key, AmpiCommType type) noexcept;
+  void splitFinish(MPI_Comm *dest) noexcept;
   MPI_Comm commCreate(const std::vector<int>& vec, AmpiCommType type) noexcept;
   MPI_Comm cartCreate0D() noexcept;
   MPI_Comm cartCreate(std::vector<int>& vec, int ndims, const int* dims) noexcept;
@@ -2891,6 +2896,7 @@ class ampi final : public CBase_ampi {
   inline bool opIsCommutative(MPI_Op op) const noexcept { return parent->opIsCommutative(op); }
   inline MPI_User_function* op2User_function(MPI_Op op) const noexcept { return parent->op2User_function(op); }
   void topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newcomm) noexcept;
+  void topoDupFinish(int topoType, MPI_Comm comm, MPI_Comm *newcomm) noexcept;
 
   inline AmpiRequestList& getReqs() noexcept { return parent->ampiReqs; }
   CkDDT *getDDT() noexcept {return &parent->myDDT;}
@@ -2962,6 +2968,18 @@ class ampi final : public CBase_ampi {
 
 CMI_WARN_UNUSED_RESULT ampiParent *getAmpiParent() noexcept;
 bool isAmpiThread() noexcept;
+
+/* TCharm Semaphore ID's for AMPI startup */
+#define AMPI_TCHARM_SEMAID 0x00A34100 /* __AMPI__ */
+#define AMPI_BARRIER_SEMAID 0x00A34200 /* __AMPI__ */
+
+// Pieces of ampiInit/MPI_Finalize shared with campi (coroutine AMPI, campi.C)
+CkArrayOptions ampiInitRootArrayOptions(CkArrayID *threads, int *nchunks) noexcept;
+ampiParent *ampiInitWorldLocal(ampi *ptr, int nchunks) noexcept;
+void removeUnimportantArrayObjsfromPeCache() noexcept;
+int ampiFinalizeBody() noexcept;
+// Defined in campi.C: ampiParent::prepareCtv reports its parent in campi mode
+void campi_parent_attached(TCharm *tc, ampiParent *parent) noexcept;
 CMI_WARN_UNUSED_RESULT ampi *getAmpiInstance(MPI_Comm comm) noexcept;
 void checkComm(MPI_Comm comm) noexcept;
 void checkRequest(MPI_Request req) noexcept;
