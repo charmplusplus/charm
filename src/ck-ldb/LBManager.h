@@ -9,6 +9,8 @@
 #include <cassert>
 
 #include "LBDatabase.h"
+#include "conv-ccs.h"   // CcsDelayedReply
+#include <deque>
 #include "json_fwd.hpp"
 using json = nlohmann::json;
 
@@ -253,6 +255,11 @@ class LBManager : public CBase_LBManager
 
   LBDatabase* lbdb_obj;
 
+  // CCS handler "LBObjLoads": pending reply tokens and whether a collection
+  // round is in flight (one round serves every request that arrived meanwhile)
+  std::deque<CcsDelayedReply> objLoadsReplies;
+  bool objLoadsCollecting;
+
   bool useBarrier;            // use barrier or not
 
   PredictCB* predictCBFn;
@@ -313,6 +320,13 @@ class LBManager : public CBase_LBManager
     lbdb_obj->setGPUPupSize(h, gpu_pup_size);
   }
   void UseAsyncMigrate(LDObjHandle h, bool flag) { lbdb_obj->UseAsyncMigrate(h, flag); };
+  // Live per-object load snapshot over CCS (handler "LBObjLoads" on PE 0):
+  // every PE appends one record, the reply is int32 numPes followed by the
+  // concatenated records; see collectObjLoads for the layout.
+  void objLoadsRequest(const CcsDelayedReply& token);
+  void collectObjLoads();
+  void objLoadsCollected(CkReductionMsg* m);
+
   int GetObjDataSz(void) { return lbdb_obj->GetObjDataSz(); }
   int GetCommDataSz(void) { return lbdb_obj->GetCommDataSz(); }
   void GetObjData(LDObjData* data) { lbdb_obj->GetObjData(data); }
