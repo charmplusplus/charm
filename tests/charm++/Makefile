@@ -37,6 +37,7 @@ DIRS = \
   unbounded_migration \
   unbounded_restart \
   anytime_bcastred \
+  threaded_redn \
   objid_home \
   objid_insert \
   objid_sections \
