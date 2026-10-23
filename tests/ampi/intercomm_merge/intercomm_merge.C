@@ -5,9 +5,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <vector>
+#include <atomic>
 #include "mpi.h"
 
 static int errors = 0;
+
+// Shared by all ranks of one process on purpose (not privatized): counts the
+// members of a new communicator that have entered the barrier after its creation.
+static std::atomic<int> membersInBarrier{0};
 
 static void check(bool cond, const char *what, int rank, int round) {
   if (!cond) {
@@ -74,6 +79,45 @@ int main(int argc, char **argv) {
     MPI_Comm_free(&merged);
     MPI_Comm_free(&inter);
     MPI_Comm_free(&local);
+  }
+
+  // Ranks that are not members of a communicator created from a subset must
+  // not be resumed by that creation (they return MPI_COMM_NULL at once and
+  // may block in something else, here a barrier that the members can only
+  // enter once the creation is complete).
+  {
+    int *numProcs = nullptr, flag = 0;
+    MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_NUM_PROCESSES, &numProcs, &flag);
+    const bool oneProcess = flag && *numProcs == 1;
+    for (int round = 0; round < 3; round++) {
+      MPI_Comm cart;
+      int dims[1] = { size - 1 }, periods[1] = { 0 };
+      MPI_Cart_create(MPI_COMM_WORLD, 1, dims, periods, 0, &cart);
+      const bool member = rank < size - 1;
+      check(member == (cart != MPI_COMM_NULL), "cart membership", rank, 4 + round);
+      if (member) membersInBarrier++;
+      MPI_Barrier(MPI_COMM_WORLD);
+      if (oneProcess)
+        check(membersInBarrier.load() == (size - 1) * (round + 1), "barrier waited for all members", rank, 4 + round);
+      MPI_Barrier(MPI_COMM_WORLD);
+      if (cart != MPI_COMM_NULL) MPI_Comm_free(&cart);
+    }
+    // A 0-dimensional Cartesian communicator has rank 0 as its only member
+    membersInBarrier = 0;
+    MPI_Comm cart0;
+    MPI_Cart_create(MPI_COMM_WORLD, 0, nullptr, nullptr, 0, &cart0);
+    check((rank == 0) == (cart0 != MPI_COMM_NULL), "0-d cart membership", rank, 7);
+    if (cart0 != MPI_COMM_NULL) {
+      int csize = -1;
+      MPI_Comm_size(cart0, &csize);
+      check(csize == 1, "0-d cart size", rank, 7);
+      membersInBarrier++;
+    }
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (oneProcess)
+      check(membersInBarrier.load() == 1, "barrier waited for the 0-d cart member", rank, 7);
+    MPI_Barrier(MPI_COMM_WORLD);
+    if (cart0 != MPI_COMM_NULL) MPI_Comm_free(&cart0);
   }
 
   int total = 0;

@@ -2376,15 +2376,17 @@ void ampi::registrationFinish() noexcept
       // MPI_Intercomm_create: the ranks are resumed by
       // ampi::setRemoteProxyAndUnblock once both groups' arrays exist.
       exchangeProxyOnFinish = false;
-      parentProxy[0].ExchangeProxy(newInterProxy);
-      return;
+      parentProxy[0].ExchangeProxy(newChildProxy);
     }
-    thisProxy.unblock(); //Matches suspends at end of ampi::commCreate, split, etc.
-    if (unblockRemoteOnFinish) {
-      // MPI_Intercomm_merge: the other group of the intercommunicator is a
-      // separate chare array, blocked in ampi::intercommMerge too.
-      unblockRemoteOnFinish = false;
-      remoteProxy.unblock();
+    else if (resumeNewArrayOnFinish) {
+      // commCreate, cartCreate0D, intercommMerge: the new array's elements are
+      // exactly the blocked ranks (both groups, for a merge); ranks of the old
+      // communicator that are not members did not block.
+      resumeNewArrayOnFinish = false;
+      newChildProxy.unblock();
+    }
+    else {
+      thisProxy.unblock(); //split: every rank of the old communicator blocked in ampi::split
     }
   }
 }
@@ -2495,6 +2497,8 @@ void ampi::commCreateReduced(CkReductionMsg *msg) noexcept {
 void ampi::commCreatePhase1(int nextComm, int commType) noexcept {
   setNumCommCreationsInProgress(1);
   CProxy_ampi newAmpi = createNewChildAmpiSync();
+  resumeNewArrayOnFinish = true;
+  newChildProxy = newAmpi;
   insertNewChildAmpiElements((MPI_Comm)nextComm, newAmpi, (AmpiCommType)commType);
 }
 
@@ -2513,8 +2517,9 @@ MPI_Comm ampi::cartCreate0D() noexcept {
     tmpVec.clear();
     tmpVec.push_back(0);
     commCreatePhase1(parent->getNextComm(), COMM_CART);
-    MPI_Comm newComm = parent->getNextComm()-1;
-    ampiCommStruct &newCommStruct = parent->getCommStruct(newComm);
+    ampi * dis = block(); //Resumed by ampi::registrationFinish
+    MPI_Comm newComm = dis->parent->getNextComm()-1;
+    ampiCommStruct &newCommStruct = dis->parent->getCommStruct(newComm);
     ampiTopology *newTopo = newCommStruct.getTopology();
     newTopo->setndims(0);
     return newComm;
@@ -2559,7 +2564,7 @@ void ampi::intercommCreateReduced(CkReductionMsg *msg) noexcept {
   setNumCommCreationsInProgress(1);
   CProxy_ampi newAmpi = createNewChildAmpiSync();
   exchangeProxyOnFinish = true;
-  newInterProxy = newAmpi;
+  newChildProxy = newAmpi;
   const std::vector<int>& lgroup = myComm->getIndices();
   const ampiCommStruct newCommstruct = ampiCommStruct(nextInterComm,newAmpi,lgroup,tmpVec);
   for(int i=0;i<lgroup.size();i++){
@@ -2618,9 +2623,10 @@ void ampi::intercommMergeGroupArrived(MPI_Comm nextIntraComm) noexcept {
   numMergeGroupsArrived = 0;
   mergeNextComm = 0;
 
-  unblockRemoteOnFinish = true;
   setNumCommCreationsInProgress(1);
   CProxy_ampi newAmpi = createNewChildAmpiSync();
+  resumeNewArrayOnFinish = true;
+  newChildProxy = newAmpi;
   insertNewChildAmpiElements(nextComm, newAmpi, COMM_INTRA);
 }
 

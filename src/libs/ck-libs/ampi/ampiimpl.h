@@ -2694,17 +2694,16 @@ class ampi final : public CBase_ampi {
     numCommCreationsInProgress = x;
   }
 
-  // Intercommunicator merging (state kept on the root of the group that goes first):
-  // the merged array is created once both groups have contributed, and
-  // registrationFinish then resumes the remote group as well as the local one.
+  // Intercommunicator merging (state kept on the root of the group that goes
+  // first): the merged array is created once both groups have contributed.
   int numMergeGroupsArrived{};
   MPI_Comm mergeNextComm{};
-  bool unblockRemoteOnFinish{};
 
-  // Intercommunicator creation: the new array's proxy, sent to ampiParent 0
-  // for the proxy exchange once all of its elements are registered.
-  bool exchangeProxyOnFinish{};
-  CProxy_ampi newInterProxy;
+  // How registrationFinish resumes the ranks of a new communicator (default:
+  // thisProxy.unblock(), for split). newChildProxy is the new array.
+  bool exchangeProxyOnFinish{};  // intercommCreate: via ExchangeProxy
+  bool resumeNewArrayOnFinish{}; // commCreate, intercommMerge: newChildProxy.unblock()
+  CProxy_ampi newChildProxy;
 
   // Intercommunicator splitting:
   std::unordered_map<int, CProxy_ampi> splitRProxyMap;
