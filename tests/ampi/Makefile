@@ -7,6 +7,7 @@ DIRS = \
   migration \
   datatype \
   collwake \
+  scan \
   privatization \
   jacobi3d \
   exit \

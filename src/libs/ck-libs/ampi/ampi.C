@@ -1445,6 +1445,9 @@ void ampiParent::pup(PUP::er &p) noexcept {
         case AMPI_G_REQ:
           blockingReq = new GReq;
           break;
+        case AMPI_SCAN_REQ:
+          blockingReq = new ScanReq;
+          break;
 #if CMK_CUDA
         case AMPI_GPU_REQ:
           CkAbort("AMPI> error trying to PUP a non-migratable GPU request!");
@@ -3119,9 +3122,14 @@ void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
 }
 
 CMK_REFNUM_TYPE ampi::getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcept {
-  int seqIdx = (tag >= MPI_BCAST_TAG) ? COLL_SEQ_IDX : destRank;
+  // Scan and exscan messages are sequenced like point-to-point messages:
+  // two scans outstanding on one communicator exchange messages with the
+  // same partner under the same tag, and they must be matched in the order
+  // they were sent.
+  const bool scanTag = (tag == MPI_SCAN_TAG || tag == MPI_EXSCAN_TAG);
+  int seqIdx = (tag >= MPI_BCAST_TAG && !scanTag) ? COLL_SEQ_IDX : destRank;
   CMK_REFNUM_TYPE seq = 0;
-  if (tag<=MPI_BCAST_TAG) {
+  if (tag<=MPI_BCAST_TAG || scanTag) {
     seq = oorder.nextOutgoing(seqIdx);
   }
   return seq;
@@ -4073,6 +4081,12 @@ void GReq::print() const noexcept {
   CkPrintf("In GReq: this=%p\n", (void *)this);
 }
 
+void ScanReq::print() const noexcept {
+  AmpiRequest::print();
+  CkPrintf("In ScanReq: this=%p, exclusive=%d, rank=%d, size=%d, mask=%d\n",
+           (void *)this, (int)exclusive, rank, size, mask);
+}
+
 void SendReq::print() const noexcept {
   AmpiRequest::print();
   CkPrintf("In SendReq: this=%p, persistent=%d\n", (void *)this, (int)persistent);
@@ -4138,6 +4152,9 @@ void AmpiRequestList::pup(PUP::er &p, AmpiRequestPool* pool) noexcept {
             break;
           case AMPI_G_REQ:
             reqs[i] = new GReq;
+            break;
+          case AMPI_SCAN_REQ:
+            reqs[i] = new ScanReq;
             break;
 #if CMK_CUDA
           case AMPI_GPU_REQ:
@@ -5663,53 +5680,124 @@ AMPI_API_IMPL(int, MPI_Ireduce_scatter, const void* sendbuf, void* recvbuf, cons
   return ret;
 }
 
-AMPI_API_IMPL(int, MPI_Scan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
-                             MPI_Op op, MPI_Comm comm)
-{
-  AMPI_API("AMPI_Scan", sendbuf, recvbuf, count, datatype, op, comm);
+/* Run scan rounds until one needs a message that has not arrived yet.
 
+   msg, if not null, is the partner's message for req's current round (the
+   request was posted for it and has just been matched). Fold it in, then for
+   each following round: send this rank's partial result to the partner, and
+   take the partner's message from unexpectedMsgs if it is already there;
+   otherwise post the request for it and return. The mask advances every
+   round, also when the partner rank^mask does not exist (size not a power of
+   two).
+
+   Called from the rank's thread when the scan starts, and from ampi::generic
+   (an entry method) when a posted round is matched. Messages go out through
+   the array proxy, never delivered inline, so a send here cannot re-enter
+   this function for this request. */
+void ampi::progressScan(ScanReq* req, AmpiMsg* msg, bool deleteMsg) noexcept
+{
+  while (true) {
+    if (msg) {
+      int partner = req->rank ^ req->mask;
+      CkAssert(msg->getSrcRank() == partner);
+      processAmpiMsg(msg, req->tmp.data(), req->type, req->count, MPI_REQUEST_NULL);
+      if (deleteMsg) {
+        CkpvAccess(msgPool).deleteAmpiMsg(msg);
+      }
+      if (req->rank > partner) {
+        // tmp covers ranks below this rank's subtree: it comes first
+        parent->applyOp(req->type, req->op, req->count, req->tmp.data(), req->partial.data());
+        if (!req->exclusive) {
+          parent->applyOp(req->type, req->op, req->count, req->tmp.data(), req->buf);
+        } else if (!req->haveResult) {
+          memcpy(req->buf, req->tmp.data(), req->tmp.size());
+          req->haveResult = true;
+        } else {
+          parent->applyOp(req->type, req->op, req->count, req->tmp.data(), req->buf);
+        }
+      } else {
+        // tmp covers ranks above: partial = partial op tmp
+        parent->applyOp(req->type, req->op, req->count, req->partial.data(), req->tmp.data());
+        std::swap(req->partial, req->tmp);
+      }
+      req->mask <<= 1;
+      msg = nullptr;
+      deleteMsg = true; // anything taken from unexpectedMsgs below is ours to free
+    }
+
+    // Skip rounds without a partner
+    while (req->mask < req->size && (req->rank ^ req->mask) >= req->size) {
+      req->mask <<= 1;
+    }
+    if (req->mask >= req->size) break;
+
+    int partner = req->rank ^ req->mask;
+    const ampiCommStruct &dest = comm2CommStruct(req->comm);
+    CMK_REFNUM_TYPE seq = getSeqNo(partner, req->comm, req->tag);
+    dest.getProxy()[dest.getIndexForRank(partner)].generic(
+        makeAmpiMsg(partner, req->tag, req->rank, req->partial.data(), req->count,
+                    req->type, req->comm, seq));
+
+    req->src = partner;
+    msg = unexpectedMsgs.get(req->tag, partner);
+    if (!msg) {
+      postedReqs.put(req); // matched in ampi::inorder, which calls back here
+      return;
+    }
+  }
+
+  req->complete = true;
+  if (req->isBlocked() && parent->numBlockedReqs != 0) {
+    parent->numBlockedReqs--;
+  }
+  // The caller (ampi::generic, or the thread itself) resumes the thread if
+  // this was the last request it was waiting for.
+}
+
+/* Start a scan (exclusive: MPI_Exscan semantics) and return its request. */
+static int ampiStartScan(const char* name, const void* sendbuf, void* recvbuf, int count,
+                         MPI_Datatype datatype, MPI_Op op, MPI_Comm comm, bool exclusive,
+                         MPI_Request* request) noexcept
+{
   handle_MPI_BOTTOM((void*&)sendbuf, datatype, recvbuf, datatype);
   handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
   if(op == MPI_OP_NULL)
-    return ampiErrhandler("AMPI_Scan", MPI_ERR_OP);
-  int ret = errorCheck("AMPI_Scan", comm, 1, count, 1, datatype, 1, 0, 0, 0, 0, sendbuf, 1, recvbuf, 1);
-  if(ret != MPI_SUCCESS)
+    return ampiErrhandler(name, MPI_ERR_OP);
+  int ret = errorCheck(name, comm, 1, count, 1, datatype, 1, 0, 0, 0, 0, sendbuf, 1, recvbuf, 1);
+  if(ret != MPI_SUCCESS) {
+    *request = MPI_REQUEST_NULL;
     return ret;
+  }
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
+  ampiParent* pptr = getAmpiParent();
   int size = ptr->getSize();
-
-  if (size == 1 && !getAmpiParent()->isInter(comm))
-    return copyDatatype(datatype, count, datatype, count, sendbuf, recvbuf);
-
-  int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
   int rank = ptr->getRank();
-  int mask = 0x1;
-  int dst;
-  std::vector<char> tmp_buf(blklen);
-  std::vector<char> partial_scan(blklen);
+  // Like the reduction collectives, this treats the datatype as contiguous.
+  int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
 
-  memcpy(recvbuf, sendbuf, blklen);
-  memcpy(partial_scan.data(), sendbuf, blklen);
-  while(mask < size){
-    dst = rank^mask;
-    if(dst < size){
-      ptr->sendrecv(partial_scan.data(), count, datatype, dst, MPI_SCAN_TAG,
-                    tmp_buf.data(), count, datatype, dst, MPI_SCAN_TAG, comm, MPI_STATUS_IGNORE);
-      if(rank > dst){
-        getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), partial_scan.data());
-        getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), recvbuf);
-      }else {
-        getAmpiParent()->applyOp(datatype, op, count, partial_scan.data(), tmp_buf.data());
-        memcpy(partial_scan.data(), tmp_buf.data(), blklen);
-      }
-    }
-    mask <<= 1;
+  ScanReq* req = new ScanReq(recvbuf, count, datatype, op, comm, rank, size, exclusive,
+                             blklen, ptr->getDDT());
+  memcpy(req->partial.data(), sendbuf, blklen);
+  if (!exclusive && sendbuf != recvbuf) {
+    memcpy(recvbuf, sendbuf, blklen);
   }
+  *request = pptr->getReqs().insert(req);
+  ptr->progressScan(req, nullptr, true);
+  return MPI_SUCCESS;
+}
 
+AMPI_API_IMPL(int, MPI_Scan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+                             MPI_Op op, MPI_Comm comm)
+{
+  AMPI_API("AMPI_Scan", sendbuf, recvbuf, count, datatype, op, comm);
+  MPI_Request req;
+  int ret = ampiStartScan("AMPI_Scan", sendbuf, recvbuf, count, datatype, op, comm, false, &req);
+  if (ret != MPI_SUCCESS) return ret;
+  ampiParent* unused = getAmpiParent()->wait(&req, MPI_STATUS_IGNORE);
   return MPI_SUCCESS;
 }
 
@@ -5717,70 +5805,17 @@ AMPI_API_IMPL(int, MPI_Iscan, const void* sendbuf, void* recvbuf, int count, MPI
                               MPI_Op op, MPI_Comm comm, MPI_Request* request)
 {
   AMPI_API("AMPI_Iscan", sendbuf, recvbuf, count, datatype, op, comm, request);
-  // FIXME: implement non-blocking scan
-  int ret = MPI_Scan(sendbuf, recvbuf, count, datatype, op, comm);
-  *request = MPI_REQUEST_NULL;
-  return ret;
+  return ampiStartScan("AMPI_Iscan", sendbuf, recvbuf, count, datatype, op, comm, false, request);
 }
 
 AMPI_API_IMPL(int, MPI_Exscan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
                                MPI_Op op, MPI_Comm comm)
 {
   AMPI_API("AMPI_Exscan", sendbuf, recvbuf, count, datatype, op, comm);
-
-  handle_MPI_BOTTOM((void*&)sendbuf, datatype, recvbuf, datatype);
-  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
-
-#if AMPI_ERROR_CHECKING
-  if(op == MPI_OP_NULL)
-    return ampiErrhandler("AMPI_Exscan", MPI_ERR_OP);
-  int ret = errorCheck("AMPI_Excan", comm, 1, count, 1, datatype, 1, 0, 0, 0, 0, sendbuf, 1, recvbuf, 1);
-  if(ret != MPI_SUCCESS)
-    return ret;
-#endif
-
-  ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
-
-  if (size == 1 && !getAmpiParent()->isInter(comm))
-    return MPI_SUCCESS;
-
-  int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
-  int rank = ptr->getRank();
-  int mask = 0x1;
-  int dst, flag;
-  std::vector<char> tmp_buf(blklen);
-  std::vector<char> partial_scan(blklen);
-
-  if (rank > 0) memcpy(recvbuf, sendbuf, blklen);
-  memcpy(partial_scan.data(), sendbuf, blklen);
-  flag = 0;
-  mask = 0x1;
-  while(mask < size){
-    dst = rank^mask;
-    if(dst < size){
-      ptr->sendrecv(partial_scan.data(), count, datatype, dst, MPI_EXSCAN_TAG,
-                    tmp_buf.data(), count, datatype, dst, MPI_EXSCAN_TAG, comm, MPI_STATUS_IGNORE);
-      if(rank > dst){
-        getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), partial_scan.data());
-        if(rank != 0){
-          if(flag == 0){
-            memcpy(recvbuf, tmp_buf.data(), blklen);
-            flag = 1;
-          }
-          else{
-            getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), recvbuf);
-          }
-        }
-      }
-      else{
-        getAmpiParent()->applyOp(datatype, op, count, partial_scan.data(), tmp_buf.data());
-        memcpy(partial_scan.data(), tmp_buf.data(), blklen);
-      }
-      mask <<= 1;
-    }
-  }
-
+  MPI_Request req;
+  int ret = ampiStartScan("AMPI_Exscan", sendbuf, recvbuf, count, datatype, op, comm, true, &req);
+  if (ret != MPI_SUCCESS) return ret;
+  ampiParent* unused = getAmpiParent()->wait(&req, MPI_STATUS_IGNORE);
   return MPI_SUCCESS;
 }
 
@@ -5788,10 +5823,7 @@ AMPI_API_IMPL(int, MPI_Iexscan, const void* sendbuf, void* recvbuf, int count, M
                                 MPI_Op op, MPI_Comm comm, MPI_Request* request)
 {
   AMPI_API("AMPI_Iexscan", sendbuf, recvbuf, count, datatype, op, comm, request);
-  // FIXME: implement non-blocking exscan
-  int ret = MPI_Exscan(sendbuf, recvbuf, count, datatype, op, comm);
-  *request = MPI_REQUEST_NULL;
-  return ret;
+  return ampiStartScan("AMPI_Iexscan", sendbuf, recvbuf, count, datatype, op, comm, true, request);
 }
 
 AMPI_API_IMPL(int, MPI_Op_create, MPI_User_function *function, int commute, MPI_Op *op)
@@ -6017,6 +6049,22 @@ CMI_WARN_UNUSED_RESULT ampiParent* GReq::wait(ampiParent* parent, MPI_Status *st
     (*pollFn)(extraState, (sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE) ? &tmpStatus : sts);
   (*queryFn)(extraState, (sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE) ? &tmpStatus : sts);
   complete = true;
+  return parent;
+}
+
+CMI_WARN_UNUSED_RESULT ampiParent* ScanReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
+  if (!complete) {
+    // Rounds complete in ampi::progressScan, called from message arrival;
+    // it resumes this thread after the last one.
+    parent->numBlockedReqs = 1;
+    setBlocked(true);
+    parent = parent->blockOnRecv();
+    setBlocked(false);
+  }
+  if (sts != MPI_STATUS_IGNORE) {
+    sts->MPI_COMM = comm;
+    sts->MPI_CANCEL = 0;
+  }
   return parent;
 }
 
@@ -6371,6 +6419,20 @@ bool GReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
     (*pollFn)(extraState, (sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE) ? &tmpStatus : sts);
   (*queryFn)(extraState, (sts == MPI_STATUS_IGNORE || sts == MPI_STATUSES_IGNORE) ? &tmpStatus : sts);
   return complete;
+}
+
+bool ScanReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
+  if (sts != MPI_STATUS_IGNORE) {
+    sts->MPI_COMM = comm;
+    sts->MPI_CANCEL = 0;
+  }
+  return complete;
+}
+
+bool ScanReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
+{
+  ptr->progressScan(this, msg, deleteMsg);
+  return true;
 }
 
 bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
