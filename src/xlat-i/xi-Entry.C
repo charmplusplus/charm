@@ -1497,6 +1497,10 @@ void Entry::genIndexDecls(XStr& str) {
         << "redn_wrapper_" << name << "(CkReductionMsg* impl_msg) { return "
         << epIdx(0, true) << "; }" << templateSpecLine << "\n    static void _call_"
         << epStr(true) << "(void* impl_msg, void* impl_obj_void);";
+    if (isThreaded()) {
+      str << templateSpecLine << "\n    static void _callthr_" << epStr(true)
+          << "(CkThrCallArg *);";
+    }
   }
 
   // call function declaration
@@ -1790,7 +1794,7 @@ void Entry::genClosure(XStr& decls, bool isDef) {
 // This routine is only used in Entry::genDefs.
 // It ends the current procedure with a call to awaken another thread,
 // and defines the thread function to handle that call.
-XStr Entry::callThread(const XStr& procName, int prependEntryName) {
+XStr Entry::callThread(const XStr& procName, int prependEntryName, bool referenceNoKeep) {
   if (isConstructor() || isMigrationConstructor())
     die("Constructors may not be 'threaded'", first_line_);
 
@@ -1802,7 +1806,8 @@ XStr Entry::callThread(const XStr& procName, int prependEntryName) {
   // A nokeep message may be shared with other receivers, and the runtime drops
   // its reference when this wrapper returns, i.e. at the thread's first
   // suspend. The thread takes its own reference, released when it ends.
-  if (isNoKeep() && !param->isVoid()) str << "  CkReferenceMsg(impl_msg);\n";
+  if (referenceNoKeep && isNoKeep() && !param->isVoid())
+    str << "  CkReferenceMsg(impl_msg);\n";
   str << "  CthThread tid = CthCreate((CthVoidFn)" << procFull
       << ", new CkThrCallArg(impl_msg,impl_obj), " << getStackSize() << ");\n";
   str << "  ((Chare *)impl_obj)->CkAddThreadListeners(tid,impl_msg);\n";
@@ -2112,8 +2117,13 @@ void Entry::genDefs(XStr& str) {
       str << "::_call_" << epStr(true) << "(void* impl_msg, void* impl_obj_void)"
           << "\n{"
           << "\n  " << container->baseName() << "* impl_obj = static_cast<"
-          << container->baseName() << "*> (impl_obj_void);\n"
-          << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
+          << container->baseName() << "*> (impl_obj_void);\n";
+      // A threaded reduction target runs on its own thread, as the direct
+      // entry does: the trampoline unpacks the CkReductionMsg and deletes it
+      // when the thread ends. The wrapper owns that message, so no extra
+      // reference is taken.
+      if (isThreaded()) str << callThread(epStr(true), 0, false);
+      str << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
       XStr precall;
       genCall(str, precall, true, false);
       if (!(sdagCon || isWhenEntry))

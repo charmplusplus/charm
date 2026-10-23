@@ -1,0 +1,13 @@
+mainmodule threaded_redn {
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [threaded, reductiontarget] void sumDone(int sum);
+    entry [reductiontarget] void allDone();
+  };
+  array [1D] Worker {
+    entry Worker();
+    entry void contributeValue();
+    entry void fillFuture(CkFuture f);
+    entry void finish();
+  };
+};
