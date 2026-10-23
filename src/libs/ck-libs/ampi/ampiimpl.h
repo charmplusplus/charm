@@ -308,6 +308,8 @@ class Amm {
   inline void put(T msg) noexcept;
   inline void put(int tag, int src, T msg) noexcept;
   inline T get(int tag, int src, int* rtags=NULL) noexcept;
+  // Like get(), but both keys must match exactly: wildcards on either side do not match.
+  inline T getExact(int tag, int src) noexcept;
   inline T probe(int tag, int src, int* rtags) noexcept;
   inline int size() const noexcept;
   void pup(PUP::er& p, AmmPupMessageFn msgpup) noexcept;
@@ -1218,6 +1220,10 @@ inline std::vector<int> rangeExclOp(int n, int ranges[][3], const std::vector<in
 #define MPI_RMA_TAG         MPI_TAG_UB_VALUE+10
 #define MPI_EPOCH_START_TAG MPI_TAG_UB_VALUE+11
 #define MPI_EPOCH_END_TAG   MPI_TAG_UB_VALUE+12
+// Key tag of a pending non-blocking reduction/gather request in ampi::postedReqs;
+// the source slot of the key holds the collective's sequence number (see
+// ampi::postCollReq).
+#define MPI_NBCOLL_TAG      MPI_TAG_UB_VALUE+13
 
 #define AMPI_COLL_SOURCE 0
 #define AMPI_COLL_COMM   MPI_COMM_WORLD
@@ -2677,6 +2683,14 @@ class ampi final : public CBase_ampi {
   Amm<AmpiRequest *, AMPI_AMM_COLL_POOL_SIZE> postedBcastReqs;
   Amm<AmpiMsg *, AMPI_AMM_COLL_POOL_SIZE> unexpectedBcastMsgs;
 
+  // Sequence number of the next non-blocking reduction or gather on this
+  // communicator. Every rank calls collectives in the same order, so the
+  // numbers agree across ranks; the number travels in the reduction message's
+  // userFlag and lets irednResult find the request a result belongs to even
+  // when results arrive out of posting order (an Igather result reaches only
+  // the root and can overtake an earlier Iallreduce's broadcast).
+  CMK_REFNUM_TYPE nbCollSeq = 0;
+
   // Store generalized request classes created by MPIX_Grequest_class_create
   std::vector<greq_class_desc> greq_classes;
 
@@ -2802,6 +2816,15 @@ class ampi final : public CBase_ampi {
   CMI_WARN_UNUSED_RESULT inline ampi* blockOnIReq(void* buf, int count, MPI_Datatype type, int s,
                                                   int t, MPI_Comm comm, MPI_Status* sts) noexcept;
   MPI_Request postReq(AmpiRequest* newreq) noexcept;
+  /// Number the next non-blocking reduction/gather on this communicator.
+  CMK_REFNUM_TYPE nextCollSeq() noexcept {
+    CMK_REFNUM_TYPE seq = nbCollSeq++;
+    if (nbCollSeq == (CMK_REFNUM_TYPE)-1) nbCollSeq = 0; // -1 means "no flag" to reductions
+    return seq;
+  }
+  /// Post the request of non-blocking reduction/gather number seq; the
+  /// reduction message must carry seq as its userFlag.
+  MPI_Request postCollReq(AmpiRequest* newreq, CMK_REFNUM_TYPE seq) noexcept;
   inline void waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept;
   inline void completedSend(MPI_Request req, CkNcpyBuffer *srcInfo=nullptr) noexcept;
   inline void completedRecv(MPI_Request req, CkNcpyBuffer *targetInfo=nullptr) noexcept;

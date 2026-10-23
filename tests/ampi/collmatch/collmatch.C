@@ -1,0 +1,210 @@
+/* Matching of non-blocking collective results to their requests
+   (ampi::irednResult; issue #4072, item 7).
+
+   Several non-blocking reductions/gathers are outstanding on the same
+   communicator. Their results can reach a rank in any order: an MPI_Igather
+   result goes only to the root and can arrive before the broadcast of an
+   earlier MPI_Iallreduce. Each result must land in its own request.
+
+   Part 1: Iallreduce then Igather on MPI_COMM_WORLD, waited in both orders.
+   Part 2: Igather then Iallreduce, waited in both orders.
+   Part 3: Iallreduce, Igather, Ireduce, Iallreduce of a different length,
+           and Iallgather, all outstanding, completed with MPI_Waitall.
+   Part 4: the same set on a sub-communicator while MPI_COMM_WORLD has one
+           Iallreduce outstanding.
+   Part 5: an MPI_Irecv(MPI_ANY_SOURCE, MPI_ANY_TAG) is posted before an
+           Iallreduce on the same communicator; the reduction result must not
+           be handed to the receive (it used to be: the result was matched by
+           (tag, source) in the same queue, and the wildcard receive matched).
+
+   Roots rotate with the iteration so that every rank is sometimes the root.
+   Every result is checked against a value computed locally. */
+
+#include <mpi.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <vector>
+
+static int failures = 0;
+
+static void check(int rank, int iter, const char *what, long got, long want)
+{
+  if (got != want) {
+    if (failures < 20) {
+      printf("FAIL: rank %d iter %d: %s = %ld, expected %ld\n", rank, iter, what, got, want);
+      fflush(stdout);
+    }
+    failures++;
+  }
+}
+
+/* Values contributed by a rank (rank within the communicator used). */
+static long redVal(int r, int iter, int k) { return (long)(r + 1) * (k + 1) + iter; }
+static long gatVal(int r, int iter) { return 1000L * r + iter; }
+
+struct Expected {
+  int size, iter;
+  long sum(int k) const {
+    long s = 0;
+    for (int r = 0; r < size; r++) s += redVal(r, iter, k);
+    return s;
+  }
+};
+
+/* One set of outstanding collectives on comm (part 3 and 4). */
+struct CollSet {
+  enum { NLONG = 3 };
+  long red1, redLong[NLONG], redRoot;
+  std::vector<long> gat, allgat;
+  MPI_Request reqs[5];
+
+  void post(MPI_Comm comm, int rank, int size, int iter) {
+    const int root = iter % size;
+    const int rroot = (iter + size / 2) % size;
+    long in1 = redVal(rank, iter, 0), inLong[NLONG], inG = gatVal(rank, iter);
+    for (int k = 0; k < NLONG; k++) inLong[k] = redVal(rank, iter, k);
+    red1 = -1; redRoot = -1;
+    for (int k = 0; k < NLONG; k++) redLong[k] = -1;
+    gat.assign(size, -1);
+    allgat.assign(size, -1);
+    MPI_Iallreduce(&in1, &red1, 1, MPI_LONG, MPI_SUM, comm, &reqs[0]);
+    MPI_Igather(&inG, 1, MPI_LONG, gat.data(), 1, MPI_LONG, root, comm, &reqs[1]);
+    MPI_Ireduce(&in1, &redRoot, 1, MPI_LONG, MPI_MAX, rroot, comm, &reqs[2]);
+    MPI_Iallreduce(inLong, redLong, NLONG, MPI_LONG, MPI_SUM, comm, &reqs[3]);
+    MPI_Iallgather(&inG, 1, MPI_LONG, allgat.data(), 1, MPI_LONG, comm, &reqs[4]);
+  }
+
+  void verify(const char *tag, int wrank, int rank, int size, int iter) {
+    const int root = iter % size;
+    const int rroot = (iter + size / 2) % size;
+    Expected e{size, iter};
+    char what[128];
+    snprintf(what, sizeof what, "%s Iallreduce", tag);
+    check(wrank, iter, what, red1, e.sum(0));
+    for (int k = 0; k < NLONG; k++) {
+      snprintf(what, sizeof what, "%s Iallreduce[%d] (length %d)", tag, k, NLONG);
+      check(wrank, iter, what, redLong[k], e.sum(k));
+    }
+    if (rank == root)
+      for (int r = 0; r < size; r++) {
+        snprintf(what, sizeof what, "%s Igather[%d]", tag, r);
+        check(wrank, iter, what, gat[r], gatVal(r, iter));
+      }
+    if (rank == rroot) {
+      snprintf(what, sizeof what, "%s Ireduce(MAX)", tag);
+      check(wrank, iter, what, redRoot, redVal(size - 1, iter, 0));
+    }
+    for (int r = 0; r < size; r++) {
+      snprintf(what, sizeof what, "%s Iallgather[%d]", tag, r);
+      check(wrank, iter, what, allgat[r], gatVal(r, iter));
+    }
+  }
+};
+
+/* Parts 1 and 2: an Iallreduce and an Igather on comm, posted in the order
+   given by gatherFirst, waited in the order given by waitGatherFirst. */
+static void pair(MPI_Comm comm, int rank, int size, int iter, bool gatherFirst,
+                 bool waitGatherFirst)
+{
+  const int root = (iter + (gatherFirst ? 1 : 0)) % size;
+  long in = redVal(rank, iter, 0), inG = gatVal(rank, iter), red = -1;
+  std::vector<long> gat(size, -1);
+  MPI_Request rr, rg;
+  if (gatherFirst) {
+    MPI_Igather(&inG, 1, MPI_LONG, gat.data(), 1, MPI_LONG, root, comm, &rg);
+    MPI_Iallreduce(&in, &red, 1, MPI_LONG, MPI_SUM, comm, &rr);
+  } else {
+    MPI_Iallreduce(&in, &red, 1, MPI_LONG, MPI_SUM, comm, &rr);
+    MPI_Igather(&inG, 1, MPI_LONG, gat.data(), 1, MPI_LONG, root, comm, &rg);
+  }
+  if (waitGatherFirst) {
+    MPI_Wait(&rg, MPI_STATUS_IGNORE);
+    MPI_Wait(&rr, MPI_STATUS_IGNORE);
+  } else {
+    MPI_Wait(&rr, MPI_STATUS_IGNORE);
+    MPI_Wait(&rg, MPI_STATUS_IGNORE);
+  }
+  const char *what = gatherFirst ? (waitGatherFirst ? "P2 gg" : "P2 gr")
+                                 : (waitGatherFirst ? "P1 rg" : "P1 rr");
+  Expected e{size, iter};
+  char buf[96];
+  snprintf(buf, sizeof buf, "%s Iallreduce", what);
+  check(rank, iter, buf, red, e.sum(0));
+  if (rank == root)
+    for (int r = 0; r < size; r++) {
+      snprintf(buf, sizeof buf, "%s Igather[%d]", what, r);
+      check(rank, iter, buf, gat[r], gatVal(r, iter));
+    }
+}
+
+int main(int argc, char **argv)
+{
+  MPI_Init(&argc, &argv);
+  int rank, size;
+  MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+  MPI_Comm_size(MPI_COMM_WORLD, &size);
+  const int iters = (argc > 1) ? atoi(argv[1]) : 50;
+  /* Bit mask of the parts to run: 1 = parts 1-4, 2 = part 5. */
+  const int parts = (argc > 2) ? atoi(argv[2]) : 3;
+
+  MPI_Comm sub; /* even ranks / odd ranks */
+  MPI_Comm_split(MPI_COMM_WORLD, rank % 2, rank, &sub);
+  int subRank, subSize;
+  MPI_Comm_rank(sub, &subRank);
+  MPI_Comm_size(sub, &subSize);
+
+  for (int iter = 0; iter < iters; iter++) {
+    const long in = redVal(rank, iter, 0);
+    long red = -1;
+    if (parts & 1) {
+      /* Parts 1 and 2 */
+      pair(MPI_COMM_WORLD, rank, size, iter, false, false);
+      pair(MPI_COMM_WORLD, rank, size, iter, false, true);
+      pair(MPI_COMM_WORLD, rank, size, iter, true, false);
+      pair(MPI_COMM_WORLD, rank, size, iter, true, true);
+
+      /* Part 3 */
+      CollSet world;
+      world.post(MPI_COMM_WORLD, rank, size, iter);
+      MPI_Waitall(5, world.reqs, MPI_STATUSES_IGNORE);
+      world.verify("P3 world", rank, rank, size, iter);
+
+      /* Part 4 */
+      MPI_Request wreq;
+      MPI_Iallreduce(&in, &red, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD, &wreq);
+      CollSet s;
+      s.post(sub, subRank, subSize, iter);
+      MPI_Waitall(5, s.reqs, MPI_STATUSES_IGNORE);
+      MPI_Wait(&wreq, MPI_STATUS_IGNORE);
+      s.verify("P4 sub", rank, subRank, subSize, iter);
+      check(rank, iter, "P4 world Iallreduce", red, Expected{size, iter}.sum(0));
+    }
+
+    /* Part 5 */
+    if (parts & 2) {
+      long msg = -1, out = 1000L * rank + iter;
+      MPI_Request rreq, areq;
+      MPI_Irecv(&msg, 1, MPI_LONG, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &rreq);
+      red = -1;
+      MPI_Iallreduce(&in, &red, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD, &areq);
+      MPI_Wait(&areq, MPI_STATUS_IGNORE);
+      check(rank, iter, "P5 Iallreduce behind wildcard Irecv", red, Expected{size, iter}.sum(0));
+      MPI_Send(&out, 1, MPI_LONG, (rank + 1) % size, 7, MPI_COMM_WORLD);
+      MPI_Wait(&rreq, MPI_STATUS_IGNORE);
+      check(rank, iter, "P5 wildcard Irecv", msg, 1000L * ((rank + size - 1) % size) + iter);
+    }
+  }
+
+  int total = 0;
+  MPI_Allreduce(&failures, &total, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  if (rank == 0) {
+    if (total == 0)
+      printf("collmatch: all %d iterations passed on %d ranks\n", iters, size);
+    else
+      printf("collmatch: %d FAILED checks on %d ranks\n", total, size);
+    fflush(stdout);
+  }
+  MPI_Comm_free(&sub);
+  MPI_Finalize();
+  return total == 0 ? 0 : 1;
+}

@@ -2035,6 +2035,24 @@ T Amm<T, N>::get(int tag, int src, int* rtags) noexcept
 }
 
 template<typename T, size_t N>
+T Amm<T, N>::getExact(int tag, int src) noexcept
+{
+  AmmEntry<T> **enth = &first;
+  while (AmmEntry<T> *ent = *enth) {
+    if (ent->tags[AMM_TAG] == tag && ent->tags[AMM_SRC] == src) {
+      T msg = ent->msg;
+      AmmEntry<T>* next = ent->next;
+      *enth = next;
+      if (!next) lasth = enth;
+      deleteEntry(ent);
+      return msg;
+    }
+    enth = &ent->next;
+  }
+  return NULL;
+}
+
+template<typename T, size_t N>
 T Amm<T, N>::probe(int tag, int src, int* rtags) noexcept
 {
   AmmEntry<T> *ent, **enth;
@@ -2211,6 +2229,7 @@ void ampi::pup(PUP::er &p) noexcept
   postedBcastReqs.pup(p, AmmPupPostedReqs);
   p|greq_classes;
   p|oorder;
+  p|nbCollSeq;
   // Do not PUP myComm here, since ampiParent owns it.
   // We update the pointer to it in findParentAfterMigration()
 }
@@ -4415,6 +4434,18 @@ MPI_Request ampi::postReq(AmpiRequest* newreq) noexcept
   return request;
 }
 
+MPI_Request ampi::postCollReq(AmpiRequest* newreq, CMK_REFNUM_TYPE seq) noexcept
+{
+  MPI_Request request = getReqs().insert(newreq);
+  // Keyed by sequence number rather than by the request's (tag, src), so that
+  // irednResult matches each result to its own request whatever the arrival
+  // order, and so that a wildcard receive can never take it.
+  if (newreq->isUnmatched()) {
+    postedReqs.put(MPI_NBCOLL_TAG, (int)seq, newreq);
+  }
+  return request;
+}
+
 AMPI_API_IMPL(int, MPI_Send, const void *buf, int count, MPI_Datatype type,
                              int dest, int tag, MPI_Comm comm)
 {
@@ -5120,7 +5151,8 @@ void ampi::irednResult(CkReductionMsg *msg) noexcept
 {
   MSG_ORDER_DEBUG(CkPrintf("[%d] irednResult called on comm %d\n", thisIndex, myComm->getComm()));
 
-  AmpiRequest* req = postedReqs.get(MPI_REDN_TAG, AMPI_COLL_SOURCE);
+  // The userFlag is the sequence number given by postCollReq on every rank.
+  AmpiRequest* req = postedReqs.getExact(MPI_NBCOLL_TAG, (int)msg->getUserFlag());
   if (req == NULL)
     CkAbort("AMPI> recv'ed a non-blocking reduction unexpectedly!\n");
 
@@ -5486,11 +5518,13 @@ AMPI_API_IMPL(int, MPI_Iallreduce, const void *inbuf, void *outbuf, int count, M
     return copyDatatype(type,count,type,count,inbuf,outbuf);
   }
 
-  *request = ptr->postReq(new RednReq(outbuf,count,type,comm,op,getDDT()));
+  const CMK_REFNUM_TYPE seq = ptr->nextCollSeq();
+  *request = ptr->postCollReq(new RednReq(outbuf,count,type,comm,op,getDDT()), seq);
 
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,rank,size,op);
   CkCallback allreduceCB(CkIndex_ampi::irednResult(0),ptr->getProxy());
   msg->setCallback(allreduceCB);
+  msg->setUserFlag(seq);
   ptr->contribute(msg);
 
   return MPI_SUCCESS;
@@ -7729,17 +7763,19 @@ AMPI_API_IMPL(int, MPI_Ireduce, const void *sendbuf, void *recvbuf, int count,
     return copyDatatype(type,count,type,count,sendbuf,recvbuf);
   }
 
+  const CMK_REFNUM_TYPE seq = ptr->nextCollSeq();
   if (rank == root){
-    *request = ptr->postReq(new RednReq(recvbuf,count,type,comm,op,getDDT()));
+    *request = ptr->postCollReq(new RednReq(recvbuf,count,type,comm,op,getDDT()), seq);
   }
   else {
-    *request = ptr->postReq(new RednReq(recvbuf,count,type,comm,op,getDDT(),AMPI_REQ_COMPLETED));
+    *request = ptr->postCollReq(new RednReq(recvbuf,count,type,comm,op,getDDT(),AMPI_REQ_COMPLETED), seq);
   }
 
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,rank,size,op);
   int rootIdx=ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkCallback reduceCB(CkIndex_ampi::irednResult(0),CkArrayIndex1D(rootIdx),ptr->getProxy());
   msg->setCallback(reduceCB);
+  msg->setUserFlag(seq);
   ptr->contribute(msg);
 
   return MPI_SUCCESS;
@@ -7886,11 +7922,13 @@ AMPI_API_IMPL(int, MPI_Iallgather, const void *sendbuf, int sendcount, MPI_Datat
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
   }
 
-  *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
+  const CMK_REFNUM_TYPE seq = ptr->nextCollSeq();
+  *request = ptr->postCollReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()), seq);
 
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback allgatherCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
   msg->setCallback(allgatherCB);
+  msg->setUserFlag(seq);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Iallgather called on comm %d\n", ptr->thisIndex, comm));
   ptr->contribute(msg);
 
@@ -7979,12 +8017,14 @@ AMPI_API_IMPL(int, MPI_Iallgatherv, const void *sendbuf, int sendcount, MPI_Data
     return copyDatatype(sendtype,sendcount,recvtype,recvcounts[0],sendbuf,recvbuf);
   }
 
-  *request = ptr->postReq(new GathervReq(recvbuf, size, recvtype, comm,
-                                         recvcounts, displs, getDDT()));
+  const CMK_REFNUM_TYPE seq = ptr->nextCollSeq();
+  *request = ptr->postCollReq(new GathervReq(recvbuf, size, recvtype, comm,
+                                             recvcounts, displs, getDDT()), seq);
 
   CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback allgathervCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
   msg->setCallback(allgathervCB);
+  msg->setUserFlag(seq);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Iallgatherv called on comm %d\n", ptr->thisIndex, comm));
   ptr->contribute(msg);
 
@@ -8110,17 +8150,19 @@ AMPI_API_IMPL(int, MPI_Igather, const void *sendbuf, int sendcount, MPI_Datatype
   }
 #endif
 
+  const CMK_REFNUM_TYPE seq = ptr->nextCollSeq();
   if (rank == root) {
-    *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
+    *request = ptr->postCollReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()), seq);
   }
   else {
-    *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT(), AMPI_REQ_COMPLETED));
+    *request = ptr->postCollReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT(), AMPI_REQ_COMPLETED), seq);
   }
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback gatherCB(CkIndex_ampi::irednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gatherCB);
+  msg->setUserFlag(seq);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Igather called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
   ptr->contribute(msg);
 
@@ -8267,19 +8309,21 @@ AMPI_API_IMPL(int, MPI_Igatherv, const void *sendbuf, int sendcount, MPI_Datatyp
   }
 #endif
 
+  const CMK_REFNUM_TYPE seq = ptr->nextCollSeq();
   if (rank == root) {
-    *request = ptr->postReq(new GathervReq(recvbuf, size, recvtype, comm,
-                                           recvcounts, displs, getDDT()));
+    *request = ptr->postCollReq(new GathervReq(recvbuf, size, recvtype, comm,
+                                               recvcounts, displs, getDDT()), seq);
   }
   else {
-    *request = ptr->postReq(new GathervReq(recvbuf, size, recvtype, comm,
-                                           recvcounts, displs, getDDT(), AMPI_REQ_COMPLETED));
+    *request = ptr->postCollReq(new GathervReq(recvbuf, size, recvtype, comm,
+                                               recvcounts, displs, getDDT(), AMPI_REQ_COMPLETED), seq);
   }
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
   CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback gathervCB(CkIndex_ampi::irednResult(0), CkArrayIndex1D(rootIdx), ptr->getProxy());
   msg->setCallback(gathervCB);
+  msg->setUserFlag(seq);
   MSG_ORDER_DEBUG(CkPrintf("[%d] AMPI_Igatherv called on comm %d root %d \n", ptr->thisIndex, comm, rootIdx));
   ptr->contribute(msg);
 
