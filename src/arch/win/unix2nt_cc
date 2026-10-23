@@ -223,11 +223,13 @@ do
 		LINK_OPTS+=(-LTCG)
 		;;
 	-g|-g[123456789]|-ggdb|-ggdb[123])
+		# Debug information only, as -g is for GCC and clang. The C runtime
+		# stays the release one (-MT): the debug one (-MTd) is a different ABI,
+		# so a -g object could not be linked with anything built without -g
+		# (reconverse, or a production Charm++ under a -g program).
 		CL_OPTS+=(-Z7)
 		ML_OPTS+=(-Zi -Zd)
 		LINK_OPT=()
-		CL_MT='-MTd'
-		CL_DLL='-LDd'
 		;;
 # Language level. MSVC has no C++11 mode; its lowest is C++14.
 	-std=c++11|-std=gnu++11|-std=c++14|-std=gnu++14|-std:c++14)
