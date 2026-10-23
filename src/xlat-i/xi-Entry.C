@@ -2119,9 +2119,9 @@ void Entry::genDefs(XStr& str) {
           << "\n  " << container->baseName() << "* impl_obj = static_cast<"
           << container->baseName() << "*> (impl_obj_void);\n";
       // A threaded reduction target runs on its own thread, as the direct
-      // entry does: the trampoline unpacks the CkReductionMsg and deletes it
-      // when the thread ends. The wrapper owns that message, so no extra
-      // reference is taken.
+      // entry does: _callthr_redn_wrapper_<name> unpacks the CkReductionMsg
+      // on that thread and deletes it when the thread ends. The wrapper owns
+      // the message, so it takes no extra reference.
       if (isThreaded()) str << callThread(epStr(true), 0, false);
       str << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
       XStr precall;
