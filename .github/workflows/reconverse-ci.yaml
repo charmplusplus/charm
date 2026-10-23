@@ -61,6 +61,7 @@ env:
     tests/charm++/objid_insert
     tests/charm++/objid_wide
     tests/charm++/anytime_bcastred
+    tests/charm++/threaded_redn
     tests/charm++/qd
     tests/charm++/within_node_bcast
     tests/charm++/zerocopy/zerocopy_with_qd
