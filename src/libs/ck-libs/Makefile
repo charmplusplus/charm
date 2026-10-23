@@ -5,8 +5,8 @@ CHARMINC=.
 
 SIMPLE_DIRS = completion cache sparseContiguousReducer tcharm ampi idxl \
               multiphaseSharedArrays io \
-              collide mblock allGather barrier irecv liveViz \
-              taskGraph search MeshStreamer NDMeshStreamer pose \
+              collide allGather barrier irecv liveViz \
+              taskGraph search MeshStreamer NDMeshStreamer \
               state_space_searchengine
 DIRS = $(SIMPLE_DIRS) pythonCCS
 
@@ -23,7 +23,6 @@ multiphaseSharedArrays:
 ParFUM:	idxl ampi collide multiphaseSharedArrays
 ParFUM-Tops: ParFUM
 collide: tcharm
-mblock: tcharm
 allGather:
 barrier:
 irecv:
