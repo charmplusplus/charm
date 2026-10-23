@@ -75,9 +75,7 @@ all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
 ifeq ($(CMK_SMP),1)
-ifneq ($(CMK_MULTICORE),1)
 	make smptest
-endif
 endif
 
 testp: $(foreach i,$(TESTPDIRS),testp-$i)
