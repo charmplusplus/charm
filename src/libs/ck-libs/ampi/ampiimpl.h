@@ -2409,7 +2409,13 @@ class ampiParent final : public CBase_ampiParent {
   // exchange proxy info between two ampi proxies
   void ExchangeProxy(CProxy_ampi rproxy) noexcept {
     if(!isTmpRProxySet){ tmpRProxy=rproxy; isTmpRProxySet=true; }
-    else{ tmpRProxy.setRemoteProxy(rproxy); rproxy.setRemoteProxy(tmpRProxy); isTmpRProxySet=false; }
+    else{
+      // Both groups' new intercommunicator arrays are fully registered:
+      // give each its remote proxy, and only then resume its ranks.
+      tmpRProxy.setRemoteProxyAndUnblock(rproxy);
+      rproxy.setRemoteProxyAndUnblock(tmpRProxy);
+      isTmpRProxySet=false;
+    }
   }
 
   //Grab the next available split/group communicator
@@ -2754,6 +2760,17 @@ class ampi final : public CBase_ampi {
     numCommCreationsInProgress = x;
   }
 
+  // Intercommunicator merging (state kept on the root of the group that goes
+  // first): the merged array is created once both groups have contributed.
+  int numMergeGroupsArrived{};
+  MPI_Comm mergeNextComm{};
+
+  // How registrationFinish resumes the ranks of a new communicator (default:
+  // thisProxy.unblock(), for split). newChildProxy is the new array.
+  bool exchangeProxyOnFinish{};  // intercommCreate: via ExchangeProxy
+  bool resumeNewArrayOnFinish{}; // commCreate, intercommMerge: newChildProxy.unblock()
+  CProxy_ampi newChildProxy;
+
   // Intercommunicator splitting:
   std::unordered_map<int, CProxy_ampi> splitRProxyMap;
 
@@ -2801,10 +2818,15 @@ class ampi final : public CBase_ampi {
 
   void splitPhase1(CkReductionMsg *msg) noexcept;
   void splitPhaseInter(CkReductionMsg *msg) noexcept;
+  // The reduction targets of communicator creation are [threaded] entry
+  // methods taking a CkReductionMsg, like splitPhase1. They block in
+  // createNewChildAmpiSync's future, so they must run in their own thread.
+  void commCreateReduced(CkReductionMsg *msg) noexcept;
+  void intercommCreateReduced(CkReductionMsg *msg) noexcept;
+  void intercommMergeReduced(CkReductionMsg *msg) noexcept;
   void commCreatePhase1(int nextComm, int commType) noexcept;
   void registrationFinish() noexcept;
-  void intercommCreatePhase1(MPI_Comm nextInterComm) noexcept;
-  void intercommMergePhase1(MPI_Comm nextIntraComm) noexcept;
+  void intercommMergeGroupArrived(MPI_Comm nextIntraComm) noexcept;
 
   void exchangeProxyForSplitLocal(int color, CProxy_ampi splitLocalProxy) noexcept {
     auto iter = splitRProxyMap.find(color);
@@ -2980,6 +3002,8 @@ class ampi final : public CBase_ampi {
   inline const CProxy_ampi &getProxy() const noexcept {return thisProxy;}
   inline const CProxy_ampi &getRemoteProxy() const noexcept {return remoteProxy;}
   inline void setRemoteProxy(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; }
+  // Matches the block() in ampi::intercommCreate
+  inline void setRemoteProxyAndUnblock(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; thread->resume(); }
   inline int getIndexForRank(int r) const noexcept {return myComm->getIndexForRank(r);}
   inline int getIndexForRemoteRank(int r) const noexcept {return myComm->getIndexForRemoteRank(r);}
   void findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const noexcept;

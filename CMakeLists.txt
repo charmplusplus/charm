@@ -778,13 +778,12 @@ set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/pup_cmialloc.h src/util/pup_mpi.h src/util/pup_paged.h
     src/util/pup_stl.h src/util/pup_toNetwork.h src/util/pup_toNetwork4.h
     src/util/rand48_replacement.h src/util/random_sequence.h
-    src/util/simd.h src/util/sockRoutines.h src/util/spanningTree.h
+    src/util/simd.h src/util/spanningTree.h
     src/util/spanningTreeStrategy.h src/util/spanningTreeVertex.h
     src/util/strided_sequence.h src/util/treeStrategy_3dTorus_minBytesHops.h
     src/util/treeStrategy_3dTorus_minHops.h
     src/util/treeStrategy_nodeAware_minBytes.h
-    src/util/treeStrategy_nodeAware_minGens.h src/util/treeStrategy_topoUnaware.h
-    src/util/uFcontext.h src/util/uJcontext.h src/util/valgrind.h
+    src/util/treeStrategy_nodeAware_minGens.h src/util/treeStrategy_topoUnaware.h src/util/valgrind.h
     src/util/vector2d.h)
 
 if(CMK_CAN_LINK_FORTRAN)
@@ -869,10 +868,10 @@ endforeach()
 configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 
 
-# TCharm. libmoduletcharm also carries the stubs for the few classic Converse
-# functions reconverse lacks (src/libs/ck-libs/tcharm/reconverse-compat);
-# migratable threads come from reconverse and isomalloc from libisomalloc
-# (cmake/converse.cmake).
+# TCharm. Migratable threads come from reconverse and isomalloc from
+# libisomalloc (cmake/converse.cmake); src/libs/ck-libs/tcharm/reconverse-compat
+# declares the few classic Converse functions reconverse defines but does not
+# declare.
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
 set(tcharm-h-sources
     src/libs/ck-libs/tcharm/tcharm.h
@@ -886,7 +885,6 @@ if(CMK_CAN_LINK_FORTRAN)
     )
 endif()
 set(tcharm-cxx-sources src/libs/ck-libs/tcharm/tcharm.C)
-list(APPEND tcharm-cxx-sources src/libs/ck-libs/tcharm/reconverse-compat/reconverse-compat.C)
 add_library(moduletcharm ${tcharm-cxx-sources} ${tcharm-h-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h)
 add_library(moduletcharmmain src/libs/ck-libs/tcharm/tcharmmain.C ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
 add_library(tcharm-compat ${tcharm-c-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)

@@ -161,7 +161,7 @@ How do I compile AMPI?
 
 Run the build script ``./build`` and choose the option for building
 "Charm++ and AMPI," or just replace "charm++" in your full build command
-with "AMPI", as in ``./build AMPI netlrts-linux-x86_64``.
+with "AMPI", as in ``./build AMPI reconverse-linux-x86_64``.
 
 Can I remove part of charm tree after compilation to free disk space?
 ---------------------------------------------------------------------
@@ -178,52 +178,11 @@ See the Charm manual for :ref:`sec:install`.
 How do I specify the processors I want to use?
 ----------------------------------------------
 
-On machines where MPI has already been wired into the job system, use
-the -mpiexec flag and -np arguments.
-
-For the netlrts- versions, you need to write a nodelist file which lists
-all the machine hostnames available for parallel runs.
-
-.. code-block:: none
-
-   group main
-     host foo1
-     host foo2 ++cpus 4
-     host foo3.bar.edu
-
-For the MPI version, you need to set up an MPI configuration for
-available machines as for normal MPI applications.
-
-You can specify the exact cores to use on each node using the ``+pemap``
-option. When running in SMP or multicore mode, this applies to the
-worker threads only, not communication threads. To specify the placement
-of communication threads, use the ``+commap`` option. For example, to
-place 8 threads on 2 nodes (16 threads total) with the comm thread on
-core 0 and the worker threads on cores 1 - 7, you would use the
-following command:
-
-.. code-block:: bash
-
-   ./charmrun +p14 ./pgm ++ppn 7 +commap 0 +pemap 1-7
-
-See :ref:`sec-smpopts` of the Charm++ manual for more information.
-
-How do I use *ssh* instead of the deprecated *rsh*?
----------------------------------------------------
-
-You need to set up your ``.ssh/authorized_keys`` file correctly. Setup
-no-password logins using ssh by putting the correct host key
-(ssh-keygen) in the file ``.ssh/authorized_keys``.
-
-Finally, in the ``.nodelist`` file, you specify the shell to use for
-remote execution of a program using the keyword *++shell*.
-
-.. code-block:: none
-
-   group main ++shell ssh
-     host foo1
-     host foo2
-     host foo3
+Give the total number of PEs with ``+pe N``. Multiple processes are
+started with ``lcrun`` on a workstation or with the site's launcher (such
+as ``srun``) inside a batch allocation; see :ref:`sec:run` of the Charm++
+manual. To choose the cores, use the ``+pemap`` option, described in
+:ref:`sec-smpopts` of the Charm++ manual.
 
 Can I use the serial library X from a Charm program?
 ----------------------------------------------------
