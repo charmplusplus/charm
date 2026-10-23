@@ -493,7 +493,7 @@ The complete set of link-time arguments relevant to TCharm is:
 
 -module F
   Link in this framework. The current set of frameworks F includes
-  ampi, collide, and mblock. You can link in multiple
+  ampi and collide. You can link in multiple
   frameworks.
 
 The complete set of command-line arguments relevant to TCharm is:

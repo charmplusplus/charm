@@ -2371,8 +2371,24 @@ void ampi::splitPhase1(CkReductionMsg *msg) noexcept
 void ampi::registrationFinish() noexcept
 {
   CkAssert(numCommCreationsInProgress > 0);
-  if (--numCommCreationsInProgress == 0)
-    thisProxy.unblock(); //Matches suspends at end of ampi::commCreate, split, etc.
+  if (--numCommCreationsInProgress == 0) {
+    if (exchangeProxyOnFinish) {
+      // MPI_Intercomm_create: the ranks are resumed by
+      // ampi::setRemoteProxyAndUnblock once both groups' arrays exist.
+      exchangeProxyOnFinish = false;
+      parentProxy[0].ExchangeProxy(newChildProxy);
+    }
+    else if (resumeNewArrayOnFinish) {
+      // commCreate, cartCreate0D, intercommMerge: the new array's elements are
+      // exactly the blocked ranks (both groups, for a merge); ranks of the old
+      // communicator that are not members did not block.
+      resumeNewArrayOnFinish = false;
+      newChildProxy.unblock();
+    }
+    else {
+      thisProxy.unblock(); //split: every rank of the old communicator blocked in ampi::split
+    }
+  }
 }
 
 void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
@@ -2451,7 +2467,7 @@ void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
 MPI_Comm ampi::commCreate(const std::vector<int>& vec, AmpiCommType type) noexcept {
   int rootIdx = vec[0];
   tmpVec = vec;
-  CkCallback cb(CkReductionTarget(ampi, commCreatePhase1), CkArrayIndex1D(rootIdx), myComm->getProxy());
+  CkCallback cb(CkIndex_ampi::commCreateReduced(NULL), CkArrayIndex1D(rootIdx), myComm->getProxy());
   int data[2] = { parent->getNextComm(), (int)type };
   contribute(sizeof(data), data, CkReduction::max_int, cb);
 
@@ -2471,9 +2487,18 @@ void ampi::insertNewChildAmpiElements(MPI_Comm nextComm, CProxy_ampi newAmpi, Am
   newAmpi.doneInserting(); // will call ampi::registrationFinish
 }
 
+void ampi::commCreateReduced(CkReductionMsg *msg) noexcept {
+  const int *data = (const int *)msg->getData();
+  const int nextComm = data[0], commType = data[1];
+  delete msg;
+  commCreatePhase1(nextComm, commType);
+}
+
 void ampi::commCreatePhase1(int nextComm, int commType) noexcept {
   setNumCommCreationsInProgress(1);
   CProxy_ampi newAmpi = createNewChildAmpiSync();
+  resumeNewArrayOnFinish = true;
+  newChildProxy = newAmpi;
   insertNewChildAmpiElements((MPI_Comm)nextComm, newAmpi, (AmpiCommType)commType);
 }
 
@@ -2492,8 +2517,9 @@ MPI_Comm ampi::cartCreate0D() noexcept {
     tmpVec.clear();
     tmpVec.push_back(0);
     commCreatePhase1(parent->getNextComm(), COMM_CART);
-    MPI_Comm newComm = parent->getNextComm()-1;
-    ampiCommStruct &newCommStruct = parent->getCommStruct(newComm);
+    ampi * dis = block(); //Resumed by ampi::registrationFinish
+    MPI_Comm newComm = dis->parent->getNextComm()-1;
+    ampiCommStruct &newCommStruct = dis->parent->getCommStruct(newComm);
     ampiTopology *newTopo = newCommStruct.getTopology();
     newTopo->setndims(0);
     return newComm;
@@ -2524,16 +2550,21 @@ MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root
   if (thisIndex==root) { // not everybody gets the valid rvec
     tmpVec = remoteVec;
   }
-  CkCallback cb(CkReductionTarget(ampi, intercommCreatePhase1),CkArrayIndex1D(root),myComm->getProxy());
+  CkCallback cb(CkIndex_ampi::intercommCreateReduced(NULL),CkArrayIndex1D(root),myComm->getProxy());
   MPI_Comm nextinter = parent->getNextComm();
   contribute(sizeof(nextinter), &nextinter,CkReduction::max_int,cb);
-  ampi * dis = block(); //Resumed by ampi::registrationFinish
+  ampi * dis = block(); //Resumed by ampi::setRemoteProxyAndUnblock
   return dis->parent->getNextComm() - 1;
 }
 
-void ampi::intercommCreatePhase1(MPI_Comm nextInterComm) noexcept {
+void ampi::intercommCreateReduced(CkReductionMsg *msg) noexcept {
+  const MPI_Comm nextInterComm = *(const MPI_Comm *)msg->getData();
+  delete msg;
+
   setNumCommCreationsInProgress(1);
   CProxy_ampi newAmpi = createNewChildAmpiSync();
+  exchangeProxyOnFinish = true;
+  newChildProxy = newAmpi;
   const std::vector<int>& lgroup = myComm->getIndices();
   const ampiCommStruct newCommstruct = ampiCommStruct(nextInterComm,newAmpi,lgroup,tmpVec);
   for(int i=0;i<lgroup.size();i++){
@@ -2541,8 +2572,6 @@ void ampi::intercommCreatePhase1(MPI_Comm nextInterComm) noexcept {
     newAmpi[newIdx].insert(parentProxy,newCommstruct);
   }
   newAmpi.doneInserting(); // will call ampi::registrationFinish
-
-  parentProxy[0].ExchangeProxy(newAmpi);
 }
 
 void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid only at local root
@@ -2559,7 +2588,7 @@ void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid 
   }
 
   int rootIdx=myComm->getIndexForRank(0);
-  CkCallback cb(CkReductionTarget(ampi, intercommMergePhase1),CkArrayIndex1D(rootIdx),myComm->getProxy());
+  CkCallback cb(CkIndex_ampi::intercommMergeReduced(NULL),CkArrayIndex1D(rootIdx),myComm->getProxy());
   MPI_Comm nextintra = parent->getNextComm();
   contribute(sizeof(nextintra), &nextintra,CkReduction::max_int,cb);
 
@@ -2568,13 +2597,37 @@ void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid 
   *ncomm=newcomm;
 }
 
-void ampi::intercommMergePhase1(MPI_Comm nextIntraComm) noexcept {
-  // gets called on two roots, first root creates the comm
-  if(tmpVec.size()==0) return;
+void ampi::intercommMergeReduced(CkReductionMsg *msg) noexcept {
+  // Called on both roots once every rank of that root's group has contributed.
+  // The root of the group that goes first (the only one with a non-empty
+  // tmpVec) creates the merged communicator; the other root tells it that its
+  // group has arrived, so that the creating root can resume both groups.
+  const MPI_Comm nextIntraComm = *(const MPI_Comm *)msg->getData();
+  delete msg;
+  if (tmpVec.size() == 0) {
+    remoteProxy[myComm->getIndexForRemoteRank(0)].intercommMergeGroupArrived(nextIntraComm);
+    return;
+  }
+  intercommMergeGroupArrived(nextIntraComm);
+}
+
+// Entry method (from the other group's root) and local call (from
+// intercommMergeReduced) on the root of the group that goes first.
+void ampi::intercommMergeGroupArrived(MPI_Comm nextIntraComm) noexcept {
+  // The two arrivals (local reduction, remote root's message) can come in
+  // either order. Only create the merged array, and so only resume any rank,
+  // after both groups' ranks are blocked in ampi::intercommMerge.
+  if (nextIntraComm > mergeNextComm) mergeNextComm = nextIntraComm;
+  if (++numMergeGroupsArrived < 2) return;
+  const MPI_Comm nextComm = mergeNextComm;
+  numMergeGroupsArrived = 0;
+  mergeNextComm = 0;
 
   setNumCommCreationsInProgress(1);
   CProxy_ampi newAmpi = createNewChildAmpiSync();
-  insertNewChildAmpiElements(nextIntraComm, newAmpi, COMM_INTRA);
+  resumeNewArrayOnFinish = true;
+  newChildProxy = newAmpi;
+  insertNewChildAmpiElements(nextComm, newAmpi, COMM_INTRA);
 }
 
 void ampi::topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newComm) noexcept

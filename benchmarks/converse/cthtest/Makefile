@@ -13,10 +13,6 @@ pgm.o: pgm.C
 
 test: cthtest
 	$(call run, ./cthtest +p1 )
-#	-$(LINKLINE) -thread context && ./charmrun ./cthtest +p1  $(TESTOPTS)&& ps -u `whoami`
-#	-$(LINKLINE) -thread pthreads -lpthread && ./charmrun ./cthtest +p1  $(TESTOPTS)&& ps -u `whoami`
-#	-$(LINKLINE) -thread qt && ./charmrun ./cthtest +p1  $(TESTOPTS)&& ps -u `whoami`
-#	-$(LINKLINE) -thread uJcontext && ./charmrun ./cthtest +p1  $(TESTOPTS)&& ps -u `whoami`
 
 
 testp: cthtest
