@@ -285,8 +285,10 @@ int ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
         int orgsize = getDDT()->getType(orgtype)->getSize(orgcnt);
         orgddt->serialize((char*)orgaddr, targdata, orgcnt, orgsize, UNPACK);
       } else {
+        // The target is contiguous: scatter its bytes into the non-contiguous
+        // origin buffer (UNPACK copies from targdata into orgaddr).
         int targsize = getDDT()->getType(targtype)->getSize(targcnt);
-        targddt->serialize((char*)orgaddr, targdata, targcnt, targsize, PACK);
+        orgddt->serialize((char*)orgaddr, targdata, orgcnt, targsize, UNPACK);
       }
       return MPI_SUCCESS;
     }
@@ -564,58 +566,47 @@ AmpiMsg* ampi::winRemoteGetAccumulate(int orgtotalsize, char* sorgaddr, int orgc
 int ampi::winCompareAndSwap(const void *orgaddr, const void *compaddr, void *resaddr, MPI_Datatype type,
                             int rank, MPI_Aint targdisp, WinStruct *win) noexcept {
   CkDDT_DataType *ddt = getDDT()->getType(type);
+  int size = ddt->getSize(1);
 
   if (ddt->isContig()) {
     ampi *destPtr = thisProxy[rank].ckLocal();
     if (destPtr != NULL) {
-      char* targaddr = destPtr->winLocalCompareAndSwap(ddt->getSize(), (char*)orgaddr,
-                                                       (char*)compaddr, type, targdisp, win->index);
-      int targsize = getDDT()->getType(type)->getSize(1);
-      ddt->serialize((char*)resaddr, targaddr, 1, targsize, PACK);
+      destPtr->winLocalCompareAndSwap(size, (char*)orgaddr, (char*)compaddr, (char*)resaddr,
+                                      targdisp, win->index);
       return MPI_SUCCESS;
     }
   }
 
-  AmpiMsg* msg = thisProxy[rank].winRemoteCompareAndSwap(getDDT()->getType(type)->getSize(1), (char*)orgaddr,
-                                                         (char*)compaddr, type, targdisp, win->index);
-  int ressize = getDDT()->getType(type)->getSize(1);
-  ddt->serialize((char*)resaddr, msg->getData(), 1, ressize, PACK);
+  AmpiMsg* msg = thisProxy[rank].winRemoteCompareAndSwap(size, (char*)orgaddr, (char*)compaddr,
+                                                         type, targdisp, win->index);
+  // The reply carries the original target value: copy it out into resaddr.
+  ddt->serialize((char*)resaddr, msg->getData(), 1, size, UNPACK);
 
   delete msg;
   return MPI_SUCCESS;
 }
 
-char* ampi::winLocalCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Datatype type,
-                                   MPI_Aint targdisp, int winIndex) noexcept {
+// MPI-3 compare-and-swap on this rank's window: store the original target
+// value in resaddr, then, if it equals compaddr (bitwise, all size bytes),
+// write sorgaddr into the target. CAS takes a single element of a
+// predefined datatype, so all buffers are contiguous.
+void ampi::winLocalCompareAndSwap(int size, char* sorgaddr, char* compaddr, char* resaddr,
+                                  MPI_Aint targdisp, int winIndex) noexcept {
   win_obj *winobj = winObjects[winIndex];
-  winobj->put(sorgaddr, 1, size, targdisp, 1, size);
+  winobj->put(sorgaddr, 1, size, targdisp, 1, size); // bounds check only, copies nothing
 
-  CkDDT_DataType *ddt = getDDT()->getType(type);
-  char* targaddr = ((char*)(winobj->baseAddr)) + ddt->getSize(targdisp);
-
-  if (*targaddr == *compaddr) {
-    int size = ddt->getSize(1);
-    ddt->serialize(targaddr, (char*)sorgaddr, 1, size, UNPACK);
+  char* targaddr = ((char*)(winobj->baseAddr)) + winobj->disp_unit*targdisp;
+  bool match = (memcmp(targaddr, compaddr, size) == 0);
+  memcpy(resaddr, targaddr, size);
+  if (match) {
+    memcpy(targaddr, sorgaddr, size);
   }
-
-  return targaddr;
 }
 
 AmpiMsg* ampi::winRemoteCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Datatype type,
                                        MPI_Aint targdisp, int winIndex) noexcept {
-  win_obj *winobj = winObjects[winIndex];
-  winobj->put(sorgaddr, 1, size, targdisp, 1, size);
-
-  CkDDT_DataType *ddt = getDDT()->getType(type);
-  char* targaddr = ((char*)(winobj->baseAddr)) + ddt->getSize(targdisp);
-
   AmpiMsg *msg = new (size, 0) AmpiMsg(0, 0, MPI_RMA_TAG, thisIndex, size);
-  ddt->serialize(targaddr, msg->getData(), 1, msg->getLength(), PACK);
-
-  if (*targaddr == *compaddr) {
-    ddt->serialize(targaddr, (char*)sorgaddr, 1, ddt->getSize(1), UNPACK);
-  }
-
+  winLocalCompareAndSwap(size, sorgaddr, compaddr, msg->getData(), targdisp, winIndex);
   return msg;
 }
 
