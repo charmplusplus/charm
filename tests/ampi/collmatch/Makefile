@@ -14,6 +14,7 @@ test: collmatch
 	$(call run, ./collmatch +p1 +vp7)
 	$(call run, ./collmatch +p2 +vp4)
 	$(call run, ./collmatch +p2 +vp7)
+	$(call run, ./collmatch +p2 +vp4 +balancer RandCentLB)
 
 testp: collmatch
 	$(call run, ./collmatch +p$(P) +vp$(P) )

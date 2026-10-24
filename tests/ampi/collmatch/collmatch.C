@@ -23,6 +23,17 @@
    Part 7: MPI_Igatherv (rank r sends r+1 values) with NULL recvcounts and
            displs on the non-roots, which MPI allows, outstanding together
            with an Iallreduce.
+   Part 8 (every 10th iteration): one of Iallreduce, Iallgatherv (rank r
+           sends r+1 values), Ibarrier, Igather on MPI_COMM_WORLD, rotating
+           per stage, posted by the even ranks before AMPI_Migrate and by the
+           odd ranks after it, so the even ranks' request is outstanding
+           (posted under its key) while load balancing runs. With +balancer
+           RandCentLB on more than one PE ranks migrate, which exercises the
+           pup path. Only one reduction is kept in flight across
+           AMPI_Migrate: with several (or with one that every rank posted
+           before AMPI_Migrate) the job hangs intermittently, already at
+           origin/recharm, because contributions made before the migration
+           never complete a reduction; that is a separate defect.
 
    Roots rotate with the iteration so that every rank is sometimes the root.
    Every result is checked against a value computed locally. */
@@ -152,8 +163,9 @@ int main(int argc, char **argv)
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   const int iters = (argc > 1) ? atoi(argv[1]) : 50;
   /* Bit mask of the parts to run: 1 = parts 1-4, 2 = part 5, 4 = part 6,
-     8 = part 7. */
-  const int parts = (argc > 2) ? atoi(argv[2]) : 15;
+     8 = part 7, 16 = part 8. */
+  const int parts = (argc > 2) ? atoi(argv[2]) : 31;
+  int moves = 0; /* times this rank changed PE across AMPI_Migrate */
 
   MPI_Comm sub; /* even ranks / odd ranks */
   MPI_Comm_split(MPI_COMM_WORLD, rank % 2, rank, &sub);
@@ -270,11 +282,65 @@ int main(int argc, char **argv)
             check(rank, iter, what, recvv[displs[r] + k], gatVal(r, iter) + 10L * k);
           }
     }
+
+    /* Part 8 */
+    if ((parts & 16) && iter % 10 == 0) {
+      const int root = (iter / 10) % size;
+      std::vector<long> sendv(rank + 1), allv, gat(size, -1);
+      std::vector<int> counts(size), displs(size);
+      int off = 0;
+      for (int r = 0; r < size; r++) { counts[r] = r + 1; displs[r] = off; off += r + 1; }
+      allv.assign(off, -1);
+      for (int k = 0; k <= rank; k++) sendv[k] = gatVal(rank, iter) + 10L * k;
+      const long inG = gatVal(rank, iter);
+      red = -1;
+      const int kind = (iter / 10) % 4;
+      MPI_Request q;
+      /* Even ranks post before AMPI_Migrate, odd ranks after, so none of
+         these can complete before load balancing finishes. */
+      for (int phase = 0; phase < 2; phase++) {
+        if (phase == rank % 2) {
+          /* One collective per stage, rotating: see the note at the top. */
+          if (kind == 0) MPI_Iallreduce(&in, &red, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD, &q);
+          if (kind == 1) MPI_Iallgatherv(sendv.data(), rank + 1, MPI_LONG, allv.data(), counts.data(),
+                                         displs.data(), MPI_LONG, MPI_COMM_WORLD, &q);
+          if (kind == 2) MPI_Ibarrier(MPI_COMM_WORLD, &q);
+          if (kind == 3) MPI_Igather(&inG, 1, MPI_LONG, gat.data(), 1, MPI_LONG, root, MPI_COMM_WORLD, &q);
+        }
+        if (phase == 0) {
+          int *pe, flag;
+          MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &pe, &flag);
+          const int peBefore = *pe;
+          AMPI_Migrate(AMPI_INFO_LB_SYNC);
+          MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &pe, &flag);
+          if (*pe != peBefore) moves++;
+        }
+      }
+      MPI_Wait(&q, MPI_STATUS_IGNORE);
+      if (kind == 0)
+        check(rank, iter, "P8 Iallreduce", red, Expected{size, iter}.sum(0));
+      if (kind == 1)
+        for (int r = 0; r < size; r++)
+          for (int k = 0; k <= r; k++) {
+            char what[96];
+            snprintf(what, sizeof what, "P8 Iallgatherv[%d][%d]", r, k);
+            check(rank, iter, what, allv[displs[r] + k], gatVal(r, iter) + 10L * k);
+          }
+      if (kind == 3 && rank == root)
+        for (int r = 0; r < size; r++) {
+          char what[96];
+          snprintf(what, sizeof what, "P8 Igather[%d]", r);
+          check(rank, iter, what, gat[r], gatVal(r, iter));
+        }
+    }
   }
 
-  int total = 0;
+  int total = 0, totalMoves = 0;
   MPI_Allreduce(&failures, &total, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(&moves, &totalMoves, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
   if (rank == 0) {
+    if (parts & 16)
+      printf("collmatch: %d rank migrations across AMPI_Migrate\n", totalMoves);
     if (total == 0)
       printf("collmatch: all %d iterations passed on %d ranks\n", iters, size);
     else
