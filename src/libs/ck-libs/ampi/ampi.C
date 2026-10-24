@@ -5035,15 +5035,15 @@ AMPI_API_IMPL(int, MPI_Barrier, MPI_Comm comm)
 
 void ampi::ibarrier(MPI_Request *request) noexcept
 {
-  *request = postReq(parent->reqPool.newReq<IReq>(nullptr, 0, MPI_INT, AMPI_COLL_SOURCE, MPI_ATA_TAG, myComm->getComm(), getDDT()));
-  CkCallback ibarrierCB(CkReductionTarget(ampi, ibarrierResult), getProxy());
+  // Completed through irednResult under the reduction-number key, like the
+  // other non-blocking collectives. It used to complete through a self-message
+  // keyed (MPI_ATA_TAG, AMPI_COLL_SOURCE), which a block of an (I)alltoall from
+  // rank 0 could stand in for (completing the barrier early and feeding the
+  // barrier's empty message to the alltoall), and which a pending wildcard
+  // receive could take (hanging the barrier).
+  *request = postCollReq(parent->reqPool.newReq<IReq>(nullptr, 0, MPI_INT, AMPI_COLL_SOURCE, MPI_ATA_TAG, myComm->getComm(), getDDT()));
+  CkCallback ibarrierCB(CkIndex_ampi::irednResult(0), getProxy());
   contribute(ibarrierCB);
-}
-
-void ampi::ibarrierResult() noexcept
-{
-  MSG_ORDER_DEBUG(CkPrintf("[%d] ibarrierResult called\n", thisIndex));
-  ampi::sendraw(MPI_ATA_TAG, AMPI_COLL_SOURCE, NULL, 0, thisArrayID, thisIndex);
 }
 
 AMPI_API_IMPL(int, MPI_Ibarrier, MPI_Comm comm, MPI_Request *request)
@@ -5199,7 +5199,7 @@ void ampi::rednResult(CkReductionMsg *msg) noexcept
   // [nokeep] entry method, so do not delete msg
 }
 
-// This routine is called with the results of an I(all)reduce or I(all)gather(v)
+// This routine is called with the results of an I(all)reduce, I(all)gather(v) or Ibarrier
 void ampi::irednResult(CkReductionMsg *msg) noexcept
 {
   MSG_ORDER_DEBUG(CkPrintf("[%d] irednResult called on comm %d\n", thisIndex, myComm->getComm()));

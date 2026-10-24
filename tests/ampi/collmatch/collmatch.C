@@ -16,6 +16,10 @@
            Iallreduce on the same communicator; the reduction result must not
            be handed to the receive (it used to be: the result was matched by
            (tag, source) in the same queue, and the wildcard receive matched).
+   Part 6: MPI_Ibarrier interleaved with MPI_Ialltoall on MPI_COMM_WORLD
+           (barrier first and alltoall first), and an Ibarrier behind a
+           wildcard Irecv. The barrier used to complete through a message
+           keyed like rank 0's alltoall block.
 
    Roots rotate with the iteration so that every rank is sometimes the root.
    Every result is checked against a value computed locally. */
@@ -144,8 +148,8 @@ int main(int argc, char **argv)
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   const int iters = (argc > 1) ? atoi(argv[1]) : 50;
-  /* Bit mask of the parts to run: 1 = parts 1-4, 2 = part 5. */
-  const int parts = (argc > 2) ? atoi(argv[2]) : 3;
+  /* Bit mask of the parts to run: 1 = parts 1-4, 2 = part 5, 4 = part 6. */
+  const int parts = (argc > 2) ? atoi(argv[2]) : 7;
 
   MPI_Comm sub; /* even ranks / odd ranks */
   MPI_Comm_split(MPI_COMM_WORLD, rank % 2, rank, &sub);
@@ -192,6 +196,45 @@ int main(int argc, char **argv)
       MPI_Send(&out, 1, MPI_LONG, (rank + 1) % size, 7, MPI_COMM_WORLD);
       MPI_Wait(&rreq, MPI_STATUS_IGNORE);
       check(rank, iter, "P5 wildcard Irecv", msg, 1000L * ((rank + size - 1) % size) + iter);
+      /* A wildcard receive also matches AMPI's internal point-to-point
+         traffic (for example Ialltoall blocks; a separate issue), so no rank
+         may start the next part while another's wildcard receive is pending. */
+      MPI_Barrier(MPI_COMM_WORLD);
+    }
+
+    /* Part 6 */
+    if (parts & 4) {
+      std::vector<long> sendb(size), recvb(size);
+      for (int barrierFirst = 0; barrierFirst < 2; barrierFirst++) {
+        for (int r = 0; r < size; r++) { sendb[r] = 100000L * rank + 100L * r + iter; recvb[r] = -1; }
+        MPI_Request q[2];
+        if (barrierFirst) {
+          MPI_Ibarrier(MPI_COMM_WORLD, &q[0]);
+          MPI_Ialltoall(sendb.data(), 1, MPI_LONG, recvb.data(), 1, MPI_LONG, MPI_COMM_WORLD, &q[1]);
+        } else {
+          MPI_Ialltoall(sendb.data(), 1, MPI_LONG, recvb.data(), 1, MPI_LONG, MPI_COMM_WORLD, &q[1]);
+          MPI_Ibarrier(MPI_COMM_WORLD, &q[0]);
+        }
+        /* Separate waits: MPI_Waitall on an Ialltoall request hangs, a
+           separate pre-existing defect. */
+        MPI_Wait(&q[barrierFirst ? 0 : 1], MPI_STATUS_IGNORE);
+        MPI_Wait(&q[barrierFirst ? 1 : 0], MPI_STATUS_IGNORE);
+        for (int r = 0; r < size; r++) {
+          char what[96];
+          snprintf(what, sizeof what, "P6 Ialltoall[%d] (%s first)", r, barrierFirst ? "Ibarrier" : "Ialltoall");
+          check(rank, iter, what, recvb[r], 100000L * r + 100L * rank + iter);
+        }
+      }
+
+      long msg = -1, out = 2000L * rank + iter;
+      MPI_Request rreq, breq;
+      MPI_Irecv(&msg, 1, MPI_LONG, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &rreq);
+      MPI_Ibarrier(MPI_COMM_WORLD, &breq);
+      MPI_Wait(&breq, MPI_STATUS_IGNORE);
+      MPI_Send(&out, 1, MPI_LONG, (rank + 1) % size, 8, MPI_COMM_WORLD);
+      MPI_Wait(&rreq, MPI_STATUS_IGNORE);
+      check(rank, iter, "P6 wildcard Irecv behind Ibarrier", msg, 2000L * ((rank + size - 1) % size) + iter);
+      MPI_Barrier(MPI_COMM_WORLD); /* as in part 5 */
     }
   }
 

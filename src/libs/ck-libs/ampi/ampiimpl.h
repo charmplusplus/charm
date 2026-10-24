@@ -1415,7 +1415,9 @@ class IReq final : public AmpiRequest {
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
-  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
+  // Only an MPI_Ibarrier's IReq is posted with ampi::postCollReq, so this is
+  // reached only for the (empty) result of the barrier's reduction.
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override { complete = true; }
   void receiveRdma(ampi *ptr, char *sbuf, int slength, int srcRank) noexcept override;
   int getNumReceivedBytes(CkDDT *ptr) const noexcept override {
     return length;
@@ -2756,7 +2758,6 @@ class ampi final : public CBase_ampi {
   void requestPut(MPI_Request req, CkNcpyBuffer targetInfo) noexcept;
   void bcastResult(AmpiMsg *msg) noexcept;
   void barrierResult(void) noexcept;
-  void ibarrierResult(void) noexcept;
   void rednResult(CkReductionMsg *msg) noexcept;
   void irednResult(CkReductionMsg *msg) noexcept;
 
