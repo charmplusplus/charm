@@ -204,7 +204,11 @@ int main(int argc, char **argv)
       printf("collmatch: %d FAILED checks on %d ranks\n", total, size);
     fflush(stdout);
   }
+  /* AMPI's MPI_Finalize never returns (it ends in AMPI_Exit(0)), so a
+     failure must be reported through the exit status before it. */
+  if (total != 0)
+    MPI_Abort(MPI_COMM_WORLD, 1);
   MPI_Comm_free(&sub);
   MPI_Finalize();
-  return total == 0 ? 0 : 1;
+  return 0;
 }
