@@ -1667,6 +1667,13 @@ then
   LANG_LIBS=("-L$CHARMLIBSO")
 else
   LANG_LIBS=("-L$CHARMLIB" "-L$CHARMRECONV")
+  # libreconverse is a shared library even in a static build. Record the physical directory of the copy linked
+  # here (DT_RPATH, searched before LD_LIBRARY_PATH): <source>/lib is a symlink that every build tree re-points
+  # at its own lib when it builds (create_symlinks), so a binary found its libreconverse.so through it found
+  # whichever tree built last. A CUDA binary that loaded the HIP tree's lost its cross-process messages and
+  # hung at startup (jacobi3d, 2026-10-23). A relocated build falls back to LD_LIBRARY_PATH.
+  RECONV_LIBDIR="$(cd "$CHARMLIB" >/dev/null 2>&1 && pwd -P)"
+  [[ -n "$RECONV_LIBDIR" && -e "$RECONV_LIBDIR/libreconverse.so" ]] && OPTS_LD+=("-Wl,-rpath,$RECONV_LIBDIR" "-Wl,--disable-new-dtags")
 fi
 
 if [[ -z "$STANDALONE" ]]
