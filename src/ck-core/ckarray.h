@@ -327,6 +327,11 @@ void CkSendMsgArray(int entryIndex, void* msg, CkArrayID aID, const CkArrayIndex
                     int opts = 0);
 void CkSendMsgArrayInline(int entryIndex, void* msg, CkArrayID aID,
                           const CkArrayIndex& idx, int opts = 0);
+// A send issued on a PE whose copy of the array manager does not exist yet
+// (its creation broadcast is still in flight) is held and re-issued when
+// CkCreateLocalGroup creates that manager. doc/internals/array-send-order.md
+void _ckArrayFlushDeferredSends(CkGroupID mgr);
+
 void CkBroadcastMsgArray(int entryIndex, void* msg, CkArrayID aID, int opts = 0);
 void CkBroadcastMsgSection(int entryIndex, void* msg, CkSectionID sID, int opts = 0);
 /************************ Array Element *********************/
