@@ -1876,6 +1876,34 @@ inline void pupFromBuf(const void *data,T &t) noexcept {
 
 #define COLL_SEQ_IDX      -1
 
+/* Which messages carry sequence numbers, and in which sequence (AmpiSeqQ
+   index). Used by both ampi::getSeqNo (sender) and AmpiMsg::getSeqIdx
+   (receiver), so the two cannot disagree.
+   - Point-to-point messages (tags up to MPI_ATA_SEQ_TAG): one sequence per
+     peer rank, index = the peer's rank.
+   - Broadcasts: one collective sequence, COLL_SEQ_IDX.
+   - Scan and exscan messages: one sequence per peer rank of their own,
+     index ampiScanSeqIdx(rank) (negative, below COLL_SEQ_IDX). Two scans
+     outstanding on a communicator send under the same tag to the same
+     partner, so they must be matched in send order; a separate sequence keeps
+     that order without making point-to-point messages wait behind scan
+     messages, which always travel through the scheduler while PE-local
+     point-to-point sends are delivered inline.
+   - Other collective tags are not sequenced (seq 0). */
+inline bool ampiIsScanTag(int tag) noexcept {
+  return tag == MPI_SCAN_TAG || tag == MPI_EXSCAN_TAG;
+}
+inline int ampiScanSeqIdx(int rank) noexcept { return COLL_SEQ_IDX - 1 - rank; }
+inline bool ampiTagIsSequenced(int tag) noexcept {
+  return tag <= MPI_BCAST_TAG || ampiIsScanTag(tag);
+}
+/// rank is the peer: the destination when sending, the source when receiving.
+inline int ampiSeqIdx(int tag, int rank) noexcept {
+  if (ampiIsScanTag(tag)) return ampiScanSeqIdx(rank);
+  if (tag >= MPI_BCAST_TAG && tag <= MPI_ATA_TAG) return COLL_SEQ_IDX;
+  return rank;
+}
+
 class AmpiMsgPool;
 
 enum AmpiMsgType : bool {
@@ -1912,18 +1940,7 @@ class AmpiMsg final : public CMessage_AmpiMsg {
   inline void setComm(MPI_Comm c) noexcept { comm = c; }
   inline CMK_REFNUM_TYPE getSeq() const noexcept { return UsrToEnv(this)->getRef(); }
   inline int getSsendReq() const noexcept { return ssendReq; }
-  inline int getSeqIdx() const noexcept {
-    // seqIdx is srcRank, unless this message was part of a collective
-    // (Scan and exscan messages are ordered per sender like point-to-point
-    // ones; see ampi::getSeqNo.)
-    if (tag >= MPI_BCAST_TAG && tag <= MPI_ATA_TAG &&
-        tag != MPI_SCAN_TAG && tag != MPI_EXSCAN_TAG) {
-      return COLL_SEQ_IDX;
-    }
-    else {
-      return srcRank;
-    }
-  }
+  inline int getSeqIdx() const noexcept { return ampiSeqIdx(tag, srcRank); }
   inline AmpiMsgType isNcpyShmMsg() const noexcept { CkAssert(isSsend()); return ((AmpiMsgType*)data)[0]; }
   inline void getNcpyShmBuffer(AmpiNcpyShmBuffer& srcInfo) noexcept {
     CkAssert(isNcpyShmMsg());

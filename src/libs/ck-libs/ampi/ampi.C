@@ -3140,17 +3140,9 @@ void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
 }
 
 CMK_REFNUM_TYPE ampi::getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcept {
-  // Scan and exscan messages are sequenced like point-to-point messages:
-  // two scans outstanding on one communicator exchange messages with the
-  // same partner under the same tag, and they must be matched in the order
-  // they were sent.
-  const bool scanTag = (tag == MPI_SCAN_TAG || tag == MPI_EXSCAN_TAG);
-  int seqIdx = (tag >= MPI_BCAST_TAG && !scanTag) ? COLL_SEQ_IDX : destRank;
-  CMK_REFNUM_TYPE seq = 0;
-  if (tag<=MPI_BCAST_TAG || scanTag) {
-    seq = oorder.nextOutgoing(seqIdx);
-  }
-  return seq;
+  // ampiTagIsSequenced / ampiSeqIdx (ampiimpl.h) hold the rule
+  if (!ampiTagIsSequenced(tag)) return 0;
+  return oorder.nextOutgoing(ampiSeqIdx(tag, destRank));
 }
 
 MPI_Request ampi::sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destIdx,
