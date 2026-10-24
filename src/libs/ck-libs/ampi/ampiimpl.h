@@ -1737,8 +1737,14 @@ class ScanReq final : public AmpiRequest {
   int mask        = 1;     // current round: partner is rank^mask
   bool exclusive  = false; // MPI_Iexscan
   bool haveResult = false; // exclusive scan: buf already holds a value
+  // Both hold count elements in the datatype's own layout (extent stride,
+  // gaps included), which is what the op functions walk; round messages carry
+  // them packed. Element 0 starts at data() - trueLB.
   std::vector<char> partial; // reduction over this rank's current subtree
   std::vector<char> tmp;     // the partner's partial result
+  MPI_Aint trueLB = 0;
+  char* partialBuf() noexcept { return partial.data() - trueLB; }
+  char* tmpBuf() noexcept { return tmp.data() - trueLB; }
   // The op's function, captured when the scan starts so that MPI_Op_free on
   // a user op while the scan is outstanding is safe (freeOp drops the op's
   // table entry, and MPI_Op_create may reuse it). For a user op this is the
@@ -1752,10 +1758,10 @@ class ScanReq final : public AmpiRequest {
   void applyOp(const void* in, void* inout) noexcept;
 
   ScanReq(void *buf_, int count_, MPI_Datatype type_, MPI_Op op_, MPI_Comm comm_,
-          int rank_, int size_, bool exclusive_, int blklen, CkDDT *ddt_,
+          int rank_, int size_, bool exclusive_, MPI_Aint span, MPI_Aint trueLB_, CkDDT *ddt_,
           AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
     : op(op_), rank(rank_), size(size_), exclusive(exclusive_),
-      partial(blklen), tmp(blklen)
+      partial(span), tmp(span), trueLB(trueLB_)
   {
     buf   = buf_;
     count = count_;
@@ -1782,6 +1788,7 @@ class ScanReq final : public AmpiRequest {
     p|haveResult;
     p|partial;
     p|tmp;
+    p|trueLB;
     p((char *)&func, sizeof(func)); // code addresses (or offsets) match on every PE
     p|userFunc;
   }

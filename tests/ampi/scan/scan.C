@@ -9,6 +9,9 @@
      - a non-commutative user op (composition of affine maps mod a prime),
        which checks that partial results are combined in rank order;
      - MPI_IN_PLACE;
+     - non-contiguous datatypes: MPI_DOUBLE_INT with MPI_MAXLOC, and a
+       strided vector type with a user op, whose gaps in recvbuf must stay
+       untouched;
      - a communicator from MPI_Comm_split, so communicator ranks differ from
        world ranks;
      - MPI_Iscan / MPI_Iexscan completed by MPI_Wait, by an MPI_Test loop, and
@@ -283,6 +286,106 @@ static void progressTests(MPI_Comm comm, Ctx &x)
   }
 }
 
+// Non-contiguous datatypes. The scan keeps partial results in the datatype's
+// layout, so the op walks them at extent stride, and recvbuf's gaps must be
+// left alone.
+struct DoubleInt { double v; int i; };
+
+// User op on MPI_Type_vector(3, 1, 2, MPI_INT): sum the three ints of each
+// element, leaving the gaps.
+static void vecSum(void *invec, void *inoutvec, int *len, MPI_Datatype *dt)
+{
+  const int *in = (const int *)invec;
+  int *io = (int *)inoutvec;
+  for (int e = 0; e < *len; e++)
+    for (int j = 0; j < 3; j++) io[e * 5 + 2 * j] += in[e * 5 + 2 * j];
+}
+
+static void derivedTests(MPI_Comm comm, Ctx &x)
+{
+  int rank, size;
+  MPI_Comm_rank(comm, &rank);
+  MPI_Comm_size(comm, &size);
+
+  for (int mode = 0; mode < 4; mode++) {
+    bool ex = mode & 1, nb = mode & 2;
+    const char *name = ex ? (nb ? "MPI_Iexscan" : "MPI_Exscan") : (nb ? "MPI_Iscan" : "MPI_Scan");
+    int last = ex ? rank - 1 : rank;
+    char how[128];
+
+    // MPI_DOUBLE_INT with MPI_MAXLOC (ties go to the lower index)
+    for (int n = 1; n <= 5; n += 4) {
+      std::vector<DoubleInt> in(n), out(n), want(n);
+      for (int k = 0; k < n; k++) {
+        in[k].v = (double)((rank * 3 + k * 5) % 4);   // values repeat: ties
+        in[k].i = rank;
+        out[k].v = -1; out[k].i = -1;
+        want[k].v = -1e300; want[k].i = -1;
+        for (int r = 0; r <= last; r++) {
+          double v = (double)((r * 3 + k * 5) % 4);
+          if (v > want[k].v) { want[k].v = v; want[k].i = r; }
+        }
+      }
+      MPI_Request req;
+      if (nb) {
+        if (ex) MPI_Iexscan(in.data(), out.data(), n, MPI_DOUBLE_INT, MPI_MAXLOC, comm, &req);
+        else    MPI_Iscan(in.data(), out.data(), n, MPI_DOUBLE_INT, MPI_MAXLOC, comm, &req);
+        MPI_Wait(&req, MPI_STATUS_IGNORE);
+      } else {
+        if (ex) MPI_Exscan(in.data(), out.data(), n, MPI_DOUBLE_INT, MPI_MAXLOC, comm);
+        else    MPI_Scan(in.data(), out.data(), n, MPI_DOUBLE_INT, MPI_MAXLOC, comm);
+      }
+      if (ex && rank == 0) continue;
+      for (int k = 0; k < n; k++) {
+        if (out[k].v != want[k].v || out[k].i != want[k].i) {
+          printf("FAIL: world rank %d (comm rank %d): %s MPI_DOUBLE_INT MAXLOC count %d element %d = (%g, %d), expected (%g, %d)\n",
+                 x.worldRank, rank, name, n, k, out[k].v, out[k].i, want[k].v, want[k].i);
+          fflush(stdout);
+          x.failures++;
+          break;
+        }
+      }
+    }
+
+    // MPI_Type_vector(3, 1, 2, MPI_INT), count 2, user sum: gaps untouched
+    MPI_Datatype vec;
+    MPI_Type_vector(3, 1, 2, MPI_INT, &vec);
+    MPI_Type_commit(&vec);
+    MPI_Op vop;
+    MPI_Op_create(vecSum, 1, &vop);
+    const int GAP = -777;
+    int in[10], out[10];
+    for (int k = 0; k < 10; k++) { in[k] = GAP - 1; out[k] = GAP; }
+    const int pos[6] = {0, 2, 4, 5, 7, 9};
+    for (int j = 0; j < 6; j++) in[pos[j]] = rank * 10 + j;
+    MPI_Request req;
+    if (nb) {
+      if (ex) MPI_Iexscan(in, out, 2, vec, vop, comm, &req);
+      else    MPI_Iscan(in, out, 2, vec, vop, comm, &req);
+      MPI_Wait(&req, MPI_STATUS_IGNORE);
+    } else {
+      if (ex) MPI_Exscan(in, out, 2, vec, vop, comm);
+      else    MPI_Scan(in, out, 2, vec, vop, comm);
+    }
+    MPI_Op_free(&vop);
+    MPI_Type_free(&vec);
+    snprintf(how, sizeof how, "%s vector type", name);
+    for (int k = 0; k < 10; k++) {
+      bool data = false;
+      int want = GAP;
+      for (int j = 0; j < 6; j++) if (pos[j] == k) { data = true; want = 0; for (int r = 0; r <= last; r++) want += r * 10 + j; }
+      if (data && ex && rank == 0) continue;
+      if (out[k] != want) {
+        printf("FAIL: world rank %d (comm rank %d): %s int %d = %d, expected %d (%s)\n",
+               x.worldRank, rank, how, k, out[k], want, data ? "data" : "gap");
+        fflush(stdout);
+        x.failures++;
+        break;
+      }
+    }
+  }
+}
+
 // MPI_Op_free on a user op while scans using it are outstanding: the pending
 // scans must complete normally (MPI-3.1 sec. 5.9.5). Rank 0 frees the op and
 // creates another one (which may reuse the freed slot) before the other ranks
@@ -366,6 +469,7 @@ int main(int argc, char **argv)
   runSuite(MPI_COMM_WORLD, "WORLD", x);
   progressTests(MPI_COMM_WORLD, x);
   opFreeTest(MPI_COMM_WORLD, x);
+  derivedTests(MPI_COMM_WORLD, x);
 #ifdef AMPI
   migrateTest(MPI_COMM_WORLD, x);
 #endif

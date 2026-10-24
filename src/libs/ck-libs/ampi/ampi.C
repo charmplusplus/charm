@@ -5722,24 +5722,25 @@ void ampi::progressScan(ScanReq* req, AmpiMsg* msg, bool deleteMsg) noexcept
     if (msg) {
       int partner = req->rank ^ req->mask;
       CkAssert(msg->getSrcRank() == partner);
-      processAmpiMsg(msg, req->tmp.data(), req->type, req->count, MPI_REQUEST_NULL);
+      processAmpiMsg(msg, req->tmpBuf(), req->type, req->count, MPI_REQUEST_NULL);
+      if (req->rank > partner && req->exclusive && !req->haveResult) {
+        // first value for an exclusive scan's result: unpack it into recvbuf
+        // as well (element by element, so gaps in recvbuf are left alone)
+        processAmpiMsg(msg, req->buf, req->type, req->count, MPI_REQUEST_NULL);
+      }
       if (deleteMsg) {
         CkpvAccess(msgPool).deleteAmpiMsg(msg);
       }
       if (req->rank > partner) {
         // tmp covers ranks below this rank's subtree: it comes first
-        req->applyOp(req->tmp.data(), req->partial.data());
-        if (!req->exclusive) {
-          req->applyOp(req->tmp.data(), req->buf);
-        } else if (!req->haveResult) {
-          memcpy(req->buf, req->tmp.data(), req->tmp.size());
-          req->haveResult = true;
-        } else {
-          req->applyOp(req->tmp.data(), req->buf);
+        req->applyOp(req->tmpBuf(), req->partialBuf());
+        if (!req->exclusive || req->haveResult) {
+          req->applyOp(req->tmpBuf(), req->buf);
         }
+        req->haveResult = true;
       } else {
         // tmp covers ranks above: partial = partial op tmp
-        req->applyOp(req->partial.data(), req->tmp.data());
+        req->applyOp(req->partialBuf(), req->tmpBuf());
         std::swap(req->partial, req->tmp);
       }
       req->mask <<= 1;
@@ -5757,7 +5758,7 @@ void ampi::progressScan(ScanReq* req, AmpiMsg* msg, bool deleteMsg) noexcept
     const ampiCommStruct &dest = comm2CommStruct(req->comm);
     CMK_REFNUM_TYPE seq = getSeqNo(partner, req->comm, req->tag);
     dest.getProxy()[dest.getIndexForRank(partner)].generic(
-        makeAmpiMsg(partner, req->tag, req->rank, req->partial.data(), req->count,
+        makeAmpiMsg(partner, req->tag, req->rank, req->partialBuf(), req->count,
                     req->type, req->comm, seq));
 
     req->src = partner;
@@ -5810,21 +5811,23 @@ static int ampiStartScan(const char* name, const void* sendbuf, void* recvbuf, i
     if (!exclusive && sendbuf != recvbuf)
       ret = copyDatatype(datatype, count, datatype, count, sendbuf, recvbuf);
     *request = pptr->getReqs().insert(new ScanReq(recvbuf, count, datatype, op, comm, rank, size,
-                                                  exclusive, 0, ptr->getDDT(), AMPI_REQ_COMPLETED));
+                                                  exclusive, 0, 0, ptr->getDDT(), AMPI_REQ_COMPLETED));
     return ret;
   }
 
-  // Like the reduction collectives, this treats the datatype as contiguous.
-  int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
+  // Partial results are kept in the datatype's layout (see ScanReq), so
+  // non-contiguous types work: span covers count elements at extent stride.
+  CkDDT_DataType* ddt = ptr->getDDT()->getType(datatype);
+  MPI_Aint span = (count > 0) ? (count - 1) * ddt->getExtent() + ddt->getTrueExtent() : 0;
 
   ScanReq* req = new ScanReq(recvbuf, count, datatype, op, comm, rank, size, exclusive,
-                             blklen, ptr->getDDT());
+                             span, ddt->getTrueLB(), ptr->getDDT());
   // Resolve the op now: MPI_Op_free while the scan is outstanding must not
   // affect it (MPI-3.1 sec. 5.9.5), and freeOp drops the op's table entry.
   req->func = pptr->op2StoredFunction(op, &req->userFunc);
-  memcpy(req->partial.data(), sendbuf, blklen);
-  if (!exclusive && sendbuf != recvbuf) {
-    memcpy(recvbuf, sendbuf, blklen);
+  copyDatatype(datatype, count, datatype, count, sendbuf, req->partialBuf());
+  if (!exclusive) {
+    copyDatatype(datatype, count, datatype, count, sendbuf, recvbuf); // no-op if in place
   }
   *request = pptr->getReqs().insert(req);
   ptr->progressScan(req, nullptr, true);
