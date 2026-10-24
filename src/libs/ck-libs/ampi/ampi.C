@@ -1957,15 +1957,19 @@ void Amm<T, N>::freeAll() noexcept
   }
 }
 
-/* free all msgs */
+/* free all msgs. This drains the queue directly rather than through
+ * get(MPI_ANY_TAG, MPI_ANY_SOURCE), because MPI_ANY_TAG does not match
+ * AMPI's internal tags (see match()). */
 template<typename T, size_t N>
 void Amm<T, N>::flushMsgs() noexcept
 {
-  T msg = get(MPI_ANY_TAG, MPI_ANY_SOURCE);
-  while (msg) {
-    delete msg;
-    msg = get(MPI_ANY_TAG, MPI_ANY_SOURCE);
+  while (first) {
+    AmmEntry<T>* ent = first;
+    first = ent->next;
+    delete ent->msg;
+    deleteEntry(ent);
   }
+  lasth = &first;
 }
 
 template<typename T, size_t N>
@@ -1984,29 +1988,24 @@ void Amm<T, N>::put(int tag, int src, T msg) noexcept
   lasth = &e->next;
 }
 
+// MPI_ANY_TAG matches only user tags (0..MPI_TAG_UB_VALUE), never the
+// internal tags above MPI_TAG_UB_VALUE that AMPI's collectives send on the
+// same communicator. Otherwise a user's MPI_ANY_TAG receive or probe could
+// take a collective's message, leaving the collective waiting forever.
+static inline bool ammTagMatch(int t1, int t2) noexcept
+{
+  if (t1 == t2) return true;
+  if (t1 == MPI_ANY_TAG) return (t2 >= 0 && t2 <= MPI_TAG_UB_VALUE);
+  if (t2 == MPI_ANY_TAG) return (t1 >= 0 && t1 <= MPI_TAG_UB_VALUE);
+  return false;
+}
+
 template<typename T, size_t N>
 bool Amm<T, N>::match(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]) const noexcept
 {
-  if (tags1[AMM_TAG]==tags2[AMM_TAG] && tags1[AMM_SRC]==tags2[AMM_SRC]) {
-    // tag and src match
-    return true;
-  }
-  else if (tags1[AMM_TAG]==tags2[AMM_TAG] && (tags1[AMM_SRC]==MPI_ANY_SOURCE || tags2[AMM_SRC]==MPI_ANY_SOURCE)) {
-    // tag matches, src is MPI_ANY_SOURCE
-    return true;
-  }
-  else if (tags1[AMM_SRC]==tags2[AMM_SRC] && (tags1[AMM_TAG]==MPI_ANY_TAG || tags2[AMM_TAG]==MPI_ANY_TAG)) {
-    // src matches, tag is MPI_ANY_TAG
-    return true;
-  }
-  else if ((tags1[AMM_SRC]==MPI_ANY_SOURCE || tags2[AMM_SRC]==MPI_ANY_SOURCE) && (tags1[AMM_TAG]==MPI_ANY_TAG || tags2[AMM_TAG]==MPI_ANY_TAG)) {
-    // src and tag are MPI_ANY
-    return true;
-  }
-  else {
-    // no match
-    return false;
-  }
+  bool srcMatch = (tags1[AMM_SRC] == tags2[AMM_SRC] ||
+                   tags1[AMM_SRC] == MPI_ANY_SOURCE || tags2[AMM_SRC] == MPI_ANY_SOURCE);
+  return srcMatch && ammTagMatch(tags1[AMM_TAG], tags2[AMM_TAG]);
 }
 
 template<typename T, size_t N>

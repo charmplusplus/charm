@@ -14,6 +14,7 @@ DIRS = \
   intercomm_merge \
   groupfree \
   bsend \
+  wildcard \
 #  intercomm_coll \ # causes hangs in SMP mode
 
 ifeq (1,$(CMK_CAN_LINK_FORTRAN))
