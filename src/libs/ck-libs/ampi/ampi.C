@@ -5763,8 +5763,10 @@ static int ampiStartScan(const char* name, const void* sendbuf, void* recvbuf, i
   handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
-  if(op == MPI_OP_NULL)
+  if(op == MPI_OP_NULL) {
+    *request = MPI_REQUEST_NULL;
     return ampiErrhandler(name, MPI_ERR_OP);
+  }
   int ret = errorCheck(name, comm, 1, count, 1, datatype, 1, 0, 0, 0, 0, sendbuf, 1, recvbuf, 1);
   if(ret != MPI_SUCCESS) {
     *request = MPI_REQUEST_NULL;
@@ -5774,6 +5776,8 @@ static int ampiStartScan(const char* name, const void* sendbuf, void* recvbuf, i
 
   ampi *ptr = getAmpiInstance(comm);
   ampiParent* pptr = getAmpiParent();
+  if (ptr->isInter())
+    CkAbort("AMPI does not implement MPI_Scan, MPI_Exscan, MPI_Iscan or MPI_Iexscan for Inter-communicators!");
   int size = ptr->getSize();
   int rank = ptr->getRank();
   // Like the reduction collectives, this treats the datatype as contiguous.

@@ -53,6 +53,7 @@ RECONVERSE_NA += \
   migration \
   megampi \
   privatization \
+  scan \
 
 endif
 endif

@@ -4,8 +4,8 @@
    Each rank's input is a deterministic function of (rank, element), so every
    rank can compute the inclusive or exclusive prefix over ranks 0..r on its
    own. Covered:
-     - int and double, MPI_SUM and MPI_MAX, a few elements and a large count
-       (large enough to take AMPI's zero-copy send paths);
+     - int and double, MPI_SUM and MPI_MAX, counts 1, 4 and 20000 (160 KB of
+       doubles per round message);
      - a non-commutative user op (composition of affine maps mod a prime),
        which checks that partial results are combined in rank order;
      - MPI_IN_PLACE;
@@ -22,7 +22,10 @@
 
    MPI_Exscan's recvbuf on rank 0 is undefined, so it is not checked there.
    The rank count that exposed the MPI_Exscan hang is 3 (any count that is not
-   a power of two): run with +vp 3, 5, 6 and 7 as well as powers of two. */
+   a power of two), so the Makefile runs +vp 3, 5 and 7 as well as 4.
+
+   AMPI's MPI_Finalize never returns, so a failure is reported through
+   MPI_Abort, which makes the run exit nonzero. */
 
 #include <mpi.h>
 #include <stdio.h>
@@ -341,6 +344,7 @@ int main(int argc, char **argv)
     else            printf("scan: %d failures on %d ranks\n", total, size);
     fflush(stdout);
   }
+  if (total != 0) MPI_Abort(MPI_COMM_WORLD, 1);
   MPI_Finalize();
-  return total == 0 ? 0 : 1;
+  return 0;
 }
