@@ -9239,7 +9239,7 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoall, const void* sendbuf, int sendcount, M
   }
 
   for (int i=0; i<num_neighbors; i++) {
-    newreq->reqs[num_neighbors+i] = ptr->send(MPI_ATA_TAG, rank_in_comm, ((char*)sendbuf)+(i*itemsize),
+    newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, ((char*)sendbuf)+(i*itemsize),
                                               sendcount, sendtype, neighbors[i], comm, I_SEND);
   }
   *request = ptr->postReq(newreq);

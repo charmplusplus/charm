@@ -7,7 +7,8 @@
 // user receive with an internal tag.
 //
 // Phase 7 checks that MPI_Probe/MPI_Iprobe with MPI_ANY_TAG skip a queued
-// internal (scatter) message.
+// internal (scatter) message. Phase 8 checks MPI_Ineighbor_alltoall on its
+// own (its sends and receives must use the same internal tag).
 //
 // Usage: ./wildcard [phase]   (no argument runs every phase)
 #include <stdio.h>
@@ -178,6 +179,18 @@ static void runPhase(Ctx &c, int phase)
     delete [] sbuf;
     break;
   }
+  case 8: { // MPI_Ineighbor_alltoall + MPI_Wait on a Cart communicator
+    MPI_Comm cart;
+    ringCart(&cart);
+    int cr;
+    MPI_Comm_rank(cart, &cr);
+    int sbuf[2] = { cr, cr }, rbuf[2] = { -1, -1 };
+    MPI_Ineighbor_alltoall(sbuf, 1, MPI_INT, rbuf, 1, MPI_INT, cart, &req);
+    MPI_Wait(&req, MPI_STATUS_IGNORE);
+    checkNbor(c, cart, phase, rbuf);
+    MPI_Comm_free(&cart);
+    break;
+  }
   }
   MPI_Barrier(MPI_COMM_WORLD);
 }
@@ -193,7 +206,7 @@ int main(int argc, char **argv)
   int n;
   MPI_Comm_size(MPI_COMM_WORLD, &n);
 
-  const int nphases = 7;
+  const int nphases = 8;
   int only = (argc > 1) ? atoi(argv[1]) : 0;
   if (n < 2) {
     if (wrank == 0) printf("wildcard: needs at least 2 ranks, skipping\n");
