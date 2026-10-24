@@ -178,6 +178,9 @@ int main(int argc, char** argv)
     if (total == 0) printf("cas test passed on %d ranks\n", size);
     else printf("cas test FAILED: %d errors\n", total);
   }
+  // AMPI's MPI_Finalize never returns (it ends in AMPI_Exit(0)), so a
+  // failure must be reported through the exit status of MPI_Abort.
+  if (total != 0) MPI_Abort(MPI_COMM_WORLD, 1);
   MPI_Finalize();
-  return total == 0 ? 0 : 1;
+  return 0;
 }
