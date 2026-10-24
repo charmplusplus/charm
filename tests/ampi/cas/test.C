@@ -122,6 +122,14 @@ static void testByteWindow(Ctx& c)
   MPI_Win_fence(0, win);
   check(res == target * 100 + 2, "disp_unit 1", "fetch_and_op: result", res, target * 100 + 2);
   check(wbuf[2] == rank * 100 + 3, "disp_unit 1", "fetch_and_op: target", wbuf[2], rank * 100 + 3);
+  // MPI_Get of one long: the remote reply must hold sizeof(long) bytes, not
+  // disp_unit*count = 1.
+  long g = -1;
+  MPI_Win_fence(0, win);
+  MPI_Get(&g, 1, MPI_LONG, target, 3 * sizeof(long), 1, MPI_LONG, win);
+  MPI_Win_fence(0, win);
+  check(g == target * 100 + 3, "disp_unit 1", "get: result", g, target * 100 + 3);
+
   check(wbuf[0] == rank * 100 + 0, "disp_unit 1", "untouched [0]", wbuf[0], rank * 100);
   check(wbuf[3] == rank * 100 + 3, "disp_unit 1", "untouched [3]", wbuf[3], rank * 100 + 3);
 

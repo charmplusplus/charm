@@ -330,7 +330,7 @@ AmpiMsg* ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int targtotalsize = winobj->disp_unit*targcnt;
+  int targtotalsize = tddt->getSize(targcnt); // bytes packed into the reply
   int orgunit = getDDT()->getSize(orgtype);
   char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
 
@@ -359,7 +359,7 @@ AmpiMsg* ampi::winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype,
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int targtotalsize = winobj->disp_unit*targcnt;
+  int targtotalsize = tddt->getSize(targcnt); // bytes packed into the reply
   int orgunit = getDDT()->getSize(orgtype);
 
   winobj->iget(orgcnt, orgunit, targdisp, targcnt, targunit);
@@ -539,7 +539,7 @@ AmpiMsg* ampi::winRemoteGetAccumulate(int orgtotalsize, char* sorgaddr, int orgc
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int targtotalsize = winobj->disp_unit*targcnt;
+  int targtotalsize = tddt->getSize(targcnt); // bytes packed into the reply
   int orgunit = getDDT()->getSize(orgtype);
   char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
 
