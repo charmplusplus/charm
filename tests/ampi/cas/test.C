@@ -5,9 +5,11 @@
 // on two PEs it is remote (ampi::winRemoteCompareAndSwap). MPI-3 semantics:
 // the target value is compared with the compare buffer; if they are equal the
 // origin value is written to the target; in every case the result buffer
-// receives the ORIGINAL target value.
+// receives the ORIGINAL target value. MPI-3.1 section 11.3.4 allows CAS only
+// on integer, logical, multi-language and byte datatypes.
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
 #include "mpi.h"
 
 // Per-rank state lives on the stack: AMPI ranks on one PE share globals.
@@ -126,6 +128,51 @@ static void testByteWindow(Ctx& c)
   MPI_Win_free(&win);
 }
 
+// MPI_BYTE window: values stay below 256 so no case wraps around.
+static void testByte(Ctx& c)
+{
+  const int rank = c.rank, target = c.target, source = c.source;
+  const char* n = "byte";
+  unsigned char wbuf[8];
+  for (int i = 0; i < 8; i++) wbuf[i] = (unsigned char)(rank * 16 + i);
+  MPI_Win win;
+  MPI_Win_create(wbuf, sizeof(wbuf), 1, MPI_INFO_NULL, MPI_COMM_WORLD, &win);
+
+  unsigned char orig = (unsigned char)(200 + rank), comp = (unsigned char)(target * 16 + 2), res = 255;
+  unsigned char orig3 = (unsigned char)(220 + rank), comp3 = (unsigned char)(target * 16 + 4), res3 = 255;
+  MPI_Win_fence(0, win);
+  MPI_Compare_and_swap(&orig, &comp, &res, MPI_BYTE, target, 2, win);
+  MPI_Compare_and_swap(&orig3, &comp3, &res3, MPI_BYTE, target, 3, win);
+  MPI_Win_fence(0, win);
+  check(res == target * 16 + 2, n, "match: result", res, target * 16 + 2);
+  check(res3 == target * 16 + 3, n, "no-match: result", res3, target * 16 + 3);
+  check(wbuf[2] == 200 + source, n, "match: target swapped", wbuf[2], 200 + source);
+  check(wbuf[3] == rank * 16 + 3, n, "no-match: target unchanged", wbuf[3], rank * 16 + 3);
+  for (int i = 0; i < 8; i++)
+    if (i != 2 && i != 3)
+      check(wbuf[i] == rank * 16 + i, n, "untouched element", wbuf[i], rank * 16 + i);
+
+  MPI_Win_free(&win);
+}
+
+// MPI_Fetch_and_op, unlike CAS, is valid on MPI_DOUBLE.
+static void testFetchAndOpDouble(Ctx& c)
+{
+  const int rank = c.rank, target = c.target;
+  const char* n = "double fetch_and_op";
+  double wbuf[2] = {rank + 0.5, rank + 0.25};
+  MPI_Win win;
+  MPI_Win_create(wbuf, sizeof(wbuf), sizeof(double), MPI_INFO_NULL, MPI_COMM_WORLD, &win);
+  double one = 1.0, res = -1.0;
+  MPI_Win_fence(0, win);
+  MPI_Fetch_and_op(&one, &res, MPI_DOUBLE, target, 1, MPI_SUM, win);
+  MPI_Win_fence(0, win);
+  check(res == target + 0.25, n, "result", res, target + 0.25);
+  check(wbuf[1] == rank + 1.25, n, "target", wbuf[1], rank + 1.25);
+  check(wbuf[0] == rank + 0.5, n, "untouched", wbuf[0], rank + 0.5);
+  MPI_Win_free(&win);
+}
+
 // MPI_Get into a non-contiguous origin type (every other int) from a
 // contiguous target.
 static void testGetNoncontigOrigin(Ctx& c)
@@ -168,8 +215,11 @@ int main(int argc, char** argv)
 
   testType<int>(c, MPI_INT, "int");
   testType<long>(c, MPI_LONG, "long");
-  testType<double>(c, MPI_DOUBLE, "double");
+  testType<unsigned>(c, MPI_UNSIGNED, "unsigned");
+  testType<int64_t>(c, MPI_INT64_T, "int64_t");
+  testByte(c);
   testByteWindow(c);
+  testFetchAndOpDouble(c);
   testGetNoncontigOrigin(c);
 
   int total = 0;
