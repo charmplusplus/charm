@@ -5701,9 +5701,21 @@ AMPI_API_IMPL(int, MPI_Ireduce_scatter, const void* sendbuf, void* recvbuf, cons
    two).
 
    Called from the rank's thread when the scan starts, and from ampi::generic
-   (an entry method) when a posted round is matched. Messages go out through
-   the array proxy, never delivered inline, so a send here cannot re-enter
-   this function for this request. */
+   (an entry method) when a posted round is matched.
+
+   Each round's message is a packed copy sent through the array proxy, not
+   through delesend, which would pick a faster path by size and locality:
+   - PE-local inline delivery would run the partner's progressScan, and in
+     turn other ranks', inside this call. While this request is between
+     rounds it is not posted, so a reply delivered inline would be matched by
+     another outstanding scan posted for the same tag and partner.
+   - The zero-copy paths (sync sends at AMPI_SSEND_THRESHOLD, node-local at
+     AMPI_NODE_LOCAL_THRESHOLD, RDMA at AMPI_RDMA_THRESHOLD) leave the send
+     buffer in use until a completion callback, but partial changes in the
+     next round; and their receive side goes through the sync-message and
+     receiveRdma paths, which ScanReq does not implement.
+   Measured on one PE with 8 ranks, MPI_Scan costs about 1.5-2.5 us more per
+   call for 4 doubles and is within noise for 20000 doubles. */
 void ampi::progressScan(ScanReq* req, AmpiMsg* msg, bool deleteMsg) noexcept
 {
   while (true) {
