@@ -555,7 +555,9 @@ static void ipcHandleOpen();
 static constexpr uint64_t HAPI_CUPTI_NO_OBJECT =
     GpuObjectTokenTable::noObjectToken();
 
-// The flush gate. cuptiActivityFlushAll on one thread (the LB helper, or the last PE of the process to reach the
+// The flush gate. Since the lock-free close (2026-10-23, see the deferred close below) the LB window close on CUDA
+// flushes nothing and takes no gate; the gated flush remains for the +gputrace stop, the exit flush and the HIP
+// close. cuptiActivityFlushAll on one thread (the LB helper, or the last PE of the process to reach the
 // window close) races with the kernel-launch intercept of another PE thread inside CUPTI: the +LBAsync segfault
 // (job 22809309, two more with the retired-buffer quarantine in place; every backtrace is the first launch of the
 // next step, cudaLaunchKernel -> libcupti, at a window close). Every driver call the runtime issues for a chare goes
@@ -884,8 +886,10 @@ static int hapiCuptiGateCount() {
   const int n = CsvAccess(gpu_manager).device_count;
   return n < 1 ? 1 : (n > HAPI_CUPTI_MAX_GATES ? HAPI_CUPTI_MAX_GATES : n);
 }
+static void hapiCuptiFlusherWait(bool close);   // the close's flusher thread (CUDA; nothing on HIP)
 void hapiCuptiFlushGated(bool forced) {
   if (t_cupti_gate_depth > 0) CmiAbort("hapiCuptiFlushGated: called from inside a gated launch");
+  hapiCuptiFlusherWait(false);
   const bool timeIt = hapiCuptiTimeIt();
   // The gate exists for the FORCED flush, which takes every thread's open buffer from under its launch intercept
   // (the +LBAsync segfault, job 22809309). The non-forced flush returns only buffers whose records are complete --
@@ -955,6 +959,62 @@ static void hapiCuptiFreeRetired(uint64_t keep_drains) {
   for (auto& b : out) g_cupti_free.push_back(b);
 }
 
+// ---- The deferred close ------------------------------------------------------------------------------------
+// At AtSync the window is only MARKED. Kernels issued before the mark may still be queued or running, and the
+// record that carries a kernel's load exists only once the kernel has completed. On HIP it is written by ROCr's
+// single async-signal thread, which on a loaded GCD runs 20-50k records behind the device (Frontier 2026-10-23).
+// On CUDA it is reserved in the launching thread's activity buffer at the launch and its timestamps are written
+// when the kernel completes: the forced flush at the close handed the record of every kernel still in flight
+// back incomplete. A snapshot taken at the mark therefore missed the tail of the window -- exactly the last steps
+// of every element's sample under +LBAsync -- and on Frontier the most loaded process read a fifth to a half of
+// its device load (DiffusionLB then moved 1,300-2,000 objects into it and the next window ran 136 ms/step
+// against 75). The last PE to arrive now calls hapiCuptiCloseBegin, keeps running, and polls
+// hapiCuptiCloseComplete from its scheduler loop until the records of the work issued before the mark are in
+// (per backend, below) or the bound (CHARM_CLOSE_WAIT_MS, default 1000) has passed. Records of work issued after
+// the mark are set aside for the next drain (hapiProcessCuptiBuffers), so a round's accounting is exact and
+// nothing is clipped. Under the barrier the PEs wait anyway; under +LBAsync the application runs on and the
+// strategy starts when the records are in.
+struct CuptiCloseWait {
+  bool active = false;
+  uint64_t mark = 0;               // the window close, in the records' clock
+  uint32_t corr_at_mark = 0;       // HIP: the largest correlation id of a call that began before the mark
+  double t0 = 0.0, last_poll = 0.0;
+  size_t scanned = 0;              // HIP: queue items already scanned
+  std::unordered_set<uint32_t> pending;        // HIP: launches before the mark without a completion record
+  std::unordered_set<uint32_t> unmatched_pre;  // HIP: completion records (id <= corr_at_mark) with no launch record:
+                                               // a packet written under an untraced call carries an id of its own
+  unsigned idle = 0, polls = 0, stall = 0;
+  size_t best_gap = (size_t)-1;     // HIP: the smallest (pending - unmatched_pre) seen: progress means pre-mark records still arrive
+  uint64_t launches = 0, kernels = 0, kernels_pre = 0, arrived_in_wait = 0;
+  // CUDA: the activity buffers CUPTI held at the mark and not yet returned, and the default flushes of the wait.
+  std::vector<uint8_t*> bufs;
+  size_t bufs_at_mark = 0, bufs_at_end = 0;
+  unsigned flushes = 0;                       // CUDA: flushes the wait asked the flusher thread for
+  double flush_gap_ms = 10.0;                 // CUDA: the interval to the next ask; doubles each ask up to 100 ms
+  uint64_t flush_calls_at_mark = 0, flusher_calls = 0;   // CUDA: the flusher's calls, and those during the wait
+  double flush_ms = 0.0, flush_ms_at_mark = 0.0, last_flush = 0.0;   // CUDA: the flusher's time in them
+  const char* ended_by = "";        // CUDA: "returned" (every buffer held at the mark is back), "bound"
+  bool timed_out = false;
+  double waited_ms = 0.0;          // the last close, for the timing print
+  size_t pending_at_end = 0, unmatched_at_end = 0;
+};
+static CuptiCloseWait g_cupti_close;
+static uint64_t g_cupti_mark_ns = 0;      // set while a deferred close is in progress or awaiting its drain
+static bool g_cupti_mark_set = false;
+static bool g_cupti_drain_deferred = false;   // this drain's records are complete to the mark: count them whole
+static bool g_cupti_close_flushless = false;   // CUDA: the close got its buffers back; the build does not flush
+// The activity buffers CUPTI holds: handed out by cuptiBufferRequested, not yet back through cuptiBufferCompleted.
+// The deferred close on CUDA waits for those it held at the mark.
+static std::mutex g_cupti_out_lock;
+static std::unordered_set<uint8_t*> g_cupti_outstanding;
+// Kernel records without timestamps in the last normalisation, owned by an object or not (the close line): on CUDA
+// the records of kernels a forced flush caught in flight (see the deferred close on CUDA).
+static size_t g_cupti_untimed_owned = 0, g_cupti_untimed_unowned = 0;
+static double hapiCuptiCloseBoundMs() {
+  static const double ms = getenv("CHARM_CLOSE_WAIT_MS") ? atof(getenv("CHARM_CLOSE_WAIT_MS")) : 1000.0;
+  return ms;
+}
+
 #if CMK_CUDA
 static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t *maxNumRecords) {
   // CUPTI writes activity records straight into this buffer and has no way to
@@ -974,8 +1034,17 @@ static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t
   // at all 80 events, 46.2 vs 40.5 ms/step) and at 16 KB the flush itself took 71 ms per drain.
   // Under the non-forced flush (HAPI_CUPTI_FLUSH_FORCED 0) the open buffer per thread is the window's unreported
   // tail, so 64 KB (~3 sph3d steps of a 25-step window; the coverage scale of hapiNormalizeCuptiLoads extrapolates it).
+  // Since the lock-free close (2026-10-23) the buffers are one per context, shared by its threads, and the close
+  // waits for the one open at the mark to come back, which it does once FULL and complete: while the context keeps
+  // launching an incomplete record is always in it, so no default flush returns it. Its size is therefore the
+  // close's wait beyond the device's queued work. 32 KB (~130 launches with their API records) fills inside the
+  // step's launch burst; 256 KB did not on the busiest 16x8x8 rank, which issues a step in a burst and then waits
+  // ~2 s on the GPU, so the buffer open at the mark filled only in the next step's burst: 3 of 4 of that rank's
+  // closes hit the 1 s bound and one waited 2.7 s under a 3 s bound, against 0.84-0.95 s at 32 KB (its queued work;
+  // 100-150 ms at 8x4x4). The drain's time did not change (0.12 s per close at 16x8x8 at both sizes) and the extra
+  // buffer callbacks are ~40 per second per process (job 23143184, A40 2026-10-23).
   static const size_t first = getenv("CHARM_LB_CUPTI_BUFKB") ? (size_t)atoi(getenv("CHARM_LB_CUPTI_BUFKB")) * 1024
-                              : (HAPI_CUPTI_FLUSH_FORCED ? 1024*1024 : 64*1024);
+                              : 32*1024;
   {
     std::lock_guard<std::mutex> lk(g_cupti_free_lock);
     if (!g_cupti_free.empty()) {
@@ -983,16 +1052,20 @@ static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t
       *size = g_cupti_free.back().second;
       *maxNumRecords = 0;
       g_cupti_free.pop_back();
+      std::lock_guard<std::mutex> o(g_cupti_out_lock);
+      g_cupti_outstanding.insert(*buffer);
       return;
     }
   }
-  const size_t sizes[] = {first, 1024*1024, 256*1024};
+  const size_t sizes[] = {first, 32*1024, 16*1024};
   for (size_t s : sizes) {
     *buffer = (uint8_t *)malloc(s);
     if (*buffer != NULL) {
       memset(*buffer, 0, s);   // fault the pages in here, once, not under CUPTI's record writes
       *size = s;
       *maxNumRecords = 0;
+      std::lock_guard<std::mutex> o(g_cupti_out_lock);
+      g_cupti_outstanding.insert(*buffer);
       return;
     }
   }
@@ -1003,49 +1076,157 @@ static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t
 static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t streamId,
                                           uint8_t *buffer, size_t size, size_t validSize) {
   GPUManager& gm = CsvAccess(gpu_manager);
-
+  {
+    std::lock_guard<std::mutex> o(g_cupti_out_lock);
+    g_cupti_outstanding.erase(buffer);
+  }
   std::lock_guard<std::mutex> lk(gm.cupti_queue_lock_);
   gm.cupti_buffer_queue_.push_back({buffer, validSize, size, (void*)ctx, nullptr});
   if (g_cupti_flush_counting) { g_cupti_flush_cbs++; g_cupti_flush_cb_bytes += validSize; }
 }
+// The deferred close on CUDA (see above). CUPTI reserves a kernel's record in an activity buffer at the launch and
+// writes its timestamps when the kernel completes. A forced flush hands back every buffer as it stands -- the record
+// of a kernel still queued or running comes back with no timestamps and is never completed afterwards (A40
+// 2026-10-23: 0-178 of 6-16k kernels per process per close) -- and it races CUPTI's launch intercept, so it ran
+// with every launch of the process held on the launch locks: up to 1.4 s on the busiest 16x8x8 rank. The close
+// therefore takes no lock and forces nothing. It records the buffers CUPTI holds at the mark and waits until every
+// one has come back through cuptiBufferCompleted: CUPTI returns a buffer only when all its records are complete, so
+// then every kernel launched before the mark has its timestamps. The buffers are one per context (see
+// hapiTraceBackendAttach): one per thread stayed open while its thread kept launching, an incomplete record always
+// in it. A full buffer comes back through CUPTI's worker; one that is not full (a context gone quiet) through a
+// default flush, asked 10 ms after the mark and then at a doubling interval up to 100 ms (hapiCuptiCloseComplete),
+// which runs alongside the launches by design. The buffers are small (32 KB, cuptiBufferRequested) so that the one
+// open at the mark fills inside the step's launch burst and the wait is the device's queued work. The drain then
+// keeps the kernels launched before the mark (hapiSplitKernelsAfterLaunch) and leaves the rest for the next round.
+// The close's default flushes run on a thread of their own, never on a PE: a CUPTI flush, forced or not, returns
+// only once the device has run the work queued ahead of it -- 0.5-2.4 s per close on the busiest 16x8x8 ranks
+// (leanmd, A40 2026-10-23), the same with CUPTI's and the driver's threads moved off the PEs' cores -- and a PE
+// inside that call holds up its objects. One per process, started at the first close, on any core (not the
+// creating PE's, which it would inherit). Heap-held and never destroyed (a static condition variable destroyed by
+// exit() under a waiting thread blocks the exit, LBOffThread.h). Every flush of the runtime's own waits out a call
+// in progress (hapiCuptiFlusherWait), and cuptiFinalize stops the flusher for good.
+struct CuptiFlusher {
+  std::mutex m;
+  std::condition_variable cv;
+  bool requested = false, busy = false, closed = false;
+  uint64_t calls = 0;
+  double total_ms = 0.0;
+};
+static CuptiFlusher& g_flusher = *new CuptiFlusher;
+static void hapiCuptiFlushAsync() {
+  static std::once_flag started;
+  std::call_once(started, [] {
+    std::thread([] {
+      cpu_set_t any;
+      CPU_ZERO(&any);
+      for (int c = 0; c < CPU_SETSIZE; c++) CPU_SET(c, &any);
+      sched_setaffinity(0, sizeof(any), &any);   // the kernel keeps the cores the process may use
+      CuptiFlusher& f = g_flusher;
+      std::unique_lock<std::mutex> lk(f.m);
+      for (;;) {
+        f.cv.wait(lk, [&f] { return f.requested; });
+        f.requested = false;
+        if (f.closed) continue;
+        f.busy = true;
+        lk.unlock();
+        const double t0 = CmiWallTimer();
+        hapiTraceBackendFlush(false);
+        const double t1 = CmiWallTimer();
+        lk.lock();
+        f.busy = false;
+        f.calls++;
+        f.total_ms += (t1 - t0) * 1000.0;
+        f.cv.notify_all();
+      }
+    }).detach();
+  });
+  std::lock_guard<std::mutex> lk(g_flusher.m);
+  if (!g_flusher.busy && !g_flusher.requested && !g_flusher.closed) {
+    g_flusher.requested = true;
+    g_flusher.cv.notify_all();
+  }
+}
+static void hapiCuptiFlusherWait(bool close) {
+  std::unique_lock<std::mutex> lk(g_flusher.m);
+  if (close) { g_flusher.closed = true; g_flusher.requested = false; }
+  g_flusher.cv.wait(lk, [] { return !g_flusher.busy; });
+}
+void hapiCuptiCloseBegin() {
+  CuptiCloseWait& w = g_cupti_close;
+  w = CuptiCloseWait();
+  if (!hapiCuptiTracingActive()) return;
+  {
+    std::lock_guard<std::mutex> lk(g_flusher.m);
+    w.flush_calls_at_mark = g_flusher.calls;
+    w.flush_ms_at_mark = g_flusher.total_ms;
+  }
+  // No launch lock: the drain assigns a kernel by its launch's correlation id (hapiSplitKernelsAfterLaunch).
+  w.mark = hapiTraceBackendTimestamp();
+  {
+    std::lock_guard<std::mutex> o(g_cupti_out_lock);
+    w.bufs.assign(g_cupti_outstanding.begin(), g_cupti_outstanding.end());
+  }
+  w.bufs_at_mark = w.bufs.size();
+  w.t0 = CmiWallTimer();
+  w.last_poll = w.t0;
+  w.last_flush = w.t0;
+  w.active = true;
+}
+bool hapiCuptiCloseComplete() {
+  CuptiCloseWait& w = g_cupti_close;
+  if (!w.active) return true;
+  const double now = CmiWallTimer();
+  if ((now - w.last_poll) * 1000.0 < 1.0) return false;   // at most one check per ms
+  w.last_poll = now;
+  w.polls++;
+  auto prune = [&w]() {
+    std::lock_guard<std::mutex> o(g_cupti_out_lock);
+    size_t keep = 0;
+    for (size_t i = 0; i < w.bufs.size(); i++)
+      if (g_cupti_outstanding.count(w.bufs[i])) w.bufs[keep++] = w.bufs[i];
+    w.bufs.resize(keep);
+  };
+  prune();
+  // CUPTI's worker returns full buffers on its own. A default flush returns only a buffer whose records are all
+  // complete, so while the context keeps launching it cannot return the one open at the mark (an incomplete record
+  // is always in it) and that buffer comes back once full. The flush is for a context gone quiet -- the barrier, the
+  // final close, an idle rank -- whose buffer will never fill. One is asked 10 ms after the mark, then at an interval
+  // that doubles to 100 ms: every 10 ms (90 asks per close at 16x8x8, job 23143184) none ever ended a close, the
+  // flusher served a fraction of them, and each sat 28-150 ms inside CUPTI on the busy ranks. The call takes no lock
+  // and runs alongside the launches (cupti_activity.h).
+  if (!w.bufs.empty() && (now - w.last_flush) * 1000.0 >= w.flush_gap_ms) {
+    hapiCuptiFlushAsync();   // asks; never waits
+    w.flushes++;
+    w.last_flush = now;
+    w.flush_gap_ms = std::min(100.0, w.flush_gap_ms * 2.0);
+  }
+  bool done = true;
+  if (w.bufs.empty()) w.ended_by = "returned";
+  else if ((now - w.t0) * 1000.0 >= hapiCuptiCloseBoundMs()) { w.ended_by = "bound"; w.timed_out = true; }
+  else done = false;
+  if (!done) return false;
+  w.waited_ms = (CmiWallTimer() - w.t0) * 1000.0;
+  w.bufs_at_end = w.bufs.size();
+  {
+    std::lock_guard<std::mutex> lk(g_flusher.m);
+    w.flusher_calls = g_flusher.calls - w.flush_calls_at_mark;
+    w.flush_ms = g_flusher.total_ms - w.flush_ms_at_mark;
+  }
+  w.active = false;
+  g_cupti_mark_ns = w.mark;
+  g_cupti_mark_set = true;
+  g_cupti_close_flushless = true;
+  return true;
+}
 #else
+static void hapiCuptiFlusherWait(bool) {}   // the HIP close flushes from its own poll
 // A HIP backend (hapi_trace_rocprof.cpp) converts each buffer callback into a
 // HapiTraceBatch and queues it here.
-// ---- The deferred close ------------------------------------------------------------------------------------
-// At AtSync the window is only MARKED. Kernels issued before the mark may still be queued or running, and on
-// HIP the completion record of a kernel is written by ROCr's single async-signal thread, which on a loaded
-// GCD runs 20-50k records behind the device (Frontier 2026-10-23). A snapshot taken at the mark therefore
-// missed the tail of the window -- exactly the last steps of every element's sample under +LBAsync -- and
-// the most loaded process read a fifth to a half of its device load (DiffusionLB then moved 1,300-2,000
-// objects into it and the next window ran 136 ms/step against 75). The last PE to arrive now calls
-// hapiCuptiCloseBegin, keeps running, and polls hapiCuptiCloseComplete from its scheduler loop: each poll
-// flushes and scans what arrived, keeping the set of launches issued before the mark that have no completion
-// record yet. The window is complete when that set is empty, or when the handler has visibly passed the mark
-// (two consecutive deliveries with kernels and none ending before it: a launch whose packet was written
-// under an untraced call carries a correlation id of its own and never matches), or when the device has gone
-// quiet, or at the bound. Records of work issued after the mark are set aside for the next drain
-// (hapiProcessCuptiBuffers), so a round's accounting is exact and nothing is clipped. Under the barrier the
-// PEs wait anyway; under +LBAsync the application runs on and the strategy starts when the records are in.
-struct CuptiCloseWait {
-  bool active = false;
-  uint64_t mark = 0;               // the window close, in the records' clock
-  uint32_t corr_at_mark = 0;       // the largest correlation id of a call that began before the mark
-  double t0 = 0.0, last_poll = 0.0;
-  size_t scanned = 0;              // queue items already scanned
-  std::unordered_set<uint32_t> pending;        // launches before the mark without a completion record
-  std::unordered_set<uint32_t> unmatched_pre;  // completion records (id <= corr_at_mark) with no launch record:
-                                               // a packet written under an untraced call carries an id of its own
-  unsigned idle = 0, polls = 0, stall = 0;
-  size_t best_gap = (size_t)-1;     // the smallest (pending - unmatched_pre) seen: progress means pre-mark records still arrive
-  uint64_t launches = 0, kernels = 0, kernels_pre = 0, arrived_in_wait = 0;
-  bool timed_out = false;
-  double waited_ms = 0.0;          // the last close, for the timing print
-  size_t pending_at_end = 0, unmatched_at_end = 0;
-};
-static CuptiCloseWait g_cupti_close;
-static uint64_t g_cupti_mark_ns = 0;      // set while a deferred close is in progress or awaiting its drain
-static bool g_cupti_mark_set = false;
-static bool g_cupti_drain_deferred = false;   // this drain's records are complete to the mark: count them whole
+// The deferred close on HIP (see above): each poll flushes and scans what arrived, keeping the set of launches
+// issued before the mark that have no completion record yet. The window is complete when that set is empty, or
+// when the handler has visibly passed the mark (two consecutive deliveries with kernels and none ending before
+// it: a launch whose packet was written under an untraced call carries a correlation id of its own and never
+// matches), or when the device has gone quiet, or at the bound.
 static bool hapiCuptiIsLaunchCbid(uint32_t cbid) {
   static std::vector<signed char> cache;
   const uint32_t n = hapiTraceBackendCallbackIdCount() + 1;
@@ -1076,7 +1257,7 @@ void hapiCuptiCloseBegin() {
 bool hapiCuptiCloseComplete() {
   CuptiCloseWait& w = g_cupti_close;
   if (!w.active) return true;
-  static const double bound_ms = getenv("CHARM_CLOSE_WAIT_MS") ? atof(getenv("CHARM_CLOSE_WAIT_MS")) : 1000.0;
+  const double bound_ms = hapiCuptiCloseBoundMs();
   const double now = CmiWallTimer();
   if (w.last_poll >= 0.0 && (now - w.last_poll) * 1000.0 < 1.0) return false;   // at most one flush per ms
   const bool first = (w.last_poll < 0.0);
@@ -1361,6 +1542,18 @@ bool hapiCuptiTraceMemcpy() {
 #if CMK_CUDA
 // ---- the CUDA trace backend: CUPTI's activity API ----
 bool hapiTraceBackendAttach() {
+  {   // One activity buffer per context, shared by its threads, instead of one per thread (the default): the deferred
+      // close needs the buffer open at the mark back without a forced flush, and a thread that keeps launching
+      // keeps its own buffer open (an incomplete record in it) until it fills, several steps later. The context's
+      // buffer fills at the rate of all its threads. Must precede the callbacks (cupti_activity.h).
+    static bool set = false;
+    if (!set) {
+      set = true;
+      uint8_t per_thread = 0;
+      size_t sz = sizeof(per_thread);
+      CUPTI_SAFE_CALL(cuptiActivitySetAttribute(CUPTI_ACTIVITY_ATTR_PER_THREAD_ACTIVITY_BUFFER, &sz, &per_thread));
+    }
+  }
   CUPTI_SAFE_CALL(
       cuptiActivityRegisterCallbacks(cuptiBufferRequested, cuptiBufferCompleted));
   // API records name their thread by the OS id (gettid), the id the mapping recorded per PE.
@@ -1434,7 +1627,10 @@ const char* hapiTraceBackendCallbackName(uint32_t cbid) {
   return name;
 }
 uint32_t hapiTraceBackendCallbackIdCount() { return CUPTI_RUNTIME_TRACE_CBID_SIZE; }
-void hapiTraceBackendFinalize() { CUPTI_SAFE_CALL(cuptiFinalize()); }
+void hapiTraceBackendFinalize() {
+  hapiCuptiFlusherWait(true);
+  CUPTI_SAFE_CALL(cuptiFinalize());
+}
 #endif
 
 void hapiCuptiStartTracing() {
@@ -2132,6 +2328,18 @@ static void hapiTraceForEachRecord(CuptiBufferItem& item, FK&& onKernel, FC&& on
     for (const HapiTraceApiRec& r : item.batch->apis) onApi(&r);
   }
 }
+// A queued buffer's records as a batch (a no-op for a batch already): the deferred close's drain sets the
+// post-mark records of a CUDA buffer aside the way it does a HIP batch's. The buffer stays on the item and is
+// retired with it.
+static void hapiTraceItemToBatch(CuptiBufferItem& item) {
+  if (item.batch != nullptr) return;
+  HapiTraceBatch* b = new HapiTraceBatch;
+  if (item.buffer != nullptr && item.validSize > 0)
+    hapiTraceForEachRecord(item, [b](const HapiTraceKernelRec* k) { b->kernels.push_back(*k); },
+                           [b](const HapiTraceCopyRec* c) { b->copies.push_back(*c); },
+                           [b](const HapiTraceApiRec* a) { b->apis.push_back(*a); });
+  item.batch = b;
+}
 
 // Pass 1, one shard, its own thread: every record of its buffers, resolved against this shard
 // alone; what needs another shard waits in sh.pending / sh.pendingApi for pass 2.
@@ -2556,6 +2764,22 @@ static void hapiSplitAfterMark(V& vec, uint64_t mark, V& out) {
   }
   vec.resize(keep);
 }
+// Kernels by LAUNCH, not start: the round owns what was launched before the mark, also a kernel still queued
+// at the mark that ran after it. Correlation ids come from one counter of the process, taken when the call
+// begins, and the mark is stamped with no gated launch in flight, so every launch before the mark has an id at
+// or below corr_mark (the largest of the API records that began before it) and every later one above.
+// g_cupti_kept_started_after counts the kernels the split by start would have moved to the next round.
+static size_t g_cupti_kept_started_after = 0;
+template <class V>
+static void hapiSplitKernelsAfterLaunch(V& vec, uint32_t corr_mark, uint64_t mark, V& out) {
+  size_t keep = 0;
+  for (size_t i = 0; i < vec.size(); i++) {
+    if (vec[i].correlationId > corr_mark) { out.push_back(vec[i]); continue; }
+    if (vec[i].start >= mark) g_cupti_kept_started_after++;
+    vec[keep++] = vec[i];
+  }
+  vec.resize(keep);
+}
 void hapiProcessCuptiBuffers() {
   GPUManager& gm = CsvAccess(gpu_manager);
   hapiPopulateDeviceProps(gm);  // lazy: device_managers is ready by now
@@ -2577,14 +2801,32 @@ void hapiProcessCuptiBuffers() {
     // The deferred close: records of work issued after the mark belong to the next round and go back to the
     // front of the queue; what this drain parses is complete to the mark and is counted whole.
     g_cupti_drain_deferred = g_cupti_mark_set;
+    // The last launch before the mark (see hapiSplitKernelsAfterLaunch); without API records, kernels split
+    // by start. Copy records carry no correlation id and split by start.
+    uint32_t corr_mark = 0;
+    bool have_corr_mark = false;
+    g_cupti_kept_started_after = 0;
+    if (g_cupti_mark_set) {
+      for (CuptiBufferItem& q : gm.cupti_buffer_queue_) {
+        hapiTraceItemToBatch(q);
+        if (q.batch == nullptr) continue;
+        for (const HapiTraceApiRec& a : q.batch->apis)
+          if (a.start < g_cupti_mark_ns && (!have_corr_mark || a.correlationId > corr_mark)) {
+            corr_mark = a.correlationId;
+            have_corr_mark = true;
+          }
+      }
+    }
     std::vector<CuptiBufferItem> after;
     while (!gm.cupti_buffer_queue_.empty()) {
       CuptiBufferItem it = gm.cupti_buffer_queue_.front();
       gm.cupti_buffer_queue_.pop_front();
+      if (g_cupti_mark_set) hapiTraceItemToBatch(it);   // CUDA: the buffer's records, complete to the mark
       if (g_cupti_mark_set && it.batch != nullptr) {
         const uint64_t mark = g_cupti_mark_ns;
         HapiTraceBatch* post = new HapiTraceBatch;
-        hapiSplitAfterMark(it.batch->kernels, mark, post->kernels);
+        if (have_corr_mark) hapiSplitKernelsAfterLaunch(it.batch->kernels, corr_mark, mark, post->kernels);
+        else hapiSplitAfterMark(it.batch->kernels, mark, post->kernels);
         hapiSplitAfterMark(it.batch->apis, mark, post->apis);
         hapiSplitAfterMark(it.batch->copies, mark, post->copies);
         if (post->kernels.empty() && post->apis.empty() && post->copies.empty()) { delete post; post = nullptr; }
@@ -2595,7 +2837,11 @@ void hapiProcessCuptiBuffers() {
           after.push_back({nullptr, bytes_post, 0, nullptr, post});
           it.validSize -= bytes_post;
         }
-        if (it.batch->kernels.empty() && it.batch->apis.empty() && it.batch->copies.empty()) { delete it.batch; continue; }
+        // Nothing before the mark: a batch alone is dropped here, a CUDA buffer goes on (empty) to be retired.
+        if (it.buffer == nullptr && it.batch->kernels.empty() && it.batch->apis.empty() && it.batch->copies.empty()) {
+          delete it.batch;
+          continue;
+        }
       }
       valid += it.validSize;
       items[i % nShards].push_back(it);
@@ -2942,19 +3188,20 @@ void hapiNormalizeCuptiLoads(int onlyDevice) {
   // cross-node moves and a 136 ms/step window. Counted in the next drain the time lands one round late,
   // which a steady rate does not notice; the audit still reports what arrived late (late_counted) and what
   // started before the window (straddle).
-  // After a deferred close (HIP) every record of the drain was issued before the mark and the round owns it
-  // whole, straddling or not; nothing is late by construction (a record older than the previous mark can only
-  // follow a bound timeout, and is counted, not dropped). Without one (CUDA's forced flush) the original rule
-  // stands: a record that ended before this window is the previous window's tail delivered late and is
-  // dropped; one that straddles the start is clipped to it.
+  // After a deferred close (both vendors) every record of the drain was issued before the mark and the round
+  // owns it whole, straddling or not; nothing is late by construction (a record older than the previous mark
+  // can only follow a bound timeout, and is counted, not dropped). Without one (a drain with tracing off, or
+  // hapiTraceStop's) the original rule stands: a record that ended before this window is the previous window's
+  // tail delivered late and is dropped; one that straddles the start is clipped to it.
   const bool whole = g_cupti_drain_deferred;
   size_t late_n = 0, clip_n = 0; uint64_t late_ns = 0, clip_ns = 0;
   auto noteLate = [&](const LBKernelRecord& k) { late_n++; late_ns += k.end_ns - k.start_ns; };
   auto noteClip = [&](const LBKernelRecord& k, uint64_t start) { if (start > k.start_ns && k.end_ns > start) { clip_n++; clip_ns += start - k.start_ns; } };
+  g_cupti_untimed_owned = g_cupti_untimed_unowned = 0;
   for (const auto& kv : gm.cupti_obj_kernel_records_) {
     for (const LBKernelRecord& k : kv.second) {
-      if (k.end_ns <= k.start_ns) continue;
       if (onlyDevice >= 0 && k.device_id != (uint32_t)onlyDevice) continue;
+      if (k.end_ns <= k.start_ns) { g_cupti_untimed_owned++; continue; }
       if (win_prev > 0 && k.end_ns <= win_prev) { noteLate(k); if (!whole) continue; }
       const uint64_t start = (!whole && win_prev > 0 && k.start_ns < win_prev) ? win_prev : k.start_ns;
       if (win_prev > 0 && k.start_ns < win_prev) noteClip(k, win_prev);
@@ -2964,8 +3211,8 @@ void hapiNormalizeCuptiLoads(int onlyDevice) {
     }
   }
   for (const LBKernelRecord& k : gm.cupti_unattributed_kernels_) {
-    if (k.end_ns <= k.start_ns) continue;
     if (onlyDevice >= 0 && k.device_id != (uint32_t)onlyDevice) continue;
+    if (k.end_ns <= k.start_ns) { g_cupti_untimed_unowned++; continue; }
     if (win_prev > 0 && k.end_ns <= win_prev) { noteLate(k); if (!whole) continue; }
     const uint64_t start = (!whole && win_prev > 0 && k.start_ns < win_prev) ? win_prev : k.start_ns;
     if (win_prev > 0 && k.start_ns < win_prev) noteClip(k, win_prev);
@@ -3406,7 +3653,10 @@ static void hapiPrepareCuptiLoadsImpl(uint64_t epoch, int dev) {
     g_cupti_window_prev_ns = g_cupti_window_close_ns;
     g_cupti_window_close_ns = now;
   }
-  if (hapiCuptiTracingActive()) hapiCuptiFlushGated(HAPI_CUPTI_FLUSH_FORCED != 0);
+  // After a CUDA deferred close the buffers holding the window are back already: no flush, so no launch waits.
+  if (hapiCuptiTracingActive() && !(g_cupti_mark_set && g_cupti_close_flushless))
+    hapiCuptiFlushGated(HAPI_CUPTI_FLUSH_FORCED != 0);
+  g_cupti_close_flushless = false;
   const double t1 = timeIt ? CmiWallTimer() : 0.0;
   std::unique_lock<std::mutex> lk(gm.cupti_prepare_lock_);
   const double t1b = timeIt ? CmiWallTimer() : 0.0;   // the wait on the lock (the other device closers' parses)
@@ -3446,6 +3696,13 @@ static void hapiPrepareCuptiLoadsImpl(uint64_t epoch, int dev) {
               CmiMyPe(), g_cupti_close.waited_ms, g_cupti_close.polls, (unsigned long long)g_cupti_close.launches,
               (unsigned long long)g_cupti_close.kernels_pre, (unsigned long long)g_cupti_close.arrived_in_wait,
               g_cupti_close.pending_at_end, g_cupti_close.unmatched_at_end, g_cupti_close.timed_out ? " TIMED OUT" : "");
+    if (g_cupti_close.ended_by[0] != '\0')   // CUDA: the buffers waited for
+      CmiPrintf("[LBCUPTI pe=%d] close buffers held at the mark=%zu, still out at the end=%zu; default flushes asked %u, "
+                "done by the flusher thread %llu (%.1f ms); ended by %s; kernel records without timestamps: owned %zu unowned %zu; launched before "
+                "the mark, started after it: %zu\n",
+                CmiMyPe(), g_cupti_close.bufs_at_mark, g_cupti_close.bufs_at_end, g_cupti_close.flushes,
+                (unsigned long long)g_cupti_close.flusher_calls, g_cupti_close.flush_ms, g_cupti_close.ended_by,
+                g_cupti_untimed_owned, g_cupti_untimed_unowned, g_cupti_kept_started_after);
     CmiPrintf("[LBCUPTI pe=%d] flush=%.3fs process=%.3fs normalize=%.3fs total=%.3fs shards=%zu free=%zu"
               " wait=%.3fs retire=%.3fs pass1=%.3fs pass2=%.3fs merge=%.3fs snap=%.3fs/%lluKB bufs=%zu/%lluKB"
               " gate=%.3fs call=%.3fs cbs=%u/%lluKB cover=%.2f scale=%.2f threads=%zu capped=%zu\n",

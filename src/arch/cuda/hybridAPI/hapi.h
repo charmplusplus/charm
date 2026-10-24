@@ -588,10 +588,10 @@ int hapiDeviceGroupSize();
 int hapiDeviceGroupFirstPe();
 int hapiMyDeviceIndex();
 void hapiPrepareCuptiLoadsDevice(uint64_t epoch, int dev);
-// The deferred close (HIP): the last PE of the process to arrive marks the window (hapiCuptiCloseBegin) and
+// The deferred close: the last PE of the process to arrive marks the window (hapiCuptiCloseBegin) and
 // polls hapiCuptiCloseComplete from its scheduler loop until every kernel issued before the mark has
-// completed and its record been delivered (or the bound CHARM_CLOSE_WAIT_MS, default 1000, has passed);
-// only then is the round's load built. Immediately complete where there is nothing to wait for (CUDA).
+// completed and its record is in (or the bound CHARM_CLOSE_WAIT_MS, default 1000, has passed); only then
+// is the round's load built. Immediately complete when tracing is off.
 void hapiCuptiCloseBegin();
 bool hapiCuptiCloseComplete();
 void hapiClearCuptiDataDevice(int dev);
