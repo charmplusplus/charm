@@ -222,6 +222,13 @@ struct DeferredArraySend
 typedef std::unordered_map<int, std::vector<DeferredArraySend>> DeferredArraySends;
 CkpvStaticDeclare(DeferredArraySends, deferredArraySends);
 
+static void deferArraySend(int entryIndex, void* msg, CkArrayID aID,
+                           const CkArrayIndex& idx, int opts)
+{
+  CkpvAccess(deferredArraySends)[((CkGroupID)aID).idx].push_back(
+      DeferredArraySend{entryIndex, msg, idx, opts});
+}
+
 void ArrayElement::initBasics(void)
 {
 #if CMK_OUT_OF_CORE
@@ -1224,8 +1231,8 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage* msg, int ep, int opts) cons
   {  // Usual case: a direct send
     CkArray* localbranch = ckLocalBranch();
     if (localbranch == NULL)
-    {  // array not created yet
-      CkAbort("Cannot send a message from an array without a local branch");
+    {  // array manager not created on this PE yet: hold until it is
+      deferArraySend(ep, msg, ckGetArrayID(), _idx, opts & (~CK_MSG_INLINE));
     }
     else
     {
@@ -1283,13 +1290,6 @@ void CkSetMsgArrayIfNotThere(void* msg, CkArray_IfNotThere policy)
   env->setMsgtype(ForArrayEltMsg);
   CkArrayMessage* m = (CkArrayMessage*)msg;
   m->array_setIfNotThere(policy);
-}
-
-static void deferArraySend(int entryIndex, void* msg, CkArrayID aID,
-                           const CkArrayIndex& idx, int opts)
-{
-  CkpvAccess(deferredArraySends)[((CkGroupID)aID).idx].push_back(
-      DeferredArraySend{entryIndex, msg, idx, opts});
 }
 
 void _ckArrayFlushDeferredSends(CkGroupID mgr)

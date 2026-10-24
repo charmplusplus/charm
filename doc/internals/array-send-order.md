@@ -25,14 +25,16 @@ this path through `_processArrayEltMsg`.
 
 ## Sending from a PE that has no manager yet
 
-`CkSendMsgArray` and `CkSendMsgArrayInline` hold the send when the sending
-PE has no local branch of the manager. The send (entry index, message,
+`CkSendMsgArray`, `CkSendMsgArrayInline` and `CProxyElement_ArrayBase::ckSend`
+(the path of a generated proxy call such as `a[i].foo()`) hold the send when
+the sending PE has no local branch of the manager. The send (entry index, message,
 element index, options) goes into a per-PE table keyed by the manager's group
 id (`deferredArraySends`, ckarray.C). `CkCreateLocalGroup` calls
 `_ckArrayFlushDeferredSends` after the new group is ready, and every held
 send for that group id is re-issued through `CkSendMsgArray` in the order it
-was held. A held inline send is re-issued as a queued send, since there was
-no manager to deliver inline to when it was called.
+was held. A held inline send (`CkSendMsgArrayInline`, or `ckSend` with
+`CK_MSG_INLINE`) is re-issued as a queued send, since there was no manager to
+deliver inline to when it was called.
 
 The table is per PE and keyed by group id. A group creation costs one hash
 lookup in it, and nothing else.
@@ -56,7 +58,7 @@ PE, and the flush is unconditional when it is processed.
 
 - src/ck-core/ckarray.C: `DeferredArraySend`, `deferArraySend`,
   `_ckArrayFlushDeferredSends`, `CkSendMsgArray`, `CkSendMsgArrayInline`,
-  `CkArray::sendMsg`.
+  `CProxyElement_ArrayBase::ckSend`, `CkArray::sendMsg`.
 - src/ck-core/ck.C: `CkCreateLocalGroup` (calls the flush after
   `CkReadyEntry`), `_lookupGroupAndBufferIfNotThere`, `_processArrayEltMsg`,
   `_prepareOutgoingArrayMsg` (quiescence count), `_createGroup`.
