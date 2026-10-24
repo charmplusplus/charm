@@ -5780,6 +5780,18 @@ static int ampiStartScan(const char* name, const void* sendbuf, void* recvbuf, i
     CkAbort("AMPI does not implement MPI_Scan, MPI_Exscan, MPI_Iscan or MPI_Iexscan for Inter-communicators!");
   int size = ptr->getSize();
   int rank = ptr->getRank();
+
+  if (size == 1) {
+    // Nothing to exchange: an inclusive scan is a copy (through the datatype,
+    // so non-contiguous types work), an exclusive one leaves recvbuf alone.
+    int ret = MPI_SUCCESS;
+    if (!exclusive && sendbuf != recvbuf)
+      ret = copyDatatype(datatype, count, datatype, count, sendbuf, recvbuf);
+    *request = pptr->getReqs().insert(new ScanReq(recvbuf, count, datatype, op, comm, rank, size,
+                                                  exclusive, 0, ptr->getDDT(), AMPI_REQ_COMPLETED));
+    return ret;
+  }
+
   // Like the reduction collectives, this treats the datatype as contiguous.
   int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
 
