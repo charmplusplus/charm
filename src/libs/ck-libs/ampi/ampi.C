@@ -1697,6 +1697,24 @@ MPI_User_function* ampiParent::op2User_function(MPI_Op op) const noexcept {
   }
 }
 
+MPI_User_function* ampiParent::op2StoredFunction(MPI_Op op, bool* isUser) const noexcept {
+  if (opIsPredefined(op)) {
+    *isUser = false;
+    return predefinedOps[op];
+  }
+  int opIdx = op - 1 - AMPI_MAX_PREDEFINED_OP;
+  CkAssert(opIdx < userOps.size());
+  *isUser = true;
+  return userOps[opIdx].func;
+}
+
+void ScanReq::applyOp(const void* in, void* inout) noexcept {
+  MPI_User_function* f = userFunc ? ampiPeMgrProxy.ckLocalBranch()->getUserFunction(func) : func;
+  int n = count;
+  MPI_Datatype t = type;
+  (*f)(const_cast<void*>(in), inout, &n, &t);
+}
+
 int ampiParent::createKeyval(MPI_Comm_copy_attr_function *copy_fn, MPI_Comm_delete_attr_function *delete_fn,
                              int *keyval, void* extra_state) noexcept {
   KeyvalNode* newnode = new KeyvalNode(copy_fn, delete_fn, extra_state);
@@ -5706,18 +5724,18 @@ void ampi::progressScan(ScanReq* req, AmpiMsg* msg, bool deleteMsg) noexcept
       }
       if (req->rank > partner) {
         // tmp covers ranks below this rank's subtree: it comes first
-        parent->applyOp(req->type, req->op, req->count, req->tmp.data(), req->partial.data());
+        req->applyOp(req->tmp.data(), req->partial.data());
         if (!req->exclusive) {
-          parent->applyOp(req->type, req->op, req->count, req->tmp.data(), req->buf);
+          req->applyOp(req->tmp.data(), req->buf);
         } else if (!req->haveResult) {
           memcpy(req->buf, req->tmp.data(), req->tmp.size());
           req->haveResult = true;
         } else {
-          parent->applyOp(req->type, req->op, req->count, req->tmp.data(), req->buf);
+          req->applyOp(req->tmp.data(), req->buf);
         }
       } else {
         // tmp covers ranks above: partial = partial op tmp
-        parent->applyOp(req->type, req->op, req->count, req->partial.data(), req->tmp.data());
+        req->applyOp(req->partial.data(), req->tmp.data());
         std::swap(req->partial, req->tmp);
       }
       req->mask <<= 1;
@@ -5797,6 +5815,9 @@ static int ampiStartScan(const char* name, const void* sendbuf, void* recvbuf, i
 
   ScanReq* req = new ScanReq(recvbuf, count, datatype, op, comm, rank, size, exclusive,
                              blklen, ptr->getDDT());
+  // Resolve the op now: MPI_Op_free while the scan is outstanding must not
+  // affect it (MPI-3.1 sec. 5.9.5), and freeOp drops the op's table entry.
+  req->func = pptr->op2StoredFunction(op, &req->userFunc);
   memcpy(req->partial.data(), sendbuf, blklen);
   if (!exclusive && sendbuf != recvbuf) {
     memcpy(recvbuf, sendbuf, blklen);

@@ -1739,6 +1739,17 @@ class ScanReq final : public AmpiRequest {
   bool haveResult = false; // exclusive scan: buf already holds a value
   std::vector<char> partial; // reduction over this rank's current subtree
   std::vector<char> tmp;     // the partner's partial result
+  // The op's function, captured when the scan starts so that MPI_Op_free on
+  // a user op while the scan is outstanding is safe (freeOp drops the op's
+  // table entry, and MPI_Op_create may reuse it). For a user op this is the
+  // stored form from OpStruct::func (an offset under PIEglobals), resolved on
+  // each call. The scan always combines in rank order, so it never needs the
+  // op's commutativity.
+  MPI_User_function* func = nullptr;
+  bool userFunc = false;
+
+  /// inout = in op inout
+  void applyOp(const void* in, void* inout) noexcept;
 
   ScanReq(void *buf_, int count_, MPI_Datatype type_, MPI_Op op_, MPI_Comm comm_,
           int rank_, int size_, bool exclusive_, int blklen, CkDDT *ddt_,
@@ -1771,6 +1782,8 @@ class ScanReq final : public AmpiRequest {
     p|haveResult;
     p|partial;
     p|tmp;
+    p((char *)&func, sizeof(func)); // code addresses (or offsets) match on every PE
+    p|userFunc;
   }
   void print() const noexcept override;
 };
@@ -2644,6 +2657,9 @@ class ampiParent final : public CBase_ampiParent {
     }
   }
   MPI_User_function* op2User_function(MPI_Op op) const noexcept;
+  /// The op's function in the form ampiParent stores it (for a user op, an
+  /// offset under PIEglobals; resolve it with resolveOpFunction).
+  MPI_User_function* op2StoredFunction(MPI_Op op, bool* isUser) const noexcept;
   inline AmpiOpHeader op2AmpiOpHeader(MPI_Op op, MPI_Datatype type, int count) const noexcept {
     if (opIsPredefined(op)) {
       int size = myDDT.getType(type)->getSize(count);

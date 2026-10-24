@@ -18,6 +18,7 @@
        only after receiving it), and a scan must advance while a rank is
        blocked in MPI_Recv on something else (rank 0 waits for a message the
        last rank sends only after its own scan has completed);
+     - MPI_Op_free on a user op while scans using it are outstanding;
      - with +balancer, an AMPI_Migrate while scans are outstanding.
 
    MPI_Exscan's recvbuf on rank 0 is undefined, so it is not checked there.
@@ -54,6 +55,13 @@ static void affineCompose(void *invec, void *inoutvec, int *len, MPI_Datatype *d
     io[i]   = (int)((a1 * a2) % MODP);
     io[i+1] = (int)((a2 * b1 + b2) % MODP);
   }
+}
+
+// A different function for the op created after the free: if a pending scan
+// looked its op up again, it would find this one and get wrong values.
+static void otherOp(void *invec, void *inoutvec, int *len, MPI_Datatype *dt)
+{
+  for (int i = 0; i < *len; i++) ((int *)inoutvec)[i] += ((const int *)invec)[i] + 1;
 }
 
 static int ival(int rank, int i) { return ((rank * 7 + i * 3) % 11) - 5; }
@@ -275,6 +283,38 @@ static void progressTests(MPI_Comm comm, Ctx &x)
   }
 }
 
+// MPI_Op_free on a user op while scans using it are outstanding: the pending
+// scans must complete normally (MPI-3.1 sec. 5.9.5). Rank 0 frees the op and
+// creates another one (which may reuse the freed slot) before the other ranks
+// have entered the scans, so rounds run after the free.
+static void opFreeTest(MPI_Comm comm, Ctx &x)
+{
+  int rank, size;
+  MPI_Comm_rank(comm, &rank);
+  MPI_Comm_size(comm, &size);
+  Ctx y = x;
+  MPI_Op_create(affineCompose, 0, &y.affineOp);
+  Case cs[2];
+  MPI_Request reqs[2];
+  for (int j = 0; j < 2; j++) {
+    cs[j].kind = K_AFFINE; cs[j].count = 6; cs[j].exclusive = j;
+    fill(cs[j], rank, y);
+  }
+  int token = 0;
+  if (rank != 0 && size > 1) MPI_Recv(&token, 1, MPI_INT, 0, 79, comm, MPI_STATUS_IGNORE);
+  MPI_Iscan(cs[0].send.data(), cs[0].recv.data(), cs[0].count, MPI_INT, y.affineOp, comm, &reqs[0]);
+  MPI_Iexscan(cs[1].send.data(), cs[1].recv.data(), cs[1].count, MPI_INT, y.affineOp, comm, &reqs[1]);
+  MPI_Op_free(&y.affineOp);
+  MPI_Op other;
+  MPI_Op_create(otherOp, 1, &other);   // may take the freed slot
+  if (rank == 0) for (int r = 1; r < size; r++) MPI_Send(&token, 1, MPI_INT, r, 79, comm);
+  MPI_Waitall(2, reqs, MPI_STATUSES_IGNORE);
+  MPI_Op_free(&other);
+  x.failures = y.failures;
+  verify(cs[0], rank, "MPI_Iscan after MPI_Op_free", x);
+  verify(cs[1], rank, "MPI_Iexscan after MPI_Op_free", x);
+}
+
 #ifdef AMPI
 // Migrate while scans are outstanding (with +balancer, ranks move and their
 // posted scan requests are packed and unpacked).
@@ -325,6 +365,7 @@ int main(int argc, char **argv)
 
   runSuite(MPI_COMM_WORLD, "WORLD", x);
   progressTests(MPI_COMM_WORLD, x);
+  opFreeTest(MPI_COMM_WORLD, x);
 #ifdef AMPI
   migrateTest(MPI_COMM_WORLD, x);
 #endif
