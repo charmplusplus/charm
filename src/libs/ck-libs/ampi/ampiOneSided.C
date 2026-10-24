@@ -577,7 +577,7 @@ int ampi::winCompareAndSwap(const void *orgaddr, const void *compaddr, void *res
   }
 
   AmpiMsg* msg = thisProxy[rank].winRemoteCompareAndSwap(size, (char*)orgaddr, (char*)compaddr,
-                                                         type, targdisp, win->index);
+                                                         targdisp, win->index);
   // The reply carries the original target value: copy it out into resaddr.
   memcpy(resaddr, msg->getData(), size);
 
@@ -603,8 +603,8 @@ void ampi::winLocalCompareAndSwap(int size, char* sorgaddr, char* compaddr, char
   }
 }
 
-AmpiMsg* ampi::winRemoteCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Datatype type,
-                                       MPI_Aint targdisp, int winIndex) noexcept {
+AmpiMsg* ampi::winRemoteCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Aint targdisp,
+                                       int winIndex) noexcept {
   AmpiMsg *msg = new (size, 0) AmpiMsg(0, 0, MPI_RMA_TAG, thisIndex, size);
   winLocalCompareAndSwap(size, sorgaddr, compaddr, msg->getData(), targdisp, winIndex);
   return msg;
