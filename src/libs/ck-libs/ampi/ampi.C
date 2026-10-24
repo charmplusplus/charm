@@ -8358,8 +8358,10 @@ AMPI_API_IMPL(int, MPI_Igatherv, const void *sendbuf, int sendcount, MPI_Datatyp
                                                recvcounts, displs, getDDT()));
   }
   else {
-    *request = ptr->postCollReq(new GathervReq(recvbuf, size, recvtype, comm,
-                                               recvcounts, displs, getDDT(), AMPI_REQ_COMPLETED));
+    // recvcounts and displs are significant only at the root and may be NULL
+    // elsewhere, so a non-root's (already complete) request copies none.
+    *request = ptr->postCollReq(new GathervReq(recvbuf, 0, recvtype, comm,
+                                               nullptr, nullptr, getDDT(), AMPI_REQ_COMPLETED));
   }
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);

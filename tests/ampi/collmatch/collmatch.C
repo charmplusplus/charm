@@ -20,6 +20,9 @@
            (barrier first and alltoall first), and an Ibarrier behind a
            wildcard Irecv. The barrier used to complete through a message
            keyed like rank 0's alltoall block.
+   Part 7: MPI_Igatherv (rank r sends r+1 values) with NULL recvcounts and
+           displs on the non-roots, which MPI allows, outstanding together
+           with an Iallreduce.
 
    Roots rotate with the iteration so that every rank is sometimes the root.
    Every result is checked against a value computed locally. */
@@ -148,8 +151,9 @@ int main(int argc, char **argv)
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
   const int iters = (argc > 1) ? atoi(argv[1]) : 50;
-  /* Bit mask of the parts to run: 1 = parts 1-4, 2 = part 5, 4 = part 6. */
-  const int parts = (argc > 2) ? atoi(argv[2]) : 7;
+  /* Bit mask of the parts to run: 1 = parts 1-4, 2 = part 5, 4 = part 6,
+     8 = part 7. */
+  const int parts = (argc > 2) ? atoi(argv[2]) : 15;
 
   MPI_Comm sub; /* even ranks / odd ranks */
   MPI_Comm_split(MPI_COMM_WORLD, rank % 2, rank, &sub);
@@ -235,6 +239,36 @@ int main(int argc, char **argv)
       MPI_Wait(&rreq, MPI_STATUS_IGNORE);
       check(rank, iter, "P6 wildcard Irecv behind Ibarrier", msg, 2000L * ((rank + size - 1) % size) + iter);
       MPI_Barrier(MPI_COMM_WORLD); /* as in part 5 */
+    }
+
+    /* Part 7 */
+    if (parts & 8) {
+      const int root = (iter + 2) % size;
+      std::vector<long> sendv(rank + 1);
+      for (int k = 0; k <= rank; k++) sendv[k] = gatVal(rank, iter) + 10L * k;
+      std::vector<int> counts, displs;
+      std::vector<long> recvv;
+      if (rank == root) {
+        counts.resize(size); displs.resize(size);
+        int off = 0;
+        for (int r = 0; r < size; r++) { counts[r] = r + 1; displs[r] = off; off += r + 1; }
+        recvv.assign(off, -1);
+      }
+      red = -1;
+      MPI_Request q[2];
+      MPI_Igatherv(sendv.data(), rank + 1, MPI_LONG, rank == root ? recvv.data() : NULL,
+                   rank == root ? counts.data() : NULL, rank == root ? displs.data() : NULL,
+                   MPI_LONG, root, MPI_COMM_WORLD, &q[0]);
+      MPI_Iallreduce(&in, &red, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD, &q[1]);
+      MPI_Waitall(2, q, MPI_STATUSES_IGNORE);
+      check(rank, iter, "P7 Iallreduce", red, Expected{size, iter}.sum(0));
+      if (rank == root)
+        for (int r = 0; r < size; r++)
+          for (int k = 0; k <= r; k++) {
+            char what[96];
+            snprintf(what, sizeof what, "P7 Igatherv[%d][%d]", r, k);
+            check(rank, iter, what, recvv[displs[r] + k], gatVal(r, iter) + 10L * k);
+          }
     }
   }
 
