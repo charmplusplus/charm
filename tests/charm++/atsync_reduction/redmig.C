@@ -39,6 +39,8 @@
 //            broadcasts are not stored for migrating elements)
 //        -d (AtSync only after the step's results arrived; see above)
 //        -o (require the results of a step in reduction order)
+//        -z (start each step with a zero-copy broadcast of 4096 ints; on
+//            reconverse it arrives as a send-done message with the payload)
 //        -M (require at least one migration; use with a balancer and >1 PE)
 //        -A (no AtSync: reductions only, checks the test's own protocol)
 //        -w <watchdog stall threshold in seconds, default 10; 0 disables>
@@ -60,6 +62,7 @@
 /*readonly*/ int staticIns;
 /*readonly*/ int drained;
 /*readonly*/ int inOrder;
+/*readonly*/ int zcStep;
 /*readonly*/ CProxy_Sync syncProxy;
 /*readonly*/ int verbose;
 
@@ -97,6 +100,9 @@ static void abortFire(void* arg, double t) {
   CkAbort("redmig: hung (state dumped above)");
 }
 
+static const int zcLen = 4096;
+static int zcVal(int step, int i) { return step * 100000 + i; }
+
 class Main : public CBase_Main {
   int step = 0;
   int redIdx = 0;        // results of this step received so far
@@ -110,7 +116,7 @@ class Main : public CBase_Main {
 public:
   Main(CkArgMsg* m) {
     nElems = 8; nSteps = 20; nRed = 3; noSync = 0; toMain = 0; useBound = 0;
-    noKeep = 0; staticIns = 0; drained = 0; inOrder = 0;
+    noKeep = 0; staticIns = 0; drained = 0; inOrder = 0; zcStep = 0;
     verbose = 0;
     CmiGetArgInt(m->argv, "-n", &nElems);
     CmiGetArgInt(m->argv, "-i", &nSteps);
@@ -124,6 +130,7 @@ public:
     if (CmiGetArgFlag(m->argv, "-s")) staticIns = 1;
     if (CmiGetArgFlag(m->argv, "-d")) drained = 1;
     if (CmiGetArgFlag(m->argv, "-o")) inOrder = 1;
+    if (CmiGetArgFlag(m->argv, "-z")) zcStep = 1;
     if (CmiGetArgFlag(m->argv, "-M")) requireMigration = 1;
     delete m;
     CkEnforce(nElems >= 1 && nSteps >= 1 && nRed >= 1);
@@ -138,6 +145,7 @@ public:
                                       : "after the contributions",
              useBound ? " on a bound array" : "",
              staticIns ? ", static insertion" : "");
+    if (zcStep) CkPrintf("redmig: each step starts with a zero-copy broadcast\n");
     mainProxy = thisProxy;
     CkArrayOptions opts(nElems);
     if (staticIns) { opts.setStaticInsertion(true); opts.setAnytimeMigration(false); }
@@ -151,7 +159,23 @@ public:
     t0 = CkWallTimer();
     lastAdvance = t0;
     if (wdSecs > 0) CcdCallFnAfter(watchdogFire, NULL, 2000);
-    elemProxy.nextStep(0);
+    startStep(0);
+  }
+
+  // Step s begins with a plain broadcast, or with -z a zero-copy one whose
+  // buffer is freed when the send completes (zcSent).
+  void startStep(int s) {
+    if (!zcStep) { elemProxy.nextStep(s); return; }
+    int* buf = new int[zcLen];
+    for (int i = 0; i < zcLen; i++) buf[i] = zcVal(s, i);
+    CkCallback cb(CkIndex_Main::zcSent(NULL), thisProxy);
+    elemProxy.nextStepZC(s, CkSendBuffer(buf, cb), zcLen);
+  }
+
+  void zcSent(CkDataMsg* m) {
+    CkNcpyBuffer* src = (CkNcpyBuffer*)(m->data);
+    delete[] (int*)src->ptr;
+    delete m;
   }
 
   void checkProgress() {
@@ -202,7 +226,7 @@ public:
 
   void advance() {
     step++;
-    if (step < nSteps) elemProxy.nextStep(step);
+    if (step < nSteps) startStep(step);
     else elemProxy.finish();
   }
 
@@ -287,6 +311,17 @@ public:
     CkEnforce(s == curStep + 1);
     if (inSync) { pendingStep = s; return; }
     doStep(s);
+  }
+
+  void nextStepZC(int s, int* data, int n) {
+    CkEnforce(n == zcLen);
+    for (int i = 0; i < n; i++) {
+      if (data[i] != zcVal(s, i))
+        CkPrintf("redmig: elem %d step %d zero-copy data[%d] = %d, expected %d\n",
+                 thisIndex, s, i, data[i], zcVal(s, i));
+      CkEnforce(data[i] == zcVal(s, i));
+    }
+    nextStep(s);
   }
 
   // A result of curStep, in any order, never before this element contributed

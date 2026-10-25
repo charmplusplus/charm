@@ -934,6 +934,7 @@ CkArray::CkArray(CkArrayOptions&& opts, CkMarshalledMessage&& initMsg)
   // Find, register, and initialize the arrayListeners
   listenerDataOffset = 0;
   broadcaster = new CkArrayBroadcaster(stableLocations, opts.broadcastViaScheduler);
+  broadcaster->setOwner(this);
   addListener(broadcaster);
   reducer = new CkArrayReducer(thisgroup);
   addListener(reducer);
@@ -1010,6 +1011,7 @@ void CkArray::pup(PUP::er& p)
     locMgr->addIndexListener([=](const CkArrayIndex& idx, CmiUInt8 id, int pe) { this->sendBufferedMsgs(idx, id, pe); });
     /// Restore our default listeners:
     broadcaster = (CkArrayBroadcaster*)(CkArrayListener*)(listeners[0]);
+    broadcaster->setOwner(this);
     reducer = (CkArrayReducer*)(CkArrayListener*)(listeners[1]);
     setupSpringCleaning();
   }
@@ -1436,6 +1438,15 @@ bool CkArrayBroadcaster::attemptDelivery(CkArrayMessage* bcast, ArrayElement* el
 bool CkArrayBroadcaster::bringUpToDate(ArrayElement* el)
 {
   int& elBcastNo = getData(el);
+  // A stable-locations array frees a broadcast once every local element has it,
+  // on the promise that no element moves while a broadcast is in flight
+  // (doc/internals/array-broadcast-migration.md)
+  if (stableLocations && elBcastNo < storedBcasts.getHeadEpoch())
+    CkAbort("Array element %s arrived on PE %d expecting broadcast %d, which this PE "
+            "freed (next kept: %d). An element of an array with static insertion and "
+            "setAnytimeMigration(false) moved while a broadcast to the array was in "
+            "flight, which such an array does not allow.\n",
+            idx2str(el), CkMyPe(), elBcastNo, storedBcasts.getHeadEpoch());
   // Keep delivering broadcasts while we have the next one in sequence
   while (storedBcasts.hasBcast(elBcastNo))
   {
@@ -1564,12 +1575,25 @@ void CkArrayBroadcaster::springCleaning(void) { storedBcasts.springCleaning(); }
 
 // Stable locations: no element will ever need a broadcast that every local
 // element has received, so free those now instead of at spring cleaning.
-void CkArrayBroadcaster::releaseDelivered(const std::vector<CkMigratable*>& elements)
+void CkArrayBroadcaster::releaseDelivered()
 {
+  if (!stableLocations)
+    return;
   int below = INT_MAX;
-  for (CkMigratable* m : elements)
+  for (CkMigratable* m : owner->localElemVec)
     below = std::min(below, getData((ArrayElement*)m));
-  storedBcasts.releaseDelivered(below);
+  storedBcasts.releaseBelow(below);
+}
+
+bool CkArrayBroadcaster::isFinalRecipient(const std::vector<CkMigratable*>& elements,
+                                          ArrayElement* el, const int epoch)
+{
+  if (getData(el) != epoch)
+    return false;
+  for (CkMigratable* m : elements)
+    if (m != el && getData((ArrayElement*)m) <= epoch)
+      return false;
+  return true;
 }
 
 void CkArrayBroadcaster::flushState() { storedBcasts.clear(); }
@@ -1750,8 +1774,9 @@ void CkArray::recvBroadcast(CkMessage* m)
   broadcaster->ingestIncoming(msg);
 
   int len = localElemVec.size();
-  // extract this field here so we can still check it even if msg is freed
+  // extract these fields here so we can still use them even if msg is freed
   const auto zc_msgtype = CMI_ZC_MSGTYPE(env);
+  const int epoch = env->getGroupEpoch();
 
   // Attempt to actually deliver the broadcast
   if (zc_msgtype == CMK_ZC_BCAST_RECV_ALL_DONE_MSG && len > 0)
@@ -1763,6 +1788,8 @@ void CkArray::recvBroadcast(CkMessage* m)
 
     bool doFree = true;  // free it since all ops are done
     broadcaster->attemptDelivery(msg, (ArrayElement*)localElemVec[0], doFree);
+    // The store held this message through the transfer; the delivery freed it
+    broadcaster->consumeBcast(epoch);
   }
   else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG && len > 0)
   {
@@ -1774,6 +1801,8 @@ void CkArray::recvBroadcast(CkMessage* m)
     // be finally freed by the first element in the
     // CMK_ZC_BCAST_RECV_ALL_DONE_MSG branch
     bool doFree = false;
+    // The transfer keeps using this message until its ALL_DONE delivery
+    broadcaster->holdBcast(epoch);
     broadcaster->attemptDelivery(msg, (ArrayElement*)localElemVec[0], doFree);
   }
   else
@@ -1791,19 +1820,25 @@ void CkArray::recvBroadcast(CkMessage* m)
     for (int i = len - 1; i >= 0; --i)
     {
       bool doFree = false;
-      // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the
-      // first element during CMK_ZC_BCAST_ALL_DONE_MSG
-      if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG)
-        doFree = false;
+      // On a stable-locations array the store would free the message right
+      // after this delivery, so the last element to receive it takes the
+      // original instead of a copy. A CMK_ZC_BCAST_RECV_DONE_MSG is freed by
+      // the first element at CMK_ZC_BCAST_RECV_ALL_DONE_MSG; a send-done
+      // message carries its payload inline and is an ordinary message here.
+      if (i == 0 && stableLocations &&
+          (zc_msgtype == CMK_REG_NO_ZC_MSG || zc_msgtype == CMK_ZC_SEND_DONE_MSG) &&
+          broadcaster->isFinalRecipient(localElemVec, (ArrayElement*)localElemVec[0], epoch))
+        doFree = true;
       CmiAssert(i < localElemVec.size());
       broadcaster->attemptDelivery(msg, (ArrayElement*)localElemVec[i], doFree);
+      if (doFree)
+        broadcaster->consumeBcast(epoch);
     }
 
 #endif  // CMK_CHARM4PY
   }
 
-  if (stableLocations)
-    broadcaster->releaseDelivered(localElemVec);
+  broadcaster->releaseDelivered();
 }
 
 void CkArray::forwardZCMsgToOtherElems(envelope* env)
@@ -1818,6 +1853,7 @@ void CkArray::forwardZCMsgToOtherElems(envelope* env)
     broadcaster->attemptDelivery((CkArrayMessage*)EnvToUsr(env), (ArrayElement*)localElemVec[i],
                          doFree);
   }
+  broadcaster->releaseDelivered();
 }
 
 void CkArray::forwardZCMsgToSpecificElem(envelope *env, CkMigratable *elem) {

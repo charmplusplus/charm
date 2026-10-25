@@ -21,6 +21,10 @@ test: redmig
 	$(call run, ./redmig +p2 -s -d -o -b -n 4 -i 5 +balancer RandCentLB -M)
 	$(call run, ./redmig +p2 -s -d -o -k -b -n 4 -i 20 +balancer RandCentLB -M)
 	$(call run, ./redmig +p4 -s -d -o -n 16 -r 3 -i 40 +balancer RandCentLB -M)
+	$(call run, ./redmig +p1 -s -d -z -n 1 -i 5)
+	$(call run, ./redmig +p2 -s -d -o -z -n 4 -i 5 +balancer RandCentLB -M)
+	$(call run, ./redmig +p4 -s -d -o -z -n 4 -i 20 +balancer RandCentLB -M)
+	$(call run, ./redmig +p2 -z -n 4 -i 5 +balancer RandCentLB -M)
 	$(call run, ./redmig +p2 -d -o -n 4 -i 5 +balancer RandCentLB -M)
 	$(call run, ./redmig +p2 +balancer RandCentLB -M)
 	$(call run, ./redmig +p2 -m +balancer RandCentLB -M)
@@ -34,6 +38,7 @@ test: redmig
 testp: redmig
 	$(call run, ./redmig +p$(P) -n 16 -r 3 -i 40 +balancer RandCentLB -M)
 	$(call run, ./redmig +p$(P) -s -d -o -n 16 -r 3 -i 40 +balancer RandCentLB -M)
+	$(call run, ./redmig +p$(P) -s -d -o -z -n 16 -r 3 -i 20 +balancer RandCentLB -M)
 
 smptest: redmig
 	$(call run, ./redmig +p2 ++ppn 2 +balancer RandCentLB -M)

@@ -33,10 +33,27 @@ the element is in the store and is delivered on arrival; one that reached the
 source PE before the element left was delivered there, and its epoch tells
 the destination to skip it.
 
-Stored broadcasts are freed by spring cleaning (`CkArrayBroadcaster::
-springCleaning`, on the array's periodic timer): a broadcast is kept until a
-cleaning pass finds it older than the newest broadcast seen at the previous
-pass.
+The store (`BcastQueue`, ckarray.h) keeps one slot per epoch from its head
+upward. A slot records whether its broadcast has arrived (seen), the message
+while the store still owns it, and whether the message is held by a zero-copy
+transfer. Freeing always starts at the head and stops at the first epoch not
+seen yet, because a broadcast still on its way may be older than a stored one
+(the next section says why), and at a held slot. Spring cleaning
+(`CkArrayBroadcaster::springCleaning`, on the array's periodic timer) frees
+up to the newest epoch seen at the previous pass under that rule, so a
+broadcast is kept for one to two minutes after it arrived.
+
+A zero-copy broadcast (`CMK_ZC_BCAST_RECV_MSG`) is delivered first to one
+local element, which posts its buffers; the transfer then runs on the same
+message, the other local elements receive it as `CMK_ZC_BCAST_RECV_DONE_MSG`
+(`CkArray::forwardZCMsgToOtherElems`), and the first element receives it once
+more as `CMK_ZC_BCAST_RECV_ALL_DONE_MSG`, which frees it. The store holds the
+slot from the first delivery (`holdBcast`) and marks it consumed at the last
+(`consumeBcast`): the message is gone, but the epoch counts as seen, so the
+head can move past it. (Reconverse completes a zero-copy broadcast's transfer
+on the sending side and forwards the payload inline as
+`CMK_ZC_SEND_DONE_MSG`, so the receive path above is not taken on it; the
+rule is kept for layers that forward the broadcast down a spanning tree.)
 
 ## Order
 
@@ -80,12 +97,23 @@ receives it twice.
 
 Under the promise no element will ever need a broadcast that every element on
 its PE has received, so such an array keeps no spring cleaning timer and
-instead frees the stored broadcasts after each delivery
-(`CkArrayBroadcaster::releaseDelivered`): every stored broadcast older than
-the lowest expected epoch among the PE's elements. A broadcast is then held
-only while an earlier one is still on its way, and the ordering above holds.
-Everything else, storing, the epoch check and the catch-up, is the same code
-in both modes.
+instead frees the stored broadcasts after every delivery path: at the end of
+`recvBroadcast`, after an arriving or newly created element has caught up,
+and after the zero-copy forwarding (`CkArrayBroadcaster::releaseDelivered`).
+It frees every stored broadcast older than the lowest expected epoch among
+the PE's elements, under the same stopping rule as spring cleaning. A
+broadcast is then held only while an earlier one is still on its way, and the
+ordering above holds. When the last local element to receive a plain
+broadcast is the one the store would free right afterwards, it takes the
+original message instead of a copy (`isFinalRecipient`), so an array with one
+element per PE receives broadcasts without a copy, as it did before
+broadcasts were stored for it. Everything else, storing, the epoch check and
+the catch-up, is the same code in both modes.
+
+If the promise is broken, an element arrives expecting an epoch below the
+head of the store on its new PE; it could never catch up and would receive
+no further broadcast. `bringUpToDate` aborts in that case and names the
+cause.
 
 In the tree, TCharm, AMPI and CkIO sessions create their arrays with these
 flags. AMPI keeps the promise by refusing `AMPI_Migrate` with a non-blocking
@@ -102,7 +130,7 @@ migration, at the memory cost of broadcasts kept until spring cleaning.
   `CkArray::sendBroadcast`, `CkArray::recvBroadcast`,
   `CkArrayBroadcaster::ingestIncoming`, `attemptDelivery`,
   `bringUpToDate`, `releaseDelivered`, `springCleaning`.
-- src/ck-core/ckarray.h: `BcastQueue` (`releaseBelow`).
+- src/ck-core/ckarray.h: `BcastQueue` (`releaseBelow`, `hold`, `consume`).
 - src/ck-core/ckarray.h: `CkArrayBroadcaster` (`ckElementStamp`,
   `ckElementArriving`), `CkArray::stableLocations`.
 - src/ck-core/init.C: `+noAnytimeMigration`.
@@ -110,6 +138,7 @@ migration, at the memory cost of broadcasts kept until spring cleaning.
   `checkNoCollectiveOutstanding`, the `setAnytimeMigration` calls.
 - tests/charm++/atsync_reduction: reductions in flight across an AtSync
   balancing step; with `-s -d`, an array with stable locations keeping the
-  promise; `-o` checks the delivery order.
+  promise; `-o` checks the delivery order; `-z` starts each step with a
+  zero-copy broadcast.
 - contrib/reconverse/README.md, "Messages to one destination can be
   reordered".

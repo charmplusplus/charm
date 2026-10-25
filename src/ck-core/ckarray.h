@@ -642,6 +642,7 @@ public:
 class CkArray : public CkReductionMgr
 {
   friend class ArrayElement;
+  friend class CkArrayBroadcaster;
   friend class CProxy_ArrayBase;
   friend class CProxyElement_ArrayBase;
   friend class CkLocMgr;
@@ -947,14 +948,37 @@ public:
 
   /// Element was just created on this processor
   /// Return false if the element migrated away or deleted itself.
-  virtual bool ckElementCreated(ArrayElement* elt) { return bringUpToDate(elt); }
-
-  // Stable locations: frees the stored broadcasts every local element has received
-  void releaseDelivered(const std::vector<CkMigratable*>& elements);
+  virtual bool ckElementCreated(ArrayElement* elt)
+  {
+    const bool stays = bringUpToDate(elt);
+    releaseDelivered();
+    return stays;
+  }
 
   /// Element just arrived on this processor (so just called pup)
   /// Return false if the element migrated away or deleted itself.
-  virtual bool ckElementArriving(ArrayElement* elt) { return bringUpToDate(elt); }
+  virtual bool ckElementArriving(ArrayElement* elt)
+  {
+    const bool stays = bringUpToDate(elt);
+    releaseDelivered();
+    return stays;
+  }
+
+  void setOwner(CkArray* array) { owner = array; }
+
+  // Stable locations: frees the stored broadcasts every local element has
+  // received. Does nothing for an array whose elements may move at any time.
+  void releaseDelivered();
+
+  // The message of this epoch is in use by a zero-copy transfer until the
+  // ALL_DONE delivery, which frees it
+  void holdBcast(const int epoch) { storedBcasts.hold(epoch); }
+  // The stored original was handed to an element and freed on delivery
+  void consumeBcast(const int epoch) { storedBcasts.consume(epoch); }
+  // True if el expects this broadcast and every other local element has it,
+  // so el may take the original
+  bool isFinalRecipient(const std::vector<CkMigratable*>& elements, ArrayElement* el,
+                        const int epoch);
 
   void ingestIncoming(CkArrayMessage* msg);
 
@@ -978,7 +1002,17 @@ private:
   class BcastQueue
   {
   private:
-    std::vector<CkArrayMessage*> storage{16};
+    // One slot per epoch from headEpoch up. A slot whose broadcast has arrived
+    // is seen; its message is null again once an element took the original
+    // (consumed). A held slot's message is still in use by a zero-copy
+    // transfer and is not freed until the ALL_DONE delivery consumes it.
+    struct Slot
+    {
+      CkArrayMessage* msg = nullptr;
+      bool seen = false;
+      bool held = false;
+    };
+    std::vector<Slot> storage{16};
     int headEpoch = 0;
     size_t headIndex = 0;
     size_t mask = 0x0F;
@@ -986,17 +1020,25 @@ private:
     int oldMaxEpoch = -1;  // Max epoch at last spring cleaning
 
     int getOffset(const int epoch) const { return epoch - headEpoch; }
+    bool inRange(const int epoch) const
+    {
+      const int offset = getOffset(epoch);
+      return offset >= 0 && offset < storage.size();
+    }
+    Slot& slot(const int epoch) { return storage[(headIndex + getOffset(epoch)) & mask]; }
+    const Slot& slot(const int epoch) const
+    {
+      return storage[(headIndex + getOffset(epoch)) & mask];
+    }
 
   public:
     BcastQueue() = default;
     BcastQueue(CkMigrateMessage* m) {}
     ~BcastQueue()
     {
-      for (CkArrayMessage* msg : storage)
-      {
-        if (msg != nullptr)
-          delete msg;
-      }
+      for (Slot& s : storage)
+        if (s.msg != nullptr)
+          delete s.msg;
     }
 
     // Inserts msg into the slot corresponding to epoch
@@ -1024,60 +1066,63 @@ private:
           std::move(storage.begin() + oldSize, storage.begin() + oldSize + headIndex,
                     storage.begin() + oldSize - headIndex);
           std::fill(storage.begin() + oldSize, storage.begin() + oldSize + headIndex,
-                    nullptr);
+                    Slot());
           headIndex = 0;
         }
       }
-      CkAssert(storage[(headIndex + offset) & mask] == nullptr);
-      storage[(headIndex + offset) & mask] = msg;
+      Slot& s = slot(epoch);
+      CkAssert(s.msg == nullptr && !s.seen);
+      s.msg = msg;
+      s.seen = true;
 
       curMaxEpoch = std::max(epoch, curMaxEpoch);
     }
 
     bool hasBcast(const int epoch) const
     {
-      const int offset = getOffset(epoch);
-      if (offset < 0 || offset >= storage.size())
-        return false;
-      return storage[(headIndex + offset) & mask] != nullptr;
+      return inRange(epoch) && slot(epoch).msg != nullptr;
     }
 
     CkArrayMessage* getBcast(const int epoch) const
     {
       CkAssert(hasBcast(epoch));
-      return storage[(headIndex + getOffset(epoch)) & mask];
+      return slot(epoch).msg;
     }
 
-    int getMaxEpoch() const
+    int getMaxEpoch() const { return curMaxEpoch; }
+    int getHeadEpoch() const { return headEpoch; }
+
+    // The message is in use by a zero-copy transfer: keep it until consumed
+    void hold(const int epoch)
     {
-      return curMaxEpoch;
+      CkAssert(hasBcast(epoch));
+      slot(epoch).held = true;
+    }
+
+    // An element took the original message and it was freed on delivery
+    void consume(const int epoch)
+    {
+      CkAssert(hasBcast(epoch));
+      Slot& s = slot(epoch);
+      s.msg = nullptr;
+      s.held = false;
     }
 
     // Frees the stored broadcasts below the given epoch, stopping at the first
-    // epoch not stored yet (one still on its way may be older than a stored one)
-    void releaseDelivered(const int below)
-    {
-      int epoch = headEpoch;
-      while (epoch < below && hasBcast(epoch)) epoch++;
-      releaseBelow(epoch);
-    }
-
-    // Frees every stored broadcast whose epoch is below the given one
+    // one not received yet (a broadcast still on its way may be older than a
+    // stored one) or still held by a zero-copy transfer
     void releaseBelow(const int epoch)
     {
-      const int nDelete = epoch - headEpoch;
-      if (nDelete > 0)
+      while (headEpoch < epoch)
       {
-        // DEBK((AA "Cleaning out %d old broadcasts\n" AB, nDelete));
-        for (size_t i = headIndex; i < headIndex + nDelete; i++)
-        {
-          CkArrayMessage* bcast = storage[i & mask];
-          if (bcast)
-            delete bcast;
-          storage[i & mask] = nullptr;
-        }
-        headIndex = (headIndex + nDelete) & mask;
-        headEpoch += nDelete;
+        Slot& s = slot(headEpoch);  // offset 0: always within storage
+        if (!s.seen || s.held)
+          break;
+        if (s.msg != nullptr)
+          delete s.msg;
+        s = Slot();
+        headIndex = (headIndex + 1) & mask;
+        headEpoch++;
       }
     }
 
@@ -1090,11 +1135,9 @@ private:
 
     void clear()
     {
-      for (CkArrayMessage* msg : storage)
-      {
-        if (msg)
-          delete msg;
-      }
+      for (Slot& s : storage)
+        if (s.msg != nullptr)
+          delete s.msg;
       storage.clear();
       storage.resize(16);
       headIndex = 0;
@@ -1117,6 +1160,7 @@ private:
   int bcastSendEpoch = 0;
   bool stableLocations;
   bool broadcastViaScheduler;
+  CkArray* owner = nullptr;  // the array whose local elements this serves
   // This queue stores old broadcasts (in case a migrant arrives
   // and needs to be brought up to date)
   BcastQueue storedBcasts;
