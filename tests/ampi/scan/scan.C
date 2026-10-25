@@ -9,7 +9,8 @@
      - a non-commutative user op (composition of affine maps mod a prime),
        which checks that partial results are combined in rank order;
      - MPI_IN_PLACE;
-     - non-contiguous datatypes: MPI_DOUBLE_INT with MPI_MAXLOC, and a
+     - non-contiguous datatypes: MPI_DOUBLE_INT with MPI_MAXLOC and with a
+       user MAXLOC that assigns whole padded structs, and a
        strided vector type with a user op, whose gaps in recvbuf must stay
        untouched;
      - a communicator from MPI_Comm_split, so communicator ranks differ from
@@ -301,6 +302,17 @@ static void vecSum(void *invec, void *inoutvec, int *len, MPI_Datatype *dt)
     for (int j = 0; j < 3; j++) io[e * 5 + 2 * j] += in[e * 5 + 2 * j];
 }
 
+// User MAXLOC on MPI_DOUBLE_INT that assigns whole (padded) structs, as
+// AMPI's own MAXLOC does: the scan's buffers must have room for the last
+// element's padding.
+static void structMaxloc(void *invec, void *inoutvec, int *len, MPI_Datatype *dt)
+{
+  const DoubleInt *in = (const DoubleInt *)invec;
+  DoubleInt *io = (DoubleInt *)inoutvec;
+  for (int k = 0; k < *len; k++)
+    if (in[k].v > io[k].v || (in[k].v == io[k].v && in[k].i < io[k].i)) io[k] = in[k];
+}
+
 static void derivedTests(MPI_Comm comm, Ctx &x)
 {
   int rank, size;
@@ -313,8 +325,13 @@ static void derivedTests(MPI_Comm comm, Ctx &x)
     int last = ex ? rank - 1 : rank;
     char how[128];
 
-    // MPI_DOUBLE_INT with MPI_MAXLOC (ties go to the lower index)
-    for (int n = 1; n <= 5; n += 4) {
+    // MPI_DOUBLE_INT with MPI_MAXLOC and with a user MAXLOC that assigns
+    // whole structs (ties go to the lower index)
+    MPI_Op umax;
+    MPI_Op_create(structMaxloc, 1, &umax);
+    for (int t = 0; t < 4; t++) {
+      int n = (t & 1) ? 5 : 1;
+      MPI_Op maxop = (t & 2) ? umax : MPI_MAXLOC;
       std::vector<DoubleInt> in(n), out(n), want(n);
       for (int k = 0; k < n; k++) {
         in[k].v = (double)((rank * 3 + k * 5) % 4);   // values repeat: ties
@@ -328,24 +345,27 @@ static void derivedTests(MPI_Comm comm, Ctx &x)
       }
       MPI_Request req;
       if (nb) {
-        if (ex) MPI_Iexscan(in.data(), out.data(), n, MPI_DOUBLE_INT, MPI_MAXLOC, comm, &req);
-        else    MPI_Iscan(in.data(), out.data(), n, MPI_DOUBLE_INT, MPI_MAXLOC, comm, &req);
+        if (ex) MPI_Iexscan(in.data(), out.data(), n, MPI_DOUBLE_INT, maxop, comm, &req);
+        else    MPI_Iscan(in.data(), out.data(), n, MPI_DOUBLE_INT, maxop, comm, &req);
         MPI_Wait(&req, MPI_STATUS_IGNORE);
       } else {
-        if (ex) MPI_Exscan(in.data(), out.data(), n, MPI_DOUBLE_INT, MPI_MAXLOC, comm);
-        else    MPI_Scan(in.data(), out.data(), n, MPI_DOUBLE_INT, MPI_MAXLOC, comm);
+        if (ex) MPI_Exscan(in.data(), out.data(), n, MPI_DOUBLE_INT, maxop, comm);
+        else    MPI_Scan(in.data(), out.data(), n, MPI_DOUBLE_INT, maxop, comm);
       }
       if (ex && rank == 0) continue;
       for (int k = 0; k < n; k++) {
         if (out[k].v != want[k].v || out[k].i != want[k].i) {
-          printf("FAIL: world rank %d (comm rank %d): %s MPI_DOUBLE_INT MAXLOC count %d element %d = (%g, %d), expected (%g, %d)\n",
-                 x.worldRank, rank, name, n, k, out[k].v, out[k].i, want[k].v, want[k].i);
+          printf("FAIL: world rank %d (comm rank %d): %s MPI_DOUBLE_INT %s count %d element %d = (%g, %d), expected (%g, %d)\n",
+                 x.worldRank, rank, name, (t & 2) ? "user MAXLOC" : "MPI_MAXLOC", n, k,
+                 out[k].v, out[k].i, want[k].v, want[k].i);
           fflush(stdout);
           x.failures++;
           break;
         }
       }
     }
+
+    MPI_Op_free(&umax);
 
     // MPI_Type_vector(3, 1, 2, MPI_INT), count 2, user sum: gaps untouched
     MPI_Datatype vec;

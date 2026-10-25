@@ -1739,7 +1739,9 @@ class ScanReq final : public AmpiRequest {
   bool haveResult = false; // exclusive scan: buf already holds a value
   // Both hold count elements in the datatype's own layout (extent stride,
   // gaps included), which is what the op functions walk; round messages carry
-  // them packed. Element 0 starts at data() - trueLB.
+  // them packed. Element 0 starts at data() - trueLB; the size is
+  // count * max(extent, trueExtent), so an op may write a whole padded last
+  // element.
   std::vector<char> partial; // reduction over this rank's current subtree
   std::vector<char> tmp;     // the partner's partial result
   MPI_Aint trueLB = 0;

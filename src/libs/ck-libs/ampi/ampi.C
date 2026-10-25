@@ -5816,9 +5816,12 @@ static int ampiStartScan(const char* name, const void* sendbuf, void* recvbuf, i
   }
 
   // Partial results are kept in the datatype's layout (see ScanReq), so
-  // non-contiguous types work: span covers count elements at extent stride.
+  // non-contiguous types work. Ops may assign whole elements including
+  // trailing padding (AMPI's MAXLOC/MINLOC copy padded structs), so give
+  // every element, the last one too, max(extent, trueExtent) bytes, as
+  // MPICH does.
   CkDDT_DataType* ddt = ptr->getDDT()->getType(datatype);
-  MPI_Aint span = (count > 0) ? (count - 1) * ddt->getExtent() + ddt->getTrueExtent() : 0;
+  MPI_Aint span = count * std::max(ddt->getExtent(), ddt->getTrueExtent());
 
   ScanReq* req = new ScanReq(recvbuf, count, datatype, op, comm, rank, size, exclusive,
                              span, ddt->getTrueLB(), ptr->getDDT());
