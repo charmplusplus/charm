@@ -45,7 +45,9 @@ jobs:
         # llvm provides llvm-profdata and llvm-cov matching the default clang.
         run: sudo apt-get update && sudo apt-get install -y cmake libfabric-dev llvm
       - name: build (instrumented)
-        run: ./build charm++ reconverse-linux-x86_64 -j4 -g --coverage
+        # 'clang' makes charmc link with clang too; CC/CXX alone only steer
+        # cmake, and the arch file would still give charmc g++.
+        run: ./build charm++ reconverse-linux-x86_64 clang -j4 -g --coverage
       - name: run tests (all tiers, 1 and 2 processes)
         # Failures are recorded in the results tables, not fatal here.
         run: |

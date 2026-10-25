@@ -10,7 +10,8 @@ tests and examples on the reconverse runtime. It covers both Charm++
 ```bash
 # 1. An instrumented build (needs clang; Apple clang on macOS).
 ./build charm++ reconverse-darwin-arm8 -j6 -g --coverage
-#    (Linux: CC=clang CXX=clang++ ./build charm++ reconverse-linux-x86_64 -j4 -g --coverage)
+#    (Linux: ./build charm++ reconverse-linux-x86_64 clang -j4 -g --coverage;
+#     the 'clang' option is what makes charmc link with clang as well)
 
 # 2. Build and run the tests, collecting profiles (about 20-25 min on a laptop).
 coverage/run.sh reconverse-darwin-arm8 --tier all-tiers --shapes "1 2"
