@@ -56,6 +56,8 @@ struct MoeCtx {
   // left is common to all of them and cancels in the comparison.
   double spt_gpu;               // decayed sum of measured device seconds
   double spt_tok;               // decayed sum of the tokens they covered
+  // Tokens issued on each lane and not yet complete (Expert::pickLane).
+  long lane_pending[MOE_MAX_LANES];
 };
 
 #define MOE_RED_BLOCKS 256

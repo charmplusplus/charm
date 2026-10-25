@@ -27,7 +27,9 @@ mainmodule moe {
   readonly int use_instrument;
   readonly double capacity_factor;
   readonly int fuse_sources;
+  readonly int stream_outputs;
   readonly int print_place;
+  readonly int flight_log;
   readonly double zipf_z;
   readonly double learning_rate;
   readonly long moe_seed;
@@ -58,14 +60,14 @@ mainmodule moe {
     entry void sendsDrained();
     // Zerocopy device receive of one expert's outputs for this PE's tokens;
     // the post entry method that supplies the device buffer is in moe.C
-    entry void receiveOutput(int ref, int e, int n, int len, nocopydevice float buf[len]);
+    entry void receiveOutput(int ref, int e, int n, long long ts, int spe, int len, nocopydevice float buf[len]);
 
     entry void runStep() {
       serial { beginStep(); }
       when gathered() serial { sendTokens(); }
       for (recv_count = 0; recv_count < n_experts; recv_count++) {
-        when receiveOutput[my_step](int ref, int e, int n, int len, nocopydevice float buf[len])
-          serial { noteOutput(e, n); }
+        when receiveOutput[my_step](int ref, int e, int n, long long ts, int spe, int len, nocopydevice float buf[len])
+          serial { noteOutput(e, n, ts, spe); }
       }
       serial { combine(); }
       when combined() serial { gateDrain(); }
@@ -86,13 +88,13 @@ mainmodule moe {
     entry void computeDone();
     entry void sendDone();
     entry void sendsDrained();
-    entry void receiveTokens(int ref, int src, int n, int len, nocopydevice float buf[len]);
+    entry void receiveTokens(int ref, int src, int n, long long ts, int spe, int len, nocopydevice float buf[len]);
 
     entry void runStep() {
       serial { beginStep(); }
       for (recv_count = 0; recv_count < n_disp; recv_count++) {
-        when receiveTokens[my_step](int ref, int src, int n, int len, nocopydevice float buf[len])
-          serial { noteTokens(src, n); }
+        when receiveTokens[my_step](int ref, int src, int n, long long ts, int spe, int len, nocopydevice float buf[len])
+          serial { noteTokens(src, n, ts, spe); }
       }
       // Every slab of this step has been consumed and nothing can be sent to
       // this expert until its outputs go out, so this is the one place where a

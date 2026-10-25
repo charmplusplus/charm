@@ -64,10 +64,30 @@ static inline bool hostSyncMode() {
 /* readonly */ int use_instrument;
 /* readonly */ double capacity_factor;
 /* readonly */ int fuse_sources;
+/* readonly */ int stream_outputs;
 /* readonly */ int print_place;
+/* readonly */ int flight_log;
 /* readonly */ double zipf_z;
 /* readonly */ double learning_rate;
 /* readonly */ long moe_seed;
+
+// -F: every slab and output message carries its sender's clock and PE; the
+// receiver notes the envelope (the post hook that picks the landing buffer)
+// and the payload (the SDAG body), and each PE prints its records after the
+// last step. CLOCK_REALTIME in ns, the clock the +gputrace records use, so the
+// records line up with a trace; across nodes the clocks agree only to NTP.
+static inline long long moeNowNs() {
+  struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);
+  return (long long)ts.tv_sec * 1000000000LL + ts.tv_nsec;
+}
+struct MoeFlight { char kind; int step, spe, dpe, expert; long bytes; long long t_send, t_env, t_land; };
+static thread_local std::vector<MoeFlight> g_flights;
+static void moeFlightDump() {
+  for (const MoeFlight& f : g_flights)
+    CkPrintf("[FLIGHT] %c step %d src %d dst %d expert %d bytes %ld send %lld env %lld land %lld\n", f.kind,
+        f.step, f.spe, f.dpe, f.expert, f.bytes, f.t_send, f.t_env, f.t_land);
+  g_flights.clear();
+}
 
 // With -I (CUPTI-measured loads instead of the experts' own estimates): how
 // many steps before an AtSync step to switch instrumentation on, as in pic2d.
@@ -153,11 +173,13 @@ public:
     use_instrument = 0;
     capacity_factor = 0.0;
     fuse_sources = 1;
+    stream_outputs = 1;
     print_place = 0;
+    flight_log = 0;
     disp_step = exp_step = done_count = 0;
 
     int c;
-    while ((c = getopt(m->argc, m->argv, "e:m:h:t:k:i:u:z:p:c:r:L:C:s:f:b:l:S:n:D:aAUTIP")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "e:m:h:t:k:i:u:z:p:c:r:L:C:s:f:b:l:S:n:D:aAUTIPFO")) != -1) {
       switch (c) {
         case 'e': n_experts = atoi(optarg); break;
         case 'm': d_model = atoi(optarg); break;
@@ -184,7 +206,9 @@ public:
         case 'I': use_instrument = 1; break;
         case 'D': capacity_factor = atof(optarg); break;
         case 'U': fuse_sources = 0; break;
+        case 'O': stream_outputs = 0; break;
         case 'P': print_place = 1; break;
+        case 'F': flight_log = 1; break;
         default:
           CkPrintf(
               "Usage: %s -e [experts] -m [d_model] -h [d_ff] -t [tokens per process per step]\n"
@@ -212,7 +236,10 @@ public:
               "  -a (async LB: overlap the step; needs +LBAsync) -l [wait lag]\n"
               "  -I (CUPTI-measured loads in a window before each LB step, instead of\n"
               "      the experts' token-count estimates)\n"
-              "  -S [seed] -P (print final placement)\n",
+              "  -S [seed] -P (print final placement)\n"
+              "  -F (print every slab and output message: bytes, sent, envelope, landed)\n"
+              "  -O (send an expert's outputs after its whole step, not each dispatcher's\n"
+              "      as soon as its tokens are done)\n",
               m->argv[0]);
           CkExit();
       }
@@ -463,6 +490,7 @@ class Dispatcher : public CBase_Dispatcher {
   std::vector<int> offs;        // slab offsets per expert (n_experts + 1)
   std::vector<int> fill_;
   std::vector<int> slot_expert;
+  std::vector<long long> env_t;   // -F: envelope arrival per expert, this step
   // expert chosen for each (token, j)
   long dropped;   // tokens the capacity factor refused this step
 
@@ -710,7 +738,7 @@ class Dispatcher : public CBase_Dispatcher {
     for (int e = 0; e < n_experts; e++) {
       const int n = counts[e];
       const int len = std::max(n, 1) * d_model;
-      expert_proxy[e].receiveTokens(my_step, dispId, n, len,
+      expert_proxy[e].receiveTokens(my_step, dispId, n, moeNowNs(), CkMyPe(), len,
           (outstanding_sends++,
            CkDeviceBuffer(d_send + (size_t)offs[e] * d_model,
                CkCallback(CkIndex_Dispatcher::sendDone(), thisProxy[CkMyPe()]),
@@ -723,8 +751,9 @@ class Dispatcher : public CBase_Dispatcher {
 
   // Post entry method: an expert's outputs land in its segment of the receive
   // slab. An empty message lands in the slack row past the end.
-  void receiveOutput(int ref, int e, int n, int& len, float*& buf,
+  void receiveOutput(int ref, int e, int n, long long ts, int spe, int& len, float*& buf,
       CkDeviceBufferPost* devicePost) {
+    if (flight_log) { env_t.resize(n_experts); env_t[e] = moeNowNs(); }
     if (ref != my_step)
       CkAbort("PE %d: outputs for step %d arrived during step %d\n", CkMyPe(),
           ref, my_step);
@@ -734,7 +763,10 @@ class Dispatcher : public CBase_Dispatcher {
     TRACE(3, "disp step %d output expert %d n=%d posted", ref, e, n);
   }
 
-  void noteOutput(int e, int n) {
+  void noteOutput(int e, int n, long long ts, int spe) {
+    if (flight_log)
+      g_flights.push_back({'O', my_step, spe, CkMyPe(), e, (long)std::max(n, 1) * d_model * (long)sizeof(float), ts,
+                           env_t[e], moeNowNs()});
     TRACE(3, "disp step %d output expert %d n=%d consumed", my_step, e, n);
     if (n != counts[e])
       CkAbort("PE %d step %d: expert %d returned %d rows for %d tokens\n",
@@ -786,6 +818,7 @@ class Dispatcher : public CBase_Dispatcher {
     if (my_step < warmup_steps + n_steps) {
       thisProxy[CkMyPe()].runStep();
     } else {
+      if (flight_log) moeFlightDump();
       main_proxy.dispDone();
     }
   }
@@ -803,10 +836,17 @@ class Expert : public CBase_Expert {
   // live); 2: outputs sent (nothing live but the weights)
   int phase = 0;
   std::vector<int> n_src;   // rows received from each dispatcher, -1 = none
+  std::vector<long long> env_t;   // -F: envelope arrival per dispatcher, this step (not migrated)
   int n_tot = 0;
   int outstanding_sends = 0;
   bool drain_pending = false;
   bool chk_due = false;
+  // The outputs went out from compute(), each dispatcher's behind the chunk
+  // that finished its tokens (stream_outputs); sendOutputs only drains.
+  bool outputs_sent = false;
+  int cur_lane = -1;      // see pickLane; not migrated: a new PE picks afresh
+  long lane_claim = 0;    // tokens this expert holds against cur_lane
+  std::vector<hapiEvent_t> ev_seg;   // per dispatcher: its outputs are in y_seg
 
   // Async LB state: the step was joined at lb_start_step and AtSyncWait is
   // owed lb_wait_lag steps later.
@@ -884,6 +924,7 @@ class Expert : public CBase_Expert {
     hapiCheck(hapiEventDestroy(ev_start));
     hapiCheck(hapiEventDestroy(ev_end));
     hapiCheck(hapiEventDestroy(ev_chk));
+    for (hapiEvent_t e : ev_seg) hapiCheck(hapiEventDestroy(e));
     hapiCheck(hapiStreamDestroy(send_stream));
     if (outstanding_sends != 0) {
       // A transport may still be reading a send buffer. Leak rather than pull
@@ -907,7 +948,32 @@ class Expert : public CBase_Expert {
 
   // Never cached: a different object on every PE this expert lands on.
   MoeCtx* ctx() { return &disp_proxy.ckLocalBranch()->gpu; }
-  MoeGpu* lane() { return &ctx()->lanes[thisIndex % n_lanes]; }
+  // The lane this expert's current (or last) step was issued on.
+  MoeGpu* lane() { return &ctx()->lanes[cur_lane >= 0 ? cur_lane : thisIndex % n_lanes]; }
+
+  // A step's whole chain goes on one lane, behind whatever that lane already
+  // holds; with lanes[thisIndex % n_lanes] an expert that happened to share
+  // the hot expert's lane queued behind its entire step, so its outputs --
+  // which every dispatcher needs -- left at the end and all eight dispatchers
+  // started their next step together (large MoE, 2 nodes: the hot expert then
+  // waited ~30 ms for its slabs, vs 1-9 ms when its neighbours were on other
+  // lanes; job 23192278). The lane with the fewest tokens still in flight goes
+  // first. Safe to switch: compute() runs only after the previous step's
+  // kernels completed (computeDone), and the results do not depend on lanes.
+  void pickLane() {
+    MoeCtx* c = ctx();
+    int best = 0;
+    for (int l = 1; l < n_lanes; l++)
+      if (c->lane_pending[l] < c->lane_pending[best]) best = l;
+    cur_lane = best;
+    lane_claim = std::max(n_tot, 1);
+    c->lane_pending[best] += lane_claim;
+  }
+  void releaseLane() {
+    if (lane_claim == 0) return;
+    ctx()->lane_pending[cur_lane] -= lane_claim;
+    lane_claim = 0;
+  }
   hapiStream_t commStream() { return ctx()->comm.stream; }
   size_t segStride() const { return (size_t)cap_src * d_model; }
   size_t wsz() const { return (size_t)d_model * d_ff; }
@@ -934,6 +1000,9 @@ class Expert : public CBase_Expert {
     hapiCheck(hapiEventCreateWithFlags(&ev_chk, hapiEventDisableTiming));
     hapiCheck(hapiStreamCreateWithPriority(&send_stream, hapiStreamNonBlocking,
         -1));
+    ev_seg.resize(n_disp);
+    for (hapiEvent_t& e : ev_seg)
+      hapiCheck(hapiEventCreateWithFlags(&e, hapiEventDisableTiming));
     ev_pending = false;
   }
 
@@ -980,6 +1049,7 @@ class Expert : public CBase_Expert {
         // so the destructor's frees park until the copies retire.
         p.pup_device_order((void*)lane()->stream);
       }
+      releaseLane();   // this PE's lane count must not keep a departed expert's tokens
     }
     p | my_step;
     p | recv_count;
@@ -989,6 +1059,7 @@ class Expert : public CBase_Expert {
     // SDAG state: which whens are outstanding, buffered ordinary messages.
     _sdag_pup(p);
     p | outstanding_sends;
+    p | outputs_sent;
     p | drain_pending;
     p | chk_due;
     p | lb_waiting;
@@ -1049,13 +1120,15 @@ class Expert : public CBase_Expert {
     recv_count = 0;
     phase = 0;
     n_tot = 0;
+    outputs_sent = false;
     std::fill(n_src.begin(), n_src.end(), -1);
   }
 
   // Post entry method: a dispatcher's slab lands in its own segment. An empty
   // message still lands one row there, which nothing reads.
-  void receiveTokens(int ref, int src, int n, int& len, float*& buf,
+  void receiveTokens(int ref, int src, int n, long long ts, int spe, int& len, float*& buf,
       CkDeviceBufferPost* devicePost) {
+    if (flight_log) { env_t.resize(n_disp); env_t[src] = moeNowNs(); }
     if (ref < my_step || ref > my_step + 1)
       CkAbort("Expert %d on PE %d: slab for step %d arrived during step %d\n",
           thisIndex, CkMyPe(), ref, my_step);
@@ -1065,7 +1138,10 @@ class Expert : public CBase_Expert {
         n);
   }
 
-  void noteTokens(int src, int n) {
+  void noteTokens(int src, int n, long long ts, int spe) {
+    if (flight_log)
+      g_flights.push_back({'T', my_step, spe, CkMyPe(), thisIndex, (long)std::max(n, 1) * d_model * (long)sizeof(float),
+                           ts, env_t[src], moeNowNs()});
     n_src[src] = n;
     TRACE(3, "expert %d step %d slab src %d n=%d consumed", thisIndex, my_step,
         src, n);
@@ -1158,9 +1234,10 @@ class Expert : public CBase_Expert {
 
   void compute() {
     phase = 1;
-    MoeGpu* g = lane();
     n_tot = 0;
     for (int s = 0; s < n_disp; s++) n_tot += std::max(n_src[s], 0);
+    pickLane();
+    MoeGpu* g = lane();
 
     sampleTiming();
 
@@ -1190,17 +1267,51 @@ class Expert : public CBase_Expert {
           off += n;
         }
         chunks = (n_tot + chunk_tokens - 1) / chunk_tokens;
-        moeExpertChunks(g, W1, W2, g->fx, g->fy, n_tot, d_model, d_ff,
-            chunk_tokens, (float)learning_rate, 1.0f / n_tot, use_adam != 0);
-        // Back into the per-source segments, so the sends and both pup phases
-        // are unchanged. Queued before ev_end, which orders a pack behind it.
-        off = 0;
-        for (int s = 0; s < n_disp; s++) {
-          if (n_src[s] <= 0) continue;
-          const size_t n = (size_t)n_src[s] * d_model;
-          hapiCheck(hapiMemcpyAsync(y_seg + s * segStride(), g->fy + off,
-              sizeof(float) * n, hapiMemcpyDeviceToDevice, g->stream));
-          off += n;
+        if (stream_outputs) {
+          // The same chunks, issued up to the one that holds each dispatcher's
+          // last token; that dispatcher's outputs are final there, so they go
+          // back into its segment and its send leaves while the rest of the
+          // step computes. A chunk range that starts at a multiple of the chunk
+          // size is the same sequence of kernels as one call over all n_tot,
+          // so the results are bit for bit those of the single call. Sending
+          // all of them after the last chunk put every dispatcher's next step
+          // behind the busiest expert's whole step plus the slowest of its
+          // eight 14 MB sends at once (large MoE, 2 nodes: the busiest GPU idle
+          // ~70 ms of a 190 ms step, job 23175260).
+          int done = 0, tok = 0;
+          for (int s = 0; s < n_disp; s++) {
+            const int ns = std::max(n_src[s], 0);
+            if (ns > 0) {
+              const int end = tok + ns;
+              const int upto = (end >= n_tot) ? n_tot
+                  : std::min(n_tot, (end + chunk_tokens - 1) / chunk_tokens * chunk_tokens);
+              if (upto > done) {
+                moeExpertChunks(g, W1, W2, g->fx + (size_t)done * d_model,
+                    g->fy + (size_t)done * d_model, upto - done, d_model, d_ff,
+                    chunk_tokens, (float)learning_rate, 1.0f / n_tot,
+                    use_adam != 0);
+                done = upto;
+              }
+              hapiCheck(hapiMemcpyAsync(y_seg + s * segStride(),
+                  g->fy + (size_t)tok * d_model, sizeof(float) * (size_t)ns * d_model,
+                  hapiMemcpyDeviceToDevice, g->stream));
+              tok = end;
+            }
+            hapiCheck(hapiEventRecord(ev_seg[s], g->stream));
+          }
+        } else {
+          moeExpertChunks(g, W1, W2, g->fx, g->fy, n_tot, d_model, d_ff,
+              chunk_tokens, (float)learning_rate, 1.0f / n_tot, use_adam != 0);
+          // Back into the per-source segments, so the sends and both pup phases
+          // are unchanged. Queued before ev_end, which orders a pack behind it.
+          off = 0;
+          for (int s = 0; s < n_disp; s++) {
+            if (n_src[s] <= 0) continue;
+            const size_t n = (size_t)n_src[s] * d_model;
+            hapiCheck(hapiMemcpyAsync(y_seg + s * segStride(), g->fy + off,
+                sizeof(float) * n, hapiMemcpyDeviceToDevice, g->stream));
+            off += n;
+          }
         }
       } else {
         for (int s = 0; s < n_disp; s++) {
@@ -1236,24 +1347,42 @@ class Expert : public CBase_Expert {
     } else {
       thisProxy[thisIndex].computeDone();
     }
+    // Each send is tagged with the send stream after a wait on its own
+    // dispatcher's event, so the runtime takes that point as "data ready":
+    // across nodes it holds the envelope until then, on the node the receiver
+    // polls the flag. Nothing waits on the host.
+    if (n_tot > 0 && fuse_sources && stream_outputs) {
+      phase = 2;   // a migration is held until every send has completed
+      for (int s = 0; s < n_disp; s++) {
+        hapiCheck(hapiStreamWaitEvent(send_stream, ev_seg[s], 0));
+        sendOutput(s);
+      }
+      outputs_sent = true;
+      TRACE(2, "expert %d step %d outputs queued behind their chunks", thisIndex, my_step);
+    }
+  }
+
+  void sendOutput(int s) {
+    const int n = std::max(n_src[s], 0);
+    const int len = std::max(n, 1) * d_model;
+    disp_proxy[CkNodeFirst(s)].receiveOutput(my_step, thisIndex, n, moeNowNs(), CkMyPe(), len,
+        (outstanding_sends++,
+         CkDeviceBuffer(y_seg + s * segStride(),
+             CkCallback(CkIndex_Expert::sendDone(), thisProxy[thisIndex]),
+             send_stream)));
   }
 
   void sendOutputs() {
-    phase = 2;
-    const double ts0 = tnow();
-    if (n_tot > 0) hapiCheck(hapiStreamWaitEvent(send_stream, ev_end, 0));
-    for (int s = 0; s < n_disp; s++) {
-      const int n = std::max(n_src[s], 0);
-      const int len = std::max(n, 1) * d_model;
-      disp_proxy[CkNodeFirst(s)].receiveOutput(my_step, thisIndex, n, len,
-          (outstanding_sends++,
-           CkDeviceBuffer(y_seg + s * segStride(),
-               CkCallback(CkIndex_Expert::sendDone(), thisProxy[thisIndex]),
-               send_stream)));
+    releaseLane();   // the step's kernels are complete (computeDone)
+    if (!outputs_sent) {
+      phase = 2;
+      const double ts0 = tnow();
+      if (n_tot > 0) hapiCheck(hapiStreamWaitEvent(send_stream, ev_end, 0));
+      for (int s = 0; s < n_disp; s++) sendOutput(s);
+      TRACE(2, "expert %d step %d outputs sent", thisIndex, my_step);
+      TRACE(2, "expert %d step %d issued %d sends in %.1f ms", thisIndex,
+          my_step, n_disp, (tnow() - ts0) * 1e3);
     }
-    TRACE(2, "expert %d step %d outputs sent", thisIndex, my_step);
-    TRACE(2, "expert %d step %d issued %d sends in %.1f ms", thisIndex,
-        my_step, n_disp, (tnow() - ts0) * 1e3);
     gateDrain();
   }
 
@@ -1304,6 +1433,7 @@ class Expert : public CBase_Expert {
       if (print_place)
         CkPrintf("Expert %d on PE %d: %d tokens in the last step\n", thisIndex,
             CkMyPe(), n_tot);
+      if (flight_log) moeFlightDump();
       contribute(CkCallback(CkReductionTarget(Main, expertsDone), main_proxy));
     }
   }
