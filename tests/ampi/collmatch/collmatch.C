@@ -25,15 +25,20 @@
            with an Iallreduce.
    Part 8 (every 10th iteration): one of Iallreduce, Iallgatherv (rank r
            sends r+1 values), Ibarrier, Igather on MPI_COMM_WORLD, rotating
-           per stage, posted by the even ranks before AMPI_Migrate and by the
-           odd ranks after it, so the even ranks' request is outstanding
-           (posted under its key) while load balancing runs. With +balancer
-           RandCentLB on more than one PE ranks migrate, which exercises the
-           pup path. Only one reduction is kept in flight across
-           AMPI_Migrate: with several (or with one that every rank posted
-           before AMPI_Migrate) the job hangs intermittently, already at
-           origin/recharm, because contributions made before the migration
-           never complete a reduction; that is a separate defect.
+           per stage, posted by every rank before AMPI_Migrate and waited on
+           after it, so the request is outstanding (posted under its key)
+           while load balancing runs. With +balancer RandCentLB on more than
+           one PE ranks migrate, which exercises the pup path. Every rank
+           posts before AMPI_Migrate because AMPI_Migrate is itself
+           collective: MPI requires all ranks to call collectives on a
+           communicator in the same order, so an earlier version that had
+           the odd ranks post after AMPI_Migrate was not a valid program
+           (it aborted intermittently with "recv'ed a non-blocking reduction
+           unexpectedly", as classic AMPI does for an MPI_Barrier placed in
+           that order). Exactly one collective is kept in flight across
+           AMPI_Migrate: with several in flight across the AtSync/CentralLB
+           step the job hangs intermittently, a core-side problem tracked
+           on charm #4072.
 
    Roots rotate with the iteration so that every rank is sometimes the root.
    Every result is checked against a value computed locally. */
@@ -296,25 +301,21 @@ int main(int argc, char **argv)
       red = -1;
       const int kind = (iter / 10) % 4;
       MPI_Request q;
-      /* Even ranks post before AMPI_Migrate, odd ranks after, so none of
-         these can complete before load balancing finishes. */
-      for (int phase = 0; phase < 2; phase++) {
-        if (phase == rank % 2) {
-          /* One collective per stage, rotating: see the note at the top. */
-          if (kind == 0) MPI_Iallreduce(&in, &red, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD, &q);
-          if (kind == 1) MPI_Iallgatherv(sendv.data(), rank + 1, MPI_LONG, allv.data(), counts.data(),
-                                         displs.data(), MPI_LONG, MPI_COMM_WORLD, &q);
-          if (kind == 2) MPI_Ibarrier(MPI_COMM_WORLD, &q);
-          if (kind == 3) MPI_Igather(&inG, 1, MPI_LONG, gat.data(), 1, MPI_LONG, root, MPI_COMM_WORLD, &q);
-        }
-        if (phase == 0) {
-          int *pe, flag;
-          MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &pe, &flag);
-          const int peBefore = *pe;
-          AMPI_Migrate(AMPI_INFO_LB_SYNC);
-          MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &pe, &flag);
-          if (*pe != peBefore) moves++;
-        }
+      /* Every rank posts before AMPI_Migrate and waits after it: the valid
+         collective order (see the note at the top). One collective per
+         stage, rotating. */
+      if (kind == 0) MPI_Iallreduce(&in, &red, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD, &q);
+      if (kind == 1) MPI_Iallgatherv(sendv.data(), rank + 1, MPI_LONG, allv.data(), counts.data(),
+                                     displs.data(), MPI_LONG, MPI_COMM_WORLD, &q);
+      if (kind == 2) MPI_Ibarrier(MPI_COMM_WORLD, &q);
+      if (kind == 3) MPI_Igather(&inG, 1, MPI_LONG, gat.data(), 1, MPI_LONG, root, MPI_COMM_WORLD, &q);
+      {
+        int *pe, flag;
+        MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &pe, &flag);
+        const int peBefore = *pe;
+        AMPI_Migrate(AMPI_INFO_LB_SYNC);
+        MPI_Comm_get_attr(MPI_COMM_WORLD, AMPI_MY_WTH, &pe, &flag);
+        if (*pe != peBefore) moves++;
       }
       MPI_Wait(&q, MPI_STATUS_IGNORE);
       if (kind == 0)
