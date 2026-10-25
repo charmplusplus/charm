@@ -989,6 +989,9 @@ struct CuptiCloseWait {
   // CUDA: the activity buffers CUPTI held at the mark and not yet returned, and the default flushes of the wait.
   std::vector<uint8_t*> bufs;
   size_t bufs_at_mark = 0, bufs_at_end = 0;
+  size_t mark_bytes_max = 0, mark_bytes_sum = 0;   // CUDA: sizes of the buffers held at the mark
+  double small_ms_before_mark = -1.0;              // CUDA: small buffers handed out since the first arrival, ms
+  unsigned long long small_handed = 0;
   unsigned flushes = 0;                       // CUDA: flushes the wait asked the flusher thread for
   double flush_gap_ms = 10.0;                 // CUDA: the interval to the next ask; doubles each ask up to 100 ms
   uint64_t flush_calls_at_mark = 0, flusher_calls = 0;   // CUDA: the flusher's calls, and those during the wait
@@ -1007,6 +1010,17 @@ static bool g_cupti_close_flushless = false;   // CUDA: the close got its buffer
 // The deferred close on CUDA waits for those it held at the mark.
 static std::mutex g_cupti_out_lock;
 static std::unordered_set<uint8_t*> g_cupti_outstanding;
+static std::unordered_map<uint8_t*, size_t> g_cupti_out_size;   // the size of each, for the close's print
+// Small buffers around the mark. CUPTI returns a buffer only once every record in it is complete, and the buffer open
+// at the mark keeps taking the launches that follow it: under +LBAsync the busiest process's host runs ~1 s ahead of
+// its GPU, so with 32 KB buffers its close waited 892 ms while only 92 kernels issued before the mark were still
+// queued (~70 ms of work; leanmd 16x8x8, job 23168861, 2026-10-24). CUPTI has no call that starts a new buffer, but
+// every buffer comes from cuptiBufferRequested: from the first PE of the process to reach the LB step until the
+// close completes, it hands out kCuptiMarkBufBytes buffers, so the one open at the mark holds a handful of launches.
+static const size_t kCuptiMarkBufBytes = 4 * 1024;
+static std::atomic<bool> g_cupti_small_bufs{false};
+static std::atomic<unsigned long long> g_cupti_small_handed{0};
+static double g_cupti_first_arrival_t = 0.0;   // CmiWallTimer of the process's first arrival this round
 // Kernel records without timestamps in the last normalisation, owned by an object or not (the close line): on CUDA
 // the records of kernels a forced flush caught in flight (see the deferred close on CUDA).
 static size_t g_cupti_untimed_owned = 0, g_cupti_untimed_unowned = 0;
@@ -1045,15 +1059,34 @@ static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t
   // buffer callbacks are ~40 per second per process (job 23143184, A40 2026-10-23).
   static const size_t first = getenv("CHARM_LB_CUPTI_BUFKB") ? (size_t)atoi(getenv("CHARM_LB_CUPTI_BUFKB")) * 1024
                               : 32*1024;
+  const bool small = g_cupti_small_bufs.load(std::memory_order_relaxed);
   {
+    // Recycled buffers of the size class wanted now: small ones only around the mark, the others otherwise.
     std::lock_guard<std::mutex> lk(g_cupti_free_lock);
-    if (!g_cupti_free.empty()) {
-      *buffer = g_cupti_free.back().first;
-      *size = g_cupti_free.back().second;
+    for (size_t i = g_cupti_free.size(); i-- > 0;) {
+      if ((g_cupti_free[i].second <= kCuptiMarkBufBytes) != small) continue;
+      *buffer = g_cupti_free[i].first;
+      *size = g_cupti_free[i].second;
       *maxNumRecords = 0;
+      g_cupti_free[i] = g_cupti_free.back();
       g_cupti_free.pop_back();
+      if (small) g_cupti_small_handed++;
       std::lock_guard<std::mutex> o(g_cupti_out_lock);
       g_cupti_outstanding.insert(*buffer);
+      g_cupti_out_size[*buffer] = *size;
+      return;
+    }
+  }
+  if (small) {
+    *buffer = (uint8_t *)malloc(kCuptiMarkBufBytes);
+    if (*buffer != NULL) {
+      memset(*buffer, 0, kCuptiMarkBufBytes);
+      *size = kCuptiMarkBufBytes;
+      *maxNumRecords = 0;
+      g_cupti_small_handed++;
+      std::lock_guard<std::mutex> o(g_cupti_out_lock);
+      g_cupti_outstanding.insert(*buffer);
+      g_cupti_out_size[*buffer] = *size;
       return;
     }
   }
@@ -1066,6 +1099,7 @@ static void CUPTIAPI cuptiBufferRequested(uint8_t **buffer, size_t *size, size_t
       *maxNumRecords = 0;
       std::lock_guard<std::mutex> o(g_cupti_out_lock);
       g_cupti_outstanding.insert(*buffer);
+      g_cupti_out_size[*buffer] = *size;
       return;
     }
   }
@@ -1079,6 +1113,7 @@ static void CUPTIAPI cuptiBufferCompleted(CUcontext ctx, uint32_t streamId,
   {
     std::lock_guard<std::mutex> o(g_cupti_out_lock);
     g_cupti_outstanding.erase(buffer);
+    g_cupti_out_size.erase(buffer);
   }
   std::lock_guard<std::mutex> lk(gm.cupti_queue_lock_);
   gm.cupti_buffer_queue_.push_back({buffer, validSize, size, (void*)ctx, nullptr});
@@ -1165,7 +1200,15 @@ void hapiCuptiCloseBegin() {
   {
     std::lock_guard<std::mutex> o(g_cupti_out_lock);
     w.bufs.assign(g_cupti_outstanding.begin(), g_cupti_outstanding.end());
+    for (uint8_t* b : w.bufs) {
+      auto it = g_cupti_out_size.find(b);
+      const size_t sz = it == g_cupti_out_size.end() ? 0 : it->second;
+      w.mark_bytes_sum += sz;
+      if (sz > w.mark_bytes_max) w.mark_bytes_max = sz;
+    }
   }
+  if (g_cupti_small_bufs.load()) w.small_ms_before_mark = (CmiWallTimer() - g_cupti_first_arrival_t) * 1000.0;
+  w.small_handed = g_cupti_small_handed.load();
   w.bufs_at_mark = w.bufs.size();
   w.t0 = CmiWallTimer();
   w.last_poll = w.t0;
@@ -1174,7 +1217,7 @@ void hapiCuptiCloseBegin() {
 }
 bool hapiCuptiCloseComplete() {
   CuptiCloseWait& w = g_cupti_close;
-  if (!w.active) return true;
+  if (!w.active) { g_cupti_small_bufs.store(false); return true; }
   const double now = CmiWallTimer();
   if ((now - w.last_poll) * 1000.0 < 1.0) return false;   // at most one check per ms
   w.last_poll = now;
@@ -1213,6 +1256,7 @@ bool hapiCuptiCloseComplete() {
     w.flush_ms = g_flusher.total_ms - w.flush_ms_at_mark;
   }
   w.active = false;
+  g_cupti_small_bufs.store(false);   // back to the normal size: the buffers held at the mark are in
   g_cupti_mark_ns = w.mark;
   g_cupti_mark_set = true;
   g_cupti_close_flushless = true;
@@ -3681,6 +3725,14 @@ bool hapiCuptiArrive(uint64_t epoch, int expected) {
   }
   g_cupti_close_round = epoch;
   a.count++;
+#if CMK_CUDA
+  // The process's first PE at this LB step: CUPTI gets small buffers from here until the close completes, so the
+  // buffer open at the mark (set by the last PE) holds few launches (see kCuptiMarkBufBytes).
+  if (a.count == 1 && expected > 1 && hapiCuptiTracingActive()) {
+    g_cupti_first_arrival_t = CmiWallTimer();
+    g_cupti_small_bufs.store(true);
+  }
+#endif
   if (a.count < expected) return false;
   a.count = 0;
   return true;
@@ -3784,10 +3836,11 @@ static void hapiPrepareCuptiLoadsImpl(uint64_t epoch, int dev) {
               (unsigned long long)g_cupti_close.kernels_pre, (unsigned long long)g_cupti_close.arrived_in_wait,
               g_cupti_close.pending_at_end, g_cupti_close.unmatched_at_end, g_cupti_close.timed_out ? " TIMED OUT" : "");
     if (g_cupti_close.ended_by[0] != '\0')   // CUDA: the buffers waited for
-      CmiPrintf("[LBCUPTI pe=%d] close buffers held at the mark=%zu, still out at the end=%zu; default flushes asked %u, "
+      CmiPrintf("[LBCUPTI pe=%d] close buffers held at the mark=%zu (%zu KB, largest %zu KB; small buffers since the first arrival %.0f ms before the mark, %llu handed so far), still out at the end=%zu; default flushes asked %u, "
                 "done by the flusher thread %llu (%.1f ms); ended by %s; kernel records without timestamps: owned %zu unowned %zu; launched before "
                 "the mark, started after it: %zu\n",
-                CmiMyPe(), g_cupti_close.bufs_at_mark, g_cupti_close.bufs_at_end, g_cupti_close.flushes,
+                CmiMyPe(), g_cupti_close.bufs_at_mark, g_cupti_close.mark_bytes_sum >> 10, g_cupti_close.mark_bytes_max >> 10,
+                g_cupti_close.small_ms_before_mark, g_cupti_close.small_handed, g_cupti_close.bufs_at_end, g_cupti_close.flushes,
                 (unsigned long long)g_cupti_close.flusher_calls, g_cupti_close.flush_ms, g_cupti_close.ended_by,
                 g_cupti_untimed_owned, g_cupti_untimed_unowned, g_cupti_kept_started_after);
     CmiPrintf("[LBCUPTI pe=%d] flush=%.3fs process=%.3fs normalize=%.3fs total=%.3fs shards=%zu free=%zu"
