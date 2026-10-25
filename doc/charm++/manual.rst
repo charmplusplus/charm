@@ -6414,9 +6414,10 @@ callback broadcasts to the array counts: contributing and then calling
 is lost for a migrating element. The command line option
 ``+noAnytimeMigration`` makes ``setAnytimeMigration(false)`` the default for
 every array of the program. In both cases the broadcasts to a chare array
-reach every element in one order, the order in which the runtime issued them;
-the results of successive reductions delivered to the array therefore arrive
-in reduction order. Messages to a single element carry no such guarantee.
+are delivered to all elements in one consistent order: if any element
+receives broadcast ``A`` before broadcast ``B``, every element does. Which of
+the two comes first is not promised, even when the same PE sent both.
+Messages to a single element carry no ordering guarantee at all.
 
 If the application needs to know when an array has been fully constructed, CkArrayOptions
 provides ``CkArrayOptions::setInitCallback(CkCallback)``. The callback passed will be

@@ -17,11 +17,12 @@
 // move. That is the promise an array created with -s makes; -s without -d
 // breaks it and hangs (doc/internals/array-broadcast-migration.md).
 //
-// The results of one step may arrive in any order (an array with stable
-// locations gets no epoch ordering of its broadcasts), so each contribution
-// carries its reduction index in bits 40 and up, and each result is checked
-// against the reduction it decodes to. With -o the results must also arrive
-// in reduction order, which the array broadcaster guarantees in both modes.
+// Each contribution carries its reduction index in bits 40 and up, and each
+// result is checked against the reduction it decodes to, so the results of
+// one step may arrive in any order. With -o the results must also arrive in
+// reduction order: the array delivers its broadcasts to every element in one
+// consistent order, and the reductions complete on PE 0, which also stamps
+// that order, so here it is the completion order.
 //
 // A stall is reported by a watchdog: after -w seconds with no reduction
 // completing, every element prints its state and the run aborts.

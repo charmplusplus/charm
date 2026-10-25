@@ -50,6 +50,15 @@ which waits in the store, and takes both in sequence when n arrives. Every
 element therefore receives the array's broadcasts in one order, the order in
 which PE 0 stamped them, in both modes below.
 
+That consistency is the whole guarantee. A broadcast issued on another PE
+reaches PE 0 as a point-to-point message to the array manager's branch
+(`sendBroadcast`), and two such messages can be reordered on the way like
+any other pair of messages, so two broadcasts issued by one PE may be stamped
+in either order. The reduction results checked by tests/charm++/
+atsync_reduction `-o` are issued on PE 0, where the reductions complete, so
+they are stamped in completion order; that is a property of the test, not a
+promise.
+
 ## Arrays with stable locations
 
 `CkArray::stableLocations` is set when both hold at array creation:
