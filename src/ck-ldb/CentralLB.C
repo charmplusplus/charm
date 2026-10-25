@@ -284,7 +284,6 @@ void CentralLB::gpuLoadsReady()
 #if CMK_LBDB_ON
 #if CMK_GPU
   lbmgr->SetObjGPULoad(CsvAccess(gpu_manager).cupti_obj_norm_load_);
-  lbmgr->TakeDepartedGPULoads();   // right after the build: the departed loads of this process are complete now
   lbmgr->SetObjDriverLoad(CsvAccess(gpu_manager).cupti_obj_api_raw_, hapiCuptiDriverScale());
   if (_lb_args.gpuScaling())
     lbmgr->SetObjGPUCosts(CsvAccess(gpu_manager).cupti_obj_epoch_costs_);
@@ -324,9 +323,7 @@ void CentralLB::ProcessAtSync()
     // reduction to get total number of objects and comm
     // so that processor 0 can pre-allocate load balancing database
   int counts[2];
-  // The message was just built (BuildStatsMsg above) and GetObjData consumed the departed entries: count what
-  // the message holds, so the central reserve matches what every PE sends.
-  counts[0] = statsMsg != NULL ? (int)statsMsg->objData.size() : lbmgr->GetObjDataSz();
+  counts[0] = lbmgr->GetObjDataSz();
   counts[1] = lbmgr->GetCommDataSz();
 
   CkCallback cb;
@@ -442,7 +439,6 @@ void CentralLB::BuildStatsMsg()
 {
 #if CMK_LBDB_ON
   // build and send stats
-  // The departed loads were taken when the counts were gathered (AssembleStats): the sizes must agree.
   const int osz = lbmgr->GetObjDataSz();
   const int csz = lbmgr->GetCommDataSz();
 
@@ -579,50 +575,6 @@ void CentralLB::MissMigrate(int waitForBarrier)
 
 // build a complete data from bufferred messages
 // not used when USE_REDUCTION = 1
-// An object that migrated after launching kernels in its old process is reported twice: its live entry from the
-// PE it is on, and a departed entry (LDObjData::departed, handle index -1) from the process its kernels ran in,
-// carrying that device load. Add the load to the live entry and drop the departed one, so every strategy sees one
-// entry per object whose load covers the same steps as everyone else's (2026-10-24, job 23162022: without this a
-// mover read 0.6-0.8 of a full round and MetisLB moved ~10k objects again).
-void CentralLB::mergeDepartedLoads(LDStats* s)
-{
-  int departed = 0;
-  for (const LDObjData& d : s->objData) if (d.departed) departed++;
-  if (_lb_args.debug() > 1) CkPrintf("[%d] CentralLB: %d departed entries among %zu (version %d)\n", CkMyPe(), departed, s->objData.size(), _lb_version);
-  if (departed == 0) return;
-  std::unordered_map<LDObjKey, int, LDObjKeyHash> live;
-  for (int i = 0; i < (int)s->objData.size(); i++) {
-    const LDObjData& d = s->objData[i];
-    if (d.departed) continue;
-    LDObjKey k; k.omID() = d.handle.omID(); k.objID() = d.handle.objID();
-    live[k] = i;
-  }
-  int merged = 0, lost = 0; double lostLoad = 0.0;
-  std::vector<LDObjData> objs; std::vector<int> from, to;
-  objs.reserve(s->objData.size() - departed); from.reserve(objs.capacity()); to.reserve(objs.capacity());
-  for (int i = 0; i < (int)s->objData.size(); i++) {
-    const LDObjData& d = s->objData[i];
-    if (d.departed) {
-      LDObjKey k; k.omID() = d.handle.omID(); k.objID() = d.handle.objID();
-      auto it = live.find(k);
-#if CMK_GPU
-      if (it != live.end()) { s->objData[it->second].gpuTime += d.gpuTime; merged++; }
-      else { lost++; lostLoad += d.gpuTime; }
-#endif
-      continue;
-    }
-    objs.push_back(d); from.push_back(s->from_proc[i]); to.push_back(s->to_proc[i]);
-  }
-  // The live entries were updated in place above; rebuild the compacted arrays from them.
-  std::vector<LDObjData> objs2; objs2.reserve(objs.size());
-  for (int i = 0; i < (int)s->objData.size(); i++) if (!s->objData[i].departed) objs2.push_back(s->objData[i]);
-  s->objData.swap(objs2); s->from_proc.swap(from); s->to_proc.swap(to);
-  s->n_migrateobjs = std::count_if(s->objData.begin(), s->objData.end(), [](const LDObjData& d) { return d.migratable; });
-  if (_lb_args.debug() > 0)
-    CkPrintf("[%d] CentralLB: %d departed load entr%s merged onto live objects%s\n", CkMyPe(), merged,
-             merged == 1 ? "y" : "ies", lost ? (std::string(", ") + std::to_string(lost) + " with no live object (" + std::to_string(lostLoad) + " s dropped)").c_str() : "");
-}
-
 void CentralLB::buildStats()
 {
     // copy all data in individual messages to this big structure
@@ -1054,7 +1006,6 @@ void CentralLB::LoadBalance()
 #else
   for (proc = 0; proc < clients; proc++) statsMsgsList[proc] = NULL;
 #endif
-  mergeDepartedLoads(statsData);   // before preprocess: a departed entry has no valid handle
 
   lbmgr->ResetAdaptive();
   if (!_lb_args.samePeSpeed()) statsData->normalize_speed();
@@ -1128,7 +1079,6 @@ void CentralLB::LoadBalance()
       return;   // strategyFinishOffThread -> ApplyDecision once the helper is done
     }
   }
-  mergeDepartedLoads(statsData);
   storedMigrateMsg = Strategy(statsData);
 
   if (!concurrent) ApplyDecision(); // immediately apply the migration decision
@@ -2194,7 +2144,6 @@ void CentralLB::simulationRead() {
     double startT = CkWallTimer();
     preprocess(statsData);
     CmiPrintf("%s> Strategy starts ... \n", lbname);
-    mergeDepartedLoads(statsData);
     LBMigrateMsg* migrateMsg = Strategy(statsData);
     CmiPrintf("%s> Strategy took %fs memory usage: CentralLB: %d KB.\n",
                lbname, CkWallTimer()-startT, (int)(useMem()/1000));

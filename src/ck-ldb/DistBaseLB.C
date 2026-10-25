@@ -228,75 +228,7 @@ void DistBaseLB::gpuLoadsReady() {
   lbmgr->SetObjDriverLoad(CsvAccess(gpu_manager).cupti_obj_api_raw_, hapiCuptiDriverScale());
   if (_lb_args.gpuScaling())
     lbmgr->SetObjGPUCosts(CsvAccess(gpu_manager).cupti_obj_epoch_costs_);
-  // An object that left this process after the previous round launched kernels here before it went; they are
-  // filed here, to an object that is gone (hapi_impl.cpp kCuptiDeferFlag). Forward each such load to the PE it
-  // left for, and count the messages so every PE assembles its stats only once all of its own have arrived.
-  // Measured 2026-10-24 (job 23168861): without this a mover read about half its load in the Diffusion round.
-  {
-    std::vector<std::pair<LDObjKey, double>> loads; std::vector<int> dest;
-    hapiCuptiTakeDepartedLoadsTo(loads, dest);   // the process's whole list: the first PE to get here takes it
-    std::vector<int> counts(CkNumPes(), 0);
-    std::unordered_map<int, std::vector<size_t>> byDest;
-    for (size_t i = 0; i < loads.size(); i++)
-      if (dest[i] >= 0 && dest[i] < CkNumPes()) byDest[dest[i]].push_back(i);
-    for (auto& kv : byDest) {
-      const int n = (int)kv.second.size();
-      std::vector<int> om(n); std::vector<CmiUInt8> id(n); std::vector<double> ld(n);
-      for (int j = 0; j < n; j++) {
-        const auto& e = loads[kv.second[j]];
-        om[j] = e.first.omID().id.idx; id[j] = e.first.objID(); ld[j] = e.second;
-      }
-      thisProxy[kv.first].receiveDepartedLoads(n, om.data(), id.data(), ld.data());
-      counts[kv.first]++;
-    }
-    if (_lb_args.debug() > 1 && !loads.empty())
-      CkPrintf("[%d] DistBaseLB: %zu departed load(s) forwarded to %zu PE(s)\n", CkMyPe(), loads.size(), byDest.size());
-    contribute(CkNumPes() * sizeof(int), counts.data(), CkReduction::sum_int,
-               CkCallback(CkReductionTarget(DistBaseLB, departedCounts), thisProxy));
-  }
-  return;   // continued in departedMaybeContinue
 #endif
-  AssembleStats();
-  thisProxy[CkMyPe()].LoadBalance();
-#endif
-}
-
-void DistBaseLB::receiveDepartedLoads(int n, int* omIdx, CmiUInt8* objIds, double* loads) {
-#if CMK_LBDB_ON
-  for (int i = 0; i < n; i++) {
-    LDObjKey k; k.omID().id.idx = omIdx[i]; k.objID() = objIds[i];
-    departed_rx_.push_back({k, loads[i]});
-  }
-  departed_rx_msgs_++;
-  departedMaybeContinue();
-#endif
-}
-
-void DistBaseLB::departedCounts(int n, int* counts) {
-#if CMK_LBDB_ON
-  departed_expected_ = (CkMyPe() < n) ? counts[CkMyPe()] : 0;
-  departedMaybeContinue();
-#endif
-}
-
-// Every forwarded load owed to this PE is in (and this PE's own loads were set before it contributed its counts):
-// add them to the live objects, then assemble the stats and start the strategy as gpuLoadsReady used to.
-void DistBaseLB::departedMaybeContinue() {
-#if CMK_LBDB_ON
-  if (departed_expected_ < 0 || departed_rx_msgs_ < departed_expected_) return;
-  const int applied = lbmgr->AddDepartedGPULoads(departed_rx_);
-  if (_lb_args.debug() > 1 && !departed_rx_.empty())
-    CkPrintf("[%d] DistBaseLB: %zu departed load(s) received, %d found their object\n", CkMyPe(), departed_rx_.size(), applied);
-  departed_rx_.clear();
-  departed_rx_msgs_ = 0;
-  departed_expected_ = -1;
-  if (_lb_args.debug() > 2) {   // the strategy's device loads per object, to compare round by round
-    std::vector<LDObjData> od(lbmgr->GetObjDataSz());
-    lbmgr->GetObjData(od.data());
-    for (const LDObjData& d : od)
-      CkPrintf("[DistLB obj] step=%d pe=%d id=%llx gpu=%.6f mig=%d\n", step(), CkMyPe(),
-               (unsigned long long)d.handle.objID(), (double)d.gpuTime, (int)d.migratable);
-  }
   AssembleStats();
   thisProxy[CkMyPe()].LoadBalance();
 #endif

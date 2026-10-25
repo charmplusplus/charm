@@ -281,10 +281,6 @@ struct LDObjData {
   LBRealType minWall, maxWall;
 #endif
   bool migratable;
-  // Set on an entry a process reports for an object that has LEFT it: the device load of the kernels the
-  // object launched there before it went (hapi_impl.cpp kCuptiDeferFlag). CentralLB adds it to the object's
-  // live entry and drops this one before any strategy sees the stats (CentralLB::mergeDepartedLoads).
-  bool departed = false;
   bool asyncArrival;
   // Object position, for geometric load balancers (DiffusionLB's MetricCentroid).
   // Ported as a field only: the CkMigratable::setObjPosition plumbing that would
@@ -478,8 +474,6 @@ inline void LDObjData::pup(PUP::er &p) {
   p|gpuTime;
   // Version-gated like gpuCosts: an older dump has no such field.
   if (_lb_version > 3) p|driverTime;
-  if (_lb_version > 7) p|departed;
-  else if (p.isUnpacking()) departed = false;
   else if (p.isUnpacking()) driverTime = 0;
 #endif
 #if CMK_LB_CPUTIMER

@@ -15,7 +15,7 @@ using json = nlohmann::json;
 
 // 4 adds GpuObjectEpochCosts to LDObjData and GpuDeviceDescriptor to ProcStats.
 // 5 adds the device pool's arena quantum and the IPC slot budget to ProcStats.
-#define LB_FORMAT_VERSION 8   // 8: LDObjData::departed
+#define LB_FORMAT_VERSION 7
 
 #define LB_MANAGER_VERSION 1
 
@@ -525,9 +525,6 @@ class LBManager : public CBase_LBManager
     lbdb_obj->SetObjDriverLoad(apiRaw, scale);
   }
 #endif
-  // CentralLB, before it sizes its stats: pull the loads of objects that left this process (hapi) into the database.
-  void TakeDepartedGPULoads() { lbdb_obj->TakeDepartedGPULoads(); }
-  int AddDepartedGPULoads(const std::vector<std::pair<LDObjKey, double>>& l) { return lbdb_obj->AddDepartedGPULoads(l); }
   void SetObjGPULoad(
       const std::unordered_map<LDObjKey, double, LDObjKeyHash> &id_loadMap)
   {

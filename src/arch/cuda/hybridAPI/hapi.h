@@ -551,13 +551,8 @@ struct LDObjHandle;
 // load balancing step and when it is released from it: under +LBAsync an
 // element keeps running between those two points, and work it does there must
 // not be billed to the load the strategy is about to read.
-void hapiCuptiObjectJoinedStep(const LDObjHandle& handle, int round);   // round: the LB step at the join; its launches from now on belong to round+1
+void hapiCuptiObjectJoinedStep(const LDObjHandle& handle);
 void hapiCuptiObjectResumed(const LDObjHandle& handle);
-void hapiCuptiObjectDeparting(const LDObjHandle& handle, int dest);   // leaving the process for PE dest: its loads filed here from now on go out as departed entries
-void hapiCuptiTakeDepartedLoads(std::vector<std::pair<LDObjKey, double>>& out);
-void hapiCuptiTakeDepartedLoadsTo(std::vector<std::pair<LDObjKey, double>>& out, std::vector<int>& dest);
-void hapiCuptiObjectArrived(const LDObjHandle& handle);   // registered in this process: no longer departed here
-void hapiCuptiDropDepartedLoads();                        // round end: unclaimed departed loads are dropped
 uint64_t hapiCuptiPushObjCorrelation();
 void hapiCuptiPopObjCorrelation();
 bool hapiCuptiPushKernelTag(uint64_t workTag);

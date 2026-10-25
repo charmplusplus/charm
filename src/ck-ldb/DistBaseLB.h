@@ -23,8 +23,6 @@ public:
   // Second half of barrierDone: runs once the process's per-object GPU loads
   // for this round exist (immediately on a non-CUDA build).
   void gpuLoadsReady();
-  void receiveDepartedLoads(int n, int* omIdx, CmiUInt8* objIds, double* loads);
-  void departedCounts(int n, int* counts);
   void LoadBalance();
   void ResumeClients();
   void ResumeClients(int balancing);
@@ -35,12 +33,6 @@ public:
   // CMK_GLOBAL_LOCATION_UPDATE is set to. With the flag off nothing sends it
   // and the body just frees the message.
   void ReceiveLocationUpdate(LBMigrateMsg* msg);
- private:
-  // Departed device loads forwarded to this PE this round (gpuLoadsReady -> departedCounts/receiveDepartedLoads).
-  std::vector<std::pair<LDObjKey, double>> departed_rx_;
-  int departed_rx_msgs_ = 0, departed_expected_ = -1;
-  void departedMaybeContinue();
- public:
 
   struct LDStats {  // Passed to Strategy
     int from_pe;

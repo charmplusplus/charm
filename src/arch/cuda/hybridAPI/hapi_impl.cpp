@@ -2076,57 +2076,6 @@ static int computeKernelSMs(const DeviceManager& dm,
 // every record. The launch signature rides along with a parked kernel because
 // it is needed to rebucket if a work tag turns up, but it is deliberately not
 // stored in LBKernelRecord: there is one of those per launch.
-// A kernel an object launches after its own join belongs to the NEXT round (cklocation.C lbJoinStep: "that work
-// belongs to the next round"). Measured 2026-10-24 (job 23160794, leanmd -lbasync lag 5): dropping those kernels
-// instead left each object's next-round load covering a different share of its steps -- heavy ones that computed
-// the whole lag read 0.8 of a full round, light ones that parked early 0.3 -- so the strategy saw a 14-24% imbalance
-// that was not there and moved ~10k objects, where sync moved none. The token such a launch is stamped with carries
-// the round it belongs to; the drain files it only once that round closes, and parks it until then.
-static const uint64_t kCuptiDeferFlag = 1ULL << 62;
-static const int kCuptiRoundShift = 40;   // tokens are small sequential integers (GpuObjectTokenTable)
-static inline uint64_t cuptiDeferredToken(uint64_t token, int round) {
-  return kCuptiDeferFlag | ((uint64_t)(round & 0xFFFF) << kCuptiRoundShift) | token;
-}
-static inline bool cuptiTokenDeferred(uint64_t t) { return t != HAPI_CUPTI_NO_OBJECT && (t & kCuptiDeferFlag) != 0; }
-static inline int cuptiTokenRound(uint64_t t) { return (int)((t >> kCuptiRoundShift) & 0xFFFF); }
-static inline uint64_t cuptiTokenBase(uint64_t t) { return cuptiTokenDeferred(t) ? (t & ((1ULL << kCuptiRoundShift) - 1)) : t; }
-static uint64_t g_cupti_close_round = 0;   // the LB round whose close the drain is building (hapiCuptiArrive)
-// Objects that left this process (LBDatabase::UnregisterObj) since the last close: the loads their remaining
-// kernels earn here go out as departed entries (LBDatabase::GetObjData) instead of to a local object that is gone.
-static std::mutex g_cupti_departed_lock;
-static std::unordered_map<LDObjKey, int, LDObjKeyHash> g_cupti_departed_keys;   // -> the PE it left for
-static std::vector<std::pair<LDObjKey, double>> g_cupti_departed_loads;
-static std::vector<int> g_cupti_departed_dest;   // parallel to g_cupti_departed_loads
-void hapiCuptiObjectDeparting(const LDObjHandle& handle, int dest) {
-  LDObjKey key; key.omID() = handle.omID(); key.objID() = handle.objID();
-  std::lock_guard<std::mutex> g(g_cupti_departed_lock);
-  g_cupti_departed_keys[key] = dest;
-}
-void hapiCuptiObjectArrived(const LDObjHandle& handle) {
-  LDObjKey key; key.omID() = handle.omID(); key.objID() = handle.objID();
-  std::lock_guard<std::mutex> g(g_cupti_departed_lock);
-  g_cupti_departed_keys.erase(key);
-}
-void hapiCuptiDropDepartedLoads() {
-  std::lock_guard<std::mutex> g(g_cupti_departed_lock);
-  g_cupti_departed_loads.clear();
-  g_cupti_departed_dest.clear();
-}
-void hapiCuptiTakeDepartedLoads(std::vector<std::pair<LDObjKey, double>>& out) {
-  std::lock_guard<std::mutex> g(g_cupti_departed_lock);
-  out.insert(out.end(), g_cupti_departed_loads.begin(), g_cupti_departed_loads.end());
-  g_cupti_departed_loads.clear();
-  g_cupti_departed_dest.clear();
-}
-// DistBaseLB: the same loads with the PE each object left for, so they can be forwarded to it.
-void hapiCuptiTakeDepartedLoadsTo(std::vector<std::pair<LDObjKey, double>>& out, std::vector<int>& dest) {
-  std::lock_guard<std::mutex> g(g_cupti_departed_lock);
-  out.insert(out.end(), g_cupti_departed_loads.begin(), g_cupti_departed_loads.end());
-  dest.insert(dest.end(), g_cupti_departed_dest.begin(), g_cupti_departed_dest.end());
-  g_cupti_departed_loads.clear();
-  g_cupti_departed_dest.clear();
-}
-
 struct CuptiPendingKernel {
   uint32_t           correlation_id;
   uint32_t           enqueue_thread;   // the backend's thread id for the dispatch (HIP), 0 if unknown
@@ -2157,7 +2106,6 @@ struct CuptiParseShard {
   std::unordered_map<LDObjKey, uint32_t, LDObjKeyHash> obj_thread;   // object -> thread that launched its kernels
   std::unordered_map<uint32_t, uint64_t> prev_object_corr, prev_work_tag_corr;   // the one before
   std::vector<CuptiPendingKernel> carried;
-  uint64_t carried_next_round = 0;   // parked because they belong to the next round (launched after their object's join)
   uint32_t pending_hint = 0;
   // Knowledge shared by every shard: seeded from the GPUManager at the start of a drain, unioned
   // back at the merge.
@@ -2458,7 +2406,7 @@ static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::v
   sh.api_count = sh.kernel_count = sh.object_corr_count = sh.work_tag_count = 0;
   sh.invalid_duration_count = sh.hash_collision_count = sh.attributed = sh.unattributed = 0;
   sh.unresolved_token = sh.deferred = sh.lost_work_tags = 0;
-  sh.carried_out = sh.carried_in_resolved = sh.carried_in_lost = 0; sh.carried_next_round = 0;
+  sh.carried_out = sh.carried_in_resolved = sh.carried_in_lost = 0;
   sh.api_corr_max = 0; sh.carried_corr_min = UINT32_MAX; sh.carried_corr_max = 0; sh.carried_above_api = 0;
   sh.carried_names.clear();
   sh.carried_pe_thread = sh.carried_other_thread = 0; sh.carried_threads.clear();
@@ -2580,13 +2528,10 @@ static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::v
         // when the drain ends.
         const uint64_t* object = cuptiFindObjectCorr(sh, kernel->correlationId, nullptr);
         if (_lb_args.debug() > 1) { auto cb = sh.corr_cbid.find(kernel->correlationId); if (cb != sh.corr_cbid.end()) sh.kernels_by_nonlaunch_cbid[cb->second]++; }
-        // Launched after its object's join: the next round's kernel, parked by pass 2 until that drain.
-        const bool next_round = object != nullptr && cuptiTokenDeferred(*object) &&
-                                (uint64_t)cuptiTokenRound(*object) > g_cupti_close_round;
         if (g_trace != nullptr)
-          hapiTraceKernel(kernel, object != nullptr ? cuptiTokenBase(*object) : HAPI_CUPTI_NO_OBJECT);
-        if (!next_round && bucket_settled && object != nullptr) {
-          cuptiFileKernel(gm, sh, rec, cuptiTokenBase(*object), cuptiThreadOfCorr(sh, kernel->correlationId, nullptr));
+          hapiTraceKernel(kernel, object != nullptr ? *object : HAPI_CUPTI_NO_OBJECT);
+        if (bucket_settled && object != nullptr) {
+          cuptiFileKernel(gm, sh, rec, *object, cuptiThreadOfCorr(sh, kernel->correlationId, nullptr));
         } else {
           sh.pending.push_back({kernel->correlationId, kernel->threadId, launch, rec, false});
           sh.deferred++;
@@ -2665,10 +2610,8 @@ static void hapiParseCuptiShardPass1(GPUManager& gm, CuptiParseShard& sh, std::v
             sh.api_unattributed_s += seconds;
           } else {
             const uint64_t* object = cuptiFindObjectCorr(sh, api->correlationId, nullptr);
-            if (object != nullptr && cuptiTokenDeferred(*object) && (uint64_t)cuptiTokenRound(*object) > g_cupti_close_round)
-              sh.api_unattributed_s += seconds;   // a launch after the object's join: not this round's driver time
-            else if (object != nullptr)
-              sh.apiByToken[cuptiTokenBase(*object)] += seconds;
+            if (object != nullptr)
+              sh.apiByToken[*object] += seconds;
             else
               sh.pendingApi.push_back({api->correlationId, seconds});
           }
@@ -2688,12 +2631,6 @@ static void hapiParseCuptiShardPass2(GPUManager& gm, CuptiParseShard& sh, std::v
   // Second pass: correlations that arrived in a later buffer, or in another shard, are now known.
   for (CuptiPendingKernel& pending_kernel : sh.pending) {
     const uint64_t* object = cuptiFindObjectCorr(sh, pending_kernel.correlation_id, &all);
-    // Launched after its object joined this round: the next round's. Parked until that drain, where the
-    // same correlation resolves through prev_object_corr and the round it carries is no longer ahead.
-    if (object != nullptr && cuptiTokenDeferred(*object) && (uint64_t)cuptiTokenRound(*object) > g_cupti_close_round) {
-      sh.carried.push_back(pending_kernel); sh.carried_next_round++;
-      continue;
-    }
     // Its correlation record may still be in a buffer CUPTI has not delivered: park it once more.
     if (object == nullptr && !pending_kernel.carried) {
       sh.carried.push_back(pending_kernel); sh.carried_out++;
@@ -2742,12 +2679,9 @@ static void hapiParseCuptiShardPass2(GPUManager& gm, CuptiParseShard& sh, std::v
       sh.unattributed++;
       continue;
     }
-    cuptiFileKernel(gm, sh, pending_kernel.rec, cuptiTokenBase(*object), cuptiThreadOfCorr(sh, pending_kernel.correlation_id, &all));
+    cuptiFileKernel(gm, sh, pending_kernel.rec, *object, cuptiThreadOfCorr(sh, pending_kernel.correlation_id, &all));
   }
   sh.pending.clear();
-  if (_lb_args.debug() > 1 && sh.carried_next_round > 0)
-    CmiPrintf("HAPI[pe=%d] shard %d: %llu kernel(s) launched after their object's join parked for the next round\n",
-              CmiMyPe(), shardIdx, (unsigned long long)sh.carried_next_round);
 
   // API records whose correlation arrived later, then every token to its
   // object. A call made outside any entry method -- the scheduler polling an
@@ -2755,9 +2689,8 @@ static void hapiParseCuptiShardPass2(GPUManager& gm, CuptiParseShard& sh, std::v
   // in the intervals, so the launch term counts it, but nobody is charged.
   for (const CuptiPendingApi& p : sh.pendingApi) {
     const uint64_t* object = cuptiFindObjectCorr(sh, p.correlation_id, &all);
-    if (object == nullptr || (cuptiTokenDeferred(*object) && (uint64_t)cuptiTokenRound(*object) > g_cupti_close_round))
-      sh.api_unattributed_s += p.seconds;
-    else sh.apiByToken[cuptiTokenBase(*object)] += p.seconds;
+    if (object == nullptr) sh.api_unattributed_s += p.seconds;
+    else sh.apiByToken[*object] += p.seconds;
   }
   sh.pendingApi.clear();
   for (const auto& kv : sh.apiByToken) {
@@ -3601,25 +3534,6 @@ void hapiNormalizeCuptiLoads(int onlyDevice) {
     }
   }
 
-  {   // loads of objects that left this process: out as departed entries, not onto a local object that is gone
-    std::lock_guard<std::mutex> g(g_cupti_departed_lock);
-    if (!g_cupti_departed_keys.empty()) {
-      size_t moved = 0;
-      for (auto it = gm.cupti_obj_norm_load_.begin(); it != gm.cupti_obj_norm_load_.end();) {
-        auto dk = g_cupti_departed_keys.find(it->first);
-        if (dk != g_cupti_departed_keys.end()) {
-          g_cupti_departed_dest.push_back(dk->second);
-          // Only objects that left the process are marked (LBDatabase::Migrate), so no live object here owns
-          // this key; the load goes out as a departed entry and CentralLB merges it onto the live one.
-          g_cupti_departed_loads.push_back({it->first, it->second});
-          g_cupti_departed_keys.erase(dk);
-          it = gm.cupti_obj_norm_load_.erase(it); moved++;
-        } else ++it;
-      }
-      if (_lb_args.debug() > 1 && moved)
-        CmiPrintf("HAPI[pe=%d]: hapiNormalizeCuptiLoads: %zu departed object(s) carry their load out of this process\n", CmiMyPe(), moved);
-    }
-  }
   if (_lb_args.debug() > 1) {
     CmiPrintf("HAPI[pe=%d]: hapiNormalizeCuptiLoads  %zu kernels across %zu "
               "device(s) -> %zu objects\n",
@@ -3723,7 +3637,6 @@ bool hapiCuptiArrive(uint64_t epoch, int expected) {
     a.epoch = epoch;
     a.count = 0;
   }
-  g_cupti_close_round = epoch;
   a.count++;
 #if CMK_CUDA
   // The process's first PE at this LB step: CUPTI gets small buffers from here until the close completes, so the
@@ -8164,8 +8077,8 @@ static thread_local std::unordered_map<LDObjKey, uint64_t, LDObjKeyHash>
 // here: its later kernels land in cupti_unattributed_kernels_ instead of its
 // own bucket, so they still count toward device occupancy but are not billed
 // to an object whose load has already been read.
-static thread_local std::unordered_map<LDObjKey, int, LDObjKeyHash>
-    cupti_joined_objects;   // -> the LB round the object joined; its launches now belong to the next one
+static thread_local std::unordered_set<LDObjKey, LDObjKeyHash>
+    cupti_joined_objects;
 
 // Drop this PE's outstanding push count if CUPTI has been detached since we
 // last looked -- the stack those pushes referred to no longer exists, so
@@ -8183,11 +8096,11 @@ static inline void hapiCuptiSyncGeneration(GPUManager& gm) {
   }
 }
 
-void hapiCuptiObjectJoinedStep(const LDObjHandle& handle, int round) {
+void hapiCuptiObjectJoinedStep(const LDObjHandle& handle) {
   LDObjKey key;
   key.omID() = handle.omID();
   key.objID() = handle.objID();
-  cupti_joined_objects[key] = round;
+  cupti_joined_objects.insert(key);
 }
 
 void hapiCuptiObjectResumed(const LDObjHandle& handle) {
@@ -8221,6 +8134,17 @@ uint64_t hapiCuptiPushObjCorrelation() {
     // Steady state is a PE-local hit: the shared lock is taken only the first
     // time this PE runs a given object, so it costs O(objects that ever run
     // here) acquisitions rather than one per entry method.
+    // Joined the step already: leave it unattributed for the rest of the round.
+    if (cupti_joined_objects.find(key) != cupti_joined_objects.end()) {
+      {
+        CuptiEntryLog& L = hapiCuptiEntryLog();
+        std::lock_guard<std::mutex> g(L.m);
+        hapiCuptiLaneOpen(L.obj, HAPI_CUPTI_NO_OBJECT);
+      }
+      ++cupti_pushed_depth;
+      return HAPI_CUPTI_NO_OBJECT;
+    }
+
     auto cached = cupti_local_object_tokens.find(key);
     if (cached != cupti_local_object_tokens.end()) {
       object_token = cached->second;
@@ -8233,9 +8157,6 @@ uint64_t hapiCuptiPushObjCorrelation() {
       cupti_local_object_tokens.emplace(key, object_token);
       if (g_trace != nullptr) hapiTraceObject(object_token, key);
     }
-    // Joined this round already: what it launches from here on is the next round's (see kCuptiDeferFlag).
-    auto joined = cupti_joined_objects.find(key);
-    if (joined != cupti_joined_objects.end()) object_token = cuptiDeferredToken(object_token, joined->second + 1);
   }
 
   // Always open a span, even with the sentinel, so that the matching pop always

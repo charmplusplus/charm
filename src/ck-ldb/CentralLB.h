@@ -229,7 +229,6 @@ public:
 
   int cur_ld_balancer;
 
-  void mergeDepartedLoads(LDStats* s);   // departed device loads onto live entries, before any strategy
   void readStatsMsgs(const char* filename);
   void writeStatsMsgs(const char* filename);
 
