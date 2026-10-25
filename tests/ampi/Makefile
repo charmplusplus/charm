@@ -9,6 +9,7 @@ DIRS = \
   datatype \
   collwake \
   collmatch \
+  scan \
   privatization \
   jacobi3d \
   exit \
@@ -54,6 +55,7 @@ RECONVERSE_NA += \
   migration \
   megampi \
   privatization \
+  scan \
 
 endif
 endif

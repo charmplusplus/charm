@@ -1238,8 +1238,9 @@ enum AmpiReqType : uint8_t {
   AMPI_GATHER_REQ  = 6,
   AMPI_GATHERV_REQ = 7,
   AMPI_G_REQ       = 8,
+  AMPI_SCAN_REQ    = 9,
 #if CMK_CUDA
-  AMPI_GPU_REQ     = 9
+  AMPI_GPU_REQ     = 10
 #endif
 };
 
@@ -1725,6 +1726,85 @@ class GReq final : public AmpiRequest {
   void print() const noexcept override;
 };
 
+/// MPI_Iscan and MPI_Iexscan (MPI_Scan and MPI_Exscan wait on one).
+///
+/// The scan is the recursive-doubling exchange: in round k each rank
+/// exchanges its partial result with partner rank^(1<<k), if that rank
+/// exists. A round cannot start before the previous one has finished, so the
+/// request runs the rounds itself: it is the posted receive for its current
+/// round (tag MPI_SCAN_TAG or MPI_EXSCAN_TAG, src = partner), and when the
+/// partner's message is matched ampi::progressScan folds it in, sends the
+/// next round's partial result and posts the request again. The scan
+/// therefore advances as messages arrive, while the rank's thread computes
+/// or waits on other requests, not only inside MPI_Wait on this request.
+class ScanReq final : public AmpiRequest {
+ public:
+  MPI_Op op       = MPI_OP_NULL;
+  int rank        = 0;
+  int size        = 0;
+  int mask        = 1;     // current round: partner is rank^mask
+  bool exclusive  = false; // MPI_Iexscan
+  bool haveResult = false; // exclusive scan: buf already holds a value
+  // Both hold count elements in the datatype's own layout (extent stride,
+  // gaps included), which is what the op functions walk; round messages carry
+  // them packed. Element 0 starts at data() - trueLB; the size is
+  // count * max(extent, trueExtent), so an op may write a whole padded last
+  // element.
+  std::vector<char> partial; // reduction over this rank's current subtree
+  std::vector<char> tmp;     // the partner's partial result
+  MPI_Aint trueLB = 0;
+  char* partialBuf() noexcept { return partial.data() - trueLB; }
+  char* tmpBuf() noexcept { return tmp.data() - trueLB; }
+  // The op's function, captured when the scan starts so that MPI_Op_free on
+  // a user op while the scan is outstanding is safe (freeOp drops the op's
+  // table entry, and MPI_Op_create may reuse it). For a user op this is the
+  // stored form from OpStruct::func (an offset under PIEglobals), resolved on
+  // each call. The scan always combines in rank order, so it never needs the
+  // op's commutativity.
+  MPI_User_function* func = nullptr;
+  bool userFunc = false;
+
+  /// inout = in op inout
+  void applyOp(const void* in, void* inout) noexcept;
+
+  ScanReq(void *buf_, int count_, MPI_Datatype type_, MPI_Op op_, MPI_Comm comm_,
+          int rank_, int size_, bool exclusive_, MPI_Aint span, MPI_Aint trueLB_, CkDDT *ddt_,
+          AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
+    : op(op_), rank(rank_), size(size_), exclusive(exclusive_),
+      partial(span), tmp(span), trueLB(trueLB_)
+  {
+    buf   = buf_;
+    count = count_;
+    type  = type_;
+    comm  = comm_;
+    tag   = exclusive ? MPI_EXSCAN_TAG : MPI_SCAN_TAG;
+    AMPI_REQUEST_COMMON_INIT
+  }
+  ScanReq() =default;
+  ~ScanReq() =default;
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts) noexcept override;
+  bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
+  AmpiReqType getType() const noexcept override { return AMPI_SCAN_REQ; }
+  bool isUnmatched() const noexcept override { return !complete; }
+  void pup(PUP::er &p) noexcept override {
+    AmpiRequest::pup(p);
+    p|op;
+    p|rank;
+    p|size;
+    p|mask;
+    p|exclusive;
+    p|haveResult;
+    p|partial;
+    p|tmp;
+    p|trueLB;
+    p((char *)&func, sizeof(func)); // code addresses (or offsets) match on every PE
+    p|userFunc;
+  }
+  void print() const noexcept override;
+};
+
 class AmpiRequestPool;
 
 class AmpiRequestList {
@@ -1813,6 +1893,34 @@ inline void pupFromBuf(const void *data,T &t) noexcept {
 
 #define COLL_SEQ_IDX      -1
 
+/* Which messages carry sequence numbers, and in which sequence (AmpiSeqQ
+   index). Used by both ampi::getSeqNo (sender) and AmpiMsg::getSeqIdx
+   (receiver), so the two cannot disagree.
+   - Point-to-point messages (tags up to MPI_ATA_SEQ_TAG): one sequence per
+     peer rank, index = the peer's rank.
+   - Broadcasts: one collective sequence, COLL_SEQ_IDX.
+   - Scan and exscan messages: one sequence per peer rank of their own,
+     index ampiScanSeqIdx(rank) (negative, below COLL_SEQ_IDX). Two scans
+     outstanding on a communicator send under the same tag to the same
+     partner, so they must be matched in send order; a separate sequence keeps
+     that order without making point-to-point messages wait behind scan
+     messages, which always travel through the scheduler while PE-local
+     point-to-point sends are delivered inline.
+   - Other collective tags are not sequenced (seq 0). */
+inline bool ampiIsScanTag(int tag) noexcept {
+  return tag == MPI_SCAN_TAG || tag == MPI_EXSCAN_TAG;
+}
+inline int ampiScanSeqIdx(int rank) noexcept { return COLL_SEQ_IDX - 1 - rank; }
+inline bool ampiTagIsSequenced(int tag) noexcept {
+  return tag <= MPI_BCAST_TAG || ampiIsScanTag(tag);
+}
+/// rank is the peer: the destination when sending, the source when receiving.
+inline int ampiSeqIdx(int tag, int rank) noexcept {
+  if (ampiIsScanTag(tag)) return ampiScanSeqIdx(rank);
+  if (tag >= MPI_BCAST_TAG && tag <= MPI_ATA_TAG) return COLL_SEQ_IDX;
+  return rank;
+}
+
 class AmpiMsgPool;
 
 enum AmpiMsgType : bool {
@@ -1849,15 +1957,7 @@ class AmpiMsg final : public CMessage_AmpiMsg {
   inline void setComm(MPI_Comm c) noexcept { comm = c; }
   inline CMK_REFNUM_TYPE getSeq() const noexcept { return UsrToEnv(this)->getRef(); }
   inline int getSsendReq() const noexcept { return ssendReq; }
-  inline int getSeqIdx() const noexcept {
-    // seqIdx is srcRank, unless this message was part of a collective
-    if (tag >= MPI_BCAST_TAG && tag <= MPI_ATA_TAG) {
-      return COLL_SEQ_IDX;
-    }
-    else {
-      return srcRank;
-    }
-  }
+  inline int getSeqIdx() const noexcept { return ampiSeqIdx(tag, srcRank); }
   inline AmpiMsgType isNcpyShmMsg() const noexcept { CkAssert(isSsend()); return ((AmpiMsgType*)data)[0]; }
   inline void getNcpyShmBuffer(AmpiNcpyShmBuffer& srcInfo) noexcept {
     CkAssert(isNcpyShmMsg());
@@ -2591,6 +2691,9 @@ class ampiParent final : public CBase_ampiParent {
     }
   }
   MPI_User_function* op2User_function(MPI_Op op) const noexcept;
+  /// The op's function in the form ampiParent stores it (for a user op, an
+  /// offset under PIEglobals; resolve it with resolveOpFunction).
+  MPI_User_function* op2StoredFunction(MPI_Op op, bool* isUser) const noexcept;
   inline AmpiOpHeader op2AmpiOpHeader(MPI_Op op, MPI_Datatype type, int count) const noexcept {
     if (opIsPredefined(op)) {
       int size = myDDT.getType(type)->getSize(count);
@@ -2670,6 +2773,7 @@ class ampi final : public CBase_ampi {
   friend class RednReq;
   friend class GatherReq;
   friend class GathervReq;
+  friend class ScanReq;
 
   ampiParent *parent;
   CProxy_ampiParent parentProxy;
@@ -2802,7 +2906,9 @@ class ampi final : public CBase_ampi {
   void insertNewChildAmpiElements(MPI_Comm newComm, CProxy_ampi newAmpi, AmpiCommType type) noexcept;
 
   inline void handleBlockedReq(AmpiRequest* req) noexcept {
-    if (req->isBlocked() && parent->numBlockedReqs != 0) {
+    // A ScanReq is matched once per round; progressScan does this when its
+    // last round completes.
+    if (req->isBlocked() && parent->numBlockedReqs != 0 && req->getType() != AMPI_SCAN_REQ) {
       parent->numBlockedReqs--;
     }
   }
@@ -2827,6 +2933,7 @@ class ampi final : public CBase_ampi {
     return static_blockOnColl(this);
   }
   inline void setBlockingReq(AmpiRequest *req) noexcept;
+  void progressScan(ScanReq* req, AmpiMsg* msg, bool deleteMsg) noexcept;
   inline AmpiRequestPool& getReqPool() const { return parent->reqPool; }
   CMI_WARN_UNUSED_RESULT inline ampi* blockOnIReq(void* buf, int count, MPI_Datatype type, int s,
                                                   int t, MPI_Comm comm, MPI_Status* sts) noexcept;
