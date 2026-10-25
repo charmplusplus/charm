@@ -345,6 +345,24 @@ Calling ``AMPI_Migrate`` on a rank with pending send requests (i.e. from
 MPI_Isend) is currently not supported, therefore users should always
 wait on any outstanding send requests before calling ``AMPI_Migrate``.
 
+Non-blocking collectives (``MPI_Iallreduce``, ``MPI_Ibarrier``, ``MPI_Igather``
+and the others) must also be complete when ``AMPI_Migrate`` is called, unless
+the program runs with ``+ampiMigrateWithCollectives``. AMPI offers two modes:
+
+- By default, AMPI tells the Charm++ runtime that its ranks move only at
+  ``AMPI_Migrate`` and with no collective outstanding, so the runtime keeps no
+  copy of a broadcast for a rank that is migrating. A rank that calls
+  ``AMPI_Migrate`` with a collective outstanding aborts with a message naming
+  the option, since its result could otherwise be lost.
+- With ``+ampiMigrateWithCollectives``, the runtime stores every broadcast to
+  the AMPI arrays until all ranks have received it, which costs memory, and
+  ranks may call ``AMPI_Migrate`` with non-blocking collectives outstanding;
+  their results are delivered after the migration.
+
+The choice is memory against the freedom to balance load without first
+completing collectives; a program that already synchronizes before
+``AMPI_Migrate`` loses nothing with the default.
+
 .. code-block:: c++
 
    // Main time-stepping loop
@@ -356,12 +374,13 @@ wait on any outstanding send requests before calling ``AMPI_Migrate``.
        AMPI_Migrate(AMPI_INFO_LB_SYNC);
    }
 
-``AMPI_Migrate_to_pe`` migrates the calling rank to the specified PE. 
-``AMPI_Migrate`` is preferred to users calling ``AMPI_Migrate_to_pe`` directly,
-because ``AMPI_Migrate_to_pe`` requires Charm++ support for anytime migration.
-Anytime migration requires the runtime system to buffer Charm++ broadcasts,
-which has a memory overhead. Consequently, users are required to run with
-``+ampiEnableMigrateToPe`` in order to call this extension routine.
+``AMPI_Migrate_to_pe`` migrates the calling rank to the specified PE, outside
+of any load balancing step. ``AMPI_Migrate`` is preferred to users calling
+``AMPI_Migrate_to_pe`` directly, because ``AMPI_Migrate_to_pe`` requires
+Charm++ support for anytime migration, which makes the runtime buffer Charm++
+broadcasts at a memory cost. Consequently, users are required to run with
+``+ampiEnableMigrateToPe`` in order to call this extension routine; that
+option implies ``+ampiMigrateWithCollectives``.
 
 Note that migrating ranks around the cores and nodes of a system can
 change which ranks share physical resources, such as memory. A

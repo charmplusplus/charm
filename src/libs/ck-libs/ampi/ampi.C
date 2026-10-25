@@ -836,6 +836,7 @@ CtvDeclare(bool, ampiInitDone);
 CtvDeclare(void*,stackBottom);
 CtvDeclare(bool, ampiFinalized);
 CkpvDeclare(bool, isMigrateToPeEnabled);
+CkpvDeclare(bool, isMigrateWithCollsEnabled);
 CkpvDeclare(Builtin_kvs, bikvs);
 CkpvDeclare(int, ampiThreadLevel);
 CkpvDeclare(AmpiMsgPool, msgPool);
@@ -1092,6 +1093,8 @@ static void ampiProcInit() noexcept {
    * line option in order to enable calling it. */
   CkpvInitialize(bool,isMigrateToPeEnabled);
   CkpvAccess(isMigrateToPeEnabled) = false;
+  CkpvInitialize(bool,isMigrateWithCollsEnabled);
+  CkpvAccess(isMigrateWithCollsEnabled) = false;
 
   CkpvInitialize(int, ampiThreadLevel);
   CkpvAccess(ampiThreadLevel) = MPI_THREAD_SINGLE;
@@ -1103,6 +1106,13 @@ static void ampiProcInit() noexcept {
   CkpvAccess(msgPool) = AmpiMsgPool(AMPI_MSG_POOL_SIZE, AMPI_POOLED_MSG_SIZE);
 
   CkpvAccess(isMigrateToPeEnabled) = (bool)CmiGetArgFlag(CkGetArgv(), "+ampiEnableMigrateToPe");
+  /* A collective outstanding across a migration needs the array broadcaster
+   * to store broadcasts for the moving rank (anytime migration), which costs
+   * memory; off by default. AMPI_Migrate_to_pe moves a rank at any point, so
+   * it needs the same. */
+  CkpvAccess(isMigrateWithCollsEnabled) = CkpvAccess(isMigrateToPeEnabled) ||
+    (bool)CmiGetArgFlagDesc(CkGetArgv(), "+ampiMigrateWithCollectives",
+                            "Allow non-blocking collectives to be outstanding across AMPI_Migrate");
 
 #if AMPIMSGLOG
   char **argv=CkGetArgv();
@@ -1234,7 +1244,7 @@ static ampi *ampiInit(char **argv) noexcept
     opts=TCHARM_Attach_start(&threads,&_nchunks);
     opts.setSectionAutoDelegate(false);
     opts.setStaticInsertion(true);
-    opts.setAnytimeMigration(CkpvAccess(isMigrateToPeEnabled));
+    opts.setAnytimeMigration(CkpvAccess(isMigrateWithCollsEnabled));
 
     ck::future<CkArrayID> newAmpiFuture;
     CkCallback cb(newAmpiFuture.handle());
@@ -2293,7 +2303,7 @@ CProxy_ampi ampi::createNewChildAmpiSync() noexcept {
   opts.setSectionAutoDelegate(false);
   opts.setNumInitial(0);
   opts.setStaticInsertion(false);
-  opts.setAnytimeMigration(CkpvAccess(isMigrateToPeEnabled));
+  opts.setAnytimeMigration(CkpvAccess(isMigrateWithCollsEnabled));
   CkCallback initCB(CkIndex_ampi::registrationFinish(), thisProxy[thisIndex]);
   opts.setInitCallback(initCB);
 
@@ -11572,6 +11582,34 @@ CLINKAGE int AMPI_Get_argc()
   return CkGetArgc();
 }
 
+// Without +ampiMigrateWithCollectives the arrays are created with anytime
+// migration off, so a collective result broadcast while a rank moves would
+// miss it (doc/internals/array-broadcast-migration.md).
+static void checkNoCollectiveOutstanding() noexcept
+{
+  if (CkpvAccess(isMigrateWithCollsEnabled)) return;
+  ampiParent *parent = getAmpiParent();
+  AmpiRequestList &reqs = parent->getReqs();
+  for (int i = 0; i < reqs.size(); i++) {
+    AmpiRequest *req = reqs[i];
+    if (req == NULL || req->complete) continue;
+    AmpiReqType t = req->getType();
+    bool coll = (t == AMPI_REDN_REQ || t == AMPI_GATHER_REQ || t == AMPI_GATHERV_REQ ||
+                 t == AMPI_ATA_REQ);
+    if (!coll && t == AMPI_I_REQ) {
+      int tag = req->getTag();
+      coll = (tag == MPI_BCAST_TAG || tag == MPI_SCATTER_TAG || tag == MPI_SCAN_TAG ||
+              tag == MPI_EXSCAN_TAG || tag == MPI_ATA_TAG || tag == MPI_NBOR_TAG ||
+              tag == MPI_REDN_TAG);
+    }
+    if (coll) {
+      CkAbort("AMPI> rank %d called AMPI_Migrate with a non-blocking collective outstanding "
+              "(MPI_Request %d). Complete it first, or run with +ampiMigrateWithCollectives.\n",
+              parent->thisIndex, i);
+    }
+  }
+}
+
 CLINKAGE int AMPI_Migrate(MPI_Info hints)
 {
   AMPI_API("AMPI_Migrate", hints);
@@ -11589,6 +11627,7 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
     else if (strncmp(key, "ampi_load_balance", MPI_MAX_INFO_KEY) == 0) {
 
       if (strncmp(value, "sync", MPI_MAX_INFO_VAL) == 0) {
+        checkNoCollectiveOutstanding();
         int oldPe = CkMyPe();
         TCHARM_Migrate();
         if (oldPe != CkMyPe()) {
@@ -11596,6 +11635,7 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
         }
       }
       else if (strncmp(value, "async", MPI_MAX_INFO_VAL) == 0) {
+        checkNoCollectiveOutstanding();
         int oldPe = CkMyPe();
         TCHARM_Async_Migrate();
         if (oldPe != CkMyPe()) {

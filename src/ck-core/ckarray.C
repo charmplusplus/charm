@@ -53,6 +53,7 @@ Orion Sky Lawlor, olawlor@acm.org
 #include <unordered_map>
 #include "ck.h"
 #include "ckarray.h"
+#include <climits>
 #include "pathHistory.h"
 #include "register.h"
 #include <stdarg.h>
@@ -910,6 +911,9 @@ CkArray::CkArray(CkArrayOptions&& opts, CkMarshalledMessage&& initMsg)
       sectionAutoDelegate(opts.isSectionAutoDelegated()),
       initCallback(opts.getInitCallback()),
       thisProxy(thisgroup),
+      // The program promises no broadcast to the array is in flight while an
+      // element moves, so a broadcast is freed once every local element has
+      // it (doc/internals/array-broadcast-migration.md).
       stableLocations(opts.isStaticInsertion() && !opts.anytimeMigration),
       numInitial(opts.getNumInitial()),
       isInserting(true),
@@ -1382,9 +1386,6 @@ void CkArrayBroadcaster::ingestIncoming(CkArrayMessage* msg)
   const int bcastEpoch = UsrToEnv(msg)->getGroupEpoch();
   DEBB((AA "Received broadcast %d\n" AB, bcastEpoch));
 
-  if (stableLocations)
-    return;
-
   CmiMemoryMarkBlock(((char*)UsrToEnv(msg)) - sizeof(CmiChunkHeader));
 
   // If this is a ZC all done msg, then the message should already be in storedMsgs, so
@@ -1415,7 +1416,7 @@ bool CkArrayBroadcaster::attemptDelivery(CkArrayMessage* bcast, ArrayElement* el
   {
     CkAssert(elBcastNo > bcastEpoch);
   }
-  else if (!stableLocations)
+  else
   {
     // if this array element already received this message, skip it
     // if this array element can move and hasn't reached this bcast epoch yet, also skip
@@ -1425,21 +1426,15 @@ bool CkArrayBroadcaster::attemptDelivery(CkArrayMessage* bcast, ArrayElement* el
     elBcastNo++;
   }
 
-  const bool deliveryStatus = performDelivery(bcast, el, doFree);
-  // If locations are stable, we deliver msgs as they come in, so only deliver one
-  if (stableLocations)
-  {
-    return deliveryStatus;
-  }
-  // Else, keep delivering broadcasts while we have the next one in sequence
+  if (!performDelivery(bcast, el, doFree))
+    return false;
+  // Keep delivering broadcasts while we have the next one in sequence
   return bringUpToDate(el);
 }
 
 // Deliver all deliverable stored broadcasts to the given element
 bool CkArrayBroadcaster::bringUpToDate(ArrayElement* el)
 {
-  if (stableLocations)
-      return true;
   int& elBcastNo = getData(el);
   // Keep delivering broadcasts while we have the next one in sequence
   while (storedBcasts.hasBcast(elBcastNo))
@@ -1501,9 +1496,7 @@ void CkArrayBroadcaster::deliverAndUpdate(CkArrayMessage* bcast,
 
   bool success = performDelivery(bcast, elements, arrayId);
 
-  if (stableLocations)
-    delete bcast;
-  else if (success)
+  if (success)
   {
     int bcastEpoch = UsrToEnv(bcast)->getGroupEpoch() + 1;
     while (storedBcasts.hasBcast(bcastEpoch))
@@ -1534,16 +1527,13 @@ bool CkArrayBroadcaster::performDelivery(CkArrayMessage* bcast,
   for (CkMigratable* m : elements)
   {
     ArrayElement* el = (ArrayElement*)m;
-    if (!stableLocations)
-    {
-      int& elBcastNo = getData(el);
-      // if this array element already received this message, skip it
-      // if this array element can move and hasn't reached this bcast epoch yet, also skip
-      // it for now, it'll be delivered when it catches up
-      if (elBcastNo != bcastEpoch)
-        continue;
-      elBcastNo++;
-    }
+    int& elBcastNo = getData(el);
+    // if this array element already received this message, skip it
+    // if this array element can move and hasn't reached this bcast epoch yet, also skip
+    // it for now, it'll be delivered when it catches up
+    if (elBcastNo != bcastEpoch)
+      continue;
+    elBcastNo++;
     DEBB((AA "Delivering broadcast %d to element %s\n" AB, bcastEpoch, idx2str(el)));
     int* index = el->thisIndexMax.data();
     for (int i = 0; i < numInts; i++) validIndexes[j++] = index[i];
@@ -1571,6 +1561,16 @@ bool CkArrayBroadcaster::performDelivery(CkArrayMessage* bcast,
 #endif
 
 void CkArrayBroadcaster::springCleaning(void) { storedBcasts.springCleaning(); }
+
+// Stable locations: no element will ever need a broadcast that every local
+// element has received, so free those now instead of at spring cleaning.
+void CkArrayBroadcaster::releaseDelivered(const std::vector<CkMigratable*>& elements)
+{
+  int below = INT_MAX;
+  for (CkMigratable* m : elements)
+    below = std::min(below, getData((ArrayElement*)m));
+  storedBcasts.releaseDelivered(below);
+}
 
 void CkArrayBroadcaster::flushState() { storedBcasts.clear(); }
 
@@ -1791,8 +1791,6 @@ void CkArray::recvBroadcast(CkMessage* m)
     for (int i = len - 1; i >= 0; --i)
     {
       bool doFree = false;
-      if (stableLocations && i == 0)
-        doFree = true;
       // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the
       // first element during CMK_ZC_BCAST_ALL_DONE_MSG
       if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG)
@@ -1804,12 +1802,8 @@ void CkArray::recvBroadcast(CkMessage* m)
 #endif  // CMK_CHARM4PY
   }
 
-  // CkArrayBroadcaster doesn't have msg buffered, and there was no last
-  // delivery to transfer ownership
-  if (stableLocations && len == 0)
-  {
-    delete msg;
-  }
+  if (stableLocations)
+    broadcaster->releaseDelivered(localElemVec);
 }
 
 void CkArray::forwardZCMsgToOtherElems(envelope* env)
@@ -1821,9 +1815,6 @@ void CkArray::forwardZCMsgToOtherElems(envelope* env)
   for (unsigned int i = 1; i < len; ++i)
   {  // Send to all elements except the first element
     bool doFree = false;
-    if (stableLocations && i == len - 1 &&
-        CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG)
-      doFree = true;
     broadcaster->attemptDelivery((CkArrayMessage*)EnvToUsr(env), (ArrayElement*)localElemVec[i],
                          doFree);
   }

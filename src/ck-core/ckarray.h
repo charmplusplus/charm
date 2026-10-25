@@ -949,6 +949,9 @@ public:
   /// Return false if the element migrated away or deleted itself.
   virtual bool ckElementCreated(ArrayElement* elt) { return bringUpToDate(elt); }
 
+  // Stable locations: frees the stored broadcasts every local element has received
+  void releaseDelivered(const std::vector<CkMigratable*>& elements);
+
   /// Element just arrived on this processor (so just called pup)
   /// Return false if the element migrated away or deleted itself.
   virtual bool ckElementArriving(ArrayElement* elt) { return bringUpToDate(elt); }
@@ -1000,6 +1003,9 @@ private:
     void insert(CkArrayMessage* const msg, const int epoch)
     {
       const int offset = getOffset(epoch);
+      if (offset < 0)
+        CkAbort("Array broadcast %d arrived after the broadcast store released it (head %d)",
+                epoch, headEpoch);
       if (offset >= storage.size())
       {
         // Size of storage is always a power of 2 to ease masking
@@ -1047,10 +1053,19 @@ private:
       return curMaxEpoch;
     }
 
-    void springCleaning()
+    // Frees the stored broadcasts below the given epoch, stopping at the first
+    // epoch not stored yet (one still on its way may be older than a stored one)
+    void releaseDelivered(const int below)
     {
-      // Remove old broadcast messages
-      const int nDelete = oldMaxEpoch - headEpoch;
+      int epoch = headEpoch;
+      while (epoch < below && hasBcast(epoch)) epoch++;
+      releaseBelow(epoch);
+    }
+
+    // Frees every stored broadcast whose epoch is below the given one
+    void releaseBelow(const int epoch)
+    {
+      const int nDelete = epoch - headEpoch;
       if (nDelete > 0)
       {
         // DEBK((AA "Cleaning out %d old broadcasts\n" AB, nDelete));
@@ -1064,6 +1079,12 @@ private:
         headIndex = (headIndex + nDelete) & mask;
         headEpoch += nDelete;
       }
+    }
+
+    // Frees the broadcasts older than the newest one seen at the previous pass
+    void springCleaning()
+    {
+      releaseBelow(oldMaxEpoch);
       oldMaxEpoch = std::max(oldMaxEpoch, curMaxEpoch);
     }
 

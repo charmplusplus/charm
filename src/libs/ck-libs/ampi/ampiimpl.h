@@ -1737,6 +1737,7 @@ class AmpiRequestList {
   AmpiRequestList(int size, AmpiRequestPool* reqPoolPtr) noexcept
     : reqs(size), startIdx(0), reqPool(reqPoolPtr) {}
   ~AmpiRequestList() noexcept {}
+  inline int size() const noexcept { return reqs.size(); }
 
   inline AmpiRequest* operator[](int n) noexcept {
 #if CMK_ERROR_CHECKING
