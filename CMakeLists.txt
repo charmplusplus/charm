@@ -503,8 +503,10 @@ if(CMK_COVERAGE)
   set(_cov_compile "-fprofile-instr-generate -fcoverage-mapping")
   string(APPEND CMAKE_C_FLAGS " ${_cov_compile}")
   string(APPEND CMAKE_CXX_FLAGS " ${_cov_compile}")
-  string(APPEND CMAKE_EXE_LINKER_FLAGS " -fprofile-instr-generate")
   string(APPEND CMAKE_SHARED_LINKER_FLAGS " -fprofile-instr-generate")
+  # Executables are linked by charmc, which adds the link flag itself except
+  # for host tools (charmxi is linked -host, with a compiler that may not be
+  # clang), so it is not put in CMAKE_EXE_LINKER_FLAGS.
 endif()
 
 # This needs to be include before we set charmc as the linker
