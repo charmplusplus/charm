@@ -2,13 +2,21 @@
 
 DIRS = \
   megampi \
+  ibarrier \
+  cas \
   stacksize \
   migration \
   datatype \
+  collwake \
+  collmatch \
+  scan \
   privatization \
   jacobi3d \
   exit \
   chkpt \
+  intercomm_merge \
+  groupfree \
+  bsend \
 #  intercomm_coll \ # causes hangs in SMP mode
 
 ifeq (1,$(CMK_CAN_LINK_FORTRAN))
@@ -47,6 +55,7 @@ RECONVERSE_NA += \
   migration \
   megampi \
   privatization \
+  scan \
 
 endif
 endif

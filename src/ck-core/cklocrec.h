@@ -59,10 +59,10 @@ public:
   inline const CkArrayIndex &getIndex(void) const {return idx;}
   inline CmiUInt8 getID() const { return id; }
   inline CkLocMgr *getLocMgr() const {return myLocMgr; }
-  inline CkSyncBarrier* getSyncBarrier() const { return syncBarrier; }
 
 #if CMK_LBDB_ON
 public:
+  inline CkSyncBarrier* getSyncBarrier() const { return syncBarrier; }
   inline LBManager *getLBMgr(void) const {return lbmgr;}
   inline MetaBalancer *getMetaBalancer(void) const {return the_metalb;}
   inline const LDObjHandle& getLdHandle() const{ return ldHandle; }

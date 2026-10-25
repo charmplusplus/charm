@@ -293,7 +293,7 @@ void handleDirectApiCompletion(NcpyOperationInfo *info) {
 // Ack handler function which invokes the callback
 void CkRdmaDirectAckHandler(void *ack) {
 
-#if CMK_RECONVERSE && (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
   /* Inter-node device (D2D) transfers ride this same ack path, but their
    * completion bookkeeping is entirely different -- see ckrdmadevice.C. They
    * are recognised by the deviceRdmaOpInfo the device path attaches to the
@@ -609,7 +609,6 @@ void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, Ncp
                 (char *)(ncpyEmBufferInfo), // destRef
                 rootNode,
                 ncpyOpInfo
-#if CMK_RECONVERSE
                 // reconverse's setNcpyOpInfo takes one more argument than
                 // classic's: the device RDMA op info. This is a host-side
                 // operation, so it carries none. Leaving the argument off
@@ -617,7 +616,6 @@ void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, Ncp
                 // stack garbage into deviceRdmaOpInfo, which CUDA builds use
                 // to route acks to the device handler.
                 , nullptr
-#endif
                 );
 
   // set opMode
@@ -2043,20 +2041,19 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
   ref->pe = CmiMyPe();
 #endif
 
+  // Both entries exist before the first Rget is issued: CmiIssueRget may run
+  // the completion (zcPupGetCompleted) inline, and it looks them up.
+  CmiLock(CksvAccess(_nodeZCPendingLock));
+  CksvAccess(pendingZCOps).emplace(id, (CmiUInt1)CpvAccess(newZCPupGets).size());
+  CmiUnlock(CksvAccess(_nodeZCPendingLock));
+  locMgr->bufferedActiveRgetMsgs.emplace(id, std::vector<CkArrayMessage *>()); // owned by locMgr, no lock
+
   for(std::vector<NcpyOperationInfo *>::iterator it = CpvAccess(newZCPupGets).begin();
         it != CpvAccess(newZCPupGets).end(); ++it) {
     (*it)->destRef = (char *)ref;
     zcQdIncrement();
     CmiIssueRget(*it); // Issue the Rget
   }
-
-  // Create an entry for the unordered map with idx as the index and the vector size as the value
-  CmiLock(CksvAccess(_nodeZCPendingLock));
-  CksvAccess(pendingZCOps).emplace(id, (CmiUInt1)CpvAccess(newZCPupGets).size());
-  CmiUnlock(CksvAccess(_nodeZCPendingLock));
-
-  // Create an entry for the unordered map with idx as the index and vector of messages as the value
-  locMgr->bufferedActiveRgetMsgs.emplace(id, std::vector<CkArrayMessage *>()); // does not require locking as it is owned by locMgr
 }
 /***************************** End of Zerocopy PUP Support ****************************/
 

@@ -37,6 +37,7 @@ DIRS = \
   unbounded_migration \
   unbounded_restart \
   anytime_bcastred \
+  threaded_redn \
   objid_home \
   objid_insert \
   objid_sections \
@@ -74,9 +75,7 @@ all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
 ifeq ($(CMK_SMP),1)
-ifneq ($(CMK_MULTICORE),1)
 	make smptest
-endif
 endif
 
 testp: $(foreach i,$(TESTPDIRS),testp-$i)

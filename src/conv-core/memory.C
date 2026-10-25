@@ -70,7 +70,7 @@
 #  define getpid _getpid
 #endif
 #include "converse.h"
-#include "conv-autoconfig.h"   /* CMK_RECONVERSE */
+#include "conv-autoconfig.h"   /* CMK_HAS_* feature tests */
 #include "charm-api.h"
 
 /* Wrap a CmiMemLock around this code */
@@ -100,7 +100,6 @@ int cpdInSystem=1; /*Start inside the system (until we start executing user code
 #define CMK_MEMORY_BUILD_OS 1
 #endif
 
-#if CMK_RECONVERSE
 /* Spellings Reconverse has under a different name, or not at all. */
 #ifndef CMK_THREADLOCAL
 #define CMK_THREADLOCAL thread_local
@@ -110,7 +109,6 @@ int cpdInSystem=1; /*Start inside the system (until we start executing user code
    incomplete type is all a stub needs. */
 struct CpdListItemsRequest;
 struct LeakSearchInfo;
-#endif
 #if CMK_MEMORY_BUILD_GNU_HOOKS
 /*While in general on could build hooks on the GNU we have, for now the hooks
  * are setup to work only with OS memory libraries --Filippo*/
@@ -290,21 +288,11 @@ CMK_TYPEDEF_UINT8 _memory_allocated_max = 0; /* High-Water Mark */
 CMK_TYPEDEF_UINT8 _memory_allocated_min = 0; /* Low-Water Mark */
 
 /* By default, there are no flags */
-#if CMK_RECONVERSE
 /* Reconverse already owns CmiMemoryIs and the flag word behind it. A second
    copy here would answer differently depending on which of the two a caller
    happened to reach, so record this module's character through Reconverse's
    setter and leave the query to it. */
 #define CmiMemorySetIs(f) CmiMemoryIsSetFlag(f)
-#else
-static int CmiMemoryIs_flag=0;
-#define CmiMemorySetIs(f) (CmiMemoryIs_flag |= (f))
-
-int CmiMemoryIs(int flag)
-{
-	return (CmiMemoryIs_flag&flag)==flag;
-}
-#endif
 
 /**
  * memory_lifeRaft is a very small heap-allocated region.
@@ -732,19 +720,6 @@ struct CmiMemUsageStruct {
     {MemusagePS, "ps"},
 };
 
-#if !CMK_RECONVERSE
-/* Reconverse's converse.h defines CmiMemoryUsage() as a macro for 0 in every
-   translation unit, so a definition here could never be reached. */
-CMK_TYPEDEF_UINT8 CmiMemoryUsage(void){
-    int i;
-    CMK_TYPEDEF_UINT8 memtotal = 0;
-    for (i=0; i<sizeof(memtest_order)/sizeof(struct CmiMemUsageStruct); i++) {
-        memtotal = memtest_order[i].fn();
-        if (memtotal) break;
-    }
-    return memtotal;
-}
-#endif
 
 const char *CmiMemoryUsageReporter(void){
     int i;

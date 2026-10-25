@@ -308,6 +308,8 @@ class Amm {
   inline void put(T msg) noexcept;
   inline void put(int tag, int src, T msg) noexcept;
   inline T get(int tag, int src, int* rtags=NULL) noexcept;
+  // Like get(), but both keys must match exactly: wildcards on either side do not match.
+  inline T getExact(int tag, int src) noexcept;
   inline T probe(int tag, int src, int* rtags) noexcept;
   inline int size() const noexcept;
   void pup(PUP::er& p, AmmPupMessageFn msgpup) noexcept;
@@ -814,8 +816,8 @@ class groupStruct {
       return ranks;
     }
   }
-  int decRefCount() noexcept { return refCount--; }
-  int incRefCount() noexcept { return refCount++; }
+  int decRefCount() noexcept { return --refCount; } // returns the new count
+  int incRefCount() noexcept { return ++refCount; }
 };
 
 inline bool operator==(const groupStruct &g1, const groupStruct &g2) {
@@ -1218,6 +1220,10 @@ inline std::vector<int> rangeExclOp(int n, int ranges[][3], const std::vector<in
 #define MPI_RMA_TAG         MPI_TAG_UB_VALUE+10
 #define MPI_EPOCH_START_TAG MPI_TAG_UB_VALUE+11
 #define MPI_EPOCH_END_TAG   MPI_TAG_UB_VALUE+12
+// Key tag of a pending non-blocking reduction/gather request in ampi::postedReqs;
+// the source slot of the key holds the Charm++ reduction number of the
+// collective's contribution (see ampi::postCollReq).
+#define MPI_NBCOLL_TAG      MPI_TAG_UB_VALUE+13
 
 #define AMPI_COLL_SOURCE 0
 #define AMPI_COLL_COMM   MPI_COMM_WORLD
@@ -1232,8 +1238,9 @@ enum AmpiReqType : uint8_t {
   AMPI_GATHER_REQ  = 6,
   AMPI_GATHERV_REQ = 7,
   AMPI_G_REQ       = 8,
+  AMPI_SCAN_REQ    = 9,
 #if CMK_CUDA
-  AMPI_GPU_REQ     = 9
+  AMPI_GPU_REQ     = 10
 #endif
 };
 
@@ -1247,7 +1254,11 @@ enum AmpiSendType : char {
   BLOCKING_SEND = 0,
   I_SEND = 1,
   BLOCKING_SSEND = 2,
-  I_SSEND = 3
+  I_SSEND = 3,
+  // Buffered sends always copy the data into a message and send it eagerly,
+  // so they complete without waiting for the matching receive.
+  BLOCKING_BSEND = 4,
+  I_BSEND = 5
 };
 
 #define MyAlign8(x) (((x)+7)&(~7))
@@ -1405,7 +1416,9 @@ class IReq final : public AmpiRequest {
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
-  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
+  // Only an MPI_Ibarrier's IReq is posted with ampi::postCollReq, so this is
+  // reached only for the (empty) result of the barrier's reduction.
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override { complete = true; }
   void receiveRdma(ampi *ptr, char *sbuf, int slength, int srcRank) noexcept override;
   int getNumReceivedBytes(CkDDT *ptr) const noexcept override {
     return length;
@@ -1713,6 +1726,85 @@ class GReq final : public AmpiRequest {
   void print() const noexcept override;
 };
 
+/// MPI_Iscan and MPI_Iexscan (MPI_Scan and MPI_Exscan wait on one).
+///
+/// The scan is the recursive-doubling exchange: in round k each rank
+/// exchanges its partial result with partner rank^(1<<k), if that rank
+/// exists. A round cannot start before the previous one has finished, so the
+/// request runs the rounds itself: it is the posted receive for its current
+/// round (tag MPI_SCAN_TAG or MPI_EXSCAN_TAG, src = partner), and when the
+/// partner's message is matched ampi::progressScan folds it in, sends the
+/// next round's partial result and posts the request again. The scan
+/// therefore advances as messages arrive, while the rank's thread computes
+/// or waits on other requests, not only inside MPI_Wait on this request.
+class ScanReq final : public AmpiRequest {
+ public:
+  MPI_Op op       = MPI_OP_NULL;
+  int rank        = 0;
+  int size        = 0;
+  int mask        = 1;     // current round: partner is rank^mask
+  bool exclusive  = false; // MPI_Iexscan
+  bool haveResult = false; // exclusive scan: buf already holds a value
+  // Both hold count elements in the datatype's own layout (extent stride,
+  // gaps included), which is what the op functions walk; round messages carry
+  // them packed. Element 0 starts at data() - trueLB; the size is
+  // count * max(extent, trueExtent), so an op may write a whole padded last
+  // element.
+  std::vector<char> partial; // reduction over this rank's current subtree
+  std::vector<char> tmp;     // the partner's partial result
+  MPI_Aint trueLB = 0;
+  char* partialBuf() noexcept { return partial.data() - trueLB; }
+  char* tmpBuf() noexcept { return tmp.data() - trueLB; }
+  // The op's function, captured when the scan starts so that MPI_Op_free on
+  // a user op while the scan is outstanding is safe (freeOp drops the op's
+  // table entry, and MPI_Op_create may reuse it). For a user op this is the
+  // stored form from OpStruct::func (an offset under PIEglobals), resolved on
+  // each call. The scan always combines in rank order, so it never needs the
+  // op's commutativity.
+  MPI_User_function* func = nullptr;
+  bool userFunc = false;
+
+  /// inout = in op inout
+  void applyOp(const void* in, void* inout) noexcept;
+
+  ScanReq(void *buf_, int count_, MPI_Datatype type_, MPI_Op op_, MPI_Comm comm_,
+          int rank_, int size_, bool exclusive_, MPI_Aint span, MPI_Aint trueLB_, CkDDT *ddt_,
+          AmpiReqSts sts_=AMPI_REQ_PENDING) noexcept
+    : op(op_), rank(rank_), size(size_), exclusive(exclusive_),
+      partial(span), tmp(span), trueLB(trueLB_)
+  {
+    buf   = buf_;
+    count = count_;
+    type  = type_;
+    comm  = comm_;
+    tag   = exclusive ? MPI_EXSCAN_TAG : MPI_SCAN_TAG;
+    AMPI_REQUEST_COMMON_INIT
+  }
+  ScanReq() =default;
+  ~ScanReq() =default;
+  bool test(MPI_Status *sts=MPI_STATUS_IGNORE) noexcept override;
+  CMI_WARN_UNUSED_RESULT ampiParent* wait(ampiParent* parent, MPI_Status *sts) noexcept override;
+  bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
+  AmpiReqType getType() const noexcept override { return AMPI_SCAN_REQ; }
+  bool isUnmatched() const noexcept override { return !complete; }
+  void pup(PUP::er &p) noexcept override {
+    AmpiRequest::pup(p);
+    p|op;
+    p|rank;
+    p|size;
+    p|mask;
+    p|exclusive;
+    p|haveResult;
+    p|partial;
+    p|tmp;
+    p|trueLB;
+    p((char *)&func, sizeof(func)); // code addresses (or offsets) match on every PE
+    p|userFunc;
+  }
+  void print() const noexcept override;
+};
+
 class AmpiRequestPool;
 
 class AmpiRequestList {
@@ -1801,6 +1893,34 @@ inline void pupFromBuf(const void *data,T &t) noexcept {
 
 #define COLL_SEQ_IDX      -1
 
+/* Which messages carry sequence numbers, and in which sequence (AmpiSeqQ
+   index). Used by both ampi::getSeqNo (sender) and AmpiMsg::getSeqIdx
+   (receiver), so the two cannot disagree.
+   - Point-to-point messages (tags up to MPI_ATA_SEQ_TAG): one sequence per
+     peer rank, index = the peer's rank.
+   - Broadcasts: one collective sequence, COLL_SEQ_IDX.
+   - Scan and exscan messages: one sequence per peer rank of their own,
+     index ampiScanSeqIdx(rank) (negative, below COLL_SEQ_IDX). Two scans
+     outstanding on a communicator send under the same tag to the same
+     partner, so they must be matched in send order; a separate sequence keeps
+     that order without making point-to-point messages wait behind scan
+     messages, which always travel through the scheduler while PE-local
+     point-to-point sends are delivered inline.
+   - Other collective tags are not sequenced (seq 0). */
+inline bool ampiIsScanTag(int tag) noexcept {
+  return tag == MPI_SCAN_TAG || tag == MPI_EXSCAN_TAG;
+}
+inline int ampiScanSeqIdx(int rank) noexcept { return COLL_SEQ_IDX - 1 - rank; }
+inline bool ampiTagIsSequenced(int tag) noexcept {
+  return tag <= MPI_BCAST_TAG || ampiIsScanTag(tag);
+}
+/// rank is the peer: the destination when sending, the source when receiving.
+inline int ampiSeqIdx(int tag, int rank) noexcept {
+  if (ampiIsScanTag(tag)) return ampiScanSeqIdx(rank);
+  if (tag >= MPI_BCAST_TAG && tag <= MPI_ATA_TAG) return COLL_SEQ_IDX;
+  return rank;
+}
+
 class AmpiMsgPool;
 
 enum AmpiMsgType : bool {
@@ -1821,9 +1941,10 @@ class AmpiMsg final : public CMessage_AmpiMsg {
 
  public:
   AmpiMsg() noexcept : data(NULL) {}
-  AmpiMsg(int sreq, int t, int sRank, int l, MPI_Comm c) noexcept :
-    ssendReq(sreq), tag(t), srcRank(sRank), length(l), origLength(l), comm(c)
-  { /* only called from AmpiMsg::pup() since the refnum (seq) will get pup'ed by the runtime */ }
+  // There is deliberately no (sreq, tag, srcRank, len, comm) constructor: with
+  // a plain int 0 as the first argument it was an exact match and won over
+  // this one, shifting every field (tag became -1, so MPI_Ibarrier never
+  // completed with more than one rank). pup() uses this constructor too.
   AmpiMsg(CMK_REFNUM_TYPE seq, int sreq, int t, int sRank, int l) noexcept :
     ssendReq(sreq), tag(t), srcRank(sRank), length(l), origLength(l)
   { CkSetRefNum(this, seq); }
@@ -1836,15 +1957,7 @@ class AmpiMsg final : public CMessage_AmpiMsg {
   inline void setComm(MPI_Comm c) noexcept { comm = c; }
   inline CMK_REFNUM_TYPE getSeq() const noexcept { return UsrToEnv(this)->getRef(); }
   inline int getSsendReq() const noexcept { return ssendReq; }
-  inline int getSeqIdx() const noexcept {
-    // seqIdx is srcRank, unless this message was part of a collective
-    if (tag >= MPI_BCAST_TAG && tag <= MPI_ATA_TAG) {
-      return COLL_SEQ_IDX;
-    }
-    else {
-      return srcRank;
-    }
-  }
+  inline int getSeqIdx() const noexcept { return ampiSeqIdx(tag, srcRank); }
   inline AmpiMsgType isNcpyShmMsg() const noexcept { CkAssert(isSsend()); return ((AmpiMsgType*)data)[0]; }
   inline void getNcpyShmBuffer(AmpiNcpyShmBuffer& srcInfo) noexcept {
     CkAssert(isNcpyShmMsg());
@@ -2343,7 +2456,13 @@ class ampiParent final : public CBase_ampiParent {
   // exchange proxy info between two ampi proxies
   void ExchangeProxy(CProxy_ampi rproxy) noexcept {
     if(!isTmpRProxySet){ tmpRProxy=rproxy; isTmpRProxySet=true; }
-    else{ tmpRProxy.setRemoteProxy(rproxy); rproxy.setRemoteProxy(tmpRProxy); isTmpRProxySet=false; }
+    else{
+      // Both groups' new intercommunicator arrays are fully registered:
+      // give each its remote proxy, and only then resume its ranks.
+      tmpRProxy.setRemoteProxyAndUnblock(rproxy);
+      rproxy.setRemoteProxyAndUnblock(tmpRProxy);
+      isTmpRProxySet=false;
+    }
   }
 
   //Grab the next available split/group communicator
@@ -2356,7 +2475,7 @@ class ampiParent final : public CBase_ampiParent {
   bool isInter(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_INTER); }
   bool isIntra(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_INTRA); }
   bool isGroup(MPI_Comm comm) const noexcept { return (comms.getType(comm) == COMM_GROUP); }
-  bool isInGroups(MPI_Group group) const noexcept { return (group>=0 && group<groups.size()); }
+  bool isInGroups(MPI_Group group) const noexcept { return (group>=0 && group<groups.size() && groups[group] != nullptr); }
 
   void pup(PUP::er &p) noexcept;
 
@@ -2411,27 +2530,43 @@ class ampiParent final : public CBase_ampiParent {
       return groups[group]->getRanks();
     }
   }
+  // Group handles are indices into groups[]. A freed group leaves a null slot
+  // (reused by later groups) so that the handles of other groups stay valid.
   inline MPI_Group saveGroupStruct(const std::vector<int>& vec) noexcept {
     if (vec.empty()) return MPI_GROUP_EMPTY;
-    for (int i=0; i<groups.size(); i++) {
-      if (vec == groups[i]->getRanks()) {
+    int freeSlot = -1;
+    for (int i=1; i<groups.size(); i++) { // slot 0 is MPI_GROUP_EMPTY
+      if (groups[i] == nullptr) {
+        if (freeSlot == -1) freeSlot = i;
+      }
+      else if (vec == groups[i]->getRanks()) {
         groups[i]->incRefCount();
         return i;
       }
     }
-    int idx = groups.size();
-    groups.resize(idx+1);
+    int idx = freeSlot;
+    if (idx == -1) {
+      idx = groups.size();
+      groups.resize(idx+1);
+    }
     groups[idx]=new groupStruct(vec);
     return (MPI_Group)idx;
   }
-  void freeGroupStruct(const MPI_Group group) noexcept {
-    if (group == MPI_GROUP_EMPTY || group == MPI_GROUP_NULL || hasComm(group)) {
-      return;
+  // Returns false if group is not a valid group handle.
+  bool freeGroupStruct(const MPI_Group group) noexcept {
+    if (group == MPI_GROUP_EMPTY || group == MPI_GROUP_NULL) {
+      return true;
+    }
+    if (!isInGroups(group)) {
+      // Internal handles that alias a live communicator (see comm2group) own
+      // no group object; anything else is not a valid group.
+      return hasComm(group);
     }
     if (groups[group]->decRefCount() == 0) {
       delete groups[group];
-      groups.remove(group);
+      groups[group] = nullptr;
     }
+    return true;
   }
   inline int getRank(const MPI_Group group) const noexcept {
     std::vector<int> vec = group2vec(group);
@@ -2449,12 +2584,23 @@ class ampiParent final : public CBase_ampiParent {
     comms.checkComm(comm);
   }
 
-  /// if intra-communicator, return comm, otherwise return null group
+  /// if intra-communicator, return comm, otherwise return null group.
+  /// The result aliases the communicator's number and owns no group object,
+  /// so it is valid only while comm exists and must not be passed to
+  /// MPI_Group_free: it is for internal use. MPI_Comm_group returns
+  /// commGroupHandle(comm) instead.
   inline MPI_Group comm2group(const MPI_Comm comm) const noexcept {
     if(isInter(comm)) return MPI_GROUP_NULL;   // we don't support inter-communicator in such functions
     const ampiCommStruct& s = comm2CommStruct(comm);
     if(comm!=MPI_COMM_WORLD && comm!=s.getComm()) CkAbort("Error in ampiParent::comm2group()");
     return (MPI_Group)(s.getComm());
+  }
+
+  /// A new reference to a group object holding comm's (local) group, owned
+  /// by the caller and independent of comm's lifetime (MPI_Comm_group).
+  inline MPI_Group commGroupHandle(const MPI_Comm comm) noexcept {
+    if (isInter(comm)) return MPI_GROUP_NULL; // as comm2group
+    return saveGroupStruct(comm2CommStruct(comm).getIndices());
   }
 
   inline int getRemoteSize(const MPI_Comm comm) const noexcept {
@@ -2545,6 +2691,9 @@ class ampiParent final : public CBase_ampiParent {
     }
   }
   MPI_User_function* op2User_function(MPI_Op op) const noexcept;
+  /// The op's function in the form ampiParent stores it (for a user op, an
+  /// offset under PIEglobals; resolve it with resolveOpFunction).
+  MPI_User_function* op2StoredFunction(MPI_Op op, bool* isUser) const noexcept;
   inline AmpiOpHeader op2AmpiOpHeader(MPI_Op op, MPI_Datatype type, int count) const noexcept {
     if (opIsPredefined(op)) {
       int size = myDDT.getType(type)->getSize(count);
@@ -2624,6 +2773,7 @@ class ampi final : public CBase_ampi {
   friend class RednReq;
   friend class GatherReq;
   friend class GathervReq;
+  friend class ScanReq;
 
   ampiParent *parent;
   CProxy_ampiParent parentProxy;
@@ -2660,6 +2810,17 @@ class ampi final : public CBase_ampi {
     CkAssert(numCommCreationsInProgress == 0);
     numCommCreationsInProgress = x;
   }
+
+  // Intercommunicator merging (state kept on the root of the group that goes
+  // first): the merged array is created once both groups have contributed.
+  int numMergeGroupsArrived{};
+  MPI_Comm mergeNextComm{};
+
+  // How registrationFinish resumes the ranks of a new communicator (default:
+  // thisProxy.unblock(), for split). newChildProxy is the new array.
+  bool exchangeProxyOnFinish{};  // intercommCreate: via ExchangeProxy
+  bool resumeNewArrayOnFinish{}; // commCreate, intercommMerge: newChildProxy.unblock()
+  CProxy_ampi newChildProxy;
 
   // Intercommunicator splitting:
   std::unordered_map<int, CProxy_ampi> splitRProxyMap;
@@ -2704,16 +2865,20 @@ class ampi final : public CBase_ampi {
   void requestPut(MPI_Request req, CkNcpyBuffer targetInfo) noexcept;
   void bcastResult(AmpiMsg *msg) noexcept;
   void barrierResult(void) noexcept;
-  void ibarrierResult(void) noexcept;
   void rednResult(CkReductionMsg *msg) noexcept;
   void irednResult(CkReductionMsg *msg) noexcept;
 
   void splitPhase1(CkReductionMsg *msg) noexcept;
   void splitPhaseInter(CkReductionMsg *msg) noexcept;
+  // The reduction targets of communicator creation are [threaded] entry
+  // methods taking a CkReductionMsg, like splitPhase1. They block in
+  // createNewChildAmpiSync's future, so they must run in their own thread.
+  void commCreateReduced(CkReductionMsg *msg) noexcept;
+  void intercommCreateReduced(CkReductionMsg *msg) noexcept;
+  void intercommMergeReduced(CkReductionMsg *msg) noexcept;
   void commCreatePhase1(int nextComm, int commType) noexcept;
   void registrationFinish() noexcept;
-  void intercommCreatePhase1(MPI_Comm nextInterComm) noexcept;
-  void intercommMergePhase1(MPI_Comm nextIntraComm) noexcept;
+  void intercommMergeGroupArrived(MPI_Comm nextIntraComm) noexcept;
 
   void exchangeProxyForSplitLocal(int color, CProxy_ampi splitLocalProxy) noexcept {
     auto iter = splitRProxyMap.find(color);
@@ -2744,7 +2909,9 @@ class ampi final : public CBase_ampi {
   void insertNewChildAmpiElements(MPI_Comm newComm, CProxy_ampi newAmpi, AmpiCommType type) noexcept;
 
   inline void handleBlockedReq(AmpiRequest* req) noexcept {
-    if (req->isBlocked() && parent->numBlockedReqs != 0) {
+    // A ScanReq is matched once per round; progressScan does this when its
+    // last round completes.
+    if (req->isBlocked() && parent->numBlockedReqs != 0 && req->getType() != AMPI_SCAN_REQ) {
       parent->numBlockedReqs--;
     }
   }
@@ -2769,10 +2936,20 @@ class ampi final : public CBase_ampi {
     return static_blockOnColl(this);
   }
   inline void setBlockingReq(AmpiRequest *req) noexcept;
+  void progressScan(ScanReq* req, AmpiMsg* msg, bool deleteMsg) noexcept;
   inline AmpiRequestPool& getReqPool() const { return parent->reqPool; }
   CMI_WARN_UNUSED_RESULT inline ampi* blockOnIReq(void* buf, int count, MPI_Datatype type, int s,
                                                   int t, MPI_Comm comm, MPI_Status* sts) noexcept;
   MPI_Request postReq(AmpiRequest* newreq) noexcept;
+  /// Post the request of a non-blocking collective whose result comes back
+  /// through irednResult. Call it right before this rank's contribute() for
+  /// that collective: the request is keyed by the reduction number that
+  /// contribution will get, which the reduction manager copies onto the result
+  /// (CkReductionMsg::getRedNo). The number is the same on every rank, so
+  /// results match their requests whatever order they arrive in (an Igather
+  /// result reaches only the root and can overtake an earlier Iallreduce's
+  /// broadcast).
+  MPI_Request postCollReq(AmpiRequest* newreq) noexcept;
   inline void waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept;
   inline void completedSend(MPI_Request req, CkNcpyBuffer *srcInfo=nullptr) noexcept;
   inline void completedRecv(MPI_Request req, CkNcpyBuffer *targetInfo=nullptr) noexcept;
@@ -2805,9 +2982,7 @@ class ampi final : public CBase_ampi {
                                  int destRank, MPI_Comm destcomm, CMK_REFNUM_TYPE seq, CProxy_ampi arrProxy,
                                  MPI_Request reqIdx) noexcept;
   inline bool destLikelyWithinProcess(CProxy_ampi arrProxy, int destIdx, ampi* destPtr) const noexcept {
-#if CMK_MULTICORE
-    return true;
-#elif CMK_SMP
+#if CMK_SMP
     if (destPtr != NULL) return true;
     CkArray* localBranch = arrProxy.ckLocalBranch();
     int destPe = localBranch->lastKnown(CkArrayIndex1D(destIdx));
@@ -2818,6 +2993,8 @@ class ampi final : public CBase_ampi {
   }
   inline MPI_Request delesend(int t, int s, const void* buf, int count, MPI_Datatype type, int rank,
                               MPI_Comm destcomm, CProxy_ampi arrproxy, AmpiSendType sendType, MPI_Request req) noexcept;
+  MPI_Request completedSendReq(const void* buf, int count, MPI_Datatype type, int rank,
+                               int t, MPI_Comm destcomm, MPI_Request reqIdx) noexcept;
   inline bool processSsendMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
   inline bool processSsendNcpyShmMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
   inline bool processSsendNcpyMsg(AmpiMsg* msg, void* buf, MPI_Datatype type, int count, MPI_Request req) noexcept;
@@ -2888,6 +3065,8 @@ class ampi final : public CBase_ampi {
   inline const CProxy_ampi &getProxy() const noexcept {return thisProxy;}
   inline const CProxy_ampi &getRemoteProxy() const noexcept {return remoteProxy;}
   inline void setRemoteProxy(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; }
+  // Matches the block() in ampi::intercommCreate
+  inline void setRemoteProxyAndUnblock(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; thread->resume(); }
   inline int getIndexForRank(int r) const noexcept {return myComm->getIndexForRank(r);}
   inline int getIndexForRemoteRank(int r) const noexcept {return myComm->getIndexForRemoteRank(r);}
   void findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const noexcept;
@@ -2945,10 +3124,10 @@ class ampi final : public CBase_ampi {
                                   int winIndex) noexcept;
   int winCompareAndSwap(const void *orgaddr, const void *compaddr, void *resaddr, MPI_Datatype type,
                         int rank, MPI_Aint targdisp, WinStruct *win) noexcept;
-  char* winLocalCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Datatype type,
-                               MPI_Aint targdisp, int winIndex) noexcept;
-  AmpiMsg* winRemoteCompareAndSwap(int size, char *sorgaddr, char *compaddr, MPI_Datatype type,
-                                   MPI_Aint targdisp, int winIndex) noexcept;
+  void winLocalCompareAndSwap(int size, char* sorgaddr, char* compaddr, char* resaddr,
+                              MPI_Aint targdisp, int winIndex) noexcept;
+  AmpiMsg* winRemoteCompareAndSwap(int size, char *sorgaddr, char *compaddr, MPI_Aint targdisp,
+                                   int winIndex) noexcept;
   void winSetName(WinStruct *win, const char *name) noexcept;
   void winGetName(WinStruct *win, char *name, int *length) const noexcept;
   win_obj* getWinObjInstance(WinStruct *win) const noexcept;

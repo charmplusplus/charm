@@ -3,9 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#if !CMK_RECONVERSE
-#include "queueing.h"
-#endif
 
 #if 0
 /* Queue message extraction calls: */
