@@ -166,10 +166,16 @@ int main(int argc, char **argv)
   int rank, size;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
-  const int iters = (argc > 1) ? atoi(argv[1]) : 50;
+  // Positional arguments: iterations, then the parts mask. Runtime options
+  // that the RTS did not consume (they start with '+') stay in argv, so skip
+  // them instead of reading them as numbers.
+  int nPos = 0, posArg[2] = {50, 31};
+  for (int a = 1; a < argc && nPos < 2; a++)
+    if (argv[a][0] != '+' && argv[a][0] != '-') posArg[nPos++] = atoi(argv[a]);
+  const int iters = posArg[0];
   /* Bit mask of the parts to run: 1 = parts 1-4, 2 = part 5, 4 = part 6,
      8 = part 7, 16 = part 8. */
-  const int parts = (argc > 2) ? atoi(argv[2]) : 31;
+  const int parts = posArg[1];
   int moves = 0; /* times this rank changed PE across AMPI_Migrate */
 
   MPI_Comm sub; /* even ranks / odd ranks */
