@@ -65,6 +65,8 @@ static inline bool hostSyncMode() {
 /* readonly */ double capacity_factor;
 /* readonly */ int fuse_sources;
 /* readonly */ int stream_outputs;
+/* readonly */ int send_ahead;
+/* readonly */ int tok_channels;
 /* readonly */ int print_place;
 /* readonly */ int flight_log;
 /* readonly */ double zipf_z;
@@ -108,6 +110,10 @@ static inline uint64_t hmix(uint64_t a, uint64_t b) {
 static inline double u01(uint64_t h) {
   return ((double)(h >> 11) + 0.5) / 9007199254740992.0;
 }
+
+// Token channels per (expert, dispatcher): one per step parity when the next
+// step's tokens can land while this step computes, else one.
+static inline int tokParities() { return send_ahead ? 2 : 1; }
 
 static inline bool isLBStep(int s) {
   return s == first_lb || (s != 0 && lb_freq > 0 && s % lb_freq == 0);
@@ -174,12 +180,14 @@ public:
     capacity_factor = 0.0;
     fuse_sources = 1;
     stream_outputs = 1;
+    send_ahead = 1;
+    tok_channels = 1;
     print_place = 0;
     flight_log = 0;
     disp_step = exp_step = done_count = 0;
 
     int c;
-    while ((c = getopt(m->argc, m->argv, "e:m:h:t:k:i:u:z:p:c:r:L:C:s:f:b:l:S:n:D:aAUTIPFO")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "e:m:h:t:k:i:u:z:p:c:r:L:C:s:f:b:l:S:n:D:aAUTIPFOYM")) != -1) {
       switch (c) {
         case 'e': n_experts = atoi(optarg); break;
         case 'm': d_model = atoi(optarg); break;
@@ -207,6 +215,8 @@ public:
         case 'D': capacity_factor = atof(optarg); break;
         case 'U': fuse_sources = 0; break;
         case 'O': stream_outputs = 0; break;
+        case 'Y': send_ahead = 0; break;
+        case 'M': tok_channels = 0; break;
         case 'P': print_place = 1; break;
         case 'F': flight_log = 1; break;
         default:
@@ -239,7 +249,11 @@ public:
               "  -S [seed] -P (print final placement)\n"
               "  -F (print every slab and output message: bytes, sent, envelope, landed)\n"
               "  -O (send an expert's outputs after its whole step, not each dispatcher's\n"
-              "      as soon as its tokens are done)\n",
+              "      as soon as its tokens are done)\n"
+              "  -Y (send a step's tokens only after the previous step's outputs are back,\n"
+              "      not while the experts still compute it)\n"
+              "  -M (send tokens as device messages the expert reads, not as channel puts\n"
+              "      the dispatcher writes)\n",
               m->argv[0]);
           CkExit();
       }
@@ -293,8 +307,10 @@ public:
 
     const size_t wbytes = sizeof(float) * (size_t)d_model * d_ff * 2 *
                           (use_adam ? 3 : 1);
+    // Inputs and outputs, and a second input slab when the next step's tokens
+    // can land while this step computes (send_ahead).
     const size_t slab_bytes = sizeof(float) * (size_t)n_disp * cap_src *
-                              d_model * 2;
+                              d_model * (send_ahead ? 3 : 2);
     const double gflop = 10.0 * avg_src * n_disp * d_model * d_ff * 1e-9;
 
     CkPrintf("\n[CUDA mixture-of-experts layer]\n");
@@ -316,9 +332,11 @@ public:
         "%.1f GFLOP per step at average load\n", wbytes / 1048576.0,
         slab_bytes / 1048576.0, gflop);
     CkPrintf("Steps: %d (+%d warmup), first LB: %d, LB frequency: %d%s, "
-        "loads: %s\n\n", n_steps, warmup_steps, first_lb, lb_freq,
+        "loads: %s; next step's tokens sent %s, %s\n\n", n_steps, warmup_steps, first_lb, lb_freq,
         async_lb ? ", async" : "",
-        use_instrument ? "CUPTI-measured" : "token-count estimates");
+        use_instrument ? "CUPTI-measured" : "token-count estimates",
+        send_ahead ? "while this step computes" : "after its outputs are back",
+        tok_channels ? "as channel puts" : "as device messages");
 
     disp_proxy = CProxy_Dispatcher::ckNew();
     expert_proxy = CProxy_Expert::ckNew(n_experts);
@@ -328,7 +346,15 @@ public:
 
   void dispReady() { expert_proxy.init(); }
 
-  void expertsReady() {
+  // The steps start once the experts are initialised and, with token channels,
+  // every dispatcher holds every expert's channels.
+  bool experts_ready = false;
+  int chan_ready_n = 0;
+  void expertsReady() { experts_ready = true; maybeStart(); }
+  void dispChannelsReady() { chan_ready_n++; maybeStart(); }
+
+  void maybeStart() {
+    if (!experts_ready || (tok_channels && chan_ready_n < n_disp)) return;
     CkPrintf("Init time: %.3lf s\n", CkWallTimer() - init_start_time);
     start_time = CkWallTimer();
     window_start_time = start_time;
@@ -480,28 +506,40 @@ class Dispatcher : public CBase_Dispatcher {
   MoeCtx gpu;
   int my_step = 0;
   int recv_count = 0;
-  int outstanding_sends = 0;
   bool drain_pending = false;
   bool chk_due = false;
   int cur_phase = -1;
   std::vector<int> perm;        // expert at each popularity rank, this phase
   std::vector<double> cdf;      // cumulative popularity by rank
-  std::vector<int> counts;      // tokens per expert, this step
-  std::vector<int> offs;        // slab offsets per expert (n_experts + 1)
   std::vector<int> fill_;
-  std::vector<int> slot_expert;
-  std::vector<long long> env_t;   // -F: envelope arrival per expert, this step
-  // expert chosen for each (token, j)
-  long dropped;   // tokens the capacity factor refused this step
+  std::vector<int> slot_expert; // expert chosen for each (token, j)
+  std::vector<long long> env_t;   // -F: envelope arrival per (step parity, expert)
+
+  // One step's routing and the buffers that carry it. Two alternate by step
+  // parity: with send_ahead, step s+1 is routed, gathered and sent while step
+  // s's outputs are still landing and before s is combined.
+  struct StepBuf {
+    std::vector<int> counts;    // tokens per expert
+    std::vector<int> offs;      // slab offsets per expert (n_experts + 1)
+    long dropped = 0;           // tokens the capacity factor refused
+    float* d_send = nullptr;    // [(n_tokens*k + 1) x d_model], tokens sorted by expert
+    float* d_recv = nullptr;    // same layout, expert outputs; +2 rows, see init()
+    int* d_send_idx = nullptr;  // token for each slot of d_send
+    int* d_recv_pos = nullptr;  // slot of d_recv for each (token, j)
+    int* h_send_idx = nullptr;  // pinned copies
+    int* h_recv_pos = nullptr;
+    int outstanding = 0;        // this step's token sends not yet complete
+  };
+  StepBuf sb[2];
+  StepBuf& stepBuf(int step) { return sb[step & 1]; }
+  int send_step = 0;      // the step issueGather routed; sendTokens sends it
+  int sent_through = 0;   // the last step whose tokens are out
+  // Sender copies of the experts' token channels, [expert * 2 + step parity].
+  std::vector<CkDeviceChannel> tok_ch;
+  int chans_in = 0;
 
   float* d_x;         // [n_tokens x d_model], fixed for the run
-  float* d_send;      // [(n_tokens*k + 1) x d_model], tokens sorted by expert
-  float* d_recv;      // same layout, expert outputs; +2 rows, see allocate()
   float* d_y;         // [n_tokens x d_model], combined outputs
-  int* d_send_idx;    // token for each slot of d_send
-  int* d_recv_pos;    // slot of d_recv for each (token, j)
-  int* h_send_idx;    // pinned copies
-  int* h_recv_pos;
   double* d_chk;
   double* h_chk;
   // A send is tagged with a stream, and the runtime records "data ready" as
@@ -586,22 +624,24 @@ class Dispatcher : public CBase_Dispatcher {
 
     const size_t TK = slots();
     hapiCheck(hapiMalloc((void**)&d_x, sizeof(float) * n_tokens * d_model));
-    hapiCheck(hapiMalloc((void**)&d_send, sizeof(float) * (TK + 1) * d_model));
-    // TK+2 rows: [TK] absorbs the one-row dummy a zero-token expert sends,
-    // [TK+1] is held at zero for tokens dropped by the capacity factor.
-    hapiCheck(hapiMalloc((void**)&d_recv, sizeof(float) * (TK + 2) * d_model));
-    hapiCheck(hapiMemset(d_recv + (TK + 1) * d_model, 0,
-        sizeof(float) * d_model));
+    for (StepBuf& b : sb) {
+      hapiCheck(hapiMalloc((void**)&b.d_send, sizeof(float) * (TK + 1) * d_model));
+      // TK+2 rows: [TK] absorbs the one-row dummy a zero-token expert sends,
+      // [TK+1] is held at zero for tokens dropped by the capacity factor.
+      hapiCheck(hapiMalloc((void**)&b.d_recv, sizeof(float) * (TK + 2) * d_model));
+      hapiCheck(hapiMemset(b.d_recv + (TK + 1) * d_model, 0,
+          sizeof(float) * d_model));
+      hapiCheck(hapiMalloc((void**)&b.d_send_idx, sizeof(int) * TK));
+      hapiCheck(hapiMalloc((void**)&b.d_recv_pos, sizeof(int) * TK));
+      hapiCheck(hapiMallocHost((void**)&b.h_send_idx, sizeof(int) * TK));
+      hapiCheck(hapiMallocHost((void**)&b.h_recv_pos, sizeof(int) * TK));
+      b.counts.assign(n_experts, 0);
+      b.offs.assign(n_experts + 1, 0);
+    }
     hapiCheck(hapiMalloc((void**)&d_y, sizeof(float) * n_tokens * d_model));
-    hapiCheck(hapiMalloc((void**)&d_send_idx, sizeof(int) * TK));
-    hapiCheck(hapiMalloc((void**)&d_recv_pos, sizeof(int) * TK));
     hapiCheck(hapiMalloc((void**)&d_chk, sizeof(double)));
-    hapiCheck(hapiMallocHost((void**)&h_send_idx, sizeof(int) * TK));
-    hapiCheck(hapiMallocHost((void**)&h_recv_pos, sizeof(int) * TK));
     hapiCheck(hapiMallocHost((void**)&h_chk, sizeof(double)));
 
-    counts.assign(n_experts, 0);
-    offs.assign(n_experts + 1, 0);
     fill_.assign(n_experts, 0);
     slot_expert.assign(TK, 0);
 
@@ -635,9 +675,12 @@ class Dispatcher : public CBase_Dispatcher {
   // index maps the gather and combine kernels use. Tokens land in an expert's
   // slab in (token, j) order, which is what makes the expert's reduction order
   // independent of anything but the routing.
-  void route() {
+  void route(int step) {
+    StepBuf& sbuf = stepBuf(step);
+    std::vector<int>& counts = sbuf.counts;
+    std::vector<int>& offs = sbuf.offs;
     const int E = n_experts, T = n_tokens, K = top_k;
-    const int phase = drift_period > 0 ? (my_step - 1) / drift_period : 0;
+    const int phase = drift_period > 0 ? (step - 1) / drift_period : 0;
     if (phase != cur_phase) {
       cur_phase = phase;
       buildPhase(phase);
@@ -648,7 +691,7 @@ class Dispatcher : public CBase_Dispatcher {
       for (int j = 0; j < K; j++) {
         int e = -1;
         for (int attempt = 0; attempt < 16 && e < 0; attempt++) {
-          const uint64_t h = hmix(hmix(hmix(hmix(hmix(moe_seed, my_step),
+          const uint64_t h = hmix(hmix(hmix(hmix(hmix(moe_seed, step),
               dispId), t), j), attempt);
           int r = (int)(std::upper_bound(cdf.begin(), cdf.end(), u01(h)) -
                         cdf.begin());
@@ -680,6 +723,7 @@ class Dispatcher : public CBase_Dispatcher {
     // zero, so their contribution to the layer output is nothing. Tokens are
     // admitted in token order, so which ones are dropped is still a pure
     // function of the routing and independent of placement.
+    long& dropped = sbuf.dropped;
     dropped = 0;
     if (capacity_factor > 0.0) {
       const int cap = std::max(1, (int)ceil(capacity_factor * (double)K *
@@ -693,7 +737,7 @@ class Dispatcher : public CBase_Dispatcher {
       offs[e + 1] = offs[e] + counts[e];
       if (counts[e] > cap_src)
         CkAbort("PE %d step %d: %d tokens for expert %d exceed the slab "
-                "capacity %d; increase -r\n", CkMyPe(), my_step, counts[e], e,
+                "capacity %d; increase -r\n", CkMyPe(), step, counts[e], e,
                 cap_src);
     }
     std::fill(fill_.begin(), fill_.end(), 0);
@@ -701,10 +745,10 @@ class Dispatcher : public CBase_Dispatcher {
     const int zero_row = (int)TK + 1;   // d_recv row kept at zero; TK is the n=0 slack
     for (size_t i = 0; i < TK; i++) {
       const int e = slot_expert[i];
-      if (fill_[e] >= counts[e]) { h_recv_pos[i] = zero_row; continue; }
+      if (fill_[e] >= counts[e]) { sbuf.h_recv_pos[i] = zero_row; continue; }
       const int pos = offs[e] + fill_[e]++;
-      h_send_idx[pos] = (int)(i / K);
-      h_recv_pos[i] = pos;
+      sbuf.h_send_idx[pos] = (int)(i / K);
+      sbuf.h_recv_pos[i] = pos;
     }
   }
 
@@ -712,21 +756,47 @@ class Dispatcher : public CBase_Dispatcher {
     my_step++;
     recv_count = 0;
     TRACE(1, "disp step %d begin", my_step);
-    route();
+  }
+
+  // Send the next step's tokens now, before this step's outputs are back.
+  // They depend on nothing this step computes -- x is fixed and the routing
+  // is a function of the step -- so their exchange overlaps the experts'
+  // compute of this step instead of every GPU idling through it at the start
+  // of the next (z 0.5, 2 nodes: 21-28 ms of a 98 ms step, GPUs 64% busy).
+  // Not across a balancing step: a migration must find no slab of a later
+  // step landed or in flight at the expert, as without lookahead, and under
+  // async LB migrations can happen until the expert's AtSyncWait lb_wait_lag
+  // steps on, so those steps' tokens wait for the previous step's outputs.
+  bool sendAhead() const {
+    const int u = my_step + 1;
+    if (!send_ahead || u > warmup_steps + n_steps) return false;
+    const int lag = async_lb ? lb_wait_lag : 0;
+    for (int L = u - 1 - lag; L <= u - 1; L++)
+      if (L >= 1 && isLBStep(L)) return false;
+    return true;
+  }
+
+  // Route step `step` into its parity's buffers and gather its tokens. The
+  // buffers were last used by step - 2, which was combined and whose sends
+  // all completed (gateDrain) before step - 1 began.
+  void issueGather(int step) {
+    send_step = step;
+    route(step);
+    StepBuf& b = stepBuf(step);
     const size_t TK = slots();
     // The gather depends on nothing that lands on the comm stream (x is
-    // fixed, the send slab is quiet once the previous step's sends drained),
+    // fixed, the send slab is quiet once its previous step's sends drained),
     // so it runs on the send stream: the sends are then tagged with the very
     // stream that produced their data, and the gather never queues behind a
     // landing. d_recv_pos is read by the combine on the comm stream, which
-    // runs only after every output of this step has landed there.
-    hapiCheck(hapiMemcpyAsync(d_send_idx, h_send_idx, sizeof(int) * TK,
+    // runs only after every output of its step has landed there.
+    hapiCheck(hapiMemcpyAsync(b.d_send_idx, b.h_send_idx, sizeof(int) * TK,
         hapiMemcpyHostToDevice, send_stream));
-    hapiCheck(hapiMemcpyAsync(d_recv_pos, h_recv_pos, sizeof(int) * TK,
+    hapiCheck(hapiMemcpyAsync(b.d_recv_pos, b.h_recv_pos, sizeof(int) * TK,
         hapiMemcpyHostToDevice, send_stream));
-    moeGather(d_x, d_send_idx, d_send, (int)TK, d_model, send_stream);
+    moeGather(d_x, b.d_send_idx, b.d_send, (int)TK, d_model, send_stream);
     hapiCheck(hapiEventRecord(ev_gather, send_stream));
-    TRACE(2, "disp step %d gather issued", my_step);
+    TRACE(2, "disp step %d gather of step %d issued", my_step, step);
     CkCallback* cb = new CkCallback(CkIndex_Dispatcher::gathered(),
         thisProxy[CkMyPe()]);
     hapiAddCallback(send_stream, cb);
@@ -737,48 +807,79 @@ class Dispatcher : public CBase_Dispatcher {
   // carries a valid buffer; the expert lands it in the unused slab.
   void sendTokens() {
     const double ts0 = tnow();
+    StepBuf& b = stepBuf(send_step);
+    const CkCallback done = (send_step & 1)
+        ? CkCallback(CkIndex_Dispatcher::sendDoneOdd(), thisProxy[CkMyPe()])
+        : CkCallback(CkIndex_Dispatcher::sendDoneEven(), thisProxy[CkMyPe()]);
     hapiCheck(hapiStreamWaitEvent(send_stream, ev_gather, 0));
-    for (int e = 0; e < n_experts; e++) {
-      const int n = counts[e];
-      const int len = std::max(n, 1) * d_model;
-      expert_proxy[e].receiveTokens(my_step, dispId, n, moeNowNs(), CkMyPe(), len,
-          (outstanding_sends++,
-           CkDeviceBuffer(d_send + (size_t)offs[e] * d_model,
-               CkCallback(CkIndex_Dispatcher::sendDone(), thisProxy[CkMyPe()]),
-               send_stream)));
+    if (tok_channels) {
+      // Written into the expert's slab by this GPU (same node) or one-sided
+      // across nodes: on the node every GPU reading its peers at once shares
+      // ~20 GB/s, writing ~50 GB/s (A40 x4, no NVLink). The put's size is the
+      // token count; an empty one is a note alone. The tag is the step.
+      const int q = send_step % tokParities();
+      for (int e = 0; e < n_experts; e++) {
+        const int n = b.counts[e];
+        b.outstanding++;
+        tok_ch[e * 2 + q].put(b.d_send + (size_t)b.offs[e] * d_model,
+            sizeof(float) * (size_t)n * d_model, send_stream, done,
+            (uint64_t)send_step);
+      }
+    } else {
+      for (int e = 0; e < n_experts; e++) {
+        const int n = b.counts[e];
+        const int len = std::max(n, 1) * d_model;
+        expert_proxy[e].receiveTokens(send_step, dispId, n, moeNowNs(), CkMyPe(), len,
+            (b.outstanding++,
+             CkDeviceBuffer(b.d_send + (size_t)b.offs[e] * d_model, done,
+                 send_stream)));
+      }
     }
-    TRACE(1, "disp step %d tokens sent", my_step);
+    sent_through = send_step;
+    TRACE(1, "disp step %d tokens sent%s", my_step,
+        send_step > my_step ? " for the next step" : "");
     TRACE(2, "disp step %d issued %d sends in %.1f ms", my_step, n_experts,
         (tnow() - ts0) * 1e3);
   }
 
   // Post entry method: an expert's outputs land in its segment of the receive
-  // slab. An empty message lands in the slack row past the end.
+  // slab of their step's parity. An empty message lands in the slack row past
+  // the end. Outputs of the next step can arrive before this one is combined:
+  // that step's tokens went out early, and an expert can finish it first.
   void receiveOutput(int ref, int e, int n, long long ts, int spe, int& len, float*& buf,
       CkDeviceBufferPost* devicePost) {
-    if (flight_log) { env_t.resize(n_experts); env_t[e] = moeNowNs(); }
-    if (ref != my_step)
-      CkAbort("PE %d: outputs for step %d arrived during step %d\n", CkMyPe(),
-          ref, my_step);
-    buf = (n > 0) ? d_recv + (size_t)offs[e] * d_model
-                  : d_recv + slots() * d_model;
+    if (flight_log) { env_t.resize(2 * n_experts); env_t[(ref & 1) * n_experts + e] = moeNowNs(); }
+    if (ref < my_step || ref > sent_through)
+      CkAbort("PE %d: outputs for step %d arrived during step %d (tokens sent "
+          "through step %d)\n", CkMyPe(), ref, my_step, sent_through);
+    StepBuf& b = stepBuf(ref);
+    buf = (n > 0) ? b.d_recv + (size_t)b.offs[e] * d_model
+                  : b.d_recv + slots() * d_model;
     devicePost[0].hapi_stream = gpu.comm.stream;
     TRACE(3, "disp step %d output expert %d n=%d posted", ref, e, n);
+  }
+
+  void takeChannels(int e, CkDeviceChannel c0, CkDeviceChannel c1) {
+    if (tok_ch.empty()) tok_ch.resize(2 * n_experts);
+    tok_ch[e * 2] = c0;
+    tok_ch[e * 2 + 1] = c1;
+    if (++chans_in == n_experts) main_proxy.dispChannelsReady();
   }
 
   void noteOutput(int e, int n, long long ts, int spe) {
     if (flight_log)
       g_flights.push_back({'O', my_step, spe, CkMyPe(), e, (long)std::max(n, 1) * d_model * (long)sizeof(float), ts,
-                           env_t[e], moeNowNs()});
+                           env_t[(my_step & 1) * n_experts + e], moeNowNs()});
     TRACE(3, "disp step %d output expert %d n=%d consumed", my_step, e, n);
-    if (n != counts[e])
+    if (n != stepBuf(my_step).counts[e])
       CkAbort("PE %d step %d: expert %d returned %d rows for %d tokens\n",
-          CkMyPe(), my_step, e, n, counts[e]);
+          CkMyPe(), my_step, e, n, stepBuf(my_step).counts[e]);
   }
 
   void combine() {
     TRACE(1, "disp step %d outputs in", my_step);
-    moeCombine(d_recv, d_recv_pos, d_y, n_tokens, top_k, d_model,
+    StepBuf& b = stepBuf(my_step);
+    moeCombine(b.d_recv, b.d_recv_pos, d_y, n_tokens, top_k, d_model,
         1.0f / top_k, gpu.comm.stream);
     chk_due = checksum_freq > 0 && (my_step % checksum_freq == 0);
     if (chk_due) {
@@ -792,16 +893,18 @@ class Dispatcher : public CBase_Dispatcher {
     hapiAddCallback(gpu.comm.stream, cb);
   }
 
-  // The next step's gather rewrites the send slab; every send must have
-  // confirmed completion first.
+  // This step's send slab is gathered into again two steps on; every send
+  // from it must have confirmed completion first.
   void gateDrain() {
-    if (outstanding_sends == 0) thisProxy[CkMyPe()].sendsDrained();
+    if (stepBuf(my_step).outstanding == 0) thisProxy[CkMyPe()].sendsDrained();
     else drain_pending = true;
   }
 
-  void sendDone() {
-    outstanding_sends--;
-    if (drain_pending && outstanding_sends == 0) {
+  void sendDoneEven() { sendDone(0); }
+  void sendDoneOdd() { sendDone(1); }
+  void sendDone(int parity) {
+    sb[parity].outstanding--;
+    if (drain_pending && (my_step & 1) == parity && sb[parity].outstanding == 0) {
       drain_pending = false;
       thisProxy[CkMyPe()].sendsDrained();
     }
@@ -817,7 +920,7 @@ class Dispatcher : public CBase_Dispatcher {
     // active branch of each process runs steps, and a group reduction would
     // wait on the branches that never do. Main sums the reports in dispatcher
     // order, which is the same fixed-order sum the reduction's slots gave.
-    main_proxy.dispStep(dispId, my_step, chk_due ? *h_chk : 0.0, (double)dropped);
+    main_proxy.dispStep(dispId, my_step, chk_due ? *h_chk : 0.0, (double)stepBuf(my_step).dropped);
     if (my_step < warmup_steps + n_steps) {
       thisProxy[CkMyPe()].runStep();
     } else {
@@ -839,7 +942,7 @@ class Expert : public CBase_Expert {
   // live); 2: outputs sent (nothing live but the weights)
   int phase = 0;
   std::vector<int> n_src;   // rows received from each dispatcher, -1 = none
-  std::vector<long long> env_t;   // -F: envelope arrival per dispatcher, this step (not migrated)
+  std::vector<long long> env_t;   // -F: envelope arrival per (step mod 3, dispatcher) (not migrated)
   int n_tot = 0;
   int outstanding_sends = 0;
   bool drain_pending = false;
@@ -850,6 +953,16 @@ class Expert : public CBase_Expert {
   int cur_lane = -1;      // see pickLane; not migrated: a new PE picks afresh
   long lane_claim = 0;    // tokens this expert holds against cur_lane
   std::vector<hapiEvent_t> ev_seg;   // per dispatcher: its outputs are in y_seg
+  // Receive channels on the input slab segments, [parity * n_disp + dispatcher]
+  // (tok_channels). Released once the step's kernels are done with the slab.
+  std::vector<CkDeviceChannel> tok_ch;
+  // Per channel: a put has landed and its note was taken, but the step loop
+  // has not consumed it (its slabIn is queued for a later step). Its bytes are
+  // in the slab only, so a migration has to carry that segment: the runtime
+  // holds a migration for a device message until it is consumed, but slabIn
+  // carries no device buffer.
+  std::vector<char> slab_held;
+  bool arrived_by_pup = false;   // the channels reopen in ckJustMigrated
 
   // Async LB state: the step was joined at lb_start_step and AtSyncWait is
   // owed lb_wait_lag steps later.
@@ -871,7 +984,8 @@ class Expert : public CBase_Expert {
   float* v1;
   float* m2;
   float* v2;
-  float* x_seg;   // [n_disp x cap_src x d_model], one segment per dispatcher
+  float* x_seg;   // [n_disp x cap_src x d_model], one segment per dispatcher;
+                  // two such slabs by step parity with send_ahead (xSeg)
   float* y_seg;   // same layout, outputs
   double* d_chk;
   double* h_chk;
@@ -980,6 +1094,15 @@ class Expert : public CBase_Expert {
   hapiStream_t commStream() { return ctx()->comm.stream; }
   size_t segStride() const { return (size_t)cap_src * d_model; }
   size_t wsz() const { return (size_t)d_model * d_ff; }
+  // A step's input slab. With send_ahead a dispatcher sends step s+1 before
+  // it has combined step s, so slabs of s+1 and s+2 can arrive while this
+  // expert is still in step s; s+2 lands in s's slab, which is free by then:
+  // a dispatcher sends s+2 only once it has this expert's step-s output,
+  // which leaves behind the copies of s's slab into the lane (fused) or
+  // after the whole step (unfused, or -O).
+  float* xSeg(int step) {
+    return x_seg + (send_ahead ? (size_t)(step & 1) * segStride() * n_disp : 0);
+  }
 
   void allocate() {
     const size_t seg = segStride() * n_disp;
@@ -991,7 +1114,7 @@ class Expert : public CBase_Expert {
       hapiCheck(hapiMalloc((void**)&m2, sizeof(float) * wsz()));
       hapiCheck(hapiMalloc((void**)&v2, sizeof(float) * wsz()));
     }
-    hapiCheck(hapiMalloc((void**)&x_seg, sizeof(float) * seg));
+    hapiCheck(hapiMalloc((void**)&x_seg, sizeof(float) * seg * (send_ahead ? 2 : 1)));
     hapiCheck(hapiMalloc((void**)&y_seg, sizeof(float) * seg));
     hapiCheck(hapiMalloc((void**)&d_chk, sizeof(double)));
     hapiCheck(hapiMallocHost((void**)&h_chk, sizeof(double)));
@@ -1012,6 +1135,21 @@ class Expert : public CBase_Expert {
   void init() {
     allocate();
     createEvents();
+    if (tok_channels) {
+      const int np = tokParities();
+      tok_ch.resize(np * n_disp);
+      slab_held.assign(np * n_disp, 0);
+      for (int q = 0; q < np; q++)
+        for (int d = 0; d < n_disp; d++) {
+          CkDeviceChannel& c = tok_ch[q * n_disp + d];
+          c = CkDeviceChannel(xSeg(q) + (size_t)d * segStride(), sizeof(float) * segStride(),
+                              CkCallback(CkIndex_Expert::slabArrived(NULL), thisProxy[thisIndex]));
+          c.open();
+        }
+      for (int d = 0; d < n_disp; d++)
+        disp_proxy[CkNodeFirst(d)].takeChannels(thisIndex, tok_ch[d],
+                                                tok_ch[(np - 1) * n_disp + d]);
+    }
     MoeGpu* g = lane();
     moeInitUniform(W1, wsz(), hmix(hmix(moe_seed, 1), thisIndex),
         1.0f / sqrtf((float)d_model), g->stream);
@@ -1072,10 +1210,35 @@ class Expert : public CBase_Expert {
     p | n_last;
     p | step_last;
     p | adam_t;
+    // The token channels travel with the element and reopen on its new slab.
+    // A put that landed after the last note taken (unseen), or whose note was
+    // taken but not yet consumed (slab_held), has its bytes in the slab only,
+    // so that segment goes with the pup.
+    p | tok_ch;
+    p | slab_held;
+    std::vector<char> carry(tok_ch.size(), 0);
+    if (!p.isUnpacking())   // the sizing pass must count what the packing pass emits
+      for (size_t i = 0; i < tok_ch.size(); i++)
+        carry[i] = tok_ch[i].unseenBytes() != 0 || slab_held[i];
+    p | carry;
 
     if (p.isUnpacking()) {
       allocate();
       createEvents();   // a pending timing sample is lost with the old events
+      // Control events queue until the channels reopen, in ckJustMigrated: an
+      // ordinary entry context once the element's state is in place, not the
+      // unpack, which can run inside the device poll's own callback (leanmd's
+      // Compute does the same).
+      for (CkDeviceChannel& c : tok_ch) c.arriving();
+      arrived_by_pup = !tok_ch.empty();
+    }
+    for (size_t i = 0; i < tok_ch.size(); i++) {
+      if (!carry[i]) continue;
+      TRACE(2, "expert %d step %d phase %d %s channel %zu (step parity %zu, dispatcher %zu): %s",
+          thisIndex, my_step, phase, p.isUnpacking() ? "unpacks" : "packs", i, i / n_disp,
+          i % n_disp, slab_held[i] ? "held" : "unseen");
+      p(xSeg((int)(i / n_disp)) + (i % n_disp) * segStride(), segStride(),
+          PUP::PUPMode::DEVICE);
     }
     // The checksum's copy into h_chk is asynchronous; wait for it before the
     // host reads it, or a migration here packs whatever was there before.
@@ -1103,7 +1266,7 @@ class Expert : public CBase_Expert {
     if (phase == 0) {
       for (int s = 0; s < n_disp; s++)
         if (n_src[s] > 0)
-          p(x_seg + s * segStride(), (size_t)n_src[s] * d_model,
+          p(xSeg(my_step) + s * segStride(), (size_t)n_src[s] * d_model,
               PUP::PUPMode::DEVICE);
     } else if (phase == 1) {
       for (int s = 0; s < n_disp; s++)
@@ -1131,20 +1294,59 @@ class Expert : public CBase_Expert {
   // message still lands one row there, which nothing reads.
   void receiveTokens(int ref, int src, int n, long long ts, int spe, int& len, float*& buf,
       CkDeviceBufferPost* devicePost) {
-    if (flight_log) { env_t.resize(n_disp); env_t[src] = moeNowNs(); }
-    if (ref < my_step || ref > my_step + 1)
+    if (flight_log) { env_t.resize(3 * n_disp); env_t[(ref % 3) * n_disp + src] = moeNowNs(); }
+    if (ref < my_step || ref > my_step + (send_ahead ? 2 : 1))
       CkAbort("Expert %d on PE %d: slab for step %d arrived during step %d\n",
           thisIndex, CkMyPe(), ref, my_step);
-    buf = x_seg + (size_t)src * segStride();
+    buf = xSeg(ref) + (size_t)src * segStride();
     devicePost[0].hapi_stream = commStream();
     TRACE(3, "expert %d step %d slab src %d n=%d posted", thisIndex, ref, src,
         n);
   }
 
+  // A note on one of the token channels: find the channel it names and let it
+  // take the note. A landed put goes on to the step loop as slabIn, matched by
+  // its step; anything else (a resolve, an announce) the channel handles.
+  void slabArrived(CkDataMsg* m) {
+    CkDeviceChannelEvent ev;
+    memcpy(&ev, m->getData(), sizeof(ev));
+    int idx = -1;
+    for (int i = 0; i < (int)tok_ch.size(); i++)
+      if (tok_ch[i].id() == ev.channel) { idx = i; break; }
+    if (idx < 0)
+      CkAbort("Expert %d on PE %d: a note for channel %llx, which is not one of its own\n",
+          thisIndex, CkMyPe(), (unsigned long long)ev.channel);
+    const CkDeviceChannelEvent* e = tok_ch[idx].event(m);
+    delete m;
+    if (e == NULL) return;
+    const int ref = (int)e->tag;
+    if (ref % tokParities() != idx / n_disp)
+      CkAbort("Expert %d on PE %d: step %d's slab arrived on the channel of parity %d\n",
+          thisIndex, CkMyPe(), ref, idx / n_disp);
+    slab_held[idx] = 1;
+    TRACE(2, "expert %d step %d slab for step %d from dispatcher %d landed, %zu bytes",
+        thisIndex, my_step, ref, idx % n_disp, e->bytes);
+    thisProxy[thisIndex].slabIn(ref, idx % n_disp,
+        (int)(e->bytes / (sizeof(float) * d_model)));
+  }
+
+  void ckJustMigrated() {
+    CBase_Expert::ckJustMigrated();
+    if (!arrived_by_pup) return;   // a handoff within the process: the channels are intact
+    arrived_by_pup = false;
+    for (size_t i = 0; i < tok_ch.size(); i++)
+      tok_ch[i].reopen(xSeg((int)(i / n_disp)) + (i % n_disp) * segStride());
+    TRACE(2, "expert %d step %d phase %d reopened %zu channels", thisIndex, my_step,
+        phase, tok_ch.size());
+  }
+
   void noteTokens(int src, int n, long long ts, int spe) {
-    if (flight_log)
+    TRACE(2, "expert %d step %d consumes slab from dispatcher %d n=%d", thisIndex,
+        my_step, src, n);
+    if (tok_channels) slab_held[(my_step % tokParities()) * n_disp + src] = 0;
+    if (flight_log && !tok_channels)
       g_flights.push_back({'T', my_step, spe, CkMyPe(), thisIndex, (long)std::max(n, 1) * d_model * (long)sizeof(float),
-                           ts, env_t[src], moeNowNs()});
+                           ts, env_t[(my_step % 3) * n_disp + src], moeNowNs()});
     n_src[src] = n;
     TRACE(3, "expert %d step %d slab src %d n=%d consumed", thisIndex, my_step,
         src, n);
@@ -1297,7 +1499,7 @@ class Expert : public CBase_Expert {
         for (int s = 0; s < n_disp; s++) {
           if (n_src[s] <= 0) continue;
           const size_t n = (size_t)n_src[s] * d_model;
-          hapiCheck(hapiMemcpyAsync(g->fx + off, x_seg + s * segStride(),
+          hapiCheck(hapiMemcpyAsync(g->fx + off, xSeg(my_step) + s * segStride(),
               sizeof(float) * n, hapiMemcpyDeviceToDevice, g->stream));
           off += n;
         }
@@ -1352,7 +1554,7 @@ class Expert : public CBase_Expert {
         for (int s = 0; s < n_disp; s++) {
           if (n_src[s] <= 0) continue;
           chunks += (n_src[s] + chunk_tokens - 1) / chunk_tokens;
-          moeExpertChunks(g, W1, W2, x_seg + s * segStride(),
+          moeExpertChunks(g, W1, W2, xSeg(my_step) + s * segStride(),
               y_seg + s * segStride(), n_src[s], d_model, d_ff, chunk_tokens,
               (float)learning_rate, 1.0f / n_tot, use_adam != 0);
         }
@@ -1409,6 +1611,12 @@ class Expert : public CBase_Expert {
 
   void sendOutputs() {
     releaseLane();   // the step's kernels are complete (computeDone)
+    if (tok_channels) {
+      // The kernels that read this step's slab are done: the dispatchers may
+      // put into it again (the step after next, or the next without send_ahead).
+      const int q = my_step % tokParities();
+      for (int d = 0; d < n_disp; d++) tok_ch[q * n_disp + d].release();
+    }
     if (!outputs_sent) {
       phase = 2;
       const double ts0 = tnow();
@@ -1443,6 +1651,7 @@ class Expert : public CBase_Expert {
     // the dispatcher's out2 slots: an order-independent exact sum.
     std::vector<double> w2e(n_experts, 0.0);
     w2e[thisIndex] = chk_due ? *h_chk : 0.0;
+    if (chk_due) TRACE(2, "expert %d step %d w2 %.17g", thisIndex, my_step, *h_chk);
     const int npes = CkNumPes();
     std::vector<long> tokpe(npes, 0);
     std::vector<double> gpupe(npes, 0.0);

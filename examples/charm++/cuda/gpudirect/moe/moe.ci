@@ -28,6 +28,8 @@ mainmodule moe {
   readonly double capacity_factor;
   readonly int fuse_sources;
   readonly int stream_outputs;
+  readonly int send_ahead;
+  readonly int tok_channels;
   readonly int print_place;
   readonly int flight_log;
   readonly double zipf_z;
@@ -38,6 +40,8 @@ mainmodule moe {
     entry Main(CkArgMsg* m);
     entry [reductiontarget] void dispReady();
     entry [reductiontarget] void expertsReady();
+    // Each process's dispatcher, once it holds every expert's token channels.
+    entry void dispChannelsReady();
     // Point-to-point from each process's dispatcher; a step is complete once
     // all n_disp have reported (see Main::dispStep).
     entry void dispStep(int disp, int step, double out2, double drop);
@@ -55,16 +59,29 @@ mainmodule moe {
     // Targets of hapiAddCallback, invoked when the stream reaches them
     entry void gathered();
     entry void combined();
-    // Completion of a zerocopy device send; the source slab is live until then
-    entry void sendDone();
+    // Completion of a zerocopy device send; the source slab is live until then.
+    // One per buffer parity: two steps' sends can be outstanding (send_ahead).
+    entry void sendDoneEven();
+    entry void sendDoneOdd();
     entry void sendsDrained();
     // Zerocopy device receive of one expert's outputs for this PE's tokens;
     // the post entry method that supplies the device buffer is in moe.C
     entry void receiveOutput(int ref, int e, int n, long long ts, int spe, int len, nocopydevice float buf[len]);
+    // An expert's token channels from this dispatcher, one per step parity.
+    entry void takeChannels(int e, CkDeviceChannel c0, CkDeviceChannel c1);
 
     entry void runStep() {
       serial { beginStep(); }
-      when gathered() serial { sendTokens(); }
+      // This step's tokens, unless they went out during the previous step.
+      if (sent_through < my_step) {
+        serial { issueGather(my_step); }
+        when gathered() serial { sendTokens(); }
+      }
+      // The next step's tokens, before this step's outputs are back.
+      if (sendAhead()) {
+        serial { issueGather(my_step + 1); }
+        when gathered() serial { sendTokens(); }
+      }
       for (recv_count = 0; recv_count < n_experts; recv_count++) {
         when receiveOutput[my_step](int ref, int e, int n, long long ts, int spe, int len, nocopydevice float buf[len])
           serial { noteOutput(e, n, ts, spe); }
@@ -89,17 +106,29 @@ mainmodule moe {
     entry void sendDone();
     entry void sendsDrained();
     entry void receiveTokens(int ref, int src, int n, long long ts, int spe, int len, nocopydevice float buf[len]);
+    // A token channel's note (tok_channels): a put landed, or a runtime event
+    // the channel consumes. Not matched by step -- runtime notes carry none.
+    entry void slabArrived(CkDataMsg* m);
+    // A landed put, re-sent to this expert by slabArrived for step matching.
+    entry void slabIn(int ref, int src, int n);
 
     entry void runStep() {
       serial { beginStep(); }
       for (recv_count = 0; recv_count < n_disp; recv_count++) {
-        when receiveTokens[my_step](int ref, int src, int n, long long ts, int spe, int len, nocopydevice float buf[len])
-          serial { noteTokens(src, n, ts, spe); }
+        if (tok_channels) {
+          when slabIn[my_step](int ref, int src, int n)
+            serial { noteTokens(src, n, 0, -1); }
+        } else {
+          when receiveTokens[my_step](int ref, int src, int n, long long ts, int spe, int len, nocopydevice float buf[len])
+            serial { noteTokens(src, n, ts, spe); }
+        }
       }
-      // Every slab of this step has been consumed and nothing can be sent to
-      // this expert until its outputs go out, so this is the one place where a
-      // migration finds no device receive landed or in flight. AtSync (or the
-      // split AtSyncStart/AtSyncWait under async LB) happens here.
+      // Every slab of this step has been consumed, and at a balancing step
+      // nothing can be sent to this expert until its outputs go out (the
+      // dispatchers send no tokens ahead across one, see sendAhead), so this
+      // is the one place where a migration finds no device receive landed or
+      // in flight. AtSync (or the split AtSyncStart/AtSyncWait under async
+      // LB) happens here.
       serial { lbPoint(); }
       when resumed() serial { compute(); }
       when computeDone() serial { sendOutputs(); }
