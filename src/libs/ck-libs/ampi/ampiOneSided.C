@@ -285,8 +285,10 @@ int ampi::winGet(void *orgaddr, int orgcnt, MPI_Datatype orgtype, int rank,
         int orgsize = getDDT()->getType(orgtype)->getSize(orgcnt);
         orgddt->serialize((char*)orgaddr, targdata, orgcnt, orgsize, UNPACK);
       } else {
+        // The target is contiguous: scatter its bytes into the non-contiguous
+        // origin buffer (UNPACK copies from targdata into orgaddr).
         int targsize = getDDT()->getType(targtype)->getSize(targcnt);
-        targddt->serialize((char*)orgaddr, targdata, targcnt, targsize, PACK);
+        orgddt->serialize((char*)orgaddr, targdata, orgcnt, targsize, UNPACK);
       }
       return MPI_SUCCESS;
     }
@@ -311,7 +313,6 @@ char* ampi::winLocalGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int targtotalsize = winobj->disp_unit*targcnt;
   int orgunit = getDDT()->getSize(orgtype);
   char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
 
@@ -328,7 +329,7 @@ AmpiMsg* ampi::winRemoteGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp,
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int targtotalsize = winobj->disp_unit*targcnt;
+  int targtotalsize = tddt->getSize(targcnt); // bytes packed into the reply
   int orgunit = getDDT()->getSize(orgtype);
   char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
 
@@ -357,7 +358,7 @@ AmpiMsg* ampi::winRemoteIget(MPI_Aint orgdisp, int orgcnt, MPI_Datatype orgtype,
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int targtotalsize = winobj->disp_unit*targcnt;
+  int targtotalsize = tddt->getSize(targcnt); // bytes packed into the reply
   int orgunit = getDDT()->getSize(orgtype);
 
   winobj->iget(orgcnt, orgunit, targdisp, targcnt, targunit);
@@ -510,7 +511,6 @@ void ampi::winLocalGetAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, M
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int targtotalsize = winobj->disp_unit*targcnt;
   int orgunit = getDDT()->getSize(orgtype);
   char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
 
@@ -537,7 +537,7 @@ AmpiMsg* ampi::winRemoteGetAccumulate(int orgtotalsize, char* sorgaddr, int orgc
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int targtotalsize = winobj->disp_unit*targcnt;
+  int targtotalsize = tddt->getSize(targcnt); // bytes packed into the reply
   int orgunit = getDDT()->getSize(orgtype);
   char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
 
@@ -563,59 +563,48 @@ AmpiMsg* ampi::winRemoteGetAccumulate(int orgtotalsize, char* sorgaddr, int orgc
 
 int ampi::winCompareAndSwap(const void *orgaddr, const void *compaddr, void *resaddr, MPI_Datatype type,
                             int rank, MPI_Aint targdisp, WinStruct *win) noexcept {
-  CkDDT_DataType *ddt = getDDT()->getType(type);
+  // MPI_Compare_and_swap admits only basic contiguous predefined types (see
+  // compareAndSwapTypeAllowed), so one element is size plain bytes on both sides.
+  int size = getDDT()->getType(type)->getSize(1);
 
-  if (ddt->isContig()) {
-    ampi *destPtr = thisProxy[rank].ckLocal();
-    if (destPtr != NULL) {
-      char* targaddr = destPtr->winLocalCompareAndSwap(ddt->getSize(), (char*)orgaddr,
-                                                       (char*)compaddr, type, targdisp, win->index);
-      int targsize = getDDT()->getType(type)->getSize(1);
-      ddt->serialize((char*)resaddr, targaddr, 1, targsize, PACK);
-      return MPI_SUCCESS;
-    }
+  ampi *destPtr = thisProxy[rank].ckLocal();
+  if (destPtr != NULL) {
+    destPtr->winLocalCompareAndSwap(size, (char*)orgaddr, (char*)compaddr, (char*)resaddr,
+                                    targdisp, win->index);
+    return MPI_SUCCESS;
   }
 
-  AmpiMsg* msg = thisProxy[rank].winRemoteCompareAndSwap(getDDT()->getType(type)->getSize(1), (char*)orgaddr,
-                                                         (char*)compaddr, type, targdisp, win->index);
-  int ressize = getDDT()->getType(type)->getSize(1);
-  ddt->serialize((char*)resaddr, msg->getData(), 1, ressize, PACK);
+  AmpiMsg* msg = thisProxy[rank].winRemoteCompareAndSwap(size, (char*)orgaddr, (char*)compaddr,
+                                                         targdisp, win->index);
+  // The reply carries the original target value: copy it out into resaddr.
+  memcpy(resaddr, msg->getData(), size);
 
   delete msg;
   return MPI_SUCCESS;
 }
 
-char* ampi::winLocalCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Datatype type,
-                                   MPI_Aint targdisp, int winIndex) noexcept {
+// MPI-3 compare-and-swap on this rank's window: store the original target
+// value in resaddr, then, if it equals compaddr (bitwise, all size bytes),
+// write sorgaddr into the target. MPI_Compare_and_swap rejects every type
+// that is not a basic contiguous predefined type, so each buffer holds one
+// element as size contiguous bytes.
+void ampi::winLocalCompareAndSwap(int size, char* sorgaddr, char* compaddr, char* resaddr,
+                                  MPI_Aint targdisp, int winIndex) noexcept {
   win_obj *winobj = winObjects[winIndex];
-  winobj->put(sorgaddr, 1, size, targdisp, 1, size);
+  winobj->put(sorgaddr, 1, size, targdisp, 1, size); // bounds check only, copies nothing
 
-  CkDDT_DataType *ddt = getDDT()->getType(type);
-  char* targaddr = ((char*)(winobj->baseAddr)) + ddt->getSize(targdisp);
-
-  if (*targaddr == *compaddr) {
-    int size = ddt->getSize(1);
-    ddt->serialize(targaddr, (char*)sorgaddr, 1, size, UNPACK);
+  char* targaddr = ((char*)(winobj->baseAddr)) + winobj->disp_unit*targdisp;
+  bool match = (memcmp(targaddr, compaddr, size) == 0);
+  memcpy(resaddr, targaddr, size);
+  if (match) {
+    memcpy(targaddr, sorgaddr, size);
   }
-
-  return targaddr;
 }
 
-AmpiMsg* ampi::winRemoteCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Datatype type,
-                                       MPI_Aint targdisp, int winIndex) noexcept {
-  win_obj *winobj = winObjects[winIndex];
-  winobj->put(sorgaddr, 1, size, targdisp, 1, size);
-
-  CkDDT_DataType *ddt = getDDT()->getType(type);
-  char* targaddr = ((char*)(winobj->baseAddr)) + ddt->getSize(targdisp);
-
+AmpiMsg* ampi::winRemoteCompareAndSwap(int size, char* sorgaddr, char* compaddr, MPI_Aint targdisp,
+                                       int winIndex) noexcept {
   AmpiMsg *msg = new (size, 0) AmpiMsg(0, 0, MPI_RMA_TAG, thisIndex, size);
-  ddt->serialize(targaddr, msg->getData(), 1, msg->getLength(), PACK);
-
-  if (*targaddr == *compaddr) {
-    ddt->serialize(targaddr, (char*)sorgaddr, 1, ddt->getSize(1), UNPACK);
-  }
-
+  winLocalCompareAndSwap(size, sorgaddr, compaddr, msg->getData(), targdisp, winIndex);
   return msg;
 }
 
@@ -950,6 +939,47 @@ AMPI_API_IMPL(int, MPI_Rget_accumulate, const void *orgaddr, int orgcnt, MPI_Dat
                                rank, targdisp, targcnt, targtype, op, winStruct);
 }
 
+// MPI-3.1 section 11.3.4: MPI_Fetch_and_op takes one element of a predefined
+// datatype. MPI_LB and MPI_UB are markers, not element types. Whether the
+// type is valid for op is left to the reduction code, as for MPI_Accumulate.
+static bool fetchAndOpTypeAllowed(MPI_Datatype type) noexcept {
+  return type >= 0 && type <= AMPI_MAX_PREDEFINED_TYPE && type != MPI_LB && type != MPI_UB;
+}
+
+// MPI-3.1 section 11.3.4: MPI_Compare_and_swap takes one element of a C
+// integer, Fortran integer, logical, multi-language or byte datatype. Every
+// one of these is a basic, contiguous predefined type in AMPI.
+static bool compareAndSwapTypeAllowed(MPI_Datatype type) noexcept {
+  switch (type) {
+    case MPI_INT: // also MPI_INTEGER
+    case MPI_SHORT:
+    case MPI_LONG:
+    case MPI_LONG_LONG_INT: // also MPI_LONG_LONG, MPI_OFFSET
+    case MPI_CHAR: // also MPI_INTEGER1 (Fortran integer)
+    case MPI_SIGNED_CHAR:
+    case MPI_UNSIGNED_CHAR:
+    case MPI_UNSIGNED_SHORT:
+    case MPI_UNSIGNED:
+    case MPI_UNSIGNED_LONG:
+    case MPI_UNSIGNED_LONG_LONG:
+    case MPI_INT8_T:
+    case MPI_INT16_T:
+    case MPI_INT32_T:
+    case MPI_INT64_T:
+    case MPI_UINT8_T:
+    case MPI_UINT16_T:
+    case MPI_UINT32_T:
+    case MPI_UINT64_T:
+    case MPI_LOGICAL:
+    case MPI_C_BOOL:
+    case MPI_AINT: // also MPI_COUNT
+    case MPI_BYTE:
+      return true;
+    default:
+      return false;
+  }
+}
+
 /*
  * int AMPI_Fetch_and_op(void *orgaddr, void *resaddr, MPI_Datatype type,
  *         int rank, MPI_Aint targdisp, MPI_Op op, MPI_Win win)
@@ -959,12 +989,9 @@ AMPI_API_IMPL(int, MPI_Fetch_and_op, const void *orgaddr, void *resaddr, MPI_Dat
                                      int rank, MPI_Aint targdisp, MPI_Op op, MPI_Win win)
 {
   AMPI_API("AMPI_Fetch_and_op", orgaddr, resaddr, type, rank, targdisp, op, win);
-  #if AMPI_ERROR_CHECKING
-    if (type > AMPI_MAX_PREDEFINED_TYPE)
-    {
-      return ampiErrhandler("AMPI_Fetch_and_op", MPI_ERR_UNSUPPORTED_OPERATION);
-    }
-  #endif
+  if (!fetchAndOpTypeAllowed(type)) {
+    return ampiErrhandler("AMPI_Fetch_and_op", MPI_ERR_TYPE);
+  }
   handle_MPI_BOTTOM((void*&)orgaddr, type);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
@@ -982,12 +1009,9 @@ AMPI_API_IMPL(int, MPI_Compare_and_swap, const void *orgaddr, const void *compad
                                          MPI_Datatype type, int rank, MPI_Aint targdisp, MPI_Win win)
 {
   AMPI_API("AMPI_Compare_and_swap", orgaddr, compaddr, resaddr, type, rank, targdisp, win);
-  #if AMPI_ERROR_CHECKING
-    if (type > AMPI_MAX_PREDEFINED_TYPE)
-    {
-      return ampiErrhandler("AMPI_Compare_and_swap", MPI_ERR_UNSUPPORTED_OPERATION);
-    }
-  #endif
+  if (!compareAndSwapTypeAllowed(type)) {
+    return ampiErrhandler("AMPI_Compare_and_swap", MPI_ERR_TYPE);
+  }
   handle_MPI_BOTTOM((void*&)orgaddr, type);
   WinStruct *winStruct = getAmpiParent()->getWinStruct(win);
   ampi *ptr = getAmpiInstance(winStruct->comm);
