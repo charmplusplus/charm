@@ -12,6 +12,11 @@ on:
   workflow_dispatch:
   schedule:
     - cron: '0 6 * * 0'  # Sundays 06:00 UTC
+  # A change to the tooling itself runs it once on the pull request.
+  pull_request:
+    paths:
+      - 'coverage/**'
+      - '.github/workflows/coverage.yaml'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
