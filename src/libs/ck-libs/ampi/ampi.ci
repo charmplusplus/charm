@@ -57,7 +57,6 @@ module ampi {
     entry EXPEDITED_NOKEEP void completedRdmaRecv(CkDataMsg *msg);
     entry EXPEDITED void requestPut(MPI_Request req, CkNcpyBuffer targetInfo);
     entry EXPEDITED_REDN void barrierResult(void);
-    entry EXPEDITED_REDN void ibarrierResult(void);
     entry EXPEDITED_NOKEEP void bcastResult(AmpiMsg *);
     entry EXPEDITED_NOKEEP void rednResult(CkReductionMsg *msg);
     entry EXPEDITED_NOKEEP void irednResult(CkReductionMsg *msg);

@@ -8,6 +8,7 @@ DIRS = \
   migration \
   datatype \
   collwake \
+  collmatch \
   privatization \
   jacobi3d \
   exit \
