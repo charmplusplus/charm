@@ -514,29 +514,33 @@ class Dispatcher : public CBase_Dispatcher {
         -1));
     hapiCheck(hapiEventCreateWithFlags(&ev_gather, hapiEventDisableTiming));
     const size_t wsz = (size_t)d_model * d_ff;
+    // A lane's buffers are scratch of this process's compute: never sent, never migrated. They come from plain
+    // device memory, not the registered pool: with 2+ nodes every pool arena is registered with the fabric and a
+    // process may hold at most 4096 MB of them, which the default size (-e 64 -m 2048 -h 8192 -t 8192) exceeded by
+    // ~1.8 GB of lane scratch (4 lanes x ~450 MB) on top of its experts' 3.7 GB (2026-10-25).
     for (int l = 0; l < n_lanes; l++) {
       MoeGpu& g = gpu.lanes[l];
       hapiCheck(hapiStreamCreateWithPriority(&g.stream, hapiStreamNonBlocking,
           0));
-      hapiCheck(hapiMalloc((void**)&g.h,
+      hapiCheck(hapiMallocUnattributed((void**)&g.h,
           sizeof(float) * (size_t)chunk_tokens * d_ff));
-      hapiCheck(hapiMalloc((void**)&g.dh,
+      hapiCheck(hapiMallocUnattributed((void**)&g.dh,
           sizeof(float) * (size_t)chunk_tokens * d_ff));
       if (use_adam) {
-        hapiCheck(hapiMalloc((void**)&g.dW1, sizeof(float) * wsz));
-        hapiCheck(hapiMalloc((void**)&g.dW2, sizeof(float) * wsz));
+        hapiCheck(hapiMallocUnattributed((void**)&g.dW1, sizeof(float) * wsz));
+        hapiCheck(hapiMallocUnattributed((void**)&g.dW2, sizeof(float) * wsz));
       }
       if (fuse_sources) {
         // Bounded by what one expert can be sent in a step, the same bound its
         // own slabs use. Sized once: growing it would have to free a block the
         // lane's queued kernels may still be reading.
         const size_t frows = (size_t)n_disp * cap_src;
-        hapiCheck(hapiMalloc((void**)&g.fx, sizeof(float) * frows * d_model));
-        hapiCheck(hapiMalloc((void**)&g.fy, sizeof(float) * frows * d_model));
+        hapiCheck(hapiMallocUnattributed((void**)&g.fx, sizeof(float) * frows * d_model));
+        hapiCheck(hapiMallocUnattributed((void**)&g.fy, sizeof(float) * frows * d_model));
       }
       g.workspace_bytes = (size_t)32 << 20;
-      hapiCheck(hapiMalloc(&g.workspace, g.workspace_bytes));
-      hapiCheck(hapiMalloc((void**)&g.partials,
+      hapiCheck(hapiMallocUnattributed(&g.workspace, g.workspace_bytes));
+      hapiCheck(hapiMallocUnattributed((void**)&g.partials,
           sizeof(double) * MOE_RED_BLOCKS));
       if (moeBlasCreate(&g, use_tf32 != 0))
         CkAbort("hapiBlasCreate failed on PE %d lane %d\n", CkMyPe(), l);
