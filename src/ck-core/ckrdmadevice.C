@@ -3366,6 +3366,14 @@ void CkDeviceChannel::onPulled() {
   // may take the DATA event much later (an SDAG waits for its tag), and the
   // next announce must not be read over it.
   busy = true;
+  // Until event() takes it, these bytes are in the buffer and nowhere else: a
+  // pack in between must carry them, and unseenBytes() is how the owner learns
+  // that. Without this only a direct put acked at closing counted, and an
+  // element that packed between this read and its DATA note left the bytes
+  // behind (moe, async LB, cross-host announces: 2 experts read a stale slab
+  // at step 13, job 23202493).
+  landed_unseen = pull_ev.bytes;
+  landed_seq = pull_ev.seq;
   if (owner_known) {
     CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(owner_mgr);
     CkLocRec* rec = mgr ? mgr->recForDeviceWork(owner_id) : NULL;
