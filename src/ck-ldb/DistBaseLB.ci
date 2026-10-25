@@ -11,6 +11,10 @@ group [migratable] DistBaseLB: BaseLB {
   // Sent to every PE of a process by the PE that built the round's GPU loads;
   // see the arrival gate in barrierDone.
   entry [expedited] void gpuLoadsReady();
+  // Pre-move device loads of objects that left another process for this PE (hapi kCuptiDeferFlag), and how
+  // many such messages every PE is owed, so the stats wait for all of them.
+  entry [expedited] void receiveDepartedLoads(int n, int omIdx[n], CmiUInt8 objIds[n], double loads[n]);
+  entry [reductiontarget] void departedCounts(int n, int counts[n]);
   entry [reductiontarget] void ResumeClients();
   entry void ResumeClients(int balancing);
 #if CMK_GLOBAL_LOCATION_UPDATE

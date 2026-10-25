@@ -2,6 +2,12 @@
 #include "cksyncbarrier.h"
 
 #include "ck.h"
+#if CMK_GPU
+void hapiCuptiObjectDeparting(const LDObjHandle&, int dest);
+void hapiCuptiTakeDepartedLoads(std::vector<std::pair<LDObjKey, double>>&);
+void hapiCuptiObjectArrived(const LDObjHandle&);
+void hapiCuptiDropDepartedLoads();
+#endif
 
 LBDatabase::LBDatabase() {
   omCount = omsRegistering = 0;
@@ -90,6 +96,9 @@ LDObjHandle LBDatabase::RegisterObj(LDOMHandle omh, CmiUInt8 id,
 
   newhandle.omhandle = omh;
   newhandle.id = id;
+#if CMK_GPU
+  hapiCuptiObjectArrived(newhandle);   // back in this process: its kernels here are a live object's again
+#endif
 
   {
     // objsEmptyHead maintains a linked list of empty positions within the objs array
@@ -179,9 +188,40 @@ void LBDatabase::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destIDs, int 
 #endif
 }
 
+// DistBaseLB: device loads forwarded from the process an object left (its pre-move kernels), added to the live
+// object here. One pass over the objects; returns how many found their object.
+int LBDatabase::AddDepartedGPULoads(const std::vector<std::pair<LDObjKey, double>>& loads)
+{
+  int applied = 0;
+#if CMK_GPU
+  if (loads.empty()) return 0;
+  std::unordered_map<LDObjKey, double, LDObjKeyHash> byKey;
+  for (const auto& kv : loads) byKey[kv.first] += kv.second;
+  for (int i = 0; i < objs.size(); i++) {
+    LBObj* obj = objs[i].obj;
+    if (obj == nullptr || obj->hasGPUDeclared()) continue;
+    const LDObjHandle& h = obj->GetLDObjHandle();
+    LDObjKey key; key.omID() = h.omID(); key.objID() = h.objID();
+    auto it = byKey.find(key);
+    if (it == byKey.end()) continue;
+    LBRealType g = 0; obj->getGPUTime(&g);
+    obj->setGPUTiming(g + it->second);
+    applied++;
+  }
+#endif
+  return applied;
+}
+
+void LBDatabase::TakeDepartedGPULoads()
+{
+#if CMK_GPU
+  hapiCuptiTakeDepartedLoads(departed_pending_);
+#endif
+}
+
 int LBDatabase::GetObjDataSz()
 {
-  int nitems = 0;
+  int nitems = (int)departed_pending_.size();
   int i;
   if (_lb_args.migObjOnly()) {
   for(i = 0; i < objs.size(); i++)
@@ -232,7 +272,8 @@ void LBDatabase::GetObjData(LDObjData *dp)
 #endif
 #if CMK_GPU
       d.driverTime *= f;
-      if (!obj->hasGPUDeclared()) d.gpuTime *= f;
+      // Not gpuTime: an object's kernels are filed to the round between its joins whenever they were launched
+      // (hapi_impl.cpp kCuptiDeferFlag), so its device load already spans the same steps for every object.
 #endif
     }
     if (obj->data.migratable) {
@@ -243,6 +284,22 @@ void LBDatabase::GetObjData(LDObjData *dp)
     }
     *dp++ = d;
   }
+  // Objects that left this process after launching kernels here: their loads travel as departed entries
+  // (handle index -1, not migratable); CentralLB::mergeDepartedLoads adds each to the object's live entry.
+  for (const auto& kv : departed_pending_) {
+    LDObjData d{};
+    d.handle.omhandle.id = kv.first.omID();
+    d.handle.id = kv.first.objID();
+    d.handle.handle = -1;
+    d.migratable = false;
+    d.departed = true;
+#if CMK_GPU
+    d.gpuTime = kv.second;
+#endif
+    *dp++ = d;
+  }
+  if (_lb_args.debug() > 1 && !departed_pending_.empty()) CmiPrintf("[DEPART pe=%d] %zu departed entries appended to this PE's stats (version %d)\n", CkMyPe(), departed_pending_.size(), _lb_version);
+  departed_pending_.clear();
   // Once per interval on PE 0 (the stats are read more than once per step);
   // the interval clock tells the reads of one step apart from the next.
   static thread_local double lastReported = -1.0;
@@ -363,6 +420,10 @@ void LBDatabase::ClearLoads(void)
   }
   delete commTable;
   commTable = new LBCommTable;
+  departed_pending_.clear();   // a round that did not take them (DistBaseLB) must never report stale departed entries
+#if CMK_GPU
+  hapiCuptiDropDepartedLoads();   // nor may the process's unclaimed ones reach a later CentralLB round
+#endif
   machineUtil.Clear();
   obj_walltime = 0;
   obj_gputime = 0;
@@ -390,6 +451,16 @@ int LBDatabase::Migrate(LDObjHandle h, int dest)
   }
 
   LBOM *const om = oms[(objs[h.handle].obj)->parentOM().handle];
+#if CMK_GPU
+  // Leaving this process: the kernels it launched here that are still in CUPTI's buffers are filed at the next
+  // close and follow it as a departed entry (CentralLB::mergeDepartedLoads). Not UnregisterObj: an arrival
+  // re-registers and would have been taken for a departure (job 23162022, 16:49).
+  // Only when it leaves the PROCESS: a move to another PE of this process keeps its kernels in this process's
+  // map, where SetObjGPULoad credits them to the live object. Marking those too (17:12, lmdfx7) split their whole
+  // load out as departed entries that no DistBaseLB round takes back: DiffusionLB saw 24% of the device load
+  // missing and moved 1180 objects.
+  if (CkNodeOf(dest) != CkMyNode()) hapiCuptiObjectDeparting(h, dest);
+#endif
   om->Migrate(h, dest);
   return 1;
 }

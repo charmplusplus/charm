@@ -83,6 +83,11 @@ public:
     LbObj(h)->getTime(&walltime, &cputime);
   };
 
+  // The device loads of objects that migrated away after their kernels ran here, waiting to be reported as
+  // departed entries by the next GetObjData (filled by TakeDepartedGPULoads, CentralLB only).
+  std::vector<std::pair<LDObjKey, double>> departed_pending_;
+  void TakeDepartedGPULoads();
+  int AddDepartedGPULoads(const std::vector<std::pair<LDObjKey, double>>& loads);
   inline void GetObjGPULoad(LDObjHandle &h, LBRealType &gputime) {
     LbObj(h)->getGPUTime(&gputime);
   };

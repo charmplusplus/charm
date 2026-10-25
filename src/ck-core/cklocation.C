@@ -12,7 +12,7 @@
 #include "charm++.h"
 #include "ck.h"
 #if CMK_GPU
-void hapiCuptiObjectJoinedStep(const LDObjHandle&);
+void hapiCuptiObjectJoinedStep(const LDObjHandle&, int round);   // round: LBManager::step() at the join
 void hapiCuptiObjectResumed(const LDObjHandle&);
 #endif
 #include <atomic>
@@ -2115,7 +2115,7 @@ void CkMigratable::lbSetMeasurementClosed(bool closed)
   // This set is PE-local. An arrival must overwrite both a missing exclusion
   // on a new PE and a stale exclusion when returning to a previous PE.
   if (closed)
-    hapiCuptiObjectJoinedStep(myRec->getLdHandle());
+    hapiCuptiObjectJoinedStep(myRec->getLdHandle(), myRec->getLBMgr()->step());
   else
     hapiCuptiObjectResumed(myRec->getLdHandle());
 #endif
