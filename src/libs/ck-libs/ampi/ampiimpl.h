@@ -308,6 +308,8 @@ class Amm {
   inline void put(T msg) noexcept;
   inline void put(int tag, int src, T msg) noexcept;
   inline T get(int tag, int src, int* rtags=NULL) noexcept;
+  // Like get(), but both keys must match exactly: wildcards on either side do not match.
+  inline T getExact(int tag, int src) noexcept;
   inline T probe(int tag, int src, int* rtags) noexcept;
   inline int size() const noexcept;
   void pup(PUP::er& p, AmmPupMessageFn msgpup) noexcept;
@@ -1218,6 +1220,10 @@ inline std::vector<int> rangeExclOp(int n, int ranges[][3], const std::vector<in
 #define MPI_RMA_TAG         MPI_TAG_UB_VALUE+10
 #define MPI_EPOCH_START_TAG MPI_TAG_UB_VALUE+11
 #define MPI_EPOCH_END_TAG   MPI_TAG_UB_VALUE+12
+// Key tag of a pending non-blocking reduction/gather request in ampi::postedReqs;
+// the source slot of the key holds the Charm++ reduction number of the
+// collective's contribution (see ampi::postCollReq).
+#define MPI_NBCOLL_TAG      MPI_TAG_UB_VALUE+13
 
 #define AMPI_COLL_SOURCE 0
 #define AMPI_COLL_COMM   MPI_COMM_WORLD
@@ -1410,7 +1416,9 @@ class IReq final : public AmpiRequest {
   bool isPersistent() const noexcept override { return persistent; }
   void start(MPI_Request reqIdx) noexcept override;
   bool receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg=true) noexcept override;
-  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override {}
+  // Only an MPI_Ibarrier's IReq is posted with ampi::postCollReq, so this is
+  // reached only for the (empty) result of the barrier's reduction.
+  void receive(ampi *ptr, CkReductionMsg *msg) noexcept override { complete = true; }
   void receiveRdma(ampi *ptr, char *sbuf, int slength, int srcRank) noexcept override;
   int getNumReceivedBytes(CkDDT *ptr) const noexcept override {
     return length;
@@ -2854,7 +2862,6 @@ class ampi final : public CBase_ampi {
   void requestPut(MPI_Request req, CkNcpyBuffer targetInfo) noexcept;
   void bcastResult(AmpiMsg *msg) noexcept;
   void barrierResult(void) noexcept;
-  void ibarrierResult(void) noexcept;
   void rednResult(CkReductionMsg *msg) noexcept;
   void irednResult(CkReductionMsg *msg) noexcept;
 
@@ -2931,6 +2938,15 @@ class ampi final : public CBase_ampi {
   CMI_WARN_UNUSED_RESULT inline ampi* blockOnIReq(void* buf, int count, MPI_Datatype type, int s,
                                                   int t, MPI_Comm comm, MPI_Status* sts) noexcept;
   MPI_Request postReq(AmpiRequest* newreq) noexcept;
+  /// Post the request of a non-blocking collective whose result comes back
+  /// through irednResult. Call it right before this rank's contribute() for
+  /// that collective: the request is keyed by the reduction number that
+  /// contribution will get, which the reduction manager copies onto the result
+  /// (CkReductionMsg::getRedNo). The number is the same on every rank, so
+  /// results match their requests whatever order they arrive in (an Igather
+  /// result reaches only the root and can overtake an earlier Iallreduce's
+  /// broadcast).
+  MPI_Request postCollReq(AmpiRequest* newreq) noexcept;
   inline void waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept;
   inline void completedSend(MPI_Request req, CkNcpyBuffer *srcInfo=nullptr) noexcept;
   inline void completedRecv(MPI_Request req, CkNcpyBuffer *targetInfo=nullptr) noexcept;
