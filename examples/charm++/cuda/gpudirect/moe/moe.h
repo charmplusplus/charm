@@ -42,20 +42,27 @@ struct MoeGpu {
 // on `comm`, and experts compute on the lanes. No cross-stream events are
 // needed: a slab is consumed only after its landing completed, and the
 // runtime orders a send behind the lane that produced its data.
+#define MOE_BUSY_STEPS 4
+#define MOE_BUSY_IVS 64
+
 struct MoeCtx {
   MoeGpu comm;                  // stream + partials only; no cuBLAS, no scratch
   MoeGpu lanes[MOE_MAX_LANES];
   int n_lanes;
-  // Seconds per token, pooled over this PE's experts. An expert times itself
-  // with events around its own kernels, but up to n_lanes experts share the
-  // device, so the span is inflated by however much company it had -- and a
-  // hot expert, which outlives its lane-mates, has less of it. Per-expert
-  // figures therefore compress exactly the skew the balancer has to see. Every
-  // expert here does identical work per token, so one pooled figure is both
-  // the right model and an accurate one: whatever concurrency inflation is
-  // left is common to all of them and cancels in the comparison.
-  double spt_gpu;               // decayed sum of measured device seconds
+  // Seconds per token, pooled over this PE's experts: the time the device
+  // spent on their kernels over the tokens they covered. Not the sum of each
+  // expert's own span: up to n_lanes experts share the device, so a span
+  // includes the others' kernels, and a GPU running ten experts read 2-3x the
+  // seconds per token of one running the hot expert alone -- after the first
+  // round isolated it, the balancer saw that GPU at 0.73x the average load
+  // while it carried 1.68x, and DiffusionLB moved experts onto it (job
+  // 23194642). Each span is placed on the device clock against ref_ev and only
+  // the part not already covered by that step's other spans is counted.
+  double spt_gpu;               // decayed sum of device-busy seconds
   double spt_tok;               // decayed sum of the tokens they covered
+  int spt_step;                 // the step the decay last advanced for
+  hapiEvent_t ref_ev;           // recorded once on comm, before any expert work
+  struct BusyStep { int step, n; float s[MOE_BUSY_IVS], e[MOE_BUSY_IVS]; } busy[MOE_BUSY_STEPS];
   // Tokens issued on each lane and not yet complete (Expert::pickLane).
   long lane_pending[MOE_MAX_LANES];
 };

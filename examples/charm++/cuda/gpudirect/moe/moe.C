@@ -533,9 +533,12 @@ class Dispatcher : public CBase_Dispatcher {
 
     memset(&gpu, 0, sizeof(gpu));
     gpu.n_lanes = n_lanes;
+    for (auto& b : gpu.busy) b.step = -1;
     // See MoeCtx in moe.h for why communication has its own stream.
     hapiCheck(hapiStreamCreateWithPriority(&gpu.comm.stream,
         hapiStreamNonBlocking, -1));
+    hapiCheck(hapiEventCreate(&gpu.ref_ev));
+    hapiCheck(hapiEventRecord(gpu.ref_ev, gpu.comm.stream));
     hapiCheck(hapiMalloc((void**)&gpu.comm.partials,
         sizeof(double) * MOE_RED_BLOCKS));
     hapiCheck(hapiStreamCreateWithPriority(&send_stream, hapiStreamNonBlocking,
@@ -1177,6 +1180,10 @@ class Expert : public CBase_Expert {
     // interval (LBObj::gpuDeclared), so under -I, which asks for the measured
     // loads, nothing is declared.
     if (!use_instrument) setObjGPUTime(s_tok * n_tot * stepsSinceLastLB(my_step));
+    if (isLBStep(my_step))
+      TRACE(1, "expert %d step %d declares %.6f s: %d tokens x %.4e s/token x %d steps; PE pool %.4f s / %.0f "
+          "tokens; own last sample %.4f s for %d tokens", thisIndex, my_step, s_tok * n_tot * stepsSinceLastLB(my_step),
+          n_tot, s_tok, stepsSinceLastLB(my_step), c->spt_gpu, c->spt_tok, gpu_last, n_last);
 
     if (isLBStep(my_step) && !lb_waiting) {
       if (!async_lb) {
@@ -1224,12 +1231,40 @@ class Expert : public CBase_Expert {
     gpu_last = ms * 1e-3;
     if (n_last > 0 && step_last > 1) {
       // Pool the sample into the PE's figure rather than keeping a per-expert
-      // one; see MoeCtx. The decay makes it track without a window.
+      // one; see MoeCtx. The decay advances once per step, so the order in
+      // which a step's experts report does not weight them differently.
       MoeCtx* c = ctx();
-      c->spt_gpu = 0.75 * c->spt_gpu + gpu_last;
-      c->spt_tok = 0.75 * c->spt_tok + n_last;
+      float s_ms = 0.0f, e_ms = 0.0f;
+      hapiCheck(hapiEventElapsedTime(&s_ms, c->ref_ev, ev_start));
+      hapiCheck(hapiEventElapsedTime(&e_ms, c->ref_ev, ev_end));
+      if (step_last > c->spt_step) {
+        c->spt_gpu *= 0.75;
+        c->spt_tok *= 0.75;
+        c->spt_step = step_last;
+      }
+      c->spt_gpu += 1e-3 * addBusy(c, step_last, s_ms, e_ms);
+      c->spt_tok += n_last;
       spt = c->spt_gpu / c->spt_tok;
     }
+  }
+
+  // Adds [s, e] (ms on the device clock) to step's busy set; returns the part
+  // no earlier span of that step covered. The set is kept disjoint.
+  static float addBusy(MoeCtx* c, int step, float s, float e) {
+    MoeCtx::BusyStep& b = c->busy[step % MOE_BUSY_STEPS];
+    if (b.step != step) { b.step = step; b.n = 0; }
+    float fresh = e - s;
+    for (int i = 0; i < b.n; i++)
+      fresh -= std::max(0.0f, std::min(e, b.e[i]) - std::max(s, b.s[i]));
+    // Merge: the overlapping intervals fold into [s, e], the rest stay.
+    int k = 0;
+    for (int i = 0; i < b.n; i++) {
+      if (b.e[i] < s || b.s[i] > e) { b.s[k] = b.s[i]; b.e[k] = b.e[i]; k++; }
+      else { s = std::min(s, b.s[i]); e = std::max(e, b.e[i]); }
+    }
+    if (k < MOE_BUSY_IVS) { b.s[k] = s; b.e[k] = e; k++; }
+    b.n = k;
+    return std::max(fresh, 0.0f);
   }
 
   void compute() {
