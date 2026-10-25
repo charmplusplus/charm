@@ -1709,6 +1709,36 @@ void MetisLB::work(LDStats* stats)
              CkMyPe(), relabelledGroups, relabelledPes, moved, (int)migVerts.size());
   }
 
+  // +LBDebug 3: the strategy's inputs and its decision, one line per object, so two rounds can be
+  // compared object by object (a sync and an async decision on the same system took different maps,
+  // job 23160080). The loads are as the strategy saw them: scaled by the object's active span over
+  // its window (LBDatabase::GetObjData); windowTime is the window itself and the per-PE lines give
+  // the interval, so the share each object was measured over can be read back.
+  if (_lb_args.debug() > 2 && CkMyPe() == cur_ld_balancer)
+  {
+    for (int i = 0; i < numVertices; i++)
+    {
+      const CkVertex& v = ogr->vertices[i];
+      double msgs = 0.0, bytes = 0.0;
+      for (const CkEdge& e : v.sendToList) { msgs += e.getNumMsgs(); bytes += e.getNumBytes(); }
+      const LDObjData& od = stats->objData[i];
+      CkPrintf("[MetisLB obj] v=%d id=%llx pe=%d to=%d host=%.6f gpu=%.6f drv=%.6f win=%.6f comp=%.6f "
+               "msgs=%.0f bytes=%.0f mig=%d\n",
+               i, (unsigned long long)od.objID(), v.getCurrentPe(),
+               newPe[i] >= 0 ? newPe[i] : v.getCurrentPe(), (double)od.wallTime,
+#if CMK_GPU
+               (double)od.gpuTime, (double)od.driverTime,
+#else
+               0.0, 0.0,
+#endif
+               (double)od.windowTime, v.getCompLoad(), msgs, bytes, (int)od.migratable);
+    }
+    for (int pe = 0; pe < (int)parr->procs.size(); pe++)
+      CkPrintf("[MetisLB pe] pe=%d interval=%.6f idle=%.6f bg=%.6f objs=%d\n", pe,
+               stats->procs[pe].total_walltime, stats->procs[pe].idletime,
+               stats->procs[pe].bg_walltime, stats->procs[pe].n_objs);
+  }
+
   if (_lb_args.debug() > 1 && CkMyPe() == cur_ld_balancer)
   {
     // Does the partition actually keep talkers together? Compare the edge
