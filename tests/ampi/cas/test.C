@@ -136,11 +136,14 @@ static void testByteWindow(Ctx& c)
   MPI_Win_free(&win);
 }
 
-// MPI_BYTE window: values stay below 256 so no case wraps around.
+// MPI_BYTE window. Values wrap modulo 256 above 15 ranks, so every expected
+// value is truncated to unsigned char (U8) like the window contents; the
+// matching and non-matching compare values still differ after truncation.
 static void testByte(Ctx& c)
 {
   const int rank = c.rank, target = c.target, source = c.source;
   const char* n = "byte";
+  auto U8 = [](int v) { return (unsigned char)v; };
   unsigned char wbuf[8];
   for (int i = 0; i < 8; i++) wbuf[i] = (unsigned char)(rank * 16 + i);
   MPI_Win win;
@@ -152,13 +155,13 @@ static void testByte(Ctx& c)
   MPI_Compare_and_swap(&orig, &comp, &res, MPI_BYTE, target, 2, win);
   MPI_Compare_and_swap(&orig3, &comp3, &res3, MPI_BYTE, target, 3, win);
   MPI_Win_fence(0, win);
-  check(res == target * 16 + 2, n, "match: result", res, target * 16 + 2);
-  check(res3 == target * 16 + 3, n, "no-match: result", res3, target * 16 + 3);
-  check(wbuf[2] == 200 + source, n, "match: target swapped", wbuf[2], 200 + source);
-  check(wbuf[3] == rank * 16 + 3, n, "no-match: target unchanged", wbuf[3], rank * 16 + 3);
+  check(res == U8(target * 16 + 2), n, "match: result", res, U8(target * 16 + 2));
+  check(res3 == U8(target * 16 + 3), n, "no-match: result", res3, U8(target * 16 + 3));
+  check(wbuf[2] == U8(200 + source), n, "match: target swapped", wbuf[2], U8(200 + source));
+  check(wbuf[3] == U8(rank * 16 + 3), n, "no-match: target unchanged", wbuf[3], U8(rank * 16 + 3));
   for (int i = 0; i < 8; i++)
     if (i != 2 && i != 3)
-      check(wbuf[i] == rank * 16 + i, n, "untouched element", wbuf[i], rank * 16 + i);
+      check(wbuf[i] == U8(rank * 16 + i), n, "untouched element", wbuf[i], U8(rank * 16 + i));
 
   MPI_Win_free(&win);
 }

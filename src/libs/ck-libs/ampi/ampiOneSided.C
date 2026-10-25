@@ -313,7 +313,6 @@ char* ampi::winLocalGet(int orgcnt, MPI_Datatype orgtype, MPI_Aint targdisp, int
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int targtotalsize = winobj->disp_unit*targcnt;
   int orgunit = getDDT()->getSize(orgtype);
   char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
 
@@ -512,7 +511,6 @@ void ampi::winLocalGetAccumulate(int orgtotalsize, char* sorgaddr, int orgcnt, M
   win_obj *winobj = winObjects[winIndex];
   CkDDT_DataType *tddt = getDDT()->getType(targtype);
   int targunit = tddt->getSize();
-  int targtotalsize = winobj->disp_unit*targcnt;
   int orgunit = getDDT()->getSize(orgtype);
   char* targaddr = (char*)(winobj->baseAddr) + winobj->disp_unit*targdisp;
 
@@ -957,6 +955,7 @@ static bool compareAndSwapTypeAllowed(MPI_Datatype type) noexcept {
     case MPI_SHORT:
     case MPI_LONG:
     case MPI_LONG_LONG_INT: // also MPI_LONG_LONG, MPI_OFFSET
+    case MPI_CHAR: // also MPI_INTEGER1 (Fortran integer)
     case MPI_SIGNED_CHAR:
     case MPI_UNSIGNED_CHAR:
     case MPI_UNSIGNED_SHORT:
