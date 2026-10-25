@@ -53,9 +53,9 @@ jobs:
         run: |
           # lcrun's file PMI backend shares one fixed rendezvous dir per host; a run that dies mid-bootstrap poisons it and the next launch aborts or hangs (charm #3987, uiuc-hpc/lci#202).
           rm -rf "$HOME/.tmp/lct_pmi_file-"*
-          coverage/run.sh reconverse-linux-x86_64 --tier all-tiers --shapes "1 2" --out coverage-out
+          coverage/run.sh reconverse-linux-x86_64-clang --tier all-tiers --shapes "1 2" --out coverage-out
       - name: report
-        run: COV_HTML=1 coverage/report.sh reconverse-linux-x86_64 coverage-out
+        run: COV_HTML=1 coverage/report.sh reconverse-linux-x86_64-clang coverage-out
       - name: job summary
         if: always()
         run: |
