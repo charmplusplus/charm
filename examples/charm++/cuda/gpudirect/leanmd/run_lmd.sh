@@ -1,7 +1,7 @@
 #!/bin/bash
 # run_lmd.sh <jobid> <tag> [extra leanmd args]: one leanmd run on an allocation with the process/GPU/PE split knobs of
 # sph3d's run3d.sh. Env: NODES (2), PPN (processes per node, 4), GPP (GPUs per process, GPUS/PPN), PES (PEs per process,
-# 8*GPP), LCIDEV=1 (+lci_ndevices GPP), LB=none|sync|async, GRID ("16 8 8"), STEPS (100), PERIOD (20), LAG (16), POOL (MB
+# 8*GPP), LCIDEV=1 (+lci_ndevices GPP), LB=none|sync|async, GRID ("16 8 8"), STEPS (100), FIRST (first LB step, default PERIOD), PERIOD (20), LAG (16), POOL (MB
 # per arena, 16384), POOL_ALLOC (vmm|buddy), TMO (s, 600), LBDEBUG (1), LMD_EXTRA (extra LB flags), CHANNELS=1 (-channels), BIN (binary in this dir, default leanmd), WRAP (pinning wrapper, default numa_wrap_lmd.sh; numa_wrap_lmd_nsys.sh traces rank LMD_NSYS_RANK into LMD_NSYS_DIR). PPN=1 GPP=4 PES=32 is
 # one process driving all four GPUs with 8 PEs each; PPN=4 GPP=1 PES=8 is the control. Rank logs: ranklogs/<tag>/.
 D=/u/bhosale/charm-reconverse/examples/charm++/cuda/gpudirect/leanmd
@@ -12,6 +12,7 @@ PES=${PES:-$((8*GPP))}
 GPUMAP=""; [ "$GPP" -gt 1 ] && GPUMAP="+gpudevs $GPP +gpumap block${LCIDEV:+ +lci_ndevices $GPP}"
 GRID=${GRID:-16 8 8}; STEPS=${STEPS:-100}; PERIOD=${PERIOD:-20}; LAG=${LAG:-16}; POOL=${POOL:-16384}
 [ "${LB:-none}" = none ] && PERIOD=99999   # no AtSync at all: the runtime would otherwise balance at the period by default
+FIRST=${FIRST:-$PERIOD}   # FIRST: the first LB step (default: the period, as before); PERIOD alone then sets both
 LBARGS=""
 case ${LB:-none} in
   sync)  LBARGS="-lbsync +LBDebug ${LBDEBUG:-1} ${LMD_EXTRA:-}";;   # the runtime picks the strategy (2026-10-18): no balancer flags here
@@ -25,7 +26,7 @@ export LD_LIBRARY_PATH=/u/bhosale/charm-reconverse/lib:/u/bhosale/charm-reconver
 export FI_MR_CACHE_MONITOR=uffd PMI_MAX_KVS_ENTRIES=8192 CUDA_DEVICE_ORDER=PCI_BUS_ID
 [ -n "${LCI_LIB:-}" ] && export LD_PRELOAD=$LCI_LIB/liblci.so LD_LIBRARY_PATH=$LCI_LIB:$LD_LIBRARY_PATH
 RL=$D/ranklogs/$TAG; rm -rf $RL; mkdir -p $RL $D/logs; LOG=$D/logs/$TAG.log
-C="$GRID $STEPS $PERIOD $PERIOD -computemap local -density gradient +pe $((PES*NP)) +setcpuaffinity +gpushm +gpuipceventpool 256 +gpupool +gpupoolsize $POOL"
+C="$GRID $STEPS $FIRST $PERIOD -computemap local -density gradient +pe $((PES*NP)) +setcpuaffinity +gpushm +gpuipceventpool 256 +gpupool +gpupoolsize $POOL"
 [ "${CHANNELS:-0}" = 1 ] && C="$C -channels"   # CHANNELS=1: persistent device channels for positions, forces, migrants
 [ "${POOL_ALLOC:-buddy}" = vmm ] && C="$C +gpupoolalloc vmm"
 SRUN="srun --jobid=$JID --overlap --mpi=cray_shasta -N $NODES -n $NP --ntasks-per-node=$PPN --gpus-per-node=$GPUS --cpus-per-task=$((64/PPN)) --cpu-bind=none --exact --kill-on-bad-exit=1"
