@@ -181,11 +181,13 @@ static bool ckLandingAdmissible(size_t size, size_t footprint, size_t* reachOut,
   return reach >= ckPoolBlock(size) + footprint + floor;
 }
 
-// Take the landing arena and the element's blocks from the pool without
-// growing it; on any miss, give everything back and report failure. Largest
-// blocks first, which is the order a buddy allocator fits best.
+// Take the landing arena and the element's blocks from the pool, without
+// growing it unless `grow`; on any miss, give everything back and report
+// failure. Largest blocks first, which is the order a buddy allocator fits
+// best.
 static bool ckTakeLandingSet(int size, const std::vector<CmiUInt8>& blocks,
-                             char** arenaOut, std::multimap<size_t, void*>& set)
+                             char** arenaOut, std::multimap<size_t, void*>& set,
+                             bool grow = false)
 {
   std::vector<std::pair<size_t, int>> want;
   for (size_t k = 0; k + 1 < blocks.size(); k += 2)
@@ -198,7 +200,7 @@ static bool ckTakeLandingSet(int size, const std::vector<CmiUInt8>& blocks,
   bool ok = true;
   for (const auto& w : want) {
     for (int c = 0; ok && c < w.second; c++) {
-      void* p = CkDeviceMallocNoGrow(w.first);
+      void* p = grow ? CkDeviceMalloc(w.first) : CkDeviceMallocNoGrow(w.first);
       if (p == nullptr) ok = false;
       else set.emplace(w.first, p);
     }
@@ -206,7 +208,7 @@ static bool ckTakeLandingSet(int size, const std::vector<CmiUInt8>& blocks,
   }
   char* arena = nullptr;
   if (ok && size > 0) {
-    arena = (char*)CkDeviceMallocNoGrow((size_t)size);
+    arena = (char*)(grow ? CkDeviceMalloc((size_t)size) : CkDeviceMallocNoGrow((size_t)size));
     if (arena == nullptr) ok = false;
   }
   hapiFootprintEnd();
@@ -218,6 +220,29 @@ static bool ckTakeLandingSet(int size, const std::vector<CmiUInt8>& blocks,
   }
   *arenaOut = arena;
   return true;
+}
+
+// Under the vmm pool a block never crosses a chunk boundary, so the free bytes
+// a landing was admitted on can sit in holes too small for the element's
+// largest block (job 23199057: 3451 MB free, largest hole 160 MB, 302 MB
+// slabs). Waiting for a free is then waiting on this device's departures in a
+// later batch, and the next batch is released only when this one completes:
+// the landing sat out the whole timeout and then grew the pool after all. A
+// vmm chunk is mapped and registered on its own, with no per-process ceiling,
+// so the landing maps what it is short of instead, if the device has the
+// memory: the set rounded up to whole chunks, and one chunk more.
+static bool ckTakeLandingSetGrowingVmm(int size, size_t footprint,
+                                       const std::vector<CmiUInt8>& blocks,
+                                       char** arenaOut, std::multimap<size_t, void*>& set)
+{
+  if (!hapiDevPoolIsVmm()) return false;
+  size_t devFree = 0, poolFree = 0, chunk = 0;
+  int slots = 0;
+  hapiLBDeviceMemory(&devFree, &poolFree, &chunk, &slots);
+  if (chunk == 0) return false;
+  const size_t need = ckPoolBlock(size) + footprint;
+  if (devFree < (need + chunk - 1) / chunk * chunk + chunk) return false;
+  return ckTakeLandingSet(size, blocks, arenaOut, set, /*grow=*/true);
 }
 
 // The migration window (+gpupool): pacing, not the safety argument. The batch
@@ -4448,11 +4473,21 @@ void CkLocMgr::admitLandingsLoop()
     }
     // Admissible by bytes: now take the arena and the element's blocks for
     // real, without growing the pool. By shape they may still not fit --
-    // that is the case the byte check cannot see -- and then this waits like
-    // any other deferral, for a free.
+    // that is the case the byte check cannot see -- and then a vmm pool maps
+    // what it is short of (ckTakeLandingSetGrowingVmm); otherwise this waits
+    // like any other deferral, for a free.
     char* arena = nullptr;
     std::multimap<size_t, void*> set;
-    if (!expired && !ckTakeLandingSet(d.size, d.blocks, &arena, set)) {
+    bool taken = expired || ckTakeLandingSet(d.size, d.blocks, &arena, set);
+    if (!taken && ckTakeLandingSetGrowingVmm(d.size, d.footprint, d.blocks, &arena, set)) {
+      taken = true;
+      static thread_local int grown = 0;
+      if (grown++ == 0)
+        CkPrintf("[%d] memory contract: a %d-byte migration landing (+%zu bytes of element "
+                 "state) fit the pool by bytes but not by shape; mapped more of the vmm pool "
+                 "instead of waiting for a free\n", CkMyPe(), d.size, d.footprint);
+    }
+    if (!taken) {
       if (!d.reported && landingDeferrals++ == 0)
         CkPrintf("[%d] memory contract: a migration landing waits for device memory "
                  "(admission gate)\n", CkMyPe());
