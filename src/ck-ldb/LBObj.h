@@ -72,6 +72,7 @@ public:
     } else if (!v && joinedStep) {     // opening
       windowOpenedAt = CkWallTimer();
       closedAt = -1.0;
+      declaredWhileJoined = false;
     }
     joinedStep = v;
   }
@@ -118,6 +119,8 @@ public:
   bool gpuDeclared = false;
   inline void setGPUDeclared(bool v) { gpuDeclared = v; }
   inline bool hasGPUDeclared(void) const { return gpuDeclared; }
+  // A declaration arrived while the window was closed (LBDatabase::EstObjGPULoad); cleared when it reopens.
+  bool declaredWhileJoined = false;
 
   inline void StartTimer(void) {
     startWTime = CkWallTimer();

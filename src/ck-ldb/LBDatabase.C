@@ -217,11 +217,12 @@ void LBDatabase::GetObjData(LDObjData *dp)
   LBRealType period = 0, cpu = 0;
   TotalTime(&period, &cpu);
   const bool migOnly = _lb_args.migObjOnly();
-  int scaled = 0, counted = 0;
+  int scaled = 0, counted = 0, lateDeclared = 0;
   double maxScale = 1.0, sumScale = 0.0;
   for (int i = 0; i < objs.size(); i++) {
     LBObj* obj = objs[i].obj;
     if (!obj || (migOnly && !obj->data.migratable)) continue;
+    if (obj->declaredWhileJoined) lateDeclared++;
     LDObjData d = obj->ObjData();
     d.windowTime = obj->windowTime();
     const double f = obj->sampleScale();
@@ -278,6 +279,10 @@ void LBDatabase::GetObjData(LDObjData *dp)
               "scale mean %.2f max %.2f capped %d; parks %d\n",
               CkMyPe(), counted, sumWin / counted, minWin, zeroWin, sumSpan / counted, (double)period,
               sumScale / counted, maxScale, capped, ckLbParksSinceLast());
+  }
+  if (_lb_args.debug() > 0 && lateDeclared > 0 && newInterval) {
+    CmiPrintf("[%d] LBDB: %d of %d objects declared a device load after joining the step; this round reads "
+              "their declaration from before the join\n", CkMyPe(), lateDeclared, (int)objs.size());
   }
   if (newInterval) lastReported = period;
 }
@@ -458,6 +463,16 @@ void LBDatabase::EstObjGPULoad(const LDObjHandle &_h, double gputime)
   LBObj *const obj = LbObj(_h);
 
   CmiAssert(obj != NULL);
+  // The window is closed from the join to AtSyncWait / ResumeFromSync, and a declaration made in it is about work
+  // the round must not see, as a launch is. Under CUDA a PE builds its stats only after the CUPTI close wait, which
+  // under -lbasync took ~230 ms while the elements kept stepping: one large-MoE round-1 decision in six read some
+  // experts' step-11 declaration (one step's tokens) in place of their step-10 one (ten steps'), and the device
+  // loads explained 58% of the interval instead of 85-90%; Metis left the token imbalance at 3.10 where the other
+  // runs reached 1.69 (job 23175260, moeST_async2).
+  if (obj->hasJoinedStep()) {
+    obj->declaredWhileJoined = true;
+    return;
+  }
   obj->data.gpuTime = gputime;
   obj->setGPUDeclared(true);
 #endif
