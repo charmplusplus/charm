@@ -1720,6 +1720,12 @@ public:
 
   void iterate() {
     PhaseScope _ps(PH_ITERATE);
+    // The balancer's first interval would otherwise span the initialisation (lattice, uploads, the first sort: ~2 s
+    // against 0.5 s of steps for an LB at step 10, job 23157137), and the loads it measured there disagree with
+    // the message graph it partitions: the priced remap read worse than the current map and nothing moved. The
+    // runtime clears the loads at the end of every LB round; this clears them once per PE as the stepping starts.
+    static thread_local bool lb_loads_cleared = false;
+    if (!lb_loads_cleared) { lb_loads_cleared = true; LBClearLoads(); }
     if (concurrent_x) {
       // The park (AtSync, or AtSyncWait at the lag) happens inside the next
       // step, after its receives and before its forces (parkOrComputeC):
