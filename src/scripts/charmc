@@ -1756,6 +1756,15 @@ then
   fi
 fi
 
+# Coverage builds instrument every program compiled and linked with charmc.
+if [[ "$CMK_COVERAGE" = '1' ]]
+then
+    CMK_CC_FLAGS+=" -fprofile-instr-generate -fcoverage-mapping"
+    CMK_CXX_FLAGS+=" -fprofile-instr-generate -fcoverage-mapping"
+    CMK_LD_FLAGS+=" -fprofile-instr-generate"
+    CMK_LDXX_FLAGS+=" -fprofile-instr-generate"
+fi
+
 ########################################################################
 #
 # Finalize command parameters
