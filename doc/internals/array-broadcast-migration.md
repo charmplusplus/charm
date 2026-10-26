@@ -43,6 +43,12 @@ seen yet, because a broadcast still on its way may be older than a stored one
 up to the newest epoch seen at the previous pass under that rule, so a
 broadcast is kept for one to two minutes after it arrived.
 
+A checkpoint saves the head and the newest epoch seen, not the messages
+(`BcastQueue::pup`). On restart the head starts past the newest epoch seen,
+because the epochs below it do not arrive again and a head waiting for one of
+them would never move, so every later broadcast would stay stored. The
+elements restored on the PE expect that same epoch or a later one.
+
 A zero-copy broadcast (`CMK_ZC_BCAST_RECV_MSG`) is delivered first to one
 local element, which posts its buffers; the transfer then runs on the same
 message, the other local elements receive it as `CMK_ZC_BCAST_RECV_DONE_MSG`
@@ -130,7 +136,7 @@ migration, at the memory cost of broadcasts kept until spring cleaning.
   `CkArray::sendBroadcast`, `CkArray::recvBroadcast`,
   `CkArrayBroadcaster::ingestIncoming`, `attemptDelivery`,
   `bringUpToDate`, `releaseDelivered`, `springCleaning`.
-- src/ck-core/ckarray.h: `BcastQueue` (`releaseBelow`, `hold`, `consume`).
+- src/ck-core/ckarray.h: `BcastQueue` (`releaseBelow`, `hold`, `consume`, `pup`).
 - src/ck-core/ckarray.h: `CkArrayBroadcaster` (`ckElementStamp`,
   `ckElementArriving`), `CkArray::stableLocations`.
 - src/ck-core/init.C: `+noAnytimeMigration`.

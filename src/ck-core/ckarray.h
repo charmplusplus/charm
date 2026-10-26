@@ -1149,10 +1149,13 @@ private:
     void pup(PUP::er& p)
     {
       p | headEpoch;
+      p | curMaxEpoch;
       if (p.isUnpacking())
       {
-        curMaxEpoch = headEpoch;
-        oldMaxEpoch = headEpoch;
+        // The messages are not saved, and the epochs below the newest one
+        // seen do not arrive again after a restart: start the head past them
+        headEpoch = std::max(headEpoch, curMaxEpoch + 1);
+        oldMaxEpoch = curMaxEpoch;
       }
     }
   };
