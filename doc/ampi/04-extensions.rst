@@ -345,19 +345,27 @@ Calling ``AMPI_Migrate`` on a rank with pending send requests (i.e. from
 MPI_Isend) is currently not supported, therefore users should always
 wait on any outstanding send requests before calling ``AMPI_Migrate``.
 
-Non-blocking collectives (``MPI_Iallreduce``, ``MPI_Ibarrier``, ``MPI_Igather``
-and the others) must also be complete when ``AMPI_Migrate`` is called, unless
-the program runs with ``+ampiMigrateWithCollectives``. AMPI offers two modes:
+Some non-blocking collectives must also be complete when ``AMPI_Migrate`` is
+called, unless the program runs with ``+ampiMigrateWithCollectives``: those
+whose result the runtime delivers as a broadcast to all the ranks of
+``MPI_COMM_WORLD``, namely ``MPI_Iallreduce``, ``MPI_Iallgather``,
+``MPI_Iallgatherv``, ``MPI_Ibarrier`` and ``MPI_Ibcast`` on ``MPI_COMM_WORLD``.
+Collectives whose results travel as messages to each rank (``MPI_Ialltoall``
+and its variants, ``MPI_Iscatter``, ``MPI_Iscan``, the neighborhood
+collectives, and ``MPI_Ireduce`` and ``MPI_Igather`` at their root) and every
+collective on a communicator other than ``MPI_COMM_WORLD`` may be outstanding
+across ``AMPI_Migrate`` in either mode. AMPI offers two modes:
 
-- By default, AMPI tells the Charm++ runtime that its ranks move only at
-  ``AMPI_Migrate`` and with no collective outstanding, so the runtime keeps no
-  copy of a broadcast for a rank that is migrating. A rank that calls
-  ``AMPI_Migrate`` with a collective outstanding aborts with a message naming
-  the option, since its result could otherwise be lost.
-- With ``+ampiMigrateWithCollectives``, the runtime stores every broadcast to
-  the AMPI arrays until all ranks have received it, which costs memory, and
-  ranks may call ``AMPI_Migrate`` with non-blocking collectives outstanding;
-  their results are delivered after the migration.
+- By default, AMPI tells the Charm++ runtime that the ranks of
+  ``MPI_COMM_WORLD`` move only at ``AMPI_Migrate`` and with no such collective
+  outstanding, so the runtime keeps no copy of a broadcast to them for a rank
+  that is migrating. A rank that calls ``AMPI_Migrate`` with one of the
+  collectives above outstanding aborts with a message naming the option, since
+  its result could otherwise be lost.
+- With ``+ampiMigrateWithCollectives``, the runtime keeps each broadcast to the
+  AMPI arrays for one to two minutes, so a migrating rank can still receive it,
+  which costs memory, and ranks may call ``AMPI_Migrate`` with any non-blocking
+  collective outstanding; the results are delivered after the migration.
 
 The choice is memory against the freedom to balance load without first
 completing collectives; a program that already synchronizes before

@@ -1110,9 +1110,12 @@ static void ampiProcInit() noexcept {
    * to store broadcasts for the moving rank (anytime migration), which costs
    * memory; off by default. AMPI_Migrate_to_pe moves a rank at any point, so
    * it needs the same. */
-  CkpvAccess(isMigrateWithCollsEnabled) = CkpvAccess(isMigrateToPeEnabled) ||
+  // Parse the flag unconditionally so that it is removed from argv and its
+  // description registered even when +ampiEnableMigrateToPe already implies it.
+  bool migrateWithColls =
     (bool)CmiGetArgFlagDesc(CkGetArgv(), "+ampiMigrateWithCollectives",
                             "Allow non-blocking collectives to be outstanding across AMPI_Migrate");
+  CkpvAccess(isMigrateWithCollsEnabled) = migrateWithColls || CkpvAccess(isMigrateToPeEnabled);
 
 #if AMPIMSGLOG
   char **argv=CkGetArgv();
@@ -4528,8 +4531,9 @@ MPI_Request ampi::postReq(AmpiRequest* newreq) noexcept
   return request;
 }
 
-MPI_Request ampi::postCollReq(AmpiRequest* newreq) noexcept
+MPI_Request ampi::postCollReq(AmpiRequest* newreq, bool resultByBcast) noexcept
 {
+  newreq->resultByBcast = resultByBcast;
   MPI_Request request = getReqs().insert(newreq);
   // Keyed by the reduction number of this rank's next contribution rather than
   // by the request's (tag, src), so that irednResult matches each result to its
@@ -5083,7 +5087,8 @@ void ampi::ibarrier(MPI_Request *request) noexcept
   // rank 0 could stand in for (completing the barrier early and feeding the
   // barrier's empty message to the alltoall), and which a pending wildcard
   // receive could take (hanging the barrier).
-  *request = postCollReq(parent->reqPool.newReq<IReq>(nullptr, 0, MPI_INT, AMPI_COLL_SOURCE, MPI_ATA_TAG, myComm->getComm(), getDDT()));
+  *request = postCollReq(parent->reqPool.newReq<IReq>(nullptr, 0, MPI_INT, AMPI_COLL_SOURCE, MPI_ATA_TAG, myComm->getComm(), getDDT()),
+                         /*resultByBcast=*/true);
   CkCallback ibarrierCB(CkIndex_ampi::irednResult(0), getProxy());
   contribute(ibarrierCB);
 }
@@ -5614,7 +5619,7 @@ AMPI_API_IMPL(int, MPI_Iallreduce, const void *inbuf, void *outbuf, int count, M
     return copyDatatype(type,count,type,count,inbuf,outbuf);
   }
 
-  *request = ptr->postCollReq(new RednReq(outbuf,count,type,comm,op,getDDT()));
+  *request = ptr->postCollReq(new RednReq(outbuf,count,type,comm,op,getDDT()), /*resultByBcast=*/true);
 
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,rank,size,op);
   CkCallback allreduceCB(CkIndex_ampi::irednResult(0),ptr->getProxy());
@@ -7834,6 +7839,7 @@ void ampi::irecvBcast(void *buf, int count, MPI_Datatype type, int src,
   }
   AmpiRequestList& reqs = getReqs();
   IReq *newreq = parent->reqPool.newReq<IReq>(buf, count, type, src, MPI_BCAST_TAG, comm, getDDT());
+  newreq->resultByBcast = true; // the root sends the data with thisProxy.bcastResult
   *request = reqs.insert(newreq);
 
   AmpiMsg* msg = unexpectedBcastMsgs.get(MPI_BCAST_TAG, src);
@@ -8096,7 +8102,7 @@ AMPI_API_IMPL(int, MPI_Iallgather, const void *sendbuf, int sendcount, MPI_Datat
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
   }
 
-  *request = ptr->postCollReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
+  *request = ptr->postCollReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()), /*resultByBcast=*/true);
 
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback allgatherCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
@@ -8190,7 +8196,8 @@ AMPI_API_IMPL(int, MPI_Iallgatherv, const void *sendbuf, int sendcount, MPI_Data
   }
 
   *request = ptr->postCollReq(new GathervReq(recvbuf, size, recvtype, comm,
-                                             recvcounts, displs, getDDT()));
+                                             recvcounts, displs, getDDT()),
+                              /*resultByBcast=*/true);
 
   CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback allgathervCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
@@ -11696,9 +11703,17 @@ CLINKAGE int AMPI_Get_argc()
   return CkGetArgc();
 }
 
-// Without +ampiMigrateWithCollectives the arrays are created with anytime
-// migration off, so a collective result broadcast while a rank moves would
-// miss it (doc/internals/array-broadcast-migration.md).
+// Without +ampiMigrateWithCollectives, MPI_COMM_WORLD's array is created with
+// static insertion and anytime migration off (stable locations), so the
+// runtime keeps no copy of a broadcast to it for a rank that is moving
+// (doc/internals/array-broadcast-migration.md). The only results at risk are
+// those delivered as a broadcast to that array: MPI_Iallreduce,
+// MPI_Iallgather(v), MPI_Ibarrier and MPI_Ibcast on MPI_COMM_WORLD. Results
+// sent to the rank's own element (MPI_Ireduce and MPI_Igather(v) at the root,
+// MPI_Iscatter, MPI_Ialltoall*, MPI_Ineighbor_*, MPI_Iscan) follow a migrating
+// element through the location manager, and every other communicator lives
+// on a child array (ampi::createNewChildAmpiSync, dynamic insertion) whose
+// broadcasts the runtime stores; neither is checked.
 static void checkNoCollectiveOutstanding() noexcept
 {
   if (CkpvAccess(isMigrateWithCollsEnabled)) return;
@@ -11706,21 +11721,11 @@ static void checkNoCollectiveOutstanding() noexcept
   AmpiRequestList &reqs = parent->getReqs();
   for (int i = 0; i < reqs.size(); i++) {
     AmpiRequest *req = reqs[i];
-    if (req == NULL || req->complete) continue;
-    AmpiReqType t = req->getType();
-    bool coll = (t == AMPI_REDN_REQ || t == AMPI_GATHER_REQ || t == AMPI_GATHERV_REQ ||
-                 t == AMPI_ATA_REQ);
-    if (!coll && t == AMPI_I_REQ) {
-      int tag = req->getTag();
-      coll = (tag == MPI_BCAST_TAG || tag == MPI_SCATTER_TAG || tag == MPI_SCAN_TAG ||
-              tag == MPI_EXSCAN_TAG || tag == MPI_ATA_TAG || tag == MPI_NBOR_TAG ||
-              tag == MPI_REDN_TAG);
-    }
-    if (coll) {
-      CkAbort("AMPI> rank %d called AMPI_Migrate with a non-blocking collective outstanding "
-              "(MPI_Request %d). Complete it first, or run with +ampiMigrateWithCollectives.\n",
-              parent->thisIndex, i);
-    }
+    if (req == NULL || req->complete || !req->resultByBcast) continue;
+    if (req->comm != MPI_COMM_WORLD) continue;
+    CkAbort("AMPI> rank %d called AMPI_Migrate with a non-blocking collective outstanding "
+            "(MPI_Request %d). Complete it first, or run with +ampiMigrateWithCollectives.\n",
+            parent->thisIndex, i);
   }
 }
 
