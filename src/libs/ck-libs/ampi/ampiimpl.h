@@ -1278,6 +1278,11 @@ class AmpiRequest {
   MPI_Request reqIdx = MPI_REQUEST_NULL;
   bool complete      = false;
   bool blocked       = false; // this req is currently blocked on
+  // The result of this non-blocking collective arrives as a broadcast to the
+  // communicator's array (MPI_Iallreduce, MPI_Iallgather(v), MPI_Ibarrier,
+  // MPI_Ibcast) rather than as a message to this rank's element; set by
+  // ampi::postCollReq and ampi::irecvBcast, read by checkNoCollectiveOutstanding.
+  bool resultByBcast = false;
 
 
  public:
@@ -1369,6 +1374,7 @@ class AmpiRequest {
     p(reqIdx);
     p(complete);
     p(blocked);
+    p(resultByBcast);
   }
 
   virtual void print() const noexcept =0;
@@ -1817,6 +1823,7 @@ class AmpiRequestList {
   AmpiRequestList(int size, AmpiRequestPool* reqPoolPtr) noexcept
     : reqs(size), startIdx(0), reqPool(reqPoolPtr) {}
   ~AmpiRequestList() noexcept {}
+  inline int size() const noexcept { return reqs.size(); }
 
   inline AmpiRequest* operator[](int n) noexcept {
 #if CMK_ERROR_CHECKING
@@ -2949,7 +2956,9 @@ class ampi final : public CBase_ampi {
   /// results match their requests whatever order they arrive in (an Igather
   /// result reaches only the root and can overtake an earlier Iallreduce's
   /// broadcast).
-  MPI_Request postCollReq(AmpiRequest* newreq) noexcept;
+  // resultByBcast: the result comes back as a broadcast to the whole array
+  // (callback on the array proxy), not as a message to this element.
+  MPI_Request postCollReq(AmpiRequest* newreq, bool resultByBcast=false) noexcept;
   inline void waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept;
   inline void completedSend(MPI_Request req, CkNcpyBuffer *srcInfo=nullptr) noexcept;
   inline void completedRecv(MPI_Request req, CkNcpyBuffer *targetInfo=nullptr) noexcept;
