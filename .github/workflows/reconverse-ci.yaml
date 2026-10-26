@@ -52,6 +52,9 @@ env:
   # redesign (PR 1d): objid_insert reproduces that defect deterministically
   # (phase 7), objid_wide covers the wide-collection layout.
   # examples/charm++/hello/local covers [local] entry methods (#4065).
+  # atsync_reduction (2026-10-25): reductions in flight across an AtSync
+  # balancing step, and arrays with stable locations (-s -d) keeping their
+  # no-broadcast-in-flight promise (#4072).
   TEST_DIRS: >-
     tests/charm++/megatest
     tests/charm++/simplearrayhello
@@ -62,6 +65,7 @@ env:
     tests/charm++/objid_insert
     tests/charm++/objid_wide
     tests/charm++/anytime_bcastred
+    tests/charm++/atsync_reduction
     tests/charm++/threaded_redn
     tests/charm++/qd
     tests/charm++/within_node_bcast
