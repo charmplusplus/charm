@@ -26,18 +26,19 @@ R=$OUT/report
 mkdir -p "$R"
 
 # The llvm tools must match the compiler that instrumented the build: try
-# the variable, then xcrun, then the compiler's own directory, then PATH
-# (plain, then suffixed with the compiler's major version).
+# the variable, then the compiler's own directory, then xcrun (Apple clang,
+# whose tools are not next to the /usr/bin shims), then PATH (plain, then
+# suffixed with the compiler's major version).
 cxx=$(grep -m1 '^CMAKE_CXX_COMPILER:' "$B/CMakeCache.txt" | cut -d= -f2)
 find_tool() {
   local name=$1 override=$2 dir major
   if [[ -n $override ]]; then echo "$override"; return 0; fi
-  if command -v xcrun >/dev/null 2>&1 && xcrun -f "$name" >/dev/null 2>&1; then
-    echo "xcrun $name"; return 0
-  fi
   if [[ -n $cxx ]] && command -v "$cxx" >/dev/null 2>&1; then
     dir=$(dirname "$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$(command -v "$cxx")")")
     if [[ -x $dir/$name ]]; then echo "$dir/$name"; return 0; fi
+  fi
+  if command -v xcrun >/dev/null 2>&1 && xcrun -f "$name" >/dev/null 2>&1; then
+    echo "xcrun $name"; return 0
   fi
   if command -v "$name" >/dev/null 2>&1; then echo "$name"; return 0; fi
   major=$("$cxx" --version 2>/dev/null | sed -n 's/.*clang version \([0-9]*\).*/\1/p' | head -1)
@@ -51,12 +52,21 @@ read -r -a LLVMCOV <<< "$(find_tool llvm-cov "${LLVM_COV:-}")" || die "llvm-cov 
 [[ ${#PROFDATA[@]} -gt 0 && ${#LLVMCOV[@]} -gt 0 ]] || die "llvm-profdata or llvm-cov not found"
 echo "tools: ${PROFDATA[*]}, ${LLVMCOV[*]}"
 
-# Cumulative labels over the tiers that have profiles, in tier order.
+# Cumulative labels over the tiers that have profiles, in tier order. A tier
+# run against another build (rebuilt since, or a different one) would mix
+# counters from different code into the merge, so it stops the report.
+stamp=$("$SRC/coverage/buildstamp.sh" "$B")
 labels=()
+tiers=()
 prev=""
 for t in ci all ex; do
   find "$OUT/profraw/$t" -name '*.profraw' 2>/dev/null > "$R/$t.inputs"
   if [[ ! -s $R/$t.inputs ]]; then rm -f "$R/$t.inputs"; continue; fi
+  [[ -f $OUT/stamp-$t.txt && -f $OUT/programs-$t.txt ]] ||
+    die "tier $t has profiles but no stamp-$t.txt or programs-$t.txt; rerun coverage/run.sh --tier $t"
+  [[ $(cat "$OUT/stamp-$t.txt") == "$stamp" ]] ||
+    die "tier $t was run against a different build of $B; rerun it (coverage/run.sh --tier $t) or remove $OUT/profraw/$t"
+  tiers+=("$t")
   if [[ -z $prev ]]; then label=$t; else label=$prev+$t; fi
   [[ -n $prev ]] && echo "$R/$prev.profdata" >> "$R/$t.inputs"
   "${PROFDATA[@]}" merge -sparse -f "$R/$t.inputs" -o "$R/$label.profdata" ||
@@ -66,15 +76,13 @@ for t in ci all ex; do
 done
 [[ ${#labels[@]} -gt 0 ]] || die "no profiles under $OUT/profraw; run coverage/run.sh first"
 
-# Every program built against this build, plus libreconverse, which holds
-# every reconverse object (charm's own libraries are static, so only what a
-# program links is visible).
+# Every program run.sh built for the merged tiers (programs-<tier>.txt),
+# plus libreconverse, which holds every reconverse object (charm's own
+# libraries are static, so only what a program links is visible).
 {
-  find "$B/tests" "$B/examples" -type f -perm -u+x -newer "$B/CMakeCache.txt" \
-       ! -name '*.o' ! -name '*.a' ! -name '*.sh' ! -name charmrun 2>/dev/null |
-    while read -r f; do
-      file "$f" | grep -qE '(Mach-O|ELF).*executable' && echo "$f"
-    done | sort
+  for t in "${tiers[@]}"; do
+    while read -r f; do [[ -f $f ]] && echo "$f"; done < "$OUT/programs-$t.txt"
+  done | sort -u
   for f in "$B"/lib/libreconverse.dylib "$B"/lib/libreconverse.so; do
     [[ -f $f ]] && echo "$f"
   done

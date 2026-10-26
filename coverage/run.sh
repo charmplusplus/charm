@@ -18,6 +18,8 @@
 #   profraw/<tier>/      raw profiles (LLVM_PROFILE_FILE=%p-%m)
 #   results-<tier>.tsv   dir, step, outcome, seconds, note
 #   vacuous-<tier>.tsv   passing runs that wrote no profile (ran nothing)
+#   programs-<tier>.txt  the programs built, which report.sh measures
+#   stamp-<tier>.txt     the build the tier ran against (coverage/buildstamp.sh)
 #   dirs-<tier>.txt      the directories run; unreached-<tier>.txt lists
 #                        directories with a test target that no aggregator
 #                        reaches
@@ -32,6 +34,8 @@ usage() {
   exit 2
 }
 die() { echo "run.sh: $*" >&2; exit 2; }
+# The value of option $1, or an error if the option was the last argument.
+optval() { [[ $# -ge 2 ]] || die "$1 needs a value"; echo "$2"; }
 
 [[ $# -ge 1 ]] || usage
 B=$(cd "$1" 2>/dev/null && pwd -P) || die "no build directory '$1'"
@@ -42,11 +46,11 @@ out=""
 list_only=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --tier) tier_arg=$2; shift 2 ;;
+    --tier) tier_arg=$(optval "$@") || exit 2; shift 2 ;;
     --tier=*) tier_arg=${1#*=}; shift ;;
-    --shapes) shapes=$2; shift 2 ;;
+    --shapes) shapes=$(optval "$@") || exit 2; shift 2 ;;
     --shapes=*) shapes=${1#*=}; shift ;;
-    --out) out=$2; shift 2 ;;
+    --out) out=$(optval "$@") || exit 2; shift 2 ;;
     --out=*) out=${1#*=}; shift ;;
     --list) list_only=1; shift ;;
     -h|--help) usage ;;
@@ -75,7 +79,7 @@ run_tmo=${COV_RUN_TIMEOUT:-300}
 lcrun_wait=${COV_LCRUN_WAIT:-1800}
 
 # Runs "$@" with a time limit, killing its whole process group on expiry;
-# exit status 124 means it timed out.
+# exit status 124 means it timed out (see outcome for 137).
 if command -v timeout >/dev/null 2>&1; then
   bounded() { local s=$1; shift; timeout -k 10 "$s" "$@"; }
 elif command -v gtimeout >/dev/null 2>&1; then
@@ -83,6 +87,17 @@ elif command -v gtimeout >/dev/null 2>&1; then
 else
   bounded() { local s=$1; shift; perl "$SRC/coverage/tmo.pl" "$s" "$@"; }
 fi
+
+# The outcome of a bounded step from its exit status and elapsed seconds.
+# GNU timeout returns 137, not 124, when the step ignored TERM and was
+# killed 10 s later; tmo.pl returns 124 either way.
+outcome() {
+  local rc=$1 e=$2 limit=$3
+  if [[ $rc -eq 0 ]]; then echo pass
+  elif [[ $rc -eq 124 || ( $rc -eq 137 && $e -ge $limit ) ]]; then echo TIMEOUT
+  else echo "FAIL(rc=$rc)"
+  fi
+}
 
 # Exclusions: one directory per line, '#' starts a comment; a directory
 # excludes everything below it.
@@ -175,27 +190,43 @@ list_tier() {
     done > "$out/unreached-$t.txt"
 }
 
+# Once a wait has run out, later runs go ahead without waiting: the job
+# that outlasted it is long-lived or orphaned, and waiting again before
+# every directory would add the full wait each time.
+lcrun_gave_up=0
 wait_for_lcrun() {
   local waited=0
+  [[ $lcrun_gave_up -eq 1 ]] && return 1
   while pgrep -f '(^|/)lcrun( |$)' >/dev/null 2>&1; do
     [[ $waited -eq 0 ]] && echo "  another lcrun job is running; waiting (up to ${lcrun_wait} s)"
     sleep 10
     waited=$((waited + 10))
     if [[ $waited -ge $lcrun_wait ]]; then
-      echo "  still running after ${lcrun_wait} s; going ahead"
+      echo "  still running after ${lcrun_wait} s; going ahead, and not waiting again"
+      lcrun_gave_up=1
       return 1
     fi
   done
   return 0
 }
 
-# Kills leftovers of a failed run: programs built in the directory.
+# Lists the programs the build step of directory $1 produced: executables
+# under it newer than the marker touched before the build.
+built_programs() {
+  local f
+  find "$B/$1" -type f -perm -u+x -newer "$2" ! -name '*.o' ! -name '*.a' \
+       ! -name '*.sh' ! -name charmrun 2>/dev/null |
+    while read -r f; do
+      file "$f" | grep -qE '(Mach-O|ELF).*executable' && echo "$f"
+    done
+}
+
+# Kills leftovers of a failed run: the programs built in the directory.
 kill_strays() {
   local x
-  find "$B/$1" -maxdepth 1 -type f -perm -u+x -newer "$B/CMakeCache.txt" 2>/dev/null |
-    while read -r x; do
-      pkill -9 -f "^\./$(basename "$x")( |$)" 2>/dev/null
-    done
+  grep -F "$B/$1/" "$programs" | while read -r x; do
+    pkill -9 -f "^\./$(basename "$x")( |$)" 2>/dev/null
+  done
 }
 
 first_error() {
@@ -214,18 +245,20 @@ run_dir() {
     return
   fi
   bounded 120 make -C "$B/$d" "${extra[@]}" clean > /dev/null 2>&1
+  touch "$out/.build-marker"
   s=$(date +%s)
   bounded "$build_tmo" make -C "$B/$d" "${extra[@]}" > "$log.build.log" 2>&1
   rc=$?
   e=$(( $(date +%s) - s ))
   if [[ $rc -ne 0 ]]; then
-    if [[ $rc -eq 124 ]]; then o=TIMEOUT; else o="FAIL(rc=$rc)"; fi
+    o=$(outcome "$rc" "$e" "$build_tmo")
     note=$(first_error "$log.build.log" 'error|fatal')
     printf '%s\tbuild\t%s\t%s\t%s\n' "$d" "$o" "$e" "$note" >> "$results"
     echo "  $d: build $o (${e}s)"
     return
   fi
   printf '%s\tbuild\tok\t%s\t\n' "$d" "$e" >> "$results"
+  built_programs "$d" "$out/.build-marker" >> "$programs"
   local line="  $d: build ok (${e}s)"
   for p in $shapes; do
     if [[ $p -gt 1 ]] && wait_for_lcrun; then
@@ -242,11 +275,7 @@ run_dir() {
     e=$(( $(date +%s) - s ))
     nprof=$(find "$out/profraw/$t" -name '*.profraw' -newer "$marker" | wc -l | tr -d ' ')
     note=""
-    case $rc in
-      0) o=pass ;;
-      124) o=TIMEOUT ;;
-      *) o="FAIL(rc=$rc)" ;;
-    esac
+    o=$(outcome "$rc" "$e" "$run_tmo")
     if [[ $rc -ne 0 ]]; then
       note=$(first_error "$log.run$p.log" 'error|abort|fatal|assert|fail|signal|segment')
       kill_strays "$d"
@@ -295,10 +324,14 @@ fi
 for t in $tiers; do
   results=$out/results-$t.tsv
   vacuous=$out/vacuous-$t.tsv
+  programs=$out/programs-$t.txt
   rm -rf "$out/profraw/$t" "$out/logs/$t"
   mkdir -p "$out/profraw/$t" "$out/logs/$t"
   : > "$results"
   : > "$vacuous"
+  : > "$programs"
+  # report.sh merges only tiers run against the build it measures.
+  "$SRC/coverage/buildstamp.sh" "$B" > "$out/stamp-$t.txt"
   list_tier "$t"
   n=$(wc -l < "$out/dirs-$t.txt" | tr -d ' ')
   echo "== tier $t: $n directories, shapes $shapes ($(date '+%H:%M:%S'))"
@@ -316,4 +349,4 @@ for t in $tiers; do
   echo "== tier $t done in ${secs} s; $(grep -c $'\tpass\t' "$results") passing runs," \
        "$(wc -l < "$vacuous" | tr -d ' ') ran nothing; unreached: $(wc -l < "$out/unreached-$t.txt" | tr -d ' ')"
 done
-rm -f "$helper" "$out/.marker"
+rm -f "$helper" "$out/.marker" "$out/.build-marker"

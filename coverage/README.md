@@ -32,16 +32,24 @@ counts; 2 runs through lcrun with `TESTRUN_PROCS=2`), `--out <dir>` (default
 `coverage/out`), `--list` (print the tiers without running anything).
 Timeouts: `COV_BUILD_TIMEOUT` (900 s) and `COV_RUN_TIMEOUT` (300 s) per
 directory; `timeout` is used where it exists, `coverage/tmo.pl` otherwise
-(macOS), and either kills the whole process group. Before a multi-process
-run `run.sh` waits for any other lcrun job on the machine to finish
-(two lcrun jobs at once stall each other on a laptop) and clears
-`~/.tmp/lct_pmi_file-*`.
+(macOS), and either kills the whole process group; a step killed for
+running past its limit is recorded as `TIMEOUT` on both. Before a
+multi-process run `run.sh` waits for any other lcrun job on the machine to
+finish (two lcrun jobs at once stall each other on a laptop) and clears
+`~/.tmp/lct_pmi_file-*`; if one wait runs out (`COV_LCRUN_WAIT`, 1800 s), it
+stops waiting for the rest of the run.
 
 `report.sh` writes `REPORT.md`, plus per cumulative tier the merged profile,
 the `llvm-cov report` text, `export -summary-only` JSON and an lcov export
 under `<out>/report/`; `COV_HTML=1` adds `llvm-cov show -format=html` of the
-last tier. It picks `llvm-profdata`/`llvm-cov` from `xcrun`, the compiler's
-directory or `PATH`; set `LLVM_PROFDATA`/`LLVM_COV` to override.
+last tier. It picks `llvm-profdata`/`llvm-cov` from the compiler's
+directory, `xcrun` or `PATH`; set `LLVM_PROFDATA`/`LLVM_COV` to override.
+It measures the programs `run.sh` built (`programs-<tier>.txt`) plus
+libreconverse, and merges a tier only if it was run against the build being
+measured: `run.sh` records the build's libraries in `stamp-<tier>.txt`
+(`coverage/buildstamp.sh`), and `report.sh` stops if a tier's stamp no
+longer matches, so rerun that tier after a rebuild or remove its
+`profraw/<tier>`.
 `.github/workflows/coverage.yaml` runs all of this weekly on ubuntu-latest
 and on demand, and uploads the output.
 
@@ -54,7 +62,9 @@ and on demand, and uploads the output.
 | `ex` | examples | the same under `examples/` |
 
 Tiers are reported cumulatively: `ci`, `ci+all`, `ci+all+ex`. Aggregators
-are not run themselves; their leaves are. An aggregator that also runs a
+are not run themselves; their leaves are. `smptest` targets are not run:
+reconverse's `testrun` drops `++ppn`, so they differ from the `test` runs
+only in PE counts, and every reconverse process already runs several PEs. An aggregator that also runs a
 program of its own (`examples/charm++/PUP`) is run with `DIRS` and
 `TESTDIRS` emptied. Each tier's directories that have a `test` target but
 that no aggregator reaches are listed in `unreached-<tier>.txt` and in the
