@@ -50,6 +50,7 @@ Converted from 1-D arrays 2/27/2000 by
 Orion Sky Lawlor, olawlor@acm.org
 */
 #include "charm++.h"
+#include <unordered_map>
 #include "ck.h"
 #include "ckarray.h"
 #include "pathHistory.h"
@@ -207,6 +208,26 @@ public:
 };
 
 CkpvStaticDeclare(ArrayElement_initInfo, initInfo);
+
+// Sends held until this PE creates the array's manager group, keyed by that
+// group's idx. Nothing is counted for quiescence here: the manager's creation
+// message, which is counted, is still unprocessed on this PE until the flush.
+struct DeferredArraySend
+{
+  int entryIndex;
+  void* msg;
+  CkArrayIndex idx;
+  int opts;
+};
+typedef std::unordered_map<int, std::vector<DeferredArraySend>> DeferredArraySends;
+CkpvStaticDeclare(DeferredArraySends, deferredArraySends);
+
+static void deferArraySend(int entryIndex, void* msg, CkArrayID aID,
+                           const CkArrayIndex& idx, int opts)
+{
+  CkpvAccess(deferredArraySends)[((CkGroupID)aID).idx].push_back(
+      DeferredArraySend{entryIndex, msg, idx, opts});
+}
 
 void ArrayElement::initBasics(void)
 {
@@ -870,6 +891,7 @@ static void CkCreateArrayAsync(void* vmsg)
 void _ckArrayInit(void)
 {
   CkpvInitialize(ArrayElement_initInfo, initInfo);
+  CkpvInitialize(DeferredArraySends, deferredArraySends);
   CkDisableTracing(CkIndex_CkArray::insertElement(0, CkArrayIndex(), 0));
   CkDisableTracing(CkIndex_CkArray::recvBroadcast(0));
   // disable because broadcast listener may deliver broadcast message
@@ -1209,8 +1231,8 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage* msg, int ep, int opts) cons
   {  // Usual case: a direct send
     CkArray* localbranch = ckLocalBranch();
     if (localbranch == NULL)
-    {  // array not created yet
-      CkAbort("Cannot send a message from an array without a local branch");
+    {  // array manager not created on this PE yet: hold until it is
+      deferArraySend(ep, msg, ckGetArrayID(), _idx, opts & (~CK_MSG_INLINE));
     }
     else
     {
@@ -1270,6 +1292,18 @@ void CkSetMsgArrayIfNotThere(void* msg, CkArray_IfNotThere policy)
   m->array_setIfNotThere(policy);
 }
 
+void _ckArrayFlushDeferredSends(CkGroupID mgr)
+{
+  DeferredArraySends& table = CkpvAccess(deferredArraySends);
+  auto it = table.find(mgr.idx);
+  if (it == table.end())
+    return;
+  std::vector<DeferredArraySend> sends = std::move(it->second);
+  table.erase(it);
+  for (const DeferredArraySend& s : sends)
+    CkSendMsgArray(s.entryIndex, s.msg, CkArrayID(mgr), s.idx, s.opts);
+}
+
 void CkSendMsgArray(int entryIndex, void* msg, CkArrayID aID, const CkArrayIndex& idx,
                     int opts)
 {
@@ -1277,7 +1311,7 @@ void CkSendMsgArray(int entryIndex, void* msg, CkArrayID aID, const CkArrayIndex
   msg_prepareSend(m, entryIndex, aID);
   CkArray* a = (CkArray*)_localBranch(aID);
   if (a == NULL)
-    CkAbort("Cannot receive a message for an array without a local branch");
+    deferArraySend(entryIndex, msg, aID, idx, opts);
   else
     a->sendMsg(m, idx, CkDeliver_queue, opts);
 }
@@ -1288,8 +1322,13 @@ void CkSendMsgArrayInline(int entryIndex, void* msg, CkArrayID aID,
   CkArrayMessage* m = (CkArrayMessage*)msg;
   msg_prepareSend(m, entryIndex, aID);
   CkArray* a = (CkArray*)_localBranch(aID);
+  if (a == NULL)
+  {
+    // No manager yet, so no inline delivery: held and sent as a queued message.
+    deferArraySend(entryIndex, msg, aID, idx, opts);
+    return;
+  }
   int oldStatus = CkDisableTracing(entryIndex);  // avoid nested tracing
-  // TODO: Why no check for null like above?
   // TODO: Why does it not change opts to match inline delivery?
   a->sendMsg(m, idx, CkDeliver_inline, opts);
   if (oldStatus)

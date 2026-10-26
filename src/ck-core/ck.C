@@ -892,6 +892,9 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   CkReadyEntry(CkpvAccess(_groupTable)->find(groupID), false);
   CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
 
+  // Array sends this PE held while this group (an array manager) did not exist.
+  _ckArrayFlushDeferredSends(groupID);
+
   _STATS_RECORD_PROCESS_GROUP_1();
 }
 
