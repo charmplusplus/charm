@@ -9,6 +9,7 @@ DIRS = \
   datatype \
   collwake \
   collmatch \
+  migrate_colls \
   scan \
   privatization \
   jacobi3d \
