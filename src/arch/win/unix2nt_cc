@@ -269,17 +269,23 @@ do
 	-U*)
 		CL+=("$arg")
 		;;
+#Include directories. One cygpath cannot convert (a relative path climbing
+#above the drive) cannot exist either, so skip it, as GCC skips a missing
+#directory, rather than fail the compile.
 	-I)
-		path="$(cygpath -w "$1")"
-		CL+=("-I$path")
-		ML+=("-I$path")
+		if path="$(cygpath -w "$1" 2>/dev/null)"
+		then
+			CL+=("-I$path")
+			ML+=("-I$path")
+		fi
 		shift
 		;;
 	-I*)
-		path="${arg#-I}"
-		path="$(cygpath -w "$path")"
-		CL+=("-I$path")
-		ML+=("-I$path")
+		if path="$(cygpath -w "${arg#-I}" 2>/dev/null)"
+		then
+			CL+=("-I$path")
+			ML+=("-I$path")
+		fi
 		;;
 	-MM|-M)
 		DODEPS='1'
