@@ -30,6 +30,14 @@ reads that and instruments every program it compiles and links, so a plain
 `run.sh` options: `--tier ci|all|ex|all-tiers`, `--shapes "1 2"` (process
 counts; 2 runs through lcrun with `TESTRUN_PROCS=2`), `--out <dir>` (default
 `coverage/out`), `--list` (print the tiers without running anything).
+The total PE count of each run is the `+p` in the test's Makefile; `testrun`
+divides it over the processes of the shape, uses fewer processes when there
+are more processes than PEs, and skips a run whose PE count the process count
+does not divide. The ci tier's Makefiles use `+p1` to `+p6` (most runs
+`+p4`), so shape 2 runs 2 processes of 2 or 3 PEs and shape 4 runs 4
+processes of 1 PE (and `+p3` as 3 processes; `+p6` is skipped). Shapes 1
+and 2 have been run over all tiers, shape 4 over the ci tier (see "Last
+verification run").
 Timeouts: `COV_BUILD_TIMEOUT` (900 s) and `COV_RUN_TIMEOUT` (300 s) per
 directory; `timeout` is used where it exists, `coverage/tmo.pl` otherwise
 (macOS), and either kills the whole process group. Before a multi-process
@@ -44,6 +52,51 @@ last tier. It picks `llvm-profdata`/`llvm-cov` from `xcrun`, the compiler's
 directory or `PATH`; set `LLVM_PROFDATA`/`LLVM_COV` to override.
 `.github/workflows/coverage.yaml` runs all of this weekly on ubuntu-latest
 and on demand, and uploads the output.
+
+## Combining builds and machines
+
+No one build exercises all the code: platform files, `#ifdef` branches and
+build options differ between architectures and configurations. To measure
+their union:
+
+1. On each machine and for each build, run steps 1-3 of the recipe with its
+   own `--out`, e.g. `--out coverage/out/linux-x86_64` (the same `<out>` goes
+   to `report.sh`).
+2. Keep `<out>/report/ci+all+ex.lcov` (or the lcov of the tier you ran) and
+   `<out>/REPORT.md` from each, and copy them to one place.
+3. Combine them, giving each a label:
+
+```bash
+python3 coverage/combine.py --lcov combined.lcov \
+  linux=linux/ci+all+ex.lcov mac=mac/ci+all+ex.lcov > COMBINED.md
+```
+
+`combine.py` takes paths relative to the repository, cut before the first
+`src`, `contrib`, `tests`, `examples` or `benchmarks` component, so checkouts
+in different places match. Headers seen through a build's `include/` are
+attributed to their `src/` or `contrib/reconverse/` file of the same name,
+and generated `.decl.h`/`.def.h` to the directory of their `.ci` file, as
+`REPORT.md` does. It sums hit counts as `lcov -a` does; a line instrumented in
+any input is instrumented in the union.
+
+`COMBINED.md` shows, per input and for the union, lines and functions covered
+per area; "lines covered only by <label>", the lines that one input covers and
+no other does, which is what each build or machine adds; and the files that
+one input instruments and another does not. `--lcov` writes the union as lcov,
+for `genhtml` or another lcov tool.
+
+Limits:
+
+- The inputs must come from the same commit; line numbers are compared as
+  they are.
+- Functions are matched by mangled name, and the mangled name of a function
+  that takes a standard-library type or a 64-bit integer differs between
+  platforms (libstdc++ against libc++; `uint64_t` is `unsigned long` on Linux
+  and `unsigned long long` on macOS). About 1900 functions per side differ
+  this way between the Linux and macOS exports, so the function union of two
+  platforms overstates the total. Compare lines.
+- `llvm-cov` HTML and `REPORT.md` are per build: llvm-cov needs the binaries
+  and profiles of one build. The combined view is `COMBINED.md` and the lcov.
 
 ## Tiers
 
@@ -129,3 +182,14 @@ odd), `tests/charm++/collide` (no Collide library in a charm++ build) and
 `examples/charm++/allGather` (its Makefile does not include `common.mk`).
 Nine `unreg` zerocopy examples fail with 2 processes only ("Network
 completion failed for peer rank 0", plain build too).
+
+2026-10-27, the same machine, charm `9eefa72ff`: the ci tier with shape 4
+(4 processes) after shapes 1 and 2. All 21 directories built and passed
+(250 s); nine runs with `+p6` were skipped. Combined with `combine.py`,
+shape 4 covers 20 lines that shapes 1 and 2 do not (`ckreduction.C` 7,
+`cksyncbarrier.C` 7, `TreeLevel.h` 4, `ckarray.C` 1, `isomalloc.C` 1), and
+shapes 1 and 2 cover 497 lines that shape 4 does not (`TreeLevel.h` 54,
+`ckrdma.C` 52, `cklocation.C` 47, reconverse `collectives.cpp` 41: shape 4
+runs one PE per process and skips the `+p6` runs). The ci tier on Linux CI and
+on macOS cover 212 and 105 lines that the other does not, out of about
+21900 each.
