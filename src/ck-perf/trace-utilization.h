@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <deque>
+#include <unordered_map>
 
 #include "charm++.h"
 
@@ -65,6 +66,11 @@ class TraceUtilizationInit : public Chare {
     // The entry-method names the stream's indices refer to, as sts text,
     // so a client needs no copy of the .util.sts file.
     CcsRegisterHandler("CkPerfSumDetail sts", CkCallback(CkIndex_TraceUtilizationBOC::ccsRequestSts(NULL), traceUtilizationGroupProxy[0]));
+    // Per-object cumulative execution time on every PE, from the same
+    // begin/endExecute events, independent of the load-balancing
+    // database and its instrumentation switch (same reply layout as
+    // LBManager's "LBObjLoads").
+    CcsRegisterHandler("CkPerfObjLoads", CkCallback(CkIndex_TraceUtilizationBOC::ccsRequestObjLoads(NULL), traceUtilizationGroupProxy[0]));
     
     CkPrintf("[%d] Setting up periodic startCollectData callback\n", CkMyPe());
     CcdCallOnConditionKeep(CcdPERIODIC_1second, collectUtilizationData, (void *)NULL);
@@ -219,6 +225,30 @@ class TraceUtilization : public Trace {
   unsigned int numBinsSent;
   unsigned int previouslySentBins;
 
+  // Per-object loads for the CCS handler "CkPerfObjLoads": cumulative
+  // execution time of every array element that ran on this PE, keyed by
+  // a 64-bit hash of its chare type and index (the detailed beginExecute
+  // carries the entry and the index; see the .C). An element not seen
+  // for OBJ_EXPIRE seconds is dropped, so the table stays the size of
+  // the recently active object set; a client that takes differences
+  // between snapshots sees a dropped-and-returned element start from
+  // zero, which is the right value.
+  //
+  // The time is measured between the element's own begin and end, at
+  // whatever nesting depth they occur: a broadcast to an array is one
+  // group entry whose delivery loop runs every local element inside it,
+  // so the outer pair (which the bins above use) spans all of them.
+  // Time of nested element executions ([inline] sends) is excluded from
+  // the enclosing element's.
+  struct ObjLoad { double wall = 0; double lastSeen = 0; int om = 0; };
+  static constexpr double OBJ_EXPIRE = 60.0;
+  static const int OBJ_MAX_DEPTH = 16;
+  std::unordered_map<CmiUInt8, ObjLoad> objLoads;
+  struct ObjFrame { CmiUInt8 key; int om; double start, nested; bool valid; };
+  ObjFrame objFrames[OBJ_MAX_DEPTH + 1];   // indexed by execDepth
+  double busyTotal;   // seconds inside begin/endExecute pairs, cumulative
+  double idleTotal, idleStart;   // from the scheduler's idle callbacks
+
 
   TraceUtilization() {
     execEp = TRACEON_EP;
@@ -226,7 +256,14 @@ class TraceUtilization : public Trace {
     cpuTime = NULL;
     lastBinUsed = -1;
     numBinsSent = 0;
+    for (int i = 0; i <= OBJ_MAX_DEPTH; i++) objFrames[i].valid = false;
+    busyTotal = idleTotal = idleStart = 0.0;
   }
+
+  /// Append this PE's record for "CkPerfObjLoads" to buf:
+  ///   int32 pe, double wallNow, double busyTotal, double idleTotal, int32 n,
+  ///   n x { uint64 objKey, int32 chareType, double objWall, uint8 1 }
+  void snapshotObjLoads(std::vector<char> &buf);
 
 
   /// Initialize memory after the number of EPs has been determined
@@ -250,8 +287,8 @@ class TraceUtilization : public Trace {
   void beginExecute(CmiObjId  *tid);
   void beginExecute(int event,int msgType,int ep,int srcPe, int mlen=0, CmiObjId *idx=NULL, void *obj=NULL);
   void endExecute(void);
-  void beginIdle(double currT) {}
-  void endIdle(double currT) {}
+  void beginIdle(double currT) { idleStart = currT; }
+  void endIdle(double currT) { idleTotal += currT - idleStart; }
   void beginPack(void){}
   void endPack(void) {}
   void beginUnpack(void) {}
@@ -357,6 +394,16 @@ class TraceUtilizationBOC : public CBase_TraceUtilizationBOC {
   void ccsRequestSts(CkCcsRequestMsg *m);
   void collectSumDetailData();
   void sumDetailDataCollected(CkReductionMsg *);
+
+  /// "CkPerfObjLoads": PE 0 keeps the reply tokens, broadcasts
+  /// collectObjLoads, and answers every waiting request from the
+  /// concatenated reduction.
+  void ccsRequestObjLoads(CkCcsRequestMsg *m);
+  void collectObjLoads();
+  void objLoadsCollected(CkReductionMsg *);
+ private:
+  std::deque<CcsDelayedReply> objLoadsReplies;
+  bool objLoadsCollecting = false;
 
 };
 

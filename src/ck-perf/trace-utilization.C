@@ -64,6 +64,25 @@ void TraceUtilization::beginExecute(int event,int msgType,int ep,int srcPe, int 
   // begin in cklocation.C, one inside the other. Count the nesting, as
   // trace-summary does, and attribute the time to the outer pair.
   execDepth++;
+  if (execDepth <= OBJ_MAX_DEPTH) {
+    ObjFrame &f = objFrames[execDepth];
+    f.valid = (obj != NULL && idx != NULL && ep >= 0 && ep < (int)_entryTable.size());
+    if (f.valid) {
+      // Key: the chare type and the element's index ints (the Projections
+      // id), hashed to 64 bits; the same on every PE. Nothing is read
+      // from obj: for a constructor entry it is not constructed yet.
+      // Two arrays of the same chare type with the same index collide.
+      int chare = _entryTable[ep]->chareIdx;
+      CmiUInt8 h = 1469598103934665603ULL;
+      auto mix = [&h](int v) { h ^= (CmiUInt8)(unsigned)v; h *= 1099511628211ULL; };
+      mix(chare);
+      for (int i = 0; i < OBJ_ID_SZ; i++) mix(idx->id[i]);
+      f.key = h;
+      f.om = chare;
+      f.start = TraceTimer();
+      f.nested = 0.0;
+    }
+  }
   if (execDepth > 1) return;
   if (execEp != INVALIDEP && execEp != TRACEON_EP) {
     TRACE_WARN("Warning: TraceUtilization two consecutive BEGIN_PROCESSING!\n");
@@ -77,6 +96,18 @@ void TraceUtilization::beginExecute(int event,int msgType,int ep,int srcPe, int 
 
 void TraceUtilization::endExecute(void)
 {
+  if (execDepth > 0 && execDepth <= OBJ_MAX_DEPTH) {
+    ObjFrame &f = objFrames[execDepth];
+    if (f.valid) {
+      double now = TraceTimer(), span = now - f.start;
+      ObjLoad &o = objLoads[f.key];
+      o.wall += span - f.nested;
+      o.lastSeen = now;
+      o.om = f.om;
+      f.valid = false;
+      if (execDepth > 1 && objFrames[execDepth - 1].valid) objFrames[execDepth - 1].nested += span;
+    }
+  }
   if (execDepth > 0) execDepth--;
   if (execDepth > 0) return;
 
@@ -91,8 +122,38 @@ void TraceUtilization::endExecute(void)
  
   updateCpuTime(execEp, start, endTime);
 
+  busyTotal += endTime - start;
 
   execEp = INVALIDEP;
+}
+
+
+void TraceUtilization::snapshotObjLoads(std::vector<char> &buf)
+{
+  double now = TraceTimer();
+  for (auto it = objLoads.begin(); it != objLoads.end();) {
+    if (now - it->second.lastSeen > OBJ_EXPIRE)
+      it = objLoads.erase(it);
+    else
+      ++it;
+  }
+  auto put = [&buf](const void *p, size_t n) {
+    buf.insert(buf.end(), (const char *)p, (const char *)p + n);
+  };
+  int pe = CkMyPe(), n = (int)objLoads.size();
+  put(&pe, sizeof(int));
+  put(&now, sizeof(double));
+  put(&busyTotal, sizeof(double));
+  put(&idleTotal, sizeof(double));
+  put(&n, sizeof(int));
+  for (const auto &kv : objLoads) {
+    CmiUInt8 id = kv.first;
+    unsigned char migratable = 1;
+    put(&id, sizeof(CmiUInt8));
+    put(&kv.second.om, sizeof(int));
+    put(&kv.second.wall, sizeof(double));
+    put(&migratable, 1);
+  }
 }
 
 
@@ -173,6 +234,40 @@ void TraceUtilizationBOC::ccsRequestSts(CkCcsRequestMsg *m) {
   CcsSendDelayedReply(m->reply, (int)len, text != NULL ? text : "");
   free(text);
   delete m;
+}
+
+
+/** CCS handler "CkPerfObjLoads" (PE 0): every PE's per-object cumulative
+    execution time, in the layout LBManager's "LBObjLoads" uses, so a
+    client can read either. Reply: int32 numPes, then one record per PE
+    (see TraceUtilization::snapshotObjLoads). Requests that arrive while
+    a collection is in flight are answered from the same reduction. */
+void TraceUtilizationBOC::ccsRequestObjLoads(CkCcsRequestMsg *m) {
+  objLoadsReplies.push_back(m->reply);
+  delete m;
+  if (!objLoadsCollecting) {
+    objLoadsCollecting = true;
+    thisProxy.collectObjLoads();
+  }
+}
+
+void TraceUtilizationBOC::collectObjLoads() {
+  std::vector<char> buf;
+  CkpvAccess(_trace)->snapshotObjLoads(buf);
+  contribute(buf.size(), buf.data(), CkReduction::concat,
+             CkCallback(CkIndex_TraceUtilizationBOC::objLoadsCollected(NULL), thisProxy[0]));
+}
+
+void TraceUtilizationBOC::objLoadsCollected(CkReductionMsg *msg) {
+  int npes = CkNumPes();
+  std::vector<char> out(sizeof(int) + msg->getSize());
+  memcpy(out.data(), &npes, sizeof(int));
+  memcpy(out.data() + sizeof(int), msg->getData(), msg->getSize());
+  for (const CcsDelayedReply &r : objLoadsReplies)
+    CcsSendDelayedReply(r, (int)out.size(), out.data());
+  objLoadsReplies.clear();
+  objLoadsCollecting = false;
+  delete msg;
 }
 
 

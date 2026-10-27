@@ -16,6 +16,10 @@ module TraceUtilization {
     entry void collectSumDetailData();
     entry void sumDetailDataCollected(CkReductionMsg *);
 
+    entry void ccsRequestObjLoads(CkCcsRequestMsg *m);
+    entry void collectObjLoads();
+    entry void objLoadsCollected(CkReductionMsg *);
+
   };
 
   readonly CProxy_TraceUtilizationBOC traceUtilizationGroupProxy;
