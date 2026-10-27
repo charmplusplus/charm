@@ -866,9 +866,7 @@ set(moduleNDMeshStreamer-cxx-sources src/libs/ck-libs/NDMeshStreamer/NDMeshStrea
 add_library(moduleNDMeshStreamer ${moduleNDMeshStreamer-cxx-sources}
     ${moduleNDMeshStreamer-h-sources}
     ${CMAKE_BINARY_DIR}/include/NDMeshStreamer.decl.h)
-target_include_directories(moduleNDMeshStreamer PUBLIC .
-    ../../../util/topomanager ../../../ck-ldb ../../../ck-perf ../../../ck-cp
-    ../completion)
+target_include_directories(moduleNDMeshStreamer PUBLIC .)
 
 add_dependencies(moduleNDMeshStreamer ck)
 
