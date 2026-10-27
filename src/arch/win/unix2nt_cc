@@ -310,11 +310,8 @@ do
 #Convert -lfoo to path-to-foo.a
 			L="${arg#-l}"
 			D=''
-			[[ -r "$L" ]] && D="$L"
-			[[ -r "$L.a" ]] && D="$L.a"
-			[[ -r "$L.lib" ]] && D="$L.lib"
-			[[ -r "lib$L.a" ]] && D="lib$L.a"
-			[[ -r "lib$L.lib" ]] && D="lib$L.lib"
+#As with ld, the first -L directory holding the library wins, so a
+#library later on the path cannot shadow one named earlier.
 			[[ ${#LIBDIRS[@]} -ne 0 ]] && \
 			for dir in "${LIBDIRS[@]}"
 			do
@@ -322,7 +319,16 @@ do
 			  [[ -r "$dir/lib$L.a" ]] && D="$dir/lib$L.a"
 			  [[ -r "$dir/$L.lib" ]] && D="$dir/$L.lib"
 			  [[ -r "$dir/lib$L.lib" ]] && D="$dir/lib$L.lib"
+			  [[ -n "$D" ]] && break
 			done
+			if [[ -z "$D" ]]
+			then
+			  [[ -r "$L" ]] && D="$L"
+			  [[ -r "$L.a" ]] && D="$L.a"
+			  [[ -r "$L.lib" ]] && D="$L.lib"
+			  [[ -r "lib$L.a" ]] && D="lib$L.a"
+			  [[ -r "lib$L.lib" ]] && D="lib$L.lib"
+			fi
 			[[ -z "$D" ]] && Abort "Couldn't find library $L in . or ${LIBDIRS[*]}"
 			LINK+=("$(cygpath -w "$D")")
 		fi
