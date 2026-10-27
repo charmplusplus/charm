@@ -2902,7 +2902,7 @@ void ampi::genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int sr
   )
 
   if (seq != 0) {
-    int seqIdx = srcRank;
+    int seqIdx = ampiSeqIdx(tag, srcRank); // the sequence AmpiMsg::getSeqIdx would use
     int n = oorder.putIfInOrder(seqIdx, seq);
     if (n > 0) { // This message was in-order
       inorderRdma(buf, size, seq, tag, srcRank);
@@ -6264,7 +6264,10 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
     }
     else {
       req.setBlocked(true);
-      numBlockedReqs++;
+      // An incomplete ATAReq is complete when all of its outstanding blocks
+      // are, and each block decrements numBlockedReqs on completion (see
+      // ATAReq::setBlocked); test() above has dropped the blocks already done.
+      numBlockedReqs += (req.getType() == AMPI_ATA_REQ) ? static_cast<ATAReq&>(req).getCount() : 1;
     }
   }
 
@@ -6348,30 +6351,38 @@ AMPI_API_IMPL(int, MPI_Waitany, int count, MPI_Request *request, int *idx, MPI_S
     return MPI_SUCCESS;
   }
 
-  // block until one of the requests is completed
-  pptr->numBlockedReqs = 1;
-  pptr = pptr->blockOnRecv();
-  reqs = &pptr->getReqs(); // update pointer in case of migration while suspended
+  // Block until one of the requests is completed. The thread is resumed when
+  // any blocked request completes; for an ATAReq that is any one of its
+  // blocks, which need not complete the ATAReq, so block again until a
+  // request in the list is complete.
+  while (true) {
+    pptr->numBlockedReqs = 1;
+    pptr = pptr->blockOnRecv();
+    reqs = &pptr->getReqs(); // update pointer in case of migration while suspended
 
-  for (int i=0; i<count; i++) {
-    if (request[i] == MPI_REQUEST_NULL) {
-      continue;
+    bool hasATAReq = false;
+    for (int i=0; i<count; i++) {
+      if (request[i] == MPI_REQUEST_NULL) {
+        continue;
+      }
+      AmpiRequest& req = *(*reqs)[request[i]];
+      if (req.test(sts)) {
+        reqs->unblockReqs(&request[0], count);
+        reqs->freeNonPersReq(pptr, request[i]);
+        *idx = i;
+        CkAssert(pptr->numBlockedReqs == 0);
+        return MPI_SUCCESS;
+      }
+      if (req.getType() == AMPI_ATA_REQ) hasATAReq = true;
     }
-    AmpiRequest& req = *(*reqs)[request[i]];
-    if (req.test(sts)) {
-      reqs->unblockReqs(&request[i], count-i);
-      reqs->freeNonPersReq(pptr, request[i]);
-      *idx = i;
-      CkAssert(pptr->numBlockedReqs == 0);
+    if (!hasATAReq) {
+#if CMK_ERROR_CHECKING
+      CkAbort("In AMPI_Waitany, a request should have completed by now!");
+#endif
+      reqs->unblockReqs(&request[0], count);
       return MPI_SUCCESS;
     }
-
-    req.setBlocked(false);
   }
-#if CMK_ERROR_CHECKING
-  CkAbort("In AMPI_Waitany, a request should have completed by now!");
-#endif
-  return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, int *outcount,
@@ -6421,34 +6432,41 @@ AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, in
     CkAssert(pptr->numBlockedReqs == 0);
     return MPI_SUCCESS;
   }
-  else { // block until one of the requests is completed
-    pptr->numBlockedReqs = 1;
-    pptr = pptr->blockOnRecv();
-    reqs = &pptr->getReqs(); // update pointer in case of migration while suspended
+  else {
+    // Block until one of the requests is completed; as in MPI_Waitany, the
+    // completion of one block of an ATAReq resumes the thread without
+    // completing the ATAReq, so block again until a request is complete.
+    while (true) {
+      pptr->numBlockedReqs = 1;
+      pptr = pptr->blockOnRecv();
+      reqs = &pptr->getReqs(); // update pointer in case of migration while suspended
 
-    for (int i=0; i<incount; i++) {
-      if (array_of_requests[i] == MPI_REQUEST_NULL) {
-        continue;
+      bool hasATAReq = false;
+      for (int i=0; i<incount; i++) {
+        if (array_of_requests[i] == MPI_REQUEST_NULL) {
+          continue;
+        }
+        AmpiRequest& req = *(*reqs)[array_of_requests[i]];
+        if (req.test(&sts)) {
+          array_of_indices[(*outcount)] = i;
+          if (array_of_statuses != MPI_STATUSES_IGNORE)
+            array_of_statuses[(*outcount)] = sts;
+          reqs->unblockReqs(&array_of_requests[0], incount);
+          reqs->freeNonPersReq(pptr, array_of_requests[i]);
+          *outcount = 1;
+          CkAssert(pptr->numBlockedReqs == 0);
+          return MPI_SUCCESS;
+        }
+        if (req.getType() == AMPI_ATA_REQ) hasATAReq = true;
       }
-      AmpiRequest& req = *(*reqs)[array_of_requests[i]];
-      if (req.test(&sts)) {
-        array_of_indices[(*outcount)] = i;
-        if (array_of_statuses != MPI_STATUSES_IGNORE)
-          array_of_statuses[(*outcount)] = sts;
-        reqs->unblockReqs(&array_of_requests[i], incount-i);
-        reqs->freeNonPersReq(pptr, array_of_requests[i]);
-        *outcount = 1;
-        CkAssert(pptr->numBlockedReqs == 0);
+      if (!hasATAReq) {
+#if CMK_ERROR_CHECKING
+        CkAbort("In AMPI_Waitsome, a request should have completed by now!");
+#endif
+        reqs->unblockReqs(&array_of_requests[0], incount);
         return MPI_SUCCESS;
       }
-      else {
-        req.setBlocked(false);
-      }
     }
-#if CMK_ERROR_CHECKING
-    CkAbort("In AMPI_Waitsome, a request should have completed by now!");
-#endif
-    return MPI_SUCCESS;
   }
 }
 
@@ -6555,6 +6573,14 @@ bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
   }
   complete = reqs.empty();
   return complete;
+}
+
+void ATAReq::setBlocked(bool b) noexcept {
+  AmpiRequest::setBlocked(b);
+  AmpiRequestList& reqList = getAmpiParent()->getReqs();
+  for (MPI_Request r : reqs) {
+    if (r != MPI_REQUEST_NULL) reqList[r]->setBlocked(b);
+  }
 }
 
 bool IReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
