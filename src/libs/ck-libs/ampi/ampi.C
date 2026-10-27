@@ -3211,7 +3211,7 @@ void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
   // plain int 0 the (sreq, tag, srcRank, len, comm) one is an exact match, which
   // shifted every field (tag became -1 and the message never matched its
   // request, so MPI_Ibarrier never completed with more than one rank).
-  AmpiMsg *msg = new (len, 0) AmpiMsg((CMK_REFNUM_TYPE)0, MPI_REQUEST_NULL, t, sRank, len);
+  AmpiMsg *msg = new (len, 0) AmpiMsg(0, MPI_REQUEST_NULL, t, sRank, len);
   memcpy(msg->getData(), buf, len);
   CProxy_ampi pa(aid);
   pa[idx].generic(msg);
