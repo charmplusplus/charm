@@ -42,7 +42,9 @@ Windows build does not fetch or build LCI.
 
 The build scripts run under bash, so they must be checked out with Unix (LF)
 line endings. Git for Windows converts them to CRLF by default. Turn that off
-**before** cloning:
+**before** cloning. This changes the setting for all your repositories; it is
+the reliable way, because the submodule is cloned with your global settings.
+(Cygwin's own `git` does not convert line endings.)
 
 ```bash
 git config --global core.autocrlf false
@@ -101,15 +103,17 @@ The build needs two environments at once: MSVC's, so that `cl`, `link` and
 - The build goes into `reconverse-win-x86_64/`. The top-level `bin/`,
   `include/` and `lib/` links point at it.
 
-For this target, `./build` makes the following choices itself. Don't
+For this target, the build makes the following choices itself. Don't
 override them:
 
-- It selects `unix2nt_cc` as the C and C++ compiler and disables Fortran.
-- It turns off Reconverse's LCI and LCW backends and does not fetch LCI.
-- It builds Reconverse as a static library, archived with MSVC's `lib`. An
+- `./build` selects `unix2nt_cc` as the C and C++ compiler and disables
+  Fortran.
+- `./build` turns off Reconverse's LCI and LCW backends and does not fetch LCI.
+- Reconverse is built as a static library, archived with MSVC's `lib`. An
   MSVC DLL cannot export the runtime's thread-local variables.
-- It compiles C++ as C++17 (`/std:c++17`). MSVC defaults to C++14, and
-  Reconverse needs C++17.
+- `charmc` compiles C++ as C++17 (`/std:c++17`, set in
+  `src/arch/common/cc-msvc.sh`). MSVC defaults to C++14, and Reconverse needs
+  C++17.
 
 ## Build and run a program
 
@@ -133,12 +137,17 @@ runs from `cmd.exe` or PowerShell, without Cygwin.
   runtime. So you can link a `-g` application against a `--with-production`
   Charm++, and a `-g` Charm++ links against Reconverse, which CMake builds
   without `-g`.
-- **Other libraries.** Any library you link into a Charm++ program must also
-  be built with the static release runtime (`/MT`). A library built with
-  `/MD` or `/MTd` fails at link time with `LNK2038` (`RuntimeLibrary` or
-  `_ITERATOR_DEBUG_LEVEL` mismatch).
-- **Seeing the real commands.** Set `VERBOSE=1` in the environment to see the
-  `cl`, `link` and `ml64` commands that `unix2nt_cc` runs.
+- **Other libraries.** Static libraries and object files you link into a
+  Charm++ program must also be built with the static release runtime
+  (`/MT`). One built with `/MD` or `/MTd` fails at link time with `LNK2038`
+  (`RuntimeLibrary` or `_ITERATOR_DEBUG_LEVEL` mismatch). DLLs, linked
+  through their import libraries, can use any runtime: NAMD links Tcl and
+  FFTW this way.
+- **Seeing the real commands.** `charmc -verbose` prints the `unix2nt_cc`
+  command lines. To see the `cl`, `link` and `ml64` commands that
+  `unix2nt_cc` runs, pass it `-verbose`: `charmc -c++-option -verbose` when
+  compiling C++ (`-cc-option` for C), and `charmc -ld++-option -verbose` when
+  linking.
 
 ## Run the tests
 
@@ -159,8 +168,10 @@ for d in $TEST_DIRS; do make -C $d test RUN_PROCS=; done
 ## Crashes and debugging
 
 - **Stack traces.** `CkAbort`/`CmiAbort`, and fatal faults such as access
-  violations, print a stack trace. With the `.pdb` present, it shows function
-  names and file:line. A fault is reported with the POSIX signal it
+  violations, print a stack trace. With the `.pdb` present, frames show
+  function names, for example `Main::Main+0x51`; code compiled with `-g`
+  also shows file:line. Without the `.pdb`, the program's own frames show
+  only module+offset. A fault is reported with the POSIX signal it
   corresponds to (for example `SIGSEGV`).
 - **No crash dialogs.** The Windows Error Reporting and `abort()` dialogs are
   suppressed, so a crashed run exits instead of waiting for someone to close
