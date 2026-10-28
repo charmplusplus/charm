@@ -786,12 +786,32 @@ static void read_restart_region(char ** argv)
   restartRegionKnown = true;
 }
 
-/* Whether [start, end) can be mapped at its own addresses: every slot when
-   the range holds fewer than 1024, otherwise 1024 samples. */
+/* Whether nothing is mapped in [start, end). This has to be exact: the
+   memory module routes free() by CmiIsomallocInRange, so a managed range
+   that covers a library or an allocator arena sends that memory's frees to
+   the wrong allocator. On Linux the process's mappings are listed in
+   /proc/self/maps; elsewhere, slot-sized probes at up to 1024 points, which
+   can miss a small mapping between two probes. */
 static bool range_is_free(memRange_t start, memRange_t end)
 {
   if (end <= start)
     return true;
+#if defined(__linux__)
+  FILE * f = fopen("/proc/self/maps", "r");
+  if (f != nullptr)
+  {
+    bool free = true;
+    char line[512];
+    while (free && fgets(line, sizeof(line), f) != nullptr)
+    {
+      unsigned long long lo = 0, hi = 0;
+      if (sscanf(line, "%llx-%llx", &lo, &hi) == 2 && lo < end && start < hi)
+        free = false;
+    }
+    fclose(f);
+    return free;
+  }
+#endif
   const memRange_t len = end - start;
   const memRange_t slots = len / slotsize;
   if (slots == 0)
