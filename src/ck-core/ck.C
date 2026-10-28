@@ -1968,12 +1968,10 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
   {
     IrrGroup *obj=(IrrGroup *)_localBranch(gID);
     if (obj!=NULL)
-    { //Just directly call the group:
-#if CMK_ERROR_CHECKING
+    { //Just directly call the group. The envelope is prepared as for a sent
+      //message: tracing reads the entry index and source PE from it, and
+      //without this a production build recorded every inline call as entry 0.
       envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
-#else
-      envelope *env=UsrToEnv(msg);
-#endif
       _deliverForBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
       return;
     }
@@ -2126,12 +2124,8 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
       void *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();
       CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
       if (obj!=NULL)
-      { //Just directly call the group:
-#if CMK_ERROR_CHECKING
+      { //Just directly call the group; see CkSendMsgBranchInline.
         envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
-#else
-        envelope *env=UsrToEnv(msg);
-#endif
         _deliverForNodeBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
         return;
       }
