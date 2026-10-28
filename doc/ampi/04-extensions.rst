@@ -437,7 +437,11 @@ directory name.) This directory is created, and the entire state of the
 program is checkpointed to this directory. One can restart the program
 from the checkpointed state (using the same, more, or fewer physical
 processors than were checkpointed with) by specifying
-``"+restart directory_name"`` on the command-line.
+``"+restart directory_name"`` on the command-line. The ranks' stacks and
+heaps return to the addresses they had, so the restart needs address
+space layout randomization off: on Linux, run it under
+``setarch $(uname -m) -R``, placed before the program or the launcher
+(see the restarting section of the Charm++ manual).
 
 Checkpointing in memory allows applications to transparently tolerate
 failures online. The checkpointing scheme used here is a double

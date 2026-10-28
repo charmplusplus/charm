@@ -21,10 +21,15 @@ Substantially rewritten by Evan Ramos in 2019.
  *************************************************************************/
 
 #include "converse.h"
+#include "conv-config.h"       /* CMK_64BIT; conv-mach.h is not on reconverse's include chain */
 #include "conv-autoconfig.h"   /* CMK_HAS_MMAP and other feature tests */
 #include "memory-isomalloc.h"
 #include "pup.h"
 #include "pup_stl.h"
+
+#include <algorithm>
+#include <string>
+#include <string.h>
 
 #define ISOMALLOC_DEBUG 0
 #if ISOMALLOC_DEBUG
@@ -81,6 +86,7 @@ static inline typename std::enable_if<std::is_pointer<T>::value>::type pup_raw_p
 static char CmiIsomallocRestart;
 #endif
 static int _mmap_probe = 0;
+static int CmiIsomallocAslr = 0; /* set in CmiIsomallocInit */
 
 static int read_randomflag(void)
 {
@@ -299,12 +305,16 @@ static int init_map() { return 0; /*Isomalloc never works without mmap*/ }
  */
 static void * map_global_memory(void * addr, size_t len)
 {
-  void * pa = call_mmap_fixed(addr, len);
+  /* A probe, not MAP_FIXED: a slot that another mapping already occupies
+     (a thread stack or allocator arena the process created after Isomalloc
+     chose its region) must fail here, not silently replace that mapping. */
+  void * pa = call_mmap_probe(addr, len);
 
   if (pa == mmap_fail)
   { /*Map just failed completely*/
     auto err = errno;
-    CmiError("Charm++> [%d] Isomalloc tried to mmap(%p, %zu), but encountered error %d\n", CmiMyPe(), addr, len, err);
+    CmiError("Charm++> [%d] Isomalloc tried to mmap(%p, %zu), but encountered error %d%s\n", CmiMyPe(), addr, len, err,
+             err == EEXIST ? " (the address range is already mapped by something else)" : "");
     CmiAbort("mmap failed in isomalloc");
     return NULL;
   }
@@ -702,6 +712,143 @@ struct CmiAddressSpaceRegion
 
 CmiAddressSpaceRegion IsoRegion;
 
+/* The raw bounds of the free range move with whatever the process mapped
+   before Isomalloc initialized: libraries, communication buffers, PE thread
+   stacks. Two more PE threads per process moved the start by 32 MB on one
+   machine, enough for a restart in fewer processes to find its checkpointed
+   contexts just below the region it computed. Rounding both bounds to a
+   coarse unit gives the same region to every run whose raw bounds differ by
+   less than a unit, which covers a different process count, PE count or
+   library set. The unit of slack inside each bound keeps the mappings the
+   process makes later (more thread stacks, allocator arenas) out of the
+   region, whose slots are mapped at fixed addresses. The unit is 1/64 of the
+   region, at most 1 TB and at least division_size; a region too small to
+   afford the slack keeps its raw bounds. */
+static void align_region_coarsely(memRange_t & start, memRange_t & end)
+{
+  const memRange_t len = end - start;
+  memRange_t unit = division_size;
+  while (unit * 2 <= len / 64 && unit * 2 <= tb)
+    unit *= 2;
+  if (len < 4 * unit)
+    return;
+  const memRange_t s = CMIALIGN(start, unit) + unit;
+  const memRange_t e = (end & ~(unit - 1)) - unit;
+  if (e > s && e - s >= (memRange_t)minimumRegionSize)
+  {
+    start = s;
+    end = e;
+  }
+}
+
+/* A checkpoint to disk records the region in this file (CmiIsomallocWriteRegion,
+   called by the checkpoint writer on PE 0), and a restart reads it back here
+   so that the contexts in the checkpoint are unpacked at their own
+   addresses. The restart's own computation usually gives the same region,
+   thanks to the coarse alignment above; the file settles the other cases. */
+static const char * const isomallocRegionFile = "Isomalloc.dat";
+static bool restartRegionKnown = false;
+static CmiAddressSpaceRegion restartRegion;
+/* Why the restart could not take restartRegion, reported when a checkpointed
+   context is unpacked; empty when it could. */
+static std::string restartRegionProblem;
+
+static void read_restart_region(char ** argv)
+{
+  /* Scanned, not consumed: Charm++ reads +restart from the same argv later. */
+  const char * dir = nullptr;
+  for (int i = 0; argv[i] != nullptr; ++i)
+    if (strcmp(argv[i], "+restart") == 0 && argv[i + 1] != nullptr)
+      dir = argv[i + 1];
+  if (dir == nullptr)
+    return;
+
+  /* A checkpoint from before this file existed, or from a partitioned run
+     (whose files sit in per-partition subdirectories), has no file here; the
+     restart then proceeds on its own computation, as it always did. */
+  const std::string path = std::string(dir) + "/" + isomallocRegionFile;
+  FILE * f = fopen(path.c_str(), "r");
+  if (f == nullptr)
+    return;
+  int version = 0;
+  unsigned long long s = 0, e = 0, slot = 0;
+  const int n = fscanf(f, "Isomalloc region %d start %llx end %llx slotsize %llu", &version, &s, &e, &slot);
+  fclose(f);
+  if (n != 4 || version != 1)
+  {
+    CmiError("Isomalloc> Warning: %s is not readable; restarting on this process's own address range.\n", path.c_str());
+    return;
+  }
+  if (s == 0 && e == 0)
+    return; /* the checkpointing run had Isomalloc disabled */
+  restartRegion.s = s;
+  restartRegion.e = e;
+  restartRegionKnown = true;
+}
+
+/* Whether [start, end) can be mapped at its own addresses: every slot when
+   the range holds fewer than 1024, otherwise 1024 samples. */
+static bool range_is_free(memRange_t start, memRange_t end)
+{
+  if (end <= start)
+    return true;
+  const memRange_t len = end - start;
+  const memRange_t slots = len / slotsize;
+  if (slots == 0)
+    return !bad_location((uint8_t *)start);
+  return good_range((uint8_t *)start, len, slots < 1024 ? (int)slots : 1024) != 0;
+}
+
+static std::string region_string(const CmiAddressSpaceRegion & r)
+{
+  char buf[64];
+  snprintf(buf, sizeof(buf), "0x%" PRIx64 " - 0x%" PRIx64, r.s, r.e);
+  return buf;
+}
+
+/* Take the checkpoint's region in place of the one this process computed,
+   when the part of it that lies outside this process's range is free. */
+static void adopt_restart_region()
+{
+  const CmiAddressSpaceRegion fresh = IsoRegion;
+  const CmiAddressSpaceRegion & rec = restartRegion;
+  if (CmiIsomallocAslr)
+  {
+    /* Not even tried: the thread stacks in the checkpoint hold code and
+       library addresses that the loader has placed elsewhere in this
+       process, so no region choice makes them resumable. The abort comes
+       when a context is unpacked; a restart without threads is unaffected. */
+    restartRegionProblem = "address space layout randomization is on";
+    return;
+  }
+  const bool ok = (rec.s >= fresh.s && rec.e <= fresh.e) ||
+                  (range_is_free(rec.s, std::min(rec.e, fresh.s)) &&
+                   range_is_free(std::max(rec.s, fresh.e), rec.e));
+  if (!ok)
+  {
+    restartRegionProblem = "the checkpoint's address range " + region_string(rec) +
+                           " is partly in use in this process, whose free range is " + region_string(fresh);
+    return;
+  }
+  IsoRegion = rec;
+  if (CmiMyPe() == 0 && (rec.s != fresh.s || rec.e != fresh.e))
+    CmiPrintf("Isomalloc> Restart: using the checkpoint's address range %s in place of this process's %s.\n",
+              region_string(rec).c_str(), region_string(fresh).c_str());
+}
+
+CLINKAGE int CmiIsomallocWriteRegion(const char * path)
+{
+  FILE * f = fopen(path, "w");
+  if (f == nullptr)
+  {
+    CmiError("Isomalloc> Could not write %s: %s\n", path, strerror(errno));
+    return 0;
+  }
+  fprintf(f, "Isomalloc region 1\nstart 0x%" PRIxPTR "\nend 0x%" PRIxPTR "\nslotsize %zu\n",
+          (uintptr_t)isomallocStart, (uintptr_t)isomallocEnd, slotsize);
+  return fclose(f) == 0;
+}
+
 static void CmiAddressSpaceRegionPup(pup_er cpup, void * data)
 {
   auto region = (CmiAddressSpaceRegion *)data;
@@ -832,6 +979,8 @@ static void CmiIsomallocInitExtent(char ** argv)
     pagesize = CmiGetPageSize();
     slotsize = CMIALIGN(slotsize, pagesize);
 
+    read_restart_region(argv);
+
 #if ISOMALLOC_DEBUG
     if (CmiMyPe() == 0) DEBUG_PRINT("[%d] Using slotsize of %zu\n", CmiMyPe(), slotsize);
 #endif
@@ -868,10 +1017,13 @@ static void CmiIsomallocInitExtent(char ** argv)
     {
       memRange_t start = CMIALIGN((uintptr_t)freeRegion.start, division_size);
       memRange_t end = CMIALIGN((uintptr_t)freeRegion.start + freeRegion.len - (division_size-1), division_size);
+      align_region_coarsely(start, end);
       IsoRegion.s = start;
       IsoRegion.e = end;
       DEBUG_PRINT("[%d] Isomalloc memory region: 0x%zx - 0x%zx (%zu gigs)\n", CmiMyPe(),
                   start, end, (end - start)/gig);
+      if (restartRegionKnown)
+        adopt_restart_region();
     }
   }
 
@@ -994,6 +1146,13 @@ static void CmiIsomallocInitExtent(char ** argv)
 
   if (CmiMyRank() == 0)
   {
+    /* The processes' regions were intersected above; a process that could
+       not take the checkpoint's region has pulled the others off it. */
+    if (restartRegionKnown && restartRegionProblem.empty() &&
+        (IsoRegion.s != restartRegion.s || IsoRegion.e != restartRegion.e))
+      restartRegionProblem = "the processes' common address range " + region_string(IsoRegion) +
+                             " does not contain the checkpoint's " + region_string(restartRegion);
+
 #if __FAULT__
     if (!CmiIsomallocRestart && CmiMyNode() == 0)
     {
@@ -1065,10 +1224,22 @@ struct isommap
 
     if (p.isUnpacking())
     {
+      /* A context restored from a checkpoint, as opposed to one arriving by
+         migration, which warnOnceAboutAslr in isomalloc-reconverse.C covers. */
+      if (p.isCheckpoint() && CmiIsomallocAslr)
+        CmiAbort("Isomalloc> Cannot restore a migratable thread from a checkpoint while address space "
+                 "layout randomization is on: its stack holds addresses of code and libraries that the "
+                 "loader placed elsewhere in this process. Run the restart with randomization off "
+                 "(Linux: setarch $(uname -m) -R, before the program or the launcher).");
       if (start < isomallocStart || isomallocEnd < allocated_extent)
+      {
+        if (!restartRegionProblem.empty())
+          CmiAbort("Isomalloc> Cannot restore a migratable thread from the checkpoint at %p - %p: %s.",
+                   (void *)start, (void *)allocated_extent, restartRegionProblem.c_str());
         CmiAbort("Could not unpack Isomalloc memory region, virtual memory regions do not overlap: "
                  "current %p - %p, context %p - %p",
                  (void *)isomallocStart, (void *)isomallocEnd, (void *)start, (void *)allocated_extent);
+      }
 
       if (isomallocEnd < end)
         end = (uint8_t *)CMIALIGN((uintptr_t)isomallocEnd - (pagesize-1), pagesize);
@@ -2592,8 +2763,6 @@ extern int num_workpes, total_pes;
    initialization. Isomalloc itself is unaffected -- it negotiates its region --
    but migrating a user-level thread is not, so the answer is published for the
    thread layer to consult (isomalloc-reconverse.C). */
-static int CmiIsomallocAslr = 0;
-
 static int CmiIsomallocReadAslr(void)
 {
 #if defined(__APPLE__)
