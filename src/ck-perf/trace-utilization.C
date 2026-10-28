@@ -22,6 +22,13 @@ void collectUtilizationData(void *ignored) {
 
 CkpvStaticDeclare(TraceUtilization*, _trace);
 
+/// Registered once per process (initnode): _createTraceutilization runs on
+/// every PE, and concurrent addReducer calls from several PE threads in one
+/// process can lose an entry and shift every later reducer index.
+void registerSumDetailCompressedReducer(void) {
+  sumDetailCompressedReducer=CkReduction::addReducer(sumDetailCompressedReduction, false, "sumDetailCompressedReduction");
+}
+
 /**
   For each TraceFoo module, _createTraceFoo() must be defined.
   This function is called in _createTraces() generated in moduleInit.C
@@ -30,9 +37,7 @@ void _createTraceutilization(char **argv)
 {
   //  CkPrintf("[%d] _createTraceutilization\n", CkMyPe());
 
-  // Register the reducer
   CkAssert(sizeof(short) == 2);
-  sumDetailCompressedReducer=CkReduction::addReducer(sumDetailCompressedReduction, false, "sumDetailCompressedReduction");
 
   CkpvInitialize(TraceUtilization*, _trace);
   CkpvAccess(_trace) = new TraceUtilization();
