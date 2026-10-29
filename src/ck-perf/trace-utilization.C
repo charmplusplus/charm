@@ -164,12 +164,28 @@ void TraceUtilizationBOC::ccsRequestSumDetailCompressed(CkCcsRequestMsg *m) {
 void TraceUtilizationBOC::ccsRequestSts(CkCcsRequestMsg *m) {
   char *text = NULL;
   size_t len = 0;
+#ifdef _WIN32
+  // Windows has no open_memstream: write to an anonymous temporary file
+  // (binary, so the bytes are the same) and read it back.
+  FILE *f = tmpfile();
+  if (f != NULL) {
+    traceWriteSTS(f, 0);
+    fprintf(f, "END\n");
+    long n = ftell(f);
+    if (n > 0 && (text = (char *)malloc((size_t)n)) != NULL) {
+      rewind(f);
+      len = fread(text, 1, (size_t)n, f);
+    }
+    fclose(f);
+  }
+#else
   FILE *f = open_memstream(&text, &len);
   if (f != NULL) {
     traceWriteSTS(f, 0);
     fprintf(f, "END\n");
     fclose(f);
   }
+#endif
   CcsSendDelayedReply(m->reply, (int)len, text != NULL ? text : "");
   free(text);
   delete m;
