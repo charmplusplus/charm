@@ -61,6 +61,28 @@ longer matches, so rerun that tier after a rebuild or remove its
 `.github/workflows/coverage.yaml` runs all of this weekly on ubuntu-latest
 and on demand, and uploads the output.
 
+## Published reports
+
+The weekly and manual workflow runs publish to
+<https://charmplusplus.org/charm-coverage/> (repository
+`charmplusplus/charm-coverage`, served by GitHub Pages from its `main`
+branch): a front page with the headline numbers of every run, and under
+`runs/<date>-<charm sha>/` the report (Markdown and HTML), the result
+tables, the summary JSON and gzipped lcov exports of each cumulative tier,
+and the llvm-cov per-file HTML view. `coverage/publish.py` writes a run
+into a checkout of that repository and regenerates the front page; the
+workflow then commits and pushes with the deploy key stored in the
+`COVERAGE_DEPLOY_KEY` secret of charmplusplus/charm. Pull-request runs
+upload the artifact only.
+
+The per-file HTML view (about 50 MB, 5 MB in git) is kept for the newest
+eight runs; the rest of a run (about 3 MB) is kept for good. The
+repository therefore grows by roughly 8 MB a week, and its history can be
+squashed to one commit when it gets large, since every published file is in
+the working tree. To publish a run made elsewhere (another machine, a
+combined report), run `publish.py --site <clone> --out <dir>` by hand and
+push.
+
 ## Combining builds and machines
 
 No one build exercises all the code: platform files, `#ifdef` branches and
