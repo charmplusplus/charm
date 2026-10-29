@@ -252,6 +252,9 @@ jobs:
           shellcheck \
             build \
             buildcmake \
+            coverage/buildstamp.sh \
+            coverage/report.sh \
+            coverage/run.sh \
             package-tarball.sh \
             relink.script \
             src/scripts/commitid.sh \
