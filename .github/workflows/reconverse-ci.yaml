@@ -258,10 +258,12 @@ jobs:
             src/scripts/testrun
 
   # AMPI tier: TCharm and AMPI on reconverse, with migratable threads and
-  # isomalloc. tests/ampi is driven by its own Makefile, which on reconverse
-  # leaves out chkpt. A rank migrating between processes resumes on a stack
-  # holding return addresses into libreconverse, so the multi-process run
-  # disables ASLR (setarch -R; the launcher's children inherit it).
+  # isomalloc. tests/ampi is driven by its own Makefile. Both tests/ampi steps
+  # run with ASLR disabled (setarch -R; the launcher's children inherit it):
+  # a rank migrating between processes, and a rank restarted from a checkpoint
+  # (tests/ampi/chkpt; a restart is a new process even in a single-process
+  # run), resume on a stack holding return addresses into libreconverse and
+  # the program, which must load at the same addresses in every process.
   # migratable_threads packs and unpacks threads in one process. megatest is
   # run from the same build to show the AMPI build changes nothing for a
   # program that does not link TCharm.
@@ -278,7 +280,7 @@ jobs:
       - name: build AMPI (builds Charm++ and TCharm too)
         run: ./build AMPI reconverse-linux-x86_64 -j4 -g
       - name: tests/ampi (single process)
-        run: make -C tests/ampi test
+        run: setarch "$(uname -m)" -R make -C tests/ampi test
       - name: tests/ampi (2 processes, lcrun)
         run: |
           set -e
