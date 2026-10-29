@@ -6,7 +6,10 @@ name: coverage
 # the examples. Informational only: not a required check, and nothing here
 # gates on a percentage. The recipe and the traps behind the numbers are in
 # coverage/README.md; the artifact holds REPORT.md, the JSON and lcov
-# exports, and an HTML view of the cumulative tier.
+# exports, and an HTML view of the cumulative tier. Scheduled and manual
+# runs also publish the report to https://charmplusplus.org/charm-coverage/
+# (repository charmplusplus/charm-coverage, pushed with the deploy key in
+# the COVERAGE_DEPLOY_KEY secret); pull-request runs do not.
 
 on:
   workflow_dispatch:
@@ -84,3 +87,24 @@ jobs:
             coverage-out/report/html/
           if-no-files-found: warn
           retention-days: 30
+      - name: publish to charmplusplus/charm-coverage
+        # Only the weekly and manual runs of this repository publish; a
+        # pull request has no access to the secret and would race the
+        # scheduled run for the same site.
+        if: github.event_name != 'pull_request' && github.repository == 'charmplusplus/charm'
+        env:
+          COVERAGE_DEPLOY_KEY: ${{ secrets.COVERAGE_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$COVERAGE_DEPLOY_KEY" > ~/.ssh/charm-coverage && chmod 600 ~/.ssh/charm-coverage
+          ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
+          export GIT_SSH_COMMAND='ssh -i ~/.ssh/charm-coverage -o IdentitiesOnly=yes'
+          git clone --quiet --depth 1 git@github.com:charmplusplus/charm-coverage.git site
+          python3 coverage/publish.py --site site --out coverage-out \
+            --run-url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          cd site
+          git config user.name "charm coverage workflow"
+          git config user.email "charm-coverage@users.noreply.github.com"
+          git add -A
+          git commit --quiet -m "$(sed -n 's/^date: //p' ../coverage-out/meta.txt), charm $(sed -n 's/^charm: //p' ../coverage-out/meta.txt)"
+          git push --quiet
