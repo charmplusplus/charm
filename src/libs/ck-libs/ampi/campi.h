@@ -19,7 +19,11 @@
  * a blocking MPI routine must itself return campi::task<T> and be awaited.
  * Blocking routines campi does not provide yet expand to an undeclared
  * identifier naming the routine, so they fail to compile instead of
- * aborting at run time. Nonblocking and local routines are AMPI's own.
+ * aborting at run time. Nonblocking and local routines are AMPI's own,
+ * except the test and probe routines (MPI_Test*, MPI_Request_get_status,
+ * MPI_Iprobe, MPI_Improbe): a miss yields to the scheduler so that messages
+ * can arrive, so they are awaitables too and a polling loop must be in a
+ * coroutine.
  *
  * Unlike thread AMPI, where MPI_Finalize ends the rank and the process exits
  * with status 0, MPI_Finalize does not end a campi rank: code after it runs,
@@ -64,6 +68,13 @@
 #undef MPI_Comm_dup
 #undef MPI_Comm_dup_with_info
 #undef MPI_Comm_create
+#undef MPI_Test
+#undef MPI_Testany
+#undef MPI_Testall
+#undef MPI_Testsome
+#undef MPI_Request_get_status
+#undef MPI_Iprobe
+#undef MPI_Improbe
 #undef AMPI_Migrate
 
 #define MPI_Init(...)        CAMPI_AWAIT(::campi::Init(__VA_ARGS__))
@@ -93,6 +104,13 @@
 #define MPI_Comm_dup(...)    CAMPI_AWAIT(::campi::Comm_dup(__VA_ARGS__))
 #define MPI_Comm_dup_with_info(...) CAMPI_AWAIT(::campi::Comm_dup_with_info(__VA_ARGS__))
 #define MPI_Comm_create(...) CAMPI_AWAIT(::campi::Comm_create(__VA_ARGS__))
+#define MPI_Test(...)        CAMPI_AWAIT(::campi::Test(__VA_ARGS__))
+#define MPI_Testany(...)     CAMPI_AWAIT(::campi::Testany(__VA_ARGS__))
+#define MPI_Testall(...)     CAMPI_AWAIT(::campi::Testall(__VA_ARGS__))
+#define MPI_Testsome(...)    CAMPI_AWAIT(::campi::Testsome(__VA_ARGS__))
+#define MPI_Request_get_status(...) CAMPI_AWAIT(::campi::Request_get_status(__VA_ARGS__))
+#define MPI_Iprobe(...)      CAMPI_AWAIT(::campi::Iprobe(__VA_ARGS__))
+#define MPI_Improbe(...)     CAMPI_AWAIT(::campi::Improbe(__VA_ARGS__))
 #define AMPI_Migrate(...)    CAMPI_AWAIT(::campi::Migrate(__VA_ARGS__))
 
 /* Routines that block inside AMPI (directly, or through a blocking MPI call,

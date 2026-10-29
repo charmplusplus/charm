@@ -2749,6 +2749,10 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::block() noexcept {
   return disParent;
 }
 CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::yield() noexcept {
+  // campi: no thread to reschedule. The test and probe routines that yield
+  // after a miss are awaitables there (campi.h), which suspend the rank's
+  // coroutine after the call returns.
+  if (tcharm_campi) return this;
   TCharm * disThread = thread->schedule();
   ampiParent* disParent = getAmpiParent();
   disParent->thread = disThread;

@@ -8,7 +8,7 @@
  * AMPI's delivery code wakes the rank (TCharm::resume, which campi redirects
  * from CthAwaken to a coroutine resume). The simple calls return a
  * request_awaiter (no coroutine frame); calls with internal awaited loops
- * (Init, Finalize, communicator creation) are tasks.
+ * (Init, Finalize, tests and probes, communicator creation) are tasks.
  *
  * Applications normally include campi.h (this header plus macros that
  * redirect the blocking MPI names to co_await expressions) and define their
@@ -260,6 +260,20 @@ request_awaiter Scan(const void *sbuf, void *rbuf, int count, MPI_Datatype type,
                      MPI_Comm comm);
 request_awaiter Exscan(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
                        MPI_Comm comm);
+
+/* ---------------- tests and probes ---------------- */
+
+// A failed test or probe is a scheduling point in thread AMPI (it yields the
+// thread so that messages can arrive); a coroutine must suspend instead, so
+// these are awaitables: the AMPI routine, then a yield after a miss.
+task<int> Test(MPI_Request *req, int *flag, MPI_Status *sts);
+task<int> Testany(int n, MPI_Request *reqs, int *index, int *flag, MPI_Status *sts);
+task<int> Testall(int n, MPI_Request *reqs, int *flag, MPI_Status *sts);
+task<int> Testsome(int n, MPI_Request *reqs, int *outcount, int *indices, MPI_Status *sts);
+task<int> Request_get_status(MPI_Request req, int *flag, MPI_Status *sts);
+task<int> Iprobe(int src, int tag, MPI_Comm comm, int *flag, MPI_Status *sts);
+task<int> Improbe(int src, int tag, MPI_Comm comm, int *flag, MPI_Message *msg,
+                  MPI_Status *sts);
 
 /* ---------------- communicator creation ---------------- */
 

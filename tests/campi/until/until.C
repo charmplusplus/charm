@@ -1,6 +1,7 @@
 // campi test: communicator creation (split, dup), Sendrecv, Gather/Scatter,
 // Waitall with several outstanding Irecvs, other collectives (Scan and
-// Exscan also over non-contiguous datatypes), and nested
+// Exscan also over non-contiguous datatypes), MPI_Test and MPI_Iprobe
+// polling loops, and nested
 // campi::task helpers that block (resume of the innermost frame).
 #include <algorithm>
 #include <cstdio>
@@ -226,6 +227,49 @@ CAMPI_MAIN(argc, argv)
     C(s2 == hs * (hs - 1) / 2);
   }
   MPI_Comm_free(&half);
+
+  // 7. Polling loops: MPI_Test on an Irecv posted before its send exists, and
+  // MPI_Iprobe on another pair (a miss must let the sender's message arrive)
+  if (size >= 2) {
+    const int trecv = 0, tsend = 1;
+    const int precv = size >= 4 ? 2 : 0, psend = size >= 4 ? 3 : 1;
+    int go = 1;
+    if (rank == trecv) {
+      int in[3] = {-1, -1, -1}, flag = 0;
+      long polls = 0;
+      MPI_Request req;
+      MPI_Status st;
+      MPI_Irecv(in, 3, MPI_INT, tsend, 300, MPI_COMM_WORLD, &req);
+      MPI_Send(&go, 1, MPI_INT, tsend, 299, MPI_COMM_WORLD); // only now may tsend send
+      while (!flag) { MPI_Test(&req, &flag, &st); polls++; }
+      int cnt = -1;
+      MPI_Get_count(&st, MPI_INT, &cnt);
+      C(in[0] == 7 && in[1] == 8 && in[2] == 9);
+      C(st.MPI_SOURCE == tsend && st.MPI_TAG == 300 && cnt == 3);
+      C(req == MPI_REQUEST_NULL && polls >= 1);
+    }
+    if (rank == tsend) {
+      int out[3] = {7, 8, 9};
+      MPI_Recv(&go, 1, MPI_INT, trecv, 299, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Send(out, 3, MPI_INT, trecv, 300, MPI_COMM_WORLD);
+    }
+    if (rank == precv) {
+      int flag = 0, cnt = -1;
+      MPI_Status st;
+      MPI_Send(&go, 1, MPI_INT, psend, 298, MPI_COMM_WORLD);
+      while (!flag) MPI_Iprobe(MPI_ANY_SOURCE, 301, MPI_COMM_WORLD, &flag, &st);
+      MPI_Get_count(&st, MPI_INT, &cnt);
+      C(st.MPI_SOURCE == psend && st.MPI_TAG == 301 && cnt == 2);
+      int in[2] = {-1, -1};
+      MPI_Recv(in, 2, MPI_INT, st.MPI_SOURCE, st.MPI_TAG, MPI_COMM_WORLD, &st);
+      C(in[0] == 41 && in[1] == 42);
+    }
+    if (rank == psend) {
+      int out[2] = {41, 42};
+      MPI_Recv(&go, 1, MPI_INT, precv, 298, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      MPI_Send(out, 2, MPI_INT, precv, 301, MPI_COMM_WORLD);
+    }
+  }
 
   long total = 0;
   MPI_Allreduce(&myerr, &total, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);

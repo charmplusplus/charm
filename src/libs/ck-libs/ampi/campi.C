@@ -490,6 +490,47 @@ request_awaiter Exscan(const void *sbuf, void *rbuf, int count, MPI_Datatype typ
 
 #undef CAMPI_POST_AND_WAIT
 
+/* ====================== tests and probes ====================== */
+
+// As in ampi.C: test first, yield after a miss (ampiParent::yield returns at
+// once in campi mode; the yield happens here, as a coroutine suspension).
+task<int> Test(MPI_Request *req, int *flag, MPI_Status *sts) {
+  int e = MPI_Test(req, flag, sts);
+  if (!*flag) co_await yield();
+  co_return e;
+}
+task<int> Testany(int n, MPI_Request *reqs, int *index, int *flag, MPI_Status *sts) {
+  int e = MPI_Testany(n, reqs, index, flag, sts);
+  if (!*flag) co_await yield();
+  co_return e;
+}
+task<int> Testall(int n, MPI_Request *reqs, int *flag, MPI_Status *sts) {
+  int e = MPI_Testall(n, reqs, flag, sts);
+  if (!*flag) co_await yield();
+  co_return e;
+}
+task<int> Testsome(int n, MPI_Request *reqs, int *outcount, int *indices, MPI_Status *sts) {
+  int e = MPI_Testsome(n, reqs, outcount, indices, sts);
+  if (*outcount == 0) co_await yield();
+  co_return e;
+}
+task<int> Request_get_status(MPI_Request req, int *flag, MPI_Status *sts) {
+  int e = MPI_Request_get_status(req, flag, sts);
+  if (!*flag) co_await yield();
+  co_return e;
+}
+task<int> Iprobe(int src, int tag, MPI_Comm comm, int *flag, MPI_Status *sts) {
+  int e = MPI_Iprobe(src, tag, comm, flag, sts);
+  if (e == MPI_SUCCESS && !*flag) co_await yield();
+  co_return e;
+}
+task<int> Improbe(int src, int tag, MPI_Comm comm, int *flag, MPI_Message *msg,
+                  MPI_Status *sts) {
+  int e = MPI_Improbe(src, tag, comm, flag, msg, sts);
+  if (e == MPI_SUCCESS && !*flag) co_await yield();
+  co_return e;
+}
+
 /* ====================== communicator creation ====================== */
 
 // ampi::split, with the suspension replaced by an await on this comm's
