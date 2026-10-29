@@ -6404,6 +6404,20 @@ called with a non-zero number of initial elements, and is set to ``DYNAMIC`` in 
 where the number of initial elements is 0. Applications can call
 ``opts.setStaticInsertion(false)`` to override this behavior for cases where there are a
 non-zero number of initial insertions, but more dynamic insertions will follow.
+Together, static insertion and ``setAnytimeMigration(false)`` are a promise as
+well as a hint: the runtime then frees each broadcast as soon as every element
+on a PE has received it and keeps no copy for an element that is migrating. The
+program must therefore ensure that no broadcast to the array is in flight while
+its elements move at a load balancing step. The result of a reduction whose
+callback broadcasts to the array counts: contributing and then calling
+``AtSync()`` before the result has arrived breaks the promise, and the result
+is lost for a migrating element. The command line option
+``+noAnytimeMigration`` makes ``setAnytimeMigration(false)`` the default for
+every array of the program. In both cases the broadcasts to a chare array
+are delivered to all elements in one consistent order: if any element
+receives broadcast ``A`` before broadcast ``B``, every element does. Which of
+the two comes first is not promised, even when the same PE sent both.
+Messages to a single element carry no ordering guarantee at all.
 
 If the application needs to know when an array has been fully constructed, CkArrayOptions
 provides ``CkArrayOptions::setInitCallback(CkCallback)``. The callback passed will be

@@ -189,6 +189,7 @@ option(AMPI_MPICH_TESTS    "Enable mpich tests for AMPI" OFF)
 option(DRONE_MODE          "Enable drone mode" OFF)
 option(TASK_QUEUE          "Enable task queue" OFF)
 option(RECONVERSE          "Use the Reconverse communication layer" OFF)
+option(CMK_COVERAGE        "Instrument for clang source-based coverage (see coverage/README.md)" OFF)
 
 if(TRACING STREQUAL "")
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -488,6 +489,26 @@ endif()
 if(BUILD_HIP)
   set(RECONVERSE_ENABLE_HIP ON CACHE BOOL "Enable HIP support in reconverse" FORCE)
 endif()
+# Coverage flags go into CMAKE_<LANG>_FLAGS, the only flags that reach
+# reconverse (cmake/reconverse clears the directory compile options), so they
+# must be set before the subdirectory is added. charmc adds the same flags for
+# programs built against this build (CMK_COVERAGE in conv-mach-opt.sh).
+if(CMK_COVERAGE)
+  if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang" OR NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR
+        "--coverage uses clang source-based coverage and needs a clang-family "
+        "compiler; this build has C=${CMAKE_C_COMPILER_ID}, "
+        "C++=${CMAKE_CXX_COMPILER_ID}. Set CC=clang CXX=clang++ or pass 'clang'.")
+  endif()
+  set(_cov_compile "-fprofile-instr-generate -fcoverage-mapping")
+  string(APPEND CMAKE_C_FLAGS " ${_cov_compile}")
+  string(APPEND CMAKE_CXX_FLAGS " ${_cov_compile}")
+  string(APPEND CMAKE_SHARED_LINKER_FLAGS " -fprofile-instr-generate")
+  # Executables are linked by charmc, which adds the link flag itself except
+  # for host tools (charmxi is linked -host, with a compiler that may not be
+  # clang), so it is not put in CMAKE_EXE_LINKER_FLAGS.
+endif()
+
 # This needs to be include before we set charmc as the linker
 # but after CMAKE_LIBRARY_OUTPUT_DIRECTORY has been set
 add_subdirectory(cmake/reconverse)
@@ -1032,6 +1053,10 @@ endif()
 
 if (NOT CMK_WINDOWS)
   file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
+endif()
+
+if(CMK_COVERAGE)
+  file(APPEND ${optfile_sh} "CMK_COVERAGE=1\n")
 endif()
 
 
