@@ -38,20 +38,25 @@ endif
 FTDIRS = \
   jacobi3d
 
-# Not yet run on reconverse: restarting from a checkpoint resumes each rank's
-# thread in a new process, and its stack holds return addresses into
-# libreconverse, which ASLR loads at a different address in every process.
+# Reconverse, macOS: a restart from a checkpoint (chkpt) is a new process that
+# resumes each rank's thread, and the thread's stack holds return addresses
+# into libreconverse and the program. They are valid only if the new process
+# loads both at the addresses the checkpointing process used, which requires
+# address space layout randomization (ASLR) to be off. Linux runs turn it off
+# with setarch -R (the CI job runs tests/ampi under setarch), so chkpt runs
+# there. macOS has no way to turn it off for these runs, and Isomalloc aborts
+# the restart, so chkpt is left out on macOS for every process count.
+#
+# A rank migrating between processes needs the same. macOS has no setarch;
+# only a launcher that spawns the processes with _POSIX_SPAWN_DISABLE_ASLR
+# (as classic charmrun did) can turn ASLR off there, and lcrun does not, so
+# with more than one process (TESTRUN_PROCS) leave out the tests whose ranks
+# migrate. One process migrates fine.
 ifeq ($(CMK_GDIR),reconverse)
+ifeq ($(CMK_MACOSX),1)
 RECONVERSE_NA = \
   chkpt \
 
-# The same holds for a rank migrating between processes. Linux runs turn ASLR
-# off (setarch -R). macOS has no setarch; only a launcher that spawns the
-# processes with _POSIX_SPAWN_DISABLE_ASLR (as classic charmrun did) can turn
-# it off there, and lcrun does not, so with more than one process
-# (TESTRUN_PROCS) leave out the tests whose ranks migrate. One process
-# migrates fine.
-ifeq ($(CMK_MACOSX),1)
 ifneq ($(filter-out 0 1,$(TESTRUN_PROCS)),)
 RECONVERSE_NA += \
   migration \
