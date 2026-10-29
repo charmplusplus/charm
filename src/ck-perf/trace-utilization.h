@@ -402,6 +402,7 @@ class TraceUtilizationBOC : public CBase_TraceUtilizationBOC {
   void collectObjLoads();
   void objLoadsCollected(CkReductionMsg *);
  private:
+  // Used on PE 0 only: the CCS callback and the reduction both land there.
   std::deque<CcsDelayedReply> objLoadsReplies;
   bool objLoadsCollecting = false;
 
