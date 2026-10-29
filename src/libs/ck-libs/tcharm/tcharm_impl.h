@@ -254,7 +254,9 @@ class TCharm: public CBase_TCharm
 	//As above, but start/stop the thread itself, too.
 	CMI_WARN_UNUSED_RESULT TCharm * stop() noexcept { //Blocks; will not return until "start" called.
 		if (tcharm_campi)
-			CkAbort("campi: blocking call on an incomplete request from non-coroutine code\n");
+			CkAbort("campi: a blocking AMPI path was reached outside a campi awaitable, "
+			        "from a non-coroutine function or from a routine campi does not yet "
+			        "support (see the lists of awaitable and unsupported routines in campi.h)\n");
 		#if CMK_ERROR_CHECKING
 		if (tid != CthSelf())
 			CkAbort("Called TCharm::stop from outside TCharm thread!\n");

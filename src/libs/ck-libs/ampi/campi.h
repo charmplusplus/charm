@@ -58,6 +58,7 @@
 #undef MPI_Exscan
 #undef MPI_Comm_split
 #undef MPI_Comm_dup
+#undef MPI_Comm_dup_with_info
 #undef MPI_Comm_create
 #undef AMPI_Migrate
 
@@ -86,10 +87,14 @@
 #define MPI_Exscan(...)      CAMPI_AWAIT(::campi::Exscan(__VA_ARGS__))
 #define MPI_Comm_split(...)  CAMPI_AWAIT(::campi::Comm_split(__VA_ARGS__))
 #define MPI_Comm_dup(...)    CAMPI_AWAIT(::campi::Comm_dup(__VA_ARGS__))
+#define MPI_Comm_dup_with_info(...) CAMPI_AWAIT(::campi::Comm_dup_with_info(__VA_ARGS__))
 #define MPI_Comm_create(...) CAMPI_AWAIT(::campi::Comm_create(__VA_ARGS__))
 #define AMPI_Migrate(...)    CAMPI_AWAIT(::campi::Migrate(__VA_ARGS__))
 
-/* Blocking routines without a campi awaitable yet: a use fails to compile. */
+/* Routines that block inside AMPI (directly, or through a blocking MPI call,
+ * a barrier, an internal waitall, or a [sync] entry method as every one-sided
+ * operation and window lock does) and have no campi awaitable yet: a use
+ * fails to compile instead of aborting at run time in TCharm::stop. */
 #undef MPI_Probe
 #undef MPI_Mprobe
 #undef MPI_Mrecv
@@ -109,6 +114,42 @@
 #undef MPI_Dist_graph_create
 #undef MPI_Dist_graph_create_adjacent
 #undef MPI_Comm_split_type
+#undef MPI_Comm_idup
+#undef MPI_Comm_idup_with_info
+#undef MPI_Comm_create_group
+#undef MPI_Ireduce_scatter
+#undef MPI_Ireduce_scatter_block
+#undef MPI_Neighbor_allgather
+#undef MPI_Neighbor_allgatherv
+#undef MPI_Neighbor_alltoall
+#undef MPI_Neighbor_alltoallv
+#undef MPI_Neighbor_alltoallw
+#undef MPI_Win_create
+#undef MPI_Win_allocate
+#undef MPI_Win_free
+#undef MPI_Win_fence
+#undef MPI_Win_lock
+#undef MPI_Win_unlock
+#undef MPI_Win_lock_all
+#undef MPI_Win_unlock_all
+#undef MPI_Win_post
+#undef MPI_Win_start
+#undef MPI_Win_complete
+#undef MPI_Win_wait
+#undef MPI_Put
+#undef MPI_Get
+#undef MPI_Accumulate
+#undef MPI_Get_accumulate
+#undef MPI_Rput
+#undef MPI_Rget
+#undef MPI_Raccumulate
+#undef MPI_Rget_accumulate
+#undef MPI_Fetch_and_op
+#undef MPI_Compare_and_swap
+#undef AMPI_Iget_wait
+#undef AMPI_Migrate_to_pe
+#undef AMPI_GPU_Invoke
+#undef AMPI_GPU_Invoke_wr
 #undef AMPI_Yield
 #undef AMPI_Suspend
 #define MPI_Probe(...)                      campi_unsupported_blocking_call_MPI_Probe
@@ -130,6 +171,42 @@
 #define MPI_Dist_graph_create(...)          campi_unsupported_blocking_call_MPI_Dist_graph_create
 #define MPI_Dist_graph_create_adjacent(...) campi_unsupported_blocking_call_MPI_Dist_graph_create_adjacent
 #define MPI_Comm_split_type(...)            campi_unsupported_blocking_call_MPI_Comm_split_type
+#define MPI_Comm_idup(...)                  campi_unsupported_blocking_call_MPI_Comm_idup
+#define MPI_Comm_idup_with_info(...)        campi_unsupported_blocking_call_MPI_Comm_idup_with_info
+#define MPI_Comm_create_group(...)          campi_unsupported_blocking_call_MPI_Comm_create_group
+#define MPI_Ireduce_scatter(...)            campi_unsupported_blocking_call_MPI_Ireduce_scatter
+#define MPI_Ireduce_scatter_block(...)      campi_unsupported_blocking_call_MPI_Ireduce_scatter_block
+#define MPI_Neighbor_allgather(...)         campi_unsupported_blocking_call_MPI_Neighbor_allgather
+#define MPI_Neighbor_allgatherv(...)        campi_unsupported_blocking_call_MPI_Neighbor_allgatherv
+#define MPI_Neighbor_alltoall(...)          campi_unsupported_blocking_call_MPI_Neighbor_alltoall
+#define MPI_Neighbor_alltoallv(...)         campi_unsupported_blocking_call_MPI_Neighbor_alltoallv
+#define MPI_Neighbor_alltoallw(...)         campi_unsupported_blocking_call_MPI_Neighbor_alltoallw
+#define MPI_Win_create(...)                 campi_unsupported_blocking_call_MPI_Win_create
+#define MPI_Win_allocate(...)               campi_unsupported_blocking_call_MPI_Win_allocate
+#define MPI_Win_free(...)                   campi_unsupported_blocking_call_MPI_Win_free
+#define MPI_Win_fence(...)                  campi_unsupported_blocking_call_MPI_Win_fence
+#define MPI_Win_lock(...)                   campi_unsupported_blocking_call_MPI_Win_lock
+#define MPI_Win_unlock(...)                 campi_unsupported_blocking_call_MPI_Win_unlock
+#define MPI_Win_lock_all(...)               campi_unsupported_blocking_call_MPI_Win_lock_all
+#define MPI_Win_unlock_all(...)             campi_unsupported_blocking_call_MPI_Win_unlock_all
+#define MPI_Win_post(...)                   campi_unsupported_blocking_call_MPI_Win_post
+#define MPI_Win_start(...)                  campi_unsupported_blocking_call_MPI_Win_start
+#define MPI_Win_complete(...)               campi_unsupported_blocking_call_MPI_Win_complete
+#define MPI_Win_wait(...)                   campi_unsupported_blocking_call_MPI_Win_wait
+#define MPI_Put(...)                        campi_unsupported_blocking_call_MPI_Put
+#define MPI_Get(...)                        campi_unsupported_blocking_call_MPI_Get
+#define MPI_Accumulate(...)                 campi_unsupported_blocking_call_MPI_Accumulate
+#define MPI_Get_accumulate(...)             campi_unsupported_blocking_call_MPI_Get_accumulate
+#define MPI_Rput(...)                       campi_unsupported_blocking_call_MPI_Rput
+#define MPI_Rget(...)                       campi_unsupported_blocking_call_MPI_Rget
+#define MPI_Raccumulate(...)                campi_unsupported_blocking_call_MPI_Raccumulate
+#define MPI_Rget_accumulate(...)            campi_unsupported_blocking_call_MPI_Rget_accumulate
+#define MPI_Fetch_and_op(...)               campi_unsupported_blocking_call_MPI_Fetch_and_op
+#define MPI_Compare_and_swap(...)           campi_unsupported_blocking_call_MPI_Compare_and_swap
+#define AMPI_Iget_wait(...)                 campi_unsupported_blocking_call_AMPI_Iget_wait
+#define AMPI_Migrate_to_pe(...)             campi_unsupported_blocking_call_AMPI_Migrate_to_pe
+#define AMPI_GPU_Invoke(...)                campi_unsupported_blocking_call_AMPI_GPU_Invoke
+#define AMPI_GPU_Invoke_wr(...)             campi_unsupported_blocking_call_AMPI_GPU_Invoke_wr
 #define AMPI_Yield(...)                     CAMPI_AWAIT(::campi::yield())
 #define AMPI_Suspend(...)                   campi_unsupported_blocking_call_AMPI_Suspend
 

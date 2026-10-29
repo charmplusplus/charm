@@ -192,7 +192,8 @@ CAMPI_MAIN(argc, argv)
     C(members[hr] == rank);
   }
 
-  // 5. Comm_dup of the split communicator; traffic on it stays separate
+  // 5. Comm_dup and Comm_dup_with_info of the split communicator; traffic on
+  // them stays separate
   {
     MPI_Comm dup;
     MPI_Comm_dup(half, &dup);
@@ -205,6 +206,14 @@ CAMPI_MAIN(argc, argv)
     MPI_Allreduce(&rank, &s2, 1, MPI_INT, MPI_SUM, dup);
     C(s1 == s2);
     MPI_Comm_free(&dup);
+    MPI_Comm dupi;
+    MPI_Comm_dup_with_info(half, MPI_INFO_NULL, &dupi);
+    MPI_Comm_rank(dupi, &dr);  MPI_Comm_size(dupi, &ds);
+    C(hr == dr && hs == ds && dupi != half);
+    int s3 = 0;
+    MPI_Allreduce(&rank, &s3, 1, MPI_INT, MPI_SUM, dupi);
+    C(s1 == s3);
+    MPI_Comm_free(&dupi);
   }
 
   // 6. Nested tasks with blocking calls, on world and on the split comm

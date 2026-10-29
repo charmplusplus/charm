@@ -535,6 +535,14 @@ task<int> Comm_dup(MPI_Comm comm, MPI_Comm *newcomm) {
   co_return ret;
 }
 
+// MPI_Comm_dup_with_info: MPI_Comm_dup, then MPI_Comm_set_info (a no-op in AMPI)
+task<int> Comm_dup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm *newcomm) {
+  int ret = co_await Comm_dup(comm, newcomm);
+  if (ret != MPI_SUCCESS) co_return ret;
+  MPI_Comm_set_info(*newcomm, info);
+  co_return MPI_SUCCESS;
+}
+
 // MPI_Comm_create for intracommunicators (a split, as in ampi.C)
 task<int> Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm *newcomm) {
   std::vector<int> vec = getAmpiParent()->group2vec(group);
