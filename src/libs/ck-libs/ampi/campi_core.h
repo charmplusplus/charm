@@ -8,7 +8,7 @@
  * AMPI's delivery code wakes the rank (TCharm::resume, which campi redirects
  * from CthAwaken to a coroutine resume). The simple calls return a
  * request_awaiter (no coroutine frame); calls with internal awaited loops
- * (Init, Finalize, Scan, Exscan, communicator creation) are tasks.
+ * (Init, Finalize, communicator creation) are tasks.
  *
  * Applications normally include campi.h (this header plus macros that
  * redirect the blocking MPI names to co_await expressions) and define their
@@ -256,11 +256,10 @@ request_awaiter Alltoall(const void *sbuf, int scount, MPI_Datatype stype, void 
 request_awaiter Alltoallv(const void *sbuf, const int *scounts, const int *sdispls,
                           MPI_Datatype stype, void *rbuf, const int *rcounts,
                           const int *rdispls, MPI_Datatype rtype, MPI_Comm comm);
-// Scan and Exscan await a loop of internal sendrecvs: they stay tasks.
-task<int> Scan(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
-               MPI_Comm comm);
-task<int> Exscan(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
-                 MPI_Comm comm);
+request_awaiter Scan(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
+                     MPI_Comm comm);
+request_awaiter Exscan(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
+                       MPI_Comm comm);
 
 /* ---------------- communicator creation ---------------- */
 

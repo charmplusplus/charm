@@ -1,5 +1,6 @@
 // campi test: communicator creation (split, dup), Sendrecv, Gather/Scatter,
-// Waitall with several outstanding Irecvs, other collectives, and nested
+// Waitall with several outstanding Irecvs, other collectives (Scan and
+// Exscan also over non-contiguous datatypes), and nested
 // campi::task helpers that block (resume of the innermost frame).
 #include <algorithm>
 #include <cstdio>
@@ -24,6 +25,17 @@ static campi::task<int> ring_sum(int rank, int size, MPI_Comm comm) {
   int sum = 0;
   MPI_Allreduce(&got, &sum, 1, MPI_INT, MPI_SUM, comm);
   co_return sum;
+}
+
+// User sum on MPI_Type_vector(VEC_N, 1, VEC_STRIDE, MPI_INT): add the ints
+// of each element, leaving the gaps.
+static const int VEC_N = 4, VEC_STRIDE = 2, VEC_EXTENT = (VEC_N - 1) * VEC_STRIDE + 1;
+static void vec_sum(void *invec, void *inoutvec, int *len, MPI_Datatype *)
+{
+  const int *in = (const int *)invec;
+  int *io = (int *)inoutvec;
+  for (int e = 0; e < *len; e++)
+    for (int j = 0; j < VEC_N; j++) io[e * VEC_EXTENT + j * VEC_STRIDE] += in[e * VEC_EXTENT + j * VEC_STRIDE];
 }
 
 CAMPI_MAIN(argc, argv)
@@ -107,6 +119,62 @@ CAMPI_MAIN(argc, argv)
     if (rank == 0)
       for (int i = 0; i < size; i++)
         for (int j = 0; j < i + 1; j++) C(gv_out[displs[i] + j] == i);
+  }
+
+  // 3b. Scan and Exscan over non-contiguous datatypes: a strided vector of
+  // ints with a user sum (the gaps between its ints must stay untouched) and
+  // MPI_DOUBLE_INT with MPI_MAXLOC
+  {
+    const int N = VEC_N, STRIDE = VEC_STRIDE, LEN = VEC_EXTENT, GAP = -7;
+    MPI_Datatype vec;
+    MPI_Type_vector(N, 1, STRIDE, MPI_INT, &vec);
+    MPI_Type_commit(&vec);
+    std::vector<int> vin(LEN, GAP), vsc(LEN, GAP), vex(LEN, GAP);
+    for (int i = 0; i < N; i++) vin[i * STRIDE] = rank * 10 + i + 1;
+    MPI_Op vop; // AMPI's predefined ops take only basic types: a user sum
+    MPI_Op_create(vec_sum, 1, &vop);
+    MPI_Scan(vin.data(), vsc.data(), 1, vec, vop, MPI_COMM_WORLD);
+    MPI_Exscan(vin.data(), vex.data(), 1, vec, vop, MPI_COMM_WORLD);
+    MPI_Op_free(&vop);
+    for (int j = 0; j < LEN; j++) {
+      if (j % STRIDE != 0) {
+        C(vsc[j] == GAP);
+        C(vex[j] == GAP);
+        continue;
+      }
+      int i = j / STRIDE, incl = 0;
+      for (int r = 0; r <= rank; r++) incl += r * 10 + i + 1;
+      C(vsc[j] == incl);
+      if (rank > 0) C(vex[j] == incl - (rank * 10 + i + 1));
+    }
+    MPI_Type_free(&vec);
+
+    struct DI { double v; int i; };
+    auto val = [](int r, int k) { return k == 0 ? (double)((r * 3) % 5) : -(double)r; };
+    DI din[2], dsc[2], dex[2];
+    for (int k = 0; k < 2; k++) {
+      din[k].v = val(rank, k);
+      din[k].i = rank;
+      dsc[k].v = dex[k].v = -1.0;
+      dsc[k].i = dex[k].i = -1;
+    }
+    MPI_Scan(din, dsc, 2, MPI_DOUBLE_INT, MPI_MAXLOC, MPI_COMM_WORLD);
+    MPI_Exscan(din, dex, 2, MPI_DOUBLE_INT, MPI_MAXLOC, MPI_COMM_WORLD);
+    for (int k = 0; k < 2; k++) {
+      // expected MAXLOC over ranks [0, upto]: largest value, lowest rank on ties
+      auto expect = [&](int upto) {
+        DI e{val(0, k), 0};
+        for (int r = 1; r <= upto; r++)
+          if (val(r, k) > e.v) e = DI{val(r, k), r};
+        return e;
+      };
+      DI e = expect(rank);
+      C(dsc[k].v == e.v && dsc[k].i == e.i);
+      if (rank > 0) {
+        DI x = expect(rank - 1);
+        C(dex[k].v == x.v && dex[k].i == x.i);
+      }
+    }
   }
 
   // 4. Comm_split into even/odd ranks, ordered by descending world rank
