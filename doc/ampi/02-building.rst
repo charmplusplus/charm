@@ -262,8 +262,9 @@ script used by ``make test`` add the prefix themselves; set
 leave randomization on. Under ``srun`` the prefix must be inside the
 launch because the Slurm daemon on each compute node starts the tasks,
 and they do not inherit settings of the ``srun`` process. On macOS
-randomization cannot be turned off this way, so migration between
-processes and restart in a new process can fail there.
+randomization cannot be turned off this way, so there a rank cannot
+migrate to another process or be restored from a checkpoint; migration
+between the PEs of one process works.
 
 Other options
 ~~~~~~~~~~~~~
