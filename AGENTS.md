@@ -12,7 +12,7 @@ how to code.
   subsystem, with the files in `src/` each chapter describes. Start at
   `doc/internals/README.md`. A change to a subsystem that has a chapter
   updates the chapter in the same pull request.
-- **The practitioner notes**, <https://github.com/UIUC-PPL/charm-notes>:
+- **The practitioner notes**, <https://github.com/charmplusplus/charm-notes>:
   dated lessons from real runs, a syntax quick reference, machine
   profiles, and an LCI reference. The repository is a skill: clone it and
   link it as `~/.claude/skills/charm-notes` (Claude Code) or upload the
