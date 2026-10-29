@@ -6083,6 +6083,39 @@ void SsendReq::start(MPI_Request reqIdx) noexcept {
   ptr->send(tag, ptr->getRank(), buf, count, type, src /*really, the destination*/, comm, I_SSEND, reqIdx);
 }
 
+CMI_WARN_UNUSED_RESULT ampiParent* AmpiRequest::blockUntilComplete(ampiParent* parent) noexcept {
+  bool viaColl = false;
+  int n = beginBlocking(parent, viaColl);
+  parent->numBlockedReqs = n;
+  parent = viaColl ? parent->blockOnColl() : parent->blockOnRecv();
+  endBlocking(parent);
+  return parent;
+}
+
+// ATAReq::wait waits on its internal requests (ampiParent::waitall): mark and
+// count the incomplete ones, each of which counts down on completion.
+int ATAReq::beginBlocking(ampiParent* parent, bool& viaColl) noexcept {
+  viaColl = false;
+  AmpiRequestList& reqList = parent->getReqs();
+  int n = 0;
+  for (MPI_Request ri : reqs) {
+    if (ri == MPI_REQUEST_NULL) continue;
+    AmpiRequest* x = reqList[ri];
+    if (!x->test(MPI_STATUS_IGNORE)) {
+      x->setBlocked(true);
+      n++;
+    }
+  }
+  return n;
+}
+
+void ATAReq::endBlocking(ampiParent* parent) noexcept {
+  AmpiRequestList& reqList = parent->getReqs();
+  for (MPI_Request ri : reqs) {
+    if (ri != MPI_REQUEST_NULL) reqList[ri]->setBlocked(false);
+  }
+}
+
 CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
 
   if (cancelled) {
@@ -6092,10 +6125,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *st
   }
 
   if (!complete) {
-    parent->numBlockedReqs = 1;
-    setBlocked(true);
-    parent = parent->blockOnRecv(); // parent is updated in case an ampi thread is migrated while waiting for a message
-    setBlocked(false);
+    parent = blockUntilComplete(parent); // parent is updated in case an ampi thread is migrated while waiting for a message
   }
 
   AMPI_DEBUG("IReq::wait has resumed\n");
@@ -6114,10 +6144,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *st
 
 CMI_WARN_UNUSED_RESULT ampiParent* RednReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
   if (!complete) {
-    parent->numBlockedReqs = 1;
-    setBlocked(true);
-    parent = parent->blockOnColl();
-    setBlocked(false);
+    parent = blockUntilComplete(parent);
   }
   AMPI_DEBUG("RednReq::wait has resumed\n");
   if (sts != MPI_STATUS_IGNORE) {
@@ -6129,10 +6156,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* RednReq::wait(ampiParent* parent, MPI_Status 
 
 CMI_WARN_UNUSED_RESULT ampiParent* GatherReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
   if (!complete) {
-    parent->numBlockedReqs = 1;
-    setBlocked(true);
-    parent = parent->blockOnColl();
-    setBlocked(false);
+    parent = blockUntilComplete(parent);
   }
   AMPI_DEBUG("GatherReq::wait has resumed\n");
   if (sts != MPI_STATUS_IGNORE) {
@@ -6144,10 +6168,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* GatherReq::wait(ampiParent* parent, MPI_Statu
 
 CMI_WARN_UNUSED_RESULT ampiParent* GathervReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
   if (!complete) {
-    parent->numBlockedReqs = 1;
-    setBlocked(true);
-    parent = parent->blockOnColl();
-    setBlocked(false);
+    parent = blockUntilComplete(parent);
   }
   AMPI_DEBUG("GathervReq::wait has resumed\n");
   if (sts != MPI_STATUS_IGNORE) {
@@ -6159,10 +6180,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* GathervReq::wait(ampiParent* parent, MPI_Stat
 
 CMI_WARN_UNUSED_RESULT ampiParent* SendReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
   if (!complete) {
-    parent->numBlockedReqs = 1;
-    setBlocked(true);
-    parent = parent->blockOnRecv();
-    setBlocked(false);
+    parent = blockUntilComplete(parent);
   }
   AMPI_DEBUG("SendReq::wait has resumed\n");
   if (sts != MPI_STATUS_IGNORE) {
@@ -6174,10 +6192,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* SendReq::wait(ampiParent* parent, MPI_Status 
 
 CMI_WARN_UNUSED_RESULT ampiParent* SsendReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
   if (!complete) {
-    parent->numBlockedReqs = 1;
-    setBlocked(true);
-    parent = parent->blockOnRecv();
-    setBlocked(false);
+    parent = blockUntilComplete(parent);
   }
   AMPI_DEBUG("SsendReq::wait has resumed\n");
   if (sts != MPI_STATUS_IGNORE) {
@@ -6207,10 +6222,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* ScanReq::wait(ampiParent* parent, MPI_Status 
   if (!complete) {
     // Rounds complete in ampi::progressScan, called from message arrival;
     // it resumes this thread after the last one.
-    parent->numBlockedReqs = 1;
-    setBlocked(true);
-    parent = parent->blockOnRecv();
-    setBlocked(false);
+    parent = blockUntilComplete(parent);
   }
   if (sts != MPI_STATUS_IGNORE) {
     sts->MPI_COMM = comm;

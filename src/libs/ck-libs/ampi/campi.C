@@ -270,37 +270,6 @@ static inline bool req_done(ampiParent *p, MPI_Request idx) {
   return lookup(p, idx)->test(MPI_STATUS_IGNORE);
 }
 
-static inline bool is_coll_req(AmpiReqType t) {
-  return t == AMPI_REDN_REQ || t == AMPI_GATHER_REQ || t == AMPI_GATHERV_REQ;
-}
-
-// Mark an incomplete request as blocked on, as its wait() does before it
-// suspends a thread; returns the number of requests counted in numBlockedReqs.
-static int mark_blocked(ampiParent *p, MPI_Request idx, bool blocked) {
-  AmpiRequest *q = lookup(p, idx);
-  int n = 0;
-  switch (q->getType()) {
-    case AMPI_ATA_REQ: { // ATAReq::wait waits on its internal requests
-      ATAReq *a = (ATAReq *)q;
-      for (MPI_Request ri : a->reqs) {
-        if (ri == MPI_REQUEST_NULL) continue;
-        AmpiRequest *x = lookup(p, ri);
-        if (!blocked) { x->setBlocked(false); continue; }
-        if (!x->test(MPI_STATUS_IGNORE)) { x->setBlocked(true); n++; }
-      }
-      break;
-    }
-    case AMPI_G_REQ: // generalized requests complete by polling
-      if (blocked) enqueue_wake(current());
-      break;
-    default:
-      q->setBlocked(blocked);
-      n = blocked ? 1 : 0;
-      break;
-  }
-  return n;
-}
-
 /* ---- request_awaiter: the frame-free awaitable of the simple calls ---- */
 
 bool request_awaiter::done() noexcept {
@@ -311,26 +280,38 @@ bool request_awaiter::done() noexcept {
   return true;
 }
 
-// As the request's wait() (WAIT_ONE) or ampiParent::waitall (WAIT_ALL,
-// SENDRECV) does before it suspends a thread.
+// As the request's wait() (WAIT_ONE, through AmpiRequest::beginBlocking) or
+// ampiParent::waitall (WAIT_ALL, SENDRECV) does before it suspends a thread.
+// A request that completes by polling (beginBlocking returns 0) is polled
+// again through a queued wake-up.
 void request_awaiter::block() noexcept {
   ampiParent *p = getAmpiParent();
   MPI_Request *r = reqs();
   CkAssert(p->numBlockedReqs == 0);
   if (kind_ == WAIT_ONE) {
-    AmpiReqType t = lookup(p, r[0])->getType();
-    p->numBlockedReqs = mark_blocked(p, r[0], true);
-    CAMPI_DBG("rank %d waits on request %d (type %d)\n", TCHARM_Element(), r[0], (int)t);
-    // IReq/SendReq/SsendReq::wait block via blockOnRecv,
+    bool viaColl = false;
+    int n = lookup(p, r[0])->beginBlocking(p, viaColl);
+    p->numBlockedReqs = n;
+    CAMPI_DBG("rank %d waits on request %d (type %d)\n", TCHARM_Element(), r[0],
+              (int)lookup(p, r[0])->getType());
+    if (n == 0) enqueue_wake(current());
+    // IReq/SendReq/SsendReq/ScanReq::wait block via blockOnRecv,
     // RednReq/GatherReq/GathervReq::wait via blockOnColl.
-    if (is_coll_req(t)) p->resumeOnColl = true;
+    if (viaColl) p->resumeOnColl = true;
     else p->resumeOnRecv = true;
   } else {
     int blocked = 0;
-    for (int i = 0; i < n_; i++)
-      if (!req_done(p, r[i])) blocked += mark_blocked(p, r[i], true);
+    bool needPoll = false;
+    for (int i = 0; i < n_; i++) {
+      if (req_done(p, r[i])) continue;
+      bool viaColl = false;
+      int n = lookup(p, r[i])->beginBlocking(p, viaColl);
+      if (n == 0) needPoll = true;
+      blocked += n;
+    }
     p->numBlockedReqs = blocked;
     CAMPI_DBG("rank %d waits on %d of %d requests\n", TCHARM_Element(), blocked, n_);
+    if (needPoll) enqueue_wake(current());
     p->resumeOnRecv = true;
     p->resumeOnColl = true; // a collective request's completion (irednResult) checks this flag
   }
@@ -340,7 +321,7 @@ void request_awaiter::unblock() noexcept {
   ampiParent *p = getAmpiParent();
   MPI_Request *r = reqs();
   for (int i = 0; i < n_; i++)
-    if (r[i] != MPI_REQUEST_NULL) mark_blocked(p, r[i], false);
+    if (r[i] != MPI_REQUEST_NULL) lookup(p, r[i])->endBlocking(p);
   p->resumeOnRecv = false;
   p->resumeOnColl = false;
   p->numBlockedReqs = 0;
