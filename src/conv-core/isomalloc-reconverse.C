@@ -139,8 +139,14 @@ static std::vector<LoadedObject> loadedObjects;
 static int collectLoadedObject(struct dl_phdr_info * info, size_t, void * data)
 {
   auto objects = (std::vector<LoadedObject> *)data;
-  objects->push_back({info->dlpi_name ? info->dlpi_name : "",
-                      (unsigned long long)info->dlpi_addr});
+  const std::string name = info->dlpi_name ? info->dlpi_name : "";
+  /* The vdso (linux-vdso.so.1, linux-gate.so.1) is left out: its functions
+     neither block nor call back, so no suspended thread's stack points into
+     it, and it is the first entry the loader lists, so a mismatch report
+     would name it instead of the object that matters. */
+  if (name.compare(0, 10, "linux-vdso") == 0 || name.compare(0, 10, "linux-gate") == 0)
+    return 0;
+  objects->push_back({name, (unsigned long long)info->dlpi_addr});
   return 0;
 }
 #endif
