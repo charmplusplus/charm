@@ -51,8 +51,7 @@ git config --global core.autocrlf false
 git clone --recurse-submodules https://github.com/charmplusplus/charm
 ```
 
-Until charmplusplus/charm#4087 and charmplusplus/reconverse#304 are merged,
-use the PR branch:
+Until charmplusplus/charm#4087 is merged, use its branch:
 
 ```bash
 cd charm
