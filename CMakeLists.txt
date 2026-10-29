@@ -677,6 +677,13 @@ configure_file(src/arch/common/conv-mach-tsan.sh             include/ COPYONLY)
 configure_file(src/scripts/conv-config.sh                    include/ COPYONLY)
 configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
 
+# MSVC is driven through these Unix-style wrappers (cc-msvc.sh); unistd.h is a
+# stand-in for the flex-generated charmxi scanner, which includes it.
+if(CMK_COMPILER STREQUAL "msvc")
+  configure_file(src/arch/win/unix2nt_cc                     bin/ COPYONLY)
+  configure_file(src/arch/win/unix2nt_ar                     bin/ COPYONLY)
+  configure_file(src/arch/win/unistd.h                       include/ COPYONLY)
+endif()
 
 set(CUDA_DIR "")
 set(HIP_DIR "")
@@ -823,8 +830,12 @@ endforeach()
 add_subdirectory(src/xlat-i)
 add_dependencies(charmxi create_symlinks)
 
-# Hwloc
-include(cmake/hwloc.cmake)
+# Hwloc. Nothing in a reconverse build includes this embedded copy (reconverse
+# finds its own hwloc), and on Windows its autotools configure would have to
+# run through the MSVC wrapper, so it is skipped there.
+if(NOT CMK_WINDOWS)
+  include(cmake/hwloc.cmake)
+endif()
 
 # Converse
 include(cmake/converse.cmake)
@@ -876,9 +887,7 @@ set(moduleNDMeshStreamer-cxx-sources src/libs/ck-libs/NDMeshStreamer/NDMeshStrea
 add_library(moduleNDMeshStreamer ${moduleNDMeshStreamer-cxx-sources}
     ${moduleNDMeshStreamer-h-sources}
     ${CMAKE_BINARY_DIR}/include/NDMeshStreamer.decl.h)
-target_include_directories(moduleNDMeshStreamer PUBLIC .
-    ../../../util/topomanager ../../../ck-ldb ../../../ck-perf ../../../ck-cp
-    ../completion)
+target_include_directories(moduleNDMeshStreamer PUBLIC .)
 
 add_dependencies(moduleNDMeshStreamer ck)
 
@@ -962,7 +971,9 @@ if(${TARGET} STREQUAL "charm4py")
     endif()
   endif()
 
-  add_dependencies(charm hwloc)
+  if(TARGET hwloc)
+    add_dependencies(charm hwloc)
+  endif()
 
 else()
   # Check that we are able to build and link an executable
