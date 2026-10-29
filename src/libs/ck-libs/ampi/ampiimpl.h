@@ -3221,6 +3221,9 @@ void removeUnimportantArrayObjsfromPeCache() noexcept;
 int ampiFinalizeBody() noexcept;
 // Defined in campi.C: ampiParent::prepareCtv reports its parent in campi mode
 void campi_parent_attached(TCharm *tc, ampiParent *parent) noexcept;
+// Defined in campi.C: per-PE campi setup, called from ampiProcInit on every
+// PE before any rank starts (registers campi's Converse handlers)
+void campi_proc_init() noexcept;
 CMI_WARN_UNUSED_RESULT ampi *getAmpiInstance(MPI_Comm comm) noexcept;
 void checkComm(MPI_Comm comm) noexcept;
 void checkRequest(MPI_Request req) noexcept;

@@ -1088,6 +1088,10 @@ static void ampiProcInit() noexcept {
   CtvInitialize(bool,ampiFinalized);
   CtvInitialize(void*,stackBottom);
 
+  // campi registers its handlers here, on every PE, so that handler indices
+  // agree across PEs whether or not a PE hosts a rank.
+  campi_proc_init();
+
   /* AMPI_Migrate_to_pe requires enabling Charm++ anytime migration, so
    * we leave support for it off by default. Users must run with this command
    * line option in order to enable calling it. */

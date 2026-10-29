@@ -27,6 +27,7 @@
 // The compiler cannot build coroutines (e.g. GCC 10 without -fcoroutines):
 // libampi is built without campi, and no program can select campi mode.
 void campi_parent_attached(TCharm *, ampiParent *) noexcept {}
+void campi_proc_init() noexcept {}
 #else
 
 #include "campi_core.h"
@@ -119,6 +120,7 @@ struct WakeMsg {
 };
 
 // Per PE (the handler table is per PE; wake messages never leave the PE).
+// Registered by campi_proc_init on every PE at startup.
 static thread_local int wakeHandlerIdx = -1;
 
 static void wakeHandler(void *msg) {
@@ -221,9 +223,7 @@ static void campi_start(TCharm *tc) {
     const char *dbg = getenv("CAMPI_DEBUG");
     campiDebug = (dbg != nullptr && atoi(dbg) != 0) ? 1 : 0;
   }
-  if (wakeHandlerIdx < 0) {
-    wakeHandlerIdx = CmiRegisterHandler((CmiHandler)wakeHandler);
-  }
+  CkAssert(wakeHandlerIdx >= 0); // registered by campi_proc_init
   Rank *r = new Rank;
   r->tc = tc;
   tc->setCampiRank(r);
@@ -241,6 +241,14 @@ static void campi_start(TCharm *tc) {
 }
 
 } // namespace campi
+
+// ampi.C hook: ampiProcInit (an initproc, run on every PE before any rank
+// starts). Registering here rather than when the first rank starts on a PE
+// keeps handler indices the same on every PE, including PEs with no rank.
+void campi_proc_init() noexcept {
+  if (campi::registered_main == nullptr) return; // not a campi program
+  campi::wakeHandlerIdx = CmiRegisterHandler((CmiHandler)campi::wakeHandler);
+}
 
 // ampi.C hook: ampiParent::prepareCtv in campi mode.
 void campi_parent_attached(TCharm *tc, ampiParent *parent) noexcept {
