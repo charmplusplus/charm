@@ -20,6 +20,10 @@
  * Blocking routines campi does not provide yet expand to an undeclared
  * identifier naming the routine, so they fail to compile instead of
  * aborting at run time. Nonblocking and local routines are AMPI's own.
+ *
+ * Unlike thread AMPI, where MPI_Finalize ends the rank and the process exits
+ * with status 0, MPI_Finalize does not end a campi rank: code after it runs,
+ * and the process exit code is the value main co_returns.
  */
 #ifndef CAMPI_H
 #define CAMPI_H
