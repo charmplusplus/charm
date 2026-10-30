@@ -2587,7 +2587,11 @@ should not depend on this switch: a program linked with ``-tracemode
 utilization`` answers the CCS request ``CkPerfObjLoads`` with every PE's
 cumulative execution time per array element, taken from the trace
 events, while ``LBObjLoads`` (the load balancing manager) reports the
-database as it is, and is empty while the instrumentation is off.
+database as it is, and is empty while the instrumentation is off. The
+two replies have the same layout and key each element the same way; the
+trace's figures include the suspended-and-resumed parts
+of threaded entry methods and of TCharm (AMPI) threads, and they are
+never cleared by a load balancing step, where the database's are.
 
 Charm++ then provides a collection of load balancing strategies whose
 job it is to decide on a new mapping of objects to processors based on
