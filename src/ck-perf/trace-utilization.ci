@@ -24,5 +24,7 @@ module TraceUtilization {
 
   readonly CProxy_TraceUtilizationBOC traceUtilizationGroupProxy;
 
+  initnode void registerSumDetailCompressedReducer(void);
+
 };
 
