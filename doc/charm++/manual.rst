@@ -11909,7 +11909,8 @@ The main directories in a Charm++ installation are:
    Directory where Charm++ is built.
 
 ``charm/tests``
-   Test Charm++ programs used by autobuild.
+   Test Charm++ programs, run by ``make test`` and the continuous
+   integration (see :ref:`sec:testing`).
 
 Reducing disk usage
 ~~~~~~~~~~~~~~~~~~~
@@ -11972,6 +11973,31 @@ example
 .. code-block:: bash
 
    $ TESTRUN_LAUNCHER="srun --mpi=pmi2 -N2 --ntasks-per-node=1 -c2" make test
+
+.. _sec:testing:
+
+Testing and coverage
+~~~~~~~~~~~~~~~~~~~~
+
+``charm/tests``, ``charm/examples`` and ``charm/benchmarks`` each have a
+``Makefile`` whose ``test`` target builds and runs every program under it
+against the build (``make -C tests test``), or run ``make test`` in one
+directory. A build directory of the git checkout links these directories,
+so ``make -C <builddir>/tests test`` works too. The continuous integration
+runs a fixed subset of the test directories on every pull request
+(``TEST_DIRS`` in ``.github/workflows/reconverse-ci.yaml``).
+
+How much of the runtime those tests reach is measured weekly with clang
+source-based coverage and published at
+https://charmplusplus.org/charm-coverage/: line, function and region
+coverage of ``src/`` and of reconverse, over the CI subset, over every other
+test directory, and over the examples, each cumulative with the one before.
+The front page shows the headline numbers of every run, and each run keeps
+its full report, the per-file view, and lcov and JSON exports. The tooling
+is in ``charm/coverage`` and its README explains how to make the same
+measurement locally (``./build ... --coverage``, then ``coverage/run.sh``
+and ``coverage/report.sh``), how to combine runs from several machines, and
+the traps in reading the numbers.
 
 .. _sec:compile:
 
