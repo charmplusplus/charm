@@ -182,10 +182,8 @@ static void startTCharmThread(TCharmInitMsg *msg)
 	TCharm::get()->traceSegmentBegin();
 	TCHARM_Thread_data_start_fn threadFn = getTCharmThreadFunction(msg->threadFn);
 	threadFn(msg->data);
-	_TRACE_END_EXECUTE();
-	_TRACE_CLEAR_OBJECT();
 	TCharm::deactivateThread();
-	TCharm::getNULL()->done(0);
+	TCharm::getNULL()->done(0);  // its stop() ends the trace segment
 }
 
 TCharm::TCharm(TCharmInitMsg *initMsg_)
