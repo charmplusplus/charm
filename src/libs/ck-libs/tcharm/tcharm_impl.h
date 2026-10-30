@@ -264,8 +264,11 @@ class TCharm: public CBase_TCharm
 			CkAbort("Cannot make blocking calls using +tcharm_nothreads!\n");
 		#endif
 		// tcharm does not trigger thread listeners on suspend/resume
-		// so it needs to manually start/stop timing
+		// so it needs to manually start/stop timing, and end and begin
+		// the trace's execution of this element (see traceSegmentBegin)
 		this->getCkLocRec()->stopTiming();
+		_TRACE_END_EXECUTE();
+		_TRACE_CLEAR_OBJECT();
 		isStopped=true;
 		DBG("thread suspended");
 
@@ -286,8 +289,19 @@ class TCharm: public CBase_TCharm
 		// tcharm does not trigger thread listeners on suspend/resume
 		// so it needs to manually start/stop timing
 		dis->getCkLocRec()->startTiming();
+		dis->traceSegmentBegin();
 		return dis;
 	}
+
+	public:
+	// A segment of the thread's execution begins: the trace's thread entry,
+	// attributed to this element (CkPerfObjLoads). Ends in stop().
+	void traceSegmentBegin() noexcept {
+		CkLocRec *rec = this->getCkLocRec();
+		_TRACE_SET_OBJECT(rec->getLocMgr()->ckGetGroupID().idx, rec->getID());
+		_TRACE_BEGIN_EXECUTE_DETAILED(-1, ForChareMsg, _threadEP, CkMyPe(), 0, NULL, NULL);
+	}
+	private:
 
  public:
 	void start() noexcept {

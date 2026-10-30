@@ -2581,6 +2581,17 @@ disabled at startup by passing the *+LBOff* flag at runtime, and
 toggled from the application by calling ``LBTurnInstrumentOn()`` and
 ``LBTurnInstrumentOff()``, enabling or disabling instrumentation on
 the calling PE.
+A program may therefore measure only the iterations just before a load
+balancing step. Tools that watch object loads while the program runs
+should not depend on this switch: a program linked with ``-tracemode
+utilization`` answers the CCS request ``CkPerfObjLoads`` with every PE's
+cumulative execution time per array element, taken from the trace
+events, while ``LBObjLoads`` (the load balancing manager) reports the
+database as it is, and is empty while the instrumentation is off. The
+two replies have the same layout and key each element the same way; the
+trace's figures include the suspended-and-resumed parts
+of threaded entry methods and of TCharm (AMPI) threads, and they are
+never cleared by a load balancing step, where the database's are.
 
 Charm++ then provides a collection of load balancing strategies whose
 job it is to decide on a new mapping of objects to processors based on
