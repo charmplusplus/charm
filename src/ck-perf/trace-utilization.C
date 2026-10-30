@@ -22,6 +22,13 @@ void collectUtilizationData(void *ignored) {
 
 CkpvStaticDeclare(TraceUtilization*, _trace);
 
+/// Registered once per process (initnode): _createTraceutilization runs on
+/// every PE, and concurrent addReducer calls from several PE threads in one
+/// process can lose an entry and shift every later reducer index.
+void registerSumDetailCompressedReducer(void) {
+  sumDetailCompressedReducer=CkReduction::addReducer(sumDetailCompressedReduction, false, "sumDetailCompressedReduction");
+}
+
 /**
   For each TraceFoo module, _createTraceFoo() must be defined.
   This function is called in _createTraces() generated in moduleInit.C
@@ -30,9 +37,7 @@ void _createTraceutilization(char **argv)
 {
   //  CkPrintf("[%d] _createTraceutilization\n", CkMyPe());
 
-  // Register the reducer
   CkAssert(sizeof(short) == 2);
-  sumDetailCompressedReducer=CkReduction::addReducer(sumDetailCompressedReduction, false, "sumDetailCompressedReduction");
 
   CkpvInitialize(TraceUtilization*, _trace);
   CkpvAccess(_trace) = new TraceUtilization();
@@ -164,12 +169,28 @@ void TraceUtilizationBOC::ccsRequestSumDetailCompressed(CkCcsRequestMsg *m) {
 void TraceUtilizationBOC::ccsRequestSts(CkCcsRequestMsg *m) {
   char *text = NULL;
   size_t len = 0;
+#ifdef _WIN32
+  // Windows has no open_memstream: write to an anonymous temporary file
+  // (binary, so the bytes are the same) and read it back.
+  FILE *f = tmpfile();
+  if (f != NULL) {
+    traceWriteSTS(f, 0);
+    fprintf(f, "END\n");
+    long n = ftell(f);
+    if (n > 0 && (text = (char *)malloc((size_t)n)) != NULL) {
+      rewind(f);
+      len = fread(text, 1, (size_t)n, f);
+    }
+    fclose(f);
+  }
+#else
   FILE *f = open_memstream(&text, &len);
   if (f != NULL) {
     traceWriteSTS(f, 0);
     fprintf(f, "END\n");
     fclose(f);
   }
+#endif
   CcsSendDelayedReply(m->reply, (int)len, text != NULL ? text : "");
   free(text);
   delete m;
