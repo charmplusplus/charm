@@ -4,6 +4,9 @@
 /*@{*/
 
 #include <atomic>
+/* First: reconverse's converse.h does not pull in conv-mach-opt.h, and the
+   CMK_GPU / CMK_CUDA tests below must see the build options. */
+#include "conv-mach-opt.h"
 #include "converse.h"
 #include <charm++.h>
 #include <ck.h>
@@ -15,6 +18,9 @@
 
 #include "DistributedLB.h"
 #include "LBManager.h"
+#include "ckcallback-ccs.h"
+
+void LBObjLoadsCcsHandler(char* msg);
 #include "LBSimulation.h"
 #include "TreeLB.h"
 #include "topology.h"
@@ -396,6 +402,9 @@ void _loadbalancerInit()
   CmiGetArgIntDesc(argv, "+LBVersion", &_lb_args.lbversion(),
                    "LB database file version number");
   CmiGetArgIntDesc(argv, "+LBCentPE", &_lb_args.central_pe(), "CentralLB processor");
+  CmiGetArgDoubleDesc(argv, "+LBGreedyRefineTolerance", &_lb_args.greedyRefineTolerance(),
+                      "For the greedy-refine balancers, how far above plain greedy's max load to "
+                      "allow in exchange for fewer migrations (1.1 = 10% higher, the default). 0 or below runs the parameter search instead");
   CmiGetArgIntDesc(argv, "+LBPercentMovesAllowed", &_lb_args.percentMovesAllowed(),
                    "For GreedyRefineCentralLB, the percentage of chares that can be moved");
   bool _lb_dump_activated = false;
@@ -671,6 +680,7 @@ void LBManager::initnodeFn()
   _registerCommandLineOpt("+LBPredictorDelay");
   _registerCommandLineOpt("+LBPredictorWindow");
   _registerCommandLineOpt("+LBVersion");
+  _registerCommandLineOpt("+LBGreedyRefineTolerance");
   _registerCommandLineOpt("+LBCentPE");
   _registerCommandLineOpt("+LBDump");
   _registerCommandLineOpt("+LBDumpSteps");
@@ -759,6 +769,11 @@ void LBManager::init(void)
   CkpvAccess(lbmanagerInited) = true;
 #if CMK_LBDB_ON
   if (manualOn) TurnManualLBOn();
+  objLoadsCollecting = false;
+  // Registered through the C-level table, which exists since ConverseInit:
+  // the CkCallback form broadcasts to the callback group, which is not
+  // created yet when this group is constructed.
+  if (CkMyPe() == 0) CcsRegisterHandler("LBObjLoads", (CmiHandler)LBObjLoadsCcsHandler);
   // Move-ledger stall reporting; no cost while no step is draining.
   CcdCallOnConditionKeep(CcdPERIODIC_1second, (CcdCondFn)ledgerWatch, this);
 #endif
@@ -773,6 +788,88 @@ void LBManager::init(void)
   {
     CkSyncBarrier::object()->addReceiver([this](void) { this->InvokeLB(); });
   }
+}
+
+/* CCS handler "LBObjLoads": a snapshot of the load database on every PE.
+
+   Reply, in the job's native byte order: int32 numPes, then one record per
+   PE in reduction order (the pe field says which):
+     int32 pe, double wallNow, double totalWall, double idleWall, int32 nObjs,
+     nObjs x { uint64 objId, int32 omGroupIdx, double objWall, uint8 migratable }
+   The times are the database's cumulative values since the last ClearLoads
+   (a load-balancing step); a client takes differences between snapshots. */
+/* Converse-level CCS handler on PE 0: take the reply token and hand the
+   request to the local LBManager branch. */
+void LBObjLoadsCcsHandler(char* msg)
+{
+  CcsDelayedReply token = CcsDelayReply();
+  CmiFree(msg);
+  LBManager::Object()->objLoadsRequest(token);
+}
+
+void LBManager::objLoadsRequest(const CcsDelayedReply& token)
+{
+  objLoadsReplies.push_back(token);
+  if (!objLoadsCollecting)
+  {
+    objLoadsCollecting = true;
+    thisProxy.collectObjLoads();
+  }
+}
+
+void LBManager::collectObjLoads()
+{
+  // Reports what the database holds and never switches the
+  // instrumentation on or off: that is the program's decision
+  // (LBTurnInstrumentOn/Off, +LBOff). A program linked -tracemode
+  // utilization also answers "CkPerfObjLoads", the same layout from the
+  // trace events, which does not depend on this switch.
+  std::vector<char> buf;
+  auto put = [&buf](const void* p, size_t n) {
+    buf.insert(buf.end(), (const char*)p, (const char*)p + n);
+  };
+  int pe = CkMyPe();
+  double now = CkWallTimer();
+  LBRealType totalWall = 0, totalCpu = 0, idle = 0, bgWall = 0, bgCpu = 0;
+  lbdb_obj->GetTime(&totalWall, &totalCpu, &idle, &bgWall, &bgCpu);
+  double tw = totalWall, id = idle;
+  const auto& objs = lbdb_obj->getObjs();
+  int n = 0;
+  for (const auto& e : objs)
+    if (e.obj) n++;
+  put(&pe, sizeof(int));
+  put(&now, sizeof(double));
+  put(&tw, sizeof(double));
+  put(&id, sizeof(double));
+  put(&n, sizeof(int));
+  for (const auto& e : objs)
+  {
+    if (!e.obj) continue;
+    const LDObjData& d = e.obj->ObjData();
+    CmiUInt8 objId = d.objID();
+    int om = d.omID().id.idx;
+    double w = d.wallTime;
+    unsigned char mig = d.migratable ? 1 : 0;
+    put(&objId, sizeof(CmiUInt8));
+    put(&om, sizeof(int));
+    put(&w, sizeof(double));
+    put(&mig, 1);
+  }
+  contribute(buf.size(), buf.data(), CkReduction::concat,
+             CkCallback(CkIndex_LBManager::objLoadsCollected(NULL), thisProxy[0]));
+}
+
+void LBManager::objLoadsCollected(CkReductionMsg* m)
+{
+  int npes = CkNumPes();
+  std::vector<char> out(sizeof(int) + m->getSize());
+  memcpy(out.data(), &npes, sizeof(int));
+  memcpy(out.data() + sizeof(int), m->getData(), m->getSize());
+  for (const CcsDelayedReply& r : objLoadsReplies)
+    CcsSendDelayedReply(r, (int)out.size(), out.data());
+  objLoadsReplies.clear();
+  objLoadsCollecting = false;
+  delete m;
 }
 
 int LBManager::AddStartLBFn(std::function<void()> fn)

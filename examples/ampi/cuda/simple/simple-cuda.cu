@@ -9,6 +9,7 @@ __global__ void helloKernel() {
 void run_hello(hapiWorkRequest* wr, cudaStream_t kernel_stream, void** devBuffers) {
   printf("Calling kernel...\n");
   helloKernel<<<wr->grid_dim, wr->block_dim, wr->shared_mem, kernel_stream>>>();
+  hapiCheck(cudaPeekAtLastError());
 }
 
 hapiWorkRequest* setupWorkRequest(cudaStream_t stream) {
@@ -26,5 +27,8 @@ void invokeKernel(cudaStream_t stream) {
 
   printf("Calling kernel...\n");
   helloKernel<<<grid_dim, block_dim, 0, stream>>>();
+  // Otherwise a launch that never happens -- no cubin or PTX for this
+  // device's architecture, say -- is indistinguishable from success.
+  hapiCheck(cudaPeekAtLastError());
 }
 #endif

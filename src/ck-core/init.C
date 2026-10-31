@@ -66,6 +66,7 @@ never be excluded...
 #include "ckcheckpoint.h"
 #include "cknvtx.h"
 #include "ck.h"
+#include "cklocation.h"
 #include "ckrescale.h"
 #include "trace.h"
 #include "ckrdma.h"
@@ -178,6 +179,10 @@ CkErrStream ckerr;
 CkInStream  ckin;
 
 CkpvDeclare(void*,       _currentChare);
+#if CMK_ERROR_CHECKING
+CkpvExtern(void *, _nokeepMsgInFlight);
+CkpvExtern(int, _nokeepEpInFlight);
+#endif
 CkpvDeclare(int,         _currentChareType);
 CkpvDeclare(CkGroupID,   _currentGroup);
 CkpvDeclare(void*,       _currentNodeGroupObj);
@@ -309,6 +314,10 @@ void _registerCommandLineOpt(const char* opt) {
   }
 }
 
+// +objid_expand, parsed by rank 0 and read by every PE after the node barrier
+static int _objidExpandFactor = 8;
+static int _objidTrancheLog2Cap = 0;
+
 static inline void _parseCommandLineOpts(char **argv)
 {
   if (CmiGetArgFlagDesc(argv,"+cs", "Print extensive statistics at shutdown"))
@@ -347,6 +356,14 @@ static inline void _parseCommandLineOpts(char **argv)
       _shrinkexpand_basedir = "/dev/shm";
 # endif
 #endif
+
+  if (!CmiGetArgIntDesc(argv, "+objid_expand", &_objidExpandFactor,
+                        "Expansion headroom assumed when sizing element id home keys"
+                        " (max processes / launch processes; default 8)"))
+      _objidExpandFactor = 8;
+  if (!CmiGetArgIntDesc(argv, "+objid_tranche_log2", &_objidTrancheLog2Cap,
+                        "Testing: cap element id tranches at 2^N numbers per process"))
+      _objidTrancheLog2Cap = 0;
 
   if(CmiGetArgString(argv,"+restart",&_restartDir))
       faultFunc = CkRestartMain;
@@ -1229,6 +1246,7 @@ void InitCallTable::enumerateInitCalls()
 
 CpvCExtern(int, cpdSuspendStartup);
 void CpdFreeze(void);
+void CcsBuiltinsInit(char **argv); /* src/conv-ccs/ccs-builtins.C */
 
 extern int _dummy_dq;
 
@@ -1352,7 +1370,21 @@ void _initCharm(int unused_argc, char **argv)
     }
   });
 
+#if CMK_CCS_AVAILABLE
+	// CCS itself is initialized by reconverse's ConverseInit on every PE.
+	// Charm++'s builtin CCS handlers (the CpdList introspection in
+	// src/conv-ccs/ccs-builtins.C) register here, where classic Converse's
+	// CcsInit registers them.
+	CcsBuiltinsInit(argv);
+#endif
+
 	CkpvInitialize(size_t *, _offsets);
+#if CMK_ERROR_CHECKING
+	CkpvInitialize(void *, _nokeepMsgInFlight);
+	CkpvAccess(_nokeepMsgInFlight) = NULL;
+	CkpvInitialize(int, _nokeepEpInFlight);
+	CkpvAccess(_nokeepEpInFlight) = -1;
+#endif
 	CkpvAccess(_offsets) = new size_t[32];
 	CkpvInitialize(PtrQ*,_buffQ);
 	CkpvInitialize(PtrVec*,_bocInitVec);
@@ -1496,6 +1528,11 @@ void _initCharm(int unused_argc, char **argv)
 	// Set the ack handler function used for the direct nocopy api
 	CmiSetDirectNcpyAckHandler(CkRdmaDirectAckHandler);
 
+/* loopback_bridge/handler live in ckrdmadevice.C's reconverse D2D half: a
+ * device completion can be raised on any PE of the process, not necessarily
+ * the destination PE, so the handler exists to bounce it to the right one.
+ * Reconverse-only -- classic ucx also sets CMK_GPU_COMM (see
+ * arch/ucx/conv-common.h) but declares no loopback bridge. */
 #if CMK_GPU && CMK_GPU_COMM
   loopback_handler = CmiRegisterHandler((CmiHandler) loopback_bridge);
   device_restage_req_handler = CmiRegisterHandler((CmiHandler) device_restage_req_bridge);
@@ -1544,6 +1581,9 @@ void _initCharm(int unused_argc, char **argv)
 		CmiArgGroup("Charm++",NULL);
 		_parseCommandLineOpts(argv);
 		_nvtxInit(argv);
+		// The element id layout for this process, from the process count and
+		// +objid_expand; a checkpoint restore overrides it (CkPupROData).
+		ck::objid::initLayout(_objidExpandFactor, _objidTrancheLog2Cap);
 		_registerInit();
 		CkRegisterMsg("System", 0, 0, CkFreeMsg, sizeof(int));
 		CkRegisterChareInCharm(CkRegisterChare("null", 0, TypeChare));
@@ -1693,7 +1733,7 @@ void _initCharm(int unused_argc, char **argv)
             int *pelist;
             int num;
             CmiGetPesOnPhysicalNode(0, &pelist, &num);
-#if !CMK_MULTICORE && !CMK_SMP_NO_COMMTHD
+#if !CMK_SMP_NO_COMMTHD
             // Count communication threads, if present
             // XXX: Assuming uniformity of node size here
             num += num/CmiMyNodeSize();
@@ -1872,14 +1912,31 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 }
 
+/* Hand converse the per-PE init hooks that reconverse's ConverseInit invokes
+ * and classic convcore calls through its own path (ConverseCommonInit).
+ * Every Charm++ entry into ConverseInit calls this -- charm_main, and the
+ * interop entry points CharmBeginInit and CharmLibInit, which bypass
+ * charm_main.
+ *  - traceInit: without it the trace array is never created and _initCharm
+ *    dereferences a null CkpvAccess(_traces).
+ *  - CmiIsomallocInit (via isomalloc-reconverse.C): has to run before
+ *    CthInit, which is the first thing that could ask for a migratable
+ *    thread stack. */
+void _registerConverseInitHooks()
+{
+#if CMK_TRACE_ENABLED
+  registerTraceInit(traceInit);
+#endif
+  extern void CmiIsomallocHookIntoReconverse(void);
+  CmiIsomallocHookIntoReconverse();
+}
+
 int charm_main(int argc, char **argv)
 {
   int stack_top=0;
   memory_stack_top = &stack_top;
 
-#if CMK_TRACE_ENABLED
-  registerTraceInit(traceInit);
-#endif
+  _registerConverseInitHooks();
 
 #if CMK_GPU
   // Before ConverseInit: the machine layer's LCI initialises the CUDA driver,

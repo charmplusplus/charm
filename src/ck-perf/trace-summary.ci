@@ -26,6 +26,8 @@ module TraceSummary {
     entry [reductiontarget] void summaryDataCollected(double result[n], int n);
 
     entry void traceSummaryParallelShutdown(int pe);
+    entry void closeSummaryOnPe();
+    entry [reductiontarget] void closeSummaryDone();
     entry [reductiontarget] void maxBinSize(double);
     entry void shrink(double _maxBinSize);
     entry [reductiontarget] void sumData(double result[n], int n);

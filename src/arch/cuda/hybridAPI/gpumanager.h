@@ -21,6 +21,29 @@
 #include "hapi_trace_backend.h"
 #include <unordered_map>
 #include <queue>
+
+// Local rank of the logical node (process) that the given PE belongs to,
+// within its physical node.
+//
+// This lives here rather than in either caller because the device comm buffer
+// and the IPC event pools are both indexed by it, and hapi_impl.cpp and
+// ckrdmadevice.C index them from opposite sides of the same transfer. Two
+// copies that drift apart would not present as a mapping bug -- they would
+// present as corrupted payloads.
+//
+// Topology-derived (CmiNodeRankOnPhysicalNode: reconverse enumerates the
+// processes sharing the host), not CmiNodeOf(pe) % (nodes / physical nodes),
+// which assumes processes per host are uniform and that logical node numbering
+// is contiguous and host-ordered. The query is O(PEs on the physical node), so
+// this PE's own rank is cached: it is a property of the job's node set, and
+// anything that changes that set (shrink/expand) must call
+// hapiRefreshTopologyCache() on every PE before the next device operation and
+// rebuild the per-host structures indexed by it.
+CpvExtern(int, my_node_rank_local);
+void hapiRefreshTopologyCache();
+
+inline int CmiNodeRankLocal(int pe) { return CmiNodeRankOnPhysicalNode(CmiNodeOf(pe)); }
+inline int CmiMyNodeRankLocal() { return CpvAccess(my_node_rank_local); }
 #include <deque>
 #include <mutex>
 #include <atomic>

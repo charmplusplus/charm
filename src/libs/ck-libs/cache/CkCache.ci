@@ -25,6 +25,17 @@ module CkCache {
     //entry [local] CkCacheEntry *requestCacheEntryNoFetch(CkCacheKey key, int chunk);
   };
 
+  // Process-shared tree store with the same protocol (CkTreeCache.h): a
+  // per-PE group whose branches share one store per process.
+  // Instantiated by the application: group CkTreeCacheManager<Key, Traits>;
+  template<class CkCacheKey, class Traits> group [migratable] CkTreeCacheManager {
+    entry CkTreeCacheManager(int n, CkGroupID locMgr[n]);
+    entry void recvData(CkCacheFillMsg<CkCacheKey> *msg);
+    entry void deliverRemote(int chunk, CkCacheKey key, CmiUInt8 data, int n, CmiUInt8 opaques[n]);
+    entry void freeChunkRecords(int chunk);
+    entry void collectStatistics(const CkCallback &cb);
+  };
+
   message CkCacheFillMsg<CmiUInt8>;
   message CkCacheRequestMsg<CmiUInt8>;
   group CkCacheManager<CmiUInt8>;

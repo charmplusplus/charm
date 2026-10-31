@@ -1,0 +1,44 @@
+mainmodule redmig {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Elem elemProxy;
+  readonly int nElems;
+  readonly int nSteps;
+  readonly int nRed;
+  readonly int noSync;
+  readonly int toMain;
+  readonly int useBound;
+  readonly int noKeep;
+  readonly int staticIns;
+  readonly int drained;
+  readonly int inOrder;
+  readonly int zcStep;
+  readonly CProxy_Sync syncProxy;
+  readonly int verbose;
+
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry [reductiontarget] void redDone(long long sum);
+    entry [reductiontarget] void stepDone(int n);
+    entry [reductiontarget] void finalStats(long long totalMigrations);
+    entry void checkProgress();
+    entry void zcSent(CkDataMsg* m);
+  };
+
+  // Bound to Elem with -b: this element owns usesAtSync and calls AtSync, so
+  // the Elem bound to it migrates as a passenger (AMPI's TCharm/ampi pair).
+  array [1D] Sync {
+    entry Sync();
+  };
+
+  array [1D] Elem {
+    entry Elem();
+    entry void nextStep(int step);
+    // With -z each step starts with a zero-copy broadcast (the nocopy path
+    // keeps the message in use after its first delivery)
+    entry void nextStepZC(int step, nocopy int data[n], int n);
+    entry [reductiontarget] void redResult(long long sum);
+    entry [nokeep] void redResultNoKeep(CkReductionMsg* m);
+    entry void finish();
+    entry void dumpState();
+  };
+}

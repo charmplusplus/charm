@@ -1,0 +1,22 @@
+Reconverse> Starting Reconverse with 4 processes, 32 PEs (1 PE = 1 thread), and 8 PEs per process
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (OS indices): 48-55
+Charm++> cpu topology info is gathered in 0.001 seconds.
+HAPI> Config: 1 device(s) per process, 8 PE(s) per device, 4 device(s) per host
+HAPI> Enabled POSIX shared memory optimizations for inter-process GPU messaging
+HAPI> GPU communication buffer size: 64 MB (rounded up to the nearest power of two)
+HAPI> GPU load balancing buffer size: 0 MB 
+HAPI> hapi IPC event pool size - 256 per PE, 2048 per device
+HAPI> Enabling P2P access between devices
+Converse> pxshm pool init'd with 8388608B segment and 262144B cutoff.
+WARNING: +gpupool is a command line argument beginning with a '+' but was not parsed by the RTS.
+If any of the above arguments were intended for the RTS you may need to recompile Charm++ with different options.
+CharmLB> MetisLB created.
+
+[GPU 2D Jacobi example, load imbalance variant]
+Grid: 8192 x 8192, Block: 512 x 512, Chares: 16 x 16, Iterations: 100, Warm-up: 10, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 0.192 s
+Total time: 1.364 s
+Average iteration time: 13635.936 us

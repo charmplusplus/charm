@@ -10,6 +10,8 @@
 #include <unordered_map>
 
 #include "LBDatabase.h"
+#include "conv-ccs.h"   // CcsDelayedReply
+#include <deque>
 #include "json_fwd.hpp"
 using json = nlohmann::json;
 
@@ -27,6 +29,12 @@ class CkLBArgs
 {
  private:
   double _autoLbPeriod;  // in seconds
+  // GreedyRefineCentralGPULB: how far above plain greedy's max load the
+  // refinement may settle in exchange for fewer migrations (1.1 = 10% higher,
+  // the default). 0 or below asks for the parameter search instead: every PE
+  // builds a candidate from a different (A,B) pair and the best is chosen,
+  // at the cost of a reduction per balancing step.
+  double _lb_greedyRefineTolerance;
   double _lb_alpha;      // per message send overhead
   double _lb_beta;       // per byte send overhead
   int _lb_debug;         // 1 or greater
@@ -135,6 +143,7 @@ class CkLBArgs
     _lb_metaLbGpuTol = 1.1;
     _lb_metaLbModelDir = nullptr;
     _lb_percentMovesAllowed = 100;
+    _lb_greedyRefineTolerance = 1.1;  // 10% over greedy; <=0 searches instead
   }
   inline char*& treeLBFile() { return _lb_treeLBFile; }
   inline double& lbperiod() { return _autoLbPeriod; }
@@ -168,6 +177,7 @@ class CkLBArgs
   inline char*& gpuRateFile() { return _lb_gpuRateFile; }
   inline int& central_pe() { return _lb_central_pe; }
   inline double& alpha() { return _lb_alpha; }
+  inline double& greedyRefineTolerance() { return _lb_greedyRefineTolerance; }
   inline double& beta() { return _lb_beta; }
   inline int& maxDistPhases() { return _lb_maxDistPhases; }
   inline double& targetRatio() { return _lb_targetRatio; }
@@ -358,6 +368,11 @@ class LBManager : public CBase_LBManager
 
   LBDatabase* lbdb_obj;
 
+  // CCS handler "LBObjLoads": pending reply tokens and whether a collection
+  // round is in flight (one round serves every request that arrived meanwhile)
+  std::deque<CcsDelayedReply> objLoadsReplies;
+  bool objLoadsCollecting;
+
   bool useBarrier;            // use barrier or not
 
   PredictCB* predictCBFn;
@@ -482,6 +497,12 @@ class LBManager : public CBase_LBManager
   void setPupSize(LDObjHandle h, size_t pup_size) { lbdb_obj->setPupSize(h, pup_size); }
   void setGPUPupSize(LDObjHandle h, size_t gpu_pup_size) { lbdb_obj->setGPUPupSize(h, gpu_pup_size); }
   void UseAsyncMigrate(LDObjHandle h, bool flag) { lbdb_obj->UseAsyncMigrate(h, flag); };
+  // Live per-object load snapshot over CCS (handler "LBObjLoads" on PE 0):
+  // every PE appends one record, the reply is int32 numPes followed by the
+  // concatenated records; see collectObjLoads for the layout.
+  void objLoadsRequest(const CcsDelayedReply& token);
+  void collectObjLoads();
+  void objLoadsCollected(CkReductionMsg* m);
   int GetObjDataSz(void) { return lbdb_obj->GetObjDataSz(); }
   int GetCommDataSz(void) { return lbdb_obj->GetCommDataSz(); }
   void GetObjData(LDObjData* data) { lbdb_obj->GetObjData(data); }

@@ -41,7 +41,6 @@ void Cpd_CmiHandleMessage(void *msg);
 void CpdAborting(const char *message);
 
 extern int (*CpdIsDebugMessage)(void*);
-extern void * (*CpdGetNextMessage)(CsdSchedulerState_t*);
 extern int _conditionalDelivery;
 extern int conditionalPipe[2];
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Thin wrapper around CMake to start a build with a similar command line as ./buildold
+# Thin wrapper around CMake to start a Charm++ build
 
 set -o errexit
 # bash < 4.4 erroneously considers empty arrays to be unset
@@ -9,23 +9,17 @@ set -o errexit
 # Determine the location of this script
 my_srcdir="$(cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
-full_args=("$@")
-
 # Check that CMake is available and that the version is sufficiently new
 command -v cmake >/dev/null 2>&1 && rc=$? || rc=$?
 
 if [[ $rc -ne 0 ]]; then
-  echo "Warning: CMake unavailable, running ./buildold instead."
-  sleep 2
-  "$my_srcdir/buildold" "$@"
-  exit $?
+  echo "Error: CMake 3.12 or newer is required to build Charm++, and no cmake was found in PATH."
+  exit 1
 fi
 
 if [[ $(uname) == "MSYS"* || $(uname) == "MINGW"* ]]; then
-  echo "Warning: CMake build is not supported under MSYS, running ./buildold instead."
-  sleep 2
-  "$my_srcdir/buildold" "$@"
-  exit $?
+  echo "Error: building Charm++ under MSYS or MinGW is not supported."
+  exit 1
 fi
 
 cmake_version_major=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 1 -d'.')
@@ -33,11 +27,9 @@ cmake_version_minor=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 2 -d'.
 
 cmake_version_full=$(cmake --version | head -1 | cut -f 3 -d' ')
 
-if [[ $cmake_version_major -lt 3 || ($cmake_version_major -eq 3 && $cmake_version_minor -lt 4) ]]; then
-  echo "Warning: The CMake version on your system is too old (needed: 3.4.0 or later; available: $cmake_version_full), running ./buildold instead."
-  sleep 2
-  "$my_srcdir/buildold" "$@"
-  exit $?
+if [[ $cmake_version_major -lt 3 || ($cmake_version_major -eq 3 && $cmake_version_minor -lt 12) ]]; then
+  echo "Error: CMake 3.12 or newer is required to build Charm++ (available: $cmake_version_full)."
+  exit 1
 fi
 
 usage()
@@ -50,7 +42,7 @@ usage()
 
 help()
 {
-  "$my_srcdir/buildold" --help
+  usage
   exit 0
 }
 
@@ -93,6 +85,7 @@ parse_triplet
 
 extra_triplet_opts=${extra_triplet_opts//-/ }
 opt_build_ofi=0
+opt_craype=0
 opt_cxi=0
 opt_ampi_error_checking=0
 opt_ampi_mpich_tests=0
@@ -101,9 +94,10 @@ opt_arch=$(echo "$actual_triplet" | cut -f 3 -d -) # opt_arch might be empty for
 opt_build_shared=0
 opt_ccs=0
 opt_charmdebug=0
+opt_coverage=0
 opt_controlpoint=0
 opt_cuda=0
-opt_hip=0
+opt_amd=0
 opt_destination=""
 opt_disabletls=0
 opt_install_prefix=""
@@ -120,9 +114,11 @@ opt_lrts_pmi=""
 opt_mempool_cutoff=26
 opt_network=0
 opt_numa=0
+opt_nolb=0
 opt_omp=0
 opt_ooc=0
 opt_parallel=-j1
+opt_perftools=0
 opt_persistent=0
 opt_prio_type="bitvec"
 opt_production=0
@@ -132,9 +128,13 @@ opt_shmem=0
 opt_xpmem=0
 opt_qlogic=0
 opt_randomized_msgq=0
-opt_reconverse=1 # fake argument for now
-opt_fetch_reconverse_tag=""
-opt_fetch_reconverse_dir=""
+# OFF unless the target network is reconverse (set below) or
+# --enable-reconverse is passed. The old default of 1 made EVERY build --
+# netlrts included -- add the reconverse subdirectory, which installs
+# reconverse's converse.h over the classic one and breaks all classic
+# arches (#3941).
+opt_reconverse=0
+opt_reconverse_dir=""
 opt_reconverse_fetch_lci=1
 opt_refnum_type="unsigned short"
 opt_replay=0
@@ -145,6 +145,7 @@ opt_suffix=""
 opt_syncft=0
 opt_task_queue=0
 opt_tcp=0
+opt_tsan=0
 opt_tracing= #undef
 opt_tracing_commthread=0
 opt_zlib=1
@@ -182,8 +183,10 @@ function parse_platform_compilers() {
     cuda)
       opt_cuda=1
       ;;
-    hip)
-      opt_hip=1
+    amd|hip)
+      # AMD GPU support via HIP/ROCm. Both spellings are accepted; the build
+      # directory is always suffixed "-amd" (e.g. reconverse-linux-x86_64-amd).
+      opt_amd=1
       ;;
     cxi)
       opt_cxi=1
@@ -196,6 +199,19 @@ function parse_platform_compilers() {
       ;;
     ooc)
       opt_ooc=1
+      ;;
+    # Option words that have a conv-mach-<word> file in src/arch/common.
+    nolb)
+      opt_nolb=1
+      ;;
+    tsan)
+      opt_tsan=1
+      ;;
+    perftools)
+      opt_perftools=1
+      ;;
+    craype)
+      opt_craype=1
       ;;
     tcp)
       opt_tcp=1
@@ -357,14 +373,32 @@ function processArgs() {
       --enable-ccs)
         opt_ccs=1
         ;;
+      --coverage)
+        # clang source-based coverage; see coverage/README.md
+        opt_coverage=1
+        ;;
       --enable-reconverse)
         opt_reconverse=1
         ;;
       --with-fetch-reconverse-tag=*)
-        opt_fetch_reconverse_tag=${arg#*=}
+        # Reconverse is a submodule now, so the version is the gitlink at
+        # contrib/reconverse rather than a tag this script passes to CMake.
+        echo "Error: --with-fetch-reconverse-tag is gone; reconverse is a git" >&2
+        echo "submodule. To build against ${arg#*=}, check it out:" >&2
+        echo "  git -C contrib/reconverse fetch origin" >&2
+        echo "  git -C contrib/reconverse checkout ${arg#*=}" >&2
+        echo "and commit the moved gitlink to change it for everyone." >&2
+        exit 1
         ;;
-      --with-fetch-reconverse-dir=*)
-        opt_fetch_reconverse_dir=${arg#*=}
+      --with-reconverse-dir=*|--with-fetch-reconverse-dir=*)
+        # Build against a reconverse tree outside the charm checkout instead of
+        # the submodule. (--with-fetch-reconverse-dir is the old spelling.)
+        # Resolved here, while the cwd is still the one the user invoked from:
+        # by the time it is passed to cmake we have cd'd into the build tree.
+        opt_reconverse_dir=$(cd "${arg#*=}" 2>/dev/null && pwd) || {
+          echo "Error: --with-reconverse-dir: ${arg#*=} is not a directory" >&2
+          exit 1
+        }
         ;;
       --without-reconverse-fetch-lci)
         opt_reconverse_fetch_lci=0
@@ -522,7 +556,7 @@ fi
 
 # Append certain features and compilers to the end of $builddir
 builddir_extra=""
-for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent opt_cuda opt_hip opt_cxi; do
+for flag in opt_omp opt_smp opt_tcp opt_pthreads opt_pxshm opt_syncft opt_ooc opt_persistent opt_cuda opt_amd opt_cxi; do
   [[ $flag -eq 1 ]] && builddir_extra+="-${flag/opt_/}"
 done
 
@@ -612,19 +646,28 @@ fi
 
 my_os=$(echo "$actual_triplet" | cut -d '-' -f2)
 
-if [[ $opt_network == "mpi" && $my_os == "win" ]]; then
-  echo "Warning: CMake build is not supported with MPI on Windows, running ./buildold instead."
-  sleep 2
-  "$my_srcdir/buildold" "${full_args[@]}"
-  exit $?
+# reconverse network type implies reconverse communication layer and inherent SMP.
+# CMK_SMP is forced to 1 by CMakeLists.txt for reconverse; we do not pass -DSMP=1
+# here because that would trigger the opt-file loop to source conv-mach-smp.sh,
+# which does not exist for reconverse (SMP flags are baked into conv-mach.h directly).
+if [[ $opt_network == "reconverse" ]]; then
+  opt_reconverse=1
 fi
 
-# Special handling for Windows compiler
+if [[ $opt_network == "mpi" && $my_os == "win" ]]; then
+  echo "Error: building Charm++ with MPI on Windows is not supported."
+  exit 1
+fi
+
+# Windows: MSVC, driven from Cygwin through the unix2nt_cc wrapper, which maps
+# Unix compiler options onto cl, link and ml64. A Windows build is a single
+# process with no network, so reconverse gets neither LCI nor LCW.
 if [[ $my_os == "win" && ( -z $opt_CC || $opt_CC == "msvc" ) ]]; then
-  # Need to use unix2nt_cc on Windows/Cygwin
-  opt_CC="$(realpath "$my_srcdir")/src/arch/win/unix2nt_cc"
+  opt_CC="$my_srcdir/src/arch/win/unix2nt_cc"
   opt_CXX="$opt_CC"
   opt_FC=
+  opt_reconverse_fetch_lci=0
+  opt_cmake_extra_args+=(-DRECONVERSE_TRY_ENABLE_COMM_LCI2=OFF -DRECONVERSE_TRY_ENABLE_COMM_LCW=OFF)
 fi
 
 [[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'
@@ -661,11 +704,11 @@ fi
 # Run configure step
 
 CMAKE_EXTRA_ARGS=()
-if [[ -n "$opt_fetch_reconverse_tag" ]]; then
-  CMAKE_EXTRA_ARGS+=(-DAUTOFETCH_RECONVERSE_TAG="$opt_fetch_reconverse_tag")
-fi
-if [[ -n "$opt_fetch_reconverse_dir" ]]; then
-  CMAKE_EXTRA_ARGS+=(-DFETCHCONTENT_SOURCE_DIR_RECONVERSE="$opt_fetch_reconverse_dir")
+if [[ -n "$opt_reconverse_dir" ]]; then
+  # We have already cd'd into the build directory, so a relative path the user
+  # typed would resolve against the wrong directory; $opt_reconverse_dir was
+  # made absolute at parse time.
+  CMAKE_EXTRA_ARGS+=(-DRECONVERSE_SOURCE_DIR="$opt_reconverse_dir")
 fi
 if (( ${#opt_cmake_extra_args[@]} > 0 )); then
   CMAKE_EXTRA_ARGS+=("${opt_cmake_extra_args[@]}")
@@ -683,9 +726,10 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DBUILD_SHARED="$opt_build_shared" \
   -DCCS="$opt_ccs" \
   -DCHARMDEBUG="$opt_charmdebug" \
+  -DCMK_COVERAGE="$opt_coverage" \
   -DCONTROLPOINT="$opt_controlpoint" \
   -DBUILD_CUDA="$opt_cuda" \
-  -DBUILD_HIP="$opt_hip" \
+  -DBUILD_HIP="$opt_amd" \
   -DDISABLE_TLS="$opt_disabletls" \
   -DDRONE_MODE="$opt_drone_mode" \
   -DENABLE_FORTRAN=$opt_enable_fortran \
@@ -700,6 +744,10 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DNUMA="$opt_numa" \
   -DOMP="$opt_omp" \
   -DOOC="$opt_ooc" \
+  -DNOLB="$opt_nolb" \
+  -DTSAN="$opt_tsan" \
+  -DPERFTOOLS="$opt_perftools" \
+  -DCRAYPE="$opt_craype" \
   -DPERSISTENT="$opt_persistent" \
   -DPRIO_TYPE="$opt_prio_type" \
   -DPTHREADS="$opt_pthreads" \

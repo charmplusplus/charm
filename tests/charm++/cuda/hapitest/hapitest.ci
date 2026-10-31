@@ -1,0 +1,30 @@
+mainmodule hapitest {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_PeCheck peCheckProxy;
+  readonly CProxy_Worker workerProxy;
+  readonly int nChares;
+  readonly int nKernels;
+  readonly int nSlotElems;
+  readonly int verbose;
+  readonly int checkMapFormula;
+
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry [reductiontarget] void streamsReady();
+    entry void peReport(CkReductionMsg* m);
+    entry [reductiontarget] void workDone(long long completions);
+    entry void quiesced();
+  };
+
+  group PeCheck {
+    entry PeCheck();
+    entry void createStreams();
+    entry void check();
+  };
+
+  array [1D] Worker {
+    entry Worker();
+    entry void run();
+    entry void kernelDone();
+  };
+};

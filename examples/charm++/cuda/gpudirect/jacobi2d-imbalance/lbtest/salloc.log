@@ -1,0 +1,6 @@
+salloc: Pending job allocation 21958361
+salloc: job 21958361 queued and waiting for resources
+salloc: job 21958361 has been allocated resources
+salloc: Granted job allocation 21958361
+salloc: Waiting for resource configuration
+salloc: Nodes gpub060 are ready for job

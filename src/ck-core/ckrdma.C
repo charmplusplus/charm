@@ -2,10 +2,10 @@
  * Charm Onesided API Utility Functions
  */
 
-#include "charm++.h"
-#include "ck.h"
 #include "converse.h"
 #include "cmirdmautils.h"
+#include "charm++.h"
+#include "ck.h"
 #include "spanningTree.h"
 #include <algorithm>
 #include "ckarray.h"
@@ -292,6 +292,27 @@ void handleDirectApiCompletion(NcpyOperationInfo *info) {
 
 // Ack handler function which invokes the callback
 void CkRdmaDirectAckHandler(void *ack) {
+
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+  /* Inter-node device (D2D) transfers ride this same ack path, but their
+   * completion bookkeeping is entirely different -- see ckrdmadevice.C. They
+   * are recognised by the deviceRdmaOpInfo the device path attaches to the
+   * destination buffer; every host-side buffer leaves it null.
+   *
+   * Dispatching here is deliberate. The obvious alternative -- having the
+   * device path call CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler) when
+   * it posts a get -- swaps a process-wide function pointer, so from the first
+   * inter-node D2D message onward every host-side Direct-API and nocopy
+   * entry-method ack would also be delivered to the device handler and
+   * dereference a null deviceRdmaOpInfo.
+   *
+   * The device handler does its own QD accounting, so return before the
+   * QdProcess below rather than after it. */
+  if (((NcpyOperationInfo *)ack)->deviceRdmaOpInfo != nullptr) {
+    CkRdmaDeviceRecvHandler(ack);
+    return;
+  }
+#endif
 
   // Process QD to mark completion of the outstanding RDMA operation
   QdProcess(1);
@@ -588,7 +609,15 @@ void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, Ncp
                 dest.pe,
                 (char *)(ncpyEmBufferInfo), // destRef
                 rootNode,
-                ncpyOpInfo);
+                ncpyOpInfo
+                // reconverse's setNcpyOpInfo takes one more argument than
+                // classic's: the device RDMA op info. This is a host-side
+                // operation, so it carries none. Leaving the argument off
+                // compiled and linked (extern "C"), and the callee then read
+                // stack garbage into deviceRdmaOpInfo, which CUDA builds use
+                // to route acks to the device handler.
+                , nullptr
+                );
 
   // set opMode
   if(emMode == ncpyEmApiMode::BCAST_SEND || emMode == ncpyEmApiMode::BCAST_RECV)
@@ -953,8 +982,9 @@ void CkRdmaIssueRgets(envelope *env, void **arrPtrs, int *arrSizes, int arrayInd
   for(int i=0; i<numops; i++){
     up|source;
 
-    if(source.cnt < arrSizes[i])
-      CkAbort("CkRdmaIssueRgets: Size of the posted buffer > Size of the source buffer\n");
+    if((size_t)arrSizes[i] > source.cnt)
+      CkAbort("CkPostBuffer: posted buffer of %zu bytes is larger than the %zu-byte source (operation %d); the posted size must be <= the source size",
+              (size_t)arrSizes[i], source.cnt, i);
 
 #if CMK_USE_CMA && CMK_REG_REQUIRED
     if(!sendBackToSourceForDereg && ncpyMode == CkNcpyMode::CMA && source.refAckInfo != NULL)
@@ -2012,20 +2042,19 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
   ref->pe = CmiMyPe();
 #endif
 
+  // Both entries exist before the first Rget is issued: CmiIssueRget may run
+  // the completion (zcPupGetCompleted) inline, and it looks them up.
+  CmiLock(CksvAccess(_nodeZCPendingLock));
+  CksvAccess(pendingZCOps).emplace(id, (CmiUInt1)CpvAccess(newZCPupGets).size());
+  CmiUnlock(CksvAccess(_nodeZCPendingLock));
+  locMgr->bufferedActiveRgetMsgs.emplace(id, std::vector<CkArrayMessage *>()); // owned by locMgr, no lock
+
   for(std::vector<NcpyOperationInfo *>::iterator it = CpvAccess(newZCPupGets).begin();
         it != CpvAccess(newZCPupGets).end(); ++it) {
     (*it)->destRef = (char *)ref;
     zcQdIncrement();
     CmiIssueRget(*it); // Issue the Rget
   }
-
-  // Create an entry for the unordered map with idx as the index and the vector size as the value
-  CmiLock(CksvAccess(_nodeZCPendingLock));
-  CksvAccess(pendingZCOps).emplace(id, (CmiUInt1)CpvAccess(newZCPupGets).size());
-  CmiUnlock(CksvAccess(_nodeZCPendingLock));
-
-  // Create an entry for the unordered map with idx as the index and vector of messages as the value
-  locMgr->bufferedActiveRgetMsgs.emplace(id, std::vector<CkArrayMessage *>()); // does not require locking as it is owned by locMgr
 }
 /***************************** End of Zerocopy PUP Support ****************************/
 
@@ -2397,8 +2426,9 @@ int CkPerformRget(CkNcpyBufferPost &post, void *destBuffer, int destSize) {
 
       if(i == destIndex) {
 
-        if(source.cnt < destSize)
-          CkAbort("CkRdmaIssueRgets: Size of the posted buffer > Size of the source buffer\n");
+        if((size_t)destSize > source.cnt)
+          CkAbort("CkPostBuffer: posted buffer of %zu bytes is larger than the %zu-byte source (tag %zu); the posted size must be <= the source size",
+                  (size_t)destSize, source.cnt, post.tag);
 
 #if CMK_USE_CMA && CMK_REG_REQUIRED
         if(!sendBackToSourceForDereg && ncpyMode == CkNcpyMode::CMA && source.refAckInfo != NULL)
@@ -2497,6 +2527,12 @@ int CkPerformRget(CkNcpyBufferPost &post, void *destBuffer, int destSize) {
     return true;
 
   } else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {
+
+    // The node-level receive already completed, so the source size is the one
+    // recorded in the post structure rather than one unpacked from the message.
+    if((size_t)destSize > post.srcSize)
+      CkAbort("CkPostBuffer: posted buffer of %zu bytes is larger than the %zu-byte source (tag %zu); the posted size must be <= the source size",
+              (size_t)destSize, post.srcSize, post.tag);
 
     memcpy(destBuffer, post.srcBuffer, post.srcSize);
 

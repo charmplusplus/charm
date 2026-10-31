@@ -1,7 +1,10 @@
 #ifndef _CONV_RDMADEVICE_H_
 #define _CONV_RDMADEVICE_H_
 
+/* The hapi-portable device-comm interface. */
 #include "charm-config.h"
+
+
 #include "converse.h"
 #include "cmirdmautils.h"
 #include "pup.h"
@@ -190,4 +193,4 @@ void CmiInvokeRecvHandler(void* data);
 #endif // CMK_GPU_COMM
 #endif // CMK_GPU
 
-#endif // _CONV_RDMADEVICE_H_
+#endif

@@ -60,6 +60,7 @@ set(ldb-h-sources ../ck-ldb/BaseLB.h ../ck-ldb/CentralLBMsg.h ../ck-ldb/LBMigrat
     ../ck-ldb/DistBaseLB.h ../ck-ldb/DistributedLB.h
     ../ck-ldb/HybridBaseLB.h ../ck-ldb/HybridLBMsg.h
     ../ck-ldb/GpuScalingModel.h
+    ../ck-ldb/GreedyRefineCentralGPULB.h
     ../ck-ldb/LBComm.h
     ../ck-ldb/LBDatabase.h ../ck-ldb/LBManager.h ../ck-ldb/LBMachineUtil.h ../ck-ldb/LBOM.h
     ../ck-ldb/LBObj.h ../ck-ldb/LBSimulation.h
@@ -185,3 +186,10 @@ target_include_directories(ckmain PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../uti
 
 add_library(mpi-mainmodule mpi-mainmodule.C)
 add_dependencies(mpi-mainmodule ck)
+
+if(CMK_CAN_LINK_FORTRAN)
+    # The Fortran program entry: mainf.f90 calls charm_main_fortran_wrapper
+    # (init.C, in libck), so it builds on reconverse too. charmc links it
+    # (-lckmainf) for every Fortran main, including AMPI's ampif90.
+    add_library(ckmainf mainf.f90)
+endif()

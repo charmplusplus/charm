@@ -49,7 +49,7 @@ void CollideGrid3d::init(const vector3d &Norigin,//Grid voxel corner 0,0,0
     sizes[i]=desiredSize[i];
 #endif
     ((double *)scales)[i]=1.0/((double *)sizes)[i];
-    testMapping(*this,i,((double *)origin)[i],((double *)sizes)[i]);
+    //testMapping(*this,i,((double *)origin)[i],((double *)sizes)[i]);
   }
 
 }

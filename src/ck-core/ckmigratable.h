@@ -221,6 +221,7 @@ public:
   void lbCheckWaitRelease() { }
   void setMigratable(int migratable)  { }
   void setPupSize(size_t obj_pup_size) { }
+  void setGPUPupSize(size_t obj_gpu_pup_size) { }
 public:
   void ckFinishConstruction(int epoch) { }
 #endif

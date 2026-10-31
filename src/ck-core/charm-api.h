@@ -9,8 +9,16 @@ libraries written in Charm for other languages.
 //#include "charm-version.h"
 //#include "charm-version-git.h"
 
-#include "charm-config.h"
-#include "converse.h" /* for CMK_FORTRAN symbols */
+#include "charm-config.h" /* for CMK_FORTRAN symbols; classic aliases conv-config */
+/* On reconverse charm-config.h is reconverse's own and does not carry the
+   CMK_FORTRAN_USES_* macros; they are in conv-autoconfig.h (guarded, and
+   already included by charm.h). Without it a unit that reaches this header
+   before charm.h or conv-config.h, such as the C stubs in TCharm and AMPI,
+   defines FTN_NAME as NONMANGLED_* while the rest of the library uses the
+   detected mangling, and Fortran-named symbols fail to link wherever a
+   Fortran compiler was found at configure time. */
+#include "conv-autoconfig.h"
+#include "converse.h"
 
 /** Used to define a C language entry point*/
 #ifdef __cplusplus

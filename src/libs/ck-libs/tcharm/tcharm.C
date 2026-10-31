@@ -44,7 +44,11 @@ public:
 };
 static TCharmTraceLibList tcharm_tracelibs;
 static bool tcharm_nomig=false;
+static bool tcharm_nomigWarned=false;
 bool tcharm_nothreads=false;
+bool tcharm_campi=false;
+TCharmCampiStartFn tcharm_campi_start_fn=nullptr;
+TCharmCampiResumeFn tcharm_campi_resume_fn=nullptr;
 #ifndef TCHARM_STACKSIZE_DEFAULT
 #define TCHARM_STACKSIZE_DEFAULT 1048576 /*Default stack size is 1MB*/
 #endif
@@ -107,6 +111,14 @@ void TCharm::procInit()
   tcharm_nomig=CmiGetArgFlagDesc(argv,"+tcharm_nomig","Disable migration support (debugging)");
   tcharm_nothreads=CmiGetArgFlagDesc(argv,"+tcharm_nothread","Disable thread support (debugging)");
   tcharm_nothreads=(CmiGetArgFlagDesc(argv,"+tcharm_nothreads",NULL)) ? true : tcharm_nothreads;
+  // campi mode: the application registered a coroutine main (campi.h), which
+  // installed the start hook during static initialization. No thread exists,
+  // and migration is not supported yet.
+  tcharm_campi = (tcharm_campi_start_fn != nullptr);
+  if (tcharm_campi) {
+    tcharm_nothreads = true;
+    tcharm_nomig = true;
+  }
   char *traceLibName=NULL;
   while (CmiGetArgStringDesc(argv,"+tcharm_trace",&traceLibName,"Print each call to this library"))
       tcharm_tracelibs.addTracing(traceLibName);
@@ -133,8 +145,9 @@ void TCharm::procInit()
     CmiGetArgIntDesc(argv, "+vp", &ignored, nullptr);
   }
   if (CkMyPe()==0) { // Echo various debugging options:
-    if (tcharm_nomig) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
-    if (tcharm_nothreads) CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
+    if (tcharm_nomig && !tcharm_campi) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
+    if (tcharm_campi) CmiPrintf("TCHARM> campi: ranks run as C++20 coroutines (no threads, no migration)\n");
+    else if (tcharm_nothreads) CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
   }
   if (!CkpvAccess(mapCreated)) {
     if (0!=CmiGetArgString(argv, "+mapping", &mapping)){
@@ -178,10 +191,11 @@ static void startTCharmThread(TCharmInitMsg *msg)
 {
 	DBGX("thread started");
 	TCharm::activateThread();
-       TCHARM_Thread_data_start_fn threadFn = getTCharmThreadFunction(msg->threadFn);
+	TCharm::get()->traceSegmentBegin();
+	TCHARM_Thread_data_start_fn threadFn = getTCharmThreadFunction(msg->threadFn);
 	threadFn(msg->data);
 	TCharm::deactivateThread();
-	TCharm::getNULL()->done(0);
+	TCharm::getNULL()->done(0);  // its stop() ends the trace segment
 }
 
 TCharm::TCharm(TCharmInitMsg *initMsg_)
@@ -189,6 +203,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   initMsg=initMsg_;
   initMsg->opts.sanityCheck();
   timeOffset=0.0;
+  campiRank=nullptr;
   if (tcharm_nothreads)
   { //Don't even make a new thread-- just use main thread
     tid=CthSelf();
@@ -207,7 +222,10 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
         CmiIsomallocContextEnableRandomAccess(heapContext);
     }
   }
-  CtvAccessOther(tid,_curTCharm)=this;
+  // campi: tid is the scheduler's thread, shared by every rank on this PE;
+  // the rank's context is installed at each coroutine resume instead.
+  if (!tcharm_campi)
+    CtvAccessOther(tid,_curTCharm)=this;
   asyncMigrate = false;
   isStopped=true;
   exitWhenDone=initMsg->opts.exitWhenDone;
@@ -217,6 +235,13 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   threadInfo.numElements=initMsg->numElements;
   nUd=0;
   usesAtSync=true;
+#if CMK_LBDB_ON
+  // Without migratable threads the element cannot be packed (see pup), so
+  // no balancer may select it, whatever path triggers the balancing step
+  // (AtSync from migrate(), async_migrate(), or a user AtSync). This also
+  // covers the arrays bound to this one: they share the location record.
+  if (tcharm_nomig) CkMigratable::setMigratable(0);
+#endif
   run();
 }
 
@@ -225,6 +250,7 @@ TCharm::TCharm(CkMigrateMessage *msg)
 {
   initMsg=NULL;
   tid=NULL;
+  campiRank=nullptr;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
 }
 
@@ -365,10 +391,21 @@ TCharm::~TCharm()
   delete initMsg;
 }
 
+// Called when a thread asks to migrate and the build has no migratable
+// threads. PE 0 prints the warning the first time this happens on it, so a
+// run prints it at most once.
+static void warnNoMigration()
+{
+	if (CkMyPe()==0 && !tcharm_nomigWarned) {
+		tcharm_nomigWarned = true;
+		CkPrintf("Warning> thread migration is not supported in this build; ranks will not migrate.\n");
+	}
+}
+
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrateTo(int destPE) noexcept {
 	if (destPE==CkMyPe()) return this;
 	if (CthMigratable() == 0) {
-	    CkPrintf("Warning> thread migration is not supported!\n");
+	    warnNoMigration();
             return this;
         }
 	asyncMigrate = true;
@@ -378,6 +415,15 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrateTo(int destPE) noexcept {
 }
 void TCharm::ckJustMigrated() {
 	ArrayElement::ckJustMigrated();
+	// Arrival is the point at which the thread's Isomalloc context needs its
+	// page protections put back: unpacking maps the region read-write, so a
+	// context holding executable pages -- which is every rank under
+	// pieglobals, whose code segment lives in the context -- comes back
+	// non-executable, and the first instruction the resumed thread runs
+	// faults. Doing it here rather than in ResumeFromSync covers the
+	// asynchronous path too (TCHARM_Migrate_to / AMPI_Migrate_to_pe resume
+	// from right below, never passing through the sync barrier).
+	CmiIsomallocContextJustMigrated(CmiIsomallocGetThreadContext(getThread()));
     if (asyncMigrate) {
         asyncMigrate = false;
         resume();
@@ -386,6 +432,9 @@ void TCharm::ckJustMigrated() {
 
 void TCharm::ckJustRestored() {
 	ArrayElement::ckJustRestored();
+	// Restored from an in-memory checkpoint: the context was unpacked again,
+	// so its page protections need the same replay as on migration arrival.
+	CmiIsomallocContextJustMigrated(CmiIsomallocGetThreadContext(getThread()));
 }
 
 // If a Tcharm object is about to migrate it should be suspended first
@@ -427,6 +476,10 @@ void *TCharm::lookupUserData(int i) noexcept {
 void TCharm::run() noexcept
 {
   DBG("TCharm::run()");
+  if (tcharm_campi) { // campi.C builds the rank record and schedules its coroutine
+	  tcharm_campi_start_fn(this);
+	  return;
+  }
   if (tcharm_nothreads) {/*Call user routine directly*/
 	  startTCharmThread(initMsg);
   } 
@@ -434,10 +487,23 @@ void TCharm::run() noexcept
   	  start();
 }
 
+// Hides CkMigratable::setMigratable (not virtual; callers hold a TCharm*):
+// a client such as AMPI_Set_migratable(1) must not re-enable migration of an
+// element whose thread cannot be packed.
+void TCharm::setMigratable(int mig) noexcept
+{
+  if (tcharm_nomig) mig = 0;
+  CkMigratable::setMigratable(mig);
+}
+
 //Go to sync, block, possibly migrate, and then resume
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrate() noexcept
 {
 #if CMK_LBDB_ON
+  if (CthMigratable() == 0) {
+    warnNoMigration();
+    return this;
+  }
   DBG("going to sync");
   AtSync();
   return stop();
@@ -451,6 +517,10 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrate() noexcept
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::async_migrate() noexcept
 {
 #if CMK_LBDB_ON
+  if (CthMigratable() == 0) {
+    warnNoMigration();
+    return this;
+  }
   DBG("going to sync at async mode");
   ReadyMigrate(false);
   asyncMigrate = true;
@@ -484,9 +554,8 @@ void TCharm::ResumeFromSync()
 {
   DBG("thread resuming from sync");
 
-  CthThread th = getThread();
-  auto ctx = CmiIsomallocGetThreadContext(th);
-  CmiIsomallocContextJustMigrated(ctx);
+  // Page protections are restored on arrival (ckJustMigrated, ckJustRestored),
+  // which covers both the synchronous and asynchronous migration paths.
 
   if (resumeAfterMigrationCallback.isInvalid())
     start();
@@ -540,6 +609,7 @@ void TCharm::done(int exitcode) noexcept {
 		contribute(exitmsg);
 	}
 	isSelfDone = true;
+	if (tcharm_campi) return; // no thread to stop: the rank's coroutine has finished
 	TCharm * unused = stop();
 }
 //Called when all threads are done running
@@ -790,11 +860,6 @@ CLINKAGE void *TCHARM_Get_global(int globalID)
 CLINKAGE void TCHARM_Migrate()
 {
 	TCHARMAPI("TCHARM_Migrate");
-	if (CthMigratable() == 0) {
-	  if(CkMyPe() == 0)
-	    CkPrintf("Warning> thread migration is not supported!\n");
-          return;
-        }
 	TCharm * unused = TCharm::get()->migrate();
 }
 FORTRAN_AS_C(TCHARM_MIGRATE,TCHARM_Migrate,tcharm_migrate,(void),())

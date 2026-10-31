@@ -4,6 +4,9 @@
 */
 /*@{*/
 
+/* First: reconverse's converse.h does not pull in conv-mach-opt.h, and the
+   CMK_GPU / CMK_CUDA tests below must see the build options. */
+#include "conv-mach-opt.h"
 #include "converse.h"
 
 /*

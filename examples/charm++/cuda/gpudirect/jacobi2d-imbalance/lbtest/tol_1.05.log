@@ -1,0 +1,55 @@
+Reconverse> Starting Reconverse with 4 processes, 32 PEs (1 PE = 1 thread), and 8 PEs per process
+CharmLB> Verbose level 1, load balancing period: -1 seconds
+CharmLB> Load balancer print summary of load balancing result.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (OS indices): 48-55
+Charm++> cpu topology info is gathered in 0.001 seconds.
+HAPI> Config: 1 device(s) per process, 8 PE(s) per device, 4 device(s) per host
+HAPI> Enabled POSIX shared memory optimizations for inter-process GPU messaging
+HAPI> GPU communication buffer size: 64 MB (rounded up to the nearest power of two)
+HAPI> GPU load balancing buffer size: 0 MB 
+HAPI> hapi IPC event pool size - 256 per PE, 2048 per device
+HAPI> Enabling P2P access between devices
+Converse> pxshm pool init'd with 8388608B segment and 262144B cutoff.
+CharmLB> GreedyRefineCentralGPULB created.
+
+[GPU 2D Jacobi example, load imbalance variant]
+Grid: 4096 x 4096, Block: 256 x 256, Chares: 16 x 16, Iterations: 30, Warm-up: 5, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 0.109 s
+
+CharmLB> GreedyRefineCentralGPULB: PE [0] step 0 starting at 0.561855 Memory: 0.000000 MB
+[0] Load Summary (before LB): max (with bg load): 0.124705 max (obj only): 0.089042 average: 0.107958 at step 0 nonlocal: 0 msgs 0.00KB.
+CharmLB> GreedyRefineCentralGPULB: PE [0] strategy starting at 0.563143
+CharmLB> GreedyRefineCentralGPULB: after lb, migrations=16(6.25%), tolerance=1.050, gpu max=0.1207 (18.58x greedy), cpu max=0.1207 (1.10x greedy)
+CharmLB> GreedyRefineCentralGPULB: PE [0] Memory: LBManager: 38 KB CentralLB: 46 KB
+CharmLB> GreedyRefineCentralGPULB: PE [0] #Objects migrating: 16, LBMigrateMsg size: 0.00 MB
+CharmLB> GreedyRefineCentralGPULB: PE [0] strategy finished at 0.563268 duration 0.000124 s
+[0] Load Summary (after LB): max (with bg load): 0.120699 max (obj only): 0.089042 average: 0.107958 at step 0 nonlocal: 0 msgs 0.00KB useMem: 45.24KB.
+CharmLB> GreedyRefineCentralGPULB: PE [0] step 0 finished at 0.563668 duration 0.001813 s
+
+
+CharmLB> GreedyRefineCentralGPULB: PE [0] step 1 starting at 0.579086 Memory: 0.000000 MB
+[0] Load Summary (before LB): max (with bg load): 0.016419 max (obj only): 0.013526 average: 0.012283 at step 1 nonlocal: 0 msgs 0.00KB.
+CharmLB> GreedyRefineCentralGPULB: PE [0] strategy starting at 0.585807
+CharmLB> GreedyRefineCentralGPULB: after lb, migrations=20(7.81%), tolerance=1.050, gpu max=0.0143 (2.21x greedy), cpu max=0.0143 (1.14x greedy)
+CharmLB> GreedyRefineCentralGPULB: PE [0] Memory: LBManager: 38 KB CentralLB: 46 KB
+CharmLB> GreedyRefineCentralGPULB: PE [0] #Objects migrating: 20, LBMigrateMsg size: 0.00 MB
+CharmLB> GreedyRefineCentralGPULB: PE [0] strategy finished at 0.585927 duration 0.000119 s
+[0] Load Summary (after LB): max (with bg load): 0.014350 max (obj only): 0.012363 average: 0.012283 at step 1 nonlocal: 0 msgs 0.00KB useMem: 45.24KB.
+CharmLB> GreedyRefineCentralGPULB: PE [0] step 1 finished at 0.586254 duration 0.007168 s
+
+
+CharmLB> GreedyRefineCentralGPULB: PE [0] step 2 starting at 0.599463 Memory: 0.000000 MB
+[0] Load Summary (before LB): max (with bg load): 0.013862 max (obj only): 0.011376 average: 0.010726 at step 2 nonlocal: 0 msgs 0.00KB.
+CharmLB> GreedyRefineCentralGPULB: PE [0] strategy starting at 0.604482
+CharmLB> GreedyRefineCentralGPULB: after lb, migrations=11(4.30%), tolerance=1.050, gpu max=0.0121 (1.87x greedy), cpu max=0.0121 (1.07x greedy)
+CharmLB> GreedyRefineCentralGPULB: PE [0] Memory: LBManager: 38 KB CentralLB: 46 KB
+CharmLB> GreedyRefineCentralGPULB: PE [0] #Objects migrating: 11, LBMigrateMsg size: 0.00 MB
+CharmLB> GreedyRefineCentralGPULB: PE [0] strategy finished at 0.604614 duration 0.000132 s
+[0] Load Summary (after LB): max (with bg load): 0.012118 max (obj only): 0.010383 average: 0.010726 at step 2 nonlocal: 0 msgs 0.00KB useMem: 45.24KB.
+CharmLB> GreedyRefineCentralGPULB: PE [0] step 2 finished at 0.604945 duration 0.005482 s
+
+Total time: 0.064 s
+Average iteration time: 2142.700 us

@@ -4,11 +4,11 @@ DIRS = \
   megatest \
   alignment \
   simplearrayhello \
+  migratable_threads \
   provisioning \
   load_balancing \
   chkpt \
   delegation \
-  queue \
   sdag \
   ckAllocSysMsgTest \
   method_templates \
@@ -34,16 +34,37 @@ DIRS = \
   amr_1d_random \
   amr_1d_simple \
   anytime_migration \
+  unbounded_migration \
+  unbounded_restart \
+  anytime_bcastred \
+  atsync_reduction \
+  threaded_redn \
+  objid_home \
+  objid_insert \
+  objid_sections \
+  objid_bound \
+  objid_tranche \
+  objid_wide \
+  collide \
+  qd \
 
 FTDIRS = \
   jacobi3d \
   jacobi3d-sdag \
 
-TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
+# Not applicable on reconverse: longIdle needs CcdCallOnConditionOnPE, which
+# reconverse does not provide.
+ifeq ($(CMK_GDIR),reconverse)
+RECONVERSE_NA = \
+  longIdle \
+
+endif
+
+TESTDIRS = $(filter-out $(FTDIRS) $(RECONVERSE_NA),$(DIRS))
 
 NONSCALEDIRS = \
   alignment \
-  queue \
+  migratable_threads \
   sdag \
   sparse \
   charmxi_parsing \
@@ -55,9 +76,7 @@ all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
 ifeq ($(CMK_SMP),1)
-ifneq ($(CMK_MULTICORE),1)
 	make smptest
-endif
 endif
 
 testp: $(foreach i,$(TESTPDIRS),testp-$i)

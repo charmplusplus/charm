@@ -6,9 +6,9 @@
 #define CHARM_H
 
 #include "charm-config.h"
+#include "conv-mach-opt.h" /* defines CMK_OPTIMIZE (and CMK_CUDA) before converse.h */
 #include "converse.h"
-#include "conv-autoconfig.h"
-#include "conv-mach-opt.h" /* for CMK_GPU */
+#include "conv-autoconfig.h" /* guarded; safe to include early on both runtimes */
 #include <sys/types.h> /* for size_t */
 
 #ifdef __cplusplus
@@ -115,6 +115,7 @@ extern void  CkFreeSysMsg(void *msg);
 extern void* CkAllocBuffer(void *msg, int bufsize);
 extern void  CkFreeMsg(void *msg);
 extern void* CkCopyMsg(void **pMsg);
+extern void* CkCopyPackedMsg(const void *packedMsg);
 extern void* CkReferenceMsg(void *msg);
 extern void  CkSetQueueing(void *msg, int strategy);
 extern void* CkPriorityPtr(void *msg);

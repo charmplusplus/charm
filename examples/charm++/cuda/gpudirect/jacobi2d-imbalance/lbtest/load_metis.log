@@ -1,0 +1,55 @@
+Reconverse> Starting Reconverse with 4 processes, 32 PEs (1 PE = 1 thread), and 8 PEs per process
+CharmLB> Verbose level 1, load balancing period: -1 seconds
+CharmLB> Load balancer print summary of load balancing result.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (OS indices): 48-55
+Charm++> cpu topology info is gathered in 0.001 seconds.
+HAPI> Config: 1 device(s) per process, 8 PE(s) per device, 4 device(s) per host
+HAPI> Enabled POSIX shared memory optimizations for inter-process GPU messaging
+HAPI> GPU communication buffer size: 64 MB (rounded up to the nearest power of two)
+HAPI> GPU load balancing buffer size: 0 MB 
+HAPI> hapi IPC event pool size - 256 per PE, 2048 per device
+HAPI> Enabling P2P access between devices
+Converse> pxshm pool init'd with 8388608B segment and 262144B cutoff.
+CharmLB> MetisLB created.
+
+[GPU 2D Jacobi example, load imbalance variant]
+Grid: 4096 x 4096, Block: 256 x 256, Chares: 16 x 16, Iterations: 30, Warm-up: 5, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 0.105 s
+
+CharmLB> MetisLB: PE [0] step 0 starting at 0.545539 Memory: 0.000000 MB
+[0] Load Summary (before LB): max (with bg load): 0.120310 max (obj only): 0.080591 average: 0.106012 at step 0 nonlocal: 0 msgs 0.00KB.
+CharmLB> MetisLB: PE [0] strategy starting at 0.546082
+[0] MetisLB done! 
+CharmLB> MetisLB: PE [0] Memory: LBManager: 38 KB CentralLB: 46 KB
+CharmLB> MetisLB: PE [0] #Objects migrating: 245, LBMigrateMsg size: 0.01 MB
+CharmLB> MetisLB: PE [0] strategy finished at 0.546488 duration 0.000406 s
+[0] Load Summary (after LB): max (with bg load): 0.119651 max (obj only): 0.068416 average: 0.106012 at step 0 nonlocal: 0 msgs 0.00KB useMem: 45.24KB.
+CharmLB> MetisLB: PE [0] step 0 finished at 0.601922 duration 0.056383 s
+
+
+CharmLB> MetisLB: PE [0] step 1 starting at 0.622941 Memory: 0.000000 MB
+[0] Load Summary (before LB): max (with bg load): 0.026101 max (obj only): 0.019891 average: 0.016819 at step 1 nonlocal: 0 msgs 0.00KB.
+CharmLB> MetisLB: PE [0] strategy starting at 0.623335
+[0] MetisLB done! 
+CharmLB> MetisLB: PE [0] Memory: LBManager: 38 KB CentralLB: 46 KB
+CharmLB> MetisLB: PE [0] #Objects migrating: 247, LBMigrateMsg size: 0.01 MB
+CharmLB> MetisLB: PE [0] strategy finished at 0.623645 duration 0.000310 s
+[0] Load Summary (after LB): max (with bg load): 0.020314 max (obj only): 0.012131 average: 0.016819 at step 1 nonlocal: 0 msgs 0.00KB useMem: 45.24KB.
+CharmLB> MetisLB: PE [0] step 1 finished at 0.674146 duration 0.051206 s
+
+
+CharmLB> MetisLB: PE [0] step 2 starting at 0.692848 Memory: 0.000000 MB
+[0] Load Summary (before LB): max (with bg load): 0.026054 max (obj only): 0.017924 average: 0.017002 at step 2 nonlocal: 0 msgs 0.00KB.
+CharmLB> MetisLB: PE [0] strategy starting at 0.693302
+[0] MetisLB done! 
+CharmLB> MetisLB: PE [0] Memory: LBManager: 38 KB CentralLB: 46 KB
+CharmLB> MetisLB: PE [0] #Objects migrating: 242, LBMigrateMsg size: 0.01 MB
+CharmLB> MetisLB: PE [0] strategy finished at 0.693629 duration 0.000327 s
+[0] Load Summary (after LB): max (with bg load): 0.020956 max (obj only): 0.012354 average: 0.017002 at step 2 nonlocal: 0 msgs 0.00KB useMem: 45.24KB.
+CharmLB> MetisLB: PE [0] step 2 finished at 0.715389 duration 0.022541 s
+
+Total time: 0.221 s
+Average iteration time: 7365.958 us

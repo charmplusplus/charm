@@ -1,0 +1,145 @@
+Reconverse> Starting Reconverse with 4 processes, 32 PEs (1 PE = 1 thread), and 8 PEs per process
+CharmLB> Verbose level 1, load balancing period: -1 seconds
+CharmLB> Load balancer print summary of load balancing result.
+CharmLB> Load balancer assumes all CPUs are same.
+Charm++> cpu affinity enabled. 
+Charm++> cpuaffinity PE-core map (OS indices): 48-55
+Charm++> cpu topology info is gathered in 0.001 seconds.
+HAPI> Config: 1 device(s) per process, 8 PE(s) per device, 4 device(s) per host
+HAPI> Enabled POSIX shared memory optimizations for inter-process GPU messaging
+HAPI> GPU communication buffer size: 64 MB (rounded up to the nearest power of two)
+HAPI> GPU load balancing buffer size: 0 MB 
+HAPI> hapi IPC event pool size - 256 per PE, 2048 per device
+HAPI> Enabling P2P access between devices
+Converse> pxshm pool init'd with 8388608B segment and 262144B cutoff.
+CharmLB> GreedyRefineCentralGPULB created.
+
+[GPU 2D Jacobi example, load imbalance variant]
+Grid: 4096 x 4096, Block: 256 x 256, Chares: 16 x 16, Iterations: 30, Warm-up: 5, Bulk-synchronous: 0, Zerocopy: 0, Print: 0
+
+Init time: 0.106 s
+[7] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[2] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[4] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[9] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[12] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[22] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[20] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[10] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[15] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[21] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[16] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[24] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[31] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[25] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[14] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[23] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[18] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[27] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[29] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+
+CharmLB> GreedyRefineCentralGPULB: PE [0] step 0 starting at 0.538956 Memory: 0.000000 MB
+[3] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[6] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[11] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[8] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[13] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[17] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[19] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[30] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[26] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[5] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[1] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+[0] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+CharmLB> GreedyRefineCentralGPULB: PE [0] strategy starting at 0.541638
+[28] Load Summary (before LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB.
+CharmLB> GreedyRefineCentralGPULB: PE [17] Memory: LBManager: 38 KB CentralLB: 46 KB
+CharmLB> GreedyRefineCentralGPULB: PE [17] #Objects migrating: 3, LBMigrateMsg size: 0.00 MB
+CharmLB> GreedyRefineCentralGPULB: PE [17] strategy finished at 0.541940 duration 0.000386 s
+[17] Load Summary (after LB): max (with bg load): 0.123631 max (obj only): 0.082349 average: 0.107051 at step 0 nonlocal: 0 msgs 0.00KB useMem: 45.24KB.
+CharmLB> GreedyRefineCentralGPULB: PE [0] step 0 finished at 0.542187 duration 0.003232 s
+
+[1] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[7] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[2] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[6] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[9] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[14] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[12] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[10] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[8] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[18] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[21] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[19] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[23] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[4] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[3] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[5] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[11] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[13] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[27] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[31] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[25] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[26] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[29] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+
+CharmLB> GreedyRefineCentralGPULB: PE [0] step 1 starting at 0.560743 Memory: 0.000000 MB
+[15] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[28] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[30] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[0] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+CharmLB> GreedyRefineCentralGPULB: PE [0] strategy starting at 0.562721
+[24] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[16] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[17] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[22] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+[20] Load Summary (before LB): max (with bg load): 0.016271 max (obj only): 0.014164 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB.
+CharmLB> GreedyRefineCentralGPULB: PE [0] Memory: LBManager: 38 KB CentralLB: 46 KB
+CharmLB> GreedyRefineCentralGPULB: PE [0] #Objects migrating: 245, LBMigrateMsg size: 0.01 MB
+CharmLB> GreedyRefineCentralGPULB: PE [0] strategy finished at 0.563015 duration 0.000294 s
+[0] Load Summary (after LB): max (with bg load): 0.013012 max (obj only): 0.011912 average: 0.012222 at step 1 nonlocal: 0 msgs 0.00KB useMem: 45.24KB.
+CharmLB> GreedyRefineCentralGPULB: PE [0] step 1 finished at 0.608498 duration 0.047755 s
+
+[4] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[3] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[7] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[11] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[8] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[14] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[15] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[22] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[19] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[16] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+
+[10] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[9] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[12] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[13] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[20] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[21] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[18] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[23] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+CharmLB> GreedyRefineCentralGPULB: PE [0] step 2 starting at 0.640044 Memory: 0.000000 MB
+[17] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[0] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+CharmLB> GreedyRefineCentralGPULB: PE [0] strategy starting at 0.642087
+[25] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[31] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[28] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[30] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[26] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[27] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[29] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[24] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[5] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[1] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[6] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+[2] Load Summary (before LB): max (with bg load): 0.029261 max (obj only): 0.020929 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB.
+CharmLB> GreedyRefineCentralGPULB: PE [2] Memory: LBManager: 38 KB CentralLB: 46 KB
+CharmLB> GreedyRefineCentralGPULB: PE [2] #Objects migrating: 27, LBMigrateMsg size: 0.00 MB
+CharmLB> GreedyRefineCentralGPULB: PE [2] strategy finished at 0.642445 duration 0.000069 s
+[2] Load Summary (after LB): max (with bg load): 0.022160 max (obj only): 0.018934 average: 0.017992 at step 2 nonlocal: 0 msgs 0.00KB useMem: 45.24KB.
+CharmLB> GreedyRefineCentralGPULB: PE [0] step 2 finished at 0.642702 duration 0.002658 s
+
+Total time: 0.130 s
+Average iteration time: 4317.625 us

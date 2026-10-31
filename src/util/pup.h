@@ -71,6 +71,8 @@ class bar {
 #else
 #ifndef CHARM_H
 #  include "converse.h" // <- for CMK_* defines
+#include "conv-mach-opt.h" /* the build options (CMK_GPU, CMK_CUDA, CMK_OPTIMIZE): on reconverse
+                               neither converse.h nor charm-config.h supplies them */
 #include "charm-config.h"
 #include "conv-autoconfig.h"
 #endif

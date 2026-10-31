@@ -50,8 +50,10 @@ Converted from 1-D arrays 2/27/2000 by
 Orion Sky Lawlor, olawlor@acm.org
 */
 #include "charm++.h"
+#include <unordered_map>
 #include "ck.h"
 #include "ckarray.h"
+#include <climits>
 #include "pathHistory.h"
 #include "register.h"
 #include <stdarg.h>
@@ -215,6 +217,26 @@ public:
 };
 
 CkpvStaticDeclare(ArrayElement_initInfo, initInfo);
+
+// Sends held until this PE creates the array's manager group, keyed by that
+// group's idx. Nothing is counted for quiescence here: the manager's creation
+// message, which is counted, is still unprocessed on this PE until the flush.
+struct DeferredArraySend
+{
+  int entryIndex;
+  void* msg;
+  CkArrayIndex idx;
+  int opts;
+};
+typedef std::unordered_map<int, std::vector<DeferredArraySend>> DeferredArraySends;
+CkpvStaticDeclare(DeferredArraySends, deferredArraySends);
+
+static void deferArraySend(int entryIndex, void* msg, CkArrayID aID,
+                           const CkArrayIndex& idx, int opts)
+{
+  CkpvAccess(deferredArraySends)[((CkGroupID)aID).idx].push_back(
+      DeferredArraySend{entryIndex, msg, idx, opts});
+}
 
 void ArrayElement::initBasics(void)
 {
@@ -701,6 +723,19 @@ static CkArrayID CkCreateArray(CkArrayMessage* m, int ctor, CkArrayOptions opts)
   CkAssert(CkMyPe() == 0);
 
   CkGroupID locMgr = opts.getLocationManager();
+  // The id layout is the location manager's: an array bound to another (bindTo)
+  // takes that array's layout whatever its own option says. Each array then gets
+  // its own collection number from the counter of that layout.
+  bool wide = opts.isWideCollection();
+  if (!locMgr.isZero())
+  {
+    CkLocMgr* mgr = CProxy_CkLocMgr(locMgr).ckLocalBranch();
+    if (mgr == nullptr)
+      CkAbort("CkCreateArray: the location manager (group %d) this array binds to has"
+              " no branch on PE 0 yet\n", locMgr.idx);
+    wide = mgr->isWideCollection();
+  }
+  opts.setCollection(ck::objid::nextCollectionNumber(wide), wide);
   if (locMgr.isZero())
   {  // Create a new location manager
     CkGroupID locCache;
@@ -909,6 +944,7 @@ static void CkCreateArrayAsync(void* vmsg)
 void _ckArrayInit(void)
 {
   CkpvInitialize(ArrayElement_initInfo, initInfo);
+  CkpvInitialize(DeferredArraySends, deferredArraySends);
   CkDisableTracing(CkIndex_CkArray::insertElement(0, CkArrayIndex(), 0));
   CkDisableTracing(CkIndex_CkArray::recvBroadcast(0));
   // disable because broadcast listener may deliver broadcast message
@@ -921,15 +957,21 @@ void _ckArrayInit(void)
 CkArray::CkArray(CkArrayOptions&& opts, CkMarshalledMessage&& initMsg)
     : locMgr(CProxy_CkLocMgr::ckLocalBranch(opts.getLocationManager())),
       locMgrID(opts.getLocationManager()),
+      collectionNumber(opts.getCollectionNumber()),
+      wideCollection(opts.isWideCollection()),
       mCastMgrID(opts.getMcastManager()),
       sectionAutoDelegate(opts.isSectionAutoDelegated()),
       initCallback(opts.getInitCallback()),
       thisProxy(thisgroup),
+      // The program promises no broadcast to the array is in flight while an
+      // element moves, so a broadcast is freed once every local element has
+      // it (doc/internals/array-broadcast-migration.md).
       stableLocations(opts.isStaticInsertion() && !opts.anytimeMigration),
       numInitial(opts.getNumInitial()),
       isInserting(true),
       numPesInited(0)
 {
+  CkAssert(wideCollection == locMgr->isWideCollection());
   // Register with our location manager
   locMgr->addManager(thisgroup, this);
   locMgr->addLocationListener([=](CmiUInt8 id, int pe) { this->sendBufferedMsgs(id, pe); });
@@ -944,6 +986,7 @@ CkArray::CkArray(CkArrayOptions&& opts, CkMarshalledMessage&& initMsg)
   // Find, register, and initialize the arrayListeners
   listenerDataOffset = 0;
   broadcaster = new CkArrayBroadcaster(stableLocations, opts.broadcastViaScheduler);
+  broadcaster->setOwner(this);
   addListener(broadcaster);
   reducer = new CkArrayReducer(thisgroup);
   addListener(reducer);
@@ -1000,6 +1043,8 @@ void CkArray::pup(PUP::er& p)
   CkReductionMgr::pup(p);
   p | numInitial;
   p | locMgrID;
+  p | collectionNumber;
+  p | wideCollection;
   p | mCastMgrID;
   p | sectionAutoDelegate;
   p | initCallback;
@@ -1012,11 +1057,13 @@ void CkArray::pup(PUP::er& p)
   {
     thisProxy = thisgroup;
     locMgr = CProxy_CkLocMgr::ckLocalBranch(locMgrID);
+    ck::objid::noteRestoredCollection(collectionNumber, wideCollection);
     locMgr->addManager(thisgroup, this);
     locMgr->addLocationListener([=](CmiUInt8 id, int pe) { this->sendBufferedMsgs(id, pe); });
     locMgr->addIndexListener([=](const CkArrayIndex& idx, CmiUInt8 id, int pe) { this->sendBufferedMsgs(idx, id, pe); });
     /// Restore our default listeners:
     broadcaster = (CkArrayBroadcaster*)(CkArrayListener*)(listeners[0]);
+    broadcaster->setOwner(this);
     reducer = (CkArrayReducer*)(CkArrayListener*)(listeners[1]);
     setupSpringCleaning();
   }
@@ -1110,6 +1157,14 @@ bool CkArray::insertElement(CkArrayMessage* m, const CkArrayIndex& idx,
 
   // Register the new element with the location manager
   CkLocRec* rec = locMgr->registerNewElement(idx);
+  if (rec == nullptr)
+  {
+    // Hashed-kind id and this process is out of unique numbers until the allocator's
+    // next tranche arrives: the insertion completes then (the element does not exist
+    // when this call returns, even for a local [inline] insert).
+    locMgr->deferInsertion(this, m, idx, listenerData);
+    return false;
+  }
   CmiUInt8 id = rec->getID();
 
   // Make sure the element doesn't already exist
@@ -1234,8 +1289,8 @@ void CProxyElement_ArrayBase::ckSend(CkArrayMessage* msg, int ep, int opts) cons
   {  // Usual case: a direct send
     CkArray* localbranch = ckLocalBranch();
     if (localbranch == NULL)
-    {  // array not created yet
-      CkAbort("Cannot send a message from an array without a local branch");
+    {  // array manager not created on this PE yet: hold until it is
+      deferArraySend(ep, msg, ckGetArrayID(), _idx, opts & (~CK_MSG_INLINE));
     }
     else
     {
@@ -1295,6 +1350,18 @@ void CkSetMsgArrayIfNotThere(void* msg, CkArray_IfNotThere policy)
   m->array_setIfNotThere(policy);
 }
 
+void _ckArrayFlushDeferredSends(CkGroupID mgr)
+{
+  DeferredArraySends& table = CkpvAccess(deferredArraySends);
+  auto it = table.find(mgr.idx);
+  if (it == table.end())
+    return;
+  std::vector<DeferredArraySend> sends = std::move(it->second);
+  table.erase(it);
+  for (const DeferredArraySend& s : sends)
+    CkSendMsgArray(s.entryIndex, s.msg, CkArrayID(mgr), s.idx, s.opts);
+}
+
 void CkSendMsgArray(int entryIndex, void* msg, CkArrayID aID, const CkArrayIndex& idx,
                     int opts)
 {
@@ -1302,7 +1369,7 @@ void CkSendMsgArray(int entryIndex, void* msg, CkArrayID aID, const CkArrayIndex
   msg_prepareSend(m, entryIndex, aID);
   CkArray* a = (CkArray*)_localBranch(aID);
   if (a == NULL)
-    CkAbort("Cannot receive a message for an array without a local branch");
+    deferArraySend(entryIndex, msg, aID, idx, opts);
   else
     a->sendMsg(m, idx, CkDeliver_queue, opts);
 }
@@ -1313,8 +1380,13 @@ void CkSendMsgArrayInline(int entryIndex, void* msg, CkArrayID aID,
   CkArrayMessage* m = (CkArrayMessage*)msg;
   msg_prepareSend(m, entryIndex, aID);
   CkArray* a = (CkArray*)_localBranch(aID);
+  if (a == NULL)
+  {
+    // No manager yet, so no inline delivery: held and sent as a queued message.
+    deferArraySend(entryIndex, msg, aID, idx, opts);
+    return;
+  }
   int oldStatus = CkDisableTracing(entryIndex);  // avoid nested tracing
-  // TODO: Why no check for null like above?
   // TODO: Why does it not change opts to match inline delivery?
   a->sendMsg(m, idx, CkDeliver_inline, opts);
   if (oldStatus)
@@ -1368,9 +1440,6 @@ void CkArrayBroadcaster::ingestIncoming(CkArrayMessage* msg)
   const int bcastEpoch = UsrToEnv(msg)->getGroupEpoch();
   DEBB((AA "Received broadcast %d\n" AB, bcastEpoch));
 
-  if (stableLocations)
-    return;
-
   CmiMemoryMarkBlock(((char*)UsrToEnv(msg)) - sizeof(CmiChunkHeader));
 
   // If this is a ZC all done msg, then the message should already be in storedMsgs, so
@@ -1401,7 +1470,7 @@ bool CkArrayBroadcaster::attemptDelivery(CkArrayMessage* bcast, ArrayElement* el
   {
     CkAssert(elBcastNo > bcastEpoch);
   }
-  else if (!stableLocations)
+  else
   {
     // if this array element already received this message, skip it
     // if this array element can move and hasn't reached this bcast epoch yet, also skip
@@ -1411,22 +1480,25 @@ bool CkArrayBroadcaster::attemptDelivery(CkArrayMessage* bcast, ArrayElement* el
     elBcastNo++;
   }
 
-  const bool deliveryStatus = performDelivery(bcast, el, doFree);
-  // If locations are stable, we deliver msgs as they come in, so only deliver one
-  if (stableLocations)
-  {
-    return deliveryStatus;
-  }
-  // Else, keep delivering broadcasts while we have the next one in sequence
+  if (!performDelivery(bcast, el, doFree))
+    return false;
+  // Keep delivering broadcasts while we have the next one in sequence
   return bringUpToDate(el);
 }
 
 // Deliver all deliverable stored broadcasts to the given element
 bool CkArrayBroadcaster::bringUpToDate(ArrayElement* el)
 {
-  if (stableLocations)
-      return true;
   int& elBcastNo = getData(el);
+  // A stable-locations array frees a broadcast once every local element has it,
+  // on the promise that no element moves while a broadcast is in flight
+  // (doc/internals/array-broadcast-migration.md)
+  if (stableLocations && elBcastNo < storedBcasts.getHeadEpoch())
+    CkAbort("Array element %s arrived on PE %d expecting broadcast %d, which this PE "
+            "freed (next kept: %d). An element of an array with static insertion and "
+            "setAnytimeMigration(false) moved while a broadcast to the array was in "
+            "flight, which such an array does not allow.\n",
+            idx2str(el), CkMyPe(), elBcastNo, storedBcasts.getHeadEpoch());
   // Keep delivering broadcasts while we have the next one in sequence
   while (storedBcasts.hasBcast(elBcastNo))
   {
@@ -1454,12 +1526,20 @@ bool CkArrayBroadcaster::performDelivery(CkArrayMessage* bcast, ArrayElement* el
     return el->ckInvokeEntry(bcast->array_ep_bcast(), bcast, doFree);
   else
   {
+    envelope* env = UsrToEnv(bcast);
     if (!doFree)
     {
-      CkArrayMessage* newMsg = (CkArrayMessage*)CkCopyMsg((void**)&bcast);
+      CkArrayMessage* newMsg = env->isPacked()
+                                   ? (CkArrayMessage*)CkCopyPackedMsg(bcast)
+                                   : (CkArrayMessage*)CkCopyMsg((void**)&bcast);
       bcast = newMsg;
     }
-    envelope* env = UsrToEnv(bcast);
+    else if (env->isPacked())
+    {
+      CkUnpackMessage(&env);
+      bcast = (CkArrayMessage*)EnvToUsr(env);
+    }
+    env = UsrToEnv(bcast);
     env->setRecipientID(el->ckGetID());
     CkArrayManagerDeliver(CkMyPe(), bcast, 0);
     return true;
@@ -1479,9 +1559,7 @@ void CkArrayBroadcaster::deliverAndUpdate(CkArrayMessage* bcast,
 
   bool success = performDelivery(bcast, elements, arrayId);
 
-  if (stableLocations)
-    delete bcast;
-  else if (success)
+  if (success)
   {
     int bcastEpoch = UsrToEnv(bcast)->getGroupEpoch() + 1;
     while (storedBcasts.hasBcast(bcastEpoch))
@@ -1512,16 +1590,13 @@ bool CkArrayBroadcaster::performDelivery(CkArrayMessage* bcast,
   for (CkMigratable* m : elements)
   {
     ArrayElement* el = (ArrayElement*)m;
-    if (!stableLocations)
-    {
-      int& elBcastNo = getData(el);
-      // if this array element already received this message, skip it
-      // if this array element can move and hasn't reached this bcast epoch yet, also skip
-      // it for now, it'll be delivered when it catches up
-      if (elBcastNo != bcastEpoch)
-        continue;
-      elBcastNo++;
-    }
+    int& elBcastNo = getData(el);
+    // if this array element already received this message, skip it
+    // if this array element can move and hasn't reached this bcast epoch yet, also skip
+    // it for now, it'll be delivered when it catches up
+    if (elBcastNo != bcastEpoch)
+      continue;
+    elBcastNo++;
     DEBB((AA "Delivering broadcast %d to element %s\n" AB, bcastEpoch, idx2str(el)));
     int* index = el->thisIndexMax.data();
     for (int i = 0; i < numInts; i++) validIndexes[j++] = index[i];
@@ -1549,6 +1624,29 @@ bool CkArrayBroadcaster::performDelivery(CkArrayMessage* bcast,
 #endif
 
 void CkArrayBroadcaster::springCleaning(void) { storedBcasts.springCleaning(); }
+
+// Stable locations: no element will ever need a broadcast that every local
+// element has received, so free those now instead of at spring cleaning.
+void CkArrayBroadcaster::releaseDelivered()
+{
+  if (!stableLocations)
+    return;
+  int below = INT_MAX;
+  for (CkMigratable* m : owner->localElemVec)
+    below = std::min(below, getData((ArrayElement*)m));
+  storedBcasts.releaseBelow(below);
+}
+
+bool CkArrayBroadcaster::isFinalRecipient(const std::vector<CkMigratable*>& elements,
+                                          ArrayElement* el, const int epoch)
+{
+  if (getData(el) != epoch)
+    return false;
+  for (CkMigratable* m : elements)
+    if (m != el && getData((ArrayElement*)m) <= epoch)
+      return false;
+  return true;
+}
 
 void CkArrayBroadcaster::flushState() { storedBcasts.clear(); }
 
@@ -1710,12 +1808,27 @@ void CkArray::recvBroadcast(CkMessage* m)
   CkArrayMessage* msg = (CkArrayMessage*)m;
   envelope* env = UsrToEnv(msg);
 
+  // A keep entry gets its own copy per local element, and the broadcast is also
+  // stored for elements that arrive later. Pack it once, here, and make every copy
+  // from the packed bytes (CkCopyPackedMsg). Copying the unpacked message instead
+  // packs and re-unpacks the source per copy (CkCopyMsg), which for a custom
+  // pack/unpack pair replaces the source object while this loop and the stored
+  // copy still hold the old pointer. Zerocopy broadcasts keep their pointers live
+  // in the message, so they are left unpacked.
+  if (CMI_ZC_MSGTYPE(env) == CMK_REG_NO_ZC_MSG && !env->isPacked() &&
+      !_entryTable[msg->array_ep_bcast()]->noKeep)
+  {
+    CkPackMessage(&env);
+    msg = (CkArrayMessage*)EnvToUsr(env);
+  }
+
   // Process the incoming message, buffers if necessary
   broadcaster->ingestIncoming(msg);
 
   int len = localElemVec.size();
-  // extract this field here so we can still check it even if msg is freed
+  // extract these fields here so we can still use them even if msg is freed
   const auto zc_msgtype = CMI_ZC_MSGTYPE(env);
+  const int epoch = env->getGroupEpoch();
 
   // Attempt to actually deliver the broadcast
   if (zc_msgtype == CMK_ZC_BCAST_RECV_ALL_DONE_MSG && len > 0)
@@ -1727,6 +1840,8 @@ void CkArray::recvBroadcast(CkMessage* m)
 
     bool doFree = true;  // free it since all ops are done
     broadcaster->attemptDelivery(msg, (ArrayElement*)localElemVec[0], doFree);
+    // The store held this message through the transfer; the delivery freed it
+    broadcaster->consumeBcast(epoch);
   }
   else if (zc_msgtype == CMK_ZC_BCAST_RECV_MSG && len > 0)
   {
@@ -1738,6 +1853,8 @@ void CkArray::recvBroadcast(CkMessage* m)
     // be finally freed by the first element in the
     // CMK_ZC_BCAST_RECV_ALL_DONE_MSG branch
     bool doFree = false;
+    // The transfer keeps using this message until its ALL_DONE delivery
+    broadcaster->holdBcast(epoch);
     broadcaster->attemptDelivery(msg, (ArrayElement*)localElemVec[0], doFree);
   }
   else
@@ -1755,25 +1872,25 @@ void CkArray::recvBroadcast(CkMessage* m)
     for (int i = len - 1; i >= 0; --i)
     {
       bool doFree = false;
-      if (stableLocations && i == 0)
+      // On a stable-locations array the store would free the message right
+      // after this delivery, so the last element to receive it takes the
+      // original instead of a copy. A CMK_ZC_BCAST_RECV_DONE_MSG is freed by
+      // the first element at CMK_ZC_BCAST_RECV_ALL_DONE_MSG; a send-done
+      // message carries its payload inline and is an ordinary message here.
+      if (i == 0 && stableLocations &&
+          (zc_msgtype == CMK_REG_NO_ZC_MSG || zc_msgtype == CMK_ZC_SEND_DONE_MSG) &&
+          broadcaster->isFinalRecipient(localElemVec, (ArrayElement*)localElemVec[0], epoch))
         doFree = true;
-      // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the
-      // first element during CMK_ZC_BCAST_ALL_DONE_MSG
-      if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG)
-        doFree = false;
       CmiAssert(i < localElemVec.size());
       broadcaster->attemptDelivery(msg, (ArrayElement*)localElemVec[i], doFree);
+      if (doFree)
+        broadcaster->consumeBcast(epoch);
     }
 
 #endif  // CMK_CHARM4PY
   }
 
-  // CkArrayBroadcaster doesn't have msg buffered, and there was no last
-  // delivery to transfer ownership
-  if (stableLocations && len == 0)
-  {
-    delete msg;
-  }
+  broadcaster->releaseDelivered();
 }
 
 void CkArray::forwardZCMsgToOtherElems(envelope* env)
@@ -1785,12 +1902,10 @@ void CkArray::forwardZCMsgToOtherElems(envelope* env)
   for (unsigned int i = 1; i < len; ++i)
   {  // Send to all elements except the first element
     bool doFree = false;
-    if (stableLocations && i == len - 1 &&
-        CMI_ZC_MSGTYPE(env) != CMK_ZC_BCAST_RECV_DONE_MSG)
-      doFree = true;
     broadcaster->attemptDelivery((CkArrayMessage*)EnvToUsr(env), (ArrayElement*)localElemVec[i],
                          doFree);
   }
+  broadcaster->releaseDelivered();
 }
 
 void CkArray::forwardZCMsgToSpecificElem(envelope *env, CkMigratable *elem) {
@@ -1853,7 +1968,7 @@ void CkArray::sendMsg(CkArrayMessage* msg, const CkArrayIndex& idx, CkDeliver_t 
   if (locMgr->lookupID(idx, id))
   {
     // We know the ID, so fill in the rest of the envelope to allow for sending
-    env->setRecipientID(ck::ObjID(thisgroup, id));
+    env->setRecipientID(makeID(id));
     int dest = locMgr->whichPe(id);
     // The process-wide resident table is ground truth for this process, and
     // the per-PE cache can lag an element's move back in. Consulting it only
@@ -1932,37 +2047,22 @@ void CkArray::recvMsg(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type, int op
       // The element is unknown to us. If we are its home, then it just means it hasn't
       // been created yet (or has been deleted). If we are not the home this can still
       // occur if we knew the element but it has been deleted or our location cache has
-      // been purged.
-      //
-      // Recovering the index from the id only works when the array's index is
-      // compressible (a dense 1-D array) or the element is already known here;
-      // otherwise lookupIdx asserts. An element that is unknown by definition
-      // is neither, so for a multidimensional array this aborted -- and
-      // migration is precisely what makes locations unknown, so any load
-      // balancing of such an array was fatal. Route by id instead, which is
-      // all this case actually needs.
-      CkArrayIndex idx;
-      if (locMgr->tryLookupIdx(id, idx))
-        handleUnknown(msg, idx, type, opts);
-      else
-        handleUnknownByID(msg, id, type, opts);
+      // been purged. Either way the index is not needed: the home is computable
+      // from the id.
+      handleUnknownByID(msg, id, type, opts);
     }
     else
     {
-      // TODO: This currently doesn't work due to home of an id being different than the
-      // home of an index, as well as some issues with messages arriving before a
-      // migrating element.
-      // If we haven't found the element in two tries, send it back home.
-      // This limits message sends for cases where there's a lot of migration, creating
-      // potentially long chains of stale location entries. In cases where there is not
-      // a lot of migration, the number of hops is likely to be 2 or less anyways.
-      //if (msg->array_hops() > 1 && CkMyPe() != pe)
-      //{
-      //  pe = locMgr->homePe(id);
-      //}
-      if (arrMigDbg())
-        CmiPrintf("[FWD %d] id=%llu hops=%d -> pe=%d\n", CkMyPe(),
-                  (unsigned long long)id, msg->array_hops(), pe);
+      // If we haven't found the element in two tries, send it back home rather than
+      // chase a chain of stale location entries; the home always knows. (Sound now
+      // that the home of an id and the home of its index are the same PE.) The home
+      // itself must follow its own entry: redirecting there would send the message
+      // to this PE again, forever.
+      if (msg->array_hops() > 1)
+      {
+        const int home = locMgr->homePe(id);
+        if (CkMyPe() != home) pe = home;
+      }
       sendToPe(msg, pe, type, opts);
     }
   }
@@ -1976,17 +2076,9 @@ void CkArray::recordSend(const CmiUInt8 id, const unsigned int bytes, int pe, co
     // LB deals in IDs with collection information only when CMK_GLOBAL_LOCATION_UPDATE
     // is enabled, so add the group information if so.
 #  if CMK_GLOBAL_LOCATION_UPDATE
-    // The collection folded in here has to be the one CkLocRec registers the
-    // element with -- mgr->getGroupID(), the location manager's -- not this
-    // array's own group. They are different groups, so with
-    // CMK_GLOBAL_LOCATION_UPDATE on, every destination key built from
-    // thisgroup missed objData and removeCommDataOfDeletedObjs discarded the
-    // record. The sender key comes from the registered LDObjHandle and
-    // resolved fine, so the effect was that 100% of object-to-object
-    // communication was dropped and every comm-aware balancer (MetisLB and
-    // the other ckgraph strategies, DiffusionLB's comm dimension) saw an
-    // empty neighbour graph.
-    const CmiUInt8 lbObjId = ck::ObjID(locMgr->getGroupID(), id).getID();
+    // The id the element registered with the LB (CkLocRec): the manager's, which
+    // differs from this array's for a bound array.
+    const CmiUInt8 lbObjId = locMgr->makeID(id).getID();
 #  else
     const CmiUInt8 lbObjId = id;
 #  endif
@@ -2095,6 +2187,11 @@ void CkArray::sendToPe(CkArrayMessage* msg, int pe, CkDeliver_t type, int opts)
         CkAssertMsg(ctor != -1,
             "Can't demand create an element with no default ctor in the .ci file\n");
         demandCreateElement(idx, ctor);
+        // The element now exists here; the pointer looked up above predates it.
+        elem = lookup(id);
+        if (elem == nullptr)
+          CkAbort("CkArray::deliverInline: demand creation of bound element id %" PRIx64
+                  " on PE %d did not create it\n", id, CkMyPe());
       }
     }
 #if CMK_LBDB_ON
@@ -2132,36 +2229,77 @@ void CkArray::deliverToElement(CkArrayMessage* msg, ArrayElement* elem)
   elem->ckInvokeEntry(msg->array_ep(), (void*)msg, true);
 }
 
-// Handle a message to an unknown destination. If we at least know the ID, we have the
-// option to send the message to the elements home. If we don't know that, the message
-// must be buffered or trigger demand creation.
-// handleUnknown for an element whose index this PE cannot name (see recvMsg).
-// Mirrors the logic below, but sourced entirely from the id: homePe has an id
-// overload, and an id-addressed message buffers against bufferedIDMsgs anyway
-// -- bufferForLocation only uses the index for messages that carry no id.
+// Handle a message for an element whose index this PE cannot name (recvMsg): the
+// same choices as handleUnknown below, sourced entirely from the id. An id-addressed
+// message buffers against bufferedIDMsgs anyway; bufferForLocation only needs the
+// index for messages that carry no id.
 void CkArray::handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t type,
                                 int opts)
 {
   envelope* env = UsrToEnv(msg);
-  // This path exists only for id-addressed messages; without an id there is
-  // nothing to route or buffer on.
+  // Only id-addressed messages arrive here; without an id there is nothing to route on.
   CkAssert(env->getRecipientID() != 0);
   const bool isSmall = env->getTotalsize() < _messageBufferingThreshold;
   const int home = locMgr->homePe(id);
   const int ifNotThere = msg->array_ifNotThere();
 
-  // Same forwarding rule as handleUnknown: hand a small message to the home PE,
-  // which either knows the location or can demand-create. createhere is excluded
-  // because it must be created on this PE, not at home.
-  if (isSmall && CkMyPe() != home && ifNotThere != CkArray_IfNotThere_createhere)
+  // Hashed kind, an id this PE knows as dead or rebound (retiredIds): re-address to
+  // the index's current id if there is a newer one; at the home, teach the sender by
+  // index, and hold a message for an index without an element until one registers.
+  // doc/internals/object-ids.md, section 3.
   {
-    // Forwarding gets this message there, but teaches this PE nothing, so every
-    // later send to the same element pays the same detour -- and a device
-    // zerocopy send keeps resolving its destination to -1. Ask once.
-    locMgr->requestLocationOnce(id);
-    if (arrMigDbg())
-      CmiPrintf("[TOHOME %d] id=%llu hops=%d -> home=%d\n", CkMyPe(),
-                (unsigned long long)id, msg->array_hops(), home);
+    CkArrayIndex idx;
+    if (locMgr->recoverIndex(id, idx))
+    {
+      CmiUInt8 current;
+      if (locMgr->lookupID(idx, current) && current != id)
+      {
+        env->setRecipientID(makeID(current));
+        const int srcPe = msg->array_getSrcPe();
+        if (CkMyPe() == home && srcPe != CkMyPe())
+          locMgr->requestLocation(idx, srcPe);
+        recvMsg(msg, current, type, opts);
+        return;
+      }
+      if (CkMyPe() == home && ifNotThere == CkArray_IfNotThere_buffer)
+      {
+        env->setRecipientID(0);
+        bufferForLocation(msg, idx);
+        return;
+      }
+    }
+  }
+
+  if (ifNotThere != CkArray_IfNotThere_buffer)
+  {
+    // Demand creation. The index-keyed path knows how to get the element created
+    // (at the home for createhome, at the original sender for createhere), and it
+    // needs the index: recover it where this PE can. Otherwise only the home can
+    // (it keeps idx -> id for every element it is home for), so hand the message
+    // there. Parking it here would wait for a location that nothing will ever
+    // report, since the element does not exist.
+    CkArrayIndex idx;
+    if (locMgr->recoverIndex(id, idx))
+    {
+      handleUnknown(msg, idx, type, opts);
+      return;
+    }
+    if (CkMyPe() != home)
+    {
+      sendToPe(msg, home, type, opts);
+      return;
+    }
+    CkAbort("CkArray::handleUnknownByID: demand creation requested for element id"
+            " %" PRIx64 " of chare array %d, whose index its home PE %d cannot"
+            " recover\n", id, thisgroup.idx, CkMyPe());
+  }
+
+  // Same forwarding rule as handleUnknown: hand a small message to the home, which
+  // either knows the location or will learn it.
+  if (isSmall && CkMyPe() != home)
+  {
+    // The delivering PE sends this PE the location (multiHop on a forwarded
+    // message), so later sends go direct.
     sendToPe(msg, home, type, opts);
     return;
   }
@@ -2172,11 +2310,12 @@ void CkArray::handleUnknownByID(CkArrayMessage* msg, CmiUInt8 id, CkDeliver_t ty
     locMgr->requestLocation(id);
   }
   bufferedIDMsgs[id].push_back(msg);
-  if (arrMigDbg())
-    CmiPrintf("[HOLDLOC %d] id=%llu hops=%d n=%zu (location unknown)\n", CkMyPe(),
-              (unsigned long long)id, msg->array_hops(), bufferedIDMsgs[id].size());
 }
 
+// Handle a message to an unknown destination. If we at least know the ID, we have the
+// option to send the message to the elements home. If we don't know that, the message
+// must be buffered or trigger demand creation.
+// handleUnknown for an element whose index this PE cannot name (see recvMsg).
 void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
                             CkDeliver_t type, int opts)
 {
@@ -2189,8 +2328,7 @@ void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
   {
     if (isSmall && hasID && CkMyPe() != home)
     {
-      // See handleUnknownByID: forwarding alone never populates this PE's cache.
-      locMgr->requestLocationOnce(msg->array_element_id());
+      // The delivering PE sends this PE the location (multiHop on a forwarded message).
       sendToPe(msg, home, type, opts);
     }
     else
@@ -2205,8 +2343,7 @@ void CkArray::handleUnknown(CkArrayMessage* msg, const CkArrayIndex& idx,
         msg->array_ifNotThere() != CkArray_IfNotThere_createhere)
     {
       // Send the message home where it will trigger demand creation, or get delivered to
-      // the element if it already exists
-      locMgr->requestLocationOnce(msg->array_element_id());
+      // the element if it already exists (either way the delivery repairs this PE's cache)
       sendToPe(msg, home, type, opts);
     }
     else
@@ -2303,6 +2440,11 @@ void CkArray::bufferForCreation(CkArrayMessage* msg, const CkArrayIndex& idx)
 
     // Send the request to the target PE
     thisProxy[home].requestDemandCreation(idx, ctor, pe);
+    // The request carries no reply for the requester: the home creates the element
+    // (or finds it exists) and, for createhome, tells nobody. Ask the home for the
+    // location by index as well; it buffers that request until the element exists and
+    // its answer is what flushes bufferedCreationMsgs here.
+    locMgr->requestLocationAtHome(idx);
   }
   bufferedCreationMsgs[idx].push_back(msg);
 }
@@ -2319,7 +2461,11 @@ void CkArray::requestDemandCreation(const CkArrayIndex& idx, int ctor, int pe)
   if (!locMgr->lookupID(idx, id) || locMgr->whichPe(id) == -1)
   {
     // We (the home PE) do not know the elements location, therefore it (and its siblings)
-    // do not exist. So we can approve the demand creation request.
+    // do not exist. So we can approve the demand creation request -- once: until the
+    // element registers here, further requests would create it again (a creation on
+    // another PE has not reported yet, or one here is deferred for an element id).
+    // The requester asked for the location as well and is told when it exists.
+    if (!pendingDemandCreations.insert(idx).second) return;
     if (pe == CkMyPe())
     {
       // Directly create the element
@@ -2375,8 +2521,22 @@ void CkArray::sendBufferedMsgs(CmiUInt8 id, int pe)
   }
 }
 
+void CkArray::releaseRetiredMsgs(CmiUInt8 oldId, CmiUInt8 newId, int pe)
+{
+  auto it = bufferedIDMsgs.find(oldId);
+  if (it == bufferedIDMsgs.end()) return;
+  for (CkArrayMessage* msg : it->second)
+  {
+    CkAssert(msg->array_element_id() == oldId);
+    UsrToEnv(msg)->setRecipientID(makeID(newId));
+    sendToPe(msg, pe, CkDeliver_queue);
+  }
+  bufferedIDMsgs.erase(it);
+}
+
 void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id, int pe)
 {
+  pendingDemandCreations.erase(idx);  // the element exists and has registered
   // TODO: This shouldn't be needed
   sendBufferedMsgs(id, pe);
   {
@@ -2385,7 +2545,7 @@ void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id, int pe)
     if (it != bufferedIndexMsgs.end()) { msgs.swap(it->second); bufferedIndexMsgs.erase(it); }
     for (CkArrayMessage* msg : msgs)
     {
-      UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, id));
+      UsrToEnv(msg)->setRecipientID(makeID(id));
       // TODO: Is deliver_queue right?
       sendToPe(msg, pe, CkDeliver_queue);
     }
@@ -2396,7 +2556,7 @@ void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id, int pe)
     if (it != bufferedCreationMsgs.end()) { msgs.swap(it->second); bufferedCreationMsgs.erase(it); }
     for (CkArrayMessage* msg : msgs)
     {
-      UsrToEnv(msg)->setRecipientID(ck::ObjID(thisgroup, id));
+      UsrToEnv(msg)->setRecipientID(makeID(id));
       // TODO: Is deliver_queue right?
       sendToPe(msg, pe, CkDeliver_queue);
     }

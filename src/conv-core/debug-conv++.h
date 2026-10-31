@@ -1,4 +1,5 @@
-//#include "debug-conv.h"
+/* reconverse's converse.h does not include debug-conv.h. */
+#include "debug-conv.h"
 #include "pup.h"
 
 #include "register.h"

@@ -15,7 +15,6 @@
 #include "debug-conv++.h"
 #include "conv-ccs.h"
 #include "sockRoutines.h"
-#include "queueing.h"
 #include "ccs-builtins.h"
 
 #ifdef __MINGW_H

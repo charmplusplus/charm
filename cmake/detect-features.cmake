@@ -30,9 +30,12 @@ endif()
 
 # CMA
 set(CMK_USE_CMA ${CMK_HAS_CMA})
-if(NETWORK STREQUAL "multicore")
-  set(CMK_USE_CMA 0)
-endif()
+# Reconverse has no CMA transport: its conv-rdma.cpp compiles the CMA paths
+# only under a CMK_USE_CMA it never defines, and it does not parse
+# +noCMAForZC. Leaving CMK_USE_CMA on for a reconverse build compiles dead
+# CMA branches into Charm++ and makes the zerocopy tests' +noCMAForZC runs
+# (guarded by CMK_USE_CMA in their Makefiles) abort with a usage error.
+set(CMK_USE_CMA 0)
 
 
 # Misc. linker flags (mostly for Charm4py)
@@ -119,6 +122,10 @@ elseif(CMK_HAS_ELF_H AND (CHARM_CPU STREQUAL "i386" OR CHARM_CPU STREQUAL "x86_6
 else()
   set(CMK_SUPPORTS_TLSGLOBALS 0)
 endif()
+# -tlsglobals needs the runtime to switch the TLS segment between user-level
+# threads, which reconverse does not do; the compile flags alone would build
+# programs whose AMPI ranks share their "privatized" globals.
+set(CMK_SUPPORTS_TLSGLOBALS 0)
 
 if(CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY AND CMK_CAN_GET_BINARY_PATH)
   set(CMK_SUPPORTS_FSGLOBALS 1)
@@ -150,9 +157,14 @@ get_cmake_property(_variableNames VARIABLES)
 list (SORT _variableNames)
 
 list(REMOVE_ITEM _variableNames CMK_USE_CMA)
+# CMK_OPTIMIZE belongs in conv-mach-opt.h (build-time options), not conv-autoconfig.h
+list(REMOVE_ITEM _variableNames CMK_OPTIMIZE)
 
 set(optfile ${CMAKE_BINARY_DIR}/include/conv-autoconfig.h)
 file(REMOVE ${optfile})
+# Include guard: this generated file is re-included transitively; without a
+# guard a mid-TU re-inclusion replays raw values over arch-header overrides.
+file(APPEND ${optfile} "#ifndef CONV_AUTOCONFIG_H\n#define CONV_AUTOCONFIG_H\n")
 
 foreach (v ${_variableNames})
     if(("${v}" MATCHES "^CMK_"  OR "${v}" MATCHES "^SIZEOF_" OR "${v}" MATCHES "^CHARM_" OR "${v}" MATCHES "^QLOGIC$") AND NOT "${v}" MATCHES "_CODE$" AND NOT "${v}" MATCHES "^CMK_LUSTREAPI")
@@ -172,3 +184,4 @@ foreach (v ${_variableNames})
         endif()
     endif()
 endforeach()
+file(APPEND ${optfile} "#endif /* CONV_AUTOCONFIG_H */\n")

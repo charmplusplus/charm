@@ -2,7 +2,8 @@ DIRS = \
   gpu_scaling_model \
   lb_test \
   meta_lb_test \
-  periodic_lb_broadcast_test
+  periodic_lb_broadcast_test \
+  lb_userdata_test \
 
 TESTDIRS = $(DIRS)
 

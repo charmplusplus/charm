@@ -59,10 +59,12 @@ public:
 
     // Calculate kernel clock count
     int cuda_device = 0;
-    cudaDeviceProp deviceProp;
+    int clock_rate_khz = 0;
     cudaGetDevice(&cuda_device);
-    cudaGetDeviceProperties(&deviceProp, cuda_device);
-    kernel_clock_count = busy_time * deviceProp.clockRate * 1000;
+    // cudaDeviceProp::clockRate was removed in CUDA 13; the attribute query
+    // returns the same kHz value and is available in every version we build.
+    cudaDeviceGetAttribute(&clock_rate_khz, cudaDevAttrClockRate, cuda_device);
+    kernel_clock_count = busy_time * clock_rate_khz * 1000;
 
     // Print configuration
     CkPrintf("\n[CUDA qdtest example]\n");

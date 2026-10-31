@@ -91,7 +91,7 @@ public:
 		 total_cputime(0.0), bg_cputime(0.0),
 #endif
 #if CMK_GPU
-	   	 gpu_device_id(-1), gpu_total_sms(0),
+	   	 gpu_device_id((uint64_t)-1), gpu_total_sms(0),
 		 gpu_mem_remaining(0), pool_buff_mem_remaining(0),
 		 gpu_pool_arena_bytes(0), gpu_pool_capacity_bytes(0), gpu_ipc_slots(0),
 #endif

@@ -3848,16 +3848,8 @@ void CkRdmaDeviceChannelsPack(CkLocRec* rec) {
 
 /****************************** Recv Entry Method API ******************************/
 
-// Returns the local rank of the logical node (process) that the given PE belongs to
-static inline int CmiNodeRankLocal(int pe) {
-  // Logical node index % Number of logical nodes per physical node
-  return CmiNodeOf(pe) % (CmiNumNodes() / CmiNumPhysicalNodes());
-}
-
-// Returns the local rank of the logical node that I belong to
-static inline int CmiMyNodeRankLocal() {
-  return CmiNodeRankLocal(CmiMyPe());
-}
+// CmiNodeRankLocal / CmiMyNodeRankLocal: one definition, in gpumanager.h,
+// shared with hapi_impl.cpp (both sides of a transfer index by them).
 
 // Debug/validation knobs on the per-message IPC path, resolved once.
 //

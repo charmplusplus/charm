@@ -3,84 +3,22 @@
 set(conv-core-h-sources
     src/util/cmitls.h
     src/conv-core/cmipool.h
-    src/conv-core/cmishmem.h
-    src/conv-core/cmidemangle.h
-    src/conv-core/conv-config.h
-    src/conv-core/conv-cpath.h
-    src/conv-core/conv-cpm.h
+    src/libs/ck-libs/tcharm/reconverse-compat/conv-config.h
+    src/libs/ck-libs/tcharm/reconverse-compat/reconverse-compat.h
     src/conv-core/conv-header.h
     src/conv-core/conv-ooc.h
-    src/conv-core/conv-qd.h
-    src/conv-core/conv-random.h
-    src/conv-core/conv-rdma.h
     src/conv-core/conv-rdmadevice.h
     src/conv-core/conv-taskQ.h
     src/conv-core/conv-trace.h
-    src/conv-core/cpthreads.h
     src/conv-core/debug-conv++.h
     src/conv-core/debug-conv.h
-    src/conv-core/hrctimer.h
-    src/conv-core/mem-arena.h
-    src/conv-core/memory-gnu-threads.h
     src/conv-core/memory-isomalloc.h
-    src/conv-core/msgq.h
-    src/conv-core/persistent.h
     src/conv-core/queueing.h
-    src/conv-core/quiescence.h
-    src/conv-core/taskqueue.h
 )
-
-set(conv-core-cxx-sources
-    src/conv-core/cmipool.C
-    src/conv-core/conv-conds.C
-    src/conv-core/conv-rdma.C
-    src/conv-core/conv-rdmadevice.C
-    src/conv-core/convcore.C
-    src/conv-core/cpm.C
-    src/conv-core/cpthreads.C
-    src/conv-core/cputopology.C
-    src/conv-core/cpuaffinity.C
-    src/conv-core/debug-conv.C
-    src/conv-core/futures.C
-    src/conv-core/global-nop.C
-    src/conv-core/isomalloc.C
-    src/conv-core/mem-arena.C
-    src/conv-core/memoryaffinity.C
-    src/conv-core/msgmgr.C
-    src/conv-core/quiescence.C
-    src/conv-core/random.C
-    src/util/cmitls.C
-    src/conv-core/conv-interoperate.C
-    src/conv-core/conv-taskQ.C
-    src/conv-core/cputopology.C
-    src/conv-core/debug-conv++.C
-    src/conv-core/memory-darwin-clang.C
-    src/conv-core/queueing.C
-    src/conv-core/hrctimer.C
-)
-
-#set(reconverse-comm-backend-sources
-#    reconverse/comm_backend/comm_backend_internal.h
-#    reconverse/comm_backend/comm_backend.h)
-
-if(${CMK_USE_SHMEM})
-    set(conv-core-cxx-sources
-        "${conv-core-cxx-sources}"
-        src/conv-core/shmem/cmishmem.C)
-endif()
 
 # conv-ccs
 set(conv-ccs-h-sources
-    src/conv-ccs/ccs-auth.h
     src/conv-ccs/ccs-builtins.h
-    src/conv-ccs/ccs-server.h
-    src/conv-ccs/conv-ccs.h
-)
-
-set(conv-ccs-cxx-sources
-    src/conv-ccs/conv-ccs.C
-    src/conv-ccs/ccs-builtins.C
-    src/conv-ccs/middle-ccs.C
 )
 
 # conv-perf
@@ -131,21 +69,18 @@ const char * const CmiCommitID = \"${CHARM_VERSION_GIT}\";
 )
 
 # conv-util
-set(conv-util-c-sources
-    src/arch/util/lz4.c
-)
-
 set(conv-util-h-sources
     src/util/cmirdmautils.h
 )
 
+# Charm++'s converse-adjacent utilities. libreconverse supplies the converse
+# layer itself, the CCS core and sockRoutines; only the Charm++ CCS builtins
+# (ccs-builtins.C) and the CpdList accessors behind them (debug-conv++.C) are
+# built here. conv-perf and TopoManager are part of this list too.
 set(conv-util-cxx-sources
     ${CMAKE_BINARY_DIR}/include/commitid.C
-    #src/arch/util/mempool.C
-    src/arch/util/persist-comm.C
     src/util/cmirdmautils.C
     src/util/crc32.C
-    #src/util/sockRoutines.C
     src/util/ckdll.C
     src/util/ckhashtable.C
     src/util/ckimage.C
@@ -162,6 +97,8 @@ set(conv-util-cxx-sources
     src/util/topomanager/TopoManager.C
     src/util/spanningTree.C
     ${conv-perf-cxx-sources}
+    src/conv-ccs/ccs-builtins.C
+    src/conv-core/debug-conv++.C
 )
 
 #Uncommenting spanning tree to satisfy ckrdma dep errors
@@ -184,25 +121,9 @@ set(conv-partition-cxx-sources
 )
 
 # conv-ldb
-set(conv-ldb-cxx-sources
-    src/conv-ldb/cldb.C
-    src/conv-ldb/topology.C
-    src/conv-ldb/edgelist.C
-    src/conv-ldb/generate.C
-)
-
 set(conv-ldb-h-sources
-    src/conv-ldb/graphdefs.h
     src/conv-ldb/topology.h
 )
-
-#add_library(ldb-none reconverse/src/cldb.none.C ${conv-ldb-h-sources})
-#add_library(ldb-test src/conv-ldb/cldb.test.C ${conv-ldb-h-sources})
-#add_library(ldb-rand reconverse/src/cl ${conv-ldb-h-sources})
-#add_library(ldb-neighbor src/conv-ldb/cldb.neighbor.C src/conv-ldb/cldb.neighbor.h ${conv-ldb-h-sources})
-#add_library(ldb-workstealing src/conv-ldb/cldb.workstealing.C src/conv-ldb/cldb.workstealing.h ${conv-ldb-h-sources})
-#add_library(ldb-spray src/conv-ldb/cldb.spray.C ${conv-ldb-h-sources})
-# add_library(ldb-prioritycentralized src/conv-ldb/cldb.prioritycentralized.C src/conv-ldb/cldb.prioritycentralized.h ${conv-ldb-h-sources})
 
 # TopoManager
 set(tmgr-c-sources src/util/topomanager/CrayNid.c)
@@ -211,52 +132,58 @@ set(tmgr-h-sources src/util/topomanager/TopoManager.h ${CMAKE_BINARY_DIR}/includ
 file(WRITE ${CMAKE_BINARY_DIR}/include/topomanager_config.h "// empty\n" )
 
 # Converse
-# add_library(converse
-    # ${CMAKE_BINARY_DIR}/include/commitid.C
-    # ${conv-core-cxx-sources}
-    # ${conv-core-h-sources}
-    # ${conv-ccs-h-sources}
-    # ${conv-ccs-cxx-sources}
-    # ${conv-perf-cxx-sources}
-    # ${conv-perf-h-sources}
-    # ${conv-util-c-sources}
-    # ${conv-util-cxx-sources}
-    # ${conv-util-h-sources}
-    # ${conv-partition-cxx-sources}
-    # ${conv-ldb-cxx-sources}
-    # ${conv-ldb-h-sources}
-    # src/arch/${GDIR}/machine.C
-    # ${tmgr-c-sources}
-    # ${tmgr-cxx-sources}
-    # ${tmgr-h-sources}
-    # ${hwloc-objects}
-    # ${all-ci-outputs}
-# )
-# add_dependencies(converse hwloc)
-
+# The converse layer itself is libreconverse (external); charm's
+# converse-adjacent utility sources build as helper libraries, and
+# `converse` is an aggregation target for dependency purposes.
 add_library(charm_cxx_utils STATIC
     ${conv-util-cxx-sources})
-
+# spanningTree.C includes charm++.h -> ckmarshall.h -> CkMarshall.decl.h, a
+# charmxi-generated header; without this target-level dependency the compile
+# races the generation and a fresh -j build can lose (found deterministically
+# on a clean tree).
+add_dependencies(charm_cxx_utils ci-generated)
 
 add_library(topomanager STATIC
     ${tmgr-cxx-sources}
     ${tmgr-h-sources}
     $<TARGET_OBJECTS:ckrescale>)
-
 target_include_directories(topomanager PUBLIC
     src/util/topomanager
     ${CMAKE_BINARY_DIR}/include)
 
-# add_library(converse INTERFACE)
-# target_link_libraries(converse INTERFACE
-#     reconverse
-#     topomanager
-#     charm_cxx_utils
-# )
-add_custom_target(converse)
-add_dependencies(converse reconverse topomanager charm_cxx_utils ckrescale)
+# Isomalloc. Reconverse has migratable user-level threads but no way to give
+# one a stack at an address every process agrees on, which is what migration
+# needs; that is Isomalloc's job. It cannot live inside Reconverse because
+# serializing a context is written against PUP, which belongs to this layer --
+# so it is built here and registered with Reconverse's thread layer through the
+# CthIsomallocOps table (see isomalloc-reconverse.C). charmc links it into
+# every program.
+add_library(isomalloc STATIC
+    src/conv-core/isomalloc.C
+    src/conv-core/isomalloc-reconverse.C
+    src/conv-core/memory-isomalloc.h)
+add_dependencies(isomalloc reconverse charm_cxx_utils)
 
-#file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/comm_backend)
+# Memory modules. These define malloc/free and friends for the whole program,
+# so they are linked only into programs that ask for one (charmc -memory
+# isomalloc, which ampicc passes); otherwise the system allocator is left
+# alone. Only the Isomalloc mode is built: it is the one AMPI needs, so that a
+# rank's heap allocations land in its own migratable context.
+add_library(memory-os-isomalloc STATIC src/conv-core/memory.C)
+target_compile_definitions(memory-os-isomalloc PRIVATE
+    -DCMK_MEMORY_BUILD_OS_WRAPPED -DCMK_MEMORY_BUILD_ISOMALLOC)
+add_dependencies(memory-os-isomalloc reconverse isomalloc)
+
+# The wrapper resolves the real allocator through dlsym(RTLD_NEXT), so that a
+# module that intercepts malloc still has something to fall back to.
+add_library(memory-os-wrapper STATIC src/conv-core/memory-os-wrapper.C)
+add_dependencies(memory-os-wrapper reconverse)
+
+# ccs-client (the library a CCS client program links) is reconverse's
+# target; it lands in lib/ with the other archives.
+add_custom_target(converse)
+add_dependencies(converse reconverse topomanager charm_cxx_utils ccs-client
+    isomalloc memory-os-isomalloc memory-os-wrapper ckrescale)
 
 foreach (filename
         ${conv-ldb-h-sources}
@@ -275,17 +202,3 @@ foreach(filename
 )
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 endforeach()
-
-# target_include_directories(converse PRIVATE src/arch/util) # for machine*.*
-# target_include_directories(converse PRIVATE src/util) # for sockRoutines.C
-# target_include_directories(converse PRIVATE src/conv-core src/util/topomanager src/ck-ldb src/ck-perf src/ck-cp)
-
-# conv-static
-add_library(conv-static OBJECT src/conv-core/conv-static.c)
-add_dependencies(reconverse conv-static)
-add_dependencies(charm_cxx_utils conv-static)
-add_custom_command(TARGET charm_cxx_utils
-    POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_BINARY_DIR}/CMakeFiles/conv-static.dir/src/conv-core/conv-static.c.o ${CMAKE_BINARY_DIR}/lib/conv-static.o
-    VERBATIM
-)

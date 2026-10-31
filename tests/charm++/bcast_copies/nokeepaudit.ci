@@ -1,0 +1,57 @@
+mainmodule nokeepaudit {
+  readonly CProxy_Main mainProxy;
+  readonly int payloadWords;
+  readonly int stressBcasts;
+
+  message FixedMsg;
+  message VarMsg { uint64_t data[]; };
+  message PackMsg;
+
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry void arrayReady();
+    entry void report(CkReductionMsg*);
+    entry [reductiontarget] void stressDone(int bad, int migrations);
+  };
+
+  // The same thirteen receivers on a group (one per PE) and on a 1D array
+  // (perPe elements per PE). Suffix NK = explicit [nokeep]; T = [threaded],
+  // the only way to make a marshalled entry NOT nokeep (xi-Entry.C).
+  // S = the thread suspends (CthYield) before touching its data, so the
+  // runtime has already run its post-call free when it reads.
+  group G {
+    entry G();
+    entry void marsh(int n, uint64_t data[n]);
+    entry [nokeep] void marshNK(int n, uint64_t data[n]);
+    entry [threaded] void marshT(int n, uint64_t data[n]);
+    entry [threaded, nokeep] void marshTNK(int n, uint64_t data[n]);
+    entry [threaded, nokeep] void marshTNKS(int n, uint64_t data[n]);
+    entry [threaded, nokeep] void fixedTNKS(FixedMsg* m);
+    entry void fixed(FixedMsg* m);
+    entry [nokeep] void fixedNK(FixedMsg* m);
+    entry void var(VarMsg* m);
+    entry [nokeep] void varNK(VarMsg* m);
+    entry void pack(PackMsg* m);
+    entry [nokeep] void packNK(PackMsg* m);
+  };
+
+  array [1D] A {
+    entry A();
+    entry void marsh(int n, uint64_t data[n]);
+    entry [nokeep] void marshNK(int n, uint64_t data[n]);
+    entry [threaded] void marshT(int n, uint64_t data[n]);
+    entry [threaded, nokeep] void marshTNK(int n, uint64_t data[n]);
+    entry [threaded, nokeep] void marshTNKS(int n, uint64_t data[n]);
+    entry [threaded, nokeep] void fixedTNKS(FixedMsg* m);
+    entry void fixed(FixedMsg* m);
+    entry [nokeep] void fixedNK(FixedMsg* m);
+    entry void var(VarMsg* m);
+    entry [nokeep] void varNK(VarMsg* m);
+    entry void pack(PackMsg* m);
+    entry [nokeep] void packNK(PackMsg* m);
+    // Stress phase: many keep broadcasts in flight while elements migrate, so
+    // broadcasts are also delivered from the stored copies in the broadcaster.
+    entry void stressP(PackMsg* m);
+    entry void stressV(VarMsg* m);
+  };
+};

@@ -12,8 +12,10 @@ client: client.o
 server.o: server.C
 	$(CHARMC) -c server.C -language converse++
 
+# The headers need C++11 or later (reconverse's converse.h needs C++17);
+# Apple clang defaults to C++98.
 client.o: client.C
-	g++ -c client.C -I$(CHARMDIR)/include
+	g++ -std=gnu++17 -c client.C -I$(CHARMDIR)/include
 
 clean:
 	rm -f client server *.o conv-host charmrun

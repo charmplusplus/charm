@@ -1,0 +1,17 @@
+mainmodule migrate {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Hello arrProxy;
+  readonly int nX;
+  readonly int nY;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void done();
+  };
+
+  array [2D] Hello {
+    entry Hello();
+    entry void SayHi(int count);
+    entry void ackPlease(int px, int py, int c);
+  };
+};

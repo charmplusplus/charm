@@ -13,6 +13,8 @@ array proxies, or the details of element creation (see ckarray.h).
 #include <map>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
+#include <atomic>
 struct IndexHasher
 {
 public:
@@ -147,7 +149,7 @@ public:
   CkArrayIndex idx;    // Array index that is migrating
   CmiUInt8 id;         // ID of the elements with this index in this collection
   bool ignoreArrival;  // if to inform LB of arrival
-  bool hasGPUMsg;
+  bool hasGPUMsg;      // a device payload travels alongside, on its own device-zerocopy send
   int length;          // Size in bytes of the packed data
   int nManagers;       // Number of associated array managers
   int epoch;
@@ -302,11 +304,16 @@ CkpvExtern(int, CkSaveRestorePrefetch);
 
 #include "ckmigratable.h"
 
+#if CMK_CUDA
+/// A device migration payload staged on the source, waiting for the
+/// destination to read it. The buffer is a copy of the element's device state,
+/// not the state itself, so the element can be destroyed as soon as the pack
+/// finishes; only this buffer has to outlive the transfer.
 class GPUMigrateData
 {
 public:
   int toPe;
-  int size;
+  size_t size;
   void* data;
   // The stream the pack copies were issued on. The payload send stages from
   // `data` on this stream, which orders it behind those copies on the device
@@ -328,6 +335,7 @@ public:
       : toPe(toPe_), size(size_), data(data_), stream(stream_),
         footprint(footprint_), blocks(std::move(blocks_)) {}
 };
+#endif
 
 /********************** CkLocMgr ********************/
 /// A tiny class for detecting heap corruption
@@ -432,6 +440,77 @@ CkpvExtern(CkMigratable_initInfo, mig_initInfo);
 // send path cannot tell them apart from a -1.
 void ckLocNoteWhichPeMiss(bool noId);
 
+namespace ck {
+namespace objid {
+/**
+ * Per-run layout of the element payload of an array whose index is not packed into
+ * the id ("hashed kind"): the top keyBits are a hash key of the index, and the home
+ * of the element is (key % CkNumNodes()) on any PE, from the id or from the index
+ * alike; the low uniqueBits are a number unique within the array, handed out in
+ * tranches. One copy per process, set at startup by rank 0 (initLayout) from the
+ * process count and the +objid_expand factor; a checkpoint restores the launch-time
+ * layout instead (CkPupROData), because keys live inside ids that survive the
+ * restart.
+ */
+struct Layout
+{
+  int keyBits = 0;
+  int uniqueBits = 0;
+  int expandFactor = 8;
+  int nodesAtLaunch = 0;
+  int trancheLog2Cap = 0;  // +objid_tranche_log2: cap on tranche sizes (testing); 0 = none
+  void pup(PUP::er& p)
+  {
+    p | keyBits;
+    p | uniqueBits;
+    p | expandFactor;
+    p | nodesAtLaunch;
+    p | trancheLog2Cap;
+  }
+};
+/// Called once per process (rank 0) before any chare array exists.
+void initLayout(int expandFactor, int trancheLog2Cap);
+const Layout& getLayout();
+/// Checkpoint the layout with the readonlies; on restore it replaces the
+/// startup layout of this process (called by CkPupROData).
+void pupLayout(PUP::er& p);
+/// Hash key of an index, in [0, 2^keyBits): a pure function of the index bytes.
+CmiUInt8 indexHashKey(const CkArrayIndex& idx);
+
+/// Collection numbers (objid.h): the next one for a new array, standard or wide.
+/// PE 0 only (CkCreateArray). Prints the wide-collection suggestion once when the
+/// standard range is half used, aborts when either range is exhausted.
+CmiUInt8 nextCollectionNumber(bool wide);
+/// A restart restores arrays with their numbers: keep the counters above them.
+void noteRestoredCollection(CmiUInt8 number, bool wide);
+
+/// Size (log2) of the first tranche the allocator grants a process that has none
+/// (after a restart), unless 1/64 of its cap (region / (8 * processes)) is smaller:
+/// then that, so a restart on which every process inserts costs the pool at most
+/// 1/512 of itself at any process count. Grants double from the first one up to the
+/// cap (CkLocMgr::requestTranche).
+constexpr int FIRST_GRANT_LOG2 = 16;
+
+/// A process's current tranche of unique numbers for one array: [cursor, end),
+/// plus the spare tranche the allocator granted for when it runs out. The fast path
+/// (CkLocMgr::mintUnique) touches only the three atomics; everything else is read
+/// and written under _nodeLock.
+struct Tranche
+{
+  std::atomic<CmiUInt8> cursor{0};
+  std::atomic<CmiUInt8> end{0};
+  std::atomic<CmiUInt8> refillAt{~(CmiUInt8)0};  // cursor value at which to ask for the next
+  CmiUInt8 len = 0;                            // length of the current tranche
+  CmiUInt8 nextBase = 0, nextLen = 0;          // the spare, installed by grantTranche
+  bool haveNext = false;
+  bool requested = false;                      // a requestTranche is in flight
+  std::vector<int> waitingPes;                 // PEs holding deferred insertions
+};
+}  // namespace objid
+}  // namespace ck
+
+class CkLocMgr;
+
 class CkLocCache : public CBase_CkLocCache
 {
 private:
@@ -447,11 +526,17 @@ private:
   // per message.
   std::unordered_set<CmiUInt8> pendingLocReqs;
 
+  // The location manager this cache serves (created one-to-one with it; bound arrays
+  // share both). Needed to compute the home of an id, which is not stored in the id.
+  CkLocMgr* mgr = nullptr;
+
 public:
   CkLocCache() = default;
   CkLocCache(CkMigrateMessage* m) : CBase_CkLocCache(m) {}
   ~CkLocCache() = default;
   void pup(PUP::er& p);
+
+  void setManager(CkLocMgr* m) { mgr = m; }
 
   void requestLocation(CmiUInt8 id);
   // Ask the home PE where an element lives, at most once until the answer
@@ -486,7 +571,7 @@ public:
   }
   int getPe(const CmiUInt8 id) const { return getLocationEntry(id).pe; }
   int getEpoch(const CmiUInt8 id) const { return getLocationEntry(id).epoch; }
-  int homePe(const CmiUInt8 id) const { return ck::ObjID(id).getHomeID(); }
+  int homePe(const CmiUInt8 id) const;  // via the manager; defined after CkLocMgr
 
   // Insertion and removal
   void insert(CmiUInt8 id, int epoch = 0);
@@ -553,11 +638,13 @@ private:
   // Immigration messages which are waiting for all array managers to be ready
   std::list<CkArrayElementMigrateMessage*> pendingImmigrate;
 
-  std::unordered_map<CmiUInt8, GPUMigrateData> sendGPUBuffers;
+  // A migration with device state travels as two independent sends: the host
+  // message through immigrate(), and the device payload through immigrateGPU()
+  // on the device-zerocopy path. Neither ordering is guaranteed, so whichever
+  // arrives first waits here for the other.
+  std::unordered_map<CmiUInt8, GPUMigrateData> sendGPUBuffers;          // source: payloads awaiting the ack
   std::unordered_map<CmiUInt8, CkArrayElementMigrateMessage*> bufferedHostMigrateMsgs;
   std::unordered_map<CmiUInt8, void*> bufferedDeviceMigrateMsgs;
-  std::unordered_map<CmiUInt8, void*> sentDeviceMsgs;
-
   std::unordered_map<CmiUInt8, void*> receivedDeviceMsgs;
 
   // Chares whose migration into this PE has begun but not finished: the source
@@ -572,8 +659,25 @@ private:
   // depending on if the bounds of this array are compressible into a 64bit ID.
   CkArrayIndex bounds;
   ck::ArrayIndexCompressor* compressor;
+  // Id layout of this array (objid.h): wide-collection or standard, the collection
+  // number of the array that created this manager (bound arrays have their own
+  // numbers but share the layout), and the payload width that follows from the kind.
+  bool wideCollection;
+  CmiUInt8 collectionNumber;
+  int payloadBits;
   IdxIdMap idx2id;    // Explicit map for non-compressible case
-  CmiUInt8 idCounter; // Counter for creating new IDs in the non-compressible case
+  // Hashed kind: ids that no longer name a live element -> index: an id this PE
+  // rebound to a newer one (insertID) and, at the home, every dead element's id
+  // (noteDead). Never pruned, like idx2id. doc/internals/object-ids.md, section 3.
+  std::unordered_map<CmiUInt8, CkArrayIndex> retiredIds;
+  // Non-compressible case: this process's tranche of unique numbers for this array,
+  // shared by all its PEs (see ck::objid::Tranche); resolved on first use.
+  ck::objid::Tranche* tranche;
+  ck::objid::Tranche* getTranche();
+  // Unpacked from a checkpoint: this process's share of the initial region is spent
+  // (the restored ids came from it), so the first tranche comes from the allocator.
+  // An array created after a restart is not restored and takes its share as usual.
+  bool restoredFromCheckpoint;
 
   /// This flag is set while we delete an old copy of a migrator
   bool duringMigration;
@@ -586,15 +690,36 @@ private:
 
   bool checkInBounds(const CkArrayIndex& idx) const;
 
-  // Get a new ID based on the ID generation scheme
-  CmiUInt8 getNewObjectID(const CkArrayIndex& idx);
+  // Get a new ID based on the ID generation scheme. False when the hashed kind has
+  // no unique number to give right now (tranche exhausted, refill not yet here).
+  bool tryNewObjectID(const CkArrayIndex& idx, CmiUInt8& id);
+  // Take the next unique number from this process's tranche; false if exhausted,
+  // in which case a refill has been requested and this PE is registered to be woken.
+  bool mintUnique(CmiUInt8& u);
+  void requestTrancheFromAllocator(int wantLog2);
+  // Allocator state (PE 0's branch is the allocator; other branches carry a copy
+  // that is never used): [allocNext, allocEnd) is the unhanded part of the pool.
+  CmiUInt8 allocNext, allocEnd;
+  struct DeferredInsertion
+  {
+    CkGroupID mgr;  // looked up at resume: the array may have been destroyed meanwhile
+    CkArrayMessage* msg;
+    CkArrayIndex idx;
+    int listenerData[CK_ARRAYLISTENER_MAXLEN];
+  };
+  std::vector<DeferredInsertion> deferredInsertions;  // this PE's, waiting for a tranche
 
   // Insert the ID into the idx2id table
   inline void insertID(const CkArrayIndex& idx, const CmiUInt8 id)
   {
     if (compressor)
       return;
-    idx2id[idx] = id;
+    auto ins = idx2id.emplace(idx, id);
+    if (!ins.second && ins.first->second != id)
+    {
+      retiredIds[ins.first->second] = idx;
+      ins.first->second = id;
+    }
   }
 
   // Insert elements after migration
@@ -660,17 +785,44 @@ public:
 
   CkGroupID getLocationCache() const { return cacheID; }
 
+  bool isWideCollection() const { return wideCollection; }
+  CmiUInt8 getCollectionNumber() const { return collectionNumber; }
+  int getPayloadBits() const { return payloadBits; }
+  /// The id of an element of this manager's primary array, from its payload (used
+  /// for load balancer object ids; CkArray::makeID gives the per-array id).
+  ck::ObjID makeID(CmiUInt8 eid) const { return ck::ObjID(collectionNumber, eid, wideCollection); }
+
   CkLocRec* registerNewElement(const CkArrayIndex& idx);
 
   // Interface used by external users:
-  /// Home mapping
+  /// Home mapping. One home per element, computable from the index or from the id
+  /// alike, on any PE, under the current process count. Packed-index arrays use the
+  /// array map, as before; hashed-kind arrays hash the index to a process.
+  /// The key selects the process (key mod processes); the quotient, which is
+  /// independent of the remainder, selects the rank within it, so a process's homes
+  /// spread over its PEs instead of all sitting on rank 0 (in a single process they
+  /// spread over every PE). Both are recomputed under the current topology, so a
+  /// restart with any process or PE count rebuilds the directories at the new homes;
+  /// nothing about the home is stored in a checkpoint. More +objid_expand means more
+  /// keys per process and therefore a more even spread over its ranks.
+  static int hashedHomePe(CmiUInt8 key)
+  {
+    const CmiUInt8 nodes = (CmiUInt8)CkNumNodes();
+    const int node = (int)(key % nodes);
+    const int rank = (int)((key / nodes) % (CmiUInt8)CkNodeSize(node));
+    return CMK_RANK_0(CkNodeFirst(node) + rank);
+  }
   int homePe(const CkArrayIndex& idx) const
   {
-    return CMK_RANK_0(map->homePe(mapHandle, idx));
+    if (compressor)
+      return CMK_RANK_0(map->homePe(mapHandle, idx));
+    return hashedHomePe(ck::objid::indexHashKey(idx));
   }
   int homePe(const CmiUInt8 id) const
   {
-    return CMK_RANK_0(id >> CMK_OBJID_ELEMENT_BITS);
+    if (compressor)
+      return homePe(compressor->decompress(id));
+    return hashedHomePe(id >> ck::objid::getLayout().uniqueBits);
   }
   int procNum(const CkArrayIndex& idx) const
   {
@@ -693,20 +845,10 @@ public:
 
   CmiUInt8 lookupID(const CkArrayIndex& idx) const
   {
-    //CkAssert(checkInBounds(idx));
+    CkAssert(checkInBounds(idx));
     if (compressor)
     {
-      const CmiUInt8 home = homePe(idx);
-      CmiAssertMsg(
-          home <= (ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS),
-          "home is too big! (home: %" PRIx64 ", max: %" PRIx64 ")", home,
-          (CmiUInt8)(ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS));
-      const CmiUInt8 id = (home << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
-      CmiAssertMsg(
-          id <= (ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK),
-          "id is too big! (id: %" PRIx64 ", max: %" PRIx64 ")", id,
-          (CmiUInt8)(ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK));
-      return id;
+      return compressor->compress(idx);
     }
     else
     {
@@ -719,19 +861,10 @@ public:
   // TODO: This should be better
   bool lookupID(const CkArrayIndex& idx, CmiUInt8& id) const
   {
-    //CkAssert(checkInBounds(idx));
+    CkAssert(checkInBounds(idx));
     if (compressor)
     {
-      const CmiUInt8 home = homePe(idx);
-      CmiAssertMsg(
-          home <= (ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS),
-          "home is too big! (home: %" PRIx64 ", max: %" PRIx64 ")", home,
-          (CmiUInt8)(ck::ObjID::masks::HOME_MASK >> ck::ObjID::bits::ELEMENT_BITS));
-      id = (home << CMK_OBJID_ELEMENT_BITS) + compressor->compress(idx);
-      CmiAssertMsg(
-          id <= (ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK),
-          "id is too big! (id: %" PRIx64 ", max: %" PRIx64 ")", id,
-          (CmiUInt8)(ck::ObjID::masks::HOME_MASK | ck::ObjID::masks::ELEMENT_MASK));
+      id = compressor->compress(idx);
       return true;
     }
     else
@@ -782,6 +915,9 @@ public:
     return false;
   }
 
+  /// id -> index. Only for a packed-index array (decode) or an element that lives
+  /// here (its record). No delivery path may call this for an element this PE has
+  /// never seen: delivery by id routes through homePe(id) and never needs the index.
   CkArrayIndex lookupIdx(const CmiUInt8& id) const
   {
     CkLocRec* rec = nullptr;
@@ -793,17 +929,24 @@ public:
     {
       return rec->getIndex();
     }
-    else
-    {
-      IdxIdMap::const_iterator itr;
-      for (itr = idx2id.begin(); itr != idx2id.end(); itr++)
-      {
-        if (itr->second == id)
-          break;
-      }
-      CkAssert(itr != idx2id.end());
-      return itr->first;
-    }
+    CkAbort("CkLocMgr::lookupIdx: the index of element id %" PRIx64
+            " (location manager %d) is not known on PE %d\n",
+            id, thisgroup.idx, CkMyPe());
+    return CkArrayIndex();
+  }
+
+  /// id -> index where it can be had without a message: the compressor, or a local
+  /// record, or an id that died or was rebound here (retiredIds; at the home that
+  /// covers every element of its that ever died). Returns false when none applies.
+  bool recoverIndex(CmiUInt8 id, CkArrayIndex& idx) const;
+
+  /// Ask the home of idx for its location by index, whether or not this PE already
+  /// holds an id for it. The home buffers the request until the element exists, so
+  /// this is the request to pair with a demand-creation request.
+  void requestLocationAtHome(const CkArrayIndex& idx)
+  {
+    const int home = homePe(idx);
+    if (home != CkMyPe()) thisProxy[home].requestLocation(idx, CkMyPe());
   }
 
   int getMapHandle() const { return mapHandle; }
@@ -924,6 +1067,9 @@ public:
   size_t numImmigrationsInFlight() const { return inFlightImmigrations.size(); }
 
 #if CMK_GPU
+  // Send a staged device payload to its destination. Runs as its own entry
+  // method rather than inline in emigrate so the send is attributed to the
+  // runtime and not to whichever element last ran on this PE.
   void sendGPUMsg(CmiUInt8 id);
   void immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, CkDeviceBufferPost* post);
   void immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe);
@@ -995,7 +1141,22 @@ public:
   void requestLocation(const CkArrayIndex& idx);
   bool requestLocation(const CkArrayIndex& idx, int peToTell);
   void updateLocation(const CkArrayIndex& idx, const CkLocEntry& e);
+#if CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
+  /// A migration the load balancer decided (UpdateLocation): record, by id, that the
+  /// element is about to live on pe, before the move is acted on.
+  void updateLocationFromLB(CmiUInt8 id, int pe);
+#endif
   void reclaimRemote(const CkArrayIndex& idx, int deletedOnPe);
+  void noteDead(const CkArrayIndex& idx, CmiUInt8 id);
+
+  // Tranche allocator (design section 3.1). The allocator is this group's branch on
+  // PE 0; it hands out tranches of the upper half of the unique space, bottom up.
+  void requestTranche(int node, int wantLog2);           // on PE 0
+  void grantTranche(CmiUInt8 base, CmiUInt8 len);        // on rank 0 of the requesting process
+  void resumeDeferredInsertions();                       // on a PE that deferred insertions
+  // Hold an insertion until this process has a tranche again (see mintUnique).
+  void deferInsertion(CkArray* mgr, CkArrayMessage* msg, const CkArrayIndex& idx,
+                      const int listenerData[CK_ARRAYLISTENER_MAXLEN]);
   void dummyAtSync(void);
 
   /// return a list of migratables in this local record
@@ -1016,5 +1177,11 @@ bool ckMigStatsOn();
 void ckMigStatChannel(int kind, double seconds);
 
 /*@}*/
+
+inline int CkLocCache::homePe(const CmiUInt8 id) const
+{
+  CkAssert(mgr != nullptr);
+  return mgr->homePe(id);
+}
 
 #endif /*def(thisHeader)*/

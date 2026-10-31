@@ -202,7 +202,7 @@ class Entry : public Member {
   XStr syncPreCall(void);
   XStr syncPostCall(void);
   XStr marshallMsg(void);
-  XStr callThread(const XStr& procName, int prependEntryName = 0);
+  XStr callThread(const XStr& procName, int prependEntryName = 0, bool referenceNoKeep = true);
 
   // SDAG support
   std::list<CStateVar*> estateVars;

@@ -517,15 +517,11 @@ CpvDeclare(bool, device_rep); // Is this PE a device representative thread? (1 p
 
 void hapiSendMemoryRequest(char* msg, int size);
 
-// Returns the local rank of the logical node (process) that the given PE belongs to
-static inline int CmiNodeRankLocal(int pe) {
-  // Logical node index % Number of logical nodes per physical node
-  return CmiNodeOf(pe) % (CmiNumNodes() / CmiNumPhysicalNodes());
-}
+// See gpumanager.h for what this indexes and why it is cached.
+CpvDeclare(int, my_node_rank_local);
 
-// Returns the local rank of the logical node that I belong to
-static inline int CmiMyNodeRankLocal() {
-  return CmiNodeRankLocal(CmiMyPe());
+void hapiRefreshTopologyCache() {
+  CpvAccess(my_node_rank_local) = CmiNodeRankLocal(CmiMyPe());
 }
 
 // HAPI internal function declarations
@@ -1795,6 +1791,9 @@ void hapiPresetEnvironment() {
 
 // Called by all PEs in Charm++ layer init
 void hapiInit(char** argv) {
+  // Before hapiInitCsv: device-manager creation already indexes by it.
+  CpvInitialize(int, my_node_rank_local);
+  hapiRefreshTopologyCache();
   if (!CmiInCommThread()) {
     if (CmiMyRank() == 0) {
       hapiInitCsv(argv); // Initialize per-process variables (GPUManager)
@@ -4343,11 +4342,35 @@ static void hapiMapping(char** argv) {
 
   CmiNodeBarrier();
 
+  /* These three are consumed unconditionally, even though only the
+   * shared-memory path acts on them. CmiGetArgIntDesc also *removes* the
+   * argument from argv, so leaving the calls inside the use_shm branch meant
+   * that passing any of them without +gpushm left a stray '+arg' behind, and
+   * the RTS then reported "not parsed by the RTS ... you may need to recompile
+   * Charm++ with different options" -- pointing at a build problem that does
+   * not exist, for a flag that was simply inapplicable. Parse them always and
+   * say plainly when they do not apply. */
+  int input_comm_buffer_size = 0;
+  const bool given_comm_buffer = CmiGetArgIntDesc(argv, "+gpucommbuffer",
+      &input_comm_buffer_size, "GPU communication buffer size (in MB); requires +gpushm");
+
+  int input_lb_buffer_size = 0;
+  const bool given_lb_buffer = CmiGetArgIntDesc(argv, "+gpulbbuffer",
+      &input_lb_buffer_size, "GPU load balancing buffer size (in MB); requires +gpushm");
+
+  int input_hapi_ipc_event_pool_size = 16;
+  const bool given_event_pool = CmiGetArgIntDesc(argv, "+gpuipceventpool",
+      &input_hapi_ipc_event_pool_size, "GPU IPC event pool size per PE; requires +gpushm");
+
+  if (!csv_gpu_manager.use_shm && CmiMyPe() == 0 &&
+      (given_comm_buffer || given_lb_buffer || given_event_pool)) {
+    CmiPrintf("HAPI> Ignoring +gpucommbuffer/+gpulbbuffer/+gpuipceventpool: "
+        "these configure the shared-memory inter-process path, which is off "
+        "unless +gpushm is also given\n");
+  }
+
   if (csv_gpu_manager.use_shm) {
-    // Process device communication buffer parameters (in MB)
-    int input_comm_buffer_size = 0;
-    if (CmiGetArgIntDesc(argv, "+gpucommbuffer", &input_comm_buffer_size,
-          "GPU communication buffer size (in MB)")) {
+    if (given_comm_buffer) {
       if (CmiMyRank() == 0 && input_comm_buffer_size > 0) {
         // Round up to the next power of two, in integer arithmetic.
         //
@@ -4374,10 +4397,7 @@ static void hapiMapping(char** argv) {
       }
     }
 
-    // Process device communication buffer parameters (in MB)
-    int input_lb_buffer_size = 0;
-    if (CmiGetArgIntDesc(argv, "+gpulbbuffer", &input_lb_buffer_size,
-          "GPU load balancing buffer size (in MB)")) {
+    if (given_lb_buffer) {
       if (CmiMyRank() == 0) {
         csv_gpu_manager.lb_buffer_size =  (size_t)input_lb_buffer_size * 1024 * 1024;
       }
@@ -4413,13 +4433,6 @@ static void hapiMapping(char** argv) {
 #if CMK_SMP
       CmiUnlock(dm->lock);
 #endif
-    }
-
-    // Process custom size for CUDA IPC event pool
-    int input_hapi_ipc_event_pool_size;
-    if (!CmiGetArgIntDesc(argv, "+gpuipceventpool", &input_hapi_ipc_event_pool_size,
-          "GPU IPC event pool size per PE")) {
-      input_hapi_ipc_event_pool_size = 16;
     }
 
     if (CmiMyRank() == 0) {
@@ -7283,8 +7296,11 @@ static void createPool(int *n_buffers, int n_slots, std::vector<BufferPool> &poo
 
   // pre-calculate memory per size
   int max_buffers = *std::max_element(n_buffers, n_buffers + n_slots);
-  int n_buffers_to_allocate[n_slots];
-  memset(n_buffers_to_allocate, 0, sizeof(n_buffers_to_allocate));
+  // Not `int n_buffers_to_allocate[n_slots]`: n_slots is a runtime parameter,
+  // so that is a VLA -- a GNU extension rather than standard C++, and one the
+  // arm builds compile with -Werror=vla. The fill constructor also replaces
+  // the memset, whose sizeof() only gave the right length while this was a VLA.
+  std::vector<int> n_buffers_to_allocate(n_slots, 0);
   size_t buf_size;
   while (available_memory >= mempool_boundaries[0] + sizeof(BufferPoolHeader)) {
     for (int i = 0; i < max_buffers; i++) {

@@ -16,6 +16,8 @@ module LBManager {
     // Destination-side ack of the move ledger: the migrated element has
     // registered, so its entry on the source can be retired.
     entry void ledgerRetire(CmiUInt8 id, int step);
+    entry void collectObjLoads();
+    entry void objLoadsCollected(CkReductionMsg* m);
     initnode void initnodeFn();
   };
 

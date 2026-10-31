@@ -1,4 +1,6 @@
-set(ampi-cxx-sources ampi.C ampiMisc.C ampiOneSided.C ampif.C ddt.C mpich-alltoall.C ampi_mpix.C ampi_noimpl.C)
+set(ampi-cxx-sources ampi.C ampiMisc.C ampiOneSided.C ampif.C ddt.C mpich-alltoall.C ampi_mpix.C ampi_noimpl.C campi.C)
+# campi (coroutine AMPI) needs C++20 <coroutine>; charmc puts these flags after its own -std
+set_source_files_properties(campi.C PROPERTIES COMPILE_OPTIONS "-std=c++20")
 
 set(ampi-f90-sources ampimod.f90)
 #disable ROMIO due to GCC 14 cascade of failures
@@ -7,7 +9,7 @@ if(NOT DEFINED CMK_AMPI_WITH_ROMIO)
 endif()       
 
 
-set(ampi-h-sources ampi.h ampi-interoperate.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h
+set(ampi-h-sources ampi.h ampi-interoperate.h ampiimpl.h ddt.h ampi_functions.h ampi_funcptr.h ampi_funcptr_loader.h campi.h campi_core.h
                    romio-stub/mpio_globals.h)
 
 if(CMK_CAN_LINK_FORTRAN)
@@ -136,8 +138,8 @@ if(CMK_CAN_LINK_FORTRAN)
     configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
     configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/ampifort       COPYONLY)
 endif()
-configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/               COPYONLY)
-configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/ampiexec       COPYONLY)
+configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/               @ONLY)
+configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/ampiexec       @ONLY)
 configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpicc.ampi     @ONLY)
 configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpiCC.ampi     @ONLY)
 configure_file(ampiCC        ${CMAKE_BINARY_DIR}/bin/mpicxx.ampi    @ONLY)
@@ -147,8 +149,8 @@ if(CMK_CAN_LINK_FORTRAN)
     configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/mpif90.ampi    COPYONLY)
     configure_file(ampif90       ${CMAKE_BINARY_DIR}/bin/mpifort.ampi   COPYONLY)
 endif()
-configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/mpirun.ampi    COPYONLY)
-configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/mpiexec.ampi   COPYONLY)
+configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/mpirun.ampi    @ONLY)
+configure_file(ampirun       ${CMAKE_BINARY_DIR}/bin/mpiexec.ampi   @ONLY)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bin/ampi/)
 configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpicc     COPYONLY)
 configure_file(pathstub.sh   ${CMAKE_BINARY_DIR}/bin/ampi/mpiCC     COPYONLY)

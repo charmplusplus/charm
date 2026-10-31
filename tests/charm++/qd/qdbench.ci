@@ -1,0 +1,17 @@
+mainmodule qdbench {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Ring ringProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry void tokenDone();
+    entry void qdReached();
+    entry void lapsPrinted();
+  };
+
+  group Ring {
+    entry Ring();
+    entry void token(int hops, int tokenId, int n, char payload[n]);
+    entry void reportLaps();
+  };
+};

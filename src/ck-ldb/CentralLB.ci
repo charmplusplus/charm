@@ -12,7 +12,7 @@ readonly CkGroupID loadbalancer;
 initnode void lbinit(void);
 
 group [migratable] CentralLB : BaseLB {
-  entry void CentralLB(const CkLBOptions &);  
+  entry void CentralLB(const CkLBOptions &);
   entry void ProcessAtSync(void);
   // Sent to every PE of a process by the PE that built the round's GPU loads;
   // see the arrival gate in CallLB.
