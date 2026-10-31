@@ -8603,8 +8603,10 @@ on to the processes it starts. The checkpoint directory records
 Isomalloc's address range in ``Isomalloc.dat``; a restart on a
 different number of processes or PEs reads it and uses the same range,
 and aborts with a message naming both ranges when that range is not
-free in the new processes. A restart without migratable threads has no
-such requirement.
+free in the new processes. (A partitioned run writes its checkpoint
+files under per-partition subdirectories, where the restart does not
+look for this file; it then uses the range it computes itself.) A
+restart without migratable threads has no such requirement.
 
 When restarting, the runtime system recreates the state of the
 application based on the recorded log files, first restoring readonly

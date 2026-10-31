@@ -28,6 +28,7 @@ Substantially rewritten by Evan Ramos in 2019.
 #include "pup_stl.h"
 
 #include <algorithm>
+#include <atomic>
 #include <string>
 #include <string.h>
 
@@ -87,6 +88,7 @@ static char CmiIsomallocRestart;
 #endif
 static int _mmap_probe = 0;
 static int CmiIsomallocAslr = 0; /* set in CmiIsomallocInit */
+static int CmiIsomallocAslrUnknown = 0; /* randomize_va_space could not be read */
 
 static int read_randomflag(void)
 {
@@ -319,9 +321,13 @@ static void * map_global_memory(void * addr, size_t len)
     return NULL;
   }
   else if (pa != addr)
-  { /*Map worked, but gave us back the wrong place*/
-    CmiError("Charm++> [%d] tried to mmap(%p, %zu), but got %p back\n", CmiMyPe(), addr, len, pa);
-    call_munmap(addr, len);
+  { /* The probe was only a hint here (no MAP_FIXED_NOREPLACE: macOS, or a
+       Linux kernel before 4.17, which ignores the flag) and the slot is
+       occupied, so the kernel mapped elsewhere. Release that stray mapping;
+       the occupant at addr (a thread stack, say) stays, so that the abort
+       below reports the collision instead of a later segmentation fault. */
+    CmiError("Charm++> [%d] tried to mmap(%p, %zu), but got %p back: the address range is already mapped by something else\n", CmiMyPe(), addr, len, pa);
+    call_munmap(pa, len);
     CmiAbort("mmap failed in isomalloc");
     return NULL;
   }
@@ -717,9 +723,10 @@ CmiAddressSpaceRegion IsoRegion;
    stacks. Two more PE threads per process moved the start by 32 MB on one
    machine, enough for a restart in fewer processes to find its checkpointed
    contexts just below the region it computed. Rounding both bounds to a
-   coarse unit gives the same region to every run whose raw bounds differ by
-   less than a unit, which covers a different process count, PE count or
-   library set. The unit of slack inside each bound keeps the mappings the
+   coarse unit gives the same region to runs whose raw bounds differ by less
+   than a unit and do not straddle a unit boundary, which covers most
+   differences in process count, PE count or library set; the file written
+   with a checkpoint (below) settles the rest. The unit of slack inside each bound keeps the mappings the
    process makes later (more thread stacks, allocator arenas) out of the
    region, whose slots are mapped at fixed addresses. The unit is 1/64 of the
    region, at most 1 TB and at least division_size; a region too small to
@@ -774,13 +781,27 @@ static void read_restart_region(char ** argv)
   unsigned long long s = 0, e = 0, slot = 0;
   const int n = fscanf(f, "Isomalloc region %d start %llx end %llx slotsize %llu", &version, &s, &e, &slot);
   fclose(f);
-  if (n != 4 || version != 1)
+  if (n >= 1 && version != 1)
+  {
+    CmiError("Isomalloc> Warning: %s is version %d, and this runtime reads version 1; "
+             "restarting on this process's own address range.\n", path.c_str(), version);
+    return;
+  }
+  if (n != 4)
   {
     CmiError("Isomalloc> Warning: %s is not readable; restarting on this process's own address range.\n", path.c_str());
     return;
   }
   if (s == 0 && e == 0)
     return; /* the checkpointing run had Isomalloc disabled */
+  if (slot != slotsize)
+  {
+    /* Contexts are laid out in slots; a different slot size would put them
+       at other offsets than the checkpoint's. */
+    CmiError("Isomalloc> Warning: %s records a slot size of %llu bytes, and this process uses %zu; "
+             "restarting on this process's own address range.\n", path.c_str(), slot, slotsize);
+    return;
+  }
   restartRegion.s = s;
   restartRegion.e = e;
   restartRegionKnown = true;
@@ -848,6 +869,9 @@ static void adopt_restart_region()
   {
     restartRegionProblem = "the checkpoint's address range " + region_string(rec) +
                            " is partly in use in this process, whose free range is " + region_string(fresh);
+    /* Said now as well as at the unpack, so that a restart that fails later
+       for this reason, or one that happens not to need the range, shows it. */
+    CmiError("Isomalloc> Warning: %s; restarting on this process's own range.\n", restartRegionProblem.c_str());
     return;
   }
   IsoRegion = rec;
@@ -856,8 +880,24 @@ static void adopt_restart_region()
               region_string(rec).c_str(), region_string(fresh).c_str());
 }
 
+/* Set once a migratable thread's context has been created in this process
+   (on any PE), read on PE 0 when a checkpoint is written. */
+static std::atomic<bool> anyContextCreated{false};
+
 CLINKAGE int CmiIsomallocWriteRegion(const char * path)
 {
+  if (CmiIsomallocAslr && anyContextCreated.load(std::memory_order_relaxed))
+    /* A restart of this checkpoint is refused whether or not randomization
+       is off then: with it off, the code and libraries sit at other
+       addresses than the ones the thread stacks hold; with it on, nothing
+       is at a predictable address at all. Said at checkpoint time, where it
+       can still be acted on; the single-process warning at thread creation
+       does not fire, since nothing migrates between processes there. */
+    CmiError("Isomalloc> Warning: this checkpoint holds migratable threads written with address "
+             "space layout randomization on%s; it cannot be restarted. Run the program with "
+             "randomization off (Linux: setarch $(uname -m) -R, before the program or the launcher) "
+             "if it is to be restarted from a checkpoint.\n",
+             CmiIsomallocAslrUnknown ? " (or /proc/sys/kernel/randomize_va_space could not be read)" : "");
   FILE * f = fopen(path, "w");
   if (f == nullptr)
   {
@@ -1248,9 +1288,11 @@ struct isommap
          migration, which warnOnceAboutAslr in isomalloc-reconverse.C covers. */
       if (p.isCheckpoint() && CmiIsomallocAslr)
         CmiAbort("Isomalloc> Cannot restore a migratable thread from a checkpoint while address space "
-                 "layout randomization is on: its stack holds addresses of code and libraries that the "
+                 "layout randomization is on%s: its stack holds addresses of code and libraries that the "
                  "loader placed elsewhere in this process. Run the restart with randomization off "
-                 "(Linux: setarch $(uname -m) -R, before the program or the launcher).");
+                 "(Linux: setarch $(uname -m) -R, before the program or the launcher).",
+                 CmiIsomallocAslrUnknown ? " (/proc/sys/kernel/randomize_va_space could not be read, "
+                                           "so randomization is assumed on)" : "");
       if (start < isomallocStart || isomallocEnd < allocated_extent)
       {
         if (!restartRegionProblem.empty())
@@ -2792,7 +2834,9 @@ static int CmiIsomallocReadAslr(void)
 #else
   /* 1 is randomized; -1 means randomize_va_space could not be read, which is
      unknown and is treated as randomized so that the warning still fires. */
-  return read_randomflag() != 0;
+  const int flag = read_randomflag();
+  CmiIsomallocAslrUnknown = flag < 0;
+  return flag != 0;
 #endif
 }
 
@@ -2857,6 +2901,7 @@ CmiIsomallocContext CmiIsomallocContextCreate(int myunit, int numunits)
   if (isomallocStart == nullptr)
     return { nullptr };
 
+  anyContextCreated.store(true, std::memory_order_relaxed);
   uint8_t * unrounded_start = get_space_partition(isomallocStart, isomallocEnd, myunit, numunits);
   uint8_t * unrounded_end = get_space_partition(isomallocStart, isomallocEnd, myunit+1, numunits);
   auto start = (uint8_t *)CMIALIGN((uintptr_t)unrounded_start, pagesize);
