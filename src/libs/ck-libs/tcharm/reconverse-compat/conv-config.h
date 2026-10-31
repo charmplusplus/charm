@@ -9,7 +9,7 @@
     conv-mach-opt.h    build-time options
     conv-autoconfig.h  detected compiler and platform features
   This header includes those three, so code that includes conv-config.h
-  (memory-isomalloc.h, cmitls.h, ampi.h, pose) sees the same configuration
+  (memory-isomalloc.h, cmitls.h, ampi.h) sees the same configuration
   macros as Charm++ itself. It defines no types and includes no Converse API;
   include converse.h for that.
 */

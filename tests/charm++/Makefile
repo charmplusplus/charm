@@ -4,6 +4,7 @@ DIRS = \
   megatest \
   alignment \
   simplearrayhello \
+  migratable_threads \
   provisioning \
   load_balancing \
   chkpt \
@@ -36,6 +37,8 @@ DIRS = \
   unbounded_migration \
   unbounded_restart \
   anytime_bcastred \
+  atsync_reduction \
+  threaded_redn \
   objid_home \
   objid_insert \
   objid_sections \
@@ -61,6 +64,7 @@ TESTDIRS = $(filter-out $(FTDIRS) $(RECONVERSE_NA),$(DIRS))
 
 NONSCALEDIRS = \
   alignment \
+  migratable_threads \
   sdag \
   sparse \
   charmxi_parsing \
@@ -72,9 +76,7 @@ all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
 ifeq ($(CMK_SMP),1)
-ifneq ($(CMK_MULTICORE),1)
 	make smptest
-endif
 endif
 
 testp: $(foreach i,$(TESTPDIRS),testp-$i)

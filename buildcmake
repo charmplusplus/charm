@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Thin wrapper around CMake to start a build with a similar command line as ./buildold
+# Thin wrapper around CMake to start a Charm++ build
 
 set -o errexit
 # bash < 4.4 erroneously considers empty arrays to be unset
@@ -9,23 +9,17 @@ set -o errexit
 # Determine the location of this script
 my_srcdir="$(cd -P "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
 
-full_args=("$@")
-
 # Check that CMake is available and that the version is sufficiently new
 command -v cmake >/dev/null 2>&1 && rc=$? || rc=$?
 
 if [[ $rc -ne 0 ]]; then
-  echo "Warning: CMake unavailable, running ./buildold instead."
-  sleep 2
-  "$my_srcdir/buildold" "$@"
-  exit $?
+  echo "Error: CMake 3.12 or newer is required to build Charm++, and no cmake was found in PATH."
+  exit 1
 fi
 
 if [[ $(uname) == "MSYS"* || $(uname) == "MINGW"* ]]; then
-  echo "Warning: CMake build is not supported under MSYS, running ./buildold instead."
-  sleep 2
-  "$my_srcdir/buildold" "$@"
-  exit $?
+  echo "Error: building Charm++ under MSYS or MinGW is not supported."
+  exit 1
 fi
 
 cmake_version_major=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 1 -d'.')
@@ -33,11 +27,9 @@ cmake_version_minor=$(cmake --version | head -1 | cut -f 3 -d' ' | cut -f 2 -d'.
 
 cmake_version_full=$(cmake --version | head -1 | cut -f 3 -d' ')
 
-if [[ $cmake_version_major -lt 3 || ($cmake_version_major -eq 3 && $cmake_version_minor -lt 4) ]]; then
-  echo "Warning: The CMake version on your system is too old (needed: 3.4.0 or later; available: $cmake_version_full), running ./buildold instead."
-  sleep 2
-  "$my_srcdir/buildold" "$@"
-  exit $?
+if [[ $cmake_version_major -lt 3 || ($cmake_version_major -eq 3 && $cmake_version_minor -lt 12) ]]; then
+  echo "Error: CMake 3.12 or newer is required to build Charm++ (available: $cmake_version_full)."
+  exit 1
 fi
 
 usage()
@@ -50,7 +42,7 @@ usage()
 
 help()
 {
-  "$my_srcdir/buildold" --help
+  usage
   exit 0
 }
 
@@ -93,6 +85,7 @@ parse_triplet
 
 extra_triplet_opts=${extra_triplet_opts//-/ }
 opt_build_ofi=0
+opt_craype=0
 opt_cxi=0
 opt_ampi_error_checking=0
 opt_ampi_mpich_tests=0
@@ -101,6 +94,7 @@ opt_arch=$(echo "$actual_triplet" | cut -f 3 -d -) # opt_arch might be empty for
 opt_build_shared=0
 opt_ccs=0
 opt_charmdebug=0
+opt_coverage=0
 opt_controlpoint=0
 opt_cuda=0
 opt_amd=0
@@ -120,9 +114,11 @@ opt_lrts_pmi=""
 opt_mempool_cutoff=26
 opt_network=0
 opt_numa=0
+opt_nolb=0
 opt_omp=0
 opt_ooc=0
 opt_parallel=-j1
+opt_perftools=0
 opt_persistent=0
 opt_prio_type="bitvec"
 opt_production=0
@@ -149,6 +145,7 @@ opt_suffix=""
 opt_syncft=0
 opt_task_queue=0
 opt_tcp=0
+opt_tsan=0
 opt_tracing= #undef
 opt_tracing_commthread=0
 opt_zlib=1
@@ -202,6 +199,19 @@ function parse_platform_compilers() {
       ;;
     ooc)
       opt_ooc=1
+      ;;
+    # Option words that have a conv-mach-<word> file in src/arch/common.
+    nolb)
+      opt_nolb=1
+      ;;
+    tsan)
+      opt_tsan=1
+      ;;
+    perftools)
+      opt_perftools=1
+      ;;
+    craype)
+      opt_craype=1
       ;;
     tcp)
       opt_tcp=1
@@ -362,6 +372,10 @@ function processArgs() {
         ;;
       --enable-ccs)
         opt_ccs=1
+        ;;
+      --coverage)
+        # clang source-based coverage; see coverage/README.md
+        opt_coverage=1
         ;;
       --enable-reconverse)
         opt_reconverse=1
@@ -641,18 +655,19 @@ if [[ $opt_network == "reconverse" ]]; then
 fi
 
 if [[ $opt_network == "mpi" && $my_os == "win" ]]; then
-  echo "Warning: CMake build is not supported with MPI on Windows, running ./buildold instead."
-  sleep 2
-  "$my_srcdir/buildold" "${full_args[@]}"
-  exit $?
+  echo "Error: building Charm++ with MPI on Windows is not supported."
+  exit 1
 fi
 
-# Special handling for Windows compiler
+# Windows: MSVC, driven from Cygwin through the unix2nt_cc wrapper, which maps
+# Unix compiler options onto cl, link and ml64. A Windows build is a single
+# process with no network, so reconverse gets neither LCI nor LCW.
 if [[ $my_os == "win" && ( -z $opt_CC || $opt_CC == "msvc" ) ]]; then
-  # Need to use unix2nt_cc on Windows/Cygwin
-  opt_CC="$(realpath "$my_srcdir")/src/arch/win/unix2nt_cc"
+  opt_CC="$my_srcdir/src/arch/win/unix2nt_cc"
   opt_CXX="$opt_CC"
   opt_FC=
+  opt_reconverse_fetch_lci=0
+  opt_cmake_extra_args+=(-DRECONVERSE_TRY_ENABLE_COMM_LCI2=OFF -DRECONVERSE_TRY_ENABLE_COMM_LCW=OFF)
 fi
 
 [[ $opt_production -eq 0 ]] && opt_production='Debug' || opt_production='Release'
@@ -711,6 +726,7 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DBUILD_SHARED="$opt_build_shared" \
   -DCCS="$opt_ccs" \
   -DCHARMDEBUG="$opt_charmdebug" \
+  -DCMK_COVERAGE="$opt_coverage" \
   -DCONTROLPOINT="$opt_controlpoint" \
   -DBUILD_CUDA="$opt_cuda" \
   -DBUILD_HIP="$opt_amd" \
@@ -728,6 +744,10 @@ CC=$opt_CC CXX=$opt_CXX FC=$opt_FC cmake "$my_srcdir" \
   -DNUMA="$opt_numa" \
   -DOMP="$opt_omp" \
   -DOOC="$opt_ooc" \
+  -DNOLB="$opt_nolb" \
+  -DTSAN="$opt_tsan" \
+  -DPERFTOOLS="$opt_perftools" \
+  -DCRAYPE="$opt_craype" \
   -DPERSISTENT="$opt_persistent" \
   -DPRIO_TYPE="$opt_prio_type" \
   -DPTHREADS="$opt_pthreads" \

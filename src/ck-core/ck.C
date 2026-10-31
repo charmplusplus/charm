@@ -8,9 +8,6 @@ clients, including the rest of Charm++, are actually C++.
 */
 #include "ck.h"
 #include "trace.h"
-#if !CMK_RECONVERSE  /* reconverse has no converse-level queueing.h */
-#include "queueing.h"
-#endif
 
 #include "pathHistory.h"
 
@@ -895,6 +892,9 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   CkReadyEntry(CkpvAccess(_groupTable)->find(groupID), false);
   CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
 
+  // Array sends this PE held while this group (an array manager) did not exist.
+  _ckArrayFlushDeferredSends(groupID);
+
   _STATS_RECORD_PROCESS_GROUP_1();
 }
 
@@ -1274,7 +1274,6 @@ IrrGroup* _getCkLocalBranchFromGroupID(CkGroupID &gID) {
 
 static inline void _deliverForNodeBocMsg(CkCoreState *ck,int epIdx, envelope *env,void *obj)
 {
-  env->setEpIdx(epIdx);
   _invokeEntry(epIdx,env,obj);
   _STATS_RECORD_PROCESS_NODE_BRANCH_1();
 }
@@ -1548,9 +1547,6 @@ void CkUnpackMessage(envelope **pEnv)
 // Thus these accellerated versions of the Cld calls.
 #if CMK_OBJECT_QUEUE_AVAILABLE
 static int index_objectQHandler;
-#endif
-#if !CMK_RECONVERSE  /* token pool lives in ckobjQ.C, classic-only */
-int index_tokenHandler;
 #endif
 int index_skipCldHandler;
 
@@ -1971,12 +1967,13 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
   {
     IrrGroup *obj=(IrrGroup *)_localBranch(gID);
     if (obj!=NULL)
-    { //Just directly call the group:
-#if CMK_ERROR_CHECKING
+    { //Just directly call the group. Prepare the envelope and trace the
+      //creation as a send does: tracing reads the entry index, source PE and
+      //event from the envelope, and without them a production build traced
+      //the call with whatever the message buffer last held.
       envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
-#else
-      envelope *env=UsrToEnv(msg);
-#endif
+      _TRACE_CREATION_1(env);
+      _TRACE_CREATION_DONE(1);
       _deliverForBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
       return;
     }
@@ -2129,12 +2126,10 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
       void *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();
       CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
       if (obj!=NULL)
-      { //Just directly call the group:
-#if CMK_ERROR_CHECKING
+      { //Just directly call the nodegroup; see CkSendMsgBranchInline.
         envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
-#else
-        envelope *env=UsrToEnv(msg);
-#endif
+        _TRACE_CREATION_1(env);
+        _TRACE_CREATION_DONE(1);
         _deliverForNodeBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
         return;
       }
@@ -2203,11 +2198,6 @@ void _ckModuleInit(void) {
 	CmiAssignOnce(&index_skipCldHandler, CkRegisterHandler(_skipCldHandler));
 #if CMK_OBJECT_QUEUE_AVAILABLE
 	CmiAssignOnce(&index_objectQHandler, CkRegisterHandler(_ObjectQHandler));
-#endif
-#if !CMK_RECONVERSE  /* _TokenHandler/TokenPool live in ckobjQ.C, classic-only */
-	CmiAssignOnce(&index_tokenHandler, CkRegisterHandler(_TokenHandler));
-	CkpvInitialize(TokenPool*, _tokenPool);
-	CkpvAccess(_tokenPool) = new TokenPool;
 #endif
 }
 
@@ -2325,6 +2315,10 @@ void StartCharmExt(int argc, char **argv) {
     strcpy(ext_args[i].data(), argv[i]);
     ext_argv[i] = ext_args[i].data();
   }
+  /* Same hand-off as charm_main: the trace and Isomalloc init hooks that
+     reconverse's ConverseInit invokes. */
+  extern void _registerConverseInitHooks();
+  _registerConverseInitHooks();
   ConverseInit(argc, ext_argv.data(), _initCharm, 0, 0);
 }
 

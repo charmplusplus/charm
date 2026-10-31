@@ -38,20 +38,6 @@ add_library(modulecollide ${collide-h-sources} ${collide-cxx-sources} collide/th
 add_dependencies(modulecollide ck)
 add_dependencies(modulecollidecharm ck)
 
-# mblock
-set(mblock-h-sources mblock/mblock.h
-    mblock/patch.h mblock/gridutil.h mblock/mblock_impl.h)
-configure_file(mblock/libmodulemblock.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
-configure_file(mblock/mblock.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
-if(CMK_CAN_LINK_FORTRAN)
-    set(mblock-h-sources ${mblock-h-sources} mblock/mblockf.h)
-    configure_file(mblock/mblockf.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
-endif()
-
-add_library(modulemblock mblock/mblock.C mblock/patch.C
-mblock/compat_driver.c mblock/compat_fdriver.c ${mblock-h-sources})
-add_dependencies(modulemblock ck)
-
 # barrier
 configure_file(barrier/barrier.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
 add_library(modulebarrier barrier/barrier.C barrier/barrier.h)
@@ -106,25 +92,6 @@ add_dependencies(modulesearch ck)
 configure_file(MeshStreamer/MeshStreamer.h ${CMAKE_BINARY_DIR}/include COPYONLY)
 add_library(moduleMeshStreamer MeshStreamer/MeshStreamer.h MeshStreamer/MeshStreamer.C)
 add_dependencies(moduleMeshStreamer ck)
-
-
-# pose
-file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/pose/)
-
-set(pose-cxx-sources pose/eventID.C pose/stats.C pose/srtable.C pose/cancel.C
-pose/memory_temporal.C
-pose/mempool.C pose/pvtobj.C pose/lbObject.C pose/ldbal.C pose/gvt.C pose/event.C pose/eqheap.C
-pose/evq.C pose/sim.C pose/rep.C pose/strat.C pose/seq.C pose/cons.C pose/opt.C pose/opt2.C pose/opt3.C
-pose/spec.C pose/adapt.C pose/adapt2.C pose/adapt3.C pose/adapt4.C pose/adapt5.C pose/pose.C)
-
-add_library(modulepose ${pose-cxx-sources})
-add_library(moduleseqpose ${pose-cxx-sources})
-target_compile_options(moduleseqpose PRIVATE -DSEQUENTIAL_POSE=1)
-add_dependencies(modulepose ck)
-add_dependencies(moduleseqpose ck)
-
-configure_file(pose/libmodulepose.dep ${CMAKE_BINARY_DIR}/lib COPYONLY)
-configure_file(pose/libmodulepose.dep ${CMAKE_BINARY_DIR}/lib/libmoduleseqpose.dep COPYONLY)
 
 
 # idxl

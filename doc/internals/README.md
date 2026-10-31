@@ -29,6 +29,8 @@ entry, and is planned once there is more than one chapter.
 | chapter | status |
 |---|---|
 | [Object ids and element location](object-ids.md) | written 2026-10-17 (64-bit id redesign, charm #3994) |
+| [Routing a send to an array element](array-send-order.md) | written 2026-10-24 (send before the array manager exists, charm #4088) |
+| [Array broadcasts and migrating elements](array-broadcast-migration.md) | written 2026-10-25 (broadcast epochs, stored broadcasts, when `stableLocations` applies; AMPI collective hang, charm #4072) |
 | Message path: envelope, scheduler, entry method dispatch | not yet written |
 | Chare arrays: creation, insertion, migration, sections | not yet written |
 | Groups and nodegroups | not yet written |

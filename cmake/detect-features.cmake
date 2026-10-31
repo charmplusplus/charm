@@ -30,17 +30,12 @@ endif()
 
 # CMA
 set(CMK_USE_CMA ${CMK_HAS_CMA})
-if(NETWORK STREQUAL "multicore")
-  set(CMK_USE_CMA 0)
-endif()
 # Reconverse has no CMA transport: its conv-rdma.cpp compiles the CMA paths
 # only under a CMK_USE_CMA it never defines, and it does not parse
 # +noCMAForZC. Leaving CMK_USE_CMA on for a reconverse build compiles dead
 # CMA branches into Charm++ and makes the zerocopy tests' +noCMAForZC runs
 # (guarded by CMK_USE_CMA in their Makefiles) abort with a usage error.
-if(RECONVERSE)
-  set(CMK_USE_CMA 0)
-endif()
+set(CMK_USE_CMA 0)
 
 
 # Misc. linker flags (mostly for Charm4py)
@@ -127,12 +122,10 @@ elseif(CMK_HAS_ELF_H AND (CHARM_CPU STREQUAL "i386" OR CHARM_CPU STREQUAL "x86_6
 else()
   set(CMK_SUPPORTS_TLSGLOBALS 0)
 endif()
-if(RECONVERSE)
-  # -tlsglobals needs the runtime to switch the TLS segment between user-level
-  # threads, which reconverse does not do; the compile flags alone would build
-  # programs whose AMPI ranks share their "privatized" globals.
-  set(CMK_SUPPORTS_TLSGLOBALS 0)
-endif()
+# -tlsglobals needs the runtime to switch the TLS segment between user-level
+# threads, which reconverse does not do; the compile flags alone would build
+# programs whose AMPI ranks share their "privatized" globals.
+set(CMK_SUPPORTS_TLSGLOBALS 0)
 
 if(CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY AND CMK_CAN_GET_BINARY_PATH)
   set(CMK_SUPPORTS_FSGLOBALS 1)
@@ -149,15 +142,6 @@ endif()
 if(CMK_CAN_OPEN_SHARED_OBJECTS_DYNAMICALLY AND CMK_CAN_GET_BINARY_PATH AND CMK_HAS_DL_ITERATE_PHDR)
   set(CMK_SUPPORTS_PIEGLOBALS 1)
 else()
-  set(CMK_SUPPORTS_PIEGLOBALS 0)
-endif()
-if(RECONVERSE)
-  # Reconverse has no isomalloc (AMPI port stage 0: ranks do not migrate).
-  # -memory isomalloc is therefore not available, and neither is -pieglobals,
-  # which copies each rank's code and data segments into an isomalloc region
-  # and aborts without one. The flags are read by charmc, ampiCC and
-  # tests/ampi/privatization. Linux detection alone would set both to 1.
-  set(CMK_SUPPORTS_MEMORY_ISOMALLOC 0)
   set(CMK_SUPPORTS_PIEGLOBALS 0)
 endif()
 

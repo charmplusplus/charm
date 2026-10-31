@@ -17,6 +17,11 @@ configure~
 # Ignore crash backtrace dumps written beside a crashing binary
 *.btr
 
+# Ignore Windows (MSVC) executables and the debug symbol files linked beside
+# them (unix2nt_cc links with -DEBUG)
+*.exe
+*.pdb
+
 # Ignore build artifacts
 config_opts.sh
 smart-build.log
@@ -37,15 +42,7 @@ src/arch/win/createlink.exe
 /empty.cpp
 
 # Ignore directories created from compilation
-/gni-*
-/mpi-*
-/multicore-*
-/netlrts-*
-/ofi-*
-/pami*
-/ucx-*
-/uth-*
-/verbs-*
+/reconverse-*
 
 # Ignore cruft that would result from compiling charm example/test code
 # Note this is negated inside src/arch to permit addition of new charmrun files in there
@@ -53,8 +50,6 @@ charmrun
 ampirun
 pgm
 *.swp
-reconverse-darwin-arm8/
-netlrts-darwin-arm8/
 bin
 *.decl.h
 *.def.h
@@ -62,4 +57,8 @@ tests/charm++/anytime_bcastred/bcastred
 tests/charm++/qd/qdbench
 tests/charm++/anytime_migration/migrate
 tests/charm++/megatest/megatest
+tests/charm++/migratable_threads/migthread
 tests/charm++/simplearrayhello/hello
+
+# Output of coverage/run.sh and coverage/report.sh
+coverage/out/

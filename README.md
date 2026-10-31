@@ -26,8 +26,7 @@ targets) is the `contrib/reconverse` submodule, which is what
 
      $ git submodule update --init -- contrib/reconverse
 
-The build does this for you when the submodule is missing, so classic
-(non-reconverse) builds need no extra step either way. To experiment with
+The build does this for you when the submodule is missing. To experiment with
 a different reconverse, check the submodule out to the branch or commit
 you want and rebuild:
 
@@ -47,6 +46,14 @@ reproducible build.
 Committing the moved submodule pointer is what changes the pairing for
 everyone else. To build against a reconverse tree kept outside the
 Charm++ checkout, pass `--with-reconverse-dir=<path>` to `./build`.
+
+Unless you pass `--without-reconverse-fetch-lci`, a `reconverse-*` build
+fetches and builds LCI from source, and the LCI it pins needs Python 3.8
+or newer and CMake 3.21 or newer. With an older Python, configure fails
+with "Cannot find source file .../src/binding/generated/binding.cpp"; with
+an older CMake, it fails with "C_STANDARD is set to invalid value '17'".
+If your system's defaults are older, load a newer Python module and
+install a recent CMake with `pip install cmake`.
 
 
 ## Build Configuration
@@ -133,6 +140,7 @@ of the `<options>` below.
 | `verbs-linux-x86_64`      | Linux   | IB Verbs      | GNU compiler                          |
 | `ofi-linux-x86_64`        | Linux   | OFI           | GNU compiler                          |
 | `ucx-linux-x86_64`        | Linux   | UCX           | GNU compiler                          |
+| `reconverse-win-x86_64`   | Windows | none (one process) | MS Visual C++; see [README.windows.md](README.windows.md) |
 
 
 To choose `<version>`, your choice is determined by two options:
@@ -298,46 +306,18 @@ executable named `nqueen`.
 
 ## Running a Program
 
-Following the previous example, to run the program on two processors, type
+Following the previous example, to run the program on two PEs in one
+process, type
 
-     $ ./charmrun +p2 ./nqueen 12 6
+     $ ./nqueen +pe 2 12 6
 
 This should run for a few seconds, and print out:
 `There are 14200 Solutions to 12 queens. Time=0.109440 End time=0.112752`
 
-`charmrun` is used to provide a uniform interface to run charm programs.
-On some platforms, `charmrun` is just a shell script which calls the
-platform-specific start program, such as `mpirun` on MPI versions.
-
-For the `netlrts-` version, `charmrun` is an executable which invokes ssh to start
-node programs on remote machines. You should set up a `~/.nodelist` that
-enumerates all the machines you want to run jobs on, otherwise it will
-create a default `~/.nodelist` for you that contains only `localhost`. Here is a
-typical `.nodelist` file:
-
-    group main ++shell /bin/ssh
-    host <machinename>
-
-The default remote shell program is ssh, but you can define a different remote
-shell to start remote processes using the `++shell` option. You should
-also make sure that ssh or your alternative can connect to these machines without
-password authentication. Just type following command to verify:
-    
-    $ ssh <machinename> date
-
-If this gives you current date immediately, your running environment with this
-node has been setup correctly.
-
-For development purposes, the `netlrts-` version of `charmrun` comes with an easy-to-use
-`++local` option. No remote shell invocation is needed in this case. It starts
-node programs right on your local machine. This could be useful if you just
-want to run program on only one machine, for example, your laptop. This
-can save you all the hassle of setting up ssh daemons.
-To use this option, just type:
-
-     $ ./charmrun ++local ./nqueen 12 100 +p2
-
-However, for best performance, you should launch one node program per processor.
+`+pe` is the total number of PEs across all processes. To run several
+processes on one machine, use the `lcrun` launcher from the LCI build
+(`<build>/_deps/lci-src/lcrun`), for example `lcrun -n 2 ./nqueen +pe 4 12 6`;
+under Slurm, use `srun`.
 
 
 ## Building Dynamic Libraries

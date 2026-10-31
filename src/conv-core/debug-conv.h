@@ -5,7 +5,6 @@
 #ifndef __CMK_DEBUG_CONV_H
 #define __CMK_DEBUG_CONV_H
 
-#include "conv-autoconfig.h" /* for CMK_RECONVERSE */
 #include "pup_c.h"
 
 /*If you are incrementing these numbers, you also need to increment MAJOR and MINOR
@@ -42,9 +41,6 @@ void Cpd_CmiHandleMessage(void *msg);
 void CpdAborting(const char *message);
 
 extern int (*CpdIsDebugMessage)(void*);
-#if !CMK_RECONVERSE /* reconverse has no CsdSchedulerState_t */
-extern void * (*CpdGetNextMessage)(CsdSchedulerState_t*);
-#endif
 extern int _conditionalDelivery;
 extern int conditionalPipe[2];
 
