@@ -8593,6 +8593,21 @@ restarting the old checkpoint on a different number of physical
 processors. This provides the flexibility to expand or shrink your
 application when the availability of computing resources changes.
 
+Migratable threads (AMPI ranks, TCharm threads and threaded entry
+methods whose stacks Isomalloc manages) are restored at the addresses
+they had when the checkpoint was written, so a restart needs address
+space layout randomization off, as a migration between processes does.
+On Linux, run the restart under ``setarch $(uname -m) -R``, placed before
+the program or before the launcher (``lcrun``, ``srun``), which passes it
+on to the processes it starts. The checkpoint directory records
+Isomalloc's address range in ``Isomalloc.dat``; a restart on a
+different number of processes or PEs reads it and uses the same range,
+and aborts with a message naming both ranges when that range is not
+free in the new processes. (A partitioned run writes its checkpoint
+files under per-partition subdirectories, where the restart does not
+look for this file; it then uses the range it computes itself.) A
+restart without migratable threads has no such requirement.
+
 When restarting, the runtime system recreates the state of the
 application based on the recorded log files, first restoring readonly
 variables, then mainchares, then singleton chares (only when the
