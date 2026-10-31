@@ -96,8 +96,9 @@ warning.
 
 ## 3. Location tables and delivery
 
-All tables are per PE today (PR 3 of the design moves the directory and cache to
-one shared table per process).
+All tables are per PE today. PR 3 of the design moves the location and index
+tables to one shared table per process; its design is the chapter
+[process-location-cache.md](process-location-cache.md).
 
 | table | key | value | owner |
 |---|---|---|---|

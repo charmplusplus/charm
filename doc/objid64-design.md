@@ -488,6 +488,15 @@ message when a grant cannot be made).
 This section analyzes which tables stay per PE, and how
 the shared table is kept race-free.
 
+The design as it will be implemented is `doc/internals/process-location-cache.md`
+(2026-10-31). It keeps 7.1 (what is shared), 7.3's race analysis, 7.6's
+guarantees S1-S5 and 7.7's eviction classification, and replaces the shard
+locks of 7.2 with a lock-free lookup path: open-addressing tables whose slot
+words are read with atomic loads and written with single-word compare-and-swap,
+a waiter bitmask per entry in place of the waiter map, an arriving state for an
+element in flight, and location messages addressed to processes. Where this
+section and that chapter differ, the chapter holds.
+
 ### 7.1 Tables today (all per PE) and where they go
 
 | table | keyed by | holds | today | PR 3 |
@@ -1007,3 +1016,10 @@ of code; the gate is the objid test set, chkpt, megatest and pingpong on the Mac
 - 2026-10-18 (fix after #4015): a deleted index re-created on a PE that never saw it gets a new id; the home keeps a retired-id table and re-addresses messages sent to the old id; section 3.4.
 - 2026-10-19 (#4057 review, Aditya): the home records every dead element's id in the retired-id table, so the index scan is gone; a PE that releases messages held under an old id re-addresses them itself; objid_insert phase 7; section 3.4.
 - 2026-10-19 (#4058 review, Ritvik, fixed forward after the merge): the LB comm record of a bound array uses the manager's id; the ObjID constructor's range check is always on; checkpoint layout marker OBJ2; the per-PE registry of managers is gone (UpdateLocation uses the record's object-manager id); objid_wide's grep cases run through testrun; advice text follows the layout widths; section 12.
+
+- 2026-10-31: PR 3 lookup path is lock-free, not shard-locked (Kale's requirement: never a
+  coarse lock on the lookup path). Reads are atomic loads on open-addressing tables, writes
+  single-word CAS with the epoch compare, waiters a bitmask per entry, growth by chained
+  segments without moving keys. Eviction (7.7) deferred to a second version. The two residue
+  items of Aditya's e417584dd (compressor overflow message, miss counters) ride with PR 3.
+  Design chapter: doc/internals/process-location-cache.md.
