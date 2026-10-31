@@ -5660,19 +5660,6 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   thisProxy[toPe].immigrate(msg);
   tE4 = CmiWallTimer();
 
-#if CMK_CUDA
-  if (gpuBufSize > 0)
-  {
-    // Dispatch the device payload from a fresh entry method rather than
-    // sending it here: the element this migration is tearing down is still
-    // the running one at this point, and the payload belongs to the runtime
-    // rather than to it. sendGPUMsg runs once this call has returned and the
-    // element is gone.
-    sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg);
-    thisProxy[CkMyPe()].sendGPUMsg(id);
-  }
-#endif
-
   duringMigration = true;
   for (auto itr = managers.begin(); itr != managers.end(); ++itr)
   {
