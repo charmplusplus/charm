@@ -12,6 +12,7 @@
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int numRounds;
 /*readonly*/ int hitsPerRound;
+/*readonly*/ CProxy_Elem arrProxy;
 
 static const int elemsPerPe = 2;
 
@@ -31,7 +32,29 @@ public:
     CkPrintf("reduction_migrate_ahead: %d elements, %d rounds, %d hits per round\n",
              numElems, numRounds, hitsPerRound);
     arr = CProxy_Elem::ckNew(numElems);
+    arrProxy = arr;
+    CcdCallFnAfter(watchdogTick, this, 2000);
     startRound();
+  }
+
+  // Watchdog: no progress in two consecutive 2 s ticks prints every
+  // element's state and aborts, instead of holding a CI step for its
+  // whole timeout.
+  int wdRound = -1, wdRed = -1, wdStalls = 0;
+  static void watchdogTick(void *arg, double) { ((Main *)arg)->watchdog(); }
+  void watchdog() {
+    if (round == wdRound && reductionsThisRound == wdRed) {
+      if (++wdStalls == 1) {
+        CkPrintf("reduction_migrate_ahead: no progress at round %d, reduction %d of %d\n",
+                 round, reductionsThisRound, hitsPerRound);
+        arr.report();
+      } else {
+        CkAbort("reduction_migrate_ahead: hung at round %d, reduction %d of %d", round, reductionsThisRound, hitsPerRound);
+      }
+    } else {
+      wdRound = round; wdRed = reductionsThisRound; wdStalls = 0;
+    }
+    CcdCallFnAfter(watchdogTick, this, 2000);
   }
 
   void startRound() {
@@ -71,6 +94,10 @@ public:
     if (CkNumPes() == 1) return;
     migrations++;
     migrateMe((CkMyPe() + 1) % CkNumPes());
+  }
+
+  void report() {
+    CkPrintf("[%d] elem %d: hits %d migrations %d\n", CkMyPe(), thisIndex, hits, migrations);
   }
 
   void hit(int round) {
