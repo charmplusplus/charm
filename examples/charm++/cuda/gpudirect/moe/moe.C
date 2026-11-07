@@ -71,8 +71,9 @@ static inline bool hostSyncMode() {
 /* readonly */ int send_ahead;
 /* readonly */ int tok_channels;
 /* readonly */ int print_place;
+/* readonly */ std::vector<int> disp_pes;   // the PE of each dispatcher: the first PE the runtime maps to each GPU
+/* readonly */ int out_channels;   // outputs return through device channels the dispatcher owns (MOE_OUT_ENTRY=1: entry-method sends, the path before 2026-11-06)
 /* readonly */ int flight_log;
-/* readonly */ int rep_max;
 /* readonly */ int rep_init_expert;
 /* readonly */ double zipf_z;
 /* readonly */ std::string trace_path;   // -E: routing replayed from a recorded trace ("" = hashed Zipf)
@@ -89,8 +90,14 @@ static inline long long moeNowNs() {
   struct timespec ts; clock_gettime(CLOCK_REALTIME, &ts);
   return (long long)ts.tv_sec * 1000000000LL + ts.tv_nsec;
 }
+// The PE that holds dispatcher d (Main: the first PE of each GPU).
+static inline int dispPe(int d) { return disp_pes[d]; }
+
 struct MoeFlight { char kind; int step, spe, dpe, expert; long bytes; long long t_send, t_env, t_land; };
 static thread_local std::vector<MoeFlight> g_flights;
+// A token put's completion (its source-done): the record's send time is the issue, env and land the completion.
+struct TokFlight { void* disp; int step, expert, dpe; long bytes; long long t_issue; };
+static void moeTokSentFn(void* param, void* msg);
 static void moeFlightDump() {
   for (const MoeFlight& f : g_flights)
     CkPrintf("[FLIGHT] %c step %d src %d dst %d expert %d bytes %ld send %lld env %lld land %lld\n", f.kind,
@@ -182,9 +189,15 @@ static inline int stepsSinceLastLB(int s) {
 }
 
 // Replication: an expert may exist as k copies (e, 0) .. (e, k-1). The
-// dispatchers are in K_PART fixed partitions, p = d % K_PART, whatever k is;
+// dispatchers are in K_PART fixed partitions of contiguous dispatchers,
+// p = d K_PART / n_disp, whatever k is (contiguous so that a partition's
+// dispatchers share a host when the dispatchers are laid out host by host:
+// with four per host, partitions 0 and 1 are host 0's, 2 and 3 host 1's);
 // copy r of k serves the contiguous block of partitions [K_PART r / k,
-// K_PART (r+1) / k), a single partition or an aligned pair. The step's
+// K_PART (r+1) / k), a single partition or an aligned pair. Each dispatcher's
+// PE declares its partition to the balancer (LBManager::setPartition), which
+// places a copy with the host that feeds its block when the copies have no
+// exchange to pay for (serving). The step's
 // gradient is always the fixed tree ((P0 + P1) + (P2 + P3)) over the
 // partitions' accumulators (Expert::treeNodes): a copy computes its block's
 // leaves, folds them to its block sum, exchanges block sums with the other
@@ -197,7 +210,7 @@ static inline int stepsSinceLastLB(int s) {
 #endif
 static const int K_PART = MOE_K_PART;   // dispatcher partitions, fixed at build time (-DMOE_K_PART=2 for the two-partition variant)
 static const int K_MAX_COPIES = 4;  // copies the channel tables are sized for
-static inline int partitionOf(int disp) { return disp % K_PART; }
+static inline int partitionOf(int disp) { return (disp * K_PART) / n_disp; }
 static inline int partitionSize(int p) {
   int n = 0;
   for (int d = 0; d < n_disp; d++) if (partitionOf(d) == p) n++;
@@ -268,14 +281,14 @@ public:
     send_ahead = 1;
     tok_channels = 1;
     print_place = 0;
-    flight_log = 0;
-    rep_max = 2;
+    flight_log = getenv("MOE_FLIGHT_LOG") != NULL;   // -F, or the environment for a run whose command line is fixed
+    out_channels = getenv("MOE_OUT_ENTRY") == NULL;
     rep_init_expert = -1;
     bool rep_init = false;
     disp_step = exp_step = done_count = 0;
 
     int c;
-    while ((c = getopt(m->argc, m->argv, "e:m:h:t:k:i:u:z:p:c:r:L:C:s:f:b:l:S:n:D:R:E:aAUTIPFOYMXBGw")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "e:m:h:t:k:i:u:z:p:c:r:L:C:s:f:b:l:S:n:D:E:aAUTIPFOYMXBGw")) != -1) {
       switch (c) {
         case 'e': n_experts = atoi(optarg); break;
         case 'm': d_model = atoi(optarg); break;
@@ -298,7 +311,6 @@ public:
         case 'b': lb_freq = atoi(optarg); break;
         case 'l': lb_wait_lag = atoi(optarg); break;
         case 'S': moe_seed = atol(optarg); break;
-        case 'R': rep_max = atoi(optarg); break;
         case 'X': rep_init = true; break;
         case 'a': async_lb = 1; break;
         case 'A': use_adam = 1; break;
@@ -344,8 +356,6 @@ public:
               "      chunks, kept for comparison. Either way the chunk boundaries follow\n"
               "      the routing alone, so the checksums are placement-independent; the\n"
               "      two modes' values differ.)\n"
-              "  -R [copies the balancer may keep of one expert: 2 (default) lets it\n"
-              "      replicate an expert hotter than a GPU's share; 1 never]\n"
               "  -X (start with the hottest expert of the first hot set replicated,\n"
               "      its second copy on the first PE of process 1 mod processes: the\n"
               "      replicated arithmetic with no balancer, same checksums as without)\n"
@@ -371,7 +381,6 @@ public:
     if (top_k < 1 || top_k > MOE_MAX_TOPK || top_k > n_experts)
       CkAbort("-k must be in [1, min(%d, experts)]\n", MOE_MAX_TOPK);
     if (chunk_tokens < 1) CkAbort("-c must be positive\n");
-    if (rep_max < 1 || rep_max > K_MAX_COPIES) CkAbort("-R must be 1 to 4\n");
     if (use_attn && (n_tokens % 1024 != 0 || d_model % 32 != 0))
       CkAbort("-w needs -t a multiple of 1024 and -m a multiple of 32\n");
     if (use_bf16 && use_tf32) CkAbort("-B and -T exclude each other\n");
@@ -381,8 +390,11 @@ public:
     // overlap experts on one device; PEs already do that, so the default
     // keeps about four lanes per GPU rather than four per PE, which at eight
     // PEs would mean 32 handles and gigabytes of scratch on one card.
-    const int pes_per_proc = CkNodeSize(CkMyNode());
-    if (n_lanes == 0) n_lanes = std::max(1, 4 / pes_per_proc);
+    // Four lanes per GPU: the runtime says how many PEs share one (+ppn PEs over
+    // +gpudevs devices, hapiPesPerDevice), one process per node driving four
+    // GPUs being one PE per device.
+    const int pes_per_device = std::max(1, hapiPesPerDevice());
+    if (n_lanes == 0) n_lanes = std::max(1, 4 / pes_per_device);
     if (n_lanes < 1 || n_lanes > MOE_MAX_LANES)
       CkAbort("-n must be in [1, %d]\n", MOE_MAX_LANES);
     // The split barrier is the application's choice (-a), declared to the
@@ -395,12 +407,25 @@ public:
       CkAbort("-l (%d) must be in [1, lb_freq): the wait must land before "
               "the next AtSyncStart\n", lb_wait_lag);
     }
-    // One dispatcher per process, on its first PE. The other PEs of a process
-    // hold no tokens; they carry experts, each on its own PE, and provide the
-    // compute context those experts run in. So the work per GPU, the slabs
-    // and the routing are the same at any +ppn, and the checksums match the
-    // one-PE run bit for bit.
-    n_disp = CkNumNodes();
+    // One dispatcher per GPU, on the first PE the runtime maps to it
+    // (hapiDeviceIndexOfPe: +ppn PEs over +gpudevs devices, block by default).
+    // PEs sharing a GPU get one dispatcher between them on the first; its
+    // other PEs hold no tokens, carry experts and provide their compute
+    // context, so the work per GPU, the slabs and the routing are the same at
+    // any +ppn and the checksums match the one-PE-per-process run bit for
+    // bit. One process per node driving four GPUs is one dispatcher per PE,
+    // the puts between a node's GPUs then plain copies in one address space.
+    disp_pes.clear();
+    for (int p = 0; p < CkNumPes(); p++) {
+      bool first = true;
+      for (int q = CkNodeFirst(CkNodeOf(p)); q < p && first; q++)
+        if (hapiDeviceIndexOfPe(q) == hapiDeviceIndexOfPe(p)) first = false;
+      if (first) disp_pes.push_back(p);
+    }
+    n_disp = (int)disp_pes.size();
+    if (CkNumPes() > CkNumNodes())
+      CkPrintf("MoE: %d dispatchers on %d PEs in %d processes (%d PE%s per GPU)\n", n_disp, CkNumPes(), CkNumNodes(),
+          pes_per_device, pes_per_device == 1 ? "" : "s");
     // A replayed trace: the hottest expert and the slab capacity come from the
     // trace itself, p_max being the largest share any expert takes of one
     // dispatcher's tokens in one step (one chunk of n_tokens text tokens).
@@ -459,14 +484,16 @@ public:
     CkPrintf("\n[CUDA mixture-of-experts layer]\n");
     CkPrintf("Experts: %d, d_model %d, d_ff %d, %s%s, up to %d cop%s each\n", n_experts, d_model,
         d_ff, serve_only ? "serving (forward only)" : use_adam ? "Adam" : "SGD",
-        use_bf16 ? ", bf16 operands with fp32 master weights" : use_tf32 ? ", TF32" : "", rep_max,
-        rep_max == 1 ? "y" : "ies");
-    CkPrintf("Tokens: %d per process per step on %d processes of %d PE%s, "
-        "top-%d, chunk %d, slab capacity %d per (process, expert), %d compute "
+        use_bf16 ? ", bf16 operands with fp32 master weights" : use_tf32 ? ", TF32" : "", K_MAX_COPIES,
+        K_MAX_COPIES == 1 ? "y" : "ies");
+    CkPrintf("Tokens: %d per dispatcher per step on %d dispatchers (one per GPU, %d PE%s each), "
+        "top-%d, chunk %d, slab capacity %d per (dispatcher, expert), %d compute "
         "lanes per PE%s\n",
-        n_tokens, n_disp, pes_per_proc, pes_per_proc == 1 ? "" : "s", top_k,
+        n_tokens, n_disp, pes_per_device, pes_per_device == 1 ? "" : "s", top_k,
         chunk_tokens, cap_src, n_lanes,
         fuse_sources ? "" : ", one pass per source");
+    CkPrintf("Outputs return %s\n", out_channels ? "through the dispatchers' device channels (one segment per expert)"
+                                                  : "as entry-method device sends (MOE_OUT_ENTRY)");
     if (capacity_factor > 0.0)
       CkPrintf("Capacity factor: %.2f (GShard/Switch token dropping; no state moves)\n",
           capacity_factor);
@@ -510,21 +537,11 @@ public:
     disp_proxy.init();
   }
 
-  // Before the experts initialise, PE 0 measures what one partial's transfer
-  // costs to a PE on its node and to one on another node (Dispatcher::probe):
-  // with copies possible (-R > 1), every expert declares those times, scaled
-  // to the balancing interval, as a copy's recurring cost, so the balancer
-  // prices a copy against what it buys. Serving exchanges nothing: cost 0.
+  // The experts initialise once every dispatcher is ready. Each expert
+  // declares to the balancer what a copy of it would send its peers (bytes
+  // and messages per interval) and, once it has copies, what the exchange
+  // measured; the runtime's calibrated transfer-cost table prices the rest.
   void dispReady() {
-    if (rep_max > 1 && !serve_only) disp_proxy[0].probe();
-    else probeDone(0.0, 0.0);
-  }
-  void probeDone(double node_s, double remote_s) {
-    if (rep_max > 1 && !serve_only)
-      CkPrintf("Exchange probe: one partial (%.0f MB) takes %.1f ms to a GPU on this host, %.1f ms to "
-               "another host; a copy is priced with these per step\n",
-               2.0 * sizeof(float) * (double)d_model * d_ff / 1048576.0, node_s * 1e3, remote_s * 1e3);
-    disp_proxy.setXchg(node_s, remote_s);
     expert_proxy.init();
   }
 
@@ -541,7 +558,7 @@ public:
     start_time = CkWallTimer();
     window_start_time = start_time;
     // Only the dispatcher branch on each process's first PE runs steps.
-    for (int d = 0; d < n_disp; d++) disp_proxy[CkNodeFirst(d)].runStep();
+    for (int d = 0; d < n_disp; d++) disp_proxy[dispPe(d)].runStep();
     expert_proxy.runStep();
   }
 
@@ -773,6 +790,16 @@ class Dispatcher : public CBase_Dispatcher {
   // copy's channels can be destroyed when it retires (an assignment over a
   // channel would leave its registration behind).
   std::vector<CkDeviceChannel*> tok_ch;
+  // Output channels (out_channels): this dispatcher owns one per (expert, copy
+  // rank, step parity) over the expert's fixed segment of the receive slab of
+  // that parity, hands them to the copy that serves it, takes each put's note
+  // (outputArrived) and releases the segment once the step is combined. The
+  // 64 outputs a step then cost the dispatcher no landing copy, no post entry
+  // and no acknowledgement (measured 2026-11-06: an output waited 16 to 30 ms
+  // between its envelope and its consumption on that path).
+  std::vector<CkDeviceChannel> out_ch;
+  std::vector<char> out_open;
+  std::vector<int> out_from;   // per (parity, expert): the copy whose put landed this step, -1 none
   int chans_in = 0;          // rank-0 channel sets held (init handshake)
   int chans_new_in = 0;      // rank > 0 channel sets taken by runStep so far
   int chans_new_needed = 0;  // ... and how many steps so far have needed one
@@ -792,12 +819,6 @@ class Dispatcher : public CBase_Dispatcher {
   // the compute context (lanes) the experts on their PE run in.
   int dispId = -1;
   bool active = false;
-  // The exchange probe's state (PE 0 and its targets) and its result on every PE.
-  char* probe_buf = nullptr;
-  char* probe_land = nullptr;
-  int probe_target = -1, probe_phase = 0, probe_reps = 0;
-  double probe_t0 = 0.0, probe_node_s = 0.0, probe_remote_s = 0.0;
-  double xchg_node_s = 0.0, xchg_remote_s = 0.0;   // seconds one partial takes to a copy on this node / another
   // The last balancing round decided nothing (LBManager::LastRoundDecisions):
   // nothing migrates or changes its copies, so the tokens of the steps in its
   // window may go ahead after all. Reset at every balancing step.
@@ -810,14 +831,74 @@ class Dispatcher : public CBase_Dispatcher {
 
   size_t slots() const { return (size_t)n_tokens * top_k; }
   static int chIdx(int e, int r, int q) { return (e * K_MAX_COPIES + r) * 2 + q; }
+  // Rows of the receive slab: with output channels every expert has a fixed
+  // segment of cap_src rows (a channel's buffer is fixed), else the tokens'.
+  size_t recvRows() const { return out_channels ? (size_t)n_experts * cap_src : slots(); }
+  void* recvSeg(int q, int e) { return (char*)sb[q].d_recv + (size_t)e * cap_src * d_model * actEsz(); }
+  void openOutChannelsFor(int e, int r, int late) {
+    for (int q = 0; q < 2; q++) {
+      CkDeviceChannel& c = out_ch[chIdx(e, r, q)];
+      c = CkDeviceChannel(recvSeg(q, e), (size_t)cap_src * d_model * actEsz(),
+                          CkCallback(CkIndex_Dispatcher::outputArrived(NULL), thisProxy[CkMyPe()]));
+      c.open();
+      out_open[chIdx(e, r, q)] = 1;
+    }
+    expert_proxy(e, r).takeOutChannels(dispId, late, out_ch[chIdx(e, r, 0)], out_ch[chIdx(e, r, 1)]);
+    TRACE(2, "disp %d: output channels for expert %d copy %d opened%s", dispId, e, r, late ? " (late)" : "");
+  }
+  // A put's note: which channel, hence which expert and copy; the tag carries
+  // the step and the copies the sender announces for the next one.
+  void outputArrived(CkDataMsg* m) {
+    CkDeviceChannelEvent ev;
+    memcpy(&ev, m->getData(), sizeof(ev));
+    int idx = -1;
+    for (int i = 0; i < (int)out_ch.size(); i++)
+      if (out_open[i] && out_ch[i].id() == ev.channel) { idx = i; break; }
+    if (idx < 0)
+      CkAbort("PE %d: an output note for channel %llx, which is not one of its dispatcher's\n", CkMyPe(),
+          (unsigned long long)ev.channel);
+    const CkDeviceChannelEvent* e = out_ch[idx].event(m);
+    delete m;
+    if (e == NULL) return;
+    const int step = (int)(e->tag >> 3), mult_next = (int)(e->tag & 7);
+    const int ex = idx / (K_MAX_COPIES * 2), r = (idx / 2) % K_MAX_COPIES, q = idx & 1;
+    if (q != (step & 1))
+      CkAbort("PE %d: expert %d copy %d's output for step %d landed on the channel of parity %d\n", CkMyPe(), ex, r,
+          step, q);
+    if (flight_log) { env_t.resize(2 * n_experts); env_t[q * n_experts + ex] = moeNowNs(); }
+    out_from[q * n_experts + ex] = r;
+    thisProxy[CkMyPe()].outputIn(step, ex, (int)(e->bytes / (actEsz() * d_model)), mult_next);
+  }
+  // This step's segments were combined: the copies may put the step after next.
+  void releaseOutputs() {
+    const int q = my_step & 1;
+    for (int e = 0; e < n_experts; e++) {
+      const int r = out_from[q * n_experts + e];
+      if (r < 0) continue;
+      out_ch[chIdx(e, r, q)].release();
+      out_from[q * n_experts + e] = -1;
+    }
+  }
+  // A retired copy has destroyed its holder copies: the channels close.
+  void outChannelsFree(int e, int r) {
+    for (int q = 0; q < 2; q++) {
+      const int i = chIdx(e, r, q);
+      if (!out_open[i]) continue;
+      out_ch[i].close();
+      out_open[i] = 0;
+    }
+    TRACE(2, "disp %d: output channels of expert %d copy %d closed", dispId, e, r);
+  }
 
   void init() {
     // The experts declare their own loads (token count x measured seconds per
     // token); with instrumentation on, the balancer would overwrite them with
     // CUPTI's measurement, and pay CUPTI's cost every step. -I keeps it.
 
-    dispId = CkMyNode();
-    active = (CkMyRank() == 0);
+    dispId = -1;
+    for (int d = 0; d < n_disp; d++) if (disp_pes[d] == CkMyPe()) dispId = d;
+    active = dispId >= 0;
+    if (active) LBManagerObj()->setPartition(partitionOf(dispId));   // this PE feeds that partition of every expert
 
     memset(&gpu, 0, sizeof(gpu));
     gpu.n_lanes = n_lanes;
@@ -882,7 +963,7 @@ class Dispatcher : public CBase_Dispatcher {
       hapiCheck(hapiMalloc((void**)&b.d_send, esz * (TK + 1) * d_model));
       // TK+2 rows: [TK] absorbs the one-row dummy a zero-token expert sends,
       // [TK+1] is held at zero for tokens dropped by the capacity factor.
-      hapiCheck(hapiMalloc((void**)&b.d_recv, esz * (TK + 2) * d_model));
+      hapiCheck(hapiMalloc((void**)&b.d_recv, esz * (recvRows() + 2) * d_model));
       hapiCheck(hapiMemset((char*)b.d_recv + (TK + 1) * d_model * esz, 0,
           esz * d_model));
       hapiCheck(hapiMalloc((void**)&b.d_send_idx, sizeof(int) * TK));
@@ -904,6 +985,13 @@ class Dispatcher : public CBase_Dispatcher {
     // announced change, so the channel wait below covers it too.
     if (rep_init_expert >= 0) pend_mult[rep_init_expert] = 2;
     tok_ch.assign(chIdx(n_experts, 0, 0), nullptr);
+    if (out_channels && active) {
+      out_ch.resize(chIdx(n_experts, 0, 0));
+      out_open.assign(out_ch.size(), 0);
+      out_from.assign(2 * n_experts, -1);
+      for (int e = 0; e < n_experts; e++)
+        openOutChannelsFor(e, copyFor(dispId, e == rep_init_expert ? 2 : 1), 0);
+    }
     LBManagerObj()->AddMigrationDoneFn(this, &Dispatcher::roundDone);
 
     // Unit-variance inputs, a pure function of (seed, PE, element); under -B
@@ -1026,13 +1114,16 @@ class Dispatcher : public CBase_Dispatcher {
     }
     std::fill(fill_.begin(), fill_.end(), 0);
     const size_t TK = slots();
-    const int zero_row = (int)TK + 1;   // d_recv row kept at zero; TK is the n=0 slack
+    const int zero_row = (int)recvRows() + 1;   // d_recv row kept at zero; recvRows() is the n=0 slack
     for (size_t i = 0; i < TK; i++) {
       const int e = slot_expert[i];
       if (fill_[e] >= counts[e]) { sbuf.h_recv_pos[i] = zero_row; continue; }
-      const int pos = offs[e] + fill_[e]++;
+      const int pos = offs[e] + fill_[e];   // the send slab: compact, by expert
       sbuf.h_send_idx[pos] = (int)(i / K);
-      sbuf.h_recv_pos[i] = pos;
+      // The receive slab: the same row of the expert's segment (fixed with
+      // output channels, the send layout without).
+      sbuf.h_recv_pos[i] = (out_channels ? e * cap_src : offs[e]) + fill_[e];
+      fill_[e]++;
     }
   }
 
@@ -1055,6 +1146,7 @@ class Dispatcher : public CBase_Dispatcher {
       // that it already has them (Expert::refreshChannels): one arrival per
       // change, waited for before this step is routed.
       if (tok_channels) chans_new_needed++;
+      if (out_channels && !out_open[chIdx(e, cNew, 0)]) openOutChannelsFor(e, cNew, 1);
       TRACE(1, "disp step %d: expert %d has %d copies from this step; copy %d serves this dispatcher",
           my_step, e, mult[e], cNew);
       if (mult[e] < old && cOld == old - 1) {
@@ -1094,74 +1186,6 @@ class Dispatcher : public CBase_Dispatcher {
     if (n == 0) lb_round_idle = true;
     TRACE(1, "disp step %d: balancing round done, %d decisions job-wide%s", my_step, n,
         n == 0 ? "; tokens go ahead again" : "");
-  }
-
-  // ---- the exchange probe (PE 0) ----
-  size_t probeBytes() const { return 2 * sizeof(float) * (size_t)d_model * d_ff; }   // dW1 and dW2, fp32
-  void probe() {
-    hapiCheck(hapiMalloc((void**)&probe_buf, probeBytes()));
-    probe_phase = 0;
-    probeNext();
-  }
-  // Phase 0: another PE on this physical host (one GPU per process, so a
-  // Charm++ node is a process and the host is CmiPhysicalNodeID); phase 1:
-  // the first PE of the next host, when there is one. Two transfers each:
-  // the first warms the registrations and the paths, the second is the
-  // measurement.
-  void probeNext() {
-    for (;;) {
-      if (probe_phase == 0) {
-        int t = -1;
-        for (int pe = 1; pe < CkNumPes(); pe++)
-          if (CmiPhysicalNodeID(pe) == CmiPhysicalNodeID(0)) { t = pe; break; }
-        if (t >= 0) { probe_target = t; break; }
-        probe_node_s = 0.0;
-        probe_phase = 1;
-      } else if (probe_phase == 1) {
-        int t = -1;
-        for (int pe = 1; pe < CkNumPes(); pe++)
-          if (CmiPhysicalNodeID(pe) != CmiPhysicalNodeID(0)) { t = pe; break; }
-        if (t >= 0) { probe_target = t; break; }
-        probe_remote_s = probe_node_s;
-        probe_phase = 2;
-      } else {
-        hapiCheck(hapiFree(probe_buf));
-        probe_buf = nullptr;
-        main_proxy.probeDone(probe_node_s, probe_remote_s);
-        return;
-      }
-    }
-    probe_reps = 0;
-    probeSend();
-  }
-  void probeSend() {
-    probe_t0 = CkWallTimer();
-    disp_proxy[probe_target].probeLand((int)probeBytes(),
-        CkDeviceBuffer(probe_buf, CkCallback(CkIndex_Dispatcher::probeSendDone(), thisProxy[CkMyPe()]),
-            gpu.comm.stream));
-  }
-  void probeSendDone() {}
-  void probeAck() {
-    const double dt = CkWallTimer() - probe_t0;
-    if (++probe_reps < 2) { probeSend(); return; }
-    if (probe_phase == 0) probe_node_s = dt; else probe_remote_s = dt;
-    probe_phase++;
-    probeNext();
-  }
-  // The target: the partial lands on the comm stream; the ack goes once it has.
-  void probeLand(int n, char*& buf, CkDeviceBufferPost* devicePost) {
-    if (!probe_land) hapiCheck(hapiMalloc((void**)&probe_land, (size_t)n));
-    buf = probe_land;
-    devicePost[0].hapi_stream = gpu.comm.stream;
-  }
-  void probeLand(int n, char* buf) {
-    hapiCheck(hapiStreamSynchronize(gpu.comm.stream));
-    disp_proxy[0].probeAck();
-  }
-  void setXchg(double node_s, double remote_s) {
-    xchg_node_s = node_s;
-    xchg_remote_s = remote_s;
-    if (probe_land) { hapiCheck(hapiFree(probe_land)); probe_land = nullptr; }
   }
 
   // Route step `step` into its parity's buffers and gather its tokens. The
@@ -1216,16 +1240,27 @@ class Dispatcher : public CBase_Dispatcher {
       // ~20 GB/s, writing ~50 GB/s (A40 x4, no NVLink). The put's size is the
       // token count; an empty one is a note alone. The tag is the step.
       const int q = send_step % tokParities();
+      // MOE_TOK_FLUSH=1: each token put its own batch (the default lets the
+      // runtime gather this entry's same-host puts into one copy).
+      static const bool tok_flush = getenv("MOE_TOK_FLUSH") != NULL;
       for (int e = 0; e < n_experts; e++) {
         const int n = b.counts[e];
-        CkDeviceChannel* ch = tok_ch[chIdx(e, copyFor(dispId, mult[e]), q)];
+        const int r = copyFor(dispId, mult[e]);
+        CkDeviceChannel* ch = tok_ch[chIdx(e, r, q)];
         if (ch == nullptr)
-          CkAbort("PE %d step %d: no channel to copy %d of expert %d\n", CkMyPe(), send_step,
-              copyFor(dispId, mult[e]), e);
+          CkAbort("PE %d step %d: no channel to copy %d of expert %d\n", CkMyPe(), send_step, r, e);
         b.outstanding++;
-        ch->put((char*)b.d_send + (size_t)b.offs[e] * d_model * actEsz(),
-            actEsz() * (size_t)n * d_model, send_stream, done,
-            (uint64_t)send_step);
+        const size_t bytes = actEsz() * (size_t)n * d_model;
+        if (flight_log) {
+          // The destination PE is where copy r of expert e lives; recorded as the expert and the bytes.
+          TokFlight* f = new TokFlight{this, send_step, e, -1, (long)bytes, moeNowNs()};
+          ch->put((char*)b.d_send + (size_t)b.offs[e] * d_model * actEsz(), bytes, send_stream,
+              CkCallback(moeTokSentFn, (void*)f), (uint64_t)send_step);
+        } else {
+          ch->put((char*)b.d_send + (size_t)b.offs[e] * d_model * actEsz(), bytes, send_stream, done,
+              (uint64_t)send_step);
+        }
+        if (tok_flush) CkRdmaDeviceChannelBatchFlush();
       }
     } else {
       for (int e = 0; e < n_experts; e++) {
@@ -1297,7 +1332,8 @@ class Dispatcher : public CBase_Dispatcher {
 
   void noteOutput(int e, int n, long long ts, int spe, int mult_next) {
     if (flight_log)
-      g_flights.push_back({'O', my_step, spe, CkMyPe(), e, (long)std::max(n, 1) * d_model * (long)actEsz(), ts,
+      g_flights.push_back({'O', my_step, spe, CkMyPe(), e, (long)std::max(n, 1) * d_model * (long)actEsz(),
+                           ts ? ts : env_t[(my_step & 1) * n_experts + e],   // a channel note carries no send time
                            env_t[(my_step & 1) * n_experts + e], moeNowNs()});
     TRACE(3, "disp step %d output expert %d n=%d consumed", my_step, e, n);
     if (n != stepBuf(my_step).counts[e])
@@ -1340,12 +1376,18 @@ class Dispatcher : public CBase_Dispatcher {
   // This step's send slab is gathered into again two steps on; every send
   // from it must have confirmed completion first.
   void gateDrain() {
+    if (out_channels) releaseOutputs();
     if (stepBuf(my_step).outstanding == 0) thisProxy[CkMyPe()].sendsDrained();
     else drain_pending = true;
   }
 
   void sendDoneEven() { sendDone(0); }
   void sendDoneOdd() { sendDone(1); }
+  void tokSent(TokFlight* f) {
+    g_flights.push_back({'T', f->step, CkMyPe(), f->dpe, f->expert, f->bytes, f->t_issue, moeNowNs(), moeNowNs()});
+    sendDone(f->step & 1);
+    delete f;
+  }
   void sendDone(int parity) {
     sb[parity].outstanding--;
     if (drain_pending && (my_step & 1) == parity && sb[parity].outstanding == 0) {
@@ -1377,6 +1419,12 @@ class Dispatcher : public CBase_Dispatcher {
 
 // ---------------------------------------------------------------------------
 
+static void moeTokSentFn(void* param, void* msg) {
+  TokFlight* f = (TokFlight*)param;
+  ((Dispatcher*)f->disp)->tokSent(f);
+  if (msg) CkFreeMsg(msg);
+}
+
 class Expert : public CBase_Expert {
   Expert_SDAG_CODE
 
@@ -1404,6 +1452,25 @@ class Expert : public CBase_Expert {
   // the step's kernels are done with the slab.
   std::vector<CkDeviceChannel> tok_ch;
   std::vector<char> ch_open;
+  // Holder copies of the dispatchers' output channels (out_channels), per
+  // (step parity, dispatcher): the step's outputs are put into them. Pointers,
+  // destroyed when the copy retires or dies (never assigned over); they travel
+  // with the copy and re-resolve after a migration.
+  std::vector<CkDeviceChannel*> out_ch;
+  std::vector<char> out_have;
+  bool out_by_pup = false;
+  // The block-sum exchange over channels (out_channels, training): this copy
+  // owns a channel per (peer slot, step parity) over its landing pair
+  // dWpeer[slot][q] (one contiguous buffer of two blocks) and hands it to
+  // that peer; it holds copies of the peers' channels and puts its own pair
+  // into them. The peer's figures (tokens, PE, device time, retiring) go as
+  // the small peerStats message serving already uses.
+  std::vector<CkDeviceChannel> grad_ch;     // (slot, parity), owner side
+  std::vector<char> grad_open;
+  std::vector<CkDeviceChannel*> grad_hold;  // (peer rank, parity), holder copies
+  std::vector<char> grad_have;              // per peer rank
+  std::vector<char> grad_holder_alive;      // per peer rank: the peer still holds copies of this copy's channels
+  bool grad_by_pup = false;
   // Per channel: a put has landed and its note was taken, but the step loop
   // has not consumed it (its slabIn is queued for a later step). Its bytes are
   // in the slab only, so a migration has to carry that segment: the runtime
@@ -1449,21 +1516,32 @@ class Expert : public CBase_Expert {
   bool grad_in_flight = false;  // the block sum's sends have not all completed
   int grad_bufs_done = 0;
   int grad_bufs_expected = 0;
-  // The balancer's decision for this round, known to every copy of the group
+  // The balancer's decisions for this round, known to every copy of the group
   // (ckClone / ckRetire on the copy concerned, the notices on the others):
-  // a copy of rank decided_rank is made (clone_decided) or retired
-  // (retire_decided) at the end of the step the round releases us in.
+  // copies of the ranks marked in decided_new are made (clone_decided), or
+  // the copy of rank decided_rank retired (retire_decided), at the end of
+  // the step the round releases us in. A round may add several copies at
+  // once; their ranks run on from nc.
   bool clone_decided = false;
   bool retire_decided = false;
   int decided_rank = -1;
-  bool clone_in_flight = false; // a clone's state send has not completed
+  bool decided_new[K_MAX_COPIES] = {};
+  bool clone_in_flight = false; // the clones' state sends have not all completed
   int clone_bufs_done = 0;
   int clone_bufs_expected = 0;
-  int clone_to_pe = -1;         // a clone decision waiting for its step
-  int clone_rank = -1;
+  int n_clone = 0;              // clone decisions this copy sources, waiting for their step
+  int clone_to_pe[K_MAX_COPIES] = {};
+  int clone_rank[K_MAX_COPIES] = {};
   bool retire_pending = false;  // a retire decision waiting for its step
   bool retiring = false;        // this step is this copy's last
   int mult_next = 1;            // copies serving the next step, told to the dispatchers
+  // What the exchange costs this copy, measured: the wait from its compute's
+  // end to the last of the other copies' block sums, summed over the steps
+  // since the last balancing point (declared per peer at the next one; the
+  // runtime's calibrated table prices a copy that has not exchanged yet).
+  double xchg_wait_s = 0.0;
+  int xchg_waits = 0;
+  double t_compute_done = 0.0;
   // The other copies' step, by rank: tokens, PE, device time, whether it retires.
   long peer_n[K_MAX_COPIES] = {};
   int peer_pe[K_MAX_COPIES] = {-1, -1, -1, -1};
@@ -1504,6 +1582,11 @@ class Expert : public CBase_Expert {
   // runs at Llama size as a deficit of exactly 1/64.
   hapiEvent_t ev_chk;
   hapiEvent_t ev_grad;   // the partial is complete on the lane (replicated)
+  // A replicated copy's exchange and update run here, not on the lane it computed
+  // on: the lane is released at computeDone and another expert's chunks may be
+  // queued on it by the time the peers' block sums are in (A100, job 23601306:
+  // an apply waited 20 ms behind them). Stream and checksum partials only.
+  MoeGpu xg;
   // Same reason as the dispatcher's: the lane's tail at send time includes
   // other experts' queued GEMMs, and a landing that waited on it stalled the
   // receiver's comm stream for a remote expert's compute. This stream waits
@@ -1518,6 +1601,7 @@ class Expert : public CBase_Expert {
     x_seg = y_seg = NULL;
     d_chk = NULL;
     h_chk = NULL;
+    memset(&xg, 0, sizeof(xg));
   }
 
   Expert(CkMigrateMessage* m) {
@@ -1527,6 +1611,7 @@ class Expert : public CBase_Expert {
     x_seg = y_seg = NULL;
     d_chk = NULL;
     h_chk = NULL;
+    memset(&xg, 0, sizeof(xg));
   }
 
   ~Expert() {
@@ -1534,9 +1619,9 @@ class Expert : public CBase_Expert {
     // Under async LB this runs mid-step on a migrating element: kernels may
     // still be in flight on the shared stream. Settle them before freeing.
     const double t0 = tnow();
-    std::vector<void*> bufs = {W1, W2, W1b, W2b, m1, v1, m2, v2, x_seg, y_seg, dWown1, dWown2, dWownS1, dWownS2};
+    std::vector<void*> bufs = {W1, W2, W1b, W2b, m1, v1, m2, v2, x_seg, y_seg, dWown1, dWownS1};   // the pairs' second halves are the firsts' tails
     for (int sl = 0; sl < K_MAX_COPIES - 1; sl++)
-      for (int q = 0; q < 2; q++) { bufs.push_back(dWpeer1[sl][q]); bufs.push_back(dWpeer2[sl][q]); }
+      for (int q = 0; q < 2; q++) bufs.push_back(dWpeer1[sl][q]);
     if (hostSyncMode() || !CkDevicePoolOn()) {
       hapiCheck(hapiStreamSynchronize(lane()->stream));
       TRACE(1, "expert %d.%d dtor step %d phase %d synced after %.3f ms",
@@ -1558,6 +1643,8 @@ class Expert : public CBase_Expert {
     hapiCheck(hapiEventDestroy(ev_grad));
     for (hapiEvent_t e : ev_seg) hapiCheck(hapiEventDestroy(e));
     hapiCheck(hapiStreamDestroy(send_stream));
+    if (xg.stream) { hapiCheck(hapiStreamSynchronize(xg.stream)); hapiCheck(hapiStreamDestroy(xg.stream)); xg.stream = NULL; }
+    if (xg.partials) { hapiCheck(hapiFree(xg.partials)); xg.partials = NULL; }
     if (outstanding_sends != 0) {
       // A transport may still be reading a send buffer. Leak rather than pull
       // memory out from under it -- the pic2d convention.
@@ -1570,10 +1657,138 @@ class Expert : public CBase_Expert {
       if (b) hapiCheck(hapiFree(b));
     hapiCheck(hapiFree(d_chk));
     hapiCheck(hapiFreeHost(h_chk));
+    for (CkDeviceChannel* c : out_ch) delete c;
+    out_ch.clear();
+    for (CkDeviceChannel* c : grad_hold) delete c;
+    grad_hold.clear();
   }
 
   int expert() const { return thisIndex.x; }
   int rank() const { return thisIndex.y; }
+  void ensureOutCh() {
+    if (out_ch.empty()) { out_ch.assign(2 * n_disp, nullptr); out_have.assign(n_disp, 0); }
+  }
+  static int gIdx(int slot, int q) { return slot * 2 + q; }
+  static int hIdx(int r, int q) { return r * 2 + q; }
+  int rankOfSlot(int slot) const { return slot < rank() ? slot : slot + 1; }
+  void ensureGradCh() {
+    if (grad_ch.empty()) {
+      grad_ch.resize((K_MAX_COPIES - 1) * 2);
+      grad_open.assign(grad_ch.size(), 0);
+      grad_hold.assign(K_MAX_COPIES * 2, nullptr);
+      grad_have.assign(K_MAX_COPIES, 0);
+      grad_holder_alive.assign(K_MAX_COPIES, 0);
+    }
+  }
+  bool gradChannelsOn() const { return out_channels && !serve_only; }
+  // This copy's channels for peer r, over its landing pair for r, handed to r.
+  void openGradChannelsFor(int r) {
+    ensureGradCh();
+    const int sl = slotOf(r);
+    for (int q = 0; q < 2; q++) {
+      CkDeviceChannel& c = grad_ch[gIdx(sl, q)];
+      c = CkDeviceChannel(dWpeer1[sl][q], 2 * sizeof(float) * wsz(),
+                          CkCallback(CkIndex_Expert::gradArrived(NULL), self()));
+      c.open();
+      grad_open[gIdx(sl, q)] = 1;
+    }
+    grad_holder_alive[r] = 1;
+    peerAt(r).takeGradChannels(rank(), grad_ch[gIdx(sl, 0)], grad_ch[gIdx(sl, 1)]);
+    TRACE(2, "expert %d.%d step %d: exchange channels for copy %d opened", expert(), rank(), my_step, r);
+  }
+  void storeGradChannels(int from, const CkDeviceChannel& c0, const CkDeviceChannel& c1) {
+    ensureGradCh();
+    delete grad_hold[hIdx(from, 0)];
+    delete grad_hold[hIdx(from, 1)];
+    grad_hold[hIdx(from, 0)] = new CkDeviceChannel(c0);
+    grad_hold[hIdx(from, 1)] = new CkDeviceChannel(c1);
+    grad_have[from] = 1;
+    TRACE(2, "expert %d.%d step %d: copy %d's exchange channels held", expert(), rank(), my_step, from);
+  }
+  // Every peer of this step's group has handed this copy channels.
+  bool gradChannelsReady() {
+    if (!gradChannelsOn() || !replicated) return true;
+    ensureGradCh();
+    for (int r = 0; r < nc; r++)
+      if (r != rank() && !grad_have[r]) return false;
+    return true;
+  }
+  // This copy destroys its holder copies of peer r's channels and says so.
+  void dropGradHolders(int r) {
+    if (grad_hold.empty() || !grad_have[r]) return;
+    delete grad_hold[hIdx(r, 0)];
+    delete grad_hold[hIdx(r, 1)];
+    grad_hold[hIdx(r, 0)] = grad_hold[hIdx(r, 1)] = nullptr;
+    grad_have[r] = 0;
+    peerAt(r).gradChannelsDropped(rank());
+  }
+  // Peer `from` destroyed its holder copies of this copy's channels: they close.
+  void gradChannelsDropped(int from) {
+    ensureGradCh();
+    const int sl = slotOf(from);
+    for (int q = 0; q < 2; q++)
+      if (grad_open[gIdx(sl, q)]) { grad_ch[gIdx(sl, q)].close(); grad_open[gIdx(sl, q)] = 0; }
+    grad_holder_alive[from] = 0;
+    TRACE(2, "expert %d.%d step %d: copy %d dropped this copy's exchange channels", expert(), rank(), my_step, from);
+    if (retiring) maybeFinishRetire();
+    else if (exchange_free_due && !grad_in_flight && noGradHolders()) { freeExchange(); exchange_free_due = false; }
+  }
+  bool noGradHolders() const {
+    for (char a : grad_holder_alive) if (a) return false;
+    return true;
+  }
+  // A peer's block-sum pair landed: which peer, which step.
+  void gradArrived(CkDataMsg* m) {
+    CkDeviceChannelEvent ev;
+    memcpy(&ev, m->getData(), sizeof(ev));
+    int idx = -1;
+    for (int i = 0; i < (int)grad_ch.size(); i++)
+      if (grad_open[i] && grad_ch[i].id() == ev.channel) { idx = i; break; }
+    if (idx < 0)
+      CkAbort("Expert %d.%d on PE %d: a block-sum note for channel %llx, which is not one of its own\n", expert(),
+          rank(), CkMyPe(), (unsigned long long)ev.channel);
+    const CkDeviceChannelEvent* e = grad_ch[idx].event(m);
+    delete m;
+    if (e == NULL) return;
+    const int step = (int)e->tag, sl = idx / 2, q = idx & 1;
+    if (q != (step & 1))
+      CkAbort("Expert %d.%d on PE %d: a block sum for step %d landed on the channel of parity %d\n", expert(), rank(),
+          CkMyPe(), step, q);
+    self().gradIn(step, rankOfSlot(sl));
+  }
+  // The step's landed pairs were applied: the peers may put the step after next.
+  void releaseGrads() {
+    const int q = my_step & 1;
+    for (int r = 0; r < nc; r++)
+      if (r != rank() && grad_open[gIdx(slotOf(r), q)]) grad_ch[gIdx(slotOf(r), q)].release();
+  }
+  void storeOutChannels(int d, const CkDeviceChannel& c0, const CkDeviceChannel& c1) {
+    ensureOutCh();
+    delete out_ch[d];
+    delete out_ch[n_disp + d];
+    out_ch[d] = new CkDeviceChannel(c0);
+    out_ch[n_disp + d] = new CkDeviceChannel(c1);
+    out_have[d] = 1;
+    TRACE(2, "expert %d.%d step %d: output channels of dispatcher %d held", expert(), rank(), my_step, d);
+  }
+  // Every dispatcher this copy serves this step has handed it channels.
+  bool outChannelsReady() {
+    if (!out_channels) return true;
+    ensureOutCh();
+    for (int d = 0; d < n_disp; d++)
+      if (serves(d) && !out_have[d]) return false;
+    return true;
+  }
+  void dropOutChannels() {
+    for (int d = 0; d < n_disp; d++) {
+      if (out_ch.empty() || !out_have[d]) continue;
+      delete out_ch[d];
+      delete out_ch[n_disp + d];
+      out_ch[d] = out_ch[n_disp + d] = nullptr;
+      out_have[d] = 0;
+      disp_proxy[dispPe(d)].outChannelsFree(expert(), rank());
+    }
+  }
   // Whether this copy serves dispatcher d this step.
   int ncopies() const { return nc; }
   // The landing slot of copy r's block sum (the copies other than this one, in rank order).
@@ -1586,7 +1801,12 @@ class Expert : public CBase_Expert {
   void setCopies(int k) {
     nc = k;
     replicated = k > 1;
-    if (replicated) allocateExchange();
+    if (replicated) allocateExchange(k);
+    if (replicated && gradChannelsOn()) {
+      ensureGradCh();
+      for (int r = 0; r < k; r++)
+        if (r != rank() && !grad_open[gIdx(slotOf(r), 0)]) openGradChannelsFor(r);
+    }
   }
   long peerTokens() const {
     long n = 0;
@@ -1640,7 +1860,11 @@ class Expert : public CBase_Expert {
   // What one copy holds beyond the expert's own state: its accumulator and
   // the two landing buffers for the other copy's (moe.h, LBObjData::
   // replicaExtraBytes).
-  size_t replicaExtraBytes() const { return serve_only ? 0 : sizeof(float) * wsz() * (4 + 4 * (size_t)(rep_max - 1)); }
+  // A copy's device state beyond the expert: its own block sum and scratch
+  // (replicaExtraBytes), and two pairs of landing buffers per peer
+  // (replicaExtraBytesPerPeer); nothing in serving, which exchanges nothing.
+  size_t replicaExtraBytes() const { return serve_only ? 0 : sizeof(float) * wsz() * 4; }
+  size_t replicaExtraBytesPerPeer() const { return serve_only ? 0 : sizeof(float) * wsz() * 4; }
   // A step's input slab. With send_ahead a dispatcher sends step s+1 before
   // it has combined step s, so slabs of s+1 and s+2 can arrive while this
   // expert is still in step s; s+2 lands in s's slab, which is free by then:
@@ -1674,26 +1898,39 @@ class Expert : public CBase_Expert {
 
   // The exchange buffers of a replicated copy. Freed, stream-ordered, when the
   // expert is alone again.
-  void allocateExchange() {
-    if (dWown1 || serve_only) return;   // serving: nothing is exchanged
-    hapiCheck(hapiMalloc((void**)&dWown1, sizeof(float) * wsz()));
-    hapiCheck(hapiMalloc((void**)&dWown2, sizeof(float) * wsz()));
-    hapiCheck(hapiMalloc((void**)&dWownS1, sizeof(float) * wsz()));
-    hapiCheck(hapiMalloc((void**)&dWownS2, sizeof(float) * wsz()));
-    for (int sl = 0; sl < rep_max - 1; sl++)
+  // The exchange state for a group of k copies: this copy's block sum and
+  // scratch once, and the landing pairs for k - 1 peers, added as the group
+  // grows (a copy pays for the peers it has, not for the most it could have).
+  void allocateExchange(int k) {
+    if (serve_only) return;   // serving: nothing is exchanged
+    // Each pair (W1-shaped, W2-shaped) is one allocation: a block-sum pair is
+    // one channel put. The second pointer is the first plus wsz; only the
+    // first is freed.
+    if (!dWown1) {
+      hapiCheck(hapiMalloc((void**)&dWown1, 2 * sizeof(float) * wsz()));
+      dWown2 = dWown1 + wsz();
+      hapiCheck(hapiMalloc((void**)&dWownS1, 2 * sizeof(float) * wsz()));
+      dWownS2 = dWownS1 + wsz();
+    }
+    for (int sl = 0; sl < k - 1; sl++)
       for (int q = 0; q < 2; q++) {
-        hapiCheck(hapiMalloc((void**)&dWpeer1[sl][q], sizeof(float) * wsz()));
-        hapiCheck(hapiMalloc((void**)&dWpeer2[sl][q], sizeof(float) * wsz()));
+        if (dWpeer1[sl][q]) continue;
+        hapiCheck(hapiMalloc((void**)&dWpeer1[sl][q], 2 * sizeof(float) * wsz()));
+        dWpeer2[sl][q] = dWpeer1[sl][q] + wsz();
       }
   }
   void freeExchange() {
-    std::vector<float*> bufs = {dWown1, dWown2, dWownS1, dWownS2};
+    // Any channel still open over a landing pair closes first (its holder
+    // dropped its copies before this ran: noGradHolders).
+    for (size_t i = 0; i < grad_ch.size(); i++)
+      if (grad_open[i]) { grad_ch[i].close(); grad_open[i] = 0; }
+    std::vector<float*> bufs = {dWown1, dWownS1};
     for (int sl = 0; sl < K_MAX_COPIES - 1; sl++)
-      for (int q = 0; q < 2; q++) { bufs.push_back(dWpeer1[sl][q]); bufs.push_back(dWpeer2[sl][q]); }
+      for (int q = 0; q < 2; q++) bufs.push_back(dWpeer1[sl][q]);
     for (float* b : bufs) {
       if (!b) continue;
-      if (CkDevicePoolOn() && !hostSyncMode()) hapiDevPoolNoteRead(b, lane()->stream);
-      else hapiCheck(hapiStreamSynchronize(lane()->stream));
+      if (CkDevicePoolOn() && !hostSyncMode()) { hapiDevPoolNoteRead(b, xg.stream); hapiDevPoolNoteRead(b, send_stream); }
+      else { hapiCheck(hapiStreamSynchronize(xg.stream)); hapiCheck(hapiStreamSynchronize(send_stream)); }
       hapiCheck(hapiFree(b));
     }
     dWown1 = dWown2 = dWownS1 = dWownS2 = NULL;
@@ -1708,6 +1945,10 @@ class Expert : public CBase_Expert {
     hapiCheck(hapiEventCreateWithFlags(&ev_grad, hapiEventDisableTiming));
     hapiCheck(hapiStreamCreateWithPriority(&send_stream, hapiStreamNonBlocking,
         -1));
+    memset(&xg, 0, sizeof(xg));
+    xg.bf16 = use_bf16 != 0;
+    hapiCheck(hapiStreamCreateWithPriority(&xg.stream, hapiStreamNonBlocking, -1));
+    hapiCheck(hapiMalloc((void**)&xg.partials, sizeof(double) * MOE_RED_BLOCKS));
     ev_seg.resize(n_disp);
     for (hapiEvent_t& e : ev_seg)
       hapiCheck(hapiEventCreateWithFlags(&e, hapiEventDisableTiming));
@@ -1727,7 +1968,7 @@ class Expert : public CBase_Expert {
       c.open();
       ch_open[q * n_disp + d] = 1;
     }
-    disp_proxy[CkNodeFirst(d)].takeChannels(expert(), rank(), late, tok_ch[d],
+    disp_proxy[dispPe(d)].takeChannels(expert(), rank(), late, tok_ch[d],
                                             tok_ch[(np - 1) * n_disp + d]);
   }
   void openChannels() {
@@ -1748,7 +1989,7 @@ class Expert : public CBase_Expert {
     for (int d = 0; d < n_disp; d++) {
       if (copyFor(d, k_new) != rank() || copyFor(d, k_old) == rank()) continue;
       if (!ch_open[d]) openChannelsFor(d, 1);
-      else disp_proxy[CkNodeFirst(d)].chanArrived();
+      else disp_proxy[dispPe(d)].chanArrived();
     }
   }
 
@@ -1835,8 +2076,13 @@ class Expert : public CBase_Expert {
     p | clone_in_flight;
     p | clone_bufs_done;
     p | clone_bufs_expected;
-    p | clone_to_pe;
-    p | clone_rank;
+    p | clone_decided;
+    p | retire_decided;
+    p | decided_rank;
+    PUParray(p, decided_new, K_MAX_COPIES);
+    p | n_clone;
+    PUParray(p, clone_to_pe, K_MAX_COPIES);
+    PUParray(p, clone_rank, K_MAX_COPIES);
     p | retire_pending;
     p | exchange_free_due;
     p | mult_next;
@@ -1856,7 +2102,7 @@ class Expert : public CBase_Expert {
     if (p.isUnpacking()) {
       allocate();
       createEvents();   // a pending timing sample is lost with the old events
-      if (replicated) allocateExchange();
+      if (replicated) allocateExchange(nc);
       // Control events queue until the channels reopen, in ckJustMigrated: an
       // ordinary entry context once the element's state is in place, not the
       // unpack, which can run inside the device poll's own callback (leanmd's
@@ -1864,6 +2110,40 @@ class Expert : public CBase_Expert {
       for (size_t i = 0; i < tok_ch.size(); i++)
         if (ch_open[i]) tok_ch[i].arriving();
       arrived_by_pup = !tok_ch.empty();
+    }
+    {
+      // The exchange channels: the owner side reopens on the new landing pairs
+      // (allocated above on unpack), the holder copies re-resolve.
+      p | grad_ch;
+      p | grad_open;
+      p | grad_holder_alive;
+      int ng = (int)grad_hold.size();
+      p | ng;
+      if (p.isUnpacking()) { grad_hold.assign(ng, nullptr); grad_by_pup = ng > 0; }
+      for (int i = 0; i < ng; i++) {
+        bool has = grad_hold[i] != nullptr;
+        p | has;
+        if (!has) continue;
+        if (p.isUnpacking()) grad_hold[i] = new CkDeviceChannel();
+        grad_hold[i]->pup(p);
+      }
+      p | grad_have;
+      if (p.isUnpacking())
+        for (size_t i = 0; i < grad_ch.size(); i++)
+          if (grad_open[i]) grad_ch[i].arriving();
+    }
+    {
+      int no = (int)out_ch.size();
+      p | no;
+      if (p.isUnpacking()) { out_ch.assign(no, nullptr); out_by_pup = no > 0; }
+      for (int i = 0; i < no; i++) {
+        bool has = out_ch[i] != nullptr;
+        p | has;
+        if (!has) continue;
+        if (p.isUnpacking()) out_ch[i] = new CkDeviceChannel();
+        out_ch[i]->pup(p);
+      }
+      p | out_have;
     }
     for (size_t i = 0; i < tok_ch.size(); i++) {
       if (!carry[i]) continue;
@@ -1967,6 +2247,18 @@ class Expert : public CBase_Expert {
 
   void ckJustMigrated() {
     CBase_Expert::ckJustMigrated();
+    if (out_by_pup) {
+      out_by_pup = false;
+      for (CkDeviceChannel* c : out_ch)
+        if (c) c->resolve();
+    }
+    if (grad_by_pup) {
+      grad_by_pup = false;
+      for (CkDeviceChannel* c : grad_hold)
+        if (c) c->resolve();
+      for (size_t i = 0; i < grad_ch.size(); i++)
+        if (grad_open[i]) grad_ch[i].reopen(dWpeer1[i / 2][i & 1]);
+    }
     if (!arrived_by_pup) return;   // a handoff within the process: the channels are intact
     arrived_by_pup = false;
     int n = 0;
@@ -2028,12 +2320,24 @@ class Expert : public CBase_Expert {
     if (!use_instrument) setObjGPUTime(s_tok * n_tot * stepsSinceLastLB(my_step));
     // This copy's place in its expert: the balancer may ask for a second copy
     // of an expert hotter than a GPU's share, or take one back (ShedLB).
-    // ... priced with what one partial's exchange costs per step (the probe at
-    // start-up: Dispatcher::probe), over the same interval as the load.
-    const Dispatcher* db = disp_proxy.ckLocalBranch();
+    // What the balancer prices a copy with: the bytes and messages it sends
+    // each peer over the interval (two fp32 block sums a step), priced by the
+    // runtime's calibrated transfer-cost table at the group's size; and, once
+    // this copy has exchanged, what the exchange took here, its wait per
+    // step and peer, which stands in for the table's figure. The capability
+    // is the four-partition tree's: up to four copies.
     const double xsteps = serve_only ? 0.0 : (double)stepsSinceLastLB(my_step);
-    setLBReplica(expert(), rank(), nc, rep_max, replicaExtraBytes(),
-        db->xchg_node_s * xsteps, db->xchg_remote_s * xsteps);
+    double measured = 0.0;
+    if (!serve_only && replicated && xchg_waits > 0) measured = xchg_wait_s / xchg_waits / (nc - 1) * xsteps;
+    setLBReplica(expert(), rank(), nc, K_MAX_COPIES, replicaExtraBytes(), measured, measured, K_PART,
+        serve_only ? 0 : (size_t)(2.0 * sizeof(float) * wsz() * xsteps), 2.0 * xsteps, replicaExtraBytesPerPeer());
+    if (isLBStep(my_step)) {
+      if (replicated && xchg_waits > 0)
+        TRACE(1, "expert %d.%d step %d: exchange wait %.2f ms per step over %d steps, %.2f ms per peer and step declared",
+            expert(), rank(), my_step, xchg_wait_s / xchg_waits * 1e3, xchg_waits, xchg_wait_s / xchg_waits / (nc - 1) * 1e3);
+      xchg_wait_s = 0.0;
+      xchg_waits = 0;
+    }
     if (isLBStep(my_step))
       TRACE(1, "expert %d.%d step %d declares %.6f s: %d tokens x %.4e s/token x %d steps; job rate %.4e; PE pool "
           "%.4f s / %.0f tokens; own last sample %.4f s for %d tokens", expert(), rank(), my_step,
@@ -2088,23 +2392,37 @@ class Expert : public CBase_Expert {
   // in (resumed_by_lb), after that step's update: the dispatchers learn the
   // change from that step's outputs and route the next step accordingly.
   void ckClone(int toPe, int rank_) {
-    if (rank_ != nc || nc >= rep_max)
+    if (rank_ < nc || rank_ >= K_MAX_COPIES || decided_new[rank_])
       CkAbort("Expert %d.%d on PE %d: asked for copy %d on PE %d while %d of %d copies exist\n",
-          expert(), rank(), CkMyPe(), rank_, toPe, nc, rep_max);
-    clone_to_pe = toPe;
-    clone_rank = rank_;
+          expert(), rank(), CkMyPe(), rank_, toPe, nc, K_MAX_COPIES);
+    clone_to_pe[n_clone] = toPe;
+    clone_rank[n_clone] = rank_;
+    n_clone++;
+    decided_new[rank_] = true;
     clone_decided = true;
-    decided_rank = rank_;
     TRACE(1, "expert %d.%d step %d: clone to PE %d as copy %d decided (this copy sends the state)",
         expert(), rank(), my_step, toPe, rank_);
   }
   void ckCloneNotice(int toPe, int rank_) {
-    if (rank_ != nc)
-      CkAbort("Expert %d.%d on PE %d: told of copy %d while %d copies exist\n", expert(), rank(),
-          CkMyPe(), rank_, nc);
+    if (rank_ < nc || rank_ >= K_MAX_COPIES || decided_new[rank_])
+      CkAbort("Expert %d.%d on PE %d: told of copy %d while %d of %d copies exist\n", expert(), rank(),
+          CkMyPe(), rank_, nc, K_MAX_COPIES);
+    decided_new[rank_] = true;
     clone_decided = true;
-    decided_rank = rank_;
     TRACE(1, "expert %d.%d step %d: copy %d on PE %d decided (notice)", expert(), rank(), my_step, rank_, toPe);
+  }
+  // The copies this round adds: their ranks run on from nc without a gap,
+  // as the block mapping assumes (the balancer numbers them so, and
+  // CentralLB keeps the contiguous prefix of what the memory verifier let
+  // through).
+  int newCopies() const {
+    int m = 0;
+    while (nc + m < K_MAX_COPIES && decided_new[nc + m]) m++;
+    for (int r = nc + m; r < K_MAX_COPIES; r++)
+      if (decided_new[r])
+        CkAbort("Expert %d.%d on PE %d: copy %d decided while copy %d was not (%d copies exist)\n",
+            expert(), rank(), CkMyPe(), r, nc + m, nc);
+    return m;
   }
   void ckRetire() {
     if (!replicated || rank() != nc - 1)
@@ -2336,7 +2654,7 @@ class Expert : public CBase_Expert {
     MoeGpu* g = lane();
 
     sampleTiming();
-    if (exchange_free_due && !grad_in_flight) {
+    if (exchange_free_due && !grad_in_flight && noGradHolders()) {
       freeExchange();
       exchange_free_due = false;
     }
@@ -2354,7 +2672,7 @@ class Expert : public CBase_Expert {
     // act at its end: the new copy starts, or the retired one ends, at the
     // next step.
     nc_next = nc;
-    if (resumed_by_lb && clone_decided) nc_next = nc + 1;
+    if (resumed_by_lb && clone_decided) nc_next = nc + newCopies();
     if (resumed_by_lb && retire_decided) {
       nc_next = nc - 1;
       if (rank() == decided_rank) retiring = true;
@@ -2474,8 +2792,25 @@ class Expert : public CBase_Expert {
     hapiCheck(hapiStreamWaitEvent(send_stream, ev_grad, 0));
     grad_in_flight = true;
     grad_bufs_done = 0;
-    grad_bufs_expected = 2 * (nc - 1);
     const CkCallback done(CkIndex_Expert::gradBufDone(), self());
+    if (gradChannelsOn()) {
+      // One put of the pair into each peer's landing channel, each its own
+      // batch; the figures go as peerStats, as in serving.
+      grad_bufs_expected = nc - 1;
+      for (int r = 0; r < nc; r++) {
+        if (r == rank()) continue;
+        CkDeviceChannel* ch = grad_hold[hIdx(r, my_step & 1)];
+        if (ch == nullptr)
+          CkAbort("Expert %d.%d on PE %d step %d: no exchange channel of copy %d\n", expert(), rank(), CkMyPe(), my_step, r);
+        ch->put(dWown1, 2 * sizeof(float) * wsz(), send_stream, done, (uint64_t)my_step);
+        CkRdmaDeviceChannelBatchFlush();
+      }
+      sendPeerStats();
+      TRACE(2, "expert %d.%d step %d block-sum pair of %d tokens put to %d other cop%s%s", expert(), rank(),
+          my_step, n_tot, nc - 1, nc - 1 == 1 ? "y" : "ies", retiring ? " (retiring)" : "");
+      return;
+    }
+    grad_bufs_expected = 2 * (nc - 1);
     for (int r = 0; r < nc; r++) {
       if (r == rank()) continue;
       peerAt(r).gradPartial(my_step, rank(), n_tot, CkMyPe(), gpu_last, retiring ? 1 : 0, (int)wsz(),
@@ -2507,9 +2842,9 @@ class Expert : public CBase_Expert {
     // next block sum waits for this copy's.
     if (!started) {
       if (W1 == NULL) { allocate(); createEvents(); }
-      allocateExchange();
+      allocateExchange(nc_next > 1 ? nc_next : K_MAX_COPIES);   // the count is not yet known before the state lands
     }
-    if ((started && !replicated) || from_rank == rank() || from_rank >= rep_max ||
+    if ((started && !replicated) || from_rank == rank() || from_rank >= K_MAX_COPIES ||
         dWpeer1[slotOf(from_rank)][ref & 1] == NULL)
       CkAbort("Expert %d.%d on PE %d: a block sum from copy %d for step %d but this copy has %d copies\n",
           expert(), rank(), CkMyPe(), from_rank, ref, nc);
@@ -2557,7 +2892,15 @@ class Expert : public CBase_Expert {
   // The update of a replicated copy: the two tree nodes assembled from its
   // own block sum and the landed ones, then the same SGD as every copy's.
   void applyReplicated() {
-    MoeGpu* g = lane();
+    if (t_compute_done > 0.0) {
+      xchg_wait_s += tnow() - t_compute_done;
+      xchg_waits++;
+    }
+    // On the copy's own exchange stream, behind its block sum (ev_grad, on the
+    // lane); the landed ones are complete, the runtime delivered their entries
+    // after the landings.
+    MoeGpu* g = &xg;
+    hapiCheck(hapiStreamWaitEvent(g->stream, ev_grad, 0));
     float *a1, *a2, *b1, *b2;
     treeNodeFromBlocks(g, 0, a1, a2);
     treeNodeFromBlocks(g, 2, b1, b2);
@@ -2569,8 +2912,27 @@ class Expert : public CBase_Expert {
 
   void sendOutput(int s) {
     const int n = std::max(n_src[s], 0);
+    if (out_channels) {
+      // Into the dispatcher's segment for this expert, the step's parity; an
+      // empty output is a note alone. The tag: the step and the copies
+      // announced for the next one.
+      CkDeviceChannel* ch = out_ch[(my_step & 1) * n_disp + s];
+      if (ch == nullptr)
+        CkAbort("Expert %d.%d on PE %d step %d: no output channel of dispatcher %d\n", expert(), rank(), CkMyPe(),
+            my_step, s);
+      outstanding_sends++;
+      ch->put(y_seg + s * segBytes(), (size_t)n * d_model * actEsz(), send_stream,
+          CkCallback(CkIndex_Expert::sendDone(), self()), ((uint64_t)my_step << 3) | (uint64_t)mult_next);
+      // Its own batch, now: the runtime gathers an entry method's puts into one
+      // copy flushed when the method ends, which would hold every dispatcher's
+      // output until the run's last chunk (stream_outputs issues them as each
+      // dispatcher's chunk completes; batched, ShedLB training on the A40 nodes
+      // went from 50 to 63 ms a step, job 23612036).
+      CkRdmaDeviceChannelBatchFlush();
+      return;
+    }
     const int len = (int)(std::max(n, 1) * d_model * actEsz());   // bytes
-    disp_proxy[CkNodeFirst(s)].receiveOutput(my_step, expert(), n, moeNowNs(), CkMyPe(), mult_next, len,
+    disp_proxy[dispPe(s)].receiveOutput(my_step, expert(), n, moeNowNs(), CkMyPe(), mult_next, len,
         (outstanding_sends++,
          CkDeviceBuffer(y_seg + s * segBytes(),
              CkCallback(CkIndex_Expert::sendDone(), self()),
@@ -2578,6 +2940,7 @@ class Expert : public CBase_Expert {
   }
 
   void sendOutputs() {
+    t_compute_done = tnow();
     releaseLane();   // the step's kernels are complete (computeDone)
     if (tok_channels) {
       // The kernels that read this step's slab are done: the dispatchers may
@@ -2617,28 +2980,30 @@ class Expert : public CBase_Expert {
   }
 
   // ---- making a copy ----
-  // After this step's update: insert (e, 1) where the balancer said, send it
-  // the weights (and moments) behind the update on the device, and serve
-  // only partition 0 from the next step. The weights are read by the send
-  // until cloneSent, which the next step's compute waits for.
+  // After this step's update: insert each copy the balancer named this copy
+  // the source of, send it the weights (and moments) behind the update on
+  // the device, and serve this copy's block of the new mapping from the next
+  // step. The weights are read by the sends until cloneSent, which the next
+  // step's compute waits for.
   void executeClone() {
-    const int toPe = clone_to_pe, r = clone_rank;
-    clone_to_pe = -1;
-    clone_rank = -1;
-    TRACE(1, "expert %d.%d step %d: copy %d inserted on PE %d, state sent", expert(), rank(), my_step,
-        r, toPe);
-    expert_proxy(expert(), r).insert(toPe);
     hapiCheck(hapiStreamWaitEvent(send_stream, ev_end, 0));
     clone_in_flight = true;
     clone_bufs_done = 0;
-    clone_bufs_expected = use_adam ? 6 : 2;
+    clone_bufs_expected = n_clone * (use_adam ? 6 : 2);
     const CkCallback done(CkIndex_Expert::cloneBufDone(), self());
-    expert_proxy(expert(), r).takeState(my_step + 1, adam_t, spt, nc_next, (int)wsz(),
-        CkDeviceBuffer(W1, done, send_stream), CkDeviceBuffer(W2, done, send_stream));
-    if (use_adam)
-      expert_proxy(expert(), r).takeMoments((int)wsz(),
-          CkDeviceBuffer(m1, done, send_stream), CkDeviceBuffer(v1, done, send_stream),
-          CkDeviceBuffer(m2, done, send_stream), CkDeviceBuffer(v2, done, send_stream));
+    for (int i = 0; i < n_clone; i++) {
+      const int toPe = clone_to_pe[i], r = clone_rank[i];
+      TRACE(1, "expert %d.%d step %d: copy %d of %d inserted on PE %d, state sent", expert(), rank(), my_step,
+          r, nc_next, toPe);
+      expert_proxy(expert(), r).insert(toPe);
+      expert_proxy(expert(), r).takeState(my_step + 1, adam_t, spt, nc_next, (int)wsz(),
+          CkDeviceBuffer(W1, done, send_stream), CkDeviceBuffer(W2, done, send_stream));
+      if (use_adam)
+        expert_proxy(expert(), r).takeMoments((int)wsz(),
+            CkDeviceBuffer(m1, done, send_stream), CkDeviceBuffer(v1, done, send_stream),
+            CkDeviceBuffer(m2, done, send_stream), CkDeviceBuffer(v2, done, send_stream));
+    }
+    n_clone = 0;
   }
   void cloneBufDone() {
     if (++clone_bufs_done == clone_bufs_expected) self().cloneSent();
@@ -2696,9 +3061,19 @@ class Expert : public CBase_Expert {
   }
   void maybeFinishRetire() {
     if (!retiring || !step_ended || grad_in_flight || chans_dropped < servedCount()) return;
+    if (gradChannelsOn()) {
+      // This copy's holder copies of the peers' channels go first (they are
+      // told); its own channels close once every peer has dropped its copies.
+      for (int r = 0; r < nc; r++)
+        if (r != rank()) dropGradHolders(r);
+      if (!noGradHolders()) return;
+      for (size_t i = 0; i < grad_ch.size(); i++)
+        if (grad_open[i]) { grad_ch[i].close(); grad_open[i] = 0; }
+    }
     TRACE(1, "expert %d.%d step %d: retired", expert(), rank(), my_step);
     for (size_t i = 0; i < tok_ch.size(); i++)
       if (ch_open[i]) tok_ch[i].close();
+    if (out_channels) dropOutChannels();
     self().die();   // off this entry method: a message to itself
   }
   void die() { ckDestroy(); }
@@ -2725,15 +3100,18 @@ class Expert : public CBase_Expert {
         // which is not this copy here). Channels for a grown block go out
         // now; a copy left alone frees its exchange buffers once this step's
         // block sum has been read by the transport (gradSent).
-        if (nc_next > nc && clone_to_pe >= 0) executeClone();
+        if (nc_next > nc && n_clone > 0) executeClone();
         TRACE(1, "expert %d.%d step %d: %d copies from step %d", expert(), rank(), my_step, nc_next, my_step + 1);
         const int k_old = nc;
         setCopies(nc_next);
         refreshChannels(k_old, nc);
+        // One fewer: the highest rank retires; its channels are of no use.
+        if (gradChannelsOn() && nc_next < k_old) dropGradHolders(k_old - 1);
         if (nc == 1) exchange_free_due = true;
         clone_decided = retire_decided = false;
         decided_rank = -1;
-        clone_to_pe = clone_rank = -1;
+        for (int r = 0; r < K_MAX_COPIES; r++) decided_new[r] = false;
+        n_clone = 0;
       }
     }
     if (retiring) {

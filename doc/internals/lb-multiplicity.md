@@ -20,7 +20,8 @@ other application is affected.
 ## The declaration
 
 `LDObjData` (`src/ck-ldb/lbdb.h`) carries seven fields per object:
-`replicaGroup`, `replicaRank`, `replicaCount`, `replicaMax`,
+`replicaGroup`, `replicaRank`, `replicaCount`, `replicaMax`, `replicaParts`,
+`replicaExchangeBytes`, `replicaExchangeMsgs`, `replicaExtraBytesPerPeer`,
 `replicaExtraBytes`, `replicaCostNode`, `replicaCostRemote`. `replicaGroup
 < 0` means not replicable, which the `LBObj` constructor sets. Objects
 sharing a group are the copies of one logical object; `replicaRank` is the
@@ -134,15 +135,56 @@ For every group of replicable objects, with `L_g` the sum of its copies'
 loads, `k` their count and `K` the declared maximum: the target is
 `k* = min(K, max(1, ceil(L_g / T)))` with `T = (1 + eps) * mean`.
 
-- `k* > k`: one clone record. The source is the copy on the fullest bin.
+- `k* > k`: every count from `k + 1` to `k*` is planned in turn, each plan
+  extending the previous one by one copy, and the count whose plan leaves
+  the fullest bin lowest is taken if it passes the critical-path test below;
+  a count that gains nothing on the way is passed over (three copies of a
+  four-partition object leave one copy with half of it: `replicaParts`,
+  declared by the application, gives each copy's share as its block of the
+  partitions, `LDObjData::replicaShare`; without it the shares are `1/k`).
+  The ranks run on from the first unused; the clones' sources and the
+  notices' targets are the copies that exist now. The source is the copy on
+  the fullest bin.
   The destination is the fullest bin that still clears `T` with the copy's
   share `L_g / k*`, else the emptiest, never a bin the group is already
-  on, and only where `feasibleArrival` says the copy fits (and the source's
-  device the extra). Every copy is priced as its share `L_g / k*` plus its
+  on, only where `feasibleArrival` says the copy fits (and the source's
+  device the extra), and only where the PE's host time stays under the
+  device target (`hostCap`, the larger of `T` and the hosts' mean with the
+  same slack): an object's entry-method time runs on the host whatever its
+  device load, a PE's step is bound by the larger of the two, and a round
+  that packed ten experts on one PE by device load alone gave its host 10 ms
+  a step and the serving step (job 23612682). The same cap applies to every
+  move of the shed loop. Every copy is priced as its share `L_g / k*` plus its
   exchanges: for each other copy, the declared `replicaCostNode` or
   `replicaCostRemote` by whether the two sit on the same node (`CkNodeOf`).
   The measured loads leave the exchange out, so the group pass first adds
-  each existing copy's exchanges to its bin. The copy is made only if the
+  each existing copy's exchanges to its bin. What one peer costs comes from
+  two places: a copy that has exchanged declares what its exchange measured
+  (`replicaCostNode` / `replicaCostRemote`: its wait per interval and peer);
+  a copy that has not declares only what it would send each peer per
+  interval (`replicaExchangeBytes`, `replicaExchangeMsgs`), and the balancer
+  prices that with the runtime's calibrated transfer-cost table at the
+  group's size (`DiffusionCostConfig::exchangePerPeer`: lbcalib's fan sweep,
+  `xchg_fan<k>_host_*` / `_inter_*`, falls back to the tier alone where a
+  table has no fan entry). The fan matters on a PCIe fabric: one 134 MB
+  partial alone takes 5.5 ms on PCIe-attached A40s, three copies on one node
+  waited 50 ms a step for two of them and four copies 300 ms for three (jobs
+  23581818, 23582210), the concurrent peer reads serialising on the fabric;
+  on NVLink-attached A100s three and four copies exchange at 75 to 90 GB/s a
+  peer, as two do (job 23601306). The built-in table is chosen by the
+  device's name (`DiffusionCostConfig::loadBuiltin`), so each node type is
+  priced from its own measurement. What the table cannot price is the copies
+  waiting for each other: the copies serve different dispatcher partitions,
+  start their steps as their slabs arrive, and every copy's apply waits for
+  the latest copy's partial. On the A100 nodes four copies with 7 ms of
+  compute each had 40 ms periods that way and the step did not fall below
+  the unreplicated one (the example's README, "Measured 2026-11-06"); the
+  wait a copy measures and declares contains it, the table's price does not.
+  The application names no copy count: it declares what it can keep
+  consistent (`replicaMax`, the example's four-partition tree) and the
+  device bytes each further peer adds to a copy (`replicaExtraBytesPerPeer`,
+  priced into the ledger's check as `replicaExtraFor(k)`), and the balancer
+  chooses. The copy is made only if the
   step's critical path, the fullest bin anywhere with those loads, drops by
   more than `eps * mean`. A copy is paid for every step, so a copy that
   relieves a bin other than the fullest, or leaves another bin as full as
@@ -164,6 +206,16 @@ loads, `k` their count and `K` the declared maximum: the target is
   retired: it keeps the object's identity for the application. The
   remaining copies' loads become `L_g / (k - 1)` plus their exchanges. The
   margin keeps the two decisions from alternating on a load near `T`.
+  When the group declares partitions and no exchange, the bins of the host
+  that originates most of the copy's block of partitions are tried first
+  (`ProcStats::partition`, set by `LBManager::setPartition` on the feeding
+  PEs: copy `r` of `k` serves `[P r / k, P (r + 1) / k)`), and the other
+  hosts' bins only when none of those can take the copy, so a copy that
+  exchanges nothing sits with its inputs. Measured 2026-11-07 on two A100
+  nodes serving SmartMoE's routing: every copy of the hot expert on one host
+  sent 100 MB a step each way over the link, the step 21.8 ms against
+  FasterMoE's 16.0. With an exchange the fan-priced cost decides as before
+  (copies on one host exchange over NVLink).
 
 Clone sources and retiring copies are left out of the shedding that
 follows, and a copy is never placed on a bin that holds another copy of its
@@ -257,7 +309,10 @@ placement-independent (the example implements this; `-R` up to 4):
 - Exchange buffers per copy: two accumulator pairs of its own and
   `(K_app - 1) x 2` landing pairs (per peer slot and step parity), where
   `K_app` is the application's `-R`; `replicaExtraBytes` follows.
-- A clone's rank is `k` (the next unused) and a retire takes the highest
+- A clone's rank is `k` (the next unused; several clones of one round take
+  `k`, `k+1`, ..., and the application counts the ranks it was told of,
+  which `CentralLB` keeps contiguous when the memory verifier refuses one)
+  and a retire takes the highest
   rank (ShedLB does both), so the block mapping only ever splits the last
   block or merges the last two. Every copy must announce the same count for
   the same step, so the decision reaches all of them before the round

@@ -27,7 +27,24 @@
 //    DiffusionLB's own predicted-vs-actual residual is the intended source of
 //    that correction.
 //
-// 3. Migration is measured, not derived. After the transfer sweeps a batch of
+// 3. A copy's exchange is measured at its fan-in, not derived. A replicated
+//    object's copies each send one buffer to every other copy and land every
+//    other's at the same time (ShedLB's multiplicity, doc/internals/
+//    lb-multiplicity.md); on a PCIe-attached host the k-th copy costs far more
+//    than the (k-1)-th, the receives serialising on one stream and the fabric
+//    shared (four copies of a 134 MB block sum: 100 ms a peer where one
+//    transfer alone takes 5). The fan sweep (-F) exchanges a buffer among k
+//    PEs on one host, one per device, for k = 2.. and fits what one peer costs
+//    a copy, alpha + beta * bytes, at each fan; the same across hosts, one PE
+//    per host, as far as the launch has hosts. The table's xchg_fan<k>_host_*
+//    and xchg_fan<k>_inter_* entries price a copy before it has exchanged.
+//    The buffers go by device channel puts, each its own batch, since
+//    2026-11-06: what the MoE example's copies exchange their block sums by
+//    (the entry-method device sends measured before then, -e, serialised
+//    their landings on the receiver's stream and collapsed at fan three on
+//    PCIe: 18, 1.5 and 0.9 GB/s a peer at two, three and four copies).
+//
+// 4. Migration is measured, not derived. After the transfer sweeps a batch of
 //    objects with a known host and device footprint migrates between the PEs
 //    of the most expensive same-host tier the launch exposes (cross-GPU IPC,
 //    else intra-process) through the same pack / stage / land / unpack path a
@@ -41,6 +58,7 @@
 #include "ckrdmadevice.h"
 #include <algorithm>
 #include <vector>
+#include <map>
 #include <string>
 #include <cstdio>
 #include <cmath>
@@ -105,6 +123,26 @@ class Main : public CBase_Main {
   bool haveMigrate = false;
   double migAlpha = 0.0, migBetaHost = 0.0, migBetaDevice = 0.0, migRsq = 0.0;
 
+  // The exchange sweep: fan 2..fanMax among PEs of one host (class 0) and of
+  // distinct hosts (class 1), buffers of xsizes, fanIters timed rounds after
+  // fanWarm; the sample is the round time per peer, fitted per fan as
+  // alpha + beta * bytes.
+  static const int FAN_MAX = 8;
+  int fanMax = 4, fanIters = 10, fanWarm = 2;
+  // The fan sweep exchanges by device channel puts (what a replicated object
+  // exchanges its block sums by since 2026-11-06); -e sends the buffers as
+  // entry-method device parameters instead (the path measured until then).
+  int fanByEntry = 0;
+  size_t xMax = (size_t)128 << 20;
+  std::vector<size_t> xsizes;
+  std::vector<double> xtimes;
+  int fanCls = 0, fan = 2, xIdx = 0;
+  std::vector<int> fanMembers;
+  double xalpha[2][FAN_MAX + 1] = {}, xbeta[2][FAN_MAX + 1] = {}, xrsq[2][FAN_MAX + 1] = {};
+  bool xhave[2][FAN_MAX + 1] = {};
+  int roundDoneCount = 0, roundIter = 0;
+  double roundStart = 0.0, roundAccum = 0.0;
+
  public:
   Main(CkArgMsg* m) {
     main_proxy = thisProxy;
@@ -116,8 +154,12 @@ class Main : public CBase_Main {
 
     int c;
     size_t migHostMax = (size_t)4 << 20, migDevMax = (size_t)4 << 20;
-    while ((c = getopt(m->argc, m->argv, "s:x:i:w:o:b:r:H:D:M:")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:x:i:w:o:b:r:H:D:M:F:X:N:e")) != -1) {
       switch (c) {
+        case 'F': fanMax = std::min(FAN_MAX, std::max(1, atoi(optarg))); break;
+        case 'e': fanByEntry = 1; break;
+        case 'X': xMax = (size_t)atol(optarg) << 20; break;
+        case 'N': fanIters = atoi(optarg); break;
         case 's': min_size = atol(optarg); break;
         case 'x': max_size = atol(optarg); break;
         case 'i': n_iters = atoi(optarg); break;
@@ -131,7 +173,8 @@ class Main : public CBase_Main {
         default: CkAbort("usage: lbcalib [-s min] [-x max] [-i iters] [-w warmup] [-o out.conf] "
                          "[-b migration batch] [-r migration round trips] "
                          "[-M migration tier 0..4] "
-                         "[-H max host MB per object] [-D max device MB per object]\n");
+                         "[-H max host MB per object] [-D max device MB per object] "
+                         "[-F max exchange fan (4; 1 = no fan sweep)] [-X max exchange MB (128)] [-N fan rounds (10)]\n");
       }
     }
     // The migration points: a host sweep with no device state, then a device
@@ -148,6 +191,9 @@ class Main : public CBase_Main {
     // Geometric sweep. A linear sweep would put nearly every sample in the
     // bandwidth-bound regime and leave alpha determined by one point.
     for (size_t s = min_size; s <= max_size; s *= 2) sizes.push_back(s);
+    // The exchange sizes: 4 MB up, the block sums a copy exchanges being tens
+    // to hundreds of MB.
+    for (size_t s = (size_t)4 << 20; s <= xMax; s *= 2) xsizes.push_back(s);
 
     for (int t = 0; t < TIER_COUNT; t++) {
       haveTier[t] = false; pairA[t] = pairB[t] = -1;
@@ -212,7 +258,7 @@ class Main : public CBase_Main {
 
   void runNextTier() {
     while (tier < TIER_COUNT && !haveTier[tier]) tier++;
-    if (tier >= TIER_COUNT) { runMigration(); return; }
+    if (tier >= TIER_COUNT) { runFanSweeps(); return; }
     sizeIdx = 0;
     timesForTier.assign(sizes.size(), 0.0);
     calib_proxy.setPair(pairA[tier], pairB[tier]);
@@ -259,6 +305,121 @@ class Main : public CBase_Main {
     rsq[tier] = (ssTot > 0) ? 1.0 - ssRes / ssTot : 1.0;
     CkPrintf("  --> %-14s alpha=%.6es beta=%.6es/B  R2=%.4f\n\n",
              tierName(tier), a, b, rsq[tier]);
+  }
+
+  // ---- exchange sweep ---------------------------------------------------
+  void runFanSweeps() {
+    if (fanMax < 2 || xsizes.empty()) { runMigration(); return; }
+    CkPrintf("=== exchange sweep by %s\n", fanByEntry ? "entry-method device sends" : "device channel puts");
+    if (fanByEntry) { fanCls = 0; fan = 2; thisProxy.nextFan(); return; }
+    setUpXChannels();
+  }
+  // The members of a group of `fan` in class `fanCls`: one PE per device on
+  // the first host, or one PE per host.
+  bool groupFor(int cls, int k, std::vector<int>& out) {
+    out.clear();
+    if (cls == 0) {
+      std::vector<int> devs;
+      for (int pe = 0; pe < CkNumPes() && (int)out.size() < k; pe++)
+        if (place[pe].host == place[0].host &&
+            std::find(devs.begin(), devs.end(), place[pe].device) == devs.end()) {
+          devs.push_back(place[pe].device); out.push_back(pe);
+        }
+    } else {
+      std::vector<int> hosts;
+      for (int pe = 0; pe < CkNumPes() && (int)out.size() < k; pe++)
+        if (std::find(hosts.begin(), hosts.end(), place[pe].host) == hosts.end()) {
+          hosts.push_back(place[pe].host); out.push_back(pe);
+        }
+    }
+    return (int)out.size() == k;
+  }
+  bool chooseFan() { return groupFor(fanCls, fan, fanMembers); }
+  // Channels: every PE that will put to another in any group gets that PE's
+  // channel over a landing buffer of its own, once, before the sweeps.
+  void setUpXChannels() {
+    std::vector<std::vector<int>> peers(CkNumPes());
+    std::vector<int> g;
+    for (int cls = 0; cls < 2; cls++)
+      for (int k = 2; k <= fanMax; k++) {
+        if (!groupFor(cls, k, g)) continue;
+        for (int a : g)
+          for (int b : g)
+            if (a != b && std::find(peers[a].begin(), peers[a].end(), b) == peers[a].end()) peers[a].push_back(b);
+      }
+    for (int pe = 0; pe < CkNumPes(); pe++) calib_proxy[pe].setXPeers(peers[pe], xMax);
+  }
+  void xChannelsReady() { fanCls = 0; fan = 2; thisProxy.nextFan(); }
+  void xHoldersDropped() { calib_proxy.closeXChannels(); }
+  void xChannelsClosed() { runMigration(); }
+  void finishFans() {
+    if (fanByEntry) { runMigration(); return; }
+    calib_proxy.dropXHolders();
+  }
+  void nextFan() {
+    for (;;) {
+      if (fan > fanMax) { fanCls++; fan = 2; }
+      if (fanCls > 1) { finishFans(); return; }
+      if (chooseFan()) break;
+      // No group of this size in this class: the larger ones are out too.
+      CkPrintf("  exchange fan %d %s: no %d %s in this launch\n", fan, fanCls == 0 ? "host" : "inter",
+               fan, fanCls == 0 ? "devices on one host" : "hosts");
+      fanCls++; fan = 2;
+    }
+    CkPrintf("=== exchange at fan %d (%s): PEs", fan, fanCls == 0 ? "one host, one PE per device" : "one PE per host");
+    for (int pe : fanMembers) CkPrintf(" %d", pe);
+    CkPrintf(", %zu..%zu B, %d rounds after %d\n", xsizes.front(), xsizes.back(), fanIters, fanWarm);
+    xIdx = 0;
+    xtimes.assign(xsizes.size(), 0.0);
+    calib_proxy.setGroup(fanMembers, xMax, fanByEntry ? fanMax : 0);
+  }
+  void groupReady() { thisProxy.nextXSize(); }
+  void nextXSize() {
+    if (xIdx >= (int)xsizes.size()) { fitFan(); fan++; thisProxy.nextFan(); return; }
+    roundIter = 0; roundAccum = 0.0;
+    startRound();
+  }
+  void startRound() {
+    roundDoneCount = 0;
+    roundStart = CkWallTimer();
+    for (int pe : fanMembers) calib_proxy[pe].round(xsizes[xIdx]);
+  }
+  // A member has every other member's buffer; the round ends with the last.
+  void memberDone() {
+    if (++roundDoneCount < fan) return;
+    const double dt = CkWallTimer() - roundStart;
+    roundIter++;
+    if (roundIter > fanWarm) roundAccum += dt;
+    if (roundIter < fanWarm + fanIters) { startRound(); return; }
+    xtimes[xIdx] = roundAccum / fanIters / (fan - 1);   // per peer
+    CkPrintf("  fan %d %-5s %10zu B  %10.3f ms per round, %8.3f ms per peer\n", fan, fanCls == 0 ? "host" : "inter",
+             xsizes[xIdx], roundAccum / fanIters * 1e3, xtimes[xIdx] * 1e3);
+    xIdx++;
+    thisProxy.nextXSize();
+  }
+  void fitFan() {
+    const int N = (int)xsizes.size();
+    double sn = 0, st = 0, snt = 0, snn = 0;
+    for (int i = 0; i < N; i++) {
+      const double x = (double)xsizes[i], y = xtimes[i];
+      sn += x; st += y; snt += x * y; snn += x * x;
+    }
+    const double denom = N * snn - sn * sn;
+    double b = (denom != 0.0) ? (N * snt - sn * st) / denom : 0.0;
+    double a = (st - b * sn) / N;
+    if (b < 0) { CkPrintf("  WARNING: fan %d beta fitted negative (%.3e); clamped to 0\n", fan, b); b = 0; }
+    if (a < 0) a = 0;   // a negative intercept at these sizes is the fit's slack, not a cost
+    double ssTot = 0, ssRes = 0; const double mean = st / N;
+    for (int i = 0; i < N; i++) {
+      const double pred = a + b * (double)xsizes[i];
+      ssRes += (xtimes[i] - pred) * (xtimes[i] - pred);
+      ssTot += (xtimes[i] - mean) * (xtimes[i] - mean);
+    }
+    xalpha[fanCls][fan] = a; xbeta[fanCls][fan] = b;
+    xrsq[fanCls][fan] = (ssTot > 0) ? 1.0 - ssRes / ssTot : 1.0;
+    xhave[fanCls][fan] = true;
+    CkPrintf("  --> fan %d %-5s alpha=%.6es beta=%.6es/B per peer (%.1f GB/s)  R2=%.4f\n\n", fan,
+             fanCls == 0 ? "host" : "inter", a, b, b > 0 ? 1e-9 / b : 0.0, xrsq[fanCls][fan]);
   }
 
   // ---- migration sweep --------------------------------------------------
@@ -413,6 +574,25 @@ class Main : public CBase_Main {
       fprintf(f, "%s_beta  = %.9e\n", tierName(t), beta[t]);
     }
 
+    // The exchange at each fan: what one peer costs a copy.
+    bool anyFan = false;
+    for (int c = 0; c < 2; c++) for (int k = 2; k <= FAN_MAX; k++) if (xhave[c][k]) anyFan = true;
+    if (anyFan) {
+      fprintf(f, "\n# A copy's exchange with one peer in a group of k copies exchanging all at once\n"
+                 "# (by %s;\n"
+                 "# xchg_fan<k>: k PEs, one per device on one host / one per host, each sending\n"
+                 "# %zu..%zu B to every other), alpha seconds per message, beta seconds per byte,\n"
+                 "# per peer; %d rounds after %d. A balancer prices a copy's k-1 peers with these.\n",
+              fanByEntry ? "entry-method device sends" : "device channel puts, each its own batch",
+              xsizes.front(), xsizes.back(), fanIters, fanWarm);
+      for (int c = 0; c < 2; c++)
+        for (int k = 2; k <= FAN_MAX; k++) {
+          if (!xhave[c][k]) continue;
+          fprintf(f, "xchg_fan%d_%s_alpha = %.9e   # R2=%.4f\n", k, c == 0 ? "host" : "inter", xalpha[c][k], xrsq[c][k]);
+          fprintf(f, "xchg_fan%d_%s_beta  = %.9e\n", k, c == 0 ? "host" : "inter", xbeta[c][k]);
+        }
+    }
+
     // Migration cost: measured by migrating batches of objects of known
     // footprint (runMigration) when the launch had a same-host pair; otherwise
     // the old estimate from the transport numbers, marked as such.
@@ -464,6 +644,24 @@ class Calib : public CBase_Calib {
   size_t curSize = 0;
   int iter = 0;
   double startTime = 0.0, accum = 0.0;
+  // The exchange sweep: this PE's place in the group, its send buffer and one
+  // landing buffer per peer slot (allocated once, at the largest size).
+  std::vector<int> grp;
+  int grpIdx = -1;
+  char* d_xsend = nullptr;
+  std::vector<char*> d_xland;
+  // Arrivals of this group's puts, counted across rounds: a peer's put for
+  // the next round can land before this PE's round() entry runs (job
+  // 23625084: Main's round message lost to the put by a few hundred us), so
+  // the count is never reset by a round, only consumed by the report.
+  int landed = 0;
+  // Channels: a landing buffer and an owned channel per PE that puts here,
+  // handed to it; holder copies of the channels of the PEs this one puts to.
+  std::map<int, char*> xlandOf;
+  std::map<int, CkDeviceChannel> xown;
+  std::map<int, CkDeviceChannel*> xhold;
+  int xExpect = -1, xHave = 0;
+  uint64_t xTag = 0;
 
  public:
   Calib() {}
@@ -497,6 +695,99 @@ class Calib : public CBase_Calib {
     else peer = -1;
     contribute(CkCallback(CkReductionTarget(Main, pairReady), main_proxy));
   }
+
+  // Before the sweeps: the landing buffer and channel for each PE that will
+  // put here, the channel sent to it; this PE is ready once it holds every
+  // channel it will put into.
+  void setXPeers(const std::vector<int>& peers, size_t maxBytes) {
+    if (d_xsend == nullptr) {
+      hapiCheck(hapiMalloc((void**)&d_xsend, maxBytes));
+      hapiCheck(hapiMemset(d_xsend, 'x', maxBytes));
+    }
+    for (int p : peers) {
+      char* land = nullptr;
+      hapiCheck(hapiMalloc((void**)&land, maxBytes));
+      xlandOf[p] = land;
+      xown[p] = CkDeviceChannel(land, maxBytes, CkCallback(CkIndex_Calib::xarrived(NULL), thisProxy[CkMyPe()]));
+      xown[p].open();
+      thisProxy[p].takeXChannel(CkMyPe(), xown[p]);
+    }
+    xExpect = (int)peers.size();
+    if (xHave == xExpect) contribute(CkCallback(CkReductionTarget(Main, xChannelsReady), main_proxy));
+  }
+  void takeXChannel(int owner, CkDeviceChannel c) {
+    delete xhold[owner];
+    xhold[owner] = new CkDeviceChannel(c);
+    xHave++;
+    if (xExpect >= 0 && xHave == xExpect) contribute(CkCallback(CkReductionTarget(Main, xChannelsReady), main_proxy));
+  }
+  void xarrived(CkDataMsg* m) {
+    CkDeviceChannelEvent ev;
+    memcpy(&ev, m->getData(), sizeof(ev));
+    CkDeviceChannel* c = nullptr;
+    for (auto& kv : xown) if (kv.second.id() == ev.channel) { c = &kv.second; break; }
+    if (c == nullptr) CkAbort("lbcalib: a put note for channel %llx, not one of PE %d's\n", (unsigned long long)ev.channel, CkMyPe());
+    const CkDeviceChannelEvent* e = c->event(m);
+    delete m;
+    if (e == NULL) return;
+    c->release();   // the bytes are not read; the sender may put again
+    oneLanded();
+  }
+  // Every other member's buffer is in: this member's part of the round is
+  // done, whichever round the puts belong to.
+  void oneLanded() {
+    if (++landed < (int)grp.size() - 1) return;
+    landed = 0;
+    main_proxy.memberDone();
+  }
+  void xsent() {}
+  void dropXHolders() {
+    for (auto& kv : xhold) delete kv.second;
+    xhold.clear();
+    contribute(CkCallback(CkReductionTarget(Main, xHoldersDropped), main_proxy));
+  }
+  void closeXChannels() {
+    for (auto& kv : xown) kv.second.close();
+    xown.clear();
+    contribute(CkCallback(CkReductionTarget(Main, xChannelsClosed), main_proxy));
+  }
+
+  void setGroup(const std::vector<int>& members, size_t maxBytes, int fanMax) {
+    grp = members;
+    grpIdx = -1;
+    landed = 0;   // no put of the previous group is in flight: Main moved on after its last round
+    for (int i = 0; i < (int)members.size(); i++) if (members[i] == CkMyPe()) grpIdx = i;
+    if (fanMax > 0 && grpIdx >= 0 && d_xsend == nullptr) {
+      hapiCheck(hapiMalloc((void**)&d_xsend, maxBytes));
+      hapiCheck(hapiMemset(d_xsend, 'x', maxBytes));
+      d_xland.assign(fanMax - 1, nullptr);
+      for (int i = 0; i < fanMax - 1; i++) hapiCheck(hapiMalloc((void**)&d_xland[i], maxBytes));
+    }
+    contribute(CkCallback(CkReductionTarget(Main, groupReady), main_proxy));
+  }
+  // One round: my buffer to every other member, into the slot that is mine
+  // at each (members below me keep my index, those above me my index less one).
+  void round(size_t size) {
+    for (int j = 0; j < (int)grp.size(); j++) {
+      if (j == grpIdx) continue;
+      if (!xhold.empty()) {
+        // The channel path: one put per peer, each its own batch (what the
+        // MoE example's copies do with their block sums).
+        CkDeviceChannel* ch = xhold[grp[j]];
+        if (ch == nullptr) CkAbort("lbcalib: PE %d holds no channel of PE %d\n", CkMyPe(), grp[j]);
+        ch->put(d_xsend, size, stream, CkCallback(CkIndex_Calib::xsent(), thisProxy[CkMyPe()]), xTag++);
+        CkRdmaDeviceChannelBatchFlush();
+        continue;
+      }
+      const int slotAtPeer = grpIdx < j ? grpIdx : grpIdx - 1;
+      thisProxy[grp[j]].xpart(size, slotAtPeer, CkDeviceBuffer(d_xsend));
+    }
+    if (grp.size() == 1) main_proxy.memberDone();
+  }
+  void xpart(size_t& size, int& slot, char*& data, CkDeviceBufferPost* post) {
+    data = d_xland[slot]; post[0].hapi_stream = stream;
+  }
+  void xpart(size_t size, int slot, char* data) { oneLanded(); }
 
   void startSweep(size_t size) {
     curSize = size; iter = 0; accum = 0.0;

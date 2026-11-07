@@ -1,4 +1,4 @@
-OPTS = -O3 -DHAPI_CUDA_CALLBACK
+OPTS = -O3
 
 CHARM_DIR = ../../../../..
 CHARMC = $(CHARM_DIR)/bin/charmc $(OPTS)
@@ -29,7 +29,9 @@ LD_LIBS += -L$(AOTRITON_DIR)/lib -laotriton_v2 -Wl,-rpath,$(AOTRITON_DIR)/lib
 endif
 else
 NVCC = nvcc
-NVCC_FLAGS = -c -std=c++17 -use_fast_math -gencode arch=compute_86,code=sm_86 $(OPTS) -I$(MATHLIBS)/include
+# Device code for the A40 (sm_86) and the A100 (sm_80) nodes of Delta; CUDA_ARCHS on the make line overrides.
+CUDA_ARCHS ?= 80 86
+NVCC_FLAGS = -c -std=c++17 -use_fast_math $(foreach a,$(CUDA_ARCHS),-gencode arch=compute_$(a),code=sm_$(a)) $(OPTS) -I$(MATHLIBS)/include
 # ShedLB is this application's balancer (README: why); +balancer on the command line still overrides it.
 LD_LIBS = -balancer ShedLB -module EveryLB -module DiffusionLB -L$(MATHLIBS)/lib64 -lcublas -Wl,-rpath,$(MATHLIBS)/lib64
 # The block variant's attention (-w) under -B runs on cuDNN's fused attention graphs: cuDNN 9 and its header-only

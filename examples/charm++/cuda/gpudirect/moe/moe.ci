@@ -35,8 +35,9 @@ mainmodule moe {
   readonly int send_ahead;
   readonly int tok_channels;
   readonly int print_place;
+  readonly std::vector<int> disp_pes;
+  readonly int out_channels;
   readonly int flight_log;
-  readonly int rep_max;
   readonly int rep_init_expert;
   readonly double zipf_z;
   readonly double learning_rate;
@@ -45,7 +46,6 @@ mainmodule moe {
   mainchare Main {
     entry Main(CkArgMsg* m);
     entry [reductiontarget] void dispReady();
-    entry void probeDone(double node_s, double remote_s);
     entry [reductiontarget] void expertsReady();
     // Each process's dispatcher, once it holds every expert's token channels.
     entry void dispChannelsReady();
@@ -88,15 +88,11 @@ mainmodule moe {
                              nocopydevice char buf[len]);
     // An expert copy's token channels from this dispatcher, one per step parity.
     entry void takeChannels(int e, int r, int late, CkDeviceChannel c0, CkDeviceChannel c1);
+    entry void outputArrived(CkDataMsg* m);
+    entry void outputIn(int ref, int e, int n, int mult_next);
+    entry void outChannelsFree(int e, int r);
     // The job-wide seconds per token, from Main (MoeCtx::global_spt).
     entry void setRate(double spt);
-    // The exchange probe (Main::dispReady): one partial's transfer time to a PE on this node and
-    // to one on another, declared to the balancer as a copy's recurring cost (setLBReplica).
-    entry void probe();
-    entry void probeSendDone();
-    entry void probeAck();
-    entry void probeLand(int n, nocopydevice char buf[n]);
-    entry void setXchg(double node_s, double remote_s);
     // A copy's channels (r > 0) are in: runStep waits for them before it routes
     // a step that copy serves.
     entry void chanArrived();
@@ -118,9 +114,14 @@ mainmodule moe {
         when gathered() serial { sendTokens(); }
       }
       for (recv_count = 0; recv_count < n_experts; recv_count++) {
-        when receiveOutput[my_step](int ref, int e, int n, long long ts, int spe, int mult_next, int len,
-                                    nocopydevice char buf[len])
-          serial { noteOutput(e, n, ts, spe, mult_next); }
+        if (out_channels) {
+          when outputIn[my_step](int ref, int e, int n, int mult_next)
+            serial { noteOutput(e, n, 0, -1, mult_next); }
+        } else {
+          when receiveOutput[my_step](int ref, int e, int n, long long ts, int spe, int mult_next, int len,
+                                      nocopydevice char buf[len])
+            serial { noteOutput(e, n, ts, spe, mult_next); }
+        }
       }
       serial { combine(); }
       when combined() serial { gateDrain(); }
@@ -178,6 +179,11 @@ mainmodule moe {
     entry void cloneSent();
     // A dispatcher dropped its channels to this retiring copy.
     entry void channelsDropped();
+    entry void takeOutChannels(int d, int late, CkDeviceChannel c0, CkDeviceChannel c1);
+    entry void takeGradChannels(int from, CkDeviceChannel c0, CkDeviceChannel c1);
+    entry void gradArrived(CkDataMsg* m);
+    entry void gradIn(int ref, int from_rank);
+    entry void gradChannelsDropped(int from);
     // The retiring copy destroys itself, outside the entry that decided it.
     entry void die();
 
@@ -208,6 +214,17 @@ mainmodule moe {
       if (grad_in_flight) {
         when gradSent() serial { grad_in_flight = false; }
       }
+      // The output channels of every dispatcher this copy serves (a new copy's
+      // arrive from the dispatchers at the step it starts serving them).
+      while (!outChannelsReady()) {
+        when takeOutChannels(int d, int late, CkDeviceChannel c0, CkDeviceChannel c1)
+          serial { storeOutChannels(d, c0, c1); }
+      }
+      // The exchange channels of every other copy of this step's group.
+      while (!gradChannelsReady()) {
+        when takeGradChannels(int from, CkDeviceChannel c0, CkDeviceChannel c1)
+          serial { storeGradChannels(from, c0, c1); }
+      }
       serial { compute(); }
       when computeDone() serial { sendOutputs(); }
       if (replicated) {
@@ -217,6 +234,17 @@ mainmodule moe {
             when peerStats[my_step](int ref, int from_rank, int n_mine, int pe, double gpu_s, int retiring)
               serial { noteGrad(from_rank, n_mine, pe, gpu_s, retiring); }
           }
+        } else if (out_channels) {
+          // The figures by message, the pair by channel put (its note).
+          for (gp_in = 0; gp_in < nc - 1; gp_in++) {
+            when peerStats[my_step](int ref, int from_rank, int n_mine, int pe, double gpu_s, int retiring)
+              serial { noteGrad(from_rank, n_mine, pe, gpu_s, retiring); }
+          }
+          for (gp_in = 0; gp_in < nc - 1; gp_in++) {
+            when gradIn[my_step](int ref, int from_rank) serial { (void)0; }
+          }
+          serial { applyReplicated(); }
+          when applyDone() serial { releaseGrads(); }
         } else {
           for (gp_in = 0; gp_in < nc - 1; gp_in++) {
             when gradPartial[my_step](int ref, int from_rank, int n_mine, int pe, double gpu_s, int retiring, int n,

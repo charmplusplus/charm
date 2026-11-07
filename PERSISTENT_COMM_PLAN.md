@@ -1269,3 +1269,14 @@ named per job STEP (`-<SLURM_STEP_ID>`). The flush-at-pop revert of 20:51 was un
 attribution restored); 16x8x8 async channels 1603.1 vs zero-copy 1663.3 (20:22 control, same node); no-LB 16x8x8
 batched 2571.6 vs 2587.5 (20:13); rank-3 copy engine 538 vs 512 ms per 10 steps. Node 23067051 released 21:03.
 Open: more than one pair per claim; the two-node and 16x8x8-two-node configurations on this protocol.
+
+**2026-11-07, the cross-host tier reads again.** The sender-write protocol chosen above (the write with the note
+as immediate data, commit 88d4f724d) was the slow verb for this fabric at the sizes the MoE example exchanges:
+on Slingshot a write landing in device memory runs at 10.9 GB/s alone and 3.7 a direction with both hosts
+writing, where a read into device memory runs at 16.1 and 12.5 (`benchmarks/charm++/cuda/gpudirect/rma_bw`,
+two A100 nodes, 128 MB). The 2026-10-19 message-path benchmark had already shown the write behind the read
+from 512 KB up (379 against 260 us at 4 MB); the applications of that day tied because their puts are small.
+The announce-and-read protocol of 2026-10-18 20:30 is the cross-host default again (`pull_mode` across hosts in
+`CkDeviceChannel::onResolved`), with two of its defects fixed (the closing ack reported announced puts as
+written; a zero-byte put's note overtook the owner's queue); the write stays behind `CHARM_CHAN_WRITE=1`. The
+record is in `examples/charm++/cuda/gpudirect/moe/README.md`, "The read path on the A100 nodes".

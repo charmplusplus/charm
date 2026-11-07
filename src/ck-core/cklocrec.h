@@ -152,7 +152,8 @@ public:
   void setPupSize(size_t obj_pup_size);
   void setGPUPupSize(size_t obj_gpu_pup_size);
   void setObjReplica(int group, int rank, int count, int maxCount, size_t extraBytes,
-                     double costNode = 0.0, double costRemote = 0.0);
+                     double costNode = 0.0, double costRemote = 0.0, int parts = 0,
+                     size_t exchangeBytes = 0, double exchangeMsgs = 0.0, size_t extraPerPeer = 0);
   void AsyncMigrate(bool use);
   bool isAsyncMigrate()   { return asyncMigrate; }
   void ReadyMigrate(bool ready) { readyMigrate = ready; } ///called from user

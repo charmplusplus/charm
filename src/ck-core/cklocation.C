@@ -2211,9 +2211,14 @@ void CkMigratable::pup(PUP::er& p)
   p | lbReplicaExtraBytes;
   p | lbReplicaCostNode;
   p | lbReplicaCostRemote;
+  p | lbReplicaParts;
+  p | lbReplicaExchangeBytes;
+  p | lbReplicaExchangeMsgs;
+  p | lbReplicaExtraBytesPerPeer;
   if (p.isUnpacking() && lbReplicaGroup >= 0)
     myRec->setObjReplica(lbReplicaGroup, lbReplicaRank, lbReplicaCount, lbReplicaMax,
-                         lbReplicaExtraBytes, lbReplicaCostNode, lbReplicaCostRemote);
+                         lbReplicaExtraBytes, lbReplicaCostNode, lbReplicaCostRemote, lbReplicaParts,
+                         lbReplicaExchangeBytes, lbReplicaExchangeMsgs, lbReplicaExtraBytesPerPeer);
 #endif
 
   if (p.isUnpacking())
@@ -2938,7 +2943,8 @@ void CkMigratable::setPupSize(size_t obj_pup_size) { myRec->setPupSize(obj_pup_s
 void CkMigratable::setGPUPupSize(size_t obj_gpu_pup_size) { myRec->setGPUPupSize(obj_gpu_pup_size); }
 
 void CkMigratable::setLBReplica(int group, int rank, int count, int maxCount, size_t extraBytes,
-                                double costNode, double costRemote)
+                                double costNode, double costRemote, int parts,
+                                size_t exchangeBytes, double exchangeMsgs, size_t extraPerPeer)
 {
   lbReplicaGroup = group;
   lbReplicaRank = rank;
@@ -2947,7 +2953,12 @@ void CkMigratable::setLBReplica(int group, int rank, int count, int maxCount, si
   lbReplicaExtraBytes = extraBytes;
   lbReplicaCostNode = costNode;
   lbReplicaCostRemote = costRemote;
-  myRec->setObjReplica(group, rank, count, maxCount, extraBytes, costNode, costRemote);
+  lbReplicaParts = parts;
+  lbReplicaExchangeBytes = exchangeBytes;
+  lbReplicaExchangeMsgs = exchangeMsgs;
+  lbReplicaExtraBytesPerPeer = extraPerPeer;
+  myRec->setObjReplica(group, rank, count, maxCount, extraBytes, costNode, costRemote, parts,
+                       exchangeBytes, exchangeMsgs, extraPerPeer);
 }
 
 
@@ -3383,9 +3394,11 @@ void CkLocRec::staticRetire(LDObjHandle h)
   el->myLocMgr->callMethod(el, &CkMigratable::ckRetire);
 }
 void CkLocRec::setObjReplica(int group, int rank, int count, int maxCount, size_t extraBytes,
-                             double costNode, double costRemote)
+                             double costNode, double costRemote, int parts,
+                             size_t exchangeBytes, double exchangeMsgs, size_t extraPerPeer)
 {
-  lbmgr->SetObjReplica(ldHandle, group, rank, count, maxCount, extraBytes, costNode, costRemote);
+  lbmgr->SetObjReplica(ldHandle, group, rank, count, maxCount, extraBytes, costNode, costRemote, parts,
+                       exchangeBytes, exchangeMsgs, extraPerPeer);
 }
 
 #if CMK_LBDB_ON

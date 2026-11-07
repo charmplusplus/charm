@@ -182,8 +182,10 @@ public:
 
   // Replication declaration; see LDObjData::replicaGroup.
   inline void ObjReplica(LDObjHandle h, int group, int rank, int count, int maxCount, size_t extraBytes,
-                         double costNode = 0.0, double costRemote = 0.0) {
-    LbObj(h)->setReplica(group, rank, count, maxCount, extraBytes, costNode, costRemote);
+                         double costNode = 0.0, double costRemote = 0.0, int parts = 0,
+                         size_t exchangeBytes = 0, double exchangeMsgs = 0.0, size_t extraPerPeer = 0) {
+    LbObj(h)->setReplica(group, rank, count, maxCount, extraBytes, costNode, costRemote, parts,
+                         exchangeBytes, exchangeMsgs, extraPerPeer);
   };
   inline void GetObjReplica(LDObjHandle h, int& group, int& rank, int& count, int& maxCount, size_t& extraBytes) {
     LbObj(h)->getReplica(group, rank, count, maxCount, extraBytes);

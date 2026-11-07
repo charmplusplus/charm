@@ -224,6 +224,10 @@ private:
   int lbReplicaMax = 1;
   size_t lbReplicaExtraBytes = 0;
   double lbReplicaCostNode = 0.0;
+  int lbReplicaParts = 0;
+  size_t lbReplicaExchangeBytes = 0;
+  double lbReplicaExchangeMsgs = 0.0;
+  size_t lbReplicaExtraBytesPerPeer = 0;
   double lbReplicaCostRemote = 0.0;
 public:
 
@@ -249,12 +253,13 @@ public:
   // exchange with that peer, on the same node or across nodes (0 when the
   // copies exchange nothing); the balancer prices a copy with them.
   void setLBReplica(int group, int rank, int count, int maxCount, size_t extraBytes,
-                    double costNode = 0.0, double costRemote = 0.0);
+                    double costNode = 0.0, double costRemote = 0.0, int parts = 0,
+                    size_t exchangeBytes = 0, double exchangeMsgs = 0.0, size_t extraPerPeer = 0);
   bool lbReplicable() const { return lbReplicaGroup >= 0 && lbReplicaMax > 1; }
 #else
   void setObjRebuildCost(double seconds) { (void)seconds; }
   double getObjRebuildCost() const { return 0.0; }
-  void setLBReplica(int, int, int, int, size_t, double = 0.0, double = 0.0) {}
+  void setLBReplica(int, int, int, int, size_t, double = 0.0, double = 0.0, int = 0, size_t = 0, double = 0.0, size_t = 0) {}
   bool lbReplicable() const { return false; }
   void AtSync(int waitForMigration=1) { ResumeFromSync();}
   enum class AtSyncStatus { Continue, Started, Blocked };

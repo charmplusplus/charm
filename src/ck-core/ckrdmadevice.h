@@ -110,9 +110,12 @@ struct CkDevicePersistent {
 // sender asking for the channel's current endpoint; CkDeviceChannel::event()
 // answers it and hands the application nothing.
 struct CkDeviceChannelEvent {
-  // ANNOUNCE: a put on the cross-host tier; the receiver reads the bytes itself
-  // (an RDMA read beat the sender's write at every size on Slingshot, 2026-10-18)
-  // and the application sees a DATA event once they are in place.
+  // ANNOUNCE: a put on the cross-host tier, or one made while the receiver was
+  // closed; the receiver reads the bytes itself and the application sees a
+  // DATA event once they are in place. On Slingshot a read into device memory
+  // runs at the link's rate where a write into it runs at a third of it with
+  // both hosts sending (rma_bw, 2026-11-07; the read also beat the write at
+  // every size on 2026-10-18).
   enum Kind : int { DATA = 1, RESOLVE = 2, ANNOUNCE = 3 };
   int kind;
   uint64_t channel;

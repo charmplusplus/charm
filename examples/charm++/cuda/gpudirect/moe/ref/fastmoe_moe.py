@@ -22,6 +22,7 @@ FMOE_FASTER_GLBPLC_ALPHA (d_ff/d_model, set here from -H/-m when unset) and
 FMOE_FASTER_GLBPLC_DMODEL (set by FastMoE from the input).
 """
 import argparse
+import contextlib
 import gc
 import math
 import os
@@ -57,6 +58,11 @@ def parse():
     ap.add_argument("--master", action="store_true",
                     help="fp32 master weights for the experts, the SGD step on them and a cast into the bf16 "
                          "parameters each step, as Megatron-LM's bf16 optimizer does (and the example)")
+    ap.add_argument("--profile", metavar="DIR",
+                    help="torch.profiler over --profile-steps (CUPTI kernels and copies, NCCL, the host ops), one "
+                         "Chrome/Perfetto trace per rank in DIR (rank_<r>.json, each step a \"step N\" range); the "
+                         "traced steps' time is reported against the untraced steps before them")
+    ap.add_argument("--profile-steps", default="30:41", help="first:last step traced, inclusive (default 30:41)")
     add_attention_args(ap)
     return ap.parse_args()
 
@@ -189,46 +195,62 @@ def main():
     loss = torch.zeros((), device=device)
     if a.forward_only and fmoe_faster_schedule:
         gc.freeze()   # the per-step collection below then scans only the step's own objects
+    prof = None
+    if a.profile:
+        from torch.profiler import profile, ProfilerActivity, schedule
+        p0, p1 = (int(v) for v in a.profile_steps.split(":"))
+        assert 2 <= p0 <= p1 <= n_total, "--profile-steps must lie in 2..%d" % n_total
+        os.makedirs(a.profile, exist_ok=True)
+        prof = profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA],
+                       schedule=schedule(wait=p0 - 2, warmup=1, active=p1 - p0 + 1, repeat=1),
+                       on_trace_ready=lambda pr: pr.export_chrome_trace(os.path.join(a.profile, "rank_%d.json" % rank)),
+                       record_shapes=False, profile_memory=False, with_stack=False)
+        prof.start()
     for s in range(1, n_total + 1):
-        layer.gate.step = s
-        ev[s][0].record()
-        if attn is not None:
-            x_in = attention_step(attn, opt_a, x_tok, 1.0, a.forward_only)
-            if not a.forward_only:
-                x_in.requires_grad_(True)
-        if a.forward_only:
-            if fmoe_faster_schedule:
-                # FasterMoE's fused forward records the experts' sub-graphs whatever the grad mode, and
-                # without a backward to consume them the hot rank's memory grew every step and ran out
-                # (44 GB) at the Mixtral shape; the graph is released by collecting the cycle each step.
-                # Everything older is frozen (above): a full collection over the long-lived objects cost
-                # ~55 ms a step (job 23452305: forward 95 ms serving against 38 ms training)
-                out = layer(x_in)
-                del out
-                gc.collect()
-                out = None
-            else:
-                with torch.no_grad():
+        with (torch.profiler.record_function("step %d" % s) if prof is not None else contextlib.nullcontext()):
+            layer.gate.step = s
+            ev[s][0].record()
+            if attn is not None:
+                x_in = attention_step(attn, opt_a, x_tok, 1.0, a.forward_only)
+                if not a.forward_only:
+                    x_in.requires_grad_(True)
+            if a.forward_only:
+                if fmoe_faster_schedule:
+                    # FasterMoE's fused forward records the experts' sub-graphs whatever the grad mode, and
+                    # without a backward to consume them the hot rank's memory grew every step and ran out
+                    # (44 GB) at the Mixtral shape; the graph is released by collecting the cycle each step.
+                    # Everything older is frozen (above): a full collection over the long-lived objects cost
+                    # ~55 ms a step (job 23452305: forward 95 ms serving against 38 ms training)
                     out = layer(x_in)
-            ev[s][1].record()
-            if out is not None:
-                loss = out.float().square().sum()   # a read of the output, as a server would make
-        else:
-            out = layer(x_in)
-            ev[s][1].record()
-            loss = 0.5 * out.float().square().sum()
-            loss_hist[s] = loss.detach()
-            loss.backward()
-            if masters is not None:
-                master_sgd_step(params, masters, a.lr / T)
+                    del out
+                    gc.collect()
+                    out = None
+                else:
+                    with torch.no_grad():
+                        out = layer(x_in)
+                ev[s][1].record()
+                if out is not None:
+                    loss = out.float().square().sum()   # a read of the output, as a server would make
             else:
-                opt.step()
-                opt.zero_grad(set_to_none=True)
-            x_in.grad = None
-        ev[s][2].record()
-        if s == a.warmup:
-            torch.cuda.synchronize()
-            t_start = time.perf_counter()
+                out = layer(x_in)
+                ev[s][1].record()
+                loss = 0.5 * out.float().square().sum()
+                loss_hist[s] = loss.detach()
+                loss.backward()
+                if masters is not None:
+                    master_sgd_step(params, masters, a.lr / T)
+                else:
+                    opt.step()
+                    opt.zero_grad(set_to_none=True)
+                x_in.grad = None
+            ev[s][2].record()
+            if s == a.warmup:
+                torch.cuda.synchronize()
+                t_start = time.perf_counter()
+        if prof is not None:
+            prof.step()
+    if prof is not None:
+        prof.stop()
     torch.cuda.synchronize()
     total_s = time.perf_counter() - t_start
     if not torch.isfinite(loss):
@@ -263,6 +285,12 @@ def main():
             timed = shadows[a.warmup:n_total]
             print("Shadowed experts: %.1f per step over the timed steps" % (
                 sum(len(x) for x in timed) / max(1, len(timed))))
+        if a.profile:
+            # step p0 - 2 ends with the profiler's start and step p1 with the trace export (seconds), so neither counts
+            tr = allt[:, 1, p0 - 1:p1 - 1].max(axis=0); un = allt[:, 1, a.warmup:p0 - 3].max(axis=0)
+            print("Profiled steps %d-%d: %.1f ms/step (step %d holds the trace export); untraced steps %d-%d: %.1f ms/step "
+                  "(step %d starts the profiler)" % (p0, p1 - 1, tr.mean() if len(tr) else float("nan"), p1, a.warmup + 1, p0 - 3,
+                                                     un.mean() if len(un) else float("nan"), p0 - 2))
         print("\nTotal time: %.3f s\nAverage step time: %.3f ms" % (total_s, total_s / a.steps * 1e3))
     dist.barrier()
     dist.destroy_process_group()

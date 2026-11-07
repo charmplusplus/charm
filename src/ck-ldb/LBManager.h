@@ -19,7 +19,9 @@ using json = nlohmann::json;
 // 5 adds the device pool's arena quantum and the IPC slot budget to ProcStats.
 // 8 adds the replication declaration (replicaGroup ...) to LDObjData.
 // 9 adds a copy's recurring exchange cost (replicaCostNode / replicaCostRemote).
-#define LB_FORMAT_VERSION 9
+// 10 adds the partition count behind a copy's share (replicaParts), the bytes and messages a copy
+//    exchanges with a peer per interval, and the device bytes a further peer adds to it.
+#define LB_FORMAT_VERSION 11
 
 #define LB_MANAGER_VERSION 1
 
@@ -369,6 +371,7 @@ class LBManager : public CBase_LBManager
   };
 
   LBDatabase* lbdb_obj;
+  int pePartition = -1;
 
   // CCS handler "LBObjLoads": pending reply tokens and whether a collection
   // round is in flight (one round serves every request that arrived meanwhile)
@@ -581,9 +584,11 @@ class LBManager : public CBase_LBManager
   void GetObjPrev(LDObjHandle h, int& pe, int& stepNo) { lbdb_obj->GetObjPrev(h, pe, stepNo); }
   // Replication declaration; see LDObjData::replicaGroup.
   void SetObjReplica(LDObjHandle h, int group, int rank, int count, int maxCount, size_t extraBytes,
-                     double costNode = 0.0, double costRemote = 0.0)
+                     double costNode = 0.0, double costRemote = 0.0, int parts = 0,
+                     size_t exchangeBytes = 0, double exchangeMsgs = 0.0, size_t extraPerPeer = 0)
   {
-    lbdb_obj->ObjReplica(h, group, rank, count, maxCount, extraBytes, costNode, costRemote);
+    lbdb_obj->ObjReplica(h, group, rank, count, maxCount, extraBytes, costNode, costRemote, parts,
+                         exchangeBytes, exchangeMsgs, extraPerPeer);
   }
   void GetObjReplica(LDObjHandle h, int& group, int& rank, int& count, int& maxCount, size_t& extraBytes)
   {
@@ -695,6 +700,15 @@ class LBManager : public CBase_LBManager
   // around a round for the sake of migrations can let it go when this is 0.
   void SetLastRoundDecisions(int n) { lastRoundDecisions = n; }
   int LastRoundDecisions() const { return lastRoundDecisions; }
+  // The partition of a replicated object's inputs that this PE originates
+  // (ProcStats::partition; -1, the default, none). A copy of rank r among k of
+  // an object with P partitions serves partitions [P r / k, P (r + 1) / k)
+  // (LDObjData::replicaShare), and a balancer that knows which PEs feed those
+  // partitions can place the copy on their host (ShedLB does, when the copies
+  // have no exchange to pay for). Declared once by the application, usually
+  // at start-up, by every PE that originates inputs.
+  void setPartition(int p) { pePartition = p; }
+  int partition() const { return pePartition; }
 
  public:
   inline void TurnManualLBOn() { useBarrier = false; }

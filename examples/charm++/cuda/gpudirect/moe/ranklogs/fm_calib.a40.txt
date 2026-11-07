@@ -1,0 +1,4 @@
+# broadcast of 470 MB to 8 ranks: 87.8 ms; GEMM 16384 x 4096 x 14336: fp32 24.0 TFLOP/s, bf16 121.2 TFLOP/s
+NETBW=5.351e+09
+GPUTP_FP32=2.397e+13
+GPUTP_BF16=1.212e+14

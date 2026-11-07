@@ -8,7 +8,10 @@ The runtime chooses the balancing strategy. A run script passes no `+balancer`, 
 | Decision | Default | Where | Override (experiments only) |
 | --- | --- | --- | --- |
 | Strategy when no `+balancer` is given | MetisLB once, then DiffusionLB at every later step (when both are linked: `-module EveryLB -module DiffusionLB`) | `LBMgrInit` (LBManager.C) | `+balancer X` |
-| Transfer-cost table | built in: the lbcalib table measured on Delta (A40 x4 per host, Slingshot, 2026-09-15); every balancer prices communication and migration | `DiffusionCostConfig::loadDefault` | `+LBCostConfig <file>` (a file that loads replaces the table; one that fails falls back) |
+| The host as a second resource (ShedLB) | no move or copy raises a PE's host time (its objects' entry-method time) above the device target, or above the hosts' mean with the same slack where that is higher: a PE's step is bound by the larger of the two (ten experts on one PE gave it 10 ms a step of launches and puts, job 23612682) | ShedLB.C | none |
+| Copies placed with their inputs (ShedLB) | a copy of a group that declares partitions and no exchange goes to the host that feeds its block of partitions (`LBManager::setPartition` on the feeding PEs, carried as `ProcStats::partition`); the other hosts' bins only when none there can take it. With an exchange the fan-priced cost decides (every copy of the hot expert on one host sent 100 MB a step each way over the link in serving, job 23624945) | ShedLB.C | none |
+| Copies of a replicable object (ShedLB) | as many as lower the step's critical path, priced with the copies' partition blocks, the calibrated table's fan-in exchange entries (`xchg_fan<k>_*`, lbcalib `-F`) until a copy has exchanged, and the copies' measured exchange after; the application declares only what it can keep consistent and what a copy sends | ShedLB.C, lbdb.h | none (the example's `-R` is gone) |
+| Transfer-cost table | built in: the lbcalib tables measured by device channels on Delta (A40 x4 per host and A100 x4 per host, Slingshot between hosts, 2026-11-07, with the cross-host put announced and read by the owner), chosen by the device's name; every balancer prices communication, migration and a copy's exchange from it | `DiffusionCostConfig::loadBuiltin` | `+LBCostConfig <file>` (a file that loads replaces the table; one that fails falls back) |
 | MetisLB accepts a partition when | the PRICED step bound (load + communication at its tier + migration amortised over the placement's lifetime) falls by the floor | MetisLB.C verdict | the raw cross-group cut ceiling (`+LBMetisMaxCutRise`) now guards only the uncalibrated case |
 | Imbalance floor (Diffusion and Metis) | 3% of the mean (was 10%, which hid a 10-20% drift on sph3d; moves are priced, so a low floor does not churn) | LBManager.h `_lb_diffMinImbalance` | `+LBDiffusionMinImbalance`, `+LBMetisMinGain` |
 | DiffusionLB object metric | communication graph (was centroid, which needs application positions) | LBManager.C | `+LBDiffusionCentroid` |
@@ -64,5 +67,8 @@ What the runs decided and what was changed on the way:
 - The MetisLB re-evaluation is every fourth event, a fixed cadence. A request from DiffusionLB when the binding
   dimension's imbalance stays above its floor would make it adaptive.
 - DiffusionLB's 10% floor costs leanmd about 3%; a priced per-move decision would remove the floor.
-- The built-in table is Delta's. Online calibration from the application's own receive times per tier (the
-  `[zc-time]` statistics exist) would remove the machine dependence.
+- The built-in tables are Delta's (the A40 nodes and the A100 nodes, chosen by the device's name; any other
+  device gets the A40 table), measured by device channels on 2026-11-07 (`lbcost.a40.2n.chan2.conf`,
+  `lbcost.a100.2n.chan.conf`: a copy's exchange costs a peer 24/16/14 GB/s at two, three and four copies on an
+  A40 host, 93 at any of them on an A100 host, 14.2 and 12.1 across hosts). Online calibration from the
+  application's own receive times per tier (the `[zc-time]` statistics exist) would remove the machine dependence.

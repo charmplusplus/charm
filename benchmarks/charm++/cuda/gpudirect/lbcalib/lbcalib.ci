@@ -18,6 +18,15 @@ mainmodule lbcalib {
     entry void moverReady();
     entry void moverArrived();
     entry void runNextMigPoint();
+    // Exchange sweep: the group of one fan is ready, a member has every
+    // other's buffer, the next size, the next fan.
+    entry [reductiontarget] void groupReady();
+    entry [reductiontarget] void xChannelsReady();
+    entry [reductiontarget] void xHoldersDropped();
+    entry [reductiontarget] void xChannelsClosed();
+    entry void memberDone();
+    entry void nextXSize();
+    entry void nextFan();
   };
 
   group Calib {
@@ -30,6 +39,18 @@ mainmodule lbcalib {
     entry void startSweep(size_t size);
     entry void ping(size_t size, nocopydevice char data[size]);
     entry void pong(size_t size, nocopydevice char data[size]);
+    // Exchange sweep: the members of a group, one round of it, one member's
+    // buffer landing in the slot that is its sender's at the receiver.
+    entry void setGroup(const std::vector<int>& members, size_t maxBytes, int fanMax);
+    entry void round(size_t size);
+    // The channel path of the exchange sweep: each PE's landing channel per peer, handed over once.
+    entry void setXPeers(const std::vector<int>& peers, size_t maxBytes);
+    entry void takeXChannel(int owner, CkDeviceChannel c);
+    entry void xarrived(CkDataMsg* m);
+    entry void xsent();
+    entry void dropXHolders();
+    entry void closeXChannels();
+    entry void xpart(size_t size, int slot, nocopydevice char data[size]);
   };
 
   // An object of known host and device footprint that migrates on request,

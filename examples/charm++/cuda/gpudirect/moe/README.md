@@ -92,7 +92,8 @@ move. The runtime's default chain, MetisLB then DiffusionLB, repartitions
 A placement balancer stops at the heaviest object: at z 1.0 the hottest
 expert draws ~21% of the tokens, so on 8 GPUs no placement gets below an
 imbalance of 1.69 (mean share 12.5%). The experts therefore declare
-themselves replicable (`setLBReplica`, up to `-R` copies, default 2), and
+themselves replicable (`setLBReplica`: up to four copies, the tree's limit,
+with what a copy sends its peers and, once it has, what that measured), and
 ShedLB asks for a copy of an expert whose load exceeds the per-GPU
 threshold (`ckClone`), and takes it back once the expert is light again
 (`ckRetire`). The runtime decides when, which expert and where, from the
@@ -133,7 +134,10 @@ implements the copy:
 `-X` starts the hottest expert of the first hot set as two copies (both
 initialised from the same seed, no transfer) with no balancer involved: the
 replicated arithmetic alone, whose checksums must equal the plain run's bit
-for bit. `-R 1` declares one copy and the balancer never replicates.
+for bit. With `-f 99999` there is no balancing step, so no copy is ever made;
+how many copies to keep is the balancer's decision, priced from the
+calibrated transfer-cost table and the copies' own measurements (there is no
+option for it since 2026-11-05; `-R` is gone).
 
 The join point is inside the expert's step, after it has consumed every slab
 of the step and before it computes (see `runStep` in `moe.ci`). Nothing can
@@ -167,7 +171,6 @@ LB step, as pic2d does, and the balancer uses measured loads.
        an expert's copies (w2 stays its initial value; out2 is the oracle)
     -C checksum frequency (5; 0 off)              -s stats frequency (1)
     -f first LB step (10)  -b LB frequency (9999) -a async LB  -l wait lag (3)
-    -R copies the balancer may keep of one expert (2, up to 4; 1 = never replicate)
     -X start with the hottest expert as two copies (the arithmetic without a balancer)
     -I CUPTI-measured loads instead of estimates  -S seed  -P print placement
     -U one chunked pass per source instead of one per expert (slower; the
@@ -185,8 +188,11 @@ LB step, as pic2d does, and the balancer uses measured loads.
 
     make                                   # needs cuBLAS: MATHLIBS=<nvhpc>/math_libs/<ver>
                                            # a HIP tree picks hipcc and hipBLAS itself (HIP_PORT.md)
+                                           # device code for sm_80 and sm_86 (Delta's A100 and A40
+                                           # nodes); CUDA_ARCHS="90" on the make line for another
 
-On Delta (one A40 node, four PEs, one per GPU, NUMA-pinned by the wrapper):
+On Delta (one A40 node, four PEs, one per GPU, NUMA-pinned by the wrapper,
+which reads each GPU's NUMA node from sysfs through `ranklogs/gpunuma.sh`):
 
     export RANKLOG_DIR=ranklogs/x; mkdir -p $RANKLOG_DIR
     srun --jobid=$J --mpi=cray_shasta -N 1 -n 4 --ntasks-per-node=4 --cpus-per-task=8 \
@@ -1445,6 +1451,957 @@ Megatron-Core; on Mixtral's routing the plain example trains 1.6x faster
 than Megatron-Core and 1.7x faster than FasterMoE, and serves level with
 FasterMoE (118.3 against 117.1), 1.2x faster than Megatron-Core and FastMoE.
 
+## Measured 2026-11-05: SmartMoE's online placement, one node
+
+**Why this section.** Two systems decide expert placement online from the
+routing, the way the balancer does, and neither had a row: FlexMoE (Nie et
+al., SIGMOD'23) and SmartMoE (Zhai et al., ATC'23). FlexMoE has no public
+code (the paper puts it inside the Hetu framework and gives no URL); its
+scheduler expands a replica of the hottest expert and shrinks one of the
+coldest when a cost model (profiled tokens per second, all-to-all bytes over
+link bandwidth, gradient-sync bytes over bandwidth) predicts a shorter step,
+replicas split tokens evenly and all-reduce their gradients, and the paper
+reports 1.30x over FasterMoE on 32 to 64 A100s; that is the replication
+decision ShedLB makes, taken by a training framework's own scheduler, and the
+example's `-X` and the reference's `--replicate` are its static analogue.
+SmartMoE's artifact (thu-pacman/SmartMoE-AE, commit e19b3a9) had been used
+only as the source of the `smartmoe_L02` routing trace. Its online part is
+small: `fmoe/smartmoe/mapping.py` re-places the experts every
+`--dynamic-freq` (10) iterations from the gate counts it samples at the last
+two iterations of each window, largest-first onto the least loaded GPU with
+an equal expert count per GPU (a permutation, never a copy), an expert left
+where it is when its GPU is among the least loaded, and the new mapping
+taken only if it lowers the maximum GPU load; `update_expert_mapping` then
+swaps the parameters with one blocking point-to-point send per expert (the
+optimizer state and the master weights stay where they were). The artifact
+runs on a 2022 FastMoE fork over torch 1.10 and CUDA 11.3 with a Megatron-LM
+fork and Apex, scripted for sixteen V100s; running it as shipped would put
+three years of FastMoE and PyTorch kernel differences into the comparison.
+The policy is therefore ported rank for rank into the reference as `--place
+smartmoe` (`ref/smartmoe_check.py` compares the port with the artifact's
+function on 2800 random instances, ties included: no mismatch), on the same
+stack as the FasterMoE arm, with the masters and moments moved for
+correctness in one batched exchange, as under every `--lb sync` placement.
+It differs from the reference's EPLB-style packing (`--place lpt`) in three
+things: the load it reads (the mean of the step before the LB step and of the
+previous LB step, against the LB step's own counts, which the reference knows
+a step ahead), the tie rule (stay if among the least loaded, against the
+relabelling that keeps the most experts in place) and the acceptance (only if
+the maximum falls, against always).
+
+Job 23567906, gpub071, one A40 node, four GPUs, the three arms in one
+allocation, `-i 40 -u 3 --dtype bf16 --fuse`, LB every 10 steps from step 10,
+steady state steps 23 to 43 (the placement arms' LB steps 30 and 40 included,
+as in every earlier row). The static controls reproduce the 2026-11-01
+four-GPU rows within 1% (105.9 / 52.8 and 108.6 / 68.8 there). The other
+systems' rows are the one-node rows of the 2026-11-01 and 2026-11-03
+sections, other nodes.
+
+| four GPUs, ms/step                                   | SmartMoE train | SmartMoE serve | Mixtral train | Mixtral serve | OLMoE train | OLMoE serve |
+|------------------------------------------------------|---------------:|---------------:|--------------:|--------------:|------------:|------------:|
+| PyTorch reference, static                            |          105.8 |           53.3 |         292.3 |         145.9 |       193.1 |       170.5 |
+| PyTorch reference, EPLB packing every 10 steps       |          107.8 |           69.6 |         264.3 |         130.7 |       197.2 |       177.4 |
+| PyTorch reference, SmartMoE online placement         |          110.4 |           71.1 |         263.4 |         128.1 |       197.5 |       178.8 |
+| example plain (2026-11-01 rows)                      |           55.4 |           32.9 |         137.8 |         108.7 |             |             |
+| example ShedLB (2026-11-01 rows)                     |           50.4 |           27.3 |         137.3 |         100.7 |             |             |
+| Megatron-Core, TE experts (2026-11-03 rows)          |           81.4 |           48.6 |         250.8 |         139.5 |       253.0 |       167.3 |
+| FasterMoE, serving fixed (2026-11-03 rows)           |                |           27.0 |               |         132.4 |             |       184.3 |
+
+| experts moved at LB steps 10 / 20 / 30 / 40          | SmartMoE routing | Mixtral routing | OLMoE routing |
+|------------------------------------------------------|-----------------:|----------------:|--------------:|
+| EPLB packing (of 32 / 8 / 64 experts)                | 18 / 16 / 16 / 12 |   4 / 2 / 3 / 4 | 43 / 41 / 41 / 42 |
+| SmartMoE placement                                   | 20 / 19 / 18 / 16 |   6 / 3 / 0 / 2 | 48 / 46 / 48 / 42 |
+| tokens per GPU, max over mean, after the placement   |     1.94 to 2.00 |    1.06 to 1.13 |  1.00 to 1.07 |
+
+What the numbers say. SmartMoE's placement and EPLB's packing are the same
+decision within 2.5% on every routing, training and serving: the same
+objective reached from a one-step-older load, and the acceptance rule changed
+one decision in twelve (Mixtral, step 30, kept). On SmartMoE's own routing
+neither helps, because the hottest expert takes 48% of the tokens, 1.9x a
+GPU's share with four GPUs, and no permutation of whole experts can lower a
+GPU's load below its hottest expert; what the arms pay is the exchange, 16 to
+20 experts of 201 MB each at every LB step (2.3 GB at 12 GB/s, about 200 ms,
+21 ms per step averaged over the run, the `migration` row of the phase table),
+which in serving is 40% of a 53 ms step. The example with ShedLB, whose
+balancer copies the hot expert instead of moving it, trains 2.2x faster and
+serves 2.6x faster than the reference under SmartMoE's policy (50.4 against
+110.4, 27.3 against 71.1); FasterMoE's shadow, the other copying policy,
+serves it in 27.0. On Mixtral's routing (eight experts, two per GPU, a 1.06
+to 1.13 token imbalance) both placements gain 10 to 12% over static, the
+7 to 10% the 2026-11-01 section measured for EPLB's packing, the exchange of
+2 to 6 experts of 470 MB paid back by a better-packed pair. On OLMoE's routing
+(sixty-four experts, top-8, a 1.00 imbalance at the block map) there is
+nothing to gain and the exchange of 40 to 48 experts per LB step costs 2 to
+5%. The 2023 paper's 1.88x over FasterMoE is an end-to-end figure on its own
+workloads with its offline parallelization search included; the online
+placement alone, which is what this arm isolates, cannot move a one-expert
+hot spot, and that is the case the balancer's copy exists for.
+
+## Measured 2026-11-05: GPU timelines of the example and FasterMoE, eight GPUs
+
+Job 23581139 (gpub009 and gpub099, two A40 nodes), the SmartMoE routing,
+MoE layer alone, the configuration of "Measured 2026-11-04": the example
+with ShedLB (`-R 2 -f 20 -b 20 -a`) and FasterMoE (smart schedule and
+shadowing, fp32 masters in training, the serving step without the per-step
+collection), each in training and serving, each as an untraced control and
+as a traced run in the same job. The example's timeline is the runtime's
+`+gputrace` (CUPTI kernels, entry methods and idle time per PE), recorded
+over the whole run, once kernels only (`+gputracenocopy`) and once with the
+copy records; FasterMoE's is torch.profiler (`ref/fastmoe_moe.py --profile`)
+over steps 30 to 41: the host ops, CUPTI kernels and copies. Steps 30 to 40
+are compared, step 41 holding FasterMoE's trace export. The breakdown is
+`ranklogs/kernelclass.py --steps 30:40` on each trace; the Perfetto files
+and the raw traces are in `/scratch/mzu/bhosale/moe_runs/prof/tr_23581139/`
+(`perfetto_example_shedlb_{train,serve}_steps30-40.json`,
+`perfetto_fastermoe_{train,serve}_steps30-40.json`).
+
+**What the tracing costs** (ms/step, steady steps 23-43 and steps 30-41;
+the example's three runs of each mode have identical out2 and w2):
+
+| arm                   | untraced control    | traced, kernels only | traced with copies |
+|-----------------------|--------------------:|---------------------:|-------------------:|
+| example ShedLB, train | 52.5 / 51.2         | 52.1 / 50.5          | 53.8 / 51.5        |
+| example ShedLB, serve | 28.0 / 24.5         | 26.9 / 24.8          | 25.6 / 23.0        |
+
+FasterMoE's controls in the job crashed on a harness import error (the
+`contextlib` import sat inside the `--profile` branch; fixed) and ran again
+in job 23581553; in the traced runs the profiler is inactive before step 28,
+so the same run holds its own control:
+
+| FasterMoE          | control (job 23581553) | traced run, untraced steps 23-27 | traced steps 30-40 | README 2026-11-04 |
+|--------------------|-----------------------:|---------------------------------:|-------------------:|------------------:|
+| train, masters     | 78.5                   | 81.5                             | 80.4               | 78.6              |
+| serve, fixed       | 40.5                   | 44.4                             | 38.7               | 40.3              |
+
+The runtime's trace changes nothing measurable; torch.profiler's traced
+steps run as the untraced ones do (its export then costs 7 s on step 41 and
+another 7 s on step 42 in training, 0.4 and 0.3 s in serving, outside the
+window).
+
+**The step by kernel class** (steps 30 to 40, ms per step, mean over the
+eight ranks with the busiest rank in parentheses; concurrent kernels add,
+so a class can exceed the step; GPU busy is the share of the step with at
+least one kernel of the class running):
+
+| per step                            | example ShedLB, train | FasterMoE, train | example ShedLB, serve | FasterMoE, serve |
+|-------------------------------------|----------------------:|-----------------:|----------------------:|-----------------:|
+| step, from the GPU timeline         | 49.0                  | 79.3             | 24.6                  | 38.6             |
+| GEMM kernels                        | 20.9 (33.0)           | 19.5 (26.3)      | 7.3 (11.6)            | 7.4 (9.4)        |
+| other kernels                       | 10.8 (25.2)           | 8.4 (9.7)        | 1.7 (2.4)             | 1.1 (1.4)        |
+| NCCL kernels                        | 0                     | 61.3 (65.3)      | 0                     | 32.7 (33.0)      |
+| of which the token exchange (SendRecv) |                    | 41.8             |                       | 18.1             |
+| of which the shadow broadcast       |                       | 14.9             |                       | 14.6             |
+| of which the shadow's gradient reduce |                     | 4.4              |                       | 0                |
+| copies (the example: its copies run) | 1.0 (1.6)            | 2.9 (3.5)        | 0.9 (2.1)             | 1.1 (1.5)        |
+| GPU busy, kernels other than NCCL   | 55% (79%)             | 35% (45%)        | 29% (50%)             | 22% (27%)        |
+| GPU busy, all kernels               | 55%                   | 96%              | 29%                   | 95%              |
+
+Per rank, training (ms per step; the example's busy share counts all its
+kernels, FasterMoE's the kernels other than NCCL's):
+
+| rank | example GEMM | example other | example busy % | FasterMoE GEMM | FasterMoE other | FasterMoE NCCL | FasterMoE busy % |
+|-----:|-------------:|--------------:|---------------:|---------------:|----------------:|---------------:|-----------------:|
+| 0    | 13.4 | 9.1  | 37 | 19.5 | 8.2 | 64.8 | 35 |
+| 1    | 33.0 | 7.3  | 76 | 13.1 | 8.8 | 63.6 | 28 |
+| 2    | 14.2 | 8.0  | 40 | 21.7 | 8.1 | 63.3 | 38 |
+| 3    | 29.4 | 4.5  | 69 | 11.6 | 6.8 | 65.3 | 23 |
+| 4    | 24.8 | 25.2 | 79 | 18.2 | 8.6 | 60.2 | 34 |
+| 5    | 22.1 | 12.1 | 56 | 26.3 | 9.7 | 56.6 | 45 |
+| 6    | 17.4 | 10.7 | 45 | 23.9 | 8.9 | 56.1 | 41 |
+| 7    | 13.1 | 9.2  | 36 | 22.0 | 8.0 | 60.5 | 38 |
+
+Per rank, serving:
+
+| rank | example GEMM | example other | example busy % | FasterMoE GEMM | FasterMoE other | FasterMoE NCCL | FasterMoE busy % |
+|-----:|-------------:|--------------:|---------------:|---------------:|----------------:|---------------:|-----------------:|
+| 0    | 4.8  | 1.4 | 19 | 7.3 | 1.0 | 32.7 | 22 |
+| 1    | 10.4 | 1.5 | 47 | 5.0 | 1.3 | 32.2 | 16 |
+| 2    | 4.4  | 1.2 | 21 | 8.9 | 1.0 | 32.7 | 26 |
+| 3    | 11.6 | 2.0 | 50 | 4.2 | 0.7 | 32.9 | 13 |
+| 4    | 7.9  | 2.4 | 28 | 7.1 | 0.9 | 32.8 | 21 |
+| 5    | 8.7  | 2.1 | 33 | 9.1 | 1.4 | 32.7 | 27 |
+| 6    | 6.2  | 1.4 | 21 | 9.4 | 1.1 | 32.5 | 27 |
+| 7    | 4.4  | 1.3 | 17 | 8.0 | 1.1 | 33.0 | 24 |
+
+What the timelines say:
+
+- **The expert compute is the same in both systems.** Per GPU and step the
+  GEMM kernels take 20.9 ms in the example and 19.5 in FasterMoE in
+  training, 7.3 and 7.4 in serving: the same tokens through the same
+  cuBLAS bf16 tensor-core kernels. The 1.6x and 1.5x between the steps is
+  entirely in what surrounds the compute.
+- **FasterMoE pays the shadow every step.** Its NCCL kernels are resident
+  61 ms of the 79 ms training step: 42 ms the group-wise token exchange
+  (`ncclDevKernel_SendRecv`, overlapped with the experts as the smart
+  schedule intends), 15 ms the broadcast of the shadowed experts' weights
+  (1.3 experts of 67 MB each step at the calibrated 5.35 GB/s) and 4 ms the
+  reduce of their gradients. In serving, 18 ms of exchange and the same 15
+  ms of broadcast fill 33 of the 39 ms. The shadow is transient, so the hot
+  expert's weights cross the network again every step; the example's copy
+  is made once, at the balancer's step, and the step carries only the
+  tokens.
+- **NCCL's kernels hold the SMs while they wait.** FasterMoE's GPUs read
+  95 to 96% busy over all kernels and 22 to 35% over the kernels that
+  compute; the example's exchange is RDMA and copy-engine traffic that
+  occupies no SM, so its 55% (training) and 29% (serving) busy shares are
+  compute. Of the example's training step, 27 ms of kernels on the busiest
+  GPU sit in a 49 ms step: the remaining 22 ms are the exchange and the
+  host-side per-message cost described under "Tracing" below.
+- **Where the imbalance sits.** The example's GEMM time per rank runs from
+  13 to 33 ms in training (ShedLB copied expert 5 from PE 1 to PE 3 at
+  step 20, each copy serving half the dispatchers, and packed ten light
+  experts onto PE 4; rank 4's 25 ms of other kernels is their update
+  passes, `addIntoKernel` and `applySgdKernel` at 2.1 ms per expert and
+  step whatever its tokens, the price of the bit-identical update scheme),
+  and the step is the busiest rank's compute plus the exchange. FasterMoE's shadow spreads the hot expert over all
+  ranks (12 to 26 ms of GEMM per rank), but the step is set by the
+  exchange and the broadcast, not by any rank's compute.
+
+
+## Measured 2026-11-05, later: every copy in one round, and what more copies cost
+
+The timelines above showed the training step set by the two copy holders
+(33.0 and 29.4 ms of GEMM against a 20.9 ms mean) with the light ranks
+idle for half the step. The balancer had reached its floor: one copy per
+balancing round, so a run with `-f 20` stops at two copies of the hot
+expert, each with half of its 47.9% of the tokens. ShedLB now plans every
+copy a group needs in one round (`src/ck-ldb/ShedLB.C`, the group pass):
+each count from the present one to the need is planned in turn and the
+count that leaves the fullest bin lowest is taken, if it passes the
+critical-path test; a count that gains nothing on the way is passed over.
+`CentralLB` keeps only the contiguous prefix of a group's new ranks when
+the memory verifier refuses one, and an expert here takes several clones in
+one round (`decided_new`, `n_clone`), announcing the final count. Validated
+in job 23581818 (gpub035 and gpub091): `replica_test` passes, and the
+`-R 4` runs' out2 and w2 equal the two-copy controls of job 23581139 bit
+for bit, through three and four copies.
+
+| SmartMoE routing, 8 GPUs, ms/step   | copies from step 21 | steady 23-43 | steps 30-41 | tokens/PE max/avg, step 30 | out2 / w2 |
+|-------------------------------------|--------------------:|-------------:|------------:|---------------------------:|-----------|
+| ShedLB `-R 2`, train (job 23581139) | 2                   | 52.5         | 51.2        | 2.00                       | 5.148446218722643e+06 / 1.091916901199783e+05 |
+| ShedLB `-R 4`, train                | 3 (the 4th declined; 4 from step 41) | 105.5 | 107.3 | 1.95                 | identical |
+| ShedLB `-R 2`, serve (job 23581139) | 2                   | 28.0         | 24.5        | 1.96                       | 7.433357930553174e+06 / 1.092300638431098e+05 |
+| ShedLB `-R 4`, serve                | 4                   | 31.8         | 25.4        | 1.88                       | identical |
+
+More copies made the training step twice as long and the serving step no
+shorter, for two reasons the traces (`tr_23581818/ex_r4_{train,serve}_k`)
+make plain:
+
+- **Three copies share a four-partition expert as 1/4, 1/4 and 1/2.** The
+  dispatcher partitions are fixed at four (`K_PART`) and a copy serves a
+  contiguous block of them, so the third copy's holder, PE 2, still ran 31.5
+  ms of GEMM against 15.0 and 16.4 on the other two. The balancer had priced
+  every copy at a third of the load and believed three copies left the
+  fullest bin at 1.026 of 1.266; it therefore also declined the fourth copy,
+  which under its model would have gained nothing more. The hot expert's
+  tokens themselves are even across the eight dispatchers in this trace
+  (12.5% each, every step), so with four copies each holder carries a quarter.
+- **The copies' exchange grows with their number and does not overlap.**
+  Each copy sends its fp32 block sum, two buffers of 67 MB, to every other
+  copy after its compute and waits for theirs before its update; the three
+  copies sat on one node, and their PEs were idle 95 of every 100 ms. The
+  start-up probe prices one partial alone at 5.5 ms; two partials per copy
+  with the receives serialised on the comm stream and the fabric shared cost
+  about 50 ms a step. With four copies in serving, where nothing is
+  exchanged, the copy holders fell to 5 to 10 ms of GEMM, the fullest GPU
+  was a non-holder (PE 5, 11.4 ms), and the step stayed at 25 ms: the
+  serving step is bound by the token exchange and its per-message host
+  cost, not by the compute (the busiest GPU is 43% busy).
+
+Two corrections followed. The declaration carries the partition count
+(`setLBReplica(..., parts)`, `LDObjData::replicaParts`, LB format 10), and
+the balancer prices copy `r` of `k` with its block's share
+(`LDObjData::replicaShare`), so three copies of a four-partition expert are
+seen for what they are and the count search can pass over them. And a copy
+that has exchanged declares what its exchange cost here, its wait per step
+and peer, in place of the probe's figure (`Expert::xchg_wait_s`); until it
+has, the probe stands. Job 23582210 (gpub009 and gpub099, the controls'
+node pair) measured the balancer's choice under both; `replica_test` passes
+on the new declaration, and every checksum is the controls' again:
+
+| SmartMoE routing, 8 GPUs, ms/step        | copies from step 21                          | steady 23-43 | steps 30-41 | tokens/PE max/avg, step 30 |
+|------------------------------------------|----------------------------------------------|-------------:|------------:|---------------------------:|
+| ShedLB `-R 2`, train, reference          | 2                                            | 51.6         | 47.9        | 1.96                       |
+| ShedLB `-R 4`, train                     | 4 at step 20 (three passed over); one retired at step 40 on the measured cost | 356.7 | 405.2 | 1.49 |
+| ShedLB `-R 4`, serve                     | 4                                            | 31.5         | 26.9        | 1.88                       |
+
+At step 20 the balancer planned four copies in one round, priced with the
+probe's 5.5 ms a partial. With four copies each one sends three block sums
+and receives three, twelve transfers of 134 MB a step through one node's
+PCIe fabric: the copies measured 292 to 338 ms of exchange wait a step
+(97 to 112 ms per peer declared), and at step 40 the balancer, now pricing
+with that, retired a copy ("the exchange costs more than the sharing
+saves"). In serving, where the copies exchange nothing, four copies cost
+nothing and gained nothing: the step is the token exchange's.
+
+What this settles. On PCIe-attached A40s the fp32 block-sum exchange, 134
+MB per peer and step at this expert shape, bounds replication in training
+at two copies: one peer costs about 10 ms a step and overlaps in part, two
+cost 50, three cost 300. The balancer now learns that cost from the copies
+after their first interval and retires what does not pay, one copy per
+round; in the first round it prices with the probe's one-partial figure,
+which is optimistic whenever the application allows more than two copies
+(`-R 4`), so a run that allows them pays for one interval of them. The
+standard configuration (`-R 2`) is unchanged by all of this: the same
+copy, the same step (51.6 against 52.5). The imbalance the timelines show,
+two copy holders at 1.6 times the mean GEMM with the light ranks idle, is
+the price of not exchanging more on this fabric. What would move it:
+inter-GPU bandwidth (NVLink, or the MI250X fabric on Frontier, where the
+measured cost would let the balancer keep more copies); bf16 block sums,
+halving the bytes but rounding where the fp32 plain run does not; or a
+reduce-scatter and all-gather among the copies in row slices pipelined
+under the compute, which cuts a copy's traffic from `k - 1` to `2 (k - 1) / k`
+block sums and hides part of it, but still puts 800 MB a step on the node
+at four copies, near the compute it would hide under. None of these is in.
+
+## Measured 2026-11-05, evening: the balancer chooses the copy count, priced from the calibration
+
+`-R` is gone. The example had named the copies the balancer might keep and
+priced their exchange with a start-up probe of its own, one partial sent
+alone; neither is the application's to decide. Now each expert declares
+what it can keep consistent (four copies, the four-partition tree's
+limit), what a copy sends each peer per balancing interval (two fp32
+block sums a step: `replicaExchangeBytes`, `replicaExchangeMsgs`), what
+each further peer costs it in device memory (`replicaExtraBytesPerPeer`,
+the landing pairs, allocated as copies appear rather than for the most
+there could be), and, once a copy has exchanged, what that exchange waited
+per step and peer. ShedLB prices the exchange of a plan with `k` copies
+from the runtime's calibrated transfer-cost table at that fan: `lbcalib`
+gained a fan sweep (`-F 4 -X 128`, job 23583472, gpub057 and gpub100:
+`k` PEs, one per device, each sending 4 to 128 MB buffers to every other
+at the same time, and two PEs across the hosts), fitted per fan as what
+one peer costs a copy, built in as the `xchg_fan<k>` entries of the
+default table (`+LBCostConfig` overrides it). A copy's own measurement
+sets the level at its present fan and the table's ratio carries it to
+another.
+
+| one peer, buffers of 4 to 128 MB            | alpha, per message | beta, per byte | rate       |
+|---------------------------------------------|-------------------:|---------------:|-----------:|
+| fan 2, one host                             | 51 us              | 5.46e-11 s     | 18.3 GB/s  |
+| fan 3, one host                             | 1.9 ms             | 6.82e-10 s     | 1.5 GB/s   |
+| fan 4, one host                             | 1.9 ms             | 1.08e-9 s      | 0.9 GB/s   |
+| fan 2, across hosts                         | 51 us              | 7.02e-11 s     | 14.2 GB/s  |
+| one transfer alone (the tier table)         | 29 us              | 3.98e-11 s     | 25 GB/s    |
+
+Two copies exchange at the bus rate; three or four at a tenth of it,
+which is not the PCIe fabric's limit but the runtime's concurrent IPC
+receive path, open as a runtime item. The table says what the copies had
+found: a 134 MB block sum costs a peer 7 ms at two copies and 150 at four.
+
+Job 23583534 (gpub065 and gpub100), the matrix's ShedLB arms on the three
+routings with the balancer choosing, `-f 20 -b 20 -a` and nothing else;
+`replica_test` passes, and every SmartMoE checksum is the plain arm's:
+
+| 8 GPUs, ms/step                | the balancer's decision                                   | steady 23-43 | steps 30-41 | before (`-R 2`, 2026-11-04) |
+|--------------------------------|-----------------------------------------------------------|-------------:|------------:|----------------------------:|
+| SmartMoE plain, train / serve  | (no balancing step)                                       | 81.6 / 35.1  | 81.3 / 35.8 | 81.1 / 35.3                 |
+| SmartMoE ShedLB, train         | 2 copies at step 20; 4 at step 40 (see below)             | 54.0         | 45.8        | 52.1                        |
+| SmartMoE ShedLB, serve         | 4 copies at step 20, exchanging nothing                   | 31.3         | 26.1        | 27.4                        |
+| Mixtral ShedLB, train / serve  | no copy: "no count up to 2 lowers the fullest bin enough" | 162.4 / 120.9 | 165.9 / 112.1 | 164.2 / 124.8            |
+| OLMoE ShedLB, train / serve    | no copy                                                   | 246.2 / 265.6 | 233.2 / 245.8 | 240.8 / (plain 249.9)    |
+
+The first round priced four copies of the SmartMoE expert at 150 ms a peer
+and kept two, as it should. At step 40 the two copies had measured their
+exchange (6.8 and 11.8 ms per step and peer, the table's fan-2 figure) and
+the balancer, which then took a measured cost as the cost at every fan,
+planned four copies for the last three steps. The fix: a measurement
+applies at the fan it was taken at and is carried to another by the
+table's ratio. Job 23583704 (gpub065 and gpub099) re-ran the arm with it:
+two copies at step 20, and at step 40 "no count up to 4 lowers the fullest
+bin enough (3 copies: 1.696 of 1.322): no copy", so two copies throughout;
+52.9 ms/step over steps 23-43 and 51.9 over 30-41, against the forced
+two-copy 52.5 and 51.2 of the morning's control, checksums the same. The
+copies' measured exchange that round: 15.4 and 3.9 ms per step and peer.
+
+What this settles. The application no longer names a copy count or prices
+its exchange; it declares its capability and its bytes, and measures what
+it pays. The balancer finds, from the calibration, that two copies of the
+SmartMoE expert are what this fabric affords in training and four what
+serving affords, and that Mixtral and OLMoE afford none, without being
+told; the rows are those of the forced `-R 2` runs where those were right
+and better where they were not (Mixtral serving: 120.9 against 124.8 with
+the forced copy). What remains is the runtime's own: the concurrent IPC
+receive path that makes a third copy's exchange ten times slower than a
+second's, which the calibration now exposes as a number.
+
+## Measured 2026-11-06: two A100 nodes, NVLink inside the node
+
+The question behind this section: how much of what the A40 rows show is the
+PCIe fabric's doing. Two `gpuA100x4-interactive` nodes (gpua048 and gpua053:
+four A100-SXM4-40GB each, every pair on four NVLink lanes, Slingshot between
+the nodes, the same four 16-core NUMA nodes as the A40 nodes with GPU L on
+node 3-L), the SmartMoE routing, the MoE layer alone, eight GPUs, the shapes
+and options of "Measured 2026-11-04". Job 23601306 ran the whole matrix in
+7 min 22 s of node time; job 23608560 validated the built-in table and
+recorded the copy records (below).
+
+What it took to run there: device code for sm_80 as well as sm_86 (the
+Makefile's `CUDA_ARCHS ?= 80 86`; one binary serves both node types, the
+A40 rows are reproducible from the same file), FastMoE's extension rebuilt
+for `8.0;8.6` by `ref/build_fastmoe.sh` (it was sm_86 only; Transformer
+Engine's wheel already ships sm_80 code), and the launch wrappers reading
+each GPU's NUMA node and core range from sysfs (`ranklogs/gpunuma.sh`; the
+first line of every rank log now says which GPU, node and cores the rank
+got) instead of assuming the A40 layout. The machine was calibrated first:
+`lbcalib -i 200 -w 20 -F 4 -X 128 -N 10` into `lbcalib/lbcost.a100.2n.fan.conf`,
+and FasterMoE's own parameters (`ranklogs/fm_calib.a100.txt`: 15.4 GB/s
+broadcast, 274 bf16 TFLOP/s, against 5.35 GB/s and 121 on the A40 nodes; the
+A40 file is kept as `fm_calib.a40.txt`). In job 23601306 the ShedLB arms
+priced from the new table through `+LBCostConfig`; the runtime now carries
+it as a second built-in table, chosen by the name of the device the PE drives
+(`DiffusionCostConfig::loadBuiltin`: an A100 gets the A100 table, anything
+else the A40 one, the chosen table and device named in the start-up line),
+so no option is needed, as on the A40 nodes.
+
+### The calibration: the fan-in collapse is the PCIe fabric's
+
+| one peer, buffers of 4 to 128 MB   | A40 nodes (PCIe) | A100 nodes (NVLink) |
+|------------------------------------|-----------------:|--------------------:|
+| 2 copies, one host                 | 18.3 GB/s        | 89.2 GB/s           |
+| 3 copies, one host                 | 1.5 GB/s         | 75.2 GB/s           |
+| 4 copies, one host                 | 0.9 GB/s         | 90.1 GB/s           |
+| 2 copies, across hosts (Slingshot) | 14.2 GB/s        | 11.4 GB/s           |
+| one transfer alone, cross-GPU tier | 25 GB/s          | 106 GB/s            |
+| migration, device bytes            | 23 GB/s          | 84 GB/s             |
+
+Three and four copies exchanging at once keep their rate on NVLink. The
+collapse of "Measured 2026-11-05, evening" is therefore the PCIe fabric's
+concurrent peer reads, not the runtime's receive path as such; the open
+item is narrowed to that fabric. On this table a 134 MB block sum costs a
+copy 1.5 ms a peer at any fan, so the balancer made four copies at once.
+
+### The matrix
+
+ms/step, steps 30 to 41 (steady 23 to 43 in parentheses), eight GPUs:
+
+| MoE layer alone, SmartMoE routing          | A100 train   | A100 serve   | A40 train | A40 serve |
+|--------------------------------------------|-------------:|-------------:|----------:|----------:|
+| example plain                              | 44.3 (43.9)  | 22.8 (22.1)  | 81.1      | 35.3      |
+| example ShedLB (4 copies at step 20)       | 45.5 (50.3)  | 16.4 (19.4)  | 52.1      | 27.4      |
+| FasterMoE (schedule + shadows, masters)    | 31.7 (31.7)  | 16.2 (16.0)  | 78.6      | 40.3      |
+| Megatron-Core, TE grouped experts, masters | 43.8 (44.6)  | 21.7 (21.9)  | 119.8     | 74.4      |
+
+The balancer's decisions (both arms, the first round at step 20, priced from
+the A100 table): "replicate group 5: load 0.937 exceeds the per-bin target
+0.268; copy 1 from PE 1 to PE 3, copy 2 to PE 2, copy 3 to PE 0, 4 copies in
+all; the fullest bin 0.961 -> 0.305" in training, the same shape in serving
+(0.295 against 0.089, the fullest bin 0.305 -> 0.098). Every ShedLB checksum
+equals plain's (5.148460962447461e+06 / 1.091916901522711e+05 training,
+7.433384418063989e+06 / 1.092300638431098e+05 serving).
+
+What the A100 rows say about the claims: on these nodes the example does not
+beat FasterMoE in training (FasterMoE is 1.4x faster: 31.7 against 44 to 45),
+ties it in serving (16.2 against 16.4), ties Megatron-Core in training (43.8
+against 44.3 plain, 45.5 ShedLB) and is 1.3x faster than it in serving (16.4
+against 21.7). The 1.5x over FasterMoE and 2.3x over Megatron-Core of
+"Measured 2026-11-04" are measured on PCIe-attached A40s, where the baselines'
+NCCL exchange and FasterMoE's per-step shadow broadcast are bound by the
+fabric; on NVLink those costs fall by 3 to 4x while the example's step is
+bound by something the fabric does not change (next two subsections). The
+copy decision itself paid in serving (22.8 -> 16.4, as the 35.3 -> 27.4 of the
+A40 nodes) and not in training.
+
+### Training: four copies that cost nothing by the table and nothing gained by the step
+
+The traced training arm (same job, `+gputrace +gputracenocopy`; read with
+`ranklogs/stepchain.py --group 5`) over steps 31 to 40, the four copies of
+expert 5 on PEs 0 to 3:
+
+| the hot copies' step, A100, training       | ms        |
+|--------------------------------------------|----------:|
+| compute (GEMM on the copy's lane)          | 6.6 to 7.3 |
+| the four copies' step starts, spread       | 13 to 20 |
+| last partial in, after the latest copy's computeDone | 20 to 23 |
+| applyDone after the last partial (copy 5.3, step 35) | 20  |
+| a hot copy's period                        | 38 to 44 |
+| a dispatcher's period, waiting for those outputs | 42 to 46 |
+| exchange wait the copies measured, per peer and step | 8.5 to 11.4 |
+| the table's price per peer                 | 1.5      |
+
+The copies serve different dispatcher partitions, and the dispatchers' step
+starts are spread by up to 32 ms, so the copies start their steps 13 to 20
+ms apart; each copy's apply waits for the latest copy's block sum, and that
+last partial lands 20 to 23 ms after the latest copy finished its compute
+(copy 5.0's partial reached copy 5.2 within 4.4 ms and copies 5.1 and 5.3
+some 20 ms later); the apply then queues on a stream behind other experts'
+chunks (copy 5.3 at step 35: every partial in by 34.6 ms, applyDone at 54.7).
+Seven ms of compute thus become a 40 ms period, and the step is plain's 44
+with a 29 to 63 ms scatter where plain holds 44. The exchange wait the copies
+report (8.5 to 11.4 ms a peer) is mostly waiting for each other and for their
+streams, which the table's transfer price (1.5 ms a peer) does not contain:
+on the A40 nodes at two copies the 7 ms a peer matched the table because the
+transfer was the larger term. This is the same gap as the serving "free
+copies" of 2026-11-05, now in training: a decision right by its model and
+wrong by the step, which only measuring the step after the round can catch.
+
+### Serving: the step is the put's completion time on either fabric
+
+The traced serving arm, steps 31 to 40 (four copies of expert 5):
+
+| the serving chain, A100 against A40        | A100     | A40 (2026-11-05) |
+|--------------------------------------------|---------:|-----------------:|
+| hot copy's compute                         | 2.4 to 3.3 | 12.0           |
+| its output puts complete, after computeDone | 13 to 15 | 12.7            |
+| a dispatcher's 64 token puts complete, after its step start | 7 to 12 | 4 to 15 |
+| the step                                   | 16       | 25               |
+| the busiest GPU, busy                      | 5 to 7   | 12               |
+
+The compute fell four to five times with NVLink and the faster GEMMs; the
+time a copy's two 16 MB output puts take to complete after its compute did
+not move, and neither did the dispatchers' token puts. A 16 MB device put
+completing 13 to 15 ms after it is issued, on NVLink as on PCIe, is the
+runtime's put path (issue, the landing on the receiver's comm stream, the
+completion notice), not the fabric, and it is what bounds the serving step on
+both machines. That is the open runtime item of these sections, sharpened.
+The same-node put is an IPC write: the channel maps the receiver's buffer
+once per device and writes into it from the producing stream, the puts of
+one entry method gathered into one `cudaMemcpyBatchAsync`
+(`ckrdmadevice.C`, `deviceChannelBatchAdd` / `deviceChannelBatchFlush`);
+across hosts it is an RDMA write with the note as immediate data. CUPTI's
+memcpy activity does not record batched copies, which is why the A40 trace
+with copy records (job 23581139, `stepchain.py --copies 4`) shows on the hot
+copy's PE only the local segment copies (ten of 16 MB a step at 260 to 290
+GB/s) and nothing landing on a dispatcher's PE: the bytes move, unrecorded.
+Everything after the copy is local to the host: the batch's completion is a
+callback on the sender's own stream, whose handler marks every put's source
+done for the sender and writes the receiver PE's note into its shared-memory
+ring (`deviceChannelShmNoteFn`), which the receiver's progress loop polls
+and turns into the landed entry. So the 13 to 15 ms between a copy's
+compute and its puts' completion sit in: the flush (at the end of the entry
+method that made the puts, or the scheduler loop's poll), the submitted
+copy's launch and its run behind whatever the producing stream holds, the
+sender's host noticing the stream callback, and the receiver's ring poll
+and delivery. Job 23608560 runs the traced arms with the example's flight
+log (`-F`, or `MOE_FLIGHT_LOG=1` through `ranklogs/env.extra`: per output
+message the send, envelope and consumed times) and the runtime's zero-copy
+statistics (`CHARM_ZC_STATS=1`: puts by tier, the host time of each put,
+and the new `[chan-done]` line: each same-host batch's time from its
+submission to its completion handler, mean and maximum), which place the
+time among those four.
+
+## Measured 2026-11-06, afternoon: the outputs go back through channels
+
+The flight log of the morning's runs (`-F`, or `MOE_FLIGHT_LOG=1`; read with
+`ranklogs/flights.py`) put the serving floor on the receiving side: on the A40
+nodes a same-host 16 MB output reached the dispatcher's host 0.04 ms after it
+was sent and was consumed 16 ms later (24 at the 90th percentile); the small
+outputs waited 24 ms; the runtime's own counter gave an IPC receive 1.8 ms
+from post to completion, 64 of them a dispatcher a step, one landing copy and
+one post entry and one acknowledgement each. The token slabs, which go the
+other way through device channels, completed their batches in 0.6 ms. Two
+other candidates were measured out first, in job 23609803 (two A40 nodes,
+2 min 40 s): a second build of the same source (meant as the pinned-flag
+completion path against host-function callbacks; the example's Makefile
+carried a dead `-DHAPI_CUDA_CALLBACK`, which the hybridAPI library reads
+when it is compiled, not an application, and the library is built without
+it, so both builds polled pinned flags, as every row in this file did) and
+the process layout (one process per node driving four GPUs, a dispatcher
+per GPU):
+
+| two A40 nodes, ms/step, steps 30 to 41 | plain serve | ShedLB serve | ShedLB train |
+|----------------------------------------|------------:|-------------:|-------------:|
+| the build of every row so far          | 35.5        | 23.2         | 50.1         |
+| the same source built again            | 35.6        | 26.8         | 52.9         |
+| one process per node                   | 34.3        | 25.6         | 48.5         |
+
+The repeat shows the run-to-run band (ShedLB serving 23 to 27), the layout
+moves nothing. So the outputs now return the way the tokens go
+(the default; `MOE_OUT_ENTRY=1` restores the entry-method sends): the
+dispatcher owns a device channel per (expert, copy rank, step parity) over
+the expert's fixed segment of its receive slab (`cap_src` rows per expert,
+so the slab is `n_experts * cap_src` rows instead of the tokens'), hands
+them to the copy that serves it (`takeOutChannels`, at start-up and when the
+serving copy changes), takes each put's note (`outputArrived`: the tag
+carries the step and the copies announced for the next one) and releases the
+segments once the step is combined. The copy puts its output into the
+channel as each dispatcher's chunk completes, each put its own batch: the
+runtime gathers an entry method's puts into one copy flushed when the method
+ends, which held every dispatcher's output until the run's last chunk and
+took ShedLB training from 50 to 63 ms a step (job 23612036); with
+`CkRdmaDeviceChannelBatchFlush()` after each put the streaming is back. A
+retiring copy destroys its holder copies and tells the dispatchers, which
+close theirs; a migrating copy carries its holder copies and re-resolves
+them. The checksums are the entry path's bit for bit.
+
+| two A40 nodes, ms/step, steps 30 to 41 | plain serve | plain train | ShedLB serve | ShedLB train |
+|----------------------------------------|------------:|------------:|-------------:|-------------:|
+| entry-method sends                     | 35.5        | 81.4        | 23.2         | 50.1         |
+| output channels, batched per entry     | 31.1        | 81.7        | 21.6         | 63.3         |
+| output channels, one batch per put     | 31.3        | 81.4        | 21.7         | 52.1         |
+
+The chain of plain serving afterwards (job 23612304, `stepchain.py`): the
+hot expert's 27.5 ms of GEMM on one GPU is the step; the dispatchers' host
+time is 0.3 ms a step (it was 4 to 9). With four copies in serving the step
+is 21 ms where the copies compute 5 to 6 ms each: the copies' wall spans are
+13 to 15 ms on PEs holding up to nine experts on four lanes with 8 ms of
+launch host time a step, and one copy's slabs arrive 20 ms after the
+others' (its dispatchers' token puts complete 13 ms into the step on the PEs
+whose copy engines also carry a copy's outputs).
+
+The block-sum exchange of training went the same way (job 23612625, the
+same nodes, 1 min 50 s): a copy owns a channel per (peer slot, step parity)
+over its landing pair, which is now one contiguous allocation of the two
+blocks, hands it to that peer (`takeGradChannels`, when the group forms or
+grows), and puts its own pair into the peers' channels as one put each,
+its own batch; the peer's figures (tokens, PE, device time, retiring) go as
+the `peerStats` message serving already used; the landed pairs are released
+after the apply. A retiring copy drops its holder copies of the survivors'
+channels and the survivors drop theirs of its, each telling the other
+(`gradChannelsDropped`), before the channels close and the copy goes; a
+copy left alone frees its pairs once no peer holds a channel over them.
+
+| two A40 nodes, ms/step, steps 30 to 41          | ShedLB train | exchange wait, copies 0 and 1 |
+|-------------------------------------------------|-------------:|------------------------------:|
+| entry-method sends (morning)                    | 50.1         | 12.9 / 6.9 ms a peer          |
+| outputs by channel                              | 52.1         | 17.5 / 5.3                    |
+| outputs and block sums by channel               | 46.1         | 11.3 / 3.2                    |
+
+Plain training stays at 81.1 and every checksum equals the entry path's.
+The drifting synthetic router (`-z 1.3 -p 10`, rounds every ten steps) made
+five copies and retired three in one run through both channel kinds, and
+its checksums equal its own plain run's. The traced chain of training with
+two copies: each copy carries 33 ms of GEMM and the exchange adds 8; the
+step is the copies' compute, and more copies would pay here, which the
+balancer does not plan because the table prices three and four copies from
+the morning's fan sweep, measured on entry-method sends; the channel path's
+fan-in is a calibration to take (below).
+
+### The A100 nodes with the channels (job 23612682, 4 min 40 s)
+
+| two A100 nodes, ms/step, steps 30 to 41 | plain train | plain serve | ShedLB train | ShedLB serve |
+|-----------------------------------------|------------:|------------:|-------------:|-------------:|
+| this morning (entry-method sends)       | 44.3        | 22.8        | 45.5         | 16.4         |
+| outputs and block sums by channel       | 40.8        | 25.6        | 27.2         | 23.0         |
+| FasterMoE (this morning)                | 31.7        | 16.0        |              |              |
+
+Training with four copies went from 45.5 to 27.2 ms a step, 1.17x faster
+than FasterMoE here (30.8 against 31.7 over steps 23 to 43, the transition
+included); the copies' exchange wait fell from 8.5 to 11.9 ms a peer to 1.2
+to 5.1. The traced chain: 7 ms of compute per copy, then the all-pairs
+exchange of 268 MB pairs (each copy sends three and receives three) and
+the apply, 15 ms together. Serving went the other way, 16.4 to 23.0, and
+the trace says why: the balancer, binning by device time, put ten experts
+on PE 3 (four to six elsewhere), whose host then spent 10.4 ms a step in
+their entry methods (0.5 to 2.4 ms per expert and step for the chunk
+launches and the output puts) and was idle 4.5 ms of 22. On the entry path
+that PE's host was busy the same way, but every dispatcher's receive path
+was slower still, so it did not show. The balancer now treats the host as a
+second resource (ShedLB: no move or copy may raise a PE's host time above
+the device target, or above the hosts' mean with the same slack). With it
+(job 23613467) no PE's host passes 6 ms a step, and the rows are plain
+40.8 / 25.2, ShedLB 27.3 / 22.2: training reproduced, serving one ms
+better, so the host was a part of it and not the whole. What the serving
+chain shows next is the dispatchers' token puts: after the gather at 0.2
+ms, the first of a dispatcher's 32 puts completes 4 to 6 ms later in most
+steps and the last 8 to 18 ms in, on NVLink, for 16 same-host puts of 20
+MB in one batch and 16 writes across the hosts; the per-put flight records
+(`[FLIGHT] T`, `flights.py`) and a one-batch-per-put switch
+(`MOE_TOK_FLUSH=1`) are the next measurement.
+
+### The per-put records on the A40 nodes (job 23615034, 7 November, 00:12)
+
+Plain serving four ways, the same build, with every token put's issue and
+completion recorded (`[FLIGHT] T`), steps 30 to 41:
+
+| two A40 nodes, plain serve                  | ms/step | puts >= 8 MB, done - issue, median / p90 / max | 1 to 8 MB | < 1 MB | last put of a dispatcher's step, median / max |
+|---------------------------------------------|--------:|-----------------------------------------------:|----------:|-------:|----------------------------------------------:|
+| batched per entry (the default)             | 31.2    | 6.5 / 23.0 / 23.9 ms                           | 0.6 / 4.8 | 0.4 / 4.0 | 6.6 / 23.9 |
+| one batch per put (`MOE_TOK_FLUSH=1`)       | 31.5    | same band                                      |           |        | 6.9 / 24.0 |
+| the same source built again (`moe.poll`)    | 31.4    | same band                                      |           |        | 6.8 / 24.2 |
+| completion by event query (`+gpueventquery`) | 31.1   | same band                                      |           |        | 6.6 / 24.0 |
+
+The four tie, so neither the batching nor the completion signal (the
+runtime's pinned flag, written by a memset in stream order, against an
+event record and query) is the latency. The records say what is: the hot
+expert's 15.7 MB slabs, one from each of the eight dispatchers in the same
+step. From the four dispatchers on the expert's own host they complete one
+after another:
+
+| expert 5's token put, same host, by source PE | 0    | 1    | 2    | 3   | other host: 4 | 5   | 6   | 7   |
+|-----------------------------------------------|-----:|-----:|-----:|----:|--------------:|----:|----:|----:|
+| done - issue, ms (step 30; every step alike)  | 23.6 | 16.1 | 9.6  | 3.6 | 3.5           | 3.0 | 5.3 | 6.9 |
+
+On one host's clock the four complete at the same instant (23.4 to 23.6
+ms after the host's first put of the step) from issue times 0, 5.5, 13.9
+and 19.8 ms, while every other put of the same dispatchers completes
+within 0.3 ms of its issue. They wait for the channel's credit: the expert
+returns a slab's credit when the step's kernels that read it are complete
+(`sendOutputs`), and expert 5 holds 55% of the tokens, about 20 ms of GEMM
+a step on an A40. Plain serving is bound by the hot expert's compute, the
+floor the copies remove, and the dispatchers' steps drift apart by up to
+20 ms behind it. The fabric is not in it. The calibration by channel puts
+(job 23626734, after a fix to lbcalib's own round counting, see below)
+says the same: on the A40 nodes the same-host fan-in holds at 24.1 GB/s a
+peer for two, 16.1 for three and 13.9 for four, against 18.3 / 1.5 / 1.0
+by entry-method sends. The collapse of the afternoon's table was the
+entry-method receive path (a landing copy, a post entry and an ack per
+message), which the channels do not have:
+
+| two A40 nodes, per peer, GB/s (alpha)      | fan 2, one host | fan 3 | fan 4 | fan 2, two hosts |
+|--------------------------------------------|----------------:|------:|------:|-----------------:|
+| entry-method device sends (`-e`)           | 18.3 (44 us)    | 1.5 (3.0 ms) | 1.0 (2.9 ms) | 14.2 (47 us) |
+| device channel puts (`lbcost.a40.2n.chan.conf`) | 24.1 (34 us) | 16.1 (19 us) | 13.9 (12 us) | 4.9 (0) |
+
+The two-host row by channels, 4.9 GB/s against the entry path's 14.2 on
+the same NIC, is not the link's rate: the next job (23627792, below) found
+the cause in the communication library's registration of the regions. The
+balancer's exchange is by channels now, so the channel rows are the table's.
+lbcalib's sweep had hung on its first exchange (job 23615034): a member
+reset its arrival count in its round entry, and a peer's put for the next
+round can land before that entry runs (job 23625084, with the runtime's
+channel trail: the arrival and its release two lines before the member's
+own put). The count is cumulative now.
+
+### The A100 nodes with every put and output recorded (job 23624945, 01:00, 3 min)
+
+The same binary, outputs by channels against the entry-method sends
+(`MOE_OUT_ENTRY=1`), serving only, steps 30 to 41:
+
+| two A100 nodes, ms/step      | plain serve | ShedLB serve | the copies' output puts, computeDone to drained |
+|------------------------------|------------:|-------------:|------------------------------------------------:|
+| outputs by channels          | 24.8        | 21.8         | 11 to 17 ms                                     |
+| outputs by entry-method sends| 22.1        | 17.1         | 7 ms                                            |
+| FasterMoE                    |             | 16.0         |                                                 |
+
+The output channels are the A100 regression, and the chains say where:
+the four copies of expert 5 finish their compute at the same times on
+both paths, but with channels their two 16 MB output puts take 11 to 17
+ms to complete against 7, and the slow one is the put across the hosts.
+The calibration by channels on the A40 nodes had measured that put: a
+cross-host channel put runs at 4.9 GB/s a writer where an entry-method
+transfer gets 14.2 on the same NIC. The balancer placed all four copies
+on one host (the cheapest exchange, which serving does not have), so the
+other host's four dispatchers send their 55% of expert 5 across the link
+and get the outputs back the same way, about 100 MB each way a step; at
+4.9 GB/s that is the 22 ms step, at the entry path's rate the 17.
+
+A cross-host channel put is one one-sided write carrying the arrival
+signal as immediate data (the whole 16 MB in one operation, the fabric's
+maximum being 2 GB); the entry path is a read by the receiver. Job
+23627792 (two A40 nodes, 04:49) took the signal off the write
+(`CHARM_CHAN_NOSIGNAL=1`, the note going as a message after the write)
+and split the write into 1, 4 and 16 concurrent operations
+(`+gpuputchunks`), against the signalled write and the entry-method read,
+on lbcalib's fan 2 inter row, 128 MB:
+
+| two A40 nodes, one writer per host, 128 MB | ms per put | GB/s |
+|--------------------------------------------|-----------:|-----:|
+| signalled write (the default)              | 28.7       | 4.6  |
+| plain write, one operation                 | 27.3       | 4.9  |
+| plain write, 4 concurrent operations       | 26.6       | 5.0  |
+| plain write, 16 concurrent operations      | 21.2       | 6.3  |
+| entry-method read                          | 9.5        | 14.2 |
+
+Neither the signal nor the single operation is the cause. The runtime
+posts a put and a read the same way (one one-sided operation each, the
+same registrations), so the difference is below it. The first suspect was
+LCI's libfabric backend: every region was registered with `FI_RMA_EVENT`
+(requested on 2026-10-19 for the put with immediate data), and the
+Slingshot provider's manual (fi_cxi(7), "Optimized RMA") says a remote
+write takes the low-overhead packet format only when the target region
+carries no `FI_RMA_EVENT`. Job 23636832 (two A100 nodes, 05:20) measured
+it with the flag made opt-in (`LCI_OFI_RMA_EVENT=1` is the old behaviour):
+the NIC's restricted-packet counter went from zero to 2.2 million an arm
+without the flag, so the format did change, and the rate did not (3.0 GB/s
+with the flag, 3.1 without, 3.2 with the signal off as well; the
+entry-method read 11.8 on the same nodes). The flag was dead weight (the
+signal on that provider is the write followed by a zero-length message,
+which needs no remote event) and stays off, but it was not the cost.
+
+The cost is the verb against the memory it lands in. `rma_bw`
+(`benchmarks/charm++/cuda/gpudirect/rma_bw/`, LCI over the provider, no
+Charm++, one operation at a time, job 23637366, two A100 nodes, the NIC
+and the device on the same NUMA node):
+
+| 128 MB, GB/s                                   | one direction | both hosts sending at once |
+|------------------------------------------------|--------------:|---------------------------:|
+| host to host, put or get                       | 24.0          |                            |
+| device source into host memory, put or get     | 16.1          |                            |
+| host source into device memory, put            | 12.3          |                            |
+| host source into device memory, get            | 24.3          |                            |
+| device to device, put                          | 10.9          | 3.7                        |
+| device to device, get                          | 16.1          | 12.5                       |
+
+A write landing in device memory is the slow leg (12.3 alone, 3.7 a
+direction when both hosts write at once, which is what an exchange does);
+the same bytes fetched by a read land at the link's rate. So the runtime's
+cross-host channel put is announced and read by the owner again: the path
+the channels already use for a put made while the owner is closed for a
+move (the announce follows the element, the owner reads in put order and
+says DONE), and the one the cross-host tier had until the write with the
+note as immediate data replaced it on 2026-10-19; the write stays behind
+`CHARM_CHAN_WRITE=1` for measurement. The next jobs run the channel test
+with migration, the calibration by channels on the read path (the tables
+the balancer prices a copy's exchange from), and the matrices on both
+machines. The second lever is the placement, built
+while that job queued: the dispatcher partitions are contiguous blocks now
+(`partitionOf`: with four dispatchers a host, partitions 0 and 1 are the
+first host's and 2 and 3 the second's), each dispatcher's PE declares its
+partition to the balancer (`LBManager::setPartition`), and ShedLB, for a
+group that declares no exchange, tries the bins of the host that feeds a
+copy's block before any other (`ProcStats::partition`, carried with the
+load statistics). Serving's copies then sit with their tokens; training's
+exchange keeps them on one host as before. Measured (job 23627965, 02:01,
+4 min), the copies placed with their inputs, steps 30 to 41:
+
+| two A100 nodes, ms/step                      | plain serve | ShedLB serve | plain train | ShedLB train |
+|----------------------------------------------|------------:|-------------:|------------:|-------------:|
+| copies with their inputs, entry-method outputs | 26.2      | **13.5**     |             |              |
+| copies with their inputs, output channels    |             | 18.6         | 38.8        | 26.8         |
+| all copies on one host (job 23624945)        |             | 17.1 / 21.8  |             |              |
+| FasterMoE                                    |             | 16.0         | 31.7        |              |
+
+Serving is 1.19x faster than FasterMoE on this fabric by entry-method
+outputs, and training 1.18x. Every ShedLB checksum equals plain's under
+the new partitions. The channel path still pays its cross-host put rate
+(the next job's question). The round placed copies 1, 2 and 3 on the
+second host: right for ranks 2 and 3, whose blocks are that host's
+dispatchers, wrong for rank 1, whose block under four copies is the first
+host's. The planner was incremental: it placed copy 1 while weighing two
+copies, where rank 1's block is half the partitions and does sit on the
+second host, and kept the placement as it went on to three and four. It
+now rebuilds the plan from scratch for every count, each copy placed with
+the block it has under that count. Measured (job 23631271, 02:29, 2 min),
+steps 30 to 41:
+
+| two A100 nodes, ms/step, the planner per count | ShedLB serve | ShedLB train | the copies' PEs |
+|------------------------------------------------|-------------:|-------------:|-----------------|
+| output channels                                | **10.6**     | 26.1         | serve 1, 2, 5, 6: one host's two blocks on its own PEs, the other's on its own |
+| entry-method outputs                           | 18.4         |              | 1, 3, 2, 0: the second host's bins refused |
+| FasterMoE                                      | 16.0         | 31.7         |                 |
+
+By channels, with every copy on the host that feeds it, serving is 1.5x
+faster than FasterMoE (steps 25 to 41 run 8.6 to 13.9 ms, the two at 4
+and 6 ms are the trace's lighter steps) and training 1.2x; checksums equal
+plain's. The entry-method arm placed copies 2 and 3 on the first host
+again, and the balancer says why: 57 destination checks were refused
+because the PE's host time would pass the cap (the hosts' mean 0.157
+against a device target of 0.090: on the entry path the host, not the
+device, is the busier resource, and the second host's PEs, which fetch the
+hot expert's 16 MB outputs across the link by reads their own host issues,
+sit above it). The channels' receive costs the host nothing of that, so
+the cap never bites and the copies land where their tokens are. The
+channel path is the design; the cross-host put rate (the write into
+device memory, above) is what it still pays here in training's exchange
+and the copies' remote partition, until the next section's read path.
+
+The host cap on the A40 nodes, same job:
+
+| two A40 nodes, ms/step, steps 30 to 41       | ShedLB serve | ShedLB train | exchange wait, copies 0 and 1 |
+|----------------------------------------------|-------------:|-------------:|------------------------------:|
+| outputs and block sums by channel            | 21.7         | 46.1         | 11.3 / 3.2 ms a peer          |
+| with the host cap                            | 19.8         | 46.7         | 11.3 / 3.2                    |
+
+Serving: four copies of expert 5 (PEs 1, 3, 2 and 0), checksums equal to
+plain's; the busiest PE's device is busy 14 ms of a 20 ms period and the
+idlest 6. Training is in its band (two copies, compute-bound at 33 ms of
+GEMM per copy).
+
+### The read path on the A100 nodes (jobs 23637513, 23637932 and 23637968, 06:08 to 06:25)
+
+Every cross-host channel put is announced and read by its owner (the
+previous section). The channel test's six arms, migration included, pass
+on it, and lbcalib's sweep by channels (`lbcost.a100.2n.chan.conf`, the
+table the balancer prices a copy's exchange from, now built in for the A100
+nodes) reads:
+
+| two A100 nodes, by channels, per peer | 2026-11-06 (write) | 2026-11-07 (read) |
+|---------------------------------------|-------------------:|------------------:|
+| fan 2, one host                       | 89.2 GB/s          | 93.3 GB/s         |
+| fan 3, one host                       | 75.2               | 93.4              |
+| fan 4, one host                       | 90.1               | 93.3              |
+| fan 2, across hosts                   | 3.0                | 12.1              |
+
+The matrix, every row from one binary in one job (23638138, gpua050 and
+gpua082, 07:16: the read path with both fixes below and the built-in A100
+table), ms/step over steps 30 to 41, FasterMoE on eight ranks with its own
+A100 parameters; the first run of the read path (jobs 23637513 and
+23637968, gpua010 with gpua029 and gpua007) beside it as the band:
+
+| two A100 nodes, ms/step                | serve | train | copies of expert 5                   | first run: serve / train |
+|----------------------------------------|------:|------:|--------------------------------------|-------------------------:|
+| example plain                          | 14.5  | 37.9  |                                      | 14.7 / 37.3              |
+| example ShedLB, outputs by channels    | 6.2   | 20.3  | PEs 3 / 5, 4 (serve); 3, 2, 0 (train) | 6.3 / 22.6               |
+| FasterMoE (schedule + shadows, masters)| 19.8  | 32.2  |                                      | 15.1 / 32.1              |
+
+Serving is 2.4 to 3.2x faster than FasterMoE (its serving step varies
+with the node pair, 15.1 to 19.8; the example's 6.2 and 6.3 do not) and
+training 1.4 to 1.6x; every ShedLB checksum equals its plain's. Plain
+serving itself fell from 24.8 to 14.5: its dispatchers send the slabs to
+the other host's experts by the same channels. The training copies'
+exchange wait is 6.3 to 8.9 ms a step (12.7 to 19.1 on the write path);
+its copies sit on one host because the exchange is what they pay for, and
+the balancer's cost table says the exchange across hosts costs 7.7x the
+one within.
+
+The read path had been dormant since 2026-10-19 while the migration
+protocol was built around the write, and the first training run found two
+defects in that interplay, each root-caused from the channel's own trail
+(the abort now prints the last 24 events of the channel):
+
+- A sender's closing ack reported its last announced put as written into
+  the owner's buffer; the owner then carried the buffer in its pup as bytes
+  landed unseen and raised, at its new home, a slab that was never read.
+  The ack and the credit accounting now count direct puts only.
+- A zero-token slab took the issue path's zero-byte shortcut (the note goes
+  straight to the application) while, on the read path, a sender issues
+  without waiting for a credit: the note for the step after next overtook
+  the current put's release at the owner, which released once for both and
+  aborted on the second release. On the read path a zero-byte put joins the
+  announce queue, which the owner takes as the note alone.
+
+The job's balancer line says 25 destination checks were refused for host
+time in serving (the hosts' mean 0.097 above the device target 0.089: with
+the receive costing the host nothing, the dispatchers' routing is what
+loads it), and every copy still landed with its inputs. The write path
+stays behind `CHARM_CHAN_WRITE=1` for measurement, with
+`CHARM_CHAN_NOSIGNAL=1` and `+gpuputchunks` only under it.
+
+### The read path on the A40 nodes (job 23637512, 06:30, gpub011 and gpub095)
+
+The same binary, in one job: the channel test (six arms, migration
+included, all pass), the put path by lbcalib on the fan 2 inter row, the
+full sweep by channels (`lbcost.a40.2n.chan2.conf`, now the built-in A40
+table), and the matrix.
+
+| two A40 nodes, one writer per host, 128 MB | GB/s |
+|--------------------------------------------|-----:|
+| channel put, read by the owner             | 14.2 |
+| channel put, one-sided write (`CHARM_CHAN_WRITE=1`) | 4.9 |
+| entry-method read                          | 14.2 |
+
+| two A40 nodes, by channels, per peer | 2026-11-06 (write) | 2026-11-07 (read) |
+|--------------------------------------|-------------------:|------------------:|
+| fan 2, one host                      | 24.1 GB/s          | 24.1 GB/s         |
+| fan 3, one host                      | 16.1               | 16.0              |
+| fan 4, one host                      | 13.9               | 13.9              |
+| fan 2, across hosts                  | 4.9                | 14.2              |
+
+The matrix, ms/step over steps 30 to 41, the ShedLB arms priced from the
+sweep's file (the built-in table carries the same numbers), the 2026-11-05
+rows (the write path, the entry-path table) beside them:
+
+| eight A40 GPUs, ms/step        | plain serve | ShedLB serve | ShedLB train | 2026-11-05: plain serve / ShedLB serve / ShedLB train |
+|--------------------------------|------------:|-------------:|-------------:|------------------------------------------------------:|
+| SmartMoE routing               | 29.4        | 11.1         | 45.5         | 35.8 / 26.1 / 45.8                                     |
+| Mixtral routing                | 63.8        | 63.2         | 144.5        | 124.8 / 112.1 / 165.9                                  |
+| OLMoE routing                  | 124.8       | 115.4        | 120.8        | 249.9 / 245.8 / 233.2                                  |
+
+SmartMoE serving: four copies of expert 5 at step 20, on PEs 3, 5 and 6
+(each with its inputs; 13 destination checks refused for host time, none
+of them on the hosts that feed the copies), the step 2.6x plain's; its
+plain training 81.2. Training: two copies (the exchange across hosts is
+priced at 14.2 GB/s now and the planner keeps two), exchange wait 3.5 and
+10.4 ms a step. Mixtral: no copy in serving (no count lowers the fullest
+bin enough under the fan rows), the step itself halved by the read path.
+OLMoE: no copy; 36 and 50 destination checks refused for host time (the
+hosts' mean 0.63 against a device target of 0.26: with 64 experts and
+top-8 routing the host, not the device, is the loaded resource there),
+serving and training both half of 2026-11-05's. Every ShedLB serving
+checksum equals its plain's; the SmartMoE training pair too; the Mixtral
+and OLMoE training checksums have no plain training run beside them in
+this job.
+
 ## Measured (2026-09-06, one A40 node, four PEs, `+gpupool`)
 
 Correctness: `out2` and `w2` are bit-identical across no-LB, sync and async
@@ -1586,6 +2543,20 @@ per-pair latencies from a level-3 trace. `CHARM_MOE_HOSTSYNC=1` restores the
 original host-synchronized pack and free for A/B runs. With more than one
 lane the per-expert device time is a wall-clock span on a shared device, so
 `gpu/PE max` overcounts; its ratio across PEs is still meaningful.
+The runtime's own GPU timeline, `+gputrace <dir>` (`+gputracenocopy` for
+kernels only), records every kernel and copy with the entry methods and
+idle time per PE; `../sph3d/gputrace_merge.py` builds the Perfetto trace
+and `ranklogs/kernelclass.py --steps A:B` the per-step time by kernel class
+(GEMM, NCCL, copies, other) per rank, with the step windows from the
+`Dispatcher::runStep` entries. The same tool reads the FasterMoE and
+Megatron harnesses' torch.profiler traces (`ref/fastmoe_moe.py --profile`),
+and `ranklogs/kineto_merge.py` joins their ranks into one Perfetto trace;
+"Measured 2026-11-05: GPU timelines" compares the two systems that way.
+`ranklogs/stepchain.py <dir> --step S` reads such a trace as one step's
+chain: per PE the dispatcher's gather, puts, outputs, combine and drain, per
+expert copy its slabs, compute, output puts, exchange and apply, on one clock
+(`--group E` lines up an expert's copies; `--steps A:B` averages). The
+tables of "Measured 2026-11-06" come from it.
 
 Running a single PE: a one-task `srun` step owns only eight of the
 allocation's cores, so the NUMA wrapper's `+pemap` aborts the run
@@ -1622,17 +2593,26 @@ numbers are in the 2026-10-31 section above.
 
 `MOE_PPN=N` through `ranklogs/moewrap.sh` (or `+ppn N +pemap <cores>` by
 hand) runs N PEs per process on one GPU. The program is the same at any N:
-one dispatcher per process, on its first PE, owns the process's `-t` tokens,
-routes them and ships one slab per expert exactly as with one PE, so the
-work per GPU, the slab count and the routing do not change with N and the
-checksums match the one-PE run bit for bit. What N changes is where the
-experts run: they spread over all the process's PEs, each with its own
-compute context (the lane count defaults to four per GPU divided among the
-PEs, `-n` overrides), so their kernel launches, landing copies and output
-sends run on N PEs instead of one, and the balancer moves them between the
-PEs of a process on host time as well as across processes on device time.
-The other PEs' dispatcher branches hold no tokens and run no steps; they
-exist for that context.
+one dispatcher per GPU, on the first PE the runtime maps to it
+(`hapiDeviceIndexOfPe`: `+ppn` PEs over `+gpudevs` devices, `+gpumap`), owns
+that GPU's `-t` tokens, routes them and ships one slab per expert exactly as
+with one PE, so the work per GPU, the slab count and the routing do not
+change with N and the checksums match the one-PE run bit for bit. What N
+changes is where the experts run: they spread over all the process's PEs,
+each with its own compute context (the lane count defaults to four per GPU
+divided among the PEs the runtime puts on it, `-n` overrides), so their
+kernel launches, landing copies and output sends run on N PEs instead of
+one, and the balancer moves them between the PEs of a process on host time
+as well as across processes on device time. The other PEs' dispatcher
+branches hold no tokens and run no steps; they exist for that context.
+
+The same rule gives one process per node driving all its GPUs:
+`MOE_GPUS_PER_PROC=4` in the wrapper runs `+ppn 4` with PE i on the first
+core of GPU i's NUMA node, the runtime's block map puts PE i on device i,
+and the example then has a dispatcher on every PE. The work per GPU is the
+one-process-per-GPU work; what changes is the put between two GPUs of a node,
+a copy in one address space instead of an IPC write into a mapped buffer
+("Measured 2026-11-06" for why that matters).
 
 Measured 12 Sep 2026, one A40 node, 8 cores per process, ms/step:
 

@@ -44,6 +44,7 @@ int lbObjRebuildSlot();
 // Transport tiers a device transfer can resolve to, cheapest first. These are
 // the four the runtime actually distinguishes, and the four the calibration
 // benchmark measures.
+#define DIFF_XCHG_MAX_FAN 8
 enum DiffusionTier
 {
   DIFF_TIER_INTRA_PROCESS = 0,  // same process, same device: device-to-device memcpy
@@ -76,6 +77,30 @@ public:
   bool calibrated = false;
 
   DiffusionTierCost tier[DIFF_TIER_COUNT];
+  // What one peer of a group of `fan` copies costs a copy per exchange, when the
+  // copies exchange all at once (lbcalib's fan sweep: k PEs, one per device,
+  // each sending one buffer to every other and landing every other's at the
+  // same time): seconds per message and per byte, per peer, on one host
+  // (index 0) and across hosts (index 1), for fan 2..DIFF_XCHG_MAX_FAN. The
+  // tier figures are one transfer alone; at fan four on PCIe-attached A40s
+  // one peer costs twenty times that (the example's four copies, job
+  // 23582210), which is what the balancer has to know before its first copy.
+  DiffusionTierCost xchg[2][DIFF_XCHG_MAX_FAN + 1];
+  bool xchgSeen[2][DIFF_XCHG_MAX_FAN + 1] = {};
+  // The price of one peer for a copy in a group of `fan`, `msgs` messages of
+  // `bytes` in all: the fan entry when the table has it, else the tier alone.
+  double exchangePerPeer(bool sameHost, int fan, double msgs, double bytes) const
+  {
+    const int c = sameHost ? 0 : 1;
+    if (fan >= 2 && fan <= DIFF_XCHG_MAX_FAN && xchgSeen[c][fan])
+      return xchg[c][fan].alpha * msgs + xchg[c][fan].beta * bytes;
+    const DiffusionTierCost& t = tier[sameHost ? DIFF_TIER_IPC_CROSS_GPU : DIFF_TIER_INTER_NODE];
+    return t.alpha * msgs + t.beta * bytes;
+  }
+  bool exchangeMeasured(bool sameHost, int fan) const
+  {
+    return fan >= 2 && fan <= DIFF_XCHG_MAX_FAN && xchgSeen[sameHost ? 0 : 1][fan];
+  }
 
   // Seconds per byte of device state a migration must pack, ship and unpack.
   // Distinct from the tier betas: a migration moves the object's whole device
@@ -97,10 +122,13 @@ public:
   // false (leaving calibrated == false) if the file cannot be read or omits a
   // required key; the reason is printed once on PE 0.
   bool load(const char* path);
-  // The table lbcalib measured on Delta (A40 x4 per host, Slingshot), 2026-09-15:
-  // the runtime's default when no +LBCostConfig names a file, so every balancer
-  // prices communication and migration without being told to. A file still
-  // overrides it (a different machine).
+  // The tables lbcalib measured on Delta, chosen by the name of the device this
+  // PE drives: the A100 nodes (x4 per host on NVLink, 2026-11-06) or, for an A40
+  // and any other device, the A40 nodes (x4 per host on PCIe, 2026-09-15, fan
+  // sweep 2026-11-05); Slingshot between hosts in both. The runtime's default
+  // when no +LBCostConfig names a file, so every balancer prices communication
+  // and migration without being told to. A file still overrides it (another
+  // machine).
   bool loadBuiltin(const char* why);
   // Either the file named by +LBCostConfig (when it loads) or the built-in table.
   void loadDefault(const char* path);

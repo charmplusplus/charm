@@ -1,9 +1,12 @@
 #!/bin/bash
 # Launch wrapper for moe_ref.py under srun: rank r on GPU r, pinned to the
-# cores of NUMA node (3-r), which hosts GPU r on gpuA40x4 (PCI bus order).
-# One log per rank in $RANKLOG_DIR.
-R=${SLURM_PROCID:-0}; L=${SLURM_LOCALID:-$R}; NUMA=$((3 - L)); FIRST=$((NUMA * 16))
-export CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=$L
+# cores of the GPU's NUMA node (ranklogs/gpunuma.sh reads it from the hardware:
+# node 3-r on gpuA40x4, whatever the A100 nodes wire). One log per rank in $RANKLOG_DIR.
+R=${SLURM_PROCID:-0}; L=${SLURM_LOCALID:-$R}
+export CUDA_DEVICE_ORDER=PCI_BUS_ID
+read -r NUMA FIRST LAST < <("$(dirname "$0")/../ranklogs/gpunuma.sh" "$L")
+export CUDA_VISIBLE_DEVICES=$L
+echo "# rank $R local $L: GPU $L on NUMA node $NUMA, cores $FIRST-$LAST, host $(hostname)" > "$RANKLOG_DIR/rank_${R}.log"
 export RANK=$R WORLD_SIZE=${SLURM_NTASKS:-1} LOCAL_RANK=$L
 export MASTER_ADDR=${MASTER_ADDR:-$(scontrol show hostnames "$SLURM_JOB_NODELIST" 2>/dev/null | head -1)} MASTER_PORT=${MASTER_PORT:-29517}
 [ -z "$MASTER_ADDR" ] && export MASTER_ADDR=$(hostname)
@@ -20,4 +23,4 @@ if [ -z "${NCCL_NET_PLUGIN:-}" ]; then
   # NCCL's tree connection, job 23452305); the module sets userfaultfd, as the example's own runners do.
 fi
 MB=""; numactl --membind=$NUMA true 2>/dev/null && MB="numactl --membind=$NUMA"
-exec $MB taskset -c $FIRST-$((FIRST + 7)) "$@" > "$RANKLOG_DIR/rank_${R}.log" 2>&1
+exec $MB taskset -c $FIRST-$((FIRST + 7)) "$@" >> "$RANKLOG_DIR/rank_${R}.log" 2>&1

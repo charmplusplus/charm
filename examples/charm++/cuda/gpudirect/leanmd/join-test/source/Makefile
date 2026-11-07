@@ -1,4 +1,4 @@
-OPTS = -O3 -DHAPI_CUDA_CALLBACK
+OPTS = -O3
 
 # This charm links against LCI, and liblci.so has a transitive dependency on
 # liblct.so that ld will not resolve on its own.

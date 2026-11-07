@@ -673,6 +673,7 @@ struct ZcModeStats {
   std::atomic<long> chan_batch_ops{0};
   std::atomic<long> chan_batch_max{0};
   std::atomic<long> chan_batch_fallback{0};
+  std::atomic<long> chan_done_n{0}, chan_done_us{0}, chan_done_max{0}, chan_done_bytes{0};   // batch submit -> completion handler, per batch; bytes per batch
   std::atomic<long> event_n{0};
   std::atomic<long> signal_n{0};   // notes that arrived as the data write's immediate
   std::atomic<long> batch_flushes{0};
@@ -715,6 +716,10 @@ struct ZcModeStats {
               (int)getpid(), chan_open_n.load(), chan_open_n.load() ? chan_open_us.load() / (double)chan_open_n.load() : 0.0,
               chan_rput_n.load(), chan_rput_n.load() ? chan_rput_us.load() / (double)chan_rput_n.load() : 0.0,
               chan_flush_n.load(), chan_flush_n.load() ? chan_flush_us.load() / (double)chan_flush_n.load() : 0.0);
+      if (chan_done_n.load() > 0)
+        fprintf(stderr, "[chan-done] pid=%d same-host batches: submit -> completion handler n=%ld (%.3f ms mean, max %.3f ms), %.1f MB per batch\n",
+                (int)getpid(), chan_done_n.load(), chan_done_us.load() / (double)chan_done_n.load() / 1e3, chan_done_max.load() / 1e3,
+                chan_done_bytes.load() / (double)chan_done_n.load() / 1048576.0);
     if (chan_batches.load() > 0)
       fprintf(stderr, "[chan-stats] pid=%d put batches %ld for %ld puts (%.1f per batch, largest %ld), batched-copy refusals %ld\n",
               (int)getpid(), chan_batches.load(), chan_batch_ops.load(), chan_batch_ops.load() / (double)chan_batches.load(),
@@ -869,10 +874,21 @@ static void chanSignalInit() {
   chan_signal_ready = true;
 }
 
+// Across hosts a put is announced and read by the owner unless
+// CHARM_CHAN_WRITE=1 keeps the one-sided write (see CkDeviceChannel::onResolved).
+static bool chanPullsAcrossHosts() {
+  static const bool pulls = getenv("CHARM_CHAN_WRITE") == nullptr;
+  return pulls;
+}
+
 // Owner: a slot for the resolution it is about to grant; -1 when none is free.
+// Only the write path uses one; under CHARM_CHAN_WRITE=1 CHARM_CHAN_NOSIGNAL=1
+// takes the slot away too (plain writes, +gpuputchunks of them, the note as a
+// message): the measurement switches of 2026-11-07.
 static int chanSignalAlloc(const CkCallback& arrived, uint64_t channel, uint64_t generation,
                            int sender_pe, uint64_t sender_token) {
-  if (!chan_signal_ready) return -1;
+  if (!chan_signal_ready || chanPullsAcrossHosts()) return -1;
+  { static const bool off = getenv("CHARM_CHAN_NOSIGNAL") != nullptr; if (off) return -1; }
   std::lock_guard<std::mutex> lk(chan_signal_lock);
   if (chan_signal_free.empty()) return -1;
   const int slot = chan_signal_free.back(); chan_signal_free.pop_back();
@@ -1657,6 +1673,7 @@ CkpvStaticDeclare(DeviceChannelStagedTable*, device_channel_staged);
 struct DeviceChannelBatchEntry { uint64_t token; uint64_t seq; CkCallback user; CkCallback note; void* note_msg; };
 struct DeviceChannelBatch {
   hapiStream_t stream;
+  double t_flush;   // CHARM_ZC_STATS: when the batched copy was submitted, for the flush-to-done latency
   bool in_entry;   // opened inside an element's entry method: CkCallstackPop flushes it; otherwise the scheduler loop does
   std::vector<void*> dsts;
   std::vector<const void*> srcs;
@@ -2302,6 +2319,15 @@ static void deviceChannelSrcDoneFn(void* param, void* msg) {
 // with one flag; its completion delivers every put's note and source-done.
 static void deviceChannelBatchDoneFn(void* param, void* msg) {
   auto* b = (DeviceChannelBatch*)param;
+  if (b->t_flush != 0.0) {
+    const long us = (long)((CkWallTimer() - b->t_flush) * 1e6);
+    zc_mode_stats.chan_done_n.fetch_add(1, std::memory_order_relaxed);
+    zc_mode_stats.chan_done_us.fetch_add(us, std::memory_order_relaxed);
+    long m = zc_mode_stats.chan_done_max.load(std::memory_order_relaxed);
+    while (m < us && !zc_mode_stats.chan_done_max.compare_exchange_weak(m, us, std::memory_order_relaxed)) {}
+    long bytes = 0; for (size_t sz : b->sizes) bytes += (long)sz;
+    zc_mode_stats.chan_done_bytes.fetch_add(bytes, std::memory_order_relaxed);
+  }
   for (const DeviceChannelBatchEntry& e : b->entries) {
     CkDeviceChannel* c = deviceChannelSender(e.token);
     if (c) c->onSrcDone(e.seq);
@@ -2326,6 +2352,7 @@ static void deviceChannelBatchFlush() {
     while (m < (long)n && !zc_mode_stats.chan_batch_max.compare_exchange_weak(m, (long)n, std::memory_order_relaxed)) {}
   }
   hapiStream_t st = b->stream;
+  b->t_flush = zcStatsOnFast() ? CkWallTimer() : 0.0;
   // The arrays belong to the batch, which lives until its completion handler
   // frees it, so the closure may run later (submit mode) and still read them.
   hapiSubmit(st, [=]() {
@@ -2378,6 +2405,7 @@ static void deviceChannelBatchAdd(hapiStream_t stream, void* dst, const void* sr
   if (cur == nullptr) {
     cur = new DeviceChannelBatch;
     cur->stream = stream;
+    cur->t_flush = 0.0;
     cur->in_entry = (CkpvAccess(_currentLocRec) != NULL);
     cur->dsts.reserve(16); cur->srcs.reserve(16); cur->sizes.reserve(16); cur->entries.reserve(16);
   }
@@ -2812,6 +2840,10 @@ void CkDeviceChannel::pollShmCredit() {
 void CkDeviceChannel::release() {
   deviceChannelProgress();
   if (!have_last) {
+    printHist(is_owner ? "owner" : "copy");
+    CmiPrintf("[CHAN-HIST %d] channel %llx: busy %d taken_seq %llu landed_unseen %zu (seq %llu) announced waiting %zu pulling %d sender pe %d\n",
+              CkMyPe(), (unsigned long long)channel_id, (int)busy, (unsigned long long)taken_seq, landed_unseen,
+              (unsigned long long)landed_seq, pulls.size(), (int)pulling, sender_pe);
     CkAbort("CkDeviceChannel::release: nothing to release; event() records the put first\n");
   }
   have_last = false;
@@ -2940,7 +2972,7 @@ void CkDeviceChannel::onCloseAck(int pe, uint64_t token, uint64_t last_seq, uint
 static const char* const chan_hist_names[] = {
   "put", "pend", "staged", "resolve-req", "resolved", "credit-msg", "credit-shm", "closing-rx", "closeack-tx",
   "srcdone", "taken", "release", "reply", "closing-tx", "closeack-rx", "handoff-leave", "handoff-arrive", "pack",
-  "unpack", "done-rx", "early-credit", "stale-credit"};
+  "unpack", "done-rx", "early-credit", "stale-credit", "pulled", "announce-rx"};
 void CkDeviceChannel::note(uint8_t kind, uint64_t seq, uint64_t epoch_, int pe, int slot, int n) {
   Hist& h = hist[hist_n++ % HIST_N];
   h.kind = kind; h.pe = pe; h.slot = slot; h.n = n; h.seq = seq; h.epoch = epoch_; h.t = CkWallTimer();
@@ -3239,15 +3271,16 @@ void CkDeviceChannel::onResolved(const CkDevicePersistent& ep, uint64_t gen_, in
   signal_slot = (signal_hdr_ != NULL) ? signal_slot_ : -1;
   if (signal_hdr_ != NULL) signal_hdr = *signal_hdr_;
   src_ep = CkDevicePersistent();   // the transport to the new home may differ
-  // Another host: announce and let the receiver read (an RDMA read beat the
-  // write at every size here); otherwise put and wait for credits.
-  // The cross-host tier announces and lets the receiver read: the receiver's
-  // get completes locally, so nothing follows the data on its path, and the
-  // read beat the write at every size on two nodes (12.4 vs 19.0 us at 1 KB,
-  // 253 vs 268 us at 4 MB). Its 2026-10-18 hangs were the cross-node message
-  // reorder, fixed by the early credits; it completed on the fixed runtime.
-  pull_mode = false;   // the write across hosts; its note is the write's immediate data
-  (void)dst.pe;
+  // Another host: announce and let the receiver read; otherwise put and wait
+  // for credits. The receiver's get completes locally, so nothing follows the
+  // data on its path, and on Slingshot a read into device memory runs at the
+  // link's rate where a write into it does not: two A100 nodes, 128 MB, one
+  // operation at a time (rma_bw, 2026-11-07): write 10.9 GB/s against read
+  // 16.1 one way, and 3.7 against 12.5 with both hosts sending at once, which
+  // is what an exchange does (host to host both verbs do 24; a device source
+  // costs either verb 16). The write with its note as immediate data (the
+  // 2026-10-19 path) stays behind CHARM_CHAN_WRITE=1 for measurement.
+  pull_mode = chanPullsAcrossHosts() && CmiPhysicalNodeID(dst.pe) != CmiPhysicalNodeID(CkMyPe());
   if (pending.valid && staged_outstanding == 0 && (pull_mode || credits > 0)) {
     Pending p = pending;
     pending.valid = false;
@@ -3348,6 +3381,7 @@ void CkDeviceChannel::onAnnounce(const CkDeviceChannelEvent& ev, const CkDeviceP
   deviceChannelProgress();
   Queued q; q.ev = ev; q.src = src;
   pulls.push_back(q);
+  note(23, ev.seq, epoch, ev.sender_pe, -1, (int)pulls.size());
   if (is_owner && !busy && !pulling) startPull();
 }
 
@@ -3395,6 +3429,7 @@ void CkDeviceChannel::onPulled() {
   // at step 13, job 23202493).
   landed_unseen = pull_ev.bytes;
   landed_seq = pull_ev.seq;
+  note(22, pull_ev.seq, epoch, pull_ev.sender_pe, -1, (int)pull_ev.bytes);
   if (owner_known) {
     CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(owner_mgr);
     CkLocRec* rec = mgr ? mgr->recForDeviceWork(owner_id) : NULL;
@@ -3420,9 +3455,18 @@ void CkDeviceChannel::issue(const void* src, size_t bytes, hapiStream_t stream,
                             const CkCallback& src_done, uint64_t tag) {
   const uint64_t seq = ++send_seq;
   note(0, seq, epoch, dst.pe, signal_slot, credits);
-  direct_issued.push_back(seq);
-  last_put_bytes = bytes;
-  last_direct_seq = seq;
+  // What the closing ack reports as written into the owner's buffer and what
+  // the credits account for: a direct put (and a zero-byte one, whose note
+  // alone goes). An announced put is read by the owner when it is ready, so
+  // it is in neither; reporting it as written made the owner carry its buffer
+  // as bytes landed unseen and raise a slab that was never read at its new
+  // home (two A100 nodes, job 23637513: an expert released a channel whose
+  // put it had never taken).
+  if (!(pull_mode && bytes > 0)) {
+    direct_issued.push_back(seq);
+    last_put_bytes = bytes;
+    last_direct_seq = seq;
+  }
   if (shm_waiting && !pending.valid) { deviceChannelShmUnlist(this); shm_waiting = false; }
   if (my_token == 0) {
     my_token = deviceChannelToken();
@@ -3444,8 +3488,13 @@ void CkDeviceChannel::issue(const void* src, size_t bytes, hapiStream_t stream,
   CkDataMsg* note = CkDataMsg::buildNew((int)sizeof(ev), &ev);
   CkSetRefNum(note, (CMK_REFNUM_TYPE)tag);
   // Nothing to move: the notification goes now and the source is done. The
-  // receiver still releases, as for any put.
-  if (bytes == 0) {
+  // receiver still releases, as for any put. Not when the receiver reads: a
+  // put there is issued without a credit, so this note would overtake the
+  // previous put's release at the receiver (an expert on two A100 nodes took
+  // the zero-token slab of the step after next before releasing the current
+  // one, then released once for both: job 23637932); the announce queue keeps
+  // the order, and the receiver takes a zero-byte announce as the note alone.
+  if (bytes == 0 && !pull_mode) {
     in_flight++;
     arrived.send(note);
     deviceChannelSrcDoneFn(new DeviceChannelSrcDone{my_token, seq, src_done}, NULL);
@@ -3456,7 +3505,11 @@ void CkDeviceChannel::issue(const void* src, size_t bytes, hapiStream_t stream,
     // source-done until the receiver's DONE, and announce when the producing
     // stream is complete. Several puts may be outstanding; the receiver queues
     // them and reads in order as its buffer frees.
-    if (src_ep.ptr != src || src_ep.cnt != bytes) {
+    { static thread_local bool said = false;
+      if (!said) { said = true;
+        CmiPrintf("[CHAN-INIT %d] first cross-host put: announced, the owner (pe %d) reads it (%zu bytes)\n",
+                  CkMyPe(), dst.pe, bytes); } }
+    if (bytes > 0 && (src_ep.ptr != src || src_ep.cnt != bytes)) {   // a zero-byte put announces nothing to read
       src_ep = CkDevicePersistent(src, bytes, stream);
       src_ep.open();
     }

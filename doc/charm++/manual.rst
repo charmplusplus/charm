@@ -3165,19 +3165,29 @@ to configure the load balancer, etc. These functions are:
    not [7]_.
 
 -  **setLBReplica(int group, int rank, int count, int maxCount, size_t
-   extraBytes, double costNode = 0, double costRemote = 0)**: is a member
-   function of array element. It declares the element one of ``count``
-   copies of logical object ``group`` (its copy index ``rank``), of which
-   the application can keep up to ``maxCount`` consistent; ``extraBytes``
-   is what one copy holds on its device beyond the element's own state
-   (the buffers the copies exchange); ``costNode`` and ``costRemote`` are
-   the load, in the units of the declared load and over the same
-   interval, that one more copy adds to each copy for its exchange with
-   that one peer, on the same node or on another (zero when the copies
-   exchange nothing). The balancer prices a copy as its share of the
-   group's load plus its exchanges with every other copy, and makes one
-   only where that lowers the fullest processor's load by more than its
-   tolerance. Call it before every ``AtSync``, like ``setObjGPUTime``. A balancer that
+   extraBytes, double costNode = 0, double costRemote = 0, int parts = 0,
+   size_t exchangeBytes = 0, double exchangeMsgs = 0, size_t
+   extraBytesPerPeer = 0)**: is a member function of array element. It
+   declares the element one of ``count`` copies of logical object ``group``
+   (its copy index ``rank``), of which the application can keep up to
+   ``maxCount`` consistent; ``extraBytes`` is what one copy holds on its
+   device beyond the element's own state and ``extraBytesPerPeer`` what each
+   further copy adds to it (the buffers the copies exchange). ``parts`` is
+   the number of fixed partitions the application splits the object's work
+   into, copy ``r`` of ``k`` serving the contiguous block
+   ``[floor(parts r / k), floor(parts (r + 1) / k))``, so that the balancer
+   prices each copy with its block's share of the load (0: equal shares).
+   ``exchangeBytes`` and ``exchangeMsgs`` are what a copy sends each other
+   copy per balancing interval; the balancer prices that exchange with the
+   runtime's calibrated transfer-cost table at the group's size (the
+   ``xchg_fan<k>`` entries ``lbcalib -F`` measures), and with ``costNode`` /
+   ``costRemote`` instead when the application gives them: the load, in the
+   units of the declared load and over the same interval, that the exchange
+   with one peer on the same node or on another measured on this copy (zero
+   when unmeasured, or when the copies exchange nothing). The balancer prices
+   a copy as its share of the group's load plus its exchanges with every
+   other copy, and chooses the count that lowers the fullest processor's
+   load most, if by more than its tolerance. Call it before every ``AtSync``, like ``setObjGPUTime``. A balancer that
    understands replication (ShedLB) may then ask for a copy with
    **ckClone(int toPe, int rank)** and take one back with **ckRetire()**,
    two virtual methods of the array element; the other copies of the group
@@ -3195,6 +3205,16 @@ to configure the load balancer, etc. These functions are:
    as migrations. An element that never calls ``setLBReplica`` is never
    replicated. The example ``examples/charm++/cuda/gpudirect/moe`` and the
    test ``tests/charm++/load_balancing/replica_test`` implement both.
+
+-  **LBManager::setPartition(int partition)**: declares, for this PE, which
+   of a replicated object's ``parts`` partitions the inputs it originates
+   belong to (-1, the default: none). A copy's block of partitions is fixed
+   by its rank, so a balancer that knows which PEs feed a block can place
+   the copy on their host; ShedLB does, when the copies declare no
+   exchange, trying the bins of the host that originates most of the block
+   before any other. Called once, usually at start-up, by every PE that
+   originates inputs (in the MoE example by each dispatcher's PE, whose
+   partition is its contiguous block of dispatchers).
 
 -  **double LBManager::GetLBPeriod()**: returns the current load
    balancing period when using *periodic load balancing mode*. Returns

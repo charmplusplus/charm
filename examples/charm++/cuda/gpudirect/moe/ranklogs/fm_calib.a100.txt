@@ -1,0 +1,4 @@
+# rank 0 local 0: GPU 0 on NUMA node 3, cores 48-63, host gpua048.delta.ncsa.illinois.edu
+NETBW=1.54e+10
+GPUTP_FP32=1.911e+13
+GPUTP_BF16=2.737e+14

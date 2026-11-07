@@ -21,7 +21,9 @@ Commits of 2026-11-02 on `rate-aware-gpu-lb`, made in the Delta clone `/u/bhosal
 | 7f3a67e46 | moe/ref: NCCL on Slingshot through the aws-ofi-nccl plugin, and the transport logged (correction 1 below) |
 | a2c2a1b23 | moe: serving ran two of four partitions (correction 2); the matrix re-measured; `-DMOE_K_PART` |
 | 3bfecb852 | moe/ref: Transformer Engine grouped experts, FasterMoE serving without the per-step collection, fp32 masters (corrections 3 to 5); not pushed at the time of writing |
-| uncommitted | moe: cuDNN fused attention for the block variant, with a startup self-check (item 6); committed once job I below has validated it |
+| e6f9b8aa9 | moe: cuDNN fused attention for the block variant, with a startup self-check (item 6); the eight-GPU matrix with the baselines as their authors run them |
+| e26ee53bf | moe: Frontier (MI250X, ROCm 7.14): the fused attention on aotriton, the runtime fixes, the one- and two-node matrices with the baselines |
+| 2026-11-07 (the last commit on the branch) | the balancer chooses the copy count and prices it from the fan calibration (`-R` gone); the cross-host channel put announced and read by the owner, with the micro-benchmark that decided it (`benchmarks/charm++/cuda/gpudirect/rma_bw`); the built-in cost tables of both Delta machines re-measured by channels; the A100 rows; the section below |
 
 Everything in them was measured on A40s only, one and two nodes (the tables in
 `examples/charm++/cuda/gpudirect/moe/README.md`). On AMD nothing has run since 2026-10-22, when leanmd,
@@ -95,6 +97,87 @@ against the unfused build, plain and ShedLB, training and serving. Their tables 
 2026-11-04" section of the README; the headline ratios change again, and the Frontier ladder (below)
 should take its A40 reference rows from that section, not from 2026-11-01.
 
+## Since 2026-11-04: the copy count, the A100 nodes, and the read path across hosts (written 2026-11-07)
+
+All of it is in the commit of 2026-11-07 on `rate-aware-gpu-lb` (made in the Delta clone, not pushed) and
+measured on Delta's A40 and A100 nodes; nothing has run on Frontier since 2026-11-04. In order:
+
+1. **The balancer chooses the copy count** (2026-11-05). `-R` is gone. An expert declares that it can be
+   copied, into how many parts, and what a copy's per-step exchange costs in bytes and messages
+   (`setLBReplica` with `parts`, `exchangeBytes`, `exchangeMsgs`, `extraPerPeer`); ShedLB plans every copy of
+   a round at once, up to four, and prices each count from the declared bytes against the calibration's fan
+   entries (a two-, three- or four-way exchange on one host and across hosts, measured by `lbcalib -F 4`
+   through device channels). `doc/internals/lb-multiplicity.md` and the manual carry the protocol. There is
+   no feedback loop from measured steps: the user's rule is to fix the model or the cost, never to retry.
+   GPU timelines of the example against FasterMoE on eight A40s (README "Measured 2026-11-05") showed
+   FasterMoE's step to be NCCL-bound, its shadow of the hottest expert about 15 ms a step.
+2. **Two A100 nodes** (2026-11-06, `gpuA100x4-interactive`). NVLink inside the node: a copy's exchange costs a
+   peer 93 GB/s on an A100 host at any copy count, where the A40 host's PCIe gives 24, 16 and 14 at two,
+   three and four copies (the fan-in collapse seen on 2026-11-05 is the PCIe fabric's). The example's
+   outputs go back to the dispatchers through channels too. The serving step across the two A100 hosts came
+   out *worse* than on the A40s (plain 24.8 ms against the A40's 29.4 was expected to halve), and that was
+   root-caused the next morning.
+3. **The read path across hosts** (2026-11-07). The cross-host channel put was a one-sided write with its
+   note as immediate data (commit 88d4f724d, 2026-10-19). It was not the signal, not chunking (16 writes
+   gave 6.3 GB/s), and not LCI's `FI_RMA_EVENT` registration flag (the NIC's restricted-packet counter
+   proved the packet format changed while the rate did not). A library-level micro-benchmark, now
+   `benchmarks/charm++/cuda/gpudirect/rma_bw` (LCI over libfabric, no Charm++; `make BUILD_HIP=1` here),
+   measured the fabric on two A100 nodes at 128 MB:
+
+   | GB/s                                        | one direction | both hosts sending at once |
+   |---------------------------------------------|--------------:|---------------------------:|
+   | host to host, put or get                    | 24.0          |                            |
+   | device source into host memory, put or get  | 16.1          |                            |
+   | host source into device memory, put         | 12.3          |                            |
+   | host source into device memory, get         | 24.3          |                            |
+   | device to device, put                       | 10.9          | 3.7                        |
+   | device to device, get                       | 16.1          | 12.5                       |
+
+   A write landing in device memory is the slow leg on Slingshot; the same bytes fetched by a read land at
+   the link's rate. The verb matters only at the destination side, where the two verbs do the same PCIe work
+   and differ in the NIC's role: on a write the target must accept, translate and acknowledge every packet
+   and the sender's window waits on it; on a read the requester writes the responses locally and nobody
+   waits. On InfiniBand the usual finding is the reverse (writes at least as fast as reads; the slow leg
+   there is a NIC *reading* GPU memory), so the verb across hosts is a machine property, not a protocol
+   constant. The runtime now announces every cross-host put and the owner reads it (`pull_mode` across hosts
+   in `CkDeviceChannel::onResolved`; the path the channels already used for a put made during a move), the
+   write stays behind `CHARM_CHAN_WRITE=1` for measurement, and two defects of the dormant read path were
+   root-caused from the channel's event trail and fixed (the closing ack reported announced puts as written;
+   a zero-byte put's note overtook the owner's queue; a release that finds no put now dumps the trail).
+   Exchange across hosts, per peer: A40 4.9 to 14.2 GB/s, A100 3.0 to 12.1. The built-in cost tables of both
+   Delta machines were re-measured by channels on this path, and ShedLB prints each copy's placement
+   outcome and the host-time refusals without `+LBDebug`. The rows, one binary, one job each, steps 30-41,
+   every ShedLB checksum equal to plain's:
+
+   | two A100 nodes, ms/step (job 23638138; the first run on another pair in brackets) | serve | train |
+   |---|---:|---:|
+   | example plain | 14.5 (14.7) | 37.9 (37.3) |
+   | example ShedLB, four copies placed with their inputs | 6.2 (6.3) | 20.3 (22.6) |
+   | FasterMoE, eight ranks, its A100 parameters, `NODES=2` | 19.8 (15.1) | 32.2 (32.1) |
+
+   | eight A40 GPUs, ms/step (job 23637512) | plain serve | ShedLB serve | ShedLB train |
+   |---|---:|---:|---:|
+   | SmartMoE (plain train 81.2) | 29.4 | 11.1 | 45.5 |
+   | Mixtral (no copy made) | 63.8 | 63.2 | 144.5 |
+   | OLMoE (no copy made, host-bound) | 124.8 | 115.4 | 120.8 |
+
+   Two process mistakes on the way, both now rules: a FasterMoE arm ran without `NODES=2` exported (its
+   `run_fm.sh` defaults to one node; the two rows were four-GPU runs and were discarded; the job script now
+   exports it and prints the rank count), and a job pointed at a binary in the session's `/tmp` scratchpad,
+   which the compute nodes cannot see (15 s of failed launches; binaries for a job live under `/scratch`).
+
+**What this means on Frontier.** Its NICs are Slingshot too (Cassini, four per node), so every two-node
+Frontier row of 2026-11-02 and 11-04 ran its cross-host exchange on the write path. The first job after the
+pull, before any row: `rma_bw` on two nodes, one rank per node, `dd` and `hh`, put and get, alone and `both`,
+128 MB. It says whether the MI250X's write-into-device leg has the same asymmetry. If the write wins there,
+`CHARM_CHAN_WRITE=1` in the runner restores the 2026-10-19 path (the proper form, a startup probe or a machine
+profile instead of an environment variable, is open item 10). Then the two-node rows again on the read path;
+open item (3) of the two-node notes, OLMoE's exchange crossing at one NIC's bandwidth, has a second candidate
+cause now. The transfer-cost table must be re-measured: the built-ins are Delta's and MI250X gets the A40 one
+without `+LBCostConfig`. Read ShedLB's placement lines in the rank log: a copy placed away from its inputs makes
+the cross-host exchange the step. The Makefiles' `-DHAPI_CUDA_CALLBACK` was dead text (the flag is the
+library's) and is gone; nothing to do here.
+
 ## What Frontier changes for the experiments
 
 | | Delta, gpuA40x4 | Frontier |
@@ -104,7 +187,7 @@ should take its A40 reference rows from that section, not from 2026-11-01.
 | pool across nodes | vmm, `+gpupoolsize 16384 +gpupoolchunk 2046` | buddy only (ROCr cannot dma-buf-export `hipMemCreate` memory): `+gpupoolalloc buddy +gpupoolsize 2048 +gpupoolarenas 4`, `CK_GPU_ARENA_TOTAL_MAX_MB=16384` |
 | pool on one node | vmm | vmm works (the IPC import keeps the fd open until the grant) |
 | a one-node `srun` step | plain | `--network=single_node_vni`, else cxi finds no VNI and LCI aborts |
-| transfer-cost table | built in (A40) | `+LBCostConfig lbcost.frontier.conf` (written by `lbcalib`, ported in `apps/lbcalib`) |
+| transfer-cost table | built in (the A40 and the A100 tables, by channels on the read path, 2026-11-07; any other device name gets the A40 table, MI250X included) | `+LBCostConfig lbcost.frontier.conf`, re-measured with `lbcalib -F 4` on the read path (the 2026-10-22 file predates the fan entries and the read path; `calibwrap.sh`, ported in `apps/lbcalib`) |
 | per-rank wrapper | `ranklogs/moewrap.sh` (NUMA node 3 - local rank, 16 cores each) | `frontier_wrap.sh` (a GCD to its L3 region, the region's first core left to the OS); adapt `moewrap.sh` to that map |
 | LCI devices | one per process | one per PE when a process has several (`+lci_ndevices 7` for leanmd); moe runs one PE per process |
 | completion flags | memset writer | kernel writer (the HIP default; `+gpuflagmemset` restores the event-and-memset one) |
@@ -136,7 +219,11 @@ repros).
 2. **Environment.** `source env.sh`; `export CC=cc CXX=CC FC=ftn` (else the system GCC 7.5 builds it);
    `$ROCM_PATH/lib/llvm/bin` on `PATH` (charmc calls bare `clang`).
 3. **LCI.** The HIP install of 2026-10-22 (UIUC-PPL/lci master 662b4736, ofi, no CUDA) still serves;
-   `ldd $LCI_HIP/lib64/liblci.so` must show no CUDA library.
+   `ldd $LCI_HIP/lib64/liblci.so` must show no CUDA library. The fork's next commit, b7c289ae of 2026-11-07
+   (`/u/bhosale/lci`, master; not pushed), requests `FI_RMA_EVENT` only under `LCI_OFI_RMA_EVENT=1`: the
+   2026-10-19 request put every remote write into cxi's ordered packet format and bought nothing (3.0 against
+   3.1 GB/s on Delta's A100 nodes), so the old install is not wrong, only heavier. Rebuild from b7c289ae the
+   next time LCI is touched.
 4. **Runtime.** The Delta configuration with the AMD option and the HIP LCI:
 
        CC=cc CXX=CC ./buildcmake charm++ reconverse-linux-x86_64 amd -j16 \
@@ -174,7 +261,10 @@ repros).
 7. **Baselines**, for the matrix only. `ref/moe_ref.py` (the PyTorch reference, the example's twin) runs
    on ROCm PyTorch with RCCL; `ref/megatron_moe.py` needs Megatron-Core (its ROCm fork); FastMoE's CUDA
    extension has no ROCm build, so `ref/fastmoe_moe.py` and FasterMoE are a port (hipify) or stay A40
-   figures.
+   figures. `ref/moe_ref.py --lb sync --place smartmoe -f 10 -b 10` is SmartMoE's online placement
+   (ATC'23) ported from its artifact, added 2026-11-05 with one-node A40 rows in README "Measured
+   2026-11-05"; it runs wherever the reference runs, and `ref/smartmoe_check.py` needs the artifact's
+   `mapping.py` only to re-check the port. FlexMoE (SIGMOD'23) has no code; the README cites its paper.
 
 ## Run
 
@@ -211,7 +301,9 @@ The three routings and their shapes (`$SM`, `$MIX`, `$OL` below):
 | Mixtral-8x7B on WikiText-103, layer 12 (15.9%) | `-e 8 -m 4096 -h 14336 -k 2 -t 8192` | `traces/mixtral_L12.trace` |
 | OLMoE-1B-7B on WikiText-103, layer 12 (5.7%) | `-e 64 -m 2048 -h 1024 -k 8 -t 8192` | `traces/olmoe_L12.trace` |
 
-Common: `-i 40 -u 3 -B`, steady state steps 23-43; plain `-R 1 -f 99999`; ShedLB `-R 2 -f 20 -b 20 -a`;
+Common: `-i 40 -u 3 -B`, steady state steps 23-43; plain `-f 99999`; ShedLB `-f 20 -b 20 -a` (since
+2026-11-05 the balancer chooses the copy count, up to four; `-R` is gone, so the `-R n` arms below are the
+ladder as it was run on 2026-11-02, and `-R 4 -f 10 -b 10 -a` reads `-f 10 -b 10 -a` now);
 serving `-G`; the transformer block `-w`; checksums `-C 4`. The per-rank log `rank_0.log` carries the
 `Step n:` lines with `out2` and `w2`; `ShedLB: replicate` and `ShedLB: retire` lines name the decisions.
 
@@ -346,6 +438,16 @@ kernel-bound fix of 2026-11-02 still owes (the README's "A kernel bound, found a
 9. Done 2026-11-04: the fused attention for the HIP build is aotriton (the paragraph under the ladder), and
    `ref_wrap.sh` logs the RCCL transport by default (correction 1). Left: the fp32 path is unfused on both
    vendors by design.
+10. The verb across hosts as a machine property: on Slingshot the owner reads, on InfiniBand the sender
+    would write; today that is `CHARM_CHAN_WRITE=1` or not. A startup probe (one put and one get of a few MB
+    between the first two hosts) or a machine profile should choose it; `rma_bw` on two Frontier nodes first.
+11. ShedLB's host cap (`max(T, hostMean * 1.1)`) refuses placements relative to the hosts' mean host time; on
+    the A40s OLMoE is host-bound (the hosts' mean 2.4x the device target) and most placements are refused
+    there. The refusal totals and the closest refused PE are printed now; the rule is to be revisited with
+    those numbers.
+12. One serving run on Delta (gpua011 and gpua040, 2026-11-06) placed all three copies on one host, 22.7 ms
+    against 6.2; never reproduced once the placement diagnostics existed. If a Frontier ShedLB row is far off
+    its band, read the placement lines before anything else.
 
 ## Delta artefacts and where they are
 

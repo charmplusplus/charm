@@ -21,7 +21,14 @@ written the way an MoE training framework writes it:
                   the step, and the placement takes effect at the next step.
     --place greedy moves as few experts as needed (pairwise transfers from
     the most to the least loaded rank); --place lpt repacks all experts
-    largest-first with an equal count per rank, EPLB's packing.
+    largest-first with an equal count per rank, EPLB's packing; --place
+    smartmoe is SmartMoE's online placement (ATC'23, the artifact's
+    fmoe/smartmoe/mapping.py): the same largest-first packing with an
+    equal count per rank, computed from the mean of the two most recent
+    sampled steps (the step before this one and the previous LB step)
+    instead of this step's counts, an expert left on its rank when that
+    rank is among the least loaded, and the new placement taken only if it
+    lowers the maximum rank load.
 
 Every Step line matches the example's format so the same scripts parse both.
 Checksums: out2 is the sum of squares of every rank's combined output, w2 the
@@ -341,6 +348,40 @@ def place_lpt(owner, load, P):
     return best
 
 
+def place_smartmoe(owner, hist, P):
+    """SmartMoE's online placement (Zhai et al., ATC'23), a rank-for-rank port
+    of greedy_gen_mapping_from_history in the artifact's
+    fmoe/smartmoe/mapping.py: experts in descending order of their history
+    load, each to the least loaded rank that still has room (an equal count
+    per rank), staying on its own rank when that rank is among the least
+    loaded; the result replaces the current placement only if its maximum
+    rank load is below the current one. SmartMoE moves the parameters only;
+    here the masters (and the moments) move, as under every placement."""
+    E = len(hist)
+    if E % P != 0:
+        sys.exit("SmartMoE's placement needs an equal expert count per rank")
+    per = E // P
+    cur_max = np.bincount(owner, weights=hist, minlength=P).max()
+    order = list(np.asarray(hist, dtype=np.float64).argsort())[::-1]   # their expression, their tie order
+    cnt = np.zeros(P, dtype=np.int64)
+    R = np.zeros(P)
+    new = np.full(E, -1, dtype=np.int64)
+    new_max = 0.0
+    for e in order:
+        old = int(owner[e])
+        pos, lo = -1, 0.0
+        for r in range(P):
+            if cnt[r] < per and (pos < 0 or R[r] < lo):
+                lo, pos = R[r], r
+        if cnt[old] < per and R[old] == lo:
+            pos = old
+        new[e] = pos
+        cnt[pos] += 1
+        R[pos] += hist[e]
+        new_max = max(new_max, R[pos])
+    return new if cur_max > new_max else owner.copy()
+
+
 # ---------------------------------------------------------------- the layer
 class Lane:
     def __init__(self, chunk, dff, dtype, device, adam, dm, fuse_rows):
@@ -499,7 +540,7 @@ def main():
     ap.add_argument("-b", "--lb-freq", type=int, default=9999)
     ap.add_argument("-S", "--seed", type=int, default=12345)
     ap.add_argument("--lb", choices=["none", "sync", "async"], default="none")
-    ap.add_argument("--place", choices=["greedy", "lpt"], default="greedy")
+    ap.add_argument("--place", choices=["greedy", "lpt", "smartmoe"], default="greedy")
     ap.add_argument("-A", "--adam", action="store_true")
     ap.add_argument("-T", "--tf32", action="store_true")
     ap.add_argument("--dtype", choices=["fp32", "bf16"], default="fp32",
@@ -690,6 +731,8 @@ def main():
     pending_moves = []
     total_moved = 0
     a2a_bytes = 0.0
+    load_hist = {}          # per-step token counts per expert (--place smartmoe reads them)
+    prev_lb_step = None
 
     # ---- the pipeline: the counts of step s+1 are exchanged before the
     # combine of step s is issued, so the host prepares s+1 while s runs.
@@ -718,10 +761,24 @@ def main():
         host_ms[s, 1] = (time.perf_counter() - t0) * 1e3
         load = C.sum(axis=0).astype(np.float64)
 
+        load_hist[s] = load
+
         moves = []
         if is_lb_step(s):
-            new_owner = place_greedy(owner, load, P, owner2=owner2) if a.place == "greedy" \
-                else place_lpt(owner, load, P)
+            if a.place == "smartmoe":
+                # SmartMoE records the gate at the last two steps of each
+                # window and decides before the window's last step runs: the
+                # decision here reads the mean of the step before this one
+                # and of the previous LB step (one sample at the first).
+                samples = [load_hist[s - 1]]
+                if prev_lb_step is not None:
+                    samples.append(load_hist[prev_lb_step])
+                new_owner = place_smartmoe(owner, np.mean(samples, axis=0), P)
+            elif a.place == "greedy":
+                new_owner = place_greedy(owner, load, P, owner2=owner2)
+            else:
+                new_owner = place_lpt(owner, load, P)
+            prev_lb_step = s
             moves = [(e, int(owner[e]), int(new_owner[e])) for e in range(E)
                      if owner[e] != new_owner[e]]
             n_moved[s] = len(moves)

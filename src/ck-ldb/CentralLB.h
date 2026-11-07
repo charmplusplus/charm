@@ -341,6 +341,7 @@ public:
 
   int from_pe;
   int pe_speed;
+  int partition;   // LBManager::setPartition, -1 none
 #if CMK_GPU
   size_t gpu_mem_remaining;
   size_t pool_buff_mem_remaining;

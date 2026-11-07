@@ -34,6 +34,10 @@ public:
     data.replicaMax = 1;
     data.replicaExtraBytes = 0;
     data.replicaCostNode = data.replicaCostRemote = 0.0;
+    data.replicaParts = 0;
+    data.replicaExchangeBytes = 0;
+    data.replicaExchangeMsgs = 0.0;
+    data.replicaExtraBytesPerPeer = 0;
     Clear();
     localUserData = usr_ptr;
   }
@@ -222,8 +226,12 @@ public:
 
   // Replication declaration; see LDObjData::replicaGroup.
   inline void setReplica(int group, int rank, int count, int maxCount, size_t extraBytes,
-                         double costNode = 0.0, double costRemote = 0.0)
+                         double costNode = 0.0, double costRemote = 0.0, int parts = 0,
+                         size_t exchangeBytes = 0, double exchangeMsgs = 0.0, size_t extraPerPeer = 0)
   {
+    data.replicaExchangeBytes = exchangeBytes;
+    data.replicaExchangeMsgs = exchangeMsgs;
+    data.replicaExtraBytesPerPeer = extraPerPeer;
     data.replicaGroup = group;
     data.replicaRank = rank;
     data.replicaCount = count;
@@ -231,6 +239,7 @@ public:
     data.replicaExtraBytes = extraBytes;
     data.replicaCostNode = costNode;
     data.replicaCostRemote = costRemote;
+    data.replicaParts = parts;
   }
   inline void getReplica(int& group, int& rank, int& count, int& maxCount, size_t& extraBytes) const
   {

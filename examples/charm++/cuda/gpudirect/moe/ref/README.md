@@ -24,7 +24,19 @@ current practice on the same node with the same work:
   the least loaded rank, the same objective as DiffusionLB); `--place lpt` is
   EPLB's packing: every expert re-placed largest-first with an equal count per
   rank, with rank labels permuted afterwards to keep as many experts in place
-  as possible.
+  as possible; `--place smartmoe` is SmartMoE's online placement (Zhai et al.,
+  ATC'23), a rank-for-rank port of `greedy_gen_mapping_from_history` in the
+  artifact's `fmoe/smartmoe/mapping.py` (thu-pacman/SmartMoE-AE, e19b3a9):
+  the same largest-first packing with an equal count per rank, computed not
+  from this step's counts but from the mean of the two steps SmartMoE
+  samples (the step before the LB step and the previous LB step; one sample
+  at the first), an expert left on its rank when that rank is among the
+  least loaded, and the new placement taken only if it lowers the maximum
+  rank load (`smartmoe_check.py <mapping.py>` compares the port with the
+  artifact's function on 2800 random instances, tie order included: 0
+  mismatches). SmartMoE swaps the parameters only, with
+  one blocking send per expert; here the masters and the moments move too,
+  in one batched exchange, as under every `--lb sync` placement.
 
 The routing hash, the init hash, the loss and the update are ports of the
 example's code; `selftest.py` checks the routing, the hashing and the init
@@ -46,7 +58,8 @@ The example's letters where they exist (`-e -m -t -k -i -u -z -p -c -n -L -C
 -f -b -S -A -T -P`; `-H` for d_ff since argparse owns `-h`), plus
 
     --lb none|sync|async     re-placement mode (default none)
-    --place greedy|lpt       placement algorithm (default greedy)
+    --place greedy|lpt|smartmoe
+                             placement algorithm (default greedy)
     --dtype fp32|bf16        bf16 weights and activations, throughput only
     --fuse                   one chunked pass per expert over all sources
     --no-pipeline            synchronize the host at every step end
@@ -302,7 +315,16 @@ against the environment's NCCL headers and `libnccl.so.2` (`build_fastmoe.sh
 <work dir>`: clone, `fastmoe-55af4f9.patch`, the NCCL stub, user-site install;
 FastMoE reports itself as 1.1.0). The group size of the group-wise exchange is
 FastMoE's default (4). `--master` is the same fp32-master option as the
-Megatron harness's. In serving with the fused schedule the forward records
+Megatron harness's. `--profile <dir>` runs torch.profiler (CUPTI kernels,
+copies, NCCL, the host ops) over `--profile-steps A:B` (default 30:41) and
+writes one Chrome/Perfetto trace per rank, `rank_<r>.json`, each step a
+"step N" range on the host and GPU rows; the summary reports the traced
+steps' time against the untraced steps before them (the step before the
+window starts CUPTI and the last traced step holds the export, seconds on
+eight ranks, so both are left out). `../ranklogs/kineto_merge.py` joins the
+ranks into one trace and `../ranklogs/kernelclass.py` gives the per-step
+time by kernel class, for this trace and the example's `+gputrace` alike.
+In serving with the fused schedule the forward records
 autograd graphs whatever the grad mode and the harness collects them each
 step; `gc.freeze()` before the loop keeps that collection to the step's own
 garbage (a full collection cost ~55 ms a step and made every FasterMoE

@@ -88,6 +88,7 @@ public:
 #endif
     // double utilization;
     int pe;			// processor id
+    int partition;		// the input partition this PE originates (LBManager::setPartition), -1 none
     bool available;
 #if CMK_GPU
     // Device memory as the memory contract reads it (hapiLBDeviceMemory):
@@ -117,7 +118,7 @@ public:
 		 gpu_mem_remaining(0), pool_buff_mem_remaining(0),
 		 gpu_pool_arena_bytes(0), gpu_pool_capacity_bytes(0), gpu_ipc_slots(0),
 #endif
-	   	 bg_walltime(0.0), pe(-1), available(true) {}
+	   	 bg_walltime(0.0), pe(-1), partition(-1), available(true) {}
     inline void clearBgLoad() {
       idletime = bg_walltime = 
 #if CMK_LB_CPUTIMER
@@ -139,6 +140,7 @@ public:
       }
       p|available; p|n_objs;
       if (_lb_args.lbversion()>=2) p|pe;
+      if (_lb_args.lbversion()>=11) p|partition;
 #if CMK_GPU
       p|gpu_mem_remaining;
       p|pool_buff_mem_remaining;

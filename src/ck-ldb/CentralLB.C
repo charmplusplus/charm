@@ -462,6 +462,7 @@ void CentralLB::BuildStatsMsg()
 #else
   msg->pe_speed = myspeed;
 #endif
+  msg->partition = lbmgr->partition();
 
 #if CMK_GPU
   // printf("CMK_CUDA setting device is %ld\n", hapiMyDevice());
@@ -621,6 +622,7 @@ void CentralLB::depositData(CLBStatsMsg *m)
   procStat.bg_cputime = m->bg_cputime;
 #endif
   procStat.pe_speed = m->pe_speed;
+  procStat.partition = m->partition;
 #if CMK_GPU
   procStat.gpu_device_id = m->gpu_device_id;
   procStat.gpu_total_sms = m->gpu_total_sms;
@@ -706,6 +708,7 @@ void CentralLB::ReceiveStats(CkMarshalledCLBStatsMessage &&msg)
       procStat.bg_cputime = m->bg_cputime;
 #endif
       procStat.pe_speed = m->pe_speed;
+  procStat.partition = m->partition;
 #if CMK_GPU
       procStat.gpu_device_id = m->gpu_device_id;
       procStat.gpu_total_sms = m->gpu_total_sms;
@@ -2007,7 +2010,32 @@ LBMigrateMsg* CentralLB::strategyFinish(LDStats* stats)
       m.toPe = &stats->to_proc[i];
       cvMoves.push_back(m);
     }
+    // A group's copies of one round take consecutive ranks and an application
+    // partitions its work over ranks 0..k-1, so a refusal below leaves only
+    // the contiguous prefix of a group's ranks: a clone whose lower-ranked
+    // sibling the verifier refused is dropped with it.
+    std::vector<std::pair<int, int>> planned;   // (group, rank) of every clone the strategy planned
+    for (const LBAction& c : stats->clones)
+      planned.push_back(std::make_pair(stats->objData[c.obj].replicaGroup, c.rank));
     ContractVerifier::verifyAndRepair(stats, cvMoves, 0.95, nullptr, &stats->clones);
+    {
+      std::vector<LBAction> kept;
+      for (const LBAction& c : stats->clones) {
+        const int g = stats->objData[c.obj].replicaGroup;
+        bool prefix = true;
+        for (const std::pair<int, int>& pr : planned) {
+          if (pr.first != g || pr.second >= c.rank) continue;
+          bool live = false;
+          for (const LBAction& d : stats->clones)
+            if (stats->objData[d.obj].replicaGroup == g && d.rank == pr.second) live = true;
+          if (!live) prefix = false;
+        }
+        if (prefix) kept.push_back(c);
+        else if (_lb_args.debug() > 0)
+          CkPrintf("CharmLB> copy %d of group %d dropped: a lower-ranked copy of this round was refused\n", c.rank, g);
+      }
+      stats->clones.swap(kept);
+    }
     // The notices of a clone the verifier refused go with it (a notice names
     // the clone's rank; the group is the object's).
     {
@@ -2419,6 +2447,7 @@ int CentralLB::useMem() {
 */
 
 CLBStatsMsg::CLBStatsMsg(int osz, int csz) {
+  partition = -1;
   objData.resize(osz);
   commData.resize(csz);
 }
@@ -2429,6 +2458,7 @@ CLBStatsMsg::~CLBStatsMsg() {
 void CLBStatsMsg::pup(PUP::er &p) {
   p|from_pe;
   p|pe_speed;
+  p|partition;
 #if CMK_GPU
   p|gpu_device_id;
   p|gpu_total_sms;

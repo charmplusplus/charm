@@ -19,7 +19,8 @@ ln -sf "$ENV/lib/python3.12/site-packages/nvidia/nccl/lib/libnccl.so.2" "$W/nccl
 export CC=gcc CXX=g++ CUDA_HOME=/usr/local/cuda-13
 export CPATH=$ENV/lib/python3.12/site-packages/nvidia/nccl/include
 export NCCL_LIBDIR=$W/ncclstub LDFLAGS="-L$W/ncclstub"
-export TORCH_CUDA_ARCH_LIST="8.6" MAX_JOBS=16 USE_NCCL=1
+# sm_86 for the A40 nodes and sm_80 for the A100 nodes of Delta, one extension for both.
+export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-8.0;8.6}" MAX_JOBS=16 USE_NCCL=1
 export PATH=$ENV/bin:$PATH
 echo "=== build_ext $(date +%T)"
 $ENV/bin/python setup.py build_ext > "$W/build_ext.log" 2>&1; rc=$?; echo "build_ext rc=$rc $(date +%T)"; tail -3 "$W/build_ext.log" | cut -c1-300

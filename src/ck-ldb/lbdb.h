@@ -322,13 +322,39 @@ struct LDObjData {
   // exchange with that one peer, on the same node or across nodes; zero when
   // the copies exchange nothing (serving). The balancer counts a copy as
   // its share of the group's load plus its exchanges with every other copy.
+  // replicaParts: the number of fixed partitions the application splits the
+  // object's work into, when copy r of k serves the contiguous block of
+  // partitions [floor(parts r / k), floor(parts (r + 1) / k)) and so carries
+  // that block's share of the load rather than 1/k of it (the example's four
+  // dispatcher partitions: three copies carry 1/4, 1/4 and 1/2); 0 means
+  // equal shares.
   int replicaGroup;
   int replicaRank;
   int replicaCount;
   int replicaMax;
   size_t replicaExtraBytes;
+  // replicaCostNode / replicaCostRemote: what the copy MEASURED its exchange
+  // with one peer to cost it (same units as the load, per balancing interval),
+  // 0 while it has not exchanged. replicaExchangeBytes / replicaExchangeMsgs:
+  // what it sends to each peer per interval, from which the balancer prices an
+  // exchange it has no measurement of, with the calibrated transfer-cost table
+  // (DiffusionCostConfig::exchangePerPeer, by the group's copy count).
+  // replicaExtraBytesPerPeer: the device bytes each further peer adds to a copy
+  // (its landing buffers), beyond replicaExtraBytes.
   double replicaCostNode;
   double replicaCostRemote;
+  int replicaParts;
+  size_t replicaExchangeBytes;
+  double replicaExchangeMsgs;
+  size_t replicaExtraBytesPerPeer;
+  // The device bytes a copy holds beyond the object's footprint in a group of k.
+  inline size_t replicaExtraFor(int k) const { return replicaExtraBytes + replicaExtraBytesPerPeer * (size_t)(k > 1 ? k - 1 : 0); }
+  // The share of the group's load copy r of k carries under this declaration.
+  inline double replicaShare(int r, int k) const {
+    if (replicaParts <= 0 || k <= 0) return k > 0 ? 1.0 / k : 1.0;
+    const int lo = (replicaParts * r) / k, hi = (replicaParts * (r + 1)) / k;
+    return (double)(hi - lo) / replicaParts;
+  }
   inline bool replicable() const { return replicaGroup >= 0 && replicaMax > 1; }
   inline const LDOMHandle &omHandle() const { return handle.omhandle; }
   inline const LDOMid &omID() const { return handle.omhandle.id; }
@@ -547,6 +573,12 @@ inline void LDObjData::pup(PUP::er &p) {
     p|replicaCostNode; p|replicaCostRemote;
   } else if (p.isUnpacking()) {
     replicaCostNode = replicaCostRemote = 0.0;
+  }
+  // Version 10 adds the partition count behind a copy's share; an older dump has equal shares.
+  if (_lb_version > 9) {
+    p|replicaParts; p|replicaExchangeBytes; p|replicaExchangeMsgs; p|replicaExtraBytesPerPeer;
+  } else if (p.isUnpacking()) {
+    replicaParts = 0; replicaExchangeBytes = 0; replicaExchangeMsgs = 0.0; replicaExtraBytesPerPeer = 0;
   }
 }
 
