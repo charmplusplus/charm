@@ -2402,6 +2402,120 @@ checksum equals its plain's; the SmartMoE training pair too; the Mixtral
 and OLMoE training checksums have no plain training run beside them in
 this job.
 
+## Measured 2026-11-07, afternoon: four PEs per GPU, what bounds the step, and copies for locality (job 23646171, two A100 nodes)
+
+The question was whether four PEs per GPU would shorten the step by
+dividing the host work, and the answer settled where the step's time goes
+and produced a balancer rule that cuts serving by a third.
+
+### Four PEs per GPU against one
+
+`MOE_PPN=4`: one dispatcher per GPU on its first PE, the experts over the
+four, one compute lane each. Checksums equal to the one-PE run's, steps 30
+to 41 (job 23645271 and 23646171, gpua006 with gpua051 and gpua058):
+
+| ms/step                  | one PE per GPU          | four PEs per GPU        |
+|--------------------------|------------------------:|------------------------:|
+| plain serving            | 14.5                    | 14.6                    |
+| plain training           | 37.9                    | 37.7                    |
+| ShedLB serving           | 6.1, 6.3, 6.4, 6.5, 7.5 | 6.3, 6.4, 6.4, 7.9      |
+| ShedLB training          | 16.6, 16.8, 16.9, 19.9, 20.6 | 18.5, 20.1, 21.3   |
+
+A tie in both, inside the run-to-run band. The premise was wrong: the
+"5 ms of host time a step" came from the balancer's first window (steps 1
+to 20), which includes the start-up. The per-PE host time the balancer
+measures in its second window, steps 20 to 40, is 0.011 to 0.024 s at one
+PE per GPU and 0.001 to 0.008 at four: about a millisecond a step, divided
+by four as expected, and never the bound of a 6 ms step. Stack samples of
+the four PE threads in steady state show them in `poll`.
+
+### Two measurement fixes
+
+- **The declared device load.** An expert declares tokens times a rate,
+  and the rate was each PE's busy union over its tokens. Four PEs sharing a
+  GPU stretch each other's spans, so the hot expert read 0.507 s where the
+  runtime's own attribution (the SM-normalized sweep, `CHARM_GPU_LOAD_OBJDUMP=1`)
+  gave 0.168 in both layouts, and the balancer planned on 1.9x loads. The
+  busy pool is now per device (`MoeDevPool`, shared by the PEs the runtime
+  maps to one GPU): the hot expert declares 0.281 at four PEs against 0.299
+  at one.
+- **The start-up in the first window.** The balancer's first round read
+  0.10 to 0.14 s of host time per PE where the steady state is 0.02, and
+  its host cap refused up to 53 placements on it (one run put all three
+  copies on one host). The example clears the loads once per PE as the
+  timed steps begin (`LBClearLoads`, as sph3d does); with it no placement is
+  refused and the copies land on the same three GPUs as the best runs.
+
+### What bounds the step
+
+Traces at one PE per GPU (`tr_23646171/shed_serve_p1`, `shed_train_p1`,
+kernel classes over steps 31 to 40):
+
+| ShedLB, two A100 nodes | step  | GPU busy per rank | mean |
+|------------------------|------:|-------------------|-----:|
+| serving                | 6.4   | 27 to 73%         | 52%  |
+| training               | 16.8  | 47 to 99%         | 71%  |
+
+Serving is the link. With the hot expert's four copies placed with their
+inputs, its 48% of the tokens stay on their host; of the rest, half cross
+to the other host: about 35 MB per host and direction for the tokens in
+and again for the outputs out, through the one NIC, which lands data in
+device memory at 12 to 16 GB/s. Two legs of 2.2 to 2.9 ms is the step, and
+the fullest GPU's 2.4 to 3.3 ms of compute fits inside it. Training is the
+fullest GPU: it is saturated, the light GPUs carry half its GEMM time (6
+against 13.5 ms a step), and the hot copies wait 3.5 to 9 ms a step for
+their gradient exchange, which sets the band.
+
+### Copies for locality
+
+The partitions are contiguous blocks of dispatchers (`partitionOf`), so a
+copy on a host serves that host's dispatchers, and in serving a copy pays
+no exchange, only memory. ShedLB now gives an exchange-free partitioned
+group one copy per host (accepted when it leaves the fullest bin no
+worse), moves a lone such object to the host that feeds its first block
+when it sits elsewhere (its copy follows the round after), and keeps those
+copies out of the retire rule. Serving, one PE per GPU, 60 steps with
+rounds at 20 and 40, the step over steps 48 to 61, checksums equal to
+plain's:
+
+| two A100 nodes, serving, ms/step | plain | ShedLB before | ShedLB, copies for locality | FasterMoE |
+|----------------------------------|------:|--------------:|----------------------------:|----------:|
+| SmartMoE                         | 14.5  | 6.1 to 7.5    | 3.9 (planner fixed; 4.1, 4.2, 4.3 before it) | 15.1 to 19.8 |
+| Mixtral                          | 53.2  | 63.2 (A40)    | 19.3 (planner fixed; 19.6, 20.0, 25.0, 30.5 before it) | 51.3 |
+| OLMoE                            | 98.3  |               | 87.9                        |           |
+
+SmartMoE's step fell by a third and its GPUs went from 27 to 73% busy to
+64 to 94%, a mean of 79% (`tr_23646171/local_serve`); the balancer made 30
+copies and 16 moves over the two rounds and no token crosses the link.
+On the planner as fixed below the traced step is 4.0 ms with the GPUs 73
+to 97% busy, a mean of 86% (`final_sm_serve`); the training trace of the
+same binary (`final_sm_train`, 17.3 ms a step) is unchanged by the rule,
+as designed: the four GPUs holding the hot expert's copies at 90 to 99%,
+the other four at 47 to 48%, a mean of 71%.
+Mixtral, one expert per GPU, gets every expert copied. Its first runs
+differed by half (19.6 to 30.5): in the traced one (`local_mx_serve`) one
+GPU ended with no expert (3% busy) while another ran at 97%, because the
+copies had been placed by the load rule's packing, the fullest bin that
+still clears the target, and planned by group id. Three planner changes
+fixed it: a copy that pays no exchange goes to the emptiest bin of its
+host; an object with partitions and no exchange is never moved off the
+host that feeds its block by the shed loop; and the groups are planned in
+descending load, heaviest first. With them Mixtral serves in 19.3 ms a
+step, 2.7x FasterMoE's 51.3, with six of eight GPUs within 5% of the
+target and the two holding the lightest experts below it. OLMoE gained
+little: only six copies were made, the memory ledger refused 93
+placements (its slab footprints at top-8) and the host cap 133 to 143
+(the hosts' mean host time is twice the device target: OLMoE is host-bound
+here as on the A40s).
+
+Open from this job: an exit segfault in two of four runs with one copy of
+every expert (the run completes every step and its checksum first; the
+family of the Frontier two-node Mixtral crash); a hang at step 821 of a
+3000-step serving run with a balancing round every 20 steps
+(`/scratch/mzu/bhosale/moe_runs/a100/hang_p4prof_23646171`); the Mixtral
+balance after locality copies; FasterMoE's Mixtral serving ran without a
+shadow (no expert over its threshold).
+
 ## Measured (2026-09-06, one A40 node, four PEs, `+gpupool`)
 
 Correctness: `out2` and `w2` are bit-identical across no-LB, sync and async

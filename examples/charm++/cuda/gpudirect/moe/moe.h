@@ -58,6 +58,21 @@ struct MoeGpu {
 // needed: a slab is consumed only after its landing completed, and the
 // runtime orders a send behind the lane that produced its data.
 #define MOE_BUSY_IVS 64
+#include <mutex>
+// The device-busy pool of one GPU (one per device in the process, moe.C):
+// seconds the device was busy with any PE's experts, as the union of their
+// kernel spans on the device clock (against ref_ev), and the tokens those
+// spans covered, with a per-step decay. Its PEs add their samples under the
+// lock and read the rate from it.
+struct MoeDevPool {
+  std::mutex m;
+  double spt_gpu = 0.0;         // decayed sum of device-busy seconds
+  double spt_tok = 0.0;         // decayed sum of the tokens they covered
+  int spt_step = 0;             // the step the decay last advanced for
+  hapiEvent_t ref_ev = nullptr; // the device clock's origin: the first PE's reference event
+  int n_iv = 0;                 // busy intervals, disjoint, in ms on the device clock
+  float iv_s[MOE_BUSY_IVS], iv_e[MOE_BUSY_IVS];
+};
 #define MOE_BUSY_HORIZON_MS 5000.0f   // busy intervals older than this are dropped
 
 struct MoeCtx {
@@ -78,13 +93,14 @@ struct MoeCtx {
   // a declared load is tokens on one scale for every GPU. This PE's own figure
   // stands in until the first broadcast, and is what a heterogeneous machine
   // would want per device class.
-  double spt_gpu;               // decayed sum of device-busy seconds
-  double spt_tok;               // decayed sum of the tokens they covered
-  int spt_step;                 // the step the decay last advanced for
+  // The pool itself lives per DEVICE (MoeDevPool, moe.C), shared by the PEs
+  // the runtime maps to one GPU: with several PEs per GPU each PE's own union
+  // is stretched by the others' kernels and the sum of the unions counts the
+  // shared device several times (four PEs per A100, 2026-11-07: the hot
+  // expert declared 0.507 s where the device had run it 0.168). One union per
+  // device over every PE's spans, over the device's tokens, is the rate.
   double global_spt;            // job-wide seconds per token from Main; 0 until known
   hapiEvent_t ref_ev;           // recorded once on comm, before any expert work
-  int n_iv;                     // busy intervals, disjoint, in ms on the device clock
-  float iv_s[MOE_BUSY_IVS], iv_e[MOE_BUSY_IVS];
   // Tokens issued on each lane and not yet complete (Expert::pickLane).
   long lane_pending[MOE_MAX_LANES];
 };

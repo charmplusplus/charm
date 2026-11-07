@@ -23,6 +23,10 @@ The decision prints one line each at startup (`CharmLB> default strategy ...`, `
 `CharmLB> asynchronous balancing on by the application`) and one line per MetisLB decision (`MetisLB priced: ...
 applied | below the floor`), so a log shows what was chosen without `+LBDebug`.
 
+- ShedLB copies an exchange-free partitioned object once per host and keeps each copy on the host that feeds
+  its block (serving experts: no token crosses the link; `doc/internals/lb-multiplicity.md`, "Copies for
+  locality"). No flag; the declaration (`setLBReplica` with parts and zero exchange bytes) is what enables it.
+
 ## What the applications still carry
 
 These are step-structure parameters of each application, not balancer flags: how often to call AtSync (`-f`,

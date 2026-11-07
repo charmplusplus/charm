@@ -65,6 +65,13 @@ static inline bool hostSyncMode() {
 /* readonly */ int use_bf16;
 /* readonly */ int serve_only;
 /* readonly */ int use_instrument;
+// One device-busy pool per GPU of this process (MoeDevPool, moe.h), indexed by
+// the runtime's device index of the calling PE.
+static MoeDevPool g_dev_pools[64];
+static MoeDevPool* moeDevPool() {
+  const int d = hapiMyDeviceIndex();
+  return &g_dev_pools[(d >= 0 && d < 64) ? d : 0];
+}
 /* readonly */ double capacity_factor;
 /* readonly */ int fuse_sources;
 /* readonly */ int stream_outputs;
@@ -902,12 +909,16 @@ class Dispatcher : public CBase_Dispatcher {
 
     memset(&gpu, 0, sizeof(gpu));
     gpu.n_lanes = n_lanes;
-    gpu.n_iv = 0;
     // See MoeCtx in moe.h for why communication has its own stream.
     hapiCheck(hapiStreamCreateWithPriority(&gpu.comm.stream,
         hapiStreamNonBlocking, -1));
     hapiCheck(hapiEventCreate(&gpu.ref_ev));
     hapiCheck(hapiEventRecord(gpu.ref_ev, gpu.comm.stream));
+    {   // the device's busy pool takes the first PE's reference event as its clock origin
+      MoeDevPool* pool = moeDevPool();
+      std::lock_guard<std::mutex> lk(pool->m);
+      if (pool->ref_ev == nullptr) { hapiCheck(hapiEventSynchronize(gpu.ref_ev)); pool->ref_ev = gpu.ref_ev; }
+    }
     hapiCheck(hapiMalloc((void**)&gpu.comm.partials,
         sizeof(double) * MOE_RED_BLOCKS));
     hapiCheck(hapiStreamCreateWithPriority(&send_stream, hapiStreamNonBlocking,
@@ -1133,6 +1144,14 @@ class Dispatcher : public CBase_Dispatcher {
   // its channels here and is told so, which lets it close them and leave.
   void beginStep() {
     my_step++;
+    if (my_step == warmup_steps + 1) {
+      // The balancer's first interval would otherwise span the start-up (the pool, the handles, the first
+      // launches: on two A100 nodes a PE's host time over steps 1-20 read 0.10 s against 0.02 over steps 20-40,
+      // and the host cap refused 43 placements on it, job 23646171). Cleared once per PE as the timed steps
+      // begin, as sph3d does; the runtime clears them at the end of every round after that.
+      static thread_local bool lb_loads_cleared = false;
+      if (!lb_loads_cleared) { lb_loads_cleared = true; LBClearLoads(); }
+    }
     recv_count = 0;
     if (isLBStep(my_step)) lb_round_idle = false;
     for (int e = 0; e < n_experts; e++) {
@@ -1824,6 +1843,7 @@ class Expert : public CBase_Expert {
 
   // Never cached: a different object on every PE this expert lands on.
   MoeCtx* ctx() { return &disp_proxy.ckLocalBranch()->gpu; }
+  MoeDevPool* devPool() { return moeDevPool(); }
   // The lane this expert's current (or last) step was issued on.
   MoeGpu* lane() { return &ctx()->lanes[cur_lane >= 0 ? cur_lane : expert() % n_lanes]; }
 
@@ -2196,6 +2216,14 @@ class Expert : public CBase_Expert {
 
   void beginStep() {
     my_step++;
+    if (my_step == warmup_steps + 1) {
+      // The balancer's first interval would otherwise span the start-up (the pool, the handles, the first
+      // launches: on two A100 nodes a PE's host time over steps 1-20 read 0.10 s against 0.02 over steps 20-40,
+      // and the host cap refused 43 placements on it, job 23646171). Cleared once per PE as the timed steps
+      // begin, as sph3d does; the runtime clears them at the end of every round after that.
+      static thread_local bool lb_loads_cleared = false;
+      if (!lb_loads_cleared) { lb_loads_cleared = true; LBClearLoads(); }
+    }
     recv_count = 0;
     phase = 0;
     n_tot = 0;
@@ -2299,8 +2327,9 @@ class Expert : public CBase_Expert {
     // declares tokens on one scale; this PE's pooled figure until Main has
     // broadcast one, and the expert's own until this PE has measured.
     const MoeCtx* c = ctx();
+    const MoeDevPool* pool = devPool();
     double s_tok = (c->global_spt > 0.0) ? c->global_spt
-                 : (c->spt_tok > 0.0) ? c->spt_gpu / c->spt_tok : spt;
+                 : (pool->spt_tok > 0.0) ? pool->spt_gpu / pool->spt_tok : spt;
     // Diagnostic: a fixed per-token cost, identical on every PE. Every expert
     // here does the same work per token, so this is the exact load ratio; it
     // separates a balancer that cannot use a good signal from a bad signal.
@@ -2342,7 +2371,7 @@ class Expert : public CBase_Expert {
       TRACE(1, "expert %d.%d step %d declares %.6f s: %d tokens x %.4e s/token x %d steps; job rate %.4e; PE pool "
           "%.4f s / %.0f tokens; own last sample %.4f s for %d tokens", expert(), rank(), my_step,
           s_tok * n_tot * stepsSinceLastLB(my_step),
-          n_tot, s_tok, stepsSinceLastLB(my_step), c->global_spt, c->spt_gpu, c->spt_tok, gpu_last, n_last);
+          n_tot, s_tok, stepsSinceLastLB(my_step), c->global_spt, pool->spt_gpu, pool->spt_tok, gpu_last, n_last);
 
     if (isLBStep(my_step) && !lb_waiting) {
       if (!async_lb) {
@@ -2457,18 +2486,19 @@ class Expert : public CBase_Expert {
       // Pool the sample into the PE's figure rather than keeping a per-expert
       // one; see MoeCtx. The decay advances once per step, so the order in
       // which a step's experts report does not weight them differently.
-      MoeCtx* c = ctx();
+      MoeDevPool* pool = devPool();
+      std::lock_guard<std::mutex> lk(pool->m);
       float s_ms = 0.0f, e_ms = 0.0f;
-      hapiCheck(hapiEventElapsedTime(&s_ms, c->ref_ev, ev_start));
-      hapiCheck(hapiEventElapsedTime(&e_ms, c->ref_ev, ev_end));
-      if (step_last > c->spt_step) {
-        c->spt_gpu *= 0.75;
-        c->spt_tok *= 0.75;
-        c->spt_step = step_last;
+      hapiCheck(hapiEventElapsedTime(&s_ms, pool->ref_ev, ev_start));
+      hapiCheck(hapiEventElapsedTime(&e_ms, pool->ref_ev, ev_end));
+      if (step_last > pool->spt_step) {
+        pool->spt_gpu *= 0.75;
+        pool->spt_tok *= 0.75;
+        pool->spt_step = step_last;
       }
-      c->spt_gpu += 1e-3 * addBusy(c, s_ms, e_ms);
-      c->spt_tok += n_last;
-      spt = c->spt_gpu / c->spt_tok;
+      pool->spt_gpu += 1e-3 * addBusy(pool, s_ms, e_ms);
+      pool->spt_tok += n_last;
+      spt = pool->spt_gpu / pool->spt_tok;
     }
   }
 
@@ -2477,7 +2507,7 @@ class Expert : public CBase_Expert {
   // experts' steps overlap in time under lookahead, and per-step sets counted
   // the same device time once per step. The set is kept disjoint; intervals
   // older than the horizon are dropped.
-  static float addBusy(MoeCtx* c, float s, float e) {
+  static float addBusy(MoeDevPool* c, float s, float e) {
     float fresh = e - s;
     for (int i = 0; i < c->n_iv; i++)
       fresh -= std::max(0.0f, std::min(e, c->iv_e[i]) - std::max(s, c->iv_s[i]));
@@ -3092,7 +3122,7 @@ class Expert : public CBase_Expert {
         pes[np] = CkMyPe(); ns[np] = n_tot; gs[np] = gpu_last; np++;
         for (int r = 1; r < nc; r++) { pes[np] = peer_pe[r]; ns[np] = peer_n[r]; gs[np] = peer_gpu[r]; np++; }
         main_proxy.expertStep(expert(), my_step, (long)n_tot + peerTokens(), w2, np, pes, ns, gs,
-            c->spt_gpu, c->spt_tok);
+            devPool()->spt_gpu, devPool()->spt_tok);
       }
       if (nc_next != nc) {
         // The round's decision takes effect: a copy more (this copy sends the

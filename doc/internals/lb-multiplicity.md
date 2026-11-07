@@ -285,6 +285,28 @@ and, on a count of 0, lets the window's remaining steps send ahead
 step. On OLMoE's routing, where the balancer had nothing to decide, the two
 rounds in a 21-step window had cost 10% of the training step.
 
+## Copies for locality
+
+An object that declared partitions and no exchange cost (an MoE expert in
+serving: `replicaParts > 0`, `replicaExchangeBytes == 0`) is fed by every
+host, and because a copy's block of partitions is contiguous, a copy on a
+host serves that host's dispatchers without the link. ShedLB therefore
+gives such a group one copy per physical host (`nHosts`, the distinct
+`CmiPhysicalNodeID` among the bins) when it can have that many, accepted
+when the plan leaves the fullest bin no worse than it is; the load rule's
+acceptance, which wants the fullest bin lowered, would refuse a light
+expert's copy. The copy is placed on the host that feeds its block, on
+the emptiest bin there that still clears the target (packing saves
+nothing for a copy that pays no exchange). A lone such object whose host
+is not the one feeding its first block is moved there before the shed
+loop (its copy follows the round after; a copy beside it would serve its
+own host and leave the original's block on the link), the shed loop never
+moves such an object off its block's host, the retire rule leaves these
+copies alone (`count <= nHosts`), and the groups are planned heaviest
+first. Measured 2026-11-07 on two A100 nodes (the example's README,
+"Copies for locality"): SmartMoE serving 6.4 to 3.9 ms a step with the
+GPUs from 52% to 79% busy, Mixtral 53 to 19 ms.
+
 ## Copies beyond two
 
 The two-copy protocol (two partitions by parity, one peer, one exchange)
