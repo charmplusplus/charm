@@ -523,6 +523,8 @@ task<int> Migrate(MPI_Info hints) {
       CkAbort("campi: AMPI_Migrate with ampi_load_balance=async is not supported in campi");
     if (a.kind == AmpiMigrateKind::CKPT_IN_MEMORY)
       CkAbort("campi: AMPI_Migrate with ampi_checkpoint=in_memory is not supported in campi");
+    if (a.kind == AmpiMigrateKind::CKPT_ROLLBACK)
+      CkAbort("campi: AMPI_Migrate with ampi_checkpoint=rollback is not supported in campi");
     if (a.kind == AmpiMigrateKind::CKPT_MESSAGE_LOGGING)
       CkAbort("campi: AMPI_Migrate with ampi_checkpoint=message_logging is not supported in campi");
   }

@@ -31,6 +31,11 @@ ifeq (1,$(CMK_CAN_LINK_FORTRAN))
   DIRS += fallreduce
 endif
 
+# Needs a build with the syncft (memft) option.
+ifeq ($(CMK_MEM_CHECKPOINT),1)
+  DIRS += memckpt
+endif
+
 NONSCALEDIRS = \
   privatization \
   datatype \
