@@ -403,6 +403,12 @@ TCharm::~TCharm()
     // object are campi's.
     if (campiRank != nullptr) tcharm_campi_destroy_fn(campiRank);
   } else {
+    // CthFree may keep the thread, and with it the Isomalloc memory, until
+    // the next thread is freed. A rollback from an in-memory checkpoint
+    // restores this rank's memory at the same addresses right after this
+    // destructor, so unmap it now (never under the running thread).
+    if (tid != NULL && tid != CthSelf())
+      CmiIsomallocContextRelease(CmiIsomallocGetThreadContext(tid));
     CthFree(tid);
   }
   delete initMsg;

@@ -2918,6 +2918,14 @@ void CmiIsomallocContextDelete(CmiIsomallocContext ctx)
   delete pool;
 }
 
+void CmiIsomallocContextRelease(CmiIsomallocContext ctx)
+{
+  auto pool = (Mempool *)ctx.opaque;
+  if (pool == nullptr)
+    return;
+  pool->backend.clear();
+}
+
 void CmiIsomallocContextPup(pup_er cpup, CmiIsomallocContext * ctxptr)
 {
   PUP::er & p = *(PUP::er *)cpup;

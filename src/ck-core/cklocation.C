@@ -3060,9 +3060,11 @@ void CkLocMgr::pup(PUP::er& p)
   }
 #endif
 
-  // Delay doneInserting when it is unpacking during restart to prevent load balancing
-  // from kicking in.
-  if (p.isUnpacking() && !CkInRestarting())
+  // Delay doneInserting when it is unpacking during an in-memory restart to prevent
+  // load balancing from kicking in. A restart from disk (_inrestart) calls it here: a PE
+  // that reads no array file, on a restart with more PEs, has no other call to it, and
+  // its sync barrier would stay off.
+  if (p.isUnpacking() && (!CkInRestarting() || _inrestart))
   {
     doneInserting();
   }
@@ -3676,6 +3678,7 @@ void CkLocMgr::pupElementsFor(PUP::er& p, CkLocRec* rec, CkElementCreation_t typ
         if (c)
           c->redNo = 0;
       }
+      ((ArrayElement*)list[l])->thisArray->restampBroadcast((ArrayElement*)list[l]);
     }
   }
 #endif
@@ -3738,6 +3741,9 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   // Let all the elements know we're leaving
   callMethod(rec, &CkMigratable::ckAboutToMigrate);
+#if CMK_MEM_CHECKPOINT
+  CkMemCheckPTNoteMigration();  // a rollback is refused after a migration
+#endif
 
   // Record the move in the process's table before the migration message exists: a
   // destination in this process can land the element, and write its own entry,
