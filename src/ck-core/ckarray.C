@@ -53,6 +53,7 @@ Orion Sky Lawlor, olawlor@acm.org
 #include <unordered_map>
 #include "ck.h"
 #include "ckarray.h"
+#include "ckdyn-impl.h"
 #include <climits>
 #include "pathHistory.h"
 #include "register.h"
@@ -1580,6 +1581,50 @@ bool CkArrayBroadcaster::performDelivery(CkArrayMessage* bcast,
 
 #endif
 
+// CkDyn elements (ckdyn-impl.h): the same epoch bookkeeping as the charm4py
+// path above, with the delivery handed to CkDynDeliverBroadcast once per PE.
+void CkArrayBroadcaster::deliverAndUpdateDyn(CkArrayMessage* bcast,
+                                             std::vector<CkMigratable*>& elements)
+{
+  if (elements.empty())
+    return;
+  bool success = performDeliveryDyn(bcast, elements);
+  if (success)
+  {
+    int bcastEpoch = UsrToEnv(bcast)->getGroupEpoch() + 1;
+    while (storedBcasts.hasBcast(bcastEpoch))
+    {
+      success = performDeliveryDyn(storedBcasts.getBcast(bcastEpoch), elements);
+      bcastEpoch++;
+    }
+  }
+}
+
+bool CkArrayBroadcaster::performDeliveryDyn(CkArrayMessage* bcast,
+                                            std::vector<CkMigratable*>& elements)
+{
+  const int bcastEpoch = UsrToEnv(bcast)->getGroupEpoch();
+  CkAssert(UsrToEnv(bcast)->getMsgtype() == ArrayBcastFwdMsg);
+  std::vector<ArrayElemDyn*> ready;
+  ready.reserve(elements.size());
+  for (CkMigratable* m : elements)
+  {
+    ArrayElement* el = (ArrayElement*)m;
+    int& elBcastNo = getData(el);
+    if (elBcastNo != bcastEpoch)
+      continue;   // already has it, or (if it can move) has not reached this epoch yet
+    // same guard as performDelivery: an element with buffered zero-copy gets
+    // waits for the stored broadcast until ckElementArriving
+    if (owner->getLocMgr()->bufferedActiveRgetMsgs.count(el->CkMigratable::ckGetID()) != 0)
+      continue;
+    elBcastNo++;
+    ready.push_back(static_cast<ArrayElemDyn*>(el));
+  }
+  if (!ready.empty())
+    CkDynDeliverBroadcast(bcast, ready.data(), (int)ready.size());
+  return !ready.empty();
+}
+
 void CkArrayBroadcaster::springCleaning(void) { storedBcasts.springCleaning(); }
 
 // Stable locations: no element will ever need a broadcast that every local
@@ -1813,6 +1858,10 @@ void CkArray::recvBroadcast(CkMessage* m)
     // The transfer keeps using this message until its ALL_DONE delivery
     broadcaster->holdBcast(epoch);
     broadcaster->attemptDelivery(msg, (ArrayElement*)localElemVec[0], doFree);
+  }
+  else if (len > 0 && CkDynIsDynamicChare(localElemVec[0]->ckGetChareType()))
+  {
+    broadcaster->deliverAndUpdateDyn(msg, localElemVec);
   }
   else
   {

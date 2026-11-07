@@ -62,6 +62,7 @@ env:
   TEST_DIRS: >-
     tests/charm++/megatest
     tests/charm++/simplearrayhello
+    tests/charm++/ckdyn
     tests/charm++/anytime_migration
     tests/charm++/amr_1d_simple
     tests/charm++/dynamic_insertion
