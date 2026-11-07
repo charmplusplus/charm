@@ -53,7 +53,9 @@ with `__FAULT__`.
   indexed the same way.
 - Per-PE counters on the group: `recvCount` (array copies stored for the
   current checkpoint), `peCount` (on the starter, reductions received),
-  `completedCheckpoints`, and `rollbackPending` (PE 0).
+  `completedCheckpoints`, `rollbacksSinceCheckpoint` (incremented in
+  `rollback` on every PE before anything is destroyed, reset in `report`;
+  read by `CkMemCheckpointRollbacks()`), and `rollbackPending` (PE 0).
 - Process-wide statics shared by the PEs of a process: `cpCallback` (the
   user's callback), `inCheckpointing`, `inRestarting`. `CkInRestarting()`
   reads `inRestarting`; the location manager, the reduction manager and
@@ -162,6 +164,14 @@ it, PE 0 delivers the callback, and the process-level data in
 `procChkptBuf` is not used (groups, mainchares, readonlys and nodegroups
 keep their current state). The stored copy is copied, not consumed, so the
 same checkpoint can be rolled back to again.
+
+A program cannot count rollbacks in its array elements, since the
+rollback restores them. `CkMemCheckpointRollbacks()` returns the number
+of rollbacks to the last completed checkpoint from the group, which is
+not restored. `rollback` increments it on every PE before `restart(-1)`,
+so it is current on every PE when PE 0 sends the callback from `finishUp`
+(incrementing in `finishUp` would race with the callback's delivery to
+other PEs).
 
 ### The migration restriction
 

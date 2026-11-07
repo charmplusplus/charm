@@ -155,6 +155,7 @@ public:
   void requestRollback();
   void rollback();
   int numCompletedCheckpoints() const { return completedCheckpoints; }
+  int numRollbacksSinceCheckpoint() const { return rollbacksSinceCheckpoint; }
   void syncFiles(void);
   void report();
   void recoverBuddies();
@@ -194,6 +195,7 @@ private:
   std::vector<int> failedPes;
   int thisFailedPe;           // -1 during a rollback
   int completedCheckpoints;   // checkpoints whose report() ran on this PE
+  int rollbacksSinceCheckpoint; // rollbacks to the last completed checkpoint
   bool rollbackPending;       // PE 0 only: a rollback was requested and has not finished
 
     /// to use memory or disk checkpointing
@@ -218,6 +220,10 @@ void CkStartMemCheckpoint(CkCallback &cb);
 // called by user applications, on any PE, after a completed checkpoint: restores
 // every array element from it and sends the checkpoint's callback again
 void CkRollbackMemCheckpoint();
+
+// the number of rollbacks to the last completed in-memory checkpoint (0 before
+// any rollback to it); not restored by a rollback, the same on every PE
+int CkMemCheckpointRollbacks();
 
 // called by the location manager when an array element leaves this PE
 void CkMemCheckPTNoteMigration();

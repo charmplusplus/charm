@@ -8771,6 +8771,19 @@ was passed to ``CkStartMemCheckpoint`` is delivered again, once. The
 program therefore continues from the point where that checkpoint
 completed. The same checkpoint can be rolled back to more than once.
 
+Because every array element is restored, a counter kept in an element
+cannot tell the first delivery of the callback from a delivery after a
+rollback. The runtime keeps that count instead:
+
+.. code-block:: c++
+
+         int CkMemCheckpointRollbacks()
+
+returns the number of rollbacks to the last completed in-memory
+checkpoint: 0 until the first rollback to it, and back to 0 when the
+next checkpoint completes. It returns the same value on every PE and is
+not affected by the rollback itself.
+
 Preconditions:
 
 - A checkpoint must have completed: call ``CkRollbackMemCheckpoint`` in or

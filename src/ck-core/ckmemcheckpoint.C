@@ -362,6 +362,7 @@ CkMemCheckPT::CkMemCheckPT(int w)
   (void)numnodes;  // one process is allowed: doItNow warns that a failure cannot be survived
 #endif
   completedCheckpoints = 0;
+  rollbacksSinceCheckpoint = 0;
   rollbackPending = false;
   inRestarting = false;
   recvCount = peCount = 0;
@@ -409,6 +410,7 @@ void CkMemCheckPT::pup(PUP::er& p)
   p|peCount;
   if (p.isUnpacking()) {
   	completedCheckpoints = 0;
+  	rollbacksSinceCheckpoint = 0;
   	rollbackPending = false;
   	recvCount = peCount = 0;
  	recvChkpCount = 0;
@@ -812,6 +814,7 @@ void CkMemCheckPT::report()
 {
   inCheckpointing = false;
   completedCheckpoints++;
+  rollbacksSinceCheckpoint = 0;
 #if !CMK_CHKP_ALL
   int objsize = 0;
   int len = ckTable.size();
@@ -1356,7 +1359,18 @@ void CkMemCheckPT::rollback()
     CkAbort("CharmFT> rollback refused: %d array elements migrated on PE %d since the last "
             "in-memory checkpoint; load balancing between a checkpoint and its rollback is "
             "not supported", moved, CkMyPe());
+  // counted before the restore, so it is current when the callback runs
+  rollbacksSinceCheckpoint++;
   restart(-1);
+}
+
+int CkMemCheckpointRollbacks()
+{
+#if CMK_MEM_CHECKPOINT
+  return CProxy_CkMemCheckPT(ckCheckPTGroupID).ckLocalBranch()->numRollbacksSinceCheckpoint();
+#else
+  return 0;
+#endif
 }
 
 // called on the PE an array element leaves (CkLocMgr::emigrate)
