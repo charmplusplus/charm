@@ -1,0 +1,566 @@
+/*
+ * CkDyn: dynamic chares for language bindings.
+ *
+ * A binding (Python, Julia, a C program, ...) describes its chare classes at
+ * run time through tables of entry descriptors, and the runtime reaches the
+ * binding's objects through one table of function pointers (CkDynHooks).
+ * Every entry method of every dynamic class delivers one message type,
+ * CkDynMsg, whose payload is a header plus typed slots (3.4 of the design
+ * document). This header is the complete binding-facing API: C types and
+ * extern "C" functions only, no Charm++ header is included, so a binding
+ * can be built without the Charm++ include tree. The C++ classes behind it
+ * are in ckdyn-impl.h.
+ *
+ * Design and rationale: charm4py-thin DESIGN.md (sections 3.1-3.17).
+ * Internals chapter: doc/internals/ckdyn.md.
+ */
+#ifndef CKDYN_H
+#define CKDYN_H
+
+#include <stddef.h>
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* Bumped on any incompatible change to this file. */
+#define CKDYN_API_VERSION 1
+
+/* ------------------------------------------------------------------------ */
+/* Classes and entry methods                                                 */
+/* ------------------------------------------------------------------------ */
+
+typedef enum {
+  CKDYN_MAINCHARE = 1,
+  CKDYN_CHARE     = 2,
+  CKDYN_GROUP     = 3,
+  CKDYN_NODEGROUP = 4,
+  CKDYN_ARRAY     = 5,
+  CKDYN_ARRAYMAP  = 6
+} CkDynKind;
+
+/* Entry-method attributes. The names match the .ci attributes. */
+enum {
+  CKDYN_EP_THREADED   = 1u << 0,  /* the binding runs it on a coroutine; passed through in ep_flags */
+  CKDYN_EP_INLINE     = 1u << 1,  /* CK_EP_INLINE: a local send runs the method at once */
+  CKDYN_EP_EXPEDITED  = 1u << 2,  /* every send to it gets CK_MSG_EXPEDITED */
+  CKDYN_EP_IMMEDIATE  = 1u << 3,  /* CK_EP_IMMEDIATE (nodegroups only) */
+  CKDYN_EP_NOKEEP     = 1u << 4,  /* always set by CkDyn; see the ownership rules below */
+  CKDYN_EP_NOTRACE    = 1u << 5,  /* CK_EP_TRACEDISABLE */
+  CKDYN_EP_APPWORK    = 1u << 6,  /* CK_EP_APPWORK */
+  CKDYN_EP_EXCLUSIVE  = 1u << 7,  /* nodegroups: one invocation at a time per branch */
+  CKDYN_EP_REDNTARGET = 1u << 8   /* documentation only: may be a reduction target */
+};
+
+typedef struct CkDynEntryDesc {
+  const char *name;     /* "Class.method"; kept by pointer for the program's lifetime */
+  uint32_t    flags;    /* CKDYN_EP_* */
+  uint32_t    user_id;  /* opaque to CkDyn; passed back on every delivery */
+} CkDynEntryDesc;
+
+struct CkDynHooks;
+
+typedef struct CkDynClassDesc {
+  const char            *name;         /* "Class"; kept by pointer */
+  CkDynKind              kind;
+  int                    ndims;        /* arrays only: 1..6 */
+  int                    num_entries;  /* entries[0] is the constructor */
+  const CkDynEntryDesc  *entries;
+  void                  *binding_data; /* opaque; passed to every per-class hook */
+  const struct CkDynHooks *hooks;      /* NULL: the table given to CkDynInit */
+} CkDynClassDesc;
+
+/* ------------------------------------------------------------------------ */
+/* Targets: one element of any kind                                          */
+/* ------------------------------------------------------------------------ */
+
+#define CKDYN_MAX_DIMS 6
+
+typedef struct CkDynTarget {
+  CkDynKind kind;
+  int       chare_idx;                 /* the Charm++ chare index of its class */
+  union {
+    struct { int pe; void *ptr; } chare;                /* MAINCHARE, CHARE: CkChareID */
+    struct { int gid; int pe_or_node; } group;          /* GROUP, NODEGROUP, ARRAYMAP */
+    struct { int aid; int ndims; int index[CKDYN_MAX_DIMS]; } array;   /* ARRAY */
+  } u;
+} CkDynTarget;
+
+/* ------------------------------------------------------------------------ */
+/* Sections (step 2; the type is part of the ABI from the start)             */
+/* ------------------------------------------------------------------------ */
+
+typedef struct CkDynSectionID {
+  int32_t  root_pe;    /* PE whose CkDynMgr holds the section */
+  int32_t  idx;        /* index in that table */
+  int32_t  coll_id;    /* array or group id (-1 for a composite) */
+  uint8_t  kind;       /* CKDYN_ARRAY, CKDYN_GROUP, or 0 for a composite */
+  uint8_t  reserved;
+  uint16_t gen;        /* generation, so a reused slot is not mistaken for the old section */
+} CkDynSectionID;
+
+/* ------------------------------------------------------------------------ */
+/* Callbacks                                                                 */
+/* ------------------------------------------------------------------------ */
+
+typedef enum {
+  CKDYN_CB_TARGET  = 1,   /* an entry method of one element, or a broadcast to a collection */
+  CKDYN_CB_SECTION = 2,   /* an entry method multicast to a section (step 2) */
+  CKDYN_CB_FUTURE  = 3,   /* a binding future (pe, id) */
+  CKDYN_CB_IGNORE  = 4,
+  CKDYN_CB_EXIT    = 5    /* CkExit */
+} CkDynCbKind;
+
+typedef struct CkDynCallback {
+  CkDynCbKind    kind;
+  CkDynTarget    t;        /* TARGET: the element, or the collection when bcast != 0 */
+  int            ep;       /* TARGET, SECTION */
+  int            bcast;
+  uint32_t       refnum;   /* non-zero: the binding future the delivered result belongs to */
+  CkDynSectionID sid;      /* SECTION */
+  int            pe;       /* FUTURE: the PE that owns the future */
+  uint32_t       id;       /* FUTURE */
+} CkDynCallback;
+
+/* ------------------------------------------------------------------------ */
+/* Messages                                                                  */
+/* ------------------------------------------------------------------------ */
+
+/* Element kinds of typed buffers and of reduction data. */
+enum {
+  CKDYN_ELEM_NONE = 0,
+  CKDYN_ELEM_I8, CKDYN_ELEM_I16, CKDYN_ELEM_I32, CKDYN_ELEM_I64,
+  CKDYN_ELEM_U8, CKDYN_ELEM_U16, CKDYN_ELEM_U32, CKDYN_ELEM_U64,
+  CKDYN_ELEM_F16, CKDYN_ELEM_F32, CKDYN_ELEM_F64,
+  CKDYN_ELEM_C64, CKDYN_ELEM_C128,
+  CKDYN_ELEM_BOOL, CKDYN_ELEM_BYTE
+};
+
+/* Slot types. */
+enum {
+  CKDYN_SLOT_NONE = 0,  /* the binding's null */
+  CKDYN_SLOT_BOOL,
+  CKDYN_SLOT_I64,
+  CKDYN_SLOT_U64,
+  CKDYN_SLOT_F64,
+  CKDYN_SLOT_BYTES,     /* small blob inline in the data region */
+  CKDYN_SLOT_BUFFER,    /* typed n-dimensional buffer copied into the data region */
+  CKDYN_SLOT_NCPY,      /* typed buffer carried by a zero-copy descriptor (step 3) */
+  CKDYN_SLOT_DEVICE,    /* typed device buffer (step 3) */
+  CKDYN_SLOT_FUTURE,    /* (pe, id) of a binding future */
+  CKDYN_SLOT_CALLBACK,  /* a CkDynCallback in the data region */
+  CKDYN_SLOT_SECTION,   /* a CkDynSectionID in the data region */
+  CKDYN_SLOT_PROXY,     /* a CkDynTarget in the data region */
+  CKDYN_SLOT_TAIL       /* marks the opaque tail; len = tail_len */
+};
+
+/* Buffer flags (CkDynSlot.bflags, CkDynBufDesc.bflags). */
+enum {
+  CKDYN_BUF_FORTRAN  = 1u << 0,  /* column-major */
+  CKDYN_BUF_READONLY = 1u << 1,
+  CKDYN_BUF_OOB      = 1u << 2   /* came from the binding's serializer out of band */
+};
+
+/* Header flags (CkDynHdr.flags). */
+enum {
+  CKDYN_MSG_BLOCK      = 1u << 0,  /* a FUTURE slot receives the method's return value */
+  CKDYN_MSG_BCAST      = 1u << 1,
+  CKDYN_MSG_BCASTRET   = 1u << 2,  /* gather the return values of a broadcast */
+  CKDYN_MSG_CREATION   = 1u << 3,  /* constructor message that acknowledges creation */
+  CKDYN_MSG_USESATSYNC = 1u << 4,  /* array element created with usesAtSync */
+  CKDYN_MSG_RAY        = 1u << 5,
+  CKDYN_MSG_CONSTRAINED = 1u << 6  /* group constructor: the last slot is a BYTES slot of int32 PE numbers;
+                                      branches on other PEs are not constructed (handle stays NULL) */
+};
+
+#define CKDYN_MAGIC 0xDA01u
+
+typedef struct CkDynHdr {
+  uint16_t magic_version;   /* CKDYN_MAGIC */
+  uint16_t ep;              /* Charm++ entry index; authoritative (the envelope's copy can be stale on inline sends) */
+  uint16_t flags;           /* CKDYN_MSG_* */
+  uint16_t nslots;
+  uint32_t user_id;         /* the entry's user_id, or the binding reducer id for foreign-reducer contributions */
+  uint32_t tail_len;        /* bytes of opaque tail */
+  uint32_t data_len;        /* bytes of the inline data region */
+  uint32_t nbuf;            /* number of NCPY/DEVICE descriptors (step 3) */
+} CkDynHdr;                 /* 24 bytes */
+
+typedef struct CkDynSlot {  /* 24 bytes, nslots of them right after the header */
+  uint8_t  type;            /* CKDYN_SLOT_* */
+  uint8_t  elem;            /* CKDYN_ELEM_* for BUFFER/NCPY/DEVICE */
+  uint8_t  ndim;            /* 0..CKDYN_MAX_BUF_DIMS for buffers, 0 for scalars */
+  uint8_t  bflags;          /* CKDYN_BUF_* */
+  uint16_t tag;             /* binding-defined subtype, opaque to CkDyn */
+  uint16_t reserved;
+  uint32_t len;             /* bytes (BYTES/BUFFER/NCPY/DEVICE/TAIL), else 0 */
+  uint32_t reserved2;
+  union {
+    int64_t  i64;
+    uint64_t u64;
+    double   f64;
+    uint64_t off;           /* offset into the data region (BYTES, BUFFER, CALLBACK, SECTION, PROXY);
+                               for BUFFER the shape (ndim int64) precedes the bytes at that offset */
+  } v;
+} CkDynSlot;
+
+#define CKDYN_MAX_BUF_DIMS 32
+
+/* Payload layout, from CkDynMsg::buf:
+ *   CkDynHdr, CkDynSlot[nslots], data region (8-byte aligned), tail (tail_len bytes).
+ * The data region holds BYTES payloads, BUFFER shapes and contents, and the
+ * pupped bytes of CALLBACK, SECTION and PROXY values.
+ */
+
+/* A buffer described to the builder. */
+typedef struct CkDynBufDesc {
+  const void    *ptr;
+  uint64_t       len;        /* bytes */
+  uint8_t        elem;       /* CKDYN_ELEM_* */
+  uint8_t        ndim;       /* 0..CKDYN_MAX_BUF_DIMS */
+  uint8_t        bflags;     /* CKDYN_BUF_* */
+  uint16_t       tag;
+  const int64_t *shape;      /* ndim entries; NULL when ndim == 0 */
+  const int64_t *strides;    /* ndim entries in bytes, or NULL for C-contiguous; must describe a contiguous layout */
+} CkDynBufDesc;
+
+typedef struct CkDynMsgBuilder CkDynMsgBuilder;      /* opaque */
+typedef struct CkDynMsg CkDynMsg;                    /* opaque to C: the Charm++ message */
+typedef struct CkDynMcastMsg CkDynMcastMsg;          /* opaque to C: the CkMulticast message (step 2) */
+typedef void (*CkDynBufDone)(void *done_arg);        /* the source buffer may be released (NCPY, step 3) */
+
+/* Begin a message. Hints size the scratch space; prio_bits reserves that many
+ * priority bits (0: none); group_dep is a CkGroupID index the message must
+ * wait for on delivery (-1: none). Group dependencies must be known at
+ * allocation (the envelope reserves space for them), which is why they are
+ * here and not in CkDynSendOpts. The runtime honors them on chare, group,
+ * nodegroup and creation messages, not on point-to-point array element sends. */
+CkDynMsgBuilder *CkDynMsgBegin(int nslots_hint, size_t data_hint, size_t tail_hint, int prio_bits, int group_dep);
+void  CkDynMsgSetFlags(CkDynMsgBuilder *b, uint16_t flags);
+void  CkDynMsgSetUserId(CkDynMsgBuilder *b, uint32_t user_id);
+void  CkDynMsgAddNone(CkDynMsgBuilder *b);
+void  CkDynMsgAddBool(CkDynMsgBuilder *b, int v);
+void  CkDynMsgAddI64(CkDynMsgBuilder *b, int64_t v);
+void  CkDynMsgAddU64(CkDynMsgBuilder *b, uint64_t v);
+void  CkDynMsgAddF64(CkDynMsgBuilder *b, double v);
+void  CkDynMsgAddBytes(CkDynMsgBuilder *b, const void *p, uint32_t len, uint16_t tag);
+void  CkDynMsgAddBuffer(CkDynMsgBuilder *b, const CkDynBufDesc *d);                       /* copies now */
+void  CkDynMsgAddFuture(CkDynMsgBuilder *b, int pe, uint32_t id);
+void  CkDynMsgAddCallback(CkDynMsgBuilder *b, const CkDynCallback *cb);
+void  CkDynMsgAddSection(CkDynMsgBuilder *b, const CkDynSectionID *sid);
+void  CkDynMsgAddProxy(CkDynMsgBuilder *b, const CkDynTarget *t);
+void *CkDynMsgReserveTail(CkDynMsgBuilder *b, uint32_t len);   /* the binding writes len bytes in place */
+/* Priority bits: valid after CkDynMsgFinish; see CkDynMsgPriorityPtr. */
+CkDynMsg *CkDynMsgFinish(CkDynMsgBuilder *b, int ep);          /* one allocation; ep goes in the header */
+void  CkDynMsgAbandon(CkDynMsgBuilder *b);
+void *CkDynMsgPriorityPtr(CkDynMsg *m);                        /* the reserved priority bits, to fill in */
+void  CkDynMsgSetQueueing(CkDynMsg *m, int queueing);          /* CK_QUEUEING_* value */
+void  CkDynMsgFree(CkDynMsg *m);                               /* a message that will not be sent */
+/* The payload bytes of a finished message (header, slots, data, tail), for a
+ * foreign-reducer contribution (CkDynContribute with CkDynForeignReducerType). */
+const void *CkDynMsgPayload(CkDynMsg *m, uint32_t *len);
+
+/* Reading a delivered message. */
+typedef enum {
+  CKDYN_MSGKIND_DYN = 0,     /* a CkDynMsg */
+  CKDYN_MSGKIND_MCAST,       /* a CkDynMcastMsg (step 2) */
+  CKDYN_MSGKIND_REDRESULT,   /* a CkReductionMsg, viewed with one synthesized BUFFER slot */
+  CKDYN_MSGKIND_SYS          /* a system message: no slots, except FUTURE when a refnum is set */
+} CkDynMsgKind;
+
+typedef struct CkDynMsgView {
+  CkDynMsgKind          kind;
+  const CkDynHdr       *hdr;        /* NULL for REDRESULT and SYS */
+  const CkDynSlot      *slots;
+  int                   nslots;
+  const char           *data;       /* data region */
+  const char           *tail;       /* tail_len bytes, or NULL */
+  uint32_t              tail_len;
+  uint32_t              refnum;     /* the envelope's reference number (0 if none); for a REDRESULT or SYS
+                                       view a FUTURE slot (CkMyPe(), refnum) is synthesized too; a foreign
+                                       reduction result is viewed as DYN and carries it only here */
+  const CkDynSectionID *section;    /* non-NULL for an MCAST delivery */
+  void                 *msg;        /* the runtime message, for retain */
+} CkDynMsgView;
+
+/* Pointer to a BUFFER slot's bytes; *shape_out gets ndim int64 values. */
+const void *CkDynViewBufferPtr(const CkDynMsgView *v, int slot, const int64_t **shape_out);
+const void *CkDynViewBytesPtr(const CkDynMsgView *v, int slot);
+void        CkDynViewCallback(const CkDynMsgView *v, int slot, CkDynCallback *out);
+void        CkDynViewSection(const CkDynMsgView *v, int slot, CkDynSectionID *out);
+void        CkDynViewProxy(const CkDynMsgView *v, int slot, CkDynTarget *out);
+
+/* Ownership. Every CkDyn entry is registered CK_EP_NOKEEP, so the runtime frees
+ * the message after the hook returns. A binding that keeps pointers into the
+ * message (a zero-copy view of a BUFFER slot) calls CkDynMsgRetain before
+ * returning and CkDynMsgRelease once per retain when done. */
+void CkDynMsgRetain(const CkDynMsgView *v);
+void CkDynMsgRelease(void *msg);
+
+/* ------------------------------------------------------------------------ */
+/* The hook table                                                            */
+/* ------------------------------------------------------------------------ */
+
+enum {
+  CKDYN_PUP_MIGRATE    = 1,
+  CKDYN_PUP_CHECKPOINT = 2,
+  CKDYN_PUP_SIZING     = 0x100   /* OR'd into reason on the sizing pass */
+};
+#define CKDYN_PACK_REFUSED ((size_t)-1)   /* pack_size: the object cannot be packed in this state; CkDyn aborts */
+
+typedef struct CkDynHooks {
+  int   version;                 /* CKDYN_API_VERSION */
+  void *global;                  /* passed to the hooks that have no class: register_classes, readonly, reduce, future, error */
+  void (*register_classes)(void *global);   /* called at start-up in place of CkRegisterMainModule (shared library) */
+  /* object lifecycle */
+  void *(*construct)(void *binding_data, const CkDynTarget *t, const CkDynMsgView *ctor_msg);
+  void  (*destruct)(void *binding_data, void *handle);
+  /* delivery */
+  void  (*deliver)(void *binding_data, void *handle, int ep, uint32_t user_id,
+                   uint32_t ep_flags, const CkDynMsgView *msg);
+  /* array broadcast: one call per PE for every local element whose epoch matches.
+     Time is charged to the array manager unless the binding brackets each element's
+     call with CkDynCallstackPush/Pop. A handler that destroys another local element
+     makes that element's handle invalid for the rest of the call. */
+  void  (*deliver_many)(void *binding_data, void **handles, int n, int ep, uint32_t user_id,
+                        uint32_t ep_flags, const CkDynMsgView *msg);
+  void  (*mainchare)(void *binding_data, void **handle_out, const CkDynTarget *t, int argc, char **argv);
+  /* pup */
+  size_t (*pack_size)(void *binding_data, void *handle, int reason);
+  void   (*pack)(void *binding_data, void *handle, int reason, void *buf, size_t len);
+  void  *(*unpack)(void *binding_data, const CkDynTarget *t, int reason, const void *buf, size_t len);
+  size_t (*pack_readonly_size)(void *global);
+  void   (*pack_readonly)(void *global, void *buf, size_t len);
+  void   (*unpack_readonly)(void *global, const void *buf, size_t len);
+  /* reductions: runs inside the reduction manager, no class context */
+  void  (*reduce)(void *global, uint32_t reducer_id, const CkDynMsgView **contribs, int n,
+                  CkDynMsgBuilder *result);
+  /* futures */
+  void  (*future)(void *global, int pe, uint32_t id, const CkDynMsgView *value);
+  /* sections (step 2) */
+  void  (*section_joined)(void *binding_data, void *handle, const CkDynSectionID *sid);
+  /* array map */
+  int   (*map_proc_num)(void *binding_data, void *handle, int aid, int ndims, const int *index);
+  /* load balancing */
+  void  (*resume_from_sync)(void *binding_data, void *handle);
+  /* errors raised inside CkDyn on behalf of the binding; CkDyn aborts after it returns */
+  void  (*error)(void *global, const char *what);
+} CkDynHooks;
+
+/* ------------------------------------------------------------------------ */
+/* Start-up and registration                                                 */
+/* ------------------------------------------------------------------------ */
+
+int  CkDynApiVersion(void);
+int  CkDynRefnumBytes(void);          /* sizeof(CMK_REFNUM_TYPE) of this libcharm */
+int  CkDynHasDeviceSupport(void);
+/* Install the hook table (copied). A shared-library binding calls it before
+ * CkDynStart; a C++ program calls it from an initnode function, before it
+ * registers classes. */
+void CkDynInit(const CkDynHooks *hooks);
+/* Start the runtime (ConverseInit); never returns. Shared-library bindings only. */
+void CkDynStart(int argc, char **argv);
+/* Create the CkDynMgr group. MainchareDyn does this itself; a C++ main chare
+ * that uses CkDyn without MainchareDyn calls it from its constructor. */
+void CkDynCreateManagers(void);
+/* Register a class; returns the chare index. *first_ep receives the entry index
+ * of entries[0]; entries[i] has index first_ep + i. Call on rank 0 of every
+ * process, in the same order, before start-up completes (from
+ * hooks.register_classes or an initnode). */
+int  CkDynRegisterClass(const CkDynClassDesc *desc, int *first_ep);
+void CkDynAllowLateRegistration(void);
+int  CkDynRegisterClassLate(const CkDynClassDesc *desc, int *first_ep);
+/* The chare index of a dynamic target's class, and its descriptor. */
+const CkDynClassDesc *CkDynClassOf(int chare_idx);
+
+/* ------------------------------------------------------------------------ */
+/* Sends                                                                     */
+/* ------------------------------------------------------------------------ */
+
+enum {
+  CKDYN_SEND_INLINE    = 1u << 0,
+  CKDYN_SEND_EXPEDITED = 1u << 1,
+  CKDYN_SEND_IMMEDIATE = 1u << 2,
+  CKDYN_SEND_NOTRACE   = 1u << 3
+};
+
+typedef struct CkDynSendOpts {
+  uint32_t flags;     /* CKDYN_SEND_*; the entry's own attributes are added by CkDyn */
+} CkDynSendOpts;      /* NULL means no flags */
+
+void CkDynSendChare     (const CkDynTarget *t, int ep, CkDynMsg *m, const CkDynSendOpts *o);
+void CkDynSendGroup     (int gid, int pe, int ep, CkDynMsg *m, const CkDynSendOpts *o);          /* pe == -1: broadcast */
+void CkDynSendGroupMulti(int gid, int npes, const int *pes, int ep, CkDynMsg *m, const CkDynSendOpts *o);
+void CkDynSendNodeGroup (int gid, int node, int ep, CkDynMsg *m, const CkDynSendOpts *o);        /* node == -1: broadcast */
+void CkDynSendArray     (int aid, int ndims, const int *index, int ep, CkDynMsg *m, const CkDynSendOpts *o); /* index == NULL: broadcast */
+void CkDynSendSection   (const CkDynSectionID *sid, int ep, CkDynMcastMsg *m, const CkDynSendOpts *o);     /* step 2 */
+/* Send to whatever a target names (chare, group branch, nodegroup branch, array element). */
+void CkDynSendTarget    (const CkDynTarget *t, int ep, CkDynMsg *m, const CkDynSendOpts *o);
+
+/* ------------------------------------------------------------------------ */
+/* Creation                                                                  */
+/* ------------------------------------------------------------------------ */
+
+typedef struct CkDynArrayOpts {
+  int        ndims;
+  const int *dims;               /* NULL: empty array, insert later */
+  int        map_gid;            /* -1: default map */
+  int        anytime_migration;  /* CkArrayOptions::setAnytimeMigration */
+  int        static_insertion;   /* CkArrayOptions::setStaticInsertion */
+  int        bind_to_aid;        /* -1, or an array to bindTo */
+} CkDynArrayOpts;
+/* A group the creation must wait for (for example the array's map, see the
+ * bindTo race in charm_best_practices.md) is the group_dep of the constructor
+ * message, given to CkDynMsgBegin. */
+
+#define CKDYN_PE_ANY (-1)
+
+/* *out receives a virtual chare id (pe < 0) usable for sends and callbacks at once;
+ * hooks.construct receives the real id. Both name the same chare. */
+void CkDynCreateChare       (int chare_idx, int on_pe, CkDynMsg *ctor, CkDynTarget *out);   /* on_pe CKDYN_PE_ANY: seed balancer */
+/* A constrained group (branches on a PE list only) is a group whose constructor
+ * message carries CKDYN_MSG_CONSTRAINED and the PE list as its last slot. */
+int  CkDynCreateGroup       (int chare_idx, CkDynMsg *ctor);
+int  CkDynCreateNodeGroup   (int chare_idx, CkDynMsg *ctor);
+int  CkDynCreateArray       (int chare_idx, CkDynMsg *ctor, const CkDynArrayOpts *o);        /* returns aid */
+/* The constructor message must have been finished with the class's constructor
+ * entry index (first_ep), which names the class to construct; every element of
+ * one array must be of the array's class. CKDYN_MSG_CREATION is for whole-array
+ * creation only: on an insert it would start a one-element reduction. */
+void CkDynArrayInsert       (int aid, int ndims, const int *index, int on_pe, CkDynMsg *ctor);
+void CkDynArrayDoneInserting(int aid);
+void CkDynArrayDestroyElement(int aid, int ndims, const int *index);                         /* local element only */
+
+/* ------------------------------------------------------------------------ */
+/* Futures and callbacks                                                     */
+/* ------------------------------------------------------------------------ */
+
+/* Deliver a value to a binding future: a CkDynMsg sent to CkDynMgr[pe], which
+ * calls hooks.future(global, pe, id, view). */
+void CkDynFutureSet(int pe, uint32_t id, CkDynMsg *value);
+/* Send a message through a callback description. */
+void CkDynCallbackSend(const CkDynCallback *cb, CkDynMsg *m);
+/* The reduction number of the local element or branch the target names. */
+int  CkDynGetReductionNumber(const CkDynTarget *t);
+
+/* ------------------------------------------------------------------------ */
+/* Reductions                                                                */
+/* ------------------------------------------------------------------------ */
+
+typedef struct CkDynReducerInfo {
+  const char *name;   /* "sum_int", ... as in CkReduction::reducerType */
+  int         type;   /* the CkReduction::reducerType value */
+  uint8_t     elem;   /* CKDYN_ELEM_* of the data, or CKDYN_ELEM_BYTE for set/concat/statistics/tuple */
+} CkDynReducerInfo;
+
+int  CkDynReducers(const CkDynReducerInfo **out);   /* count; *out points at a static table */
+int  CkDynForeignReducerType(void);                  /* the one reducerType for binding-defined reducers */
+
+typedef struct CkDynRedData {
+  const void *data;
+  uint32_t    len;    /* bytes; 0 with data NULL for an empty contribution */
+  int         type;   /* CkReduction::reducerType, or CkDynForeignReducerType() */
+} CkDynRedData;
+
+/* contribute() on the local element or branch the target names. For a foreign
+ * reducer the data is a CkDyn payload (header + slots + tail) whose user_id is
+ * the binding's reducer id; hooks.reduce combines them. */
+void CkDynContribute(const CkDynTarget *me, const CkDynRedData *d, const CkDynCallback *cb);
+
+/* ------------------------------------------------------------------------ */
+/* Sections (step 2)                                                         */
+/* ------------------------------------------------------------------------ */
+
+void CkDynSectionCreateArray(int aid, int nelems, int ndims, const int *indices, int bfactor,
+                             const CkDynCallback *done, CkDynSectionID *out);
+void CkDynSectionCreateGroup(int gid, int npes, const int *pes, int bfactor,
+                             const CkDynCallback *done, CkDynSectionID *out);
+void CkDynSectionCombine(int nparts, const CkDynSectionID *parts, const CkDynCallback *done, CkDynSectionID *out);
+void CkDynSectionDelete(const CkDynSectionID *sid);
+int  CkDynSectionRedNo(const CkDynTarget *me, const CkDynSectionID *sid);
+void CkDynContributeSection(const CkDynTarget *me, const CkDynSectionID *sid, const CkDynRedData *d,
+                            const CkDynCallback *cb);
+
+/* ------------------------------------------------------------------------ */
+/* Checkpoint, quiescence, load balancing, tracing                           */
+/* ------------------------------------------------------------------------ */
+
+void CkDynCheckpoint(const char *dirname, const CkDynCallback *done);   /* CkStartCheckpoint */
+void CkDynStartQD(const CkDynCallback *cb);
+
+void CkDynAtSync(const CkDynTarget *t);
+void CkDynSetMigratable(const CkDynTarget *t, int migratable);
+void CkDynMigrateMe(const CkDynTarget *t, int to_pe);
+void CkDynLBInstrument(int on);
+void CkDynSetObjLoad(const CkDynTarget *t, double secs);
+void CkDynCallstackPush(const CkDynTarget *t);
+void CkDynCallstackPop(const CkDynTarget *t);
+
+int  CkDynTraceRegisterUserEvent(const char *desc, int id);
+void CkDynTraceBeginUserBracketEvent(int id);
+void CkDynTraceEndUserBracketEvent(int id);
+void CkDynTraceBeginEntry(int ep);
+void CkDynTraceEndEntry(int ep);
+
+/* ------------------------------------------------------------------------ */
+/* Zero-copy and devices (step 3)                                            */
+/* ------------------------------------------------------------------------ */
+
+typedef struct CkDynDevDesc {
+  const void *ptr;
+  uint64_t    len;
+  uint8_t     elem;
+  uint8_t     ndim;
+  uint16_t    tag;
+  int         device;
+  uint64_t    stream;
+  const int64_t *shape;
+} CkDynDevDesc;
+
+void CkDynMsgAddNcpy(CkDynMsgBuilder *b, const CkDynBufDesc *d, CkDynBufDone done, void *arg);
+void CkDynMsgAddDevice(CkDynMsgBuilder *b, const CkDynDevDesc *d, CkDynBufDone done, void *arg);
+void CkDynPostBuffer(const CkDynTarget *t, int ep, int slot, const CkDynBufDesc *d);
+void CkDynPostDeviceBuffer(const CkDynTarget *t, int ep, int slot, const CkDynDevDesc *d);
+void CkDynHapiAddCallback(uint64_t stream, const CkDynCallback *cb);
+
+/* ------------------------------------------------------------------------ */
+/* Runtime wrappers, so that a binding includes no Charm++ header            */
+/* ------------------------------------------------------------------------ */
+
+int    CkDynMyPe(void);
+int    CkDynNumPes(void);
+int    CkDynMyNode(void);
+int    CkDynNumNodes(void);
+int    CkDynMyRank(void);
+int    CkDynNodeSize(int node);
+int    CkDynNodeFirst(int node);
+int    CkDynNodeOf(int pe);
+void   CkDynExit(int code);
+void   CkDynAbort(const char *msg);
+void   CkDynPrintf(const char *text);
+double CkDynWallTimer(void);
+int    CkDynNumPhysicalNodes(void);
+int    CkDynPhysicalNodeID(int pe);
+int    CkDynPhysicalRank(int pe);
+int    CkDynNumPesOnPhysicalNode(int node);
+int    CkDynGetPesOnPhysicalNode(int node, int *pes, int max);
+int    CkDynTopoTreeEdges(int pe, int root, const int *pes, int npes, int bfactor,
+                          int *parent, int *children, int max);
+void   CkDynCallAfter(void (*fn)(void *arg, double now), void *arg, double msecs);
+int    CkDynIsRestarting(void);
+int    CkDynHasLB(void);
+
+/* CCS */
+typedef void (*CkDynCcsHandler)(void *global, const char *name, const void *data, int len);
+void   CkDynCcsRegister(const char *name, CkDynCcsHandler fn);
+int    CkDynCcsIsRemoteRequest(void);
+void   CkDynCcsSendReply(int len, const void *data);
+void  *CkDynCcsDelayReply(void);
+void   CkDynCcsSendDelayedReply(void *token, int len, const void *data);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* CKDYN_H */

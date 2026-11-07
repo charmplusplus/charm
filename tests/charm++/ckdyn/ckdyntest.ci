@@ -1,0 +1,18 @@
+// The CkDyn acceptance test (DESIGN.md 3.16): a C++ program whose chare
+// classes Ping, Grp, NGrp and Single are dynamic classes registered at run
+// time through CkDyn by the test binding in cbinding.C.
+mainmodule ckdyntest {
+  readonly CProxy_TestMain mainProxy;
+  readonly int aidPing;
+  readonly int gidGrp;
+  readonly int gidNGrp;
+  readonly int numElems;
+
+  initnode void ckdynRegister(void);
+  initproc void ckdynTestInitProc(void);
+
+  mainchare TestMain {
+    entry TestMain(CkArgMsg *m);
+    entry void nextPhase();
+  };
+};

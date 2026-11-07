@@ -219,12 +219,17 @@ class ChareInfo {
     /// true if this EP is charm internal functions
     bool inCharm;
 
+    /// true for a class registered through CkDyn (ckdyn.h): its array
+    /// broadcasts are delivered with one call per PE (ckarray.C)
+    bool isDynamic;
+
     ChareInfo(const char *n, size_t s, ChareType t) : name(n), size(s) {
       defCtor=migCtor=-1;
       isIrr = false;
       numbases = 0;
       chareType = t;
       inCharm = false;
+      isDynamic = false;
       mainChareIdx = -1;
       ndims = -1;
     }

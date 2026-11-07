@@ -1,0 +1,18 @@
+// CkDyn: the message types and the per-PE manager group of the dynamic-chare
+// layer (src/ck-core/ckdyn.h, ckdyn.C). The dynamic chare classes themselves
+// are registered at run time by CkDynRegisterClass, not here.
+module CkDyn {
+  message CkDynMsg { char buf[]; };
+  message CkDynMcastMsg { char buf[]; };
+
+  readonly CkGroupID _ckdynMgrGID;
+
+  initnode void _ckdynInitNode(void);
+  initproc void _ckdynInitProc(void);
+
+  group [migratable] CkDynMgr {
+    entry CkDynMgr();
+    entry void deposit(CkDynMsg *m);   // a binding future's value; the future id is the envelope's reference number
+    entry void relay(CkDynMsg *m);     // section callback relay (step 2)
+  };
+};

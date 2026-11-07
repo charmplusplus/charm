@@ -4,6 +4,7 @@ DIRS = \
   megatest \
   alignment \
   simplearrayhello \
+  ckdyn \
   migratable_threads \
   provisioning \
   load_balancing \
