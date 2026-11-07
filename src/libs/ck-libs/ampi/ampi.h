@@ -342,6 +342,7 @@ typedef int MPI_Info;
 #define AMPI_INFO_LB_SYNC           AMPI_API_STATIC_CAST(MPI_Info, 1)
 #define AMPI_INFO_LB_ASYNC          AMPI_API_STATIC_CAST(MPI_Info, 2)
 #define AMPI_INFO_CHKPT_IN_MEMORY   AMPI_API_STATIC_CAST(MPI_Info, 3)
+#define AMPI_INFO_CHKPT_ROLLBACK    AMPI_API_STATIC_CAST(MPI_Info, 4)
 
 /* the size of MPI_Status must conform to MPI_STATUS_SIZE in ampif.h */
 struct AmpiMsg;
