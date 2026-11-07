@@ -610,7 +610,9 @@ void CkMemCheckPT::startArrayCheckpoint(){
 #if CMK_CHKP_ALL
 	size_t size;
 	{
-		PUP::sizer psizer;
+		// IS_CHECKPOINT: buffers packed with pup_buffer (an Isomalloc thread's
+		// stack and heap) are copied, not referenced; the restore unpacks with it.
+		PUP::sizer psizer(PUP::er::IS_CHECKPOINT);
 		pupAllElements(psizer);
 		size = psizer.size();
 	}
@@ -622,7 +624,7 @@ void CkMemCheckPT::startArrayCheckpoint(){
 	msg->bud1=CkMyPe();
 	msg->bud2=ChkptOnPe(CkMyPe());
 	{
-		PUP::toMem p(msg->packData);
+		PUP::toMem p(msg->packData, PUP::er::IS_CHECKPOINT);
 		pupAllElements(p);
 	}
 	CpvAccess(migrationsSinceCheckpoint) = 0;

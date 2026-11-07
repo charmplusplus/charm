@@ -86,7 +86,11 @@ returns the PE itself when there is one PE.
    `pupElementsFor(..., CkElementCreation_migrate)`, the same pup as a
    migration), sends a copy to `ChkptOnPe(me)` (`recvArrayCheckpoint`),
    stores the original in `chkpTable[0]` at the slot being written, and
-   resets the migration counter.
+   resets the migration counter. The sizer and the `PUP::toMem` carry
+   `IS_CHECKPOINT`, under which `pup_buffer` copies the bytes: without it
+   `toMem` records only a zero-copy reference to the live buffer, and an
+   Isomalloc thread's memory (an AMPI rank's stack and heap) is pupped
+   that way, so the checkpoint would refer to the rank's current memory.
 4. `recvArrayCheckpoint` stores the buddy's copy (`chkpTable[1]`, or
    `chkpTable[0]` when the copy is the PE's own, as with one process).
    `arrayCopyStored` counts the two copies of the PE; the second, in either
