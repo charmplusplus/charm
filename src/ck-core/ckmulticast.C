@@ -158,6 +158,12 @@ class mCastEntry
         mCastEntry *oldc, *newc;
         /// Old spanning tree
         SectionLocation   oldtree;
+        /// Root only: the reduction number has been requested from the old
+        /// tree and has not arrived yet
+        char redNoPending;
+        /// Root only: a retrieveCookie received while redNoPending; its
+        /// requester (the next root), answered when the number arrives
+        CkSectionInfo pendingRetrieve;
         // for reduction
         sectionRedInfo red;
         //
@@ -167,10 +173,10 @@ class mCastEntry
 	char grpSec;
     public:
         mCastEntry(CkArrayID _aid): aid(_aid), numChild(0), localGrpElem(0), asm_msg(NULL),
-                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0),
+                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0), redNoPending(0),
                    flag(COOKIE_NOTREADY), grpSec(0) {}
         mCastEntry(CkGroupID _gid): aid(_gid), numChild(0), localGrpElem(0), asm_msg(NULL),
-                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0),
+                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0), redNoPending(0),
                    flag(COOKIE_NOTREADY), grpSec(1) {}
         mCastEntry(mCastEntry *);
         /// Check if this tree is only a branch and has a parent
@@ -279,7 +285,7 @@ void _ckMulticastInit(void)
 
 
 mCastEntry::mCastEntry (mCastEntry *old): 
-  numChild(0), oldc(NULL), newc(NULL), flag(COOKIE_NOTREADY), grpSec(old->isGrpSec())
+  numChild(0), oldc(NULL), newc(NULL), redNoPending(0), flag(COOKIE_NOTREADY), grpSec(old->isGrpSec())
 {
   aid = old->aid;
   parentGrp = old->parentGrp;
@@ -396,6 +402,7 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayBase &proxy)
   entry->oldtree.set(oldentry, oldpe);
 
   // retire the old tree and fetch its reduction number, in one message
+  entry->redNoPending = 1;
   mCastGrp[oldpe].retrieveCookie(CkSectionInfo(oldpe, oldentry, 0, aid), info);
 }
 
@@ -508,6 +515,12 @@ void CkMulticastMgr::initGrpDelegateMgr(CProxySection_Group *proxy, int opts)
 void CkMulticastMgr::retrieveCookie(CkSectionInfo s, CkSectionInfo srcInfo)
 {
   mCastEntry *entry = (mCastEntry *)s.get_val();
+  if (entry->redNoPending) {
+    // The root moved again before this entry learned its own number:
+    // answer from recvCookieInfo.
+    entry->pendingRetrieve = srcInfo;
+    return;
+  }
   // Retire first: an obsolete root forwards contributions to the new root,
   // so its redNo no longer advances and the value sent below is final.
   retire(s, srcInfo);
@@ -521,7 +534,12 @@ void CkMulticastMgr::recvCookieInfo(CkSectionInfo s, int red)
 {
   mCastEntry *entry = (mCastEntry *)s.get_val();
   entry->red.redNo = red;
+  entry->redNoPending = 0;
+  if (entry->pendingRetrieve.get_val())
+    retrieveCookie(s, entry->pendingRetrieve);
 
+  // Still build the tree when retired: childrenReady releases the
+  // multicasts buffered here through it.
   initCookie(s);
 
   // TODO delete old tree
@@ -666,7 +684,8 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     } 
     entry->aid = aid;
     entry->pe = CkMyPe();
-    entry->rootSid = msg->rootSid;
+    /// A root retired before its own setup arrives keeps the new root as rootSid
+    if (!entry->isObsolete()) entry->rootSid = msg->rootSid;
     entry->parentGrp = msg->parent;
     int factor = entry->bfactor = msg->bfactor;
 
@@ -786,9 +805,16 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
 
 void CkMulticastMgr::childrenReady(mCastEntry *entry)
 {
-    // Mark this entry as ready
-    entry->setReady();
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+    if (entry->isObsolete()) {
+        /// Retired while the tree was still being built: retire found no
+        /// children to tear down, so tear them down now. The entry stays
+        /// obsolete; the messages released below are forwarded to the new root.
+        for (size_t i=0; i<entry->children.size(); i++)
+            mCastGrp[entry->children[i].get_pe()].teardown(entry->children[i]);
+    }
+    else
+        entry->setReady();
 
     DEBUGF(("[%d] childrenReady entry %p groupsection?: %d,  Arrayelems: %zu, GroupElems: %zu, redNo: %d\n", CkMyPe(), entry, entry->isGrpSec(), entry->allElem.size(), entry->allGrpElem.size(), entry->red.redNo));
 
