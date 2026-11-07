@@ -194,6 +194,14 @@ AMPI (Adaptive MPI):
   examples/ampi/Cjacobi3D demonstrates it with '-chkpt ITER DIR', and
   the manual has the recipe (#4134).
 
+- In-memory checkpoint and rollback, with the syncft build option:
+  'ampi_checkpoint' set to 'in_memory' checkpoints the ranks, and the
+  new value 'rollback' (AMPI_INFO_CHKPT_ROLLBACK) returns every rank to
+  that checkpoint without any process failing; AMPI_Rollback_count
+  tells the two returns from the checkpoint call apart. Works on macOS
+  and in one process; Cjacobi3D demonstrates it with '-memckpt ITER
+  -rollback ITER2'. Restart after a process failure is not available.
+
 - Standard coverage: the run of the 2018 MPICH pass list recorded on
   #4103 (2026-10-30) passed 181 of 185 tests with one rank per
   process; of the other four, comm/ctxalloc, rma/locknull and
@@ -246,9 +254,9 @@ Known gaps in the alpha:
   sequence number wraparound). pieglobals with Fortran aborts at exit
   on Linux after the program has finished (#4157). On macOS a rank
   cannot move to another process or restart from a checkpoint (no
-  way to turn address randomization off); campi can. In-memory
-  checkpoint and shrink/expand are not in this release, and ROMIO is
-  not built by default.
+  way to turn address randomization off); campi can. Restart from an
+  in-memory checkpoint after a process failure, and shrink/expand, are
+  not in this release, and ROMIO is not built by default.
 
 - Windows multicore is not yet available.
 
