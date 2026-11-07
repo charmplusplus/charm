@@ -361,6 +361,14 @@ AMPI (Adaptive MPI):
   and '+restart DIR' resumes it, also after load balancing steps;
   examples/ampi/Cjacobi3D demonstrates it with '-chkpt' (#4134).
 
+- In-memory checkpoint and rollback, with the syncft build option:
+  'ampi_checkpoint' set to 'in_memory' checkpoints the ranks, and the
+  new value 'rollback' (AMPI_INFO_CHKPT_ROLLBACK) returns every rank to
+  that checkpoint without any process failing; AMPI_Rollback_count
+  tells the two returns from the checkpoint call apart. Works on macOS
+  and in one process; Cjacobi3D demonstrates it with '-memckpt ITER
+  -rollback ITER2'. Restart after a process failure is not available.
+
 - Exit status: MPI_Finalize returns, and the largest value main
   returns over the ranks becomes the program's exit status (#4102,
   #4170). MPI_Abort ends the program with its error code as the exit

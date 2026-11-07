@@ -11,7 +11,7 @@ are only available in Fortran.
 .. code-block:: none
 
    AMPI_Migrate          AMPI_Register_pup            AMPI_Get_pup_data
-   AMPI_Migrate_to_pe    AMPI_Set_migratable
+   AMPI_Migrate_to_pe    AMPI_Set_migratable          AMPI_Rollback_count
    AMPI_Load_set_value   AMPI_Load_start_measure      AMPI_Load_stop_measure
    AMPI_Iget             AMPI_Iget_wait               AMPI_Iget_data
    AMPI_Iget_free        AMPI_Type_is_contiguous
@@ -429,9 +429,10 @@ call to ``int AMPI_Migrate(MPI_Info hints)`` with an ``MPI_Info`` object
 that specifies how you would like to checkpoint. Checkpointing can be
 thought of as migrating AMPI ranks to storage. Users set the
 checkpointing policy on an ``MPI_Info`` object’s ``"ampi_checkpoint"``
-key to one of the following values: ``"to_file=directory_name"`` or
-``"false"``. To perform checkpointing in memory a built-in MPI_Info
-object called ``AMPI_INFO_CHKPT_IN_MEMORY`` is provided.
+key to one of the following values: ``"to_file=directory_name"``,
+``"in_memory"``, ``"rollback"`` or ``"false"``. The built-in MPI_Info
+objects ``AMPI_INFO_CHKPT_IN_MEMORY`` and ``AMPI_INFO_CHKPT_ROLLBACK``
+carry the values ``"in_memory"`` and ``"rollback"``.
 
 Checkpointing to file tells the runtime system to save checkpoints in a
 given directory. (Typically, in an iterative program, the iteration
@@ -495,6 +496,89 @@ illustrated in the code snippet below.
      if (iter % chkpt_freq == 0)
        AMPI_Migrate(AMPI_INFO_CHKPT_IN_MEMORY);
    }
+
+In-memory checkpointing needs Charm++ built with the ``syncft`` option
+(for example ``./build AMPI reconverse-linux-x86_64 syncft``); without it,
+``AMPI_Migrate`` with ``"in_memory"`` or ``"rollback"`` aborts. On
+reconverse builds a process failure still ends the job: the runtime does
+not detect failures or replace processes yet, so the online restart
+described above does not happen. What works is rolling back to the last
+in-memory checkpoint without any failure, for example after the program
+detects an error in its own data.
+
+Rollback to an in-memory checkpoint
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``AMPI_Migrate`` with ``"ampi_checkpoint"`` set to ``"rollback"`` (or the
+built-in object ``AMPI_INFO_CHKPT_ROLLBACK``) returns every rank to the
+last completed in-memory checkpoint. Like the other values it is
+collective over ``MPI_COMM_WORLD``. The runtime destroys every rank and
+restores it from the checkpoint: its stack, its heap and its MPI state
+(communicators, datatypes, info objects) are as they were when the
+checkpoint was taken. Each rank's thread was suspended inside the
+``AMPI_Migrate(in_memory)`` call that took the checkpoint, so that call
+returns a second time, and the program continues from there. The call
+that asked for the rollback never returns.
+
+Since everything in the rank is restored, a counter kept in the rank's
+own variables cannot tell the first return from the return after a
+rollback: the checkpoint was taken before the first return, so every
+rollback restores the counter to its value before any increment. The
+runtime keeps the count outside the ranks:
+
+.. code-block:: c++
+
+   int AMPI_Rollback_count(int *count);
+
+sets ``count`` to the number of rollbacks to the last completed in-memory
+checkpoint, 0 until the first one; the count starts again from 0 when the
+next checkpoint completes. A program that rolls back once after an error
+found at a later step looks like this:
+
+.. code-block:: c++
+
+   int rollbacks = 0;
+   for (int iter = 1; iter <= max_iters; iter++) {
+
+     // Time step work ...
+
+     if (iter == chkpt_iter) {
+       AMPI_Migrate(AMPI_INFO_CHKPT_IN_MEMORY);
+       AMPI_Rollback_count(&rollbacks);  // 0, then 1 after the rollback
+     }
+     if (error_found && rollbacks == 0)  // every rank must take this branch
+       AMPI_Migrate(AMPI_INFO_CHKPT_ROLLBACK);
+   }
+
+Restrictions and notes:
+
+- A checkpoint must have completed. A rollback before any in-memory
+  checkpoint aborts the program.
+- No rank may migrate between the checkpoint and the rollback, so no load
+  balancing may run in that interval: the rollback restores each rank on
+  the PE that held it at the checkpoint. A rollback after an
+  ``AMPI_Migrate`` with ``"ampi_load_balance"`` that moved a rank is
+  refused by the runtime, which aborts with ``CharmFT> rollback refused:
+  N array elements migrated on PE p since the last in-memory
+  checkpoint``.
+- Only the ranks are restored. Nothing outside them is: readonly
+  variables, Charm++ groups, and files the program wrote keep their
+  current state. In a program whose global variables are not privatized,
+  the globals are shared by the process and are not restored either.
+- The same checkpoint can be rolled back to more than once, and a new
+  checkpoint can be taken after a rollback.
+- With a single process, both copies of each checkpoint are kept in that
+  process and PE 0 prints ``CharmFT> one node: a process failure cannot
+  be survived; checkpoint and rollback work``. Checkpoint and rollback
+  work normally there.
+- A rollback never moves a rank between processes, so it works on macOS,
+  where ranks cannot migrate between processes, in one process and in
+  several.
+- campi programs cannot use in-memory checkpoints or rollback.
+
+``tests/ampi/memckpt`` checks a rollback, and the example
+``examples/ampi/Cjacobi3D`` shows one with ``-memckpt`` and
+``-rollback`` (see its header comment).
 
 A value of ``"false"`` results in no checkpoint being done that step.
 Note that ``AMPI_Migrate`` is a collective function, meaning every
