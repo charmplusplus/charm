@@ -31,6 +31,8 @@ typedef struct CmiIsomallocRegion {
  * No use case for this currently exists. */
 CmiIsomallocContext CmiIsomallocContextCreate(int myunit, int numunits);
 void CmiIsomallocContextDelete(CmiIsomallocContext ctx);
+/* Unmap the context's memory now; the context itself is deleted later. */
+void CmiIsomallocContextRelease(CmiIsomallocContext ctx);
 void CmiIsomallocContextPup(pup_er p, CmiIsomallocContext * ctxptr);
 void CmiIsomallocContextEnableRandomAccess(CmiIsomallocContext ctx);
 void CmiIsomallocContextJustMigrated(CmiIsomallocContext ctx);

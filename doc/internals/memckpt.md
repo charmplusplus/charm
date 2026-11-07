@@ -133,7 +133,11 @@ starts the next. `diePe` is the failed PE, or -1 for a rollback.
    rebuild=true)`). `rebuild` resets the element's reduction numbers to 0
    and restamps its broadcast epoch (array-broadcast-migration.md); the
    location manager registers the element as local without telling its
-   home PE. Then `doneInserting`.
+   home PE. Then `doneInserting`. A rank's Isomalloc context is recreated
+   at the addresses it had, so step 2 must have unmapped them: Reconverse's
+   `CthFree` keeps the last freed thread of each PE, with its memory, until
+   the next one is freed, and `TCharm::~TCharm` therefore unmaps the
+   context's memory itself (`CmiIsomallocContextRelease`).
 6. `finishUp`: clears `inRestarting` (here, after the reduction, because
    the flag is shared by the PEs of a process and must stay set until all
    of them have resumed their elements), and the failed PE, or PE 0 for a
