@@ -509,14 +509,6 @@ if(CMK_COVERAGE)
   # clang), so it is not put in CMAKE_EXE_LINKER_FLAGS.
 endif()
 
-# This needs to be include before we set charmc as the linker
-# but after CMAKE_LIBRARY_OUTPUT_DIRECTORY has been set
-add_subdirectory(cmake/reconverse)
-
-if (NOT CMK_MEMPOOL_CUTOFFNUM)
-  set(CMK_MEMPOOL_CUTOFFNUM 28)
-endif()
-
 set(CMK_OPTIMIZE 0)
 if(CMAKE_BUILD_TYPE MATCHES "Release" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
     set(CMK_OPTIMIZE 1)
@@ -524,6 +516,17 @@ if(CMAKE_BUILD_TYPE MATCHES "Release" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInf
     set(BUILDOPTS "${BUILDOPTS} -optimize -production")
     set(OPTS "${OPTS} -optimize -production")
     set(OPTSATBUILDTIME "${OPTSATBUILDTIME} -optimize -production")
+endif()
+# Every object in this build and in reconverse sees the same CMK_OPTIMIZE,
+# whether or not it includes conv-mach-opt.h before converse.h.
+add_compile_definitions(CMK_OPTIMIZE=${CMK_OPTIMIZE})
+
+# This needs to be include before we set charmc as the linker
+# but after CMAKE_LIBRARY_OUTPUT_DIRECTORY has been set
+add_subdirectory(cmake/reconverse)
+
+if (NOT CMK_MEMPOOL_CUTOFFNUM)
+  set(CMK_MEMPOOL_CUTOFFNUM 28)
 endif()
 
 set(CMK_CHARM4PY 0)
