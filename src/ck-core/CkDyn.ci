@@ -18,6 +18,8 @@ module CkDyn {
     entry [notrace] void deposit(CkDynMsg *m);
     // a section callback's result, forwarded to the section (any message type arrives here)
     entry void relay(CkDynMsg *m);
+    // a CkDynHapiAddCallback completion: m carries the CkDynCallback to send to
+    entry void hapiDone(CkDynMsg *m);
     // sections rooted on this PE (doc/internals/ckdyn.md, "Sections")
     entry void sectionSend(CkDynMcastMsg *m);
     entry void sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe);
