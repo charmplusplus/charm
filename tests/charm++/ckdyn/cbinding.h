@@ -63,6 +63,7 @@ struct Obj {
 
 const CkDynHooks *cbHooks(void);
 void cbRegister(CbClass *c);      /* CkDynRegisterClass; fills chareIdx, firstEp */
+void cbRegisterLate(CbClass *c);  /* the same after start-up, with CkDynRegisterClassLate */
 void cbInitPe(void);              /* per-PE state; call from an initproc */
 
 /* ---- futures ------------------------------------------------------------ */

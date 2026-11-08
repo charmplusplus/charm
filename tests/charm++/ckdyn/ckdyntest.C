@@ -72,15 +72,16 @@ static CkDynCallback viewCb(const CkDynMsgView *v, int slot) { CkDynCallback c; 
 /* Classes                                                                 */
 /* ====================================================================== */
 
-extern CbClass Ping, Sec, Grp, NGrp, Single, DMain;
+extern CbClass Ping, Sec, Grp, NGrp, Single, DMain, Late;
 
 enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTRED, P_GOTREDB, P_COMPUTE, P_CORO, P_SYNCSTART, P_RESUMED };
 enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED };
 enum { G_CTOR, G_GOTRED, G_GOTREDB, G_NGSEND, G_NGREPORT, G_PRIOSTART, G_PRIORECV, G_EXPRECV,
-       G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE };
+       G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE, G_LATEREG };
 enum { N_CTOR, N_INCR };
 enum { S_CTOR, S_GOTRED };
 enum { D_CTOR, D_RESUMED };
+enum { L_CTOR, L_ADD, L_TWICE };
 
 static inline int myIndex(Obj *o) { return o->t.u.array.index[0]; }
 static void sendPing(int i, int m, CkDynMsg *msg) { CkDynSendArray(aidPing, 1, &i, Ping.ep(m), msg, nullptr); }
@@ -454,6 +455,16 @@ static int64_t grpSecCreate(Obj *, const CkDynMsgView *v) {
   return 0;
 }
 
+/* lateReg(CALLBACK done): register Late after start-up. The main chare runs
+ * this phase only with one PE per process, so each PE registers for its
+ * process; the reduction tells it that every process has. */
+static int64_t grpLateReg(Obj *o, const CkDynMsgView *v) {
+  cbRegisterLate(&Late);
+  int r[3] = { 1, Late.chareIdx, Late.firstEp };
+  contributeInts(o, r, 3, viewCb(v, 0));
+  return 0;
+}
+
 CbClass Grp = { "Grp", CKDYN_GROUP, 0, {
   { "Grp.Grp", 0, grpCtor },
   { "Grp.gotRed", CKDYN_EP_REDNTARGET, grpGotRed },
@@ -467,6 +478,7 @@ CbClass Grp = { "Grp", CKDYN_GROUP, 0, {
   { "Grp.gotElem", CKDYN_EP_REDNTARGET, secGotElem },
   { "Grp.gotSec", CKDYN_EP_REDNTARGET, secGotSec },
   { "Grp.secCreate", 0, grpSecCreate },
+  { "Grp.lateReg", 0, grpLateReg },
 } };
 
 /* ---- NGrp (nodegroup) ---------------------------------------------------- */
@@ -538,6 +550,30 @@ CbClass DMain = { "DMain", CKDYN_MAINCHARE, 0, {
   { "DMain.resumed", 0, dmainResumed },
 } };
 
+/* ---- Late (1-D array registered after start-up, the late phase) -------- */
+
+static int64_t lateCtor(Obj *o, const CkDynMsgView *v) {
+  CHECK(v->hdr && (v->hdr->flags & CKDYN_MSG_CREATION), "Late constructor message lost its flags");
+  CHECK(o->t.kind == CKDYN_ARRAY && o->t.chare_idx == Late.chareIdx, "Late constructed with a wrong target");
+  o->s.counter = 0;
+  return 0;
+}
+/* add(value, cb): counter += value * (index + 1); contribute (counter, 1) */
+static int64_t lateAdd(Obj *o, const CkDynMsgView *v) {
+  o->s.counter += cbI64(v, 0) * (myIndex(o) + 1);
+  int r[2] = { (int)o->s.counter, 1 };
+  contributeInts(o, r, 2, viewCb(v, 1));
+  return 0;
+}
+/* twice(x) with CKDYN_MSG_BLOCK: a point-to-point send whose future gets 2x */
+static int64_t lateTwice(Obj *, const CkDynMsgView *v) { return 2 * cbI64(v, 0); }
+
+CbClass Late = { "Late", CKDYN_ARRAY, 1, {
+  { "Late.Late", 0, lateCtor },
+  { "Late.add", CKDYN_EP_REDNTARGET, lateAdd },
+  { "Late.twice", 0, lateTwice },
+} };
+
 /* ====================================================================== */
 /* Registration                                                            */
 /* ====================================================================== */
@@ -550,6 +586,7 @@ void ckdynRegister(void) {
   cbRegister(&NGrp);
   cbRegister(&Single);
   cbRegister(&DMain);
+  CkDynAllowLateRegistration();   /* Late is registered by the late phase */
 }
 
 void ckdynTestInitProc(void) { cbInitPe(); }
@@ -569,7 +606,7 @@ class TestMain : public CBase_TestMain {
     "future_return", "nodegroup", "qd", "priority", "coroutine",
     "sections/array", "sections/group", "sections/remote", "sections/combine_overlap",
     "sections/combine_arrays", "sections/delete", "sections/migration",
-    "migration", "checkpoint", "exit" };
+    "migration", "checkpoint", "late", "exit" };
   std::string ckptDir = "ckdyntest.ckpt";
   int step = -1;
   int pending = 0;
@@ -662,6 +699,7 @@ public:
     else if (s.compare(0, 9, "sections/") == 0) runSections(s);
     else if (s == "migration") runMigration();
     else if (s == "checkpoint") runCheckpoint();
+    else if (s == "late") runLate();
     else if (s == "exit") { CkPrintf("ALL DONE (%.3f s)\n", CkWallTimer() - tStart); CkDynExit(0); }
   }
 
@@ -805,6 +843,51 @@ public:
     CkDynCheckpoint(ckptDir.c_str(), &cb);
   }
 
+  /* late: register Late on every process after start-up (after the checkpoint
+     phase, so that the checkpoint holds no Late object: a restart would need
+     Late registered at start-up), then create an array of it, send to one
+     element, broadcast to all and reduce. Needs one PE per process. */
+  void runLate() {
+    if (CkMyNodeSize() != 1) {
+      CkPrintf("SKIP late (%d PEs per process; late registration needs one)\n", CkMyNodeSize());
+      next();
+      return;
+    }
+    uint32_t freg = cbNewFuture([this](const CkDynMsgView *v) {
+      int n = redInt(v, 0), idx = redInt(v, 1), ep = redInt(v, 2);
+      CHECK(n == CkNumPes(), "late: %d PEs registered Late, expected %d", n, CkNumPes());
+      CHECK(Late.chareIdx > 0 && idx == n * Late.chareIdx && ep == n * Late.firstEp,
+            "late: processes disagree on Late's indices (chare %d, ep %d on PE 0)", Late.chareIdx, Late.firstEp);
+      CHECK(CkDynClassOf(Late.chareIdx) != nullptr, "late: CkDynClassOf(Late) is NULL");
+      CkPrintf("  late: Late registered on %d processes: chare index %d, entries %d..%d\n",
+               n, Late.chareIdx, Late.firstEp, Late.ep(L_TWICE));
+      lateArray();
+    });
+    CkDynSendGroup(gidGrp, -1, Grp.ep(G_LATEREG), MsgB().cb(cbFutureCb(0, freg)).finish(0), nullptr);
+  }
+  void lateArray() {
+    int n = 2 * CkNumPes() + 1;
+    uint32_t fc = cbNewFuture([this, n](const CkDynMsgView *) {
+      uint32_t ft = cbNewFuture([this, n](const CkDynMsgView *v) {
+        CHECK(cbI64(v, 0) == 42, "late: twice(21) returned %lld", (long long)cbI64(v, 0));
+        const int value = 3;
+        uint32_t fr = cbNewFuture([this, n, value](const CkDynMsgView *v) {
+          int sum = redInt(v, 0), cnt = redInt(v, 1);
+          CHECK(cnt == n, "late: %d contributions, expected %d", cnt, n);
+          CHECK(sum == value * n * (n + 1) / 2, "late: sum %d, expected %d", sum, value * n * (n + 1) / 2);
+          CkPrintf("  late: %d elements, point-to-point send, broadcast and reduction\n", n);
+          pass("late");
+        });
+        CkDynSendArray(lateAid, 1, nullptr, Late.ep(L_ADD), MsgB().i64(value).cb(cbFutureCb(0, fr)).finish(0), nullptr);
+      });
+      int last = n - 1;
+      CkDynSendArray(lateAid, 1, &last, Late.ep(L_TWICE), MsgB().flags(CKDYN_MSG_BLOCK).i64(21).fut(0, ft).finish(0), nullptr);
+    });
+    int dims[1] = { n };
+    CkDynArrayOpts ao = { 1, dims, -1, 0, 0, -1 };
+    lateAid = CkDynCreateArray(Late.chareIdx, MsgB().flags(CKDYN_MSG_CREATION).fut(0, fc).finish(Late.ep(L_CTOR)), &ao);
+  }
+  int lateAid = -1;
   /* AtSync on every element of the arrays created with usesAtSync (the load
      balancer starts on a PE only when all of its such elements have called
      it); `ping` checks Ping's result, `done` gets the Sec elements that moved */

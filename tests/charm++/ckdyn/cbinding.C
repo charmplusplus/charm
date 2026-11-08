@@ -289,7 +289,7 @@ const CkDynHooks *cbHooks(void) {
   return &g_hooks;
 }
 
-void cbRegister(CbClass *c) {
+static void registerClass(CbClass *c, bool late) {
   int n = (int)c->methods.size();
   CkDynEntryDesc *e = new CkDynEntryDesc[n];   /* leaked: registration keeps it for the run */
   for (int i = 0; i < n; i++) {
@@ -303,5 +303,8 @@ void cbRegister(CbClass *c) {
   d.num_entries = n; d.entries = e;
   d.binding_data = c;
   d.hooks = nullptr;
-  c->chareIdx = CkDynRegisterClass(&d, &c->firstEp);
+  c->chareIdx = late ? CkDynRegisterClassLate(&d, &c->firstEp) : CkDynRegisterClass(&d, &c->firstEp);
 }
+
+void cbRegister(CbClass *c) { registerClass(c, false); }
+void cbRegisterLate(CbClass *c) { registerClass(c, true); }
