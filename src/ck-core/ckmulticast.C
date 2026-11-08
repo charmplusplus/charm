@@ -1455,6 +1455,9 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
         mCastGrp[entry->parentGrp.get_pe()].recvRedMsg(newmsg);
     } else {
         newmsg->sid = id;
+        // A reducer that builds a new message leaves its callback unset; the
+        // cross-array reducer (XArraySectionReducer) reads it from here
+        newmsg->callback = msg_cb;
         // Buffer the reduced fragment
         rmsgs.push_back (newmsg);
         // If all the fragments have been reduced
