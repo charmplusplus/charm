@@ -99,6 +99,9 @@ set(BUILD_SHARED_LIBS ${_save_BUILD_SHARED_LIBS} CACHE INTERNAL "")
 if("${TARGET}" STREQUAL "charm4py")
   target_compile_definitions(reconverse PRIVATE CMK_CHARM4PY=1)
 endif()
+# The directory properties cleared above drop Charm++'s CMK_OPTIMIZE, and
+# reconverse only sets its own when it is the root project.
+target_compile_definitions(reconverse PRIVATE CMK_OPTIMIZE=${CMK_OPTIMIZE})
 
 configure_file(${_reconverse_src}/include/converse.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 configure_file(${_reconverse_src}/src/cldb.h ${CMAKE_BINARY_DIR}/include/ COPYONLY)
