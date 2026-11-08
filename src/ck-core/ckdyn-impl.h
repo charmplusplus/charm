@@ -165,8 +165,10 @@ struct CkDynSection {
   std::vector<Query> queries;                         /* member queries that arrived before ready */
 };
 
-/* A section callback: the relay slot's target (CkDynMgr::relay). */
-struct CkDynRelaySlot { CkDynSectionID sid; int ep; uint32_t refnum; };
+/* A section callback: the relay slot's target (CkDynMgr::relay). sys marks a
+ * slot for a system message (QD, checkpoint), which carries no reference
+ * number of its own: the slot holds it in sysRefnum. */
+struct CkDynRelaySlot { CkDynSectionID sid; int ep; bool sys; uint32_t sysRefnum; };
 
 class CkDynMgr : public CBase_CkDynMgr {
 public:
@@ -195,7 +197,7 @@ public:
   /* section callbacks made on this PE */
   std::vector<CkDynRelaySlot> relays;
   std::map<std::vector<uint32_t>, int> relayIndex;
-  int relaySlot(const CkDynSectionID &sid, int ep, uint32_t refnum);
+  int relaySlot(const CkDynSectionID &sid, int ep, bool sys = false, uint32_t sysRefnum = 0);
 };
 
 /* ---- helpers used by ckarray.C ------------------------------------------ */
@@ -211,7 +213,9 @@ void CkDynDeliverBroadcast(void *bcastMsg, ArrayElemDyn **elems, int n);
  * hook table was installed. */
 bool CkDynCallRegisterHook();
 
-/* Build a CkCallback from a description. */
-CkCallback CkDynMakeCallback(const CkDynCallback *cb);
+/* Build a CkCallback from a description. sysMsg: the callback will receive a
+ * system message (QD, checkpoint), so a SECTION callback's refnum is kept in
+ * its relay slot instead of being read from the message. */
+CkCallback CkDynMakeCallback(const CkDynCallback *cb, bool sysMsg = false);
 
 #endif /* CKDYN_IMPL_H */

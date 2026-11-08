@@ -340,13 +340,15 @@ static int64_t secGotBcast(Obj *o, const CkDynMsgView *v) {
   CkDynContribute(&o->t, &d, &cb);
   return 0;
 }
-/* gotSec: a SECTION callback; every member reduces [value, count, 1] over the section */
+/* gotSec: a SECTION callback; every member reduces [value, count, 1, refnum]
+ * over the section, so the root can check the refnum each member received */
 static int64_t secGotSec(Obj *o, const CkDynMsgView *v) {
   CHECK(v->kind == CKDYN_MSGKIND_MCAST && v->section, "gotSec: view kind %d", (int)v->kind);
   CHECK(v->refnum != 0, "gotSec: the section callback lost its reference number");
-  double r[3];
+  double r[4];
   resultOf(v, &r[0], &r[1]);
   r[2] = 1;
+  r[3] = v->refnum;
   CkDynRedData d = { r, sizeof r, redType("sum_double") };
   CkDynCallback cb = cbFutureCb(0, v->refnum);
   CkDynSectionID sid = *v->section;
@@ -905,7 +907,10 @@ public:
       static const char *kinds[] = { "future", "element", "bcast", "section" };
       Sect &S = sects[name];
       std::string what = cur + ": " + name + (mode ? " foreign" : " sum_double") + " to " + kinds[kind];
-      uint32_t f = cbNewFuture([this, &S, mode, kind, what](const CkDynMsgView *v) {
+      uint32_t *fp = new uint32_t(0);
+      uint32_t f = cbNewFuture([this, &S, mode, kind, what, fp](const CkDynMsgView *v) {
+        uint32_t f = *fp;
+        delete fp;
         double val, cnt, n = 1;
         if (kind == 0) {
           CHECK(v->kind == (mode == 0 ? CKDYN_MSGKIND_REDRESULT : CKDYN_MSGKIND_DYN), "%s: view kind %d", what.c_str(), (int)v->kind);
@@ -918,10 +923,14 @@ public:
         }
         double expectN = kind == 2 ? nSecA : (kind == 3 ? S.size : 1);
         CHECK(n == expectN, "%s: %g receivers of the result, expected %g", what.c_str(), n, expectN);
+        if (kind == 3)
+          CHECK(redDouble(v, 3) == (double)f * expectN, "%s: members received refnum sum %g, expected %u each",
+                what.c_str(), redDouble(v, 3), f);
         CHECK(val == S.sum * expectN, "%s: sum %g, expected %g", what.c_str(), val, S.sum * expectN);
         if (mode == 0) CHECK(cnt == S.size * expectN, "%s: %g contributions, expected %g", what.c_str(), cnt, S.size * expectN);
         go();
       });
+      *fp = f;
       CkDynCallback cb;
       if (kind == 0) cb = cbFutureCb(0, f);
       else if (kind == 1) cb = S.group ? cbTargetCb(cbGroupTarget(gidGrp, Grp.chareIdx, 0), Grp.ep(G_GOTELEM), 0, f)
@@ -955,6 +964,9 @@ public:
       qCreateArray("Aeven", aidSecA, evens);
       qRound("Aeven", 0, 0); qRound("Aeven", 1, 0); qRound("Aeven", 0, 1);
       qRound("Aeven", 1, 2); qRound("Aeven", 0, 3); qRound("Aeven", 1, 3);
+      /* the same SECTION callback (sid, ep) again with another refnum: one relay
+         slot per PE serves both, and each round checks its own refnum arrived */
+      qRound("Aeven", 0, 3);
     } else if (s == "sections/group") {
       std::vector<int> pes;
       for (int p = 0; p < CkNumPes(); p += 2) pes.push_back(p);

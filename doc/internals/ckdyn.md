@@ -462,7 +462,7 @@ A binding describes a callback with the POD `CkDynCallback`;
 | `TARGET`, `bcast != 0` | `bcastGroup`, `bcastNodeGroup` or `bcastArray` |
 | `FUTURE` | `sendGroup` to `CkDynMgr[cb->pe].deposit`, reference number `cb->id` |
 | `IGNORE`, `EXIT` | `CkCallback::ignore`, `CkCallback::ckExit` |
-| `SECTION` | `sendGroup` to `CkDynMgr[CkMyPe()].relay`, reference number = a relay slot (see Sections) |
+| `SECTION` | `sendGroup` to `CkDynMgr[CkMyPe()].relay`, reference number = a relay slot (see Sections); `CkDynCallbackSend` sends to the section directly |
 
 A `TARGET` callback to a main chare is the exception to the first row: it
 becomes `sendGroup` to the class's relay entry for `cb->ep` (`relayFirst +
@@ -672,16 +672,38 @@ id.
 **Section callbacks** (`CKDYN_CB_SECTION`) are converted, on the PE that
 converts them, to a group callback to `CkDynMgr[CkMyPe()].relay` whose
 reference number is a slot in that branch's relay table (`relaySlot`, slots
-deduplicated by `(sid, ep, refnum)`). `relay` reads the slot, converts the
-message it received into a `CkDynMcastMsg` (`toMcast`: a `CkDynMsg` or a
-foreign result keeps its payload; a built-in reduction result becomes one
-`BUFFER` slot whose `elem` comes from the reducer table; a system message
-becomes an empty payload), sets the callback's `refnum` as the reference
-number, and sends it with `CkDynSendSection`. Members see an MCAST view, with
-`refnum` set and no synthesized FUTURE slot. Such a callback is pup-able,
-unlike Charm++'s `bcastSection` callback. The relay table grows by one slot per
-distinct `(sid, ep, refnum)` converted on a PE and is never trimmed; with a
-16-bit `CMK_REFNUM_TYPE` a PE has at most 65534 slots.
+deduplicated by `(sid, ep)`). The callback's reference number replaces the
+envelope's on delivery, so the callback's own `refnum` cannot travel there;
+`relay` recovers it per message kind:
+
+- a reduction result (`CkDynContributeSection`, and `CkDynContribute` from a
+  group, node group or array element) carries it as the `CkReductionMsg` user
+  flag: `sectionContribute` passes it as CkMulticast's `userData`,
+  `CkDynContribute` as the `userFlag` of `contribute`; the all-ones flag means
+  none. CkMulticast keeps the user flag through cross-array results.
+- a system message (`CkDynStartQD`, `CkDynCheckpoint`) carries none, so these
+  two convert with `CkDynMakeCallback(cb, true)` and get a slot of their own
+  keyed by `(sid, ep, refnum)` that holds it (`CkDynRelaySlot::sys`,
+  `sysRefnum`).
+- a `CkDynMsg` given to `CkDynCallbackSend` does not go through the relay:
+  `CkDynCallbackSend` converts it and sends it to the section itself, with
+  `cb->refnum` as the reference number.
+
+Any other message type at a reduction slot aborts. `relay` converts the
+message into a `CkDynMcastMsg` (`toMcast`: a foreign result keeps its
+payload; a built-in reduction result becomes one `BUFFER` slot whose `elem`
+comes from the reducer table; a system message becomes an empty payload),
+sets the recovered reference number, and sends it with `CkDynSendSection`.
+Members see an MCAST view, with `refnum` set and no synthesized FUTURE slot.
+Such a callback is pup-able, unlike Charm++'s `bcastSection` callback.
+
+The relay table is never trimmed and does not need to be: a PE holds one
+reduction slot per `(section id, entry)` pair used in a section callback
+converted there, so a program that calls collectives with a fresh future id
+each time reuses the same slot. The section id includes the generation, so
+deleting and re-creating sections adds slots for the new ids; QD and
+checkpoint with a section callback add one slot per distinct reference
+number. With a 16-bit `CMK_REFNUM_TYPE` a PE has at most 65534 slots.
 
 ### Combine
 
@@ -867,6 +889,13 @@ libck that also defines it.
   group part or with parts of different index dimension counts, a section
   message with a group dependency, and a section message for an entry of
   another class than the receiving element.
+- **Section callback relay table.** Per PE, one slot per `(section id with
+  generation, entry)` used in a section callback converted on that PE, plus
+  one per distinct reference number of a QD or checkpoint section callback;
+  slots are never freed. Fresh future ids per collective call do not add
+  slots. At most 65534 slots with a 16-bit `CMK_REFNUM_TYPE`; the next one
+  aborts with "future id %u is not usable as this build's %d-byte reference
+  number".
 - **Not implemented yet.** Zero-copy
   and device buffers (`CkDynMsgAddNcpy`, `CkDynMsgAddDevice`,
   `CkDynPostBuffer`, `CkDynPostDeviceBuffer`) and `CkDynHapiAddCallback`

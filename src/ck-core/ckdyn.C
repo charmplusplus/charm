@@ -1307,7 +1307,7 @@ static CMK_REFNUM_TYPE checkedRefnum(uint32_t id) {
   return (CMK_REFNUM_TYPE)id;
 }
 
-CkCallback CkDynMakeCallback(const CkDynCallback *cb) {
+CkCallback CkDynMakeCallback(const CkDynCallback *cb, bool sysMsg) {
   switch (cb->kind) {
     case CKDYN_CB_IGNORE: return CkCallback(CkCallback::ignore);
     case CKDYN_CB_EXIT:   return CkCallback(CkCallback::ckExit);
@@ -1317,10 +1317,11 @@ CkCallback CkDynMakeCallback(const CkDynCallback *cb) {
       return c;
     }
     case CKDYN_CB_SECTION: {
-      /* through a relay slot on this PE's CkDynMgr, which holds (sid, ep, refnum)
-         and forwards the delivered message to the section */
+      /* through a relay slot on this PE's CkDynMgr, which holds (sid, ep) and
+         forwards the delivered message to the section (doc/internals/ckdyn.md,
+         Sections: Reductions) */
       CkDynMgr *mg = CProxy_CkDynMgr(_ckdynMgrGID).ckLocalBranch();
-      int slot = mg->relaySlot(cb->sid, cb->ep, cb->refnum);
+      int slot = sysMsg ? mg->relaySlot(cb->sid, cb->ep, true, cb->refnum) : mg->relaySlot(cb->sid, cb->ep);
       CkCallback c(CkIndex_CkDynMgr::relay(0), CkMyPe(), _ckdynMgrGID);
       c.setRefnum(checkedRefnum((uint32_t)slot));
       return c;
@@ -1363,7 +1364,18 @@ CkCallback CkDynMakeCallback(const CkDynCallback *cb) {
   CkAbort("CkDyn: unknown callback kind %d", (int)cb->kind);
 }
 
+static CkDynMcastMsg *toMcast(void *msg);   /* in the sections part below */
+
 extern "C" void CkDynCallbackSend(const CkDynCallback *cb, CkDynMsg *m) {
+  if (cb->kind == CKDYN_CB_SECTION) {
+    /* sent to the section here: through the relay, the slot would replace the
+       envelope's reference number and cb->refnum would be lost */
+    CkDynMcastMsg *mm = toMcast(m);
+    CkFreeMsg(m);
+    UsrToEnv(mm)->setRef((CMK_REFNUM_TYPE)cb->refnum);
+    CkDynSendSection(&cb->sid, cb->ep, mm, nullptr);
+    return;
+  }
   if (cb->kind == CKDYN_CB_TARGET) stampEp(m, cb->ep);
   CkDynMakeCallback(cb).send(m);
 }
@@ -1399,30 +1411,39 @@ void CkDynMgr::deposit(CkDynMsg *m) {
   CkFreeMsg(m);
 }
 
-static CkDynMcastMsg *toMcast(void *msg);   /* in the sections part below */
-
-int CkDynMgr::relaySlot(const CkDynSectionID &sid, int ep, uint32_t refnum) {
-  std::vector<uint32_t> key = { (uint32_t)sid.root_pe, (uint32_t)sid.idx, sid.gen, (uint32_t)ep, refnum };
+int CkDynMgr::relaySlot(const CkDynSectionID &sid, int ep, bool sys, uint32_t sysRefnum) {
+  if (!sys) sysRefnum = 0;
+  std::vector<uint32_t> key = { (uint32_t)sid.root_pe, (uint32_t)sid.idx, sid.gen, (uint32_t)ep, (uint32_t)sys, sysRefnum };
   auto it = relayIndex.find(key);
   if (it != relayIndex.end()) return it->second;
-  relays.push_back(CkDynRelaySlot{ sid, ep, refnum });
+  relays.push_back(CkDynRelaySlot{ sid, ep, sys, sysRefnum });
   int slot = (int)relays.size();   /* 1-based: 0 is "no reference number" */
   relayIndex[key] = slot;
   return slot;
 }
 
-/* A section callback's message (a CkDynMsg, a reduction result or a system
-   message) arrives here with the relay slot as its reference number; it is
-   converted to a section message carrying the callback's own reference
-   number and sent to the section. */
+/* A section callback's message (a reduction result or a system message)
+   arrives here with the relay slot as its reference number; it is converted
+   to a section message carrying the callback's own reference number and sent
+   to the section. A reduction result carries that number as its user flag
+   (the contribution's userFlag); a system message carries none, so its slot
+   holds it. */
 void CkDynMgr::relay(CkDynMsg *m) {
   void *msg = m;
   uint32_t slot = refOf(msg);
   if (slot == 0 || slot > relays.size()) CkAbort("CkDyn: section callback relay slot %u does not exist on PE %d", slot, CkMyPe());
   CkDynRelaySlot r = relays[slot - 1];
+  uint32_t ref;
+  if (r.sys) ref = r.sysRefnum;
+  else if (UsrToEnv(msg)->getMsgIdx() == CkReductionMsg::__idx) {
+    CMK_REFNUM_TYPE f = ((CkReductionMsg *)msg)->getUserFlag();
+    ref = f == (CMK_REFNUM_TYPE)~(CMK_REFNUM_TYPE)0 ? 0 : (uint32_t)f;
+  } else
+    CkAbort("CkDyn: message type %d reached section callback relay slot %u, which takes reduction results only",
+            UsrToEnv(msg)->getMsgIdx(), slot);
   CkDynMcastMsg *mm = toMcast(msg);
   CkFreeMsg(msg);
-  UsrToEnv(mm)->setRef((CMK_REFNUM_TYPE)r.refnum);
+  UsrToEnv(mm)->setRef((CMK_REFNUM_TYPE)ref);
   CkDynSendSection(&r.sid, r.ep, mm, nullptr);
 }
 
@@ -1491,10 +1512,12 @@ extern "C" void CkDynContribute(const CkDynTarget *me, const CkDynRedData *d, co
   const void *data = d->data;
   if (d->type == CkReduction::nop) { len = 0; data = nullptr; }
   CkCallback ck = CkDynMakeCallback(cb);
+  /* a SECTION callback's refnum travels as the user flag (see CkDynMgr::relay) */
+  CMK_REFNUM_TYPE uf = cb->kind == CKDYN_CB_SECTION && cb->refnum ? checkedRefnum(cb->refnum) : (CMK_REFNUM_TYPE)-1;
   switch (me->kind) {
-    case CKDYN_GROUP:     ((Group *)c)->contribute(len, data, (CkReduction::reducerType)d->type, ck); break;
-    case CKDYN_NODEGROUP: ((NodeGroup *)c)->contribute(len, data, (CkReduction::reducerType)d->type, ck); break;
-    case CKDYN_ARRAY:     ((ArrayElement *)c)->contribute(len, data, (CkReduction::reducerType)d->type, ck); break;
+    case CKDYN_GROUP:     ((Group *)c)->contribute(len, data, (CkReduction::reducerType)d->type, ck, uf); break;
+    case CKDYN_NODEGROUP: ((NodeGroup *)c)->contribute(len, data, (CkReduction::reducerType)d->type, ck, uf); break;
+    case CKDYN_ARRAY:     ((ArrayElement *)c)->contribute(len, data, (CkReduction::reducerType)d->type, ck, uf); break;
     default: CkAbort("CkDyn: contribute from a kind without reductions");
   }
 }
@@ -1892,10 +1915,10 @@ extern "C" void CkDynContributeSection(const CkDynTarget *me, const CkDynSection
 /* ====================================================================== */
 
 extern "C" void CkDynCheckpoint(const char *dirname, const CkDynCallback *done) {
-  CkStartCheckpoint(dirname, CkDynMakeCallback(done));
+  CkStartCheckpoint(dirname, CkDynMakeCallback(done, true));
 }
 
-extern "C" void CkDynStartQD(const CkDynCallback *cb) { CkStartQD(CkDynMakeCallback(cb)); }
+extern "C" void CkDynStartQD(const CkDynCallback *cb) { CkStartQD(CkDynMakeCallback(cb, true)); }
 
 static ArrayElement *localElemOrAbort(const CkDynTarget *t, const char *what) {
   if (t->kind != CKDYN_ARRAY) CkAbort("CkDyn: %s on a target that is not an array element", what);
