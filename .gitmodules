@@ -5,3 +5,7 @@
 	# submodule to the tip of this branch. A plain `--init` still checks out
 	# the recorded commit, so ordinary builds stay reproducible.
 	branch = main
+[submodule "miniapps"]
+	path = miniapps
+	url = https://github.com/charmplusplus/miniapps.git
+	branch = main
