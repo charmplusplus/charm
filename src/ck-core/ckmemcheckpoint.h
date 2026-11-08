@@ -228,6 +228,10 @@ int CkMemCheckpointRollbacks();
 
 // called by the location manager when an array element leaves this PE
 void CkMemCheckPTNoteMigration();
+// called by the location manager when an array element is inserted on or
+// deleted from this PE outside a migration and a restore
+void CkMemCheckPTNoteInsertion();
+void CkMemCheckPTNoteDeletion();
 
 // true if inside a restarting phase
 extern "C" int CkInRestarting();

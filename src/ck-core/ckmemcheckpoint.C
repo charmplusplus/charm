@@ -135,9 +135,12 @@ CpvDeclare(CkProcCheckPTMessage**, procChkptBuf);
 //point to the checkpoint should be used for recovery
 CpvDeclare(int, chkpPointer);
 CpvDeclare(int, chkpNum);
-// array elements that emigrated from this PE since its last checkpoint pack;
-// a rollback is refused when nonzero (see CkRollbackMemCheckpoint)
+// array elements that emigrated from, were inserted on, or were deleted on this
+// PE since its last checkpoint pack; a rollback is refused when any is nonzero
+// (see CkMemCheckPT::rollback)
 CpvDeclare(int, migrationsSinceCheckpoint);
+CpvDeclare(int, insertionsSinceCheckpoint);
+CpvDeclare(int, deletionsSinceCheckpoint);
 
 // compute the backup processor
 // FIXME: avoid crashed processors
@@ -584,12 +587,19 @@ class MemElementPacker : public CkLocIterator{
 			CkArrayIndexMax idx = loc.getIndex();
 			CkGroupID gID = locMgr->ckGetGroupID();
 			CmiUInt8 id = loc.getID();
-                        ArrayElement *elt = (ArrayElement *)loc.getLocalRecord();
-			CmiAssert(elt);
-			//elt = (ArrayElement *)locMgr->lookup(idx, aid);
+                        CkLocRec *rec = loc.getLocalRecord();
+			CmiAssert(rec);
+			// The element's epoch and life, so that the restore keeps them:
+			// nothing migrates, is inserted or is deleted between a checkpoint
+			// and its rollback, so the home's and other processes' location
+			// tables still name this PE under this epoch and life.
+			int epoch = locMgr->cache->getEpoch(id);
+			CmiUInt8 life = rec->getLife();
 			p|gID;
 			p|idx;
 			p|id;
+			p|epoch;
+			p|life;
                         locMgr->pupElementsFor(p,loc.getLocalRecord(),CkElementCreation_migrate);
 		}
 };
@@ -630,6 +640,8 @@ void CkMemCheckPT::startArrayCheckpoint(){
 		pupAllElements(p);
 	}
 	CpvAccess(migrationsSinceCheckpoint) = 0;
+	CpvAccess(insertionsSinceCheckpoint) = 0;
+	CpvAccess(deletionsSinceCheckpoint) = 0;
 	thisProxy[msg->bud2].recvArrayCheckpoint((CkArrayCheckPTMessage *)CkCopyMsg((void **)&msg));
 	chkpTable[0].updateBuffer(CpvAccess(chkpPointer)^1,msg);
 	arrayCopyStored();
@@ -1202,14 +1214,18 @@ void CkMemCheckPT::recoverAll(CkArrayCheckPTMessage * msg,std::vector<CkGroupID>
 			CkGroupID gID;
 			CkArrayIndex idx;
                         CmiUInt8 id;
+			int epoch;
+			CmiUInt8 life;
 			p|gID;
 			p|idx;
                         p|id;
+			p|epoch;
+			p|life;
 			CkLocMgr * mgr = (CkLocMgr *)CkpvAccess(_groupTable)->find(gID).getObj();
 #if !STREAMING_INFORMHOME && CK_NO_PROC_POOL
-			mgr->resume(idx, id, p, true, true);
+			mgr->resume(idx, id, p, true, true, epoch, life);
 #else
-			mgr->resume(idx, id, p, false, true);
+			mgr->resume(idx, id, p, false, true, epoch, life);
 #endif
 #if STREAMING_INFORMHOME && CK_NO_PROC_POOL
 			int homePe = mgr->homePe(idx);
@@ -1361,6 +1377,16 @@ void CkMemCheckPT::rollback()
     CkAbort("CharmFT> rollback refused: %d array elements migrated on PE %d since the last "
             "in-memory checkpoint; load balancing between a checkpoint and its rollback is "
             "not supported", moved, CkMyPe());
+  int inserted = CpvAccess(insertionsSinceCheckpoint);
+  if (inserted != 0)
+    CkAbort("CharmFT> rollback refused: %d array elements inserted on PE %d since the last "
+            "in-memory checkpoint; inserting array elements between a checkpoint and its "
+            "rollback is not supported", inserted, CkMyPe());
+  int deleted = CpvAccess(deletionsSinceCheckpoint);
+  if (deleted != 0)
+    CkAbort("CharmFT> rollback refused: %d array elements deleted on PE %d since the last "
+            "in-memory checkpoint; deleting array elements between a checkpoint and its "
+            "rollback is not supported", deleted, CkMyPe());
   // counted before the restore, so it is current when the callback runs
   rollbacksSinceCheckpoint++;
   restart(-1);
@@ -1380,6 +1406,24 @@ void CkMemCheckPTNoteMigration()
 {
 #if CMK_MEM_CHECKPOINT
   CpvAccess(migrationsSinceCheckpoint)++;
+#endif
+}
+
+// called on the PE an array element is created on, not by a migration or a
+// restore (CkLocMgr::createLocal)
+void CkMemCheckPTNoteInsertion()
+{
+#if CMK_MEM_CHECKPOINT
+  CpvAccess(insertionsSinceCheckpoint)++;
+#endif
+}
+
+// called on the PE an array element is destroyed on, not by a migration or a
+// restore (CkLocMgr::reclaim)
+void CkMemCheckPTNoteDeletion()
+{
+#if CMK_MEM_CHECKPOINT
+  CpvAccess(deletionsSinceCheckpoint)++;
 #endif
 }
 
@@ -1925,6 +1969,10 @@ void CkRegisterRestartHandler( )
   CpvAccess(chkpNum) = 0;
   CpvInitialize(int, migrationsSinceCheckpoint);
   CpvAccess(migrationsSinceCheckpoint) = 0;
+  CpvInitialize(int, insertionsSinceCheckpoint);
+  CpvAccess(insertionsSinceCheckpoint) = 0;
+  CpvInitialize(int, deletionsSinceCheckpoint);
+  CpvAccess(deletionsSinceCheckpoint) = 0;
 
 #if __FAULT__
   notify_crash_fn = notify_crash;

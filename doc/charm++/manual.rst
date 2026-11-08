@@ -8795,6 +8795,12 @@ Preconditions:
   migrations and aborts a rollback after one with the message
   ``CharmFT> rollback refused: N array elements migrated on PE p since the
   last in-memory checkpoint``.
+- No array element may be inserted or deleted between the checkpoint and
+  the rollback (``insert``, ``ckDestroy``, or the creation of a new array
+  with elements). The runtime counts both and aborts a rollback after
+  either with the message ``CharmFT> rollback refused: N array elements
+  inserted on PE p since the last in-memory checkpoint`` or ``... deleted
+  on PE p ...``.
 - The program must have stopped its own message traffic. The rollback
   starts only when the runtime detects quiescence (see
   :numref:`sec:qd`), so a program that keeps sending messages delays it
@@ -8805,8 +8811,9 @@ Only array elements are restored. Groups, node groups, mainchares,
 readonly variables and singleton chares keep their current state. In
 particular, a counter kept in a mainchare is not reverted: the
 checkpoint callback is the place to reset such state (the test
-``tests/charm++/memckpt_rollback`` shows this). Arrays created after the
-checkpoint keep their managers but lose their elements.
+``tests/charm++/memckpt_rollback`` shows this). An array created after
+the checkpoint with no elements keeps its manager, still empty; one
+created with elements makes the rollback abort, as above.
 
 On a single process (one node), the second copy of each checkpoint is
 kept in the same process, so a process failure could not be survived;

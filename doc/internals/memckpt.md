@@ -30,8 +30,11 @@ The option changes code outside this file, which is why it is off by
 default: `ArrayElement::ArrayElement` calls `init_checkpt`, which sends two
 `createEntry` messages per element; `CentralLB.C` collects statistics
 point to point instead of by reduction; `CkReductionMgr` disables the
-inactive-PE optimization; `CkLocMgr::emigrate` counts migrations
-(`CkMemCheckPTNoteMigration`).
+inactive-PE optimization; `CkLocMgr::emigrate`, `createLocal` and
+`reclaim` count migrations, insertions and deletions
+(`CkMemCheckPTNoteMigration`, `CkMemCheckPTNoteInsertion`,
+`CkMemCheckPTNoteDeletion`), and `reclaim` sends no death notice while
+`CkInRestarting()`.
 
 The macro `__FAULT__` stays off on reconverse. It selects the classic
 dead-process restart (below), which needs a restart phase in the message
@@ -60,8 +63,9 @@ with `__FAULT__`.
   user's callback), `inCheckpointing`, `inRestarting`. `CkInRestarting()`
   reads `inRestarting`; the location manager, the reduction manager and
   AMPI consult it while elements are being destroyed and restored.
-- `CpvAccess(migrationsSinceCheckpoint)`: array elements that left this PE
-  since its last checkpoint pack.
+- `CpvAccess(migrationsSinceCheckpoint)`, `insertionsSinceCheckpoint`,
+  `deletionsSinceCheckpoint`: array elements that left this PE, were
+  created on it, or were destroyed on it since its last checkpoint pack.
 
 The `ckTable` of `CkCheckPTInfo` entries filled by `createEntry` belongs to
 the per-element variant (`CMK_CHKP_ALL` 0), which is not compiled; with
@@ -84,11 +88,11 @@ returns the PE itself when there is one PE.
    `inCheckpointing`, then calls `startArrayCheckpoint` and `sendProcData`.
 3. `startArrayCheckpoint` packs every local element of every location
    manager into one `CkArrayCheckPTMessage` (`pupAllElements`: count, then
-   per element its location manager, index, id and
+   per element its location manager, index, id, location epoch, life and
    `pupElementsFor(..., CkElementCreation_migrate)`, the same pup as a
    migration), sends a copy to `ChkptOnPe(me)` (`recvArrayCheckpoint`),
    stores the original in `chkpTable[0]` at the slot being written, and
-   resets the migration counter. The sizer and the `PUP::toMem` carry
+   resets the migration, insertion and deletion counters. The sizer and the `PUP::toMem` carry
    `IS_CHECKPOINT`, under which `pup_buffer` copies the bytes: without it
    `toMem` records only a zero-copy reference to the live buffer, and an
    Isomalloc thread's memory (an AMPI rank's stack and heap) is pupped
@@ -120,8 +124,11 @@ starts the next. `diePe` is the failed PE, or -1 for a rollback.
    PE unavailable to the load balancer (`resetLB`, skipped when there is
    none), calls `startInserting` on every location manager.
 2. `removeArrayElements`: `flushLocalRecs` on every location manager
-   destroys every local element. While `CkInRestarting()` is true, the
-   destructor path does not tell the home PE (`CkLocMgr::reclaim`).
+   destroys every local element (`ArrayElement::ckDestroy` ->
+   `CkArray::deleteElt` -> `~CkMigratable` -> `CkLocRec::destroy` ->
+   `CkLocMgr::reclaim`). While `CkInRestarting()` is true, `reclaim` tells
+   no home PE, remote or local: no `reclaimRemote`, no `noteDead`, no
+   `homeNoteDeath` (see "Epoch and life" below).
 3. `resetReductionMgr`: `flushStates` and `ckJustMigrated` on every group.
    Reduction managers restart at reduction 0 (`CkReductionMgr::flushStates`,
    `Group::flushStates`); array managers zero their contributor counts
@@ -132,10 +139,11 @@ starts the next. `diePe` is the failed PE, or -1 for a rollback.
 5. `recoverArrayElements`: every PE takes a copy of its own last completed
    checkpoint (`chkpTable[0]`, slot `chkpPointer`) and recreates each
    element (`recoverAll` -> `CkLocMgr::resume(idx, id, p, notify=false,
-   rebuild=true)`). `rebuild` resets the element's reduction numbers to 0
-   and restamps its broadcast epoch (array-broadcast-migration.md); the
-   location manager registers the element as local without telling its
-   home PE. Then `doneInserting`. A rank's Isomalloc context is recreated
+   rebuild=true, epoch, life)` -> `createLocal`). `rebuild` resets the
+   element's reduction numbers to 0 and restamps its broadcast epoch
+   (array-broadcast-migration.md); the location manager registers the
+   element as local, under the location epoch and life it had at the
+   checkpoint, without telling its home PE. Then `doneInserting`. A rank's Isomalloc context is recreated
    at the addresses it had, so step 2 must have unmapped them: Reconverse's
    `CthFree` keeps the last freed thread of each PE, with its memory, until
    the next one is freed, and `TCharm::~TCharm` therefore unmaps the
@@ -181,20 +189,51 @@ not restored. `rollback` increments it on every PE before `restart(-1)`,
 so it is current on every PE when PE 0 sends the callback from
 `restartDone`.
 
-### The migration restriction
+### The migration, insertion and deletion restriction
 
 The restore recreates each element on the PE that packed it, and
 `resume(..., notify=false)` does not update the home PE or other PEs'
 location tables. An element that migrated after the checkpoint is named in
 those tables (with a newer epoch, process-location-cache.md) on the PE it
 moved to, so after the rollback messages for it would go to a PE that no
-longer has it. Reconciling the tables is not done. Instead
-`CkLocMgr::emigrate` counts each departure
-(`CkMemCheckPTNoteMigration`), the pack in `startArrayCheckpoint` resets
-the count, and `rollback` aborts on any PE whose count is nonzero:
+longer has it. An element deleted after the checkpoint is restored under a
+life its home has marked dead, and one inserted after it is destroyed
+without its home being told. Reconciling the tables is not done. Instead
+`CkLocMgr::emigrate` counts each departure (`CkMemCheckPTNoteMigration`),
+`CkLocMgr::createLocal` counts each creation that is neither a migration's
+arrival nor a restore (`CkMemCheckPTNoteInsertion`, skipped while
+`CkInRestarting()`), and `CkLocMgr::reclaim` counts each destruction that
+is neither a departure nor part of a restore (`CkMemCheckPTNoteDeletion`).
+The pack in `startArrayCheckpoint` resets the three counts, so the
+elements created before the first checkpoint are not counted, and
+`rollback` aborts on any PE where one is nonzero:
 `CharmFT> rollback refused: N array elements migrated on PE p since the
 last in-memory checkpoint; load balancing between a checkpoint and its
-rollback is not supported`.
+rollback is not supported`, or the same with `inserted` or `deleted`.
+
+### Epoch and life
+
+Each location table entry carries an epoch, the number of moves of the
+element, and an update with an epoch not above the entry's is dropped
+(`LocTable::update`). The home also keeps, per element, the life tag of
+each creation, and drops updates from a life it has marked dead
+(`homeNoteLocation`, `homeNoteDeath`). Under the restriction above, every
+table is still correct at the rollback for each element's checkpointed
+PE, epoch and life. The restore therefore keeps them: `MemElementPacker`
+packs the epoch from the process's location table and the life from the
+`CkLocRec`, `recoverAll` passes both through `resume` to `createLocal`,
+and `reclaim` during the restore leaves the home's records alone. A
+restore at epoch 0 under a new life, as `createLocal` gives by default,
+would break two things. An element that migrated before the checkpoint
+(epoch e >= 1 everywhere) would be at epoch 0 locally, its next e moves
+would carry epochs 1..e, and the home and the other processes would drop
+them, so messages would reach it only through forwarding from its old PE.
+And a later deletion would make the local home reinstall the old life's
+entry (`homeNoteDeath` -> `homeReinstall`), which a re-insertion at epoch 0
+cannot replace. `tests/charm++/memckpt_rollback -lbfirst` (RotateLB at
+step 3, before the checkpoint, and at step 9, after the rollback) checks at
+the end, on each element's home PE, that the table names the element's PE;
+with two processes it fails when the restore uses epoch 0 and a new life.
 
 ### Restart after a process failure (classic only)
 
@@ -223,13 +262,15 @@ only with `__FAULT__`.
   `startArrayCheckpoint`, `arrayCopyStored`, `recvArrayCheckpoint`,
   `sendProcData`, `recvProcData`, `cpFinish`, `report`, `cpDone`;
   `CkRollbackMemCheckpoint`, `requestRollback`, `rollback`,
-  `CkMemCheckPTNoteMigration`; the chain `restart`, `removeArrayElements`,
+  `CkMemCheckPTNoteMigration`, `CkMemCheckPTNoteInsertion`,
+  `CkMemCheckPTNoteDeletion`; the chain `restart`, `removeArrayElements`,
   `resetReductionMgr`, `recoverBuddies`, `recoverArrayElements`,
   `recoverAll`, `finishUp`, `restartDone`; `ChkptOnPe`, `BuddyPE`.
 - src/ck-core/ckmemcheckpoint.h: `CkCheckPTEntry`, `CkMemCheckPT`.
 - src/ck-core/cklocation.C: `CkLocMgr::emigrate` (migration count),
-  `CkLocMgr::resume` and `pupElementsFor` with `rebuild`,
-  `CkLocMgr::reclaim` (no home notice while restarting).
+  `CkLocMgr::createLocal` (insertion count), `CkLocMgr::resume` (epoch and
+  life) and `pupElementsFor` with `rebuild`, `CkLocMgr::reclaim` (deletion
+  count; no home notice while restarting).
 - src/ck-core/ckarray.C: `CkArray::flushStates`,
   `CkArrayBroadcaster::flushState`, `CkArray::restampBroadcast`.
 - src/ck-core/ckreduction.C: `CkReductionMgr::flushStates`, the
@@ -237,4 +278,6 @@ only with `__FAULT__`.
 - src/arch/common/conv-mach-syncft.{h,sh}, CMakeLists.txt, buildcmake: the
   build option.
 - tests/charm++/memckpt_rollback: checkpoint, rollback (once and with
-  `-rollbacks N`), and the migration refusal (`testrestriction`).
+  `-rollbacks N`), migration before the checkpoint and after the rollback
+  (`-lbfirst`), a `pup_buffer` array restored by the rollback, and the
+  migration, insertion and deletion refusals (`testrestriction`).
