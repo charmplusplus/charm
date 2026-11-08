@@ -94,19 +94,44 @@ described below.
 
 **When.** `CkDynRegisterClass` aborts unless it runs on rank 0. It must run
 on every process, in the same order, before `_registerDone`
-(src/ck-core/init.C:1668). A shared-library binding registers from
+(src/ck-core/init.C:1672). A shared-library binding registers from
 `hooks.register_classes`, which `_initCharm` calls in place of
 `CkRegisterMainModule` (see Start-up). A C++ program registers from an
 `initnode` function: init calls run on rank 0 of each process before
 `_registerDone` (`InitCallTable::enumerateInitCalls`, init.C).
 
 **Late registration.** After `CkDynAllowLateRegistration()`,
-`CkDynRegisterClassLate` registers a class after start-up. It aborts unless
-the process has one PE, because `_entryTable` and `_chareTable` are
-process-wide vectors that another PE of the same process could be reading
-while dispatching. Only builds with `CMK_CHARM4PY` accept it:
-`CkRegisterEpInternal` (src/ck-core/register.C:48-53) aborts on any
-registration after `_registerDone` otherwise.
+`CkDynRegisterClassLate` registers a class after start-up, in every build. It
+aborts unless the process has one PE, because `_entryTable` and `_chareTable`
+are process-wide vectors that another PE of the same process could be reading
+while dispatching. Like `CkDynRegisterClass` it must run on every process, in
+the same order, before any message for the class is sent: the test's late
+phase registers from a group broadcast and waits for a reduction.
+
+`CkRegisterEpInternal` and `CkRegisterIfNotThere` (register.C) refuse a
+registration after `_registerDone` unless `lateRegistrationAllowed()`: true in
+a `CMK_CHARM4PY` build (the Ext API registers classes late without telling
+the runtime), and otherwise only between `_registerLateBegin()` and
+`_registerLateEnd()`, which `CkDynRegisterClassLate` calls around
+`registerClass`. A plain program that registers an entry late by mistake
+(a templated entry method not instantiated in a `.ci` file) still aborts with
+"late entry method registration happened after init".
+
+What sizes itself by the entry or chare count, and how a late class fares:
+
+| consumer | sized when | late class |
+|---|---|---|
+| `g_eps`, `g_classes` (ckdyn.C) | grow with each registration | works |
+| `_entryTable`, `_chareTable`, `_msgTable` (register.C) | vectors, grow | works (one PE per process) |
+| trace-projections | `.sts` written at exit from the current tables; `traceSetMsgID` checks the current size | works |
+| trace-summary (`SumLogPool::initMem`, `PhaseEntry`), trace-utilization (`initMem`), trace-counter | per-entry arrays allocated when the module starts | an executed late entry aborts with "Invalid entry point!!" (summary) or is out of range; only with `CMK_TRACE_ENABLED` and those trace modes |
+| `_debugEntryTable` (debug-charm.C, `CMK_CHARMDEBUG` only) | `CpdFinishInitialization`, before `_registerDone` | a breakpoint on a late entry indexes past the table |
+| readonlies (`_readonlyTable`) | broadcast once at start-up | a readonly registered late is never broadcast; CkDyn registers `ckdyn_ro` in `CkDynInit`, before start |
+| `_mainTable` | main chares are created at start-up | a `MAINCHARE` class registered late is never constructed |
+| checkpoint restart | the restarting run registers classes at start-up | a checkpoint holding objects of a late class restarts only if the restarted program registers the same classes, in the same order, at start-up |
+
+The `ADAPT_SCHED_MEM` table of memory-critical entries (init.C) is built at
+start-up too, but CkDyn never sets `CK_EP_MEMCRITICAL`.
 
 An array class registered with `ndims == 0` accepts any dimension count: each
 creation or insert gives its own, and `CkDynCreateArray` checks the count only
@@ -142,7 +167,7 @@ always taken from `g_hooks`.
 
 | hook | called from | when |
 |---|---|---|
-| `register_classes(global)` | `CkDynCallRegisterHook`, from `_initCharm` | start-up, rank 0 of each process, `CMK_CHARM4PY` builds |
+| `register_classes(global)` | `CkDynCallRegisterHook`, from `_initCharm` | start-up, rank 0 of each process, when `CkDynInit` ran before `_initCharm` |
 | `construct(bd, target, ctor view)` | constructors of `ChareDyn`, `GroupDyn`, `NodeGroupDyn`, `ArrayElemDyn`, `ArrayMapDyn` | object creation; returns the handle |
 | `mainchare(bd, &handle, target, argc, argv)` | `MainchareDyn(CkArgMsg*)` | main chare creation on PE 0 |
 | `destruct(bd, handle)` | destructors of all six classes, when the handle is not NULL | object deletion, migration away, exit |
@@ -808,12 +833,15 @@ A shared-library binding:
    `_registerConverseInitHooks()` and `ConverseInit(argc, argv, _initCharm,
    0, 0)`, and never returns.
 3. In `_initCharm`, rank 0 of each process registers the core modules,
-   including `_registerCkDyn()` (init.C:1600), which registers the two
+   including `_registerCkDyn()` (init.C:1601), which registers the two
    message types, `CkDynMgr`, `_ckdynMgrGID` and the two init calls.
-4. In a `CMK_CHARM4PY` build `_initCharm` then calls `CkDynCallRegisterHook()`
-   (init.C:1634), which calls `hooks.register_classes` and returns true. When
-   it returns false (no hook table, or no `register_classes`), the Ext API's
-   `CkRegisterMainModuleCallback` runs as before.
+4. `_initCharm` then calls `CkDynCallRegisterHook()`, which calls
+   `hooks.register_classes` and returns true, or returns false when there is
+   no hook table or no `register_classes`. In a `CMK_CHARM4PY` build it takes
+   the place of `CkRegisterMainModule`, and when it returns false the Ext
+   API's `CkRegisterMainModuleCallback` runs. In any other build it runs
+   after `CkRegisterMainModule`, so a program with a charmxi main module that
+   starts through `CkDynStart` gets both.
 5. The init calls run: `_ckdynInitNode` (rank 0) registers the foreign
    reducer and the two section init entries; `_ckdynInitProc` (every PE)
    initializes the builder Ckpv.
@@ -823,14 +851,27 @@ A shared-library binding:
 
 A C++ program links CkDyn from libck and starts as any Charm++ program. It
 calls `CkDynInit` and registers its classes from an `initnode` function, which
-runs after `_ckdynInitNode` because the CkDyn module is registered first. In a
-build without `CMK_CHARM4PY`, `register_classes` is never called. A program
+runs after `_ckdynInitNode` because the CkDyn module is registered first.
+`register_classes` is not called for it, because `CkDynInit` runs after the
+point in `_initCharm` where the hook is called. A program
 whose main chare is an ordinary C++ main chare calls `CkDynCreateManagers()`
 from its constructor.
 
-`_createTraces` in init.C is a weak symbol (init.C:103, 109), so a
-charmc-linked program, which generates its own definition, links against a
-libck that also defines it.
+`_createTraces` in init.C is a weak symbol in every build (empty, or in a
+`CMK_CHARM4PY` build with tracing calling the projections and summary
+modules), so a program without a charmc-generated moduleinit links, and a
+charmc-linked program keeps its generated definition.
+
+**What `CMK_CHARM4PY` means.** CkDyn does not depend on it: registration, the
+hook, late registration, CCS (`CcsRegisterHandlerFn`) and `_createTraces` work
+in a plain build. The macro selects a build of libcharm as one shared library
+for a Python binding (the `charm4py` build target, built with the separate
+option `REFNUM_TYPE="unsigned int"` for 32-bit reference numbers): the Ext API used by charm4py 1.x (ck.C, register.C, init.C:
+`registerCkRegisterMainModuleCallback`, `_registerTreeLB` and the trace module
+registration, since no charmc moduleinit exists), late registration accepted
+without `_registerLateBegin`, and the charm4py CCS layout in reconverse. One
+such libcharm serves both charm4py 1.x (through the Ext API) and a CkDyn
+binding.
 
 ## Limits and diagnostics
 
