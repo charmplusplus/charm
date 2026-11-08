@@ -16,10 +16,10 @@ for every entry method of every dynamic class.
 The reasons for each choice, the alternatives and the measurements are in the
 design document, [`doc/charm4py-thin-design.md`](../charm4py-thin-design.md)
 (until it moves into this repository it is `DESIGN.md` of the charm4py-thin
-project), section 3. This chapter describes what the code does today. Sections
-over CkMulticast (design 3.9), zero-copy and device buffers (3.14) and the
-Python binding (section 4) are planned; their entry points exist in `ckdyn.h`
-and abort, and they are not described here.
+project), section 3. This chapter describes what the code does today.
+Zero-copy and device buffers (3.14) and the Python binding (section 4) are
+planned; their entry points exist in `ckdyn.h` and abort, and they are not
+described here.
 
 ## Files
 
@@ -152,7 +152,7 @@ always taken from `g_hooks`.
 | `pack_readonly_size`, `pack_readonly`, `unpack_readonly` | `ckdynRoPup` | readonly broadcast at start-up, checkpoint, restart |
 | `reduce(global, reducer_id, views, n, builder)` | `ckdynForeignReduce` | combining contributions to the foreign reducer |
 | `future(global, pe, id, view)` | `CkDynMgr::deposit` | a value for a binding future arrives |
-| `section_joined` | not called | sections are planned (design 3.9) |
+| `section_joined(bd, handle, sid)` | `sectionJoin` | a member received its section's creation multicast; optional (NULL: not called) |
 | `map_proc_num(bd, handle, aid, ndims, index)` | `ArrayMapDyn::procNum` | the array manager asks where an index lives |
 | `resume_from_sync(bd, handle)` | `ArrayElemDyn::ResumeFromSync` | after a load balancing step, only for elements created with `CKDYN_MSG_USESATSYNC` |
 | `error(global, what)` | `bindingError` | before CkDyn aborts on the binding's behalf |
@@ -183,8 +183,8 @@ the start of the marshalled buffer. `CkDynMcastMsg` derives from
 `CkMcastBaseMsg` first, because `CkMulticastMgr` writes the section cookie
 into the first bytes of a multicast message. No single layout satisfies both,
 so there are two message types. Every send, broadcast, constructor message and
-future value is a `CkDynMsg`; `CkDynMcastMsg` is reserved for section sends
-(planned). Two of the 256 message indices are used.
+future value is a `CkDynMsg`; `CkDynMcastMsg` carries section sends only
+(see Sections). Two of the 256 message indices are used.
 
 ### Payload layout
 
@@ -282,7 +282,8 @@ set `ForArrayEltMsg` and `CkArray_IfNotThere_buffer` on the message.
 
 The receiver reads a message through a `CkDynMsgView`: kind, header pointer,
 slots, data, tail, `refnum` (the envelope's reference number), `section`
-(NULL until sections exist) and `msg` (the runtime message). `viewAny(view,
+(the section id of a `CkDynMcastMsg` delivery, NULL otherwise) and `msg` (the
+runtime message). `viewAny(view,
 tmp, msg)` builds it and returns the entry index:
 
 - It reads the message index from the envelope (`env->getMsgIdx()`).
@@ -461,7 +462,7 @@ A binding describes a callback with the POD `CkDynCallback`;
 | `TARGET`, `bcast != 0` | `bcastGroup`, `bcastNodeGroup` or `bcastArray` |
 | `FUTURE` | `sendGroup` to `CkDynMgr[cb->pe].deposit`, reference number `cb->id` |
 | `IGNORE`, `EXIT` | `CkCallback::ignore`, `CkCallback::ckExit` |
-| `SECTION` | aborts (planned) |
+| `SECTION` | `sendGroup` to `CkDynMgr[CkMyPe()].relay`, reference number = a relay slot (see Sections) |
 
 A `TARGET` callback to a main chare is the exception to the first row: it
 becomes `sendGroup` to the class's relay entry for `cb->ep` (`relayFirst +
@@ -520,9 +521,10 @@ frees the message (`deposit` is not nokeep). `deposit` is declared
 each resumed run records its own execute event (next section), which would
 otherwise nest inside one for `deposit`. `CkDynCreateManagers` creates the
 group once; later calls (a program with several main chares) do nothing. It aborts if the binding has no
-`future` hook. The `relay` entry is reserved for section callbacks and
-aborts. The group is `[migratable]` and has a `pup` (which holds no CkDyn
-state), so a checkpoint restores it.
+`future` hook. The `relay` entry serves section callbacks, and the
+`section*` entries serve the section table (see Sections). The group is
+`[migratable]` and has a `pup`, which holds no CkDyn state (the section
+table is not checkpointed), so a checkpoint restores it.
 
 ### Coroutines: load and trace attribution
 
@@ -582,12 +584,164 @@ builder's payload with the same `user_id` and returns it as a new
 so the next level of the reduction tree and the final view treat it the
 same way.
 
+## Sections
+
+A section is a subset of one array, of one group, or of several arrays (a
+combined section), with multicast and section reductions through
+`CkMulticastMgr`. `CkDynCreateManagers` creates the one `CkMulticastMgr`
+CkDyn uses (`_ckdynMcastGID`, a readonly next to `_ckdynMgrGID`), in the
+main chare constructor, so it exists on every PE before any section call.
+
+### The table and the id
+
+A section lives in the `CkDynMgr` branch of the PE that created it, its root.
+`CkDynMgr::sections` holds one `CkDynSection` per slot: the kind
+(`CKDYN_ARRAY`, `CKDYN_GROUP`, 0 for combined), a generation, the member
+lists (`aids` with one index list per array, or `gid` and `pes`), the
+delegated `CProxySection_ArrayBase` or `CProxySection_Group`, the `done`
+callback, and the state of a combine in progress. Everything else names the
+section by `CkDynSectionID` `(root_pe, idx, coll_id, kind, gen)`, 16 bytes,
+which messages carry as bytes: a `CkSectionID` holds its member list, and its
+cookie points at an `mCastEntry` valid only on the root, so it cannot travel.
+`coll_id` is the array or group id, -1 for a combined section (whose arrays a
+combine with remote parts learns only later). Generation 0 is never valid.
+
+### Creation
+
+`CkDynSectionCreateArray(aid, n, ndims, indices, bfactor, done, &sid)` and
+`CkDynSectionCreateGroup(gid, npes, pes, bfactor, done, &sid)` run on the
+calling PE, which becomes the root. They remove duplicate members, take a
+slot (`newSection`; a deleted slot is reused with its bumped generation),
+fill `*sid`, and call `finishSection`:
+
+1. Build the section proxy and delegate it to the `CkMulticastMgr`
+   (`ckSectionDelegate`, which builds the spanning tree).
+2. Multicast one `CkDynMcastMsg` with a `SECTION` slot (the id) and a
+   `CALLBACK` slot (`done`) to the entry `CkDyn.sectionInit(array)` or
+   `CkDyn.sectionInit(group)`.
+3. Send the messages that `CkDynSendSection` held while the section was not
+   ready, and answer member queries from combines (below).
+
+The two init entries are registered once by `_ckdynInitNode`, on the base
+chare types `ArrayElement` and `IrrGroup`, not per class: CkMulticast sends
+one entry index to every sub-section of a combined section, whose arrays may
+belong to different classes. `sectionJoin` runs on each member: it stores the
+cookie from the message (`CkGetSectionInfo`) in the member's cookie map
+(`CkDynObj::sectionCookies`, keyed by the section id), calls
+`hooks.section_joined(bd, handle, &sid)` if set, and contributes an empty
+section reduction (`nop`) whose callback is `done`. The result, a REDRESULT
+view with an empty `BUFFER` slot, is the "section is ready" signal: every
+member has its cookie. A group section must name a dynamic group; creation
+aborts otherwise.
+
+### Sends
+
+`CkDynMsgFinishMcast(builder, ep)` finishes a payload as a `CkDynMcastMsg`
+(the same payload as `CkDynMsgFinish`, `CkMcastBaseMsg` in front; no group
+dependency). `CkDynSendSection(sid, ep, msg, opts)` writes `ep` into the
+header and the id into the message's `sid` field. On the root it calls
+`CkDynMgr::sendTo`: `CProxySection_ArrayBase::ckSend`, which goes to
+`CkMulticastMgr::ArraySectionSend`, or `CkMulticastMgr::GroupSectionSend`.
+On another PE it sends the message to `CkDynMgr[root_pe].sectionSend`, which
+does the same on the root (one extra hop, design 3.9 F17). Send options are
+ignored: CkMulticast delivers to members with its own flags. A send to a
+section that is not ready (a combine waiting for remote parts) is held and
+sent after the creation multicast.
+
+On delivery `dispatch` sees a `CkDynMcastMsg`, refreshes the member's stored
+cookie with `CkGetSectionInfo` (so that it follows tree rebuilds) and sets
+`view.section` to the message's id. The view kind is `CKDYN_MSGKIND_MCAST`.
+If the entry belongs to another class than the element (one entry multicast
+to a combined section over arrays of different classes), `dispatch` reports a
+binding error and aborts.
+
+### Reductions
+
+`CkDynContributeSection(me, sid, data, cb)` finds the member's cookie (it
+aborts if the object is not local, not a member, or has not received the
+creation multicast) and calls `CkMulticastMgr::contribute(len, data, type,
+cookie, callback, userData)`. `userData` becomes the result's reference
+number at the root; CkDyn passes the callback's `refnum`, or the future id of
+a FUTURE callback, never the default -1 (design 3.7). The foreign reducer
+works as in whole-collection reductions: CkMulticast calls the registered
+reducer function. `CkDynSectionRedNo(me, sid)` returns the cookie's `redNo`,
+the number of section reductions this member has contributed to, which every
+member computes identically and which the binding uses as a collective future
+id.
+
+**Section callbacks** (`CKDYN_CB_SECTION`) are converted, on the PE that
+converts them, to a group callback to `CkDynMgr[CkMyPe()].relay` whose
+reference number is a slot in that branch's relay table (`relaySlot`, slots
+deduplicated by `(sid, ep, refnum)`). `relay` reads the slot, converts the
+message it received into a `CkDynMcastMsg` (`toMcast`: a `CkDynMsg` or a
+foreign result keeps its payload; a built-in reduction result becomes one
+`BUFFER` slot whose `elem` comes from the reducer table; a system message
+becomes an empty payload), sets the callback's `refnum` as the reference
+number, and sends it with `CkDynSendSection`. Members see an MCAST view, with
+`refnum` set and no synthesized FUTURE slot. Such a callback is pup-able,
+unlike Charm++'s `bcastSection` callback. The relay table grows by one slot per
+distinct `(sid, ep, refnum)` converted on a PE and is never trimmed; with a
+16-bit `CMK_REFNUM_TYPE` a PE has at most 65534 slots.
+
+### Combine
+
+`CkDynSectionCombine(nparts, parts, done, &sid)` makes a new section on the
+calling PE whose members are the union of the parts, each member once. Parts
+rooted on the calling PE are read from the table; for each other part, a
+`sectionQuery` goes to its root, which answers with `sectionParts` (its
+arrays and member indices; a part that is itself a combine still waiting for
+its own parts answers when it is ready). When all parts are in, `addPart`
+checks the rules and forms the union: every part must be an array section
+or a combined section ("part %d is a group section; only array sections can
+be combined"), and all parts must have one index dimension count ("a combined
+section needs arrays of one index dimension count"). The union has one
+sub-section per distinct array, in the order the parts first name them, so
+an element in two parts is a member once. The section is then finished like a
+created one: a `CProxySection_ArrayBase` over several `CkSectionID`s, so the
+combined section has its own cookie on every member and its own reduction
+numbers. CkMulticast reduces each sub-section on its own tree and combines the
+sub-section results in `XArraySectionReducer` on the root; that class and
+`CkMulticastMgr::reduceFragment` keep the reducer type, the user flag and the
+callback of the result, which CkDyn needs (the reducer type for the `BUFFER`
+slot's `elem`, the user flag for the reference number, the callback for a
+foreign reducer whose result is a new message).
+
+### Delete and generations
+
+`CkDynSectionDelete(sid)` runs on the root (from another PE it sends
+`sectionDelete` there). It frees the held messages, clears the slot and bumps
+its generation. Any later use of the old id on the root (`lookup`) aborts:
+"send to a deleted section (root PE %d, index %d, stale generation %u; the
+slot is at generation %u, ...)". The CkMulticast trees of a deleted section
+stay allocated (CkMulticastMgr has no call that frees a section), and members
+keep their cookie map entries; neither is used again.
+
+### Migration and checkpoint
+
+`pupObj` pups the cookie map before the binding's bytes, so a member that
+migrates keeps its cookies and reduction numbers. Its cookie still points at
+the tree node on its old PE: its next contribution goes there and is marked
+`rebuilt`, the root sets `needRebuild`, the next multicast goes to every member
+point to point (`SimpleSend`) and the one after rebuilds the tree
+(ckmulticast.C `sendToSection`). The root is a PE, not an element, so the
+root-migration paths of CkMulticast are not used. A checkpoint writes no
+cookies and the section table is not checkpointed: sections do not survive
+`+restart` and a binding recreates them.
+
+The phases `sections/*` of tests/charm++/ckdyn exercise each part: array and
+group sections with both reducer kinds and every callback kind, a section
+created on another PE and sent to from PE 0, combines with overlapping
+members and over two arrays, delete with slot reuse (and, with
+`-stalesend`, the stale-generation abort), and section reductions across
+RotateLB migrations.
+
 ## Pup
 
 All six classes override `pup`: each calls its base class's `pup`, builds the
 object's target, and calls `pupObj(p, d, target)`. `pupObj` pups the chare
-index and a `hasHandle` bool. A branch outside a constrained group has no
-handle and stops there, without calling the binding. Otherwise it pups the
+index, the section cookie map (empty on a checkpoint; see Sections) and a
+`hasHandle` bool. A branch outside a constrained group has no handle and stops
+there, without calling the binding. Otherwise it pups the
 binding's bytes:
 
 - Reason: `CKDYN_PUP_CHECKPOINT` when `p.isCheckpoint()`, else
@@ -617,7 +771,8 @@ path aborts on a chare without one); singleton chares do not migrate.
 function `ckdynRoPup` calls `pack_readonly_size`/`pack_readonly` when
 packing and `unpack_readonly` when unpacking, with the same `PUP::mem` rule.
 The start-up readonly broadcast and the checkpoint file both go through it.
-CkDyn's own readonly, `_ckdynMgrGID`, is declared in `CkDyn.ci`.
+CkDyn's own readonlies, `_ckdynMgrGID` and `_ckdynMcastGID`, are declared in
+`CkDyn.ci`.
 
 ## Start-up
 
@@ -638,10 +793,11 @@ A shared-library binding:
    it returns false (no hook table, or no `register_classes`), the Ext API's
    `CkRegisterMainModuleCallback` runs as before.
 5. The init calls run: `_ckdynInitNode` (rank 0) registers the foreign
-   reducer; `_ckdynInitProc` (every PE) initializes the builder Ckpv.
+   reducer and the two section init entries; `_ckdynInitProc` (every PE)
+   initializes the builder Ckpv.
 6. `_registerDone`; PE 0 constructs the main chare. `MainchareDyn` creates
-   `CkDynMgr` before calling `hooks.mainchare`, so the manager exists on
-   every PE before any other message is delivered.
+   `CkDynMgr` and the `CkMulticastMgr` before calling `hooks.mainchare`, so
+   both exist on every PE before any other message is delivered.
 
 A C++ program links CkDyn from libck and starts as any Charm++ program. It
 calls `CkDynInit` and registers its classes from an `initnode` function, which
@@ -704,10 +860,14 @@ libck that also defines it.
   `CkDynMigrateMe` and `CkDynSetObjLoad` on a target that is not a local array
   element, and `CkDynArrayInsert` with a message not finished with an array
   class's constructor entry.
-- **Not implemented yet.** Sections (`CkDynSendSection`,
-  `CkDynSectionCreate*`, `CkDynSectionCombine`, `CkDynSectionDelete`,
-  `CkDynSectionRedNo`, `CkDynContributeSection`, `SECTION` callbacks,
-  `CkDynMgr::relay`) abort with "... not implemented yet (step 2)". Zero-copy
+- **Sections** abort on: an empty member list, a group section over a group
+  that is not dynamic, a PE out of range, a send, delete or combine naming a
+  deleted section (stale generation) or an unknown slot, a contribution or
+  `CkDynSectionRedNo` from an object that is not a member, a combine with a
+  group part or with parts of different index dimension counts, a section
+  message with a group dependency, and a section message for an entry of
+  another class than the receiving element.
+- **Not implemented yet.** Zero-copy
   and device buffers (`CkDynMsgAddNcpy`, `CkDynMsgAddDevice`,
   `CkDynPostBuffer`, `CkDynPostDeviceBuffer`) and `CkDynHapiAddCallback`
   abort with "... not implemented yet (step 3)".
@@ -718,7 +878,9 @@ libck that also defines it.
   `CkDynCallback`, `CkDynHdr`, `CkDynSlot`, `CkDynHooks`, all functions.
 - src/ck-core/ckdyn-impl.h: the message classes, `CkDynObj`, the six chare
   classes, `CkDynMgr`, the helpers used by ckarray.C and init.C.
-- src/ck-core/CkDyn.ci: the message types, `_ckdynMgrGID`, `_ckdynInitNode`,
+- src/ck-core/ckmulticast.C, XArraySectionReducer.h: CkMulticast, which
+  carries section multicasts and reductions.
+- src/ck-core/CkDyn.ci: the message types, `_ckdynMgrGID`, `_ckdynMcastGID`, `_ckdynInitNode`,
   `_ckdynInitProc`, the `CkDynMgr` group.
 - src/ck-core/ckdyn.C: the class and entry tables (`ClassRec`, `EpRec`,
   `g_classes`, `g_eps`), `registerClass`, the builder (`CkDynMsgBegin`,
@@ -726,7 +888,10 @@ libck that also defines it.
   `viewReduction`, `viewSys`, `viewAny`), `dispatch`,
   `CkDynDeliverBroadcast`, the chare classes, `MainchareDyn::callRelay`,
   `noteDims`, `pupObj`, the sends and creation functions,
-  `CkDynMakeCallback`, `CkDynMgr::deposit`, `CkDynCoroResume`,
+  `CkDynMakeCallback`, `CkDynMgr::deposit`, the section table and protocol
+  (`CkDynMgr::newSection`, `finishSection`, `sendTo`, `addPart`,
+  `deleteSection`, `relay`, `relaySlot`, `toMcast`, `sectionJoin`,
+  `sectionContribute`), `CkDynCoroResume`,
   `CkDynCoroSuspend`, the reducer
   table and `ckdynForeignReduce`, `ckdynRoPup`, `CkDynInit`, `CkDynStart`.
 - src/ck-core/register.h: `ChareInfo::isDynamic`.
