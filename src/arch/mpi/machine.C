@@ -11,6 +11,8 @@
 #include "cmirdmautils.h"
 #include <mpi.h>
 #include <algorithm>
+#include <atomic>
+#include <time.h>
 
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
@@ -325,8 +327,6 @@ static int _thread_provided = -1; /* Indicating MPI thread level */
  * - cmi_mpi_abort_in_signal: an abort from a signal handler can interrupt this thread inside MPI (e.g.
  *   SIGTERM while the comm thread is in MPI_Iprobe); MPI_Abort is not async-signal-safe and was seen to
  *   spin in MPIDIU_get_buf_safe, so a signal abort leaves with _exit() and lets the launcher end the job. */
-#include <atomic>
-#include <time.h>
 static std::atomic<int> cmi_mpi_abort_requested{0};
 static volatile sig_atomic_t cmi_mpi_abort_in_signal = 0;
 static void cmi_mpi_check_abort_request(void) {
