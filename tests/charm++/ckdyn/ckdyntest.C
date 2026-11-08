@@ -2,7 +2,9 @@
  * CkDyn acceptance test, driven by the C++ test binding (cbinding.C).
  * TestMain is an ordinary main chare; every phase ends in a binding future
  * whose callback checks the result and calls mainProxy.nextPhase().
- * Run: ./ckdyntest +pe 4 +balancer RotateLB [-skip <phase>]... [-ckptdir <dir>]
+ * Run: ./ckdyntest +pe 4 +balancer RotateLB -requiremoves [-skip <phase>]... [-ckptdir <dir>]
+ * (-requiremoves: the sections/migration phase checks that elements moved;
+ * -stalesend: the sections/delete phase sends to the deleted section, which must abort)
  * The checkpoint phase writes <dir> (default ckdyntest.ckpt); then
  *      ./ckdyntest +pe 4 +restart <dir>
  * checks that the checkpoint callback reaches the restored main chare DMain.
@@ -11,6 +13,9 @@
 #include "cbinding.h"
 #include <cmath>
 #include <cstring>
+#include <deque>
+#include <functional>
+#include <map>
 #include <set>
 #include <string>
 #include <vector>
@@ -20,6 +25,10 @@
 /* readonly */ int gidGrp;
 /* readonly */ int gidNGrp;
 /* readonly */ int numElems;
+/* readonly */ int aidSecA = -1;   /* section test arrays (-1 when the sections phases are skipped) */
+/* readonly */ int aidSecB = -1;
+/* readonly */ int nSecA;
+/* readonly */ int nSecB;
 
 #define CHECK(cond, ...) do { if (!(cond)) cbFail(__VA_ARGS__); } while (0)
 
@@ -63,10 +72,12 @@ static CkDynCallback viewCb(const CkDynMsgView *v, int slot) { CkDynCallback c; 
 /* Classes                                                                 */
 /* ====================================================================== */
 
-extern CbClass Ping, Grp, NGrp, Single, DMain;
+extern CbClass Ping, Sec, Grp, NGrp, Single, DMain;
 
 enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTRED, P_GOTREDB, P_COMPUTE, P_CORO, P_SYNCSTART, P_RESUMED };
-enum { G_CTOR, G_GOTRED, G_GOTREDB, G_NGSEND, G_NGREPORT, G_PRIOSTART, G_PRIORECV, G_EXPRECV };
+enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED };
+enum { G_CTOR, G_GOTRED, G_GOTREDB, G_NGSEND, G_NGREPORT, G_PRIOSTART, G_PRIORECV, G_EXPRECV,
+       G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE };
 enum { N_CTOR, N_INCR };
 enum { S_CTOR, S_GOTRED };
 enum { D_CTOR, D_RESUMED };
@@ -259,6 +270,119 @@ CbClass Ping = { "Ping", CKDYN_ARRAY, 1, {
   { "Ping.resumed", 0, pingResumed },
 } };
 
+/* ---- section members (Sec array elements and Grp branches) --------------- */
+
+/* The value a member contributes: Sec element i of array A gives i+1, of
+   array B 1000*(i+1); a Grp branch gives its PE + 1. */
+static double memberValue(Obj *o) {
+  if (o->t.kind == CKDYN_GROUP) return o->t.u.group.pe_or_node + 1;
+  return (o->t.u.array.aid == aidSecA ? 1.0 : 1000.0) * (o->t.u.array.index[0] + 1);
+}
+
+/* secRecv(mode, expectRedNo, cb): a section multicast. Checks the view and
+ * the member's section reduction number, then contributes to the section:
+ * mode 0 sum_double of [value, 1]; mode 1 the foreign reducer over value. */
+static int64_t secRecv(Obj *o, const CkDynMsgView *v) {
+  CHECK(v->kind == CKDYN_MSGKIND_MCAST && v->section != nullptr, "secRecv: view kind %d, section %p", (int)v->kind, (const void *)v->section);
+  CHECK(o->s.joined > 0, "secRecv: the member never got section_joined");
+  CkDynSectionID sid = *v->section;
+  int64_t mode = cbI64(v, 0), expect = cbI64(v, 1);
+  CkDynCallback cb = viewCb(v, 2);
+  int rn = CkDynSectionRedNo(&o->t, &sid);
+  CHECK(expect < 0 || rn == expect, "secRecv: section (root %d, idx %d) reduction number %d, expected %lld",
+        sid.root_pe, sid.idx, rn, (long long)expect);
+  o->s.counter++;
+  double val = memberValue(o);
+  if (mode == 0) {
+    double r[2] = { val, 1.0 };
+    CkDynRedData d = { r, sizeof r, redType("sum_double") };
+    CkDynContributeSection(&o->t, &sid, &d, &cb);
+  } else {
+    CkDynMsg *m = MsgB().user(CB_REDUCER_SUM_I64).i64((int64_t)val).finish(0);
+    uint32_t len;
+    const void *p = CkDynMsgPayload(m, &len);
+    CkDynRedData d = { p, len, CkDynForeignReducerType() };
+    CkDynContributeSection(&o->t, &sid, &d, &cb);
+    CkDynMsgFree(m);
+  }
+  return 0;
+}
+
+/* The (value, count) of a section reduction result in any of its forms: a
+   REDRESULT or a section callback's BUFFER slot of doubles (count is the
+   second double), or a foreign result's I64 slot (count -1). */
+static void resultOf(const CkDynMsgView *v, double *value, double *count) {
+  CHECK(v->nslots >= 1, "result view without slots (kind %d)", (int)v->kind);
+  if (v->slots[0].type == CKDYN_SLOT_I64) { *value = (double)v->slots[0].v.i64; *count = -1; return; }
+  CHECK(v->slots[0].type == CKDYN_SLOT_BUFFER, "result slot 0 has type %d", v->slots[0].type);
+  CHECK(v->slots[0].elem == CKDYN_ELEM_F64, "result buffer elem %d, expected F64", v->slots[0].elem);
+  const double *p = (const double *)CkDynViewBufferPtr(v, 0, nullptr);
+  *value = p[0];
+  *count = v->slots[0].len >= 16 ? p[1] : -1;
+}
+
+/* gotElem: a TARGET callback to one member; reports (value, count) to the future */
+static int64_t secGotElem(Obj *, const CkDynMsgView *v) {
+  CHECK(v->refnum != 0, "gotElem: no reference number");
+  double val, cnt;
+  resultOf(v, &val, &cnt);
+  CkDynFutureSet(0, v->refnum, MsgB().f64(val).f64(cnt).finish(0));
+  return 0;
+}
+/* gotBcast: a TARGET broadcast; every element of the array reduces [value, count, 1] */
+static int64_t secGotBcast(Obj *o, const CkDynMsgView *v) {
+  CHECK(v->kind == CKDYN_MSGKIND_REDRESULT || v->kind == CKDYN_MSGKIND_DYN, "gotBcast: view kind %d", (int)v->kind);
+  double r[3];
+  resultOf(v, &r[0], &r[1]);
+  r[2] = 1;
+  CkDynRedData d = { r, sizeof r, redType("sum_double") };
+  CkDynCallback cb = cbFutureCb(0, v->refnum);
+  CkDynContribute(&o->t, &d, &cb);
+  return 0;
+}
+/* gotSec: a SECTION callback; every member reduces [value, count, 1] over the section */
+static int64_t secGotSec(Obj *o, const CkDynMsgView *v) {
+  CHECK(v->kind == CKDYN_MSGKIND_MCAST && v->section, "gotSec: view kind %d", (int)v->kind);
+  CHECK(v->refnum != 0, "gotSec: the section callback lost its reference number");
+  double r[3];
+  resultOf(v, &r[0], &r[1]);
+  r[2] = 1;
+  CkDynRedData d = { r, sizeof r, redType("sum_double") };
+  CkDynCallback cb = cbFutureCb(0, v->refnum);
+  CkDynSectionID sid = *v->section;
+  CkDynContributeSection(&o->t, &sid, &d, &cb);
+  return 0;
+}
+
+/* ---- Sec (1-D array, section and migration tests) ------------------------ */
+
+static int64_t secCtor(Obj *, const CkDynMsgView *) { return 0; }
+static int64_t secSyncStart(Obj *o, const CkDynMsgView *v) {
+  int pe; uint32_t id;
+  CHECK(cbFindFuture(v, &pe, &id), "Sec.syncStart without a future");
+  o->s.fid = id;
+  o->s.origPe = CkMyPe();
+  CkDynAtSync(&o->t);
+  return 0;
+}
+static int64_t secResumed(Obj *o, const CkDynMsgView *) {
+  double r[2] = { 1.0, o->s.origPe != CkMyPe() ? 1.0 : 0.0 };
+  CkDynRedData d = { r, sizeof r, redType("sum_double") };
+  CkDynCallback cb = cbFutureCb(0, (uint32_t)o->s.fid);
+  CkDynContribute(&o->t, &d, &cb);
+  return 0;
+}
+
+CbClass Sec = { "Sec", CKDYN_ARRAY, 1, {
+  { "Sec.Sec", 0, secCtor },
+  { "Sec.secRecv", 0, secRecv },
+  { "Sec.gotElem", CKDYN_EP_REDNTARGET, secGotElem },
+  { "Sec.gotBcast", CKDYN_EP_REDNTARGET, secGotBcast },
+  { "Sec.gotSec", CKDYN_EP_REDNTARGET, secGotSec },
+  { "Sec.syncStart", 0, secSyncStart },
+  { "Sec.resumed", 0, secResumed },
+} };
+
 /* ---- Grp (group) ---------------------------------------------------------- */
 
 static Obj *volatile g_ngObj = nullptr;   /* this process's NGrp branch (one per process) */
@@ -312,6 +436,22 @@ static int64_t grpPrioStart(Obj *o, const CkDynMsgView *v) {
 static int64_t grpPrioRecv(Obj *o, const CkDynMsgView *v) { o->order.push_back(cbI64(v, 0)); grpMaybeReport(o); return 0; }
 static int64_t grpExpRecv(Obj *o, const CkDynMsgView *) { o->s.expGot = 1; grpMaybeReport(o); return 0; }
 
+/* secCreate(n, FUTURE sidFuture, CALLBACK done): create the section of the
+ * first n elements of array A on this PE (its root) and report its id. */
+static int64_t grpSecCreate(Obj *, const CkDynMsgView *v) {
+  int n = (int)cbI64(v, 0);
+  int pe; uint32_t id;
+  CHECK(cbFindFuture(v, &pe, &id), "secCreate without a future");
+  CkDynCallback done = viewCb(v, 2);
+  std::vector<int> idx(n);
+  for (int i = 0; i < n; i++) idx[i] = i;
+  CkDynSectionID sid;
+  CkDynSectionCreateArray(aidSecA, n, 1, idx.data(), 0, &done, &sid);
+  CHECK(sid.root_pe == CkMyPe() && sid.kind == CKDYN_ARRAY && sid.coll_id == aidSecA, "secCreate: section id fields");
+  CkDynFutureSet(pe, id, MsgB().sec(sid).finish(0));
+  return 0;
+}
+
 CbClass Grp = { "Grp", CKDYN_GROUP, 0, {
   { "Grp.Grp", 0, grpCtor },
   { "Grp.gotRed", CKDYN_EP_REDNTARGET, grpGotRed },
@@ -321,6 +461,10 @@ CbClass Grp = { "Grp", CKDYN_GROUP, 0, {
   { "Grp.prioStart", 0, grpPrioStart },
   { "Grp.prioRecv", 0, grpPrioRecv },
   { "Grp.expRecv", 0, grpExpRecv },
+  { "Grp.secRecv", 0, secRecv },
+  { "Grp.gotElem", CKDYN_EP_REDNTARGET, secGotElem },
+  { "Grp.gotSec", CKDYN_EP_REDNTARGET, secGotSec },
+  { "Grp.secCreate", 0, grpSecCreate },
 } };
 
 /* ---- NGrp (nodegroup) ---------------------------------------------------- */
@@ -399,6 +543,7 @@ CbClass DMain = { "DMain", CKDYN_MAINCHARE, 0, {
 void ckdynRegister(void) {
   CkDynInit(cbHooks());
   cbRegister(&Ping);
+  cbRegister(&Sec);
   cbRegister(&Grp);
   cbRegister(&NGrp);
   cbRegister(&Single);
@@ -419,12 +564,30 @@ class TestMain : public CBase_TestMain {
     "pingpong", "pingpong_inline", "bcast",
     "reductions/single", "reductions/single_any", "reductions/group_elem", "reductions/group_bcast",
     "reductions/array_elem", "reductions/array_bcast", "reductions/future", "reductions/foreign",
-    "future_return", "nodegroup", "qd", "priority", "coroutine", "migration", "checkpoint", "exit" };
+    "future_return", "nodegroup", "qd", "priority", "coroutine",
+    "sections/array", "sections/group", "sections/remote", "sections/combine_overlap",
+    "sections/combine_arrays", "sections/delete", "sections/migration",
+    "migration", "checkpoint", "exit" };
   std::string ckptDir = "ckdyntest.ckpt";
   int step = -1;
   int pending = 0;
   double tStart = 0;
   CkDynTarget single0, singleAny;
+  bool staleSend = false;   /* -stalesend: the delete phase sends to the deleted section, which must abort */
+  bool requireMoves = false; /* -requiremoves: a load balancer that moves elements is loaded (RotateLB) */
+
+  /* sections: the expected membership of each section the phases create */
+  struct Sect {
+    CkDynSectionID sid;
+    std::set<std::pair<int, int> > mem;   /* (aid, index), or (-1, pe) for a group section */
+    bool group = false;
+    int size = 0;
+    double sum = 0;
+    int reds = 1;                         /* section reductions so far: the creation reduction is the first */
+  };
+  std::map<std::string, Sect> sects;
+  std::deque<std::function<void()> > q;   /* the steps of the current sections phase */
+  std::string cur;
 
   bool skipped(const std::string &s) {
     if (skip.count(s)) return true;
@@ -439,6 +602,8 @@ public:
     for (int i = 1; i < m->argc; i++)
       if (strcmp(m->argv[i], "-skip") == 0 && i + 1 < m->argc) skip.insert(m->argv[++i]);
       else if (strcmp(m->argv[i], "-ckptdir") == 0 && i + 1 < m->argc) ckptDir = m->argv[++i];
+      else if (strcmp(m->argv[i], "-stalesend") == 0) staleSend = true;
+      else if (strcmp(m->argv[i], "-requiremoves") == 0) requireMoves = true;
     delete m;
     mainProxy = thisProxy;
     numElems = 2 * CkNumPes();
@@ -451,7 +616,8 @@ public:
     /* -skip nodegroup also skips creating NGrp (its constructor is where a
        nodegroup defect would show) */
     bool withNg = skip.count("nodegroup") == 0;
-    pending = withNg ? 5 : 4;
+    bool withSec = skip.count("sections") == 0;
+    pending = (withNg ? 5 : 4) + (withSec ? 2 : 0);
     auto created = [this](const char *what) {
       return cbNewFuture([this, what](const CkDynMsgView *v) {
         CkPrintf("  created %s (view kind %d)\n", what, (int)v->kind);
@@ -464,6 +630,16 @@ public:
         MsgB().flags(CKDYN_MSG_CREATION | CKDYN_MSG_USESATSYNC).fut(0, created("Ping")).finish(Ping.ep(0)), &ao);
     gidGrp = CkDynCreateGroup(Grp.chareIdx, MsgB().flags(CKDYN_MSG_CREATION).fut(0, created("Grp")).finish(Grp.ep(0)));
     gidNGrp = !withNg ? -1 : CkDynCreateNodeGroup(NGrp.chareIdx, MsgB().flags(CKDYN_MSG_CREATION).fut(0, created("NGrp")).finish(NGrp.ep(0)));
+    if (withSec) {
+      nSecA = 2 * CkNumPes() + 1;
+      nSecB = CkNumPes() + 2;
+      int da[1] = { nSecA }, db[1] = { nSecB };
+      CkDynArrayOpts oa = { 1, da, -1, 0, 0, -1 }, ob = { 1, db, -1, 0, 0, -1 };
+      aidSecA = CkDynCreateArray(Sec.chareIdx,
+          MsgB().flags(CKDYN_MSG_CREATION | CKDYN_MSG_USESATSYNC).fut(0, created("Sec A")).finish(Sec.ep(0)), &oa);
+      aidSecB = CkDynCreateArray(Sec.chareIdx,
+          MsgB().flags(CKDYN_MSG_CREATION | CKDYN_MSG_USESATSYNC).fut(0, created("Sec B")).finish(Sec.ep(0)), &ob);
+    }
     CkDynCreateChare(Single.chareIdx, 0, MsgB().flags(CKDYN_MSG_CREATION).fut(0, created("Single(pe 0)")).finish(Single.ep(0)), &single0);
     CkDynCreateChare(Single.chareIdx, CKDYN_PE_ANY, MsgB().flags(CKDYN_MSG_CREATION).fut(0, created("Single(any)")).finish(Single.ep(0)), &singleAny);
   }
@@ -481,6 +657,7 @@ public:
     else if (s == "qd") runQD();
     else if (s == "priority") runPriority();
     else if (s == "coroutine") runCoroutine();
+    else if (s.compare(0, 9, "sections/") == 0) runSections(s);
     else if (s == "migration") runMigration();
     else if (s == "checkpoint") runCheckpoint();
     else if (s == "exit") { CkPrintf("ALL DONE (%.3f s)\n", CkWallTimer() - tStart); CkDynExit(0); }
@@ -626,9 +803,30 @@ public:
     CkDynCheckpoint(ckptDir.c_str(), &cb);
   }
 
+  /* AtSync on every element of the arrays created with usesAtSync (the load
+     balancer starts on a PE only when all of its such elements have called
+     it); `ping` checks Ping's result, `done` gets the Sec elements that moved */
+  void syncAll(std::function<void(const CkDynMsgView *)> ping, std::function<void(double)> done) {
+    int *left = new int(aidSecA >= 0 ? 3 : 1);
+    double *moved = new double(0);
+    auto fin = [left, moved, done]() { if (--*left == 0) { double m = *moved; delete left; delete moved; done(m); } };
+    uint32_t fp = cbNewFuture([ping, fin](const CkDynMsgView *v) { ping(v); fin(); });
+    bcastPing(P_SYNCSTART, MsgB().fut(0, fp).finish(0));
+    if (aidSecA < 0) return;
+    for (int k = 0; k < 2; k++) {
+      int aid = k == 0 ? aidSecA : aidSecB, n = k == 0 ? nSecA : nSecB;
+      uint32_t f = cbNewFuture([moved, fin, n](const CkDynMsgView *v) {
+        CHECK(redDouble(v, 0) == n, "sync: %g Sec elements resumed, expected %d", redDouble(v, 0), n);
+        *moved += redDouble(v, 1);
+        fin();
+      });
+      CkDynSendArray(aid, 1, nullptr, Sec.ep(SC_SYNCSTART), MsgB().fut(0, f).finish(0), nullptr);
+    }
+  }
+
   void runMigration() {
     if (CkNumPes() == 1) { CkPrintf("SKIP migration (one PE)\n"); next(); return; }
-    uint32_t f = cbNewFuture([this](const CkDynMsgView *v) {
+    auto f = [this](const CkDynMsgView *v) {
       double m = numElems;
       double expect = 100.0 * VEC_LEN * m * (m - 1) / 2 + m * (VEC_LEN * (VEC_LEN - 1) / 2);
       double sum = redDouble(v, 0), moved = redDouble(v, 1), count = redDouble(v, 2);
@@ -636,9 +834,194 @@ public:
       CHECK(sum == expect, "migration: state sum %g, expected %g", sum, expect);
       CkPrintf("  migration: %d elements resumed, %d changed PE%s\n", numElems, (int)moved,
                CkDynHasLB() ? "" : " (no LB in this build)");
-      pass("migration");
+    };
+    syncAll(f, [this](double) { pass("migration"); });
+  }
+
+  /* ---- sections ---------------------------------------------------------- */
+
+  static double valOf(int aid, int i) { return aid < 0 ? i + 1.0 : (aid == aidSecA ? 1.0 : 1000.0) * (i + 1); }
+  void finalize(Sect &S) {
+    S.size = (int)S.mem.size();
+    S.sum = 0;
+    for (auto &m : S.mem) S.sum += valOf(m.first, m.second);
+  }
+  void go() {
+    if (q.empty()) { pass(cur); return; }
+    std::function<void()> f = q.front();
+    q.pop_front();
+    f();
+  }
+  uint32_t doneFuture(const std::string &name) {
+    return cbNewFuture([this, name](const CkDynMsgView *v) {
+      CHECK(v->kind == CKDYN_MSGKIND_REDRESULT, "%s: section %s done: view kind %d", cur.c_str(), name.c_str(), (int)v->kind);
+      Sect &S = sects[name];
+      CkPrintf("  section %s ready: root PE %d, index %d, generation %u, %d members\n", name.c_str(),
+               S.sid.root_pe, S.sid.idx, S.sid.gen, S.size);
+      go();
     });
-    bcastPing(P_SYNCSTART, MsgB().fut(0, f).finish(0));
+  }
+  void qCreateArray(const std::string &name, int aid, std::vector<int> idx) {
+    q.push_back([this, name, aid, idx] {
+      Sect &S = sects[name];
+      S = Sect();
+      for (int i : idx) S.mem.insert({ aid, i });
+      finalize(S);
+      CkDynCallback d = cbFutureCb(0, doneFuture(name));
+      CkDynSectionCreateArray(aid, (int)idx.size(), 1, idx.data(), 0, &d, &S.sid);
+      CHECK(S.sid.root_pe == CkMyPe() && S.sid.kind == CKDYN_ARRAY && S.sid.coll_id == aid && S.sid.gen != 0,
+            "%s: section id fields", name.c_str());
+    });
+  }
+  void qCreateGroup(const std::string &name, std::vector<int> pes) {
+    q.push_back([this, name, pes] {
+      Sect &S = sects[name];
+      S = Sect();
+      S.group = true;
+      for (int p : pes) S.mem.insert({ -1, p });
+      finalize(S);
+      CkDynCallback d = cbFutureCb(0, doneFuture(name));
+      CkDynSectionCreateGroup(gidGrp, (int)pes.size(), pes.data(), 0, &d, &S.sid);
+      CHECK(S.sid.kind == CKDYN_GROUP && S.sid.coll_id == gidGrp, "%s: section id fields", name.c_str());
+    });
+  }
+  void qCombine(const std::string &name, std::vector<std::string> parts) {
+    q.push_back([this, name, parts] {
+      Sect &S = sects[name];
+      S = Sect();
+      std::vector<CkDynSectionID> ids;
+      for (const std::string &p : parts) { S.mem.insert(sects[p].mem.begin(), sects[p].mem.end()); ids.push_back(sects[p].sid); }
+      finalize(S);
+      CkDynCallback d = cbFutureCb(0, doneFuture(name));
+      CkDynSectionCombine((int)ids.size(), ids.data(), &d, &S.sid);
+      CHECK(S.sid.kind == 0 && S.sid.coll_id == -1 && S.sid.root_pe == CkMyPe(), "%s: combined section id fields", name.c_str());
+    });
+  }
+  /* One multicast of secRecv to a section and one section reduction, mode 0
+     (sum_double) or 1 (foreign), to a callback of kind 0 FUTURE, 1 TARGET
+     element, 2 TARGET array broadcast (array A), 3 SECTION (the section). */
+  void qRound(const std::string &name, int mode, int kind) {
+    q.push_back([this, name, mode, kind] {
+      static const char *kinds[] = { "future", "element", "bcast", "section" };
+      Sect &S = sects[name];
+      std::string what = cur + ": " + name + (mode ? " foreign" : " sum_double") + " to " + kinds[kind];
+      uint32_t f = cbNewFuture([this, &S, mode, kind, what](const CkDynMsgView *v) {
+        double val, cnt, n = 1;
+        if (kind == 0) {
+          CHECK(v->kind == (mode == 0 ? CKDYN_MSGKIND_REDRESULT : CKDYN_MSGKIND_DYN), "%s: view kind %d", what.c_str(), (int)v->kind);
+          resultOf(v, &val, &cnt);
+          CHECK(v->refnum != 0, "%s: no reference number", what.c_str());
+        } else if (kind == 1) {
+          val = cbF64(v, 0); cnt = cbF64(v, 1);
+        } else {
+          val = redDouble(v, 0); cnt = redDouble(v, 1); n = redDouble(v, 2);
+        }
+        double expectN = kind == 2 ? nSecA : (kind == 3 ? S.size : 1);
+        CHECK(n == expectN, "%s: %g receivers of the result, expected %g", what.c_str(), n, expectN);
+        CHECK(val == S.sum * expectN, "%s: sum %g, expected %g", what.c_str(), val, S.sum * expectN);
+        if (mode == 0) CHECK(cnt == S.size * expectN, "%s: %g contributions, expected %g", what.c_str(), cnt, S.size * expectN);
+        go();
+      });
+      CkDynCallback cb;
+      if (kind == 0) cb = cbFutureCb(0, f);
+      else if (kind == 1) cb = S.group ? cbTargetCb(cbGroupTarget(gidGrp, Grp.chareIdx, 0), Grp.ep(G_GOTELEM), 0, f)
+                                       : cbTargetCb(cbArrayTarget1(aidSecA, Sec.chareIdx, 0), Sec.ep(SC_GOTELEM), 0, f);
+      else if (kind == 2) cb = cbTargetCb(cbArrayTarget1(aidSecA, Sec.chareIdx, 0), Sec.ep(SC_GOTBCAST), 1, f);
+      else cb = cbSectionCb(S.sid, S.group ? Grp.ep(G_GOTSEC) : Sec.ep(SC_GOTSEC), f);
+      int expect = S.reds;
+      S.reds += kind == 3 ? 2 : 1;
+      int ep = S.group ? Grp.ep(G_SECRECV) : Sec.ep(SC_RECV);
+      CkDynSendSection(&S.sid, ep, MsgB().i64(mode).i64(expect).cb(cb).finishMcast(ep), nullptr);
+    });
+  }
+  void qSync() {
+    q.push_back([this] {
+      if (CkNumPes() == 1) { go(); return; }
+      syncAll([](const CkDynMsgView *) {}, [this](double moved) {
+        CHECK(moved > 0 || !requireMoves, "%s: no Sec element changed PE at the load balancing step", cur.c_str());
+        CkPrintf("  %s: %d Sec elements changed PE\n", cur.c_str(), (int)moved);
+        go();
+      });
+    });
+  }
+
+  void runSections(const std::string &s) {
+    cur = s;
+    q.clear();
+    std::vector<int> evens, odds, allB;
+    for (int i = 0; i < nSecA; i++) (i % 2 ? odds : evens).push_back(i);
+    for (int i = 0; i < nSecB; i++) allB.push_back(i);
+    if (s == "sections/array") {
+      qCreateArray("Aeven", aidSecA, evens);
+      qRound("Aeven", 0, 0); qRound("Aeven", 1, 0); qRound("Aeven", 0, 1);
+      qRound("Aeven", 1, 2); qRound("Aeven", 0, 3); qRound("Aeven", 1, 3);
+    } else if (s == "sections/group") {
+      std::vector<int> pes;
+      for (int p = 0; p < CkNumPes(); p += 2) pes.push_back(p);
+      qCreateGroup("G", pes);
+      qRound("G", 0, 0); qRound("G", 1, 0); qRound("G", 0, 1); qRound("G", 0, 3);
+    } else if (s == "sections/remote") {
+      /* created on the last PE (its root); the main chare sends from PE 0 */
+      q.push_back([this] {
+        int n = (nSecA + 1) / 2;
+        Sect &S = sects["R"];
+        S = Sect();
+        for (int i = 0; i < n; i++) S.mem.insert({ aidSecA, i });
+        finalize(S);
+        int *left = new int(2);
+        uint32_t fs = cbNewFuture([this, left](const CkDynMsgView *v) {
+          CkDynViewSection(v, 0, &sects["R"].sid);
+          CHECK(sects["R"].sid.root_pe == CkNumPes() - 1, "remote: root PE %d", sects["R"].sid.root_pe);
+          if (--*left == 0) { delete left; go(); }
+        });
+        uint32_t fd = cbNewFuture([this, left](const CkDynMsgView *v) {
+          CHECK(v->kind == CKDYN_MSGKIND_REDRESULT, "remote: done view kind %d", (int)v->kind);
+          if (--*left == 0) { delete left; go(); }
+        });
+        CkDynSendGroup(gidGrp, CkNumPes() - 1, Grp.ep(G_SECCREATE),
+                       MsgB().i64(n).fut(0, fs).cb(cbFutureCb(0, fd)).finish(0), nullptr);
+      });
+      qRound("R", 0, 0); qRound("R", 0, 3); qRound("R", 1, 0); qRound("R", 0, 1);
+    } else if (s == "sections/combine_overlap") {
+      /* Aeven and R overlap in the even indices of the first half */
+      qCombine("C1", { "Aeven", "R" });
+      qRound("C1", 0, 0); qRound("C1", 1, 0); qRound("C1", 0, 3); qRound("C1", 0, 1);
+      qRound("Aeven", 0, 0); qRound("R", 0, 0);   /* the parts keep their own cookies */
+    } else if (s == "sections/combine_arrays") {
+      qCreateArray("Ball", aidSecB, allB);
+      qCombine("C2", { "Aeven", "Ball" });
+      qRound("C2", 0, 0); qRound("C2", 1, 0); qRound("C2", 0, 3); qRound("C2", 1, 3); qRound("C2", 0, 2);
+    } else if (s == "sections/delete") {
+      qCreateArray("D", aidSecA, { 0, 1 });
+      q.push_back([this] {
+        CkDynSectionDelete(&sects["D"].sid);
+        if (staleSend) {
+          CkPrintf("  sending to the deleted section; CkDyn must abort\n");
+          int ep = Sec.ep(SC_RECV);
+          CkDynSendSection(&sects["D"].sid, ep, MsgB().i64(0).i64(-1).cb(cbFutureCb(0, 1)).finishMcast(ep), nullptr);
+          CHECK(false, "a send to a deleted section did not abort");
+        }
+        go();
+      });
+      qCreateArray("D2", aidSecA, { 2 });
+      q.push_back([this] {
+        const CkDynSectionID &a = sects["D"].sid, &b = sects["D2"].sid;
+        CHECK(a.idx == b.idx && a.gen != b.gen, "delete: the new section has index %d generation %u; "
+              "expected the deleted slot %d with a new generation (was %u)", b.idx, b.gen, a.idx, a.gen);
+        go();
+      });
+      qRound("D2", 0, 0);
+    } else if (s == "sections/migration") {
+      /* section reductions with RotateLB migrations between them */
+      qCreateArray("Aodd", aidSecA, odds);
+      qCombine("C3", { "Aodd", "Ball" });
+      for (int r = 0; r < 4; r++) {
+        qRound("Aodd", 0, 0); qRound("C3", 0, 0); qRound("C3", 1, 3); qRound("C2", 0, 3); qRound("G", 0, 0);
+        qSync();
+      }
+      qRound("Aodd", 0, 0); qRound("C3", 0, 3); qRound("C1", 0, 0); qRound("R", 1, 0);
+    }
+    go();
   }
 };
 

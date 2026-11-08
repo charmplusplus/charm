@@ -47,6 +47,7 @@ struct ObjState {
   int64_t n;          /* ping-pong rounds */
   int64_t mode;
   int64_t expGot;     /* priority test: the expedited message arrived */
+  int64_t joined;     /* section_joined calls */
   double  t0;
 };
 
@@ -87,6 +88,7 @@ CkDynTarget cbGroupTarget(int gid, int chareIdx, int pe);
 
 CkDynCallback cbFutureCb(int pe, uint32_t id);
 CkDynCallback cbTargetCb(const CkDynTarget &t, int ep, int bcast, uint32_t refnum);
+CkDynCallback cbSectionCb(const CkDynSectionID &sid, int ep, uint32_t refnum);
 
 /* ---- message building --------------------------------------------------- */
 
@@ -99,7 +101,9 @@ struct MsgB {
   MsgB &f64(double v) { CkDynMsgAddF64(b, v); return *this; }
   MsgB &fut(int pe, uint32_t id) { CkDynMsgAddFuture(b, pe, id); return *this; }
   MsgB &cb(const CkDynCallback &c) { CkDynMsgAddCallback(b, &c); return *this; }
+  MsgB &sec(const CkDynSectionID &s) { CkDynMsgAddSection(b, &s); return *this; }
   CkDynMsg *finish(int ep) { return CkDynMsgFinish(b, ep); }
+  CkDynMcastMsg *finishMcast(int ep) { return CkDynMsgFinishMcast(b, ep); }
 };
 
 /* ---- reading views ------------------------------------------------------ */

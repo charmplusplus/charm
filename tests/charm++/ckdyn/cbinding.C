@@ -104,6 +104,13 @@ CkDynCallback cbTargetCb(const CkDynTarget &t, int ep, int bcast, uint32_t refnu
   return c;
 }
 
+CkDynCallback cbSectionCb(const CkDynSectionID &sid, int ep, uint32_t refnum) {
+  CkDynCallback c;
+  memset(&c, 0, sizeof c);
+  c.kind = CKDYN_CB_SECTION; c.sid = sid; c.ep = ep; c.refnum = refnum;
+  return c;
+}
+
 /* ---- futures ------------------------------------------------------------ */
 
 uint32_t cbNewFuture(CbFutureFn fn) {
@@ -247,6 +254,14 @@ static void hResumeFromSync(void *bd, void *h) {
   CkDynSendTarget(&o->t, c->ep(m), MsgB().finish(c->ep(m)), nullptr);
 }
 
+/* section_joined: the member counts the sections it belongs to */
+static void hSectionJoined(void *bd, void *h, const CkDynSectionID *sid) {
+  Obj *o = (Obj *)h;
+  if (o->cls != (const CbClass *)bd) cbFail("section_joined: binding data of another class");
+  if (sid->root_pe < 0 || sid->root_pe >= CkNumPes() || sid->gen == 0) cbFail("section_joined: malformed section id");
+  o->s.joined++;
+}
+
 static void hError(void *, const char *what) {
   CkPrintf("[PE %d] cbinding: CkDyn error: %s\n", CkMyPe(), what);
 }
@@ -269,6 +284,7 @@ const CkDynHooks *cbHooks(void) {
   g_hooks.future = hFuture;
   g_hooks.map_proc_num = hMapProcNum;
   g_hooks.resume_from_sync = hResumeFromSync;
+  g_hooks.section_joined = hSectionJoined;
   g_hooks.error = hError;
   return &g_hooks;
 }
