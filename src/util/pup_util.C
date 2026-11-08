@@ -229,7 +229,14 @@ void PUP::fromMem::bytes_device(void *p,size_t n,size_t itemSize,dataType t)
 #endif
 }
 
+// A pup_buffer normally sends only a reference to the buffer, which the
+// receiver fetches (zero copy). A checkpoint (IS_CHECKPOINT) must hold the
+// bytes as they are now, so the sizer, toMem and fromMem copy them instead.
 void PUP::sizer::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t) {
+	if (isCheckpoint()) {
+		bytes(p, n, itemSize, t);
+		return;
+	}
 #ifdef CK_CHECK_PUP
 	nBytes+=sizeof(pupCheckRec);
 #endif
@@ -245,6 +252,11 @@ void PUP::toMem::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
 }
 
 void PUP::fromMem::pup_buffer_generic(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, bool isMalloc) {
+	if (isCheckpoint()) {
+		p = isMalloc ? malloc(n * itemSize) : allocate(n);
+		bytes(p, n, itemSize, t);
+		return;
+	}
 #ifdef CK_CHECK_PUP
 	((pupCheckRec *)buf)->check(t,n);
 	buf+=sizeof(pupCheckRec);
@@ -280,6 +292,11 @@ void PUP::fromMem::pup_buffer(void *&p,size_t n,size_t itemSize,dataType t) {
 }
 
 void PUP::toMem::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t, std::function<void *(size_t)> allocate, std::function<void (void *)> deallocate) {
+	if (isCheckpoint()) {
+		bytes(p, n, itemSize, t);
+		if (isDeleting()) deallocate(p);
+		return;
+	}
 #ifdef CK_CHECK_PUP
 	((pupCheckRec *)buf)->write(t,n);
 	buf+=sizeof(pupCheckRec);

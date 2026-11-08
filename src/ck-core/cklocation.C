@@ -3060,9 +3060,11 @@ void CkLocMgr::pup(PUP::er& p)
   }
 #endif
 
-  // Delay doneInserting when it is unpacking during restart to prevent load balancing
-  // from kicking in.
-  if (p.isUnpacking() && !CkInRestarting())
+  // Delay doneInserting when it is unpacking during an in-memory restart to prevent
+  // load balancing from kicking in. A restart from disk (_inrestart) calls it here: a PE
+  // that reads no array file, on a restart with more PEs, has no other call to it, and
+  // its sync barrier would stay off.
+  if (p.isUnpacking() && (!CkInRestarting() || _inrestart))
   {
     doneInserting();
   }
@@ -3120,6 +3122,10 @@ CkLocRec* CkLocMgr::createLocal(const CkArrayIndex& idx, bool forMigration,
   DEBC((AA "Adding new record for element %s\n" AB, idx2str(idx)));
   CmiUInt8 id = lookupID(idx);
   if (life == 0) life = newLife();  // a creation; a landing brings the element's tag
+#if CMK_MEM_CHECKPOINT
+  if (!forMigration && !CkInRestarting())
+    CkMemCheckPTNoteInsertion();  // a rollback is refused after an insertion
+#endif
 
   CkLocRec* rec = new CkLocRec(this, forMigration, ignoreArrival, idx, id);
   rec->setLife(life);
@@ -3370,6 +3376,19 @@ void CkLocMgr::reclaim(CkLocRec* rec)
   DEBC((AA "Destroying record for element %s\n" AB, idx2str(rec->getIndex())));
   if (!duringMigration)
   {  // This is a local element dying a natural death
+#if CMK_MEM_CHECKPOINT
+    // A rollback destroys every element and restores it on the same PE under the
+    // same epoch and life (CkMemCheckPT::recoverAll), so the home's records and
+    // other processes' tables stay as they are: no notice to a remote home, and
+    // none to a local one, where homeNoteDeath would mark the life dead and the
+    // restored element's location would then be dropped as stale.
+    if (CkInRestarting())
+    {
+      delete rec;
+      return;
+    }
+    CkMemCheckPTNoteDeletion();  // a rollback is refused after a deletion
+#endif
     int home = homePe(rec->getIndex());
     if (home == CkMyPe())
     {
@@ -3381,13 +3400,9 @@ void CkLocMgr::reclaim(CkLocRec* rec)
       died.life = rec->getLife();
       homeNoteDeath(rec->getIndex(), died);
     }
-    else
-#if CMK_MEM_CHECKPOINT
-      if (!CkInRestarting())  // all array elements are removed anyway
-#endif
-        if (!duringDestruction)
-          thisProxy[home].reclaimRemote(rec->getIndex(), rec->getID(), CkMyPe(), epoch,
-                                        rec->getLife());
+    else if (!duringDestruction)
+      thisProxy[home].reclaimRemote(rec->getIndex(), rec->getID(), CkMyPe(), epoch,
+                                    rec->getLife());
   }
   delete rec;
 }
@@ -3676,6 +3691,7 @@ void CkLocMgr::pupElementsFor(PUP::er& p, CkLocRec* rec, CkElementCreation_t typ
         if (c)
           c->redNo = 0;
       }
+      ((ArrayElement*)list[l])->thisArray->restampBroadcast((ArrayElement*)list[l]);
     }
   }
 #endif
@@ -3738,6 +3754,9 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   // Let all the elements know we're leaving
   callMethod(rec, &CkMigratable::ckAboutToMigrate);
+#if CMK_MEM_CHECKPOINT
+  CkMemCheckPTNoteMigration();  // a rollback is refused after a migration
+#endif
 
   // Record the move in the process's table before the migration message exists: a
   // destination in this process can land the element, and write its own entry,
@@ -4054,11 +4073,12 @@ void CkLocMgr::restore(const CkArrayIndex& idx, CmiUInt8 id, PUP::er& p)
 
 /// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
 void CkLocMgr::resume(const CkArrayIndex& idx, CmiUInt8 id, PUP::er& p, bool notify,
-                      bool rebuild)
+                      bool rebuild, int epoch, CmiUInt8 life)
 {
   insertID(idx, id);
 
-  CkLocRec* rec = createLocal(idx, false, false, notify /* home doesn't know yet */);
+  CkLocRec* rec = createLocal(idx, false, false, notify /* home doesn't know yet */,
+                              epoch, life);
 
   // Create the new elements as we unpack the message
   pupElementsFor(p, rec, CkElementCreation_resume, rebuild);

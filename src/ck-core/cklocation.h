@@ -869,8 +869,10 @@ public:
   void restore(const CkArrayIndex& idx, CmiUInt8 id, PUP::er& p);
   /// Insert and unpack this array element from this checkpoint (e.g., from
   /// CkLocation::pup)
+  /// epoch and life: the element's, from an in-memory checkpoint (0: epoch 0
+  /// and a new life)
   void resume(const CkArrayIndex& idx, CmiUInt8 id, PUP::er& p, bool notify = true,
-              bool = false);
+              bool = false, int epoch = 0, CmiUInt8 life = 0);
 
   // Interface used by array manager and proxies
   /// Add a new local array manager to our list.
