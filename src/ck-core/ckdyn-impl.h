@@ -56,6 +56,7 @@ public:
   static void callCtor(void *msg, void *obj);
   static void callEntry(void *msg, void *obj);
   static void callMigrate(void *msg, void *obj);
+  static void callRelay(void *msg, void *obj);   /* a callback routed through CkDynMgr */
   void pup(PUP::er &p) override;
 };
 

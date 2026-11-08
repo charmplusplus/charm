@@ -57,6 +57,16 @@ be contiguous. The migration constructor (`X::callMigrate`, message index 0,
 `CkRegisterMigCtor`) is registered after the user entries so that it does not
 break the contiguity.
 
+A main chare class also gets one **relay entry** per user entry, registered
+after its migration constructor with `MainchareDyn::callRelay`, the same name
+and flags, and contiguous from `ClassRec::relayFirst`; its `EpRec::relayTo`
+names the main chare entry it stands for. A `TARGET` callback to a main chare
+is sent to the relay entry on `CkDynMgr` of the main chare's PE (see
+Callbacks and futures), because the main chare's `CkChareID` holds an object
+pointer (`thishandle.objPtr` is the object itself for main chares, which are
+not in `chare_objs`) and a process restarted from a checkpoint allocates the
+main chare elsewhere.
+
 `ckFlagsOf` maps the entry attributes to Charm++ entry flags, for the
 constructor of every kind except the main chare and for every user entry:
 always
@@ -427,6 +437,29 @@ A binding describes a callback with the POD `CkDynCallback`;
 | `IGNORE`, `EXIT` | `CkCallback::ignore`, `CkCallback::ckExit` |
 | `SECTION` | aborts (planned) |
 
+A `TARGET` callback to a main chare is the exception to the first row: it
+becomes `sendGroup` to the class's relay entry for `cb->ep` (`relayFirst +
+(cb->ep - firstEp) - 1`) on `CkDynMgr[t.u.chare.pe]`. `callRelay` runs on
+that branch, finds the main chare through `_mainTable[...]->getObj()`, pushes
+it on the running-object stack and calls `dispatch`, which delivers with
+`relayTo` as the entry index when the message is not a `CkDynMsg` (whose
+header already holds the main chare's entry, stamped by
+`CkDynCallbackSend`). Such a callback holds the chare index and PE only, so
+it survives a checkpoint.
+
+**Checkpoint.** `CkDynCheckpoint(dir, done)` calls `CkStartCheckpoint` with
+`CkDynMakeCallback(done)`. Charm++ calls the callback when the checkpoint is
+written and, in a program started with `+restart dir`, once restart completes
+(`CkRestartMain`, ckcheckpoint.C). The callback may target an entry of a
+group, an array element or a main chare; the main chare is restored by
+`CkPupMainChareData` through `MainchareDyn`'s migration constructor and
+`pupObj`, so the binding's `unpack` hook receives it. Futures from the
+checkpointed run are invalid after restart: no coroutine waits on them in the
+new process, so a `FUTURE` callback is not a resume target. A binding that
+needs the original run to continue after the checkpoint tells the two runs
+apart itself (the test's `DMain` checks whether its constructor ran in this
+process).
+
 A `TARGET` callback with a non-zero `refnum` sets it on the `CkCallback`.
 `CkDynCallbackSend` stamps the ep into the header for a `TARGET` callback
 before sending.
@@ -456,10 +489,46 @@ message's reference number to `id` and sends it to `CkDynMgr[pe].deposit`.
 `deposit` views the message (any kind: a `CkDynMsg` from `CkDynFutureSet`, a
 reduction result or a system message from a FUTURE callback), reads `id`
 from the envelope, calls `g_hooks.future(global, CkMyPe(), id, &view)`, and
-frees the message (`deposit` is not nokeep). It aborts if the binding has no
+frees the message (`deposit` is not nokeep). `deposit` is declared
+`[notrace]`: a binding resumes its coroutines from the `future` hook, and
+each resumed run records its own execute event (next section), which would
+otherwise nest inside one for `deposit`. `CkDynCreateManagers` creates the
+group once; later calls (a program with several main chares) do nothing. It aborts if the binding has no
 `future` hook. The `relay` entry is reserved for section callbacks and
 aborts. The group is `[migratable]` and has a `pup` (which holds no CkDyn
 state), so a checkpoint restores it.
+
+### Coroutines: load and trace attribution
+
+A binding coroutine (a greenlet) that suspends on a future is resumed later
+from the `future` hook, inside `CkDynMgr.deposit`. Without more work its time
+there is charged to `CkDynMgr`, a group the load balancer cannot move, and
+tracing shows nothing for it. A binding therefore calls
+`CkDynCoroResume(target, ep, coro_id)` right after switching into a
+coroutine and `CkDynCoroSuspend(target)` right before switching out of it
+(when it waits again or finishes). This is what Charm++ does for a
+`[threaded]` entry's thread with two listeners: `CkChareThreadListener`
+(ck.C) pushes and pops the chare on the running-object stack, and
+`TraceThreadListener` (trace-common.C) sets the traced object and begins an
+execute event on resume, and ends them on suspend.
+
+`CkDynCoroResume` finds the local object (`localChare`; it aborts if the
+target is not local) and calls `CkCallstackPush`, which stops the timing of
+the object below and starts the target's (load balancer instrumentation).
+When tracing is on and `ep` is traced, it also begins an execute event for
+`ep`: for an array element it sets the traced object (location manager group
+and element id) and uses the element's projection id (its index), so
+Projections attributes the event to the element; for a group, nodegroup,
+chare or main chare the object id is made from `coro_id` as `CthSetThreadID`
+makes one for a thread (`{CkMyPe(), low 32 bits, high 32 bits, 0}`). A per-PE
+stack (`_ckdynCoroTraced`) records whether an event was begun, so that
+`CkDynCoroSuspend` ends only events Resume began. `CkDynCoroSuspend` ends the
+event, clears the traced object and calls `CkCallstackPop`. With tracing
+compiled out both are the running-object push and pop only. The pair must be
+called outside any traced entry, as from the `future` hook: `deposit` is not
+traced, so the events do not nest. The test phase `coroutine`
+(tests/charm++/ckdyn) checks the running object inside and after the
+bracket for an array element and for a group branch.
 
 ## Reductions
 

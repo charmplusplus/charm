@@ -119,16 +119,19 @@ typedef enum {
   CKDYN_CB_EXIT    = 5    /* CkExit */
 } CkDynCbKind;
 
+/* A TARGET callback to a main chare entry is routed by chare index through
+ * CkDynMgr on the main chare's PE, not by the target's object pointer, so it
+ * stays valid in a program restarted from a checkpoint (CkDynCheckpoint). */
 typedef struct CkDynCallback {
-  CkDynCbKind    kind;
+  int32_t        kind;     /* CkDynCbKind */
   CkDynTarget    t;        /* TARGET: the element, or the collection when bcast != 0 */
-  int            ep;       /* TARGET, SECTION */
-  int            bcast;
+  int32_t        ep;       /* TARGET, SECTION */
+  int32_t        bcast;
   uint32_t       refnum;   /* non-zero: the binding future the delivered result belongs to */
   CkDynSectionID sid;      /* SECTION */
-  int            pe;       /* FUTURE: the PE that owns the future */
+  int32_t        pe;       /* FUTURE: the PE that owns the future */
   uint32_t       id;       /* FUTURE */
-} CkDynCallback;
+} CkDynCallback;           /* 88 bytes */
 
 /* ------------------------------------------------------------------------ */
 /* Messages                                                                  */
@@ -336,8 +339,9 @@ typedef struct CkDynHooks {
   void  (*deliver)(void *binding_data, void *handle, int ep, uint32_t user_id,
                    uint32_t ep_flags, const CkDynMsgView *msg);
   /* array broadcast: one call per PE for every local element whose epoch matches.
-     Time is charged to the array manager unless the binding brackets each element's
-     call with CkDynCallstackPush/Pop. A handler that destroys another local element
+     Time is charged to the array manager, and tracing records no event per element,
+     unless the binding brackets each element's call with CkDynCoroResume/Suspend
+     (or CkDynCallstackPush/Pop for the load alone). A handler that destroys another local element
      makes that element's handle invalid for the rest of the call. */
   void  (*deliver_many)(void *binding_data, void **handles, int n, int ep, uint32_t user_id,
                         uint32_t ep_flags, const CkDynMsgView *msg);
@@ -505,7 +509,11 @@ void CkDynContributeSection(const CkDynTarget *me, const CkDynSectionID *sid, co
 /* Checkpoint, quiescence, load balancing, tracing                           */
 /* ------------------------------------------------------------------------ */
 
-void CkDynCheckpoint(const char *dirname, const CkDynCallback *done);   /* CkStartCheckpoint */
+/* CkStartCheckpoint. done is called when the checkpoint is written and, in a
+ * program restarted with +restart, once restart completes. It may be a TARGET
+ * callback to a group, array element or main chare entry; a FUTURE callback
+ * does not survive a restart (the future belongs to the checkpointed run). */
+void CkDynCheckpoint(const char *dirname, const CkDynCallback *done);
 void CkDynStartQD(const CkDynCallback *cb);
 
 void CkDynAtSync(const CkDynTarget *t);
@@ -515,6 +523,19 @@ void CkDynLBInstrument(int on);
 void CkDynSetObjLoad(const CkDynTarget *t, double secs);
 void CkDynCallstackPush(const CkDynTarget *t);
 void CkDynCallstackPop(const CkDynTarget *t);
+/* Bracket one run of a binding coroutine (a resumed greenlet) so that its
+ * time is charged to the object it belongs to. Call Resume right after
+ * switching into the coroutine and Suspend right before switching out (or
+ * when it finishes). Resume pushes the target's object on the running-object
+ * stack (load balancer timing) and, when tracing is on, begins an execute
+ * event for entry ep; Suspend ends both. The trace event's object id is the
+ * element's index for an array element and is made from coro_id otherwise.
+ * Call them outside any traced entry: from a hook that runs inside
+ * CkDynMgr.deposit (not traced) or another untraced entry, so that the
+ * events do not nest. They also serve to trace each element of a
+ * deliver_many call. */
+void CkDynCoroResume(const CkDynTarget *t, int ep, uint64_t coro_id);
+void CkDynCoroSuspend(const CkDynTarget *t);
 
 int  CkDynTraceRegisterUserEvent(const char *desc, int id);
 void CkDynTraceBeginUserBracketEvent(int id);

@@ -2,7 +2,10 @@
  * CkDyn acceptance test, driven by the C++ test binding (cbinding.C).
  * TestMain is an ordinary main chare; every phase ends in a binding future
  * whose callback checks the result and calls mainProxy.nextPhase().
- * Run: ./ckdyntest +pe 4 +balancer RotateLB [-skip <phase>]...
+ * Run: ./ckdyntest +pe 4 +balancer RotateLB [-skip <phase>]... [-ckptdir <dir>]
+ * The checkpoint phase writes <dir> (default ckdyntest.ckpt); then
+ *      ./ckdyntest +pe 4 +restart <dir>
+ * checks that the checkpoint callback reaches the restored main chare DMain.
  */
 #include "ckdyntest.decl.h"
 #include "cbinding.h"
@@ -60,12 +63,13 @@ static CkDynCallback viewCb(const CkDynMsgView *v, int slot) { CkDynCallback c; 
 /* Classes                                                                 */
 /* ====================================================================== */
 
-extern CbClass Ping, Grp, NGrp, Single;
+extern CbClass Ping, Grp, NGrp, Single, DMain;
 
-enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTRED, P_GOTREDB, P_COMPUTE, P_SYNCSTART, P_RESUMED };
+enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTRED, P_GOTREDB, P_COMPUTE, P_CORO, P_SYNCSTART, P_RESUMED };
 enum { G_CTOR, G_GOTRED, G_GOTREDB, G_NGSEND, G_NGREPORT, G_PRIOSTART, G_PRIORECV, G_EXPRECV };
 enum { N_CTOR, N_INCR };
 enum { S_CTOR, S_GOTRED };
+enum { D_CTOR, D_RESUMED };
 
 static inline int myIndex(Obj *o) { return o->t.u.array.index[0]; }
 static void sendPing(int i, int m, CkDynMsg *msg) { CkDynSendArray(aidPing, 1, &i, Ping.ep(m), msg, nullptr); }
@@ -186,6 +190,39 @@ static int64_t pingGotRed(Obj *o, const CkDynMsgView *v) { return gotRedTo0(o, v
 static int64_t pingGotRedB(Obj *o, const CkDynMsgView *v) { return gotRedBContribute(o, v, "Ping.gotRedB"); }
 static int64_t pingCompute(Obj *, const CkDynMsgView *v) { return 2 * cbI64(v, 0); }
 
+/* coro(cb): a fake coroutine. The element sets a future on its own PE; the
+ * future's function runs inside CkDynMgr.deposit, where a binding resumes a
+ * coroutine, and brackets its body with CkDynCoroResume/Suspend. During the
+ * body the element must be the running object (so the load balancer charges
+ * the time to it); after Suspend the deposit context must be back. The same
+ * is checked for a group branch. */
+static int64_t pingCoro(Obj *o, const CkDynMsgView *v) {
+  CkDynCallback cb = viewCb(v, 0);
+  CkGroupID ag; ag.idx = aidPing;
+  Chare *self = CProxyElement_ArrayBase(CkArrayID(ag), CkArrayIndex1D(myIndex(o))).ckLocal();
+  CHECK(self != nullptr, "coro: element %d is not local", myIndex(o));
+  uint32_t f = cbNewFuture([o, self, cb](const CkDynMsgView *) {
+    Chare *outer = CkActiveObj();
+    CHECK(outer != self, "coro: the element is the running object inside CkDynMgr.deposit");
+    CkDynCoroResume(&o->t, Ping.ep(P_CORO), 1000 + myIndex(o));
+    CHECK(CkActiveObj() == self, "coro: element %d is not the running object after CkDynCoroResume", myIndex(o));
+    double t0 = CkWallTimer();
+    while (CkWallTimer() - t0 < 1e-4) {}
+    CkDynCoroSuspend(&o->t);
+    CHECK(CkActiveObj() == outer, "coro: the running object was not restored by CkDynCoroSuspend");
+    CkDynTarget g = cbGroupTarget(gidGrp, Grp.chareIdx, CkMyPe());
+    CkGroupID gid; gid.idx = gidGrp;
+    CkDynCoroResume(&g, Grp.ep(G_GOTRED), 7);
+    CHECK(CkActiveObj() == (Chare *)CkLocalBranch(gid), "coro: the Grp branch is not the running object");
+    CkDynCoroSuspend(&g);
+    CHECK(CkActiveObj() == outer, "coro: the running object was not restored after the group bracket");
+    int one = 1;
+    contributeInts(o, &one, 1, cb);
+  });
+  CkDynFutureSet(CkMyPe(), f, emptyMsg());
+  return 0;
+}
+
 static int64_t pingSyncStart(Obj *o, const CkDynMsgView *v) {
   int pe; uint32_t id;
   CHECK(cbFindFuture(v, &pe, &id), "syncStart without a future");
@@ -217,6 +254,7 @@ CbClass Ping = { "Ping", CKDYN_ARRAY, 1, {
   { "Ping.gotRed", CKDYN_EP_REDNTARGET, pingGotRed },
   { "Ping.gotRedB", CKDYN_EP_REDNTARGET, pingGotRedB },
   { "Ping.compute", 0, pingCompute },
+  { "Ping.coro", 0, pingCoro },
   { "Ping.syncStart", 0, pingSyncStart },
   { "Ping.resumed", 0, pingResumed },
 } };
@@ -318,6 +356,40 @@ CbClass Single = { "Single", CKDYN_CHARE, 0, {
   { "Single.gotRed", CKDYN_EP_REDNTARGET, singleGotRed },
 } };
 
+/* ---- DMain (dynamic main chare: the checkpoint callback target) --------- */
+
+static Obj *g_dmain = nullptr;          /* PE 0 */
+static bool g_dmainBuiltHere = false;   /* constructed in this process, so not restored from a checkpoint */
+static const uint32_t CKPT_MARKER = 4242;
+static const int64_t CKPT_STATE = 777;
+
+static int64_t dmainCtor(Obj *o, const CkDynMsgView *v) {
+  CHECK(v == nullptr && o->t.kind == CKDYN_MAINCHARE && CkMyPe() == 0, "DMain constructed with a wrong target");
+  g_dmain = o;
+  g_dmainBuiltHere = true;
+  return 0;
+}
+
+/* resumed: the checkpoint callback, with the marker as its reference number.
+ * In the checkpointing run it reports to TestMain; after +restart it is the
+ * whole test. */
+static int64_t dmainResumed(Obj *o, const CkDynMsgView *v) {
+  CHECK(CkMyPe() == 0, "DMain.resumed on PE %d", CkMyPe());
+  CHECK(v->refnum == CKPT_MARKER, "DMain.resumed: reference number %u, expected the marker %u", v->refnum, CKPT_MARKER);
+  CHECK(o->s.counter == CKPT_STATE, "DMain.resumed: state %lld, expected %lld", (long long)o->s.counter, (long long)CKPT_STATE);
+  if (g_dmainBuiltHere) { CkDynFutureSet(0, (uint32_t)o->s.fid, emptyMsg()); return 0; }
+  CkPrintf("PASS restart: DMain.resumed ran on the restored main chare (marker %u, state %lld, view kind %d)\n",
+           v->refnum, (long long)o->s.counter, (int)v->kind);
+  CkPrintf("ALL DONE (restart)\n");
+  CkDynExit(0);
+  return 0;
+}
+
+CbClass DMain = { "DMain", CKDYN_MAINCHARE, 0, {
+  { "DMain.DMain", 0, dmainCtor },
+  { "DMain.resumed", 0, dmainResumed },
+} };
+
 /* ====================================================================== */
 /* Registration                                                            */
 /* ====================================================================== */
@@ -328,6 +400,7 @@ void ckdynRegister(void) {
   cbRegister(&Grp);
   cbRegister(&NGrp);
   cbRegister(&Single);
+  cbRegister(&DMain);
 }
 
 void ckdynTestInitProc(void) { cbInitPe(); }
@@ -344,7 +417,8 @@ class TestMain : public CBase_TestMain {
     "pingpong", "pingpong_inline", "bcast",
     "reductions/single", "reductions/single_any", "reductions/group_elem", "reductions/group_bcast",
     "reductions/array_elem", "reductions/array_bcast", "reductions/future", "reductions/foreign",
-    "future_return", "nodegroup", "qd", "priority", "migration", "exit" };
+    "future_return", "nodegroup", "qd", "priority", "coroutine", "migration", "checkpoint", "exit" };
+  std::string ckptDir = "ckdyntest.ckpt";
   int step = -1;
   int pending = 0;
   double tStart = 0;
@@ -362,6 +436,7 @@ public:
   TestMain(CkArgMsg *m) {
     for (int i = 1; i < m->argc; i++)
       if (strcmp(m->argv[i], "-skip") == 0 && i + 1 < m->argc) skip.insert(m->argv[++i]);
+      else if (strcmp(m->argv[i], "-ckptdir") == 0 && i + 1 < m->argc) ckptDir = m->argv[++i];
     delete m;
     mainProxy = thisProxy;
     numElems = 2 * CkNumPes();
@@ -403,7 +478,9 @@ public:
     else if (s == "nodegroup") runNodegroup();
     else if (s == "qd") runQD();
     else if (s == "priority") runPriority();
+    else if (s == "coroutine") runCoroutine();
     else if (s == "migration") runMigration();
+    else if (s == "checkpoint") runCheckpoint();
     else if (s == "exit") { CkPrintf("ALL DONE (%.3f s)\n", CkWallTimer() - tStart); CkDynExit(0); }
   }
 
@@ -525,6 +602,26 @@ public:
       pass("priority");
     });
     CkDynSendGroup(gidGrp, 0, Grp.ep(G_PRIOSTART), MsgB().fut(0, f).finish(0), nullptr);
+  }
+
+  void runCoroutine() {
+    uint32_t f = cbNewFuture([this](const CkDynMsgView *v) {
+      int got = redInt(v, 0);
+      CHECK(got == numElems, "coroutine: %d elements confirmed, expected %d", got, numElems);
+      pass("coroutine");
+    });
+    bcastPing(P_CORO, MsgB().cb(cbFutureCb(0, f)).finish(0));
+  }
+
+  void runCheckpoint() {
+    CHECK(g_dmain != nullptr, "checkpoint: DMain was not constructed on PE 0");
+    g_dmain->s.counter = CKPT_STATE;
+    g_dmain->s.fid = cbNewFuture([this](const CkDynMsgView *) {
+      CkPrintf("  checkpoint: written to %s; DMain.resumed ran; restart with +restart %s\n", ckptDir.c_str(), ckptDir.c_str());
+      pass("checkpoint");
+    });
+    CkDynCallback cb = cbTargetCb(g_dmain->t, DMain.ep(D_RESUMED), 0, CKPT_MARKER);
+    CkDynCheckpoint(ckptDir.c_str(), &cb);
   }
 
   void runMigration() {

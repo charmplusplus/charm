@@ -132,6 +132,18 @@ static void *hConstruct(void *bd, const CkDynTarget *t, const CkDynMsgView *v) {
   return o;
 }
 
+/* The main chare's constructor method runs with a NULL view (there is no
+ * CkDyn message, only argc/argv). */
+static void hMainchare(void *bd, void **handle_out, const CkDynTarget *t, int, char **) {
+  const CbClass *c = (const CbClass *)bd;
+  Obj *o = new Obj;
+  o->cls = c;
+  o->t = *t;
+  memset(&o->s, 0, sizeof o->s);
+  *handle_out = o;
+  if (c->methods[0].fn) c->methods[0].fn(o, nullptr);
+}
+
 static void hDestruct(void *, void *h) { delete (Obj *)h; }
 
 static void hDeliver(void *bd, void *h, int ep, uint32_t user_id, uint32_t, const CkDynMsgView *v) {
@@ -240,6 +252,7 @@ const CkDynHooks *cbHooks(void) {
   memset(&g_hooks, 0, sizeof g_hooks);
   g_hooks.version = CKDYN_API_VERSION;
   g_hooks.size = sizeof(CkDynHooks);
+  g_hooks.mainchare = hMainchare;
   g_hooks.construct = hConstruct;
   g_hooks.destruct = hDestruct;
   g_hooks.deliver = hDeliver;

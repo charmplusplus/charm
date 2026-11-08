@@ -19,10 +19,13 @@ cbinding.o: cbinding.C cbinding.h
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o ckdyntest charmrun *.log *.sum *.sts
+	rm -rf ckdyntest.ckpt
 
 test: all
 	$(call run, ./ckdyntest +p4 +balancer RotateLB )
+	$(call run, ./ckdyntest +p4 +restart ckdyntest.ckpt )
 	$(call run, ./ckdyntest +p1 )
+	$(call run, ./ckdyntest +p1 +restart ckdyntest.ckpt )
 
 testp: all
 	$(call run, ./ckdyntest +p$(P) +balancer RotateLB )

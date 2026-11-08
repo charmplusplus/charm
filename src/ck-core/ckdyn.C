@@ -39,12 +39,14 @@ struct ClassRec {
   int ctorEp = -1;
   int firstEp = -1;
   int migEp = -1;
+  int relayFirst = -1;   /* main chares: the CkDynMgr relay ep of entries[1] */
 };
 
 struct EpRec {
   ClassRec *cls = nullptr;
   uint32_t flags = 0;
   uint32_t user_id = 0;
+  int relayTo = -1;      /* a main chare relay ep: the main chare entry it delivers to */
 };
 
 static CkDynHooks g_hooks;
@@ -266,6 +268,19 @@ static int registerClass(const CkDynClassDesc *desc, int *first_ep) {
     default:
       break;
   }
+  /* main chares: one relay entry per user entry, delivered by CkDynMgr on the
+     main chare's PE, so that a callback names the main chare by chare index
+     rather than by its object pointer (which a restarted process does not share) */
+  if (desc->kind == CKDYN_MAINCHARE) {
+    for (int i = 1; i < desc->num_entries; i++) {
+      int rep = CkRegisterEp(c->entries[i].name, MainchareDyn::callRelay, CkDynMsg::__idx, idx,
+                             ckFlagsOf(c->entries[i].flags));
+      if (i == 1) c->relayFirst = rep;
+      else if (rep != c->relayFirst + i - 1) CkAbort("CkDyn: relay entry indices of class %s are not contiguous", name);
+      noteEp(rep, c, c->entries[i].flags | CKDYN_EP_NOKEEP, c->entries[i].user_id);
+      g_eps[rep].relayTo = ctor + i;
+    }
+  }
   _chareTable[idx]->isDynamic = true;
   g_classes[idx] = c;
   if (first_ep) *first_ep = ctor;
@@ -329,6 +344,9 @@ struct CkDynMsgBuilder {
 };
 
 CkpvStaticDeclare(CkDynMsgBuilder *, _ckdynBuilder);
+#if CMK_TRACE_ENABLED
+CkpvStaticDeclare(std::vector<bool>, _ckdynCoroTraced);   /* per open CkDynCoroResume: an event was begun */
+#endif
 
 static inline size_t align8(size_t n) { return (n + 7) & ~(size_t)7; }
 
@@ -687,6 +705,7 @@ static void dispatch(CkDynObj &d, void *msg) {
   CkDynSlot tmp[2];
   int ep = viewAny(v, tmp, msg);
   const EpRec &r = epRec(ep);
+  if (r.relayTo >= 0) ep = r.relayTo;   /* a non-CkDyn message through a main chare relay */
   if (d.handle == nullptr) {
     /* a branch outside a constrained group: broadcasts and callback results
        reach every branch and are dropped here; a point-to-point send is an error */
@@ -724,7 +743,9 @@ void CkDynDeliverBroadcast(void *bcastMsg, ArrayElemDyn **elems, int n) {
 
 /* ---- MainchareDyn ------------------------------------------------------- */
 
+/* Once per program: a program with several main chares may call it from each. */
 extern "C" void CkDynCreateManagers(void) {
+  if (!_ckdynMgrGID.isZero()) return;
   _ckdynMgrGID = CProxy_CkDynMgr::ckNew();
 }
 
@@ -747,6 +768,16 @@ MainchareDyn::~MainchareDyn() {
 void MainchareDyn::callCtor(void *msg, void *obj) { new (obj) MainchareDyn((CkArgMsg *)msg); }
 void MainchareDyn::callMigrate(void *msg, void *obj) { new (obj) MainchareDyn((CkMigrateMessage *)msg); }
 void MainchareDyn::callEntry(void *msg, void *obj) { dispatch(((MainchareDyn *)obj)->d, msg); }
+/* A relay entry: runs on the CkDynMgr branch (obj) of the main chare's PE and
+   delivers to the main chare of the entry's class. */
+void MainchareDyn::callRelay(void *msg, void *) {
+  const EpRec &r = epRec(UsrToEnv(msg)->getEpIdx());
+  MainchareDyn *m = (MainchareDyn *)_mainTable[_chareTable[r.cls->chareIdx]->mainChareType()]->getObj();
+  if (m == nullptr) CkAbort("CkDyn: a callback reached main chare %s on PE %d, where it does not exist", r.cls->desc.name, CkMyPe());
+  CkCallstackPush(m);
+  dispatch(m->d, msg);
+  CkCallstackPop(m);
+}
 
 /* ---- ChareDyn ----------------------------------------------------------- */
 
@@ -1196,7 +1227,16 @@ CkCallback CkDynMakeCallback(const CkDynCallback *cb) {
       CkCallback c;
       const CkDynTarget &t = cb->t;
       switch (t.kind) {
-        case CKDYN_MAINCHARE: case CKDYN_CHARE: {
+        case CKDYN_MAINCHARE: {
+          /* by chare index through the relay entry on CkDynMgr (see registerClass) */
+          ClassRec *mc = classOf(t.chare_idx);
+          int i = cb->ep - mc->firstEp;
+          if (i < 1 || i >= mc->desc.num_entries)
+            CkAbort("CkDyn: callback to entry %d, which is not a method of main chare %s", cb->ep, mc->desc.name);
+          c = CkCallback(mc->relayFirst + i - 1, t.u.chare.pe, _ckdynMgrGID);
+          break;
+        }
+        case CKDYN_CHARE: {
           CkChareID cid; cid.onPE = t.u.chare.pe; cid.objPtr = t.u.chare.ptr;
           c = CkCallback(cb->ep, cid);
           break;
@@ -1395,6 +1435,52 @@ extern "C" void CkDynCallstackPop(const CkDynTarget *t) {
   if (c) CkCallstackPop(c);
 }
 
+/* The thread listeners of a [threaded] entry do the same for a CthThread:
+   CkChareThreadListener_resume/suspend (ck.C) for the running-object stack and
+   traceThreadListener_resume/suspend (trace-common.C) for the trace events. */
+extern "C" void CkDynCoroResume(const CkDynTarget *t, int ep, uint64_t coro_id) {
+  Chare *c = localChare(t);
+  if (c == nullptr) CkAbort("CkDyn: CkDynCoroResume on an object that is not local");
+  CkCallstackPush(c);
+#if CMK_TRACE_ENABLED
+  if (CpvAccess(traceOn) && ep >= 0 && (size_t)ep < _entryTable.size() && _entryTable[ep]->traceEnabled) {
+    CmiObjId id;
+    if (t->kind == CKDYN_ARRAY) {
+      ArrayElement *el = (ArrayElement *)c;
+      id = el->ckGetArrayIndex().getProjectionID();
+      _TRACE_SET_OBJECT(CkArrayID(el->ckGetArrayID()).ckLocalBranch()->getLocMgr()->ckGetGroupID().idx,
+                        el->CkMigratable::ckGetID());
+    } else {
+      /* as CthSetThreadID does for a thread: PE, then the id */
+      id.id[0] = CkMyPe();
+      id.id[1] = (int)(uint32_t)coro_id;
+      id.id[2] = (int)(uint32_t)(coro_id >> 32);
+      id.id[3] = 0;
+    }
+    _TRACE_BEGIN_EXECUTE_DETAILED(-1, ForChareMsg, ep, CkMyPe(), 0, &id, c);
+    CkpvAccess(_ckdynCoroTraced).push_back(true);
+  } else {
+    CkpvAccess(_ckdynCoroTraced).push_back(false);
+  }
+#else
+  (void)ep; (void)coro_id;
+#endif
+}
+
+extern "C" void CkDynCoroSuspend(const CkDynTarget *t) {
+  Chare *c = localChare(t);
+  if (c == nullptr) CkAbort("CkDyn: CkDynCoroSuspend on an object that is not local");
+#if CMK_TRACE_ENABLED
+  /* end the event only if Resume began one (tracing may have been switched on in between) */
+  auto &tr = CkpvAccess(_ckdynCoroTraced);
+  if (tr.empty()) CkAbort("CkDyn: CkDynCoroSuspend without a matching CkDynCoroResume");
+  bool began = tr.back();
+  tr.pop_back();
+  if (began) { _TRACE_END_EXECUTE(); _TRACE_CLEAR_OBJECT(); }
+#endif
+  CkCallstackPop(c);
+}
+
 extern "C" int  CkDynTraceRegisterUserEvent(const char *desc, int id) { return traceRegisterUserEvent(desc, id); }
 extern "C" void CkDynTraceBeginUserBracketEvent(int id) { traceBeginUserBracketEvent(id); }
 extern "C" void CkDynTraceEndUserBracketEvent(int id) { traceEndUserBracketEvent(id); }
@@ -1583,6 +1669,9 @@ void _ckdynInitNode(void) {
 void _ckdynInitProc(void) {
   CkpvInitialize(CkDynMsgBuilder *, _ckdynBuilder);
   CkpvAccess(_ckdynBuilder) = nullptr;
+#if CMK_TRACE_ENABLED
+  CkpvInitialize(std::vector<bool>, _ckdynCoroTraced);
+#endif
 }
 
 #include "CkDyn.def.h"
