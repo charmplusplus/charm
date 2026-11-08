@@ -80,7 +80,7 @@ static CkDynCallback viewCb(const CkDynMsgView *v, int slot) { CkDynCallback c; 
 extern CbClass Ping, Sec, Grp, NGrp, Single, DMain, Late;
 
 enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTRED, P_GOTREDB, P_COMPUTE, P_CORO, P_SYNCSTART, P_RESUMED,
-       P_ZSTART, P_ZRECV, P_ZPOST, P_ZSPIN, P_ZACK };
+       P_ZSTART, P_ZRECV, P_ZPOST, P_ZSPIN, P_ZACK, P_DSTART, P_DRECV, P_DCHECK };
 enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED };
 enum { G_CTOR, G_GOTRED, G_GOTREDB, G_NGSEND, G_NGREPORT, G_PRIOSTART, G_PRIORECV, G_EXPRECV,
        G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE, G_LATEREG };
@@ -406,6 +406,84 @@ static int64_t pingZSpin(Obj *o, const CkDynMsgView *v) {
 
 static int64_t pingZAck(Obj *o, const CkDynMsgView *) { o->s.counter++; zMaybeReport(o); return 0; }
 
+/* ---- Ping: device buffers (the device phases; CUDA or HIP builds) --------
+ * dStart(target, FUTURE) on element 0 copies a 16 MB pattern to device memory
+ * and sends it as a DEVICE slot: dRecv(replyTo, DEVICE data, seed). The
+ * target copies it back to the host and checks it, then sends itself
+ * dCheck(ptr, len), which runs after the delivery's memory was released and
+ * checks that the pool hands out the same block again. Element 0 reports
+ * after its done function, the data check and the pool check (zAck). */
+#if CMK_CUDA || CMK_HIP
+static const int DSLOT = 1;
+
+static void dDoneFn(void *arg) {
+  ZDone *d = (ZDone *)arg;
+  CHECK(d->pe == CkMyPe(), "device: done ran on PE %d, the buffer was sent from PE %d", CkMyPe(), d->pe);
+  CHECK(++d->calls == 1, "device: done called %d times for one send", d->calls);
+  hapiCheck(hapiFree(d->relMsg));
+  d->relMsg = nullptr;
+  sendPing(d->ackTo, P_ZACK, MsgB().i64(0).finish(0));
+}
+
+static int64_t pingDStart(Obj *o, const CkDynMsgView *v) {
+  int target = (int)cbI64(v, 0);
+  int pe; uint32_t id;
+  CHECK(cbFindFuture(v, &pe, &id), "dStart without a future");
+  o->s.fid = id; o->s.counter = 0; o->s.replies = 1;
+  int64_t seed = 77 + target;
+  std::vector<double> h(ZN);
+  for (int64_t i = 0; i < ZN; i++) h[i] = zVal(seed, i);
+  void *dsrc = nullptr;
+  hapiCheck(hapiMalloc(&dsrc, ZN * sizeof(double)));
+  hapiCheck(hapiMemcpy(dsrc, h.data(), ZN * sizeof(double), hapiMemcpyHostToDevice));
+  int dev = 0;
+  hapiCheck(hapiGetDevice(&dev));
+  static const int64_t shape[1] = { ZN };
+  CkDynDevDesc d = { dsrc, (uint64_t)(ZN * sizeof(double)), CKDYN_ELEM_F64, 1, 0, dev, 0, shape };
+  ZDone *rec = new ZDone{ CkMyPe(), 0, dsrc, nullptr, myIndex(o) };
+  o->s.t0 = CkWallTimer();
+  MsgB b;
+  b.i64(myIndex(o));
+  CkDynMsgAddDevice(b.b, &d, dDoneFn, rec);
+  sendPing(target, P_DRECV, b.i64(seed).finish(0));
+  return 0;
+}
+
+static int64_t pingDRecv(Obj *o, const CkDynMsgView *v) {
+  int replyTo = (int)cbI64(v, 0);
+  int64_t seed = cbI64(v, 2);
+  const CkDynSlot &sl = v->slots[DSLOT];
+  CHECK(v->hdr->nbuf == 1 && sl.type == CKDYN_SLOT_DEVICE && sl.len == ZN * sizeof(double), "device: slot lost its type or length");
+  int dev = 0;
+  hapiCheck(hapiGetDevice(&dev));
+  CHECK(sl.reserved == dev, "device: slot names device %d, this PE uses device %d", (int)sl.reserved, dev);
+  const int64_t *shape;
+  const void *dp = CkDynViewBufferPtr(v, DSLOT, &shape);
+  CHECK(shape && shape[0] == ZN, "device: shape lost");
+  std::vector<double> h(ZN, -1.0);
+  hapiCheck(hapiMemcpy(h.data(), dp, ZN * sizeof(double), hapiMemcpyDeviceToHost));
+  for (int64_t i = 0; i < ZN; i++)
+    if (h[i] != zVal(seed, i)) cbFail("device: element %d received %g at %lld, expected %g", myIndex(o), h[i], (long long)i, zVal(seed, i));
+  sendPing(replyTo, P_ZACK, MsgB().i64(0).finish(0));
+  sendPing(myIndex(o), P_DCHECK, MsgB().i64((int64_t)(uintptr_t)dp).i64(replyTo).finish(0));
+  return 0;
+}
+
+/* dCheck(ptr, replyTo): the delivery's pool block was freed when its message was */
+static int64_t pingDCheck(Obj *, const CkDynMsgView *v) {
+  void *was = (void *)(uintptr_t)cbI64(v, 0);
+  void *again = CkDeviceMalloc(ZN * sizeof(double));
+  CHECK(again == was, "device: the received buffer's pool block %p was not free again after the delivery (got %p)", was, again);
+  CkDeviceFree(again);
+  sendPing((int)cbI64(v, 1), P_ZACK, MsgB().i64(0).finish(0));
+  return 0;
+}
+#else
+static int64_t pingDStart(Obj *, const CkDynMsgView *) { cbFail("device phase in a build without CUDA or HIP"); return 0; }
+static int64_t pingDRecv(Obj *, const CkDynMsgView *) { return 0; }
+static int64_t pingDCheck(Obj *, const CkDynMsgView *) { return 0; }
+#endif
+
 CbClass Ping = { "Ping", CKDYN_ARRAY, 1, {
   { "Ping.Ping", 0, pingCtor },
   { "Ping.recv", 0, pingRecv },
@@ -425,6 +503,9 @@ CbClass Ping = { "Ping", CKDYN_ARRAY, 1, {
   { "Ping.zPost", 0, pingZPost },
   { "Ping.zSpin", 0, pingZSpin },
   { "Ping.zAck", 0, pingZAck },
+  { "Ping.dStart", 0, pingDStart },
+  { "Ping.dRecv", 0, pingDRecv },
+  { "Ping.dCheck", 0, pingDCheck },
 } };
 
 /* ---- section members (Sec array elements and Grp branches) --------------- */
@@ -760,7 +841,8 @@ class TestMain : public CBase_TestMain {
     "reductions/single", "reductions/single_any", "reductions/group_elem", "reductions/group_bcast",
     "reductions/array_elem", "reductions/array_bcast", "reductions/future", "reductions/foreign",
     "future_return", "nodegroup", "qd", "priority", "coroutine",
-    "ncpy/nonpost", "ncpy/post_before", "ncpy/post_after", "ncpy/samepe", "hapi",
+    "ncpy/nonpost", "ncpy/post_before", "ncpy/post_after", "ncpy/samepe",
+    "device/remote", "device/samepe", "hapi",
     "sections/array", "sections/group", "sections/remote", "sections/combine_overlap",
     "sections/combine_arrays", "sections/delete", "sections/migration",
     "migration", "checkpoint", "late", "exit" };
@@ -856,6 +938,7 @@ public:
     else if (s == "priority") runPriority();
     else if (s == "coroutine") runCoroutine();
     else if (s.compare(0, 5, "ncpy/") == 0) runNcpy(s);
+    else if (s.compare(0, 7, "device/") == 0) runDevice(s);
     else if (s == "hapi") runHapi();
     else if (s.compare(0, 9, "sections/") == 0) runSections(s);
     else if (s == "migration") runMigration();
@@ -1023,6 +1106,23 @@ public:
       else
         sendPing(last, P_ZSPIN, MsgB().i64(f).finish(0));
     } else sendPing(0, P_ZSTART, MsgB().i64(0).i64(1).fut(0, f).finish(0));
+  }
+
+  /* device: 16 MB of device memory as a DEVICE slot from element 0 to the
+     last element (another PE when there is more than one) and to element 1
+     (element 0's PE). See dStart. */
+  void runDevice(const std::string &s) {
+#if CMK_CUDA || CMK_HIP
+    uint32_t f = cbNewFuture([this, s](const CkDynMsgView *v) {
+      CkPrintf("  %s: 16 MB device to device, checked on the host, pool block freed (%.3f ms)\n", s.c_str(), cbF64(v, 1) * 1e3);
+      pass(s);
+    });
+    int target = s == "device/remote" ? numElems - 1 : 1;
+    sendPing(0, P_DSTART, MsgB().i64(target).fut(0, f).finish(0));
+#else
+    CkPrintf("SKIP %s (no CUDA or HIP in this build)\n", s.c_str());
+    next();
+#endif
   }
 
   /* hapi: a host-device-host copy on a stream; CkDynHapiAddCallback sends to
