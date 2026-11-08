@@ -799,7 +799,7 @@ void MainchareDyn::callRelay(void *msg, void *) {
 
 /* ---- ChareDyn ----------------------------------------------------------- */
 
-static void pupObj(PUP::er &p, CkDynObj &d, const CkDynTarget &t);
+static void pupObj(PUP::er &p, CkDynObj &d, CkDynTarget t);
 
 ChareDyn::ChareDyn(CkDynMsg *m) {
   /* _currentChareType is set only for main chares (init.C); a singleton's class
@@ -834,8 +834,9 @@ void ChareDyn::callEntry(void *msg, void *obj) { dispatch(((ChareDyn *)obj)->d, 
 
 /* ---- pup shared by the migratable kinds --------------------------------- */
 
-static void pupObj(PUP::er &p, CkDynObj &d, const CkDynTarget &t) {
+static void pupObj(PUP::er &p, CkDynObj &d, CkDynTarget t) {
   p | d.chareIdx;
+  t.chare_idx = d.chareIdx;   /* the caller's copy was filled before d.chareIdx was restored */
   bool hasHandle = d.handle != nullptr;   /* false on a branch outside a constrained group */
   p | hasHandle;
   if (!hasHandle) return;
@@ -1500,7 +1501,9 @@ extern "C" void CkDynCoroResume(const CkDynTarget *t, int ep, uint64_t coro_id) 
 
 extern "C" void CkDynCoroSuspend(const CkDynTarget *t) {
   Chare *c = localChare(t);
-  if (c == nullptr) CkAbort("CkDyn: CkDynCoroSuspend on an object that is not local");
+  /* A coroutine may destroy its own element and then return; the element is then no
+     longer local but its (nulled) entry is still on the running-object stack. */
+  if (c == nullptr) c = CkActiveObj();
 #if CMK_TRACE_ENABLED
   /* end the event only if Resume began one (tracing may have been switched on in between) */
   auto &tr = CkpvAccess(_ckdynCoroTraced);

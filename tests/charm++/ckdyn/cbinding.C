@@ -15,6 +15,7 @@ struct PeState {
   std::map<int, int64_t> manyCalls;   /* ep -> deliver_many calls */
   std::map<int, int64_t> manyMaxN;    /* ep -> largest n */
   bool inMany = false;
+  int64_t unpacks = 0;                /* unpack calls whose target carried the class's chare index */
 };
 CkpvStaticDeclare(PeState *, cbPe);
 
@@ -116,6 +117,7 @@ uint32_t cbNewFuture(CbFutureFn fn) {
   return id;
 }
 
+int64_t cbUnpacks(void) { return CkpvAccess(cbPe)->unpacks; }
 int64_t cbDeliverManyCalls(int ep) { auto &m = CkpvAccess(cbPe)->manyCalls; auto it = m.find(ep); return it == m.end() ? 0 : it->second; }
 int64_t cbMaxDeliverManyN(int ep) { auto &m = CkpvAccess(cbPe)->manyMaxN; auto it = m.find(ep); return it == m.end() ? 0 : it->second; }
 bool cbInDeliverMany(void) { return CkpvAccess(cbPe)->inMany; }
@@ -191,6 +193,9 @@ static void *hUnpack(void *bd, const CkDynTarget *t, int, const void *buf, size_
   Obj *o = new Obj;
   o->cls = (const CbClass *)bd;
   o->t = *t;
+  if (t->chare_idx != o->cls->chareIdx)
+    cbFail("unpack: %s target has chare_idx %d, expected the registered %d", o->cls->name, t->chare_idx, o->cls->chareIdx);
+  CkpvAccess(cbPe)->unpacks++;
   const char *p = (const char *)buf, *end = p + len;
   if (len < sizeof(ObjState) + 16) cbFail("unpack: %zu bytes is too short", len);
   memcpy(&o->s, p, sizeof o->s); p += sizeof o->s;

@@ -73,6 +73,7 @@ uint32_t cbNewFuture(CbFutureFn fn);
 
 /* ---- per-PE counters the tests read ------------------------------------- */
 
+int64_t cbUnpacks(void);              /* unpack calls on this PE (each checked the target's chare_idx) */
 int64_t cbDeliverManyCalls(int ep);   /* deliver_many calls on this PE for ep */
 bool    cbInDeliverMany(void);        /* true while deliver_many is delivering */
 int64_t cbMaxDeliverManyN(int ep);    /* the largest n of those calls */

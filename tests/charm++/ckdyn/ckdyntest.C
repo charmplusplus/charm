@@ -380,6 +380,8 @@ static int64_t dmainResumed(Obj *o, const CkDynMsgView *v) {
   if (g_dmainBuiltHere) { CkDynFutureSet(0, (uint32_t)o->s.fid, emptyMsg()); return 0; }
   CkPrintf("PASS restart: DMain.resumed ran on the restored main chare (marker %u, state %lld, view kind %d)\n",
            v->refnum, (long long)o->s.counter, (int)v->kind);
+  CHECK(cbUnpacks() > 0, "restart: no unpack call on PE 0");
+  CkPrintf("PASS restart: unpack saw the registered chare index in the target (%lld objects on PE 0)\n", (long long)cbUnpacks());
   CkPrintf("ALL DONE (restart)\n");
   CkDynExit(0);
   return 0;
