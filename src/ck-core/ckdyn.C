@@ -1452,7 +1452,7 @@ extern "C" int CkDynTopoTreeEdges(int pe, int root, const int *pes, int npes, in
   int count = 0, *kids = nullptr;
   getPETopoTreeEdges(pe, root, pes ? tmp.data() : nullptr, pes ? npes : 0, (unsigned)bfactor, parent, &count, &kids);
   for (int i = 0; i < count && i < max; i++) children[i] = kids[i];
-  if (kids) free(kids);   /* spanningTree.C allocates the list with malloc */
+  if (count > 0 && kids) free(kids);   /* spanningTree.C mallocs the list only for a PE with children */
   return count;
 }
 extern "C" void CkDynCallAfter(void (*fn)(void *arg, double now), void *arg, double msecs) {
