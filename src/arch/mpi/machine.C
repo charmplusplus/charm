@@ -11,6 +11,8 @@
 #include "cmirdmautils.h"
 #include <mpi.h>
 #include <algorithm>
+#include <atomic>
+#include <time.h>
 
 #ifdef AMPI
 #  warning "We got the AMPI version of mpi.h, instead of the system version--"
@@ -317,6 +319,19 @@ struct sigaction signal_int;
 void (*signal_int)(int);
 #endif
 static int _thread_provided = -1; /* Indicating MPI thread level */
+
+/* Exit/abort hardening:
+ * - cmi_mpi_abort_requested: a worker PE that aborts under MPI_THREAD_FUNNELED/SERIALIZED must not call
+ *   MPI itself; it asks the comm thread to call MPI_Abort (LrtsAdvanceCommunication, exit drain loop) and
+ *   _exit()s after CHARM_MPI_ABORT_TIMEOUT seconds (default 10) if that never happens.
+ * - cmi_mpi_abort_in_signal: an abort from a signal handler can interrupt this thread inside MPI (e.g.
+ *   SIGTERM while the comm thread is in MPI_Iprobe); MPI_Abort is not async-signal-safe and was seen to
+ *   spin in MPIDIU_get_buf_safe, so a signal abort leaves with _exit() and lets the launcher end the job. */
+static std::atomic<int> cmi_mpi_abort_requested{0};
+static volatile sig_atomic_t cmi_mpi_abort_in_signal = 0;
+static void cmi_mpi_check_abort_request(void) {
+    if (cmi_mpi_abort_requested.load(std::memory_order_acquire)) MPI_Abort(charmComm, 1);
+}
 static int idleblock = 0;
 
 #if __FAULT__ 
@@ -1149,6 +1164,9 @@ void LrtsAdvanceCommunication(int whenidle) {
     double t1, t2, t3, t4;
     t1 = CmiWallTimer();
 #endif
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+    cmi_mpi_check_abort_request();
+#endif
 
 #if CMK_SMP
     PumpMsgs();
@@ -1274,8 +1292,38 @@ void LrtsDrainResources(void) {
 #endif
     MACHSTATE(2, "Machine exit barrier begin {");
     START_EVENT();
+#if MPI_VERSION >= 3
+    /* A blocking MPI_Barrier here deadlocks on multi-node runs that exit with messages in flight: a
+     * process in the barrier no longer posts receives (messages are received by Iprobe + Recv), so a
+     * rendezvous MPI_Isend to it from a process still in the drain loop above never completes, and
+     * that process never reaches the barrier. Keep receiving while the barrier completes. */
+    {
+        MPI_Request breq;
+        int bdone = 0;
+        if (MPI_SUCCESS != MPI_Ibarrier(charmComm, &breq))
+            CmiAbort("LrtsDrainResources: MPI_Ibarrier failed!\n");
+        while (!bdone) {
+#if !CMK_SMP
+            PumpMsgs();
+            ReleasePostedMessages();
+#else
+            if (Cmi_smp_mode_setting == COMM_THREAD_SEND_RECV) {
+#if !CMK_SMP_NO_COMMTHD
+                cmi_mpi_check_abort_request();
+#endif
+                PumpMsgs();
+                ReleasePostedMessages();
+                SendMsgBuf();
+            }
+#endif
+            if (MPI_SUCCESS != MPI_Test(&breq, &bdone, MPI_STATUS_IGNORE))
+                CmiAbort("LrtsDrainResources: MPI_Test(barrier) failed!\n");
+        }
+    }
+#else
     if (MPI_SUCCESS != MPI_Barrier(charmComm))
         CmiAbort("LrtsDrainResources: MPI_Barrier failed!\n");
+#endif
     END_EVENT(10);
     MACHSTATE(2, "} Machine exit barrier end");
 }
@@ -1339,6 +1387,7 @@ static void KillOnAllSigs(int sigNo) {
     char *m;
     if (already_in_signal_handler) return;   /* MPI_Abort(charmComm,1); */
     already_in_signal_handler = 1;
+    cmi_mpi_abort_in_signal = 1;
 
     CmiAbortHelper("Caught Signal", strsignal(sigNo), NULL, 1, 1);
 }
@@ -1824,6 +1873,31 @@ void LrtsPostCommonInit(int everReturn) {
  ************************************************************************/
 
 void LrtsAbort(const char *message) {
+    if (cmi_mpi_abort_in_signal) {
+        /* possibly interrupted inside MPI: no MPI call, the launcher ends the job step */
+        fflush(stdout); fflush(stderr);
+        _exit(1);
+    }
+#if CMK_SMP && !CMK_SMP_NO_COMMTHD
+    if (CmiMyRank() != CmiMyNodeSize() && _thread_provided < MPI_THREAD_MULTIPLE) {
+        /* worker PE under FUNNELED/SERIALIZED: MPI_Abort from here races the comm thread inside MPI
+         * (seen: SIGSEGV / assertion in MPI_Abort). Hand it to the comm thread, with a deadline. */
+        const char *e = getenv("CHARM_MPI_ABORT_TIMEOUT");
+        double tmo = e ? atof(e) : 10.0;
+        struct timespec t0, t1;
+        clock_gettime(CLOCK_MONOTONIC, &t0);
+        cmi_mpi_abort_requested.store(1, std::memory_order_release);
+        fflush(stdout); fflush(stderr);
+        for (;;) {
+            usleep(10000);
+            clock_gettime(CLOCK_MONOTONIC, &t1);
+            if ((t1.tv_sec - t0.tv_sec) + 1e-9 * (t1.tv_nsec - t0.tv_nsec) > tmo) break;
+        }
+        fprintf(stderr, "Charm++> comm thread did not abort within %.0f s; exiting process\n", tmo);
+        fflush(stderr);
+        _exit(1);
+    }
+#endif
     MPI_Abort(charmComm, 1);
     CMI_NORETURN_FUNCTION_END
 }
