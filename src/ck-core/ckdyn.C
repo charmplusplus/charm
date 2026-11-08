@@ -288,18 +288,31 @@ bool CkDynIsDynamicChare(int chareIdx) {
 /* Message builder                                                         */
 /* ====================================================================== */
 
+/* The data region is assembled at Finish from pieces: small ones (bytes,
+ * shapes, callbacks, sections, proxies) are copied into `inl` when added,
+ * large ones (buffers) are recorded by pointer and copied straight into the
+ * message, so a buffer is written once. */
+struct Piece {
+  uint64_t off;        /* offset in the data region */
+  uint64_t len;
+  const void *src;     /* a caller's buffer (valid until Finish or Abandon), or NULL */
+  uint64_t inlOff;     /* offset into inl when src is NULL */
+};
+
 struct CkDynMsgBuilder {
   std::vector<CkDynSlot> slots;
-  std::vector<char> data;
+  std::vector<Piece> pieces;
+  std::vector<char> inl;
   std::vector<char> tail;
+  uint64_t dataLen = 0;       /* bytes of the data region so far */
   uint16_t flags = 0;
   uint32_t user_id = 0;
   int prio_bits = 0;
   int group_dep = -1;
   bool inUse = false;
   void reset(int nslots_hint, size_t data_hint, size_t tail_hint) {
-    slots.clear(); data.clear(); tail.clear();
-    slots.reserve(nslots_hint); data.reserve(data_hint); tail.reserve(tail_hint);
+    slots.clear(); pieces.clear(); inl.clear(); tail.clear(); dataLen = 0;
+    slots.reserve(nslots_hint); inl.reserve(data_hint); tail.reserve(tail_hint);
     flags = 0; user_id = 0; prio_bits = 0; group_dep = -1; inUse = true;
   }
 };
@@ -308,10 +321,24 @@ CkpvStaticDeclare(CkDynMsgBuilder *, _ckdynBuilder);
 
 static inline size_t align8(size_t n) { return (n + 7) & ~(size_t)7; }
 
+/* Copy n bytes into the builder now; returns their offset in the data region. */
 static uint64_t appendData(CkDynMsgBuilder *b, const void *p, size_t n) {
-  size_t off = align8(b->data.size());
-  b->data.resize(off + n);
-  if (n) memcpy(b->data.data() + off, p, n);
+  uint64_t off = align8(b->dataLen);
+  if (n) {
+    uint64_t io = b->inl.size();
+    b->inl.insert(b->inl.end(), (const char *)p, (const char *)p + n);
+    b->pieces.push_back(Piece{off, n, nullptr, io});
+  }
+  b->dataLen = off + n;
+  return off;
+}
+
+/* Record n bytes to be copied into the message at Finish; the source must stay
+ * valid until then. Returns their offset in the data region. */
+static uint64_t deferData(CkDynMsgBuilder *b, const void *p, size_t n) {
+  uint64_t off = b->dataLen;    /* immediately after the caller's previous append */
+  if (n) b->pieces.push_back(Piece{off, n, p, 0});
+  b->dataLen = off + n;
   return off;
 }
 
@@ -383,10 +410,10 @@ extern "C" void CkDynMsgAddBuffer(CkDynMsgBuilder *b, const CkDynBufDesc *d) {
   if (d->ndim > CKDYN_MAX_BUF_DIMS) CkAbort("CkDyn: buffer with %d dimensions", (int)d->ndim);
   if (!contiguous(d, elemSize(d->elem))) CkAbort("CkDyn: non-contiguous buffer passed to CkDynMsgAddBuffer");
   checkLen(d->len);
-  uint64_t off = align8(b->data.size());
-  b->data.resize(off + 8 * d->ndim + d->len);
-  if (d->ndim) memcpy(b->data.data() + off, d->shape, 8 * d->ndim);
-  if (d->len) memcpy(b->data.data() + off + 8 * d->ndim, d->ptr, d->len);
+  /* the shape (copied now) and then the bytes (copied into the message at Finish) */
+  uint64_t off = d->ndim ? appendData(b, d->shape, 8 * d->ndim) : align8(b->dataLen);
+  if (!d->ndim) b->dataLen = off;
+  deferData(b, d->ptr, d->len);
   CkDynSlot &s = newSlot(b, CKDYN_SLOT_BUFFER);
   s.elem = d->elem; s.ndim = d->ndim; s.bflags = d->bflags; s.tag = d->tag;
   s.len = (uint32_t)d->len; s.v.off = off;
@@ -424,7 +451,7 @@ extern "C" void *CkDynMsgReserveTail(CkDynMsgBuilder *b, uint32_t len) {
 
 /* Lay the payload out into buf (which has payloadSize(b) bytes). */
 static size_t payloadSize(const CkDynMsgBuilder *b) {
-  return sizeof(CkDynHdr) + b->slots.size() * sizeof(CkDynSlot) + align8(b->data.size()) + b->tail.size();
+  return sizeof(CkDynHdr) + b->slots.size() * sizeof(CkDynSlot) + align8(b->dataLen) + b->tail.size();
 }
 
 static void writePayload(const CkDynMsgBuilder *b, char *buf, int ep) {
@@ -436,12 +463,18 @@ static void writePayload(const CkDynMsgBuilder *b, char *buf, int ep) {
   h->nslots = (uint16_t)b->slots.size();
   h->user_id = b->user_id;
   h->tail_len = (uint32_t)b->tail.size();
-  h->data_len = (uint32_t)align8(b->data.size());
+  h->data_len = (uint32_t)align8(b->dataLen);
   char *p = buf + sizeof(CkDynHdr);
   if (!b->slots.empty()) memcpy(p, b->slots.data(), b->slots.size() * sizeof(CkDynSlot));
   p += b->slots.size() * sizeof(CkDynSlot);
-  if (!b->data.empty()) memcpy(p, b->data.data(), b->data.size());
-  if (h->data_len > b->data.size()) memset(p + b->data.size(), 0, h->data_len - b->data.size());
+  /* the data region: each piece once, alignment gaps zeroed */
+  uint64_t cur = 0;
+  for (const Piece &pc : b->pieces) {
+    if (pc.off > cur) memset(p + cur, 0, pc.off - cur);
+    memcpy(p + pc.off, pc.src ? pc.src : b->inl.data() + pc.inlOff, pc.len);
+    cur = pc.off + pc.len;
+  }
+  if (h->data_len > cur) memset(p + cur, 0, h->data_len - cur);
   p += h->data_len;
   if (!b->tail.empty()) memcpy(p, b->tail.data(), b->tail.size());
 }

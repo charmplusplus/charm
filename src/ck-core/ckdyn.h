@@ -246,7 +246,9 @@ void  CkDynMsgAddI64(CkDynMsgBuilder *b, int64_t v);
 void  CkDynMsgAddU64(CkDynMsgBuilder *b, uint64_t v);
 void  CkDynMsgAddF64(CkDynMsgBuilder *b, double v);
 void  CkDynMsgAddBytes(CkDynMsgBuilder *b, const void *p, uint32_t len, uint16_t tag);
-void  CkDynMsgAddBuffer(CkDynMsgBuilder *b, const CkDynBufDesc *d);                       /* copies now */
+/* The shape is copied now; the bytes are copied into the message by
+ * CkDynMsgFinish, so d->ptr must stay valid until Finish or Abandon. */
+void  CkDynMsgAddBuffer(CkDynMsgBuilder *b, const CkDynBufDesc *d);
 void  CkDynMsgAddFuture(CkDynMsgBuilder *b, int pe, uint32_t id);
 void  CkDynMsgAddCallback(CkDynMsgBuilder *b, const CkDynCallback *cb);
 void  CkDynMsgAddSection(CkDynMsgBuilder *b, const CkDynSectionID *sid);

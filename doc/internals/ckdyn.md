@@ -31,7 +31,7 @@ users. CkDyn is compiled into libck on every target; nothing in it runs until
 ## Registration
 
 A binding describes a class with a `CkDynClassDesc`: name, kind, `ndims`
-(arrays only, 1 to 6), `num_entries`, an array of `CkDynEntryDesc`
+(arrays only, 1 to 6, or 0 for any), `num_entries`, an array of `CkDynEntryDesc`
 (`name`, `flags`, `user_id`) whose element 0 is the constructor,
 `binding_data` (opaque, passed to every per-class hook) and `hooks` (NULL
 selects the table given to `CkDynInit`). `CkDynRegisterClass(desc,
@@ -206,8 +206,14 @@ header extension.
 ### The builder
 
 `CkDynMsgBegin(nslots_hint, data_hint, tail_hint, prio_bits, group_dep)`
-returns a `CkDynMsgBuilder`: three growable vectors (slots, data, tail) plus
-flags, `user_id`, priority bits and group dependency. Each PE caches one
+returns a `CkDynMsgBuilder`: a slot vector, the data region as a list of
+pieces, a tail vector, plus flags, `user_id`, priority bits and group
+dependency. A piece is either small content copied into the builder when it
+is added (BYTES payloads, buffer shapes, callbacks, sections, proxies) or a
+buffer recorded by pointer and length (`CkDynMsgAddBuffer`): its bytes are
+copied once, straight into the message, by `Finish`, so the caller's buffer
+must stay valid until `Finish` or `Abandon`. A 1 MB array is therefore
+written once, not into the builder and again into the message. Each PE caches one
 builder in the Ckpv `_ckdynBuilder`, allocated on first use and reused. If the
 cached builder is in use, which happens when a build is nested inside another
 (an inline delivery that sends, or `ckdynForeignReduce` calling `reduce` while
@@ -218,8 +224,9 @@ the binding was building), `CkDynMsgBegin` allocates a second builder, and
 `operator new` (`new (total, prio_bits) CkDynMsg`, or the `GroupDepNum{1}`
 variant with `setGroupDep` when `group_dep >= 0`), which sets `buf` to the
 variable-size area. Group dependencies are given at `Begin` because the
-envelope reserves their space at allocation. `writePayload` copies the
-header, slots, data and tail into `buf`. Priority bits are filled after
+envelope reserves their space at allocation. `writePayload` writes the
+header and slots, copies each piece of the data region to its offset
+(zeroing the alignment gaps), then the tail. Priority bits are filled after
 `Finish` through `CkDynMsgPriorityPtr`; queueing through `CkDynMsgSetQueueing`.
 `CkDynMsgPayload(m, &len)` returns the payload bytes of a finished message
 (header to end of tail), which is how a C binding makes a foreign-reducer
@@ -546,7 +553,7 @@ libck that also defines it.
 - **Entries and message types.** The envelope's `epIdx` and the header's
   `ep` are 16 bits: at most 65536 entry indices per process, the runtime's
   own included. `msgIdx` is 8 bits: 256 message types, two used by CkDyn.
-- **Dimensions.** Array classes have 1 to 6 dimensions (`CKDYN_MAX_DIMS`);
+- **Dimensions.** Array classes have 1 to 6 dimensions (`CKDYN_MAX_DIMS`), or register with 0 and take the count from each creation;
   registration aborts with "array class %s has %d dimensions", `mkIndex` with
   "array index with %d dimensions", `CkDynCreateArray` with "array %s has %d
   dimensions, creation gave %d". A `BUFFER` slot has at most 32 dimensions
@@ -555,7 +562,7 @@ libck that also defines it.
   more than 65535 slots abort when the message is built.
 - **Array indices.** Components of a 4- to 6-dimensional index must fit in
   16 bits ("index component %d does not fit in 16 bits").
-- **Future ids** must fit `CMK_REFNUM_TYPE`, 16 bits in the current builds;
+- **Future ids** must fit `CMK_REFNUM_TYPE`, 16 bits by default and 32 bits in a build configured with `REFNUM_TYPE="unsigned int"` (the charm4py build); 0 and the all-ones value are reserved;
   id 0 means "none".
 - **Group dependencies** (`group_dep` of `CkDynMsgBegin`) are set in the
   envelope, but the runtime does not honor them on point-to-point sends to
