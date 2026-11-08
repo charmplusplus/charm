@@ -19,6 +19,14 @@ CkpvExtern(std::vector<void *>, chare_objs);
 
 /* readonly */ CkGroupID _ckdynMgrGID;
 
+/* The structs a binding copies as bytes into messages keep their sizes; a
+   change here is an ABI change (bump CKDYN_API_VERSION). */
+static_assert(sizeof(CkDynTarget) == 40, "CkDynTarget layout changed");
+static_assert(sizeof(CkDynSectionID) == 16, "CkDynSectionID layout changed");
+static_assert(sizeof(CkDynCallback) == 88, "CkDynCallback layout changed");
+static_assert(sizeof(CkDynHdr) == 24, "CkDynHdr layout changed");
+static_assert(sizeof(CkDynSlot) == 24, "CkDynSlot layout changed");
+
 /* ====================================================================== */
 /* Tables                                                                  */
 /* ====================================================================== */
@@ -147,6 +155,9 @@ static void noteEp(int ep, ClassRec *c, uint32_t flags, uint32_t user_id) {
 static int registerClass(const CkDynClassDesc *desc, int *first_ep) {
   if (desc->num_entries < 1 || desc->entries == nullptr)
     CkAbort("CkDyn: class %s has no constructor entry", desc->name ? desc->name : "?");
+  if (desc->hooks && (desc->hooks->version != CKDYN_API_VERSION || desc->hooks->size != sizeof(CkDynHooks)))
+    CkAbort("CkDyn: class %s: hook table built for API version %u with size %u; this libcharm has version %d, size %zu",
+            desc->name ? desc->name : "?", desc->hooks->version, desc->hooks->size, CKDYN_API_VERSION, sizeof(CkDynHooks));
   ClassRec *c = new ClassRec;
   c->desc = *desc;
   c->desc.name = strdup(desc->name);
@@ -1528,9 +1539,11 @@ static void ckdynRoPup(void *pup_er) {
 }
 
 extern "C" void CkDynInit(const CkDynHooks *hooks) {
-  if (hooks->version != CKDYN_API_VERSION) {
+  if (hooks->version != CKDYN_API_VERSION || hooks->size != sizeof(CkDynHooks)) {
     /* before ConverseInit in a shared-library binding, so not CkAbort */
-    fprintf(stderr, "CkDyn: binding built for API version %d, this libcharm has %d\n", hooks->version, CKDYN_API_VERSION);
+    fprintf(stderr, "CkDyn: binding built for API version %u with a %u-byte hook table; "
+            "this libcharm has version %d and a %zu-byte table\n",
+            hooks->version, hooks->size, CKDYN_API_VERSION, sizeof(CkDynHooks));
     abort();
   }
   g_hooks = *hooks;

@@ -31,7 +31,8 @@ users. CkDyn is compiled into libck on every target; nothing in it runs until
 ## Registration
 
 A binding describes a class with a `CkDynClassDesc`: name, kind, `ndims`
-(arrays only, 1 to 6, or 0 for any), `num_entries`, an array of `CkDynEntryDesc`
+(arrays only: 0 to 6, where 0 means any dimension count and the index given
+at each creation or insert decides), `num_entries`, an array of `CkDynEntryDesc`
 (`name`, `flags`, `user_id`) whose element 0 is the constructor,
 `binding_data` (opaque, passed to every per-class hook) and `hooks` (NULL
 selects the table given to `CkDynInit`). `CkDynRegisterClass(desc,
@@ -105,9 +106,12 @@ dimension count at creation (charm4py) registers every array class that way.
 ## The hook table
 
 `CkDynInit(hooks)` copies the table into `g_hooks` and checks
-`hooks->version == CKDYN_API_VERSION`. A class whose descriptor has
+`hooks->version == CKDYN_API_VERSION` and `hooks->size == sizeof(CkDynHooks)`
+(the size as compiled by the binding, so a binding built against a header
+with a different table is rejected even at the same version). A class whose descriptor has
 `hooks == NULL` uses `&g_hooks`; otherwise its own table, kept by pointer, so
-that table must outlive the program. The per-class hooks receive the class's
+that table must outlive the program, and `registerClass` applies the same
+two checks to it. The per-class hooks receive the class's
 `binding_data`; the hooks without a class receive `g_hooks.global` and are
 always taken from `g_hooks`.
 
@@ -130,7 +134,8 @@ always taken from `g_hooks`.
 
 The handle is whatever `construct`, `mainchare` or `unpack` returned. CkDyn
 stores it in `CkDynObj::handle` (with the chare index) and never dereferences
-it. A target (`CkDynTarget`) names one object of any kind: the `CkChareID`
+it. A handle must be non-NULL: NULL marks a group branch that was not
+constructed (outside a constrained group). A target (`CkDynTarget`) names one object of any kind: the `CkChareID`
 fields for chares, group id and PE or node for groups, array id with an `int`
 index for arrays. CkDyn converts array indices to and from `CkArrayIndex`
 (`mkIndex`, `fillIndex`), which stores four to six dimensions as shorts;
@@ -270,7 +275,10 @@ tmp, msg)` builds it and returns the entry index:
   `CkMessageToEpIdx(msg)`.
 
 The synthesized slots live in a two-slot array on the caller's stack (`tmp`),
-so a view of a reduction or system message is valid only during the hook.
+so a view of a reduction or system message, and every pointer the binding
+read from its slots, is valid only until the hook that received it returns
+(documented at `CkDynMsgKind` in ckdyn.h). `CkDynMsgRetain` keeps the message,
+and so the reduction data, alive, not the synthesized slots.
 
 The header carries the entry index because the envelope's `epIdx` can be
 stale: in a production build `CkSendMsgInline` to a local chare does not
@@ -427,10 +435,12 @@ before sending.
 number writes it into the envelope's `ref` field of whatever message it
 sends. On the receiving side `viewAny` turns a non-zero `ref` on a reduction
 or system message into a `FUTURE` slot `(CkMyPe(), ref)`, and every view
-exposes it as `refnum`. The field is `CMK_REFNUM_TYPE`, `unsigned short` by
-default (CMakeLists.txt:184). `checkedRefnum` aborts when a future id does not
-fit ("future id %u does not fit in this build's %d-byte reference number");
-the design asks for a 32-bit build option. `CkDynRefnumBytes()` reports the
+exposes it as `refnum`. The field is `CMK_REFNUM_TYPE`. Future ids are
+32-bit, 1 to 2^32-2, in a libcharm built with `REFNUM_TYPE="unsigned int"`
+(CMakeLists.txt:184), which the design requires for bindings; the default
+build keeps `unsigned short`, where `checkedRefnum` aborts on an id above
+65534 ("future id %u is not usable as this build's %d-byte reference
+number"). `CkDynRefnumBytes()` reports the
 width so that the binding can check it.
 Future id 0 cannot travel this way, because 0 means "no reference number",
 and neither can the all-ones value: a reduction result carries the reduction's
@@ -518,9 +528,10 @@ CkDyn's own readonly, `_ckdynMgrGID`, is declared in `CkDyn.ci`.
 
 A shared-library binding:
 
-1. `CkDynInit(&hooks)` copies the table, checks the version, and registers
-   `ckdyn_ro` if the binding has readonly hooks. A version mismatch prints to
-   stderr and calls `abort()`, since this runs before `ConverseInit`.
+1. `CkDynInit(&hooks)` copies the table, checks the version and the table
+   size, and registers `ckdyn_ro` if the binding has readonly hooks. A
+   mismatch prints to stderr and calls `abort()`, since this runs before
+   `ConverseInit`.
 2. `CkDynStart(argc, argv)` copies argv into storage it owns, calls
    `_registerConverseInitHooks()` and `ConverseInit(argc, argv, _initCharm,
    0, 0)`, and never returns.
@@ -562,8 +573,16 @@ libck that also defines it.
   more than 65535 slots abort when the message is built.
 - **Array indices.** Components of a 4- to 6-dimensional index must fit in
   16 bits ("index component %d does not fit in 16 bits").
-- **Future ids** must fit `CMK_REFNUM_TYPE`, 16 bits by default and 32 bits in a build configured with `REFNUM_TYPE="unsigned int"` (the charm4py build); 0 and the all-ones value are reserved;
-  id 0 means "none".
+- **Future ids** are 32-bit, 1 to 2^32-2: 0 means "none" and the all-ones
+  value is the reduction user flag. This needs a libcharm built with
+  `REFNUM_TYPE="unsigned int"`, as the design requires; a build with the
+  default 16-bit `CMK_REFNUM_TYPE` accepts only 1 to 65534.
+- **ABI.** The structs a binding copies as bytes into messages
+  (`CkDynTarget`, `CkDynSectionID`, `CkDynCallback`, `CkDynHdr`, `CkDynSlot`)
+  have fixed-width integer fields only; the enums supply constants.
+  `static_assert`s in ckdyn.C fix their sizes (40, 16, 88, 24 and 24 bytes),
+  so a change that alters one fails to compile until `CKDYN_API_VERSION` is
+  reconsidered.
 - **Group dependencies** (`group_dep` of `CkDynMsgBegin`) are set in the
   envelope, but the runtime does not honor them on point-to-point sends to
   array elements.
@@ -576,7 +595,7 @@ libck that also defines it.
   PE per process. Lookup: a chare index or entry index that is not dynamic
   (a non-CkDyn message reached a CkDyn entry, or the header's ep is wrong),
   "message without a CkDyn header (magic 0x%x)", a slot index out of range or
-  of another type. Start-up: API version mismatch, `CkDynStart` before
+  of another type. Start-up: API version or hook table size mismatch, `CkDynStart` before
   `CkDynInit`. A missing hook that the situation needs (`mainchare`,
   `unpack`, `pack_size`, `map_proc_num`, `future`, `reduce`,
   `unpack_readonly` with readonly data present).

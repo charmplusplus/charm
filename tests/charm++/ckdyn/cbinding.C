@@ -239,6 +239,7 @@ static CkDynHooks g_hooks;
 const CkDynHooks *cbHooks(void) {
   memset(&g_hooks, 0, sizeof g_hooks);
   g_hooks.version = CKDYN_API_VERSION;
+  g_hooks.size = sizeof(CkDynHooks);
   g_hooks.construct = hConstruct;
   g_hooks.destruct = hDestruct;
   g_hooks.deliver = hDeliver;

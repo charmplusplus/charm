@@ -25,7 +25,11 @@ extern "C" {
 #endif
 
 /* Bumped on any incompatible change to this file. */
-#define CKDYN_API_VERSION 1
+#define CKDYN_API_VERSION 2
+
+/* Handles. Every handle a binding gives CkDyn (from construct, mainchare or
+ * unpack) must be non-NULL: CkDyn uses NULL to mark a branch that was not
+ * constructed (a group branch outside a constrained group's PE list). */
 
 /* ------------------------------------------------------------------------ */
 /* Classes and entry methods                                                 */
@@ -77,15 +81,18 @@ typedef struct CkDynClassDesc {
 
 #define CKDYN_MAX_DIMS 6
 
+/* Structs that CkDyn copies as bytes into messages (CkDynTarget,
+ * CkDynSectionID, CkDynCallback, CkDynHdr, CkDynSlot) use fixed-width integer
+ * fields only; the enums supply the constants. ckdyn.C checks their sizes. */
 typedef struct CkDynTarget {
-  CkDynKind kind;
-  int       chare_idx;                 /* the Charm++ chare index of its class */
+  int32_t kind;                        /* CkDynKind */
+  int32_t chare_idx;                   /* the Charm++ chare index of its class */
   union {
-    struct { int pe; void *ptr; } chare;                /* MAINCHARE, CHARE: CkChareID */
-    struct { int gid; int pe_or_node; } group;          /* GROUP, NODEGROUP, ARRAYMAP */
-    struct { int aid; int ndims; int index[CKDYN_MAX_DIMS]; } array;   /* ARRAY */
+    struct { int32_t pe; void *ptr; } chare;            /* MAINCHARE, CHARE: CkChareID */
+    struct { int32_t gid; int32_t pe_or_node; } group;  /* GROUP, NODEGROUP, ARRAYMAP */
+    struct { int32_t aid; int32_t ndims; int32_t index[CKDYN_MAX_DIMS]; } array;   /* ARRAY */
   } u;
-} CkDynTarget;
+} CkDynTarget;                         /* 40 bytes */
 
 /* ------------------------------------------------------------------------ */
 /* Sections (step 2; the type is part of the ABI from the start)             */
@@ -98,7 +105,7 @@ typedef struct CkDynSectionID {
   uint8_t  kind;       /* CKDYN_ARRAY, CKDYN_GROUP, or 0 for a composite */
   uint8_t  reserved;
   uint16_t gen;        /* generation, so a reused slot is not mistaken for the old section */
-} CkDynSectionID;
+} CkDynSectionID;                     /* 16 bytes */
 
 /* ------------------------------------------------------------------------ */
 /* Callbacks                                                                 */
@@ -271,6 +278,10 @@ typedef enum {
   CKDYN_MSGKIND_REDRESULT,   /* a CkReductionMsg, viewed with one synthesized BUFFER slot */
   CKDYN_MSGKIND_SYS          /* a system message: no slots, except FUTURE when a refnum is set */
 } CkDynMsgKind;
+/* The slots of a REDRESULT or SYS view are synthesized in the caller's stack
+ * frame: the view, its slots and the pointers read from it are valid only
+ * until the hook that received the view returns. CkDynMsgRetain keeps the
+ * message (the reduction data) alive, not the synthesized slots. */
 
 typedef struct CkDynMsgView {
   CkDynMsgKind          kind;
@@ -314,7 +325,8 @@ enum {
 #define CKDYN_PACK_REFUSED ((size_t)-1)   /* pack_size: the object cannot be packed in this state; CkDyn aborts */
 
 typedef struct CkDynHooks {
-  int   version;                 /* CKDYN_API_VERSION */
+  uint32_t version;              /* CKDYN_API_VERSION */
+  uint32_t size;                 /* sizeof(CkDynHooks) as compiled by the binding */
   void *global;                  /* passed to the hooks that have no class: register_classes, readonly, reduce, future, error */
   void (*register_classes)(void *global);   /* called at start-up in place of CkRegisterMainModule (shared library) */
   /* object lifecycle */
@@ -359,7 +371,9 @@ typedef struct CkDynHooks {
 int  CkDynApiVersion(void);
 int  CkDynRefnumBytes(void);          /* sizeof(CMK_REFNUM_TYPE) of this libcharm */
 int  CkDynHasDeviceSupport(void);
-/* Install the hook table (copied). A shared-library binding calls it before
+/* Install the hook table (copied). version must equal CKDYN_API_VERSION and
+ * size sizeof(CkDynHooks), otherwise CkDyn aborts; the same check applies to
+ * a class's own table (CkDynClassDesc.hooks). A shared-library binding calls it before
  * CkDynStart; a C++ program calls it from an initnode function, before it
  * registers classes. */
 void CkDynInit(const CkDynHooks *hooks);
