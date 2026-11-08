@@ -64,7 +64,7 @@ struct CkDynHooks;
 typedef struct CkDynClassDesc {
   const char            *name;         /* "Class"; kept by pointer */
   CkDynKind              kind;
-  int                    ndims;        /* arrays only: 1..6 */
+  int                    ndims;        /* arrays only: 1..6, or 0 for any (the index given at creation decides) */
   int                    num_entries;  /* entries[0] is the constructor */
   const CkDynEntryDesc  *entries;
   void                  *binding_data; /* opaque; passed to every per-class hook */
@@ -170,8 +170,9 @@ enum {
   CKDYN_MSG_CREATION   = 1u << 3,  /* constructor message that acknowledges creation */
   CKDYN_MSG_USESATSYNC = 1u << 4,  /* array element created with usesAtSync */
   CKDYN_MSG_RAY        = 1u << 5,
-  CKDYN_MSG_CONSTRAINED = 1u << 6  /* group constructor: the last slot is a BYTES slot of int32 PE numbers;
+  CKDYN_MSG_CONSTRAINED = 1u << 6, /* group constructor: the last slot is a BYTES slot of int32 PE numbers;
                                       branches on other PEs are not constructed (handle stays NULL) */
+  CKDYN_MSG_BINDING_MASK = 0xF000u /* bits 12-15: the binding's own flags; CkDyn neither sets nor reads them */
 };
 
 #define CKDYN_MAGIC 0xDA01u

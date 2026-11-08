@@ -97,6 +97,11 @@ while dispatching. Only builds with `CMK_CHARM4PY` accept it:
 `CkRegisterEpInternal` (src/ck-core/register.C:48-53) aborts on any
 registration after `_registerDone` otherwise.
 
+An array class registered with `ndims == 0` accepts any dimension count: each
+creation or insert gives its own, and `CkDynCreateArray` checks the count only
+for a class registered with a fixed one. A language whose arrays pick their
+dimension count at creation (charm4py) registers every array class that way.
+
 ## The hook table
 
 `CkDynInit(hooks)` copies the table into `g_hooks` and checks
@@ -192,6 +197,11 @@ is a `BYTES` slot of int32 PE numbers; bit 6), `CKDYN_MSG_BCAST` (set by the
 broadcast sends, read by `dispatch`). `BLOCK`, `BCASTRET` and `RAY` are
 defined for the binding and passed through. Whether a message is a reduction
 result or a system message is carried by the view's `kind`, not by a flag.
+
+Bits 12-15 of the header flags (`CKDYN_MSG_BINDING_MASK`) belong to the
+binding: CkDyn neither sets nor reads them, so a binding can mark its own
+message kinds (the Python binding marks foreign reduction results) without a
+header extension.
 
 ### The builder
 

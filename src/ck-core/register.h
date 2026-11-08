@@ -210,7 +210,7 @@ class ChareInfo {
     ChareType  chareType;
     int mainChareIdx;
 
-    /// Number of dimensions for chare arrays (-1 if not an array, 0 is invalid)
+    /// Number of dimensions for chare arrays (-1 if not an array; 0 for a CkDyn array class whose creations choose it)
     int ndims;
 
     /// For groups -- true if the group is Irreducible

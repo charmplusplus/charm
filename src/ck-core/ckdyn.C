@@ -192,7 +192,8 @@ static int registerClass(const CkDynClassDesc *desc, int *first_ep) {
       entryFn = NodeGroupDyn::callEntry;
       break;
     case CKDYN_ARRAY:
-      if (desc->ndims < 1 || desc->ndims > CKDYN_MAX_DIMS)
+      /* ndims 0: any dimension count; each creation or insert gives its own */
+      if (desc->ndims < 0 || desc->ndims > CKDYN_MAX_DIMS)
         CkAbort("CkDyn: array class %s has %d dimensions", name, desc->ndims);
       idx = CkRegisterChare(name, sizeof(ArrayElemDyn), TypeArray);
       CkRegisterBase(idx, CkIndex_ArrayElement::__idx);
@@ -1075,7 +1076,8 @@ extern "C" int CkDynCreateArray(int chare_idx, CkDynMsg *ctor, const CkDynArrayO
   CkArrayOptions opts;
   if (o->dims != nullptr) {
     int dims[CKDYN_MAX_DIMS];
-    if (o->ndims != c->desc.ndims) CkAbort("CkDyn: array %s has %d dimensions, creation gave %d", c->desc.name, c->desc.ndims, o->ndims);
+    if (c->desc.ndims != 0 && o->ndims != c->desc.ndims) CkAbort("CkDyn: array %s has %d dimensions, creation gave %d", c->desc.name, c->desc.ndims, o->ndims);
+    if (o->ndims < 1 || o->ndims > CKDYN_MAX_DIMS) CkAbort("CkDyn: array %s created with %d dimensions", c->desc.name, o->ndims);
     for (int i = 0; i < o->ndims; i++) dims[i] = o->dims[i];
     opts = CkArrayOptions(o->ndims, dims);
   }
