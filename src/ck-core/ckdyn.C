@@ -303,7 +303,10 @@ extern "C" int CkDynRegisterClassLate(const CkDynClassDesc *desc, int *first_ep)
   if (!g_lateAllowed) CkAbort("CkDyn: late registration not enabled (CkDynAllowLateRegistration)");
   if (CkMyNodeSize() != 1)
     CkAbort("CkDyn: late registration needs one PE per process (this process has %d)", CkMyNodeSize());
-  return registerClass(desc, first_ep);
+  _registerLateBegin();
+  int idx = registerClass(desc, first_ep);
+  _registerLateEnd();
+  return idx;
 }
 
 extern "C" const CkDynClassDesc *CkDynClassOf(int chare_idx) {

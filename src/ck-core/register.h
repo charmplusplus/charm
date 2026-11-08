@@ -361,6 +361,10 @@ extern CkRegisteredInfo<ReadonlyMsgInfo> _readonlyMsgs;
 
 extern void _registerInit(void);
 extern void _registerDone(void);
+/* Bracket a registration made after _registerDone (CkDynRegisterClassLate);
+ * see doc/internals/ckdyn.md, Registration. */
+extern void _registerLateBegin(void);
+extern void _registerLateEnd(void);
 
 extern int CkGetChareIdx(const char *name);
 
