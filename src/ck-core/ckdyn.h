@@ -95,14 +95,14 @@ typedef struct CkDynTarget {
 } CkDynTarget;                         /* 40 bytes */
 
 /* ------------------------------------------------------------------------ */
-/* Sections (step 2; the type is part of the ABI from the start)             */
+/* Section ids                                                               */
 /* ------------------------------------------------------------------------ */
 
 typedef struct CkDynSectionID {
-  int32_t  root_pe;    /* PE whose CkDynMgr holds the section */
+  int32_t  root_pe;    /* PE whose CkDynMgr holds the section (the PE that created it) */
   int32_t  idx;        /* index in that table */
-  int32_t  coll_id;    /* array or group id (-1 for a composite) */
-  uint8_t  kind;       /* CKDYN_ARRAY, CKDYN_GROUP, or 0 for a composite */
+  int32_t  coll_id;    /* array or group id (-1 for a combined section) */
+  uint8_t  kind;       /* CKDYN_ARRAY, CKDYN_GROUP, or 0 for a combined section (CkDynSectionCombine) */
   uint8_t  reserved;
   uint16_t gen;        /* generation, so a reused slot is not mistaken for the old section */
 } CkDynSectionID;                     /* 16 bytes */
@@ -113,7 +113,7 @@ typedef struct CkDynSectionID {
 
 typedef enum {
   CKDYN_CB_TARGET  = 1,   /* an entry method of one element, or a broadcast to a collection */
-  CKDYN_CB_SECTION = 2,   /* an entry method multicast to a section (step 2) */
+  CKDYN_CB_SECTION = 2,   /* an entry method multicast to a section (relayed by CkDynMgr; a pup-able callback) */
   CKDYN_CB_FUTURE  = 3,   /* a binding future (pe, id) */
   CKDYN_CB_IGNORE  = 4,
   CKDYN_CB_EXIT    = 5    /* CkExit */
@@ -238,7 +238,7 @@ typedef struct CkDynBufDesc {
 
 typedef struct CkDynMsgBuilder CkDynMsgBuilder;      /* opaque */
 typedef struct CkDynMsg CkDynMsg;                    /* opaque to C: the Charm++ message */
-typedef struct CkDynMcastMsg CkDynMcastMsg;          /* opaque to C: the CkMulticast message (step 2) */
+typedef struct CkDynMcastMsg CkDynMcastMsg;          /* opaque to C: the CkMulticast message (CkDynSendSection) */
 typedef void (*CkDynBufDone)(void *done_arg);        /* the source buffer may be released (NCPY, step 3) */
 
 /* Begin a message. Hints size the scratch space; prio_bits reserves that many
@@ -266,6 +266,10 @@ void  CkDynMsgAddProxy(CkDynMsgBuilder *b, const CkDynTarget *t);
 void *CkDynMsgReserveTail(CkDynMsgBuilder *b, uint32_t len);   /* the binding writes len bytes in place */
 /* Priority bits: valid after CkDynMsgFinish; see CkDynMsgPriorityPtr. */
 CkDynMsg *CkDynMsgFinish(CkDynMsgBuilder *b, int ep);          /* one allocation; ep goes in the header */
+/* The same payload as a section message, for CkDynSendSection. It takes no
+ * group dependency; CkDynMsgPriorityPtr, CkDynMsgSetQueueing and CkDynMsgFree
+ * accept it cast to CkDynMsg *. */
+CkDynMcastMsg *CkDynMsgFinishMcast(CkDynMsgBuilder *b, int ep);
 void  CkDynMsgAbandon(CkDynMsgBuilder *b);
 void *CkDynMsgPriorityPtr(CkDynMsg *m);                        /* the reserved priority bits, to fill in */
 void  CkDynMsgSetQueueing(CkDynMsg *m, int queueing);          /* CK_QUEUEING_* value */
@@ -277,7 +281,7 @@ const void *CkDynMsgPayload(CkDynMsg *m, uint32_t *len);
 /* Reading a delivered message. */
 typedef enum {
   CKDYN_MSGKIND_DYN = 0,     /* a CkDynMsg */
-  CKDYN_MSGKIND_MCAST,       /* a CkDynMcastMsg (step 2) */
+  CKDYN_MSGKIND_MCAST,       /* a CkDynMcastMsg: a section send or a section callback's result */
   CKDYN_MSGKIND_REDRESULT,   /* a CkReductionMsg, viewed with one synthesized BUFFER slot */
   CKDYN_MSGKIND_SYS          /* a system message: no slots, except FUTURE when a refnum is set */
 } CkDynMsgKind;
@@ -358,7 +362,7 @@ typedef struct CkDynHooks {
                   CkDynMsgBuilder *result);
   /* futures */
   void  (*future)(void *global, int pe, uint32_t id, const CkDynMsgView *value);
-  /* sections (step 2) */
+  /* sections: a member received its section's creation multicast (optional) */
   void  (*section_joined)(void *binding_data, void *handle, const CkDynSectionID *sid);
   /* array map */
   int   (*map_proc_num)(void *binding_data, void *handle, int aid, int ndims, const int *index);
@@ -416,7 +420,7 @@ void CkDynSendGroup     (int gid, int pe, int ep, CkDynMsg *m, const CkDynSendOp
 void CkDynSendGroupMulti(int gid, int npes, const int *pes, int ep, CkDynMsg *m, const CkDynSendOpts *o);
 void CkDynSendNodeGroup (int gid, int node, int ep, CkDynMsg *m, const CkDynSendOpts *o);        /* node == -1: broadcast */
 void CkDynSendArray     (int aid, int ndims, const int *index, int ep, CkDynMsg *m, const CkDynSendOpts *o); /* index == NULL: broadcast */
-void CkDynSendSection   (const CkDynSectionID *sid, int ep, CkDynMcastMsg *m, const CkDynSendOpts *o);     /* step 2 */
+void CkDynSendSection   (const CkDynSectionID *sid, int ep, CkDynMcastMsg *m, const CkDynSendOpts *o);     /* opts ignored */
 /* Send to whatever a target names (chare, group branch, nodegroup branch, array element). */
 void CkDynSendTarget    (const CkDynTarget *t, int ep, CkDynMsg *m, const CkDynSendOpts *o);
 
@@ -492,8 +496,13 @@ typedef struct CkDynRedData {
 void CkDynContribute(const CkDynTarget *me, const CkDynRedData *d, const CkDynCallback *cb);
 
 /* ------------------------------------------------------------------------ */
-/* Sections (step 2)                                                         */
+/* Sections (doc/internals/ckdyn.md, "Sections")                            */
 /* ------------------------------------------------------------------------ */
+
+/* Creation runs on the calling PE, which becomes the root. done receives an
+ * empty reduction once every member has its cookie; send after it fires.
+ * Combine: the union of array or combined sections (each element once),
+ * all with one index dimension count; group parts abort. */
 
 void CkDynSectionCreateArray(int aid, int nelems, int ndims, const int *indices, int bfactor,
                              const CkDynCallback *done, CkDynSectionID *out);

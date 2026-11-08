@@ -7,10 +7,17 @@
 #define CKDYN_IMPL_H
 
 #include "charm++.h"
+#include "pup_stl.h"
+#include "ckmulticast.h"
 #include "ckdyn.h"
-#include "CkDyn.decl.h"
 #include <map>
+#include <memory>
 #include <vector>
+
+PUPbytes(CkDynSectionID)
+
+class CkDynMcastMsg;
+#include "CkDyn.decl.h"
 
 /* ---- the two message types ---------------------------------------------- */
 
@@ -22,21 +29,16 @@ public:
   char *buf;
 };
 
-/* For CkMulticast (step 2): CkMcastBaseMsg must come first because
- * CkMulticastMgr writes the section cookie into the first bytes. */
+/* A section multicast: CkMcastBaseMsg must come first because
+ * CkMulticastMgr writes the section cookie into the first bytes. `sid` names
+ * the CkDyn section, so that a member can find its cookie on delivery. */
 class CkDynMcastMsg : public CkMcastBaseMsg, public CMessage_CkDynMcastMsg {
 public:
   char *buf;
+  CkDynSectionID sid;
 };
 
 /* ---- per-object state shared by every kind ------------------------------ */
-
-struct CkDynObj {
-  void *handle = nullptr;        /* the binding's object; never dereferenced by CkDyn */
-  int   chareIdx = -1;           /* Charm++ chare index of the class */
-  size_t sizedLen = 0;           /* pack_size of the sizing pass, checked on the packing pass */
-  std::map<CkDynSectionID, CkSectionInfo> *sectionCookies = nullptr;   /* step 2 */
-};
 
 /* Compare section ids so they can key a std::map. */
 inline bool operator<(const CkDynSectionID &a, const CkDynSectionID &b) {
@@ -44,6 +46,19 @@ inline bool operator<(const CkDynSectionID &a, const CkDynSectionID &b) {
   if (a.idx != b.idx) return a.idx < b.idx;
   return a.gen < b.gen;
 }
+
+typedef std::map<CkDynSectionID, CkSectionInfo> CkDynCookieMap;
+
+struct CkDynObj {
+  void *handle = nullptr;        /* the binding's object; never dereferenced by CkDyn */
+  int   chareIdx = -1;           /* Charm++ chare index of the class */
+  size_t sizedLen = 0;           /* pack_size of the sizing pass, checked on the packing pass */
+  CkDynCookieMap *sectionCookies = nullptr;   /* this object's CkMulticast cookie per section */
+  CkDynObj() = default;
+  CkDynObj(const CkDynObj &) = delete;
+  CkDynObj &operator=(const CkDynObj &) = delete;
+  ~CkDynObj() { delete sectionCookies; }
+};
 
 /* ---- the chare kinds ---------------------------------------------------- */
 
@@ -125,6 +140,34 @@ public:
 
 /* ---- the per-PE manager group ------------------------------------------- */
 
+/* One section in its root PE's table (doc/internals/ckdyn.md, "Sections"). */
+struct CkDynSection {
+  bool     live = false;
+  bool     ready = false;          /* proxy built and delegated; a combine waits for remote parts */
+  uint8_t  kind = 0;               /* CKDYN_ARRAY, CKDYN_GROUP, or 0 for a combined section */
+  uint16_t gen = 0;
+  int      bfactor = 0;
+  int      ndims = 0;
+  std::vector<int> aids;                              /* arrays (one per sub-section) */
+  std::vector<std::vector<CkArrayIndex> > elems;      /* members per array */
+  int      gid = -1;                                  /* group sections */
+  std::vector<int> pes;
+  CProxySection_ArrayBase aproxy;
+  CProxySection_Group     gproxy;
+  CkDynCallback done;
+  std::vector<CkDynMcastMsg *> held;                  /* sends before the section is ready */
+  /* combine in progress: one record per part, filled locally or by sectionParts */
+  struct Part { bool have = false; int kind = 0; int ndims = 0; std::vector<int> aids;
+                std::vector<std::vector<CkArrayIndex> > elems; };
+  std::vector<Part> parts;
+  int partsPending = 0;
+  struct Query { int combIdx, combGen, partNo, replyPe; };
+  std::vector<Query> queries;                         /* member queries that arrived before ready */
+};
+
+/* A section callback: the relay slot's target (CkDynMgr::relay). */
+struct CkDynRelaySlot { CkDynSectionID sid; int ep; uint32_t refnum; };
+
 class CkDynMgr : public CBase_CkDynMgr {
 public:
   CkDynMgr();
@@ -132,7 +175,27 @@ public:
   void pup(PUP::er &p) override;
   /* entries */
   void deposit(CkDynMsg *m);      /* future value: hooks.future */
-  void relay(CkDynMsg *m);        /* section callback relay (step 2) */
+  void relay(CkDynMsg *m);        /* a section callback: forward the result to the section */
+  void sectionSend(CkDynMcastMsg *m);   /* a section send from another PE */
+  void sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe);
+  void sectionParts(int combIdx, int combGen, int partNo, int kind, int ndims,
+                    const std::vector<int> &aids, const std::vector<int> &counts, const std::vector<int> &flat);
+  void sectionDelete(int idx, int gen);
+  /* sections rooted here */
+  std::vector<std::unique_ptr<CkDynSection> > sections;
+  int  newSection(uint8_t kind, const CkDynCallback *done, int bfactor);
+  CkDynSectionID idOf(int idx) const;
+  CkDynSection &lookup(const CkDynSectionID &sid, const char *what);
+  void finishSection(int idx);
+  void sendTo(CkDynSection &s, int ep, CkDynMcastMsg *m);
+  void addPart(int combIdx, int partNo, int kind, int ndims, const std::vector<int> &aids,
+               const std::vector<std::vector<CkArrayIndex> > &elems);
+  void answerQuery(const CkDynSection &s, const CkDynSection::Query &q);
+  void deleteSection(const CkDynSectionID &sid);
+  /* section callbacks made on this PE */
+  std::vector<CkDynRelaySlot> relays;
+  std::map<std::vector<uint32_t>, int> relayIndex;
+  int relaySlot(const CkDynSectionID &sid, int ep, uint32_t refnum);
 };
 
 /* ---- helpers used by ckarray.C ------------------------------------------ */

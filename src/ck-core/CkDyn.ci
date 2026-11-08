@@ -6,6 +6,7 @@ module CkDyn {
   message CkDynMcastMsg { char buf[]; };
 
   readonly CkGroupID _ckdynMgrGID;
+  readonly CkGroupID _ckdynMcastGID;   // the CkMulticastMgr behind CkDyn sections
 
   initnode void _ckdynInitNode(void);
   initproc void _ckdynInitProc(void);
@@ -15,6 +16,13 @@ module CkDyn {
     // a binding future's value; the future id is the envelope's reference number.
     // notrace: a binding coroutine resumed here traces its own event (CkDynCoroResume)
     entry [notrace] void deposit(CkDynMsg *m);
-    entry void relay(CkDynMsg *m);     // section callback relay (step 2)
+    // a section callback's result, forwarded to the section (any message type arrives here)
+    entry void relay(CkDynMsg *m);
+    // sections rooted on this PE (doc/internals/ckdyn.md, "Sections")
+    entry void sectionSend(CkDynMcastMsg *m);
+    entry void sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe);
+    entry void sectionParts(int combIdx, int combGen, int partNo, int kind, int ndims,
+                            std::vector<int> aids, std::vector<int> counts, std::vector<int> flat);
+    entry void sectionDelete(int idx, int gen);
   };
 };
