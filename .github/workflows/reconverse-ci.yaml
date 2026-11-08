@@ -134,8 +134,12 @@ jobs:
           TESTRUN_PROCS=2 TESTRUN_VA_RANDOMIZATION=1 timeout 1800 make -C examples/charm++/zerocopy test
 
   # The syncft (in-memory checkpoint) build option: checkpoint, rollback and
-  # the migration refusal, in one and two processes. A job of its own because
-  # the option changes code every program runs (see doc/internals/memckpt.md).
+  # the migration, insertion and deletion refusals, in one and two processes.
+  # A job of its own because the option changes code every program runs (see
+  # doc/internals/memckpt.md). tests/campi/jacobi3d restarts from a disk
+  # checkpoint onto more PEs, which under syncft goes through the doneInserting
+  # condition in CkLocMgr's pup; as in ampi-linux-x86_64, its two-process run
+  # leaves address randomization on (a campi rank holds no code or data address).
   reconverse-linux-x86_64-syncft:
     timeout-minutes: 60
     runs-on: ubuntu-latest
@@ -151,6 +155,10 @@ jobs:
         run: timeout 900 make -C tests/charm++/memckpt_rollback test
       - name: test (2 processes, lcrun)
         run: TESTRUN_PROCS=2 timeout 900 make -C tests/charm++/memckpt_rollback test
+      - name: tests/campi/jacobi3d (single process)
+        run: timeout 900 make -C tests/campi/jacobi3d test
+      - name: tests/campi/jacobi3d (2 processes, lcrun, randomization on)
+        run: TESTRUN_PROCS=2 TESTRUN_VA_RANDOMIZATION=1 timeout 900 make -C tests/campi/jacobi3d test
 
   # MPI interop (CharmLibInit/CharmLibExit) in an Open MPI program. A job of
   # its own so that the MPI packages stay out of the other builds.

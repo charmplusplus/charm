@@ -20,11 +20,14 @@ test: all testrestriction
 	$(call run, ./memckpt_rollback +p4 -lbfirst +balancer RotateLB )
 
 # A migration, an insertion or a deletion between the checkpoint and the
-# rollback must abort the rollback.
+# rollback must abort the rollback. testrun skips (exit 0, "Skipping the test")
+# when the process count does not divide 4; that counts as a pass.
 # $(1): program options, $(2): the word in the refusal message
 define refusal
 	@$(call run, ./memckpt_rollback +p4 $(1) ) > restriction.out 2>&1; rc=$$?; \
-	if [ $$rc -eq 0 ]; then \
+	if grep -q "Skipping the test" restriction.out; then \
+	  echo "memckpt_rollback testrestriction ($(1)) skipped"; \
+	elif [ $$rc -eq 0 ]; then \
 	  cat restriction.out; echo "testrestriction ($(1)): expected a nonzero exit"; exit 1; \
 	elif ! grep -q "rollback refused: .* array elements $(2)" restriction.out; then \
 	  cat restriction.out; echo "testrestriction ($(1)): restriction message missing"; exit 1; \
