@@ -2099,6 +2099,7 @@ CkLocRec::CkLocRec(CkLocMgr* mgr, bool fromMigration, bool ignoreArrival,
   DEBL((AA "Registering element %s with load balancer\n" AB, idx2str(idx)));
   nextPe = -1;
   asyncMigrate = false;
+  lbOrderedMigrate = false;
   readyMigrate = true;
   enable_measure = true;
   syncBarrier = CkSyncBarrier::object();
@@ -2265,6 +2266,7 @@ void CkLocRec::staticMigrate(LDObjHandle h, int dest)
 
 void CkLocRec::recvMigrate(int toPe)
 {
+  lbOrderedMigrate = true;  // only these arrivals count towards the balancer's step
   // we are in the mode of delaying actual migration
   // till readyMigrate()
   if (readyMigrate)
@@ -3783,7 +3785,9 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   CkArrayElementMigrateMessage* msg =
       new (bufSize, 0) CkArrayElementMigrateMessage(idx, id,
 #if CMK_LBDB_ON
-                                                    rec->isAsyncMigrate(),
+                                                    // The balancer counts the arrivals it ordered;
+                                                    // a migrateMe is not one of them.
+                                                    rec->isAsyncMigrate() || !rec->isLBOrderedMigrate(),
 #else
                                                     false,
 #endif

@@ -3061,7 +3061,13 @@ The detailed APIs of these two methods are described as follows:
 	     ``AtSync()``. Insertions and/or deletions may begin again after
 	     load balancing is complete (i.e. ``ResumeFromSync()`` is called for
 	     an object on the given PE for insertions or for the object in
-	     question for deletions).
+	     question for deletions). The same rule applies to ``migrateMe()``:
+	     an element that uses AtSync must not call it between ``AtSync()``
+	     and ``ResumeFromSync()``, and because PEs finish a step at different
+	     times, not until the elements of every PE have resumed. An element
+	     that arrives on a PE still in a step is resumed with that PE's
+	     elements, so it receives a ``ResumeFromSync()`` it did not ask for.
+	     Between steps, ``migrateMe()`` and AtSync can be combined freely.
 
 #. **Periodic load balancing mode**: This mode uses a timer to perform
    load balancing periodically at a user-specified interval. In order
