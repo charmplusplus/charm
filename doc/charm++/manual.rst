@@ -8811,7 +8811,11 @@ Only array elements are restored. Groups, node groups, mainchares,
 readonly variables and singleton chares keep their current state. In
 particular, a counter kept in a mainchare is not reverted: the
 checkpoint callback is the place to reset such state (the test
-``tests/charm++/memckpt_rollback`` shows this). An array created after
+``tests/charm++/memckpt_rollback`` shows this). The reduction state of
+groups is the exception: the rollback calls ``flushStates()`` and
+``ckJustMigrated()`` on every group, user groups included, so a group
+reduction that is partly contributed when the rollback starts is
+discarded, and the group's reduction numbers restart at 0. An array created after
 the checkpoint with no elements keeps its manager, still empty; one
 created with elements makes the rollback abort, as above.
 
