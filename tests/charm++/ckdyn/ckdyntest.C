@@ -14,8 +14,10 @@
 #if CMK_CUDA || CMK_HIP
 #include "hapi.h"
 #endif
+#include <atomic>
 #include <cmath>
 #include <cstring>
+#include <mutex>
 #include <deque>
 #include <functional>
 #include <map>
@@ -77,7 +79,8 @@ static CkDynCallback viewCb(const CkDynMsgView *v, int slot) { CkDynCallback c; 
 
 extern CbClass Ping, Sec, Grp, NGrp, Single, DMain, Late;
 
-enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTRED, P_GOTREDB, P_COMPUTE, P_CORO, P_SYNCSTART, P_RESUMED };
+enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTRED, P_GOTREDB, P_COMPUTE, P_CORO, P_SYNCSTART, P_RESUMED,
+       P_ZSTART, P_ZRECV, P_ZPOST, P_ZSPIN, P_ZACK };
 enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED };
 enum { G_CTOR, G_GOTRED, G_GOTREDB, G_NGSEND, G_NGREPORT, G_PRIOSTART, G_PRIORECV, G_EXPRECV,
        G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE, G_LATEREG };
@@ -258,6 +261,151 @@ static int64_t pingResumed(Obj *o, const CkDynMsgView *) {
   return 0;
 }
 
+/* ---- Ping: zero-copy (the ncpy phases) ------------------------------------
+ * zStart(mode, target, FUTURE) on element 0 sends a 16 MB float64 buffer as
+ * an NCPY slot to element `target`: zRecv(mode, replyTo, NCPY data, seed).
+ * The target checks the data and echoes it back with replyTo -1. Element 0
+ * reports to the future after three events (zAck): the echo, its own done
+ * function, and the target's done function. Modes: 0 non-post (the target
+ * retains the view and echoes from the retained pointer; its done function
+ * releases the message), 1 post before the send (zPost on the target posts,
+ * then starts element 0), 2 post after the send has been issued. */
+static const int64_t ZN = 2 * 1024 * 1024;   /* doubles: 16 MB */
+static const int ZSLOT = 2;                 /* the NCPY slot's index in a zRecv message */
+
+static std::mutex g_zLock;
+static std::map<int, std::vector<double> > g_zPost;   /* posted buffer per element index */
+static std::atomic<int> g_zSpinB(0);                   /* post_after within one process */
+
+static double zVal(int64_t seed, int64_t i) { return (double)seed + 0.5 * (double)i; }
+
+static double *zPostBuf(int idx) {
+  std::lock_guard<std::mutex> g(g_zLock);
+  std::vector<double> &b = g_zPost[idx];
+  b.assign(ZN, -1.0);
+  return b.data();
+}
+
+/* done records: called exactly once, on the PE that sent */
+struct ZDone { int pe; int calls; void *relMsg; double *freeBuf; int ackTo; };
+static void zDoneFn(void *arg) {
+  ZDone *d = (ZDone *)arg;
+  CHECK(d->pe == CkMyPe(), "ncpy: done ran on PE %d, the buffer was sent from PE %d", CkMyPe(), d->pe);
+  CHECK(++d->calls == 1, "ncpy: done called %d times for one send", d->calls);
+  if (d->relMsg) CkDynMsgRelease(d->relMsg);   /* the retained message the echo was sent from */
+  delete[] d->freeBuf;
+  d->relMsg = nullptr; d->freeBuf = nullptr;
+  if (d->ackTo >= 0) sendPing(d->ackTo, P_ZACK, MsgB().i64(0).finish(0));
+  /* d is kept so that a second call is detected */
+}
+
+static void zSend(int to, int64_t mode, int64_t replyTo, const double *data, int64_t seed,
+                  void *relMsg, double *freeBuf, int ackTo) {
+  static const int64_t shape[1] = { ZN };
+  CkDynBufDesc d = { data, (uint64_t)(ZN * sizeof(double)), CKDYN_ELEM_F64, 1, 0, 0, shape, nullptr };
+  ZDone *rec = new ZDone{ CkMyPe(), 0, relMsg, freeBuf, ackTo };
+  MsgB b;
+  b.i64(mode).i64(replyTo);
+  CkDynMsgAddNcpy(b.b, &d, zDoneFn, rec);
+  sendPing(to, P_ZRECV, b.i64(seed).finish(0));
+}
+
+static void zMaybeReport(Obj *o) {
+  if (o->s.counter < 3) return;
+  CkDynFutureSet(0, (uint32_t)o->s.fid, MsgB().i64(o->s.replies).f64(CkWallTimer() - o->s.t0).finish(0));
+}
+
+static void zPostFor(int idx) {
+  CkDynTarget t = cbArrayTarget1(aidPing, Ping.chareIdx, idx);
+  CkDynBufDesc d = { zPostBuf(idx), (uint64_t)(ZN * sizeof(double)), CKDYN_ELEM_F64, 0, 0, 0, nullptr, nullptr };
+  CkDynPostBuffer(&t, Ping.ep(P_ZRECV), ZSLOT, &d);
+}
+
+/* zStart(mode, target, FUTURE) */
+static int64_t pingZStart(Obj *o, const CkDynMsgView *v) {
+  int64_t mode = cbI64(v, 0);
+  int target = (int)cbI64(v, 1);
+  int pe; uint32_t id;
+  CHECK(cbFindFuture(v, &pe, &id), "zStart without a future");
+  o->s.fid = id; o->s.counter = 0; o->s.mode = mode; o->s.replies = 0;
+  int64_t seed = 1000 * mode + 7;
+  double *src = new double[ZN];   /* freed by the done function */
+  for (int64_t i = 0; i < ZN; i++) src[i] = zVal(seed, i);
+  o->s.t0 = CkWallTimer();
+  zSend(target, mode, myIndex(o), src, seed, nullptr, src, myIndex(o));
+  if (mode == 2) {
+    if (CkNumPes() == 1) {
+      zPostFor(target);   /* the target is on this PE: post for it right after the send */
+    } else if (CkNodeOf(CkNumPes() - 1) == CkMyNode()) {
+      /* the target's PE spins in zSpin until the send is issued, then posts */
+      g_zSpinB.store(1);
+    } else {
+      /* another process: the post request follows the data, and the data
+         is delivered only after its transfer */
+      sendPing(target, P_ZPOST, MsgB().i64(mode).i64(-1).finish(0));
+    }
+  }
+  return 0;
+}
+
+/* zRecv(mode, replyTo, NCPY data, seed) */
+static int64_t pingZRecv(Obj *o, const CkDynMsgView *v) {
+  int64_t mode = cbI64(v, 0), replyTo = cbI64(v, 1), seed = cbI64(v, 3);
+  CHECK(v->hdr->nbuf == 1 && v->slots[ZSLOT].type == CKDYN_SLOT_NCPY, "ncpy: slot %d is type %d, nbuf %u",
+        ZSLOT, (int)v->slots[ZSLOT].type, v->hdr->nbuf);
+  const int64_t *shape;
+  const double *p = (const double *)CkDynViewBufferPtr(v, ZSLOT, &shape);
+  CHECK(shape && shape[0] == ZN && v->slots[ZSLOT].len == ZN * sizeof(double) && v->slots[ZSLOT].elem == CKDYN_ELEM_F64,
+        "ncpy: slot shape or length lost");
+  for (int64_t i = 0; i < ZN; i++)
+    if (p[i] != zVal(seed, i)) cbFail("ncpy: element %d received %g at %lld, expected %g", myIndex(o), p[i], (long long)i, zVal(seed, i));
+  bool posted = false;
+  {
+    std::lock_guard<std::mutex> g(g_zLock);
+    auto it = g_zPost.find(myIndex(o));
+    posted = it != g_zPost.end() && !it->second.empty() && p == it->second.data();
+  }
+  if (replyTo < 0) {   /* the echo, back at element 0 */
+    o->s.replies = posted ? 2 : 1;
+    o->s.counter++;
+    zMaybeReport(o);
+    return 0;
+  }
+  CHECK(posted == (mode != 0), "ncpy: mode %lld delivered %s the posted buffer", (long long)mode, posted ? "into" : "outside");
+  if (mode == 0) {
+    /* echo from the retained view after this hook returns; the done function releases it */
+    CkDynMsgRetain(v);
+    zSend((int)replyTo, mode, -1, p, seed, v->msg, nullptr, (int)replyTo);
+  } else {
+    zSend((int)replyTo, mode, -1, p, seed, nullptr, nullptr, (int)replyTo);
+  }
+  return 0;
+}
+
+/* zPost(mode, startFuture): post a buffer for zRecv's NCPY slot; with a
+   future id >= 0, then start element 0 (post before the send) */
+static int64_t pingZPost(Obj *o, const CkDynMsgView *v) {
+  int64_t mode = cbI64(v, 0), fut = cbI64(v, 1);
+  zPostFor(myIndex(o));
+  if (fut >= 0) sendPing(0, P_ZSTART, MsgB().i64(mode).i64(myIndex(o)).fut(0, (uint32_t)fut).finish(0));
+  return 0;
+}
+
+/* zSpin(fut): post after the send within one process. Start element 0, spin
+   until it has issued the send (its message cannot be processed on this PE
+   meanwhile), post, return. */
+static int64_t pingZSpin(Obj *o, const CkDynMsgView *v) {
+  int64_t fut = cbI64(v, 0);
+  CHECK(CkMyPe() == CkNumPes() - 1 && CkMyPe() != 0, "zSpin on PE %d", CkMyPe());
+  g_zSpinB.store(0);
+  sendPing(0, P_ZSTART, MsgB().i64(2).i64(myIndex(o)).fut(0, (uint32_t)fut).finish(0));
+  while (g_zSpinB.load() == 0) {}
+  zPostFor(myIndex(o));
+  return 0;
+}
+
+static int64_t pingZAck(Obj *o, const CkDynMsgView *) { o->s.counter++; zMaybeReport(o); return 0; }
+
 CbClass Ping = { "Ping", CKDYN_ARRAY, 1, {
   { "Ping.Ping", 0, pingCtor },
   { "Ping.recv", 0, pingRecv },
@@ -272,6 +420,11 @@ CbClass Ping = { "Ping", CKDYN_ARRAY, 1, {
   { "Ping.coro", 0, pingCoro },
   { "Ping.syncStart", 0, pingSyncStart },
   { "Ping.resumed", 0, pingResumed },
+  { "Ping.zStart", 0, pingZStart },
+  { "Ping.zRecv", 0, pingZRecv },
+  { "Ping.zPost", 0, pingZPost },
+  { "Ping.zSpin", 0, pingZSpin },
+  { "Ping.zAck", 0, pingZAck },
 } };
 
 /* ---- section members (Sec array elements and Grp branches) --------------- */
@@ -606,7 +759,8 @@ class TestMain : public CBase_TestMain {
     "pingpong", "pingpong_inline", "bcast",
     "reductions/single", "reductions/single_any", "reductions/group_elem", "reductions/group_bcast",
     "reductions/array_elem", "reductions/array_bcast", "reductions/future", "reductions/foreign",
-    "future_return", "nodegroup", "qd", "priority", "coroutine", "hapi",
+    "future_return", "nodegroup", "qd", "priority", "coroutine",
+    "ncpy/nonpost", "ncpy/post_before", "ncpy/post_after", "ncpy/samepe", "hapi",
     "sections/array", "sections/group", "sections/remote", "sections/combine_overlap",
     "sections/combine_arrays", "sections/delete", "sections/migration",
     "migration", "checkpoint", "late", "exit" };
@@ -617,6 +771,7 @@ class TestMain : public CBase_TestMain {
   CkDynTarget single0, singleAny;
   bool staleSend = false;   /* -stalesend: the delete phase sends to the deleted section, which must abort */
   bool requireMoves = false; /* -requiremoves: a load balancer that moves elements is loaded (RotateLB) */
+  bool zcBcast = false;      /* -zcbcast: the ncpy/nonpost phase broadcasts an NCPY slot, which must abort */
 
   /* sections: the expected membership of each section the phases create */
   struct Sect {
@@ -646,6 +801,7 @@ public:
       else if (strcmp(m->argv[i], "-ckptdir") == 0 && i + 1 < m->argc) ckptDir = m->argv[++i];
       else if (strcmp(m->argv[i], "-stalesend") == 0) staleSend = true;
       else if (strcmp(m->argv[i], "-requiremoves") == 0) requireMoves = true;
+      else if (strcmp(m->argv[i], "-zcbcast") == 0) zcBcast = true;
     delete m;
     mainProxy = thisProxy;
     numElems = 2 * CkNumPes();
@@ -699,6 +855,7 @@ public:
     else if (s == "qd") runQD();
     else if (s == "priority") runPriority();
     else if (s == "coroutine") runCoroutine();
+    else if (s.compare(0, 5, "ncpy/") == 0) runNcpy(s);
     else if (s == "hapi") runHapi();
     else if (s.compare(0, 9, "sections/") == 0) runSections(s);
     else if (s == "migration") runMigration();
@@ -834,6 +991,38 @@ public:
       pass("coroutine");
     });
     bcastPing(P_CORO, MsgB().cb(cbFutureCb(0, f)).finish(0));
+  }
+
+  /* ncpy: 16 MB as an NCPY slot from element 0 to the last element (on the
+     last PE) and back, then the post path with the post made before and
+     after the send, then to element 1 (element 0's PE). See zStart. */
+  void runNcpy(const std::string &s) {
+    int last = numElems - 1;
+    std::string kind = s.substr(5);
+    uint32_t f = cbNewFuture([this, s](const CkDynMsgView *v) {
+      CHECK(cbI64(v, 0) == 1, "%s: the echo to element 0 landed in a posted buffer", s.c_str());
+      CkPrintf("  %s: 16 MB out and back, each done function called once (%.3f ms)\n", s.c_str(), cbF64(v, 1) * 1e3);
+      pass(s);
+    });
+    if (zcBcast) {
+      static double one[4] = { 1, 2, 3, 4 };
+      CkDynBufDesc d = { one, sizeof one, CKDYN_ELEM_F64, 0, 0, 0, nullptr, nullptr };
+      MsgB b;
+      b.i64(0).i64(-1);
+      CkDynMsgAddNcpy(b.b, &d, nullptr, nullptr);
+      CkPrintf("  broadcasting an NCPY slot; CkDyn must abort\n");
+      bcastPing(P_ZRECV, b.i64(0).finish(0));
+      CHECK(false, "a broadcast with an NCPY slot did not abort");
+    }
+    if (kind == "nonpost") sendPing(0, P_ZSTART, MsgB().i64(0).i64(last).fut(0, f).finish(0));
+    else if (kind == "post_before") sendPing(last, P_ZPOST, MsgB().i64(1).i64(f).finish(0));
+    else if (kind == "post_after") {
+      /* one PE, or the last PE in another process: zStart orders the post itself */
+      if (CkNumPes() == 1 || CkNodeOf(CkNumPes() - 1) != CkMyNode())
+        sendPing(0, P_ZSTART, MsgB().i64(2).i64(last).fut(0, f).finish(0));
+      else
+        sendPing(last, P_ZSPIN, MsgB().i64(f).finish(0));
+    } else sendPing(0, P_ZSTART, MsgB().i64(0).i64(1).fut(0, f).finish(0));
   }
 
   /* hapi: a host-device-host copy on a stream; CkDynHapiAddCallback sends to
