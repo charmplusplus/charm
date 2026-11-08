@@ -425,7 +425,13 @@ default (CMakeLists.txt:184). `checkedRefnum` aborts when a future id does not
 fit ("future id %u does not fit in this build's %d-byte reference number");
 the design asks for a 32-bit build option. `CkDynRefnumBytes()` reports the
 width so that the binding can check it.
-Future id 0 cannot travel this way, because 0 means "no reference number".
+Future id 0 cannot travel this way, because 0 means "no reference number",
+and neither can the all-ones value: a reduction result carries the reduction's
+user flag as its reference number, -1 by default (ckreduction.C sets it before
+the callback's own reference number, if any, replaces it), so `refOf` reads
+all-ones as none and `checkedRefnum` rejects both values. `CkDynMsgFinish`
+clears the reference number of a new message, which allocation leaves
+uninitialized.
 
 **`CkDynMgr`** is a group with one branch per PE, declared in `CkDyn.ci`,
 created by `CkDynCreateManagers`. `CkDynFutureSet(pe, id, msg)` sets the

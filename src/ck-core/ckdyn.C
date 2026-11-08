@@ -459,6 +459,7 @@ extern "C" CkDynMsg *CkDynMsgFinish(CkDynMsgBuilder *b, int ep) {
     m = new (total, b->prio_bits) CkDynMsg;
   }
   setMemoryTypeMessage(UsrToEnv(m));
+  UsrToEnv(m)->setRef(0);   /* the envelope's ref is not initialized by allocation */
   writePayload(b, m->buf, ep);
   releaseBuilder(b);
   return m;
@@ -490,12 +491,22 @@ static void viewPayload(CkDynMsgView &v, const char *buf, void *msg, CkDynMsgKin
   v.data = buf + sizeof(CkDynHdr) + h->nslots * sizeof(CkDynSlot);
   v.tail_len = h->tail_len;
   v.tail = h->tail_len ? v.data + h->data_len : nullptr;
-  v.refnum = msg ? (uint32_t)UsrToEnv(msg)->getRef() : 0;
+  v.refnum = msg ? refOf(msg) : 0;
   v.section = nullptr;
   v.msg = msg;
 }
 
 static uint8_t elemOfReducer(int type);
+
+/* The envelope's reference number as a future id: 0 when none. A reduction
+ * result carries the reduction's user flag, -1 by default (ckreduction.C
+ * CkSetRefNum(result, getUserFlag())), unless the callback set one; that
+ * all-ones value means none here, so a future id must stay below it. */
+static uint32_t refOf(void *msg) {
+  CMK_REFNUM_TYPE r = UsrToEnv(msg)->getRef();
+  if (r == (CMK_REFNUM_TYPE)~(CMK_REFNUM_TYPE)0) return 0;
+  return (uint32_t)r;
+}
 
 /* A reduction result: one BUFFER slot over the reduction data, plus a FUTURE
  * slot when the envelope carries a reference number. tmp must hold 2 slots. */
@@ -510,7 +521,7 @@ static void viewReduction(CkDynMsgView &v, CkDynSlot *tmp, CkReductionMsg *rm) {
   tmp[0].len = rm->getSize();
   tmp[0].v.off = 0;
   int n = 1;
-  uint32_t ref = (uint32_t)UsrToEnv(rm)->getRef();
+  uint32_t ref = refOf(rm);
   if (ref) { tmp[1].type = CKDYN_SLOT_FUTURE; tmp[1].v.u64 = ((uint64_t)(uint32_t)CkMyPe() << 32) | ref; n = 2; }
   v.kind = CKDYN_MSGKIND_REDRESULT;
   v.hdr = nullptr;
@@ -524,7 +535,7 @@ static void viewReduction(CkDynMsgView &v, CkDynSlot *tmp, CkReductionMsg *rm) {
 
 static void viewSys(CkDynMsgView &v, CkDynSlot *tmp, void *msg) {
   memset(tmp, 0, sizeof(CkDynSlot));
-  uint32_t ref = (uint32_t)UsrToEnv(msg)->getRef();
+  uint32_t ref = refOf(msg);
   int n = 0;
   if (ref) { tmp[0].type = CKDYN_SLOT_FUTURE; tmp[0].v.u64 = ((uint64_t)(uint32_t)CkMyPe() << 32) | ref; n = 1; }
   v.kind = CKDYN_MSGKIND_SYS;
@@ -1119,8 +1130,8 @@ extern "C" void CkDynArrayDestroyElement(int aid, int ndims, const int *index) {
    with the default 16-bit CMK_REFNUM_TYPE cannot carry ids above 65535
    (DESIGN.md 3.7: build with --with-refnum-type="unsigned int"). */
 static CMK_REFNUM_TYPE checkedRefnum(uint32_t id) {
-  if (id > (uint32_t)(CMK_REFNUM_TYPE)~(CMK_REFNUM_TYPE)0)
-    CkAbort("CkDyn: future id %u does not fit in this build's %d-byte reference number", id, (int)sizeof(CMK_REFNUM_TYPE));
+  if (id == 0 || id >= (uint32_t)(CMK_REFNUM_TYPE)~(CMK_REFNUM_TYPE)0)
+    CkAbort("CkDyn: future id %u is not usable as this build's %d-byte reference number (0 and the all-ones value are reserved)", id, (int)sizeof(CMK_REFNUM_TYPE));
   return (CMK_REFNUM_TYPE)id;
 }
 
@@ -1194,7 +1205,7 @@ void CkDynMgr::deposit(CkDynMsg *m) {
   CkDynMsgView v;
   CkDynSlot tmp[2];
   viewAny(v, tmp, m);
-  uint32_t id = (uint32_t)UsrToEnv(m)->getRef();
+  uint32_t id = refOf(m);
   if (g_hooks.future == nullptr) CkAbort("CkDyn: a future value arrived but the binding has no future hook");
   g_hooks.future(g_hooks.global, CkMyPe(), id, &v);
   CkFreeMsg(m);
@@ -1401,9 +1412,10 @@ extern "C" int    CkDynGetPesOnPhysicalNode(int node, int *pes, int max) {
 }
 extern "C" int CkDynTopoTreeEdges(int pe, int root, const int *pes, int npes, int bfactor,
                                   int *parent, int *children, int max) {
-  std::vector<int> tmp(pes, pes + npes);
+  std::vector<int> tmp;
+  if (pes) tmp.assign(pes, pes + npes);
   int count = 0, *kids = nullptr;
-  getPETopoTreeEdges(pe, root, tmp.data(), npes, (unsigned)bfactor, parent, &count, &kids);
+  getPETopoTreeEdges(pe, root, pes ? tmp.data() : nullptr, pes ? npes : 0, (unsigned)bfactor, parent, &count, &kids);
   for (int i = 0; i < count && i < max; i++) children[i] = kids[i];
   if (kids) free(kids);   /* spanningTree.C allocates the list with malloc */
   return count;

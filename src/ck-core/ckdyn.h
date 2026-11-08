@@ -278,8 +278,9 @@ typedef struct CkDynMsgView {
   const char           *data;       /* data region */
   const char           *tail;       /* tail_len bytes, or NULL */
   uint32_t              tail_len;
-  uint32_t              refnum;     /* the envelope's reference number (0 if none); for a REDRESULT or SYS
-                                       view a FUTURE slot (CkMyPe(), refnum) is synthesized too; a foreign
+  uint32_t              refnum;     /* the envelope's reference number (0 if none; the all-ones value, the
+                                       default reduction user flag, also reads as none); for a REDRESULT or
+                                       SYS view a FUTURE slot (CkMyPe(), refnum) is synthesized too; a foreign
                                        reduction result is viewed as DYN and carries it only here */
   const CkDynSectionID *section;    /* non-NULL for an MCAST delivery */
   void                 *msg;        /* the runtime message, for retain */
@@ -438,7 +439,8 @@ void CkDynArrayDestroyElement(int aid, int ndims, const int *index);            
 /* ------------------------------------------------------------------------ */
 
 /* Deliver a value to a binding future: a CkDynMsg sent to CkDynMgr[pe], which
- * calls hooks.future(global, pe, id, view). */
+ * calls hooks.future(global, pe, id, view). Future ids are 1 .. 2^(8*CkDynRefnumBytes())-2:
+ * 0 means no reference number and the all-ones value is the reduction user flag. */
 void CkDynFutureSet(int pe, uint32_t id, CkDynMsg *value);
 /* Send a message through a callback description. */
 void CkDynCallbackSend(const CkDynCallback *cb, CkDynMsg *m);
