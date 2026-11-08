@@ -481,6 +481,8 @@ static inline void stampEp(CkDynMsg *m, int ep) { ((CkDynHdr *)m->buf)->ep = (ui
 /* Views                                                                   */
 /* ====================================================================== */
 
+static uint32_t refOf(void *msg);
+
 static void viewPayload(CkDynMsgView &v, const char *buf, void *msg, CkDynMsgKind kind) {
   const CkDynHdr *h = (const CkDynHdr *)buf;
   if (h->magic_version != CKDYN_MAGIC) CkAbort("CkDyn: message without a CkDyn header (magic 0x%x)", h->magic_version);
