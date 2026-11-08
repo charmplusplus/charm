@@ -11,6 +11,9 @@
  */
 #include "ckdyntest.decl.h"
 #include "cbinding.h"
+#if CMK_CUDA || CMK_HIP
+#include "hapi.h"
+#endif
 #include <cmath>
 #include <cstring>
 #include <deque>
@@ -603,7 +606,7 @@ class TestMain : public CBase_TestMain {
     "pingpong", "pingpong_inline", "bcast",
     "reductions/single", "reductions/single_any", "reductions/group_elem", "reductions/group_bcast",
     "reductions/array_elem", "reductions/array_bcast", "reductions/future", "reductions/foreign",
-    "future_return", "nodegroup", "qd", "priority", "coroutine",
+    "future_return", "nodegroup", "qd", "priority", "coroutine", "hapi",
     "sections/array", "sections/group", "sections/remote", "sections/combine_overlap",
     "sections/combine_arrays", "sections/delete", "sections/migration",
     "migration", "checkpoint", "late", "exit" };
@@ -696,6 +699,7 @@ public:
     else if (s == "qd") runQD();
     else if (s == "priority") runPriority();
     else if (s == "coroutine") runCoroutine();
+    else if (s == "hapi") runHapi();
     else if (s.compare(0, 9, "sections/") == 0) runSections(s);
     else if (s == "migration") runMigration();
     else if (s == "checkpoint") runCheckpoint();
@@ -830,6 +834,36 @@ public:
       pass("coroutine");
     });
     bcastPing(P_CORO, MsgB().cb(cbFutureCb(0, f)).finish(0));
+  }
+
+  /* hapi: a host-device-host copy on a stream; CkDynHapiAddCallback sends to
+     a future when the stream reaches the call, and the copy must be complete. */
+  void runHapi() {
+#if CMK_CUDA || CMK_HIP
+    const size_t n = 1 << 20;
+    double *h = new double[n], *back = new double[n];
+    for (size_t i = 0; i < n; i++) { h[i] = 0.5 * (double)i; back[i] = -1; }
+    void *d = nullptr;
+    hapiStream_t st;
+    hapiCheck(hapiMalloc(&d, n * sizeof(double)));
+    hapiCheck(hapiStreamCreate(&st));
+    hapiCheck(hapiMemcpyAsync(d, h, n * sizeof(double), hapiMemcpyHostToDevice, st));
+    hapiCheck(hapiMemcpyAsync(back, d, n * sizeof(double), hapiMemcpyDeviceToHost, st));
+    uint32_t f = cbNewFuture([this, h, back, d, st, n](const CkDynMsgView *v) {
+      for (size_t i = 0; i < n; i++)
+        CHECK(back[i] == h[i], "hapi: element %zu is %g after the stream callback, expected %g", i, back[i], h[i]);
+      delete[] h; delete[] back;
+      hapiCheck(hapiFree(d));
+      hapiCheck(hapiStreamDestroy(st));
+      CkPrintf("  hapi: %zu doubles copied host-device-host, complete when the callback ran\n", n);
+      pass("hapi");
+    });
+    CkDynCallback cb = cbFutureCb(0, f);
+    CkDynHapiAddCallback((uint64_t)(uintptr_t)st, &cb);
+#else
+    CkPrintf("SKIP hapi (no CUDA or HIP in this build)\n");
+    next();
+#endif
   }
 
   void runCheckpoint() {

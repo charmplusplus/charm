@@ -14,6 +14,9 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#if CMK_CUDA || CMK_HIP
+#include "hapi.h"
+#endif
 
 CkpvExtern(int, _currentChareType);
 CkpvExtern(std::vector<void *>, chare_objs);
@@ -2022,11 +2025,34 @@ extern "C" void CkDynPostBuffer(const CkDynTarget *, int, int, const CkDynBufDes
 extern "C" void CkDynPostDeviceBuffer(const CkDynTarget *, int, int, const CkDynDevDesc *) {
   CkAbort("CkDyn: device posts are not implemented yet (step 3)");
 }
-extern "C" void CkDynHapiAddCallback(uint64_t, const CkDynCallback *) {
-  CkAbort("CkDyn: HAPI callbacks are not implemented yet (step 3)");
+/* The stream's completion arrives at CkDynMgr::hapiDone on this PE with a
+   message holding cb; hapiAddCallback keeps quiescence from being detected
+   until then. */
+extern "C" void CkDynHapiAddCallback(uint64_t stream, const CkDynCallback *cb) {
+#if CMK_CUDA || CMK_HIP
+  CkDynMsgBuilder *b = CkDynMsgBegin(1, sizeof *cb, 0, 0, -1);
+  CkDynMsgAddCallback(b, cb);
+  CkDynMsg *m = CkDynMsgFinish(b, 0);
+  CkCallback c(CkIndex_CkDynMgr::hapiDone(0), CkMyPe(), _ckdynMgrGID);
+  hapiAddCallback((hapiStream_t)(uintptr_t)stream, c, m);
+#else
+  (void)stream; (void)cb;
+  CkAbort("CkDyn: CkDynHapiAddCallback needs a CUDA or HIP build of Charm++");
+#endif
 }
+
+void CkDynMgr::hapiDone(CkDynMsg *m) {
+  CkDynMsgView v;
+  CkDynSlot tmp[2];
+  viewAny(v, tmp, m);
+  CkDynCallback cb;
+  CkDynViewCallback(&v, 0, &cb);
+  CkFreeMsg(m);
+  CkDynCallbackSend(&cb, emptyMsg());
+}
+
 extern "C" int CkDynHasDeviceSupport(void) {
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
   return 1;
 #else
   return 0;

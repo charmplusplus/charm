@@ -178,6 +178,7 @@ public:
   /* entries */
   void deposit(CkDynMsg *m);      /* future value: hooks.future */
   void relay(CkDynMsg *m);        /* a section callback: forward the result to the section */
+  void hapiDone(CkDynMsg *m);     /* a stream reached a CkDynHapiAddCallback: send to its callback */
   void sectionSend(CkDynMcastMsg *m);   /* a section send from another PE */
   void sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe);
   void sectionParts(int combIdx, int combGen, int partNo, int kind, int ndims,
