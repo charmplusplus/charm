@@ -19,6 +19,18 @@ all-test-benchmarks: LIBS
 # Remove the silent flag from MAKEFLAGS
 	MAKEFLAGS=$${MAKEFLAGS#$(SILENT)} $(MAKE) -C ../benchmarks all
 
+# The mini-applications are the git submodule miniapps/, which a plain clone
+# does not fetch. They are not part of all-test or test.
+MINIAPPS_CHECK = @test -f ../miniapps/Makefile || { echo "miniapps/ is not checked out: run 'git submodule update --init miniapps' in the charm source tree, then make in the build directory"; exit 1; }
+
+all-test-miniapps: LIBS
+	$(MINIAPPS_CHECK)
+	MAKEFLAGS=$${MAKEFLAGS#$(SILENT)} $(MAKE) -C ../miniapps all
+
+test-miniapps: LIBS
+	$(MINIAPPS_CHECK)
+	$(MAKE) -C ../miniapps test
+
 all-zc: charm++
 	$(MAKE) -C ../tests/charm++/zerocopy all
 	$(MAKE) -C ../examples/charm++/zerocopy all

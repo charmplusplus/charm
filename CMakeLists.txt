@@ -1225,6 +1225,8 @@ add_custom_target(create_symlinks ALL
                   COMMAND test -d ${CMAKE_BINARY_DIR}/benchmarks || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/benchmarks ${CMAKE_BINARY_DIR}/benchmarks && true
                   COMMAND test -d ${CMAKE_BINARY_DIR}/examples || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/examples ${CMAKE_BINARY_DIR}/examples && true
                   COMMAND test -d ${CMAKE_BINARY_DIR}/tests || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/tests && true
+                  # miniapps/ is a submodule a plain clone leaves empty: mirror it on the first make after it is checked out.
+                  COMMAND test -f ${CMAKE_BINARY_DIR}/miniapps/Makefile || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/miniapps ${CMAKE_BINARY_DIR}/miniapps && true
                   VERBATIM
                  )
 
