@@ -14,6 +14,8 @@
 #include <set>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <mutex>
 #if CMK_CUDA || CMK_HIP
 #include "hapi.h"
 #endif
@@ -22,6 +24,7 @@ CkpvExtern(int, _currentChareType);
 CkpvExtern(std::vector<void *>, chare_objs);
 
 /* readonly */ CkGroupID _ckdynMgrGID;
+/* readonly */ extern CProxy_ckcallback_group _ckcallbackgroup;
 /* readonly */ CkGroupID _ckdynMcastGID;
 
 /* the CkDyn entries that deliver a section's creation multicast (registered by _ckdynInitNode) */
@@ -336,8 +339,19 @@ struct Piece {
   uint64_t inlOff;     /* offset into inl when src is NULL */
 };
 
+/* A zero-copy slot (NCPY or DEVICE) waiting for Finish. */
+struct ZcRec {
+  const void *ptr;
+  uint64_t len;
+  CkDynBufDone done;
+  void *arg;
+  uint64_t stream;     /* DEVICE: the stream the data is valid on */
+};
+
 struct CkDynMsgBuilder {
   std::vector<CkDynSlot> slots;
+  std::vector<ZcRec> zc;       /* in descriptor order; slot.reserved2 is the index */
+  bool zcDevice = false;
   std::vector<Piece> pieces;
   std::vector<char> inl;
   std::vector<char> tail;
@@ -348,7 +362,7 @@ struct CkDynMsgBuilder {
   int group_dep = -1;
   bool inUse = false;
   void reset(int nslots_hint, size_t data_hint, size_t tail_hint) {
-    slots.clear(); pieces.clear(); inl.clear(); tail.clear(); dataLen = 0;
+    slots.clear(); zc.clear(); zcDevice = false; pieces.clear(); inl.clear(); tail.clear(); dataLen = 0;
     slots.reserve(nslots_hint); inl.reserve(data_hint); tail.reserve(tail_hint);
     flags = 0; user_id = 0; prio_bits = 0; group_dep = -1; inUse = true;
   }
@@ -400,7 +414,13 @@ extern "C" CkDynMsgBuilder *CkDynMsgBegin(int nslots_hint, size_t data_hint, siz
   return b;
 }
 
+static void zcScheduleDone(CkDynBufDone done, void *arg);
+
+/* Abandon (or Finish after it moved the zero-copy records into the message):
+   the done functions of records still here run from the scheduler. */
 static void releaseBuilder(CkDynMsgBuilder *b) {
+  for (const ZcRec &z : b->zc) zcScheduleDone(z.done, z.arg);
+  b->zc.clear();
   b->inUse = false;
   if (b != CkpvAccess(_ckdynBuilder)) delete b;
 }
@@ -459,6 +479,47 @@ extern "C" void CkDynMsgAddBuffer(CkDynMsgBuilder *b, const CkDynBufDesc *d) {
   s.len = (uint32_t)d->len; s.v.off = off;
 }
 
+/* The largest descriptor count: the prefix's first int must not read as the
+   CkDyn magic (doc/internals/ckdyn.md, "Zero-copy"). */
+static const size_t CKDYN_MAX_NBUF = 4096;
+
+static CkDynSlot &zcSlot(CkDynMsgBuilder *b, uint8_t type, const ZcRec &z, uint8_t elem, uint8_t ndim,
+                         const int64_t *shape, uint16_t tag) {
+  if (b->zc.size() >= CKDYN_MAX_NBUF) CkAbort("CkDyn: more than %zu zero-copy slots in one message", CKDYN_MAX_NBUF);
+  if (ndim > CKDYN_MAX_BUF_DIMS) CkAbort("CkDyn: buffer with %d dimensions", (int)ndim);
+  checkLen(z.len);
+  /* DEVICE: the stream, then the shape; NCPY: the shape. v.off is the shape's offset. */
+  if (type == CKDYN_SLOT_DEVICE) appendData(b, &z.stream, sizeof z.stream);
+  uint64_t off = ndim ? appendData(b, shape, 8 * ndim) : align8(b->dataLen);
+  if (!ndim) b->dataLen = off;
+  CkDynSlot &s = newSlot(b, type);
+  s.elem = elem; s.ndim = ndim; s.tag = tag;
+  s.len = (uint32_t)z.len; s.v.off = off;
+  s.reserved2 = (uint32_t)b->zc.size();
+  b->zc.push_back(z);
+  return s;
+}
+
+extern "C" void CkDynMsgAddNcpy(CkDynMsgBuilder *b, const CkDynBufDesc *d, CkDynBufDone done, void *arg) {
+  if (b->zcDevice) CkAbort("CkDyn: one message cannot carry both NCPY and DEVICE slots");
+  if (d->ndim <= CKDYN_MAX_BUF_DIMS && !contiguous(d, elemSize(d->elem)))
+    CkAbort("CkDyn: non-contiguous buffer passed to CkDynMsgAddNcpy");
+  ZcRec z = { d->ptr, d->len, done, arg, 0 };
+  zcSlot(b, CKDYN_SLOT_NCPY, z, d->elem, d->ndim, d->shape, d->tag).bflags = d->bflags;
+}
+
+extern "C" void CkDynMsgAddDevice(CkDynMsgBuilder *b, const CkDynDevDesc *d, CkDynBufDone done, void *arg) {
+#if CMK_CUDA || CMK_HIP
+  if (!b->zc.empty() && !b->zcDevice) CkAbort("CkDyn: one message cannot carry both NCPY and DEVICE slots");
+  b->zcDevice = true;
+  ZcRec z = { d->ptr, d->len, done, arg, d->stream };
+  zcSlot(b, CKDYN_SLOT_DEVICE, z, d->elem, d->ndim, d->shape, d->tag).reserved = (uint16_t)d->device;
+#else
+  (void)b; (void)d; (void)done; (void)arg;
+  CkAbort("CkDyn: device slots need a CUDA or HIP build of Charm++");
+#endif
+}
+
 extern "C" void CkDynMsgAddFuture(CkDynMsgBuilder *b, int pe, uint32_t id) {
   CkDynSlot &s = newSlot(b, CKDYN_SLOT_FUTURE);
   s.v.u64 = ((uint64_t)(uint32_t)pe << 32) | id;
@@ -504,6 +565,7 @@ static void writePayload(const CkDynMsgBuilder *b, char *buf, int ep) {
   h->user_id = b->user_id;
   h->tail_len = (uint32_t)b->tail.size();
   h->data_len = (uint32_t)align8(b->dataLen);
+  h->nbuf = (uint32_t)b->zc.size();
   char *p = buf + sizeof(CkDynHdr);
   if (!b->slots.empty()) memcpy(p, b->slots.data(), b->slots.size() * sizeof(CkDynSlot));
   p += b->slots.size() * sizeof(CkDynSlot);
@@ -519,8 +581,12 @@ static void writePayload(const CkDynMsgBuilder *b, char *buf, int ep) {
   if (!b->tail.empty()) memcpy(p, b->tail.data(), b->tail.size());
 }
 
+static size_t zcBuildPrefix(CkDynMsgBuilder *b, std::vector<char> &out);
+
 extern "C" CkDynMsg *CkDynMsgFinish(CkDynMsgBuilder *b, int ep) {
-  size_t psize = payloadSize(b);
+  std::vector<char> prefix;
+  size_t pre = b->zc.empty() ? 0 : zcBuildPrefix(b, prefix);
+  size_t psize = pre + payloadSize(b);
   if (psize > 0x7fffffffu) CkAbort("CkDyn: message payload of %zu bytes exceeds the 2 GB message limit", psize);
   if (b->slots.size() > 0xffff) CkAbort("CkDyn: %zu slots exceed the 65535 slot limit", b->slots.size());
   int total = (int)psize;
@@ -533,7 +599,12 @@ extern "C" CkDynMsg *CkDynMsgFinish(CkDynMsgBuilder *b, int ep) {
   }
   setMemoryTypeMessage(UsrToEnv(m));
   UsrToEnv(m)->setRef(0);   /* the envelope's ref is not initialized by allocation */
-  writePayload(b, m->buf, ep);
+  if (pre) {
+    memcpy(m->buf, prefix.data(), pre);
+    CMI_ZC_MSGTYPE((char *)UsrToEnv(m)) = b->zcDevice ? CMK_ZC_DEVICE_MSG : CMK_ZC_P2P_SEND_MSG;
+  }
+  writePayload(b, m->buf + pre, ep);
+  b->zc.clear();   /* the done functions now travel in the descriptors */
   releaseBuilder(b);
   return m;
 }
@@ -550,6 +621,11 @@ static CkDynMcastMsg *newMcastMsg(size_t psize, int prio_bits) {
 
 extern "C" CkDynMcastMsg *CkDynMsgFinishMcast(CkDynMsgBuilder *b, int ep) {
   if (b->group_dep >= 0) CkAbort("CkDyn: a section message cannot carry a group dependency");
+  if (!b->zc.empty()) {
+    for (size_t i = 0; i < b->slots.size(); i++)
+      if (b->slots[i].type == CKDYN_SLOT_NCPY || b->slots[i].type == CKDYN_SLOT_DEVICE)
+        CkAbort("CkDyn: slot %zu is a zero-copy slot; a section message cannot carry one (send it as a BUFFER)", i);
+  }
   if (b->slots.size() > 0xffff) CkAbort("CkDyn: %zu slots exceed the 65535 slot limit", b->slots.size());
   CkDynMcastMsg *m = newMcastMsg(payloadSize(b), b->prio_bits);
   writePayload(b, m->buf, ep);
@@ -560,14 +636,20 @@ extern "C" CkDynMcastMsg *CkDynMsgFinishMcast(CkDynMsgBuilder *b, int ep) {
 extern "C" void CkDynMsgAbandon(CkDynMsgBuilder *b) { releaseBuilder(b); }
 extern "C" void *CkDynMsgPriorityPtr(CkDynMsg *m) { return CkPriorityPtr(m); }
 extern "C" void CkDynMsgSetQueueing(CkDynMsg *m, int queueing) { CkSetQueueing(m, queueing); }
-extern "C" void CkDynMsgFree(CkDynMsg *m) { CkFreeMsg(m); }
+static void zcFreeUnsent(CkDynMsg *m);
+static char *dynPayload(CkDynMsg *m);
+static inline CkDynHdr *dynHdr(CkDynMsg *m) { return (CkDynHdr *)dynPayload(m); }
+static void zcRefuse(CkDynMsg *m, const char *what);
+
+extern "C" void CkDynMsgFree(CkDynMsg *m) { zcFreeUnsent(m); CkFreeMsg(m); }
 extern "C" const void *CkDynMsgPayload(CkDynMsg *m, uint32_t *len) {
+  zcRefuse(m, "a reduction contribution");
   const CkDynHdr *h = (const CkDynHdr *)m->buf;
   *len = (uint32_t)(sizeof(CkDynHdr) + h->nslots * sizeof(CkDynSlot) + h->data_len + h->tail_len);
   return m->buf;
 }
 
-static inline void stampEp(CkDynMsg *m, int ep) { ((CkDynHdr *)m->buf)->ep = (uint16_t)ep; }
+static inline void stampEp(CkDynMsg *m, int ep) { dynHdr(m)->ep = (uint16_t)ep; }
 
 /* ====================================================================== */
 /* Views                                                                   */
@@ -646,7 +728,7 @@ static int viewAny(CkDynMsgView &v, CkDynSlot *tmp, void *msg) {
   envelope *env = UsrToEnv(msg);
   int mi = env->getMsgIdx();
   if (mi == CkDynMsg::__idx) {
-    viewPayload(v, ((CkDynMsg *)msg)->buf, msg, CKDYN_MSGKIND_DYN);
+    viewPayload(v, dynPayload((CkDynMsg *)msg), msg, CKDYN_MSGKIND_DYN);
     return v.hdr->ep;
   }
   if (mi == CkDynMcastMsg::__idx) {
@@ -664,7 +746,7 @@ static int viewAny(CkDynMsgView &v, CkDynSlot *tmp, void *msg) {
 static int epOf(void *msg) {
   envelope *env = UsrToEnv(msg);
   int mi = env->getMsgIdx();
-  if (mi == CkDynMsg::__idx) return ((const CkDynHdr *)((CkDynMsg *)msg)->buf)->ep;
+  if (mi == CkDynMsg::__idx) return dynHdr((CkDynMsg *)msg)->ep;
   if (mi == CkDynMcastMsg::__idx) return ((const CkDynHdr *)((CkDynMcastMsg *)msg)->buf)->ep;
   return CkMessageToEpIdx(msg);
 }
@@ -674,8 +756,14 @@ static inline const CkDynSlot *slotAt(const CkDynMsgView *v, int i) {
   return &v->slots[i];
 }
 
+static const void *zcViewPtr(const CkDynMsgView *v, const CkDynSlot *s);
+
 extern "C" const void *CkDynViewBufferPtr(const CkDynMsgView *v, int slot, const int64_t **shape_out) {
   const CkDynSlot *s = slotAt(v, slot);
+  if (s->type == CKDYN_SLOT_NCPY || s->type == CKDYN_SLOT_DEVICE) {
+    if (shape_out) *shape_out = s->ndim ? (const int64_t *)(v->data + s->v.off) : nullptr;
+    return zcViewPtr(v, s);
+  }
   if (s->type != CKDYN_SLOT_BUFFER) CkAbort("CkDyn: slot %d is not a BUFFER", slot);
   const char *p = v->data + s->v.off;
   if (shape_out) *shape_out = s->ndim ? (const int64_t *)p : nullptr;
@@ -707,7 +795,8 @@ extern "C" void CkDynViewProxy(const CkDynMsgView *v, int slot, CkDynTarget *out
 }
 
 extern "C" void CkDynMsgRetain(const CkDynMsgView *v) { CmiReference(UsrToEnv(v->msg)); }
-extern "C" void CkDynMsgRelease(void *msg) { CmiFree(UsrToEnv(msg)); }
+static void zcBeforeRelease(void *msg);
+extern "C" void CkDynMsgRelease(void *msg) { zcBeforeRelease(msg); CmiFree(UsrToEnv(msg)); }
 
 /* The first FUTURE slot of a view, or false. */
 static bool findFuture(const CkDynMsgView &v, int *pe, uint32_t *id) {
@@ -737,6 +826,9 @@ static void noteSectionDelivery(CkDynObj &d, CkDynMcastMsg *m, CkDynMsgView &v) 
   v.section = &m->sid;
 }
 
+static bool zcArrive(CkDynMsg *m, CkDynObj *d, int ep);
+static void zcAfterDelivery(void *msg);
+
 static void dispatch(CkDynObj &d, void *msg) {
   ClassRec *c = classOf(d.chareIdx);
   CkDynMsgView v;
@@ -755,6 +847,9 @@ static void dispatch(CkDynObj &d, void *msg) {
     }
     noteSectionDelivery(d, (CkDynMcastMsg *)msg, v);
   }
+  const bool zc = v.kind == CKDYN_MSGKIND_DYN && v.hdr->nbuf != 0;
+  /* a device message's first delivery issues its transfers; it arrives again when they complete */
+  if (zc && zcArrive((CkDynMsg *)msg, &d, ep)) return;
   if (d.handle == nullptr) {
     /* a branch outside a constrained group: broadcasts and callback results
        reach every branch and are dropped here; a point-to-point send is an error */
@@ -762,6 +857,7 @@ static void dispatch(CkDynObj &d, void *msg) {
     bindingError(c->hooks, "entry method invoked on a branch that was not constructed (outside a constrained group?)");
   }
   c->hooks->deliver(c->desc.binding_data, d.handle, ep, r.user_id, r.flags, &v);
+  if (zc) zcAfterDelivery(msg);
 }
 
 void CkDynDeliverBroadcast(void *bcastMsg, ArrayElemDyn **elems, int n) {
@@ -855,7 +951,7 @@ ChareDyn::ChareDyn(CkDynMsg *m) {
   /* _currentChareType is set only for main chares (init.C); a singleton's class
      comes from the constructor entry stamped in the message header */
   CkDynMsgView v;
-  viewPayload(v, m->buf, m, CKDYN_MSGKIND_DYN);
+  viewPayload(v, dynPayload(m), m, CKDYN_MSGKIND_DYN);
   ClassRec *c = epRec(v.hdr->ep).cls;
   d.chareIdx = c->chareIdx;
   CkDynTarget t;
@@ -953,7 +1049,7 @@ void MainchareDyn::pup(PUP::er &p) {
    only for main chares. */
 GroupDyn::GroupDyn(CkDynMsg *m) {
   CkDynMsgView v;
-  viewPayload(v, m->buf, m, CKDYN_MSGKIND_DYN);
+  viewPayload(v, dynPayload(m), m, CKDYN_MSGKIND_DYN);
   ClassRec *c = epRec(v.hdr->ep).cls;
   d.chareIdx = c->chareIdx;
   bool member = true;
@@ -999,7 +1095,7 @@ void GroupDyn::pup(PUP::er &p) {
 
 NodeGroupDyn::NodeGroupDyn(CkDynMsg *m) {
   CkDynMsgView v;
-  viewPayload(v, m->buf, m, CKDYN_MSGKIND_DYN);
+  viewPayload(v, dynPayload(m), m, CKDYN_MSGKIND_DYN);
   ClassRec *c = epRec(v.hdr->ep).cls;
   d.chareIdx = c->chareIdx;
   CkDynTarget t;
@@ -1061,7 +1157,7 @@ static void noteDims(int chareIdx, int nd) {
 
 ArrayElemDyn::ArrayElemDyn(CkDynMsg *m) {
   CkDynMsgView v;
-  viewPayload(v, m->buf, m, CKDYN_MSGKIND_DYN);
+  viewPayload(v, dynPayload(m), m, CKDYN_MSGKIND_DYN);
   ClassRec *c = epRec(v.hdr->ep).cls;
   d.chareIdx = c->chareIdx;
   usesAtSync = (v.hdr->flags & CKDYN_MSG_USESATSYNC) != 0;
@@ -1103,7 +1199,7 @@ void ArrayElemDyn::pup(PUP::er &p) {
 
 ArrayMapDyn::ArrayMapDyn(CkDynMsg *m) {
   CkDynMsgView v;
-  viewPayload(v, m->buf, m, CKDYN_MSGKIND_DYN);
+  viewPayload(v, dynPayload(m), m, CKDYN_MSGKIND_DYN);
   ClassRec *c = epRec(v.hdr->ep).cls;
   d.chareIdx = c->chareIdx;
   CkDynTarget t;
@@ -1139,6 +1235,11 @@ int ArrayMapDyn::procNum(int arrayHdl, const CkArrayIndex &idx) {
 /* Sends                                                                   */
 /* ====================================================================== */
 
+/* Zero-copy messages before a point-to-point send (defined with the zero-copy code). */
+enum { ZC_NONE = 0, ZC_HOST = 1, ZC_DEVICE = 2 };
+static int zcKind(CkDynMsg *m);
+static void zcBeforeSend(CkDynMsg *m, int destPe, int *flags);
+
 static int sendFlags(int ep, const CkDynSendOpts *o) {
   const EpRec &r = epRec(ep);
   int f = 0;
@@ -1158,6 +1259,7 @@ extern "C" void CkDynSendChare(const CkDynTarget *t, int ep, CkDynMsg *m, const 
   int f = sendFlags(ep, o);
   stampEp(m, ep);
   CkChareID cid; cid.onPE = t->u.chare.pe; cid.objPtr = t->u.chare.ptr;
+  if (zcKind(m)) zcBeforeSend(m, t->u.chare.pe, &f);
   if (f & CK_MSG_INLINE) CkSendMsgInline(ep, m, &cid, f);
   else CkSendMsg(ep, m, &cid, f);
 }
@@ -1165,7 +1267,9 @@ extern "C" void CkDynSendChare(const CkDynTarget *t, int ep, CkDynMsg *m, const 
 extern "C" void CkDynSendGroup(int gid, int pe, int ep, CkDynMsg *m, const CkDynSendOpts *o) {
   int f = sendFlags(ep, o);
   stampEp(m, ep);
-  if (pe < 0) { ((CkDynHdr *)m->buf)->flags |= CKDYN_MSG_BCAST; CkBroadcastMsgBranch(ep, m, gidOf(gid), f); }
+  if (pe < 0) zcRefuse(m, "a group broadcast");
+  else if (zcKind(m)) zcBeforeSend(m, pe, &f);
+  if (pe < 0) { dynHdr(m)->flags |= CKDYN_MSG_BCAST; CkBroadcastMsgBranch(ep, m, gidOf(gid), f); }
   else if (f & CK_MSG_INLINE) CkSendMsgBranchInline(ep, m, pe, gidOf(gid), f);
   else CkSendMsgBranch(ep, m, pe, gidOf(gid), f);
 }
@@ -1173,13 +1277,16 @@ extern "C" void CkDynSendGroup(int gid, int pe, int ep, CkDynMsg *m, const CkDyn
 extern "C" void CkDynSendGroupMulti(int gid, int npes, const int *pes, int ep, CkDynMsg *m, const CkDynSendOpts *o) {
   int f = sendFlags(ep, o);
   stampEp(m, ep);
+  zcRefuse(m, "a send to several group branches");
   CkSendMsgBranchMulti(ep, m, gidOf(gid), npes, pes, f);
 }
 
 extern "C" void CkDynSendNodeGroup(int gid, int node, int ep, CkDynMsg *m, const CkDynSendOpts *o) {
   int f = sendFlags(ep, o);
   stampEp(m, ep);
-  if (node < 0) { ((CkDynHdr *)m->buf)->flags |= CKDYN_MSG_BCAST; CkBroadcastMsgNodeBranch(ep, m, gidOf(gid), f); }
+  if (node < 0) zcRefuse(m, "a nodegroup broadcast");
+  else if (zcKind(m)) zcBeforeSend(m, CmiNodeFirst(node), &f);
+  if (node < 0) { dynHdr(m)->flags |= CKDYN_MSG_BCAST; CkBroadcastMsgNodeBranch(ep, m, gidOf(gid), f); }
   else if (f & CK_MSG_INLINE) CkSendMsgNodeBranchInline(ep, m, node, gidOf(gid), f);
   else CkSendMsgNodeBranch(ep, m, node, gidOf(gid), f);
 }
@@ -1192,10 +1299,12 @@ extern "C" void CkDynSendArray(int aid, int ndims, const int *index, int ep, CkD
   am->array_setIfNotThere(CkArray_IfNotThere_buffer);
   CkArrayID a(gidOf(aid));
   if (index == nullptr) {
-    ((CkDynHdr *)m->buf)->flags |= CKDYN_MSG_BCAST;
+    zcRefuse(m, "an array broadcast");
+    dynHdr(m)->flags |= CKDYN_MSG_BCAST;
     CkBroadcastMsgArray(ep, am, a, f);
   } else {
     CkArrayIndex ix = mkIndex(ndims, index);
+    if (int k = zcKind(m)) zcBeforeSend(m, k == ZC_DEVICE ? a.ckLocalBranch()->lastKnown(ix) : -1, &f);
     if (f & CK_MSG_INLINE) CkSendMsgArrayInline(ep, am, a, ix, f);
     else CProxyElement_ArrayBase::ckSendWrapper(a, ix, am, ep, f);
   }
@@ -1232,6 +1341,7 @@ extern "C" void CkDynSendTarget(const CkDynTarget *t, int ep, CkDynMsg *m, const
 extern "C" void CkDynCreateChare(int chare_idx, int on_pe, CkDynMsg *ctor, CkDynTarget *out) {
   ClassRec *c = classOf(chare_idx);
   if (c->desc.kind != CKDYN_CHARE) CkAbort("CkDyn: CkDynCreateChare on a class that is not a chare");
+  zcRefuse(ctor, "a constructor message");
   stampEp(ctor, c->ctorEp);
   CkChareID cid;
   CkCreateChare(chare_idx, c->ctorEp, ctor, &cid, on_pe < 0 ? CK_PE_ANY : on_pe);
@@ -1245,6 +1355,7 @@ extern "C" int CkDynCreateGroup(int chare_idx, CkDynMsg *ctor) {
   ClassRec *c = classOf(chare_idx);
   if (c->desc.kind != CKDYN_GROUP && c->desc.kind != CKDYN_ARRAYMAP)
     CkAbort("CkDyn: CkDynCreateGroup on a class that is not a group or array map");
+  zcRefuse(ctor, "a constructor message");
   stampEp(ctor, c->ctorEp);
   return CkCreateGroup(chare_idx, c->ctorEp, ctor).idx;
 }
@@ -1252,6 +1363,7 @@ extern "C" int CkDynCreateGroup(int chare_idx, CkDynMsg *ctor) {
 extern "C" int CkDynCreateNodeGroup(int chare_idx, CkDynMsg *ctor) {
   ClassRec *c = classOf(chare_idx);
   if (c->desc.kind != CKDYN_NODEGROUP) CkAbort("CkDyn: CkDynCreateNodeGroup on a class that is not a nodegroup");
+  zcRefuse(ctor, "a constructor message");
   stampEp(ctor, c->ctorEp);
   return CkCreateNodeGroup(chare_idx, c->ctorEp, ctor).idx;
 }
@@ -1259,6 +1371,7 @@ extern "C" int CkDynCreateNodeGroup(int chare_idx, CkDynMsg *ctor) {
 extern "C" int CkDynCreateArray(int chare_idx, CkDynMsg *ctor, const CkDynArrayOpts *o) {
   ClassRec *c = classOf(chare_idx);
   if (c->desc.kind != CKDYN_ARRAY) CkAbort("CkDyn: CkDynCreateArray on a class that is not an array");
+  zcRefuse(ctor, "a constructor message");
   stampEp(ctor, c->ctorEp);
   CkArrayOptions opts;
   if (o->dims != nullptr) {
@@ -1281,7 +1394,8 @@ extern "C" int CkDynCreateArray(int chare_idx, CkDynMsg *ctor, const CkDynArrayO
 extern "C" void CkDynArrayInsert(int aid, int ndims, const int *index, int on_pe, CkDynMsg *ctor) {
   /* the class is the array's: look it up through the ctor ep in the header,
      which the binding stamped by building the message for that class */
-  int ctorEp = ((const CkDynHdr *)ctor->buf)->ep;
+  zcRefuse(ctor, "a constructor message");
+  int ctorEp = dynHdr(ctor)->ep;
   const EpRec &r = epRec(ctorEp);
   if (r.cls->ctorEp != ctorEp || r.cls->desc.kind != CKDYN_ARRAY)
     CkAbort("CkDyn: CkDynArrayInsert: the message was not finished with an array class's constructor entry");
@@ -1372,7 +1486,27 @@ CkCallback CkDynMakeCallback(const CkDynCallback *cb, bool sysMsg) {
 
 static CkDynMcastMsg *toMcast(void *msg);   /* in the sections part below */
 
+/* The PE a point-to-point callback delivers on, for a DEVICE message's sender side. */
+static int callbackPe(const CkDynCallback *cb) {
+  if (cb->kind == CKDYN_CB_FUTURE) return cb->pe;
+  const CkDynTarget &t = cb->t;
+  switch (t.kind) {
+    case CKDYN_MAINCHARE: case CKDYN_CHARE: return t.u.chare.pe;
+    case CKDYN_GROUP: case CKDYN_ARRAYMAP: return t.u.group.pe_or_node;
+    case CKDYN_NODEGROUP: return CmiNodeFirst(t.u.group.pe_or_node);
+    case CKDYN_ARRAY:
+      return CkArrayID(gidOf(t.u.array.aid)).ckLocalBranch()->lastKnown(mkIndex(t.u.array.ndims, t.u.array.index));
+  }
+  return -1;
+}
+
 extern "C" void CkDynCallbackSend(const CkDynCallback *cb, CkDynMsg *m) {
+  if (dynHdr(m)->nbuf) {
+    if (cb->kind == CKDYN_CB_IGNORE || cb->kind == CKDYN_CB_EXIT) { CkDynMsgFree(m); m = emptyMsg(); }
+    else if (cb->kind == CKDYN_CB_SECTION) zcRefuse(m, "a section callback");
+    else if (cb->kind == CKDYN_CB_TARGET && cb->bcast) zcRefuse(m, "a broadcast callback");
+    else if (int k = zcKind(m)) zcBeforeSend(m, k == ZC_DEVICE ? callbackPe(cb) : -1, nullptr);
+  }
   if (cb->kind == CKDYN_CB_SECTION) {
     /* sent to the section here: through the relay, the slot would replace the
        envelope's reference number and cb->refnum would be lost */
@@ -1388,6 +1522,7 @@ extern "C" void CkDynCallbackSend(const CkDynCallback *cb, CkDynMsg *m) {
 
 extern "C" void CkDynFutureSet(int pe, uint32_t id, CkDynMsg *value) {
   CkSetRefNum(value, checkedRefnum(id));
+  if (zcKind(value)) zcBeforeSend(value, pe, nullptr);
   CProxy_CkDynMgr(_ckdynMgrGID)[pe].deposit(value);
 }
 
@@ -1411,9 +1546,12 @@ void CkDynMgr::deposit(CkDynMsg *m) {
   CkDynMsgView v;
   CkDynSlot tmp[2];
   viewAny(v, tmp, m);
+  const bool zc = v.hdr && v.hdr->nbuf != 0;
+  if (zc && zcArrive(m, nullptr, -1)) { CkFreeMsg(m); return; }
   uint32_t id = refOf(m);
   if (g_hooks.future == nullptr) CkAbort("CkDyn: a future value arrived but the binding has no future hook");
   g_hooks.future(g_hooks.global, CkMyPe(), id, &v);
+  if (zc) zcAfterDelivery(m);
   CkFreeMsg(m);
 }
 
@@ -2010,21 +2148,408 @@ extern "C" void CkDynTraceBeginEntry(int ep) {
 extern "C" void CkDynTraceEndEntry(int ep) { (void)ep; _TRACE_END_EXECUTE(); }
 
 /* ====================================================================== */
-/* Zero-copy and devices (step 3)                                          */
+/* Zero-copy and devices                                                   */
 /* ====================================================================== */
 
-extern "C" void CkDynMsgAddNcpy(CkDynMsgBuilder *, const CkDynBufDesc *, CkDynBufDone, void *) {
-  CkAbort("CkDyn: zero-copy slots are not implemented yet (step 3)");
+/* Mechanism: doc/internals/ckdyn.md, "Zero-copy". A message with nbuf > 0
+   starts with the descriptor prefix of the generated nocopy marshalling code
+   (host: int count, int root node, CkNcpyBuffer each; device: int count,
+   CkDeviceBuffer each), zero padding to a 16-byte boundary, then the CkDyn
+   payload. The envelope's zero-copy type says which prefix format it is. */
+
+static inline size_t align16(size_t n) { return (n + 15) & ~(size_t)15; }
+
+/* The prefix format of a message that has a prefix. Host messages are
+   P2P_SEND before their transfer and SEND_DONE after; a device message is
+   DEVICE before and REG_NO_ZC after (CkRdmaDeviceIssueRgets). */
+static int zcFormat(envelope *env) {
+  int t = CMI_ZC_MSGTYPE((char *)env);
+  return (t == CMK_ZC_P2P_SEND_MSG || t == CMK_ZC_SEND_DONE_MSG) ? ZC_HOST : ZC_DEVICE;
 }
-extern "C" void CkDynMsgAddDevice(CkDynMsgBuilder *, const CkDynDevDesc *, CkDynBufDone, void *) {
-  CkAbort("CkDyn: device slots are not implemented yet (step 3)");
+
+/* Walk the prefix at buf; returns the payload's offset, *n the descriptor
+   count, offs (if given) each descriptor's offset. A device prefix reserves
+   room for CK_DEVICE_ACK_CAP acknowledgement ids on its first descriptor,
+   which CkRdmaDeviceOnSender fills at send time. */
+static size_t zcPrefixLen(const char *buf, int fmt, int *n, std::vector<size_t> *offs) {
+  PUP::fromMem up((void *)buf);
+  up | *n;
+  if (fmt == ZC_HOST) {
+    int root; up | root;
+    for (int i = 0; i < *n; i++) { if (offs) offs->push_back(up.size()); CkNcpyBuffer nb; up | nb; }
+    return align16(up.size());
+  }
+#if CMK_CUDA || CMK_HIP
+  size_t acks = 0;
+  for (int i = 0; i < *n; i++) {
+    if (offs) offs->push_back(up.size());
+    CkDeviceBuffer db; up | db;
+    if (i == 0) acks = db.ack_count;
+  }
+  return align16(up.size() - 8 * acks + 8 * CK_DEVICE_ACK_CAP);
+#else
+  CkAbort("CkDyn: a message with DEVICE slots reached a build without CUDA or HIP");
+#endif
 }
-extern "C" void CkDynPostBuffer(const CkDynTarget *, int, int, const CkDynBufDesc *) {
-  CkAbort("CkDyn: zero-copy posts are not implemented yet (step 3)");
+
+static char *dynPayload(CkDynMsg *m) {
+  char *buf = m->buf;
+  if (*(const uint16_t *)buf == CKDYN_MAGIC) return buf;
+  int n;
+  return buf + zcPrefixLen(buf, zcFormat(UsrToEnv(m)), &n, nullptr);
 }
-extern "C" void CkDynPostDeviceBuffer(const CkDynTarget *, int, int, const CkDynDevDesc *) {
-  CkAbort("CkDyn: device posts are not implemented yet (step 3)");
+
+/* ZC_HOST or ZC_DEVICE for a message whose transfer has not been issued. */
+static int zcKind(CkDynMsg *m) {
+  int t = CMI_ZC_MSGTYPE((char *)UsrToEnv(m));
+  return t == CMK_ZC_P2P_SEND_MSG ? ZC_HOST : (t == CMK_ZC_DEVICE_MSG ? ZC_DEVICE : ZC_NONE);
 }
+
+static void zcRefuse(CkDynMsg *m, const char *what) {
+  const CkDynHdr *h = dynHdr(m);
+  if (h->nbuf == 0) return;
+  const CkDynSlot *sl = (const CkDynSlot *)(h + 1);
+  for (int i = 0; i < h->nslots; i++)
+    if (sl[i].type == CKDYN_SLOT_NCPY || sl[i].type == CKDYN_SLOT_DEVICE)
+      CkAbort("CkDyn: slot %d is %s slot; a message with zero-copy slots is sent point to point only, not as %s",
+              i, sl[i].type == CKDYN_SLOT_NCPY ? "an NCPY" : "a DEVICE", what);
+}
+
+/* ---- done functions ----------------------------------------------------- */
+
+struct ZcDone { CkDynBufDone done; void *arg; };
+
+/* A CkCallback (callCFn) on the sending PE; the runtime sends it a message
+   when the source may be released. */
+static void zcDoneFn(void *param, void *msg) {
+  ZcDone *r = (ZcDone *)param;
+  if (msg) CkFreeMsg(msg);
+  CkDynBufDone f = r->done;
+  void *a = r->arg;
+  delete r;
+  if (f) f(a);
+}
+
+static CkCallback zcDoneCallback(CkDynBufDone done, void *arg) {
+  return CkCallback(zcDoneFn, new ZcDone{ done, arg });
+}
+
+/* Run a callback from the scheduler of this PE, never inline. */
+static void zcSendLater(const CkCallback &cb) {
+  _ckcallbackgroup[CkMyPe()].call(cb, 0, (const char *)nullptr);
+}
+
+static void zcScheduleDone(CkDynBufDone done, void *arg) { zcSendLater(zcDoneCallback(done, arg)); }
+
+/* CkDynMsgFree of a message that was finished but never sent. */
+static void zcFreeUnsent(CkDynMsg *m) {
+  int k = zcKind(m);
+  if (k == ZC_NONE) return;
+  int n;
+  std::vector<size_t> offs;
+  zcPrefixLen(m->buf, k, &n, &offs);
+  for (int i = 0; i < n; i++) {
+    PUP::fromMem up(m->buf + offs[i]);
+    if (k == ZC_HOST) { CkNcpyBuffer nb; up | nb; zcSendLater(nb.cb); }
+#if CMK_CUDA || CMK_HIP
+    else { CkDeviceBuffer db; up | db; zcSendLater(db.cb); }
+#endif
+  }
+}
+
+/* ---- sender ------------------------------------------------------------- */
+
+static size_t zcBuildPrefix(CkDynMsgBuilder *b, std::vector<char> &out) {
+  int n = (int)b->zc.size();
+  if (!b->zcDevice) {
+    int root = CkMyNode();
+    std::vector<CkNcpyBuffer> nbs;
+    nbs.reserve(n);
+    for (const ZcRec &z : b->zc) {
+      CkCallback cb = zcDoneCallback(z.done, z.arg);
+      nbs.emplace_back(z.ptr, (size_t)z.len, cb, CK_BUFFER_UNREG);
+    }
+    PUP::sizer ps;
+    ps | n; ps | root;
+    for (CkNcpyBuffer &nb : nbs) ps | nb;
+    size_t pre = align16(ps.size());
+    out.assign(pre, 0);
+    PUP::toMem pm(out.data());
+    pm | n; pm | root;
+    for (CkNcpyBuffer &nb : nbs) pm | nb;
+    return pre;
+  }
+#if CMK_CUDA || CMK_HIP
+  std::vector<CkDeviceBuffer> dbs;
+  dbs.reserve(n);
+  for (const ZcRec &z : b->zc)
+    dbs.emplace_back(z.ptr, (size_t)z.len, zcDoneCallback(z.done, z.arg), (hapiStream_t)(uintptr_t)z.stream);
+  PUP::sizer ps;
+  ps | n;
+  for (CkDeviceBuffer &db : dbs) ps | db;
+  size_t pre = align16(ps.size() + 8 * CK_DEVICE_ACK_CAP);
+  out.assign(pre, 0);
+  PUP::toMem pm(out.data());
+  pm | n;
+  for (CkDeviceBuffer &db : dbs) pm | db;
+  return pre;
+#else
+  CkAbort("CkDyn: device slots need a CUDA or HIP build of Charm++");
+#endif
+}
+
+/* A device message's sender-side work, once the destination PE is known:
+   CkRdmaDeviceOnSender (stream synchronization or IPC staging, registration,
+   acknowledgement ids), and the descriptors re-pupped in place. */
+static void zcDevicePrepare(CkDynMsg *m, int destPe) {
+#if CMK_CUDA || CMK_HIP
+  if (destPe < 0 || destPe >= CkNumPes())
+    CkAbort("CkDyn: a message with DEVICE slots needs a destination PE known at send time (got %d)", destPe);
+  char *buf = m->buf;
+  int n;
+  size_t pre = zcPrefixLen(buf, ZC_DEVICE, &n, nullptr);
+  std::vector<CkDeviceBuffer> dbs(n);
+  {
+    PUP::fromMem up(buf);
+    int nn; up | nn;
+    for (int i = 0; i < n; i++) up | dbs[i];
+  }
+  /* the streams are not pupped: each DEVICE slot keeps its stream before its shape */
+  const CkDynHdr *h = (const CkDynHdr *)(buf + pre);
+  const CkDynSlot *sl = (const CkDynSlot *)(h + 1);
+  const char *data = (const char *)(sl + h->nslots);
+  for (int i = 0; i < h->nslots; i++)
+    if (sl[i].type == CKDYN_SLOT_DEVICE) {
+      uint64_t st;
+      memcpy(&st, data + sl[i].v.off - 8, 8);
+      dbs[sl[i].reserved2].hapi_stream = (hapiStream_t)(uintptr_t)st;
+    }
+  std::vector<CkDeviceBuffer *> bp(n);
+  for (int i = 0; i < n; i++) bp[i] = &dbs[i];
+  CkRdmaDeviceOnSender(destPe, n, bp.data());
+  PUP::toMem pm(buf);
+  pm | n;
+  for (int i = 0; i < n; i++) pm | dbs[i];
+  if (pm.size() > pre) CkAbort("CkDyn: device descriptors grew past their reserved %zu bytes", pre);
+  memset(buf + pm.size(), 0, pre - pm.size());
+#else
+  (void)m; (void)destPe;
+#endif
+}
+
+/* Before a point-to-point send of a message with zero-copy slots: no inline
+   delivery (the transfer happens in _processHandler, which an inline send
+   bypasses), and the device sender work. */
+static void zcBeforeSend(CkDynMsg *m, int destPe, int *flags) {
+  if (flags) *flags &= ~CK_MSG_INLINE;
+  if (zcKind(m) == ZC_DEVICE) zcDevicePrepare(m, destPe);
+}
+
+/* ---- receiver ----------------------------------------------------------- */
+
+static bool zcTakePost(CkDynObj &d, int ep, int slot, bool device, CkDynPost *out) {
+  if (d.posts == nullptr) return false;
+  for (size_t i = 0; i < d.posts->size(); i++) {
+    CkDynPost &p = (*d.posts)[i];
+    if (p.ep != ep || p.slot != slot) continue;
+    if (p.device != device)
+      CkAbort("CkDyn: a %s buffer was posted for entry %d slot %d, which carries a %s slot",
+              p.device ? "device" : "host", ep, slot, device ? "DEVICE" : "NCPY");
+    *out = p;
+    d.posts->erase(d.posts->begin() + i);
+    return true;
+  }
+  return false;
+}
+
+static void zcCheckPostLen(const CkDynPost &p, const CkDynSlot &s) {
+  if (p.len != s.len)
+    CkAbort("CkDyn: entry %d slot %d: the posted buffer has %llu bytes, the message's slot %u",
+            p.ep, p.slot, (unsigned long long)p.len, s.len);
+}
+
+/* Host posts: the slot's data, already in the message, is copied into the
+   posted buffer and the descriptor is pointed at it. */
+static void zcApplyHostPosts(CkDynMsg *m, CkDynObj &d, int ep) {
+  CkDynHdr *h = dynHdr(m);
+  const CkDynSlot *sl = (const CkDynSlot *)(h + 1);
+  std::vector<size_t> offs;
+  int n;
+  zcPrefixLen(m->buf, ZC_HOST, &n, &offs);
+  for (int i = 0; i < h->nslots; i++) {
+    if (sl[i].type != CKDYN_SLOT_NCPY) continue;
+    CkDynPost p;
+    if (!zcTakePost(d, ep, i, false, &p)) continue;
+    zcCheckPostLen(p, sl[i]);
+    char *at = m->buf + offs[sl[i].reserved2];
+    CkNcpyBuffer nb;
+    { PUP::fromMem up(at); up | nb; }
+    memcpy(p.ptr, nb.ptr, sl[i].len);
+    nb.ptr = p.ptr;
+    PUP::toMem pm(at);
+    pm | nb;
+  }
+}
+
+#if CMK_CUDA || CMK_HIP
+/* Device memory CkDyn allocated for received DEVICE slots (CkDeviceMalloc),
+   and the delivered messages that still hold some because the binding
+   retained them. Process-wide: a binding may release on any PE. */
+static std::mutex g_zcLock;
+static std::unordered_set<const void *> g_zcOwned;
+static std::unordered_map<void *, std::vector<void *> > g_zcHeld;
+
+static void zcDeviceIssue(CkDynMsg *m, CkDynObj *d, int ep) {
+  CkDynHdr *h = dynHdr(m);
+  CkDynSlot *sl = (CkDynSlot *)(h + 1);
+  int n = (int)h->nbuf;
+  std::vector<void *> ptrs(n, nullptr);
+  std::vector<int> sizes(n, 0);
+  std::vector<CkDeviceBufferPost> posts(n);
+  int dev = 0;
+  hapiCheck(hapiGetDevice(&dev));
+  for (int i = 0; i < h->nslots; i++) {
+    if (sl[i].type != CKDYN_SLOT_DEVICE) continue;
+    int k = (int)sl[i].reserved2;
+    CkDynPost p;
+    if (d && zcTakePost(*d, ep, i, true, &p)) {
+      zcCheckPostLen(p, sl[i]);
+      ptrs[k] = p.ptr;
+      sl[i].reserved = (uint16_t)p.device_ord;
+    } else {
+      ptrs[k] = CkDeviceMalloc(sl[i].len ? sl[i].len : 1);
+      sl[i].reserved = (uint16_t)dev;
+      std::lock_guard<std::mutex> g(g_zcLock);
+      g_zcOwned.insert(ptrs[k]);
+    }
+    sizes[k] = (int)sl[i].len;
+  }
+  /* copies the message (with the slot changes above), retargets its
+     descriptors at ptrs, and enqueues the copy when every transfer is done */
+  CkRdmaDeviceIssueRgets(UsrToEnv(m), n, ptrs.data(), sizes.data(), posts.data());
+}
+
+static void zcFreeOwned(const std::vector<void *> &v) {
+  for (void *p : v) CkDeviceFree(p);
+}
+#endif
+
+/* Called for a delivery of a message with zero-copy slots, before the hook.
+   Returns true when the message is a device message whose transfers were
+   just issued: the copy is delivered again when they complete. */
+static bool zcArrive(CkDynMsg *m, CkDynObj *d, int ep) {
+  int t = CMI_ZC_MSGTYPE((char *)UsrToEnv(m));
+  if (t == CMK_ZC_P2P_SEND_MSG)
+    CkAbort("CkDyn: a message with NCPY slots reached entry %d without its transfer", ep);
+  if (t == CMK_ZC_SEND_DONE_MSG) {
+    if (d && d->posts) zcApplyHostPosts(m, *d, ep);
+    return false;
+  }
+#if CMK_CUDA || CMK_HIP
+  if (t == CMK_ZC_DEVICE_MSG) { zcDeviceIssue(m, d, ep); return true; }
+#endif
+  return false;
+}
+
+/* After the hook: device memory CkDyn allocated for the slots is freed now
+   if the binding kept no retain, else when the last retain is released. */
+static void zcAfterDelivery(void *msg) {
+#if CMK_CUDA || CMK_HIP
+  envelope *env = UsrToEnv(msg);
+  if (zcFormat(env) != ZC_DEVICE) return;
+  int n;
+  std::vector<size_t> offs;
+  zcPrefixLen(((CkDynMsg *)msg)->buf, ZC_DEVICE, &n, &offs);
+  std::vector<void *> owned;
+  std::lock_guard<std::mutex> g(g_zcLock);
+  for (int i = 0; i < n; i++) {
+    PUP::fromMem up(((CkDynMsg *)msg)->buf + offs[i]);
+    CkDeviceBuffer db; up | db;
+    auto it = g_zcOwned.find(db.ptr);
+    if (it != g_zcOwned.end()) { owned.push_back((void *)db.ptr); g_zcOwned.erase(it); }
+  }
+  if (owned.empty()) return;
+  if (CmiGetReference(env) <= 1) zcFreeOwned(owned);   /* only the runtime's reference is left */
+  else g_zcHeld[msg] = owned;
+#else
+  (void)msg;
+#endif
+}
+
+static void zcBeforeRelease(void *msg) {
+#if CMK_CUDA || CMK_HIP
+  std::lock_guard<std::mutex> g(g_zcLock);
+  if (g_zcHeld.empty()) return;
+  auto it = g_zcHeld.find(msg);
+  if (it == g_zcHeld.end() || CmiGetReference(UsrToEnv(msg)) != 1) return;
+  zcFreeOwned(it->second);
+  g_zcHeld.erase(it);
+#else
+  (void)msg;
+#endif
+}
+
+static const void *zcViewPtr(const CkDynMsgView *v, const CkDynSlot *s) {
+  if (v->kind != CKDYN_MSGKIND_DYN || v->msg == nullptr || UsrToEnv(v->msg)->getMsgIdx() != CkDynMsg::__idx)
+    CkAbort("CkDyn: a zero-copy slot in a view that is not a delivered CkDynMsg");
+  CkDynMsg *m = (CkDynMsg *)v->msg;
+  envelope *env = UsrToEnv(m);
+  int t = CMI_ZC_MSGTYPE((char *)env);
+  if (t == CMK_ZC_P2P_SEND_MSG || t == CMK_ZC_DEVICE_MSG)
+    CkAbort("CkDyn: a zero-copy slot read before its transfer");
+  int fmt = zcFormat(env), n;
+  std::vector<size_t> offs;
+  zcPrefixLen(m->buf, fmt, &n, &offs);
+  if ((int)s->reserved2 >= n) CkAbort("CkDyn: zero-copy slot names descriptor %u of %d", s->reserved2, n);
+  PUP::fromMem up(m->buf + offs[s->reserved2]);
+  if (fmt == ZC_HOST) { CkNcpyBuffer nb; up | nb; return nb.ptr; }
+#if CMK_CUDA || CMK_HIP
+  CkDeviceBuffer db; up | db; return db.ptr;
+#else
+  return nullptr;
+#endif
+}
+
+/* ---- posts -------------------------------------------------------------- */
+
+static CkDynObj *objOf(const CkDynTarget *t) {
+  Chare *c = localChare(t);
+  if (c == nullptr) return nullptr;
+  switch (t->kind) {
+    case CKDYN_MAINCHARE: return &static_cast<MainchareDyn *>(c)->d;
+    case CKDYN_CHARE: return &static_cast<ChareDyn *>(c)->d;
+    case CKDYN_GROUP: return &static_cast<GroupDyn *>(c)->d;
+    case CKDYN_ARRAYMAP: return &static_cast<ArrayMapDyn *>(c)->d;
+    case CKDYN_ARRAY: return &static_cast<ArrayElemDyn *>(static_cast<ArrayElement *>(c))->d;
+  }
+  return nullptr;
+}
+
+static void addPost(const CkDynTarget *t, int ep, int slot, bool device, int dev, const void *ptr, uint64_t len) {
+  if (t->kind == CKDYN_NODEGROUP) CkAbort("CkDyn: posting a buffer for a nodegroup branch is not supported");
+  CkDynObj *d = objOf(t);
+  if (d == nullptr) CkAbort("CkDyn: a buffer posted for an object that is not on PE %d", CkMyPe());
+  epRec(ep);
+  if (d->posts == nullptr) d->posts = new std::vector<CkDynPost>;
+  for (const CkDynPost &p : *d->posts)
+    if (p.ep == ep && p.slot == slot)
+      CkAbort("CkDyn: a second buffer posted for entry %d slot %d before the first was used", ep, slot);
+  d->posts->push_back(CkDynPost{ ep, slot, device, dev, (void *)ptr, len });
+}
+
+extern "C" void CkDynPostBuffer(const CkDynTarget *t, int ep, int slot, const CkDynBufDesc *d) {
+  addPost(t, ep, slot, false, 0, d->ptr, d->len);
+}
+
+extern "C" void CkDynPostDeviceBuffer(const CkDynTarget *t, int ep, int slot, const CkDynDevDesc *d) {
+#if CMK_CUDA || CMK_HIP
+  addPost(t, ep, slot, true, d->device, d->ptr, d->len);
+#else
+  (void)t; (void)ep; (void)slot; (void)d;
+  CkAbort("CkDyn: device posts need a CUDA or HIP build of Charm++");
+#endif
+}
+
 /* The stream's completion arrives at CkDynMgr::hapiDone on this PE with a
    message holding cb; hapiAddCallback keeps quiescence from being detected
    until then. */

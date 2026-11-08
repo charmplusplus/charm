@@ -156,8 +156,8 @@ enum {
   CKDYN_SLOT_F64,
   CKDYN_SLOT_BYTES,     /* small blob inline in the data region */
   CKDYN_SLOT_BUFFER,    /* typed n-dimensional buffer copied into the data region */
-  CKDYN_SLOT_NCPY,      /* typed buffer carried by a zero-copy descriptor (step 3) */
-  CKDYN_SLOT_DEVICE,    /* typed device buffer (step 3) */
+  CKDYN_SLOT_NCPY,      /* typed host buffer transferred by the runtime, not copied into the message */
+  CKDYN_SLOT_DEVICE,    /* typed device buffer, transferred device to device */
   CKDYN_SLOT_FUTURE,    /* (pe, id) of a binding future */
   CKDYN_SLOT_CALLBACK,  /* a CkDynCallback in the data region */
   CKDYN_SLOT_SECTION,   /* a CkDynSectionID in the data region */
@@ -195,7 +195,7 @@ typedef struct CkDynHdr {
   uint32_t user_id;         /* the entry's user_id, or the binding reducer id for foreign-reducer contributions */
   uint32_t tail_len;        /* bytes of opaque tail */
   uint32_t data_len;        /* bytes of the inline data region */
-  uint32_t nbuf;            /* number of NCPY/DEVICE descriptors (step 3) */
+  uint32_t nbuf;            /* number of NCPY/DEVICE slots */
 } CkDynHdr;                 /* 24 bytes */
 
 typedef struct CkDynSlot {  /* 24 bytes, nslots of them right after the header */
@@ -204,15 +204,16 @@ typedef struct CkDynSlot {  /* 24 bytes, nslots of them right after the header *
   uint8_t  ndim;            /* 0..CKDYN_MAX_BUF_DIMS for buffers, 0 for scalars */
   uint8_t  bflags;          /* CKDYN_BUF_* */
   uint16_t tag;             /* binding-defined subtype, opaque to CkDyn */
-  uint16_t reserved;
+  uint16_t reserved;        /* DEVICE: the device ordinal of the data (the receiver's device after delivery) */
   uint32_t len;             /* bytes (BYTES/BUFFER/NCPY/DEVICE/TAIL), else 0 */
-  uint32_t reserved2;
+  uint32_t reserved2;       /* NCPY/DEVICE: the slot's descriptor index (CkDyn's own) */
   union {
     int64_t  i64;
     uint64_t u64;
     double   f64;
-    uint64_t off;           /* offset into the data region (BYTES, BUFFER, CALLBACK, SECTION, PROXY);
-                               for BUFFER the shape (ndim int64) precedes the bytes at that offset */
+    uint64_t off;           /* offset into the data region (BYTES, BUFFER, NCPY, DEVICE, CALLBACK, SECTION, PROXY);
+                               for BUFFER the shape (ndim int64) precedes the bytes at that offset;
+                               for NCPY and DEVICE only the shape is there (read the data with CkDynViewBufferPtr) */
   } v;
 } CkDynSlot;
 
@@ -239,7 +240,7 @@ typedef struct CkDynBufDesc {
 typedef struct CkDynMsgBuilder CkDynMsgBuilder;      /* opaque */
 typedef struct CkDynMsg CkDynMsg;                    /* opaque to C: the Charm++ message */
 typedef struct CkDynMcastMsg CkDynMcastMsg;          /* opaque to C: the CkMulticast message (CkDynSendSection) */
-typedef void (*CkDynBufDone)(void *done_arg);        /* the source buffer may be released (NCPY, step 3) */
+typedef void (*CkDynBufDone)(void *done_arg);        /* the source buffer may be released (NCPY, DEVICE) */
 
 /* Begin a message. Hints size the scratch space; prio_bits reserves that many
  * priority bits (0: none); group_dep is a CkGroupID index the message must
@@ -306,7 +307,10 @@ typedef struct CkDynMsgView {
   void                 *msg;        /* the runtime message, for retain */
 } CkDynMsgView;
 
-/* Pointer to a BUFFER slot's bytes; *shape_out gets ndim int64 values. */
+/* Pointer to a BUFFER, NCPY or DEVICE slot's bytes; *shape_out gets ndim int64
+ * values. For a DEVICE slot the pointer is device memory on the device the
+ * slot's `reserved` field names. NCPY and DEVICE data live as long as the
+ * message (CkDynMsgRetain), unless the slot was delivered into a posted buffer. */
 const void *CkDynViewBufferPtr(const CkDynMsgView *v, int slot, const int64_t **shape_out);
 const void *CkDynViewBytesPtr(const CkDynMsgView *v, int slot);
 void        CkDynViewCallback(const CkDynMsgView *v, int slot, CkDynCallback *out);
@@ -553,24 +557,40 @@ void CkDynTraceBeginEntry(int ep);
 void CkDynTraceEndEntry(int ep);
 
 /* ------------------------------------------------------------------------ */
-/* Zero-copy and devices (step 3)                                            */
+/* Zero-copy and devices                                                     */
 /* ------------------------------------------------------------------------ */
 
+/* Mechanism: doc/internals/ckdyn.md, "Zero-copy". */
+
 typedef struct CkDynDevDesc {
-  const void *ptr;
-  uint64_t    len;
+  const void *ptr;           /* device memory, C-contiguous */
+  uint64_t    len;           /* bytes */
   uint8_t     elem;
   uint8_t     ndim;
   uint16_t    tag;
-  int         device;
-  uint64_t    stream;
+  int         device;        /* device ordinal */
+  uint64_t    stream;        /* the cudaStream_t / hipStream_t the data is valid on (0: the default stream) */
   const int64_t *shape;
 } CkDynDevDesc;
 
+/* A slot whose data the runtime transfers without copying it into the
+ * message. d->ptr must stay valid until done(arg) runs; it runs exactly once,
+ * from the scheduler of the sending PE, after the data has left the source,
+ * or after CkDynMsgAbandon / CkDynMsgFree of an unsent message. A message
+ * with NCPY or DEVICE slots (header nbuf > 0) is sent point to point only:
+ * a broadcast, section, multi-branch, constructor or reduction use aborts.
+ * NCPY and DEVICE slots cannot share a message. CkDynMsgAddDevice aborts in
+ * a build without CUDA or HIP. */
 void CkDynMsgAddNcpy(CkDynMsgBuilder *b, const CkDynBufDesc *d, CkDynBufDone done, void *arg);
 void CkDynMsgAddDevice(CkDynMsgBuilder *b, const CkDynDevDesc *d, CkDynBufDone done, void *arg);
+/* A destination, on the calling PE, for slot `slot` of the next message to
+ * the local object t's entry ep. The lengths must match; one post per
+ * (object, ep, slot) at a time; posts are dropped when the object migrates or
+ * is destroyed. Not for nodegroups. */
 void CkDynPostBuffer(const CkDynTarget *t, int ep, int slot, const CkDynBufDesc *d);
 void CkDynPostDeviceBuffer(const CkDynTarget *t, int ep, int slot, const CkDynDevDesc *d);
+/* cb receives an empty message, from this PE's scheduler, when the stream
+ * reaches this point. Aborts in a build without CUDA or HIP. */
 void CkDynHapiAddCallback(uint64_t stream, const CkDynCallback *cb);
 
 /* ------------------------------------------------------------------------ */

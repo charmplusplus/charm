@@ -217,7 +217,8 @@ future value is a `CkDynMsg`; `CkDynMcastMsg` carries section sends only
 
 1. `CkDynHdr`, 24 bytes: `magic_version` (`CKDYN_MAGIC`, 0xDA01), `ep`
    (uint16), `flags` (uint16), `nslots` (uint16), `user_id`, `tail_len`,
-   `data_len`, `nbuf` (reserved for zero-copy descriptors).
+   `data_len`, `nbuf` (the number of `NCPY` and `DEVICE` slots; a message
+   with any starts with a descriptor prefix, see Zero-copy).
 2. `nslots` `CkDynSlot` records of 24 bytes: `type`, `elem`, `ndim`,
    `bflags`, `tag` (binding-defined, opaque to CkDyn), `len`, and a union `v`
    holding an inline scalar or an offset into the data region.
@@ -235,7 +236,7 @@ Slot types:
 | `BOOL`, `I64`, `U64`, `F64` | inline in `v` | none |
 | `BYTES` | `v.off`, `len` | the bytes |
 | `BUFFER` | `v.off`, `len`, `elem`, `ndim`, `bflags` | `ndim` int64 shape values, then `len` bytes of contents |
-| `NCPY`, `DEVICE` | planned (design 3.14) | |
+| `NCPY`, `DEVICE` | `v.off`, `len`, `elem`, `ndim`, `bflags`; `reserved2` the descriptor index; `DEVICE`: `reserved` the device ordinal | `ndim` int64 shape values (`DEVICE`: preceded by the stream); the data is not in the message (see Zero-copy) |
 | `FUTURE` | inline `v.u64 = (pe << 32) \| id` | none |
 | `CALLBACK` | `v.off` | a `CkDynCallback` copied as bytes |
 | `SECTION` | `v.off` | a `CkDynSectionID` copied as bytes |
@@ -782,6 +783,163 @@ members and over two arrays, delete with slot reuse (and, with
 `-stalesend`, the stale-generation abort), and section reductions across
 RotateLB migrations.
 
+## Zero-copy
+
+`NCPY` slots carry host buffers and `DEVICE` slots device buffers that the
+runtime transfers without copying them into the message: the message carries
+a descriptor per slot, and the receiver's runtime fetches the data. Both use
+the layout and the transfer code of the generated marshalling code for
+`nocopy` and `nocopydevice` parameters, so ck.C and ckrdma.C are unchanged.
+
+### Layout and marking
+
+A message with `nbuf > 0` has a descriptor prefix at the start of `buf`,
+before the CkDyn header:
+
+- host: `int` count, `int` root node (`CkMyNode()` of the sender, unused for
+  point-to-point), then one pupped `CkNcpyBuffer` per `NCPY` slot. This is
+  the layout xi-Parameter.C writes for `nocopy` parameters
+  (`impl_num_rdma_fields`, `impl_num_root_node`, `pupRdma`).
+- device: `int` count, then one pupped `CkDeviceBuffer` per `DEVICE` slot, as
+  for `nocopydevice` parameters (`impl_num_device_rdma_fields`). The first
+  descriptor's acknowledgement block (`CkDeviceBuffer::acks`) grows at send
+  time, so the prefix reserves room for `CK_DEVICE_ACK_CAP` ids on it.
+
+The prefix is padded with zeros to a 16-byte boundary and the CkDyn payload
+(header, slots, data region, tail) follows. `CkDynMsgFinish` marks the
+envelope `CMK_ZC_P2P_SEND_MSG` (host) or `CMK_ZC_DEVICE_MSG` (device).
+
+`dynPayload` finds the header: when the first two bytes of `buf` are
+`CKDYN_MAGIC` there is no prefix; otherwise the prefix is walked with
+`PUP::fromMem` and its length is the walked length rounded up to 16 (for a
+device prefix, computed as if the acknowledgement block were full). The
+descriptor count is limited to 4096 so that the first `int` never reads as
+the magic. The prefix format follows from the envelope's zero-copy type: a
+host message is `P2P_SEND` before its transfer and `SEND_DONE` after; a
+device message is `DEVICE` before and `REG_NO_ZC` after.
+
+An `NCPY` or `DEVICE` slot has `len`, `elem`, `ndim`, `bflags` and `tag` as
+a `BUFFER` slot; `v.off` points at its shape in the data region (for a
+`DEVICE` slot the 8 bytes before the shape hold the stream, which a
+`CkDeviceBuffer` does not pup), `reserved2` is the descriptor index, and a
+`DEVICE` slot's `reserved` is the device ordinal: the sender's in an unsent
+message, the receiver's after delivery. `CkDynViewBufferPtr` reads the data
+pointer from the descriptor at view time.
+
+### Sending
+
+`CkDynMsgAddNcpy` and `CkDynMsgAddDevice` record the buffer in the builder;
+`CkDynMsgFinish` builds the descriptors: `CkNcpyBuffer(ptr, len, cb,
+CK_BUFFER_UNREG)` (no registration outlives the message; reconverse registers
+an unregistered source on demand for a true get) or `CkDeviceBuffer(ptr, len,
+cb, stream)`. The callback `cb` is a `callCFn` `CkCallback` to `zcDoneFn` on
+the sending PE with a `ZcDone {done, arg}` record, so the runtime's source
+acknowledgement runs `done(arg)` there, once:
+
+- host, same process (`MEMCPY` mode in `CkRdmaIssueRgets`): from
+  `performEmApiMemcpy` inside the receiver's `_processHandler`, or through
+  `_ckcallbackgroup` when the receiver is another PE;
+- host, other process: `handleEntryMethodApiCompletion` when the get
+  completes, delivered to the source PE as a message;
+- device: `CkRdmaDeviceRecvHandler` (stream completion) or the sender's own
+  acknowledgement table (`deviceResolveAck`, RDMA mode).
+
+A builder abandoned with zero-copy slots, and `CkDynMsgFree` of a finished
+message never sent, send each `done` through `_ckcallbackgroup[CkMyPe()]`,
+so it runs from the scheduler and never inside a CkDyn call.
+
+Every point-to-point send (`CkDynSendChare`, `Group`, `NodeGroup`, `Array`,
+`CkDynFutureSet`, `CkDynCallbackSend`) passes a message that still has an
+unissued transfer through `zcBeforeSend`: it clears `CK_MSG_INLINE` (an
+inline send would bypass `_processHandler`, where the host transfer
+happens), and for a device message runs `CkRdmaDeviceOnSender(destPe, ...)`
+with the destination PE (array: `lastKnown`; nodegroup: the node's first PE;
+callback: its target) and re-pups the descriptors in place.
+`CkRdmaDeviceOnSender` synchronizes the stream (same process), stages into
+the IPC communication buffer (same host), or registers the buffer and mints
+acknowledgement ids (other host). Broadcasts, sends to several branches,
+section messages (`CkDynMsgFinishMcast`), constructor messages, reduction
+payloads (`CkDynMsgPayload`), and broadcast or section callbacks abort,
+naming the slot. A callback of kind `IGNORE` or `EXIT` frees the message
+(running its `done` functions) and sends an empty one.
+
+### Receiving: host
+
+`_processHandler` sees `CMK_ZC_P2P_SEND_MSG` and calls `CkRdmaIssueRgets`
+before the entry runs: it allocates a new message with room for every
+buffer after the original bytes, copies (same process) or gets (other
+process) each buffer into it, rewrites the descriptors' pointers to those
+places, marks it `SEND_DONE`, and enqueues it. The view's pointer is
+therefore inside the delivered message and lives as long as a retain, as
+for a `BUFFER` slot. If the message is packed again (an array element that
+moved), `CkPackRdmaPtrs` stores those pointers as offsets. `dispatch` aborts
+if an `NCPY` message arrives still marked `P2P_SEND`.
+
+### Receiving: device
+
+There is no device step in `_processHandler`; the generated code issues the
+transfers from the entry method's first delivery, and CkDyn does the same in
+`zcArrive`, called by `dispatch` and `CkDynMgr::deposit` before the hook.
+For a `DEVICE`-marked message it chooses a destination per slot (a posted
+buffer, or `CkDeviceMalloc` from the registered device pool, recorded in a
+process-wide set), writes the receiver's device ordinal into each slot, and
+calls `CkRdmaDeviceIssueRgets`, which copies the message, points the copy's
+descriptors at the destinations, issues the transfers, and enqueues the copy
+when all complete (with the quiescence accounting of that path). The first
+delivery returns without calling the hook; the runtime frees the original.
+The copy's delivery calls the hook. Afterwards `zcAfterDelivery` frees the
+pool memory at once if the binding kept no retain (the reference count is 1),
+or records it under the message; `CkDynMsgRelease` frees it when the count
+reaches 1, before the last `CmiFree`. HAPI's `hapiPoolMalloc` is pinned host
+memory, not device memory, so the device pool is `CkDeviceMalloc`.
+
+### Posts
+
+`CkDynPostBuffer(t, ep, slot, d)` adds `{ep, slot, ptr, len}` to the local
+object's `CkDynObj::posts`; a second post for the same pair aborts.
+`CkDynObj`'s destructor deletes the list, so posts do not survive migration
+or destruction; nodegroups are refused (a branch is shared by the node's
+PEs). Of the two implementations the design allows, CkDyn keeps its own
+table; it does not use `CkPostBuffer`/`CkMatchBuffer`, whose tag space is
+global per PE and whose `P2P_RECV` flow delivers an entry method twice.
+
+- Host: the sender cannot know whether the receiver posted, and the
+  non-post path transfers the data in `_processHandler`, before the object is
+  known. So `zcArrive` applies a host post at delivery by copying the slot
+  from the delivered message into the posted buffer (one copy on the
+  receiving PE) and rewriting the descriptor to point at it; the view's
+  pointer is then the posted buffer. A post made any time before the message
+  is delivered to the object is used, including after the send was issued.
+  Receiving straight into the posted buffer would need `_processHandler` to
+  consult CkDyn before `CkRdmaIssueRgets`.
+- Device: the destination is chosen in `zcArrive` before the transfers are
+  issued, so a device post receives the data directly.
+
+### HAPI callbacks
+
+`CkDynHapiAddCallback(stream, cb)` builds a message with one `CALLBACK` slot
+holding `cb` and calls `hapiAddCallback(stream, CkCallback(CkDynMgr::hapiDone,
+CkMyPe()), msg)`. When the stream reaches that point HAPI sends the message
+to `CkDynMgr::hapiDone` on the calling PE, which sends an empty `CkDynMsg` to
+`cb` with `CkDynCallbackSend`. `hapiAddCallback` keeps quiescence from being
+detected until then. Every CUDA- or HIP-dependent line is under
+`CMK_CUDA || CMK_HIP`; other builds abort with a message.
+
+### Tests
+
+`tests/charm++/ckdyn` phases `ncpy/nonpost`, `ncpy/post_before`,
+`ncpy/post_after` and `ncpy/samepe` send 16 MB from element 0 to the last
+element and back (the last one to element 1, on element 0's PE), check the
+data, that each `done` runs once on the sending PE, that a retained view's
+pointer stays valid after the hook (the echo is sent from it and its `done`
+releases the message), and that a post made before or after the send
+receives the data. The post-after case is ordered by the test: on one PE the
+post follows the send in the same method; within one process the receiving
+PE spins until the sender has sent; across processes the post request
+follows the data, which is delivered only after its transfer. The `-zcbcast`
+run must abort on a broadcast with an `NCPY` slot. The `device` and `hapi`
+phases are compiled only in a CUDA or HIP build.
+
 ## Pup
 
 All six classes override `pup`: each calls its base class's `pup`, builds the
@@ -937,10 +1095,16 @@ binding.
   slots. At most 65534 slots with a 16-bit `CMK_REFNUM_TYPE`; the next one
   aborts with "future id %u is not usable as this build's %d-byte reference
   number".
-- **Not implemented yet.** Zero-copy
-  and device buffers (`CkDynMsgAddNcpy`, `CkDynMsgAddDevice`,
-  `CkDynPostBuffer`, `CkDynPostDeviceBuffer`) and `CkDynHapiAddCallback`
-  abort with "... not implemented yet (step 3)".
+- **Zero-copy** (see Zero-copy) aborts on: more than 4096 zero-copy slots
+  in a message, `NCPY` and `DEVICE` slots in one message, a zero-copy slot
+  in a broadcast, multi-branch send, section message, constructor message,
+  reduction payload or broadcast or section callback ("slot %d is an NCPY
+  slot; a message with zero-copy slots is sent point to point only, not as
+  ..."), a device send whose destination PE is unknown, a posted length
+  that differs from the slot's, a second post for one (object, entry, slot),
+  a post for an object that is not local or for a nodegroup, a host post for
+  a `DEVICE` slot or the reverse, an `NCPY` message delivered without its
+  transfer, and any device call in a build without CUDA or HIP.
 
 ## Where in the source
 
@@ -963,7 +1127,13 @@ binding.
   `deleteSection`, `relay`, `relaySlot`, `toMcast`, `sectionJoin`,
   `sectionContribute`), `CkDynCoroResume`,
   `CkDynCoroSuspend`, the reducer
-  table and `ckdynForeignReduce`, `ckdynRoPup`, `CkDynInit`, `CkDynStart`.
+  table and `ckdynForeignReduce`, `ckdynRoPup`, `CkDynInit`, `CkDynStart`,
+  and the zero-copy part (`zcBuildPrefix`, `dynPayload`, `zcPrefixLen`,
+  `zcBeforeSend`, `zcDevicePrepare`, `zcArrive`, `zcApplyHostPosts`,
+  `zcDeviceIssue`, `zcAfterDelivery`, `zcViewPtr`, the posts,
+  `CkDynHapiAddCallback`, `CkDynMgr::hapiDone`).
+- src/ck-core/ckrdma.C, ckrdmadevice.C: the transfers CkDyn's zero-copy slots
+  use (`CkRdmaIssueRgets`, `CkRdmaDeviceOnSender`, `CkRdmaDeviceIssueRgets`).
 - src/ck-core/register.h: `ChareInfo::isDynamic`.
 - src/ck-core/ckarray.C, ckarray.h: `CkArrayBroadcaster::deliverAndUpdateDyn`,
   `performDeliveryDyn`, and the branch in `CkArray::recvBroadcast` that

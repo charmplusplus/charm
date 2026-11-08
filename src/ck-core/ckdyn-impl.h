@@ -49,15 +49,27 @@ inline bool operator<(const CkDynSectionID &a, const CkDynSectionID &b) {
 
 typedef std::map<CkDynSectionID, CkSectionInfo> CkDynCookieMap;
 
+/* A destination posted with CkDynPostBuffer or CkDynPostDeviceBuffer for the
+   next message to (this object, ep) with a zero-copy slot at index slot. */
+struct CkDynPost {
+  int ep;
+  int slot;
+  bool device;
+  int device_ord;      /* DEVICE: the device ordinal the binding gave */
+  void *ptr;
+  uint64_t len;
+};
+
 struct CkDynObj {
   void *handle = nullptr;        /* the binding's object; never dereferenced by CkDyn */
   int   chareIdx = -1;           /* Charm++ chare index of the class */
   size_t sizedLen = 0;           /* pack_size of the sizing pass, checked on the packing pass */
   CkDynCookieMap *sectionCookies = nullptr;   /* this object's CkMulticast cookie per section */
+  std::vector<CkDynPost> *posts = nullptr;     /* outstanding posts; not migrated or checkpointed */
   CkDynObj() = default;
   CkDynObj(const CkDynObj &) = delete;
   CkDynObj &operator=(const CkDynObj &) = delete;
-  ~CkDynObj() { delete sectionCookies; }
+  ~CkDynObj() { delete sectionCookies; delete posts; }
 };
 
 /* ---- the chare kinds ---------------------------------------------------- */
