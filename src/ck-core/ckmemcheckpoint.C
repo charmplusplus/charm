@@ -1236,22 +1236,6 @@ void CkMemCheckPT::finishUp()
   recvCount = peCount = 0;
   recvChkpCount = 0;
   inRestarting = false;
-  // the failed PE sends the checkpoint callback, or PE 0 after a rollback
-  if (CkMyPe() == thisFailedPe || (thisFailedPe < 0 && CkMyPe() == 0))
-  {
-       DEBUGF("[%d] CkMemCheckPT ----- %s in %f seconds, callback triggered\n",CkMyPe(), stage, CmiWallTimer()-startTime);
-       //CkStartQD(cpCallback);
-       if (thisFailedPe < 0) {
-         CpvAccess(migrationsSinceCheckpoint) = 0;
-         rollbackPending = false;
-       }
-       if (!quietModeRequested)
-         CkPrintf("CharmFT> %s finished in %f seconds.\n",
-                  thisFailedPe < 0 ? "Rollback" : "Restart", CkWallTimer()-restartT);
-       cpCallback.send();
-  }
-  else if (thisFailedPe < 0)
-    CpvAccess(migrationsSinceCheckpoint) = 0;
 #if CMK_CONVERSE_MPI	
   if (CmiMyPe() == BuddyPE(thisFailedPe)) {
     lastPingTime = CmiWallTimer();
@@ -1271,6 +1255,24 @@ void CkMemCheckPT::finishUp()
     _memChkptOn = false;
   }
 #endif
+  // the callback goes out from restartDone, once every PE has run finishUp:
+  // before that, a PE that has not run it still has inRestarting set (so a
+  // rollback or checkpoint requested there would be ignored) and would reset
+  // recvCount after a new checkpoint's copy had already arrived
+  contribute(CkCallback(CkReductionTarget(CkMemCheckPT, restartDone),
+                        thisProxy[thisFailedPe < 0 ? 0 : thisFailedPe]));
+}
+
+// on the failed PE, or PE 0 after a rollback, once every PE has run finishUp
+void CkMemCheckPT::restartDone()
+{
+  DEBUGF("[%d] CkMemCheckPT ----- %s in %f seconds, callback triggered\n",CkMyPe(), stage, CmiWallTimer()-startTime);
+  if (thisFailedPe < 0)
+    rollbackPending = false;
+  if (!quietModeRequested)
+    CkPrintf("CharmFT> %s finished in %f seconds.\n",
+             thisFailedPe < 0 ? "Rollback" : "Restart", CkWallTimer()-restartT);
+  cpCallback.send();
 }
 
 // called only on 0

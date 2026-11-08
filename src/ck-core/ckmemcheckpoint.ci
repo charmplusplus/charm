@@ -35,6 +35,7 @@ module CkMemCheckpoint {
 	entry void recoverEntry(CkArrayCheckPTMessage *msg);
  	entry [reductiontarget] void recoverArrayElements();
 	entry [reductiontarget] void finishUp();
+	entry [reductiontarget] void restartDone();
 	entry void gotReply();
 	entry void quiescence(CkCallback&);
         entry void inmem_restore(CkArrayCheckPTMessage *m);

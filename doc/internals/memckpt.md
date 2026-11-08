@@ -142,8 +142,17 @@ starts the next. `diePe` is the failed PE, or -1 for a rollback.
    context's memory itself (`CmiIsomallocContextRelease`).
 6. `finishUp`: clears `inRestarting` (here, after the reduction, because
    the flag is shared by the PEs of a process and must stay set until all
-   of them have resumed their elements), and the failed PE, or PE 0 for a
-   rollback, sends `cpCallback`.
+   of them have resumed their elements), zeroes `recvCount` and
+   `recvChkpCount`, and contributes to `restartDone`.
+7. `restartDone`, on the failed PE or on PE 0 for a rollback, clears
+   `rollbackPending` after a rollback and sends `cpCallback`. The callback
+   therefore runs after every PE has run `finishUp`, the same pattern as
+   `cpDone` for a checkpoint. Sending it from `finishUp` on one PE would let
+   it, or what it triggers, reach a PE that has not run `finishUp` yet:
+   there `CkInRestarting()` is still true, so `CkRollbackMemCheckpoint` and
+   `CkStartMemCheckpoint` return without acting, and a new checkpoint's
+   copy stored before `finishUp` would be lost when `finishUp` zeroes
+   `recvCount`, leaving that checkpoint waiting forever.
 
 ### Rollback
 
@@ -151,7 +160,7 @@ starts the next. `diePe` is the failed PE, or -1 for a rollback.
 restart is under way, aborts if a checkpoint is in progress
 (`inCheckpointing`) or none has completed, and otherwise sends
 `requestRollback` to PE 0. PE 0 accepts one request at a time
-(`rollbackPending`, cleared in `finishUp`) and calls `CkStartQD`; at
+(`rollbackPending`, cleared in `restartDone`) and calls `CkStartQD`; at
 quiescence it broadcasts `rollback`. Waiting for quiescence replaces the
 restart phase of the classic path: nothing is in flight when elements are
 destroyed, so no message for a destroyed element can reach its restored
@@ -169,9 +178,8 @@ A program cannot count rollbacks in its array elements, since the
 rollback restores them. `CkMemCheckpointRollbacks()` returns the number
 of rollbacks to the last completed checkpoint from the group, which is
 not restored. `rollback` increments it on every PE before `restart(-1)`,
-so it is current on every PE when PE 0 sends the callback from `finishUp`
-(incrementing in `finishUp` would race with the callback's delivery to
-other PEs).
+so it is current on every PE when PE 0 sends the callback from
+`restartDone`.
 
 ### The migration restriction
 
@@ -217,7 +225,7 @@ only with `__FAULT__`.
   `CkRollbackMemCheckpoint`, `requestRollback`, `rollback`,
   `CkMemCheckPTNoteMigration`; the chain `restart`, `removeArrayElements`,
   `resetReductionMgr`, `recoverBuddies`, `recoverArrayElements`,
-  `recoverAll`, `finishUp`; `ChkptOnPe`, `BuddyPE`.
+  `recoverAll`, `finishUp`, `restartDone`; `ChkptOnPe`, `BuddyPE`.
 - src/ck-core/ckmemcheckpoint.h: `CkCheckPTEntry`, `CkMemCheckPT`.
 - src/ck-core/cklocation.C: `CkLocMgr::emigrate` (migration count),
   `CkLocMgr::resume` and `pupElementsFor` with `rebuild`,
