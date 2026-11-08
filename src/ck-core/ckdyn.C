@@ -2167,10 +2167,16 @@ static int zcFormat(envelope *env) {
   return (t == CMK_ZC_P2P_SEND_MSG || t == CMK_ZC_SEND_DONE_MSG) ? ZC_HOST : ZC_DEVICE;
 }
 
+static void zcDoneFn(void *param, void *msg);
+
 /* Walk the prefix at buf; returns the payload's offset, *n the descriptor
    count, offs (if given) each descriptor's offset. A device prefix reserves
    room for CK_DEVICE_ACK_CAP acknowledgement ids on its first descriptor,
-   which CkRdmaDeviceOnSender fills at send time. */
+   which CkRdmaDeviceOnSender fills at send time. On the inter-process path
+   CkRdmaDeviceOnSender also replaces a descriptor's callback by an ignore
+   callback, which pups fewer bytes, so the payload offset is computed from
+   the widths zcBuildPrefix sized (a C function callback, no ids), not from
+   the bytes walked. */
 static size_t zcPrefixLen(const char *buf, int fmt, int *n, std::vector<size_t> *offs) {
   PUP::fromMem up((void *)buf);
   up | *n;
@@ -2180,13 +2186,16 @@ static size_t zcPrefixLen(const char *buf, int fmt, int *n, std::vector<size_t> 
     return align16(up.size());
   }
 #if CMK_CUDA || CMK_HIP
-  size_t acks = 0;
+  PUP::sizer ps;
+  ps | *n;
   for (int i = 0; i < *n; i++) {
     if (offs) offs->push_back(up.size());
     CkDeviceBuffer db; up | db;
-    if (i == 0) acks = db.ack_count;
+    db.ack_count = 0;
+    db.cb = CkCallback(zcDoneFn, nullptr);
+    ps | db;
   }
-  return align16(up.size() - 8 * acks + 8 * CK_DEVICE_ACK_CAP);
+  return align16(ps.size() + 8 * CK_DEVICE_ACK_CAP);
 #else
   CkAbort("CkDyn: a message with DEVICE slots reached a build without CUDA or HIP");
 #endif
