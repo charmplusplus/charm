@@ -731,11 +731,29 @@ void CkDynDeliverBroadcast(void *bcastMsg, ArrayElemDyn **elems, int n) {
     CkArray *arr = CkArrayID(elems[0]->ckGetArrayID()).ckLocalBranch();
     std::vector<CkArrayIndex> idx(n);
     for (int i = 0; i < n; i++) idx[i] = elems[i]->ckGetArrayIndex();
+#if CMK_TRACE_ENABLED
+    /* one execute event per element, as CkLocRec::invokeEntry records for a
+       charmxi element; CkArray::recvBroadcast is not traced, so none is open */
+    envelope *env = UsrToEnv(bcastMsg);
+    const bool traced = CpvAccess(traceOn) && _entryTable[ep]->traceEnabled;
+    const int locMgr = arr->getLocMgr()->ckGetGroupID().idx;
+#endif
     for (int i = 0; i < n; i++) {
       ArrayElemDyn *el = static_cast<ArrayElemDyn *>(arr->lookup(idx[i]));
       if (el == nullptr || el->d.handle == nullptr) continue;
       CkCallstackPush(el);
+#if CMK_TRACE_ENABLED
+      if (traced) {
+        CmiObjId pid = idx[i].getProjectionID();
+        _TRACE_SET_OBJECT(locMgr, el->CkMigratable::ckGetID());
+        _TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(), ForChareMsg, ep, env->getSrcPe(),
+                                      env->getTotalsize(), &pid, el);
+      }
+#endif
       c->hooks->deliver(c->desc.binding_data, el->d.handle, ep, r.user_id, r.flags, &v);
+#if CMK_TRACE_ENABLED
+      if (traced) { _TRACE_END_EXECUTE(); _TRACE_CLEAR_OBJECT(); }
+#endif
       CkCallstackPop(el);
     }
   }
@@ -973,6 +991,15 @@ void NodeGroupDyn::pup(PUP::er &p) {
 
 /* ---- ArrayElemDyn ------------------------------------------------------- */
 
+/* A class registered with ndims 0 takes the dimension count of the first
+   index this process sees for it, so that the .sts file and the projections
+   log record that many index fields, as for a charmxi array. Only the trace
+   modules read _chareTable[]->ndims. */
+static void noteDims(int chareIdx, int nd) {
+  ChareInfo *ci = _chareTable[chareIdx];
+  if (ci->ndims == 0 && classOf(chareIdx)->desc.ndims == 0) ci->ndims = nd;
+}
+
 ArrayElemDyn::ArrayElemDyn(CkDynMsg *m) {
   CkDynMsgView v;
   viewPayload(v, m->buf, m, CKDYN_MSGKIND_DYN);
@@ -981,6 +1008,7 @@ ArrayElemDyn::ArrayElemDyn(CkDynMsg *m) {
   usesAtSync = (v.hdr->flags & CKDYN_MSG_USESATSYNC) != 0;
   CkDynTarget t;
   fillTarget(&t);
+  noteDims(d.chareIdx, t.u.array.ndims);
   d.handle = c->hooks->construct(c->desc.binding_data, &t, &v);
   int pe; uint32_t id;
   if ((v.hdr->flags & CKDYN_MSG_CREATION) && findFuture(v, &pe, &id)) {
@@ -1009,6 +1037,7 @@ void ArrayElemDyn::pup(PUP::er &p) {
   CkDynTarget t;
   fillTarget(&t);
   pupObj(p, d, t);
+  if (p.isUnpacking()) noteDims(d.chareIdx, t.u.array.ndims);
 }
 
 /* ---- ArrayMapDyn -------------------------------------------------------- */
@@ -1168,6 +1197,7 @@ extern "C" int CkDynCreateArray(int chare_idx, CkDynMsg *ctor, const CkDynArrayO
     if (o->ndims < 1 || o->ndims > CKDYN_MAX_DIMS) CkAbort("CkDyn: array %s created with %d dimensions", c->desc.name, o->ndims);
     for (int i = 0; i < o->ndims; i++) dims[i] = o->dims[i];
     opts = CkArrayOptions(o->ndims, dims);
+    noteDims(chare_idx, o->ndims);
   }
   if (o->map_gid >= 0) opts.setMap(gidOf(o->map_gid));
   if (o->bind_to_aid >= 0) opts.bindTo(CkArrayID(gidOf(o->bind_to_aid)));
@@ -1185,6 +1215,7 @@ extern "C" void CkDynArrayInsert(int aid, int ndims, const int *index, int on_pe
   const EpRec &r = epRec(ctorEp);
   if (r.cls->ctorEp != ctorEp || r.cls->desc.kind != CKDYN_ARRAY)
     CkAbort("CkDyn: CkDynArrayInsert: the message was not finished with an array class's constructor entry");
+  noteDims(r.cls->chareIdx, ndims);
   UsrToEnv(ctor)->setMsgtype(ArrayEltInitMsg);   /* ckInsertIdx buffers the insert if the array is not here yet */
   CProxy_ArrayBase(CkArrayID(gidOf(aid))).ckInsertIdx((CkArrayMessage *)ctor, ctorEp, on_pe, mkIndex(ndims, index));
 }

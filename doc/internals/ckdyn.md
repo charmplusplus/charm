@@ -113,6 +113,21 @@ creation or insert gives its own, and `CkDynCreateArray` checks the count only
 for a class registered with a fixed one. A language whose arrays pick their
 dimension count at creation (charm4py) registers every array class that way.
 
+Tracing reads the dimension count from `_chareTable[idx]->ndims`: the `.sts`
+file's `CHARE` line reports it, and Projections reads that many index fields
+from each `BEGIN_PROCESSING` record of the class
+(trace-projections.C `LogEntry::pup`; Projections `GenericLogReader`). For a
+class registered with 0, `noteDims` sets `_chareTable[idx]->ndims` to the
+dimension count of the first index this process sees for the class
+(`CkDynCreateArray`, `CkDynArrayInsert`, the element constructor, and an
+element unpacked after migration or restart), so the records carry the
+element's index exactly as for a charmxi array of that dimension count.
+Limits: a class used for arrays of different dimension counts in one run
+keeps the first count, so the index fields of the others are truncated or
+padded (the record layout still matches the `.sts` file); and the `.sts`
+file, written by PE 0's process, reports 0 (no index fields) for a class of
+which that process never created, inserted or held an element.
+
 ## The hook table
 
 `CkDynInit(hooks)` copies the table into `g_hooks` and checks
@@ -417,10 +432,21 @@ first, then before each call looks the element up again with
 `CkCallstackPush`/`CkCallstackPop` of the element. The message is not copied
 per element and not freed here; the broadcast store owns it.
 
-This path does not go through `CkDeliverMessageFree`, so the entry method is
-not traced per element and, with `deliver_many`, no element is on the
-running-object stack during the call: time is charged to the array manager
-unless the binding brackets each element with `CkDynCallstackPush`/`Pop`.
+This path does not go through `CkLocRec::invokeEntry`, so CkDyn does the
+tracing itself. `CkArray::recvBroadcast` is registered not traced
+(`CkDisableTracing`, ckarray.C `_ckArrayInit`), so no execute event is open
+when `CkDynDeliverBroadcast` runs. Without `deliver_many`, when tracing is on
+(`CpvAccess(traceOn)`) and the entry is traced, each element's call is
+bracketed as `invokeEntry` brackets a charmxi element: `_TRACE_SET_OBJECT`
+with the location manager and the element's id, then
+`_TRACE_BEGIN_EXECUTE_DETAILED` with the broadcast's event, source PE and
+length and the element's projection id (its index), then
+`_TRACE_END_EXECUTE` and `_TRACE_CLEAR_OBJECT`; Projections shows one event
+per element. With `deliver_many`, CkDyn makes one call for all elements and
+neither traces nor pushes any element: time is charged to the array manager
+and no per-element event is recorded unless the binding brackets each
+element's method with `CkDynCoroResume(target, ep, 0)`/`CkDynCoroSuspend`
+(below), or with `CkDynCallstackPush`/`Pop` for the load alone.
 All local elements are assumed to belong to the class of the first one.
 
 ## Callbacks and futures
@@ -698,8 +724,10 @@ libck that also defines it.
   `g_classes`, `g_eps`), `registerClass`, the builder (`CkDynMsgBegin`,
   `writePayload`, `CkDynMsgFinish`), the views (`viewPayload`,
   `viewReduction`, `viewSys`, `viewAny`), `dispatch`,
-  `CkDynDeliverBroadcast`, the chare classes, `pupObj`, the sends and
-  creation functions, `CkDynMakeCallback`, `CkDynMgr::deposit`, the reducer
+  `CkDynDeliverBroadcast`, the chare classes, `MainchareDyn::callRelay`,
+  `noteDims`, `pupObj`, the sends and creation functions,
+  `CkDynMakeCallback`, `CkDynMgr::deposit`, `CkDynCoroResume`,
+  `CkDynCoroSuspend`, the reducer
   table and `ckdynForeignReduce`, `ckdynRoPup`, `CkDynInit`, `CkDynStart`.
 - src/ck-core/register.h: `ChareInfo::isDynamic`.
 - src/ck-core/ckarray.C, ckarray.h: `CkArrayBroadcaster::deliverAndUpdateDyn`,
