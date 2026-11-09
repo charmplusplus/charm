@@ -2627,6 +2627,7 @@ bool CkLocMgr::mintUnique(CmiUInt8& u)
     }
     if (std::find(t->waitingPes.begin(), t->waitingPes.end(), CkMyPe()) == t->waitingPes.end())
       t->waitingPes.push_back(CkMyPe());
+    mintFailedWithoutTranche = (t->len == 0);
     CmiUnlock(lock);
     if (send) requestTrancheFromAllocator(want);
     return false;
@@ -2702,12 +2703,10 @@ void CkLocMgr::deferInsertion(CkArray* mgr, CkArrayMessage* msg, const CkArrayIn
   static std::atomic<bool> warned{false};
   if (!warned.exchange(true))
   {
+    // From the failed mint, not the tranche now: another PE may have installed the
+    // grant since.
     const ck::objid::Layout& l = ck::objid::getLayout();
-    ck::objid::Tranche* t = getTranche();
-    CmiLock(CksvAccess(_nodeLock));
-    const CmiUInt8 len = t->len;
-    CmiUnlock(CksvAccess(_nodeLock));
-    if (len == 0)
+    if (mintFailedWithoutTranche)
       CkPrintf("Charm++> Note: PE %d deferred an insertion into chare array (location"
                " manager %d): this process's first tranche of element ids after the"
                " restart has not arrived yet. The element is created when it does;"
