@@ -383,6 +383,11 @@ typedef struct CkDynHooks {
 int  CkDynApiVersion(void);
 int  CkDynRefnumBytes(void);          /* sizeof(CMK_REFNUM_TYPE) of this libcharm */
 int  CkDynHasDeviceSupport(void);
+/* The device HAPI assigned to the calling PE (-1 without CUDA or HIP), and
+ * the same made the calling thread's current device (cudaSetDevice), so
+ * that a binding's libraries allocate on it by default; returns the device. */
+int  CkDynHapiMyDevice(void);
+int  CkDynHapiUseMyDevice(void);
 /* Install the hook table (copied). version must equal CKDYN_API_VERSION and
  * size sizeof(CkDynHooks), otherwise CkDyn aborts; the same check applies to
  * a class's own table (CkDynClassDesc.hooks). A shared-library binding calls it before

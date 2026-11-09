@@ -2768,6 +2768,28 @@ void CkDynMgr::hapiDone(CkDynMsg *m) {
   CkDynCallbackSend(&cb, emptyMsg());
 }
 
+#if CMK_CUDA || CMK_HIP
+CpvExtern(int, my_device);
+#endif
+
+extern "C" int CkDynHapiMyDevice(void) {
+#if CMK_CUDA || CMK_HIP
+  return CpvAccess(my_device);
+#else
+  return -1;
+#endif
+}
+
+extern "C" int CkDynHapiUseMyDevice(void) {
+#if CMK_CUDA || CMK_HIP
+  int dev = CpvAccess(my_device);
+  hapiCheck(hapiSetDevice(dev));
+  return dev;
+#else
+  return -1;
+#endif
+}
+
 extern "C" int CkDynHasDeviceSupport(void) {
 #if CMK_CUDA || CMK_HIP
   return 1;

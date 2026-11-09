@@ -924,6 +924,15 @@ consumed only by an `NCPY` or `DEVICE` slot; when the slot arrives as a
 the post stays, and the binding removes it with `CkDynUnpostBuffer` and copies
 the value itself.
 
+### The device of a PE
+
+`CkDynHapiMyDevice()` returns the device HAPI's mapping gave the calling PE
+(`CpvAccess(my_device)`, the ordinal `hapiInit` passed to `cudaSetDevice` on that
+PE's thread), -1 in a build without CUDA or HIP. `CkDynHapiUseMyDevice()` makes
+it the calling thread's current device and returns it. A binding calls it before
+its first user code on a PE, so that libraries that allocate on the current
+device (CuPy, PyTorch, Numba) use the PE's device by default.
+
 ### Persistent device buffers
 
 The implementation is Charm++'s `CkDevicePersistent` (ckrdmadevice.h/.C);
