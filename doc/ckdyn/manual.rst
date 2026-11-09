@@ -229,13 +229,13 @@ Class descriptors and entry descriptors
 .. code-block:: c
 
    typedef struct CkDynEntryDesc {
-     const char *name;     /* "Class.method"; kept by pointer for the program's lifetime */
+     const char *name;     /* "Class.method"; copied at registration */
      uint32_t    flags;    /* CKDYN_EP_* */
      uint32_t    user_id;  /* opaque to CkDyn; passed back on every delivery */
    } CkDynEntryDesc;
 
    typedef struct CkDynClassDesc {
-     const char            *name;         /* "Class"; kept by pointer */
+     const char            *name;         /* "Class"; copied at registration */
      CkDynKind              kind;
      int                    ndims;        /* arrays: 1..6, or 0 for any */
      int                    num_entries;  /* entries[0] is the constructor */
@@ -493,9 +493,8 @@ Rules:
   process assigns the same indices.
 - Call it before start-up completes. A class registered after that needs
   late registration.
-- The class and entry names are kept by pointer: keep the strings valid for
-  the program's lifetime (string literals, or strings the binding never
-  frees). ``CkDynClassOf(chare_idx)`` returns the registered descriptor, or
+- The class and entry names are copied at registration: the binding may
+  free its strings once ``CkDynRegisterClass`` returns. ``CkDynClassOf(chare_idx)`` returns the registered descriptor, or
   NULL for an index that is not a dynamic class.
 
 A MAINCHARE class is constructed on PE 0 at start-up; a program may
@@ -1806,7 +1805,9 @@ The rules a binding must follow, collected from the chapters above:
 1. Check ``CkDynApiVersion()`` and set ``version`` and ``size`` in every hook
    table. Check ``CkDynRefnumBytes()`` if future ids may exceed 65534.
 2. Register the same classes in the same order on every process, from rank 0.
-3. Keep class and entry name strings valid for the program's lifetime.
+3. Keep the hook table and what ``binding_data`` points to valid for the
+   program's lifetime (the descriptor, the entry table and the name strings
+   are copied at registration).
 4. Never return NULL from ``construct``, ``mainchare`` or ``unpack``.
 5. Abandon a builder on every error path between ``CkDynMsgBegin`` and
    ``CkDynMsgFinish``; free a finished message that will not be sent with

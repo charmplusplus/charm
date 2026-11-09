@@ -58,7 +58,7 @@ enum {
 };
 
 typedef struct CkDynEntryDesc {
-  const char *name;     /* "Class.method"; kept by pointer for the program's lifetime */
+  const char *name;     /* "Class.method"; copied at registration */
   uint32_t    flags;    /* CKDYN_EP_* */
   uint32_t    user_id;  /* opaque to CkDyn; passed back on every delivery */
 } CkDynEntryDesc;
@@ -66,7 +66,7 @@ typedef struct CkDynEntryDesc {
 struct CkDynHooks;
 
 typedef struct CkDynClassDesc {
-  const char            *name;         /* "Class"; kept by pointer */
+  const char            *name;         /* "Class"; copied at registration */
   CkDynKind              kind;
   int                    ndims;        /* arrays only: 1..6, or 0 for any (the index given at creation decides) */
   int                    num_entries;  /* entries[0] is the constructor */

@@ -14,12 +14,12 @@ binding's objects), one message format (`CkDynMsg`, a header plus typed slots)
 for every entry method of every dynamic class.
 
 The reasons for each choice, the alternatives and the measurements are in the
-design document, [`doc/charm4py-thin-design.md`](../charm4py-thin-design.md)
-(until it moves into this repository it is `DESIGN.md` of the charm4py-thin
-project), section 3. This chapter describes what the code does today.
-Zero-copy and device buffers (3.14) and the Python binding (section 4) are
-planned; their entry points exist in `ckdyn.h` and abort, and they are not
-described here.
+design document, `docs/design/DESIGN.md` on branch `thin` of the charm4py
+repository (github.com/charmplusplus/charm4py), section 3. This chapter
+describes what the code does today. Zero-copy host and device slots, posts and
+HAPI callbacks are implemented and described below. The Python binding is
+charm4py 2, branch `thin` of the charm4py repository; it is not described
+here.
 
 ## Files
 
@@ -1077,7 +1077,7 @@ binding.
   %zu on the sizing pass" is a binding whose two passes disagree.
 - **Kind mismatches.** `CkDynCreate*` on a class of another kind,
   `CkDynContribute` from a chare or main chare, `CkDynGetReductionNumber` on a
-  kind other than group or array, `CkDynAtSync`, `CkDynSetMigratable`,
+  kind other than group, nodegroup, array map or array element, `CkDynAtSync`, `CkDynSetMigratable`,
   `CkDynMigrateMe` and `CkDynSetObjLoad` on a target that is not a local array
   element, and `CkDynArrayInsert` with a message not finished with an array
   class's constructor entry.
