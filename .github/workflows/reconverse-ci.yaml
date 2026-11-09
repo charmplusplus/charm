@@ -63,6 +63,8 @@ env:
   # pup_buffer data; the 2-process step is the one that reaches the case.
   # section_migrate: CkMulticast section multicasts and reductions while the
   # members and the section root migrate (migrateMe and AtSync).
+  # xarray_section_reduction: reductions over a section that spans two arrays
+  # keep their reducer type, user flag and callback.
   TEST_DIRS: >-
     tests/charm++/megatest
     tests/charm++/simplearrayhello
@@ -85,6 +87,7 @@ env:
     tests/charm++/threaded_redn
     tests/charm++/reduction_migrate_ahead
     tests/charm++/section_migrate
+    tests/charm++/xarray_section_reduction
     tests/charm++/qd
     tests/charm++/within_node_bcast
     tests/charm++/zerocopy/zerocopy_with_qd
