@@ -52,6 +52,8 @@ env:
   # redesign (PR 1d): objid_insert reproduces that defect deterministically
   # (phase 7), objid_wide covers the wide-collection layout.
   # examples/charm++/hello/local covers [local] entry methods (#4065).
+  # objloads: the CkPerfObjLoads and LBObjLoads CCS queries agree; it needs a
+  # tracing build, so it runs in the ARM64 Linux job and skips elsewhere.
   # atsync_reduction (2026-10-25): reductions in flight across an AtSync
   # balancing step, and arrays with stable locations (-s -d) keeping their
   # no-broadcast-in-flight promise (#4072).
@@ -59,6 +61,10 @@ env:
   # reductions on their old PE (#4145).
   # bcast_zcpup: broadcasts to elements that migrate to another process with
   # pup_buffer data; the 2-process step is the one that reaches the case.
+  # section_migrate: CkMulticast section multicasts and reductions while the
+  # members and the section root migrate (migrateMe and AtSync).
+  # xarray_section_reduction: reductions over a section that spans two arrays
+  # keep their reducer type, user flag and callback.
   TEST_DIRS: >-
     tests/charm++/megatest
     tests/charm++/simplearrayhello
@@ -75,10 +81,14 @@ env:
     tests/charm++/groupdep_creator
     tests/charm++/objid_boundrecreate
     tests/charm++/anytime_bcastred
+    tests/charm++/objloads
     tests/charm++/delegation/multicast
     tests/charm++/atsync_reduction
     tests/charm++/threaded_redn
     tests/charm++/reduction_migrate_ahead
+    tests/charm++/section_migrate
+    tests/charm++/load_balancing/migrate_then_atsync
+    tests/charm++/xarray_section_reduction
     tests/charm++/qd
     tests/charm++/within_node_bcast
     tests/charm++/zerocopy/zerocopy_with_qd
@@ -123,15 +133,43 @@ jobs:
         run: |
           set -e
           for d in $TEST_DIRS; do TESTRUN_PROCS=2 TESTRUN_VA_RANDOMIZATION=1 timeout 900 make -C $d test; done
-      # Every zerocopy example across two processes, so that each transfer
-      # crosses the network: reg, unreg and prereg buffers for the direct,
-      # entry method and broadcast APIs (#4146).
-      - name: zerocopy examples (2 processes, lcrun)
-        run: |
-          set -e
-          B=$PWD/reconverse-linux-x86_64
-          make -C examples/charm++/zerocopy CHARMC=$B/bin/charmc
-          TESTRUN_PROCS=2 TESTRUN_VA_RANDOMIZATION=1 timeout 1800 make -C examples/charm++/zerocopy test
+      # Every example in examples/charm++ (the directories its Makefile lists),
+      # in one process and in two (#4161). In two processes every zerocopy
+      # transfer crosses the network: reg, unreg and prereg buffers for the
+      # direct, entry method and broadcast APIs (#4146).
+      - name: build examples/charm++
+        run: make -C examples/charm++ CHARMC=$PWD/reconverse-linux-x86_64/bin/charmc
+      - name: examples/charm++ (single process)
+        run: TESTRUN_VA_RANDOMIZATION=1 timeout 1800 make -C examples/charm++ test
+      - name: examples/charm++ (2 processes, lcrun)
+        run: TESTRUN_PROCS=2 TESTRUN_VA_RANDOMIZATION=1 timeout 1800 make -C examples/charm++ test
+
+  # The syncft (in-memory checkpoint) build option: checkpoint, rollback and
+  # the migration, insertion and deletion refusals, in one and two processes.
+  # A job of its own because the option changes code every program runs (see
+  # doc/internals/memckpt.md). tests/campi/jacobi3d restarts from a disk
+  # checkpoint onto more PEs, which under syncft goes through the doneInserting
+  # condition in CkLocMgr's pup; as in ampi-linux-x86_64, its two-process run
+  # leaves address randomization on (a campi rank holds no code or data address).
+  reconverse-linux-x86_64-syncft:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+      - name: install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libfabric-dev
+      - name: build
+        run: ./build AMPI reconverse-linux-x86_64 syncft -j4 -g
+      - name: test (single process)
+        run: timeout 900 make -C tests/charm++/memckpt_rollback test
+      - name: test (2 processes, lcrun)
+        run: TESTRUN_PROCS=2 timeout 900 make -C tests/charm++/memckpt_rollback test
+      - name: tests/campi/jacobi3d (single process)
+        run: timeout 900 make -C tests/campi/jacobi3d test
+      - name: tests/campi/jacobi3d (2 processes, lcrun, randomization on)
+        run: TESTRUN_PROCS=2 TESTRUN_VA_RANDOMIZATION=1 timeout 900 make -C tests/campi/jacobi3d test
 
   # MPI interop (CharmLibInit/CharmLibExit) in an Open MPI program. A job of
   # its own so that the MPI packages stay out of the other builds.
@@ -170,7 +208,8 @@ jobs:
       - name: install dependencies
         run: sudo apt-get update && sudo apt-get install -y cmake libfabric-dev
       - name: build
-        run: ./build charm++ reconverse-linux-arm8 -j4 -g -Werror=vla
+        # --enable-tracing: tests/charm++/objloads needs libtrace-utilization.
+        run: ./build charm++ reconverse-linux-arm8 -j4 -g -Werror=vla --enable-tracing
       - name: build tests
         run: |
           set -e

@@ -348,11 +348,7 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
   for (r=redNo;r<ci->redNo;r++)
     adj(r).lcount++;//He'll be contributing to r here
 
-  // Check whether the death of this contributor made this pe go barren at this
-  // redNo
-  if (ci->redNo <= redNo) {
-    checkIsActive();
-  }
+  checkIsActive();
   finishReduction();
   maybeCompleteObligationFreeRound();  // same hole as migration (see below)
 }
@@ -391,10 +387,9 @@ void CkReductionMgr::contributorLeaving(contributorInfo *ci)
   for (int r=redNo;r<ci->redNo;r++)
     adj(r).lcount++;//He'll be contributing to r here
 
-  // Check whether this made this pe go barren at redNo
-  if (ci->redNo <= redNo) {
-    checkIsActive();
-  }
+  // Unconditionally: is_inactive must follow lcount whatever round the
+  // element is at, or a PE that empties again never re-informs its parent.
+  checkIsActive();
   finishReduction();
   maybeCompleteObligationFreeRound();
 }
@@ -413,10 +408,7 @@ void CkReductionMgr::contributorArriving(contributorInfo *ci)
   for (int r=redNo;r<ci->redNo;r++)
     adj(r).lcount--;//He won't be contributing to r here
 
-  // Check if the arrival of a new contributor makes this PE become active again
-  if (ci->redNo == redNo) {
-    checkIsActive();
-  }
+  checkIsActive();
   maybeCompleteObligationFreeRound();
 }
 

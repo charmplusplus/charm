@@ -64,6 +64,9 @@ class sectionRedInfo {
         void *storedClientParam;
         /// Reduction sequence number
         int redNo;
+        /// Root only: a fragment of this reduction was completed by
+        /// contributions that did not all come through this tree
+        int8_t mixed;
         /// Messages for this reduction
         reductionMsgs  msgs [MAXFRAGS];
         /// Messages of future reductions
@@ -73,7 +76,7 @@ class sectionRedInfo {
         sectionRedInfo(): npProcessed(0),
                          storedCallback(NULL),
                          storedClientParam(NULL),
-                         redNo(0) {
+                         redNo(0), mixed(0) {
             for (int8_t i=0; i<MAXFRAGS; i++)
                 lcount [i] = ccount [i] = gcount [i] = 0;
         }
@@ -155,6 +158,12 @@ class mCastEntry
         mCastEntry *oldc, *newc;
         /// Old spanning tree
         SectionLocation   oldtree;
+        /// Root only: the reduction number has been requested from the old
+        /// tree and has not arrived yet
+        char redNoPending;
+        /// Root only: a retrieveCookie received while redNoPending; its
+        /// requester (the next root), answered when the number arrives
+        CkSectionInfo pendingRetrieve;
         // for reduction
         sectionRedInfo red;
         //
@@ -164,10 +173,10 @@ class mCastEntry
 	char grpSec;
     public:
         mCastEntry(CkArrayID _aid): aid(_aid), numChild(0), localGrpElem(0), asm_msg(NULL),
-                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0),
+                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0), redNoPending(0),
                    flag(COOKIE_NOTREADY), grpSec(0) {}
         mCastEntry(CkGroupID _gid): aid(_gid), numChild(0), localGrpElem(0), asm_msg(NULL),
-                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0),
+                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0), redNoPending(0),
                    flag(COOKIE_NOTREADY), grpSec(1) {}
         mCastEntry(mCastEntry *);
         /// Check if this tree is only a branch and has a parent
@@ -276,7 +285,7 @@ void _ckMulticastInit(void)
 
 
 mCastEntry::mCastEntry (mCastEntry *old): 
-  numChild(0), oldc(NULL), newc(NULL), flag(COOKIE_NOTREADY), grpSec(old->isGrpSec())
+  numChild(0), oldc(NULL), newc(NULL), redNoPending(0), flag(COOKIE_NOTREADY), grpSec(old->isGrpSec())
 {
   aid = old->aid;
   parentGrp = old->parentGrp;
@@ -393,6 +402,7 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayBase &proxy)
   entry->oldtree.set(oldentry, oldpe);
 
   // retire the old tree and fetch its reduction number, in one message
+  entry->redNoPending = 1;
   mCastGrp[oldpe].retrieveCookie(CkSectionInfo(oldpe, oldentry, 0, aid), info);
 }
 
@@ -505,6 +515,12 @@ void CkMulticastMgr::initGrpDelegateMgr(CProxySection_Group *proxy, int opts)
 void CkMulticastMgr::retrieveCookie(CkSectionInfo s, CkSectionInfo srcInfo)
 {
   mCastEntry *entry = (mCastEntry *)s.get_val();
+  if (entry->redNoPending) {
+    // The root moved again before this entry learned its own number:
+    // answer from recvCookieInfo.
+    entry->pendingRetrieve = srcInfo;
+    return;
+  }
   // Retire first: an obsolete root forwards contributions to the new root,
   // so its redNo no longer advances and the value sent below is final.
   retire(s, srcInfo);
@@ -518,7 +534,12 @@ void CkMulticastMgr::recvCookieInfo(CkSectionInfo s, int red)
 {
   mCastEntry *entry = (mCastEntry *)s.get_val();
   entry->red.redNo = red;
+  entry->redNoPending = 0;
+  if (entry->pendingRetrieve.get_val())
+    retrieveCookie(s, entry->pendingRetrieve);
 
+  // Still build the tree when retired: childrenReady releases the
+  // multicasts buffered here through it.
   initCookie(s);
 
   // TODO delete old tree
@@ -663,7 +684,8 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     } 
     entry->aid = aid;
     entry->pe = CkMyPe();
-    entry->rootSid = msg->rootSid;
+    /// A root retired before its own setup arrives keeps the new root as rootSid
+    if (!entry->isObsolete()) entry->rootSid = msg->rootSid;
     entry->parentGrp = msg->parent;
     int factor = entry->bfactor = msg->bfactor;
 
@@ -783,9 +805,16 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
 
 void CkMulticastMgr::childrenReady(mCastEntry *entry)
 {
-    // Mark this entry as ready
-    entry->setReady();
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+    if (entry->isObsolete()) {
+        /// Retired while the tree was still being built: retire found no
+        /// children to tear down, so tear them down now. The entry stays
+        /// obsolete; the messages released below are forwarded to the new root.
+        for (size_t i=0; i<entry->children.size(); i++)
+            mCastGrp[entry->children[i].get_pe()].teardown(entry->children[i]);
+    }
+    else
+        entry->setReady();
 
     DEBUGF(("[%d] childrenReady entry %p groupsection?: %d,  Arrayelems: %zu, GroupElems: %zu, redNo: %d\n", CkMyPe(), entry, entry->isGrpSec(), entry->allElem.size(), entry->allGrpElem.size(), entry->red.redNo));
 
@@ -1426,6 +1455,9 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
         mCastGrp[entry->parentGrp.get_pe()].recvRedMsg(newmsg);
     } else {
         newmsg->sid = id;
+        // A reducer that builds a new message leaves its callback unset; the
+        // cross-array reducer (XArraySectionReducer) reads it from here
+        newmsg->callback = msg_cb;
         // Buffer the reduced fragment
         rmsgs.push_back (newmsg);
         // If all the fragments have been reduced
@@ -1488,8 +1520,6 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
 
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
-    int updateReduceNo = 0;
-
     //-------------------------------------------------------------------------
     /// If this cookie is obsolete
     if (entry->isObsolete()) {
@@ -1508,8 +1538,6 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
         if (!entry->hasParent() && !entry->isObsolete()) {
             /// Indicate it is not on old spanning tree
             msg->sourceFlag = 0;
-            /// Flag the redn as coming from an old tree and that the new entry cookie needs to know the new redn num.
-            updateReduceNo  = 1;
         }
         /// If I am not the root or this latest cookie is also obsolete
         else {
@@ -1618,11 +1646,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
         const int8_t nFrags = msg->nFrags;
         /// Reduce this fragment
         reduceFragment (index, id, entry, redInfo, currentTreeUp);
-
-        // If migration happened, and my sub-tree reconstructed itself,
-        // share the current reduction number with myself and all my children
-        if (updateReduceNo)
-            mCastGrp[CkMyPe()].updateRedNo(entry, redInfo.redNo);
+        if (!currentTreeUp) redInfo.mixed = 1;
 
         /// If all the fragments for the current reduction have been processed
         if (redInfo.npProcessed == nFrags) {
@@ -1637,6 +1661,14 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
                 redInfo.gcount [i] = 0;
             }
             redInfo.npProcessed = 0;
+            /// A child that did not carry every fragment still has the number
+            /// this tree was built with (contributions were in flight in the
+            /// old tree) and would hold the next reduction as a future one.
+            if (redInfo.mixed) {
+                redInfo.mixed = 0;
+                for (size_t c=0; c<entry->children.size(); c++)
+                    mCastGrp[entry->children[c].get_pe()].updateRedNo((mCastEntry *)entry->children[c].get_val(), redInfo.redNo);
+            }
             /// Now that, the current redn is done, release any pending msgs from future redns
             releaseFutureReduceMsgs(entry);
         }

@@ -43,8 +43,9 @@ class XArraySectionReducer
               msgMap[redNo].pop_back();
               // Only the partially reduced message should be remaining in the msgs vector after partialReduction
               CkAssert(intermediateReducedMsg == msgMap[redNo][0]);
-              // Copy the reducer in the newly created message which will be used in the finalReducer()
+              // Copy the reducer and the user flag in the newly created message which will be used in the finalReducer()
               intermediateReducedMsg->reducer = msg->reducer;
+              intermediateReducedMsg->userFlag = msg->userFlag;
               delete msg;
             }
             numReceivedMap[redNo]++;
@@ -57,12 +58,21 @@ class XArraySectionReducer
         void finalReducer(int redNo)
         {
             // Get a handle on the reduction function for this message
-            CkReduction::reducerFn f = CkReduction::reducerTable()[ msgMap[redNo][0]->reducer ].fn;
+            CkReductionMsg *first = msgMap[redNo][0];
+            CkReduction::reducerType reducer = first->reducer;
+            int userFlag = first->userFlag;
+            CkCallback cb = first->callback;
+            CkReduction::reducerFn f = CkReduction::reducerTable()[reducer].fn;
             // Perform an extra reduction step on all the subsection reduction msgs
             CkReductionMsg *finalMsg = (*f)(msgMap[redNo].size(), msgMap[redNo].data());
+            // The reducer function resets these fields (buildNew); the client
+            // sees them as in a single-section reduction
+            finalMsg->reducer = reducer;
+            finalMsg->userFlag = userFlag;
+            CkSetRefNum(finalMsg, userFlag);
             // Send the final reduced msg to the client
             if (finalCB == nullptr)
-                msgMap[redNo][0]->callback.send(finalMsg);
+                cb.send(finalMsg);
             else
                 finalCB->send(finalMsg);
             // Delete the subsection redn msgs, accounting for any msg reuse

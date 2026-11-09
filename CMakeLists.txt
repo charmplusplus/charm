@@ -509,14 +509,6 @@ if(CMK_COVERAGE)
   # clang), so it is not put in CMAKE_EXE_LINKER_FLAGS.
 endif()
 
-# This needs to be include before we set charmc as the linker
-# but after CMAKE_LIBRARY_OUTPUT_DIRECTORY has been set
-add_subdirectory(cmake/reconverse)
-
-if (NOT CMK_MEMPOOL_CUTOFFNUM)
-  set(CMK_MEMPOOL_CUTOFFNUM 28)
-endif()
-
 set(CMK_OPTIMIZE 0)
 if(CMAKE_BUILD_TYPE MATCHES "Release" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInfo")
     set(CMK_OPTIMIZE 1)
@@ -524,6 +516,17 @@ if(CMAKE_BUILD_TYPE MATCHES "Release" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInf
     set(BUILDOPTS "${BUILDOPTS} -optimize -production")
     set(OPTS "${OPTS} -optimize -production")
     set(OPTSATBUILDTIME "${OPTSATBUILDTIME} -optimize -production")
+endif()
+# Every object in this build and in reconverse sees the same CMK_OPTIMIZE,
+# whether or not it includes conv-mach-opt.h before converse.h.
+add_compile_definitions(CMK_OPTIMIZE=${CMK_OPTIMIZE})
+
+# This needs to be include before we set charmc as the linker
+# but after CMAKE_LIBRARY_OUTPUT_DIRECTORY has been set
+add_subdirectory(cmake/reconverse)
+
+if (NOT CMK_MEMPOOL_CUTOFFNUM)
+  set(CMK_MEMPOOL_CUTOFFNUM 28)
 endif()
 
 set(CMK_CHARM4PY 0)
@@ -668,6 +671,8 @@ configure_file(src/arch/common/conv-mach-papi.sh             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-papi.h              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-perftools.sh        include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-perftools.h         include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-syncft.h            include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-syncft.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-persistent.sh       include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-persistent.h        include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-pgf90.sh            include/ COPYONLY)
@@ -1077,6 +1082,14 @@ if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NET
 endif()
 
 
+# CMK_MEM_CHECKPOINT reaches Makefiles through conv-mach-opt.mak (tests skip
+# the in-memory checkpoint tests without it); C code gets it from conv-mach-syncft.h.
+if(SYNCFT)
+  set(CMK_MEM_CHECKPOINT 1)
+else()
+  set(CMK_MEM_CHECKPOINT 0)
+endif()
+
 # Create conv-mach-opt.mak
 set(optfile_mak ${CMAKE_BINARY_DIR}/include/conv-mach-opt.mak)
 
@@ -1088,7 +1101,7 @@ foreach(l CUDA_DIR HIP_DIR BUILD_CUDA BUILD_HIP CMK_AMPI_WITH_ROMIO CMK_MACOSX C
         CMK_SUPPORTS_SWAPGLOBALS CMK_SUPPORTS_TLSGLOBALS CMK_HAS_OPENMP
         CMK_TRACE_ENABLED CMK_USE_LRTS CMK_VDIR OPTSATBUILDTIME CMK_AMPI_ONLY CMK_WINDOWS
         CMK_USE_CMA CMK_USER_SUFFIX CMK_CAN_LINK_FORTRAN CMK_SUPPORTS_MEMORY_ISOMALLOC
-	CMK_CXI)
+	CMK_CXI CMK_MEM_CHECKPOINT)
     file(APPEND ${optfile_mak} "${l}:=${${l}}\n" )
 endforeach(l)
 
@@ -1212,6 +1225,8 @@ add_custom_target(create_symlinks ALL
                   COMMAND test -d ${CMAKE_BINARY_DIR}/benchmarks || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/benchmarks ${CMAKE_BINARY_DIR}/benchmarks && true
                   COMMAND test -d ${CMAKE_BINARY_DIR}/examples || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/examples ${CMAKE_BINARY_DIR}/examples && true
                   COMMAND test -d ${CMAKE_BINARY_DIR}/tests || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/tests && true
+                  # miniapps/ is a submodule a plain clone leaves empty: mirror it on the first make after it is checked out.
+                  COMMAND test -f ${CMAKE_BINARY_DIR}/miniapps/Makefile || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/miniapps ${CMAKE_BINARY_DIR}/miniapps && true
                   VERBATIM
                  )
 

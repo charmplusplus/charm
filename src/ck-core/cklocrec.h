@@ -21,6 +21,7 @@ private:
 #if CMK_LBDB_ON
   bool  asyncMigrate;  /// if readyMove is inited
   bool  readyMigrate;    /// status whether it is ready to migrate
+  bool  lbOrderedMigrate; /// the pending departure was ordered by the load balancer
   bool  enable_measure;
   int  nextPe;              /// next migration dest processor
   CkSyncBarrier* syncBarrier;
@@ -78,6 +79,7 @@ public:
   void setGPUPupSize(size_t obj_gpu_pup_size);
   void AsyncMigrate(bool use);
   bool isAsyncMigrate()   { return asyncMigrate; }
+  bool isLBOrderedMigrate() { return lbOrderedMigrate; }
   void ReadyMigrate(bool ready) { readyMigrate = ready; } ///called from user
   bool isReadyMigrate()	{ return readyMigrate; }
   bool checkBufferedMigration();	// check and execute pending migration

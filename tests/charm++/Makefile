@@ -52,13 +52,21 @@ DIRS = \
   objid_recreate \
   objid_boundrecreate \
   collide \
+  objloads \
   qd \
   reduction_migrate_ahead \
+  section_migrate \
+  xarray_section_reduction \
   bcast_zcpup \
 
 FTDIRS = \
   jacobi3d \
   jacobi3d-sdag \
+
+# Needs a build with the syncft (memft) option.
+ifeq ($(CMK_MEM_CHECKPOINT),1)
+DIRS += memckpt_rollback
+endif
 
 # Not applicable on reconverse: longIdle needs CcdCallOnConditionOnPE, which
 # reconverse does not provide.
