@@ -706,24 +706,24 @@ Priorities and queueing
 
 Reserve priority bits at ``CkDynMsgBegin``, then after ``Finish`` write the
 priority through ``CkDynMsgPriorityPtr(m)`` and set the queueing strategy
-with ``CkDynMsgSetQueueing(m, q)``. The values of ``q`` are Converse's
-``CQS_QUEUEING_*`` constants, which a binding without Charm++ headers
-defines itself:
+with ``CkDynMsgSetQueueing(m, q)``, where ``q`` is one of the
+``CKDYN_QUEUEING_*`` constants of ``ckdyn.h`` (their values equal Charm++'s
+``CK_QUEUEING_*``). Without a call the message is queued FIFO.
 
 .. list-table::
    :header-rows: 1
    :widths: 50 50
 
-   * - strategy
-     - value
-   * - FIFO, LIFO
-     - 2, 3
-   * - IFIFO, ILIFO (integer priority)
-     - 4, 5
-   * - BFIFO, BLIFO (bit-vector priority)
-     - 6, 7
-   * - LFIFO, LLIFO (64-bit priority)
-     - 8, 9
+   * - constants
+     - priority
+   * - ``CKDYN_QUEUEING_FIFO``, ``CKDYN_QUEUEING_LIFO``
+     - none
+   * - ``CKDYN_QUEUEING_IFIFO``, ``CKDYN_QUEUEING_ILIFO``
+     - an ``int``, lower first
+   * - ``CKDYN_QUEUEING_BFIFO``, ``CKDYN_QUEUEING_BLIFO``
+     - a bit vector
+   * - ``CKDYN_QUEUEING_LFIFO``, ``CKDYN_QUEUEING_LLIFO``
+     - a 64-bit integer
 
 From the C++ test (a smaller integer runs first):
 
@@ -733,7 +733,7 @@ From the C++ test (a smaller integer runs first):
    CkDynMsgAddI64(b, p);
    CkDynMsg *m = CkDynMsgFinish(b, 0);
    *(int *)CkDynMsgPriorityPtr(m) = p;
-   CkDynMsgSetQueueing(m, 4 /* IFIFO */);
+   CkDynMsgSetQueueing(m, CKDYN_QUEUEING_IFIFO);
    CkDynSendGroup(gid, CkDynMyPe(), ep, m, NULL);
 
 Sending
@@ -1950,7 +1950,7 @@ See :ref:`ckdyn-messages`. Each ``Add`` function appends one slot.
    The reserved priority bits of a finished message, to fill in.
 
 ``void CkDynMsgSetQueueing(CkDynMsg *m, int queueing)``
-   Sets the queueing strategy (a ``CQS_QUEUEING_*`` value).
+   Sets the queueing strategy (a ``CKDYN_QUEUEING_*`` value).
 
 ``void CkDynMsgFree(CkDynMsg *m)``
    Frees a finished message that will not be sent.
