@@ -1601,12 +1601,17 @@ void CkDynMgr::relay(CkDynMsg *m) {
 /* Reductions                                                              */
 /* ====================================================================== */
 
+/* The *_long reducers operate on C long: 4 bytes on LLP64 (Windows), 8 on LP64. */
+static_assert(sizeof(long) == 4 || sizeof(long) == 8, "CkDyn: long must be 4 or 8 bytes");
+#define CKDYN_ELEM_LONG  (sizeof(long) == 4 ? CKDYN_ELEM_I32 : CKDYN_ELEM_I64)
+#define CKDYN_ELEM_ULONG (sizeof(long) == 4 ? CKDYN_ELEM_U32 : CKDYN_ELEM_U64)
+
 #define R(name, elem) { #name, CkReduction::name, elem }
 #define RFAM(op) \
   R(op##_char, CKDYN_ELEM_I8), R(op##_short, CKDYN_ELEM_I16), R(op##_int, CKDYN_ELEM_I32), \
-  R(op##_long, CKDYN_ELEM_I64), R(op##_long_long, CKDYN_ELEM_I64), \
+  R(op##_long, CKDYN_ELEM_LONG), R(op##_long_long, CKDYN_ELEM_I64), \
   R(op##_uchar, CKDYN_ELEM_U8), R(op##_ushort, CKDYN_ELEM_U16), R(op##_uint, CKDYN_ELEM_U32), \
-  R(op##_ulong, CKDYN_ELEM_U64), R(op##_ulong_long, CKDYN_ELEM_U64), \
+  R(op##_ulong, CKDYN_ELEM_ULONG), R(op##_ulong_long, CKDYN_ELEM_U64), \
   R(op##_float, CKDYN_ELEM_F32), R(op##_double, CKDYN_ELEM_F64)
 
 static const CkDynReducerInfo g_reducerTable[] = {
@@ -1623,6 +1628,8 @@ static const CkDynReducerInfo g_reducerTable[] = {
 };
 #undef R
 #undef RFAM
+#undef CKDYN_ELEM_LONG
+#undef CKDYN_ELEM_ULONG
 
 static const int g_numReducers = (int)(sizeof(g_reducerTable) / sizeof(g_reducerTable[0]));
 
