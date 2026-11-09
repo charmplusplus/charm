@@ -121,6 +121,7 @@ public:
   static void callEntry(void *msg, void *obj);
   static void callMigrate(void *msg, void *obj);
   void pup(PUP::er &p) override;
+  int getRedNo() const { return reductionInfo.redNo; }   // NodeGroup keeps it protected
 };
 
 class ArrayElemDyn : public ArrayElement {

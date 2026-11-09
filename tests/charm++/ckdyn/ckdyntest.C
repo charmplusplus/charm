@@ -722,6 +722,7 @@ CbClass Grp = { "Grp", CKDYN_GROUP, 0, {
 
 static int64_t ngCtor(Obj *o, const CkDynMsgView *) {
   CHECK(o->t.kind == CKDYN_NODEGROUP && o->t.u.group.pe_or_node == CkMyNode(), "NGrp constructed with a wrong target");
+  CHECK(CkDynGetReductionNumber(&o->t) == 0, "NGrp: reduction number of a new branch is not 0");
   g_ngObj = o;
   return 0;
 }

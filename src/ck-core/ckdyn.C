@@ -1530,9 +1530,10 @@ extern "C" int CkDynGetReductionNumber(const CkDynTarget *t) {
   Chare *c = localChare(t);
   if (c == nullptr) CkAbort("CkDyn: CkDynGetReductionNumber on an object that is not local");
   switch (t->kind) {
-    case CKDYN_GROUP: return ((Group *)c)->getRedNo();
+    case CKDYN_GROUP: case CKDYN_ARRAYMAP: return ((Group *)c)->getRedNo();
+    case CKDYN_NODEGROUP: return ((NodeGroupDyn *)c)->getRedNo();
     case CKDYN_ARRAY: return ((ArrayElement *)c)->getRedNo();
-    default: CkAbort("CkDyn: CkDynGetReductionNumber: only groups and array elements expose a reduction number");
+    default: CkAbort("CkDyn: CkDynGetReductionNumber: only groups, nodegroups and array elements expose a reduction number");
   }
 }
 
