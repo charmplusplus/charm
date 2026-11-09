@@ -16,6 +16,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <mutex>
+#include <atomic>
+#include <map>
 #if CMK_CUDA || CMK_HIP
 #include "hapi.h"
 #endif
@@ -2307,6 +2309,13 @@ static size_t zcBuildPrefix(CkDynMsgBuilder *b, std::vector<char> &out) {
 #endif
 }
 
+/* transfer modes of DEVICE slots and persistent device buffers (dpAnnounce) */
+enum { DP_MEMCPY = 0, DP_MODE_IPC = 1, DP_RDMA = 2 };
+#if CMK_CUDA || CMK_HIP
+static void dpAnnounce(const char *what, int mode);
+static bool dpUseShm();
+#endif
+
 /* A device message's sender-side work, once the destination PE is known:
    CkRdmaDeviceOnSender (stream synchronization or IPC staging, registration,
    acknowledgement ids), and the descriptors re-pupped in place. */
@@ -2335,6 +2344,8 @@ static void zcDevicePrepare(CkDynMsg *m, int destPe) {
     }
   std::vector<CkDeviceBuffer *> bp(n);
   for (int i = 0; i < n; i++) bp[i] = &dbs[i];
+  dpAnnounce("DEVICE slots", CmiNodeOf(destPe) == CkMyNode() ? DP_MEMCPY
+             : (CmiPeOnSamePhysicalNode(destPe, CkMyPe()) && dpUseShm()) ? DP_MODE_IPC : DP_RDMA);
   CkRdmaDeviceOnSender(destPe, n, bp.data());
   PUP::toMem pm(buf);
   pm | n;
@@ -2356,11 +2367,24 @@ static void zcBeforeSend(CkDynMsg *m, int destPe, int *flags) {
 
 /* ---- receiver ----------------------------------------------------------- */
 
-static bool zcTakePost(CkDynObj &d, int ep, int slot, bool device, CkDynPost *out) {
+/* 1 when slot 0 of the message is the FUTURE slot of a CKDYN_MSG_BLOCK message:
+   argument k of a CKDYN_POST_ARG post is then slot k + 1 */
+static int zcArgOffset(const CkDynHdr *h) {
+  const CkDynSlot *sl = (const CkDynSlot *)(h + 1);
+  return ((h->flags & CKDYN_MSG_BLOCK) && h->nslots > 0 && sl[0].type == CKDYN_SLOT_FUTURE) ? 1 : 0;
+}
+
+static bool zcPostMatches(const CkDynPost &p, int ep, int slot, int argOff) {
+  if (p.ep != ep) return false;
+  if (p.slot & CKDYN_POST_ARG) return (p.slot & ~CKDYN_POST_ARG) + argOff == slot;
+  return p.slot == slot;
+}
+
+static bool zcTakePost(CkDynObj &d, int ep, int slot, int argOff, bool device, CkDynPost *out) {
   if (d.posts == nullptr) return false;
   for (size_t i = 0; i < d.posts->size(); i++) {
     CkDynPost &p = (*d.posts)[i];
-    if (p.ep != ep || p.slot != slot) continue;
+    if (!zcPostMatches(p, ep, slot, argOff)) continue;
     if (p.device != device)
       CkAbort("CkDyn: a %s buffer was posted for entry %d slot %d, which carries a %s slot",
               p.device ? "device" : "host", ep, slot, device ? "DEVICE" : "NCPY");
@@ -2373,8 +2397,9 @@ static bool zcTakePost(CkDynObj &d, int ep, int slot, bool device, CkDynPost *ou
 
 static void zcCheckPostLen(const CkDynPost &p, const CkDynSlot &s) {
   if (p.len != s.len)
-    CkAbort("CkDyn: entry %d slot %d: the posted buffer has %llu bytes, the message's slot %u",
-            p.ep, p.slot, (unsigned long long)p.len, s.len);
+    CkAbort("CkDyn: entry %d %s %d: the posted buffer has %llu bytes, the message's slot %u",
+            p.ep, (p.slot & CKDYN_POST_ARG) ? "argument" : "slot", p.slot & ~CKDYN_POST_ARG,
+            (unsigned long long)p.len, s.len);
 }
 
 /* Host posts: the slot's data, already in the message, is copied into the
@@ -2388,7 +2413,7 @@ static void zcApplyHostPosts(CkDynMsg *m, CkDynObj &d, int ep) {
   for (int i = 0; i < h->nslots; i++) {
     if (sl[i].type != CKDYN_SLOT_NCPY) continue;
     CkDynPost p;
-    if (!zcTakePost(d, ep, i, false, &p)) continue;
+    if (!zcTakePost(d, ep, i, zcArgOffset(h), false, &p)) continue;
     zcCheckPostLen(p, sl[i]);
     char *at = m->buf + offs[sl[i].reserved2];
     CkNcpyBuffer nb;
@@ -2421,7 +2446,7 @@ static void zcDeviceIssue(CkDynMsg *m, CkDynObj *d, int ep) {
     if (sl[i].type != CKDYN_SLOT_DEVICE) continue;
     int k = (int)sl[i].reserved2;
     CkDynPost p;
-    if (d && zcTakePost(*d, ep, i, true, &p)) {
+    if (d && zcTakePost(*d, ep, i, zcArgOffset(h), true, &p)) {
       zcCheckPostLen(p, sl[i]);
       ptrs[k] = p.ptr;
       sl[i].reserved = (uint16_t)p.device_ord;
@@ -2546,6 +2571,17 @@ static void addPost(const CkDynTarget *t, int ep, int slot, bool device, int dev
   d->posts->push_back(CkDynPost{ ep, slot, device, dev, (void *)ptr, len });
 }
 
+extern "C" int CkDynUnpostBuffer(const CkDynTarget *t, int ep, int slot) {
+  CkDynObj *d = t->kind == CKDYN_NODEGROUP ? nullptr : objOf(t);
+  if (d == nullptr || d->posts == nullptr) return 0;
+  for (size_t i = 0; i < d->posts->size(); i++)
+    if ((*d->posts)[i].ep == ep && (*d->posts)[i].slot == slot) {
+      d->posts->erase(d->posts->begin() + i);
+      return 1;
+    }
+  return 0;
+}
+
 extern "C" void CkDynPostBuffer(const CkDynTarget *t, int ep, int slot, const CkDynBufDesc *d) {
   addPost(t, ep, slot, false, 0, d->ptr, d->len);
 }
@@ -2558,6 +2594,337 @@ extern "C" void CkDynPostDeviceBuffer(const CkDynTarget *t, int ep, int slot, co
   CkAbort("CkDyn: device posts need a CUDA or HIP build of Charm++");
 #endif
 }
+
+/* ---- persistent device buffers ------------------------------------------ */
+
+/* Mechanism: doc/internals/ckdyn.md, "Persistent device buffers". The handle
+   is DpHandle, copied as bytes; its CmiNcpyBuffer is pupped into nb. */
+
+#if CMK_CUDA || CMK_HIP
+static const uint32_t DP_MAGIC = 0xD9E5B001u;
+enum { DP_REG = 1u, DP_IPC = 2u };
+
+struct DpHandle {
+  uint32_t magic, flags;
+  uint64_t ptr, len;
+  int32_t pe, device, node, physNode;
+  uint64_t ipcOff;                   /* ptr - the allocation's base (what an IPC handle maps) */
+  unsigned char ipc[64];             /* hapiIpcMemHandle_t of the allocation */
+  uint32_t nbLen, pad;
+  unsigned char nb[256];             /* the pupped CmiNcpyBuffer (registered memory) */
+};
+
+#include "gpumanager.h"
+#include "ck.h"   /* QdCreate */
+#include <dlfcn.h>
+CsvExtern(GPUManager, gpu_manager);
+
+static_assert(sizeof(hapiIpcMemHandle_t) <= 64, "IPC handle larger than DpHandle::ipc");
+
+struct CkDynDevPersist {
+  const void *ptr;
+  uint64_t len;
+  int device;
+  hapiStream_t stream;
+  CkDynCallback done;
+  int pe;
+  int busy;            /* transfers issued, not completed */
+  DpHandle h;
+  CkNcpyBuffer nb;     /* registered (DP_REG) */
+};
+
+struct DpOp { CkDynDevPersist *p; uint32_t refnum; };
+
+static bool dpUseShm() { return CsvAccess(gpu_manager).use_shm; }
+
+/* One line per process and mode the first time it is used, so that a run
+   says which path it took. */
+static void dpAnnounce(const char *what, int mode) {
+  static std::mutex lock;
+  static std::set<std::pair<std::string, int> > said;
+  {
+    std::lock_guard<std::mutex> g(lock);
+    if (!said.insert(std::make_pair(std::string(what), mode)).second) return;
+  }
+  static const char *names[3] = {
+    "copy on the device (one process)",
+    "CUDA/HIP IPC between processes on one host (+gpushm)",
+    "RDMA on registered device memory" };
+  CmiPrintf("[%d] CkDyn> %s: %s\n", CkMyPe(), what, names[mode]);
+}
+
+/* The allocation's base, which is what an IPC handle maps in the other
+   process (cupy and torch hand out pieces of larger allocations). */
+static bool dpAllocBase(const void *ptr, uintptr_t *base) {
+#if CMK_HIP
+  void *b = nullptr; size_t sz = 0;
+  if (hipMemGetAddressRange(&b, &sz, (void *)ptr) != hipSuccess) { (void)hipGetLastError(); return false; }
+  *base = (uintptr_t)b;
+  return true;
+#else
+  typedef int (*RangeFn)(unsigned long long *, size_t *, unsigned long long);
+  static RangeFn fn = nullptr;
+  static bool looked = false;
+  if (!looked) {
+    void *s = dlsym(RTLD_DEFAULT, "cuMemGetAddressRange_v2");
+    if (!s) {
+      void *lib = dlopen("libcuda.so.1", RTLD_NOW | RTLD_NOLOAD);
+      if (!lib) lib = dlopen("libcuda.so.1", RTLD_NOW);
+      if (lib) s = dlsym(lib, "cuMemGetAddressRange_v2");
+    }
+    fn = (RangeFn)s;
+    looked = true;
+  }
+  if (!fn) return false;
+  unsigned long long b = 0; size_t sz = 0;
+  if (fn(&b, &sz, (unsigned long long)(uintptr_t)ptr) != 0) return false;
+  *base = (uintptr_t)b;
+  return true;
+#endif
+}
+
+/* IPC mappings of other processes' allocations, opened once per process
+   (a handle may be opened only once per process) and kept until exit. */
+static std::mutex g_dpIpcLock;
+static std::map<std::string, void *> g_dpIpc;
+
+static void *dpIpcPtr(const DpHandle &h) {
+  std::string key((const char *)h.ipc, sizeof(hapiIpcMemHandle_t));
+  std::lock_guard<std::mutex> g(g_dpIpcLock);
+  auto it = g_dpIpc.find(key);
+  void *base = nullptr;
+  if (it != g_dpIpc.end()) base = it->second;
+  else {
+    hapiIpcMemHandle_t ih;
+    memcpy(&ih, h.ipc, sizeof ih);
+    if (hapiIpcOpenMemHandle(&base, ih, hapiIpcMemLazyEnablePeerAccess) != hapiSuccess) {
+      (void)hapiGetLastError();
+      CmiPrintf("[%d] CkDyn> persistent device buffer: IPC open of PE %d's buffer failed; using RDMA\n",
+                CkMyPe(), h.pe);
+      base = nullptr;
+    }
+    g_dpIpc[key] = base;
+  }
+  return base ? (char *)base + h.ipcOff : nullptr;
+}
+
+static void dpCheckHandle(const DpHandle &h) {
+  if (h.magic != DP_MAGIC) CkAbort("CkDyn: not a persistent device buffer handle (magic 0x%x)", h.magic);
+}
+
+static int dpModeOf(const DpHandle &mine, const DpHandle &other) {
+  if (other.node == CkMyNode()) return DP_MEMCPY;
+  if (dpUseShm() && other.physNode == mine.physNode && (other.flags & DP_IPC)) return DP_MODE_IPC;
+  if (!(other.flags & DP_REG) || !(mine.flags & DP_REG))
+    CkAbort("CkDyn: persistent device buffer of PE %d is not registered for RDMA", other.pe);
+  return DP_RDMA;
+}
+
+static void dpUnpackNb(const DpHandle &h, CkNcpyBuffer &nb) {
+  PUP::fromMem up(h.nb);
+  static_cast<CmiNcpyBuffer &>(nb).pup(up);
+  nb.cb = CkCallback(CkCallback::ignore);
+  nb.clearDeviceRdmaOpInfo();
+}
+
+static void dpSendDone(const CkDynCallback &done, uint32_t refnum) {
+  CkDynCallback c = done;
+  if (refnum) { if (c.kind == CKDYN_CB_FUTURE) c.id = refnum; else c.refnum = refnum; }
+  CkDynCallbackSend(&c, emptyMsg());
+}
+
+/* A transfer completed on the issuing PE (a callCFn callback, so always there). */
+static void dpDoneFn(void *param, void *msg) {
+  if (msg) CkFreeMsg(msg);
+  DpOp *op = (DpOp *)param;
+  CkDynDevPersist *p = op->p;
+  uint32_t refnum = op->refnum;
+  delete op;
+  p->busy--;
+  dpSendDone(p->done, refnum);
+}
+
+/* After the copy issued on p's stream: the stream reaching this point. */
+static void dpOnStream(CkDynDevPersist *p, uint32_t refnum) {
+  hapiAddCallback(p->stream, CkCallback(dpDoneFn, new DpOp{ p, refnum }));
+}
+
+/* An RDMA get into dst (registered here) from src; cb runs on this PE. */
+static void dpRdmaGet(const DpHandle &dst, const DpHandle &src, const CkCallback &done) {
+  CkNcpyBuffer d, s;
+  dpUnpackNb(dst, d);
+  dpUnpackNb(src, s);
+  CkCallback srcCb(CkCallback::ignore), dstCb(done);
+  QdCreate(1);   /* matched in CkRdmaDirectAckHandler */
+  d.rdmaGet(s, sizeof(CkCallback), (char *)&srcCb, (char *)&dstCb);
+}
+
+static void dpLocal(const CkDynDevPersist *p, const char *what) {
+  if (p == nullptr) CkAbort("CkDyn: %s of a null persistent device buffer", what);
+  if (p->pe != CkMyPe()) CkAbort("CkDyn: %s of a persistent device buffer opened on PE %d, called on PE %d", what, p->pe, CkMyPe());
+}
+
+extern "C" CkDynDevPersist *CkDynDevPersistOpen(const CkDynDevDesc *d, const CkDynCallback *done) {
+  CkDynDevPersist *p = new CkDynDevPersist;
+  p->ptr = d->ptr; p->len = d->len; p->device = d->device;
+  p->stream = (hapiStream_t)(uintptr_t)d->stream;
+  p->done = *done;
+  p->pe = CkMyPe();
+  p->busy = 0;
+  DpHandle &h = p->h;
+  memset(&h, 0, sizeof h);
+  h.magic = DP_MAGIC;
+  h.ptr = (uint64_t)(uintptr_t)d->ptr; h.len = d->len;
+  h.pe = CkMyPe(); h.device = d->device; h.node = CkMyNode(); h.physNode = CmiPhysicalNodeID(CkMyPe());
+  if (CkNumNodes() > 1 && d->len > 0) {
+    /* registered once, released by Close; RDMA peers use it from the handle */
+    CkCallback ig(CkCallback::ignore);
+    p->nb.init(d->ptr, (size_t)d->len, ig, CK_BUFFER_REG, CK_BUFFER_NODEREG);
+    PUP::sizer ps;
+    static_cast<CmiNcpyBuffer &>(p->nb).pup(ps);
+    if (ps.size() > sizeof h.nb) CkAbort("CkDyn: a CmiNcpyBuffer pups %zu bytes, the handle holds %zu", ps.size(), sizeof h.nb);
+    PUP::toMem pm(h.nb);
+    static_cast<CmiNcpyBuffer &>(p->nb).pup(pm);
+    h.nbLen = (uint32_t)ps.size();
+    h.flags |= DP_REG;
+    hapiIpcMemHandle_t ih;
+    uintptr_t base = 0;
+    if (dpAllocBase(d->ptr, &base) && hapiIpcGetMemHandle(&ih, (void *)d->ptr) == hapiSuccess) {
+      memcpy(h.ipc, &ih, sizeof ih);
+      h.ipcOff = (uint64_t)((uintptr_t)d->ptr - base);
+      h.flags |= DP_IPC;
+    } else {
+      (void)hapiGetLastError();
+    }
+  }
+  return p;
+}
+
+extern "C" void CkDynDevPersistClose(CkDynDevPersist *p) {
+  dpLocal(p, "close");
+  if (p->busy) CkAbort("CkDyn: close of a persistent device buffer with %d transfer(s) outstanding", p->busy);
+  if (p->h.flags & DP_REG) p->nb.deregisterMem();
+  delete p;
+}
+
+extern "C" size_t CkDynDevPersistHandleSize(void) { return sizeof(DpHandle); }
+
+extern "C" void CkDynDevPersistHandle(const CkDynDevPersist *p, void *out) {
+  dpLocal(p, "handle");
+  memcpy(out, &p->h, sizeof(DpHandle));
+}
+
+extern "C" int CkDynDevPersistMode(const CkDynDevPersist *p, const void *handle) {
+  DpHandle h;
+  memcpy(&h, handle, sizeof h);
+  dpCheckHandle(h);
+  return dpModeOf(p->h, h);
+}
+
+extern "C" void CkDynDevPersistGet(CkDynDevPersist *dst, const void *src_handle, uint32_t refnum) {
+  dpLocal(dst, "get");
+  DpHandle src;
+  memcpy(&src, src_handle, sizeof src);
+  dpCheckHandle(src);
+  if (dst->len < src.len)
+    CkAbort("CkDyn: persistent get of %llu bytes into a %llu-byte buffer",
+            (unsigned long long)src.len, (unsigned long long)dst->len);
+  int mode = dpModeOf(dst->h, src);
+  void *from = nullptr;
+  if (mode == DP_MODE_IPC && (from = dpIpcPtr(src)) == nullptr) {
+    if (!(src.flags & DP_REG)) CkAbort("CkDyn: IPC failed and PE %d's buffer is not registered", src.pe);
+    mode = DP_RDMA;
+  }
+  dpAnnounce("persistent get", mode);
+  dst->busy++;
+  if (mode == DP_RDMA) {
+    hapiCheck(hapiStreamSynchronize(dst->stream));   /* earlier work on dst is done */
+    dpRdmaGet(dst->h, src, CkCallback(dpDoneFn, new DpOp{ dst, refnum }));
+    return;
+  }
+  if (mode == DP_MEMCPY) from = (void *)(uintptr_t)src.ptr;
+  hapiCheck(hapiMemcpyAsync((void *)dst->ptr, from, (size_t)src.len, hapiMemcpyDeviceToDevice, dst->stream));
+  dpOnStream(dst, refnum);
+}
+
+/* A put between hosts: the destination's PE gets from the source. */
+struct DpPutReq { DpHandle dst, src; int32_t issuer, pad; uint64_t op; };
+struct DpPutAck { int32_t issuer; uint64_t op; };
+
+static void dpPutGotFn(void *param, void *msg) {
+  if (msg) CkFreeMsg(msg);
+  DpPutAck *a = (DpPutAck *)param;
+  CkDynMsgBuilder *b = CkDynMsgBegin(1, 8, 0, 0, -1);
+  CkDynMsgAddU64(b, a->op);
+  CProxy_CkDynMgr(_ckdynMgrGID)[a->issuer].persistPutAck(CkDynMsgFinish(b, 0));
+  delete a;
+}
+
+extern "C" void CkDynDevPersistPut(const void *dst_handle, CkDynDevPersist *src, uint32_t refnum) {
+  dpLocal(src, "put");
+  DpHandle dst;
+  memcpy(&dst, dst_handle, sizeof dst);
+  dpCheckHandle(dst);
+  if (dst.len < src->len)
+    CkAbort("CkDyn: persistent put of %llu bytes into a %llu-byte buffer",
+            (unsigned long long)src->len, (unsigned long long)dst.len);
+  int mode = dpModeOf(src->h, dst);
+  void *to = nullptr;
+  if (mode == DP_MODE_IPC && (to = dpIpcPtr(dst)) == nullptr) {
+    if (!(dst.flags & DP_REG)) CkAbort("CkDyn: IPC failed and PE %d's buffer is not registered", dst.pe);
+    mode = DP_RDMA;
+  }
+  dpAnnounce("persistent put", mode);
+  src->busy++;
+  if (mode == DP_RDMA) {
+    hapiCheck(hapiStreamSynchronize(src->stream));   /* the source's data is complete */
+    CkDynMsgBuilder *b = CkDynMsgBegin(1, sizeof(DpPutReq), 0, 0, -1);
+    DpPutReq r;
+    memset(&r, 0, sizeof r);
+    r.dst = dst; r.src = src->h; r.issuer = CkMyPe();
+    r.op = (uint64_t)(uintptr_t)new DpOp{ src, refnum };
+    CkDynMsgAddBytes(b, &r, sizeof r, 0);
+    CProxy_CkDynMgr(_ckdynMgrGID)[dst.pe].persistPutReq(CkDynMsgFinish(b, 0));
+    return;
+  }
+  if (mode == DP_MEMCPY) to = (void *)(uintptr_t)dst.ptr;
+  hapiCheck(hapiMemcpyAsync(to, src->ptr, (size_t)src->len, hapiMemcpyDeviceToDevice, src->stream));
+  dpOnStream(src, refnum);
+}
+
+void CkDynMgr::persistPutReq(CkDynMsg *m) {
+  CkDynMsgView v;
+  CkDynSlot tmp[2];
+  viewAny(v, tmp, m);
+  DpPutReq r;
+  memcpy(&r, CkDynViewBytesPtr(&v, 0), sizeof r);
+  CkFreeMsg(m);
+  dpRdmaGet(r.dst, r.src, CkCallback(dpPutGotFn, new DpPutAck{ r.issuer, r.op }));
+}
+
+void CkDynMgr::persistPutAck(CkDynMsg *m) {
+  CkDynMsgView v;
+  CkDynSlot tmp[2];
+  viewAny(v, tmp, m);
+  uint64_t op = v.slots[0].v.u64;
+  CkFreeMsg(m);
+  dpDoneFn((void *)(uintptr_t)op, nullptr);
+}
+
+#else  /* no CUDA or HIP */
+
+static void dpNoDevice() { CkAbort("CkDyn: persistent device buffers need a CUDA or HIP build of Charm++"); }
+extern "C" CkDynDevPersist *CkDynDevPersistOpen(const CkDynDevDesc *, const CkDynCallback *) { dpNoDevice(); return nullptr; }
+extern "C" void CkDynDevPersistClose(CkDynDevPersist *) { dpNoDevice(); }
+extern "C" size_t CkDynDevPersistHandleSize(void) { dpNoDevice(); return 0; }
+extern "C" void CkDynDevPersistHandle(const CkDynDevPersist *, void *) { dpNoDevice(); }
+extern "C" int CkDynDevPersistMode(const CkDynDevPersist *, const void *) { dpNoDevice(); return -1; }
+extern "C" void CkDynDevPersistGet(CkDynDevPersist *, const void *, uint32_t) { dpNoDevice(); }
+extern "C" void CkDynDevPersistPut(const void *, CkDynDevPersist *, uint32_t) { dpNoDevice(); }
+void CkDynMgr::persistPutReq(CkDynMsg *m) { CkFreeMsg(m); dpNoDevice(); }
+void CkDynMgr::persistPutAck(CkDynMsg *m) { CkFreeMsg(m); dpNoDevice(); }
+
+#endif
 
 /* The stream's completion arrives at CkDynMgr::hapiDone on this PE with a
    message holding cb; hapiAddCallback keeps quiescence from being detected

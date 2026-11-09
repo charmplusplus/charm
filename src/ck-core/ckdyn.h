@@ -589,6 +589,45 @@ void CkDynMsgAddDevice(CkDynMsgBuilder *b, const CkDynDevDesc *d, CkDynBufDone d
  * is destroyed. Not for nodegroups. */
 void CkDynPostBuffer(const CkDynTarget *t, int ep, int slot, const CkDynBufDesc *d);
 void CkDynPostDeviceBuffer(const CkDynTarget *t, int ep, int slot, const CkDynDevDesc *d);
+/* `slot` of a post or unpost OR'd with CKDYN_POST_ARG counts arguments
+ * rather than slots: in a message whose header has CKDYN_MSG_BLOCK and whose
+ * slot 0 is a FUTURE slot, argument k is slot k + 1, otherwise slot k. The
+ * binding then need not know at post time whether the sender will block. */
+#define CKDYN_POST_ARG 0x40000000
+/* Remove the post for (t, ep, slot) if it is still outstanding (a message
+ * whose slot was a BUFFER or pickled value does not consume it). Returns 1
+ * when a post was removed, 0 when there was none. */
+int  CkDynUnpostBuffer(const CkDynTarget *t, int ep, int slot);
+
+/* Persistent device buffers (doc/internals/ckdyn.md, "Persistent device
+ * buffers"). A buffer is opened on one PE and stays registered until closed;
+ * its handle, a fixed number of bytes, may be sent to any PE inside a
+ * message, and a get or put between an open buffer and a handle needs no
+ * entry method and no per-transfer registration. Transfer mode: a copy on
+ * the device when both buffers are in one process, CUDA/HIP IPC between
+ * processes on one host when the program runs with +gpushm, RDMA on
+ * registered device memory otherwise. `done` receives an empty message on
+ * the issuing PE once per completed get or put: for a FUTURE callback the
+ * call's refnum, when non-zero, is the future id; for any other kind it is
+ * the callback's refnum (the envelope's reference number). A get is complete
+ * when the bytes are in dst; a put when they are in the remote buffer (between
+ * hosts the put is carried out as a get issued by the destination's PE).
+ * The caller keeps the memory valid and does not touch the destination until
+ * done; d->stream orders the transfer after earlier work on it (0: the
+ * default stream). Every function aborts in a build without CUDA or HIP. */
+typedef struct CkDynDevPersist CkDynDevPersist;      /* opaque, PE-local */
+CkDynDevPersist *CkDynDevPersistOpen(const CkDynDevDesc *d, const CkDynCallback *done);
+void   CkDynDevPersistClose(CkDynDevPersist *p);      /* aborts with a transfer outstanding */
+size_t CkDynDevPersistHandleSize(void);
+void   CkDynDevPersistHandle(const CkDynDevPersist *p, void *out);   /* HandleSize() bytes */
+/* dst must be open on the calling PE; src_handle names a buffer opened anywhere.
+ * dst must hold at least the source's bytes (get) and the destination at least
+ * src's (put); the transfer moves the source's length. */
+void   CkDynDevPersistGet(CkDynDevPersist *dst, const void *src_handle, uint32_t refnum);
+void   CkDynDevPersistPut(const void *dst_handle, CkDynDevPersist *src, uint32_t refnum);
+/* The transfer mode a get or put between p and the handle would use:
+ * 0 copy in one process, 1 IPC, 2 RDMA. */
+int    CkDynDevPersistMode(const CkDynDevPersist *p, const void *handle);
 /* cb receives an empty message, from this PE's scheduler, when the stream
  * reaches this point. Aborts in a build without CUDA or HIP. */
 void CkDynHapiAddCallback(uint64_t stream, const CkDynCallback *cb);

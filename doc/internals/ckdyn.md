@@ -915,6 +915,63 @@ global per PE and whose `P2P_RECV` flow delivers an entry method twice.
 - Device: the destination is chosen in `zcArrive` before the transfers are
   issued, so a device post receives the data directly.
 
+A post's `slot` OR'd with `CKDYN_POST_ARG` names an argument instead of a slot
+(`zcPostMatches`): in a message with `CKDYN_MSG_BLOCK` whose slot 0 is a
+`FUTURE` slot, argument k is slot k + 1, otherwise slot k. A binding that
+posts before it knows whether the sender will block uses it. A post is
+consumed only by an `NCPY` or `DEVICE` slot; when the slot arrives as a
+`BUFFER` (below the binding's zero-copy threshold, or in a copied context),
+the post stays, and the binding removes it with `CkDynUnpostBuffer` and copies
+the value itself.
+
+### Persistent device buffers
+
+`CkDynDevPersistOpen(d, done)` wraps device memory that stays valid until
+`CkDynDevPersistClose`. In a program of more than one process it registers the
+memory once (`CkNcpyBuffer::init`, `CK_BUFFER_REG`, `CK_BUFFER_NODEREG`; Close
+deregisters) and, when the allocation's base is known (`cuMemGetAddressRange`
+through `dlsym`, `hipMemGetAddressRange`), takes a CUDA/HIP IPC handle of the
+allocation and the buffer's offset in it: cupy and torch hand out pieces of
+larger allocations, and an IPC handle maps the whole allocation. The handle
+(`DpHandle`, `CkDynDevPersistHandleSize()` bytes) holds the pointer, length,
+PE, process, host, the IPC handle and offset, and the pupped `CmiNcpyBuffer`
+with the registration; a binding sends it as bytes.
+
+This is not Charm++'s `CkDevicePersistent` (ckrdmadevice.C), which aborts
+between hosts, takes the IPC handle of the pointer as if it were the
+allocation's base, keeps the opened IPC mapping in the copy of the remote
+buffer it was given (so a handle received again is opened again), and fires both buffers' callbacks from the issuing PE. CkDyn
+fires only the issuing side's `done`.
+
+Mode (`dpModeOf`), for a get into a local buffer from a handle or a put from a
+local buffer to a handle:
+
+- same process: `hapiMemcpyAsync` device to device on the local buffer's
+  stream, and `hapiAddCallback` on that stream runs `done`;
+- another process on the same host, with `+gpushm`, when the remote buffer
+  has an IPC handle: the handle is opened once per process (a table keyed by
+  the handle's bytes, kept until exit), and the copy goes through the mapping
+  as above. If opening fails, the transfer falls back to RDMA;
+- otherwise RDMA on the registered memory. A get is `CmiNcpyBuffer::rdmaGet`
+  with the Direct API acknowledgement: the destination's callback is a
+  `callCFn` to `dpDoneFn` on the issuing PE, the source's is ignore. A put is
+  carried out as a get by the destination's PE: the issuer sends
+  `CkDynMgr::persistPutReq` with both handles, that PE gets, and its
+  completion sends `persistPutAck` back to the issuer, which runs `done`. A
+  true RDMA put completes on the source before the data is visible at the
+  destination (CommRputLocalHandler in reconverse), so `done` could not
+  mean "arrived". Before an RDMA transfer the local buffer's stream is
+  synchronized.
+
+`done` gets an empty message on the issuing PE once per transfer: for a
+`FUTURE` callback the call's refnum is the future id, for any other kind it is
+the callback's refnum. The first use of each mode in a process prints a line
+(`[pe] CkDyn> persistent get: ...`); the send of a `DEVICE` message (`zcDevicePrepare`)
+prints the same for `DEVICE` slots (`[pe] CkDyn> DEVICE slots: ...`), which is how a run
+shows whether `+gpushm` took the IPC path. `CkDynDevPersistMode` returns the
+mode a transfer would use. Close aborts while a transfer is outstanding. In a
+build without CUDA or HIP every function aborts.
+
 ### HAPI callbacks
 
 `CkDynHapiAddCallback(stream, cb)` builds a message with one `CALLBACK` slot
@@ -938,7 +995,13 @@ post follows the send in the same method; within one process the receiving
 PE spins until the sender has sent; across processes the post request
 follows the data, which is delivered only after its transfer. The `-zcbcast`
 run must abort on a broadcast with an `NCPY` slot. The `device` and `hapi`
-phases are compiled only in a CUDA or HIP build.
+phases are compiled only in a CUDA or HIP build, as are `devpersist/remote`
+and `devpersist/samepe`: element 0 opens a 16 MB buffer and sends its handle
+to the last element (or element 1, on its PE), which gets it into its own
+buffer, checks the pattern, writes a second pattern and puts it back; element
+0 checks, closes, reopens and sends the new handle, the target gets and checks
+again, and both close. The done callbacks are `TARGET` callbacks to `pDone`
+with the call's refnum.
 
 ## Pup
 
