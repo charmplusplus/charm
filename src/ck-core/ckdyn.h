@@ -605,8 +605,8 @@ int  CkDynUnpostBuffer(const CkDynTarget *t, int ep, int slot);
  * message, and a get or put between an open buffer and a handle needs no
  * entry method and no per-transfer registration. Transfer mode: a copy on
  * the device when both buffers are in one process, CUDA/HIP IPC between
- * processes on one host when the program runs with +gpushm, RDMA on
- * registered device memory otherwise. `done` receives an empty message on
+ * processes on one host when the peer's IPC handle opens in this process
+ * (+gpushm is not needed), RDMA on registered device memory otherwise. `done` receives an empty message on
  * the issuing PE once per completed get or put: for a FUTURE callback the
  * call's refnum, when non-zero, is the future id; for any other kind it is
  * the callback's refnum (the envelope's reference number). A get is complete

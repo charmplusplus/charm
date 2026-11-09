@@ -9714,11 +9714,12 @@ at every iteration. This allows us to reduce the overheads involved with
 with direct GPU messaging, including the nature of the multi-hop mechanism and
 CUDA IPC setup, and directly issue ``cudaMemcpy`` calls at the message send sites
 (for a ``put`` type operation; a ``get`` type operation is also supported).
-Between processes on one node, with ``+gpushm``, CUDA IPC handles are created,
-exchanged and opened only once per process (this setup step can be performed again
-if the buffer addresses or sizes involved in the persistent communication change).
-Between nodes, and between processes on one node without ``+gpushm``, the transfer is
-an RDMA get on device memory that ``open`` registered once; a ``put`` is carried out
+Between processes on one node, CUDA IPC handles are created, exchanged and opened
+only once per process (this setup step can be performed again if the buffer addresses
+or sizes involved in the persistent communication change); ``+gpushm`` is not needed.
+Between nodes, and between processes on one node whose GPUs cannot open each other's
+IPC handles (for example one GPU visible per process), the transfer is an RDMA get on
+device memory that ``open`` registered once; a ``put`` is carried out
 as a get by the destination's PE, so that the callbacks mean the data has arrived.
 
 Setup and communication routines are supported through ``CkDevicePersistent``:

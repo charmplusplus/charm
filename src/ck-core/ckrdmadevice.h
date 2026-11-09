@@ -17,8 +17,8 @@
 // Persistent device buffers (manual: "Persistent GPU Communication"; mechanism:
 // doc/internals/ckdyn.md, "Persistent device buffers"). get/put choose a mode
 // per pair (mode()): a device copy within a process, CUDA/HIP IPC between
-// processes on one host with +gpushm, RDMA on the memory registered by open()
-// otherwise. Both buffers' callbacks are sent from the issuing PE once the
+// processes on one host when the peer's IPC handle opens here, RDMA on the
+// memory registered by open() otherwise. Both buffers' callbacks are sent from the issuing PE once the
 // bytes are in the destination.
 struct CkDevicePersistent {
   const void* ptr;

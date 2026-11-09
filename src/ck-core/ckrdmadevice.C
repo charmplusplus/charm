@@ -611,7 +611,7 @@ static void persistAnnounce(const char* what, int mode) {
   }
   static const char* names[3] = {
     "copy on the device (one process)",
-    "CUDA/HIP IPC between processes on one host (+gpushm)",
+    "CUDA/HIP IPC between processes on one host",
     "RDMA on registered device memory" };
   CmiPrintf("[%d] CkDevicePersistent> %s: %s\n", CkMyPe(), what, names[mode]);
 }
@@ -813,7 +813,10 @@ void CkDevicePersistent::pup(PUP::er& p) {
 
 int CkDevicePersistent::mode(const CkDevicePersistent& other) const {
   if (other.node == CkMyNode()) return 0;
-  if (CsvAccess(gpu_manager).use_shm && other.phys_node == CmiPhysicalNodeID(CkMyPe()) && other.ipc_valid) return 1;
+  // IPC whenever the peer's handle opens here (with or without +gpushm, which
+  // concerns DEVICE-slot messages); RDMA when it does not (the peer's GPU is
+  // not visible to this process, for example with one GPU per task)
+  if (other.phys_node == CmiPhysicalNodeID(CkMyPe()) && other.ipc_valid && persistIpcPtr(other) != nullptr) return 1;
   return 2;
 }
 
@@ -828,8 +831,7 @@ CkDeviceStatus CkDevicePersistent::get(CkDevicePersistent& src) {
     CkAbort("CkDevicePersistent::get: Destination buffer is smaller than source buffer\n");
   }
   int m = mode(src);
-  void* from = nullptr;
-  if (m == 1 && (from = persistIpcPtr(src)) == nullptr) m = 2;
+  void* from = m == 1 ? persistIpcPtr(src) : nullptr;
   persistAnnounce("get", m);
   if (m == 2) {
     persistNeedRdma(*this, src);
@@ -848,8 +850,7 @@ CkDeviceStatus CkDevicePersistent::put(CkDevicePersistent& dst) {
     CkAbort("CkDevicePersistent::put: Destination buffer is smaller than source buffer\n");
   }
   int m = mode(dst);
-  void* to = nullptr;
-  if (m == 1 && (to = persistIpcPtr(dst)) == nullptr) m = 2;
+  void* to = m == 1 ? persistIpcPtr(dst) : nullptr;
   persistAnnounce("put", m);
   if (m == 2) {
     persistNeedRdma(*this, dst);

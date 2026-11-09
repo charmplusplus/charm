@@ -943,11 +943,13 @@ one:
 
 - same process: `hapiMemcpyAsync` device to device on the local buffer's
   stream; `hapiAddCallback` on that stream sends each buffer's callback;
-- another process on the same host, with `+gpushm`, when the remote buffer
-  has an IPC handle: the handle is opened once per process (a table keyed by
+- another process on the same host, when the remote buffer has an IPC
+  handle and it opens in this process (`+gpushm` is not needed: it concerns
+  `DEVICE` slots): the handle is opened once per process (a table keyed by
   the handle's bytes, kept until exit, since CUDA maps a handle once per
-  process), and the copy goes through the mapping as above. If opening fails,
-  the transfer falls back to RDMA;
+  process), and the copy goes through the mapping as above. If opening fails (the peer's
+  GPU is not visible to this process, as with one GPU per task), `mode()`
+  reports RDMA and the transfer uses it;
 - otherwise RDMA on the registered memory. A get is `CmiNcpyBuffer::rdmaGet`
   with the Direct API acknowledgement, whose destination callback is a
   `callCFn` on the issuing PE that sends both buffers' callbacks. A put is
