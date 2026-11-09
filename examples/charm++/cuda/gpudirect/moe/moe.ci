@@ -140,6 +140,20 @@ mainmodule moe {
         }
       }
       serial { recv_count = 0; }
+      // Training keeps the loop it had before 2026-11-09: only the outputs, so the new copies' channel arrivals
+      // (chanArrived) are taken where runStep waits for them, before a step that routes to the copy.
+      if (!serve_only) {
+        while (recv_count < outputsExpected()) {
+          if (out_channels) {
+            when outputIn[my_step](int ref, int e, int n, int mult_next, int r)
+              serial { noteOutput(e, n, 0, -1, mult_next, r); recv_count++; }
+          } else {
+            when receiveOutput[my_step](int ref, int e, int n, long long ts, int spe, int mult_next, int len,
+                                        nocopydevice char buf[len])
+              serial { noteOutput(e, n, ts, spe, mult_next); recv_count++; }
+          }
+        }
+      }
       while (recv_count < outputsExpected()) {
         if (out_channels) {
           case {
@@ -222,6 +236,7 @@ mainmodule moe {
     // A copy made by the runtime (ckCloneTo, the pup's cloning branch) is
     // told its first step by its source.
     entry void startCopy(int step, int adam_t, double spt, int ncopies);
+    entry void copyWhole(int r);
     // The runtime's ckCloneSent, as a message: the copies' packs have read
     // this copy's weights, which may be updated again.
     entry void cloneSent();
@@ -270,7 +285,7 @@ mainmodule moe {
         when cloneSent() serial { clone_in_flight = false; }
       }
       if (grad_in_flight) {
-        when gradSent() serial { grad_in_flight = false; }
+        when gradSent() serial { grad_in_flight = false; dropGradAfterSend(); }
       }
       // The output channels of every dispatcher this copy serves (a new copy's
       // arrive from the dispatchers at the step it starts serving them).

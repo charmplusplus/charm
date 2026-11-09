@@ -313,6 +313,9 @@ class Main : public CBase_Main {
   double init_start_time;
   double start_time;
   double window_start_time;
+  double first_lb_done_time = -1.0;   // when every dispatcher had finished the first balancing step
+  double last_step_time = 0.0;        // ... and the last step
+  int last_step = 0;
   int disp_step;   // steps whose dispatcher reports have all arrived
   int exp_step;    // steps whose expert reports have all arrived
   int done_count;
@@ -691,6 +694,11 @@ public:
       start_time = now;
       window_start_time = now;
     }
+    // The first balancing step's completion: the average reported after it covers everything from there on (the
+    // first round's transition, every later round, its copies and moves), on the same clock as the per-step lines.
+    if (disp_step == first_lb) first_lb_done_time = now;
+    last_step_time = now;
+    last_step = disp_step;
     DispRec r;
     r.out2 = out2;
     r.drop = drop;
@@ -877,6 +885,13 @@ public:
     const double total_time = CkWallTimer() - start_time;
     CkPrintf("\nTotal time: %.3lf s\nAverage step time: %.3lf ms\n",
         total_time, total_time / n_steps * 1e3);
+    // Every step after the first balancing step, rounds and all: from the completion of step first_lb to that of
+    // the last step, over the steps in between (the per-step lines' sum over the same steps).
+    if (first_lb_done_time >= 0.0 && last_step > first_lb)
+      CkPrintf("Average step time after the first balancing step (steps %d-%d): %.3lf ms\n", first_lb + 1, last_step,
+          (last_step_time - first_lb_done_time) / (last_step - first_lb) * 1e3);
+    else
+      CkPrintf("Average step time after the first balancing step: none (no balancing step in the run)\n");
     CkExit();
   }
 };
@@ -1729,7 +1744,13 @@ class Dispatcher : public CBase_Dispatcher {
       // that it already has them (Expert::refreshChannels): one arrival per
       // change, waited for before this step is routed.
       if (tok_channels) chans_new_needed++;
-      if (out_channels && !out_open[chIdx(e, cNew, 0)]) openOutChannelsFor(e, cNew, 1);
+      // The copy now serving this dispatcher gets its output channels: opened if they are not, else the open ones
+      // again, since the copy of that rank may be a new one (2026-11-09: expert 29's copy 1, retired at step 25 and
+      // made again at 110, waited at step 113 for output channels this dispatcher still held open for the old one).
+      if (out_channels) {
+        if (!out_open[chIdx(e, cNew, 0)]) openOutChannelsFor(e, cNew, 1);
+        else expert_proxy(e, cNew).takeOutChannels(dispId, 1, out_ch[chIdx(e, cNew, 0)], out_ch[chIdx(e, cNew, 1)]);
+      }
       TRACE(1, "disp step %d: expert %d has %d copies from this step; copy %d serves this dispatcher",
           my_step, e, mult[e], cNew);
       if (mult[e] < old && cOld == old - 1) {
@@ -1763,7 +1784,7 @@ class Dispatcher : public CBase_Dispatcher {
     // channels (announced two steps ahead, noteOutput).
     for (int e = 0; e < n_experts; e++)
       if (pend_mult[e] != 0 && pend_from[e] == u) return false;
-    if (serve_only && !routable(u)) return false;
+    if (!routable(u)) return false;
     return true;
   }
   // 1: send the next step now; 2: serving, the next step is not routable yet, send it when it is; 0: not at all.
@@ -1896,7 +1917,17 @@ class Dispatcher : public CBase_Dispatcher {
   // chanArrived: the agreement's callback, or the copy's channels); the output channels of a copy routed to for the
   // first time go out now.
   bool routable(int step) {
-    if (!serve_only) return true;
+    if (!serve_only) {
+      // Training: every copy this step routes to has handed its channels over. The count of arrivals against
+      // changes (chans_new_in / chans_new_needed, runStep) is shared by all experts and was met by another copy's
+      // arrival while a re-made copy's were still on their way (2026-11-09: expert 29's copy 1, retired at the
+      // round at 20 and made again at 110, was routed to at step 113 with no channel, "no channel to copy 1").
+      if (!tok_channels) return true;
+      const int q = step % tokParities();
+      for (int e = 0; e < n_experts; e++)
+        if (tok_ch[chIdx(e, routeOf(e, step), q)] == nullptr) return false;
+      return true;
+    }
     const CkArrayID aid = expert_proxy.ckGetArrayID();
     const int q = step % tokParities();
     if (split_route) {
@@ -2264,6 +2295,7 @@ class Expert : public CBase_Expert {
   int nc_next = 1;              // copies from step nc_from (mult_next, announced in the outputs)
   int nc_from = 0;              // the first step nc_next serves: two after the step that decided it
   bool retire_me = false;       // this copy goes when nc_next takes effect
+  std::vector<int> res_at = std::vector<int>(K_MAX_COPIES, -1);   // the step copy r tagged its exchange with its resume
   int gp_in = 0;                // the SDAG loop over the other copies' block sums
   float* dWown1 = NULL;         // this copy's block sum of the step's gradient (its leaves folded)
   float* dWown2 = NULL;
@@ -2487,6 +2519,13 @@ class Expert : public CBase_Expert {
     return true;
   }
   // This copy destroys its holder copies of peer r's channels and says so.
+  int grad_drop_after = -1;   // a retired peer's holders, dropped once this copy's put into them is done
+  void dropGradAfterSend() {
+    if (grad_drop_after < 0) return;
+    const int r = grad_drop_after;
+    grad_drop_after = -1;
+    dropGradHolders(r);
+  }
   void dropGradHolders(int r) {
     if (grad_hold.empty() || !grad_have[r]) return;
     delete grad_hold[hIdx(r, 0)];
@@ -2864,12 +2903,31 @@ class Expert : public CBase_Expert {
     // existence travels; a partial's send still in flight is held by the
     // runtime (outstanding device sends) like any other.
     p | started;
+    // A copy's start, across a move between its making and its start (the copy made on its source's PE and moved).
+    {
+      int src = p.isCloning() ? rank() : clone_source;
+      p | src;
+      if (p.isUnpacking()) clone_source = src;
+    }
+    if (!p.isCloning()) {
+      p | state_whole;
+      p | start_pending;
+      PUParray(p, pend_start, 3);
+      p | pend_spt;
+      p | clone_start_step;
+      p | clone_start_adam;
+      p | clone_start_nc;
+      p | clone_start_spt;
+      p | clone_whole;
+    }
     p | replicated;
     p | nc;
     p | nc_next;
     p | nc_from;
     p | retire_me;
+    p | res_at;
     p | grad_in_flight;
+    p | grad_drop_after;
     p | grad_bufs_done;
     p | clone_in_flight;
     p | clone_bufs_done;
@@ -3690,17 +3748,17 @@ class Expert : public CBase_Expert {
     // releases it, so all announce the same count in this step's outputs and
     // act at its end: the new copy starts, or the retired one ends, at the
     // next step.
+    if (!serve_only && resumed_by_lb) res_at[rank()] = my_step;   // tagged in this step's exchange
     if (serve_only) {
       nc_next = nc;   // the runtime's count (beginStep)
     } else if (nc_from <= my_step) {   // no change in flight: this step may decide one
       nc_next = nc;
-      // A lone expert in serving acts on its copies as soon as they are decided, not at the round's release: the
-      // release waits for every migration of the round (40 states in SmartMoE's first), and the hot expert ran alone
-      // through all of them (2026-11-08: decided at step 5, copies serving from 12). All its copies are decided in
-      // one entry, and no other copy has to agree on the step. Its copies serve from wherever the runtime has them.
-      const bool act_now = resumed_by_lb || (serve_only && nc == 1 && !retire_decided);
-      if (act_now && clone_decided) nc_next = nc + newCopies();
-      if (resumed_by_lb && retire_decided) {
+      // The round's decisions, at the step every copy of the expert agrees on (resumedEverywhere).
+      const bool lb_agreed = resumedEverywhere();
+      if (lb_agreed)
+        for (int r = 0; r < K_MAX_COPIES; r++) res_at[r] = -1;
+      if (lb_agreed && clone_decided) nc_next = nc + newCopies();
+      if (lb_agreed && retire_decided) {
         nc_next = nc - 1;
         retire_me = (rank() == decided_rank);
       }
@@ -3815,7 +3873,7 @@ class Expert : public CBase_Expert {
   // device time, whether this copy retires); nothing is in flight after.
   void sendPeerStats() {
     for (int r = 0; r < nc; r++)
-      if (r != rank()) peerAt(r).peerStats(my_step, rank(), n_tot, CkMyPe(), gpu_last, retiring ? 1 : 0);
+      if (r != rank()) peerAt(r).peerStats(my_step, rank(), n_tot, CkMyPe(), gpu_last, exchangeFlags());
   }
 
   // This copy's partial to the other copy, behind its own kernels on the
@@ -3847,7 +3905,7 @@ class Expert : public CBase_Expert {
     grad_bufs_expected = 2 * (nc - 1);
     for (int r = 0; r < nc; r++) {
       if (r == rank()) continue;
-      peerAt(r).gradPartial(my_step, rank(), n_tot, CkMyPe(), gpu_last, retiring ? 1 : 0, (int)wsz(),
+      peerAt(r).gradPartial(my_step, rank(), n_tot, CkMyPe(), gpu_last, exchangeFlags(), (int)wsz(),
           CkDeviceBuffer(dWown1, done, send_stream), CkDeviceBuffer(dWown2, done, send_stream));
     }
     TRACE(2, "expert %d.%d step %d block sum of %d tokens sent to %d other cop%s%s", expert(), rank(),
@@ -3896,9 +3954,26 @@ class Expert : public CBase_Expert {
     peer_n[from_rank] = n_mine;
     peer_pe[from_rank] = pe;
     peer_gpu[from_rank] = gpu_s;
-    peer_ret[from_rank] = retiring_ != 0;
-    TRACE(2, "expert %d.%d step %d block sum of %d tokens from copy %d in%s", expert(), rank(), my_step,
-        n_mine, from_rank, peer_ret[from_rank] ? " (it retires)" : "");
+    peer_ret[from_rank] = (retiring_ & 1) != 0;
+    if (retiring_ & 2) res_at[from_rank] = my_step;
+    TRACE(2, "expert %d.%d step %d block sum of %d tokens from copy %d in%s%s", expert(), rank(), my_step,
+        n_mine, from_rank, peer_ret[from_rank] ? " (it retires)" : "", (retiring_ & 2) ? " (resumed)" : "");
+  }
+  // Bit 0: this copy retires at this step's end; bit 1: the balancer released this copy in this step.
+  int exchangeFlags() const { return (retiring ? 1 : 0) | (res_at[rank()] == my_step ? 2 : 0); }
+  // Training: the step all copies of the expert act on a round's decisions in. Each copy parks for the round at a
+  // step of its own (the split barrier's park waits for this PE's moves, AtSyncStepInFlight), so the resume comes
+  // at different steps on different copies; acting at the resume, copy 0 of expert 10 went to one copy from step 113
+  // and copy 1 from step 114 (2026-11-09, training on 16 GPUs, rounds every 10 steps), and copy 0 waited for slabs
+  // that dispatchers 8-15 sent to copy 1. Each copy tags the exchange of the step it resumed in (exchangeFlags); all
+  // act in the first step after the last tag. Every copy has read every tag by then (the update before that step
+  // waited for all block sums of the step before), and none counts a tag of that step or later, even one in early.
+  // A lone copy acts at its resume.
+  bool resumedEverywhere() const {
+    if (nc == 1) return res_at[0] >= 0;
+    for (int r = 0; r < nc; r++)
+      if (res_at[r] < 0 || res_at[r] >= my_step) return false;
+    return true;
   }
 
   // Copy r's block sum this step: its own, or the landed one; NULL when it saw no tokens.
@@ -4030,9 +4105,45 @@ class Expert : public CBase_Expert {
     for (int i = 0; i < n_clone; i++) {
       TRACE(1, "expert %d.%d step %d: copy %d of %d on PE %d starts at step %d", expert(), rank(), my_step,
           clone_rank[i], nc_next, clone_to_pe[i], my_step + 1);
-      expert_proxy(expert(), clone_rank[i]).startCopy(my_step + 1, adam_t, spt, nc_next);
+      // Training: told only once the copy exists (copyWhole). Sent here, right after the clone was begun, the start
+      // could reach no element (2026-11-09: expert 29's copy 1, made again at the round at 110 after an earlier
+      // copy 1 had retired, never started, and its dispatchers routed to it without its channels at step 113).
+      const int r = clone_rank[i];
+      if (!serve_only) {
+        if (clone_start_step.empty()) clearCloneStarts();
+        clone_start_step[r] = my_step + 1;
+        clone_start_adam[r] = adam_t;
+        clone_start_spt[r] = spt;
+        clone_start_nc[r] = nc_next;
+        if (clone_whole[r]) sendCloneStart(r);
+      } else {
+        expert_proxy(expert(), r).startCopy(my_step + 1, adam_t, spt, nc_next);
+      }
     }
     n_clone = 0;
+  }
+  // The source's side of a new training copy's start: its step and figures (executeClone) and whether the copy has
+  // reported its state in (copyWhole); the start goes when both are known.
+  std::vector<int> clone_start_step, clone_start_adam, clone_start_nc;
+  std::vector<double> clone_start_spt;
+  std::vector<char> clone_whole;
+  int clone_source = -1;   // a copy: the rank it was made from
+  void clearCloneStarts() {
+    clone_start_step.assign(K_MAX_COPIES, -1);
+    clone_start_adam.assign(K_MAX_COPIES, 0);
+    clone_start_nc.assign(K_MAX_COPIES, 0);
+    clone_start_spt.assign(K_MAX_COPIES, 0.0);
+    clone_whole.assign(K_MAX_COPIES, 0);
+  }
+  void sendCloneStart(int r) {
+    expert_proxy(expert(), r).startCopy(clone_start_step[r], clone_start_adam[r], clone_start_spt[r], clone_start_nc[r]);
+    clone_start_step[r] = -1;
+    clone_whole[r] = 0;
+  }
+  void copyWhole(int r) {
+    if (clone_start_step.empty()) clearCloneStarts();
+    if (clone_start_step[r] >= 0) sendCloneStart(r);
+    else clone_whole[r] = 1;
   }
   // The runtime: the pack of one copy has finished reading this copy's buffers.
   void ckCloneSent() {
@@ -4057,6 +4168,7 @@ class Expert : public CBase_Expert {
     for (int r = 0; r < K_MAX_COPIES; r++) decided_new[r] = false;
     n_clone = 0; retire_pending = false; retiring = false; exchange_free_due = false;
     nc_from = 0; retire_me = false;
+    for (int r = 0; r < K_MAX_COPIES; r++) res_at[r] = -1;
     state_whole = false; start_pending = false;   // until ckJustCloned
     mult_next = 1;
     tok_ch.clear(); ch_open.clear(); slab_held.clear();
@@ -4081,6 +4193,7 @@ class Expert : public CBase_Expert {
       return;
     }
     if (start_pending) { start_pending = false; startCopy(pend_start[0], pend_start[1], pend_spt, pend_start[2]); }
+    else if (clone_source >= 0 && !started) peerAt(clone_source).copyWhole(rank());   // the source sends the start now
   }
   bool state_whole = true;      // a copy: its state has been unpacked (ckJustCloned)
   bool replica_gone = false;    // serving: past the runtime's count, this copy ends
@@ -4194,7 +4307,14 @@ class Expert : public CBase_Expert {
         setCopies(nc_next);
         refreshChannels(k_old, nc);
         // One fewer: the highest rank retires; its channels are of no use.
-        if (gradChannelsOn() && nc_next < k_old) dropGradHolders(k_old - 1);
+        // Not while this copy's last block sum is still being put into it: the put's completion (gradBufDone, then
+        // gradSent, which the next step waits for) goes through the holder, and deleting it first lost it (2026-11-09,
+        // training on 16 GPUs: the remaining copy of three experts whose copy 1 retired at step 24 never began
+        // step 25). Dropped once gradSent is in (dropGradAfterSend).
+        if (gradChannelsOn() && nc_next < k_old) {
+          if (grad_in_flight) grad_drop_after = k_old - 1;
+          else dropGradHolders(k_old - 1);
+        }
         if (nc == 1) exchange_free_due = true;
         clone_decided = retire_decided = false;
         decided_rank = -1;
