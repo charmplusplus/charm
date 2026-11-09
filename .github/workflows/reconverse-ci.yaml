@@ -80,6 +80,7 @@ env:
     tests/charm++/objid_migrate6
     tests/charm++/objid_loctable
     tests/charm++/objid_recreate
+    tests/charm++/objid_detour
     tests/charm++/io_sessions
     tests/charm++/groupdep_creator
     tests/charm++/objid_boundrecreate

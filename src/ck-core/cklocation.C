@@ -2807,17 +2807,18 @@ void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
 void CkLocCache::updateLocation(const CkLocEntry& newEntry)
 {
   if (CkNodeOf(homePe(newEntry.id)) == CkMyNode()) return;
-  applyLocation(newEntry);
+  applyLocation(newEntry, true);
 }
 
-void CkLocCache::applyLocation(const CkLocEntry& newEntry)
+void CkLocCache::applyLocation(const CkLocEntry& newEntry, bool byId)
 {
   CkAssert(newEntry.pe != -1);
   bool written = false;
   // A received update (W4, received = true) never replaces what a PE of this process
-  // wrote about itself (section 3.5).
-  const CmiUInt8 waiters = ck::objid::locTable().update(key(newEntry.id), newEntry.pe,
-                                                        newEntry.epoch, false, &written, true);
+  // wrote about itself. One by id that disagrees with the entry and loses the epoch
+  // compare clears it, so the next send asks the home (section 3.5).
+  const CmiUInt8 waiters = ck::objid::locTable().update(
+      key(newEntry.id), newEntry.pe, newEntry.epoch, false, &written, true, byId);
   if (written)
   {
     notifyListeners(newEntry.id, newEntry.pe);

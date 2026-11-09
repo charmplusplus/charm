@@ -59,6 +59,7 @@ public:
     std::atomic<uint64_t> fills{0};            // a write that took waiter bits
     std::atomic<uint64_t> wakesSent{0};        // wake messages to other ranks
     std::atomic<uint64_t> repairsSkipped{0};   // repair to a sender in this process
+    std::atomic<uint64_t> conflictsCleared{0}; // update by id disagreeing with the entry
     std::atomic<uint64_t> missNoId{0};         // whichPe(idx): no id for the index
     std::atomic<uint64_t> missNoLocation{0};   // whichPe(idx): id known, no location
     std::atomic<uint64_t> growths{0};
@@ -85,9 +86,11 @@ public:
   /// byMessage. It is not applied over an entry that a PE of this process wrote about
   /// itself (W1, W2, W3; not marked): those writes are synchronous, so the message is
   /// at best redundant, at worst from an earlier life. A received update clears the
-  /// request flag whether or not it writes.
+  /// request flag whether or not it writes. With clearOnConflict, an update that is
+  /// not written and names another PE than the entry clears the entry instead
+  /// (section 3.5: two lives both start at epoch 0).
   uint64_t update(uint64_t key, int pe, int epoch, bool arriving, bool* written = nullptr,
-                  bool received = false);
+                  bool received = false, bool clearOnConflict = false);
   /// W2: {fromPe, e} -> {toPe, e+1}; returns the new epoch. The entry must name fromPe.
   int recordEmigration(uint64_t key, int fromPe, int toPe);
   /// Forget the location (death, or the record leaving this PE); the key, the

@@ -50,6 +50,7 @@ DIRS = \
   objid_loctable \
   objid_recreate \
   objid_boundrecreate \
+  objid_detour \
   collide \
   objloads \
   qd \
