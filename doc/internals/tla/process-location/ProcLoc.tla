@@ -203,7 +203,7 @@ Cleared(T) == [T EXCEPT !.pe = None, !.ep = None, !.own = FALSE]
 \* cannot order them (two lives each start at 0), so the entry is cleared and the
 \* next send asks the home.  Never the process's own write; the home's process
 \* drops these updates before this point.
-Conflict(P, r) == ClearConflict /\ ~r.idx /\ tab[P].pe # None /\ tab[P].pe # r.pe
+Conflict(P, r) == Fix /\ ClearConflict /\ ~r.idx /\ tab[P].pe # None /\ tab[P].pe # r.pe
                   /\ ~Written(P, r.ep) /\ ~OwnWrite(P, tab[P])
 
 \* Re-send every held message of p toward q: CkArray::sendBufferedMsgs(id, pe)

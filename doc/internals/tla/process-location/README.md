@@ -236,6 +236,29 @@ first violation.
 | `MC_death_3proc_fix` (3 procs x 1 PE) | 0 | 1 | 1 | 1 | `EventuallyDelivered`, `Quiesces` | 210,446 | 2m06s | pass |
 | `MC_death_safety_2msg_fix` | 1 | 1 | 2 | 1 | `Inv`, `TableMonotone` | incomplete: no violation in 455,443,965 distinct states (depth 24, 71.7M states still queued) when TLC stopped after 6 h 00 min with `java.io.IOException: File too large` from its disk-backed state queue (2026-11-03 16:21 to 22:21) | 6 h 00 min | the one-message variant above covers the same deletions with one message in flight; this run is the only one not completed |
 
+### With the conflict clear (`ClearConflict = TRUE`, finding 10, charm #4031 defect 2)
+
+`Fix = TRUE`, `Rec = TRUE`. The `*_cc` configurations are the earlier
+configurations of the same name with the rule switched on and
+`RepairNotIgnored` added. 2026-11-09, TLC 2.20, 4 workers.
+
+| config | procs x PEs | Home | MaxMig | msgs | MaxDel | checks | distinct states | time | result |
+|---|---|---|---|---|---|---|---|---|---|
+| `MC_detour` (rule off) | 3 x 1 | 0 | 0 | 2 | 1 | `Inv`, `RepairNotIgnored` | 118,929 to the hit | 4s | `RepairNotIgnored` violated (finding 10) |
+| `MC_detour_fix` | 3 x 1 | 0 | 0 | 2 | 1 | `Inv`, `RepairNotIgnored` | 1,051,227 | 20s | pass |
+| `MC_detour_1mig_fix` | 3 x 1 | 0 | 1 | 2 | 1 | `Inv`, `RepairNotIgnored` | 79,341,580 | 29m17s | pass |
+| `MC_detour_liveness_fix` | 3 x 1 | 0 | 0 | 2 | 1 | `Inv`, `RepairNotIgnored`, `EventuallyDelivered`, `Quiesces` | 1,051,227 | 17m31s | pass |
+| `MC_death_3proc_fix_cc` | 3 x 1 | 0 | 1 | 1 | 1 | `RepairNotIgnored`, `EventuallyDelivered`, `Quiesces` | 272,716 | 2m08s | pass |
+| `MC_death_safety_fix_cc` | 2 x 2 | 1 | 1 | 1 | 1 | `Inv`, `TableMonotone`, `RepairNotIgnored` | 1,954,738 | 31s | pass |
+| `MC_death_liveness_fix_cc` | 2 x 2 | 1 | 1 | 1 | 1 | `Inv`, `TableMonotone`, `RepairNotIgnored` + 3 liveness properties | 1,954,738 | 32m38s | pass |
+| `MC_liveness_2mig_cc` | 2 x 2 | 1 | 2 | 1 | 0 | `Inv`, `TableMonotone`, `RepairNotIgnored` + 3 liveness properties | 214,784 | 2m38s | pass |
+| `MC_safety_final_cc` | 2 x 2 | 1 | 2 | 2 | 0 | `Inv`, `TableMonotone`, `RepairNotIgnored` | 89,192,345 | 32m30s | pass |
+
+The rule requires `Fix` (`Conflict`): without the own-write protection it would
+clear the holder's own entry, which the code never does (`MC_liveness_2mig` and
+`MC_safety_final` are `Fix = FALSE` configurations; their `_cc` copies set
+`Fix = TRUE`).
+
 ### Reduced protocols, with and without the contract (`Rec = FALSE`)
 
 Run for the design document's section 7.8 (is the record needed, and what does
