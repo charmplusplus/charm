@@ -216,3 +216,10 @@ listsend.o: \
 	megatest.h \
 	listsend.def.h
 	$(CHARMC) -o listsend.o -c listsend.C
+arraymaps.o: \
+	arraymaps.C \
+	arraymaps.h \
+	arraymaps.decl.h \
+	megatest.h \
+	arraymaps.def.h
+	$(CHARMC) -o arraymaps.o -c arraymaps.C
