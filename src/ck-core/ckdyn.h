@@ -273,7 +273,19 @@ CkDynMsg *CkDynMsgFinish(CkDynMsgBuilder *b, int ep);          /* one allocation
 CkDynMcastMsg *CkDynMsgFinishMcast(CkDynMsgBuilder *b, int ep);
 void  CkDynMsgAbandon(CkDynMsgBuilder *b);
 void *CkDynMsgPriorityPtr(CkDynMsg *m);                        /* the reserved priority bits, to fill in */
-void  CkDynMsgSetQueueing(CkDynMsg *m, int queueing);          /* CK_QUEUEING_* value */
+/* Queueing strategies for CkDynMsgSetQueueing; the values equal Charm++'s
+ * CK_QUEUEING_* (checked in ckdyn.C). The default without a call is FIFO. */
+enum {
+  CKDYN_QUEUEING_FIFO  = 2,
+  CKDYN_QUEUEING_LIFO  = 3,
+  CKDYN_QUEUEING_IFIFO = 4,  /* integer priority, lower first */
+  CKDYN_QUEUEING_ILIFO = 5,
+  CKDYN_QUEUEING_BFIFO = 6,  /* bitvector priority */
+  CKDYN_QUEUEING_BLIFO = 7,
+  CKDYN_QUEUEING_LFIFO = 8,  /* long integer priority */
+  CKDYN_QUEUEING_LLIFO = 9
+};
+void  CkDynMsgSetQueueing(CkDynMsg *m, int queueing);          /* a CKDYN_QUEUEING_* value */
 void  CkDynMsgFree(CkDynMsg *m);                               /* a message that will not be sent */
 /* The payload bytes of a finished message (header, slots, data, tail), for a
  * foreign-reducer contribution (CkDynContribute with CkDynForeignReducerType). */

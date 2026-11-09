@@ -35,6 +35,11 @@ static int g_secInitArrayEp = -1, g_secInitGroupEp = -1;
 static_assert(sizeof(CkDynTarget) == 40, "CkDynTarget layout changed");
 static_assert(sizeof(CkDynSectionID) == 16, "CkDynSectionID layout changed");
 static_assert(sizeof(CkDynCallback) == 88, "CkDynCallback layout changed");
+static_assert(CKDYN_QUEUEING_FIFO == CK_QUEUEING_FIFO && CKDYN_QUEUEING_LIFO == CK_QUEUEING_LIFO &&
+              CKDYN_QUEUEING_IFIFO == CK_QUEUEING_IFIFO && CKDYN_QUEUEING_ILIFO == CK_QUEUEING_ILIFO &&
+              CKDYN_QUEUEING_BFIFO == CK_QUEUEING_BFIFO && CKDYN_QUEUEING_BLIFO == CK_QUEUEING_BLIFO &&
+              CKDYN_QUEUEING_LFIFO == CK_QUEUEING_LFIFO && CKDYN_QUEUEING_LLIFO == CK_QUEUEING_LLIFO,
+              "CKDYN_QUEUEING_* must equal CK_QUEUEING_*");
 static_assert(sizeof(CkDynHdr) == 24, "CkDynHdr layout changed");
 static_assert(sizeof(CkDynSlot) == 24, "CkDynSlot layout changed");
 
