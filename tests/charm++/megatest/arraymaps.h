@@ -62,8 +62,8 @@ class arraymaps_inserter : public CBase_arraymaps_inserter
 };
 
 // Element logic shared by the 1D, 2D and 3D arrays.
-template <class CBase>
-class arraymaps_elt : public CBase
+template <class Base>
+class arraymaps_elt : public Base
 {
  protected:
   CProxy_arraymaps_driver driver;
@@ -86,11 +86,11 @@ class arraymaps_elt : public CBase
     else
       driver.inserted(arraymaps_flat(caseId, this->thisIndex), CkMyPe());
   }
-  arraymaps_elt(CkMigrateMessage* m) : CBase(m) {}
+  arraymaps_elt(CkMigrateMessage* m) : Base(m) {}
 
   void pup(PUP::er& p)
   {
-    CBase::pup(p);
+    Base::pup(p);
     p | driver;
     p | caseId;
     p | destPe;
@@ -108,7 +108,7 @@ class arraymaps_elt : public CBase
   }
   void ckJustMigrated(void)
   {
-    CBase::ckJustMigrated();
+    Base::ckJustMigrated();
     this->thisProxy[this->thisIndex].afterMigrate();
   }
   void afterMigrate(void) { checkPe("after migration"); report(); }
