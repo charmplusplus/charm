@@ -229,4 +229,4 @@ addressed by `CkGroupID` alone; no `ObjID` is ever minted for them.
 | process-level location table, index table, retired ids | `src/ck-core/cklocnode.h`, `src/ck-core/cklocnode.C` (chapter [process-location-cache.md](process-location-cache.md)) |
 | collection numbers, delivery by id, buffering | `src/ck-core/ckarray.C` (`CkCreateArray`, `CkArray::deliver*`) |
 | array options (bounds, wide) | `src/ck-core/ckarrayoptions.h` |
-| tests | `tests/charm++/objid_bound`, `objid_home`, `objid_insert`, `objid_sections`, `objid_tranche`, `objid_wide`, `objid_migrate6`, `objid_loctable`, `unbounded_restart`, `unbounded_migration` |
+| tests | `tests/charm++/objid_bound`, `objid_home`, `objid_insert`, `objid_sections`, `objid_tranche`, `objid_wide`, `objid_migrate6`, `objid_loctable`, `ckpt_restart`, `unbounded_migration` |

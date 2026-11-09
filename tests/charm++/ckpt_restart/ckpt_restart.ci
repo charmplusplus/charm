@@ -1,0 +1,58 @@
+mainmodule ckpt_restart {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Ring ringProxy;
+  readonly CProxy_UbElem ubProxy;
+  readonly CProxy_PlainChare chareProxy;
+  readonly CProxy_PeGroup groupProxy;
+  readonly CProxy_NodeData nodeGroupProxy;
+  readonly int roSteps;
+  readonly int roRingSize;
+
+  initnode void unbufferStdout(void);
+
+  mainchare [migratable] Main {
+    entry Main(CkArgMsg *m);
+    entry void chareAck(int value, int pe);
+    entry void reportId(int idx, CmiUInt8 id);
+    entry void destroyed(int idx);
+    entry void census(CkReductionMsg *m);
+    entry void pong(int idx, CmiUInt8 id);
+    entry void stepDone(CkReductionMsg *m);
+    entry void ringReported(CkReductionMsg *m);
+    entry void tagged(CkReductionMsg *m);
+    entry void groupsChecked(CkReductionMsg *m);
+    entry void resumed();
+  };
+
+  array [1D] Ring {
+    entry Ring();
+    entry void step(int s);
+    entry void recv(int s, int fromLeft, double v);
+    entry void report();
+  };
+
+  array [1D] UbElem {
+    entry UbElem();
+    entry void ping();
+    entry void census();
+    entry void die();
+  };
+
+  chare [migratable] PlainChare {
+    entry PlainChare();
+    entry void sayHi(int value);
+    entry void check(int expected);
+  };
+
+  group [migratable] PeGroup {
+    entry PeGroup();
+    entry void setTag(int t);
+    entry void check(int steps, int tag, int fromPe0);
+  };
+
+  nodegroup [migratable] NodeData {
+    entry NodeData();
+    entry void setTag(int t);
+    entry void check(int steps, int tag, int fromNode0);
+  };
+};

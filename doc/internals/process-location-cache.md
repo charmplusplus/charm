@@ -719,7 +719,7 @@ tranche cursor keeps its existing treatment (object-ids.md section 5).
 ## 7. Tests
 
 Existing: `tests/charm++/anytime_migration`, `anytime_bcastred`,
-`atsync_reduction`, `unbounded_migration`, `unbounded_restart`, `objid_insert`,
+`atsync_reduction`, `unbounded_migration`, `ckpt_restart`, `objid_insert`,
 `objid_tranche`, `objid_home`, `dynamic_insertion_deletion`, `demand_creation`,
 `megatest`, run in one, two and four processes. New with PR 3:
 
