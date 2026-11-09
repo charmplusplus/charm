@@ -85,6 +85,7 @@ env:
     tests/charm++/threaded_redn
     tests/charm++/reduction_migrate_ahead
     tests/charm++/section_migrate
+    tests/charm++/load_balancing/migrate_then_atsync
     tests/charm++/qd
     tests/charm++/within_node_bcast
     tests/charm++/zerocopy/zerocopy_with_qd
