@@ -688,7 +688,8 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 	}
 }
 
-#if __FAULT__
+// also used by the in-memory checkpoint, which does not need __FAULT__
+#if __FAULT__ || CMK_MEM_CHECKPOINT
 int  CkCountArrayElements(){
     int numGroups = CkpvAccess(_groupIDTable)->size();
     int i;
@@ -920,7 +921,15 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
             }
 	  }
 
-        _inrestart = false;
+	// _inrestart is one flag per process, and CkLocMgr::pup reads it while a PE
+	// restores its groups (CkPupGroupData above): clear it only once every PE of
+	// the process is past that, as it was set before the barrier after the
+	// readonlys. It is cleared before _initDone, not after: _initDone runs the
+	// messages buffered during startup, and one creating a group (sent by the
+	// program once PE 0 has delivered the restart callback) would abort in
+	// Group::Group while _inrestart is set (ckreduction.C).
+	CmiNodeBarrier();
+	if (CmiMyRank() == 0) _inrestart = false;
 
 	// Every PE finishes its own initialization here, as the shrink/expand restart
 	// path already does. The other ranks of a process used to rely on the readonly

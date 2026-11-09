@@ -949,12 +949,16 @@ static inline void _processROMsgMsg(envelope *env)
   }
 }
 
-static inline void _processRODataMsg(envelope *env)
+// pupFlags: the flags the sender packed with. The startup broadcast (the
+// RODataMsg packed after the mainchares ran) uses none; the restart broadcast
+// from a disk checkpoint (bdcastRO) uses PUP::er::IS_CHECKPOINT, under which
+// pup_buffer carries the bytes instead of a zero-copy reference.
+static inline void _processRODataMsg(envelope *env, unsigned int pupFlags)
 {
   //Unpack each readonly:
   if(!CmiMyRank()) {
     //Unpack each readonly
-    PUP::fromMem pu((char *)EnvToUsr(env));
+    PUP::fromMem pu((char *)EnvToUsr(env), pupFlags);
     CmiSpanningTreeInfo &t = *_topoTree;
 
 #if CMK_SMP
@@ -1001,7 +1005,7 @@ static void _roRestartHandler(void *msg)
   envelope *env = (envelope *) msg;
   CkpvAccess(_numInitsRecd)++;
   _numExpectInitMsgs = env->getCount();
-  _processRODataMsg(env);
+  _processRODataMsg(env, PUP::er::IS_CHECKPOINT);  // packed by bdcastRO
   // in SMP, potentially there us a race condition between rank0 calling
   // initDone, which sendTriggers, and PE 0 calls bdcastRO which broadcast
   // readonlys
@@ -1122,7 +1126,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
       CkpvAccess(_numInitsRecd)++;
       CpvAccess(_qd)->process();
       _numExpectInitMsgs = env->getCount();
-      _processRODataMsg(env);
+      _processRODataMsg(env, 0);  // packed with no flags at startup
       break;
     default:
       CmiAbort("Internal Error: Unknown-msg-type. Contact Developers.\n");
