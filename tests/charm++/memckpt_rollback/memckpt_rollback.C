@@ -1,0 +1,317 @@
+// In-memory checkpoint and rollback with no failed process.
+//
+// A 1-D array of Worker elements advances one step per broadcast; each step
+// ends in a reduction to Main. At step 5 Main takes an in-memory checkpoint
+// (CkStartMemCheckpoint). At step 8, the first time only, Main calls
+// CkRollbackMemCheckpoint(): every element is restored to its step-5 state
+// (step counter, accumulator, a heap-allocated history vector, and a heap
+// array packed with pup_buffer, which the checkpoint must copy), and the
+// checkpoint's callback (Main::afterCheckpoint) arrives a second time. Steps
+// 6-8 therefore run twice (N+1 times with -rollbacks N, which rolls back to
+// the same checkpoint at each of the first N arrivals at step 8). Main and the Tally group are not rolled back (only
+// array elements are), so they can count the repeats: Main counts the
+// reductions per step and the callbacks, and Tally counts per element how
+// often step 6 ran. The final accumulator sum must equal a run with no
+// rollback.
+//
+// With -lb the elements call AtSync at step 6 (run with +balancer RotateLB):
+// elements migrate between the checkpoint and the rollback, which the
+// runtime refuses with a "rollback refused" abort (testrestriction target).
+//
+// With -lbfirst the elements call AtSync at step 3, before the checkpoint, and
+// at step 9, after the rollback (run with +balancer RotateLB). The restore
+// must keep each element's location epoch and life, or the home and the other
+// processes ignore its moves after the rollback; the token sent every step
+// goes through the location tables after both migrations. At the end, after
+// quiescence, each element's home PE checks that its location table names the
+// PE the element is on (in all modes): a move dropped by the home as stale
+// leaves the home naming the element's previous PE.
+//
+// With -insert (-delete) Main inserts (deletes) one element after step 6 and
+// rolls back at once; the runtime refuses the rollback with a "rollback
+// refused" abort naming the insertion (deletion) (testrestriction target).
+
+#include "memckpt_rollback.decl.h"
+#include <cstdlib>
+#include <map>
+#include <string>
+#include <vector>
+
+CProxy_Main mainProxy;
+CProxy_Tally tallyProxy;
+CProxy_Worker workerProxy;
+int numElements;
+int lbMode;      // 0: no load balancing; 1: -lb; 2: -lbfirst
+int changeMode;  // 0: none; 1: -insert; 2: -delete
+int numRollbacks;  // -rollbacks N: roll back to the same checkpoint N times (default 1)
+
+static const int kCheckpointStep = 5;
+static const int kRollbackStep = 8;
+static const int kLastStep = 10;
+static const long kMod = 1000000007L;
+
+static const int kBufLen = 16;
+static const int kFirstLbStep = 3;  // -lbfirst: before the checkpoint
+static const int kLastLbStep = 9;   // -lbfirst: after the rollback
+
+static long nextAcc(long acc, int idx, int step) { return (acc * 31 + idx * 7 + step) % kMod; }
+// contents of an element's pup_buffer array after it has run the given step
+static long bufValue(int idx, int step, int k) { return 100000L * idx + 100L * step + k; }
+
+static bool atSyncStep(int step)
+{
+  if (lbMode == 1) return step == kCheckpointStep + 1;
+  if (lbMode == 2) return step == kFirstLbStep || step == kLastLbStep;
+  return false;
+}
+
+class Main : public CBase_Main {
+  CProxy_Worker workers;
+  int stepRuns[kLastStep + 1] = {0};
+  int callbacks = 0;
+  bool checkpointed = false;
+  int rollbacks = 0;
+
+ public:
+  Main(CkArgMsg *m) {
+    numElements = 8;
+    lbMode = 0;
+    changeMode = 0;
+    numRollbacks = 1;
+    for (int i = 1; i < m->argc; i++) {
+      if (std::string(m->argv[i]) == "-lb") lbMode = 1;
+      if (std::string(m->argv[i]) == "-lbfirst") lbMode = 2;
+      if (std::string(m->argv[i]) == "-insert") changeMode = 1;
+      if (std::string(m->argv[i]) == "-delete") changeMode = 2;
+      if (std::string(m->argv[i]) == "-rollbacks" && i + 1 < m->argc) numRollbacks = atoi(m->argv[++i]);
+    }
+    delete m;
+    mainProxy = thisProxy;
+    tallyProxy = CProxy_Tally::ckNew();
+    CkArrayOptions opts(numElements);
+    if (changeMode == 1) opts.setBounds(numElements + 1);  // room for the inserted element
+    workers = CProxy_Worker::ckNew(opts);
+    workerProxy = workers;
+    workers.doStep(1);
+  }
+
+  // data[0] is the sum of the elements' step numbers, data[1] of their accumulators
+  void stepDone(int n, long *data) {
+    int step = (int)(data[0] / numElements);
+    long sum = data[1];
+    stepRuns[step]++;
+    if (step == kCheckpointStep && !checkpointed) {
+      checkpointed = true;
+      CkCallback cb(CkIndex_Main::afterCheckpoint(), thisProxy);
+      CkStartMemCheckpoint(cb);
+      return;
+    }
+    if (step == kCheckpointStep + 1 && changeMode != 0) {
+      if (changeMode == 1) {
+        CkPrintf("memckpt_rollback: inserting element %d, then rolling back\n", numElements);
+        workers[numElements].insert();
+      } else {
+        CkPrintf("memckpt_rollback: deleting element %d, then rolling back\n", numElements - 1);
+        workers[numElements - 1].ckDestroy();
+      }
+      CkRollbackMemCheckpoint();  // waits for quiescence, so the change is done
+      return;
+    }
+    if (step == kRollbackStep && rollbacks < numRollbacks) {
+      rollbacks++;
+      CkPrintf("memckpt_rollback: rolling back at step %d\n", step);
+      // Nothing else is in flight; the runtime waits for quiescence anyway.
+      CkRollbackMemCheckpoint();
+      return;
+    }
+    if (step < kLastStep) {
+      workers.doStep(step + 1);
+      return;
+    }
+    long expect = 0;
+    for (int i = 0; i < numElements; i++) {
+      long acc = 0;
+      for (int s = 1; s <= kLastStep; s++) acc = nextAcc(acc, i, s);
+      expect += acc;
+    }
+    if (sum != expect) CkAbort("memckpt_rollback: final sum %ld, expected %ld", sum, expect);
+    for (int s = 1; s <= kLastStep; s++) {
+      int want = (s > kCheckpointStep && s <= kRollbackStep) ? numRollbacks + 1 : 1;
+      if (stepRuns[s] != want)
+        CkAbort("memckpt_rollback: step %d completed %d times, expected %d", s, stepRuns[s], want);
+    }
+    if (callbacks != numRollbacks + 1)
+      CkAbort("memckpt_rollback: checkpoint callback arrived %d times, expected %d", callbacks,
+              numRollbacks + 1);
+    // every location update from the migrations has landed once nothing is in flight
+    CkStartQD(CkCallback(CkIndex_Main::checkHomes(), thisProxy));
+  }
+
+  void checkHomes() {
+    tallyProxy.startHomes();
+    workers.reportPe();
+  }
+
+  void homesDone(int stale) {
+    if (stale != 0)
+      CkAbort("memckpt_rollback: %d home PEs name a PE other than their element's", stale);
+    tallyProxy.check();
+  }
+
+  // Sent once when the checkpoint completes and once more after the rollback.
+  // Main's own state is not reverted by the rollback; it restarts the steps
+  // from the checkpoint step itself.
+  void afterCheckpoint() {
+    callbacks++;
+    CkPrintf("memckpt_rollback: checkpoint callback %d\n", callbacks);
+    workers.doStep(kCheckpointStep + 1);
+  }
+
+  void tallyDone(int good, int bad) {
+    if (good != numElements || bad != 0)
+      CkAbort("memckpt_rollback: %d elements ran step 6 %d times, %d did not", good,
+              numRollbacks + 1, bad);
+    CkPrintf("memckpt_rollback passed\n");
+    CkExit();
+  }
+};
+
+// Not rolled back: counts per element how many times step 6 ran.
+class Tally : public CBase_Tally {
+ public:
+  std::map<int, int> ranStep6;
+  bool homesStarted = false;
+  int reported = 0, stale = 0;
+  Tally() {}
+
+  int countHomed() const {
+    CkLocMgr *mgr = workerProxy.ckLocMgr();
+    int n = 0;
+    for (int i = 0; i < numElements; i++)
+      if (mgr->homePe(CkArrayIndex1D(i)) == CkMyPe()) n++;
+    return n;
+  }
+  void contributeHomes() {
+    contribute(sizeof(int), &stale, CkReduction::sum_int,
+               CkCallback(CkReductionTarget(Main, homesDone), mainProxy));
+  }
+  // Main sends startHomes to every PE and reportPe to every element; the PE
+  // contributes once it has both startHomes and a report from each element
+  // whose home it is, in whichever order they arrive.
+  void startHomes() {
+    homesStarted = true;
+    if (reported == countHomed()) contributeHomes();
+  }
+  // on the element's home PE: does this process's location table name its PE?
+  void notePe(int idx, int pe) {
+    int known = workerProxy.ckLocMgr()->whichPe(CkArrayIndex1D(idx));
+    if (known != pe) {
+      CkPrintf("memckpt_rollback: element %d is on PE %d, its home PE %d names PE %d\n", idx,
+               pe, CkMyPe(), known);
+      stale++;
+    }
+    reported++;
+    if (homesStarted && reported == countHomed()) contributeHomes();
+  }
+  void check() {
+    int res[2] = {0, 0};
+    for (auto &e : ranStep6) res[e.second == numRollbacks + 1 ? 0 : 1]++;
+    contribute(2 * sizeof(int), res, CkReduction::sum_int,
+               CkCallback(CkReductionTarget(Main, tallyDone), mainProxy));
+  }
+};
+
+// Each step an element also sends a token to its right neighbor and finishes
+// the step when it has the neighbor's token too, so that point-to-point sends
+// go through the location tables after a rollback.
+class Worker : public CBase_Worker {
+  int step = 0;
+  int tokenStep = 0;     // step of the last token received from the left neighbor
+  int finishedStep = 0;  // last step this element contributed for
+  long acc = 0;
+  std::vector<long> *history;  // heap state that must be restored
+  long *buf = nullptr;         // packed with pup_buffer; malloc'd, kBufLen entries
+
+  void checkBuf(int s) const {
+    for (int k = 0; k < kBufLen; k++)
+      if (buf[k] != bufValue(thisIndex, s, k))
+        CkAbort("memckpt_rollback: element %d at step %d has buf[%d] = %ld, expected %ld",
+                thisIndex, s, k, buf[k], bufValue(thisIndex, s, k));
+  }
+  void fillBuf(int s) {
+    for (int k = 0; k < kBufLen; k++) buf[k] = bufValue(thisIndex, s, k);
+  }
+
+ public:
+  Worker() : history(new std::vector<long>) {
+    usesAtSync = (lbMode != 0);
+    buf = (long *)malloc(kBufLen * sizeof(long));
+    fillBuf(0);
+  }
+  Worker(CkMigrateMessage *m) : CBase_Worker(m), history(new std::vector<long>) {}
+  ~Worker() {
+    delete history;
+    free(buf);
+  }
+
+  void pup(PUP::er &p) {
+    p | step;
+    p | tokenStep;
+    p | finishedStep;
+    p | acc;
+    p | *history;
+    // A migration's pack hands the buffer to the runtime, which frees it after
+    // the transfer (or passes the pointer itself within a process); a
+    // checkpoint's pack (IS_CHECKPOINT) copies the bytes and the element keeps it.
+    p.pup_buffer(buf, kBufLen);
+    if (p.isPacking() && !p.isCheckpoint()) buf = nullptr;
+  }
+
+  void doStep(int s) {
+    if (s != step + 1)
+      CkAbort("memckpt_rollback: element %d at step %d got step %d", thisIndex, step, s);
+    if ((int)history->size() != step)
+      CkAbort("memckpt_rollback: element %d history has %d entries at step %d", thisIndex,
+              (int)history->size(), step);
+    checkBuf(step);  // after a rollback: the values packed at the checkpoint
+    step = s;
+    fillBuf(s);
+    acc = nextAcc(acc, thisIndex, s);
+    history->push_back(acc);
+    if (s == kCheckpointStep + 1) tallyProxy.ckLocalBranch()->ranStep6[thisIndex]++;
+    thisProxy[(thisIndex + 1) % numElements].token(s);
+    tryFinish();
+  }
+
+  void token(int s) {
+    if (s != tokenStep + 1)
+      CkAbort("memckpt_rollback: element %d after token %d got token %d", thisIndex, tokenStep, s);
+    tokenStep = s;
+    tryFinish();
+  }
+
+  void tryFinish() {
+    if (tokenStep != step || finishedStep == step) return;
+    finishedStep = step;
+    if (atSyncStep(step)) {
+      AtSync();
+      return;
+    }
+    finishStep();
+  }
+
+  void ResumeFromSync() { finishStep(); }
+
+  void reportPe() {
+    tallyProxy[workerProxy.ckLocMgr()->homePe(CkArrayIndex1D(thisIndex))].notePe(thisIndex,
+                                                                                  CkMyPe());
+  }
+
+  void finishStep() {
+    long data[2] = {step, acc};
+    contribute(2 * sizeof(long), data, CkReduction::sum_long,
+               CkCallback(CkReductionTarget(Main, stepDone), mainProxy));
+  }
+};
+
+#include "memckpt_rollback.def.h"
