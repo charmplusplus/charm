@@ -649,7 +649,7 @@ The builder
   allocation. The runtime honors it on chare, group, nodegroup and creation
   messages, not on point-to-point sends to array elements. Its main use is
   creating an array with a custom map: the array's constructor message
-  depends on the map group (:ref:`ckdyn-arrays`).
+  depends on the map group (:ref:`array maps <ckdyn-arrays>`).
 - ``CkDynMsgAddBuffer`` copies the shape at once but the contents only at
   ``CkDynMsgFinish``, straight into the message, so ``desc.ptr`` must stay
   valid until ``Finish`` or ``Abandon``. Strides, if given, must describe a
