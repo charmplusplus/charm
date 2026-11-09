@@ -16,6 +16,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <mutex>
+#include <atomic>
+#include <map>
 #if CMK_CUDA || CMK_HIP
 #include "hapi.h"
 #endif
@@ -2320,6 +2322,13 @@ static size_t zcBuildPrefix(CkDynMsgBuilder *b, std::vector<char> &out) {
 #endif
 }
 
+/* transfer modes of DEVICE slots and persistent device buffers (dpAnnounce) */
+enum { DP_MEMCPY = 0, DP_MODE_IPC = 1, DP_RDMA = 2 };
+#if CMK_CUDA || CMK_HIP
+static void dpAnnounce(const char *what, int mode);
+static bool dpUseShm();
+#endif
+
 /* A device message's sender-side work, once the destination PE is known:
    CkRdmaDeviceOnSender (stream synchronization or IPC staging, registration,
    acknowledgement ids), and the descriptors re-pupped in place. */
@@ -2348,6 +2357,8 @@ static void zcDevicePrepare(CkDynMsg *m, int destPe) {
     }
   std::vector<CkDeviceBuffer *> bp(n);
   for (int i = 0; i < n; i++) bp[i] = &dbs[i];
+  dpAnnounce("DEVICE slots", CmiNodeOf(destPe) == CkMyNode() ? DP_MEMCPY
+             : (CmiPeOnSamePhysicalNode(destPe, CkMyPe()) && dpUseShm()) ? DP_MODE_IPC : DP_RDMA);
   CkRdmaDeviceOnSender(destPe, n, bp.data());
   PUP::toMem pm(buf);
   pm | n;
@@ -2369,11 +2380,24 @@ static void zcBeforeSend(CkDynMsg *m, int destPe, int *flags) {
 
 /* ---- receiver ----------------------------------------------------------- */
 
-static bool zcTakePost(CkDynObj &d, int ep, int slot, bool device, CkDynPost *out) {
+/* 1 when slot 0 of the message is the FUTURE slot of a CKDYN_MSG_BLOCK message:
+   argument k of a CKDYN_POST_ARG post is then slot k + 1 */
+static int zcArgOffset(const CkDynHdr *h) {
+  const CkDynSlot *sl = (const CkDynSlot *)(h + 1);
+  return ((h->flags & CKDYN_MSG_BLOCK) && h->nslots > 0 && sl[0].type == CKDYN_SLOT_FUTURE) ? 1 : 0;
+}
+
+static bool zcPostMatches(const CkDynPost &p, int ep, int slot, int argOff) {
+  if (p.ep != ep) return false;
+  if (p.slot & CKDYN_POST_ARG) return (p.slot & ~CKDYN_POST_ARG) + argOff == slot;
+  return p.slot == slot;
+}
+
+static bool zcTakePost(CkDynObj &d, int ep, int slot, int argOff, bool device, CkDynPost *out) {
   if (d.posts == nullptr) return false;
   for (size_t i = 0; i < d.posts->size(); i++) {
     CkDynPost &p = (*d.posts)[i];
-    if (p.ep != ep || p.slot != slot) continue;
+    if (!zcPostMatches(p, ep, slot, argOff)) continue;
     if (p.device != device)
       CkAbort("CkDyn: a %s buffer was posted for entry %d slot %d, which carries a %s slot",
               p.device ? "device" : "host", ep, slot, device ? "DEVICE" : "NCPY");
@@ -2386,8 +2410,9 @@ static bool zcTakePost(CkDynObj &d, int ep, int slot, bool device, CkDynPost *ou
 
 static void zcCheckPostLen(const CkDynPost &p, const CkDynSlot &s) {
   if (p.len != s.len)
-    CkAbort("CkDyn: entry %d slot %d: the posted buffer has %llu bytes, the message's slot %u",
-            p.ep, p.slot, (unsigned long long)p.len, s.len);
+    CkAbort("CkDyn: entry %d %s %d: the posted buffer has %llu bytes, the message's slot %u",
+            p.ep, (p.slot & CKDYN_POST_ARG) ? "argument" : "slot", p.slot & ~CKDYN_POST_ARG,
+            (unsigned long long)p.len, s.len);
 }
 
 /* Host posts: the slot's data, already in the message, is copied into the
@@ -2401,7 +2426,7 @@ static void zcApplyHostPosts(CkDynMsg *m, CkDynObj &d, int ep) {
   for (int i = 0; i < h->nslots; i++) {
     if (sl[i].type != CKDYN_SLOT_NCPY) continue;
     CkDynPost p;
-    if (!zcTakePost(d, ep, i, false, &p)) continue;
+    if (!zcTakePost(d, ep, i, zcArgOffset(h), false, &p)) continue;
     zcCheckPostLen(p, sl[i]);
     char *at = m->buf + offs[sl[i].reserved2];
     CkNcpyBuffer nb;
@@ -2434,7 +2459,7 @@ static void zcDeviceIssue(CkDynMsg *m, CkDynObj *d, int ep) {
     if (sl[i].type != CKDYN_SLOT_DEVICE) continue;
     int k = (int)sl[i].reserved2;
     CkDynPost p;
-    if (d && zcTakePost(*d, ep, i, true, &p)) {
+    if (d && zcTakePost(*d, ep, i, zcArgOffset(h), true, &p)) {
       zcCheckPostLen(p, sl[i]);
       ptrs[k] = p.ptr;
       sl[i].reserved = (uint16_t)p.device_ord;
@@ -2559,6 +2584,17 @@ static void addPost(const CkDynTarget *t, int ep, int slot, bool device, int dev
   d->posts->push_back(CkDynPost{ ep, slot, device, dev, (void *)ptr, len });
 }
 
+extern "C" int CkDynUnpostBuffer(const CkDynTarget *t, int ep, int slot) {
+  CkDynObj *d = t->kind == CKDYN_NODEGROUP ? nullptr : objOf(t);
+  if (d == nullptr || d->posts == nullptr) return 0;
+  for (size_t i = 0; i < d->posts->size(); i++)
+    if ((*d->posts)[i].ep == ep && (*d->posts)[i].slot == slot) {
+      d->posts->erase(d->posts->begin() + i);
+      return 1;
+    }
+  return 0;
+}
+
 extern "C" void CkDynPostBuffer(const CkDynTarget *t, int ep, int slot, const CkDynBufDesc *d) {
   addPost(t, ep, slot, false, 0, d->ptr, d->len);
 }
@@ -2571,6 +2607,153 @@ extern "C" void CkDynPostDeviceBuffer(const CkDynTarget *t, int ep, int slot, co
   CkAbort("CkDyn: device posts need a CUDA or HIP build of Charm++");
 #endif
 }
+
+/* ---- persistent device buffers ------------------------------------------ */
+
+/* Thin wrappers of Charm++'s CkDevicePersistent (ckrdmadevice.h; mechanism:
+   doc/internals/ckdyn.md, "Persistent device buffers"). The handle is the
+   pupped CkDevicePersistent with an ignore callback, in a fixed-size record,
+   so only the issuing side's done runs. */
+
+#if CMK_CUDA || CMK_HIP
+#include "gpumanager.h"
+#include "ck.h"   /* QdCreate */
+CsvExtern(GPUManager, gpu_manager);
+
+static const uint32_t DP_MAGIC = 0xD9E5B002u;
+struct DpHandle {
+  uint32_t magic, len;
+  unsigned char bytes[504];   /* the pupped CkDevicePersistent */
+};
+
+struct CkDynDevPersist {
+  CkDevicePersistent dp;
+  CkDynCallback done;
+  int busy;            /* transfers issued, not completed */
+  DpHandle h;
+};
+
+struct DpOp { CkDynDevPersist *p; uint32_t refnum; };
+
+static bool dpUseShm() { return CsvAccess(gpu_manager).use_shm; }
+
+/* One line per process and mode the first time DEVICE slots use it. */
+static void dpAnnounce(const char *what, int mode) {
+  static std::mutex lock;
+  static std::set<std::pair<std::string, int> > said;
+  {
+    std::lock_guard<std::mutex> g(lock);
+    if (!said.insert(std::make_pair(std::string(what), mode)).second) return;
+  }
+  static const char *names[3] = {
+    "copy on the device (one process)",
+    "CUDA/HIP IPC between processes on one host (+gpushm)",
+    "RDMA on registered device memory" };
+  CmiPrintf("[%d] CkDyn> %s: %s\n", CkMyPe(), what, names[mode]);
+}
+
+static void dpUnpack(const void *handle, CkDevicePersistent &out) {
+  DpHandle h;
+  memcpy(&h, handle, sizeof h);
+  if (h.magic != DP_MAGIC || h.len > sizeof h.bytes)
+    CkAbort("CkDyn: not a persistent device buffer handle (magic 0x%x)", h.magic);
+  PUP::fromMem up(h.bytes);
+  up | out;
+}
+
+static void dpSendDone(const CkDynCallback &done, uint32_t refnum) {
+  CkDynCallback c = done;
+  if (refnum) { if (c.kind == CKDYN_CB_FUTURE) c.id = refnum; else c.refnum = refnum; }
+  CkDynCallbackSend(&c, emptyMsg());
+}
+
+/* The local buffer's callback: a callCFn on the issuing PE. */
+static void dpDoneFn(void *param, void *msg) {
+  if (msg) CkFreeMsg(msg);
+  DpOp *op = (DpOp *)param;
+  CkDynDevPersist *p = op->p;
+  uint32_t refnum = op->refnum;
+  delete op;
+  p->busy--;
+  dpSendDone(p->done, refnum);
+}
+
+static void dpLocal(const CkDynDevPersist *p, const char *what) {
+  if (p == nullptr) CkAbort("CkDyn: %s of a null persistent device buffer", what);
+  if (p->dp.pe != CkMyPe()) CkAbort("CkDyn: %s of a persistent device buffer opened on PE %d, called on PE %d", what, p->dp.pe, CkMyPe());
+}
+
+extern "C" CkDynDevPersist *CkDynDevPersistOpen(const CkDynDevDesc *d, const CkDynCallback *done) {
+  CkDynDevPersist *p = new CkDynDevPersist;
+  p->dp = CkDevicePersistent(d->ptr, (size_t)d->len, (hapiStream_t)(uintptr_t)d->stream);
+  p->dp.open();
+  p->done = *done;
+  p->busy = 0;
+  memset(&p->h, 0, sizeof p->h);
+  p->h.magic = DP_MAGIC;
+  PUP::sizer ps;
+  ps | p->dp;
+  if (ps.size() > sizeof p->h.bytes) CkAbort("CkDyn: a CkDevicePersistent pups %zu bytes, the handle holds %zu", ps.size(), sizeof p->h.bytes);
+  PUP::toMem pm(p->h.bytes);
+  pm | p->dp;
+  p->h.len = (uint32_t)ps.size();
+  return p;
+}
+
+extern "C" void CkDynDevPersistClose(CkDynDevPersist *p) {
+  dpLocal(p, "close");
+  if (p->busy) CkAbort("CkDyn: close of a persistent device buffer with %d transfer(s) outstanding", p->busy);
+  p->dp.close();
+  delete p;
+}
+
+extern "C" size_t CkDynDevPersistHandleSize(void) { return sizeof(DpHandle); }
+
+extern "C" void CkDynDevPersistHandle(const CkDynDevPersist *p, void *out) {
+  dpLocal(p, "handle");
+  memcpy(out, &p->h, sizeof(DpHandle));
+}
+
+extern "C" int CkDynDevPersistMode(const CkDynDevPersist *p, const void *handle) {
+  CkDevicePersistent other;
+  dpUnpack(handle, other);
+  return p->dp.mode(other);
+}
+
+extern "C" void CkDynDevPersistGet(CkDynDevPersist *dst, const void *src_handle, uint32_t refnum) {
+  dpLocal(dst, "get");
+  CkDevicePersistent src;
+  dpUnpack(src_handle, src);
+  if (dst->dp.cnt < src.cnt)
+    CkAbort("CkDyn: persistent get of %zu bytes into a %zu-byte buffer", src.cnt, dst->dp.cnt);
+  dst->busy++;
+  dst->dp.cb = CkCallback(dpDoneFn, new DpOp{ dst, refnum });
+  dst->dp.get(src);
+}
+
+extern "C" void CkDynDevPersistPut(const void *dst_handle, CkDynDevPersist *src, uint32_t refnum) {
+  dpLocal(src, "put");
+  CkDevicePersistent dst;
+  dpUnpack(dst_handle, dst);
+  if (dst.cnt < src->dp.cnt)
+    CkAbort("CkDyn: persistent put of %zu bytes into a %zu-byte buffer", src->dp.cnt, dst.cnt);
+  src->busy++;
+  src->dp.cb = CkCallback(dpDoneFn, new DpOp{ src, refnum });
+  src->dp.put(dst);
+}
+
+#else  /* no CUDA or HIP */
+
+static void dpNoDevice() { CkAbort("CkDyn: persistent device buffers need a CUDA or HIP build of Charm++"); }
+extern "C" CkDynDevPersist *CkDynDevPersistOpen(const CkDynDevDesc *, const CkDynCallback *) { dpNoDevice(); return nullptr; }
+extern "C" void CkDynDevPersistClose(CkDynDevPersist *) { dpNoDevice(); }
+extern "C" size_t CkDynDevPersistHandleSize(void) { dpNoDevice(); return 0; }
+extern "C" void CkDynDevPersistHandle(const CkDynDevPersist *, void *) { dpNoDevice(); }
+extern "C" int CkDynDevPersistMode(const CkDynDevPersist *, const void *) { dpNoDevice(); return -1; }
+extern "C" void CkDynDevPersistGet(CkDynDevPersist *, const void *, uint32_t) { dpNoDevice(); }
+extern "C" void CkDynDevPersistPut(const void *, CkDynDevPersist *, uint32_t) { dpNoDevice(); }
+
+#endif
 
 /* The stream's completion arrives at CkDynMgr::hapiDone on this PE with a
    message holding cb; hapiAddCallback keeps quiescence from being detected
@@ -2596,6 +2779,28 @@ void CkDynMgr::hapiDone(CkDynMsg *m) {
   CkDynViewCallback(&v, 0, &cb);
   CkFreeMsg(m);
   CkDynCallbackSend(&cb, emptyMsg());
+}
+
+#if CMK_CUDA || CMK_HIP
+CpvExtern(int, my_device);
+#endif
+
+extern "C" int CkDynHapiMyDevice(void) {
+#if CMK_CUDA || CMK_HIP
+  return CpvAccess(my_device);
+#else
+  return -1;
+#endif
+}
+
+extern "C" int CkDynHapiUseMyDevice(void) {
+#if CMK_CUDA || CMK_HIP
+  int dev = CpvAccess(my_device);
+  hapiCheck(hapiSetDevice(dev));
+  return dev;
+#else
+  return -1;
+#endif
 }
 
 extern "C" int CkDynHasDeviceSupport(void) {

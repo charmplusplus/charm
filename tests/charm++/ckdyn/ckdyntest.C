@@ -80,7 +80,8 @@ static CkDynCallback viewCb(const CkDynMsgView *v, int slot) { CkDynCallback c; 
 extern CbClass Ping, Sec, Grp, NGrp, Single, DMain, Late;
 
 enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTRED, P_GOTREDB, P_COMPUTE, P_CORO, P_SYNCSTART, P_RESUMED,
-       P_ZSTART, P_ZRECV, P_ZPOST, P_ZSPIN, P_ZACK, P_DSTART, P_DRECV, P_DCHECK };
+       P_ZSTART, P_ZRECV, P_ZPOST, P_ZSPIN, P_ZACK, P_DSTART, P_DRECV, P_DCHECK,
+       P_PSTART, P_PRECV, P_PDONE, P_PCHECK };
 enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED };
 enum { G_CTOR, G_GOTRED, G_GOTREDB, G_NGSEND, G_NGREPORT, G_PRIOSTART, G_PRIORECV, G_EXPRECV,
        G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE, G_LATEREG };
@@ -478,7 +479,127 @@ static int64_t pingDCheck(Obj *, const CkDynMsgView *v) {
   sendPing((int)cbI64(v, 1), P_ZACK, MsgB().i64(0).finish(0));
   return 0;
 }
+
+/* ---- Ping: persistent device buffers (the devpersist phases) -------------
+ * pStart(target, FUTURE) on element 0 fills a 16 MB device buffer A with
+ * pattern seed1, opens it and sends its handle: pRecv(handle, round 1,
+ * seed1). The target opens its own buffer B, gets A into B (pDone refnum 1),
+ * checks seed1, writes seed2 into B and puts B back into A (pDone refnum 2),
+ * then tells element 0: pCheck(round 1, seed2, mode). Element 0 checks A,
+ * closes A's buffer and opens it again, and sends the new handle: pRecv(handle,
+ * round 2, seed2); the target gets again, checks seed2, closes and frees B,
+ * and sends pCheck(round 2); element 0 closes, frees A and reports. Both
+ * done callbacks are TARGET callbacks to pDone with the call's refnum. */
+struct DpState { void *buf = nullptr; CkDynDevPersist *p = nullptr; std::vector<char> remote; int64_t seed = 0, round = 0; int replyTo = 0; uint32_t fid = 0; double t0 = 0, tGet = 0; };
+static std::mutex g_dpLock;
+static std::map<int, DpState> g_dp;   /* per element index */
+static DpState &dpState(int idx) { std::lock_guard<std::mutex> g(g_dpLock); return g_dp[idx]; }
+
+static void dpFill(void *dbuf, int64_t seed) {
+  std::vector<double> h(ZN);
+  for (int64_t i = 0; i < ZN; i++) h[i] = zVal(seed, i);
+  hapiCheck(hapiMemcpy(dbuf, h.data(), ZN * sizeof(double), hapiMemcpyHostToDevice));
+}
+static void dpCheck(Obj *o, const void *dbuf, int64_t seed, const char *what) {
+  std::vector<double> h(ZN, -1.0);
+  hapiCheck(hapiMemcpy(h.data(), dbuf, ZN * sizeof(double), hapiMemcpyDeviceToHost));
+  for (int64_t i = 0; i < ZN; i++)
+    if (h[i] != zVal(seed, i)) cbFail("devpersist: %s on element %d: %g at %lld, expected %g", what, myIndex(o), h[i], (long long)i, zVal(seed, i));
+}
+static CkDynDevPersist *dpOpen(Obj *o, void *dbuf) {
+  int dev = 0;
+  hapiCheck(hapiGetDevice(&dev));
+  static const int64_t shape[1] = { ZN };
+  CkDynDevDesc d = { dbuf, (uint64_t)(ZN * sizeof(double)), CKDYN_ELEM_F64, 1, 0, dev, 0, shape };
+  CkDynCallback done = cbTargetCb(o->t, Ping.ep(P_PDONE), 0, 0);
+  return CkDynDevPersistOpen(&d, &done);
+}
+static CkDynMsg *dpHandleMsg(CkDynDevPersist *p, int64_t round, int64_t seed) {
+  std::vector<char> h(CkDynDevPersistHandleSize());
+  CkDynDevPersistHandle(p, h.data());
+  MsgB b;
+  CkDynMsgAddBytes(b.b, h.data(), (uint32_t)h.size(), 0);
+  return b.i64(round).i64(seed).finish(0);
+}
+
+static int64_t pingPStart(Obj *o, const CkDynMsgView *v) {
+  int target = (int)cbI64(v, 0);
+  int pe; uint32_t id;
+  CHECK(cbFindFuture(v, &pe, &id), "pStart without a future");
+  DpState &st = dpState(myIndex(o));
+  st.fid = id; st.replyTo = target; st.seed = 501 + target;
+  hapiCheck(hapiMalloc(&st.buf, ZN * sizeof(double)));
+  dpFill(st.buf, st.seed);
+  st.p = dpOpen(o, st.buf);
+  st.t0 = CkWallTimer();
+  sendPing(target, P_PRECV, dpHandleMsg(st.p, 1, st.seed));
+  return 0;
+}
+
+/* pRecv(handle, round, seed) on the target */
+static int64_t pingPRecv(Obj *o, const CkDynMsgView *v) {
+  CHECK(v->slots[0].type == CKDYN_SLOT_BYTES && v->slots[0].len == CkDynDevPersistHandleSize(),
+        "devpersist: handle slot of %u bytes, expected %zu", v->slots[0].len, CkDynDevPersistHandleSize());
+  DpState &st = dpState(myIndex(o));
+  const char *h = (const char *)CkDynViewBytesPtr(v, 0);
+  st.remote.assign(h, h + v->slots[0].len);
+  st.round = cbI64(v, 1); st.seed = cbI64(v, 2);
+  if (!st.p) {
+    hapiCheck(hapiMalloc(&st.buf, ZN * sizeof(double)));
+    hapiCheck(hapiMemset(st.buf, 0, ZN * sizeof(double)));
+    st.p = dpOpen(o, st.buf);
+  }
+  st.t0 = CkWallTimer();
+  CkDynDevPersistGet(st.p, st.remote.data(), 1);
+  return 0;
+}
+
+/* pDone: refnum 1 a get completed, 2 a put completed (on the issuing PE) */
+static int64_t pingPDone(Obj *o, const CkDynMsgView *v) {
+  DpState &st = dpState(myIndex(o));
+  int mode = CkDynDevPersistMode(st.p, st.remote.data());
+  if (v->refnum == 1) {
+    st.tGet = CkWallTimer() - st.t0;
+    dpCheck(o, st.buf, st.seed, "get");
+    if (st.round == 1) {
+      dpFill(st.buf, st.seed + 1);
+      CkDynDevPersistPut(st.remote.data(), st.p, 2);
+    } else {
+      CkDynDevPersistClose(st.p);
+      hapiCheck(hapiFree(st.buf));
+      st.p = nullptr; st.buf = nullptr;
+      sendPing(0, P_PCHECK, MsgB().i64(2).i64(st.seed).i64(mode).f64(st.tGet).finish(0));
+    }
+  } else if (v->refnum == 2) {
+    sendPing(0, P_PCHECK, MsgB().i64(1).i64(st.seed + 1).i64(mode).f64(st.tGet).finish(0));
+  } else {
+    cbFail("devpersist: done with refnum %u", v->refnum);
+  }
+  return 0;
+}
+
+/* pCheck(round, seed, mode, getTime) on element 0 */
+static int64_t pingPCheck(Obj *o, const CkDynMsgView *v) {
+  DpState &st = dpState(myIndex(o));
+  int64_t round = cbI64(v, 0), seed = cbI64(v, 1), mode = cbI64(v, 2);
+  dpCheck(o, st.buf, seed, round == 1 ? "put" : "after the round-2 get");
+  CkDynDevPersistClose(st.p);
+  st.p = nullptr;
+  if (round == 1) {
+    st.p = dpOpen(o, st.buf);   /* close and reopen: a new handle for the same memory */
+    sendPing(st.replyTo, P_PRECV, dpHandleMsg(st.p, 2, seed));
+    return 0;
+  }
+  hapiCheck(hapiFree(st.buf));
+  st.buf = nullptr;
+  CkDynFutureSet(0, st.fid, MsgB().i64(mode).f64(cbF64(v, 3)).f64(CkWallTimer() - st.t0).finish(0));
+  return 0;
+}
 #else
+static int64_t pingPStart(Obj *, const CkDynMsgView *) { cbFail("devpersist phase in a build without CUDA or HIP"); return 0; }
+static int64_t pingPRecv(Obj *, const CkDynMsgView *) { return 0; }
+static int64_t pingPDone(Obj *, const CkDynMsgView *) { return 0; }
+static int64_t pingPCheck(Obj *, const CkDynMsgView *) { return 0; }
 static int64_t pingDStart(Obj *, const CkDynMsgView *) { cbFail("device phase in a build without CUDA or HIP"); return 0; }
 static int64_t pingDRecv(Obj *, const CkDynMsgView *) { return 0; }
 static int64_t pingDCheck(Obj *, const CkDynMsgView *) { return 0; }
@@ -506,6 +627,10 @@ CbClass Ping = { "Ping", CKDYN_ARRAY, 1, {
   { "Ping.dStart", 0, pingDStart },
   { "Ping.dRecv", 0, pingDRecv },
   { "Ping.dCheck", 0, pingDCheck },
+  { "Ping.pStart", 0, pingPStart },
+  { "Ping.pRecv", 0, pingPRecv },
+  { "Ping.pDone", 0, pingPDone },
+  { "Ping.pCheck", 0, pingPCheck },
 } };
 
 /* ---- section members (Sec array elements and Grp branches) --------------- */
@@ -843,7 +968,7 @@ class TestMain : public CBase_TestMain {
     "reductions/array_elem", "reductions/array_bcast", "reductions/future", "reductions/foreign",
     "future_return", "nodegroup", "qd", "priority", "coroutine",
     "ncpy/nonpost", "ncpy/post_before", "ncpy/post_after", "ncpy/samepe",
-    "device/remote", "device/samepe", "hapi",
+    "device/remote", "device/samepe", "hapi", "devpersist/remote", "devpersist/samepe",
     "sections/array", "sections/group", "sections/remote", "sections/combine_overlap",
     "sections/combine_arrays", "sections/delete", "sections/migration",
     "migration", "checkpoint", "late", "exit" };
@@ -941,6 +1066,7 @@ public:
     else if (s.compare(0, 5, "ncpy/") == 0) runNcpy(s);
     else if (s.compare(0, 7, "device/") == 0) runDevice(s);
     else if (s == "hapi") runHapi();
+    else if (s.compare(0, 11, "devpersist/") == 0) runDevPersist(s);
     else if (s.compare(0, 9, "sections/") == 0) runSections(s);
     else if (s == "migration") runMigration();
     else if (s == "checkpoint") runCheckpoint();
@@ -1120,6 +1246,27 @@ public:
     });
     int target = s == "device/remote" ? numElems - 1 : 1;
     sendPing(0, P_DSTART, MsgB().i64(target).fut(0, f).finish(0));
+#else
+    CkPrintf("SKIP %s (no CUDA or HIP in this build)\n", s.c_str());
+    next();
+#endif
+  }
+
+  /* devpersist: persistent device buffers between element 0 and the last
+     element (another PE when there is more than one) and element 1 (element
+     0's PE). See pStart. */
+  void runDevPersist(const std::string &s) {
+#if CMK_CUDA || CMK_HIP
+    uint32_t f = cbNewFuture([this, s](const CkDynMsgView *v) {
+      static const char *modes[3] = { "copy in one process", "IPC", "RDMA" };
+      int64_t mode = cbI64(v, 0);
+      CkPrintf("  %s: 16 MB get, put, close, reopen and get, checked on the host; mode %s; "
+               "16 MB get %.3f ms (including the done callback); phase %.3f ms\n",
+               s.c_str(), mode >= 0 && mode < 3 ? modes[mode] : "?", cbF64(v, 1) * 1e3, cbF64(v, 2) * 1e3);
+      pass(s);
+    });
+    int target = s == "devpersist/remote" ? numElems - 1 : 1;
+    sendPing(0, P_PSTART, MsgB().i64(target).fut(0, f).finish(0));
 #else
     CkPrintf("SKIP %s (no CUDA or HIP in this build)\n", s.c_str());
     next();

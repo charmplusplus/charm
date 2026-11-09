@@ -14,16 +14,30 @@
 #define CkNcpyModeDevice CmiNcpyModeDevice
 #define CkDeviceStatus CmiDeviceStatus
 
+// Persistent device buffers (manual: "Persistent GPU Communication"; mechanism:
+// doc/internals/ckdyn.md, "Persistent device buffers"). get/put choose a mode
+// per pair (mode()): a device copy within a process, CUDA/HIP IPC between
+// processes on one host when the peer's IPC handle opens here, RDMA on the
+// memory registered by open() otherwise. Both buffers' callbacks are sent from the issuing PE once the
+// bytes are in the destination.
 struct CkDevicePersistent {
   const void* ptr;
   size_t cnt;
   CkCallback cb;
   void* cb_msg;
-  hapiStream_t hapi_stream;
+  hapiStream_t hapi_stream = 0;   // the default stream unless a constructor names one
   int pe;
   hapiIpcMemHandle_t hapi_ipc_handle;
-  void* ipc_ptr;
-  bool ipc_open; // Used only by the remote chare
+  void* ipc_ptr;      // unused; the mapping of a remote buffer is kept per process
+  bool ipc_open;      // unused
+  // set by open() and carried by pup
+  size_t ipc_offset = 0;    // ptr minus the base of its allocation (what the IPC handle maps)
+  bool ipc_valid = false;   // hapi_ipc_handle names ptr's allocation
+  int node = -1;            // the process (logical node) of pe
+  int phys_node = -1;       // the host of pe
+  bool registered = false;  // ncpy holds a registration of [ptr, ptr + cnt)
+  CmiNcpyBuffer ncpy;
+  bool owner = false;       // this object opened the buffer (not pupped)
 
   CkDevicePersistent() : ptr(nullptr), cnt(0), cb(CkCallback(CkCallback::ignore)),
                          cb_msg(nullptr), pe(-1), ipc_ptr(nullptr), ipc_open(false) {}
@@ -51,7 +65,11 @@ struct CkDevicePersistent {
   }
 
   void init();
+  // Takes the IPC handle of the allocation and, in a program of more than one
+  // process, registers the memory for RDMA. Call before sending the object.
   void open();
+  // On the object that opened the buffer: releases the registration. On a
+  // copy received from a peer: nothing (IPC mappings are kept per process).
   void close();
   void set_msg(void* msg);
 
@@ -59,6 +77,9 @@ struct CkDevicePersistent {
   // After the owner chare migrates, CkDevicePersistent needs to be recreated
   // and exchanged again.
   void pup(PUP::er& p);
+
+  // 0 copy within a process, 1 IPC, 2 RDMA: how get/put with other moves the bytes
+  int mode(const CkDevicePersistent& other) const;
 
   CkDeviceStatus get(CkDevicePersistent& src);
   CkDeviceStatus put(CkDevicePersistent& dst);
@@ -156,6 +177,10 @@ extern "C" {
   extern int device_dereg_handler;
   void* device_ack_bridge(void* arg);
   extern int device_ack_handler;
+  void* persist_put_bridge(void* arg);
+  extern int persist_put_handler;
+  void* persist_ack_bridge(void* arg);
+  extern int persist_ack_handler;
 }
 
 // Device pool: arenas registered lazily, whole, on first network use.

@@ -915,6 +915,78 @@ global per PE and whose `P2P_RECV` flow delivers an entry method twice.
 - Device: the destination is chosen in `zcArrive` before the transfers are
   issued, so a device post receives the data directly.
 
+A post's `slot` OR'd with `CKDYN_POST_ARG` names an argument instead of a slot
+(`zcPostMatches`): in a message with `CKDYN_MSG_BLOCK` whose slot 0 is a
+`FUTURE` slot, argument k is slot k + 1, otherwise slot k. A binding that
+posts before it knows whether the sender will block uses it. A post is
+consumed only by an `NCPY` or `DEVICE` slot; when the slot arrives as a
+`BUFFER` (below the binding's zero-copy threshold, or in a copied context),
+the post stays, and the binding removes it with `CkDynUnpostBuffer` and copies
+the value itself.
+
+### The device of a PE
+
+`CkDynHapiMyDevice()` returns the device HAPI's mapping gave the calling PE
+(`CpvAccess(my_device)`, the ordinal `hapiInit` passed to `cudaSetDevice` on that
+PE's thread), -1 in a build without CUDA or HIP. `CkDynHapiUseMyDevice()` makes
+it the calling thread's current device and returns it. A binding calls it before
+its first user code on a PE, so that libraries that allocate on the current
+device (CuPy, PyTorch, Numba) use the PE's device by default.
+
+### Persistent device buffers
+
+The implementation is Charm++'s `CkDevicePersistent` (ckrdmadevice.h/.C);
+CkDyn's functions wrap it. `open()` takes a CUDA/HIP IPC handle of the
+allocation holding the buffer and the buffer's offset in it (the base from
+`cuMemGetAddressRange` through `dlsym`, or `hipMemGetAddressRange`): cupy,
+torch and pool allocators hand out pieces of larger allocations, and an IPC
+handle maps the whole allocation. In a program of more than one process
+`open()` also registers the memory once (`CmiNcpyBuffer::init`,
+`CMK_BUFFER_REG`, `CMK_BUFFER_NODEREG`); `close()` on the object that opened it
+deregisters, and on a copy received from a peer does nothing. The pup carries
+the pointer, length, PE, process, host, the IPC handle and offset, and the
+pupped `CmiNcpyBuffer` with the registration.
+
+Mode (`CkDevicePersistent::mode`), for a get into a local buffer or a put from
+one:
+
+- same process: `hapiMemcpyAsync` device to device on the local buffer's
+  stream; `hapiAddCallback` on that stream sends each buffer's callback;
+- another process on the same host, when the remote buffer has an IPC
+  handle and it opens in this process (`+gpushm` is not needed: it concerns
+  `DEVICE` slots): the handle is opened once per process (a table keyed by
+  the handle's bytes, reused by every copy of the peer's buffer and kept
+  until exit), and the copy goes through the mapping as above. If opening fails (the peer's
+  GPU is not visible to this process, as with one GPU per task), `mode()`
+  reports RDMA and the transfer uses it;
+- otherwise RDMA on the registered memory. A get is `CmiNcpyBuffer::rdmaGet`
+  with the Direct API acknowledgement, whose destination callback is a
+  `callCFn` on the issuing PE that sends both buffers' callbacks. A put is
+  carried out as a get by the destination's PE: the issuer sends both
+  buffers in a Converse message (`persist_put_handler`), that PE gets, and
+  its completion sends `persist_ack_handler` back to the issuer, which sends
+  the callbacks. A true RDMA put completes on the source before the data is
+  visible at the destination (CommRputLocalHandler in reconverse), so its
+  callbacks could not mean "arrived". Before an RDMA transfer the local
+  buffer's stream is synchronized.
+
+In every mode both buffers' callbacks are sent from the issuing PE when the
+bytes are in the destination, each with its `cb_msg` (`set_msg`), as the
+manual describes. The first use of each mode and operation in a process prints
+a line (`[pe] CkDevicePersistent> get: ...`).
+
+CkDyn's `CkDynDevPersist` holds an opened `CkDevicePersistent`; the handle is
+that object pupped with an ignore callback, in a fixed 512-byte record
+(`CkDynDevPersistHandleSize()`), so a transfer never sends the remote side's
+callback. Each get or put sets the local object's callback to a `callCFn` on
+the issuing PE that sends `done` an empty message: for a `FUTURE` callback the
+call's refnum is the future id, for any other kind it is the callback's
+refnum. The send of a `DEVICE` message (`zcDevicePrepare`) prints the mode of
+`DEVICE` slots once per process (`[pe] CkDyn> DEVICE slots: ...`), which is
+how a run shows whether `+gpushm` took the IPC path. `CkDynDevPersistMode`
+returns `CkDevicePersistent::mode`. Close aborts while a transfer is
+outstanding. In a build without CUDA or HIP every CkDyn function aborts.
+
 ### HAPI callbacks
 
 `CkDynHapiAddCallback(stream, cb)` builds a message with one `CALLBACK` slot
@@ -938,7 +1010,13 @@ post follows the send in the same method; within one process the receiving
 PE spins until the sender has sent; across processes the post request
 follows the data, which is delivered only after its transfer. The `-zcbcast`
 run must abort on a broadcast with an `NCPY` slot. The `device` and `hapi`
-phases are compiled only in a CUDA or HIP build.
+phases are compiled only in a CUDA or HIP build, as are `devpersist/remote`
+and `devpersist/samepe`: element 0 opens a 16 MB buffer and sends its handle
+to the last element (or element 1, on its PE), which gets it into its own
+buffer, checks the pattern, writes a second pattern and puts it back; element
+0 checks, closes, reopens and sends the new handle, the target gets and checks
+again, and both close. The done callbacks are `TARGET` callbacks to `pDone`
+with the call's refnum.
 
 ## Pup
 
