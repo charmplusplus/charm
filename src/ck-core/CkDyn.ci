@@ -20,10 +20,6 @@ module CkDyn {
     entry void relay(CkDynMsg *m);
     // a CkDynHapiAddCallback completion: m carries the CkDynCallback to send to
     entry void hapiDone(CkDynMsg *m);
-    // a persistent device put between hosts: get into the local destination (CkDynDevPersistPut)
-    entry void persistPutReq(CkDynMsg *m);
-    // that get completed: the done callback of the put runs here, on the issuing PE
-    entry void persistPutAck(CkDynMsg *m);
     // sections rooted on this PE (doc/internals/ckdyn.md, "Sections")
     entry void sectionSend(CkDynMcastMsg *m);
     entry void sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe);
