@@ -1264,3 +1264,19 @@ of code; the gate is the objid test set, chkpt, megatest and pingpong on the Mac
   reaches it. Reusing numbers on destroy stays out: a late message, a stale location entry
   or a section cookie of the destroyed array would reach the new one. Test `io_sessions`,
   in the CI tier.
+- 2026-11-09 (#4031 defect 2): a process that addressed an element's dead life keeps
+  {d, e}; the new life starts at epoch 0, so its repairs lose the compare while their
+  epoch is <= e and every send from that process detours through d for good. The fix
+  planned on 2026-11-04, a starting epoch assigned by the home, was not taken: the home
+  learns the final epoch of the old life only from its death notice, which can arrive
+  after the new life's creation, so the base would have to wait for the notice and then
+  travel to wherever the new life has moved by then (a new message, routed by id, and an
+  epoch rebase at the holder). Taken instead: a reply or repair by id that loses the
+  compare to an entry naming another PE clears the entry, and the next send asks the
+  home, whose entry the life record keeps right. No new message; the entry it clears in
+  the normal case (a reply overtaken by a newer update) costs one request. Chapter
+  section 3.5 and rule 6 of section 3.0; TLA+ `ClearConflict` with the action property
+  `RepairNotIgnored` (violated without the rule, `trace_detour.txt`); test
+  `objid_detour`, which also found that a proxy insertion (`findInitialHostPe`) placed a
+  new element on the PE a stale entry named and aborted when that disagreed with the
+  insertion's PE; that lookup is now limited to bound arrays, as in #4138.

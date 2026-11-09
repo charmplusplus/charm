@@ -462,7 +462,7 @@ public:
   /// process's own writes keep current (section 3.5); else applyLocation.
   void updateLocation(const CkLocEntry& e);
   /// W4 on this process's entry, then the listeners and wakes if written.
-  void applyLocation(const CkLocEntry& e);
+  void applyLocation(const CkLocEntry& e, bool byId = false);
   /// Another PE of this process wrote the location of id, or retired id: flush what
   /// this PE holds for it.
   void wake(CmiUInt8 id);
