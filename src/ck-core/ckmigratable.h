@@ -105,7 +105,9 @@ public:
   /// ckJustCloned (default: ckJustMigrated) once its state is in; this
   /// element gets ckCloneSent once the pack has finished reading its buffers
   /// (an element whose buffers change must not write them before then).
-  void ckCloneTo(int toPe, const CkArrayIndex& newIdx);
+  // atDestination: unpack the copy on toPe (the runtime-managed copies: a copy serves only from an agreed step, so
+  // making it here first and moving it buys nothing, and it would open its channels where it is about to leave).
+  void ckCloneTo(int toPe, const CkArrayIndex& newIdx, bool atDestination = false);
   virtual void ckJustCloned(void) { ckJustMigrated(); }
   virtual void ckCloneSent(void) {}
   /// The balancer makes a copy of (or retires) another copy of this element's group: `rank` is the
@@ -230,6 +232,8 @@ private:
   // travels with it and is declared again to the database of every PE it
   // reaches. lbReplicaGroup < 0 means not replicable, the default.
   int lbReplicaGroup = -1;
+  int lbReplicaWherePe = -1;   // the PE this copy last announced (CkLocMgr::replicaWhere); not pupped: a move re-announces
+  bool lbReplicaManaged = false;   // the runtime makes, switches and retires its copies (setReplicaManaged)
   int lbReplicaRank = 0;
   int lbReplicaCount = 1;
   int lbReplicaMax = 1;
@@ -267,11 +271,36 @@ public:
                     double costNode = 0.0, double costRemote = 0.0, int parts = 0,
                     size_t exchangeBytes = 0, double exchangeMsgs = 0.0, size_t extraPerPeer = 0);
   bool lbReplicable() const { return lbReplicaGroup >= 0 && lbReplicaMax > 1; }
+  /// Runtime-managed copies (2026-11-08). An element that calls setReplicaManaged(true) (with setLBReplica) has
+  /// its copies made, switched and retired by the runtime: the balancer's ckClone and ckRetire are handled here,
+  /// not by the element. The element names the index of its copy `rank` (replicaIndex). A new copy calls
+  /// ckReplicaReady once what its senders need is out; the runtime then agrees with every PE the epoch (the
+  /// application's step, as its senders and copies give it to CkReplicaRoute / CkReplicaServes) from which the
+  /// new count serves, and tells each copy of the group (ckReplicaServing). A copy past the count calls
+  /// ckReplicaDone after its last epoch, and the runtime ends it.
+  void setReplicaManaged(bool on) { lbReplicaManaged = on; }
+  bool replicaManaged() const { return lbReplicaManaged; }
+  int replicaGroup() const { return lbReplicaGroup; }
+  int replicaRank() const { return lbReplicaRank; }
+  virtual CkArrayIndex replicaIndex(int rank) const;
+  virtual void ckReplicaServing(int fromEpoch, int k) { (void)fromEpoch; (void)k; }
+  // rank: the copy's own (a copy carries its source's declaration until its first balancing point).
+  void ckReplicaReady(int rank = -1);
+  void ckReplicaDone();
+  void ckReplicaServingFromCommit(void* args);   // the location manager's path to ckReplicaServing
 #else
   void setObjRebuildCost(double seconds) { (void)seconds; }
   double getObjRebuildCost() const { return 0.0; }
   void setLBReplica(int, int, int, int, size_t, double = 0.0, double = 0.0, int = 0, size_t = 0, double = 0.0, size_t = 0) {}
   bool lbReplicable() const { return false; }
+  void setReplicaManaged(bool) {}
+  bool replicaManaged() const { return false; }
+  int replicaGroup() const { return -1; }
+  int replicaRank() const { return 0; }
+  virtual CkArrayIndex replicaIndex(int) const { return CkArrayIndex(); }
+  virtual void ckReplicaServing(int, int) {}
+  void ckReplicaReady(int = -1) {}
+  void ckReplicaDone() { ckDestroy(); }
   void AtSync(int waitForMigration=1) { ResumeFromSync();}
   enum class AtSyncStatus { Continue, Started, Blocked };
   AtSyncStatus AtSyncStart(int waitForMigration=1) { ResumeFromSync(); return AtSyncStatus::Continue; }

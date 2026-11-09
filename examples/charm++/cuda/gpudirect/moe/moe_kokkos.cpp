@@ -145,15 +145,17 @@ struct GatherKernel {
 
 template <class T>
 struct CombineKernel {
-  const T* recv; const int* pos; float* y; size_t total; int k; int dm; float w;
+  const T* const* recv; int rpc; const int* pos; float* y; size_t total; int k; int dm; float w;
   KOKKOS_INLINE_FUNCTION void operator()(const Member& m) const {
     const size_t stride = gridStride(m);
     for (size_t e = gridStart(m); e < total; e += stride) {
       size_t t = e / dm;
       int c = (int)(e - t * dm);
       float acc = 0.0f;
-      for (int j = 0; j < k; j++)
-        acc += toF(recv[(size_t)pos[t * k + j] * dm + c]);
+      for (int j = 0; j < k; j++) {
+        const int r = pos[t * k + j], ch = r / rpc;   // the receive slab's chunk (moe.C init())
+        acc += toF(recv[ch][(size_t)(r - ch * rpc) * dm + c]);
+      }
       y[e] = w * acc;
     }
   }
@@ -281,16 +283,16 @@ void moeGather(const void* x, const int* idx, void* out, int n_slots,
   hapiCheck(hapiPeekAtLastError());
 }
 
-void moeCombine(const void* recv, const int* pos, float* y, int n_tok,
+void moeCombine(const void* const* recv, int rpc, const int* pos, float* y, int n_tok,
     int k, int dm, float w, bool bf16, hapiStream_t s) {
   size_t total = (size_t)n_tok * dm;
   static std::once_flag o_f, o_b;
   if (bf16)
     site(o_b, "moe::combine", teamOf(s, nblocks(total), BLOCK_1D),
-         CombineKernel<moe_bf16>{(const moe_bf16*)recv, pos, y, total, k, dm, w});
+         CombineKernel<moe_bf16>{(const moe_bf16* const*)recv, rpc, pos, y, total, k, dm, w});
   else
     site(o_f, "moe::combine", teamOf(s, nblocks(total), BLOCK_1D),
-         CombineKernel<float>{(const float*)recv, pos, y, total, k, dm, w});
+         CombineKernel<float>{(const float* const*)recv, rpc, pos, y, total, k, dm, w});
   hapiCheck(hapiPeekAtLastError());
 }
 

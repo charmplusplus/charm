@@ -7741,6 +7741,20 @@ extern "C" void hapiDumpEventQueues(int max_streams) {
     CmiPrintf("[HAPI-QUEUES %d] stream %p dev %d: %zu queued; head %s seq %u slot=%u busy=%d event=%s; stream %s\n",
               CmiMyPe(), (void*)e.first, hapiStreamDeviceOf(e.first), e.second.size(), kind, (unsigned)h.flag_seq,
               slotval, busy, evq, (q == hapiSuccess) ? "idle" : (q == hapiErrorNotReady) ? "busy" : hapiGetErrorName(q));
+    // What the head entry will fire: the entry method and, for an array element, its index.
+    {
+      const int ep = h.cb.epIndex();
+      const char* nm = (ep >= 0 && ep < (int)_entryTable.size()) ? _entryTable[ep]->name : "-";
+      const char* cn = (ep >= 0 && ep < (int)_entryTable.size()) ? _chareTable[_entryTable[ep]->chareIdx]->name : "-";
+      if (h.cb.type == CkCallback::sendArray || h.cb.type == CkCallback::isendArray) {
+        const int* ix = h.cb.d.array.idx.asChild().data();
+        CmiPrintf("[HAPI-QUEUES %d]   head -> %s::%s on element (%d,%d) wr=%p\n", CmiMyPe(), cn, nm, ix[0], ix[1],
+                  (void*)h.wr);
+      } else {
+        CmiPrintf("[HAPI-QUEUES %d]   head -> %s::%s (callback type %d) wr=%p\n", CmiMyPe(), cn, nm, (int)h.cb.type,
+                  (void*)h.wr);
+      }
+    }
   }
 #else
   (void)max_streams;

@@ -668,7 +668,7 @@ class Calib : public CBase_Calib {
 
   void reportPlacement() {
     int device = -1;
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP   // the HIP build (CMK_HIP) drives devices too; without this every PE reported device -1 (one device per host, 2026-10-22)
     device = (int)hapiMyDevice();
 #endif
     main_proxy.reportPlacement(CkMyPe(), CmiPhysicalNodeID(CkMyPe()),

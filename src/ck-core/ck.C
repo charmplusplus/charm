@@ -247,6 +247,14 @@ bool CkActiveLdHandle(LDObjHandle &out) {
 }
 #endif
 
+void IrrGroup::ckSetGPUTime(double gputime) {
+#if CMK_LBDB_ON && CMK_GPU
+  if (ckLbRec != nullptr && ckLbRec->lbmgr != nullptr) ckLbRec->lbmgr->EstObjGPULoad(ckLbRec->handle, gputime);
+#else
+  (void)gputime;
+#endif
+}
+
 void IrrGroup::ckRegisterWithLB(void) {
 #if CMK_LBDB_ON
   if (ckLbRec != nullptr) return;

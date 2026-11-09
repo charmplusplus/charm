@@ -172,7 +172,7 @@ __global__ void gatherKernel(const T* x, const int* idx, T* out,
 // result does not depend on which expert answered first. The sum is fp32
 // whatever recv holds.
 template <class T>
-__global__ void combineKernel(const T* recv, const int* pos, float* y,
+__global__ void combineKernel(const T* const* recv, int rpc, const int* pos, float* y,
     size_t total, int k, int dm, float w) {
   size_t stride = (size_t)blockDim.x * gridDim.x;
   for (size_t e = (size_t)blockIdx.x * blockDim.x + threadIdx.x; e < total;
@@ -180,8 +180,11 @@ __global__ void combineKernel(const T* recv, const int* pos, float* y,
     size_t t = e / dm;
     int c = (int)(e - t * dm);
     float acc = 0.0f;
-    for (int j = 0; j < k; j++)
-      acc += toF(recv[(size_t)pos[t * k + j] * dm + c]);
+    for (int j = 0; j < k; j++) {
+      // The slab's chunk this row lives in (moe.C init(): whole expert segments of rpc rows per chunk).
+      const int r = pos[t * k + j], ch = r / rpc;
+      acc += toF(recv[ch][(size_t)(r - ch * rpc) * dm + c]);
+    }
     y[e] = w * acc;
   }
 }
@@ -300,14 +303,14 @@ void moeGather(const void* x, const int* idx, void* out, int n_slots,
   hapiCheck(hapiPeekAtLastError());
 }
 
-void moeCombine(const void* recv, const int* pos, float* y, int n_tok,
+void moeCombine(const void* const* recv, int rpc, const int* pos, float* y, int n_tok,
     int k, int dm, float w, bool bf16, hapiStream_t s) {
   size_t total = (size_t)n_tok * dm;
   if (bf16)
-    combineKernel<moe_bf16><<<nblocks(total), BLOCK_1D, 0, s>>>((const moe_bf16*)recv, pos,
+    combineKernel<moe_bf16><<<nblocks(total), BLOCK_1D, 0, s>>>((const moe_bf16* const*)recv, rpc, pos,
         y, total, k, dm, w);
   else
-    combineKernel<float><<<nblocks(total), BLOCK_1D, 0, s>>>((const float*)recv, pos, y,
+    combineKernel<float><<<nblocks(total), BLOCK_1D, 0, s>>>((const float* const*)recv, rpc, pos, y,
         total, k, dm, w);
   hapiCheck(hapiPeekAtLastError());
 }

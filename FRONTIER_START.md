@@ -338,7 +338,7 @@ Read the results this way:
 | pool across nodes | vmm, `+gpupoolsize 16384 +gpupoolchunk 2046` | buddy only (ROCr cannot dma-buf-export `hipMemCreate` memory): `+gpupoolalloc buddy +gpupoolsize 2048 +gpupoolarenas 4`, `CK_GPU_ARENA_TOTAL_MAX_MB=16384` |
 | pool on one node | vmm | vmm works (the IPC import keeps the fd open until the grant) |
 | a one-node `srun` step | plain | `--network=single_node_vni`, else cxi finds no VNI and LCI aborts |
-| transfer-cost table | built in (the A40 and the A100 tables, by channels on the read path, 2026-11-07; any other device name gets the A40 table, MI250X included) | `+LBCostConfig lbcost.frontier.conf`, re-measured with `lbcalib -F 4` on the read path (the 2026-10-22 file predates the fan entries and the read path; `calibwrap.sh`, ported in `apps/lbcalib`) |
+| transfer-cost table | built in (the A40 and the A100 tables, by channels on the read path, 2026-11-07; any other device name gets the A40 table, MI250X included) | `+LBCostConfig lbcost.frontier.chan.conf`, measured 2026-11-07 by `lbcalib -F 4` through channels in the example's layout (`apps/lbcalib`, launched by `irun.sh`; `moe_run.sh` passes it, `LBCOST=` overrides); the 2026-10-22 `lbcost.frontier.conf` predates the fan entries |
 | per-rank wrapper | `ranklogs/moewrap.sh` (NUMA node 3 - local rank, 16 cores each) | `frontier_wrap.sh` (a GCD to its L3 region, the region's first core left to the OS); adapt `moewrap.sh` to that map |
 | LCI devices | one per process | one per PE when a process has several (`+lci_ndevices 7` for leanmd); moe runs one PE per process |
 | completion flags | memset writer | kernel writer (the HIP default; `+gpuflagmemset` restores the event-and-memset one) |
@@ -373,8 +373,8 @@ repros).
    `ldd $LCI_HIP/lib64/liblci.so` must show no CUDA library. The fork's next commit, b7c289ae of 2026-11-07
    (`/u/bhosale/lci`, master; not pushed), requests `FI_RMA_EVENT` only under `LCI_OFI_RMA_EVENT=1`: the
    2026-10-19 request put every remote write into cxi's ordered packet format and bought nothing (3.0 against
-   3.1 GB/s on Delta's A100 nodes), so the old install is not wrong, only heavier. Rebuild from b7c289ae the
-   next time LCI is touched.
+   3.1 GB/s on Delta's A100 nodes), so the old install is not wrong, only heavier. Rebuilt from b7c289ae on
+   2026-11-07 (`cmake --build lci/build-hip -j16 && cmake --install lci/build-hip`; no CUDA library in `ldd`).
 4. **Runtime.** The Delta configuration with the AMD option and the HIP LCI:
 
        CC=cc CXX=CC ./buildcmake charm++ reconverse-linux-x86_64 amd -j16 \
@@ -383,7 +383,10 @@ repros).
            -DRECONVERSE_ENABLE_HIP=ON -DCMAKE_HIP_ARCHITECTURES=gfx90a \
            -DCMK_USE_SHMEM=ON -DLBUSERDATA=1 -DCMAKE_BUILD_TYPE=Release"
 
-   Expect the tree `reconverse-linux-x86_64-amd`. This line has not been run since the merge. The
+   Expect the tree `reconverse-linux-x86_64-amd`. Run it once: `buildcmake` removes everything under an
+   existing tree (`rm -rf "$builddir"/*`), `apps/` with the traces and binaries included. After a pull rebuild
+   in place with `make -j16` inside the tree (cmake tracks the headers; three minutes on 2026-11-07), then the
+   apps from clean objects. This line was last run on 2026-11-02. The
    2026-10-22 corrections to watch for are in `HIP_PORT.md`: without `-DRECONVERSE_ENABLE_HIP=ON`
    reconverse builds with `CMK_HIP 0`; autofetched non-HIP `liblci*.so` in the tree's `lib/` shadow the HIP
    LCI at run time (move them aside); clang rejected `void*` arithmetic in `buddy_allocator.cpp` (fixed
@@ -537,6 +540,57 @@ network Libfabric", every Megatron header "SequentialMLP (local spec)" with the 
 comparison exists on Frontier now, the same fixture on both sides: the README section has the tables.
 Transformer Engine does not reach MI250X (the pull note above), so the Megatron rows stay the sequential ones.*
 
+*Pulled 2026-11-07 (charm 4537c12c9, LCI b7c289ae; reconverse unchanged) and the two-node comparison re-run on the
+read path: job 5877110 (frontier09162 and 09164, 11:42 to 12:19, one hour of debug QOS), the README section "Measured
+2026-11-07: Frontier, two nodes on the read path". Builds: LCI reinstalled, the tree rebuilt in place (item 4 above),
+`moe` and `moe.attn_unfused` from clean objects, `apps/rma_bw` (`make BUILD_HIP=1 CXX=hipcc`: `CXX ?=` loses to make's
+default) and `apps/lbcalib` (its device report was guarded by `CMK_CUDA`, now `CMK_CUDA || CMK_HIP`; the HIP tree
+defines both). What the job found, in the order the section above asked: (1) `rma_bw` on two Frontier nodes: put and
+get both at 24 GB/s into device memory, alone and with both hosts sending (23.3 each way), every memory class alike;
+no write penalty on MI250X and Cassini, so the verb is a wash here and the read path (the default) ran the rows;
+registrations of 4 and 8 GB still fail on cxi without `FI_RMA_EVENT`, 2 GB runs at 24 GB/s (`rma_bw_sweep.sh`,
+`logs/rma_bw.txt`). (2) `lbcost.frontier.chan.conf` by `lbcalib -F 4` in the example's layout: 23.4 GB/s per peer
+across hosts, 145 / 34.8 / 50.3 on one host at fan 2 / 3 / 4 (the two dies of one MI250X, then another package);
+`moe_run.sh` passes it. (3) The rows: SmartMoE ShedLB 67.8 training and 20.3 serving with one round (three copies at
+once, two on the other host; 90.8 and 32.7 before), 51.7 and 17.8 with rounds every 10 steps; 2.6x over Megatron-Core
+and 2.0x over the reference's best arm in training, 3.0x and 3.3x in serving. Mixtral serving plain 112.4 (164.6)
+with the outputs through the channels, level with the reference; its ShedLB now makes one copy and gains nothing.
+OLMoE could not run as pulled: with the outputs through channels the dispatcher's receive slab is 64 fixed segments,
+3 GB a parity, over the 2048 MB arena and the 16384 MB per-process registration caps; `moe.C` now allocates it in
+chunks of whole segments of at most 1024 MB (`recvRowPtr`, the combine kernel maps a row to its chunk; one chunk
+wherever it fits, bit-identical there) and the rows ran with `-r 7.5`, the trace's own maximum (7680 rows): 124.4
+and 131.6 (159.2 and 163.1 before), the entry-method output path 129.0 and 132.3 on the same nodes, ShedLB placing
+nothing (host-bound). Open: the Mixtral ShedLB exit segfault persists (the PE holding the copy); the reference's EPLB
+arm hung a third time; OLMoE still trails the baselines 1.7x to 2.6x. Uncommitted: `moe.C`, `moe.cu`, `moe.h`,
+`moe_kokkos.cpp` (the chunked slab), `lbcalib.C` (the guard), this file and the README. Scripts under the scratch
+root: `read_path.sh` (the chain, `SKIP_RB=1` skips its `rma_bw` section), `rma_bw_sweep.sh`, `ol_rows.sh`,
+`ol_rows2.sh`, `rp_table.sh`, `swap_tail.sh` (stops a chain between arms). Process notes: the first `rma_bw` runs
+failed on `taskset` because a one-task step with `-c 8` has no cores 49-55 (a full-node step, `-c 56`, has them);
+pausing a chain with SIGSTOP ends it (the parent shell reads the stop as an exit), so a chain is replaced by killing
+it between arms and starting the next script on the same allocation.*
+
+*Pulled again 2026-11-07 ~16:25 (charm 1f0db0b17: ShedLB copies for locality, the declared load pooled per device,
+LBClearLoads at the timed steps; LCI b7c289ae and reconverse 038893f unchanged) over the local changes (stash, ff-pull,
+pop: no conflicts); the runtime rebuilt in place (`make -j16`, rebuild_1107b.log), apps/moe rebuilt from clean objects
+(build_moe_1107b.sh: the chunked slab and ExpertMap included, so the OLMoE rows run from apps/moe at -r 7.5). The two-node
+comparison re-run at one PE per GCD on job 5879259 (frontier05256-05257, 16:33-17:0x): read_path2.sh (tags rp2_*,
+logs/moe/read_path2.txt, logs/ref/results_rp2.txt), rp2_table.sh (the tables beside the morning's), ss.sh (a mean over
+any step range: the protocol's 23-43 window now holds the landing step of eight-copy rounds). Verdict in the README
+("Measured 2026-11-07, evening"): Mixtral serving 111.8 -> 57.4 after the round (one copy of every expert on the other
+host, 2.1x the reference), SmartMoE serving's 31 locality copies buy nothing on top of the hot expert's three, training
+unchanged, OLMoE serving -20%. Open: the exit segfault on a copy's PE in 4 of 12 ShedLB rows (upstream's known item),
+the 5.7 s landing of the eight copies in the MoE-only Mixtral serving row (216 ms in the block row), the reference EPLB arm hung a fourth time (rc=124). Job released 17:00.*
+
+*Four PEs per GCD, 2026-11-07 15:57-16:20 (job 5878615), then dropped.* `moe_run.sh PPN=4` (`+ppn 4`, the wrapper pins
+four cores of the GCD's region), `lbcost.frontier.chan.ppn4.conf` (lbcalib `+ppn 4`), `apps/moe3` (the example with
+`ExpertMap`: experts blocked over the GPUs as at one PE, since the default map put SmartMoE on one host and Mixtral four
+to a GCD past the 16384 MB ceiling), scripts `ppn4*.sh`, `p4_table.sh`, rows in `logs/moe/ppn4.txt`. Verdict in the
+README ("Measured 2026-11-07, later"): a wash on this machine, the balancer's host-time guard flips at four PEs (the
+expert's entry-method wall time fills its own PE's interval; a group is abandoned when two copies fail the cap although
+three or four would pass), and `+lci_ndevices 4` takes OLMoE from 124 to 96 ms a step (four PEs on one LCI device: 150 M
+send-lock retries). The user dropped the plan at 16:25; the queued follow-up job (5879192, `ppn4e.sh`) was cancelled
+unrun. Still uncommitted: `moe.C`/`moe.ci` (`ExpertMap`; harmless at one PE, the controls reproduce the morning's rows).
+
 This is the job cancelled unrun on Delta (`/scratch/mzu/bhosale/moe_runs/v4b_fix.sbatch`), the one the
 kernel-bound fix of 2026-11-02 still owes (the README's "A kernel bound, found and removed").
 
@@ -591,7 +645,9 @@ kernel-bound fix of 2026-11-02 still owes (the README's "A kernel bound, found a
    vendors by design.
 10. The verb across hosts as a machine property: on Slingshot the owner reads, on InfiniBand the sender
     would write; today that is `CHARM_CHAN_WRITE=1` or not. A startup probe (one put and one get of a few MB
-    between the first two hosts) or a machine profile should choose it; `rma_bw` on two Frontier nodes first.
+    between the first two hosts) or a machine profile should choose it. Measured on two Frontier nodes
+    2026-11-07: a wash (24 GB/s either verb into device memory, 23.3 each way with both hosts sending), so
+    the probe would choose nothing there; the A100 asymmetry is the NIC's, not Slingshot's as such.
 11. ShedLB's host cap (`max(T, hostMean * 1.1)`) refuses placements relative to the hosts' mean host time; on
     the A40s OLMoE is host-bound (the hosts' mean 2.4x the device target) and most placements are refused
     there. The refusal totals and the closest refused PE are printed now; the rule is to be revisited with
@@ -599,6 +655,14 @@ kernel-bound fix of 2026-11-02 still owes (the README's "A kernel bound, found a
 12. One serving run on Delta (gpua011 and gpua040, 2026-11-06) placed all three copies on one host, 22.7 ms
     against 6.2; never reproduced once the placement diagnostics existed. If a Frontier ShedLB row is far off
     its band, read the placement lines before anything else.
+13. The receive slab's fixed per-expert segments against the registration caps (2048 MB an arena, 16384 MB a
+    process on cxi, both re-confirmed 2026-11-07): OLMoE on 16 GCDs needs the chunked slab and the trace's own
+    capacity (`-r 7.5`). Sizing each expert's segment from the trace (or the hot set) instead of one `cap_src`
+    for all would put the auto capacity back; the per-process cap itself is unexplained (ADDR_OUT_OF_RANGE past
+    16 GB registered).
+14. OLMoE on the read path: 124 to 132 ms a step against the 159 to 163 of the write path, the same on either
+    output path, so the gain is the read protocol's or LCI's packet format's (b7c289ae); `CHARM_CHAN_WRITE=1`
+    on the same nodes separates them. The baselines still lead 1.7x to 2.6x there (item 3 of the two-node notes).
 
 ## Delta artefacts and where they are
 

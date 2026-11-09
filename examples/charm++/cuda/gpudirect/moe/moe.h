@@ -140,8 +140,9 @@ void moeInitUniform(float* p, size_t n, uint64_t seed, float bound,
 void moeCastBf16(const float* src, moe_bf16* dst, size_t n, hapiStream_t s);
 void moeGather(const void* x, const int* idx, void* out, int n_slots,
     int dm, bool bf16, hapiStream_t s);
-// y (fp32) = w * sum of the k rows of recv (fp32 or bf16) each token's slots name.
-void moeCombine(const void* recv, const int* pos, float* y, int n_tok,
+// y (fp32) = w * sum of the k rows of recv (fp32 or bf16) each token's slots name; recv is the receive
+// slab's chunks (rpc rows each, the row's chunk = row / rpc).
+void moeCombine(const void* const* recv, int rpc, const int* pos, float* y, int n_tok,
     int k, int dm, float w, bool bf16, hapiStream_t s);
 // One run of an expert's step (the tokens of one dispatcher partition in
 // dispatcher order): forward, the self-similar backward, and the gradient

@@ -92,6 +92,12 @@ public:
   // per-process and every PE reads it concurrently, so this must not mutate it.
   // An object whose application declared its load this interval keeps the
   // declaration (LBObj::gpuDeclared).
+  // Whether every object here declared its device load this interval (LBObj::gpuDeclared); true with none.
+  inline bool AllObjGPUDeclared() const {
+    for (size_t i = 0; i < objs.size(); i++)
+      if (objs[i].obj != nullptr && !objs[i].obj->hasGPUDeclared()) return false;
+    return true;
+  }
   inline void SetObjGPULoad(
       const std::unordered_map<LDObjKey, double, LDObjKeyHash> &id_loadMap)
   {

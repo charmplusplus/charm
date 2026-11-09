@@ -265,6 +265,16 @@ void CentralLB::CallLB()
   // whole process, and a drain by the first arrival dropped every kernel the
   // other PEs' objects were still finishing. See DistBaseLB::barrierDone for
   // the measurement. The earlier arrivals continue from gpuLoadsReady.
+  // Unless CHARM_LB_DECLARED_WAIT=1: when every object of this PE declared its device load for the interval, the round
+  // reads no measured device load, so it does not wait for the records of the kernels in flight (the close wait,
+  // below): under the split barrier that wait held the round's strategy until the hottest object's kernels on its
+  // device were done (2026-11-09, SmartMoE on 16 GPUs: 55 ms of the first round, its copies a step later). Only with
+  // one PE per device: the arrival below is counted across a process's PEs.
+  static const bool declaredNowait = getenv("CHARM_LB_DECLARED_WAIT") == NULL;
+  if (declaredNowait && hapiDeviceGroupSize() == 1 && lbmgr->AllObjGPUDeclared()) {
+    thisProxy[CkMyPe()].ProcessAtSync();
+    return;
+  }
   if (!hapiCuptiArrive((uint64_t)step(), hapiDeviceGroupSize())) return;   // per process (see DistBaseLB)
   // Mark the window and wait, from the scheduler loop, for the records of the work issued before the mark
   // (the deferred close, hapi.h); cuptiCloseWaitPoll then builds -- on the helper thread

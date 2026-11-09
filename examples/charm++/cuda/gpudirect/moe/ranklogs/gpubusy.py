@@ -20,7 +20,15 @@ def union(iv):
 for run in sys.argv[1:]:
     st = steps(run); gp = []
     for p in sorted(glob.glob(run + "/gputrace.*.proc")):
-        gp.append(union([(int(x[3]), int(x[4])) for x in (l.split() for l in open(p)) if x and x[0] == "K" and len(x) >= 5]))
+        # The kernels are on the profiler's clock, the steps (.pe files) on the host's: the header pairs the two
+        # (realtime_ns, cupti_ns). The same clock under CUPTI; rocprofiler-sdk's differs (Frontier, 2026-11-08).
+        off = 0
+        with open(p) as f:
+            hdr = f.readline()
+        m = dict(kv.split("=", 1) for kv in hdr.split() if "=" in kv)
+        if "realtime_ns" in m and "cupti_ns" in m:
+            off = int(m["realtime_ns"]) - int(m["cupti_ns"])
+        gp.append(union([(int(x[3]) + off, int(x[4]) + off) for x in (l.split() for l in open(p)) if x and x[0] == "K" and len(x) >= 5]))
     print(run)
     for name, (s0, s1) in (("steady 48-61", (48, 62)), ("round 1, 19-27", (19, 28)), ("round 2, 40-48", (40, 49)), ("steps 5-62", (5, 63))):
         if s1 > len(st): continue

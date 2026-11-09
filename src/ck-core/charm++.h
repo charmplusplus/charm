@@ -375,6 +375,9 @@ class IrrGroup : public Chare {
     // the node, which no per-PE object can stand for. Not preserved across a
     // checkpoint restart; call it again on unpacking.
     void ckRegisterWithLB(void);
+    // Declare this object's device load for the interval (seconds), as an array element's setObjGPUTime: with
+    // every object of a PE declared, a round need not wait for its kernels to be recorded (CentralLB::CallLB).
+    void ckSetGPUTime(double gputime);
 
     // Silly run-time type information
     virtual bool isNodeGroup() { return false; };

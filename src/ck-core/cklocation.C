@@ -2234,9 +2234,13 @@ void CkMigratable::pup(PUP::er& p)
   p | lbReplicaExtraBytesPerPeer;
   // A copy declares itself (its rank is its own) at its first balancing point.
   if (p.isUnpacking() && lbReplicaGroup >= 0 && !p.isCloning())
+  {
     myRec->setObjReplica(lbReplicaGroup, lbReplicaRank, lbReplicaCount, lbReplicaMax,
                          lbReplicaExtraBytes, lbReplicaCostNode, lbReplicaCostRemote, lbReplicaParts,
                          lbReplicaExchangeBytes, lbReplicaExchangeMsgs, lbReplicaExtraBytesPerPeer);
+    // A moved copy keeps its rank: where it is now, for the split (CkReplicaSplit).
+    if (lbReplicaManaged) { lbReplicaWherePe = CkMyPe(); myRec->getLocMgr()->replicaAnnounce(lbReplicaGroup, lbReplicaRank); }
+  }
 #endif
 
   if (p.isUnpacking())
@@ -2244,19 +2248,34 @@ void CkMigratable::pup(PUP::er& p)
 }
 
 void CkMigratable::ckDestroy(void) {}
-void CkMigratable::ckCloneTo(int toPe, const CkArrayIndex& newIdx)
+void CkMigratable::ckCloneTo(int toPe, const CkArrayIndex& newIdx, bool atDestination)
 {
-  myRec->getLocMgr()->cloneElement(myRec, toPe, newIdx);
+  myRec->getLocMgr()->cloneElement(myRec, toPe, newIdx, atDestination);
 }
 void CkMigratable::ckAboutToMigrate(void) {}
 void CkMigratable::ckClone(int toPe, int rank)
 {
+#if CMK_LBDB_ON
+  if (lbReplicaManaged) {
+    // The runtime makes the copy: its state ships while this element keeps running (cloneElement), and the
+    // group's coordinator switches to the new count once every new copy is ready.
+    myRec->getLocMgr()->replicaToCoord(0, lbReplicaGroup, rank);
+    ckCloneTo(toPe, replicaIndex(rank), true);
+    return;
+  }
+#endif
   if (lbReplicable())
     CkAbort("the balancer asked for a copy of this element (replica %d on PE %d) but it does "
             "not implement ckClone; setLBReplica declared it replicable", rank, toPe);
 }
 void CkMigratable::ckRetire(void)
 {
+#if CMK_LBDB_ON
+  if (lbReplicaManaged) {
+    myRec->getLocMgr()->replicaToCoord(2, lbReplicaGroup, lbReplicaRank);
+    return;
+  }
+#endif
   if (lbReplicable())
     CkAbort("the balancer asked this element to retire a copy but it does not implement "
             "ckRetire; setLBReplica declared it replicable");
@@ -2981,6 +3000,11 @@ void CkMigratable::setLBReplica(int group, int rank, int count, int maxCount, si
   lbReplicaExtraBytesPerPeer = extraPerPeer;
   myRec->setObjReplica(group, rank, count, maxCount, extraBytes, costNode, costRemote, parts,
                        exchangeBytes, exchangeMsgs, extraPerPeer);
+  if (lbReplicaManaged && lbReplicaWherePe != CkMyPe() && group >= 0)
+  {
+    lbReplicaWherePe = CkMyPe();
+    myRec->getLocMgr()->replicaAnnounce(group, rank);
+  }
 }
 
 
@@ -5909,6 +5933,14 @@ void ckCloneSentFn(void* arg, void*)
   if (mgr != nullptr) mgr->cloneSentFor(a->srcId);
   delete a;
 }
+struct CkCloneUnpackedArg { CkGroupID mgr; CmiUInt8 id; int moveTo; };
+void ckCloneUnpackedFn(void* arg, void*)
+{
+  CkCloneUnpackedArg* a = (CkCloneUnpackedArg*)arg;
+  CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(a->mgr);
+  if (mgr != nullptr) mgr->cloneUnpackedFor(a->id, a->moveTo);
+  delete a;
+}
 }
 // The pack of a copy has finished reading element srcId's buffers (or there was nothing to read).
 void CkLocMgr::cloneSentFor(CmiUInt8 srcId)
@@ -5952,7 +5984,16 @@ void CkLocMgr::moveCopy(CkLocRec* rec, int toPe)
 #endif
 }
 
-void CkLocMgr::cloneElement(CkLocRec* rec, int toPe, const CkArrayIndex& newIdx)
+// Device bytes promised to copies made on this PE whose local unpack (and Stable snapshot) has not run yet: a
+// round decides several copies back to back, and each must see the others' share (cloneElement, immigrate).
+static thread_local size_t ckCloneReservedBytes = 0;
+static thread_local std::unordered_map<CmiUInt8, size_t> ckCloneReserved;
+#if CMK_GPU
+// A copy made on its source's PE: the event behind its pack's copies, which its unpack waits on (immigrate).
+static thread_local std::unordered_map<CmiUInt8, hapiEvent_t> ckClonePackDone;
+#endif
+
+void CkLocMgr::cloneElement(CkLocRec* rec, int toPe, const CkArrayIndex& newIdx, bool atDestination)
 {
   CK_MAGICNUMBER_CHECK
   if (!compressor)
@@ -5974,9 +6015,31 @@ void CkLocMgr::cloneElement(CkLocRec* rec, int toPe, const CkArrayIndex& newIdx)
 #if CMK_GPU && CMK_LBDB_ON
   {
     static const bool direct = getenv("CHARM_CLONE_DIRECT") != nullptr && atoi(getenv("CHARM_CLONE_DIRECT")) != 0;
-    if (!direct && toPe != CkMyPe() && sz.gpu_stable_size() > 0 && sz.gpu_size() > 0 && CkDevicePoolOn() &&
+    if (!direct && !atDestination && toPe != CkMyPe() && sz.gpu_stable_size() > 0 && sz.gpu_size() > 0 && CkDevicePoolOn() &&
         ckMigrateArenaMode())
-      unpackPe = CkMyPe();
+    {
+      // Made here only when this GPU's pool can hold it: until the switch the copy's own buffers, the pack's
+      // payload and the Stable snapshot all sit on this device, and the balancer's memory ledger plans the
+      // destination, not this temporary (Frontier, 2026-11-08: five 1.4 GB SmartMoE copies made on one source at
+      // the second round asked for a ninth 2 GB arena, past the 16 GB a process may register). Half again as much
+      // free as needed, for the buddy pool's fragmentation; otherwise the copy is unpacked at its destination.
+      std::vector<std::pair<size_t, int>> blocks;
+      hapiObjectBlocks(rec, blocks);
+      size_t need = sz.gpu_size() + sz.gpu_stable_size();
+      for (const auto& b : blocks) need += b.first * (size_t)b.second;
+      const size_t poolFree = hapiDevPoolFreeBytes();
+      const size_t avail = poolFree > ckCloneReservedBytes ? poolFree - ckCloneReservedBytes : 0;
+      if (avail >= need + need / 2)
+      {
+        unpackPe = CkMyPe();
+        ckCloneReservedBytes += need;
+        ckCloneReserved[newId] = need;
+      }
+      else if (migDbg())
+        CkPrintf("[CLONE %d] elem %s id=%llu: %zu device bytes do not fit this GPU's pool (%zu free, %zu promised "
+                 "to copies not yet made): unpacked at pe %d\n", CkMyPe(), idx2str(rec->getIndex()),
+                 (unsigned long long)rec->getID(), need, poolFree, ckCloneReservedBytes, toPe);
+    }
   }
 #endif
   size_t gpuBufSize = 0, nGpuBufs = 0;
@@ -6070,7 +6133,15 @@ void CkLocMgr::cloneElement(CkLocRec* rec, int toPe, const CkArrayIndex& newIdx)
     // another stream, so the pack's copies finish first -- after which the
     // source's buffers may change again.
     msg->cloneMoveTo = toPe;
-    if (migStream != NULL) hapiCheck(ckSubmitDrainThenSync(migStream));
+    if (migStream != NULL) {
+      // Ordered on the device, not by the host (2026-11-08): the unpack stream waits on this event before its copies
+      // read the payload (immigrate). The host waiting here blocked the source's PE -- the hot expert's, the job's
+      // critical path -- about 6 ms a copy behind its compute, 45 ms for seven copies in one balancing step.
+      hapiEvent_t ev = nullptr;
+      hapiCheck(hapiEventCreateWithFlags(&ev, hapiEventDisableTiming));
+      hapiCheck(hapiEventRecord(ev, migStream));
+      ckClonePackDone[newId] = ev;
+    }
     else { hapiSubmitDrain(); hapiDeviceSynchronize(); }
     bufferedDeviceMigrateMsgs[newId] = gpuMsg;
     thisProxy[CkMyPe()].immigrate(msg);
@@ -6112,6 +6183,381 @@ void CkLocMgr::cloneElement(CkLocRec* rec, int toPe, const CkArrayIndex& newIdx)
              "packed in %.3f ms\n", CkMyPe(), idx2str(rec->getIndex()), (unsigned long long)srcId, idx2str(newIdx),
              (unsigned long long)newId, toPe, bufSize, gpuBufSize, nGpuBufs, (CmiWallTimer() - t0) * 1e3);
   CK_MAGICNUMBER_CHECK
+}
+
+// A copy made on its source's PE has unpacked (the unpack stream's callback): its reservation goes, it learns it is
+// whole, and it moves to the balancer's PE as a deferred move (moveCopy).
+void CkLocMgr::cloneUnpackedFor(CmiUInt8 id, int moveTo)
+{
+  auto rit = ckCloneReserved.find(id);
+  if (rit != ckCloneReserved.end()) {
+    ckCloneReservedBytes -= std::min(ckCloneReservedBytes, rit->second);
+    ckCloneReserved.erase(rit);
+  }
+#if CMK_GPU
+  auto eit = ckClonePackDone.find(id);
+  if (eit != ckClonePackDone.end()) {
+    hapiCheck(hapiEventDestroy(eit->second));
+    ckClonePackDone.erase(eit);
+  }
+#endif
+  CkLocRec* rec = elementNrec(id);
+  if (rec == nullptr) return;
+  callMethod(rec, &CkMigratable::ckJustCloned);
+  if (moveTo >= 0 && moveTo != CkMyPe()) moveCopy(rec, moveTo);
+}
+
+
+#if CMK_LBDB_ON
+// ---- Runtime-managed copies (2026-11-08): see CkMigratable::setReplicaManaged and CkLocMgr in cklocation.h ----
+CkArrayIndex CkMigratable::replicaIndex(int rank) const
+{
+  CkAbort("a managed replica group (setReplicaManaged) must name its copies' indices (replicaIndex); copy %d", rank);
+  return CkArrayIndex();
+}
+void CkMigratable::ckReplicaReady(int rank)
+{
+  const int r = rank >= 0 ? rank : lbReplicaRank;
+  // Where it is first: the announcement is on its way before the commit that routes to it.
+  lbReplicaWherePe = CkMyPe();
+  myRec->getLocMgr()->replicaAnnounce(lbReplicaGroup, r);
+  myRec->getLocMgr()->replicaToCoord(1, lbReplicaGroup, r);
+}
+void CkMigratable::ckReplicaDone() { ckDestroy(); }
+struct CkReplicaServingArgs { int group; int epoch; int k; };
+void CkMigratable::ckReplicaServingFromCommit(void* data)
+{
+  const CkReplicaServingArgs* a = (const CkReplicaServingArgs*)data;
+  if (lbReplicaManaged && lbReplicaGroup == a->group) ckReplicaServing(a->epoch, a->k);
+}
+void CkLocMgr::replicaToCoord(int what, int group, int rank)
+{
+  const int c = group % CkNumPes();
+  if (what == 0) thisProxy[c].replicaDecided(group, rank);
+  else if (what == 1) thisProxy[c].replicaReady(group, rank);
+  else thisProxy[c].replicaRetire(group, rank);
+}
+int CkLocMgr::replicaCount(int group, int epoch, bool advance)
+{
+  if (advance && epoch > repMaxEpoch) repMaxEpoch = epoch;
+  auto pp = repPrep.find(group);
+  if (pp != repPrep.end() && epoch >= pp->second.blockFrom) return -1;
+  int k = 1;
+  auto it = repRoutes.find(group);
+  if (it != repRoutes.end())
+    for (const ReplicaChange& c : it->second)
+      if (c.epoch <= epoch) k = c.k;
+  return k;
+}
+int CkLocMgr::replicaRoute(int group, int part, int parts, int epoch)
+{
+  const int k = replicaCount(group, epoch);
+  if (k < 0) return -1;
+  for (int r = 0; r < k; r++)
+    if (part < (parts * (r + 1)) / k) return r;
+  return k - 1;
+}
+int CkLocMgr::replicaServes(int group, int rank, int part, int parts, int epoch)
+{
+  const int r = replicaRoute(group, part, parts, epoch);
+  return r < 0 ? -1 : (r == rank ? 1 : 0);
+}
+void CkLocMgr::replicaWhenAgreed(int group, const CkCallback& cb)
+{
+  if (repPrep.find(group) == repPrep.end()) { cb.send(); return; }
+  repWaiters[group].push_back(cb);
+}
+// Coordinator: a copy decided (its state is shipping), a copy ready, the highest copy retired.
+void CkLocMgr::replicaDecided(int group, int rank)
+{
+  ReplicaCoord& c = repCoord[group];
+  c.retired.erase(rank);
+  c.kWant = std::max(c.kWant, rank + 1);
+  if (c.readyEarly.erase(rank) == 0) c.pending.insert(rank);
+  replicaMaybePropose(group);
+}
+void CkLocMgr::replicaReady(int group, int rank)
+{
+  ReplicaCoord& c = repCoord[group];
+  if (c.pending.erase(rank) == 0) c.readyEarly.insert(rank);
+  replicaMaybePropose(group);
+}
+void CkLocMgr::replicaRetire(int group, int rank)
+{
+  ReplicaCoord& c = repCoord[group];
+  // Ranks stay contiguous: a retired copy below the top waits for the ones above it (a balancer may retire two
+  // in a round, and their notices may arrive in either order).
+  c.retired.insert(rank);
+  while (c.kWant > 1 && c.retired.count(c.kWant - 1)) { c.retired.erase(c.kWant - 1); c.kWant--; }
+  replicaMaybePropose(group);
+}
+void CkLocMgr::replicaMaybePropose(int group)
+{
+  ReplicaCoord& c = repCoord[group];
+  if (c.agreeing) return;
+  // The ready prefix: every rank below the first copy still in flight serves as soon as it is ready, not once the
+  // last of the round's copies is (2026-11-09, SmartMoE on 16 GPUs: the hot expert's seven copies, all cloned from
+  // the one GPU that was the job's bottleneck, served together 241 ms after the round, five steps of 55 ms).
+  int target = c.kWant;
+  if (!c.pending.empty()) target = std::min(target, *c.pending.begin());
+  if (target < 1 || target == c.kNow) return;
+  c.agreeing = true;
+  c.seq++;
+  c.acks = 0;
+  c.maxAck = 0;
+  c.kTarget = target;
+  thisProxy.replicaPrepare(group, c.kTarget, c.seq, CkMyPe());
+}
+// Every PE: hold this group's routing from two epochs past what it has reached until the commit, and answer.
+void CkLocMgr::replicaPrepare(int group, int k, int seq, int coord)
+{
+  (void)k;
+  // Blocked from the first epoch this PE has not routed (2026-11-09: two past it, which put a ready copy into service
+  // a step later than needed; a step of 50 ms while the round's first copies are on their way).
+  repPrep[group] = ReplicaPrep{seq, k, repMaxEpoch + 1};
+  thisProxy[coord].replicaAck(group, seq, repMaxEpoch);
+}
+void CkLocMgr::replicaAck(int group, int seq, int epoch)
+{
+  ReplicaCoord& c = repCoord[group];
+  if (!c.agreeing || seq != c.seq) return;
+  c.maxAck = std::max(c.maxAck, epoch);
+  if (++c.acks < CkNumPes()) return;
+  c.kNow = c.kTarget;
+  thisProxy.replicaCommit(group, c.kNow, c.maxAck + 1, seq);   // the coordinator proposes again on its own commit
+}
+void CkLocMgr::replicaCommit(int group, int k, int epoch, int seq)
+{
+  std::vector<ReplicaChange>& v = repRoutes[group];
+  v.push_back(ReplicaChange{epoch, k, seq});
+  // By epoch, and at one epoch by the coordinator's order: two commits of a group can share an epoch (the ready
+  // prefix grows by a commit per copy, 2026-11-09), and broadcasts are not ordered, so the order they arrived in
+  // could differ between PEs and with it the count each PE takes for that epoch.
+  std::sort(v.begin(), v.end(), [](const ReplicaChange& a, const ReplicaChange& b) {
+    return a.epoch != b.epoch ? a.epoch < b.epoch : a.seq < b.seq;
+  });
+  auto pp = repPrep.find(group);
+  if (pp != repPrep.end() && pp->second.seq == seq) repPrep.erase(pp);
+  if (getenv("CHARM_DEBUG_REPLICA") && CkMyPe() == group % CkNumPes())
+    CkPrintf("[REPLICA %d] group %d: %d copies from epoch %d\n", CkMyPe(), group, k, epoch);
+  // The group's copies here learn the count and its first epoch.
+  CkReplicaServingArgs args{group, epoch, k};
+  std::vector<CkLocRec*> recs;
+  for (auto& kv : hash) recs.push_back(kv.second);
+  for (CkLocRec* rec : recs) callMethod(rec, &CkMigratable::ckReplicaServingFromCommit, (void*)&args);
+  auto w = repWaiters.find(group);
+  if (w != repWaiters.end()) {
+    std::vector<CkCallback> cbs;
+    cbs.swap(w->second);
+    repWaiters.erase(w);
+    for (const CkCallback& cb : cbs) cb.send();
+  }
+  if (group % CkNumPes() == CkMyPe()) {
+    ReplicaCoord& c = repCoord[group];
+    if (c.seq == seq) c.agreeing = false;
+    replicaMaybePropose(group);
+  }
+}
+#endif
+
+#if CMK_LBDB_ON
+void CkLocMgr::replicaWhere(int group, int rank, int pe)
+{
+  std::vector<int>& w = repWhere[group];
+  if ((int)w.size() <= rank) w.resize(rank + 1, -1);
+  w[rank] = pe;
+}
+// The split of each group's demand over its copies at `epoch`: water-filling, every group's copies at once, over the
+// devices the copies are on (one bin per GPU: copies on PEs that share a device share its time), so each step's
+// work lands evenly whatever it is (2026-11-09: replaying the SmartMoE trace on 16 GPUs, a split of the step's own
+// demand kept every step at 91% of the mean or better from one placement at step 5; a split of the step before's
+// fell to 41%, and fixed blocks of sources reached 87% at best). Deterministic in its inputs: every PE that asks
+// with the same demand and the same announced places gets the same split, and a PE that has not yet heard of a
+// move gets a split that is only less even, never wrong (each sender divides its own work by it).
+//
+// peCost (optional, per PE, 0 unknown): what a unit of work costs on each PE's device, as measured (2026-11-09: at
+// equal tokens the GPUs of a 16-GPU SmartMoE run were 78-91% busy, the copies' piece sizes making a token cost more
+// on some): the split then levels the devices' time, a copy's work weighing its PE's cost. Unknown PEs take the mean.
+// perCopy: a copy's fixed cost, in units of work, counted in its device's bin whatever its share (2026-11-09: at
+// equal tokens a 16-GPU SmartMoE run's GPUs were busy 75% with one copy and 88% with 6.65, ~200 tokens' time a copy).
+// peBase (optional, per PE, in units of work): what each PE's device spends a step whatever its share, counted once
+// per device before the split fills it.
+// minShare (units of work): after half the passes, a copy whose share is below it gets none, and the group's demand
+// fills its other copies (at least one stays): a share smaller than what a copy costs its device to run at all
+// (a product's setup, its partial chunk) buys less balance than it costs.
+void CkLocMgr::replicaSplit(int epoch, const std::vector<long>& demand, std::vector<std::vector<float>>& frac,
+                            const std::vector<double>* peCost, double perCopy, const std::vector<double>* peBase,
+                            double minShare)
+{
+  const int G = (int)demand.size();
+  frac.assign(G, std::vector<float>());
+  std::vector<std::vector<long>> key(G);
+  std::vector<std::vector<double>> x(G), w(G);
+  std::map<long, double> bin;
+  double meanCost = 0.0;
+  int nCost = 0;
+  if (peCost)
+    for (double c : *peCost) if (c > 0.0) { meanCost += c; nCost++; }
+  meanCost = nCost ? meanCost / nCost : 1.0;
+  auto costOf = [&](int pe) {
+    if (!peCost || pe < 0 || pe >= (int)peCost->size() || !((*peCost)[pe] > 0.0)) return 1.0;
+    return (*peCost)[pe] / meanCost;
+  };
+  auto deviceOf = [](int pe) -> long {
+#if CMK_GPU
+    return (long)CmiPhysicalNodeID(pe) * 4096 + hapiDeviceIndexOfPe(pe);
+#else
+    return pe;
+#endif
+  };
+  for (int g = 0; g < G; g++)
+  {
+    const int k = std::max(1, replicaCount(g, epoch, true));
+    auto wh = repWhere.find(g);
+    key[g].resize(k);
+    w[g].resize(k);
+    for (int r = 0; r < k; r++)
+    {
+      const int pe = (wh != repWhere.end() && r < (int)wh->second.size()) ? wh->second[r] : -1;
+      key[g][r] = pe >= 0 ? deviceOf(pe) : -1 - ((long)g * 4096 + r);   // not heard of yet: a bin of its own
+      w[g][r] = costOf(pe);
+    }
+    x[g].assign(k, (double)demand[g] / k);
+    for (int r = 0; r < k; r++) bin[key[g][r]] += x[g][r] * w[g][r] + perCopy * w[g][r];
+  }
+  if (peBase)
+  {
+    std::set<long> seen;
+    for (int pe = 0; pe < (int)peBase->size(); pe++)
+    {
+      const double b = (*peBase)[pe];
+      if (!(b > 0.0)) continue;
+      const long d = deviceOf(pe);
+      if (!seen.insert(d).second) continue;
+      bin[d] += b;
+    }
+  }
+  std::vector<int> order(G);
+  for (int g = 0; g < G; g++) order[g] = g;
+  std::stable_sort(order.begin(), order.end(), [&](int a, int b) { return demand[a] > demand[b]; });
+  std::vector<std::pair<double, int>> lv;
+  std::vector<std::vector<char>> on(G);
+  for (int g = 0; g < G; g++) on[g].assign(x[g].size(), 1);
+  const int passes = 8;
+  for (int pass = 0; pass < passes; pass++)
+  {
+    if (minShare > 0.0 && pass == passes / 2)
+      for (int g = 0; g < G; g++)
+      {
+        const int k = (int)x[g].size();
+        if (k < 2 || demand[g] <= 0) continue;
+        int big = 0;
+        for (int r = 1; r < k; r++) if (x[g][r] > x[g][big]) big = r;
+        for (int r = 0; r < k; r++)
+          if (r != big && on[g][r] && x[g][r] < minShare) { on[g][r] = 0; bin[key[g][r]] -= x[g][r] * w[g][r]; x[g][r] = 0.0; }
+      }
+    for (int g : order)
+    {
+      const int k = (int)x[g].size();
+      if (k < 2 || demand[g] <= 0) continue;
+      for (int r = 0; r < k; r++) if (on[g][r]) bin[key[g][r]] -= x[g][r] * w[g][r];
+      lv.clear();
+      for (int r = 0; r < k; r++) if (on[g][r]) lv.push_back(std::make_pair(bin[key[g][r]], r));
+      std::sort(lv.begin(), lv.end());
+      const int ka = (int)lv.size();
+      // The level (in time) the group's demand fills the emptiest of its bins to: copy r takes (level - b_r) / w_r.
+      double sumBW = 0.0, sumIW = 0.0, level = 0.0;
+      for (int m = 1; m <= ka; m++)
+      {
+        const int r = lv[m - 1].second;
+        sumBW += lv[m - 1].first / w[g][r];
+        sumIW += 1.0 / w[g][r];
+        level = ((double)demand[g] + sumBW) / sumIW;
+        if (m == ka || level <= lv[m].first) break;
+      }
+      double tot = 0.0;
+      for (int r = 0; r < k; r++)
+      {
+        x[g][r] = on[g][r] ? std::max(0.0, (level - bin[key[g][r]]) / w[g][r]) : 0.0;
+        tot += x[g][r];
+      }
+      for (int r = 0; r < k; r++)
+      {
+        if (!on[g][r]) continue;
+        x[g][r] = tot > 0.0 ? x[g][r] * (double)demand[g] / tot : (double)demand[g] / ka;
+        bin[key[g][r]] += x[g][r] * w[g][r];
+      }
+    }
+  }
+  for (int g = 0; g < G; g++)
+  {
+    const int k = (int)x[g].size();
+    frac[g].resize(k);
+    for (int r = 0; r < k; r++) frac[g][r] = demand[g] > 0 ? (float)(x[g][r] / (double)demand[g]) : 1.0f / k;
+  }
+}
+#endif
+
+void CkReplicaSplit(const CkArrayID& aid, int epoch, const std::vector<long>& demand, std::vector<std::vector<float>>& frac,
+                    const std::vector<double>* peCost, double perCopy, const std::vector<double>* peBase,
+                    double minShare)
+{
+#if CMK_LBDB_ON
+  aid.ckLocalBranch()->getLocMgr()->replicaSplit(epoch, demand, frac, peCost, perCopy, peBase, minShare);
+#else
+  frac.assign(demand.size(), std::vector<float>(1, 1.0f));
+#endif
+}
+int CkReplicaWhere(const CkArrayID& aid, int group, int rank)
+{
+#if CMK_LBDB_ON
+  CkLocMgr* m = aid.ckLocalBranch()->getLocMgr();
+  auto it = m->repWhere.find(group);
+  return (it == m->repWhere.end() || rank >= (int)it->second.size()) ? -1 : it->second[rank];
+#else
+  return -1;
+#endif
+}
+int CkReplicaSendCount(const CkArrayID& aid, int group, int epoch)
+{
+#if CMK_LBDB_ON
+  return aid.ckLocalBranch()->getLocMgr()->replicaCount(group, epoch, true);
+#else
+  return 1;
+#endif
+}
+
+int CkReplicaRoute(const CkArrayID& aid, int group, int part, int parts, int epoch)
+{
+#if CMK_LBDB_ON
+  return aid.ckLocalBranch()->getLocMgr()->replicaRoute(group, part, parts, epoch);
+#else
+  return 0;
+#endif
+}
+int CkReplicaServes(const CkArrayID& aid, int group, int rank, int part, int parts, int epoch)
+{
+#if CMK_LBDB_ON
+  return aid.ckLocalBranch()->getLocMgr()->replicaServes(group, rank, part, parts, epoch);
+#else
+  return rank == 0 ? 1 : 0;
+#endif
+}
+int CkReplicaCount(const CkArrayID& aid, int group, int epoch)
+{
+#if CMK_LBDB_ON
+  return aid.ckLocalBranch()->getLocMgr()->replicaCount(group, epoch, false);
+#else
+  return 1;
+#endif
+}
+void CkReplicaWhenAgreed(const CkArrayID& aid, int group, const CkCallback& cb)
+{
+#if CMK_LBDB_ON
+  aid.ckLocalBranch()->getLocMgr()->replicaWhenAgreed(group, cb);
+#else
+  cb.send();
+#endif
 }
 
 // The entries that carry an object's device state between PEs: a migration's
@@ -6295,7 +6741,23 @@ void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char* &data, int& srcPe, Ck
 
 
 
+// The payload's transfer is done on the landing stream, where its copy into the landing block was put (the post
+// entry): as for the stable region (stableLandedOnDevice), the source's block is let go and the element unpacked
+// only once the device has reached this point (2026-11-09: with arrivals no longer held on the host by their event
+// creation, one run in sixteen still had wrong outputs and right weights after the stable region's fix).
+struct CkPayloadLandedArg { CkGroupID mgr; CmiUInt8 id; int size; char* data; int srcPe; };
+static void ckPayloadLandedFn(void* arg, void*)
+{
+  CkPayloadLandedArg* a = (CkPayloadLandedArg*)arg;
+  CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(a->mgr);
+  if (mgr != nullptr) mgr->payloadLandedOnDevice(a->id, a->size, a->data, a->srcPe);
+  delete a;
+}
 void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data, int srcPe)
+{
+  hapiAddCallback(ckLandingStream(), CkCallback(ckPayloadLandedFn, (void*)new CkPayloadLandedArg{thisgroup, id, size, data, srcPe}));
+}
+void CkLocMgr::payloadLandedOnDevice(CmiUInt8 id, int size, char* data, int srcPe)
 {
   MIGT("entry", id, data);
   if (migStatsOn()) {
@@ -6355,7 +6817,11 @@ static hapiStream_t ckMigrationStreamLocked(DeviceManager* dm)
 {
   const int i = dm->migration_stream_next;
   dm->migration_stream_next = (i + 1) % DeviceManager::MIGRATION_STREAMS;
-  if (dm->migration_streams[i] == NULL) hapiCheck(hapiStreamCreate(&dm->migration_streams[i]));
+  // Non-blocking, as every stream should be: a legacy blocking stream implicitly orders against the default stream,
+  // and since the moves of 2026-11-08 run mid-step that hidden ordering ties the migration copies to unrelated work
+  // (Frontier, job 5888388: GPU queues stalled at the first balancing rounds). The copies' real dependencies are
+  // explicit (pup_device_order's event, the pool's noted reads).
+  if (dm->migration_streams[i] == NULL) hapiCheck(hapiStreamCreateNonBlocking(&dm->migration_streams[i]));
   if (dm->migration_stream == NULL) dm->migration_stream = dm->migration_streams[0];
   return dm->migration_streams[i];
 }
@@ -6555,10 +7021,27 @@ void CkLocMgr::immigrateStable(CmiUInt8& id, int& size, char*& data, int& srcPe,
   post[0].hapi_stream = ckLandingStream();
 }
 
-// Destination: the stable region has landed.
+// Destination: the stable region's transfer is done -- on the landing stream, which is where its copy into the
+// landing block was put (the post entry): the region is only whole once the device has reached this point, so the
+// rest waits for it there (2026-11-09: with arrivals no longer held 3.5 ms on the host by their event and stream
+// creation, a moved expert bound its weights to a landing block still being written and computed from them: two
+// runs' output checksums off by up to 1%, the moved copies' weight checksums wrong at their first step after the
+// move and in one case right again five steps later). The source's block is let go only then too.
+struct CkStableLandedArg { CkGroupID mgr; CmiUInt8 id; int size; int srcPe; int gen; };
+static void ckStableLandedFn(void* arg, void*)
+{
+  CkStableLandedArg* a = (CkStableLandedArg*)arg;
+  CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(a->mgr);
+  if (mgr != nullptr) mgr->stableLandedOnDevice(a->id, a->size, a->srcPe, a->gen);
+  delete a;
+}
 void CkLocMgr::immigrateStable(CmiUInt8 id, int size, char* data, int srcPe, int gen)
 {
   (void)data;
+  hapiAddCallback(ckLandingStream(), CkCallback(ckStableLandedFn, (void*)new CkStableLandedArg{thisgroup, id, size, srcPe, gen}));
+}
+void CkLocMgr::stableLandedOnDevice(CmiUInt8 id, int size, int srcPe, int gen)
+{
   thisProxy[srcPe].finishStableSend(id, gen);   // the source block may go back
   char* block = receivedStableMsgs[std::make_pair(id, gen)];
   receivedStableMsgs.erase(std::make_pair(id, gen));
@@ -6722,8 +7205,11 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   // blocked and nothing of this element's in flight.
   static thread_local hapiStream_t unpackStream = NULL;
   if (gpuMsgIsArena) {
-    if (unpackStream == NULL) hapiCheck(hapiStreamCreate(&unpackStream));
+    if (unpackStream == NULL) hapiCheck(hapiStreamCreateNonBlocking(&unpackStream));   // non-blocking (ckMigrationStreamLocked)
     p.gpuStream = (void*)unpackStream;
+    // A copy made here: its unpack reads the payload after the pack's copies, on the device (cloneElement).
+    auto pe = ckClonePackDone.find(msg->id);
+    if (pe != ckClonePackDone.end()) hapiCheck(hapiStreamWaitEvent(unpackStream, pe->second, 0));
   }
 #endif
 
@@ -6799,7 +7285,16 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   // default stream, so waiting on that stream is exactly the wait that was
   // wanted.
   const bool deviceRebound = gpuMsgIsArena && p.deviceReboundCount > 0;
-  if (gpuMsg != nullptr && !deviceRebound) {
+  // A copy made on its source's PE does not run until it is told its first step, and only after it has heard it
+  // is whole (ckJustCloned): that comes from a callback on the unpack stream (below), so the host does not wait
+  // here -- it is the source's PE, the one whose expert is the hottest (2026-11-08: 31 ms of seven such waits in
+  // one balancing step). The payload's free is ordered behind the unpack's reads by the pool.
+  // Every copy (2026-11-08), not only one made on its source: at its destination the wait sat behind that GPU's
+  // compute too, 3.7 ms a copy on each PE that received one, and a round's copies stalled their PEs' dispatchers.
+  const bool localCloneAsync = msg->isClone && p.gpuStream != nullptr &&
+                               gpuMsg != nullptr && gpuMsgIsArena && !deviceRebound;
+  if (localCloneAsync) hapiDevPoolNoteRead(gpuMsg, (hapiStream_t)p.gpuStream);
+  if (gpuMsg != nullptr && !deviceRebound && !localCloneAsync) {
     const double tw0 = CmiWallTimer();
     if (p.gpuStream != nullptr)
       hapiCheck(ckSubmitDrainThenSync((hapiStream_t)p.gpuStream));
@@ -6935,8 +7430,13 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
     const double tj0 = migStatsOn() ? CkWallTimer() : 0.0;
     if (msg->isClone)
     {
-      callMethod(rec, &CkMigratable::ckJustCloned);
-      if (msg->cloneMoveTo >= 0 && msg->cloneMoveTo != CkMyPe()) moveCopy(rec, msg->cloneMoveTo);
+#if CMK_GPU
+      if (localCloneAsync)
+        hapiAddCallback((hapiStream_t)p.gpuStream,
+                        CkCallback(ckCloneUnpackedFn, (void*)new CkCloneUnpackedArg{thisgroup, msg->id, msg->cloneMoveTo}));
+      else
+#endif
+        cloneUnpackedFor(msg->id, msg->cloneMoveTo);
     }
     else
     {

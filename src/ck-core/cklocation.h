@@ -13,6 +13,7 @@ array proxies, or the details of element creation (see ckarray.h).
 #include <map>
 #include <vector>
 #include <unordered_map>
+#include <set>
 #include <unordered_set>
 #include <atomic>
 struct IndexHasher
@@ -1056,8 +1057,46 @@ public:
   // under +LBAsync moves an element: its Stable buffers ship while it runs,
   // and it switches to toPe when they have landed (moveCopy). Every copy
   // switches on its own landing. CHARM_CLONE_DIRECT=1: unpacked on toPe.
-  void cloneElement(CkLocRec* rec, int toPe, const CkArrayIndex& newIdx);
+  void cloneElement(CkLocRec* rec, int toPe, const CkArrayIndex& newIdx, bool atDestination = false);
   void cloneSentFor(CmiUInt8 srcId);
+  // ---- Runtime-managed copies (CkMigratable::setReplicaManaged, 2026-11-08) ----
+  // Per replica group: from which epoch how many copies serve, and the change being agreed. A change takes effect
+  // at an epoch every PE has agreed is still ahead of it: the group's coordinator (group % CkNumPes()) proposes it
+  // once every new copy is ready, each PE answers with the latest epoch it has routed or served and holds that
+  // group's routing past two epochs on until the commit, and the commit names the epoch two past the latest answer.
+  struct ReplicaChange { int epoch; int k; int seq; };   // seq: the coordinator's proposal, which orders two at one epoch
+  struct ReplicaPrep { int seq; int k; int blockFrom; };
+  struct ReplicaCoord { int seq = 0; int kNow = 1; int kWant = 1; int kTarget = 1; std::set<int> pending, readyEarly, retired; int acks = 0; int maxAck = 0; bool agreeing = false; };
+  std::unordered_map<int, std::vector<ReplicaChange>> repRoutes;
+  std::unordered_map<int, ReplicaPrep> repPrep;
+  std::unordered_map<int, std::vector<CkCallback>> repWaiters;
+  std::unordered_map<int, ReplicaCoord> repCoord;
+  int repMaxEpoch = 0;
+  // advance: the epoch is a sender's (routing); the copies' own queries (a new copy asks for its first epoch, ahead
+  // of the senders) must not raise what this PE answers in an agreement, or each change pushes the next further out.
+  int replicaCount(int group, int epoch, bool advance = true);          // -1: not agreed yet (wait)
+  int replicaRoute(int group, int part, int parts, int epoch);           // the serving copy's rank, -1: wait
+  int replicaServes(int group, int rank, int part, int parts, int epoch); // 1, 0, -1: wait
+  void replicaWhenAgreed(int group, const CkCallback& cb);               // cb once the group's change is committed here
+  void replicaMaybePropose(int group);
+  // Where each copy is (2026-11-09): per group, copy rank -> PE, as the copies announced it (replicaAnnounce: when a
+  // copy is ready, when one lands after a move, and at a copy's declaration on a PE it had not announced from).
+  std::unordered_map<int, std::vector<int>> repWhere;
+  void replicaAnnounce(int group, int rank) { thisProxy.replicaWhere(group, rank, CkMyPe()); }
+  void replicaWhere(int group, int rank, int pe);
+  // The split of each group's demand at `epoch` over its copies (CkReplicaSplit).
+  void replicaSplit(int epoch, const std::vector<long>& demand, std::vector<std::vector<float>>& frac,
+                    const std::vector<double>* peCost = nullptr, double perCopy = 0.0,
+                    const std::vector<double>* peBase = nullptr, double minShare = 0.0);
+  void replicaToCoord(int what, int group, int rank);   // 0 decided, 1 ready, 2 retire: to the group's coordinator
+  void replicaDecided(int group, int rank);
+  void replicaReady(int group, int rank);
+  void replicaRetire(int group, int rank);
+  void replicaPrepare(int group, int k, int seq, int coord);
+  void replicaAck(int group, int seq, int epoch);
+  void replicaCommit(int group, int k, int epoch, int seq);
+  // A copy made on its source's PE: its unpack has completed on the device (immigrate's callback).
+  void cloneUnpackedFor(CmiUInt8 id, int moveTo);
   void moveCopy(CkLocRec* rec, int toPe);
   void informLBPeriod(CkLocRec* rec, int lb_ideal_period);
   void metaLBCallLB(CkLocRec* rec);
@@ -1155,6 +1194,8 @@ public:
   void stableDiscard(CkLocRec* rec);
   void immigrateStable(CmiUInt8& id, int& size, char*& data, int& srcPe, int& gen, CkDeviceBufferPost* post);
   void immigrateStable(CmiUInt8 id, int size, char* data, int srcPe, int gen);
+  void stableLandedOnDevice(CmiUInt8 id, int size, int srcPe, int gen);   // immigrateStable, once its copy is done on the device
+  void payloadLandedOnDevice(CmiUInt8 id, int size, char* data, int srcPe);   // immigrateGPU, likewise
   void finishStableSend(CmiUInt8 id, int gen);
   void discardStable(CmiUInt8 id, int gen);
   struct StableSend { void* block; size_t bytes; int toPe; int gen; };

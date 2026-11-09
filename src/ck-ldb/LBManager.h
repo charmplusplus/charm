@@ -635,6 +635,7 @@ class LBManager : public CBase_LBManager
   {
     lbdb_obj->EstObjGPULoad(h, gputime);
   }
+  bool AllObjGPUDeclared() const { return lbdb_obj->AllObjGPUDeclared(); }
   void BackgroundLoad(LBRealType* walltime, LBRealType* cputime)
   {
     lbdb_obj->BackgroundLoad(walltime, cputime);

@@ -263,10 +263,43 @@ void ShedLB::work(LDStats* stats)
         CkPrintf("[ShedLB] group %d: copy %d of %d on PE %d, load %.4f (max %d)\n", g,
                  stats->objData[cands[k].idx].replicaRank, count, stats->from_proc[cands[k].idx],
                  cands[k].load, maxCount);
-    if (L <= 0.0) continue;
+    // An idle split group still takes its copies: the split needs them before its demand arrives, not a round after.
+    if (L <= 0.0 && stats->objData[cands[members[0]].idx].replicaParts >= 0) continue;
     int want = (int)std::ceil(L / T);
     if (want < 1) want = 1;
+    // A copy's share is a block of the declared partitions, not 1/k: with P partitions and k copies the largest is
+    // ceil(P/k)/P. Counts are tried up to the first whose largest share fits the target (2026-11-08, SmartMoE on
+    // 16 dispatchers: ceil(L/T) = 7 copies leave blocks of 3, which do not lower the fullest bin, so the planner
+    // stopped at 6 and the fullest GPU carried 1.5x the mean; 8 copies give every copy 2).
+    {
+      const LDObjData& odp = stats->objData[cands[members[0]].idx];
+      if (odp.replicaParts > 0)
+        for (int k = want; k <= maxCount; k++)
+        {
+          double big = 0.0;
+          for (int r = 0; r < k; r++) big = std::max(big, odp.replicaShare(r, k));
+          want = k;
+          if (L * big <= T) break;
+        }
+    }
     if (want > maxCount) want = maxCount;
+    // A group whose copies split every source's work between them each step (replicaParts < 0: the runtime's
+    // CkReplicaSplit, from the step's demand and where the copies are) is not bound to the count that fits: the
+    // split moves the group's work between the GPUs its copies are on, so each copy past the count that fits is
+    // room for the step's demand to shift into. Two of them: replaying the SmartMoE trace on 16 GPUs
+    // (2026-11-09, scratchpad sim3.py), ceil(L/T) + 2 copies placed at step 5 kept every step through 61 at 91% of
+    // the mean or better (mean 93%, and 98% with rounds at 20 and 40), where ceil(L/T) + 1 fell to 46% and fixed
+    // blocks of sources reached 87% at best even re-placed every step.
+    const bool splitGroup = stats->objData[cands[members[0]].idx].replicaParts < 0;
+    static const int splitExtra = getenv("CHARM_SHED_SPLIT_EXTRA") ? atoi(getenv("CHARM_SHED_SPLIT_EXTRA")) : 2;
+    // CHARM_SHED_SPLIT_FLOOR=1: a split group's count is taken for at least the mean group's load, so a group idle
+    // at this round has room for its share to come back before the next (2026-11-09, SmartMoE: experts idle at
+    // step 5 carried 10-20% of the tokens by step 20 on two or three copies, steps 11-27 at 67-78% busy).
+    static const bool splitFloor = getenv("CHARM_SHED_SPLIT_FLOOR") != NULL;
+    const double Lfloor = (splitFloor && !groupMembers.empty()) ? std::max(L, total / (double)groupMembers.size()) : L;
+    if (splitGroup) want = std::max(1, std::min(std::min(maxCount, nbins), (int)std::ceil(Lfloor / T - 1e-9) + splitExtra));
+    // The count at which every copy of the group fits the target (above).
+    const int fitK = want;
     // Copies for locality. An object that declared partitions and no exchange
     // (an expert in serving) is fed by every host, and a copy placed with its
     // block of partitions serves that host's tokens without the link; the
@@ -296,7 +329,10 @@ void ShedLB::work(LDStats* stats)
     const bool exchangeFree = odg0.replicaParts > 0 && odg0.replicaExchangeBytes == 0 && nHosts > 1;
     const bool onBlock0Host = exchangeFree &&
         CmiPhysicalNodeID(stats->from_proc[cands[members[0]].idx]) == blockHost(odg0, 0, nHosts);
-    const bool localRule = exchangeFree && onBlock0Host && count < nHosts && maxCount >= nHosts;
+    // Not for a group that takes next to nothing: a copy of an idle expert keeps no tokens off the link and costs
+    // a clone and its memory (2026-11-09, SmartMoE on 16 GCDs: the round at step 5 copied eight experts of load
+    // 0.000-0.012 for locality).
+    const bool localRule = exchangeFree && onBlock0Host && count < nHosts && maxCount >= nHosts && L > eps * avg;
     if (localRule && want < nHosts) want = nHosts;
 
     // The recurring cost of a copy, as the application declared it: what
@@ -383,7 +419,10 @@ void ShedLB::work(LDStats* stats)
       std::vector<double> tbins(nbins);
       std::vector<int> trank, tbin;
       std::vector<double> tload, txc;   // txc: each member's exchanges in the tentative state
+      std::vector<int> binObjs(nbins, 0);
       auto resetTentative = [&]() {
+        std::fill(binObjs.begin(), binObjs.end(), 0);
+        for (const Cand& cd : cands) if (cd.bin >= 0 && cd.bin < nbins) binObjs[cd.bin]++;
         for (int b = 0; b < nbins; b++) tbins[b] = bins[b].load;
         trank.clear(); tbin.clear(); tload.clear(); txc = xcost;
         for (size_t a = 0; a < members.size(); a++)
@@ -393,7 +432,8 @@ void ShedLB::work(LDStats* stats)
           tload.push_back(cands[members[a]].load);
         }
       };
-      std::vector<PlannedCopy> plan, bestPlan, localPlan;
+      std::vector<PlannedCopy> plan, bestPlan, localPlan, fitPlan;
+      double fitAfter = 0.0;
       std::vector<double> afterAt;   // per count tried, the fullest bin it leaves
       auto holdsBin = [&](int b) { for (int x : tbin) if (x == b) return true; return false; };
       double bestAfter = before - eps * avg;   // what a plan must beat
@@ -468,7 +508,20 @@ void ShedLB::work(LDStats* stats)
             }
   #endif
             const double after = tbins[b] + share;
-            if (sod.replicaExchangeBytes == 0)
+            if (splitGroup)
+            {
+              // A split group's copy: by load, the fewest objects breaking ties; a copy that carries next to nothing
+              // now by the fewest objects alone, since by load every such copy lands in the one emptiest bin, which
+              // it leaves the emptiest (2026-11-09, SmartMoE on 16 GPUs: 24 copies of idle experts on one GPU,
+              // which then ran out of device memory at step 21).
+              const bool idleCopy = share <= eps * avg;
+              const double kb = idleCopy ? (double)binObjs[b] : tbins[b];
+              const double kd = dst < 0 ? 0.0 : (idleCopy ? (double)binObjs[dst] : tbins[dst]);
+              const double tb = idleCopy ? tbins[b] : (double)binObjs[b];
+              const double td = dst < 0 ? 0.0 : (idleCopy ? tbins[dst] : (double)binObjs[dst]);
+              if (dst < 0 || kb < kd || (kb == kd && tb < td)) { bestFit = tbins[b]; dst = b; }
+            }
+            else if (sod.replicaExchangeBytes == 0)
             {
               // Nothing is saved by packing a copy that pays no exchange: the
               // emptiest bin that still clears T (two A100 nodes, Mixtral: the
@@ -520,6 +573,7 @@ void ShedLB::work(LDStats* stats)
             dstx += peerCost(dstPe, binPe[tbin[a]], k);
           }
           tbins[dst] += share + dstx;
+          binObjs[dst]++;
           txc.push_back(dstx);
           trank.push_back(rank); tbin.push_back(dst); tload.push_back(share);
           double after = 0.0;
@@ -535,9 +589,30 @@ void ShedLB::work(LDStats* stats)
         const double after = plan.back().after;
         afterAt.push_back(after);
         if (after < bestAfter) { bestAfter = after; bestK = k; bestPlan = plan; }
+        if (k == fitK) { fitAfter = after; fitPlan = plan; }
         if (localRule && k == nHosts && after <= std::max(before, T)) localPlan = plan;
       }
       plan = bestPlan;
+      // Prefer the count at which every copy fits the target when it leaves the fullest bin no worse than the best
+      // count within the tolerance: past the best, the fullest bin is another object's (the shed loop's to move),
+      // and fewer copies would leave each one of this group over the target for the moves to work around
+      // (2026-11-08, SmartMoE on 16 GCDs: 3 copies where 8 fit, the hot GPU at 1.5x the mean after the round). No
+      // worse is enough: while another group holds the fullest bin, every group's fitting count leaves it as it is,
+      // and a strict improvement would give the next-heaviest groups no copies until a later round.
+      if (!fitPlan.empty() && fitK > bestK && fitAfter <= before && fitAfter <= bestAfter + eps * avg)
+      {
+        bestK = fitK;
+        bestAfter = fitAfter;
+        plan = fitPlan;
+      }
+      // A split group takes its count whatever the fullest bin does now: the per-step split, not this model of
+      // equal shares, decides the bins' loads.
+      if (splitGroup && !fitPlan.empty() && fitK > count)
+      {
+        bestK = fitK;
+        bestAfter = fitAfter;
+        plan = fitPlan;
+      }
       bool localChosen = false;
       if (bestK == count && localRule && !localPlan.empty())
       {
@@ -556,6 +631,22 @@ void ShedLB::work(LDStats* stats)
                    g, L, T, count + (int)afterAt.size(), atK, lowest, before);
         }
         continue;
+      }
+      // A split group's new copies are numbered nearest first: the copies serve in rank order (each count is a
+      // prefix of the ranks), and a copy on its source's host lands first (2026-11-09, SmartMoE on 16 GPUs: the hot
+      // expert's copies within its node landed 90-110 ms after the round, those across 220-240 ms, and ranks 1-4
+      // were the far ones, so the near three served only with them).
+      if (splitGroup && bestK - count > 1)
+      {
+        std::vector<PlannedCopy> taken(plan.begin(), plan.begin() + (bestK - count));
+        int lowRank = taken[0].rank;
+        for (const PlannedCopy& pc : taken) lowRank = std::min(lowRank, pc.rank);
+        std::stable_sort(taken.begin(), taken.end(), [&](const PlannedCopy& x, const PlannedCopy& y) {
+          const bool xn = CmiPhysicalNodeID(binPe[x.dst]) == CmiPhysicalNodeID(homePe(x.src));
+          const bool yn = CmiPhysicalNodeID(binPe[y.dst]) == CmiPhysicalNodeID(homePe(y.src));
+          return xn && !yn;
+        });
+        for (size_t i = 0; i < taken.size(); i++) { taken[i].rank = lowRank + (int)i; plan[i] = taken[i]; }
       }
       // The plan up to bestK is taken: the clones and their notices, the
       // ledger, the members and their loads.
@@ -660,7 +751,10 @@ void ShedLB::work(LDStats* stats)
       // copy per host) are kept: their share is small by design, and retiring
       // one puts its host's tokens back on the link.
       if (odg.replicaParts > 0 && odg.replicaExchangeBytes == 0 && nHosts > 1 && count <= nHosts) continue;
-      const bool fits = share <= T * (1.0 - eps);
+      // A split group keeps its copies up to one past its count (the count is ceil(L/T) + 2, above), so a load
+      // that hovers at a boundary does not clone and retire on alternate rounds.
+      if (splitGroup && count <= want + 1) continue;
+      const bool fits = splitGroup || share <= T * (1.0 - eps);
       const bool cheaper = after <= before - eps * avg;
       if (!fits && !cheaper) continue;
       bins[cands[victim].bin].load -= cands[victim].load + xcost[va];
@@ -747,12 +841,21 @@ void ShedLB::work(LDStats* stats)
     }
     const int oldPe = stats->from_proc[c.idx];
     if (block0Host < 0 || CmiPhysicalNodeID(oldPe) == block0Host) continue;
+    // An object that takes next to nothing has no traffic to keep local, and moving it costs a migration; and since
+    // it adds nothing to a bin, the emptiest bin stays the emptiest and would take every such object (2026-11-09,
+    // SmartMoE on 16 GCDs: ten idle experts moved onto PE 5 at step 5, three of them among the hottest by step 20).
+    if (c.load <= eps * avg) continue;
     for (int b = 0; b < nbins; b++) binPe[b] = landingPe(b);
     int dst = -1;
     double emptiest = std::numeric_limits<double>::max();
     for (int b = 0; b < nbins; b++)
     {
       if (b == c.bin || CmiPhysicalNodeID(binPe[b]) != block0Host) continue;
+      // Not onto a bin it would push past the target: locality is worth a link crossing, not the fullest GPU
+      // (2026-11-08, SmartMoE on 16 GCDs: the second-hottest expert, 1.8x the target alone, went onto a GPU
+      // that held a copy of the hottest and stayed the job's fullest after both rounds). It stays, and the
+      // replication pass splits it if it is over the target.
+      if (bins[b].load + c.load > T) continue;
       if (peCpu[binPe[b]] + cod.wallTime > hostCap) { hostRefusals++; continue; }
 #if CMK_GPU
       if (!ledger.feasible(c.idx, oldPe, binPe[b])) { memRefusals++; continue; }

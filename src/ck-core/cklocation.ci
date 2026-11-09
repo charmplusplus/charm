@@ -42,6 +42,14 @@ module CkLocation {
     entry [expedited] void requestTranche(int node, int wantLog2);
     entry [expedited] void grantTranche(CmiUInt8 base, CmiUInt8 len);
     entry [expedited] void resumeDeferredInsertions();
+    // Runtime-managed copies (CkMigratable::setReplicaManaged): the coordinator's bookkeeping and the agreement.
+    entry [expedited] void replicaDecided(int rgroup, int rank);
+    entry [expedited] void replicaReady(int rgroup, int rank);
+    entry [expedited] void replicaRetire(int rgroup, int rank);
+    entry [expedited] void replicaPrepare(int rgroup, int k, int seq, int coord);
+    entry [expedited] void replicaAck(int rgroup, int seq, int epoch);
+    entry [expedited] void replicaCommit(int rgroup, int k, int epoch, int seq);
+    entry [expedited] void replicaWhere(int rgroup, int rank, int pe);
   };
   
   // Array Map object support:

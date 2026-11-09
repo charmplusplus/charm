@@ -1181,4 +1181,26 @@ public:
   int incBcastSendEpoch() { return bcastSendEpoch++; }
 };
 
+
+// Runtime-managed copies (CkMigratable::setReplicaManaged, 2026-11-08). For replica group `group` of the array
+// `aid`, at the application's epoch (its step): the rank of the copy that serves partition `part` of `parts`
+// (CkReplicaRoute), whether copy `rank` serves it (CkReplicaServes: 1 / 0), the number of copies (CkReplicaCount).
+// -1: the change being agreed may take effect by then -- call CkReplicaWhenAgreed and ask again.
+int CkReplicaRoute(const CkArrayID& aid, int group, int part, int parts, int epoch);
+int CkReplicaServes(const CkArrayID& aid, int group, int rank, int part, int parts, int epoch);
+int CkReplicaCount(const CkArrayID& aid, int group, int epoch);
+void CkReplicaWhenAgreed(const CkArrayID& aid, int group, const CkCallback& cb);
+// Split routing (2026-11-09): a sender that divides each group's work between all of its copies. The copies a
+// sender divides over at `epoch` (-1: wait, as for CkReplicaRoute), and every group's split at `epoch` given each
+// group's demand job-wide (the sum over the senders): frac[g][r] is the part of every sender's work for group g that
+// goes to copy r. A group that declared replicaParts < 0 (setLBReplica) is split this way.
+int CkReplicaSendCount(const CkArrayID& aid, int group, int epoch);
+// Where copy `rank` of `group` last announced itself (a PE), -1 if not heard of.
+int CkReplicaWhere(const CkArrayID& aid, int group, int rank);
+// peCost (optional): each PE's measured cost of a unit of work (0: unknown); the split then levels time, not work.
+// perCopy: what a copy costs its device whatever its share, in units of work.
+// peBase (optional): per PE, what its device spends a step whatever its share (in units of work), once per device.
+void CkReplicaSplit(const CkArrayID& aid, int epoch, const std::vector<long>& demand, std::vector<std::vector<float>>& frac,
+                    const std::vector<double>* peCost = nullptr, double perCopy = 0.0,
+                    const std::vector<double>* peBase = nullptr, double minShare = 0.0);
 #endif

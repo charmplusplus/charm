@@ -1029,6 +1029,119 @@ drain and its handler sends; the fix belongs in the exit sequence (drain
 without delivering, or cancel the posted receives before the backend exits).
 Open; the rows above are unaffected.
 
+## Measured 2026-11-09: serving with split routing, GPU utilization on Frontier
+
+SmartMoE serving (`-e 32 -m 2048 -h 8192 -k 1 -t 8192 -u 3 -B -E traces/smartmoe_L02.trace -G`), two nodes, one PE
+per GCD (16 GPUs), ShedLB rounds at step 5 and every 20 steps after under the split barrier (`-f 5 -b 20 -a`). The
+figure is each GPU's busy fraction (the union of its kernels, `+gputrace +gputracenocopy`; `ranklogs/gpubusy.py`
+windows, between the dispatcher's step starts on PE 0), the mean over the 16 GPUs.
+
+Jobs 5888836, 5889030 and 5889247 (2026-11-09, 00:52 to 04:56). The same 240-step run three times on the final
+build (`fin_def1-3`; every output and weight checksum equal to the others', 1.4862279e7 and 1.0923006e5):
+
+| GPU busy, mean of 16 (min-max over the GPUs) | run 1 | run 2 | run 3 |
+|---|---:|---:|---:|
+| steps 28-240 (after the second round) | 86% (76-91) | 89% (85-92) | 89% (84-93) |
+| steps 5-240 | 78% | 79% | 80% |
+| steps 5-10 (the first round: until the hot expert has copies) | 21% | 22% | 21% |
+| steps 11-27 (the first round's copies, the trace drifting) | 75% | 67% | 78% |
+| steps 40-47 (a round at 40) | 81% | 83% | 78% |
+| steps 60-67 / 100-107 / 140-147 / 180-187 | 91 / 83 / 86 / 86% | 84 / 88 / 89 / 94% | 94 / 86 / 89 / 90% |
+| ms/step, steps 28-240 | 8.4 | 8.2 | 8.3 |
+
+Against the same protocol at the start of the night: one copy per expert throughout ("plain") 14% busy at 51
+ms/step; the runtime's copies with fixed blocks of dispatchers, 70-78% in steps 48-61 and 33-38% over 5-62, every
+round costing 25-70 ms steps. Over steps 28-240 the busiest GPU is 91-93%: what is left
+in steady state is mostly common to all GPUs (the dependency chain below), not imbalance.
+
+Before the first round no placement can be balanced: until the hot expert (half the tokens) has copies, every step
+is that one GPU's 50 ms. The round itself starts only when that expert joins at its step 5, 50 ms after the
+others, and its copies serve from step 8.
+
+### Why fixed blocks of dispatchers could not get there
+
+Replaying the trace offline (the routing of every step is known in advance) put a ceiling on the routing of the
+morning, where copy r of k serves a fixed block of dispatchers: re-placed at every step from that step's exact
+loads, its balance (mean over max of the GPUs' tokens) averaged 87%; a placement made at step 40 held 65-76% over the
+20 steps after it, because the trace's per-step routing drifts. Splitting each step's tokens of an expert between all
+of its copies, by a split computed from that step's job-wide demand, with ceil(L/T) + 2 copies per expert, kept every
+step from 6 to 61 at 91% of the mean or better from one placement at step 5 (93% mean; 98% with rounds at 20 and 40).
+A split from the previous step's demand fell to 41%. ceil(L/T) + 1 copies fell to 46%. So: split the step's own
+demand, with two copies past the count that fits.
+
+### What the runtime does
+
+- `CkReplicaSplit(aid, epoch, demand, frac)` (cklocation.C): the split of each group's demand over its copies at an
+  epoch, by water-filling all groups at once over the devices the copies are on (copies on PEs of one GPU share its
+  bin). Deterministic in its inputs. Copies announce where they are (`replicaAnnounce`: when ready, after a move,
+  at a declaration from a new PE); `CkReplicaWhere` reads it. Optional per-PE cost and per-device base terms exist
+  (`peCost`, `perCopy`, `peBase`); none helped (below), and the example passes none.
+- Copy-count agreement: the coordinator commits the ready prefix of a group's new copies as each lands, not once
+  the round's last copy of the group is ready; a retired rank below the top waits for the ranks above it (any order
+  of retire notices); two commits of one group at one epoch are ordered by the coordinator's sequence, not by
+  arrival; a commit takes effect at the first epoch no PE has routed (it was two past it).
+- ShedLB, for groups that declare `replicaParts < 0` (split): ceil(L/T) + 2 copies (`CHARM_SHED_SPLIT_EXTRA`, default
+  2), taken whatever the fullest bin does now; one retired per round only past want + 1; idle groups get their copies
+  too; a copy of next to no load is placed by the fewest objects, the others by load then object count (by load
+  alone, 24 copies of idle experts went to one GPU and exhausted its device memory at step 21); a round's new copies
+  are numbered nearest first (same host as their source), since copies serve in rank order. No copies or moves for
+  locality of a group with next to no load.
+- The stable region of a moved element (its weights, shipped at the balancer's decision) is taken as landed only
+  from a callback on the landing stream, and the source's block is let go only then.
+
+### What the example does (`split_route`, the serving default; `MOE_BLOCK_ROUTE=1` for the blocks)
+
+- The plan of a step: every dispatcher sends its tokens per expert to dispatcher 0 two steps ahead (`countsIn`);
+  dispatcher 0 asks the runtime for the split once every expert's copies at that step are agreed, makes integer
+  targets, and broadcasts the plan (`planIn`). Dispatchers and copies walk it the same way: an expert's tokens fill
+  its copies, both walked host by host, so a dispatcher sends an expert's tokens to one copy (two where a target ends
+  inside its run) and only the difference between a host's demand and its copies' targets crosses hosts (walked in
+  rank order, half the tokens crossed, and a put across the nodes took 6.5-7.3 ms to land against 0.2 ms within one).
+  No empty puts: each copy knows from the plan whom to expect.
+- Receive segments per (expert, copy), added as copies appear (an output channel lands at its buffer's start).
+- No barrier between the copies of an expert in serving: each reports its own step to Main.
+- Sends: a step's tokens go right behind their gather on the send stream (no host round trip through the gather's
+  completion); the step after next is gathered as soon as this step's sends are done and its plan is in, and put as
+  soon as this step's last output is in (it waited for the combine to come back and the next step to begin); a next
+  step whose plan is late goes out when the plan comes, not a step later. Tokens go no further ahead than before.
+- A copy computes a piece of at least `-c` tokens (`MOE_EAGER_MIN`) as its slab lands and sends that dispatcher's
+  output behind it; the smaller pieces are fused into one pass after the step's last slab.
+- Per-PE pools of device events and streams, made at start-up: hipEventCreate costs ~175 us on ROCm 7.14, and an
+  arriving expert's ~20 events held its unpack 3.55 ms of 3.7 on the host, every clone and move, so one PE that
+  received nine experts in a round stalled 32 ms and the job with it. A round's steps went from 25-33 ms to 10-12.
+- A copy other than the primary carries its bf16 weights alone (the primary keeps the masters for the checksum).
+- Output channels are released by the step of the put that landed (with the step after next's tokens out before
+  this step is combined, a put of that step could land on a channel idle this step and was released with it).
+
+### What did not help
+
+Weighting the split by each GPU's measured time per token (67% against 79%: the average folds each copy's fixed cost
+into its tokens and lags); a fixed cost per copy in the split (200 tokens: 79%, 500: 74%, against 86%); a per-GPU
+fixed cost estimated from the measurements (84% against 87%); every piece computed on arrival (74% against 82%: each
+(dispatcher, copy) piece a GEMM chain of its own); chunks of 2048-8192 tokens (the same busy fraction, shorter
+steps); one lane per GPU; plan counts four or three steps ahead (no better, and a round's copies serve later).
+
+### What is left
+
+- The first round's transition (steps 5-8, ~45 ms each). Its floor is the hot expert's own late join, the clone
+  transfer, and the plan's two steps of lead (a commit takes effect at the first epoch not yet planned).
+- The copies' count follows the load at the last round, and this trace drifts between rounds: experts idle at step
+  5 carry 10-20% of the tokens by step 20 on their two or three copies (steps 11-27 at 67-78%).
+- A race on an expert's arrival that a few milliseconds of host time hide: with the stream pool made at start-up
+  (`MOE_STREAMWARM=1`) and the split's minimum share (`MOE_SPLIT_MIN=256`), outputs came out wrong at some steps in
+  one run of three to six; made on arrival (the default), 0 of 18. Not the unpack's device copies (waited for) nor
+  the payload's or stable region's landing (now taken as landed only on the landing stream, which removed the
+  wrong weights and most wrong outputs seen earlier in the night). Likely in the channel handover around the move.
+- The primary copy's weight checksum can read half its value at one checksum step and its own the next (expert 1
+  at step 125 of one run with `MOE_EAGER_MIN=512`; outputs right): the read of the checksum after one of its two
+  matrices' sums, a race in the checksum's own path (its pinned or device scratch), not in the weights. None in nine
+  runs at the default threshold.
+- Neither `MOE_EAGER_MIN=512` (steady 91 and 85%), `MOE_SPLIT_MIN=512` (81 and 90%) nor both (83 and 89%) is
+  better than the defaults (86, 89, 89%) beyond the spread between runs.
+- `MOE_BLOCK_ROUTE=1` (the fixed blocks) aborts at the first round's commits ("a slab from dispatcher 10, which its
+  other copy serves").
+- The exit sometimes ends in an LCI completion error after the last step (the open exit-crash entry above).
+
 ## Measured 2026-11-04: Frontier, the block rows with the fused attention
 
 The HIP build's attention sublayer was unfused (the score GEMM, a softmax
@@ -1138,6 +1251,372 @@ one-node training), the attention being a fixed cost on every side. On the
 A40 pair the balanced example's block margin over Megatron is 2.2x in
 training; on the Frontier pair 1.7x, the balanced step there being the copy
 exchange's floor of the 2026-11-02 two-node section.
+
+## Measured 2026-11-07, evening: Frontier, two nodes after the copies for locality (charm 1f0db0b17)
+
+The two-node comparison of the morning again after the pull of 1f0db0b17
+(ShedLB's copies for locality, the declared load pooled per device, the
+loads cleared as the timed steps begin; LCI and reconverse unchanged), one
+PE per GCD, job 5879259 (frontier05256 and 05257, 16:33 to 17:0x), the same
+40-step protocol and the morning's cost table (`read_path2.sh`, tags
+`rp2_*`; `rp2_table.sh` prints the tables). The baselines ran again on the
+same pair of nodes and read 2 to 5% slower than on the morning's pair
+(reference static 166.9 against 161.0, Megatron 143.1 against 136.5), as did
+the example's plain rows (139.3 against 132.9): read each column against its
+own baselines. Every ShedLB row's checksums equal its plain's.
+
+| MoE layer alone, ms/step, 16 GCDs | train | train, morning | serve | serve, morning |
+|---|---:|---:|---:|---:|
+| SmartMoE: example plain | 139.3 | 132.9 | 54.0 | 51.0 |
+| SmartMoE: example ShedLB, a round at step 20 | 69.6 (64.1 after the round) | 67.8 | 24.4 (19.6) | 20.3 (17.2) |
+| SmartMoE: example ShedLB, rounds every 10 steps | 52.3 | 51.7 | 21.4 (16.5) | 17.8 |
+| SmartMoE: example -X (1 copy from the start) | 91.9 | 92.5 | 33.7 | 34.3 |
+| SmartMoE: PyTorch reference, static | 166.9 | 161.0 | 61.5 | 59.5 |
+| SmartMoE: PyTorch reference, SmartMoE's placement | 168.4 | 162.0 | | |
+| SmartMoE: PyTorch reference, EPLB packing | hung | hung | | |
+| SmartMoE: PyTorch reference, one static copy | 102.3 | 102.5 | | |
+| SmartMoE: Megatron-Core, sequential experts, masters | 143.1 | 136.5 | 55.4 | 53.5 |
+| SmartMoE: Megatron-Core, capacity factor 1.25 | 143.3 | 136.7 | | |
+| Mixtral: example plain | 272.8 | 283.8 | 111.8 | 112.4 |
+| Mixtral: example ShedLB | 276.5 | 284.4 | 315.5 (57.4 after the round) | 114.8 |
+| Mixtral: PyTorch reference, static | 337.7 | 324.7 | 118.4 | 113.3 |
+| OLMoE: example plain | 129.4 | 124.4 | 121.9 | 131.6 |
+| OLMoE: example ShedLB | 125.7 | 126.5 | 106.1 (98.3) | 125.6 |
+| OLMoE: PyTorch reference, static | 72.5 | 73.1 | 50.7 | 50.1 |
+| OLMoE: PyTorch reference, SmartMoE's placement | 63.9 | 62.8 | | |
+| OLMoE: Megatron-Core, masters | 82.3 | 81.2 | 49.1 | 47.5 |
+
+| Transformer block (-w), 16 GCDs, fused attention | train | train, morning | serve | serve, morning |
+|---|---:|---:|---:|---:|
+| SmartMoE: example plain | 144.6 | 137.7 | 55.4 | 52.5 |
+| SmartMoE: example ShedLB | 64.4 (58.5) | 71.4 | 27.8 (22.9) | 24.2 (20.4) |
+| SmartMoE: PyTorch reference, static | 176.4 | 170.2 | 64.5 | 62.4 |
+| SmartMoE: Megatron-Core, masters | 153.2 | 146.0 | 58.6 | 56.8 |
+| Mixtral: example plain | 298.5 | 307.5 | 119.4 | 121.9 |
+| Mixtral: example ShedLB | 299.0 | 307.9 | 78.5 (68.7) | 122.9 |
+| Mixtral: PyTorch reference, static | 364.6 | 351.0 | 127.3 | 122.2 |
+
+The figure in parentheses is the mean over steps 25 to 43, after the round
+at step 20 has landed (`ss.sh 25 43 <tags>`): the protocol's window, steps
+23 to 43, now holds the landing step of rounds that copy eight experts.
+
+**Mixtral serving is the change.** The balancer makes one copy of every
+expert on the other host (the copies for locality: an expert fed by both
+hosts, no exchange to pay in serving, a copy per host serving that host's
+block of dispatchers without the link), eight copies at the round at step
+20, and the step goes from 111.8 to 57.4 -- 2.1x the reference's 118.4,
+where the morning's balancer, with one copy of one expert, gained nothing
+(114.8). In the block it is 119.4 to 68.7 against the reference's 127.3.
+The eight copies land in step 24, which took 5662 ms in the MoE-only row and
+216 ms in the block row with the same eight experts (672 MB of state and
+2028 MB of slabs each): the MoE-only landing is not traced and stays open.
+
+**SmartMoE serving** gets the same locality copies on top of its three copies
+of the hot expert: 34 copies at the round at 20, 31 of them for locality
+(20 in OLMoE's serving row, 19 for locality). The round costs more -- steps
+20 to 23 at 63 to 95 ms against 49 to 54 in the morning -- and the step
+after it is 19.6 against the morning's 17.2 with a round at 20, 16.5 against
+17.8 with rounds every 10 steps: the locality copies of a top-1 routing
+whose hot expert already has three copies buy nothing here, and the second
+round at step 40 (in the window) costs a step. Training is unchanged: 69.6
+and 52.3 against 67.8 and 51.7, the same three copies, 64.4 in the block
+against 71.4. OLMoE's serving row gains 20% from its 20 copies (121.9 to
+98.3 after the round) and its training row places nothing, as before.
+
+Against the baselines on this pair of nodes: SmartMoE training with rounds
+every 10 steps 2.7x Megatron-Core (52.3 against 143.1) and 2.0x the
+reference's best arm (one static copy, 102.3); serving 3.4x Megatron-Core
+and 3.7x the reference after the round (16.5 against 55.4 and 61.5); the
+block 2.4x and 2.7x training (64.4 against 153.2 and 176.4), 2.6x and 2.8x
+serving (22.9 against 58.6 and 64.5). Mixtral training 1.2x the reference
+(276 against 338), serving 2.1x after the round. OLMoE stays behind: 1.7x
+slower than the reference training (125.7 against 72.5), 1.9x serving
+(98.3 against 50.7, Megatron-Core 49.1).
+
+Open, and new with the copies: the exit segfault. Four of the twelve ShedLB
+rows crashed after their last step on a PE holding a copy -- Mixtral
+training (one rank, as in the morning), SmartMoE serving (two ranks), the
+block's SmartMoE serving (four) and Mixtral training (a hang, one rank
+segfaulted) -- the "exit segfault in about half the runs with one copy of
+every expert" of 1f0db0b17's notes; every row had completed its 40 steps
+and its checksums. The reference's EPLB arm hung a fourth time in RCCL's
+setup (rc=124 at the 150 s cap, no step run).
+
+## Measured 2026-11-07, later: four PEs per GCD on Frontier
+
+The question was whether `+ppn 4` -- four PEs per GCD, the sweet spot of the
+A40 measurement under "Several PEs per process" -- helps on Frontier's two
+nodes. Job 5878615 (frontier02422 and 03451, 15:57 to 16:20), the binaries
+of the morning's read-path job, 16 processes of 4 PEs pinned by
+`frontier_wrap.sh` on four cores of each GCD's L3 region (`moe_run.sh PPN=4`,
+`irun.sh 16 4`), 64 PEs, one dispatcher per GCD on its first PE, the cost
+table remeasured in that layout (`lbcalib +ppn 4`, `lbcost.frontier.chan.ppn4.conf`:
+intra-process 24 us and 446 GB/s, cross-GCD IPC 38 us and 135 GB/s, inter-node
+30 us and 22.0 GB/s against 24.3 at one PE, fan 2/3/4 on a host 145/35/50 GB/s
+per peer, fan 2 across hosts 20.5). Every four-PE row's checksums equal its
+one-PE row's bit for bit, as the design says they must. Three findings.
+
+**1. The default array map is wrong at `+ppn 4`, and the example now places
+experts by GPU.** `DefaultArrayMap` blocks the experts over the PEs. At one PE
+per GPU that is a block over the GPUs: SmartMoE's 32 experts two per GCD,
+Mixtral's eight one per GCD on the first host, OLMoE's 64 four per GCD. Over
+64 PEs the same rule puts expert e on PE e: SmartMoE's 32 experts four per
+GCD on the first host's eight GCDs and none on the second host, Mixtral's
+eight four on each of two GCDs -- 4 x (672 MB of state + 2028 MB of slabs)
+past the pool's 16384 MB registration ceiling, so Mixtral aborted at startup
+("refusing to open arena 9") -- and only OLMoE by chance as before. The
+balancer then spent its first round shipping copies to the empty host, and
+every copy round stalled one step by 2.7 to 5.4 s (train 5417 ms at step 24,
+serve 2.7 to 2.8 s at each round) where the one-PE round costs under 100 ms.
+`ExpertMap` (moe.C, set on the array with `setMap`) keeps the default's block
+rule but applies it to the GPUs -- the devices in PE order, as the dispatchers
+are numbered -- and spreads a GPU's experts over its PEs in turn, the first on
+the dispatcher's PE. At one PE per GPU it is the default map exactly: the
+one-PE controls on the rebuilt binary (`apps/moe3`) reproduce the morning's
+rows, 136.0 plain and 71.2 with the same three copies from PE 2 to PEs 13, 6
+and 0. The "4 PEs, default map" columns below are the rows before the map.
+
+| MoE layer alone, train, ms/step, 16 GCDs | 1 PE per GCD | 4 PEs per GCD | 4 PEs, default map |
+|---|---:|---:|---:|
+| SmartMoE: plain | 132.9 | 136.2 | 145.8 |
+| SmartMoE: ShedLB, a round at step 20 | 67.8 | 136.2 (refused), 71.7 (again) | 307.0 |
+| SmartMoE: ShedLB, rounds every 10 steps | 51.7 | 70.6 | 60.1 |
+| Mixtral: plain | 283.8 | 277.7 | abort |
+| Mixtral: ShedLB | 284.4 | 276.5 | abort |
+| OLMoE: plain | 124.4 | 123.2 | 124.9 |
+| OLMoE: ShedLB (nothing placed) | 126.5 | 114.7 | 117.2 |
+
+| MoE layer alone, serve | 1 PE per GCD | 4 PEs per GCD | 4 PEs, default map |
+|---|---:|---:|---:|
+| SmartMoE: plain | 51.0 | 54.3 | 57.7 |
+| SmartMoE: ShedLB, a round at step 20 | 20.3 | 21.3 | 177.1 |
+| SmartMoE: ShedLB, rounds every 10 steps | 17.8 | 18.1 | 144.8 |
+| Mixtral: plain | 112.4 | 112.5 | abort |
+| Mixtral: ShedLB (one copy to the other host) | 114.8 | 113.1 | abort |
+| OLMoE: plain | 131.6 | 123.5 | 128.4 |
+| OLMoE: ShedLB | 125.6 | 126.2 | - |
+
+| Transformer block (-w), fused attention | 1 PE train | 4 PEs train | 1 PE serve | 4 PEs serve |
+|---|---:|---:|---:|---:|
+| SmartMoE: plain | 137.7 | 140.3 | 52.5 | 54.9 |
+| SmartMoE: ShedLB | 71.4 | 65.5 | 24.2 | 23.8 |
+| Mixtral: plain | 307.5 | 305.2 | 121.9 | 122.3 |
+| Mixtral: ShedLB | 307.9 | 305.7 (hung at exit) | 122.9 | 123.7 |
+
+With the experts where the one-PE run has them, four PEs per GCD is a wash on
+this machine: plain rows within 3% either way (SmartMoE 2% slower, Mixtral 2%
+faster, OLMoE the same), the balanced SmartMoE rows within 1 to 5 ms. The A40
+gain came from the dispatcher PE's route+gather and output exchange sharing
+cores with the experts' launches; on Frontier a GCD's L3 region has seven
+cores and one PE already keeps up with the step (the one-PE rows' steps are
+set by the hot GCD's compute), so there is nothing to take off it.
+
+**2. The balancer's host-time guard flips at four PEs.** The ShedLB row with
+one round at step 20 read 136.2 twice (the round refused: "group 5 carries
+4.23 of a mean 0.55 and would need 4 copies, but no bin can hold copy 2") and
+71.7 once (the round taken, the same three copies the one-PE run makes). The
+per-PE dump (`+LBDebug 2 +LBPrintSummary`) says why. ShedLB sums each PE's
+objects' entry-method wall time and refuses a destination PE whose sum plus
+the copy's share (the expert's wall time over the copy count) would pass
+1.1 x the PEs' mean. At one PE per GCD every PE reads 3.23 to 3.35 s of a
+3.3 s interval, the mean 3.29, the cap 3.62, and the hot expert's share at
+any count fits under it. At four PEs the sums are bimodal: a PE holding an
+expert with tokens reads 3.25 to 3.68 -- the expert accrues the whole
+interval on its own PE, whatever its load (expert 0 at 0.5 of the mean reads
+3.25, the hot expert 5 at 4.2x reads 3.40) -- a PE with a cold expert 0.09 to
+0.34, a PE with nothing 0.05. The mean lands between 1.35 and 1.89 depending
+on how many cold experts there are that interval, so the cap sits between
+1.48 and 2.08, and the first count the planner tries, two copies, needs the
+empty PE's 0.05 plus 3.40 / 2 = 1.75: below the cap in one run, above it in
+the next. When two copies fail the planner abandons the group ("no bin can
+hold copy 2") although three or four copies, at 1.18 and 0.90, would pass.
+Rounds every 10 steps recover at the next round (70.6, the copies landing at
+step 24), serving's shares are smaller and its round at 20 passed every time.
+Two things to fix, both in the balancer: the expert's wall time on a PE of
+its own, which is the PE waiting for the device inside the expert's entry
+methods rather than host work (ShedLB meant the cap to keep launches and puts
+off an overloaded host, "job 23612682"); and a plan should fall through to
+the larger counts when the smaller fails the host check.
+
+**3. One LCI device per PE.** The runtime gives a process one LCI device
+unless told otherwise, and four PEs sending on one device contend for its
+lock: OLMoE's 64-expert top-8 traffic made 150 M retries in LCI's send path
+over the run (the `[am-send]` counters summed over ranks and threads) against
+26 M at one PE per GCD. `+lci_ndevices 4` (one device per PE, leanmd's
+setting on this machine) brings it to 22 M, and OLMoE trains at 96.3 ms a
+step against 123.2 on one device and 124.4 at one PE per GCD -- the only
+configuration so far that moves OLMoE, 22% faster than one PE. SmartMoE,
+whose traffic is 32 slabs a step, does not move (136.3 / 52.6). The rows of
+that configuration across the matrix were queued (`ppn4e.sh`, tags `p4l_*`)
+and the plan was dropped before they ran (the user's call, 16:25): what is
+measured of it is the three `*_lci4` rows above.
+
+Also seen: the block Mixtral ShedLB row at four PEs ran its 40 steps (305.7)
+and then hung at exit with the copy of expert 1 alive on the other host --
+the exit bug that segfaulted the copy's PE at one PE this morning, a hang at
+four. The default-map stalls (finding 1) were not root-caused; they went with
+the layout and are noted as such.
+
+Scripts: `ppn4.sh` (the default-map job: cost table, rows `p4_*`), `ppn4b.sh`
+/ `ppn4c.sh` / `ppn4d.sh` (the rebuilt example: controls `rp_*_m3`, rows
+`p4b_*`, the guard diagnostics `*_dbg` and `*_sum`, the LCI rows `*_lci4`),
+`p4_table.sh` (these tables from `logs/moe/ppn4.txt` and `read_path.txt`),
+`moe_run.sh PPN=`, `apps/moe3` (the example with `ExpertMap`, chunked
+receive slab included).
+
+## Measured 2026-11-07: Frontier, two nodes on the read path, the balancer's copy count
+
+The two-node comparison again after the pull of 2026-11-07 (charm 4537c12c9:
+every cross-host channel put announced and read by its owner, ShedLB choosing
+the copy count priced from the fan calibration with `-R` gone, the outputs
+back through the dispatchers' channels; reconverse 038893f; LCI b7c289ae,
+`FI_RMA_EVENT` only on request, rebuilt). Job 5877110, frontier09162 and
+09164, 11:42 to 12:19: the example from one binary built at 11:19 (the OLMoE
+rows from a second, below), the baselines on the same nodes in the same job
+(RCCL over the aws-ofi-nccl plugin, "Using network Libfabric" in every log;
+Megatron-Core's sequential experts with fp32 masters), steady state steps
+23-43. The 2026-11-02 and 11-04 rows, the write path and `-R`, stand beside
+the new ones. Within the job every ShedLB checksum equals its plain's; the
+plain checksums moved in the seventh digit against the 2026-11-02 run's (the
+outputs' path), the references' did not.
+
+Two measurements came first, as `FRONTIER_START.md` asks.
+
+**The verb across hosts is a wash on Frontier.** `rma_bw` (the micro-benchmark
+of the A100 finding, `make BUILD_HIP=1 CXX=hipcc`), one rank per host on GCD
+0, 128 MB x 10:
+
+| GB/s, two Frontier nodes                    | put  | get  |
+|---------------------------------------------|-----:|-----:|
+| device to device                            | 24.1 | 24.1 |
+| device to device, both hosts sending        | 23.3 | 23.3 |
+| host to host                                | 22.9 | 22.6 |
+| host to host, both hosts sending            | 16.7 |      |
+| device source into host memory              | 24.0 | 22.5 |
+| host source into device memory              | 23.7 | 24.2 |
+
+Where two A100 nodes wrote into device memory at 10.9 GB/s alone and 3.7 with
+both hosts sending, against 16.1 and 12.5 for a read, the MI250X and Cassini
+pair runs every verb and memory class at the link's 24 GB/s (the same from
+GCD 4, on cxi2's NUMA node). The verb is a machine property, as open item 10
+of `FRONTIER_START.md` says, and on this machine it does not matter: the rows
+run the read path, the default, and `CHARM_CHAN_WRITE=1` was not tried.
+Registrations past 2048 MB still fail on cxi without `FI_RMA_EVENT` (2 GB
+registers and runs at 24 GB/s; 4 and 8 GB abort in LCI's registration), so
+the pool's arena cap stands.
+
+**The cost table.** `lbcalib -F 4` by device channels in the example's layout
+(16 processes of one PE, one GCD each, the buddy pool; `lbcost.frontier.chan.conf`,
+passed by `moe_run.sh` with `+LBCostConfig`; the built-in table is Delta's A40
+one for any device but an A100): inter-node 24.3 GB/s (alpha 23.5 us), IPC
+across GCDs 134 GB/s (alpha 37 us), migration alpha 15.8 us; a copy's exchange
+per peer 145 GB/s at fan 2 on one host (GCDs 0 and 1, the two dies of one
+MI250X on Infinity Fabric), 34.8 at fan 3 and 50.3 at fan 4 (a third die sits
+on another package), 23.4 across hosts (the A100 pair gives 12.1 on the read
+path, the A40 pair 14.2).
+
+| MoE layer alone, ms/step, 16 GCDs                   | train | serve | train, before | serve, before |
+|-----------------------------------------------------|------:|------:|--------------:|--------------:|
+| SmartMoE: example plain                             | 132.9 |  51.0 |         132.6 |          58.8 |
+| SmartMoE: example ShedLB, one round at step 20 (4 copies) | 67.8 | 20.3 | 90.8 (`-R 2`) | 32.7 (`-R 2`) |
+| SmartMoE: example ShedLB, rounds every 10 steps     |  51.7 |  17.8 | 88.1 (`-R 4`) | 30.9 (`-R 4`) |
+| SmartMoE: example `-X` (1 copy from the start)      |  92.5 |  34.3 |          96.6 |          36.9 |
+| SmartMoE: PyTorch reference, static                 | 161.0 |  59.5 |         162.5 |          60.0 |
+| SmartMoE: PyTorch reference, SmartMoE's placement   | 162.0 |       |               |               |
+| SmartMoE: PyTorch reference, EPLB packing           | hung (third time) | |          hung |               |
+| SmartMoE: PyTorch reference, one static copy        | 102.5 |       |         106.7 |               |
+| SmartMoE: Megatron-Core, sequential experts, masters | 136.5 | 53.5 |         142.0 |          53.8 |
+| SmartMoE: Megatron-Core, capacity factor 1.25       | 136.7 |       |         141.7 |               |
+| Mixtral: example plain                              | 283.8 | 112.4 |         305.1 |         164.6 |
+| Mixtral: example ShedLB (1 copy, on the other host) | 284.4 | 114.8 | 306.9 (no copy) | 160.0 (no copy) |
+| Mixtral: PyTorch reference, static                  | 324.7 | 113.3 |         328.9 |         115.6 |
+| OLMoE: example plain (capacity 7680, chunked slab)  | 124.4 | 131.6 |         159.2 |         163.1 |
+| OLMoE: example ShedLB (nothing placed)              | 126.5 | 125.6 |         163.4 |         161.9 |
+| OLMoE: example plain, outputs by entry methods      | 129.0 | 132.3 |               |               |
+| OLMoE: PyTorch reference, static                    |  73.1 |  50.1 |          74.6 |          50.5 |
+| OLMoE: PyTorch reference, SmartMoE's placement      |  62.8 |       |               |               |
+| OLMoE: Megatron-Core, masters                       |  81.2 |  47.5 |          82.6 |          50.5 |
+
+| Transformer block (`-w`), 16 GCDs, fused attention  | train | serve | train, before | serve, before |
+|-----------------------------------------------------|------:|------:|--------------:|--------------:|
+| SmartMoE: example plain                             | 137.7 |  52.5 |         141.4 |          57.2 |
+| SmartMoE: example ShedLB                            |  71.4 |  24.2 |          90.8 |          34.2 |
+| SmartMoE: example plain, unfused attention          | 145.7 |  56.2 |         148.4 |          57.7 |
+| SmartMoE: PyTorch reference, static                 | 170.2 |  62.4 |         174.5 |          63.9 |
+| SmartMoE: Megatron-Core, masters                    | 146.0 |  56.8 |         150.6 |          58.1 |
+| Mixtral: example plain                              | 307.5 | 121.9 |         299.8 |         127.8 |
+| Mixtral: example ShedLB                             | 307.9 | 122.9 |         303.3 |         134.7 |
+| Mixtral: example plain, unfused attention           | 317.5 | 128.2 |         311.9 |         128.3 |
+| Mixtral: PyTorch reference, static                  | 351.0 | 122.2 |         360.8 |         125.6 |
+
+**SmartMoE.** The round at step 20 now makes all three copies of expert 5 at
+once (load 3.22 against the per-bin target 0.46: copies on PEs 13, 6 and 0
+from PE 2, two hosts, the fullest bin 3.25 to 1.15 by the plan, each copy
+placed with its inputs; 31 destination checks refused for host time) where the
+2026-11-02 rule made one copy a round: training falls from 90.8 to 67.8 ms,
+and with a round every 10 steps to 51.7 (the hot GCD's tokens 1.95x the mean
+from 7.8x, its device time 62 to 75 ms against the plain step's 134). Serving
+20.3 and 17.8 against 32.7 and 30.9. Against the baselines the balanced
+example trains 2.6x faster than Megatron-Core (136.5) and 2.0x faster than
+the reference's best arm, its static copy (102.5; 3.1x over its static), and
+serves 3.0x and 3.3x faster (53.5 and 59.5); on 2026-11-04 the margins were
+1.6x and 1.7x. Plain serving fell from 58.8 to 51.0 with the outputs through
+the channels; plain training did not move. SmartMoE's own online placement
+(`--place smartmoe -f 10 -b 10`, ATC'23) buys the reference nothing on this
+routing at 16 ranks (162.0 against 162.5): two experts per rank and one of
+them 48% of the tokens, so the hottest rank stays the hottest under any
+equal-count packing. The reference's EPLB arm hung a third time in RCCL's
+channel setup before its first step (150 s), the open item of the 2026-11-02
+section.
+
+**Mixtral, eight experts on sixteen GCDs.** Serving falls from 164.6 to
+112.4 ms with the outputs returning through the dispatchers' channels, level
+with the reference's 113.3 that had been 1.4x ahead; training 283.8 against
+305.1. The balancer now does make a copy (expert 1 from PE 1 to the other
+host, "2 copies in all", the fullest bin 5.53 to 5.05; the other seven
+experts: "no count up to 3 lowers the fullest bin enough") and the step does
+not move with it (284.4, 114.8): eight bins loaded alike, and the step is the
+exchange. The exit segfault of the 2026-11-02 section persists on the read
+path, now on the PE that holds the copy (12 or 15), after the last step and
+the checksums, in three of four ShedLB arms.
+
+**OLMoE and the memory it needs.** With the outputs through channels every
+expert owns a fixed segment of `cap_src` rows of the dispatcher's receive
+slab, and for 64 experts at the auto capacity (11424 rows, 1.5x the hottest
+(dispatcher, expert) count of 7573 in any step of the trace) that slab is
+3 GB a parity: on Frontier a NIC-registered pool arena holds at most 2048 MB
+and a process registers at most 16384 MB (`FRONTIER_START.md`), and the pool
+refused the allocation on every rank. Two changes made the rows: the slab is
+allocated in chunks of whole segments of at most 1024 MB and the combine
+kernel maps a row to its chunk (moe.C `recvRowPtr`, moe.cu `combineKernel`;
+one chunk, the layout as before, wherever it fits, and the SmartMoE plain arm
+from that binary measured 133.0 against 132.9 with equal checksums), and the
+capacity was set to the trace's own maximum (`-r 7.5`: 7680 rows, which
+brings the slab to two chunks of 1020 MB and the process under the cap; the
+chunked slab alone still asked for a ninth arena). Plain 124.4 training and
+131.6 serving against 159.2 and 163.1; the entry-method output path on the
+same binary (`MOE_OUT_ENTRY=1`, the auto capacity) 129.0 and 132.3, so the
+gain over 2026-11-02 is the read path's and the LCI change's, not the output
+channels'; which of the two, `CHARM_CHAN_WRITE=1` would say. ShedLB places
+nothing on OLMoE (host-bound: the hosts' mean 4.06 against the device target
+0.60, 21 checks refused; open item 11), its rows equal plain's within the
+step's noise. The baselines keep their lead on this routing (reference 73.1
+and 50.1, Megatron 81.2 and 47.5, SmartMoE's placement 62.8): the open item
+of the example's exchange crossing at one NIC's bandwidth stands.
+
+**The block rows.** The balanced SmartMoE block trains at 71.4 (90.8) and
+serves at 24.2 (34.2): 2.0x faster than Megatron-Core and 2.4x faster than
+the reference in training, 2.3x and 2.6x in serving. The fused attention is
+worth 8 ms in training and 3.7 in serving against the unfused build on the
+same nodes, as on 2026-11-04. Mixtral's block rows sit within a few percent
+of the 2026-11-04 pair's (307.5 against 299.8 in training, the unfused
+control 317.5 against 311.9 alike: the pair), serving 121.9 against 127.8,
+ShedLB's copy again buying nothing.
+
+The scripts: `read_path.sh` (the chain: `rma_bw`, `lbcalib -F 4`, the rows,
+the baselines, the controls, `scancel`), `rma_bw_sweep.sh`, `ol_rows2.sh`
+(the OLMoE rows), `rp_table.sh` (these tables from `logs/moe/read_path.txt`
+and `logs/ref/results_rp.txt`), all under the Frontier scratch root.
 
 ## Measured 2026-11-02: the same matrix with NCCL on Slingshot, and a serving fix
 
@@ -2719,6 +3198,13 @@ kernel launches, landing copies and output sends run on N PEs instead of
 one, and the balancer moves them between the PEs of a process on host time
 as well as across processes on device time. The other PEs' dispatcher
 branches hold no tokens and run no steps; they exist for that context.
+
+Where the experts start is the array map's business, and since 2026-11-07
+it is `ExpertMap` (moe.C): the default map's block rule applied to the GPUs
+rather than the PEs, a GPU's experts spread over its PEs, so the GPU holding
+each expert is the one-PE run's at any N (the default map at N = 4 put
+SmartMoE's experts on one host and Mixtral's four to a GPU; "Measured
+2026-11-07, later").
 
 The same rule gives one process per node driving all its GPUs:
 `MOE_GPUS_PER_PROC=4` in the wrapper runs `+ppn 4` with PE i on the first
