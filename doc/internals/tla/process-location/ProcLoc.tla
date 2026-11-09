@@ -58,7 +58,10 @@ CONSTANTS
     Sync,       \* TRUE: a re-creation happens only after every runtime message of
                 \* the earlier life has been delivered (the contract: a global
                 \* synchronization between the deletion and the re-insertion).
-    Mutation    \* 0: the code.  1..4: deliberate protocol errors (see README)
+    Mutation,   \* 0: the code.  1..4: deliberate protocol errors (see README)
+    ClearConflict \* TRUE: a reply or repair by id that loses the epoch compare to an
+                \* entry naming another PE clears that entry (charm #4031, the
+                \* third-process detour: two lives of the element both start at epoch 0)
 
 PEs == {P * PPN + r : P \in Procs, r \in 0..PPN-1}
 Proc(p) == p \div PPN
@@ -194,6 +197,14 @@ Written(P, e) == (tab[P].pe = None \/ e > tab[P].ep) /\ ~OwnWrite(P, tab[P])
 
 \* Cleared: the entry without its location (W5; key and waiter bits kept).
 Cleared(T) == [T EXCEPT !.pe = None, !.ep = None, !.own = FALSE]
+
+\* ClearConflict: a received update by id (a reply or a sender repair) that is not
+\* written and names another PE than the entry: the two disagree and the epoch
+\* cannot order them (two lives each start at 0), so the entry is cleared and the
+\* next send asks the home.  Never the process's own write; the home's process
+\* drops these updates before this point.
+Conflict(P, r) == ClearConflict /\ ~r.idx /\ tab[P].pe # None /\ tab[P].pe # r.pe
+                  /\ ~Written(P, r.ep) /\ ~OwnWrite(P, tab[P])
 
 \* Re-send every held message of p toward q: CkArray::sendBufferedMsgs(id, pe)
 \* through the location listener, sendToPe(msg, q, CkDeliver_queue).
@@ -474,7 +485,9 @@ RecvUpd(r) ==
                 /\ UNCHANGED hl
           ELSE
              /\ hl' = IF atHome THEN Upsert(hl, HomeRec(r.pe, r.ep, r.life)) ELSE hl
-             /\ tab' = IF wr THEN [tab EXCEPT ![P] = Recv4(r.pe, r.ep)] ELSE tab
+             /\ tab' = IF wr THEN [tab EXCEPT ![P] = Recv4(r.pe, r.ep)]
+                       ELSE IF Conflict(P, r) THEN [tab EXCEPT ![P] = Cleared(@)]
+                       ELSE tab
              /\ buf' = IF flush THEN [buf EXCEPT ![p] = {}] ELSE buf
              /\ pendReq' = IF p = Home /\ r.idx THEN {} ELSE pendReq
              /\ net' = rest
@@ -610,10 +623,12 @@ RequestOutstanding ==
 Inv == TypeOK /\ ExactlyOnce /\ OneElement /\ HolderEntryExact /\ EpochOK
        /\ WaiterCoverage /\ RequestOutstanding
 
-\* Table epochs never move back.
+\* Table epochs never move back.  With ClearConflict an entry may lose its location
+\* (a stale reply or repair that disagrees with it); it never takes an older one.
 TableMonotone ==
     [][dels = 0 /\ dels' = 0 =>
-        \A P \in Procs : tab[P].pe # None => tab'[P].pe # None /\ tab'[P].ep >= tab[P].ep]_vars
+        \A P \in Procs : tab[P].pe # None =>
+            IF tab'[P].pe = None THEN ClearConflict ELSE tab'[P].ep >= tab[P].ep]_vars
 
 (* Liveness *)
 
@@ -626,6 +641,22 @@ Quiesces == <>[](net = {} /\ \A p \in PEs : buf[p] = {} /\ pc[p].kind = "idle")
 \* The network drains: every message comes to rest, delivered or held (a message
 \* to an element that died and is not re-created is held at the home).
 NetDrains == <>[](net = {})
+
+\* #4031 defect 2: a reply or repair by id that names where the element is now
+\* is never ignored by a process (other than the home's) whose entry names another
+\* PE: the entry takes it, or is cleared so that the next send asks the home.
+\* Fails with ClearConflict = FALSE when a third process holds an entry of a dead
+\* life at an epoch the new life has not reached.
+RepairNotIgnored ==
+    [][\A r \in net :
+         (/\ r.type = "upd" /\ ~r.idx /\ r \notin net'
+          /\ holder \in PEs /\ r.pe = holder /\ r.ep = epoch
+          /\ Proc(r.to) # Proc(Home)
+          /\ tab[Proc(r.to)].pe \notin {None, holder}
+          /\ ~OwnWrite(Proc(r.to), tab[Proc(r.to)])
+          /\ pc[r.to].kind = "idle" /\ UNCHANGED <<holder, epoch>>
+          /\ RecvUpd(r))
+         => tab'[Proc(r.to)].pe \in {None, holder}]_vars
 
 -----------------------------------------------------------------------------
 (* Probe: expected to FAIL; its trace shows how far a message is forwarded. *)

@@ -293,7 +293,7 @@ process.
 the same id while messages about the old life (home updates, replies, repairs,
 the death notice) are still in flight, in any order. The new life starts at
 epoch 0, so the epoch compare cannot tell it from the old one, and the old
-life's messages can carry higher epochs than the new life's. Five rules handle
+life's messages can carry higher epochs than the new life's. Six rules handle
 this; each defeats a named ordering (the trace files are in the model folder):
 
 1. *Life tags* on updates, notices and the migration message, so the home can
@@ -327,8 +327,15 @@ this; each defeats a named ordering (the trace files are in the model folder):
    out, as in rule 2.
 5. *The notice clears by match*, {d, e} or the recorded location of the life,
    never unconditionally, so a later life's entry under the same id survives it.
+6. *A disagreeing reply or repair by id clears the entry.* One that loses the
+   epoch compare to an entry naming another PE leaves the entry empty, so the
+   next send asks the home. Without it, a process holding an entry of the dead
+   life at an epoch the new life has not reached rejects every repair, and its
+   sends detour through the dead life's PE for good (`trace_detour.txt`;
+   section 3.5).
 
-None of these adds a message. Updates, replies and the migration message grow
+None of these adds a message (an entry cleared by rule 6 makes the process's next
+send ask the home, as for any element it has not heard of). Updates, replies and the migration message grow
 by the 8-byte tag; the home keeps about a hundred bytes per element it is home
 of, and the set of dead tags grows with the deletions (section 9). The rules are
 exercised only when an index is re-created while the old life's messages are
@@ -598,6 +605,21 @@ compare, like any stale entry, and the notice undoes it. The repair rule
 higher epoch, which two lives at epoch 0 do not give it, so the home relies on
 the notice and the record, not on the repair.
 
+The same gap reaches every other process. A process that addressed the old
+life keeps its entry {d, e}; nothing tells it of the death. When the new life
+is created on another PE at epoch 0, every send from that process goes to d,
+is forwarded to the new holder, and the holder's repair {holder, k} loses the
+epoch compare while k <= e: the detour is permanent (#4031, `objid_detour`).
+So a reply or repair by id that is not written and names another PE than the
+entry clears the entry (`LocTable::update` with `clearOnConflict`, from
+`CkLocCache::updateLocation`): the two disagree, the epoch cannot order them,
+and the process asks the home on its next send, whose answer is written into
+the empty entry. Within one life the rule fires only for a reply or repair
+that a newer update overtook; the entry it clears costs one request. The
+process's own writes are kept as before, and the home's process never gets
+here (rule 4). Updates by index, which the home sends with the life, are not
+affected.
+
 ### 3.6 Device zero-copy sends to an element that moved
 
 A device send picks its transfer mode on the sender from the destination PE it
@@ -745,6 +767,12 @@ Existing: `tests/charm++/anytime_migration`, `anytime_bcastred`,
 - `objid_insert` phase 7 now distinguishes a fresh PE whose process never
   addressed the index (three or more processes: a new id) from one whose
   process did (the old id is reused).
+- `tests/charm++/objid_detour`: a process that addressed an element's first
+  life keeps sending to it after the element dies and is created again on
+  another PE; its entries must name the new life within two rounds of sends
+  (section 3.5, rule 6 of section 3.0). Two to four processes; one process
+  skips. Also covers an insertion from a process whose entry names the dead
+  life (`CkArray::findInitialHostPe`).
 - `tests/charm++/objid_recreate`: the home's handling of an element re-created
   under the same id (section 3.5). Every PE drives the home-side handlers of a
   packed-kind array's `CkLocMgr` directly, for the indices it is the home of, in
