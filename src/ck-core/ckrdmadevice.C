@@ -646,8 +646,8 @@ static bool persistAllocBase(const void* ptr, uintptr_t* base) {
 #endif
 }
 
-// IPC mappings of other processes' allocations, opened once per process (CUDA
-// maps a handle once per process) and kept until exit.
+// IPC mappings of other processes' allocations, opened once per process and
+// reused by every copy of the peer's buffer, kept until exit.
 static std::mutex persist_ipc_lock;
 static std::map<std::string, void*> persist_ipc;
 
