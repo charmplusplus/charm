@@ -612,6 +612,9 @@ private:
   // (the restored ids came from it), so the first tranche comes from the allocator.
   // An array created after a restart is not restored and takes its share as usual.
   bool restoredFromCheckpoint;
+  // This PE's last failed mintUnique found no tranche at all (the first after a
+  // restart), as opposed to a used one; read by deferInsertion's note.
+  bool mintFailedWithoutTranche = false;
 
   /// This flag is set while we delete an old copy of a migrator
   bool duringMigration;
