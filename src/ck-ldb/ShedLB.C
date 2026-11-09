@@ -450,7 +450,11 @@ void ShedLB::work(LDStats* stats)
           {
             if (holdsBin(b)) continue;
             if (pass == 0 && CmiPhysicalNodeID(binPe[b]) != prefHost) continue;
-            if (peCpu[binPe[b]] + sod.wallTime / k > hostCap)
+            // Past the cap only where the copy would leave this PE's host time
+            // at or above the source's: below it, the busiest host still drops
+            // (a host-only run, where host time is the load, needs exactly that).
+            if (peCpu[binPe[b]] + sod.wallTime / k > hostCap &&
+                peCpu[binPe[b]] + sod.wallTime / k >= peCpu[srcPe])
             {
               hostRefusals++; hostRefusedHere++;
               if (peCpu[binPe[b]] > hostMostCpu) { hostMostCpu = peCpu[binPe[b]]; hostMostLoaded = binPe[b]; }

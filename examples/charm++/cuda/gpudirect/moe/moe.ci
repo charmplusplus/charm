@@ -96,6 +96,7 @@ mainmodule moe {
     // A copy's channels (r > 0) are in: runStep waits for them before it routes
     // a step that copy serves.
     entry void chanArrived();
+    entry void roundResumed();
 
     entry void runStep() {
       serial { beginStep(); }
@@ -169,13 +170,11 @@ mainmodule moe {
     // A new copy's state from the copy the balancer cloned: the weights after
     // step `step` - 1 (and the Adam moments), the step it starts at, and the
     // timing estimate. Lands in buffers the copy allocates in the post method.
-    entry void takeState(int step, int adam_t, double spt, int ncopies, int n, nocopydevice float w1[n],
-                         nocopydevice float w2[n]);
-    entry void takeMoments(int n, nocopydevice float a[n], nocopydevice float b[n],
-                           nocopydevice float c[n], nocopydevice float d[n]);
-    // One of the clone's state buffers was read by the transport; after all
-    // of them, cloneSent: the weights may be updated again.
-    entry void cloneBufDone();
+    // A copy made by the runtime (ckCloneTo, the pup's cloning branch) is
+    // told its first step by its source.
+    entry void startCopy(int step, int adam_t, double spt, int ncopies);
+    // The runtime's ckCloneSent, as a message: the copies' packs have read
+    // this copy's weights, which may be updated again.
     entry void cloneSent();
     // A dispatcher dropped its channels to this retiring copy.
     entry void channelsDropped();

@@ -525,6 +525,52 @@ void PUP::fromMem::pup_buffer_device(void *&p, size_t n, size_t itemSize, Device
 #endif
 }
 
+// Into the caller's buffer, from whichever region the sender's manifest says
+// the bytes travelled in: the stable region (the decision-time snapshot) or
+// the packed stream. Mirrors bytes(DEVICE) for the latter.
+void PUP::fromMem::pup_device(void *p, size_t n, size_t itemSize, DeviceLife life)
+{
+#ifdef CK_CHECK_PUP
+  ((pupCheckRec *)buf)->check(Tchar, n);
+  buf += sizeof(pupCheckRec);
+#endif
+  n *= itemSize;
+#if CMK_GPU
+  const bool stable = deviceManifestCheck(n, life);
+  if (stable) {
+    if (stableOrigBuf == nullptr)
+      CmiAbort("Device pup: device buffer #%zu (%zu bytes) was shipped in the stable region, "
+               "but no stable region landed for this element", deviceManifestIdx, n);
+    stableBuf = stableOrigBuf + alignDeviceOffset((size_t)(stableBuf - stableOrigBuf));
+    {
+      hapiError_t e = (gpuStream != nullptr)
+          ? hapiMemcpyAsync(p, (const void *)stableBuf, n, hapiMemcpyDeviceToDevice, (hapiStream_t)gpuStream)
+          : hapiMemcpy(p, (const void *)stableBuf, n, hapiMemcpyDeviceToDevice);
+      if (e != hapiSuccess)
+        CmiAbort("pup_device: stable copy of buffer #%zu (%zu bytes) %p <- %p (region %p) stream %p failed: %s",
+                 deviceManifestIdx, n, p, (void*)stableBuf, (void*)stableOrigBuf, gpuStream, hapiGetErrorString(e));
+      // The landed block (a pool block) is freed when the unpack ends unless a
+      // buffer rebound into it: that free must wait for this copy.
+      if (gpuStream != nullptr) hapiDevPoolNoteRead(stableOrigBuf, (hapiStream_t)gpuStream);
+    }
+    stableBuf += n;
+  } else {
+    gpuBuf = gpuOrigBuf + alignDeviceOffset((size_t)(gpuBuf - gpuOrigBuf));
+    {
+      hapiError_t e = (gpuStream != nullptr)
+          ? hapiMemcpyAsync(p, (const void *)gpuBuf, n, hapiMemcpyDeviceToDevice, (hapiStream_t)gpuStream)
+          : hapiMemcpy(p, (const void *)gpuBuf, n, hapiMemcpyDeviceToDevice);
+      if (e != hapiSuccess)
+        CmiAbort("pup_device: packed copy of buffer #%zu (%zu bytes) %p <- %p (region %p) stream %p failed: %s",
+                 deviceManifestIdx, n, p, (void*)gpuBuf, (void*)gpuOrigBuf, gpuStream, hapiGetErrorString(e));
+    }
+    gpuBuf += n;
+  }
+#else
+  (void)p; (void)life;
+#endif
+}
+
 void PUP::sizer::pup_buffer(void *&p,size_t n, size_t itemSize, dataType t) {
 #ifdef CK_CHECK_PUP
 	nBytes+=sizeof(pupCheckRec);

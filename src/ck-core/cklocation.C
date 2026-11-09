@@ -2128,7 +2128,13 @@ void CkMigratable::pup(PUP::er& p)
 {
   DEBM((AA "In CkMigratable::pup %s\n" AB, idx2str(thisIndexMax)));
   Chare::pup(p);
-  p | thisIndexMax;
+  {
+    // A copy (IS_CLONING) keeps the index it was created under; a migrated
+    // element takes the one it had.
+    CkArrayIndex idxIn = thisIndexMax;
+    p | idxIn;
+    if (!(p.isUnpacking() && p.isCloning())) thisIndexMax = idxIn;
+  }
   p | usesAtSync;
   p | can_reset;
   p | usesAutoMeasure;
@@ -2165,6 +2171,16 @@ void CkMigratable::pup(PUP::er& p)
     p | lbStepSeen;
     p | lbIterNo;
     p | lbStepBlocked;
+    if (p.isUnpacking() && p.isCloning())
+    {
+      // A copy joined no round: it starts as a fresh element does.
+      epoch = -1;
+      lbStepPending = false;
+      lbMeasurementClosed = false;
+      waitParked = false;
+      lbWaitEpoch = 0;
+      lbStepBlocked = false;
+    }
     if (p.isUnpacking()) lbSetMeasurementClosed(lbMeasurementClosed);
   }
 
@@ -2199,6 +2215,7 @@ void CkMigratable::pup(PUP::er& p)
     }
     p | prevPe;
     p | prevStep;
+    if (p.isUnpacking() && p.isCloning()) { prevPe = -1; prevStep = -1; }   // a copy came from no move
     if (p.isUnpacking())
       myRec->setObjPrev(prevPe, prevStep);
   }
@@ -2215,7 +2232,8 @@ void CkMigratable::pup(PUP::er& p)
   p | lbReplicaExchangeBytes;
   p | lbReplicaExchangeMsgs;
   p | lbReplicaExtraBytesPerPeer;
-  if (p.isUnpacking() && lbReplicaGroup >= 0)
+  // A copy declares itself (its rank is its own) at its first balancing point.
+  if (p.isUnpacking() && lbReplicaGroup >= 0 && !p.isCloning())
     myRec->setObjReplica(lbReplicaGroup, lbReplicaRank, lbReplicaCount, lbReplicaMax,
                          lbReplicaExtraBytes, lbReplicaCostNode, lbReplicaCostRemote, lbReplicaParts,
                          lbReplicaExchangeBytes, lbReplicaExchangeMsgs, lbReplicaExtraBytesPerPeer);
@@ -2226,6 +2244,10 @@ void CkMigratable::pup(PUP::er& p)
 }
 
 void CkMigratable::ckDestroy(void) {}
+void CkMigratable::ckCloneTo(int toPe, const CkArrayIndex& newIdx)
+{
+  myRec->getLocMgr()->cloneElement(myRec, toPe, newIdx);
+}
 void CkMigratable::ckAboutToMigrate(void) {}
 void CkMigratable::ckClone(int toPe, int rank)
 {
@@ -3165,6 +3187,19 @@ extern "C" void _deferredMigrateHandler(void* arg)
     if (getenv("CHARM_DEBUG_MIGRATE"))
       CmiPrintf("[KICK %d] id=%llu movable=%d held=%d toPe=%d\n", CkMyPe(),
                 (unsigned long long)m->id, (int)movable, (int)rec->migrateKickHeld, m->toPe);
+#if CMK_GPU
+    // The Stable snapshot for this move has not landed: the move waits for it
+    // (finishStableSend kicks again), and the element's receives flow.
+    if (rec->stable != nullptr && rec->stable->toPe == m->toPe && !rec->stable->landed) {
+      if (rec->migrateKickHeld) {
+        rec->migrateKickHeld = false;
+        CkDeviceRecvAdmissionReplay(m->id);
+      }
+      rec->pendingMigrateTo = m->toPe;
+      CmiFree(m);
+      return;
+    }
+#endif
     if (movable) {
       mgr->emigrate(rec, m->toPe);  // does not return to this record
     } else if (rec->pendingMigrateTo == -1) {
@@ -3440,6 +3475,9 @@ static void ckPostDeferredMigrate(CkLocMgr* mgr, CmiUInt8 id, int toPe)
 void CkLocRec::recvMigrate(int toPe)
 {
 #if CMK_LBDB_ON
+  // A balancer's move: its arrival is counted, even for a copy still on its
+  // way from its source's PE (moveCopy), whose move this one replaces.
+  copyInTransit = false;
   if (migDecidedAt == 0.0) migDecidedAt = CkWallTimer();
 #if CMK_GPU
   // Its Stable device buffers go now, while it keeps stepping; the pack
@@ -3483,6 +3521,17 @@ void CkLocRec::recvMigrate(int toPe)
     // re-buffers into nextPe through this function if the window has closed.
     if (lbMigrateDeferred())
     {
+#if CMK_GPU
+      // Its Stable buffers are shipping (stableSnapshot above): the move
+      // waits for their landing, not for a quiet moment. The element keeps
+      // stepping meanwhile; finishStableSend posts the kick when the
+      // destination has the region, and the pack then carries the rest.
+      if (stable != nullptr && stable->toPe == toPe && !stable->landed)
+      {
+        pendingMigrateTo = toPe;
+        return;
+      }
+#endif
       if (outstandingDeviceSends > 0)
       {
         // Busy: a kick now would only find it busy and re-arm (1225 of 3407
@@ -5296,6 +5345,7 @@ bool CkLocMgr::emigrateIntraProcess(CkLocRec* rec, int toPe)
     msg->aids[i] = aids[i];
     msg->eltPtrs[i] = eltPtrs[i];
   }
+  msg->lbUntracked = rec->copyInTransit;
 #if CMK_LBDB_ON
   // Ledger-tracked move: the destination acks this PE's LBManager on
   // registration. Consume the tag so the destructor below does not retire it.
@@ -5360,7 +5410,7 @@ void CkLocMgr::immigrateIntraProcess(CkArrayElementIntraProcessMigrateMessage* m
 
   CkLocRec* rec = elementNrec(msg->id);
   if (rec == nullptr)
-    rec = createLocal(idx, true /* fromMigration */, msg->ignoreArrival,
+    rec = createLocal(idx, !msg->lbUntracked /* fromMigration: a balancer counts it */, msg->ignoreArrival,
                       false /* home told on departure */, msg->locEpoch);
 
   for (int i = 0; i < msg->nManagers; i++)
@@ -5440,6 +5490,18 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
     return;
   }
 
+#if CMK_GPU
+  // A snapshot in flight for this move: not before it has landed (the kick
+  // comes from finishStableSend).
+  if (rec->stable != nullptr && rec->stable->toPe == toPe && !rec->stable->landed)
+  {
+    if (getenv("CHARM_DEBUG_MIGRATE"))
+      CmiPrintf("[DEFER-MIG %d] elem %s id=%llu: stable snapshot gen %d not landed at pe %d yet\n", CkMyPe(),
+                idx2str(rec->getIndex()), (unsigned long long)rec->getID(), rec->stable->gen, toPe);
+    rec->pendingMigrateTo = toPe;
+    return;
+  }
+#endif
   // Started only past the stand-down above, so the count is actual emigrations
   // rather than deferral attempts.
   MigTimer _te(&g_mig.emigSecs, &g_mig.emigN);
@@ -5592,6 +5654,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
                                                     cache->getEpoch(id) + 1,
                                                     gpuBufSize > 0,
                                                     (int)nGpuBufs);
+  msg->lbUntracked = rec->copyInTransit;
 #if CMK_LBDB_ON
   // Ledger-tracked move: the destination acks this PE's LBManager on
   // registration. Consume the tag so the destructor does not retire it.
@@ -5826,6 +5889,238 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #endif
 
   CK_MAGICNUMBER_CHECK
+}
+
+// A copy of rec's element on toPe at newIdx. The packed path of emigrate
+// without its departure: the sizer and the packer run with IS_CLONING so the
+// element's pup can leave out what a copy must not inherit, nothing is
+// deleted or freed, no location changes, the device payload ships as a
+// migration's (its own send, the destination's landing), and the host
+// message carries the new index. The source learns when its buffers have
+// been read (ckCloneSent: the pack copies' completion on the migration
+// stream), the copy learns when it is whole (ckJustCloned, in immigrate).
+static inline bool ckMigrateArenaMode();
+namespace {
+struct CkCloneSentArg { CkGroupID mgr; CmiUInt8 srcId; };
+void ckCloneSentFn(void* arg, void*)
+{
+  CkCloneSentArg* a = (CkCloneSentArg*)arg;
+  CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(a->mgr);
+  if (mgr != nullptr) mgr->cloneSentFor(a->srcId);
+  delete a;
+}
+}
+// The pack of a copy has finished reading element srcId's buffers (or there was nothing to read).
+void CkLocMgr::cloneSentFor(CmiUInt8 srcId)
+{
+  CkLocRec* rec = elementNrec(srcId);
+  if (rec != nullptr) callMethod(rec, &CkMigratable::ckCloneSent);
+}
+// A copy made on its source's PE goes to toPe as a balancer's deferred move
+// goes: its Stable buffers ship now while it runs (stableSnapshot), the move
+// waits for their landing (finishStableSend kicks it), and the pack then
+// carries the rest. Until the switch, messages to the copy are delivered here.
+// No balancer step waits on it (no ledger entry). Without a snapshot (no
+// room, or the same device) it moves at its next quiet moment.
+void CkLocMgr::moveCopy(CkLocRec* rec, int toPe)
+{
+#if CMK_LBDB_ON
+  if (rec->migDecidedAt == 0.0) rec->migDecidedAt = CkWallTimer();
+  rec->copyInTransit = true;
+#if CMK_GPU
+  stableSnapshot(rec, toPe);
+  ckNotePendingPack(rec, toPe);
+  const bool held = rec->stable != nullptr && rec->stable->toPe == toPe && !rec->stable->landed;
+  if (migDbg())
+    CkPrintf("[CLONE %d] elem %s id=%llu: made here, moves to pe %d %s\n", CkMyPe(), idx2str(rec->getIndex()),
+             (unsigned long long)rec->getID(), toPe, held ? "when its Stable buffers have landed" : "now");
+  if (held)
+  {
+    rec->pendingMigrateTo = toPe;
+    return;
+  }
+#endif
+  if (rec->outstandingDeviceSends > 0)
+  {
+    rec->pendingMigrateTo = toPe;
+    return;
+  }
+  rec->migrateKickHeld = true;
+  ckPostDeferredMigrate(this, rec->getID(), toPe);
+#else
+  emigrate(rec, toPe);
+#endif
+}
+
+void CkLocMgr::cloneElement(CkLocRec* rec, int toPe, const CkArrayIndex& newIdx)
+{
+  CK_MAGICNUMBER_CHECK
+  if (!compressor)
+    CkAbort("PE %d: cloneElement of %s: the array has no index compressor (CkArrayOptions::setBounds), "
+            "so a copy's id cannot be computed from its index on every PE", CkMyPe(), idx2str(rec->getIndex()));
+  const CmiUInt8 srcId = rec->getID();
+  const CmiUInt8 newId = lookupID(newIdx);
+  const double t0 = CmiWallTimer();
+
+  PUP::sizer sz(PUP::er::IS_MIGRATION | PUP::er::IS_CLONING);
+  pupElementsFor(sz, rec, CkElementCreation_migrate);
+  const size_t bufSize = sz.size();
+  // Where the copy is unpacked: here, when its state has Stable device
+  // buffers, so that it is routable at once and then moves to toPe the way a
+  // balancer's move does (moveCopy: those buffers ship while it runs, and it
+  // switches when they have landed); otherwise on toPe, where messages to it
+  // wait for its state.
+  int unpackPe = toPe;
+#if CMK_GPU && CMK_LBDB_ON
+  {
+    static const bool direct = getenv("CHARM_CLONE_DIRECT") != nullptr && atoi(getenv("CHARM_CLONE_DIRECT")) != 0;
+    if (!direct && toPe != CkMyPe() && sz.gpu_stable_size() > 0 && sz.gpu_size() > 0 && CkDevicePoolOn() &&
+        ckMigrateArenaMode())
+      unpackPe = CkMyPe();
+  }
+#endif
+  size_t gpuBufSize = 0, nGpuBufs = 0;
+#if CMK_GPU
+  gpuBufSize = sz.gpu_size();
+  nGpuBufs = sz.gpu_buf_count();
+  // What the copy will hold on the device: the destination's landing set.
+  std::vector<CmiUInt8> emigBlocks;
+  size_t emigFootprint = 0;
+  {
+    std::vector<std::pair<size_t, int>> blocks;
+    hapiObjectBlocks(rec, blocks);
+    for (const auto& b : blocks) {
+      emigBlocks.push_back((CmiUInt8)b.first);
+      emigBlocks.push_back((CmiUInt8)b.second);
+      emigFootprint += b.first * (size_t)b.second;
+    }
+  }
+#endif
+#if CMK_ERROR_CHECKING
+  if (bufSize > std::numeric_limits<int>::max())
+    CkAbort("Cannot clone an object with size greater than %d bytes!\n", std::numeric_limits<int>::max());
+#endif
+  CkArrayElementMigrateMessage* msg =
+      new (bufSize, nGpuBufs, 0) CkArrayElementMigrateMessage(newIdx, newId, false, bufSize, managers.size(),
+                                                              0, gpuBufSize > 0, (int)nGpuBufs);
+  msg->isClone = true;
+  msg->cloneOf = srcId;
+#if CMK_LBDB_ON
+  msg->lbLedgerSrcPe = -1;   // no balancer step waits on a copy's registration
+  msg->lbLedgerStep = -1;
+#endif
+  void* gpuMsg = nullptr;
+#if CMK_GPU
+  hapiStream_t migStream = NULL;
+  msg->needsLanding = ckAdmissionGateOn() && gpuBufSize == 0 && !emigBlocks.empty();
+  if (gpuBufSize > 0) {
+    GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+    if (!csv_gpu_manager.use_shm)
+      CkAbort("PE %d: cloneElement needs the shared-memory device path (+gpushm) for its payload", CkMyPe());
+    DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
+    if (CkDevicePoolOn()) {
+      hapiFootprintBegin(nullptr);
+      gpuMsg = (char*)CkDeviceMalloc(gpuBufSize);
+      hapiFootprintEnd();
+      if (gpuMsg == nullptr)
+        CkAbort("PE %d: device pool could not provide a %zu-byte clone payload (+gpupoolsize)", CkMyPe(), gpuBufSize);
+    } else {
+      gpuMsg = CkRdmaDeviceAllocLbBuffer(dm, gpuBufSize);
+      if (gpuMsg == nullptr)
+        CkAbort("PE %d, device %d: not enough memory in the load-balance buffer for a %zu-byte clone payload "
+                "(+gpulbbuffer <MB>)", CkMyPe(), dm->global_index, gpuBufSize);
+    }
+#if CMK_SMP
+    CmiLock(dm->lock);
+#endif
+    migStream = ckMigrationStreamLocked(dm);
+#if CMK_SMP
+    CmiUnlock(dm->lock);
+#endif
+  }
+#endif
+  PUP::toMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION | PUP::er::IS_CLONING);
+#if CMK_GPU
+  p.gpuStream = (void*)migStream;
+  p.deviceManifestOut = msg->gpuManifest;
+  p.deviceManifestCap = nGpuBufs;
+#endif
+  // Not deleting: the source keeps every buffer the pack reads.
+  pupElementsFor(p, rec, CkElementCreation_migrate);
+  if (p.size() != bufSize)
+    CkAbort("Array element's pup routine has a direction mismatch (clone: sized %zu bytes, packed %zu).\n",
+            bufSize, p.size());
+#if CMK_GPU
+  if (p.gpu_size() > gpuBufSize || p.deviceManifestIdx > nGpuBufs)
+    CkAbort("Array element's pup routine has a device direction mismatch (clone: sized %zu device bytes in %zu "
+            "buffers, packed %zu in %zu).\n", gpuBufSize, nGpuBufs, p.gpu_size(), p.deviceManifestIdx);
+  if (gpuBufSize > 0 && !p.deviceAllPool) {
+    // A source outside the pool has no stream-ordered protection: the pack
+    // copies must be complete before anything may write it, and before the
+    // payload send stages.
+    if (migStream != NULL) hapiCheck(ckSubmitDrainThenSync(migStream));
+    else { hapiSubmitDrain(); hapiDeviceSynchronize(); }
+  }
+#endif
+#if CMK_GPU && CMK_LBDB_ON
+  if (unpackPe != toPe)
+  {
+    // Unpacked here, by a message (the caller may be walking this PE's
+    // elements): the payload is this PE's pool block, read by the unpack on
+    // another stream, so the pack's copies finish first -- after which the
+    // source's buffers may change again.
+    msg->cloneMoveTo = toPe;
+    if (migStream != NULL) hapiCheck(ckSubmitDrainThenSync(migStream));
+    else { hapiSubmitDrain(); hapiDeviceSynchronize(); }
+    bufferedDeviceMigrateMsgs[newId] = gpuMsg;
+    thisProxy[CkMyPe()].immigrate(msg);
+    callMethod(rec, &CkMigratable::ckCloneSent);
+    if (migDbg())
+      CkPrintf("[CLONE %d] elem %s id=%llu -> %s id=%llu here, then to pe %d: %zu host bytes, %zu device bytes "
+               "(%zu Stable) in %zu buffers, packed in %.3f ms\n", CkMyPe(), idx2str(rec->getIndex()),
+               (unsigned long long)srcId, idx2str(newIdx), (unsigned long long)newId, toPe, bufSize, gpuBufSize,
+               sz.gpu_stable_size(), nGpuBufs, (CmiWallTimer() - t0) * 1e3);
+    CK_MAGICNUMBER_CHECK
+    return;
+  }
+#endif
+  thisProxy[toPe].immigrate(msg);
+#if CMK_GPU
+  if (gpuBufSize > 0)
+  {
+    sendGPUBuffers[newId] = GPUMigrateData(toPe, gpuBufSize, gpuMsg, (void*)migStream,
+                                           emigFootprint, std::move(emigBlocks));
+    thisProxy[CkMyPe()].sendGPUMsg(newId);
+    // The pack copies read the source's buffers on the migration stream:
+    // when they are done, the source may write them again.
+    if (migStream != NULL)
+      hapiAddCallback(migStream, CkCallback(ckCloneSentFn, (void*)new CkCloneSentArg{thisgroup, srcId}));
+    else
+      callMethod(rec, &CkMigratable::ckCloneSent);
+  }
+  else
+  {
+    if (msg->needsLanding)
+      thisProxy[toPe].requestLanding(newId, 0, CkMyPe(), (int)emigBlocks.size(), emigBlocks.data());
+    callMethod(rec, &CkMigratable::ckCloneSent);
+  }
+#else
+  callMethod(rec, &CkMigratable::ckCloneSent);
+#endif
+  if (migDbg())
+    CkPrintf("[CLONE %d] elem %s id=%llu -> %s id=%llu on pe %d: %zu host bytes, %zu device bytes in %zu buffers, "
+             "packed in %.3f ms\n", CkMyPe(), idx2str(rec->getIndex()), (unsigned long long)srcId, idx2str(newIdx),
+             (unsigned long long)newId, toPe, bufSize, gpuBufSize, nGpuBufs, (CmiWallTimer() - t0) * 1e3);
+  CK_MAGICNUMBER_CHECK
+}
+
+// The entries that carry an object's device state between PEs: a migration's
+// (or a copy's) payload and the stable snapshot. Their reads are bulk to the
+// transport (CmiRdmaSetBulk): they go behind the reads a computation waits on.
+bool CkIsStatePayloadEntry(int ep)
+{
+  return ep == CkIndex_CkLocMgr::idx_immigrateGPU_marshall5() ||
+         ep == CkIndex_CkLocMgr::idx_immigrateStable_marshall9();
 }
 
 #if CMK_LBDB_ON
@@ -6294,9 +6589,28 @@ void CkLocMgr::immigrateStable(CmiUInt8 id, int size, char* data, int srcPe, int
 void CkLocMgr::finishStableSend(CmiUInt8 id, int gen)
 {
   auto it = stableSends.find(std::make_pair(id, gen));
-  if (it == stableSends.end()) return;
-  CkDeviceFree(it->second.block);
-  stableSends.erase(it);
+  if (it != stableSends.end()) {
+    CkDeviceFree(it->second.block);
+    stableSends.erase(it);
+  }
+  // The region is at the destination: the move it was taken for may go. A
+  // move held for it (recvMigrate, the kick handler, emigrate) is kicked
+  // here if the element is quiet; otherwise noteDeviceSendDone's zero
+  // crossing kicks it, as for any pending move.
+  CkLocRec* rec = elementNrec(id);
+  if (rec != nullptr && rec->stable != nullptr && rec->stable->gen == gen) {
+    rec->stable->landed = true;
+    if (migDbg())
+      CkPrintf("[STABLE %d] id=%llu gen %d landed at pe %d after %.1f ms; move %s\n", CkMyPe(),
+               (unsigned long long)id, gen, rec->stable->toPe, (CkWallTimer() - rec->stable->takenAt) * 1e3,
+               rec->pendingMigrateTo != -1 ? "kicked" : "not pending here");
+    if (rec->pendingMigrateTo != -1 && rec->outstandingDeviceSends == 0) {
+      const int toPe = rec->pendingMigrateTo;
+      rec->pendingMigrateTo = -1;
+      rec->migrateKickHeld = true;
+      ckPostDeferredMigrate(this, id, toPe);
+    }
+  }
 }
 
 void CkLocMgr::discardStable(CmiUInt8 id, int gen)
@@ -6374,12 +6688,15 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 
   const CkArrayIndex& idx = msg->idx;
 
-  PUP::fromMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
+  PUP::fromMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION | (msg->isClone ? PUP::er::IS_CLONING : 0));
 #if CMK_GPU
   // Sender-recorded device manifest: every DEVICE-mode unpack call is checked
-  // against it (see PUP::fromMem::deviceManifestIn). nGpuBufs is 0 for
-  // migrations whose payload was not packed by toMem (the by-handle path).
-  if (msg->hasGPUMsg && msg->nGpuBufs > 0) {
+  // against it (see PUP::fromMem::deviceManifestIn), and it says which region
+  // each buffer travelled in -- so it is needed whenever either region came,
+  // including a move whose device buffers all went in the stable region (no
+  // packed payload at all). nGpuBufs is 0 for migrations whose payload was not
+  // packed by toMem (the by-handle path).
+  if ((msg->hasGPUMsg || msg->hasStable) && msg->nGpuBufs > 0) {
     p.deviceManifestIn = msg->gpuManifest;
     p.deviceManifestCount = (size_t)msg->nGpuBufs;
   }
@@ -6430,7 +6747,20 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   // Create a record for this element
   CkLocRec* rec = elementNrec(msg->id);
   if (rec == nullptr)
-      rec = createLocal(idx, true, msg->ignoreArrival, false /* home told on departure */, msg->epoch);
+  {
+    if (msg->isClone)
+    {
+      // A new element of the array, as an insertion: the home learns of it
+      // here (nothing departed anywhere).
+      if (migDbg())
+        CkPrintf("[CLONE %d] elem %s id=%llu: a copy of %llu arrives\n", CkMyPe(), idx2str(idx),
+                 (unsigned long long)msg->id, (unsigned long long)msg->cloneOf);
+      rec = createLocal(idx, false, false, true /* the home does not know yet */);
+    }
+    else
+      // A copy's move from its source's PE (lbUntracked) is no balancer's move: not counted as an arrival.
+      rec = createLocal(idx, !msg->lbUntracked, msg->ignoreArrival, false /* home told on departure */, msg->epoch);
+  }
 
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
   // Create the new elements as we unpack the message. What the unpack
@@ -6603,8 +6933,16 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   {
     // Let all the elements know we've arrived
     const double tj0 = migStatsOn() ? CkWallTimer() : 0.0;
-    callMethod(rec, &CkMigratable::ckJustMigrated);
-    callMethod(rec, &CkMigratable::lbCheckWaitRelease);
+    if (msg->isClone)
+    {
+      callMethod(rec, &CkMigratable::ckJustCloned);
+      if (msg->cloneMoveTo >= 0 && msg->cloneMoveTo != CkMyPe()) moveCopy(rec, msg->cloneMoveTo);
+    }
+    else
+    {
+      callMethod(rec, &CkMigratable::ckJustMigrated);
+      callMethod(rec, &CkMigratable::lbCheckWaitRelease);
+    }
     if (tj0 != 0.0) g_mig.settle.add(CkWallTimer() - tj0);
   }
 

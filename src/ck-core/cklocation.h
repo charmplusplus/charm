@@ -125,6 +125,9 @@ public:
   // destination retires the entry once the element has registered.
   int lbLedgerSrcPe = -1;
   int lbLedgerStep = -1;
+  // A copy on its way from its source's PE (CkLocMgr::moveCopy): no balancer
+  // counts this arrival.
+  bool lbUntracked = false;
   CkGroupID* aids;
   uintptr_t* eltPtrs;
 };
@@ -177,6 +180,15 @@ public:
   int stableGen = 0;
   int stableBytes = 0;
   int stableCount = 0;
+  // A copy, not a move (CkLocMgr::cloneElement): the packed state of element
+  // cloneOf, unpacked as a new element at idx; the source keeps its state.
+  bool isClone = false;
+  CmiUInt8 cloneOf = 0;
+  // A copy made on its source's PE and then moved to this PE as any element
+  // moves (CkLocMgr::moveCopy); -1 for a copy unpacked where it stays.
+  int cloneMoveTo = -1;
+  // That copy's move (CkLocMgr::moveCopy): no balancer counts this arrival.
+  bool lbUntracked = false;
   char* packData;
   size_t* gpuManifest;
 };
@@ -193,12 +205,19 @@ struct CkStableSnapshot {
   unsigned long long* hashes;       // device: count words at the snapshot, count at the pack, one flag; or null
   void* done;                       // cudaEvent_t after the snapshot's copies and hashes: the pack's compare waits on it
   double takenAt;
+  // The destination has the region (its ack, CkLocMgr::finishStableSend). A
+  // deferred move waits for this before it packs: the element keeps stepping
+  // while its Stable buffers ship, and leaves only once they are there.
+  bool landed = false;
 };
 
 /******************* Map object ******************/
 
 extern CkGroupID _defaultArrayMapID;
 extern CkGroupID _fastArrayMapID;
+// Whether entry `ep` carries an object's device state between PEs (cklocation.C).
+bool CkIsStatePayloadEntry(int ep);
+
 class CkLocMgr;
 class CkArray;
 
@@ -1025,6 +1044,21 @@ public:
   // Interface used by CkLocRec
   // Migrate us to another processor
   void emigrate(CkLocRec* rec, int toPe);
+  // A copy of rec's element on toPe under another index of the same array,
+  // through the element's pup with PUP::er::IS_CLONING set: the state ships
+  // as a migration's does (the device payload by its own send), the source
+  // keeps running and is never deleted, the destination unpacks a new element
+  // (CkMigratable::ckJustCloned) and tells the home. The source's
+  // ckCloneSent runs once the pack has finished reading its buffers. The
+  // array needs an index compressor (CkArrayOptions::setBounds).
+  // A copy whose state has Stable device buffers is made on this PE first,
+  // where it is routable at once, and then moved to toPe as a balancer's move
+  // under +LBAsync moves an element: its Stable buffers ship while it runs,
+  // and it switches to toPe when they have landed (moveCopy). Every copy
+  // switches on its own landing. CHARM_CLONE_DIRECT=1: unpacked on toPe.
+  void cloneElement(CkLocRec* rec, int toPe, const CkArrayIndex& newIdx);
+  void cloneSentFor(CmiUInt8 srcId);
+  void moveCopy(CkLocRec* rec, int toPe);
   void informLBPeriod(CkLocRec* rec, int lb_ideal_period);
   void metaLBCallLB(CkLocRec* rec);
 

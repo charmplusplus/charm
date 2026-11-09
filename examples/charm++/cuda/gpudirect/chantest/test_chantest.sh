@@ -34,4 +34,7 @@ for lay in memcpy ipc rdma; do
   arm ${lay}_plain $N $NP $PPN $PRE -i $IT -s 4096 $PPNARG $POOL
   arm ${lay}_lb    $N $NP $PPN $PRE -i $IT -s 4096 -l -p $LBP $PPNARG $POOL
 done
+# Across hosts with 16 MB device buffers: each migration's payload is read in several bulk pieces
+# (CmiRdmaSetBulk, the LCI backend's bulk queue), behind the channel reads of the iterations.
+arm rdma_lb_big 2 2 1 1 -i $IT -s 2097152 -l -p $LBP +ppn 1 $POOL
 echo "=== chantest done $(date +%T)"

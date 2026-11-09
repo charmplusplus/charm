@@ -23,7 +23,8 @@ Commits of 2026-11-02 on `rate-aware-gpu-lb`, made in the Delta clone `/u/bhosal
 | 3bfecb852 | moe/ref: Transformer Engine grouped experts, FasterMoE serving without the per-step collection, fp32 masters (corrections 3 to 5); not pushed at the time of writing |
 | e6f9b8aa9 | moe: cuDNN fused attention for the block variant, with a startup self-check (item 6); the eight-GPU matrix with the baselines as their authors run them |
 | e26ee53bf | moe: Frontier (MI250X, ROCm 7.14): the fused attention on aotriton, the runtime fixes, the one- and two-node matrices with the baselines |
-| 2026-11-07 (the last commit on the branch) | the balancer chooses the copy count and prices it from the fan calibration (`-R` gone); the cross-host channel put announced and read by the owner, with the micro-benchmark that decided it (`benchmarks/charm++/cuda/gpudirect/rma_bw`); the built-in cost tables of both Delta machines re-measured by channels; the A100 rows; the section below |
+| 2026-11-08 (with reconverse's of the same day) | the runtime clone (`ckCloneTo` through the element's pup); moves that ship their Stable device buffers first and switch at their landing; copies made on their source's PE and switched by the runtime at their landing (not yet run anywhere); the bulk-read queue in reconverse's LCI backend; the section "Since 2026-11-07" below |
+| 2026-11-07 | the balancer chooses the copy count and prices it from the fan calibration (`-R` gone); the cross-host channel put announced and read by the owner, with the micro-benchmark that decided it (`benchmarks/charm++/cuda/gpudirect/rma_bw`); the built-in cost tables of both Delta machines re-measured by channels; the A100 rows; the section below |
 
 Everything in them was measured on A40s only, one and two nodes (the tables in
 `examples/charm++/cuda/gpudirect/moe/README.md`). On AMD nothing has run since 2026-10-22, when leanmd,
@@ -177,6 +178,156 @@ cause now. The transfer-cost table must be re-measured: the built-ins are Delta'
 without `+LBCostConfig`. Read ShedLB's placement lines in the rank log: a copy placed away from its inputs makes
 the cross-host exchange the step. The Makefiles' `-DHAPI_CUDA_CALLBACK` was dead text (the flag is the
 library's) and is gone; nothing to do here.
+
+## Since 2026-11-07: the runtime clone, and copies switched at their landing (written 2026-11-08)
+
+One charm commit and one reconverse commit of 2026-11-08 on `rate-aware-gpu-lb`, pushed together. Pull both:
+charm's `ckrdmadevice.C` calls reconverse's new `CmiRdmaSetBulk`. `pup.h` (a new virtual in `PUP::er`),
+`cklocation.h`, `cklocrec.h` and `ckmigratable.h` changed, so the tree needs a full rebuild. A single-target
+`make` gave a binary that died at start-up on Delta.
+
+**Status, plainly.** Items 1 and 2 ran on Delta: A40 and A100, two nodes each. Item 3 is the A100 evidence
+for what was still wrong. Item 4 is the fix for that; it is built but has not run on any machine yet. Its
+first runs are queued on Delta's A40s (job 23674111, tasks `10_rs_serve` to `50_rs_tests` in
+`/scratch/mzu/bhosale/moe_runs/a40ab/queue`). Frontier is free to run it first.
+
+1. **The runtime clone.** `CkMigratable::ckCloneTo(toPe, newIdx)` makes a copy of an element at another
+   index of the same array (the array needs `CkArrayOptions::setBounds`). The element's own pup runs with
+   `PUP::er::IS_CLONING` on both sides, so the pup decides what a copy inherits (`p.isCloning()`). The
+   state ships as a migration's does while the source keeps running. The copy gets `ckJustCloned` once
+   its state is in, and the source gets `ckCloneSent` once the pack has finished reading its buffers. A copy
+   starts with no SDAG state (`charm++.h` skips `_sdag_pup` when cloning): the source's open `when`s and
+   their buffered messages stay with the source. The MoE example now makes every copy this way; its own
+   `takeState`/`takeMoments` protocol is gone. A copy is told its first step by `startCopy`.
+2. **Moves that ship first and switch at their landing.** A device buffer pupped as
+   `p.pup_device(ptr, n, PUP::DeviceLife::Stable)` promises that nothing writes it. Under `+LBAsync` the
+   balancer's decision ships a snapshot of the Stable buffers at once (`stableSnapshot`), and the element
+   keeps stepping. The move is held until the snapshot has landed: `finishStableSend` kicks it. The pack
+   then carries only the rest. `CHARM_DEBUG_MIGRATE=1` hashes each Stable buffer at both points and aborts on
+   a broken promise. The example declares its weights Stable in serving and Mutable in training. During a
+   round, an expert parks only once the round is over (`LB_PARK_MAX` bounds the wait), and a dispatcher
+   sends no tokens ahead until two steps after `roundResumed`. Four bugs were found and fixed on the way:
+   - **ABI skew.** The new `PUP::er` virtual needs the full rebuild above.
+   - **A move whose device buffers were all Stable.** It unpacked from a null packed region; the manifest is
+     now passed whenever either region came (`immigrate`).
+   - **Copies inherited the source's SDAG buffers.** Fixed by the `charm++.h` change in item 1.
+   - **ShedLB's host cap refused copies.** It refused `replica_test`'s copy. A copy now passes the cap when
+     the destination's host time stays below the source's.
+
+   Validation on Delta (A40):
+
+   | Check | Result |
+   |---|---|
+   | chantest | 6/6 arms pass |
+   | Stable arms | 8/8 pass |
+   | `replica_test` | PASS |
+   | serving, training and Mixtral checksums | equal to plain's, on A40 and on A100 |
+
+   Two problems are still open:
+   - a token-conservation abort in 1 of 21 runs;
+   - a segfault at exit (rc 139) in some serving runs of the 2026-11-07 binary.
+3. **What the A100 rounds showed** (2026-11-08, two nodes). Steady state was good. The balancing rounds
+   were not, and every earlier comparison with FasterMoE had left them out, which flattered ShedLB.
+   Balancing runs every 20 steps; a period is one round plus the steps after it. ms/step:
+
+   | | After the rounds | Period with round 2 (40-59) | Period with round 1 (20-39) | FasterMoE |
+   |---|---:|---:|---:|---|
+   | SmartMoE serving, ShedLB | 3.7 | 12.4 | 19.8 | 19.8 (steps 30-41), 21.2 (5-43) |
+   | SmartMoE serving, plain | 14.2 | 14.2 | 14.7 | |
+   | Mixtral serving, ShedLB | 21.1 | 35.9 | 59.4 | 51.3 (2026-11-07) |
+   | Mixtral serving, plain | 52.0 | 52.2 | 53.0 | |
+   | SmartMoE training, ShedLB | 23.6 | (40-step run) | 26.6 | 32.2 (30-41), 36.5 (5-43) |
+   | SmartMoE training, plain | 37.9 | | 38.7 | |
+
+   The FasterMoE rows come from other A100 nodes on 2026-11-07. Every comparison with FasterMoE from now on
+   reports the full-period means beside the after-round window, because FasterMoE's figures include its own
+   per-step rebalancing.
+
+   Inside the rounds the GPUs were 11-16% busy, against 84-86% in steady state. The cause: every dispatcher
+   routes to a new copy from a fixed step, whether or not the copy's state has landed. Copies land one after
+   another at link speed, and the step is all-to-all, so the whole step waits for the last copy. Round 2 of
+   one run:
+
+   | | Time from step 46's start |
+   |---|---:|
+   | 18 copies decided onto host 1; their state (134 MB each) starts shipping | -14 ms |
+   | first copy lands | +26 ms |
+   | 5th / 10th / 15th copy lands | +46 / +79 / +111 ms |
+   | last copy lands | +146 ms |
+   | step 46 ends on every dispatcher | +148 to +152 ms |
+
+   Most of those copies were locality copies of nearly idle experts: 26 of the 34 in that run. Pricing a
+   copy against what it saves over one period is an open item; the balancer has no such price yet.
+
+   A first diagnosis blamed contention on the link. The bulk-read queue built on it changed nothing:
+
+   | | Payloads whole | Bulk queue on |
+   |---|---:|---:|
+   | steady state, 48-61 | 3.7 ms/step | 3.8 ms/step |
+   | GPU busy, round 1 (19-27) | 11% | 12% |
+   | GPU busy, round 2 (40-48) | 16% | 16% |
+
+   The queue is in this commit anyway. Reads of migration state (`CkIsStatePayloadEntry`) go to the LCI
+   backend's bulk queue: 2 MB pieces, at most 8 MB in flight, 2 MB while other gets are pending. It is on
+   by default; `CHARM_RDMA_BULK=0` turns it off, and `CHARM_RDMA_BULK_{CHUNK,CAP,BUSY}_KB` set the sizes.
+   chantest has an arm for it (`rdma_lb_big`). It is a candidate for removal.
+4. **Copies switched by the runtime at their landing (new, not yet run).** No step should wait for a copy,
+   no copy for another copy, and the application should not handle any of it. `CkLocMgr::cloneElement`
+   now unpacks the copy on the source's own PE whenever its state has Stable device buffers (and the
+   device pool and arena mode are on). It does so through a local `immigrate` message, after a host wait
+   on the migration stream for the device-to-device pack. Messages can reach the copy at once.
+   `immigrate` then calls `CkLocMgr::moveCopy`, which treats the copy as a balancer's deferred move:
+   - the snapshot of its Stable buffers ships to the balancer's PE while the copy runs;
+   - `finishStableSend` kicks the move when they have landed;
+   - the pack carries the rest, and the copy switches.
+
+   Each copy switches on its own landing. Until then it serves from its source's GPU, which carries the
+   load it carried before the round.
+
+   The copy's arrival is not counted by the balancer: `CentralLB::Migrated` would count it toward
+   `migrates_expected`, so `copyInTransit` on the record makes it `lbUntracked` on the message. A
+   balancer's own later move of the copy clears the flag and is counted.
+
+   - **Comparing.** `CHARM_CLONE_DIRECT=1` restores the old path (the copy unpacked at its destination,
+     messages waiting for it), so one binary gives the A/B.
+   - **Training.** Its weights are Mutable, so training takes the old path, unchanged.
+   - **The example.** The application-level switch is removed. A copy starts at the round's release step,
+     as before, wherever the runtime has it at the time. In serving, a copy's pack skips
+     `pup_device_order`, since nothing writes the weights.
+   - **Memory on the source's GPU, per copy.** The pack's payload block until the unpack, plus the copy's
+     buffers, plus the snapshot block until it lands. On Delta that is about 0.5 GB per SmartMoE copy and
+     1.6 GB per Mixtral copy.
+   - **Not built.** Replica routing (senders address the object and the runtime picks a replica). Here each
+     copy stays an element with its own index. Also not built: a test that reaches `moveCopy` (only the
+     MoE runs reach it), the `doc/internals` chapter, and the price for locality copies above.
+
+**The experiment.** Run this on Frontier, or on Delta if it gets there first. Use one binary, two nodes
+(16 GCDs), the buddy pool flags of the Run section, and `+LBCostConfig` with a Frontier table. Serving,
+60 steps, rounds at 20 and 40, two runs of each arm for the band:
+
+    SM60="-e 32 -m 2048 -h 8192 -k 1 -t 8192 -i 60 -u 3 -B -E traces/smartmoe_L02.trace"
+    MX60="-e 8 -m 4096 -h 14336 -k 2 -t 8192 -i 60 -u 3 -B -E traces/mixtral_L12.trace"
+    run_app rs_plain   $SM60 -G -f 99999
+    run_app rs_new     $SM60 -G -f 20 -b 20 -a $COST                          # copies switched at landing
+    CHARM_CLONE_DIRECT=1 run_app rs_direct $SM60 -G -f 20 -b 20 -a $COST     # the old copy
+    # the same three with $MX60; then once each with +gputrace <dir> +gputracenocopy for the GPU busy time,
+    # and once rs_new under CHARM_DEBUG_MIGRATE=1 for the mechanism
+
+Read the results this way:
+- **The table.** Mean ms/step over 20-39 and 40-59 (the full periods), 48-61 (after the rounds) and 5-62,
+  one row per run.
+- **Correctness.** Checksums (`out2`, `w2` on the `Step n:` lines) equal to plain's. Kill the experiment
+  on a checksum that differs, an abort, or a hang.
+- **GPU busy time.** `python3 ranklogs/gpubusy.py <trace dir>` gives each GPU's busy fraction in steps
+  48-61, 19-27 (round 1), 40-48 (round 2) and 5-62. `python3 ranklogs/gaps.py <trace dir> --rounds 23,44`
+  gives the long steps after the rounds. Both read the runtime's own `+gputrace` files, so they should work
+  unchanged with the rocprofiler backend; that is not yet checked.
+- **The mechanism**, under `CHARM_DEBUG_MIGRATE=1`. `[CLONE n] ... here, then to pe m` is a copy made on
+  its source's PE. `[CLONE n] ...: made here, moves to pe m when its Stable buffers have landed` is its move
+  held. `[STABLE n] id=... landed at pe m after x ms; move kicked` is the switch. `[CLONE n] ... on pe m`
+  is a copy that took the old path.
+- **Success** means rounds whose GPU busy time is near steady state's, and full-period means near the
+  after-round window. Compare FasterMoE on those full-period means.
 
 ## What Frontier changes for the experiments
 

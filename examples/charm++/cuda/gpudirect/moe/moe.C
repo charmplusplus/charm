@@ -58,6 +58,7 @@ static inline bool hostSyncMode() {
 /* readonly */ int lb_freq;
 /* readonly */ int async_lb;
 /* readonly */ int lb_wait_lag;
+static const int LB_PARK_MAX = 512;   // steps after the join an expert parks at whatever the round's state
 /* readonly */ int checksum_freq;
 /* readonly */ int stats_freq;
 /* readonly */ int use_adam;
@@ -99,6 +100,14 @@ static inline long long moeNowNs() {
 }
 // The PE that holds dispatcher d (Main: the first PE of each GPU).
 static inline int dispPe(int d) { return disp_pes[d]; }
+// The dispatcher on this PE's GPU: the first PE the runtime mapped to it.
+static inline int localDispPe() {
+  for (int d = 0; d < (int)disp_pes.size(); d++) {
+    const int pe = disp_pes[d];
+    if (CkNodeOf(pe) == CkMyNode() && hapiDeviceIndexOfPe(pe) == hapiDeviceIndexOfPe(CkMyPe())) return pe;
+  }
+  return disp_pes.empty() ? 0 : disp_pes[0];
+}
 
 struct MoeFlight { char kind; int step, spe, dpe, expert; long bytes; long long t_send, t_env, t_land; };
 static thread_local std::vector<MoeFlight> g_flights;
@@ -830,6 +839,8 @@ class Dispatcher : public CBase_Dispatcher {
   // nothing migrates or changes its copies, so the tokens of the steps in its
   // window may go ahead after all. Reset at every balancing step.
   bool lb_round_idle = false;
+  bool lb_round_open = false;       // a balancing round in flight: no lookahead
+  int lb_round_close_step = 0;      // lookahead again from this step
 
   // A fixed load balancing object on this PE: the dispatcher's host time and
   // kernels are its own, not unattributed background that DiffusionLB ignores
@@ -1153,7 +1164,7 @@ class Dispatcher : public CBase_Dispatcher {
       if (!lb_loads_cleared) { lb_loads_cleared = true; LBClearLoads(); }
     }
     recv_count = 0;
-    if (isLBStep(my_step)) lb_round_idle = false;
+    if (isLBStep(my_step)) { lb_round_idle = false; lb_round_open = true; }
     for (int e = 0; e < n_experts; e++) {
       if (pend_mult[e] == 0) continue;
       const int old = mult[e];
@@ -1196,7 +1207,19 @@ class Dispatcher : public CBase_Dispatcher {
   bool sendAhead() const {
     const int u = my_step + 1;
     if (!send_ahead || u > warmup_steps + n_steps) return false;
-    return !inLBWindow(my_step) || lb_round_idle;
+    // Off from the balancing step until the round is over (roundResumed, two
+    // steps on, so the outputs that announce a copy count are in first): a
+    // move may take an expert at any quiet entry boundary until then, now
+    // that an expert keeps stepping while its Stable weights ship.
+    if (lb_round_open && !lb_round_idle) return false;
+    return my_step >= lb_round_close_step;
+  }
+  // From an expert on this GPU, resumed by the balancer: the round is over.
+  void roundResumed() {
+    if (!lb_round_open) return;
+    lb_round_open = false;
+    lb_round_close_step = my_step + 2;
+    TRACE(1, "disp step %d: balancing round over, tokens go ahead from step %d", my_step, lb_round_close_step);
   }
   // Every PE's migration-done callback: the round is over here. With no
   // decision anywhere, the window's remaining steps need no pause.
@@ -1569,8 +1592,6 @@ class Expert : public CBase_Expert {
   bool exchange_free_due = false;   // alone again: the exchange buffers go once the last partial's send is done
   int chans_dropped = 0;        // dispatchers that dropped their channels to this retiring copy
   bool step_ended = false;      // retiring: the last step is over (teardown waits for both)
-  bool state_in = false;        // a new copy: the weights (and moments) have landed
-  bool moments_in = false;
   bool started = false;         // init() ran (an original) or the state is in (a new copy)
 
   float* W1;   // [d_model x d_ff], the master weights (fp32 always)
@@ -2053,14 +2074,15 @@ class Expert : public CBase_Expert {
         hapiCheck(hapiStreamSynchronize(lane()->stream));
         TRACE(1, "expert %d.%d pack step %d phase %d synced after %.3f ms",
             expert(), rank(), my_step, phase, (tnow() - t0) * 1e3);
-      } else {
+      } else if (!(serve_only && p.isCloning())) {
         // Order the migration stream's copies behind this stream's queued
         // work on the device instead; the host goes on. Safe because the
         // runtime notes every pool source as read on the migration stream,
-        // so the destructor's frees park until the copies retire.
+        // so the destructor's frees park until the copies retire. (A copy in
+        // serving reads only the weights, which nothing writes: no order.)
         p.pup_device_order((void*)lane()->stream);
       }
-      releaseLane();   // this PE's lane count must not keep a departed expert's tokens
+      if (!p.isCloning()) releaseLane();   // this PE's lane count must not keep a departed expert's tokens
     }
     p | my_step;
     p | recv_count;
@@ -2068,8 +2090,10 @@ class Expert : public CBase_Expert {
     p | phase;
     p | n_src;
     p | n_tot;
-    // SDAG state: which whens are outstanding, buffered ordinary messages.
-    _sdag_pup(p);
+    // SDAG state: which whens are outstanding, buffered ordinary messages. A
+    // copy (p.isCloning(), the runtime's clone) starts with none of it: the
+    // migration constructor's fresh state stands.
+    if (!p.isCloning()) _sdag_pup(p);
     p | outstanding_sends;
     p | outputs_sent;
     p | drain_pending;
@@ -2110,16 +2134,25 @@ class Expert : public CBase_Expert {
     // A put that landed after the last note taken (unseen), or whose note was
     // taken but not yet consumed (slab_held), has its bytes in the slab only,
     // so that segment goes with the pup.
-    p | tok_ch;
-    p | ch_open;
-    p | slab_held;
-    std::vector<char> carry(tok_ch.size(), 0);
-    if (!p.isUnpacking())   // the sizing pass must count what the packing pass emits
-      for (size_t i = 0; i < tok_ch.size(); i++)
-        carry[i] = ch_open[i] && (tok_ch[i].unseenBytes() != 0 || slab_held[i]);
-    p | carry;
+    std::vector<char> carry;
+    if (!p.isCloning()) {
+      p | tok_ch;
+      p | ch_open;
+      p | slab_held;
+      carry.assign(tok_ch.size(), 0);
+      if (!p.isUnpacking())   // the sizing pass must count what the packing pass emits
+        for (size_t i = 0; i < tok_ch.size(); i++)
+          carry[i] = ch_open[i] && (tok_ch[i].unseenBytes() != 0 || slab_held[i]);
+      p | carry;
+    }
 
-    if (p.isUnpacking()) {
+    if (p.isUnpacking() && p.isCloning()) {
+      // A copy: its own buffers, its own events, none of the source's step,
+      // channels or decisions. It serves nothing until startCopy.
+      allocate();
+      createEvents();
+      resetAsCopy();
+    } else if (p.isUnpacking()) {
       allocate();
       createEvents();   // a pending timing sample is lost with the old events
       if (replicated) allocateExchange(nc);
@@ -2131,7 +2164,7 @@ class Expert : public CBase_Expert {
         if (ch_open[i]) tok_ch[i].arriving();
       arrived_by_pup = !tok_ch.empty();
     }
-    {
+    if (!p.isCloning()) {
       // The exchange channels: the owner side reopens on the new landing pairs
       // (allocated above on unpack), the holder copies re-resolve.
       p | grad_ch;
@@ -2152,7 +2185,7 @@ class Expert : public CBase_Expert {
         for (size_t i = 0; i < grad_ch.size(); i++)
           if (grad_open[i]) grad_ch[i].arriving();
     }
-    {
+    if (!p.isCloning()) {
       int no = (int)out_ch.size();
       p | no;
       if (p.isUnpacking()) { out_ch.assign(no, nullptr); out_by_pup = no > 0; }
@@ -2165,7 +2198,7 @@ class Expert : public CBase_Expert {
       }
       p | out_have;
     }
-    for (size_t i = 0; i < tok_ch.size(); i++) {
+    for (size_t i = 0; i < carry.size(); i++) {
       if (!carry[i]) continue;
       TRACE(2, "expert %d.%d step %d phase %d %s channel %zu (step parity %zu, dispatcher %zu): %s",
           expert(), rank(), my_step, phase, p.isUnpacking() ? "unpacks" : "packs", i, i / n_disp,
@@ -2175,14 +2208,27 @@ class Expert : public CBase_Expert {
     }
     // The checksum's copy into h_chk is asynchronous; wait for it before the
     // host reads it, or a migration here packs whatever was there before.
-    if (p.isPacking() && h_chk && chk_due)
-      hapiCheck(hapiEventSynchronize(ev_chk));
-    double chk = (h_chk && chk_due) ? *h_chk : 0.0;
-    p | chk;
-    if (p.isUnpacking()) *h_chk = chk;
+    if (!p.isCloning()) {
+      if (p.isPacking() && h_chk && chk_due)
+        hapiCheck(hapiEventSynchronize(ev_chk));
+      double chk = (h_chk && chk_due) ? *h_chk : 0.0;
+      p | chk;
+      if (p.isUnpacking()) *h_chk = chk;
+    }
 
-    p(W1, wsz(), PUP::PUPMode::DEVICE);
-    p(W2, wsz(), PUP::PUPMode::DEVICE);
+    // In serving nothing writes the weights, so they are Stable: the runtime
+    // ships them at the balancer's decision while this copy keeps stepping,
+    // holds the move until they have landed, and the pack carries the rest
+    // (a migration then stops the expert for the host state and the
+    // channels, not for 200 MB over the link: two A100 nodes, 2026-11-07, a
+    // round moving 16 experts and cloning 30 stopped every step for 245 ms).
+    // In training the update rewrites them every step: Mutable, copied at
+    // the pack as before.
+    {
+      const PUP::DeviceLife life = serve_only ? PUP::DeviceLife::Stable : PUP::DeviceLife::Mutable;
+      p.pup_device(W1, wsz(), life);
+      p.pup_device(W2, wsz(), life);
+    }
     if (use_adam) {
       p(m1, wsz(), PUP::PUPMode::DEVICE);
       p(v1, wsz(), PUP::PUPMode::DEVICE);
@@ -2196,7 +2242,9 @@ class Expert : public CBase_Expert {
     //   phase 1: the outputs the kernels (now complete) produced, which
     //            sendOutputs will send from the destination;
     //   phase 2: nothing -- the outputs have gone.
-    if (phase == 0) {
+    if (p.isCloning()) {
+      // A copy takes the weights (and moments) alone.
+    } else if (phase == 0) {
       for (int s = 0; s < n_disp; s++)
         if (n_src[s] > 0)
           p(xSeg(my_step) + s * segBytes(), (size_t)n_src[s] * d_model * actEsz(),
@@ -2391,9 +2439,16 @@ class Expert : public CBase_Expert {
       self().resumed();
       return;
     }
-    if (lb_waiting && my_step >= lb_start_step + lb_wait_lag) {
+    if (lb_waiting && my_step >= lb_start_step + lb_wait_lag &&
+        (!AtSyncStepInFlight() || my_step >= lb_start_step + LB_PARK_MAX)) {
       // The other half of the split: park until the step is collected.
-      // Resumes inline if it already is.
+      // Resumes inline if it already is -- and that is the normal case now:
+      // an expert keeps stepping while the round's moves ship (a move waits
+      // for its Stable buffers to land, then takes the expert at a quiet
+      // entry boundary), and parks only once the round is over, where the
+      // park is a formality. A parked expert serves no tokens, so parking at
+      // the lag while another expert's 200 MB crossed the link stopped every
+      // dispatcher for the transfer. LB_PARK_MAX bounds the wait.
       lb_waiting = false;
       TRACE(1, "expert %d.%d step %d atsyncwait", expert(), rank(), my_step);
       awaiting_resume = true;
@@ -2413,6 +2468,9 @@ class Expert : public CBase_Expert {
     awaiting_resume = false;
     resumed_by_lb = true;
     TRACE(1, "expert %d.%d step %d resume", expert(), rank(), my_step);
+    // The round is over everywhere (the resume epoch is global): this GPU's
+    // dispatcher may send ahead again, from the step after the next.
+    disp_proxy[localDispPe()].roundResumed();
     self().resumed();
   }
 
@@ -2429,8 +2487,12 @@ class Expert : public CBase_Expert {
     n_clone++;
     decided_new[rank_] = true;
     clone_decided = true;
-    TRACE(1, "expert %d.%d step %d: clone to PE %d as copy %d decided (this copy sends the state)",
-        expert(), rank(), my_step, toPe, rank_);
+    TRACE(1, "expert %d.%d step %d: clone to PE %d as copy %d decided (the runtime copies the state%s)",
+        expert(), rank(), my_step, toPe, rank_, serve_only ? " now" : " after this step's update");
+    // Serving: the weights never change, so the copy's state goes now, while
+    // this copy keeps stepping; by the step it is released in, the copy is
+    // there, and it is told its first step then.
+    if (serve_only) ckCloneTo(toPe, CkArrayIndex2D(expert(), rank_));
   }
   void ckCloneNotice(int toPe, int rank_) {
     if (rank_ < nc || rank_ >= K_MAX_COPIES || decided_new[rank_])
@@ -2867,7 +2929,7 @@ class Expert : public CBase_Expert {
     // A new copy: the other copies' block sums for its first step can land before its state
     // (their step ends while the state is still in flight from another PE; on Frontier the
     // partial beat a 384 MB state). The landing buffers do not depend on the copy count, so
-    // they are made here; the count is set when the state is in (startAsCopy), and the SDAG
+    // they are made here; the count is set when the copy starts (startCopy), and the SDAG
     // loop takes the partial when its step comes. Nothing else can arrive early: a copy's
     // next block sum waits for this copy's.
     if (!started) {
@@ -3010,69 +3072,67 @@ class Expert : public CBase_Expert {
   }
 
   // ---- making a copy ----
-  // After this step's update: insert each copy the balancer named this copy
-  // the source of, send it the weights (and moments) behind the update on
-  // the device, and serve this copy's block of the new mapping from the next
-  // step. The weights are read by the sends until cloneSent, which the next
-  // step's compute waits for.
+  // At the end of the step the balancer released this copy in: in training
+  // the copies' state goes now, after this step's update, through the
+  // runtime (ckCloneTo), and the next step's compute waits for the pack to
+  // have read the weights (ckCloneSent -> cloneSent); in serving it went at
+  // the decision. Either way each copy is then told its first step, a
+  // message that waits for the copy if its state has not landed yet.
   void executeClone() {
-    hapiCheck(hapiStreamWaitEvent(send_stream, ev_end, 0));
-    clone_in_flight = true;
-    clone_bufs_done = 0;
-    clone_bufs_expected = n_clone * (use_adam ? 6 : 2);
-    const CkCallback done(CkIndex_Expert::cloneBufDone(), self());
+    if (!serve_only) {
+      clone_in_flight = true;
+      clone_bufs_done = 0;
+      clone_bufs_expected = n_clone;
+      for (int i = 0; i < n_clone; i++) ckCloneTo(clone_to_pe[i], CkArrayIndex2D(expert(), clone_rank[i]));
+    }
     for (int i = 0; i < n_clone; i++) {
-      const int toPe = clone_to_pe[i], r = clone_rank[i];
-      TRACE(1, "expert %d.%d step %d: copy %d of %d inserted on PE %d, state sent", expert(), rank(), my_step,
-          r, nc_next, toPe);
-      expert_proxy(expert(), r).insert(toPe);
-      expert_proxy(expert(), r).takeState(my_step + 1, adam_t, spt, nc_next, (int)wsz(),
-          CkDeviceBuffer(W1, done, send_stream), CkDeviceBuffer(W2, done, send_stream));
-      if (use_adam)
-        expert_proxy(expert(), r).takeMoments((int)wsz(),
-            CkDeviceBuffer(m1, done, send_stream), CkDeviceBuffer(v1, done, send_stream),
-            CkDeviceBuffer(m2, done, send_stream), CkDeviceBuffer(v2, done, send_stream));
+      TRACE(1, "expert %d.%d step %d: copy %d of %d on PE %d starts at step %d", expert(), rank(), my_step,
+          clone_rank[i], nc_next, clone_to_pe[i], my_step + 1);
+      expert_proxy(expert(), clone_rank[i]).startCopy(my_step + 1, adam_t, spt, nc_next);
     }
     n_clone = 0;
   }
-  void cloneBufDone() {
+  // The runtime: the pack of one copy has finished reading this copy's buffers.
+  void ckCloneSent() {
+    if (!clone_in_flight) return;   // serving: nothing waits
     if (++clone_bufs_done == clone_bufs_expected) self().cloneSent();
   }
 
-  // The new copy. Post entry method: its buffers are allocated here, so the
-  // state lands straight in them.
-  void takeState(int step, int adam_t_, double spt_, int ncopies_, int& n, float*& w1, float*& w2,
-      CkDeviceBufferPost* devicePost) {
-    if (W1 == NULL) { allocate(); createEvents(); }
-    w1 = W1;
-    w2 = W2;
-    devicePost[0].hapi_stream = commStream();
-    devicePost[1].hapi_stream = commStream();
-    devicePost[0].buffer_free = devicePost[1].buffer_free = true;
+  // A copy made by the runtime (ckCloneTo): the unpack gave it the weights
+  // (and moments); everything of the source's step, channels and decisions
+  // it must not inherit is cleared here (called from the pup's cloning
+  // branch after allocate). It serves nothing until startCopy.
+  void resetAsCopy() {
+    recv_count = 0; n_expect = 0; phase = 0;
+    n_src.assign(n_src.size(), 0);
+    n_tot = 0;
+    outstanding_sends = 0; outputs_sent = 0; drain_pending = false; chk_due = false;
+    lb_waiting = false; lb_start_step = 0; awaiting_resume = false; resumed_by_lb = false;
+    started = false; replicated = false; nc = 1;
+    grad_in_flight = false; grad_bufs_done = 0;
+    clone_in_flight = false; clone_bufs_done = 0; clone_bufs_expected = 0;
+    clone_decided = false; retire_decided = false; decided_rank = -1;
+    for (int r = 0; r < K_MAX_COPIES; r++) decided_new[r] = false;
+    n_clone = 0; retire_pending = false; retiring = false; exchange_free_due = false;
+    mult_next = 1;
+    tok_ch.clear(); ch_open.clear(); slab_held.clear();
+    arrived_by_pup = grad_by_pup = out_by_pup = false;
+    wb_stale = use_bf16 != 0;   // the bf16 operands are made from the masters at the first compute
   }
-  void takeState(int step, int adam_t_, double spt_, int ncopies_, int n, float* w1, float* w2) {
+  // The runtime made this copy (on its source's PE, from where it moves to
+  // the balancer's PE when its Stable weights have landed there, serving
+  // wherever it is meanwhile).
+  void ckJustCloned() {
+    TRACE(1, "expert %d.%d: a copy, state in; waiting for its first step", expert(), rank());
+  }
+  // From the source, at the end of the step the balancer released it in: the
+  // copy serves its block from `step`.
+  void startCopy(int step, int adam_t_, double spt_, int ncopies_) {
     my_step = step - 1;   // beginStep makes it `step`
     adam_t = adam_t_;
     spt = spt_;
     nc_next = ncopies_;
-    state_in = true;
-    TRACE(1, "expert %d.%d: state in; first step %d", expert(), rank(), step);
-    startAsCopy();
-  }
-  void takeMoments(int& n, float*& a, float*& b, float*& c, float*& d, CkDeviceBufferPost* devicePost) {
-    if (W1 == NULL) { allocate(); createEvents(); }
-    a = m1; b = v1; c = m2; d = v2;
-    for (int i = 0; i < 4; i++) {
-      devicePost[i].hapi_stream = commStream();
-      devicePost[i].buffer_free = true;
-    }
-  }
-  void takeMoments(int n, float* a, float* b, float* c, float* d) {
-    moments_in = true;
-    startAsCopy();
-  }
-  void startAsCopy() {
-    if (!state_in || (use_adam && !moments_in)) return;
+    TRACE(1, "expert %d.%d: starts as a copy at step %d of %d copies", expert(), rank(), step, ncopies_);
     started = true;
     setCopies(nc_next);
     openChannels();

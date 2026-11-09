@@ -62,6 +62,9 @@ public:
   // behind a step's worth of messages, found the next step's arrivals already
   // admitted: 28% of moves went at the first kick, median 2.5 s to move.
   bool migrateKickHeld = false;
+  // A copy made on its source's PE, moving to the balancer's PE (moveCopy):
+  // its arrival there is not one of a balancer's moves.
+  bool copyInTransit = false;
   void noteDeviceSendPosted() { outstandingDeviceSends++; }
   void noteDeviceSendDone(bool urgentKick = false);
   // The move window tally (CHARM_LB_MIGSTATS, see MigStats in cklocation.C):

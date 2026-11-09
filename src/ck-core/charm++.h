@@ -447,7 +447,10 @@ template <typename T>
 struct recursive_pup_impl<T, true> {
   void operator()(T *obj, PUP::er &p) {
     obj->parent_pup(p);
-    obj->_sdag_pup(p);
+    // A copy (PUP::er::IS_CLONING, CkMigratable::ckCloneTo) starts with no
+    // SDAG state: the source's open whens and the messages buffered for them
+    // were addressed to the source, which keeps them.
+    if (!p.isCloning()) obj->_sdag_pup(p);
     obj->T::pup(p);
   }
 };

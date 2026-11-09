@@ -97,6 +97,17 @@ public:
   /// element that did not override them and do nothing for any other element.
   virtual void ckClone(int toPe, int rank);
   virtual void ckRetire(void);
+  /// The runtime copies this element: its pup runs with PUP::er::IS_CLONING on
+  /// both sides, the packed state (device buffers included) ships as a
+  /// migration's does while this element keeps running, and the destination
+  /// unpacks a new element of the same array at newIdx. The element's pup is
+  /// where it decides what a copy inherits (p.isCloning()). The copy gets
+  /// ckJustCloned (default: ckJustMigrated) once its state is in; this
+  /// element gets ckCloneSent once the pack has finished reading its buffers
+  /// (an element whose buffers change must not write them before then).
+  void ckCloneTo(int toPe, const CkArrayIndex& newIdx);
+  virtual void ckJustCloned(void) { ckJustMigrated(); }
+  virtual void ckCloneSent(void) {}
   /// The balancer makes a copy of (or retires) another copy of this element's group: `rank` is the
   /// copy made on `toPe` (or the copy retired). Delivered before the round releases the element,
   /// so every copy can act in the same step. Default: nothing.

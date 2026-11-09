@@ -255,7 +255,9 @@ class er {
     IS_DELETING = 0x0008,    // If set, C & f90 objects should delete themselves after pup
     IS_COMMENTS = 0x0010,    // If set, this PUP::er wants comments and sync codes.
     IS_CHECKPOINT = 0x0020,  // If set, it is creating or restarting from a checkpoint
-    IS_MIGRATION = 0x0040    // If set, it is migrating between PEs (e.g. in LB)
+    IS_MIGRATION = 0x0040,   // If set, it is migrating between PEs (e.g. in LB)
+    IS_CLONING = 0x0080      // With IS_MIGRATION: the element is being copied, not moved (CkLocMgr::cloneElement);
+                             // the source keeps its state, the unpack makes a new element under another index
   };
 
   //State queries (exactly one of these will be true)
@@ -268,6 +270,7 @@ class er {
   //This indicates that the pup routine should free memory during packing.
   void becomeDeleting(void) {PUP_er_state|=IS_DELETING;}
   bool isDeleting(void) const {return (PUP_er_state&IS_DELETING)!=0?true:false;}
+  bool isCloning(void) const {return (PUP_er_state&IS_CLONING)!=0?true:false;}
 
   //This indicates that the pup routine should not call system objects' pups.
   void becomeUserlevel(void) {PUP_er_state|=IS_USERLEVEL;}
@@ -345,6 +348,18 @@ class er {
   virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize, DeviceLife life) {
     (void)life;
     pup_buffer_device(p, n, itemSize);
+  }
+  // A device buffer the element allocates itself, pupped with a lifetime:
+  // like operator()(a, n, PUPMode::DEVICE) (the bytes travel, the unpack
+  // copies them into the caller's buffer, nothing is rebound), with the
+  // Stable snapshot and the pack's skip of pup_buffer_device's Stable path.
+  template<class T>
+  void pup_device(T *a, size_t nItems, DeviceLife life) {
+    pup_device((void *)a, nItems, sizeof(T), life);
+  }
+  virtual void pup_device(void *p, size_t n, size_t itemSize, DeviceLife life) {
+    void *q = p;   // the packing walks never change the pointer
+    pup_buffer_device(q, n, itemSize, life);
   }
   // Order this PUP::er's device copies behind the application's own device
   // work. Packing records an event on `producerStream` (a hapiStream_t) and
@@ -715,6 +730,8 @@ class fromMem : public mem {
   using er::pup_buffer_device;
   virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize);
   virtual void pup_buffer_device(void *&p, size_t n, size_t itemSize, DeviceLife life);
+  using er::pup_device;
+  virtual void pup_device(void *p, size_t n, size_t itemSize, DeviceLife life);
 
  protected:
   // Shared by bytes(DEVICE) and pup_buffer_device: the element-wise manifest

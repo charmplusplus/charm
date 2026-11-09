@@ -6076,7 +6076,12 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       }
       // Stamp the cross-node tier per op; see DeviceRdmaOp::rget_posted.
       save_op.rget_posted = zcStatsOn() ? CkWallTimer() : 0.0;
+      // An object's state moving between PEs is bulk to the transport: it is
+      // read in pieces behind the reads computations are waiting on.
+      const bool bulk = CkIsStatePayloadEntry(env->getEpIdx());
+      if (bulk) CmiRdmaSetBulk(1);
       lci_dest_ncpy_buffer.rdmaGet(source.lci_ncpy_buffer, 0, nullptr, nullptr);
+      if (bulk) CmiRdmaSetBulk(0);
       continue;
 #else
       // Handle all other cases (basic inter-process and inter-node)
