@@ -56,6 +56,7 @@ DIRS = \
   qd \
   reduction_migrate_ahead \
   section_migrate \
+  xarray_section_reduction \
   bcast_zcpup \
 
 FTDIRS = \
