@@ -25,15 +25,19 @@ is the header's opening comment.
 - `chain`: `sites` (one site id per resumable-function depth, pupped),
   `linked` (per depth: entered through a `CK_CALL` site), `depth`,
   `restarting`, and the `noted` fields that connect a `note_site` call with
-  the `co_await` that follows it. This is CAMPI's site chain
-  (`campi_core.h`, `campi::frame_guard`) with the rank record replaced by a
-  record pointer.
+  the `co_await` that follows it. `chain`, `frame_guard`, `note_site`,
+  `abort_no_site` and `task<T>` are in `ckcoro_core.h`, shared with CAMPI,
+  whose rank record holds one `chain`.
 - `buffer`: `ep`, `hasRef`, `ref`, and either a message (`isMsg`, `msg`,
   pupped with `CkPupMessage`) or marshalled arguments as `bytes`
   (`PUP::toMem` of a `std::tuple` of the decayed arguments).
 - `thread_local record *current_`: the record of the coroutine running on
   this PE thread; set by `state::begin` and `state::push` around a run,
-  read by `frame_guard`, `note_site` and the awaitables.
+  read by the awaitables.
+- `thread_local chain *current_chain_` (`ckcoro_core.h`): the chain of the
+  coroutine running on this PE thread, read by `frame_guard`; set with
+  `current_` by `state::begin` and `state::push`, and by CAMPI's
+  `campi_resume` to the rank's chain.
 - `thread_local std::coroutine_handle<> pending_root_`: set by
   `coroutine::promise_type::get_return_object`, consumed by `state::begin`
   so that the record learns its frame handle.
@@ -114,12 +118,15 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
 
 ## Where in the source
 
-- `src/ck-core/ckcoro.h`: everything above.
-- `src/ck-core/CMakeLists.txt`: installs the header.
+- `src/ck-core/ckcoro.h`: everything above except the shared core.
+- `src/ck-core/ckcoro_core.h`: `task<T>`, `chain`, `frame_guard`,
+  `note_site`, `abort_no_site`, `current_chain_`; included by `ckcoro.h`
+  and by CAMPI's `campi_core.h`.
+- `src/ck-core/CMakeLists.txt`: installs the headers.
 - `tests/charm++/jacobi3d-coro/`: the first program (migration at a site,
   rebuild, checkpoint and restart).
 - `tests/charm++/ckcoro/`: the SDAG migration test as a coroutine
   (synchronized and anytime migration while suspended, `CK_WHEN_ANY`).
 - `benchmarks/charm++/coro_pingpong/`: plain, SDAG and coroutine ping-pong.
-- `src/libs/ck-libs/ampi/campi_core.h`: the origin of `task<T>` and the
-  site chain.
+- `src/libs/ck-libs/ampi/campi_core.h`, `campi.C`: CAMPI, the other user
+  of the shared core.

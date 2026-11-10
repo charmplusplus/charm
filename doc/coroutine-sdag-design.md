@@ -389,15 +389,12 @@ What charm4py can mirror: the record and site protocol of section 8, with
 no C++ frame involved.
 
 Before the beta: fill the Anvil row, merge the shared core with CAMPI if
-its tests stay green, add the two test directories to CI (done on the
+its tests stay green (done: `ckcoro_core.h`), add the two test directories to CI (done on the
 branch: `TEST_DIRS` in `reconverse-ci.yaml`). First beta update: `overlap`
 as several coroutines per element and the rest of the SDAG test corpus.
 
 ## 10. Open items
 
-- Share `task<T>`, `chain`, `frame_guard` and `note_site` between
-  `campi_core.h` and `ckcoro.h` (a `ckcoro_core.h`); CAMPI's tests must stay
-  green.
 - `when_any` for `case`; several coroutines per element for `overlap` and
   `forall`.
 - Groups, nodegroups and singleton chares as owners of coroutine entries

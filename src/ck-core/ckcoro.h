@@ -74,6 +74,7 @@
 #include <vector>
 #include "charm++.h"
 #include "pup_stl.h"
+#include "ckcoro_core.h"
 
 namespace ck {
 namespace coro {
@@ -85,86 +86,6 @@ struct record;
 inline thread_local record *current_ = nullptr;
 // The frame handle of a coroutine entry just created, picked up by CK_COROUTINE.
 inline thread_local std::coroutine_handle<> pending_root_ = {};
-
-[[noreturn]] inline void abort_unhandled_exception() noexcept {
-  CkAbort("ck::coro: unhandled C++ exception in a coroutine entry method");
-  std::abort();
-}
-
-/* ---------------- task<T>: awaited helper coroutines ---------------- */
-
-template <class T> class task;
-
-namespace detail {
-
-struct promise_base {
-  std::coroutine_handle<> continuation;
-  std::suspend_always initial_suspend() const noexcept { return {}; }
-  struct final_awaiter {
-    bool await_ready() const noexcept { return false; }
-    template <class P>
-    std::coroutine_handle<> await_suspend(std::coroutine_handle<P> h) const noexcept {
-      std::coroutine_handle<> c = h.promise().continuation;
-      return c ? c : std::noop_coroutine();
-    }
-    void await_resume() const noexcept {}
-  };
-  final_awaiter final_suspend() const noexcept { return {}; }
-  void unhandled_exception() const noexcept { abort_unhandled_exception(); }
-};
-
-template <class T> struct promise : promise_base {
-  T value{};
-  task<T> get_return_object() noexcept;
-  template <class U> void return_value(U &&v) { value = std::forward<U>(v); }
-};
-
-template <> struct promise<void> : promise_base {
-  task<void> get_return_object() noexcept;
-  void return_void() const noexcept {}
-};
-
-} // namespace detail
-
-// A lazily started coroutine; awaiting it starts it, and it resumes the
-// awaiter when it finishes (as campi::task).
-template <class T = void> class [[nodiscard]] task {
- public:
-  using promise_type = detail::promise<T>;
-  using handle_type = std::coroutine_handle<promise_type>;
-
-  task() noexcept = default;
-  explicit task(handle_type h) noexcept : h_(h) {}
-  task(task &&o) noexcept : h_(std::exchange(o.h_, {})) {}
-  task &operator=(task &&o) noexcept {
-    if (this != &o) { if (h_) h_.destroy(); h_ = std::exchange(o.h_, {}); }
-    return *this;
-  }
-  task(const task &) = delete;
-  task &operator=(const task &) = delete;
-  ~task() { if (h_) h_.destroy(); }
-
-  bool await_ready() const noexcept { return !h_ || h_.done(); }
-  std::coroutine_handle<> await_suspend(std::coroutine_handle<> awaiting) noexcept {
-    h_.promise().continuation = awaiting;
-    return h_;
-  }
-  T await_resume() {
-    if constexpr (!std::is_void_v<T>) return std::move(h_.promise().value);
-  }
-
- private:
-  handle_type h_{};
-};
-
-namespace detail {
-template <class T> task<T> promise<T>::get_return_object() noexcept {
-  return task<T>(std::coroutine_handle<promise<T>>::from_promise(*this));
-}
-inline task<void> promise<void>::get_return_object() noexcept {
-  return task<void>(std::coroutine_handle<promise<void>>::from_promise(*this));
-}
-} // namespace detail
 
 /* ---------------- coroutine: the entry method type ---------------- */
 
@@ -192,46 +113,6 @@ class coroutine {
 
  private:
   std::coroutine_handle<> h_;
-};
-
-/* ---------------- restart sites ---------------- */
-
-// The restart chain of one coroutine: entry d is the last site (CK_WHEN or
-// CK_CALL, identified by __LINE__) noted by the resumable function at depth
-// d. On a restarted coroutine, each function on the recorded path switches
-// to its recorded site.
-struct chain {
-  std::vector<int> sites;      // pupped
-  std::vector<char> linked;    // per depth: entered through a noted call site
-  unsigned depth = 0;          // active frame_guards
-  bool restarting = false;     // the body runs again toward the recorded site
-  bool noted = false;          // a site was noted and its await is next
-  bool notedCall = false;      // ... a call site (else a when site)
-  unsigned notedDepth = 0;     // ... by the function at this depth
-  bool destroying = false;     // frame_guard destructors leave the sites alone
-  void pup(PUP::er &p) { p | sites; }
-};
-
-inline chain &current_chain();
-
-class frame_guard;
-void note_site(frame_guard &g, int line, bool call = false) noexcept;
-[[noreturn]] void abort_no_site(const frame_guard &g) noexcept;
-
-class frame_guard {
- public:
-  frame_guard() noexcept;
-  ~frame_guard();
-  frame_guard(const frame_guard &) = delete;
-  frame_guard &operator=(const frame_guard &) = delete;
-  int site() const noexcept { return site_; }
-
- private:
-  friend void note_site(frame_guard &g, int line, bool call) noexcept;
-  friend void abort_no_site(const frame_guard &g) noexcept;
-  chain *c_;
-  unsigned depth_;
-  int site_;
 };
 
 /* ---------------- the inbox ---------------- */
@@ -297,6 +178,7 @@ struct record {
   std::coroutine_handle<> root;  // the entry's frame
   std::coroutine_handle<> h;     // the innermost suspended frame
   record *prev = nullptr;        // current_ before this record ran
+  chain *prevChain = nullptr;    // current_chain_ before this record ran
   bool waiting = false;          // suspended in a when awaitable
   bool atSite = false;           // ... reached through CK_WHEN
   std::vector<want> wants;       // what it waits for (one entry; several for when_any)
@@ -433,64 +315,10 @@ inline bool fake_migrate_enabled() noexcept {
   return v == 1;
 }
 
-inline chain &current_chain() {
-  if (current_ == nullptr)
-    CkAbort("ck::coro: CK_RESUMABLE/CK_WHEN/CK_CALL used outside a coroutine entry method");
-  return current_->ch;
-}
-
 inline state &current_state() {
   if (current_ == nullptr)
     CkAbort("ck::coro: CK_WHEN used outside a coroutine entry method");
   return *current_->owner;
-}
-
-inline frame_guard::frame_guard() noexcept : c_(&current_chain()), depth_(0), site_(0) {
-  chain &c = *c_;
-  depth_ = c.depth++;
-  if (c.linked.size() < c.depth) c.linked.resize(c.depth);
-  c.linked[depth_] = depth_ == 0 || (c.noted && c.notedCall && c.notedDepth == depth_ - 1);
-  c.noted = false;
-  if (c.restarting) {
-    if (depth_ >= c.sites.size())
-      CkAbort("ck::coro: restart reached a function that was not on the recorded path "
-              "(depth %u, %zu sites recorded)", depth_, c.sites.size());
-    site_ = c.sites[depth_];
-  }
-}
-
-inline frame_guard::~frame_guard() {
-  chain &c = *c_;
-  if (c.destroying) return;
-  c.depth--;
-  if (!c.restarting && c.sites.size() > depth_) c.sites.resize(depth_);
-}
-
-inline void note_site(frame_guard &g, int line, bool call) noexcept {
-  chain &c = *g.c_;
-  const unsigned d = g.depth_;
-  if (c.restarting) {
-    if (d >= c.sites.size() || c.sites[d] != line)
-      CkAbort("ck::coro: restart reached site %d, recorded site %d (depth %u)", line,
-              d < c.sites.size() ? c.sites[d] : -1, d);
-    const bool innermost = (d + 1 == c.sites.size());
-    if (innermost == call)
-      CkAbort("ck::coro: recorded site %d (depth %u) is a %s site but the recorded path %s",
-              line, d, call ? "call" : "when", call ? "ends there" : "continues into a call");
-  } else {
-    if (c.sites.size() < d + 1) c.sites.resize(d + 1);
-    c.sites[d] = line;
-    c.sites.resize(d + 1);
-  }
-  c.noted = true;
-  c.notedCall = call;
-  c.notedDepth = d;
-}
-
-inline void abort_no_site(const frame_guard &g) noexcept {
-  CkAbort("ck::coro: recorded restart site %d is not a site of the resumable function at "
-          "depth %u", g.site_, g.depth_);
-  std::abort();
 }
 
 inline coroutine::~coroutine() {
@@ -556,14 +384,18 @@ inline record &state::begin(ArrayElement *elt, int ep, void *msg) {
   rec->root = root;
   rec->h = root;
   rec->prev = current_;
+  rec->prevChain = current_chain_;
   current_ = rec;
+  current_chain_ = &rec->ch;
   return *rec;
 }
 
 // After the body ran (first run or a resume) and suspended or finished.
 inline void state::finish_run(record *rec) {
   current_ = rec->prev;
+  current_chain_ = rec->prevChain;
   rec->prev = nullptr;
+  rec->prevChain = nullptr;
   if (rec->root.done()) {
     destroy_frames(*rec);
     if (rec->msg) CkFreeMsg(rec->msg);
@@ -605,7 +437,9 @@ inline void state::push(buffer &&b) {
       rec.readyIndex = (int)i;
       rec.readyBuf = std::move(b);
       rec.prev = current_;
+      rec.prevChain = current_chain_;
       current_ = &rec;
+      current_chain_ = &rec.ch;
       std::coroutine_handle<> h = std::exchange(rec.h, {});
       h.resume();
       finish_run(&rec);
