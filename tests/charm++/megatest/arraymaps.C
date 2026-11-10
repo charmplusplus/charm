@@ -9,11 +9,9 @@
  *      per index] checks that every element exists exactly once;
  *   2. insertion (1D, maps that support it): elements 37..41 are inserted
  *      from PE 1 (PE 0 on one PE), checked the same way;
- *   3. every element migrates to (CkMyPe()+1) % CkNumPes() and checks it arrived
- *      (inserted elements stay put unless ARRAYMAPS_MOVE_INSERTED, see arraymaps.h);
+ *   3. every element migrates to (CkMyPe()+1) % CkNumPes() and checks it arrived;
  *   4. a broadcast reaches every element (reduction checks the full set);
- *   5. every element contributes once more and calls ckDestroy() (inserted
- *      elements are left alive unless ARRAYMAPS_MOVE_INSERTED);
+ *   5. every element contributes once more and calls ckDestroy();
  *      the next case starts when that reduction arrives.
  *
  * Maps and what is left out:
