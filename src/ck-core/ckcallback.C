@@ -337,6 +337,7 @@ void CkCallback::send(void *msg,int opts) const
 
 	switch(type) {
 	case CkCallback::sendFuture:
+		if (!msg) msg=CkAllocSysMsg();
 		CkSendToFuture(d.future.fut, msg);
 		break;
 	  //	CkPrintf("type:%d\n",type);
@@ -555,6 +556,7 @@ bool CkCallback::containsPointer() const {
   case bcastGroup:
   case bcastNodeGroup:
   case bcastArray:
+  case sendFuture:
 #if CMK_CHARM4PY
   case bcastSection:
 #endif
