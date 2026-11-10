@@ -168,7 +168,12 @@ Safety (`Inv`, plus the action property `TableMonotone`):
 - `RequestOutstanding` — a process that waits with no location, with the home
   elsewhere, has a request in flight or held at the home, or a reply coming,
   or its first registrant has not yet sent it.
-- `TableMonotone` — a process entry's epoch never moves back (without deaths).
+- `TableMonotone` — a process entry's epoch never moves back (without deaths);
+  with `ClearConflict` an entry may lose its location instead (finding 10).
+- `RepairNotIgnored` (action property) — a reply or repair by id that names
+  the element's current PE and epoch is not ignored by a process, other than
+  the home's, whose entry names another PE: the entry takes it or is cleared
+  (finding 10).
 
 Weaker forms of `HolderEntryExact`, used to see past finding 1 (TLC stops at
 the first violation, so a second ordering under the same invariant stays
@@ -230,6 +235,29 @@ first violation.
 | `MC_death_liveness_fix_noinv` | 1 | 1 | 1 | 1 | 3 liveness properties | 1,541,300 | 31m22s | pass |
 | `MC_death_3proc_fix` (3 procs x 1 PE) | 0 | 1 | 1 | 1 | `EventuallyDelivered`, `Quiesces` | 210,446 | 2m06s | pass |
 | `MC_death_safety_2msg_fix` | 1 | 1 | 2 | 1 | `Inv`, `TableMonotone` | incomplete: no violation in 455,443,965 distinct states (depth 24, 71.7M states still queued) when TLC stopped after 6 h 00 min with `java.io.IOException: File too large` from its disk-backed state queue (2026-11-03 16:21 to 22:21) | 6 h 00 min | the one-message variant above covers the same deletions with one message in flight; this run is the only one not completed |
+
+### With the conflict clear (`ClearConflict = TRUE`, finding 10, charm #4031 defect 2)
+
+`Fix = TRUE`, `Rec = TRUE`. The `*_cc` configurations are the earlier
+configurations of the same name with the rule switched on and
+`RepairNotIgnored` added. 2026-11-09, TLC 2.20, 4 workers.
+
+| config | procs x PEs | Home | MaxMig | msgs | MaxDel | checks | distinct states | time | result |
+|---|---|---|---|---|---|---|---|---|---|
+| `MC_detour` (rule off) | 3 x 1 | 0 | 0 | 2 | 1 | `Inv`, `RepairNotIgnored` | 118,929 to the hit | 4s | `RepairNotIgnored` violated (finding 10) |
+| `MC_detour_fix` | 3 x 1 | 0 | 0 | 2 | 1 | `Inv`, `RepairNotIgnored` | 1,051,227 | 20s | pass |
+| `MC_detour_1mig_fix` | 3 x 1 | 0 | 1 | 2 | 1 | `Inv`, `RepairNotIgnored` | 79,341,580 | 29m17s | pass |
+| `MC_detour_liveness_fix` | 3 x 1 | 0 | 0 | 2 | 1 | `Inv`, `RepairNotIgnored`, `EventuallyDelivered`, `Quiesces` | 1,051,227 | 17m31s | pass |
+| `MC_death_3proc_fix_cc` | 3 x 1 | 0 | 1 | 1 | 1 | `RepairNotIgnored`, `EventuallyDelivered`, `Quiesces` | 272,716 | 2m08s | pass |
+| `MC_death_safety_fix_cc` | 2 x 2 | 1 | 1 | 1 | 1 | `Inv`, `TableMonotone`, `RepairNotIgnored` | 1,954,738 | 31s | pass |
+| `MC_death_liveness_fix_cc` | 2 x 2 | 1 | 1 | 1 | 1 | `Inv`, `TableMonotone`, `RepairNotIgnored` + 3 liveness properties | 1,954,738 | 32m38s | pass |
+| `MC_liveness_2mig_cc` | 2 x 2 | 1 | 2 | 1 | 0 | `Inv`, `TableMonotone`, `RepairNotIgnored` + 3 liveness properties | 214,784 | 2m38s | pass |
+| `MC_safety_final_cc` | 2 x 2 | 1 | 2 | 2 | 0 | `Inv`, `TableMonotone`, `RepairNotIgnored` | 89,192,345 | 32m30s | pass |
+
+The rule requires `Fix` (`Conflict`): without the own-write protection it would
+clear the holder's own entry, which the code never does (`MC_liveness_2mig` and
+`MC_safety_final` are `Fix = FALSE` configurations; their `_cc` copies set
+`Fix = TRUE`).
 
 ### Reduced protocols, with and without the contract (`Rec = FALSE`)
 
@@ -542,3 +570,38 @@ stayed set with no request out; after a death, every miss in the process held.
 Every received update now clears the flag, written or not, with an exchange
 before the value is read (`LocTable::update`); `objid_loctable` phase 10 drives
 that order. The model has no request flag, so this is outside it as well.
+
+### 10. A third process keeps the dead life's entry and rejects every repair of the new life (charm #4031, defect 2)
+
+`MC_detour`, `trace_detour.txt`, three processes of one PE, Home = PE 0,
+`Fix = TRUE`, `ClearConflict = FALSE`, two messages allowed, one used.
+
+1. PE 1 sends message 1 (large): no entry, so PE 1 holds it and registers.
+2. `createLocal` on PE 0 (the home), epoch 0: process 0 entry {PE 0, 0}.
+3. PE 1's re-read finds nothing; it sends the request to the home.
+4. The home answers by id: {PE 0, 0}.
+5. Process 1 writes {PE 0, 0} (marked); PE 1 flushes message 1 to PE 0.
+6. `reclaim` on PE 0: the life dies and the home's entry is cleared.
+7. `createLocal` on PE 2, epoch 0; the home records the new life, {PE 2, 0}.
+8. Message 1 reaches PE 0: no element; the entry names PE 2, so it is forwarded there and delivered after a forward.
+9. PE 2 repairs process 1 with {PE 2, 0}; process 1 keeps {PE 0, 0}, since 0 is not newer than 0.
+
+Every later send from process 1 goes the same way: to PE 0, forwarded to PE 2,
+and a repair that loses again. Delivery is never at risk (the forward and the
+home take care of it), so `EventuallyDelivered` and `Quiesces` pass; the action
+property `RepairNotIgnored`, which says that a reply or repair by id naming the
+element's current location is not ignored by a process whose entry names
+another PE, fails. With a higher epoch in the dead life (it moved before it
+died) the same holds for every repair of the new life until it has moved as
+often. The code has it with any number of processes, as soon as one process
+other than the home's addressed the old life (`tests/charm++/objid_detour`).
+
+Fix (`ClearConflict = TRUE`): a reply or repair by id that is not written and
+names another PE than the entry clears the entry (not the process's own write;
+the home's process drops these before this point). The next send from the
+process finds no entry and asks the home, whose answer is written. Within one
+life the rule fires only for a reply or repair overtaken by a newer update, so
+`TableMonotone` now allows an entry to lose its location when `ClearConflict`
+is on, never to take an older one. A starting epoch assigned by the home was
+the alternative; the home knows the old life's last epoch only once its death
+notice arrives, which can be after the new life was created and has moved.

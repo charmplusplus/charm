@@ -1039,7 +1039,10 @@ void CkArray::prepareCtorMsg(CkMessage* m, int* listenerData)
 
 int CkArray::findInitialHostPe(const CkArrayIndex& idx, int proposedPe)
 {
-  int hostPe = locMgr->whichPe(idx);
+  // A known location is a bound sibling's only when the manager serves bound arrays;
+  // otherwise it can be a dead element's stale entry (doc/internals/object-ids.md,
+  // section 3).
+  int hostPe = locMgr->servesBoundArrays() ? locMgr->whichPe(idx) : -1;
 
   if (hostPe == -1 && proposedPe == -1)
     return procNum(idx);

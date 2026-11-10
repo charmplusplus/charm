@@ -462,7 +462,7 @@ public:
   /// process's own writes keep current (section 3.5); else applyLocation.
   void updateLocation(const CkLocEntry& e);
   /// W4 on this process's entry, then the listeners and wakes if written.
-  void applyLocation(const CkLocEntry& e);
+  void applyLocation(const CkLocEntry& e, bool byId = false);
   /// Another PE of this process wrote the location of id, or retired id: flush what
   /// this PE holds for it.
   void wake(CmiUInt8 id);
@@ -612,6 +612,9 @@ private:
   // (the restored ids came from it), so the first tranche comes from the allocator.
   // An array created after a restart is not restored and takes its share as usual.
   bool restoredFromCheckpoint;
+  // This PE's last failed mintUnique found no tranche at all (the first after a
+  // restart), as opposed to a used one; read by deferInsertion's note.
+  bool mintFailedWithoutTranche = false;
 
   /// This flag is set while we delete an old copy of a migrator
   bool duringMigration;

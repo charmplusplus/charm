@@ -1,0 +1,42 @@
+module arraymaps {
+  // Steps through the cases in arraymaps.C one at a time (lives on PE 0).
+  chare arraymaps_driver {
+    entry arraymaps_driver(void);
+    entry [reductiontarget] void phaseDone(int n, int v[n]);
+    entry void inserted(int flat, int pe);
+  };
+
+  // Inserts elements from a PE other than 0 when there is one.
+  group arraymaps_inserter {
+    entry arraymaps_inserter(void);
+    entry void insert(CkArrayID arr, CProxy_arraymaps_driver driver,
+                      int caseId, int first, int n, std::vector<int> expected);
+  };
+
+  array [1D] arraymaps_1d {
+    entry arraymaps_1d(CProxy_arraymaps_driver driver, int caseId, bool initial,
+                       std::vector<int> expected);
+    entry void migrate(void);
+    entry void afterMigrate(void);
+    entry void ping(void);
+    entry void destroy(void);
+  };
+
+  array [2D] arraymaps_2d {
+    entry arraymaps_2d(CProxy_arraymaps_driver driver, int caseId, bool initial,
+                       std::vector<int> expected);
+    entry void migrate(void);
+    entry void afterMigrate(void);
+    entry void ping(void);
+    entry void destroy(void);
+  };
+
+  array [3D] arraymaps_3d {
+    entry arraymaps_3d(CProxy_arraymaps_driver driver, int caseId, bool initial,
+                       std::vector<int> expected);
+    entry void migrate(void);
+    entry void afterMigrate(void);
+    entry void ping(void);
+    entry void destroy(void);
+  };
+};

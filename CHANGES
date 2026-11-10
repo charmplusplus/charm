@@ -134,6 +134,18 @@ New on this line since the split from classic:
   re-creates half of the destroyed elements this way; the new test
   objid_boundrecreate covers a bound array over two processes.
 
+- A process that had sent to an array element before it was destroyed
+  kept sending to the PE the element died on after the element was
+  created again elsewhere, every message taking a detour through that
+  PE, for the rest of the run (#4031, defect 2). The new life starts at
+  epoch 0 and its location repairs lost to the old entry's epoch. A
+  repair or reply that disagrees with the entry and loses the compare
+  now clears it, and the next send asks the home. An insertion through
+  the proxy from such a process also stopped following that entry (it
+  aborted with "hostPe for a bound element disagrees with an explicit
+  proposedPe" when given a PE). New test objid_detour, two to four
+  processes.
+
 - Broadcasts and [nokeep] entry methods: fixes for message reuse and
   copies (#4000-#4012). Checkpoint restart no longer hangs with more
   than one process and more than one PE per process (#4019). The
