@@ -30,7 +30,7 @@ on:
         description: number of runs
         default: "200"
       sanitizer:
-        description: address = AddressSanitizer build; none = plain -g build with MALLOC_CHECK_=3
+        description: address = AddressSanitizer build; none = built and launched as the runner's CI job does, with glibc heap checks (MALLOC_CHECK_=3)
         type: choice
         default: address
         options: [address, none]
@@ -48,7 +48,9 @@ jobs:
       TEST_DIR: ${{ inputs.test_dir || 'tests/charm++/section_migrate' }}
       BINARY: ${{ inputs.binary || 'section_migrate' }}
       ARGS: ${{ inputs.args || '+pe 4 -lb -auto +balancer RotateLB +randomized_msgq +randomized_seed 2' }}
-      VARY_SEED: ${{ inputs.vary_seed || 'true' }}
+      # inputs.vary_seed is a boolean, so "inputs.vary_seed || 'true'" would be
+      # true even when it is unchecked; a pull request run varies the seed.
+      VARY_SEED: ${{ github.event_name == 'pull_request' || inputs.vary_seed }}
       RUNS: ${{ inputs.runs || '2000' }}
       SANITIZER: ${{ inputs.sanitizer || 'address' }}
       RUN_TIMEOUT: ${{ inputs.run_timeout || '120' }}
@@ -63,9 +65,13 @@ jobs:
       - name: build
         # The sanitizer flags go in CFLAGS/CXXFLAGS/LDFLAGS as well as the
         # build options: the reconverse CMake tree takes only the former.
+        # CIOPTS are the build options of this runner's job in reconverse-ci.yaml.
         run: |
           set -e
-          case "$(uname -m)" in aarch64) ARCH=reconverse-linux-arm8;; *) ARCH=reconverse-linux-x86_64;; esac
+          case "$(uname -m)" in
+            aarch64) ARCH=reconverse-linux-arm8; CIOPTS="-Werror=vla --enable-tracing";;
+            *) ARCH=reconverse-linux-x86_64; CIOPTS="";;
+          esac
           echo "ARCH=$ARCH" >> $GITHUB_ENV
           if [ "$SANITIZER" = address ]; then
             SAN="-fsanitize=address -fno-omit-frame-pointer"
@@ -73,7 +79,7 @@ jobs:
             CFLAGS="$SAN" CXXFLAGS="$SAN" LDFLAGS="-fsanitize=address" ./build charm++ $ARCH -j4 -g -O1 $SAN
           else
             echo "OPTS=-g" >> $GITHUB_ENV
-            ./build charm++ $ARCH -j4 -g
+            ./build charm++ $ARCH -j4 -g $CIOPTS
           fi
       - name: build test
         # OPTS goes inside CHARMC: a CHARMC on the command line replaces the
@@ -83,14 +89,23 @@ jobs:
         run: |
           mkdir -p hunt-failures
           cd $TEST_DIR
-          [ "$SANITIZER" = none ] && export MALLOC_CHECK_=3
+          # none: launch as CI's test steps do (testrun runs every test under
+          # setarch -R, address randomization off), with glibc's heap checks.
+          # Since glibc 2.34, MALLOC_CHECK_ works only with libc_malloc_debug
+          # preloaded; env applies both to the test alone.
+          launch=""
+          if [ "$SANITIZER" = none ]; then
+            setarch "$(uname -m)" -R true || { echo "setarch -R is not permitted on this runner"; exit 1; }
+            dbg=$(ls /usr/lib/*/libc_malloc_debug.so.0)
+            launch="setarch $(uname -m) -R env MALLOC_CHECK_=3 LD_PRELOAD=$dbg"
+          fi
           fails=0; hangs=0
           for i in $(seq 1 $RUNS); do
             a="$ARGS"
             # a seed in ARGS is replaced, not repeated: the second copy would reach the program
             [ "$VARY_SEED" = true ] && a="$(echo "$ARGS" | sed -E 's/\+randomized_seed +[0-9]+//') +randomized_seed $i"
             rc=0
-            timeout $RUN_TIMEOUT ./$BINARY $a > out.txt 2>&1 || rc=$?
+            timeout $RUN_TIMEOUT $launch ./$BINARY $a > out.txt 2>&1 || rc=$?
             [ $rc = 0 ] && continue
             fails=$((fails+1)); [ $rc = 124 ] && hangs=$((hangs+1))
             { echo "ARGS: $a"; echo "EXIT: $rc"; cat out.txt; } > $GITHUB_WORKSPACE/hunt-failures/run$i-rc$rc.txt
@@ -98,7 +113,7 @@ jobs:
             [ $fails -ge 20 ] && { echo "stopping after 20 failures"; RUNS=$i; break; }
           done
           echo "## hunt: $TEST_DIR/$BINARY $ARGS" >> $GITHUB_STEP_SUMMARY
-          echo "runs: $RUNS, failures: $fails (hangs: $hangs), sanitizer: $SANITIZER, runner: $(uname -m)" >> $GITHUB_STEP_SUMMARY
+          echo "runs: $RUNS, failures: $fails (hangs: $hangs), sanitizer: $SANITIZER, runner: $(uname -m)${launch:+, launched with: $launch}" >> $GITHUB_STEP_SUMMARY
           for f in $GITHUB_WORKSPACE/hunt-failures/*.txt; do
             [ -e "$f" ] || break
             echo '```' >> $GITHUB_STEP_SUMMARY; grep -m3 'ERROR: AddressSanitizer\|malloc\|Abort\|Assert\|EXIT' "$f" >> $GITHUB_STEP_SUMMARY; echo '```' >> $GITHUB_STEP_SUMMARY
