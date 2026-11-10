@@ -86,12 +86,16 @@ jobs:
           [ "$SANITIZER" = none ] && export MALLOC_CHECK_=3
           fails=0; hangs=0
           for i in $(seq 1 $RUNS); do
-            a="$ARGS"; [ "$VARY_SEED" = true ] && a="$a +randomized_seed $i"
-            if timeout $RUN_TIMEOUT ./$BINARY $a > out.txt 2>&1; then continue; fi
-            rc=$?
+            a="$ARGS"
+            # a seed in ARGS is replaced, not repeated: the second copy would reach the program
+            [ "$VARY_SEED" = true ] && a="$(echo "$ARGS" | sed -E 's/\+randomized_seed +[0-9]+//') +randomized_seed $i"
+            rc=0
+            timeout $RUN_TIMEOUT ./$BINARY $a > out.txt 2>&1 || rc=$?
+            [ $rc = 0 ] && continue
             fails=$((fails+1)); [ $rc = 124 ] && hangs=$((hangs+1))
             { echo "ARGS: $a"; echo "EXIT: $rc"; cat out.txt; } > $GITHUB_WORKSPACE/hunt-failures/run$i-rc$rc.txt
             echo "run $i failed (rc $rc)"
+            [ $fails -ge 20 ] && { echo "stopping after 20 failures"; RUNS=$i; break; }
           done
           echo "## hunt: $TEST_DIR/$BINARY $ARGS" >> $GITHUB_STEP_SUMMARY
           echo "runs: $RUNS, failures: $fails (hangs: $hangs), sanitizer: $SANITIZER, runner: $(uname -m)" >> $GITHUB_STEP_SUMMARY
