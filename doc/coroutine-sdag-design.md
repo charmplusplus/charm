@@ -126,12 +126,15 @@ any. A zero-argument marshalled entry (`ResumeFromSync` above) carries none.
    `begin_iteration`, which runs before the ghost sites and is skipped when
    the element arrives in the middle of a step).
 3. **Migration and checkpoint happen only while every active coroutine of
-   the element is suspended at a site** (`CK_WHEN` or `CK_CALL`). A plain
-   `co_await` on a `when` awaitable is allowed between sites, but packing an
-   element suspended there aborts with a message naming the entry. This is
-   where the design is more permissive than CAMPI (which has no awaitables
-   that are not sites) and more restrictive than SDAG (which can pack any
-   `when`).
+   the element is suspended at a site** (`CK_WHEN`, `CK_WHEN_ANY` or
+   `CK_CALL`). A plain `co_await` on a `when` awaitable is allowed between
+   sites, but packing an element suspended there aborts with a message
+   naming the entry. This is where the design is more permissive than CAMPI
+   (which has no awaitables that are not sites) and more restrictive than
+   SDAG (which can pack any `when`). A body may call `migrateMe(pe)` or
+   `AtSync()` itself: both are messages to the element (`ckEmigrate`, the
+   balancer's reply), so the move happens while the body waits at the next
+   site, which is what the migration test does.
 4. **One active coroutine per entry method per element.** A second
    invocation of a coroutine entry while one is suspended aborts. SDAG allows
    several concurrent invocations of one SDAG entry; none of the SDAG test
@@ -186,11 +189,32 @@ the frame may suspend at non-site awaitables between sites as long as the
 element does not migrate there. The checks are the same: the restart aborts
 if the body reaches a different site than recorded, if a function on the
 recorded path is missing, or if a helper is awaited without `CK_CALL`;
-`+ck_fakemigrate` exercises every site without a balancer. In the jacobi3d
-test with the flag on, 320 rebuilds happen in a 20-iteration run on 2 PEs
-(one per suspension at a site) and the checksum is unchanged.
+`+ck_fakemigrate` exercises every site without a balancer: the first time
+a coroutine suspends at a site, the element's coroutines are packed and
+unpacked in place and re-invoked; a body that was just restarted to a site
+waits there without rebuilding again, so a program progresses and reaches
+quiescence as without the flag (the first version rebuilt on every
+suspension, and the migration test, which waits for quiescence, never got
+it). In the jacobi3d test with the flag on, 320 rebuilds happen in a
+20-iteration run on 2 PEs and the checksum is unchanged; the migration
+test passes with the flag on 2, 3 and 4 PEs.
+
+A restart message can be in flight when the element migrates (the
+element's record was unpacked, its message sent, and a balancer or an
+anytime migration moves the element before the message arrives). The
+record remembers that a restart is pending, so the second unpack does not
+send another and the location manager forwards the first. A disk
+checkpoint taken with a restart message in flight would lose it; Charm++
+checkpoints assume no messages in flight, and the program's own
+synchronization (a reduction before `CkStartCheckpoint`) provides that.
 
 ### 4.3 Overlap and when-any
+
+`when_any` exists: `CK_WHEN_ANY(idx, CK_ALT(ep, ref, out...), ...)` waits
+for the first of several deliveries and stores the index of the
+alternative that matched; a record waits on a list of (entry, refnum)
+pairs instead of one. That is SDAG `case` over single whens; a `case` arm
+with a conjunction (`when b(), d()`) is not expressible yet.
 
 `overlap` is deferred. The design that fits the restart protocol is
 *several coroutines per element*: each `when` clause of an `overlap`
@@ -198,10 +222,9 @@ becomes its own coroutine entry (or a `task<void>` helper started with its
 own record), each with its own site chain; the state object already keeps
 a list of records, and the join is a counter in a member followed by a
 plain `when`. The alternative, `co_await when_any(...)` over several
-awaitables, gives SDAG `case` (a disjunction) and is a small addition to
-the inbox matcher (a record waits on a list of `want`s; the record already
-holds a vector), but it does not give `overlap`, which is a conjunction of
-independent progress. Neither needs a new pup story: a record is a record.
+awaitables, is what `when_any` already is, and it does not give `overlap`,
+which is a conjunction of independent progress. Neither needs a new pup
+story: a record is a record.
 
 ### 4.4 Message buffering
 
@@ -271,48 +294,60 @@ visibly the chare's.
 ## 6. Measurements
 
 Mac (Apple M-series, 8 cores), reconverse build `--with-production`,
-2026-11-09. Each number is the median of three runs; raw lines are in the
-project's `measure-1.log`.
+2026-11-09 23:45 PST. Each number is the median of three runs; the raw
+lines are in the project's `measure-2.log`.
 
 ### 6.1 A when-matched message: `benchmarks/charm++/coro_pingpong`
 
-Two array elements, 200000 round trips of an 8-byte message, each message
+Two array elements, 50000 round trips of an 8-byte message, each message
 matched by iteration number (SDAG `when recv[iter]`, coroutine
 `CK_WHEN(..., iter, m)`), against plain entry methods with no matching.
+Microseconds per message (half a round trip):
 
-| | plain | SDAG when | coroutine CK_WHEN |
+| | plain entry | SDAG when | coroutine CK_WHEN |
 |---|---|---|---|
-| one PE, both elements local (us per message) | (see log) | | |
-| two PEs, one element each (us per message) | | | |
+| one PE, both elements local | 0.229 | 1.677 | 0.479 |
+| two PEs, one element each | 0.463 | 1.291 | 0.637 |
+
+On one PE the coroutine match costs 0.25 us over a plain entry and the
+SDAG match 1.45 us; the SDAG path allocates a `Buffer`, a `MsgClosure` and
+a `Continuation` per message and walks two lists, the coroutine path moves
+the buffer into the record and resumes. Across two PEs the message itself
+costs more and the gap narrows (0.17 us against 0.83 us). charm4py's
+measurement of 1.58 us for a coroutine message against 0.38 plain is a
+different binding; here the coroutine overhead is a fifth of SDAG's.
 
 ### 6.2 jacobi3d end to end
 
 `./jacobi3d 64 16 200 100`: 64 elements of 16^3 cells, 200 iterations, a
-report every 100; the SDAG program (`tests/charm++/jacobi3d-sdag`, with the
-checksum line added on this branch) and the coroutine program print the
-same checksum (4335374606600 for the 32/16/20 test case). Time per
-iteration as printed by the program:
+report every 100, no load balancing. Both programs print checksum
+64041493740160. Time per iteration as printed by the program
+(milliseconds, median of three):
 
-| | SDAG | coroutine |
-|---|---|---|
-| +pe 1 | | |
-| +pe 4 | | |
+| | SDAG | coroutine | change |
+|---|---|---|---|
+| +pe 1 | 3.39 | 2.83 | -17% |
+| +pe 4 | 0.900 | 0.770 | -14% |
 
-Anvil at two nodes: not yet run.
+Six matched messages per element per iteration at 1.2 us of saved
+matching each account for about 0.5 ms of the 0.56 ms saved on one PE;
+the rest is within run-to-run noise. The compute kernel is identical.
+
+Anvil at two nodes: delegated 2026-11-09 23:50 PST; results to be added.
 
 ## 7. Test plan (from the charm-tests requirements, 2026-11-09) and status
 
 | requirement | status |
 |---|---|
 | jacobi3d: same results at +pe 4 and in two processes | done: checksum identical at +pe 1, +pe 4, lcrun -n 2 |
-| migration under `+balancer RotateLB` through declared sites, element suspended in a when | done: AtSync inside the coroutine, the element waits for ResumeFromSync at a site; RotateLB moves all elements every 4 iterations |
+| migration under `+balancer RotateLB` through declared sites, element suspended in a when | done: AtSync inside the coroutine, the element waits for ResumeFromSync at a site; RotateLB moves all elements every 4 iterations. Anytime migration while suspended: `tests/charm++/ckcoro` (the SDAG migration test as a coroutine) |
 | rebuild-at-every-site flag | done: `+ck_fakemigrate`, 320 rebuilds in the 2-PE run |
 | checkpoint of a suspended element, restart | done: checkpoint at a when site, `+restart` on 4 and 2 PEs in one process and on 4 PEs in two processes |
 | when with reference numbers | done (jacobi3d ghosts, pingpong) |
-| `case` | not yet: needs `when_any` |
+| `case` | done for single-when arms: `CK_WHEN_ANY` in `tests/charm++/ckcoro` |
 | `overlap` | deferred (Kale) |
-| equivalence corpus: megatest synctest, every `tests/charm++/sdag` directory, SDAG-heavy miniapps under both implementations | not started; `tests/charm++/sdag/basic` needs `case`, `overlap` and `forall`; `refnum` needs `forall` and `case`; `migration` needs `case` |
-| CAMPI tests stay green when the core is shared | the prototype copies CAMPI's chain and task code rather than sharing it; sharing is the next step |
+| equivalence corpus: megatest synctest, every `tests/charm++/sdag` directory, SDAG-heavy miniapps under both implementations | started: the `migration` module of `tests/charm++/sdag` is ported (`tests/charm++/ckcoro`); `basic` needs `overlap` and `forall`; `refnum` needs `forall` |
+| CAMPI tests stay green when the core is shared | in progress (2026-11-09 23:50): a shared `ckcoro_core.h` for `task<T>` and the site chain, delegated |
 
 ## 8. What charm4py can mirror
 
@@ -327,23 +362,36 @@ id, or a line number). This is the alternative to copying a Python frame
 (the charm4py-thin probe of 2026-11-08 found that fragile), at the price of
 the rules in section 3.
 
-## 9. Decision memo for Kale (draft, to be completed after the measurements)
+## 9. Decision memo for Kale
 
-- The prototype is a 700-line header with no runtime or translator change,
-  and jacobi3d runs under it with migration, rebuild, checkpoint and
-  restart. The restrictions (section 3) are the ones CAMPI already imposes
-  on AMPI programs, plus one per entry (one active coroutine) that the
-  translator could lift.
-- What is missing for "an SDAG equivalent": `when_any` (`case`), several
-  coroutines per element (`overlap`, `forall`), and the equivalence corpus.
-  `when_any` is a day; the corpus is the larger part because the SDAG tests
-  use every construct.
-- Recommendation: ship `ckcoro.h` in the beta marked experimental, with
-  the jacobi3d test and the microbenchmark, and without translator
-  attributes; add `when_any` before the beta if time allows; keep SDAG
-  unchanged. Sharing the chain and task code with CAMPI (one header both
-  include) is a cleanup to do before the first beta update, not before the
-  beta.
+**Recommendation: ship `ckcoro.h` in the beta, marked experimental.** It
+is a header with no runtime or translator change, so it cannot break
+anything that does not include it, and it already carries a real program
+(jacobi3d with load balancing, rebuild, checkpoint and restart) and the
+SDAG migration test. Its matching costs a fifth of SDAG's and jacobi3d
+runs 14 to 17 percent faster per iteration. The restrictions are the ones
+CAMPI already imposes on AMPI programs (state in members, sites are
+declared, nothing packed except at a site) plus one active coroutine per
+entry and no marshalled parameters on the coroutine entry.
+
+What "experimental" has to say: no `overlap` and no `forall`; `case` only
+over single whens; arrays only (no groups or singleton chares as owners);
+the macro syntax may change when the translator attributes arrive.
+
+What the translator must gain, in order of value: an `[inbox]` attribute
+(removes the one-line bodies, admits array parameters), a `[coroutine]`
+attribute (marshalled parameters on the entry, implicit entry index,
+several active coroutines by a generated record per invocation), and
+nothing else; both are small changes in `src/xlat-i` and neither is needed
+for the beta.
+
+What charm4py can mirror: the record and site protocol of section 8, with
+no C++ frame involved.
+
+Before the beta: fill the Anvil row, merge the shared core with CAMPI if
+its tests stay green, add the two test directories to CI (done on the
+branch: `TEST_DIRS` in `reconverse-ci.yaml`). First beta update: `overlap`
+as several coroutines per element and the rest of the SDAG test corpus.
 
 ## 10. Open items
 
