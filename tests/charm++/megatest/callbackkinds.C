@@ -480,9 +480,20 @@ void callbackkinds_driver::sectionCases(void)
       reflector[nextPe()].reflect(cb, mode, val);
       waitFor(1);
 #else
+#if CALLBACKKINDS_SECTION_IFNOTTHERE
       if (mode == CBK_MSG) cb.send(new callbackkinds_msg(val));
       else if (mode == CBK_NOMSG) cb.send();
       else cb.send(sizeof(int), &val);
+#else
+      // Build every message here and set its ifNotThere policy, which the
+      // bcastSection send path leaves uninitialized (see the switch).
+      void* m;
+      if (mode == CBK_MSG) m = new callbackkinds_msg(val);
+      else if (mode == CBK_NOMSG) m = CkAllocSysMsg();
+      else m = CkDataMsg::buildNew(sizeof(int), &val);
+      CkSetMsgArrayIfNotThere(m, CkArray_IfNotThere_buffer);
+      cb.send(m);
+#endif
       waitFor(0);
 #endif
     }

@@ -32,6 +32,22 @@
 #define CALLBACKKINDS_SECTION_PROXY 0
 #endif
 
+// CALLBACKKINDS_SECTION_IFNOTTHERE=0 makes the section sends from a message
+// built here with CkSetMsgArrayIfNotThere(m, CkArray_IfNotThere_buffer).
+// CkCallback::send's bcastSection case (ckcallback.C:431) and
+// CkBroadcastMsgSection / CProxySection_ArrayBase::ckSend (ckarray.C:1272)
+// never set the envelope's ifNotThere, and envelope::alloc does not initialize
+// it (envelope.h, memset only under CMK_REPLAYSYSTEM), so it holds whatever
+// the reused buffer held. sendArray and bcastArray set it
+// (CkSetMsgArrayIfNotThere). When the sending PE does not know the element's
+// id and the stale byte is not CkArray_IfNotThere_buffer, CkArray::handleUnknown
+// (ckarray.C:2239) takes the demand-creation path and aborts in
+// bufferForCreation: "Can't demand create an element with no default ctor".
+// Seen in CI (linux, lcrun -n 2 +pe 4). Set to 1 once fixed.
+#ifndef CALLBACKKINDS_SECTION_IFNOTTHERE
+#define CALLBACKKINDS_SECTION_IFNOTTHERE 0
+#endif
+
 // CALLBACKKINDS_FUTURE_NOMSG=0 skips send() with no message on a callback to
 // a future: CkCallback::send passes the NULL straight to CkSendToFuture, which
 // dereferences it (CkSendToFutureID: UsrToEnv(m)->setRef); every other kind
