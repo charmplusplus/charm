@@ -1,0 +1,42 @@
+mainmodule jacobi3d {
+
+  readonly CProxy_Main mainProxy;
+  readonly int arrayDimX;
+  readonly int arrayDimY;
+  readonly int arrayDimZ;
+  readonly int blockDimX;
+  readonly int blockDimY;
+  readonly int blockDimZ;
+
+  readonly int num_chare_x;
+  readonly int num_chare_y;
+  readonly int num_chare_z;
+
+  readonly int maxIter;
+  readonly int ckptFreq;
+  readonly int lbFreq;
+  readonly int chkptIter;
+  readonly std::string chkptDir;
+
+  message ghostMsg {
+    double gh[];
+  };
+
+  mainchare [migratable] Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void report(long long sum);
+    entry [reductiontarget] void checkpoint();
+    entry void checkpointed();
+  };
+
+  array [3D] Jacobi {
+    entry Jacobi(void);
+    // The coroutine entry (ck::coroutine Jacobi::doStep() in jacobi3d.C).
+    entry void doStep(void);
+    // Inbox entries: their bodies hand the delivery to the coroutine state.
+    entry void receiveGhosts(ghostMsg *gmsg);
+    entry void ResumeFromSync(void);
+    entry void resume(void);
+  };
+
+};

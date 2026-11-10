@@ -36,7 +36,7 @@ set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     ckobjQ.h ckrdma.h ckrdmadevice.h ckreduction.h cksection.h
     ckstream.h cksyncbarrier.h debug-charm.h envelope-path.h envelope.h init.h
     middle-conv.h middle.h mpi-interoperate.h objid.h qd.h
-    readonly.h register.h sdag.h stats.h waitqd.h ../ck-ldb/CentralLB.h
+    readonly.h register.h sdag.h ckcoro.h stats.h waitqd.h ../ck-ldb/CentralLB.h
     ../ck-cp/arrayRedistributor.h ../ck-cp/controlPoints.h ../ck-cp/pathHistory.h ../ck-cp/API-generator/cp_effects.h)
 
 if(CMK_CAN_LINK_FORTRAN)
