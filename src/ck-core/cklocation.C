@@ -3198,6 +3198,15 @@ CkLocRec* CkLocMgr::registerNewElement(const CkArrayIndex& idx)
     // TODO: This is going to end up needlessly calling getNewObjectID(...) again
     rec = createLocal(idx, false, false, true);
   }
+#if CMK_MEM_CHECKPOINT
+  else if (!CkInRestarting())
+  {
+    // An element of an array bound to another (bindTo) joins the record its
+    // siblings already have, so createLocal does not count it. Count it here: a
+    // rollback restores each record from the checkpoint, which lacks this element.
+    CkMemCheckPTNoteInsertion();
+  }
+#endif
 
   return rec;
 }

@@ -30,8 +30,8 @@ The option changes code outside this file, which is why it is off by
 default: `ArrayElement::ArrayElement` calls `init_checkpt`, which sends two
 `createEntry` messages per element; `CentralLB.C` collects statistics
 point to point instead of by reduction; `CkReductionMgr` disables the
-inactive-PE optimization; `CkLocMgr::emigrate`, `createLocal` and
-`reclaim` count migrations, insertions and deletions
+inactive-PE optimization; `CkLocMgr::emigrate`, `createLocal` (with
+`registerNewElement`) and `reclaim` count migrations, insertions and deletions
 (`CkMemCheckPTNoteMigration`, `CkMemCheckPTNoteInsertion`,
 `CkMemCheckPTNoteDeletion`), and `reclaim` sends no death notice while
 `CkInRestarting()`.
@@ -202,8 +202,13 @@ without its home being told. Reconciling the tables is not done. Instead
 `CkLocMgr::emigrate` counts each departure (`CkMemCheckPTNoteMigration`),
 `CkLocMgr::createLocal` counts each creation that is neither a migration's
 arrival nor a restore (`CkMemCheckPTNoteInsertion`, skipped while
-`CkInRestarting()`), and `CkLocMgr::reclaim` counts each destruction that
-is neither a departure nor part of a restore (`CkMemCheckPTNoteDeletion`).
+`CkInRestarting()`), `CkLocMgr::registerNewElement` counts an inserted
+element that joins an existing record, that is, an element of an array bound
+to another (`bindTo`, as AMPI does for every new communicator) created after
+the checkpoint (without the count, the restore of the record from a
+checkpoint taken with one fewer bound array aborts in `addElementToRec`
+with `Registered idx is out of bounds`), and `CkLocMgr::reclaim` counts
+each destruction that is neither a departure nor part of a restore (`CkMemCheckPTNoteDeletion`).
 The pack in `startArrayCheckpoint` resets the three counts, so the
 elements created before the first checkpoint are not counted, and
 `rollback` aborts on any PE where one is nonzero:
@@ -268,7 +273,8 @@ only with `__FAULT__`.
   `recoverAll`, `finishUp`, `restartDone`; `ChkptOnPe`, `BuddyPE`.
 - src/ck-core/ckmemcheckpoint.h: `CkCheckPTEntry`, `CkMemCheckPT`.
 - src/ck-core/cklocation.C: `CkLocMgr::emigrate` (migration count),
-  `CkLocMgr::createLocal` (insertion count), `CkLocMgr::resume` (epoch and
+  `CkLocMgr::createLocal` and `CkLocMgr::registerNewElement` (insertion
+  count), `CkLocMgr::resume` (epoch and
   life) and `pupElementsFor` with `rebuild`, `CkLocMgr::reclaim` (deletion
   count; no home notice while restarting).
 - src/ck-core/ckarray.C: `CkArray::flushStates`,
@@ -280,4 +286,5 @@ only with `__FAULT__`.
 - tests/charm++/memckpt_rollback: checkpoint, rollback (once and with
   `-rollbacks N`), migration before the checkpoint and after the rollback
   (`-lbfirst`), a `pup_buffer` array restored by the rollback, and the
-  migration, insertion and deletion refusals (`testrestriction`).
+  migration, insertion and deletion refusals, the insertion also by an
+  array bound to the workers after the checkpoint (`testrestriction`).
