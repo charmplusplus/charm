@@ -82,7 +82,7 @@ class Jacobi : public CBase_Jacobi {
 };
 ```
 
-The SDAG original of the loop, for comparison:
+The SDAG original, for comparison:
 
 ```
 entry void doStep() {
@@ -93,6 +93,17 @@ entry void doStep() {
   serial { check_and_compute(); }
 };
 ```
+
+The two `if` blocks at the top of the coroutine have no counterpart in the
+SDAG program, so the SDAG text is shorter for that reason and not because of
+the notation. The SDAG program has no checkpoint, and it balances load
+outside the SDAG code: `check_and_compute` ends with `AtSync()` instead of
+`doStep()`, and the plain entry `ResumeFromSync` calls `doStep()`. The
+coroutine version could do the same with the same two lines. It waits for
+the balancer and for the checkpoint inside the body on purpose, so that the
+test migrates and checkpoints an element suspended at a site. Without those
+two blocks the coroutine body is the loop shown, between `CK_COROUTINE` and
+`CK_END`.
 
 Vocabulary (all in `ckcoro.h`):
 
