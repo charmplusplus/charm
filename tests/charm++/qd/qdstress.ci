@@ -2,7 +2,7 @@ mainmodule qdstress {
   extern module completion;
 
   readonly CProxy_Main mainProxy;
-  readonly CProxy_Stats statsProxy;
+  readonly CProxy_QdCounts statsProxy;
   readonly CProxy_Mig migProxy;
   readonly CProxy_Ins insProxy0;
   readonly CProxy_Ins insProxy1;
@@ -31,8 +31,8 @@ mainmodule qdstress {
   };
 
   // Per-PE work counters; report() sums them into one reduction.
-  group Stats {
-    entry Stats();
+  group QdCounts {
+    entry QdCounts();
     entry void report(CkCallback cb);
   };
 

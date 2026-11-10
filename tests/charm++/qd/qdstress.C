@@ -3,7 +3,7 @@
 // Every phase knows exactly how much work it must do (messages delivered,
 // elements constructed or destroyed, bytes received). The driver, a [threaded]
 // entry of the mainchare, starts the work and waits for quiescence, then sums
-// the per-PE work counters (group Stats) in a reduction. A count short of the
+// the per-PE work counters (group QdCounts) in a reduction. A count short of the
 // expected one means QD fired before the work was done:
 //   CkAbort("qdstress phase X round R (QD by K): QD fired with N of M ...").
 // It then waits for quiescence a second time and counts again; any counter that
@@ -63,7 +63,7 @@
 #include "qdstress.decl.h"
 
 /*readonly*/ CProxy_Main mainProxy;
-/*readonly*/ CProxy_Stats statsProxy;
+/*readonly*/ CProxy_QdCounts statsProxy;
 /*readonly*/ CProxy_Mig migProxy;
 /*readonly*/ CProxy_Ins insProxy0, insProxy1;
 static inline CProxy_Ins& insProxy(int w) { return w == 0 ? insProxy0 : insProxy1; }
@@ -126,11 +126,11 @@ static inline CmiUInt8 mix(CmiUInt8 x)
   return x ^ (x >> 31);
 }
 
-class Stats : public CBase_Stats
+class QdCounts : public CBase_QdCounts
 {
 public:
   long c[NSLOT];
-  Stats() { memset(c, 0, sizeof(c)); }
+  QdCounts() { memset(c, 0, sizeof(c)); }
   void report(CkCallback cb) { contribute(sizeof(c), c, CkReduction::sum_long, cb); }
 };
 
@@ -946,7 +946,7 @@ public:
     nMig = 4 * CkNumPes();
     nLb = 4 * CkNumPes();
     nZc = 2 * CkNumPes();
-    statsProxy = CProxy_Stats::ckNew();
+    statsProxy = CProxy_QdCounts::ckNew();
     migProxy = CProxy_Mig::ckNew(nMig);
     for (int w = 0; w < 2; w++) insProxy(w) = CProxy_Ins::ckNew(CkArrayOptions());
     lbProxy = CProxy_Lb::ckNew(nLb);
