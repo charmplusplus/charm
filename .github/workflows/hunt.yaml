@@ -1,7 +1,7 @@
 # Repeat one test many times on a CI runner, optionally under AddressSanitizer,
 # to catch an intermittent failure seen in CI. Run it from the Actions tab
 # (workflow_dispatch) with the test, arguments and run count; it also runs with
-# the defaults below on a pull request that changes this file.
+# the defaults below on a pull request that changes this file (2000 runs, seed varied per run).
 # Failing runs' outputs are uploaded as the artifact "hunt-failures".
 name: hunt
 
@@ -48,8 +48,8 @@ jobs:
       TEST_DIR: ${{ inputs.test_dir || 'tests/charm++/section_migrate' }}
       BINARY: ${{ inputs.binary || 'section_migrate' }}
       ARGS: ${{ inputs.args || '+pe 4 -lb -auto +balancer RotateLB +randomized_msgq +randomized_seed 2' }}
-      VARY_SEED: ${{ inputs.vary_seed || 'false' }}
-      RUNS: ${{ inputs.runs || '200' }}
+      VARY_SEED: ${{ inputs.vary_seed || 'true' }}
+      RUNS: ${{ inputs.runs || '2000' }}
       SANITIZER: ${{ inputs.sanitizer || 'address' }}
       RUN_TIMEOUT: ${{ inputs.run_timeout || '120' }}
       # detect_leaks=0: the instrumented charmxi would otherwise fail the build.
