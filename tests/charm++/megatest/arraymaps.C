@@ -28,12 +28,9 @@
  *     only that each element exists exactly once. Elements are inserted with
  *     a PE; ARRAYMAPS_CLDMAP_INSERT=1 inserts without one, which must abort
  *     with "ckInsert without a PE is not supported".
- *   ConfigurableRRMap: only with ARRAYMAPS_CONFIGRR=1 and the run line flag
- *     +ConfigurableRRMap "<config>"; 1D only (populateInitial aborts on other
- *     dimensions). populateInitial reads its configuration only inside
- *     CkAssert(haveConfigurableRRMap()), which a production build compiles
- *     out, so it then indexes an empty table (SIGSEGV), flag or not. When
- *     enabled, initial placement is checked against the configuration and
+ *   ConfigurableRRMap: only with the run line flag +ConfigurableRRMap
+ *     "<config>", e.g. "4 2 0 1 1 0"; 1D only (populateInitial aborts on other
+ *     dimensions). Initial placement is checked against the configuration and
  *     inserted elements against homePe (procNum is RRMap's).
  *   Simple1DFileMap: 1D only (it aborts on other dimensions). ReadFileMap:
  *     1D/2D/3D. PE 0 writes ./mapfile before creating the map group; every PE
@@ -48,9 +45,6 @@
 
 #ifndef ARRAYMAPS_CLDMAP_INSERT
 #define ARRAYMAPS_CLDMAP_INSERT 0
-#endif
-#ifndef ARRAYMAPS_CONFIGRR
-#define ARRAYMAPS_CONFIGRR 0
 #endif
 #ifndef ARRAYMAPS_HILBERT_ODD
 #define ARRAYMAPS_HILBERT_ODD 0
@@ -91,9 +85,7 @@ static const arraymaps_case cases[] = {
 #endif
     {PROP, 1, false, 37, 1, 1}, {PROP, D2}, {PROP, D3},
     {CLD, D1}, {CLD, D2}, {CLD, D3},
-#if ARRAYMAPS_CONFIGRR
     {CONFIGRR, D1},
-#endif
     {FILE1D, 1, false, 37, 1, 1},
     {READFILE, 1, false, 37, 1, 1}, {READFILE, D2}, {READFILE, D3},
 };

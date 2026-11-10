@@ -1324,10 +1324,13 @@ public:
     if (state == not_loaded)
     {
       DEBUG(("[%d] loading ConfigurableRRMap configuration\n", CkMyPe()));
+      // Read without removing: the flag is read after the main chare got argv
+      // (CkArgMsg shares the array), so removing it would shift the program's argv.
       char** argv = CkGetArgv();
       char* configuration = NULL;
-      bool found = CmiGetArgString(argv, "+ConfigurableRRMap", &configuration);
-      if (!found)
+      for (int a = 0; argv[a] != NULL && argv[a + 1] != NULL; a++)
+        if (strcmp(argv[a], "+ConfigurableRRMap") == 0) configuration = argv[a + 1];
+      if (configuration == NULL)
       {
         DEBUG(("Couldn't find +ConfigurableRRMap command line argument\n"));
         state = loaded_not_found;
@@ -1394,14 +1397,15 @@ public:
   void populateInitial(int arrayHdl, CkArrayOptions& options, void* ctorMsg, CkArray* mgr)
   {
     CkArrayIndex end = options.getEnd();
-    // Try to load the configuration from command line argument
-    CkAssert(haveConfigurableRRMap());
-    ConfigurableRRMapLoader& loader = CkpvAccess(myConfigRRMapState);
     if (end.dimension == 0)
     {
       CkFreeMsg(ctorMsg);
       return;
     }
+    if (!haveConfigurableRRMap())
+      CkAbort("ConfigurableRRMap needs the option +ConfigurableRRMap \"<objects per "
+              "block> <PEs per block> <PE of each object within its block>\"\n");
+    ConfigurableRRMapLoader& loader = CkpvAccess(myConfigRRMapState);
     int thisPe = CkMyPe();
     int maxIndex = end.data()[0];
     DEBUG(("[%d] ConfigurableRRMap: index=%d,%d,%d\n", CkMyPe(), (int)end.data()[0],
