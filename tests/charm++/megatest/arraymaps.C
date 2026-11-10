@@ -19,9 +19,8 @@
  *   FastArrayMap: 1D/2D/3D. No insertion: procNum is flat/ceil(n/P), so an
  *     index past the initial size names a PE beyond CkNumPes() (the map's
  *     comment says it is for arrays that promise no late insertion).
- *   HilbertArrayMap: 1D 37, 2D 4x4, 3D 4x4x4 (see the case table for why not
- *     5x7 and 3x4x5). No insertion, as FastArrayMap (it indexes its PE list
- *     with flat/ceil(n/P)).
+ *   HilbertArrayMap: 1D 37, 2D 5x7 and 4x4, 3D 3x4x5 and 4x4x4. No insertion,
+ *     as FastArrayMap (it indexes its PE list with flat/ceil(n/P)).
  *   PropMap: 1D/2D/3D. No insertion: 1D procNum indexes a table of the initial
  *     size with the element index.
  *   CldMap: 1D/2D/3D. procNum is CLD_ANYWHERE, so placement is not checked;
@@ -45,9 +44,6 @@
 
 #ifndef ARRAYMAPS_CLDMAP_INSERT
 #define ARRAYMAPS_CLDMAP_INSERT 0
-#endif
-#ifndef ARRAYMAPS_HILBERT_ODD
-#define ARRAYMAPS_HILBERT_ODD 0
 #endif
 
 enum MapKind { RR, DEFAULT, FAST, BLOCK, HILBERT, PROP, CLD, CONFIGRR, FILE1D, READFILE };
@@ -74,15 +70,9 @@ static const arraymaps_case cases[] = {
     {DEFAULT, D1}, {DEFAULT, D2}, {DEFAULT, D3},
     {BLOCK, D1}, {BLOCK, D2}, {BLOCK, D3},
     {FAST, 1, false, 37, 1, 1}, {FAST, D2}, {FAST, D3},
-    // HilbertArrayMap 2D/3D use power-of-two cubes: with 5x7 and 3x4x5 the
-    // curve position of some indices exceeds the element count, procNum reads
-    // past its PE list, and those elements are never created (ARRAYMAPS_HILBERT_ODD).
-    {HILBERT, 1, false, 37, 1, 1},
-#if ARRAYMAPS_HILBERT_ODD
-    {HILBERT, D2}, {HILBERT, D3},
-#else
+    // HilbertArrayMap: power-of-two cubes as well as the odd extents.
+    {HILBERT, 1, false, 37, 1, 1}, {HILBERT, D2}, {HILBERT, D3},
     {HILBERT, 2, false, 4, 4, 1}, {HILBERT, 3, false, 4, 4, 4},
-#endif
     {PROP, 1, false, 37, 1, 1}, {PROP, D2}, {PROP, D3},
     {CLD, D1}, {CLD, D2}, {CLD, D3},
     {CONFIGRR, D1},

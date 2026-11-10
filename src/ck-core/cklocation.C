@@ -25,6 +25,7 @@
 #include "trace.h"
 #include <algorithm>
 #include <limits>
+#include <numeric>
 #include <sstream>
 #include <stdarg.h>
 #include <vector>
@@ -916,12 +917,20 @@ public:
                   coords[2] = k;
                   coords[3] = x;
                   coords[4] = y;
-                  coords[5] = y;
+                  coords[5] = z;
                   index = Hilbert_to_int(coords, dims);
                   allpairs[counter] = index;
                   counter++;
                 }
     }
+    // procNum cuts allpairs values into blocks of _binSizeCeil, so they must be
+    // 0..n-1; curve positions are not when an extent is not a power of two.
+    // Replace each position by its rank along the curve.
+    std::vector<int> order(allpairs.size());
+    std::iota(order.begin(), order.end(), 0);
+    std::stable_sort(order.begin(), order.end(),
+                     [&](int a, int b) { return allpairs[a] < allpairs[b]; });
+    for (size_t r = 0; r < order.size(); r++) allpairs[order[r]] = (int)r;
     return idx;
   }
 
