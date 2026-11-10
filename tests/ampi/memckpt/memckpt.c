@@ -40,7 +40,12 @@
                   iteration 9 and roll back to it at iteration 10, once:
                   the checkpoint buffers are reused, and the count starts
                   again from 0 at the new checkpoint
-     -norollback  checkpoint only (the plain in_memory path) */
+     -norollback  checkpoint only (the plain in_memory path)
+     -newcomm     at iteration 8, duplicate MPI_COMM_WORLD before asking
+                  for the rollback: a communicator created after the
+                  checkpoint makes the runtime refuse the rollback with
+                  "CharmFT> rollback refused: N array elements inserted"
+                  (the Makefile's testrefusal target expects that abort) */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -80,7 +85,7 @@ static void check_arrays(int rank, int iter, const int *stk, const int *heap)
 
 int main(int argc, char **argv)
 {
-  int rank, size, useInfo = 0, second = 0, norollback = 0;
+  int rank, size, useInfo = 0, second = 0, norollback = 0, newcomm = 0;
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -88,6 +93,7 @@ int main(int argc, char **argv)
     if (strcmp(argv[a], "-info") == 0) useInfo = 1;
     else if (strcmp(argv[a], "-second") == 0) second = 1;
     else if (strcmp(argv[a], "-norollback") == 0) norollback = 1;
+    else if (strcmp(argv[a], "-newcomm") == 0) newcomm = 1;
   }
 
   MPI_Info ckptInfo = AMPI_INFO_CHKPT_IN_MEMORY, rollbackInfo = AMPI_INFO_CHKPT_ROLLBACK;
@@ -140,6 +146,14 @@ int main(int argc, char **argv)
     }
     if (((!norollback && iter == ROLLBACK_ITER) || (second && iter == ROLLBACK2_ITER))
         && count == 0) {
+      if (newcomm) {
+        MPI_Comm dup;
+        MPI_Comm_dup(MPI_COMM_WORLD, &dup);
+        if (rank == 0) {
+          printf("created a communicator after the checkpoint, rolling back\n");
+          fflush(stdout);
+        }
+      }
       AMPI_Migrate(rollbackInfo);
       fail(rank, "AMPI_Migrate(rollback) returned", iter);
     }

@@ -514,11 +514,13 @@ built-in object ``AMPI_INFO_CHKPT_ROLLBACK``) returns every rank to the
 last completed in-memory checkpoint. Like the other values it is
 collective over ``MPI_COMM_WORLD``. The runtime destroys every rank and
 restores it from the checkpoint: its stack, its heap and its MPI state
-(communicators, datatypes, info objects) are as they were when the
-checkpoint was taken. Each rank's thread was suspended inside the
-``AMPI_Migrate(in_memory)`` call that took the checkpoint, so that call
-returns a second time, and the program continues from there. The call
-that asked for the rollback never returns.
+(datatypes, info objects, and the communicators that existed at the
+checkpoint, including any freed since) are as they were when the
+checkpoint was taken; a communicator created after the checkpoint makes
+the rollback fail (see the restrictions below). Each rank's thread was
+suspended inside the ``AMPI_Migrate(in_memory)`` call that took the
+checkpoint, so that call returns a second time, and the program continues
+from there. The call that asked for the rollback never returns.
 
 Since everything in the rank is restored, a counter kept in the rank's
 own variables cannot tell the first return from the return after a
@@ -561,6 +563,15 @@ Restrictions and notes:
   refused by the runtime, which aborts with ``CharmFT> rollback refused:
   N array elements migrated on PE p since the last in-memory
   checkpoint``.
+- No new communicators may be created between a checkpoint and its
+  rollback (``MPI_Comm_dup``, ``MPI_Comm_split``, ``MPI_Comm_create``,
+  intercommunicator and topology constructors): each new communicator's
+  ranks are new Charm++ array elements, which the checkpoint does not
+  contain. The runtime refuses such a rollback and aborts with
+  ``CharmFT> rollback refused: N array elements inserted on PE p since the
+  last in-memory checkpoint``. Communicators created before the checkpoint
+  can be used after the rollback, and freeing a communicator between the
+  checkpoint and the rollback is allowed (the rollback restores it).
 - Only the ranks are restored. Nothing outside them is: readonly
   variables, Charm++ groups, and files the program wrote keep their
   current state. In a program whose global variables are not privatized,
