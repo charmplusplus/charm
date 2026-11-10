@@ -288,10 +288,24 @@ void CkCallstackUnwind(Chare *obj);
 Chare *CkActiveObj(void);
 Chare *CkAllocateChare(int objId);
 
+// The message and the entry index being delivered to the running entry
+// method: null and -1 outside an entry method. An [inline] or [local] call
+// made from an entry method sees the caller's delivery.
+CkpvExtern(void *, _ckCurrentMsg);
+CkpvExtern(int, _ckCurrentEp);
+static inline void *CkCurrentMessage(void) { return CkpvAccess(_ckCurrentMsg); }
+static inline int CkCurrentEntry(void) { return CkpvAccess(_ckCurrentEp); }
+
 static inline void CkInvokeEP(Chare *obj, const int &epIdx, void *msg) {
+  void *prevMsg = CkpvAccess(_ckCurrentMsg);
+  int prevEp = CkpvAccess(_ckCurrentEp);
+  CkpvAccess(_ckCurrentMsg) = msg;
+  CkpvAccess(_ckCurrentEp) = epIdx;
   CkCallstackPush(obj);
   _entryTable[epIdx]->call(msg, obj);
   CkCallstackPop(obj);
+  CkpvAccess(_ckCurrentMsg) = prevMsg;
+  CkpvAccess(_ckCurrentEp) = prevEp;
 }
 
 #if CMK_HAS_IS_CONSTRUCTIBLE
@@ -432,6 +446,7 @@ struct recursive_pup_impl<T, true> {
   void operator()(T *obj, PUP::er &p) {
     obj->parent_pup(p);
     obj->_sdag_pup(p);
+    obj->_coro_pup(p);
     obj->T::pup(p);
   }
 };
@@ -465,6 +480,7 @@ class CProxy_ArrayBase;
   CProxy_Derived thisProxy;                                   \
   void pup(PUP::er &p) { (void)p; }                           \
   inline void _sdag_pup(PUP::er &p) { (void)p; }              \
+  inline void _coro_pup(PUP::er &p) { (void)p; }              \
   void virtual_pup(PUP::er &p)
 
 /*Templated implementation of CBase_* classes.*/

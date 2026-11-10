@@ -114,7 +114,7 @@ void ReservedWord(int token, int fCol, int lCol);
 %token THREADED
 %token TEMPLATE
 %token WHENIDLE SYNC IGET EXCLUSIVE IMMEDIATE SKIPSCHED INLINE VIRTUAL MIGRATABLE AGGREGATE
-%token CREATEHERE CREATEHOME NOKEEP NOTRACE APPWORK
+%token CREATEHERE CREATEHOME NOKEEP NOTRACE APPWORK INBOX COROUTINE
 %token VOID
 %token CONST
 %token NOCOPY
@@ -268,6 +268,8 @@ Name		: IDENT
 		| CREATEHERE { ReservedWord(CREATEHERE, @$.first_column, @$.last_column); YYABORT; }
 		| CREATEHOME { ReservedWord(CREATEHOME, @$.first_column, @$.last_column); YYABORT; }
 		| NOKEEP { ReservedWord(NOKEEP, @$.first_column, @$.last_column); YYABORT; }
+		| INBOX { ReservedWord(INBOX, @$.first_column, @$.last_column); YYABORT; }
+		| COROUTINE { ReservedWord(COROUTINE, @$.first_column, @$.last_column); YYABORT; }
 		| NOTRACE { ReservedWord(NOTRACE, @$.first_column, @$.last_column); YYABORT; }
 		| APPWORK { ReservedWord(APPWORK, @$.first_column, @$.last_column); YYABORT; }
 		/* | VOID { ReservedWord(VOID, @$.first_column, @$.last_column); YYABORT; } */
@@ -1024,6 +1026,10 @@ EAttrib		: THREADED
 		{ $$ = SCREATEHOME; }
 		| NOKEEP
 		{ $$ = SNOKEEP; }
+		| INBOX
+		{ $$ = SINBOX; }
+		| COROUTINE
+		{ $$ = SCOROUTINE; }
 		| NOTRACE
 		{ $$ = SNOTRACE; }
 		| APPWORK 

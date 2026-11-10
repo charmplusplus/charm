@@ -95,6 +95,33 @@ void Entry::check() {
   if (isExclusive() && !container->isNodeGroup())
     XLAT_ERROR_NOCOL("only nodegroup methods can be 'exclusive'", first_line_);
 
+    if (isInbox() || isCoroutine()) {
+      if (isInbox() && isCoroutine())
+        XLAT_ERROR_NOCOL("an entry method is 'inbox' or 'coroutine', not both", first_line_);
+      if (!container->isArray())
+        XLAT_ERROR_NOCOL("'inbox' and 'coroutine' entry methods belong to array elements",
+                         first_line_);
+      if (isConstructor() || isThreaded() || isSync() || isLocal() || isInline() ||
+          isWhenIdle() || isIget() || isPython() || isTramTarget())
+        XLAT_ERROR_NOCOL("an 'inbox' or 'coroutine' entry method is a plain asynchronous "
+                         "entry method (not threaded, sync, local, inline, whenidle, iget, "
+                         "python or aggregate)", first_line_);
+      if (retType && !retType->isVoid())
+        XLAT_ERROR_NOCOL("an 'inbox' or 'coroutine' entry method returns void", first_line_);
+      if (isCoroutine() && !(param->isVoid() || param->isMessage()))
+        XLAT_ERROR_NOCOL("a 'coroutine' entry method takes no parameters or one message",
+                         first_line_);
+      if (isCoroutine() && isReductionTarget())
+        XLAT_ERROR_NOCOL("a 'coroutine' entry method is not a reduction target: make the "
+                         "target an 'inbox' entry and wait for it", first_line_);
+      for (ParamList* pl = param; pl != NULL; pl = pl->next) {
+        Parameter* sv = pl->param;
+        if (sv->isArray() || sv->isConditional() || sv->isRdma())
+          XLAT_ERROR_NOCOL("an 'inbox' entry method takes a message or marshalled parameters "
+                           "without arrays, conditional or nocopy parameters", first_line_);
+      }
+    }
+
   // (?) Check that every when statement has a corresponding entry method
   // declaration. Otherwise, print all candidates tested (as in clang, gcc.)
   if (isSdag()) {
@@ -242,6 +269,10 @@ void Entry::setChare(Chare* c) {
 
   if (isWhenIdle()) {
     container->setWhenIdle(1);
+  }
+
+  if (isInbox() || isCoroutine()) {
+    container->setCoro(1);
   }
 }
 
@@ -2620,9 +2651,39 @@ int Entry::isAccel(void) { return (hasAttribute(SACCEL)); }
 
 int Entry::isMemCritical(void) { return (hasAttribute(SMEM)); }
 int Entry::isReductionTarget(void) { return (hasAttribute(SREDUCE)); }
+int Entry::isInbox(void) { return (hasAttribute(SINBOX)); }
+int Entry::isCoroutine(void) { return (hasAttribute(SCOROUTINE)); }
 
 char* Entry::getEntryName() { return name; }
 int Entry::getLine() { return line; }
 Chare* Entry::getContainer(void) const { return container; }
+
+// One entry's lines of the X_CORO_CODE macro (Chare::genCoroCode).
+void Entry::genCoroCode(CoroGen& g) {
+  XStr& str = *g.str;
+  if (g.pass == CoroGen::isEntry) {
+    if (isCoroutine()) str << " || ep == " << epIdx(1);
+    return;
+  }
+  if (!isInbox()) return;
+  if (g.pass == CoroGen::stub) {
+    // The entry's body: hand the message, or the arguments, to the state.
+    str << "  void " << name << "(" << paramType(0, 0) << ") { __coro.deliver(" << epIdx(1);
+    if (param->isMessage()) {
+      str << ", " << param->param->name;
+    } else {
+      for (ParamList* pl = param; pl != NULL; pl = pl->next)
+        if (!pl->param->getType()->isVoid()) str << ", " << pl->param->name;
+    }
+    str << "); }\n";
+  } else if (g.pass == CoroGen::want) {
+    // inbox::name() waits for any delivery, inbox::name(ref) for one with
+    // that reference number.
+    str << "    static ::ck::coro::want " << name << "() { return ::ck::coro::want(" << epIdx(1)
+        << "); }\n"
+        << "    static ::ck::coro::want " << name << "(CMK_REFNUM_TYPE ref) { return ::ck::coro::want("
+        << epIdx(1) << ", ref); }\n";
+  }
+}
 
 }  // namespace xi

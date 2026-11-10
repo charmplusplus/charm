@@ -1,8 +1,10 @@
 # Entry methods as C++20 coroutines: an SDAG equivalent (design)
 
-Status: prototype on branch `coroutine-sdag` (2026-11-09), header
-`src/ck-core/ckcoro.h`, first program `tests/charm++/jacobi3d-coro`,
-microbenchmark `benchmarks/charm++/coro_pingpong`. The mechanism as built is
+Status: prototype on branch `coroutine-sdag` (2026-11-09; attributes
+`[inbox]` and `[coroutine]` and the `CkCurrentMessage` accessor added
+2026-11-10), header `src/ck-core/ckcoro.h`, first program
+`tests/charm++/jacobi3d-coro`, microbenchmark
+`benchmarks/charm++/coro_pingpong`. The mechanism as built is
 described in `doc/internals/coroutine-sdag.md`; this document holds the
 reasons, the alternatives and the measurements. The precedent is CAMPI
 (`src/libs/ck-libs/ampi/campi.h`, `campi_core.h`, PRs #4073 and #4136),
@@ -31,16 +33,16 @@ entry method is invoked again and jumps to the recorded site.
 
 ## 2. API, with the complete jacobi3d step
 
-The .ci file declares ordinary entries; nothing marks the coroutine or the
-inbox entries, and charmxi generates its usual code:
+The .ci file declares the coroutine entry `[coroutine]` and the entries
+it waits for `[inbox]`; the control flow is not in the .ci file:
 
 ```
 array [3D] Jacobi {
   entry Jacobi(void);
-  entry void doStep(void);                 // the coroutine entry
-  entry void receiveGhosts(ghostMsg *gmsg); // inbox entries
-  entry void ResumeFromSync(void);
-  entry void resume(void);
+  entry [coroutine] void doStep(void);      // ck::coroutine Jacobi::doStep() in jacobi3d.C
+  entry [inbox] void receiveGhosts(ghostMsg *gmsg);
+  entry [inbox] void ResumeFromSync(void);
+  entry [inbox] void resume(void);
 };
 ```
 
@@ -49,31 +51,27 @@ original is `tests/charm++/jacobi3d-sdag`):
 
 ```c++
 class Jacobi : public CBase_Jacobi {
-  ck::coro::state co;      // the coroutine's record and the inbox; pupped
+  Jacobi_CORO_CODE         // generated: the coroutine state (pupped with the element),
+                           // the inbox entry bodies, and inbox::name() / inbox::name(ref)
   int iterations, imsg;    // state across sites: members, pupped
   double *temperature, *new_temperature;
   ghostMsg *gmsg;          // scratch: assigned at a site, used after it
 
-  void pup(PUP::er &p) { p | iterations; p | imsg; ...; p | co; }
-
-  // Inbox entries: one line each.
-  void receiveGhosts(ghostMsg *m) { co.deliver(CkIndex_Jacobi::receiveGhosts(0), m); }
-  void ResumeFromSync() { co.deliver(CkIndex_Jacobi::ResumeFromSync()); }
-  void resume() { co.deliver(CkIndex_Jacobi::resume()); }
+  void pup(PUP::er &p) { p | iterations; p | imsg; ...; }
 
   ck::coroutine doStep() {
-    CK_COROUTINE(co, CkIndex_Jacobi::doStep());
+    CK_COROUTINE();
     if (lbFreq > 0 && iterations > 0 && iterations % lbFreq == 0) {
       AtSync();
-      CK_WHEN(CkIndex_Jacobi::ResumeFromSync(), ck::coro::noref);
+      CK_WHEN(inbox::ResumeFromSync());
     }
     if (iterations == chkptIter) {
       contribute(CkCallback(CkReductionTarget(Main, checkpoint), mainProxy));
-      CK_WHEN(CkIndex_Jacobi::resume(), ck::coro::noref);
+      CK_WHEN(inbox::resume());
     }
     begin_iteration();
     for (imsg = 0; imsg < 6; imsg++) {
-      CK_WHEN(CkIndex_Jacobi::receiveGhosts(0), iterations, gmsg);  // when receiveGhosts[iterations](ghostMsg *gmsg)
+      CK_WHEN(inbox::receiveGhosts(iterations), gmsg);  // when receiveGhosts[iterations](ghostMsg *gmsg)
       processGhosts(gmsg);
     }
     check_and_compute();
@@ -105,23 +103,29 @@ test migrates and checkpoints an element suspended at a site. Without those
 two blocks the coroutine body is the loop shown, between `CK_COROUTINE` and
 `CK_END`.
 
-Vocabulary (all in `ckcoro.h`):
+Vocabulary (the attributes in charmxi, the rest in `ckcoro.h`):
 
 | | |
 |---|---|
+| `[coroutine]`, `[inbox]` | .ci attributes: the entry is a coroutine (void; no parameters or one message); the entry is waited for (a message, or marshalled parameters without arrays) |
+| `X_CORO_CODE` | generated macro placed in the class: the `ck::coro::state` member (pupped through the generated pup), the inbox entry bodies, `__coro_is_entry`, and `struct inbox` |
+| `inbox::name()` / `inbox::name(ref)` | a `ck::coro::want`: a delivery to that entry with any, or with that, reference number |
 | `ck::coroutine` | return type of a coroutine entry method; the body starts at once |
-| `ck::coro::state` | one member per chare: active coroutines and the inbox; `p \| co` in pup |
-| `co.deliver(ep, msg)` / `co.deliver(ep, args...)` | the body of an inbox entry; `ep` is `CkIndex_X::name(...)` |
-| `CK_COROUTINE(co, ep)` / `CK_COROUTINE_MSG(co, ep, msg)` | opens the body; registers the coroutine; opens the restart switch |
-| `CK_WHEN(ep, refnum-or-noref, out...)` | a site: wait for a delivery to `ep` with that reference number and store it in `out` (a message pointer, or the marshalled arguments) |
+| `CK_COROUTINE()` | opens the body; registers the coroutine (the entry being delivered); opens the restart switch |
+| `CK_WHEN(want, out...)` | a site: wait for the delivery and store it in `out` (the message pointer, or every marshalled parameter in order) |
+| `CK_WHEN_ANY(idx, CK_ALT(want, out...), ...)` | a site: the first of several (SDAG `case`); `idx` gets the index that matched |
+| `ck::coro::state`, `co.deliver(ep, msg)` / `co.deliver(ep, args...)`, `CK_COROUTINE(co, ep)`, `CK_WHEN(ep, ref-or-noref, out...)` | the same by hand, without the attributes: a state member pupped by the chare, inbox bodies written out, entry indices spelled `CkIndex_X::name(...)` |
 | `CK_CALL(expr)` / `CK_CALL_TO(lhs, expr)` | a site: await a `ck::coro::task<T>` helper that itself contains sites |
 | `CK_RESUMABLE()` / `CK_END()` | the restart switch of a helper; `CK_END` closes any body |
 | `ck::coro::task<T>` | lazily started helper coroutine (CAMPI's `campi::task`) |
 | `+ck_fakemigrate` | every site rebuilds the element's coroutines in place |
 
 Reference numbers follow SDAG: the envelope's for a message entry, the
-first arithmetic argument for a marshalled entry; `ck::coro::noref` matches
-any. A zero-argument marshalled entry (`ResumeFromSync` above) carries none.
+first arithmetic argument for a marshalled entry; `inbox::name()` (by
+hand: `ck::coro::noref`) matches any. The reference number is a
+`CMK_REFNUM_TYPE` (`unsigned short` by default, a build option), the same
+field SDAG matches on; it wraps, which is harmless as long as no delivery
+from 65536 iterations ago is still unconsumed.
 
 ## 3. Rules
 
@@ -152,8 +156,8 @@ any. A zero-argument marshalled entry (`ResumeFromSync` above) carries none.
    programs or jacobi3d relies on it. The restriction is what lets a restart
    be a plain re-invocation of the entry (section 4.5).
 5. **A coroutine entry takes no parameters or one message.** Parameters it
-   needs are members. Marshalled parameters would need the translator to
-   generate the closure that carries them across a restart (section 4.1).
+   needs are members. Marshalled parameters would need a generated closure
+   that carries them across a restart (section 4.1); not done.
 6. A site is one statement and may be the body of an `if` or a loop; its
    case label must not be inside a `switch` of the user's own; two sites must
    not share a line (CAMPI's rules, from the `switch`/`case __LINE__`
@@ -171,25 +175,46 @@ parameters on the SDAG entry, and `overlap` (not yet).
 
 ### 4.1 Library or translator
 
-Library, with no charmxi change, is enough for everything in section 2.
-Two facts make it so: (a) charmxi's generated wrapper for a void entry
-calls `impl_obj->doStep()` and ignores the return value, so the C++
-definition may return `ck::coroutine` while the .ci file says `void`;
-(b) an inbox entry is an ordinary entry whose body is one line. What
-charmxi still has to know is nothing; what it could usefully learn later:
+Library first, then two small attributes. The library alone does
+everything in section 2, because (a) charmxi's generated wrapper for a
+void entry calls `impl_obj->doStep()` and ignores the return value, so the
+C++ definition may return `ck::coroutine` while the .ci file says `void`,
+and (b) an inbox entry is an ordinary entry whose body is one line. That
+form (`ck::coro::state co` pupped by the chare, `co.deliver(...)` bodies,
+`CK_COROUTINE(co, ep)`, `CK_WHEN(CkIndex_X::name(0), ref, out)`) still
+works and is what the pingpong benchmark uses. Its three warts are the
+entry index spelled with a placeholder argument at every site, the
+one-line bodies, and the state member the chare has to declare and pup.
 
-- an `[inbox]` attribute that generates the one-line body and, for
-  marshalled entries with arrays (`int data[n]`), keeps the marshalled
-  message in the inbox instead of re-packing the arguments (today the
-  library packs the arguments with PUP into bytes, which handles scalars,
-  `std::vector`, `std::string` and anything with a `pup`, but not raw
-  arrays);
-- a `[coroutine]` attribute that carries marshalled parameters across a
-  restart (rule 5) and that makes `CK_COROUTINE`'s entry index implicit.
+The two attributes remove them and nothing else. `[inbox]` and
+`[coroutine]` make charmxi emit a macro, `X_CORO_CODE` (as `X_SDAG_CODE`),
+that the class places in its body: the state member and its pup hook
+(called by the generated recursive pup, as `_sdag_pup` is), the inbox
+entry bodies, the test `CK_COROUTINE()` uses to check that it runs as one
+of the chare's coroutine entries, and `struct inbox` with one function per
+inbox entry returning a `ck::coro::want`. The generated wrappers are not
+changed: a coroutine entry's wrapper calls the method as before, and the
+body learns its entry index and message from `CkCurrentEntry()` and
+`CkCurrentMessage()`, a runtime accessor added for this (three lines in
+`CkInvokeEP`). An inbox entry's generated body is the one-liner the
+programmer wrote before. Validation: both attributes need an array
+element, a void return, and none of threaded, sync, local, inline,
+whenidle, iget, python or aggregate; `[inbox]` rejects array, conditional
+and nocopy parameters; `[coroutine]` takes no parameters or one message and
+is not a reduction target. The whole translator change is the two
+keywords, the two bits, the checks, and `Chare::genCoroCode` with
+`Entry::genCoroCode` (about 120 lines in `src/xlat-i`), plus the
+regenerated parser and scanner.
 
-Both are small (the SDAG translator already generates closures for
-when-entries, `CEntry::generateCode`), and both keep the .ci file readable:
-the declaration stays one line. They are not needed for the beta.
+The choice of a generated body over a generated raw wrapper was made so
+that the hand-written form and the generated form run the same delivery
+code: there is one path in the header to test, and a program can drop the
+attributes without touching the runtime. The cost is that the wrapper's
+unmarshalling of the parameters is wasted (the inbox keeps the message and
+unpacks again at the site), which is the same as SDAG's closure path for
+non-array parameters. A later charmxi optimisation can emit a wrapper that
+skips the unmarshalling for `[inbox]` entries without changing any program
+text.
 
 ### 4.2 Suspension and migration rules
 
@@ -241,8 +266,17 @@ story: a record is a record.
 
 The inbox buffers every delivery that no coroutine is waiting for, keyed by
 entry index (stable across PEs) and reference number, in arrival order, and
-`CK_WHEN` takes the first match. Messages are kept as messages
-(`CkPupMessage` moves them); marshalled arguments are kept as pupped bytes.
+`CK_WHEN` takes the first match. Every buffered delivery is a message
+(`CkPupMessage` moves them): the entry's own message, or the
+`CkMarshallMsg` that carried the marshalled parameters, which the inbox
+body keeps with a reference count instead of copying the parameters
+(`CkCurrentMessage()` gives it the message being delivered; SDAG keeps the
+marshalled message only for array parameters and copies the rest into its
+closure). A delivery reached in another way, through the reduction
+wrapper of a `[reductiontarget, inbox]` entry or by a direct call, packs
+the arguments into a fresh `CkMarshallMsg` in the same layout, so a site
+unpacks every buffered delivery the same way. A void entry buffers no
+message.
 The inbox moves with the element; messages that reach the old PE after the
 element left are forwarded by the location manager and delivered to the
 new PE's inbox entry as usual. SDAG's `Dependency`/`Buffer`/`Continuation`
@@ -404,26 +438,35 @@ the rules in section 3.
 
 ## 9. Decision memo for Kale
 
-**Recommendation: ship `ckcoro.h` in the beta, marked experimental.** It
-is a header with no runtime or translator change, so it cannot break
-anything that does not include it, and it already carries a real program
-(jacobi3d with load balancing, rebuild, checkpoint and restart) and the
-SDAG migration test. Its matching costs a fifth of SDAG's and jacobi3d
-runs 14 to 17 percent faster per iteration. The restrictions are the ones
-CAMPI already imposes on AMPI programs (state in members, sites are
-declared, nothing packed except at a site) plus one active coroutine per
-entry and no marshalled parameters on the coroutine entry.
+**Recommendation: ship `ckcoro.h` with the `[inbox]` and `[coroutine]`
+attributes in the beta, marked experimental.** The runtime change is one
+accessor (`CkCurrentMessage`, `CkCurrentEntry`: three lines in
+`CkInvokeEP` and a hook in the recursive pup), the translator change is
+two attributes that generate a macro, and neither touches a program that
+does not use them. The branch carries a real program (jacobi3d with load
+balancing, rebuild, checkpoint and restart), the SDAG migration test, and
+a marshalled-inbox test (matching by the first parameter, a broadcast, a
+reduction target). Matching costs a fifth of SDAG's and jacobi3d runs 14
+to 17 percent faster per iteration. The restrictions are the ones CAMPI
+already imposes on AMPI programs (state in members, sites are declared,
+nothing packed except at a site) plus one active coroutine per entry, no
+marshalled parameters on the coroutine entry, and no arrays among inbox
+parameters.
+
+The attributes are in the beta (Kale, 2026-11-10) because they remove the
+three things a reader of the hand-written form complains about first: the
+entry index spelled `CkIndex_X::name(0)` at every site, the one-line
+inbox bodies, and the state member to declare and pup. They were kept to
+generating what the programmer would write, over the current-message
+accessor, so that the hand-written form keeps working unchanged, there is
+one delivery path, and a later decision about the `.ci` file in general
+is not prejudged: with the `.ci` file kept, the attributes stay; without
+it, the same macro can be produced by a C++20 member-pointer template
+(`ck::entry<&X::name>`) over a registry, and the header does not change.
 
 What "experimental" has to say: no `overlap` and no `forall`; `case` only
 over single whens; arrays only (no groups or singleton chares as owners);
-the macro syntax may change when the translator attributes arrive.
-
-What the translator must gain, in order of value: an `[inbox]` attribute
-(removes the one-line bodies, admits array parameters), a `[coroutine]`
-attribute (marshalled parameters on the entry, implicit entry index,
-several active coroutines by a generated record per invocation), and
-nothing else; both are small changes in `src/xlat-i` and neither is needed
-for the beta.
+inbox parameters without arrays; the site macros may still change.
 
 What charm4py can mirror: the record and site protocol of section 8, with
 no C++ frame involved.
@@ -440,5 +483,7 @@ rest of the SDAG test corpus.
   `forall`.
 - Groups, nodegroups and singleton chares as owners of coroutine entries
   (the prototype's record builds its callback from an `ArrayElement`).
-- An `[inbox]` attribute for marshalled entries with arrays.
-- The equivalence corpus runs, and the Anvil timing.
+- Array parameters on `[inbox]` entries (charmxi's array layout: sizes
+  first, data aligned), and a generated wrapper that skips the wasted
+  unmarshalling.
+- The equivalence corpus runs.

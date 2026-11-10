@@ -8,5 +8,20 @@ mainmodule ckcoro_tests {
     entry Main(CkArgMsg* msg);
     entry void doMigrationTest();
     entry [reductiontarget] void migrationTestDone();
+    entry void doMarshallTest();
+    entry [reductiontarget] void marshallTestDone();
+  }
+
+  // Marshalled inbox entries: the parameters stay in the message being
+  // delivered, which the inbox keeps (and pups under +ck_fakemigrate).
+  array [1D] MarshallTest {
+    entry MarshallTest();
+    entry [coroutine] void run();
+    // Matched by the first argument (SDAG: when recv[iter](...)).
+    entry [inbox] void recv(int iter, std::vector<int> values);
+    // A broadcast: every element keeps a reference to one message.
+    entry [inbox] void tag(int t, double x);
+    // Reached through the reduction wrapper: the arguments are packed.
+    entry [inbox, reductiontarget] void total(int sum);
   }
 }

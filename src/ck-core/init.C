@@ -1381,6 +1381,10 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 
 	CkpvInitialize(size_t *, _offsets);
+	CkpvInitialize(void *, _ckCurrentMsg);
+	CkpvAccess(_ckCurrentMsg) = NULL;
+	CkpvInitialize(int, _ckCurrentEp);
+	CkpvAccess(_ckCurrentEp) = -1;
 #if CMK_ERROR_CHECKING
 	CkpvInitialize(void *, _nokeepMsgInFlight);
 	CkpvAccess(_nokeepMsgInFlight) = NULL;

@@ -31,12 +31,12 @@ mainmodule jacobi3d {
 
   array [3D] Jacobi {
     entry Jacobi(void);
-    // The coroutine entry (ck::coroutine Jacobi::doStep() in jacobi3d.C).
-    entry void doStep(void);
-    // Inbox entries: their bodies hand the delivery to the coroutine state.
-    entry void receiveGhosts(ghostMsg *gmsg);
-    entry void ResumeFromSync(void);
-    entry void resume(void);
+    // ck::coroutine Jacobi::doStep() in jacobi3d.C; waits at CK_WHEN sites
+    // for the inbox entries below, whose bodies are generated.
+    entry [coroutine] void doStep(void);
+    entry [inbox] void receiveGhosts(ghostMsg *gmsg);
+    entry [inbox] void ResumeFromSync(void);
+    entry [inbox] void resume(void);
   };
 
 };

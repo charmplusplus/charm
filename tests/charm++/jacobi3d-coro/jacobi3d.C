@@ -150,8 +150,8 @@ class Main : public CBase_Main {
 };
 
 class Jacobi : public CBase_Jacobi {
+  Jacobi_CORO_CODE          // the coroutine state and the inbox entries
   public:
-    ck::coro::state co;      // the coroutine's record and the inbox
     int iterations;
     int imsg;
     double *temperature;
@@ -192,28 +192,22 @@ class Jacobi : public CBase_Jacobi {
         gmsg = nullptr;
       }
       p((char *)temperature, (blockDimX+2) * (blockDimY+2) * (blockDimZ+2) * sizeof(double));
-      p | co;
     }
-
-    // Inbox entries.
-    void receiveGhosts(ghostMsg *m) { co.deliver(CkIndex_Jacobi::receiveGhosts(0), m); }
-    void ResumeFromSync() { co.deliver(CkIndex_Jacobi::ResumeFromSync()); }
-    void resume() { co.deliver(CkIndex_Jacobi::resume()); }
 
     // One step: the SDAG doStep of jacobi3d-sdag as a coroutine.
     ck::coroutine doStep() {
-      CK_COROUTINE(co, CkIndex_Jacobi::doStep());
+      CK_COROUTINE();
       if (lbFreq > 0 && iterations > 0 && iterations % lbFreq == 0) {
         AtSync();
-        CK_WHEN(CkIndex_Jacobi::ResumeFromSync(), ck::coro::noref);
+        CK_WHEN(inbox::ResumeFromSync());
       }
       if (iterations == chkptIter) {
         contribute(CkCallback(CkReductionTarget(Main, checkpoint), mainProxy));
-        CK_WHEN(CkIndex_Jacobi::resume(), ck::coro::noref);
+        CK_WHEN(inbox::resume());
       }
       begin_iteration();
       for (imsg = 0; imsg < 6; imsg++) {
-        CK_WHEN(CkIndex_Jacobi::receiveGhosts(0), iterations, gmsg);
+        CK_WHEN(inbox::receiveGhosts(iterations), gmsg);   // when receiveGhosts[iterations](ghostMsg *gmsg)
         processGhosts(gmsg);
       }
       check_and_compute();

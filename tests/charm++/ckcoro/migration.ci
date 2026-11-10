@@ -14,28 +14,28 @@ module migration {
     entry MigrationTest();
 
     // Sent before migration, with the origin PE
-    entry void sentBefore(TestMessage* msg);
+    entry [inbox] void sentBefore(TestMessage* msg);
     // Sent after migration, from ckJustMigrated
-    entry void sentAfter(TestMessage* msg);
+    entry [inbox] void sentAfter(TestMessage* msg);
 
     // Sent at the start of the test, received throughout the coroutine
-    entry void call1();
-    entry void call2();
-    entry void call3();
+    entry [inbox] void call1();
+    entry [inbox] void call2();
+    entry [inbox] void call3();
 
     // Sent as each call is received
-    entry void response1();
-    entry void response2();
-    entry void response3();
+    entry [inbox] void response1();
+    entry [inbox] void response2();
+    entry [inbox] void response3();
 
     // Synchronization of the migrations
-    entry void doMigration();
-    entry [reductiontarget] void migrationDone();
+    entry [inbox] void doMigration();
+    entry [inbox, reductiontarget] void migrationDone();
 
     // Migrates the element while run() is suspended at a site.
     entry void migrateNow();
 
     // The coroutine entry (ck::coroutine MigrationTest::run()).
-    entry void run();
+    entry [coroutine] void run();
   }
 }

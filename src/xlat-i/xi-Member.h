@@ -14,6 +14,12 @@ class Type;
 class NamedType;
 
 /* Member of a chare or group, i.e. entry, RO or ROM */
+// The pass of Chare::genCoroCode an entry is writing its X_CORO_CODE lines for.
+struct CoroGen {
+  XStr* str;
+  enum { isEntry, stub, want } pass;
+};
+
 class Member : public Construct {
   // friend class CParsedFile;
  protected:
@@ -31,6 +37,7 @@ class Member : public Construct {
   XStr makeDecl(const XStr& returnType, int forProxy = 0, bool isStatic = false, XStr fwdStr = XStr());
   virtual void genPythonDecls(XStr&) {}
   virtual void genIndexDecls(XStr&) {}
+  virtual void genCoroCode(CoroGen&) {}
   virtual void genPythonDefs(XStr&) {}
   virtual void genPythonStaticDefs(XStr&) {}
   virtual void genPythonStaticDocs(XStr&) {}

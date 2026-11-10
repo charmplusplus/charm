@@ -2098,6 +2098,111 @@ contains when clauses. It has to be only called using the proxy i.e.
 
 .. _sec:pup:
 
+.. _sec:ckcoro:
+
+Structured Control Flow: Coroutine Entry Methods
+------------------------------------------------
+
+An entry method of an array element can be written as a C++20 coroutine
+that waits in the middle of its body for other entry methods of the
+element, as an SDAG entry waits with ``when``. The control flow is plain
+C++ (``if``, loops, calls), the interface file keeps only the
+declarations, and the element can migrate or be checkpointed while the
+coroutine waits. The header is ``ckcoro.h``; the programs must be compiled
+with ``-std=c++20``. This feature is experimental in this release.
+
+The entry methods involved are declared with two attributes: the
+coroutine entry is ``[coroutine]`` (void, with no parameters or one
+message), and the entries it waits for are ``[inbox]`` (a message, or
+marshalled parameters without arrays). The chare puts the generated macro
+``ClassName_CORO_CODE`` in its class, which defines the coroutine state
+(the active coroutines and the buffered deliveries, packed with the
+element), the bodies of the inbox entries, and ``inbox::name()`` and
+``inbox::name(ref)``, which name an inbox entry at a wait. The jacobi3d
+step of ``tests/charm++/jacobi3d-coro``:
+
+.. code-block:: none
+
+   array [3D] Jacobi {
+     entry Jacobi();
+     entry [coroutine] void doStep();
+     entry [inbox] void receiveGhosts(ghostMsg *m);
+     entry [inbox] void ResumeFromSync();
+   };
+
+.. code-block:: c++
+
+   class Jacobi : public CBase_Jacobi {
+     Jacobi_CORO_CODE
+     int iterations, imsg;   // live across waits: members, pupped as usual
+     ghostMsg *gmsg;         // assigned at a wait, used after it
+     ...
+     ck::coroutine doStep() {
+       CK_COROUTINE();
+       if (iterations > 0 && iterations % lbFreq == 0) {
+         AtSync();
+         CK_WHEN(inbox::ResumeFromSync());
+       }
+       begin_iteration();
+       for (imsg = 0; imsg < 6; imsg++) {
+         CK_WHEN(inbox::receiveGhosts(iterations), gmsg); // when receiveGhosts[iterations](ghostMsg *gmsg)
+         processGhosts(gmsg);
+       }
+       check_and_compute();
+       CK_END();
+     }
+   };
+
+``CK_WHEN(want, out...)`` waits until a delivery to the named entry
+arrives, then stores it into the lvalues that follow: the message pointer
+(the coroutine owns the message), or every marshalled parameter of the
+entry in order. ``inbox::name(ref)`` matches the reference number, which
+is the envelope's for a message entry and the first arithmetic parameter
+for a marshalled entry; ``inbox::name()`` matches any. A delivery that no
+coroutine is waiting for is buffered in the element, in arrival order, and
+moves with the element. ``CK_WHEN_ANY(idx, CK_ALT(want, out...), ...)``
+waits for the first of several alternatives and stores the index of the
+one that matched, as an SDAG ``case``. Two consecutive ``CK_WHEN`` wait
+for both deliveries, as an SDAG ``when a(), b()``.
+
+A coroutine frame is never packed. When the element migrates or is
+checkpointed, the coroutine state records which wait each active coroutine
+is suspended at, and after unpacking the entry is invoked again: its body
+runs again from the top and jumps to the recorded wait. This gives the
+rules:
+
+-  A value that is live across a wait is a member of the chare, pupped as
+   usual. (C++ rejects a jump past a local with an initializer; a scalar
+   declared without one is not caught.)
+-  Code before a wait runs again after a migration, so its results must
+   be members, not recomputed side effects.
+-  The element migrates or is checkpointed only while every active
+   coroutine of it is suspended at a ``CK_WHEN``, ``CK_WHEN_ANY`` or
+   ``CK_CALL``; packing it while suspended at another ``co_await`` aborts.
+   ``AtSync()`` and ``migrateMe()`` may be called from the body: the move
+   happens while the body waits at the next ``CK_WHEN``.
+-  A wait is one statement and may be the body of an ``if`` or a loop; it
+   must not be inside a ``switch`` of the program's own, and two waits
+   must not share a source line.
+-  At most one coroutine per entry method is active in an element at a
+   time.
+
+A function that itself waits is written as a ``ck::coro::task<T>``
+coroutine whose body is bracketed by ``CK_RESUMABLE()`` and ``CK_END()``,
+and is awaited with ``CK_CALL(expr)`` or ``CK_CALL_TO(lhs, expr)``.
+
+The command line option ``+ck_fakemigrate`` makes every wait pack and
+unpack the element's coroutines in place the first time a coroutine
+suspends there, so that a program can check the rules above on one
+processor without a load balancer.
+
+Inside any entry method, ``CkCurrentMessage()`` returns the message being
+delivered (for marshalled parameters, the message that carries them) and
+``CkCurrentEntry()`` the index of the entry method; both are null (-1)
+outside an entry method, and an ``[inline]`` or ``[local]`` call sees the
+caller's delivery. The inbox entries use them to keep marshalled
+parameters in the message they arrived in instead of copying them.
+
 Serialization Using the PUP Framework
 -------------------------------------
 
@@ -4357,7 +4462,8 @@ follows:
 
 Charm++ currently offers the following attributes that one may assign to
 an entry method: threaded, sync, exclusive, nokeep, notrace, appwork,
-immediate, expedited, inline, local, python, reductiontarget, aggregate.
+immediate, expedited, inline, local, python, reductiontarget, aggregate,
+inbox, coroutine.
 
 threaded
    entry methods run in their own non-preemptible threads. These entry
@@ -4419,6 +4525,16 @@ nokeep
    ``nokeep`` message is also an error, which the runtime does not
    detect. An example can be found in
    ``examples/charm++/histogram_group``.
+
+inbox
+   entry methods of an array element deliver to the element's coroutine
+   state (section :numref:`sec:ckcoro`): their bodies are generated. They
+   take a message or marshalled parameters without arrays.
+
+coroutine
+   entry methods of an array element are defined in C++ as coroutines
+   returning ``ck::coroutine`` (section :numref:`sec:ckcoro`). They take
+   no parameters or one message.
 
 notrace
    entry methods will not be traced during execution. As a result, they

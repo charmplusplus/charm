@@ -1,56 +1,71 @@
 /*
  * ckcoro: Charm++ entry methods as C++20 coroutines. Requires C++20.
  *
- * A coroutine entry method is declared in the .ci file as an ordinary void
- * entry method (no parameters, or one message) and defined in C++ with the
- * return type ck::coroutine. Its body begins with CK_COROUTINE and ends with
- * CK_END, and suspends at CK_WHEN sites until a message for an inbox entry
- * arrives. An inbox entry is an ordinary entry method whose body hands its
- * arguments to the element's ck::coro::state object:
+ * A coroutine entry method is declared [coroutine] in the .ci file (void,
+ * with no parameters or one message) and defined in C++ with the return
+ * type ck::coroutine. Its body begins with CK_COROUTINE() and ends with
+ * CK_END(), and suspends at CK_WHEN sites until a delivery to an [inbox]
+ * entry matches. The chare puts the generated X_CORO_CODE macro in its
+ * class: it defines the ck::coro::state member (the active coroutines and
+ * the inbox, packed with the element), the bodies of the inbox entries, and
+ * inbox::name() / inbox::name(ref), which name the entry at a site.
  *
- *   // .ci: entry void doStep(); entry void recvGhost(GhostMsg *m);
+ *   // .ci: entry [coroutine] void doStep();
+ *   //      entry [inbox] void recvGhost(GhostMsg *m);
+ *   //      entry [inbox] void recvCount(int iter, int count);
  *   class Jacobi : public CBase_Jacobi {
- *     ck::coro::state co;            // active coroutines and the inbox
+ *     Jacobi_CORO_CODE
  *     GhostMsg *gmsg;                // scratch; assigned at a site, used after it
- *     int imsg, iter;                // state: members, pupped
- *     void pup(PUP::er &p) { ...; p | co; }
- *     void recvGhost(GhostMsg *m) { co.deliver(CkIndex_Jacobi::recvGhost(0), m); }
+ *     int imsg, iter, i, count;      // state across sites: members, pupped
  *     ck::coroutine doStep() {
- *       CK_COROUTINE(co, CkIndex_Jacobi::doStep());
+ *       CK_COROUTINE();
  *       sendGhosts();
  *       for (imsg = 0; imsg < 6; imsg++) {
- *         CK_WHEN(CkIndex_Jacobi::recvGhost(0), iter, gmsg);   // like when recvGhost[iter](GhostMsg *gmsg)
+ *         CK_WHEN(inbox::recvGhost(iter), gmsg);   // when recvGhost[iter](GhostMsg *gmsg)
  *         process(gmsg);
  *       }
+ *       CK_WHEN(inbox::recvCount(iter), i, count); // when recvCount[iter](int i, int count)
  *       compute();
  *       CK_END();
  *     }
  *   };
  *
- * Messages for an inbox entry that no coroutine is waiting for are buffered
- * in the state object, matched later by entry and reference number (the
- * envelope's for a message, the first arithmetic argument for marshalled
- * parameters), and move with the element.
+ * A when stores the delivery into the lvalues that follow the want: the
+ * message pointer (the coroutine owns it), or every marshalled parameter of
+ * the entry in order. inbox::name(ref) matches the reference number:
+ * the envelope's for a message entry, the first arithmetic parameter for a
+ * marshalled entry; inbox::name() matches any. Deliveries that no coroutine
+ * is waiting for are buffered as messages (the marshalled parameters stay
+ * in the message being delivered, see CkCurrentMessage) and move with the
+ * element. CK_WHEN_ANY(idx, CK_ALT(...), ...) waits for the first of
+ * several (an SDAG case).
+ *
+ * Without the attributes, the same works by hand: a ck::coro::state member
+ * pupped by the chare, inbox entries whose bodies call co.deliver(ep, msg)
+ * or co.deliver(ep, args...), CK_COROUTINE(co, ep) and CK_WHEN(ep, ref, ...)
+ * with ep = CkIndex_X::name(...).
  *
  * Migration and checkpoint. A coroutine frame is never packed. The state
- * object packs, for each active coroutine, the entry index, a callback to the
- * element and the chain of restart sites, and on unpacking sends the entry's
- * message to the element again: the body runs again from the top and the
- * switch opened by CK_COROUTINE jumps to the recorded site, where CK_WHEN
- * finds the buffered message or waits for it. Rules: (1) a value that is
- * live across a site is a member of the chare (C++ rejects the jump past a
- * local with an initializer; a scalar declared without one is not caught,
- * and +ck_fakemigrate is the check); (2) code before a site is skipped on
- * a restart, so its results must be members; (3) an element may migrate or
- * be checkpointed only while its coroutines are suspended at sites (CK_WHEN,
- * CK_CALL); a plain co_await is allowed between sites, but packing an
- * element suspended there aborts. A site is one statement and may be the
- * body of an if or a loop; its case label must not be inside a switch of
- * the user's own; two sites must not share a line. A function awaited from
- * a coroutine that contains a site returns ck::coro::task<T>, has its own
- * CK_RESUMABLE/CK_END and is awaited with CK_CALL or CK_CALL_TO.
+ * object packs, for each active coroutine, the entry index, a callback to
+ * the element and the chain of restart sites, and on unpacking sends the
+ * entry's message to the element again: the body runs again from the top
+ * and the switch opened by CK_COROUTINE jumps to the recorded site, where
+ * CK_WHEN finds the buffered message or waits for it. Rules: (1) a value
+ * that is live across a site is a member of the chare (C++ rejects the jump
+ * past a local with an initializer; a scalar declared without one is not
+ * caught, and +ck_fakemigrate is the check); (2) code before a site is
+ * skipped on a restart, so its results must be members; (3) an element may
+ * migrate or be checkpointed only while its coroutines are suspended at
+ * sites (CK_WHEN, CK_WHEN_ANY, CK_CALL); a plain co_await is allowed between
+ * sites, but packing an element suspended there aborts. A site is one
+ * statement and may be the body of an if or a loop; its case label must not
+ * be inside a switch of the user's own; two sites must not share a line. A
+ * function awaited from a coroutine that contains a site returns
+ * ck::coro::task<T>, has its own CK_RESUMABLE/CK_END and is awaited with
+ * CK_CALL or CK_CALL_TO.
  *
  * At most one coroutine per entry method is active in an element at a time.
+ * Inbox entries take a message or marshalled parameters without arrays.
  *
  * +ck_fakemigrate on the command line makes every site rebuild the element's
  * coroutines in place (state packed and unpacked, frames destroyed, entries
@@ -121,24 +136,24 @@ template <class T>
 inline constexpr bool is_message_ptr_v =
     std::is_pointer_v<T> && std::is_base_of_v<CkMessage, std::remove_pointer_t<T>>;
 
-// One buffered delivery: a message, or marshalled arguments as pupped bytes.
+// True for the message that carries an entry's marshalled parameters.
+inline bool is_marshall_msg(const void *m) noexcept {
+  return m != nullptr && UsrToEnv(m)->getMsgIdx() == CMessage_CkMarshallMsg::__idx;
+}
+
+// One buffered delivery: the entry's message, or a CkMarshallMsg holding the
+// marshalled parameters, or no message (a void entry). The state owns it.
 struct buffer {
   int ep = -1;
-  bool hasRef = false;
   CMK_REFNUM_TYPE ref = 0;
-  bool isMsg = false;
   void *msg = nullptr;
-  std::vector<char> bytes;
 
   buffer() = default;
-  buffer(buffer &&o) noexcept
-      : ep(o.ep), hasRef(o.hasRef), ref(o.ref), isMsg(o.isMsg),
-        msg(std::exchange(o.msg, nullptr)), bytes(std::move(o.bytes)) {}
+  buffer(buffer &&o) noexcept : ep(o.ep), ref(o.ref), msg(std::exchange(o.msg, nullptr)) {}
   buffer &operator=(buffer &&o) noexcept {
     if (this != &o) {
       release();
-      ep = o.ep; hasRef = o.hasRef; ref = o.ref; isMsg = o.isMsg;
-      msg = std::exchange(o.msg, nullptr); bytes = std::move(o.bytes);
+      ep = o.ep; ref = o.ref; msg = std::exchange(o.msg, nullptr);
     }
     return *this;
   }
@@ -148,19 +163,24 @@ struct buffer {
   void release() { if (msg) { CkFreeMsg(msg); msg = nullptr; } }
 
   void pup(PUP::er &p) {
-    p | ep; p | hasRef; p | ref; p | isMsg;
-    if (isMsg) CkPupMessage(p, &msg);
-    else p | bytes;
+    p | ep; p | ref;
+    bool hasMsg = msg != nullptr;
+    p | hasMsg;
+    if (hasMsg) CkPupMessage(p, &msg);
   }
 };
 
-// What a suspended coroutine waits for.
+// What a when site waits for: a delivery to entry ep, with reference number
+// ref or with any (noref). The generated X_CORO_CODE macro's inbox::name()
+// and inbox::name(ref) functions make these.
 struct want {
   int ep;
   bool hasRef;
   CMK_REFNUM_TYPE ref;
+  explicit want(int ep_) noexcept : ep(ep_), hasRef(false), ref(0) {}
+  want(int ep_, CMK_REFNUM_TYPE ref_) noexcept : ep(ep_), hasRef(true), ref(ref_) {}
   bool matches(const buffer &b) const noexcept {
-    return b.ep == ep && (!hasRef || (b.hasRef && b.ref == ref));
+    return b.ep == ep && (!hasRef || b.ref == ref);
   }
 };
 
@@ -254,18 +274,31 @@ class state {
   state &operator=(const state &) = delete;
   ~state();
 
-  // Inbox entry bodies: hand the entry's message or arguments to the state.
-  template <class... Args> void deliver(int ep, Args &&...args);
+  // Inbox entry bodies (generated by [inbox], or written by hand): hand the
+  // delivery to the state. A message entry hands over its message. A
+  // marshalled or void entry passes its arguments: the reference number is
+  // the first arithmetic argument, else the envelope's; the arguments
+  // themselves stay in the message being delivered (CkCurrentMessage), which
+  // the state keeps, unless the entry was reached some other way (a reduction
+  // target, a direct call), in which case they are packed into a new message.
+  template <class Msg, std::enable_if_t<is_message_ptr_v<Msg *>, int> = 0>
+  void deliver(int ep, Msg *m);
+  template <class... Args, std::enable_if_t<!(sizeof...(Args) == 1 && (is_message_ptr_v<std::decay_t<Args>> && ...)), int> = 0>
+  void deliver(int ep, const Args &...args);
 
   // Await a delivery to entry ep with reference number ref (or any, with
   // noref), storing the message or arguments in outs. CK_WHEN wraps this.
   template <class... Outs>
   when_awaiter<Outs...> when(int ep, CMK_REFNUM_TYPE ref, Outs &...outs) noexcept {
-    return when_awaiter<Outs...>(*this, want{ep, true, ref}, outs...);
+    return when_awaiter<Outs...>(*this, want(ep, ref), outs...);
   }
   template <class... Outs>
   when_awaiter<Outs...> when(int ep, noref_t, Outs &...outs) noexcept {
-    return when_awaiter<Outs...>(*this, want{ep, false, 0}, outs...);
+    return when_awaiter<Outs...>(*this, want(ep), outs...);
+  }
+  template <class... Outs>
+  when_awaiter<Outs...> when(want w, Outs &...outs) noexcept {
+    return when_awaiter<Outs...>(*this, w, outs...);
   }
   // The first of several whens to match: co_await co.any(co.when(...), co.when(...)).
   template <class... W> any_awaiter<W...> any(W &&...w) noexcept {
@@ -276,6 +309,7 @@ class state {
 
   // Internal.
   record &begin(ArrayElement *elt, int ep, void *msg);
+  record &begin(ArrayElement *elt, bool isEntry);
   void finish_run(record *rec);
   bool take(const want &w, buffer &out);
   void rebuild();
@@ -295,6 +329,7 @@ class state {
 class root_guard {
  public:
   root_guard(state &s, ArrayElement *elt, int ep, void *msg);
+  root_guard(state &s, ArrayElement *elt, bool isEntry);
   ~root_guard() = default;
   root_guard(const root_guard &) = delete;
   root_guard &operator=(const root_guard &) = delete;
@@ -333,6 +368,9 @@ inline coroutine::~coroutine() {
 
 inline root_guard::root_guard(state &s, ArrayElement *elt, int ep, void *msg) {
   s.begin(elt, ep, msg);
+}
+inline root_guard::root_guard(state &s, ArrayElement *elt, bool isEntry) {
+  s.begin(elt, isEntry);
 }
 
 inline state::~state() {
@@ -388,6 +426,19 @@ inline record &state::begin(ArrayElement *elt, int ep, void *msg) {
   current_ = rec;
   current_chain_ = &rec->ch;
   return *rec;
+}
+
+// CK_COROUTINE() with no arguments: the entry and its message are the ones
+// being delivered (the generated __coro_is_entry says whether the running
+// entry is one of the chare's [coroutine] entries). A void entry's system
+// message is not kept.
+inline record &state::begin(ArrayElement *elt, bool isEntry) {
+  if (!isEntry)
+    CkAbort("ck::coro: CK_COROUTINE() in a function that is not running as a [coroutine] entry "
+            "method (entry %d is being delivered)", CkCurrentEntry());
+  void *m = CkCurrentMessage();
+  if (m && (is_marshall_msg(m) || UsrToEnv(m)->getMsgIdx() == 0)) m = nullptr;
+  return begin(elt, CkCurrentEntry(), m);
 }
 
 // After the body ran (first run or a resume) and suspended or finished.
@@ -449,29 +500,42 @@ inline void state::push(buffer &&b) {
   inbox_.push_back(std::move(b));
 }
 
-template <class... Args> inline void state::deliver(int ep, Args &&...args) {
+template <class Msg, std::enable_if_t<is_message_ptr_v<Msg *>, int>>
+inline void state::deliver(int ep, Msg *m) {
   buffer b;
   b.ep = ep;
-  if constexpr (sizeof...(Args) == 1 && (is_message_ptr_v<std::decay_t<Args>> && ...)) {
-    void *m = (std::forward<Args>(args), ...);
-    b.isMsg = true;
-    b.msg = m;
-    b.hasRef = true;
-    b.ref = CkGetRefNum(m);
-  } else {
-    std::tuple<std::decay_t<Args>...> t(std::forward<Args>(args)...);
-    if constexpr (sizeof...(Args) > 0) {
-      using First = std::tuple_element_t<0, decltype(t)>;
-      if constexpr (std::is_arithmetic_v<First>) {
-        b.hasRef = true;
-        b.ref = (CMK_REFNUM_TYPE)std::get<0>(t);
-      }
+  b.msg = m;
+  b.ref = CkGetRefNum(m);
+  push(std::move(b));
+}
+
+template <class... Args, std::enable_if_t<!(sizeof...(Args) == 1 && (is_message_ptr_v<std::decay_t<Args>> && ...)), int>>
+inline void state::deliver(int ep, const Args &...args) {
+  buffer b;
+  b.ep = ep;
+  void *cur = CkCurrentMessage();
+  bool hasRef = false;
+  if constexpr (sizeof...(Args) > 0) {
+    using First = std::tuple_element_t<0, std::tuple<Args...>>;
+    if constexpr (std::is_arithmetic_v<First>) {
+      hasRef = true;
+      b.ref = (CMK_REFNUM_TYPE)std::get<0>(std::tie(args...));
     }
+  }
+  if (!hasRef && cur) b.ref = CkGetRefNum(cur);
+  if (CkCurrentEntry() == ep && is_marshall_msg(cur)) {
+    // The entry's own marshalled parameters: keep the message.
+    CkReferenceMsg(cur);
+    b.msg = cur;
+  } else if constexpr (sizeof...(Args) > 0) {
+    // Reached otherwise (a reduction target, a direct call): pack the
+    // arguments in the layout the marshalled message would have.
     PUP::sizer ps;
-    ps | t;
-    b.bytes.resize(ps.size());
-    PUP::toMem pm(b.bytes.data());
-    pm | t;
+    ((ps | const_cast<Args &>(args)), ...);
+    CkMarshallMsg *m = CkAllocateMarshallMsg(ps.size());
+    PUP::toMem pm(m->msgBuf);
+    ((pm | const_cast<Args &>(args)), ...);
+    b.msg = m;
   }
   push(std::move(b));
 }
@@ -562,14 +626,16 @@ inline void arm_wait(record *rec, std::coroutine_handle<> h) {
 
 template <class... Outs> inline void when_awaiter<Outs...>::unpack(buffer &b) {
   if constexpr (sizeof...(Outs) == 1 && (is_message_ptr_v<Outs> && ...)) {
-    if (!b.isMsg) CkAbort("ck::coro: entry %d delivered marshalled arguments but the when "
-                          "expects a message", w_.ep);
+    if (b.msg == nullptr || is_marshall_msg(b.msg))
+      CkAbort("ck::coro: entry %d delivered marshalled arguments but the when expects a message",
+              w_.ep);
     std::get<0>(outs_) = static_cast<std::tuple_element_t<0, std::tuple<Outs...>>>(b.msg);
     b.msg = nullptr; // the coroutine owns the message now
-  } else {
-    if (b.isMsg) CkAbort("ck::coro: entry %d delivered a message but the when expects "
-                         "marshalled arguments", w_.ep);
-    PUP::fromMem pf(b.bytes.data());
+  } else if constexpr (sizeof...(Outs) > 0) {
+    if (!is_marshall_msg(b.msg))
+      CkAbort("ck::coro: entry %d delivered %s but the when expects marshalled arguments", w_.ep,
+              b.msg ? "a message" : "no arguments");
+    PUP::fromMem pf(static_cast<CkMarshallMsg *>(b.msg)->msgBuf);
     std::apply([&](Outs &...o) { ((pf | o), ...); }, outs_);
   }
 }
@@ -647,7 +713,18 @@ using coroutine = coro::coroutine;
   ::ck::coro::frame_guard ck_frame_;                                          \
   switch (ck_frame_.site()) {                                                 \
   case 0:
-#define CK_COROUTINE(co_, ep_) CK_COROUTINE_MSG(co_, ep_, nullptr)
+#define CK_COROUTINE_2_(co_, ep_) CK_COROUTINE_MSG(co_, ep_, nullptr)
+// With the [coroutine] attribute and X_CORO_CODE in the class, CK_COROUTINE()
+// takes no arguments: the state is the generated member and the entry is
+// the one being delivered.
+#define CK_COROUTINE_0_()                                                     \
+  ::ck::coro::root_guard ck_root_(__coro, this, __coro_is_entry(::CkCurrentEntry())); \
+  ::ck::coro::frame_guard ck_frame_;                                          \
+  switch (ck_frame_.site()) {                                                 \
+  case 0:
+#define CK_CORO_SELECT_(a_, b_, name_, ...) name_
+#define CK_COROUTINE(...)                                                     \
+  CK_CORO_SELECT_(__VA_ARGS__ __VA_OPT__(, ) CK_COROUTINE_2_, CK_COROUTINE_0_, CK_COROUTINE_0_)(__VA_ARGS__)
 
 // The start of the restart switch of an awaited helper (ck::coro::task<T>).
 #define CK_RESUMABLE()                                                        \

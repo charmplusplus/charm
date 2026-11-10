@@ -29,6 +29,8 @@ CksvExtern(ObjNumRdmaOpsMap, pendingZCOps);
 typedef std::map<int, CkChareID>  Vidblockmap;
 CkpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
 CkpvDeclare(int, currentChareIdx);
+CkpvDeclare(void *, _ckCurrentMsg);  // see CkCurrentMessage (charm++.h)
+CkpvDeclare(int, _ckCurrentEp);
 #endif
 
 // Map of array IDs to array elements for fast message delivery

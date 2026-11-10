@@ -100,6 +100,8 @@ struct rwentry rwtable[] = {
 {  "createhere",	CREATEHERE },
 {  "createhome",	CREATEHOME },
 {  "nokeep",	NOKEEP },
+{  "inbox",	INBOX },
+{  "coroutine",	COROUTINE },
 {  "notrace",	NOTRACE },
 {  "appwork",	APPWORK},
 {  "template",	TEMPLATE },
