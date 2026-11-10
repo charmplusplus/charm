@@ -1008,15 +1008,36 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
   else {
     // fixme - in this case, not recorded in LB
     CmiPrintf("Warning: Multicast not optimized after multicast root migrated. \n");
+    // Only the root can count this multicast toward freeing its tree, so the
+    // whole message goes to the root, which sends it on (recvFromRemote).
+    msg->_cookie = s;
+    CProxy_CkMulticastMgr(thisgroup)[s.get_pe()].recvFromRemote(msg);
+    return;
   }
 
   // update cookie
   msg->_cookie = s;
-  if (s.get_pe() == CkMyPe()) ((mCastEntry *)s.get_val())->injected++;
+  ((mCastEntry *)s.get_val())->injected++;
+  sendFromRoot(msg);
+}
 
+/// A multicast sent through a copy of the section proxy on another PE: count
+/// it at the root entry it is addressed to, then send it down the tree as if
+/// it had been sent here.
+void CkMulticastMgr::recvFromRemote(multicastGrpMsg *msg)
+{
+  ((mCastEntry *)msg->_cookie.get_val())->injected++;
+  sendFromRoot(msg);
+}
+
+/// Hand a multicast, already counted in injected, to its root entry on this
+/// PE: whole, or as packets when it is at least split_threshold bytes.
+void CkMulticastMgr::sendFromRoot(multicastGrpMsg *msg)
+{
 #if SPLIT_MULTICAST
+  CkSectionInfo s = msg->_cookie;   // a copy: packing may move the message
   // split multicast msg into SPLIT_NUM copies
-  envelope *env = UsrToEnv(m);
+  envelope *env = UsrToEnv(msg);
   CkPackMessage(&env);
   int totalsize = env->getTotalsize();
   int packetSize = 0;
@@ -1036,18 +1057,10 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
   int sizesofar = 0;
   char *data = (char*) env;
   if (totalcount == 1) {
-    // If the root of this section's tree is on this PE, then just propagate msg
-    if (s.get_pe() == CkMyPe()) {
-      CkUnpackMessage(&env);
-      msg = (multicastGrpMsg *)EnvToUsr(env);
-      recvMsg(msg);
-    }
-    // else send msg to root of section's spanning tree
-    else {
-      CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-      msg = (multicastGrpMsg *)EnvToUsr(env);
-      mCastGrp[s.get_pe()].recvMsg(msg);
-    }
+    // the root of this section's tree is on this PE: just propagate msg
+    CkUnpackMessage(&env);
+    msg = (multicastGrpMsg *)EnvToUsr(env);
+    recvMsg(msg);
     return;
   }
   for (int i=0; i<totalcount; i++) {
@@ -1056,20 +1069,14 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
       mysize = totalsize-sizesofar;
     }
     //CmiPrintf("[%d] send to %d : mysize: %d total: %d \n", CkMyPe(), s.get_pe(), mysize, totalsize);
-    mCastGrp[s.get_pe()].recvPacket(s, sizesofar, mysize, data, i, totalcount, totalsize, 0);
+    mCastGrp[CkMyPe()].recvPacket(s, sizesofar, mysize, data, i, totalcount, totalsize, 0);
     sizesofar += mysize;
     data += mysize;
   }
   CmiFree(env);
 #else
-  if (s.get_pe() == CkMyPe()) {
-    DEBUGF((CkPrintf("sendToSection, msg-used :%d\n", UsrToEnv(msg)->isUsed()));
-    recvMsg(msg);
-  }
-  else {
-    CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-    mCastGrp[s.get_pe()].recvMsg(msg);
-  }
+  DEBUGF((CkPrintf("sendToSection, msg-used :%d\n", UsrToEnv(msg)->isUsed()));
+  recvMsg(msg);
 #endif
 }
 
@@ -1102,13 +1109,16 @@ void CkMulticastMgr::recvPacket(CkSectionInfo &&_cookie, int offset, int n, char
   memcpy(entry->asm_msg+offset, data, n);
   entry->asm_fill += n;
   if (entry->asm_fill == totalsize) {
-    CkUnpackMessage((envelope **)&entry->asm_msg);
-    multicastGrpMsg *msg = (multicastGrpMsg *)EnvToUsr((envelope*)entry->asm_msg);
+    // Reset the assembly before sendToLocal: delivering this message may
+    // complete an old entry's count and free the entry (tryFree).
+    char *asm_msg = entry->asm_msg;
+    entry->asm_msg = NULL;
+    entry->asm_fill = 0;
+    CkUnpackMessage((envelope **)&asm_msg);
+    multicastGrpMsg *msg = (multicastGrpMsg *)EnvToUsr((envelope*)asm_msg);
     msg->_cookie = _cookie;
 //    mCastGrp[CkMyPe()].recvMsg(msg);
     sendToLocal(msg);
-    entry->asm_msg = NULL;
-    entry->asm_fill = 0;
   }
 //  if (fromBuffer) delete [] data;
 }

@@ -57,7 +57,10 @@ flight inside the old tree:
 - Every entry counts the multicasts it has delivered (`received`, in
   `delivered`) and the ones it has forwarded to each child (`sentToChild`,
   same order as `children`). A root also counts the multicasts handed to it
-  (`injected`, in `sendToSection`).
+  (`injected`): in `sendToSection` for a send on the root's PE, and in
+  `recvFromRemote` for a send through a copy of the section proxy on another
+  PE, which `sendToSection` forwards whole to the root ("Multicast not
+  optimized" warning).
 - `freeup(cookie, expected)` records `expected`, the number of multicasts the
   parent forwarded to this entry, or the root's own `injected` when the
   argument is -1, and sets `freeRequested`.
@@ -67,11 +70,15 @@ flight inside the old tree:
   `delivered`, whichever completes the count last.
 
 Invariant: an entry is deleted only after the last multicast its parent
-forwarded to it has been delivered through it, so no message reaches a freed
-entry. `sendToLocal` asserts that an entry with no local members has no
+forwarded to it has been delivered through it, so no multicast reaches a
+freed entry. `sendToLocal` asserts that an entry with no local members has no
 parent: only a root, current or retired, is in that state.
 
-Not covered by the count: a section proxy copy on another PE that keeps
-sending to a root that has since retired (`sendToSection` with the cookie's
-PE not the local PE, "Multicast not optimized" warning). Such a proxy must be
-reset after the root migrates.
+Not covered by the count:
+
+- Reduction messages. A member that contributes with the cookie of its last
+  multicast through the old tree sends the contribution to that old entry.
+- A multicast from a section proxy copy on another PE that is still on its
+  way to the root when the root is freed, such as one sent to a root that has
+  since retired: the root counts it only when it arrives (`recvFromRemote`).
+  Such a proxy must be reset after the root migrates.

@@ -83,6 +83,9 @@ class CkMulticastMgr: public CkDelegateMgr
         // ------------------------- Multicasts ------------------------
         /// entry
         void recvMsg(multicastGrpMsg *m);
+        /// entry A multicast sent through a section proxy copy on another PE; the root counts it and sends it on
+        void recvFromRemote(multicastGrpMsg *m);
+        void sendFromRoot(multicastGrpMsg *m);
         /// entry
         void sendToLocal(multicastGrpMsg *m);
         /// entry
