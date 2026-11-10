@@ -1277,6 +1277,9 @@ void CkBroadcastMsgSection(int entryIndex, void* msg, CkSectionID sID, int opts)
 
 void CProxySection_ArrayBase::ckSend(CkArrayMessage* msg, int ep, int opts)
 {
+  // Envelopes are not zeroed at allocation and not every caller sets the
+  // policy (CkBroadcastMsgSection); the copies made below inherit it.
+  CkSetMsgArrayIfNotThere(msg, _entryTable[ep]->ifNotThere);
   if (ckIsDelegated())  // Just call our delegateMgr
     ckDelegatedTo()->ArraySectionSend(ckDelegatedPtr(), ep, msg, _sid.size(), _sid.data(),
                                       opts);
