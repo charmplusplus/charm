@@ -503,6 +503,23 @@ void CkCallback::pup(PUP::er &p) {
     p|d.array.hasRefnum;
     p|d.array.refnum;
     break;
+#if !CMK_CHARM4PY
+  case bcastSection:
+    // Unpacking allocates the element and PE arrays; nothing frees them.
+    p|d.section.sinfo;
+    p|d.section.ep;
+    p|d.section._nElems;
+    p|d.section.npes;
+    if (p.isUnpacking()) {
+      d.section._elems = d.section._nElems ? new CkArrayIndex[d.section._nElems] : nullptr;
+      d.section.pelist = d.section.npes ? new int[d.section.npes] : nullptr;
+    }
+    PUParray(p, d.section._elems, d.section._nElems);
+    PUParray(p, d.section.pelist, d.section.npes);
+    p|d.section.hasRefnum;
+    p|d.section.refnum;
+    break;
+#endif
   case replyCCS:
     p((char*)&d.ccsReply.reply, sizeof(d.ccsReply.reply));
     break;
