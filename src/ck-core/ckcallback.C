@@ -185,7 +185,7 @@ CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool forceInline)
 #endif
       type=bcastSection; // forceInline currently ignored
       d.section.ep=ep; 
-      CkSectionID secID=sectElt.ckGetSectionID(0); 
+      CkSectionID &secID = sectElt.ckGetSectionID(0); // the callback points into it
       d.section.sinfo = secID._cookie;
       d.section._elems = secID._elems.data();
       d.section._nElems = secID._elems.size();
