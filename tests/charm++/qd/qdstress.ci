@@ -1,0 +1,112 @@
+mainmodule qdstress {
+  extern module completion;
+
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Stats statsProxy;
+  readonly CProxy_Mig migProxy;
+  readonly CProxy_Ins insProxy0;
+  readonly CProxy_Ins insProxy1;
+  readonly CProxy_Lb lbProxy;
+  readonly CProxy_Zc zcProxy;
+  readonly CProxy_Grp grpProxy;
+  readonly CProxy_NGrp ngProxy;
+  readonly CProxy_Thr thrProxy;
+  readonly CProxy_Cd cdProxy;
+  readonly CProxy_CompletionDetector detProxy;
+  readonly int nMig;
+  readonly int nLb;
+  readonly int nZc;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [threaded] void run();
+    entry void qdFired();
+    entry void insertAck(int which);
+    entry void thrSnap(int kind, long hops);
+    entry [reductiontarget] void cdStarted();
+    entry void cdAllProduced();
+    entry [reductiontarget] void cdFinished();
+    entry void fakeChainDone();
+    entry void migCensus(int idx, int starts, int lastStart, int pe);
+  };
+
+  // Per-PE work counters; report() sums them into one reduction.
+  group Stats {
+    entry Stats();
+    entry void report(CkCallback cb);
+  };
+
+  // Phase migrate: message chains chase elements that migrateMe() at any time.
+  array [1D] Mig {
+    entry Mig();
+    entry void start(int k, int hops, int round);
+    entry void hop(int remaining, CmiUInt8 seed);
+    entry void census();
+  };
+
+  // Phase insert: elements inserted late, messaged before insertion, destroyed
+  // after their last expected message.
+  array [1D] Ins {
+    entry Ins();
+    entry void ping(int from);
+  };
+
+  // Phase lb: AtSync load balancing; the resume starts the traffic.
+  array [1D] Lb {
+    entry Lb();
+    entry void go(int round);
+    entry [reductiontarget] void chains();
+    entry void hop(int remaining, CmiUInt8 seed);
+  };
+
+  // Phase zerocopy: nocopy parameters and the Direct API (get and put).
+  array [1D] Zc {
+    entry Zc();
+    entry void start(int round);
+    entry void recvNocopy(nocopy char buf[n], int n, int s, int round, int from);
+    entry void doGet(CkNcpyBuffer src, int s, int round, int from);
+    entry void doPut(CkNcpyBuffer dst, int s, int round);
+    entry void srcDone(CkDataMsg* m);
+    entry void getDone(CkDataMsg* m);
+    entry void putDone(CkDataMsg* m);
+  };
+
+  // Phase groups (and the helpers of phases insert and fakeqd).
+  group Grp {
+    entry Grp();
+    entry void start(int k, int hops, int ihops, int round);
+    entry void hop(int remaining, CmiUInt8 seed);
+    entry [expedited] void ehop(int remaining, CmiUInt8 seed);
+    entry [inline] void ihop(int remaining, CmiUInt8 seed);
+    entry void bcast(int from);
+    entry [reductiontarget] void redDone(long sum);
+    entry void insPings(int which, int lo, int k);
+    entry void delayInsert(int which, int idx, int d);
+    entry void fhop(int remaining);
+  };
+
+  nodegroup NGrp {
+    entry NGrp();
+    entry void start(int k, int hops, int round);
+    entry [exclusive] void xhop(int remaining, CmiUInt8 seed);
+    entry void nhop(int remaining, CmiUInt8 seed);
+    entry void bcast(int from);
+    entry [reductiontarget] void redDone(long sum);
+  };
+
+  // Phase threads: [threaded] entries that CkWaitQD, and CkStartQD from every PE.
+  group Thr {
+    entry Thr();
+    entry [threaded] void run(int k, int hops, int round);
+    entry void hop(int remaining, CmiUInt8 seed);
+    entry void qdCb();
+  };
+
+  // Phase completion: producers and consumers of the CompletionDetector library.
+  group Cd {
+    entry Cd();
+    entry void produce(int batches, int m, int hops, int round);
+    entry void prodStep(int b, int m, int hops, CmiUInt8 seed);
+    entry void item(int remaining, CmiUInt8 seed);
+  };
+};
