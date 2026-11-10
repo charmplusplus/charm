@@ -25,9 +25,9 @@
  *   PropMap: 1D/2D/3D. No insertion: 1D procNum indexes a table of the initial
  *     size with the element index.
  *   CldMap: 1D/2D/3D. procNum is CLD_ANYWHERE, so placement is not checked;
- *     only that each element exists exactly once. Insertion only with
- *     ARRAYMAPS_CLDMAP_INSERT=1: ckInsertIdx sends the element to PE
- *     procNum() == -1 (one PE: "Destnode -1 out of range"; more: SIGSEGV).
+ *     only that each element exists exactly once. Elements are inserted with
+ *     a PE; ARRAYMAPS_CLDMAP_INSERT=1 inserts without one, which must abort
+ *     with "ckInsert without a PE is not supported".
  *   ConfigurableRRMap: only with ARRAYMAPS_CONFIGRR=1 and the run line flag
  *     +ConfigurableRRMap "<config>"; 1D only (populateInitial aborts on other
  *     dimensions). populateInitial reads its configuration only inside
@@ -90,7 +90,7 @@ static const arraymaps_case cases[] = {
     {HILBERT, 2, false, 4, 4, 1}, {HILBERT, 3, false, 4, 4, 4},
 #endif
     {PROP, 1, false, 37, 1, 1}, {PROP, D2}, {PROP, D3},
-    {CLD, 1, ARRAYMAPS_CLDMAP_INSERT, 37, 1, 1}, {CLD, D2}, {CLD, D3},
+    {CLD, D1}, {CLD, D2}, {CLD, D3},
 #if ARRAYMAPS_CONFIGRR
     {CONFIGRR, D1},
 #endif
@@ -167,7 +167,12 @@ void arraymaps_inserter::insert(CkArrayID aid, CProxy_arraymaps_driver driver,
                                 int caseId, int first, int n, std::vector<int> expected)
 {
   CProxy_arraymaps_1d arr(aid);
-  for (int i = first; i < first + n; i++) arr[i].insert(driver, caseId, false, expected);
+  // CldMap names no PE, so its elements are inserted with one (unless
+  // ARRAYMAPS_CLDMAP_INSERT, which checks the abort without one).
+  const bool withPe = cases[caseId].map == CLD && !ARRAYMAPS_CLDMAP_INSERT;
+  for (int i = first; i < first + n; i++)
+    if (withPe) arr[i].insert(driver, caseId, false, expected, i % CkNumPes());
+    else arr[i].insert(driver, caseId, false, expected);
   arr.doneInserting();
 }
 
