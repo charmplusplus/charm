@@ -10188,6 +10188,7 @@ AMPI_API_IMPL(int, MPI_Intercomm_merge, MPI_Comm intercomm, int high, MPI_Comm *
 
 // MPI_Abort ends the whole program with errorcode as its exit status: PE 0
 // calls CkExit(errorcode), and the calling rank never returns to user code.
+// A nonzero errorcode whose low 8 bits are 0 exits with status 1.
 AMPI_API_IMPL(int, MPI_Abort, MPI_Comm comm, int errorcode)
 {
   AMPI_API_INIT("AMPI_Abort", comm, errorcode);
@@ -10199,7 +10200,9 @@ AMPI_API_IMPL(int, MPI_Abort, MPI_Comm comm, int errorcode)
   ampiParent *ptr = getAmpiParent();
   CkError("AMPI: Application called MPI_Abort() on rank %d of MPI_COMM_WORLD with error code %d\n",
           ptr->thisIndex, errorcode);
-  ampiPeMgrProxy[0].exitWithCode(errorcode);
+  // Only the low 8 bits reach the exit status; keep a nonzero code nonzero.
+  int exitCode = (errorcode != 0 && (errorcode & 0xff) == 0) ? 1 : errorcode;
+  ampiPeMgrProxy[0].exitWithCode(exitCode);
   if (tcharm_campi) {
     // campi: no thread; this runs on the scheduler's stack inside the rank's
     // coroutine. The scheduler processes the exit messages here and the
