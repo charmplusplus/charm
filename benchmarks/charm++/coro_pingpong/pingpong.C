@@ -5,10 +5,11 @@
  * sends each message back with the same refnum; element 0 answers refnum r
  * with r+1. Prints the time per round trip (two matched messages).
  *
- *   ./pingpong plain|sdag|coro [iterations] [payload bytes] +pe 1   (both elements on one PE)
+ *   ./pingpong plain|sdag|coro [iterations <= 65535] [payload bytes] +pe 1   (both elements on one PE)
  *   ./pingpong ... +pe 2                                            (one element per PE)
  */
 #include <cstring>
+#include <limits>
 #include "pingpong.decl.h"
 #include "ckcoro.h"
 
@@ -33,11 +34,15 @@ class Main : public CBase_Main {
  public:
   Main(CkArgMsg *m) {
     mainProxy = thisProxy;
-    niter = 100000;
+    niter = 50000;
     payload = 8;
     mode = m->argc > 1 ? m->argv[1] : "coro";
     if (m->argc > 2) niter = atoi(m->argv[2]);
     if (m->argc > 3) payload = atoi(m->argv[3]);
+    // The iteration is the message's reference number, a CMK_REFNUM_TYPE.
+    if (niter > (int)std::numeric_limits<CMK_REFNUM_TYPE>::max())
+      CkAbort("iterations must fit a reference number (at most %d)",
+              (int)std::numeric_limits<CMK_REFNUM_TYPE>::max());
     CkPrintf("pingpong %s: %d round trips, %d-byte payload, %d PEs\n", mode, niter, payload, CkNumPes());
     t0 = CkWallTimer();
     if (strcmp(mode, "plain") == 0) {

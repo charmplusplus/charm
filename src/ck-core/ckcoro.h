@@ -54,8 +54,8 @@
  *
  * +ck_fakemigrate on the command line makes every site rebuild the element's
  * coroutines in place (state packed and unpacked, frames destroyed, entries
- * invoked again to the recorded sites), so programs can check the rules
- * without a load balancer.
+ * invoked again to the recorded sites) the first time a coroutine suspends
+ * there, so programs can check the rules without a load balancer.
  */
 #ifndef CKCORO_H
 #define CKCORO_H
@@ -304,10 +304,13 @@ struct record {
   int readyIndex = -1;
   buffer readyBuf;
   bool fakeRestart = false;      // rebuild once it has suspended (+ck_fakemigrate)
+  bool rebuilt = false;          // restarted and not yet past the recorded site: no rebuild there
+  bool pending = false;          // a restart message is on its way to the element; pupped
 
   void pup(PUP::er &p) {
     p | ep;
     p | target;
+    p | pending;
     bool hasMsg = msg != nullptr;
     p | hasMsg;
     if (hasMsg) CkPupMessage(p, &msg);
@@ -320,19 +323,44 @@ inline state &current_state();
 
 /* ---------------- when awaitable ---------------- */
 
+// The record of the running coroutine, entering a when or when_any: a
+// restarted body has reached its site; remember whether the await was
+// reached through a site macro.
+inline record *enter_await();
+
 template <class... Outs> class when_awaiter {
  public:
   when_awaiter(state &s, want w, Outs &...outs) noexcept : s_(s), w_(w), outs_(outs...) {}
+  const want &spec() const noexcept { return w_; }
+  void unpack(buffer &b);
   bool await_ready();
   void await_suspend(std::coroutine_handle<> h);
   void await_resume();
 
  private:
-  void unpack(buffer &b);
   state &s_;
   want w_;
   std::tuple<Outs &...> outs_;
   record *rec_ = nullptr;
+};
+
+// Await the first of several deliveries (SDAG case): the awaited value is
+// the index of the alternative that matched, whose outputs are stored.
+template <class... W> class any_awaiter {
+ public:
+  explicit any_awaiter(state &s, W &&...w) noexcept : s_(s), alts_(std::move(w)...) {}
+  bool await_ready();
+  void await_suspend(std::coroutine_handle<> h);
+  int await_resume();
+
+ private:
+  void unpack_at(int i, buffer &b) {
+    std::apply([&](auto &...a) { int k = 0; ((k++ == i ? (a.unpack(b), 0) : 0), ...); }, alts_);
+  }
+  state &s_;
+  std::tuple<W...> alts_;
+  record *rec_ = nullptr;
+  int ready_ = -1;
 };
 
 /* ---------------- state: per-element coroutines and inbox ---------------- */
@@ -356,6 +384,10 @@ class state {
   template <class... Outs>
   when_awaiter<Outs...> when(int ep, noref_t, Outs &...outs) noexcept {
     return when_awaiter<Outs...>(*this, want{ep, false, 0}, outs...);
+  }
+  // The first of several whens to match: co_await co.any(co.when(...), co.when(...)).
+  template <class... W> any_awaiter<W...> any(W &&...w) noexcept {
+    return any_awaiter<W...>(*this, std::move(w)...);
   }
 
   void pup(PUP::er &p);
@@ -519,6 +551,7 @@ inline record &state::begin(ArrayElement *elt, int ep, void *msg) {
     if (msg) { void *m = msg; rec->msg = CkCopyMsg(&m); }
   } else {
     rec->ch.restarting = !rec->ch.sites.empty();
+    rec->pending = false;
   }
   rec->root = root;
   rec->h = root;
@@ -609,7 +642,11 @@ template <class... Args> inline void state::deliver(int ep, Args &&...args) {
   push(std::move(b));
 }
 
+// Invoke the entry again. A record whose restart message is already on its
+// way (sent before a migration; the location manager forwards it) gets none.
 inline void state::send_restart(record &rec) {
+  if (rec.pending) return;
+  rec.pending = true;
   void *m;
   if (rec.msg) { void *c = rec.msg; m = CkCopyMsg(&c); }
   else m = CkAllocSysMsg();
@@ -663,13 +700,31 @@ inline void state::pup(PUP::er &p) {
       rec.owner = this;
       if (rec.ch.sites.empty())
         CkAbort("ck::coro: unpacked a coroutine of entry %d with no recorded site", rec.ep);
-      rec.ch.restarting = true;
       send_restart(rec);
     }
   }
 }
 
-/* ---- when_awaiter ---- */
+/* ---- when_awaiter, any_awaiter ---- */
+
+inline record *enter_await() {
+  record *rec = current_;
+  if (rec == nullptr) CkAbort("ck::coro: co_await when outside a coroutine entry method");
+  rec->rebuilt = rec->ch.restarting; // a restarted body has reached its recorded site
+  rec->ch.restarting = false;
+  rec->atSite = rec->ch.noted && !rec->ch.notedCall;
+  rec->ch.noted = false;
+  return rec;
+}
+
+// +ck_fakemigrate rebuilds at a site once per arrival: a body that was just
+// restarted to this site waits here without rebuilding again, so a program
+// progresses (and reaches quiescence) as without the flag.
+inline void arm_wait(record *rec, std::coroutine_handle<> h) {
+  rec->h = h;
+  rec->waiting = true;
+  if (rec->atSite && !rec->rebuilt && fake_migrate_enabled()) rec->fakeRestart = true;
+}
 
 template <class... Outs> inline void when_awaiter<Outs...>::unpack(buffer &b) {
   if constexpr (sizeof...(Outs) == 1 && (is_message_ptr_v<Outs> && ...)) {
@@ -686,15 +741,10 @@ template <class... Outs> inline void when_awaiter<Outs...>::unpack(buffer &b) {
 }
 
 template <class... Outs> inline bool when_awaiter<Outs...>::await_ready() {
-  record *rec = current_;
-  if (rec == nullptr) CkAbort("ck::coro: co_await when outside a coroutine entry method");
-  rec->ch.restarting = false; // a restarted body has reached its site
-  const bool atSite = rec->ch.noted && !rec->ch.notedCall;
-  rec->ch.noted = false;
+  record *rec = enter_await();
   buffer taken;
   if (!s_.take(w_, taken)) {
     rec_ = rec;
-    rec->atSite = atSite;
     return false;
   }
   unpack(taken);
@@ -702,11 +752,8 @@ template <class... Outs> inline bool when_awaiter<Outs...>::await_ready() {
 }
 
 template <class... Outs> inline void when_awaiter<Outs...>::await_suspend(std::coroutine_handle<> h) {
-  record *rec = rec_;
-  rec->h = h;
-  rec->waiting = true;
-  rec->wants.assign(1, w_);
-  if (rec->atSite && fake_migrate_enabled()) rec->fakeRestart = true;
+  rec_->wants.assign(1, w_);
+  arm_wait(rec_, h);
 }
 
 template <class... Outs> inline void when_awaiter<Outs...>::await_resume() {
@@ -717,6 +764,36 @@ template <class... Outs> inline void when_awaiter<Outs...>::await_resume() {
   rec->atSite = false;
   unpack(rec->readyBuf);
   rec->readyBuf.release();
+}
+
+template <class... W> inline bool any_awaiter<W...>::await_ready() {
+  record *rec = enter_await();
+  buffer taken;
+  int i = 0;
+  bool found = std::apply([&](auto &...a) {
+    return ((s_.take(a.spec(), taken) ? (a.unpack(taken), ready_ = i, true) : (i++, false)) || ...);
+  }, alts_);
+  if (found) return true;
+  rec_ = rec;
+  return false;
+}
+
+template <class... W> inline void any_awaiter<W...>::await_suspend(std::coroutine_handle<> h) {
+  rec_->wants.clear();
+  std::apply([&](auto &...a) { (rec_->wants.push_back(a.spec()), ...); }, alts_);
+  arm_wait(rec_, h);
+}
+
+template <class... W> inline int any_awaiter<W...>::await_resume() {
+  if (rec_ == nullptr) return ready_; // was ready
+  record *rec = rec_;
+  if (!rec->ready) CkAbort("ck::coro: coroutine resumed without a delivery");
+  rec->ready = false;
+  rec->atSite = false;
+  int i = rec->readyIndex;
+  unpack_at(i, rec->readyBuf);
+  rec->readyBuf.release();
+  return i;
 }
 
 } // namespace coro
@@ -758,6 +835,16 @@ using coroutine = coro::coroutine;
     do {                                                                      \
       ::ck::coro::note_site(ck_frame_, __LINE__);                             \
       co_await ::ck::coro::current_state().when(__VA_ARGS__);                 \
+    } while (0)
+
+// A when-any site (SDAG case): CK_WHEN_ANY(idx, CK_ALT(ep, ref, out...), ...)
+// stores the index of the alternative that matched in idx.
+#define CK_ALT(...) ::ck::coro::current_state().when(__VA_ARGS__)
+#define CK_WHEN_ANY(idx_, ...)                                                \
+  case __LINE__:                                                              \
+    do {                                                                      \
+      ::ck::coro::note_site(ck_frame_, __LINE__);                             \
+      (idx_) = co_await ::ck::coro::current_state().any(__VA_ARGS__);         \
     } while (0)
 
 // A call site: awaits a resumable helper that contains a site.

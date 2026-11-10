@@ -1,0 +1,41 @@
+// The coroutine version of tests/charm++/sdag/migration.ci: migrations in the
+// middle of a coroutine entry method, synchronized (after quiescence) and
+// anytime; messages received before and after a migration; the coroutine's
+// site chain and the buffered messages pupped with the element.
+
+module migration {
+
+  // Data is filled with [0, index), then the PE the message was created on.
+  message TestMessage {
+    int data[];
+  };
+
+  array [1D] MigrationTest {
+    entry MigrationTest();
+
+    // Sent before migration, with the origin PE
+    entry void sentBefore(TestMessage* msg);
+    // Sent after migration, from ckJustMigrated
+    entry void sentAfter(TestMessage* msg);
+
+    // Sent at the start of the test, received throughout the coroutine
+    entry void call1();
+    entry void call2();
+    entry void call3();
+
+    // Sent as each call is received
+    entry void response1();
+    entry void response2();
+    entry void response3();
+
+    // Synchronization of the migrations
+    entry void doMigration();
+    entry [reductiontarget] void migrationDone();
+
+    // Migrates the element while run() is suspended at a site.
+    entry void migrateNow();
+
+    // The coroutine entry (ck::coroutine MigrationTest::run()).
+    entry void run();
+  }
+}
