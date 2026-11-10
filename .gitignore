@@ -55,6 +55,7 @@ bin
 *.def.h
 tests/charm++/anytime_bcastred/bcastred
 tests/charm++/qd/qdbench
+tests/charm++/qd/qdstress
 tests/charm++/anytime_migration/migrate
 tests/charm++/megatest/megatest
 tests/charm++/migratable_threads/migthread

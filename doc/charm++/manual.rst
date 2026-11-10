@@ -8499,7 +8499,7 @@ complete, the application checkpoints the result. Further executions of
 the second phase may just resume from that checkpoint.
 
 An example of Charm++'s support for split execution can be seen in
-``tests/charm++/chkpt/hello``.
+``tests/charm++/ckpt_restart``.
 
 .. _sec:diskcheckpoint:
 
