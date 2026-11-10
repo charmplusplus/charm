@@ -56,19 +56,25 @@ class MultiToThread: public FutureRequest {
     std::fill(values.begin(), values.end(), nullptr);
   }
 
-  virtual void fulfill(const CkFutureID& id, void* value) override {
+  // Stores a value; returns true when every value is present.
+  bool store(const CkFutureID& id, void* value) {
     const auto search = std::find(ids.begin(), ids.end(), id);
     const auto offset = search - ids.begin();
 
     CkAssert(value != nullptr && search != ids.end());
 
-    if (th != nullptr && values[offset] == nullptr) {
+    if (values[offset] == nullptr) {
       values[offset] = value;
+      nRecvd++;
+    }
+    return nRecvd >= values.size();
+  }
 
-      if (++nRecvd >= values.size()) {
-        CthAwaken(th);
-        th = nullptr;
-      }
+  // Called only for values that arrive while the thread is suspended.
+  virtual void fulfill(const CkFutureID& id, void* value) override {
+    if (th != nullptr && store(id, value)) {
+      CthAwaken(th);
+      th = nullptr;
     }
   }
 };
@@ -320,20 +326,21 @@ std::pair<void*, CkFutureID> CkWaitAnyID(const std::vector<CkFutureID>& handles)
 std::vector<void*> CkWaitAllIDs(const std::vector<CkFutureID>& ids) {
   auto fs = &(CpvAccess(futurestate));
   auto req = std::make_shared<MultiToThread>(CthSelf(), ids);
-  bool wait = false;
+  bool done = ids.empty();
 
+  // Values already present are stored without an awaken: this thread is
+  // running, and a stray awaken would end its next CthSuspend early.
   for (const auto& id : ids) {
     auto val = (*fs)[id];
 
     if (val != nullptr) {
-      req->fulfill(id, val);
+      done = req->store(id, val);
     } else {
       fs->request(id, req);
-      wait = true;
     }
   }
 
-  if (wait) {
+  if (!done) {
     CthSuspend();
   }
 
