@@ -76,7 +76,9 @@ jobs:
             ./build charm++ $ARCH -j4 -g
           fi
       - name: build test
-        run: make -C $TEST_DIR CHARMC=$PWD/$ARCH/bin/charmc OPTS="$OPTS"
+        # OPTS goes inside CHARMC: a CHARMC on the command line replaces the
+        # Makefile's "CHARMC = .../charmc $(OPTS)" line.
+        run: make -C $TEST_DIR CHARMC="$PWD/$ARCH/bin/charmc $OPTS"
       - name: run
         run: |
           mkdir -p hunt-failures
