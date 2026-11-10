@@ -5,10 +5,13 @@ A coroutine entry method is an entry method whose C++ definition returns
 `CK_WHEN` sites until a delivery to an inbox entry matches, and finishes
 like any entry method. The element's `ck::coro::state` member holds the
 records of its active coroutines and the inbox, and packs them with the
-element; a coroutine frame is never packed. Everything is in
-`src/ck-core/ckcoro.h` (header-only, C++20); the reasons and the
-measurements are in `doc/coroutine-sdag-design.md`. The user-facing contract
-is the header's opening comment.
+element; a coroutine frame is never packed. The mechanism is in
+`src/ck-core/ckcoro.h` (header-only, C++20); charmxi's `[inbox]` and
+`[coroutine]` attributes generate the `X_CORO_CODE` macro that declares
+the state member and the inbox entry bodies; the runtime contributes
+`CkCurrentMessage()`/`CkCurrentEntry()`. The reasons and the measurements
+are in `doc/coroutine-sdag-design.md`; the user-facing contract is the
+header's opening comment and the manual section "Coroutine Entry Methods".
 
 ## Data structures
 
@@ -28,9 +31,9 @@ is the header's opening comment.
   the `co_await` that follows it. `chain`, `frame_guard`, `note_site`,
   `abort_no_site` and `task<T>` are in `ckcoro_core.h`, shared with CAMPI,
   whose rank record holds one `chain`.
-- `buffer`: `ep`, `hasRef`, `ref`, and either a message (`isMsg`, `msg`,
-  pupped with `CkPupMessage`) or marshalled arguments as `bytes`
-  (`PUP::toMem` of a `std::tuple` of the decayed arguments).
+- `buffer`: `ep`, `ref`, and `msg` (pupped with `CkPupMessage`): the
+  entry's message, or the `CkMarshallMsg` carrying its marshalled
+  parameters, or null for a void entry.
 - `thread_local record *current_`: the record of the coroutine running on
   this PE thread; set by `state::begin` and `state::push` around a run,
   read by the awaitables.
@@ -41,24 +44,47 @@ is the header's opening comment.
 - `thread_local std::coroutine_handle<> pending_root_`: set by
   `coroutine::promise_type::get_return_object`, consumed by `state::begin`
   so that the record learns its frame handle.
+- `CkpvAccess(_ckCurrentMsg)`, `CkpvAccess(_ckCurrentEp)` (ck.C, set and
+  restored around the call in `CkInvokeEP`, charm++.h): the message and
+  entry index being delivered, read as `CkCurrentMessage()` and
+  `CkCurrentEntry()`.
+- The generated `X_CORO_CODE` macro (`Chare::genCoroCode`,
+  `Entry::genCoroCode` in src/xlat-i): `ck::coro::state __coro`,
+  `_coro_pup(p)` (called by `recursive_pup_impl` in charm++.h next to
+  `_sdag_pup`), `static bool __coro_is_entry(int ep)` (true for the
+  chare's `[coroutine]` entries), one method body per `[inbox]` entry
+  (`__coro.deliver(CkIndex_X::idx_name(), params...)`), and
+  `struct inbox` with `static want name()` and `static want name(ref)`
+  per inbox entry.
 
 ## Protocols
 
 **Start.** The generated entry wrapper calls the user's method, which is a
 coroutine with `initial_suspend` = never: the body runs to `CK_COROUTINE`,
-whose `root_guard` calls `state::begin(elt, ep, msg)`. `begin` adopts a
-restarting record of the same entry if there is one, else creates a record
-(aborting if an active record of that entry exists), stores the frame
-handle and sets `current_`. The `frame_guard` that follows opens the switch
+whose `root_guard` calls `state::begin(elt, ep, msg)`. With no arguments
+(`CK_COROUTINE()`, the attribute form) the guard takes `ep` from
+`CkCurrentEntry()` and `msg` from `CkCurrentMessage()` (null for a void
+entry's system message), after checking `__coro_is_entry(ep)` so that a
+direct C++ call of the method aborts instead of recording the caller's
+entry. `begin` adopts a restarting record of the same entry if there is
+one, else creates a record (aborting if an active record of that entry
+exists), stores the frame handle and sets `current_`. The `frame_guard` that follows opens the switch
 at `chain.sites[0]` when restarting, else at 0. When the body first
 suspends or finishes, the wrapper's discarded `ck::coroutine` object is
 destroyed and `~coroutine` calls `state::finish_run`, which clears
 `current_`, destroys a finished frame and erases its record, or rebuilds
 when `+ck_fakemigrate` asked for it.
 
-**Delivery.** `state::deliver(ep, ...)` builds a `buffer` (reference
-number: the envelope's for a message, the first arithmetic argument for
-marshalled arguments) and calls `push`. `push` looks for a waiting record
+**Delivery.** `state::deliver(ep, msg)` buffers the message (reference
+number: the envelope's). `state::deliver(ep, args...)` (reference number:
+the first arithmetic argument, else the envelope's) keeps the message
+being delivered when `CkCurrentEntry() == ep` and it is a `CkMarshallMsg`
+(`CkReferenceMsg`; the runtime's `nokeep` free after the wrapper only
+drops the count), and otherwise, for a `[reductiontarget, inbox]` entry
+reached through its reduction wrapper or a direct call, packs `args` into
+a new `CkMarshallMsg` in the marshalled layout (`PUP::toMem` of each
+argument in order, which is charmxi's layout for non-array parameters). A
+void entry buffers no message. Then `push`. `push` looks for a waiting record
 whose `wants` match; if found it moves the buffer into the record, sets
 `current_`, resumes `record.h` and calls `finish_run` when the body
 suspends again or finishes; otherwise it appends the buffer to the inbox.
@@ -72,8 +98,8 @@ the order of the rest); if there is none, `await_suspend` stores the `want`
 and `arm_wait` records the innermost handle and sets `fakeRestart` when the
 flag is on and the body was not just restarted to this site. `await_resume`
 unpacks the delivered buffer into the `out` lvalues: a message pointer is
-handed over (the coroutine owns the message), marshalled arguments are read
-back with `PUP::fromMem`. `CK_WHEN_ANY` uses `any_awaiter` over several
+handed over (the coroutine owns the message), marshalled parameters are
+read back in order with `PUP::fromMem` from the `CkMarshallMsg`'s buffer. `CK_WHEN_ANY` uses `any_awaiter` over several
 `when_awaiter`s: `await_ready` tries each alternative in order, `await_suspend`
 stores all their `want`s, and `await_resume` unpacks through the
 alternative at `readyIndex` and yields that index.
@@ -112,8 +138,11 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
   the entry index.
 - A restarted body that reaches a site other than the recorded one, or a
   helper not on the recorded path, aborts (`note_site`, `frame_guard`).
-- Marshalled inbox arguments must be types with a `pup` (scalars, STL
-  containers, pupable classes); raw arrays are not handled.
+- Marshalled inbox parameters must be types with a `pup` (scalars, STL
+  containers, pupable classes); charmxi rejects array, conditional and
+  nocopy parameters on `[inbox]` entries, whose marshalled layout differs.
+- `CkCurrentMessage()` sees the caller's delivery inside an `[inline]` or
+  `[local]` call; `deliver` then packs the arguments instead.
 - `CKCORO_DEBUG=1` in the environment prints each rebuild.
 
 ## Where in the source
@@ -123,10 +152,18 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
   `note_site`, `abort_no_site`, `current_chain_`; included by `ckcoro.h`
   and by CAMPI's `campi_core.h`.
 - `src/ck-core/CMakeLists.txt`: installs the headers.
+- `src/ck-core/charm++.h` (`CkInvokeEP`, `CkCurrentMessage`,
+  `CkCurrentEntry`, `recursive_pup_impl`), `ck.C`, `init.C`: the accessor
+  and the `_coro_pup` hook.
+- `src/xlat-i/xi-scan.l`, `xi-grammar.y` (and the regenerated `xi-scan.C`,
+  `xi-grammar.tab.C/h`), `xi-Entry.{h,C}`, `xi-Chare.{h,C}`, `xi-Member.h`:
+  the two attributes, their checks, and `X_CORO_CODE`.
 - `tests/charm++/jacobi3d-coro/`: the first program (migration at a site,
   rebuild, checkpoint and restart).
 - `tests/charm++/ckcoro/`: the SDAG migration test as a coroutine
-  (synchronized and anytime migration while suspended, `CK_WHEN_ANY`).
+  (synchronized and anytime migration while suspended, `CK_WHEN_ANY`) and
+  the marshalled inbox test (matching by the first parameter, a broadcast,
+  a reduction target, under `+ck_fakemigrate`).
 - `benchmarks/charm++/coro_pingpong/`: plain, SDAG and coroutine ping-pong.
 - `src/libs/ck-libs/ampi/campi_core.h`, `campi.C`: CAMPI, the other user
   of the shared core.
