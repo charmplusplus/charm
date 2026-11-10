@@ -16,7 +16,7 @@ module CkMulticast {
     entry void setup(multicastSetupMsg *);
     entry void recvCookie(CkSectionInfo sid, CkSectionInfo child);
     entry void teardown(CkSectionInfo sid);
-    entry void freeup(CkSectionInfo sid);
+    entry void freeup(CkSectionInfo sid, int expected);
     entry void retrieveCookie(CkSectionInfo s, CkSectionInfo srcInfo);
     entry void recvCookieInfo(CkSectionInfo s, int red);
     entry void retire(CkSectionInfo sid, CkSectionInfo root);
