@@ -333,7 +333,36 @@ Six matched messages per element per iteration at 1.2 us of saved
 matching each account for about 0.5 ms of the 0.56 ms saved on one PE;
 the rest is within run-to-run noise. The compute kernel is identical.
 
-Anvil at two nodes: delegated 2026-11-09 23:50 PST; results to be added.
+### 6.3 Anvil, two nodes
+
+Purdue Anvil (2 x AMD EPYC 7763 per node, InfiniBand HDR), production
+build of the branch at `/anvil/scratch/x-lkale/coro-sdag-measure/charm`,
+Slurm job 22127892 run 2026-11-10 about 02:00 PST (outside the morning
+window in which the network is quietest, see `machines/anvil.md`); the
+job's output is the project's `anvil-measure-1.log`. Two processes, one
+per node, 64 PEs each on socket 0 (`+pe 128 +pemap 0-63`).
+
+jacobi3d `512 32 100 50` (4096 elements of 32^3 cells, 32 per PE, 100
+iterations; both programs print checksum 18642873093165056), milliseconds
+per iteration, three runs each, alternating:
+
+| | run 1 | run 2 | run 3 | median |
+|---|---|---|---|---|
+| SDAG | 27.54 | 27.35 | 32.26 | 27.54 |
+| coroutine | 26.97 | 26.80 | 26.63 | 26.80 |
+
+At this scale the step is dominated by the 32^3 stencil and the halo
+copies, so the 1.2 us saved per matched message is 3 percent of the
+iteration. The ping-pong (us per message, median of three):
+
+| | plain entry | SDAG when | coroutine CK_WHEN |
+|---|---|---|---|
+| across the two nodes, one PE each | 3.313 | 4.470 | 3.656 |
+| within one node, two PEs in one process | 0.647 | 1.758 | 1.000 |
+
+The matching cost over a plain entry is the same as on the Mac in
+proportion: SDAG 1.1 us, coroutine 0.35 us within the node; across the
+network the message itself is 3.3 us and the two differ by 0.8 us.
 
 ## 7. Test plan (from the charm-tests requirements, 2026-11-09) and status
 
@@ -388,10 +417,11 @@ for the beta.
 What charm4py can mirror: the record and site protocol of section 8, with
 no C++ frame involved.
 
-Before the beta: fill the Anvil row, merge the shared core with CAMPI if
-its tests stay green (done: `ckcoro_core.h`), add the two test directories to CI (done on the
-branch: `TEST_DIRS` in `reconverse-ci.yaml`). First beta update: `overlap`
-as several coroutines per element and the rest of the SDAG test corpus.
+Everything the beta needs is on the branch: the shared core with CAMPI
+(`ckcoro_core.h`, CAMPI's tests green), the two test directories in CI
+(`TEST_DIRS` in `reconverse-ci.yaml`), and the Mac and Anvil measurements.
+First beta update: `overlap` as several coroutines per element and the
+rest of the SDAG test corpus.
 
 ## 10. Open items
 
