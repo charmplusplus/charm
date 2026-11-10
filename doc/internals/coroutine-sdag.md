@@ -16,10 +16,12 @@ is the header's opening comment.
   `std::vector<buffer> inbox_`.
 - `record`: the coroutine entry's index `ep`, a `CkCallback target` to the
   element, the entry's message `msg` (a copy, for message entries; null for
-  void entries), the restart `chain`, the frame handles `root` (the entry's
-  frame) and `h` (the innermost suspended frame), and the wait state:
-  `waiting`, `atSite`, `wants` (entry and reference number), and the
-  delivered `readyBuf`.
+  void entries), `pending` (a restart message is on its way; pupped), the
+  restart `chain`, the frame handles `root` (the entry's frame) and `h`
+  (the innermost suspended frame), and the wait state: `waiting`, `atSite`,
+  `rebuilt` (restarted and not yet past the recorded site), `wants` (the
+  entry and reference number pairs it waits for: one for a when, several
+  for a when_any), and the delivered `readyBuf` with `readyIndex`.
 - `chain`: `sites` (one site id per resumable-function depth, pupped),
   `linked` (per depth: entered through a `CK_CALL` site), `depth`,
   `restarting`, and the `noted` fields that connect a `note_site` call with
@@ -58,34 +60,40 @@ whose `wants` match; if found it moves the buffer into the record, sets
 suspends again or finishes; otherwise it appends the buffer to the inbox.
 
 **Waiting.** `CK_WHEN` is `case __LINE__: note_site(...); co_await
-state.when(ep, ref, out...)`. `when_awaiter::await_ready` clears
-`chain.restarting` (a restarted body has reached its site), remembers
-whether a site was noted (`record.atSite`), and takes the first matching
-buffer from the inbox (`state::take`, keeping the order of the rest); if
-there is none, `await_suspend` records the innermost handle and the `want`
-in the record and sets `fakeRestart` when the flag is on. `await_resume`
+state.when(ep, ref, out...)`. `enter_await` clears `chain.restarting` (a
+restarted body has reached its site, remembered in `record.rebuilt`) and
+records whether a site was noted (`record.atSite`). `when_awaiter::await_ready`
+then takes the first matching buffer from the inbox (`state::take`, keeping
+the order of the rest); if there is none, `await_suspend` stores the `want`
+and `arm_wait` records the innermost handle and sets `fakeRestart` when the
+flag is on and the body was not just restarted to this site. `await_resume`
 unpacks the delivered buffer into the `out` lvalues: a message pointer is
 handed over (the coroutine owns the message), marshalled arguments are read
-back with `PUP::fromMem`.
+back with `PUP::fromMem`. `CK_WHEN_ANY` uses `any_awaiter` over several
+`when_awaiter`s: `await_ready` tries each alternative in order, `await_suspend`
+stores all their `want`s, and `await_resume` unpacks through the
+alternative at `readyIndex` and yields that index.
 
 **Pack.** `state::pup` writes the inbox and, per record, `ep`, `target`,
 `msg` and `chain.sites`. Packing aborts if a record is running or is
 suspended at a `co_await` that is not a site (`waiting && atSite` is the
 condition).
 
-**Unpack and restart.** `state::pup` reads the same, marks each record
-`restarting` and calls `send_restart`: a copy of the record's message (or a
-fresh system message for a void entry) is sent through `target`, so the
-entry is invoked again by the array manager after the unpack completes.
-The body runs to `CK_COROUTINE`, adopts the record, and each `frame_guard`
-on the recorded path switches to its site; `note_site` checks that the site
-reached is the recorded one. Deliveries that arrive before the restart
-message are buffered as usual.
+**Unpack and restart.** `state::pup` reads the same and calls
+`send_restart` for each record: unless a restart message is already
+`pending` (sent before the element moved again; the location manager
+forwards it), a copy of the record's message (or a fresh system message for
+a void entry) is sent through `target` and `pending` is set, so the entry
+is invoked again by the array manager after the unpack completes. The body
+runs to `CK_COROUTINE`, adopts the record (clearing `pending`, setting
+`chain.restarting`), and each `frame_guard` on the recorded path switches
+to its site; `note_site` checks that the site reached is the recorded one.
+Deliveries that arrive before the restart message are buffered as usual.
 
-**Rebuild (`+ck_fakemigrate`).** After a body suspends at a site,
-`finish_run` calls `state::rebuild`: the state is packed into memory,
-every frame destroyed, the records and inbox cleared, and the state
-unpacked from memory, which sends the restarts.
+**Rebuild (`+ck_fakemigrate`).** After a body suspends at a site it did
+not just restart to, `finish_run` calls `state::rebuild`: the state is
+packed into memory, every frame destroyed, the records and inbox cleared,
+and the state unpacked from memory, which sends the restarts.
 
 **Helpers.** A `ck::coro::task<T>` helper awaited with `CK_CALL` has its
 own `CK_RESUMABLE`/`CK_END` and therefore its own depth in the chain;
@@ -110,6 +118,8 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
 - `src/ck-core/CMakeLists.txt`: installs the header.
 - `tests/charm++/jacobi3d-coro/`: the first program (migration at a site,
   rebuild, checkpoint and restart).
+- `tests/charm++/ckcoro/`: the SDAG migration test as a coroutine
+  (synchronized and anytime migration while suspended, `CK_WHEN_ANY`).
 - `benchmarks/charm++/coro_pingpong/`: plain, SDAG and coroutine ping-pong.
 - `src/libs/ck-libs/ampi/campi_core.h`: the origin of `task<T>` and the
   site chain.
