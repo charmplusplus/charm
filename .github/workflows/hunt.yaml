@@ -1,0 +1,106 @@
+# Repeat one test many times on a CI runner, optionally under AddressSanitizer,
+# to catch an intermittent failure seen in CI. Run it from the Actions tab
+# (workflow_dispatch) with the test, arguments and run count; it also runs with
+# the defaults below on a pull request that changes this file.
+# Failing runs' outputs are uploaded as the artifact "hunt-failures".
+name: hunt
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: runner (the failing CI job's)
+        type: choice
+        default: ubuntu-24.04-arm
+        options: [ubuntu-24.04-arm, ubuntu-latest]
+      test_dir:
+        description: test directory
+        default: tests/charm++/section_migrate
+      binary:
+        description: executable in that directory
+        default: section_migrate
+      args:
+        description: arguments of the failing line
+        default: "+pe 4 -lb -auto +balancer RotateLB +randomized_msgq +randomized_seed 2"
+      vary_seed:
+        description: append +randomized_seed <run number> to args
+        type: boolean
+        default: false
+      runs:
+        description: number of runs
+        default: "200"
+      sanitizer:
+        description: address = AddressSanitizer build; none = plain -g build with MALLOC_CHECK_=3
+        type: choice
+        default: address
+        options: [address, none]
+      run_timeout:
+        description: seconds per run before it counts as a hang
+        default: "120"
+  pull_request:
+    paths: ['.github/workflows/hunt.yaml']
+
+jobs:
+  hunt:
+    timeout-minutes: 330
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04-arm' }}
+    env:
+      TEST_DIR: ${{ inputs.test_dir || 'tests/charm++/section_migrate' }}
+      BINARY: ${{ inputs.binary || 'section_migrate' }}
+      ARGS: ${{ inputs.args || '+pe 4 -lb -auto +balancer RotateLB +randomized_msgq +randomized_seed 2' }}
+      VARY_SEED: ${{ inputs.vary_seed || 'false' }}
+      RUNS: ${{ inputs.runs || '200' }}
+      SANITIZER: ${{ inputs.sanitizer || 'address' }}
+      RUN_TIMEOUT: ${{ inputs.run_timeout || '120' }}
+      # detect_leaks=0: the instrumented charmxi would otherwise fail the build.
+      ASAN_OPTIONS: abort_on_error=1:detect_leaks=0
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+      - name: install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libfabric-dev
+      - name: build
+        # The sanitizer flags go in CFLAGS/CXXFLAGS/LDFLAGS as well as the
+        # build options: the reconverse CMake tree takes only the former.
+        run: |
+          set -e
+          case "$(uname -m)" in aarch64) ARCH=reconverse-linux-arm8;; *) ARCH=reconverse-linux-x86_64;; esac
+          echo "ARCH=$ARCH" >> $GITHUB_ENV
+          if [ "$SANITIZER" = address ]; then
+            SAN="-fsanitize=address -fno-omit-frame-pointer"
+            echo "OPTS=-g -O1 $SAN" >> $GITHUB_ENV
+            CFLAGS="$SAN" CXXFLAGS="$SAN" LDFLAGS="-fsanitize=address" ./build charm++ $ARCH -j4 -g -O1 $SAN
+          else
+            echo "OPTS=-g" >> $GITHUB_ENV
+            ./build charm++ $ARCH -j4 -g
+          fi
+      - name: build test
+        run: make -C $TEST_DIR CHARMC=$PWD/$ARCH/bin/charmc OPTS="$OPTS"
+      - name: run
+        run: |
+          mkdir -p hunt-failures
+          cd $TEST_DIR
+          [ "$SANITIZER" = none ] && export MALLOC_CHECK_=3
+          fails=0; hangs=0
+          for i in $(seq 1 $RUNS); do
+            a="$ARGS"; [ "$VARY_SEED" = true ] && a="$a +randomized_seed $i"
+            if timeout $RUN_TIMEOUT ./$BINARY $a > out.txt 2>&1; then continue; fi
+            rc=$?
+            fails=$((fails+1)); [ $rc = 124 ] && hangs=$((hangs+1))
+            { echo "ARGS: $a"; echo "EXIT: $rc"; cat out.txt; } > $GITHUB_WORKSPACE/hunt-failures/run$i-rc$rc.txt
+            echo "run $i failed (rc $rc)"
+          done
+          echo "## hunt: $TEST_DIR/$BINARY $ARGS" >> $GITHUB_STEP_SUMMARY
+          echo "runs: $RUNS, failures: $fails (hangs: $hangs), sanitizer: $SANITIZER, runner: $(uname -m)" >> $GITHUB_STEP_SUMMARY
+          for f in $GITHUB_WORKSPACE/hunt-failures/*.txt; do
+            [ -e "$f" ] || break
+            echo '```' >> $GITHUB_STEP_SUMMARY; grep -m3 'ERROR: AddressSanitizer\|malloc\|Abort\|Assert\|EXIT' "$f" >> $GITHUB_STEP_SUMMARY; echo '```' >> $GITHUB_STEP_SUMMARY
+          done
+          [ $fails = 0 ]
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hunt-failures
+          path: hunt-failures
+          if-no-files-found: ignore
