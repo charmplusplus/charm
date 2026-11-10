@@ -11,7 +11,7 @@ jacobi3d: $(OBJS)
 jacobi3d.decl.h: jacobi3d.ci
 	$(CHARMC) jacobi3d.ci
 
-jacobi3d.o: jacobi3d.C jacobi3d.decl.h
+jacobi3d.o: jacobi3d.C jacobi3d.decl.h ../../../include/ckcoro.h
 	$(CHARMC) -std=c++20 -c jacobi3d.C
 
 clean:

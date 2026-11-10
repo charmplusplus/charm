@@ -395,6 +395,8 @@ inline bool fake_migrate_enabled() noexcept {
     char **argv = CkGetArgv();
     for (int i = 0; argv && argv[i]; i++)
       if (std::strcmp(argv[i], "+ck_fakemigrate") == 0) v = 1;
+    if (v && CkMyPe() == 0)
+      CkPrintf("ck::coro> +ck_fakemigrate: every when site rebuilds the element's coroutines in place\n");
   }
   return v == 1;
 }
