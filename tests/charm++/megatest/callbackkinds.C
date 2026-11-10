@@ -534,7 +534,12 @@ void callbackkinds_driver::functionCases(void)
 static void callbackkinds_checkThread(void* m, int mode, int val, const char* what)
 {
   int got, refnum;
-  callbackkinds_decode(m, got, refnum);
+  // A send() with no message may arrive as an empty system message
+  // (CkAllocSysMsg, message index 0): a future cannot hold NULL.
+  if (m && mode == CBK_NOMSG && UsrToEnv(m)->getMsgIdx() == 0)
+    got = -1;
+  else
+    callbackkinds_decode(m, got, refnum);
   int want = mode == CBK_NOMSG ? -1 : val;
   if (got != want)
     CkAbort("callbackkinds: %s mode %d: value %d, expected %d\n", what, mode, got, want);
