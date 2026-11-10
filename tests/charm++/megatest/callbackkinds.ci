@@ -1,0 +1,53 @@
+module callbackkinds {
+  message callbackkinds_msg;
+
+  // Lives on PE 0 and steps through the cases in one thread.
+  chare callbackkinds_driver {
+    entry callbackkinds_driver(void);
+    entry [threaded] void run(void);
+    entry void got(int kind, int val, int where, int refnum);
+    entry void reflected(void);
+    entry void echo(CkCallback cb);
+  };
+
+  // Receives a marshalled CkCallback (so CkCallback::pup runs) and sends it.
+  group callbackkinds_reflector {
+    entry callbackkinds_reflector(CProxy_callbackkinds_driver driver);
+    entry void reflect(CkCallback cb, int mode, int val);
+  };
+
+  // Each target kind reports every delivery to the driver. accept() takes a
+  // message, ping() is reached by send() with no message, data() by
+  // send(length, data).
+  chare callbackkinds_chare {
+    entry callbackkinds_chare(CProxy_callbackkinds_driver driver);
+    entry void accept(callbackkinds_msg* m);
+    entry void ping(void);
+    entry void data(CkDataMsg* m);
+    entry void bounce(CProxy_callbackkinds_reflector r, int reflectPe, int mode, int val);
+  };
+
+  group callbackkinds_group {
+    entry callbackkinds_group(CProxy_callbackkinds_driver driver);
+    entry void accept(callbackkinds_msg* m);
+    entry void ping(void);
+    entry void data(CkDataMsg* m);
+    entry void bounce(CProxy_callbackkinds_reflector r, int reflectPe, int mode, int val);
+  };
+
+  nodegroup callbackkinds_nodegroup {
+    entry callbackkinds_nodegroup(CProxy_callbackkinds_driver driver);
+    entry void accept(callbackkinds_msg* m);
+    entry void ping(void);
+    entry void data(CkDataMsg* m);
+    entry void bounce(CProxy_callbackkinds_reflector r, int reflectPe, int mode, int val);
+  };
+
+  array [1D] callbackkinds_array {
+    entry callbackkinds_array(CProxy_callbackkinds_driver driver);
+    entry void accept(callbackkinds_msg* m);
+    entry void ping(void);
+    entry void data(CkDataMsg* m);
+    entry void bounce(CProxy_callbackkinds_reflector r, int reflectPe, int mode, int val);
+  };
+};
