@@ -773,8 +773,25 @@ foreign reducer whose result is a new message).
 its generation. Any later use of the old id on the root (`lookup`) aborts:
 "send to a deleted section (root PE %d, index %d, stale generation %u; the
 slot is at generation %u, ...)". The CkMulticast trees of a deleted section
-stay allocated (CkMulticastMgr has no call that frees a section), and members
-keep their cookie map entries; neither is used again.
+stay allocated (CkMulticastMgr has no call that frees a section).
+
+If the section was ready, `deleteSection` first multicasts a `CkDynMcastMsg`
+with one `U64` slot, the section's `nsent` (multicasts sent to it, the
+creation multicast included; `sendTo` counts them), to the entry
+`CkDyn.sectionDelete(array)` or `CkDyn.sectionDelete(group)`. A member's
+cookie map holds a `CkDynMember` per section: the cookie, `got` (multicasts
+received: `sectionJoin` and `noteSectionDelivery` count) and `deleteAt` (set
+by `sectionLeave` from the slot). CkMulticast does not keep the order of a
+root's multicasts, so the deletion may arrive before earlier messages; the
+record is `deleted()` only when `got >= deleteAt`, and it is erased then (by
+`sectionLeave` or `sectionJoin` if the deletion is the last to arrive, else
+lazily by `cookieOf` or `pupObj`). `cookieOf` aborts on a deleted record
+unless the handler running on this PE is the one for this object and section
+(`_ckdynMcastObj`, `_ckdynMcastSid`, set by `dispatch` around the `deliver`
+call without touching the object afterwards, since a handler may migrate or
+destroy it), so the last message sent before the deletion can still use the
+id. Test: the run with `-staleredno` asks a member for the reduction number of
+a deleted section after quiescence and must abort.
 
 ### Order of section operations
 

@@ -82,7 +82,7 @@ extern CbClass Ping, Sec, Grp, NGrp, Single, DMain, Late;
 enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTRED, P_GOTREDB, P_COMPUTE, P_CORO, P_SYNCSTART, P_RESUMED,
        P_ZSTART, P_ZRECV, P_ZPOST, P_ZSPIN, P_ZACK, P_DSTART, P_DRECV, P_DCHECK,
        P_PSTART, P_PRECV, P_PDONE, P_PCHECK };
-enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED, SC_SINK };
+enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED, SC_SINK, SC_REDNO };
 enum { G_CTOR, G_GOTRED, G_GOTREDB, G_NGSEND, G_NGREPORT, G_PRIOSTART, G_PRIORECV, G_EXPRECV,
        G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE, G_LATEREG, G_SENDDELETE };
 enum { N_CTOR, N_INCR };
@@ -737,6 +737,16 @@ static int64_t secSink(Obj *, const CkDynMsgView *v) {
         v->slots[1].len == ORDER_BYTES, "Sec.sink: a malformed section message");
   return 0;
 }
+/* redNo(SECTION sid, FUTURE f): CkDynSectionRedNo of this member, to f */
+static int64_t secRedNo(Obj *o, const CkDynMsgView *v) {
+  CkDynSectionID sid;
+  CkDynViewSection(v, 0, &sid);
+  int pe; uint32_t id;
+  CHECK(cbFindFuture(v, &pe, &id), "Sec.redNo without a future");
+  int rn = CkDynSectionRedNo(&o->t, &sid);
+  CkDynFutureSet(pe, id, MsgB().i64(rn).finish(0));
+  return 0;
+}
 static int64_t secResumed(Obj *o, const CkDynMsgView *) {
   double r[2] = { 1.0, o->s.origPe != CkMyPe() ? 1.0 : 0.0 };
   CkDynRedData d = { r, sizeof r, redType("sum_double") };
@@ -754,6 +764,7 @@ CbClass Sec = { "Sec", CKDYN_ARRAY, 1, {
   { "Sec.syncStart", 0, secSyncStart },
   { "Sec.resumed", 0, secResumed },
   { "Sec.sink", 0, secSink },
+  { "Sec.redNo", 0, secRedNo },
 } };
 
 /* ---- Grp (group) ---------------------------------------------------------- */
@@ -1034,6 +1045,7 @@ class TestMain : public CBase_TestMain {
   bool xiSection = false;    /* -xisection: a section of a charmxi array, which must abort */
   bool ckptSection = false;  /* -ckptsection: the checkpoint phase passes a SECTION callback, which must abort */
   bool deleteWaiting = false; /* -deletewaiting: the delete phase deletes a part a combine waits on, which must abort */
+  bool staleRedNo = false;   /* -staleredno: a member asks for the reduction number of a deleted section, which must abort */
 
   /* sections: the expected membership of each section the phases create */
   struct Sect {
@@ -1067,6 +1079,7 @@ public:
       else if (strcmp(m->argv[i], "-xisection") == 0) xiSection = true;
       else if (strcmp(m->argv[i], "-ckptsection") == 0) ckptSection = true;
       else if (strcmp(m->argv[i], "-deletewaiting") == 0) deleteWaiting = true;
+      else if (strcmp(m->argv[i], "-staleredno") == 0) staleRedNo = true;
     delete m;
     mainProxy = thisProxy;
     numElems = 2 * CkNumPes();
@@ -1650,6 +1663,20 @@ public:
       qCreateArray("D", aidSecA, { 0, 1 });
       q.push_back([this] {
         CkDynSectionDelete(&sects["D"].sid);
+        if (staleRedNo) {
+          /* after quiescence the deletion has reached the members */
+          uint32_t fq = cbNewFuture([this](const CkDynMsgView *) {
+            CkPrintf("  a member of the deleted section asks for its reduction number; CkDyn must abort\n");
+            uint32_t f = cbNewFuture([](const CkDynMsgView *) {
+              CHECK(false, "CkDynSectionRedNo on a deleted section did not abort");
+            });
+            int one = 1;
+            CkDynSendArray(aidSecA, 1, &one, Sec.ep(SC_REDNO), MsgB().sec(sects["D"].sid).fut(0, f).finish(0), nullptr);
+          });
+          CkDynCallback qd = cbFutureCb(0, fq);
+          CkDynStartQD(&qd);
+          return;
+        }
         if (staleSend) {
           CkPrintf("  sending to the deleted section; CkDyn must abort\n");
           int ep = Sec.ep(SC_RECV);

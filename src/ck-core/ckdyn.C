@@ -31,6 +31,7 @@ CkpvExtern(std::vector<void *>, chare_objs);
 
 /* the CkDyn entries that deliver a section's creation multicast (registered by _ckdynInitNode) */
 static int g_secInitArrayEp = -1, g_secInitGroupEp = -1;
+static int g_secLeaveArrayEp = -1, g_secLeaveGroupEp = -1;   /* a section's deletion multicast */
 
 /* The structs a binding copies as bytes into messages keep their sizes; a
    change here is an ABI change (bump CKDYN_API_VERSION). */
@@ -825,11 +826,19 @@ static CkDynMsg *emptyMsg() {
 /* Delivery                                                                */
 /* ====================================================================== */
 
+/* The section message whose handler runs now on this PE, if any: inside it a
+   member may still use a section whose deletion has reached it (cookieOf). */
+CkpvStaticDeclare(CkDynObj *, _ckdynMcastObj);
+CkpvStaticDeclare(CkDynSectionID, _ckdynMcastSid);
+
 /* A section message reached a member: refresh its cookie (as the manual asks
-   of every CkMulticast receiver, so that the cookie follows tree rebuilds). */
+   of every CkMulticast receiver, so that the cookie follows tree rebuilds)
+   and count it. */
 static void noteSectionDelivery(CkDynObj &d, CkDynMcastMsg *m, CkDynMsgView &v) {
   if (d.sectionCookies == nullptr) d.sectionCookies = new CkDynCookieMap;
-  CkGetSectionInfo((*d.sectionCookies)[m->sid], m);
+  CkDynMember &e = (*d.sectionCookies)[m->sid];
+  CkGetSectionInfo(e.ck, m);
+  e.got++;
   v.section = &m->sid;
 }
 
@@ -853,6 +862,17 @@ static void dispatch(CkDynObj &d, void *msg) {
       bindingError(c->hooks, what);
     }
     noteSectionDelivery(d, (CkDynMcastMsg *)msg, v);
+    /* the object may be gone when the hook returns (a handler can migrate or
+       destroy it), so the marker is set here and restored after without
+       touching d */
+    CkDynObj *outerObj = CkpvAccess(_ckdynMcastObj);
+    CkDynSectionID outerSid = CkpvAccess(_ckdynMcastSid);
+    CkpvAccess(_ckdynMcastObj) = &d;
+    CkpvAccess(_ckdynMcastSid) = ((CkDynMcastMsg *)msg)->sid;
+    if (d.handle != nullptr) c->hooks->deliver(c->desc.binding_data, d.handle, ep, r.user_id, r.flags, &v);
+    CkpvAccess(_ckdynMcastObj) = outerObj;
+    CkpvAccess(_ckdynMcastSid) = outerSid;
+    return;   /* a section message has no zero-copy slots; a branch outside a constrained group drops it */
   }
   const bool zc = v.kind == CKDYN_MSGKIND_DYN && v.hdr->nbuf != 0;
   /* a device message's first delivery issues its transfers; it arrives again when they complete */
@@ -992,6 +1012,9 @@ static void pupObj(PUP::er &p, CkDynObj &d, CkDynTarget t) {
   t.chare_idx = d.chareIdx;   /* the caller's copy was filled before d.chareIdx was restored */
   /* section cookies move with a migrating element; a checkpoint writes none,
      because the sections themselves (the root's table) are not checkpointed */
+  if (!p.isUnpacking() && d.sectionCookies)   /* records of deleted sections stay behind */
+    for (auto it = d.sectionCookies->begin(); it != d.sectionCookies->end();)
+      it = it->second.deleted() ? d.sectionCookies->erase(it) : std::next(it);
   bool hasCookies = !p.isCheckpoint() && d.sectionCookies && !d.sectionCookies->empty();
   p | hasCookies;
   if (hasCookies) {
@@ -1839,6 +1862,7 @@ void CkDynMgr::finishSection(int idx) {
 
 void CkDynMgr::sendTo(CkDynSection &s, int ep, CkDynMcastMsg *m) {
   if (!s.ready) { s.held.push_back(m); return; }
+  s.nsent++;
   if (s.kind == CKDYN_GROUP)
     mcastMgr()->GroupSectionSend(s.gproxy.ckDelegatedPtr(), ep, m, s.gproxy.ckGetNumSections(), s.gproxy.ckGetSectionIDs());
   else
@@ -2035,6 +2059,16 @@ void CkDynMgr::deleteSection(const CkDynSectionID &sid) {
             sid.root_pe, sid.idx, sid.gen, s.queries.size(), q.partNo, q.replyPe, q.combIdx);
   }
   for (CkDynMcastMsg *m : s.held) CkFreeMsg(m);
+  if (s.ready) {
+    /* tell the members, with the count of multicasts they must have received
+       before they drop the section (CkMulticast does not keep their order) */
+    CkDynMsgBuilder *b = CkDynMsgBegin(1, 0, 0, 0, -1);
+    CkDynMsgAddU64(b, s.nsent);
+    int ep = s.kind == CKDYN_GROUP ? g_secLeaveGroupEp : g_secLeaveArrayEp;
+    CkDynMcastMsg *m = CkDynMsgFinishMcast(b, ep);
+    m->sid = sid;
+    sendTo(s, ep, m);
+  }
   uint16_t gen = (uint16_t)(s.gen + 1);
   if (gen == 0) gen = 1;
   /* the CkMulticast trees of the section stay allocated: CkMulticastMgr has no
@@ -2085,10 +2119,19 @@ static CkSectionInfo &cookieOf(const CkDynTarget *me, const CkDynSectionID *sid,
   CkDynObj &d = localMember(me, what);
   if (d.sectionCookies) {
     auto it = d.sectionCookies->find(*sid);
-    if (it != d.sectionCookies->end()) return it->second;
+    if (it != d.sectionCookies->end()) {
+      if (!it->second.deleted()) return it->second.ck;
+      /* the handler of the last message sent before the deletion may still use it */
+      if (CkpvAccess(_ckdynMcastObj) == &d && memcmp(&CkpvAccess(_ckdynMcastSid), sid, sizeof *sid) == 0)
+        return it->second.ck;
+      d.sectionCookies->erase(it);
+      CkAbort("CkDyn: %s: section (root PE %d, index %d, generation %u) was deleted", what, sid->root_pe,
+              sid->idx, sid->gen);
+    }
   }
   CkAbort("CkDyn: %s: the object is not a member of section (root PE %d, index %d, generation %u), "
-          "or has not received its creation multicast yet", what, sid->root_pe, sid->idx, sid->gen);
+          "has not received its creation multicast yet, or the section was deleted", what, sid->root_pe,
+          sid->idx, sid->gen);
 }
 
 /* userData becomes the result's reference number (3.7 of the design): the
@@ -2108,12 +2151,28 @@ static void sectionJoin(CkDynObj &d, CkDynMcastMsg *m) {
   CkDynCallback done;
   CkDynViewCallback(&v, 1, &done);
   if (d.sectionCookies == nullptr) d.sectionCookies = new CkDynCookieMap;
-  CkSectionInfo &ck = (*d.sectionCookies)[sid];
-  CkGetSectionInfo(ck, m);
+  CkDynMember &e = (*d.sectionCookies)[sid];
+  CkGetSectionInfo(e.ck, m);
+  e.got++;
   ClassRec *c = classOf(d.chareIdx);
   if (d.handle && c->hooks->section_joined) c->hooks->section_joined(c->desc.binding_data, d.handle, &sid);
-  sectionContribute(ck, 0, nullptr, CkReduction::nop, &done);
+  sectionContribute(e.ck, 0, nullptr, CkReduction::nop, &done);
+  if (e.deleted()) d.sectionCookies->erase(sid);   /* the deletion arrived first */
 }
+
+/* The root's deletion multicast reached a member: slot 0 is the number of
+   multicasts the root sent to the section before it. The record goes once
+   they have all arrived; a later one that arrives first keeps it until then. */
+static void sectionLeave(CkDynObj &d, CkDynMcastMsg *m) {
+  CkDynMsgView v;
+  viewPayload(v, m->buf, m, CKDYN_MSGKIND_MCAST);
+  if (d.sectionCookies == nullptr) d.sectionCookies = new CkDynCookieMap;
+  CkDynMember &e = (*d.sectionCookies)[m->sid];
+  e.deleteAt = (uint32_t)v.slots[0].v.u64;
+  if (e.deleted()) d.sectionCookies->erase(m->sid);
+}
+static void sectionLeaveArray(void *msg, void *obj) { sectionLeave(((ArrayElemDyn *)obj)->d, (CkDynMcastMsg *)msg); }
+static void sectionLeaveGroup(void *msg, void *obj) { sectionLeave(((GroupDyn *)obj)->d, (CkDynMcastMsg *)msg); }
 
 static void sectionInitArray(void *msg, void *obj) {
   int cidx = ((ArrayElement *)obj)->ckGetChareType();
@@ -3035,12 +3094,19 @@ void _ckdynInitNode(void) {
                                   CkIndex_ArrayElement::__idx, CK_EP_NOKEEP);
   g_secInitGroupEp = CkRegisterEp("CkDyn.sectionInit(group)", sectionInitGroup, CkDynMcastMsg::__idx,
                                   CkIndex_IrrGroup::__idx, CK_EP_NOKEEP);
+  g_secLeaveArrayEp = CkRegisterEp("CkDyn.sectionDelete(array)", sectionLeaveArray, CkDynMcastMsg::__idx,
+                                   CkIndex_ArrayElement::__idx, CK_EP_NOKEEP);
+  g_secLeaveGroupEp = CkRegisterEp("CkDyn.sectionDelete(group)", sectionLeaveGroup, CkDynMcastMsg::__idx,
+                                   CkIndex_IrrGroup::__idx, CK_EP_NOKEEP);
 }
 
 /* initproc: per-PE state. */
 void _ckdynInitProc(void) {
   CkpvInitialize(CkDynMsgBuilder *, _ckdynBuilder);
   CkpvAccess(_ckdynBuilder) = nullptr;
+  CkpvInitialize(CkDynObj *, _ckdynMcastObj);
+  CkpvAccess(_ckdynMcastObj) = nullptr;
+  CkpvInitialize(CkDynSectionID, _ckdynMcastSid);
 #if CMK_TRACE_ENABLED
   CkpvInitialize(std::vector<bool>, _ckdynCoroTraced);
 #endif

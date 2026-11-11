@@ -52,7 +52,19 @@ inline bool operator<(const CkDynSectionID &a, const CkDynSectionID &b) {
   return a.gen < b.gen;
 }
 
-typedef std::map<CkDynSectionID, CkSectionInfo> CkDynCookieMap;
+/* A member's record of one section: its CkMulticast cookie, the section
+   messages it has received (the creation multicast included), and, once the
+   root's deletion multicast has arrived, the number the root had sent before
+   it. The record is deleted() when all of those have arrived; the member then
+   rejects the id (cookieOf), except inside the handler of that last message. */
+struct CkDynMember {
+  CkSectionInfo ck;
+  uint32_t got = 0;
+  uint32_t deleteAt = 0;   /* 0: not deleted; the creation multicast makes every count >= 1 */
+  bool deleted() const { return deleteAt != 0 && got >= deleteAt; }
+  void pup(PUP::er &p) { p | ck; p | got; p | deleteAt; }
+};
+typedef std::map<CkDynSectionID, CkDynMember> CkDynCookieMap;
 
 /* A destination posted with CkDynPostBuffer or CkDynPostDeviceBuffer for the
    next message to (this object, ep) with a zero-copy slot at index slot. */
@@ -165,6 +177,7 @@ struct CkDynSection {
   uint8_t  kind = 0;               /* CKDYN_ARRAY, CKDYN_GROUP, or 0 for a combined section */
   uint16_t gen = 0;
   int      bfactor = 0;
+  uint32_t nsent = 0;              /* multicasts sent to the members, the creation multicast included */
   int      ndims = 0;
   std::vector<int> aids;                              /* arrays (one per sub-section) */
   std::vector<std::vector<CkArrayIndex> > elems;      /* members per array */

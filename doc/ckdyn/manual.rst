@@ -1446,6 +1446,14 @@ the number of section reductions the member has contributed to, which every
 member computes identically: a binding derives a collective future id from
 it.
 
+After ``CkDynSectionDelete`` the root multicasts the deletion to the members,
+with the number of multicasts it sent to the section before it. A member
+drops the section once that deletion and all those multicasts have reached
+it; from then on ``CkDynContributeSection`` and ``CkDynSectionRedNo`` with
+the id abort. The handler of a multicast sent before the deletion can still
+use the id, whichever arrives first. A contribution made before the deletion
+reaches the member is reduced as usual.
+
 A **section callback** (``CKDYN_CB_SECTION``) multicasts a result to every
 member of a section, as an MCAST view with ``refnum`` set. Unlike Charm++'s
 ``bcastSection`` callback it can be put into a message and pupped. A
@@ -1464,7 +1472,8 @@ Migration, restart and restrictions
   them. An id from before the restart, for example one held in an object's
   restored state, aborts on its next use (see `Section ids`_). The check
   repeats after 256 restarts.
-- A deleted section's CkMulticast trees stay allocated.
+- A deleted section's CkMulticast trees stay allocated. Deleting a section
+  costs one multicast to its members.
 - Section messages take no group dependency and no zero-copy slots.
 - A group section must name a dynamic group; an empty member list aborts.
 - Each PE keeps one relay entry per (section id, entry) pair used in a
