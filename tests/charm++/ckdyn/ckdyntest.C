@@ -95,8 +95,17 @@ static void sendPing(int i, int m, CkDynMsg *msg) { CkDynSendArray(aidPing, 1, &
 
 /* ---- Ping (1-D array) ---------------------------------------------------- */
 
-static int64_t pingCtor(Obj *, const CkDynMsgView *v) {
+/* The target CkDyn passes to construct (and unpack) is zero-filled, so it
+   compares byte-equal with the one a binding builds (cbArrayTarget1 and
+   friends memset theirs). */
+static void checkTargetBytes(const Obj *o, const CkDynTarget &expect, const char *who) {
+  CHECK(memcmp(&o->t, &expect, sizeof expect) == 0, "%s: the target CkDyn built differs in its bytes from the "
+        "binding-built one (padding or unused index entries not zero)", who);
+}
+
+static int64_t pingCtor(Obj *o, const CkDynMsgView *v) {
   CHECK(v->hdr && (v->hdr->flags & CKDYN_MSG_CREATION), "Ping constructor message lost its flags");
+  checkTargetBytes(o, cbArrayTarget1(o->t.u.array.aid, Ping.chareIdx, myIndex(o)), "Ping constructor");
   return 0;
 }
 
@@ -754,6 +763,7 @@ static Obj *volatile g_ngObj = nullptr;   /* this process's NGrp branch (one per
 
 static int64_t grpCtor(Obj *o, const CkDynMsgView *) {
   CHECK(o->t.kind == CKDYN_GROUP && o->t.u.group.pe_or_node == CkMyPe(), "Grp constructed with a wrong target");
+  checkTargetBytes(o, cbGroupTarget(o->t.u.group.gid, Grp.chareIdx, CkMyPe()), "Grp constructor");
   return 0;
 }
 static int64_t grpGotRed(Obj *o, const CkDynMsgView *v) { return gotRedTo0(o, v, "Grp.gotRed"); }
@@ -868,6 +878,10 @@ CbClass NGrp = { "NGrp", CKDYN_NODEGROUP, 0, {
 
 static int64_t singleCtor(Obj *o, const CkDynMsgView *) {
   CHECK(o->t.kind == CKDYN_CHARE && o->t.u.chare.pe == CkMyPe(), "Single constructed with a wrong target");
+  CkDynTarget t;
+  memset(&t, 0, sizeof t);
+  t.kind = CKDYN_CHARE; t.chare_idx = Single.chareIdx; t.u.chare.pe = CkMyPe(); t.u.chare.ptr = o->t.u.chare.ptr;
+  checkTargetBytes(o, t, "Single constructor");
   return 0;
 }
 static int64_t singleGotRed(Obj *o, const CkDynMsgView *v) { return gotRedTo0(o, v, "Single.gotRed"); }

@@ -116,6 +116,8 @@ static void fillIndex(const CkArrayIndex &ix, int *out, int *ndims) {
 static inline CkGroupID gidOf(int idx) { CkGroupID g; g.idx = idx; return g; }
 
 void ArrayElemDyn::fillTarget(CkDynTarget *t) const {
+  memset(t, 0, sizeof *t);   /* every target CkDyn builds is zeroed first, padding and unused index entries included,
+                               so that it compares byte-equal with one a binding builds */
   t->kind = CKDYN_ARRAY;
   t->chare_idx = d.chareIdx;
   t->u.array.aid = ((CkGroupID)thisArrayID).idx;
@@ -925,6 +927,7 @@ MainchareDyn::MainchareDyn(CkArgMsg *m) {
   ClassRec *c = classOf(d.chareIdx);
   CkDynCreateManagers();
   CkDynTarget t;
+  memset(&t, 0, sizeof t);
   t.kind = CKDYN_MAINCHARE; t.chare_idx = d.chareIdx;
   t.u.chare.pe = thishandle.onPE; t.u.chare.ptr = thishandle.objPtr;
   if (c->hooks->mainchare == nullptr) CkAbort("CkDyn: no mainchare hook");
@@ -962,6 +965,7 @@ ChareDyn::ChareDyn(CkDynMsg *m) {
   ClassRec *c = epRec(v.hdr->ep).cls;
   d.chareIdx = c->chareIdx;
   CkDynTarget t;
+  memset(&t, 0, sizeof t);
   t.kind = CKDYN_CHARE; t.chare_idx = d.chareIdx;
   t.u.chare.pe = thishandle.onPE; t.u.chare.ptr = thishandle.objPtr;
   d.handle = c->hooks->construct(c->desc.binding_data, &t, &v);
@@ -975,6 +979,7 @@ void ChareDyn::callMigrate(void *msg, void *obj) { new (obj) ChareDyn((CkMigrate
 void ChareDyn::pup(PUP::er &p) {
   Chare::pup(p);
   CkDynTarget t;
+  memset(&t, 0, sizeof t);
   t.kind = CKDYN_CHARE; t.chare_idx = d.chareIdx;
   t.u.chare.pe = thishandle.onPE; t.u.chare.ptr = thishandle.objPtr;
   pupObj(p, d, t);
@@ -1043,6 +1048,7 @@ static void pupObj(PUP::er &p, CkDynObj &d, CkDynTarget t) {
 void MainchareDyn::pup(PUP::er &p) {
   Chare::pup(p);
   CkDynTarget t;
+  memset(&t, 0, sizeof t);
   t.kind = CKDYN_MAINCHARE; t.chare_idx = d.chareIdx;
   t.u.chare.pe = thishandle.onPE; t.u.chare.ptr = thishandle.objPtr;
   pupObj(p, d, t);
@@ -1071,6 +1077,7 @@ GroupDyn::GroupDyn(CkDynMsg *m) {
   }
   if (member) {
     CkDynTarget t;
+    memset(&t, 0, sizeof t);
     t.kind = CKDYN_GROUP; t.chare_idx = d.chareIdx;
     t.u.group.gid = thisgroup.idx; t.u.group.pe_or_node = CkMyPe();
     d.handle = c->hooks->construct(c->desc.binding_data, &t, &v);
@@ -1093,6 +1100,7 @@ void GroupDyn::callEntry(void *msg, void *obj) { dispatch(((GroupDyn *)obj)->d, 
 void GroupDyn::pup(PUP::er &p) {
   Group::pup(p);
   CkDynTarget t;
+  memset(&t, 0, sizeof t);
   t.kind = CKDYN_GROUP; t.chare_idx = d.chareIdx;
   t.u.group.gid = thisgroup.idx; t.u.group.pe_or_node = CkMyPe();
   pupObj(p, d, t);
@@ -1106,6 +1114,7 @@ NodeGroupDyn::NodeGroupDyn(CkDynMsg *m) {
   ClassRec *c = epRec(v.hdr->ep).cls;
   d.chareIdx = c->chareIdx;
   CkDynTarget t;
+  memset(&t, 0, sizeof t);
   t.kind = CKDYN_NODEGROUP; t.chare_idx = d.chareIdx;
   t.u.group.gid = thisgroup.idx; t.u.group.pe_or_node = CkMyNode();
   d.handle = c->hooks->construct(c->desc.binding_data, &t, &v);
@@ -1146,6 +1155,7 @@ void NodeGroupDyn::callEntry(void *msg, void *obj) {
 void NodeGroupDyn::pup(PUP::er &p) {
   NodeGroup::pup(p);
   CkDynTarget t;
+  memset(&t, 0, sizeof t);
   t.kind = CKDYN_NODEGROUP; t.chare_idx = d.chareIdx;
   t.u.group.gid = thisgroup.idx; t.u.group.pe_or_node = CkMyNode();
   pupObj(p, d, t);
@@ -1210,6 +1220,7 @@ ArrayMapDyn::ArrayMapDyn(CkDynMsg *m) {
   ClassRec *c = epRec(v.hdr->ep).cls;
   d.chareIdx = c->chareIdx;
   CkDynTarget t;
+  memset(&t, 0, sizeof t);
   t.kind = CKDYN_ARRAYMAP; t.chare_idx = d.chareIdx;
   t.u.group.gid = thisgroup.idx; t.u.group.pe_or_node = CkMyPe();
   d.handle = c->hooks->construct(c->desc.binding_data, &t, &v);
@@ -1220,6 +1231,7 @@ void ArrayMapDyn::callMigrate(void *msg, void *obj) { new (obj) ArrayMapDyn((CkM
 void ArrayMapDyn::pup(PUP::er &p) {
   CkArrayMap::pup(p);
   CkDynTarget t;
+  memset(&t, 0, sizeof t);
   t.kind = CKDYN_ARRAYMAP; t.chare_idx = d.chareIdx;
   t.u.group.gid = thisgroup.idx; t.u.group.pe_or_node = CkMyPe();
   pupObj(p, d, t);
@@ -1353,6 +1365,7 @@ extern "C" void CkDynCreateChare(int chare_idx, int on_pe, CkDynMsg *ctor, CkDyn
   CkChareID cid;
   CkCreateChare(chare_idx, c->ctorEp, ctor, &cid, on_pe < 0 ? CK_PE_ANY : on_pe);
   if (out) {
+    memset(out, 0, sizeof *out);
     out->kind = CKDYN_CHARE; out->chare_idx = chare_idx;
     out->u.chare.pe = cid.onPE; out->u.chare.ptr = cid.objPtr;
   }

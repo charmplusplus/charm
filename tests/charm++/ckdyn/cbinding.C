@@ -202,6 +202,11 @@ static void *hUnpack(void *bd, const CkDynTarget *t, int, const void *buf, size_
   o->t = *t;
   if (t->chare_idx != o->cls->chareIdx)
     cbFail("unpack: %s target has chare_idx %d, expected the registered %d", o->cls->name, t->chare_idx, o->cls->chareIdx);
+  if (t->kind == CKDYN_ARRAY) {
+    CkDynTarget e = cbArrayTarget1(t->u.array.aid, t->chare_idx, t->u.array.index[0]);
+    if (t->u.array.ndims != 1 || memcmp(t, &e, sizeof e) != 0)
+      cbFail("unpack: the target CkDyn built differs in its bytes from the binding-built one");
+  }
   CkpvAccess(cbPe)->unpacks++;
   const char *p = (const char *)buf, *end = p + len;
   if (len < sizeof(ObjState) + 16) cbFail("unpack: %zu bytes is too short", len);
