@@ -710,6 +710,13 @@ static std::map<uint64_t, PersistReg> persist_reg;          // this process's op
 static std::map<uint64_t, CmiNcpyBuffer> persist_remote;    // other processes' registrations, by id
 static std::atomic<uint64_t> persist_next_id{1};
 
+static void persistCheckRdmaUsable() {
+  if (CmiUseCopyBasedRDMA)
+    CkAbort("CkDevicePersistent: a transfer between PEs on different hosts, or whose IPC handle did not "
+            "open, needs RDMA, but this run moves RDMA data through host memory (the LCW backend, or "
+            "+nordma), which cannot read or write device memory");
+}
+
 // Registers r once; called with persist_reg_lock held.
 static void persistRegisterLocked(PersistReg& r) {
   if (r.state != 0) return;
@@ -719,6 +726,7 @@ static void persistRegisterLocked(PersistReg& r) {
     return;
   }
   r.ncpy.deviceRdmaOpInfo = nullptr;
+  memset(r.ncpy.layerInfo, 0, sizeof(r.ncpy.layerInfo));   // stays zero if nothing is registered
   r.ncpy.init(r.ptr, r.cnt, CMK_BUFFER_REG, CMK_BUFFER_NODEREG);   // released by close()
   // The memory region handle is the first field of the layer information
   // (CmiSetRdmaBufferInfo); the backend leaves it null when it registered nothing.
@@ -803,6 +811,7 @@ struct PersistRegRepMsg {
 // objects' current cnt, as in the IPC and copy modes. The source's
 // registration is asked of its process the first time and kept here.
 static void persistRdmaGet(const CkDevicePersistent& dst, const CkDevicePersistent& src, const CkCallback& done) {
+  persistCheckRdmaUsable();
   if (src.id == 0) persistNotOpened(src);
   CmiNcpyBuffer d = persistLocalNcpy(dst);
   CmiNcpyBuffer s;
@@ -1038,6 +1047,7 @@ CkDeviceStatus CkDevicePersistent::put(CkDevicePersistent& dst) {
   void* to = m == 1 ? persistIpcPtr(dst) : nullptr;
   persistAnnounce("put", m);
   if (m == 2) {
+    persistCheckRdmaUsable();
     if (dst.id == 0) persistNotOpened(dst);
     CmiNcpyBuffer s = persistLocalNcpy(*this);
     hapiCheck(hapiStreamSynchronize(hapi_stream));   // the source's data is complete
