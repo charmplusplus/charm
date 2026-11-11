@@ -257,7 +257,15 @@ struct record {
   std::vector<want> wants;       // what it waits for, grouped by arm (when_any alternatives)
   bool ready = false;            // delivered: which arm and its buffers
   int readyIndex = -1;
-  std::vector<buffer> readyBufs;
+  buffer ready0;                 // the first (usually only) delivery of the arm:
+  std::vector<buffer> readyMore; // kept out of the vector, which costs on the hot path
+  buffer &ready_buf(size_t k) { return k == 0 ? ready0 : readyMore[k - 1]; }
+  void set_ready(std::vector<buffer> &&bufs) {
+    ready0 = std::move(bufs[0]);
+    readyMore.clear();
+    for (size_t k = 1; k < bufs.size(); k++) readyMore.push_back(std::move(bufs[k]));
+  }
+  void clear_ready() { ready0.release(); readyMore.clear(); }
   bool fakeRestart = false;      // rebuild once it has suspended (+ck_fakemigrate)
   bool rebuilt = false;          // restarted and not yet past the recorded site: no rebuild there
   bool pending = false;          // a restart message is on its way to the element; pupped
@@ -316,7 +324,7 @@ template <class Schema, class... Outs> class when_awaiter {
   // As an alternative of a when_any, or a member of a when_all.
   void add_wants(std::vector<want> &ws, int arm) const { ws.push_back(w_); ws.back().arm = arm; }
   bool try_ready(record *rec);                  // take from the inbox and unpack
-  void unpack_ready(record *rec) { unpack(rec->readyBufs[0], rec); }
+  void unpack_ready(record *rec) { unpack(rec->ready0, rec); }
 
  private:
   template <class... Ps, size_t... I>
@@ -356,7 +364,7 @@ template <class... W> class all_awaiter {
   }
   bool try_ready(record *rec);
   void unpack_ready(record *rec) {
-    std::apply([&](auto &...a) { size_t k = 0; (a.unpack(rec->readyBufs[k++], rec), ...); }, parts_);
+    std::apply([&](auto &...a) { size_t k = 0; (a.unpack(rec->ready_buf(k++), rec), ...); }, parts_);
   }
 
  private:
@@ -565,7 +573,7 @@ inline void state::destroy_frames(record &rec) {
   rec.atSite = false;
   rec.wants.clear();
   rec.ready = false;
-  rec.readyBufs.clear();
+  rec.clear_ready();
 }
 
 inline record &state::begin(ArrayElement *elt, int ep, void *msg, bool own) {
@@ -686,25 +694,49 @@ inline void state::push(buffer &&b) {
   // delivery is buffered.
   // The delivery joins the inbox first; an alternative of a waiting
   // coroutine is satisfied when every want of it has a buffered match.
-  inbox_.push_back(std::move(b));
-  const buffer &nb = inbox_.back();
-  visit(recs_, [&](record &rec) {
+  // Fast path, the common case: a waiting record with a one-want arm that
+  // matches the delivery takes it directly (no inbox traffic, no
+  // allocation).
+  bool delivered = visit(recs_, [&](record &rec) {
     if (!rec.waiting) return false;
-    bool touched = false;
-    for (const want &w : rec.wants) if (w.matches(nb)) { touched = true; break; }
-    if (!touched) return false;
-    std::vector<want> armWants;
-    for (int arm = 0;; arm++) {
-      armWants.clear();
-      for (const want &w : rec.wants) if (w.arm == arm) armWants.push_back(w);
-      if (armWants.empty()) break;
-      std::vector<buffer> bufs;
-      if (!try_arm(armWants.data(), armWants.size(), bufs)) continue;
+    const size_t nw = rec.wants.size();
+    for (size_t i = 0; i < nw; i++) {
+      if (!rec.wants[i].matches(b)) continue;
+      const int arm = rec.wants[i].arm;
+      if (nw > 1) {
+        size_t armSize = 0;
+        for (const want &w : rec.wants) if (w.arm == arm) armSize++;
+        if (armSize != 1) return false; // an earlier conjunction arm may be satisfied: general path
+      }
+      rec.ready0 = std::move(b);
       rec.waiting = false;
       rec.wants.clear();
       rec.ready = true;
       rec.readyIndex = arm;
-      rec.readyBufs = std::move(bufs);
+      run(&rec);
+      return true;
+    }
+    return false;
+  });
+  if (delivered) return;
+  // Otherwise it joins the inbox; an arm with several wants (a conjunction)
+  // is satisfied when every want has a buffered match.
+  inbox_.push_back(std::move(b));
+  const buffer &nb = inbox_.back();
+  visit(recs_, [&](record &rec) {
+    if (!rec.waiting) return false;
+    for (size_t i = 0; i < rec.wants.size(); i++) {
+      if (!rec.wants[i].matches(nb)) continue;
+      const int arm = rec.wants[i].arm;
+      std::vector<want> armWants;
+      for (const want &w : rec.wants) if (w.arm == arm) armWants.push_back(w);
+      std::vector<buffer> bufs;
+      if (!try_arm(armWants.data(), armWants.size(), bufs)) continue;
+      rec.set_ready(std::move(bufs));
+      rec.waiting = false;
+      rec.wants.clear();
+      rec.ready = true;
+      rec.readyIndex = arm;
       run(&rec);
       return true;
     }
@@ -1016,7 +1048,7 @@ template <class Schema, class... Outs> inline void when_awaiter<Schema, Outs...>
   rec->ready = false;
   rec->atSite = false;
   unpack_ready(rec);
-  rec->readyBufs.clear();
+  rec->clear_ready();
 }
 
 template <class... W> inline bool all_awaiter<W...>::try_ready(record *rec) {
@@ -1048,7 +1080,7 @@ template <class... W> inline void all_awaiter<W...>::await_resume() {
   rec->ready = false;
   rec->atSite = false;
   unpack_ready(rec);
-  rec->readyBufs.clear();
+  rec->clear_ready();
 }
 
 template <class... W> inline bool any_awaiter<W...>::await_ready() {
@@ -1076,7 +1108,7 @@ template <class... W> inline int any_awaiter<W...>::await_resume() {
   rec->atSite = false;
   int i = rec->readyIndex;
   std::apply([&](auto &...a) { int k = 0; ((k++ == i ? (a.unpack_ready(rec), 0) : 0), ...); }, alts_);
-  rec->readyBufs.clear();
+  rec->clear_ready();
   return i;
 }
 
