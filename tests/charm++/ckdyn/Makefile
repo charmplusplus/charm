@@ -22,8 +22,12 @@ clean:
 	rm -rf ckdyntest.ckpt
 
 # The randomized scheduler queue ignores priorities, so that run skips the
-# priority phase. The stale-send run must abort with CkDyn's message, and so
-# must the run that broadcasts an NCPY slot.
+# priority phase. Each `!` run must abort with the CkDyn message its grep
+# names: a send to a deleted section, a broadcast with an NCPY slot, a
+# section id from before +restart (the restart of the +p1 checkpoint), a
+# section of a charmxi array, a SECTION callback as checkpoint callback,
+# deleting a combined section that a combine waits on, and the reduction
+# number of a deleted section.
 test: all
 	$(call run, ./ckdyntest +p4 +balancer RotateLB +randomized_msgq -skip priority -requiremoves )
 	$(call run, ./ckdyntest +p4 +balancer RotateLB -requiremoves )
