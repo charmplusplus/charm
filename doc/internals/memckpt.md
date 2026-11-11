@@ -198,17 +198,12 @@ those tables (with a newer epoch, process-location-cache.md) on the PE it
 moved to, so after the rollback messages for it would go to a PE that no
 longer has it. An element deleted after the checkpoint is restored under a
 life its home has marked dead, and one inserted after it is destroyed
-without its home being told. Reconciling the tables is not done. Instead
-`CkLocMgr::emigrate` counts each departure (`CkMemCheckPTNoteMigration`),
+without its home being told. Reconciling the tables is not done. Instead,
+the following happens: `CkLocMgr::emigrate` counts 
+each departure (`CkMemCheckPTNoteMigration`),
 `CkLocMgr::createLocal` counts each creation that is neither a migration's
-arrival nor a restore (`CkMemCheckPTNoteInsertion`, skipped while
-`CkInRestarting()`), `CkLocMgr::registerNewElement` counts an inserted
-element that joins an existing record, that is, an element of an array bound
-to another (`bindTo`, as AMPI does for every new communicator) created after
-the checkpoint (without the count, the restore of the record from a
-checkpoint taken with one fewer bound array aborts in `addElementToRec`
-with `Registered idx is out of bounds`), and `CkLocMgr::reclaim` counts
-each destruction that is neither a departure nor part of a restore (`CkMemCheckPTNoteDeletion`).
+arrival nor a restore, and `CkLocMgr::registerNewElement` 
+counts an inserted element that joins an existing record.
 The pack in `startArrayCheckpoint` resets the three counts, so the
 elements created before the first checkpoint are not counted, and
 `rollback` aborts on any PE where one is nonzero:
