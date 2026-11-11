@@ -95,6 +95,7 @@ env:
     tests/charm++/xarray_section_reduction
     tests/charm++/jacobi3d-coro
     tests/charm++/ckcoro
+    tests/charm++/sparse-coro
     tests/charm++/ckpt_restart
     tests/charm++/qd
     tests/charm++/within_node_bcast

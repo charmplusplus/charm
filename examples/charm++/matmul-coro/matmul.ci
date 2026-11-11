@@ -1,0 +1,19 @@
+mainmodule matmul {
+  readonly CProxy_Main mainProxy;
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void done(double checksum);
+  };
+
+  // The SDAG Block of examples/charm++/matmul with its SDAG entries written
+  // as coroutine entries (ckcoro.h): pdgemmSendInput had only a serial
+  // block and is a plain entry; pdgemmRun is a coroutine whose forall body
+  // is the task Block::step; inputA and inputB are its inbox entries.
+  array [2D] Block {
+    entry Block(bool randomInit, unsigned int blockSize, unsigned int numBlocks);
+    entry void pdgemmSendInput(CProxy_Block output, bool aOrB);
+    entry [coroutine] void pdgemmRun(double alpha, CkCallback done);
+    entry [inbox] void inputA(int blockIdA, double blockA[M*KA], unsigned int M, unsigned int KA);
+    entry [inbox] void inputB(int blockIdB, double blockB[KB*N], unsigned int KB, unsigned int N);
+  };
+};

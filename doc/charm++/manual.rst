@@ -2288,16 +2288,22 @@ outside an entry method, and an ``[inline]`` or ``[local]`` call sees the
 caller's delivery. The inbox entries use them to keep marshalled
 parameters in the message they arrived in instead of copying them.
 
-Programs in the distribution that use coroutine entry methods, each with
-an SDAG program of the same behaviour next to it:
-``tests/charm++/jacobi3d-coro`` (the 3D Jacobi of
+Programs in the distribution that use coroutine entry methods, each
+next to the SDAG program it was written from and printing the same
+result: ``examples/charm++/leanmd-coro`` (the molecular dynamics
+miniapp: a mainchare, a 3D and a 6D array, waits with reference numbers,
+an array parameter, a container parameter and a message held across a
+wait), ``examples/charm++/fib-coro`` (singleton chares, nested waits),
+``examples/charm++/matmul-coro`` (a ``forall`` over a conjunction of two
+array parameters), ``tests/charm++/sparse-coro`` (a mainchare's chain of
+waits in block form), ``tests/charm++/jacobi3d-coro`` (the 3D Jacobi of
 ``tests/charm++/jacobi3d-sdag``, with load balancing, checkpoint and
-restart in its ``make test``); ``tests/charm++/ckcoro`` (the ``basic``,
+restart in its ``make test``), ``tests/charm++/ckcoro`` (the ``basic``,
 ``refnum`` and ``migration`` modules of ``tests/charm++/sdag`` written
 as coroutines, with every construct of this section, plus modules for
 marshalled inbox entries, arrays and overlap under migration, and for
 a group, a nodegroup, a singleton chare and the mainchare as owners,
-checkpointed and restarted while their coroutines wait); and
+checkpointed and restarted while their coroutines wait), and
 ``benchmarks/charm++/coro_pingpong`` (one ping-pong written three ways,
 plain entry methods, SDAG and a coroutine, in one file).
 
@@ -2331,7 +2337,11 @@ Differences from SDAG
    helper passed to ``CK_OVERLAP``; the body of a ``forall`` is one task
    that takes the index. SDAG's inline clause bodies have no equivalent
    (a lambda coroutine would outlive its closure).
--  Not available: several active invocations of one entry per element.
+-  A coroutine body must not delete its own chare (``delete this``
+   inside a ``when`` body is allowed in SDAG): the deletion goes through
+   a message to the chare itself, delivered after the coroutine has
+   finished, as ``examples/charm++/fib-coro`` does.
+-  Not available: several active invocations of one entry per chare.
 -  Available only here: waits inside called functions (``CK_CALL``),
    plain C++ control flow and calls, parameters on the coroutine entry,
    and no bodies in the ``.ci`` file.

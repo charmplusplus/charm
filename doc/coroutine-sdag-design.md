@@ -107,7 +107,7 @@ Vocabulary (the attributes in charmxi, the rest in `ckcoro.h`):
 
 | | |
 |---|---|
-| `[coroutine]`, `[inbox]` | .ci attributes: the entry is a coroutine (void; no parameters or one message); the entry is waited for (a message, or marshalled parameters, arrays included; not conditional or nocopy) |
+| `[coroutine]`, `[inbox]` | .ci attributes: the entry is a coroutine (void; a message or marshalled parameters, re-supplied by a restart; on any chare kind); the entry is waited for (a message, or marshalled parameters, arrays included; not conditional or nocopy) |
 | `X_CORO_CODE` | generated macro placed in the class: the `ck::coro::state` member (pupped through the generated pup), the inbox entry bodies, `__coro_is_entry`, and `struct inbox` |
 | `inbox::name()` / `inbox::name(ref)` | a `ck::coro::want_t<inbox::name_params>`: a delivery to that entry with any, or with that, reference number; the want carries the entry's parameter types |
 | `CK_WHEN_BLOCK(want, name...) { ... }` | the block form: the parameters as block-scoped variables; no site inside the block |
@@ -120,7 +120,7 @@ Vocabulary (the attributes in charmxi, the rest in `ckcoro.h`):
 | `CK_CALL(expr)` / `CK_CALL_TO(lhs, expr)` | a site: await a `ck::coro::task<T>` helper that itself contains sites |
 | `CK_RESUMABLE()` / `CK_END()` | the restart switch of a helper; `CK_END` closes any body |
 | `ck::coro::task<T>` | lazily started helper coroutine (CAMPI's `campi::task`) |
-| `+ck_fakemigrate` | every site rebuilds the element's coroutines in place |
+| `+ck_fakemigrate` | every site rebuilds the chare's coroutines in place |
 
 Reference numbers follow SDAG: the envelope's for a message entry, the
 first arithmetic argument for a marshalled entry; `inbox::name()` (by
@@ -452,7 +452,7 @@ network the message itself is 3.3 us and the two differ by 0.8 us.
 | when with reference numbers | done (jacobi3d ghosts, pingpong) |
 | `case` | done, conjunction arms included: `CK_WHEN_ANY` in `tests/charm++/ckcoro` (basic test) |
 | `overlap`, `forall` | done (2026-11-11): child coroutines, `tests/charm++/ckcoro` overlap, basic and refnum tests, with migration and `+ck_fakemigrate` |
-| equivalence corpus: megatest synctest, every `tests/charm++/sdag` directory, SDAG-heavy miniapps under both implementations | `tests/charm++/sdag` fully ported (`basic`, `refnum`, `migration` in `tests/charm++/ckcoro`): the coroutine program prints the same lines as the SDAG one on 4 PEs (2026-11-11); jacobi3d-coro matches jacobi3d-sdag's checksum; megatest synctest and the miniapps not yet |
+| equivalence corpus: megatest synctest, every `tests/charm++/sdag` directory, SDAG-heavy miniapps under both implementations | done (2026-11-11): `tests/charm++/sdag` fully ported (`basic`, `refnum`, `migration` in `tests/charm++/ckcoro`), same output lines on 4 PEs; jacobi3d-coro matches jacobi3d-sdag's checksum; the SDAG programs with the most `when` clauses in the tree ported next to the originals with identical results on 1 and 4 PEs and under `+ck_fakemigrate`: `examples/charm++/leanmd-coro` (integer checksum of positions and forces), `examples/charm++/matmul-coro` (checksum), `examples/charm++/fib-coro`, `tests/charm++/sparse-coro` (same output). megatest's synctest has no SDAG (it tests sync entries) and was dropped. The ports found one defect (a conjunction kept only its last borrowed array, fixed) and two in the originals (shared `drand48` state across PE threads made matmul's and leanmd's results differ between 4-PE runs; both now seed per element) |
 | CAMPI tests stay green when the core is shared | in progress (2026-11-09 23:50): a shared `ckcoro_core.h` for `task<T>` and the site chain, delegated |
 
 ## 8. What charm4py can mirror
@@ -509,9 +509,9 @@ Everything the beta needs is on the branch: the shared core with CAMPI
 (`ckcoro_core.h`, CAMPI's tests green), the two test directories in CI
 (`TEST_DIRS` in `reconverse-ci.yaml`), and the Mac and Anvil measurements.
 First beta update: `overlap` as several coroutines per element and the
-rest of the SDAG test corpus.
+rest of the SDAG test corpus (both done 2026-11-11).
 
 ## 10. Open items
 
-- The rest of the equivalence corpus: megatest synctest and SDAG-heavy
-  miniapps under both implementations.
+- An example program under `examples/charm++` written for the manual
+  (the corpus ports there are translations of SDAG programs).

@@ -20,6 +20,7 @@ DIRS = \
   io_sessions \
   groupdep_creator \
   sparse \
+  sparse-coro \
   reductionTesting \
   partitions \
   charmxi_parsing \
@@ -85,6 +86,7 @@ NONSCALEDIRS = \
   migratable_threads \
   sdag \
   sparse \
+  sparse-coro \
   charmxi_parsing \
   anytime_migration \
 
