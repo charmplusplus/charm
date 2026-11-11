@@ -1228,8 +1228,14 @@ value, and the element kind of its data. The table covers ``nop``; ``sum``,
 (``_char`` to ``_ulong_long``, ``_float``, ``_double``); the ``logical_*``
 and ``bitvec_*`` reducers; ``random``; and ``concat``, ``set``,
 ``statistics`` and ``tuple``, whose data is ``CKDYN_ELEM_BYTE`` and whose
-format the binding handles. A binding looks the types up by name once at
-start-up:
+format the binding handles. ``random`` passes one contribution on unchanged,
+so its element kind is ``CKDYN_ELEM_BYTE`` too. The ``_char`` reducers
+operate on the platform's plain ``char``: their element kind is
+``CKDYN_ELEM_I8`` where ``char`` is signed (x86, macOS) and
+``CKDYN_ELEM_U8`` where it is unsigned (aarch64 and POWER Linux); use
+``_uchar`` or a binding-defined reducer for a type with a fixed sign. The
+``_long`` reducers are 32-bit on Windows and 64-bit elsewhere. A binding
+looks the types up by name once at start-up:
 
 .. code-block:: c
 

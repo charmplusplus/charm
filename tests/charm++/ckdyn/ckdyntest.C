@@ -23,6 +23,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 /* readonly */ CProxy_TestMain mainProxy;
@@ -978,7 +979,7 @@ class TestMain : public CBase_TestMain {
   std::set<std::string> skip;
   std::vector<std::string> steps = {
     "pingpong", "pingpong_inline", "bcast",
-    "reductions/single", "reductions/single_any", "reductions/group_elem", "reductions/group_bcast",
+    "reductions/table", "reductions/single", "reductions/single_any", "reductions/group_elem", "reductions/group_bcast",
     "reductions/array_elem", "reductions/array_bcast", "reductions/future", "reductions/foreign",
     "future_return", "nodegroup", "qd", "priority", "coroutine",
     "ncpy/nonpost", "ncpy/post_before", "ncpy/post_after", "ncpy/samepe",
@@ -1128,6 +1129,21 @@ public:
     std::string kind = s.substr(11);
     CkDynCallback cb;
     int mode = 0;
+    if (kind == "table") {
+      /* element kinds of the reducers whose data type depends on the platform */
+      const CkDynReducerInfo *t;
+      int n = CkDynReducers(&t);
+      std::map<std::string, int> elem;
+      for (int i = 0; i < n; i++) elem[t[i].name] = t[i].elem;
+      int charElem = std::is_signed<char>::value ? CKDYN_ELEM_I8 : CKDYN_ELEM_U8;
+      for (const char *r : { "sum_char", "product_char", "max_char", "min_char" })
+        CHECK(elem.count(r) && elem[r] == charElem, "%s: element kind %d, expected %d (char is %s here)",
+              r, elem.count(r) ? elem[r] : -1, charElem, std::is_signed<char>::value ? "signed" : "unsigned");
+      CHECK(elem["sum_uchar"] == CKDYN_ELEM_U8, "sum_uchar: element kind %d", elem["sum_uchar"]);
+      CHECK(elem["random"] == CKDYN_ELEM_BYTE, "random: element kind %d, expected BYTE", elem["random"]);
+      pass(s);
+      return;
+    }
     if (kind == "group_bcast" || kind == "array_bcast") {
       int expect = kind == "group_bcast" ? CkNumPes() : numElems;
       uint32_t f = cbNewFuture([this, s, expect](const CkDynMsgView *v) {
