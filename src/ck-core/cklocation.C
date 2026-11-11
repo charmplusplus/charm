@@ -25,6 +25,7 @@
 #include "trace.h"
 #include <algorithm>
 #include <limits>
+#include <numeric>
 #include <sstream>
 #include <stdarg.h>
 #include <vector>
@@ -916,12 +917,20 @@ public:
                   coords[2] = k;
                   coords[3] = x;
                   coords[4] = y;
-                  coords[5] = y;
+                  coords[5] = z;
                   index = Hilbert_to_int(coords, dims);
                   allpairs[counter] = index;
                   counter++;
                 }
     }
+    // procNum cuts allpairs values into blocks of _binSizeCeil, so they must be
+    // 0..n-1; curve positions are not when an extent is not a power of two.
+    // Replace each position by its rank along the curve.
+    std::vector<int> order(allpairs.size());
+    std::iota(order.begin(), order.end(), 0);
+    std::stable_sort(order.begin(), order.end(),
+                     [&](int a, int b) { return allpairs[a] < allpairs[b]; });
+    for (size_t r = 0; r < order.size(); r++) allpairs[order[r]] = (int)r;
     return idx;
   }
 
@@ -1324,10 +1333,13 @@ public:
     if (state == not_loaded)
     {
       DEBUG(("[%d] loading ConfigurableRRMap configuration\n", CkMyPe()));
+      // Read without removing: the flag is read after the main chare got argv
+      // (CkArgMsg shares the array), so removing it would shift the program's argv.
       char** argv = CkGetArgv();
       char* configuration = NULL;
-      bool found = CmiGetArgString(argv, "+ConfigurableRRMap", &configuration);
-      if (!found)
+      for (int a = 0; argv[a] != NULL && argv[a + 1] != NULL; a++)
+        if (strcmp(argv[a], "+ConfigurableRRMap") == 0) configuration = argv[a + 1];
+      if (configuration == NULL)
       {
         DEBUG(("Couldn't find +ConfigurableRRMap command line argument\n"));
         state = loaded_not_found;
@@ -1394,14 +1406,15 @@ public:
   void populateInitial(int arrayHdl, CkArrayOptions& options, void* ctorMsg, CkArray* mgr)
   {
     CkArrayIndex end = options.getEnd();
-    // Try to load the configuration from command line argument
-    CkAssert(haveConfigurableRRMap());
-    ConfigurableRRMapLoader& loader = CkpvAccess(myConfigRRMapState);
     if (end.dimension == 0)
     {
       CkFreeMsg(ctorMsg);
       return;
     }
+    if (!haveConfigurableRRMap())
+      CkAbort("ConfigurableRRMap needs the option +ConfigurableRRMap \"<objects per "
+              "block> <PEs per block> <PE of each object within its block>\"\n");
+    ConfigurableRRMapLoader& loader = CkpvAccess(myConfigRRMapState);
     int thisPe = CkMyPe();
     int maxIndex = end.data()[0];
     DEBUG(("[%d] ConfigurableRRMap: index=%d,%d,%d\n", CkMyPe(), (int)end.data()[0],
