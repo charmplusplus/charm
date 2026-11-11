@@ -2384,7 +2384,9 @@ Runtime wrappers
    Calls ``fn`` from the scheduler after ``msecs`` milliseconds.
 
 ``int CkDynIsRestarting(void)``
-   1 in a program restarted from a checkpoint.
+   1 in a program started with ``+restart``, from the start of the restart to
+   the end of the run (so a ``done`` callback delivered by the restart can
+   tell itself from one delivered by a later checkpoint).
 
 ``int CkDynHasLB(void)``
    1 when the build has load balancing.

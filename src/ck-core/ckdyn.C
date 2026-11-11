@@ -3234,7 +3234,9 @@ extern "C" int CkDynTopoTreeEdges(int pe, int root, const int *pes, int npes, in
 extern "C" void CkDynCallAfter(void (*fn)(void *arg, double now), void *arg, double msecs) {
   CcdCallFnAfter((CcdVoidFn)fn, arg, msecs);
 }
-extern "C" int CkDynIsRestarting(void) { return _chareRestored ? 1 : 0; }
+/* _restarted is set at the start of CkRestartMain for the rest of the run;
+   _chareRestored is set only on a PE whose singleton chares were restored. */
+extern "C" int CkDynIsRestarting(void) { return _restarted ? 1 : 0; }
 extern "C" int CkDynHasLB(void) {
 #if CMK_LBDB_ON
   return 1;
