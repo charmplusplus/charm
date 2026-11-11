@@ -40,6 +40,7 @@ testrestriction: all
 	$(call refusal,-lb +balancer RotateLB,migrated)
 	$(call refusal,-insert,inserted)
 	$(call refusal,-delete,deleted)
+	$(call refusal,-bind,inserted)
 
 testp: all
 	$(call run, ./memckpt_rollback +p$(P) )

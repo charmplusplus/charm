@@ -28,7 +28,12 @@ void *CkAllocSysMsg(const CkEntryOptions *opts)
 
 void CkFreeSysMsg(void *m)
 {
-  CkpvAccess(_msgPool)->put(m);
+  // A void entry method frees whatever message delivered it, e.g. the
+  // CkReductionMsg of an empty contribute(); only system messages are pooled.
+  if (UsrToEnv(m)->getMsgIdx() != 0)
+    CkFreeMsg(m);
+  else
+    CkpvAccess(_msgPool)->put(m);
 }
 
 void* CkAllocMsg(int msgIdx, int msgBytes, int prioBits, GroupDepNum groupDepNum)

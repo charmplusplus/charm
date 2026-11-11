@@ -3,6 +3,7 @@ DIRS = \
   meta_lb_test \
   periodic_lb_broadcast_test \
   lb_userdata_test \
+  migrate_then_atsync \
 
 TESTDIRS = $(DIRS)
 

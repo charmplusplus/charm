@@ -142,10 +142,13 @@ and one of them may be told to create it again. A demand creation the home
 approved (`CkArray::demandCreateElement`) is created on the requesting PE without
 looking at that entry: the home grants it only when its table has no location
 for the id, and bound arrays share the id, so no sibling is alive.
-`CkArray::insertElement` forwards an explicit insertion to the PE the entry names
+`CkArray::insertElement` forwards an explicit insertion to the PE the entry names,
+and the inserting proxy (`CkArray::findInitialHostPe`) places an insertion there,
 only when the location manager serves bound arrays
 (`CkLocMgr::servesBoundArrays`), where the entry is a live sibling's; when every
 sibling has died the entry is stale and the insertion is misplaced (#4031).
+Otherwise the entry may be a dead element's and is not consulted: an insertion
+with a PE goes to that PE, one without goes to the map's PE.
 
 Re-creation under a new id: an element inserted without a PE argument lands on
 the map's PE, which for the hashed kind is not its home, so a deleted index
@@ -229,4 +232,4 @@ addressed by `CkGroupID` alone; no `ObjID` is ever minted for them.
 | process-level location table, index table, retired ids | `src/ck-core/cklocnode.h`, `src/ck-core/cklocnode.C` (chapter [process-location-cache.md](process-location-cache.md)) |
 | collection numbers, delivery by id, buffering | `src/ck-core/ckarray.C` (`CkCreateArray`, `CkArray::deliver*`) |
 | array options (bounds, wide) | `src/ck-core/ckarrayoptions.h` |
-| tests | `tests/charm++/objid_bound`, `objid_home`, `objid_insert`, `objid_sections`, `objid_tranche`, `objid_wide`, `objid_migrate6`, `objid_loctable`, `unbounded_restart`, `unbounded_migration` |
+| tests | `tests/charm++/objid_bound`, `objid_home`, `objid_insert`, `objid_sections`, `objid_tranche`, `objid_wide`, `objid_migrate6`, `objid_loctable`, `ckpt_restart`, `unbounded_migration` |

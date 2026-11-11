@@ -23,6 +23,10 @@ mainmodule memckpt_rollback {
     entry void reportPe();
   };
 
+  array [1D] Buddy {
+    entry Buddy();
+  };
+
   group Tally {
     entry Tally();
     entry void check();

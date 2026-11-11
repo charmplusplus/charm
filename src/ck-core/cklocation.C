@@ -25,6 +25,7 @@
 #include "trace.h"
 #include <algorithm>
 #include <limits>
+#include <numeric>
 #include <sstream>
 #include <stdarg.h>
 #include <vector>
@@ -916,12 +917,20 @@ public:
                   coords[2] = k;
                   coords[3] = x;
                   coords[4] = y;
-                  coords[5] = y;
+                  coords[5] = z;
                   index = Hilbert_to_int(coords, dims);
                   allpairs[counter] = index;
                   counter++;
                 }
     }
+    // procNum cuts allpairs values into blocks of _binSizeCeil, so they must be
+    // 0..n-1; curve positions are not when an extent is not a power of two.
+    // Replace each position by its rank along the curve.
+    std::vector<int> order(allpairs.size());
+    std::iota(order.begin(), order.end(), 0);
+    std::stable_sort(order.begin(), order.end(),
+                     [&](int a, int b) { return allpairs[a] < allpairs[b]; });
+    for (size_t r = 0; r < order.size(); r++) allpairs[order[r]] = (int)r;
     return idx;
   }
 
@@ -1324,10 +1333,13 @@ public:
     if (state == not_loaded)
     {
       DEBUG(("[%d] loading ConfigurableRRMap configuration\n", CkMyPe()));
+      // Read without removing: the flag is read after the main chare got argv
+      // (CkArgMsg shares the array), so removing it would shift the program's argv.
       char** argv = CkGetArgv();
       char* configuration = NULL;
-      bool found = CmiGetArgString(argv, "+ConfigurableRRMap", &configuration);
-      if (!found)
+      for (int a = 0; argv[a] != NULL && argv[a + 1] != NULL; a++)
+        if (strcmp(argv[a], "+ConfigurableRRMap") == 0) configuration = argv[a + 1];
+      if (configuration == NULL)
       {
         DEBUG(("Couldn't find +ConfigurableRRMap command line argument\n"));
         state = loaded_not_found;
@@ -1394,14 +1406,15 @@ public:
   void populateInitial(int arrayHdl, CkArrayOptions& options, void* ctorMsg, CkArray* mgr)
   {
     CkArrayIndex end = options.getEnd();
-    // Try to load the configuration from command line argument
-    CkAssert(haveConfigurableRRMap());
-    ConfigurableRRMapLoader& loader = CkpvAccess(myConfigRRMapState);
     if (end.dimension == 0)
     {
       CkFreeMsg(ctorMsg);
       return;
     }
+    if (!haveConfigurableRRMap())
+      CkAbort("ConfigurableRRMap needs the option +ConfigurableRRMap \"<objects per "
+              "block> <PEs per block> <PE of each object within its block>\"\n");
+    ConfigurableRRMapLoader& loader = CkpvAccess(myConfigRRMapState);
     int thisPe = CkMyPe();
     int maxIndex = end.data()[0];
     DEBUG(("[%d] ConfigurableRRMap: index=%d,%d,%d\n", CkMyPe(), (int)end.data()[0],
@@ -2099,6 +2112,7 @@ CkLocRec::CkLocRec(CkLocMgr* mgr, bool fromMigration, bool ignoreArrival,
   DEBL((AA "Registering element %s with load balancer\n" AB, idx2str(idx)));
   nextPe = -1;
   asyncMigrate = false;
+  lbOrderedMigrate = false;
   readyMigrate = true;
   enable_measure = true;
   syncBarrier = CkSyncBarrier::object();
@@ -2265,6 +2279,7 @@ void CkLocRec::staticMigrate(LDObjHandle h, int dest)
 
 void CkLocRec::recvMigrate(int toPe)
 {
+  lbOrderedMigrate = true;  // only these arrivals count towards the balancer's step
   // we are in the mode of delaying actual migration
   // till readyMigrate()
   if (readyMigrate)
@@ -2625,6 +2640,7 @@ bool CkLocMgr::mintUnique(CmiUInt8& u)
     }
     if (std::find(t->waitingPes.begin(), t->waitingPes.end(), CkMyPe()) == t->waitingPes.end())
       t->waitingPes.push_back(CkMyPe());
+    mintFailedWithoutTranche = (t->len == 0);
     CmiUnlock(lock);
     if (send) requestTrancheFromAllocator(want);
     return false;
@@ -2700,12 +2716,10 @@ void CkLocMgr::deferInsertion(CkArray* mgr, CkArrayMessage* msg, const CkArrayIn
   static std::atomic<bool> warned{false};
   if (!warned.exchange(true))
   {
+    // From the failed mint, not the tranche now: another PE may have installed the
+    // grant since.
     const ck::objid::Layout& l = ck::objid::getLayout();
-    ck::objid::Tranche* t = getTranche();
-    CmiLock(CksvAccess(_nodeLock));
-    const CmiUInt8 len = t->len;
-    CmiUnlock(CksvAccess(_nodeLock));
-    if (len == 0)
+    if (mintFailedWithoutTranche)
       CkPrintf("Charm++> Note: PE %d deferred an insertion into chare array (location"
                " manager %d): this process's first tranche of element ids after the"
                " restart has not arrived yet. The element is created when it does;"
@@ -2806,17 +2820,18 @@ void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
 void CkLocCache::updateLocation(const CkLocEntry& newEntry)
 {
   if (CkNodeOf(homePe(newEntry.id)) == CkMyNode()) return;
-  applyLocation(newEntry);
+  applyLocation(newEntry, true);
 }
 
-void CkLocCache::applyLocation(const CkLocEntry& newEntry)
+void CkLocCache::applyLocation(const CkLocEntry& newEntry, bool byId)
 {
   CkAssert(newEntry.pe != -1);
   bool written = false;
   // A received update (W4, received = true) never replaces what a PE of this process
-  // wrote about itself (section 3.5).
-  const CmiUInt8 waiters = ck::objid::locTable().update(key(newEntry.id), newEntry.pe,
-                                                        newEntry.epoch, false, &written, true);
+  // wrote about itself. One by id that disagrees with the entry and loses the epoch
+  // compare clears it, so the next send asks the home (section 3.5).
+  const CmiUInt8 waiters = ck::objid::locTable().update(
+      key(newEntry.id), newEntry.pe, newEntry.epoch, false, &written, true, byId);
   if (written)
   {
     notifyListeners(newEntry.id, newEntry.pe);
@@ -3196,6 +3211,15 @@ CkLocRec* CkLocMgr::registerNewElement(const CkArrayIndex& idx)
     // TODO: This is going to end up needlessly calling getNewObjectID(...) again
     rec = createLocal(idx, false, false, true);
   }
+#if CMK_MEM_CHECKPOINT
+  else if (!CkInRestarting())
+  {
+    // An element of an array bound to another (bindTo) joins the record its
+    // siblings already have, so createLocal does not count it. Count it here: a
+    // rollback restores each record from the checkpoint, which lacks this element.
+    CkMemCheckPTNoteInsertion();
+  }
+#endif
 
   return rec;
 }
@@ -3802,7 +3826,9 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   CkArrayElementMigrateMessage* msg =
       new (bufSize, 0) CkArrayElementMigrateMessage(idx, id,
 #if CMK_LBDB_ON
-                                                    rec->isAsyncMigrate(),
+                                                    // The balancer counts the arrivals it ordered;
+                                                    // a migrateMe is not one of them.
+                                                    rec->isAsyncMigrate() || !rec->isLBOrderedMigrate(),
 #else
                                                     false,
 #endif
