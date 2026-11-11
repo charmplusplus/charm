@@ -980,6 +980,7 @@ class TestMain : public CBase_TestMain {
   bool staleSend = false;   /* -stalesend: the delete phase sends to the deleted section, which must abort */
   bool requireMoves = false; /* -requiremoves: a load balancer that moves elements is loaded (RotateLB) */
   bool zcBcast = false;      /* -zcbcast: the ncpy/nonpost phase broadcasts an NCPY slot, which must abort */
+  bool xiSection = false;    /* -xisection: a section of a charmxi array, which must abort */
 
   /* sections: the expected membership of each section the phases create */
   struct Sect {
@@ -1010,6 +1011,7 @@ public:
       else if (strcmp(m->argv[i], "-stalesend") == 0) staleSend = true;
       else if (strcmp(m->argv[i], "-requiremoves") == 0) requireMoves = true;
       else if (strcmp(m->argv[i], "-zcbcast") == 0) zcBcast = true;
+      else if (strcmp(m->argv[i], "-xisection") == 0) xiSection = true;
     delete m;
     mainProxy = thisProxy;
     numElems = 2 * CkNumPes();
@@ -1017,6 +1019,15 @@ public:
              CkNumPes(), CkNumNodes(), numElems, CkDynRefnumBytes());
     tStart = CkWallTimer();
     CkDynCreateManagers();
+    if (xiSection) {
+      CkPrintf("  making a section of a charmxi array; CkDyn must abort\n");
+      CProxy_Plain plain = CProxy_Plain::ckNew(2);
+      int idx[2] = { 0, 1 };
+      CkDynSectionID sid;
+      CkDynSectionCreateArray(((CkGroupID)plain.ckGetArrayID()).idx, 2, 1, idx, 0, nullptr, &sid);
+      CkStartQD(CkCallback(CkIndex_TestMain::nextPhase(), thisProxy));
+      return;
+    }
 
     /* phase creation: all five creation futures */
     /* -skip nodegroup also skips creating NGrp (its constructor is where a
@@ -1051,6 +1062,7 @@ public:
   }
 
   void nextPhase() {
+    CHECK(!xiSection, "a section of a charmxi array did not abort");
     step++;
     CkEnforce(step < (int)steps.size());
     const std::string s = steps[step];
@@ -1589,6 +1601,13 @@ public:
     }
     go();
   }
+};
+
+/* a charmxi array element (-xisection) */
+class Plain : public CBase_Plain {
+public:
+  Plain() {}
+  Plain(CkMigrateMessage *m) : CBase_Plain(m) {}
 };
 
 #include "ckdyntest.def.h"

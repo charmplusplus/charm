@@ -34,6 +34,8 @@ test: all
 	grep -q "send to a deleted section .*stale generation" stalesend.log
 	! ./ckdyntest +pe 1 -zcbcast -skip pingpong -skip pingpong_inline > zcbcast.log 2>&1
 	grep -q "slot 2 is an NCPY slot; a message with zero-copy slots is sent point to point only, not as an array broadcast" zcbcast.log
+	! ./ckdyntest +pe 2 -xisection > xisection.log 2>&1
+	grep -q "a member is an element of class Plain, which is not a dynamic class" xisection.log
 
 testp: all
 	$(call run, ./ckdyntest +p$(P) +balancer RotateLB )

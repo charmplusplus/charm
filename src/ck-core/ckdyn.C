@@ -1836,6 +1836,11 @@ extern "C" void CkDynSectionCreateArray(int aid, int nelems, int ndims, const in
                                         const CkDynCallback *done, CkDynSectionID *out) {
   if (nelems < 1) CkAbort("CkDyn: CkDynSectionCreateArray with %d members", nelems);
   if (ndims < 1 || ndims > CKDYN_MAX_DIMS) CkAbort("CkDyn: CkDynSectionCreateArray with %d dimensions", ndims);
+  IrrGroup *arr = (IrrGroup *)CkLocalBranch(gidOf(aid));
+  if (arr == nullptr || !arr->isArrMgr())
+    CkAbort("CkDyn: CkDynSectionCreateArray: %d is not an array id", aid);
+  /* that the elements are dynamic is checked where they join (sectionInitArray):
+     an array manager does not record its element class */
   std::set<std::vector<int> > seen;
   std::vector<CkArrayIndex> el;
   for (int i = 0; i < nelems; i++) {
@@ -2058,7 +2063,13 @@ static void sectionJoin(CkDynObj &d, CkDynMcastMsg *m) {
   sectionContribute(ck, 0, nullptr, CkReduction::nop, &done);
 }
 
-static void sectionInitArray(void *msg, void *obj) { sectionJoin(((ArrayElemDyn *)obj)->d, (CkDynMcastMsg *)msg); }
+static void sectionInitArray(void *msg, void *obj) {
+  int cidx = ((ArrayElement *)obj)->ckGetChareType();
+  if (!CkDynIsDynamicChare(cidx))
+    CkAbort("CkDyn: CkDynSectionCreateArray: a member is an element of class %s, which is not a dynamic class "
+            "(a CkDyn section holds elements of arrays created with CkDynCreateArray)", _chareTable[cidx]->name);
+  sectionJoin(((ArrayElemDyn *)obj)->d, (CkDynMcastMsg *)msg);
+}
 static void sectionInitGroup(void *msg, void *obj) { sectionJoin(((GroupDyn *)obj)->d, (CkDynMcastMsg *)msg); }
 
 extern "C" int CkDynSectionRedNo(const CkDynTarget *me, const CkDynSectionID *sid) {

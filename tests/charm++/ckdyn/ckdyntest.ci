@@ -19,4 +19,9 @@ mainmodule ckdyntest {
     entry TestMain(CkArgMsg *m);
     entry void nextPhase();
   };
+
+  // a charmxi array: -xisection makes a CkDyn section of it, which must abort
+  array [1D] Plain {
+    entry Plain();
+  };
 };
