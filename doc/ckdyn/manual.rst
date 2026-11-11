@@ -1448,6 +1448,15 @@ built-in reduction result arrives as one BUFFER slot; a binding-defined
 reducer's result keeps its payload; a SYS result (quiescence, checkpoint)
 arrives empty.
 
+A whole-collection reduction (``CkDynContribute`` from array elements,
+group or nodegroup branches) may have a section callback, for example a
+section of the same array: every contributor passes the same
+``CkDynCallback``. CkDyn sends the contributions through an internal reducer
+that carries the section, the entry and the reference number along with the
+data and applies the reducer the binding gave (built-in or binding-defined),
+so that every PE contributes with the same Charm++ callback; the result is
+multicast from the section's root PE.
+
 Migration, restart and restrictions
 -----------------------------------
 
@@ -1461,7 +1470,7 @@ Migration, restart and restrictions
 - Section messages take no group dependency and no zero-copy slots.
 - A group section must name a dynamic group; an empty member list aborts.
 - Each PE keeps one relay entry per (section id, entry) pair used in a
-  section callback created on it, plus one per distinct reference number of
+  section callback created on it (``CkDynContribute`` needs none), plus one per distinct reference number of
   a quiescence or checkpoint section callback. They are never freed. With a
   16-bit reference number a PE can hold at most 65534.
 

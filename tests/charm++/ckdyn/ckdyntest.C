@@ -83,10 +83,10 @@ extern CbClass Ping, Sec, Grp, NGrp, Single, DMain, Late, Tmp;
 enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTRED, P_GOTREDB, P_COMPUTE, P_CORO, P_SYNCSTART, P_RESUMED,
        P_ZSTART, P_ZRECV, P_ZPOST, P_ZSPIN, P_ZACK, P_DSTART, P_DRECV, P_DCHECK,
        P_PSTART, P_PRECV, P_PDONE, P_PCHECK };
-enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED };
+enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED, SC_REDTOSEC };
 enum { G_CTOR, G_GOTRED, G_GOTREDB, G_NGSEND, G_NGREPORT, G_PRIOSTART, G_PRIORECV, G_EXPRECV,
        G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE, G_LATEREG, G_CSREPORT,
-       G_CBRECV, G_CBCOUNT };
+       G_CBRECV, G_CBCOUNT, G_REDTOSEC };
 enum { N_CTOR, N_INCR };
 enum { S_CTOR, S_GOTRED, S_INL, S_PLAIN };
 enum { D_CTOR, D_RESUMED };
@@ -694,6 +694,17 @@ static void resultOf(const CkDynMsgView *v, double *value, double *count) {
     return;
   }
   CHECK(v->slots[0].type == CKDYN_SLOT_BUFFER, "result slot 0 has type %d", v->slots[0].type);
+  if (v->slots[0].elem == CKDYN_ELEM_BYTE) {
+    /* a set reduction of (value, count) pairs: sum them */
+    *value = 0; *count = 0;
+    const CkReduction::setElement *e = (const CkReduction::setElement *)CkDynViewBufferPtr(v, 0, nullptr);
+    for (; e != nullptr; e = const_cast<CkReduction::setElement *>(e)->next()) {
+      CHECK(e->dataSize == 2 * sizeof(double), "set result element of %d bytes", e->dataSize);
+      const double *d = (const double *)e->data;
+      *value += d[0]; *count += d[1];
+    }
+    return;
+  }
   CHECK(v->slots[0].elem == CKDYN_ELEM_F64, "result buffer elem %d, expected F64", v->slots[0].elem);
   const double *p = (const double *)CkDynViewBufferPtr(v, 0, nullptr);
   *value = p[0];
@@ -735,6 +746,29 @@ static int64_t secGotSec(Obj *o, const CkDynMsgView *v) {
   return 0;
 }
 
+/* redToSec(mode, cb): a reduction over the whole array or group (not a
+ * section) whose callback is the SECTION callback cb: mode 0 sum_double of
+ * [value, 1], 1 the foreign reducer over value, 2 the set reducer over
+ * [value, 1]. Contributors on different PEs must carry the same Charm++
+ * callback (CkDynContribute's section-tagged reducer). */
+static int64_t memberRedToSec(Obj *o, const CkDynMsgView *v) {
+  int64_t mode = cbI64(v, 0);
+  CkDynCallback cb = viewCb(v, 1);
+  double r[2] = { memberValue(o), 1.0 };
+  if (mode == 1) {
+    CkDynMsg *m = MsgB().user(CB_REDUCER_SUM_I64).i64((int64_t)r[0]).finish(0);
+    uint32_t len;
+    const void *p = CkDynMsgPayload(m, &len);
+    CkDynRedData d = { p, len, CkDynForeignReducerType() };
+    CkDynContribute(&o->t, &d, &cb);
+    CkDynMsgFree(m);
+  } else {
+    CkDynRedData d = { r, sizeof r, redType(mode == 0 ? "sum_double" : "set") };
+    CkDynContribute(&o->t, &d, &cb);
+  }
+  return 0;
+}
+
 /* ---- Sec (1-D array, section and migration tests) ------------------------ */
 
 static int64_t secCtor(Obj *, const CkDynMsgView *) { return 0; }
@@ -762,6 +796,7 @@ CbClass Sec = { "Sec", CKDYN_ARRAY, 1, {
   { "Sec.gotSec", CKDYN_EP_REDNTARGET, secGotSec },
   { "Sec.syncStart", 0, secSyncStart },
   { "Sec.resumed", 0, secResumed },
+  { "Sec.redToSec", 0, memberRedToSec },
 } };
 
 /* ---- Grp (group) ---------------------------------------------------------- */
@@ -896,6 +931,7 @@ CbClass Grp = { "Grp", CKDYN_GROUP, 0, {
   { "Grp.csReport", 0, grpCsReport },
   { "Grp.cbRecv", 0, grpCbRecv },
   { "Grp.cbCount", 0, grpCbCount },
+  { "Grp.redToSec", 0, memberRedToSec },
 } };
 
 /* ---- NGrp (nodegroup) ---------------------------------------------------- */
@@ -1076,7 +1112,7 @@ class TestMain : public CBase_TestMain {
     "constrained",
     "ncpy/nonpost", "ncpy/post_before", "ncpy/post_after", "ncpy/samepe",
     "device/remote", "device/samepe", "hapi", "devpersist/remote", "devpersist/samepe",
-    "sections/array", "sections/group", "sections/remote", "sections/combine_overlap",
+    "sections/array", "sections/group", "sections/contribute", "sections/remote", "sections/combine_overlap",
     "sections/combine_arrays", "sections/delete", "sections/migration",
     "migration", "checkpoint", "late", "exit" };
   std::string ckptDir = "ckdyntest.ckpt";
@@ -1708,6 +1744,40 @@ public:
       CkDynSendSection(&S.sid, ep, MsgB().i64(mode).i64(expect).cb(cb).finishMcast(ep), nullptr);
     });
   }
+  /* Every element of array A (or every Grp branch) contributes with a
+     SECTION callback to the section `name` (redToSec); each member of the
+     section gets the result with the callback's refnum and reduces
+     [value, count, 1, refnum] over the section to the future (gotSec). */
+  void qRoundAll(const std::string &name, int mode) {
+    q.push_back([this, name, mode] {
+      static const char *modes[] = { "sum_double", "foreign", "set" };
+      Sect &S = sects[name];
+      std::string what = cur + ": all contribute (" + modes[mode] + ") to section " + name;
+      int n = S.group ? CkNumPes() : nSecA;
+      double total = 0;
+      for (int i = 0; i < n; i++) total += S.group ? i + 1.0 : valOf(aidSecA, i);
+      uint32_t *fp = new uint32_t(0);
+      uint32_t f = cbNewFuture([this, &S, mode, what, fp, n, total](const CkDynMsgView *v) {
+        uint32_t f = *fp;
+        delete fp;
+        double val = redDouble(v, 0), cnt = redDouble(v, 1), recv = redDouble(v, 2), refs = redDouble(v, 3);
+        CHECK(recv == S.size, "%s: %g members received the result, expected %d", what.c_str(), recv, S.size);
+        CHECK(refs == (double)f * S.size, "%s: members received refnum sum %g, expected %u each", what.c_str(), refs, f);
+        CHECK(val == total * S.size, "%s: sum %g, expected %g on each of %d members", what.c_str(), val / S.size, total, S.size);
+        if (mode != 1) CHECK(cnt == (double)n * S.size, "%s: %g contributions, expected %d", what.c_str(), cnt / S.size, n);
+        CkPrintf("  %s: %d contributions reduced to %g, delivered to %d members with refnum %u\n",
+                 what.c_str(), n, total, S.size, f);
+        go();
+      });
+      *fp = f;
+      S.reds += 1;   /* the members' gotSec reduction */
+      CkDynCallback cb = cbSectionCb(S.sid, S.group ? Grp.ep(G_GOTSEC) : Sec.ep(SC_GOTSEC), f);
+      MsgB m;
+      m.i64(mode).cb(cb);
+      if (S.group) CkDynSendGroup(gidGrp, -1, Grp.ep(G_REDTOSEC), m.finish(0), nullptr);
+      else CkDynSendArray(aidSecA, 1, nullptr, Sec.ep(SC_REDTOSEC), m.finish(0), nullptr);
+    });
+  }
   void qSync() {
     q.push_back([this] {
       if (CkNumPes() == 1) { go(); return; }
@@ -1737,6 +1807,10 @@ public:
       for (int p = 0; p < CkNumPes(); p += 2) pes.push_back(p);
       qCreateGroup("G", pes);
       qRound("G", 0, 0); qRound("G", 1, 0); qRound("G", 0, 1); qRound("G", 0, 3);
+    } else if (s == "sections/contribute") {
+      /* reductions over a whole collection to a SECTION callback */
+      for (int mode = 0; mode < 3; mode++) { qRoundAll("Aeven", mode); qRoundAll("G", mode); }
+      qRound("Aeven", 0, 0);   /* the section's own reduction numbers are unaffected */
     } else if (s == "sections/remote") {
       /* created on the last PE (its root); the main chare sends from PE 0 */
       q.push_back([this] {

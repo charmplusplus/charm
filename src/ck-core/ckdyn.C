@@ -1472,6 +1472,10 @@ static CMK_REFNUM_TYPE checkedRefnum(uint32_t id) {
   return (CMK_REFNUM_TYPE)id;
 }
 
+/* A callback's own reference number: 0 (none) is legal; any other value must
+   fit this build's CMK_REFNUM_TYPE, as for a future id. */
+static CMK_REFNUM_TYPE refnumOrZero(uint32_t r) { return r ? checkedRefnum(r) : (CMK_REFNUM_TYPE)0; }
+
 CkCallback CkDynMakeCallback(const CkDynCallback *cb, bool sysMsg) {
   switch (cb->kind) {
     case CKDYN_CB_IGNORE: return CkCallback(CkCallback::ignore);
@@ -1486,7 +1490,7 @@ CkCallback CkDynMakeCallback(const CkDynCallback *cb, bool sysMsg) {
          forwards the delivered message to the section (doc/internals/ckdyn.md,
          Sections: Reductions) */
       CkDynMgr *mg = CProxy_CkDynMgr(_ckdynMgrGID).ckLocalBranch();
-      int slot = sysMsg ? mg->relaySlot(cb->sid, cb->ep, true, cb->refnum) : mg->relaySlot(cb->sid, cb->ep);
+      int slot = sysMsg ? mg->relaySlot(cb->sid, cb->ep, true, refnumOrZero(cb->refnum)) : mg->relaySlot(cb->sid, cb->ep);
       CkCallback c(CkIndex_CkDynMgr::relay(0), CkMyPe(), _ckdynMgrGID);
       c.setRefnum(checkedRefnum((uint32_t)slot));
       return c;
@@ -1557,7 +1561,7 @@ extern "C" void CkDynCallbackSend(const CkDynCallback *cb, CkDynMsg *m) {
        envelope's reference number and cb->refnum would be lost */
     CkDynMcastMsg *mm = toMcast(m);
     CkFreeMsg(m);
-    UsrToEnv(mm)->setRef((CMK_REFNUM_TYPE)cb->refnum);
+    UsrToEnv(mm)->setRef(refnumOrZero(cb->refnum));
     CkDynSendSection(&cb->sid, cb->ep, mm, nullptr);
     return;
   }
@@ -1620,14 +1624,19 @@ int CkDynMgr::relaySlot(const CkDynSectionID &sid, int ep, bool sys, uint32_t sy
   return slot;
 }
 
-/* A section callback's message (a reduction result or a system message)
-   arrives here with the relay slot as its reference number; it is converted
-   to a section message carrying the callback's own reference number and sent
-   to the section. A reduction result carries that number as its user flag
-   (the contribution's userFlag); a system message carries none, so its slot
-   holds it. */
+/* A section callback's message arrives here. A result of the section-tagged
+   reducer (CkDynContribute) names its section itself. Anything else (a
+   section reduction result, a system message) has the relay slot as its
+   reference number; it is converted to a section message carrying the
+   callback's own reference number and sent to the section. A section
+   reduction result carries that number as its user flag (CkMulticast's
+   userData); a system message carries none, so its slot holds it. */
+static CkDynMcastMsg *mcastFromReduction(const void *data, size_t len, int reducer);   /* in the sections part below */
+static bool unwrapSectionTagged(void *msg);   /* in the reductions part below */
+
 void CkDynMgr::relay(CkDynMsg *m) {
   void *msg = m;
+  if (unwrapSectionTagged(msg)) return;   /* CkDynContribute's section callback: the result names its section */
   uint32_t slot = refOf(msg);
   if (slot == 0 || slot > relays.size()) CkAbort("CkDyn: section callback relay slot %u does not exist on PE %d", slot, CkMyPe());
   CkDynRelaySlot r = relays[slot - 1];
@@ -1641,7 +1650,7 @@ void CkDynMgr::relay(CkDynMsg *m) {
             UsrToEnv(msg)->getMsgIdx(), slot);
   CkDynMcastMsg *mm = toMcast(msg);
   CkFreeMsg(msg);
-  UsrToEnv(mm)->setRef((CMK_REFNUM_TYPE)ref);
+  UsrToEnv(mm)->setRef((CMK_REFNUM_TYPE)ref);   /* r.sysRefnum was checked when the slot was made */
   CkDynSendSection(&r.sid, r.ep, mm, nullptr);
 }
 
@@ -1717,19 +1726,137 @@ static CkReductionMsg *ckdynForeignReduce(int n, CkReductionMsg **msgs) {
   return CkReductionMsg::buildNew((int)out.size(), out.data(), g_foreignType);
 }
 
+/* ---- section callbacks of CkDynContribute -------------------------------
+ * A reduction's callback must be the same on every contributing PE, so a
+ * SECTION callback cannot become a per-PE relay slot here. CkDynContribute
+ * instead contributes with the reducer CkDyn::sectionTagged: the data is a
+ * SecTag (the section, entry, reference number and the reducer the binding
+ * asked for) followed by the binding's data, and the callback is the relay
+ * entry of the CkDynMgr on the section's root PE, with no reference number.
+ * The tagged reducer combines the data with the inner reducer and keeps the
+ * tag; the relay unwraps the result and sends it to the section
+ * (doc/internals/ckdyn.md, "Sections: Reductions"). */
+struct SecTag {
+  CkDynSectionID sid;
+  int32_t  ep;
+  uint32_t refnum;    /* the callback's reference number, 0 for none */
+  int32_t  inner;     /* the reducer the binding gave */
+  int32_t  reserved;
+};
+static_assert(sizeof(SecTag) == 32, "SecTag layout changed");
+static CkReduction::reducerType g_secTaggedType = CkReduction::invalid;
+
+/* set and tuple tell a contribution from a partial result by the message's
+   sourceFlag, and the reduction tree passes a lone message on without calling
+   the reducer, which turns a contribution into a partial result unconverted.
+   Their contributions are therefore converted when contributed (preReduce),
+   and every message the tagged reducer hands them is a partial result. */
+/* The CkReductionMsg fields and reducer table the tagged reducer needs (ckreduction.h makes it a friend). */
+struct CkDynReduceAccess {
+  static CkReduction::reducerFn fn(int type) { return CkReduction::reducerTable()[type].fn; }
+  static void copyCounts(CkReductionMsg *to, const CkReductionMsg *from, int sourceFlag) {
+    to->sourceFlag = sourceFlag; to->gcount = from->gcount; to->userFlag = from->userFlag;
+  }
+  static void setSingle(CkReductionMsg *m) { m->sourceFlag = -1; }
+  static int sourceFlag(const CkReductionMsg *m) { return m->sourceFlag; }
+};
+
+static bool needsPreReduce(int type) { return type == CkReduction::set || type == CkReduction::tuple; }
+
+static void preReduce(int type, const void *data, int len, std::vector<char> &out) {
+  CkReductionMsg *m = CkReductionMsg::buildNew(len, data, (CkReduction::reducerType)type);
+  CkDynReduceAccess::setSingle(m);   /* a single contribution */
+  CkReductionMsg *r = CkDynReduceAccess::fn(type)(1, &m);
+  out.assign((const char *)r->getData(), (const char *)r->getData() + r->getSize());
+  if (r != m) delete r;
+  delete m;
+}
+
+static CkReductionMsg *ckdynSectionTaggedReduce(int n, CkReductionMsg **msgs) {
+  const SecTag *t0 = (const SecTag *)msgs[0]->getData();
+  int inner = CkReduction::nop;
+  for (int i = 0; i < n; i++) {
+    if (msgs[i]->getSize() < (int)sizeof(SecTag)) CkAbort("CkDyn: a section-callback contribution without its tag");
+    const SecTag *t = (const SecTag *)msgs[i]->getData();
+    if (memcmp(&t->sid, &t0->sid, sizeof t->sid) != 0 || t->ep != t0->ep || t->refnum != t0->refnum)
+      CkAbort("CkDyn: contributions to one reduction name different SECTION callbacks (section root %d index %d "
+              "entry %d refnum %u, and section root %d index %d entry %d refnum %u)", t0->sid.root_pe, t0->sid.idx,
+              t0->ep, t0->refnum, t->sid.root_pe, t->sid.idx, t->ep, t->refnum);
+    if (t->inner == CkReduction::nop) continue;   /* an empty contribution that keeps the counts, as Charm++ treats nop */
+    if (inner == CkReduction::nop) inner = t->inner;
+    else if (t->inner != inner)
+      CkAbort("CkDyn: contributions to one reduction use reducers %d and %d", inner, t->inner);
+  }
+  std::vector<CkReductionMsg *> in;
+  if (inner != CkReduction::nop) {
+    for (int i = 0; i < n; i++) {
+      const SecTag *t = (const SecTag *)msgs[i]->getData();
+      if (t->inner != inner) continue;
+      CkReductionMsg *m = CkReductionMsg::buildNew(msgs[i]->getSize() - (int)sizeof(SecTag), t + 1,
+                                                   (CkReduction::reducerType)inner);
+      CkDynReduceAccess::copyCounts(m, msgs[i], needsPreReduce(inner) ? 1 : CkDynReduceAccess::sourceFlag(msgs[i]));
+      in.push_back(m);
+    }
+  }
+  CkReductionMsg *r = in.empty() ? nullptr : CkDynReduceAccess::fn(inner)((int)in.size(), in.data());
+  int len = r ? r->getSize() : 0;
+  CkReductionMsg *out = CkReductionMsg::buildNew((int)sizeof(SecTag) + len, nullptr, g_secTaggedType);
+  SecTag *ot = (SecTag *)out->getData();
+  *ot = *t0;
+  ot->inner = inner;
+  if (len) memcpy(ot + 1, r->getData(), len);
+  bool rIsInput = false;
+  for (CkReductionMsg *m : in) { if (m == r) rIsInput = true; delete m; }
+  if (r && !rIsInput) delete r;
+  return out;
+}
+
+/* At the relay: a result of the tagged reducer is unwrapped and sent to its
+   section with its reference number. False for any other message. */
+static bool unwrapSectionTagged(void *msg) {
+  if (UsrToEnv(msg)->getMsgIdx() != CkReductionMsg::__idx) return false;
+  CkReductionMsg *rm = (CkReductionMsg *)msg;
+  if (g_secTaggedType == CkReduction::invalid || rm->getReducer() != g_secTaggedType) return false;
+  if (rm->getSize() < (int)sizeof(SecTag)) CkAbort("CkDyn: a section-callback reduction result without its tag");
+  SecTag t;
+  memcpy(&t, rm->getData(), sizeof t);
+  CkDynMcastMsg *mm = mcastFromReduction((const char *)rm->getData() + sizeof t, rm->getSize() - sizeof t, t.inner);
+  CkFreeMsg(msg);
+  UsrToEnv(mm)->setRef((CMK_REFNUM_TYPE)t.refnum);   /* checked by CkDynContribute */
+  CkDynSendSection(&t.sid, t.ep, mm, nullptr);
+  return true;
+}
+
 extern "C" void CkDynContribute(const CkDynTarget *me, const CkDynRedData *d, const CkDynCallback *cb) {
   Chare *c = localChare(me);
   if (c == nullptr) CkAbort("CkDyn: contribute from an object that is not local");
   int len = (int)d->len;
   const void *data = d->data;
-  if (d->type == CkReduction::nop) { len = 0; data = nullptr; }
-  CkCallback ck = CkDynMakeCallback(cb);
-  /* a SECTION callback's refnum travels as the user flag (see CkDynMgr::relay) */
-  CMK_REFNUM_TYPE uf = cb->kind == CKDYN_CB_SECTION && cb->refnum ? checkedRefnum(cb->refnum) : (CMK_REFNUM_TYPE)-1;
+  int type = d->type;
+  if (type == CkReduction::nop) { len = 0; data = nullptr; }
+  CkCallback ck;
+  std::vector<char> tagged;
+  if (cb->kind == CKDYN_CB_SECTION) {
+    if (cb->sid.root_pe < 0 || cb->sid.root_pe >= CkNumPes())
+      CkAbort("CkDyn: contribute to a SECTION callback whose section has root PE %d", cb->sid.root_pe);
+    epRec(cb->ep);
+    SecTag t;
+    memset(&t, 0, sizeof t);
+    t.sid = cb->sid; t.ep = cb->ep; t.refnum = refnumOrZero(cb->refnum); t.inner = type;
+    std::vector<char> pre;
+    if (needsPreReduce(type)) { preReduce(type, data, len, pre); data = pre.data(); len = (int)pre.size(); }
+    tagged.resize(sizeof t + len);
+    memcpy(tagged.data(), &t, sizeof t);
+    if (len) memcpy(tagged.data() + sizeof t, data, len);
+    data = tagged.data(); len = (int)tagged.size(); type = g_secTaggedType;
+    ck = CkCallback(CkIndex_CkDynMgr::relay(0), cb->sid.root_pe, _ckdynMgrGID);   /* the same on every PE */
+  } else {
+    ck = CkDynMakeCallback(cb);
+  }
   switch (me->kind) {
-    case CKDYN_GROUP:     ((Group *)c)->contribute(len, data, (CkReduction::reducerType)d->type, ck, uf); break;
-    case CKDYN_NODEGROUP: ((NodeGroup *)c)->contribute(len, data, (CkReduction::reducerType)d->type, ck, uf); break;
-    case CKDYN_ARRAY:     ((ArrayElement *)c)->contribute(len, data, (CkReduction::reducerType)d->type, ck, uf); break;
+    case CKDYN_GROUP:     ((Group *)c)->contribute(len, data, (CkReduction::reducerType)type, ck); break;
+    case CKDYN_NODEGROUP: ((NodeGroup *)c)->contribute(len, data, (CkReduction::reducerType)type, ck); break;
+    case CKDYN_ARRAY:     ((ArrayElement *)c)->contribute(len, data, (CkReduction::reducerType)type, ck); break;
     default: CkAbort("CkDyn: contribute from a kind without reductions");
   }
 }
@@ -1774,16 +1901,21 @@ static CkDynMcastMsg *toMcast(void *msg) {
   }
   if (mi == CkReductionMsg::__idx) {
     CkReductionMsg *rm = (CkReductionMsg *)msg;
-    if (g_foreignType != CkReduction::invalid && rm->getReducer() == g_foreignType)
-      return mcastFromBytes(rm->getData(), rm->getSize());
-    CkDynMsgBuilder *b = CkDynMsgBegin(1, 0, 0, 0, -1);
-    CkDynBufDesc d;
-    memset(&d, 0, sizeof d);
-    d.ptr = rm->getData(); d.len = rm->getSize(); d.elem = elemOfReducer(rm->getReducer());
-    CkDynMsgAddBuffer(b, &d);
-    return CkDynMsgFinishMcast(b, 0);
+    return mcastFromReduction(rm->getData(), rm->getSize(), rm->getReducer());
   }
   return CkDynMsgFinishMcast(CkDynMsgBegin(0, 0, 0, 0, -1), 0);
+}
+
+/* The section message for reduction data of a reducer: a foreign result keeps
+   its payload; a built-in one becomes one BUFFER slot (as a REDRESULT view shows it). */
+static CkDynMcastMsg *mcastFromReduction(const void *data, size_t len, int reducer) {
+  if (g_foreignType != CkReduction::invalid && reducer == g_foreignType) return mcastFromBytes(data, len);
+  CkDynMsgBuilder *b = CkDynMsgBegin(1, 0, 0, 0, -1);
+  CkDynBufDesc d;
+  memset(&d, 0, sizeof d);
+  d.ptr = data; d.len = len; d.elem = elemOfReducer(reducer);
+  CkDynMsgAddBuffer(b, &d);
+  return CkDynMsgFinishMcast(b, 0);
 }
 
 static void indexInts(const CkArrayIndex &ix, std::vector<int> &out) {
@@ -3015,6 +3147,7 @@ extern "C" void CkDynStart(int argc, char **argv) {
 /* initnode: the foreign reducer, registered once per process in module order. */
 void _ckdynInitNode(void) {
   g_foreignType = CkReduction::addReducer(ckdynForeignReduce, false, "CkDyn::foreign");
+  g_secTaggedType = CkReduction::addReducer(ckdynSectionTaggedReduce, false, "CkDyn::sectionTagged");
   /* a section's creation multicast: one entry for array members and one for
      group members, whatever the class, because CkMulticast sends one entry
      index to every sub-section of a combined section */

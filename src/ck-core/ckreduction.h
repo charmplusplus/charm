@@ -103,6 +103,7 @@ PUPbytes(countAdjustment)
  * delegated cross-array reductions are implemented more optimally
  */
 namespace ck { namespace impl { class XArraySectionReducer; } }
+struct CkDynReduceAccess;   // ckdyn.C: the section-tagged reducer runs an inner reducer
 
 //CkReduction is just a "namespace class" for the user-visible
 // parts of the reduction system.
@@ -256,6 +257,7 @@ private:
  	friend class CkNodeReductionMgr;
 	friend class CkMulticastMgr;
     friend class ck::impl::XArraySectionReducer;
+    friend struct CkDynReduceAccess;
 //System-level interface
 
 	//Reducer table: maps reducerTypes to reducerFns.
@@ -362,6 +364,7 @@ class CkReductionMsg : public CMessage_CkReductionMsg
 	friend class AllreduceMgr;
 #endif
 	friend class ck::impl::XArraySectionReducer;
+	friend struct CkDynReduceAccess;
 public:
 
 //Publically-accessible fields:

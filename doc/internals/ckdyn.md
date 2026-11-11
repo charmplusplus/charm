@@ -498,7 +498,7 @@ A binding describes a callback with the POD `CkDynCallback`;
 | `TARGET`, `bcast != 0` | `bcastGroup`, `bcastNodeGroup` or `bcastArray` |
 | `FUTURE` | `sendGroup` to `CkDynMgr[cb->pe].deposit`, reference number `cb->id` |
 | `IGNORE`, `EXIT` | `CkCallback::ignore`, `CkCallback::ckExit` |
-| `SECTION` | `sendGroup` to `CkDynMgr[CkMyPe()].relay`, reference number = a relay slot (see Sections); `CkDynCallbackSend` sends to the section directly |
+| `SECTION` | `sendGroup` to `CkDynMgr[CkMyPe()].relay`, reference number = a relay slot (see Sections); `CkDynContribute` uses `CkDynMgr[sid.root_pe].relay` with no reference number and the section-tagged reducer; `CkDynCallbackSend` sends to the section directly |
 
 A `TARGET` callback to a main chare is the exception to the first row: it
 becomes `sendGroup` to the class's relay entry for `cb->ep` (`relayFirst +
@@ -605,7 +605,8 @@ gives `elem` of the `BUFFER` slot in a reduction result view.
 `CkDynContribute(me, data, cb)` finds the local object the target names
 (`localChare`) and calls `contribute(len, data, type, callback)` on its
 `Group`, `NodeGroup` or `ArrayElement`. A `nop` contribution is sent with no
-data.
+data. A SECTION callback is the exception: the contribution goes through the
+section-tagged reducer (Sections, Reductions).
 
 **The foreign reducer.** `_ckdynInitNode` registers one reducer,
 `CkDyn::foreign` (`CkReduction::addReducer`), on every process in module
@@ -705,18 +706,47 @@ the number of section reductions this member has contributed to, which every
 member computes identically and which the binding uses as a collective future
 id.
 
-**Section callbacks** (`CKDYN_CB_SECTION`) are converted, on the PE that
-converts them, to a group callback to `CkDynMgr[CkMyPe()].relay` whose
-reference number is a slot in that branch's relay table (`relaySlot`, slots
-deduplicated by `(sid, ep)`). The callback's reference number replaces the
-envelope's on delivery, so the callback's own `refnum` cannot travel there;
-`relay` recovers it per message kind:
+**Section callbacks of `CkDynContribute`.** A whole-collection reduction
+(group, nodegroup, array) compares the callbacks of the partial results it
+combines (`CkReductionMgr::reduceMessages` aborts with "mis-matched client
+callbacks" under `CMK_ERROR_CHECKING`), so every contributing PE must pass a
+byte-equal `CkCallback`. A per-PE relay slot cannot be one. `CkDynContribute`
+therefore contributes with a second reducer that `_ckdynInitNode` registers,
+`CkDyn::sectionTagged`, and the callback `CkDynMgr[sid.root_pe].relay` with no
+reference number, the same on every PE. The data is a 32-byte `SecTag` (the
+section id, the entry, the callback's `refnum`, and the reducer the binding
+gave, the inner reducer) followed by the binding's data. The reducer function
+`ckdynSectionTaggedReduce` checks that every message names the same section,
+entry and refnum, builds temporary `CkReductionMsg`s of the inner data, calls
+the inner reducer's function from the reducer table (built-in reducers, the
+foreign reducer and any other registered one alike) and returns the result
+with the same tag. `nop` contributions are skipped, as Charm++ skips them.
+`set` and `tuple` tell a contribution from a partial result by `sourceFlag`,
+and `reduceMessages` passes a lone message on without calling the reducer,
+which would turn a raw contribution into a partial result unconverted; their
+contributions are therefore converted when contributed (`preReduce`, the
+inner reducer over the one contribution) and all inner messages are marked as
+partial results. `CkDynReduceAccess` is the friend of `CkReduction` and
+`CkReductionMsg` that reaches the reducer table and the message counts. On the
+root PE `relay` recognizes the tagged reducer's result (`unwrapSectionTagged`),
+builds the section message from the inner data (`mcastFromReduction`, as
+`toMcast` does), sets the tag's refnum and sends it with `CkDynSendSection`.
 
-- a reduction result (`CkDynContributeSection`, and `CkDynContribute` from a
-  group, node group or array element) carries it as the `CkReductionMsg` user
-  flag: `sectionContribute` passes it as CkMulticast's `userData`,
-  `CkDynContribute` as the `userFlag` of `contribute`; the all-ones flag means
-  none. CkMulticast keeps the user flag through cross-array results.
+**Other section callbacks** (`CKDYN_CB_SECTION` given to
+`CkDynContributeSection`, `CkDynStartQD`, `CkDynCheckpoint` and the other calls
+that take a callback) are converted, on the PE that converts them, to a group
+callback to `CkDynMgr[CkMyPe()].relay` whose reference number is a slot in
+that branch's relay table (`relaySlot`, slots deduplicated by `(sid, ep)`).
+CkMulticast does not compare the callbacks of section contributions, so
+members on different PEs may carry different slots that hold the same
+`(sid, ep)`. The callback's reference number replaces the envelope's on
+delivery, so the callback's own `refnum` cannot travel there; `relay`
+recovers it per message kind:
+
+- a section reduction result (`CkDynContributeSection`) carries it as the
+  `CkReductionMsg` user flag: `sectionContribute` passes it as CkMulticast's
+  `userData`; the all-ones flag means none. CkMulticast keeps the user flag
+  through cross-array results.
 - a system message (`CkDynStartQD`, `CkDynCheckpoint`) carries none, so these
   two convert with `CkDynMakeCallback(cb, true)` and get a slot of their own
   keyed by `(sid, ep, refnum)` that holds it (`CkDynRelaySlot::sys`,
@@ -735,7 +765,7 @@ Such a callback is pup-able, unlike Charm++'s `bcastSection` callback.
 
 The relay table is never trimmed and does not need to be: a PE holds one
 reduction slot per `(section id, entry)` pair used in a section callback
-converted there, so a program that calls collectives with a fresh future id
+converted there (not counting `CkDynContribute`, which uses no slot), so a program that calls collectives with a fresh future id
 each time reuses the same slot. The section id includes the generation, so
 deleting and re-creating sections adds slots for the new ids; QD and
 checkpoint with a section callback add one slot per distinct reference
@@ -1177,7 +1207,8 @@ binding.
   message with a group dependency, and a section message for an entry of
   another class than the receiving element.
 - **Section callback relay table.** Per PE, one slot per `(section id with
-  generation, entry)` used in a section callback converted on that PE, plus
+  generation, entry)` used in a section callback converted on that PE (other
+  than by `CkDynContribute`), plus
   one per distinct reference number of a QD or checkpoint section callback;
   slots are never freed. Fresh future ids per collective call do not add
   slots. At most 65534 slots with a 16-bit `CMK_REFNUM_TYPE`; the next one
