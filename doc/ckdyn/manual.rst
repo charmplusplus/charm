@@ -644,7 +644,10 @@ The builder
    void *t = CkDynMsgReserveTail(b, len);   /* write len bytes at t */
    CkDynMsg *m = CkDynMsgFinish(b, ep);  /* one allocation */
 
-- The hints size the builder's scratch space; they are not limits.
+- The hints size the builder's scratch space; they are not limits. Each PE
+  keeps one builder and reuses it, so its scratch space stays at the largest
+  size any message on that PE needed; it is not returned until the run ends.
+  A negative ``nslots_hint`` counts as 0.
 - ``prio_bits`` reserves that many priority bits (0: none).
 - ``group_dep`` is a group id the message must wait for on delivery, or -1.
   It must be given here because the envelope reserves space for it at
