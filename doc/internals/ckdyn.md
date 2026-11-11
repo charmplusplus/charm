@@ -469,16 +469,27 @@ first, then before each call looks the element up again with
 per element and not freed here; the broadcast store owns it.
 
 This path does not go through `CkLocRec::invokeEntry`, so CkDyn does the
-tracing itself. `CkArray::recvBroadcast` is registered not traced
-(`CkDisableTracing`, ckarray.C `_ckArrayInit`), so no execute event is open
-when `CkDynDeliverBroadcast` runs. Without `deliver_many`, when tracing is on
+tracing itself. CkDyn entries are NOKEEP (`ckFlagsOf`), so `CkBroadcastMsgArray`
+sends the broadcast to `CkArray::recvNoKeepBroadcast`, or to
+`recvNoKeepExpeditedBroadcast` for an expedited send, not to
+`recvBroadcast`. `_ckArrayInit` (ckarray.C) registers all four receiving
+entries not traced (`CkDisableTracing`; until this branch only
+`recvBroadcast` was, so a NOKEEP broadcast, CkDyn's or a charmxi `[nokeep]`
+entry's, recorded the array manager's event with the elements' events nested
+inside it), so no execute event is open when `CkDynDeliverBroadcast` runs.
+Without `deliver_many`, when tracing is on
 (`CpvAccess(traceOn)`) and the entry is traced, each element's call is
 bracketed as `invokeEntry` brackets a charmxi element: `_TRACE_SET_OBJECT`
 with the location manager and the element's id, then
 `_TRACE_BEGIN_EXECUTE_DETAILED` with the broadcast's event, source PE and
 length and the element's projection id (its index), then
 `_TRACE_END_EXECUTE` and `_TRACE_CLEAR_OBJECT`; Projections shows one event
-per element. With `deliver_many`, CkDyn makes one call for all elements and
+per element. An entry registered with `CKDYN_EP_APPWORK` also gets
+`_TRACE_BEGIN_APPWORK`/`_TRACE_END_APPWORK` around each element's call, as
+`CkDeliverMessageFree` (ck.C) brackets an entry. With `deliver_many`, CkDyn
+makes one call for all elements and records neither the per-element events
+nor the APPWORK bracket; a binding that wants them brackets each element.
+With `deliver_many`, CkDyn makes one call for all elements and
 neither traces nor pushes any element: time is charged to the array manager
 and no per-element event is recorded unless the binding brackets each
 element's method with `CkDynCoroResume(target, ep, 0)`/`CkDynCoroSuspend`

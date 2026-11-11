@@ -278,7 +278,8 @@ Entry attributes (``CkDynEntryDesc.flags``):
    * - ``CKDYN_EP_NOTRACE``
      - the entry is not traced
    * - ``CKDYN_EP_APPWORK``
-     - the entry is application work (``CK_EP_APPWORK``)
+     - the entry is application work (``CK_EP_APPWORK``); not applied to
+       array broadcasts delivered through ``deliver_many``
    * - ``CKDYN_EP_EXCLUSIVE``
      - nodegroups: one invocation at a time per branch
    * - ``CKDYN_EP_REDNTARGET``

@@ -904,6 +904,11 @@ void _ckArrayInit(void)
   CkpvInitialize(DeferredArraySends, deferredArraySends);
   CkDisableTracing(CkIndex_CkArray::insertElement(0, CkArrayIndex(), 0));
   CkDisableTracing(CkIndex_CkArray::recvBroadcast(0));
+  // the other broadcast entries deliver the same way (each element's
+  // invocation records its own event), so they are not traced either
+  CkDisableTracing(CkIndex_CkArray::recvExpeditedBroadcast(0));
+  CkDisableTracing(CkIndex_CkArray::recvNoKeepBroadcast(0));
+  CkDisableTracing(CkIndex_CkArray::recvNoKeepExpeditedBroadcast(0));
   // disable because broadcast listener may deliver broadcast message
   CkDisableTracing(CkIndex_CkLocMgr::immigrate(0));
   // by default anytime migration is allowed

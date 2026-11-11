@@ -907,11 +907,15 @@ void CkDynDeliverBroadcast(void *bcastMsg, ArrayElemDyn **elems, int n) {
     for (int i = 0; i < n; i++) idx[i] = elems[i]->ckGetArrayIndex();
 #if CMK_TRACE_ENABLED
     /* one execute event per element, as CkLocRec::invokeEntry records for a
-       charmxi element; CkArray::recvBroadcast is not traced, so none is open */
+       charmxi element. CkDyn entries are NOKEEP, so the broadcast arrives
+       through CkArray::recvNoKeepBroadcast (or its expedited variant); like
+       recvBroadcast they are registered not traced (_ckArrayInit), so no
+       event is open here */
     envelope *env = UsrToEnv(bcastMsg);
     const bool traced = CpvAccess(traceOn) && _entryTable[ep]->traceEnabled;
     const int locMgr = arr->getLocMgr()->ckGetGroupID().idx;
 #endif
+    const bool appWork = _entryTable[ep]->appWork;   /* CKDYN_EP_APPWORK, bracketed as ck.C does */
     for (int i = 0; i < n; i++) {
       ArrayElemDyn *el = static_cast<ArrayElemDyn *>(arr->lookup(idx[i]));
       if (el == nullptr || el->d.handle == nullptr) continue;
@@ -924,7 +928,9 @@ void CkDynDeliverBroadcast(void *bcastMsg, ArrayElemDyn **elems, int n) {
                                       env->getTotalsize(), &pid, el);
       }
 #endif
+      if (appWork) _TRACE_BEGIN_APPWORK();
       c->hooks->deliver(c->desc.binding_data, el->d.handle, ep, r.user_id, r.flags, &v);
+      if (appWork) _TRACE_END_APPWORK();
 #if CMK_TRACE_ENABLED
       if (traced) { _TRACE_END_EXECUTE(); _TRACE_CLEAR_OBJECT(); }
 #endif
