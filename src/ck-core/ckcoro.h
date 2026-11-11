@@ -30,9 +30,13 @@
  *     }
  *   };
  *
- * A when stores the delivery into the lvalues that follow the want: the
- * message pointer (the coroutine owns it), or every marshalled parameter of
- * the entry in order. inbox::name(ref) matches the reference number:
+ * A when stores the delivery into the members of the chare that follow the
+ * want: the message pointer (the coroutine owns it: delete it before the
+ * next wait or pup it), or every marshalled parameter of the entry in
+ * order, a parameter used only for matching included. The outs are members,
+ * not variables declared by the wait, because a member is pupped with the
+ * element and a local does not survive a restart (see Migration below).
+ * inbox::name(ref) matches the reference number:
  * the envelope's for a message entry, the first arithmetic parameter for a
  * marshalled entry; inbox::name() matches any. Deliveries that no coroutine
  * is waiting for are buffered as messages (the marshalled parameters stay

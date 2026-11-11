@@ -129,13 +129,20 @@ from 65536 iterations ago is still unconsumed.
 
 ## 3. Rules
 
-1. **State lives in members.** A value that is live across a site is a
-   member of the chare and is pupped by the chare's pup, exactly as SDAG
-   requires of its state variables (`int imsg` is a member in both
-   programs). C++ rejects the restart jump past a local with an initializer
-   or a non-trivial type, which catches most mistakes at compile time; a
-   scalar declared without an initializer (such as `gmsg` above, assigned at
-   the site) is not caught, and `+ck_fakemigrate` is the check.
+1. **State lives in members.** The outs of a when, and any other value that
+   is live across a site, are members of the chare and are pupped by the
+   chare's pup, exactly as SDAG requires of its state variables (`int imsg`
+   is a member in both programs). A when fills existing members instead of
+   declaring block-scoped variables as an SDAG `when` does: a block-scoped
+   form is implementable (an if-with-initializer holding the received
+   values, verified with clang), but it could not contain a further site,
+   since a restarted body cannot reconstruct a local, so SDAG's nested when
+   that uses the outer parameters would not translate; one rule was
+   preferred (Kale, 2026-11-10). C++ rejects the restart jump past a local
+   with an initializer or a non-trivial type, which catches most mistakes
+   at compile time; a scalar declared without an initializer, or declared
+   before `CK_COROUTINE()`, is not caught, and `+ck_fakemigrate` is the
+   check.
 2. **Code before a site is skipped on a restart**, so its effects must be
    recorded in members (above: `iterations` is incremented in
    `begin_iteration`, which runs before the ghost sites and is skipped when

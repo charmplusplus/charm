@@ -2154,11 +2154,16 @@ step of ``tests/charm++/jacobi3d-coro``:
    };
 
 ``CK_WHEN(want, out...)`` waits until a delivery to the named entry
-arrives, then stores it into the lvalues that follow: the message pointer
-(the coroutine owns the message), or every marshalled parameter of the
-entry in order. ``inbox::name(ref)`` matches the reference number, which
-is the envelope's for a message entry and the first arithmetic parameter
-for a marshalled entry; ``inbox::name()`` matches any. A delivery that no
+arrives, then stores it into the members of the chare that follow: the
+message pointer, or every marshalled parameter of the entry in order, a
+parameter used only for matching included. The received values live in
+members, not in variables declared by the wait as an SDAG ``when`` does,
+because a member is pupped with the element and a local is not (see the
+rules below). The coroutine owns a received message: it deletes it before
+the next wait, or pups the member with ``CkPupMessage``.
+``inbox::name(ref)`` matches the reference number, which is the
+envelope's for a message entry and the first arithmetic parameter for a
+marshalled entry; ``inbox::name()`` matches any. A delivery that no
 coroutine is waiting for is buffered in the element, in arrival order, and
 moves with the element. ``CK_WHEN_ANY(idx, CK_ALT(want, out...), ...)``
 waits for the first of several alternatives and stores the index of the
@@ -2171,9 +2176,11 @@ is suspended at, and after unpacking the entry is invoked again: its body
 runs again from the top and jumps to the recorded wait. This gives the
 rules:
 
--  A value that is live across a wait is a member of the chare, pupped as
-   usual. (C++ rejects a jump past a local with an initializer; a scalar
-   declared without one is not caught.)
+-  The outs of a wait, and any other value that is live across a wait,
+   are members of the chare, pupped as usual. A local survives neither
+   the jump nor the migration: C++ rejects a jump past a local with an
+   initializer, and a local declared before ``CK_COROUTINE()`` is silently
+   re-initialized when the body runs again.
 -  Code before a wait runs again after a migration, so its results must
    be members, not recomputed side effects.
 -  The element migrates or is checkpointed only while every active
