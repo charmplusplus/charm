@@ -678,6 +678,7 @@ static CkArrayID CkCreateArray(CkArrayMessage* m, int ctor, CkArrayOptions opts)
   if (!locMgr.isZero())
   {
     CkLocMgr* mgr = CProxy_CkLocMgr(locMgr).ckLocalBranch();
+    // The asynchronous path waits for this branch in CkCreateArrayAsync.
     if (mgr == nullptr)
       CkAbort("CkCreateArray: the location manager (group %d) this array binds to has"
               " no branch on PE 0 yet\n", locMgr.idx);
@@ -842,6 +843,7 @@ class CkCreateArrayAsyncMsg : public CMessage_CkCreateArrayAsyncMsg
   int ctor;
   CkCallback cb;
   CkArrayOptions opts;
+  bool held = false;  // waited on PE 0 for the bound-to location manager
   char* ctorPayload;
 
   CkCreateArrayAsyncMsg(int ctor_, CkCallback cb_, CkArrayOptions opts_)
@@ -873,6 +875,22 @@ static void CkCreateArrayAsync(void* vmsg)
   envelope* venv = static_cast<envelope*>(vmsg);
   CkUnpackMessage(&venv);
   CkCreateArrayAsyncMsg* msg = static_cast<CkCreateArrayAsyncMsg*>(EnvToUsr(venv));
+
+  // An array bound to another (bindTo) needs that array's location manager on
+  // PE 0. Hold the request in the manager's pending queue until it is built, as
+  // a group creation with an unsatisfied dependence is held; the redelivery
+  // re-enters this handler. Counted for quiescence while held.
+  CkGroupID locMgr = msg->opts.getLocationManager();
+  if (!locMgr.isZero())
+  {
+    if (!lookupGroupAndBufferIfNotThere(CkpvAccess(_coreState), venv, locMgr))
+    {
+      if (!msg->held) CpvAccess(_qd)->create();
+      msg->held = true;
+      return;
+    }
+    if (msg->held) CkpvAccess(_coreState)->process();
+  }
 
   // Unpack arguments
   PUP::fromMem p(msg->ctorPayload);

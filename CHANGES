@@ -146,6 +146,13 @@ New on this line since the split from classic:
   proposedPe" when given a PE). New test objid_detour, two to four
   processes.
 
+- An array created asynchronously from a PE other than 0 and bound to
+  another (bindTo) aborted with "the location manager ... this array
+  binds to has no branch on PE 0 yet" when its request reached PE 0
+  while the other array's location manager was still held there,
+  waiting for a custom map created elsewhere (#4174). The request now
+  waits on PE 0 for that branch. New test objid_bindasync.
+
 - Broadcasts and [nokeep] entry methods: fixes for message reuse and
   copies (#4000-#4012). Checkpoint restart no longer hangs with more
   than one process and more than one PE per process (#4019). The
