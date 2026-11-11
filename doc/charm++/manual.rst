@@ -2275,6 +2275,17 @@ outside an entry method, and an ``[inline]`` or ``[local]`` call sees the
 caller's delivery. The inbox entries use them to keep marshalled
 parameters in the message they arrived in instead of copying them.
 
+Programs in the distribution that use coroutine entry methods, each with
+an SDAG program of the same behaviour next to it:
+``tests/charm++/jacobi3d-coro`` (the 3D Jacobi of
+``tests/charm++/jacobi3d-sdag``, with load balancing, checkpoint and
+restart in its ``make test``); ``tests/charm++/ckcoro`` (the ``basic``,
+``refnum`` and ``migration`` modules of ``tests/charm++/sdag`` written
+as coroutines, with every construct of this section, plus modules for
+marshalled inbox entries, arrays and overlap under migration); and
+``benchmarks/charm++/coro_pingpong`` (one ping-pong written three ways,
+plain entry methods, SDAG and a coroutine, in one file).
+
 Differences from SDAG
 ~~~~~~~~~~~~~~~~~~~~~
 
