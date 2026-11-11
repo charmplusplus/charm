@@ -904,6 +904,11 @@ void _ckArrayInit(void)
   CkpvInitialize(DeferredArraySends, deferredArraySends);
   CkDisableTracing(CkIndex_CkArray::insertElement(0, CkArrayIndex(), 0));
   CkDisableTracing(CkIndex_CkArray::recvBroadcast(0));
+  // the other broadcast entries deliver the same way (each element's
+  // invocation records its own event), so they are not traced either
+  CkDisableTracing(CkIndex_CkArray::recvExpeditedBroadcast(0));
+  CkDisableTracing(CkIndex_CkArray::recvNoKeepBroadcast(0));
+  CkDisableTracing(CkIndex_CkArray::recvNoKeepExpeditedBroadcast(0));
   // disable because broadcast listener may deliver broadcast message
   CkDisableTracing(CkIndex_CkLocMgr::immigrate(0));
   // by default anytime migration is allowed
@@ -1611,34 +1616,47 @@ bool CkArrayBroadcaster::performDelivery(CkArrayMessage* bcast,
 #endif
 
 // CkDyn elements (ckdyn-impl.h): the same epoch bookkeeping as the charm4py
-// path above, with the delivery handed to CkDynDeliverBroadcast once per PE.
+// path above, with the delivery handed to CkDynDeliverBroadcast. A handler
+// may migrate or destroy other local elements, so the elements are named by
+// index and looked up again before each delivery.
 void CkArrayBroadcaster::deliverAndUpdateDyn(CkArrayMessage* bcast,
                                              std::vector<CkMigratable*>& elements)
 {
   if (elements.empty())
     return;
-  bool success = performDeliveryDyn(bcast, elements);
+  const bool batch = CkDynBatchesBroadcasts(elements[0]->ckGetChareType());
+  std::vector<CkArrayIndex> idx;
+  idx.reserve(elements.size());
+  for (CkMigratable* m : elements) idx.push_back(((ArrayElement*)m)->ckGetArrayIndex());
+  bool success = performDeliveryDyn(bcast, idx, batch);
   if (success)
   {
     int bcastEpoch = UsrToEnv(bcast)->getGroupEpoch() + 1;
     while (storedBcasts.hasBcast(bcastEpoch))
     {
-      success = performDeliveryDyn(storedBcasts.getBcast(bcastEpoch), elements);
+      success = performDeliveryDyn(storedBcasts.getBcast(bcastEpoch), idx, batch);
       bcastEpoch++;
     }
   }
 }
 
+// Without deliver_many (batch false) each element's epoch is advanced just
+// before its own delivery, as attemptDelivery does for a charmxi element: an
+// element that an earlier handler migrates away leaves at this epoch and
+// receives the broadcast where it arrives. With deliver_many one call
+// delivers to all of them, so every epoch is advanced first.
 bool CkArrayBroadcaster::performDeliveryDyn(CkArrayMessage* bcast,
-                                            std::vector<CkMigratable*>& elements)
+                                            const std::vector<CkArrayIndex>& elements, bool batch)
 {
   const int bcastEpoch = UsrToEnv(bcast)->getGroupEpoch();
   CkAssert(UsrToEnv(bcast)->getMsgtype() == ArrayBcastFwdMsg);
   std::vector<ArrayElemDyn*> ready;
-  ready.reserve(elements.size());
-  for (CkMigratable* m : elements)
+  bool delivered = false;
+  for (const CkArrayIndex& ix : elements)
   {
-    ArrayElement* el = (ArrayElement*)m;
+    ArrayElement* el = owner->lookup(ix);
+    if (el == nullptr)
+      continue;   // migrated away or destroyed by an earlier handler
     int& elBcastNo = getData(el);
     if (elBcastNo != bcastEpoch)
       continue;   // already has it, or (if it can move) has not reached this epoch yet
@@ -1647,11 +1665,21 @@ bool CkArrayBroadcaster::performDeliveryDyn(CkArrayMessage* bcast,
     if (owner->getLocMgr()->bufferedActiveRgetMsgs.count(el->CkMigratable::ckGetID()) != 0)
       continue;
     elBcastNo++;
-    ready.push_back(static_cast<ArrayElemDyn*>(el));
+    ArrayElemDyn* d = static_cast<ArrayElemDyn*>(el);
+    if (batch)
+      ready.push_back(d);
+    else
+    {
+      CkDynDeliverBroadcast(bcast, &d, 1);
+      delivered = true;
+    }
   }
   if (!ready.empty())
+  {
     CkDynDeliverBroadcast(bcast, ready.data(), (int)ready.size());
-  return !ready.empty();
+    delivered = true;
+  }
+  return delivered;
 }
 
 void CkArrayBroadcaster::springCleaning(void) { storedBcasts.springCleaning(); }

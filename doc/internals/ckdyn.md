@@ -454,18 +454,27 @@ src/ck-core/ckarray.C:1862; the branch requires at least one local
 element), `recvBroadcast` calls
 `CkArrayBroadcaster::deliverAndUpdateDyn` instead of the per-element loop.
 
-`performDeliveryDyn` (ckarray.C:1603) walks the local elements and selects
-those whose expected epoch (`getData(el)`) equals the broadcast's, advancing
-each selected element's epoch by one. It skips the rest, which already have
-the broadcast or have not reached that epoch, and skips an element whose
-zero-copy gets after a migration are still pending
-(`bufferedActiveRgetMsgs`, the same guard as `performDelivery`); the stored
-broadcast reaches it on arrival. It then calls
-`CkDynDeliverBroadcast(bcast, ready, n)` once for all of them.
-`deliverAndUpdateDyn` (ckarray.C:1586) repeats this for each stored
-broadcast that follows in epoch order, as long as the previous one reached
-someone. Storing, the epoch rules and `releaseDelivered` are the code the
-normal path uses.
+`deliverAndUpdateDyn` first records the indices of the local elements and
+whether the class has a `deliver_many` hook (`CkDynBatchesBroadcasts`). For
+each index, `performDeliveryDyn` looks the element up again
+(`CkArray::lookup`; an element migrated away or destroyed by an earlier
+handler is skipped), and selects it if its expected epoch (`getData(el)`)
+equals the broadcast's. It skips the rest, which already have the broadcast
+or have not reached that epoch, and skips an element whose zero-copy gets
+after a migration are still pending (`bufferedActiveRgetMsgs`, the same guard
+as `performDelivery`); the stored broadcast reaches it on arrival. Without
+`deliver_many`, each selected element's epoch is advanced just before its
+own `CkDynDeliverBroadcast(bcast, &el, 1)`, as `attemptDelivery` does for a
+charmxi element, so an element that an earlier handler migrates away leaves
+at the broadcast's epoch and receives it from the store on its new PE (test
+phase `bcast_migrate`, which failed with the earlier advance-all-first code).
+With `deliver_many`, every selected epoch is advanced and then one
+`CkDynDeliverBroadcast(bcast, ready, n)` delivers to all of them; an element
+migrated away during that call does not receive the broadcast (documented in
+the manual). `deliverAndUpdateDyn` repeats this for each stored broadcast
+that follows in epoch order, as long as the previous one reached someone.
+Storing, the epoch rules and `releaseDelivered` are the code the normal path
+uses.
 
 `CkDynDeliverBroadcast` views the message once and calls
 `hooks.deliver_many` with the handles of all selected elements. A handler
@@ -478,16 +487,27 @@ first, then before each call looks the element up again with
 per element and not freed here; the broadcast store owns it.
 
 This path does not go through `CkLocRec::invokeEntry`, so CkDyn does the
-tracing itself. `CkArray::recvBroadcast` is registered not traced
-(`CkDisableTracing`, ckarray.C `_ckArrayInit`), so no execute event is open
-when `CkDynDeliverBroadcast` runs. Without `deliver_many`, when tracing is on
+tracing itself. CkDyn entries are NOKEEP (`ckFlagsOf`), so `CkBroadcastMsgArray`
+sends the broadcast to `CkArray::recvNoKeepBroadcast`, or to
+`recvNoKeepExpeditedBroadcast` for an expedited send, not to
+`recvBroadcast`. `_ckArrayInit` (ckarray.C) registers all four receiving
+entries not traced (`CkDisableTracing`; until this branch only
+`recvBroadcast` was, so a NOKEEP broadcast, CkDyn's or a charmxi `[nokeep]`
+entry's, recorded the array manager's event with the elements' events nested
+inside it), so no execute event is open when `CkDynDeliverBroadcast` runs.
+Without `deliver_many`, when tracing is on
 (`CpvAccess(traceOn)`) and the entry is traced, each element's call is
 bracketed as `invokeEntry` brackets a charmxi element: `_TRACE_SET_OBJECT`
 with the location manager and the element's id, then
 `_TRACE_BEGIN_EXECUTE_DETAILED` with the broadcast's event, source PE and
 length and the element's projection id (its index), then
 `_TRACE_END_EXECUTE` and `_TRACE_CLEAR_OBJECT`; Projections shows one event
-per element. With `deliver_many`, CkDyn makes one call for all elements and
+per element. An entry registered with `CKDYN_EP_APPWORK` also gets
+`_TRACE_BEGIN_APPWORK`/`_TRACE_END_APPWORK` around each element's call, as
+`CkDeliverMessageFree` (ck.C) brackets an entry. With `deliver_many`, CkDyn
+makes one call for all elements and records neither the per-element events
+nor the APPWORK bracket; a binding that wants them brackets each element.
+With `deliver_many`, CkDyn makes one call for all elements and
 neither traces nor pushes any element: time is charged to the array manager
 and no per-element event is recorded unless the binding brackets each
 element's method with `CkDynCoroResume(target, ep, 0)`/`CkDynCoroSuspend`
@@ -526,7 +546,9 @@ group, an array element or a main chare; the main chare is restored by
 `CkPupMainChareData` through `MainchareDyn`'s migration constructor and
 `pupObj`, so the binding's `unpack` hook receives it. Futures from the
 checkpointed run are invalid after restart: no coroutine waits on them in the
-new process, so a `FUTURE` callback is not a resume target. A binding that
+new process, so a `FUTURE` callback is not a resume target. A `SECTION`
+callback aborts in `CkDynCheckpoint`: neither the root's section table nor
+the PE tables that route a section callback are checkpointed. A binding that
 needs the original run to continue after the checkpoint tells the two runs
 apart itself (the test's `DMain` checks whether its constructor ran in this
 process).
@@ -650,6 +672,16 @@ which messages carry as bytes: a `CkSectionID` holds its member list, and its
 cookie points at an `mCastEntry` valid only on the root, so it cannot travel.
 `coll_id` is the array or group id, -1 for a combined section (whose arrays a
 combine with remote parts learns only later). Generation 0 is never valid.
+
+`reserved` holds `CkDynMgr::restarts`, the number of restarts from a
+checkpoint (modulo 256): `CkDynMgr::pup` writes it, and unpacking it, which
+happens only on a restart, adds one. The section table is not checkpointed,
+so after a restart `newSection` hands out index 0, generation 1 again, and an
+id held in restored object state would otherwise name the new section.
+`CkDynMgr::checkRun` compares the field with the counter at every use of an
+id: `CkDynSendSection`, `CkDynSectionCombine`, `CkDynSectionDelete`, the
+member lookups of `CkDynContributeSection` and `CkDynSectionRedNo`, and
+`lookup` on the root.
 
 ### Creation
 
@@ -805,12 +837,46 @@ foreign reducer whose result is a new message).
 ### Delete and generations
 
 `CkDynSectionDelete(sid)` runs on the root (from another PE it sends
-`sectionDelete` there). It frees the held messages, clears the slot and bumps
+`sectionDelete` there; see "Order of section operations" below). It frees the held messages, clears the slot and bumps
 its generation. Any later use of the old id on the root (`lookup`) aborts:
 "send to a deleted section (root PE %d, index %d, stale generation %u; the
 slot is at generation %u, ...)". The CkMulticast trees of a deleted section
-stay allocated (CkMulticastMgr has no call that frees a section), and members
-keep their cookie map entries; neither is used again.
+stay allocated (CkMulticastMgr has no call that frees a section).
+
+If the section was ready, `deleteSection` first multicasts a `CkDynMcastMsg`
+with one `U64` slot, the section's `nsent` (multicasts sent to it, the
+creation multicast included; `sendTo` counts them), to the entry
+`CkDyn.sectionDelete(array)` or `CkDyn.sectionDelete(group)`. A member's
+cookie map holds a `CkDynMember` per section: the cookie, `got` (multicasts
+received: `sectionJoin` and `noteSectionDelivery` count) and `deleteAt` (set
+by `sectionLeave` from the slot). CkMulticast does not keep the order of a
+root's multicasts, so the deletion may arrive before earlier messages; the
+record is `deleted()` only when `got >= deleteAt`, and it is erased then (by
+`sectionLeave` or `sectionJoin` if the deletion is the last to arrive, else
+lazily by `cookieOf` or `pupObj`). `cookieOf` aborts on a deleted record
+unless the handler running on this PE is the one for this object and section
+(`_ckdynMcastObj`, `_ckdynMcastSid`, set by `dispatch` around the `deliver`
+call without touching the object afterwards, since a handler may migrate or
+destroy it), so the last message sent before the deletion can still use the
+id. Test: the run with `-staleredno` asks a member for the reduction number of
+a deleted section after quiescence and must abort.
+
+### Order of section operations
+
+`sectionSend`, `sectionQuery` and `sectionDelete` are three entry methods,
+and Charm++ on reconverse does not order two messages from one PE to another,
+so a send followed by a delete from a PE other than the root could reach the
+root reversed and abort with "send to a deleted section". Each `CkDynMgr`
+therefore numbers the section operations it sends to each root
+(`seqTo[root]`, `nextSeq`); the `CkDynMcastMsg` carries `(srcPe, seq)` in
+fields after `sid`, the two marshalled entries take them as parameters. The
+root applies an operation only when its number is the next one expected from
+that sender (`seqFrom[src]`, `inOrder`); one that arrives early waits in
+`early` as a closure and runs when its turn comes. Operations issued on the
+root itself run synchronously, as before. The counters are not
+checkpointed. Test: `sections/order` sends a 256 KB message from the last PE
+to each of 32 sections rooted on PE 0 and deletes each right after; without
+the numbering it aborted in 5 of 5 runs at `+pe 4 +randomized_msgq`.
 
 ### Migration and checkpoint
 
@@ -822,7 +888,8 @@ point to point (`SimpleSend`) and the one after rebuilds the tree
 (ckmulticast.C `sendToSection`). The root is a PE, not an element, so the
 root-migration paths of CkMulticast are not used. A checkpoint writes no
 cookies and the section table is not checkpointed: sections do not survive
-`+restart` and a binding recreates them.
+`+restart` and a binding recreates them; an id from before the restart aborts
+on use ("stale section id from before restart", see the run counter above).
 
 The phases `sections/*` of tests/charm++/ckdyn exercise each part: array and
 group sections with both reducer kinds and every callback kind, a section
@@ -1141,10 +1208,15 @@ point in `_initCharm` where the hook is called. A program
 whose main chare is an ordinary C++ main chare calls `CkDynCreateManagers()`
 from its constructor.
 
-`_createTraces` in init.C is a weak symbol in every build (empty, or in a
-`CMK_CHARM4PY` build with tracing calling the projections and summary
-modules), so a program without a charmc-generated moduleinit links, and a
-charmc-linked program keeps its generated definition.
+`_createTraces` in init.C is a weak symbol (`CK_WEAK_DEFINITION`) outside
+Windows (empty, or in a `CMK_CHARM4PY` build with tracing calling the
+projections and summary modules), so a program without a charmc-generated
+moduleinit links, and a charmc-linked program keeps its generated
+definition. MSVC has no weak definitions: on Windows (`_WIN32`) init.C
+defines `_createTraces`, as a strong symbol, only in a `CMK_CHARM4PY` build,
+whose shared library is linked without a moduleinit; a plain build leaves it
+to the program's moduleinit, so on Windows a binding needs the `charm4py`
+build target.
 
 **What `CMK_CHARM4PY` means.** CkDyn does not depend on it: registration, the
 hook, late registration, CCS (`CcsRegisterHandlerFn`) and `_createTraces` work
@@ -1266,7 +1338,7 @@ binding.
   `performDeliveryDyn`, and the branch in `CkArray::recvBroadcast` that
   selects them.
 - src/ck-core/init.C: `_registerCkDyn` and `CkDynCallRegisterHook` in
-  `_initCharm`; the weak `_createTraces`.
+  `_initCharm`; `_createTraces` (weak outside Windows).
 - tests/charm++/ckdyn: the C++ test binding (`cbinding.h`, `cbinding.C`): a
   hook table over C++ method tables, installed with `CkDynInit` from an
   `initnode`, and the tests that use it.

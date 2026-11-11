@@ -10,6 +10,7 @@
 #include "pup_stl.h"
 #include "ckmulticast.h"
 #include "ckdyn.h"
+#include <functional>
 #include <map>
 #include <memory>
 #include <vector>
@@ -31,11 +32,15 @@ public:
 
 /* A section multicast: CkMcastBaseMsg must come first because
  * CkMulticastMgr writes the section cookie into the first bytes. `sid` names
- * the CkDyn section, so that a member can find its cookie on delivery. */
+ * the CkDyn section, so that a member can find its cookie on delivery.
+ * srcPe and seq order a send from another PE than the root among that PE's
+ * section operations (CkDynMgr::inOrder). */
 class CkDynMcastMsg : public CkMcastBaseMsg, public CMessage_CkDynMcastMsg {
 public:
   char *buf;
   CkDynSectionID sid;
+  int32_t srcPe;
+  uint32_t seq;
 };
 
 /* ---- per-object state shared by every kind ------------------------------ */
@@ -47,7 +52,19 @@ inline bool operator<(const CkDynSectionID &a, const CkDynSectionID &b) {
   return a.gen < b.gen;
 }
 
-typedef std::map<CkDynSectionID, CkSectionInfo> CkDynCookieMap;
+/* A member's record of one section: its CkMulticast cookie, the section
+   messages it has received (the creation multicast included), and, once the
+   root's deletion multicast has arrived, the number the root had sent before
+   it. The record is deleted() when all of those have arrived; the member then
+   rejects the id (cookieOf), except inside the handler of that last message. */
+struct CkDynMember {
+  CkSectionInfo ck;
+  uint32_t got = 0;
+  uint32_t deleteAt = 0;   /* 0: not deleted; the creation multicast makes every count >= 1 */
+  bool deleted() const { return deleteAt != 0 && got >= deleteAt; }
+  void pup(PUP::er &p) { p | ck; p | got; p | deleteAt; }
+};
+typedef std::map<CkDynSectionID, CkDynMember> CkDynCookieMap;
 
 /* A destination posted with CkDynPostBuffer or CkDynPostDeviceBuffer for the
    next message to (this object, ep) with a zero-copy slot at index slot. */
@@ -160,6 +177,7 @@ struct CkDynSection {
   uint8_t  kind = 0;               /* CKDYN_ARRAY, CKDYN_GROUP, or 0 for a combined section */
   uint16_t gen = 0;
   int      bfactor = 0;
+  uint32_t nsent = 0;              /* multicasts sent to the members, the creation multicast included */
   int      ndims = 0;
   std::vector<int> aids;                              /* arrays (one per sub-section) */
   std::vector<std::vector<CkArrayIndex> > elems;      /* members per array */
@@ -193,10 +211,26 @@ public:
   void relay(CkDynMsg *m);        /* a section callback: forward the result to the section */
   void hapiDone(CkDynMsg *m);     /* a stream reached a CkDynHapiAddCallback: send to its callback */
   void sectionSend(CkDynMcastMsg *m);   /* a section send from another PE */
-  void sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe);
+  void sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe, int srcPe, int seq);
+  void applyQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe);
   void sectionParts(int combIdx, int combGen, int partNo, int kind, int ndims,
                     const std::vector<int> &aids, const std::vector<int> &counts, const std::vector<int> &flat);
-  void sectionDelete(int idx, int gen);
+  void sectionDelete(int idx, int gen, int srcPe, int seq);
+  /* Section operations (send, combine query, delete) from one PE to one root
+     are applied at the root in the order the PE issued them: Charm++ does not
+     order messages, so each carries a sequence number per (sender, root).
+     Not checkpointed: no section operation survives a restart. */
+  std::map<int, uint32_t> seqTo;      /* root PE -> next number this PE sends it */
+  std::map<int, uint32_t> seqFrom;    /* sender PE -> next number this root applies */
+  std::map<std::pair<int, uint32_t>, std::function<void()> > early;   /* arrived ahead of their turn */
+  uint32_t nextSeq(int root) { return seqTo[root]++; }
+  void inOrder(int srcPe, uint32_t seq, std::function<void()> op);
+  /* restarts of this program from a checkpoint (modulo 256). Every section id
+     made on a PE carries it in `reserved`, and every use of an id checks it,
+     so an id from before a restart aborts instead of naming a section that
+     reuses its (root, index, generation). Checkpointed; +1 on restart. */
+  uint8_t restarts = 0;
+  void checkRun(const CkDynSectionID &sid, const char *what) const;
   /* sections rooted here */
   std::vector<std::unique_ptr<CkDynSection> > sections;
   int  newSection(uint8_t kind, const CkDynCallback *done, int bfactor);
@@ -218,6 +252,9 @@ public:
 
 /* True when the chare index names a dynamic class. */
 bool CkDynIsDynamicChare(int chareIdx);
+/* True when the dynamic class has a deliver_many hook: an array broadcast
+ * reaches all local elements in one call. */
+bool CkDynBatchesBroadcasts(int chareIdx);
 /* Deliver one array broadcast to the given local dynamic elements with one
  * hooks.deliver_many call. */
 void CkDynDeliverBroadcast(void *bcastMsg, ArrayElemDyn **elems, int n);

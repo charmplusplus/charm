@@ -33,6 +33,7 @@ CkpvExtern(std::vector<void *>, chare_objs);
 
 /* the CkDyn entries that deliver a section's creation multicast (registered by _ckdynInitNode) */
 static int g_secInitArrayEp = -1, g_secInitGroupEp = -1;
+static int g_secLeaveArrayEp = -1, g_secLeaveGroupEp = -1;   /* a section's deletion multicast */
 
 /* The structs a binding copies as bytes into messages keep their sizes; a
    change here is an ABI change (bump CKDYN_API_VERSION). */
@@ -368,6 +369,8 @@ extern "C" const CkDynClassDesc *CkDynClassOf(int chare_idx) {
   auto it = g_classes.find(chare_idx);
   return it == g_classes.end() ? nullptr : &it->second->desc;
 }
+
+bool CkDynBatchesBroadcasts(int chareIdx) { return classOf(chareIdx)->hooks->deliver_many != nullptr; }
 
 bool CkDynIsDynamicChare(int chareIdx) {
   return chareIdx >= 0 && (size_t)chareIdx < _chareTable.size() && _chareTable[chareIdx]->isDynamic;
@@ -888,11 +891,19 @@ static CkDynMsg *emptyMsg() {
 /* Delivery                                                                */
 /* ====================================================================== */
 
+/* The section message whose handler runs now on this PE, if any: inside it a
+   member may still use a section whose deletion has reached it (cookieOf). */
+CkpvStaticDeclare(CkDynObj *, _ckdynMcastObj);
+CkpvStaticDeclare(CkDynSectionID, _ckdynMcastSid);
+
 /* A section message reached a member: refresh its cookie (as the manual asks
-   of every CkMulticast receiver, so that the cookie follows tree rebuilds). */
+   of every CkMulticast receiver, so that the cookie follows tree rebuilds)
+   and count it. */
 static void noteSectionDelivery(CkDynObj &d, CkDynMcastMsg *m, CkDynMsgView &v) {
   if (d.sectionCookies == nullptr) d.sectionCookies = new CkDynCookieMap;
-  CkGetSectionInfo((*d.sectionCookies)[m->sid], m);
+  CkDynMember &e = (*d.sectionCookies)[m->sid];
+  CkGetSectionInfo(e.ck, m);
+  e.got++;
   v.section = &m->sid;
 }
 
@@ -916,6 +927,17 @@ static void dispatch(CkDynObj &d, void *msg) {
       bindingError(c->hooks, what);
     }
     noteSectionDelivery(d, (CkDynMcastMsg *)msg, v);
+    /* the object may be gone when the hook returns (a handler can migrate or
+       destroy it), so the marker is set here and restored after without
+       touching d */
+    CkDynObj *outerObj = CkpvAccess(_ckdynMcastObj);
+    CkDynSectionID outerSid = CkpvAccess(_ckdynMcastSid);
+    CkpvAccess(_ckdynMcastObj) = &d;
+    CkpvAccess(_ckdynMcastSid) = ((CkDynMcastMsg *)msg)->sid;
+    if (d.handle != nullptr) c->hooks->deliver(c->desc.binding_data, d.handle, ep, r.user_id, r.flags, &v);
+    CkpvAccess(_ckdynMcastObj) = outerObj;
+    CkpvAccess(_ckdynMcastSid) = outerSid;
+    return;   /* a section message has no zero-copy slots; a branch outside a constrained group drops it */
   }
   const bool zc = v.kind == CKDYN_MSGKIND_DYN && v.hdr->nbuf != 0;
   /* a device message's first delivery issues its transfers; it arrives again when they complete */
@@ -952,11 +974,15 @@ void CkDynDeliverBroadcast(void *bcastMsg, ArrayElemDyn **elems, int n) {
     for (int i = 0; i < n; i++) idx[i] = elems[i]->ckGetArrayIndex();
 #if CMK_TRACE_ENABLED
     /* one execute event per element, as CkLocRec::invokeEntry records for a
-       charmxi element; CkArray::recvBroadcast is not traced, so none is open */
+       charmxi element. CkDyn entries are NOKEEP, so the broadcast arrives
+       through CkArray::recvNoKeepBroadcast (or its expedited variant); like
+       recvBroadcast they are registered not traced (_ckArrayInit), so no
+       event is open here */
     envelope *env = UsrToEnv(bcastMsg);
     const bool traced = CpvAccess(traceOn) && _entryTable[ep]->traceEnabled;
     const int locMgr = arr->getLocMgr()->ckGetGroupID().idx;
 #endif
+    const bool appWork = _entryTable[ep]->appWork;   /* CKDYN_EP_APPWORK, bracketed as ck.C does */
     for (int i = 0; i < n; i++) {
       ArrayElemDyn *el = static_cast<ArrayElemDyn *>(arr->lookup(idx[i]));
       if (el == nullptr || el->d.handle == nullptr) continue;
@@ -969,7 +995,9 @@ void CkDynDeliverBroadcast(void *bcastMsg, ArrayElemDyn **elems, int n) {
                                       env->getTotalsize(), &pid, el);
       }
 #endif
+      if (appWork) _TRACE_BEGIN_APPWORK();
       c->hooks->deliver(c->desc.binding_data, el->d.handle, ep, user_id, flags, &v);
+      if (appWork) _TRACE_END_APPWORK();
 #if CMK_TRACE_ENABLED
       if (traced) { _TRACE_END_EXECUTE(); _TRACE_CLEAR_OBJECT(); }
 #endif
@@ -1062,6 +1090,9 @@ static void pupObj(PUP::er &p, CkDynObj &d, CkDynTarget t) {
   t.chare_idx = d.chareIdx;   /* the caller's copy was filled before d.chareIdx was restored */
   /* section cookies move with a migrating element; a checkpoint writes none,
      because the sections themselves (the root's table) are not checkpointed */
+  if (!p.isUnpacking() && d.sectionCookies)   /* records of deleted sections stay behind */
+    for (auto it = d.sectionCookies->begin(); it != d.sectionCookies->end();)
+      it = it->second.deleted() ? d.sectionCookies->erase(it) : std::next(it);
   bool hasCookies = !p.isCheckpoint() && d.sectionCookies && !d.sectionCookies->empty();
   p | hasCookies;
   if (hasCookies) {
@@ -1400,12 +1431,15 @@ extern "C" void CkDynSendSection(const CkDynSectionID *sid, int ep, CkDynMcastMs
   epRec(ep);
   if (sid->root_pe < 0 || sid->root_pe >= CkNumPes())
     CkAbort("CkDyn: section send to a section with root PE %d", sid->root_pe);
+  CProxy_CkDynMgr(_ckdynMgrGID).ckLocalBranch()->checkRun(*sid, "CkDynSendSection");
   ((CkDynHdr *)m->buf)->ep = (uint16_t)ep;
   m->sid = *sid;
+  CkDynMgr *mg = CProxy_CkDynMgr(_ckdynMgrGID).ckLocalBranch();
   if (sid->root_pe == CkMyPe()) {
-    CkDynMgr *mg = CProxy_CkDynMgr(_ckdynMgrGID).ckLocalBranch();
     mg->sendTo(mg->lookup(*sid, "send to"), ep, m);
   } else {
+    m->srcPe = CkMyPe();
+    m->seq = mg->nextSeq(sid->root_pe);
     CProxy_CkDynMgr(_ckdynMgrGID)[sid->root_pe].sectionSend(m);
   }
 }
@@ -1656,7 +1690,21 @@ extern "C" int CkDynGetReductionNumber(const CkDynTarget *t) {
 
 CkDynMgr::CkDynMgr() {}
 CkDynMgr::CkDynMgr(CkMigrateMessage *m) : CBase_CkDynMgr(m) {}
-void CkDynMgr::pup(PUP::er &p) { CBase_CkDynMgr::pup(p); }
+/* Only a checkpoint packs this group, so unpacking means a restart. With a
+   different PE count every branch is unpacked from PE 0's bytes, which hold
+   the same count. */
+void CkDynMgr::pup(PUP::er &p) {
+  CBase_CkDynMgr::pup(p);
+  p | restarts;
+  if (p.isUnpacking()) restarts++;
+}
+
+void CkDynMgr::checkRun(const CkDynSectionID &sid, const char *what) const {
+  if (sid.reserved != restarts)
+    CkAbort("CkDyn: %s: stale section id from before restart (root PE %d, index %d, generation %u, made after "
+            "%u restarts; the program has now restarted %u times): sections are not checkpointed, recreate them "
+            "after +restart", what, sid.root_pe, sid.idx, sid.gen, sid.reserved, restarts);
+}
 
 void CkDynMgr::deposit(CkDynMsg *m) {
   CkDynMsgView v;
@@ -2014,10 +2062,12 @@ CkDynSectionID CkDynMgr::idOf(int idx) const {
   sid.kind = s.kind;
   sid.coll_id = s.kind == CKDYN_GROUP ? s.gid : (s.kind == CKDYN_ARRAY ? s.aids[0] : -1);
   sid.gen = s.gen;
+  sid.reserved = restarts;
   return sid;
 }
 
 CkDynSection &CkDynMgr::lookup(const CkDynSectionID &sid, const char *what) {
+  checkRun(sid, what);
   if (sid.root_pe != CkMyPe())
     CkAbort("CkDyn: %s section (root PE %d, index %d) on PE %d, which is not its root", what, sid.root_pe, sid.idx, CkMyPe());
   if (sid.idx < 0 || (size_t)sid.idx >= sections.size())
@@ -2063,14 +2113,28 @@ void CkDynMgr::finishSection(int idx) {
 
 void CkDynMgr::sendTo(CkDynSection &s, int ep, CkDynMcastMsg *m) {
   if (!s.ready) { s.held.push_back(m); return; }
+  s.nsent++;
   if (s.kind == CKDYN_GROUP)
     mcastMgr()->GroupSectionSend(s.gproxy.ckDelegatedPtr(), ep, m, s.gproxy.ckGetNumSections(), s.gproxy.ckGetSectionIDs());
   else
     s.aproxy.ckSend((CkArrayMessage *)m, ep, 0);
 }
 
+void CkDynMgr::inOrder(int srcPe, uint32_t seq, std::function<void()> op) {
+  uint32_t &next = seqFrom[srcPe];
+  if (seq != next) { early.emplace(std::make_pair(srcPe, seq), std::move(op)); return; }
+  op();
+  next++;
+  for (auto it = early.find(std::make_pair(srcPe, next)); it != early.end(); it = early.find(std::make_pair(srcPe, next))) {
+    std::function<void()> f = std::move(it->second);
+    early.erase(it);
+    f();
+    next++;
+  }
+}
+
 void CkDynMgr::sectionSend(CkDynMcastMsg *m) {
-  CkDynSendSection(&m->sid, ((const CkDynHdr *)m->buf)->ep, m, nullptr);
+  inOrder(m->srcPe, m->seq, [this, m] { sendTo(lookup(m->sid, "send to"), ((const CkDynHdr *)m->buf)->ep, m); });
 }
 
 /* ---- creation ----------------------------------------------------------- */
@@ -2079,6 +2143,11 @@ extern "C" void CkDynSectionCreateArray(int aid, int nelems, int ndims, const in
                                         const CkDynCallback *done, CkDynSectionID *out) {
   if (nelems < 1) CkAbort("CkDyn: CkDynSectionCreateArray with %d members", nelems);
   if (ndims < 1 || ndims > CKDYN_MAX_DIMS) CkAbort("CkDyn: CkDynSectionCreateArray with %d dimensions", ndims);
+  IrrGroup *arr = (IrrGroup *)CkLocalBranch(gidOf(aid));
+  if (arr == nullptr || !arr->isArrMgr())
+    CkAbort("CkDyn: CkDynSectionCreateArray: %d is not an array id", aid);
+  /* that the elements are dynamic is checked where they join (sectionInitArray):
+     an array manager does not record its element class */
   std::set<std::vector<int> > seen;
   std::vector<CkArrayIndex> el;
   for (int i = 0; i < nelems; i++) {
@@ -2134,10 +2203,14 @@ void CkDynMgr::answerQuery(const CkDynSection &s, const CkDynSection::Query &q) 
   thisProxy[q.replyPe].sectionParts(q.combIdx, q.combGen, q.partNo, s.kind, s.ndims, aids, counts, flat);
 }
 
-void CkDynMgr::sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe) {
+void CkDynMgr::sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe, int srcPe, int seq) {
+  inOrder(srcPe, (uint32_t)seq, [=] { applyQuery(combIdx, combGen, partNo, idx, gen, replyPe); });
+}
+
+void CkDynMgr::applyQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe) {
   CkDynSectionID sid;
   memset(&sid, 0, sizeof sid);
-  sid.root_pe = CkMyPe(); sid.idx = idx; sid.gen = (uint16_t)gen;
+  sid.root_pe = CkMyPe(); sid.idx = idx; sid.gen = (uint16_t)gen; sid.reserved = restarts;   /* the sender checked the run */
   CkDynSection &s = lookup(sid, "CkDynSectionCombine: combine");
   CkDynSection::Query q = { combIdx, combGen, partNo, replyPe };
   if (!s.ready) s.queries.push_back(q);   /* a combined section still waiting for its own parts */
@@ -2199,6 +2272,7 @@ void CkDynMgr::addPart(int combIdx, int partNo, int kind, int ndims, const std::
 extern "C" void CkDynSectionCombine(int nparts, const CkDynSectionID *parts, const CkDynCallback *done, CkDynSectionID *out) {
   if (nparts < 1) CkAbort("CkDyn: CkDynSectionCombine with %d parts", nparts);
   CkDynMgr *mg = localMgr();
+  for (int i = 0; i < nparts; i++) mg->checkRun(parts[i], "CkDynSectionCombine");
   int idx = mg->newSection(0, done, 0);
   CkDynSection &s = *mg->sections[idx];
   s.parts.resize(nparts);
@@ -2216,7 +2290,8 @@ extern "C" void CkDynSectionCombine(int nparts, const CkDynSectionID *parts, con
     } else {
       if (parts[i].root_pe < 0 || parts[i].root_pe >= CkNumPes())
         CkAbort("CkDyn: CkDynSectionCombine: part %d has root PE %d", i, parts[i].root_pe);
-      CProxy_CkDynMgr(_ckdynMgrGID)[parts[i].root_pe].sectionQuery(idx, gen, i, parts[i].idx, parts[i].gen, CkMyPe());
+      CProxy_CkDynMgr(_ckdynMgrGID)[parts[i].root_pe].sectionQuery(idx, gen, i, parts[i].idx, parts[i].gen, CkMyPe(),
+                                                                   CkMyPe(), (int)mg->nextSeq(parts[i].root_pe));
     }
   }
 }
@@ -2225,7 +2300,26 @@ extern "C" void CkDynSectionCombine(int nparts, const CkDynSectionID *parts, con
 
 void CkDynMgr::deleteSection(const CkDynSectionID &sid) {
   CkDynSection &s = lookup(sid, "CkDynSectionDelete:");
+  /* a combined section still waiting for its parts holds the queries of other
+     combines that name it; they could never be answered */
+  if (!s.queries.empty()) {
+    const CkDynSection::Query &q = s.queries[0];
+    CkAbort("CkDyn: CkDynSectionDelete: section (root PE %d, index %d, generation %u) is a combined section "
+            "that is not ready yet, and %zu combine(s) named it as a part (the first: part %d of the section with "
+            "root PE %d, index %d); delete a part only after the combines that name it are ready",
+            sid.root_pe, sid.idx, sid.gen, s.queries.size(), q.partNo, q.replyPe, q.combIdx);
+  }
   for (CkDynMcastMsg *m : s.held) CkFreeMsg(m);
+  if (s.ready) {
+    /* tell the members, with the count of multicasts they must have received
+       before they drop the section (CkMulticast does not keep their order) */
+    CkDynMsgBuilder *b = CkDynMsgBegin(1, 0, 0, 0, -1);
+    CkDynMsgAddU64(b, s.nsent);
+    int ep = s.kind == CKDYN_GROUP ? g_secLeaveGroupEp : g_secLeaveArrayEp;
+    CkDynMcastMsg *m = CkDynMsgFinishMcast(b, ep);
+    m->sid = sid;
+    sendTo(s, ep, m);
+  }
   uint16_t gen = (uint16_t)(s.gen + 1);
   if (gen == 0) gen = 1;
   /* the CkMulticast trees of the section stay allocated: CkMulticastMgr has no
@@ -2234,16 +2328,22 @@ void CkDynMgr::deleteSection(const CkDynSectionID &sid) {
   s.gen = gen;
 }
 
-void CkDynMgr::sectionDelete(int idx, int gen) {
-  CkDynSectionID sid;
-  memset(&sid, 0, sizeof sid);
-  sid.root_pe = CkMyPe(); sid.idx = idx; sid.gen = (uint16_t)gen;
-  deleteSection(sid);
+void CkDynMgr::sectionDelete(int idx, int gen, int srcPe, int seq) {
+  inOrder(srcPe, (uint32_t)seq, [=] {
+    CkDynSectionID sid;
+    memset(&sid, 0, sizeof sid);
+    sid.root_pe = CkMyPe(); sid.idx = idx; sid.gen = (uint16_t)gen; sid.reserved = restarts;   /* the sender checked the run */
+    deleteSection(sid);
+  });
 }
 
 extern "C" void CkDynSectionDelete(const CkDynSectionID *sid) {
-  if (sid->root_pe == CkMyPe()) localMgr()->deleteSection(*sid);
-  else CProxy_CkDynMgr(_ckdynMgrGID)[sid->root_pe].sectionDelete(sid->idx, sid->gen);
+  if (sid->root_pe < 0 || sid->root_pe >= CkNumPes())
+    CkAbort("CkDyn: CkDynSectionDelete of a section with root PE %d", sid->root_pe);
+  localMgr()->checkRun(*sid, "CkDynSectionDelete");
+  CkDynMgr *mg = localMgr();
+  if (sid->root_pe == CkMyPe()) mg->deleteSection(*sid);
+  else CProxy_CkDynMgr(_ckdynMgrGID)[sid->root_pe].sectionDelete(sid->idx, sid->gen, CkMyPe(), (int)mg->nextSeq(sid->root_pe));
 }
 
 /* ---- members ------------------------------------------------------------ */
@@ -2266,13 +2366,23 @@ static CkDynObj &localMember(const CkDynTarget *t, const char *what) {
 }
 
 static CkSectionInfo &cookieOf(const CkDynTarget *me, const CkDynSectionID *sid, const char *what) {
+  localMgr()->checkRun(*sid, what);
   CkDynObj &d = localMember(me, what);
   if (d.sectionCookies) {
     auto it = d.sectionCookies->find(*sid);
-    if (it != d.sectionCookies->end()) return it->second;
+    if (it != d.sectionCookies->end()) {
+      if (!it->second.deleted()) return it->second.ck;
+      /* the handler of the last message sent before the deletion may still use it */
+      if (CkpvAccess(_ckdynMcastObj) == &d && memcmp(&CkpvAccess(_ckdynMcastSid), sid, sizeof *sid) == 0)
+        return it->second.ck;
+      d.sectionCookies->erase(it);
+      CkAbort("CkDyn: %s: section (root PE %d, index %d, generation %u) was deleted", what, sid->root_pe,
+              sid->idx, sid->gen);
+    }
   }
   CkAbort("CkDyn: %s: the object is not a member of section (root PE %d, index %d, generation %u), "
-          "or has not received its creation multicast yet", what, sid->root_pe, sid->idx, sid->gen);
+          "has not received its creation multicast yet, or the section was deleted", what, sid->root_pe,
+          sid->idx, sid->gen);
 }
 
 /* userData becomes the result's reference number (3.7 of the design): the
@@ -2292,14 +2402,36 @@ static void sectionJoin(CkDynObj &d, CkDynMcastMsg *m) {
   CkDynCallback done;
   CkDynViewCallback(&v, 1, &done);
   if (d.sectionCookies == nullptr) d.sectionCookies = new CkDynCookieMap;
-  CkSectionInfo &ck = (*d.sectionCookies)[sid];
-  CkGetSectionInfo(ck, m);
+  CkDynMember &e = (*d.sectionCookies)[sid];
+  CkGetSectionInfo(e.ck, m);
+  e.got++;
   ClassRec *c = classOf(d.chareIdx);
   if (d.handle && c->hooks->section_joined) c->hooks->section_joined(c->desc.binding_data, d.handle, &sid);
-  sectionContribute(ck, 0, nullptr, CkReduction::nop, &done);
+  sectionContribute(e.ck, 0, nullptr, CkReduction::nop, &done);
+  if (e.deleted()) d.sectionCookies->erase(sid);   /* the deletion arrived first */
 }
 
-static void sectionInitArray(void *msg, void *obj) { sectionJoin(((ArrayElemDyn *)obj)->d, (CkDynMcastMsg *)msg); }
+/* The root's deletion multicast reached a member: slot 0 is the number of
+   multicasts the root sent to the section before it. The record goes once
+   they have all arrived; a later one that arrives first keeps it until then. */
+static void sectionLeave(CkDynObj &d, CkDynMcastMsg *m) {
+  CkDynMsgView v;
+  viewPayload(v, m->buf, m, CKDYN_MSGKIND_MCAST);
+  if (d.sectionCookies == nullptr) d.sectionCookies = new CkDynCookieMap;
+  CkDynMember &e = (*d.sectionCookies)[m->sid];
+  e.deleteAt = (uint32_t)v.slots[0].v.u64;
+  if (e.deleted()) d.sectionCookies->erase(m->sid);
+}
+static void sectionLeaveArray(void *msg, void *obj) { sectionLeave(((ArrayElemDyn *)obj)->d, (CkDynMcastMsg *)msg); }
+static void sectionLeaveGroup(void *msg, void *obj) { sectionLeave(((GroupDyn *)obj)->d, (CkDynMcastMsg *)msg); }
+
+static void sectionInitArray(void *msg, void *obj) {
+  int cidx = ((ArrayElement *)obj)->ckGetChareType();
+  if (!CkDynIsDynamicChare(cidx))
+    CkAbort("CkDyn: CkDynSectionCreateArray: a member is an element of class %s, which is not a dynamic class "
+            "(a CkDyn section holds elements of arrays created with CkDynCreateArray)", _chareTable[cidx]->name);
+  sectionJoin(((ArrayElemDyn *)obj)->d, (CkDynMcastMsg *)msg);
+}
 static void sectionInitGroup(void *msg, void *obj) { sectionJoin(((GroupDyn *)obj)->d, (CkDynMcastMsg *)msg); }
 
 extern "C" int CkDynSectionRedNo(const CkDynTarget *me, const CkDynSectionID *sid) {
@@ -2317,6 +2449,11 @@ extern "C" void CkDynContributeSection(const CkDynTarget *me, const CkDynSection
 /* ====================================================================== */
 
 extern "C" void CkDynCheckpoint(const char *dirname, const CkDynCallback *done) {
+  /* done is also delivered after +restart, but sections and the PE tables
+     that route a section callback are not checkpointed */
+  if (done->kind == CKDYN_CB_SECTION)
+    CkAbort("CkDyn: CkDynCheckpoint: the done callback is a SECTION callback; sections are not checkpointed, "
+            "so it could not be delivered after +restart (use a TARGET callback)");
   CkStartCheckpoint(dirname, CkDynMakeCallback(done, true));
 }
 
@@ -3218,12 +3355,19 @@ void _ckdynInitNode(void) {
                                   CkIndex_ArrayElement::__idx, CK_EP_NOKEEP);
   g_secInitGroupEp = CkRegisterEp("CkDyn.sectionInit(group)", sectionInitGroup, CkDynMcastMsg::__idx,
                                   CkIndex_IrrGroup::__idx, CK_EP_NOKEEP);
+  g_secLeaveArrayEp = CkRegisterEp("CkDyn.sectionDelete(array)", sectionLeaveArray, CkDynMcastMsg::__idx,
+                                   CkIndex_ArrayElement::__idx, CK_EP_NOKEEP);
+  g_secLeaveGroupEp = CkRegisterEp("CkDyn.sectionDelete(group)", sectionLeaveGroup, CkDynMcastMsg::__idx,
+                                   CkIndex_IrrGroup::__idx, CK_EP_NOKEEP);
 }
 
 /* initproc: per-PE state. */
 void _ckdynInitProc(void) {
   CkpvInitialize(CkDynMsgBuilder *, _ckdynBuilder);
   CkpvAccess(_ckdynBuilder) = nullptr;
+  CkpvInitialize(CkDynObj *, _ckdynMcastObj);
+  CkpvAccess(_ckdynMcastObj) = nullptr;
+  CkpvInitialize(CkDynSectionID, _ckdynMcastSid);
 #if CMK_TRACE_ENABLED
   CkpvInitialize(std::vector<bool>, _ckdynCoroTraced);
 #endif

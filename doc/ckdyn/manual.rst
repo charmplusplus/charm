@@ -278,7 +278,8 @@ Entry attributes (``CkDynEntryDesc.flags``):
    * - ``CKDYN_EP_NOTRACE``
      - the entry is not traced
    * - ``CKDYN_EP_APPWORK``
-     - the entry is application work (``CK_EP_APPWORK``)
+     - the entry is application work (``CK_EP_APPWORK``); not applied to
+       array broadcasts delivered through ``deliver_many``
    * - ``CKDYN_EP_EXCLUSIVE``
      - nodegroups: one invocation at a time per branch
    * - ``CKDYN_EP_REDNTARGET``
@@ -767,7 +768,8 @@ attributes (NULL: none):
 - ``CKDYN_SEND_EXPEDITED``: the message bypasses the priority queue.
 - ``CKDYN_SEND_IMMEDIATE``: Charm++ immediate delivery (nodegroups).
 - ``CKDYN_SEND_NOTRACE``: the message is not recorded in the load
-  balancer's communication statistics.
+  balancer's communication statistics (``CK_MSG_LB_NOTRACE``, which only
+  array sends consult). It does not affect Projections tracing.
 
 An inline send nests the receiver's ``deliver`` inside the sender's hook; a
 binding whose methods send inline to each other in a loop should drive the
@@ -903,6 +905,14 @@ call with ``CkDynCoroResume``/``CkDynCoroSuspend`` (or
 
 A handler that destroys another local element makes that element's handle
 invalid for the rest of the call.
+
+Without ``deliver_many`` a handler may migrate or destroy other local
+elements of the array: CkDyn looks each element up again before its call,
+and an element migrated away before its turn receives the broadcast once, on
+its new PE. With ``deliver_many`` the call covers every local element at
+once, and each is counted as having received the broadcast before the call:
+an element that a handler migrates away during the call does not receive it
+on its new PE, and the binding must not deliver to its handle either.
 
 .. _ckdyn-objects:
 
@@ -1102,12 +1112,27 @@ once the restart completes. On restart:
   element or a main chare entry: a callback to a main chare is routed by
   chare index, not by object pointer, so it reaches the restored main chare.
   A FUTURE callback does not survive a restart (the future belonged to the
-  checkpointed run's coroutine).
+  checkpointed run's coroutine). A SECTION callback aborts in
+  ``CkDynCheckpoint``: sections are not checkpointed, so it could not be
+  delivered after a restart.
 
-Not restored: sections (a binding recreates them), buffer posts, futures and
-pending messages. A program that continues after its own checkpoint tells
-the two runs apart itself; the C++ test's dynamic main chare checks whether
-its constructor ran in this process.
+Not restored: sections (a binding recreates them; an old section id aborts on
+use), buffer posts, futures and pending messages. A program that continues
+after its own checkpoint tells the two runs apart itself; the C++ test's
+dynamic main chare checks whether its constructor ran in this process.
+
+A restart may use another PE count than the checkpointed run. Then:
+
+- array elements are restored and spread over the new PEs;
+- every group branch is unpacked from PE 0's bytes and every nodegroup
+  branch from node 0's (the Charm++ checkpoint rule): ``unpack`` on every PE
+  receives the bytes PE 0 packed, so per-branch state of the other branches
+  is lost;
+- singleton chares (``CkDynCreateChare``) are not restored at all, and
+  nothing reports it: their targets name no object, and a send to one is an
+  error the runtime does not detect.
+  A program that holds singleton chares restarts with the same PE count;
+- the main chare is restored on PE 0 as usual.
 
 Quiescence
 ----------
@@ -1400,11 +1425,23 @@ after ``done`` fires.**
 
 ``CkDynSectionCombine`` makes a section whose members are the union of the
 parts, each member once. Parts may be array sections or combined sections,
-from any root, all with one index dimension count; a group part aborts.
+from any root, all with one index dimension count; a group part aborts. A
+combine takes each part's member list when the part's root receives the
+request; a part that is itself a combined section not yet ready answers once
+it is ready. Deleting such a part while a combine waits on it aborts, naming
+the waiting combine: delete a part only after the combines that name it are
+ready.
 
 ``CkDynSectionDelete`` deletes a section (from any PE; the request goes to
 the root). Later use of the id aborts with a message about a stale
 generation.
+
+**Section operations from one PE are applied at the root in program order.**
+A send (``CkDynSendSection``, also through a section callback), the member
+query of a combine and a delete issued on one PE reach the root in any order
+on the network, but the root applies them in the order that PE issued them,
+so a send followed by a delete delivers the message. Operations from
+different PEs have no order between them.
 
 Section ids
 -----------
@@ -1416,14 +1453,22 @@ Section ids
      int32_t  idx;        /* index in the root's table */
      int32_t  coll_id;    /* array or group id (-1 for a combined section) */
      uint8_t  kind;       /* CKDYN_ARRAY, CKDYN_GROUP, or 0 for a combined section */
-     uint8_t  reserved;
+     uint8_t  reserved;   /* restarts before the id was made, modulo 256 */
      uint16_t gen;        /* generation */
    } CkDynSectionID;
 
 The id is 16 bytes, travels in messages (``CkDynMsgAddSection``,
 ``CkDynViewSection``) and is valid on every PE. The generation makes a
 deleted section's id distinct from a later section that reuses its table
-slot; generation 0 is never valid.
+slot; generation 0 is never valid. ``reserved`` holds the number of times
+the program has been restarted from a checkpoint (modulo 256) when the id
+was made. Sections are not checkpointed, and after ``+restart`` the first
+sections a program creates get the same root, index and generation as
+sections of the checkpointed run; every use of an id (send, contribute,
+``CkDynSectionRedNo``, combine, delete) compares ``reserved`` with the
+current count and aborts with "stale section id from before restart" when
+they differ. A binding treats the id as 16 opaque bytes and copies all of
+them.
 
 Multicasts and section reductions
 ---------------------------------
@@ -1453,6 +1498,14 @@ the number of section reductions the member has contributed to, which every
 member computes identically: a binding derives a collective future id from
 it.
 
+After ``CkDynSectionDelete`` the root multicasts the deletion to the members,
+with the number of multicasts it sent to the section before it. A member
+drops the section once that deletion and all those multicasts have reached
+it; from then on ``CkDynContributeSection`` and ``CkDynSectionRedNo`` with
+the id abort. The handler of a multicast sent before the deletion can still
+use the id, whichever arrives first. A contribution made before the deletion
+reaches the member is reduced as usual.
+
 A **section callback** (``CKDYN_CB_SECTION``) multicasts a result to every
 member of a section, as an MCAST view with ``refnum`` set. Unlike Charm++'s
 ``bcastSection`` callback it can be put into a message and pupped. A
@@ -1477,8 +1530,11 @@ Migration, restart and restrictions
   point to point and CkMulticast rebuilds the spanning tree for the one
   after.
 - Sections are not checkpointed: after ``+restart`` a binding recreates
-  them.
-- A deleted section's CkMulticast trees stay allocated.
+  them. An id from before the restart, for example one held in an object's
+  restored state, aborts on its next use (see `Section ids`_). The check
+  repeats after 256 restarts.
+- A deleted section's CkMulticast trees stay allocated. Deleting a section
+  costs one multicast to its members.
 - Section messages take no group dependency and no zero-copy slots.
 - A group section must name a dynamic group; an empty member list aborts.
 - Each PE keeps one relay entry per (section id, entry) pair used in a
@@ -1525,6 +1581,8 @@ Posted buffers
 
    void CkDynPostBuffer(const CkDynTarget *t, int ep, int slot, const CkDynBufDesc *d);
    void CkDynPostDeviceBuffer(const CkDynTarget *t, int ep, int slot, const CkDynDevDesc *d);
+   int  CkDynUnpostBuffer(const CkDynTarget *t, int ep, int slot);
+   #define CKDYN_POST_ARG 0x40000000
 
 A post names, on the calling PE, the destination of slot ``slot`` of the
 next message to the local object ``t``'s entry ``ep``. The posted length must
@@ -1534,7 +1592,21 @@ host post may be made any time before the message is delivered to the
 object, even after the send was issued: the runtime copies the slot from the
 delivered message into the posted buffer (one copy on the receiving PE), and
 ``CkDynViewBufferPtr`` returns the posted buffer. A device post receives the
-transfer directly. The C API has no call to withdraw a post.
+transfer directly.
+
+``CkDynUnpostBuffer(t, ep, slot)`` withdraws the post for ``(t, ep, slot)``
+if it is still outstanding and returns 1, or returns 0 when there is none. A
+post is consumed only by a message whose slot is NCPY or DEVICE; a message
+that carries that slot as a BUFFER or BYTES value leaves it in place, so a
+binding that posted for a call whose argument then arrived by value
+withdraws the post before posting again for the next call.
+
+``slot`` in a post or unpost may be OR'd with ``CKDYN_POST_ARG``; it then
+counts arguments, not slots: in a message whose header has
+``CKDYN_MSG_BLOCK`` and whose slot 0 is a FUTURE slot, argument ``k`` is slot
+``k + 1``, otherwise slot ``k``. The binding then need not know at post time
+whether the sender will block on the call. An unpost names the slot in the
+same form as its post.
 
 Device buffers: DEVICE slots
 ----------------------------
@@ -1566,7 +1638,15 @@ that hands the data to user code either copies it or retains the message for
 as long as the user holds it.
 
 A device send needs to know the destination PE: a DEVICE slot to a singleton
-chare created with ``CKDYN_PE_ANY`` that is not yet constructed aborts.
+chare created with ``CKDYN_PE_ANY`` that is not yet constructed aborts. For an
+array element CkDyn uses the sending PE's last known location of the element
+and chooses the transfer mode for that PE's process. If the element has moved
+to another process by the time the message arrives (or the sender's location
+was out of date), the receiver aborts ("Destination process does not match
+the one the sender determined"); a move to another PE of the same process is
+fine. A binding that sends DEVICE slots to array elements does so while
+they do not migrate between processes (between load balancing steps, for
+example).
 
 ``CkDynHasDeviceSupport()`` returns 1 in a CUDA or HIP build; every device
 function aborts in other builds.
@@ -1579,12 +1659,62 @@ from the calling PE's scheduler, when ``stream`` reaches this point. Quiescence
 is not detected while such a callback is pending. A binding uses it to resume
 a coroutine that waits for a kernel or a copy.
 
-Persistent device buffers (planned)
------------------------------------
+.. _ckdyn-devpersist:
 
-A persistent device buffer API (open a device buffer once, then get and put
-into it repeatedly without a message per transfer) is planned for a later
-version of ``ckdyn.h``. It is not part of API version 2.
+Persistent device buffers
+-------------------------
+
+.. code-block:: c
+
+   typedef struct CkDynDevPersist CkDynDevPersist;   /* opaque, valid on the PE that opened it */
+   CkDynDevPersist *CkDynDevPersistOpen(const CkDynDevDesc *d, const CkDynCallback *done);
+   void   CkDynDevPersistClose(CkDynDevPersist *p);
+   size_t CkDynDevPersistHandleSize(void);
+   void   CkDynDevPersistHandle(const CkDynDevPersist *p, void *out);
+   void   CkDynDevPersistGet(CkDynDevPersist *dst, const void *src_handle, uint32_t refnum);
+   void   CkDynDevPersistPut(const void *dst_handle, CkDynDevPersist *src, uint32_t refnum);
+   int    CkDynDevPersistMode(const CkDynDevPersist *p, const void *handle);
+
+A persistent device buffer is a device buffer opened once on one PE and then
+used for any number of one-sided transfers, without a message or a memory
+registration per transfer. ``CkDynDevPersistOpen`` opens the buffer ``d``
+names (``ptr``, ``len``, ``device`` and ``stream`` are used; the stream
+orders each transfer after earlier work on it) and registers it for RDMA in a
+program of more than one process. ``CkDynDevPersistHandle`` writes the
+buffer's handle, ``CkDynDevPersistHandleSize()`` bytes, which the binding
+sends to other PEs in an ordinary message (a BYTES slot, for example).
+
+``CkDynDevPersistGet(dst, src_handle, refnum)`` copies the source buffer
+named by the handle into ``dst``, which must be open on the calling PE.
+``CkDynDevPersistPut(dst_handle, src, refnum)`` copies the local open buffer
+``src`` into the buffer named by the handle. The transfer moves the source's
+length; the destination must be at least as long. Either side may be on any
+PE. ``done``, the callback given to ``CkDynDevPersistOpen`` of the local
+buffer, receives an empty message on the issuing PE once per completed
+transfer: a get is complete when the bytes are in ``dst``, a put when they
+are in the remote buffer. For a FUTURE callback a non-zero ``refnum`` of the
+call is the future id; for the other kinds the message carries the
+callback's own reference number. The caller keeps both buffers valid and
+does not read the destination before ``done``.
+
+The transfer mode is chosen per pair of buffers, and
+``CkDynDevPersistMode`` returns it: 0, a device copy when both buffers are in
+one process; 1, CUDA or HIP IPC when they are in different processes on one
+host and the peer's IPC handle opens in this process (``+gpushm`` is not
+needed; it concerns DEVICE slots); 2, RDMA on the registered memory
+otherwise. Between hosts a put is carried out as a get issued by the
+destination's PE, so that ``done`` means the data has arrived. RDMA needs
+both buffers registered, which ``CkDynDevPersistOpen`` does in every program
+of more than one process, and a machine layer that can register device
+memory; the underlying ``CkDevicePersistent`` aborts an RDMA transfer whose
+buffers are not registered. The first use of each mode in a process prints
+one line.
+
+``CkDynDevPersistClose`` deregisters and frees the local record; it aborts
+while a transfer of that buffer is outstanding. A handle stays usable only
+while its buffer is open. Persistent buffers are not migrated or
+checkpointed. Every function aborts in a build without CUDA or HIP.
+charm4py binds them as ``charm.DevicePersistent``.
 
 .. _ckdyn-coro:
 
@@ -1652,8 +1782,9 @@ shows ``Class.method`` names, and for array elements the element index, as
 for a charmxi program. The usual tracing options (``+traceroot``,
 ``+logsize``, ``+traceoff``) apply to a build with tracing enabled.
 
-- ``CKDYN_EP_NOTRACE`` on an entry, or ``CKDYN_SEND_NOTRACE`` on a send,
-  leaves it out.
+- ``CKDYN_EP_NOTRACE`` on an entry leaves its executions out.
+  ``CKDYN_SEND_NOTRACE`` on a send does not: it only keeps the message out
+  of the load balancer's communication statistics.
 - ``CkDynTraceBeginEntry(ep)`` / ``CkDynTraceEndEntry(ep)`` bracket a region
   as an execute event of ``ep`` with no object.
 - User events: ``CkDynTraceRegisterUserEvent(desc, id)`` returns the event
@@ -1661,6 +1792,16 @@ for a charmxi program. The usual tracing options (``+traceroot``,
   ``CkDynTraceEndUserBracketEvent(id)`` bracket a region.
 - Array broadcasts through ``deliver_many`` need the per-element bracket
   above to appear per element.
+- Projections reads an array element's index fields from the dimension
+  count of its class in the ``.sts`` file. A class registered with
+  ``ndims`` 0 (any dimension count) takes the count of the first element
+  constructed in each process, and only PE 0's process writes the ``.sts``:
+  if the class's arrays differ in dimension count, or PE 0's process
+  constructed none of its elements before the file was written, Projections
+  shows the indices of some elements with the wrong number of fields. The
+  count is recorded by every PE thread of a process without
+  synchronization; the threads write the same value for one array. Register
+  a class with a fixed ``ndims`` when its indices matter in Projections.
 
 Other runtime services
 ----------------------
@@ -2192,6 +2333,13 @@ See :ref:`ckdyn-zerocopy`.
 
 ``void CkDynPostDeviceBuffer(const CkDynTarget *t, int ep, int slot, const CkDynDevDesc *d)``
    Posts a device destination.
+
+``int CkDynUnpostBuffer(const CkDynTarget *t, int ep, int slot)``
+   Withdraws an outstanding post; returns 1 if there was one. ``slot`` of a
+   post or unpost may carry ``CKDYN_POST_ARG`` to count arguments.
+
+``CkDynDevPersist *CkDynDevPersistOpen(const CkDynDevDesc *d, const CkDynCallback *done)``, ``CkDynDevPersistClose``, ``CkDynDevPersistHandleSize``, ``CkDynDevPersistHandle``, ``CkDynDevPersistGet``, ``CkDynDevPersistPut``, ``CkDynDevPersistMode``
+   Persistent device buffers: :ref:`ckdyn-devpersist`.
 
 ``void CkDynHapiAddCallback(uint64_t stream, const CkDynCallback *cb)``
    Delivers an empty message to ``cb`` when the stream reaches this point.

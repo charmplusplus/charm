@@ -35,6 +35,7 @@ struct CbClass {
   std::vector<CbMethod> methods;   /* methods[0]: constructor */
   int chareIdx;       /* filled by cbRegister; no default initializers: charmc compiles C++11 aggregates */
   int firstEp;
+  bool noMany;        /* register with a hook table without deliver_many (set before cbRegister) */
   int ep(int method) const { return firstEp + method; }
 };
 
@@ -49,6 +50,7 @@ struct ObjState {
   int64_t expGot;     /* priority test: the expedited message arrived */
   int64_t joined;     /* section_joined calls */
   double  t0;
+  CkDynSectionID heldSid;   /* DMain: a section id held across checkpoint and restart */
 };
 
 struct Obj {

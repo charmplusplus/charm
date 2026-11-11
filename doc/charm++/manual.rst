@@ -9859,8 +9859,19 @@ Once the ``CkDevicePersistent`` objects are created and ``open`` ed, they should
 exchanged between the communication peers. After this setup stage, the objects'
 ``get`` and ``put`` methods can be invoked freely to perform the desired communication.
 
+Within a process, and through IPC between processes on one node, only the buffer
+whose object is sent to the peer needs ``open``. An RDMA transfer (between nodes, or
+between processes whose GPUs cannot open each other's IPC handles) needs **both**
+buffers opened, because each side's memory must be registered: a ``put`` from a local
+source buffer that was never ``open`` ed aborts there ("needs both buffers opened"),
+and so does a ``get`` into one. Open the local buffer as well before transferring
+between nodes.
+
 Examples using persistent GPU communication can be found in
 ``examples/charm++/cuda/gpudirect/persitent`` and ``examples/charm++/cuda/gpudirect/jacobi3d``.
+The jacobi3d example opens only its receive buffers (the ones it sends to its
+neighbors), so its persistent mode runs within a node; between nodes its ``put``
+calls abort for the reason above.
 
 .. _sec:mpiinterop:
 

@@ -79,15 +79,15 @@ static CkDynCallback viewCb(const CkDynMsgView *v, int slot) { CkDynCallback c; 
 /* Classes                                                                 */
 /* ====================================================================== */
 
-extern CbClass Ping, Sec, Grp, NGrp, Single, DMain, Late, Tmp;
+extern CbClass Ping, Sec, Grp, NGrp, Single, DMain, Late, Tmp, Mig;
 
 enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTRED, P_GOTREDB, P_COMPUTE, P_CORO, P_SYNCSTART, P_RESUMED,
        P_ZSTART, P_ZRECV, P_ZPOST, P_ZSPIN, P_ZACK, P_DSTART, P_DRECV, P_DCHECK,
        P_PSTART, P_PRECV, P_PDONE, P_PCHECK };
-enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED, SC_REDTOSEC };
+enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED, SC_REDTOSEC, SC_SINK, SC_REDNO };
 enum { G_CTOR, G_GOTRED, G_GOTREDB, G_NGSEND, G_NGREPORT, G_PRIOSTART, G_PRIORECV, G_EXPRECV,
        G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE, G_LATEREG, G_CSREPORT,
-       G_CBRECV, G_CBCOUNT, G_REDTOSEC };
+       G_CBRECV, G_CBCOUNT, G_REDTOSEC, G_SENDDELETE };
 enum { N_CTOR, N_INCR };
 enum { S_CTOR, S_GOTRED, S_INL, S_PLAIN };
 enum { D_CTOR, D_RESUMED };
@@ -781,6 +781,23 @@ static int64_t secSyncStart(Obj *o, const CkDynMsgView *v) {
   CkDynAtSync(&o->t);
   return 0;
 }
+/* sink(n, bytes): a large section message (sections/order); checks its length */
+static const uint32_t ORDER_BYTES = 256 * 1024;
+static int64_t secSink(Obj *, const CkDynMsgView *v) {
+  CHECK(v->kind == CKDYN_MSGKIND_MCAST && v->nslots == 2 && v->slots[1].type == CKDYN_SLOT_BYTES &&
+        v->slots[1].len == ORDER_BYTES, "Sec.sink: a malformed section message");
+  return 0;
+}
+/* redNo(SECTION sid, FUTURE f): CkDynSectionRedNo of this member, to f */
+static int64_t secRedNo(Obj *o, const CkDynMsgView *v) {
+  CkDynSectionID sid;
+  CkDynViewSection(v, 0, &sid);
+  int pe; uint32_t id;
+  CHECK(cbFindFuture(v, &pe, &id), "Sec.redNo without a future");
+  int rn = CkDynSectionRedNo(&o->t, &sid);
+  CkDynFutureSet(pe, id, MsgB().i64(rn).finish(0));
+  return 0;
+}
 static int64_t secResumed(Obj *o, const CkDynMsgView *) {
   double r[2] = { 1.0, o->s.origPe != CkMyPe() ? 1.0 : 0.0 };
   CkDynRedData d = { r, sizeof r, redType("sum_double") };
@@ -798,6 +815,8 @@ CbClass Sec = { "Sec", CKDYN_ARRAY, 1, {
   { "Sec.syncStart", 0, secSyncStart },
   { "Sec.resumed", 0, secResumed },
   { "Sec.redToSec", 0, memberRedToSec },
+  { "Sec.sink", 0, secSink },
+  { "Sec.redNo", 0, secRedNo },
 } };
 
 /* ---- Grp (group) ---------------------------------------------------------- */
@@ -870,6 +889,29 @@ static int64_t grpSecCreate(Obj *, const CkDynMsgView *v) {
   return 0;
 }
 
+/* sendDelete(n, FUTURE f, SECTION sid x n): from a PE that is not the root of
+ * the sections, send a large message to each section and delete it at once,
+ * then set f. The root must apply the send before the delete. */
+static int64_t grpSendDelete(Obj *, const CkDynMsgView *v) {
+  int n = (int)cbI64(v, 0);
+  int pe; uint32_t id;
+  CHECK(cbFindFuture(v, &pe, &id), "sendDelete without a future");
+  std::vector<char> big(ORDER_BYTES, 'x');
+  int ep = Sec.ep(SC_SINK);
+  for (int i = 0; i < n; i++) {
+    CkDynSectionID sid;
+    CkDynViewSection(v, 2 + i, &sid);
+    CHECK(sid.root_pe != CkMyPe(), "sendDelete on the root PE %d", sid.root_pe);
+    MsgB b;
+    b.i64(i);
+    CkDynMsgAddBytes(b.b, big.data(), ORDER_BYTES, 0);
+    CkDynSendSection(&sid, ep, b.finishMcast(ep), nullptr);
+    CkDynSectionDelete(&sid);
+  }
+  CkDynFutureSet(pe, id, emptyMsg());
+  return 0;
+}
+
 /* lateReg(CALLBACK done): register Late after start-up. The main chare runs
  * this phase only with one PE per process, so each PE registers for its
  * process; the reduction tells it that every process has. */
@@ -933,6 +975,7 @@ CbClass Grp = { "Grp", CKDYN_GROUP, 0, {
   { "Grp.cbRecv", 0, grpCbRecv },
   { "Grp.cbCount", 0, grpCbCount },
   { "Grp.redToSec", 0, memberRedToSec },
+  { "Grp.sendDelete", 0, grpSendDelete },
 } };
 
 /* ---- NGrp (nodegroup) ---------------------------------------------------- */
@@ -1015,6 +1058,25 @@ static int64_t dmainResumed(Obj *o, const CkDynMsgView *v) {
   CHECK(v->refnum == CKPT_MARKER, "DMain.resumed: reference number %u, expected the marker %u", v->refnum, CKPT_MARKER);
   CHECK(o->s.counter == CKPT_STATE, "DMain.resumed: state %lld, expected %lld", (long long)o->s.counter, (long long)CKPT_STATE);
   if (g_dmainBuiltHere) { CkDynFutureSet(0, (uint32_t)o->s.fid, emptyMsg()); return 0; }
+  bool staleRestart = false;
+  for (char **a = CkGetArgv(); *a; a++) if (strcmp(*a, "-stalerestart") == 0) staleRestart = true;
+  if (staleRestart) {
+    /* the first section made after the restart reuses the held id's root,
+       index and generation; only the run counter tells them apart */
+    const CkDynSectionID held = o->s.heldSid;
+    CHECK(held.gen != 0 && aidSecA >= 0, "-stalerestart: the checkpoint holds no section id");
+    int zero = 0;
+    CkDynSectionID fresh;
+    CkDynSectionCreateArray(aidSecA, 1, 1, &zero, 0, nullptr, &fresh);
+    CHECK(fresh.root_pe == held.root_pe && fresh.idx == held.idx && fresh.gen == held.gen &&
+          fresh.reserved == (uint8_t)(held.reserved + 1),
+          "-stalerestart: new id (%d, %d, %u, run %u), held id (%d, %d, %u, run %u)", fresh.root_pe, fresh.idx,
+          fresh.gen, fresh.reserved, held.root_pe, held.idx, held.gen, held.reserved);
+    CkPrintf("  sending to a section id from before the restart; CkDyn must abort\n");
+    int ep = Sec.ep(SC_RECV);
+    CkDynSendSection(&held, ep, MsgB().i64(0).i64(-1).finishMcast(ep), nullptr);
+    CHECK(false, "a send with a section id from before the restart did not abort");
+  }
   CkPrintf("PASS restart: DMain.resumed ran on the restored main chare (marker %u, state %lld, view kind %d)\n",
            v->refnum, (long long)o->s.counter, (int)v->kind);
   CHECK(cbUnpacks() > 0, "restart: no unpack call on PE 0");
@@ -1027,6 +1089,43 @@ static int64_t dmainResumed(Obj *o, const CkDynMsgView *v) {
 CbClass DMain = { "DMain", CKDYN_MAINCHARE, 0, {
   { "DMain.DMain", 0, dmainCtor },
   { "DMain.resumed", 0, dmainResumed },
+} };
+
+/* ---- Mig (1-D array without deliver_many, the bcast_migrate phase) ------ */
+
+/* this PE's Mig elements constructed here and not migrated away, by index */
+typedef std::map<int, Obj *> MigLocalMap;
+CkpvStaticDeclare(MigLocalMap, migLocal);
+
+static int64_t migCtor(Obj *o, const CkDynMsgView *) {
+  o->s.counter = 0;
+  CkpvAccess(migLocal)[myIndex(o)] = o;
+  return 0;
+}
+/* bcast(CALLBACK cb): count the broadcast; if the partner element (index ^ 1)
+ * is local and has not received it yet, migrate it to the next PE, so that it
+ * leaves in the middle of this PE's delivery of the broadcast. Contribute
+ * [1, moved]. */
+static int64_t migBcast(Obj *o, const CkDynMsgView *v) {
+  o->s.counter++;
+  int moved = 0;
+  auto &local = CkpvAccess(migLocal);
+  auto it = local.find(myIndex(o) ^ 1);
+  if (CkNumPes() > 1 && it != local.end() && it->second->s.counter < o->s.counter) {
+    Obj *p = it->second;
+    local.erase(it);
+    CkDynMigrateMe(&p->t, (CkMyPe() + 1) % CkNumPes());
+    moved = 1;
+  }
+  local.erase(myIndex(o));   /* it may move later (load balancing); stop naming it */
+  int r[2] = { 1, moved };
+  contributeInts(o, r, 2, viewCb(v, 0));
+  return 0;
+}
+
+CbClass Mig = { "Mig", CKDYN_ARRAY, 1, {
+  { "Mig.Mig", 0, migCtor },
+  { "Mig.bcast", 0, migBcast },
 } };
 
 /* ---- Late (1-D array registered after start-up, the late phase) -------- */
@@ -1097,10 +1196,15 @@ void ckdynRegister(void) {
   cbRegister(&Single);
   cbRegister(&DMain);
   cbRegister(&Tmp);
+  Mig.noMany = true;
+  cbRegister(&Mig);
   CkDynAllowLateRegistration();   /* Late is registered by the late phase */
 }
 
-void ckdynTestInitProc(void) { cbInitPe(); }
+void ckdynTestInitProc(void) {
+  cbInitPe();
+  CkpvInitialize(MigLocalMap, migLocal);
+}
 
 /* ====================================================================== */
 /* The main chare                                                          */
@@ -1111,7 +1215,7 @@ static void bcastPing(int m, CkDynMsg *msg) { CkDynSendArray(aidPing, 1, nullptr
 class TestMain : public CBase_TestMain {
   std::set<std::string> skip;
   std::vector<std::string> steps = {
-    "pingpong", "pingpong_inline", "bcast",
+    "pingpong", "pingpong_inline", "bcast", "bcast_migrate",
     "reductions/table", "reductions/single", "reductions/single_any", "reductions/group_elem", "reductions/group_bcast",
     "reductions/array_elem", "reductions/array_bcast", "reductions/future", "reductions/foreign",
     "future_return", "nodegroup", "qd", "priority", "coroutine", "builder", "callstack", "inline_chare",
@@ -1119,7 +1223,7 @@ class TestMain : public CBase_TestMain {
     "ncpy/nonpost", "ncpy/post_before", "ncpy/post_after", "ncpy/samepe",
     "device/remote", "device/samepe", "hapi", "devpersist/remote", "devpersist/samepe",
     "sections/array", "sections/group", "sections/contribute", "sections/remote", "sections/combine_overlap",
-    "sections/combine_arrays", "sections/delete", "sections/migration",
+    "sections/combine_arrays", "sections/delete", "sections/order", "sections/migration",
     "migration", "checkpoint", "late", "exit" };
   std::string ckptDir = "ckdyntest.ckpt";
   int step = -1;
@@ -1129,6 +1233,10 @@ class TestMain : public CBase_TestMain {
   bool staleSend = false;   /* -stalesend: the delete phase sends to the deleted section, which must abort */
   bool requireMoves = false; /* -requiremoves: a load balancer that moves elements is loaded (RotateLB) */
   bool zcBcast = false;      /* -zcbcast: the ncpy/nonpost phase broadcasts an NCPY slot, which must abort */
+  bool xiSection = false;    /* -xisection: a section of a charmxi array, which must abort */
+  bool ckptSection = false;  /* -ckptsection: the checkpoint phase passes a SECTION callback, which must abort */
+  bool deleteWaiting = false; /* -deletewaiting: the delete phase deletes a part a combine waits on, which must abort */
+  bool staleRedNo = false;   /* -staleredno: a member asks for the reduction number of a deleted section, which must abort */
 
   /* sections: the expected membership of each section the phases create */
   struct Sect {
@@ -1165,6 +1273,10 @@ public:
         cbRegister(&Late);
         CHECK(false, "CkDynRegisterClass after start-up did not abort");
       }
+      else if (strcmp(m->argv[i], "-xisection") == 0) xiSection = true;
+      else if (strcmp(m->argv[i], "-ckptsection") == 0) ckptSection = true;
+      else if (strcmp(m->argv[i], "-deletewaiting") == 0) deleteWaiting = true;
+      else if (strcmp(m->argv[i], "-staleredno") == 0) staleRedNo = true;
     delete m;
     mainProxy = thisProxy;
     numElems = 2 * CkNumPes();
@@ -1172,6 +1284,15 @@ public:
              CkNumPes(), CkNumNodes(), numElems, CkDynRefnumBytes());
     tStart = CkWallTimer();
     CkDynCreateManagers();
+    if (xiSection) {
+      CkPrintf("  making a section of a charmxi array; CkDyn must abort\n");
+      CProxy_Plain plain = CProxy_Plain::ckNew(2);
+      int idx[2] = { 0, 1 };
+      CkDynSectionID sid;
+      CkDynSectionCreateArray(((CkGroupID)plain.ckGetArrayID()).idx, 2, 1, idx, 0, nullptr, &sid);
+      CkStartQD(CkCallback(CkIndex_TestMain::nextPhase(), thisProxy));
+      return;
+    }
 
     /* phase creation: all five creation futures */
     /* -skip nodegroup also skips creating NGrp (its constructor is where a
@@ -1206,12 +1327,14 @@ public:
   }
 
   void nextPhase() {
+    CHECK(!xiSection, "a section of a charmxi array did not abort");
     step++;
     CkEnforce(step < (int)steps.size());
     const std::string s = steps[step];
     if (skipped(s) && s != "exit") { CkPrintf("SKIP %s\n", s.c_str()); next(); return; }
     if (s == "pingpong" || s == "pingpong_inline") runPingpong(s, s == "pingpong" ? 0 : 1);
     else if (s == "bcast") runBcast();
+    else if (s == "bcast_migrate") runBcastMigrate();
     else if (s.compare(0, 11, "reductions/") == 0) runReduction(s);
     else if (s == "future_return") runFutureReturn();
     else if (s == "nodegroup") runNodegroup();
@@ -1232,6 +1355,34 @@ public:
     else if (s == "late") runLate();
     else if (s == "exit") { CkPrintf("ALL DONE (%.3f s)\n", CkWallTimer() - tStart); CkDynExit(0); }
   }
+
+  /* bcast_migrate: an array without deliver_many; during one broadcast the
+     handler of one element of each co-located pair migrates the other away
+     before it has received the broadcast. Every element must still receive
+     it exactly once (each contributes 1); quiescence ends the phase, so a
+     lost delivery fails instead of hanging. */
+  void runBcastMigrate() {
+    const int n = 2 * CkNumPes();
+    uint32_t fc = cbNewFuture([this, n](const CkDynMsgView *) {
+      int *got = new int[2]{ -1, -1 };
+      uint32_t fr = cbNewFuture([got](const CkDynMsgView *v) { got[0] = redInt(v, 0); got[1] = redInt(v, 1); });
+      uint32_t fq = cbNewFuture([this, n, got](const CkDynMsgView *) {
+        int cnt = got[0], moved = got[1];
+        delete[] got;
+        CHECK(cnt == n, "bcast_migrate: %d of %d elements received the broadcast", cnt, n);
+        CHECK(CkNumPes() == 1 || moved > 0, "bcast_migrate: no element was migrated during the broadcast");
+        CkPrintf("  bcast_migrate: %d elements received the broadcast once; %d were migrated during it\n", cnt, moved);
+        pass("bcast_migrate");
+      });
+      CkDynSendArray(migAid, 1, nullptr, Mig.ep(1), MsgB().cb(cbFutureCb(0, fr)).finish(0), nullptr);
+      CkDynCallback qd = cbFutureCb(0, fq);
+      CkDynStartQD(&qd);
+    });
+    int dims[1] = { n };
+    CkDynArrayOpts ao = { 1, dims, -1, 0, 0, -1 };
+    migAid = CkDynCreateArray(Mig.chareIdx, MsgB().flags(CKDYN_MSG_CREATION).fut(0, fc).finish(Mig.ep(0)), &ao);
+  }
+  int migAid = -1;
 
   void runPingpong(std::string s, int mode) {
     uint32_t f = cbNewFuture([this, s, mode](const CkDynMsgView *v) {
@@ -1603,11 +1754,22 @@ public:
   void runCheckpoint() {
     CHECK(g_dmain != nullptr, "checkpoint: DMain was not constructed on PE 0");
     g_dmain->s.counter = CKPT_STATE;
+    /* the first section of the run (root PE 0, index 0, generation 1), for
+       the -stalerestart restart run */
+    if (sects.count("Aeven")) g_dmain->s.heldSid = sects["Aeven"].sid;
     g_dmain->s.fid = cbNewFuture([this](const CkDynMsgView *) {
       CkPrintf("  checkpoint: written to %s; DMain.resumed ran; restart with +restart %s\n", ckptDir.c_str(), ckptDir.c_str());
       pass("checkpoint");
     });
     CkDynCallback cb = cbTargetCb(g_dmain->t, DMain.ep(D_RESUMED), 0, CKPT_MARKER);
+    if (ckptSection) {
+      CkPrintf("  checkpoint with a SECTION done callback; CkDyn must abort\n");
+      CkDynSectionID sid;
+      memset(&sid, 0, sizeof sid);
+      cb = cbSectionCb(sid, Sec.ep(SC_GOTSEC), CKPT_MARKER);
+      CkDynCheckpoint((ckptDir + ".section").c_str(), &cb);
+      CHECK(false, "a checkpoint with a SECTION callback did not abort");
+    }
     CkDynCheckpoint(ckptDir.c_str(), &cb);
   }
 
@@ -1893,9 +2055,34 @@ public:
       qCombine("C2", { "Aeven", "Ball" });
       qRound("C2", 0, 0); qRound("C2", 1, 0); qRound("C2", 0, 3); qRound("C2", 1, 3); qRound("C2", 0, 2);
     } else if (s == "sections/delete") {
+      if (deleteWaiting) q.push_back([this] {
+        /* W waits for R's member list from R's root (the last PE); W2 names W,
+           so W's root queues W2's query until W is ready */
+        CHECK(sects["R"].sid.root_pe != CkMyPe(), "-deletewaiting needs two PEs");
+        CkDynSectionID ids[2] = { sects["Aeven"].sid, sects["R"].sid }, w, w2;
+        CkDynSectionCombine(2, ids, nullptr, &w);
+        CkDynSectionCombine(1, &w, nullptr, &w2);
+        CkPrintf("  deleting a combined section that a combine waits on; CkDyn must abort\n");
+        CkDynSectionDelete(&w);
+        CHECK(false, "deleting a part a combine waits on did not abort");
+      });
       qCreateArray("D", aidSecA, { 0, 1 });
       q.push_back([this] {
         CkDynSectionDelete(&sects["D"].sid);
+        if (staleRedNo) {
+          /* after quiescence the deletion has reached the members */
+          uint32_t fq = cbNewFuture([this](const CkDynMsgView *) {
+            CkPrintf("  a member of the deleted section asks for its reduction number; CkDyn must abort\n");
+            uint32_t f = cbNewFuture([](const CkDynMsgView *) {
+              CHECK(false, "CkDynSectionRedNo on a deleted section did not abort");
+            });
+            int one = 1;
+            CkDynSendArray(aidSecA, 1, &one, Sec.ep(SC_REDNO), MsgB().sec(sects["D"].sid).fut(0, f).finish(0), nullptr);
+          });
+          CkDynCallback qd = cbFutureCb(0, fq);
+          CkDynStartQD(&qd);
+          return;
+        }
         if (staleSend) {
           CkPrintf("  sending to the deleted section; CkDyn must abort\n");
           int ep = Sec.ep(SC_RECV);
@@ -1912,6 +2099,32 @@ public:
         go();
       });
       qRound("D2", 0, 0);
+    } else if (s == "sections/order") {
+      /* send then delete from a PE that is not the root, many times: the
+         root must apply them in that order, whatever order they arrive in */
+      q.push_back([this] {
+        if (CkNumPes() == 1) { CkPrintf("  %s: one PE, nothing to order\n", cur.c_str()); go(); return; }
+        const int n = 32;
+        MsgB b;
+        b.i64(n);
+        uint32_t f = cbNewFuture([this, n](const CkDynMsgView *) {
+          uint32_t fq = cbNewFuture([this, n](const CkDynMsgView *) {
+            CkPrintf("  %s: %d sends of %u bytes, each followed by a delete, from PE %d to root PE 0\n",
+                     cur.c_str(), n, ORDER_BYTES, CkNumPes() - 1);
+            go();
+          });
+          CkDynCallback qd = cbFutureCb(0, fq);
+          CkDynStartQD(&qd);
+        });
+        b.fut(0, f);
+        for (int i = 0; i < n; i++) {
+          int idx[2] = { i % nSecA, (i + 1) % nSecA };
+          CkDynSectionID sid;
+          CkDynSectionCreateArray(aidSecA, 2, 1, idx, 0, nullptr, &sid);
+          b.sec(sid);
+        }
+        CkDynSendGroup(gidGrp, CkNumPes() - 1, Grp.ep(G_SENDDELETE), b.finish(0), nullptr);
+      });
     } else if (s == "sections/migration") {
       /* section reductions with RotateLB migrations between them */
       qCreateArray("Aodd", aidSecA, odds);
@@ -1924,6 +2137,13 @@ public:
     }
     go();
   }
+};
+
+/* a charmxi array element (-xisection) */
+class Plain : public CBase_Plain {
+public:
+  Plain() {}
+  Plain(CkMigrateMessage *m) : CBase_Plain(m) {}
 };
 
 #include "ckdyntest.def.h"

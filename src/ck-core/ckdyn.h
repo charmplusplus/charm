@@ -103,7 +103,7 @@ typedef struct CkDynSectionID {
   int32_t  idx;        /* index in that table */
   int32_t  coll_id;    /* array or group id (-1 for a combined section) */
   uint8_t  kind;       /* CKDYN_ARRAY, CKDYN_GROUP, or 0 for a combined section (CkDynSectionCombine) */
-  uint8_t  reserved;
+  uint8_t  reserved;   /* set by CkDyn: restarts from a checkpoint before the id was made, modulo 256 */
   uint16_t gen;        /* generation, so a reused slot is not mistaken for the old section */
 } CkDynSectionID;                     /* 16 bytes */
 
@@ -431,7 +431,7 @@ enum {
   CKDYN_SEND_INLINE    = 1u << 0,
   CKDYN_SEND_EXPEDITED = 1u << 1,
   CKDYN_SEND_IMMEDIATE = 1u << 2,
-  CKDYN_SEND_NOTRACE   = 1u << 3
+  CKDYN_SEND_NOTRACE   = 1u << 3   /* CK_MSG_LB_NOTRACE: not in the LB's communication statistics (array sends) */
 };
 
 typedef struct CkDynSendOpts {
