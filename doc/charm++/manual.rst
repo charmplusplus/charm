@@ -9804,8 +9804,8 @@ corrected (issue #3963) and should not be copied as a model for buffer reuse
 until they are. Follow the rule above instead: pass the callback, or
 double-buffer.
 
-Intra-node Persistent GPU Communication
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Persistent GPU Communication
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Persistent GPU communication is a feature designed to take advantage of the fact
 that the address and size of the source/destination buffers do not change in
@@ -9815,10 +9815,13 @@ at every iteration. This allows us to reduce the overheads involved with
 with direct GPU messaging, including the nature of the multi-hop mechanism and
 CUDA IPC setup, and directly issue ``cudaMemcpy`` calls at the message send sites
 (for a ``put`` type operation; a ``get`` type operation is also supported).
-In inter-process communication, CUDA IPC handles are created, exchanged
-and opened only once (this setup step can be performed again if the buffer addresses
-or sizes involved in the persistent communication change). Note that this feature
-is currently supported only for intra-node communication.
+Between processes on one node, CUDA IPC handles are created, exchanged and opened
+only once per process (this setup step can be performed again if the buffer addresses
+or sizes involved in the persistent communication change); ``+gpushm`` is not needed.
+Between nodes, and between processes on one node whose GPUs cannot open each other's
+IPC handles (for example one GPU visible per process), the transfer is an RDMA get on
+device memory that ``open`` registered once; a ``put`` is carried out
+as a get by the destination's PE, so that the callbacks mean the data has arrived.
 
 Setup and communication routines are supported through ``CkDevicePersistent``:
 
@@ -9831,8 +9834,8 @@ Setup and communication routines are supported through ``CkDevicePersistent``:
      CkDevicePersistent(const void* ptr, size_t size, cudaStream_t stream);
      CkDevicePersistent(const void* ptr, size_t size, const CkCallback& cb, cudaStream_t stream);
 
-     void open(); // Creates an IPC handle for inter-process communication
-     void closes(); // Closes an opened IPC handle
+     void open(); // Creates an IPC handle and, with more than one process, registers the buffer
+     void close(); // Releases the registration (on the object that called open)
      void set_msg(void* msg); // Ties a Charm++ message to the stored callback
      void get(CkDevicePersistent& src); // Initiates transfer from the specified source buffer
      void put(CkDevicePersistent& dst); // Initiates transfer to the specified destination buffer
@@ -9856,7 +9859,7 @@ Once the ``CkDevicePersistent`` objects are created and ``open`` ed, they should
 exchanged between the communication peers. After this setup stage, the objects'
 ``get`` and ``put`` methods can be invoked freely to perform the desired communication.
 
-Examples using the intra-node persistent GPU communication can be found in
+Examples using persistent GPU communication can be found in
 ``examples/charm++/cuda/gpudirect/persitent`` and ``examples/charm++/cuda/gpudirect/jacobi3d``.
 
 .. _sec:mpiinterop:

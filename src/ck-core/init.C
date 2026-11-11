@@ -1539,6 +1539,8 @@ void _initCharm(int unused_argc, char **argv)
   loopback_handler = CmiRegisterHandler((CmiHandler) loopback_bridge);
   device_dereg_handler = CmiRegisterHandler((CmiHandler) device_dereg_bridge);
   device_ack_handler = CmiRegisterHandler((CmiHandler) device_ack_bridge);
+  persist_put_handler = CmiRegisterHandler((CmiHandler) persist_put_bridge);
+  persist_ack_handler = CmiRegisterHandler((CmiHandler) persist_ack_bridge);
   CkRdmaDeviceInit();
 #endif
 

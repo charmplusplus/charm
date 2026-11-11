@@ -594,21 +594,196 @@ void CkRdmaDeviceRecvHandler(void* data, void* msg)
 
 /****************************** Direct (Persistent) API ******************************/
 
+/* Persistent device buffers: see CkDevicePersistent in ckrdmadevice.h and the manual, "Persistent GPU Communication". */
+
+#include <dlfcn.h>
+#include <set>
+#include <string>
+
+// One line per process, mode and operation the first time it is used, so that
+// a run states which path it took.
+static void persistAnnounce(const char* what, int mode) {
+  static std::mutex lock;
+  static std::set<std::pair<std::string, int> > said;
+  {
+    std::lock_guard<std::mutex> g(lock);
+    if (!said.insert(std::make_pair(std::string(what), mode)).second) return;
+  }
+  static const char* names[3] = {
+    "copy on the device (one process)",
+    "CUDA/HIP IPC between processes on one host",
+    "RDMA on registered device memory" };
+  CmiPrintf("[%d] CkDevicePersistent> %s: %s\n", CkMyPe(), what, names[mode]);
+}
+
+// The base of the allocation holding ptr: what an IPC handle maps in the other
+// process (cupy, torch and pool allocators hand out pieces of allocations).
+static bool persistAllocBase(const void* ptr, uintptr_t* base) {
+#if CMK_HIP
+  void* b = nullptr; size_t sz = 0;
+  if (hipMemGetAddressRange(&b, &sz, (void*)ptr) != hipSuccess) { (void)hipGetLastError(); return false; }
+  *base = (uintptr_t)b;
+  return true;
+#else
+  typedef int (*RangeFn)(unsigned long long*, size_t*, unsigned long long);
+  static RangeFn fn = nullptr;
+  static bool looked = false;
+  if (!looked) {
+    void* s = dlsym(RTLD_DEFAULT, "cuMemGetAddressRange_v2");
+    if (!s) {
+      void* lib = dlopen("libcuda.so.1", RTLD_NOW | RTLD_NOLOAD);
+      if (!lib) lib = dlopen("libcuda.so.1", RTLD_NOW);
+      if (lib) s = dlsym(lib, "cuMemGetAddressRange_v2");
+    }
+    fn = (RangeFn)s;
+    looked = true;
+  }
+  if (!fn) return false;
+  unsigned long long b = 0; size_t sz = 0;
+  if (fn(&b, &sz, (unsigned long long)(uintptr_t)ptr) != 0) return false;
+  *base = (uintptr_t)b;
+  return true;
+#endif
+}
+
+// IPC mappings of other processes' allocations, opened once per process and
+// reused by every copy of the peer's buffer, kept until exit.
+static std::mutex persist_ipc_lock;
+static std::map<std::string, void*> persist_ipc;
+
+static void* persistIpcPtr(const CkDevicePersistent& r) {
+  std::string key((const char*)&r.hapi_ipc_handle, sizeof(hapiIpcMemHandle_t));
+  std::lock_guard<std::mutex> g(persist_ipc_lock);
+  auto it = persist_ipc.find(key);
+  void* base = nullptr;
+  if (it != persist_ipc.end()) base = it->second;
+  else {
+    if (hapiIpcOpenMemHandle(&base, r.hapi_ipc_handle, hapiIpcMemLazyEnablePeerAccess) != hapiSuccess) {
+      (void)hapiGetLastError();
+      CmiPrintf("[%d] CkDevicePersistent> IPC open of PE %d's buffer failed; using RDMA\n", CkMyPe(), r.pe);
+      base = nullptr;
+    }
+    persist_ipc[key] = base;
+  }
+  return base ? (char*)base + r.ipc_offset : nullptr;
+}
+
+// The two buffers' callbacks, sent from the issuing PE when a transfer is done.
+struct PersistDone {
+  CkCallback a, b;
+  void *amsg, *bmsg;
+  void fire() {
+    if (a.type != CkCallback::ignore) a.send(amsg);
+    if (b.type != CkCallback::ignore) b.send(bmsg);
+  }
+};
+
+static void persistOnStream(hapiStream_t st, const CkDevicePersistent& x, const CkDevicePersistent& y) {
+  if (x.cb.type != CkCallback::ignore) hapiAddCallback(st, x.cb, x.cb_msg);
+  if (y.cb.type != CkCallback::ignore) hapiAddCallback(st, y.cb, y.cb_msg);
+}
+
+// A callCFn callback on the issuing PE: the RDMA transfer finished.
+static void persistRdmaDone(void* param, void* msg) {
+  if (msg) CkFreeMsg(msg);
+  PersistDone* d = (PersistDone*)param;
+  d->fire();
+  delete d;
+}
+
+// An RDMA get into dst (registered in this process) from src.
+static void persistRdmaGet(const CkDevicePersistent& dst, const CkDevicePersistent& src, const CkCallback& done) {
+  CmiNcpyBuffer d = dst.ncpy, s = src.ncpy;
+  d.deviceRdmaOpInfo = nullptr;
+  s.deviceRdmaOpInfo = nullptr;
+  CkCallback srcAck(CkCallback::ignore), dstAck(done);
+  QdCreate(1);   // matched in CkRdmaDirectAckHandler
+  d.rdmaGet(s, sizeof(CkCallback), (char*)&srcAck, (char*)&dstAck);
+}
+
+// A put between hosts is a get issued by the destination's PE, so that the
+// callbacks are sent only once the bytes are there (a true RDMA put completes
+// on the source before they are visible at the destination).
+struct PersistPutMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  int issuer;
+  int len;
+  uint64_t rec;
+  // then the pupped destination and source buffers
+};
+struct PersistAckMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  uint64_t rec;
+};
+struct PersistPutAck { int issuer; uint64_t rec; };
+
+static void persistPutGot(void* param, void* msg) {
+  if (msg) CkFreeMsg(msg);
+  PersistPutAck* a = (PersistPutAck*)param;
+  PersistAckMsg* m = (PersistAckMsg*)CmiAlloc(sizeof(PersistAckMsg));
+  m->rec = a->rec;
+  CmiSetHandler(m, persist_ack_handler);
+  QdCreate(1);
+  CmiSyncSendAndFree(a->issuer, sizeof(PersistAckMsg), m);
+  delete a;
+}
+
+extern "C" {
+  void* persist_put_bridge(void* arg) {
+    PersistPutMsg* m = (PersistPutMsg*)arg;
+    QdProcess(1);
+    CkDevicePersistent dst, src;
+    PUP::fromMem up((char*)m + sizeof(PersistPutMsg));
+    up | dst;
+    up | src;
+    persistRdmaGet(dst, src, CkCallback(persistPutGot, new PersistPutAck{ m->issuer, m->rec }));
+    CmiFree(m);
+    return NULL;
+  }
+  int persist_put_handler;
+
+  void* persist_ack_bridge(void* arg) {
+    PersistAckMsg* m = (PersistAckMsg*)arg;
+    QdProcess(1);
+    persistRdmaDone((void*)(uintptr_t)m->rec, nullptr);
+    CmiFree(m);
+    return NULL;
+  }
+  int persist_ack_handler;
+}
+
 void CkDevicePersistent::init() {
   pe = CkMyPe();
+  node = CkMyNode();
+  phys_node = CmiPhysicalNodeID(CkMyPe());
   cb_msg = nullptr;
   ipc_ptr = nullptr;
   ipc_open = false;
 }
 
 void CkDevicePersistent::open() {
-  // Create an IPC handle for inter-process communication
-  hapiCheck(hapiIpcGetMemHandle(&hapi_ipc_handle, (void*)ptr));
+  if (pe != CkMyPe()) CkAbort("CkDevicePersistent::open on PE %d of a buffer created on PE %d", CkMyPe(), pe);
+  owner = true;
+  uintptr_t base = 0;
+  if (persistAllocBase(ptr, &base) && hapiIpcGetMemHandle(&hapi_ipc_handle, (void*)ptr) == hapiSuccess) {
+    ipc_offset = (size_t)((uintptr_t)ptr - base);
+    ipc_valid = true;
+  } else {
+    (void)hapiGetLastError();
+    ipc_valid = false;
+  }
+  if (CkNumNodes() > 1 && cnt > 0 && !registered) {
+    ncpy.deviceRdmaOpInfo = nullptr;
+    ncpy.init(ptr, cnt, CMK_BUFFER_REG, CMK_BUFFER_NODEREG);   // released by close()
+    registered = true;
+  }
 }
 
 void CkDevicePersistent::close() {
-  // Close the IPC handle if it was opened
-  hapiCheck(hapiIpcCloseMemHandle(ipc_ptr));
+  if (owner && registered) {
+    ncpy.deregisterMem();
+    registered = false;
+  }
 }
 
 void CkDevicePersistent::set_msg(void* msg) {
@@ -621,75 +796,86 @@ void CkDevicePersistent::pup(PUP::er& p) {
   p|pe;
   p|cb;
   p((char*)&hapi_ipc_handle, sizeof(hapi_ipc_handle));
+  p|ipc_offset;
+  p|ipc_valid;
+  p|node;
+  p|phys_node;
+  p|registered;
+  if (registered) ncpy.pup(p);
+  if (p.isUnpacking()) {
+    owner = false;
+    cb_msg = nullptr;
+    ipc_ptr = nullptr;
+    ipc_open = false;
+    ncpy.deviceRdmaOpInfo = nullptr;
+  }
+}
+
+int CkDevicePersistent::mode(const CkDevicePersistent& other) const {
+  if (other.node == CkMyNode()) return 0;
+  // IPC whenever the peer's handle opens here (with or without +gpushm, which
+  // concerns DEVICE-slot messages); RDMA when it does not (the peer's GPU is
+  // not visible to this process, for example with one GPU per task)
+  if (other.phys_node == CmiPhysicalNodeID(CkMyPe()) && other.ipc_valid && persistIpcPtr(other) != nullptr) return 1;
+  return 2;
+}
+
+static void persistNeedRdma(const CkDevicePersistent& a, const CkDevicePersistent& b) {
+  if (!a.registered || !b.registered)
+    CkAbort("CkDevicePersistent: an RDMA transfer between PE %d and PE %d needs both buffers opened "
+            "(open() before sending) in a program of more than one process", a.pe, b.pe);
 }
 
 CkDeviceStatus CkDevicePersistent::get(CkDevicePersistent& src) {
-  // Check that the source buffer fits into the destination buffer
   if (cnt < src.cnt) {
     CkAbort("CkDevicePersistent::get: Destination buffer is smaller than source buffer\n");
   }
-
-  CkNcpyModeDevice mode = findTransferModeDevice(src.pe, CkMyPe());
-
-  // Perform get
-  if (mode == CkNcpyModeDevice::MEMCPY) {
-    hapiCheck(hapiMemcpyAsync((void*)ptr, src.ptr, cnt, hapiMemcpyDeviceToDevice,
-          hapi_stream));
-  } else if (mode == CkNcpyModeDevice::IPC) {
-    if (!src.ipc_open) {
-      hapiCheck(hapiIpcOpenMemHandle(&src.ipc_ptr, src.hapi_ipc_handle,
-            hapiIpcMemLazyEnablePeerAccess));
-      src.ipc_open = true;
-    }
-    hapiCheck(hapiMemcpyAsync((void*)ptr, src.ipc_ptr, cnt,
-          hapiMemcpyDeviceToDevice, hapi_stream));
-  } else {
-    CkAbort("Persistent GPU messaging is currently not supported for inter-node messages");
+  int m = mode(src);
+  void* from = m == 1 ? persistIpcPtr(src) : nullptr;
+  persistAnnounce("get", m);
+  if (m == 2) {
+    persistNeedRdma(*this, src);
+    hapiCheck(hapiStreamSynchronize(hapi_stream));   // earlier work on the destination is done
+    persistRdmaGet(*this, src, CkCallback(persistRdmaDone, new PersistDone{ src.cb, cb, src.cb_msg, cb_msg }));
+    return CkDeviceStatus::incomplete;
   }
-
-  // Set callbacks to be invoked once get is complete
-  if (src.cb.type != CkCallback::ignore) {
-    hapiAddCallback(hapi_stream, src.cb, src.cb_msg);
-  }
-  if (cb.type != CkCallback::ignore) {
-    hapiAddCallback(hapi_stream, cb, cb_msg);
-  }
-
+  if (m == 0) from = (void*)src.ptr;
+  hapiCheck(hapiMemcpyAsync((void*)ptr, from, src.cnt, hapiMemcpyDeviceToDevice, hapi_stream));
+  persistOnStream(hapi_stream, src, *this);
   return CkDeviceStatus::incomplete;
 }
 
 CkDeviceStatus CkDevicePersistent::put(CkDevicePersistent& dst) {
-  // Check that the source buffer fits into the destination buffer
   if (dst.cnt < cnt) {
     CkAbort("CkDevicePersistent::put: Destination buffer is smaller than source buffer\n");
   }
-
-  CkNcpyModeDevice mode = findTransferModeDevice(CkMyPe(), dst.pe);
-
-  // Perform put
-  if (mode == CkNcpyModeDevice::MEMCPY) {
-    hapiCheck(hapiMemcpyAsync((void*)dst.ptr, ptr, cnt, hapiMemcpyDeviceToDevice,
-          hapi_stream));
-  } else if (mode == CkNcpyModeDevice::IPC) {
-    if (!dst.ipc_open) {
-      hapiCheck(hapiIpcOpenMemHandle(&dst.ipc_ptr, dst.hapi_ipc_handle,
-            hapiIpcMemLazyEnablePeerAccess));
-      dst.ipc_open = true;
-    }
-    hapiCheck(hapiMemcpyAsync(dst.ipc_ptr, ptr, cnt, hapiMemcpyDeviceToDevice,
-          hapi_stream));
-  } else {
-    CkAbort("Persistent GPU messaging is not yet supported for inter-node messages");
+  int m = mode(dst);
+  void* to = m == 1 ? persistIpcPtr(dst) : nullptr;
+  persistAnnounce("put", m);
+  if (m == 2) {
+    persistNeedRdma(*this, dst);
+    hapiCheck(hapiStreamSynchronize(hapi_stream));   // the source's data is complete
+    PersistDone* d = new PersistDone{ cb, dst.cb, cb_msg, dst.cb_msg };
+    CkDevicePersistent dcopy = dst, scopy = *this;
+    dcopy.cb = CkCallback(CkCallback::ignore);   // fired here, from d
+    scopy.cb = CkCallback(CkCallback::ignore);
+    PUP::sizer ps;
+    ps | dcopy; ps | scopy;
+    int len = (int)ps.size();
+    PersistPutMsg* msg = (PersistPutMsg*)CmiAlloc(sizeof(PersistPutMsg) + len);
+    msg->issuer = CkMyPe();
+    msg->len = len;
+    msg->rec = (uint64_t)(uintptr_t)d;
+    PUP::toMem pm((char*)msg + sizeof(PersistPutMsg));
+    pm | dcopy; pm | scopy;
+    CmiSetHandler(msg, persist_put_handler);
+    QdCreate(1);
+    CmiSyncSendAndFree(dst.pe, sizeof(PersistPutMsg) + len, msg);
+    return CkDeviceStatus::incomplete;
   }
-
-  // Set callbacks to be invoked once put is complete
-  if (cb.type != CkCallback::ignore) {
-    hapiAddCallback(hapi_stream, cb, cb_msg);
-  }
-  if (dst.cb.type != CkCallback::ignore) {
-    hapiAddCallback(hapi_stream, dst.cb, dst.cb_msg);
-  }
-
+  if (m == 0) to = (void*)dst.ptr;
+  hapiCheck(hapiMemcpyAsync(to, ptr, cnt, hapiMemcpyDeviceToDevice, hapi_stream));
+  persistOnStream(hapi_stream, *this, dst);
   return CkDeviceStatus::incomplete;
 }
 
