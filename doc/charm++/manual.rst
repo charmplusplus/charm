@@ -3061,7 +3061,17 @@ The detailed APIs of these two methods are described as follows:
 	     ``AtSync()``. Insertions and/or deletions may begin again after
 	     load balancing is complete (i.e. ``ResumeFromSync()`` is called for
 	     an object on the given PE for insertions or for the object in
-	     question for deletions).
+	     question for deletions). The same rule applies to ``migrateMe()``:
+	     an element that uses AtSync must not call it between ``AtSync()``
+	     and ``ResumeFromSync()``. PEs finish a step at different times, and
+	     an element that arrives on a PE still in a step is resumed with that
+	     PE's elements, so it receives a ``ResumeFromSync()`` it did not ask
+	     for. There is currently no notification that every PE has resumed,
+	     so a program that mixes ``migrateMe()`` with load balancing must
+	     keep the two apart by its own synchronization, for example a
+	     reduction after ``ResumeFromSync()`` before any element moves (see
+	     issue #4195). Outside a step, that is after such a reduction and
+	     before the next ``AtSync()``, ``migrateMe()`` is fully supported.
 
 #. **Periodic load balancing mode**: This mode uses a timer to perform
    load balancing periodically at a user-specified interval. In order
@@ -6465,6 +6475,9 @@ There is a default map object, which maps 1D array indices in a block
 fashion to processors, and maps other array indices based on a hash
 function. Some other mappings such as round-robin (RRMap) also exist,
 which can be used similar to custom ones described below.
+CldMap names no PE for an element (its procNum returns ``CLD_ANYWHERE``),
+so ``insert()`` into an array that uses it must be given a PE; without one
+the program aborts.
 
 A custom map object is implemented as a group which inherits from
 CkArrayMap and defines these virtual methods:
@@ -8489,7 +8502,7 @@ complete, the application checkpoints the result. Further executions of
 the second phase may just resume from that checkpoint.
 
 An example of Charm++'s support for split execution can be seen in
-``tests/charm++/chkpt/hello``.
+``tests/charm++/ckpt_restart``.
 
 .. _sec:diskcheckpoint:
 
@@ -8797,7 +8810,10 @@ Preconditions:
   last in-memory checkpoint``.
 - No array element may be inserted or deleted between the checkpoint and
   the rollback (``insert``, ``ckDestroy``, or the creation of a new array
-  with elements). The runtime counts both and aborts a rollback after
+  with elements). Creating an array bound to an existing one
+  (``CkArrayOptions::bindTo``) with elements counts as insertion, even
+  though its elements join the location records of the existing array's
+  elements. The runtime counts both and aborts a rollback after
   either with the message ``CharmFT> rollback refused: N array elements
   inserted on PE p since the last in-memory checkpoint`` or ``... deleted
   on PE p ...``.

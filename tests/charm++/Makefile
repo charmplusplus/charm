@@ -8,7 +8,7 @@ DIRS = \
   migratable_threads \
   provisioning \
   load_balancing \
-  chkpt \
+  ckpt_restart \
   delegation \
   sdag \
   ckAllocSysMsgTest \
@@ -38,7 +38,6 @@ DIRS = \
   amr_1d_simple \
   anytime_migration \
   unbounded_migration \
-  unbounded_restart \
   anytime_bcastred \
   atsync_reduction \
   threaded_redn \
@@ -52,11 +51,13 @@ DIRS = \
   objid_loctable \
   objid_recreate \
   objid_boundrecreate \
+  objid_detour \
   collide \
   objloads \
   qd \
   reduction_migrate_ahead \
   section_migrate \
+  xarray_section_reduction \
   bcast_zcpup \
 
 FTDIRS = \

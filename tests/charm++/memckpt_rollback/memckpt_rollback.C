@@ -30,6 +30,13 @@
 // With -insert (-delete) Main inserts (deletes) one element after step 6 and
 // rolls back at once; the runtime refuses the rollback with a "rollback
 // refused" abort naming the insertion (deletion) (testrestriction target).
+//
+// With -bind Main creates, after step 6, an array of Buddy elements bound to
+// the workers (CkArrayOptions::bindTo) and rolls back at once. The new
+// elements join the workers' existing location records instead of creating
+// records, and the runtime must still count them as insertions and refuse the
+// rollback (testrestriction target); restoring the records from a checkpoint
+// taken without the bound array would abort in addElementToRec.
 
 #include "memckpt_rollback.decl.h"
 #include <cstdlib>
@@ -42,7 +49,7 @@ CProxy_Tally tallyProxy;
 CProxy_Worker workerProxy;
 int numElements;
 int lbMode;      // 0: no load balancing; 1: -lb; 2: -lbfirst
-int changeMode;  // 0: none; 1: -insert; 2: -delete
+int changeMode;  // 0: none; 1: -insert; 2: -delete; 3: -bind
 int numRollbacks;  // -rollbacks N: roll back to the same checkpoint N times (default 1)
 
 static const int kCheckpointStep = 5;
@@ -83,6 +90,7 @@ class Main : public CBase_Main {
       if (std::string(m->argv[i]) == "-lbfirst") lbMode = 2;
       if (std::string(m->argv[i]) == "-insert") changeMode = 1;
       if (std::string(m->argv[i]) == "-delete") changeMode = 2;
+      if (std::string(m->argv[i]) == "-bind") changeMode = 3;
       if (std::string(m->argv[i]) == "-rollbacks" && i + 1 < m->argc) numRollbacks = atoi(m->argv[++i]);
     }
     delete m;
@@ -110,9 +118,14 @@ class Main : public CBase_Main {
       if (changeMode == 1) {
         CkPrintf("memckpt_rollback: inserting element %d, then rolling back\n", numElements);
         workers[numElements].insert();
-      } else {
+      } else if (changeMode == 2) {
         CkPrintf("memckpt_rollback: deleting element %d, then rolling back\n", numElements - 1);
         workers[numElements - 1].ckDestroy();
+      } else {
+        CkPrintf("memckpt_rollback: creating an array bound to the workers, then rolling back\n");
+        CkArrayOptions bopts(numElements);
+        bopts.bindTo(workers);
+        CProxy_Buddy::ckNew(bopts);
       }
       CkRollbackMemCheckpoint();  // waits for quiescence, so the change is done
       return;
@@ -312,6 +325,16 @@ class Worker : public CBase_Worker {
     contribute(2 * sizeof(long), data, CkReduction::sum_long,
                CkCallback(CkReductionTarget(Main, stepDone), mainProxy));
   }
+};
+
+// -bind: an array bound to the workers, created after the checkpoint
+class Buddy : public CBase_Buddy {
+  int value = 0;
+
+ public:
+  Buddy() : value(thisIndex) {}
+  Buddy(CkMigrateMessage *m) : CBase_Buddy(m) {}
+  void pup(PUP::er &p) { p | value; }
 };
 
 #include "memckpt_rollback.def.h"

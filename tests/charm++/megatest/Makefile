@@ -35,7 +35,10 @@ OBJS=megatest.o \
      inlineem.o \
      completion_test.o \
      groupdependence.o \
-     listsend.o
+     listsend.o \
+     arraymaps.o \
+     futures.o \
+     callbackkinds.o
 
 CIFILES =  \
       arrayring.def.h  immediatering.def.h  nodering.def.h   rotest.def.h  \
@@ -45,7 +48,8 @@ CIFILES =  \
       groupcast.def.h  migration.def.h      queens.def.h     varraystest.def.h\
       groupring.def.h  nodecast.def.h       reduction.def.h  varsizetest.def.h\
       groupsectiontest.def.h multisectiontest.def.h inlineem.def.h varsizetest2.def.h\
-      groupmulti.def.h completion_test.def.h groupdependence.def.h listsend.def.h
+      groupmulti.def.h completion_test.def.h groupdependence.def.h listsend.def.h\
+      arraymaps.def.h futures.def.h callbackkinds.def.h
 
 .SUFFIXES:
 .SUFFIXES: .o .C .def.h .decl.h .ci .h

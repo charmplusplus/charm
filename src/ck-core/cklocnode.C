@@ -193,7 +193,7 @@ static inline bool ownWrite(const LocTable::Value& c)
 }
 
 uint64_t LocTable::update(uint64_t key, int pe, int epoch, bool arriving, bool* written,
-                          bool received)
+                          bool received, bool clearOnConflict)
 {
   Slot* s = findOrInsert(key);
   // A received update answers or overtakes this process's request: it clears the
@@ -209,6 +209,13 @@ uint64_t LocTable::update(uint64_t key, int pe, int epoch, bool arriving, bool* 
     c.raw = cur;
     if (c.hasLocation() && (epoch <= c.epoch() || (received && ownWrite(c))))
     {
+      if (clearOnConflict && c.pe() != pe && !ownWrite(c))
+      {
+        if (!s->value.compare_exchange_weak(cur, 0, std::memory_order_acq_rel,
+                                            std::memory_order_acquire))
+          continue;  // cur changed: decide again
+        if (_objidDiag) counts.conflictsCleared.fetch_add(1, std::memory_order_relaxed);
+      }
       if (written) *written = false;
       return 0;
     }
@@ -569,7 +576,7 @@ struct TableHolder
               " index table %zu slots in %d segments, %zu used; %zu retired ids;"
               " misses %llu (by index: no id %llu, no location %llu); requests sent %llu,"
               " skipped %llu; fills with waiters %llu, wakes sent %llu; repairs skipped"
-              " (same process) %llu; growths %llu\n",
+              " (same process) %llu; entries cleared by a disagreeing update %llu; growths %llu\n",
               CmiMyNode(), table->slots(), table->segments(), table->used(),
               index ? index->slots() : (size_t)0, index ? index->segments() : 0,
               index ? index->used() : (size_t)0, retired.size(),
@@ -579,6 +586,7 @@ struct TableHolder
               (unsigned long long)c.requestsSkipped.load(), (unsigned long long)c.fills.load(),
               (unsigned long long)c.wakesSent.load(),
               (unsigned long long)c.repairsSkipped.load(),
+              (unsigned long long)c.conflictsCleared.load(),
               (unsigned long long)c.growths.load());
     }
     delete table;

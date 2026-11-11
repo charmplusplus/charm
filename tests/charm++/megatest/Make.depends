@@ -216,3 +216,24 @@ listsend.o: \
 	megatest.h \
 	listsend.def.h
 	$(CHARMC) -o listsend.o -c listsend.C
+arraymaps.o: \
+	arraymaps.C \
+	arraymaps.h \
+	arraymaps.decl.h \
+	megatest.h \
+	arraymaps.def.h
+	$(CHARMC) -o arraymaps.o -c arraymaps.C
+futures.o: \
+	futures.C \
+	futures.h \
+	futures.decl.h \
+	megatest.h \
+	futures.def.h
+	$(CHARMC) -o futures.o -c futures.C
+callbackkinds.o: \
+	callbackkinds.C \
+	callbackkinds.h \
+	callbackkinds.decl.h \
+	megatest.h \
+	callbackkinds.def.h
+	$(CHARMC) -o callbackkinds.o -c callbackkinds.C

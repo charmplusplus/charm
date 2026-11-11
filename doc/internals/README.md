@@ -35,6 +35,7 @@ entry, and is planned once there is more than one chapter.
 | [CkDyn: dynamic chares for language bindings](ckdyn.md) | written 2026-11-07, updated 2026-11-08: registration, messages, delivery, callbacks and futures, reductions, sections, zero-copy (host and device slots, posts, HAPI callbacks), pup, start-up; the Python binding (charm4py 2, branch `thin`) is described in the charm4py repository |
 | Message path: envelope, scheduler, entry method dispatch | not yet written |
 | Chare arrays: creation, insertion, migration, sections | not yet written |
+| [Section multicast trees: build, rebuild, retire, free](section-trees.md) | written 2026-11-09 (counted free of a replaced tree, charm #4132 item 2) |
 | Groups and nodegroups | not yet written |
 | Load balancing: the LB framework and TreeLB | not yet written |
 | [Checkpoint, restart, shrink/expand](memckpt.md) | first section written 2026-11-06: the double in-memory checkpoint and its rollback (syncft option); disk checkpoint and shrink/expand not yet written |

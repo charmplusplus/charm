@@ -173,6 +173,7 @@ void TreeLB::configure(LBTreeBuilder& builder, json& config)
   std::fill(load_received.begin(), load_received.end(), 0);
   // std::fill(notify_after_transfer.begin(), notify_after_transfer.end(), -1);
   std::fill(awaitingLB.begin(), awaitingLB.end(), false);
+  decision_received = false;
 
 #endif
 }
@@ -313,7 +314,11 @@ void TreeLB::loadBalanceSubtree(int level)
 {
   if (!awaitingLB[level]) return;
   awaitingLB[level] = false;
-  if (level == 0) return lb_done();
+  if (level == 0)
+  {
+    decision_received = false;
+    return lb_done();
+  }
 
   // CkPrintf("[%d] TreeLB::loadBalanceSubtree - level=%d\n", CkMyPe(), level);
 
@@ -405,6 +410,11 @@ void TreeLB::receiveDecision(TreeLBMessage* decision, int level)
   logic[level]->processDecision(decision, incoming, outgoing);
   // fprintf(stderr, "[%d] level=%d incoming=%d outgoing=%d\n", CkMyPe(), level, incoming,
   // outgoing);
+  if (level == 0)
+  {
+    decision_received = true;
+    if (load_received[level] > incoming) abortUnorderedArrival();
+  }
   if (incoming == 0 && outgoing == 0)
   {
     // no exchange with other subtrees, can do lb for my subtree now
@@ -478,12 +488,23 @@ void TreeLB::objMovedIn(bool waitBarrier)
 {
   if (!waitBarrier) CkAbort("TreeLB future migrates not supported\n");
 
-  // fprintf(stderr, "[%d] TreeLB::objMovedIn\n", CkMyPe());
-
   int level = 0;
-  CkAssert(numLevels > 0 && awaitingLB[level]);
+  // Only arrivals this balancer ordered are reported here (CkLocMgr::emigrate marks
+  // them), so one outside a step, or beyond the ordered count once the decision is
+  // known, is a runtime error. Counting it would leave load_received !=
+  // expected_incoming forever and this PE would never resume its elements.
+  if (numLevels == 0 || !awaitingLB[level] ||
+      (decision_received && load_received[level] >= expected_incoming[level]))
+    abortUnorderedArrival();
   load_received[level] += 1;
   checkLoadExchanged(level);
+}
+
+void TreeLB::abortUnorderedArrival()
+{
+  CkAbort("TreeLB: PE %d received an array element it did not order (load balancing "
+          "step %d, received %d, expected %d)\n",
+          CkMyPe(), lbmgr->step(), load_received[0], expected_incoming[0]);
 }
 
 void TreeLB::migrateObjects(const IDM& mig_order)
