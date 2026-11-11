@@ -899,6 +899,25 @@ static int64_t dmainResumed(Obj *o, const CkDynMsgView *v) {
   CHECK(v->refnum == CKPT_MARKER, "DMain.resumed: reference number %u, expected the marker %u", v->refnum, CKPT_MARKER);
   CHECK(o->s.counter == CKPT_STATE, "DMain.resumed: state %lld, expected %lld", (long long)o->s.counter, (long long)CKPT_STATE);
   if (g_dmainBuiltHere) { CkDynFutureSet(0, (uint32_t)o->s.fid, emptyMsg()); return 0; }
+  bool staleRestart = false;
+  for (char **a = CkGetArgv(); *a; a++) if (strcmp(*a, "-stalerestart") == 0) staleRestart = true;
+  if (staleRestart) {
+    /* the first section made after the restart reuses the held id's root,
+       index and generation; only the run counter tells them apart */
+    const CkDynSectionID held = o->s.heldSid;
+    CHECK(held.gen != 0 && aidSecA >= 0, "-stalerestart: the checkpoint holds no section id");
+    int zero = 0;
+    CkDynSectionID fresh;
+    CkDynSectionCreateArray(aidSecA, 1, 1, &zero, 0, nullptr, &fresh);
+    CHECK(fresh.root_pe == held.root_pe && fresh.idx == held.idx && fresh.gen == held.gen &&
+          fresh.reserved == (uint8_t)(held.reserved + 1),
+          "-stalerestart: new id (%d, %d, %u, run %u), held id (%d, %d, %u, run %u)", fresh.root_pe, fresh.idx,
+          fresh.gen, fresh.reserved, held.root_pe, held.idx, held.gen, held.reserved);
+    CkPrintf("  sending to a section id from before the restart; CkDyn must abort\n");
+    int ep = Sec.ep(SC_RECV);
+    CkDynSendSection(&held, ep, MsgB().i64(0).i64(-1).finishMcast(ep), nullptr);
+    CHECK(false, "a send with a section id from before the restart did not abort");
+  }
   CkPrintf("PASS restart: DMain.resumed ran on the restored main chare (marker %u, state %lld, view kind %d)\n",
            v->refnum, (long long)o->s.counter, (int)v->kind);
   CHECK(cbUnpacks() > 0, "restart: no unpack call on PE 0");
@@ -1322,6 +1341,9 @@ public:
   void runCheckpoint() {
     CHECK(g_dmain != nullptr, "checkpoint: DMain was not constructed on PE 0");
     g_dmain->s.counter = CKPT_STATE;
+    /* the first section of the run (root PE 0, index 0, generation 1), for
+       the -stalerestart restart run */
+    if (sects.count("Aeven")) g_dmain->s.heldSid = sects["Aeven"].sid;
     g_dmain->s.fid = cbNewFuture([this](const CkDynMsgView *) {
       CkPrintf("  checkpoint: written to %s; DMain.resumed ran; restart with +restart %s\n", ckptDir.c_str(), ckptDir.c_str());
       pass("checkpoint");

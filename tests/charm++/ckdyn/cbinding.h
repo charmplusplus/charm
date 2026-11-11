@@ -49,6 +49,7 @@ struct ObjState {
   int64_t expGot;     /* priority test: the expedited message arrived */
   int64_t joined;     /* section_joined calls */
   double  t0;
+  CkDynSectionID heldSid;   /* DMain: a section id held across checkpoint and restart */
 };
 
 struct Obj {

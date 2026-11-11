@@ -1322,6 +1322,7 @@ extern "C" void CkDynSendSection(const CkDynSectionID *sid, int ep, CkDynMcastMs
   epRec(ep);
   if (sid->root_pe < 0 || sid->root_pe >= CkNumPes())
     CkAbort("CkDyn: section send to a section with root PE %d", sid->root_pe);
+  CProxy_CkDynMgr(_ckdynMgrGID).ckLocalBranch()->checkRun(*sid, "CkDynSendSection");
   ((CkDynHdr *)m->buf)->ep = (uint16_t)ep;
   m->sid = *sid;
   if (sid->root_pe == CkMyPe()) {
@@ -1548,7 +1549,21 @@ extern "C" int CkDynGetReductionNumber(const CkDynTarget *t) {
 
 CkDynMgr::CkDynMgr() {}
 CkDynMgr::CkDynMgr(CkMigrateMessage *m) : CBase_CkDynMgr(m) {}
-void CkDynMgr::pup(PUP::er &p) { CBase_CkDynMgr::pup(p); }
+/* Only a checkpoint packs this group, so unpacking means a restart. With a
+   different PE count every branch is unpacked from PE 0's bytes, which hold
+   the same count. */
+void CkDynMgr::pup(PUP::er &p) {
+  CBase_CkDynMgr::pup(p);
+  p | restarts;
+  if (p.isUnpacking()) restarts++;
+}
+
+void CkDynMgr::checkRun(const CkDynSectionID &sid, const char *what) const {
+  if (sid.reserved != restarts)
+    CkAbort("CkDyn: %s: stale section id from before restart (root PE %d, index %d, generation %u, made in run %u; "
+            "this is run %u after %u restarts): sections are not checkpointed, recreate them after +restart",
+            what, sid.root_pe, sid.idx, sid.gen, sid.reserved, restarts, restarts);
+}
 
 void CkDynMgr::deposit(CkDynMsg *m) {
   CkDynMsgView v;
@@ -1771,10 +1786,12 @@ CkDynSectionID CkDynMgr::idOf(int idx) const {
   sid.kind = s.kind;
   sid.coll_id = s.kind == CKDYN_GROUP ? s.gid : (s.kind == CKDYN_ARRAY ? s.aids[0] : -1);
   sid.gen = s.gen;
+  sid.reserved = restarts;
   return sid;
 }
 
 CkDynSection &CkDynMgr::lookup(const CkDynSectionID &sid, const char *what) {
+  checkRun(sid, what);
   if (sid.root_pe != CkMyPe())
     CkAbort("CkDyn: %s section (root PE %d, index %d) on PE %d, which is not its root", what, sid.root_pe, sid.idx, CkMyPe());
   if (sid.idx < 0 || (size_t)sid.idx >= sections.size())
@@ -1899,7 +1916,7 @@ void CkDynMgr::answerQuery(const CkDynSection &s, const CkDynSection::Query &q) 
 void CkDynMgr::sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe) {
   CkDynSectionID sid;
   memset(&sid, 0, sizeof sid);
-  sid.root_pe = CkMyPe(); sid.idx = idx; sid.gen = (uint16_t)gen;
+  sid.root_pe = CkMyPe(); sid.idx = idx; sid.gen = (uint16_t)gen; sid.reserved = restarts;   /* the sender checked the run */
   CkDynSection &s = lookup(sid, "CkDynSectionCombine: combine");
   CkDynSection::Query q = { combIdx, combGen, partNo, replyPe };
   if (!s.ready) s.queries.push_back(q);   /* a combined section still waiting for its own parts */
@@ -1961,6 +1978,7 @@ void CkDynMgr::addPart(int combIdx, int partNo, int kind, int ndims, const std::
 extern "C" void CkDynSectionCombine(int nparts, const CkDynSectionID *parts, const CkDynCallback *done, CkDynSectionID *out) {
   if (nparts < 1) CkAbort("CkDyn: CkDynSectionCombine with %d parts", nparts);
   CkDynMgr *mg = localMgr();
+  for (int i = 0; i < nparts; i++) mg->checkRun(parts[i], "CkDynSectionCombine");
   int idx = mg->newSection(0, done, 0);
   CkDynSection &s = *mg->sections[idx];
   s.parts.resize(nparts);
@@ -2008,13 +2026,14 @@ void CkDynMgr::deleteSection(const CkDynSectionID &sid) {
 void CkDynMgr::sectionDelete(int idx, int gen) {
   CkDynSectionID sid;
   memset(&sid, 0, sizeof sid);
-  sid.root_pe = CkMyPe(); sid.idx = idx; sid.gen = (uint16_t)gen;
+  sid.root_pe = CkMyPe(); sid.idx = idx; sid.gen = (uint16_t)gen; sid.reserved = restarts;   /* the sender checked the run */
   deleteSection(sid);
 }
 
 extern "C" void CkDynSectionDelete(const CkDynSectionID *sid) {
   if (sid->root_pe < 0 || sid->root_pe >= CkNumPes())
     CkAbort("CkDyn: CkDynSectionDelete of a section with root PE %d", sid->root_pe);
+  localMgr()->checkRun(*sid, "CkDynSectionDelete");
   if (sid->root_pe == CkMyPe()) localMgr()->deleteSection(*sid);
   else CProxy_CkDynMgr(_ckdynMgrGID)[sid->root_pe].sectionDelete(sid->idx, sid->gen);
 }
@@ -2039,6 +2058,7 @@ static CkDynObj &localMember(const CkDynTarget *t, const char *what) {
 }
 
 static CkSectionInfo &cookieOf(const CkDynTarget *me, const CkDynSectionID *sid, const char *what) {
+  localMgr()->checkRun(*sid, what);
   CkDynObj &d = localMember(me, what);
   if (d.sectionCookies) {
     auto it = d.sectionCookies->find(*sid);

@@ -634,6 +634,16 @@ cookie points at an `mCastEntry` valid only on the root, so it cannot travel.
 `coll_id` is the array or group id, -1 for a combined section (whose arrays a
 combine with remote parts learns only later). Generation 0 is never valid.
 
+`reserved` holds `CkDynMgr::restarts`, the number of restarts from a
+checkpoint (modulo 256): `CkDynMgr::pup` writes it, and unpacking it, which
+happens only on a restart, adds one. The section table is not checkpointed,
+so after a restart `newSection` hands out index 0, generation 1 again, and an
+id held in restored object state would otherwise name the new section.
+`CkDynMgr::checkRun` compares the field with the counter at every use of an
+id: `CkDynSendSection`, `CkDynSectionCombine`, `CkDynSectionDelete`, the
+member lookups of `CkDynContributeSection` and `CkDynSectionRedNo`, and
+`lookup` on the root.
+
 ### Creation
 
 `CkDynSectionCreateArray(aid, n, ndims, indices, bfactor, done, &sid)` and
@@ -776,7 +786,8 @@ point to point (`SimpleSend`) and the one after rebuilds the tree
 (ckmulticast.C `sendToSection`). The root is a PE, not an element, so the
 root-migration paths of CkMulticast are not used. A checkpoint writes no
 cookies and the section table is not checkpointed: sections do not survive
-`+restart` and a binding recreates them.
+`+restart` and a binding recreates them; an id from before the restart aborts
+on use ("stale section id from before restart", see the run counter above).
 
 The phases `sections/*` of tests/charm++/ckdyn exercise each part: array and
 group sections with both reducer kinds and every callback kind, a section

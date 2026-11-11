@@ -30,6 +30,8 @@ test: all
 	$(call run, ./ckdyntest +p4 +restart ckdyntest.ckpt )
 	$(call run, ./ckdyntest +p1 )
 	$(call run, ./ckdyntest +p1 +restart ckdyntest.ckpt )
+	! ./ckdyntest +pe 1 +restart ckdyntest.ckpt -stalerestart > stalerestart.log 2>&1
+	grep -q "CkDynSendSection: stale section id from before restart" stalerestart.log
 	! ./ckdyntest +pe 1 -stalesend -skip pingpong -skip pingpong_inline > stalesend.log 2>&1
 	grep -q "send to a deleted section .*stale generation" stalesend.log
 	! ./ckdyntest +pe 1 -zcbcast -skip pingpong -skip pingpong_inline > zcbcast.log 2>&1

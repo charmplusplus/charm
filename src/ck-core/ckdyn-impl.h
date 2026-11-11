@@ -197,6 +197,12 @@ public:
   void sectionParts(int combIdx, int combGen, int partNo, int kind, int ndims,
                     const std::vector<int> &aids, const std::vector<int> &counts, const std::vector<int> &flat);
   void sectionDelete(int idx, int gen);
+  /* restarts of this program from a checkpoint (modulo 256). Every section id
+     made on a PE carries it in `reserved`, and every use of an id checks it,
+     so an id from before a restart aborts instead of naming a section that
+     reuses its (root, index, generation). Checkpointed; +1 on restart. */
+  uint8_t restarts = 0;
+  void checkRun(const CkDynSectionID &sid, const char *what) const;
   /* sections rooted here */
   std::vector<std::unique_ptr<CkDynSection> > sections;
   int  newSection(uint8_t kind, const CkDynCallback *done, int bfactor);

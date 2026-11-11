@@ -103,7 +103,7 @@ typedef struct CkDynSectionID {
   int32_t  idx;        /* index in that table */
   int32_t  coll_id;    /* array or group id (-1 for a combined section) */
   uint8_t  kind;       /* CKDYN_ARRAY, CKDYN_GROUP, or 0 for a combined section (CkDynSectionCombine) */
-  uint8_t  reserved;
+  uint8_t  reserved;   /* set by CkDyn: restarts from a checkpoint before the id was made, modulo 256 */
   uint16_t gen;        /* generation, so a reused slot is not mistaken for the old section */
 } CkDynSectionID;                     /* 16 bytes */
 

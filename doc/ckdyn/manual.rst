@@ -1091,8 +1091,8 @@ once the restart completes. On restart:
   ``CkDynCheckpoint``: sections are not checkpointed, so it could not be
   delivered after a restart.
 
-Not restored: sections (a binding recreates them), buffer posts, futures and
-pending messages. A program that continues after its own checkpoint tells
+Not restored: sections (a binding recreates them; an old section id aborts on
+use), buffer posts, futures and pending messages. A program that continues after its own checkpoint tells
 the two runs apart itself; the C++ test's dynamic main chare checks whether
 its constructor ran in this process.
 
@@ -1394,14 +1394,22 @@ Section ids
      int32_t  idx;        /* index in the root's table */
      int32_t  coll_id;    /* array or group id (-1 for a combined section) */
      uint8_t  kind;       /* CKDYN_ARRAY, CKDYN_GROUP, or 0 for a combined section */
-     uint8_t  reserved;
+     uint8_t  reserved;   /* restarts before the id was made, modulo 256 */
      uint16_t gen;        /* generation */
    } CkDynSectionID;
 
 The id is 16 bytes, travels in messages (``CkDynMsgAddSection``,
 ``CkDynViewSection``) and is valid on every PE. The generation makes a
 deleted section's id distinct from a later section that reuses its table
-slot; generation 0 is never valid.
+slot; generation 0 is never valid. ``reserved`` holds the number of times
+the program has been restarted from a checkpoint (modulo 256) when the id
+was made. Sections are not checkpointed, and after ``+restart`` the first
+sections a program creates get the same root, index and generation as
+sections of the checkpointed run; every use of an id (send, contribute,
+``CkDynSectionRedNo``, combine, delete) compares ``reserved`` with the
+current count and aborts with "stale section id from before restart" when
+they differ. A binding treats the id as 16 opaque bytes and copies all of
+them.
 
 Multicasts and section reductions
 ---------------------------------
@@ -1446,7 +1454,9 @@ Migration, restart and restrictions
   point to point and CkMulticast rebuilds the spanning tree for the one
   after.
 - Sections are not checkpointed: after ``+restart`` a binding recreates
-  them.
+  them. An id from before the restart, for example one held in an object's
+  restored state, aborts on its next use (see `Section ids`_). The check
+  repeats after 256 restarts.
 - A deleted section's CkMulticast trees stay allocated.
 - Section messages take no group dependency and no zero-copy slots.
 - A group section must name a dynamic group; an empty member list aborts.
