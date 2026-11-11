@@ -361,6 +361,8 @@ static inline void _parseCommandLineOpts(char **argv)
       ck::objid::_objidTableLog2 = 16;
   ck::objid::_objidDiag = CmiGetArgFlagDesc(argv, "+objid_diag",
                         "Count location-table events and print them per process at exit");
+  _ckCoroFakeMigrate = CmiGetArgFlagDesc(argv, "+ck_fakemigrate",
+                        "ckcoro: every wait rebuilds the chare's coroutines in place (see ckcoro.h)");
 
   if(CmiGetArgString(argv,"+restart",&_restartDir))
       faultFunc = CkRestartMain;

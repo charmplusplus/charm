@@ -619,8 +619,9 @@ class MarshallTest : public CBase_MarshallTest {
   int sum;
   // Array parameters: a pointer out borrows the message until the next
   // wait; a container out copies.
-  int n;
+  int n, n2;
   double* darr;
+  double* darr2;   // a conjunction's second array, borrowed alongside the first
   std::vector<double> dvec;
   std::vector<int> tail;
 
@@ -660,10 +661,11 @@ public:
     CK_WHEN(inbox::total(), sum);
     check(sum == MARSHALL_ELEMS * (MARSHALL_ELEMS - 1) / 2, "total: wrong reduction result");
 
-    // Array parameters, three rounds sent ahead of time (round r, iteration
+    // Array parameters, five rounds sent ahead of time (round r, iteration
     // k has reference number 100 r + k): received into a pointer, into a
-    // vector with the other parameters skipped, and with the block form.
-    for (iter = 0; iter < 2 * 100 + MARSHALL_ITERS; iter++) {
+    // vector with the other parameters skipped, with the block form, and
+    // two rounds at once by a conjunction with both arrays borrowed.
+    for (iter = 0; iter < 4 * 100 + MARSHALL_ITERS; iter++) {
       if (iter % 100 >= MARSHALL_ITERS) continue;
       std::vector<double> d(iter % 100 + 2);
       for (size_t k = 0; k < d.size(); k++) d[k] = thisIndex * 100 + iter + k;
@@ -690,6 +692,14 @@ public:
         check(data[len - 1] == data[0] + len - 1, "arr block: wrong data[n-1]");
         check(tl.size() == 2 && tl[0] == iter && tl[1] == len, "arr block: wrong tail");
       }
+    }
+    for (iter = 300; iter < 300 + MARSHALL_ITERS; iter++) {
+      CK_WHEN_ALL(CK_ALT(inbox::arr(iter), i, n, darr, tail),
+                  CK_ALT(inbox::arr(iter + 100), ck::coro::skip, n2, darr2, ck::coro::skip));
+      check(i == iter && n == iter % 100 + 2 && n2 == n, "arr all: wrong iteration or lengths");
+      check(darr[0] == (double)((thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS * 100 + iter), "arr all: wrong data[0]");
+      check(darr2[0] == darr[0] + 100, "arr all: wrong second data[0]");
+      check(darr[n - 1] == darr[0] + n - 1 && darr2[n - 1] == darr2[0] + n - 1, "arr all: wrong data[n-1]");
     }
     // A reduction target with an array parameter, reached through the
     // reduction wrapper: the arguments are packed into a message.

@@ -37,9 +37,10 @@ header's opening comment and the manual section "Coroutine Entry Methods".
   whose rank record holds one `chain`.
 - `buffer`: `ep`, `ref`, and `msg` (pupped with `CkPupMessage`): the
   entry's message, or the `CkMarshallMsg` carrying its marshalled
-  parameters, or null for a void entry. `record.held` keeps the last
-  delivery while a pointer out (an array parameter) points into it;
-  `enter_await` releases it at the next wait.
+  parameters, or null for a void entry. `record.held` (a vector) keeps
+  the deliveries of the last wait while a pointer out (an array
+  parameter) points into one of them, one per alternative of a
+  conjunction; `enter_await` releases them at the next wait.
 - `want_t<params<Ps...>>`: a want carrying the entry's parameter types
   (`value_t<T>` per marshalled parameter, `array_param<T>` for an array,
   the message pointer for a message entry), generated as
@@ -130,7 +131,7 @@ handed over (the coroutine owns the message); marshalled parameters are
 read back in order with `PUP::fromMem` from the `CkMarshallMsg`'s buffer,
 an array's offset and count read into slots and, after the scalars, its
 pointer computed from the aligned array start: a pointer out gets it
-(the buffer moves to `record.held` until the next wait), a container out
+(the buffer is pushed on `record.held` until the next wait), a container out
 copies the elements with `assign`; a `ck::coro::skip` out reads into a
 temporary. Without a typed want (the hand-written form) the outs are
 pupped in order with no array support. `CK_WHEN_ALL` uses `all_awaiter`

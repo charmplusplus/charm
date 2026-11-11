@@ -293,6 +293,7 @@ Chare *CkAllocateChare(int objId);
 // made from an entry method sees the caller's delivery.
 CkpvExtern(void *, _ckCurrentMsg);
 CkpvExtern(int, _ckCurrentEp);
+extern bool _ckCoroFakeMigrate;   // +ck_fakemigrate (init.C), read by ckcoro.h
 static inline void *CkCurrentMessage(void) { return CkpvAccess(_ckCurrentMsg); }
 static inline int CkCurrentEntry(void) { return CkpvAccess(_ckCurrentEp); }
 

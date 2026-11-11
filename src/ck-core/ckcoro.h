@@ -288,7 +288,7 @@ struct record {
   bool fakeRestart = false;      // rebuild once it has suspended (+ck_fakemigrate)
   bool rebuilt = false;          // restarted and not yet past the recorded site: no rebuild there
   bool pending = false;          // a restart message is on its way to the element; pupped
-  buffer held;                   // the last delivery, kept while an array out points into it
+  std::vector<buffer> held;      // the deliveries of the last wait, kept while array outs point into them
   // An overlap (CK_OVERLAP, CK_FORALL) runs its tasks as child records of
   // the record at the site: each has its own chain, pupped with the parent,
   // and is created again by the parent's restart. A finished child stays
@@ -555,12 +555,9 @@ class root_guard {
 inline bool fake_migrate_enabled() noexcept {
   static thread_local int v = -1;
   if (v < 0) {
-    v = 0;
-    char **argv = CkGetArgv();
-    for (int i = 0; argv && argv[i]; i++)
-      if (std::strcmp(argv[i], "+ck_fakemigrate") == 0) v = 1;
+    v = _ckCoroFakeMigrate ? 1 : 0; // the flag is parsed in init.C
     if (v && CkMyPe() == 0)
-      CkPrintf("ck::coro> +ck_fakemigrate: every when site rebuilds the element's coroutines in place\n");
+      CkPrintf("ck::coro> +ck_fakemigrate: every when site rebuilds the chare's coroutines in place\n");
   }
   return v == 1;
 }
@@ -971,7 +968,7 @@ inline void state::pup_impl(PUP::er &p, target_fn mk, void *owner) {
 inline record *enter_await() {
   record *rec = current_;
   if (rec == nullptr) CkAbort("ck::coro: co_await when outside a coroutine entry method");
-  rec->held.release(); // an array received at the previous wait is no longer valid
+  rec->held.clear(); // an array received at the previous wait is no longer valid
   rec->rebuilt = rec->ch.restarting; // a restarted body has reached its recorded site
   rec->ch.restarting = false;
   rec->atSite = rec->ch.noted && !rec->ch.notedCall;
@@ -1055,7 +1052,7 @@ inline void when_awaiter<Schema, Outs...>::unpack_marshalled(params<Ps...>, std:
       }
     };
     (fill(std::type_identity<Ps>{}, std::get<I>(outs_), I), ...);
-    if (borrowed) rec->held = std::move(b);
+    if (borrowed) rec->held.push_back(std::move(b));
   }
 }
 

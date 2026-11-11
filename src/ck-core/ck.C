@@ -30,6 +30,7 @@ typedef std::map<int, CkChareID>  Vidblockmap;
 CkpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
 CkpvDeclare(int, currentChareIdx);
 CkpvDeclare(void *, _ckCurrentMsg);  // see CkCurrentMessage (charm++.h)
+bool _ckCoroFakeMigrate = false;     // +ck_fakemigrate (parsed in init.C), read by ckcoro.h
 CkpvDeclare(int, _ckCurrentEp);
 #endif
 
