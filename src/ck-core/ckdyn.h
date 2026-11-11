@@ -552,6 +552,8 @@ void CkDynSetMigratable(const CkDynTarget *t, int migratable);
 void CkDynMigrateMe(const CkDynTarget *t, int to_pe);
 void CkDynLBInstrument(int on);
 void CkDynSetObjLoad(const CkDynTarget *t, double secs);
+/* Push/Pop the running object; always paired: Pop pops one entry even when the
+   object destroyed itself after Push. */
 void CkDynCallstackPush(const CkDynTarget *t);
 void CkDynCallstackPop(const CkDynTarget *t);
 /* Bracket one run of a binding coroutine (a resumed greenlet) so that its

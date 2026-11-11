@@ -78,18 +78,19 @@ static CkDynCallback viewCb(const CkDynMsgView *v, int slot) { CkDynCallback c; 
 /* Classes                                                                 */
 /* ====================================================================== */
 
-extern CbClass Ping, Sec, Grp, NGrp, Single, DMain, Late;
+extern CbClass Ping, Sec, Grp, NGrp, Single, DMain, Late, Tmp;
 
 enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTRED, P_GOTREDB, P_COMPUTE, P_CORO, P_SYNCSTART, P_RESUMED,
        P_ZSTART, P_ZRECV, P_ZPOST, P_ZSPIN, P_ZACK, P_DSTART, P_DRECV, P_DCHECK,
        P_PSTART, P_PRECV, P_PDONE, P_PCHECK };
 enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED };
 enum { G_CTOR, G_GOTRED, G_GOTREDB, G_NGSEND, G_NGREPORT, G_PRIOSTART, G_PRIORECV, G_EXPRECV,
-       G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE, G_LATEREG };
+       G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE, G_LATEREG, G_CSREPORT };
 enum { N_CTOR, N_INCR };
-enum { S_CTOR, S_GOTRED };
+enum { S_CTOR, S_GOTRED, S_INL, S_PLAIN };
 enum { D_CTOR, D_RESUMED };
 enum { L_CTOR, L_ADD, L_TWICE };
+enum { T_CTOR, T_DESTROY };
 
 static inline int myIndex(Obj *o) { return o->t.u.array.index[0]; }
 static void sendPing(int i, int m, CkDynMsg *msg) { CkDynSendArray(aidPing, 1, &i, Ping.ep(m), msg, nullptr); }
@@ -838,6 +839,17 @@ static int64_t grpLateReg(Obj *o, const CkDynMsgView *v) {
   return 0;
 }
 
+/* csReport(cb): contribute the number of Tmp elements that destroyed
+   themselves inside a CkDynCallstackPush/Pop bracket on this PE */
+static std::mutex g_csLock;
+static std::map<int, int> g_csDone;   /* PE -> count */
+static int64_t grpCsReport(Obj *o, const CkDynMsgView *v) {
+  int c;
+  { std::lock_guard<std::mutex> g(g_csLock); c = g_csDone[CkMyPe()]; }
+  contributeInts(o, &c, 1, viewCb(v, 0));
+  return 0;
+}
+
 CbClass Grp = { "Grp", CKDYN_GROUP, 0, {
   { "Grp.Grp", 0, grpCtor },
   { "Grp.gotRed", CKDYN_EP_REDNTARGET, grpGotRed },
@@ -852,6 +864,7 @@ CbClass Grp = { "Grp", CKDYN_GROUP, 0, {
   { "Grp.gotSec", CKDYN_EP_REDNTARGET, secGotSec },
   { "Grp.secCreate", 0, grpSecCreate },
   { "Grp.lateReg", 0, grpLateReg },
+  { "Grp.csReport", 0, grpCsReport },
 } };
 
 /* ---- NGrp (nodegroup) ---------------------------------------------------- */
@@ -877,19 +890,34 @@ CbClass NGrp = { "NGrp", CKDYN_NODEGROUP, 0, {
 
 /* ---- Single (singleton chare) -------------------------------------------- */
 
+static CkDynTarget g_singleHere;      /* a Single constructed on PE 0, as its constructor saw it */
+static bool g_singleHereSet = false;
 static int64_t singleCtor(Obj *o, const CkDynMsgView *) {
   CHECK(o->t.kind == CKDYN_CHARE && o->t.u.chare.pe == CkMyPe(), "Single constructed with a wrong target");
   CkDynTarget t;
   memset(&t, 0, sizeof t);
   t.kind = CKDYN_CHARE; t.chare_idx = Single.chareIdx; t.u.chare.pe = CkMyPe(); t.u.chare.ptr = o->t.u.chare.ptr;
   checkTargetBytes(o, t, "Single constructor");
+  if (CkMyPe() == 0 && !g_singleHereSet) { g_singleHere = o->t; g_singleHereSet = true; }
   return 0;
 }
 static int64_t singleGotRed(Obj *o, const CkDynMsgView *v) { return gotRedTo0(o, v, "Single.gotRed"); }
+/* inl (an INLINE entry) and plain: record the value and reference number, so
+   the inline_chare phase can check the delivery ran inside the send */
+static int64_t g_singleSeen = 0;
+static uint32_t g_singleRef = 0;
+static int64_t singleNote(Obj *, const CkDynMsgView *v) {
+  CHECK(v->kind == CKDYN_MSGKIND_DYN, "Single.inl/plain: view kind %d", (int)v->kind);
+  g_singleSeen = cbI64(v, 0);
+  g_singleRef = v->refnum;
+  return 0;
+}
 
 CbClass Single = { "Single", CKDYN_CHARE, 0, {
   { "Single.Single", 0, singleCtor },
   { "Single.gotRed", CKDYN_EP_REDNTARGET, singleGotRed },
+  { "Single.inl", CKDYN_EP_INLINE, singleNote },
+  { "Single.plain", 0, singleNote },
 } };
 
 /* ---- DMain (dynamic main chare: the checkpoint callback target) --------- */
@@ -952,6 +980,37 @@ CbClass Late = { "Late", CKDYN_ARRAY, 1, {
   { "Late.twice", 0, lateTwice },
 } };
 
+/* ---- Tmp (1-D array whose elements destroy themselves, the callstack phase) */
+
+static int64_t tmpCtor(Obj *, const CkDynMsgView *) { return 0; }
+/* destroy: inside a CkDynCallstackPush/Pop bracket the element destroys
+   itself; Pop must still pop its entry, leaving the running object as it was */
+static int64_t tmpDestroy(Obj *o, const CkDynMsgView *) {
+  CkDynTarget t = o->t;   /* o is freed by the destruct hook when the element goes */
+  /* an outer bracket on the local Grp branch, so that the object expected
+     after Pop is not NULL (a nulled entry left on the stack would read as NULL) */
+  CkDynTarget g = cbGroupTarget(gidGrp, Grp.chareIdx, CkMyPe());
+  CkDynCallstackPush(&g);
+  Chare *before = CkActiveObj();
+  CHECK(before != nullptr, "callstack: the Grp branch is not the running object after CkDynCallstackPush");
+  CkDynCallstackPush(&t);
+  Chare *self = CkActiveObj();
+  CHECK(self != nullptr && self != before, "callstack: CkDynCallstackPush did not make the element the running object");
+  CkDynArrayDestroyElement(t.u.array.aid, 1, t.u.array.index);
+  CkDynCallstackPop(&t);
+  CHECK(CkActiveObj() == before, "callstack: after the element destroyed itself, CkDynCallstackPop left %p "
+        "as the running object; expected %p", (void *)CkActiveObj(), (void *)before);
+  CkDynCallstackPop(&g);
+  std::lock_guard<std::mutex> lk(g_csLock);
+  g_csDone[CkMyPe()]++;
+  return 0;
+}
+
+CbClass Tmp = { "Tmp", CKDYN_ARRAY, 1, {
+  { "Tmp.Tmp", 0, tmpCtor },
+  { "Tmp.destroy", 0, tmpDestroy },
+} };
+
 /* ====================================================================== */
 /* Registration                                                            */
 /* ====================================================================== */
@@ -964,6 +1023,7 @@ void ckdynRegister(void) {
   cbRegister(&NGrp);
   cbRegister(&Single);
   cbRegister(&DMain);
+  cbRegister(&Tmp);
   CkDynAllowLateRegistration();   /* Late is registered by the late phase */
 }
 
@@ -981,7 +1041,7 @@ class TestMain : public CBase_TestMain {
     "pingpong", "pingpong_inline", "bcast",
     "reductions/table", "reductions/single", "reductions/single_any", "reductions/group_elem", "reductions/group_bcast",
     "reductions/array_elem", "reductions/array_bcast", "reductions/future", "reductions/foreign",
-    "future_return", "nodegroup", "qd", "priority", "coroutine",
+    "future_return", "nodegroup", "qd", "priority", "coroutine", "callstack", "inline_chare",
     "ncpy/nonpost", "ncpy/post_before", "ncpy/post_after", "ncpy/samepe",
     "device/remote", "device/samepe", "hapi", "devpersist/remote", "devpersist/samepe",
     "sections/array", "sections/group", "sections/remote", "sections/combine_overlap",
@@ -1078,6 +1138,8 @@ public:
     else if (s == "qd") runQD();
     else if (s == "priority") runPriority();
     else if (s == "coroutine") runCoroutine();
+    else if (s == "callstack") runCallstack();
+    else if (s == "inline_chare") runInlineChare();
     else if (s.compare(0, 5, "ncpy/") == 0) runNcpy(s);
     else if (s.compare(0, 7, "device/") == 0) runDevice(s);
     else if (s == "hapi") runHapi();
@@ -1231,6 +1293,58 @@ public:
       pass("coroutine");
     });
     bcastPing(P_CORO, MsgB().cb(cbFutureCb(0, f)).finish(0));
+  }
+
+  /* callstack: every element of a new Tmp array destroys itself between
+     CkDynCallstackPush and Pop (tmpDestroy checks the running object); then
+     QD, and the Grp branches report how many did. Also Push/Pop of a target
+     that is not local keeps the stack balanced. */
+  void runCallstack() {
+    int n = numElems;
+    uint32_t fc = cbNewFuture([this, n](const CkDynMsgView *) {
+      CkDynSendArray(tmpAid, 1, nullptr, Tmp.ep(T_DESTROY), emptyMsg(), nullptr);
+      CkDynCallback qd = cbFutureCb(0, cbNewFuture([this, n](const CkDynMsgView *) {
+        Chare *before = CkActiveObj();
+        CkDynTarget gone = cbArrayTarget1(tmpAid, Tmp.chareIdx, 0);   /* destroyed: not local anywhere */
+        CkDynCallstackPush(&gone);
+        CkDynCallstackPop(&gone);
+        CHECK(CkActiveObj() == before, "callstack: Push/Pop of a non-local target changed the running object");
+        uint32_t fr = cbNewFuture([this, n](const CkDynMsgView *v) {
+          int got = redInt(v, 0);
+          CHECK(got == n, "callstack: %d elements destroyed themselves inside the bracket, expected %d", got, n);
+          CkPrintf("  callstack: %d elements destroyed themselves between Push and Pop; running object restored\n", n);
+          pass("callstack");
+        });
+        CkDynSendGroup(gidGrp, -1, Grp.ep(G_CSREPORT), MsgB().cb(cbFutureCb(0, fr)).finish(0), nullptr);
+      }));
+      CkDynStartQD(&qd);
+    });
+    int dims[1] = { n };
+    CkDynArrayOpts ao = { 1, dims, -1, 0, 0, -1 };
+    tmpAid = CkDynCreateArray(Tmp.chareIdx, MsgB().flags(CKDYN_MSG_CREATION).fut(0, fc).finish(Tmp.ep(T_CTOR)), &ao);
+  }
+  int tmpAid = -1;
+
+  /* inline_chare: inline delivery to the singleton chare on this PE (PE 0):
+     an INLINE entry, CKDYN_SEND_INLINE to a plain entry, and a TARGET callback
+     to the INLINE entry. Each must run inside the call. */
+  void runInlineChare() {
+    /* the constructor's own target: CkDynCreateChare's is a virtual chare id,
+       which CkSendMsgInline sends through the scheduler */
+    CHECK(g_singleHereSet && g_singleHere.u.chare.pe == CkMyPe(), "inline_chare: no Single on PE 0");
+    const CkDynTarget &single = g_singleHere;
+    g_singleSeen = 0;
+    CkDynSendChare(&single, Single.ep(S_INL), MsgB().i64(11).finish(0), nullptr);
+    CHECK(g_singleSeen == 11, "inline_chare: the INLINE entry did not run inside CkDynSendChare (saw %lld)", (long long)g_singleSeen);
+    CkDynSendOpts io = { CKDYN_SEND_INLINE };
+    CkDynSendChare(&single, Single.ep(S_PLAIN), MsgB().i64(12).finish(0), &io);
+    CHECK(g_singleSeen == 12, "inline_chare: CKDYN_SEND_INLINE did not run inside CkDynSendChare (saw %lld)", (long long)g_singleSeen);
+    CkDynCallback cb = cbTargetCb(single, Single.ep(S_INL), 0, 77);
+    CkDynCallbackSend(&cb, MsgB().i64(13).finish(0));
+    CHECK(g_singleSeen == 13 && g_singleRef == 77, "inline_chare: the TARGET callback to the INLINE entry saw %lld, "
+          "refnum %u (expected 13, 77 inside CkDynCallbackSend)", (long long)g_singleSeen, g_singleRef);
+    CkPrintf("  inline_chare: INLINE entry, CKDYN_SEND_INLINE and an inline TARGET callback ran inside the call\n");
+    pass("inline_chare");
   }
 
   /* ncpy: 16 MB as an NCPY slot from element 0 to the last element (on the

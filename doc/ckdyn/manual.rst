@@ -1593,7 +1593,11 @@ charm4py's switch function:
 running-object half alone: load balancer timing and, in a CUDA build with
 load balancing, the attribution of GPU kernels launched in between to that
 object. charm4py uses them for a coroutine entry inside ``deliver_many``,
-whose trace events come from its own switch.
+whose trace events come from its own switch. Each call changes the stack by
+exactly one entry: Push of an object that is not local pushes nothing that
+the load balancer charges, and Pop after the object destroyed itself in
+between (``CkDynArrayDestroyElement``) still pops its entry, so the running
+object is again the one before Push.
 
 Load balancing
 --------------
@@ -2121,7 +2125,8 @@ See :ref:`ckdyn-pup` and :ref:`ckdyn-coro`.
    Sets a local array element's load.
 
 ``void CkDynCallstackPush(const CkDynTarget *t)``, ``void CkDynCallstackPop(const CkDynTarget *t)``
-   Push or pop a local object on the running-object stack.
+   Push or pop a local object on the running-object stack. Always paired:
+   Pop pops one entry even when the object was destroyed after Push.
 
 ``void CkDynCoroResume(const CkDynTarget *t, int ep, uint64_t coro_id)``, ``void CkDynCoroSuspend(const CkDynTarget *t)``
    Bracket one run of a coroutine: running object and trace event.

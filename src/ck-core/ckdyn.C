@@ -2120,13 +2120,17 @@ extern "C" void CkDynLBInstrument(int on) {
 #endif
 }
 extern "C" void CkDynSetObjLoad(const CkDynTarget *t, double secs) { localElemOrAbort(t, "setObjLoad")->setObjTime(secs); }
+/* Push and Pop always change the running-object stack by one entry, so that
+   they stay balanced: a target that is not local pushes NULL, and an object
+   destroyed between Push and Pop (its entry was nulled by ~Chare) is popped
+   as the top entry, as CkDynCoroSuspend does. */
 extern "C" void CkDynCallstackPush(const CkDynTarget *t) {
-  Chare *c = localChare(t);
-  if (c) CkCallstackPush(c);
+  CkCallstackPush(localChare(t));
 }
 extern "C" void CkDynCallstackPop(const CkDynTarget *t) {
   Chare *c = localChare(t);
-  if (c) CkCallstackPop(c);
+  if (c == nullptr) c = CkActiveObj();
+  CkCallstackPop(c);
 }
 
 /* The thread listeners of a [threaded] entry do the same for a CthThread:
