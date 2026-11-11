@@ -1410,7 +1410,8 @@ void CkMemCheckPTNoteMigration()
 }
 
 // called on the PE an array element is created on, not by a migration or a
-// restore (CkLocMgr::createLocal)
+// restore (CkLocMgr::createLocal, or CkLocMgr::registerNewElement for an element
+// of a bound array that joins an existing record)
 void CkMemCheckPTNoteInsertion()
 {
 #if CMK_MEM_CHECKPOINT
