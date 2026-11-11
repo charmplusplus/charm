@@ -18,7 +18,7 @@
 // get/put choose a mode
 // per pair (mode()): a device copy within a process, CUDA/HIP IPC between
 // processes on one host when the peer's IPC handle opens here, RDMA on the
-// memory registered by open() otherwise. Both buffers' callbacks are sent from the issuing PE once the
+// memory of both buffers otherwise, registered on first use. Both buffers' callbacks are sent from the issuing PE once the
 // bytes are in the destination.
 struct CkDevicePersistent {
   const void* ptr;
@@ -35,8 +35,7 @@ struct CkDevicePersistent {
   bool ipc_valid = false;   // hapi_ipc_handle names ptr's allocation
   int node = -1;            // the process (logical node) of pe
   int phys_node = -1;       // the host of pe
-  bool registered = false;  // ncpy holds a registration of [ptr, ptr + cnt)
-  CmiNcpyBuffer ncpy;
+  uint64_t id = 0;          // nonzero once opened: the buffer's entry in its process's registration table
   bool owner = false;       // this object opened the buffer (not pupped)
 
   CkDevicePersistent() : ptr(nullptr), cnt(0), cb(CkCallback(CkCallback::ignore)),
@@ -65,8 +64,9 @@ struct CkDevicePersistent {
   }
 
   void init();
-  // Takes the IPC handle of the allocation and, in a program of more than one
-  // process, registers the memory for RDMA. Call before sending the object.
+  // Takes the IPC handle of the allocation and records the buffer (ptr, cnt)
+  // for RDMA; the memory is registered with the network the first time a
+  // transfer needs RDMA. Call before sending the object.
   void open();
   // On the object that opened the buffer: releases the registration. On a
   // copy received from a peer: nothing (IPC mappings are kept per process).
@@ -181,6 +181,10 @@ extern "C" {
   extern int persist_put_handler;
   void* persist_ack_bridge(void* arg);
   extern int persist_ack_handler;
+  void* persist_reg_req_bridge(void* arg);
+  extern int persist_reg_req_handler;
+  void* persist_reg_rep_bridge(void* arg);
+  extern int persist_reg_rep_handler;
 }
 
 // Device pool: arenas registered lazily, whole, on first network use.
