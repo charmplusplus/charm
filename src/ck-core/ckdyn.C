@@ -1999,6 +1999,8 @@ void CkDynMgr::sectionDelete(int idx, int gen) {
 }
 
 extern "C" void CkDynSectionDelete(const CkDynSectionID *sid) {
+  if (sid->root_pe < 0 || sid->root_pe >= CkNumPes())
+    CkAbort("CkDyn: CkDynSectionDelete of a section with root PE %d", sid->root_pe);
   if (sid->root_pe == CkMyPe()) localMgr()->deleteSection(*sid);
   else CProxy_CkDynMgr(_ckdynMgrGID)[sid->root_pe].sectionDelete(sid->idx, sid->gen);
 }
