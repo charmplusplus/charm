@@ -2185,8 +2185,8 @@ the reduction message's, set on the callback, as SDAG does);
 ``inbox::name()`` matches any. A delivery that no coroutine is waiting
 for is buffered in the element, in arrival order, and moves with the
 element. ``CK_WHEN_ALL(CK_ALT(want, out...), ...)`` waits until every
-alternative has a delivery and takes them together, as an SDAG ``when
-a(), b()``. ``CK_WHEN_ANY(idx, CK_ALT(want, out...), ...)`` waits for the
+alternative has a delivery and takes them together, as an SDAG
+``when a(), b()``. ``CK_WHEN_ANY(idx, CK_ALT(want, out...), ...)`` waits for the
 first of several alternatives and stores the index of the one that
 matched, as an SDAG ``case``; an alternative may be a conjunction,
 ``CK_ALL(CK_ALT(...), CK_ALT(...))``, which is taken only when all its
@@ -2229,8 +2229,9 @@ and is awaited with ``CK_CALL(expr)`` or ``CK_CALL_TO(lhs, expr)``.
 Several waits can be in progress at once, as with an SDAG ``overlap``:
 ``CK_OVERLAP(task...)`` runs the ``ck::coro::task<void>`` helpers given to
 it as child coroutines of the current one, each waiting at its own sites,
-and continues when all of them have finished; ``CK_FORALL(i, lo, hi,
-expr)`` does the same with one task per value of ``i`` in ``[lo, hi)``,
+and continues when all of them have finished;
+``CK_FORALL(i, lo, hi, expr)`` does the same with one task per value of
+``i`` in ``[lo, hi)``,
 and ``CK_FORALL_STRIDE(i, start, end, stride, expr)`` for ``i`` from
 ``start`` to ``end`` inclusive in steps of ``stride`` of either sign, as
 an SDAG ``forall``. The children are started in order and run until
@@ -2278,13 +2279,13 @@ Differences from SDAG
 ~~~~~~~~~~~~~~~~~~~~~
 
 -  A ``when`` body is a block of the coroutine, not a separate function.
-   ``when e(int x, Y y) { body }`` is ``CK_WHEN_BLOCK(inbox::e(), x, y)
-   { body }`` as long as the body contains no wait. If it does (a nested
-   ``when``), the outer parameters are received into members with
-   ``CK_WHEN(inbox::e(), x, y)`` and the body follows, with the nested
-   wait inside it. SDAG keeps a when's parameters across nested whens in a
-   closure that it packs with the element; here the member is that
-   closure and the chare pups it.
+   ``when e(int x, Y y) { body }`` is
+   ``CK_WHEN_BLOCK(inbox::e(), x, y) { body }`` as long as the body
+   contains no wait. If it does (a nested ``when``), the outer parameters
+   are received into members with ``CK_WHEN(inbox::e(), x, y)`` and the
+   body follows, with the nested wait inside it. SDAG keeps a when's
+   parameters across nested whens in a closure that it packs with the
+   element; here the member is that closure and the chare pups it.
 -  A wait names every parameter of the entry, including one used only for
    matching (``ck::coro::skip`` discards it); SDAG's ``when e[ref](...)``
    and ``when e(int ref, ...)`` both become ``inbox::e(ref)`` with the
