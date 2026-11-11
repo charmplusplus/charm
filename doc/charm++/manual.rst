@@ -2107,12 +2107,13 @@ contains when clauses. It has to be only called using the proxy i.e.
 Structured Control Flow: Coroutine Entry Methods
 ------------------------------------------------
 
-An entry method of an array element can be written as a C++20 coroutine
-that waits in the middle of its body for other entry methods of the
-element, as an SDAG entry waits with ``when``. The control flow is plain
-C++ (``if``, loops, calls), the interface file keeps only the
-declarations, and the element can migrate or be checkpointed while the
-coroutine waits. The header is ``ckcoro.h``; the programs must be compiled
+An entry method of a chare of any kind (an array element, a group or
+nodegroup branch, a singleton chare, the mainchare) can be written as a
+C++20 coroutine that waits in the middle of its body for other entry
+methods of the same chare, as an SDAG entry waits with ``when``. The
+control flow is plain C++ (``if``, loops, calls), the interface file
+keeps only the declarations, and the chare can migrate or be
+checkpointed while the coroutine waits. The header is ``ckcoro.h``; the programs must be compiled
 with ``-std=c++20``. This feature is experimental in this release.
 Readers who know SDAG: the two treat the parameters of a waited-for
 entry method differently; the subsection *Differences from SDAG* at the
@@ -2124,7 +2125,7 @@ coroutine entry is ``[coroutine]`` and the entries it waits for are
 parameters (conditional and nocopy parameters excepted). The
 chare puts the generated macro ``ClassName_CORO_CODE`` in its class,
 which defines the coroutine state (the active coroutines and the
-buffered deliveries, packed with the element), the bodies of the inbox
+buffered deliveries, packed with the chare), the bodies of the inbox
 entries, and ``inbox::name()`` and ``inbox::name(ref)``, which name an
 inbox entry at a wait. The jacobi3d step of
 ``tests/charm++/jacobi3d-coro``:
@@ -2171,7 +2172,7 @@ the same way and stores the delivery into members of the chare that
 follow, again the message pointer or every marshalled parameter in order,
 a parameter used only for matching included (``ck::coro::skip`` in place
 of a member discards one). A received value that is needed after a later
-wait goes through a member, because a member is pupped with the element
+wait goes through a member, because a member is pupped with the chare
 and a variable of the coroutine is not (see the rules below). The
 coroutine owns a received message: it deletes it before the next wait,
 or pups the member with ``CkPupMessage``. An array parameter
@@ -2183,8 +2184,8 @@ envelope's for a message entry and the first arithmetic parameter for a
 marshalled entry (a reduction target reached through its reduction uses
 the reduction message's, set on the callback, as SDAG does);
 ``inbox::name()`` matches any. A delivery that no coroutine is waiting
-for is buffered in the element, in arrival order, and moves with the
-element. ``CK_WHEN_ALL(CK_ALT(want, out...), ...)`` waits until every
+for is buffered in the chare, in arrival order, and moves with the
+chare. ``CK_WHEN_ALL(CK_ALT(want, out...), ...)`` waits until every
 alternative has a delivery and takes them together, as an SDAG
 ``when a(), b()``. ``CK_WHEN_ANY(idx, CK_ALT(want, out...), ...)`` waits for the
 first of several alternatives and stores the index of the one that
@@ -2192,7 +2193,7 @@ matched, as an SDAG ``case``; an alternative may be a conjunction,
 ``CK_ALL(CK_ALT(...), CK_ALT(...))``, which is taken only when all its
 deliveries are present.
 
-A coroutine frame is never packed. When the element migrates or is
+A coroutine frame is never packed. When the chare migrates or is
 checkpointed, the coroutine state records which wait each active coroutine
 is suspended at, and after unpacking the entry is invoked again: its body
 runs again from the top and jumps to the recorded wait. This gives the
@@ -2264,9 +2265,21 @@ parameters are supplied again by the restart, so they may be the
 ``forall`` index and values derived from members.
 
 The command line option ``+ck_fakemigrate`` makes every wait pack and
-unpack the element's coroutines in place the first time a coroutine
+unpack the chare's coroutines in place the first time a coroutine
 suspends there, so that a program can check the rules above on one
 processor without a load balancer.
+
+The chare kinds differ only in how a suspended coroutine is invoked
+again after a migration or a restart from a checkpoint: the coroutine
+state sends the entry's message to the chare's own handle, index or
+branch, so a group's or a singleton chare's coroutine resumes on the PE
+it was checkpointed on. On a nodegroup the ``[inbox]`` and
+``[coroutine]`` entries are made ``exclusive`` by charmxi, as SDAG's
+entries of a nodegroup are, so that deliveries from different PEs of
+the node and the coroutine body never run at the same time; the node
+lock is released whenever the coroutine suspends, because the entry
+method returns there. These entries must not be tagged ``exclusive``
+by hand.
 
 Inside any entry method, ``CkCurrentMessage()`` returns the message being
 delivered (for marshalled parameters, the message that carries them) and
@@ -2282,7 +2295,9 @@ an SDAG program of the same behaviour next to it:
 restart in its ``make test``); ``tests/charm++/ckcoro`` (the ``basic``,
 ``refnum`` and ``migration`` modules of ``tests/charm++/sdag`` written
 as coroutines, with every construct of this section, plus modules for
-marshalled inbox entries, arrays and overlap under migration); and
+marshalled inbox entries, arrays and overlap under migration, and for
+a group, a nodegroup, a singleton chare and the mainchare as owners,
+checkpointed and restarted while their coroutines wait); and
 ``benchmarks/charm++/coro_pingpong`` (one ping-pong written three ways,
 plain entry methods, SDAG and a coroutine, in one file).
 
@@ -4645,13 +4660,13 @@ nokeep
    ``examples/charm++/histogram_group``.
 
 inbox
-   entry methods of an array element deliver to the element's coroutine
+   entry methods of a chare of any kind deliver to the chare's coroutine
    state (section :numref:`sec:ckcoro`): their bodies are generated. They
    take a message or marshalled parameters (conditional and nocopy
    parameters excepted).
 
 coroutine
-   entry methods of an array element are defined in C++ as coroutines
+   entry methods of a chare of any kind are defined in C++ as coroutines
    returning ``ck::coroutine`` (section :numref:`sec:ckcoro`). They take
    a message or marshalled parameters (conditional and nocopy parameters
    excepted) and return void.

@@ -1,0 +1,36 @@
+// Groups, nodegroups and singleton chares as owners of coroutine entry
+// methods (the mainchare Main of ckcoro_tests.ci is the fourth owner and
+// drives these). Each owner waits for its deliveries, reports that it is
+// ready, waits for resume() (the checkpoint, if any, is taken in between)
+// and reports its result. A restarted run (+restart) finds every owner
+// suspended at the resume() wait.
+
+module owners {
+
+  // Receives one token per round from every PE of its node: the inbox
+  // entries run on different PEs of the node, serialized by the node lock
+  // charmxi adds to the inbox and coroutine entries of a nodegroup.
+  nodegroup [migratable] NodeGroupTest {
+    entry NodeGroupTest();
+    entry [coroutine] void run(int rounds);
+    entry [inbox] void token(int round, int from);
+    entry [inbox] void resume();
+  }
+
+  // A ring over the PEs: each branch passes one token per round to the
+  // next PE and sends the same token to its node's NodeGroupTest branch.
+  group [migratable] GroupTest {
+    entry GroupTest();
+    entry [coroutine] void run(int rounds, CProxy_NodeGroupTest ng);
+    entry [inbox] void token(int round, int from);
+    entry [inbox] void resume();
+  }
+
+  // Items sent in reverse order before run(), received in index order.
+  chare [migratable] ChareTest {
+    entry ChareTest(int n);
+    entry [coroutine] void run();
+    entry [inbox] void item(int i, int v);
+    entry [inbox] void resume();
+  }
+}

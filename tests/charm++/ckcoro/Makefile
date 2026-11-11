@@ -4,7 +4,7 @@ CHARMC=../../../bin/charmc $(OPTS)
 
 all: ckcoro_tests
 
-ckcoro_tests: ckcoro_tests.C ckcoro_tests.decl.h basic.decl.h refnum.decl.h migration.decl.h ../../../include/ckcoro.h
+ckcoro_tests: ckcoro_tests.C ckcoro_tests.decl.h basic.decl.h refnum.decl.h migration.decl.h owners.decl.h ../../../include/ckcoro.h
 	$(CHARMC) -std=c++20 ckcoro_tests.C -o ckcoro_tests
 
 %.decl.h: %.ci
@@ -12,10 +12,15 @@ ckcoro_tests: ckcoro_tests.C ckcoro_tests.decl.h basic.decl.h refnum.decl.h migr
 
 clean:
 	rm -f *.decl.h *.def.h *.o ckcoro_tests charmrun
+	rm -rf log
 
 test: all
 	$(call run, ./ckcoro_tests +p1)
 	$(call run, ./ckcoro_tests +p4)
 	$(call run, ./ckcoro_tests +p4 +ck_fakemigrate)
+	rm -rf log
+	$(call run, ./ckcoro_tests -chkpt log +p4)
+	-sync
+	$(call run, ./ckcoro_tests +p4 +restart log)
 
 .PHONY: all clean test

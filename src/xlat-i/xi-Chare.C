@@ -1761,7 +1761,7 @@ void Chare::genCoroCode(XStr& str) {
   body << "#define " << baseName(0) << "_CORO_CODE \n"
        << "public:\n"
        << "  ::ck::coro::state __coro;\n"
-       << "  void _coro_pup(PUP::er &p) { p | __coro; }\n";
+       << "  void _coro_pup(PUP::er &p) { __coro.pup(p, this); }\n";
   CoroGen g;
   g.str = &body;
   g.pass = CoroGen::isEntry;

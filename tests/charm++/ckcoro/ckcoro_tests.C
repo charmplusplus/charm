@@ -19,6 +19,8 @@
 #define OVERLAP_ELEMS 6
 #define OVERLAP_ROUNDS 4
 #define OVERLAP_ITEMS 5
+#define OWNER_ROUNDS 3
+#define OWNER_ITEMS 7
 
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ CProxy_MigrationTest migrationTestProxy;
@@ -26,8 +28,23 @@
 /* readonly */ CProxy_RefnumTest refnumTestProxy;
 
 class Main : public CBase_Main {
+  Main_CORO_CODE
+  // The owner tests' proxies and results: pupped, the checkpoint restores them.
+  CProxy_GroupTest group;
+  CProxy_NodeGroupTest ngroup;
+  CProxy_ChareTest chare;
+  std::string chkptDir;
+  int gsum, nsum, csum;
+
+  static void check(bool ok, const char* what) {
+    if (!ok) ::CkAbort("ckcoro owner test: %s", what);
+  }
+
 public:
   Main(CkArgMsg* m) {
+    // -chkpt DIR: checkpoint to DIR during the owner tests; +restart DIR resumes there.
+    for (int i = 1; i + 1 < m->argc; i++)
+      if (strcmp(m->argv[i], "-chkpt") == 0) chkptDir = m->argv[i + 1];
     delete m;
     mainProxy = thisProxy;
     basicTestProxy = CProxy_BasicTest::ckNew(1);
@@ -104,7 +121,133 @@ public:
 
   void overlapTestDone() {
     CkPrintf("Overlap tests complete\n");
+    thisProxy.runOwners(OWNER_ROUNDS);
+  }
+
+  Main(CkMigrateMessage* m) : CBase_Main(m) {}
+  void pup(PUP::er& p) {
+    p | group; p | ngroup; p | chare; p | chkptDir;
+    p | gsum; p | nsum; p | csum;
+  }
+
+  // The mainchare's own coroutine entry: starts the three owners, waits for
+  // all of them to be ready (a conjunction of two reduction targets and a
+  // plain inbox entry), checkpoints with every owner's coroutine suspended,
+  // resumes them and collects their results. rounds is re-supplied by a
+  // restart.
+  ck::coroutine runOwners(int rounds) {
+    CK_COROUTINE();
+    CkPrintf("Running owner tests (group, nodegroup, chare, mainchare)\n");
+    ngroup = CProxy_NodeGroupTest::ckNew();
+    group = CProxy_GroupTest::ckNew();
+    chare = CProxy_ChareTest::ckNew(OWNER_ITEMS);
+    for (int i = OWNER_ITEMS - 1; i >= 0; i--) chare.item(i, i * i);
+    group.run(rounds, ngroup);
+    ngroup.run(rounds);
+    chare.run();
+    CK_WHEN_ALL(CK_ALT(inbox::groupReady()), CK_ALT(inbox::nodeGroupReady()),
+                CK_ALT(inbox::chareReady()));
+    if (!chkptDir.empty()) {
+      CkPrintf("Checkpoint to %s with the owners' coroutines suspended\n", chkptDir.c_str());
+      CkStartCheckpoint(chkptDir.c_str(), CkCallback(CkIndex_Main::checkpointed(), thisProxy));
+      // After the checkpoint in this run, and the first message of a run
+      // restarted from it.
+      CK_WHEN(inbox::checkpointed());
+      CkPrintf("Resuming after the checkpoint on %d PEs\n", CkNumPes());
+    }
+    group.resume();
+    ngroup.resume();
+    chare.resume();
+    CK_WHEN_ALL(CK_ALT(inbox::groupDone(), gsum), CK_ALT(inbox::nodeGroupDone(), nsum),
+                CK_ALT(inbox::chareDone(), csum));
+    {
+      int p = CkNumPes();
+      int expected = rounds * p * (p - 1) / 2;   // every PE receives from its predecessor
+      check(gsum == expected, "group sum");
+      check(nsum == expected, "nodegroup sum");  // the same tokens, by node
+      int items = 0;
+      for (int i = 0; i < OWNER_ITEMS; i++) items += i * i;
+      check(csum == items, "chare sum");
+    }
+    CkPrintf("Owner tests complete\n");
     CkExit();
+    CK_END();
+  }
+};
+
+class GroupTest : public CBase_GroupTest {
+  GroupTest_CORO_CODE
+  int round, from, sum;
+  static void check(bool ok, const char* what) {
+    if (!ok) ::CkAbort("ckcoro owner test (group): %s", what);
+  }
+
+public:
+  GroupTest() : round(0), from(-1), sum(0) {}
+  GroupTest(CkMigrateMessage* m) : CBase_GroupTest(m) {}
+  void pup(PUP::er& p) { p | round; p | from; p | sum; }
+
+  ck::coroutine run(int rounds, CProxy_NodeGroupTest ng) {
+    CK_COROUTINE();
+    for (round = 0; round < rounds; round++) {
+      thisProxy[(CkMyPe() + 1) % CkNumPes()].token(round, CkMyPe());
+      ng[CkMyNode()].token(round, CkMyPe());
+      CK_WHEN(inbox::token(round), ck::coro::skip, from);
+      check(from == (CkMyPe() + CkNumPes() - 1) % CkNumPes(), "token from the wrong PE");
+      sum += from;
+    }
+    contribute(CkCallback(CkReductionTarget(Main, groupReady), mainProxy));
+    CK_WHEN(inbox::resume());
+    contribute(sizeof(int), &sum, CkReduction::sum_int,
+               CkCallback(CkReductionTarget(Main, groupDone), mainProxy));
+    CK_END();
+  }
+};
+
+class NodeGroupTest : public CBase_NodeGroupTest {
+  NodeGroupTest_CORO_CODE
+  int round, count, from, sum;
+
+public:
+  NodeGroupTest() : round(0), count(0), from(-1), sum(0) {}
+  NodeGroupTest(CkMigrateMessage* m) : CBase_NodeGroupTest(m) {}
+  void pup(PUP::er& p) { p | round; p | count; p | from; p | sum; }
+
+  ck::coroutine run(int rounds) {
+    CK_COROUTINE();
+    for (round = 0; round < rounds; round++) {
+      for (count = 0; count < CkNodeSize(CkMyNode()); count++) {
+        CK_WHEN(inbox::token(round), ck::coro::skip, from);
+        sum += from;
+      }
+    }
+    contribute(CkCallback(CkReductionTarget(Main, nodeGroupReady), mainProxy));
+    CK_WHEN(inbox::resume());
+    contribute(sizeof(int), &sum, CkReduction::sum_int,
+               CkCallback(CkReductionTarget(Main, nodeGroupDone), mainProxy));
+    CK_END();
+  }
+};
+
+class ChareTest : public CBase_ChareTest {
+  ChareTest_CORO_CODE
+  int n, i, v, sum;
+
+public:
+  ChareTest(int n_) : n(n_), i(0), v(0), sum(0) {}
+  ChareTest(CkMigrateMessage* m) : CBase_ChareTest(m) {}
+  void pup(PUP::er& p) { p | n; p | i; p | v; p | sum; }
+
+  ck::coroutine run() {
+    CK_COROUTINE();
+    for (i = 0; i < n; i++) {
+      CK_WHEN(inbox::item(i), ck::coro::skip, v);
+      sum += v;
+    }
+    mainProxy.chareReady();
+    CK_WHEN(inbox::resume());
+    mainProxy.chareDone(sum);
+    CK_END();
   }
 };
 
@@ -344,17 +487,19 @@ class MigrationTest : public CBase_MigrationTest {
 private:
   int data;
   bool qd_reached;
+  bool finished;   // the test is over: ckJustMigrated contributes no more
   // Scratch, assigned at sites and used after them.
   TestMessage *msg1, *msg2;
   int which;
 
 public:
-  MigrationTest() : data(thisIndex), qd_reached(false), msg1(nullptr), msg2(nullptr), which(-1) {}
+  MigrationTest() : data(thisIndex), qd_reached(false), finished(false), msg1(nullptr), msg2(nullptr), which(-1) {}
   MigrationTest(CkMigrateMessage* msg) : CBase_MigrationTest(msg) {}
 
   void pup(PUP::er& p) {
     p | data;
     p | qd_reached;
+    p | finished;
     if (p.isUnpacking()) { msg1 = msg2 = nullptr; which = -1; }
   }
 
@@ -435,6 +580,7 @@ public:
     }
     // Every message was consumed (the SDAG test's final overlap).
     CkAssert(__coro.num_buffered() == 0);
+    finished = true;
     contribute(CkCallback(CkReductionTarget(Main, migrationTestDone), mainProxy));
     CK_END();
   }
@@ -447,7 +593,11 @@ public:
     migrateMe(migrateToPe);
   }
 
+  // Not once the test is over: the owner tests take a checkpoint after it,
+  // and the restart restores the elements through the migration path, where
+  // this contribution would have no reduction to join.
   void ckJustMigrated() {
+    if (finished) return;
     contribute(CkCallback(CkReductionTarget(MigrationTest, migrationDone), thisProxy));
     TestMessage* msg = new (thisIndex+1) TestMessage(thisIndex, CkMyPe());
     thisProxy[thisIndex].sentAfter(msg);
@@ -646,3 +796,4 @@ public:
 #include "basic.def.h"
 #include "refnum.def.h"
 #include "migration.def.h"
+#include "owners.def.h"

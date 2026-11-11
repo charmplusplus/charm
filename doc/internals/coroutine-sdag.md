@@ -3,9 +3,10 @@
 A coroutine entry method is an entry method whose C++ definition returns
 `ck::coroutine`: its body runs when the entry is invoked, suspends at
 `CK_WHEN` sites until a delivery to an inbox entry matches, and finishes
-like any entry method. The element's `ck::coro::state` member holds the
-records of its active coroutines and the inbox, and packs them with the
-element; a coroutine frame is never packed. The mechanism is in
+like any entry method. The chare's `ck::coro::state` member (any chare
+kind: array element, group or nodegroup branch, singleton chare,
+mainchare) holds the records of its active coroutines and the inbox, and
+packs them with the chare; a coroutine frame is never packed. The mechanism is in
 `src/ck-core/ckcoro.h` (header-only, C++20); charmxi's `[inbox]` and
 `[coroutine]` attributes generate the `X_CORO_CODE` macro that declares
 the state member and the inbox entry bodies; the runtime contributes
@@ -18,7 +19,9 @@ header's opening comment and the manual section "Coroutine Entry Methods".
 - `ck::coro::state` (one per chare): `std::list<record> recs_` and
   `std::vector<buffer> inbox_`.
 - `record`: the coroutine entry's index `ep`, a `CkCallback target` to the
-  element, the entry's message `msg` (a copy, for message entries; null for
+  owner (`self_target`, one overload per chare kind: an array element by
+  index, a group branch by PE, a nodegroup branch by node, a chare or
+  mainchare by handle), the entry's message `msg` (a copy, for message entries; null for
   void entries), `pending` (a restart message is on its way; pupped), the
   restart `chain`, the frame handles `root` (the entry's frame) and `h`
   (the innermost suspended frame), and the wait state: `waiting`, `atSite`,
@@ -67,8 +70,8 @@ header's opening comment and the manual section "Coroutine Entry Methods".
   `CkCurrentEntry()`.
 - The generated `X_CORO_CODE` macro (`Chare::genCoroCode`,
   `Entry::genCoroCode` in src/xlat-i): `ck::coro::state __coro`,
-  `_coro_pup(p)` (called by `recursive_pup_impl` in charm++.h next to
-  `_sdag_pup`), `static bool __coro_is_entry(int ep)` (true for the
+  `_coro_pup(p)` (`__coro.pup(p, this)`, called by `recursive_pup_impl`
+  in charm++.h next to `_sdag_pup`), `static bool __coro_is_entry(int ep)` (true for the
   chare's `[coroutine]` entries), one method body per `[inbox]` entry
   (`__coro.deliver(CkIndex_X::idx_name(), params...)`, an array as
   `array_arg<T>{p, bytes}`), and `struct inbox` with `using name_params`
@@ -167,7 +170,11 @@ condition).
 `pending` (sent before the element moved again; the location manager
 forwards it), a copy of the record's message (or a fresh system message for
 a void entry) is sent through `target` and `pending` is set, so the entry
-is invoked again by the array manager after the unpack completes. The body
+is invoked again by the runtime after the unpack completes. `pup(p,
+owner)`, the form the generated `_coro_pup` calls, rebuilds `target`
+from the owner before sending (`self_target`), so a chare restored from
+a checkpoint, whose handle is new, and a group branch are reached; the
+library form `p | state` keeps the packed target. The body
 runs to `CK_COROUTINE`, adopts the record (clearing `pending`, setting
 `chain.restarting`), and each `frame_guard` on the recorded path switches
 to its site; `note_site` checks that the site reached is the recorded one.
@@ -185,14 +192,21 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
 
 ## Limits and diagnostics
 
-- One active coroutine per entry per element (`begin` aborts otherwise).
+- One active coroutine per entry per chare (`begin` aborts otherwise).
+- On a nodegroup, charmxi makes `[inbox]` and `[coroutine]` entries
+  `[exclusive]` (as SDAG's when-entries of a nodegroup) and rejects the
+  attribute written by hand. The generated `_call_` of a marshalled inbox
+  entry and the reduction wrapper of an exclusive entry take the node
+  lock with the same try-lock-and-resend as other exclusive entries; the
+  resend copies the message only when the entry is nokeep. The lock is
+  released when the coroutine suspends, since the entry returns there.
 - Coroutine entries take a message or marshalled parameters (not
   conditional or nocopy); a `[coroutine]` entry is not `nokeep`, and
   `state::begin` takes its marshalled message as the record's own
   (`own`), replacing it on a restart so that array parameters point into
   the live copy.
 - An overlap restarted with a different number of tasks aborts.
-- An element packed while suspended at a non-site `co_await` aborts with
+- A chare packed while suspended at a non-site `co_await` aborts with
   the entry index.
 - A restarted body that reaches a site other than the recorded one, or a
   helper not on the recorded path, aborts (`note_site`, `frame_guard`).
@@ -205,7 +219,8 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
   by `else`.
 - `CkCurrentMessage()` sees the caller's delivery inside an `[inline]` or
   `[local]` call; `deliver` then packs the arguments instead.
-- `CKCORO_DEBUG=1` in the environment prints each rebuild.
+- `CKCORO_DEBUG=1` in the environment prints each rebuild and each
+  restart.
 
 ## Where in the source
 
@@ -225,7 +240,10 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
 - `tests/charm++/ckcoro/`: the SDAG migration test as a coroutine
   (synchronized and anytime migration while suspended, `CK_WHEN_ANY`) and
   the marshalled inbox test (matching by the first parameter, a broadcast,
-  a reduction target, under `+ck_fakemigrate`).
+  a reduction target, under `+ck_fakemigrate`), the SDAG basic and
+  refnum tests, overlap under migration, and the owners module (a group,
+  a nodegroup, a singleton chare and the mainchare, checkpointed and
+  restarted while suspended).
 - `benchmarks/charm++/coro_pingpong/`: plain, SDAG and coroutine ping-pong.
 - `src/libs/ck-libs/ampi/campi_core.h`, `campi.C`: CAMPI, the other user
   of the shared core.

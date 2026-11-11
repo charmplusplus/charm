@@ -496,8 +496,11 @@ is not prejudged: with the `.ci` file kept, the attributes stay; without
 it, the same macro can be produced by a C++20 member-pointer template
 (`ck::entry<&X::name>`) over a registry, and the header does not change.
 
-What "experimental" has to say: arrays only (no groups or singleton
-chares as owners); the site macros may still change.
+What "experimental" has to say: the site macros may still change.
+Owners of every kind since 2026-11-11: the restart callback is built per
+chare kind (`self_target`) and rebuilt from the owner on unpack, which
+is what a checkpoint restart of a singleton chare needs; nodegroup
+entries are made exclusive by charmxi, as SDAG's.
 
 What charm4py can mirror: the record and site protocol of section 8, with
 no C++ frame involved.
@@ -510,7 +513,5 @@ rest of the SDAG test corpus.
 
 ## 10. Open items
 
-- Groups, nodegroups and singleton chares as owners of coroutine entries
-  (the prototype's record builds its callback from an `ArrayElement`).
 - The rest of the equivalence corpus: megatest synctest and SDAG-heavy
   miniapps under both implementations.

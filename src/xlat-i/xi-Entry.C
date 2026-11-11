@@ -98,9 +98,15 @@ void Entry::check() {
     if (isInbox() || isCoroutine()) {
       if (isInbox() && isCoroutine())
         XLAT_ERROR_NOCOL("an entry method is 'inbox' or 'coroutine', not both", first_line_);
-      if (!container->isArray())
-        XLAT_ERROR_NOCOL("'inbox' and 'coroutine' entry methods belong to array elements",
-                         first_line_);
+      if (container->isNodeGroup()) {
+        // Serialized with each other as SDAG entries of a nodegroup are: the
+        // coroutine state has no lock of its own. The lock is released when
+        // the coroutine suspends, because the entry returns there.
+        if (isExclusive())
+          XLAT_ERROR_NOCOL("an 'inbox' or 'coroutine' entry method of a nodegroup is exclusive "
+                           "by itself; do not tag it 'exclusive'", first_line_);
+        addAttribute(SLOCKED);
+      }
       if (isConstructor() || isThreaded() || isSync() || isLocal() || isInline() ||
           isWhenIdle() || isIget() || isPython() || isTramTarget())
         XLAT_ERROR_NOCOL("an 'inbox' or 'coroutine' entry method is a plain asynchronous "
@@ -2155,9 +2161,20 @@ void Entry::genDefs(XStr& str) {
       // on that thread and deletes it when the thread ends. The wrapper owns
       // the message, so it takes no extra reference.
       if (isThreaded()) str << callThread(epStr(true), 0, false);
+      if (isExclusive()) {
+        // The reduction wrapper of an exclusive entry takes the node lock as
+        // the direct call does, resending the reduction message when the
+        // lock is busy.
+        str << "  if(CmiTryLock(impl_obj->__nodelock)) {\n"
+            << "    CkSendMsgNodeBranch(" << epIdx(1, true)
+            << ",impl_msg,CkMyNode(),impl_obj->CkGetNodeGroupID());\n"
+            << "    return;\n"
+            << "  }\n";
+      }
       str << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
       XStr precall;
       genCall(str, precall, true, false);
+      if (isExclusive()) str << "  CmiUnlock(impl_obj->__nodelock);\n";
       if (!(sdagCon || isWhenEntry))
         str << "  delete (CkReductionMsg*)impl_msg;\n}\n\n";
       else
@@ -2230,8 +2247,10 @@ void Entry::genDefs(XStr& str) {
     // An exclusive method
     preMarshall
         << "  if(CmiTryLock(impl_obj->__nodelock)) {\n"; /*Resend msg. if lock busy*/
-    /******* DANGER-- RESEND CODE UNTESTED **********/
-    if (param->isMarshalled()) {
+    // The original is freed after the call when the entry is nokeep (every
+    // marshalled entry but inbox, coroutine and threaded ones), so the resend
+    // takes a copy; otherwise the original is resent.
+    if (param->isMarshalled() && isNoKeep()) {
       preMarshall << "    impl_msg = CkCopyMsg(&impl_msg);\n";
     }
     preMarshall << "    CkSendMsgNodeBranch(" << epIdx()
@@ -2343,9 +2362,12 @@ void Entry::genDefs(XStr& str) {
   }
   if (isInbox() && param->isMarshalled()) {
     // A marshalled inbox entry: the message goes to the coroutine state as
-    // it is; a when unmarshals it when it matches.
+    // it is; a when unmarshals it when it matches. On a nodegroup, under the
+    // node lock (preMarshall and postCall are the exclusive wrapper).
+    str << preMarshall;
     str << "  impl_obj->__coro.deliver_message<" << container->baseName() << "::inbox::" << name
         << "_params>(" << epIdx(1) << ", (CkMarshallMsg *)impl_msg);\n";
+    str << postCall;
   } else if (!isLocal()) {
     if (isThreaded()) str << callThread(epStr());
     str << preMarshall;

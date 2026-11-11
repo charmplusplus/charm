@@ -2,13 +2,16 @@ mainmodule ckcoro_tests {
   extern module basic;
   extern module refnum;
   extern module migration;
+  extern module owners;
 
   readonly CProxy_Main mainProxy;
   readonly CProxy_MigrationTest migrationTestProxy;
   readonly CProxy_BasicTest basicTestProxy;
   readonly CProxy_RefnumTest refnumTestProxy;
 
-  mainchare Main {
+  // Migratable: a checkpoint (-chkpt DIR) is taken during the owner tests
+  // while Main's own coroutine entry runOwners is suspended.
+  mainchare [migratable] Main {
     entry Main(CkArgMsg* msg);
     entry void doBasicTest();
     entry void basicTestDone();
@@ -20,6 +23,15 @@ mainmodule ckcoro_tests {
     entry [reductiontarget] void marshallTestDone();
     entry void doOverlapTest();
     entry [reductiontarget] void overlapTestDone();
+    // The mainchare as a coroutine owner, driving the owners module.
+    entry [coroutine] void runOwners(int rounds);
+    entry [inbox, reductiontarget] void groupReady();
+    entry [inbox, reductiontarget] void nodeGroupReady();
+    entry [inbox] void chareReady();
+    entry [inbox] void checkpointed();
+    entry [inbox, reductiontarget] void groupDone(int sum);
+    entry [inbox, reductiontarget] void nodeGroupDone(int sum);
+    entry [inbox] void chareDone(int sum);
   }
 
   // Overlap and forall as child coroutines, and a coroutine entry with

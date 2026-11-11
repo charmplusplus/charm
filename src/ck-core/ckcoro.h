@@ -61,24 +61,27 @@
  *
  * Migration and checkpoint. A coroutine frame is never packed. The state
  * object packs, for each active coroutine, the entry index, a callback to
- * the element and the chain of restart sites, and on unpacking sends the
- * entry's message to the element again: the body runs again from the top
+ * the owner and the chain of restart sites, and on unpacking sends the
+ * entry's message to the owner again: the body runs again from the top
  * and the switch opened by CK_COROUTINE jumps to the recorded site, where
  * CK_WHEN finds the buffered message or waits for it. Rules: (1) a value
  * that is live across a site is a member of the chare (C++ rejects the jump
  * past a local with an initializer; a scalar declared without one is not
  * caught, and +ck_fakemigrate is the check); (2) code before a site is
- * skipped on a restart, so its results must be members; (3) an element may
+ * skipped on a restart, so its results must be members; (3) a chare may
  * migrate or be checkpointed only while its coroutines are suspended at
  * sites (CK_WHEN, CK_WHEN_ANY, CK_CALL); a plain co_await is allowed between
- * sites, but packing an element suspended there aborts. A site is one
+ * sites, but packing a chare suspended there aborts. A site is one
  * statement and may be the body of an if or a loop; its case label must not
  * be inside a switch of the user's own; two sites must not share a line. A
  * function awaited from a coroutine that contains a site returns
  * ck::coro::task<T>, has its own CK_RESUMABLE/CK_END and is awaited with
  * CK_CALL or CK_CALL_TO.
  *
- * At most one coroutine per entry method is active in an element at a time.
+ * The owner is a chare of any kind: an array element, a group or nodegroup
+ * branch (its inbox and coroutine entries are exclusive, added by charmxi),
+ * a singleton chare or the mainchare. At most one coroutine per entry
+ * method is active in a chare at a time.
  * Inbox entries take a message or marshalled parameters (not conditional
  * or nocopy ones). CK_OVERLAP(task...) and CK_FORALL(i, lo, hi, expr) run
  * ck::coro::task<void> helpers as child coroutines, each with its own
@@ -86,7 +89,7 @@
  * finished before a migration is not run again, so its results live in
  * pupped members.
  *
- * +ck_fakemigrate on the command line makes every site rebuild the element's
+ * +ck_fakemigrate on the command line makes every site rebuild the chare's
  * coroutines in place (state packed and unpacked, frames destroyed, entries
  * invoked again to the recorded sites) the first time a coroutine suspends
  * there, so programs can check the rules without a load balancer.
@@ -119,6 +122,22 @@ struct record;
 
 // The record of the coroutine running on this PE thread, if any.
 inline thread_local record *current_ = nullptr;
+
+// The callback that invokes an entry of the owner again (the restart after a
+// migration or a checkpoint, +ck_fakemigrate), one overload per chare kind.
+// It is rebuilt from the owner whenever the state is unpacked: an array
+// element keeps its index, a chare restarted from a checkpoint has a new
+// handle, a group branch the PE it was unpacked on.
+inline CkCallback self_target(int ep, ArrayElement *e) {
+  return CkCallback(ep, e->ckGetArrayIndex(), e->ckGetArrayID());
+}
+inline CkCallback self_target(int ep, NodeGroup *g) {
+  return CkCallback(ep, CkMyNode(), g->ckGetGroupID(), false, true);
+}
+inline CkCallback self_target(int ep, IrrGroup *g) {
+  return CkCallback(ep, CkMyPe(), g->ckGetGroupID());
+}
+inline CkCallback self_target(int ep, Chare *c) { return CkCallback(ep, c->ckGetChareID()); }
 // The frame handle of a coroutine entry just created, picked up by CK_COROUTINE.
 inline thread_local std::coroutine_handle<> pending_root_ = {};
 
@@ -245,7 +264,7 @@ inline skip_t skip;
 struct record {
   state *owner = nullptr;
   int ep = -1;                   // the coroutine entry; pupped
-  CkCallback target;             // the element; pupped
+  CkCallback target;             // the owner (self_target); pupped, rebuilt by state::pup(p, owner)
   void *msg = nullptr;           // the entry's message, for a restart; pupped (null: a void entry)
   chain ch;                      // restart sites; its sites pupped
   std::coroutine_handle<> root;  // the entry's frame
@@ -473,11 +492,22 @@ class state {
   // of them (SDAG overlap, forall). CK_OVERLAP and CK_FORALL wrap this.
   overlap_awaiter overlap(std::vector<task<void>> &&tasks) noexcept;
 
-  void pup(PUP::er &p);
+  // Pack or unpack the state. The form with the owner (what X_CORO_CODE's
+  // _coro_pup calls) rebuilds each restart target from the owner on unpack;
+  // the form without keeps the packed targets (the library form, p | state,
+  // where the owner is an array element whose index does not change).
+  void pup(PUP::er &p) { pup_impl(p, nullptr, nullptr); }
+  template <class Owner> void pup(PUP::er &p, Owner *owner) {
+    pup_impl(p, [](int ep, void *o) { return self_target(ep, static_cast<Owner *>(o)); }, owner);
+  }
 
   // Internal.
-  record &begin(ArrayElement *elt, int ep, void *msg, bool own = false);
-  record &begin(ArrayElement *elt, bool isEntry);
+  template <class Owner> record &begin(Owner *owner, int ep, void *msg, bool own = false) {
+    return begin_record(ep, msg, own, [](int ep_, void *o) {
+      return self_target(ep_, static_cast<Owner *>(o));
+    }, owner);
+  }
+  template <class Owner> record &begin(Owner *owner, bool isEntry);
   void finish_run(record *rec);
   void run(record *rec);
   bool take(const want &w, buffer &out);
@@ -487,6 +517,9 @@ class state {
   size_t num_active() const noexcept { return recs_.size(); }
 
  private:
+  using target_fn = CkCallback (*)(int ep, void *owner);
+  record &begin_record(int ep, void *msg, bool own, target_fn mk, void *owner);
+  void pup_impl(PUP::er &p, target_fn mk, void *owner);
   void destroy_frames(record &rec);
   void send_restart(record &rec);
   void push(buffer &&b);
@@ -506,8 +539,12 @@ class state {
 // The frame guard of a coroutine entry: creates or adopts the record.
 class root_guard {
  public:
-  root_guard(state &s, ArrayElement *elt, int ep, void *msg);
-  root_guard(state &s, ArrayElement *elt, bool isEntry);
+  template <class Owner> root_guard(state &s, Owner *owner, int ep, void *msg) {
+    s.begin(owner, ep, msg);
+  }
+  template <class Owner> root_guard(state &s, Owner *owner, bool isEntry) {
+    s.begin(owner, isEntry);
+  }
   ~root_guard() = default;
   root_guard(const root_guard &) = delete;
   root_guard &operator=(const root_guard &) = delete;
@@ -528,6 +565,13 @@ inline bool fake_migrate_enabled() noexcept {
   return v == 1;
 }
 
+// CKCORO_DEBUG=1 in the environment prints rebuilds and restarts.
+inline bool debug_enabled() noexcept {
+  static thread_local int dbg = -1;
+  if (dbg < 0) dbg = getenv("CKCORO_DEBUG") != nullptr;
+  return dbg == 1;
+}
+
 inline state &current_state() {
   if (current_ == nullptr)
     CkAbort("ck::coro: CK_WHEN used outside a coroutine entry method");
@@ -542,13 +586,6 @@ inline coroutine::~coroutine() {
     CkAbort("ck::coro: a coroutine entry method suspended without CK_COROUTINE at its start");
   }
   rec->owner->finish_run(rec);
-}
-
-inline root_guard::root_guard(state &s, ArrayElement *elt, int ep, void *msg) {
-  s.begin(elt, ep, msg);
-}
-inline root_guard::root_guard(state &s, ArrayElement *elt, bool isEntry) {
-  s.begin(elt, isEntry);
 }
 
 inline state::~state() {
@@ -576,7 +613,7 @@ inline void state::destroy_frames(record &rec) {
   rec.clear_ready();
 }
 
-inline record &state::begin(ArrayElement *elt, int ep, void *msg, bool own) {
+inline record &state::begin_record(int ep, void *msg, bool own, target_fn mk, void *owner) {
   std::coroutine_handle<> root = std::exchange(pending_root_, {});
   if (!root) CkAbort("ck::coro: CK_COROUTINE in a function that does not return ck::coroutine");
   record *rec = nullptr;
@@ -592,12 +629,15 @@ inline record &state::begin(ArrayElement *elt, int ep, void *msg, bool own) {
     rec = &recs_.back();
     rec->owner = this;
     rec->ep = ep;
-    rec->target = CkCallback(ep, elt->ckGetArrayIndex(), elt->ckGetArrayID());
+    rec->target = mk(ep, owner);
     if (msg && own) rec->msg = msg;
     else if (msg) { void *m = msg; rec->msg = CkCopyMsg(&m); }
   } else {
     rec->ch.restarting = !rec->ch.sites.empty();
     rec->pending = false;
+    if (debug_enabled())
+      CkPrintf("[%d] ck::coro: restarting entry %s toward its recorded site\n", CkMyPe(),
+               _entryTable[ep]->name);
     if (own) {
       // The restarted body's marshalled parameters point into this copy.
       if (rec->msg) CkFreeMsg(rec->msg);
@@ -617,7 +657,7 @@ inline record &state::begin(ArrayElement *elt, int ep, void *msg, bool own) {
 // being delivered (the generated __coro_is_entry says whether the running
 // entry is one of the chare's [coroutine] entries). A void entry's system
 // message is not kept.
-inline record &state::begin(ArrayElement *elt, bool isEntry) {
+template <class Owner> inline record &state::begin(Owner *owner, bool isEntry) {
   if (!isEntry)
     CkAbort("ck::coro: CK_COROUTINE() in a function that is not running as a [coroutine] entry "
             "method (entry %d is being delivered)", CkCurrentEntry());
@@ -625,7 +665,7 @@ inline record &state::begin(ArrayElement *elt, bool isEntry) {
   if (m && UsrToEnv(m)->getMsgIdx() == 0) m = nullptr;
   // A marshalled [coroutine] entry is not nokeep: the state owns its
   // message, so array parameters stay valid while the coroutine lives.
-  return begin(elt, CkCurrentEntry(), m, m != nullptr && is_marshall_msg(m));
+  return begin(owner, CkCurrentEntry(), m, m != nullptr && is_marshall_msg(m));
 }
 
 // After the body ran (first run or a resume) and suspended or finished.
@@ -876,9 +916,7 @@ inline void state::send_restart(record &rec) {
 // moving the element: pack and unpack the state into itself, destroy the
 // frames and invoke every active entry again toward its recorded site.
 inline void state::rebuild() {
-  static thread_local int dbg = -1;
-  if (dbg < 0) dbg = getenv("CKCORO_DEBUG") != nullptr;
-  if (dbg)
+  if (debug_enabled())
     CkPrintf("[%d] ck::coro: rebuilding %zu coroutine(s), %zu buffered deliveries\n", CkMyPe(),
              recs_.size(), inbox_.size());
   PUP::sizer ps;
@@ -897,7 +935,7 @@ inline void state::rebuild() {
   pup(pf); // unpacking sends the restarts
 }
 
-inline void state::pup(PUP::er &p) {
+inline void state::pup_impl(PUP::er &p, target_fn mk, void *owner) {
   size_t nbuf = inbox_.size(), nrec = recs_.size();
   p | nbuf;
   p | nrec;
@@ -910,9 +948,9 @@ inline void state::pup(PUP::er &p) {
     visit(recs_, [&](record &rec) {
       int ep = rec.parent ? rec.parent->ep : rec.ep;
       if (current_ == &rec)
-        CkAbort("ck::coro: an element is packed from inside its own coroutine entry %d", ep);
+        CkAbort("ck::coro: a chare is packed from inside its own coroutine entry %d", ep);
       if (rec.root && !(rec.waiting && rec.atSite))
-        CkAbort("ck::coro: element packed while a coroutine of entry %d is suspended at a "
+        CkAbort("ck::coro: chare packed while a coroutine of entry %d is suspended at a "
                 "co_await that is not a CK_WHEN, CK_OVERLAP or CK_CALL site", ep);
       return false;
     });
@@ -922,6 +960,7 @@ inline void state::pup(PUP::er &p) {
     if (p.isUnpacking()) {
       if (rec.ch.sites.empty())
         CkAbort("ck::coro: unpacked a coroutine of entry %d with no recorded site", rec.ep);
+      if (mk) rec.target = mk(rec.ep, owner);
       send_restart(rec);
     }
   }
