@@ -14,12 +14,12 @@
 #define CkNcpyModeDevice CmiNcpyModeDevice
 #define CkDeviceStatus CmiDeviceStatus
 
-// Persistent device buffers (manual: "Persistent GPU Communication").
-// get/put choose a mode
-// per pair (mode()): a device copy within a process, CUDA/HIP IPC between
-// processes on one host when the peer's IPC handle opens here, RDMA on the
-// memory of both buffers otherwise, registered on first use. Both buffers' callbacks are sent from the issuing PE once the
-// bytes are in the destination.
+// Persistent device buffers (manual: "Persistent GPU Communication"). get/put
+// choose a mode per pair (mode()): a device copy within a process, CUDA/HIP
+// IPC between processes on one host when the peer's IPC handle opens here,
+// RDMA otherwise, on memory registered the first time RDMA needs it. Both
+// buffers' callbacks are sent from the issuing PE once the bytes are in the
+// destination.
 struct CkDevicePersistent {
   const void* ptr;
   size_t cnt;
@@ -63,13 +63,46 @@ struct CkDevicePersistent {
     init();
   }
 
+  // Ownership. open() makes this object the owner of the buffer's entry in
+  // its process's registration table; close() or the destructor of the owner
+  // releases it. Copies never own: copy construction, copy assignment, pup
+  // (sending the object, a marshalled parameter). Moving (construction or
+  // assignment from a temporary, as in buf = CkDevicePersistent(...), or a
+  // std::vector reallocating) transfers ownership. Assigning over an owner
+  // releases its entry first, unless the value assigned names the same buffer.
+  CkDevicePersistent(const CkDevicePersistent& o) { copyFrom(o); owner = false; }
+  CkDevicePersistent(CkDevicePersistent&& o) noexcept { copyFrom(o); owner = o.owner; o.owner = false; }
+  CkDevicePersistent& operator=(const CkDevicePersistent& o) {
+    if (this != &o) {
+      bool keep = owner && id == o.id;
+      if (owner && !keep) close();
+      copyFrom(o);
+      owner = keep;
+    }
+    return *this;
+  }
+  CkDevicePersistent& operator=(CkDevicePersistent&& o) noexcept {
+    if (this != &o) {
+      bool keep = owner && id == o.id;
+      if (owner && !keep) close();
+      copyFrom(o);
+      owner = keep || o.owner;
+      o.owner = false;
+    }
+    return *this;
+  }
+  ~CkDevicePersistent() { if (owner) close(); }
+
   void init();
   // Takes the IPC handle of the allocation and records the buffer (ptr, cnt)
   // for RDMA; the memory is registered with the network the first time a
   // transfer needs RDMA. Call before sending the object.
   void open();
-  // On the object that opened the buffer: releases the registration. On a
-  // copy received from a peer: nothing (IPC mappings are kept per process).
+  // On the owner: deregisters the memory if a transfer registered it and
+  // removes the entry; copies of the buffer cannot be used for RDMA after it.
+  // On a copy of another process's buffer: closes this process's IPC mapping
+  // of it (synchronizing the device first), which a later transfer opens again.
+  // On any other copy: nothing.
   void close();
   void set_msg(void* msg);
 
@@ -83,6 +116,14 @@ struct CkDevicePersistent {
 
   CkDeviceStatus get(CkDevicePersistent& src);
   CkDeviceStatus put(CkDevicePersistent& dst);
+
+private:
+  void copyFrom(const CkDevicePersistent& o) {
+    ptr = o.ptr; cnt = o.cnt; cb = o.cb; cb_msg = o.cb_msg; hapi_stream = o.hapi_stream;
+    pe = o.pe; hapi_ipc_handle = o.hapi_ipc_handle; ipc_ptr = o.ipc_ptr; ipc_open = o.ipc_open;
+    ipc_offset = o.ipc_offset; ipc_valid = o.ipc_valid; node = o.node; phys_node = o.phys_node;
+    id = o.id;
+  }
 };
 
 #define CK_DEVICE_ACK_CAP 8

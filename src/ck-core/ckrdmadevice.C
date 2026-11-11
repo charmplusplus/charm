@@ -649,9 +649,11 @@ static bool persistAllocBase(const void* ptr, uintptr_t* base) {
 }
 
 // IPC mappings of other processes' allocations, opened once per process and
-// reused by every copy of the peer's buffer, kept until exit.
-static std::mutex persist_ipc_lock;
-static std::map<std::string, void*> persist_ipc;
+// reused by every copy of the peer's buffer, until close() on a copy. The
+// tables of this section are never destroyed, so that the destructor of a
+// static CkDevicePersistent can still use them at exit.
+static std::mutex& persist_ipc_lock = *new std::mutex;
+static std::map<std::string, void*>& persist_ipc = *new std::map<std::string, void*>;
 
 static void* persistIpcPtr(const CkDevicePersistent& r) {
   std::string key((const char*)&r.hapi_ipc_handle, sizeof(hapiIpcMemHandle_t));
@@ -705,9 +707,11 @@ struct PersistReg {
   const char* why = "";    // the reason for state -1
   CmiNcpyBuffer ncpy;
 };
-static std::mutex persist_reg_lock;
-static std::map<uint64_t, PersistReg> persist_reg;          // this process's opened buffers
-static std::map<uint64_t, CmiNcpyBuffer> persist_remote;    // other processes' registrations, by id
+static std::mutex& persist_reg_lock = *new std::mutex;
+static std::map<uint64_t, PersistReg>& persist_reg =          // this process's opened buffers
+    *new std::map<uint64_t, PersistReg>;
+static std::map<uint64_t, CmiNcpyBuffer>& persist_remote =    // other processes' registrations, by id
+    *new std::map<uint64_t, CmiNcpyBuffer>;
 static std::atomic<uint64_t> persist_next_id{1};
 
 static void persistCheckRdmaUsable() {
@@ -986,7 +990,25 @@ void CkDevicePersistent::close() {
     }
     owner = false;
     id = 0;
+    return;
   }
+  // A copy of another process's buffer: release this process's IPC mapping of
+  // it and the kept registration. Other copies of it here open it again on use.
+  if (node == CkMyNode()) return;
+  {
+    std::lock_guard<std::mutex> g(persist_reg_lock);
+    persist_remote.erase(id);
+  }
+  if (!ipc_valid) return;
+  std::string key((const char*)&hapi_ipc_handle, sizeof(hapiIpcMemHandle_t));
+  std::lock_guard<std::mutex> g(persist_ipc_lock);
+  auto it = persist_ipc.find(key);
+  if (it == persist_ipc.end()) return;
+  if (it->second != nullptr) {
+    hapiCheck(hapiDeviceSynchronize());   // no copy through the mapping is still running
+    hapiCheck(hapiIpcCloseMemHandle(it->second));
+  }
+  persist_ipc.erase(it);
 }
 
 void CkDevicePersistent::set_msg(void* msg) {
