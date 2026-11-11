@@ -763,7 +763,8 @@ attributes (NULL: none):
 - ``CKDYN_SEND_EXPEDITED``: the message bypasses the priority queue.
 - ``CKDYN_SEND_IMMEDIATE``: Charm++ immediate delivery (nodegroups).
 - ``CKDYN_SEND_NOTRACE``: the message is not recorded in the load
-  balancer's communication statistics.
+  balancer's communication statistics (``CK_MSG_LB_NOTRACE``, which only
+  array sends consult). It does not affect Projections tracing.
 
 An inline send nests the receiver's ``deliver`` inside the sender's hook; a
 binding whose methods send inline to each other in a loop should drive the
@@ -1718,8 +1719,9 @@ shows ``Class.method`` names, and for array elements the element index, as
 for a charmxi program. The usual tracing options (``+traceroot``,
 ``+logsize``, ``+traceoff``) apply to a build with tracing enabled.
 
-- ``CKDYN_EP_NOTRACE`` on an entry, or ``CKDYN_SEND_NOTRACE`` on a send,
-  leaves it out.
+- ``CKDYN_EP_NOTRACE`` on an entry leaves its executions out.
+  ``CKDYN_SEND_NOTRACE`` on a send does not: it only keeps the message out
+  of the load balancer's communication statistics.
 - ``CkDynTraceBeginEntry(ep)`` / ``CkDynTraceEndEntry(ep)`` bracket a region
   as an execute event of ``ep`` with no object.
 - User events: ``CkDynTraceRegisterUserEvent(desc, id)`` returns the event

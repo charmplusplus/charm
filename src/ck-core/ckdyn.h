@@ -429,7 +429,7 @@ enum {
   CKDYN_SEND_INLINE    = 1u << 0,
   CKDYN_SEND_EXPEDITED = 1u << 1,
   CKDYN_SEND_IMMEDIATE = 1u << 2,
-  CKDYN_SEND_NOTRACE   = 1u << 3
+  CKDYN_SEND_NOTRACE   = 1u << 3   /* CK_MSG_LB_NOTRACE: not in the LB's communication statistics (array sends) */
 };
 
 typedef struct CkDynSendOpts {
