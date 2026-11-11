@@ -2180,12 +2180,17 @@ until the next wait, or copied into a container member such as a
 ``std::vector<double>`` when the member has that type.
 ``inbox::name(ref)`` matches the reference number, which is the
 envelope's for a message entry and the first arithmetic parameter for a
-marshalled entry; ``inbox::name()`` matches any. A delivery that no
-coroutine is waiting for is buffered in the element, in arrival order, and
-moves with the element. ``CK_WHEN_ANY(idx, CK_ALT(want, out...), ...)``
-waits for the first of several alternatives and stores the index of the
-one that matched, as an SDAG ``case``. Two consecutive waits wait for
-both deliveries, as an SDAG ``when a(), b()``.
+marshalled entry (a reduction target reached through its reduction uses
+the reduction message's, set on the callback, as SDAG does);
+``inbox::name()`` matches any. A delivery that no coroutine is waiting
+for is buffered in the element, in arrival order, and moves with the
+element. ``CK_WHEN_ALL(CK_ALT(want, out...), ...)`` waits until every
+alternative has a delivery and takes them together, as an SDAG ``when
+a(), b()``. ``CK_WHEN_ANY(idx, CK_ALT(want, out...), ...)`` waits for the
+first of several alternatives and stores the index of the one that
+matched, as an SDAG ``case``; an alternative may be a conjunction,
+``CK_ALL(CK_ALT(...), CK_ALT(...))``, which is taken only when all its
+deliveries are present.
 
 A coroutine frame is never packed. When the element migrates or is
 checkpointed, the coroutine state records which wait each active coroutine
@@ -2226,7 +2231,9 @@ Several waits can be in progress at once, as with an SDAG ``overlap``:
 it as child coroutines of the current one, each waiting at its own sites,
 and continues when all of them have finished; ``CK_FORALL(i, lo, hi,
 expr)`` does the same with one task per value of ``i`` in ``[lo, hi)``,
-as an SDAG ``forall``. The children are started in order and run until
+and ``CK_FORALL_STRIDE(i, start, end, stride, expr)`` for ``i`` from
+``start`` to ``end`` inclusive in steps of ``stride`` of either sign, as
+an SDAG ``forall``. The children are started in order and run until
 their first wait, a delivery resumes whichever child waits for it, and
 the parent resumes after the last child finishes. Each ``when`` clause
 of an SDAG ``overlap`` becomes a task:
@@ -2284,9 +2291,12 @@ Differences from SDAG
    reference number parameter listed.
 -  A pointer to an array parameter is valid until the next wait, not
    across nested whens; a container member copies it.
--  ``when a(), b()`` is two consecutive waits; ``case`` is ``CK_WHEN_ANY``;
-   loops and conditionals are the C++ ones, with the loop variable a
-   member in both.
+-  ``when a(), b()`` is ``CK_WHEN_ALL``; ``case`` is ``CK_WHEN_ANY`` with
+   ``CK_ALL`` for an arm that is a conjunction; the arm's body is the code
+   after the wait, selected on the stored index with ``if``, not with a
+   ``switch`` (a wait may not be inside a ``switch``). Loops and
+   conditionals are the C++ ones, with the loop variable a member in
+   both; ``forall [i] (start:end, stride)`` is ``CK_FORALL_STRIDE``.
 -  After a migration or restart, the coroutine's body runs again from the
    top to the recorded wait, so code before a wait must not repeat a side
    effect; SDAG resumes without re-running anything.

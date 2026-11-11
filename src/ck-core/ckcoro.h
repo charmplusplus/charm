@@ -48,8 +48,11 @@
  * marshalled entry; inbox::name() matches any. Deliveries that no coroutine
  * is waiting for are buffered as messages (the marshalled parameters stay
  * in the message being delivered, see CkCurrentMessage) and move with the
- * element. CK_WHEN_ANY(idx, CK_ALT(...), ...) waits for the first of
- * several (an SDAG case).
+ * element. CK_WHEN_ALL(CK_ALT(...), ...) waits for all of several (an SDAG
+ * when a(), b()); CK_WHEN_ANY(idx, CK_ALT(...), CK_ALL(...), ...) waits for
+ * the first of several alternatives, each a when or a conjunction (an SDAG
+ * case). Through a reduction wrapper the reference number is the
+ * reduction message's.
  *
  * Without the attributes, the same works by hand: a ck::coro::state member
  * pupped by the chare, inbox entries whose bodies call co.deliver(ep, msg)
@@ -98,6 +101,7 @@
 #include <coroutine>
 #include <cstdlib>
 #include <cstring>
+#include <algorithm>
 #include <list>
 #include <tuple>
 #include <type_traits>
@@ -193,6 +197,7 @@ struct want {
   int ep;
   bool hasRef;
   CMK_REFNUM_TYPE ref;
+  int arm = 0;   // which alternative of a when_any this want belongs to
   explicit want(int ep_) noexcept : ep(ep_), hasRef(false), ref(0) {}
   want(int ep_, CMK_REFNUM_TYPE ref_) noexcept : ep(ep_), hasRef(true), ref(ref_) {}
   bool matches(const buffer &b) const noexcept {
@@ -249,10 +254,10 @@ struct record {
   chain *prevChain = nullptr;    // current_chain_ before this record ran
   bool waiting = false;          // suspended in a when awaitable
   bool atSite = false;           // ... reached through CK_WHEN
-  std::vector<want> wants;       // what it waits for (one entry; several for when_any)
-  bool ready = false;            // delivered: which and the buffer
+  std::vector<want> wants;       // what it waits for, grouped by arm (when_any alternatives)
+  bool ready = false;            // delivered: which arm and its buffers
   int readyIndex = -1;
-  buffer readyBuf;
+  std::vector<buffer> readyBufs;
   bool fakeRestart = false;      // rebuild once it has suspended (+ck_fakemigrate)
   bool rebuilt = false;          // restarted and not yet past the recorded site: no rebuild there
   bool pending = false;          // a restart message is on its way to the element; pupped
@@ -308,6 +313,10 @@ template <class Schema, class... Outs> class when_awaiter {
   bool await_ready();
   void await_suspend(std::coroutine_handle<> h);
   void await_resume();
+  // As an alternative of a when_any, or a member of a when_all.
+  void add_wants(std::vector<want> &ws, int arm) const { ws.push_back(w_); ws.back().arm = arm; }
+  bool try_ready(record *rec);                  // take from the inbox and unpack
+  void unpack_ready(record *rec) { unpack(rec->readyBufs[0], rec); }
 
  private:
   template <class... Ps, size_t... I>
@@ -334,8 +343,31 @@ class tuple_awaiter : tuple_vals<Ps...>, public when_awaiter<params<Ps...>, out_
   }
 };
 
-// Await the first of several deliveries (SDAG case): the awaited value is
-// the index of the alternative that matched, whose outputs are stored.
+// Await several deliveries together (SDAG when a(), b()): ready only when
+// every member has a match, and then all are taken at once.
+template <class... W> class all_awaiter {
+ public:
+  explicit all_awaiter(state &s, W &&...w) noexcept : s_(s), parts_(std::move(w)...) {}
+  bool await_ready();
+  void await_suspend(std::coroutine_handle<> h);
+  void await_resume();
+  void add_wants(std::vector<want> &ws, int arm) const {
+    std::apply([&](const auto &...a) { (a.add_wants(ws, arm), ...); }, parts_);
+  }
+  bool try_ready(record *rec);
+  void unpack_ready(record *rec) {
+    std::apply([&](auto &...a) { size_t k = 0; (a.unpack(rec->readyBufs[k++], rec), ...); }, parts_);
+  }
+
+ private:
+  state &s_;
+  std::tuple<W...> parts_;
+  record *rec_ = nullptr;
+};
+
+// Await the first of several alternatives (SDAG case), each a when or a
+// when_all: the awaited value is the index of the alternative that matched,
+// whose outputs are stored.
 template <class... W> class any_awaiter {
  public:
   explicit any_awaiter(state &s, W &&...w) noexcept : s_(s), alts_(std::move(w)...) {}
@@ -344,9 +376,6 @@ template <class... W> class any_awaiter {
   int await_resume();
 
  private:
-  void unpack_at(int i, buffer &b, record *rec) {
-    std::apply([&](auto &...a) { int k = 0; ((k++ == i ? (a.unpack(b, rec), 0) : 0), ...); }, alts_);
-  }
   state &s_;
   std::tuple<W...> alts_;
   record *rec_ = nullptr;
@@ -424,9 +453,13 @@ class state {
   // over unmarshalled; the reference number is its first parameter if that
   // is arithmetic, else the envelope's.
   template <class P> void deliver_message(int ep, CkMarshallMsg *m);
-  // The first of several whens to match: co_await co.any(co.when(...), co.when(...)).
+  // The first of several alternatives to match: co_await co.any(co.when(...), co.when(...)).
   template <class... W> any_awaiter<W...> any(W &&...w) noexcept {
     return any_awaiter<W...>(*this, std::move(w)...);
+  }
+  // All of several whens together: co_await co.all(co.when(...), co.when(...)).
+  template <class... W> all_awaiter<W...> all(W &&...w) noexcept {
+    return all_awaiter<W...>(*this, std::move(w)...);
   }
   // Run the tasks as child coroutines of the current one and wait for all
   // of them (SDAG overlap, forall). CK_OVERLAP and CK_FORALL wrap this.
@@ -440,6 +473,7 @@ class state {
   void finish_run(record *rec);
   void run(record *rec);
   bool take(const want &w, buffer &out);
+  bool try_arm(const want *ws, size_t n, std::vector<buffer> &out);
   void rebuild();
   size_t num_buffered() const noexcept { return inbox_.size(); }
   size_t num_active() const noexcept { return recs_.size(); }
@@ -531,7 +565,7 @@ inline void state::destroy_frames(record &rec) {
   rec.atSite = false;
   rec.wants.clear();
   rec.ready = false;
-  rec.readyBuf.release();
+  rec.readyBufs.clear();
 }
 
 inline record &state::begin(ArrayElement *elt, int ep, void *msg, bool own) {
@@ -650,21 +684,56 @@ inline void state::push(buffer &&b) {
   // A suspended coroutine waiting for this delivery resumes at once, inside
   // the delivering entry method (as an SDAG when body runs); otherwise the
   // delivery is buffered.
-  bool delivered = visit(recs_, [&](record &rec) {
+  // The delivery joins the inbox first; an alternative of a waiting
+  // coroutine is satisfied when every want of it has a buffered match.
+  inbox_.push_back(std::move(b));
+  const buffer &nb = inbox_.back();
+  visit(recs_, [&](record &rec) {
     if (!rec.waiting) return false;
-    for (size_t i = 0; i < rec.wants.size(); i++) {
-      if (!rec.wants[i].matches(b)) continue;
+    bool touched = false;
+    for (const want &w : rec.wants) if (w.matches(nb)) { touched = true; break; }
+    if (!touched) return false;
+    std::vector<want> armWants;
+    for (int arm = 0;; arm++) {
+      armWants.clear();
+      for (const want &w : rec.wants) if (w.arm == arm) armWants.push_back(w);
+      if (armWants.empty()) break;
+      std::vector<buffer> bufs;
+      if (!try_arm(armWants.data(), armWants.size(), bufs)) continue;
       rec.waiting = false;
       rec.wants.clear();
       rec.ready = true;
-      rec.readyIndex = (int)i;
-      rec.readyBuf = std::move(b);
+      rec.readyIndex = arm;
+      rec.readyBufs = std::move(bufs);
       run(&rec);
       return true;
     }
     return false;
   });
-  if (!delivered) inbox_.push_back(std::move(b));
+}
+
+// Take the buffered deliveries matching all of ws (distinct buffers, in
+// the order of ws) if every one has a match; else take nothing.
+inline bool state::try_arm(const want *ws, size_t n, std::vector<buffer> &out) {
+  std::vector<size_t> idx;
+  idx.reserve(n);
+  for (size_t k = 0; k < n; k++) {
+    bool found = false;
+    for (size_t i = 0; i < inbox_.size() && !found; i++) {
+      if (!ws[k].matches(inbox_[i])) continue;
+      bool used = false;
+      for (size_t j : idx) if (j == i) { used = true; break; }
+      if (!used) { idx.push_back(i); found = true; }
+    }
+    if (!found) return false;
+  }
+  out.clear();
+  out.reserve(n);
+  for (size_t i : idx) out.push_back(std::move(inbox_[i]));
+  std::vector<size_t> sorted(idx);
+  std::sort(sorted.begin(), sorted.end());
+  for (size_t k = sorted.size(); k-- > 0;) inbox_.erase(inbox_.begin() + sorted[k]);
+  return true;
 }
 
 template <class Msg, std::enable_if_t<is_message_ptr_v<Msg *>, int>>
@@ -689,6 +758,9 @@ inline void state::deliver(int ep, const Args &...args) {
       b.ref = (CMK_REFNUM_TYPE)std::get<0>(std::tie(args...));
     }
   }
+  // Through a reduction wrapper the reference number is the reduction
+  // message's (set on the callback), as SDAG does.
+  if (cur && UsrToEnv(cur)->getMsgIdx() == CMessage_CkReductionMsg::__idx) hasRef = false;
   if (!hasRef && cur) b.ref = CkGetRefNum(cur);
   if (CkCurrentEntry() == ep && is_marshall_msg(cur)) {
     // The entry's own marshalled parameters: keep the message.
@@ -916,20 +988,24 @@ inline void when_awaiter<Schema, Outs...>::unpack_marshalled(params<Ps...>, std:
   }
 }
 
-template <class Schema, class... Outs> inline bool when_awaiter<Schema, Outs...>::await_ready() {
-  record *rec = enter_await();
+template <class Schema, class... Outs> inline bool when_awaiter<Schema, Outs...>::try_ready(record *rec) {
   buffer taken;
-  if (!s_.take(w_, taken)) {
-    rec_ = rec;
-    return false;
-  }
+  if (!s_.take(w_, taken)) return false;
   unpack(taken, rec);
   return true;
 }
 
+template <class Schema, class... Outs> inline bool when_awaiter<Schema, Outs...>::await_ready() {
+  record *rec = enter_await();
+  if (try_ready(rec)) return true;
+  rec_ = rec;
+  return false;
+}
+
 template <class Schema, class... Outs>
 inline void when_awaiter<Schema, Outs...>::await_suspend(std::coroutine_handle<> h) {
-  rec_->wants.assign(1, w_);
+  rec_->wants.clear();
+  add_wants(rec_->wants, 0);
   arm_wait(rec_, h);
 }
 
@@ -939,16 +1015,47 @@ template <class Schema, class... Outs> inline void when_awaiter<Schema, Outs...>
   if (!rec->ready) CkAbort("ck::coro: coroutine resumed without a delivery");
   rec->ready = false;
   rec->atSite = false;
-  unpack(rec->readyBuf, rec);
-  rec->readyBuf.release();
+  unpack_ready(rec);
+  rec->readyBufs.clear();
+}
+
+template <class... W> inline bool all_awaiter<W...>::try_ready(record *rec) {
+  std::vector<want> ws;
+  add_wants(ws, 0);
+  std::vector<buffer> bufs;
+  if (!s_.try_arm(ws.data(), ws.size(), bufs)) return false;
+  std::apply([&](auto &...a) { size_t k = 0; (a.unpack(bufs[k++], rec), ...); }, parts_);
+  return true;
+}
+
+template <class... W> inline bool all_awaiter<W...>::await_ready() {
+  record *rec = enter_await();
+  if (try_ready(rec)) return true;
+  rec_ = rec;
+  return false;
+}
+
+template <class... W> inline void all_awaiter<W...>::await_suspend(std::coroutine_handle<> h) {
+  rec_->wants.clear();
+  add_wants(rec_->wants, 0);
+  arm_wait(rec_, h);
+}
+
+template <class... W> inline void all_awaiter<W...>::await_resume() {
+  if (rec_ == nullptr) return; // was ready
+  record *rec = rec_;
+  if (!rec->ready) CkAbort("ck::coro: coroutine resumed without a delivery");
+  rec->ready = false;
+  rec->atSite = false;
+  unpack_ready(rec);
+  rec->readyBufs.clear();
 }
 
 template <class... W> inline bool any_awaiter<W...>::await_ready() {
   record *rec = enter_await();
-  buffer taken;
   int i = 0;
   bool found = std::apply([&](auto &...a) {
-    return ((s_.take(a.spec(), taken) ? (a.unpack(taken, rec), ready_ = i, true) : (i++, false)) || ...);
+    return ((a.try_ready(rec) ? (ready_ = i, true) : (i++, false)) || ...);
   }, alts_);
   if (found) return true;
   rec_ = rec;
@@ -957,7 +1064,7 @@ template <class... W> inline bool any_awaiter<W...>::await_ready() {
 
 template <class... W> inline void any_awaiter<W...>::await_suspend(std::coroutine_handle<> h) {
   rec_->wants.clear();
-  std::apply([&](auto &...a) { (rec_->wants.push_back(a.spec()), ...); }, alts_);
+  std::apply([&](auto &...a) { int k = 0; (a.add_wants(rec_->wants, k++), ...); }, alts_);
   arm_wait(rec_, h);
 }
 
@@ -968,8 +1075,8 @@ template <class... W> inline int any_awaiter<W...>::await_resume() {
   rec->ready = false;
   rec->atSite = false;
   int i = rec->readyIndex;
-  unpack_at(i, rec->readyBuf, rec);
-  rec->readyBuf.release();
+  std::apply([&](auto &...a) { int k = 0; ((k++ == i ? (a.unpack_ready(rec), 0) : 0), ...); }, alts_);
+  rec->readyBufs.clear();
   return i;
 }
 
@@ -1083,9 +1190,18 @@ using coroutine = coro::coroutine;
                               co_await ::ck::coro::current_state().when_block(want_)); \
         true)
 
-// A when-any site (SDAG case): CK_WHEN_ANY(idx, CK_ALT(ep, ref, out...), ...)
-// stores the index of the alternative that matched in idx.
+// A when-all site (SDAG when a(), b()): CK_WHEN_ALL(CK_ALT(...), CK_ALT(...))
+// waits until every alternative has a delivery and takes them together.
+// A when-any site (SDAG case): CK_WHEN_ANY(idx, CK_ALT(...), CK_ALL(CK_ALT(...), ...), ...)
+// stores the index of the alternative (a when or a when-all) that matched in idx.
 #define CK_ALT(...) ::ck::coro::current_state().when(__VA_ARGS__)
+#define CK_ALL(...) ::ck::coro::current_state().all(__VA_ARGS__)
+#define CK_WHEN_ALL(...)                                                      \
+  case __LINE__:                                                              \
+    do {                                                                      \
+      ::ck::coro::note_site(ck_frame_, __LINE__);                             \
+      co_await ::ck::coro::current_state().all(__VA_ARGS__);                  \
+    } while (0)
 #define CK_WHEN_ANY(idx_, ...)                                                \
   case __LINE__:                                                              \
     do {                                                                      \
@@ -1109,6 +1225,20 @@ using coroutine = coro::coroutine;
       co_await ::ck::coro::current_state().overlap([&]() {                    \
         std::vector<::ck::coro::task<void>> ck_tasks_;                        \
         for (int var_ = (lo_); var_ < (hi_); var_++) ck_tasks_.push_back(expr_); \
+        return ck_tasks_;                                                     \
+      }());                                                                   \
+    } while (0)
+// SDAG's forall [i] (start:end, stride): end included, stride of either sign.
+#define CK_FORALL_STRIDE(var_, start_, end_, stride_, expr_)                  \
+  case __LINE__:                                                              \
+    do {                                                                      \
+      ::ck::coro::note_site(ck_frame_, __LINE__);                             \
+      co_await ::ck::coro::current_state().overlap([&]() {                    \
+        std::vector<::ck::coro::task<void>> ck_tasks_;                        \
+        const int ck_end_ = (end_), ck_stride_ = (stride_);                   \
+        for (int var_ = (start_); ck_stride_ > 0 ? var_ <= ck_end_ : var_ >= ck_end_; \
+             var_ += ck_stride_)                                              \
+          ck_tasks_.push_back(expr_);                                         \
         return ck_tasks_;                                                     \
       }());                                                                   \
     } while (0)

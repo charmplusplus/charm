@@ -1,11 +1,19 @@
 mainmodule ckcoro_tests {
+  extern module basic;
+  extern module refnum;
   extern module migration;
 
   readonly CProxy_Main mainProxy;
   readonly CProxy_MigrationTest migrationTestProxy;
+  readonly CProxy_BasicTest basicTestProxy;
+  readonly CProxy_RefnumTest refnumTestProxy;
 
   mainchare Main {
     entry Main(CkArgMsg* msg);
+    entry void doBasicTest();
+    entry void basicTestDone();
+    entry void doRefnumTest();
+    entry [reductiontarget] void refnumTestDone();
     entry void doMigrationTest();
     entry [reductiontarget] void migrationTestDone();
     entry void doMarshallTest();

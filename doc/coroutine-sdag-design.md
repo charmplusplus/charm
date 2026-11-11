@@ -267,11 +267,16 @@ synchronization (a reduction before `CkStartCheckpoint`) provides that.
 
 ### 4.3 Overlap and when-any
 
-`when_any` exists: `CK_WHEN_ANY(idx, CK_ALT(ep, ref, out...), ...)` waits
-for the first of several deliveries and stores the index of the
-alternative that matched; a record waits on a list of (entry, refnum)
-pairs instead of one. That is SDAG `case` over single whens; a `case` arm
-with a conjunction (`when b(), d()`) is not expressible yet.
+`when_any` and `when_all` exist: `CK_WHEN_ANY(idx, CK_ALT(...),
+CK_ALL(CK_ALT(...), ...), ...)` waits for the first alternative whose
+deliveries are all present and stores its index (SDAG `case`, arms with
+conjunctions included); `CK_WHEN_ALL(CK_ALT(...), ...)` is one site that
+takes several deliveries together (SDAG `when a(), b()`), so a migration
+cannot fall between them. A record's wants carry an arm index; a delivery
+joins the inbox and then each arm of a waiting record is tried in order
+(`try_arm`: every want matched by a distinct buffer, all taken at once).
+The reference number of a delivery through a reduction wrapper is the
+reduction message's (set on the callback), as SDAG's closure does.
 
 `overlap` and `forall` are child coroutines (2026-11-11): `CK_OVERLAP`
 and `CK_FORALL` are one site of the parent that starts `task<void>`
@@ -358,8 +363,8 @@ visibly the chare's.
 | state across a suspension | class members ("state variables") | the `State` object | class members |
 | migration at any suspension | yes | no: `AMPI_Migrate` sites only | at `CK_WHEN`/`CK_CALL` sites only |
 | nested blocking helpers | no | `task<T>` with `CAMPI_CALL` | `task<T>` with `CK_CALL` |
-| disjunction / conjunction | `case`, `when a(), b()` | n/a | `when_any` planned; sequential awaits |
-| independent progress | `overlap`, `forall` | n/a | several coroutines (planned) |
+| disjunction / conjunction | `case`, `when a(), b()` | n/a | `CK_WHEN_ANY` with `CK_ALL` arms, `CK_WHEN_ALL` |
+| independent progress | `overlap`, `forall` | n/a | `CK_OVERLAP`, `CK_FORALL` (child coroutines) |
 | self-check without a balancer | none | `+campi_fakemigrate` | `+ck_fakemigrate` |
 | compiler requirement | C++11 | C++20 | C++20 for the files that include `ckcoro.h` |
 
@@ -445,9 +450,9 @@ network the message itself is 3.3 us and the two differ by 0.8 us.
 | rebuild-at-every-site flag | done: `+ck_fakemigrate`, 320 rebuilds in the 2-PE run |
 | checkpoint of a suspended element, restart | done: checkpoint at a when site, `+restart` on 4 and 2 PEs in one process and on 4 PEs in two processes |
 | when with reference numbers | done (jacobi3d ghosts, pingpong) |
-| `case` | done for single-when arms: `CK_WHEN_ANY` in `tests/charm++/ckcoro` |
-| `overlap` | deferred (Kale) |
-| equivalence corpus: megatest synctest, every `tests/charm++/sdag` directory, SDAG-heavy miniapps under both implementations | started: the `migration` module of `tests/charm++/sdag` is ported (`tests/charm++/ckcoro`); `basic` needs `overlap` and `forall`; `refnum` needs `forall` |
+| `case` | done, conjunction arms included: `CK_WHEN_ANY` in `tests/charm++/ckcoro` (basic test) |
+| `overlap`, `forall` | done (2026-11-11): child coroutines, `tests/charm++/ckcoro` overlap, basic and refnum tests, with migration and `+ck_fakemigrate` |
+| equivalence corpus: megatest synctest, every `tests/charm++/sdag` directory, SDAG-heavy miniapps under both implementations | `tests/charm++/sdag` fully ported (`basic`, `refnum`, `migration` in `tests/charm++/ckcoro`): the coroutine program prints the same lines as the SDAG one on 4 PEs (2026-11-11); jacobi3d-coro matches jacobi3d-sdag's checksum; megatest synctest and the miniapps not yet |
 | CAMPI tests stay green when the core is shared | in progress (2026-11-09 23:50): a shared `ckcoro_core.h` for `task<T>` and the site chain, delegated |
 
 ## 8. What charm4py can mirror
@@ -491,9 +496,8 @@ is not prejudged: with the `.ci` file kept, the attributes stay; without
 it, the same macro can be produced by a C++20 member-pointer template
 (`ck::entry<&X::name>`) over a registry, and the header does not change.
 
-What "experimental" has to say: `case` only over single whens; arrays only
-(no groups or singleton chares as owners); the site macros may still
-change.
+What "experimental" has to say: arrays only (no groups or singleton
+chares as owners); the site macros may still change.
 
 What charm4py can mirror: the record and site protocol of section 8, with
 no C++ frame involved.
@@ -508,4 +512,5 @@ rest of the SDAG test corpus.
 
 - Groups, nodegroups and singleton chares as owners of coroutine entries
   (the prototype's record builds its callback from an `ArrayElement`).
-- The equivalence corpus runs.
+- The rest of the equivalence corpus: megatest synctest and SDAG-heavy
+  miniapps under both implementations.

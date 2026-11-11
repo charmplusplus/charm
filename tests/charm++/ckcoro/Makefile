@@ -4,7 +4,7 @@ CHARMC=../../../bin/charmc $(OPTS)
 
 all: ckcoro_tests
 
-ckcoro_tests: ckcoro_tests.C ckcoro_tests.decl.h migration.decl.h ../../../include/ckcoro.h
+ckcoro_tests: ckcoro_tests.C ckcoro_tests.decl.h basic.decl.h refnum.decl.h migration.decl.h ../../../include/ckcoro.h
 	$(CHARMC) -std=c++20 ckcoro_tests.C -o ckcoro_tests
 
 %.decl.h: %.ci

@@ -11,6 +11,9 @@
 #include "ckcoro.h"
 
 #define MIGRATION_ELEMS 64
+#define REFNUM_ELEMS 8
+#define REFNUM_ITERATIONS 100
+#define FOR_ITERATIONS 16
 #define MARSHALL_ELEMS 8
 #define MARSHALL_ITERS 10
 #define OVERLAP_ELEMS 6
@@ -19,13 +22,41 @@
 
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ CProxy_MigrationTest migrationTestProxy;
+/* readonly */ CProxy_BasicTest basicTestProxy;
+/* readonly */ CProxy_RefnumTest refnumTestProxy;
 
 class Main : public CBase_Main {
 public:
   Main(CkArgMsg* m) {
     delete m;
     mainProxy = thisProxy;
+    basicTestProxy = CProxy_BasicTest::ckNew(1);
+    refnumTestProxy = CProxy_RefnumTest::ckNew(REFNUM_ELEMS, REFNUM_ELEMS);
     migrationTestProxy = CProxy_MigrationTest::ckNew(MIGRATION_ELEMS);
+    thisProxy.doBasicTest();
+  }
+
+  void doBasicTest() {
+    CkPrintf("Running basic coroutine tests\n");
+    for (int i = 0; i < FOR_ITERATIONS / 3; i++) basicTestProxy.fizz();
+    for (int i = 0; i < FOR_ITERATIONS / 5; i++) basicTestProxy.buzz();
+    basicTestProxy.call1();
+    basicTestProxy.call2();
+    basicTestProxy.run();
+  }
+
+  void basicTestDone() {
+    CkPrintf("Basic coroutine tests complete\n");
+    thisProxy.doRefnumTest();
+  }
+
+  void doRefnumTest() {
+    CkPrintf("Running refnum coroutine tests\n");
+    refnumTestProxy.run(REFNUM_ITERATIONS);
+  }
+
+  void refnumTestDone() {
+    CkPrintf("Refnum coroutine tests complete\n");
     thisProxy.doMigrationTest();
   }
 
@@ -74,6 +105,221 @@ public:
   void overlapTestDone() {
     CkPrintf("Overlap tests complete\n");
     CkExit();
+  }
+};
+
+class BasicTest : public CBase_BasicTest {
+  BasicTest_CORO_CODE
+  int for_index, which;
+  bool do_while, unlocked1, unlocked2, unlocked3;
+
+  static void check(bool ok, const char* what) {
+    if (!ok) ::CkAbort("ckcoro basic test: %s", what);
+  }
+  // overlap { when unlock1() serial { unlocked1 = true; } ... }
+  ck::coro::task<void> waitUnlock1() { CK_RESUMABLE(); CK_WHEN(inbox::unlock1()); unlocked1 = true; CK_END(); }
+  ck::coro::task<void> waitUnlock2() { CK_RESUMABLE(); CK_WHEN(inbox::unlock2()); unlocked2 = true; CK_END(); }
+  ck::coro::task<void> waitUnlock3() { CK_RESUMABLE(); CK_WHEN(inbox::unlock3()); unlocked3 = true; CK_END(); }
+  // The final overlap over stray messages: each arm aborts if reached.
+  ck::coro::task<void> extra(ck::coro::want w, const char* name) {
+    CK_RESUMABLE();
+    CK_WHEN(w);
+    ::CkAbort("ckcoro basic test: extra %s", name);
+    CK_END();
+  }
+
+public:
+  BasicTest() : for_index(0), which(-1), do_while(true), unlocked1(false), unlocked2(false), unlocked3(false) {
+    CkPrintf("BasicTest created on PE %i\n", CkMyPe());
+  }
+  BasicTest(CkMigrateMessage* m) : CBase_BasicTest(m) {}
+  void pup(PUP::er& p) { p | for_index; p | which; p | do_while; p | unlocked1; p | unlocked2; p | unlocked3; }
+
+  ck::coroutine run() {
+    CK_COROUTINE();
+    thisProxy.unlock1();
+
+    // FizzBuzz: for loops and if/else; Main sent the fizz and buzz messages.
+    CkPrintf("Testing coroutine for loops, and if/else\n");
+    for (for_index = 1; for_index <= FOR_ITERATIONS; for_index++) {
+      if (for_index % 3 == 0 && for_index % 5 == 0) {
+        CK_WHEN_ALL(CK_ALT(inbox::fizz()), CK_ALT(inbox::buzz()));   // when fizz(), buzz()
+        CkPrintf("FizzBuzz\n");
+      } else if (for_index % 3 == 0) {
+        CK_WHEN(inbox::fizz());
+        CkPrintf("Fizz\n");
+      } else if (for_index % 5 == 0) {
+        CK_WHEN(inbox::buzz());
+        CkPrintf("Buzz\n");
+      } else {
+        CkPrintf("%i\n", for_index);
+      }
+    }
+    check(for_index == FOR_ITERATIONS + 1, "for loop did not run to the end");
+    thisProxy.unlock2();
+
+    // While loops and case statements. The arms with never() can never be
+    // taken; the case must not get stuck on them.
+    CkPrintf("Testing coroutine while loops and case statements\n");
+    while (do_while) {
+      CK_WHEN_ANY(which,
+                  CK_ALL(CK_ALT(inbox::call1()), CK_ALT(inbox::never())),
+                  CK_ALL(CK_ALT(inbox::call2()), CK_ALT(inbox::never())),
+                  CK_ALT(inbox::call1()),
+                  CK_ALT(inbox::call2()),
+                  CK_ALL(CK_ALT(inbox::call1()), CK_ALT(inbox::call2())),
+                  CK_ALL(CK_ALT(inbox::response1()), CK_ALT(inbox::response2())),
+                  CK_ALT(inbox::responseBoth()));
+      if (which == 0 || which == 1) ::CkAbort("Received never()\n");
+      else if (which == 2) thisProxy.response1();
+      else if (which == 3) thisProxy.response2();
+      else if (which == 4) thisProxy.responseBoth();
+      else do_while = false;
+    }
+    check(do_while == false, "while loop did not end");
+    thisProxy.unlock3();
+
+    // Overlap: all three unlock messages, in any order.
+    CkPrintf("Testing coroutine overlap statements\n");
+    CK_OVERLAP(waitUnlock1(), waitUnlock2(), waitUnlock3());
+    check(unlocked1 && unlocked2 && unlocked3, "overlap missed an unlock");
+    mainProxy.basicTestDone();
+
+    // Any unhandled message is a failure.
+    CK_OVERLAP(extra(inbox::fizz(), "fizz"), extra(inbox::buzz(), "buzz"),
+               extra(inbox::call1(), "call1"), extra(inbox::call2(), "call2"),
+               extra(inbox::response1(), "response1"), extra(inbox::response2(), "response2"),
+               extra(inbox::responseBoth(), "responseBoth"), extra(inbox::unlock1(), "unlock1"),
+               extra(inbox::unlock2(), "unlock2"), extra(inbox::unlock3(), "unlock3"),
+               extra(inbox::never(), "never"));
+    CK_END();
+  }
+};
+
+class RefnumTest : public CBase_RefnumTest {
+  RefnumTest_CORO_CODE
+  int array_size;
+  int refnum_sum, expected_refnum_sum;
+  int marshall_sum, expected_marshall_sum;
+  int redn_sum, expected_redn_sum;
+  int cb_sum, expected_cb_sum;
+  int ignored_sum, expected_ignored_sum;
+  int index;
+
+  static void check(bool ok, const char* what) {
+    if (!ok) ::CkAbort("ckcoro refnum test: %s", what);
+  }
+  // case { when recvNum[index](int n) {...} when recvData[index](CkDataMsg* m) {...} }
+  ck::coro::task<void> receive(int idx) {
+    CK_RESUMABLE();
+    int which;
+    int n;
+    CkDataMsg* m;
+    CK_WHEN_ANY(which, CK_ALT(inbox::recvNum(idx), n), CK_ALT(inbox::recvData(idx), m));
+    if (which == 0) {
+      refnum_sum += idx;
+      if (n > 0) marshall_sum += n;
+      else redn_sum += n;
+    } else {
+      refnum_sum += idx;
+      cb_sum += ((int*)(m->getData()))[0];
+      delete m;
+    }
+    CK_END();
+  }
+  // forall [index] (0:messages, 2) { if (index & (index - 1)) case {...} else serial {...} }
+  ck::coro::task<void> evenIndex(int idx) {
+    CK_RESUMABLE();
+    if (idx & (idx - 1)) {
+      CK_CALL(receive(idx));
+    } else {
+      ignored_sum += idx;
+    }
+    CK_END();
+  }
+  ck::coro::task<void> missed(ck::coro::want w, const char* name) {
+    CK_RESUMABLE();
+    CK_WHEN(w);
+    ::CkAbort("ckcoro refnum test: missed a %s message", name);
+    CK_END();
+  }
+
+public:
+  RefnumTest(int s) : array_size(s) {}
+  RefnumTest(CkMigrateMessage* m) : CBase_RefnumTest(m) {}
+  void pup(PUP::er& p) {
+    p | array_size; p | refnum_sum; p | expected_refnum_sum; p | marshall_sum; p | expected_marshall_sum;
+    p | redn_sum; p | expected_redn_sum; p | cb_sum; p | expected_cb_sum; p | ignored_sum;
+    p | expected_ignored_sum; p | index;
+  }
+
+  ck::coroutine run(int messages) {
+    CK_COROUTINE();
+    {
+      // The first third of the messages are marshalled, the second third
+      // come through reductions, the last third through callbacks.
+      int marshall_start = 0;
+      int redn_start = messages / 3;
+      int cb_start = 2 * messages / 3;
+
+      refnum_sum = 0;
+      expected_refnum_sum = (messages * (messages + 1)) / 2;
+
+      marshall_sum = 0;
+      expected_marshall_sum = (redn_start * (redn_start - 1)) / 2;
+      for (int i = marshall_start; i < redn_start; i++) thisProxy[thisIndex].recvNum(i);
+
+      // A reduction sends -1 as the data.
+      redn_sum = 0;
+      expected_redn_sum = -1 * array_size * (cb_start - redn_start);
+      for (int i = redn_start; i < cb_start; i++) {
+        CkCallback cb(CkReductionTarget(RefnumTest, recvNum), thisProxy);
+        cb.setRefNum(i);
+        int data = -1;
+        contribute(sizeof(int), &data, CkReduction::sum_int, cb);
+      }
+
+      // The data messages contain our own index.
+      cb_sum = 0;
+      expected_cb_sum = thisIndex * (messages - cb_start + 1);
+      for (int i = cb_start; i <= messages; i++) {
+        CkCallback cb(CkIndex_RefnumTest::recvData(NULL), thisProxy[thisIndex]);
+        cb.setRefNum(i);
+        int data = thisIndex;
+        cb.send(sizeof(int), &data);
+      }
+
+      // The first forall ignores powers of two.
+      ignored_sum = 0;
+      expected_ignored_sum = 0;
+      for (int i = 2; i < messages; i *= 2) expected_ignored_sum += i;
+    }
+
+    // Even reference numbers, powers of two skipped: a positive stride and
+    // a branch on the index inside the forall body.
+    CK_FORALL_STRIDE(idx, 0, messages, 2, evenIndex(idx));
+
+    // The powers of two, with a plain for loop.
+    for (index = 1; index < messages; index *= 2) {
+      CK_CALL(receive(index));
+    }
+
+    // The odd ones except 1: a negative stride that does not land on the end.
+    CK_FORALL_STRIDE(idx, messages + (messages % 2 - 1), 2, -2, receive(idx));
+
+    // A single reference number (0 is in no loop above).
+    CK_WHEN(inbox::recvNum(0), ck::coro::skip);
+
+    check(refnum_sum == expected_refnum_sum, "refnum sum");
+    check(marshall_sum == expected_marshall_sum, "marshalled sum");
+    check(redn_sum == expected_redn_sum, "reduction sum");
+    check(cb_sum == expected_cb_sum, "callback sum");
+    check(ignored_sum == expected_ignored_sum, "ignored sum");
+    contribute(CkCallback(CkReductionTarget(Main, refnumTestDone), mainProxy));
+
+    // Every message was received exactly once above: these never trigger.
+    CK_OVERLAP(missed(inbox::recvNum(), "recvNum"), missed(inbox::recvData(), "recvData"));
+    CK_END();
   }
 };
 
@@ -397,4 +643,6 @@ public:
 };
 
 #include "ckcoro_tests.def.h"
+#include "basic.def.h"
+#include "refnum.def.h"
 #include "migration.def.h"

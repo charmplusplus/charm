@@ -23,8 +23,9 @@ header's opening comment and the manual section "Coroutine Entry Methods".
   restart `chain`, the frame handles `root` (the entry's frame) and `h`
   (the innermost suspended frame), and the wait state: `waiting`, `atSite`,
   `rebuilt` (restarted and not yet past the recorded site), `wants` (the
-  entry and reference number pairs it waits for: one for a when, several
-  for a when_any), and the delivered `readyBuf` with `readyIndex`.
+  entry and reference number pairs it waits for, each tagged with the
+  `arm` of a when_any it belongs to), and the delivered `readyBufs` (one
+  per want of the arm) with `readyIndex`.
 - `chain`: `sites` (one site id per resumable-function depth, pupped),
   `linked` (per depth: entered through a `CK_CALL` site), `depth`,
   `restarting`, and the `noted` fields that connect a `note_site` call with
@@ -129,10 +130,18 @@ pointer computed from the aligned array start: a pointer out gets it
 (the buffer moves to `record.held` until the next wait), a container out
 copies the elements with `assign`; a `ck::coro::skip` out reads into a
 temporary. Without a typed want (the hand-written form) the outs are
-pupped in order with no array support. `CK_WHEN_ANY` uses `any_awaiter` over several
-`when_awaiter`s: `await_ready` tries each alternative in order, `await_suspend`
-stores all their `want`s, and `await_resume` unpacks through the
-alternative at `readyIndex` and yields that index.
+pupped in order with no array support. `CK_WHEN_ALL` uses `all_awaiter`
+over several `when_awaiter`s: ready only when `state::try_arm` finds a
+distinct buffered match for every want (then all are taken, in want
+order), else all its wants are stored under arm 0. `CK_WHEN_ANY` uses
+`any_awaiter` over alternatives that are `when_awaiter`s or
+`all_awaiter`s (`try_ready`, `add_wants(ws, arm)`, `unpack_ready`):
+`await_ready` tries each alternative in order, `await_suspend` stores
+their wants tagged with the alternative's index, and `await_resume`
+unpacks through the alternative at `readyIndex` and yields that index.
+`state::push` appends the delivery to the inbox and then, for each
+waiting record one of whose wants matches it, tries its arms in order
+with `try_arm`; the first satisfied arm resumes the record.
 
 **Overlap.** `CK_OVERLAP(tasks...)` / `CK_FORALL(i, lo, hi, expr)` are
 `case __LINE__: note_site(...); co_await state.overlap(vector<task<void>>)`.

@@ -1,0 +1,33 @@
+// The coroutine version of tests/charm++/sdag/basic.ci: when, for, while,
+// if/else, case (with conjunction arms) and overlap. The SDAG test's
+// singleton chare is a one-element array here (coroutine entries belong to
+// array elements).
+
+module basic {
+  array [1D] BasicTest {
+    entry BasicTest();
+
+    // Sent by Main multiple times
+    entry [inbox] void fizz();
+    entry [inbox] void buzz();
+
+    // Sent by Main exactly one time each
+    entry [inbox] void call1();
+    entry [inbox] void call2();
+
+    // Sent from within the while loop as responses to the call1/2 messages
+    entry [inbox] void response1();
+    entry [inbox] void response2();
+    entry [inbox] void responseBoth();
+
+    // Called throughout run() as different tests complete
+    entry [inbox] void unlock1();
+    entry [inbox] void unlock2();
+    entry [inbox] void unlock3();
+
+    // Never called, but used as a potential pitfall in case statements
+    entry [inbox] void never();
+
+    entry [coroutine] void run();
+  }
+}
