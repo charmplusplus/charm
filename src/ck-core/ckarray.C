@@ -58,6 +58,8 @@ Orion Sky Lawlor, olawlor@acm.org
 #include "register.h"
 #include <stdarg.h>
 
+CkpvExtern(int, currentChareIdx);
+
 bool _isAnytimeMigration;
 bool _isNotifyChildInRed;
 
@@ -787,6 +789,12 @@ void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage* m, int ctor, int proposedPe,
   }
 
   int hostPe = ca->findInitialHostPe(idx, proposedPe);
+  // CldMap's procNum is CLD_ANYWHERE; FastArrayMap names PEs past the last one
+  // for indices well beyond its initial range.
+  if (hostPe < 0 || hostPe >= CkNumPes())
+    CkAbort("ckInsert without a PE is not supported with this array map (CldMap, or "
+            "FastArrayMap beyond its initial range): the map gave PE %d; pass a PE to "
+            "insert()\n", hostPe);
 
   int listenerData[CK_ARRAYLISTENER_MAXLEN];
   ca->prepareCtorMsg(m, listenerData);
@@ -1141,9 +1149,17 @@ bool CkArray::insertElement(CkArrayMessage* m, const CkArrayIndex& idx,
   i.locRec = rec;
   i.chareType = chareType;
 
-  // Execute the constructor
-  if (!rec->invokeEntry(elt, (void*)m, ctorIdx, true))
-    return false;
+  // Execute the constructor. A -1 currentChareIdx keeps the element's Chare
+  // constructor from taking the plain-chare slot of the caller (ck.C, Chare::Chare).
+#ifndef CMK_CHARE_USE_PTR
+  int callingChareIdx = CkpvAccess(currentChareIdx);
+  CkpvAccess(currentChareIdx) = -1;
+#endif
+  bool alive = rec->invokeEntry(elt, (void*)m, ctorIdx, true);
+#ifndef CMK_CHARE_USE_PTR
+  CkpvAccess(currentChareIdx) = callingChareIdx;
+#endif
+  if (!alive) return false;
 
   elt->ckFinishConstruction();
 

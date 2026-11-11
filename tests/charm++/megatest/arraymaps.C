@@ -9,11 +9,9 @@
  *      per index] checks that every element exists exactly once;
  *   2. insertion (1D, maps that support it): elements 37..41 are inserted
  *      from PE 1 (PE 0 on one PE), checked the same way;
- *   3. every element migrates to (CkMyPe()+1) % CkNumPes() and checks it arrived
- *      (inserted elements stay put unless ARRAYMAPS_MOVE_INSERTED, see arraymaps.h);
+ *   3. every element migrates to (CkMyPe()+1) % CkNumPes() and checks it arrived;
  *   4. a broadcast reaches every element (reduction checks the full set);
- *   5. every element contributes once more and calls ckDestroy() (inserted
- *      elements are left alive unless ARRAYMAPS_MOVE_INSERTED);
+ *   5. every element contributes once more and calls ckDestroy();
  *      the next case starts when that reduction arrives.
  *
  * Maps and what is left out:
@@ -21,21 +19,17 @@
  *   FastArrayMap: 1D/2D/3D. No insertion: procNum is flat/ceil(n/P), so an
  *     index past the initial size names a PE beyond CkNumPes() (the map's
  *     comment says it is for arrays that promise no late insertion).
- *   HilbertArrayMap: 1D 37, 2D 4x4, 3D 4x4x4 (see the case table for why not
- *     5x7 and 3x4x5). No insertion, as FastArrayMap (it indexes its PE list
- *     with flat/ceil(n/P)).
+ *   HilbertArrayMap: 1D 37, 2D 5x7 and 4x4, 3D 3x4x5 and 4x4x4. No insertion,
+ *     as FastArrayMap (it indexes its PE list with flat/ceil(n/P)).
  *   PropMap: 1D/2D/3D. No insertion: 1D procNum indexes a table of the initial
  *     size with the element index.
  *   CldMap: 1D/2D/3D. procNum is CLD_ANYWHERE, so placement is not checked;
- *     only that each element exists exactly once. Insertion only with
- *     ARRAYMAPS_CLDMAP_INSERT=1: ckInsertIdx sends the element to PE
- *     procNum() == -1 (one PE: "Destnode -1 out of range"; more: SIGSEGV).
- *   ConfigurableRRMap: only with ARRAYMAPS_CONFIGRR=1 and the run line flag
- *     +ConfigurableRRMap "<config>"; 1D only (populateInitial aborts on other
- *     dimensions). populateInitial reads its configuration only inside
- *     CkAssert(haveConfigurableRRMap()), which a production build compiles
- *     out, so it then indexes an empty table (SIGSEGV), flag or not. When
- *     enabled, initial placement is checked against the configuration and
+ *     only that each element exists exactly once. Elements are inserted with
+ *     a PE; ARRAYMAPS_CLDMAP_INSERT=1 inserts without one, which must abort
+ *     with "ckInsert without a PE is not supported".
+ *   ConfigurableRRMap: only with the run line flag +ConfigurableRRMap
+ *     "<config>", e.g. "4 2 0 1 1 0"; 1D only (populateInitial aborts on other
+ *     dimensions). Initial placement is checked against the configuration and
  *     inserted elements against homePe (procNum is RRMap's).
  *   Simple1DFileMap: 1D only (it aborts on other dimensions). ReadFileMap:
  *     1D/2D/3D. PE 0 writes ./mapfile before creating the map group; every PE
@@ -50,12 +44,6 @@
 
 #ifndef ARRAYMAPS_CLDMAP_INSERT
 #define ARRAYMAPS_CLDMAP_INSERT 0
-#endif
-#ifndef ARRAYMAPS_CONFIGRR
-#define ARRAYMAPS_CONFIGRR 0
-#endif
-#ifndef ARRAYMAPS_HILBERT_ODD
-#define ARRAYMAPS_HILBERT_ODD 0
 #endif
 
 enum MapKind { RR, DEFAULT, FAST, BLOCK, HILBERT, PROP, CLD, CONFIGRR, FILE1D, READFILE };
@@ -82,20 +70,12 @@ static const arraymaps_case cases[] = {
     {DEFAULT, D1}, {DEFAULT, D2}, {DEFAULT, D3},
     {BLOCK, D1}, {BLOCK, D2}, {BLOCK, D3},
     {FAST, 1, false, 37, 1, 1}, {FAST, D2}, {FAST, D3},
-    // HilbertArrayMap 2D/3D use power-of-two cubes: with 5x7 and 3x4x5 the
-    // curve position of some indices exceeds the element count, procNum reads
-    // past its PE list, and those elements are never created (ARRAYMAPS_HILBERT_ODD).
-    {HILBERT, 1, false, 37, 1, 1},
-#if ARRAYMAPS_HILBERT_ODD
-    {HILBERT, D2}, {HILBERT, D3},
-#else
+    // HilbertArrayMap: power-of-two cubes as well as the odd extents.
+    {HILBERT, 1, false, 37, 1, 1}, {HILBERT, D2}, {HILBERT, D3},
     {HILBERT, 2, false, 4, 4, 1}, {HILBERT, 3, false, 4, 4, 4},
-#endif
     {PROP, 1, false, 37, 1, 1}, {PROP, D2}, {PROP, D3},
-    {CLD, 1, ARRAYMAPS_CLDMAP_INSERT, 37, 1, 1}, {CLD, D2}, {CLD, D3},
-#if ARRAYMAPS_CONFIGRR
+    {CLD, D1}, {CLD, D2}, {CLD, D3},
     {CONFIGRR, D1},
-#endif
     {FILE1D, 1, false, 37, 1, 1},
     {READFILE, 1, false, 37, 1, 1}, {READFILE, D2}, {READFILE, D3},
 };
@@ -169,7 +149,12 @@ void arraymaps_inserter::insert(CkArrayID aid, CProxy_arraymaps_driver driver,
                                 int caseId, int first, int n, std::vector<int> expected)
 {
   CProxy_arraymaps_1d arr(aid);
-  for (int i = first; i < first + n; i++) arr[i].insert(driver, caseId, false, expected);
+  // CldMap names no PE, so its elements are inserted with one (unless
+  // ARRAYMAPS_CLDMAP_INSERT, which checks the abort without one).
+  const bool withPe = cases[caseId].map == CLD && !ARRAYMAPS_CLDMAP_INSERT;
+  for (int i = first; i < first + n; i++)
+    if (withPe) arr[i].insert(driver, caseId, false, expected, i % CkNumPes());
+    else arr[i].insert(driver, caseId, false, expected);
   arr.doneInserting();
 }
 

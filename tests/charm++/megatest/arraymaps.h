@@ -4,17 +4,6 @@
 #include <vector>
 #include "megatest.h"
 
-// ARRAYMAPS_MOVE_INSERTED=0 keeps dynamically inserted elements on their PE
-// and alive at the end of a case. CkArray::insertElement runs the element
-// constructor without resetting currentChareIdx (CkLocMgr::addElementToRec
-// does), so an inserted element takes the chare_objs slot of the last plain
-// chare created on its PE. When the element is deleted there, by ckDestroy()
-// or by migrating away, ~Chare clears that slot, and the next message to the
-// plain chare is delivered to a null object (SIGSEGV). Set to 1 once fixed.
-#ifndef ARRAYMAPS_MOVE_INSERTED
-#define ARRAYMAPS_MOVE_INSERTED 0
-#endif
-
 #include "arraymaps.decl.h"
 
 // Flat (row-major) index of an element, for the 1D, 2D and 3D shapes used here.
@@ -69,7 +58,6 @@ class arraymaps_elt : public Base
   CProxy_arraymaps_driver driver;
   int caseId;
   int destPe;
-  bool inserted;  // created by insert() after the initial wave
   std::vector<int> expected;
 
   void checkPlacement(bool initial);
@@ -78,7 +66,7 @@ class arraymaps_elt : public Base
  public:
   arraymaps_elt(CProxy_arraymaps_driver driver_, int caseId_, bool initial,
                 const std::vector<int>& expected_)
-      : driver(driver_), caseId(caseId_), destPe(-1), inserted(!initial), expected(expected_)
+      : driver(driver_), caseId(caseId_), destPe(-1), expected(expected_)
   {
     checkPlacement(initial);
     if (initial)
@@ -94,13 +82,12 @@ class arraymaps_elt : public Base
     p | driver;
     p | caseId;
     p | destPe;
-    p | inserted;
     p | expected;
   }
 
   void migrate(void)
   {
-    destPe = (inserted && !ARRAYMAPS_MOVE_INSERTED) ? CkMyPe() : (CkMyPe() + 1) % CkNumPes();
+    destPe = (CkMyPe() + 1) % CkNumPes();
     if (destPe == CkMyPe())
       this->thisProxy[this->thisIndex].afterMigrate();
     else
@@ -116,7 +103,7 @@ class arraymaps_elt : public Base
   void destroy(void)
   {
     report();
-    if (!inserted || ARRAYMAPS_MOVE_INSERTED) this->ckDestroy();
+    this->ckDestroy();
   }
 
  private:

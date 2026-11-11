@@ -6475,6 +6475,9 @@ There is a default map object, which maps 1D array indices in a block
 fashion to processors, and maps other array indices based on a hash
 function. Some other mappings such as round-robin (RRMap) also exist,
 which can be used similar to custom ones described below.
+CldMap names no PE for an element (its procNum returns ``CLD_ANYWHERE``),
+so ``insert()`` into an array that uses it must be given a PE; without one
+the program aborts.
 
 A custom map object is implemented as a group which inherits from
 CkArrayMap and defines these virtual methods:
