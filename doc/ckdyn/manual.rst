@@ -1600,7 +1600,15 @@ that hands the data to user code either copies it or retains the message for
 as long as the user holds it.
 
 A device send needs to know the destination PE: a DEVICE slot to a singleton
-chare created with ``CKDYN_PE_ANY`` that is not yet constructed aborts.
+chare created with ``CKDYN_PE_ANY`` that is not yet constructed aborts. For an
+array element CkDyn uses the sending PE's last known location of the element
+and chooses the transfer mode for that PE's process. If the element has moved
+to another process by the time the message arrives (or the sender's location
+was out of date), the receiver aborts ("Destination process does not match
+the one the sender determined"); a move to another PE of the same process is
+fine. A binding that sends DEVICE slots to array elements does so while
+they do not migrate between processes (between load balancing steps, for
+example).
 
 ``CkDynHasDeviceSupport()`` returns 1 in a CUDA or HIP build; every device
 function aborts in other builds.
@@ -1742,6 +1750,16 @@ for a charmxi program. The usual tracing options (``+traceroot``,
   ``CkDynTraceEndUserBracketEvent(id)`` bracket a region.
 - Array broadcasts through ``deliver_many`` need the per-element bracket
   above to appear per element.
+- Projections reads an array element's index fields from the dimension
+  count of its class in the ``.sts`` file. A class registered with
+  ``ndims`` 0 (any dimension count) takes the count of the first element
+  constructed in each process, and only PE 0's process writes the ``.sts``:
+  if the class's arrays differ in dimension count, or PE 0's process
+  constructed none of its elements before the file was written, Projections
+  shows the indices of some elements with the wrong number of fields. The
+  count is recorded by every PE thread of a process without
+  synchronization; the threads write the same value for one array. Register
+  a class with a fixed ``ndims`` when its indices matter in Projections.
 
 Other runtime services
 ----------------------
