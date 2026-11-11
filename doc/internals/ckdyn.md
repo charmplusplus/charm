@@ -1160,10 +1160,15 @@ point in `_initCharm` where the hook is called. A program
 whose main chare is an ordinary C++ main chare calls `CkDynCreateManagers()`
 from its constructor.
 
-`_createTraces` in init.C is a weak symbol in every build (empty, or in a
-`CMK_CHARM4PY` build with tracing calling the projections and summary
-modules), so a program without a charmc-generated moduleinit links, and a
-charmc-linked program keeps its generated definition.
+`_createTraces` in init.C is a weak symbol (`CK_WEAK_DEFINITION`) outside
+Windows (empty, or in a `CMK_CHARM4PY` build with tracing calling the
+projections and summary modules), so a program without a charmc-generated
+moduleinit links, and a charmc-linked program keeps its generated
+definition. MSVC has no weak definitions: on Windows (`_WIN32`) init.C
+defines `_createTraces`, as a strong symbol, only in a `CMK_CHARM4PY` build,
+whose shared library is linked without a moduleinit; a plain build leaves it
+to the program's moduleinit, so on Windows a binding needs the `charm4py`
+build target.
 
 **What `CMK_CHARM4PY` means.** CkDyn does not depend on it: registration, the
 hook, late registration, CCS (`CcsRegisterHandlerFn`) and `_createTraces` work
@@ -1284,7 +1289,7 @@ binding.
   `performDeliveryDyn`, and the branch in `CkArray::recvBroadcast` that
   selects them.
 - src/ck-core/init.C: `_registerCkDyn` and `CkDynCallRegisterHook` in
-  `_initCharm`; the weak `_createTraces`.
+  `_initCharm`; `_createTraces` (weak outside Windows).
 - tests/charm++/ckdyn: the C++ test binding (`cbinding.h`, `cbinding.C`): a
   hook table over C++ method tables, installed with `CkDynInit` from an
   `initnode`, and the tests that use it.

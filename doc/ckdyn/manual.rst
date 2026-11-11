@@ -1102,7 +1102,20 @@ once the restart completes. On restart:
   delivered after a restart.
 
 Not restored: sections (a binding recreates them; an old section id aborts on
-use), buffer posts, futures and pending messages. A program that continues after its own checkpoint tells
+use), buffer posts, futures and pending messages.
+
+A restart may use another PE count than the checkpointed run. Then:
+
+- array elements are restored and spread over the new PEs;
+- every group branch is unpacked from PE 0's bytes and every nodegroup
+  branch from node 0's (the Charm++ checkpoint rule): ``unpack`` on every PE
+  receives the bytes PE 0 packed, so per-branch state of the other branches
+  is lost;
+- singleton chares (``CkDynCreateChare``) are not restored at all, and
+  nothing reports it: their targets name no object, and a send to one is an
+  error the runtime does not detect.
+  A program that holds singleton chares restarts with the same PE count;
+- the main chare is restored on PE 0 as usual. A program that continues after its own checkpoint tells
 the two runs apart itself; the C++ test's dynamic main chare checks whether
 its constructor ran in this process.
 
