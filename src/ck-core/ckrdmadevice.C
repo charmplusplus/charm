@@ -691,9 +691,17 @@ static void persistRdmaDone(void* param, void* msg) {
   delete d;
 }
 
-// An RDMA get into dst (registered in this process) from src.
+// An RDMA get into dst (registered in this process) from src. The lengths are
+// the objects' current cnt, as in the IPC and copy modes; open() registered
+// cnt as it was then, the most a transfer may move.
 static void persistRdmaGet(const CkDevicePersistent& dst, const CkDevicePersistent& src, const CkCallback& done) {
   CmiNcpyBuffer d = dst.ncpy, s = src.ncpy;
+  if (dst.cnt > d.cnt || src.cnt > s.cnt)
+    CkAbort("CkDevicePersistent: a transfer of %zu bytes from PE %d into %zu bytes on PE %d exceeds "
+            "the length registered by open() (%zu and %zu bytes); open() again after enlarging cnt",
+            src.cnt, src.pe, dst.cnt, dst.pe, s.cnt, d.cnt);
+  d.cnt = dst.cnt;
+  s.cnt = src.cnt;
   d.deviceRdmaOpInfo = nullptr;
   s.deviceRdmaOpInfo = nullptr;
   CkCallback srcAck(CkCallback::ignore), dstAck(done);
