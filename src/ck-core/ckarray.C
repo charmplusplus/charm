@@ -680,11 +680,20 @@ static CkArrayID CkCreateArray(CkArrayMessage* m, int ctor, CkArrayOptions opts)
   bool wide = opts.isWideCollection();
   if (!locMgr.isZero())
   {
-    CkLocMgr* mgr = CProxy_CkLocMgr(locMgr).ckLocalBranch();
-    if (mgr == nullptr)
-      CkAbort("CkCreateArray: the location manager (group %d) this array binds to has"
-              " no branch on PE 0 yet\n", locMgr.idx);
-    wide = mgr->isWideCollection();
+    // bindTo recorded the layout on the PE that called it, so a request sent from
+    // there does not need the location manager's branch here, which may still be
+    // waiting for its map (#4174). Only a location manager set directly
+    // (setLocationManager) is read here.
+    if (opts.getBoundWideCollection() >= 0)
+      wide = opts.getBoundWideCollection() == 1;
+    else
+    {
+      CkLocMgr* mgr = CProxy_CkLocMgr(locMgr).ckLocalBranch();
+      if (mgr == nullptr)
+        CkAbort("CkCreateArray: the location manager (group %d) this array binds to has"
+                " no branch on PE 0 yet; bind with CkArrayOptions::bindTo\n", locMgr.idx);
+      wide = mgr->isWideCollection();
+    }
   }
   opts.setCollection(ck::objid::nextCollectionNumber(wide), wide);
   if (locMgr.isZero())

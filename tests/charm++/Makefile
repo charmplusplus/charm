@@ -52,6 +52,7 @@ DIRS = \
   objid_recreate \
   objid_boundrecreate \
   objid_detour \
+  objid_bindasync \
   collide \
   objloads \
   qd \

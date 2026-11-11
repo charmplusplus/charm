@@ -85,6 +85,10 @@ class CkArrayOptions {
   bool broadcastViaScheduler;    // broadcast inline or through scheduler
   bool sectionAutoDelegate;      // Create a mCastMgr and auto-delegate all sections
   bool wideCollection;           // Element ids use the wide-collection layout (objid.h)
+  // The bound-to location manager's layout, as bindTo read it on the calling PE:
+  // 1 wide, 0 not, -1 unknown (no bindTo). CkCreateArray uses it, so PE 0 does not
+  // need that location manager's branch (#4174).
+  signed char boundWideCollection;
   CmiUInt8 collectionNumber;     // Assigned on PE 0 by CkCreateArray; 0 until then
 
   enum class InsertionType : char {
@@ -221,6 +225,7 @@ class CkArrayOptions {
   /// Use this location manager
   CkArrayOptions& setLocationManager(const CkGroupID& l) {
     locMgr = l;
+    boundWideCollection = -1;  // bindTo sets it after this call
     return *this;
   }
 
@@ -299,6 +304,8 @@ class CkArrayOptions {
   const CkGroupID& getLocationCache(void) const { return locCache; }
   bool isSectionAutoDelegated(void) const { return sectionAutoDelegate; }
   bool isWideCollection(void) const { return wideCollection; }
+  /// 1 or 0: the bound-to location manager's layout, recorded by bindTo; -1: unknown
+  int getBoundWideCollection(void) const { return boundWideCollection; }
   CmiUInt8 getCollectionNumber(void) const { return collectionNumber; }
   // Used by CkCreateArray (PE 0) once the number is assigned and the kind settled
   void setCollection(CmiUInt8 number, bool wide) {
