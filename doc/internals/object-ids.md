@@ -50,9 +50,12 @@ from 1 to 2^C - 1, and C is `CMK_OBJID_COLLECTION_BITS` (default 12, a build
 flag). Before the redesign this field held the array's `CkGroupID`, which
 counted every group in the program; now it counts arrays. An array bound to
 another with `bindTo` has its own number but shares the other array's location
-manager and layout. `CkCreateArray` reads that layout from the location manager's branch
-on PE 0; an asynchronous creation request that arrives before the branch is
-built waits in the group's pending queue (`CkCreateArrayAsync`).
+manager and layout. `bindTo` records that layout in the options
+(`boundWideCollection`) on the PE that calls it, where the other array's
+branch exists, and `CkCreateArray` on PE 0 takes it from there: PE 0 may not
+have built the location manager yet when an asynchronous creation request
+arrives (#4174). Only a location manager set directly with
+`setLocationManager` is read from its branch on PE 0.
 
 **Payload.** What the payload means is decided per array, by its `CkLocMgr`,
 from whether the array has bounds:

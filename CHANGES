@@ -150,8 +150,9 @@ New on this line since the split from classic:
   another (bindTo) aborted with "the location manager ... this array
   binds to has no branch on PE 0 yet" when its request reached PE 0
   while the other array's location manager was still held there,
-  waiting for a custom map created elsewhere (#4174). The request now
-  waits on PE 0 for that branch. New test objid_bindasync.
+  waiting for a custom map created elsewhere (#4174). bindTo now records
+  the other array's id layout in the options on the calling PE, so PE 0
+  no longer needs that branch. New test objid_bindasync.
 
 - Broadcasts and [nokeep] entry methods: fixes for message reuse and
   copies (#4000-#4012). Checkpoint restart no longer hangs with more

@@ -1,5 +1,6 @@
 // objid_bindasync: an asynchronous creation request for an array bound to
-// another (bindTo) waits on PE 0 for the bound-to location manager (charm #4174).
+// another (bindTo) succeeds when it reaches PE 0 before the bound-to location
+// manager is built there (charm #4174).
 // Each round PE 1 creates a custom map M and, asynchronously, array A on M; then,
 // once A's branch exists on PE 1, array B bound to A. A's location manager on
 // PE 0 is held until M's creation reaches PE 0. PE 0 stalls while PE 1 floods it
