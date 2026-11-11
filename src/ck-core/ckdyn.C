@@ -1593,9 +1593,9 @@ void CkDynMgr::pup(PUP::er &p) {
 
 void CkDynMgr::checkRun(const CkDynSectionID &sid, const char *what) const {
   if (sid.reserved != restarts)
-    CkAbort("CkDyn: %s: stale section id from before restart (root PE %d, index %d, generation %u, made in run %u; "
-            "this is run %u after %u restarts): sections are not checkpointed, recreate them after +restart",
-            what, sid.root_pe, sid.idx, sid.gen, sid.reserved, restarts, restarts);
+    CkAbort("CkDyn: %s: stale section id from before restart (root PE %d, index %d, generation %u, made after "
+            "%u restarts; the program has now restarted %u times): sections are not checkpointed, recreate them "
+            "after +restart", what, sid.root_pe, sid.idx, sid.gen, sid.reserved, restarts);
 }
 
 void CkDynMgr::deposit(CkDynMsg *m) {
