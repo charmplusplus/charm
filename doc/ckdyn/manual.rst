@@ -1529,6 +1529,8 @@ Posted buffers
 
    void CkDynPostBuffer(const CkDynTarget *t, int ep, int slot, const CkDynBufDesc *d);
    void CkDynPostDeviceBuffer(const CkDynTarget *t, int ep, int slot, const CkDynDevDesc *d);
+   int  CkDynUnpostBuffer(const CkDynTarget *t, int ep, int slot);
+   #define CKDYN_POST_ARG 0x40000000
 
 A post names, on the calling PE, the destination of slot ``slot`` of the
 next message to the local object ``t``'s entry ``ep``. The posted length must
@@ -1538,7 +1540,21 @@ host post may be made any time before the message is delivered to the
 object, even after the send was issued: the runtime copies the slot from the
 delivered message into the posted buffer (one copy on the receiving PE), and
 ``CkDynViewBufferPtr`` returns the posted buffer. A device post receives the
-transfer directly. The C API has no call to withdraw a post.
+transfer directly.
+
+``CkDynUnpostBuffer(t, ep, slot)`` withdraws the post for ``(t, ep, slot)``
+if it is still outstanding and returns 1, or returns 0 when there is none. A
+post is consumed only by a message whose slot is NCPY or DEVICE; a message
+that carries that slot as a BUFFER or BYTES value leaves it in place, so a
+binding that posted for a call whose argument then arrived by value
+withdraws the post before posting again for the next call.
+
+``slot`` in a post or unpost may be OR'd with ``CKDYN_POST_ARG``; it then
+counts arguments, not slots: in a message whose header has
+``CKDYN_MSG_BLOCK`` and whose slot 0 is a FUTURE slot, argument ``k`` is slot
+``k + 1``, otherwise slot ``k``. The binding then need not know at post time
+whether the sender will block on the call. An unpost names the slot in the
+same form as its post.
 
 Device buffers: DEVICE slots
 ----------------------------
@@ -1583,12 +1599,62 @@ from the calling PE's scheduler, when ``stream`` reaches this point. Quiescence
 is not detected while such a callback is pending. A binding uses it to resume
 a coroutine that waits for a kernel or a copy.
 
-Persistent device buffers (planned)
------------------------------------
+.. _ckdyn-devpersist:
 
-A persistent device buffer API (open a device buffer once, then get and put
-into it repeatedly without a message per transfer) is planned for a later
-version of ``ckdyn.h``. It is not part of API version 2.
+Persistent device buffers
+-------------------------
+
+.. code-block:: c
+
+   typedef struct CkDynDevPersist CkDynDevPersist;   /* opaque, valid on the PE that opened it */
+   CkDynDevPersist *CkDynDevPersistOpen(const CkDynDevDesc *d, const CkDynCallback *done);
+   void   CkDynDevPersistClose(CkDynDevPersist *p);
+   size_t CkDynDevPersistHandleSize(void);
+   void   CkDynDevPersistHandle(const CkDynDevPersist *p, void *out);
+   void   CkDynDevPersistGet(CkDynDevPersist *dst, const void *src_handle, uint32_t refnum);
+   void   CkDynDevPersistPut(const void *dst_handle, CkDynDevPersist *src, uint32_t refnum);
+   int    CkDynDevPersistMode(const CkDynDevPersist *p, const void *handle);
+
+A persistent device buffer is a device buffer opened once on one PE and then
+used for any number of one-sided transfers, without a message or a memory
+registration per transfer. ``CkDynDevPersistOpen`` opens the buffer ``d``
+names (``ptr``, ``len``, ``device`` and ``stream`` are used; the stream
+orders each transfer after earlier work on it) and registers it for RDMA in a
+program of more than one process. ``CkDynDevPersistHandle`` writes the
+buffer's handle, ``CkDynDevPersistHandleSize()`` bytes, which the binding
+sends to other PEs in an ordinary message (a BYTES slot, for example).
+
+``CkDynDevPersistGet(dst, src_handle, refnum)`` copies the source buffer
+named by the handle into ``dst``, which must be open on the calling PE.
+``CkDynDevPersistPut(dst_handle, src, refnum)`` copies the local open buffer
+``src`` into the buffer named by the handle. The transfer moves the source's
+length; the destination must be at least as long. Either side may be on any
+PE. ``done``, the callback given to ``CkDynDevPersistOpen`` of the local
+buffer, receives an empty message on the issuing PE once per completed
+transfer: a get is complete when the bytes are in ``dst``, a put when they
+are in the remote buffer. For a FUTURE callback a non-zero ``refnum`` of the
+call is the future id; for the other kinds the message carries the
+callback's own reference number. The caller keeps both buffers valid and
+does not read the destination before ``done``.
+
+The transfer mode is chosen per pair of buffers, and
+``CkDynDevPersistMode`` returns it: 0, a device copy when both buffers are in
+one process; 1, CUDA or HIP IPC when they are in different processes on one
+host and the peer's IPC handle opens in this process (``+gpushm`` is not
+needed; it concerns DEVICE slots); 2, RDMA on the registered memory
+otherwise. Between hosts a put is carried out as a get issued by the
+destination's PE, so that ``done`` means the data has arrived. RDMA needs
+both buffers registered, which ``CkDynDevPersistOpen`` does in every program
+of more than one process, and a machine layer that can register device
+memory; the underlying ``CkDevicePersistent`` aborts an RDMA transfer whose
+buffers are not registered. The first use of each mode in a process prints
+one line.
+
+``CkDynDevPersistClose`` deregisters and frees the local record; it aborts
+while a transfer of that buffer is outstanding. A handle stays usable only
+while its buffer is open. Persistent buffers are not migrated or
+checkpointed. Every function aborts in a build without CUDA or HIP.
+charm4py binds them as ``charm.DevicePersistent``.
 
 .. _ckdyn-coro:
 
@@ -2188,6 +2254,13 @@ See :ref:`ckdyn-zerocopy`.
 
 ``void CkDynPostDeviceBuffer(const CkDynTarget *t, int ep, int slot, const CkDynDevDesc *d)``
    Posts a device destination.
+
+``int CkDynUnpostBuffer(const CkDynTarget *t, int ep, int slot)``
+   Withdraws an outstanding post; returns 1 if there was one. ``slot`` of a
+   post or unpost may carry ``CKDYN_POST_ARG`` to count arguments.
+
+``CkDynDevPersist *CkDynDevPersistOpen(const CkDynDevDesc *d, const CkDynCallback *done)``, ``CkDynDevPersistClose``, ``CkDynDevPersistHandleSize``, ``CkDynDevPersistHandle``, ``CkDynDevPersistGet``, ``CkDynDevPersistPut``, ``CkDynDevPersistMode``
+   Persistent device buffers: :ref:`ckdyn-devpersist`.
 
 ``void CkDynHapiAddCallback(uint64_t stream, const CkDynCallback *cb)``
    Delivers an empty message to ``cb`` when the stream reaches this point.
