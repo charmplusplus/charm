@@ -15,14 +15,14 @@
  *   //      entry [inbox] void recvCount(int iter, int count);
  *   class Jacobi : public CBase_Jacobi {
  *     Jacobi_CORO_CODE
- *     GhostMsg *gmsg;                // scratch; assigned at a site, used after it
  *     int imsg, iter, i, count;      // state across sites: members, pupped
  *     ck::coroutine doStep() {
  *       CK_COROUTINE();
  *       sendGhosts();
  *       for (imsg = 0; imsg < 6; imsg++) {
- *         CK_WHEN(inbox::recvGhost(iter), gmsg);   // when recvGhost[iter](GhostMsg *gmsg)
- *         process(gmsg);
+ *         CK_WHEN_BLOCK(inbox::recvGhost(iter), gmsg) { // when recvGhost[iter](GhostMsg *gmsg) {
+ *           process(gmsg);
+ *         }
  *       }
  *       CK_WHEN(inbox::recvCount(iter), i, count); // when recvCount[iter](int i, int count)
  *       compute();
@@ -30,13 +30,19 @@
  *     }
  *   };
  *
- * A when stores the delivery into the members of the chare that follow the
- * want: the message pointer (the coroutine owns it: delete it before the
- * next wait or pup it), or every marshalled parameter of the entry in
- * order, a parameter used only for matching included. The outs are members,
- * not variables declared by the wait, because a member is pupped with the
- * element and a local does not survive a restart (see Migration below).
- * inbox::name(ref) matches the reference number:
+ * A wait has two forms. CK_WHEN_BLOCK(want, name...) { ... } declares the
+ * entry's parameters, in order, as variables of the block: the message
+ * pointer, or every marshalled parameter (an array as a pointer into the
+ * message); the block may not contain a site (the compiler rejects the
+ * restart jump past the declarations). CK_WHEN(want, out...) stores the
+ * delivery into members of the chare that follow the want, in the same
+ * order, a parameter used only for matching included (ck::coro::skip
+ * discards one); an array parameter into a pointer member (valid until
+ * the next wait) or a container member (copied). A received message is
+ * owned by the coroutine: delete it before the next wait or pup it. A
+ * value needed after a later wait is a member, because a member is pupped
+ * with the element and a local does not survive a restart (see Migration
+ * below). inbox::name(ref) matches the reference number:
  * the envelope's for a message entry, the first arithmetic parameter for a
  * marshalled entry; inbox::name() matches any. Deliveries that no coroutine
  * is waiting for are buffered as messages (the marshalled parameters stay
@@ -69,7 +75,8 @@
  * CK_CALL or CK_CALL_TO.
  *
  * At most one coroutine per entry method is active in an element at a time.
- * Inbox entries take a message or marshalled parameters without arrays.
+ * Inbox entries take a message or marshalled parameters (not conditional
+ * or nocopy ones).
  *
  * +ck_fakemigrate on the command line makes every site rebuild the element's
  * coroutines in place (state packed and unpacked, frames destroyed, entries
@@ -191,6 +198,38 @@ struct want {
 struct noref_t {};
 inline constexpr noref_t noref{};
 
+// The parameter list of an inbox entry, as the generated inbox::name_params
+// type: each marshalled parameter's value type, an array parameter as
+// array_param<T>, a message entry as the message pointer, a void entry as
+// params<>. A want_t<P> is a want that carries it, so that a when can check
+// its outs against the entry and unpack arrays.
+template <class... Ps> struct params {};
+template <class T> struct array_param {};
+template <class P> struct want_t : want {
+  using want::want;
+  using params_type = P;
+};
+template <class T> using value_t = std::remove_cv_t<std::remove_reference_t<T>>;
+template <class T> inline constexpr bool is_array_param_v = false;
+template <class T> inline constexpr bool is_array_param_v<array_param<T>> = true;
+template <class P> struct out_of { using type = P; };
+template <class T> struct out_of<array_param<T>> { using type = T *; };
+template <class P> using out_t = typename out_of<P>::type;
+
+// An array argument handed to deliver() by a generated inbox body reached
+// otherwise than through its own message (a reduction target, a direct
+// call): the pointer and the byte count, packed in charmxi's layout.
+template <class T> struct array_arg {
+  const T *data;
+  size_t bytes;
+};
+template <class T> inline constexpr bool is_array_arg_v = false;
+template <class T> inline constexpr bool is_array_arg_v<array_arg<T>> = true;
+
+// An out that discards its parameter: CK_WHEN(inbox::recv(iter), ck::coro::skip, values).
+struct skip_t {};
+inline skip_t skip;
+
 /* ---------------- records of active coroutines ---------------- */
 
 struct record {
@@ -212,6 +251,7 @@ struct record {
   bool fakeRestart = false;      // rebuild once it has suspended (+ck_fakemigrate)
   bool rebuilt = false;          // restarted and not yet past the recorded site: no rebuild there
   bool pending = false;          // a restart message is on its way to the element; pupped
+  buffer held;                   // the last delivery, kept while an array out points into it
 
   void pup(PUP::er &p) {
     p | ep;
@@ -234,20 +274,40 @@ inline state &current_state();
 // reached through a site macro.
 inline record *enter_await();
 
-template <class... Outs> class when_awaiter {
+// Schema: the entry's params<...> when the want came from the generated
+// inbox struct (the outs are checked against it, arrays unpacked), else void.
+template <class Schema, class... Outs> class when_awaiter {
  public:
   when_awaiter(state &s, want w, Outs &...outs) noexcept : s_(s), w_(w), outs_(outs...) {}
   const want &spec() const noexcept { return w_; }
-  void unpack(buffer &b);
+  void unpack(buffer &b, record *rec);
   bool await_ready();
   void await_suspend(std::coroutine_handle<> h);
   void await_resume();
 
  private:
+  template <class... Ps, size_t... I>
+  void unpack_marshalled(params<Ps...>, std::index_sequence<I...>, buffer &b, record *rec);
   state &s_;
   want w_;
   std::tuple<Outs &...> outs_;
   record *rec_ = nullptr;
+};
+
+// The block form: the outs are the awaiter's own, returned as a tuple for a
+// structured binding (CK_WHEN_BLOCK).
+template <class... Ps> struct tuple_vals { std::tuple<out_t<Ps>...> vals_{}; };
+template <class... Ps>
+class tuple_awaiter : tuple_vals<Ps...>, public when_awaiter<params<Ps...>, out_t<Ps>...> {
+  using base = when_awaiter<params<Ps...>, out_t<Ps>...>;
+ public:
+  tuple_awaiter(state &s, want w) noexcept
+      : tuple_vals<Ps...>(),
+        base(std::apply([&](auto &...v) { return base(s, w, v...); }, this->vals_)) {}
+  std::tuple<out_t<Ps>...> await_resume() {
+    base::await_resume();
+    return std::move(this->vals_);
+  }
 };
 
 // Await the first of several deliveries (SDAG case): the awaited value is
@@ -260,8 +320,8 @@ template <class... W> class any_awaiter {
   int await_resume();
 
  private:
-  void unpack_at(int i, buffer &b) {
-    std::apply([&](auto &...a) { int k = 0; ((k++ == i ? (a.unpack(b), 0) : 0), ...); }, alts_);
+  void unpack_at(int i, buffer &b, record *rec) {
+    std::apply([&](auto &...a) { int k = 0; ((k++ == i ? (a.unpack(b, rec), 0) : 0), ...); }, alts_);
   }
   state &s_;
   std::tuple<W...> alts_;
@@ -293,17 +353,30 @@ class state {
   // Await a delivery to entry ep with reference number ref (or any, with
   // noref), storing the message or arguments in outs. CK_WHEN wraps this.
   template <class... Outs>
-  when_awaiter<Outs...> when(int ep, CMK_REFNUM_TYPE ref, Outs &...outs) noexcept {
-    return when_awaiter<Outs...>(*this, want(ep, ref), outs...);
+  when_awaiter<void, Outs...> when(int ep, CMK_REFNUM_TYPE ref, Outs &...outs) noexcept {
+    return when_awaiter<void, Outs...>(*this, want(ep, ref), outs...);
   }
   template <class... Outs>
-  when_awaiter<Outs...> when(int ep, noref_t, Outs &...outs) noexcept {
-    return when_awaiter<Outs...>(*this, want(ep), outs...);
+  when_awaiter<void, Outs...> when(int ep, noref_t, Outs &...outs) noexcept {
+    return when_awaiter<void, Outs...>(*this, want(ep), outs...);
   }
   template <class... Outs>
-  when_awaiter<Outs...> when(want w, Outs &...outs) noexcept {
-    return when_awaiter<Outs...>(*this, w, outs...);
+  when_awaiter<void, Outs...> when(want w, Outs &...outs) noexcept {
+    return when_awaiter<void, Outs...>(*this, w, outs...);
   }
+  template <class P, class... Outs>
+  when_awaiter<P, Outs...> when(want_t<P> w, Outs &...outs) noexcept {
+    return when_awaiter<P, Outs...>(*this, w, outs...);
+  }
+  // The block form: the awaited value is a tuple of the entry's parameters.
+  template <class... Ps>
+  tuple_awaiter<Ps...> when_block(want_t<params<Ps...>> w) noexcept {
+    return tuple_awaiter<Ps...>(*this, w);
+  }
+  // The generated wrapper of a marshalled inbox entry: the message is handed
+  // over unmarshalled; the reference number is its first parameter if that
+  // is arithmetic, else the envelope's.
+  template <class P> void deliver_message(int ep, CkMarshallMsg *m);
   // The first of several whens to match: co_await co.any(co.when(...), co.when(...)).
   template <class... W> any_awaiter<W...> any(W &&...w) noexcept {
     return any_awaiter<W...>(*this, std::move(w)...);
@@ -533,14 +606,64 @@ inline void state::deliver(int ep, const Args &...args) {
     b.msg = cur;
   } else if constexpr (sizeof...(Args) > 0) {
     // Reached otherwise (a reduction target, a direct call): pack the
-    // arguments in the layout the marshalled message would have.
+    // arguments in the layout the marshalled message would have: the
+    // scalars in order, an array as its offset and byte count, then the
+    // arrays from a 16-byte aligned start.
+    constexpr size_t N = sizeof...(Args);
+    int offs[N] = {}, cnts[N] = {};
+    int off = 0, k = 0;
+    auto place = [&](const auto &a) {
+      using A = std::decay_t<decltype(a)>;
+      if constexpr (is_array_arg_v<A>) {
+        using T = std::remove_cv_t<std::remove_pointer_t<decltype(a.data)>>;
+        offs[k] = off = CK_ALIGN(off, (int)sizeof(T));
+        cnts[k] = (int)a.bytes;
+        off += cnts[k];
+      }
+      k++;
+    };
+    (place(args), ...);
+    auto pup_one = [&](PUP::er &p, const auto &a, int i) {
+      using A = std::decay_t<decltype(a)>;
+      if constexpr (is_array_arg_v<A>) { p | offs[i]; p | cnts[i]; }
+      else p | const_cast<A &>(a);
+    };
     PUP::sizer ps;
-    ((ps | const_cast<Args &>(args)), ...);
-    CkMarshallMsg *m = CkAllocateMarshallMsg(ps.size());
+    k = 0;
+    (pup_one(ps, args, k++), ...);
+    int arrstart = CK_ALIGN((int)ps.size(), 16);
+    CkMarshallMsg *m = CkAllocateMarshallMsg(arrstart + off);
     PUP::toMem pm(m->msgBuf);
-    ((pm | const_cast<Args &>(args)), ...);
+    k = 0;
+    (pup_one(pm, args, k++), ...);
+    auto copy_one = [&](const auto &a, int i) {
+      using A = std::decay_t<decltype(a)>;
+      if constexpr (is_array_arg_v<A>)
+        if (cnts[i] > 0) std::memcpy(m->msgBuf + arrstart + offs[i], a.data, cnts[i]);
+    };
+    k = 0;
+    (copy_one(args, k++), ...);
     b.msg = m;
   }
+  push(std::move(b));
+}
+
+template <class P> inline void state::deliver_message(int ep, CkMarshallMsg *m) {
+  buffer b;
+  b.ep = ep;
+  b.msg = m;
+  b.ref = CkGetRefNum(m);
+  [&]<class... Ps>(params<Ps...>) {
+    if constexpr (sizeof...(Ps) > 0) {
+      using First = std::tuple_element_t<0, std::tuple<Ps...>>;
+      if constexpr (std::is_arithmetic_v<First>) {
+        PUP::fromMem pf(m->msgBuf);
+        First v;
+        pf | v;
+        b.ref = (CMK_REFNUM_TYPE)v;
+      }
+    }
+  }(P{});
   push(std::move(b));
 }
 
@@ -612,6 +735,7 @@ inline void state::pup(PUP::er &p) {
 inline record *enter_await() {
   record *rec = current_;
   if (rec == nullptr) CkAbort("ck::coro: co_await when outside a coroutine entry method");
+  rec->held.release(); // an array received at the previous wait is no longer valid
   rec->rebuilt = rec->ch.restarting; // a restarted body has reached its recorded site
   rec->ch.restarting = false;
   rec->atSite = rec->ch.noted && !rec->ch.notedCall;
@@ -628,45 +752,101 @@ inline void arm_wait(record *rec, std::coroutine_handle<> h) {
   if (rec->atSite && !rec->rebuilt && fake_migrate_enabled()) rec->fakeRestart = true;
 }
 
-template <class... Outs> inline void when_awaiter<Outs...>::unpack(buffer &b) {
+template <class Schema, class... Outs>
+inline void when_awaiter<Schema, Outs...>::unpack(buffer &b, record *rec) {
   if constexpr (sizeof...(Outs) == 1 && (is_message_ptr_v<Outs> && ...)) {
     if (b.msg == nullptr || is_marshall_msg(b.msg))
       CkAbort("ck::coro: entry %d delivered marshalled arguments but the when expects a message",
               w_.ep);
     std::get<0>(outs_) = static_cast<std::tuple_element_t<0, std::tuple<Outs...>>>(b.msg);
     b.msg = nullptr; // the coroutine owns the message now
-  } else if constexpr (sizeof...(Outs) > 0) {
-    if (!is_marshall_msg(b.msg))
-      CkAbort("ck::coro: entry %d delivered %s but the when expects marshalled arguments", w_.ep,
-              b.msg ? "a message" : "no arguments");
-    PUP::fromMem pf(static_cast<CkMarshallMsg *>(b.msg)->msgBuf);
-    std::apply([&](Outs &...o) { ((pf | o), ...); }, outs_);
+  } else if constexpr (std::is_void_v<Schema>) {
+    if constexpr (sizeof...(Outs) > 0) {
+      static_assert(!(std::is_same_v<Outs, skip_t> || ...),
+                    "ck::coro::skip needs a want from the generated inbox struct");
+      if (!is_marshall_msg(b.msg))
+        CkAbort("ck::coro: entry %d delivered %s but the when expects marshalled arguments", w_.ep,
+                b.msg ? "a message" : "no arguments");
+      PUP::fromMem pf(static_cast<CkMarshallMsg *>(b.msg)->msgBuf);
+      std::apply([&](Outs &...o) { ((pf | o), ...); }, outs_);
+    }
+  } else {
+    unpack_marshalled(Schema{}, std::index_sequence_for<Outs...>{}, b, rec);
   }
 }
 
-template <class... Outs> inline bool when_awaiter<Outs...>::await_ready() {
+// Read every parameter in order, as charmxi's unmarshalling does: a scalar
+// into its out (or into a temporary for ck::coro::skip), an array's offset
+// and count into a slot; then point each array out into the message, or
+// copy the elements into a container out. A message with a pointer out is
+// kept in the record until the next wait.
+template <class Schema, class... Outs>
+template <class... Ps, size_t... I>
+inline void when_awaiter<Schema, Outs...>::unpack_marshalled(params<Ps...>, std::index_sequence<I...>,
+                                                             buffer &b, record *rec) {
+  static_assert(sizeof...(Ps) == sizeof...(Outs),
+                "a when lists every parameter of the inbox entry, in order (ck::coro::skip for one it does not use)");
+  if constexpr (sizeof...(Ps) > 0) {
+    if (!is_marshall_msg(b.msg))
+      CkAbort("ck::coro: entry %d delivered %s but the when expects marshalled arguments", w_.ep,
+              b.msg ? "a message" : "no arguments");
+    char *buf = static_cast<CkMarshallMsg *>(b.msg)->msgBuf;
+    PUP::fromMem pf(buf);
+    int offs[sizeof...(Ps)] = {}, cnts[sizeof...(Ps)] = {};
+    auto read = [&](auto tag, auto &o, size_t i) {
+      using P = typename decltype(tag)::type;
+      using O = std::remove_reference_t<decltype(o)>;
+      if constexpr (is_array_param_v<P>) { pf | offs[i]; pf | cnts[i]; }
+      else if constexpr (std::is_same_v<O, skip_t>) { P tmp; pf | tmp; }
+      else pf | o;
+    };
+    (read(std::type_identity<Ps>{}, std::get<I>(outs_), I), ...);
+    char *arrs = buf + CK_ALIGN(pf.size(), 16);
+    bool borrowed = false;
+    auto fill = [&](auto tag, auto &o, size_t i) {
+      using P = typename decltype(tag)::type;
+      using O = std::remove_reference_t<decltype(o)>;
+      if constexpr (is_array_param_v<P>) {
+        if constexpr (std::is_same_v<O, skip_t>) {
+        } else if constexpr (std::is_pointer_v<O>) {
+          o = reinterpret_cast<O>(arrs + offs[i]); // borrowed until the next wait
+          borrowed = true;
+        } else {
+          using T = std::remove_pointer_t<out_t<P>>;
+          const T *p = reinterpret_cast<const T *>(arrs + offs[i]);
+          o.assign(p, p + cnts[i] / sizeof(T));
+        }
+      }
+    };
+    (fill(std::type_identity<Ps>{}, std::get<I>(outs_), I), ...);
+    if (borrowed) rec->held = std::move(b);
+  }
+}
+
+template <class Schema, class... Outs> inline bool when_awaiter<Schema, Outs...>::await_ready() {
   record *rec = enter_await();
   buffer taken;
   if (!s_.take(w_, taken)) {
     rec_ = rec;
     return false;
   }
-  unpack(taken);
+  unpack(taken, rec);
   return true;
 }
 
-template <class... Outs> inline void when_awaiter<Outs...>::await_suspend(std::coroutine_handle<> h) {
+template <class Schema, class... Outs>
+inline void when_awaiter<Schema, Outs...>::await_suspend(std::coroutine_handle<> h) {
   rec_->wants.assign(1, w_);
   arm_wait(rec_, h);
 }
 
-template <class... Outs> inline void when_awaiter<Outs...>::await_resume() {
+template <class Schema, class... Outs> inline void when_awaiter<Schema, Outs...>::await_resume() {
   if (rec_ == nullptr) return; // was ready
   record *rec = rec_;
   if (!rec->ready) CkAbort("ck::coro: coroutine resumed without a delivery");
   rec->ready = false;
   rec->atSite = false;
-  unpack(rec->readyBuf);
+  unpack(rec->readyBuf, rec);
   rec->readyBuf.release();
 }
 
@@ -675,7 +855,7 @@ template <class... W> inline bool any_awaiter<W...>::await_ready() {
   buffer taken;
   int i = 0;
   bool found = std::apply([&](auto &...a) {
-    return ((s_.take(a.spec(), taken) ? (a.unpack(taken), ready_ = i, true) : (i++, false)) || ...);
+    return ((s_.take(a.spec(), taken) ? (a.unpack(taken, rec), ready_ = i, true) : (i++, false)) || ...);
   }, alts_);
   if (found) return true;
   rec_ = rec;
@@ -695,7 +875,7 @@ template <class... W> inline int any_awaiter<W...>::await_resume() {
   rec->ready = false;
   rec->atSite = false;
   int i = rec->readyIndex;
-  unpack_at(i, rec->readyBuf);
+  unpack_at(i, rec->readyBuf, rec);
   rec->readyBuf.release();
   return i;
 }
@@ -751,6 +931,18 @@ using coroutine = coro::coroutine;
       ::ck::coro::note_site(ck_frame_, __LINE__);                             \
       co_await ::ck::coro::current_state().when(__VA_ARGS__);                 \
     } while (0)
+
+// The block form of a when: CK_WHEN_BLOCK(want, name...) { ... } declares the
+// entry's parameters, in order, as variables of the block that follows (an
+// array as a pointer into the message, valid in the block). The block
+// cannot contain a site: the restart jump would bypass the declarations,
+// which the compiler rejects. The want must come from the generated inbox
+// struct. Being an if statement, it cannot be followed by an else.
+#define CK_WHEN_BLOCK(want_, ...)                                             \
+  case __LINE__:                                                              \
+    if (auto [__VA_ARGS__] = (::ck::coro::note_site(ck_frame_, __LINE__),     \
+                              co_await ::ck::coro::current_state().when_block(want_)); \
+        true)
 
 // A when-any site (SDAG case): CK_WHEN_ANY(idx, CK_ALT(ep, ref, out...), ...)
 // stores the index of the alternative that matched in idx.

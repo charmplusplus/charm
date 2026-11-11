@@ -23,5 +23,7 @@ mainmodule ckcoro_tests {
     entry [inbox] void tag(int t, double x);
     // Reached through the reduction wrapper: the arguments are packed.
     entry [inbox, reductiontarget] void total(int sum);
+    entry [inbox] void arr(int iter, int n, double data[n], std::vector<int> tail);
+    entry [inbox, reductiontarget] void arrTotal(int n, double sums[n]);
   }
 }

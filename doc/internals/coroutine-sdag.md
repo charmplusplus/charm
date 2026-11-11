@@ -33,7 +33,16 @@ header's opening comment and the manual section "Coroutine Entry Methods".
   whose rank record holds one `chain`.
 - `buffer`: `ep`, `ref`, and `msg` (pupped with `CkPupMessage`): the
   entry's message, or the `CkMarshallMsg` carrying its marshalled
-  parameters, or null for a void entry.
+  parameters, or null for a void entry. `record.held` keeps the last
+  delivery while a pointer out (an array parameter) points into it;
+  `enter_await` releases it at the next wait.
+- `want_t<params<Ps...>>`: a want carrying the entry's parameter types
+  (`value_t<T>` per marshalled parameter, `array_param<T>` for an array,
+  the message pointer for a message entry), generated as
+  `inbox::name_params`; `when_awaiter<Schema, Outs...>` checks the outs
+  against it (`static_assert` on the count) and unpacks arrays.
+  `tuple_awaiter<Ps...>` (the block form) owns its outs and returns them
+  as a tuple for the structured binding of `CK_WHEN_BLOCK`.
 - `thread_local record *current_`: the record of the coroutine running on
   this PE thread; set by `state::begin` and `state::push` around a run,
   read by the awaitables.
@@ -53,9 +62,12 @@ header's opening comment and the manual section "Coroutine Entry Methods".
   `_coro_pup(p)` (called by `recursive_pup_impl` in charm++.h next to
   `_sdag_pup`), `static bool __coro_is_entry(int ep)` (true for the
   chare's `[coroutine]` entries), one method body per `[inbox]` entry
-  (`__coro.deliver(CkIndex_X::idx_name(), params...)`), and
-  `struct inbox` with `static want name()` and `static want name(ref)`
-  per inbox entry.
+  (`__coro.deliver(CkIndex_X::idx_name(), params...)`, an array as
+  `array_arg<T>{p, bytes}`), and `struct inbox` with `using name_params`
+  and `static want_t<name_params> name()` / `name(ref)` per inbox entry.
+  The `_call_` wrapper of a marshalled inbox entry (`Entry::genDefs`) is
+  `__coro.deliver_message<X::inbox::name_params>(ep, msg)` instead of the
+  unmarshalling call, and the entry is not `nokeep`.
 
 ## Protocols
 
@@ -76,15 +88,20 @@ destroyed and `~coroutine` calls `state::finish_run`, which clears
 when `+ck_fakemigrate` asked for it.
 
 **Delivery.** `state::deliver(ep, msg)` buffers the message (reference
-number: the envelope's). `state::deliver(ep, args...)` (reference number:
-the first arithmetic argument, else the envelope's) keeps the message
-being delivered when `CkCurrentEntry() == ep` and it is a `CkMarshallMsg`
-(`CkReferenceMsg`; the runtime's `nokeep` free after the wrapper only
-drops the count), and otherwise, for a `[reductiontarget, inbox]` entry
-reached through its reduction wrapper or a direct call, packs `args` into
-a new `CkMarshallMsg` in the marshalled layout (`PUP::toMem` of each
-argument in order, which is charmxi's layout for non-array parameters). A
-void entry buffers no message. Then `push`. `push` looks for a waiting record
+number: the envelope's). `state::deliver_message<P>(ep, m)`, called by
+the generated wrapper of a marshalled inbox entry, buffers the
+`CkMarshallMsg` unopened (reference number: the first parameter if
+arithmetic, read with `PUP::fromMem`, else the envelope's); the entry is
+not `nokeep`, so the state owns the message. `state::deliver(ep,
+args...)` (reference number: the first arithmetic argument, else the
+envelope's), the generated body reached through a reduction wrapper or a
+direct call, or a hand-written inbox body, keeps the message being
+delivered when `CkCurrentEntry() == ep` and it is a `CkMarshallMsg`
+(`CkReferenceMsg`), and otherwise packs `args` into a new `CkMarshallMsg`
+in charmxi's layout: each scalar pupped in order, an `array_arg<T>` as
+its offset (aligned to `sizeof(T)`) and byte count, then the arrays from
+`CK_ALIGN(scalar size, 16)`. A void entry buffers no message. Then
+`push`. `push` looks for a waiting record
 whose `wants` match; if found it moves the buffer into the record, sets
 `current_`, resumes `record.h` and calls `finish_run` when the body
 suspends again or finishes; otherwise it appends the buffer to the inbox.
@@ -97,9 +114,15 @@ then takes the first matching buffer from the inbox (`state::take`, keeping
 the order of the rest); if there is none, `await_suspend` stores the `want`
 and `arm_wait` records the innermost handle and sets `fakeRestart` when the
 flag is on and the body was not just restarted to this site. `await_resume`
-unpacks the delivered buffer into the `out` lvalues: a message pointer is
-handed over (the coroutine owns the message), marshalled parameters are
-read back in order with `PUP::fromMem` from the `CkMarshallMsg`'s buffer. `CK_WHEN_ANY` uses `any_awaiter` over several
+unpacks the delivered buffer into the outs: a message pointer is
+handed over (the coroutine owns the message); marshalled parameters are
+read back in order with `PUP::fromMem` from the `CkMarshallMsg`'s buffer,
+an array's offset and count read into slots and, after the scalars, its
+pointer computed from the aligned array start: a pointer out gets it
+(the buffer moves to `record.held` until the next wait), a container out
+copies the elements with `assign`; a `ck::coro::skip` out reads into a
+temporary. Without a typed want (the hand-written form) the outs are
+pupped in order with no array support. `CK_WHEN_ANY` uses `any_awaiter` over several
 `when_awaiter`s: `await_ready` tries each alternative in order, `await_suspend`
 stores all their `want`s, and `await_resume` unpacks through the
 alternative at `readyIndex` and yields that index.
@@ -139,8 +162,12 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
 - A restarted body that reaches a site other than the recorded one, or a
   helper not on the recorded path, aborts (`note_site`, `frame_guard`).
 - Marshalled inbox parameters must be types with a `pup` (scalars, STL
-  containers, pupable classes); charmxi rejects array, conditional and
-  nocopy parameters on `[inbox]` entries, whose marshalled layout differs.
+  containers, pupable classes) or arrays; charmxi rejects conditional and
+  nocopy parameters on `[inbox]` entries.
+- A when's out count must equal the entry's parameter count
+  (`static_assert`); a `CK_WHEN_BLOCK` containing a site fails to compile
+  (jump past the structured binding); a `CK_WHEN_BLOCK` cannot be followed
+  by `else`.
 - `CkCurrentMessage()` sees the caller's delivery inside an `[inline]` or
   `[local]` call; `deliver` then packs the arguments instead.
 - `CKCORO_DEBUG=1` in the environment prints each rebuild.

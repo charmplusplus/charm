@@ -157,7 +157,6 @@ class Jacobi : public CBase_Jacobi {
     double *temperature;
     double *new_temperature;
     double timing, average;
-    ghostMsg *gmsg;          // scratch: assigned at a when site, used after it
 
     Jacobi() {
       temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
@@ -169,7 +168,6 @@ class Jacobi : public CBase_Jacobi {
       iterations = 0;
       imsg = 0;
       timing = average = 0.0;
-      gmsg = nullptr;
       constrainBC();
       usesAtSync = true;
     }
@@ -189,7 +187,6 @@ class Jacobi : public CBase_Jacobi {
       if (p.isUnpacking()) {
         temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
         new_temperature = new double[(blockDimX+2) * (blockDimY+2) * (blockDimZ+2)];
-        gmsg = nullptr;
       }
       p((char *)temperature, (blockDimX+2) * (blockDimY+2) * (blockDimZ+2) * sizeof(double));
     }
@@ -207,8 +204,9 @@ class Jacobi : public CBase_Jacobi {
       }
       begin_iteration();
       for (imsg = 0; imsg < 6; imsg++) {
-        CK_WHEN(inbox::receiveGhosts(iterations), gmsg);   // when receiveGhosts[iterations](ghostMsg *gmsg)
-        processGhosts(gmsg);
+        CK_WHEN_BLOCK(inbox::receiveGhosts(iterations), gmsg) {  // when receiveGhosts[iterations](ghostMsg *gmsg) {
+          processGhosts(gmsg);
+        }
       }
       check_and_compute();
       CK_END();

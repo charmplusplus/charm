@@ -116,9 +116,9 @@ void Entry::check() {
                          "target an 'inbox' entry and wait for it", first_line_);
       for (ParamList* pl = param; pl != NULL; pl = pl->next) {
         Parameter* sv = pl->param;
-        if (sv->isArray() || sv->isConditional() || sv->isRdma())
+        if (sv->isConditional() || sv->isRdma())
           XLAT_ERROR_NOCOL("an 'inbox' entry method takes a message or marshalled parameters "
-                           "without arrays, conditional or nocopy parameters", first_line_);
+                           "without conditional or nocopy parameters", first_line_);
       }
     }
 
@@ -204,7 +204,9 @@ Entry::Entry(int l, Attribute* a, Type* r, const char* n, ParamList* p, Value* s
   entryCount = -1;
   isWhenEntry = 0;
   containsWhenConstruct = false;
-  if (param && param->isMarshalled() && !isThreaded()) addAttribute(SNOKEEP);
+  // An inbox entry's wrapper hands the marshalled message to the coroutine
+  // state unopened, so the runtime must not free it after the call.
+  if (param && param->isMarshalled() && !isThreaded() && !isInbox()) addAttribute(SNOKEEP);
   if (isPython()) pythonDoc = python_doc;
   ParamList* plist = p;
   while (plist != NULL) {
@@ -2340,7 +2342,12 @@ void Entry::genDefs(XStr& str) {
     str << "  " << container->baseName() << "* impl_obj = static_cast<"
         << container->baseName() << "*>(impl_obj_void);\n";
   }
-  if (!isLocal()) {
+  if (isInbox() && param->isMarshalled()) {
+    // A marshalled inbox entry: the message goes to the coroutine state as
+    // it is; a when unmarshals it when it matches.
+    str << "  impl_obj->__coro.deliver_message<" << container->baseName() << "::inbox::" << name
+        << "_params>(" << epIdx(1) << ", (CkMarshallMsg *)impl_msg);\n";
+  } else if (!isLocal()) {
     if (isThreaded()) str << callThread(epStr());
     str << preMarshall;
     if (param->isMarshalled()) {
@@ -2667,21 +2674,59 @@ void Entry::genCoroCode(CoroGen& g) {
   }
   if (!isInbox()) return;
   if (g.pass == CoroGen::stub) {
-    // The entry's body: hand the message, or the arguments, to the state.
+    // The entry's body, reached through a reduction wrapper or a direct call
+    // (its own marshalled message is handed over by the generated _call_
+    // wrapper without unmarshalling): hand the message, or the arguments,
+    // to the state. An array argument carries its byte count.
     str << "  void " << name << "(" << paramType(0, 0) << ") { __coro.deliver(" << epIdx(1);
     if (param->isMessage()) {
       str << ", " << param->param->name;
     } else {
-      for (ParamList* pl = param; pl != NULL; pl = pl->next)
-        if (!pl->param->getType()->isVoid()) str << ", " << pl->param->name;
+      for (ParamList* pl = param; pl != NULL; pl = pl->next) {
+        Parameter* sv = pl->param;
+        if (sv->getType()->isVoid()) continue;
+        if (sv->isArray()) {
+          str << ", ::ck::coro::array_arg<";
+          sv->getType()->print(str);
+          str << ">{" << sv->name << ", sizeof(";
+          sv->getType()->print(str);
+          str << ")*(" << sv->getArrayLen() << ")}";
+        } else {
+          str << ", " << sv->name;
+        }
+      }
     }
     str << "); }\n";
   } else if (g.pass == CoroGen::want) {
-    // inbox::name() waits for any delivery, inbox::name(ref) for one with
-    // that reference number.
-    str << "    static ::ck::coro::want " << name << "() { return ::ck::coro::want(" << epIdx(1)
-        << "); }\n"
-        << "    static ::ck::coro::want " << name << "(CMK_REFNUM_TYPE ref) { return ::ck::coro::want("
+    // inbox::name_params lists the entry's parameter types; inbox::name()
+    // waits for any delivery, inbox::name(ref) for one with that reference
+    // number.
+    str << "    using " << name << "_params = ::ck::coro::params<";
+    if (param->isMessage()) {
+      param->param->getType()->print(str);
+    } else {
+      bool first = true;
+      for (ParamList* pl = param; pl != NULL; pl = pl->next) {
+        Parameter* sv = pl->param;
+        if (sv->getType()->isVoid()) continue;
+        if (!first) str << ", ";
+        first = false;
+        if (sv->isArray()) {
+          str << "::ck::coro::array_param<";
+          sv->getType()->print(str);
+          str << ">";
+        } else {
+          str << "::ck::coro::value_t<";
+          sv->getType()->print(str);
+          str << ">";
+        }
+      }
+    }
+    str << ">;\n";
+    str << "    static ::ck::coro::want_t<" << name << "_params> " << name
+        << "() { return ::ck::coro::want_t<" << name << "_params>(" << epIdx(1) << "); }\n"
+        << "    static ::ck::coro::want_t<" << name << "_params> " << name
+        << "(CMK_REFNUM_TYPE ref) { return ::ck::coro::want_t<" << name << "_params>("
         << epIdx(1) << ", ref); }\n";
   }
 }

@@ -203,6 +203,12 @@ class MarshallTest : public CBase_MarshallTest {
   std::vector<int> values;
   double x;
   int sum;
+  // Array parameters: a pointer out borrows the message until the next
+  // wait; a container out copies.
+  int n;
+  double* darr;
+  std::vector<double> dvec;
+  std::vector<int> tail;
 
   static void check(bool ok, const char* what) {
     if (!ok) ::CkAbort("ckcoro marshall test: %s", what);
@@ -214,7 +220,7 @@ public:
 
   void pup(PUP::er& p) {
     p | iter;
-    if (p.isUnpacking()) { values.clear(); t = i = 0; x = 0; sum = 0; }
+    if (p.isUnpacking()) { values.clear(); t = i = 0; x = 0; sum = 0; n = 0; darr = nullptr; dvec.clear(); tail.clear(); }
   }
 
   ck::coroutine run() {
@@ -239,6 +245,53 @@ public:
                CkCallback(CkReductionTarget(MarshallTest, total), thisProxy));
     CK_WHEN(inbox::total(), sum);
     check(sum == MARSHALL_ELEMS * (MARSHALL_ELEMS - 1) / 2, "total: wrong reduction result");
+
+    // Array parameters, three rounds sent ahead of time (round r, iteration
+    // k has reference number 100 r + k): received into a pointer, into a
+    // vector with the other parameters skipped, and with the block form.
+    for (iter = 0; iter < 2 * 100 + MARSHALL_ITERS; iter++) {
+      if (iter % 100 >= MARSHALL_ITERS) continue;
+      std::vector<double> d(iter % 100 + 2);
+      for (size_t k = 0; k < d.size(); k++) d[k] = thisIndex * 100 + iter + k;
+      std::vector<int> tl = {iter, (int)d.size()};
+      thisProxy[(thisIndex + 1) % MARSHALL_ELEMS].arr(iter, (int)d.size(), d.data(), tl);
+    }
+    for (iter = 0; iter < MARSHALL_ITERS; iter++) {
+      CK_WHEN(inbox::arr(iter), i, n, darr, tail);
+      check(i == iter && n == iter + 2, "arr: wrong iteration or length");
+      check(darr[0] == (double)((thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS * 100 + iter), "arr: wrong data[0]");
+      check(darr[n - 1] == darr[0] + n - 1, "arr: wrong data[n-1]");
+      check(tail.size() == 2 && tail[0] == iter && tail[1] == n, "arr: wrong tail");
+    }
+    for (iter = 100; iter < 100 + MARSHALL_ITERS; iter++) {
+      CK_WHEN(inbox::arr(iter), ck::coro::skip, n, dvec, ck::coro::skip);
+      check(n == iter % 100 + 2 && (int)dvec.size() == n, "arr: wrong vector length");
+      check(dvec[0] == (double)((thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS * 100 + iter), "arr: wrong vector data[0]");
+      check(dvec[n - 1] == dvec[0] + n - 1, "arr: wrong vector data[n-1]");
+    }
+    for (iter = 200; iter < 200 + MARSHALL_ITERS; iter++) {
+      CK_WHEN_BLOCK(inbox::arr(iter), it, len, data, tl) {
+        check(it == iter && len == iter % 100 + 2, "arr block: wrong iteration or length");
+        check(data[0] == (double)((thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS * 100 + iter), "arr block: wrong data[0]");
+        check(data[len - 1] == data[0] + len - 1, "arr block: wrong data[n-1]");
+        check(tl.size() == 2 && tl[0] == iter && tl[1] == len, "arr block: wrong tail");
+      }
+    }
+    // A reduction target with an array parameter, reached through the
+    // reduction wrapper: the arguments are packed into a message.
+    {
+      double part[3] = {1.0 * thisIndex, 2.0 * thisIndex, 1.0};
+      contribute(sizeof(part), part, CkReduction::sum_double,
+                 CkCallback(CkReductionTarget(MarshallTest, arrTotal), thisProxy));
+    }
+    CK_WHEN(inbox::arrTotal(), n, dvec);
+    check(n == 3 && dvec.size() == 3, "arrTotal: wrong length");
+    check(dvec[0] == sum && dvec[1] == 2 * sum && dvec[2] == MARSHALL_ELEMS, "arrTotal: wrong sums");
+    // The block form on a message entry's twin: the broadcast tag again.
+    thisProxy[thisIndex].tag(9, 4.5);
+    CK_WHEN_BLOCK(inbox::tag(9), t9, x9) {
+      check(t9 == 9 && x9 == 4.5, "tag block: wrong values");
+    }
     check(__coro.num_buffered() == 0, "messages left in the inbox");
     contribute(CkCallback(CkReductionTarget(Main, marshallTestDone), mainProxy));
     CK_END();

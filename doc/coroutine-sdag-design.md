@@ -107,9 +107,11 @@ Vocabulary (the attributes in charmxi, the rest in `ckcoro.h`):
 
 | | |
 |---|---|
-| `[coroutine]`, `[inbox]` | .ci attributes: the entry is a coroutine (void; no parameters or one message); the entry is waited for (a message, or marshalled parameters without arrays) |
+| `[coroutine]`, `[inbox]` | .ci attributes: the entry is a coroutine (void; no parameters or one message); the entry is waited for (a message, or marshalled parameters, arrays included; not conditional or nocopy) |
 | `X_CORO_CODE` | generated macro placed in the class: the `ck::coro::state` member (pupped through the generated pup), the inbox entry bodies, `__coro_is_entry`, and `struct inbox` |
-| `inbox::name()` / `inbox::name(ref)` | a `ck::coro::want`: a delivery to that entry with any, or with that, reference number |
+| `inbox::name()` / `inbox::name(ref)` | a `ck::coro::want_t<inbox::name_params>`: a delivery to that entry with any, or with that, reference number; the want carries the entry's parameter types |
+| `CK_WHEN_BLOCK(want, name...) { ... }` | the block form: the parameters as block-scoped variables; no site inside the block |
+| `ck::coro::skip` | an out that discards its parameter |
 | `ck::coroutine` | return type of a coroutine entry method; the body starts at once |
 | `CK_COROUTINE()` | opens the body; registers the coroutine (the entry being delivered); opens the restart switch |
 | `CK_WHEN(want, out...)` | a site: wait for the delivery and store it in `out` (the message pointer, or every marshalled parameter in order) |
@@ -132,17 +134,20 @@ from 65536 iterations ago is still unconsumed.
 1. **State lives in members.** The outs of a when, and any other value that
    is live across a site, are members of the chare and are pupped by the
    chare's pup, exactly as SDAG requires of its state variables (`int imsg`
-   is a member in both programs). A when fills existing members instead of
-   declaring block-scoped variables as an SDAG `when` does: a block-scoped
-   form is implementable (an if-with-initializer holding the received
-   values, verified with clang), but it could not contain a further site,
-   since a restarted body cannot reconstruct a local, so SDAG's nested when
-   that uses the outer parameters would not translate; one rule was
-   preferred (Kale, 2026-11-10). C++ rejects the restart jump past a local
-   with an initializer or a non-trivial type, which catches most mistakes
-   at compile time; a scalar declared without an initializer, or declared
-   before `CK_COROUTINE()`, is not caught, and `+ck_fakemigrate` is the
-   check.
+   is a member in both programs). A when has two forms: `CK_WHEN_BLOCK`
+   declares the parameters as variables of the block that follows (an
+   if-with-initializer holding a structured binding of the received
+   values), and `CK_WHEN` fills existing members. A block cannot contain a
+   further site: a restarted body cannot reconstruct a local, and the
+   compiler rejects the jump past the binding, so SDAG's nested when that
+   uses the outer parameters is written with the outer when in the member
+   form. Kale weighed one rule (members only, 2026-11-10) against the
+   common `for { when e(x) { work(x) } }` pattern and chose both forms
+   (2026-11-11), since the misuse is a compile error, not a runtime
+   surprise. C++ rejects the restart jump past a local with an initializer
+   or a non-trivial type, which catches most mistakes at compile time; a
+   scalar declared without an initializer, or declared before
+   `CK_COROUTINE()`, is not caught, and `+ck_fakemigrate` is the check.
 2. **Code before a site is skipped on a restart**, so its effects must be
    recorded in members (above: `iterations` is incremented in
    `begin_iteration`, which runs before the ghost sites and is skipped when
@@ -213,15 +218,20 @@ keywords, the two bits, the checks, and `Chare::genCoroCode` with
 `Entry::genCoroCode` (about 120 lines in `src/xlat-i`), plus the
 regenerated parser and scanner.
 
-The choice of a generated body over a generated raw wrapper was made so
-that the hand-written form and the generated form run the same delivery
-code: there is one path in the header to test, and a program can drop the
-attributes without touching the runtime. The cost is that the wrapper's
-unmarshalling of the parameters is wasted (the inbox keeps the message and
-unpacks again at the site), which is the same as SDAG's closure path for
-non-array parameters. A later charmxi optimisation can emit a wrapper that
-skips the unmarshalling for `[inbox]` entries without changing any program
-text.
+The generated body (reached through a reduction wrapper or a direct
+call) and the hand-written form run the same delivery code, so there is
+one path in the header to test and a program can drop the attributes
+without touching the runtime. The generated `_call_` wrapper of a
+marshalled `[inbox]` entry, however, does not unmarshal: it hands the
+`CkMarshallMsg` to the state as it is (`deliver_message`, which reads
+only the first parameter for the reference number), and the entry is
+registered without `nokeep` so that the runtime leaves the message to
+the state. A site unmarshals once, when the delivery matches. Array
+parameters follow charmxi's layout (the scalars in order, an array as its
+offset and byte count, then the arrays from a 16-byte aligned start): the
+want carries the parameter types (`inbox::name_params`), so the site can
+read the layout, and the generated body packs the same layout for the
+other paths.
 
 ### 4.2 Suspension and migration rules
 
@@ -473,7 +483,7 @@ it, the same macro can be produced by a C++20 member-pointer template
 
 What "experimental" has to say: no `overlap` and no `forall`; `case` only
 over single whens; arrays only (no groups or singleton chares as owners);
-inbox parameters without arrays; the site macros may still change.
+the site macros may still change.
 
 What charm4py can mirror: the record and site protocol of section 8, with
 no C++ frame involved.
@@ -490,7 +500,4 @@ rest of the SDAG test corpus.
   `forall`.
 - Groups, nodegroups and singleton chares as owners of coroutine entries
   (the prototype's record builds its callback from an `ArrayElement`).
-- Array parameters on `[inbox]` entries (charmxi's array layout: sizes
-  first, data aligned), and a generated wrapper that skips the wasted
-  unmarshalling.
 - The equivalence corpus runs.
