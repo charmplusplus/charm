@@ -314,19 +314,11 @@ public:
 	}
 
 	inline QdState *getQD() {return qd;}
-	// when in interrupt based net version, use the extra copy
- 	// of qd when inside an immediate handler function.
 	inline void process(int n=1) {
-	  if (CmiImmIsRunning())
-	    CpvAccessOther(_qd, 1)->process(n);
-	  else
-	    qd->process(n);
+		qd->process(n);
 	}
 	inline void create(int n=1) {
-	  if (CmiImmIsRunning())
-	    CpvAccessOther(_qd, 1)->create(n);
-	  else
-	    qd->create(n);
+		qd->create(n);
 	}
 };
 
