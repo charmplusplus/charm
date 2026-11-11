@@ -862,8 +862,11 @@ static void dispatch(CkDynObj &d, void *msg) {
   if (zc && zcArrive((CkDynMsg *)msg, &d, ep)) return;
   if (d.handle == nullptr) {
     /* a branch outside a constrained group: broadcasts and callback results
-       reach every branch and are dropped here; a point-to-point send is an error */
-    if (v.kind != CKDYN_MSGKIND_DYN || (v.hdr->flags & CKDYN_MSG_BCAST)) return;
+       reach every branch and are dropped here; a point-to-point send is an
+       error. Anything but a CkDynMsg (a reduction result, foreign ones
+       included, a system message, a section message) is a callback result;
+       a CkDynMsg broadcast carries CKDYN_MSG_BCAST (CkDynSend*, CkDynCallbackSend). */
+    if (UsrToEnv(msg)->getMsgIdx() != CkDynMsg::__idx || (v.hdr->flags & CKDYN_MSG_BCAST)) return;
     bindingError(c->hooks, "entry method invoked on a branch that was not constructed (outside a constrained group?)");
   }
   c->hooks->deliver(c->desc.binding_data, d.handle, ep, r.user_id, r.flags, &v);
@@ -1537,7 +1540,10 @@ extern "C" void CkDynCallbackSend(const CkDynCallback *cb, CkDynMsg *m) {
     CkDynSendSection(&cb->sid, cb->ep, mm, nullptr);
     return;
   }
-  if (cb->kind == CKDYN_CB_TARGET) stampEp(m, cb->ep);
+  if (cb->kind == CKDYN_CB_TARGET) {
+    stampEp(m, cb->ep);
+    if (cb->bcast) dynHdr(m)->flags |= CKDYN_MSG_BCAST;   /* as CkDynSend* mark their broadcasts */
+  }
   CkDynMakeCallback(cb).send(m);
 }
 

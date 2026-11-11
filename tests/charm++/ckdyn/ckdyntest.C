@@ -85,7 +85,8 @@ enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTR
        P_PSTART, P_PRECV, P_PDONE, P_PCHECK };
 enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED };
 enum { G_CTOR, G_GOTRED, G_GOTREDB, G_NGSEND, G_NGREPORT, G_PRIOSTART, G_PRIORECV, G_EXPRECV,
-       G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE, G_LATEREG, G_CSREPORT };
+       G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE, G_LATEREG, G_CSREPORT,
+       G_CBRECV, G_CBCOUNT };
 enum { N_CTOR, N_INCR };
 enum { S_CTOR, S_GOTRED, S_INL, S_PLAIN };
 enum { D_CTOR, D_RESUMED };
@@ -850,6 +851,29 @@ static int64_t grpCsReport(Obj *o, const CkDynMsgView *v) {
   return 0;
 }
 
+/* cbRecv: on a member of the constrained group, a broadcast TARGET callback
+   (a CkDynMsg, slot 0 the value) or a foreign reduction result (slot 0 the
+   sum); the reference number is the future to report to. Reports
+   cbCount(future, value) to branch 0 of the full group Grp. */
+static int64_t grpCbRecv(Obj *o, const CkDynMsgView *v) {
+  CHECK(v->kind == CKDYN_MSGKIND_DYN && v->refnum != 0, "constrained: cbRecv view kind %d, refnum %u", (int)v->kind, v->refnum);
+  CHECK(o->t.u.group.pe_or_node % 2 == 0, "constrained: cbRecv ran on PE %d, which is not a member", CkMyPe());
+  CkDynSendGroup(gidGrp, 0, Grp.ep(G_CBCOUNT), MsgB().i64(v->refnum).i64(cbI64(v, 0)).finish(0), nullptr);
+  return 0;
+}
+/* cbCount(future, value) on Grp branch 0: count the members that reported
+   for the future; after the last one, set it to (count, value) */
+static std::map<int64_t, std::pair<int, int64_t> > g_cbCount;   /* PE 0 only */
+static int64_t g_cbExpect = 0;
+static int64_t grpCbCount(Obj *, const CkDynMsgView *v) {
+  int64_t f = cbI64(v, 0), val = cbI64(v, 1);
+  auto &e = g_cbCount[f];
+  CHECK(e.first == 0 || e.second == val, "constrained: members received %lld and %lld", (long long)e.second, (long long)val);
+  e.second = val;
+  if (++e.first == g_cbExpect) CkDynFutureSet(0, (uint32_t)f, MsgB().i64(e.first).i64(val).finish(0));
+  return 0;
+}
+
 CbClass Grp = { "Grp", CKDYN_GROUP, 0, {
   { "Grp.Grp", 0, grpCtor },
   { "Grp.gotRed", CKDYN_EP_REDNTARGET, grpGotRed },
@@ -865,6 +889,8 @@ CbClass Grp = { "Grp", CKDYN_GROUP, 0, {
   { "Grp.secCreate", 0, grpSecCreate },
   { "Grp.lateReg", 0, grpLateReg },
   { "Grp.csReport", 0, grpCsReport },
+  { "Grp.cbRecv", 0, grpCbRecv },
+  { "Grp.cbCount", 0, grpCbCount },
 } };
 
 /* ---- NGrp (nodegroup) ---------------------------------------------------- */
@@ -1042,6 +1068,7 @@ class TestMain : public CBase_TestMain {
     "reductions/table", "reductions/single", "reductions/single_any", "reductions/group_elem", "reductions/group_bcast",
     "reductions/array_elem", "reductions/array_bcast", "reductions/future", "reductions/foreign",
     "future_return", "nodegroup", "qd", "priority", "coroutine", "callstack", "inline_chare",
+    "constrained",
     "ncpy/nonpost", "ncpy/post_before", "ncpy/post_after", "ncpy/samepe",
     "device/remote", "device/samepe", "hapi", "devpersist/remote", "devpersist/samepe",
     "sections/array", "sections/group", "sections/remote", "sections/combine_overlap",
@@ -1140,6 +1167,7 @@ public:
     else if (s == "coroutine") runCoroutine();
     else if (s == "callstack") runCallstack();
     else if (s == "inline_chare") runInlineChare();
+    else if (s == "constrained") runConstrained();
     else if (s.compare(0, 5, "ncpy/") == 0) runNcpy(s);
     else if (s.compare(0, 7, "device/") == 0) runDevice(s);
     else if (s == "hapi") runHapi();
@@ -1346,6 +1374,39 @@ public:
     CkPrintf("  inline_chare: INLINE entry, CKDYN_SEND_INLINE and an inline TARGET callback ran inside the call\n");
     pass("inline_chare");
   }
+
+  /* constrained: a Grp group with branches on the even PEs only. A
+     broadcast TARGET callback (CkDynCallbackSend) and a foreign reduction
+     result over Ping to a group broadcast callback both reach every branch;
+     the members report (cbRecv), the other branches must drop them. */
+  void runConstrained() {
+    std::vector<int32_t> pes;
+    for (int p = 0; p < CkNumPes(); p += 2) pes.push_back(p);
+    g_cbExpect = (int64_t)pes.size();
+    uint32_t fc = cbNewFuture([this](const CkDynMsgView *) {
+      CkDynTarget all = cbGroupTarget(cgid, Grp.chareIdx, -1);
+      uint32_t f2 = cbNewFuture([this](const CkDynMsgView *v) {
+        CHECK(cbI64(v, 0) == g_cbExpect && cbI64(v, 1) == (int64_t)expectedSum(),
+              "constrained: foreign result reached %lld members with %lld; expected %lld with %g",
+              (long long)cbI64(v, 0), (long long)cbI64(v, 1), (long long)g_cbExpect, expectedSum());
+        CkPrintf("  constrained: %lld of %d branches are members; a broadcast callback and a foreign reduction "
+                 "result reached each member once and were dropped elsewhere\n", (long long)g_cbExpect, CkNumPes());
+        pass("constrained");
+      });
+      uint32_t f1 = cbNewFuture([this, all, f2](const CkDynMsgView *v) {
+        CHECK(cbI64(v, 0) == g_cbExpect && cbI64(v, 1) == 5, "constrained: broadcast callback reached %lld members "
+              "with %lld; expected %lld with 5", (long long)cbI64(v, 0), (long long)cbI64(v, 1), (long long)g_cbExpect);
+        bcastPing(P_DORED, MsgB().i64(1).cb(cbTargetCb(all, Grp.ep(G_CBRECV), 1, f2)).finish(0));
+      });
+      CkDynCallback cb = cbTargetCb(all, Grp.ep(G_CBRECV), 1, f1);
+      CkDynCallbackSend(&cb, MsgB().i64(5).finish(0));
+    });
+    MsgB b;
+    b.flags(CKDYN_MSG_CREATION | CKDYN_MSG_CONSTRAINED).fut(0, fc);
+    CkDynMsgAddBytes(b.b, pes.data(), (uint32_t)(pes.size() * sizeof(int32_t)), 0);
+    cgid = CkDynCreateGroup(Grp.chareIdx, b.finish(Grp.ep(G_CTOR)));
+  }
+  int cgid = -1;
 
   /* ncpy: 16 MB as an NCPY slot from element 0 to the last element (on the
      last PE) and back, then the post path with the post made before and

@@ -250,7 +250,8 @@ Header flags that CkDyn reads: `CKDYN_MSG_CREATION` (acknowledge creation to
 the FUTURE slot, see below), `CKDYN_MSG_USESATSYNC` (array element constructor:
 set `usesAtSync`), `CKDYN_MSG_CONSTRAINED` (group constructor: the last slot
 is a `BYTES` slot of int32 PE numbers; bit 6), `CKDYN_MSG_BCAST` (set by the
-broadcast sends, read by `dispatch`). `BLOCK`, `BCASTRET` and `RAY` are
+broadcast sends and by `CkDynCallbackSend` with a broadcast TARGET callback,
+read by `dispatch`). `BLOCK`, `BCASTRET` and `RAY` are
 defined for the binding and passed through. Whether a message is a reduction
 result or a system message is carried by the view's `kind`, not by a flag.
 
@@ -367,9 +368,11 @@ flags, &view)`.
 
 A NULL handle means the object was never constructed, which happens on a
 branch outside a constrained group. Broadcasts and callback results reach
-every branch, so `dispatch` drops a message there when its view is not of
-kind `DYN` (a reduction result or system message) or its header has
-`CKDYN_MSG_BCAST`. A point-to-point `CkDynMsg` to such a branch is an error
+every branch, so `dispatch` drops a message there when the envelope's message
+type is not `CkDynMsg` (a reduction result, binding-defined ones included,
+whose view is also of kind `DYN`; a system message; a section message) or its
+header has `CKDYN_MSG_BCAST`, which `CkDynSendGroup`, `CkDynSendNodeGroup`,
+`CkDynSendArray` and `CkDynCallbackSend` with a broadcast TARGET callback set. A point-to-point `CkDynMsg` to such a branch is an error
 and goes to `bindingError`.
 
 `NodeGroupDyn::callEntry` first reads the entry index (`epOf`, the same rule

@@ -869,7 +869,8 @@ Broadcasts
 ``CkDynSendGroup`` with PE -1, ``CkDynSendNodeGroup`` with node -1 and
 ``CkDynSendArray`` with a NULL index broadcast. ``CkDynSendGroupMulti``
 sends one message to a list of group branches. The receiver sees
-``CKDYN_MSG_BCAST`` in the header.
+``CKDYN_MSG_BCAST`` in the header; so does the receiver of a message sent with
+``CkDynCallbackSend`` through a broadcast TARGET callback.
 
 .. _ckdyn-bcast:
 
