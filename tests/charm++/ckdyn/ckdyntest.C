@@ -981,6 +981,7 @@ class TestMain : public CBase_TestMain {
   bool requireMoves = false; /* -requiremoves: a load balancer that moves elements is loaded (RotateLB) */
   bool zcBcast = false;      /* -zcbcast: the ncpy/nonpost phase broadcasts an NCPY slot, which must abort */
   bool xiSection = false;    /* -xisection: a section of a charmxi array, which must abort */
+  bool ckptSection = false;  /* -ckptsection: the checkpoint phase passes a SECTION callback, which must abort */
 
   /* sections: the expected membership of each section the phases create */
   struct Sect {
@@ -1012,6 +1013,7 @@ public:
       else if (strcmp(m->argv[i], "-requiremoves") == 0) requireMoves = true;
       else if (strcmp(m->argv[i], "-zcbcast") == 0) zcBcast = true;
       else if (strcmp(m->argv[i], "-xisection") == 0) xiSection = true;
+      else if (strcmp(m->argv[i], "-ckptsection") == 0) ckptSection = true;
     delete m;
     mainProxy = thisProxy;
     numElems = 2 * CkNumPes();
@@ -1323,6 +1325,14 @@ public:
       pass("checkpoint");
     });
     CkDynCallback cb = cbTargetCb(g_dmain->t, DMain.ep(D_RESUMED), 0, CKPT_MARKER);
+    if (ckptSection) {
+      CkPrintf("  checkpoint with a SECTION done callback; CkDyn must abort\n");
+      CkDynSectionID sid;
+      memset(&sid, 0, sizeof sid);
+      cb = cbSectionCb(sid, Sec.ep(SC_GOTSEC), CKPT_MARKER);
+      CkDynCheckpoint((ckptDir + ".section").c_str(), &cb);
+      CHECK(false, "a checkpoint with a SECTION callback did not abort");
+    }
     CkDynCheckpoint(ckptDir.c_str(), &cb);
   }
 

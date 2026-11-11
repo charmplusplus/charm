@@ -508,7 +508,9 @@ group, an array element or a main chare; the main chare is restored by
 `CkPupMainChareData` through `MainchareDyn`'s migration constructor and
 `pupObj`, so the binding's `unpack` hook receives it. Futures from the
 checkpointed run are invalid after restart: no coroutine waits on them in the
-new process, so a `FUTURE` callback is not a resume target. A binding that
+new process, so a `FUTURE` callback is not a resume target. A `SECTION`
+callback aborts in `CkDynCheckpoint`: neither the root's section table nor
+the PE tables that route a section callback are checkpointed. A binding that
 needs the original run to continue after the checkpoint tells the two runs
 apart itself (the test's `DMain` checks whether its constructor ran in this
 process).

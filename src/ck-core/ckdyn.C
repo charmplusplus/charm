@@ -2087,6 +2087,11 @@ extern "C" void CkDynContributeSection(const CkDynTarget *me, const CkDynSection
 /* ====================================================================== */
 
 extern "C" void CkDynCheckpoint(const char *dirname, const CkDynCallback *done) {
+  /* done is also delivered after +restart, but sections and the PE tables
+     that route a section callback are not checkpointed */
+  if (done->kind == CKDYN_CB_SECTION)
+    CkAbort("CkDyn: CkDynCheckpoint: the done callback is a SECTION callback; sections are not checkpointed, "
+            "so it could not be delivered after +restart (use a TARGET callback)");
   CkStartCheckpoint(dirname, CkDynMakeCallback(done, true));
 }
 

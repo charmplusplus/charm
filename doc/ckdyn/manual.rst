@@ -1087,7 +1087,9 @@ once the restart completes. On restart:
   element or a main chare entry: a callback to a main chare is routed by
   chare index, not by object pointer, so it reaches the restored main chare.
   A FUTURE callback does not survive a restart (the future belonged to the
-  checkpointed run's coroutine).
+  checkpointed run's coroutine). A SECTION callback aborts in
+  ``CkDynCheckpoint``: sections are not checkpointed, so it could not be
+  delivered after a restart.
 
 Not restored: sections (a binding recreates them), buffer posts, futures and
 pending messages. A program that continues after its own checkpoint tells

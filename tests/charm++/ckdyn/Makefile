@@ -36,6 +36,8 @@ test: all
 	grep -q "slot 2 is an NCPY slot; a message with zero-copy slots is sent point to point only, not as an array broadcast" zcbcast.log
 	! ./ckdyntest +pe 2 -xisection > xisection.log 2>&1
 	grep -q "a member is an element of class Plain, which is not a dynamic class" xisection.log
+	! ./ckdyntest +pe 1 -ckptsection -skip sections -skip pingpong -skip pingpong_inline > ckptsection.log 2>&1
+	grep -q "CkDynCheckpoint: the done callback is a SECTION callback" ckptsection.log
 
 testp: all
 	$(call run, ./ckdyntest +p$(P) +balancer RotateLB )
