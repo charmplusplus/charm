@@ -5073,8 +5073,9 @@ void ampi::sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
   MPI_Request reqs[2];
   irecv(buf, count, datatype, source, recvtag, comm, &reqs[0]);
 
+  // tmpBuf holds the packed bytes, so it is sent as bytes, not with datatype's layout.
   // FIXME: this send may do a copy internally! If we knew now that it would, we could avoid double copying:
-  reqs[1] = send(sendtag, getRank(), tmpBuf.data(), count, datatype, dest, comm, I_SEND);
+  reqs[1] = send(sendtag, getRank(), tmpBuf.data(), (int)tmpBuf.size(), MPI_BYTE, dest, comm, I_SEND);
 
   if (status == MPI_STATUS_IGNORE) {
     parent = parent->waitall(2, reqs);
@@ -5552,6 +5553,28 @@ static void handle_MPI_IN_PLACE_alltoallw(void* &sendbuf, void* recvbuf, int* &s
     sdispls    = (int*)rdispls;
   }
   CkAssert(recvbuf != MPI_IN_PLACE);
+}
+
+// For MPI_IN_PLACE in a nonblocking alltoall: widens [lo, hi) to the bytes that
+// count elements of type at byte offset disp in the receive buffer cover.
+static void inPlaceSpan(MPI_Aint &lo, MPI_Aint &hi, MPI_Aint disp, int count,
+                        MPI_Datatype type) noexcept
+{
+  if (count == 0) return;
+  CkDDT_DataType *ddt = getDDT()->getType(type);
+  MPI_Aint b = disp + ddt->getTrueLB();
+  MPI_Aint e = b + (MPI_Aint)(count - 1) * ddt->getExtent() + ddt->getTrueExtent();
+  if (lo == hi || b < lo) lo = b;
+  if (lo == hi || e > hi) hi = e;
+}
+
+// Copies bytes [lo, hi) of recvbuf into copy and returns the address that
+// stands for recvbuf in the copy, so the send displacements are unchanged.
+static char *inPlaceCopy(std::vector<char> &copy, const void *recvbuf,
+                         MPI_Aint lo, MPI_Aint hi) noexcept
+{
+  copy.assign((const char *)recvbuf + lo, (const char *)recvbuf + hi);
+  return copy.data() - lo;
 }
 
 #define AMPI_SYNC_REDUCE 0
@@ -9125,6 +9148,12 @@ AMPI_API_IMPL(int, MPI_Ialltoall, const void *sendbuf, int sendcount, MPI_Dataty
 
   // use an ATAReq to non-block the caller and get a request ptr
   ATAReq *newreq = new ATAReq(size*2);
+  if (sendbuf == recvbuf) { // MPI_IN_PLACE: send from a copy, since receives land in recvbuf
+    MPI_Aint lo = 0, hi = 0;
+    for (int i=0; i<size; i++)
+      inPlaceSpan(lo, hi, extent*i, recvcount, recvtype);
+    sendbuf = inPlaceCopy(newreq->sendCopy, recvbuf, lo, hi);
+  }
   for (int i=0; i<size; i++) {
     ptr->irecv((char*)recvbuf+(extent*i), recvcount, recvtype, i, MPI_ATA_TAG, comm, &newreq->reqs[i]);
   }
@@ -9270,6 +9299,12 @@ AMPI_API_IMPL(int, MPI_Ialltoallv, void *sendbuf, int *sendcounts, int *sdispls,
 
   // use an ATAReq to non-block the caller and get a request ptr
   ATAReq *newreq = new ATAReq(size*2);
+  if (sendbuf == recvbuf) { // MPI_IN_PLACE: send from a copy, since receives land in recvbuf
+    MPI_Aint lo = 0, hi = 0;
+    for (int i=0; i<size; i++)
+      inPlaceSpan(lo, hi, (MPI_Aint)extent*rdispls[i], recvcounts[i], recvtype);
+    sendbuf = inPlaceCopy(newreq->sendCopy, recvbuf, lo, hi);
+  }
   for (int i=0; i<size; i++) {
     ptr->irecv((char*)recvbuf+(extent*rdispls[i]), recvcounts[i],
                recvtype, i, MPI_ATA_TAG, comm, &newreq->reqs[i]);
@@ -9425,6 +9460,12 @@ AMPI_API_IMPL(int, MPI_Ialltoallw, const void *sendbuf, const int *sendcounts, c
 
   // use an ATAReq to non-block the caller and get a request ptr
   ATAReq *newreq = new ATAReq(size*2);
+  if (sendbuf == recvbuf) { // MPI_IN_PLACE: send from a copy, since receives land in recvbuf
+    MPI_Aint lo = 0, hi = 0;
+    for (int i=0; i<size; i++)
+      inPlaceSpan(lo, hi, rdispls[i], recvcounts[i], recvtypes[i]);
+    sendbuf = inPlaceCopy(newreq->sendCopy, recvbuf, lo, hi);
+  }
   for (int i=0; i<size; i++) {
     ptr->irecv((char*)recvbuf+rdispls[i], recvcounts[i], recvtypes[i],
                i, MPI_ATA_TAG, comm, &newreq->reqs[i]);
@@ -9432,8 +9473,8 @@ AMPI_API_IMPL(int, MPI_Ialltoallw, const void *sendbuf, const int *sendcounts, c
 
   for (int i=0; i<size; i++) {
     int dst = (rank+i) % size;
-    newreq->reqs[i] = ptr->send(MPI_ATA_TAG, rank, (char*)sendbuf+sdispls[dst],
-                                sendcounts[dst], sendtypes[dst], dst, comm, I_SEND);
+    newreq->reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, (char*)sendbuf+sdispls[dst],
+                                     sendcounts[dst], sendtypes[dst], dst, comm, I_SEND);
   }
   *request = ptr->postReq(newreq);
 
