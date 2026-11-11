@@ -1548,10 +1548,15 @@ extern "C" void CkDynFutureSet(int pe, uint32_t id, CkDynMsg *value) {
 }
 
 extern "C" int CkDynGetReductionNumber(const CkDynTarget *t) {
+  /* An array map has no reduction number: ArrayMapDyn derives from CkArrayMap,
+     an IrrGroup, not from Group, so it has no reduction state (and
+     CkDynContribute refuses it as well). */
+  if (t->kind == CKDYN_ARRAYMAP)
+    CkAbort("CkDyn: CkDynGetReductionNumber on an array map; array maps do not take part in reductions");
   Chare *c = localChare(t);
   if (c == nullptr) CkAbort("CkDyn: CkDynGetReductionNumber on an object that is not local");
   switch (t->kind) {
-    case CKDYN_GROUP: case CKDYN_ARRAYMAP: return ((Group *)c)->getRedNo();
+    case CKDYN_GROUP: return ((GroupDyn *)c)->getRedNo();
     case CKDYN_NODEGROUP: return ((NodeGroupDyn *)c)->getRedNo();
     case CKDYN_ARRAY: return ((ArrayElement *)c)->getRedNo();
     default: CkAbort("CkDyn: CkDynGetReductionNumber: only groups, nodegroups and array elements expose a reduction number");

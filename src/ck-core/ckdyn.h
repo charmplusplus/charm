@@ -489,7 +489,8 @@ void CkDynArrayDestroyElement(int aid, int ndims, const int *index);            
 void CkDynFutureSet(int pe, uint32_t id, CkDynMsg *value);
 /* Send a message through a callback description. */
 void CkDynCallbackSend(const CkDynCallback *cb, CkDynMsg *m);
-/* The reduction number of the local element or branch the target names. */
+/* The reduction number of the local array element, group or nodegroup branch
+ * the target names (an array map has none). */
 int  CkDynGetReductionNumber(const CkDynTarget *t);
 
 /* ------------------------------------------------------------------------ */

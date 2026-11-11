@@ -1155,7 +1155,7 @@ binding.
   %zu on the sizing pass" is a binding whose two passes disagree.
 - **Kind mismatches.** `CkDynCreate*` on a class of another kind,
   `CkDynContribute` from a chare or main chare, `CkDynGetReductionNumber` on a
-  kind other than group, nodegroup, array map or array element, `CkDynAtSync`, `CkDynSetMigratable`,
+  kind other than group, nodegroup or array element (an array map included), `CkDynAtSync`, `CkDynSetMigratable`,
   `CkDynMigrateMe` and `CkDynSetObjLoad` on a target that is not a local array
   element, and `CkDynArrayInsert` with a message not finished with an array
   class's constructor entry.

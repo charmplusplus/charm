@@ -2053,8 +2053,8 @@ See :ref:`ckdyn-futures`.
    Sends a message through a callback.
 
 ``int CkDynGetReductionNumber(const CkDynTarget *t)``
-   The reduction number of a local group, nodegroup or array map branch, or
-   array element.
+   The reduction number of a local group or nodegroup branch, or array
+   element. An array map has none: the call aborts.
 
 Reductions
 ----------
