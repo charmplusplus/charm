@@ -13,10 +13,10 @@ module CkDyn {
 
   group [migratable] CkDynMgr {
     entry CkDynMgr();
-    // a binding future's value; the future id is the envelope's reference number.
+    // the value of a binding future; the future id is the envelope reference number.
     // notrace: a binding coroutine resumed here traces its own event (CkDynCoroResume)
     entry [notrace] void deposit(CkDynMsg *m);
-    // a section callback's result, forwarded to the section (any message type arrives here)
+    // the result of a section callback, forwarded to the section (any message type arrives here)
     entry void relay(CkDynMsg *m);
     // a CkDynHapiAddCallback completion: m carries the CkDynCallback to send to
     entry void hapiDone(CkDynMsg *m);

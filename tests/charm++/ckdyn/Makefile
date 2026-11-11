@@ -23,7 +23,8 @@ clean:
 
 # The randomized scheduler queue ignores priorities, so that run skips the
 # priority phase. The stale-send run must abort with CkDyn's message, and so
-# must the run that broadcasts an NCPY slot.
+# must the run that broadcasts an NCPY slot and the run that calls
+# CkDynRegisterClass after start-up.
 test: all
 	$(call run, ./ckdyntest +p4 +balancer RotateLB +randomized_msgq -skip priority -requiremoves )
 	$(call run, ./ckdyntest +p4 +balancer RotateLB -requiremoves )
@@ -34,6 +35,8 @@ test: all
 	grep -q "send to a deleted section .*stale generation" stalesend.log
 	! ./ckdyntest +pe 1 -zcbcast -skip pingpong -skip pingpong_inline > zcbcast.log 2>&1
 	grep -q "slot 2 is an NCPY slot; a message with zero-copy slots is sent point to point only, not as an array broadcast" zcbcast.log
+	! ./ckdyntest +pe 1 -badlatereg > badlatereg.log 2>&1
+	grep -q "CkDynRegisterClass for class Late after start-up; register it with CkDynRegisterClassLate" badlatereg.log
 
 testp: all
 	$(call run, ./ckdyntest +p$(P) +balancer RotateLB )

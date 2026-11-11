@@ -34,6 +34,7 @@ static inline bool lateRegistrationAllowed(void)
 }
 
 void _registerLateBegin(void) { __registerLateOpen++; }
+int _registerIsDone(void) { return __registerDone; }
 void _registerLateEnd(void) { __registerLateOpen--; }
 
 void _registerInit(void)

@@ -117,6 +117,20 @@ static void fillIndex(const CkArrayIndex &ix, int *out, int *ndims) {
 
 static inline CkGroupID gidOf(int idx) { CkGroupID g; g.idx = idx; return g; }
 
+/* The class of each dynamic array this process has seen (created here, or an
+   element constructed or unpacked here), for CkDynArrayInsert's check. */
+static std::mutex g_arrayClassLock;
+static std::unordered_map<int, int> g_arrayClass;   /* aid -> chare index */
+static void noteArrayClass(int aid, int chareIdx) {
+  std::lock_guard<std::mutex> g(g_arrayClassLock);
+  g_arrayClass[aid] = chareIdx;
+}
+static int arrayClassOf(int aid) {
+  std::lock_guard<std::mutex> g(g_arrayClassLock);
+  auto it = g_arrayClass.find(aid);
+  return it == g_arrayClass.end() ? -1 : it->second;
+}
+
 void ArrayElemDyn::fillTarget(CkDynTarget *t) const {
   memset(t, 0, sizeof *t);   /* every target CkDyn builds is zeroed first, padding and unused index entries included,
                                so that it compares byte-equal with one a binding builds */
@@ -126,9 +140,17 @@ void ArrayElemDyn::fillTarget(CkDynTarget *t) const {
   fillIndex(thisIndexMax, t->u.array.index, &t->u.array.ndims);
 }
 
+/* The PE an array element was last known on, or -1 before the array has a
+   branch on this PE (the device send path then aborts with its own message). */
+static int lastKnownPe(int aid, const CkArrayIndex &ix) {
+  CkArray *a = CkArrayID(gidOf(aid)).ckLocalBranch();
+  return a ? a->lastKnown(ix) : -1;
+}
+
 static ArrayElement *localArrayElem(int aid, int ndims, const int *index) {
-  CProxyElement_ArrayBase p(CkArrayID(gidOf(aid)), mkIndex(ndims, index));
-  return p.ckLocal();
+  CkArray *a = CkArrayID(gidOf(aid)).ckLocalBranch();
+  if (a == nullptr) return nullptr;   /* the array has no branch on this PE yet */
+  return a->lookup(mkIndex(ndims, index));
 }
 
 /* The local C++ object a target names, or NULL. */
@@ -176,7 +198,15 @@ static void noteEp(int ep, ClassRec *c, uint32_t flags, uint32_t user_id) {
   g_eps[ep].user_id = user_id;
 }
 
+/* The header carries the entry index in 16 bits (CkDynHdr::ep). */
+static void checkEpLimit(int ep, const char *cls) {
+  if (ep > 0xffff)
+    CkAbort("CkDyn: class %s: entry index %d does not fit the 16-bit entry field of a CkDyn message "
+            "(this program registers more than 65535 entry methods)", cls, ep);
+}
+
 static int registerClass(const CkDynClassDesc *desc, int *first_ep) {
+  if (desc->name == nullptr) CkAbort("CkDyn: a class description without a name");
   if (desc->num_entries < 1 || desc->entries == nullptr)
     CkAbort("CkDyn: class %s has no constructor entry", desc->name ? desc->name : "?");
   if (desc->hooks && (desc->hooks->version != CKDYN_API_VERSION || desc->hooks->size != sizeof(CkDynHooks)))
@@ -247,6 +277,7 @@ static int registerClass(const CkDynClassDesc *desc, int *first_ep) {
     default:
       CkAbort("CkDyn: class %s has an unknown kind %d", name, (int)desc->kind);
   }
+  checkEpLimit(ctor, name);
   c->chareIdx = idx;
   c->ctorEp = ctor;
   c->firstEp = ctor;
@@ -258,6 +289,7 @@ static int registerClass(const CkDynClassDesc *desc, int *first_ep) {
   for (int i = 1; i < desc->num_entries; i++) {
     int ep = CkRegisterEp(c->entries[i].name, entryFn, CkDynMsg::__idx, idx, ckFlagsOf(c->entries[i].flags));
     if (ep != ctor + i) CkAbort("CkDyn: entry indices of class %s are not contiguous", name);
+    checkEpLimit(ep, name);
     noteEp(ep, c, c->entries[i].flags | CKDYN_EP_NOKEEP, c->entries[i].user_id);
   }
 
@@ -311,6 +343,12 @@ static int registerClass(const CkDynClassDesc *desc, int *first_ep) {
 
 extern "C" int CkDynRegisterClass(const CkDynClassDesc *desc, int *first_ep) {
   if (CkMyRank() != 0) CkAbort("CkDyn: CkDynRegisterClass must run on rank 0 of each process");
+  /* after start-up only through CkDynRegisterClassLate, which checks that every
+     PE of the process sees the class (a CMK_CHARM4PY build would accept the
+     registration silently: its Ext API registers late) */
+  if (_registerIsDone())
+    CkAbort("CkDyn: CkDynRegisterClass for class %s after start-up; register it with CkDynRegisterClassLate "
+            "(after CkDynAllowLateRegistration)", desc->name ? desc->name : "?");
   return registerClass(desc, first_ep);
 }
 
@@ -459,6 +497,7 @@ extern "C" void CkDynMsgAddBytes(CkDynMsgBuilder *b, const void *p, uint32_t len
 /* True when strides describe the contiguous layout of shape in the given order. */
 static bool contiguous(const CkDynBufDesc *d, size_t itemsize) {
   if (d->ndim == 0 || d->strides == nullptr) return true;
+  for (int i = 0; i < d->ndim; i++) if (d->shape[i] == 0) return true;   /* empty: strides are free (numpy 2 keeps real ones) */
   int64_t expect = (int64_t)itemsize;
   if (d->bflags & CKDYN_BUF_FORTRAN) {
     for (int i = 0; i < d->ndim; i++) { if (d->shape[i] > 1 && d->strides[i] != expect) return false; expect *= d->shape[i]; }
@@ -900,11 +939,12 @@ void CkDynDeliverBroadcast(void *bcastMsg, ArrayElemDyn **elems, int n) {
   CkDynMsgView v;
   CkDynSlot tmp[2];
   int ep = viewAny(v, tmp, bcastMsg);
-  const EpRec &r = epRec(ep);
+  /* copies: a handler may register a class late, which can reallocate g_eps */
+  const uint32_t user_id = epRec(ep).user_id, flags = epRec(ep).flags;
   if (c->hooks->deliver_many) {
     std::vector<void *> handles(n);
     for (int i = 0; i < n; i++) handles[i] = elems[i]->d.handle;
-    c->hooks->deliver_many(c->desc.binding_data, handles.data(), n, ep, r.user_id, r.flags, &v);
+    c->hooks->deliver_many(c->desc.binding_data, handles.data(), n, ep, user_id, flags, &v);
   } else {
     /* a handler may destroy another local element: look each one up again by index */
     CkArray *arr = CkArrayID(elems[0]->ckGetArrayID()).ckLocalBranch();
@@ -929,7 +969,7 @@ void CkDynDeliverBroadcast(void *bcastMsg, ArrayElemDyn **elems, int n) {
                                       env->getTotalsize(), &pid, el);
       }
 #endif
-      c->hooks->deliver(c->desc.binding_data, el->d.handle, ep, r.user_id, r.flags, &v);
+      c->hooks->deliver(c->desc.binding_data, el->d.handle, ep, user_id, flags, &v);
 #if CMK_TRACE_ENABLED
       if (traced) { _TRACE_END_EXECUTE(); _TRACE_CLEAR_OBJECT(); }
 #endif
@@ -1206,6 +1246,7 @@ ArrayElemDyn::ArrayElemDyn(CkDynMsg *m) {
   CkDynTarget t;
   fillTarget(&t);
   noteDims(d.chareIdx, t.u.array.ndims);
+  noteArrayClass(t.u.array.aid, d.chareIdx);
   d.handle = c->hooks->construct(c->desc.binding_data, &t, &v);
   int pe; uint32_t id;
   if ((v.hdr->flags & CKDYN_MSG_CREATION) && findFuture(v, &pe, &id)) {
@@ -1234,7 +1275,7 @@ void ArrayElemDyn::pup(PUP::er &p) {
   CkDynTarget t;
   fillTarget(&t);
   pupObj(p, d, t);
-  if (p.isUnpacking()) noteDims(d.chareIdx, t.u.array.ndims);
+  if (p.isUnpacking()) { noteDims(d.chareIdx, t.u.array.ndims); noteArrayClass(t.u.array.aid, d.chareIdx); }
 }
 
 /* ---- ArrayMapDyn -------------------------------------------------------- */
@@ -1348,7 +1389,7 @@ extern "C" void CkDynSendArray(int aid, int ndims, const int *index, int ep, CkD
     CkBroadcastMsgArray(ep, am, a, f);
   } else {
     CkArrayIndex ix = mkIndex(ndims, index);
-    if (int k = zcKind(m)) zcBeforeSend(m, k == ZC_DEVICE ? a.ckLocalBranch()->lastKnown(ix) : -1, &f);
+    if (int k = zcKind(m)) zcBeforeSend(m, k == ZC_DEVICE ? lastKnownPe(aid, ix) : -1, &f);
     if (f & CK_MSG_INLINE) CkSendMsgArrayInline(ep, am, a, ix, f);
     else CProxyElement_ArrayBase::ckSendWrapper(a, ix, am, ep, f);
   }
@@ -1433,6 +1474,7 @@ extern "C" int CkDynCreateArray(int chare_idx, CkDynMsg *ctor, const CkDynArrayO
   if (o->static_insertion) opts.setStaticInsertion(true);
   UsrToEnv(ctor)->setMsgtype(ArrayEltInitMsg);
   CkGroupID g = CProxy_ArrayBase::ckCreateArray((CkArrayMessage *)ctor, c->ctorEp, opts);
+  noteArrayClass(g.idx, chare_idx);
   return g.idx;
 }
 
@@ -1444,6 +1486,10 @@ extern "C" void CkDynArrayInsert(int aid, int ndims, const int *index, int on_pe
   const EpRec &r = epRec(ctorEp);
   if (r.cls->ctorEp != ctorEp || r.cls->desc.kind != CKDYN_ARRAY)
     CkAbort("CkDyn: CkDynArrayInsert: the message was not finished with an array class's constructor entry");
+  int arrCls = arrayClassOf(aid);
+  if (arrCls >= 0 && arrCls != r.cls->chareIdx)
+    CkAbort("CkDyn: CkDynArrayInsert of a %s element into array %d, whose elements are of class %s",
+            r.cls->desc.name, aid, classOf(arrCls)->desc.name);
   noteDims(r.cls->chareIdx, ndims);
   UsrToEnv(ctor)->setMsgtype(ArrayEltInitMsg);   /* ckInsertIdx buffers the insert if the array is not here yet */
   CProxy_ArrayBase(CkArrayID(gidOf(aid))).ckInsertIdx((CkArrayMessage *)ctor, ctorEp, on_pe, mkIndex(ndims, index));
@@ -1544,7 +1590,7 @@ static int callbackPe(const CkDynCallback *cb) {
     case CKDYN_GROUP: case CKDYN_ARRAYMAP: return t.u.group.pe_or_node;
     case CKDYN_NODEGROUP: return CmiNodeFirst(t.u.group.pe_or_node);
     case CKDYN_ARRAY:
-      return CkArrayID(gidOf(t.u.array.aid)).ckLocalBranch()->lastKnown(mkIndex(t.u.array.ndims, t.u.array.index));
+      return lastKnownPe(t.u.array.aid, mkIndex(t.u.array.ndims, t.u.array.index));
   }
   return -1;
 }
@@ -1569,7 +1615,19 @@ extern "C" void CkDynCallbackSend(const CkDynCallback *cb, CkDynMsg *m) {
     stampEp(m, cb->ep);
     if (cb->bcast) dynHdr(m)->flags |= CKDYN_MSG_BCAST;   /* as CkDynSend* mark their broadcasts */
   }
-  CkDynMakeCallback(cb).send(m);
+  CkCallback c = CkDynMakeCallback(cb);
+  if (dynHdr(m)->nbuf) {
+    /* a message with zero-copy slots is not delivered inline (the transfer
+       runs in the scheduler's handler), as zcBeforeSend drops CK_MSG_INLINE */
+    switch (c.type) {
+      case CkCallback::isendChare:     c.type = CkCallback::sendChare; break;
+      case CkCallback::isendGroup:     c.type = CkCallback::sendGroup; break;
+      case CkCallback::isendNodeGroup: c.type = CkCallback::sendNodeGroup; break;
+      case CkCallback::isendArray:     c.type = CkCallback::sendArray; break;
+      default: break;
+    }
+  }
+  c.send(m);
 }
 
 extern "C" void CkDynFutureSet(int pe, uint32_t id, CkDynMsg *value) {
@@ -3090,14 +3148,19 @@ extern "C" int CkDynRefnumBytes(void) { return (int)sizeof(CMK_REFNUM_TYPE); }
 /* The binding's readonly data, registered as one Charm++ readonly whose pup
  * calls the hooks: the start-up broadcast and the checkpoint file both go
  * through it. */
+static size_t s_roSizedLen = 0;   /* pack_readonly_size of the last sizing pass, checked as pupObj does */
+
 static void ckdynRoPup(void *pup_er) {
   PUP::er &p = *(PUP::er *)pup_er;
   PUP::mem *mem = dynamic_cast<PUP::mem *>(&p);
   if (!p.isUnpacking()) {
     size_t n = g_hooks.pack_readonly_size ? g_hooks.pack_readonly_size(g_hooks.global) : 0;
+    if (p.isSizing()) { s_roSizedLen = n; p | n; p((char *)nullptr, n); return; }
+    if (mem && n != s_roSizedLen)
+      CkAbort("CkDyn: pack_readonly_size returned %zu bytes on the packing pass but %zu on the sizing pass", n, s_roSizedLen);
     p | n;
-    if (p.isSizing()) { p((char *)nullptr, n); return; }
     if (n == 0) return;
+    if (g_hooks.pack_readonly == nullptr) CkAbort("CkDyn: readonly data of %zu bytes without a pack_readonly hook", n);
     if (mem) { g_hooks.pack_readonly(g_hooks.global, mem->get_current_pointer(), n); mem->advance(n); }
     else { std::vector<char> tmp(n); g_hooks.pack_readonly(g_hooks.global, tmp.data(), n); p(tmp.data(), n); }
   } else {

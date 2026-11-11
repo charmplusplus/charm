@@ -455,7 +455,8 @@ typedef struct CkDynArrayOpts {
   int        ndims;
   const int *dims;               /* NULL: empty array, insert later */
   int        map_gid;            /* -1: default map */
-  int        anytime_migration;  /* CkArrayOptions::setAnytimeMigration */
+  int        anytime_migration;  /* nonzero: CkArrayOptions::setAnytimeMigration(true); 0 keeps the default
+                                    (on, unless +noAnytimeMigration); matters only with static_insertion */
   int        static_insertion;   /* CkArrayOptions::setStaticInsertion */
   int        bind_to_aid;        /* -1, or an array to bindTo */
 } CkDynArrayOpts;

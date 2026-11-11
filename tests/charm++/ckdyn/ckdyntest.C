@@ -4,7 +4,8 @@
  * whose callback checks the result and calls mainProxy.nextPhase().
  * Run: ./ckdyntest +pe 4 +balancer RotateLB -requiremoves [-skip <phase>]... [-ckptdir <dir>]
  * (-requiremoves: the sections/migration phase checks that elements moved;
- * -stalesend: the sections/delete phase sends to the deleted section, which must abort)
+ * -stalesend: the sections/delete phase sends to the deleted section, which must abort;
+ * -badlatereg: CkDynRegisterClass after start-up, which must abort)
  * The checkpoint phase writes <dir> (default ckdyntest.ckpt); then
  *      ./ckdyntest +pe 4 +restart <dir>
  * checks that the checkpoint callback reaches the restored main chare DMain.
@@ -975,6 +976,11 @@ static int64_t g_singleSeen = 0;
 static uint32_t g_singleRef = 0;
 static int64_t singleNote(Obj *, const CkDynMsgView *v) {
   CHECK(v->kind == CKDYN_MSGKIND_DYN, "Single.inl/plain: view kind %d", (int)v->kind);
+  if (v->nslots > 1) {   /* the NCPY round of inline_chare: slot 1 holds 0.5 * i */
+    CHECK(v->slots[1].type == CKDYN_SLOT_NCPY, "Single.inl: slot 1 has type %d", (int)v->slots[1].type);
+    const double *p = (const double *)CkDynViewBufferPtr(v, 1, nullptr);
+    for (int i = 0; i < 8; i++) CHECK(p[i] == 0.5 * i, "Single.inl: NCPY element %d is %g", i, p[i]);
+  }
   g_singleSeen = cbI64(v, 0);
   g_singleRef = v->refnum;
   return 0;
@@ -1108,7 +1114,7 @@ class TestMain : public CBase_TestMain {
     "pingpong", "pingpong_inline", "bcast",
     "reductions/table", "reductions/single", "reductions/single_any", "reductions/group_elem", "reductions/group_bcast",
     "reductions/array_elem", "reductions/array_bcast", "reductions/future", "reductions/foreign",
-    "future_return", "nodegroup", "qd", "priority", "coroutine", "callstack", "inline_chare",
+    "future_return", "nodegroup", "qd", "priority", "coroutine", "builder", "callstack", "inline_chare",
     "constrained",
     "ncpy/nonpost", "ncpy/post_before", "ncpy/post_after", "ncpy/samepe",
     "device/remote", "device/samepe", "hapi", "devpersist/remote", "devpersist/samepe",
@@ -1153,6 +1159,12 @@ public:
       else if (strcmp(m->argv[i], "-stalesend") == 0) staleSend = true;
       else if (strcmp(m->argv[i], "-requiremoves") == 0) requireMoves = true;
       else if (strcmp(m->argv[i], "-zcbcast") == 0) zcBcast = true;
+      else if (strcmp(m->argv[i], "-badlatereg") == 0) {
+        /* CkDynRegisterClass after start-up must abort and name CkDynRegisterClassLate */
+        CkPrintf("  registering Late with CkDynRegisterClass after start-up; CkDyn must abort\n");
+        cbRegister(&Late);
+        CHECK(false, "CkDynRegisterClass after start-up did not abort");
+      }
     delete m;
     mainProxy = thisProxy;
     numElems = 2 * CkNumPes();
@@ -1206,6 +1218,7 @@ public:
     else if (s == "qd") runQD();
     else if (s == "priority") runPriority();
     else if (s == "coroutine") runCoroutine();
+    else if (s == "builder") runBuilder();
     else if (s == "callstack") runCallstack();
     else if (s == "inline_chare") runInlineChare();
     else if (s == "constrained") runConstrained();
@@ -1369,6 +1382,25 @@ public:
      CkDynCallstackPush and Pop (tmpDestroy checks the running object); then
      QD, and the Grp branches report how many did. Also Push/Pop of a target
      that is not local keeps the stack balanced. */
+  /* builder: edge cases of the message builder that must not abort: a
+     negative slot hint, and an empty buffer with real strides (numpy 2's
+     np.zeros((5, 3))[:, :0] has shape (5, 0) and strides (24, 8)) */
+  void runBuilder() {
+    CkDynMsgBuilder *b = CkDynMsgBegin(-1, 0, 0, 0, -1);
+    static const int64_t shape[2] = { 5, 0 }, strides[2] = { 24, 8 };
+    static double dummy;
+    CkDynBufDesc d = { &dummy, 0, CKDYN_ELEM_F64, 2, 0, 0, shape, strides };
+    CkDynMsgAddBuffer(b, &d);
+    CkDynMsg *m = CkDynMsgFinish(b, 0);
+    uint32_t len;
+    const CkDynHdr *h = (const CkDynHdr *)CkDynMsgPayload(m, &len);
+    const CkDynSlot *sl = (const CkDynSlot *)(h + 1);
+    CHECK(h->nslots == 1 && sl[0].type == CKDYN_SLOT_BUFFER && sl[0].len == 0 && sl[0].ndim == 2,
+          "builder: the empty strided buffer was not kept as a 2-D BUFFER slot of 0 bytes");
+    CkDynMsgFree(m);
+    pass("builder");
+  }
+
   void runCallstack() {
     int n = numElems;
     uint32_t fc = cbNewFuture([this, n](const CkDynMsgView *) {
@@ -1413,8 +1445,26 @@ public:
     CkDynCallbackSend(&cb, MsgB().i64(13).finish(0));
     CHECK(g_singleSeen == 13 && g_singleRef == 77, "inline_chare: the TARGET callback to the INLINE entry saw %lld, "
           "refnum %u (expected 13, 77 inside CkDynCallbackSend)", (long long)g_singleSeen, g_singleRef);
-    CkPrintf("  inline_chare: INLINE entry, CKDYN_SEND_INLINE and an inline TARGET callback ran inside the call\n");
-    pass("inline_chare");
+    /* with an NCPY slot the same TARGET callback must not deliver inline: the
+       transfer runs in the scheduler's handler */
+    static double zbuf[8];
+    for (int i = 0; i < 8; i++) zbuf[i] = 0.5 * i;
+    CkDynBufDesc d = { zbuf, sizeof zbuf, CKDYN_ELEM_F64, 0, 0, 0, nullptr, nullptr };
+    MsgB b;
+    b.i64(14);
+    CkDynMsgAddNcpy(b.b, &d, nullptr, nullptr);
+    g_singleSeen = 0;
+    CkDynCallback cbz = cbTargetCb(single, Single.ep(S_INL), 0, 78);
+    CkDynCallbackSend(&cbz, b.finish(0));
+    CHECK(g_singleSeen == 0, "inline_chare: a message with an NCPY slot was delivered inline through a TARGET callback");
+    CkDynCallback qd = cbFutureCb(0, cbNewFuture([this](const CkDynMsgView *) {
+      CHECK(g_singleSeen == 14 && g_singleRef == 78, "inline_chare: the NCPY message through the TARGET callback "
+            "saw %lld, refnum %u (expected 14, 78)", (long long)g_singleSeen, g_singleRef);
+      CkPrintf("  inline_chare: INLINE entry, CKDYN_SEND_INLINE and an inline TARGET callback ran inside the call; "
+               "with an NCPY slot the callback went through the scheduler\n");
+      pass("inline_chare");
+    }));
+    CkDynStartQD(&qd);
   }
 
   /* constrained: a Grp group with branches on the even PEs only. A

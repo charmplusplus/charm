@@ -115,7 +115,12 @@ the runtime), and otherwise only between `_registerLateBegin()` and
 `_registerLateEnd()`, which `CkDynRegisterClassLate` calls around
 `registerClass`. A plain program that registers an entry late by mistake
 (a templated entry method not instantiated in a `.ci` file) still aborts with
-"late entry method registration happened after init".
+"late entry method registration happened after init". `CkDynRegisterClass`
+does not rely on that check: after `_registerDone` (`_registerIsDone()`) it
+aborts and names `CkDynRegisterClassLate`, because in a `CMK_CHARM4PY` build
+the check above passes and the one-PE-per-process condition of the late path
+would be skipped. Registration also aborts on an entry index above 65535,
+which the 16-bit `CkDynHdr::ep` cannot carry.
 
 What sizes itself by the entry or chare count, and how a late class fares:
 
@@ -417,8 +422,11 @@ virtual chare id (negative PE) that is usable for sends and callbacks at
 once; `construct` receives the real id. `CkDynArrayInsert` takes the
 constructor ep from the message header, so the binding must have finished the
 message with the class's `first_ep`; it aborts unless that ep is the
-constructor of an array class. If the array has no local branch yet,
-`ckInsertIdx` buffers the insert.
+constructor of an array class, or when that class differs from the array's.
+The array's class is known to a process that created the array or holds one
+of its elements (`g_arrayClass`, filled by `CkDynCreateArray`, the element
+constructor and unpack); elsewhere the insert is not checked. If the array
+has no local branch yet, `ckInsertIdx` buffers the insert.
 
 **Creation acknowledgement.** A constructor message with
 `CKDYN_MSG_CREATION` and a `FUTURE` slot (the first one, `findFuture`)

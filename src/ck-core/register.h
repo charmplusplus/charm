@@ -365,6 +365,8 @@ extern void _registerDone(void);
  * see doc/internals/ckdyn.md, Registration. */
 extern void _registerLateBegin(void);
 extern void _registerLateEnd(void);
+/* True after _registerDone: start-up registration is over. */
+extern int _registerIsDone(void);
 
 extern int CkGetChareIdx(const char *name);
 

@@ -512,7 +512,9 @@ Late registration
    int idx = CkDynRegisterClassLate(&desc, &first_ep);
 
 ``CkDynRegisterClassLate`` registers a class after start-up, in every build.
-Its limits:
+``CkDynRegisterClass`` after start-up aborts and names it, also in a
+``charm4py`` build of Charm++, whose own registration tables accept late
+entries. Its limits:
 
 - The process must have one PE; it aborts otherwise, because the runtime's
   entry and chare tables are shared by the PEs of a process.
@@ -655,7 +657,8 @@ The builder
   result builder, which copies the contents at once). A NULL ``desc.ptr``
   with a nonzero length aborts. Strides, if given, must describe a
   contiguous layout in C or Fortran order (``CKDYN_BUF_FORTRAN``); CkDyn
-  aborts otherwise.
+  aborts otherwise. An empty buffer (an extent of 0) is accepted whatever
+  its strides.
 - ``CkDynMsgFinish(b, ep)`` allocates the message once and writes ``ep``
   into the header. The send functions write the destination entry into the
   header again, so for a plain send the ``ep`` given to ``Finish`` does not
@@ -971,7 +974,9 @@ With ``dims`` the array is created with all its elements; with NULL it starts
 empty, elements are added with ``CkDynArrayInsert`` (on ``on_pe``, or -1 for
 the map's choice), and ``CkDynArrayDoneInserting`` ends insertion. Every
 element of an array is of the array's class, and the insert's constructor
-message must be finished with that class's ``first_ep``.
+message must be finished with that class's ``first_ep``; an insert with
+another class's constructor aborts once the process has seen the array's
+class (it created the array, or holds one of its elements).
 ``CKDYN_MSG_CREATION`` is for whole-array creation only: on an insert it
 would start a reduction over one element.
 
@@ -1044,8 +1049,15 @@ The C++ test binding resumes by sending the element a message:
      CkDynSendTarget(&o->t, c->ep(m), MsgB().finish(c->ep(m)), nullptr);
    }
 
-``CkDynArrayOpts.anytime_migration`` allows the balancer to move elements at
-any time.
+``CkDynArrayOpts.anytime_migration`` does not decide whether elements can
+migrate: AtSync, ``CkDynMigrateMe`` and the load balancer move them either
+way. It is Charm++'s ``CkArrayOptions::setAnytimeMigration``, which only
+matters together with ``static_insertion``: an array with static insertion
+and without anytime migration is assumed to keep its elements where they
+were created, and its broadcasts skip the bookkeeping for elements that
+move. Anytime migration is on for every array unless the program runs with
+``+noAnytimeMigration``, so ``anytime_migration = 0`` keeps that default and
+a nonzero value turns it on for this array under ``+noAnytimeMigration``.
 
 **Pup hooks.** Packing an object runs two passes:
 
@@ -1911,7 +1923,9 @@ See :ref:`ckdyn-registration`.
 
 ``int CkDynRegisterClass(const CkDynClassDesc *desc, int *first_ep)``
    Registers a class on rank 0 before start-up completes; returns the chare
-   index and stores the constructor's entry index in ``*first_ep``.
+   index and stores the constructor's entry index in ``*first_ep``. Aborts
+   after start-up (use ``CkDynRegisterClassLate``), on a NULL name, and when
+   an entry index would exceed 65535 (the message header keeps 16 bits).
 
 ``void CkDynAllowLateRegistration(void)``
    Enables ``CkDynRegisterClassLate``.
