@@ -316,6 +316,14 @@ void BaseLB::LDStats::print()
       CkPrintf("     id = %" PRIu64 "\n",odata.objID());
       CkPrintf("  OM id = %d\t",odata.omID().id.idx);
       CkPrintf("   Mig. = %d\n",odata.migratable);
+
+      if (!odata.position.empty()){
+	CkPrintf("    Pos = < ");
+	for (const auto& elem : odata.position) { 
+	  CkPrintf("%f ", elem); 
+	 } 
+	CkPrintf(">\n");
+      }
 #if CMK_LB_CPUTIMER
       CkPrintf("    CPU = %f\t",odata.cpuTime);
 #endif
