@@ -1102,7 +1102,9 @@ once the restart completes. On restart:
   delivered after a restart.
 
 Not restored: sections (a binding recreates them; an old section id aborts on
-use), buffer posts, futures and pending messages.
+use), buffer posts, futures and pending messages. A program that continues
+after its own checkpoint tells the two runs apart itself; the C++ test's
+dynamic main chare checks whether its constructor ran in this process.
 
 A restart may use another PE count than the checkpointed run. Then:
 
@@ -1115,9 +1117,7 @@ A restart may use another PE count than the checkpointed run. Then:
   nothing reports it: their targets name no object, and a send to one is an
   error the runtime does not detect.
   A program that holds singleton chares restarts with the same PE count;
-- the main chare is restored on PE 0 as usual. A program that continues after its own checkpoint tells
-the two runs apart itself; the C++ test's dynamic main chare checks whether
-its constructor ran in this process.
+- the main chare is restored on PE 0 as usual.
 
 Quiescence
 ----------
