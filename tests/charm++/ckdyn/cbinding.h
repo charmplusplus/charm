@@ -118,8 +118,13 @@ const void *cbRedData(const CkDynMsgView *v, uint32_t *len);
 /* Bytes of a CkDyn payload: header, slots, data region and tail. */
 uint32_t cbPayloadLen(const CkDynMsgView *v);
 
-/* The binding reducer id of the "sum of I64 slot 0" foreign reducer. */
-enum { CB_REDUCER_SUM_I64 = 7 };
+/* The binding reducer id of the "sum of I64 slot 0" foreign reducer. Its
+ * result also carries slot 1, a BUFFER of CB_RBUF_N int64 sum, sum+1, ...
+ * that the hook builds in a temporary (the copy-at-add contract of the reduce
+ * builder); cbCheckReduceBuffer checks it and returns 1, or 0 for a view
+ * with one slot (a single contribution passed on without combining). */
+enum { CB_REDUCER_SUM_I64 = 7, CB_RBUF_N = 6 };
+int cbCheckReduceBuffer(const CkDynMsgView *v);
 
 void cbFail(const char *fmt, ...);   /* print and abort */
 

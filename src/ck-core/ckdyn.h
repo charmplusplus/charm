@@ -258,7 +258,9 @@ void  CkDynMsgAddU64(CkDynMsgBuilder *b, uint64_t v);
 void  CkDynMsgAddF64(CkDynMsgBuilder *b, double v);
 void  CkDynMsgAddBytes(CkDynMsgBuilder *b, const void *p, uint32_t len, uint16_t tag);
 /* The shape is copied now; the bytes are copied into the message by
- * CkDynMsgFinish, so d->ptr must stay valid until Finish or Abandon. */
+ * CkDynMsgFinish, so d->ptr must stay valid until Finish or Abandon. In the
+ * reduce hook's result builder the bytes are copied now as well, so d->ptr
+ * may be freed as soon as this returns. */
 void  CkDynMsgAddBuffer(CkDynMsgBuilder *b, const CkDynBufDesc *d);
 void  CkDynMsgAddFuture(CkDynMsgBuilder *b, int pe, uint32_t id);
 void  CkDynMsgAddCallback(CkDynMsgBuilder *b, const CkDynCallback *cb);

@@ -276,6 +276,10 @@ cached builder is in use, which happens when a build is nested inside another
 (an inline delivery that sends, or `ckdynForeignReduce` calling `reduce` while
 the binding was building), `CkDynMsgBegin` allocates a second builder, and
 `releaseBuilder` deletes it at `CkDynMsgFinish` or `CkDynMsgAbandon`.
+The builder `ckdynForeignReduce` hands to the `reduce` hook has `copyBuffers`
+set: `CkDynMsgAddBuffer` then copies the contents into the builder when it is
+called, because the hook's result is written only after the hook returns, and
+a hook may build it in memory it frees on return.
 
 `CkDynMsgFinish(b, ep)` allocates the message once with the charmxi-generated
 `operator new` (`new (total, prio_bits) CkDynMsg`, or the `GroupDepNum{1}`
@@ -289,9 +293,12 @@ header and slots, copies each piece of the data region to its offset
 (header to end of tail), which is how a C binding makes a foreign-reducer
 contribution.
 
-Size checks: a slot longer than 32 bits aborts when it is added; `Finish`
-aborts on a payload above 2 GB (the allocator takes an `int`) or more than
-65535 slots (`nslots` is 16 bits).
+Size checks: a slot longer than 32 bits aborts when it is added; `checkLimits`,
+called by `Finish`, `FinishMcast` and `ckdynForeignReduce` for the reduce
+hook's result, aborts on more than 65535 slots (`nslots` is 16 bits) or a
+payload that with the envelope, the message class and the priority field
+(`msgOverhead`) exceeds 2 GB (the allocator takes an `int`). A reduce result
+with an NCPY or DEVICE slot aborts as well.
 
 ### Sends
 

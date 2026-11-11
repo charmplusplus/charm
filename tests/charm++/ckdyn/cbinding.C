@@ -219,6 +219,21 @@ static void *hUnpack(void *bd, const CkDynTarget *t, int, const void *buf, size_
   return o;
 }
 
+/* The reduce hook's second slot: a BUFFER of sum, sum+1, ... built in a
+   stack array that is overwritten right after CkDynMsgAddBuffer returns, so a
+   builder that read it later would deliver 0xab bytes. */
+static void addReduceCheckBuffer(CkDynMsgBuilder *result, int64_t sum) {
+  int64_t tmp[CB_RBUF_N];
+  for (int k = 0; k < CB_RBUF_N; k++) tmp[k] = sum + k;
+  static const int64_t shape[1] = { CB_RBUF_N };
+  CkDynBufDesc d;
+  memset(&d, 0, sizeof d);
+  d.ptr = tmp; d.len = sizeof tmp; d.elem = CKDYN_ELEM_I64; d.ndim = 1; d.shape = shape;
+  CkDynMsgAddBuffer(result, &d);
+  volatile unsigned char *q = (volatile unsigned char *)tmp;   /* volatile: the overwrite is kept */
+  for (size_t i = 0; i < sizeof tmp; i++) q[i] = 0xab;
+}
+
 static void hReduce(void *, uint32_t rid, const CkDynMsgView **contribs, int n, CkDynMsgBuilder *result) {
   if (rid != CB_REDUCER_SUM_I64) cbFail("reduce: unknown reducer id %u", rid);
   int64_t sum = 0;
@@ -229,6 +244,21 @@ static void hReduce(void *, uint32_t rid, const CkDynMsgView **contribs, int n, 
     sum += cbI64(contribs[i], 0);
   }
   CkDynMsgAddI64(result, sum);
+  addReduceCheckBuffer(result, sum);
+}
+
+int cbCheckReduceBuffer(const CkDynMsgView *v) {
+  if (v->nslots < 2) return 0;
+  if (v->slots[1].type != CKDYN_SLOT_BUFFER || v->slots[1].len != CB_RBUF_N * sizeof(int64_t) ||
+      v->slots[1].elem != CKDYN_ELEM_I64)
+    cbFail("reduce result: slot 1 is not the %d-int64 BUFFER the reduce hook added", CB_RBUF_N);
+  const int64_t *p = (const int64_t *)CkDynViewBufferPtr(v, 1, nullptr);
+  int64_t sum = cbI64(v, 0);
+  for (int k = 0; k < CB_RBUF_N; k++)
+    if (p[k] != sum + k)
+      cbFail("reduce result: BUFFER element %d is %lld, expected %lld (the hook's temporary was not copied at "
+             "CkDynMsgAddBuffer)", k, (long long)p[k], (long long)(sum + k));
+  return 1;
 }
 
 static void hFuture(void *, int pe, uint32_t id, const CkDynMsgView *v) {

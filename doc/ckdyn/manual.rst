@@ -651,7 +651,9 @@ The builder
   depends on the map group (:ref:`array maps <ckdyn-arrays>`).
 - ``CkDynMsgAddBuffer`` copies the shape at once but the contents only at
   ``CkDynMsgFinish``, straight into the message, so ``desc.ptr`` must stay
-  valid until ``Finish`` or ``Abandon``. Strides, if given, must describe a
+  valid until ``Finish`` or ``Abandon`` (except in the ``reduce`` hook's
+  result builder, which copies the contents at once). A NULL ``desc.ptr``
+  with a nonzero length aborts. Strides, if given, must describe a
   contiguous layout in C or Fortran order (``CKDYN_BUF_FORTRAN``); CkDyn
   aborts otherwise.
 - ``CkDynMsgFinish(b, ep)`` allocates the message once and writes ``ep``
@@ -1331,7 +1333,15 @@ header flags on ``result`` with ``CkDynMsgSetFlags``, for example a bit of
 ``CKDYN_MSG_BINDING_MASK`` that marks the message as a reduction result for
 the receiving binding (charm4py does this). ``reduce`` runs on whichever PE
 combines, with no object context, and can run concurrently with other hooks
-of the process. The C++ test binding's reducer:
+of the process.
+
+Everything the hook adds to ``result`` is copied before the add call
+returns, BUFFER contents included: the hook may build its combined value
+in a temporary and free it as soon as ``CkDynMsgAddBuffer`` returns. A
+reduce result has the limits of any message (65535 slots, 2 GB with header
+and envelope) and carries no NCPY or DEVICE slot; CkDyn aborts otherwise.
+The C++ test binding's reducer, without the BUFFER slot it adds to check
+this:
 
 .. code-block:: c++
 
@@ -1930,7 +1940,8 @@ See :ref:`ckdyn-messages`. Each ``Add`` function appends one slot.
 
 ``void CkDynMsgAddBuffer(CkDynMsgBuilder *b, const CkDynBufDesc *d)``
    A BUFFER slot; the shape is copied now, the contents at ``Finish``, so
-   ``d->ptr`` stays valid until ``Finish`` or ``Abandon``.
+   ``d->ptr`` stays valid until ``Finish`` or ``Abandon``. In the ``reduce``
+   hook's result builder the contents are copied now.
 
 ``void CkDynMsgAddFuture(CkDynMsgBuilder *b, int pe, uint32_t id)``
    A FUTURE slot.

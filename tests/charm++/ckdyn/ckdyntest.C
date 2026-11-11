@@ -688,7 +688,11 @@ static int64_t secRecv(Obj *o, const CkDynMsgView *v) {
    second double), or a foreign result's I64 slot (count -1). */
 static void resultOf(const CkDynMsgView *v, double *value, double *count) {
   CHECK(v->nslots >= 1, "result view without slots (kind %d)", (int)v->kind);
-  if (v->slots[0].type == CKDYN_SLOT_I64) { *value = (double)v->slots[0].v.i64; *count = -1; return; }
+  if (v->slots[0].type == CKDYN_SLOT_I64) {
+    cbCheckReduceBuffer(v);
+    *value = (double)v->slots[0].v.i64; *count = -1;
+    return;
+  }
   CHECK(v->slots[0].type == CKDYN_SLOT_BUFFER, "result slot 0 has type %d", v->slots[0].type);
   CHECK(v->slots[0].elem == CKDYN_ELEM_F64, "result buffer elem %d, expected F64", v->slots[0].elem);
   const double *p = (const double *)CkDynViewBufferPtr(v, 0, nullptr);
@@ -857,6 +861,7 @@ static int64_t grpCsReport(Obj *o, const CkDynMsgView *v) {
    cbCount(future, value) to branch 0 of the full group Grp. */
 static int64_t grpCbRecv(Obj *o, const CkDynMsgView *v) {
   CHECK(v->kind == CKDYN_MSGKIND_DYN && v->refnum != 0, "constrained: cbRecv view kind %d, refnum %u", (int)v->kind, v->refnum);
+  cbCheckReduceBuffer(v);
   CHECK(o->t.u.group.pe_or_node % 2 == 0, "constrained: cbRecv ran on PE %d, which is not a member", CkMyPe());
   CkDynSendGroup(gidGrp, 0, Grp.ep(G_CBCOUNT), MsgB().i64(v->refnum).i64(cbI64(v, 0)).finish(0), nullptr);
   return 0;
@@ -1257,6 +1262,7 @@ public:
         CHECK(v->hdr->user_id == CB_REDUCER_SUM_I64, "%s: result user_id %u", s.c_str(), v->hdr->user_id);
         int64_t got = cbI64(v, 0);
         CHECK(got == (int64_t)expectedSum(), "%s: sum %lld, expected %g", s.c_str(), (long long)got, expectedSum());
+        CHECK(cbCheckReduceBuffer(v) == 1, "%s: the result did not go through the reduce hook", s.c_str());
         pass(s);
       }));
     } else {

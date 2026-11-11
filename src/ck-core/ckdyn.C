@@ -9,6 +9,7 @@
 #include "spanningTree.h"
 #include "conv-ccs.h"
 #include "trace.h"
+#include <algorithm>
 #include <cstring>
 #include <cstdlib>
 #include <set>
@@ -371,10 +372,11 @@ struct CkDynMsgBuilder {
   int prio_bits = 0;
   int group_dep = -1;
   bool inUse = false;
+  bool copyBuffers = false;   /* AddBuffer copies the bytes when called (the reduce hook's result builder) */
   void reset(int nslots_hint, size_t data_hint, size_t tail_hint) {
     slots.clear(); zc.clear(); zcDevice = false; pieces.clear(); inl.clear(); tail.clear(); dataLen = 0;
-    slots.reserve(nslots_hint); inl.reserve(data_hint); tail.reserve(tail_hint);
-    flags = 0; user_id = 0; prio_bits = 0; group_dep = -1; inUse = true;
+    slots.reserve(nslots_hint > 0 ? nslots_hint : 0); inl.reserve(data_hint); tail.reserve(tail_hint);
+    flags = 0; user_id = 0; prio_bits = 0; group_dep = -1; inUse = true; copyBuffers = false;
   }
 };
 
@@ -448,6 +450,7 @@ static void checkLen(uint64_t len) {
 }
 
 extern "C" void CkDynMsgAddBytes(CkDynMsgBuilder *b, const void *p, uint32_t len, uint16_t tag) {
+  if (p == nullptr && len > 0) CkAbort("CkDyn: CkDynMsgAddBytes with a NULL pointer and %u bytes", len);
   uint64_t off = appendData(b, p, len);
   CkDynSlot &s = newSlot(b, CKDYN_SLOT_BYTES);
   s.len = len; s.tag = tag; s.v.off = off;
@@ -479,11 +482,14 @@ static size_t elemSize(uint8_t elem) {
 extern "C" void CkDynMsgAddBuffer(CkDynMsgBuilder *b, const CkDynBufDesc *d) {
   if (d->ndim > CKDYN_MAX_BUF_DIMS) CkAbort("CkDyn: buffer with %d dimensions", (int)d->ndim);
   if (!contiguous(d, elemSize(d->elem))) CkAbort("CkDyn: non-contiguous buffer passed to CkDynMsgAddBuffer");
+  if (d->ptr == nullptr && d->len > 0) CkAbort("CkDyn: CkDynMsgAddBuffer with a NULL pointer and %llu bytes", (unsigned long long)d->len);
   checkLen(d->len);
-  /* the shape (copied now) and then the bytes (copied into the message at Finish) */
+  /* the shape (copied now) and then the bytes (copied into the message at
+     Finish, or now in a reduce result's builder, whose hook may free them) */
   uint64_t off = d->ndim ? appendData(b, d->shape, 8 * d->ndim) : align8(b->dataLen);
   if (!d->ndim) b->dataLen = off;
-  deferData(b, d->ptr, d->len);
+  if (b->copyBuffers) appendData(b, d->ptr, d->len);   /* off is 8-aligned, so appendData puts them right after the shape */
+  else deferData(b, d->ptr, d->len);
   CkDynSlot &s = newSlot(b, CKDYN_SLOT_BUFFER);
   s.elem = d->elem; s.ndim = d->ndim; s.bflags = d->bflags; s.tag = d->tag;
   s.len = (uint32_t)d->len; s.v.off = off;
@@ -593,12 +599,26 @@ static void writePayload(const CkDynMsgBuilder *b, char *buf, int ep) {
 
 static size_t zcBuildPrefix(CkDynMsgBuilder *b, std::vector<char> &out);
 
+/* Bytes a message adds around its payload: the envelope, the message class
+   (the largest of the three a payload travels in) and the priority field. */
+static size_t msgOverhead(int prio_bits) {
+  return sizeof(envelope) + std::max(sizeof(CkDynMcastMsg), sizeof(CkReductionMsg)) + 16 + align8(((size_t)prio_bits + 7) / 8);
+}
+
+/* The limits every finished payload is checked against: Finish, FinishMcast
+   and the reduce hook's result (ckdynForeignReduce). */
+static void checkLimits(const CkDynMsgBuilder *b, size_t psize, const char *what) {
+  if (b->slots.size() > 0xffff) CkAbort("CkDyn: %s has %zu slots; the limit is 65535", what, b->slots.size());
+  size_t total = psize + msgOverhead(b->prio_bits);
+  if (total > 0x7fffffffu)
+    CkAbort("CkDyn: %s of %zu bytes (%zu with header and envelope) exceeds the 2 GB message limit", what, psize, total);
+}
+
 extern "C" CkDynMsg *CkDynMsgFinish(CkDynMsgBuilder *b, int ep) {
   std::vector<char> prefix;
   size_t pre = b->zc.empty() ? 0 : zcBuildPrefix(b, prefix);
   size_t psize = pre + payloadSize(b);
-  if (psize > 0x7fffffffu) CkAbort("CkDyn: message payload of %zu bytes exceeds the 2 GB message limit", psize);
-  if (b->slots.size() > 0xffff) CkAbort("CkDyn: %zu slots exceed the 65535 slot limit", b->slots.size());
+  checkLimits(b, psize, "a message");
   int total = (int)psize;
   CkDynMsg *m;
   if (b->group_dep >= 0) {
@@ -621,7 +641,8 @@ extern "C" CkDynMsg *CkDynMsgFinish(CkDynMsgBuilder *b, int ep) {
 
 /* The section message: same payload, CkMcastBaseMsg in front. */
 static CkDynMcastMsg *newMcastMsg(size_t psize, int prio_bits) {
-  if (psize > 0x7fffffffu) CkAbort("CkDyn: message payload of %zu bytes exceeds the 2 GB message limit", psize);
+  if (psize + msgOverhead(prio_bits) > 0x7fffffffu)
+    CkAbort("CkDyn: section message payload of %zu bytes exceeds the 2 GB message limit with header and envelope", psize);
   CkDynMcastMsg *m = new ((int)psize, prio_bits) CkDynMcastMsg;
   setMemoryTypeMessage(UsrToEnv(m));
   UsrToEnv(m)->setRef(0);
@@ -636,7 +657,7 @@ extern "C" CkDynMcastMsg *CkDynMsgFinishMcast(CkDynMsgBuilder *b, int ep) {
       if (b->slots[i].type == CKDYN_SLOT_NCPY || b->slots[i].type == CKDYN_SLOT_DEVICE)
         CkAbort("CkDyn: slot %zu is a zero-copy slot; a section message cannot carry one (send it as a BUFFER)", i);
   }
-  if (b->slots.size() > 0xffff) CkAbort("CkDyn: %zu slots exceed the 65535 slot limit", b->slots.size());
+  checkLimits(b, payloadSize(b), "a section message");
   CkDynMcastMsg *m = newMcastMsg(payloadSize(b), b->prio_bits);
   writePayload(b, m->buf, ep);
   releaseBuilder(b);
@@ -1685,8 +1706,11 @@ static CkReductionMsg *ckdynForeignReduce(int n, CkReductionMsg **msgs) {
   }
   uint32_t rid = views[0].hdr->user_id;
   CkDynMsgBuilder *b = CkDynMsgBegin(2, 64, 0, 0, -1);
+  b->copyBuffers = true;   /* the hook may build its result in memory it frees on return */
   g_hooks.reduce(g_hooks.global, rid, ptrs.data(), n, b);
   b->user_id = rid;
+  if (!b->zc.empty()) CkAbort("CkDyn: the reduce hook added an NCPY or DEVICE slot; a reduce result carries BUFFER slots only");
+  checkLimits(b, payloadSize(b), "a reduce result");
   std::vector<char> out(payloadSize(b));
   writePayload(b, out.data(), 0);
   releaseBuilder(b);
