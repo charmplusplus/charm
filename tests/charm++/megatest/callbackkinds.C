@@ -14,8 +14,8 @@
  * driver compares the copy with operator==.
  *
  * Kinds: chare, group element, group broadcast, nodegroup element, nodegroup
- * broadcast, array element, array broadcast, array section (sent from PE 0;
- * see the CALLBACKKINDS_* switches in callbackkinds.h), each through every
+ * broadcast, array element, array broadcast, array section (also sent
+ * directly from PE 0), each through every
  * constructor that makes it (including the inline forms and the Chare*,
  * Group*, NodeGroup* and ArrayElement* constructors, built inside the
  * target), C function (callCFn, forwarded back to PE 0), call1Fn (runs where
@@ -455,13 +455,7 @@ void callbackkinds_driver::sectionCases(void)
       CProxySection_callbackkinds_array::ckNew(array.ckGetArrayID(), 0, nArr - 1, 2);
   std::vector<int> evens(nArr, 0);
   for (int i = 0; i < nArr; i += 2) evens[i] = 1;
-  {
-    // Built from the proxy, checked, never sent (see CALLBACKKINDS_SECTION_PROXY).
-    CkCallback p(callbackkinds_array_eps[0], sec);
-    what = "section (proxy) accessors";
-    checkAccessors(p, CkCallback::bcastSection, true, -1);
-  }
-  for (int form = CALLBACKKINDS_SECTION_PROXY ? 0 : 1; form < 2; form++)
+  for (int form = 0; form < 2; form++)
     for (int mode = CBK_MSG; mode <= CBK_DATA; mode++)
     {
       int ep = callbackkinds_array_eps[mode];
@@ -471,31 +465,19 @@ void callbackkinds_driver::sectionCases(void)
       if (!cb.requiresMsgConstruction()) CkAbort("callbackkinds: %s needs no message\n", what);
       int val = 2200 + 10 * form + mode;
       cb.setRefnum(221);
-#if CALLBACKKINDS_SECTION_EQ
       CkCallback same = cb;
       if (!(same == cb)) CkAbort("callbackkinds: %s copy differs\n", what);
-#endif
+      // Marshalled: the unpacked copy's element and PE lists are never freed (charm #4214).
+      echoCheck(cb, nextPe());
       expect(CBK_ARRAY, mode == CBK_NOMSG ? -1 : val, 221, evens);
-#if CALLBACKKINDS_PUP_SECTION
       reflector[nextPe()].reflect(cb, mode, val);
       waitFor(1);
-#else
-#if CALLBACKKINDS_SECTION_IFNOTTHERE
+      // The same callback sent directly from PE 0.
+      expect(CBK_ARRAY, mode == CBK_NOMSG ? -1 : val, 221, evens);
       if (mode == CBK_MSG) cb.send(new callbackkinds_msg(val));
       else if (mode == CBK_NOMSG) cb.send();
       else cb.send(sizeof(int), &val);
-#else
-      // Build every message here and set its ifNotThere policy, which the
-      // bcastSection send path leaves uninitialized (see the switch).
-      void* m;
-      if (mode == CBK_MSG) m = new callbackkinds_msg(val);
-      else if (mode == CBK_NOMSG) m = CkAllocSysMsg();
-      else m = CkDataMsg::buildNew(sizeof(int), &val);
-      CkSetMsgArrayIfNotThere(m, CkArray_IfNotThere_buffer);
-      cb.send(m);
-#endif
       waitFor(0);
-#endif
     }
 }
 
@@ -596,19 +578,11 @@ void callbackkinds_driver::futureCases(void)
   std::vector<int> none(1, 0);
   for (int mode = CBK_MSG; mode <= CBK_DATA; mode++)
   {
-#if !CALLBACKKINDS_FUTURE_NOMSG
-    if (mode == CBK_NOMSG) continue;
-#endif
     int val = 2600 + mode;
     CkFuture f = CkCreateFuture();
     CkCallback cb(f);
     what = "sendFuture";
-#if CALLBACKKINDS_FUTURE_CONTAINSPTR
     checkAccessors(cb, CkCallback::sendFuture, false, -1);
-#else
-    if (cb.type != CkCallback::sendFuture || cb.epIndex() != -1 || !cb.requiresMsgConstruction())
-      CkAbort("callbackkinds: sendFuture accessors wrong\n");
-#endif
     echoCheck(cb, nextPe());
     CkCallback other(CkCreateFuture());
     if (cb == other) CkAbort("callbackkinds: callbacks to different futures equal\n");
