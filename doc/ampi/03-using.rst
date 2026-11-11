@@ -31,6 +31,13 @@ main function. This header file has a preprocessor macro that renames
 main, and the renamed version is called by the AMPI runtime for each
 rank.
 
+Exit Status
+~~~~~~~~~~~
+
+``MPI_Abort(comm, errorcode)`` ends the whole program with ``errorcode`` as
+its exit status. Only the low 8 bits of the code reach the exit status, and a
+nonzero code whose low 8 bits are 0 (for example 256) exits with status 1.
+
 Command Line Argument Parsing
 -----------------------------
 

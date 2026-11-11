@@ -23,6 +23,8 @@ test: section_migrate
 	$(call run, ./section_migrate +p3 -lb -inflight -every +balancer RotateLB)
 	$(call run, ./section_migrate +p3 -lb -inflight -every +balancer RotateLB +randomized_msgq +randomized_seed 2)
 	$(call run, ./section_migrate +p4 -lb -auto +balancer RotateLB +randomized_msgq +randomized_seed 2)
+	$(call run, ./section_migrate +p4 -double -lb -inflight -every +balancer RotateLB +randomized_msgq +randomized_seed 794)
+	$(call run, ./section_migrate +p4 -lb -auto -inflight -every +balancer RotateLB +randomized_msgq +randomized_seed 11)
 	$(call run, ./section_migrate +p3 -inflight -root)
 	$(call run, ./section_migrate +p4 -inflight -root +randomized_msgq +randomized_seed 2)
 	$(call run, ./section_migrate +p3 -lb -inflight +balancer RotateLB)

@@ -11,6 +11,7 @@ DIRS = \
   until \
   jacobi3d \
   migrate \
+  abort \
 
 else
 DIRS =

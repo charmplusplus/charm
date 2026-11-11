@@ -228,10 +228,13 @@ AMPI (Adaptive MPI):
   reductions that used the wrong reducer for most type and operation
   pairs, and MAXLOC/MINLOC on the pair types (#4173). MPI_Finalize now
   returns, and the largest value main returns over the ranks becomes
-  the program's exit status (#4170). Core fixes found by AMPI: a
-  reduction no longer hangs when elements migrate in after
-  contributing to later rounds (#4151); a broadcast waits for an
-  element still reading its zero-copy pup buffers (#4148).
+  the program's exit status (#4170). MPI_Abort ends the program with
+  its error code as the exit status (low 8 bits; a nonzero code whose
+  low 8 bits are 0 exits with 1) instead of status 134 (#4180). Core
+  fixes found by AMPI: a reduction no longer hangs when elements
+  migrate in after contributing to later rounds (#4151); a broadcast
+  waits for an element still reading its zero-copy pup buffers
+  (#4148).
 
 - campi, experimental: AMPI ranks as C++20 coroutines in the same
   library, with no thread per rank (#4073, #4136). A campi program is
@@ -248,8 +251,7 @@ AMPI (Adaptive MPI):
 
 Known gaps in the alpha:
 
-- AMPI: MPI_Abort calls CkAbort, so the program exits with status 134
-  (SIGABRT), not with the error code. Not yet fixed: dup and split of
+- AMPI: Not yet fixed: dup and split of
   an intercommunicator, concurrent MPI_Intercomm_create, and
   MPI_Comm_create_group by a subset of ranks (#4099); CkDDT_Struct lower bounds and negative
   extents (#4100); the neighbor order of Cart and Dist_graph
