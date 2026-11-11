@@ -2119,9 +2119,9 @@ entry method differently; the subsection *Differences from SDAG* at the
 end of this section collects what changes.
 
 The entry methods involved are declared with two attributes: the
-coroutine entry is ``[coroutine]`` (void, with no parameters or one
-message), and the entries it waits for are ``[inbox]`` (a message, or
-marshalled parameters; conditional and nocopy parameters excepted). The
+coroutine entry is ``[coroutine]`` and the entries it waits for are
+``[inbox]``; both return void and take a message or marshalled
+parameters (conditional and nocopy parameters excepted). The
 chare puts the generated macro ``ClassName_CORO_CODE`` in its class,
 which defines the coroutine state (the active coroutines and the
 buffered deliveries, packed with the element), the bodies of the inbox
@@ -2211,10 +2211,49 @@ rules:
    must not share a source line.
 -  At most one coroutine per entry method is active in an element at a
    time.
+-  The parameters of a coroutine entry are taken by value in its C++
+   definition (a reference would bind to the generated wrapper's local,
+   which is gone after the first wait). They are supplied again when the
+   body runs again after a migration. An array parameter points into the
+   entry's message, which lives as long as the coroutine.
 
 A function that itself waits is written as a ``ck::coro::task<T>``
 coroutine whose body is bracketed by ``CK_RESUMABLE()`` and ``CK_END()``,
 and is awaited with ``CK_CALL(expr)`` or ``CK_CALL_TO(lhs, expr)``.
+
+Several waits can be in progress at once, as with an SDAG ``overlap``:
+``CK_OVERLAP(task...)`` runs the ``ck::coro::task<void>`` helpers given to
+it as child coroutines of the current one, each waiting at its own sites,
+and continues when all of them have finished; ``CK_FORALL(i, lo, hi,
+expr)`` does the same with one task per value of ``i`` in ``[lo, hi)``,
+as an SDAG ``forall``. The children are started in order and run until
+their first wait, a delivery resumes whichever child waits for it, and
+the parent resumes after the last child finishes. Each ``when`` clause
+of an SDAG ``overlap`` becomes a task:
+
+.. code-block:: c++
+
+   ck::coro::task<void> waitA() {
+     CK_RESUMABLE();
+     CK_WHEN(inbox::a(round), ck::coro::skip, gotA);   // overlap { when a[round](int r, int gotA) {...}
+     CK_END();
+   }
+   ck::coro::task<void> waitItem(int i) {
+     CK_RESUMABLE();
+     CK_WHEN_BLOCK(inbox::item(i), tag, v) { sum += v; } // forall [i] (0:n-1,1) { when item[i](int tag, int v) {...} }
+     CK_END();
+   }
+   ...
+   CK_OVERLAP(waitA(), waitB());
+   CK_FORALL(i, 0, n, waitItem(i));
+
+The element may migrate while the children wait: the parent's record
+packs each child's wait, and after the restart the parent reaches the
+``CK_OVERLAP`` again and starts only the children that had not finished.
+A finished child is not run again, so what it computed must be in
+pupped members, like any value that is live across a wait. A task's
+parameters are supplied again by the restart, so they may be the
+``forall`` index and values derived from members.
 
 The command line option ``+ck_fakemigrate`` makes every wait pack and
 unpack the element's coroutines in place the first time a coroutine
@@ -2251,10 +2290,14 @@ Differences from SDAG
 -  After a migration or restart, the coroutine's body runs again from the
    top to the recorded wait, so code before a wait must not repeat a side
    effect; SDAG resumes without re-running anything.
--  Not available: ``overlap``, ``forall``, and several active invocations
-   of one entry per element.
+-  Each ``when`` clause of an ``overlap`` is a named ``task<void>``
+   helper passed to ``CK_OVERLAP``; the body of a ``forall`` is one task
+   that takes the index. SDAG's inline clause bodies have no equivalent
+   (a lambda coroutine would outlive its closure).
+-  Not available: several active invocations of one entry per element.
 -  Available only here: waits inside called functions (``CK_CALL``),
-   plain C++ control flow and calls, and no bodies in the ``.ci`` file.
+   plain C++ control flow and calls, parameters on the coroutine entry,
+   and no bodies in the ``.ci`` file.
 
 Serialization Using the PUP Framework
 -------------------------------------
@@ -4588,7 +4631,8 @@ inbox
 coroutine
    entry methods of an array element are defined in C++ as coroutines
    returning ``ck::coroutine`` (section :numref:`sec:ckcoro`). They take
-   no parameters or one message.
+   a message or marshalled parameters (conditional and nocopy parameters
+   excepted) and return void.
 
 notrace
    entry methods will not be traced during execution. As a result, they

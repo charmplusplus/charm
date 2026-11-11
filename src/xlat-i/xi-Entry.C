@@ -108,17 +108,14 @@ void Entry::check() {
                          "python or aggregate)", first_line_);
       if (retType && !retType->isVoid())
         XLAT_ERROR_NOCOL("an 'inbox' or 'coroutine' entry method returns void", first_line_);
-      if (isCoroutine() && !(param->isVoid() || param->isMessage()))
-        XLAT_ERROR_NOCOL("a 'coroutine' entry method takes no parameters or one message",
-                         first_line_);
       if (isCoroutine() && isReductionTarget())
         XLAT_ERROR_NOCOL("a 'coroutine' entry method is not a reduction target: make the "
                          "target an 'inbox' entry and wait for it", first_line_);
       for (ParamList* pl = param; pl != NULL; pl = pl->next) {
         Parameter* sv = pl->param;
         if (sv->isConditional() || sv->isRdma())
-          XLAT_ERROR_NOCOL("an 'inbox' entry method takes a message or marshalled parameters "
-                           "without conditional or nocopy parameters", first_line_);
+          XLAT_ERROR_NOCOL("an 'inbox' or 'coroutine' entry method takes a message or marshalled "
+                           "parameters without conditional or nocopy parameters", first_line_);
       }
     }
 
@@ -204,9 +201,11 @@ Entry::Entry(int l, Attribute* a, Type* r, const char* n, ParamList* p, Value* s
   entryCount = -1;
   isWhenEntry = 0;
   containsWhenConstruct = false;
-  // An inbox entry's wrapper hands the marshalled message to the coroutine
-  // state unopened, so the runtime must not free it after the call.
-  if (param && param->isMarshalled() && !isThreaded() && !isInbox()) addAttribute(SNOKEEP);
+  // The wrapper of a marshalled inbox entry hands the message to the
+  // coroutine state unopened, and the state owns a coroutine entry's
+  // message (its array parameters point into it), so neither is nokeep.
+  if (param && param->isMarshalled() && !isThreaded() && !isInbox() && !isCoroutine())
+    addAttribute(SNOKEEP);
   if (isPython()) pythonDoc = python_doc;
   ParamList* plist = p;
   while (plist != NULL) {

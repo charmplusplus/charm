@@ -10,6 +10,18 @@ mainmodule ckcoro_tests {
     entry [reductiontarget] void migrationTestDone();
     entry void doMarshallTest();
     entry [reductiontarget] void marshallTestDone();
+    entry void doOverlapTest();
+    entry [reductiontarget] void overlapTestDone();
+  }
+
+  // Overlap and forall as child coroutines, and a coroutine entry with
+  // marshalled parameters (re-supplied by the restart).
+  array [1D] OverlapTest {
+    entry OverlapTest();
+    entry [coroutine] void run(int rounds, std::vector<int> seeds, int nitems, double weights[nitems]);
+    entry [inbox] void a(int r, int v);
+    entry [inbox] void b(int r, int v);
+    entry [inbox] void item(int tag, int v);   // tag = round * items + i
   }
 
   // Marshalled inbox entries: the parameters stay in the message being

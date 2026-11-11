@@ -167,9 +167,13 @@ from 65536 iterations ago is still unconsumed.
    several concurrent invocations of one SDAG entry; none of the SDAG test
    programs or jacobi3d relies on it. The restriction is what lets a restart
    be a plain re-invocation of the entry (section 4.5).
-5. **A coroutine entry takes no parameters or one message.** Parameters it
-   needs are members. Marshalled parameters would need a generated closure
-   that carries them across a restart (section 4.1); not done.
+5. **A coroutine entry's parameters are supplied again by the restart.**
+   The record keeps the entry's message (a `[coroutine]` entry is not
+   `nokeep`, so the state owns a marshalled message outright) and sends a
+   copy on a restart; the generated wrapper unmarshals it again, so the
+   body's parameters have their values at every site. They are taken by
+   value in the C++ definition (a reference would bind to the wrapper's
+   local); an array parameter points into the message the state keeps.
 6. A site is one statement and may be the body of an `if` or a loop; its
    case label must not be inside a `switch` of the user's own; two sites must
    not share a line (CAMPI's rules, from the `switch`/`case __LINE__`
@@ -269,15 +273,21 @@ alternative that matched; a record waits on a list of (entry, refnum)
 pairs instead of one. That is SDAG `case` over single whens; a `case` arm
 with a conjunction (`when b(), d()`) is not expressible yet.
 
-`overlap` is deferred. The design that fits the restart protocol is
-*several coroutines per element*: each `when` clause of an `overlap`
-becomes its own coroutine entry (or a `task<void>` helper started with its
-own record), each with its own site chain; the state object already keeps
-a list of records, and the join is a counter in a member followed by a
-plain `when`. The alternative, `co_await when_any(...)` over several
-awaitables, is what `when_any` already is, and it does not give `overlap`,
-which is a conjunction of independent progress. Neither needs a new pup
-story: a record is a record.
+`overlap` and `forall` are child coroutines (2026-11-11): `CK_OVERLAP`
+and `CK_FORALL` are one site of the parent that starts `task<void>`
+helpers as child records, each with its own chain, and waits for all of
+them. A child record is pupped inside its parent (chain and a done flag)
+and is created again by the parent's restart: the parent body runs again
+to the overlap site, the awaiter adopts the recorded children by position,
+starts the unfinished ones toward their recorded sites and skips the
+finished ones. So a child's results must be in pupped members, which is
+rule 1 again. The join is the count of unfinished children; the last
+child to finish resumes the parent. The alternative, `co_await
+when_any(...)` over several awaitables, is what `when_any` already is,
+and it does not give `overlap`, which is a conjunction of independent
+progress. A `+ck_fakemigrate` rebuild requested by a child suspending
+inside its parent's start is deferred until no coroutine of the element
+is on the stack.
 
 ### 4.4 Message buffering
 
@@ -481,9 +491,9 @@ is not prejudged: with the `.ci` file kept, the attributes stay; without
 it, the same macro can be produced by a C++20 member-pointer template
 (`ck::entry<&X::name>`) over a registry, and the header does not change.
 
-What "experimental" has to say: no `overlap` and no `forall`; `case` only
-over single whens; arrays only (no groups or singleton chares as owners);
-the site macros may still change.
+What "experimental" has to say: `case` only over single whens; arrays only
+(no groups or singleton chares as owners); the site macros may still
+change.
 
 What charm4py can mirror: the record and site protocol of section 8, with
 no C++ frame involved.
@@ -496,8 +506,6 @@ rest of the SDAG test corpus.
 
 ## 10. Open items
 
-- `when_any` for `case`; several coroutines per element for `overlap` and
-  `forall`.
 - Groups, nodegroups and singleton chares as owners of coroutine entries
   (the prototype's record builds its callback from an `ArrayElement`).
 - The equivalence corpus runs.

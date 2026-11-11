@@ -43,6 +43,13 @@ header's opening comment and the manual section "Coroutine Entry Methods".
   against it (`static_assert` on the count) and unpacks arrays.
   `tuple_awaiter<Ps...>` (the block form) owns its outs and returns them
   as a tuple for the structured binding of `CK_WHEN_BLOCK`.
+- `record.kids` (`std::list<record>`, pupped inside the parent as chain
+  and `done` per child), `parent`, `done`, `kidsRunning`: the child
+  coroutines of an overlap site. `state::visit` walks records and
+  children; `push` and the pack checks use it.
+- `state::pendingRebuild_`: a `+ck_fakemigrate` rebuild requested while
+  another coroutine of the element is on the stack, done by the
+  outermost `finish_run`.
 - `thread_local record *current_`: the record of the coroutine running on
   this PE thread; set by `state::begin` and `state::push` around a run,
   read by the awaitables.
@@ -127,6 +134,20 @@ pupped in order with no array support. `CK_WHEN_ANY` uses `any_awaiter` over sev
 stores all their `want`s, and `await_resume` unpacks through the
 alternative at `readyIndex` and yields that index.
 
+**Overlap.** `CK_OVERLAP(tasks...)` / `CK_FORALL(i, lo, hi, expr)` are
+`case __LINE__: note_site(...); co_await state.overlap(vector<task<void>>)`.
+`overlap_awaiter::await_ready` creates the child records on the first
+visit (or finds them, recorded, on a restart), counts the unfinished
+ones, and for each unfinished child takes the task's frame
+(`task::release`), sets `chain.restarting` when it has recorded sites,
+and `state::run`s it: the child runs to its first site (its own
+`frame_guard`, depth 0 of its own chain) or to its end. A child that
+finishes has `finish_run` mark it `done`, decrement the parent's count
+and, when the count reaches zero and the parent is waiting, resume the
+parent. `await_ready` is true when no child is unfinished;
+`await_suspend` arms the parent with no wants; `await_resume` clears the
+children. Deliveries find waiting children through `visit`.
+
 **Pack.** `state::pup` writes the inbox and, per record, `ep`, `target`,
 `msg` and `chain.sites`. Packing aborts if a record is running or is
 suspended at a `co_await` that is not a site (`waiting && atSite` is the
@@ -156,7 +177,12 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
 ## Limits and diagnostics
 
 - One active coroutine per entry per element (`begin` aborts otherwise).
-- Coroutine entries take no parameters or one message.
+- Coroutine entries take a message or marshalled parameters (not
+  conditional or nocopy); a `[coroutine]` entry is not `nokeep`, and
+  `state::begin` takes its marshalled message as the record's own
+  (`own`), replacing it on a restart so that array parameters point into
+  the live copy.
+- An overlap restarted with a different number of tasks aborts.
 - An element packed while suspended at a non-site `co_await` aborts with
   the entry index.
 - A restarted body that reaches a site other than the recorded one, or a

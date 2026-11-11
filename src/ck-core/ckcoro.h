@@ -1,9 +1,10 @@
 /*
  * ckcoro: Charm++ entry methods as C++20 coroutines. Requires C++20.
  *
- * A coroutine entry method is declared [coroutine] in the .ci file (void,
- * with no parameters or one message) and defined in C++ with the return
- * type ck::coroutine. Its body begins with CK_COROUTINE() and ends with
+ * A coroutine entry method is declared [coroutine] in the .ci file (void;
+ * a message or marshalled parameters, taken by value in C++ and supplied
+ * again on a restart) and defined in C++ with the return type
+ * ck::coroutine. Its body begins with CK_COROUTINE() and ends with
  * CK_END(), and suspends at CK_WHEN sites until a delivery to an [inbox]
  * entry matches. The chare puts the generated X_CORO_CODE macro in its
  * class: it defines the ck::coro::state member (the active coroutines and
@@ -76,7 +77,11 @@
  *
  * At most one coroutine per entry method is active in an element at a time.
  * Inbox entries take a message or marshalled parameters (not conditional
- * or nocopy ones).
+ * or nocopy ones). CK_OVERLAP(task...) and CK_FORALL(i, lo, hi, expr) run
+ * ck::coro::task<void> helpers as child coroutines, each with its own
+ * sites, and wait for all of them (SDAG overlap, forall); a child that
+ * finished before a migration is not run again, so its results live in
+ * pupped members.
  *
  * +ck_fakemigrate on the command line makes every site rebuild the element's
  * coroutines in place (state packed and unpacked, frames destroyed, entries
@@ -252,15 +257,34 @@ struct record {
   bool rebuilt = false;          // restarted and not yet past the recorded site: no rebuild there
   bool pending = false;          // a restart message is on its way to the element; pupped
   buffer held;                   // the last delivery, kept while an array out points into it
+  // An overlap (CK_OVERLAP, CK_FORALL) runs its tasks as child records of
+  // the record at the site: each has its own chain, pupped with the parent,
+  // and is created again by the parent's restart. A finished child stays
+  // (done, pupped) so that a restart does not run it again.
+  std::list<record> kids;
+  record *parent = nullptr;
+  bool done = false;
+  int kidsRunning = 0;
 
   void pup(PUP::er &p) {
-    p | ep;
-    p | target;
-    p | pending;
-    bool hasMsg = msg != nullptr;
-    p | hasMsg;
-    if (hasMsg) CkPupMessage(p, &msg);
+    if (parent == nullptr) {
+      p | ep;
+      p | target;
+      p | pending;
+      bool hasMsg = msg != nullptr;
+      p | hasMsg;
+      if (hasMsg) CkPupMessage(p, &msg);
+    }
+    p | done;
     ch.pup(p);
+    size_t nkids = kids.size();
+    p | nkids;
+    if (p.isUnpacking()) kids.resize(nkids);
+    for (record &k : kids) {
+      k.parent = this;
+      k.owner = owner;
+      k.pup(p);
+    }
   }
 };
 
@@ -329,6 +353,29 @@ template <class... W> class any_awaiter {
   int ready_ = -1;
 };
 
+// Await the completion of child tasks (SDAG overlap / forall). await_ready
+// starts each task (or adopts its record on a restart) and is true when all
+// have finished; a finishing child resumes the parent when it was the last.
+class overlap_awaiter {
+ public:
+  overlap_awaiter(state &s, std::vector<task<void>> &&t) noexcept : s_(s), tasks_(std::move(t)) {}
+  bool await_ready();
+  void await_suspend(std::coroutine_handle<> h);
+  void await_resume();
+
+ private:
+  state &s_;
+  std::vector<task<void>> tasks_;
+  record *rec_ = nullptr;
+};
+
+template <class... T> inline std::vector<task<void>> tasks(T &&...t) {
+  std::vector<task<void>> v;
+  v.reserve(sizeof...(T));
+  (v.push_back(std::move(t)), ...);
+  return v;
+}
+
 /* ---------------- state: per-element coroutines and inbox ---------------- */
 
 class state {
@@ -381,13 +428,17 @@ class state {
   template <class... W> any_awaiter<W...> any(W &&...w) noexcept {
     return any_awaiter<W...>(*this, std::move(w)...);
   }
+  // Run the tasks as child coroutines of the current one and wait for all
+  // of them (SDAG overlap, forall). CK_OVERLAP and CK_FORALL wrap this.
+  overlap_awaiter overlap(std::vector<task<void>> &&tasks) noexcept;
 
   void pup(PUP::er &p);
 
   // Internal.
-  record &begin(ArrayElement *elt, int ep, void *msg);
+  record &begin(ArrayElement *elt, int ep, void *msg, bool own = false);
   record &begin(ArrayElement *elt, bool isEntry);
   void finish_run(record *rec);
+  void run(record *rec);
   bool take(const want &w, buffer &out);
   void rebuild();
   size_t num_buffered() const noexcept { return inbox_.size(); }
@@ -398,8 +449,16 @@ class state {
   void send_restart(record &rec);
   void push(buffer &&b);
 
+  template <class F> static bool visit(std::list<record> &recs, F &&f) {
+    for (record &rec : recs) {
+      if (f(rec)) return true;
+      if (visit(rec.kids, f)) return true;
+    }
+    return false;
+  }
   std::list<record> recs_;
   std::vector<buffer> inbox_;
+  bool pendingRebuild_ = false;
 };
 
 // The frame guard of a coroutine entry: creates or adopts the record.
@@ -457,6 +516,7 @@ inline state::~state() {
 }
 
 inline void state::destroy_frames(record &rec) {
+  for (record &k : rec.kids) destroy_frames(k);
   if (rec.root) {
     rec.ch.destroying = true;
     rec.root.destroy();
@@ -474,7 +534,7 @@ inline void state::destroy_frames(record &rec) {
   rec.readyBuf.release();
 }
 
-inline record &state::begin(ArrayElement *elt, int ep, void *msg) {
+inline record &state::begin(ArrayElement *elt, int ep, void *msg, bool own) {
   std::coroutine_handle<> root = std::exchange(pending_root_, {});
   if (!root) CkAbort("ck::coro: CK_COROUTINE in a function that does not return ck::coroutine");
   record *rec = nullptr;
@@ -491,10 +551,16 @@ inline record &state::begin(ArrayElement *elt, int ep, void *msg) {
     rec->owner = this;
     rec->ep = ep;
     rec->target = CkCallback(ep, elt->ckGetArrayIndex(), elt->ckGetArrayID());
-    if (msg) { void *m = msg; rec->msg = CkCopyMsg(&m); }
+    if (msg && own) rec->msg = msg;
+    else if (msg) { void *m = msg; rec->msg = CkCopyMsg(&m); }
   } else {
     rec->ch.restarting = !rec->ch.sites.empty();
     rec->pending = false;
+    if (own) {
+      // The restarted body's marshalled parameters point into this copy.
+      if (rec->msg) CkFreeMsg(rec->msg);
+      rec->msg = msg;
+    }
   }
   rec->root = root;
   rec->h = root;
@@ -514,8 +580,10 @@ inline record &state::begin(ArrayElement *elt, bool isEntry) {
     CkAbort("ck::coro: CK_COROUTINE() in a function that is not running as a [coroutine] entry "
             "method (entry %d is being delivered)", CkCurrentEntry());
   void *m = CkCurrentMessage();
-  if (m && (is_marshall_msg(m) || UsrToEnv(m)->getMsgIdx() == 0)) m = nullptr;
-  return begin(elt, CkCurrentEntry(), m);
+  if (m && UsrToEnv(m)->getMsgIdx() == 0) m = nullptr;
+  // A marshalled [coroutine] entry is not nokeep: the state owns its
+  // message, so array parameters stay valid while the coroutine lives.
+  return begin(elt, CkCurrentEntry(), m, m != nullptr && is_marshall_msg(m));
 }
 
 // After the body ran (first run or a resume) and suspended or finished.
@@ -526,17 +594,44 @@ inline void state::finish_run(record *rec) {
   rec->prevChain = nullptr;
   if (rec->root.done()) {
     destroy_frames(*rec);
-    if (rec->msg) CkFreeMsg(rec->msg);
-    rec->msg = nullptr;
-    for (auto it = recs_.begin(); it != recs_.end(); ++it)
-      if (&*it == rec) { recs_.erase(it); break; }
-    return;
+    if (rec->parent) {
+      // A child: the parent waits for its last child.
+      record *par = rec->parent;
+      rec->done = true;
+      if (--par->kidsRunning == 0 && par->waiting) {
+        par->waiting = false;
+        run(par);
+      }
+    } else {
+      if (rec->msg) CkFreeMsg(rec->msg);
+      rec->msg = nullptr;
+      for (auto it = recs_.begin(); it != recs_.end(); ++it)
+        if (&*it == rec) { recs_.erase(it); break; }
+    }
+  } else {
+    if (!rec->h) CkAbort("ck::coro: coroutine suspended at an awaitable that is not ck::coro's");
+    if (rec->fakeRestart) {
+      rec->fakeRestart = false;
+      pendingRebuild_ = true;
+    }
   }
-  if (!rec->h) CkAbort("ck::coro: coroutine suspended at an awaitable that is not ck::coro's");
-  if (rec->fakeRestart) {
-    rec->fakeRestart = false;
+  // A rebuild destroys every frame, so it waits until no coroutine of this
+  // element is on the stack (a child suspending inside its parent's start).
+  if (current_ == nullptr && pendingRebuild_) {
+    pendingRebuild_ = false;
     rebuild();
   }
+}
+
+// Resume rec (its innermost suspended frame) as the running coroutine.
+inline void state::run(record *rec) {
+  rec->prev = current_;
+  rec->prevChain = current_chain_;
+  current_ = rec;
+  current_chain_ = &rec->ch;
+  std::coroutine_handle<> h = std::exchange(rec->h, {});
+  h.resume();
+  finish_run(rec);
 }
 
 // Remove and return the first buffered delivery matching w, keeping the order
@@ -555,8 +650,8 @@ inline void state::push(buffer &&b) {
   // A suspended coroutine waiting for this delivery resumes at once, inside
   // the delivering entry method (as an SDAG when body runs); otherwise the
   // delivery is buffered.
-  for (record &rec : recs_) {
-    if (!rec.waiting) continue;
+  bool delivered = visit(recs_, [&](record &rec) {
+    if (!rec.waiting) return false;
     for (size_t i = 0; i < rec.wants.size(); i++) {
       if (!rec.wants[i].matches(b)) continue;
       rec.waiting = false;
@@ -564,17 +659,12 @@ inline void state::push(buffer &&b) {
       rec.ready = true;
       rec.readyIndex = (int)i;
       rec.readyBuf = std::move(b);
-      rec.prev = current_;
-      rec.prevChain = current_chain_;
-      current_ = &rec;
-      current_chain_ = &rec.ch;
-      std::coroutine_handle<> h = std::exchange(rec.h, {});
-      h.resume();
-      finish_run(&rec);
-      return;
+      run(&rec);
+      return true;
     }
-  }
-  inbox_.push_back(std::move(b));
+    return false;
+  });
+  if (!delivered) inbox_.push_back(std::move(b));
 }
 
 template <class Msg, std::enable_if_t<is_message_ptr_v<Msg *>, int>>
@@ -712,17 +802,20 @@ inline void state::pup(PUP::er &p) {
     recs_.resize(nrec);
   }
   for (buffer &b : inbox_) b.pup(p);
-  for (record &rec : recs_) {
-    if (!p.isUnpacking()) {
+  if (!p.isUnpacking())
+    visit(recs_, [&](record &rec) {
+      int ep = rec.parent ? rec.parent->ep : rec.ep;
       if (current_ == &rec)
-        CkAbort("ck::coro: an element is packed from inside its own coroutine entry %d", rec.ep);
+        CkAbort("ck::coro: an element is packed from inside its own coroutine entry %d", ep);
       if (rec.root && !(rec.waiting && rec.atSite))
         CkAbort("ck::coro: element packed while a coroutine of entry %d is suspended at a "
-                "co_await that is not a CK_WHEN or CK_CALL site", rec.ep);
-    }
+                "co_await that is not a CK_WHEN, CK_OVERLAP or CK_CALL site", ep);
+      return false;
+    });
+  for (record &rec : recs_) {
+    rec.owner = this;
     rec.pup(p);
     if (p.isUnpacking()) {
-      rec.owner = this;
       if (rec.ch.sites.empty())
         CkAbort("ck::coro: unpacked a coroutine of entry %d with no recorded site", rec.ep);
       send_restart(rec);
@@ -880,6 +973,52 @@ template <class... W> inline int any_awaiter<W...>::await_resume() {
   return i;
 }
 
+inline overlap_awaiter state::overlap(std::vector<task<void>> &&tasks) noexcept {
+  return overlap_awaiter(*this, std::move(tasks));
+}
+
+inline bool overlap_awaiter::await_ready() {
+  record *rec = enter_await();
+  rec_ = rec;
+  size_t n = tasks_.size();
+  if (rec->kids.empty()) {
+    for (size_t k = 0; k < n; k++) {
+      rec->kids.emplace_back();
+      rec->kids.back().owner = rec->owner;
+      rec->kids.back().parent = rec;
+    }
+  } else if (rec->kids.size() != n) {
+    CkAbort("ck::coro: an overlap restarted with %zu tasks where %zu were recorded", n,
+            rec->kids.size());
+  }
+  // Count the unfinished children first: a child that finishes while being
+  // started decrements the count in finish_run, and the parent is not
+  // waiting yet, so no resume happens before this returns.
+  rec->kidsRunning = 0;
+  for (record &kid : rec->kids) if (!kid.done) rec->kidsRunning++;
+  size_t k = 0;
+  for (record &kid : rec->kids) {
+    task<void> &t = tasks_[k++];
+    if (kid.done || kid.root) continue; // finished before a restart: not run again
+    kid.root = kid.h = t.release();
+    kid.ch.restarting = !kid.ch.sites.empty();
+    s_.run(&kid);                       // to its first site, or to its end
+  }
+  return rec->kidsRunning == 0;
+}
+
+inline void overlap_awaiter::await_suspend(std::coroutine_handle<> h) {
+  rec_->wants.clear();
+  arm_wait(rec_, h);
+}
+
+inline void overlap_awaiter::await_resume() {
+  record *rec = rec_;
+  rec->atSite = false;
+  rec->waiting = false;
+  rec->kids.clear(); // all done; a later overlap at another site starts afresh
+}
+
 } // namespace coro
 
 // The return type of a coroutine entry method.
@@ -952,6 +1091,26 @@ using coroutine = coro::coroutine;
     do {                                                                      \
       ::ck::coro::note_site(ck_frame_, __LINE__);                             \
       (idx_) = co_await ::ck::coro::current_state().any(__VA_ARGS__);         \
+    } while (0)
+
+// An overlap site (SDAG overlap): runs the ck::coro::task<void> helpers as
+// child coroutines of this one, each with its own sites, and waits for all
+// of them. CK_FORALL(i, lo, hi, expr) makes one task per i in [lo, hi).
+#define CK_OVERLAP(...)                                                       \
+  case __LINE__:                                                              \
+    do {                                                                      \
+      ::ck::coro::note_site(ck_frame_, __LINE__);                             \
+      co_await ::ck::coro::current_state().overlap(::ck::coro::tasks(__VA_ARGS__)); \
+    } while (0)
+#define CK_FORALL(var_, lo_, hi_, expr_)                                      \
+  case __LINE__:                                                              \
+    do {                                                                      \
+      ::ck::coro::note_site(ck_frame_, __LINE__);                             \
+      co_await ::ck::coro::current_state().overlap([&]() {                    \
+        std::vector<::ck::coro::task<void>> ck_tasks_;                        \
+        for (int var_ = (lo_); var_ < (hi_); var_++) ck_tasks_.push_back(expr_); \
+        return ck_tasks_;                                                     \
+      }());                                                                   \
     } while (0)
 
 // A call site: awaits a resumable helper that contains a site.

@@ -13,6 +13,9 @@
 #define MIGRATION_ELEMS 64
 #define MARSHALL_ELEMS 8
 #define MARSHALL_ITERS 10
+#define OVERLAP_ELEMS 6
+#define OVERLAP_ROUNDS 4
+#define OVERLAP_ITEMS 5
 
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ CProxy_MigrationTest migrationTestProxy;
@@ -55,6 +58,21 @@ public:
 
   void marshallTestDone() {
     CkPrintf("Marshalled inbox tests complete\n");
+    thisProxy.doOverlapTest();
+  }
+
+  void doOverlapTest() {
+    CkPrintf("Running overlap tests\n");
+    CProxy_OverlapTest a = CProxy_OverlapTest::ckNew(OVERLAP_ELEMS);
+    std::vector<int> seeds(OVERLAP_ROUNDS);
+    for (int r = 0; r < OVERLAP_ROUNDS; r++) seeds[r] = 1000 + 7 * r;
+    double weights[OVERLAP_ITEMS];
+    for (int i = 0; i < OVERLAP_ITEMS; i++) weights[i] = 0.5 * i;
+    a.run(OVERLAP_ROUNDS, seeds, OVERLAP_ITEMS, weights);
+  }
+
+  void overlapTestDone() {
+    CkPrintf("Overlap tests complete\n");
     CkExit();
   }
 };
@@ -294,6 +312,86 @@ public:
     }
     check(__coro.num_buffered() == 0, "messages left in the inbox");
     contribute(CkCallback(CkReductionTarget(Main, marshallTestDone), mainProxy));
+    CK_END();
+  }
+};
+
+// Each round, the left neighbour sends b, then a, then the items; the
+// overlap waits for a and b in either order, the forall for the items by
+// index. The entry's parameters are re-supplied by the restart; weights
+// points into the entry's message, which the state keeps.
+class OverlapTest : public CBase_OverlapTest {
+  OverlapTest_CORO_CODE
+  int round;                 // live across waits
+  // Written by the children and read by the parent after the overlap: a
+  // finished child is not run again after a migration, so its results are
+  // pupped members like any value live across a wait.
+  int gotA, gotB;
+  double itemSum;
+  std::string order;         // 'a'/'b' per round, in completion order
+
+  static void check(bool ok, const char* what) {
+    if (!ok) ::CkAbort("ckcoro overlap test: %s", what);
+  }
+  int left() const { return (thisIndex + OVERLAP_ELEMS - 1) % OVERLAP_ELEMS; }
+
+public:
+  OverlapTest() : round(0), gotA(0), gotB(0), itemSum(0) {}
+  OverlapTest(CkMigrateMessage* m) : CBase_OverlapTest(m) {}
+  void pup(PUP::er& p) { p | round; p | order; p | gotA; p | gotB; p | itemSum; }
+
+  ck::coro::task<void> waitA() {
+    CK_RESUMABLE();
+    CK_WHEN(inbox::a(round), ck::coro::skip, gotA);
+    order += 'a';
+    CK_END();
+  }
+  ck::coro::task<void> waitB() {
+    CK_RESUMABLE();
+    CK_WHEN(inbox::b(round), ck::coro::skip, gotB);
+    order += 'b';
+    CK_END();
+  }
+  // Matched by round and index together: after a migration, a neighbour's
+  // messages for the next round may be delivered before this round's.
+  ck::coro::task<void> waitItem(int i, double w) {
+    CK_RESUMABLE();
+    CK_WHEN_BLOCK(inbox::item(round * OVERLAP_ITEMS + i), tag, v) {
+      check(tag == round * OVERLAP_ITEMS + i, "item: wrong tag");
+      itemSum += w * v;
+    }
+    CK_END();
+  }
+
+  ck::coroutine run(int rounds, std::vector<int> seeds, int nitems, double* weights) {
+    CK_COROUTINE();
+    check(rounds == OVERLAP_ROUNDS && (int)seeds.size() == rounds && nitems == OVERLAP_ITEMS,
+          "run: wrong parameters");
+    for (round = 0; round < rounds; round++) {
+      {  // a block: locals with initializers may not be in scope at a site
+        int right = (thisIndex + 1) % OVERLAP_ELEMS;
+        int seed = seeds[round] + thisIndex;
+        thisProxy[right].b(round, seed + 1);
+        thisProxy[right].a(round, seed);
+        for (int i = nitems - 1; i >= 0; i--) thisProxy[right].item(round * nitems + i, seed * 10 + i);
+      }
+      // Migrate in the middle (the move happens at the next wait): the
+      // record with its children is packed and restarted on the new PE.
+      if (round == 1 && CkNumPes() > 1) migrateMe((CkMyPe() + 1) % CkNumPes());
+      CK_OVERLAP(waitA(), waitB());
+      check(gotA == seeds[round] + left() && gotB == gotA + 1, "overlap: wrong a or b");
+      if (round == 2 && CkNumPes() > 1) migrateMe((CkMyPe() + 1) % CkNumPes());
+      itemSum = 0;
+      CK_FORALL(i, 0, nitems, waitItem(i, weights[i]));
+      {
+        double expect = 0;
+        for (int i = 0; i < nitems; i++) expect += weights[i] * ((seeds[round] + left()) * 10 + i);
+        check(itemSum == expect, "forall: wrong item sum");
+      }
+    }
+    check((int)order.size() == 2 * rounds, "overlap: a child ran twice or not at all");
+    check(__coro.num_buffered() == 0, "overlap: messages left in the inbox");
+    contribute(CkCallback(CkReductionTarget(Main, overlapTestDone), mainProxy));
     CK_END();
   }
 };
