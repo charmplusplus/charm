@@ -436,18 +436,27 @@ src/ck-core/ckarray.C:1862; the branch requires at least one local
 element), `recvBroadcast` calls
 `CkArrayBroadcaster::deliverAndUpdateDyn` instead of the per-element loop.
 
-`performDeliveryDyn` (ckarray.C:1603) walks the local elements and selects
-those whose expected epoch (`getData(el)`) equals the broadcast's, advancing
-each selected element's epoch by one. It skips the rest, which already have
-the broadcast or have not reached that epoch, and skips an element whose
-zero-copy gets after a migration are still pending
-(`bufferedActiveRgetMsgs`, the same guard as `performDelivery`); the stored
-broadcast reaches it on arrival. It then calls
-`CkDynDeliverBroadcast(bcast, ready, n)` once for all of them.
-`deliverAndUpdateDyn` (ckarray.C:1586) repeats this for each stored
-broadcast that follows in epoch order, as long as the previous one reached
-someone. Storing, the epoch rules and `releaseDelivered` are the code the
-normal path uses.
+`deliverAndUpdateDyn` first records the indices of the local elements and
+whether the class has a `deliver_many` hook (`CkDynBatchesBroadcasts`). For
+each index, `performDeliveryDyn` looks the element up again
+(`CkArray::lookup`; an element migrated away or destroyed by an earlier
+handler is skipped), and selects it if its expected epoch (`getData(el)`)
+equals the broadcast's. It skips the rest, which already have the broadcast
+or have not reached that epoch, and skips an element whose zero-copy gets
+after a migration are still pending (`bufferedActiveRgetMsgs`, the same guard
+as `performDelivery`); the stored broadcast reaches it on arrival. Without
+`deliver_many`, each selected element's epoch is advanced just before its
+own `CkDynDeliverBroadcast(bcast, &el, 1)`, as `attemptDelivery` does for a
+charmxi element, so an element that an earlier handler migrates away leaves
+at the broadcast's epoch and receives it from the store on its new PE (test
+phase `bcast_migrate`, which failed with the earlier advance-all-first code).
+With `deliver_many`, every selected epoch is advanced and then one
+`CkDynDeliverBroadcast(bcast, ready, n)` delivers to all of them; an element
+migrated away during that call does not receive the broadcast (documented in
+the manual). `deliverAndUpdateDyn` repeats this for each stored broadcast
+that follows in epoch order, as long as the previous one reached someone.
+Storing, the epoch rules and `releaseDelivered` are the code the normal path
+uses.
 
 `CkDynDeliverBroadcast` views the message once and calls
 `hooks.deliver_many` with the handles of all selected elements. A handler

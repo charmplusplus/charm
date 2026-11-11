@@ -252,6 +252,9 @@ public:
 
 /* True when the chare index names a dynamic class. */
 bool CkDynIsDynamicChare(int chareIdx);
+/* True when the dynamic class has a deliver_many hook: an array broadcast
+ * reaches all local elements in one call. */
+bool CkDynBatchesBroadcasts(int chareIdx);
 /* Deliver one array broadcast to the given local dynamic elements with one
  * hooks.deliver_many call. */
 void CkDynDeliverBroadcast(void *bcastMsg, ArrayElemDyn **elems, int n);

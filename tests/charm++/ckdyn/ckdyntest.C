@@ -77,7 +77,7 @@ static CkDynCallback viewCb(const CkDynMsgView *v, int slot) { CkDynCallback c; 
 /* Classes                                                                 */
 /* ====================================================================== */
 
-extern CbClass Ping, Sec, Grp, NGrp, Single, DMain, Late;
+extern CbClass Ping, Sec, Grp, NGrp, Single, DMain, Late, Mig;
 
 enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTRED, P_GOTREDB, P_COMPUTE, P_CORO, P_SYNCSTART, P_RESUMED,
        P_ZSTART, P_ZRECV, P_ZPOST, P_ZSPIN, P_ZACK, P_DSTART, P_DRECV, P_DCHECK,
@@ -975,6 +975,43 @@ CbClass DMain = { "DMain", CKDYN_MAINCHARE, 0, {
   { "DMain.resumed", 0, dmainResumed },
 } };
 
+/* ---- Mig (1-D array without deliver_many, the bcast_migrate phase) ------ */
+
+/* this PE's Mig elements constructed here and not migrated away, by index */
+typedef std::map<int, Obj *> MigLocalMap;
+CkpvStaticDeclare(MigLocalMap, migLocal);
+
+static int64_t migCtor(Obj *o, const CkDynMsgView *) {
+  o->s.counter = 0;
+  CkpvAccess(migLocal)[myIndex(o)] = o;
+  return 0;
+}
+/* bcast(CALLBACK cb): count the broadcast; if the partner element (index ^ 1)
+ * is local and has not received it yet, migrate it to the next PE, so that it
+ * leaves in the middle of this PE's delivery of the broadcast. Contribute
+ * [1, moved]. */
+static int64_t migBcast(Obj *o, const CkDynMsgView *v) {
+  o->s.counter++;
+  int moved = 0;
+  auto &local = CkpvAccess(migLocal);
+  auto it = local.find(myIndex(o) ^ 1);
+  if (CkNumPes() > 1 && it != local.end() && it->second->s.counter < o->s.counter) {
+    Obj *p = it->second;
+    local.erase(it);
+    CkDynMigrateMe(&p->t, (CkMyPe() + 1) % CkNumPes());
+    moved = 1;
+  }
+  local.erase(myIndex(o));   /* it may move later (load balancing); stop naming it */
+  int r[2] = { 1, moved };
+  contributeInts(o, r, 2, viewCb(v, 0));
+  return 0;
+}
+
+CbClass Mig = { "Mig", CKDYN_ARRAY, 1, {
+  { "Mig.Mig", 0, migCtor },
+  { "Mig.bcast", 0, migBcast },
+} };
+
 /* ---- Late (1-D array registered after start-up, the late phase) -------- */
 
 static int64_t lateCtor(Obj *o, const CkDynMsgView *v) {
@@ -1011,10 +1048,15 @@ void ckdynRegister(void) {
   cbRegister(&NGrp);
   cbRegister(&Single);
   cbRegister(&DMain);
+  Mig.noMany = true;
+  cbRegister(&Mig);
   CkDynAllowLateRegistration();   /* Late is registered by the late phase */
 }
 
-void ckdynTestInitProc(void) { cbInitPe(); }
+void ckdynTestInitProc(void) {
+  cbInitPe();
+  CkpvInitialize(MigLocalMap, migLocal);
+}
 
 /* ====================================================================== */
 /* The main chare                                                          */
@@ -1025,7 +1067,7 @@ static void bcastPing(int m, CkDynMsg *msg) { CkDynSendArray(aidPing, 1, nullptr
 class TestMain : public CBase_TestMain {
   std::set<std::string> skip;
   std::vector<std::string> steps = {
-    "pingpong", "pingpong_inline", "bcast",
+    "pingpong", "pingpong_inline", "bcast", "bcast_migrate",
     "reductions/single", "reductions/single_any", "reductions/group_elem", "reductions/group_bcast",
     "reductions/array_elem", "reductions/array_bcast", "reductions/future", "reductions/foreign",
     "future_return", "nodegroup", "qd", "priority", "coroutine",
@@ -1137,6 +1179,7 @@ public:
     if (skipped(s) && s != "exit") { CkPrintf("SKIP %s\n", s.c_str()); next(); return; }
     if (s == "pingpong" || s == "pingpong_inline") runPingpong(s, s == "pingpong" ? 0 : 1);
     else if (s == "bcast") runBcast();
+    else if (s == "bcast_migrate") runBcastMigrate();
     else if (s.compare(0, 11, "reductions/") == 0) runReduction(s);
     else if (s == "future_return") runFutureReturn();
     else if (s == "nodegroup") runNodegroup();
@@ -1153,6 +1196,34 @@ public:
     else if (s == "late") runLate();
     else if (s == "exit") { CkPrintf("ALL DONE (%.3f s)\n", CkWallTimer() - tStart); CkDynExit(0); }
   }
+
+  /* bcast_migrate: an array without deliver_many; during one broadcast the
+     handler of one element of each co-located pair migrates the other away
+     before it has received the broadcast. Every element must still receive
+     it exactly once (each contributes 1); quiescence ends the phase, so a
+     lost delivery fails instead of hanging. */
+  void runBcastMigrate() {
+    const int n = 2 * CkNumPes();
+    uint32_t fc = cbNewFuture([this, n](const CkDynMsgView *) {
+      int *got = new int[2]{ -1, -1 };
+      uint32_t fr = cbNewFuture([got](const CkDynMsgView *v) { got[0] = redInt(v, 0); got[1] = redInt(v, 1); });
+      uint32_t fq = cbNewFuture([this, n, got](const CkDynMsgView *) {
+        int cnt = got[0], moved = got[1];
+        delete[] got;
+        CHECK(cnt == n, "bcast_migrate: %d of %d elements received the broadcast", cnt, n);
+        CHECK(CkNumPes() == 1 || moved > 0, "bcast_migrate: no element was migrated during the broadcast");
+        CkPrintf("  bcast_migrate: %d elements received the broadcast once; %d were migrated during it\n", cnt, moved);
+        pass("bcast_migrate");
+      });
+      CkDynSendArray(migAid, 1, nullptr, Mig.ep(1), MsgB().cb(cbFutureCb(0, fr)).finish(0), nullptr);
+      CkDynCallback qd = cbFutureCb(0, fq);
+      CkDynStartQD(&qd);
+    });
+    int dims[1] = { n };
+    CkDynArrayOpts ao = { 1, dims, -1, 0, 0, -1 };
+    migAid = CkDynCreateArray(Mig.chareIdx, MsgB().flags(CKDYN_MSG_CREATION).fut(0, fc).finish(Mig.ep(0)), &ao);
+  }
+  int migAid = -1;
 
   void runPingpong(std::string s, int mode) {
     uint32_t f = cbNewFuture([this, s, mode](const CkDynMsgView *v) {

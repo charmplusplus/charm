@@ -266,7 +266,7 @@ static void hError(void *, const char *what) {
   CkPrintf("[PE %d] cbinding: CkDyn error: %s\n", CkMyPe(), what);
 }
 
-static CkDynHooks g_hooks;
+static CkDynHooks g_hooks, g_hooksNoMany;
 
 const CkDynHooks *cbHooks(void) {
   memset(&g_hooks, 0, sizeof g_hooks);
@@ -286,6 +286,8 @@ const CkDynHooks *cbHooks(void) {
   g_hooks.resume_from_sync = hResumeFromSync;
   g_hooks.section_joined = hSectionJoined;
   g_hooks.error = hError;
+  g_hooksNoMany = g_hooks;
+  g_hooksNoMany.deliver_many = nullptr;
   return &g_hooks;
 }
 
@@ -302,7 +304,7 @@ static void registerClass(CbClass *c, bool late) {
   d.name = c->name; d.kind = c->kind; d.ndims = c->ndims;
   d.num_entries = n; d.entries = e;
   d.binding_data = c;
-  d.hooks = nullptr;
+  d.hooks = c->noMany ? &g_hooksNoMany : nullptr;   /* NULL: the table given to CkDynInit */
   c->chareIdx = late ? CkDynRegisterClassLate(&d, &c->firstEp) : CkDynRegisterClass(&d, &c->firstEp);
 }
 

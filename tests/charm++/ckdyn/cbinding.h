@@ -35,6 +35,7 @@ struct CbClass {
   std::vector<CbMethod> methods;   /* methods[0]: constructor */
   int chareIdx;       /* filled by cbRegister; no default initializers: charmc compiles C++11 aggregates */
   int firstEp;
+  bool noMany;        /* register with a hook table without deliver_many (set before cbRegister) */
   int ep(int method) const { return firstEp + method; }
 };
 

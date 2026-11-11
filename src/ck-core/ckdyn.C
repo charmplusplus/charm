@@ -328,6 +328,8 @@ extern "C" const CkDynClassDesc *CkDynClassOf(int chare_idx) {
   return it == g_classes.end() ? nullptr : &it->second->desc;
 }
 
+bool CkDynBatchesBroadcasts(int chareIdx) { return classOf(chareIdx)->hooks->deliver_many != nullptr; }
+
 bool CkDynIsDynamicChare(int chareIdx) {
   return chareIdx >= 0 && (size_t)chareIdx < _chareTable.size() && _chareTable[chareIdx]->isDynamic;
 }

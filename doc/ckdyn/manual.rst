@@ -898,6 +898,14 @@ call with ``CkDynCoroResume``/``CkDynCoroSuspend`` (or
 A handler that destroys another local element makes that element's handle
 invalid for the rest of the call.
 
+Without ``deliver_many`` a handler may migrate or destroy other local
+elements of the array: CkDyn looks each element up again before its call,
+and an element migrated away before its turn receives the broadcast once, on
+its new PE. With ``deliver_many`` the call covers every local element at
+once, and each is counted as having received the broadcast before the call:
+an element that a handler migrates away during the call does not receive it
+on its new PE, and the binding must not deliver to its handle either.
+
 .. _ckdyn-objects:
 
 Objects
