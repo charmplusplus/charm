@@ -38,6 +38,8 @@ test: all
 	grep -q "a member is an element of class Plain, which is not a dynamic class" xisection.log
 	! ./ckdyntest +pe 1 -ckptsection -skip sections -skip pingpong -skip pingpong_inline > ckptsection.log 2>&1
 	grep -q "CkDynCheckpoint: the done callback is a SECTION callback" ckptsection.log
+	! ./ckdyntest +pe 2 -deletewaiting -skip pingpong -skip pingpong_inline > deletewaiting.log 2>&1
+	grep -q "combine(s) named it as a part" deletewaiting.log
 
 testp: all
 	$(call run, ./ckdyntest +p$(P) +balancer RotateLB )

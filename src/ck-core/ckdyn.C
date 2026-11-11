@@ -1987,6 +1987,15 @@ extern "C" void CkDynSectionCombine(int nparts, const CkDynSectionID *parts, con
 
 void CkDynMgr::deleteSection(const CkDynSectionID &sid) {
   CkDynSection &s = lookup(sid, "CkDynSectionDelete:");
+  /* a combined section still waiting for its parts holds the queries of other
+     combines that name it; they could never be answered */
+  if (!s.queries.empty()) {
+    const CkDynSection::Query &q = s.queries[0];
+    CkAbort("CkDyn: CkDynSectionDelete: section (root PE %d, index %d, generation %u) is a combined section "
+            "that is not ready yet, and %zu combine(s) named it as a part (the first: part %d of the section with "
+            "root PE %d, index %d); delete a part only after the combines that name it are ready",
+            sid.root_pe, sid.idx, sid.gen, s.queries.size(), q.partNo, q.replyPe, q.combIdx);
+  }
   for (CkDynMcastMsg *m : s.held) CkFreeMsg(m);
   uint16_t gen = (uint16_t)(s.gen + 1);
   if (gen == 0) gen = 1;

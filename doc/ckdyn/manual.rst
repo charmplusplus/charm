@@ -1373,7 +1373,12 @@ after ``done`` fires.**
 
 ``CkDynSectionCombine`` makes a section whose members are the union of the
 parts, each member once. Parts may be array sections or combined sections,
-from any root, all with one index dimension count; a group part aborts.
+from any root, all with one index dimension count; a group part aborts. A
+combine takes each part's member list when the part's root receives the
+request; a part that is itself a combined section not yet ready answers once
+it is ready. Deleting such a part while a combine waits on it aborts, naming
+the waiting combine: delete a part only after the combines that name it are
+ready.
 
 ``CkDynSectionDelete`` deletes a section (from any PE; the request goes to
 the root). Later use of the id aborts with a message about a stale

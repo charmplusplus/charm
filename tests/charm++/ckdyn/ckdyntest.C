@@ -982,6 +982,7 @@ class TestMain : public CBase_TestMain {
   bool zcBcast = false;      /* -zcbcast: the ncpy/nonpost phase broadcasts an NCPY slot, which must abort */
   bool xiSection = false;    /* -xisection: a section of a charmxi array, which must abort */
   bool ckptSection = false;  /* -ckptsection: the checkpoint phase passes a SECTION callback, which must abort */
+  bool deleteWaiting = false; /* -deletewaiting: the delete phase deletes a part a combine waits on, which must abort */
 
   /* sections: the expected membership of each section the phases create */
   struct Sect {
@@ -1014,6 +1015,7 @@ public:
       else if (strcmp(m->argv[i], "-zcbcast") == 0) zcBcast = true;
       else if (strcmp(m->argv[i], "-xisection") == 0) xiSection = true;
       else if (strcmp(m->argv[i], "-ckptsection") == 0) ckptSection = true;
+      else if (strcmp(m->argv[i], "-deletewaiting") == 0) deleteWaiting = true;
     delete m;
     mainProxy = thisProxy;
     numElems = 2 * CkNumPes();
@@ -1580,6 +1582,17 @@ public:
       qCombine("C2", { "Aeven", "Ball" });
       qRound("C2", 0, 0); qRound("C2", 1, 0); qRound("C2", 0, 3); qRound("C2", 1, 3); qRound("C2", 0, 2);
     } else if (s == "sections/delete") {
+      if (deleteWaiting) q.push_back([this] {
+        /* W waits for R's member list from R's root (the last PE); W2 names W,
+           so W's root queues W2's query until W is ready */
+        CHECK(sects["R"].sid.root_pe != CkMyPe(), "-deletewaiting needs two PEs");
+        CkDynSectionID ids[2] = { sects["Aeven"].sid, sects["R"].sid }, w, w2;
+        CkDynSectionCombine(2, ids, nullptr, &w);
+        CkDynSectionCombine(1, &w, nullptr, &w2);
+        CkPrintf("  deleting a combined section that a combine waits on; CkDyn must abort\n");
+        CkDynSectionDelete(&w);
+        CHECK(false, "deleting a part a combine waits on did not abort");
+      });
       qCreateArray("D", aidSecA, { 0, 1 });
       q.push_back([this] {
         CkDynSectionDelete(&sects["D"].sid);
