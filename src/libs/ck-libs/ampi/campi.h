@@ -165,6 +165,17 @@
 #undef MPI_Request_get_status
 #undef MPI_Iprobe
 #undef MPI_Improbe
+#undef MPI_Probe
+#undef MPI_Mprobe
+#undef MPI_Mrecv
+#undef MPI_Waitany
+#undef MPI_Waitsome
+#undef MPI_Bsend
+#undef MPI_Rsend
+#undef MPI_Sendrecv_replace
+#undef MPI_Reduce_scatter
+#undef MPI_Reduce_scatter_block
+#undef MPI_Alltoallw
 #undef AMPI_Migrate
 
 #define MPI_Init(...)        CAMPI_AWAIT(::campi::Init(__VA_ARGS__))
@@ -201,6 +212,17 @@
 #define MPI_Request_get_status(...) CAMPI_AWAIT(::campi::Request_get_status(__VA_ARGS__))
 #define MPI_Iprobe(...)      CAMPI_AWAIT(::campi::Iprobe(__VA_ARGS__))
 #define MPI_Improbe(...)     CAMPI_AWAIT(::campi::Improbe(__VA_ARGS__))
+#define MPI_Probe(...)       CAMPI_AWAIT(::campi::Probe(__VA_ARGS__))
+#define MPI_Mprobe(...)      CAMPI_AWAIT(::campi::Mprobe(__VA_ARGS__))
+#define MPI_Mrecv(...)       CAMPI_AWAIT(::campi::Mrecv(__VA_ARGS__))
+#define MPI_Waitany(...)     CAMPI_AWAIT(::campi::Waitany(__VA_ARGS__))
+#define MPI_Waitsome(...)    CAMPI_AWAIT(::campi::Waitsome(__VA_ARGS__))
+#define MPI_Bsend(...)       CAMPI_AWAIT(::campi::Bsend(__VA_ARGS__))
+#define MPI_Rsend(...)       CAMPI_AWAIT(::campi::Rsend(__VA_ARGS__))
+#define MPI_Sendrecv_replace(...) CAMPI_AWAIT(::campi::Sendrecv_replace(__VA_ARGS__))
+#define MPI_Reduce_scatter(...) CAMPI_AWAIT(::campi::Reduce_scatter(__VA_ARGS__))
+#define MPI_Reduce_scatter_block(...) CAMPI_AWAIT(::campi::Reduce_scatter_block(__VA_ARGS__))
+#define MPI_Alltoallw(...)   CAMPI_AWAIT(::campi::Alltoallw(__VA_ARGS__))
 // Aborts at run time unless written CAMPI_MIGRATE inside CAMPI_RESUMABLE/CAMPI_END.
 #define AMPI_Migrate(...)    CAMPI_AWAIT(::campi::Migrate(__VA_ARGS__))
 
@@ -208,17 +230,6 @@
  * a barrier, an internal waitall, or a [sync] entry method as every one-sided
  * operation and window lock does) and have no campi awaitable yet: a use
  * fails to compile instead of aborting at run time in TCharm::stop. */
-#undef MPI_Probe
-#undef MPI_Mprobe
-#undef MPI_Mrecv
-#undef MPI_Waitany
-#undef MPI_Waitsome
-#undef MPI_Bsend
-#undef MPI_Rsend
-#undef MPI_Sendrecv_replace
-#undef MPI_Reduce_scatter
-#undef MPI_Reduce_scatter_block
-#undef MPI_Alltoallw
 #undef MPI_Intercomm_create
 #undef MPI_Intercomm_merge
 #undef MPI_Cart_create
@@ -265,17 +276,6 @@
 #undef AMPI_GPU_Invoke_wr
 #undef AMPI_Yield
 #undef AMPI_Suspend
-#define MPI_Probe(...)                      campi_unsupported_blocking_call_MPI_Probe
-#define MPI_Mprobe(...)                     campi_unsupported_blocking_call_MPI_Mprobe
-#define MPI_Mrecv(...)                      campi_unsupported_blocking_call_MPI_Mrecv
-#define MPI_Waitany(...)                    campi_unsupported_blocking_call_MPI_Waitany
-#define MPI_Waitsome(...)                   campi_unsupported_blocking_call_MPI_Waitsome
-#define MPI_Bsend(...)                      campi_unsupported_blocking_call_MPI_Bsend
-#define MPI_Rsend(...)                      campi_unsupported_blocking_call_MPI_Rsend
-#define MPI_Sendrecv_replace(...)           campi_unsupported_blocking_call_MPI_Sendrecv_replace
-#define MPI_Reduce_scatter(...)             campi_unsupported_blocking_call_MPI_Reduce_scatter
-#define MPI_Reduce_scatter_block(...)       campi_unsupported_blocking_call_MPI_Reduce_scatter_block
-#define MPI_Alltoallw(...)                  campi_unsupported_blocking_call_MPI_Alltoallw
 #define MPI_Intercomm_create(...)           campi_unsupported_blocking_call_MPI_Intercomm_create
 #define MPI_Intercomm_merge(...)            campi_unsupported_blocking_call_MPI_Intercomm_merge
 #define MPI_Cart_create(...)                campi_unsupported_blocking_call_MPI_Cart_create
