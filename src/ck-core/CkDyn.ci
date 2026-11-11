@@ -22,9 +22,10 @@ module CkDyn {
     entry void hapiDone(CkDynMsg *m);
     // sections rooted on this PE (doc/internals/ckdyn.md, "Sections")
     entry void sectionSend(CkDynMcastMsg *m);
-    entry void sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe);
+    // section operations from another PE carry (srcPe, seq): CkDynMgr::inOrder
+    entry void sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe, int srcPe, int seq);
     entry void sectionParts(int combIdx, int combGen, int partNo, int kind, int ndims,
                             std::vector<int> aids, std::vector<int> counts, std::vector<int> flat);
-    entry void sectionDelete(int idx, int gen);
+    entry void sectionDelete(int idx, int gen, int srcPe, int seq);
   };
 };

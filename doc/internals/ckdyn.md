@@ -769,12 +769,29 @@ foreign reducer whose result is a new message).
 ### Delete and generations
 
 `CkDynSectionDelete(sid)` runs on the root (from another PE it sends
-`sectionDelete` there). It frees the held messages, clears the slot and bumps
+`sectionDelete` there; see "Order of section operations" below). It frees the held messages, clears the slot and bumps
 its generation. Any later use of the old id on the root (`lookup`) aborts:
 "send to a deleted section (root PE %d, index %d, stale generation %u; the
 slot is at generation %u, ...)". The CkMulticast trees of a deleted section
 stay allocated (CkMulticastMgr has no call that frees a section), and members
 keep their cookie map entries; neither is used again.
+
+### Order of section operations
+
+`sectionSend`, `sectionQuery` and `sectionDelete` are three entry methods,
+and Charm++ on reconverse does not order two messages from one PE to another,
+so a send followed by a delete from a PE other than the root could reach the
+root reversed and abort with "send to a deleted section". Each `CkDynMgr`
+therefore numbers the section operations it sends to each root
+(`seqTo[root]`, `nextSeq`); the `CkDynMcastMsg` carries `(srcPe, seq)` in
+fields after `sid`, the two marshalled entries take them as parameters. The
+root applies an operation only when its number is the next one expected from
+that sender (`seqFrom[src]`, `inOrder`); one that arrives early waits in
+`early` as a closure and runs when its turn comes. Operations issued on the
+root itself run synchronously, as before. The counters are not
+checkpointed. Test: `sections/order` sends a 256 KB message from the last PE
+to each of 32 sections rooted on PE 0 and deletes each right after; without
+the numbering it aborted in 5 of 5 runs at `+pe 4 +randomized_msgq`.
 
 ### Migration and checkpoint
 

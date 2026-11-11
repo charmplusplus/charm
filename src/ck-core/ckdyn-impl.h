@@ -10,6 +10,7 @@
 #include "pup_stl.h"
 #include "ckmulticast.h"
 #include "ckdyn.h"
+#include <functional>
 #include <map>
 #include <memory>
 #include <vector>
@@ -31,11 +32,15 @@ public:
 
 /* A section multicast: CkMcastBaseMsg must come first because
  * CkMulticastMgr writes the section cookie into the first bytes. `sid` names
- * the CkDyn section, so that a member can find its cookie on delivery. */
+ * the CkDyn section, so that a member can find its cookie on delivery.
+ * srcPe and seq order a send from another PE than the root among that PE's
+ * section operations (CkDynMgr::inOrder). */
 class CkDynMcastMsg : public CkMcastBaseMsg, public CMessage_CkDynMcastMsg {
 public:
   char *buf;
   CkDynSectionID sid;
+  int32_t srcPe;
+  uint32_t seq;
 };
 
 /* ---- per-object state shared by every kind ------------------------------ */
@@ -193,10 +198,20 @@ public:
   void relay(CkDynMsg *m);        /* a section callback: forward the result to the section */
   void hapiDone(CkDynMsg *m);     /* a stream reached a CkDynHapiAddCallback: send to its callback */
   void sectionSend(CkDynMcastMsg *m);   /* a section send from another PE */
-  void sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe);
+  void sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe, int srcPe, int seq);
+  void applyQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe);
   void sectionParts(int combIdx, int combGen, int partNo, int kind, int ndims,
                     const std::vector<int> &aids, const std::vector<int> &counts, const std::vector<int> &flat);
-  void sectionDelete(int idx, int gen);
+  void sectionDelete(int idx, int gen, int srcPe, int seq);
+  /* Section operations (send, combine query, delete) from one PE to one root
+     are applied at the root in the order the PE issued them: Charm++ does not
+     order messages, so each carries a sequence number per (sender, root).
+     Not checkpointed: no section operation survives a restart. */
+  std::map<int, uint32_t> seqTo;      /* root PE -> next number this PE sends it */
+  std::map<int, uint32_t> seqFrom;    /* sender PE -> next number this root applies */
+  std::map<std::pair<int, uint32_t>, std::function<void()> > early;   /* arrived ahead of their turn */
+  uint32_t nextSeq(int root) { return seqTo[root]++; }
+  void inOrder(int srcPe, uint32_t seq, std::function<void()> op);
   /* restarts of this program from a checkpoint (modulo 256). Every section id
      made on a PE carries it in `reserved`, and every use of an id checks it,
      so an id from before a restart aborts instead of naming a section that

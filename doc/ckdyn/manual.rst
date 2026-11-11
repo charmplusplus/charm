@@ -1384,6 +1384,13 @@ ready.
 the root). Later use of the id aborts with a message about a stale
 generation.
 
+**Section operations from one PE are applied at the root in program order.**
+A send (``CkDynSendSection``, also through a section callback), the member
+query of a combine and a delete issued on one PE reach the root in any order
+on the network, but the root applies them in the order that PE issued them,
+so a send followed by a delete delivers the message. Operations from
+different PEs have no order between them.
+
 Section ids
 -----------
 

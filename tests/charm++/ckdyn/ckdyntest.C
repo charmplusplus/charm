@@ -82,9 +82,9 @@ extern CbClass Ping, Sec, Grp, NGrp, Single, DMain, Late;
 enum { P_CTOR, P_RECV, P_RECVI, P_STARTPING, P_COUNT, P_DORED, P_FOREIGN, P_GOTRED, P_GOTREDB, P_COMPUTE, P_CORO, P_SYNCSTART, P_RESUMED,
        P_ZSTART, P_ZRECV, P_ZPOST, P_ZSPIN, P_ZACK, P_DSTART, P_DRECV, P_DCHECK,
        P_PSTART, P_PRECV, P_PDONE, P_PCHECK };
-enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED };
+enum { SC_CTOR, SC_RECV, SC_GOTELEM, SC_GOTBCAST, SC_GOTSEC, SC_SYNCSTART, SC_RESUMED, SC_SINK };
 enum { G_CTOR, G_GOTRED, G_GOTREDB, G_NGSEND, G_NGREPORT, G_PRIOSTART, G_PRIORECV, G_EXPRECV,
-       G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE, G_LATEREG };
+       G_SECRECV, G_GOTELEM, G_GOTSEC, G_SECCREATE, G_LATEREG, G_SENDDELETE };
 enum { N_CTOR, N_INCR };
 enum { S_CTOR, S_GOTRED };
 enum { D_CTOR, D_RESUMED };
@@ -730,6 +730,13 @@ static int64_t secSyncStart(Obj *o, const CkDynMsgView *v) {
   CkDynAtSync(&o->t);
   return 0;
 }
+/* sink(n, bytes): a large section message (sections/order); checks its length */
+static const uint32_t ORDER_BYTES = 256 * 1024;
+static int64_t secSink(Obj *, const CkDynMsgView *v) {
+  CHECK(v->kind == CKDYN_MSGKIND_MCAST && v->nslots == 2 && v->slots[1].type == CKDYN_SLOT_BYTES &&
+        v->slots[1].len == ORDER_BYTES, "Sec.sink: a malformed section message");
+  return 0;
+}
 static int64_t secResumed(Obj *o, const CkDynMsgView *) {
   double r[2] = { 1.0, o->s.origPe != CkMyPe() ? 1.0 : 0.0 };
   CkDynRedData d = { r, sizeof r, redType("sum_double") };
@@ -746,6 +753,7 @@ CbClass Sec = { "Sec", CKDYN_ARRAY, 1, {
   { "Sec.gotSec", CKDYN_EP_REDNTARGET, secGotSec },
   { "Sec.syncStart", 0, secSyncStart },
   { "Sec.resumed", 0, secResumed },
+  { "Sec.sink", 0, secSink },
 } };
 
 /* ---- Grp (group) ---------------------------------------------------------- */
@@ -817,6 +825,29 @@ static int64_t grpSecCreate(Obj *, const CkDynMsgView *v) {
   return 0;
 }
 
+/* sendDelete(n, FUTURE f, SECTION sid x n): from a PE that is not the root of
+ * the sections, send a large message to each section and delete it at once,
+ * then set f. The root must apply the send before the delete. */
+static int64_t grpSendDelete(Obj *, const CkDynMsgView *v) {
+  int n = (int)cbI64(v, 0);
+  int pe; uint32_t id;
+  CHECK(cbFindFuture(v, &pe, &id), "sendDelete without a future");
+  std::vector<char> big(ORDER_BYTES, 'x');
+  int ep = Sec.ep(SC_SINK);
+  for (int i = 0; i < n; i++) {
+    CkDynSectionID sid;
+    CkDynViewSection(v, 2 + i, &sid);
+    CHECK(sid.root_pe != CkMyPe(), "sendDelete on the root PE %d", sid.root_pe);
+    MsgB b;
+    b.i64(i);
+    CkDynMsgAddBytes(b.b, big.data(), ORDER_BYTES, 0);
+    CkDynSendSection(&sid, ep, b.finishMcast(ep), nullptr);
+    CkDynSectionDelete(&sid);
+  }
+  CkDynFutureSet(pe, id, emptyMsg());
+  return 0;
+}
+
 /* lateReg(CALLBACK done): register Late after start-up. The main chare runs
  * this phase only with one PE per process, so each PE registers for its
  * process; the reduction tells it that every process has. */
@@ -841,6 +872,7 @@ CbClass Grp = { "Grp", CKDYN_GROUP, 0, {
   { "Grp.gotSec", CKDYN_EP_REDNTARGET, secGotSec },
   { "Grp.secCreate", 0, grpSecCreate },
   { "Grp.lateReg", 0, grpLateReg },
+  { "Grp.sendDelete", 0, grpSendDelete },
 } };
 
 /* ---- NGrp (nodegroup) ---------------------------------------------------- */
@@ -989,7 +1021,7 @@ class TestMain : public CBase_TestMain {
     "ncpy/nonpost", "ncpy/post_before", "ncpy/post_after", "ncpy/samepe",
     "device/remote", "device/samepe", "hapi", "devpersist/remote", "devpersist/samepe",
     "sections/array", "sections/group", "sections/remote", "sections/combine_overlap",
-    "sections/combine_arrays", "sections/delete", "sections/migration",
+    "sections/combine_arrays", "sections/delete", "sections/order", "sections/migration",
     "migration", "checkpoint", "late", "exit" };
   std::string ckptDir = "ckdyntest.ckpt";
   int step = -1;
@@ -1634,6 +1666,32 @@ public:
         go();
       });
       qRound("D2", 0, 0);
+    } else if (s == "sections/order") {
+      /* send then delete from a PE that is not the root, many times: the
+         root must apply them in that order, whatever order they arrive in */
+      q.push_back([this] {
+        if (CkNumPes() == 1) { CkPrintf("  %s: one PE, nothing to order\n", cur.c_str()); go(); return; }
+        const int n = 32;
+        MsgB b;
+        b.i64(n);
+        uint32_t f = cbNewFuture([this, n](const CkDynMsgView *) {
+          uint32_t fq = cbNewFuture([this, n](const CkDynMsgView *) {
+            CkPrintf("  %s: %d sends of %u bytes, each followed by a delete, from PE %d to root PE 0\n",
+                     cur.c_str(), n, ORDER_BYTES, CkNumPes() - 1);
+            go();
+          });
+          CkDynCallback qd = cbFutureCb(0, fq);
+          CkDynStartQD(&qd);
+        });
+        b.fut(0, f);
+        for (int i = 0; i < n; i++) {
+          int idx[2] = { i % nSecA, (i + 1) % nSecA };
+          CkDynSectionID sid;
+          CkDynSectionCreateArray(aidSecA, 2, 1, idx, 0, nullptr, &sid);
+          b.sec(sid);
+        }
+        CkDynSendGroup(gidGrp, CkNumPes() - 1, Grp.ep(G_SENDDELETE), b.finish(0), nullptr);
+      });
     } else if (s == "sections/migration") {
       /* section reductions with RotateLB migrations between them */
       qCreateArray("Aodd", aidSecA, odds);

@@ -1325,10 +1325,12 @@ extern "C" void CkDynSendSection(const CkDynSectionID *sid, int ep, CkDynMcastMs
   CProxy_CkDynMgr(_ckdynMgrGID).ckLocalBranch()->checkRun(*sid, "CkDynSendSection");
   ((CkDynHdr *)m->buf)->ep = (uint16_t)ep;
   m->sid = *sid;
+  CkDynMgr *mg = CProxy_CkDynMgr(_ckdynMgrGID).ckLocalBranch();
   if (sid->root_pe == CkMyPe()) {
-    CkDynMgr *mg = CProxy_CkDynMgr(_ckdynMgrGID).ckLocalBranch();
     mg->sendTo(mg->lookup(*sid, "send to"), ep, m);
   } else {
+    m->srcPe = CkMyPe();
+    m->seq = mg->nextSeq(sid->root_pe);
     CProxy_CkDynMgr(_ckdynMgrGID)[sid->root_pe].sectionSend(m);
   }
 }
@@ -1843,8 +1845,21 @@ void CkDynMgr::sendTo(CkDynSection &s, int ep, CkDynMcastMsg *m) {
     s.aproxy.ckSend((CkArrayMessage *)m, ep, 0);
 }
 
+void CkDynMgr::inOrder(int srcPe, uint32_t seq, std::function<void()> op) {
+  uint32_t &next = seqFrom[srcPe];
+  if (seq != next) { early.emplace(std::make_pair(srcPe, seq), std::move(op)); return; }
+  op();
+  next++;
+  for (auto it = early.find(std::make_pair(srcPe, next)); it != early.end(); it = early.find(std::make_pair(srcPe, next))) {
+    std::function<void()> f = std::move(it->second);
+    early.erase(it);
+    f();
+    next++;
+  }
+}
+
 void CkDynMgr::sectionSend(CkDynMcastMsg *m) {
-  CkDynSendSection(&m->sid, ((const CkDynHdr *)m->buf)->ep, m, nullptr);
+  inOrder(m->srcPe, m->seq, [this, m] { sendTo(lookup(m->sid, "send to"), ((const CkDynHdr *)m->buf)->ep, m); });
 }
 
 /* ---- creation ----------------------------------------------------------- */
@@ -1913,7 +1928,11 @@ void CkDynMgr::answerQuery(const CkDynSection &s, const CkDynSection::Query &q) 
   thisProxy[q.replyPe].sectionParts(q.combIdx, q.combGen, q.partNo, s.kind, s.ndims, aids, counts, flat);
 }
 
-void CkDynMgr::sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe) {
+void CkDynMgr::sectionQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe, int srcPe, int seq) {
+  inOrder(srcPe, (uint32_t)seq, [=] { applyQuery(combIdx, combGen, partNo, idx, gen, replyPe); });
+}
+
+void CkDynMgr::applyQuery(int combIdx, int combGen, int partNo, int idx, int gen, int replyPe) {
   CkDynSectionID sid;
   memset(&sid, 0, sizeof sid);
   sid.root_pe = CkMyPe(); sid.idx = idx; sid.gen = (uint16_t)gen; sid.reserved = restarts;   /* the sender checked the run */
@@ -1996,7 +2015,8 @@ extern "C" void CkDynSectionCombine(int nparts, const CkDynSectionID *parts, con
     } else {
       if (parts[i].root_pe < 0 || parts[i].root_pe >= CkNumPes())
         CkAbort("CkDyn: CkDynSectionCombine: part %d has root PE %d", i, parts[i].root_pe);
-      CProxy_CkDynMgr(_ckdynMgrGID)[parts[i].root_pe].sectionQuery(idx, gen, i, parts[i].idx, parts[i].gen, CkMyPe());
+      CProxy_CkDynMgr(_ckdynMgrGID)[parts[i].root_pe].sectionQuery(idx, gen, i, parts[i].idx, parts[i].gen, CkMyPe(),
+                                                                   CkMyPe(), (int)mg->nextSeq(parts[i].root_pe));
     }
   }
 }
@@ -2023,19 +2043,22 @@ void CkDynMgr::deleteSection(const CkDynSectionID &sid) {
   s.gen = gen;
 }
 
-void CkDynMgr::sectionDelete(int idx, int gen) {
-  CkDynSectionID sid;
-  memset(&sid, 0, sizeof sid);
-  sid.root_pe = CkMyPe(); sid.idx = idx; sid.gen = (uint16_t)gen; sid.reserved = restarts;   /* the sender checked the run */
-  deleteSection(sid);
+void CkDynMgr::sectionDelete(int idx, int gen, int srcPe, int seq) {
+  inOrder(srcPe, (uint32_t)seq, [=] {
+    CkDynSectionID sid;
+    memset(&sid, 0, sizeof sid);
+    sid.root_pe = CkMyPe(); sid.idx = idx; sid.gen = (uint16_t)gen; sid.reserved = restarts;   /* the sender checked the run */
+    deleteSection(sid);
+  });
 }
 
 extern "C" void CkDynSectionDelete(const CkDynSectionID *sid) {
   if (sid->root_pe < 0 || sid->root_pe >= CkNumPes())
     CkAbort("CkDyn: CkDynSectionDelete of a section with root PE %d", sid->root_pe);
   localMgr()->checkRun(*sid, "CkDynSectionDelete");
-  if (sid->root_pe == CkMyPe()) localMgr()->deleteSection(*sid);
-  else CProxy_CkDynMgr(_ckdynMgrGID)[sid->root_pe].sectionDelete(sid->idx, sid->gen);
+  CkDynMgr *mg = localMgr();
+  if (sid->root_pe == CkMyPe()) mg->deleteSection(*sid);
+  else CProxy_CkDynMgr(_ckdynMgrGID)[sid->root_pe].sectionDelete(sid->idx, sid->gen, CkMyPe(), (int)mg->nextSeq(sid->root_pe));
 }
 
 /* ---- members ------------------------------------------------------------ */
