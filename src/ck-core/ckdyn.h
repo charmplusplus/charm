@@ -623,7 +623,7 @@ void CkDynPostDeviceBuffer(const CkDynTarget *t, int ep, int slot, const CkDynDe
 int  CkDynUnpostBuffer(const CkDynTarget *t, int ep, int slot);
 
 /* Persistent device buffers (doc/internals/ckdyn.md, "Persistent device
- * buffers"). A buffer is opened on one PE and stays registered until closed;
+ * buffers"). A buffer is opened on one PE and stays usable until closed;
  * its handle, a fixed number of bytes, may be sent to any PE inside a
  * message, and a get or put between an open buffer and a handle needs no
  * entry method and no per-transfer registration. Transfer mode: a copy on

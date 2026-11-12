@@ -1682,8 +1682,9 @@ A persistent device buffer is a device buffer opened once on one PE and then
 used for any number of one-sided transfers, without a message or a memory
 registration per transfer. ``CkDynDevPersistOpen`` opens the buffer ``d``
 names (``ptr``, ``len``, ``device`` and ``stream`` are used; the stream
-orders each transfer after earlier work on it) and registers it for RDMA in a
-program of more than one process. ``CkDynDevPersistHandle`` writes the
+orders each transfer after earlier work on it); the memory is registered with
+the network the first time a transfer needs RDMA, so a run in one process, or
+one that uses only IPC, registers nothing. ``CkDynDevPersistHandle`` writes the
 buffer's handle, ``CkDynDevPersistHandleSize()`` bytes, which the binding
 sends to other PEs in an ordinary message (a BYTES slot, for example).
 
@@ -1706,17 +1707,24 @@ one process; 1, CUDA or HIP IPC when they are in different processes on one
 host and the peer's IPC handle opens in this process (``+gpushm`` is not
 needed; it concerns DEVICE slots); 2, RDMA on the registered memory
 otherwise. Between hosts a put is carried out as a get issued by the
-destination's PE, so that ``done`` means the data has arrived. RDMA needs
-both buffers registered, which ``CkDynDevPersistOpen`` does in every program
-of more than one process, and a machine layer that can register device
-memory; the underlying ``CkDevicePersistent`` aborts an RDMA transfer whose
-buffers are not registered. The first use of each mode in a process prints
-one line.
+destination's PE, so that ``done`` means the data has arrived. RDMA needs a
+machine layer that can register device memory; the underlying
+``CkDevicePersistent`` aborts an RDMA transfer whose buffer cannot be
+registered, or whose buffer's owner has closed it. With ``+gpupersistverbose``
+the first use of each mode and operation in a process prints one line
+(``[pe] CkDevicePersistent> get: ...``).
 
-``CkDynDevPersistClose`` deregisters and frees the local record; it aborts
+The local buffer keeps what a transfer with a peer's handle set up: its
+reference on this process's IPC mapping of the peer's allocation and the
+peer's RDMA registration, so that later transfers with that handle reuse them.
+A handle of the same peer buffer after the peer reopened it replaces the
+earlier one. ``CkDynDevPersistClose`` releases those, deregisters the local
+memory if a transfer registered it, and frees the local record; it aborts
 while a transfer of that buffer is outstanding. A handle stays usable only
-while its buffer is open. Persistent buffers are not migrated or
-checkpointed. Every function aborts in a build without CUDA or HIP.
+while its buffer is open, and only in the run that opened it (a handle saved
+in a checkpoint does not name a buffer after a restart). Persistent buffers
+are not migrated or checkpointed. Every function aborts in a build without
+CUDA or HIP.
 charm4py binds them as ``charm.DevicePersistent``.
 
 .. _ckdyn-coro:

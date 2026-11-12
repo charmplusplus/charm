@@ -1055,12 +1055,18 @@ CkDyn's functions wrap it. `open()` takes a CUDA/HIP IPC handle of the
 allocation holding the buffer and the buffer's offset in it (the base from
 `cuMemGetAddressRange` through `dlsym`, or `hipMemGetAddressRange`): cupy,
 torch and pool allocators hand out pieces of larger allocations, and an IPC
-handle maps the whole allocation. In a program of more than one process
-`open()` also registers the memory once (`CmiNcpyBuffer::init`,
-`CMK_BUFFER_REG`, `CMK_BUFFER_NODEREG`); `close()` on the object that opened it
-deregisters, and on a copy received from a peer does nothing. The pup carries
-the pointer, length, PE, process, host, the IPC handle and offset, and the
-pupped `CmiNcpyBuffer` with the registration.
+handle maps the whole allocation. `open()` also gives the buffer an `id`,
+node (20 bits) | run token (16 bits) | counter (28 bits), and enters it in its
+process's registration table; the memory is registered (`CmiNcpyBuffer::init`,
+`CMK_BUFFER_REG`, `CMK_BUFFER_NODEREG`) the first time a transfer needs RDMA,
+and a PE of another process fetches that registration once
+(`persist_reg_req_handler`/`persist_reg_rep_handler`) and keeps it by id. The
+run token differs between a run and its restart, so an object restored from a
+checkpoint does not name a buffer of the new run. The object that called
+`open()` owns the entry (copies and pupped objects never own; a move transfers
+ownership); its `close()` or destructor deregisters and removes it. The pup
+carries the pointer, length, PE, process, host, the IPC handle and offset, and
+the id.
 
 Mode (`CkDevicePersistent::mode`), for a get into a local buffer or a put from
 one:
@@ -1070,8 +1076,10 @@ one:
 - another process on the same host, when the remote buffer has an IPC
   handle and it opens in this process (`+gpushm` is not needed: it concerns
   `DEVICE` slots): the handle is opened once per process (a table keyed by
-  the handle's bytes, reused by every copy of the peer's buffer and kept
-  until exit), and the copy goes through the mapping as above. If opening fails (the peer's
+  the handle's bytes, shared by every copy of the peer's buffer and reference
+  counted: a copy takes a reference on its first transfer and releases it in
+  `close()`; the last release synchronizes the device and closes the mapping),
+  and the copy goes through the mapping as above. If opening fails (the peer's
   GPU is not visible to this process, as with one GPU per task), `mode()`
   reports RDMA and the transfer uses it;
 - otherwise RDMA on the registered memory. A get is `CmiNcpyBuffer::rdmaGet`
@@ -1087,8 +1095,8 @@ one:
 
 In every mode both buffers' callbacks are sent from the issuing PE when the
 bytes are in the destination, each with its `cb_msg` (`set_msg`), as the
-manual describes. The first use of each mode and operation in a process prints
-a line (`[pe] CkDevicePersistent> get: ...`).
+manual describes. With `+gpupersistverbose` the first use of each mode and
+operation in a process prints a line (`[pe] CkDevicePersistent> get: ...`).
 
 CkDyn's `CkDynDevPersist` holds an opened `CkDevicePersistent`; the handle is
 that object pupped with an ignore callback, in a fixed 512-byte record
@@ -1099,7 +1107,12 @@ call's refnum is the future id, for any other kind it is the callback's
 refnum. The send of a `DEVICE` message (`zcDevicePrepare`) prints the mode of
 `DEVICE` slots once per process (`[pe] CkDyn> DEVICE slots: ...`), which is
 how a run shows whether `+gpushm` took the IPC path. `CkDynDevPersistMode`
-returns `CkDevicePersistent::mode`. Close aborts while a transfer is
+returns `CkDevicePersistent::mode`. A `CkDynDevPersist` keeps the copies of
+peer buffers its transfers used, by id (`peers`), so that the IPC reference and
+the fetched registration a copy takes are taken once per peer buffer; a handle
+with a new id for the same peer PE and pointer (a reopen) replaces the older
+copy, which is closed after the new transfer is issued, and Close closes all of
+them before closing its own buffer. Close aborts while a transfer is
 outstanding. In a build without CUDA or HIP every CkDyn function aborts.
 
 ### HAPI callbacks
