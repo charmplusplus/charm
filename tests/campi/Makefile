@@ -11,6 +11,7 @@ DIRS = \
   until \
   calls \
   comms \
+  neighbor \
   jacobi3d \
   migrate \
   abort \

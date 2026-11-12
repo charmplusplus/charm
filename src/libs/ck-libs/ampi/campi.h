@@ -184,6 +184,15 @@
 #undef MPI_Bsend
 #undef MPI_Rsend
 #undef MPI_Sendrecv_replace
+#undef MPI_Comm_idup
+#undef MPI_Comm_idup_with_info
+#undef MPI_Ireduce_scatter
+#undef MPI_Ireduce_scatter_block
+#undef MPI_Neighbor_allgather
+#undef MPI_Neighbor_allgatherv
+#undef MPI_Neighbor_alltoall
+#undef MPI_Neighbor_alltoallv
+#undef MPI_Neighbor_alltoallw
 #undef MPI_Reduce_scatter
 #undef MPI_Reduce_scatter_block
 #undef MPI_Alltoallw
@@ -242,6 +251,15 @@
 #define MPI_Sendrecv_replace(...) CAMPI_AWAIT(::campi::Sendrecv_replace(__VA_ARGS__))
 #define MPI_Reduce_scatter(...) CAMPI_AWAIT(::campi::Reduce_scatter(__VA_ARGS__))
 #define MPI_Reduce_scatter_block(...) CAMPI_AWAIT(::campi::Reduce_scatter_block(__VA_ARGS__))
+#define MPI_Comm_idup(...) CAMPI_AWAIT(::campi::Comm_idup(__VA_ARGS__))
+#define MPI_Comm_idup_with_info(...) CAMPI_AWAIT(::campi::Comm_idup_with_info(__VA_ARGS__))
+#define MPI_Ireduce_scatter(...) CAMPI_AWAIT(::campi::Ireduce_scatter(__VA_ARGS__))
+#define MPI_Ireduce_scatter_block(...) CAMPI_AWAIT(::campi::Ireduce_scatter_block(__VA_ARGS__))
+#define MPI_Neighbor_allgather(...) CAMPI_AWAIT(::campi::Neighbor_allgather(__VA_ARGS__))
+#define MPI_Neighbor_allgatherv(...) CAMPI_AWAIT(::campi::Neighbor_allgatherv(__VA_ARGS__))
+#define MPI_Neighbor_alltoall(...) CAMPI_AWAIT(::campi::Neighbor_alltoall(__VA_ARGS__))
+#define MPI_Neighbor_alltoallv(...) CAMPI_AWAIT(::campi::Neighbor_alltoallv(__VA_ARGS__))
+#define MPI_Neighbor_alltoallw(...) CAMPI_AWAIT(::campi::Neighbor_alltoallw(__VA_ARGS__))
 #define MPI_Alltoallw(...)   CAMPI_AWAIT(::campi::Alltoallw(__VA_ARGS__))
 // Aborts at run time unless written CAMPI_MIGRATE inside a CAMPI_MIGRATABLE block.
 #define AMPI_Migrate(...)    CAMPI_AWAIT(::campi::Migrate(__VA_ARGS__))
@@ -250,15 +268,6 @@
  * a barrier, an internal waitall, or a [sync] entry method as every one-sided
  * operation and window lock does) and have no campi awaitable yet: a use
  * fails to compile instead of aborting at run time in TCharm::stop. */
-#undef MPI_Comm_idup
-#undef MPI_Comm_idup_with_info
-#undef MPI_Ireduce_scatter
-#undef MPI_Ireduce_scatter_block
-#undef MPI_Neighbor_allgather
-#undef MPI_Neighbor_allgatherv
-#undef MPI_Neighbor_alltoall
-#undef MPI_Neighbor_alltoallv
-#undef MPI_Neighbor_alltoallw
 #undef MPI_Win_create
 #undef MPI_Win_allocate
 #undef MPI_Win_free
@@ -287,15 +296,6 @@
 #undef AMPI_GPU_Invoke_wr
 #undef AMPI_Yield
 #undef AMPI_Suspend
-#define MPI_Comm_idup(...)                  campi_unsupported_blocking_call_MPI_Comm_idup
-#define MPI_Comm_idup_with_info(...)        campi_unsupported_blocking_call_MPI_Comm_idup_with_info
-#define MPI_Ireduce_scatter(...)            campi_unsupported_blocking_call_MPI_Ireduce_scatter
-#define MPI_Ireduce_scatter_block(...)      campi_unsupported_blocking_call_MPI_Ireduce_scatter_block
-#define MPI_Neighbor_allgather(...)         campi_unsupported_blocking_call_MPI_Neighbor_allgather
-#define MPI_Neighbor_allgatherv(...)        campi_unsupported_blocking_call_MPI_Neighbor_allgatherv
-#define MPI_Neighbor_alltoall(...)          campi_unsupported_blocking_call_MPI_Neighbor_alltoall
-#define MPI_Neighbor_alltoallv(...)         campi_unsupported_blocking_call_MPI_Neighbor_alltoallv
-#define MPI_Neighbor_alltoallw(...)         campi_unsupported_blocking_call_MPI_Neighbor_alltoallw
 #define MPI_Win_create(...)                 campi_unsupported_blocking_call_MPI_Win_create
 #define MPI_Win_allocate(...)               campi_unsupported_blocking_call_MPI_Win_allocate
 #define MPI_Win_free(...)                   campi_unsupported_blocking_call_MPI_Win_free

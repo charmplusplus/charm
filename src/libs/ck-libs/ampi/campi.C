@@ -825,6 +825,43 @@ request_awaiter Exscan(const void *sbuf, void *rbuf, int count, MPI_Datatype typ
   CAMPI_POST_AND_WAIT(MPI_Iexscan(sbuf, rbuf, count, type, op, comm, req), MPI_STATUS_IGNORE)
 }
 
+request_awaiter Neighbor_allgather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                                   int rcount, MPI_Datatype rtype, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ineighbor_allgather(sbuf, scount, stype, rbuf, rcount, rtype, comm, req),
+                      MPI_STATUS_IGNORE)
+}
+
+request_awaiter Neighbor_allgatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                                    const int *rcounts, const int *displs, MPI_Datatype rtype,
+                                    MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ineighbor_allgatherv(sbuf, scount, stype, rbuf, rcounts, displs, rtype,
+                                               comm, req),
+                      MPI_STATUS_IGNORE)
+}
+
+request_awaiter Neighbor_alltoall(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                                  int rcount, MPI_Datatype rtype, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ineighbor_alltoall(sbuf, scount, stype, rbuf, rcount, rtype, comm, req),
+                      MPI_STATUS_IGNORE)
+}
+
+request_awaiter Neighbor_alltoallv(const void *sbuf, const int *scounts, const int *sdispls,
+                                   MPI_Datatype stype, void *rbuf, const int *rcounts,
+                                   const int *rdispls, MPI_Datatype rtype, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ineighbor_alltoallv(sbuf, scounts, sdispls, stype, rbuf, rcounts,
+                                              rdispls, rtype, comm, req),
+                      MPI_STATUS_IGNORE)
+}
+
+request_awaiter Neighbor_alltoallw(const void *sbuf, const int *scounts, const MPI_Aint *sdispls,
+                                   const MPI_Datatype *stypes, void *rbuf, const int *rcounts,
+                                   const MPI_Aint *rdispls, const MPI_Datatype *rtypes,
+                                   MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ineighbor_alltoallw(sbuf, scounts, sdispls, stypes, rbuf, rcounts,
+                                              rdispls, rtypes, comm, req),
+                      MPI_STATUS_IGNORE)
+}
+
 #undef CAMPI_POST_AND_WAIT
 
 // The send data is packed first, so the receive can go straight into buf.
@@ -882,6 +919,20 @@ task<int> Reduce_scatter(const void *sbuf, void *rbuf, const int *rcounts, MPI_D
   if (e != MPI_SUCCESS) co_return e;
   co_return co_await Scatterv(t, rcounts, displs.data(), type, rbuf, rcounts[rank], type,
                               AMPI_COLL_SOURCE, comm);
+}
+
+// AMPI's MPI_Ireduce_scatter(_block) and MPI_Comm_idup complete before they
+// return, with *request = MPI_REQUEST_NULL; these do the same.
+task<int> Ireduce_scatter_block(const void *sbuf, void *rbuf, int count, MPI_Datatype type,
+                                MPI_Op op, MPI_Comm comm, MPI_Request *request) {
+  *request = MPI_REQUEST_NULL;
+  co_return co_await Reduce_scatter_block(sbuf, rbuf, count, type, op, comm);
+}
+
+task<int> Ireduce_scatter(const void *sbuf, void *rbuf, const int *rcounts, MPI_Datatype type,
+                          MPI_Op op, MPI_Comm comm, MPI_Request *request) {
+  *request = MPI_REQUEST_NULL;
+  co_return co_await Reduce_scatter(sbuf, rbuf, rcounts, type, op, comm);
 }
 
 // With MPI_IN_PLACE each rank sends from a copy of its receive buffer, taken
@@ -1103,6 +1154,17 @@ task<int> Comm_dup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm *newcomm) {
   if (ret != MPI_SUCCESS) co_return ret;
   MPI_Comm_set_info(*newcomm, info);
   co_return MPI_SUCCESS;
+}
+
+task<int> Comm_idup(MPI_Comm comm, MPI_Comm *newcomm, MPI_Request *request) {
+  *request = MPI_REQUEST_NULL;
+  co_return co_await Comm_dup(comm, newcomm);
+}
+
+task<int> Comm_idup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm *newcomm,
+                              MPI_Request *request) {
+  *request = MPI_REQUEST_NULL;
+  co_return co_await Comm_dup_with_info(comm, info, newcomm);
 }
 
 // MPI_Comm_create for intracommunicators (a split, as in ampi.C)
