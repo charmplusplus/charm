@@ -1,7 +1,7 @@
 // The coroutine version of tests/charm++/sdag/migration.ci: migrations in the
 // middle of a coroutine entry method, synchronized (after quiescence) and
-// anytime; messages received before and after a migration; the coroutine's
-// site chain and the buffered messages pupped with the element.
+// anytime; messages received before and after a migration; the site chain of
+// the coroutine and the buffered messages pupped with the element.
 
 module migration {
 

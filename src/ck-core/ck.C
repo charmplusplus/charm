@@ -29,17 +29,36 @@ CksvExtern(ObjNumRdmaOpsMap, pendingZCOps);
 typedef std::map<int, CkChareID>  Vidblockmap;
 CkpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
 CkpvDeclare(int, currentChareIdx);
-CkpvDeclare(void *, _ckCurrentMsg);  // see CkCurrentMessage (charm++.h)
-bool _ckCoroFakeMigrate = false;     // +ck_fakemigrate (parsed in init.C), read by ckcoro.h
-CkpvDeclare(int, _ckCurrentEp);
-CkpvDeclare(Chare *, _ckDestroyLater);   // see Chare::ckDestroyLater (charm++.h)
+#endif
 
+CkpvDeclare(void *, _ckCurrentMsg);  // see CkCurrentMessage (charm++.h)
+CkpvDeclare(int, _ckCurrentEp);
+bool _ckCoroFakeMigrate = false;     // +ck_fakemigrate (parsed in init.C), read by ckcoro.h
+
+// ckDestroyLater: a Converse message to this PE whose handler destroys the
+// chare, so the destruction follows the return of whatever is running on
+// the chare now (an entry method, or a direct call that resumed a
+// coroutine), and several chares may ask on one PE.
+int _ckDestroyLaterHandlerIdx;
+struct CkDestroyLaterMsg {
+  char core[CmiMsgHeaderSizeBytes];
+  Chare *obj;
+};
+void _ckDestroyLaterHandler(void *m) {
+  Chare *obj = ((CkDestroyLaterMsg *)m)->obj;
+  CmiFree(m);
+  obj->ckDestroy();
+}
 void Chare::ckDestroy(void) { delete this; }
-void Chare::ckDestroyLater(void) { CkpvAccess(_ckDestroyLater) = this; }
+void Chare::ckDestroyLater(void) {
+  CkDestroyLaterMsg *m = (CkDestroyLaterMsg *)CmiAlloc(sizeof(CkDestroyLaterMsg));
+  m->obj = this;
+  CmiSetHandler(m, _ckDestroyLaterHandlerIdx);
+  CmiSyncSendAndFree(CkMyPe(), sizeof(CkDestroyLaterMsg), (char *)m);
+}
 void IrrGroup::ckDestroy(void) {
   CkAbort("ckDestroy/ckDestroyLater on a group or nodegroup branch: groups are not destroyed one branch at a time");
 }
-#endif
 
 // Map of array IDs to array elements for fast message delivery
 CkpvDeclare(ArrayObjMap, array_objs);

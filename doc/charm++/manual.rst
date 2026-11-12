@@ -1596,8 +1596,11 @@ an element, you may insert a new element at its index.
 A chare that decides inside one of its own entry methods that it is
 finished can call ``ckDestroyLater()``, defined for every chare: the
 chare is destroyed (deleted, or for an array element detached from the
-array first, as ``ckDestroy()`` does) as soon as the entry method that
-is running on it returns. This is the way to destroy a chare when
+array first, as ``ckDestroy()`` does) by a message to the same PE,
+handled after whatever is running on the chare has returned: the entry
+method, or a direct call such as the load balancer's call of
+``ResumeFromSync``. The chare must not migrate before then, so the call
+belongs at the end of the body. This is the way to destroy a chare when
 something of it is still on the stack, for example a coroutine entry
 method (section :numref:`sec:ckcoro`) that has not finished yet; a
 singleton chare's entry method may instead ``delete this`` as its last
@@ -2111,8 +2114,6 @@ contains when clauses. It has to be only called using the proxy i.e.
 ``computeObj.startStep();`` , where ``computeObj`` is the proxy to
 ``ComputeObject``.
 
-.. _sec:pup:
-
 .. _sec:ckcoro:
 
 Structured Control Flow: Coroutine Entry Methods
@@ -2246,7 +2247,11 @@ runs again from the top and jumps to the recorded wait. The jump is what
 the block, and each wait is a ``case`` of that switch labelled with its
 source line, so a fresh start enters the block from the top, a restart
 enters it at the recorded wait, and a recorded wait that is not in the
-block aborts before any of the block runs. This gives the rules:
+block aborts before any of the block runs. Because the restart sites are
+source line numbers, a checkpoint can be restarted only by a binary built
+from the same source layout of the coroutine bodies: a line added above a
+wait, even a comment, makes ``+restart`` abort with a message naming the
+two sites. This gives the rules:
 
 -  Any value that is live across a wait is a member of the chare, pupped
    as usual: the variables of a ``CK_WHEN_BLOCK`` end with its block, and
@@ -2254,6 +2259,11 @@ block aborts before any of the block runs. This gives the rules:
    past a local with an initializer, and a local declared before
    ``CK_MIGRATABLE`` is silently re-initialized when the body runs
    again). A pointer to an array parameter is valid until the next wait.
+   Compiling with ``-Wall`` is recommended: clang reports a scalar local
+   used across a wait without an initializer as
+   ``-Wsometimes-uninitialized`` ("variable 'x' is used uninitialized
+   whenever switch case is taken"), and under ``+ck_fakemigrate`` such a
+   variable holds an unspecified value after the rebuild.
 -  Code inside ``CK_MIGRATABLE`` before the recorded wait is skipped
    after a migration, so its results must be members; code before
    ``CK_MIGRATABLE`` runs again every time the body is rebuilt, so it
@@ -2272,7 +2282,10 @@ block aborts before any of the block runs. This gives the rules:
    definition (a reference would bind to the generated wrapper's local,
    which is gone after the first wait). They are supplied again when the
    body runs again after a migration. An array parameter points into the
-   entry's message, which lives as long as the coroutine.
+   entry's message, which lives as long as the coroutine. A coroutine
+   entry that takes a message type has the message copied once per
+   invocation by the coroutine state, so a large message is better sent
+   to an inbox entry and waited for, or passed as marshalled parameters.
 
 A function that itself waits is a coroutine task: a function returning
 ``ck::coro::task<T>`` whose body is a ``CK_MIGRATABLE`` block of its own,
@@ -2330,7 +2343,11 @@ parameters are supplied again by the restart, so they may be the
 The command line option ``+ck_fakemigrate`` makes every wait pack and
 unpack the chare's coroutines in place the first time a coroutine
 suspends there, so that a program can check the rules above on one
-processor without a load balancer.
+processor without a load balancer. The flag checks the restart of the
+coroutine bodies only, not the chare's own pup (a member left out of
+``pup()`` keeps its value under the flag), so a run on two or more PEs
+with a load balancer, or a checkpoint and ``+restart``, is still needed
+to check the pup.
 
 The chare kinds differ only in how a suspended coroutine is invoked
 again after a migration or a restart from a checkpoint: the coroutine
@@ -2344,12 +2361,15 @@ lock is released whenever the coroutine suspends, because the entry
 method returns there. These entries must not be tagged ``exclusive``
 by hand.
 
-Inside any entry method, ``CkCurrentMessage()`` returns the message being
-delivered (for marshalled parameters, the message that carries them) and
-``CkCurrentEntry()`` the index of the entry method; both are null (-1)
-outside an entry method, and an ``[inline]`` or ``[local]`` call sees the
-caller's delivery. The inbox entries use them to keep marshalled
-parameters in the message they arrived in instead of copying them.
+Inside a ``[coroutine]`` or ``[inbox]`` entry method, ``CkCurrentMessage()``
+returns the message being delivered (for marshalled parameters, the
+message that carries them) and ``CkCurrentEntry()`` the index of the entry
+method; their generated wrappers set them, so both are null (-1) in every
+other entry method and outside entry methods, and an ``[inline]`` or
+``[local]`` call made from such an entry sees the caller's delivery. The
+coroutine entries use them to register the body with its message, and the
+inbox entries to keep marshalled parameters in the message they arrived in
+instead of copying them.
 
 Programs in the distribution that use coroutine entry methods:
 ``examples/charm++/heat1d-coro`` (the program above, with migration
@@ -2405,14 +2425,22 @@ Differences from SDAG
    ``forall`` is one coroutine task
    that takes the index. SDAG's inline clause bodies have no equivalent
    (a lambda coroutine would outlive its closure).
+-  A coroutine entry is invoked only through its proxy; a direct C++
+   call of the member function aborts. SDAG's
+   ``ResumeFromSync() { doStep(); }`` becomes
+   ``thisProxy[thisIndex].doStep()`` or an inbox wait on
+   ``ResumeFromSync``.
 -  A coroutine body must not delete its own chare (``delete this``
    inside a ``when`` body is allowed in SDAG): it calls
-   ``ckDestroyLater()``, and the chare is destroyed when the entry
-   method running on it returns, as ``examples/charm++/fib-coro`` does.
+   ``ckDestroyLater()``, and the chare is destroyed by a message handled
+   after the call running on it returns, as ``examples/charm++/fib-coro``
+   does.
 -  Not available: several active invocations of one entry per chare.
 -  Available only here: waits inside called functions (``CK_CALL``),
    plain C++ control flow and calls, parameters on the coroutine entry,
    and no bodies in the ``.ci`` file.
+
+.. _sec:pup:
 
 Serialization Using the PUP Framework
 -------------------------------------

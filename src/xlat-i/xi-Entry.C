@@ -114,6 +114,9 @@ void Entry::check() {
                          "python or aggregate)", first_line_);
       if (retType && !retType->isVoid())
         XLAT_ERROR_NOCOL("an 'inbox' or 'coroutine' entry method returns void", first_line_);
+      if (isNoKeep())
+        XLAT_ERROR_NOCOL("an 'inbox' or 'coroutine' entry method is not 'nokeep': the coroutine "
+                         "state keeps the message", first_line_);
       if (isCoroutine() && isReductionTarget())
         XLAT_ERROR_NOCOL("a 'coroutine' entry method is not a reduction target: make the "
                          "target an 'inbox' entry and wait for it", first_line_);
@@ -2161,6 +2164,8 @@ void Entry::genDefs(XStr& str) {
       // on that thread and deletes it when the thread ends. The wrapper owns
       // the message, so it takes no extra reference.
       if (isThreaded()) str << callThread(epStr(true), 0, false);
+      if (isInbox())
+        str << "  CkEntryScope impl_entry(impl_msg, " << epIdx(1, true) << ");\n";
       if (isExclusive()) {
         // The reduction wrapper of an exclusive entry takes the node lock as
         // the direct call does, resending the reduction message when the
@@ -2370,6 +2375,10 @@ void Entry::genDefs(XStr& str) {
     str << postCall;
   } else if (!isLocal()) {
     if (isThreaded()) str << callThread(epStr());
+    // The body of a coroutine entry, and the inbox stub reached by a local
+    // delivery, read the message and the entry index being delivered.
+    if (isInbox() || isCoroutine())
+      str << "  CkEntryScope impl_entry(impl_msg, " << epIdx(1) << ");\n";
     str << preMarshall;
     if (param->isMarshalled()) {
       if (param->hasConditional())
@@ -2403,6 +2412,8 @@ void Entry::genDefs(XStr& str) {
     str << "  envelope *env = UsrToEnv(impl_buf);\n";
     if (!isLocal()) {
       if (!param->hasConditional()) {
+        if (isInbox() || isCoroutine())
+          str << "  CkEntryScope impl_entry(impl_buf, " << epIdx(1) << ");\n";
         genCall(str, preCall, false, true);
         /*FIXME: implP.size() is wrong if the parameter list contains arrays--
         need to add in the size of the arrays.

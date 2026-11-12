@@ -159,6 +159,8 @@ int   _roRestartHandlerIdx;
 int   _shrinkExpandRestartHandlerIdx;
 int   _bocHandlerIdx;
 int   _qdHandlerIdx;
+extern int _ckDestroyLaterHandlerIdx;          // ck.C
+extern void _ckDestroyLaterHandler(void *m);   // ck.C
 int   _qdCommHandlerIdx;
 int   _triggerHandlerIdx;
 
@@ -1264,6 +1266,7 @@ void initQd(char **argv)
 #endif
 	}
 	CmiAssignOnce(&_qdHandlerIdx, CmiRegisterHandler((CmiHandler)_qdHandler));
+	CmiAssignOnce(&_ckDestroyLaterHandlerIdx, CmiRegisterHandler((CmiHandler)_ckDestroyLaterHandler));
 	CmiAssignOnce(&_qdCommHandlerIdx, CmiRegisterHandler((CmiHandler)_qdCommHandler));
         if (CmiGetArgIntDesc(argv,"+qd",&_dummy_dq, "QD time in seconds")) {
           if (CmiMyPe()==0)
@@ -1387,8 +1390,6 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvAccess(_ckCurrentMsg) = NULL;
 	CkpvInitialize(int, _ckCurrentEp);
 	CkpvAccess(_ckCurrentEp) = -1;
-	CkpvInitialize(Chare *, _ckDestroyLater);
-	CkpvAccess(_ckDestroyLater) = nullptr;
 #if CMK_ERROR_CHECKING
 	CkpvInitialize(void *, _nokeepMsgInFlight);
 	CkpvAccess(_nokeepMsgInFlight) = NULL;

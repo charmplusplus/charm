@@ -199,6 +199,24 @@ class coroutine {
   std::coroutine_handle<> h_;
 };
 
+} // namespace coro
+} // namespace ck
+
+// A coroutine entry method takes its parameters by value: a reference would
+// bind to the generated wrapper's local, which is gone after the first wait
+// (the usual `const std::vector<T> &` of a marshalled entry is rejected at
+// compile time; review of PR #4231).
+template <class Self, class... Params>
+struct std::coroutine_traits<ck::coro::coroutine, Self, Params...> {
+  static_assert((!std::is_reference_v<Params> && ...),
+                "a coroutine entry method takes its parameters by value: a reference "
+                "parameter dangles after the first wait");
+  using promise_type = ck::coro::coroutine::promise_type;
+};
+
+namespace ck {
+namespace coro {
+
 /* ---------------- the inbox ---------------- */
 
 template <class T>
@@ -333,6 +351,9 @@ struct record {
       p | ep;
       p | target;
       p | pending;
+      // A restart message in flight when a checkpoint was taken does not
+      // survive the restart from it: send it again on unpacking.
+      if (p.isUnpacking() && p.isCheckpoint()) pending = false;
       bool hasMsg = msg != nullptr;
       p | hasMsg;
       if (hasMsg) CkPupMessage(p, &msg);
@@ -1005,6 +1026,16 @@ inline record *enter_await() {
   rec->rebuilt = rec->ch.restarting; // a restarted body has reached its recorded site
   rec->ch.restarting = false;
   rec->atSite = rec->ch.noted && !rec->ch.notedCall;
+  if (rec->atSite) {
+    // A site inside a helper that was awaited with a plain co_await instead
+    // of CK_CALL is not on any restart path: the restart would run the
+    // caller from the top (review of PR #4231).
+    for (unsigned d = 0; d < rec->ch.depth; d++)
+      if (!rec->ch.linked[d])
+        CkAbort("ck::coro: the wait at line %d is inside a ck::coro::task that was awaited "
+                "with co_await instead of CK_CALL (depth %u of %u): a restart could not reach it",
+                rec->ch.sites.empty() ? 0 : rec->ch.sites.back(), d, rec->ch.depth);
+  }
   rec->ch.noted = false;
   return rec;
 }

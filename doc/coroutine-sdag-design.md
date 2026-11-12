@@ -101,7 +101,10 @@ SDAG program, so the SDAG text is shorter for that reason and not because of
 the notation. The SDAG program has no checkpoint, and it balances load
 outside the SDAG code: `check_and_compute` ends with `AtSync()` instead of
 `doStep()`, and the plain entry `ResumeFromSync` calls `doStep()`. The
-coroutine version could do the same with the same two lines. It waits for
+coroutine version cannot call `doStep()` directly (a direct C++ call of a
+coroutine entry aborts): it would write `thisProxy[thisIndex].doStep()` in
+`ResumeFromSync`, or wait for `ResumeFromSync` as an inbox entry, which is
+what it does. It waits for
 the balancer and for the checkpoint inside the body on purpose, so that the
 test migrates and checkpoints an element suspended at a site. Without those
 two blocks the coroutine body is the loop shown, inside `CK_MIGRATABLE`.
@@ -212,16 +215,19 @@ that the class places in its body: the state member and its pup hook
 (called by the generated recursive pup, as `_sdag_pup` is), the inbox
 entry bodies, the test the promise of `ck::coroutine` uses to check that
 the method runs as one of the chare's coroutine entries, and `struct
-inbox` with one function per inbox entry returning a `ck::coro::want`. The generated wrappers are not
-changed: a coroutine entry's wrapper calls the method as before, and the
-body learns its entry index and message from `CkCurrentEntry()` and
-`CkCurrentMessage()`, a runtime accessor added for this (three lines in
-`CkInvokeEP`). An inbox entry's generated body is the one-liner the
-programmer wrote before. Validation: both attributes need an array
-element, a void return, and none of threaded, sync, local, inline,
-whenidle, iget, python or aggregate; `[inbox]` rejects array, conditional
-and nocopy parameters; `[coroutine]` takes no parameters or one message and
-is not a reduction target. The whole translator change is the two
+inbox` with one function per inbox entry returning a `ck::coro::want`. The generated wrapper of a
+coroutine or inbox entry sets the message and entry index being delivered
+(`CkEntryScope` in charm++.h, restored when the wrapper returns), and the
+body learns them from `CkCurrentEntry()` and `CkCurrentMessage()`; until
+the review of PR #4231 `CkInvokeEP` set them for every entry method, which
+cost about 3 ns per entry method in every program. An inbox entry's
+generated body is the one-liner the programmer wrote before. Validation: both attributes work on any chare
+kind (chare, group, nodegroup, array element) and need a void return and
+none of threaded, sync, local, inline, whenidle, iget, python, aggregate
+or nokeep; `[inbox]` takes marshalled parameters, arrays included, or a
+message; `[coroutine]` takes marshalled parameters (by value in the C++
+definition) or a message and is not a reduction target; both reject
+conditional and nocopy parameters. The whole translator change is the two
 keywords, the two bits, the checks, and `Chare::genCoroCode` with
 `Entry::genCoroCode` (about 120 lines in `src/xlat-i`), plus the
 regenerated parser and scanner.
@@ -537,19 +543,24 @@ the rules in section 3.
 ## 9. Decision memo for Kale
 
 **Recommendation: ship `ckcoro.h` with the `[inbox]` and `[coroutine]`
-attributes in the beta, marked experimental.** The runtime change is one
-accessor (`CkCurrentMessage`, `CkCurrentEntry`: three lines in
-`CkInvokeEP` and a hook in the recursive pup), the translator change is
-two attributes that generate a macro, and neither touches a program that
-does not use them. The branch carries a real program (jacobi3d with load
+attributes in the beta, marked experimental.** The runtime changes are
+the accessors `CkCurrentMessage()` and `CkCurrentEntry()`, set by the
+generated wrappers of coroutine and inbox entries; `Chare::ckDestroyLater()`
+(a message to the PE whose handler destroys the chare), with `ckDestroy`
+made virtual; a node lock taken in the generated reduction wrapper of
+`[exclusive]` nodegroup entries, which resends the reduction message when
+the lock is busy; and a hook in the recursive pup. Two of them reach every
+program: the node lock (a correction of the wrapper, which did not take
+the lock before) and the virtual `ckDestroy`; `CkInvokeEP` is unchanged
+since the review of PR #4231. The translator change is two attributes that
+generate a macro. The branch carries a real program (jacobi3d with load
 balancing, rebuild, checkpoint and restart), the SDAG migration test, and
 a marshalled-inbox test (matching by the first parameter, a broadcast, a
 reduction target). Matching costs a fifth of SDAG's and jacobi3d runs 14
 to 17 percent faster per iteration. The restrictions are the ones CAMPI
 already imposes on AMPI programs (state in members, sites are declared,
-nothing packed except at a site) plus one active coroutine per entry, no
-marshalled parameters on the coroutine entry, and no arrays among inbox
-parameters.
+nothing packed except at a site) plus one active coroutine per entry and
+no direct C++ call of a coroutine entry.
 
 The attributes are in the beta (Kale, 2026-11-10) because they remove the
 three things a reader of the hand-written form complains about first: the
@@ -601,7 +612,7 @@ them in one table each so that a reviewer can check what was weighed.
 | Inline bodies for `overlap` clauses, as lambda coroutines | rejected for now | A lambda coroutine outlives its closure object, so captures dangle; a restart would have to recreate the lambda in the same state. Each clause is a named `ck::coro::task<void>`. |
 | Migration while suspended at any `co_await` | restricted to sites | A plain `co_await` between sites is allowed; packing there aborts with the entry's name, because only a site has a recorded id the restart can jump to. (Section 3 rule 3.) |
 | Several active invocations of one coroutine entry per chare | rejected unless a program needs it | A restart is a plain re-invocation of the entry; with several invocations the restart would have to tell them apart, and no program in the corpus needs it. (Section 3 rule 4, Kale 2026-11-11.) |
-| `delete this` inside a body (allowed in an SDAG `when` body) | replaced by `Chare::ckDestroyLater()` | The coroutine body is still on the stack when it would delete the chare, and the chare's state member is touched when the body ends; `fib-coro` first used a separate destroy entry, and Kale asked for a facility in the base class instead (2026-11-11). The chare is destroyed by `CkInvokeEP` after the entry method returns. |
+| `delete this` inside a body (allowed in an SDAG `when` body) | replaced by `Chare::ckDestroyLater()` | The coroutine body is still on the stack when it would delete the chare, and the chare's state member is touched when the body ends; `fib-coro` first used a separate destroy entry, and Kale asked for a facility in the base class instead (2026-11-11). The chare is destroyed by the handler of a message `ckDestroyLater` sends to its own PE, after the call running on the chare returns (an entry method or a direct call such as the load balancer's `ResumeFromSync`). |
 | `exclusive` written by hand on a nodegroup's coroutine or inbox entries | rejected, charmxi adds it | SDAG's rule: the entries are exclusive, the node lock is released at every wait because the entry method returns there, and a hand-written tag is an error so that the generated code is the only place the lock is taken. (Kale 2026-11-11.) |
 | `CK_END` closing `CK_COROUTINE()`, and `CK_TASK` for a coroutine task | renamed, then replaced | First matched pairs with no synonyms (`CK_COROUTINE`/`CK_COROUTINE_END`, `CK_CORO_TASK`/`CK_CORO_TASK_END`; `CK_TASK` would collide with Charm++'s stealable tasks), then the pairs themselves were replaced by one block, `CK_MIGRATABLE { ... }`, with the registration moved into the promise. (Kale 2026-11-11; section 4.8.) |
 | An awaitable future | not in this PR | Sketched as a callback-entry awaitable; no program in the corpus needed it. |
@@ -627,6 +638,7 @@ them in one table each so that a reviewer can check what was weighed.
   stays so unless a program needs it, Kale 2026-11-11).
 - Inline bodies for `overlap` clauses (see 9a).
 - Projections events for the code between waits, as SDAG's named `serial` blocks have (see 9a).
-- The copy of the entry's message that a restart of a message-parameter
-  coroutine entry sends: measured only for small messages (jacobi3d,
-  the tests); a large message entry would pay a copy per migration.
+- The copy of the entry's message that the coroutine state makes for a
+  coroutine entry that takes a message type: paid once per invocation
+  (a restart sends a second copy), measured only for small messages
+  (jacobi3d, the tests).

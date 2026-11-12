@@ -14,11 +14,14 @@ module owners {
     entry NodeGroupTest();
     entry [coroutine] void run(int rounds);
     entry [inbox] void token(int round, int from);
+    // The group branches reduce their sums to every branch: the reduction
+    // wrapper of a nodegroup inbox entry takes the node lock.
+    entry [inbox, reductiontarget] void groupSum(int s);
     entry [inbox] void resume();
   }
 
   // A ring over the PEs: each branch passes one token per round to the
-  // next PE and sends the same token to its node's NodeGroupTest branch.
+  // next PE and sends the same token to the NodeGroupTest branch of its node.
   group [migratable] GroupTest {
     entry GroupTest();
     entry [coroutine] void run(int rounds, CProxy_NodeGroupTest ng);

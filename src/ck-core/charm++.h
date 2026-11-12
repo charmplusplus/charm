@@ -259,6 +259,9 @@ class Chare {
     /// returned (ckDestroy from inside the call, which is the usual
     /// "delete this" in an entry method, is not possible when something of
     /// the chare is still on the stack: a coroutine body, for example).
+    /// The destruction is a message to this PE, handled after the current
+    /// call returns, whether it came through an entry method or a direct
+    /// call; the chare must not migrate before then.
     void ckDestroyLater(void);
     // object message queue
     void  CkEnableObjQ();
@@ -296,32 +299,33 @@ void CkCallstackUnwind(Chare *obj);
 Chare *CkActiveObj(void);
 Chare *CkAllocateChare(int objId);
 
-// The message and the entry index being delivered to the running entry
-// method: null and -1 outside an entry method. An [inline] or [local] call
-// made from an entry method sees the caller's delivery.
+// The message and the entry index being delivered to a running [coroutine]
+// or [inbox] entry method, set by their generated wrappers (CkEntryScope):
+// null and -1 elsewhere. An [inline] or [local] call made from such an
+// entry sees the caller's delivery. Read by ckcoro.h.
 CkpvExtern(void *, _ckCurrentMsg);
 CkpvExtern(int, _ckCurrentEp);
-CkpvExtern(Chare *, _ckDestroyLater);   // the chare that asked for ckDestroyLater, or null
 extern bool _ckCoroFakeMigrate;   // +ck_fakemigrate (init.C), read by ckcoro.h
 static inline void *CkCurrentMessage(void) { return CkpvAccess(_ckCurrentMsg); }
 static inline int CkCurrentEntry(void) { return CkpvAccess(_ckCurrentEp); }
+struct CkEntryScope {
+  void *prevMsg;
+  int prevEp;
+  CkEntryScope(void *msg, int ep)
+      : prevMsg(CkpvAccess(_ckCurrentMsg)), prevEp(CkpvAccess(_ckCurrentEp)) {
+    CkpvAccess(_ckCurrentMsg) = msg;
+    CkpvAccess(_ckCurrentEp) = ep;
+  }
+  ~CkEntryScope() {
+    CkpvAccess(_ckCurrentMsg) = prevMsg;
+    CkpvAccess(_ckCurrentEp) = prevEp;
+  }
+};
 
 static inline void CkInvokeEP(Chare *obj, const int &epIdx, void *msg) {
-  void *prevMsg = CkpvAccess(_ckCurrentMsg);
-  int prevEp = CkpvAccess(_ckCurrentEp);
-  CkpvAccess(_ckCurrentMsg) = msg;
-  CkpvAccess(_ckCurrentEp) = epIdx;
   CkCallstackPush(obj);
   _entryTable[epIdx]->call(msg, obj);
   CkCallstackPop(obj);
-  CkpvAccess(_ckCurrentMsg) = prevMsg;
-  CkpvAccess(_ckCurrentEp) = prevEp;
-  // ckDestroyLater: the pointer is compared, not followed (the call may
-  // have deleted obj itself), and only the chare's own entry destroys it.
-  if (CkpvAccess(_ckDestroyLater) == obj) {
-    CkpvAccess(_ckDestroyLater) = nullptr;
-    obj->ckDestroy();
-  }
 }
 
 #if CMK_HAS_IS_CONSTRUCTIBLE

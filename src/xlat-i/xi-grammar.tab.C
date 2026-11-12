@@ -2538,13 +2538,13 @@ yyreduce:
 
   case 42:
 #line 271 "xi-grammar.y" /* yacc.c:1646  */
-    { ReservedWord(INBOX, (yyloc).first_column, (yyloc).last_column); YYABORT; }
+    { (yyval.strval) = strdup("inbox"); }
 #line 2543 "y.tab.c" /* yacc.c:1646  */
     break;
 
   case 43:
 #line 272 "xi-grammar.y" /* yacc.c:1646  */
-    { ReservedWord(COROUTINE, (yyloc).first_column, (yyloc).last_column); YYABORT; }
+    { (yyval.strval) = strdup("coroutine"); }
 #line 2549 "y.tab.c" /* yacc.c:1646  */
     break;
 

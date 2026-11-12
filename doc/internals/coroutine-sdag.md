@@ -65,10 +65,12 @@ header's opening comment and the manual section "Coroutine Entry Methods".
 - `thread_local std::coroutine_handle<> pending_root_`: set by
   `coroutine::promise_type::get_return_object`, consumed by `state::begin`
   so that the record learns its frame handle.
-- `CkpvAccess(_ckCurrentMsg)`, `CkpvAccess(_ckCurrentEp)` (ck.C, set and
-  restored around the call in `CkInvokeEP`, charm++.h): the message and
-  entry index being delivered, read as `CkCurrentMessage()` and
-  `CkCurrentEntry()`.
+- `CkpvAccess(_ckCurrentMsg)`, `CkpvAccess(_ckCurrentEp)` (ck.C; set and
+  restored by `CkEntryScope`, charm++.h, which the generated wrappers of
+  coroutine and inbox entries declare around the call, in `_call_`,
+  `_callmarshall_` and the reduction wrapper): the message and entry
+  index being delivered, read as `CkCurrentMessage()` and
+  `CkCurrentEntry()`; null and -1 in other entry methods.
 - The generated `X_CORO_CODE` macro (`Chare::genCoroCode`,
   `Entry::genCoroCode` in src/xlat-i): `ck::coro::state __coro`,
   `_coro_pup(p)` (`__coro.pup(p, this)`, called by `recursive_pup_impl`
@@ -230,11 +232,13 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
 - `CKCORO_DEBUG=1` in the environment prints each rebuild and each
   restart.
 - A coroutine body must not delete its chare (its frame would be destroyed
-  while running). `Chare::ckDestroyLater()` (charm++.h, ck.C) records the
-  chare in `CkpvAccess(_ckDestroyLater)` and `CkInvokeEP` calls the
-  virtual `ckDestroy()` after the entry method call returns, when the
-  recorded pointer equals the object (compared, not followed: the call may
-  have deleted the object itself). `Chare::ckDestroy` deletes, the
+  while running). `Chare::ckDestroyLater()` (charm++.h, ck.C) sends a
+  Converse message (`CkDestroyLaterMsg`, handler
+  `_ckDestroyLaterHandler`, registered in init.C) to its own PE, whose
+  handler calls the virtual `ckDestroy()`; so the destruction follows the
+  return of whatever is running on the chare, an entry method or a direct
+  call (the load balancer's `ResumeFromSync`), and several chares of one
+  PE may ask in one entry method. `Chare::ckDestroy` deletes, the
   array element's detaches first, a group's aborts.
 
 ## Where in the source
@@ -244,9 +248,9 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
   `note_site`, `abort_no_site`, `current_chain_`; included by `ckcoro.h`
   and by CAMPI's `campi_core.h`.
 - `src/ck-core/CMakeLists.txt`: installs the headers.
-- `src/ck-core/charm++.h` (`CkInvokeEP`, `CkCurrentMessage`,
-  `CkCurrentEntry`, `recursive_pup_impl`), `ck.C`, `init.C`: the accessor
-  and the `_coro_pup` hook.
+- `src/ck-core/charm++.h` (`CkEntryScope`, `CkCurrentMessage`,
+  `CkCurrentEntry`, `ckDestroyLater`, `recursive_pup_impl`), `ck.C`,
+  `init.C`: the accessors, the destroy message and the `_coro_pup` hook.
 - `src/xlat-i/xi-scan.l`, `xi-grammar.y` (and the regenerated `xi-scan.C`,
   `xi-grammar.tab.C/h`), `xi-Entry.{h,C}`, `xi-Chare.{h,C}`, `xi-Member.h`:
   the two attributes, their checks, and `X_CORO_CODE`.

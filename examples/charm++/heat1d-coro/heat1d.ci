@@ -1,6 +1,6 @@
 // Heat diffusion on a ring of 1D strips, written with coroutine entry
-// methods (ckcoro.h). The example of the manual section "Structured
-// Control Flow: Coroutine Entry Methods".
+// methods (ckcoro.h). The example of the manual section Structured
+// Control Flow: Coroutine Entry Methods.
 mainmodule heat1d {
   readonly CProxy_Main mainProxy;
   readonly int numStrips;      // array elements

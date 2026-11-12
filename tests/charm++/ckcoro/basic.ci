@@ -1,7 +1,7 @@
 // The coroutine version of tests/charm++/sdag/basic.ci: when, for, while,
-// if/else, case (with conjunction arms) and overlap. The SDAG test's
-// singleton chare is a one-element array here (coroutine entries belong to
-// array elements).
+// if/else, case (with conjunction arms) and overlap. The singleton chare of
+// the SDAG test is a one-element array here, so that the migration tests of
+// the suite can share its code.
 
 module basic {
   array [1D] BasicTest {

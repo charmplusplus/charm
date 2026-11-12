@@ -198,6 +198,8 @@ public:
         check(from == (CkMyPe() + CkNumPes() - 1) % CkNumPes(), "token from the wrong PE");
         sum += from;
       }
+      contribute(sizeof(int), &sum, CkReduction::sum_int,
+                 CkCallback(CkReductionTarget(NodeGroupTest, groupSum), ng));
       contribute(CkCallback(CkReductionTarget(Main, groupReady), mainProxy));
       CK_WHEN(inbox::resume());
       contribute(sizeof(int), &sum, CkReduction::sum_int,
@@ -208,12 +210,15 @@ public:
 
 class NodeGroupTest : public CBase_NodeGroupTest {
   NodeGroupTest_CORO_CODE
-  int round, count, from, sum;
+  int round, count, from, sum, groupTotal;
+  static void check(bool ok, const char* what) {
+    if (!ok) ::CkAbort("ckcoro owner test (nodegroup): %s", what);
+  }
 
 public:
-  NodeGroupTest() : round(0), count(0), from(-1), sum(0) {}
+  NodeGroupTest() : round(0), count(0), from(-1), sum(0), groupTotal(-1) {}
   NodeGroupTest(CkMigrateMessage* m) : CBase_NodeGroupTest(m) {}
-  void pup(PUP::er& p) { p | round; p | count; p | from; p | sum; }
+  void pup(PUP::er& p) { p | round; p | count; p | from; p | sum; p | groupTotal; }
 
   ck::coroutine run(int rounds) {
     CK_MIGRATABLE {
@@ -223,6 +228,10 @@ public:
           sum += from;
         }
       }
+      // The group reduction, delivered to every branch through the reduction
+      // wrapper of a nodegroup inbox entry (under the node lock).
+      CK_WHEN(inbox::groupSum(), groupTotal);
+      check(groupTotal == rounds * CkNumPes() * (CkNumPes() - 1) / 2, "group sum by reduction");
       contribute(CkCallback(CkReductionTarget(Main, nodeGroupReady), mainProxy));
       CK_WHEN(inbox::resume());
       contribute(sizeof(int), &sum, CkReduction::sum_int,

@@ -10,7 +10,7 @@ mainmodule ckcoro_tests {
   readonly CProxy_RefnumTest refnumTestProxy;
 
   // Migratable: a checkpoint (-chkpt DIR) is taken during the owner tests
-  // while Main's own coroutine entry runOwners is suspended.
+  // while runOwners, the own coroutine entry of Main, is suspended.
   mainchare [migratable] Main {
     entry Main(CkArgMsg* msg);
     entry void doBasicTest();
