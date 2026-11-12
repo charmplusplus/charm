@@ -1178,28 +1178,31 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
 
 /************** Receive: Chares *************/
 
+// The object on this PE that a chare message for entry epIdx is delivered
+// to; objPtr is the objPtr of its CkChareID (an index into chare_objs for a
+// plain chare unless CMK_CHARE_USE_PTR). NULL if the chare was deleted.
+static inline void *_localPlainChareObj(int epIdx, void *objPtr)
+{
+  int chareIdx = _entryTable[epIdx]->chareIdx;
+  int mainIdx = _chareTable[chareIdx]->mainChareType();
+  if (mainIdx != -1) {           // mainchare
+    CmiAssert(CkMyPe()==0);
+    return _mainTable[mainIdx]->getObj();
+  }
+#ifndef CMK_CHARE_USE_PTR
+  if (_chareTable[chareIdx]->chareType == TypeChare)
+    return CkpvAccess(chare_objs)[(CmiIntPtr)objPtr];
+#endif
+  return objPtr;
+}
+
 static inline void _processForPlainChareMsg(CkCoreState *ck,envelope *env)
 {
   if(isGroupDepUnsatisfied(ck, env))
     return;
   ck->process(); // ck->process() updates mProcessed count used in QD
   int epIdx = env->getEpIdx();
-  int mainIdx = _chareTable[_entryTable[epIdx]->chareIdx]->mainChareType();
-  void *obj;
-  if (mainIdx != -1)  {           // mainchare
-    CmiAssert(CkMyPe()==0);
-    obj = _mainTable[mainIdx]->getObj();
-  }
-  else {
-#ifndef CMK_CHARE_USE_PTR
-    if (_chareTable[_entryTable[epIdx]->chareIdx]->chareType == TypeChare)
-      obj = CkpvAccess(chare_objs)[(CmiIntPtr)env->getObjPtr()];
-    else
-      obj = env->getObjPtr();
-#else
-    obj = env->getObjPtr();
-#endif
-  }
+  void *obj = _localPlainChareObj(epIdx, env->getObjPtr());
   _invokeEntry(epIdx,env,obj);
   _STATS_RECORD_PROCESS_MSG_1();
 }
@@ -1838,7 +1841,8 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
 
 void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 {
-  if (pCid->onPE==CkMyPe())
+  void *obj = (pCid->onPE == CkMyPe()) ? _localPlainChareObj(entryIndex, pCid->objPtr) : NULL;
+  if (obj != NULL)
   {
 #if CMK_CHARMDEBUG
     //Just in case we need to breakpoint or use the envelope in some way
@@ -1848,10 +1852,10 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
     envelope *env = UsrToEnv(msg);
     if (env->isPacked()) CkUnpackMessage(&env);
     _STATS_RECORD_PROCESS_MSG_1();
-    _invokeEntryNoTrace(entryIndex,env,pCid->objPtr);
+    _invokeEntryNoTrace(entryIndex,env,obj);
   }
   else {
-    //No way to inline a cross-processor message:
+    //Not on this PE (or a virtual chare ID): send it normally
     CkSendMsg(entryIndex, msg, pCid, opts & (~CK_MSG_INLINE));
   }
 }

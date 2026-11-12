@@ -34,6 +34,7 @@ entry, and is planned once there is more than one chapter.
 | [The process-level location table](process-location-cache.md) | one lock-free location table and one index table per process, shared by all PEs and arrays; one location request per process; what the first version leaves out (objid PR 3) |
 | Message path: envelope, scheduler, entry method dispatch | not yet written |
 | Chare arrays: creation, insertion, migration, sections | not yet written |
+| [Section multicast trees: build, rebuild, retire, free](section-trees.md) | written 2026-11-09 (counted free of a replaced tree, charm #4132 item 2) |
 | Groups and nodegroups | not yet written |
 | Load balancing: the LB framework and TreeLB | not yet written |
 | [Checkpoint, restart, shrink/expand](memckpt.md) | first section written 2026-11-06: the double in-memory checkpoint and its rollback (syncft option); disk checkpoint and shrink/expand not yet written |

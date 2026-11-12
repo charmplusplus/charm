@@ -6795,6 +6795,9 @@ There is a default map object, which maps 1D array indices in a block
 fashion to processors, and maps other array indices based on a hash
 function. Some other mappings such as round-robin (RRMap) also exist,
 which can be used similar to custom ones described below.
+CldMap names no PE for an element (its procNum returns ``CLD_ANYWHERE``),
+so ``insert()`` into an array that uses it must be given a PE; without one
+the program aborts.
 
 A custom map object is implemented as a group which inherits from
 CkArrayMap and defines these virtual methods:
@@ -9127,7 +9130,10 @@ Preconditions:
   last in-memory checkpoint``.
 - No array element may be inserted or deleted between the checkpoint and
   the rollback (``insert``, ``ckDestroy``, or the creation of a new array
-  with elements). The runtime counts both and aborts a rollback after
+  with elements). Creating an array bound to an existing one
+  (``CkArrayOptions::bindTo``) with elements counts as insertion, even
+  though its elements join the location records of the existing array's
+  elements. The runtime counts both and aborts a rollback after
   either with the message ``CharmFT> rollback refused: N array elements
   inserted on PE p since the last in-memory checkpoint`` or ``... deleted
   on PE p ...``.
