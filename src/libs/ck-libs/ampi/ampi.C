@@ -2346,6 +2346,7 @@ void ampi::pup(PUP::er &p) noexcept
   p|comm;
   p|tmpVec;
   p|remoteProxy;
+  p|numCommCreations;
   unexpectedMsgs.pup(p, AmmPupUnexpectedMsgs);
   postedReqs.pup(p, AmmPupPostedReqs);
   unexpectedBcastMsgs.pup(p, AmmPupUnexpectedMsgs);
@@ -2390,8 +2391,23 @@ void ampi::split(int color,int key,MPI_Comm *dest, AmpiCommType type) noexcept
 }
 
 // The two halves of split around its suspension (campi awaits in between)
+// Called by every member at the start of a call that creates a communicator.
+int ampi::beginCommCreation() noexcept
+{
+  creationId = ++numCommCreations;
+  if (tcharm_campi) campi_creation_begun(thread, creationId);
+  return creationId;
+}
+
+void ampi::unblockCreation(int id) noexcept
+{
+  if (tcharm_campi) campi_creation_done(thread, id);
+  thread->resume();
+}
+
 void ampi::splitPost(int color,int key, AmpiCommType type) noexcept
 {
+  beginCommCreation();
   MPI_Comm nextComm = parent->getNextComm();
   ampiSplitKey splitKey(nextComm,color,key,myRank,type);
   int rootIdx=myComm->getIndexForRank(0);
@@ -2538,10 +2554,10 @@ void ampi::registrationFinish() noexcept
       // exactly the blocked ranks (both groups, for a merge); ranks of the old
       // communicator that are not members did not block.
       resumeNewArrayOnFinish = false;
-      newChildProxy.unblock();
+      newChildProxy.unblockCreation(creationId);
     }
     else {
-      thisProxy.unblock(); //split: every rank of the old communicator blocked in ampi::split
+      thisProxy.unblockCreation(creationId); //split: every rank of the old communicator blocked in ampi::split
     }
   }
 }
@@ -2620,6 +2636,7 @@ void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
 //   2. the root in the old communicator create the new array
 //   3. ampiParent::register is called to register new array as new comm
 MPI_Comm ampi::commCreate(const std::vector<int>& vec, AmpiCommType type) noexcept {
+  beginCommCreation();
   int rootIdx = vec[0];
   tmpVec = vec;
   CkCallback cb(CkIndex_ampi::commCreateReduced(NULL), CkArrayIndex1D(rootIdx), myComm->getProxy());
@@ -2686,6 +2703,7 @@ MPI_Comm ampi::cartCreate0D() noexcept {
 
 MPI_Comm ampi::cartCreate(std::vector<int>& vec, int ndims, const int* dims) noexcept {
   if (ndims == 0) {
+    beginCommCreation();
     return cartCreate0D();
   }
 
@@ -2703,6 +2721,7 @@ MPI_Comm ampi::cartCreate(std::vector<int>& vec, int ndims, const int* dims) noe
 
 // remoteRoot: the other group's leader (its world rank), valid at the root only
 MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root, int remoteRoot) noexcept {
+  beginCommCreation();
   if (thisIndex==root) { // not everybody gets the valid rvec
     tmpVec = remoteVec;
     remoteRootIdx = remoteRoot;
@@ -2732,6 +2751,7 @@ void ampi::intercommCreateReduced(CkReductionMsg *msg) noexcept {
 }
 
 void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid only at local root
+  beginCommCreation();
   if(myRank == 0 && first == 1){ // first (lower) group creates the intracommunicator for the higher group
     const std::vector<int>& lvec = myComm->getIndices();
     const std::vector<int>& rvec = myComm->getRemoteIndices();
