@@ -459,7 +459,7 @@ network the message itself is 3.3 us and the two differ by 0.8 us.
 | `case` | done, conjunction arms included: `CK_WHEN_ANY` in `tests/charm++/ckcoro` (basic test) |
 | `overlap`, `forall` | done (2026-11-11): child coroutines, `tests/charm++/ckcoro` overlap, basic and refnum tests, with migration and `+ck_fakemigrate` |
 | equivalence corpus: megatest synctest, every `tests/charm++/sdag` directory, SDAG-heavy miniapps under both implementations | done (2026-11-11): `tests/charm++/sdag` fully ported (`basic`, `refnum`, `migration` in `tests/charm++/ckcoro`), same output lines on 4 PEs; jacobi3d-coro matches jacobi3d-sdag's checksum; the SDAG programs with the most `when` clauses in the tree ported next to the originals with identical results on 1 and 4 PEs and under `+ck_fakemigrate`: `examples/charm++/leanmd-coro` (integer checksum of positions and forces), `examples/charm++/matmul-coro` (checksum), `examples/charm++/fib-coro`, `tests/charm++/sparse-coro` (same output). megatest's synctest has no SDAG (it tests sync entries) and was dropped. The ports found one defect (a conjunction kept only its last borrowed array, fixed) and two in the originals (shared `drand48` state across PE threads made matmul's and leanmd's results differ between 4-PE runs; both now seed per element) |
-| CAMPI tests stay green when the core is shared | in progress (2026-11-09 23:50): a shared `ckcoro_core.h` for `task<T>` and the site chain, delegated |
+| CAMPI tests stay green when the core is shared | done (2026-11-10): `ckcoro_core.h` holds `task<T>` and the site chain for both; `tests/campi` green in every regression since |
 
 ## 8. What charm4py can mirror
 
@@ -540,7 +540,7 @@ them in one table each so that a reviewer can check what was weighed.
 | Inline bodies for `overlap` clauses, as lambda coroutines | rejected for now | A lambda coroutine outlives its closure object, so captures dangle; a restart would have to recreate the lambda in the same state. Each clause is a named `ck::coro::task<void>`. |
 | Migration while suspended at any `co_await` | restricted to sites | A plain `co_await` between sites is allowed; packing there aborts with the entry's name, because only a site has a recorded id the restart can jump to. (Section 3 rule 3.) |
 | Several active invocations of one coroutine entry per chare | rejected unless a program needs it | A restart is a plain re-invocation of the entry; with several invocations the restart would have to tell them apart, and no program in the corpus needs it. (Section 3 rule 4, Kale 2026-11-11.) |
-| `delete this` inside a body (allowed in an SDAG `when` body) | replaced by `Chare::ckDestroyLater()` | The body runs inside the coroutine frame, which the entry wrapper and the state still touch after the body ends; `fib-coro` first used a separate destroy entry, and Kale asked for a facility in the base class instead (2026-11-11). The chare is destroyed by `CkInvokeEP` after the entry returns. |
+| `delete this` inside a body (allowed in an SDAG `when` body) | replaced by `Chare::ckDestroyLater()` | The coroutine body is still on the stack when it would delete the chare, and the chare's state member is touched when the body ends; `fib-coro` first used a separate destroy entry, and Kale asked for a facility in the base class instead (2026-11-11). The chare is destroyed by `CkInvokeEP` after the entry method returns. |
 | `exclusive` written by hand on a nodegroup's coroutine or inbox entries | rejected, charmxi adds it | SDAG's rule: the entries are exclusive, the node lock is released at every wait because the entry method returns there, and a hand-written tag is an error so that the generated code is the only place the lock is taken. (Kale 2026-11-11.) |
 | `CK_END` closing `CK_COROUTINE()`, and `CK_TASK` for a coroutine task | renamed | Matched pairs with no synonyms: `CK_COROUTINE`/`CK_COROUTINE_END`, `CK_CORO_TASK`/`CK_CORO_TASK_END`; `CK_TASK` would collide with Charm++'s stealable tasks. (Kale 2026-11-11.) |
 | An awaitable future | not in this PR | Sketched as a callback-entry awaitable; no program in the corpus needed it. |
@@ -557,7 +557,7 @@ them in one table each so that a reviewer can check what was weighed.
 | `delete this` in a `when` body | `ckDestroyLater()` | See the table above. |
 | `atomic`/`serial` blocks | plain code | Nothing to carry: every statement of the body is serial code. |
 | State variables declared in the class but used as if local | the same rule, visible | SDAG's surprise ("state variables must be declared in the class") remains the rule here; the difference is that the body is C++ and the reader sees the member. |
-| Trace events per construct for Projections (`_TRACE_BEGIN_EXECUTE_DETAILED` around each generated `when` method) | none | A wait is a `co_await` in the user's body, not a generated method; a site could emit the same event, open item. The entry methods themselves are traced as usual. |
+| A Projections entry per named `serial` block (`_TRACE_BEGIN_EXECUTE_DETAILED` around the generated method) | none | There is no generated method to wrap; the code between two waits is the user's. A site could emit an event for the code that follows it, open item. The entry methods themselves are traced as usual. |
 | C++11 | C++20 for the files that include `ckcoro.h` | Coroutines are a C++20 feature; the rest of the program and the runtime stay at their standard. |
 
 ## 10. Open items
@@ -565,7 +565,7 @@ them in one table each so that a reviewer can check what was weighed.
 - Several active invocations of one coroutine entry per chare (an error;
   stays so unless a program needs it, Kale 2026-11-11).
 - Inline bodies for `overlap` clauses (see 9a).
-- Per-wait trace events for Projections (see 9a).
+- Projections events for the code between waits, as SDAG's named `serial` blocks have (see 9a).
 - The copy of the entry's message that a restart of a message-parameter
   coroutine entry sends: measured only for small messages (jacobi3d,
   the tests); a large message entry would pay a copy per migration.
