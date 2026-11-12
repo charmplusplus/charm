@@ -401,8 +401,14 @@ static void deviceFlushAllAcks(void*) {
   for (int pe : pes) deviceFlushAcks(pe);
 }
 
-void CkRdmaDeviceInit() {
+static int persist_verbose = 0;                   // +gpupersistverbose
+static std::atomic<bool> persist_exiting{false};  // set once a PE's exit sequence reaches ConverseExit
+
+void CkRdmaDeviceInit(char** argv) {
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE, (CcdCondFn)deviceFlushAllAcks, NULL);
+  if (CmiGetArgFlagDesc(argv, "+gpupersistverbose",
+                        "print the mode of CkDevicePersistent transfers, once per process and mode"))
+    persist_verbose = 1;
 }
 
 // The receiver owes 'id' to 'pe'.  Held for the next device message to that
@@ -601,10 +607,13 @@ void CkRdmaDeviceRecvHandler(void* data, void* msg)
 #include <string>
 #include <atomic>
 #include <climits>
+#include <ctime>
+#include <unistd.h>
 
-// One line per process, mode and operation the first time it is used, so that
-// a run states which path it took.
+// With +gpupersistverbose: one line per process, mode and operation the first
+// time it is used, so that a run states which path it took.
 static void persistAnnounce(const char* what, int mode) {
+  if (!persist_verbose) return;
   static std::mutex lock;
   static std::set<std::pair<std::string, int> > said;
   {
@@ -648,28 +657,60 @@ static bool persistAllocBase(const void* ptr, uintptr_t* base) {
 #endif
 }
 
-// IPC mappings of other processes' allocations, opened once per process and
-// reused by every copy of the peer's buffer, until close() on a copy. The
-// tables of this section are never destroyed, so that the destructor of a
-// static CkDevicePersistent can still use them at exit.
+// IPC mappings of other processes' allocations, one per process, shared by
+// the copies of the peer's buffer on all PEs of the process and reference
+// counted: a copy takes a reference the first time it transfers through the
+// mapping and releases it in its close(); the mapping is closed with the last
+// reference. A handle that did not open is kept with base null and no
+// references, so that the failure is reported once. The tables of this
+// section are never destroyed, so that the destructor of a static
+// CkDevicePersistent can still use them at exit.
+struct PersistIpcMap { void* base; int refs; };
 static std::mutex& persist_ipc_lock = *new std::mutex;
-static std::map<std::string, void*>& persist_ipc = *new std::map<std::string, void*>;
+static std::map<std::string, PersistIpcMap>& persist_ipc = *new std::map<std::string, PersistIpcMap>;
 
+// r's buffer as mapped in this process, or null when r's handle does not open
+// here. The first call on a copy finds or opens the mapping and takes a
+// reference; the copy keeps the answer (ipc_open, ipc_ptr), so later calls
+// touch neither the table nor its lock.
 static void* persistIpcPtr(const CkDevicePersistent& r) {
+  if (r.ipc_open) return r.ipc_ptr;
   std::string key((const char*)&r.hapi_ipc_handle, sizeof(hapiIpcMemHandle_t));
   std::lock_guard<std::mutex> g(persist_ipc_lock);
   auto it = persist_ipc.find(key);
   void* base = nullptr;
-  if (it != persist_ipc.end()) base = it->second;
-  else {
+  if (it != persist_ipc.end()) {
+    base = it->second.base;
+    if (base) it->second.refs++;
+  } else {
     if (hapiIpcOpenMemHandle(&base, r.hapi_ipc_handle, hapiIpcMemLazyEnablePeerAccess) != hapiSuccess) {
       (void)hapiGetLastError();
       CmiPrintf("[%d] CkDevicePersistent> IPC open of PE %d's buffer failed; using RDMA\n", CkMyPe(), r.pe);
       base = nullptr;
     }
-    persist_ipc[key] = base;
+    persist_ipc[key] = PersistIpcMap{ base, base ? 1 : 0 };
   }
-  return base ? (char*)base + r.ipc_offset : nullptr;
+  r.ipc_open = true;
+  r.ipc_ptr = base ? (char*)base + r.ipc_offset : nullptr;
+  return r.ipc_ptr;
+}
+
+// Releases the reference a copy holds on its peer's mapping, closing the
+// mapping with the last one, after a device synchronize so that no copy
+// through it is still running.
+static void persistIpcRelease(CkDevicePersistent& r) {
+  if (!r.ipc_open) return;
+  r.ipc_open = false;
+  void* p = r.ipc_ptr;
+  r.ipc_ptr = nullptr;
+  if (!p) return;
+  std::string key((const char*)&r.hapi_ipc_handle, sizeof(hapiIpcMemHandle_t));
+  std::lock_guard<std::mutex> g(persist_ipc_lock);
+  auto it = persist_ipc.find(key);
+  if (it == persist_ipc.end() || --it->second.refs > 0) return;
+  hapiCheck(hapiDeviceSynchronize());
+  hapiCheck(hapiIpcCloseMemHandle(it->second.base));
+  persist_ipc.erase(it);
 }
 
 
@@ -713,6 +754,14 @@ static std::map<uint64_t, PersistReg>& persist_reg =          // this process's 
 static std::map<uint64_t, CmiNcpyBuffer>& persist_remote =    // other processes' registrations, by id
     *new std::map<uint64_t, CmiNcpyBuffer>;
 static std::atomic<uint64_t> persist_next_id{1};
+
+// An id is node (20 bits) | run token (16 bits) | counter (28 bits). The token
+// differs between a run and its restart from a checkpoint, so an object
+// restored from the checkpoint does not name a buffer opened in the new run.
+static uint64_t persistRunToken() {
+  static const uint64_t token = ((uint64_t)time(nullptr) ^ ((uint64_t)getpid() << 5)) & 0xffff;
+  return token;
+}
 
 static void persistCheckRdmaUsable() {
   if (CmiUseCopyBasedRDMA)
@@ -969,7 +1018,7 @@ void CkDevicePersistent::open() {
     (void)hapiGetLastError();
     ipc_valid = false;
   }
-  id = ((uint64_t)CkMyNode() << 40) | persist_next_id++;
+  id = ((uint64_t)CkMyNode() << 44) | (persistRunToken() << 28) | (persist_next_id++ & 0xfffffff);
   PersistReg r;
   r.ptr = ptr;
   r.cnt = cnt;
@@ -985,30 +1034,28 @@ void CkDevicePersistent::close() {
     std::lock_guard<std::mutex> g(persist_reg_lock);
     auto it = persist_reg.find(id);
     if (it != persist_reg.end()) {
-      if (it->second.state == 1) it->second.ncpy.deregisterMem();
+      // After ConverseExit the network layer is gone: a static owner destroyed
+      // at process exit drops its entry without deregistering.
+      if (it->second.state == 1 && !persist_exiting) it->second.ncpy.deregisterMem();
       persist_reg.erase(it);
     }
     owner = false;
     id = 0;
     return;
   }
-  // A copy of another process's buffer: release this process's IPC mapping of
-  // it and the kept registration. Other copies of it here open it again on use.
+  // A copy of another process's buffer: release this copy's reference on the
+  // IPC mapping and the kept registration. A later transfer takes them again.
   if (node == CkMyNode()) return;
   {
     std::lock_guard<std::mutex> g(persist_reg_lock);
     persist_remote.erase(id);
   }
-  if (!ipc_valid) return;
-  std::string key((const char*)&hapi_ipc_handle, sizeof(hapiIpcMemHandle_t));
-  std::lock_guard<std::mutex> g(persist_ipc_lock);
-  auto it = persist_ipc.find(key);
-  if (it == persist_ipc.end()) return;
-  if (it->second != nullptr) {
-    hapiCheck(hapiDeviceSynchronize());   // no copy through the mapping is still running
-    hapiCheck(hapiIpcCloseMemHandle(it->second));
-  }
-  persist_ipc.erase(it);
+  persistIpcRelease(*this);
+}
+
+// Called on each PE when its exit sequence reaches ConverseExit (init.C).
+void CkRdmaDeviceExit() {
+  persist_exiting = true;
 }
 
 void CkDevicePersistent::set_msg(void* msg) {

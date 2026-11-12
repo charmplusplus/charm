@@ -9856,17 +9856,22 @@ moves ``cnt`` bytes of the source as the object holds it at the time of the call
 ``open`` (call ``open`` again for that).
 
 **Transfer modes.** ``get`` and ``put`` choose one of three modes for each pair of
-buffers; ``mode(other)`` returns it (0, 1 or 2), and each process prints one line
-the first time it uses a mode:
+buffers; ``mode(other)`` returns it (0, 1 or 2), and with ``+gpupersistverbose``
+each process prints one line the first time it uses a mode:
 
 - 0, a device copy (``cudaMemcpyAsync``): both buffers belong to PEs of one process.
   Neither buffer needs to be opened.
 - 1, CUDA/HIP IPC: the buffers belong to processes on one host, and the peer's IPC
-  handle (taken by ``open``) opens in this process. Each process opens a peer
-  buffer's handle once and keeps the mapping. ``+gpushm`` is not needed; it
-  concerns the shared communication buffer of other device messages and does
-  not select this mode. ``mode`` opens the handle to answer, so it reports the
-  mode that runs.
+  handle (taken by ``open``) opens in this process. A process opens a peer
+  buffer's handle once; the mapping is shared by the copies of that buffer on
+  all PEs of the process and reference counted. A copy takes a reference the
+  first time it transfers through the mapping and keeps the mapped address, so
+  later transfers from that copy cost no lookup; ``close`` on the copy releases
+  the reference, and the mapping is closed with the last one. ``close`` on one
+  copy therefore never unmaps a buffer that a copy on another PE is using.
+  ``+gpushm`` is not needed; it concerns the shared communication buffer of
+  other device messages and does not select this mode. ``mode`` opens the
+  handle to answer, so it reports the mode that runs.
 - 2, RDMA on device memory: the buffers belong to different hosts, or the peer's
   IPC handle does not open in this process (for example when each process sees
   only its own GPU). **Both** buffers must have been opened, the source as well
@@ -9888,11 +9893,19 @@ copies. Moving an object (assigning a temporary, as in
 ownership. Assigning over an owner, or calling ``open`` again, releases the old
 setup first. A copy cannot be used for an RDMA transfer once its owner has
 released it, so keep the owner alive (for example as a chare member) while peers
-use the buffer. ``close`` on a received copy of another process's buffer closes
-this process's IPC mapping of it (after synchronizing the device); call it when
-the peer's buffer will no longer be used, or before migration. Persistent
-objects are not migrated: after a chare migrates, create, open and exchange them
-again.
+use the buffer. ``close`` on a received copy of another process's buffer
+releases its reference on this process's IPC mapping of the buffer (the
+mapping is closed with the last reference, after synchronizing the device) and
+the registration it kept; call it when the peer's buffer will no longer be
+used, or before migration. Assigning over a copy releases its reference the
+same way; a copy destroyed without ``close`` keeps its reference, so the
+mapping stays open for the rest of the run. An owner that is a static or
+global object is released at process exit without deregistering, since the
+network layer is gone by then; call ``close`` on it before ``CkExit`` to
+deregister. Persistent objects are not migrated and not restored from a
+checkpoint: after a chare migrates, or a run restarts, create, open and
+exchange them again (an object from a previous run is refused, since its id
+carries a token of the run that opened it).
 
 Examples using persistent GPU communication can be found in
 ``examples/charm++/cuda/gpudirect/persistent``,

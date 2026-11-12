@@ -28,8 +28,12 @@ struct CkDevicePersistent {
   hapiStream_t hapi_stream = 0;   // the default stream unless a constructor names one
   int pe;
   hapiIpcMemHandle_t hapi_ipc_handle;
-  void* ipc_ptr;      // unused; the mapping of a remote buffer is kept per process
-  bool ipc_open;      // unused
+  // This copy's view of the peer buffer's IPC mapping in this process: set by
+  // the first transfer through it, which takes a reference on the mapping;
+  // close() releases it. Not copied (each copy takes its own reference), moved
+  // with the object, mutable because mode() is const.
+  mutable void* ipc_ptr;   // the mapped address, null when the handle did not open here
+  mutable bool ipc_open;   // ipc_ptr is set
   // set by open() and carried by pup
   size_t ipc_offset = 0;    // ptr minus the base of its allocation (what the IPC handle maps)
   bool ipc_valid = false;   // hapi_ipc_handle names ptr's allocation
@@ -71,26 +75,34 @@ struct CkDevicePersistent {
   // std::vector reallocating) transfers ownership. Assigning over an owner
   // releases its entry first, unless the value assigned names the same buffer.
   CkDevicePersistent(const CkDevicePersistent& o) { copyFrom(o); owner = false; }
-  CkDevicePersistent(CkDevicePersistent&& o) noexcept { copyFrom(o); owner = o.owner; o.owner = false; }
+  CkDevicePersistent(CkDevicePersistent&& o) noexcept { copyFrom(o); owner = o.owner; o.owner = false; takeIpc(o); }
   CkDevicePersistent& operator=(const CkDevicePersistent& o) {
     if (this != &o) {
-      bool keep = owner && id == o.id;
-      if (owner && !keep) close();
+      bool same = id != 0 && id == o.id;
+      if (!same) close();   // this object's setup (an owner) or mapping reference (a copy)
+      void* kp = ipc_ptr; bool ko = ipc_open;
+      bool keep = owner && same;
       copyFrom(o);
       owner = keep;
+      if (same) { ipc_ptr = kp; ipc_open = ko; }
     }
     return *this;
   }
   CkDevicePersistent& operator=(CkDevicePersistent&& o) noexcept {
     if (this != &o) {
-      bool keep = owner && id == o.id;
-      if (owner && !keep) close();
+      bool same = id != 0 && id == o.id;
+      if (!same) close();
+      void* kp = ipc_ptr; bool ko = ipc_open;
+      bool keep = owner && same;
       copyFrom(o);
       owner = keep || o.owner;
       o.owner = false;
+      if (same && ko) { ipc_ptr = kp; ipc_open = ko; o.close(); }   // keep ours, drop the moved-from reference
+      else takeIpc(o);
     }
     return *this;
   }
+
   ~CkDevicePersistent() { if (owner) close(); }
 
   void init();
@@ -100,9 +112,10 @@ struct CkDevicePersistent {
   void open();
   // On the owner: deregisters the memory if a transfer registered it and
   // removes the entry; copies of the buffer cannot be used for RDMA after it.
-  // On a copy of another process's buffer: closes this process's IPC mapping
-  // of it (synchronizing the device first), which a later transfer opens again.
-  // On any other copy: nothing.
+  // On a copy of another process's buffer: releases this copy's reference on
+  // the process's IPC mapping of it (the mapping is closed with the last
+  // reference, after a device synchronize) and the kept registration; a later
+  // transfer takes them again. On any other copy: nothing.
   void close();
   void set_msg(void* msg);
 
@@ -120,9 +133,14 @@ struct CkDevicePersistent {
 private:
   void copyFrom(const CkDevicePersistent& o) {
     ptr = o.ptr; cnt = o.cnt; cb = o.cb; cb_msg = o.cb_msg; hapi_stream = o.hapi_stream;
-    pe = o.pe; hapi_ipc_handle = o.hapi_ipc_handle; ipc_ptr = o.ipc_ptr; ipc_open = o.ipc_open;
+    pe = o.pe; hapi_ipc_handle = o.hapi_ipc_handle; ipc_ptr = nullptr; ipc_open = false;
     ipc_offset = o.ipc_offset; ipc_valid = o.ipc_valid; node = o.node; phys_node = o.phys_node;
     id = o.id;
+  }
+  // A move carries the moved-from copy's mapping reference along.
+  void takeIpc(CkDevicePersistent& o) {
+    ipc_ptr = o.ipc_ptr; ipc_open = o.ipc_open;
+    o.ipc_ptr = nullptr; o.ipc_open = false;
   }
 };
 
@@ -234,8 +252,11 @@ extern "C" {
 // registration cache to do.
 void* CkDeviceMalloc(size_t size);
 void CkDeviceFree(void* ptr);
-// Per-PE init of the device zerocopy path (idle-time ack flush).
-void CkRdmaDeviceInit();
+// Per-PE init of the device zerocopy path (idle-time ack flush, options).
+void CkRdmaDeviceInit(char** argv);
+// Called on each PE when its exit sequence reaches ConverseExit: after it, a
+// CkDevicePersistent owner destroyed at process exit does not deregister.
+void CkRdmaDeviceExit();
 
 #endif // CMK_CUDA
 
