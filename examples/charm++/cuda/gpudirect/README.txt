@@ -55,15 +55,7 @@ Known limitations, as measured on Frontier (2026-09-01)
 These are properties of the runtime, not of the examples, but they decide how
 the examples can be run, so they are recorded here.
 
-1. CkDevicePersistent does not work between hosts. The runtime rejects it
-   outright -- "Persistent GPU messaging is currently not supported for
-   inter-node messages", from the two guards in ck-core/ckrdmadevice.C -- so
-   the persistent example and the latency-persistent benchmark abort
-   immediately when run across more than one host. Both work within a host, on
-   the device-memcpy and IPC paths. This is an unimplemented feature rather
-   than a defect; nothing to work around, just run them on one host.
-
-2. Load balancing and GPU-direct transfers cannot be combined across processes.
+1. Load balancing and GPU-direct transfers cannot be combined across processes.
    The sender resolves the destination PE before the transfer; if the
    destination chare has since migrated to another process, the receiver
    rejects the buffer and aborts with "Destination process does not match the
@@ -78,12 +70,12 @@ the examples can be run, so they are recorded here.
    runtime's message names CMK_GLOBAL_LOCATION_UPDATE, which is referenced in
    ck-core but not defined by any build -- or a re-send handshake.
 
-3. The bandwidth benchmark's zerocopy phase exhausts LCI's memory registrations
+2. The bandwidth benchmark's zerocopy phase exhausts LCI's memory registrations
    at the default 4 MB maximum size ("register_memory_impl ... No space left on
    device"). It reallocates its device buffers per message size and the
    registrations are not released. -x 65536 stays under the limit.
 
-4. +gpucommbuffer, +gpulbbuffer and +gpuipceventpool configure the
+3. +gpucommbuffer, +gpulbbuffer and +gpuipceventpool configure the
    shared-memory inter-process path and only take effect alongside +gpushm.
    Passing one without it is now reported as such at startup.
 
@@ -95,6 +87,13 @@ Fixed since these examples were first run, and required by them:
     made every inter-node run here hang before reaching main, and it was not
     GPU-specific: ckhello hung identically. Fixed in reconverse 2c50813e7
     (charmplusplus/reconverse#212); this tree pins it.
+
+  - CkDevicePersistent used to abort between hosts ("Persistent GPU messaging
+    is currently not supported for inter-node messages"), so the persistent
+    example and the latency-persistent benchmark ran on one host only.
+    Transfers between hosts now use RDMA on device memory
+    (charmplusplus/charm#4228). That mode needs both buffers opened, which
+    both programs do.
 
 Reusing a send buffer
 ---------------------
