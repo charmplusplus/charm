@@ -156,7 +156,7 @@ struct main_registrar {
 
 /* ---------------- restart sites ---------------- */
 
-// One per resumable function (CAMPI_RESUMABLE). The rank keeps a chain of
+// One per resumable function (CAMPI_MIGRATABLE). The rank keeps a chain of
 // site ids, one per active frame_guard depth: entry d is the last site
 // (CAMPI_MIGRATE or CAMPI_CALL, both identified by __LINE__) noted by the
 // function at depth d. A restarted rank (after migration, restart from a
@@ -372,7 +372,7 @@ task<int> Init_thread(int *argc, char ***argv, int required, int *provided);
 task<int> Finalize();
 // AMPI_Migrate: load balancing (ampi_load_balance=sync) or a checkpoint to
 // files (ampi_checkpoint=to_file=DIR). Must be reached through CAMPI_MIGRATE
-// (campi.h) inside CAMPI_RESUMABLE/CAMPI_END. A rank that moves, or restarts
+// (campi.h) inside a CAMPI_MIGRATABLE block. A rank that moves, or restarts
 // from the checkpoint, does not return from here: its frame is destroyed and
 // main runs again from the top to this site, where Migrate returns at once.
 task<int> Migrate(MPI_Info hints);
