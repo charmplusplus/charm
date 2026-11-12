@@ -113,7 +113,11 @@ Runtime (reconverse):
 - GPU support on reconverse: portable HAPI core (#3951),
   device-to-device communication (#3955), device zerocopy with
   register-once buffers (#3960, #3961), GPU-aware load balancer
-  (#3968).
+  (#3968). CkDevicePersistent, persistent device-to-device transfers
+  opened once and reused, works between any pair of PEs: within a
+  host over IPC or a device copy, between hosts over RDMA; a buffer
+  may start inside an allocation, +gpushm is not required, and each
+  transfer moves the object's current count (#4228).
 
 - charmxi: a [threaded, reductiontarget] entry method runs on its
   own thread (#4079, #4082); charmxi no longer crashes on serial
