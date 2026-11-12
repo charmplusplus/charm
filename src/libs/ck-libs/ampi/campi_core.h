@@ -364,6 +364,23 @@ task<int> Comm_split(MPI_Comm comm, int color, int key, MPI_Comm *newcomm);
 task<int> Comm_dup(MPI_Comm comm, MPI_Comm *newcomm);
 task<int> Comm_dup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm *newcomm);
 task<int> Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm *newcomm);
+task<int> Comm_split_type(MPI_Comm comm, int split_type, int key, MPI_Info info, MPI_Comm *newcomm);
+task<int> Comm_create_group(MPI_Comm comm, MPI_Group group, int tag, MPI_Comm *newcomm);
+task<int> Cart_create(MPI_Comm comm_old, int ndims, const int *dims, const int *periods,
+                      int reorder, MPI_Comm *comm_cart);
+task<int> Cart_sub(MPI_Comm comm, const int *remain_dims, MPI_Comm *newcomm);
+task<int> Graph_create(MPI_Comm comm_old, int nnodes, const int *index, const int *edges,
+                       int reorder, MPI_Comm *comm_graph);
+task<int> Dist_graph_create(MPI_Comm comm_old, int n, const int *sources, const int *degrees,
+                            const int *destinations, const int *weights, MPI_Info info,
+                            int reorder, MPI_Comm *comm_dist_graph);
+task<int> Dist_graph_create_adjacent(MPI_Comm comm_old, int indegree, const int *sources,
+                                     const int *sourceweights, int outdegree,
+                                     const int *destinations, const int *destweights,
+                                     MPI_Info info, int reorder, MPI_Comm *comm_dist_graph);
+task<int> Intercomm_create(MPI_Comm localComm, int localLeader, MPI_Comm peerComm,
+                           int remoteLeader, int tag, MPI_Comm *newintercomm);
+task<int> Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm);
 
 /* ---------------- startup, shutdown, migration ---------------- */
 
