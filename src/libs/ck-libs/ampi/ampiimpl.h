@@ -614,10 +614,6 @@ class ampiTopology {
   virtual void pup(PUP::er &p) noexcept =0;
   virtual int getType() const noexcept =0;
   virtual void dup(ampiTopology* topo) noexcept =0;
-  virtual std::vector<int> &getnbors() noexcept =0;
-  virtual const std::vector<int> &getnbors() const noexcept =0;
-  virtual void setnbors(const std::vector<int> &nbors_) noexcept =0;
-  virtual void sortnbors(CProxy_ampi arrProxy, std::vector<int> &nbors_) noexcept;
 
   virtual const std::vector<int> &getdims() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
   virtual const std::vector<int> &getperiods() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
@@ -654,7 +650,7 @@ class ampiTopology {
 class ampiCartTopology final : public ampiTopology {
  private:
   int ndims;
-  std::vector<int> dims, periods, nbors;
+  std::vector<int> dims, periods;
 
  public:
   ampiCartTopology() noexcept : ndims(-1) {}
@@ -663,7 +659,6 @@ class ampiCartTopology final : public ampiTopology {
     p|ndims;
     p|dims;
     p|periods;
-    p|nbors;
   }
 
   inline int getType() const noexcept {return MPI_CART;}
@@ -672,25 +667,21 @@ class ampiCartTopology final : public ampiTopology {
     setndims(topo->getndims());
     setdims(topo->getdims());
     setperiods(topo->getperiods());
-    setnbors(topo->getnbors());
   }
 
   inline const std::vector<int> &getdims() const noexcept {return dims;}
   inline const std::vector<int> &getperiods() const noexcept {return periods;}
   inline int getndims() const noexcept {return ndims;}
-  inline std::vector<int> &getnbors() noexcept {return nbors;}
-  inline const std::vector<int> &getnbors() const noexcept {return nbors;}
 
   inline void setdims(const std::vector<int> &d) noexcept {dims = d; dims.shrink_to_fit();}
   inline void setperiods(const std::vector<int> &p) noexcept {periods = p; periods.shrink_to_fit();}
   inline void setndims(int nd) noexcept {ndims = nd;}
-  inline void setnbors(const std::vector<int> &n) noexcept {nbors = n; nbors.shrink_to_fit();}
 };
 
 class ampiGraphTopology final : public ampiTopology {
  private:
   int nvertices;
-  std::vector<int> index, edges, nbors;
+  std::vector<int> index, edges;
 
  public:
   ampiGraphTopology() noexcept : nvertices(-1) {}
@@ -699,7 +690,6 @@ class ampiGraphTopology final : public ampiTopology {
     p|nvertices;
     p|index;
     p|edges;
-    p|nbors;
   }
 
   inline int getType() const noexcept {return MPI_GRAPH;}
@@ -708,26 +698,22 @@ class ampiGraphTopology final : public ampiTopology {
     setnvertices(topo->getnvertices());
     setindex(topo->getindex());
     setedges(topo->getedges());
-    setnbors(topo->getnbors());
   }
 
   inline int getnvertices() const noexcept {return nvertices;}
   inline const std::vector<int> &getindex() const noexcept {return index;}
   inline const std::vector<int> &getedges() const noexcept {return edges;}
-  inline std::vector<int> &getnbors() noexcept {return nbors;}
-  inline const std::vector<int> &getnbors() const noexcept {return nbors;}
 
   inline void setnvertices(int nv) noexcept {nvertices = nv;}
   inline void setindex(const std::vector<int> &i) noexcept {index = i; index.shrink_to_fit();}
   inline void setedges(const std::vector<int> &e) noexcept {edges = e; edges.shrink_to_fit();}
-  inline void setnbors(const std::vector<int> &n) noexcept {nbors = n; nbors.shrink_to_fit();}
 };
 
 class ampiDistGraphTopology final : public ampiTopology {
  private:
   int inDegree, outDegree;
   bool sourcesWeighted, destsWeighted;
-  std::vector<int> sources, sourceWeights, destinations, destWeights, nbors;
+  std::vector<int> sources, sourceWeights, destinations, destWeights;
 
  public:
   ampiDistGraphTopology() noexcept : inDegree(-1), outDegree(-1), sourcesWeighted(false), destsWeighted(false) {}
@@ -741,7 +727,6 @@ class ampiDistGraphTopology final : public ampiTopology {
     p|sourceWeights;
     p|destinations;
     p|destWeights;
-    p|nbors;
   }
 
   inline int getType() const noexcept {return MPI_DIST_GRAPH;}
@@ -755,7 +740,6 @@ class ampiDistGraphTopology final : public ampiTopology {
     setOutDegree(topo->getOutDegree());
     setDestinations(topo->getDestinations());
     setDestWeights(topo->getDestWeights());
-    setnbors(topo->getnbors());
   }
 
   inline int getInDegree() const noexcept {return inDegree;}
@@ -766,8 +750,6 @@ class ampiDistGraphTopology final : public ampiTopology {
   inline const std::vector<int> &getDestWeights() const noexcept {return destWeights;}
   inline bool areSourcesWeighted() const noexcept {return sourcesWeighted;}
   inline bool areDestsWeighted() const noexcept {return destsWeighted;}
-  inline std::vector<int> &getnbors() noexcept {return nbors;}
-  inline const std::vector<int> &getnbors() const noexcept {return nbors;}
 
   inline void setAreSourcesWeighted(bool v) noexcept {sourcesWeighted = v ? 1 : 0;}
   inline void setAreDestsWeighted(bool v) noexcept {destsWeighted = v ? 1 : 0;}
@@ -777,7 +759,6 @@ class ampiDistGraphTopology final : public ampiTopology {
   inline void setOutDegree(int d) noexcept {outDegree = d;}
   inline void setDestinations(const std::vector<int> &d) noexcept {destinations = d; destinations.shrink_to_fit();}
   inline void setDestWeights(const std::vector<int> &dw) noexcept {destWeights = dw; destWeights.shrink_to_fit();}
-  inline void setnbors(const std::vector<int> &nbors_) noexcept {nbors = nbors_; nbors.shrink_to_fit();}
 };
 
 /* KeyValue class for attribute caching. The copy and delete functions are
@@ -3203,10 +3184,8 @@ class ampi final : public CBase_ampi {
   inline void setRemoteProxyAndUnblock(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; thread->resume(); }
   inline int getIndexForRank(int r) const noexcept {return myComm->getIndexForRank(r);}
   inline int getIndexForRemoteRank(int r) const noexcept {return myComm->getIndexForRemoteRank(r);}
-  void findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const noexcept;
-  inline void sortNeighborsByLocality(std::vector<int>& nbors) noexcept { myComm->getTopology()->sortnbors(thisProxy, nbors); }
-  inline std::vector<int>& getNeighbors() noexcept { return myComm->getTopology()->getnbors(); }
-  inline const std::vector<int>& getNeighbors() const noexcept { return myComm->getTopology()->getnbors(); }
+  void getNeighborLists(std::vector<int>& srcs, std::vector<int>& dsts) const noexcept;
+  std::vector<int> neighborSendOrder(const std::vector<int>& dsts) noexcept;
   inline bool opIsCommutative(MPI_Op op) const noexcept { return parent->opIsCommutative(op); }
   inline MPI_User_function* op2User_function(MPI_Op op) const noexcept { return parent->op2User_function(op); }
   void topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newcomm) noexcept;

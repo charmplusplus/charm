@@ -23,6 +23,7 @@ DIRS = \
   groupfree \
   bsend \
   replace_ataw \
+  neighbor \
   wildcard \
   commdup \
   intercomm_coll \
