@@ -247,6 +247,8 @@ static void campi_pup(TCharm *tc, PUP::er &p) {
     if (r != nullptr) CkAbort("campi: unpacking a TCharm element that has a rank");
     r = new Rank;
     r->tc = tc;
+    r->ch.ownerKind = "rank";
+    r->ch.owner = tc->getElement();
     r->state = registered_ops->create();
     pup_rank_data(p, r);
     r->initDone = true; // AMPI_Migrate is called only after MPI_Init
@@ -363,6 +365,8 @@ static void campi_start(TCharm *tc) {
   CkAssert(wakeHandlerIdx >= 0); // registered by campi_proc_init
   Rank *r = new Rank;
   r->tc = tc;
+  r->ch.ownerKind = "rank";   // named in the restart aborts of the shared core
+  r->ch.owner = tc->getElement();
   tc->setCampiRank(r);
   r->state = registered_ops->create();
 

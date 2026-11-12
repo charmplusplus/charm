@@ -43,7 +43,8 @@ void set_resume_point(std::coroutine_handle<> h, request_awaiter *w) noexcept;
 /* ---------------- the shared coroutine core (ckcoro_core.h) ---------------- */
 
 // task<T>: the rank's coroutine type; frame_guard, note_site, abort_no_site:
-// the restart sites of resumable functions (CAMPI_RESUMABLE, campi.h).
+// the restart sites of resumable functions (CAMPI_RESUMABLE, campi.h;
+// CAMPI_MIGRATABLE after campi PR #4242).
 template <class T = void> using task = ::ck::coro::task<T>;
 using frame_guard = ::ck::coro::frame_guard;
 using ::ck::coro::note_site;
@@ -263,7 +264,7 @@ task<int> Init_thread(int *argc, char ***argv, int required, int *provided);
 task<int> Finalize();
 // AMPI_Migrate: load balancing (ampi_load_balance=sync) or a checkpoint to
 // files (ampi_checkpoint=to_file=DIR). Must be reached through CAMPI_MIGRATE
-// (campi.h) inside CAMPI_RESUMABLE/CAMPI_END. A rank that moves, or restarts
+// (campi.h) inside the CAMPI_RESUMABLE block. A rank that moves, or restarts
 // from the checkpoint, does not return from here: its frame is destroyed and
 // main runs again from the top to this site, where Migrate returns at once.
 task<int> Migrate(MPI_Info hints);

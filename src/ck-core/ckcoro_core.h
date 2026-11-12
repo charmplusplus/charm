@@ -17,6 +17,7 @@
 #endif
 
 #include <coroutine>
+#include <cstdio>
 #include <cstdlib>
 #include <type_traits>
 #include <utility>
@@ -129,7 +130,17 @@ struct chain {
   bool notedCall = false;      // ... a call site (else a when or migrate site)
   unsigned notedDepth = 0;     // ... by the function at this depth
   bool destroying = false;     // frame_guard destructors leave the sites alone
+  // Who the chain belongs to, for the restart aborts: a kind and a number
+  // ("rank 3"); set by the owner, not pupped. Unset: no owner in the text.
+  const char *ownerKind = nullptr;
+  int owner = -1;
   void pup(PUP::er &p) { p | sites; }
+  // " of rank 3" or "", for the abort texts.
+  const char *who(char *buf, size_t n) const noexcept {
+    if (ownerKind == nullptr || owner < 0) { if (n) buf[0] = 0; return buf; }
+    std::snprintf(buf, n, " of %s %d", ownerKind, owner);
+    return buf;
+  }
 };
 
 // The chain of the coroutine running on this PE thread, if any; set by the
@@ -173,9 +184,10 @@ inline frame_guard::frame_guard() noexcept : c_(current_chain_), depth_(0), site
   c.linked[depth_] = depth_ == 0 || (c.noted && c.notedCall && c.notedDepth == depth_ - 1);
   c.noted = false;
   if (c.restarting) {
+    char who[64];
     if (depth_ >= c.sites.size())
-      CkAbort("ck::coro: restart reached a function that was not on the recorded path "
-              "(depth %u, %zu sites recorded)", depth_, c.sites.size());
+      CkAbort("ck::coro: restart%s reached a function that was not on the recorded path "
+              "(depth %u, %zu sites recorded)", c.who(who, sizeof who), depth_, c.sites.size());
     site_ = c.sites[depth_];
   }
 }
@@ -195,13 +207,15 @@ inline void note_site(frame_guard &g, int line, bool call) noexcept {
   chain &c = *g.c_;
   const unsigned d = g.depth_;
   if (c.restarting) {
+    char who[64];
     if (d >= c.sites.size() || c.sites[d] != line)
-      CkAbort("ck::coro: restart reached site %d, recorded site %d (depth %u)", line,
-              d < c.sites.size() ? c.sites[d] : -1, d);
+      CkAbort("ck::coro: restart%s reached site %d, recorded site %d (depth %u)",
+              c.who(who, sizeof who), line, d < c.sites.size() ? c.sites[d] : -1, d);
     const bool innermost = (d + 1 == c.sites.size());
     if (innermost == call)
-      CkAbort("ck::coro: recorded site %d (depth %u) is a %s site but the recorded path %s",
-              line, d, call ? "call" : "when", call ? "ends there" : "continues into a call");
+      CkAbort("ck::coro: recorded site %d%s (depth %u) is a %s site but the recorded path %s",
+              line, c.who(who, sizeof who), d, call ? "call" : "when",
+              call ? "ends there" : "continues into a call");
   } else {
     if (c.sites.size() < d + 1) c.sites.resize(d + 1);
     c.sites[d] = line;
@@ -214,8 +228,9 @@ inline void note_site(frame_guard &g, int line, bool call) noexcept {
 }
 
 inline void abort_no_site(const frame_guard &g) noexcept {
-  CkAbort("ck::coro: recorded restart site %d is not a site of the resumable function at "
-          "depth %u", g.site_, g.depth_);
+  char who[64];
+  CkAbort("ck::coro: recorded restart site %d%s is not a site of the resumable function at "
+          "depth %u", g.site_, g.c_->who(who, sizeof who), g.depth_);
   std::abort();
 }
 
