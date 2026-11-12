@@ -370,48 +370,6 @@ class IrrGroup : public Chare {
     virtual void CkAddThreadListeners(CthThread tid, void *msg);
 };
 
-#if CMK_CHARM4PY
-
-extern void (*GroupMsgRecvExtCallback)(int, int, int, char *, int);        // callback to forward received msg to external Group chare
-extern void (*ChareMsgRecvExtCallback)(int, void*, int, int, char *, int); // callback to forward received msg to external Chare
-
-/// Supports readonlies outside of the C/C++ runtime. See README.charm4py
-class ReadOnlyExt {
-public:
-  static void *ro_data; // on PE 0, points to the readonly data that is broadcast to every PE
-  static size_t data_size;
-
-  static void setData(void *msg, size_t msgSize);
-  static void _roPup(void *pup_er); // pack/unpack readonly data
-};
-
-/// Lightweight object to support mainchares defined outside of the C/C++ runtime.
-/// Relays messages to appropiate external chare. See README.charm4py
-class MainchareExt: public Chare {
-public:
-  MainchareExt(CkArgMsg *m);
-
-  static void __Ctor_CkArgMsg(void *impl_msg, void *impl_obj_void) {
-    new (impl_obj_void) MainchareExt((CkArgMsg*)impl_msg);
-  }
-
-  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
-    //fprintf(stderr, "MainchareExt:: entry method invoked\n");
-    MainchareExt *obj = static_cast<MainchareExt *>(impl_obj_void);
-    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
-    char *impl_buf = impl_msg_typed->msgBuf;
-    PUP::fromMem implP(impl_buf);
-    int msgSize; implP|msgSize;
-    int ep; implP|ep;
-    int dcopy_start; implP|dcopy_start;
-    // relay msg to external chare
-    ChareMsgRecvExtCallback(obj->thishandle.onPE, obj->thishandle.objPtr, ep, msgSize,
-                            impl_buf+(3*sizeof(int)), dcopy_start);
-  }
-};
-
-#endif
-
 /// Base case for the infrastructure to recursively handle inheritance
 /// through CBase_foo from anything that implements X::pup(). Chare
 /// classes have generated specializations that call PUPs for their
@@ -1089,80 +1047,6 @@ typedef CProxySection_Group CProxySection_IrrGroup;
 
 //Defines the actual "Group"
 #include "ckreduction.h"
-
-#if CMK_CHARM4PY
-
-/// Lightweight object to support chares defined outside of the C/C++ runtime
-/// Relays messages to appropiate external chare. See README.charm4py
-class GroupExt: public Group {
-public:
-  GroupExt(void *impl_msg);
-
-  static void __GroupExt(void *impl_msg, void *impl_obj_void) {
-    new (impl_obj_void) GroupExt(impl_msg);
-  }
-
-  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
-    //fprintf(stderr, "GroupExt:: entry method invoked\n");
-    GroupExt *obj = static_cast<GroupExt *>(impl_obj_void);
-    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
-    char *impl_buf = impl_msg_typed->msgBuf;
-    PUP::fromMem implP(impl_buf);
-    int msgSize; implP|msgSize;
-    int ep; implP|ep;
-    int dcopy_start; implP|dcopy_start;
-    // relay received msg to external chare
-    GroupMsgRecvExtCallback(obj->thisgroup.idx, ep, msgSize, impl_buf+(3*sizeof(int)),
-                            dcopy_start);
-  }
-};
-
-class SectionManagerExt: public GroupExt {
-public:
-
-  SectionManagerExt(void *impl_msg) : GroupExt(impl_msg) {}
-
-  static void __SectionManagerExt(void *impl_msg, void *impl_obj_void) {
-    new (impl_obj_void) SectionManagerExt(impl_msg);
-  }
-
-  // entry methods of SectionManager other than sendToSection
-  static void __entryMethod(void *impl_msg, void *impl_obj_void) {
-    SectionManagerExt *obj = static_cast<SectionManagerExt *>(impl_obj_void);
-    CkMarshallMsg *impl_msg_typed = (CkMarshallMsg *)impl_msg;
-    char *impl_buf = impl_msg_typed->msgBuf;
-    PUP::fromMem implP(impl_buf);
-    int msgSize; implP|msgSize;
-    implP|obj->ep;
-    int dcopy_start; implP|dcopy_start;
-    GroupMsgRecvExtCallback(obj->thisgroup.idx, obj->ep, msgSize, impl_buf+(3*sizeof(int)),
-                            dcopy_start);
-  }
-
-  // sendToSection entry method
-  static void __sendToSection(void *impl_msg, void *impl_obj_void) {
-    SectionManagerExt *obj = static_cast<SectionManagerExt *>(impl_obj_void);
-    obj->msg = impl_msg; // store msg for forwarding to children in multicast spanning tree
-    SectionManagerExt::__entryMethod(impl_msg, impl_obj_void);
-    // if msg != null because I haven't forwarded it (I'm a leaf) delete it now
-    CkFreeMsg(obj->msg);
-  }
-
-  // Used by Charm4py SectionManager to forward a multicast msg to its children without copying.
-  // The msg was received by SectionManagerExt::__sendToSection. When forwardMulticastMsg is reached, we
-  // are still inside the GroupMsgRecvExtCallback call, so the msg has not been deleted yet
-  void forwardMulticastMsg(int num_children, const int *children) {
-    CkSendMsgBranchMulti(ep, msg, thisgroup, num_children, children);
-    // CkSendMsgBranchMulti deletes the msg, so mark it as null to not delete it again
-    msg = nullptr;
-  }
-
-private:
-  int ep;
-  void *msg;
-};
-
-#endif
 
 class CkQdMsg {
   public:

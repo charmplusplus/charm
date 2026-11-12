@@ -178,7 +178,6 @@ CkCallback::CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool forceIn
         d.array.refnum = 0;
 }
 
-#if !CMK_CHARM4PY
 CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool forceInline) {
 #if CMK_ERROR_CHECKING
       memset(this, 0, sizeof(CkCallback));
@@ -209,7 +208,6 @@ CkCallback::CkCallback(int ep, CkSectionID &id) {
       d.section.hasRefnum = false;
       d.section.refnum = 0;
 }
-#endif
 
 CkCallback::CkCallback(ArrayElement *p, int ep,bool forceInline) {
 #if CMK_ERROR_CHECKING
@@ -222,88 +220,6 @@ CkCallback::CkCallback(ArrayElement *p, int ep,bool forceInline) {
         d.array.hasRefnum= false;
         d.array.refnum = 0;
 }
-
-#if CMK_CHARM4PY
-
-// currently this is only used with Charm4py, so we are only enabling it for that case
-// to guarantee best performance for non-charm4py applications
-
-// function pointer to interact with Charm4py to generate callback msg
-extern void (*CreateCallbackMsgExt)(void*, int, int, int, int *, char**, int*);
-
-static void CkCallbackSendExt(const CkCallback &cb, void *msg)
-{
-  char *extResultMsgData[2] = {NULL, NULL};
-  int extResultMsgDataSizes[2] = {0, 0};
-  void *data = NULL;
-  int dataLen = 0;
-  int reducerType = -1;
-  if (msg != NULL) {
-    // right now this can only be a CkReductionMsg
-    CkReductionMsg* redMsg = (CkReductionMsg*)msg;
-    data = redMsg->getData();
-    dataLen = redMsg->getLength();
-    reducerType = redMsg->getReducer();
-  }
-
-  int _pe = -1;
-  int sectionInfo[3] = {-1, 0, 0};
-  switch (cb.type) {
-    case CkCallback::sendFuture:
-      CkSendToFuture(cb.d.future.fut, msg);
-      break;
-    case CkCallback::sendChare: // Send message to a chare
-      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.chare.refnum, sectionInfo,
-                                  extResultMsgData, extResultMsgDataSizes);
-      CkChareExtSend_multi(cb.d.chare.id.onPE, cb.d.chare.id.objPtr, cb.d.chare.ep,
-                           2, extResultMsgData, extResultMsgDataSizes);
-      break;
-    case CkCallback::sendGroup: // Send message to a group element
-      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.group.refnum, sectionInfo,
-                                  extResultMsgData, extResultMsgDataSizes);
-      CkGroupExtSend_multi(cb.d.group.id.idx, 1, &(cb.d.group.onPE), cb.d.group.ep,
-                           2, extResultMsgData, extResultMsgDataSizes);
-      break;
-    case CkCallback::sendArray: // Send message to an array element
-      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.array.refnum, sectionInfo,
-                                  extResultMsgData, extResultMsgDataSizes);
-      CkArrayExtSend_multi(cb.d.array.id.idx, cb.d.array.idx.asChild().data(), cb.d.array.idx.dimension,
-                           cb.d.array.ep, 2, extResultMsgData, extResultMsgDataSizes);
-      break;
-    case CkCallback::bcastGroup:
-      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.group.refnum, sectionInfo,
-                                  extResultMsgData, extResultMsgDataSizes);
-      // onPE is set to -1 since its a bcast
-      CkGroupExtSend_multi(cb.d.group.id.idx, 1, &_pe, cb.d.group.ep, 2, extResultMsgData, extResultMsgDataSizes);
-      break;
-    case CkCallback::bcastArray:
-      CreateCallbackMsgExt(data, dataLen, reducerType, cb.d.array.refnum, sectionInfo,
-                                  extResultMsgData, extResultMsgDataSizes);
-      // numDimensions is set to 0 since its bcast
-      CkArrayExtSend_multi(cb.d.array.id.idx, cb.d.array.idx.asChild().data(), 0,
-                           cb.d.array.ep, 2, extResultMsgData, extResultMsgDataSizes);
-      break;
-    case CkCallback::bcastSection: // Send message to a section
-      sectionInfo[0] = cb.d.section.sid_pe;
-      sectionInfo[1] = cb.d.section.sid_cnt;
-      sectionInfo[2] = cb.d.section.ep;
-      CreateCallbackMsgExt(data, dataLen, reducerType, 0, sectionInfo,
-                           extResultMsgData, extResultMsgDataSizes);
-      // after CreateCallbackMsgExt:
-      // sectionInfo[0] contains SectionManager gid
-      // sectionInfo[1] contains SectionManager ep (for sending section broadcasts)
-      // send to SectionManager on root PE
-      CkGroupExtSend_multi(sectionInfo[0], 1, &(cb.d.section.rootPE), sectionInfo[1],
-                           2, extResultMsgData, extResultMsgDataSizes);
-      break;
-    default:
-      CkAbort("Unsupported callback for ext reduction, or corrupted callback");
-      break;
-  }
-
-  CkFreeMsg(msg); // free no longer used msg object
-}
-#endif
 
 void CkCallback::send(int length,const void *data) const
 {
@@ -319,12 +235,6 @@ void CkCallback::send(int length,const void *data) const
 */
 void CkCallback::send(void *msg,int opts) const
 {
-#if CMK_CHARM4PY
-  if (isExtCallback) { // callback target is external
-    CkCallbackSendExt(*this, msg);
-    return;
-  }
-#endif
 
 	// lookup an entry method's flags in table
 	auto ep = this->epIndex();
@@ -428,7 +338,6 @@ void CkCallback::send(void *msg,int opts) const
 		CkSetMsgArrayIfNotThere(msg, policy);
 		CkBroadcastMsgArray(d.array.ep, msg, d.array.id, opts);
 		break;
-#if !CMK_CHARM4PY
 	case bcastSection: {
 		if(!msg)msg=CkAllocSysMsg();
                 if (d.section.hasRefnum) CkSetRefNum(msg, d.section.refnum);
@@ -437,7 +346,6 @@ void CkCallback::send(void *msg,int opts) const
 		CkBroadcastMsgSection(d.section.ep, msg, secID, opts);
 		break;
              }
-#endif
 	case replyCCS: { /* Send CkDataMsg as a CCS reply */
 		void *data=NULL;
 		int length=0;
@@ -504,7 +412,6 @@ void CkCallback::pup(PUP::er &p) {
     p|d.array.hasRefnum;
     p|d.array.refnum;
     break;
-#if !CMK_CHARM4PY
   case bcastSection:
     // Unpacking allocates the element and PE arrays; nothing frees them.
     p|d.section.sinfo;
@@ -520,7 +427,6 @@ void CkCallback::pup(PUP::er &p) {
     p|d.section.hasRefnum;
     p|d.section.refnum;
     break;
-#endif
   case replyCCS:
     p((char*)&d.ccsReply.reply, sizeof(d.ccsReply.reply));
     break;
@@ -537,9 +443,6 @@ void CkCallback::pup(PUP::er &p) {
   default:
     CkAbort("Inconsistent CkCallback type");
   }
-#if CMK_CHARM4PY
-  p|isExtCallback;
-#endif
 }
 
 bool CkCallback::containsPointer() const {
@@ -557,18 +460,13 @@ bool CkCallback::containsPointer() const {
   case bcastNodeGroup:
   case bcastArray:
   case sendFuture:
-#if CMK_CHARM4PY
-  case bcastSection:
-#endif
     return false;
 
   case resumeThread:
   case callCFn:
   case call1Fn:
   case replyCCS:
-#if !CMK_CHARM4PY
   case bcastSection:
-#endif
     return true;
 
   case sendChare:

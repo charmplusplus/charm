@@ -529,9 +529,11 @@ if (NOT CMK_MEMPOOL_CUTOFFNUM)
   set(CMK_MEMPOOL_CUTOFFNUM 28)
 endif()
 
-set(CMK_CHARM4PY 0)
+# The charm4py target builds Charm++ as a shared library (libcharm) for
+# bindings that load it at run time; CMK_LIBCHARM_SHARED marks that build.
+set(CMK_LIBCHARM_SHARED 0)
 if(${TARGET} STREQUAL "charm4py")
-  set(CMK_CHARM4PY 1)
+  set(CMK_LIBCHARM_SHARED 1)
   # Create libcharm.so for Charm4py
   add_compile_options(-build-shared)
   set(BUILDOPTS "${BUILDOPTS} -build-shared")

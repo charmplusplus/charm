@@ -493,112 +493,6 @@ typedef ArrayElementT<CkIndex5D> ArrayElement5D;
 typedef ArrayElementT<CkIndex6D> ArrayElement6D;
 typedef ArrayElementT<CkIndexMax> ArrayElementMax;
 
-#if CMK_CHARM4PY
-
-extern void (*ArrayMsgRecvExtCallback)(int, int, int*, int, int, char*, int);
-extern int (*ArrayElemLeaveExt)(int, int, int*, char**, int);
-extern void (*ArrayElemJoinExt)(int, int, int*, int, char*, int);
-extern void (*ArrayResumeFromSyncExtCallback)(int, int, int*);
-
-class ArrayElemExt : public ArrayElement
-{
-private:
-  int ctorEpIdx;
-
-public:
-  ArrayElemExt(void* impl_msg);
-  ArrayElemExt(CkMigrateMessage* m) { delete m; }
-
-  static void __ArrayElemExt(void* impl_msg, void* impl_obj_void)
-  {
-    new (impl_obj_void) ArrayElemExt(impl_msg);
-  }
-
-  static void __entryMethod(void* impl_msg, void* impl_obj_void)
-  {
-    // fprintf(stderr, "ArrayElemExt:: Entry method invoked\n");
-    ArrayElemExt* e = static_cast<ArrayElemExt*>(impl_obj_void);
-    CkMarshallMsg* impl_msg_typed = (CkMarshallMsg*)impl_msg;
-    char* impl_buf = impl_msg_typed->msgBuf;
-    PUP::fromMem implP(impl_buf);
-    int msgSize;
-    implP | msgSize;
-    int ep;
-    implP | ep;
-    int dcopy_start;
-    implP | dcopy_start;
-    ArrayMsgRecvExtCallback(((CkGroupID)e->thisArrayID).idx,
-                            int(e->thisIndexMax.getDimension()), e->thisIndexMax.data(),
-                            ep, msgSize, impl_buf + (3 * sizeof(int)), dcopy_start);
-  }
-
-  static void __AtSyncEntryMethod(void* impl_msg, void* impl_obj_void)
-  {
-    ArrayElemExt* e = static_cast<ArrayElemExt*>(impl_obj_void);
-    // printf("ArrayElementExt:: calling AtSync elem->usesAtSync=%d\n", e->usesAtSync);
-    e->AtSync();
-    if (UsrToEnv(impl_msg)->isVarSysMsg() == 0)
-      CkFreeSysMsg(impl_msg);
-    else
-      CkFreeMsg(impl_msg);
-  }
-
-  static void __CkMigrateMessage(void* impl_msg, void* impl_obj_void)
-  {
-    // printf("ArrayElemExt:: Migration constructor invoked\n");
-    call_migration_constructor<ArrayElemExt> c = impl_obj_void;
-    c((CkMigrateMessage*)impl_msg);
-  }
-
-  // NOTE this assumes that calls to pup are due to array element migration
-  // not sure if it's always going to be the case
-  void pup(PUP::er& p)
-  {
-    // because this is not generated code, looks like I need to make explicit call
-    // to parent pup method, otherwise fields in parent class like usesAtSync will
-    // not be pupped!
-    ArrayElement::pup(p);
-    int nDims = thisIndexMax.getDimension();
-    int aid = ((CkGroupID)thisArrayID).idx;
-    int data_size;
-    if (!p.isUnpacking())
-    {  // packing or sizing
-      char* msg;
-      data_size = ArrayElemLeaveExt(aid, nDims, thisIndexMax.data(), &msg, p.isSizing());
-      p | data_size;
-      p | ctorEpIdx;
-      p(msg, data_size);
-    }
-    else
-    {
-      p | data_size;
-      p | ctorEpIdx;
-      PUP::fromMem* p_mem = (PUP::fromMem*)&p;
-      ArrayElemJoinExt(aid, nDims, thisIndexMax.data(), ctorEpIdx,
-                       p_mem->get_current_pointer(), data_size);
-      p_mem->advance(data_size);
-    }
-  }
-
-  void ResumeFromSync()
-  {
-    if (!usesAtSync)
-    {
-      // not sure in which cases it is useful to receive resumeFromSync if
-      // usesAtSync=false, but for now I'm disabling it because it is
-      // unnecessary overhead. In non-lb scenarios with NullLB, every LBPeriod
-      // (which is 0.5 s by default), the lb infrastructure calls atsync and
-      // resumefromsync on every chare array element, even if usesAtSync=false.
-      // that part of the lb infrastructure should be fixed first.
-      return;
-    }
-    ArrayResumeFromSyncExtCallback(((CkGroupID)thisArrayID).idx,
-                                   int(thisIndexMax.getDimension()), thisIndexMax.data());
-  }
-};
-
-#endif
-
 /*@}*/
 
 /*********************** Array Manager BOC *******************/
@@ -997,12 +891,6 @@ public:
 
   bool attemptDelivery(CkArrayMessage* bcast, ArrayElement* el, bool doFree);
   bool performDelivery(CkArrayMessage* bcast, ArrayElement* el, bool doFree);
-#if CMK_CHARM4PY
-  void deliverAndUpdate(CkArrayMessage* bcast, std::vector<CkMigratable*>& elements,
-                        int arrayId);
-  bool performDelivery(CkArrayMessage* bcast, std::vector<CkMigratable*>& elements,
-                       int arrayId);
-#endif
   // Dynamic (CkDyn) elements: one delivery call per PE for all local elements
   // whose broadcast epoch matches, then the stored broadcasts that follow.
   void deliverAndUpdateDyn(CkArrayMessage* bcast, std::vector<CkMigratable*>& elements);
