@@ -32,6 +32,9 @@ project(Charm++ LANGUAGES CXX C ASM VERSION 9.0.0)
 find_package(Threads)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
 
+# Set before its first use below; ./build passes -DNETWORK, a bare cmake run does not.
+set(NETWORK "reconverse" CACHE STRING "Target network layer: reconverse (the classic layers mpi, netlrts, ... are on the branch classic)")
+
 set(CMK_BUILD_MPI 0)
 set(CMK_BUILD_ON_MPI 0)
 set(CMK_CXX_MPI_BINDINGS 1) # Always true, this just checked for a conflict with old mpich versions.
@@ -106,7 +109,6 @@ else()
 endif()
 
 # Build options
-set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,reconverse,gni,ofi,pami,pamilrts,ucx,verbs")
 set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,ChaNGa,everylb")
 set(ARCH "" CACHE STRING "Target architecture, can be one of i386,x86_64,arm7,arm8,ppc64le") # By default, detect arch we are running on.
 
