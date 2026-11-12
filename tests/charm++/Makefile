@@ -56,6 +56,7 @@ DIRS = \
   objloads \
   qd \
   reduction_migrate_ahead \
+  reduction_empty_kid \
   section_migrate \
   xarray_section_reduction \
   bcast_zcpup \

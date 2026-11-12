@@ -287,6 +287,20 @@ request_awaiter Recv(void *buf, int count, MPI_Datatype type, int src, int tag, 
 request_awaiter Sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
                          void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
                          MPI_Comm comm, MPI_Status *sts);
+request_awaiter Bsend(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                      MPI_Comm comm);
+request_awaiter Rsend(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                      MPI_Comm comm);
+request_awaiter Mrecv(void *buf, int count, MPI_Datatype type, MPI_Message *msg,
+                      MPI_Status *sts);
+task<int> Sendrecv_replace(void *buf, int count, MPI_Datatype type, int dest, int stag, int src,
+                           int rtag, MPI_Comm comm, MPI_Status *sts);
+// Block until a matching message has arrived (MPI_Probe), and take it (MPI_Mprobe).
+task<int> Probe(int src, int tag, MPI_Comm comm, MPI_Status *sts);
+task<int> Mprobe(int src, int tag, MPI_Comm comm, MPI_Message *msg, MPI_Status *sts);
+// Block until at least one of the requests is complete.
+task<int> Waitany(int n, MPI_Request *reqs, int *index, MPI_Status *sts);
+task<int> Waitsome(int n, MPI_Request *reqs, int *outcount, int *indices, MPI_Status *sts);
 
 /* ---------------- blocking collectives ---------------- */
 
@@ -320,6 +334,15 @@ request_awaiter Scan(const void *sbuf, void *rbuf, int count, MPI_Datatype type,
                      MPI_Comm comm);
 request_awaiter Exscan(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
                        MPI_Comm comm);
+// A reduction to rank 0, then a scatter, each awaited (as in ampi.C).
+task<int> Reduce_scatter_block(const void *sbuf, void *rbuf, int count, MPI_Datatype type,
+                               MPI_Op op, MPI_Comm comm);
+task<int> Reduce_scatter(const void *sbuf, void *rbuf, const int *rcounts, MPI_Datatype type,
+                         MPI_Op op, MPI_Comm comm);
+// One receive and one send per rank, awaited together; displacements in bytes.
+task<int> Alltoallw(const void *sbuf, const int *scounts, const int *sdispls,
+                    const MPI_Datatype *stypes, void *rbuf, const int *rcounts,
+                    const int *rdispls, const MPI_Datatype *rtypes, MPI_Comm comm);
 
 /* ---------------- tests and probes ---------------- */
 
