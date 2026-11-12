@@ -347,7 +347,7 @@ class RefnumTest : public CBase_RefnumTest {
   int redn_sum, expected_redn_sum;
   int cb_sum, expected_cb_sum;
   int ignored_sum, expected_ignored_sum;
-  int index;
+  int index, got;   // got: the value a task returns through CK_CALL_TO
 
   static void check(bool ok, const char* what) {
     if (!ok) ::CkAbort("ckcoro refnum test: %s", what);
@@ -380,6 +380,13 @@ class RefnumTest : public CBase_RefnumTest {
     }
     CK_END();
   }
+  // A helper that returns a value: co_return after CK_END.
+  ck::coro::task<int> receiveIndex(int idx) {
+    CK_RESUMABLE();
+    CK_CALL(receive(idx));
+    CK_END();
+    co_return idx;
+  }
   ck::coro::task<void> missed(ck::coro::want w, const char* name) {
     CK_RESUMABLE();
     CK_WHEN(w);
@@ -393,7 +400,7 @@ public:
   void pup(PUP::er& p) {
     p | array_size; p | refnum_sum; p | expected_refnum_sum; p | marshall_sum; p | expected_marshall_sum;
     p | redn_sum; p | expected_redn_sum; p | cb_sum; p | expected_cb_sum; p | ignored_sum;
-    p | expected_ignored_sum; p | index;
+    p | expected_ignored_sum; p | index; p | got;
   }
 
   ck::coroutine run(int messages) {
@@ -444,7 +451,8 @@ public:
 
     // The powers of two, with a plain for loop.
     for (index = 1; index < messages; index *= 2) {
-      CK_CALL(receive(index));
+      CK_CALL_TO(got, receiveIndex(index));
+      check(got == index, "CK_CALL_TO: wrong value returned");
     }
 
     // The odd ones except 1: a negative stride that does not land on the end.

@@ -2127,40 +2127,67 @@ chare puts the generated macro ``ClassName_CORO_CODE`` in its class,
 which defines the coroutine state (the active coroutines and the
 buffered deliveries, packed with the chare), the bodies of the inbox
 entries, and ``inbox::name()`` and ``inbox::name(ref)``, which name an
-inbox entry at a wait. The jacobi3d step of
-``tests/charm++/jacobi3d-coro``:
+inbox entry at a wait. A coroutine entry is invoked like any other entry
+method (``strips.run()`` below); the invocation returns when the body
+finishes or first waits, and the body continues inside the inbox entries
+that deliver what it waits for. The strips of the heat diffusion in
+``examples/charm++/heat1d-coro``, which exchange boundary cells around a
+ring every iteration:
 
 .. code-block:: none
 
-   array [3D] Jacobi {
-     entry Jacobi();
-     entry [coroutine] void doStep();
-     entry [inbox] void receiveGhosts(ghostMsg *m);
+   array [1D] Strip {
+     entry Strip();
+     entry [coroutine] void run();
+     entry [inbox] void fromLeft(int iter, double value);
+     entry [inbox] void fromRight(int iter, double value);
      entry [inbox] void ResumeFromSync();
    };
 
 .. code-block:: c++
 
-   class Jacobi : public CBase_Jacobi {
-     Jacobi_CORO_CODE
-     int iterations, imsg;   // live across waits: members, pupped as usual
+   class Strip : public CBase_Strip {
+     Strip_CORO_CODE
+     std::vector<double> t;         // the cells, with a ghost at each end
+     int iter;                      // live across waits: a member, pupped
+     double leftGhost, rightGhost;  // received at the wait: members, pupped
      ...
-     ck::coroutine doStep() {
+     ck::coroutine run() {
        CK_COROUTINE();
-       if (iterations > 0 && iterations % lbFreq == 0) {
-         AtSync();
-         CK_WHEN(inbox::ResumeFromSync());
-       }
-       begin_iteration();
-       for (imsg = 0; imsg < 6; imsg++) {
-         CK_WHEN_BLOCK(inbox::receiveGhosts(iterations), gmsg) { // when receiveGhosts[iterations](ghostMsg *gmsg) {
-           processGhosts(gmsg);
+       for (iter = 1; iter <= maxIter; iter++) {
+         if (lbFreq > 0 && iter % lbFreq == 0) {
+           AtSync();                      // the element may migrate while it waits here
+           CK_WHEN(inbox::ResumeFromSync());
          }
+         thisProxy[(thisIndex + numStrips - 1) % numStrips].fromRight(iter, t[1]);
+         thisProxy[(thisIndex + 1) % numStrips].fromLeft(iter, t[cellsPerStrip]);
+         // when fromLeft[iter](int i, double v), fromRight[iter](int i, double v)
+         CK_WHEN_ALL(CK_ALT(inbox::fromLeft(iter), ck::coro::skip, leftGhost),
+                     CK_ALT(inbox::fromRight(iter), ck::coro::skip, rightGhost));
+         update();
+         if (iter % reportFreq == 0)
+           contribute(sizeof(double), &maxChange, CkReduction::max_double,
+                      CkCallback(CkReductionTarget(Main, report), mainProxy));
        }
-       check_and_compute();
        CK_END();
      }
    };
+
+The mainchare of the same program waits for the reports in its own
+coroutine, with the block form of a wait:
+
+.. code-block:: c++
+
+   ck::coroutine run() {                    // entry [coroutine] void run();
+     CK_COROUTINE();
+     for (reports = 1; reports <= maxIter / reportFreq; reports++) {
+       CK_WHEN_BLOCK(inbox::report(), maxChange) {   // entry [inbox, reductiontarget] void report(double maxChange);
+         CkPrintf("iteration %d: largest change %.6e\n", reports * reportFreq, maxChange);
+       }
+     }
+     ...
+     CK_END();
+   }
 
 A wait has two forms. ``CK_WHEN_BLOCK(want, name...) { ... }`` waits
 until a delivery to the named entry arrives and declares the entry's
@@ -2189,7 +2216,8 @@ chare. ``CK_WHEN_ALL(CK_ALT(want, out...), ...)`` waits until every
 alternative has a delivery and takes them together, as an SDAG
 ``when a(), b()``. ``CK_WHEN_ANY(idx, CK_ALT(want, out...), ...)`` waits for the
 first of several alternatives and stores the index of the one that
-matched, as an SDAG ``case``; an alternative may be a conjunction,
+matched in the ``int`` variable ``idx`` (a member if it is read after a
+later wait), as an SDAG ``case``; an alternative may be a conjunction,
 ``CK_ALL(CK_ALT(...), CK_ALT(...))``, which is taken only when all its
 deliveries are present.
 
@@ -2207,7 +2235,7 @@ rules:
    again). A pointer to an array parameter is valid until the next wait.
 -  Code before a wait runs again after a migration, so its results must
    be members, not recomputed side effects.
--  The element migrates or is checkpointed only while every active
+-  The chare migrates or is checkpointed only while every active
    coroutine of it is suspended at a ``CK_WHEN``, ``CK_WHEN_ANY`` or
    ``CK_CALL``; packing it while suspended at another ``co_await`` aborts.
    ``AtSync()`` and ``migrateMe()`` may be called from the body: the move
@@ -2215,7 +2243,7 @@ rules:
 -  A wait is one statement and may be the body of an ``if`` or a loop; it
    must not be inside a ``switch`` of the program's own, and two waits
    must not share a source line.
--  At most one coroutine per entry method is active in an element at a
+-  At most one coroutine per entry method is active in a chare at a
    time.
 -  The parameters of a coroutine entry are taken by value in its C++
    definition (a reference would bind to the generated wrapper's local,
@@ -2225,7 +2253,19 @@ rules:
 
 A function that itself waits is written as a ``ck::coro::task<T>``
 coroutine whose body is bracketed by ``CK_RESUMABLE()`` and ``CK_END()``,
-and is awaited with ``CK_CALL(expr)`` or ``CK_CALL_TO(lhs, expr)``.
+and is awaited with ``CK_CALL(expr)`` or ``CK_CALL_TO(lhs, expr)``; a
+value is returned with ``co_return`` after ``CK_END()``:
+
+.. code-block:: c++
+
+   ck::coro::task<int> receive(int idx) {     // waits inside a called function
+     CK_RESUMABLE();
+     CK_WHEN(inbox::recvNum(idx), n);         // n: a member
+     CK_END();
+     co_return n;
+   }
+   ...
+   CK_CALL_TO(total, receive(i));             // total: a member if used after a later wait
 
 Several waits can be in progress at once, as with an SDAG ``overlap``:
 ``CK_OVERLAP(task...)`` runs the ``ck::coro::task<void>`` helpers given to
@@ -2288,9 +2328,11 @@ outside an entry method, and an ``[inline]`` or ``[local]`` call sees the
 caller's delivery. The inbox entries use them to keep marshalled
 parameters in the message they arrived in instead of copying them.
 
-Programs in the distribution that use coroutine entry methods, each
-next to the SDAG program it was written from and printing the same
-result: ``examples/charm++/leanmd-coro`` (the molecular dynamics
+Programs in the distribution that use coroutine entry methods:
+``examples/charm++/heat1d-coro`` (the program above, with migration
+under a load balancer and a checksum checked by its ``make test``); then,
+each next to the SDAG program it was written from and printing the same
+result, ``examples/charm++/leanmd-coro`` (the molecular dynamics
 miniapp: a mainchare, a 3D and a 6D array, waits with reference numbers,
 an array parameter, a container parameter and a message held across a
 wait), ``examples/charm++/fib-coro`` (singleton chares, nested waits),

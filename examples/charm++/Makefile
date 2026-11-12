@@ -10,6 +10,7 @@ DIRS = \
   fib \
   fib-coro \
   groupsection \
+  heat1d-coro \
   hello \
   immediateEntryMethod \
   integrate \
