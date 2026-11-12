@@ -412,10 +412,12 @@ close one. What can be removed is the closer and the registration:
   a coroutine").
 
 The word says what the block buys: the code inside can be rebuilt after a
-migration or a checkpoint, and a chare that never migrates while waiting
-may leave it out (its awaits are plain `co_await`s and the pup aborts if
-it is packed while suspended there). The same block serves entries and
-helpers, so the task pair is gone too. A scratch probe (block form,
+migration or a checkpoint. Every coroutine body is the block, because
+each wait is a case of the switch it opens (the first text said a chare
+that never migrates could leave it out; the review of PR #4231 pointed
+out that a body without the block has no way to write a wait, and Kale
+chose one rule over a second set of wait macros, 2026-11-12). The same
+block serves entries and helpers, so the task pair is gone too. A scratch probe (block form,
 labels inside loops, the promise constructor receiving `*this`, the
 missed-site destructor) compiled clean under Apple clang 17 with `-Wall
 -Wextra` before the conversion; the suite under `+ck_fakemigrate`,
