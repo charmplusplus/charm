@@ -1,7 +1,9 @@
 // Tests of coroutine entry methods (ckcoro.h). The migration test is the
 // coroutine version of tests/charm++/sdag/sdag_tests.C's MigrationTest: its
-// case statements are CK_WHEN_ANY sites, its conjunctions are consecutive
-// CK_WHEN sites, and its final overlap over stray messages is a check that
+// case statements are CK_WHEN_ANY sites, its conjunctions CK_WHEN_ALL sites
+// (both messages stay in the pupped inbox until both have arrived, so the
+// element may migrate in between), and its final overlap over stray
+// messages is a check that
 // the inbox is empty when the coroutine ends. The marshall test checks
 // marshalled inbox entries: matched by the first argument, delivered by
 // broadcast, and reached through a reduction.
@@ -555,9 +557,8 @@ public:
       CK_WHEN(inbox::migrationDone());
       CkAssert(qd_reached);
 
-      // Both TestMessages (an SDAG conjunction: two consecutive sites)
-      CK_WHEN(inbox::sentBefore(), msg1);
-      CK_WHEN(inbox::sentAfter(), msg2);
+      // Both TestMessages (the SDAG conjunction when sentBefore(m1), sentAfter(m2))
+      CK_WHEN_ALL(CK_ALT(inbox::sentBefore(), msg1), CK_ALT(inbox::sentAfter(), msg2));
       checkPair();
 
       // One of the calls, which was pupped as a buffered message (SDAG case)
@@ -570,8 +571,7 @@ public:
       sendBefore();
       thisProxy[thisIndex].migrateNow();
 
-      CK_WHEN(inbox::sentBefore(), msg1);
-      CK_WHEN(inbox::sentAfter(), msg2);
+      CK_WHEN_ALL(CK_ALT(inbox::sentBefore(), msg1), CK_ALT(inbox::sentAfter(), msg2));
       checkPair();
 
       CK_WHEN_ANY(which, CK_ALT(inbox::call1()), CK_ALT(inbox::call2()), CK_ALT(inbox::call3()));
