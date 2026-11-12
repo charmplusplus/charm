@@ -330,7 +330,9 @@ tmp, msg)` builds it and returns the entry index:
   (`viewPayload`, which aborts when the magic is wrong); the entry index is
   the header's `ep`.
 - `CkReductionMsg`: kind `REDRESULT`, one synthesized `BUFFER` slot over
-  `getData()` (no copy) whose `elem` comes from the reducer table, plus a
+  `getData()` (no copy) whose `elem` comes from the reducer table (for a
+  result of the shaped reducer, the slot starts after the 8-byte header,
+  with that header's dimension count and shape: Reductions), plus a
   `FUTURE` slot `(CkMyPe(), ref)` when the envelope's reference number is not
   zero. A result of the foreign reducer is itself a CkDyn payload and is
   viewed as kind `DYN` over `getData()`. The entry index is
@@ -637,6 +639,38 @@ gives `elem` of the `BUFFER` slot in a reduction result view.
 `Group`, `NodeGroup` or `ArrayElement`. A `nop` contribution is sent with no
 data. A SECTION callback is the exception: the contribution goes through the
 section-tagged reducer (Sections, Reductions).
+
+**Shaped contributions.** `CkDynContributeShaped(me, data, cb, ndim, shape)`
+and `CkDynContributeSectionShaped` (added within API version 2) carry the
+contributors' array shape to the result (charm4py issue #321). The built-in
+reducers combine flat element arrays and cannot be changed, so with `ndim`
+2 or more and a reducer of the `CkDynReducers` table on a numeric element
+kind (not `NONE`, not `BYTE`), `shapedContribution` wraps the data for a
+third reducer that `_ckdynInitNode` registers, `CkDyn::shaped`: an 8-byte
+`ShapedHdr` (`int32 inner`, the reducer the binding gave; `uint32 ndim`),
+`int64 shape[ndim]`, then the elements. It checks that the shape's element
+count times the element size equals the length. Anything else (`ndim` 0 or
+1, `nop`, the foreign reducer, a `BYTE` or `NONE` kind) is contributed
+unchanged, so `CkDynContribute(me, data, cb)` is
+`contributeImpl(me, data, cb, 1, NULL)` and behaves as before.
+`ckdynShapedReduce` skips empty messages, checks that every other message
+has the same inner reducer and the same shape (it aborts with "contributions
+to one reduction have different shapes, (2, 3) and (3, 2)" otherwise),
+builds temporary `CkReductionMsg`s of the elements, calls the inner reducer's
+function from the reducer table, and returns the result behind the first
+message's header. One contributor is passed on unreduced, which is already
+the result's layout. Because the header is 8 bytes, the shape and elements
+after it are laid out as a `BUFFER` slot's data (shape, then bytes), so
+`viewReduction` synthesizes the slot over the message without a copy:
+`v.off` 8, `ndim` from the header, `elem` from the inner reducer, `len` the
+element bytes (`shapedSplit` parses the header). `mcastFromReduction`, which
+turns a built-in result into a section message for a SECTION callback, adds
+a `BUFFER` slot with that shape. Composition with the other wrappers: a
+`CkDynContribute` to a SECTION callback tags the shaped data (the `SecTag`'s
+inner reducer is `CkDyn::shaped`), and `unwrapSectionTagged` hands the inner
+data to `mcastFromReduction`; a `CkDynContributeSectionShaped` passes the
+shaped data and reducer to `CkMulticastMgr::contribute`, which calls the
+registered reducer function like any other.
 
 **The foreign reducer.** `_ckdynInitNode` registers one reducer,
 `CkDyn::foreign` (`CkReduction::addReducer`), on every process in module
@@ -1206,8 +1240,8 @@ A shared-library binding:
    API's `CkRegisterMainModuleCallback` runs. In any other build it runs
    after `CkRegisterMainModule`, so a program with a charmxi main module that
    starts through `CkDynStart` gets both.
-5. The init calls run: `_ckdynInitNode` (rank 0) registers the foreign
-   reducer and the two section init entries; `_ckdynInitProc` (every PE)
+5. The init calls run: `_ckdynInitNode` (rank 0) registers the foreign,
+   section-tagged and shaped reducers and the two section init entries; `_ckdynInitProc` (every PE)
    initializes the builder Ckpv.
 6. `_registerDone`; PE 0 constructs the main chare. `MainchareDyn` creates
    `CkDynMgr` and the `CkMulticastMgr` before calling `hooks.mainchare`, so

@@ -655,9 +655,22 @@ static double memberValue(Obj *o) {
   return (o->t.u.array.aid == aidSecA ? 1.0 : 1000.0) * (o->t.u.array.index[0] + 1);
 }
 
+/* The shaped contribution of a member (CkDynContributeShaped): a 2x3 array
+   of doubles, row 0 value * (1, 2, 3) and row 1 (1, 2, 3); with -mixedshape
+   odd array elements and odd PEs give it the shape 3x2, which must abort. */
+/* readonly */ bool g_mixedShape = false;   /* -mixedshape (TestMain sets it, so every PE has it) */
+static void shapedOf(Obj *o, double a[6], int64_t shape[2]) {
+  double v = memberValue(o);
+  for (int j = 0; j < 3; j++) { a[j] = v * (j + 1); a[3 + j] = j + 1; }
+  shape[0] = 2; shape[1] = 3;
+  int who = o->t.kind == CKDYN_GROUP ? o->t.u.group.pe_or_node : o->t.u.array.index[0];
+  if (g_mixedShape && who % 2 == 1) { shape[0] = 3; shape[1] = 2; }
+}
+
 /* secRecv(mode, expectRedNo, cb): a section multicast. Checks the view and
  * the member's section reduction number, then contributes to the section:
- * mode 0 sum_double of [value, 1]; mode 1 the foreign reducer over value. */
+ * mode 0 sum_double of [value, 1]; mode 1 the foreign reducer over value;
+ * mode 2 sum_double of the 2x3 shaped array (CkDynContributeSectionShaped). */
 static int64_t secRecv(Obj *o, const CkDynMsgView *v) {
   CHECK(v->kind == CKDYN_MSGKIND_MCAST && v->section != nullptr, "secRecv: view kind %d, section %p", (int)v->kind, (const void *)v->section);
   CHECK(o->s.joined > 0, "secRecv: the member never got section_joined");
@@ -673,6 +686,11 @@ static int64_t secRecv(Obj *o, const CkDynMsgView *v) {
     double r[2] = { val, 1.0 };
     CkDynRedData d = { r, sizeof r, redType("sum_double") };
     CkDynContributeSection(&o->t, &sid, &d, &cb);
+  } else if (mode == 2) {
+    double a[6]; int64_t shape[2];
+    shapedOf(o, a, shape);
+    CkDynRedData d = { a, sizeof a, redType("sum_double") };
+    CkDynContributeSectionShaped(&o->t, &sid, &d, &cb, 2, shape);
   } else {
     CkDynMsg *m = MsgB().user(CB_REDUCER_SUM_I64).i64((int64_t)val).finish(0);
     uint32_t len;
@@ -686,7 +704,8 @@ static int64_t secRecv(Obj *o, const CkDynMsgView *v) {
 
 /* The (value, count) of a section reduction result in any of its forms: a
    REDRESULT or a section callback's BUFFER slot of doubles (count is the
-   second double), or a foreign result's I64 slot (count -1). */
+   second double), a shaped 2x3 result of shapedOf contributions (value
+   [0][0], count [1][0]), or a foreign result's I64 slot (count -1). */
 static void resultOf(const CkDynMsgView *v, double *value, double *count) {
   CHECK(v->nslots >= 1, "result view without slots (kind %d)", (int)v->kind);
   if (v->slots[0].type == CKDYN_SLOT_I64) {
@@ -707,6 +726,19 @@ static void resultOf(const CkDynMsgView *v, double *value, double *count) {
     return;
   }
   CHECK(v->slots[0].elem == CKDYN_ELEM_F64, "result buffer elem %d, expected F64", v->slots[0].elem);
+  if (v->slots[0].ndim != 0) {
+    const int64_t *shape;
+    const double *p = (const double *)CkDynViewBufferPtr(v, 0, &shape);
+    CHECK(v->slots[0].ndim == 2 && shape[0] == 2 && shape[1] == 3 && v->slots[0].len == 6 * sizeof(double),
+          "shaped result: ndim %d, shape (%lld, %lld), %u bytes; expected (2, 3) of doubles", v->slots[0].ndim,
+          (long long)shape[0], (long long)(v->slots[0].ndim > 1 ? shape[1] : -1), v->slots[0].len);
+    for (int j = 1; j < 3; j++)
+      CHECK(p[j] == p[0] * (j + 1) && p[3 + j] == p[3] * (j + 1), "shaped result: column %d is (%g, %g), "
+            "expected (%g, %g)", j, p[j], p[3 + j], p[0] * (j + 1), p[3] * (j + 1));
+    *value = p[0];
+    *count = p[3];
+    return;
+  }
   const double *p = (const double *)CkDynViewBufferPtr(v, 0, nullptr);
   *value = p[0];
   *count = v->slots[0].len >= 16 ? p[1] : -1;
@@ -750,13 +782,20 @@ static int64_t secGotSec(Obj *o, const CkDynMsgView *v) {
 /* redToSec(mode, cb): a reduction over the whole array or group (not a
  * section) whose callback is the SECTION callback cb: mode 0 sum_double of
  * [value, 1], 1 the foreign reducer over value, 2 the set reducer over
- * [value, 1]. Contributors on different PEs must carry the same Charm++
- * callback (CkDynContribute's section-tagged reducer). */
+ * [value, 1], 3 sum_double of the 2x3 shaped array (CkDynContributeShaped).
+ * Contributors on different PEs must carry the same Charm++ callback
+ * (CkDynContribute's section-tagged reducer). Mode 3 also serves the
+ * sections/shaped phase with a FUTURE callback. */
 static int64_t memberRedToSec(Obj *o, const CkDynMsgView *v) {
   int64_t mode = cbI64(v, 0);
   CkDynCallback cb = viewCb(v, 1);
   double r[2] = { memberValue(o), 1.0 };
-  if (mode == 1) {
+  if (mode == 3) {
+    double a[6]; int64_t shape[2];
+    shapedOf(o, a, shape);
+    CkDynRedData d = { a, sizeof a, redType("sum_double") };
+    CkDynContributeShaped(&o->t, &d, &cb, 2, shape);
+  } else if (mode == 1) {
     CkDynMsg *m = MsgB().user(CB_REDUCER_SUM_I64).i64((int64_t)r[0]).finish(0);
     uint32_t len;
     const void *p = CkDynMsgPayload(m, &len);
@@ -1222,7 +1261,7 @@ class TestMain : public CBase_TestMain {
     "constrained",
     "ncpy/nonpost", "ncpy/post_before", "ncpy/post_after", "ncpy/samepe",
     "device/remote", "device/samepe", "hapi", "devpersist/remote", "devpersist/samepe",
-    "sections/array", "sections/group", "sections/contribute", "sections/remote", "sections/combine_overlap",
+    "sections/array", "sections/group", "sections/contribute", "sections/shaped", "sections/remote", "sections/combine_overlap",
     "sections/combine_arrays", "sections/delete", "sections/order", "sections/migration",
     "migration", "checkpoint", "late", "exit" };
   std::string ckptDir = "ckdyntest.ckpt";
@@ -1277,6 +1316,7 @@ public:
       else if (strcmp(m->argv[i], "-ckptsection") == 0) ckptSection = true;
       else if (strcmp(m->argv[i], "-deletewaiting") == 0) deleteWaiting = true;
       else if (strcmp(m->argv[i], "-staleredno") == 0) staleRedNo = true;
+      else if (strcmp(m->argv[i], "-mixedshape") == 0) g_mixedShape = true;
     delete m;
     mainProxy = thisProxy;
     numElems = 2 * CkNumPes();
@@ -1919,14 +1959,16 @@ public:
     q.push_back([this, name, mode, kind] {
       static const char *kinds[] = { "future", "element", "bcast", "section" };
       Sect &S = sects[name];
-      std::string what = cur + ": " + name + (mode ? " foreign" : " sum_double") + " to " + kinds[kind];
+      static const char *modes[] = { " sum_double", " foreign", " shaped sum_double" };
+      std::string what = cur + ": " + name + modes[mode] + " to " + kinds[kind];
       uint32_t *fp = new uint32_t(0);
       uint32_t f = cbNewFuture([this, &S, mode, kind, what, fp](const CkDynMsgView *v) {
         uint32_t f = *fp;
         delete fp;
         double val, cnt, n = 1;
         if (kind == 0) {
-          CHECK(v->kind == (mode == 0 ? CKDYN_MSGKIND_REDRESULT : CKDYN_MSGKIND_DYN), "%s: view kind %d", what.c_str(), (int)v->kind);
+          CHECK(v->kind == (mode != 1 ? CKDYN_MSGKIND_REDRESULT : CKDYN_MSGKIND_DYN), "%s: view kind %d", what.c_str(), (int)v->kind);
+          if (mode == 2) CHECK(v->slots[0].ndim == 2, "%s: result slot ndim %d, expected 2", what.c_str(), v->slots[0].ndim);
           resultOf(v, &val, &cnt);
           CHECK(v->refnum != 0, "%s: no reference number", what.c_str());
         } else if (kind == 1) {
@@ -1940,7 +1982,7 @@ public:
           CHECK(redDouble(v, 3) == (double)f * expectN, "%s: members received refnum sum %g, expected %u each",
                 what.c_str(), redDouble(v, 3), f);
         CHECK(val == S.sum * expectN, "%s: sum %g, expected %g", what.c_str(), val, S.sum * expectN);
-        if (mode == 0) CHECK(cnt == S.size * expectN, "%s: %g contributions, expected %g", what.c_str(), cnt, S.size * expectN);
+        if (mode != 1) CHECK(cnt == S.size * expectN, "%s: %g contributions, expected %g", what.c_str(), cnt, S.size * expectN);
         go();
       });
       *fp = f;
@@ -1962,7 +2004,7 @@ public:
      [value, count, 1, refnum] over the section to the future (gotSec). */
   void qRoundAll(const std::string &name, int mode) {
     q.push_back([this, name, mode] {
-      static const char *modes[] = { "sum_double", "foreign", "set" };
+      static const char *modes[] = { "sum_double", "foreign", "set", "shaped sum_double" };
       Sect &S = sects[name];
       std::string what = cur + ": all contribute (" + modes[mode] + ") to section " + name;
       int n = S.group ? CkNumPes() : nSecA;
@@ -2019,6 +2061,32 @@ public:
       for (int p = 0; p < CkNumPes(); p += 2) pes.push_back(p);
       qCreateGroup("G", pes);
       qRound("G", 0, 0); qRound("G", 1, 0); qRound("G", 0, 1); qRound("G", 0, 3);
+    } else if (s == "sections/shaped") {
+      /* CkDynContributeShaped and CkDynContributeSectionShaped: 2x3 arrays
+         reduce to a 2x3 result slot (resultOf checks the shape) over the whole
+         array to a FUTURE, over a section to every callback kind, and over the
+         whole array or group to a SECTION callback (the section-tagged reducer
+         around the shaped one) */
+      q.push_back([this] {
+        std::string what = cur + ": array A shaped sum_double to future";
+        uint32_t f = cbNewFuture([this, what](const CkDynMsgView *v) {
+          CHECK(v->kind == CKDYN_MSGKIND_REDRESULT && v->slots[0].ndim == 2, "%s: view kind %d, slot ndim %d",
+                what.c_str(), (int)v->kind, v->slots[0].ndim);
+          double val, cnt, total = 0;
+          resultOf(v, &val, &cnt);
+          for (int i = 0; i < nSecA; i++) total += valOf(aidSecA, i);
+          CHECK(val == total && cnt == nSecA, "%s: (%g, %g), expected (%g, %d)", what.c_str(), val, cnt, total, nSecA);
+          CkPrintf("  %s: shape (2, 3), sum %g over %d elements\n", what.c_str(), val, nSecA);
+          go();
+        });
+        MsgB m;
+        m.i64(3).cb(cbFutureCb(0, f));
+        CkDynSendArray(aidSecA, 1, nullptr, Sec.ep(SC_REDTOSEC), m.finish(0), nullptr);
+      });
+      if (g_mixedShape) q.push_back([] { CHECK(false, "contributions of two shapes did not abort"); });
+      for (int kind = 0; kind < 4; kind++) qRound("Aeven", 2, kind);
+      qRound("G", 2, 0); qRound("G", 2, 3);
+      qRoundAll("Aeven", 3); qRoundAll("G", 3);
     } else if (s == "sections/contribute") {
       /* reductions over a whole collection to a SECTION callback */
       for (int mode = 0; mode < 3; mode++) { qRoundAll("Aeven", mode); qRoundAll("G", mode); }

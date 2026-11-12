@@ -1308,6 +1308,46 @@ contribute). The data is copied. Every member of the collection contributes
 once per reduction, with the same reducer and callback; ``nop`` with no data
 is a barrier.
 
+.. _ckdyn-shaped:
+
+Shaped contributions
+~~~~~~~~~~~~~~~~~~~~
+
+The built-in reducers combine flat arrays of elements. To get a result with
+the contributors' array shape, contribute with the shape:
+
+.. code-block:: c
+
+   void CkDynContributeShaped(const CkDynTarget *me, const CkDynRedData *d, const CkDynCallback *cb,
+                              int ndim, const int64_t *shape);
+   void CkDynContributeSectionShaped(const CkDynTarget *me, const CkDynSectionID *sid, const CkDynRedData *d,
+                                     const CkDynCallback *cb, int ndim, const int64_t *shape);
+
+The elements are in C order, and the product of ``shape`` times the element
+size of the reducer must equal ``d->len`` (CkDyn aborts otherwise). With
+``ndim`` 2 or more and a built-in reducer on a numeric element kind, the
+result's BUFFER slot (REDRESULT view, or the MCAST view of a SECTION
+callback) has that ``ndim`` and shape: ``CkDynViewBufferPtr(v, 0, &shape)``
+returns it. Every contribution to one reduction must have the same shape;
+contributions of two shapes abort with "contributions to one reduction have
+different shapes". With ``ndim`` 0 or 1, ``nop``, a binding-defined reducer,
+or a reducer whose element kind is ``CKDYN_ELEM_BYTE`` or
+``CKDYN_ELEM_NONE``, the shape is ignored and the call is
+``CkDynContribute`` (or ``CkDynContributeSection``): the result slot is flat
+(``ndim`` 0), as before. Both functions were added within API version 2;
+the plain contribute functions are unchanged.
+
+.. code-block:: c
+
+   double a[2][3];                       /* this member's values */
+   int64_t shape[2] = { 2, 3 };
+   CkDynRedData d = { a, sizeof a, redType("sum_double") };
+   CkDynContributeShaped(&o->t, &d, &cb, 2, shape);
+
+   /* in the target entry: slot 0 has ndim 2 and shape (2, 3) */
+   const int64_t *shp;
+   const double *p = (const double *)CkDynViewBufferPtr(v, 0, &shp);
+
 Results
 -------
 
@@ -1315,7 +1355,8 @@ The callback receives the result:
 
 - With a built-in reducer, a REDRESULT view: slot 0 is a BUFFER slot over
   the reduction data, with ``elem`` from the reducer table and ``len`` the
-  data's byte count. When the reference number is set (a FUTURE callback, or
+  data's byte count; ``ndim`` is 0, or the contributions' shape for
+  :ref:`shaped contributions <ckdyn-shaped>`. When the reference number is set (a FUTURE callback, or
   a TARGET callback with ``refnum``), ``view->refnum`` holds it and a FUTURE
   slot ``(CkDynMyPe(), refnum)`` follows.
 - With a binding-defined reducer, a DYN view of the payload the ``reduce``
