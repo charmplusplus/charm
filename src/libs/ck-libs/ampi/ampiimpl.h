@@ -1765,6 +1765,8 @@ class GPUReq : public AmpiRequest {
 class ATAReq final : public AmpiRequest {
  public:
   std::vector<MPI_Request> reqs;
+  /// With MPI_IN_PLACE, the blocks to send, copied before any receive can land.
+  std::vector<char> sendCopy;
 
   ATAReq(int numReqs_) noexcept : reqs(numReqs_) {}
   ATAReq() =default;
@@ -1784,6 +1786,7 @@ class ATAReq final : public AmpiRequest {
   void pup(PUP::er &p) noexcept override {
     AmpiRequest::pup(p);
     p|reqs;
+    p|sendCopy;
   }
   void print() const noexcept override;
 };

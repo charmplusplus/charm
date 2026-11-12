@@ -375,8 +375,10 @@ class Block : public CBase_Block {
         p_send_bufs.emplace_back(d_send_ghosts[0][i], ghost_sizes[i], CkCallback::ignore, comm_stream);
         p_recv_bufs.emplace_back(d_recv_ghosts[0][i], ghost_sizes[i], recv_cb, comm_stream);
 
-        // Open buffers that will be sent to neighbors
+        // Open the buffers sent to neighbors, and the send buffers too: a put
+        // between hosts registers both buffers for RDMA, which needs both opened
         p_recv_bufs[i].open();
+        p_send_bufs[i].open();
       }
 
       // Send persistent buffer info to neighbors

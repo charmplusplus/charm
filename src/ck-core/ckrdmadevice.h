@@ -14,12 +14,12 @@
 #define CkNcpyModeDevice CmiNcpyModeDevice
 #define CkDeviceStatus CmiDeviceStatus
 
-// Persistent device buffers (manual: "Persistent GPU Communication"; mechanism:
-// doc/internals/ckdyn.md, "Persistent device buffers"). get/put choose a mode
-// per pair (mode()): a device copy within a process, CUDA/HIP IPC between
-// processes on one host when the peer's IPC handle opens here, RDMA on the
-// memory registered by open() otherwise. Both buffers' callbacks are sent from the issuing PE once the
-// bytes are in the destination.
+// Persistent device buffers (manual: "Persistent GPU Communication"). get/put
+// choose a mode per pair (mode()): a device copy within a process, CUDA/HIP
+// IPC between processes on one host when the peer's IPC handle opens here,
+// RDMA otherwise, on memory registered the first time RDMA needs it. Both
+// buffers' callbacks are sent from the issuing PE once the bytes are in the
+// destination.
 struct CkDevicePersistent {
   const void* ptr;
   size_t cnt;
@@ -28,15 +28,18 @@ struct CkDevicePersistent {
   hapiStream_t hapi_stream = 0;   // the default stream unless a constructor names one
   int pe;
   hapiIpcMemHandle_t hapi_ipc_handle;
-  void* ipc_ptr;      // unused; the mapping of a remote buffer is kept per process
-  bool ipc_open;      // unused
+  // This copy's view of the peer buffer's IPC mapping in this process: set by
+  // the first transfer through it, which takes a reference on the mapping;
+  // close() releases it. Not copied (each copy takes its own reference), moved
+  // with the object, mutable because mode() is const.
+  mutable void* ipc_ptr;   // the mapped address, null when the handle did not open here
+  mutable bool ipc_open;   // ipc_ptr is set
   // set by open() and carried by pup
   size_t ipc_offset = 0;    // ptr minus the base of its allocation (what the IPC handle maps)
   bool ipc_valid = false;   // hapi_ipc_handle names ptr's allocation
   int node = -1;            // the process (logical node) of pe
   int phys_node = -1;       // the host of pe
-  bool registered = false;  // ncpy holds a registration of [ptr, ptr + cnt)
-  CmiNcpyBuffer ncpy;
+  uint64_t id = 0;          // nonzero once opened: the buffer's entry in its process's registration table
   bool owner = false;       // this object opened the buffer (not pupped)
 
   CkDevicePersistent() : ptr(nullptr), cnt(0), cb(CkCallback(CkCallback::ignore)),
@@ -64,12 +67,55 @@ struct CkDevicePersistent {
     init();
   }
 
+  // Ownership. open() makes this object the owner of the buffer's entry in
+  // its process's registration table; close() or the destructor of the owner
+  // releases it. Copies never own: copy construction, copy assignment, pup
+  // (sending the object, a marshalled parameter). Moving (construction or
+  // assignment from a temporary, as in buf = CkDevicePersistent(...), or a
+  // std::vector reallocating) transfers ownership. Assigning over an owner
+  // releases its entry first, unless the value assigned names the same buffer.
+  CkDevicePersistent(const CkDevicePersistent& o) { copyFrom(o); owner = false; }
+  CkDevicePersistent(CkDevicePersistent&& o) noexcept { copyFrom(o); owner = o.owner; o.owner = false; takeIpc(o); }
+  CkDevicePersistent& operator=(const CkDevicePersistent& o) {
+    if (this != &o) {
+      bool same = id != 0 && id == o.id;
+      if (!same) close();   // this object's setup (an owner) or mapping reference (a copy)
+      void* kp = ipc_ptr; bool ko = ipc_open;
+      bool keep = owner && same;
+      copyFrom(o);
+      owner = keep;
+      if (same) { ipc_ptr = kp; ipc_open = ko; }
+    }
+    return *this;
+  }
+  CkDevicePersistent& operator=(CkDevicePersistent&& o) noexcept {
+    if (this != &o) {
+      bool same = id != 0 && id == o.id;
+      if (!same) close();
+      void* kp = ipc_ptr; bool ko = ipc_open;
+      bool keep = owner && same;
+      copyFrom(o);
+      owner = keep || o.owner;
+      o.owner = false;
+      if (same && ko) { ipc_ptr = kp; ipc_open = ko; o.close(); }   // keep ours, drop the moved-from reference
+      else takeIpc(o);
+    }
+    return *this;
+  }
+
+  ~CkDevicePersistent() { if (owner) close(); }
+
   void init();
-  // Takes the IPC handle of the allocation and, in a program of more than one
-  // process, registers the memory for RDMA. Call before sending the object.
+  // Takes the IPC handle of the allocation and records the buffer (ptr, cnt)
+  // for RDMA; the memory is registered with the network the first time a
+  // transfer needs RDMA. Call before sending the object.
   void open();
-  // On the object that opened the buffer: releases the registration. On a
-  // copy received from a peer: nothing (IPC mappings are kept per process).
+  // On the owner: deregisters the memory if a transfer registered it and
+  // removes the entry; copies of the buffer cannot be used for RDMA after it.
+  // On a copy of another process's buffer: releases this copy's reference on
+  // the process's IPC mapping of it (the mapping is closed with the last
+  // reference, after a device synchronize) and the kept registration; a later
+  // transfer takes them again. On any other copy: nothing.
   void close();
   void set_msg(void* msg);
 
@@ -83,6 +129,19 @@ struct CkDevicePersistent {
 
   CkDeviceStatus get(CkDevicePersistent& src);
   CkDeviceStatus put(CkDevicePersistent& dst);
+
+private:
+  void copyFrom(const CkDevicePersistent& o) {
+    ptr = o.ptr; cnt = o.cnt; cb = o.cb; cb_msg = o.cb_msg; hapi_stream = o.hapi_stream;
+    pe = o.pe; hapi_ipc_handle = o.hapi_ipc_handle; ipc_ptr = nullptr; ipc_open = false;
+    ipc_offset = o.ipc_offset; ipc_valid = o.ipc_valid; node = o.node; phys_node = o.phys_node;
+    id = o.id;
+  }
+  // A move carries the moved-from copy's mapping reference along.
+  void takeIpc(CkDevicePersistent& o) {
+    ipc_ptr = o.ipc_ptr; ipc_open = o.ipc_open;
+    o.ipc_ptr = nullptr; o.ipc_open = false;
+  }
 };
 
 #define CK_DEVICE_ACK_CAP 8
@@ -181,6 +240,10 @@ extern "C" {
   extern int persist_put_handler;
   void* persist_ack_bridge(void* arg);
   extern int persist_ack_handler;
+  void* persist_reg_req_bridge(void* arg);
+  extern int persist_reg_req_handler;
+  void* persist_reg_rep_bridge(void* arg);
+  extern int persist_reg_rep_handler;
 }
 
 // Device pool: arenas registered lazily, whole, on first network use.
@@ -189,8 +252,11 @@ extern "C" {
 // registration cache to do.
 void* CkDeviceMalloc(size_t size);
 void CkDeviceFree(void* ptr);
-// Per-PE init of the device zerocopy path (idle-time ack flush).
-void CkRdmaDeviceInit();
+// Per-PE init of the device zerocopy path (idle-time ack flush, options).
+void CkRdmaDeviceInit(char** argv);
+// Called on each PE when its exit sequence reaches ConverseExit: after it, a
+// CkDevicePersistent owner destroyed at process exit does not deregister.
+void CkRdmaDeviceExit();
 
 #endif // CMK_CUDA
 

@@ -401,8 +401,14 @@ static void deviceFlushAllAcks(void*) {
   for (int pe : pes) deviceFlushAcks(pe);
 }
 
-void CkRdmaDeviceInit() {
+static int persist_verbose = 0;                   // +gpupersistverbose
+static std::atomic<bool> persist_exiting{false};  // set once a PE's exit sequence reaches ConverseExit
+
+void CkRdmaDeviceInit(char** argv) {
   CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE, (CcdCondFn)deviceFlushAllAcks, NULL);
+  if (CmiGetArgFlagDesc(argv, "+gpupersistverbose",
+                        "print the mode of CkDevicePersistent transfers, once per process and mode"))
+    persist_verbose = 1;
 }
 
 // The receiver owes 'id' to 'pe'.  Held for the next device message to that
@@ -594,15 +600,20 @@ void CkRdmaDeviceRecvHandler(void* data, void* msg)
 
 /****************************** Direct (Persistent) API ******************************/
 
-/* Mechanism: doc/internals/ckdyn.md, "Persistent device buffers". */
+/* Persistent device buffers: see CkDevicePersistent in ckrdmadevice.h and the manual, "Persistent GPU Communication". */
 
 #include <dlfcn.h>
 #include <set>
 #include <string>
+#include <atomic>
+#include <climits>
+#include <ctime>
+#include <unistd.h>
 
-// One line per process, mode and operation the first time it is used, so that
-// a run states which path it took.
+// With +gpupersistverbose: one line per process, mode and operation the first
+// time it is used, so that a run states which path it took.
 static void persistAnnounce(const char* what, int mode) {
+  if (!persist_verbose) return;
   static std::mutex lock;
   static std::set<std::pair<std::string, int> > said;
   {
@@ -646,27 +657,62 @@ static bool persistAllocBase(const void* ptr, uintptr_t* base) {
 #endif
 }
 
-// IPC mappings of other processes' allocations, opened once per process and
-// reused by every copy of the peer's buffer, kept until exit.
-static std::mutex persist_ipc_lock;
-static std::map<std::string, void*> persist_ipc;
+// IPC mappings of other processes' allocations, one per process, shared by
+// the copies of the peer's buffer on all PEs of the process and reference
+// counted: a copy takes a reference the first time it transfers through the
+// mapping and releases it in its close(); the mapping is closed with the last
+// reference. A handle that did not open is kept with base null and no
+// references, so that the failure is reported once. The tables of this
+// section are never destroyed, so that the destructor of a static
+// CkDevicePersistent can still use them at exit.
+struct PersistIpcMap { void* base; int refs; };
+static std::mutex& persist_ipc_lock = *new std::mutex;
+static std::map<std::string, PersistIpcMap>& persist_ipc = *new std::map<std::string, PersistIpcMap>;
 
+// r's buffer as mapped in this process, or null when r's handle does not open
+// here. The first call on a copy finds or opens the mapping and takes a
+// reference; the copy keeps the answer (ipc_open, ipc_ptr), so later calls
+// touch neither the table nor its lock.
 static void* persistIpcPtr(const CkDevicePersistent& r) {
+  if (r.ipc_open) return r.ipc_ptr;
   std::string key((const char*)&r.hapi_ipc_handle, sizeof(hapiIpcMemHandle_t));
   std::lock_guard<std::mutex> g(persist_ipc_lock);
   auto it = persist_ipc.find(key);
   void* base = nullptr;
-  if (it != persist_ipc.end()) base = it->second;
-  else {
+  if (it != persist_ipc.end()) {
+    base = it->second.base;
+    if (base) it->second.refs++;
+  } else {
     if (hapiIpcOpenMemHandle(&base, r.hapi_ipc_handle, hapiIpcMemLazyEnablePeerAccess) != hapiSuccess) {
       (void)hapiGetLastError();
       CmiPrintf("[%d] CkDevicePersistent> IPC open of PE %d's buffer failed; using RDMA\n", CkMyPe(), r.pe);
       base = nullptr;
     }
-    persist_ipc[key] = base;
+    persist_ipc[key] = PersistIpcMap{ base, base ? 1 : 0 };
   }
-  return base ? (char*)base + r.ipc_offset : nullptr;
+  r.ipc_open = true;
+  r.ipc_ptr = base ? (char*)base + r.ipc_offset : nullptr;
+  return r.ipc_ptr;
 }
+
+// Releases the reference a copy holds on its peer's mapping, closing the
+// mapping with the last one, after a device synchronize so that no copy
+// through it is still running.
+static void persistIpcRelease(CkDevicePersistent& r) {
+  if (!r.ipc_open) return;
+  r.ipc_open = false;
+  void* p = r.ipc_ptr;
+  r.ipc_ptr = nullptr;
+  if (!p) return;
+  std::string key((const char*)&r.hapi_ipc_handle, sizeof(hapiIpcMemHandle_t));
+  std::lock_guard<std::mutex> g(persist_ipc_lock);
+  auto it = persist_ipc.find(key);
+  if (it == persist_ipc.end() || --it->second.refs > 0) return;
+  hapiCheck(hapiDeviceSynchronize());
+  hapiCheck(hapiIpcCloseMemHandle(it->second.base));
+  persist_ipc.erase(it);
+}
+
 
 // The two buffers' callbacks, sent from the issuing PE when a transfer is done.
 struct PersistDone {
@@ -691,9 +737,99 @@ static void persistRdmaDone(void* param, void* msg) {
   delete d;
 }
 
-// An RDMA get into dst (registered in this process) from src.
-static void persistRdmaGet(const CkDevicePersistent& dst, const CkDevicePersistent& src, const CkCallback& done) {
-  CmiNcpyBuffer d = dst.ncpy, s = src.ncpy;
+// Network registrations of opened buffers, one table per process. open() adds
+// an entry and the owner's close() removes it; the memory is registered the
+// first time a transfer needs RDMA, so a run that never needs it (one process,
+// or IPC on one host) never registers device memory with the network.
+struct PersistReg {
+  const void* ptr;
+  size_t cnt;              // the length registered (cnt at open())
+  int state = 0;           // 0 not yet registered, 1 registered, -1 cannot be registered
+  const char* why = "";    // the reason for state -1
+  CmiNcpyBuffer ncpy;
+};
+static std::mutex& persist_reg_lock = *new std::mutex;
+static std::map<uint64_t, PersistReg>& persist_reg =          // this process's opened buffers
+    *new std::map<uint64_t, PersistReg>;
+static std::map<uint64_t, CmiNcpyBuffer>& persist_remote =    // other processes' registrations, by id
+    *new std::map<uint64_t, CmiNcpyBuffer>;
+static std::atomic<uint64_t> persist_next_id{1};
+
+// An id is node (20 bits) | run token (16 bits) | counter (28 bits). The token
+// differs between a run and its restart from a checkpoint, so an object
+// restored from the checkpoint does not name a buffer opened in the new run.
+static uint64_t persistRunToken() {
+  static const uint64_t token = ((uint64_t)time(nullptr) ^ ((uint64_t)getpid() << 5)) & 0xffff;
+  return token;
+}
+
+static void persistCheckRdmaUsable() {
+  if (CmiUseCopyBasedRDMA)
+    CkAbort("CkDevicePersistent: a transfer between PEs on different hosts, or whose IPC handle did not "
+            "open, needs RDMA, but this run moves RDMA data through host memory (the LCW backend, or "
+            "+nordma), which cannot read or write device memory");
+}
+
+// Registers r once; called with persist_reg_lock held.
+static void persistRegisterLocked(PersistReg& r) {
+  if (r.state != 0) return;
+  if (r.cnt > (size_t)INT_MAX) {
+    r.state = -1;
+    r.why = "the buffer is 2 GiB or larger, and the network registration takes an int length";
+    return;
+  }
+  r.ncpy.deviceRdmaOpInfo = nullptr;
+  memset(r.ncpy.layerInfo, 0, sizeof(r.ncpy.layerInfo));   // stays zero if nothing is registered
+  r.ncpy.init(r.ptr, r.cnt, CMK_BUFFER_REG, CMK_BUFFER_NODEREG);   // released by close()
+  // The memory region handle is the first field of the layer information
+  // (CmiSetRdmaBufferInfo); the backend leaves it null when it registered nothing.
+  void* mr = nullptr;
+  memcpy(&mr, r.ncpy.layerInfo + CmiGetRdmaCommonInfoSize(), sizeof(mr));
+  if (!r.ncpy.isRegistered || mr == nullptr) {
+    r.state = -1;
+    r.why = "the network layer did not register the device memory";
+    return;
+  }
+  r.state = 1;
+}
+
+static void persistNoRdma(const CkDevicePersistent& b, const PersistReg& r) {
+  CkAbort("CkDevicePersistent: a transfer needs RDMA on PE %d's buffer of %zu bytes, but it cannot be "
+          "registered with the network: %s", b.pe, r.cnt, r.why);
+}
+
+static void persistNotOpened(const CkDevicePersistent& b) {
+  CkAbort("CkDevicePersistent: a transfer between PEs on different hosts, or whose IPC handle did not "
+          "open, needs RDMA, and PE %d's buffer was not opened (call open() on both buffers before "
+          "exchanging them)", b.pe);
+}
+
+// The registration of b, a buffer opened in this process, registering it now
+// if needed, with cnt set to b's current cnt.
+static CmiNcpyBuffer persistLocalNcpy(const CkDevicePersistent& b) {
+  if (b.id == 0) persistNotOpened(b);
+  if (b.node != CkMyNode())
+    CkAbort("CkDevicePersistent: an RDMA transfer on PE %d into or out of PE %d's buffer must be issued "
+            "on a PE of that buffer's process", CkMyPe(), b.pe);
+  CmiNcpyBuffer n;
+  {
+    std::lock_guard<std::mutex> g(persist_reg_lock);
+    auto it = persist_reg.find(b.id);
+    if (it == persist_reg.end())
+      CkAbort("CkDevicePersistent: a transfer on PE %d's buffer after its owner called close()", b.pe);
+    persistRegisterLocked(it->second);
+    if (it->second.state != 1) persistNoRdma(b, it->second);
+    n = it->second.ncpy;
+  }
+  if (b.cnt > n.cnt)
+    CkAbort("CkDevicePersistent: a transfer of %zu bytes on PE %d's buffer exceeds the %zu bytes it had "
+            "at open(); open() again after enlarging cnt", b.cnt, b.pe, n.cnt);
+  n.cnt = b.cnt;
+  n.deviceRdmaOpInfo = nullptr;
+  return n;
+}
+
+static void persistIssueGet(CmiNcpyBuffer d, CmiNcpyBuffer s, const CkCallback& done) {
   d.deviceRdmaOpInfo = nullptr;
   s.deviceRdmaOpInfo = nullptr;
   CkCallback srcAck(CkCallback::ignore), dstAck(done);
@@ -701,15 +837,71 @@ static void persistRdmaGet(const CkDevicePersistent& dst, const CkDevicePersiste
   d.rdmaGet(s, sizeof(CkCallback), (char*)&srcAck, (char*)&dstAck);
 }
 
+// A get waiting for the registration of its source (persist_reg_req/rep).
+struct PersistPending {
+  CmiNcpyBuffer d;
+  size_t src_cnt;
+  int src_pe;
+  CkCallback done;
+};
+struct PersistRegReqMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  int issuer;
+  uint64_t id;
+  uint64_t pending;
+};
+struct PersistRegRepMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  uint64_t id;
+  uint64_t pending;
+  int ok;
+  size_t cnt;
+  char why[128];
+  CmiNcpyBuffer ncpy;
+};
+
+// An RDMA get into dst (opened in this process) from src. The lengths are the
+// objects' current cnt, as in the IPC and copy modes. The source's
+// registration is asked of its process the first time and kept here.
+static void persistRdmaGet(const CkDevicePersistent& dst, const CkDevicePersistent& src, const CkCallback& done) {
+  persistCheckRdmaUsable();
+  if (src.id == 0) persistNotOpened(src);
+  CmiNcpyBuffer d = persistLocalNcpy(dst);
+  CmiNcpyBuffer s;
+  bool have = false;
+  {
+    std::lock_guard<std::mutex> g(persist_reg_lock);
+    auto it = persist_remote.find(src.id);
+    if (it != persist_remote.end()) { s = it->second; have = true; }
+  }
+  if (have) {
+    if (src.cnt > s.cnt)
+      CkAbort("CkDevicePersistent: a transfer of %zu bytes from PE %d's buffer exceeds the %zu bytes it "
+              "had at open(); open() again after enlarging cnt", src.cnt, src.pe, s.cnt);
+    s.cnt = src.cnt;
+    persistIssueGet(d, s, done);
+    return;
+  }
+  PersistRegReqMsg* m = (PersistRegReqMsg*)CmiAlloc(sizeof(PersistRegReqMsg));
+  m->issuer = CkMyPe();
+  m->id = src.id;
+  m->pending = (uint64_t)(uintptr_t)new PersistPending{ d, src.cnt, src.pe, done };
+  CmiSetHandler(m, persist_reg_req_handler);
+  QdCreate(1);
+  CmiSyncSendAndFree(src.pe, sizeof(PersistRegReqMsg), m);
+}
+
 // A put between hosts is a get issued by the destination's PE, so that the
 // callbacks are sent only once the bytes are there (a true RDMA put completes
-// on the source before they are visible at the destination).
+// on the source before they are visible at the destination). The source's
+// registration travels with the request.
 struct PersistPutMsg {
   char header[CmiMsgHeaderSizeBytes];
   int issuer;
   int len;
   uint64_t rec;
-  // then the pupped destination and source buffers
+  CmiNcpyBuffer src;
+  // then the pupped destination buffer
 };
 struct PersistAckMsg {
   char header[CmiMsgHeaderSizeBytes];
@@ -732,11 +924,10 @@ extern "C" {
   void* persist_put_bridge(void* arg) {
     PersistPutMsg* m = (PersistPutMsg*)arg;
     QdProcess(1);
-    CkDevicePersistent dst, src;
+    CkDevicePersistent dst;
     PUP::fromMem up((char*)m + sizeof(PersistPutMsg));
     up | dst;
-    up | src;
-    persistRdmaGet(dst, src, CkCallback(persistPutGot, new PersistPutAck{ m->issuer, m->rec }));
+    persistIssueGet(persistLocalNcpy(dst), m->src, CkCallback(persistPutGot, new PersistPutAck{ m->issuer, m->rec }));
     CmiFree(m);
     return NULL;
   }
@@ -750,6 +941,61 @@ extern "C" {
     return NULL;
   }
   int persist_ack_handler;
+
+  // On the source's process: register the buffer if needed and reply.
+  void* persist_reg_req_bridge(void* arg) {
+    PersistRegReqMsg* m = (PersistRegReqMsg*)arg;
+    QdProcess(1);
+    PersistRegRepMsg* r = (PersistRegRepMsg*)CmiAlloc(sizeof(PersistRegRepMsg));
+    r->id = m->id;
+    r->pending = m->pending;
+    r->ok = 0;
+    r->cnt = 0;
+    r->why[0] = '\0';
+    {
+      std::lock_guard<std::mutex> g(persist_reg_lock);
+      auto it = persist_reg.find(m->id);
+      if (it == persist_reg.end()) {
+        snprintf(r->why, sizeof(r->why), "the buffer's owner called close()");
+      } else {
+        persistRegisterLocked(it->second);
+        r->cnt = it->second.cnt;
+        if (it->second.state == 1) { r->ok = 1; r->ncpy = it->second.ncpy; }
+        else snprintf(r->why, sizeof(r->why), "%s", it->second.why);
+      }
+    }
+    CmiSetHandler(r, persist_reg_rep_handler);
+    QdCreate(1);
+    CmiSyncSendAndFree(m->issuer, sizeof(PersistRegRepMsg), r);
+    CmiFree(m);
+    return NULL;
+  }
+  int persist_reg_req_handler;
+
+  // On the issuing PE: keep the source's registration and issue the get.
+  void* persist_reg_rep_bridge(void* arg) {
+    PersistRegRepMsg* r = (PersistRegRepMsg*)arg;
+    QdProcess(1);
+    PersistPending* p = (PersistPending*)(uintptr_t)r->pending;
+    if (!r->ok)
+      CkAbort("CkDevicePersistent: a transfer needs RDMA on PE %d's buffer of %zu bytes, but it cannot be "
+              "registered with the network: %s", p->src_pe, r->cnt, r->why);
+    CmiNcpyBuffer s = r->ncpy;
+    s.deviceRdmaOpInfo = nullptr;
+    {
+      std::lock_guard<std::mutex> g(persist_reg_lock);
+      persist_remote[r->id] = s;
+    }
+    if (p->src_cnt > s.cnt)
+      CkAbort("CkDevicePersistent: a transfer of %zu bytes from PE %d's buffer exceeds the %zu bytes it "
+              "had at open(); open() again after enlarging cnt", p->src_cnt, p->src_pe, s.cnt);
+    s.cnt = p->src_cnt;
+    persistIssueGet(p->d, s, p->done);
+    delete p;
+    CmiFree(r);
+    return NULL;
+  }
+  int persist_reg_rep_handler;
 }
 
 void CkDevicePersistent::init() {
@@ -763,7 +1009,7 @@ void CkDevicePersistent::init() {
 
 void CkDevicePersistent::open() {
   if (pe != CkMyPe()) CkAbort("CkDevicePersistent::open on PE %d of a buffer created on PE %d", CkMyPe(), pe);
-  owner = true;
+  if (owner) close();
   uintptr_t base = 0;
   if (persistAllocBase(ptr, &base) && hapiIpcGetMemHandle(&hapi_ipc_handle, (void*)ptr) == hapiSuccess) {
     ipc_offset = (size_t)((uintptr_t)ptr - base);
@@ -772,18 +1018,44 @@ void CkDevicePersistent::open() {
     (void)hapiGetLastError();
     ipc_valid = false;
   }
-  if (CkNumNodes() > 1 && cnt > 0 && !registered) {
-    ncpy.deviceRdmaOpInfo = nullptr;
-    ncpy.init(ptr, cnt, CMK_BUFFER_REG, CMK_BUFFER_NODEREG);   // released by close()
-    registered = true;
+  id = ((uint64_t)CkMyNode() << 44) | (persistRunToken() << 28) | (persist_next_id++ & 0xfffffff);
+  PersistReg r;
+  r.ptr = ptr;
+  r.cnt = cnt;
+  {
+    std::lock_guard<std::mutex> g(persist_reg_lock);
+    persist_reg.emplace(id, r);
   }
+  owner = true;
 }
 
 void CkDevicePersistent::close() {
-  if (owner && registered) {
-    ncpy.deregisterMem();
-    registered = false;
+  if (owner) {
+    std::lock_guard<std::mutex> g(persist_reg_lock);
+    auto it = persist_reg.find(id);
+    if (it != persist_reg.end()) {
+      // After ConverseExit the network layer is gone: a static owner destroyed
+      // at process exit drops its entry without deregistering.
+      if (it->second.state == 1 && !persist_exiting) it->second.ncpy.deregisterMem();
+      persist_reg.erase(it);
+    }
+    owner = false;
+    id = 0;
+    return;
   }
+  // A copy of another process's buffer: release this copy's reference on the
+  // IPC mapping and the kept registration. A later transfer takes them again.
+  if (node == CkMyNode()) return;
+  {
+    std::lock_guard<std::mutex> g(persist_reg_lock);
+    persist_remote.erase(id);
+  }
+  persistIpcRelease(*this);
+}
+
+// Called on each PE when its exit sequence reaches ConverseExit (init.C).
+void CkRdmaDeviceExit() {
+  persist_exiting = true;
 }
 
 void CkDevicePersistent::set_msg(void* msg) {
@@ -800,14 +1072,12 @@ void CkDevicePersistent::pup(PUP::er& p) {
   p|ipc_valid;
   p|node;
   p|phys_node;
-  p|registered;
-  if (registered) ncpy.pup(p);
+  p|id;
   if (p.isUnpacking()) {
     owner = false;
     cb_msg = nullptr;
     ipc_ptr = nullptr;
     ipc_open = false;
-    ncpy.deviceRdmaOpInfo = nullptr;
   }
 }
 
@@ -820,12 +1090,6 @@ int CkDevicePersistent::mode(const CkDevicePersistent& other) const {
   return 2;
 }
 
-static void persistNeedRdma(const CkDevicePersistent& a, const CkDevicePersistent& b) {
-  if (!a.registered || !b.registered)
-    CkAbort("CkDevicePersistent: an RDMA transfer between PE %d and PE %d needs both buffers opened "
-            "(open() before sending) in a program of more than one process", a.pe, b.pe);
-}
-
 CkDeviceStatus CkDevicePersistent::get(CkDevicePersistent& src) {
   if (cnt < src.cnt) {
     CkAbort("CkDevicePersistent::get: Destination buffer is smaller than source buffer\n");
@@ -834,7 +1098,6 @@ CkDeviceStatus CkDevicePersistent::get(CkDevicePersistent& src) {
   void* from = m == 1 ? persistIpcPtr(src) : nullptr;
   persistAnnounce("get", m);
   if (m == 2) {
-    persistNeedRdma(*this, src);
     hapiCheck(hapiStreamSynchronize(hapi_stream));   // earlier work on the destination is done
     persistRdmaGet(*this, src, CkCallback(persistRdmaDone, new PersistDone{ src.cb, cb, src.cb_msg, cb_msg }));
     return CkDeviceStatus::incomplete;
@@ -853,21 +1116,23 @@ CkDeviceStatus CkDevicePersistent::put(CkDevicePersistent& dst) {
   void* to = m == 1 ? persistIpcPtr(dst) : nullptr;
   persistAnnounce("put", m);
   if (m == 2) {
-    persistNeedRdma(*this, dst);
+    persistCheckRdmaUsable();
+    if (dst.id == 0) persistNotOpened(dst);
+    CmiNcpyBuffer s = persistLocalNcpy(*this);
     hapiCheck(hapiStreamSynchronize(hapi_stream));   // the source's data is complete
     PersistDone* d = new PersistDone{ cb, dst.cb, cb_msg, dst.cb_msg };
-    CkDevicePersistent dcopy = dst, scopy = *this;
+    CkDevicePersistent dcopy = dst;
     dcopy.cb = CkCallback(CkCallback::ignore);   // fired here, from d
-    scopy.cb = CkCallback(CkCallback::ignore);
     PUP::sizer ps;
-    ps | dcopy; ps | scopy;
+    ps | dcopy;
     int len = (int)ps.size();
     PersistPutMsg* msg = (PersistPutMsg*)CmiAlloc(sizeof(PersistPutMsg) + len);
     msg->issuer = CkMyPe();
     msg->len = len;
     msg->rec = (uint64_t)(uintptr_t)d;
+    msg->src = s;
     PUP::toMem pm((char*)msg + sizeof(PersistPutMsg));
-    pm | dcopy; pm | scopy;
+    pm | dcopy;
     CmiSetHandler(msg, persist_put_handler);
     QdCreate(1);
     CmiSyncSendAndFree(dst.pe, sizeof(PersistPutMsg) + len, msg);

@@ -649,6 +649,15 @@ void _resume_charm_message()
 }
 #endif
 
+// The end of the exit sequence on this PE.
+static void _converseExit()
+{
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+  CkRdmaDeviceExit();
+#endif
+  ConverseExit(_exitcode);
+}
+
 static void _exitHandler(envelope *env)
 {
   DEBUGF(("exitHandler called on %d msgtype: %d\n", CkMyPe(), env->getMsgtype()));
@@ -733,7 +742,7 @@ static void _exitHandler(envelope *env)
       //everyone exits here - there may be issues with leftover messages in the queue
 #if !CMK_WITH_STATS && !CMK_WITH_WARNINGS
       DEBUGF(("[%d] Calling converse exit from ReqStatMsg \n",CkMyPe()));
-      ConverseExit(_exitcode);
+      _converseExit();
       if(CharmLibInterOperate)
 	CpvAccess(interopExitFlag) = 1;
 #endif
@@ -761,7 +770,7 @@ static void _exitHandler(envelope *env)
 
     case StatDoneMsg: // Indicates completion of stats reduction
       DEBUGF(("[%d] Calling converse exit from StatDoneMsg \n",CkMyPe()));
-      ConverseExit(_exitcode);
+      _converseExit();
       if (CharmLibInterOperate)
         CpvAccess(interopExitFlag) = 1;
       break;
@@ -780,7 +789,7 @@ static void _exitHandler(envelope *env)
     }
     case WarnDoneMsg: // Indicates completion of warnings reduction
       DEBUGF(("[%d] Calling converse exit from WarnDoneMsg \n",CkMyPe()));
-      ConverseExit(_exitcode);
+      _converseExit();
       if (CharmLibInterOperate)
         CpvAccess(interopExitFlag) = 1;
       break;
@@ -1556,7 +1565,9 @@ void _initCharm(int unused_argc, char **argv)
   device_ack_handler = CmiRegisterHandler((CmiHandler) device_ack_bridge);
   persist_put_handler = CmiRegisterHandler((CmiHandler) persist_put_bridge);
   persist_ack_handler = CmiRegisterHandler((CmiHandler) persist_ack_bridge);
-  CkRdmaDeviceInit();
+  persist_reg_req_handler = CmiRegisterHandler((CmiHandler) persist_reg_req_bridge);
+  persist_reg_rep_handler = CmiRegisterHandler((CmiHandler) persist_reg_rep_bridge);
+  CkRdmaDeviceInit(argv);
 #endif
 
 #if CMK_USE_SHMEM
