@@ -2185,10 +2185,9 @@ ring every iteration:
      }
    };
 
-``CK_MIGRATABLE { ... }`` encloses the part of the body that can be
-rebuilt after a migration or a checkpoint (how is explained below); a
-chare that never migrates or is checkpointed while a coroutine waits may
-leave it out.
+``CK_MIGRATABLE { ... }`` encloses the body: the part that can be rebuilt
+after a migration or a checkpoint (how is explained below). Every wait
+is written inside it.
 
 The mainchare of the same program waits for the reports in its own
 coroutine, with the block form of a wait:
