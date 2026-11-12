@@ -1718,7 +1718,11 @@ The local buffer keeps what a transfer with a peer's handle set up: its
 reference on this process's IPC mapping of the peer's allocation and the
 peer's RDMA registration, so that later transfers with that handle reuse them.
 A handle of the same peer buffer after the peer reopened it replaces the
-earlier one. ``CkDynDevPersistClose`` releases those, deregisters the local
+earlier one. The same peer buffer means the same PE and device pointer: two
+buffers open at once at one address (a whole array and a prefix of it, say)
+replace each other's copy at every use, and each RDMA transfer then requests
+the registration again, so open one buffer per address.
+``CkDynDevPersistClose`` releases those, deregisters the local
 memory if a transfer registered it, and frees the local record; it aborts
 while a transfer of that buffer is outstanding. A handle stays usable only
 while its buffer is open, and only in the run that opened it (a handle saved
@@ -1726,6 +1730,21 @@ in a checkpoint does not name a buffer after a restart). Persistent buffers
 are not migrated or checkpointed. Every function aborts in a build without
 CUDA or HIP.
 charm4py binds them as ``charm.DevicePersistent``.
+
+Before a program frees the memory of a persistent buffer, every other process
+on the same host that transferred with the buffer's handle must have closed,
+with ``CkDynDevPersistClose``, each of its buffers that did so. A transfer
+through IPC maps the peer's whole allocation into the process that issues it,
+and the mapping stays open until every buffer of that process that transferred
+with a handle of the allocation has been closed; closing the peer's own buffer
+does not close mappings in other processes. CUDA documents freeing an
+allocation (``cudaFree``) before the processes that imported it close their
+mappings as undefined behavior, and the rule here is the same for HIP. A pool
+allocator that returns cached blocks to the driver (CuPy's
+``free_all_blocks``, ``torch.cuda.empty_cache``) frees memory in this sense.
+There is no call that releases one peer's copy without closing the local
+buffer, so a binding that exposes persistent buffers passes this rule on to
+its users.
 
 .. _ckdyn-coro:
 
@@ -2430,4 +2449,4 @@ Further Reading
   design documents under ``docs/design/``: ``DESIGN.md`` (section 3 gives
   the reasons for CkDyn's choices), ``SPEC-3.md`` (zero-copy and devices),
   ``SPEC-4b.md`` (sections and constrained groups in the binding) and
-  ``SPEC-7-device.md`` (persistent device buffers, planned).
+  ``SPEC-7-device.md`` (persistent device buffers).

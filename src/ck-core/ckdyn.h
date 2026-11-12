@@ -637,7 +637,11 @@ int  CkDynUnpostBuffer(const CkDynTarget *t, int ep, int slot);
  * hosts the put is carried out as a get issued by the destination's PE).
  * The caller keeps the memory valid and does not touch the destination until
  * done; d->stream orders the transfer after earlier work on it (0: the
- * default stream). Every function aborts in a build without CUDA or HIP. */
+ * default stream). A buffer that used a peer's handle keeps an IPC mapping of
+ * the peer's allocation until its own close, so the peer's memory is freed
+ * only after the other processes on its host have closed those buffers (the
+ * manual's "Persistent device buffers"). Every function aborts in a build
+ * without CUDA or HIP. */
 typedef struct CkDynDevPersist CkDynDevPersist;      /* opaque, PE-local */
 CkDynDevPersist *CkDynDevPersistOpen(const CkDynDevDesc *d, const CkDynCallback *done);
 void   CkDynDevPersistClose(CkDynDevPersist *p);      /* aborts with a transfer outstanding */
