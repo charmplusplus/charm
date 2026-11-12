@@ -29,45 +29,40 @@ script. Common compile time options such as
 To build a debugging version of AMPI, use the option: ``-g``. To build a
 production version of AMPI, use the option: ``--with-production``.
 
-``<version>`` depends on the machine, operating system, and the
-underlying communication library one wants to use for running AMPI
-programs. See the charm/README file for details on picking the proper
-version. Here is an example of how to build a debug version of AMPI in a
-linux and ethernet environment:
+``<version>`` depends on the operating system and processor:
+``reconverse-linux-x86_64``, ``reconverse-linux-arm8``,
+``reconverse-darwin-arm8`` or ``reconverse-win-x86_64``. See the
+Reconverse section of the Charm++ installation instructions
+(:ref:`sec:reconverseinstall`) for details. Here is an example of how to
+build a debug version of AMPI on Linux:
 
 .. code-block:: bash
 
-   $ ./build AMPI netlrts-linux-x86_64 -g
+   $ ./build AMPI reconverse-linux-x86_64 -g
 
 And the following is an example of how to build a production version of
-AMPI on a Cray XC system, with MPI-level error checking in AMPI turned
-off:
+AMPI, with MPI-level error checking in AMPI turned off:
 
 .. code-block:: bash
 
-   $ ./build AMPI-only gni-crayxc --with-production --disable-ampi-error-checking
+   $ ./build AMPI-only reconverse-linux-x86_64 --with-production --disable-ampi-error-checking
 
-AMPI can also be built with support for multithreaded parallelism on any
-communication layer by adding "smp" as an option after the build target.
-For example, on an Infiniband Linux cluster:
-
-.. code-block:: bash
-
-   $ ./build AMPI-only verbs-linux-x86_64 smp --with-production
+Reconverse builds always support multithreaded parallelism (several
+worker threads per process), so the ``smp`` option is not needed.
 
 AMPI ranks are implemented as user-level threads with a stack size
 default of 1MB. If the default is not correct for your program, you can
 specify a different default stack size (in bytes) at build time. The
-following build command illustrates this for an Intel Omni-Path system:
+following build command illustrates this:
 
 .. code-block:: bash
 
-   $ ./build AMPI-only ofi-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
+   $ ./build AMPI-only reconverse-linux-x86_64 --with-production -DTCHARM_STACKSIZE_DEFAULT=16777216
 
 The same can be done for AMPI’s RDMA messaging threshold using
 ``AMPI_RDMA_THRESHOLD_DEFAULT`` and, for messages sent within the same
 address space (ranks on the same worker thread or ranks on different
-worker threads in the same process in SMP builds), using
+worker threads in the same process), using
 ``AMPI_SMP_RDMA_THRESHOLD_DEFAULT``. Contiguous messages with sizes
 larger than the threshold are sent via RDMA on communication layers that
 support this capability. You can also set the environment variables
@@ -130,7 +125,7 @@ contains the wrappers with their exact standard names, allowing them to
 be given precedence as shell commands in a ``module``-like fashion by
 adding this directory to the ``$PATH`` environment variable:
 
-   $ export PATH=/home/user/charm/netlrts-linux-x86_64/bin/ampi:$PATH
+   $ export PATH=/home/user/charm/reconverse-linux-x86_64/bin/ampi:$PATH
    $ mpicc -c pgm.c -O3
    $ mpif90 -c pgm.f90 -O0 -g
    $ mpicc -o pgm pgm.o -lm -O3
@@ -156,28 +151,25 @@ information about the full set of parameters supported by ``charmc``.
 Running AMPI Programs
 ---------------------
 
-AMPI offers two options to execute an AMPI program, ``charmrun`` and
-``ampirun``.
+An AMPI program can be run directly, with ``lcrun`` or the site
+launcher like any other Charm++ program, or with ``ampirun``.
 
-Running with charmrun
-~~~~~~~~~~~~~~~~~~~~~
+Running directly
+~~~~~~~~~~~~~~~~
 
-The Charm++ distribution contains a script called ``charmrun`` that
-makes the job of running AMPI programs portable and easier across all
-parallel machines supported by Charm++. ``charmrun`` is copied to a
-directory where an AMPI program is built using ``ampicc``. It takes a
-command line parameter specifying number of processors, and the name of
-the program followed by AMPI options (such as number of ranks to create,
-and the stack size of every user-level thread) and the program
-arguments. A typical invocation of an AMPI program ``pgm`` with
-``charmrun`` is:
+An AMPI program is an ordinary executable. It takes the total number of
+PEs (``+pe``), AMPI options (such as the number of ranks to create, and
+the stack size of every user-level thread) and the program arguments. A
+typical invocation of an AMPI program ``pgm`` is:
 
 .. code-block:: bash
 
-   $ ./charmrun +p16 ./pgm +vp64
+   $ ./pgm +pe 16 +vp64
 
-Here, the AMPI program ``pgm`` is run on 16 physical processors with 64
-total virtual ranks (which will be mapped 4 per processor initially).
+Here, the AMPI program ``pgm`` is run on 16 PEs with 64 total virtual
+ranks (which will be mapped 4 per PE initially). Several processes are
+started with ``lcrun -n 4 ./pgm +pe 16 +vp64`` on one host, or with the
+site launcher under a batch system, as described below for ``ampirun``.
 
 To run with load balancing, specify a load balancing strategy.
 
@@ -188,14 +180,14 @@ example:
 
 .. code-block:: bash
 
-   $ ./charmrun +p16 ./pgm +vp128 +tcharm_stacksize 32K +balancer RefineLB
+   $ ./pgm +pe 16 +vp128 +tcharm_stacksize 32K +balancer RefineLB
 
 Running with ampirun
 ~~~~~~~~~~~~~~~~~~~~
 
 For compliance with the MPI standard and simpler execution, AMPI ships
 with the ``ampirun`` script that is similar to ``mpirun`` provided by
-other MPI runtimes. As with ``charmrun``, ``ampirun`` is copied
+other MPI runtimes. ``ampirun`` is copied
 automatically to the program directory when compiling an application
 with ``ampicc``. Users with prior MPI experience may find ``ampirun`` the
 simplest way to run AMPI programs.
@@ -204,21 +196,20 @@ The basic usage of ampirun is as follows:
 
 .. code-block:: bash
 
-   $ ./ampirun -np 16 --host h1,h2,h3,h4 ./pgm
+   $ ./ampirun -np 16 ./pgm
 
-This command will create 16 (non-virtualized) ranks and distribute them
-on the hosts h1-h4.
+This command will create 16 (non-virtualized) ranks, one per PE.
 
 When using the ``-vr`` option, AMPI will create the number of ranks
-specified by the ``-np`` parameter as virtual ranks, and will create
-only one process per host:
+specified by the ``-np`` parameter as virtual ranks, and will run one PE
+per process:
 
 .. code-block:: bash
 
-   $ ./ampirun -np 16 --host h1,h2,h3,h4 -vr ./pgm
+   $ ./ampirun -np 16 --procs 4 -vr ./pgm
 
-Other options (such as the load balancing strategy), can be specified in
-the same way as for charmrun:
+Other options (such as the load balancing strategy), can be specified as
+program arguments:
 
 .. code-block:: bash
 

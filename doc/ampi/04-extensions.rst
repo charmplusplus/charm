@@ -747,7 +747,7 @@ compressed log file.)
 
 .. code-block:: bash
 
-   $ ./build AMPI netlrts-linux-x86_64 -DAMPIMSGLOG
+   $ ./build AMPI reconverse-linux-x86_64 -DAMPIMSGLOG
 
 The feature is used in two phases: writing (logging) the environment and
 repeating the run. The first logging phase is invoked by a parallel run
@@ -755,15 +755,15 @@ of the AMPI program with some additional command line options.
 
 .. code-block:: bash
 
-   $ ./charmrun ./pgm +p4 +vp4 +msgLogWrite +msgLogRank 2 +msgLogFilename "msg2.log"
+   $ ./pgm +pe 4 +vp4 +msgLogWrite +msgLogRank 2 +msgLogFilename "msg2.log"
 
 In the above example, a parallel run with 4 worker threads and 4 AMPI
 ranks will be executed, and the changes in the MPI environment of worker
 thread 2 (also rank 2, starting from 0) will get logged into diskfile
 "msg2.log".
 
-Unlike the first run, the re-run is a sequential program, so it is not
-invoked by charmrun (and omitting charmrun options like +p4 and +vp4),
+Unlike the first run, the re-run is a sequential program, so it runs on
+one PE (omitting options like +pe 4 and +vp4),
 and additional command line options are required as well.
 
 .. code-block:: bash
@@ -789,7 +789,7 @@ Round Robin
 
    .. code-block:: bash
 
-      $ ./charmrun ./hello +p2 +vp8 +mapping RR_MAP
+      $ ./hello +pe 2 +vp8 +mapping RR_MAP
 
 Block Mapping
    This mapping scheme maps virtual processors to physical processor in
@@ -800,7 +800,7 @@ Block Mapping
 
    .. code-block:: bash
 
-      $ ./charmrun ./hello +p2 +vp8 +mapping BLOCK_MAP
+      $ ./hello +pe 2 +vp8 +mapping BLOCK_MAP
 
 Proportional Mapping
    This scheme takes the processing capability of physical processors
@@ -813,8 +813,8 @@ Proportional Mapping
 
    .. code-block:: bash
 
-      $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP
-      $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP +balancer GreedyLB +LBTestPESpeed
+      $ ./hello +pe 2 +vp8 +mapping PROP_MAP
+      $ ./hello +pe 2 +vp8 +mapping PROP_MAP +balancer GreedyLB +LBTestPESpeed
 
 Custom Mapping
    To define your own mapping scheme, create a file named "mapfile"
@@ -837,7 +837,7 @@ Custom Mapping
 
    .. code-block:: bash
 
-      $ ./charmrun ./hello +p2 +vp8 +mapping MAPFILE
+      $ ./hello +pe 2 +vp8 +mapping MAPFILE
 
    Note that users can find the current mapping of ranks to PEs (after
    dynamic load balancing) by calling ``AMPI_Comm_get_attr`` on
