@@ -162,10 +162,14 @@ class coroutine {
     // accepts them) and the record is created or adopted when the return
     // object is made, before the body starts. Without X_CORO_CODE (the
     // hand-written form) the body registers with CK_COROUTINE_STATE.
+    // GCC deduces Owner as a reference type (Jacobi&) from *this, clang as
+    // the class; owner_t strips it, or GCC's constraint fails and the
+    // promise is default-constructed without registering (CI, 2026-11-11).
+    template <class T> using owner_t = std::remove_cv_t<std::remove_reference_t<T>>;
     template <class Owner, class... Args>
-      requires requires(Owner &o) { o.__coro; Owner::__coro_is_entry(0); }
+      requires requires(owner_t<Owner> &o) { o.__coro; owner_t<Owner>::__coro_is_entry(0); }
     promise_type(Owner &self, Args &...) noexcept
-        : owner_(&self), begin_(&begin_for<Owner>) {}
+        : owner_(&self), begin_(&begin_for<owner_t<Owner>>) {}
     promise_type() noexcept = default;
     coroutine get_return_object() {
       auto h = std::coroutine_handle<promise_type>::from_promise(*this);

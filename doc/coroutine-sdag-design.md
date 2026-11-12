@@ -389,6 +389,12 @@ close one. What can be removed is the closer and the registration:
   `state::begin` from `get_return_object`, before the body starts. The
   hand-written form without `X_CORO_CODE` keeps a registration
   statement, `CK_COROUTINE_STATE(co, ep)`, as the first line of the body.
+  One compiler difference, found by Linux CI: GCC deduces the owner
+  parameter of that constructor as a reference type (`Jacobi&`), clang as
+  the class, so the constraint strips references (`owner_t`); with the
+  constraint written on the deduced type as is, GCC default-constructs the
+  promise and the body runs unregistered (the abort "CK_MIGRATABLE outside
+  a coroutine").
 
 The word says what the block buys: the code inside can be rebuilt after a
 migration or a checkpoint, and a chare that never migrates while waiting
