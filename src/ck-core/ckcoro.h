@@ -1237,19 +1237,25 @@ using coroutine = coro::coroutine;
 /* ---------------- macros ---------------- */
 
 // The block of a body that can be rebuilt after a migration: CK_MIGRATABLE
-// { ... } opens the restart switch, whose body is the block that follows;
-// each site in the block is a case of it. A restart jumps to the recorded
-// site. A recorded site that is not a case of this function enters the
-// block from the top (default:) and aborts at the first site it reaches,
-// or, if it reaches none, in the frame guard's destructor; the default
-// label also keeps the end of a value-returning task unreachable for the
-// compiler, so co_return inside the block is enough. The same block serves
-// a coroutine entry and a ck::coro::task<T> helper.
+// { ... } opens the restart switch, whose body is the block that follows
+// (the else branch of an if (false)); each site in the block is a case of
+// it. Site 0 enters the block from the top; a restart jumps to the
+// recorded site; a recorded site that is not a case of this function lands
+// on the default label and aborts before any statement of the block runs
+// (the shape is the CAMPI session's, 2026-11-12: with default: next to
+// case 0 the code before the first site ran a second time before the
+// abort). abort_no_site is [[noreturn]], so the end of a value-returning
+// task stays unreachable for the compiler and co_return inside the block
+// is enough. The same block serves a coroutine entry and a
+// ck::coro::task<T> helper.
 #define CK_MIGRATABLE                                                         \
   ::ck::coro::frame_guard ck_frame_;                                          \
   switch (ck_frame_.site())                                                   \
-  default:                                                                    \
-  case 0:
+  case 0:                                                                     \
+    if (false)                                                                \
+    default:                                                                  \
+      ::ck::coro::abort_no_site(ck_frame_);                                   \
+    else
 
 // The hand-written form (no X_CORO_CODE): the first statement of a coroutine
 // entry's body names the chare's ck::coro::state member and the entry's

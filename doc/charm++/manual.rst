@@ -2242,10 +2242,11 @@ checkpointed, the coroutine state records which wait each active coroutine
 is suspended at, and after unpacking the entry is invoked again: its body
 runs again from the top and jumps to the recorded wait. The jump is what
 ``CK_MIGRATABLE`` provides: it expands to a frame guard and
-``switch (site) default: case 0:`` followed by the block, and each wait
-is a ``case`` of that switch labelled with its source line, so a restart
-enters the block at the recorded wait and a body that reaches none aborts.
-This gives the rules:
+``switch (site) case 0: if (false) default: abort(); else`` followed by
+the block, and each wait is a ``case`` of that switch labelled with its
+source line, so a fresh start enters the block from the top, a restart
+enters it at the recorded wait, and a recorded wait that is not in the
+block aborts before any of the block runs. This gives the rules:
 
 -  Any value that is live across a wait is a member of the chare, pupped
    as usual: the variables of a ``CK_WHEN_BLOCK`` end with its block, and
@@ -2253,8 +2254,10 @@ This gives the rules:
    past a local with an initializer, and a local declared before
    ``CK_MIGRATABLE`` is silently re-initialized when the body runs
    again). A pointer to an array parameter is valid until the next wait.
--  Code before a wait runs again after a migration, so its results must
-   be members, not recomputed side effects.
+-  Code inside ``CK_MIGRATABLE`` before the recorded wait is skipped
+   after a migration, so its results must be members; code before
+   ``CK_MIGRATABLE`` runs again every time the body is rebuilt, so it
+   must not have side effects that cannot be repeated.
 -  The chare migrates or is checkpointed only while every active
    coroutine of it is suspended at a ``CK_WHEN``, ``CK_WHEN_ANY`` or
    ``CK_CALL``; packing it while suspended at another ``co_await`` aborts.
@@ -2392,9 +2395,11 @@ Differences from SDAG
    ``switch`` (a wait may not be inside a ``switch``). Loops and
    conditionals are the C++ ones, with the loop variable a member in
    both; ``forall [i] (start:end, stride)`` is ``CK_FORALL_STRIDE``.
--  After a migration or restart, the coroutine's body runs again from the
-   top to the recorded wait, so code before a wait must not repeat a side
-   effect; SDAG resumes without re-running anything.
+-  After a migration or restart, the coroutine's body is invoked again
+   and jumps to the recorded wait: the code inside ``CK_MIGRATABLE``
+   before that wait is skipped, so its results must be members, and the
+   code before ``CK_MIGRATABLE`` runs again; SDAG resumes without
+   re-running anything.
 -  Each ``when`` clause of an ``overlap`` is a named coroutine task
    (``ck::coro::task<void>``) passed to ``CK_OVERLAP``; the body of a
    ``forall`` is one coroutine task

@@ -116,7 +116,7 @@ Vocabulary (the attributes in charmxi, the rest in `ckcoro.h`):
 | `CK_WHEN_BLOCK(want, name...) { ... }` | the block form: the parameters as block-scoped variables; no site inside the block |
 | `ck::coro::skip` | an out that discards its parameter |
 | `ck::coroutine` | return type of a coroutine entry method; the body starts at once |
-| `CK_MIGRATABLE { ... }` | the block that can be rebuilt after a migration: a frame guard and the restart switch, `switch (site) default: case 0:` followed by the block; the same block in an entry body and in a `ck::coro::task<T>` helper, `co_return` inside it. The registration of the coroutine is done by the promise of `ck::coroutine` through `X_CORO_CODE`. (Until 2026-11-11 the body was bracketed by `CK_COROUTINE()`/`CK_COROUTINE_END()` and a helper by `CK_CORO_TASK()`/`CK_CORO_TASK_END()`; Kale asked whether C++ could remove the pair, and the block form with the registration in the promise is the answer; section 4.8) |
+| `CK_MIGRATABLE { ... }` | the block that can be rebuilt after a migration: a frame guard and the restart switch, `switch (site) case 0: if (false) default: abort_no_site(); else` followed by the block; the same block in an entry body and in a `ck::coro::task<T>` helper, `co_return` inside it. The registration of the coroutine is done by the promise of `ck::coroutine` through `X_CORO_CODE`. (Until 2026-11-11 the body was bracketed by `CK_COROUTINE()`/`CK_COROUTINE_END()` and a helper by `CK_CORO_TASK()`/`CK_CORO_TASK_END()`; Kale asked whether C++ could remove the pair, and the block form with the registration in the promise is the answer; section 4.8) |
 | `CK_WHEN(want, out...)` | a site: wait for the delivery and store it in `out` (the message pointer, or every marshalled parameter in order) |
 | `CK_WHEN_ANY(idx, CK_ALT(want, out...), ...)` | a site: the first of several (SDAG `case`); `idx` gets the index that matched |
 | `ck::coro::state`, `co.deliver(ep, msg)` / `co.deliver(ep, args...)`, `CK_COROUTINE_STATE(co, ep)`, `CK_WHEN(ep, ref-or-noref, out...)` | the same by hand, without the attributes: a state member pupped by the chare, inbox bodies written out, `CK_COROUTINE_STATE` as the first statement of the body (the promise registers only through `X_CORO_CODE`), entry indices spelled `CkIndex_X::name(...)` |
@@ -372,15 +372,24 @@ labels are; a guard object's constructor and destructor cannot open and
 close one. What can be removed is the closer and the registration:
 
 - `CK_MIGRATABLE { ... }`: an object-like macro expanding to the frame
-  guard and `switch (site) default: case 0:` with no brace of its own, so
-  the user's braces are the switch body and the sites inside them, nested
-  in loops or not, are its cases (labels may sit anywhere in the
-  substatement). The `default:` sends a recorded site that is not a case
-  of this function through the block from the top, where the first site
-  it reaches aborts (`note_site`), or the frame guard's destructor aborts
-  if it reaches none; it also keeps the end of a value-returning task
-  unreachable for the compiler, so `co_return` inside the block is enough
-  (without it clang warns that the task may fall off its end).
+  guard and `switch (site) case 0: if (false) default: abort_no_site();
+  else` with no brace of its own, so the user's braces are the else
+  branch, the switch's substatement, and the sites inside them, nested in
+  loops or not, are its cases (labels may sit anywhere in the
+  substatement). Site 0 enters the block from the top, a recorded site
+  jumps to its label, and any other value lands on `default:` and aborts
+  before a statement of the block runs. The first version (pushed
+  2026-11-11) had `default:` next to `case 0:`, so an unknown site ran
+  the block from the top and aborted at the first site it reached; the
+  CAMPI session pointed out on 2026-11-12 that everything before that
+  first site then ran a second time on the restarted object (in CAMPI,
+  MPI_Init and collectives the other ranks never join; in ckcoro, the
+  sends before the first wait), and proposed the `if (false) default:`
+  shape, which both libraries use. `abort_no_site` is `[[noreturn]]`,
+  which keeps the end of a value-returning task unreachable for the
+  compiler, so `co_return` inside the block is enough (without it clang
+  warns that the task may fall off its end). The frame guard's destructor
+  keeps its check that a restarted function reached its site.
 - Registration in the promise: C++20 constructs the promise of a member
   coroutine with `*this` and the arguments when the promise has a
   constructor that accepts them, so `ck::coroutine::promise_type` has a

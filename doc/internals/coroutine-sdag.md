@@ -179,12 +179,13 @@ a checkpoint, whose handle is new, and a group branch are reached; the
 library form `p | state` keeps the packed target. The promise adopts
 the record (clearing `pending`, setting `chain.restarting`), and each
 `frame_guard` on the recorded path, declared by `CK_MIGRATABLE`, switches
-to its site: the macro expands to the guard and `switch (site) default:
-case 0:` followed by the user's block, whose sites are the cases.
-`note_site` checks that the site reached is the recorded one; a recorded
-site that is not a case of the function enters the block from the top and
-aborts at the first site it reaches, or in the guard's destructor if it
-reaches none.
+to its site: the macro expands to the guard and `switch (site) case 0:
+if (false) default: abort_no_site(); else` followed by the user's block,
+whose sites are the cases. `note_site` checks that the site reached is
+the recorded one; a recorded site that is not a case of the function
+lands on `default:` and aborts before any statement of the block runs
+(the guard's destructor also checks that a restarted function reached
+its site).
 Deliveries that arrive before the restart message are buffered as usual.
 
 **Rebuild (`+ck_fakemigrate`).** After a body suspends at a site it did
