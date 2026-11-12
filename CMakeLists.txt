@@ -529,9 +529,11 @@ if (NOT CMK_MEMPOOL_CUTOFFNUM)
   set(CMK_MEMPOOL_CUTOFFNUM 28)
 endif()
 
-set(CMK_CHARM4PY 0)
+# The charm4py target builds Charm++ as a shared library (libcharm) for
+# bindings that load it at run time; CMK_LIBCHARM_SHARED marks that build.
+set(CMK_LIBCHARM_SHARED 0)
 if(${TARGET} STREQUAL "charm4py")
-  set(CMK_CHARM4PY 1)
+  set(CMK_LIBCHARM_SHARED 1)
   # Create libcharm.so for Charm4py
   add_compile_options(-build-shared)
   set(BUILDOPTS "${BUILDOPTS} -build-shared")
@@ -951,7 +953,8 @@ if(${TARGET} STREQUAL "charm4py")
   # `converse` is an aggregation (UTILITY) target on Reconverse builds and
   # cannot be linked: libreconverse is the Converse layer (CCS core
   # included), charm_cxx_utils holds charm's utilities, TopoManager and
-  # the CCS builtins, and isomalloc the init hook StartCharmExt registers
+  # the CCS builtins, and isomalloc the init hook that
+  # _registerConverseInitHooks installs
   # (-standalone means charmc adds none of these itself).
   set(CHARM4PY_RUNTIME_TARGETS reconverse charm_cxx_utils isomalloc)
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")

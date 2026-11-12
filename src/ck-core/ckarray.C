@@ -515,30 +515,6 @@ void ArrayElement::CkAbort(const char* format, ...) const
 
 void ArrayElement::recvBroadcast(CkMessage* m) {}
 
-#if CMK_CHARM4PY
-
-ArrayElemExt::ArrayElemExt(void* impl_msg)
-{
-  int chareIdx = ckGetChareType();
-  ctorEpIdx = _chareTable[chareIdx]->getDefaultCtor();
-  // printf("Constructor of ArrayElemExt, aid=%d, chareIdx=%d, ctorEpIdx=%d\n",
-  // ((CkGroupID)thisArrayID).idx, chareIdx, ctorEpIdx);
-  CkMarshallMsg* impl_msg_typed = (CkMarshallMsg*)impl_msg;
-  char* impl_buf = impl_msg_typed->msgBuf;
-  PUP::fromMem implP(impl_buf);
-  implP | usesAtSync;
-  int msgSize;
-  implP | msgSize;
-  int dcopy_start;
-  implP | dcopy_start;
-
-  ArrayMsgRecvExtCallback(((CkGroupID)thisArrayID).idx, int(thisIndexMax.getDimension()),
-                          thisIndexMax.data(), ctorEpIdx, msgSize,
-                          impl_buf + (2 * sizeof(int)) + sizeof(char), dcopy_start);
-}
-
-#endif
-
 /*********************** Spring Cleaning *****************
 Periodically (every minute or so) remove expired broadcasts
 from the queue.
@@ -1547,83 +1523,6 @@ bool CkArrayBroadcaster::performDelivery(CkArrayMessage* bcast, ArrayElement* el
   }
 }
 
-#if CMK_CHARM4PY
-
-extern void (*ArrayBcastRecvExtCallback)(int, int, int, int, int*, int, int, char*, int);
-
-void CkArrayBroadcaster::deliverAndUpdate(CkArrayMessage* bcast,
-                                          std::vector<CkMigratable*>& elements,
-                                          int arrayId)
-{
-  if (elements.empty())
-    return;
-
-  bool success = performDelivery(bcast, elements, arrayId);
-
-  if (success)
-  {
-    int bcastEpoch = UsrToEnv(bcast)->getGroupEpoch() + 1;
-    while (storedBcasts.hasBcast(bcastEpoch))
-    {
-      success = performDelivery(storedBcasts.getBcast(bcastEpoch), elements, arrayId);
-      bcastEpoch++;
-    }
-  }
-}
-
-bool CkArrayBroadcaster::performDelivery(CkArrayMessage* bcast,
-                                         std::vector<CkMigratable*>& elements,
-                                         int arrayId)
-{
-  const int bcastEpoch = UsrToEnv(bcast)->getGroupEpoch();
-
-  CkAssert(UsrToEnv(bcast)->getMsgtype() == ArrayBcastFwdMsg);
-
-  ArrayElement* el = (ArrayElement*)elements[0];
-  // get number of dimensions and number of ints used by CkArrayIndex of this array
-  const int numDim = el->thisIndexMax.getDimension();
-  const int numInts = el->thisIndexMax.nInts;
-  // store array index data of elements that are going to receive the broadcast, to pass
-  // to Charm4py
-  std::vector<int> validIndexes(elements.size() * numInts);
-  int numValidElements = 0;
-  int j = 0;
-  for (CkMigratable* m : elements)
-  {
-    ArrayElement* el = (ArrayElement*)m;
-    int& elBcastNo = getData(el);
-    // if this array element already received this message, skip it
-    // if this array element can move and hasn't reached this bcast epoch yet, also skip
-    // it for now, it'll be delivered when it catches up
-    if (elBcastNo != bcastEpoch)
-      continue;
-    elBcastNo++;
-    DEBB((AA "Delivering broadcast %d to element %s\n" AB, bcastEpoch, idx2str(el)));
-    int* index = el->thisIndexMax.data();
-    for (int i = 0; i < numInts; i++) validIndexes[j++] = index[i];
-    numValidElements++;
-  }
-
-  if (numValidElements > 0)
-  {
-    char* msg_buf = ((CkMarshallMsg*)bcast)->msgBuf;
-    PUP::fromMem implP(msg_buf);
-    int msgSize;
-    implP | msgSize;
-    int ep;
-    implP | ep;
-    int dcopy_start;
-    implP | dcopy_start;
-    ArrayBcastRecvExtCallback(arrayId, numDim, numInts, numValidElements,
-                              validIndexes.data(), ep, msgSize,
-                              msg_buf + (3 * sizeof(int)), dcopy_start);
-  }
-
-  return numValidElements > 0;
-}
-
-#endif
-
 // CkDyn elements (ckdyn-impl.h): the same epoch bookkeeping as the charm4py
 // path above, with the delivery handed to CkDynDeliverBroadcast. A handler
 // may migrate or destroy other local elements, so the elements are named by
@@ -1933,9 +1832,6 @@ void CkArray::recvBroadcast(CkMessage* m)
   }
   else
   {
-#if CMK_CHARM4PY
-    broadcaster->deliverAndUpdate(msg, localElemVec, thisgroup.idx);
-#else
     // Do not free if CMK_ZC_BCAST_RECV_DONE_MSG, since it'll be freed by the
     // first element during CMK_ZC_BCAST_ALL_DONE_MSG
     if (zc_msgtype == CMK_ZC_BCAST_RECV_DONE_MSG) {
@@ -1961,7 +1857,6 @@ void CkArray::recvBroadcast(CkMessage* m)
         broadcaster->consumeBcast(epoch);
     }
 
-#endif  // CMK_CHARM4PY
   }
 
   broadcaster->releaseDelivered();

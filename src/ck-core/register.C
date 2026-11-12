@@ -24,13 +24,12 @@ CkRegisteredInfo<ReadonlyMsgInfo> _readonlyMsgs;
 
 static int __registerDone = 0;
 /* Registration after _registerDone is accepted while this is nonzero
- * (_registerLateBegin/_registerLateEnd, used by CkDynRegisterClassLate), and
- * always in a CMK_CHARM4PY build, whose Ext API registers classes late. */
+ * (_registerLateBegin/_registerLateEnd, used by CkDynRegisterClassLate). */
 static int __registerLateOpen = 0;
 
 static inline bool lateRegistrationAllowed(void)
 {
-  return !__registerDone || CMK_CHARM4PY || __registerLateOpen > 0;
+  return !__registerDone || __registerLateOpen > 0;
 }
 
 void _registerLateBegin(void) { __registerLateOpen++; }
@@ -108,82 +107,6 @@ void CkRegisterGroupIrr(int chareIndex,int isIrr){
   _chareTable[chareIndex]->isIrr = (isIrr!=0);
 }
 
-#if CMK_CHARM4PY
-
-// TODO give a unique name to entry methods when calling CkRegisterEp
-// (no need has appeared for this so this is very low priority)
-
-void CkRegisterGroupExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx) {
-  int __idx = CkRegisterChare(s, sizeof(GroupExt), TypeGroup);
-  CkRegisterBase(__idx, CkIndex_IrrGroup::__idx);
-
-  int epIdxCtor = CkRegisterEp(s, GroupExt::__GroupExt, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
-  CkRegisterDefaultCtor(__idx, epIdxCtor);
-
-  for (int i=emNamesStart + 1; i < emNamesStart+numEntryMethods; i++)
-    {
-      CkRegisterEp(emNames[i], GroupExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
-    }
-
-  *chareIdx = __idx;
-  *startEpIdx = epIdxCtor;
-}
-
-void CkRegisterSectionManagerExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx) {
-  int __idx = CkRegisterChare(s, sizeof(SectionManagerExt), TypeGroup);
-  CkRegisterBase(__idx, CkIndex_IrrGroup::__idx);
-
-  int epIdxCtor = CkRegisterEp(s, SectionManagerExt::__SectionManagerExt, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
-  CkRegisterDefaultCtor(__idx, epIdxCtor);
-
-  CkRegisterEp("sendToSection", SectionManagerExt::__sendToSection, CkMarshallMsg::__idx, __idx, 0);
-
-  for (int i=emNamesStart+2; i < numEntryMethods+emNamesStart; i++)
-    {
-      CkRegisterEp(emNames[i], SectionManagerExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
-    }
-
-  *chareIdx = __idx;
-  *startEpIdx = epIdxCtor;
-}
-
-void CkRegisterArrayMapExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx) {
-  int __idx = CkRegisterChare(s, sizeof(ArrayMapExt), TypeGroup);
-  CkRegisterBase(__idx, CkIndex_IrrGroup::__idx);
-
-  int epIdxCtor = CkRegisterEp(s, ArrayMapExt::__ArrayMapExt, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
-  CkRegisterDefaultCtor(__idx, epIdxCtor);
-
-  for (int i=1; i < numEntryMethods; i++)
-    CkRegisterEp(emNames[i], ArrayMapExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
-
-  *chareIdx = __idx;
-  *startEpIdx = epIdxCtor;
-}
-
-void CkRegisterArrayExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx) {
-  int __idx = CkRegisterChare(s, sizeof(ArrayElemExt), TypeArray);
-  CkRegisterBase(__idx, CkIndex_ArrayElement::__idx);
-
-  int epIdxCtor = CkRegisterEp(s, ArrayElemExt::__ArrayElemExt, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
-  CkRegisterDefaultCtor(__idx, epIdxCtor);
-
-  int epidx = CkRegisterEp(s, ArrayElemExt::__CkMigrateMessage, 0, __idx, 0);
-  CkRegisterMigCtor(__idx, epidx);
-
-  CkRegisterEp(s, ArrayElemExt::__AtSyncEntryMethod, 0, __idx, 0);
-
-  for (int i=emNamesStart+3; i < emNamesStart+numEntryMethods; i++)
-    {
-      CkRegisterEp(emNames[i], ArrayElemExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
-    }
-
-  *chareIdx = __idx;
-  *startEpIdx = epIdxCtor;
-}
-
-#endif
-
 void CkRegisterDefaultCtor(int chareIdx, int ctorEpIdx)
 {
   _chareTable[chareIdx]->setDefaultCtor(ctorEpIdx);
@@ -199,26 +122,6 @@ int CkRegisterMainChare(int chareIdx, int entryIdx)
   _chareTable[chareIdx]->setMainChareType(mIdx);
   return mIdx;
 }
-
-#if CMK_CHARM4PY
-
-void CkRegisterMainChareExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx) {
-  int __idx = CkRegisterChare(s, sizeof(MainchareExt), TypeMainChare);
-  CkRegisterBase(__idx, CkIndex_Chare::__idx);
-
-  int epIdxCtor = CkRegisterEp(s, MainchareExt::__Ctor_CkArgMsg, CMessage_CkArgMsg::__idx, __idx, 0);
-  CkRegisterMessagePupFn(epIdxCtor, (CkMessagePupFn)CkArgMsg::ckDebugPup);
-  CkRegisterMainChare(__idx, epIdxCtor);
-
-  for (int i=emNamesStart+1; i < emNamesStart+numEntryMethods; i++)
-    {
-      CkRegisterEp(emNames[i], MainchareExt::__entryMethod, CkMarshallMsg::__idx, __idx, 0+CK_EP_NOKEEP);
-    }
-
-  *chareIdx = __idx;
-  *startEpIdx = epIdxCtor;
-}
-#endif
 
 void CkRegisterIfNotThere(int epIdx, CkArray_IfNotThere policy) {
   if ((epIdx >= 0) && lateRegistrationAllowed()) {
@@ -245,13 +148,6 @@ void CkRegisterReadonly(const char *name,const char *type,
 {
   _readonlyTable.add(new ReadonlyInfo(name,type,size,ptr,pup_fn));
 }
-
-#if CMK_CHARM4PY
-void CkRegisterReadonlyExt(const char *name, const char *type, size_t msgSize, char *msg) {
-  if (msgSize > 0) ReadOnlyExt::setData(msg, msgSize);
-  CkRegisterReadonly(name, type, msgSize, ReadOnlyExt::ro_data, ReadOnlyExt::_roPup);
-}
-#endif
 
 void CkRegisterReadonlyMsg(const char *name,const char *type,void **pMsg)
 {

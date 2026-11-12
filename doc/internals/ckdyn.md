@@ -109,17 +109,15 @@ the same order, before any message for the class is sent: the test's late
 phase registers from a group broadcast and waits for a reduction.
 
 `CkRegisterEpInternal` and `CkRegisterIfNotThere` (register.C) refuse a
-registration after `_registerDone` unless `lateRegistrationAllowed()`: true in
-a `CMK_CHARM4PY` build (the Ext API registers classes late without telling
-the runtime), and otherwise only between `_registerLateBegin()` and
+registration after `_registerDone` unless `lateRegistrationAllowed()`: true
+only between `_registerLateBegin()` and
 `_registerLateEnd()`, which `CkDynRegisterClassLate` calls around
 `registerClass`. A plain program that registers an entry late by mistake
 (a templated entry method not instantiated in a `.ci` file) still aborts with
 "late entry method registration happened after init". `CkDynRegisterClass`
 does not rely on that check: after `_registerDone` (`_registerIsDone()`) it
-aborts and names `CkDynRegisterClassLate`, because in a `CMK_CHARM4PY` build
-the check above passes and the one-PE-per-process condition of the late path
-would be skipped. Registration also aborts on an entry index above 65535,
+aborts and names `CkDynRegisterClassLate`, so the one-PE-per-process
+condition of the late path cannot be skipped. Registration also aborts on an entry index above 65535,
 which the 16-bit `CkDynHdr::ep` cannot carry.
 
 What sizes itself by the entry or chare count, and how a late class fares:
@@ -1201,9 +1199,9 @@ A shared-library binding:
    message types, `CkDynMgr`, `_ckdynMgrGID` and the two init calls.
 4. `_initCharm` then calls `CkDynCallRegisterHook()`, which calls
    `hooks.register_classes` and returns true, or returns false when there is
-   no hook table or no `register_classes`. In a `CMK_CHARM4PY` build it takes
-   the place of `CkRegisterMainModule`, and when it returns false the Ext
-   API's `CkRegisterMainModuleCallback` runs. In any other build it runs
+   no hook table or no `register_classes`. In a `CMK_LIBCHARM_SHARED` build
+   it takes the place of `CkRegisterMainModule`, and when it returns false
+   `_initCharm` aborts. In any other build it runs
    after `CkRegisterMainModule`, so a program with a charmxi main module that
    starts through `CkDynStart` gets both.
 5. The init calls run: `_ckdynInitNode` (rank 0) registers the foreign
@@ -1222,25 +1220,26 @@ whose main chare is an ordinary C++ main chare calls `CkDynCreateManagers()`
 from its constructor.
 
 `_createTraces` in init.C is a weak symbol (`CK_WEAK_DEFINITION`) outside
-Windows (empty, or in a `CMK_CHARM4PY` build with tracing calling the
+Windows (empty, or in a `CMK_LIBCHARM_SHARED` build with tracing calling the
 projections and summary modules), so a program without a charmc-generated
 moduleinit links, and a charmc-linked program keeps its generated
 definition. MSVC has no weak definitions: on Windows (`_WIN32`) init.C
-defines `_createTraces`, as a strong symbol, only in a `CMK_CHARM4PY` build,
+defines `_createTraces`, as a strong symbol, only in a `CMK_LIBCHARM_SHARED` build,
 whose shared library is linked without a moduleinit; a plain build leaves it
 to the program's moduleinit, so on Windows a binding needs the `charm4py`
 build target.
 
-**What `CMK_CHARM4PY` means.** CkDyn does not depend on it: registration, the
-hook, late registration, CCS (`CcsRegisterHandlerFn`) and `_createTraces` work
-in a plain build. The macro selects a build of libcharm as one shared library
-for a Python binding (the `charm4py` build target, built with the separate
-option `REFNUM_TYPE="unsigned int"` for 32-bit reference numbers): the Ext API used by charm4py 1.x (ck.C, register.C, init.C:
-`registerCkRegisterMainModuleCallback`, `_registerTreeLB` and the trace module
-registration, since no charmc moduleinit exists), late registration accepted
-without `_registerLateBegin`, and the charm4py CCS layout in reconverse. One
-such libcharm serves both charm4py 1.x (through the Ext API) and a CkDyn
-binding.
+**What `CMK_LIBCHARM_SHARED` means.** CkDyn does not depend on it:
+registration, the hook, late registration, CCS (`CcsRegisterHandlerFn`) and
+`_createTraces` work in a plain build. The macro (set by the `charm4py` build
+target, formerly named `CMK_CHARM4PY`) selects a build of libcharm as one
+shared library for a binding, usually configured with the separate option
+`REFNUM_TYPE="unsigned int"` for 32-bit reference numbers. What it changes in
+the source is limited to what a missing charmc moduleinit requires (init.C:
+`_registerTreeLB` and the trace module registration, the `_createTraces`
+definition, and `CkDynCallRegisterHook` in place of `CkRegisterMainModule`);
+in the build system it selects `-build-shared` and leaves out
+`-ftls-model=initial-exec`. The Ext API that charm4py 1.x used was removed.
 
 ## Limits and diagnostics
 
