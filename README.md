@@ -1,6 +1,6 @@
 # Charm++
 
-[![Build Status](https://travis-ci.org/charmplusplus/charm.svg?branch=main)](https://travis-ci.org/charmplusplus/charm)
+[![reconverse-ci](https://github.com/charmplusplus/charm/actions/workflows/reconverse-ci.yaml/badge.svg?branch=recharm)](https://github.com/charmplusplus/charm/actions/workflows/reconverse-ci.yaml)
 [![Documentation Status](https://readthedocs.org/projects/charm/badge/?version=latest)](https://charm.readthedocs.io/en/latest/?badge=latest)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3370873.svg)](https://doi.org/10.5281/zenodo.3370873)
 
@@ -12,6 +12,11 @@ It is implemented as a set of libraries for C++, is efficient,
 and is portable to a wide variety of parallel machines.
 Source code is provided, and non-commercial use is free.
 
+Charm++ 9.0 runs on reconverse, the runtime layer in the
+`contrib/reconverse` submodule; this line is the branch `recharm`. The
+classic Converse runtime is on the branch `classic`, and 8.1.0 is its
+last release.
+
 
 ## Getting the Latest Source
 
@@ -20,8 +25,7 @@ code, as follows:
 
      $ git clone --recurse-submodules https://github.com/charmplusplus/charm
 
-Reconverse (the communication layer used by the `reconverse-*` build
-targets) is the `contrib/reconverse` submodule, which is what
+Reconverse is the `contrib/reconverse` submodule, which is what
 `--recurse-submodules` picks up. If you already cloned without it, run
 
      $ git submodule update --init -- contrib/reconverse
@@ -47,251 +51,145 @@ Committing the moved submodule pointer is what changes the pairing for
 everyone else. To build against a reconverse tree kept outside the
 Charm++ checkout, pass `--with-reconverse-dir=<path>` to `./build`.
 
-Unless you pass `--without-reconverse-fetch-lci`, a `reconverse-*` build
-fetches and builds LCI from source, and the LCI it pins needs Python 3.8
-or newer and CMake 3.21 or newer. With an older Python, configure fails
-with "Cannot find source file .../src/binding/generated/binding.cpp"; with
-an older CMake, it fails with "C_STANDARD is set to invalid value '17'".
-If your system's defaults are older, load a newer Python module and
-install a recent CMake with `pip install cmake`.
+Reconverse uses LCI2 as its network layer. The build uses an installed
+LCI when CMake finds one, and otherwise fetches and builds LCI from
+source; `--without-reconverse-fetch-lci` turns the fetch off. The LCI it
+fetches needs Python 3.8 or newer and CMake 3.21 or newer. With an older
+Python, configure fails with "Cannot find source file
+.../src/binding/generated/binding.cpp"; with an older CMake, it fails
+with "C_STANDARD is set to invalid value '17'". If your system's
+defaults are older, load a newer Python module and install a recent
+CMake with `pip install cmake`.
 
 
 ## Build Configuration
 
-### Quick Start:
-
-First-time users are encouraged to run the top-level `build` script and follow its lead:
-    
-    $ ./build
-
-### Advanced Build Options:
-First, you need to decide which version of Charm++ to use. The `build`
-script takes several command line options to compile Charm++. The command line syntax is:
+The `build` script takes the following arguments:
 
      $ ./build <target> <version> [options ...]
                                   [--basedir=dir] [--libdir=dir] [--incdir=dir]
                                   [charmc-options ...]
 
-For detailed help messages, pass `-h` or `--help` to the build script.
+The recommended build on a 64-bit Linux machine is
 
-### Required:
+     $ ./build charm++ reconverse-linux-x86_64 --with-production -j8
 
-`<target>` specifies the parts of Charm++ to compile.  The most often used
-`<target>` is `charm++`, which will compile the key Charm++ executables and
-runtime libraries.  Other common targets are `AMPI` and `LIBS`, which build
-Adaptive MPI and Charm++ and all of its libraries, respectively.
-`<version>` defines the CPU, OS and communication layer of the machines.  See
-  "How to choose a `<version>`" below for details.
+which builds Charm++ in the directory `reconverse-linux-x86_64/`.
 
-### Optional:
+### `<target>`
 
-`<options>` defines more detailed information of the compilations, including
-compilers, features to support, etc.  See "How to choose `<options>`"
-below.
+`<target>` specifies the parts of Charm++ to compile:
 
+* `charm++`  The key Charm++ executables and runtime libraries
+* `AMPI`     Adaptive MPI, an implementation of MPI on top of Charm++
+             (see [README.ampi](README.ampi))
+* `LIBS`     Charm++, AMPI, and the other libraries built on top of them
+* `charm4py` The shared library used by Charm4py
+             (see [README.charm4py](README.charm4py))
+
+### `<version>`
+
+`<version>` names the runtime, the operating system and the CPU
+architecture. Every version is a reconverse version; the list is the
+set of directories under `src/arch/`:
+
+| Charm++ Version           | OS      | CPU            | Default Compiler                       |
+|---------------------------|---------|----------------|----------------------------------------|
+| `reconverse-linux-x86_64` | Linux   | x86-64         | GNU compiler                           |
+| `reconverse-linux-arm8`   | Linux   | ARM64 (AArch64)| GNU compiler                           |
+| `reconverse-darwin-arm8`  | macOS   | Apple silicon  | Clang C++ compiler                     |
+| `reconverse-win-x86_64`   | Windows | x86-64         | MS Visual C++; see [README.windows.md](README.windows.md) |
+
+Every reconverse build runs in SMP mode: one OS process per logical
+node, with the PEs as threads of that process. There is no
+communication thread; the PEs themselves drive the network, so a process
+with N PEs uses N cores. A Windows build runs as a single process.
+
+### `<options>`
+
+`<options>` select compilers, optional features, and flags passed to
+the `charmc` compiler script. Compiler words select a compiler other
+than the default, for example `gcc`, `clang`, `icx`, `nvhpc` or
+`mpicxx`, and `gfortran`, `flang`, `ifx` or `nvfortran` for Fortran; a
+version suffix such as `gcc-13` selects a specific version. Other
+option words:
+
+* `cuda`, `hip` - GPU support through CUDA or HIP/ROCm.
+* `omp` - Integrated OpenMP support.
+* `tsan` - Compile Charm++ with support for ThreadSanitizer.
+* `perftools`, `craype` - Flags for Cray perftools and the Cray
+  programming environment.
+
+Flags of the form `--enable-<feature>`, `--with-<feature>` and others:
+
+* `--with-production` - Turn on optimizations and turn off most of the
+  run-time checking in Charm++ and reconverse. Tracing is also off
+  unless `--enable-tracing` is given. Use this option for performance
+  runs, after the program has been debugged.
+* `--enable-tracing` - Build the tracing modules, for analysis of
+  performance with Projections.
+* `--enable-error-checking` - Keep run-time checking in a production
+  build.
+* `--enable-ccs`, `--enable-replay` - Converse client-server and
+  deterministic record-replay.
+* `--coverage` - Instrument for clang source-based coverage (see
+  [coverage/README.md](coverage/README.md)).
+* `--disable-fortran` - Do not build the Fortran interfaces.
+* `--with-reconverse-dir=<path>`, `--without-reconverse-fetch-lci` -
+  See "Getting the Latest Source" above.
+* `-j<N>` - Build in parallel with N jobs.
+* `-g`, `-O`, `-Ipath`, `-Lpath`, `-llib` and other unrecognized
+  arguments are passed to `charmc` and from there to the compiler.
+* `--force` - Delete and reconfigure an existing build directory.
 * `[--libdir=dir]` specify additional lib paths for building Charm++.
 * `[--incdir=dir]` specify additional include paths for building Charm++.
 * `[--basedir=dir]` a shortcut to specify additional include and library paths
   for building Charm++, the include path is `dir/include` and library path
   is `dir/lib`.
 
-
-Running build script, a directory of the name of combination of version and
-options like `<version>-<option1>-<option2>-...` will be created and
-the build script will compile Charm++ under this directory.
-
-For example, on an ordinary Linux PC:
-
-     $ ./build charm++ netlrts-linux-x86_64
-
-will build Charm++ in the directory `netlrts-linux-x86_64/`. The communication
-defaults to UDP packets and the compiler to `gcc`.
-
-For a more complex example, consider a shared-memory build with the
-Intel C++ compiler `icc`, where you want the communication to happen over TCP sockets:
-
-     $ ./build charm++ netlrts-linux-x86_64 smp icc tcp
-
-will build Charm++ in the directory `netlrts-linux-x86_64-smp-tcp-icc/`.
-
-You can specify multiple options, however you can use at most one compiler
-option. The sequencing of options given to the build script should follow the rules:
-1. Compiler option should be at the end
-2. Other options are sorted alphabetically
-
-### How to choose a `<version>`:
-Here is the table for choosing a correct build version. The default compiler
-in Charm++ is `gcc/g++` on Linux and `clang/clang++` on MacOS. However,
-one can use `<options>` to specify other compilers. See the detailed explanation
-of the `<options>` below.
-
-(Note: this isn't a complete list.  Run `./build` for a complete listing)
-
-| Charm++ Version           | OS      | Communication | Default Compiler                      |
-|---------------------------|---------|---------------|---------------------------------------|
-| `netlrts-linux-x86_64`    | Linux   | UDP           | GNU compiler                          |
-| `netlrts-darwin-x86_64`   | macOS   | UDP           | Clang C++ compiler                    |
-| `netlrts-win-x86_64`      | Windows | UDP           | MS Visual C++                         |
-| `mpi-linux-x86_64`        | Linux   | MPI           | GNU compiler                          |
-| `multicore-linux-x86_64`  | Linux   | Shared memory | GNU compiler                          |
-| `multicore-darwin-x86_64` | macOS   | Shared memory | Clang C++ compiler                    |
-| `gni-crayxc`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
-| `gni-crayxe`              | Linux   | GNI           | CC (whatever PrgEnv module is loaded) |
-| `verbs-linux-x86_64`      | Linux   | IB Verbs      | GNU compiler                          |
-| `ofi-linux-x86_64`        | Linux   | OFI           | GNU compiler                          |
-| `ucx-linux-x86_64`        | Linux   | UCX           | GNU compiler                          |
-| `reconverse-win-x86_64`   | Windows | none (one process) | MS Visual C++; see [README.windows.md](README.windows.md) |
-
-
-To choose `<version>`, your choice is determined by two options:
-
-1. The way a parallel program written in Charm++ will communicate:
-    - `netlrts-`: Charm++ communicates using the regular TCP/IP stack (UDP packets),
-    which works everywhere but is fairly slow.  Use this option for networks of workstations,
-    clusters, or single-machine development and testing.
-    * `gni-`, `pamilrts-`, `verbs-`, `ofi-`, `ucx-` : Charm++ communicates using direct calls to the machine's
-    communication primitives. Use these versions on machines that support them for best performance.
-    * `mpi-`: Charm++ communicates using MPI calls. This will work on almost every distributed machine,
-    but performance is often worse than using the machine's direct calls referenced above.
-    * `multicore-`: Charm++ communicates using shared memory within a single node. A version of
-    Charm++ built with this option will not run on more than a single node.
-
-
-2. Your operating system/architecture:
-    * `linux-x86_64`: Linux with AMD64 64-bit x86 instructions
-    * `win-x86_64`: MS Windows with MS Visual C++ compiler
-    * `darwin-x86_64`: Apple macOS
-    * `cray{xe/xc}`: Cray XE/XC Supercomputer
-    * `linux-ppc64le`: POWER/PowerPC
-
-Your Charm++ version is made by concatenating the options, e.g.:
-* `netlrts-linux-x86_64`: Charm++ for a network of 64-bit Linux workstations compiled using g++.
-* `gni-crayxc`: Charm++ for Cray XC systems using the system compiler.
-
-
-### How to choose `<options>`:
-
-`<version>` above defines the most important OS, CPU, and communication of
-your machine.
-
-To use a different compiler or demand additional special feature support, you
-need to choose `<options>` from the following list (compilers may also be
-suffixed with a version number to use a specific version, e.g. `gcc-7`). Note that
-this list is merely a sampling of common options, please see the documentation
-for more information:
-
-* `icc` - Intel C/C++ compiler.
-* `ifort` - Intel Fortran compiler
-* `xlc` - IBM XLC compiler.
-* `clang` - Clang compiler.
-* `mpicxx` - Use MPI-wrappers for MPI builds.
-* `pgcc` - Portland Group's C++ compiler.
-* `smp` - Enable direct SMP support.  An `smp` version communicates using
-    shared memory within a process but normal message passing across
-    processes and nodes. `smp` mode also introduces a dedicated 
-    communication thread for every process. Because of locking, `smp` may
-    slightly impact non-SMP performance. Try your application to decide if
-    enabling `smp` mode improves performance.
-* `tcp` - The `netlrts-` version communicates via UDP by default. The `tcp` option
-    will use TCP instead. The TCP version of Charm++ is usually slower
-    than UDP, but it is more reliable.
-* `async` - On PAMI systems, this option enables use of hardware communication
-    threads. For applications with significant communication on large
-    scale, this option typically improves performance.
-* `regularpages` - On Cray systems, Charm++'s default is to use `hugepages`. This
-    option disables `hugepages`, and uses regular `malloc` for messages.
-* `persistent` - On Cray systems, this option enables use of persistent mode for
-* `cxi` - On HPE Slingshot-11 systems, this option enables use of Cassini extensions for communication.  Usually autodetected and enabled where available.
-* `pxshm` - Use POSIX Shared Memory for communication between Charm++ processes
-    within a shared-memory host.
-* `syncft` - Enable in-memory fault tolerance support in Charm++.
-* `tsan` - Compile Charm++ with support for Thread Sanitizer.
-* `papi` - Enable PAPI performance counters.
-* `ooc` - Build Charm++ with out-of-core execution features.
-* `help` - show supported options for a version. For example, for `netlrts-linux-x86_64`, running:
-         
-         $ ./build charm++ netlrts-linux-x86_64 help
-         
-     will give:
-    
-      Supported compilers: clang craycc gcc icc iccstatic msvc pgcc xlc xlc64 icx
-      Supported options: common cuda flang gfortran ifort local nolb omp ooc papi perftools persistent pgf90 pxshm smp syncft sysvshm tcp tsan
+The build directory is named after the version followed by the
+selected option words and compilers, for example
+`reconverse-linux-x86_64-cuda-clang/`.
 
 
 ## Building the Source
 
-If you have downloaded a binary version of Charm++, you can skip
-this step -- Charm++ should already be compiled.
-
-Once you have decided on a version, unpack Charm++, `cd` into `charm/`,
-and run
+Once you have chosen a target, a version and options, `cd` into
+`charm/` and run
 
      $ ./build <target> <version> <opts>
 
-`<target>` is one of:
-        
-* `charm++`  The basic Charm++ language
-* `AMPI`     An implementation of MPI on top of Charm++
-* `LIBS`    Charm++, AMPI, and other libraries built on top of them
-
-`<version>` is described above in the "How to choose a `<version>`" section.
-
-`<opts>` are build-time options (such as the compiler or `smp`), or command
-line options passed to the `charmc` compiler script. Common compile time
-options such as `-g`, `-O`, `-Ipath`, `-Lpath`, `-llib` are accepted (these
-may vary depending on the compiler one has selected).
-
 For example, on a Linux machine, you would run
-     
-     $ ./build charm++ netlrts-linux-x86_64 -O
 
-This will construct a `netlrts-linux-x86_64` directory, link over all
-the Charm++ source code into `netlrts-linux-x86_64/tmp`, build the entire
-Charm++ runtime system in `netlrts-linux-x86_64/tmp`, and link example
-programs into `netlrts-linux-x86_64/examples`.
+     $ ./build charm++ reconverse-linux-x86_64 --with-production -j8
 
-Charm++ can be compiled with several optional features enabled or
-disabled. These include runtime error checking, tracing, interactive
-debugging, deterministic record-replay, and more. They can be
-controlled by passing flags of the form `--enable-<featurename>` or
-`--disable-<featurename>` to the build command:
+and on a Mac with Apple silicon
 
-     $ ./build charm++ netlrts-linux-x86_64 --disable-tracing
+     $ ./build charm++ reconverse-darwin-arm8 --with-production -j8
 
-Production optimizations: Pass the configure option `--with-production`
-to `./build` to turn on optimizations in Charm++/Converse. This disables
-most of the run-time checking performed by Converse and Charm++
-runtime. This option should be used only after the program has been
-debugged. Also, this option disables Converse/Charm++ tracing
-mechanisms such as projections and summary.
-
-Performance analysis: Pass the configuration option `--enable-tracing` to
-enable tracing and generation of logs for analysis with Projections. This is
-the recommended way to analyze performance of applications.
-
+To rebuild after changing the source, run `make` in the build directory.
 When Charm++ is built successfully, the directory structure under the
-target directory will look like:
+build directory looks like:
 ```
-netlrts-linux-x86_64/
+reconverse-linux-x86_64/
    |
    ---  benchmarks/      # benchmark programs
    |
-   ---  bin/             # all executables
-   |
-   ---  doc/             # documentations (doc/internals/ for how the runtime works inside)
+   ---  bin/             # all executables: charmc, charmxi, lcrun
    |
    ---  include/         # header files
    |
    ---  lib/             # static libraries
    |
-   ---  lib_so/          # shared libraries
+   ---  lib_so/          # shared libraries (with --build-shared)
    |
    ---  examples/        # example programs
    |
    ---  tests/           # test programs
-   |
-   ---  tmp/             # Charm++ build directory
 ```
+
+The top-level `bin/`, `include/` and `lib/` of the checkout are links
+to the most recent build.
 
 ## Building a Program
 
@@ -306,6 +204,8 @@ executable named `nqueen`.
 
 ## Running a Program
 
+A Charm++ program is an ordinary executable. The number of processing
+elements (PEs) it runs on is given on its own command line with `+pe`.
 Following the previous example, to run the program on two PEs in one
 process, type
 
@@ -314,28 +214,33 @@ process, type
 This should run for a few seconds, and print out:
 `There are 14200 Solutions to 12 queens. Time=0.109440 End time=0.112752`
 
-`+pe` is the total number of PEs across all processes. To run several
-processes on one machine, use LCI's `lcrun` launcher, which the build puts
-in `<build>/bin`, for example `lcrun -n 2 ./nqueen +pe 4 12 6`;
-under Slurm, use `srun`.
+`+pe` is always the total number of PEs across all processes. To run
+several processes on one machine, use LCI's `lcrun` launcher, which the
+build puts in `<build>/bin` next to `charmc`:
+
+     $ lcrun -n 2 ./nqueen +pe 4 12 6      # two processes, 4 PEs in total
+
+Inside a batch allocation, start the program with the site's launcher,
+such as `srun`, `mpirun` or `mpiexec`, even for a single-process run:
+
+     $ srun -N 2 --ntasks-per-node=1 -c 16 ./pgm +pe 32
+
+There is no `charmrun`. The manual's "Running Charm++ Programs" chapter
+describes the run-time options.
 
 
 ## Building Dynamic Libraries
 
-In order to compile Charm++ into dynamic libraries, one needs to specify the
-`--build-shared` option to the Charm `./build` script. Charm++'s dynamic
-libraries are compiled into the `lib_so/` directory. Typically, they are
-generated with a `.so` suffix.
-
-One can compile a Charm++ application linking against Charm++ dynamic
-libraries by linking with `charmc`'s `-charm-shared` option.
-For example:
+The `--build-shared` option to `./build` compiles Charm++ into dynamic
+libraries in the `lib_so/` directory, and `charmc`'s `-charm-shared`
+option links an application against them:
 
      $ charmc -o pgm pgm.o -charm-shared
 
-You can then run the program as usual.
-Note that linking against Charm++ dynamic libraries produces much smaller
-binaries and takes much less linking time.
+On reconverse versions this option does not work yet: the link fails
+because `libreconverse` is placed in `lib_so/` while `charmc` looks for
+it in `lib/` (issue #4049). The `charm4py` target builds its own
+shared library and does not use this option.
 
 
 ## Contributing
@@ -343,7 +248,7 @@ binaries and takes much less linking time.
 The recommended way to contribute to Charm++ development is to open a pull request (PR) on GitHub.
 To open a pull request, create a fork of the Charm++ repo in your own space
 (if you already have a fork, make sure is it up-to-date), and then create a new branch off of the
-`main` branch.
+`recharm` branch.
 
 GitHub provides a detailed tutorial on creating pull requests 
 (https://docs.github.com/en/pull-requests/collaborating-with-pull-requests). 
@@ -358,7 +263,9 @@ Our wiki contains additional information about pull requests
 
 ## For More Information
 
-The Charm++ documentation is at https://charm.readthedocs.io/
+The Charm++ documentation is at https://charm.readthedocs.io/; its
+source is in [doc/](doc/). The [CHANGES](CHANGES) file lists the
+significant changes in each release.
 
 How the runtime works inside, for people who work on the runtime itself,
 is described chapter by chapter in [doc/internals/](doc/internals/README.md).
