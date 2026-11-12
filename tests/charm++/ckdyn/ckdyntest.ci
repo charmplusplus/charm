@@ -11,6 +11,7 @@ mainmodule ckdyntest {
   readonly int aidSecB;
   readonly int nSecA;
   readonly int nSecB;
+  readonly bool g_mixedShape;
 
   initnode void ckdynRegister(void);
   initproc void ckdynTestInitProc(void);
