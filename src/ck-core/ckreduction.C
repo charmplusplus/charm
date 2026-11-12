@@ -669,6 +669,7 @@ void CkReductionMgr::finishReduction(void)
   CkReductionMsg *result=reduceMessages(msgs);
   result->fromPE = CkMyPe();
   result->redNo=redNo;
+  const bool sendsContributions = result->nSources() > 0;
   DEBR((AA "Reduced gcount=%d; sourceFlag=%d\n" AB,result->gcount,result->sourceFlag));
 
   if (partialReduction) {
@@ -710,6 +711,10 @@ void CkReductionMgr::finishReduction(void)
 
   //House Keeping Operations will have to check later what needs to be changed
   redNo++;
+  // The parent drops a kid whose message carries contributions from its
+  // inactive list. A kid that sent contributions left behind by migrated
+  // elements and still has no element must inform it again.
+  if (sendsContributions) is_inactive = false;
   // Check after every reduction contribution whether this makes the PE inactive
   // starting this redNo
   checkIsActive();

@@ -9,6 +9,7 @@ ifeq (1,$(CAMPI_COROUTINES))
 DIRS = \
   pingpong \
   until \
+  calls \
   jacobi3d \
   migrate \
   abort \

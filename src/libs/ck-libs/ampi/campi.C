@@ -648,6 +648,21 @@ request_awaiter Sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int d
   return w;
 }
 
+request_awaiter Bsend(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                      MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ibsend(buf, count, type, dest, tag, comm, req), MPI_STATUS_IGNORE)
+}
+
+request_awaiter Rsend(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                      MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Irsend(buf, count, type, dest, tag, comm, req), MPI_STATUS_IGNORE)
+}
+
+request_awaiter Mrecv(void *buf, int count, MPI_Datatype type, MPI_Message *msg,
+                      MPI_Status *sts) {
+  CAMPI_POST_AND_WAIT(MPI_Imrecv(buf, count, type, msg, req), sts)
+}
+
 /* ====================== collectives ====================== */
 
 request_awaiter Barrier(MPI_Comm comm) {
@@ -728,6 +743,108 @@ request_awaiter Exscan(const void *sbuf, void *rbuf, int count, MPI_Datatype typ
 
 #undef CAMPI_POST_AND_WAIT
 
+// The send data is packed first, so the receive can go straight into buf.
+task<int> Sendrecv_replace(void *buf, int count, MPI_Datatype type, int dest, int stag, int src,
+                           int rtag, MPI_Comm comm, MPI_Status *sts) {
+  int size = 0, pos = 0;
+  int e = MPI_Pack_size(count, type, comm, &size);
+  if (e != MPI_SUCCESS) co_return e;
+  std::vector<char> packed(size);
+  e = MPI_Pack(buf, count, type, packed.data(), size, &pos, comm);
+  if (e != MPI_SUCCESS) co_return e;
+  co_return co_await Sendrecv(packed.data(), pos, MPI_PACKED, dest, stag, buf, count, type, src,
+                              rtag, comm, sts);
+}
+
+// A buffer for count elements of type, and the address to pass for it.
+static char *coll_buffer(std::vector<char> &v, int count, MPI_Datatype type) {
+  MPI_Aint lb = 0, extent = 0;
+  MPI_Type_get_extent(type, &lb, &extent);
+  v.resize(count > 0 ? (size_t)extent * count : 1);
+  return v.data() - lb;
+}
+
+task<int> Reduce_scatter_block(const void *sbuf, void *rbuf, int count, MPI_Datatype type,
+                               MPI_Op op, MPI_Comm comm) {
+  if (getAmpiParent()->isInter(comm))
+    CkAbort("campi: MPI_Reduce_scatter_block on an intercommunicator is not supported");
+  if (sbuf == MPI_IN_PLACE) sbuf = rbuf;
+  int size;
+  MPI_Comm_size(comm, &size);
+  std::vector<char> tmp;
+  char *t = coll_buffer(tmp, count * size, type);
+  int e = co_await Reduce(sbuf, t, count * size, type, op, AMPI_COLL_SOURCE, comm);
+  if (e != MPI_SUCCESS) co_return e;
+  co_return co_await Scatter(t, count, type, rbuf, count, type, AMPI_COLL_SOURCE, comm);
+}
+
+task<int> Reduce_scatter(const void *sbuf, void *rbuf, const int *rcounts, MPI_Datatype type,
+                         MPI_Op op, MPI_Comm comm) {
+  if (getAmpiParent()->isInter(comm))
+    CkAbort("campi: MPI_Reduce_scatter on an intercommunicator is not supported");
+  if (sbuf == MPI_IN_PLACE) sbuf = rbuf;
+  int size, rank;
+  MPI_Comm_size(comm, &size);
+  MPI_Comm_rank(comm, &rank);
+  std::vector<int> displs(size);
+  int count = 0;
+  for (int i = 0; i < size; i++) {
+    displs[i] = count;
+    count += rcounts[i];
+  }
+  std::vector<char> tmp;
+  char *t = coll_buffer(tmp, count, type);
+  int e = co_await Reduce(sbuf, t, count, type, op, AMPI_COLL_SOURCE, comm);
+  if (e != MPI_SUCCESS) co_return e;
+  co_return co_await Scatterv(t, rcounts, displs.data(), type, rbuf, rcounts[rank], type,
+                              AMPI_COLL_SOURCE, comm);
+}
+
+// With MPI_IN_PLACE each rank sends from a copy of its receive buffer, taken
+// before any receive is posted.
+task<int> Alltoallw(const void *sbuf, const int *scounts, const int *sdispls,
+                    const MPI_Datatype *stypes, void *rbuf, const int *rcounts,
+                    const int *rdispls, const MPI_Datatype *rtypes, MPI_Comm comm) {
+  if (getAmpiParent()->isInter(comm))
+    CkAbort("campi: MPI_Alltoallw on an intercommunicator is not supported");
+  int size, rank;
+  MPI_Comm_size(comm, &size);
+  MPI_Comm_rank(comm, &rank);
+  std::vector<char> copy;
+  const char *send = (const char *)sbuf;
+  if (sbuf == MPI_IN_PLACE) {
+    // the bytes [lo, hi) of rbuf that the blocks cover
+    MPI_Aint lo = 0, hi = 0;
+    bool any = false;
+    for (int i = 0; i < size; i++) {
+      if (rcounts[i] == 0) continue;
+      MPI_Aint lb, extent, tlb, textent;
+      MPI_Type_get_extent(rtypes[i], &lb, &extent);
+      MPI_Type_get_true_extent(rtypes[i], &tlb, &textent);
+      MPI_Aint b = rdispls[i] + tlb, end = b + (MPI_Aint)(rcounts[i] - 1) * extent + textent;
+      if (!any || b < lo) lo = b;
+      if (!any || end > hi) hi = end;
+      any = true;
+    }
+    copy.assign((const char *)rbuf + lo, (const char *)rbuf + hi);
+    send = copy.data() - lo;
+    scounts = rcounts;
+    sdispls = rdispls;
+    stypes = rtypes;
+  }
+  // AMPI's internal tag for alltoall blocks, as MPI_Ialltoallw sends them
+  ampi *ptr = getAmpiInstance(comm);
+  std::vector<MPI_Request> reqs(2 * size, MPI_REQUEST_NULL);
+  for (int i = 0; i < size; i++)
+    ptr->irecv((char *)rbuf + rdispls[i], rcounts[i], rtypes[i], i, MPI_ATA_TAG, comm, &reqs[i]);
+  for (int i = 0; i < size; i++) {
+    int dst = (rank + i) % size;
+    reqs[size + i] = ptr->send(MPI_ATA_TAG, rank, send + sdispls[dst], scounts[dst],
+                               stypes[dst], dst, comm, I_SEND);
+  }
+  co_return co_await Waitall(2 * size, reqs.data(), MPI_STATUSES_IGNORE);
+}
+
 /* ====================== tests and probes ====================== */
 
 // As in ampi.C: test first, yield after a miss (ampiParent::yield returns at
@@ -766,6 +883,92 @@ task<int> Improbe(int src, int tag, MPI_Comm comm, int *flag, MPI_Message *msg,
                   MPI_Status *sts) {
   int e = MPI_Improbe(src, tag, comm, flag, msg, sts);
   if (e == MPI_SUCCESS && !*flag) co_await yield();
+  co_return e;
+}
+
+// Suspends the rank until a message arrives for it, as ampi::blockOnRecv does
+// for MPI_Probe: any arrival wakes it, so the caller probes again.
+struct recv_awaiter {
+  bool await_ready() const noexcept { return false; }
+  void await_suspend(std::coroutine_handle<> h) const noexcept {
+    ampiParent *p = getAmpiParent();
+    CkAssert(p->numBlockedReqs == 0);
+    p->resumeOnRecv = true;
+    set_resume_point(h);
+  }
+  void await_resume() const noexcept { getAmpiParent()->resumeOnRecv = false; }
+};
+
+task<int> Probe(int src, int tag, MPI_Comm comm, MPI_Status *sts) {
+  int flag = 0;
+  int e = MPI_Iprobe(src, tag, comm, &flag, sts);
+  while (e == MPI_SUCCESS && !flag) {
+    co_await recv_awaiter{};
+    e = MPI_Iprobe(src, tag, comm, &flag, sts);
+  }
+  co_return e;
+}
+
+task<int> Mprobe(int src, int tag, MPI_Comm comm, MPI_Message *msg, MPI_Status *sts) {
+  int flag = 0;
+  int e = MPI_Improbe(src, tag, comm, &flag, msg, sts);
+  while (e == MPI_SUCCESS && !flag) {
+    co_await recv_awaiter{};
+    e = MPI_Improbe(src, tag, comm, &flag, msg, sts);
+  }
+  co_return e;
+}
+
+// Suspends the rank until one of n incomplete requests completes, as
+// MPI_Waitany does before it blocks a thread: each request is marked blocked
+// and numBlockedReqs is 1, so the first completion wakes the rank. The caller
+// tests again, since the completion of one block of an alltoall request wakes
+// it too.
+struct any_awaiter {
+  int n;
+  MPI_Request *reqs;
+  bool await_ready() const noexcept { return false; }
+  void await_suspend(std::coroutine_handle<> h) const noexcept {
+    ampiParent *p = getAmpiParent();
+    CkAssert(p->numBlockedReqs == 0);
+    bool needPoll = false;
+    for (int i = 0; i < n; i++) {
+      if (reqs[i] == MPI_REQUEST_NULL) continue;
+      bool viaColl = false;
+      if (lookup(p, reqs[i])->beginBlocking(p, viaColl) == 0) needPoll = true;
+    }
+    p->numBlockedReqs = 1;
+    p->resumeOnRecv = true;
+    p->resumeOnColl = true;
+    if (needPoll) enqueue_wake(current());
+    set_resume_point(h);
+  }
+  void await_resume() const noexcept {
+    ampiParent *p = getAmpiParent();
+    for (int i = 0; i < n; i++)
+      if (reqs[i] != MPI_REQUEST_NULL) lookup(p, reqs[i])->endBlocking(p);
+    p->resumeOnRecv = false;
+    p->resumeOnColl = false;
+    p->numBlockedReqs = 0;
+  }
+};
+
+task<int> Waitany(int n, MPI_Request *reqs, int *index, MPI_Status *sts) {
+  int flag = 0;
+  int e = MPI_Testany(n, reqs, index, &flag, sts);
+  while (e == MPI_SUCCESS && !flag) {
+    co_await any_awaiter{n, reqs};
+    e = MPI_Testany(n, reqs, index, &flag, sts);
+  }
+  co_return e;
+}
+
+task<int> Waitsome(int n, MPI_Request *reqs, int *outcount, int *indices, MPI_Status *sts) {
+  int e = MPI_Testsome(n, reqs, outcount, indices, sts);
+  while (e == MPI_SUCCESS && *outcount == 0) {
+    co_await any_awaiter{n, reqs};
+    e = MPI_Testsome(n, reqs, outcount, indices, sts);
+  }
   co_return e;
 }
 
