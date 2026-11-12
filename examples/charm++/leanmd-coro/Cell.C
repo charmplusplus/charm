@@ -96,7 +96,7 @@ ck::coroutine Cell::run() {
   }
   //everything done, reduction of the integer checksum of positions and forces
   contributeChecksum();
-  CK_END();
+  CK_COROUTINE_END();
 }
 
 //constructor for chare object migration

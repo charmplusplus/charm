@@ -32,6 +32,13 @@ CkpvDeclare(int, currentChareIdx);
 CkpvDeclare(void *, _ckCurrentMsg);  // see CkCurrentMessage (charm++.h)
 bool _ckCoroFakeMigrate = false;     // +ck_fakemigrate (parsed in init.C), read by ckcoro.h
 CkpvDeclare(int, _ckCurrentEp);
+CkpvDeclare(Chare *, _ckDestroyLater);   // see Chare::ckDestroyLater (charm++.h)
+
+void Chare::ckDestroy(void) { delete this; }
+void Chare::ckDestroyLater(void) { CkpvAccess(_ckDestroyLater) = this; }
+void IrrGroup::ckDestroy(void) {
+  CkAbort("ckDestroy/ckDestroyLater on a group or nodegroup branch: groups are not destroyed one branch at a time");
+}
 #endif
 
 // Map of array IDs to array elements for fast message delivery

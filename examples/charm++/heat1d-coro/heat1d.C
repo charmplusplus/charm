@@ -58,7 +58,7 @@ class Main : public CBase_Main {
       CkPrintf("heat1d: %d iterations, checksum %lld\n", maxIter, checksum);
     }
     CkExit();
-    CK_END();
+    CK_COROUTINE_END();
   }
 };
 
@@ -106,7 +106,7 @@ class Strip : public CBase_Strip {
       contribute(sizeof(sum), &sum, CkReduction::sum_long_long,
                  CkCallback(CkReductionTarget(Main, done), mainProxy));
     }
-    CK_END();
+    CK_COROUTINE_END();
   }
 
   void update() {

@@ -28,19 +28,18 @@ struct Fib : public CBase_Fib {
       CK_WHEN(inbox::response(), val2);   //   when response(int val2)
       respond(val + val2);
     }
-    CK_END();
+    CK_COROUTINE_END();
   }
-
-  // The SDAG version calls delete this inside respond(); here the deletion
-  // is a message to this chare, run after calc() has finished.
-  void destroy() { delete this; }
 
   int seqFib(int n) { return (n < 2) ? n : seqFib(n - 1) + seqFib(n - 2); }
 
   void respond(int val) {
     if (!isRoot) {
       parent.response(val);
-      thisProxy.destroy();
+      // The SDAG version deletes the chare here, inside the when body; a
+      // coroutine body must not, so the chare is destroyed when the entry
+      // method running on it returns (after calc() has finished).
+      ckDestroyLater();
     } else {
       CkPrintf("Fibonacci number is: %d\n", val);
       CkExit();

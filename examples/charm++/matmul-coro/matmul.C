@@ -108,7 +108,7 @@ class Block : public CBase_Block {
   // The body of forall [block]:
   //   when inputA[block](...), inputB[block](...) serial { ... }
   ck::coro::task<void> step(int block, double alpha) {
-    CK_RESUMABLE();
+    CK_TASK();
     CK_WHEN_ALL(CK_ALT(inbox::inputA(block), blockIdA, blockA, M, KA),
                 CK_ALT(inbox::inputB(block), blockIdB, blockB, KB, N));
     CkAssert(KA == KB);
@@ -130,7 +130,7 @@ class Block : public CBase_Block {
       int destY = (thisIndex.y + 1) % numBlocks;
       thisProxy(destX, destY).inputB(blockIdB+1, blockB, KB, N);
     }
-    CK_END();
+    CK_TASK_END();
   }
 
   ck::coroutine pdgemmRun(double alpha, CkCallback done) {
@@ -141,7 +141,7 @@ class Block : public CBase_Block {
       for (unsigned int i = 0; i < blockSize*blockSize; ++i) sum += data[i];
       contribute(sizeof(double), &sum, CkReduction::sum_double, done);
     }
-    CK_END();
+    CK_COROUTINE_END();
   }
 };
 

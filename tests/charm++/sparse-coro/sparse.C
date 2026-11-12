@@ -214,7 +214,7 @@ ck::coroutine Main::run_tests() {
     CkPrintf("=========================================================\n");
     CkExit();
   }
-  CK_END();
+  CK_COROUTINE_END();
 }
 
 void Main::checkTest(int actual) {

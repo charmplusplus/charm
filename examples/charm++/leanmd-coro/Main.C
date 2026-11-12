@@ -78,7 +78,7 @@ ck::coroutine Main::run() {
   CkPrintf("leanmd: %d steps, checksum %lld\n", finalStepCount, checksum);
   CkPrintf("Simulation completed\n");
   CkExit();
-  CK_END();
+  CK_COROUTINE_END();
 }
 
 //constructor for chare object migration

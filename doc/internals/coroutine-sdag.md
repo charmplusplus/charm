@@ -187,7 +187,7 @@ packed into memory, every frame destroyed, the records and inbox cleared,
 and the state unpacked from memory, which sends the restarts.
 
 **Helpers.** A `ck::coro::task<T>` helper awaited with `CK_CALL` has its
-own `CK_RESUMABLE`/`CK_END` and therefore its own depth in the chain;
+own `CK_TASK`/`CK_TASK_END` and therefore its own depth in the chain;
 `note_site(..., call = true)` marks the call site and `frame_guard` records
 that the helper was entered through it (`chain.linked`), as in CAMPI.
 
@@ -222,6 +222,13 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
   `[local]` call; `deliver` then packs the arguments instead.
 - `CKCORO_DEBUG=1` in the environment prints each rebuild and each
   restart.
+- A coroutine body must not delete its chare (its frame would be destroyed
+  while running). `Chare::ckDestroyLater()` (charm++.h, ck.C) records the
+  chare in `CkpvAccess(_ckDestroyLater)` and `CkInvokeEP` calls the
+  virtual `ckDestroy()` after the entry method call returns, when the
+  recorded pointer equals the object (compared, not followed: the call may
+  have deleted the object itself). `Chare::ckDestroy` deletes, the
+  array element's detaches first, a group's aborts.
 
 ## Where in the source
 

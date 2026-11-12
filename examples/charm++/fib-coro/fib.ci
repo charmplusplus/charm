@@ -9,9 +9,5 @@ mainmodule fib {
     entry Fib(int n, bool isRoot, CProxy_Fib parent);
     entry [coroutine] void calc(int n);
     entry [inbox] void response(int val);
-    // The SDAG version deletes the chare inside the when body; a coroutine
-    // must not destroy its own chare while it runs, so the deletion is a
-    // message to itself, delivered after calc() has finished.
-    entry void destroy();
   };
 };

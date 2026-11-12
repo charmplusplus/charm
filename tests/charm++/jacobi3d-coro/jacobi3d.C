@@ -209,7 +209,7 @@ class Jacobi : public CBase_Jacobi {
         }
       }
       check_and_compute();
-      CK_END();
+      CK_COROUTINE_END();
     }
 
     void begin_iteration() {

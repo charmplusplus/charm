@@ -1593,6 +1593,17 @@ different from the one on which the array element resides. You must
 ensure that no messages are sent to a deleted element. After destroying
 an element, you may insert a new element at its index.
 
+A chare that decides inside one of its own entry methods that it is
+finished can call ``ckDestroyLater()``, defined for every chare: the
+chare is destroyed (deleted, or for an array element detached from the
+array first, as ``ckDestroy()`` does) as soon as the entry method that
+is running on it returns. This is the way to destroy a chare when
+something of it is still on the stack, for example a coroutine entry
+method (section :numref:`sec:ckcoro`) that has not finished yet; a
+singleton chare's entry method may instead ``delete this`` as its last
+action. Group and nodegroup branches are not destroyed one at a time;
+calling either method on one aborts.
+
 .. _sec:sdag:
 
 Structured Control Flow: Structured Dagger
@@ -2169,7 +2180,7 @@ ring every iteration:
            contribute(sizeof(double), &maxChange, CkReduction::max_double,
                       CkCallback(CkReductionTarget(Main, report), mainProxy));
        }
-       CK_END();
+       CK_COROUTINE_END();
      }
    };
 
@@ -2186,7 +2197,7 @@ coroutine, with the block form of a wait:
        }
      }
      ...
-     CK_END();
+     CK_COROUTINE_END();
    }
 
 A wait has two forms. ``CK_WHEN_BLOCK(want, name...) { ... }`` waits
@@ -2252,16 +2263,16 @@ rules:
    entry's message, which lives as long as the coroutine.
 
 A function that itself waits is written as a ``ck::coro::task<T>``
-coroutine whose body is bracketed by ``CK_RESUMABLE()`` and ``CK_END()``,
+coroutine whose body is bracketed by ``CK_TASK()`` and ``CK_TASK_END()``,
 and is awaited with ``CK_CALL(expr)`` or ``CK_CALL_TO(lhs, expr)``; a
-value is returned with ``co_return`` after ``CK_END()``:
+value is returned with ``co_return`` after ``CK_TASK_END()``:
 
 .. code-block:: c++
 
    ck::coro::task<int> receive(int idx) {     // waits inside a called function
-     CK_RESUMABLE();
+     CK_TASK();
      CK_WHEN(inbox::recvNum(idx), n);         // n: a member
-     CK_END();
+     CK_TASK_END();
      co_return n;
    }
    ...
@@ -2283,14 +2294,14 @@ of an SDAG ``overlap`` becomes a task:
 .. code-block:: c++
 
    ck::coro::task<void> waitA() {
-     CK_RESUMABLE();
+     CK_TASK();
      CK_WHEN(inbox::a(round), ck::coro::skip, gotA);   // overlap { when a[round](int r, int gotA) {...}
-     CK_END();
+     CK_TASK_END();
    }
    ck::coro::task<void> waitItem(int i) {
-     CK_RESUMABLE();
+     CK_TASK();
      CK_WHEN_BLOCK(inbox::item(i), tag, v) { sum += v; } // forall [i] (0:n-1,1) { when item[i](int tag, int v) {...} }
-     CK_END();
+     CK_TASK_END();
    }
    ...
    CK_OVERLAP(waitA(), waitB());
@@ -2380,9 +2391,9 @@ Differences from SDAG
    that takes the index. SDAG's inline clause bodies have no equivalent
    (a lambda coroutine would outlive its closure).
 -  A coroutine body must not delete its own chare (``delete this``
-   inside a ``when`` body is allowed in SDAG): the deletion goes through
-   a message to the chare itself, delivered after the coroutine has
-   finished, as ``examples/charm++/fib-coro`` does.
+   inside a ``when`` body is allowed in SDAG): it calls
+   ``ckDestroyLater()``, and the chare is destroyed when the entry
+   method running on it returns, as ``examples/charm++/fib-coro`` does.
 -  Not available: several active invocations of one entry per chare.
 -  Available only here: waits inside called functions (``CK_CALL``),
    plain C++ control flow and calls, parameters on the coroutine entry,

@@ -252,6 +252,14 @@ class Chare {
 
     inline const CkChareID &ckGetChareID(void) const {return thishandle;}
     inline void CkGetChareID(CkChareID *dest) const {*dest=thishandle;}
+    /// Destroy this chare now: delete it (an array element detaches from
+    /// its array first; a group branch cannot be destroyed).
+    virtual void ckDestroy(void);
+    /// Destroy this chare after the entry method now running on it has
+    /// returned (ckDestroy from inside the call, which is the usual
+    /// "delete this" in an entry method, is not possible when something of
+    /// the chare is still on the stack: a coroutine body, for example).
+    void ckDestroyLater(void);
     // object message queue
     void  CkEnableObjQ();
 #if CMK_OBJECT_QUEUE_AVAILABLE
@@ -293,6 +301,7 @@ Chare *CkAllocateChare(int objId);
 // made from an entry method sees the caller's delivery.
 CkpvExtern(void *, _ckCurrentMsg);
 CkpvExtern(int, _ckCurrentEp);
+CkpvExtern(Chare *, _ckDestroyLater);   // the chare that asked for ckDestroyLater, or null
 extern bool _ckCoroFakeMigrate;   // +ck_fakemigrate (init.C), read by ckcoro.h
 static inline void *CkCurrentMessage(void) { return CkpvAccess(_ckCurrentMsg); }
 static inline int CkCurrentEntry(void) { return CkpvAccess(_ckCurrentEp); }
@@ -307,6 +316,12 @@ static inline void CkInvokeEP(Chare *obj, const int &epIdx, void *msg) {
   CkCallstackPop(obj);
   CkpvAccess(_ckCurrentMsg) = prevMsg;
   CkpvAccess(_ckCurrentEp) = prevEp;
+  // ckDestroyLater: the pointer is compared, not followed (the call may
+  // have deleted obj itself), and only the chare's own entry destroys it.
+  if (CkpvAccess(_ckDestroyLater) == obj) {
+    CkpvAccess(_ckDestroyLater) = nullptr;
+    obj->ckDestroy();
+  }
 }
 
 #if CMK_HAS_IS_CONSTRUCTIBLE
@@ -366,6 +381,7 @@ class IrrGroup : public Chare {
     virtual ~IrrGroup(); //<- needed for *any* child to have a virtual destructor
 
     virtual void pup(PUP::er &p);//<- pack/unpack routine
+    virtual void ckDestroy(void);   // aborts: a group is not destroyed one branch at a time
     virtual void ckJustMigrated(void);
     // TODO: We don't need three versions of this (undocumented) function
     inline const CkGroupID &getGroupID(void) const {return thisgroup;}

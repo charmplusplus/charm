@@ -135,7 +135,7 @@ class Coro : public CBase_Coro {
       }
     }
     if (thisIndex == 0) mainProxy.done(CkWallTimer() - t0);
-    CK_END();
+    CK_COROUTINE_END();
   }
 };
 

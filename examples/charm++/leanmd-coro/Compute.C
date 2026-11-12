@@ -47,7 +47,7 @@ ck::coroutine Compute::run() {
       bufferedMsg = msg = nullptr;
     }
   }
-  CK_END();
+  CK_COROUTINE_END();
 }
 
 //interaction within a cell
