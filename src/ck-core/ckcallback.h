@@ -12,6 +12,7 @@ Initial version by Orion Sky Lawlor, olawlor@acm.org, 2/8/2002
 #ifndef _CKCALLBACK_H_
 #define _CKCALLBACK_H_
 
+#include <algorithm>
 #include "cksection.h"
 #include "conv-ccs.h" /*for CcsDelayedReply struct*/
 #include "charm.h"
@@ -213,14 +214,16 @@ public:
 		d.section.rootPE == other.d.section.rootPE &&
 		d.section.ep == other.d.section.ep);
 #else
-	      return (d.section._elems == other.d.section._elems &&
-		d.section.pelist && other.d.section.pelist &&
-		d.section.sinfo == other.d.section.sinfo &&
+	      return (d.section.sinfo == other.d.section.sinfo &&
+		d.section.ep == other.d.section.ep &&
 		d.section._nElems == other.d.section._nElems &&
 		d.section.npes == other.d.section.npes &&
-		d.section.ep == other.d.section.ep &&
-		((d.section.hasRefnum && other.d.section.hasRefnum) &&
-		 (d.section.refnum == other.d.section.refnum)));
+		std::equal(d.section._elems, d.section._elems + d.section._nElems,
+			   other.d.section._elems) &&
+		std::equal(d.section.pelist, d.section.pelist + d.section.npes,
+			   other.d.section.pelist) &&
+		d.section.hasRefnum == other.d.section.hasRefnum &&
+		(!d.section.hasRefnum || d.section.refnum == other.d.section.refnum));
 #endif
 	    case ignore:
 	    case ckExit:

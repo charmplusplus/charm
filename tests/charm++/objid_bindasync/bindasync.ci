@@ -1,0 +1,34 @@
+mainmodule bindasync {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Driver driver;
+  readonly int rounds;
+  readonly int floodCount;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry void bMade(CkArrayCreatedMsg* m);
+    entry [reductiontarget] void checked(int n);
+  };
+
+  group Driver {
+    entry Driver();
+    entry void begin(int round);
+    entry void stall();
+    entry void ping();
+    entry void aMade(CkArrayCreatedMsg* m);
+    entry void tryBind();
+  };
+
+  group Map : CkArrayMap {
+    entry Map();
+  };
+
+  array [1D] A {
+    entry A();
+  };
+
+  array [1D] B {
+    entry B(CkArrayID aid);
+    entry void check();
+  };
+};

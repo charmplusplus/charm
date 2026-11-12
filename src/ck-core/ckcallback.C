@@ -185,7 +185,7 @@ CkCallback::CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool forceInline)
 #endif
       type=bcastSection; // forceInline currently ignored
       d.section.ep=ep; 
-      CkSectionID secID=sectElt.ckGetSectionID(0); 
+      CkSectionID &secID = sectElt.ckGetSectionID(0); // the callback points into it
       d.section.sinfo = secID._cookie;
       d.section._elems = secID._elems.data();
       d.section._nElems = secID._elems.size();
@@ -337,6 +337,7 @@ void CkCallback::send(void *msg,int opts) const
 
 	switch(type) {
 	case CkCallback::sendFuture:
+		if (!msg) msg=CkAllocSysMsg();
 		CkSendToFuture(d.future.fut, msg);
 		break;
 	  //	CkPrintf("type:%d\n",type);
@@ -503,6 +504,23 @@ void CkCallback::pup(PUP::er &p) {
     p|d.array.hasRefnum;
     p|d.array.refnum;
     break;
+#if !CMK_CHARM4PY
+  case bcastSection:
+    // Unpacking allocates the element and PE arrays; nothing frees them.
+    p|d.section.sinfo;
+    p|d.section.ep;
+    p|d.section._nElems;
+    p|d.section.npes;
+    if (p.isUnpacking()) {
+      d.section._elems = d.section._nElems ? new CkArrayIndex[d.section._nElems] : nullptr;
+      d.section.pelist = d.section.npes ? new int[d.section.npes] : nullptr;
+    }
+    PUParray(p, d.section._elems, d.section._nElems);
+    PUParray(p, d.section.pelist, d.section.npes);
+    p|d.section.hasRefnum;
+    p|d.section.refnum;
+    break;
+#endif
   case replyCCS:
     p((char*)&d.ccsReply.reply, sizeof(d.ccsReply.reply));
     break;
@@ -538,6 +556,7 @@ bool CkCallback::containsPointer() const {
   case bcastGroup:
   case bcastNodeGroup:
   case bcastArray:
+  case sendFuture:
 #if CMK_CHARM4PY
   case bcastSection:
 #endif
