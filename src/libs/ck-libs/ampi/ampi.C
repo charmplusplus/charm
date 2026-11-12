@@ -1395,7 +1395,7 @@ static ampi *ampiInit(char **argv) noexcept
 //-------------------- ampiParent -------------------------
 ampiParent::ampiParent(CProxy_TCharm threads_,int nRanks_) noexcept
   : threads(threads_), ampiReqs(64, &reqPool), myDDT(ampiPredefinedTypes),
-    predefinedOps(ampiPredefinedOps), isTmpRProxySet(false)
+    predefinedOps(ampiPredefinedOps)
 {
   int barrier = 0x1234;
   STARTUP_DEBUG("ampiParent> starting up")
@@ -1493,8 +1493,7 @@ void ampiParent::pup(PUP::er &p) noexcept {
   ampiReqs.pup(p, &reqPool);
 
   p|kvlist;
-  p|isTmpRProxySet;
-  p|tmpRProxy;
+  p|pendingRProxies;
 
   p|userAboutToMigrateFn;
   p|userJustMigratedFn;
@@ -2531,7 +2530,8 @@ void ampi::registrationFinish() noexcept
       // MPI_Intercomm_create: the ranks are resumed by
       // ampi::setRemoteProxyAndUnblock once both groups' arrays exist.
       exchangeProxyOnFinish = false;
-      parentProxy[0].ExchangeProxy(newChildProxy);
+      parentProxy[std::min(thisIndex, remoteRootIdx)].ExchangeProxy(newChildProxy,
+                                                    std::max(thisIndex, remoteRootIdx));
     }
     else if (resumeNewArrayOnFinish) {
       // commCreate, cartCreate0D, intercommMerge: the new array's elements are
@@ -2701,9 +2701,11 @@ MPI_Comm ampi::cartCreate(std::vector<int>& vec, int ndims, const int* dims) noe
   return commCreate(vec, COMM_CART);
 }
 
-MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root, MPI_Comm tcomm) noexcept {
+// remoteRoot: the other group's leader (its world rank), valid at the root only
+MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root, int remoteRoot) noexcept {
   if (thisIndex==root) { // not everybody gets the valid rvec
     tmpVec = remoteVec;
+    remoteRootIdx = remoteRoot;
   }
   CkCallback cb(CkIndex_ampi::intercommCreateReduced(NULL),CkArrayIndex1D(root),myComm->getProxy());
   MPI_Comm nextinter = parent->getNextComm();
@@ -10188,7 +10190,8 @@ AMPI_API_IMPL(int, MPI_Intercomm_create, MPI_Comm localComm, int localLeader, MP
     }
   }
 
-  *newintercomm = localPtr->intercommCreate(remoteVec,rootIndex,localComm);
+  int remoteRootIndex = (localRank == localLeader) ? peerPtr->getIndexForRank(remoteLeader) : -1;
+  *newintercomm = localPtr->intercommCreate(remoteVec,rootIndex,remoteRootIndex);
 
   return MPI_SUCCESS;
 }
@@ -10884,26 +10887,19 @@ AMPI_API_IMPL(int, MPI_Comm_create_group, MPI_Comm comm, MPI_Group group, int ta
   MPI_Group_translate_ranks(group, groupSize, groupPids.data(), parentGroup, pids.data());
   MPI_Group_free(&parentGroup);
 
-  MPI_Comm commOld, tmpInter;
-  for (int i=0; i<groupSize; i*=2) {
-    int groupId = (i == 0) ? groupRank : groupRank/i;
-    commOld = *newcomm;
-
-    if (groupId % 2 == 0) {
-      if ((groupId+1)*i < groupSize) {
-        MPI_Intercomm_create(*newcomm, 0, comm, pids[(groupId+1)*i], tag, &tmpInter);
-        MPI_Intercomm_merge(tmpInter, 0, newcomm);
-      }
-    }
-    else {
-      MPI_Intercomm_create(*newcomm, 0, comm, pids[(groupId+1)*i], tag, &tmpInter);
-      MPI_Intercomm_merge(tmpInter, 1, newcomm);
-    }
-
-    if (*newcomm != commOld) {
-      MPI_Comm_free(&tmpInter);
-      MPI_Comm_free(&commOld);
-    }
+  // Blocks of 1, 2, 4, ... group ranks merge pairwise: at each step the even
+  // block's leader and the odd block's leader create an intercommunicator
+  // over comm, and the two blocks merge it (the even block first).
+  for (int step = 1; step < groupSize; step *= 2) {
+    const int block = groupRank / step;
+    const int partner = (block % 2 == 0) ? block + 1 : block - 1;
+    if (partner * step >= groupSize) continue; // the last block has no partner at this step
+    MPI_Comm inter, merged;
+    MPI_Intercomm_create(*newcomm, 0, comm, pids[partner * step], tag, &inter);
+    MPI_Intercomm_merge(inter, block % 2, &merged);
+    MPI_Comm_free(&inter);
+    MPI_Comm_free(newcomm);
+    *newcomm = merged;
   }
 
   return MPI_SUCCESS;
