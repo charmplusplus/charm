@@ -187,7 +187,7 @@ packed into memory, every frame destroyed, the records and inbox cleared,
 and the state unpacked from memory, which sends the restarts.
 
 **Helpers.** A `ck::coro::task<T>` helper awaited with `CK_CALL` has its
-own `CK_TASK`/`CK_TASK_END` and therefore its own depth in the chain;
+own `CK_CORO_TASK`/`CK_CORO_TASK_END` and therefore its own depth in the chain;
 `note_site(..., call = true)` marks the call site and `frame_guard` records
 that the helper was entered through it (`chain.linked`), as in CAMPI.
 

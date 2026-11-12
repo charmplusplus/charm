@@ -75,7 +75,7 @@
  * statement and may be the body of an if or a loop; its case label must not
  * be inside a switch of the user's own; two sites must not share a line. A
  * function awaited from a coroutine that contains a site returns
- * ck::coro::task<T>, has its own CK_TASK/CK_TASK_END and is awaited with
+ * ck::coro::task<T>, has its own CK_CORO_TASK/CK_CORO_TASK_END and is awaited with
  * CK_CALL or CK_CALL_TO.
  *
  * The owner is a chare of any kind: an array element, a group or nodegroup
@@ -1225,19 +1225,19 @@ using coroutine = coro::coroutine;
   CK_CORO_SELECT_(__VA_ARGS__ __VA_OPT__(, ) CK_COROUTINE_2_, CK_COROUTINE_0_, CK_COROUTINE_0_)(__VA_ARGS__)
 
 // The start of the restart switch of an awaited helper (ck::coro::task<T>).
-#define CK_TASK()                                                             \
+#define CK_CORO_TASK()                                                             \
   ::ck::coro::frame_guard ck_frame_;                                          \
   switch (ck_frame_.site()) {                                                 \
   case 0:
 
 // The end of a coroutine entry method (CK_COROUTINE_END) or of a task
-// helper (CK_TASK_END); the two close the same restart switch.
+// helper (CK_CORO_TASK_END); the two close the same restart switch.
 #define CK_COROUTINE_END()                                                    \
   break;                                                                      \
   default:                                                                    \
     ::ck::coro::abort_no_site(ck_frame_);                                     \
   }
-#define CK_TASK_END() CK_COROUTINE_END()
+#define CK_CORO_TASK_END() CK_COROUTINE_END()
 
 // A when site: CK_WHEN(ep, refnum-or-ck::coro::noref, out...) stores the
 // delivered message pointer or arguments into out.

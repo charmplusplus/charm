@@ -261,15 +261,15 @@ class BasicTest : public CBase_BasicTest {
     if (!ok) ::CkAbort("ckcoro basic test: %s", what);
   }
   // overlap { when unlock1() serial { unlocked1 = true; } ... }
-  ck::coro::task<void> waitUnlock1() { CK_TASK(); CK_WHEN(inbox::unlock1()); unlocked1 = true; CK_TASK_END(); }
-  ck::coro::task<void> waitUnlock2() { CK_TASK(); CK_WHEN(inbox::unlock2()); unlocked2 = true; CK_TASK_END(); }
-  ck::coro::task<void> waitUnlock3() { CK_TASK(); CK_WHEN(inbox::unlock3()); unlocked3 = true; CK_TASK_END(); }
+  ck::coro::task<void> waitUnlock1() { CK_CORO_TASK(); CK_WHEN(inbox::unlock1()); unlocked1 = true; CK_CORO_TASK_END(); }
+  ck::coro::task<void> waitUnlock2() { CK_CORO_TASK(); CK_WHEN(inbox::unlock2()); unlocked2 = true; CK_CORO_TASK_END(); }
+  ck::coro::task<void> waitUnlock3() { CK_CORO_TASK(); CK_WHEN(inbox::unlock3()); unlocked3 = true; CK_CORO_TASK_END(); }
   // The final overlap over stray messages: each arm aborts if reached.
   ck::coro::task<void> extra(ck::coro::want w, const char* name) {
-    CK_TASK();
+    CK_CORO_TASK();
     CK_WHEN(w);
     ::CkAbort("ckcoro basic test: extra %s", name);
-    CK_TASK_END();
+    CK_CORO_TASK_END();
   }
 
 public:
@@ -355,7 +355,7 @@ class RefnumTest : public CBase_RefnumTest {
   }
   // case { when recvNum[index](int n) {...} when recvData[index](CkDataMsg* m) {...} }
   ck::coro::task<void> receive(int idx) {
-    CK_TASK();
+    CK_CORO_TASK();
     int which;
     int n;
     CkDataMsg* m;
@@ -369,30 +369,30 @@ class RefnumTest : public CBase_RefnumTest {
       cb_sum += ((int*)(m->getData()))[0];
       delete m;
     }
-    CK_TASK_END();
+    CK_CORO_TASK_END();
   }
   // forall [index] (0:messages, 2) { if (index & (index - 1)) case {...} else serial {...} }
   ck::coro::task<void> evenIndex(int idx) {
-    CK_TASK();
+    CK_CORO_TASK();
     if (idx & (idx - 1)) {
       CK_CALL(receive(idx));
     } else {
       ignored_sum += idx;
     }
-    CK_TASK_END();
+    CK_CORO_TASK_END();
   }
-  // A helper that returns a value: co_return after CK_TASK_END.
+  // A helper that returns a value: co_return after CK_CORO_TASK_END.
   ck::coro::task<int> receiveIndex(int idx) {
-    CK_TASK();
+    CK_CORO_TASK();
     CK_CALL(receive(idx));
-    CK_TASK_END();
+    CK_CORO_TASK_END();
     co_return idx;
   }
   ck::coro::task<void> missed(ck::coro::want w, const char* name) {
-    CK_TASK();
+    CK_CORO_TASK();
     CK_WHEN(w);
     ::CkAbort("ckcoro refnum test: missed a %s message", name);
-    CK_TASK_END();
+    CK_CORO_TASK_END();
   }
 
 public:
@@ -756,26 +756,26 @@ public:
   void pup(PUP::er& p) { p | round; p | order; p | gotA; p | gotB; p | itemSum; }
 
   ck::coro::task<void> waitA() {
-    CK_TASK();
+    CK_CORO_TASK();
     CK_WHEN(inbox::a(round), ck::coro::skip, gotA);
     order += 'a';
-    CK_TASK_END();
+    CK_CORO_TASK_END();
   }
   ck::coro::task<void> waitB() {
-    CK_TASK();
+    CK_CORO_TASK();
     CK_WHEN(inbox::b(round), ck::coro::skip, gotB);
     order += 'b';
-    CK_TASK_END();
+    CK_CORO_TASK_END();
   }
   // Matched by round and index together: after a migration, a neighbour's
   // messages for the next round may be delivered before this round's.
   ck::coro::task<void> waitItem(int i, double w) {
-    CK_TASK();
+    CK_CORO_TASK();
     CK_WHEN_BLOCK(inbox::item(round * OVERLAP_ITEMS + i), tag, v) {
       check(tag == round * OVERLAP_ITEMS + i, "item: wrong tag");
       itemSum += w * v;
     }
-    CK_TASK_END();
+    CK_CORO_TASK_END();
   }
 
   ck::coroutine run(int rounds, std::vector<int> seeds, int nitems, double* weights) {

@@ -113,12 +113,12 @@ Vocabulary (the attributes in charmxi, the rest in `ckcoro.h`):
 | `CK_WHEN_BLOCK(want, name...) { ... }` | the block form: the parameters as block-scoped variables; no site inside the block |
 | `ck::coro::skip` | an out that discards its parameter |
 | `ck::coroutine` | return type of a coroutine entry method; the body starts at once |
-| `CK_COROUTINE()` / `CK_COROUTINE_END()` | open and close the body; registers the coroutine (the entry being delivered); the restart switch (the names were `CK_COROUTINE`/`CK_END` and `CK_RESUMABLE`/`CK_END` until 2026-11-11; Kale asked for matched pairs) |
+| `CK_COROUTINE()` / `CK_COROUTINE_END()` | open and close the body; registers the coroutine (the entry being delivered); the restart switch (the names were `CK_COROUTINE`/`CK_END` and `CK_RESUMABLE`/`CK_END` until 2026-11-11; Kale asked for matched pairs, and for the `CORO_` qualifier on the task pair because Charm++ already has stealable tasks) |
 | `CK_WHEN(want, out...)` | a site: wait for the delivery and store it in `out` (the message pointer, or every marshalled parameter in order) |
 | `CK_WHEN_ANY(idx, CK_ALT(want, out...), ...)` | a site: the first of several (SDAG `case`); `idx` gets the index that matched |
 | `ck::coro::state`, `co.deliver(ep, msg)` / `co.deliver(ep, args...)`, `CK_COROUTINE(co, ep)`, `CK_WHEN(ep, ref-or-noref, out...)` | the same by hand, without the attributes: a state member pupped by the chare, inbox bodies written out, entry indices spelled `CkIndex_X::name(...)` |
 | `CK_CALL(expr)` / `CK_CALL_TO(lhs, expr)` | a site: await a `ck::coro::task<T>` helper that itself contains sites |
-| `CK_TASK()` / `CK_TASK_END()` | the restart switch of a helper and its end; `CK_COROUTINE_END()` ends an entry body |
+| `CK_CORO_TASK()` / `CK_CORO_TASK_END()` | the restart switch of a helper and its end; `CK_COROUTINE_END()` ends an entry body |
 | `ck::coro::task<T>` | lazily started helper coroutine (CAMPI's `campi::task`) |
 | `+ck_fakemigrate` | every site rebuilds the chare's coroutines in place |
 | `ckDestroyLater()` (charm++.h, every chare) | destroy the chare after the entry method running on it returns: what a coroutine body does instead of `delete this` (Kale, 2026-11-11) |

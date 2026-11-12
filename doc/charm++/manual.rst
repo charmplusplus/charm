@@ -2262,46 +2262,46 @@ rules:
    body runs again after a migration. An array parameter points into the
    entry's message, which lives as long as the coroutine.
 
-A function that itself waits is written as a ``ck::coro::task<T>``
-coroutine whose body is bracketed by ``CK_TASK()`` and ``CK_TASK_END()``,
+A function that itself waits is a coroutine task: a function returning
+``ck::coro::task<T>`` whose body is bracketed by ``CK_CORO_TASK()`` and ``CK_CORO_TASK_END()``,
 and is awaited with ``CK_CALL(expr)`` or ``CK_CALL_TO(lhs, expr)``; a
-value is returned with ``co_return`` after ``CK_TASK_END()``:
+value is returned with ``co_return`` after ``CK_CORO_TASK_END()``:
 
 .. code-block:: c++
 
    ck::coro::task<int> receive(int idx) {     // waits inside a called function
-     CK_TASK();
+     CK_CORO_TASK();
      CK_WHEN(inbox::recvNum(idx), n);         // n: a member
-     CK_TASK_END();
+     CK_CORO_TASK_END();
      co_return n;
    }
    ...
    CK_CALL_TO(total, receive(i));             // total: a member if used after a later wait
 
 Several waits can be in progress at once, as with an SDAG ``overlap``:
-``CK_OVERLAP(task...)`` runs the ``ck::coro::task<void>`` helpers given to
+``CK_OVERLAP(task...)`` runs the ``ck::coro::task<void>`` coroutine tasks given to
 it as child coroutines of the current one, each waiting at its own sites,
 and continues when all of them have finished;
-``CK_FORALL(i, lo, hi, expr)`` does the same with one task per value of
+``CK_FORALL(i, lo, hi, expr)`` does the same with one coroutine task per value of
 ``i`` in ``[lo, hi)``,
 and ``CK_FORALL_STRIDE(i, start, end, stride, expr)`` for ``i`` from
 ``start`` to ``end`` inclusive in steps of ``stride`` of either sign, as
 an SDAG ``forall``. The children are started in order and run until
 their first wait, a delivery resumes whichever child waits for it, and
 the parent resumes after the last child finishes. Each ``when`` clause
-of an SDAG ``overlap`` becomes a task:
+of an SDAG ``overlap`` becomes a coroutine task:
 
 .. code-block:: c++
 
    ck::coro::task<void> waitA() {
-     CK_TASK();
+     CK_CORO_TASK();
      CK_WHEN(inbox::a(round), ck::coro::skip, gotA);   // overlap { when a[round](int r, int gotA) {...}
-     CK_TASK_END();
+     CK_CORO_TASK_END();
    }
    ck::coro::task<void> waitItem(int i) {
-     CK_TASK();
+     CK_CORO_TASK();
      CK_WHEN_BLOCK(inbox::item(i), tag, v) { sum += v; } // forall [i] (0:n-1,1) { when item[i](int tag, int v) {...} }
-     CK_TASK_END();
+     CK_CORO_TASK_END();
    }
    ...
    CK_OVERLAP(waitA(), waitB());
@@ -2311,7 +2311,7 @@ The element may migrate while the children wait: the parent's record
 packs each child's wait, and after the restart the parent reaches the
 ``CK_OVERLAP`` again and starts only the children that had not finished.
 A finished child is not run again, so what it computed must be in
-pupped members, like any value that is live across a wait. A task's
+pupped members, like any value that is live across a wait. A coroutine task's
 parameters are supplied again by the restart, so they may be the
 ``forall`` index and values derived from members.
 
@@ -2386,8 +2386,9 @@ Differences from SDAG
 -  After a migration or restart, the coroutine's body runs again from the
    top to the recorded wait, so code before a wait must not repeat a side
    effect; SDAG resumes without re-running anything.
--  Each ``when`` clause of an ``overlap`` is a named ``task<void>``
-   helper passed to ``CK_OVERLAP``; the body of a ``forall`` is one task
+-  Each ``when`` clause of an ``overlap`` is a named coroutine task
+   (``ck::coro::task<void>``) passed to ``CK_OVERLAP``; the body of a
+   ``forall`` is one coroutine task
    that takes the index. SDAG's inline clause bodies have no equivalent
    (a lambda coroutine would outlive its closure).
 -  A coroutine body must not delete its own chare (``delete this``
