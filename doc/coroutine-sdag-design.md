@@ -1,20 +1,24 @@
 # Entry methods as C++20 coroutines: an SDAG equivalent (design)
 
-Status: prototype on branch `coroutine-sdag` (2026-11-09; attributes
-`[inbox]` and `[coroutine]` and the `CkCurrentMessage` accessor added
-2026-11-10), header `src/ck-core/ckcoro.h`, first program
-`tests/charm++/jacobi3d-coro`, microbenchmark
-`benchmarks/charm++/coro_pingpong`. The mechanism as built is
-described in `doc/internals/coroutine-sdag.md`; this document holds the
-reasons, the alternatives and the measurements. The precedent is CAMPI
-(`src/libs/ck-libs/ampi/campi.h`, `campi_core.h`, PRs #4073 and #4136),
-which runs AMPI ranks as coroutines with the same restart protocol; the
-analysis behind CAMPI is in the ampi project's notes
-(`AMPI-COROUTINE-ANALYSIS-2026-10-19.md`, sections 2, 4A and 9).
+Status: pull request #4231 (`coroutine-sdag` into `recharm`, opened
+2026-11-11), header `src/ck-core/ckcoro.h` with the charmxi attributes
+`[inbox]` and `[coroutine]`, the manual section "Structured Control Flow:
+Coroutine Entry Methods", the example `examples/charm++/heat1d-coro`, the
+test suite `tests/charm++/ckcoro`, the SDAG programs of the tree ported
+next to their originals, and the microbenchmark
+`benchmarks/charm++/coro_pingpong`. The mechanism as built is described
+in `doc/internals/coroutine-sdag.md`; this document holds the reasons,
+the alternatives (section 4 per question, section 9a as a list) and the
+measurements. The precedent is CAMPI (`src/libs/ck-libs/ampi/campi.h`,
+`campi_core.h`, PRs #4073 and #4136), which runs AMPI ranks as
+coroutines with the same restart protocol; the analysis behind CAMPI is
+in the ampi project's notes (`AMPI-COROUTINE-ANALYSIS-2026-10-19.md`,
+sections 2, 4A and 9).
 
-Scope of the first cut (Kale, 2026-11-09): SDAG `overlap` is not supported
-yet; the SDAG runtime structures may be reused after cleaning; `overlap` can
-come later as additional coroutine functions.
+History: prototype 2026-11-09 (library only, `overlap` left out by Kale's
+scoping of the first cut), attributes and `CkCurrentMessage` 2026-11-10,
+block form, `overlap`/`forall` as child coroutines, owners of every chare
+kind, the equivalence corpus and the pull request 2026-11-11.
 
 ## 1. The idea in one paragraph
 
@@ -185,8 +189,9 @@ of the language (`break`, `continue`, `return` from the middle, nested
 loops, lambdas, `switch` outside sites), nested blocking helpers returning
 `task<T>` (CAMPI's `tests/campi/until` shows the pattern), and a debugger
 that steps through the body. What SDAG allows that this forbids: packing at
-any `when`, several concurrent invocations of one SDAG entry, marshalled
-parameters on the SDAG entry, and `overlap` (not yet).
+any `when`, several concurrent invocations of one SDAG entry, inline
+bodies for `overlap` clauses, and `delete this` in a body (section 9a
+has the full list with the reasons).
 
 ## 4. The seven questions
 
@@ -512,7 +517,55 @@ Everything the beta needs is on the branch: the shared core with CAMPI
 First beta update: `overlap` as several coroutines per element and the
 rest of the SDAG test corpus (both done 2026-11-11).
 
+## 9a. Alternatives considered, and SDAG features not carried over
+
+The sections above give each decision in its place; this section lists
+them in one table each so that a reviewer can check what was weighed.
+
+### Alternatives considered
+
+| alternative | decision | reason |
+|---|---|---|
+| Pack the coroutine frame on migration | rejected outright | The frame's layout is compiler private and holds code addresses and the compiler's own temporaries; there is no portable way to serialize it, and a frame restored in another process would hold the old process's addresses. The same reason rules out moving a frame between PEs of one process when the two PEs differ in anything the frame points to. (Section 1.) |
+| Stackful threads: a `[threaded]` entry with isomalloc-migrated stacks, as AMPI does | rejected | Already available and unchanged; it needs isomalloc, a stack per suspended entry, and an identical program load address in every process (address-space randomization off, which macOS cannot do; `machines/mac.md`). The restart protocol packs integers and a message and needs none of that. (Section 4.5.) |
+| Keep SDAG's translator and generate closures from a C++ body | rejected | It would need charmxi to parse C++ bodies, which it cannot, or a C++ front end; the point of the design is that the body is ordinary C++ compiled by the compiler, with the `.ci` file holding declarations only. (Section 4.1.) |
+| A separate state object (CAMPI's `State`) instead of the chare | rejected | The chare already has a pup and its members already are SDAG's state variables; a second object would duplicate the rule. (Section 4.2, decision 2.) |
+| Library only, no `.ci` attributes | kept as the hand-written form, attributes added | The library alone works (the pingpong benchmark still uses it) but every site spells the entry index with a placeholder argument, every inbox entry is a one-line body, and the chare declares and pups the state. Two attributes generate those three things and nothing else; the delivery path is one. (Section 4.1, Kale 2026-11-10.) |
+| A C++20 member-pointer template (`ck::entry<&X::name>`) over a registry instead of attributes | deferred | Possible later without changing the header; it belongs to a decision about the `.ci` file in general, which this PR does not take. (Section 9.) |
+| Reuse SDAG's `Dependency`/`Buffer`/`Continuation` structures | rejected | The waiter here is a coroutine handle plus a want, not a closure chain; the matching is forty lines, and sharing the structures would tie the two implementations' lifetimes. (Section 4.4.) |
+| Copy marshalled parameters into a closure on arrival (SDAG) | rejected | The `CkMarshallMsg` is kept with a reference count and unmarshalled once at the site that takes it, so array parameters are read in place and a delivery is one buffer kind for every path. (Section 4.4.) |
+| Members-only rule for received values | both forms kept | `CK_WHEN` fills members; `CK_WHEN_BLOCK` gives a block scope, since `for { when e(x) { work(x) } }` is the common pattern and the misuse (a wait inside the block) is a compile error. (Section 3 rule 1, Kale 2026-11-11.) |
+| Conjunction `when a(), b()` as two sequential waits | used in the prototype, replaced | A migration can fall between the two waits and the first value, if it is not a pupped member, is lost; Linux CI found exactly that in the ported migration test. `CK_WHEN_ALL` is one site that takes both deliveries. (Section 4.3.) |
+| `overlap` as `co_await when_any(...)` over several awaitables | rejected | That is `CK_WHEN_ANY`; `overlap` is independent progress of several clauses, which needs a coroutine per clause (child records pupped inside the parent). (Section 4.3.) |
+| Inline bodies for `overlap` clauses, as lambda coroutines | rejected for now | A lambda coroutine outlives its closure object, so captures dangle; a restart would have to recreate the lambda in the same state. Each clause is a named `ck::coro::task<void>`. |
+| Migration while suspended at any `co_await` | restricted to sites | A plain `co_await` between sites is allowed; packing there aborts with the entry's name, because only a site has a recorded id the restart can jump to. (Section 3 rule 3.) |
+| Several active invocations of one coroutine entry per chare | rejected unless a program needs it | A restart is a plain re-invocation of the entry; with several invocations the restart would have to tell them apart, and no program in the corpus needs it. (Section 3 rule 4, Kale 2026-11-11.) |
+| `delete this` inside a body (allowed in an SDAG `when` body) | replaced by `Chare::ckDestroyLater()` | The body runs inside the coroutine frame, which the entry wrapper and the state still touch after the body ends; `fib-coro` first used a separate destroy entry, and Kale asked for a facility in the base class instead (2026-11-11). The chare is destroyed by `CkInvokeEP` after the entry returns. |
+| `exclusive` written by hand on a nodegroup's coroutine or inbox entries | rejected, charmxi adds it | SDAG's rule: the entries are exclusive, the node lock is released at every wait because the entry method returns there, and a hand-written tag is an error so that the generated code is the only place the lock is taken. (Kale 2026-11-11.) |
+| `CK_END` closing `CK_COROUTINE()`, and `CK_TASK` for a coroutine task | renamed | Matched pairs with no synonyms: `CK_COROUTINE`/`CK_COROUTINE_END`, `CK_CORO_TASK`/`CK_CORO_TASK_END`; `CK_TASK` would collide with Charm++'s stealable tasks. (Kale 2026-11-11.) |
+| An awaitable future | not in this PR | Sketched as a callback-entry awaitable; no program in the corpus needed it. |
+
+### SDAG features not carried over
+
+| SDAG feature | here | reason |
+|---|---|---|
+| Migration or checkpoint at any `when` | only at a site (`CK_WHEN`, `CK_WHEN_BLOCK`, `CK_WHEN_ALL`, `CK_WHEN_ANY`, `CK_CALL`, `CK_OVERLAP`, `CK_FORALL`) | A pure C++ solution cannot pack the frame; a site is where the body has a recorded id to jump to. In practice every SDAG `when` becomes a site, so the loss is only the plain `co_await` between sites. |
+| Resume without re-running | the body runs again from the top to the recorded site | The frame is rebuilt by execution, not restored; code before a site must not repeat a side effect (rule 2). SDAG's closures carry the position. |
+| Several concurrent invocations of one SDAG entry | an error | See the table above. |
+| A `when` body that uses the outer when's parameters across a nested `when` | the outer wait in member form | A block-scoped variable cannot survive the restart jump; the compiler rejects the jump past its initializer. SDAG keeps the parameters in a packed closure; here the member is that closure. |
+| `overlap` clauses and `forall` bodies written inline | named coroutine tasks | See the table above. |
+| `delete this` in a `when` body | `ckDestroyLater()` | See the table above. |
+| `atomic`/`serial` blocks | plain code | Nothing to carry: every statement of the body is serial code. |
+| State variables declared in the class but used as if local | the same rule, visible | SDAG's surprise ("state variables must be declared in the class") remains the rule here; the difference is that the body is C++ and the reader sees the member. |
+| Trace events per construct for Projections (`_TRACE_BEGIN_EXECUTE_DETAILED` around each generated `when` method) | none | A wait is a `co_await` in the user's body, not a generated method; a site could emit the same event, open item. The entry methods themselves are traced as usual. |
+| C++11 | C++20 for the files that include `ckcoro.h` | Coroutines are a C++20 feature; the rest of the program and the runtime stay at their standard. |
+
 ## 10. Open items
 
-- An example program under `examples/charm++` written for the manual
-  (the corpus ports there are translations of SDAG programs).
+- Several active invocations of one coroutine entry per chare (an error;
+  stays so unless a program needs it, Kale 2026-11-11).
+- Inline bodies for `overlap` clauses (see 9a).
+- Per-wait trace events for Projections (see 9a).
+- The copy of the entry's message that a restart of a message-parameter
+  coroutine entry sends: measured only for small messages (jacobi3d,
+  the tests); a large message entry would pay a copy per migration.
