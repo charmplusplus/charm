@@ -9897,15 +9897,23 @@ use the buffer. ``close`` on a received copy of another process's buffer
 releases its reference on this process's IPC mapping of the buffer (the
 mapping is closed with the last reference, after synchronizing the device) and
 the registration it kept; call it when the peer's buffer will no longer be
-used, or before migration. Assigning over a copy releases its reference the
-same way; a copy destroyed without ``close`` keeps its reference, so the
-mapping stays open for the rest of the run. An owner that is a static or
-global object is released at process exit without deregistering, since the
-network layer is gone by then; call ``close`` on it before ``CkExit`` to
-deregister. Persistent objects are not migrated and not restored from a
-checkpoint: after a chare migrates, or a run restarts, create, open and
-exchange them again (an object from a previous run is refused, since its id
-carries a token of the run that opened it).
+used, or before migration, and only once the callbacks of the transfers made
+through the copy have been invoked (the device synchronize when the mapping
+closes covers only the GPU of the PE that closes it). Assigning over a copy
+releases its reference the same way; a copy destroyed without ``close`` keeps
+its reference, so the mapping stays open for the rest of the run. Before the
+owner's program frees the device memory, close the copies of the buffer in
+the other processes on its host: CUDA documents freeing an allocation before
+the other processes close their IPC mappings of it as undefined behavior. An
+owner that is a static or global object is released at process exit without
+deregistering, since the network layer is gone by then; call ``close`` on it
+before ``CkExit`` to deregister. Persistent objects are not migrated and not
+restored from a checkpoint: after a chare migrates, or a run restarts, create,
+open and exchange them again. In RDMA mode an object from a previous run is
+refused, since its id carries a token of the run that opened it. The
+device-copy and IPC modes do not check the id, so they do not detect a stale
+object, whether it is from a previous run or a copy whose owner has released
+the buffer.
 
 Examples using persistent GPU communication can be found in
 ``examples/charm++/cuda/gpudirect/persistent``,
