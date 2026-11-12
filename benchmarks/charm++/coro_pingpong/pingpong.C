@@ -120,22 +120,23 @@ class Coro : public CBase_Coro {
   Coro() {}
   void recv(PingMsg *msg) { co.deliver(CkIndex_Coro::recv(0), msg); }
   ck::coroutine run() {
-    CK_COROUTINE(co, CkIndex_Coro::run());
-    if (thisIndex == 0) {
-      t0 = CkWallTimer();
-      thisProxy[1].recv(make_msg(0));
-    }
-    for (iter = 0; iter < niter; iter++) {
-      CK_WHEN(CkIndex_Coro::recv(0), iter, m);
-      {
-        int r = CkGetRefNum(m);
-        delete m;
-        if (thisIndex == 1) thisProxy[0].recv(make_msg(r));
-        else if (iter + 1 < niter) thisProxy[1].recv(make_msg(iter + 1));
+    CK_COROUTINE_STATE(co, CkIndex_Coro::run());
+    CK_MIGRATABLE {
+      if (thisIndex == 0) {
+        t0 = CkWallTimer();
+        thisProxy[1].recv(make_msg(0));
       }
+      for (iter = 0; iter < niter; iter++) {
+        CK_WHEN(CkIndex_Coro::recv(0), iter, m);
+        {
+          int r = CkGetRefNum(m);
+          delete m;
+          if (thisIndex == 1) thisProxy[0].recv(make_msg(r));
+          else if (iter + 1 < niter) thisProxy[1].recv(make_msg(iter + 1));
+        }
+      }
+      if (thisIndex == 0) mainProxy.done(CkWallTimer() - t0);
     }
-    if (thisIndex == 0) mainProxy.done(CkWallTimer() - t0);
-    CK_COROUTINE_END();
   }
 };
 

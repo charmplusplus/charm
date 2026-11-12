@@ -6,8 +6,8 @@
  *
  * The owner of a coroutine (a ck::coro::state record, a campi rank) keeps
  * one chain per coroutine and sets current_chain_ to it around every run of
- * the coroutine; frame_guard, created by CK_CORO_TASK/CAMPI_RESUMABLE (and
- * CK_COROUTINE), reads it there.
+ * the coroutine; frame_guard, created by CK_MIGRATABLE/CAMPI_RESUMABLE,
+ * reads it there.
  */
 #ifndef CKCORO_CORE_H
 #define CKCORO_CORE_H
@@ -158,11 +158,12 @@ class frame_guard {
   chain *c_;
   unsigned depth_;
   int site_;
+  bool noted_ = false; // a site of this function was noted since the start
 };
 
 inline frame_guard::frame_guard() noexcept : c_(current_chain_), depth_(0), site_(0) {
   if (c_ == nullptr) {
-    CkAbort("ck::coro: CK_CORO_TASK/CAMPI_RESUMABLE outside a coroutine");
+    CkAbort("ck::coro: CK_MIGRATABLE/CAMPI_RESUMABLE outside a coroutine");
     std::abort();
   }
   chain &c = *c_;
@@ -182,6 +183,9 @@ inline frame_guard::frame_guard() noexcept : c_(current_chain_), depth_(0), site
 inline frame_guard::~frame_guard() {
   chain &c = *c_;
   if (c.destroying) return; // the frames are destroyed for a rebuild
+  // A restarted function that finishes without reaching its recorded site:
+  // the site is not a case of this function (the switch fell through).
+  if (c.restarting && site_ != 0 && !noted_) abort_no_site(*this);
   c.depth--;
   // A finished function's sites (and its callees') are not on any later path.
   if (!c.restarting && c.sites.size() > depth_) c.sites.resize(depth_);
@@ -206,6 +210,7 @@ inline void note_site(frame_guard &g, int line, bool call) noexcept {
   c.noted = true;
   c.notedCall = call;
   c.notedDepth = d;
+  g.noted_ = true;
 }
 
 inline void abort_no_site(const frame_guard &g) noexcept {

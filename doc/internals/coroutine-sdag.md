@@ -84,12 +84,13 @@ header's opening comment and the manual section "Coroutine Entry Methods".
 ## Protocols
 
 **Start.** The generated entry wrapper calls the user's method, which is a
-coroutine with `initial_suspend` = never: the body runs to `CK_COROUTINE`,
-whose `root_guard` calls `state::begin(elt, ep, msg)`. With no arguments
-(`CK_COROUTINE()`, the attribute form) the guard takes `ep` from
-`CkCurrentEntry()` and `msg` from `CkCurrentMessage()` (null for a void
-entry's system message), after checking `__coro_is_entry(ep)` so that a
-direct C++ call of the method aborts instead of recording the caller's
+coroutine with `initial_suspend` = never. Its promise is constructed with
+the chare (`*this`) when the chare has `X_CORO_CODE`, and
+`get_return_object` calls `state::begin(elt, isEntry)` before the body
+starts: `ep` comes from `CkCurrentEntry()` and `msg` from
+`CkCurrentMessage()` (null for a void entry's system message), after
+checking `__coro_is_entry(ep)` so that a direct C++ call of the method
+aborts instead of recording the caller's
 entry. `begin` adopts a restarting record of the same entry if there is
 one, else creates a record (aborting if an active record of that entry
 exists), stores the frame handle and sets `current_`. The `frame_guard` that follows opens the switch
@@ -175,10 +176,15 @@ is invoked again by the runtime after the unpack completes. `pup(p,
 owner)`, the form the generated `_coro_pup` calls, rebuilds `target`
 from the owner before sending (`self_target`), so a chare restored from
 a checkpoint, whose handle is new, and a group branch are reached; the
-library form `p | state` keeps the packed target. The body
-runs to `CK_COROUTINE`, adopts the record (clearing `pending`, setting
-`chain.restarting`), and each `frame_guard` on the recorded path switches
-to its site; `note_site` checks that the site reached is the recorded one.
+library form `p | state` keeps the packed target. The promise adopts
+the record (clearing `pending`, setting `chain.restarting`), and each
+`frame_guard` on the recorded path, declared by `CK_MIGRATABLE`, switches
+to its site: the macro expands to the guard and `switch (site) default:
+case 0:` followed by the user's block, whose sites are the cases.
+`note_site` checks that the site reached is the recorded one; a recorded
+site that is not a case of the function enters the block from the top and
+aborts at the first site it reaches, or in the guard's destructor if it
+reaches none.
 Deliveries that arrive before the restart message are buffered as usual.
 
 **Rebuild (`+ck_fakemigrate`).** After a body suspends at a site it did
@@ -187,7 +193,7 @@ packed into memory, every frame destroyed, the records and inbox cleared,
 and the state unpacked from memory, which sends the restarts.
 
 **Helpers.** A `ck::coro::task<T>` helper awaited with `CK_CALL` has its
-own `CK_CORO_TASK`/`CK_CORO_TASK_END` and therefore its own depth in the chain;
+own `CK_MIGRATABLE` block and therefore its own depth in the chain;
 `note_site(..., call = true)` marks the call site and `frame_guard` records
 that the helper was entered through it (`chain.linked`), as in CAMPI.
 

@@ -66,37 +66,37 @@ Cell::Cell() {
 
 //function to perform iterations for Cells (the SDAG run() of the original)
 ck::coroutine Cell::run() {
-  CK_COROUTINE();
-  for(stepCount = 1; stepCount <= finalStepCount; stepCount++) {
-    //send current atom positions to my computes
-    sendPositions();
+  CK_MIGRATABLE {
+    for(stepCount = 1; stepCount <= finalStepCount; stepCount++) {
+      //send current atom positions to my computes
+      sendPositions();
 
-    //update properties of atoms using new force values
-    for(forceCount=0; forceCount < inbrs; forceCount++){
-      // when receiveForces[stepCount](int iter, vec3 forces[n], int n)
-      CK_WHEN(inbox::receiveForces(stepCount), forceIter, forces, forceLen);
-      addForces(forces);
-    }
+      //update properties of atoms using new force values
+      for(forceCount=0; forceCount < inbrs; forceCount++){
+        // when receiveForces[stepCount](int iter, vec3 forces[n], int n)
+        CK_WHEN(inbox::receiveForces(stepCount), forceIter, forces, forceLen);
+        addForces(forces);
+      }
 
-    updateProperties();
+      updateProperties();
 
-    if ((stepCount %  MIGRATE_STEPCOUNT) == 0) {
-      //send atoms that have moved beyond my cell to neighbors
-      migrateParticles();
+      if ((stepCount %  MIGRATE_STEPCOUNT) == 0) {
+        //send atoms that have moved beyond my cell to neighbors
+        migrateParticles();
 
-      //receive particles from my neighbors
-      for(updateCount = 0; updateCount < inbrs; updateCount++) {
-        CK_WHEN_BLOCK(inbox::receiveParticles(), updates) { // when receiveParticles(CkVec<Particle> &updates)
-          for(int i=0; i < updates.length(); i++) {
-            particles.push_back(updates[i]);    //add particles that have moved from neighboring cells to my cell
+        //receive particles from my neighbors
+        for(updateCount = 0; updateCount < inbrs; updateCount++) {
+          CK_WHEN_BLOCK(inbox::receiveParticles(), updates) { // when receiveParticles(CkVec<Particle> &updates)
+            for(int i=0; i < updates.length(); i++) {
+              particles.push_back(updates[i]);    //add particles that have moved from neighboring cells to my cell
+            }
           }
         }
       }
     }
+    //everything done, reduction of the integer checksum of positions and forces
+    contributeChecksum();
   }
-  //everything done, reduction of the integer checksum of positions and forces
-  contributeChecksum();
-  CK_COROUTINE_END();
 }
 
 //constructor for chare object migration

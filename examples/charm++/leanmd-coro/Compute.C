@@ -32,22 +32,22 @@ Compute::Compute(CkMigrateMessage *m): CBase_Compute(m)  {
 // receives: selfInteract and interact (calcInternalForces and
 // calcPairForces in physics.h) delete them.
 ck::coroutine Compute::run() {
-  CK_COROUTINE();
-  for(stepCount = 1; stepCount <= finalStepCount; stepCount++) {
-    //self interaction check
-    if(thisIndex.x1==thisIndex.x2 && thisIndex.y1==thisIndex.y2 && thisIndex.z1==thisIndex.z2) {
-      CK_WHEN(inbox::calculateForces(stepCount), msg);   // when calculateForces[stepCount](ParticleDataMsg *msg)
-      selfInteract(msg);
-      msg = nullptr;
-    } else {
-      //receive positions from two cells - buffer the first one
-      CK_WHEN(inbox::calculateForces(stepCount), bufferedMsg);
-      CK_WHEN(inbox::calculateForces(stepCount), msg);
-      interact(msg);
-      bufferedMsg = msg = nullptr;
+  CK_MIGRATABLE {
+    for(stepCount = 1; stepCount <= finalStepCount; stepCount++) {
+      //self interaction check
+      if(thisIndex.x1==thisIndex.x2 && thisIndex.y1==thisIndex.y2 && thisIndex.z1==thisIndex.z2) {
+        CK_WHEN(inbox::calculateForces(stepCount), msg);   // when calculateForces[stepCount](ParticleDataMsg *msg)
+        selfInteract(msg);
+        msg = nullptr;
+      } else {
+        //receive positions from two cells - buffer the first one
+        CK_WHEN(inbox::calculateForces(stepCount), bufferedMsg);
+        CK_WHEN(inbox::calculateForces(stepCount), msg);
+        interact(msg);
+        bufferedMsg = msg = nullptr;
+      }
     }
   }
-  CK_COROUTINE_END();
 }
 
 //interaction within a cell

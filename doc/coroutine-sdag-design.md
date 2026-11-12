@@ -64,22 +64,22 @@ class Jacobi : public CBase_Jacobi {
   void pup(PUP::er &p) { p | iterations; p | imsg; ...; }
 
   ck::coroutine doStep() {
-    CK_COROUTINE();
-    if (lbFreq > 0 && iterations > 0 && iterations % lbFreq == 0) {
-      AtSync();
-      CK_WHEN(inbox::ResumeFromSync());
+    CK_MIGRATABLE {
+      if (lbFreq > 0 && iterations > 0 && iterations % lbFreq == 0) {
+        AtSync();
+        CK_WHEN(inbox::ResumeFromSync());
+      }
+      if (iterations == chkptIter) {
+        contribute(CkCallback(CkReductionTarget(Main, checkpoint), mainProxy));
+        CK_WHEN(inbox::resume());
+      }
+      begin_iteration();
+      for (imsg = 0; imsg < 6; imsg++) {
+        CK_WHEN(inbox::receiveGhosts(iterations), gmsg);  // when receiveGhosts[iterations](ghostMsg *gmsg)
+        processGhosts(gmsg);
+      }
+      check_and_compute();
     }
-    if (iterations == chkptIter) {
-      contribute(CkCallback(CkReductionTarget(Main, checkpoint), mainProxy));
-      CK_WHEN(inbox::resume());
-    }
-    begin_iteration();
-    for (imsg = 0; imsg < 6; imsg++) {
-      CK_WHEN(inbox::receiveGhosts(iterations), gmsg);  // when receiveGhosts[iterations](ghostMsg *gmsg)
-      processGhosts(gmsg);
-    }
-    check_and_compute();
-    CK_COROUTINE_END();
   }
 };
 ```
@@ -104,8 +104,7 @@ outside the SDAG code: `check_and_compute` ends with `AtSync()` instead of
 coroutine version could do the same with the same two lines. It waits for
 the balancer and for the checkpoint inside the body on purpose, so that the
 test migrates and checkpoints an element suspended at a site. Without those
-two blocks the coroutine body is the loop shown, between `CK_COROUTINE` and
-`CK_COROUTINE_END`.
+two blocks the coroutine body is the loop shown, inside `CK_MIGRATABLE`.
 
 Vocabulary (the attributes in charmxi, the rest in `ckcoro.h`):
 
@@ -117,12 +116,11 @@ Vocabulary (the attributes in charmxi, the rest in `ckcoro.h`):
 | `CK_WHEN_BLOCK(want, name...) { ... }` | the block form: the parameters as block-scoped variables; no site inside the block |
 | `ck::coro::skip` | an out that discards its parameter |
 | `ck::coroutine` | return type of a coroutine entry method; the body starts at once |
-| `CK_COROUTINE()` / `CK_COROUTINE_END()` | open and close the body; registers the coroutine (the entry being delivered); the restart switch (the names were `CK_COROUTINE`/`CK_END` and `CK_RESUMABLE`/`CK_END` until 2026-11-11; Kale asked for matched pairs, and for the `CORO_` qualifier on the task pair because Charm++ already has stealable tasks) |
+| `CK_MIGRATABLE { ... }` | the block that can be rebuilt after a migration: a frame guard and the restart switch, `switch (site) default: case 0:` followed by the block; the same block in an entry body and in a `ck::coro::task<T>` helper, `co_return` inside it. The registration of the coroutine is done by the promise of `ck::coroutine` through `X_CORO_CODE`. (Until 2026-11-11 the body was bracketed by `CK_COROUTINE()`/`CK_COROUTINE_END()` and a helper by `CK_CORO_TASK()`/`CK_CORO_TASK_END()`; Kale asked whether C++ could remove the pair, and the block form with the registration in the promise is the answer; section 4.8) |
 | `CK_WHEN(want, out...)` | a site: wait for the delivery and store it in `out` (the message pointer, or every marshalled parameter in order) |
 | `CK_WHEN_ANY(idx, CK_ALT(want, out...), ...)` | a site: the first of several (SDAG `case`); `idx` gets the index that matched |
-| `ck::coro::state`, `co.deliver(ep, msg)` / `co.deliver(ep, args...)`, `CK_COROUTINE(co, ep)`, `CK_WHEN(ep, ref-or-noref, out...)` | the same by hand, without the attributes: a state member pupped by the chare, inbox bodies written out, entry indices spelled `CkIndex_X::name(...)` |
+| `ck::coro::state`, `co.deliver(ep, msg)` / `co.deliver(ep, args...)`, `CK_COROUTINE_STATE(co, ep)`, `CK_WHEN(ep, ref-or-noref, out...)` | the same by hand, without the attributes: a state member pupped by the chare, inbox bodies written out, `CK_COROUTINE_STATE` as the first statement of the body (the promise registers only through `X_CORO_CODE`), entry indices spelled `CkIndex_X::name(...)` |
 | `CK_CALL(expr)` / `CK_CALL_TO(lhs, expr)` | a site: await a `ck::coro::task<T>` helper that itself contains sites |
-| `CK_CORO_TASK()` / `CK_CORO_TASK_END()` | the restart switch of a helper and its end; `CK_COROUTINE_END()` ends an entry body |
 | `ck::coro::task<T>` | lazily started helper coroutine (CAMPI's `campi::task`) |
 | `+ck_fakemigrate` | every site rebuilds the chare's coroutines in place |
 | `ckDestroyLater()` (charm++.h, every chare) | destroy the chare after the entry method running on it returns: what a coroutine body does instead of `delete this` (Kale, 2026-11-11) |
@@ -152,7 +150,7 @@ from 65536 iterations ago is still unconsumed.
    surprise. C++ rejects the restart jump past a local with an initializer
    or a non-trivial type, which catches most mistakes at compile time; a
    scalar declared without an initializer, or declared before
-   `CK_COROUTINE()`, is not caught, and `+ck_fakemigrate` is the check.
+   `CK_MIGRATABLE`, is not caught, and `+ck_fakemigrate` is the check.
 2. **Code before a site is skipped on a restart**, so its effects must be
    recorded in members (above: `iterations` is incremented in
    `begin_iteration`, which runs before the ghost sites and is skipped when
@@ -203,7 +201,7 @@ void entry calls `impl_obj->doStep()` and ignores the return value, so the
 C++ definition may return `ck::coroutine` while the .ci file says `void`,
 and (b) an inbox entry is an ordinary entry whose body is one line. That
 form (`ck::coro::state co` pupped by the chare, `co.deliver(...)` bodies,
-`CK_COROUTINE(co, ep)`, `CK_WHEN(CkIndex_X::name(0), ref, out)`) still
+`CK_COROUTINE_STATE(co, ep)`, `CK_WHEN(CkIndex_X::name(0), ref, out)`) still
 works and is what the pingpong benchmark uses. Its three warts are the
 entry index spelled with a placeholder argument at every site, the
 one-line bodies, and the state member the chare has to declare and pup.
@@ -212,9 +210,9 @@ The two attributes remove them and nothing else. `[inbox]` and
 `[coroutine]` make charmxi emit a macro, `X_CORO_CODE` (as `X_SDAG_CODE`),
 that the class places in its body: the state member and its pup hook
 (called by the generated recursive pup, as `_sdag_pup` is), the inbox
-entry bodies, the test `CK_COROUTINE()` uses to check that it runs as one
-of the chare's coroutine entries, and `struct inbox` with one function per
-inbox entry returning a `ck::coro::want`. The generated wrappers are not
+entry bodies, the test the promise of `ck::coroutine` uses to check that
+the method runs as one of the chare's coroutine entries, and `struct
+inbox` with one function per inbox entry returning a `ck::coro::want`. The generated wrappers are not
 changed: a coroutine entry's wrapper calls the method as before, and the
 body learns its entry index and message from `CkCurrentEntry()` and
 `CkCurrentMessage()`, a runtime accessor added for this (three lines in
@@ -356,6 +354,53 @@ section 3; what would be gained is the removal of `src/xlat-i/sdag/` (about
 2500 lines) and of `sdag.h`, and the end of the "state variables must be
 declared in the class" surprise, since in a coroutine body all state is
 visibly the chare's.
+
+### 4.8 The block instead of the begin/end pair (2026-11-11)
+
+Until the evening of 2026-11-11 a body was bracketed by `CK_COROUTINE()`
+and `CK_COROUTINE_END()`, a helper by `CK_CORO_TASK()` and
+`CK_CORO_TASK_END()`: the first macro declared the guards and opened
+`switch (site) { case 0:`, the second closed it with a `default:` that
+aborted. This is the shape of CAMPI's `CAMPI_RESUMABLE()`/`CAMPI_END()`
+and of the C resumable-function libraries built on the same switch
+(protothreads). Kale asked whether C++ could remove the pair, since a
+plain coroutine needs nothing of the kind. What requires it is the
+restart jump: the only standard way to jump forward to one of several
+points chosen by an integer is a `switch` whose `case` labels sit at
+those points, and the switch has to be in the user's function because the
+labels are; a guard object's constructor and destructor cannot open and
+close one. What can be removed is the closer and the registration:
+
+- `CK_MIGRATABLE { ... }`: an object-like macro expanding to the frame
+  guard and `switch (site) default: case 0:` with no brace of its own, so
+  the user's braces are the switch body and the sites inside them, nested
+  in loops or not, are its cases (labels may sit anywhere in the
+  substatement). The `default:` sends a recorded site that is not a case
+  of this function through the block from the top, where the first site
+  it reaches aborts (`note_site`), or the frame guard's destructor aborts
+  if it reaches none; it also keeps the end of a value-returning task
+  unreachable for the compiler, so `co_return` inside the block is enough
+  (without it clang warns that the task may fall off its end).
+- Registration in the promise: C++20 constructs the promise of a member
+  coroutine with `*this` and the arguments when the promise has a
+  constructor that accepts them, so `ck::coroutine::promise_type` has a
+  constrained constructor for an owner with `__coro` and
+  `__coro_is_entry` (both generated by `X_CORO_CODE`) and calls
+  `state::begin` from `get_return_object`, before the body starts. The
+  hand-written form without `X_CORO_CODE` keeps a registration
+  statement, `CK_COROUTINE_STATE(co, ep)`, as the first line of the body.
+
+The word says what the block buys: the code inside can be rebuilt after a
+migration or a checkpoint, and a chare that never migrates while waiting
+may leave it out (its awaits are plain `co_await`s and the pup aborts if
+it is packed while suspended there). The same block serves entries and
+helpers, so the task pair is gone too. A scratch probe (block form,
+labels inside loops, the promise constructor receiving `*this`, the
+missed-site destructor) compiled clean under Apple clang 17 with `-Wall
+-Wextra` before the conversion; the suite under `+ck_fakemigrate`,
+checkpoint and restart is the real test. CAMPI can adopt the same block
+in its own PR; the core change (the destructor check) is compatible with
+its `default:` closer.
 
 ## 5. SDAG, CAMPI, coroutine entries
 
@@ -529,6 +574,7 @@ them in one table each so that a reviewer can check what was weighed.
 | Pack the coroutine frame on migration | rejected outright | The frame's layout is compiler private and holds code addresses and the compiler's own temporaries; there is no portable way to serialize it, and a frame restored in another process would hold the old process's addresses. The same reason rules out moving a frame between PEs of one process when the two PEs differ in anything the frame points to. (Section 1.) |
 | Stackful threads: a `[threaded]` entry with isomalloc-migrated stacks, as AMPI does | rejected | Already available and unchanged; it needs isomalloc, a stack per suspended entry, and an identical program load address in every process (address-space randomization off, which macOS cannot do; `machines/mac.md`). The restart protocol packs integers and a message and needs none of that. (Section 4.5.) |
 | Keep SDAG's translator and generate closures from a C++ body | rejected | It would need charmxi to parse C++ bodies, which it cannot, or a C++ front end; the point of the design is that the body is ordinary C++ compiled by the compiler, with the `.ci` file holding declarations only. (Section 4.1.) |
+| A guard object whose constructor and destructor replace the begin/end macros | rejected | The pair is a `switch` and its closing brace, which an object cannot open or close; the guards are objects already. The block form of section 4.8 is what C++ allows. |
 | A separate state object (CAMPI's `State`) instead of the chare | rejected | The chare already has a pup and its members already are SDAG's state variables; a second object would duplicate the rule. (Section 4.2, decision 2.) |
 | Library only, no `.ci` attributes | kept as the hand-written form, attributes added | The library alone works (the pingpong benchmark still uses it) but every site spells the entry index with a placeholder argument, every inbox entry is a one-line body, and the chare declares and pups the state. Two attributes generate those three things and nothing else; the delivery path is one. (Section 4.1, Kale 2026-11-10.) |
 | A C++20 member-pointer template (`ck::entry<&X::name>`) over a registry instead of attributes | deferred | Possible later without changing the header; it belongs to a decision about the `.ci` file in general, which this PR does not take. (Section 9.) |
@@ -542,7 +588,7 @@ them in one table each so that a reviewer can check what was weighed.
 | Several active invocations of one coroutine entry per chare | rejected unless a program needs it | A restart is a plain re-invocation of the entry; with several invocations the restart would have to tell them apart, and no program in the corpus needs it. (Section 3 rule 4, Kale 2026-11-11.) |
 | `delete this` inside a body (allowed in an SDAG `when` body) | replaced by `Chare::ckDestroyLater()` | The coroutine body is still on the stack when it would delete the chare, and the chare's state member is touched when the body ends; `fib-coro` first used a separate destroy entry, and Kale asked for a facility in the base class instead (2026-11-11). The chare is destroyed by `CkInvokeEP` after the entry method returns. |
 | `exclusive` written by hand on a nodegroup's coroutine or inbox entries | rejected, charmxi adds it | SDAG's rule: the entries are exclusive, the node lock is released at every wait because the entry method returns there, and a hand-written tag is an error so that the generated code is the only place the lock is taken. (Kale 2026-11-11.) |
-| `CK_END` closing `CK_COROUTINE()`, and `CK_TASK` for a coroutine task | renamed | Matched pairs with no synonyms: `CK_COROUTINE`/`CK_COROUTINE_END`, `CK_CORO_TASK`/`CK_CORO_TASK_END`; `CK_TASK` would collide with Charm++'s stealable tasks. (Kale 2026-11-11.) |
+| `CK_END` closing `CK_COROUTINE()`, and `CK_TASK` for a coroutine task | renamed, then replaced | First matched pairs with no synonyms (`CK_COROUTINE`/`CK_COROUTINE_END`, `CK_CORO_TASK`/`CK_CORO_TASK_END`; `CK_TASK` would collide with Charm++'s stealable tasks), then the pairs themselves were replaced by one block, `CK_MIGRATABLE { ... }`, with the registration moved into the promise. (Kale 2026-11-11; section 4.8.) |
 | An awaitable future | not in this PR | Sketched as a callback-entry awaitable; no program in the corpus needed it. |
 
 ### SDAG features not carried over

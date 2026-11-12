@@ -2164,25 +2164,30 @@ ring every iteration:
      double leftGhost, rightGhost;  // received at the wait: members, pupped
      ...
      ck::coroutine run() {
-       CK_COROUTINE();
-       for (iter = 1; iter <= maxIter; iter++) {
-         if (lbFreq > 0 && iter % lbFreq == 0) {
-           AtSync();                      // the element may migrate while it waits here
-           CK_WHEN(inbox::ResumeFromSync());
+       CK_MIGRATABLE {
+         for (iter = 1; iter <= maxIter; iter++) {
+           if (lbFreq > 0 && iter % lbFreq == 0) {
+             AtSync();                    // the element may migrate while it waits here
+             CK_WHEN(inbox::ResumeFromSync());
+           }
+           thisProxy[(thisIndex + numStrips - 1) % numStrips].fromRight(iter, t[1]);
+           thisProxy[(thisIndex + 1) % numStrips].fromLeft(iter, t[cellsPerStrip]);
+           // when fromLeft[iter](int i, double v), fromRight[iter](int i, double v)
+           CK_WHEN_ALL(CK_ALT(inbox::fromLeft(iter), ck::coro::skip, leftGhost),
+                       CK_ALT(inbox::fromRight(iter), ck::coro::skip, rightGhost));
+           update();
+           if (iter % reportFreq == 0)
+             contribute(sizeof(double), &maxChange, CkReduction::max_double,
+                        CkCallback(CkReductionTarget(Main, report), mainProxy));
          }
-         thisProxy[(thisIndex + numStrips - 1) % numStrips].fromRight(iter, t[1]);
-         thisProxy[(thisIndex + 1) % numStrips].fromLeft(iter, t[cellsPerStrip]);
-         // when fromLeft[iter](int i, double v), fromRight[iter](int i, double v)
-         CK_WHEN_ALL(CK_ALT(inbox::fromLeft(iter), ck::coro::skip, leftGhost),
-                     CK_ALT(inbox::fromRight(iter), ck::coro::skip, rightGhost));
-         update();
-         if (iter % reportFreq == 0)
-           contribute(sizeof(double), &maxChange, CkReduction::max_double,
-                      CkCallback(CkReductionTarget(Main, report), mainProxy));
        }
-       CK_COROUTINE_END();
      }
    };
+
+``CK_MIGRATABLE { ... }`` encloses the part of the body that can be
+rebuilt after a migration or a checkpoint (how is explained below); a
+chare that never migrates or is checkpointed while a coroutine waits may
+leave it out.
 
 The mainchare of the same program waits for the reports in its own
 coroutine, with the block form of a wait:
@@ -2190,14 +2195,14 @@ coroutine, with the block form of a wait:
 .. code-block:: c++
 
    ck::coroutine run() {                    // entry [coroutine] void run();
-     CK_COROUTINE();
-     for (reports = 1; reports <= maxIter / reportFreq; reports++) {
-       CK_WHEN_BLOCK(inbox::report(), maxChange) {   // entry [inbox, reductiontarget] void report(double maxChange);
-         CkPrintf("iteration %d: largest change %.6e\n", reports * reportFreq, maxChange);
+     CK_MIGRATABLE {
+       for (reports = 1; reports <= maxIter / reportFreq; reports++) {
+         CK_WHEN_BLOCK(inbox::report(), maxChange) {   // entry [inbox, reductiontarget] void report(double maxChange);
+           CkPrintf("iteration %d: largest change %.6e\n", reports * reportFreq, maxChange);
+         }
        }
+       ...
      }
-     ...
-     CK_COROUTINE_END();
    }
 
 A wait has two forms. ``CK_WHEN_BLOCK(want, name...) { ... }`` waits
@@ -2235,14 +2240,18 @@ deliveries are present.
 A coroutine frame is never packed. When the chare migrates or is
 checkpointed, the coroutine state records which wait each active coroutine
 is suspended at, and after unpacking the entry is invoked again: its body
-runs again from the top and jumps to the recorded wait. This gives the
-rules:
+runs again from the top and jumps to the recorded wait. The jump is what
+``CK_MIGRATABLE`` provides: it expands to a frame guard and
+``switch (site) default: case 0:`` followed by the block, and each wait
+is a ``case`` of that switch labelled with its source line, so a restart
+enters the block at the recorded wait and a body that reaches none aborts.
+This gives the rules:
 
 -  Any value that is live across a wait is a member of the chare, pupped
    as usual: the variables of a ``CK_WHEN_BLOCK`` end with its block, and
    a local survives neither the jump nor the migration (C++ rejects a jump
    past a local with an initializer, and a local declared before
-   ``CK_COROUTINE()`` is silently re-initialized when the body runs
+   ``CK_MIGRATABLE`` is silently re-initialized when the body runs
    again). A pointer to an array parameter is valid until the next wait.
 -  Code before a wait runs again after a migration, so its results must
    be members, not recomputed side effects.
@@ -2263,17 +2272,17 @@ rules:
    entry's message, which lives as long as the coroutine.
 
 A function that itself waits is a coroutine task: a function returning
-``ck::coro::task<T>`` whose body is bracketed by ``CK_CORO_TASK()`` and ``CK_CORO_TASK_END()``,
+``ck::coro::task<T>`` whose body is a ``CK_MIGRATABLE`` block of its own,
 and is awaited with ``CK_CALL(expr)`` or ``CK_CALL_TO(lhs, expr)``; a
-value is returned with ``co_return`` after ``CK_CORO_TASK_END()``:
+value is returned with ``co_return`` inside the block:
 
 .. code-block:: c++
 
    ck::coro::task<int> receive(int idx) {     // waits inside a called function
-     CK_CORO_TASK();
-     CK_WHEN(inbox::recvNum(idx), n);         // n: a member
-     CK_CORO_TASK_END();
-     co_return n;
+     CK_MIGRATABLE {
+       CK_WHEN(inbox::recvNum(idx), n);       // n: a member
+       co_return n;
+     }
    }
    ...
    CK_CALL_TO(total, receive(i));             // total: a member if used after a later wait
@@ -2294,14 +2303,14 @@ of an SDAG ``overlap`` becomes a coroutine task:
 .. code-block:: c++
 
    ck::coro::task<void> waitA() {
-     CK_CORO_TASK();
-     CK_WHEN(inbox::a(round), ck::coro::skip, gotA);   // overlap { when a[round](int r, int gotA) {...}
-     CK_CORO_TASK_END();
+     CK_MIGRATABLE {
+       CK_WHEN(inbox::a(round), ck::coro::skip, gotA);   // overlap { when a[round](int r, int gotA) {...}
+     }
    }
    ck::coro::task<void> waitItem(int i) {
-     CK_CORO_TASK();
-     CK_WHEN_BLOCK(inbox::item(i), tag, v) { sum += v; } // forall [i] (0:n-1,1) { when item[i](int tag, int v) {...} }
-     CK_CORO_TASK_END();
+     CK_MIGRATABLE {
+       CK_WHEN_BLOCK(inbox::item(i), tag, v) { sum += v; } // forall [i] (0:n-1,1) { when item[i](int tag, int v) {...} }
+     }
    }
    ...
    CK_OVERLAP(waitA(), waitB());

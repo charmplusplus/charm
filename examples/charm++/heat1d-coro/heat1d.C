@@ -48,17 +48,17 @@ class Main : public CBase_Main {
   // The driver as a coroutine: each report is a reduction delivered to the
   // inbox entry report(); the block form gives its parameter a block scope.
   ck::coroutine run() {
-    CK_COROUTINE();
-    for (reports = 1; reports <= maxIter / reportFreq; reports++) {
-      CK_WHEN_BLOCK(inbox::report(), maxChange) {
-        CkPrintf("iteration %d: largest change %.6e\n", reports * reportFreq, maxChange);
+    CK_MIGRATABLE {
+      for (reports = 1; reports <= maxIter / reportFreq; reports++) {
+        CK_WHEN_BLOCK(inbox::report(), maxChange) {
+          CkPrintf("iteration %d: largest change %.6e\n", reports * reportFreq, maxChange);
+        }
       }
+      CK_WHEN_BLOCK(inbox::done(), checksum) {
+        CkPrintf("heat1d: %d iterations, checksum %lld\n", maxIter, checksum);
+      }
+      CkExit();
     }
-    CK_WHEN_BLOCK(inbox::done(), checksum) {
-      CkPrintf("heat1d: %d iterations, checksum %lld\n", maxIter, checksum);
-    }
-    CkExit();
-    CK_COROUTINE_END();
   }
 };
 
@@ -82,31 +82,31 @@ class Strip : public CBase_Strip {
   }
 
   ck::coroutine run() {
-    CK_COROUTINE();
-    for (iter = 1; iter <= maxIter; iter++) {
-      if (lbFreq > 0 && iter % lbFreq == 0) {
-        AtSync();                            // the element may migrate while it waits here
-        CK_WHEN(inbox::ResumeFromSync());
+    CK_MIGRATABLE {
+      for (iter = 1; iter <= maxIter; iter++) {
+        if (lbFreq > 0 && iter % lbFreq == 0) {
+          AtSync();                            // the element may migrate while it waits here
+          CK_WHEN(inbox::ResumeFromSync());
+        }
+        // Boundary cells to the neighbours on the ring, tagged with the iteration.
+        thisProxy[(thisIndex + numStrips - 1) % numStrips].fromRight(iter, t[1]);
+        thisProxy[(thisIndex + 1) % numStrips].fromLeft(iter, t[cellsPerStrip]);
+        // Both neighbours' values for this iteration (when fromLeft[iter](...), fromRight[iter](...)).
+        CK_WHEN_ALL(CK_ALT(inbox::fromLeft(iter), ck::coro::skip, leftGhost),
+                    CK_ALT(inbox::fromRight(iter), ck::coro::skip, rightGhost));
+        update();
+        if (iter % reportFreq == 0)
+          contribute(sizeof(double), &maxChange, CkReduction::max_double,
+                     CkCallback(CkReductionTarget(Main, report), mainProxy));
       }
-      // Boundary cells to the neighbours on the ring, tagged with the iteration.
-      thisProxy[(thisIndex + numStrips - 1) % numStrips].fromRight(iter, t[1]);
-      thisProxy[(thisIndex + 1) % numStrips].fromLeft(iter, t[cellsPerStrip]);
-      // Both neighbours' values for this iteration (when fromLeft[iter](...), fromRight[iter](...)).
-      CK_WHEN_ALL(CK_ALT(inbox::fromLeft(iter), ck::coro::skip, leftGhost),
-                  CK_ALT(inbox::fromRight(iter), ck::coro::skip, rightGhost));
-      update();
-      if (iter % reportFreq == 0)
-        contribute(sizeof(double), &maxChange, CkReduction::max_double,
-                   CkCallback(CkReductionTarget(Main, report), mainProxy));
+      {
+        // Sum of squares (the sum itself is conserved by the diffusion).
+        long long sum = 0;
+        for (int i = 1; i <= cellsPerStrip; i++) sum += (long long)(t[i] * t[i] * 1e3);
+        contribute(sizeof(sum), &sum, CkReduction::sum_long_long,
+                   CkCallback(CkReductionTarget(Main, done), mainProxy));
+      }
     }
-    {
-      // Sum of squares (the sum itself is conserved by the diffusion).
-      long long sum = 0;
-      for (int i = 1; i <= cellsPerStrip; i++) sum += (long long)(t[i] * t[i] * 1e3);
-      contribute(sizeof(sum), &sum, CkReduction::sum_long_long,
-                 CkCallback(CkReductionTarget(Main, done), mainProxy));
-    }
-    CK_COROUTINE_END();
   }
 
   void update() {

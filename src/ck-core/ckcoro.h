@@ -4,9 +4,8 @@
  * A coroutine entry method is declared [coroutine] in the .ci file (void;
  * a message or marshalled parameters, taken by value in C++ and supplied
  * again on a restart) and defined in C++ with the return type
- * ck::coroutine. Its body begins with CK_COROUTINE() and ends with
- * CK_COROUTINE_END(), and suspends at CK_WHEN sites until a delivery to an [inbox]
- * entry matches. The chare puts the generated X_CORO_CODE macro in its
+ * ck::coroutine. Its body is a CK_MIGRATABLE { ... } block, which suspends
+ * at CK_WHEN sites until a delivery to an [inbox] entry matches. The chare puts the generated X_CORO_CODE macro in its
  * class: it defines the ck::coro::state member (the active coroutines and
  * the inbox, packed with the element), the bodies of the inbox entries, and
  * inbox::name() / inbox::name(ref), which name the entry at a site.
@@ -18,16 +17,16 @@
  *     Jacobi_CORO_CODE
  *     int imsg, iter, i, count;      // state across sites: members, pupped
  *     ck::coroutine doStep() {
- *       CK_COROUTINE();
- *       sendGhosts();
- *       for (imsg = 0; imsg < 6; imsg++) {
- *         CK_WHEN_BLOCK(inbox::recvGhost(iter), gmsg) { // when recvGhost[iter](GhostMsg *gmsg) {
- *           process(gmsg);
+ *       CK_MIGRATABLE {
+ *         sendGhosts();
+ *         for (imsg = 0; imsg < 6; imsg++) {
+ *           CK_WHEN_BLOCK(inbox::recvGhost(iter), gmsg) { // when recvGhost[iter](GhostMsg *gmsg) {
+ *             process(gmsg);
+ *           }
  *         }
+ *         CK_WHEN(inbox::recvCount(iter), i, count); // when recvCount[iter](int i, int count)
+ *         compute();
  *       }
- *       CK_WHEN(inbox::recvCount(iter), i, count); // when recvCount[iter](int i, int count)
- *       compute();
- *       CK_COROUTINE_END();
  *     }
  *   };
  *
@@ -56,15 +55,19 @@
  *
  * Without the attributes, the same works by hand: a ck::coro::state member
  * pupped by the chare, inbox entries whose bodies call co.deliver(ep, msg)
- * or co.deliver(ep, args...), CK_COROUTINE(co, ep) and CK_WHEN(ep, ref, ...)
- * with ep = CkIndex_X::name(...).
+ * or co.deliver(ep, args...), CK_COROUTINE_STATE(co, ep) as the first
+ * statement of the body (the promise registers the coroutine only through
+ * X_CORO_CODE), then CK_MIGRATABLE { ... } with CK_WHEN(ep, ref, ...) sites,
+ * ep = CkIndex_X::name(...).
  *
  * Migration and checkpoint. A coroutine frame is never packed. The state
  * object packs, for each active coroutine, the entry index, a callback to
  * the owner and the chain of restart sites, and on unpacking sends the
  * entry's message to the owner again: the body runs again from the top
- * and the switch opened by CK_COROUTINE jumps to the recorded site, where
- * CK_WHEN finds the buffered message or waits for it. Rules: (1) a value
+ * and the switch opened by CK_MIGRATABLE jumps to the recorded site, where
+ * CK_WHEN finds the buffered message or waits for it. CK_MIGRATABLE expands
+ * to a frame guard and `switch (site) case 0:` followed by the block, so a
+ * site is a case of that switch and a restart that reaches none aborts. Rules: (1) a value
  * that is live across a site is a member of the chare (C++ rejects the jump
  * past a local with an initializer; a scalar declared without one is not
  * caught, and +ck_fakemigrate is the check); (2) code before a site is
@@ -75,8 +78,11 @@
  * statement and may be the body of an if or a loop; its case label must not
  * be inside a switch of the user's own; two sites must not share a line. A
  * function awaited from a coroutine that contains a site returns
- * ck::coro::task<T>, has its own CK_CORO_TASK/CK_CORO_TASK_END and is awaited with
- * CK_CALL or CK_CALL_TO.
+ * ck::coro::task<T>, has its own CK_MIGRATABLE block (co_return inside it)
+ * and is awaited with CK_CALL or CK_CALL_TO. A chare that never migrates or
+ * checkpoints while a coroutine waits may leave CK_MIGRATABLE out and
+ * co_await the state's when awaitables directly; packing it while it waits
+ * there aborts.
  *
  * The owner is a chare of any kind: an array element, a group or nodegroup
  * branch (its inbox and coroutine entries are exclusive, added by charmxi),
@@ -138,7 +144,7 @@ inline CkCallback self_target(int ep, IrrGroup *g) {
   return CkCallback(ep, CkMyPe(), g->ckGetGroupID());
 }
 inline CkCallback self_target(int ep, Chare *c) { return CkCallback(ep, c->ckGetChareID()); }
-// The frame handle of a coroutine entry just created, picked up by CK_COROUTINE.
+// The frame handle of a coroutine entry just created, picked up by state::begin.
 inline thread_local std::coroutine_handle<> pending_root_ = {};
 
 /* ---------------- coroutine: the entry method type ---------------- */
@@ -150,15 +156,35 @@ inline thread_local std::coroutine_handle<> pending_root_ = {};
 class coroutine {
  public:
   struct promise_type {
-    coroutine get_return_object() noexcept {
+    // A member coroutine of a chare with X_CORO_CODE registers itself: the
+    // promise is constructed with the chare the member function runs on
+    // (C++20 passes *this and the arguments to a promise constructor that
+    // accepts them) and the record is created or adopted when the return
+    // object is made, before the body starts. Without X_CORO_CODE (the
+    // hand-written form) the body registers with CK_COROUTINE_STATE.
+    template <class Owner, class... Args>
+      requires requires(Owner &o) { o.__coro; Owner::__coro_is_entry(0); }
+    promise_type(Owner &self, Args &...) noexcept
+        : owner_(&self), begin_(&begin_for<Owner>) {}
+    promise_type() noexcept = default;
+    coroutine get_return_object() {
       auto h = std::coroutine_handle<promise_type>::from_promise(*this);
       pending_root_ = h;
+      if (begin_) begin_(owner_);
       return coroutine(h);
     }
     std::suspend_never initial_suspend() const noexcept { return {}; }
     std::suspend_always final_suspend() const noexcept { return {}; }
     void return_void() const noexcept {}
     void unhandled_exception() const noexcept { abort_unhandled_exception(); }
+
+   private:
+    template <class Owner> static void begin_for(void *o) {
+      Owner *self = static_cast<Owner *>(o);
+      self->__coro.begin(self, Owner::__coro_is_entry(::CkCurrentEntry()));
+    }
+    void *owner_ = nullptr;
+    void (*begin_)(void *) = nullptr;
   };
   explicit coroutine(std::coroutine_handle<> h) noexcept : h_(h) {}
   coroutine(const coroutine &) = delete;
@@ -536,7 +562,8 @@ class state {
   bool pendingRebuild_ = false;
 };
 
-// The frame guard of a coroutine entry: creates or adopts the record.
+// The registration of a hand-written coroutine entry (CK_COROUTINE_STATE):
+// creates or adopts the record.
 class root_guard {
  public:
   template <class Owner> root_guard(state &s, Owner *owner, int ep, void *msg) {
@@ -578,9 +605,11 @@ inline state &current_state() {
 inline coroutine::~coroutine() {
   record *rec = current_;
   if (rec == nullptr || rec->root != h_) {
-    // The body never reached CK_COROUTINE.
+    // The coroutine was never registered (no X_CORO_CODE and no
+    // CK_COROUTINE_STATE).
     if (h_.done()) { h_.destroy(); return; }
-    CkAbort("ck::coro: a coroutine entry method suspended without CK_COROUTINE at its start");
+    CkAbort("ck::coro: a coroutine entry method suspended without being registered (a chare "
+            "without X_CORO_CODE registers with CK_COROUTINE_STATE at the start of the body)");
   }
   rec->owner->finish_run(rec);
 }
@@ -612,7 +641,7 @@ inline void state::destroy_frames(record &rec) {
 
 inline record &state::begin_record(int ep, void *msg, bool own, target_fn mk, void *owner) {
   std::coroutine_handle<> root = std::exchange(pending_root_, {});
-  if (!root) CkAbort("ck::coro: CK_COROUTINE in a function that does not return ck::coroutine");
+  if (!root) CkAbort("ck::coro: CK_COROUTINE_STATE in a function that does not return ck::coroutine");
   record *rec = nullptr;
   for (record &r : recs_) {
     if (r.ep != ep) continue;
@@ -650,13 +679,13 @@ inline record &state::begin_record(int ep, void *msg, bool own, target_fn mk, vo
   return *rec;
 }
 
-// CK_COROUTINE() with no arguments: the entry and its message are the ones
-// being delivered (the generated __coro_is_entry says whether the running
-// entry is one of the chare's [coroutine] entries). A void entry's system
-// message is not kept.
+// Registration by the promise of ck::coroutine: the entry and its message
+// are the ones being delivered (the generated __coro_is_entry says whether
+// the running entry is one of the chare's [coroutine] entries). A void
+// entry's system message is not kept.
 template <class Owner> inline record &state::begin(Owner *owner, bool isEntry) {
   if (!isEntry)
-    CkAbort("ck::coro: CK_COROUTINE() in a function that is not running as a [coroutine] entry "
+    CkAbort("ck::coro: a ck::coroutine member function is not running as a [coroutine] entry "
             "method (entry %d is being delivered)", CkCurrentEntry());
   void *m = CkCurrentMessage();
   if (m && UsrToEnv(m)->getMsgIdx() == 0) m = nullptr;
@@ -1203,41 +1232,29 @@ using coroutine = coro::coroutine;
 
 /* ---------------- macros ---------------- */
 
-// The start of a coroutine entry method: co_ is the element's ck::coro::state
-// member, ep_ the entry's index (CkIndex_X::name(...)); the _MSG form passes
-// the entry's message, which is copied for restarts.
-#define CK_COROUTINE_MSG(co_, ep_, msg_)                                      \
-  ::ck::coro::root_guard ck_root_((co_), this, (ep_), (msg_));                \
+// The block of a body that can be rebuilt after a migration: CK_MIGRATABLE
+// { ... } opens the restart switch, whose body is the block that follows;
+// each site in the block is a case of it. A restart jumps to the recorded
+// site. A recorded site that is not a case of this function enters the
+// block from the top (default:) and aborts at the first site it reaches,
+// or, if it reaches none, in the frame guard's destructor; the default
+// label also keeps the end of a value-returning task unreachable for the
+// compiler, so co_return inside the block is enough. The same block serves
+// a coroutine entry and a ck::coro::task<T> helper.
+#define CK_MIGRATABLE                                                         \
   ::ck::coro::frame_guard ck_frame_;                                          \
-  switch (ck_frame_.site()) {                                                 \
-  case 0:
-#define CK_COROUTINE_2_(co_, ep_) CK_COROUTINE_MSG(co_, ep_, nullptr)
-// With the [coroutine] attribute and X_CORO_CODE in the class, CK_COROUTINE()
-// takes no arguments: the state is the generated member and the entry is
-// the one being delivered.
-#define CK_COROUTINE_0_()                                                     \
-  ::ck::coro::root_guard ck_root_(__coro, this, __coro_is_entry(::CkCurrentEntry())); \
-  ::ck::coro::frame_guard ck_frame_;                                          \
-  switch (ck_frame_.site()) {                                                 \
-  case 0:
-#define CK_CORO_SELECT_(a_, b_, name_, ...) name_
-#define CK_COROUTINE(...)                                                     \
-  CK_CORO_SELECT_(__VA_ARGS__ __VA_OPT__(, ) CK_COROUTINE_2_, CK_COROUTINE_0_, CK_COROUTINE_0_)(__VA_ARGS__)
-
-// The start of the restart switch of an awaited helper (ck::coro::task<T>).
-#define CK_CORO_TASK()                                                             \
-  ::ck::coro::frame_guard ck_frame_;                                          \
-  switch (ck_frame_.site()) {                                                 \
-  case 0:
-
-// The end of a coroutine entry method (CK_COROUTINE_END) or of a task
-// helper (CK_CORO_TASK_END); the two close the same restart switch.
-#define CK_COROUTINE_END()                                                    \
-  break;                                                                      \
+  switch (ck_frame_.site())                                                   \
   default:                                                                    \
-    ::ck::coro::abort_no_site(ck_frame_);                                     \
-  }
-#define CK_CORO_TASK_END() CK_COROUTINE_END()
+  case 0:
+
+// The hand-written form (no X_CORO_CODE): the first statement of a coroutine
+// entry's body names the chare's ck::coro::state member and the entry's
+// index (CkIndex_X::name(...)); the _MSG form passes the entry's message,
+// which is copied for restarts. With X_CORO_CODE the promise registers the
+// coroutine and the body starts with CK_MIGRATABLE.
+#define CK_COROUTINE_STATE_MSG(co_, ep_, msg_)                                \
+  ::ck::coro::root_guard ck_root_((co_), this, (ep_), (msg_))
+#define CK_COROUTINE_STATE(co_, ep_) CK_COROUTINE_STATE_MSG(co_, ep_, nullptr)
 
 // A when site: CK_WHEN(ep, refnum-or-ck::coro::noref, out...) stores the
 // delivered message pointer or arguments into out.

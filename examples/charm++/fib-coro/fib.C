@@ -19,16 +19,16 @@ struct Fib : public CBase_Fib {
   }
 
   ck::coroutine calc(int n) {
-    CK_COROUTINE();
-    if (n < THRESHOLD) respond(seqFib(n));
-    else {
-      CProxy_Fib::ckNew(n - 1, false, thisProxy);
-      CProxy_Fib::ckNew(n - 2, false, thisProxy);
-      CK_WHEN(inbox::response(), val);    // when response(int val)
-      CK_WHEN(inbox::response(), val2);   //   when response(int val2)
-      respond(val + val2);
+    CK_MIGRATABLE {
+      if (n < THRESHOLD) respond(seqFib(n));
+      else {
+        CProxy_Fib::ckNew(n - 1, false, thisProxy);
+        CProxy_Fib::ckNew(n - 2, false, thisProxy);
+        CK_WHEN(inbox::response(), val);    // when response(int val)
+        CK_WHEN(inbox::response(), val2);   //   when response(int val2)
+        respond(val + val2);
+      }
     }
-    CK_COROUTINE_END();
   }
 
   int seqFib(int n) { return (n < 2) ? n : seqFib(n - 1) + seqFib(n - 2); }

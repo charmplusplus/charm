@@ -1754,7 +1754,7 @@ static XStr indexSuffix2object(const XStr& indexSuffix) {
 }
 
 // The X_CORO_CODE macro (ckcoro.h): the chare's ck::coro::state, its pup, the
-// test used by CK_COROUTINE(), the bodies of the [inbox] entries, and the
+// test used by the promise of ck::coroutine, the bodies of the [inbox] entries, and the
 // inbox struct whose functions name the entries at CK_WHEN sites.
 void Chare::genCoroCode(XStr& str) {
   XStr body;

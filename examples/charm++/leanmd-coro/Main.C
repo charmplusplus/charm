@@ -66,19 +66,19 @@ Main::Main(CkArgMsg* m) {
 
 // The SDAG run() of the original: two waits in sequence.
 ck::coroutine Main::run() {
-  CK_COROUTINE();
-  //compute array created, call for section creation
-  CK_WHEN(inbox::computesCreated());          // when computesCreated()
-  computeArray.doneInserting();
-  CkPrintf("Starting simulation .... \n\n");
-  cellArray.run();
-  computeArray.run();
-  //when all chares are done
-  CK_WHEN(inbox::done(), checksum);           // when done(long long sum)
-  CkPrintf("leanmd: %d steps, checksum %lld\n", finalStepCount, checksum);
-  CkPrintf("Simulation completed\n");
-  CkExit();
-  CK_COROUTINE_END();
+  CK_MIGRATABLE {
+    //compute array created, call for section creation
+    CK_WHEN(inbox::computesCreated());          // when computesCreated()
+    computeArray.doneInserting();
+    CkPrintf("Starting simulation .... \n\n");
+    cellArray.run();
+    computeArray.run();
+    //when all chares are done
+    CK_WHEN(inbox::done(), checksum);           // when done(long long sum)
+    CkPrintf("leanmd: %d steps, checksum %lld\n", finalStepCount, checksum);
+    CkPrintf("Simulation completed\n");
+    CkExit();
+  }
 }
 
 //constructor for chare object migration

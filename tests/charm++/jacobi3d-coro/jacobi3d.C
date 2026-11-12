@@ -193,23 +193,23 @@ class Jacobi : public CBase_Jacobi {
 
     // One step: the SDAG doStep of jacobi3d-sdag as a coroutine.
     ck::coroutine doStep() {
-      CK_COROUTINE();
-      if (lbFreq > 0 && iterations > 0 && iterations % lbFreq == 0) {
-        AtSync();
-        CK_WHEN(inbox::ResumeFromSync());
-      }
-      if (iterations == chkptIter) {
-        contribute(CkCallback(CkReductionTarget(Main, checkpoint), mainProxy));
-        CK_WHEN(inbox::resume());
-      }
-      begin_iteration();
-      for (imsg = 0; imsg < 6; imsg++) {
-        CK_WHEN_BLOCK(inbox::receiveGhosts(iterations), gmsg) {  // when receiveGhosts[iterations](ghostMsg *gmsg) {
-          processGhosts(gmsg);
+      CK_MIGRATABLE {
+        if (lbFreq > 0 && iterations > 0 && iterations % lbFreq == 0) {
+          AtSync();
+          CK_WHEN(inbox::ResumeFromSync());
         }
+        if (iterations == chkptIter) {
+          contribute(CkCallback(CkReductionTarget(Main, checkpoint), mainProxy));
+          CK_WHEN(inbox::resume());
+        }
+        begin_iteration();
+        for (imsg = 0; imsg < 6; imsg++) {
+          CK_WHEN_BLOCK(inbox::receiveGhosts(iterations), gmsg) {  // when receiveGhosts[iterations](ghostMsg *gmsg) {
+            processGhosts(gmsg);
+          }
+        }
+        check_and_compute();
       }
-      check_and_compute();
-      CK_COROUTINE_END();
     }
 
     void begin_iteration() {

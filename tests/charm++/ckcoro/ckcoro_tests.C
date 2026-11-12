@@ -138,42 +138,42 @@ public:
   // resumes them and collects their results. rounds is re-supplied by a
   // restart.
   ck::coroutine runOwners(int rounds) {
-    CK_COROUTINE();
-    CkPrintf("Running owner tests (group, nodegroup, chare, mainchare)\n");
-    ngroup = CProxy_NodeGroupTest::ckNew();
-    group = CProxy_GroupTest::ckNew();
-    chare = CProxy_ChareTest::ckNew(OWNER_ITEMS);
-    for (int i = OWNER_ITEMS - 1; i >= 0; i--) chare.item(i, i * i);
-    group.run(rounds, ngroup);
-    ngroup.run(rounds);
-    chare.run();
-    CK_WHEN_ALL(CK_ALT(inbox::groupReady()), CK_ALT(inbox::nodeGroupReady()),
-                CK_ALT(inbox::chareReady()));
-    if (!chkptDir.empty()) {
-      CkPrintf("Checkpoint to %s with the owners' coroutines suspended\n", chkptDir.c_str());
-      CkStartCheckpoint(chkptDir.c_str(), CkCallback(CkIndex_Main::checkpointed(), thisProxy));
-      // After the checkpoint in this run, and the first message of a run
-      // restarted from it.
-      CK_WHEN(inbox::checkpointed());
-      CkPrintf("Resuming after the checkpoint on %d PEs\n", CkNumPes());
+    CK_MIGRATABLE {
+      CkPrintf("Running owner tests (group, nodegroup, chare, mainchare)\n");
+      ngroup = CProxy_NodeGroupTest::ckNew();
+      group = CProxy_GroupTest::ckNew();
+      chare = CProxy_ChareTest::ckNew(OWNER_ITEMS);
+      for (int i = OWNER_ITEMS - 1; i >= 0; i--) chare.item(i, i * i);
+      group.run(rounds, ngroup);
+      ngroup.run(rounds);
+      chare.run();
+      CK_WHEN_ALL(CK_ALT(inbox::groupReady()), CK_ALT(inbox::nodeGroupReady()),
+                  CK_ALT(inbox::chareReady()));
+      if (!chkptDir.empty()) {
+        CkPrintf("Checkpoint to %s with the owners' coroutines suspended\n", chkptDir.c_str());
+        CkStartCheckpoint(chkptDir.c_str(), CkCallback(CkIndex_Main::checkpointed(), thisProxy));
+        // After the checkpoint in this run, and the first message of a run
+        // restarted from it.
+        CK_WHEN(inbox::checkpointed());
+        CkPrintf("Resuming after the checkpoint on %d PEs\n", CkNumPes());
+      }
+      group.resume();
+      ngroup.resume();
+      chare.resume();
+      CK_WHEN_ALL(CK_ALT(inbox::groupDone(), gsum), CK_ALT(inbox::nodeGroupDone(), nsum),
+                  CK_ALT(inbox::chareDone(), csum));
+      {
+        int p = CkNumPes();
+        int expected = rounds * p * (p - 1) / 2;   // every PE receives from its predecessor
+        check(gsum == expected, "group sum");
+        check(nsum == expected, "nodegroup sum");  // the same tokens, by node
+        int items = 0;
+        for (int i = 0; i < OWNER_ITEMS; i++) items += i * i;
+        check(csum == items, "chare sum");
+      }
+      CkPrintf("Owner tests complete\n");
+      CkExit();
     }
-    group.resume();
-    ngroup.resume();
-    chare.resume();
-    CK_WHEN_ALL(CK_ALT(inbox::groupDone(), gsum), CK_ALT(inbox::nodeGroupDone(), nsum),
-                CK_ALT(inbox::chareDone(), csum));
-    {
-      int p = CkNumPes();
-      int expected = rounds * p * (p - 1) / 2;   // every PE receives from its predecessor
-      check(gsum == expected, "group sum");
-      check(nsum == expected, "nodegroup sum");  // the same tokens, by node
-      int items = 0;
-      for (int i = 0; i < OWNER_ITEMS; i++) items += i * i;
-      check(csum == items, "chare sum");
-    }
-    CkPrintf("Owner tests complete\n");
-    CkExit();
-    CK_COROUTINE_END();
   }
 };
 
@@ -190,19 +190,19 @@ public:
   void pup(PUP::er& p) { p | round; p | from; p | sum; }
 
   ck::coroutine run(int rounds, CProxy_NodeGroupTest ng) {
-    CK_COROUTINE();
-    for (round = 0; round < rounds; round++) {
-      thisProxy[(CkMyPe() + 1) % CkNumPes()].token(round, CkMyPe());
-      ng[CkMyNode()].token(round, CkMyPe());
-      CK_WHEN(inbox::token(round), ck::coro::skip, from);
-      check(from == (CkMyPe() + CkNumPes() - 1) % CkNumPes(), "token from the wrong PE");
-      sum += from;
+    CK_MIGRATABLE {
+      for (round = 0; round < rounds; round++) {
+        thisProxy[(CkMyPe() + 1) % CkNumPes()].token(round, CkMyPe());
+        ng[CkMyNode()].token(round, CkMyPe());
+        CK_WHEN(inbox::token(round), ck::coro::skip, from);
+        check(from == (CkMyPe() + CkNumPes() - 1) % CkNumPes(), "token from the wrong PE");
+        sum += from;
+      }
+      contribute(CkCallback(CkReductionTarget(Main, groupReady), mainProxy));
+      CK_WHEN(inbox::resume());
+      contribute(sizeof(int), &sum, CkReduction::sum_int,
+                 CkCallback(CkReductionTarget(Main, groupDone), mainProxy));
     }
-    contribute(CkCallback(CkReductionTarget(Main, groupReady), mainProxy));
-    CK_WHEN(inbox::resume());
-    contribute(sizeof(int), &sum, CkReduction::sum_int,
-               CkCallback(CkReductionTarget(Main, groupDone), mainProxy));
-    CK_COROUTINE_END();
   }
 };
 
@@ -216,18 +216,18 @@ public:
   void pup(PUP::er& p) { p | round; p | count; p | from; p | sum; }
 
   ck::coroutine run(int rounds) {
-    CK_COROUTINE();
-    for (round = 0; round < rounds; round++) {
-      for (count = 0; count < CkNodeSize(CkMyNode()); count++) {
-        CK_WHEN(inbox::token(round), ck::coro::skip, from);
-        sum += from;
+    CK_MIGRATABLE {
+      for (round = 0; round < rounds; round++) {
+        for (count = 0; count < CkNodeSize(CkMyNode()); count++) {
+          CK_WHEN(inbox::token(round), ck::coro::skip, from);
+          sum += from;
+        }
       }
+      contribute(CkCallback(CkReductionTarget(Main, nodeGroupReady), mainProxy));
+      CK_WHEN(inbox::resume());
+      contribute(sizeof(int), &sum, CkReduction::sum_int,
+                 CkCallback(CkReductionTarget(Main, nodeGroupDone), mainProxy));
     }
-    contribute(CkCallback(CkReductionTarget(Main, nodeGroupReady), mainProxy));
-    CK_WHEN(inbox::resume());
-    contribute(sizeof(int), &sum, CkReduction::sum_int,
-               CkCallback(CkReductionTarget(Main, nodeGroupDone), mainProxy));
-    CK_COROUTINE_END();
   }
 };
 
@@ -241,16 +241,16 @@ public:
   void pup(PUP::er& p) { p | n; p | i; p | v; p | sum; }
 
   ck::coroutine run() {
-    CK_COROUTINE();
-    for (i = 0; i < n; i++) {
-      CK_WHEN(inbox::item(i), ck::coro::skip, v);
-      sum += v;
+    CK_MIGRATABLE {
+      for (i = 0; i < n; i++) {
+        CK_WHEN(inbox::item(i), ck::coro::skip, v);
+        sum += v;
+      }
+      mainProxy.chareReady();
+      CK_WHEN(inbox::resume());
+      mainProxy.chareDone(sum);
+      ckDestroyLater();   // destroyed once the entry method running this body returns
     }
-    mainProxy.chareReady();
-    CK_WHEN(inbox::resume());
-    mainProxy.chareDone(sum);
-    ckDestroyLater();   // destroyed once the entry method running this body returns
-    CK_COROUTINE_END();
   }
 };
 
@@ -263,15 +263,15 @@ class BasicTest : public CBase_BasicTest {
     if (!ok) ::CkAbort("ckcoro basic test: %s", what);
   }
   // overlap { when unlock1() serial { unlocked1 = true; } ... }
-  ck::coro::task<void> waitUnlock1() { CK_CORO_TASK(); CK_WHEN(inbox::unlock1()); unlocked1 = true; CK_CORO_TASK_END(); }
-  ck::coro::task<void> waitUnlock2() { CK_CORO_TASK(); CK_WHEN(inbox::unlock2()); unlocked2 = true; CK_CORO_TASK_END(); }
-  ck::coro::task<void> waitUnlock3() { CK_CORO_TASK(); CK_WHEN(inbox::unlock3()); unlocked3 = true; CK_CORO_TASK_END(); }
+  ck::coro::task<void> waitUnlock1() { CK_MIGRATABLE { CK_WHEN(inbox::unlock1()); unlocked1 = true; } }
+  ck::coro::task<void> waitUnlock2() { CK_MIGRATABLE { CK_WHEN(inbox::unlock2()); unlocked2 = true; } }
+  ck::coro::task<void> waitUnlock3() { CK_MIGRATABLE { CK_WHEN(inbox::unlock3()); unlocked3 = true; } }
   // The final overlap over stray messages: each arm aborts if reached.
   ck::coro::task<void> extra(ck::coro::want w, const char* name) {
-    CK_CORO_TASK();
-    CK_WHEN(w);
-    ::CkAbort("ckcoro basic test: extra %s", name);
-    CK_CORO_TASK_END();
+    CK_MIGRATABLE {
+      CK_WHEN(w);
+      ::CkAbort("ckcoro basic test: extra %s", name);
+    }
   }
 
 public:
@@ -282,63 +282,63 @@ public:
   void pup(PUP::er& p) { p | for_index; p | which; p | do_while; p | unlocked1; p | unlocked2; p | unlocked3; }
 
   ck::coroutine run() {
-    CK_COROUTINE();
-    thisProxy.unlock1();
+    CK_MIGRATABLE {
+      thisProxy.unlock1();
 
-    // FizzBuzz: for loops and if/else; Main sent the fizz and buzz messages.
-    CkPrintf("Testing coroutine for loops, and if/else\n");
-    for (for_index = 1; for_index <= FOR_ITERATIONS; for_index++) {
-      if (for_index % 3 == 0 && for_index % 5 == 0) {
-        CK_WHEN_ALL(CK_ALT(inbox::fizz()), CK_ALT(inbox::buzz()));   // when fizz(), buzz()
-        CkPrintf("FizzBuzz\n");
-      } else if (for_index % 3 == 0) {
-        CK_WHEN(inbox::fizz());
-        CkPrintf("Fizz\n");
-      } else if (for_index % 5 == 0) {
-        CK_WHEN(inbox::buzz());
-        CkPrintf("Buzz\n");
-      } else {
-        CkPrintf("%i\n", for_index);
+      // FizzBuzz: for loops and if/else; Main sent the fizz and buzz messages.
+      CkPrintf("Testing coroutine for loops, and if/else\n");
+      for (for_index = 1; for_index <= FOR_ITERATIONS; for_index++) {
+        if (for_index % 3 == 0 && for_index % 5 == 0) {
+          CK_WHEN_ALL(CK_ALT(inbox::fizz()), CK_ALT(inbox::buzz()));   // when fizz(), buzz()
+          CkPrintf("FizzBuzz\n");
+        } else if (for_index % 3 == 0) {
+          CK_WHEN(inbox::fizz());
+          CkPrintf("Fizz\n");
+        } else if (for_index % 5 == 0) {
+          CK_WHEN(inbox::buzz());
+          CkPrintf("Buzz\n");
+        } else {
+          CkPrintf("%i\n", for_index);
+        }
       }
+      check(for_index == FOR_ITERATIONS + 1, "for loop did not run to the end");
+      thisProxy.unlock2();
+
+      // While loops and case statements. The arms with never() can never be
+      // taken; the case must not get stuck on them.
+      CkPrintf("Testing coroutine while loops and case statements\n");
+      while (do_while) {
+        CK_WHEN_ANY(which,
+                    CK_ALL(CK_ALT(inbox::call1()), CK_ALT(inbox::never())),
+                    CK_ALL(CK_ALT(inbox::call2()), CK_ALT(inbox::never())),
+                    CK_ALT(inbox::call1()),
+                    CK_ALT(inbox::call2()),
+                    CK_ALL(CK_ALT(inbox::call1()), CK_ALT(inbox::call2())),
+                    CK_ALL(CK_ALT(inbox::response1()), CK_ALT(inbox::response2())),
+                    CK_ALT(inbox::responseBoth()));
+        if (which == 0 || which == 1) ::CkAbort("Received never()\n");
+        else if (which == 2) thisProxy.response1();
+        else if (which == 3) thisProxy.response2();
+        else if (which == 4) thisProxy.responseBoth();
+        else do_while = false;
+      }
+      check(do_while == false, "while loop did not end");
+      thisProxy.unlock3();
+
+      // Overlap: all three unlock messages, in any order.
+      CkPrintf("Testing coroutine overlap statements\n");
+      CK_OVERLAP(waitUnlock1(), waitUnlock2(), waitUnlock3());
+      check(unlocked1 && unlocked2 && unlocked3, "overlap missed an unlock");
+      mainProxy.basicTestDone();
+
+      // Any unhandled message is a failure.
+      CK_OVERLAP(extra(inbox::fizz(), "fizz"), extra(inbox::buzz(), "buzz"),
+                 extra(inbox::call1(), "call1"), extra(inbox::call2(), "call2"),
+                 extra(inbox::response1(), "response1"), extra(inbox::response2(), "response2"),
+                 extra(inbox::responseBoth(), "responseBoth"), extra(inbox::unlock1(), "unlock1"),
+                 extra(inbox::unlock2(), "unlock2"), extra(inbox::unlock3(), "unlock3"),
+                 extra(inbox::never(), "never"));
     }
-    check(for_index == FOR_ITERATIONS + 1, "for loop did not run to the end");
-    thisProxy.unlock2();
-
-    // While loops and case statements. The arms with never() can never be
-    // taken; the case must not get stuck on them.
-    CkPrintf("Testing coroutine while loops and case statements\n");
-    while (do_while) {
-      CK_WHEN_ANY(which,
-                  CK_ALL(CK_ALT(inbox::call1()), CK_ALT(inbox::never())),
-                  CK_ALL(CK_ALT(inbox::call2()), CK_ALT(inbox::never())),
-                  CK_ALT(inbox::call1()),
-                  CK_ALT(inbox::call2()),
-                  CK_ALL(CK_ALT(inbox::call1()), CK_ALT(inbox::call2())),
-                  CK_ALL(CK_ALT(inbox::response1()), CK_ALT(inbox::response2())),
-                  CK_ALT(inbox::responseBoth()));
-      if (which == 0 || which == 1) ::CkAbort("Received never()\n");
-      else if (which == 2) thisProxy.response1();
-      else if (which == 3) thisProxy.response2();
-      else if (which == 4) thisProxy.responseBoth();
-      else do_while = false;
-    }
-    check(do_while == false, "while loop did not end");
-    thisProxy.unlock3();
-
-    // Overlap: all three unlock messages, in any order.
-    CkPrintf("Testing coroutine overlap statements\n");
-    CK_OVERLAP(waitUnlock1(), waitUnlock2(), waitUnlock3());
-    check(unlocked1 && unlocked2 && unlocked3, "overlap missed an unlock");
-    mainProxy.basicTestDone();
-
-    // Any unhandled message is a failure.
-    CK_OVERLAP(extra(inbox::fizz(), "fizz"), extra(inbox::buzz(), "buzz"),
-               extra(inbox::call1(), "call1"), extra(inbox::call2(), "call2"),
-               extra(inbox::response1(), "response1"), extra(inbox::response2(), "response2"),
-               extra(inbox::responseBoth(), "responseBoth"), extra(inbox::unlock1(), "unlock1"),
-               extra(inbox::unlock2(), "unlock2"), extra(inbox::unlock3(), "unlock3"),
-               extra(inbox::never(), "never"));
-    CK_COROUTINE_END();
   }
 };
 
@@ -357,44 +357,44 @@ class RefnumTest : public CBase_RefnumTest {
   }
   // case { when recvNum[index](int n) {...} when recvData[index](CkDataMsg* m) {...} }
   ck::coro::task<void> receive(int idx) {
-    CK_CORO_TASK();
-    int which;
-    int n;
-    CkDataMsg* m;
-    CK_WHEN_ANY(which, CK_ALT(inbox::recvNum(idx), n), CK_ALT(inbox::recvData(idx), m));
-    if (which == 0) {
-      refnum_sum += idx;
-      if (n > 0) marshall_sum += n;
-      else redn_sum += n;
-    } else {
-      refnum_sum += idx;
-      cb_sum += ((int*)(m->getData()))[0];
-      delete m;
+    CK_MIGRATABLE {
+      int which;
+      int n;
+      CkDataMsg* m;
+      CK_WHEN_ANY(which, CK_ALT(inbox::recvNum(idx), n), CK_ALT(inbox::recvData(idx), m));
+      if (which == 0) {
+        refnum_sum += idx;
+        if (n > 0) marshall_sum += n;
+        else redn_sum += n;
+      } else {
+        refnum_sum += idx;
+        cb_sum += ((int*)(m->getData()))[0];
+        delete m;
+      }
     }
-    CK_CORO_TASK_END();
   }
   // forall [index] (0:messages, 2) { if (index & (index - 1)) case {...} else serial {...} }
   ck::coro::task<void> evenIndex(int idx) {
-    CK_CORO_TASK();
-    if (idx & (idx - 1)) {
-      CK_CALL(receive(idx));
-    } else {
-      ignored_sum += idx;
+    CK_MIGRATABLE {
+      if (idx & (idx - 1)) {
+        CK_CALL(receive(idx));
+      } else {
+        ignored_sum += idx;
+      }
     }
-    CK_CORO_TASK_END();
   }
-  // A helper that returns a value: co_return after CK_CORO_TASK_END.
+  // A helper that returns a value: co_return inside its CK_MIGRATABLE block.
   ck::coro::task<int> receiveIndex(int idx) {
-    CK_CORO_TASK();
-    CK_CALL(receive(idx));
-    CK_CORO_TASK_END();
-    co_return idx;
+    CK_MIGRATABLE {
+      CK_CALL(receive(idx));
+      co_return idx;
+    }
   }
   ck::coro::task<void> missed(ck::coro::want w, const char* name) {
-    CK_CORO_TASK();
-    CK_WHEN(w);
-    ::CkAbort("ckcoro refnum test: missed a %s message", name);
-    CK_CORO_TASK_END();
+    CK_MIGRATABLE {
+      CK_WHEN(w);
+      ::CkAbort("ckcoro refnum test: missed a %s message", name);
+    }
   }
 
 public:
@@ -407,73 +407,73 @@ public:
   }
 
   ck::coroutine run(int messages) {
-    CK_COROUTINE();
-    {
-      // The first third of the messages are marshalled, the second third
-      // come through reductions, the last third through callbacks.
-      int marshall_start = 0;
-      int redn_start = messages / 3;
-      int cb_start = 2 * messages / 3;
+    CK_MIGRATABLE {
+      {
+        // The first third of the messages are marshalled, the second third
+        // come through reductions, the last third through callbacks.
+        int marshall_start = 0;
+        int redn_start = messages / 3;
+        int cb_start = 2 * messages / 3;
 
-      refnum_sum = 0;
-      expected_refnum_sum = (messages * (messages + 1)) / 2;
+        refnum_sum = 0;
+        expected_refnum_sum = (messages * (messages + 1)) / 2;
 
-      marshall_sum = 0;
-      expected_marshall_sum = (redn_start * (redn_start - 1)) / 2;
-      for (int i = marshall_start; i < redn_start; i++) thisProxy[thisIndex].recvNum(i);
+        marshall_sum = 0;
+        expected_marshall_sum = (redn_start * (redn_start - 1)) / 2;
+        for (int i = marshall_start; i < redn_start; i++) thisProxy[thisIndex].recvNum(i);
 
-      // A reduction sends -1 as the data.
-      redn_sum = 0;
-      expected_redn_sum = -1 * array_size * (cb_start - redn_start);
-      for (int i = redn_start; i < cb_start; i++) {
-        CkCallback cb(CkReductionTarget(RefnumTest, recvNum), thisProxy);
-        cb.setRefNum(i);
-        int data = -1;
-        contribute(sizeof(int), &data, CkReduction::sum_int, cb);
+        // A reduction sends -1 as the data.
+        redn_sum = 0;
+        expected_redn_sum = -1 * array_size * (cb_start - redn_start);
+        for (int i = redn_start; i < cb_start; i++) {
+          CkCallback cb(CkReductionTarget(RefnumTest, recvNum), thisProxy);
+          cb.setRefNum(i);
+          int data = -1;
+          contribute(sizeof(int), &data, CkReduction::sum_int, cb);
+        }
+
+        // The data messages contain our own index.
+        cb_sum = 0;
+        expected_cb_sum = thisIndex * (messages - cb_start + 1);
+        for (int i = cb_start; i <= messages; i++) {
+          CkCallback cb(CkIndex_RefnumTest::recvData(NULL), thisProxy[thisIndex]);
+          cb.setRefNum(i);
+          int data = thisIndex;
+          cb.send(sizeof(int), &data);
+        }
+
+        // The first forall ignores powers of two.
+        ignored_sum = 0;
+        expected_ignored_sum = 0;
+        for (int i = 2; i < messages; i *= 2) expected_ignored_sum += i;
       }
 
-      // The data messages contain our own index.
-      cb_sum = 0;
-      expected_cb_sum = thisIndex * (messages - cb_start + 1);
-      for (int i = cb_start; i <= messages; i++) {
-        CkCallback cb(CkIndex_RefnumTest::recvData(NULL), thisProxy[thisIndex]);
-        cb.setRefNum(i);
-        int data = thisIndex;
-        cb.send(sizeof(int), &data);
+      // Even reference numbers, powers of two skipped: a positive stride and
+      // a branch on the index inside the forall body.
+      CK_FORALL_STRIDE(idx, 0, messages, 2, evenIndex(idx));
+
+      // The powers of two, with a plain for loop.
+      for (index = 1; index < messages; index *= 2) {
+        CK_CALL_TO(got, receiveIndex(index));
+        check(got == index, "CK_CALL_TO: wrong value returned");
       }
 
-      // The first forall ignores powers of two.
-      ignored_sum = 0;
-      expected_ignored_sum = 0;
-      for (int i = 2; i < messages; i *= 2) expected_ignored_sum += i;
+      // The odd ones except 1: a negative stride that does not land on the end.
+      CK_FORALL_STRIDE(idx, messages + (messages % 2 - 1), 2, -2, receive(idx));
+
+      // A single reference number (0 is in no loop above).
+      CK_WHEN(inbox::recvNum(0), ck::coro::skip);
+
+      check(refnum_sum == expected_refnum_sum, "refnum sum");
+      check(marshall_sum == expected_marshall_sum, "marshalled sum");
+      check(redn_sum == expected_redn_sum, "reduction sum");
+      check(cb_sum == expected_cb_sum, "callback sum");
+      check(ignored_sum == expected_ignored_sum, "ignored sum");
+      contribute(CkCallback(CkReductionTarget(Main, refnumTestDone), mainProxy));
+
+      // Every message was received exactly once above: these never trigger.
+      CK_OVERLAP(missed(inbox::recvNum(), "recvNum"), missed(inbox::recvData(), "recvData"));
     }
-
-    // Even reference numbers, powers of two skipped: a positive stride and
-    // a branch on the index inside the forall body.
-    CK_FORALL_STRIDE(idx, 0, messages, 2, evenIndex(idx));
-
-    // The powers of two, with a plain for loop.
-    for (index = 1; index < messages; index *= 2) {
-      CK_CALL_TO(got, receiveIndex(index));
-      check(got == index, "CK_CALL_TO: wrong value returned");
-    }
-
-    // The odd ones except 1: a negative stride that does not land on the end.
-    CK_FORALL_STRIDE(idx, messages + (messages % 2 - 1), 2, -2, receive(idx));
-
-    // A single reference number (0 is in no loop above).
-    CK_WHEN(inbox::recvNum(0), ck::coro::skip);
-
-    check(refnum_sum == expected_refnum_sum, "refnum sum");
-    check(marshall_sum == expected_marshall_sum, "marshalled sum");
-    check(redn_sum == expected_redn_sum, "reduction sum");
-    check(cb_sum == expected_cb_sum, "callback sum");
-    check(ignored_sum == expected_ignored_sum, "ignored sum");
-    contribute(CkCallback(CkReductionTarget(Main, refnumTestDone), mainProxy));
-
-    // Every message was received exactly once above: these never trigger.
-    CK_OVERLAP(missed(inbox::recvNum(), "recvNum"), missed(inbox::recvData(), "recvData"));
-    CK_COROUTINE_END();
   }
 };
 
@@ -542,56 +542,56 @@ public:
   }
 
   ck::coroutine run() {
-    CK_COROUTINE();
-    if (CkNumPes() > 1) {
-      sendBefore();
+    CK_MIGRATABLE {
+      if (CkNumPes() > 1) {
+        sendBefore();
 
-      // Synchronized migration: QD calls doMigration, nothing else happens
-      // until migrationDone is called.
-      CK_WHEN(inbox::doMigration());
-      qd_reached = true;
-      if (thisIndex == 0) CkPrintf("Testing synchronized migration\n");
-      migrateToRandomPE();  // deferred: the element moves while run() waits below
+        // Synchronized migration: QD calls doMigration, nothing else happens
+        // until migrationDone is called.
+        CK_WHEN(inbox::doMigration());
+        qd_reached = true;
+        if (thisIndex == 0) CkPrintf("Testing synchronized migration\n");
+        migrateToRandomPE();  // deferred: the element moves while run() waits below
 
-      // Called after all elements arrive on their new PEs
-      CK_WHEN(inbox::migrationDone());
-      CkAssert(qd_reached);
+        // Called after all elements arrive on their new PEs
+        CK_WHEN(inbox::migrationDone());
+        CkAssert(qd_reached);
 
-      // Both TestMessages (the SDAG conjunction when sentBefore(m1), sentAfter(m2))
-      CK_WHEN_ALL(CK_ALT(inbox::sentBefore(), msg1), CK_ALT(inbox::sentAfter(), msg2));
-      checkPair();
+        // Both TestMessages (the SDAG conjunction when sentBefore(m1), sentAfter(m2))
+        CK_WHEN_ALL(CK_ALT(inbox::sentBefore(), msg1), CK_ALT(inbox::sentAfter(), msg2));
+        checkPair();
 
-      // One of the calls, which was pupped as a buffered message (SDAG case)
-      CK_WHEN_ANY(which, CK_ALT(inbox::call1()), CK_ALT(inbox::call2()), CK_ALT(inbox::call3()));
-      respond(which);
+        // One of the calls, which was pupped as a buffered message (SDAG case)
+        CK_WHEN_ANY(which, CK_ALT(inbox::call1()), CK_ALT(inbox::call2()), CK_ALT(inbox::call3()));
+        respond(which);
 
-      // Anytime migration: the element migrates without waiting for QD and
-      // this coroutine keeps receiving whenever messages arrive.
-      if (thisIndex == 0) CkPrintf("Testing anytime migration\n");
-      sendBefore();
-      thisProxy[thisIndex].migrateNow();
+        // Anytime migration: the element migrates without waiting for QD and
+        // this coroutine keeps receiving whenever messages arrive.
+        if (thisIndex == 0) CkPrintf("Testing anytime migration\n");
+        sendBefore();
+        thisProxy[thisIndex].migrateNow();
 
-      CK_WHEN_ALL(CK_ALT(inbox::sentBefore(), msg1), CK_ALT(inbox::sentAfter(), msg2));
-      checkPair();
+        CK_WHEN_ALL(CK_ALT(inbox::sentBefore(), msg1), CK_ALT(inbox::sentAfter(), msg2));
+        checkPair();
 
-      CK_WHEN_ANY(which, CK_ALT(inbox::call1()), CK_ALT(inbox::call2()), CK_ALT(inbox::call3()));
-      respond(which);
+        CK_WHEN_ANY(which, CK_ALT(inbox::call1()), CK_ALT(inbox::call2()), CK_ALT(inbox::call3()));
+        respond(which);
 
-      CK_WHEN(inbox::migrationDone());
+        CK_WHEN(inbox::migrationDone());
 
-      CK_WHEN_ANY(which, CK_ALT(inbox::call1()), CK_ALT(inbox::call2()), CK_ALT(inbox::call3()));
-      respond(which);
+        CK_WHEN_ANY(which, CK_ALT(inbox::call1()), CK_ALT(inbox::call2()), CK_ALT(inbox::call3()));
+        respond(which);
 
-      // All three responses
-      CK_WHEN(inbox::response1());
-      CK_WHEN(inbox::response2());
-      CK_WHEN(inbox::response3());
+        // All three responses
+        CK_WHEN(inbox::response1());
+        CK_WHEN(inbox::response2());
+        CK_WHEN(inbox::response3());
+      }
+      // Every message was consumed (the SDAG test's final overlap).
+      CkAssert(__coro.num_buffered() == 0);
+      finished = true;
+      contribute(CkCallback(CkReductionTarget(Main, migrationTestDone), mainProxy));
     }
-    // Every message was consumed (the SDAG test's final overlap).
-    CkAssert(__coro.num_buffered() == 0);
-    finished = true;
-    contribute(CkCallback(CkReductionTarget(Main, migrationTestDone), mainProxy));
-    CK_COROUTINE_END();
   }
 
   void migrateToRandomPE() {
@@ -648,86 +648,86 @@ public:
   }
 
   ck::coroutine run() {
-    CK_COROUTINE();
-    CK_WHEN(inbox::tag(7), t, x);
-    check(t == 7 && x == 2.5, "broadcast tag(7, 2.5) not received");
-    // Everything ahead of time, so iteration k's message is buffered when
-    // iteration k-1 is waited for.
-    for (iter = 0; iter < MARSHALL_ITERS; iter++) {
-      std::vector<int> v(iter + 1);
-      std::iota(v.begin(), v.end(), thisIndex);
-      thisProxy[(thisIndex + 1) % MARSHALL_ELEMS].recv(iter, v);
-    }
-    for (iter = MARSHALL_ITERS - 1; iter >= 0; iter--) {
-      CK_WHEN(inbox::recv(iter), i, values);
-      check(i == iter, "recv matched by the wrong iteration");
-      check((int)values.size() == iter + 1, "recv: wrong vector length");
-      check(values[0] == (thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS, "recv: wrong sender");
-      check(values.back() == values[0] + iter, "recv: wrong vector contents");
-    }
-    contribute(sizeof(int), &thisIndex, CkReduction::sum_int,
-               CkCallback(CkReductionTarget(MarshallTest, total), thisProxy));
-    CK_WHEN(inbox::total(), sum);
-    check(sum == MARSHALL_ELEMS * (MARSHALL_ELEMS - 1) / 2, "total: wrong reduction result");
-
-    // Array parameters, five rounds sent ahead of time (round r, iteration
-    // k has reference number 100 r + k): received into a pointer, into a
-    // vector with the other parameters skipped, with the block form, and
-    // two rounds at once by a conjunction with both arrays borrowed.
-    for (iter = 0; iter < 4 * 100 + MARSHALL_ITERS; iter++) {
-      if (iter % 100 >= MARSHALL_ITERS) continue;
-      std::vector<double> d(iter % 100 + 2);
-      for (size_t k = 0; k < d.size(); k++) d[k] = thisIndex * 100 + iter + k;
-      std::vector<int> tl = {iter, (int)d.size()};
-      thisProxy[(thisIndex + 1) % MARSHALL_ELEMS].arr(iter, (int)d.size(), d.data(), tl);
-    }
-    for (iter = 0; iter < MARSHALL_ITERS; iter++) {
-      CK_WHEN(inbox::arr(iter), i, n, darr, tail);
-      check(i == iter && n == iter + 2, "arr: wrong iteration or length");
-      check(darr[0] == (double)((thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS * 100 + iter), "arr: wrong data[0]");
-      check(darr[n - 1] == darr[0] + n - 1, "arr: wrong data[n-1]");
-      check(tail.size() == 2 && tail[0] == iter && tail[1] == n, "arr: wrong tail");
-    }
-    for (iter = 100; iter < 100 + MARSHALL_ITERS; iter++) {
-      CK_WHEN(inbox::arr(iter), ck::coro::skip, n, dvec, ck::coro::skip);
-      check(n == iter % 100 + 2 && (int)dvec.size() == n, "arr: wrong vector length");
-      check(dvec[0] == (double)((thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS * 100 + iter), "arr: wrong vector data[0]");
-      check(dvec[n - 1] == dvec[0] + n - 1, "arr: wrong vector data[n-1]");
-    }
-    for (iter = 200; iter < 200 + MARSHALL_ITERS; iter++) {
-      CK_WHEN_BLOCK(inbox::arr(iter), it, len, data, tl) {
-        check(it == iter && len == iter % 100 + 2, "arr block: wrong iteration or length");
-        check(data[0] == (double)((thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS * 100 + iter), "arr block: wrong data[0]");
-        check(data[len - 1] == data[0] + len - 1, "arr block: wrong data[n-1]");
-        check(tl.size() == 2 && tl[0] == iter && tl[1] == len, "arr block: wrong tail");
+    CK_MIGRATABLE {
+      CK_WHEN(inbox::tag(7), t, x);
+      check(t == 7 && x == 2.5, "broadcast tag(7, 2.5) not received");
+      // Everything ahead of time, so iteration k's message is buffered when
+      // iteration k-1 is waited for.
+      for (iter = 0; iter < MARSHALL_ITERS; iter++) {
+        std::vector<int> v(iter + 1);
+        std::iota(v.begin(), v.end(), thisIndex);
+        thisProxy[(thisIndex + 1) % MARSHALL_ELEMS].recv(iter, v);
       }
+      for (iter = MARSHALL_ITERS - 1; iter >= 0; iter--) {
+        CK_WHEN(inbox::recv(iter), i, values);
+        check(i == iter, "recv matched by the wrong iteration");
+        check((int)values.size() == iter + 1, "recv: wrong vector length");
+        check(values[0] == (thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS, "recv: wrong sender");
+        check(values.back() == values[0] + iter, "recv: wrong vector contents");
+      }
+      contribute(sizeof(int), &thisIndex, CkReduction::sum_int,
+                 CkCallback(CkReductionTarget(MarshallTest, total), thisProxy));
+      CK_WHEN(inbox::total(), sum);
+      check(sum == MARSHALL_ELEMS * (MARSHALL_ELEMS - 1) / 2, "total: wrong reduction result");
+
+      // Array parameters, five rounds sent ahead of time (round r, iteration
+      // k has reference number 100 r + k): received into a pointer, into a
+      // vector with the other parameters skipped, with the block form, and
+      // two rounds at once by a conjunction with both arrays borrowed.
+      for (iter = 0; iter < 4 * 100 + MARSHALL_ITERS; iter++) {
+        if (iter % 100 >= MARSHALL_ITERS) continue;
+        std::vector<double> d(iter % 100 + 2);
+        for (size_t k = 0; k < d.size(); k++) d[k] = thisIndex * 100 + iter + k;
+        std::vector<int> tl = {iter, (int)d.size()};
+        thisProxy[(thisIndex + 1) % MARSHALL_ELEMS].arr(iter, (int)d.size(), d.data(), tl);
+      }
+      for (iter = 0; iter < MARSHALL_ITERS; iter++) {
+        CK_WHEN(inbox::arr(iter), i, n, darr, tail);
+        check(i == iter && n == iter + 2, "arr: wrong iteration or length");
+        check(darr[0] == (double)((thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS * 100 + iter), "arr: wrong data[0]");
+        check(darr[n - 1] == darr[0] + n - 1, "arr: wrong data[n-1]");
+        check(tail.size() == 2 && tail[0] == iter && tail[1] == n, "arr: wrong tail");
+      }
+      for (iter = 100; iter < 100 + MARSHALL_ITERS; iter++) {
+        CK_WHEN(inbox::arr(iter), ck::coro::skip, n, dvec, ck::coro::skip);
+        check(n == iter % 100 + 2 && (int)dvec.size() == n, "arr: wrong vector length");
+        check(dvec[0] == (double)((thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS * 100 + iter), "arr: wrong vector data[0]");
+        check(dvec[n - 1] == dvec[0] + n - 1, "arr: wrong vector data[n-1]");
+      }
+      for (iter = 200; iter < 200 + MARSHALL_ITERS; iter++) {
+        CK_WHEN_BLOCK(inbox::arr(iter), it, len, data, tl) {
+          check(it == iter && len == iter % 100 + 2, "arr block: wrong iteration or length");
+          check(data[0] == (double)((thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS * 100 + iter), "arr block: wrong data[0]");
+          check(data[len - 1] == data[0] + len - 1, "arr block: wrong data[n-1]");
+          check(tl.size() == 2 && tl[0] == iter && tl[1] == len, "arr block: wrong tail");
+        }
+      }
+      for (iter = 300; iter < 300 + MARSHALL_ITERS; iter++) {
+        CK_WHEN_ALL(CK_ALT(inbox::arr(iter), i, n, darr, tail),
+                    CK_ALT(inbox::arr(iter + 100), ck::coro::skip, n2, darr2, ck::coro::skip));
+        check(i == iter && n == iter % 100 + 2 && n2 == n, "arr all: wrong iteration or lengths");
+        check(darr[0] == (double)((thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS * 100 + iter), "arr all: wrong data[0]");
+        check(darr2[0] == darr[0] + 100, "arr all: wrong second data[0]");
+        check(darr[n - 1] == darr[0] + n - 1 && darr2[n - 1] == darr2[0] + n - 1, "arr all: wrong data[n-1]");
+      }
+      // A reduction target with an array parameter, reached through the
+      // reduction wrapper: the arguments are packed into a message.
+      {
+        double part[3] = {1.0 * thisIndex, 2.0 * thisIndex, 1.0};
+        contribute(sizeof(part), part, CkReduction::sum_double,
+                   CkCallback(CkReductionTarget(MarshallTest, arrTotal), thisProxy));
+      }
+      CK_WHEN(inbox::arrTotal(), n, dvec);
+      check(n == 3 && dvec.size() == 3, "arrTotal: wrong length");
+      check(dvec[0] == sum && dvec[1] == 2 * sum && dvec[2] == MARSHALL_ELEMS, "arrTotal: wrong sums");
+      // The block form on a message entry's twin: the broadcast tag again.
+      thisProxy[thisIndex].tag(9, 4.5);
+      CK_WHEN_BLOCK(inbox::tag(9), t9, x9) {
+        check(t9 == 9 && x9 == 4.5, "tag block: wrong values");
+      }
+      check(__coro.num_buffered() == 0, "messages left in the inbox");
+      contribute(CkCallback(CkReductionTarget(Main, marshallTestDone), mainProxy));
     }
-    for (iter = 300; iter < 300 + MARSHALL_ITERS; iter++) {
-      CK_WHEN_ALL(CK_ALT(inbox::arr(iter), i, n, darr, tail),
-                  CK_ALT(inbox::arr(iter + 100), ck::coro::skip, n2, darr2, ck::coro::skip));
-      check(i == iter && n == iter % 100 + 2 && n2 == n, "arr all: wrong iteration or lengths");
-      check(darr[0] == (double)((thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS * 100 + iter), "arr all: wrong data[0]");
-      check(darr2[0] == darr[0] + 100, "arr all: wrong second data[0]");
-      check(darr[n - 1] == darr[0] + n - 1 && darr2[n - 1] == darr2[0] + n - 1, "arr all: wrong data[n-1]");
-    }
-    // A reduction target with an array parameter, reached through the
-    // reduction wrapper: the arguments are packed into a message.
-    {
-      double part[3] = {1.0 * thisIndex, 2.0 * thisIndex, 1.0};
-      contribute(sizeof(part), part, CkReduction::sum_double,
-                 CkCallback(CkReductionTarget(MarshallTest, arrTotal), thisProxy));
-    }
-    CK_WHEN(inbox::arrTotal(), n, dvec);
-    check(n == 3 && dvec.size() == 3, "arrTotal: wrong length");
-    check(dvec[0] == sum && dvec[1] == 2 * sum && dvec[2] == MARSHALL_ELEMS, "arrTotal: wrong sums");
-    // The block form on a message entry's twin: the broadcast tag again.
-    thisProxy[thisIndex].tag(9, 4.5);
-    CK_WHEN_BLOCK(inbox::tag(9), t9, x9) {
-      check(t9 == 9 && x9 == 4.5, "tag block: wrong values");
-    }
-    check(__coro.num_buffered() == 0, "messages left in the inbox");
-    contribute(CkCallback(CkReductionTarget(Main, marshallTestDone), mainProxy));
-    CK_COROUTINE_END();
   }
 };
 
@@ -756,58 +756,58 @@ public:
   void pup(PUP::er& p) { p | round; p | order; p | gotA; p | gotB; p | itemSum; }
 
   ck::coro::task<void> waitA() {
-    CK_CORO_TASK();
-    CK_WHEN(inbox::a(round), ck::coro::skip, gotA);
-    order += 'a';
-    CK_CORO_TASK_END();
+    CK_MIGRATABLE {
+      CK_WHEN(inbox::a(round), ck::coro::skip, gotA);
+      order += 'a';
+    }
   }
   ck::coro::task<void> waitB() {
-    CK_CORO_TASK();
-    CK_WHEN(inbox::b(round), ck::coro::skip, gotB);
-    order += 'b';
-    CK_CORO_TASK_END();
+    CK_MIGRATABLE {
+      CK_WHEN(inbox::b(round), ck::coro::skip, gotB);
+      order += 'b';
+    }
   }
   // Matched by round and index together: after a migration, a neighbour's
   // messages for the next round may be delivered before this round's.
   ck::coro::task<void> waitItem(int i, double w) {
-    CK_CORO_TASK();
-    CK_WHEN_BLOCK(inbox::item(round * OVERLAP_ITEMS + i), tag, v) {
-      check(tag == round * OVERLAP_ITEMS + i, "item: wrong tag");
-      itemSum += w * v;
+    CK_MIGRATABLE {
+      CK_WHEN_BLOCK(inbox::item(round * OVERLAP_ITEMS + i), tag, v) {
+        check(tag == round * OVERLAP_ITEMS + i, "item: wrong tag");
+        itemSum += w * v;
+      }
     }
-    CK_CORO_TASK_END();
   }
 
   ck::coroutine run(int rounds, std::vector<int> seeds, int nitems, double* weights) {
-    CK_COROUTINE();
-    check(rounds == OVERLAP_ROUNDS && (int)seeds.size() == rounds && nitems == OVERLAP_ITEMS,
-          "run: wrong parameters");
-    for (round = 0; round < rounds; round++) {
-      {  // a block: locals with initializers may not be in scope at a site
-        int right = (thisIndex + 1) % OVERLAP_ELEMS;
-        int seed = seeds[round] + thisIndex;
-        thisProxy[right].b(round, seed + 1);
-        thisProxy[right].a(round, seed);
-        for (int i = nitems - 1; i >= 0; i--) thisProxy[right].item(round * nitems + i, seed * 10 + i);
+    CK_MIGRATABLE {
+      check(rounds == OVERLAP_ROUNDS && (int)seeds.size() == rounds && nitems == OVERLAP_ITEMS,
+            "run: wrong parameters");
+      for (round = 0; round < rounds; round++) {
+        {  // a block: locals with initializers may not be in scope at a site
+          int right = (thisIndex + 1) % OVERLAP_ELEMS;
+          int seed = seeds[round] + thisIndex;
+          thisProxy[right].b(round, seed + 1);
+          thisProxy[right].a(round, seed);
+          for (int i = nitems - 1; i >= 0; i--) thisProxy[right].item(round * nitems + i, seed * 10 + i);
+        }
+        // Migrate in the middle (the move happens at the next wait): the
+        // record with its children is packed and restarted on the new PE.
+        if (round == 1 && CkNumPes() > 1) migrateMe((CkMyPe() + 1) % CkNumPes());
+        CK_OVERLAP(waitA(), waitB());
+        check(gotA == seeds[round] + left() && gotB == gotA + 1, "overlap: wrong a or b");
+        if (round == 2 && CkNumPes() > 1) migrateMe((CkMyPe() + 1) % CkNumPes());
+        itemSum = 0;
+        CK_FORALL(i, 0, nitems, waitItem(i, weights[i]));
+        {
+          double expect = 0;
+          for (int i = 0; i < nitems; i++) expect += weights[i] * ((seeds[round] + left()) * 10 + i);
+          check(itemSum == expect, "forall: wrong item sum");
+        }
       }
-      // Migrate in the middle (the move happens at the next wait): the
-      // record with its children is packed and restarted on the new PE.
-      if (round == 1 && CkNumPes() > 1) migrateMe((CkMyPe() + 1) % CkNumPes());
-      CK_OVERLAP(waitA(), waitB());
-      check(gotA == seeds[round] + left() && gotB == gotA + 1, "overlap: wrong a or b");
-      if (round == 2 && CkNumPes() > 1) migrateMe((CkMyPe() + 1) % CkNumPes());
-      itemSum = 0;
-      CK_FORALL(i, 0, nitems, waitItem(i, weights[i]));
-      {
-        double expect = 0;
-        for (int i = 0; i < nitems; i++) expect += weights[i] * ((seeds[round] + left()) * 10 + i);
-        check(itemSum == expect, "forall: wrong item sum");
-      }
+      check((int)order.size() == 2 * rounds, "overlap: a child ran twice or not at all");
+      check(__coro.num_buffered() == 0, "overlap: messages left in the inbox");
+      contribute(CkCallback(CkReductionTarget(Main, overlapTestDone), mainProxy));
     }
-    check((int)order.size() == 2 * rounds, "overlap: a child ran twice or not at all");
-    check(__coro.num_buffered() == 0, "overlap: messages left in the inbox");
-    contribute(CkCallback(CkReductionTarget(Main, overlapTestDone), mainProxy));
-    CK_COROUTINE_END();
   }
 };
 
