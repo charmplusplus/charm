@@ -449,7 +449,7 @@ task<void> yield() {
 /* ====================== restart sites ====================== */
 
 frame_guard::frame_guard() noexcept : r_(current()), depth_(0), site_(0) {
-  if (r_ == nullptr) CkAbort("campi: CAMPI_RESUMABLE outside a campi rank");
+  if (r_ == nullptr) CkAbort("campi: CAMPI_MIGRATABLE outside a campi rank");
   depth_ = r_->depth++;
   if (r_->linked.size() < r_->depth) r_->linked.resize(r_->depth);
   // Entered through a call site noted by the caller (the root needs none).
@@ -507,7 +507,7 @@ static void check_migrate_site(Rank *r) {
   bool ok = r->noted && !r->notedCall && r->depth > 0 && r->notedDepth == r->depth - 1;
   for (unsigned d = 0; ok && d < r->depth; d++) ok = r->linked[d];
   if (!ok)
-    CkAbort("campi: AMPI_Migrate must be written CAMPI_MIGRATE inside CAMPI_RESUMABLE/CAMPI_END "
+    CkAbort("campi: AMPI_Migrate must be written CAMPI_MIGRATE inside a CAMPI_MIGRATABLE block "
             "(and each resumable function on the way awaited with CAMPI_CALL)");
   r->noted = false;
 }
