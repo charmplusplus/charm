@@ -10,6 +10,7 @@ DIRS = \
   pingpong \
   until \
   calls \
+  comms \
   jacobi3d \
   migrate \
   abort \

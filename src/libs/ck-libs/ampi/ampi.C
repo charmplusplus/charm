@@ -2547,7 +2547,7 @@ void ampi::registrationFinish() noexcept
       // MPI_Intercomm_create: the ranks are resumed by
       // ampi::setRemoteProxyAndUnblock once both groups' arrays exist.
       exchangeProxyOnFinish = false;
-      parentProxy[0].ExchangeProxy(newChildProxy);
+      parentProxy[0].ExchangeProxy(newChildProxy, creationId);
     }
     else if (resumeNewArrayOnFinish) {
       // commCreate, cartCreate0D, intercommMerge: the new array's elements are
@@ -2635,17 +2635,21 @@ void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
 //   1. reduction to make sure all members have called
 //   2. the root in the old communicator create the new array
 //   3. ampiParent::register is called to register new array as new comm
-MPI_Comm ampi::commCreate(const std::vector<int>& vec, AmpiCommType type) noexcept {
+// Returns whether this rank is in vec, and so waits for the new communicator.
+bool ampi::commCreatePost(const std::vector<int>& vec, AmpiCommType type) noexcept {
   beginCommCreation();
   int rootIdx = vec[0];
   tmpVec = vec;
   CkCallback cb(CkIndex_ampi::commCreateReduced(NULL), CkArrayIndex1D(rootIdx), myComm->getProxy());
   int data[2] = { parent->getNextComm(), (int)type };
   contribute(sizeof(data), data, CkReduction::max_int, cb);
+  return getPosOp(thisIndex, vec) >= 0;
+}
 
-  if (getPosOp(thisIndex, vec) >= 0) {
+MPI_Comm ampi::commCreate(const std::vector<int>& vec, AmpiCommType type) noexcept {
+  if (commCreatePost(vec, type)) {
     ampi * dis = block(); //Resumed by ampi::registrationFinish
-    return dis->parent->getNextComm() - 1;
+    return dis->newestComm();
   } else {
     return MPI_COMM_NULL;
   }
@@ -2684,26 +2688,30 @@ void ampiTopology::sortnbors(CProxy_ampi arrProxy, std::vector<int> &nbors_) noe
 }
 
 // 0-dimensional cart comm: rank 0 creates a dup of COMM_SELF with topo info.
+// Returns whether this rank (rank 0) waits for the new communicator.
+bool ampi::cartCreate0DPost() noexcept {
+  beginCommCreation();
+  if (getRank() != 0) return false;
+  tmpVec.clear();
+  tmpVec.push_back(0);
+  commCreatePhase1(parent->getNextComm(), COMM_CART);
+  return true;
+}
+
+void ampi::cartCreate0DFinish(MPI_Comm newComm) noexcept {
+  getAmpiParent()->getCommStruct(newComm).getTopology()->setndims(0);
+}
+
 MPI_Comm ampi::cartCreate0D() noexcept {
-  if (getRank() == 0) {
-    tmpVec.clear();
-    tmpVec.push_back(0);
-    commCreatePhase1(parent->getNextComm(), COMM_CART);
-    ampi * dis = block(); //Resumed by ampi::registrationFinish
-    MPI_Comm newComm = dis->parent->getNextComm()-1;
-    ampiCommStruct &newCommStruct = dis->parent->getCommStruct(newComm);
-    ampiTopology *newTopo = newCommStruct.getTopology();
-    newTopo->setndims(0);
-    return newComm;
-  }
-  else {
-    return MPI_COMM_NULL;
-  }
+  if (!cartCreate0DPost()) return MPI_COMM_NULL;
+  ampi * dis = block(); //Resumed by ampi::registrationFinish
+  MPI_Comm newComm = dis->newestComm();
+  cartCreate0DFinish(newComm);
+  return newComm;
 }
 
 MPI_Comm ampi::cartCreate(std::vector<int>& vec, int ndims, const int* dims) noexcept {
   if (ndims == 0) {
-    beginCommCreation();
     return cartCreate0D();
   }
 
@@ -2719,7 +2727,7 @@ MPI_Comm ampi::cartCreate(std::vector<int>& vec, int ndims, const int* dims) noe
   return commCreate(vec, COMM_CART);
 }
 
-MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root, MPI_Comm tcomm) noexcept {
+void ampi::intercommCreatePost(const std::vector<int>& remoteVec, const int root) noexcept {
   beginCommCreation();
   if (thisIndex==root) { // not everybody gets the valid rvec
     tmpVec = remoteVec;
@@ -2727,8 +2735,12 @@ MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root
   CkCallback cb(CkIndex_ampi::intercommCreateReduced(NULL),CkArrayIndex1D(root),myComm->getProxy());
   MPI_Comm nextinter = parent->getNextComm();
   contribute(sizeof(nextinter), &nextinter,CkReduction::max_int,cb);
+}
+
+MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root, MPI_Comm tcomm) noexcept {
+  intercommCreatePost(remoteVec, root);
   ampi * dis = block(); //Resumed by ampi::setRemoteProxyAndUnblock
-  return dis->parent->getNextComm() - 1;
+  return dis->newestComm();
 }
 
 void ampi::intercommCreateReduced(CkReductionMsg *msg) noexcept {
@@ -2748,7 +2760,7 @@ void ampi::intercommCreateReduced(CkReductionMsg *msg) noexcept {
   newAmpi.doneInserting(); // will call ampi::registrationFinish
 }
 
-void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid only at local root
+void ampi::intercommMergePost(int first) noexcept { // first valid only at local root
   beginCommCreation();
   if(myRank == 0 && first == 1){ // first (lower) group creates the intracommunicator for the higher group
     const std::vector<int>& lvec = myComm->getIndices();
@@ -2766,10 +2778,12 @@ void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid 
   CkCallback cb(CkIndex_ampi::intercommMergeReduced(NULL),CkArrayIndex1D(rootIdx),myComm->getProxy());
   MPI_Comm nextintra = parent->getNextComm();
   contribute(sizeof(nextintra), &nextintra,CkReduction::max_int,cb);
+}
 
+void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept {
+  intercommMergePost(first);
   ampi * dis = block(); //Resumed by ampi::registrationFinish
-  MPI_Comm newcomm = dis->parent->getNextComm()-1;
-  *ncomm=newcomm;
+  *ncomm = dis->newestComm();
 }
 
 void ampi::intercommMergeReduced(CkReductionMsg *msg) noexcept {

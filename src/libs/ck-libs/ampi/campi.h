@@ -158,6 +158,15 @@
 #undef MPI_Comm_dup
 #undef MPI_Comm_dup_with_info
 #undef MPI_Comm_create
+#undef MPI_Intercomm_create
+#undef MPI_Intercomm_merge
+#undef MPI_Cart_create
+#undef MPI_Cart_sub
+#undef MPI_Graph_create
+#undef MPI_Dist_graph_create
+#undef MPI_Dist_graph_create_adjacent
+#undef MPI_Comm_split_type
+#undef MPI_Comm_create_group
 #undef MPI_Test
 #undef MPI_Testany
 #undef MPI_Testall
@@ -205,6 +214,15 @@
 #define MPI_Comm_dup(...)    CAMPI_AWAIT(::campi::Comm_dup(__VA_ARGS__))
 #define MPI_Comm_dup_with_info(...) CAMPI_AWAIT(::campi::Comm_dup_with_info(__VA_ARGS__))
 #define MPI_Comm_create(...) CAMPI_AWAIT(::campi::Comm_create(__VA_ARGS__))
+#define MPI_Intercomm_create(...) CAMPI_AWAIT(::campi::Intercomm_create(__VA_ARGS__))
+#define MPI_Intercomm_merge(...) CAMPI_AWAIT(::campi::Intercomm_merge(__VA_ARGS__))
+#define MPI_Cart_create(...) CAMPI_AWAIT(::campi::Cart_create(__VA_ARGS__))
+#define MPI_Cart_sub(...) CAMPI_AWAIT(::campi::Cart_sub(__VA_ARGS__))
+#define MPI_Graph_create(...) CAMPI_AWAIT(::campi::Graph_create(__VA_ARGS__))
+#define MPI_Dist_graph_create(...) CAMPI_AWAIT(::campi::Dist_graph_create(__VA_ARGS__))
+#define MPI_Dist_graph_create_adjacent(...) CAMPI_AWAIT(::campi::Dist_graph_create_adjacent(__VA_ARGS__))
+#define MPI_Comm_split_type(...) CAMPI_AWAIT(::campi::Comm_split_type(__VA_ARGS__))
+#define MPI_Comm_create_group(...) CAMPI_AWAIT(::campi::Comm_create_group(__VA_ARGS__))
 #define MPI_Test(...)        CAMPI_AWAIT(::campi::Test(__VA_ARGS__))
 #define MPI_Testany(...)     CAMPI_AWAIT(::campi::Testany(__VA_ARGS__))
 #define MPI_Testall(...)     CAMPI_AWAIT(::campi::Testall(__VA_ARGS__))
@@ -230,17 +248,8 @@
  * a barrier, an internal waitall, or a [sync] entry method as every one-sided
  * operation and window lock does) and have no campi awaitable yet: a use
  * fails to compile instead of aborting at run time in TCharm::stop. */
-#undef MPI_Intercomm_create
-#undef MPI_Intercomm_merge
-#undef MPI_Cart_create
-#undef MPI_Cart_sub
-#undef MPI_Graph_create
-#undef MPI_Dist_graph_create
-#undef MPI_Dist_graph_create_adjacent
-#undef MPI_Comm_split_type
 #undef MPI_Comm_idup
 #undef MPI_Comm_idup_with_info
-#undef MPI_Comm_create_group
 #undef MPI_Ireduce_scatter
 #undef MPI_Ireduce_scatter_block
 #undef MPI_Neighbor_allgather
@@ -276,17 +285,8 @@
 #undef AMPI_GPU_Invoke_wr
 #undef AMPI_Yield
 #undef AMPI_Suspend
-#define MPI_Intercomm_create(...)           campi_unsupported_blocking_call_MPI_Intercomm_create
-#define MPI_Intercomm_merge(...)            campi_unsupported_blocking_call_MPI_Intercomm_merge
-#define MPI_Cart_create(...)                campi_unsupported_blocking_call_MPI_Cart_create
-#define MPI_Cart_sub(...)                   campi_unsupported_blocking_call_MPI_Cart_sub
-#define MPI_Graph_create(...)               campi_unsupported_blocking_call_MPI_Graph_create
-#define MPI_Dist_graph_create(...)          campi_unsupported_blocking_call_MPI_Dist_graph_create
-#define MPI_Dist_graph_create_adjacent(...) campi_unsupported_blocking_call_MPI_Dist_graph_create_adjacent
-#define MPI_Comm_split_type(...)            campi_unsupported_blocking_call_MPI_Comm_split_type
 #define MPI_Comm_idup(...)                  campi_unsupported_blocking_call_MPI_Comm_idup
 #define MPI_Comm_idup_with_info(...)        campi_unsupported_blocking_call_MPI_Comm_idup_with_info
-#define MPI_Comm_create_group(...)          campi_unsupported_blocking_call_MPI_Comm_create_group
 #define MPI_Ireduce_scatter(...)            campi_unsupported_blocking_call_MPI_Ireduce_scatter
 #define MPI_Ireduce_scatter_block(...)      campi_unsupported_blocking_call_MPI_Ireduce_scatter_block
 #define MPI_Neighbor_allgather(...)         campi_unsupported_blocking_call_MPI_Neighbor_allgather
