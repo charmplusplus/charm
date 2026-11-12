@@ -2510,8 +2510,9 @@ class ampiParent final : public CBase_ampiParent {
   int bsendBufferSize; //       we only keep track of it to return it from MPI_Buffer_detach
 
   // Intercommunicator creation:
-  bool isTmpRProxySet;
-  CProxy_ampi tmpRProxy;
+  // ExchangeProxy: the first group's new array of each MPI_Intercomm_create in
+  // progress, by the larger of the two leaders' world ranks
+  std::map<int, CProxy_ampi> pendingRProxies;
 
   int myHomePE;
 
@@ -2582,15 +2583,21 @@ class ampiParent final : public CBase_ampiParent {
   TCharm *registerAmpi(ampi *ptr,const ampiCommStruct &s,bool forMigration) noexcept;
 
   // exchange proxy info between two ampi proxies
-  void ExchangeProxy(CProxy_ampi rproxy) noexcept {
-    if(!isTmpRProxySet){ tmpRProxy=rproxy; isTmpRProxySet=true; }
-    else{
-      // Both groups' new intercommunicator arrays are fully registered:
-      // give each its remote proxy, and only then resume its ranks.
-      tmpRProxy.setRemoteProxyAndUnblock(rproxy);
-      rproxy.setRemoteProxyAndUnblock(tmpRProxy);
-      isTmpRProxySet=false;
+  // exchange proxy info between two ampi proxies. Sent by both groups' leaders
+  // to the parent of the smaller leader's world rank; key is the larger one, so
+  // concurrent MPI_Intercomm_creates between other leaders are kept apart.
+  void ExchangeProxy(CProxy_ampi rproxy, int key) noexcept {
+    auto it = pendingRProxies.find(key);
+    if (it == pendingRProxies.end()) {
+      pendingRProxies.emplace(key, rproxy);
+      return;
     }
+    // Both groups' new intercommunicator arrays are fully registered:
+    // give each its remote proxy, and only then resume its ranks.
+    CProxy_ampi first = it->second;
+    pendingRProxies.erase(it);
+    first.setRemoteProxyAndUnblock(rproxy);
+    rproxy.setRemoteProxyAndUnblock(first);
   }
 
   //Grab the next available split/group communicator
@@ -2953,6 +2960,7 @@ class ampi final : public CBase_ampi {
   // How registrationFinish resumes the ranks of a new communicator (default:
   // thisProxy.unblock(), for split). newChildProxy is the new array.
   bool exchangeProxyOnFinish{};  // intercommCreate: via ExchangeProxy
+  int remoteRootIdx{};           // intercommCreate, at the root: the other leader
   bool resumeNewArrayOnFinish{}; // commCreate, intercommMerge: newChildProxy.unblock()
   CProxy_ampi newChildProxy;
 
@@ -3181,7 +3189,7 @@ class ampi final : public CBase_ampi {
   MPI_Comm commCreate(const std::vector<int>& vec, AmpiCommType type) noexcept;
   MPI_Comm cartCreate0D() noexcept;
   MPI_Comm cartCreate(std::vector<int>& vec, int ndims, const int* dims) noexcept;
-  MPI_Comm intercommCreate(const std::vector<int>& rvec, int root, MPI_Comm tcomm) noexcept;
+  MPI_Comm intercommCreate(const std::vector<int>& rvec, int root, int remoteRoot) noexcept;
 
   inline bool isInter() const noexcept { return myComm->isinter(); }
   void intercommMerge(int first, MPI_Comm *ncomm) noexcept;
