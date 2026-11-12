@@ -367,7 +367,7 @@ Until the evening of 2026-11-11 a body was bracketed by `CK_COROUTINE()`
 and `CK_COROUTINE_END()`, a helper by `CK_CORO_TASK()` and
 `CK_CORO_TASK_END()`: the first macro declared the guards and opened
 `switch (site) { case 0:`, the second closed it with a `default:` that
-aborted. This is the shape of CAMPI's `CAMPI_RESUMABLE()`/`CAMPI_END()`
+aborted. This was the shape of CAMPI's `CAMPI_RESUMABLE()`/`CAMPI_END()` (now `CAMPI_MIGRATABLE { }`, #4242)
 and of the C resumable-function libraries built on the same switch
 (protothreads). Kale asked whether C++ could remove the pair, since a
 plain coroutine needs nothing of the kind. What requires it is the

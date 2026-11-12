@@ -6,7 +6,7 @@
  *
  * The owner of a coroutine (a ck::coro::state record, a campi rank) keeps
  * one chain per coroutine and sets current_chain_ to it around every run of
- * the coroutine; frame_guard, created by CK_MIGRATABLE/CAMPI_RESUMABLE,
+ * the coroutine; frame_guard, created by CK_MIGRATABLE/CAMPI_MIGRATABLE,
  * reads it there.
  */
 #ifndef CKCORO_CORE_H
@@ -174,7 +174,7 @@ class frame_guard {
 
 inline frame_guard::frame_guard() noexcept : c_(current_chain_), depth_(0), site_(0) {
   if (c_ == nullptr) {
-    CkAbort("ck::coro: CK_MIGRATABLE/CAMPI_RESUMABLE outside a coroutine");
+    CkAbort("ck::coro: CK_MIGRATABLE/CAMPI_MIGRATABLE outside a coroutine");
     std::abort();
   }
   chain &c = *c_;

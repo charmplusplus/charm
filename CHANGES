@@ -246,7 +246,7 @@ AMPI (Adaptive MPI):
 
 - campi, experimental: AMPI ranks as C++20 coroutines in the same
   library, with no thread per rank (#4073, #4136). A campi program is
-  C++20 using the CAMPI_MAIN, CAMPI_RESUMABLE and CAMPI_MIGRATE macros
+  C++20 using the CAMPI_MAIN, CAMPI_MIGRATABLE and CAMPI_MIGRATE macros
   of campi.h; blocking calls are awaited, and after a migration or a
   restart a rank runs its main again to the recorded site, with its
   state in one pupped object. campi migration and restart need

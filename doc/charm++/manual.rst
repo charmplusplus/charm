@@ -10166,8 +10166,8 @@ corrected (issue #3963) and should not be copied as a model for buffer reuse
 until they are. Follow the rule above instead: pass the callback, or
 double-buffer.
 
-Intra-node Persistent GPU Communication
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Persistent GPU Communication
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Persistent GPU communication is a feature designed to take advantage of the fact
 that the address and size of the source/destination buffers do not change in
@@ -10177,10 +10177,6 @@ at every iteration. This allows us to reduce the overheads involved with
 with direct GPU messaging, including the nature of the multi-hop mechanism and
 CUDA IPC setup, and directly issue ``cudaMemcpy`` calls at the message send sites
 (for a ``put`` type operation; a ``get`` type operation is also supported).
-In inter-process communication, CUDA IPC handles are created, exchanged
-and opened only once (this setup step can be performed again if the buffer addresses
-or sizes involved in the persistent communication change). Note that this feature
-is currently supported only for intra-node communication.
 
 Setup and communication routines are supported through ``CkDevicePersistent``:
 
@@ -10193,9 +10189,10 @@ Setup and communication routines are supported through ``CkDevicePersistent``:
      CkDevicePersistent(const void* ptr, size_t size, cudaStream_t stream);
      CkDevicePersistent(const void* ptr, size_t size, const CkCallback& cb, cudaStream_t stream);
 
-     void open(); // Creates an IPC handle for inter-process communication
-     void closes(); // Closes an opened IPC handle
+     void open(); // Takes the IPC handle and records the buffer for RDMA
+     void close(); // Releases what open() set up (see "Ownership" below)
      void set_msg(void* msg); // Ties a Charm++ message to the stored callback
+     int mode(const CkDevicePersistent& other) const; // How get/put with other moves the bytes
      void get(CkDevicePersistent& src); // Initiates transfer from the specified source buffer
      void put(CkDevicePersistent& dst); // Initiates transfer to the specified destination buffer
    };
@@ -10207,19 +10204,84 @@ buffer is complete. For instance, if both sender and receiver ``CkDevicePersiste
 objects have callbacks associated with them, the sender's callback will be invoked
 once the send operation is complete and when the user can reuse/free the associated buffer,
 and the receiver's callback will be invoked once the received data is available.
+Both callbacks are sent from the PE that called ``get`` or ``put``.
 The associated CUDA stream will be used in the ``cudaMemcpyAsync`` calls to asynchronously
 invoke the underlying data transfers, which are tracked to invoke the subsequent callbacks, if any.
-The ``open`` and ``close`` calls are required for CUDA IPC setup and teardown.
-``open`` should be called after the creation of the ``CkDevicePersistent`` object and before
-sending it to a communication peer, and ``close`` should be called when the persistent
-object will no longer be used or before migration.
 
-Once the ``CkDevicePersistent`` objects are created and ``open`` ed, they should be
-exchanged between the communication peers. After this setup stage, the objects'
-``get`` and ``put`` methods can be invoked freely to perform the desired communication.
+``open`` should be called after the creation of the ``CkDevicePersistent`` object, on
+the PE that created it, and before sending it to a communication peer. Once the
+objects are created and ``open`` ed, they should be exchanged between the
+communication peers. After this setup stage, the objects' ``get`` and ``put``
+methods can be invoked freely to perform the desired communication. A transfer
+moves ``cnt`` bytes of the source as the object holds it at the time of the call;
+``cnt`` may be lowered between transfers, but not raised above its value at
+``open`` (call ``open`` again for that).
 
-Examples using the intra-node persistent GPU communication can be found in
-``examples/charm++/cuda/gpudirect/persitent`` and ``examples/charm++/cuda/gpudirect/jacobi3d``.
+**Transfer modes.** ``get`` and ``put`` choose one of three modes for each pair of
+buffers; ``mode(other)`` returns it (0, 1 or 2), and with ``+gpupersistverbose``
+each process prints one line the first time it uses a mode:
+
+- 0, a device copy (``cudaMemcpyAsync``): both buffers belong to PEs of one process.
+  Neither buffer needs to be opened.
+- 1, CUDA/HIP IPC: the buffers belong to processes on one host, and the peer's IPC
+  handle (taken by ``open``) opens in this process. A process opens a peer
+  buffer's handle once; the mapping is shared by the copies of that buffer on
+  all PEs of the process and reference counted. A copy takes a reference the
+  first time it transfers through the mapping and keeps the mapped address, so
+  later transfers from that copy cost no lookup; ``close`` on the copy releases
+  the reference, and the mapping is closed with the last one. ``close`` on one
+  copy therefore never unmaps a buffer that a copy on another PE is using.
+  ``+gpushm`` is not needed; it concerns the shared communication buffer of
+  other device messages and does not select this mode. ``mode`` opens the
+  handle to answer, so it reports the mode that runs.
+- 2, RDMA on device memory: the buffers belong to different hosts, or the peer's
+  IPC handle does not open in this process (for example when each process sees
+  only its own GPU). **Both** buffers must have been opened, the source as well
+  as the destination. The memory is registered with the network the first time
+  a transfer needs it, and stays registered until the owner's ``close``. A ``put``
+  is carried out as a get issued by the destination's PE, so that the callbacks
+  mean the data has arrived; the first ``get`` from a source asks the source's
+  process for its registration, one round trip. RDMA mode aborts with a message
+  when the network layer moves RDMA data through host memory (the LCW backend,
+  or ``+nordma``), when a buffer is 2 GiB or larger, or when the network layer
+  cannot register the device memory.
+
+**Ownership.** The object on which ``open`` was called owns the buffer's setup;
+``close`` on it, or its destructor, releases it, including the network
+registration. Copies never own: copy construction, copy assignment, and sending
+the object (as a marshalled parameter or through ``pup``) all make non-owning
+copies. Moving an object (assigning a temporary, as in
+``buf = CkDevicePersistent(...)``, or a ``std::vector`` reallocating) transfers
+ownership. Assigning over an owner, or calling ``open`` again, releases the old
+setup first. A copy cannot be used for an RDMA transfer once its owner has
+released it, so keep the owner alive (for example as a chare member) while peers
+use the buffer. ``close`` on a received copy of another process's buffer
+releases its reference on this process's IPC mapping of the buffer (the
+mapping is closed with the last reference, after synchronizing the device) and
+the registration it kept; call it when the peer's buffer will no longer be
+used, or before migration, and only once the callbacks of the transfers made
+through the copy have been invoked (the device synchronize when the mapping
+closes covers only the GPU of the PE that closes it). Assigning over a copy
+releases its reference the same way; a copy destroyed without ``close`` keeps
+its reference, so the mapping stays open for the rest of the run. Before the
+owner's program frees the device memory, close the copies of the buffer in
+the other processes on its host: CUDA documents freeing an allocation before
+the other processes close their IPC mappings of it as undefined behavior. An
+owner that is a static or global object is released at process exit without
+deregistering, since the network layer is gone by then; call ``close`` on it
+before ``CkExit`` to deregister. Persistent objects are not migrated and not
+restored from a checkpoint: after a chare migrates, or a run restarts, create,
+open and exchange them again. In RDMA mode an object from a previous run is
+refused, since its id carries a token of the run that opened it. The
+device-copy and IPC modes do not check the id, so they do not detect a stale
+object, whether it is from a previous run or a copy whose owner has released
+the buffer.
+
+Examples using persistent GPU communication can be found in
+``examples/charm++/cuda/gpudirect/persistent``,
+``examples/charm++/cuda/gpudirect/jacobi3d`` (option ``-s``; it opens both its
+send and receive buffers, so it also runs between hosts) and
+``benchmarks/charm++/cuda/gpudirect/latency-persistent``.
 
 .. _sec:mpiinterop:
 

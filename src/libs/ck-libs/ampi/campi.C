@@ -35,6 +35,8 @@
 void campi_parent_attached(TCharm *, ampiParent *) noexcept {}
 void campi_proc_init() noexcept {}
 void campi_migrate_resumed(TCharm *) noexcept {}
+void campi_creation_begun(TCharm *, int) noexcept {}
+void campi_creation_done(TCharm *, int) noexcept {}
 #else
 
 #include "campi_core.h"
@@ -86,6 +88,10 @@ struct Rank {
   bool migrateDone = false;        // set by campi_migrate_resumed
   bool fakeRestart = false;        // rebuild in campi_resume (+campi_fakemigrate)
   bool dead = false;               // the element is gone; a wake is still queued
+
+  // Communicator creation (ampi::beginCommCreation, ampi::unblockCreation)
+  int creationId = 0;              // the creation this rank started; 0: none
+  bool creationDone = false;       // its wake-up arrived
 };
 
 // The record of a rank whose element is gone, once no wake message refers to it.
@@ -402,6 +408,23 @@ void campi_migrate_resumed(TCharm *tc) noexcept {
   if (r != nullptr) r->migrateDone = true;
 }
 
+// ampi.C hooks: ampi::beginCommCreation and ampi::unblockCreation in campi mode.
+void campi_creation_begun(TCharm *tc, int id) noexcept {
+  campi::Rank *r = (campi::Rank *)tc->getCampiRank();
+  if (r == nullptr) return;
+  r->creationId = id;
+  r->creationDone = false;
+}
+
+void campi_creation_done(TCharm *tc, int id) noexcept {
+  campi::Rank *r = (campi::Rank *)tc->getCampiRank();
+  if (r == nullptr) return;
+  if (id != r->creationId)
+    CkAbort("campi: rank %d woken for communicator creation %d while in creation %d",
+            tc->getElement(), id, r->creationId);
+  r->creationDone = true;
+}
+
 // ampi.C hook: ampiParent::prepareCtv in campi mode.
 void campi_parent_attached(TCharm *tc, ampiParent *parent) noexcept {
   campi::Rank *r = (campi::Rank *)tc->getCampiRank();
@@ -427,7 +450,7 @@ static void check_migrate_site(Rank *r) {
   bool ok = c.noted && !c.notedCall && c.depth > 0 && c.notedDepth == c.depth - 1;
   for (unsigned d = 0; ok && d < c.depth; d++) ok = c.linked[d];
   if (!ok)
-    CkAbort("campi: AMPI_Migrate must be written CAMPI_MIGRATE inside CAMPI_RESUMABLE/CAMPI_END "
+    CkAbort("campi: AMPI_Migrate must be written CAMPI_MIGRATE inside a CAMPI_MIGRATABLE block "
             "(and each resumable function on the way awaited with CAMPI_CALL)");
   r->ch.noted = false;
 }
@@ -978,13 +1001,21 @@ task<int> Waitsome(int n, MPI_Request *reqs, int *outcount, int *indices, MPI_St
 
 /* ====================== communicator creation ====================== */
 
-// ampi::split, with the suspension replaced by an await on this comm's
-// unblock() (sent by ampi::registrationFinish when the new arrays exist).
+// Suspends until the creation this rank started (ampi::beginCommCreation)
+// has woken it through ampi::unblockCreation; other wake-ups are skipped.
+static task<void> creation_done() {
+  Rank *r = current();
+  while (!r->creationDone) co_await suspend();
+  r->creationId = 0;
+  r->creationDone = false;
+}
+
+// ampi::split, with the suspension replaced by an await on the creation's
+// wake-up (sent by ampi::registrationFinish when the new arrays exist).
 task<int> Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest) {
   ampi *ptr = getAmpiParent()->comm2ampi(src);
-  const int before = ptr->getNumUnblocks();
   ptr->splitPost(color, key, ptr->getCommStruct().getType());
-  while (ptr->getNumUnblocks() == before) co_await suspend();
+  co_await creation_done();
   ptr->splitFinish(dest);
   if (color == MPI_UNDEFINED) *dest = MPI_COMM_NULL;
   co_return MPI_SUCCESS;
@@ -996,9 +1027,8 @@ task<int> Comm_dup(MPI_Comm comm, MPI_Comm *newcomm) {
     ampi *ptr = getAmpiInstance(comm);
     int topoType, rank = ptr->getRank();
     MPI_Topo_test(comm, &topoType);
-    const int before = ptr->getNumUnblocks();
     ptr->splitPost(0, rank, getAmpiParent()->getCommStruct(comm).getType());
-    while (ptr->getNumUnblocks() == before) co_await suspend();
+    co_await creation_done();
     ptr->splitFinish(newcomm);
     ptr->topoDupFinish(topoType, comm, newcomm);
   }

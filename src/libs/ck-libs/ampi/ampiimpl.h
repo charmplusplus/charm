@@ -614,10 +614,6 @@ class ampiTopology {
   virtual void pup(PUP::er &p) noexcept =0;
   virtual int getType() const noexcept =0;
   virtual void dup(ampiTopology* topo) noexcept =0;
-  virtual std::vector<int> &getnbors() noexcept =0;
-  virtual const std::vector<int> &getnbors() const noexcept =0;
-  virtual void setnbors(const std::vector<int> &nbors_) noexcept =0;
-  virtual void sortnbors(CProxy_ampi arrProxy, std::vector<int> &nbors_) noexcept;
 
   virtual const std::vector<int> &getdims() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
   virtual const std::vector<int> &getperiods() const noexcept {CkAbort("AMPI: instance of invalid Virtual Topology class."); return v;}
@@ -654,7 +650,7 @@ class ampiTopology {
 class ampiCartTopology final : public ampiTopology {
  private:
   int ndims;
-  std::vector<int> dims, periods, nbors;
+  std::vector<int> dims, periods;
 
  public:
   ampiCartTopology() noexcept : ndims(-1) {}
@@ -663,7 +659,6 @@ class ampiCartTopology final : public ampiTopology {
     p|ndims;
     p|dims;
     p|periods;
-    p|nbors;
   }
 
   inline int getType() const noexcept {return MPI_CART;}
@@ -672,25 +667,21 @@ class ampiCartTopology final : public ampiTopology {
     setndims(topo->getndims());
     setdims(topo->getdims());
     setperiods(topo->getperiods());
-    setnbors(topo->getnbors());
   }
 
   inline const std::vector<int> &getdims() const noexcept {return dims;}
   inline const std::vector<int> &getperiods() const noexcept {return periods;}
   inline int getndims() const noexcept {return ndims;}
-  inline std::vector<int> &getnbors() noexcept {return nbors;}
-  inline const std::vector<int> &getnbors() const noexcept {return nbors;}
 
   inline void setdims(const std::vector<int> &d) noexcept {dims = d; dims.shrink_to_fit();}
   inline void setperiods(const std::vector<int> &p) noexcept {periods = p; periods.shrink_to_fit();}
   inline void setndims(int nd) noexcept {ndims = nd;}
-  inline void setnbors(const std::vector<int> &n) noexcept {nbors = n; nbors.shrink_to_fit();}
 };
 
 class ampiGraphTopology final : public ampiTopology {
  private:
   int nvertices;
-  std::vector<int> index, edges, nbors;
+  std::vector<int> index, edges;
 
  public:
   ampiGraphTopology() noexcept : nvertices(-1) {}
@@ -699,7 +690,6 @@ class ampiGraphTopology final : public ampiTopology {
     p|nvertices;
     p|index;
     p|edges;
-    p|nbors;
   }
 
   inline int getType() const noexcept {return MPI_GRAPH;}
@@ -708,26 +698,22 @@ class ampiGraphTopology final : public ampiTopology {
     setnvertices(topo->getnvertices());
     setindex(topo->getindex());
     setedges(topo->getedges());
-    setnbors(topo->getnbors());
   }
 
   inline int getnvertices() const noexcept {return nvertices;}
   inline const std::vector<int> &getindex() const noexcept {return index;}
   inline const std::vector<int> &getedges() const noexcept {return edges;}
-  inline std::vector<int> &getnbors() noexcept {return nbors;}
-  inline const std::vector<int> &getnbors() const noexcept {return nbors;}
 
   inline void setnvertices(int nv) noexcept {nvertices = nv;}
   inline void setindex(const std::vector<int> &i) noexcept {index = i; index.shrink_to_fit();}
   inline void setedges(const std::vector<int> &e) noexcept {edges = e; edges.shrink_to_fit();}
-  inline void setnbors(const std::vector<int> &n) noexcept {nbors = n; nbors.shrink_to_fit();}
 };
 
 class ampiDistGraphTopology final : public ampiTopology {
  private:
   int inDegree, outDegree;
   bool sourcesWeighted, destsWeighted;
-  std::vector<int> sources, sourceWeights, destinations, destWeights, nbors;
+  std::vector<int> sources, sourceWeights, destinations, destWeights;
 
  public:
   ampiDistGraphTopology() noexcept : inDegree(-1), outDegree(-1), sourcesWeighted(false), destsWeighted(false) {}
@@ -741,7 +727,6 @@ class ampiDistGraphTopology final : public ampiTopology {
     p|sourceWeights;
     p|destinations;
     p|destWeights;
-    p|nbors;
   }
 
   inline int getType() const noexcept {return MPI_DIST_GRAPH;}
@@ -755,7 +740,6 @@ class ampiDistGraphTopology final : public ampiTopology {
     setOutDegree(topo->getOutDegree());
     setDestinations(topo->getDestinations());
     setDestWeights(topo->getDestWeights());
-    setnbors(topo->getnbors());
   }
 
   inline int getInDegree() const noexcept {return inDegree;}
@@ -766,8 +750,6 @@ class ampiDistGraphTopology final : public ampiTopology {
   inline const std::vector<int> &getDestWeights() const noexcept {return destWeights;}
   inline bool areSourcesWeighted() const noexcept {return sourcesWeighted;}
   inline bool areDestsWeighted() const noexcept {return destsWeighted;}
-  inline std::vector<int> &getnbors() noexcept {return nbors;}
-  inline const std::vector<int> &getnbors() const noexcept {return nbors;}
 
   inline void setAreSourcesWeighted(bool v) noexcept {sourcesWeighted = v ? 1 : 0;}
   inline void setAreDestsWeighted(bool v) noexcept {destsWeighted = v ? 1 : 0;}
@@ -777,7 +759,6 @@ class ampiDistGraphTopology final : public ampiTopology {
   inline void setOutDegree(int d) noexcept {outDegree = d;}
   inline void setDestinations(const std::vector<int> &d) noexcept {destinations = d; destinations.shrink_to_fit();}
   inline void setDestWeights(const std::vector<int> &dw) noexcept {destWeights = dw; destWeights.shrink_to_fit();}
-  inline void setnbors(const std::vector<int> &nbors_) noexcept {nbors = nbors_; nbors.shrink_to_fit();}
 };
 
 /* KeyValue class for attribute caching. The copy and delete functions are
@@ -2510,8 +2491,9 @@ class ampiParent final : public CBase_ampiParent {
   int bsendBufferSize; //       we only keep track of it to return it from MPI_Buffer_detach
 
   // Intercommunicator creation:
-  bool isTmpRProxySet;
-  CProxy_ampi tmpRProxy;
+  // ExchangeProxy: the first group's new array of each MPI_Intercomm_create in
+  // progress, by the larger of the two leaders' world ranks
+  std::map<int, CProxy_ampi> pendingRProxies;
 
   int myHomePE;
 
@@ -2582,15 +2564,21 @@ class ampiParent final : public CBase_ampiParent {
   TCharm *registerAmpi(ampi *ptr,const ampiCommStruct &s,bool forMigration) noexcept;
 
   // exchange proxy info between two ampi proxies
-  void ExchangeProxy(CProxy_ampi rproxy) noexcept {
-    if(!isTmpRProxySet){ tmpRProxy=rproxy; isTmpRProxySet=true; }
-    else{
-      // Both groups' new intercommunicator arrays are fully registered:
-      // give each its remote proxy, and only then resume its ranks.
-      tmpRProxy.setRemoteProxyAndUnblock(rproxy);
-      rproxy.setRemoteProxyAndUnblock(tmpRProxy);
-      isTmpRProxySet=false;
+  // exchange proxy info between two ampi proxies. Sent by both groups' leaders
+  // to the parent of the smaller leader's world rank; key is the larger one, so
+  // concurrent MPI_Intercomm_creates between other leaders are kept apart.
+  void ExchangeProxy(CProxy_ampi rproxy, int key) noexcept {
+    auto it = pendingRProxies.find(key);
+    if (it == pendingRProxies.end()) {
+      pendingRProxies.emplace(key, rproxy);
+      return;
     }
+    // Both groups' new intercommunicator arrays are fully registered:
+    // give each its remote proxy, and only then resume its ranks.
+    CProxy_ampi first = it->second;
+    pendingRProxies.erase(it);
+    first.setRemoteProxyAndUnblock(rproxy);
+    rproxy.setRemoteProxyAndUnblock(first);
   }
 
   //Grab the next available split/group communicator
@@ -2938,7 +2926,12 @@ class ampi final : public CBase_ampi {
   CProxy_ampi remoteProxy; // valid only for intercommunicator
   CkPupPtrVec<win_obj> winObjects;
   int numCommCreationsInProgress{};
-  int numUnblocks{}; // count of unblock() calls (comm creation done), for campi
+  // Calls that create a communicator from this one, counted alike on every
+  // member (MPI orders collectives); the count identifies the wake-up that
+  // ends such a call, so campi can tell it from other wake-ups. Pupped.
+  int numCommCreations{};
+  int creationId{}; // the creation in progress (used on the creating root)
+  int beginCommCreation() noexcept;
   void setNumCommCreationsInProgress(int x)
   {
     CkAssert(numCommCreationsInProgress == 0);
@@ -2953,6 +2946,7 @@ class ampi final : public CBase_ampi {
   // How registrationFinish resumes the ranks of a new communicator (default:
   // thisProxy.unblock(), for split). newChildProxy is the new array.
   bool exchangeProxyOnFinish{};  // intercommCreate: via ExchangeProxy
+  int remoteRootIdx{};           // intercommCreate, at the root: the other leader
   bool resumeNewArrayOnFinish{}; // commCreate, intercommMerge: newChildProxy.unblock()
   CProxy_ampi newChildProxy;
 
@@ -2982,11 +2976,8 @@ class ampi final : public CBase_ampi {
   void allInitDone() noexcept;
   void setInitDoneFlag() noexcept;
 
-  inline void unblock() noexcept {
-    ++numUnblocks; // lets campi tell this wake-up from others (not pupped)
-    thread->resume();
-  }
-  int getNumUnblocks() const noexcept { return numUnblocks; }
+  inline void unblock() noexcept { thread->resume(); }
+  void unblockCreation(int id) noexcept; // ends the communicator creation id
 
   void injectMsg(int size, char* buf) noexcept;
   void genericSync(AmpiMsg *) noexcept;
@@ -3181,7 +3172,7 @@ class ampi final : public CBase_ampi {
   MPI_Comm commCreate(const std::vector<int>& vec, AmpiCommType type) noexcept;
   MPI_Comm cartCreate0D() noexcept;
   MPI_Comm cartCreate(std::vector<int>& vec, int ndims, const int* dims) noexcept;
-  MPI_Comm intercommCreate(const std::vector<int>& rvec, int root, MPI_Comm tcomm) noexcept;
+  MPI_Comm intercommCreate(const std::vector<int>& rvec, int root, int remoteRoot) noexcept;
 
   inline bool isInter() const noexcept { return myComm->isinter(); }
   void intercommMerge(int first, MPI_Comm *ncomm) noexcept;
@@ -3203,10 +3194,8 @@ class ampi final : public CBase_ampi {
   inline void setRemoteProxyAndUnblock(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; thread->resume(); }
   inline int getIndexForRank(int r) const noexcept {return myComm->getIndexForRank(r);}
   inline int getIndexForRemoteRank(int r) const noexcept {return myComm->getIndexForRemoteRank(r);}
-  void findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const noexcept;
-  inline void sortNeighborsByLocality(std::vector<int>& nbors) noexcept { myComm->getTopology()->sortnbors(thisProxy, nbors); }
-  inline std::vector<int>& getNeighbors() noexcept { return myComm->getTopology()->getnbors(); }
-  inline const std::vector<int>& getNeighbors() const noexcept { return myComm->getTopology()->getnbors(); }
+  void getNeighborLists(std::vector<int>& srcs, std::vector<int>& dsts) const noexcept;
+  std::vector<int> neighborSendOrder(const std::vector<int>& dsts) noexcept;
   inline bool opIsCommutative(MPI_Op op) const noexcept { return parent->opIsCommutative(op); }
   inline MPI_User_function* op2User_function(MPI_Op op) const noexcept { return parent->op2User_function(op); }
   void topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newcomm) noexcept;
@@ -3304,6 +3293,10 @@ void campi_proc_init() noexcept;
 // in campi mode that the load balancing step or checkpoint the rank waits on
 // in AMPI_Migrate is over, before they wake the rank.
 void campi_migrate_resumed(TCharm *tc) noexcept;
+// Defined in campi.C: a rank starts a call that creates a communicator, and
+// that creation's wake-up (ampi::unblockCreation) arrives.
+void campi_creation_begun(TCharm *tc, int id) noexcept;
+void campi_creation_done(TCharm *tc, int id) noexcept;
 
 // The actions an AMPI_Migrate info asks for, in the order of its keys
 // (shared by AMPI_Migrate and campi::Migrate). Values "false" add nothing;
