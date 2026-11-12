@@ -2938,7 +2938,12 @@ class ampi final : public CBase_ampi {
   CProxy_ampi remoteProxy; // valid only for intercommunicator
   CkPupPtrVec<win_obj> winObjects;
   int numCommCreationsInProgress{};
-  int numUnblocks{}; // count of unblock() calls (comm creation done), for campi
+  // Calls that create a communicator from this one, counted alike on every
+  // member (MPI orders collectives); the count identifies the wake-up that
+  // ends such a call, so campi can tell it from other wake-ups. Pupped.
+  int numCommCreations{};
+  int creationId{}; // the creation in progress (used on the creating root)
+  int beginCommCreation() noexcept;
   void setNumCommCreationsInProgress(int x)
   {
     CkAssert(numCommCreationsInProgress == 0);
@@ -2982,11 +2987,8 @@ class ampi final : public CBase_ampi {
   void allInitDone() noexcept;
   void setInitDoneFlag() noexcept;
 
-  inline void unblock() noexcept {
-    ++numUnblocks; // lets campi tell this wake-up from others (not pupped)
-    thread->resume();
-  }
-  int getNumUnblocks() const noexcept { return numUnblocks; }
+  inline void unblock() noexcept { thread->resume(); }
+  void unblockCreation(int id) noexcept; // ends the communicator creation id
 
   void injectMsg(int size, char* buf) noexcept;
   void genericSync(AmpiMsg *) noexcept;
@@ -3304,6 +3306,10 @@ void campi_proc_init() noexcept;
 // in campi mode that the load balancing step or checkpoint the rank waits on
 // in AMPI_Migrate is over, before they wake the rank.
 void campi_migrate_resumed(TCharm *tc) noexcept;
+// Defined in campi.C: a rank starts a call that creates a communicator, and
+// that creation's wake-up (ampi::unblockCreation) arrives.
+void campi_creation_begun(TCharm *tc, int id) noexcept;
+void campi_creation_done(TCharm *tc, int id) noexcept;
 
 // The actions an AMPI_Migrate info asks for, in the order of its keys
 // (shared by AMPI_Migrate and campi::Migrate). Values "false" add nothing;

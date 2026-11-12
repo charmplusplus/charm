@@ -2,7 +2,8 @@
 // MPI_Probe, MPI_Mprobe/MPI_Mrecv, MPI_Waitany, MPI_Waitsome (also over a
 // collective request), MPI_Bsend, MPI_Rsend, MPI_Sendrecv_replace (also over
 // a non-contiguous datatype), MPI_Reduce_scatter_block, MPI_Reduce_scatter
-// and MPI_Alltoallw (also with MPI_IN_PLACE). Where a call should block, the
+// and MPI_Alltoallw (also with MPI_IN_PLACE), and MPI_Comm_split woken by an
+// unrelated wake-up. Where a call should block, the
 // matching send is held back until the receiver has signalled, so the
 // receiver suspends in the call.
 #include <cstdio>
@@ -236,6 +237,27 @@ CAMPI_MAIN(argc, argv)
     MPI_Alltoallw(MPI_IN_PLACE, nullptr, nullptr, nullptr, ip.data(), ones.data(),
                   bytes.data(), types.data(), MPI_COMM_WORLD);
     for (int src = 0; src < size; src++) C(ip[src] == src * 100 + rank);
+  }
+
+  // 11. MPI_Comm_split ends on its own wake-up only: rank 1 is suspended in
+  // the split when rank 0 sends it an unrelated wake-up (AMPI_Resume)
+  if (size >= 2) {
+    if (rank == 1) MPI_Send(&go, 1, MPI_INT, 0, 20, MPI_COMM_WORLD);
+    if (rank == 0) {
+      MPI_Recv(&go, 1, MPI_INT, 1, 20, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+      AMPI_Resume(1, MPI_COMM_WORLD);
+    }
+    MPI_Comm half;
+    MPI_Comm_split(MPI_COMM_WORLD, rank % 2, -rank, &half);
+    int hrank = -1, hsize = -1, sum = -1;
+    MPI_Comm_rank(half, &hrank);
+    MPI_Comm_size(half, &hsize);
+    C(hsize == (size + 1 - rank % 2) / 2 && hrank == hsize - 1 - rank / 2);
+    MPI_Allreduce(&rank, &sum, 1, MPI_INT, MPI_SUM, half);
+    int expect = 0;
+    for (int i = rank % 2; i < size; i += 2) expect += i;
+    C(sum == expect);
+    MPI_Comm_free(&half);
   }
 
   long total = 0;
