@@ -249,6 +249,24 @@ first run of a body is inside the coroutine entry's own execution and
 needs no event. In a build without tracing (`CMK_TRACE_ENABLED` 0) both
 are empty.
 
+**Labels.** `CK_LABEL("name") { ... }` declares a `label_scope` in an `if`
+condition: its constructor begins an execution of the label's entry, with
+the owner and its Projections id, and its destructor ends it. The entry
+comes from `label<Owner, "name">::slot`, an inline static member of a
+class template: its initializer runs before `main` and records the name
+and a function returning `Owner::index_t::__idx` (`_ckCoroAddLabel`,
+`ck.C`). `_initCharm` calls `_ckCoroRegisterLabels` on rank 0 after
+`_registerExternalModules`, which registers each label with
+`CkRegisterEp(name, NULL, 0, chareIdx, 0)`, as charmxi registers a named
+`serial`. Static initialization records the labels in the same order in
+every process of the binary, so every process gives a label the index
+the `.sts` file written by PE 0 names. `label_depth_` counts the open
+blocks on the PE thread; a record notes it when a segment begins
+(`begin`, `run`), and `finish_run` aborts when a segment ends with a
+different count, that is, after a wait inside a block. Under
+`CK_MIGRATABLE` the compiler rejects such a wait already: the `case`
+label inside the block would jump past the scope's declaration.
+
 **Helpers.** A `ck::coro::task<T>` helper awaited with `CK_CALL` has its
 own `CK_MIGRATABLE` block and therefore its own depth in the chain;
 `note_site(..., call = true)` marks the call site and `frame_guard` records
@@ -308,7 +326,8 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
 - `src/ck-core/CMakeLists.txt`: installs the headers.
 - `src/ck-core/charm++.h` (`CkEntryScope`, `CkCurrentMessage`,
   `CkCurrentEntry`, `ckDestroyLater`, `recursive_pup_impl`), `ck.C`,
-  `init.C`: the accessors, the destroy message and the `_coro_pup` hook.
+  `init.C`: the accessors, the destroy message, the `_coro_pup` hook, the
+  flags, and the recorded labels and their registration.
 - `src/xlat-i/xi-scan.l`, `xi-grammar.y` (and the regenerated `xi-scan.C`,
   `xi-grammar.tab.C/h`), `xi-Entry.{h,C}`, `xi-Chare.{h,C}`, `xi-Member.h`:
   the two attributes, their checks, and `X_CORO_CODE`; `Chare::preprocess`
@@ -328,7 +347,8 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
   owners module (a group, a nodegroup, a singleton chare and the
   mainchare, checkpointed and restarted while suspended); `make test` also
   runs it under `+ck_fakemigrate_pup`, and on a build with tracing runs
-  `tracetest`, which counts the Projections events of resumed segments.
+  `tracetest`, which counts the Projections events of resumed segments
+  and of two labelled blocks (one in a coroutine, one in a constructor).
 - `benchmarks/charm++/coro_pingpong/`: plain, SDAG and coroutine ping-pong.
 - `src/libs/ck-libs/ampi/campi_core.h`, `campi.C`: CAMPI, the other user
   of the shared core.

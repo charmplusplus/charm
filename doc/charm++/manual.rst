@@ -2404,6 +2404,22 @@ wait is an execution of the coroutine entry method, nested in the
 execution of the entry method whose delivery resumed it, as SDAG traces
 each ``serial`` block.
 
+``CK_LABEL`` traces a block under a name of its own, as SDAG's
+``serial "name"`` does:
+
+.. code-block:: c++
+
+   CK_LABEL("update") { update(); }
+
+In the trace the block is an execution of an entry method ``update`` of
+the chare, nested in the execution around it. The name is a string
+literal, written only in the ``.C`` file; the labels are registered at
+startup after the modules' entry methods, and one name used twice in a
+chare is one entry method. ``CK_LABEL`` works in any member function of
+a chare, not only in a coroutine. The block cannot contain a wait: inside
+``CK_MIGRATABLE`` the compiler rejects one, and elsewhere the program
+aborts when the coroutine suspends inside the block.
+
 The chare kinds differ only in how a suspended coroutine is invoked
 again after a migration or a restart from a checkpoint: the coroutine
 state sends the entry's message to the chare's own handle, index or

@@ -974,8 +974,10 @@ public:
           contribute(sizeof(int), &v, CkReduction::sum_int, CK_FUTURE_ALL(fsum));
         }
         CK_WHEN(fsum, red);
-        check(*(int*)red->getData() == sumOver(round), "sum awaited through a future");
-        delete red;
+        CK_LABEL("checkSum") {
+          check(*(int*)red->getData() == sumOver(round), "sum awaited through a future");
+          delete red;
+        }
 
         // Two reductions in flight, awaited together.
         {

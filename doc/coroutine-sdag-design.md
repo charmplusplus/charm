@@ -458,6 +458,20 @@ No entry points are registered for this: SDAG names each `serial`, but a
 coroutine's segments have no names, and the entry's own name is what the
 review asked for.
 
+A block is named with `CK_LABEL("name") { ... }`, the counterpart of
+`serial "name"`: an entry `name` of the chare, nested in the execution
+around it. SDAG's labels are registered by charmxi, which reads the
+`serial` in the `.ci` file; a coroutine body is in the `.C` file, which
+charmxi never reads. Two ways were weighed: the name only in the `.C`
+file, recorded before `main` through a C++20 string template argument and
+registered by `_initCharm` after the modules' entries; or the labels also
+declared in the `.ci` file, for charmxi to register as SDAG's are, which
+needed a grammar change and the name written twice. Kale chose the first
+(2026-11-13). The order of static initialization is the same in every
+process of one binary, which is what the entry indices need. A wait
+inside the block is a compile error under `CK_MIGRATABLE` and an abort
+otherwise, as a `serial` cannot contain a `when`.
+
 **`+ck_fakemigrate_pup`.** `+ck_fakemigrate` rebuilds the coroutines in
 place and so never runs the chare's own pup. The new flag makes an array
 element migrate to the next PE (`migrateMe`) wherever `+ck_fakemigrate`
@@ -677,7 +691,7 @@ them in one table each so that a reviewer can check what was weighed.
 | `delete this` in a `when` body | `ckDestroyLater()` | See the table above. |
 | `atomic`/`serial` blocks | plain code | Nothing to carry: every statement of the body is serial code. |
 | State variables declared in the class but used as if local | the same rule, visible | SDAG's surprise ("state variables must be declared in the class") remains the rule here; the difference is that the body is C++ and the reader sees the member. |
-| A Projections entry per named `serial` block (`_TRACE_BEGIN_EXECUTE_DETAILED` around the generated method) | an event per resumed segment, under the coroutine entry (section 4.9) | There is no generated method to name; the code between two waits is the user's. The state traces each resume as an execution of the coroutine entry, nested in the delivery that resumed it. |
+| A Projections entry per named `serial` block (`_TRACE_BEGIN_EXECUTE_DETAILED` around the generated method) | an event per resumed segment, under the coroutine entry; `CK_LABEL("name") { ... }` for a named block (section 4.9) | There is no generated method to name; the code between two waits is the user's. The state traces each resume as an execution of the coroutine entry, nested in the delivery that resumed it, and a labelled block as an entry of its own, registered at startup from the `.C` file. |
 | C++11 | C++20 for the files that include `ckcoro.h` | Coroutines are a C++20 feature; the rest of the program and the runtime stay at their standard. |
 
 ## 10. Open items

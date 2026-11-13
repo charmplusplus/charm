@@ -38,6 +38,28 @@ CkpvDeclare(int, _ckCurrentEp);
 bool _ckCoroFakeMigrate = false;     // +ck_fakemigrate (parsed in init.C), read by ckcoro.h
 bool _ckCoroFakeMigratePup = false;  // +ck_fakemigrate_pup (parsed in init.C), read by ckcoro.h
 
+// CK_LABEL labels, in the order the program's static initialization recorded
+// them, registered as entries of their chares on rank 0 of each process.
+namespace {
+struct CoroLabel {
+  const char *name;
+  int (*chareIdx)();
+  int ep;
+};
+std::vector<CoroLabel> &coroLabels() {
+  static std::vector<CoroLabel> labels;
+  return labels;
+}
+}
+int _ckCoroAddLabel(const char *name, int (*chareIdx)()) {
+  coroLabels().push_back(CoroLabel{name, chareIdx, -1});
+  return (int)coroLabels().size() - 1;
+}
+int _ckCoroLabelEp(int label) { return coroLabels()[label].ep; }
+void _ckCoroRegisterLabels() {
+  for (CoroLabel &l : coroLabels()) l.ep = CkRegisterEp(l.name, NULL, 0, l.chareIdx(), 0);
+}
+
 // ckDestroyLater: a Converse message to this PE whose handler destroys the
 // chare, so the destruction follows the return of whatever is running on
 // the chare now (an entry method, or a direct call that resumed a

@@ -1696,6 +1696,7 @@ void _initCharm(int unused_argc, char **argv)
 #if !CMK_CHARM4PY
 		_registerExternalModules(argv);
 #endif
+		_ckCoroRegisterLabels(); // CK_LABEL blocks, after the chares they belong to
 	}
 
 	/* The following will happen on every virtual processor in BigEmulator, not just on once per real processor */

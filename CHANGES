@@ -154,7 +154,9 @@ Programming model and language bindings:
   element), with no [inbox, reductiontarget] entry in the .ci file;
   charmxi adds an [inbox] entry, _coro_callback(CkMessage*), to every
   chare with a [coroutine] entry. In a Projections trace each segment
-  that runs after a wait is an execution of the coroutine entry.
+  that runs after a wait is an execution of the coroutine entry, and
+  CK_LABEL("name") { ... } traces a block as an entry of its own, as
+  SDAG's serial "name" does.
   +ck_fakemigrate_pup moves an array element to the next PE at every
   wait, so that its own pup runs (two or more PEs; elements that use
   AtSync, groups and chares are rebuilt in place).

@@ -151,6 +151,55 @@ inline CkCallback all_target(int ep, ArrayElement *e) { return CkCallback(ep, e-
 inline CkCallback all_target(int ep, NodeGroup *g) { return CkCallback(ep, g->ckGetGroupID(), true); }
 inline CkCallback all_target(int ep, IrrGroup *g) { return CkCallback(ep, g->ckGetGroupID()); }
 inline CkCallback all_target(int ep, Chare *c) { return CkCallback(ep, c->ckGetChareID()); }
+
+// CK_LABEL: a block traced as an entry of the chare named by the label.
+// label<Owner, "name">::slot is an inline variable of a class template, so
+// its initializer runs before main and records the label (_ckCoroAddLabel):
+// in the same order in every process of the binary, as entry indices need.
+// _initCharm registers the recorded labels after the modules' entries.
+template <std::size_t N> struct label_text {
+  char s[N];
+  constexpr label_text(const char (&a)[N]) noexcept {
+    for (std::size_t i = 0; i < N; i++) s[i] = a[i];
+  }
+};
+template <class Owner, label_text L> struct label {
+  static int chare() { return Owner::index_t::__idx; }
+  static inline const int slot = _ckCoroAddLabel(L.s, &chare);
+};
+// Open CK_LABEL blocks on this PE thread; a segment ends with as many open
+// as it began with, or a wait was inside a block (state::finish_run).
+inline thread_local int label_depth_ = 0;
+class label_scope {
+ public:
+  template <class Owner> label_scope(int slot, const Owner *o) noexcept {
+    label_depth_++;
+#if CMK_TRACE_ENABLED
+    CmiObjId *idx = nullptr;
+    if constexpr (std::is_base_of_v<ArrayElement, Owner>) {
+      id_ = o->ckGetArrayIndex().getProjectionID();
+      idx = &id_;
+    }
+    _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _ckCoroLabelEp(slot), CkMyPe(), 0, idx,
+                                  const_cast<void *>(static_cast<const void *>(o)));
+#else
+    (void)slot;
+    (void)o;
+#endif
+  }
+  ~label_scope() {
+    _TRACE_END_EXECUTE();
+    label_depth_--;
+  }
+  label_scope(const label_scope &) = delete;
+  label_scope &operator=(const label_scope &) = delete;
+
+ private:
+#if CMK_TRACE_ENABLED
+  CmiObjId id_;
+#endif
+};
+
 // The frame handle of a coroutine entry just created, picked up by state::begin.
 inline thread_local std::coroutine_handle<> pending_root_ = {};
 
@@ -375,6 +424,7 @@ struct record {
   chain *prevChain = nullptr;    // current_chain_ before this record ran
   bool waiting = false;          // suspended in a when awaitable
   bool atSite = false;           // ... reached through CK_WHEN
+  int labelDepth = 0;            // label_depth_ when the running segment began
   std::vector<want> wants;       // what it waits for, grouped by arm (when_any alternatives)
   bool ready = false;            // delivered: which arm and its buffers
   int readyIndex = -1;
@@ -874,6 +924,7 @@ inline record &state::begin_record(int ep, void *msg, bool own, entry_msg em, ta
   rec->h = root;
   rec->prev = current_;
   rec->prevChain = current_chain_;
+  rec->labelDepth = label_depth_;
   current_ = rec;
   current_chain_ = &rec->ch;
   return *rec;
@@ -906,6 +957,12 @@ template <class Owner> inline record &state::begin(Owner *owner, bool isEntry, e
 
 // After the body ran (first run or a resume) and suspended or finished.
 inline void state::finish_run(record *rec) {
+  if (label_depth_ != rec->labelDepth) {
+    const record *root = rec;
+    while (root->parent) root = root->parent;
+    CkAbort("ck::coro: a coroutine of entry %s waited inside a CK_LABEL block",
+            _entryTable[root->ep]->name);
+  }
   current_ = rec->prev;
   current_chain_ = rec->prevChain;
   rec->prev = nullptr;
@@ -961,6 +1018,7 @@ inline void state::fake_migrate() {
 inline void state::run(record *rec) {
   rec->prev = current_;
   rec->prevChain = current_chain_;
+  rec->labelDepth = label_depth_;
   current_ = rec;
   current_chain_ = &rec->ch;
   std::coroutine_handle<> h = std::exchange(rec->h, {});
@@ -1557,6 +1615,15 @@ using coroutine = coro::coroutine;
     if (auto [__VA_ARGS__] = (::ck::coro::note_site(ck_frame_, __LINE__),     \
                               co_await ::ck::coro::current_state().when_block(want_)); \
         true)
+
+// CK_LABEL("name") { ... }: the block is traced in Projections as an entry
+// "name" of the chare, as SDAG's serial "name" { ... }; in any member
+// function of a chare. A wait inside the block aborts (under CK_MIGRATABLE
+// the compiler rejects it: the restart jump would bypass the declaration).
+#define CK_LABEL(name_)                                                       \
+  if (::ck::coro::label_scope ck_label_{                                      \
+          ::ck::coro::label<std::remove_cvref_t<decltype(*this)>, name_>::slot, this}; \
+      true)
 
 // A when-all site (SDAG when a(), b()): CK_WHEN_ALL(CK_ALT(...), CK_ALT(...))
 // waits until every alternative has a delivery and takes them together.
