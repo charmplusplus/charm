@@ -31,8 +31,8 @@ CKPT = $(RUN) -ckpt-at 6
 # passes: one process in the plain pass, two processes with TESTRUN_PROCS=2.
 test: all
 	-rm -rf log ref.chk
-	# Reference: no checkpoint, at 2 PEs (ckpt_restart.C says why not 1).
-	$(call run, $(RUN) +p2 -write-check ref.chk )
+	# Reference: no checkpoint, at 1 PE.
+	$(call run, $(RUN) +p1 -write-check ref.chk )
 ifeq ($(filter-out 0 1,$(TESTRUN_PROCS)),)
 	# Checkpoint in 2 processes, restart in 1 process on fewer and the same PEs.
 	$(RUN_PROCS) $(call run, $(CKPT) +p4 +balancer RotateLB -expect-check ref.chk )
@@ -57,6 +57,7 @@ endif
 	$(call run, $(CKPT) +p2 -expect-check ref.chk )
 	-sync
 	$(call run, ./ckpt_restart +p4 +restart log -expect-check ref.chk )
+	$(call run, ./ckpt_restart +p1 +restart log -expect-check ref.chk )
 	-rm -rf log
 	# A chain of three restarts, each from the checkpoint the previous one wrote (-c).
 	$(call run, $(CKPT) +p4 +balancer RotateLB -expect-check ref.chk )
@@ -68,7 +69,7 @@ endif
 # Checkpoint on $(P) PEs, restart on $(P) and $(P)/2 PEs; then on $(P)/2, restart on $(P).
 testp: all
 	-rm -rf log ref.chk
-	$(call run, $(RUN) +p2 -write-check ref.chk )
+	$(call run, $(RUN) +p1 -write-check ref.chk )
 	$(call run, $(CKPT) +p$(P) +balancer RotateLB -expect-check ref.chk )
 	-sync
 	$(call run, ./ckpt_restart +p$(P) +restart log -expect-check ref.chk )
@@ -85,7 +86,7 @@ testp: all
 # show what each restart costs now.
 testchain: all
 	-rm -rf log ref.chk
-	$(call run, $(RUN) +p2 -write-check ref.chk )
+	$(call run, $(RUN) +p1 -write-check ref.chk )
 	$(call run, $(CKPT) +p4 -expect-check ref.chk )
 	for i in 1 2 3 4 5 6 7 8; do \
 	  $(call run, ./ckpt_restart +p4 +restart log -c -expect-check ref.chk ) || exit 1; \
@@ -98,7 +99,7 @@ testchain: all
 # is cap / 64 = 2^15, not the flat 2^16 (see the "Generation N" lines).
 testnarrow: all
 	-rm -rf log ref.chk
-	$(call run, $(RUN) +p2 -write-check ref.chk )
+	$(call run, $(RUN) +p1 -write-check ref.chk )
 	$(call run, $(CKPT) +p4 +objid_expand 16777216 -expect-check ref.chk )
 	$(call run, ./ckpt_restart +p4 +restart log -c -expect-check ref.chk )
 	$(call run, ./ckpt_restart +p4 +restart log -c -expect-check ref.chk )

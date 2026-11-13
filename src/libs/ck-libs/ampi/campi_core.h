@@ -156,7 +156,7 @@ struct main_registrar {
 
 /* ---------------- restart sites ---------------- */
 
-// One per resumable function (CAMPI_RESUMABLE). The rank keeps a chain of
+// One per resumable function (CAMPI_MIGRATABLE). The rank keeps a chain of
 // site ids, one per active frame_guard depth: entry d is the last site
 // (CAMPI_MIGRATE or CAMPI_CALL, both identified by __LINE__) noted by the
 // function at depth d. A restarted rank (after migration, restart from a
@@ -339,10 +339,29 @@ task<int> Reduce_scatter_block(const void *sbuf, void *rbuf, int count, MPI_Data
                                MPI_Op op, MPI_Comm comm);
 task<int> Reduce_scatter(const void *sbuf, void *rbuf, const int *rcounts, MPI_Datatype type,
                          MPI_Op op, MPI_Comm comm);
+// Complete before returning, with *request = MPI_REQUEST_NULL, as in ampi.C.
+task<int> Ireduce_scatter_block(const void *sbuf, void *rbuf, int count, MPI_Datatype type,
+                                MPI_Op op, MPI_Comm comm, MPI_Request *request);
+task<int> Ireduce_scatter(const void *sbuf, void *rbuf, const int *rcounts, MPI_Datatype type,
+                          MPI_Op op, MPI_Comm comm, MPI_Request *request);
 // One receive and one send per rank, awaited together; displacements in bytes.
 task<int> Alltoallw(const void *sbuf, const int *scounts, const int *sdispls,
                     const MPI_Datatype *stypes, void *rbuf, const int *rcounts,
                     const int *rdispls, const MPI_Datatype *rtypes, MPI_Comm comm);
+request_awaiter Neighbor_allgather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                                   int rcount, MPI_Datatype rtype, MPI_Comm comm);
+request_awaiter Neighbor_allgatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                                    const int *rcounts, const int *displs, MPI_Datatype rtype,
+                                    MPI_Comm comm);
+request_awaiter Neighbor_alltoall(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                                  int rcount, MPI_Datatype rtype, MPI_Comm comm);
+request_awaiter Neighbor_alltoallv(const void *sbuf, const int *scounts, const int *sdispls,
+                                   MPI_Datatype stype, void *rbuf, const int *rcounts,
+                                   const int *rdispls, MPI_Datatype rtype, MPI_Comm comm);
+request_awaiter Neighbor_alltoallw(const void *sbuf, const int *scounts, const MPI_Aint *sdispls,
+                                   const MPI_Datatype *stypes, void *rbuf, const int *rcounts,
+                                   const MPI_Aint *rdispls, const MPI_Datatype *rtypes,
+                                   MPI_Comm comm);
 
 /* ---------------- tests and probes ---------------- */
 
@@ -363,7 +382,28 @@ task<int> Improbe(int src, int tag, MPI_Comm comm, int *flag, MPI_Message *msg,
 task<int> Comm_split(MPI_Comm comm, int color, int key, MPI_Comm *newcomm);
 task<int> Comm_dup(MPI_Comm comm, MPI_Comm *newcomm);
 task<int> Comm_dup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm *newcomm);
+// Complete before returning, with *request = MPI_REQUEST_NULL, as in ampi.C.
+task<int> Comm_idup(MPI_Comm comm, MPI_Comm *newcomm, MPI_Request *request);
+task<int> Comm_idup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm *newcomm,
+                              MPI_Request *request);
 task<int> Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm *newcomm);
+task<int> Comm_split_type(MPI_Comm comm, int split_type, int key, MPI_Info info, MPI_Comm *newcomm);
+task<int> Comm_create_group(MPI_Comm comm, MPI_Group group, int tag, MPI_Comm *newcomm);
+task<int> Cart_create(MPI_Comm comm_old, int ndims, const int *dims, const int *periods,
+                      int reorder, MPI_Comm *comm_cart);
+task<int> Cart_sub(MPI_Comm comm, const int *remain_dims, MPI_Comm *newcomm);
+task<int> Graph_create(MPI_Comm comm_old, int nnodes, const int *index, const int *edges,
+                       int reorder, MPI_Comm *comm_graph);
+task<int> Dist_graph_create(MPI_Comm comm_old, int n, const int *sources, const int *degrees,
+                            const int *destinations, const int *weights, MPI_Info info,
+                            int reorder, MPI_Comm *comm_dist_graph);
+task<int> Dist_graph_create_adjacent(MPI_Comm comm_old, int indegree, const int *sources,
+                                     const int *sourceweights, int outdegree,
+                                     const int *destinations, const int *destweights,
+                                     MPI_Info info, int reorder, MPI_Comm *comm_dist_graph);
+task<int> Intercomm_create(MPI_Comm localComm, int localLeader, MPI_Comm peerComm,
+                           int remoteLeader, int tag, MPI_Comm *newintercomm);
+task<int> Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm);
 
 /* ---------------- startup, shutdown, migration ---------------- */
 
@@ -372,7 +412,7 @@ task<int> Init_thread(int *argc, char ***argv, int required, int *provided);
 task<int> Finalize();
 // AMPI_Migrate: load balancing (ampi_load_balance=sync) or a checkpoint to
 // files (ampi_checkpoint=to_file=DIR). Must be reached through CAMPI_MIGRATE
-// (campi.h) inside CAMPI_RESUMABLE/CAMPI_END. A rank that moves, or restarts
+// (campi.h) inside a CAMPI_MIGRATABLE block. A rank that moves, or restarts
 // from the checkpoint, does not return from here: its frame is destroyed and
 // main runs again from the top to this site, where Migrate returns at once.
 task<int> Migrate(MPI_Info hints);

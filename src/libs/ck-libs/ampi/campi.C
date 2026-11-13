@@ -35,6 +35,8 @@
 void campi_parent_attached(TCharm *, ampiParent *) noexcept {}
 void campi_proc_init() noexcept {}
 void campi_migrate_resumed(TCharm *) noexcept {}
+void campi_creation_begun(TCharm *, int) noexcept {}
+void campi_creation_done(TCharm *, int) noexcept {}
 #else
 
 #include "campi_core.h"
@@ -93,6 +95,10 @@ struct Rank {
   bool migrateDone = false;        // set by campi_migrate_resumed
   bool fakeRestart = false;        // rebuild in campi_resume (+campi_fakemigrate)
   bool dead = false;               // the element is gone; a wake is still queued
+
+  // Communicator creation (ampi::beginCommCreation, ampi::unblockCreation)
+  int creationId = 0;              // the creation this rank started; 0: none
+  bool creationDone = false;       // its wake-up arrived
 };
 
 // The record of a rank whose element is gone, once no wake message refers to it.
@@ -407,6 +413,23 @@ void campi_migrate_resumed(TCharm *tc) noexcept {
   if (r != nullptr) r->migrateDone = true;
 }
 
+// ampi.C hooks: ampi::beginCommCreation and ampi::unblockCreation in campi mode.
+void campi_creation_begun(TCharm *tc, int id) noexcept {
+  campi::Rank *r = (campi::Rank *)tc->getCampiRank();
+  if (r == nullptr) return;
+  r->creationId = id;
+  r->creationDone = false;
+}
+
+void campi_creation_done(TCharm *tc, int id) noexcept {
+  campi::Rank *r = (campi::Rank *)tc->getCampiRank();
+  if (r == nullptr) return;
+  if (id != r->creationId)
+    CkAbort("campi: rank %d woken for communicator creation %d while in creation %d",
+            tc->getElement(), id, r->creationId);
+  r->creationDone = true;
+}
+
 // ampi.C hook: ampiParent::prepareCtv in campi mode.
 void campi_parent_attached(TCharm *tc, ampiParent *parent) noexcept {
   campi::Rank *r = (campi::Rank *)tc->getCampiRank();
@@ -426,7 +449,7 @@ task<void> yield() {
 /* ====================== restart sites ====================== */
 
 frame_guard::frame_guard() noexcept : r_(current()), depth_(0), site_(0) {
-  if (r_ == nullptr) CkAbort("campi: CAMPI_RESUMABLE outside a campi rank");
+  if (r_ == nullptr) CkAbort("campi: CAMPI_MIGRATABLE outside a campi rank");
   depth_ = r_->depth++;
   if (r_->linked.size() < r_->depth) r_->linked.resize(r_->depth);
   // Entered through a call site noted by the caller (the root needs none).
@@ -484,7 +507,7 @@ static void check_migrate_site(Rank *r) {
   bool ok = r->noted && !r->notedCall && r->depth > 0 && r->notedDepth == r->depth - 1;
   for (unsigned d = 0; ok && d < r->depth; d++) ok = r->linked[d];
   if (!ok)
-    CkAbort("campi: AMPI_Migrate must be written CAMPI_MIGRATE inside CAMPI_RESUMABLE/CAMPI_END "
+    CkAbort("campi: AMPI_Migrate must be written CAMPI_MIGRATE inside a CAMPI_MIGRATABLE block "
             "(and each resumable function on the way awaited with CAMPI_CALL)");
   r->noted = false;
 }
@@ -802,6 +825,43 @@ request_awaiter Exscan(const void *sbuf, void *rbuf, int count, MPI_Datatype typ
   CAMPI_POST_AND_WAIT(MPI_Iexscan(sbuf, rbuf, count, type, op, comm, req), MPI_STATUS_IGNORE)
 }
 
+request_awaiter Neighbor_allgather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                                   int rcount, MPI_Datatype rtype, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ineighbor_allgather(sbuf, scount, stype, rbuf, rcount, rtype, comm, req),
+                      MPI_STATUS_IGNORE)
+}
+
+request_awaiter Neighbor_allgatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                                    const int *rcounts, const int *displs, MPI_Datatype rtype,
+                                    MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ineighbor_allgatherv(sbuf, scount, stype, rbuf, rcounts, displs, rtype,
+                                               comm, req),
+                      MPI_STATUS_IGNORE)
+}
+
+request_awaiter Neighbor_alltoall(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                                  int rcount, MPI_Datatype rtype, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ineighbor_alltoall(sbuf, scount, stype, rbuf, rcount, rtype, comm, req),
+                      MPI_STATUS_IGNORE)
+}
+
+request_awaiter Neighbor_alltoallv(const void *sbuf, const int *scounts, const int *sdispls,
+                                   MPI_Datatype stype, void *rbuf, const int *rcounts,
+                                   const int *rdispls, MPI_Datatype rtype, MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ineighbor_alltoallv(sbuf, scounts, sdispls, stype, rbuf, rcounts,
+                                              rdispls, rtype, comm, req),
+                      MPI_STATUS_IGNORE)
+}
+
+request_awaiter Neighbor_alltoallw(const void *sbuf, const int *scounts, const MPI_Aint *sdispls,
+                                   const MPI_Datatype *stypes, void *rbuf, const int *rcounts,
+                                   const MPI_Aint *rdispls, const MPI_Datatype *rtypes,
+                                   MPI_Comm comm) {
+  CAMPI_POST_AND_WAIT(MPI_Ineighbor_alltoallw(sbuf, scounts, sdispls, stypes, rbuf, rcounts,
+                                              rdispls, rtypes, comm, req),
+                      MPI_STATUS_IGNORE)
+}
+
 #undef CAMPI_POST_AND_WAIT
 
 // The send data is packed first, so the receive can go straight into buf.
@@ -859,6 +919,20 @@ task<int> Reduce_scatter(const void *sbuf, void *rbuf, const int *rcounts, MPI_D
   if (e != MPI_SUCCESS) co_return e;
   co_return co_await Scatterv(t, rcounts, displs.data(), type, rbuf, rcounts[rank], type,
                               AMPI_COLL_SOURCE, comm);
+}
+
+// AMPI's MPI_Ireduce_scatter(_block) and MPI_Comm_idup complete before they
+// return, with *request = MPI_REQUEST_NULL; these do the same.
+task<int> Ireduce_scatter_block(const void *sbuf, void *rbuf, int count, MPI_Datatype type,
+                                MPI_Op op, MPI_Comm comm, MPI_Request *request) {
+  *request = MPI_REQUEST_NULL;
+  co_return co_await Reduce_scatter_block(sbuf, rbuf, count, type, op, comm);
+}
+
+task<int> Ireduce_scatter(const void *sbuf, void *rbuf, const int *rcounts, MPI_Datatype type,
+                          MPI_Op op, MPI_Comm comm, MPI_Request *request) {
+  *request = MPI_REQUEST_NULL;
+  co_return co_await Reduce_scatter(sbuf, rbuf, rcounts, type, op, comm);
 }
 
 // With MPI_IN_PLACE each rank sends from a copy of its receive buffer, taken
@@ -1035,13 +1109,21 @@ task<int> Waitsome(int n, MPI_Request *reqs, int *outcount, int *indices, MPI_St
 
 /* ====================== communicator creation ====================== */
 
-// ampi::split, with the suspension replaced by an await on this comm's
-// unblock() (sent by ampi::registrationFinish when the new arrays exist).
+// Suspends until the creation this rank started (ampi::beginCommCreation)
+// has woken it through ampi::unblockCreation; other wake-ups are skipped.
+static task<void> creation_done() {
+  Rank *r = current();
+  while (!r->creationDone) co_await suspend();
+  r->creationId = 0;
+  r->creationDone = false;
+}
+
+// ampi::split, with the suspension replaced by an await on the creation's
+// wake-up (sent by ampi::registrationFinish when the new arrays exist).
 task<int> Comm_split(MPI_Comm src, int color, int key, MPI_Comm *dest) {
   ampi *ptr = getAmpiParent()->comm2ampi(src);
-  const int before = ptr->getNumUnblocks();
   ptr->splitPost(color, key, ptr->getCommStruct().getType());
-  while (ptr->getNumUnblocks() == before) co_await suspend();
+  co_await creation_done();
   ptr->splitFinish(dest);
   if (color == MPI_UNDEFINED) *dest = MPI_COMM_NULL;
   co_return MPI_SUCCESS;
@@ -1053,9 +1135,8 @@ task<int> Comm_dup(MPI_Comm comm, MPI_Comm *newcomm) {
     ampi *ptr = getAmpiInstance(comm);
     int topoType, rank = ptr->getRank();
     MPI_Topo_test(comm, &topoType);
-    const int before = ptr->getNumUnblocks();
     ptr->splitPost(0, rank, getAmpiParent()->getCommStruct(comm).getType());
-    while (ptr->getNumUnblocks() == before) co_await suspend();
+    co_await creation_done();
     ptr->splitFinish(newcomm);
     ptr->topoDupFinish(topoType, comm, newcomm);
   }
@@ -1073,6 +1154,17 @@ task<int> Comm_dup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm *newcomm) {
   if (ret != MPI_SUCCESS) co_return ret;
   MPI_Comm_set_info(*newcomm, info);
   co_return MPI_SUCCESS;
+}
+
+task<int> Comm_idup(MPI_Comm comm, MPI_Comm *newcomm, MPI_Request *request) {
+  *request = MPI_REQUEST_NULL;
+  co_return co_await Comm_dup(comm, newcomm);
+}
+
+task<int> Comm_idup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm *newcomm,
+                              MPI_Request *request) {
+  *request = MPI_REQUEST_NULL;
+  co_return co_await Comm_dup_with_info(comm, info, newcomm);
 }
 
 // MPI_Comm_create for intracommunicators (a split, as in ampi.C)
@@ -1097,6 +1189,295 @@ task<int> Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm *newcomm) {
     key = rank_in_group;
   }
   co_return co_await Comm_split(comm, color, key, newcomm);
+}
+
+// ampi::commCreate: MPI_COMM_NULL for a rank not in vec
+static task<MPI_Comm> comm_create(MPI_Comm comm, const std::vector<int> &vec, AmpiCommType type) {
+  if (!getAmpiInstance(comm)->commCreatePost(vec, type)) co_return MPI_COMM_NULL;
+  co_await creation_done();
+  co_return getAmpiInstance(comm)->newestComm();
+}
+
+// ampi::cartCreate0D: MPI_COMM_NULL except on rank 0
+static task<MPI_Comm> cart_create_0d(MPI_Comm comm) {
+  if (!getAmpiInstance(comm)->cartCreate0DPost()) co_return MPI_COMM_NULL;
+  co_await creation_done();
+  MPI_Comm newComm = getAmpiInstance(comm)->newestComm();
+  ampi::cartCreate0DFinish(newComm);
+  co_return newComm;
+}
+
+// MPI_Comm_split_type, as in ampi.C
+task<int> Comm_split_type(MPI_Comm comm, int split_type, int key, MPI_Info info, MPI_Comm *newcomm) {
+  if (comm == MPI_COMM_SELF && split_type == MPI_UNDEFINED) {
+    *newcomm = MPI_COMM_NULL;
+    co_return MPI_SUCCESS;
+  }
+  int color = MPI_UNDEFINED;
+  if (split_type == MPI_COMM_TYPE_SHARED || split_type == AMPI_COMM_TYPE_HOST)
+    color = CmiPhysicalNodeID(CkMyPe());
+  else if (split_type == AMPI_COMM_TYPE_PROCESS)
+    color = CkMyNode();
+  else if (split_type == AMPI_COMM_TYPE_WTH)
+    color = CkMyPe();
+  co_return co_await Comm_split(comm, color, key, newcomm);
+}
+
+// MPI_Cart_create, as in ampi.C (no reordering; ranks beyond the grid get MPI_COMM_NULL)
+task<int> Cart_create(MPI_Comm comm_old, int ndims, const int *dims, const int *periods,
+                      int reorder, MPI_Comm *comm_cart) {
+  int newrank;
+  MPI_Cart_map(comm_old, ndims, dims, periods, &newrank);
+  if (ndims == 0) {
+    *comm_cart = co_await cart_create_0d(comm_old);
+  } else {
+    ampiParent *pp = getAmpiParent();
+    std::vector<int> vec = pp->group2vec(pp->comm2group(comm_old));
+    int newsize = 1;
+    for (int i = 0; i < ndims; i++) newsize *= dims[i];
+    if ((int)vec.size() > newsize) vec.resize(newsize);
+    *comm_cart = co_await comm_create(comm_old, vec, COMM_CART);
+  }
+  if (*comm_cart != MPI_COMM_NULL) {
+    ampiTopology *topo = getAmpiParent()->getCommStruct(*comm_cart).getTopology();
+    topo->setndims(ndims);
+    std::vector<int> dimsv(dims, dims + ndims), periodsv(periods, periods + ndims);
+    topo->setdims(dimsv);
+    topo->setperiods(periodsv);
+  }
+  co_return MPI_SUCCESS;
+}
+
+// MPI_Cart_sub, as in ampi.C
+task<int> Cart_sub(MPI_Comm comm, const int *remain_dims, MPI_Comm *newcomm) {
+  ampi *ptr = getAmpiInstance(comm);
+  int rank = ptr->getRank();
+  ampiTopology *topo = getAmpiParent()->getCommStruct(comm).getTopology();
+  const int ndims = topo->getndims();
+  const std::vector<int> dims = topo->getdims(), periods = topo->getperiods();
+  std::vector<int> coords(ndims), dimsv, periodsv;
+  MPI_Cart_coords(comm, rank, ndims, coords.data());
+  int color = 1, key = 1;
+  for (int i = 0; i < ndims; i++) {
+    if (remain_dims[i]) {
+      key = key * dims[i] + coords[i];
+      dimsv.push_back(dims[i]);
+      periodsv.push_back(periods[i]);
+    } else {
+      color = color * dims[i] + coords[i];
+    }
+  }
+  if (dimsv.empty()) {
+    *newcomm = co_await cart_create_0d(comm);
+    co_return MPI_SUCCESS;
+  }
+  ptr->splitPost(color, key, COMM_CART);
+  co_await creation_done();
+  getAmpiInstance(comm)->splitFinish(newcomm);
+  ampiTopology *newtopo = getAmpiParent()->getCommStruct(*newcomm).getTopology();
+  newtopo->setndims(dimsv.size());
+  newtopo->setdims(dimsv);
+  newtopo->setperiods(periodsv);
+  co_return MPI_SUCCESS;
+}
+
+// MPI_Graph_create, as in ampi.C (no mapping)
+task<int> Graph_create(MPI_Comm comm_old, int nnodes, const int *index, const int *edges,
+                       int reorder, MPI_Comm *comm_graph) {
+  if (nnodes == 0) {
+    *comm_graph = MPI_COMM_NULL;
+    co_return MPI_SUCCESS;
+  }
+  int newrank;
+  MPI_Graph_map(comm_old, nnodes, index, edges, &newrank);
+  ampiParent *pp = getAmpiParent();
+  std::vector<int> vec = pp->group2vec(pp->comm2group(comm_old));
+  *comm_graph = co_await comm_create(comm_old, vec, COMM_GRAPH);
+  ampiTopology &topo = *getAmpiParent()->getCommStruct(*comm_graph).getTopology();
+  std::vector<int> index_(index, index + nnodes), edges_(edges, edges + index[nnodes - 1]);
+  topo.setnvertices(nnodes);
+  topo.setindex(index_);
+  topo.setedges(edges_);
+  co_return MPI_SUCCESS;
+}
+
+// MPI_Dist_graph_create_adjacent, as in ampi.C
+task<int> Dist_graph_create_adjacent(MPI_Comm comm_old, int indegree, const int *sources,
+                                     const int *sourceweights, int outdegree,
+                                     const int *destinations, const int *destweights,
+                                     MPI_Info info, int reorder, MPI_Comm *comm_dist_graph) {
+  ampiParent *pp = getAmpiParent();
+  std::vector<int> vec = pp->group2vec(pp->comm2group(comm_old));
+  *comm_dist_graph = co_await comm_create(comm_old, vec, COMM_DIST_GRAPH);
+  ampiTopology *topo = getAmpiParent()->getCommStruct(*comm_dist_graph).getTopology();
+  topo->setInDegree(indegree);
+  topo->setOutDegree(outdegree);
+  topo->setAreSourcesWeighted(sourceweights != MPI_UNWEIGHTED);
+  if (topo->areSourcesWeighted())
+    topo->setSourceWeights(std::vector<int>(sourceweights, sourceweights + indegree));
+  topo->setAreDestsWeighted(destweights != MPI_UNWEIGHTED);
+  if (topo->areDestsWeighted())
+    topo->setDestWeights(std::vector<int>(destweights, destweights + outdegree));
+  topo->setSources(std::vector<int>(sources, sources + indegree));
+  topo->setDestinations(std::vector<int>(destinations, destinations + outdegree));
+  co_return MPI_SUCCESS;
+}
+
+// MPI_Dist_graph_create, as in ampi.C: each rank sends every rank the edges
+// it gives that rank (a list ending in 1 for incoming, -1 for outgoing).
+task<int> Dist_graph_create(MPI_Comm comm_old, int n, const int *sources, const int *degrees,
+                            const int *destinations, const int *weights, MPI_Info info,
+                            int reorder, MPI_Comm *comm_dist_graph) {
+  ampiParent *pp = getAmpiParent();
+  std::vector<int> vec = pp->group2vec(pp->comm2group(comm_old));
+  *comm_dist_graph = co_await comm_create(comm_old, vec, COMM_DIST_GRAPH);
+  const int p = getAmpiParent()->getCommStruct(*comm_dist_graph).getSize();
+  std::vector<std::vector<int>> in(p), out(p);
+  for (int i = 0, e = 0; i < n; i++)
+    for (int j = 0; j < degrees[i]; j++, e++) {
+      out[sources[i]].push_back(destinations[e]);
+      in[destinations[e]].push_back(sources[i]);
+    }
+  // how many lists of each kind every rank receives
+  std::vector<int> edgeCount(2 * p), totalcount(2);
+  for (int i = 0; i < p; i++) {
+    edgeCount[2 * i] = !in[i].empty();
+    edgeCount[2 * i + 1] = !out[i].empty();
+  }
+  co_await Reduce_scatter_block(edgeCount.data(), totalcount.data(), 2, MPI_INT, MPI_SUM, comm_old);
+  std::vector<MPI_Request> requests;
+  for (int i = 0; i < p; i++) {
+    if (!in[i].empty()) {
+      in[i].push_back(1);
+      requests.emplace_back();
+      MPI_Isend(in[i].data(), (int)in[i].size(), MPI_INT, i, 0, comm_old, &requests.back());
+    }
+    if (!out[i].empty()) {
+      out[i].push_back(-1);
+      requests.emplace_back();
+      MPI_Isend(out[i].data(), (int)out[i].size(), MPI_INT, i, 0, comm_old, &requests.back());
+    }
+  }
+  std::vector<int> saveSources, saveDestinations;
+  for (int j = 0; j < totalcount[0] + totalcount[1]; j++) {
+    MPI_Status status;
+    int numEdges;
+    co_await Probe(MPI_ANY_SOURCE, 0, comm_old, &status);
+    MPI_Get_count(&status, MPI_INT, &numEdges);
+    std::vector<int> edges(numEdges);
+    co_await Recv(edges.data(), numEdges, MPI_INT, status.MPI_SOURCE, 0, comm_old, MPI_STATUS_IGNORE);
+    std::vector<int> &save = edges[numEdges - 1] > 0 ? saveSources : saveDestinations;
+    save.insert(save.end(), edges.begin(), edges.end() - 1);
+  }
+  ampiTopology *topo = getAmpiParent()->getCommStruct(*comm_dist_graph).getTopology();
+  topo->setDestinations(saveDestinations);
+  topo->setSources(saveSources);
+  topo->setOutDegree(saveDestinations.size());
+  topo->setInDegree(saveSources.size());
+  topo->setAreSourcesWeighted(weights != MPI_UNWEIGHTED);
+  topo->setAreDestsWeighted(weights != MPI_UNWEIGHTED);
+  if (topo->areSourcesWeighted()) {
+    std::vector<int> w(weights, weights + n);
+    topo->setSourceWeights(w);
+    topo->setDestWeights(w);
+  }
+  co_await Waitall((int)requests.size(), requests.data(), MPI_STATUSES_IGNORE);
+  co_return MPI_SUCCESS;
+}
+
+// MPI_Intercomm_create, as in ampi.C: the leaders exchange their groups over
+// peerComm, then each group creates its side.
+task<int> Intercomm_create(MPI_Comm localComm, int localLeader, MPI_Comm peerComm,
+                           int remoteLeader, int tag, MPI_Comm *newintercomm) {
+  ampiParent *pp = getAmpiParent();
+  if (pp->isInter(localComm) || pp->isInter(peerComm))
+    CkAbort("campi: MPI_Intercomm_create needs intracommunicators");
+  ampi *localPtr = getAmpiInstance(localComm);
+  int rootIndex = localPtr->getIndexForRank(localLeader);
+  std::vector<int> remoteVec;
+  if (localPtr->getRank() == localLeader) {
+    std::vector<int> localVec = localPtr->getIndices();
+    MPI_Request req;
+    MPI_Isend(localVec.data(), localVec.size(), MPI_INT, remoteLeader, tag, peerComm, &req);
+    MPI_Status sts;
+    int remoteSize;
+    co_await Probe(remoteLeader, tag, peerComm, &sts);
+    MPI_Get_count(&sts, MPI_INT, &remoteSize);
+    remoteVec.resize(remoteSize);
+    co_await Recv(remoteVec.data(), remoteSize, MPI_INT, remoteLeader, tag, peerComm, MPI_STATUS_IGNORE);
+    co_await Wait(&req, MPI_STATUS_IGNORE);
+    if (remoteSize == 0) {
+      *newintercomm = MPI_COMM_NULL;
+      co_return MPI_SUCCESS;
+    }
+  }
+  int remoteRootIndex = (getAmpiInstance(localComm)->getRank() == localLeader)
+                            ? getAmpiInstance(peerComm)->getIndexForRank(remoteLeader) : -1;
+  getAmpiInstance(localComm)->intercommCreatePost(remoteVec, rootIndex, remoteRootIndex);
+  co_await creation_done(); // ampi::setRemoteProxyAndUnblock
+  *newintercomm = getAmpiInstance(localComm)->newestComm();
+  co_return MPI_SUCCESS;
+}
+
+// MPI_Intercomm_merge, as in ampi.C: the roots exchange their high flags to
+// decide which group goes first.
+task<int> Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm) {
+  if (!getAmpiParent()->isInter(intercomm))
+    CkAbort("campi: MPI_Intercomm_merge needs an intercommunicator");
+  ampi *ptr = getAmpiInstance(intercomm);
+  int first = 0;
+  if (ptr->getRank() == 0) {
+    int lroot = ptr->getIndexForRank(0), rroot = ptr->getIndexForRemoteRank(0);
+    int lhigh = high, rhigh = 0;
+    MPI_Request reqs[2];
+    ptr->irecv(&rhigh, 1, MPI_INT, 0, MPI_ATA_TAG, intercomm, &reqs[0]);
+    reqs[1] = ptr->send(MPI_ATA_TAG, ptr->getRank(), &lhigh, 1, MPI_INT, 0, intercomm, I_SEND);
+    co_await Waitall(2, reqs, MPI_STATUSES_IGNORE);
+    // same flags: the group with the smaller root goes first; else high=false first
+    first = (!lhigh == !rhigh) ? (lroot < rroot) : !lhigh;
+  }
+  getAmpiInstance(intercomm)->intercommMergePost(first);
+  co_await creation_done();
+  *newintracomm = getAmpiInstance(intercomm)->newestComm();
+  co_return MPI_SUCCESS;
+}
+
+// MPI_Comm_create_group: the group's members only. Blocks of 1, 2, 4, ...
+// group ranks merge pairwise: at each step the even block's leader and the
+// odd block's leader create an intercommunicator over comm and merge it.
+task<int> Comm_create_group(MPI_Comm comm, MPI_Group group, int tag, MPI_Comm *newcomm) {
+  if (group == MPI_GROUP_NULL) {
+    *newcomm = MPI_COMM_NULL;
+    co_return MPI_SUCCESS;
+  }
+  if (getAmpiParent()->isInter(comm))
+    CkAbort("campi: MPI_Comm_create_group needs an intracommunicator");
+  int groupRank, groupSize;
+  MPI_Group_rank(group, &groupRank);
+  MPI_Group_size(group, &groupSize);
+  if (groupRank == MPI_UNDEFINED) {
+    *newcomm = MPI_COMM_NULL;
+    co_return MPI_SUCCESS;
+  }
+  std::vector<int> groupRanks(groupSize), commRanks(groupSize);
+  for (int i = 0; i < groupSize; i++) groupRanks[i] = i;
+  MPI_Group parentGroup;
+  MPI_Comm_group(comm, &parentGroup);
+  MPI_Group_translate_ranks(group, groupSize, groupRanks.data(), parentGroup, commRanks.data());
+  MPI_Group_free(&parentGroup);
+  co_await Comm_dup(MPI_COMM_SELF, newcomm);
+  for (int step = 1; step < groupSize; step *= 2) {
+    const int block = groupRank / step;
+    const int partner = (block % 2 == 0) ? block + 1 : block - 1;
+    if (partner * step >= groupSize) continue; // the last block has no partner at this step
+    MPI_Comm inter, merged;
+    co_await Intercomm_create(*newcomm, 0, comm, commRanks[partner * step], tag, &inter);
+    co_await Intercomm_merge(inter, block % 2, &merged);
+    MPI_Comm_free(&inter);
+    MPI_Comm_free(newcomm);
+    *newcomm = merged;
+  }
+  co_return MPI_SUCCESS;
 }
 
 /* ====================== Init / Finalize ====================== */

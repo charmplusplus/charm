@@ -2,10 +2,13 @@
  * arraymaps: the built-in array maps of cklocation.C.
  *
  * For each map, arrays of 37 (1D), 5x7 (2D) and 3x4x5 (3D) elements are
- * created with that map, one case at a time. Each case:
+ * created with that map, one case at a time; DefaultArrayMap and FastArrayMap
+ * also get 3x2x2x2 (4D), 2x3x2x1x2 (5D) and 2x2x1x3x1x2 (6D) arrays, whose
+ * indices take the short-int branches of procNum. Each case:
  *   1. creation: every element checks it was built on the PE the map names
  *      (CkLocMgr::homePe, and a table the test computed when it knows the
- *      placement independently); a sum reduction of [1, f(index), one slot
+ *      placement independently: block placement for DefaultArrayMap and
+ *      FastArrayMap, file and configuration maps); a sum reduction of [1, f(index), one slot
  *      per index] checks that every element exists exactly once;
  *   2. insertion (1D, maps that support it): elements 37..41 are inserted
  *      from PE 1 (PE 0 on one PE), checked the same way;
@@ -15,8 +18,9 @@
  *      the next case starts when that reduction arrives.
  *
  * Maps and what is left out:
- *   RRMap, DefaultArrayMap, BlockMap: 1D/2D/3D, with insertion.
- *   FastArrayMap: 1D/2D/3D. No insertion: procNum is flat/ceil(n/P), so an
+ *   RRMap, BlockMap: 1D/2D/3D, with insertion. DefaultArrayMap: 1D-6D,
+ *     with insertion in 1D.
+ *   FastArrayMap: 1D-6D. No insertion: procNum is flat/ceil(n/P), so an
  *     index past the initial size names a PE beyond CkNumPes() (the map's
  *     comment says it is for arrays that promise no late insertion).
  *   HilbertArrayMap: 1D 37, 2D 5x7 and 4x4, 3D 3x4x5 and 4x4x4. No insertion,
@@ -58,18 +62,23 @@ struct arraymaps_case
   MapKind map;
   int dims;
   bool insert;  // insert elements 37..41 after creation (1D only)
-  int nx, ny, nz;  // extents; ny = nz = 1 below 2D
+  int ext[6];   // extents of the first dims dimensions
 };
 
 // 1D 37 (+5 inserted), 2D 5x7, 3D 3x4x5, except where a comment says otherwise.
 #define D1 1, true, 37, 1, 1
 #define D2 2, false, 5, 7, 1
 #define D3 3, false, 3, 4, 5
+#define D4 4, false, 3, 2, 2, 2
+#define D5 5, false, 2, 3, 2, 1, 2
+#define D6 6, false, 2, 2, 1, 3, 1, 2
 static const arraymaps_case cases[] = {
     {RR, D1}, {RR, D2}, {RR, D3},
     {DEFAULT, D1}, {DEFAULT, D2}, {DEFAULT, D3},
+    {DEFAULT, D4}, {DEFAULT, D5}, {DEFAULT, D6},
     {BLOCK, D1}, {BLOCK, D2}, {BLOCK, D3},
     {FAST, 1, false, 37, 1, 1}, {FAST, D2}, {FAST, D3},
+    {FAST, D4}, {FAST, D5}, {FAST, D6},
     // HilbertArrayMap: power-of-two cubes as well as the odd extents.
     {HILBERT, 1, false, 37, 1, 1}, {HILBERT, D2}, {HILBERT, D3},
     {HILBERT, 2, false, 4, 4, 1}, {HILBERT, 3, false, 4, 4, 4},
@@ -83,22 +92,36 @@ static const int nCases = sizeof(cases) / sizeof(cases[0]);
 
 static const int N1 = 37, NINSERT = 5;  // inserted elements get indices N1..N1+NINSERT-1
 
+// +useNodeBlkMapping changes DefaultArrayMap's placement; its table is then
+// not computed.
+static bool nodeBlk = false;
+
 // +ConfigurableRRMap "<objs per block> <PEs per block> <location of each obj>",
 // read on PE 0 by arraymaps_moduleinit without removing it from argv.
 static bool crrPresent = false;
 static int crrObjs = 0, crrPEs = 0;
 static std::vector<int> crrLoc;
 
-int arraymaps_flat(int c, int i) { return i; }
-int arraymaps_flat(int c, const CkIndex2D& i) { return i.x * cases[c].ny + i.y; }
-int arraymaps_flat(int c, const CkIndex3D& i)
+// Row-major flat index of an index with cases[c].dims components.
+template <class T>
+static int flatOf(int c, const T* idx)
 {
-  return (i.x * cases[c].ny + i.y) * cases[c].nz + i.z;
+  int flat = 0;
+  for (int d = 0; d < cases[c].dims; d++) flat = flat * cases[c].ext[d] + idx[d];
+  return flat;
 }
+int arraymaps_flat(int c, int i) { return i; }
+int arraymaps_flat(int c, const CkIndex2D& i) { return flatOf(c, &i.x); }
+int arraymaps_flat(int c, const CkIndex3D& i) { return flatOf(c, &i.x); }
+int arraymaps_flat(int c, const CkIndex4D& i) { return flatOf(c, &i.w); }
+int arraymaps_flat(int c, const CkIndex5D& i) { return flatOf(c, &i.v); }
+int arraymaps_flat(int c, const CkIndex6D& i) { return flatOf(c, &i.x1); }
 
 static int initialCount(int c)
 {
-  return cases[c].nx * cases[c].ny * cases[c].nz;
+  int n = 1;
+  for (int d = 0; d < cases[c].dims; d++) n *= cases[c].ext[d];
+  return n;
 }
 int arraymaps_slots(int c) { return initialCount(c) + (cases[c].insert ? NINSERT : 0); }
 const char* arraymaps_mapName(int c) { return mapNames[cases[c].map]; }
@@ -166,7 +189,19 @@ static std::vector<int> expectedTable(int c)
 {
   std::vector<int> e(arraymaps_slots(c), -1);
   const int P = CkNumPes(), n = initialCount(c);
-  if (cases[c].map == CONFIGRR)
+  if (cases[c].map == DEFAULT && !nodeBlk)
+  {
+    // Blocks of n/P, the first n%P PEs taking one more.
+    const int lo = n / P, rem = n % P;
+    for (int i = 0; i < n; i++)
+      e[i] = i < rem * (lo + 1) ? i / (lo + 1) : rem + (i - rem * (lo + 1)) / lo;
+  }
+  else if (cases[c].map == FAST)
+  {
+    const int hi = (n + P - 1) / P;  // blocks of ceil(n/P)
+    for (int i = 0; i < n; i++) e[i] = i / hi;
+  }
+  else if (cases[c].map == CONFIGRR)
   {
     for (int i = 0; i < n; i++)
       e[i] = ((i / crrObjs) * crrPEs + crrLoc[i % crrObjs]) % P;
@@ -246,18 +281,57 @@ void arraymaps_driver::startCase(void)
   const arraymaps_case& c = cases[caseId];
   expected = expectedTable(caseId);
   phase = CREATE;
-  CkArrayOptions opts = c.dims == 1 ? CkArrayOptions(c.nx)
-                        : c.dims == 2 ? CkArrayOptions(c.nx, c.ny)
-                                      : CkArrayOptions(c.nx, c.ny, c.nz);
+  const int* x = c.ext;
+  CkArrayOptions opts;
+  switch (c.dims)
+  {
+    case 1: opts = CkArrayOptions(x[0]); break;
+    case 2: opts = CkArrayOptions(x[0], x[1]); break;
+    case 3: opts = CkArrayOptions(x[0], x[1], x[2]); break;
+    case 4: opts = CkArrayOptions((short)x[0], (short)x[1], (short)x[2], (short)x[3]); break;
+    case 5:
+      opts = CkArrayOptions((short)x[0], (short)x[1], (short)x[2], (short)x[3], (short)x[4]);
+      break;
+    default:
+      opts = CkArrayOptions((short)x[0], (short)x[1], (short)x[2], (short)x[3], (short)x[4],
+                            (short)x[5]);
+  }
   if (c.insert) opts.setBounds(N1 + NINSERT);
   opts.setMap(createMap(c.map));
   CProxy_arraymaps_driver self(thisProxy);
-  if (c.dims == 1)
-    arr = CProxy_arraymaps_1d::ckNew(self, caseId, true, expected, opts);
-  else if (c.dims == 2)
-    arr = CProxy_arraymaps_2d::ckNew(self, caseId, true, expected, opts);
-  else
-    arr = CProxy_arraymaps_3d::ckNew(self, caseId, true, expected, opts);
+  switch (c.dims)
+  {
+    case 1: arr = CProxy_arraymaps_1d::ckNew(self, caseId, true, expected, opts); break;
+    case 2: arr = CProxy_arraymaps_2d::ckNew(self, caseId, true, expected, opts); break;
+    case 3: arr = CProxy_arraymaps_3d::ckNew(self, caseId, true, expected, opts); break;
+    case 4: arr = CProxy_arraymaps_4d::ckNew(self, caseId, true, expected, opts); break;
+    case 5: arr = CProxy_arraymaps_5d::ckNew(self, caseId, true, expected, opts); break;
+    default: arr = CProxy_arraymaps_6d::ckNew(self, caseId, true, expected, opts);
+  }
+}
+
+enum { OP_MIGRATE, OP_PING, OP_DESTROY };
+template <class Proxy>
+static void arraymaps_bcast(CkArrayID arr, int op)
+{
+  Proxy p(arr);
+  if (op == OP_MIGRATE) p.migrate();
+  else if (op == OP_PING) p.ping();
+  else p.destroy();
+}
+
+// Broadcasts migrate(), ping() or destroy() to the current case's array.
+static void arraymaps_bcastOp(int dims, CkArrayID arr, int op)
+{
+  switch (dims)
+  {
+    case 1: arraymaps_bcast<CProxy_arraymaps_1d>(arr, op); break;
+    case 2: arraymaps_bcast<CProxy_arraymaps_2d>(arr, op); break;
+    case 3: arraymaps_bcast<CProxy_arraymaps_3d>(arr, op); break;
+    case 4: arraymaps_bcast<CProxy_arraymaps_4d>(arr, op); break;
+    case 5: arraymaps_bcast<CProxy_arraymaps_5d>(arr, op); break;
+    default: arraymaps_bcast<CProxy_arraymaps_6d>(arr, op);
+  }
 }
 
 // v = [count, sum f(flat), one slot per flat index]
@@ -307,15 +381,11 @@ void arraymaps_driver::phaseDone(int n, int* v)
       break;
     case MIGRATE:
       phase = PING;
-      if (c.dims == 1) CProxy_arraymaps_1d(arr).ping();
-      else if (c.dims == 2) CProxy_arraymaps_2d(arr).ping();
-      else CProxy_arraymaps_3d(arr).ping();
+      arraymaps_bcastOp(c.dims, arr, OP_PING);
       break;
     case PING:
       phase = DESTROY;
-      if (c.dims == 1) CProxy_arraymaps_1d(arr).destroy();
-      else if (c.dims == 2) CProxy_arraymaps_2d(arr).destroy();
-      else CProxy_arraymaps_3d(arr).destroy();
+      arraymaps_bcastOp(c.dims, arr, OP_DESTROY);
       break;
     case DESTROY:
       nextCase();
@@ -333,11 +403,8 @@ void arraymaps_driver::inserted(int flat, int pe)
 
 void arraymaps_driver::startMigrate(void)
 {
-  const int dims = cases[caseId].dims;
   phase = MIGRATE;
-  if (dims == 1) CProxy_arraymaps_1d(arr).migrate();
-  else if (dims == 2) CProxy_arraymaps_2d(arr).migrate();
-  else CProxy_arraymaps_3d(arr).migrate();
+  arraymaps_bcastOp(cases[caseId].dims, arr, OP_MIGRATE);
 }
 
 /******************** megatest hooks ********************/
@@ -349,6 +416,7 @@ void arraymaps_moduleinit(void)
   char** argv = CkGetArgv();
   for (int i = 0; argv[i] != NULL; i++)
   {
+    if (strcmp(argv[i], "+useNodeBlkMapping") == 0) nodeBlk = true;
     if (strcmp(argv[i], "+ConfigurableRRMap") != 0 || argv[i + 1] == NULL) continue;
     std::istringstream in(argv[i + 1]);
     in >> crrObjs >> crrPEs;

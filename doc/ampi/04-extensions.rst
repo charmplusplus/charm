@@ -517,10 +517,10 @@ as ``co_await`` expressions, so every function that calls one, directly or
 through another function, must itself be a coroutine returning
 ``campi::task<T>`` and be awaited; the compiler rejects a blocking call from
 an ordinary function. Blocking routines campi does not provide yet fail to
-compile by name: the topology and intercommunicator constructors,
-``MPI_Comm_split_type``, ``MPI_Comm_create_group``, ``MPI_Comm_idup``, the
-neighbor collectives, ``MPI_Ireduce_scatter`` and
-``MPI_Ireduce_scatter_block``, and the one-sided routines. Unlike thread AMPI, ``MPI_Finalize`` does not end the
+compile by name: these are the one-sided routines. As in thread AMPI,
+``MPI_Comm_idup``, ``MPI_Ireduce_scatter`` and ``MPI_Ireduce_scatter_block``
+complete before they return and set the request to ``MPI_REQUEST_NULL``;
+in campi they are therefore awaited like blocking calls. Unlike thread AMPI, ``MPI_Finalize`` does not end the
 rank: the process exit code is the value main ``co_return``\ s.
 
 A campi rank migrates and is checkpointed only at ``AMPI_Migrate``, and it
@@ -544,16 +544,16 @@ to the migration point the rank was at, where ``AMPI_Migrate`` returns:
    };
 
    CAMPI_MAIN_STATE(State, argc, argv, s) {
-     CAMPI_RESUMABLE();                  // jump to the recorded site
-     MPI_Init(&argc, &argv);             // skipped when the rank restarts
-     s.nsteps = 100;
-     s.u.assign(1000, 0.0);
-     for (s.step = 0; s.step < s.nsteps; s.step++) {
-       // ... computation and MPI calls; locals here are fine ...
-       CAMPI_MIGRATE(AMPI_INFO_LB_SYNC); // a migration point
+     CAMPI_MIGRATABLE {                    // jump to the recorded site
+       MPI_Init(&argc, &argv);             // skipped when the rank restarts
+       s.nsteps = 100;
+       s.u.assign(1000, 0.0);
+       for (s.step = 0; s.step < s.nsteps; s.step++) {
+         // ... computation and MPI calls; locals here are fine ...
+         CAMPI_MIGRATE(AMPI_INFO_LB_SYNC); // a migration point
+       }
+       MPI_Finalize();
      }
-     MPI_Finalize();
-     CAMPI_END();
      co_return 0;
    }
 
@@ -562,9 +562,10 @@ The macros:
 - ``CAMPI_MAIN_STATE(State, argc, argv, s)`` declares main with a state
   object ``s`` of type ``State``, which must be default constructible and
   have a ``pup`` routine. ``CAMPI_MAIN(argc, argv)`` is main without one.
-- ``CAMPI_RESUMABLE()`` and ``CAMPI_END()`` open and close the switch of a
-  resumable function. Every function on the path from main to a migration
-  point has its own pair.
+- ``CAMPI_MIGRATABLE { ... }`` marks the body of a resumable function:
+  when the rank restarts, it jumps to the recorded migration point in the
+  block, and aborts if the block has no such point. Every function on the
+  path from main to a migration point has its own block.
 - ``CAMPI_MIGRATE(info)`` is ``AMPI_Migrate(info)`` at a migration point.
   A bare ``AMPI_Migrate`` aborts at run time.
 - ``CAMPI_CALL(f(...))`` awaits a resumable function that contains a

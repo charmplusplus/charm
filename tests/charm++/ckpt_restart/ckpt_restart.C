@@ -35,15 +35,6 @@
 //   (a broadcast census returns exactly the live set, with matching ids).
 // - New: the checkpoint is written by 1 or 2 processes and restarted in 2 or 1.
 //
-// Plain chare and insertions: an array element inserted on a PE that also hosts a
-// plain (non-array) chare can take that chare's slot in the PE's chare table, and
-// when the element is later destroyed or migrates away the chare's next message
-// crashes (runtime defect; an issue is being filed). So the plain chare lives on
-// PE 0, elements are never inserted on PE 0, and the chare is messaged only
-// before the insertions of the run. PE 0 always hosts the mainchare, whose slot an
-// element inserted there would take as well, so the program needs at least 2 PEs
-// until the defect is fixed (at 1 PE a checked build aborts in ~Chare).
-//
 // Options: -steps N (default 16); -ckpt-at K: checkpoint to log/ after step K
 // (without it the 16 insertions of step K happen after step 6); -c;
 // -write-check F; -expect-check F.
@@ -76,8 +67,8 @@ static const int chareValue = 7;
 
 void unbufferStdout(void) { setvbuf(stdout, NULL, _IONBF, 0); }
 
-// Unbounded elements avoid PE 0, where the plain chare lives (see the top).
-static int insertPe(int i) { return CkNumPes() > 1 ? 1 + i % (CkNumPes() - 1) : 0; }
+// PE 0, which hosts the mainchare and the plain chare, gets elements too (charm #4218).
+static int insertPe(int i) { return i % CkNumPes(); }
 static bool baseDestroyed(int i) { return i % 4 == 3; }
 
 struct IdPair
@@ -130,9 +121,6 @@ public:
       phaseStep = ckptAt;
     parseRunArgs(argv);
     CkEnforce(phaseStep >= 1 && phaseStep < nSteps);
-    if (CkNumPes() < 2)
-      CkAbort("ckpt_restart needs at least 2 PEs: elements must not be inserted on PE 0"
-              " (see the top of ckpt_restart.C)\n");
     delete m;
     a = 123; b[0] = 456; b[1] = 789;
     roSteps = nSteps;
@@ -146,7 +134,7 @@ public:
     chareProxy = CProxy_PlainChare::ckNew(0);
     CkPrintf("ckpt_restart: %d steps, %d PEs, %d processes, checkpoint after step %d\n",
              nSteps, CkNumPes(), CkNumNodes(), ckptAt);
-    // The plain chare is messaged before any insertion (see the top).
+    // The plain chare is messaged before any insertion.
     chareProxy.sayHi(chareValue);
   }
 
