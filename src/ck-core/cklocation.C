@@ -481,6 +481,21 @@ public:
   }
 };
 
+// True when every component of i lies within the extents n an array was created
+// with. Maps that have no PE for other indices return -1 from procNum, so
+// ckInsert without a PE aborts (CProxy_ArrayBase::ckInsertIdx).
+static bool indexWithinExtents(const CkArrayIndex& n, const CkArrayIndex& i)
+{
+  if (i.dimension != n.dimension) return false;
+  for (int d = 0; d < i.dimension; d++)
+  {
+    const int x = i.dimension > 3 ? i.shortData()[d] : i.data()[d];
+    const int extent = n.dimension > 3 ? n.shortData()[d] : n.data()[d];
+    if (x < 0 || x >= extent) return false;
+  }
+  return true;
+}
+
 /**
  * The default map object -- This does blocked mapping in the general case and
  * calls the round-robin procNum for the dynamic insertion case -- ASB
@@ -664,6 +679,7 @@ public:
     {
       return RRMap::procNum(arrayHdl, i);
     }
+    if (!indexWithinExtents(amaps[arrayHdl]->_nelems, i)) return -1;
 
     if (i.dimension == 1)
     {
@@ -942,6 +958,7 @@ public:
     {
       return RRMap::procNum(arrayHdl, i);
     }
+    if (!indexWithinExtents(amaps[arrayHdl]->_nelems, i)) return -1;
     if (i.dimension == 1)
     {
       flati = i.data()[0];
