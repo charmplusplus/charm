@@ -1,0 +1,15 @@
+module nodereduction {
+  // Runs the two phases in nodereduction.C (lives on PE 0).
+  chare nodereduction_driver {
+    entry nodereduction_driver(void);
+    entry void startRest(void);
+    entry void startRoot(void);
+    entry [reductiontarget] void sumDone(int n, int v[n]);
+    entry void setDone(CkReductionMsg* m);
+  };
+
+  nodegroup nodereduction_ng {
+    entry nodereduction_ng(void);
+    entry void burst(CProxy_nodereduction_driver driver, int phase);
+  };
+};

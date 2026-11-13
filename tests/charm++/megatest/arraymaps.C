@@ -36,7 +36,8 @@
  *
  * Maps and what is left out:
  *   RRMap, BlockMap: 1D/2D/3D, with insertion in 1D. DefaultArrayMap: 1D-6D,
- *     with insertion in 1D-3D, and a SHARE case.
+ *     with insertion in 1D-3D, and a SHARE case; with +useNodeBlkMapping its
+ *     table is blocks per process, then blocks per PE within each process.
  *   FastArrayMap: 1D-6D, insertion with a PE in 1D, and a SHARE case.
  *   HilbertArrayMap: 1D 37, 2D 5x7 and 4x4, 3D 3x4x5 and 4x4x4, insertion
  *     with a PE in 1D-3D, and a SHARE case. At creation no PE may hold more
@@ -119,9 +120,9 @@ static const int nCases = sizeof(cases) / sizeof(cases[0]);
 
 static const int NINSERT = 5;  // inserted: flat indices initialCount..initialCount+4
 
-// +useNodeBlkMapping changes DefaultArrayMap's placement; its table is then
-// not computed.
-static bool nodeBlk = false;
+// Set by +useNodeBlkMapping (init.C): DefaultArrayMap places blocks per
+// process, then blocks per PE within the process.
+extern bool useNodeBlkMapping;
 
 // +ConfigurableRRMap "<objs per block> <PEs per block> <location of each obj>",
 // read on PE 0 by arraymaps_moduleinit without removing it from argv.
@@ -260,12 +261,28 @@ static std::vector<int> expectedTable(int c)
 {
   std::vector<int> e(arraymaps_slots(c), -1);
   const int P = CkNumPes(), n = initialCount(c);
-  if (cases[c].map == DEFAULT && !nodeBlk)
+  if (cases[c].map == DEFAULT && !useNodeBlkMapping)
   {
     // Blocks of n/P, the first n%P PEs taking one more.
     const int lo = n / P, rem = n % P;
     for (int i = 0; i < n; i++)
       e[i] = i < rem * (lo + 1) ? i / (lo + 1) : rem + (i - rem * (lo + 1)) / lo;
+  }
+  else if (cases[c].map == DEFAULT)
+  {
+    // The same split twice: n over the processes, then each process's block
+    // over its PEs (all processes have CkNodeSize(0) PEs).
+    const int N = CkNumNodes(), S = CkNodeSize(0);
+    const int lo = n / N, rem = n % N;
+    for (int i = 0; i < n; i++)
+    {
+      const int node = i < rem * (lo + 1) ? i / (lo + 1) : rem + (i - rem * (lo + 1)) / lo;
+      const int start = node < rem ? node * (lo + 1) : rem * (lo + 1) + (node - rem) * lo;
+      const int m = node < rem ? lo + 1 : lo, off = i - start;
+      const int plo = m / S, prem = m % S;
+      e[i] = CkNodeFirst(node) +
+             (off < prem * (plo + 1) ? off / (plo + 1) : prem + (off - prem * (plo + 1)) / plo);
+    }
   }
   else if (cases[c].map == FAST)
   {
@@ -550,7 +567,6 @@ void arraymaps_moduleinit(void)
   char** argv = CkGetArgv();
   for (int i = 0; argv[i] != NULL; i++)
   {
-    if (strcmp(argv[i], "+useNodeBlkMapping") == 0) nodeBlk = true;
     if (strcmp(argv[i], "+ConfigurableRRMap") != 0 || argv[i + 1] == NULL) continue;
     std::istringstream in(argv[i + 1]);
     in >> crrObjs >> crrPEs;

@@ -19,15 +19,22 @@
 //   rotate   every migratable element moved from PE p to (p+1)%P
 //   dummy    no element moved
 //   random   integrity checks only
+// -expect also takes one class per step separated by slashes, for runs that
+// give several +balancer options (step s uses the s-th class, the last one
+// for the rest): -expect rotate/dummy.
 // The lower bound is max(total/P, largest migratable load, largest
 // non-migratable load on one PE). With -localfreq F the balancer is taken to
 // balance only within each process except on steps s with (s+1)%F == 0 (a
 // TreeLB process level with a root step_freq of F); on those other steps the
 // bound is computed per process.
 //
+// With -manual 1 load balancing is manual (TurnManualLBOn on every PE): AtSync
+// does not start a step; after every element has called AtSync a reduction
+// reaches Main, which calls CkStartLB().
+//
 //   ./lbsweep +p4 -expect improve [-tol 1.34] [-n 64] [-steps 3]
 //       [-profile heavy|ramp|uniform] [-nonmig 16] [-maxmig 0.5]
-//       [-localfreq 1] +balancer GreedyLB
+//       [-localfreq 1] [-manual 0] +balancer GreedyLB
 #include "lbsweep.decl.h"
 #include <cmath>
 #include <cstring>
@@ -40,6 +47,21 @@
 /* readonly */ int numIters;
 /* readonly */ int profile;
 /* readonly */ int nonmigEvery;
+/* readonly */ int manualLB;
+
+// Runs on every PE before the main chare: manual mode has to be on everywhere
+// before the first AtSync, so the flag is read from argv here as well.
+void lbsweepInitProc(void)
+{
+  char** argv = CkGetArgv();
+  for (int a = 0; argv[a] != NULL && argv[a + 1] != NULL; a++)
+    if (!strcmp(argv[a], "-manual") && atoi(argv[a + 1]) != 0) TurnManualLBOn();
+}
+
+static bool knownClass(const std::string& c)
+{
+  return c == "improve" || c == "rotate" || c == "dummy" || c == "random";
+}
 
 enum { PROFILE_HEAVY, PROFILE_RAMP, PROFILE_UNIFORM };
 
@@ -180,7 +202,7 @@ class Elem : public CBase_Elem
 
 class Main : public CBase_Main
 {
-  std::string expect = "improve";
+  std::vector<std::string> expects{"improve"};
   double tol = 4.0 / 3.0;
   double maxMigFrac = 1.0;
   int localFreq = 1;
@@ -217,6 +239,7 @@ class Main : public CBase_Main
     numIters = 2;
     profile = PROFILE_HEAVY;
     nonmigEvery = 16;
+    manualLB = 0;
     for (int a = 1; a < m->argc; a++)
     {
       const char* o = m->argv[a];
@@ -226,7 +249,19 @@ class Main : public CBase_Main
       else if (!strcmp(o, "-steps")) numSteps = atoi(val);
       else if (!strcmp(o, "-iters")) numIters = atoi(val);
       else if (!strcmp(o, "-nonmig")) nonmigEvery = atoi(val);
-      else if (!strcmp(o, "-expect")) expect = val;
+      else if (!strcmp(o, "-expect"))
+      {
+        expects.clear();
+        std::string list = val;
+        size_t start = 0, slash;
+        do
+        {
+          slash = list.find('/', start);
+          expects.push_back(list.substr(start, slash - start));
+          start = slash + 1;
+        } while (slash != std::string::npos);
+      }
+      else if (!strcmp(o, "-manual")) manualLB = atoi(val);
       else if (!strcmp(o, "-tol")) tol = atof(val);
       else if (!strcmp(o, "-maxmig")) maxMigFrac = atof(val);
       else if (!strcmp(o, "-localfreq")) localFreq = atoi(val);
@@ -240,12 +275,16 @@ class Main : public CBase_Main
       else CkAbort("lbsweep: unknown option %s\n", o);
       a++;
     }
-    if (expect != "improve" && expect != "rotate" && expect != "dummy" && expect != "random")
-      CkAbort("lbsweep: unknown -expect %s\n", expect.c_str());
+    std::string expectList;
+    for (const std::string& c : expects)
+    {
+      if (!knownClass(c)) CkAbort("lbsweep: unknown -expect class %s\n", c.c_str());
+      expectList += (expectList.empty() ? "" : "/") + c;
+    }
     if (numElems < 1 || numSteps < 1 || numIters < 1 || localFreq < 1)
       CkAbort("lbsweep: bad -n/-steps/-iters/-localfreq\n");
     CkPrintf("lbsweep: %d elements on %d PEs in %d processes, %d steps, expect %s, tol %.3f\n",
-             numElems, CkNumPes(), CkNumNodes(), numSteps, expect.c_str(), tol);
+             numElems, CkNumPes(), CkNumNodes(), numSteps, expectList.c_str(), tol);
     delete m;
     mainProxy = thisProxy;
     CkArrayOptions opts(numElems);
@@ -254,9 +293,13 @@ class Main : public CBase_Main
     elems.run();
   }
 
+  // Every element has called AtSync (manual mode only).
+  void readyForLB() { CkStartLB(); }
+
   void stepDone(int n, double* v)
   {
     const int P = CkNumPes();
+    const std::string& expect = expects[std::min<size_t>(stepsDone, expects.size() - 1)];
     CkAssert(n == rSize());
     const double* before = v + rBefore();
     const double* after = v + rAfter();
@@ -291,9 +334,9 @@ class Main : public CBase_Main
       for (int node = 0; node < CkNumNodes(); node++)
         lb = std::max(lb, bound(before, fixed, CkNodeFirst(node),
                                 CkNodeFirst(node) + CkNodeSize(node)));
-    CkPrintf("lbsweep: step %d: max/avg %.3f -> %.3f, %s bound %.3f, migrations %ld of %ld\n",
-             stepsDone, maxB / avg, maxA / avg, local ? "process" : "global", lb / avg, moved,
-             migratable);
+    CkPrintf("lbsweep: step %d (%s): max/avg %.3f -> %.3f, %s bound %.3f, migrations %ld of %ld\n",
+             stepsDone, expect.c_str(), maxB / avg, maxA / avg, local ? "process" : "global",
+             lb / avg, moved, migratable);
 
     if (expect == "improve")
     {
