@@ -259,6 +259,7 @@ public:
       CK_WHEN(inbox::resume());
       mainProxy.chareDone(sum);
       ckDestroyLater();   // destroyed once the entry method running this body returns
+      ckDestroyLater();   // a second call does nothing more
     }
   }
 };

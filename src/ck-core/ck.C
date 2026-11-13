@@ -15,6 +15,8 @@ clients, including the rest of Charm++, are actually C++.
 #include "LBManager.h"
 #endif // CMK_LBDB_ON
 
+#include <unordered_set>
+
 #ifndef CMK_CHARE_USE_PTR
 #include <map>
 CkpvDeclare(std::vector<void *>, chare_objs);
@@ -38,7 +40,11 @@ bool _ckCoroFakeMigrate = false;     // +ck_fakemigrate (parsed in init.C), read
 // ckDestroyLater: a Converse message to this PE whose handler destroys the
 // chare, so the destruction follows the return of whatever is running on
 // the chare now (an entry method, or a direct call that resumed a
-// coroutine), and several chares may ask on one PE.
+// coroutine), and several chares may ask on one PE. The chares that asked
+// and still exist are in _ckDestroyLaterPending: a second call sends
+// nothing, and a chare destroyed another way first leaves the set in
+// ~Chare, so its message finds nothing to destroy.
+CkpvDeclare(std::unordered_set<Chare *>, _ckDestroyLaterPending);
 int _ckDestroyLaterHandlerIdx;
 struct CkDestroyLaterMsg {
   char core[CmiMsgHeaderSizeBytes];
@@ -47,10 +53,12 @@ struct CkDestroyLaterMsg {
 void _ckDestroyLaterHandler(void *m) {
   Chare *obj = ((CkDestroyLaterMsg *)m)->obj;
   CmiFree(m);
+  if (CkpvAccess(_ckDestroyLaterPending).erase(obj) == 0) return;
   obj->ckDestroy();
 }
 void Chare::ckDestroy(void) { delete this; }
 void Chare::ckDestroyLater(void) {
+  if (!CkpvAccess(_ckDestroyLaterPending).insert(this).second) return;
   CkDestroyLaterMsg *m = (CkDestroyLaterMsg *)CmiAlloc(sizeof(CkDestroyLaterMsg));
   m->obj = this;
   CmiSetHandler(m, _ckDestroyLaterHandlerIdx);
@@ -137,6 +145,9 @@ void Chare::CkEnableObjQ()
 
 Chare::~Chare() {
   CkCallstackUnwind(this);
+  // A ckDestroyLater message still on its way finds nothing to destroy.
+  if (CkpvInitialized(_ckDestroyLaterPending) && !CkpvAccess(_ckDestroyLaterPending).empty())
+    CkpvAccess(_ckDestroyLaterPending).erase(this);
 
 #ifndef CMK_CHARE_USE_PTR
 /*

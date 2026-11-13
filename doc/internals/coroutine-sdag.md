@@ -238,8 +238,12 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
   handler calls the virtual `ckDestroy()`; so the destruction follows the
   return of whatever is running on the chare, an entry method or a direct
   call (the load balancer's `ResumeFromSync`), and several chares of one
-  PE may ask in one entry method. `Chare::ckDestroy` deletes, the
-  array element's detaches first, a group's aborts.
+  PE may ask in one entry method. The per-PE set `_ckDestroyLaterPending`
+  holds the chares whose message is on its way: `ckDestroyLater` sends
+  only when it inserts, the handler destroys only what it erases, and
+  `~Chare` erases its chare, so a second call sends nothing and a chare
+  destroyed another way first is not destroyed again. `Chare::ckDestroy`
+  deletes, the array element's detaches first, a group's aborts.
 
 ## Where in the source
 

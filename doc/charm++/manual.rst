@@ -1600,7 +1600,9 @@ array first, as ``ckDestroy()`` does) by a message to the same PE,
 handled after whatever is running on the chare has returned: the entry
 method, or a direct call such as the load balancer's call of
 ``ResumeFromSync``. The chare must not migrate before then, so the call
-belongs at the end of the body. This is the way to destroy a chare when
+belongs at the end of the body. Calling it again before then has no
+further effect, and a chare destroyed in another way in the meantime is
+not destroyed a second time. This is the way to destroy a chare when
 something of it is still on the stack, for example a coroutine entry
 method (section :numref:`sec:ckcoro`) that has not finished yet; a
 singleton chare's entry method may instead ``delete this`` as its last

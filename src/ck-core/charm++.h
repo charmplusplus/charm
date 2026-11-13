@@ -261,7 +261,9 @@ class Chare {
     /// the chare is still on the stack: a coroutine body, for example).
     /// The destruction is a message to this PE, handled after the current
     /// call returns, whether it came through an entry method or a direct
-    /// call; the chare must not migrate before then.
+    /// call; the chare must not migrate before then. A second call before
+    /// then does nothing more, and a chare destroyed another way first is
+    /// not destroyed again.
     void ckDestroyLater(void);
     // object message queue
     void  CkEnableObjQ();
