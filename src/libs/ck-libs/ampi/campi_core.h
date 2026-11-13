@@ -156,7 +156,7 @@ struct main_registrar {
 
 /* ---------------- restart sites ---------------- */
 
-// One per resumable function (CAMPI_RESUMABLE). The rank keeps a chain of
+// One per resumable function (CAMPI_MIGRATABLE). The rank keeps a chain of
 // site ids, one per active frame_guard depth: entry d is the last site
 // (CAMPI_MIGRATE or CAMPI_CALL, both identified by __LINE__) noted by the
 // function at depth d. A restarted rank (after migration, restart from a
@@ -287,6 +287,20 @@ request_awaiter Recv(void *buf, int count, MPI_Datatype type, int src, int tag, 
 request_awaiter Sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
                          void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
                          MPI_Comm comm, MPI_Status *sts);
+request_awaiter Bsend(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                      MPI_Comm comm);
+request_awaiter Rsend(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                      MPI_Comm comm);
+request_awaiter Mrecv(void *buf, int count, MPI_Datatype type, MPI_Message *msg,
+                      MPI_Status *sts);
+task<int> Sendrecv_replace(void *buf, int count, MPI_Datatype type, int dest, int stag, int src,
+                           int rtag, MPI_Comm comm, MPI_Status *sts);
+// Block until a matching message has arrived (MPI_Probe), and take it (MPI_Mprobe).
+task<int> Probe(int src, int tag, MPI_Comm comm, MPI_Status *sts);
+task<int> Mprobe(int src, int tag, MPI_Comm comm, MPI_Message *msg, MPI_Status *sts);
+// Block until at least one of the requests is complete.
+task<int> Waitany(int n, MPI_Request *reqs, int *index, MPI_Status *sts);
+task<int> Waitsome(int n, MPI_Request *reqs, int *outcount, int *indices, MPI_Status *sts);
 
 /* ---------------- blocking collectives ---------------- */
 
@@ -320,6 +334,15 @@ request_awaiter Scan(const void *sbuf, void *rbuf, int count, MPI_Datatype type,
                      MPI_Comm comm);
 request_awaiter Exscan(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
                        MPI_Comm comm);
+// A reduction to rank 0, then a scatter, each awaited (as in ampi.C).
+task<int> Reduce_scatter_block(const void *sbuf, void *rbuf, int count, MPI_Datatype type,
+                               MPI_Op op, MPI_Comm comm);
+task<int> Reduce_scatter(const void *sbuf, void *rbuf, const int *rcounts, MPI_Datatype type,
+                         MPI_Op op, MPI_Comm comm);
+// One receive and one send per rank, awaited together; displacements in bytes.
+task<int> Alltoallw(const void *sbuf, const int *scounts, const int *sdispls,
+                    const MPI_Datatype *stypes, void *rbuf, const int *rcounts,
+                    const int *rdispls, const MPI_Datatype *rtypes, MPI_Comm comm);
 
 /* ---------------- tests and probes ---------------- */
 
@@ -349,7 +372,7 @@ task<int> Init_thread(int *argc, char ***argv, int required, int *provided);
 task<int> Finalize();
 // AMPI_Migrate: load balancing (ampi_load_balance=sync) or a checkpoint to
 // files (ampi_checkpoint=to_file=DIR). Must be reached through CAMPI_MIGRATE
-// (campi.h) inside CAMPI_RESUMABLE/CAMPI_END. A rank that moves, or restarts
+// (campi.h) inside a CAMPI_MIGRATABLE block. A rank that moves, or restarts
 // from the checkpoint, does not return from here: its frame is destroyed and
 // main runs again from the top to this site, where Migrate returns at once.
 task<int> Migrate(MPI_Info hints);

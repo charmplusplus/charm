@@ -42,15 +42,15 @@
  *     void pup(PUP::er &p) { p | step; p | nsteps; }
  *   };
  *   CAMPI_MAIN_STATE(State, argc, argv, s) {
- *     CAMPI_RESUMABLE();               // switch to the recorded site
- *     MPI_Init(&argc, &argv);          // skipped on a restarted rank
- *     s.nsteps = 100;
- *     for (s.step = 0; s.step < s.nsteps; s.step++) {
- *       ...
- *       CAMPI_MIGRATE(AMPI_INFO_LB_SYNC);  // a migrate site
+ *     CAMPI_MIGRATABLE {                 // jump to the recorded site
+ *       MPI_Init(&argc, &argv);          // skipped on a restarted rank
+ *       s.nsteps = 100;
+ *       for (s.step = 0; s.step < s.nsteps; s.step++) {
+ *         ...
+ *         CAMPI_MIGRATE(AMPI_INFO_LB_SYNC);  // a migrate site
+ *       }
+ *       MPI_Finalize();
  *     }
- *     MPI_Finalize();
- *     CAMPI_END();
  *     co_return 0;
  *   }
  *
@@ -61,7 +61,7 @@
  * (2) no request is outstanding at a migrate site; (3) code before a site is
  * skipped on restart, so its results must be in the state object. A
  * resumable function other than main that contains a site (directly or in a
- * function it awaits) has its own CAMPI_RESUMABLE/CAMPI_END and is awaited
+ * function it awaits) has its own CAMPI_MIGRATABLE block and is awaited
  * with CAMPI_CALL or CAMPI_CALL_TO. A site is one statement and may be the
  * body of an if or a loop. Case labels of a site must not be inside a switch
  * statement of the user's own, and two sites must not share a line.
@@ -91,16 +91,18 @@
 #define CAMPI_MAIN(argc_, argv_)                                              \
   CAMPI_MAIN_STATE(::campi::no_state, argc_, argv_, campi_unused_state_)
 
-// The start of the restart switch of a resumable function, and its end.
-#define CAMPI_RESUMABLE()                                                     \
+// The restart switch of a resumable function, written in front of the block
+// that is its body: CAMPI_MIGRATABLE { ... }. Site 0 enters the block at its
+// start and a recorded site at that site's case label; any other site aborts
+// at the default label before running any of the block.
+#define CAMPI_MIGRATABLE                                                      \
   ::campi::frame_guard campi_frame_;                                          \
-  switch (campi_frame_.site()) {                                              \
-  case 0:
-#define CAMPI_END()                                                           \
-  break;                                                                      \
-  default:                                                                    \
-    ::campi::abort_no_site(campi_frame_);                                     \
-  }
+  switch (campi_frame_.site())                                                \
+  case 0:                                                                     \
+    if (false)                                                                \
+    default:                                                                  \
+      ::campi::abort_no_site(campi_frame_);                                   \
+    else
 
 // A migrate site: AMPI_Migrate(info) at a restart point. The case label comes
 // first and the rest is one statement, so a site may be the body of an if or a
@@ -165,6 +167,17 @@
 #undef MPI_Request_get_status
 #undef MPI_Iprobe
 #undef MPI_Improbe
+#undef MPI_Probe
+#undef MPI_Mprobe
+#undef MPI_Mrecv
+#undef MPI_Waitany
+#undef MPI_Waitsome
+#undef MPI_Bsend
+#undef MPI_Rsend
+#undef MPI_Sendrecv_replace
+#undef MPI_Reduce_scatter
+#undef MPI_Reduce_scatter_block
+#undef MPI_Alltoallw
 #undef AMPI_Migrate
 
 #define MPI_Init(...)        CAMPI_AWAIT(::campi::Init(__VA_ARGS__))
@@ -201,24 +214,24 @@
 #define MPI_Request_get_status(...) CAMPI_AWAIT(::campi::Request_get_status(__VA_ARGS__))
 #define MPI_Iprobe(...)      CAMPI_AWAIT(::campi::Iprobe(__VA_ARGS__))
 #define MPI_Improbe(...)     CAMPI_AWAIT(::campi::Improbe(__VA_ARGS__))
-// Aborts at run time unless written CAMPI_MIGRATE inside CAMPI_RESUMABLE/CAMPI_END.
+#define MPI_Probe(...)       CAMPI_AWAIT(::campi::Probe(__VA_ARGS__))
+#define MPI_Mprobe(...)      CAMPI_AWAIT(::campi::Mprobe(__VA_ARGS__))
+#define MPI_Mrecv(...)       CAMPI_AWAIT(::campi::Mrecv(__VA_ARGS__))
+#define MPI_Waitany(...)     CAMPI_AWAIT(::campi::Waitany(__VA_ARGS__))
+#define MPI_Waitsome(...)    CAMPI_AWAIT(::campi::Waitsome(__VA_ARGS__))
+#define MPI_Bsend(...)       CAMPI_AWAIT(::campi::Bsend(__VA_ARGS__))
+#define MPI_Rsend(...)       CAMPI_AWAIT(::campi::Rsend(__VA_ARGS__))
+#define MPI_Sendrecv_replace(...) CAMPI_AWAIT(::campi::Sendrecv_replace(__VA_ARGS__))
+#define MPI_Reduce_scatter(...) CAMPI_AWAIT(::campi::Reduce_scatter(__VA_ARGS__))
+#define MPI_Reduce_scatter_block(...) CAMPI_AWAIT(::campi::Reduce_scatter_block(__VA_ARGS__))
+#define MPI_Alltoallw(...)   CAMPI_AWAIT(::campi::Alltoallw(__VA_ARGS__))
+// Aborts at run time unless written CAMPI_MIGRATE inside a CAMPI_MIGRATABLE block.
 #define AMPI_Migrate(...)    CAMPI_AWAIT(::campi::Migrate(__VA_ARGS__))
 
 /* Routines that block inside AMPI (directly, or through a blocking MPI call,
  * a barrier, an internal waitall, or a [sync] entry method as every one-sided
  * operation and window lock does) and have no campi awaitable yet: a use
  * fails to compile instead of aborting at run time in TCharm::stop. */
-#undef MPI_Probe
-#undef MPI_Mprobe
-#undef MPI_Mrecv
-#undef MPI_Waitany
-#undef MPI_Waitsome
-#undef MPI_Bsend
-#undef MPI_Rsend
-#undef MPI_Sendrecv_replace
-#undef MPI_Reduce_scatter
-#undef MPI_Reduce_scatter_block
-#undef MPI_Alltoallw
 #undef MPI_Intercomm_create
 #undef MPI_Intercomm_merge
 #undef MPI_Cart_create
@@ -265,17 +278,6 @@
 #undef AMPI_GPU_Invoke_wr
 #undef AMPI_Yield
 #undef AMPI_Suspend
-#define MPI_Probe(...)                      campi_unsupported_blocking_call_MPI_Probe
-#define MPI_Mprobe(...)                     campi_unsupported_blocking_call_MPI_Mprobe
-#define MPI_Mrecv(...)                      campi_unsupported_blocking_call_MPI_Mrecv
-#define MPI_Waitany(...)                    campi_unsupported_blocking_call_MPI_Waitany
-#define MPI_Waitsome(...)                   campi_unsupported_blocking_call_MPI_Waitsome
-#define MPI_Bsend(...)                      campi_unsupported_blocking_call_MPI_Bsend
-#define MPI_Rsend(...)                      campi_unsupported_blocking_call_MPI_Rsend
-#define MPI_Sendrecv_replace(...)           campi_unsupported_blocking_call_MPI_Sendrecv_replace
-#define MPI_Reduce_scatter(...)             campi_unsupported_blocking_call_MPI_Reduce_scatter
-#define MPI_Reduce_scatter_block(...)       campi_unsupported_blocking_call_MPI_Reduce_scatter_block
-#define MPI_Alltoallw(...)                  campi_unsupported_blocking_call_MPI_Alltoallw
 #define MPI_Intercomm_create(...)           campi_unsupported_blocking_call_MPI_Intercomm_create
 #define MPI_Intercomm_merge(...)            campi_unsupported_blocking_call_MPI_Intercomm_merge
 #define MPI_Cart_create(...)                campi_unsupported_blocking_call_MPI_Cart_create

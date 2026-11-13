@@ -22,6 +22,9 @@ DIRS = \
   intercomm_merge \
   groupfree \
   bsend \
+  comm_create_group \
+  replace_ataw \
+  neighbor \
   wildcard \
   commdup \
   intercomm_coll \

@@ -1395,7 +1395,7 @@ static ampi *ampiInit(char **argv) noexcept
 //-------------------- ampiParent -------------------------
 ampiParent::ampiParent(CProxy_TCharm threads_,int nRanks_) noexcept
   : threads(threads_), ampiReqs(64, &reqPool), myDDT(ampiPredefinedTypes),
-    predefinedOps(ampiPredefinedOps), isTmpRProxySet(false)
+    predefinedOps(ampiPredefinedOps)
 {
   int barrier = 0x1234;
   STARTUP_DEBUG("ampiParent> starting up")
@@ -1493,8 +1493,7 @@ void ampiParent::pup(PUP::er &p) noexcept {
   ampiReqs.pup(p, &reqPool);
 
   p|kvlist;
-  p|isTmpRProxySet;
-  p|tmpRProxy;
+  p|pendingRProxies;
 
   p|userAboutToMigrateFn;
   p|userJustMigratedFn;
@@ -2347,6 +2346,7 @@ void ampi::pup(PUP::er &p) noexcept
   p|comm;
   p|tmpVec;
   p|remoteProxy;
+  p|numCommCreations;
   unexpectedMsgs.pup(p, AmmPupUnexpectedMsgs);
   postedReqs.pup(p, AmmPupPostedReqs);
   unexpectedBcastMsgs.pup(p, AmmPupUnexpectedMsgs);
@@ -2391,8 +2391,23 @@ void ampi::split(int color,int key,MPI_Comm *dest, AmpiCommType type) noexcept
 }
 
 // The two halves of split around its suspension (campi awaits in between)
+// Called by every member at the start of a call that creates a communicator.
+int ampi::beginCommCreation() noexcept
+{
+  creationId = ++numCommCreations;
+  if (tcharm_campi) campi_creation_begun(thread, creationId);
+  return creationId;
+}
+
+void ampi::unblockCreation(int id) noexcept
+{
+  if (tcharm_campi) campi_creation_done(thread, id);
+  thread->resume();
+}
+
 void ampi::splitPost(int color,int key, AmpiCommType type) noexcept
 {
+  beginCommCreation();
   MPI_Comm nextComm = parent->getNextComm();
   ampiSplitKey splitKey(nextComm,color,key,myRank,type);
   int rootIdx=myComm->getIndexForRank(0);
@@ -2531,17 +2546,18 @@ void ampi::registrationFinish() noexcept
       // MPI_Intercomm_create: the ranks are resumed by
       // ampi::setRemoteProxyAndUnblock once both groups' arrays exist.
       exchangeProxyOnFinish = false;
-      parentProxy[0].ExchangeProxy(newChildProxy);
+      parentProxy[std::min(thisIndex, remoteRootIdx)].ExchangeProxy(newChildProxy,
+                                                    std::max(thisIndex, remoteRootIdx));
     }
     else if (resumeNewArrayOnFinish) {
       // commCreate, cartCreate0D, intercommMerge: the new array's elements are
       // exactly the blocked ranks (both groups, for a merge); ranks of the old
       // communicator that are not members did not block.
       resumeNewArrayOnFinish = false;
-      newChildProxy.unblock();
+      newChildProxy.unblockCreation(creationId);
     }
     else {
-      thisProxy.unblock(); //split: every rank of the old communicator blocked in ampi::split
+      thisProxy.unblockCreation(creationId); //split: every rank of the old communicator blocked in ampi::split
     }
   }
 }
@@ -2620,6 +2636,7 @@ void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
 //   2. the root in the old communicator create the new array
 //   3. ampiParent::register is called to register new array as new comm
 MPI_Comm ampi::commCreate(const std::vector<int>& vec, AmpiCommType type) noexcept {
+  beginCommCreation();
   int rootIdx = vec[0];
   tmpVec = vec;
   CkCallback cb(CkIndex_ampi::commCreateReduced(NULL), CkArrayIndex1D(rootIdx), myComm->getProxy());
@@ -2658,14 +2675,6 @@ void ampi::commCreatePhase1(int nextComm, int commType) noexcept {
 }
 
 /* Virtual topology communicator creation */
-void ampiTopology::sortnbors(CProxy_ampi arrProxy, std::vector<int> &nbors_) noexcept {
-  if (nbors_.size() > 1) {
-    // Sort neighbors so that non-PE-local ranks are before PE-local ranks, so that
-    // we can overlap non-local messages with local ones which happen inline
-    std::partition(nbors_.begin(), nbors_.end(), [&](int idx) { return !arrProxy[idx].ckLocal(); } );
-  }
-}
-
 // 0-dimensional cart comm: rank 0 creates a dup of COMM_SELF with topo info.
 MPI_Comm ampi::cartCreate0D() noexcept {
   if (getRank() == 0) {
@@ -2686,6 +2695,7 @@ MPI_Comm ampi::cartCreate0D() noexcept {
 
 MPI_Comm ampi::cartCreate(std::vector<int>& vec, int ndims, const int* dims) noexcept {
   if (ndims == 0) {
+    beginCommCreation();
     return cartCreate0D();
   }
 
@@ -2701,9 +2711,12 @@ MPI_Comm ampi::cartCreate(std::vector<int>& vec, int ndims, const int* dims) noe
   return commCreate(vec, COMM_CART);
 }
 
-MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root, MPI_Comm tcomm) noexcept {
+// remoteRoot: the other group's leader (its world rank), valid at the root only
+MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root, int remoteRoot) noexcept {
+  beginCommCreation();
   if (thisIndex==root) { // not everybody gets the valid rvec
     tmpVec = remoteVec;
+    remoteRootIdx = remoteRoot;
   }
   CkCallback cb(CkIndex_ampi::intercommCreateReduced(NULL),CkArrayIndex1D(root),myComm->getProxy());
   MPI_Comm nextinter = parent->getNextComm();
@@ -2730,6 +2743,7 @@ void ampi::intercommCreateReduced(CkReductionMsg *msg) noexcept {
 }
 
 void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid only at local root
+  beginCommCreation();
   if(myRank == 0 && first == 1){ // first (lower) group creates the intracommunicator for the higher group
     const std::vector<int>& lvec = myComm->getIndices();
     const std::vector<int>& rvec = myComm->getRemoteIndices();
@@ -5073,8 +5087,9 @@ void ampi::sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
   MPI_Request reqs[2];
   irecv(buf, count, datatype, source, recvtag, comm, &reqs[0]);
 
+  // tmpBuf holds the packed bytes, so it is sent as bytes, not with datatype's layout.
   // FIXME: this send may do a copy internally! If we knew now that it would, we could avoid double copying:
-  reqs[1] = send(sendtag, getRank(), tmpBuf.data(), count, datatype, dest, comm, I_SEND);
+  reqs[1] = send(sendtag, getRank(), tmpBuf.data(), (int)tmpBuf.size(), MPI_BYTE, dest, comm, I_SEND);
 
   if (status == MPI_STATUS_IGNORE) {
     parent = parent->waitall(2, reqs);
@@ -5552,6 +5567,28 @@ static void handle_MPI_IN_PLACE_alltoallw(void* &sendbuf, void* recvbuf, int* &s
     sdispls    = (int*)rdispls;
   }
   CkAssert(recvbuf != MPI_IN_PLACE);
+}
+
+// For MPI_IN_PLACE in a nonblocking alltoall: widens [lo, hi) to the bytes that
+// count elements of type at byte offset disp in the receive buffer cover.
+static void inPlaceSpan(MPI_Aint &lo, MPI_Aint &hi, MPI_Aint disp, int count,
+                        MPI_Datatype type) noexcept
+{
+  if (count == 0) return;
+  CkDDT_DataType *ddt = getDDT()->getType(type);
+  MPI_Aint b = disp + ddt->getTrueLB();
+  MPI_Aint e = b + (MPI_Aint)(count - 1) * ddt->getExtent() + ddt->getTrueExtent();
+  if (lo == hi || b < lo) lo = b;
+  if (lo == hi || e > hi) hi = e;
+}
+
+// Copies bytes [lo, hi) of recvbuf into copy and returns the address that
+// stands for recvbuf in the copy, so the send displacements are unchanged.
+static char *inPlaceCopy(std::vector<char> &copy, const void *recvbuf,
+                         MPI_Aint lo, MPI_Aint hi) noexcept
+{
+  copy.assign((const char *)recvbuf + lo, (const char *)recvbuf + hi);
+  return copy.data() - lo;
 }
 
 #define AMPI_SYNC_REDUCE 0
@@ -9125,6 +9162,12 @@ AMPI_API_IMPL(int, MPI_Ialltoall, const void *sendbuf, int sendcount, MPI_Dataty
 
   // use an ATAReq to non-block the caller and get a request ptr
   ATAReq *newreq = new ATAReq(size*2);
+  if (sendbuf == recvbuf) { // MPI_IN_PLACE: send from a copy, since receives land in recvbuf
+    MPI_Aint lo = 0, hi = 0;
+    for (int i=0; i<size; i++)
+      inPlaceSpan(lo, hi, extent*i, recvcount, recvtype);
+    sendbuf = inPlaceCopy(newreq->sendCopy, recvbuf, lo, hi);
+  }
   for (int i=0; i<size; i++) {
     ptr->irecv((char*)recvbuf+(extent*i), recvcount, recvtype, i, MPI_ATA_TAG, comm, &newreq->reqs[i]);
   }
@@ -9270,6 +9313,12 @@ AMPI_API_IMPL(int, MPI_Ialltoallv, void *sendbuf, int *sendcounts, int *sdispls,
 
   // use an ATAReq to non-block the caller and get a request ptr
   ATAReq *newreq = new ATAReq(size*2);
+  if (sendbuf == recvbuf) { // MPI_IN_PLACE: send from a copy, since receives land in recvbuf
+    MPI_Aint lo = 0, hi = 0;
+    for (int i=0; i<size; i++)
+      inPlaceSpan(lo, hi, (MPI_Aint)extent*rdispls[i], recvcounts[i], recvtype);
+    sendbuf = inPlaceCopy(newreq->sendCopy, recvbuf, lo, hi);
+  }
   for (int i=0; i<size; i++) {
     ptr->irecv((char*)recvbuf+(extent*rdispls[i]), recvcounts[i],
                recvtype, i, MPI_ATA_TAG, comm, &newreq->reqs[i]);
@@ -9425,6 +9474,12 @@ AMPI_API_IMPL(int, MPI_Ialltoallw, const void *sendbuf, const int *sendcounts, c
 
   // use an ATAReq to non-block the caller and get a request ptr
   ATAReq *newreq = new ATAReq(size*2);
+  if (sendbuf == recvbuf) { // MPI_IN_PLACE: send from a copy, since receives land in recvbuf
+    MPI_Aint lo = 0, hi = 0;
+    for (int i=0; i<size; i++)
+      inPlaceSpan(lo, hi, rdispls[i], recvcounts[i], recvtypes[i]);
+    sendbuf = inPlaceCopy(newreq->sendCopy, recvbuf, lo, hi);
+  }
   for (int i=0; i<size; i++) {
     ptr->irecv((char*)recvbuf+rdispls[i], recvcounts[i], recvtypes[i],
                i, MPI_ATA_TAG, comm, &newreq->reqs[i]);
@@ -9432,12 +9487,45 @@ AMPI_API_IMPL(int, MPI_Ialltoallw, const void *sendbuf, const int *sendcounts, c
 
   for (int i=0; i<size; i++) {
     int dst = (rank+i) % size;
-    newreq->reqs[i] = ptr->send(MPI_ATA_TAG, rank, (char*)sendbuf+sdispls[dst],
-                                sendcounts[dst], sendtypes[dst], dst, comm, I_SEND);
+    newreq->reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, (char*)sendbuf+sdispls[dst],
+                                     sendcounts[dst], sendtypes[dst], dst, comm, I_SEND);
   }
   *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
+}
+
+/* One block of a neighbor collective's buffers. */
+struct NborBlock {
+  const void *buf;
+  int count;
+  MPI_Datatype type;
+};
+
+/* Posts a neighbor collective's receives and sends on ptr's communicator,
+   adding their requests to reqs: block j of the receive buffer, recvBlock(j),
+   comes from the j-th source and block i of the send buffer, sendBlock(i),
+   goes to the i-th destination (ampi::getNeighborLists). An MPI_PROC_NULL
+   neighbor's block is skipped. */
+template <class RecvBlock, class SendBlock>
+static void postNeighborExchange(ampi *ptr, RecvBlock recvBlock, SendBlock sendBlock,
+                                 std::vector<MPI_Request> &reqs) noexcept
+{
+  std::vector<int> srcs, dsts;
+  ptr->getNeighborLists(srcs, dsts);
+  MPI_Comm comm = ptr->getComm();
+  int rank = ptr->getRank();
+  for (int j = 0; j < (int)srcs.size(); j++) {
+    if (srcs[j] == MPI_PROC_NULL) continue;
+    NborBlock b = recvBlock(j);
+    MPI_Request req;
+    ptr->irecv(const_cast<void*>(b.buf), b.count, b.type, srcs[j], MPI_NBOR_TAG, comm, &req);
+    reqs.push_back(req);
+  }
+  for (int i : ptr->neighborSendOrder(dsts)) {
+    NborBlock b = sendBlock(i);
+    reqs.push_back(ptr->send(MPI_NBOR_TAG, rank, b.buf, b.count, b.type, dsts[i], comm, I_SEND));
+  }
 }
 
 AMPI_API_IMPL(int, MPI_Neighbor_alltoall, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
@@ -9464,28 +9552,15 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoall, const void* sendbuf, int sendcount, MP
 
   ampiParent *pptr = getAmpiParent();
   ampi *ptr = pptr->comm2ampi(comm);
-  int rank_in_comm = ptr->getRank();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint sextent = getDDT()->getExtent(sendtype) * sendcount; // block i at i*sendcount*extent (MPI 3.1 7.7)
+  MPI_Aint rextent = getDDT()->getExtent(recvtype) * recvcount;
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*j, recvcount, recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf + sextent*i, sendcount, sendtype}; };
 
-  if (ptr->getSize() == 1)
-    return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
-  int itemextent = getDDT()->getExtent(sendtype) * sendcount; // block i at i*sendcount*extent (MPI 3.1 7.7)
-  int extent = getDDT()->getExtent(recvtype) * recvcount;
-
-  std::vector<MPI_Request> reqs(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv(((char*)recvbuf)+(extent*j), recvcount, recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemextent*i)),
-                                      sendcount, sendtype, neighbors[i], comm, I_SEND);
-  }
-
+  std::vector<MPI_Request> reqs;
+  postNeighborExchange(ptr, recvBlock, sendBlock, reqs);
   pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
@@ -9517,31 +9592,16 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoall, const void* sendbuf, int sendcount, M
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank();
-
-  if (ptr->getSize() == 1) {
-    *request = ptr->postReq(getAmpiParent()->reqPool.newReq<IReq>(recvbuf,recvcount,recvtype,rank_in_comm,MPI_NBOR_TAG,comm,
-                            getDDT(), AMPI_REQ_COMPLETED));
-    return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
-  }
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
-  int itemextent = getDDT()->getExtent(sendtype) * sendcount; // block i at i*sendcount*extent (MPI 3.1 7.7)
-  int extent = getDDT()->getExtent(recvtype) * recvcount;
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint sextent = getDDT()->getExtent(sendtype) * sendcount; // block i at i*sendcount*extent (MPI 3.1 7.7)
+  MPI_Aint rextent = getDDT()->getExtent(recvtype) * recvcount;
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*j, recvcount, recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf + sextent*i, sendcount, sendtype}; };
 
   // use an ATAReq to non-block the caller and get a request ptr
-  ATAReq *newreq = new ATAReq(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv((char*)recvbuf+(extent*j), recvcount, recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, ((char*)sendbuf)+(i*itemextent),
-                                              sendcount, sendtype, neighbors[i], comm, I_SEND);
-  }
+  ATAReq *newreq = new ATAReq();
+  postNeighborExchange(ptr, recvBlock, sendBlock, newreq->reqs);
   *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
@@ -9571,28 +9631,15 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallv, const void* sendbuf, const int *sendc
 
   ampiParent *pptr = getAmpiParent();
   ampi *ptr = pptr->comm2ampi(comm);
-  int rank_in_comm = ptr->getRank();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint sextent = getDDT()->getExtent(sendtype); // displacements count elements
+  MPI_Aint rextent = getDDT()->getExtent(recvtype);
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*rdispls[j], recvcounts[j], recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf + sextent*sdispls[i], sendcounts[i], sendtype}; };
 
-  if (ptr->getSize() == 1)
-    return copyDatatype(sendtype, sendcounts[0], recvtype, recvcounts[0], sendbuf, recvbuf);
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
-  int itemextent = getDDT()->getExtent(sendtype); // sdispls count elements, each one extent apart
-  int extent = getDDT()->getExtent(recvtype);
-
-  std::vector<MPI_Request> reqs(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv(((char*)recvbuf)+(extent*rdispls[j]), recvcounts[j], recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemextent*sdispls[i])),
-                                      sendcounts[i], sendtype, neighbors[i], comm, I_SEND);
-  }
-
+  std::vector<MPI_Request> reqs;
+  postNeighborExchange(ptr, recvBlock, sendBlock, reqs);
   pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
@@ -9625,31 +9672,16 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoallv, const void* sendbuf, const int *send
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank();
-
-  if (ptr->getSize() == 1) {
-    *request = ptr->postReq(getAmpiParent()->reqPool.newReq<IReq>(recvbuf,recvcounts[0],recvtype,rank_in_comm,MPI_NBOR_TAG,comm,
-                            getDDT(), AMPI_REQ_COMPLETED));
-    return copyDatatype(sendtype, sendcounts[0], recvtype, recvcounts[0], sendbuf, recvbuf);
-  }
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
-  int itemextent = getDDT()->getExtent(sendtype); // sdispls count elements, each one extent apart
-  int extent = getDDT()->getExtent(recvtype);
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint sextent = getDDT()->getExtent(sendtype); // displacements count elements
+  MPI_Aint rextent = getDDT()->getExtent(recvtype);
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*rdispls[j], recvcounts[j], recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf + sextent*sdispls[i], sendcounts[i], sendtype}; };
 
   // use an ATAReq to non-block the caller and get a request ptr
-  ATAReq *newreq = new ATAReq(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv((char*)recvbuf+(extent*rdispls[j]), recvcounts[j], recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (char*)sendbuf+(itemextent*sdispls[i]),
-                                              sendcounts[i], sendtype, neighbors[i], comm, I_SEND);
-  }
+  ATAReq *newreq = new ATAReq();
+  postNeighborExchange(ptr, recvBlock, sendBlock, newreq->reqs);
   *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
@@ -9679,26 +9711,13 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallw, const void* sendbuf, const int *sendc
 
   ampiParent *pptr = getAmpiParent();
   ampi *ptr = pptr->comm2ampi(comm);
-  int rank_in_comm = ptr->getRank();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rdispls[j], recvcounts[j], recvtypes[j]}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf + sdispls[i], sendcounts[i], sendtypes[i]}; };
 
-  if (ptr->getSize() == 1)
-    return copyDatatype(sendtypes[0], sendcounts[0], recvtypes[0], recvcounts[0], sendbuf, recvbuf);
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
-
-  std::vector<MPI_Request> reqs(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv(((char*)recvbuf)+rdispls[j], recvcounts[j], recvtypes[j],
-               neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
-                                      sendcounts[i], sendtypes[i], neighbors[i], comm, I_SEND);
-  }
-
+  std::vector<MPI_Request> reqs;
+  postNeighborExchange(ptr, recvBlock, sendBlock, reqs);
   pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
@@ -9731,29 +9750,14 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoallw, const void* sendbuf, const int *send
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank();
-
-  if (ptr->getSize() == 1) {
-    *request = ptr->postReq(getAmpiParent()->reqPool.newReq<IReq>(recvbuf,recvcounts[0],recvtypes[0],rank_in_comm,MPI_NBOR_TAG,comm,
-                            getDDT(), AMPI_REQ_COMPLETED));
-    return copyDatatype(sendtypes[0], sendcounts[0], recvtypes[0], recvcounts[0], sendbuf, recvbuf);
-  }
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rdispls[j], recvcounts[j], recvtypes[j]}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf + sdispls[i], sendcounts[i], sendtypes[i]}; };
 
   // use an ATAReq to non-block the caller and get a request ptr
-  ATAReq *newreq = new ATAReq(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv((char*)recvbuf+rdispls[j], recvcounts[j], recvtypes[j],
-               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
-                                              sendcounts[i], sendtypes[i], neighbors[i], comm, I_SEND);
-  }
+  ATAReq *newreq = new ATAReq();
+  postNeighborExchange(ptr, recvBlock, sendBlock, newreq->reqs);
   *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
@@ -9783,27 +9787,14 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgather, const void* sendbuf, int sendcount, M
 
   ampiParent *pptr = getAmpiParent();
   ampi *ptr = pptr->comm2ampi(comm);
-  int rank_in_comm = ptr->getRank();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint rextent = getDDT()->getExtent(recvtype) * recvcount;
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*j, recvcount, recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf, sendcount, sendtype}; };
 
-  if (ptr->getSize() == 1)
-    return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
-
-  int extent = getDDT()->getExtent(recvtype) * recvcount;
-  std::vector<MPI_Request> reqs(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv(((char*)recvbuf)+(extent*j), recvcount, recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount,
-                                      sendtype, neighbors[i], comm, I_SEND);
-  }
-
+  std::vector<MPI_Request> reqs;
+  postNeighborExchange(ptr, recvBlock, sendBlock, reqs);
   pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
@@ -9835,30 +9826,15 @@ AMPI_API_IMPL(int, MPI_Ineighbor_allgather, const void* sendbuf, int sendcount, 
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank();
-
-  if (ptr->getSize() == 1) {
-    *request = ptr->postReq(getAmpiParent()->reqPool.newReq<IReq>(recvbuf,recvcount,recvtype,rank_in_comm,MPI_NBOR_TAG,comm,
-                            getDDT(), AMPI_REQ_COMPLETED));
-    return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
-  }
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint rextent = getDDT()->getExtent(recvtype) * recvcount;
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*j, recvcount, recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf, sendcount, sendtype}; };
 
   // use an ATAReq to non-block the caller and get a request ptr
-  ATAReq *newreq = new ATAReq(num_neighbors*2);
-  int extent = getDDT()->getExtent(recvtype) * recvcount;
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv((char*)recvbuf+(extent*j), recvcount, recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount,
-                                              sendtype, neighbors[i], comm, I_SEND);
-  }
+  ATAReq *newreq = new ATAReq();
+  postNeighborExchange(ptr, recvBlock, sendBlock, newreq->reqs);
   *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
@@ -9888,25 +9864,14 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgatherv, const void* sendbuf, int sendcount, 
 
   ampiParent *pptr = getAmpiParent();
   ampi *ptr = pptr->comm2ampi(comm);
-  int rank_in_comm = ptr->getRank();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint rextent = getDDT()->getExtent(recvtype);
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*displs[j], recvcounts[j], recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf, sendcount, sendtype}; };
 
-  if (ptr->getSize() == 1)
-    return copyDatatype(sendtype, sendcount, recvtype, recvcounts[0], sendbuf, recvbuf);
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
-  int extent = getDDT()->getExtent(recvtype);
-  std::vector<MPI_Request> reqs(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv(((char*)recvbuf)+(extent*displs[j]), recvcounts[j], recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
-  }
-  for (int i=0; i<num_neighbors; i++) {
-    reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount,
-                                      sendtype, neighbors[i], comm, I_SEND);
-  }
-
+  std::vector<MPI_Request> reqs;
+  postNeighborExchange(ptr, recvBlock, sendBlock, reqs);
   pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
@@ -9938,30 +9903,15 @@ AMPI_API_IMPL(int, MPI_Ineighbor_allgatherv, const void* sendbuf, int sendcount,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank();
-
-  if (ptr->getSize() == 1) {
-    *request = ptr->postReq(getAmpiParent()->reqPool.newReq<IReq>(recvbuf,recvcounts[0],recvtype,rank_in_comm,MPI_NBOR_TAG,comm,
-                            getDDT(), AMPI_REQ_COMPLETED));
-    return copyDatatype(sendtype, sendcount, recvtype, recvcounts[0], sendbuf, recvbuf);
-  }
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint rextent = getDDT()->getExtent(recvtype);
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*displs[j], recvcounts[j], recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf, sendcount, sendtype}; };
 
   // use an ATAReq to non-block the caller and get a request ptr
-  ATAReq *newreq = new ATAReq(num_neighbors*2);
-  int extent = getDDT()->getExtent(recvtype);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv((char*)recvbuf+(extent*displs[j]), recvcounts[j], recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount,
-                                              sendtype, neighbors[i], comm, I_SEND);
-  }
+  ATAReq *newreq = new ATAReq();
+  postNeighborExchange(ptr, recvBlock, sendBlock, newreq->reqs);
   *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
@@ -10147,7 +10097,8 @@ AMPI_API_IMPL(int, MPI_Intercomm_create, MPI_Comm localComm, int localLeader, MP
     }
   }
 
-  *newintercomm = localPtr->intercommCreate(remoteVec,rootIndex,localComm);
+  int remoteRootIndex = (localRank == localLeader) ? peerPtr->getIndexForRank(remoteLeader) : -1;
+  *newintercomm = localPtr->intercommCreate(remoteVec,rootIndex,remoteRootIndex);
 
   return MPI_SUCCESS;
 }
@@ -10843,26 +10794,19 @@ AMPI_API_IMPL(int, MPI_Comm_create_group, MPI_Comm comm, MPI_Group group, int ta
   MPI_Group_translate_ranks(group, groupSize, groupPids.data(), parentGroup, pids.data());
   MPI_Group_free(&parentGroup);
 
-  MPI_Comm commOld, tmpInter;
-  for (int i=0; i<groupSize; i*=2) {
-    int groupId = (i == 0) ? groupRank : groupRank/i;
-    commOld = *newcomm;
-
-    if (groupId % 2 == 0) {
-      if ((groupId+1)*i < groupSize) {
-        MPI_Intercomm_create(*newcomm, 0, comm, pids[(groupId+1)*i], tag, &tmpInter);
-        MPI_Intercomm_merge(tmpInter, 0, newcomm);
-      }
-    }
-    else {
-      MPI_Intercomm_create(*newcomm, 0, comm, pids[(groupId+1)*i], tag, &tmpInter);
-      MPI_Intercomm_merge(tmpInter, 1, newcomm);
-    }
-
-    if (*newcomm != commOld) {
-      MPI_Comm_free(&tmpInter);
-      MPI_Comm_free(&commOld);
-    }
+  // Blocks of 1, 2, 4, ... group ranks merge pairwise: at each step the even
+  // block's leader and the odd block's leader create an intercommunicator
+  // over comm, and the two blocks merge it (the even block first).
+  for (int step = 1; step < groupSize; step *= 2) {
+    const int block = groupRank / step;
+    const int partner = (block % 2 == 0) ? block + 1 : block - 1;
+    if (partner * step >= groupSize) continue; // the last block has no partner at this step
+    MPI_Comm inter, merged;
+    MPI_Intercomm_create(*newcomm, 0, comm, pids[partner * step], tag, &inter);
+    MPI_Intercomm_merge(inter, block % 2, &merged);
+    MPI_Comm_free(&inter);
+    MPI_Comm_free(newcomm);
+    *newcomm = merged;
   }
 
   return MPI_SUCCESS;
@@ -11034,11 +10978,9 @@ AMPI_API_IMPL(int, MPI_Cart_create, MPI_Comm comm_old, int ndims, const int *dim
     ampiCommStruct &c = getAmpiParent()->getCommStruct(*comm_cart);
     ampiTopology *topo = c.getTopology();
     topo->setndims(ndims);
-    std::vector<int> dimsv(dims, dims+ndims), periodsv(periods, periods+ndims), nborsv;
+    std::vector<int> dimsv(dims, dims+ndims), periodsv(periods, periods+ndims);
     topo->setdims(dimsv);
     topo->setperiods(periodsv);
-    getAmpiInstance(*comm_cart)->findNeighbors(*comm_cart, newrank, nborsv);
-    topo->setnbors(nborsv);
   }
 
   return MPI_SUCCESS;
@@ -11063,16 +11005,13 @@ AMPI_API_IMPL(int, MPI_Graph_create, MPI_Comm comm_old, int nnodes, const int *i
   *comm_graph = getAmpiInstance(comm_old)->commCreate(vec, COMM_GRAPH);
   ampiTopology &topo = *getAmpiParent()->getCommStruct(*comm_graph).getTopology();
 
-  std::vector<int> index_(index, index+nnodes), edges_, nborsv;
+  std::vector<int> index_(index, index+nnodes), edges_;
   topo.setnvertices(nnodes);
   topo.setindex(index_);
 
   for (int i = 0; i < index[nnodes - 1]; i++)
     edges_.push_back(edges[i]);
   topo.setedges(edges_);
-
-  getAmpiInstance(*comm_graph)->findNeighbors(*comm_graph, newrank, nborsv);
-  topo.setnbors(nborsv);
 
   return MPI_SUCCESS;
 }
@@ -11622,26 +11561,58 @@ AMPI_API_IMPL(int, MPI_Dist_graph_neighbors, MPI_Comm comm, int maxindegree, int
   return MPI_SUCCESS;
 }
 
-/* Used by MPI_Cart_create & MPI_Graph_create */
-void ampi::findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const noexcept {
-  int max_neighbors = 0;
-  ampiParent *ptr = getAmpiParent();
-  if (ptr->isGraph(comm)) {
-    MPI_Graph_neighbors_count(comm, rank, &max_neighbors);
-    neighbors.resize(max_neighbors);
-    MPI_Graph_neighbors(comm, rank, max_neighbors, &neighbors[0]);
-  }
-  else if (ptr->isCart(comm)) {
-    int num_dims;
-    MPI_Cartdim_get(comm, &num_dims);
-    max_neighbors = 2*num_dims;
-    for (int i=0; i<max_neighbors; i++) {
-      int src, dest;
-      MPI_Cart_shift(comm, i/2, (i%2==0)?1:-1, &src, &dest);
-      if (dest != MPI_PROC_NULL)
-        neighbors.push_back(dest);
+/* This rank's neighbors in its communicator's topology, in the order of MPI
+   3.1 section 7.6: block j of a neighbor collective's receive buffer comes
+   from srcs[j], block i of its send buffer goes to dsts[i]. A Cartesian
+   topology lists, for each dimension, the neighbor at -1 and then the one at
+   +1, including MPI_PROC_NULL at the edge of a non-periodic dimension. */
+void ampi::getNeighborLists(std::vector<int>& srcs, std::vector<int>& dsts) const noexcept {
+  ampiParent *pptr = getAmpiParent();
+  MPI_Comm comm = getComm();
+  const ampiTopology *topo = myComm->getTopology();
+  if (pptr->isCart(comm)) {
+    int ndims = topo->getndims();
+    for (int d = 0; d < ndims; d++) {
+      int lo, hi;
+      MPI_Cart_shift(comm, d, 1, &lo, &hi);
+      srcs.push_back(lo);
+      srcs.push_back(hi);
     }
+    dsts = srcs;
   }
+  else if (pptr->isGraph(comm)) {
+    int n;
+    MPI_Graph_neighbors_count(comm, getRank(), &n);
+    srcs.resize(n);
+    MPI_Graph_neighbors(comm, getRank(), n, srcs.data());
+    dsts = srcs;
+  }
+  else if (pptr->isDistGraph(comm)) {
+    srcs = topo->getSources();
+    dsts = topo->getDestinations();
+  }
+  else {
+    CkAbort("AMPI> a neighbor collective needs a communicator with a topology");
+  }
+}
+
+/* The indices into dsts in the order to send. Sends to one rank keep their
+   order, which is the order in which that rank posts the matching receives:
+   in a Cartesian topology the block for the +1 neighbor goes before the one
+   for -1, since the receiver posts its receive from -1 first, and the two
+   neighbors are the same rank in a periodic dimension of size 1 or 2. Ranks
+   on other PEs go first, so that their messages overlap with the PE-local
+   ones, which are delivered inline. */
+std::vector<int> ampi::neighborSendOrder(const std::vector<int>& dsts) noexcept {
+  std::vector<int> order;
+  bool cart = getAmpiParent()->isCart(getComm());
+  for (int i = 0; i < (int)dsts.size(); i++) {
+    int k = cart ? (i ^ 1) : i;
+    if (dsts[k] != MPI_PROC_NULL) order.push_back(k);
+  }
+  std::stable_partition(order.begin(), order.end(),
+                        [&](int k) { return !thisProxy[dsts[k]].ckLocal(); });
+  return order;
 }
 
 /* Factorization code by Orion. Idea thrashed out by Orion and Prakash */
@@ -11796,10 +11767,6 @@ AMPI_API_IMPL(int, MPI_Cart_sub, MPI_Comm comm, const int *remain_dims, MPI_Comm
   }
   newtopo->setdims(dimsv);
   newtopo->setperiods(periodsv);
-
-  std::vector<int> nborsv;
-  getAmpiInstance(*newcomm)->findNeighbors(*newcomm, getAmpiParent()->getRank(*newcomm), nborsv);
-  newtopo->setnbors(nborsv);
 
   return MPI_SUCCESS;
 }
