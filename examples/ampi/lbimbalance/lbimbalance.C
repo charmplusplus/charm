@@ -14,6 +14,11 @@
  *                  heavy end is rank 0: load a + a*|m|*(n-1-i)/n, so loads
  *                  stay positive for any k. At m = 0 the load is even.
  *
+ *  -pattern pivot  (slowly varying, constant total) rank i has load
+ *                  c + a*m*(i - (n-1)/2)/n with c = a*(1 + k/2): the line turns
+ *                  around the center rank as m goes from -k to +k, the total
+ *                  load stays n*c, and the lightest rank has load a at |m| = k.
+ *
  *  -pattern spike  (adaptive refinement) every -spikeperiod steps a new random
  *                  subset of -spikefrac of the ranks gets -spikefactor times
  *                  the base load; the others have load a.
@@ -26,7 +31,7 @@
  * moved to another PE.
  *
  * Usage: ./lbimbalance +vp 64 +pe 4 +mapping BLOCK_MAP [+balancer GreedyLB]
- *          [-pattern tri|spike] [-steps 400] [-lbperiod 20] [-a 1000] [-k 3]
+ *          [-pattern tri|pivot|spike] [-steps 400] [-lbperiod 20] [-a 1000] [-k 3]
  *          [-spikefrac 0.1] [-spikefactor 4] [-spikeperiod 100]
  */
 
@@ -39,6 +44,7 @@
 
 struct Params {
   bool spike = false;
+  bool pivot = false;
   int steps = 400;
   int lbperiod = 20;
   double a = 1000.0; // base load, microseconds
@@ -52,7 +58,10 @@ static Params parseArgs(int argc, char **argv) {
   Params p;
   for (int i = 1; i + 1 < argc; i += 2) {
     const char *f = argv[i], *v = argv[i + 1];
-    if (!strcmp(f, "-pattern")) p.spike = !strcmp(v, "spike");
+    if (!strcmp(f, "-pattern")) {
+      p.spike = !strcmp(v, "spike");
+      p.pivot = !strcmp(v, "pivot");
+    }
     else if (!strcmp(f, "-steps")) p.steps = atoi(v);
     else if (!strcmp(f, "-lbperiod")) p.lbperiod = atoi(v);
     else if (!strcmp(f, "-a")) p.a = atof(v);
@@ -76,6 +85,7 @@ static unsigned long long mix(unsigned long long x) {
 static double loadOf(const Params &p, int rank, int n, int step) {
   if (!p.spike) {
     double m = p.steps > 1 ? -p.k + 2.0 * p.k * step / (p.steps - 1) : 0.0;
+    if (p.pivot) return p.a * (1 + p.k / 2) + p.a * m * (rank - (n - 1) / 2.0) / n;
     double pos = m >= 0 ? rank : (n - 1 - rank);
     return p.a + p.a * std::fabs(m) * pos / n;
   }
@@ -114,8 +124,8 @@ int main(int argc, char **argv) {
   if (rank == 0)
     printf("lbimbalance: %d ranks on %d PEs, pattern %s, %d steps, LB every %d, "
            "a=%g us, %s\n",
-           n, npes, p.spike ? "spike" : "tri", p.steps, p.lbperiod, p.a,
-           p.spike ? "spikes" : "triangle");
+           n, npes, p.spike ? "spike" : p.pivot ? "pivot" : "tri", p.steps,
+           p.lbperiod, p.a, p.spike ? "spikes" : "triangle");
   if (rank == 0 && p.spike)
     printf("  spikefrac %g, spikefactor %g, spikeperiod %d\n", p.spikefrac,
            p.spikefactor, p.spikeperiod);
