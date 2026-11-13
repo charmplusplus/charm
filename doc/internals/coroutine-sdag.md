@@ -239,7 +239,11 @@ message (a reduction's result included). The delivery is buffered and
 matched as any message inbox delivery. `state::when(const future &,
 outs...)` makes a `when_awaiter<future_msg, ...>` on `want(f.ep, f.id)`:
 one message-pointer out takes the message, no out frees it.
-`when_block(const future &)` makes a `tuple_awaiter<CkMessage *>`.
+`when_block(const future &)` makes a `tuple_awaiter<CkMessage *>`. The
+ids wrap after `kOwnFuture` of each kind (2^15 with the default 16-bit
+refnum); `make_future` aborts when the inbox still holds a message under
+the new id (`state::has_buffered`), which the new future would otherwise
+take. A message still in flight under that id is not detected.
 
 **Tracing.** `state::run`, which resumes a suspended coroutine, wraps the
 resume in `_TRACE_BEGIN_EXECUTE_DETAILED` / `_TRACE_END_EXECUTE` under the

@@ -927,13 +927,16 @@ public:
 // callback to every element); a sum and a max awaited together; a callback
 // to this element (CK_FUTURE) handed to the left neighbour, which sends a
 // CkDataMsg to it; and a reduction inside a CK_CALL task. At the end every
-// element awaits the quiescence that element 0 starts. The futures and
-// the round are pupped members: the waits survive +ck_fakemigrate, the pup
-// mode, and the restart that follows.
+// element awaits the quiescence that element 0 starts. An own future's id
+// comes round again after kOwnFuture futures, which is fine once the
+// earlier message has been taken. The futures and the round are pupped
+// members: the waits survive +ck_fakemigrate, the pup mode, and the
+// restart that follows.
 class FutureTest : public CBase_FutureTest {
   FutureTest_CORO_CODE
   int round;
-  ck::coro::future fsum, fa, fb, fpeer, fqd, ftask;
+  ck::coro::future fsum, fa, fb, fpeer, fqd, ftask, fwrap;
+  CMK_REFNUM_TYPE wrapId = 0;
   CkReductionMsg* red;   // received at a wait and deleted before the next
   CkReductionMsg* red2;
   int total;
@@ -961,7 +964,8 @@ public:
   FutureTest() : round(0), red(nullptr), red2(nullptr), total(0) {}
   FutureTest(CkMigrateMessage* m) : CBase_FutureTest(m), red(nullptr), red2(nullptr) {}
   void pup(PUP::er& p) {
-    p | round; p | fsum; p | fa; p | fb; p | fpeer; p | fqd; p | ftask; p | total;
+    p | round; p | fsum; p | fa; p | fb; p | fpeer; p | fqd; p | ftask; p | fwrap; p | wrapId;
+    p | total;
   }
 
   void ask(CkCallback cb, int value) { cb.send(CkDataMsg::buildNew(sizeof(int), &value)); }
@@ -1001,6 +1005,23 @@ public:
 
         CK_CALL_TO(total, allSum(thisIndex * round));
         check(total == round * FUTURE_ELEMS * (FUTURE_ELEMS - 1) / 2, "sum returned by a task");
+      }
+      // The id of an own future comes round again (with a 16-bit refnum).
+      {
+        CkCallback cb = CK_FUTURE(fwrap);
+        wrapId = fwrap.id;
+        cb.send();
+      }
+      CK_WHEN(fwrap);
+      if (ck::coro::state::kOwnFuture <= (1ul << 16)) {
+        for (unsigned long i = 1; i < (unsigned long)ck::coro::state::kOwnFuture; i++)
+          (void)CK_FUTURE(fwrap);
+        {
+          CkCallback cb = CK_FUTURE(fwrap);
+          check(fwrap.id == wrapId, "own future ids wrap");
+          cb.send();
+        }
+        CK_WHEN(fwrap);
       }
       // Quiescence awaited by every element, its message discarded: each
       // makes the future, element 0 starts the detection with it.

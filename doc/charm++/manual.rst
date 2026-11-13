@@ -2274,6 +2274,16 @@ keeps, so the elements agree on the id when they make the same
 ``CK_FUTURE_ALL`` calls in the same order, as they make the same
 ``contribute`` calls.
 
+The reference number of the callback belongs to the future: a message
+sent through it arrives with the future's id as its reference number,
+whatever it carried, and the callback cannot carry a reference number of
+its own. Use a new future to tell iterations apart, and put any other tag
+in the message's data. The ids wrap after 32768 futures of each kind
+(``CK_FUTURE`` and ``CK_FUTURE_ALL``) with the default 16-bit reference
+number (``--with-refnum-type`` widens it), so every message sent to a
+future should be taken by a wait: making a future whose id is still held
+by an unclaimed message aborts.
+
 A coroutine frame is never packed. When the chare migrates or is
 checkpointed, the coroutine state records which wait each active coroutine
 is suspended at, and after unpacking the entry is invoked again: its body

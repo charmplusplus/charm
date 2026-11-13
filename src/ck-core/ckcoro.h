@@ -689,6 +689,11 @@ class state {
   bool try_arm(const want *ws, size_t n, std::vector<buffer> &out);
   void rebuild();
   size_t num_buffered() const noexcept { return inbox_.size(); }
+  bool has_buffered(const want &w) const noexcept {
+    for (const buffer &b : inbox_)
+      if (w.matches(b)) return true;
+    return false;
+  }
   size_t num_active() const noexcept { return recs_.size(); }
 
  private:
@@ -1050,6 +1055,14 @@ template <class Owner>
 inline CkCallback make_future(state &s, Owner *owner, future &f, int ep, bool all) {
   f.ep = ep;
   f.id = s.new_future_id(all);
+  // The ids wrap (2^15 of each kind with the default 16-bit refnum): a
+  // message still unclaimed under the id would be taken by the new future.
+  if (s.has_buffered(want(ep, f.id)))
+    CkAbort("ck::coro: %s future id %lu came round again while a message sent to the earlier "
+            "future with that id is still unclaimed; take every future's messages (ids wrap "
+            "after %lu, or build with --with-refnum-type=int)",
+            all ? "a CK_FUTURE_ALL" : "a CK_FUTURE", (unsigned long)f.id,
+            (unsigned long)state::kOwnFuture);
   CkCallback cb = all ? all_target(ep, owner) : self_target(ep, owner);
   cb.setRefnum(f.id);
   return cb;
