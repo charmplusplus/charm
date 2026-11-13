@@ -26,6 +26,22 @@ mpi_interop: mpi_interop.o libmodulephaselib.a
 
 test: all
 	$(LAUNCH) ./mpi_interop $(NP) +pe $(PES)
+	@$(MAKE) --no-print-directory testabort
+
+# A CkAbort on the last PE must end the whole job through MPI_Abort, the
+# abort hook CharmLibInit registers (reconverse #321): the run must fail, show
+# the abort, and show MPI_Abort's report (Open MPI: "MPI_ABORT was invoked",
+# MPICH: "MPI_Abort("). Without the hook only the aborting process ends;
+# mpirun then ends the others, but srun without --kill-on-bad-exit does not.
+testabort: all
+	@$(LAUNCH) ./mpi_interop $(NP) abort +pe $(PES) > abort.out 2>&1; rc=$$?; \
+	cat abort.out; \
+	if [ $$rc -eq 0 ]; then echo "testabort: expected a nonzero exit"; exit 1; fi; \
+	if ! grep -q "mpi_interop: deliberate abort" abort.out; then \
+	  echo "testabort: the abort did not happen"; exit 1; fi; \
+	if ! grep -q -e "MPI_ABORT was invoked" -e "MPI_Abort(" abort.out; then \
+	  echo "testabort: the job did not end through MPI_Abort"; exit 1; fi; \
+	echo "mpi_interop testabort passed"
 
 clean:
-	rm -f mpi_interop *.o *.a *.decl.h *.def.h charmrun charm_all_libs.sh
+	rm -f mpi_interop *.o *.a *.decl.h *.def.h charmrun charm_all_libs.sh abort.out

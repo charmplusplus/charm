@@ -42,6 +42,18 @@ void StopCharmScheduler();
 #endif
 
 #if CMK_INTEROP_HAVE_MPI_H
+// CharmLibInit's abort hook (CmiSetAbortHook): a CkAbort or CmiAbort in any
+// process ends the whole MPI job. LCI is bootstrapped over LCT's tcp backend,
+// whose process-manager abort reaches no other process, so without the hook
+// an abort ended only its own process, and under srun without
+// --kill-on-bad-exit the others waited until the time limit (reconverse
+// #321). CmiAbort has already printed msg. This runs on whichever PE thread
+// aborted, and MPI_Abort is its only MPI call.
+static inline void CharmInteropAbortHook(int code, const char *msg) {
+  (void)msg;
+  MPI_Abort(MPI_COMM_WORLD, code);
+}
+
 // Starts Charm++ inside an MPI program. Charm++ runs on every rank of the job:
 // userComm must be MPI_COMM_WORLD or congruent to it, and Charm++ process i is
 // MPI_COMM_WORLD rank i. After CharmLibExit returns the program may keep
@@ -108,6 +120,9 @@ static inline void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
   char userPmi[32] = "";
   if (const char *p = getenv("LCT_PMI_BACKEND"))
     snprintf(userPmi, sizeof(userPmi), "%s", p);
+  // Before Charm++ starts, so that an abort during startup ends the job too.
+  // CharmLibExit removes it.
+  CmiSetAbortHook(CharmInteropAbortHook);
   CharmLibInitWorldTcp(rank, size, local_rank, local_size, host, port, argc,
                        argv);
   if (CmiMyNode() != rank || CmiNumNodes() != size) {
