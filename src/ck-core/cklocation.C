@@ -764,13 +764,24 @@ bool myCompare(hilbert_pair p1, hilbert_pair p2) { return p1.intIndex < p2.intIn
 class HilbertArrayMap : public DefaultArrayMap
 {
   std::vector<int> allpairs;
+  // The PEs in curve order: getHilbertList orders the processes, and each
+  // process contributes its PEs in rank order.
   std::vector<int> procList;
+
+  void buildProcList()
+  {
+    std::vector<int> nodeList(CkNumNodes());
+    getHilbertList(nodeList.data());
+    procList.clear();
+    for (int node : nodeList)
+      for (int pe = CkNodeFirst(node); pe < CkNodeFirst(node) + CkNodeSize(node); pe++)
+        procList.push_back(pe);
+  }
 
 public:
   HilbertArrayMap(void)
   {
-    procList.resize(CkNumPes());
-    getHilbertList(procList.data());
+    buildProcList();
     DEBC((AA "Creating HilbertArrayMap\n" AB));
   }
 
