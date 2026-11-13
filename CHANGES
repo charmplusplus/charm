@@ -185,6 +185,25 @@ New on this line since the split from classic:
   communicator only; not on Windows. Launch with the launcher the MPI
   library requires (Cray MPICH under Slurm: srun --mpi=cray_shasta).
 
+- CkDyn: a C API for language bindings that define chare classes at
+  run time instead of in a .ci file (#4193). A class is registered
+  with a table of entry methods and reached through a table of
+  function pointers the binding supplies; every entry method receives
+  one message type with typed slots. Dynamic classes get what charmxi
+  classes get: groups (also constrained to a PE list), nodegroups,
+  arrays of one to six dimensions, array maps, sections over
+  CkMulticast, reductions with built-in and binding-defined reducers,
+  migration, load balancing, checkpoint and restart, quiescence
+  detection, zero-copy host and device buffers, persistent device
+  buffers, and class and method names in Projections. charm4py's new
+  binding (charm4py#316) is built on it. The manual for binding
+  authors is doc/ckdyn/manual.rst, the mechanism is described in
+  doc/internals/ckdyn.md, and tests/charm++/ckdyn is the acceptance
+  test. For every program, [nokeep] and [expedited] array broadcasts
+  no longer record a separate Projections event for the array
+  manager, as plain broadcasts already did not; each element's
+  invocation is still traced.
+
 - Coroutine entry methods (#4231): an entry method tagged [coroutine]
   is a C++20 coroutine that waits for [inbox] entry methods with
   CK_WHEN, CK_WHEN_ANY, CK_WHEN_ALL and CK_OVERLAP, and calls helper

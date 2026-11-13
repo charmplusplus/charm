@@ -1003,6 +1003,10 @@ public:
   bool performDelivery(CkArrayMessage* bcast, std::vector<CkMigratable*>& elements,
                        int arrayId);
 #endif
+  // Dynamic (CkDyn) elements: one delivery call per PE for all local elements
+  // whose broadcast epoch matches, then the stored broadcasts that follow.
+  void deliverAndUpdateDyn(CkArrayMessage* bcast, std::vector<CkMigratable*>& elements);
+  bool performDeliveryDyn(CkArrayMessage* bcast, const std::vector<CkArrayIndex>& elements, bool batch);
 
   void springCleaning(void);
 

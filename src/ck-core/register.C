@@ -23,6 +23,19 @@ CkRegisteredInfo<ReadonlyInfo> _readonlyTable;
 CkRegisteredInfo<ReadonlyMsgInfo> _readonlyMsgs;
 
 static int __registerDone = 0;
+/* Registration after _registerDone is accepted while this is nonzero
+ * (_registerLateBegin/_registerLateEnd, used by CkDynRegisterClassLate), and
+ * always in a CMK_CHARM4PY build, whose Ext API registers classes late. */
+static int __registerLateOpen = 0;
+
+static inline bool lateRegistrationAllowed(void)
+{
+  return !__registerDone || CMK_CHARM4PY || __registerLateOpen > 0;
+}
+
+void _registerLateBegin(void) { __registerLateOpen++; }
+int _registerIsDone(void) { return __registerDone; }
+void _registerLateEnd(void) { __registerLateOpen--; }
 
 void _registerInit(void)
 {
@@ -45,12 +58,10 @@ static
 int CkRegisterEpInternal(const char *name, CkCallFnPtr call, int msgIdx, int chareIdx,
 	int ck_ep_flags, bool isTemplated)
 {
-#if !CMK_CHARM4PY    // charm4py can support dynamic registration of Chares after program start
-  if (__registerDone) {
+  if (!lateRegistrationAllowed()) {
     CkPrintf("Charm++: late entry method registration happened after init\nEntry point: %s, addr: %p\n", name, (void *)call);
     CkAbort("Did you forget to import a module or instantiate a templated entry method in a .ci file?\n");
   }
-#endif
   EntryInfo *e = new EntryInfo(name, call?call:ckInvalidCallFn, msgIdx, chareIdx, isTemplated);
   if (ck_ep_flags & CK_EP_NOKEEP) e->noKeep=true;
   if (ck_ep_flags & CK_EP_INTRINSIC) e->inCharm=true;
@@ -210,7 +221,7 @@ void CkRegisterMainChareExt(const char *s, const char **emNames, int emNamesStar
 #endif
 
 void CkRegisterIfNotThere(int epIdx, CkArray_IfNotThere policy) {
-  if ((epIdx >= 0) && (!__registerDone || CMK_CHARM4PY)) {
+  if ((epIdx >= 0) && lateRegistrationAllowed()) {
     _entryTable[epIdx]->ifNotThere = policy;
   }
 }

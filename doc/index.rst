@@ -19,6 +19,7 @@ Charm++ Documentation
    ampi/manual
    f90charm/manual
    libraries/manual
+   ckdyn/manual
    faq/manual
 
 .. toctree::
