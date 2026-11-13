@@ -210,6 +210,13 @@ jobs:
         env:
           LCI_ATTR_BACKEND: ofi
         run: timeout 600 make -C tests/charm++/mpi-interop test NP=2 LAUNCH="mpirun --oversubscribe -n 2"
+      - name: testabort (2 MPI ranks of 2 PEs, mpirun)
+        # The abort is on a PE thread that MPI did not create. --bind-to none:
+        # mpirun binds each rank to one core, and Charm++'s affinity check
+        # would abort first on two PEs sharing it.
+        env:
+          LCI_ATTR_BACKEND: ofi
+        run: timeout 300 make -C tests/charm++/mpi-interop testabort NP=2 PES=4 LAUNCH="mpirun --oversubscribe --bind-to none -n 2"
 
   # ARM64 Linux (Grace-class systems). Replaces the coverage CircleCI's
   # arm.medium jobs provided on the classic line; -Werror=vla carried over
