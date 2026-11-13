@@ -45,15 +45,21 @@ void StopCharmScheduler();
 // CharmLibInit's abort hook (CmiSetAbortHook): a CkAbort or CmiAbort in any
 // process ends the whole MPI job. Without it an abort ends only its own
 // process, because LCI is bootstrapped over LCT's tcp backend, whose
-// process-manager abort reaches no other. CmiAbort has already printed msg.
-// It runs on whichever PE thread aborted, which with several PEs per process
-// is not the thread that initialized MPI (see CharmLibInit). If the program
-// has already finalized MPI, it does nothing and CmiAbort goes on as usual.
+// process-manager abort reaches no other. CmiAbort has already printed msg;
+// the hook says itself that it ends the job, since the MPI library's own
+// report can be lost (Open MPI's mpirun drops it at times). It runs on
+// whichever PE thread aborted, which with several PEs per process is not the
+// thread that initialized MPI (see CharmLibInit). If the program has already
+// finalized MPI, it does nothing and CmiAbort goes on as usual.
 static inline void CharmInteropAbortHook(int code, const char *msg) {
   (void)msg;
   int finalized = 0;
   MPI_Finalized(&finalized);
-  if (!finalized) MPI_Abort(MPI_COMM_WORLD, code);
+  if (finalized) return;
+  fprintf(stderr, "CharmLibInit: ending the MPI job with MPI_Abort(MPI_COMM_WORLD, %d)\n",
+          code);
+  fflush(stderr);
+  MPI_Abort(MPI_COMM_WORLD, code);
 }
 
 // Starts Charm++ inside an MPI program. Charm++ runs on every rank of the job:
