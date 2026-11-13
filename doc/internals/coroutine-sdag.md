@@ -253,7 +253,10 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
   `init.C`: the accessors, the destroy message and the `_coro_pup` hook.
 - `src/xlat-i/xi-scan.l`, `xi-grammar.y` (and the regenerated `xi-scan.C`,
   `xi-grammar.tab.C/h`), `xi-Entry.{h,C}`, `xi-Chare.{h,C}`, `xi-Member.h`:
-  the two attributes, their checks, and `X_CORO_CODE`.
+  the two attributes, their checks, and `X_CORO_CODE`. The scanner returns
+  `INBOX` and `COROUTINE` only inside the `[...]` that follows `entry`
+  (`search` and `punct` in xi-scan.l), and `IDENT` everywhere else, so the
+  words stay names (`tests/charm++/ckcoro/names.ci`).
 - `tests/charm++/jacobi3d-coro/`: the first program (migration at a site,
   rebuild, checkpoint and restart).
 - `tests/charm++/ckcoro/`: the SDAG migration test as a coroutine

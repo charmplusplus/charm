@@ -820,6 +820,7 @@ std::list<Entry *> connectEntries;
 /* Local to file */
 unsigned char in_comment=0;
 int search(char *s);
+int punct(int c);
 void update_position();
 int count_newlines(const char *s);
 
@@ -832,8 +833,8 @@ int count_newlines(const char *s);
 #undef yywrap
 #endif
 
-#line 835 "lex.yy.c"
 #line 836 "lex.yy.c"
+#line 837 "lex.yy.c"
 
 #define INITIAL 0
 
@@ -1056,9 +1057,9 @@ YY_DECL
 		}
 
 	{
-#line 61 "xi-scan.l"
+#line 62 "xi-scan.l"
 
-#line 1061 "lex.yy.c"
+#line 1062 "lex.yy.c"
 
 	while ( /*CONSTCOND*/1 )		/* loops until end-of-file is reached */
 		{
@@ -1124,94 +1125,94 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 62 "xi-scan.l"
+#line 63 "xi-scan.l"
 { if (in_bracket)  {Yval; update_position(); return Token(CPROGRAM);} else REJECT;}
 	YY_BREAK
 case 2:
 /* rule 2 can match eol */
 YY_RULE_SETUP
-#line 63 "xi-scan.l"
+#line 64 "xi-scan.l"
 { if (in_braces)   {Yval; lineno += count_newlines(yytext); update_position(); return Token(CPROGRAM);} else REJECT;}
 	YY_BREAK
 case 3:
 /* rule 3 can match eol */
 YY_RULE_SETUP
-#line 64 "xi-scan.l"
+#line 65 "xi-scan.l"
 { if (in_int_expr) {Yval; update_position(); return Token(CPROGRAM);} else REJECT;}
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 65 "xi-scan.l"
+#line 66 "xi-scan.l"
 { update_position(); /* ignore single line comments */ }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 66 "xi-scan.l"
+#line 67 "xi-scan.l"
 { update_position(); /* ignore ^M characters for dos-unix compat */ }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 67 "xi-scan.l"
+#line 68 "xi-scan.l"
 { update_position(); in_comment = 1; /* Single line C-style comments */ }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 68 "xi-scan.l"
+#line 69 "xi-scan.l"
 { update_position(); in_comment = 0; }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 69 "xi-scan.l"
+#line 70 "xi-scan.l"
 { update_position(); Return Token(HASHIF); }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 70 "xi-scan.l"
+#line 71 "xi-scan.l"
 { update_position(); Return Token(HASHIFDEF); }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 71 "xi-scan.l"
+#line 72 "xi-scan.l"
 { update_position(); in_comment = 0; /* comments */ }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 72 "xi-scan.l"
+#line 73 "xi-scan.l"
 { update_position(); /* ignore white space */ }
 	YY_BREAK
 case 12:
 /* rule 12 can match eol */
 YY_RULE_SETUP
-#line 73 "xi-scan.l"
+#line 74 "xi-scan.l"
 { yycolumn = 1; lineno++;}
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 74 "xi-scan.l"
+#line 75 "xi-scan.l"
 { update_position(); Yval; Return Token(NUMBER); }
 	YY_BREAK
 case 14:
 /* rule 14 can match eol */
 YY_RULE_SETUP
-#line 75 "xi-scan.l"
+#line 76 "xi-scan.l"
 { update_position(); Yval; Return Token(LITERAL); }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 76 "xi-scan.l"
+#line 77 "xi-scan.l"
 { update_position(); Return Token(search(yytext)); }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 77 "xi-scan.l"
-{ update_position(); Return Token(yytext[0]); }
+#line 78 "xi-scan.l"
+{ update_position(); Return Token(punct(yytext[0])); }
 	YY_BREAK
 case 17:
 YY_RULE_SETUP
-#line 78 "xi-scan.l"
+#line 79 "xi-scan.l"
 ECHO;
 	YY_BREAK
-#line 1214 "lex.yy.c"
+#line 1215 "lex.yy.c"
 			case YY_STATE_EOF(INITIAL):
 				yyterminate();
 
@@ -2189,7 +2190,7 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 78 "xi-scan.l"
+#line 79 "xi-scan.l"
 
 
 /* Reserved word table */
@@ -2271,15 +2272,36 @@ struct rwentry rwtable[] = {
 {  "",		0 }
 };
 
+/* "inbox" and "coroutine" are keywords only in the attribute list of an
+   entry method ("entry [inbox] void f(...)") and names everywhere else. A
+   '[' right after ENTRY opens the list, and the next ']' closes it. */
+static int after_entry = 0;       /* the last token returned was ENTRY */
+static int in_entry_attribs = 0;  /* between "entry [" and "]" */
+
 int search(char *s)
 {
   int i;
   for(i=0; rwtable[i].tok != 0; i++) {
-    if(strcmp(rwtable[i].res, s) == 0)
-      return(rwtable[i].tok);
+    if(strcmp(rwtable[i].res, s) == 0) {
+      int tok = rwtable[i].tok;
+      if ((tok == INBOX || tok == COROUTINE) && !in_entry_attribs)
+        break;
+      after_entry = (tok == ENTRY);
+      return(tok);
+    }
   }
+  after_entry = 0;
   yylval.strval = strcpy(new char[yyleng+1], s);
   return IDENT;
+}
+
+/* A one-character token; tracks the attribute list of an entry method. */
+int punct(int c)
+{
+  if (c == '[' && after_entry) in_entry_attribs = 1;
+  else if (c == ']') in_entry_attribs = 0;
+  after_entry = 0;
+  return c;
 }
 
 void update_position()

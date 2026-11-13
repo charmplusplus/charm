@@ -17,6 +17,7 @@ std::list<Entry *> connectEntries;
 /* Local to file */
 unsigned char in_comment=0;
 int search(char *s);
+int punct(int c);
 void update_position();
 int count_newlines(const char *s);
 
@@ -74,7 +75,7 @@ nonIntExpr [^();,:]*
 {number}	{ update_position(); Yval; Return Token(NUMBER); }
 {literal}	{ update_position(); Yval; Return Token(LITERAL); }
 {name}		{ update_position(); Return Token(search(yytext)); }
-.			{ update_position(); Return Token(yytext[0]); }
+.			{ update_position(); Return Token(punct(yytext[0])); }
 %%
 
 /* Reserved word table */
@@ -156,15 +157,36 @@ struct rwentry rwtable[] = {
 {  "",		0 }
 };
 
+/* "inbox" and "coroutine" are keywords only in the attribute list of an
+   entry method ("entry [inbox] void f(...)") and names everywhere else. A
+   '[' right after ENTRY opens the list, and the next ']' closes it. */
+static int after_entry = 0;       /* the last token returned was ENTRY */
+static int in_entry_attribs = 0;  /* between "entry [" and "]" */
+
 int search(char *s)
 {
   int i;
   for(i=0; rwtable[i].tok != 0; i++) {
-    if(strcmp(rwtable[i].res, s) == 0)
-      return(rwtable[i].tok);
+    if(strcmp(rwtable[i].res, s) == 0) {
+      int tok = rwtable[i].tok;
+      if ((tok == INBOX || tok == COROUTINE) && !in_entry_attribs)
+        break;
+      after_entry = (tok == ENTRY);
+      return(tok);
+    }
   }
+  after_entry = 0;
   yylval.strval = strcpy(new char[yyleng+1], s);
   return IDENT;
+}
+
+/* A one-character token; tracks the attribute list of an entry method. */
+int punct(int c)
+{
+  if (c == '[' && after_entry) in_entry_attribs = 1;
+  else if (c == ']') in_entry_attribs = 0;
+  after_entry = 0;
+  return c;
 }
 
 void update_position()
