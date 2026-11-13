@@ -43,16 +43,10 @@ LBS += GreedyLB,+LBPrintSummary,+LBDebug,2:-expect,improve
 LBS += GreedyLB,+balancer,RotateLB:-expect,improve/rotate
 LBS += MetisLB,+balancer,DummyLB:-expect,improve/dummy,-tol,1.5
 LBS += RotateLB,+balancer,DummyLB,+LBLoop:-expect,rotate/dummy/rotate
-# Manual load balancing (TurnManualLBOn, CkStartLB) is off by default:
-# CkMigratable::AtSync enters the sync barrier without checking
-# LBManager::useBarrier, which TurnManualLBOn clears, so AtSync still starts a
-# step and CkStartLB starts a second one on the same objects. TreeLB aborts on
-# an arrival it did not order; CentralLB aborts in LBDatabase::Migrate or hangs
-# in some runs. Set LBSWEEP_MANUAL=1 to run them.
-ifeq ($(LBSWEEP_MANUAL),1)
+# Manual load balancing: TurnManualLBOn on every PE, CkStartLB from Main once
+# every element has called AtSync.
 LBS += GreedyLB:-expect,improve,-manual,1
 LBS += MetisLB:-expect,improve,-tol,1.5,-manual,1
-endif
 
 comma = ,
 lbargs = $(subst $(comma), ,$(word $(1),$(subst :, ,$(2))))
@@ -63,10 +57,7 @@ endef
 
 # The LBDump run stops the program (CkExit) right after writing the step 1
 # data, and the LBSim run stops after simulating that step, so those two runs
-# check that the file was written and read rather than the placement. The
-# LBSim run is off by default: CentralLB::readStatsMsgs aborts with
-# std::length_error in BaseLB::LDStats::pup (commData) on the file
-# CentralLB::writeStatsMsgs wrote. Set LBSWEEP_LBSIM=1 to run it.
+# check that the file was written and read rather than the placement.
 #
 # 2groups.json splits the processes into two process groups; the root passes
 # load tokens between them. It needs two processes, so it is left out where
@@ -87,11 +78,9 @@ test: lbsweep
 	rm -f lbdump.* lbsim.out
 	$(call run, ./lbsweep +p4 -expect improve -tol 1.5 +balancer MetisLB +LBDump 1 +LBDumpSteps 1 +LBDumpFile lbdump)
 	test -s lbdump.1
-ifeq ($(LBSWEEP_LBSIM),1)
 	$(call run, ./lbsweep +p4 -expect improve -tol 1.5 +balancer MetisLB +LBSim 1 +LBSimSteps 1 +LBDumpFile lbdump) > lbsim.out 2>&1 || { cat lbsim.out; exit 1; }
 	cat lbsim.out
 	grep -q "LBSim: Simulation of load balancing step 1 done" lbsim.out
-endif
 	rm -f lbdump.* lbsim.out
 ifneq ($(RUN_PROCS),)
 	$(RUN_PROCS) $(call run, ./lbsweep +p4 -expect improve -tol 1.5 -localfreq 2 +balancer TreeLB +TreeLBFile 2groups.json +LBDebug 1)
