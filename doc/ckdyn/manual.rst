@@ -148,7 +148,12 @@ API version and ABI rules
 -------------------------
 
 ``CKDYN_API_VERSION`` (currently 2) is bumped on any incompatible change to
-``ckdyn.h``. Three checks keep a binding and a ``libcharm`` consistent:
+``ckdyn.h``. Additions (a new function, such as ``CkDynContributeShaped``) do
+not bump it: an older binding keeps working with a newer library, while a
+binding that uses an addition needs a library that has it and fails to load
+with an undefined symbol against an older one, before ``CkDynApiVersion()``
+can be called. A binding pins the Charm++ commit it is built with
+(charm4py's ``charm_version.txt``). Three checks keep a binding and a ``libcharm`` consistent:
 
 - ``CkDynApiVersion()`` returns the version the library was built with; a
   binding compares it with the ``CKDYN_API_VERSION`` it was compiled
@@ -1330,7 +1335,15 @@ result's BUFFER slot (REDRESULT view, or the MCAST view of a SECTION
 callback) has that ``ndim`` and shape: ``CkDynViewBufferPtr(v, 0, &shape)``
 returns it. Every contribution to one reduction must have the same shape;
 contributions of two shapes abort with "contributions to one reduction have
-different shapes". With ``ndim`` 0 or 1, ``nop``, a binding-defined reducer,
+different shapes". One reduction also cannot mix the two forms: a shaped
+contribution (``ndim`` 2 or more) and a flat one (``CkDynContribute``, or
+``ndim`` 0 or 1) under a built-in reducer use different Charm++ reducers
+(``CkDyn::shaped`` and the built-in one), and the program aborts with
+"contributions to one reduction use different reducers" (or, through a
+SECTION callback, "contributions to one reduction mix shaped and flat
+forms"). The shaped reducer combines the elements in place in the first
+message, so a shaped reduction costs what a flat one does apart from the
+``8 + 8 * ndim`` header bytes. With ``ndim`` 0 or 1, ``nop``, a binding-defined reducer,
 or a reducer whose element kind is ``CKDYN_ELEM_BYTE`` or
 ``CKDYN_ELEM_NONE``, the shape is ignored and the call is
 ``CkDynContribute`` (or ``CkDynContributeSection``): the result slot is flat

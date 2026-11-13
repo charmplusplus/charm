@@ -653,13 +653,22 @@ count times the element size equals the length. Anything else (`ndim` 0 or
 1, `nop`, the foreign reducer, a `BYTE` or `NONE` kind) is contributed
 unchanged, so `CkDynContribute(me, data, cb)` is
 `contributeImpl(me, data, cb, 1, NULL)` and behaves as before.
-`ckdynShapedReduce` skips empty messages, checks that every other message
-has the same inner reducer and the same shape (it aborts with "contributions
-to one reduction have different shapes, (2, 3) and (3, 2)" otherwise),
-builds temporary `CkReductionMsg`s of the elements, calls the inner reducer's
-function from the reducer table, and returns the result behind the first
-message's header. One contributor is passed on unreduced, which is already
-the result's layout. Because the header is 8 bytes, the shape and elements
+`contributeImpl` builds the `CkReductionMsg` itself from its parts
+(`SecTag` for a SECTION callback, `ShapedHdr` and shape, data), so the data
+is copied once. `ckdynShapedReduce` skips empty messages, checks that every
+other message has the reducer `CkDyn::shaped` ("mix shaped and flat forms"
+otherwise), the same inner reducer and the same shape ("contributions to one
+reduction have different shapes, (2, 3) and (3, 2)"), and combines the
+elements in place in the first message with data (`shapedCombine`, one loop
+per built-in reducer with the loop body of `ckreduction.C`'s reducer), which
+it returns as the result, as the built-in reducers return `msg[0]`: no input
+or result is copied. One contributor is passed on unreduced, which is
+already the result's layout. A reduction that mixes shaped and flat
+contributions reaches Charm++ with two reducers; `CkReduction::checkSameReducer`
+(called by `reduceMessages`, `CkMulticastMgr` and `XArraySectionReducer`)
+aborts it before either reducer reads the other's messages. Through a
+SECTION callback both are `CkDyn::sectionTagged`, and
+`ckdynSectionTaggedReduce` aborts on the inner reducers. Because the header is 8 bytes, the shape and elements
 after it are laid out as a `BUFFER` slot's data (shape, then bytes), so
 `viewReduction` synthesizes the slot over the message without a copy:
 `v.off` 8, `ndim` from the header, `elem` from the inner reducer, `len` the
