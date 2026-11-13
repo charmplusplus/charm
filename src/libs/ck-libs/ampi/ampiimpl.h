@@ -2606,6 +2606,9 @@ class ampiParent final : public CBase_ampiParent {
   void startCheckpoint(const char* dname) noexcept;
   void checkpointAfterBarrier() noexcept;
   void ResumeThread() noexcept;
+  // Roll back to the last in-memory checkpoint (ampi_checkpoint=rollback):
+  // rank 0 starts the rollback, and every rank blocks; it never returns.
+  void startRollback() noexcept;
   TCharm* getTCharmThread() const noexcept {return thread;}
   CMI_WARN_UNUSED_RESULT inline ampiParent* blockOnRecv() noexcept;
   CMI_WARN_UNUSED_RESULT static ampiParent* static_blockOnColl(ampiParent* dis) noexcept;
@@ -3319,7 +3322,8 @@ void campi_creation_done(TCharm *tc, int id) noexcept;
 // info asks for more) and returns their number. AmpiMigrateAction is plain
 // data, so that thread AMPI can keep the list on the rank's stack, which
 // migrates with the thread, unlike blocks of the process heap.
-enum class AmpiMigrateKind { LB_SYNC, LB_ASYNC, CKPT_TO_FILE, CKPT_IN_MEMORY, CKPT_MESSAGE_LOGGING };
+enum class AmpiMigrateKind { LB_SYNC, LB_ASYNC, CKPT_TO_FILE, CKPT_IN_MEMORY, CKPT_ROLLBACK,
+                             CKPT_MESSAGE_LOGGING };
 struct AmpiMigrateAction {
   AmpiMigrateKind kind;
   char dir[MPI_MAX_INFO_VAL]; // CKPT_TO_FILE: the checkpoint directory
@@ -3409,7 +3413,7 @@ static const char *funclist[] = {"AMPI_Abort", "AMPI_Add_error_class", "AMPI_Add
 "AMPI_Win_get_group", "AMPI_Win_get_info", "AMPI_Win_get_name", "AMPI_Win_lock",
 "AMPI_Win_post", "AMPI_Win_set_attr", "AMPI_Win_set_errhandler", "AMPI_Win_set_info",
 "AMPI_Win_set_name", "AMPI_Win_start", "AMPI_Win_test", "AMPI_Win_unlock",
-"AMPI_Win_wait", "AMPI_Exit" /*AMPI extensions:*/, "AMPI_Migrate",
+"AMPI_Win_wait", "AMPI_Exit" /*AMPI extensions:*/, "AMPI_Migrate", "AMPI_Rollback_count",
 "AMPI_Load_start_measure", "AMPI_Load_stop_measure",
 "AMPI_Load_set_value", "AMPI_Migrate_to_pe", "AMPI_Set_migratable",
 "AMPI_Register_pup", "AMPI_Get_pup_data",

@@ -305,6 +305,7 @@
 
 /* AMPI extensions */
 #define ampi_migrate FTN_NAME( AMPI_MIGRATE , ampi_migrate )
+#define ampi_rollback_count FTN_NAME( AMPI_ROLLBACK_COUNT , ampi_rollback_count )
 #define ampi_load_start_measure FTN_NAME( AMPI_LOAD_START_MEASURE, ampi_load_start_measure )
 #define ampi_load_stop_measure FTN_NAME( AMPI_LOAD_STOP_MEASURE, ampi_load_stop_measure )
 #define ampi_load_reset_measure FTN_NAME( AMPI_LOAD_RESET_MEASURE, ampi_load_reset_measure )
@@ -2207,6 +2208,11 @@ void mpir_status_set_bytes(int *status, int* datatype, MPI_Count *nbytes, int* i
 void ampi_migrate(int *hints, int *ierr) noexcept
 {
   *ierr = AMPI_Migrate(*hints);
+}
+
+void ampi_rollback_count(int *count, int *ierr) noexcept
+{
+  *ierr = AMPI_Rollback_count(count);
 }
 
 void ampi_load_start_measure(int *ierr) noexcept
