@@ -1,0 +1,36 @@
+mainmodule lbsweep {
+  readonly CProxy_Main mainProxy;
+  readonly int numElems;
+  readonly int numSteps;
+  readonly int numIters;
+  readonly int profile;
+  readonly int nonmigEvery;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void stepDone(int n, double v[n]);
+  };
+
+  group PackedMap : CkArrayMap {
+    entry PackedMap();
+  };
+
+  array [1D] Elem {
+    entry Elem();
+    entry void recvGhost(int ref, int from, double v);
+    entry void ResumeFromSync();
+    entry void run() {
+      for (step = 0; step < numSteps; step++) {
+        for (iter = 0; iter < numIters; iter++) {
+          serial { sendGhosts(); }
+          for (got = 0; got < 2; got++) {
+            when recvGhost[step * numIters + iter](int ref, int from, double v)
+              serial { checkGhost(ref, from, v); }
+          }
+        }
+        serial { prevPE = CkMyPe(); AtSync(); }
+        when ResumeFromSync() serial { report(); }
+      }
+    };
+  };
+};
