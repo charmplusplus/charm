@@ -20,10 +20,16 @@ static void check(bool ok, int rank, const char *what, long got, long want) {
 }
 
 int main(int argc, char **argv) {
-  MPI_Init(&argc, &argv);
+  // SERIALIZED: with several PEs per process, an abort calls MPI_Abort from a
+  // PE thread that MPI did not create (see CharmLibInit).
+  int provided = MPI_THREAD_SINGLE;
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
   int rank, size;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
+  if (provided < MPI_THREAD_SERIALIZED && rank == 0)
+    fprintf(stderr, "Warning: MPI provides thread level %d, below "
+            "MPI_THREAD_SERIALIZED\n", provided);
 
   int expected = argc > 1 ? atoi(argv[1]) : 0;
   if (expected <= 0) {

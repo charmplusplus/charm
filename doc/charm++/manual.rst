@@ -10441,10 +10441,15 @@ this.
 
 A ``CkAbort`` (or ``CmiAbort``) in any process ends the whole job:
 ``CharmLibInit`` registers an abort hook (``CmiSetAbortHook``) that calls
-``MPI_Abort``, and ``CharmLibExit`` removes it. A process that dies of a
-signal, such as a segmentation fault, does not go through it, so under
-``srun`` add ``--kill-on-bad-exit`` as well; without it, after such a
-crash the other processes wait until the job's time limit.
+``MPI_Abort``, and ``CharmLibExit`` removes it. With several PEs per
+process, the PE that aborts calls ``MPI_Abort`` from a thread MPI did not
+create, so initialize MPI with
+``MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided)``
+instead of ``MPI_Init``; while Charm++ runs, the main thread makes no MPI
+call. A process that dies of a signal, such as a segmentation fault, does
+not reach ``CmiAbort`` or the hook, so under ``srun`` add
+``--kill-on-bad-exit`` as well; without it, after such a crash the other
+processes wait until the job's time limit.
 
 On HPE Slingshot (the CXI libfabric provider), export
 ``FI_CXI_RX_MATCH_MODE=hybrid`` in the job script. Reconverse sets it

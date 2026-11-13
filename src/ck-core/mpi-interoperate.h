@@ -43,21 +43,26 @@ void StopCharmScheduler();
 
 #if CMK_INTEROP_HAVE_MPI_H
 // CharmLibInit's abort hook (CmiSetAbortHook): a CkAbort or CmiAbort in any
-// process ends the whole MPI job. LCI is bootstrapped over LCT's tcp backend,
-// whose process-manager abort reaches no other process, so without the hook
-// an abort ended only its own process, and under srun without
-// --kill-on-bad-exit the others waited until the time limit (reconverse
-// #321). CmiAbort has already printed msg. This runs on whichever PE thread
-// aborted, and MPI_Abort is its only MPI call.
+// process ends the whole MPI job. Without it an abort ends only its own
+// process, because LCI is bootstrapped over LCT's tcp backend, whose
+// process-manager abort reaches no other. CmiAbort has already printed msg.
+// It runs on whichever PE thread aborted, which with several PEs per process
+// is not the thread that initialized MPI (see CharmLibInit). If the program
+// has already finalized MPI, it does nothing and CmiAbort goes on as usual.
 static inline void CharmInteropAbortHook(int code, const char *msg) {
   (void)msg;
-  MPI_Abort(MPI_COMM_WORLD, code);
+  int finalized = 0;
+  MPI_Finalized(&finalized);
+  if (!finalized) MPI_Abort(MPI_COMM_WORLD, code);
 }
 
 // Starts Charm++ inside an MPI program. Charm++ runs on every rank of the job:
 // userComm must be MPI_COMM_WORLD or congruent to it, and Charm++ process i is
 // MPI_COMM_WORLD rank i. After CharmLibExit returns the program may keep
-// using MPI and must call MPI_Finalize itself.
+// using MPI and must call MPI_Finalize itself. With several PEs per process,
+// initialize MPI with MPI_Init_thread(..., MPI_THREAD_SERIALIZED, ...): an
+// abort on a PE calls MPI_Abort from a thread MPI did not create, while the
+// main thread, inside Charm++, makes no MPI call.
 static inline void CharmLibInit(MPI_Comm userComm, int argc, char **argv) {
 #if defined(_WIN32)
   fprintf(stderr, "CharmLibInit: MPI interop is not supported on Windows\n");
