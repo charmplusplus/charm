@@ -95,6 +95,57 @@ static void run(Ctx &c, const Topo &t) {
 
 // A Cartesian communicator: slot 2d comes from the -1 neighbor's block for
 // +1 (2d+1), slot 2d+1 from the +1 neighbor's block for -1 (2d).
+// MPI_Dist_graph_create's weights: rank 0 specifies a weighted ring
+// r -> r+1 with weight 10*r+1 and the other ranks pass no edges and NULL
+// arrays, which still means a weighted graph (MPI_UNWEIGHTED is not NULL);
+// then an MPI_UNWEIGHTED graph, and an empty graph with MPI_WEIGHTS_EMPTY.
+static void weights(Ctx &c) {
+  const int rank = c.rank, size = c.size;
+  std::vector<int> srcs, degs, dsts, ws;
+  if (rank == 0)
+    for (int r = 0; r < size; r++) {
+      srcs.push_back(r); degs.push_back(1); dsts.push_back((r + 1) % size); ws.push_back(10 * r + 1);
+    }
+  MPI_Comm g;
+  MPI_Dist_graph_create(MPI_COMM_WORLD, rank == 0 ? size : 0, rank == 0 ? srcs.data() : nullptr,
+                        rank == 0 ? degs.data() : nullptr, rank == 0 ? dsts.data() : nullptr,
+                        rank == 0 ? ws.data() : nullptr, MPI_INFO_NULL, 0, &g);
+  int in = -1, out = -1, weighted = -1;
+  MPI_Dist_graph_neighbors_count(g, &in, &out, &weighted);
+  if (in != 1 || out != 1 || !weighted) {
+    printf("[%d] weights: degrees %d/%d weighted %d, expected 1/1 1\n", rank, in, out, weighted);
+    c.errs++;
+  } else {
+    int s, sw, d, dw;
+    MPI_Dist_graph_neighbors(g, 1, &s, &sw, 1, &d, &dw);
+    const int left = (rank + size - 1) % size, right = (rank + 1) % size;
+    if (s != left || sw != 10 * left + 1 || d != right || dw != 10 * rank + 1) {
+      printf("[%d] weights: source %d (w %d) dest %d (w %d), expected %d (w %d) %d (w %d)\n", rank, s,
+             sw, d, dw, left, 10 * left + 1, right, 10 * rank + 1);
+      c.errs++;
+    }
+  }
+  MPI_Comm_free(&g);
+
+  int src = rank, deg = 1, dst = (rank + 1) % size;
+  MPI_Dist_graph_create(MPI_COMM_WORLD, 1, &src, &deg, &dst, MPI_UNWEIGHTED, MPI_INFO_NULL, 0, &g);
+  MPI_Dist_graph_neighbors_count(g, &in, &out, &weighted);
+  if (in != 1 || out != 1 || weighted) {
+    printf("[%d] unweighted: degrees %d/%d weighted %d, expected 1/1 0\n", rank, in, out, weighted);
+    c.errs++;
+  }
+  MPI_Comm_free(&g);
+
+  MPI_Dist_graph_create_adjacent(MPI_COMM_WORLD, 0, nullptr, MPI_WEIGHTS_EMPTY, 0, nullptr,
+                                 MPI_WEIGHTS_EMPTY, MPI_INFO_NULL, 0, &g);
+  MPI_Dist_graph_neighbors_count(g, &in, &out, &weighted);
+  if (in != 0 || out != 0 || !weighted) {
+    printf("[%d] empty: degrees %d/%d weighted %d, expected 0/0 1\n", rank, in, out, weighted);
+    c.errs++;
+  }
+  MPI_Comm_free(&g);
+}
+
 static void cart(Ctx &c, const char *name, int ndims, const int *dims, const int *periods) {
   Topo t{name, MPI_COMM_NULL, {}, {}, 2 * ndims};
   MPI_Cart_create(MPI_COMM_WORLD, ndims, dims, periods, 0, &t.comm);
@@ -166,6 +217,8 @@ int main(int argc, char **argv) {
     run(c, t);
     MPI_Comm_free(&t.comm);
   }
+
+  weights(c);
 
   long total = 0;
   MPI_Reduce(&c.errs, &total, 1, MPI_LONG, MPI_SUM, 0, MPI_COMM_WORLD);
