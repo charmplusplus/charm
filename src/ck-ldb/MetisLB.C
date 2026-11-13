@@ -90,7 +90,10 @@ void MetisLB::work(LDStats* stats)
   for (int i = 0; i < numVertices; i++)
   {
     xadj[i] = edgeNum;
-    vwgt[i] = (int)ceil(ogr->vertices[i].getVertexLoad() * ratio);
+    // A non-migratable vertex stays on its PE; its load enters through tpwgts.
+    vwgt[i] = ogr->vertices[i].isMigratable()
+                  ? (int)ceil(ogr->vertices[i].getVertexLoad() * ratio)
+                  : 0;
     for (const auto& outEdge : ogr->vertices[i].sendToList)
     {
       adjncy[edgeNum] = outEdge.getNeighborId();
@@ -124,10 +127,33 @@ void MetisLB::work(LDStats* stats)
 
   // Specifies size of vertices for computing the total communication volume
   constexpr idx_t* vsize = nullptr;
-  // This array of size nparts specifies the desired weight for each partition
-  // and setting it to NULL indicates graph should be equally divided among
-  // partitions
-  constexpr real_t* tpwgts = nullptr;
+
+  // Target weight of each partition: the fraction of the migratable load that
+  // brings the PE to the average load once its non-migratable load is added.
+  // The entries sum to 1. NULL (no migratable load) divides equally.
+  std::vector<double> share(numPes, 0.0);
+  double totalLoad = 0.0;
+  for (const auto& vertex : ogr->vertices)
+  {
+    totalLoad += vertex.getVertexLoad();
+    if (!vertex.isMigratable())
+      share[vertex.getCurrentPe()] -= vertex.getVertexLoad();
+  }
+  double shareSum = 0.0;
+  for (auto& s : share)
+  {
+    s = std::max(0.0, totalLoad / numPes + s);
+    shareSum += s;
+  }
+  std::vector<real_t> tpwgtsVec;
+  real_t* tpwgts = nullptr;
+  if (shareSum > 0.0)
+  {
+    tpwgtsVec.resize(numPes * ncon);
+    for (idx_t p = 0; p < numPes; p++)
+      tpwgtsVec[p] = share[p] / shareSum;
+    tpwgts = tpwgtsVec.data();
+  }
 
   // Output fields:
   // number of edges cut by the partitioning
@@ -162,7 +188,7 @@ void MetisLB::work(LDStats* stats)
 
   for (int i = 0; i < numVertices; i++)
   {
-    if (pemap[i] != ogr->vertices[i].getCurrentPe())
+    if (ogr->vertices[i].isMigratable() && pemap[i] != ogr->vertices[i].getCurrentPe())
       ogr->vertices[i].setNewPe(pemap[i]);
   }
 
