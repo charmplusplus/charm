@@ -1,0 +1,55 @@
+-include ../../common.mk
+CHARMC=../../../bin/charmc $(OPTS)
+
+OBJS = ckdyntest.o cbinding.o
+
+all: ckdyntest
+
+ckdyntest: $(OBJS)
+	$(CHARMC) -language charm++ -o ckdyntest $(OBJS) -module CommonLBs
+
+ckdyntest.decl.h: ckdyntest.ci
+	$(CHARMC) ckdyntest.ci
+
+ckdyntest.o: ckdyntest.C ckdyntest.decl.h cbinding.h
+	$(CHARMC) -c ckdyntest.C
+
+cbinding.o: cbinding.C cbinding.h
+	$(CHARMC) -c cbinding.C
+
+clean:
+	rm -f *.decl.h *.def.h conv-host *.o ckdyntest charmrun *.log *.sum *.sts
+	rm -rf ckdyntest.ckpt
+
+# The randomized scheduler queue ignores priorities, so that run skips the
+# priority phase. Each `!` run must abort with the CkDyn message its grep
+# names: a send to a deleted section, a broadcast with an NCPY slot, a
+# section id from before +restart (the restart of the +p1 checkpoint), a
+# section of a charmxi array, a SECTION callback as checkpoint callback,
+# deleting a combined section that a combine waits on, and the reduction
+# number of a deleted section, and a CkDynRegisterClass call after start-up.
+test: all
+	$(call run, ./ckdyntest +p4 +balancer RotateLB +randomized_msgq -skip priority -requiremoves )
+	$(call run, ./ckdyntest +p4 +balancer RotateLB -requiremoves )
+	$(call run, ./ckdyntest +p4 +restart ckdyntest.ckpt )
+	$(call run, ./ckdyntest +p1 )
+	$(call run, ./ckdyntest +p1 +restart ckdyntest.ckpt )
+	! ./ckdyntest +pe 1 +restart ckdyntest.ckpt -stalerestart > stalerestart.log 2>&1
+	grep -q "CkDynSendSection: stale section id from before restart" stalerestart.log
+	! ./ckdyntest +pe 1 -stalesend -skip pingpong -skip pingpong_inline > stalesend.log 2>&1
+	grep -q "send to a deleted section .*stale generation" stalesend.log
+	! ./ckdyntest +pe 2 -staleredno -skip pingpong -skip pingpong_inline > staleredno.log 2>&1
+	grep -q "CkDynSectionRedNo: .*was deleted" staleredno.log
+	! ./ckdyntest +pe 1 -zcbcast -skip pingpong -skip pingpong_inline > zcbcast.log 2>&1
+	grep -q "slot 2 is an NCPY slot; a message with zero-copy slots is sent point to point only, not as an array broadcast" zcbcast.log
+	! ./ckdyntest +pe 1 -badlatereg > badlatereg.log 2>&1
+	grep -q "CkDynRegisterClass for class Late after start-up; register it with CkDynRegisterClassLate" badlatereg.log
+	! ./ckdyntest +pe 2 -xisection > xisection.log 2>&1
+	grep -q "a member is an element of class Plain, which is not a dynamic class" xisection.log
+	! ./ckdyntest +pe 1 -ckptsection -skip sections -skip pingpong -skip pingpong_inline > ckptsection.log 2>&1
+	grep -q "CkDynCheckpoint: the done callback is a SECTION callback" ckptsection.log
+	! ./ckdyntest +pe 2 -deletewaiting -skip pingpong -skip pingpong_inline > deletewaiting.log 2>&1
+	grep -q "combine(s) named it as a part" deletewaiting.log
+
+testp: all
+	$(call run, ./ckdyntest +p$(P) +balancer RotateLB )

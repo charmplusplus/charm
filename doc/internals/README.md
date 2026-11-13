@@ -32,6 +32,7 @@ entry, and is planned once there is more than one chapter.
 | [Routing a send to an array element](array-send-order.md) | written 2026-10-24 (send before the array manager exists, charm #4088) |
 | [Array broadcasts and migrating elements](array-broadcast-migration.md) | written 2026-10-25 (broadcast epochs, stored broadcasts, when `stableLocations` applies; AMPI collective hang, charm #4072) |
 | [The process-level location table](process-location-cache.md) | one lock-free location table and one index table per process, shared by all PEs and arrays; one location request per process; what the first version leaves out (objid PR 3) |
+| [CkDyn: dynamic chares for language bindings](ckdyn.md) | written 2026-11-07, updated 2026-11-08: registration, messages, delivery, callbacks and futures, reductions, sections, zero-copy (host and device slots, posts, HAPI callbacks), pup, start-up; the Python binding (charm4py 2, branch `thin`) is described in the charm4py repository |
 | Message path: envelope, scheduler, entry method dispatch | not yet written |
 | Chare arrays: creation, insertion, migration, sections | not yet written |
 | [Section multicast trees: build, rebuild, retire, free](section-trees.md) | written 2026-11-09 (counted free of a replaced tree, charm #4132 item 2) |
