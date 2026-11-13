@@ -24,14 +24,18 @@ endif
 tracetest: tracetest.C tracetest.decl.h ../../../include/ckcoro.h
 	$(CHARMC) -std=c++20 tracetest.C -o tracetest -tracemode projections
 
-# 4 elements x (1 invocation + 10 resumes) begin events (type 2) for run().
+# At least 4 elements x (1 invocation + 10 resumes) begin events (type 2) for
+# run(); 4 if resumed segments are not traced. More when an entry runs inside
+# a segment (a reduction's broadcast sent from contribute): Projections ends
+# the segment's event and logs a second begin for it after the inner one.
+# The files are named after the binary: tracetest.exe.sts on Windows.
 trace-test: tracetest
 	rm -rf trc
 	mkdir trc
 	$(call run, ./tracetest +p2 +traceroot trc)
-	@ep=$$(awk '/^ENTRY CHARE .* "run\(\)"/ {print $$3}' trc/tracetest.sts); \
-	n=$$(gzip -dcf trc/tracetest.*.log* | awk -v ep=$$ep '$$1 == 2 && $$3 == ep {n++} END {print n+0}'); \
-	echo "tracetest: $$n begin events for run() (entry $$ep), expected 44"; test "$$n" = 44
+	@ep=$$(awk '/^ENTRY CHARE .* "run\(\)"/ {print $$3}' trc/*.sts); \
+	n=$$(gzip -dcf trc/*.log* | awk -v ep=$$ep '$$1 == 2 && $$3 == ep {n++} END {print n+0}'); \
+	echo "tracetest: $$n begin events for run() (entry $$ep), expected at least 44"; test "$$n" -ge 44
 
 clean:
 	rm -f *.decl.h *.def.h *.o ckcoro_tests tracetest charmrun

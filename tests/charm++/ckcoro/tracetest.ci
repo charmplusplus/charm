@@ -6,9 +6,8 @@ mainmodule tracetest {
     entry TraceMain(CkArgMsg* m);
     entry [reductiontarget] void done();
   };
-  array [1D] Pinger {
-    entry Pinger();
+  array [1D] Stepper {
+    entry Stepper();
     entry [coroutine] void run();
-    entry [inbox] void ping(int round);
   };
 };
