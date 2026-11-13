@@ -1,0 +1,6 @@
+{
+  "tree": "PE_Process_ProcessGroup_Root",
+  "root": { "pe": 0, "step_freq": 2 },
+  "processgroup": { "num_groups": 1, "strategies": ["GreedyRefine"] },
+  "process": { "strategies": ["Greedy"] }
+}

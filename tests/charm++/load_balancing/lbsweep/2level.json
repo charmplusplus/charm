@@ -1,0 +1,8 @@
+{
+  "tree": "PE_Root",
+  "root": {
+    "pe": 3,
+    "strategies": ["Greedy", "RefineA", "GreedyRefine"],
+    "GreedyRefine": { "tolerance": 1.05 }
+  }
+}

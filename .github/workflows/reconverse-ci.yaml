@@ -97,6 +97,7 @@ env:
     tests/charm++/reduction_empty_kid
     tests/charm++/section_migrate
     tests/charm++/load_balancing/migrate_then_atsync
+    tests/charm++/load_balancing/lbsweep
     tests/charm++/xarray_section_reduction
     tests/charm++/jacobi3d-coro
     tests/charm++/ckcoro
