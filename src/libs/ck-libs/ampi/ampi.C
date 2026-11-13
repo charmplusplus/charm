@@ -1191,7 +1191,6 @@ static void ampiProcInit() noexcept {
 
 #if AMPI_PRINT_MSG_SIZES
   // Only record and print message sizes if this option is given, and only for those ranks.
-  // Running with the '+syncprint' option is recommended if printing from multiple ranks.
   char *ranks = NULL;
   CkpvInitialize(CkListString, msgSizesRanks);
   if (CmiGetArgStringDesc(CkGetArgv(), "+msgSizesRanks", &ranks,
