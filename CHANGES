@@ -123,6 +123,55 @@ Runtime (reconverse):
   own thread (#4079, #4082); charmxi no longer crashes on serial
   blocks when run without -orig-file (#4027).
 
+Programming model and language bindings:
+
+- Coroutine entry methods (#4231): an entry method tagged [coroutine]
+  is a C++20 coroutine that waits for [inbox] entry methods with
+  CK_WHEN, CK_WHEN_ANY, CK_WHEN_ALL and CK_OVERLAP, and calls helper
+  coroutines (ck::coro::task) with CK_CALL, in plain C++ control flow
+  where SDAG uses when and serial. SDAG is unchanged; the two coexist.
+  The owner may be an array element, a group or nodegroup branch, a
+  singleton chare or the mainchare. A chare waiting in a coroutine
+  migrates and is checkpointed: the body is a CK_MIGRATABLE block that
+  is invoked again and jumps to the recorded wait, so the values live
+  across a wait are pupped members; +ck_fakemigrate rebuilds the
+  coroutines at every wait to check this on one PE. Manual section
+  "Structured Control Flow: Coroutine Entry Methods", design in
+  doc/coroutine-sdag-design.md, internals in
+  doc/internals/coroutine-sdag.md; tests/charm++/ckcoro,
+  jacobi3d-coro and sparse-coro, four examples/charm++/*-coro programs
+  and benchmarks/charm++/coro_pingpong. For every program: the
+  reduction wrapper of an [exclusive] nodegroup entry method now takes
+  the node lock, as a direct delivery does; Chare::ckDestroy() is
+  virtual, and Chare::ckDestroyLater() destroys a chare after the call
+  running on it returns. In a .ci file, "inbox" and "coroutine" are
+  attributes only inside the [...] of an entry method and stay names
+  everywhere else.
+
+- CkDyn: a C API for language bindings that define chare classes at
+  run time instead of in a .ci file (#4193). A class is registered
+  with a table of entry methods and reached through a table of
+  function pointers the binding supplies; every entry method receives
+  one message type with typed slots. Dynamic classes get what charmxi
+  classes get: groups (also constrained to a PE list), nodegroups,
+  arrays of one to six dimensions, array maps, sections over
+  CkMulticast, reductions with built-in and binding-defined reducers,
+  migration, load balancing, checkpoint and restart, quiescence
+  detection, zero-copy host and device buffers, persistent device
+  buffers, and class and method names in Projections. charm4py's new
+  binding (charm4py#316) is built on it. The manual for binding
+  authors is doc/ckdyn/manual.rst, the mechanism is described in
+  doc/internals/ckdyn.md, and tests/charm++/ckdyn is the acceptance
+  test. For every program, [nokeep] and [expedited] array broadcasts
+  no longer record a separate Projections event for the array
+  manager, as plain broadcasts already did not; each element's
+  invocation is still traced.
+
+- CkDyn shaped reductions: CkDynContributeShaped and
+  CkDynContributeSectionShaped keep the contributors' array shape
+  through a reduction, and the shaped reducer combines the
+  contributions in place (#4249).
+
 Object ids and element location:
 
 - 64-bit object ids (#3994; #4015, #4016, #4017, #4028, #4021, #4039,
@@ -194,6 +243,9 @@ Arrays, reductions, multicast and load balancing:
   when a PE empties, fills and empties again (#4191, #4192), or when
   an empty PE sends contributions left behind by migration (#4234).
   New tests reduction_migrate_ahead and reduction_empty_kid.
+  Contributions to one reduction that use different reducers abort
+  with both reducer names instead of being read with the wrong layout
+  (#4249).
 
 - CkMulticast, when a section's root element migrates: the old tree
   is retired and its reduction number read in one message (#4032,
@@ -204,6 +256,10 @@ Arrays, reductions, multicast and load balancing:
   message has arrived (#4206). Cross-array section reductions keep
   the reducer type, user flag and callback (#4199). New test
   section_migrate.
+
+- Section sends with an empty section ID no longer read past the
+  element list, and the message is freed when no section has
+  elements (#4244).
 
 - A group creation's dependence (CkEntryOptions::setGroupDepID)
   holds on the creating PE as well as on the others (#4150, #4172);
@@ -218,6 +274,15 @@ Arrays, reductions, multicast and load balancing:
   CldMap array without an explicit PE aborts with a message;
   ConfigurableRRMap reads its configuration in production builds;
   HilbertArrayMap places n elements at 0..n-1 for any extents.
+
+- Array maps, second round (#4245, fixes #4222): inserting an index
+  outside the extents an array was created with needs a PE on every
+  map (PropMap, FastArrayMap and HilbertArrayMap join CldMap); with a
+  PE it works. PropMap no longer reads past its table or divides by
+  zero for an empty array. HilbertArrayMap keeps per-array block
+  boundaries instead of a table with an entry per element on every
+  PE, orders every PE rather than one per process, and survives
+  checkpoint restart. New test arraymap_insert_abort.
 
 - Futures and callbacks (#4225): CkWaitAllIDs with every value
   present, CkSendMsgInline to a chare on another PE, section
@@ -234,7 +299,11 @@ Arrays, reductions, multicast and load balancing:
   AtSync steps no longer corrupts TreeLB's count (#4195, #4196).
   Deleting an array element no longer leaves a stale entry at its
   home (#4044). Restart no longer hangs with more than one process
-  and more than one PE per process (#4019).
+  and more than one PE per process (#4019). MetisLB and RecBipartLB
+  no longer move elements that called setMigratable(false), and
+  MetisLB subtracts the non-migratable load from each PE's target
+  share; the new test load_balancing/lbsweep runs every usable
+  balancer on a modelled imbalanced load (#4250).
 
 - CkIO: session arrays use the wide-collection layout, so a program
   may run more than 4,095 read and write sessions (#4149, #4152);
@@ -315,13 +384,19 @@ AMPI (Adaptive MPI):
   (#4085); send offsets of non-contiguous types in intercommunicator
   scatters and neighbor alltoalls (#4125); predefined reductions
   with the wrong reducer, and MAXLOC/MINLOC on the pair types
-  (#4156, #4173).
+  (#4156, #4173); the neighbor collectives (MPI_Neighbor_* and
+  MPI_Ineighbor_*) exchanged blocks with the wrong neighbors on
+  Cartesian and graph topologies and exchanged nothing on
+  distributed graphs (#4238).
 
 - Communicators and groups: MPI_Intercomm_merge deadlock and an
   MPI_Intercomm_create race (#4076); MPI_Group_free on a group from
   MPI_Comm_group (#4077); the abort after 4,095
   MPI_Comm_dup/MPI_Comm_free pairs, by giving communicator arrays the
-  wide-collection layout (#4117, #4118).
+  wide-collection layout (#4117, #4118). MPI_Comm_create_group by a
+  subset of ranks returns, and concurrent MPI_Intercomm_create calls
+  between different pairs of groups no longer pair one creation's
+  group with another's (#4236).
 
 - One-sided: MPI_Compare_and_swap (#4083); bounds with disp_unit,
   MPI_PROC_NULL targets and non-contiguous targets (#4106); window
@@ -337,8 +412,10 @@ campi (coroutine AMPI, experimental):
 
 - AMPI ranks as C++20 coroutines in the same library, with no thread
   per rank (#4073). A campi program is C++20 using the CAMPI_MAIN,
-  CAMPI_RESUMABLE and CAMPI_MIGRATE macros of campi.h; blocking
-  calls are awaited, and everything else is AMPI's code.
+  CAMPI_MIGRATABLE and CAMPI_MIGRATE macros of campi.h; blocking
+  calls are awaited, and everything else is AMPI's code. A
+  CAMPI_MIGRATABLE { ... } block replaces the CAMPI_RESUMABLE() and
+  CAMPI_END() pair of earlier versions (#4242).
 
 - Migration under a load balancer, checkpoint to a directory and
   restart (#4136): the rank's state lives in one pupped object
@@ -352,8 +429,19 @@ campi (coroutine AMPI, experimental):
   collective calls of #4073, plus MPI_Probe, MPI_Mprobe, MPI_Mrecv,
   MPI_Waitany, MPI_Waitsome, MPI_Bsend, MPI_Rsend,
   MPI_Sendrecv_replace, MPI_Reduce_scatter, MPI_Reduce_scatter_block
-  and MPI_Alltoallw (#4229). A blocking call campi does not yet
-  provide is a compile error. tests/campi has the tests.
+  and MPI_Alltoallw (#4229); the communicator constructors
+  MPI_Comm_split_type, MPI_Cart_create, MPI_Cart_sub,
+  MPI_Graph_create, MPI_Dist_graph_create(_adjacent),
+  MPI_Intercomm_create, MPI_Intercomm_merge and
+  MPI_Comm_create_group, the five MPI_Neighbor_* collectives,
+  MPI_Ireduce_scatter(_block) and MPI_Comm_idup(_with_info) (#4243).
+  The one-sided calls are the only MPI routines that remain compile
+  errors in a campi program. tests/campi has the tests.
+
+- A communicator creation completes on its own wake-up, identified
+  by a per-communicator count, so an unrelated wake-up such as
+  AMPI_Resume no longer ends MPI_Comm_split or MPI_Comm_dup before
+  the new communicator exists (#4235).
 
 Tests, CI and tooling:
 
@@ -374,7 +462,10 @@ Tests, CI and tooling:
 - megatest gained the modules futures, callbackkinds (#4208) and
   arraymaps (#4202), which found the fixes of #4225 and #4226; a
   quiescence stress test (#4208); smptest targets in three more
-  directories (#4135); ten stale tests build again (#4048).
+  directories (#4135); ten stale tests build again (#4048). The
+  futures and callbackkinds cases that waited for those fixes run
+  unconditionally, arraymaps covers 4D to 6D arrays, and
+  ckpt_restart runs and restarts on 1 PE again (#4233).
 
 - The mini-applications are the submodule miniapps/
   (charmplusplus/miniapps): 'git submodule update --init miniapps',
@@ -399,6 +490,9 @@ Tests, CI and tooling:
   AGENTS.md says where the knowledge is for an AI coding agent and
   the conventions for comments (#4114, #4141).
 
+- Manuals updated for reconverse: launch, debugging, the Converse
+  API (#4240).
+
 Build and packaging:
 
 - Targets are reconverse-<os>-<arch>: reconverse-linux-x86_64,
@@ -409,6 +503,9 @@ Build and packaging:
 - --with-production passes CMK_OPTIMIZE to every object, including
   reconverse, so CmiAssert is compiled out of the whole production
   build (#4190).
+
+- A direct 'cmake -S . -B build' configures: NETWORK defaults to
+  reconverse and is set before its first use (#4241).
 
 - The charm4py target builds and loads on reconverse: libcharm links
   reconverse, which is built with CMK_CHARM4PY (#4063).
@@ -428,17 +525,15 @@ Removed:
 
 Known gaps in the beta:
 
-- AMPI: dup and split of an intercommunicator, concurrent
-  MPI_Intercomm_create and MPI_Comm_create_group by a subset of
-  ranks (#4099); CkDDT_Struct lower bounds and negative extents
-  (#4100); the neighbor order of Cart and Dist_graph topologies
-  (#4101); three request-completion items of #4097 (same-root
-  Ibcasts, MPI_Op_free during a non-blocking reduction, sequence
-  number wraparound). pieglobals with Fortran aborts at exit on
-  Linux after the program has finished (#4157, #4189). On macOS a
-  rank cannot move to another process or restart from a checkpoint
-  (no way to turn address randomization off); campi can. No
-  shrink/expand; ROMIO is not built by default.
+- AMPI: dup and split of an intercommunicator (#4099); CkDDT_Struct
+  lower bounds and negative extents (#4100); the neighbor order of
+  Cart and Dist_graph topologies (#4101); three request-completion
+  items of #4097 (same-root Ibcasts, MPI_Op_free during a non-blocking
+  reduction, sequence number wraparound). pieglobals with Fortran
+  aborts at exit on Linux after the program has finished (#4157,
+  #4189). On macOS a rank cannot move to another process or restart
+  from a checkpoint (no way to turn address randomization off); campi
+  can. No shrink/expand; ROMIO is not built by default.
 
 - CharmDebug is not available.
 
