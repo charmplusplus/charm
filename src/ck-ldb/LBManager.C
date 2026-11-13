@@ -212,7 +212,7 @@ void _loadbalancerInit()
       lbNames.push_back("Greedy");
       lbNames.push_back("GreedyRefine");
       lbNames.push_back("DistributedLB");
-      lbNames.push_back("Refine");
+      lbNames.push_back("RefineA");
       lbNames.push_back("Hybrid");
       lbNames.push_back("MetisLB");
       if (CkMyPe() == 0)
@@ -853,16 +853,16 @@ void LBManager::switchLoadbalancer(int switchFrom, int switchTo)
     if (lbNames[switchTo] == "Hybrid")
     {
       config["tree"] = "PE_Process_Root";
-      config["Root"]["pe"] = 0;
-      config["Root"]["step_freq"] = 3;
-      config["Root"]["strategies"] = {"GreedyRefine"};
-      config["Process"]["strategies"] = {"GreedyRefine"};
+      config["root"]["pe"] = 0;
+      config["root"]["step_freq"] = 3;
+      config["root"]["strategies"] = {"GreedyRefine"};
+      config["process"]["strategies"] = {"GreedyRefine"};
     }
     else
     {
       config["tree"] = "PE_Root";
-      config["Root"]["pe"] = 0;
-      config["Root"]["strategies"] = {lbNames[switchTo]};
+      config["root"]["pe"] = 0;
+      config["root"]["strategies"] = {lbNames[switchTo]};
     }
     configureTreeLB(config);
   }
