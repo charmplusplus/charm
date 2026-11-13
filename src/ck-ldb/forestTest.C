@@ -30,6 +30,7 @@
  * purpose.
  */
 
+#include <algorithm>
 #include "RandomForestModel.h"
 #include <cassert>
 
@@ -44,8 +45,9 @@ int ForestModel::forestTest(std::vector<double>& X, int num_rows, int num_cols) 
   std::vector<double> model_Ysoft(LB_CLASSES);
   DataMatrix Xarray(X, num_rows, num_cols);
 
-  // Assuming initialization to 0s
+  // Each tree writes the class distribution of the leaf its sample reaches.
   for (int i = 0; i < numTrees; i++) {
+    std::fill(model_Ysoft.begin(), model_Ysoft.end(), 0.0);
     treeModels[i].treeTest(Xarray, model_Ysoft);
 
     for (int ii = 0; ii < LB_CLASSES; ii++) Ysoft[ii] += model_Ysoft[ii];

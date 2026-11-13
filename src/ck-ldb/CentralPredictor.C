@@ -277,7 +277,7 @@ void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
 	  // model wrong, rebuild it now
 	  predicted_model->predictor->initialize_params(predicted_model->parameters[i].data());
 	  model_done = Marquardt_solver(predicted_model, i);
-	  CkPrintf("LB: Updated model for object %d %s",i,model_done?"success":"failed. ");
+	  CkPrintf("LB: Updated model for object %d %s\n",i,model_done?"success":"failed");
 	  predicted_model->predictor->print(predicted_model->parameters[i].data());
 	}
 	if (fabs(error_model[i]) < fabs(error_default[i])) predicted_model->model_valid[i] = true;
