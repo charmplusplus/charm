@@ -156,9 +156,12 @@ public:
   virtual void populateInitial(int arrayHdl, CkArrayOptions& options, void* ctorMsg,
                                CkArray* mgr);
   virtual int procNum(int arrayHdl, const CkArrayIndex& element) = 0;
+  // An index the map names no PE for (procNum -1, e.g. one outside the range the
+  // map was configured for, inserted with an explicit PE) gets a hashed home.
   virtual int homePe(int arrayHdl, const CkArrayIndex& element)
   {
-    return procNum(arrayHdl, element);
+    const int pe = procNum(arrayHdl, element);
+    return pe >= 0 ? pe : (int)(element.hash() % (CkHashCode)CkNumPes());
   }
 
   virtual void pup(PUP::er& p);
