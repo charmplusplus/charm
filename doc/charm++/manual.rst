@@ -249,8 +249,7 @@ Charm++ recognizes two logical entities: a PE (processing element) and a
 logical node, or simply “node”. In a Charm++ program, a PE is a unit of
 mapping and scheduling: each PE has a scheduler with an associated pool
 of messages. Each chare is assumed to reside on one PE at a time. A
-logical node is implemented as an OS process. In non-SMP mode there is
-no distinction between a PE and a logical node. Otherwise, a PE takes
+logical node is implemented as an OS process. A PE takes
 the form of an OS thread, and a logical node may contain one or more
 PEs. Physical nodes may be partitioned into one or more logical nodes.
 Since PEs within a logical node share the same memory address space, the
@@ -260,19 +259,13 @@ may optionally be associated with a subset of cores or hardware threads.
 
 A Charm++ program can be launched with one or more (logical) nodes per
 physical node. For example, on a machine with a four-core processor,
-where each core has two hardware threads, common configurations in
-non-SMP mode would be one node per core (four nodes/PEs total) or one
-node per hardware thread (eight nodes/PEs total). In SMP mode, the most
-common choice to fully subscribe the physical node would be one logical
-node containing *seven* PEs-one OS thread is set aside per process for
-network communications. (When built in the “multicore” mode that lacks
-network support, a comm thread is unnecessary, and eight PEs can be used
-in this case. A comm thread is also omitted when using some
-high-performance network layers such as PAMI.) Alternatively, one can
+where each core has two hardware threads, the most common choice to
+fully subscribe the physical node would be one logical node containing
+four or eight PEs; no OS thread is set aside for network communication.
+Alternatively, one can
 choose to partition the physical node into multiple logical nodes, each
-containing multiple PEs. One example would be *three* PEs per logical
-node and two logical nodes per physical node, again reserving a comm
-thread per logical node.
+containing multiple PEs. One example would be *four* PEs per logical
+node and two logical nodes per physical node.
 
 It is not a general practice in Charm++ to oversubscribe the underlying
 physical cores or hardware threads on each node. In other words, a
@@ -3044,7 +3037,7 @@ infrastructure:
   above link in order to use this load balancer. Because of this
   dependence, ScotchLB is not built by default; it can be built by
   running ``make ScotchLB`` in the Charm++ build folder
-  (e.g. ``netlrts-linux-x86_64-smp/``). If SCOTCH is installed in a
+  (e.g. ``reconverse-linux-x86_64/``). If SCOTCH is installed in a
   non-standard location, use the *-incdir* and *-libdir* build time
   options to point to the include and library directories used,
   respectively. (``+balancer ScotchLB``)
@@ -4799,13 +4792,12 @@ immediate
    otherwise a compilation error will result. If the destination of such
    entry method is on the local node, then the method will be executed
    in the context of the regular PE regardless the execution mode of
-   Charm++ runtime. However, in the SMP mode, if the destination of the
-   method is on the remote node, then the method will be executed in the
-   context of the communication thread. For that reason, immediate entry
-   methods should be used for code that is performance critical and does
-   not take too long in terms of execution time because long running
-   entry methods can delay communication by occupying the communication
-   thread for entry method execution rather than remote communication.
+   Charm++ runtime. On a remote node, there is no communication thread,
+   and the method is delivered as an ordinary message to a PE of that
+   node. (On the classic branch only, in SMP mode, a remote immediate
+   method runs in the context of the communication thread; there,
+   immediate entry methods should be short, because long running entry
+   methods delay communication by occupying the communication thread.)
 
    Such entry methods can be useful for implementing
    multicasts/reductions as well as data lookup when such operations are
@@ -5394,11 +5386,11 @@ Memory Registration and Registration Modes
 
 There are four modes of memory registration for the Zero Copy API. These
 registration modes act as control switches on networks that require memory
-registration like GNI, OFI, UCX and Verbs, in order to perform RDMA
+registration, such as the networks LCI drives, in order to perform RDMA
 operations . They dictate the functioning of the API providing flexible
 options based on user requirement. On other networks, where network
-memory management is not necessary (Netlrts) or is internally handled by
-the lower layer networking API (PAMI, MPI), these switches are still
+memory management is not necessary or is internally handled by
+the lower layer networking API, these switches are still
 supported to maintain API consistency by all behaving in the similar
 default mode of operation.
 
@@ -5431,9 +5423,9 @@ to register and perform the RDMA operation. This mode is demonstrated in
 
 
 This mode is only beneficial by implementations that use
-pre-registered memory pools. In Charm++, GNI and Verbs machine layers
-use pre-registered memory pools for avoiding registration costs. On
-other machine layers, this mode is supported, but it behaves similar to
+pre-registered memory pools. On the classic branch, the GNI and Verbs
+machine layers use pre-registered memory pools for avoiding registration
+costs. On reconverse, this mode is supported, but it behaves similar to
 ``CK_BUFFER_REG``. A custom allocator, ``CkRdmaAlloc`` can be used to
 allocate a buffer from a pool of pre-registered memory to avoid the
 expensive malloc and memory registration costs. For a buffer allocated
@@ -5775,13 +5767,13 @@ behaves like a regular entry method that copies its arguments.
 
 Table :numref:`tab:rdmathreshold` displays the
 message size thresholds for the Zero Copy Entry Method Send API on
-popular systems and build architectures. These results were obtained by
+popular systems and build architectures of the classic branch (Charm++
+8.1); thresholds for reconverse builds have not been tabulated. These
+results were obtained by
 running ``benchmarks/charm++/zerocopy/entry_method_api/pingpong`` in
 non-SMP mode on production builds. For message sizes greater than or
 equal to the displayed thresholds, the Zero Copy API is found to perform
-better than the regular message send API. For network layers that are
-not pamilrts, gni, verbs, ofi or mpi, the generic implementation is
-used.
+better than the regular message send API.
 
 .. table:: Message Size Thresholds for which Zero Copy Entry API performs better than Regular API
    :name: tab:rdmathreshold
@@ -8709,8 +8701,7 @@ Querying Network Topology
 
 The following calls provide information about the machine upon which the
 parallel program is executed. A processing element (PE) is a unit of
-mapping and scheduling, which takes the form of an OS thread in SMP mode
-and an OS process in non-SMP mode. A node (specifically, a logical node)
+mapping and scheduling, which takes the form of an OS thread. A node (specifically, a logical node)
 refers to an OS process: a set of one or more PEs that share memory
 (i.e. an address space). PEs and nodes are ranked separately starting
 from zero: PEs are ranked from ``0`` to ``CmiNumPes()``, and nodes are ranked
@@ -8759,8 +8750,7 @@ Physical Node API
 
 The following calls provide information about the division and mapping
 of physical hardware in Charm++. A processing element (PE) is a unit of
-mapping and scheduling, which takes the form of an OS thread in SMP mode
-and an OS process in non-SMP mode. A logical node (often shortened to
+mapping and scheduling, which takes the form of an OS thread. A logical node (often shortened to
 *node*) refers to an OS process: a set of one or more PEs that share
 memory (i.e. an address space). A physical node refers to an individual
 hardware machine (or, more precisely, an operating system instance on
@@ -9024,7 +9014,7 @@ After a failure, the system may contain fewer or more processors. Once
 the failed components have been repaired, some processors may become
 available again. Therefore, the user may need the flexibility to restart
 on a different number of processors than in the checkpointing phase.
-This is allowable by giving a different ``+pN`` option at runtime. One
+This is allowable by giving a different ``+pe N`` option at runtime. One
 thing to note is that the new load distribution might differ from the
 previous one at checkpoint time, so running a load balancer (see
 Section :numref:`loadbalancing`) after restart is suggested.
@@ -9395,9 +9385,11 @@ source code. The interface functions of this library are as follows:
 -  CProxy_FuncCkLoop **CkLoop_Init**\ (int numThreads=0): This function
    initializes the CkLoop library, and it only needs to be called once
    on a single PE during the initialization phase of the application.
-   The argument ``numThreads`` is only used in non-SMP mode, specifying
+   The argument ``numThreads`` is only used in non-SMP mode (classic
+   branch only), specifying
    the number of threads to be created for the single-node shared-memory
-   parallelism. It will be ignored in SMP mode.
+   parallelism. It will be ignored in SMP mode, which every reconverse
+   build uses.
 
 -  void **CkLoop_SetSchedPolicy**\ (CkLoop_sched
    schedPolicy=CKLOOP_NODE_QUEUE) : This function sets the scheduling
@@ -9410,7 +9402,7 @@ source code. The interface functions of this library are as follows:
    ``CKLOOP_LIST`` uses list to deliver the messages.
 
 -  void **CkLoop_Exit**\ (CProxy_FuncCkLoop ckLoop): This function is
-   intended to be used in non-SMP mode, as it frees the resources (e.g.
+   intended to be used in non-SMP mode (classic branch only), as it frees the resources (e.g.
    terminating the spawned threads) used by the CkLoop library. It
    should be called on just one PE.
 
@@ -9535,14 +9527,13 @@ Instructions to build and use the integrated OpenMP library
 Instructions to build
 '''''''''''''''''''''
 
-The OpenMP library can be built with ``omp`` keyword on any smp version
-of Charm++ including multicore build when you build Charm++ or AMPI,
+The OpenMP library can be built with ``omp`` keyword
+when you build Charm++ or AMPI,
 for example:
 
 .. code-block:: bash
 
-   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 omp
-   $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp
+   $ $CHARM_DIR/build charm++ reconverse-linux-x86_64 omp
 
 This library is based on the LLVM OpenMP runtime library. So it supports
 the ABI used by clang, intel and gcc compilers.
@@ -9581,7 +9572,7 @@ to avoid the error:
    $ sudo ln -svT /usr/bin/clang-3.8 /usr/bin/clang
    $ sudo ln -svT /usr/bin/clang++-3.8 /usr/bin/clang
 
-   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 clang omp --with-production -j8
+   $ $CHARM_DIR/build charm++ reconverse-linux-x86_64 clang omp --with-production -j8
    $ echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a  # Dummy library. This will make you avoid the error message.
 
 On Mac, the Apple-provided clang installed in default doesn’t have
@@ -9595,8 +9586,7 @@ to the invocation of the Charm++ build script. For example:
 
 .. code-block:: bash
 
-   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 omp gcc-7
-   $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp gcc-7
+   $ $CHARM_DIR/build charm++ reconverse-darwin-arm8 omp gcc-7
 
 If this does not work, you should set environment variables so that the
 Charm++ build script uses the normal gcc installed from Homebrew or
@@ -9837,7 +9827,7 @@ with GPU support (or configure CMake with ``-D CUDA=ON``), e.g.
 
 .. code-block:: bash
 
-   $ ./build charm++ netlrts-linux-x86_64 cuda -j8 --with-production
+   $ ./build charm++ reconverse-linux-x86_64 cuda -j8 --with-production
 
 Building with GPU support requires an installation of the CUDA Toolkit on the
 system, which is automatically found by the build script. If the script fails
@@ -9970,15 +9960,14 @@ buffer to the destination buffer (also on the GPU).
 There are currently two implementations for direct GPU messaging:
 (1) CUDA memcpy and IPC based mechanism for intra-node communication
 (inter-node communication reverts back to a host-staging mechanism),
-and (2) UCX-based mechanism that supports both intra-node and inter-node
-communication. When Charm++ is built with the UCX machine layer
-and CUDA support (e.g., ucx-linux-x86_64-cuda), it will automatically use
-the UCX-based mechanism with the direct GPU messaging API.
-Other CUDA-enabled builds will only support
-the first mechanism and limit the use of direct GPU-GPU transfers within
-a single physical node. For inter-node messages, the runtime system will
-revert back to a host-staging mechanism where the GPU buffer is moved to
-host memory before being sent.
+and (2) a network-based mechanism that supports both intra-node and
+inter-node communication. Reconverse builds with GPU support (e.g.,
+``reconverse-linux-x86_64-cuda``) use the network-based mechanism, a
+device-to-device RDMA get through the network backend, described below.
+On the classic branch only, the UCX machine layer provides it, and other
+classic CUDA-enabled builds revert back to a host-staging mechanism for
+inter-node messages, where the GPU buffer is moved to host memory before
+being sent.
 The user APIs for both implementations remain the same, however, as detailed
 in the following.
 
@@ -11240,7 +11229,7 @@ The database data structure named LDStats is defined in *CentralLB.h*:
 #. *LBRealType* is the data type for load balancer measured time. It is
    "double" by default. User can specify the type to float at Charm++
    compile time if want. For example, ./build charm++
-   netlrts-linux-x86_64 --with-lbtime-type=float;
+   reconverse-linux-x86_64 --with-lbtime-type=float;
 
 #. *procs* array defines processor attributes and usage data for each
    processor;
@@ -11995,9 +11984,9 @@ is used to access a physical address; however, this is not guaranteed.
 In practice, most modern compilers comply with this suggestion, but please
 alert us if you encounter synchronization issues!
 
-To build with SHMEM, pass ``--enable-shmem`` (to use PXSHM) or
-``--enable-xpmem`` (to use XPMEM) as command-line options to a Charm++ build;
-only CMake builds are supported at this time. Charm++ currently has a cutoff
+On reconverse builds the shared-memory pool is always built, and it is
+turned on at run time with ``+ipc`` (``+ipcmode {auto,shm,xpmem}`` chooses
+the mechanism; XPMEM needs a build with ``--enable-xpmem``). Charm++ currently has a cutoff
 for using SHMEM, after which it falls back to conventional messaging. This
 decision accommodates SHMEM's bounded pool, and potentially more efficient
 IPC mechanisms exist for "large" messages (e.g., the ZeroCopy API). One can
@@ -12005,7 +11994,7 @@ alter these behaviors with the command line options ``++ipcpoolsize`` and
 ``++ipccutoff``, which change the size of the shared pool of memory and
 message size cutoff (in bytes), respectively. For example, this command
 will run ``a.out`` with a 128MB IPC pool size and a 256KB message cutoff:
-``./charmrun ++local ++auto-provision ./a.out ++ipcpoolsize $((128*1024*1024)) ++ipccutoff $((256*1024))``
+``lcrun -n 2 ./a.out +pe 2 +ipc ++ipcpoolsize $((128*1024*1024)) ++ipccutoff $((256*1024))``
 
 Note, Charm++ maintains and polls its own SHMEM IPC manager. Libraries can
 instantiate their own IPC manager if they require custom IPC behaviors. For
@@ -12199,6 +12188,10 @@ subsequent production runs.
 Malleability: Shrink/Expand Number of Processors
 ------------------------------------------------
 
+Shrink/expand is available on the classic branch only (Charm++ 8.1): it
+uses ``charmrun`` to start the processes of the new configuration, and
+reconverse builds do not support ``--enable-shrinkexpand``.
+
 This feature enables a Charm++ application to dynamically shrink and
 expand the number of processors that it is running on during the
 execution. It internally uses three other features of Charm++: CCS
@@ -12235,7 +12228,7 @@ used, and a port number to listen the shrink/expand commands:
 
 .. code-block:: bash
 
-   	$ ./jacobi2d 200 20 +pe 4 +balancer GreedyLB ++server ++server-port 1234
+   	$ ./charmrun +p4 ./jacobi2d 200 20 +balancer GreedyLB ++nodelist ./mynodelistfile ++server ++server-port 1234
 
 The CCS client to send shrink/expand commands needs to specify the
 hostname, port number, the old(current) number of processor and the
@@ -12345,17 +12338,17 @@ where,
    *reconverse-linux-x86_64*, *reconverse-darwin-arm8* etc.
 
 ``OPTIONS``
-   are additional options to the build process, e.g. *smp* is used to
-   build a shared memory version, *-j8* is given to build in parallel
-   etc.
+   are additional options to the build process, e.g. *-j8* is given to
+   build in parallel etc. (Reconverse builds are always SMP, so *smp*
+   is not needed.)
 
 In Table :numref:`tab:buildlist`, a list of build
 commands is provided for some of the commonly used systems. Note that,
-in general, options such as *smp*, ``--with-production``, compiler
+in general, options such as ``--with-production``, compiler
 specifiers etc can be used with all targets. It is advisable to build
 with ``--with-production`` to obtain the best performance. If one
 desires to perform trace collection (for Projections),
-``--enable-tracing --enable-tracing-commthread`` should also be passed
+``--enable-tracing`` should also be passed
 to the build command.
 
 Details on all the available alternatives for each of the above
@@ -12404,7 +12397,9 @@ A basic command to install Charm++ through Spack is the following:
 
    	$ spack install charmpp
 
-By default, the netlrts network backend with SMP support is built. You
+The Spack package currently builds Charm++ 8.1 (classic branch), and the
+options below apply to it. By default, the netlrts network backend with
+SMP support is built. You
 can specify other backends by providing the ``backend`` parameter to
 spack. It is also possible to specify other options, as listed in
 Section :numref:`sec:manualinstall`, by adding them to the Spack
@@ -12449,24 +12444,23 @@ After downloading and unpacking Charm++, it can be installed in the following wa
    $ cd charm
    $ mkdir build-cmake
    $ cd build-cmake
-   $ cmake ..
+   $ cmake .. -DNETWORK=reconverse
    $ make -j4
 
 
-By default, CMake builds the netlrts version.
 Other configuration options can be specified in the cmake command above.
-For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the following command can be used:
+For example, to build Charm++ and AMPI, the following command can be used:
 
 .. code-block:: bash
 
-   $ cmake .. -DNETWORK=mpi -DSMP=on -DTARGET=AMPI
+   $ cmake .. -DNETWORK=reconverse -DTARGET=AMPI
 
 Alternatively, one could also specify other ``cmake`` configuration options via the 
 ``../build`` command, for example, by replacing the above ``cmake ..`` command with
 
 .. code-block:: bash
 
-   $ ../build AMPI mpi-linux-x86_64 smp
+   $ ../build AMPI reconverse-linux-x86_64
 
 Charm++ installation directories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -13632,8 +13626,9 @@ CharmDebug
 
 The CharmDebug interactive debugging tool can be used to inspect the
 messages in the scheduling queue of each processing element, and to
-manipulate the order in which they’re delivered. More details on how to
-use CharmDebug can be found in its manual.
+manipulate the order in which they’re delivered. CharmDebug is not
+available on reconverse in Charm++ 9 (classic branch only). More details
+on how to use CharmDebug can be found in its manual.
 
 Deterministic Record-Replay
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^

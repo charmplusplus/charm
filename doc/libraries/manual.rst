@@ -36,7 +36,7 @@ client is a small Java program. A typical use of this is:
 
    	cd charm/examples/charm++/wave2d
    	make
-   	./charmrun ./wave2d +p2 ++server ++server-port 1234
+   	./wave2d +pe 2 ++server ++server-port 1234
    	~/ccs_tools/bin/liveViz localhost 1234
 
 Use git to obtain a copy of ccs_tools (prior to using liveViz) and build
@@ -330,9 +330,9 @@ calculations are required to access data.
 
 To use MSA in a Charm++ program:
 
--  build Charm++ for your architecture, e.g. ``netlrts-linux-x86_64``.
+-  build Charm++ for your architecture, e.g. ``reconverse-linux-x86_64``.
 
--  ``cd charm/netlrts-linux-x86_64/tmp/libs/ck-libs/multiphaseSharedArrays/; make``
+-  ``cd charm/reconverse-linux-x86_64/tmp/libs/ck-libs/multiphaseSharedArrays/; make``
 
 -  ``#include “msa/msa.h”`` in your header file.
 

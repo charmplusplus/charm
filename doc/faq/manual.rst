@@ -66,11 +66,13 @@ Will Charm++ run on my machine?
 
 Yes.
 
-Charm++ supports both shared-memory and distributed-memory machines,
-SMPs and non-SMPs. In particular, we support serial machines, Windows
-machines, Apple machines, ARM machines, clusters connected via Ethernet,
-or Infiniband, IBM Power series, Cray XC/XE/XK series,
-and any machine that supports MPI. We normally do our development on
+Charm++ supports both shared-memory and distributed-memory machines.
+Charm++ 9 builds for Linux on x86_64 and ARM (``reconverse-linux-x86_64``,
+``reconverse-linux-arm8``), Apple Silicon Macs (``reconverse-darwin-arm8``)
+and Windows (``reconverse-win-x86_64``), from single workstations to
+clusters connected via Ethernet, Infiniband or Slingshot. The
+classic Converse layers for MPI, Cray and IBM networks are on the classic
+branch only (Charm++ 8.1). We normally do our development on
 Linux workstations, and our testing on large parallel machines. Programs
 written using Charm++ will run on any supported machine.
 
@@ -150,7 +152,7 @@ saved automatically in ``smart-build.log``)
 If you have a very unusual machine configuration, you will have to run
 ``./build -help`` to list all possible build options. You will then
 choose the closest architecture, and then you may have to modify the
-associated conf-mach.sh and conv-mach.h files in src/arch to point to
+associated conv-mach.sh and conv-mach.h files in src/arch to point to
 your desired compilers and options. If you develop a significantly
 different platform, please open a pull request on our
 `GitHub <https://github.com/charmplusplus/charm>`_
@@ -208,9 +210,9 @@ Try
 
 .. code-block:: bash
 
-   ./charmrun ./pgm --help
+   ./pgm --help
 
-to see a list of parameters at the command line. The charmrun arguments
+to see a list of parameters at the command line. The runtime arguments
 are documented in :ref:`charmrun`. The arguments for the installed libraries are
 listed in the library manuals.
 
@@ -802,7 +804,8 @@ nodegroup element per node (CkNumNodes() elements). Because they execute
 on a node, nodegroups have very different semantics from the rest of
 Charm++.
 
-Note that on a non-SMP machine, groups and nodegroups are identical.
+Note that when a process runs only one PE (``+pe`` equal to the number
+of processes), groups and nodegroups are identical.
 
 Do nodegroup entry methods execute on one fixed processor of the node, or on the next available processor?
 ----------------------------------------------------------------------------------------------------------
@@ -1059,21 +1062,22 @@ print
    be printed.
 
 gdb
-   This can be used both on a single processor, and in parallel
-   simulations. In the latter, each processor has a terminal window with
-   a gdb connected.
+   This can be used both on a single process, and in parallel runs. In
+   the latter, each process can be started under its own gdb in a
+   separate terminal window.
 
 charmdebug
    This is the most sophisticated method to debug parallel programs in
    Charm++. It is tailored to Charm++ and it can display and inspect
    chare objects as well as messages in the system. Single *gdb*\ s can
-   be attached to specific processors on demand.
+   be attached to specific processors on demand. CharmDebug is not
+   available on reconverse in Charm++ 9 (classic branch only).
 
 How do I use charmdebug?
 ------------------------
 
-Currently charmdebug is tested to work only under netlrts- non-SMP
-versions. With other versions, testing is pending. To get the Charm
+CharmDebug is not available on reconverse in Charm++ 9; it works with
+the netlrts- non-SMP versions of the classic branch (Charm++ 8.1). To get the Charm
 Debug tool, check out the source code from the repository. This will
 create a directory named ccs_tools. Move to this directory and build
 Charm Debug.
@@ -1097,10 +1101,10 @@ You can find more detailed information in the debugger manual in
 Can I use distributed debuggers like Allinea DDT and RogueWave TotalView?
 -------------------------------------------------------------------------
 
-Yes, on mpi- versions of Charm++. In this case, the program is a regular
-MPI application, and as such any tool available for MPI programs can be
-used. Notice that some of the internal data structures (like messages in
-queue) might be difficult to find.
+Yes, if the debugger can attach to the processes started by your
+launcher (``srun``, ``mpirun``). Their MPI-specific views (message
+queues) do not show Charm++ messages, and some of the internal data
+structures might be difficult to find.
 
 Depending on your debugging needs, see the other notes about
 alternatives such as CharmDebug and directly-attached gdb.
@@ -1108,39 +1112,20 @@ alternatives such as CharmDebug and directly-attached gdb.
 How do I use *gdb* with Charm++ programs?
 -----------------------------------------
 
-It depends on the machine. On the netlrts- versions of Charm++, like
-netlrts-linux-x86_64, you can just run the serial debugger:
+A Charm++ program is an ordinary executable, so a single-process run
+can be started under the serial debugger directly (``lldb`` on macOS):
 
 .. code-block:: bash
 
-   $ gdb myprogram
+   $ gdb --args ./myprogram +pe 2
 
-If the problem only shows up in parallel, and you’re running on an X
-terminal, you can use the *++debug* or *++debug-no-pause* options of
-charmrun to get a separate window for each process:
+If the problem only shows up with several processes, and you’re running
+on an X terminal, start each process under its own debugger in a
+separate window:
 
 .. code-block:: bash
 
-   $ export DISPLAY="myterminal:0"
-   $ ./charmrun ./myprogram +p2 ++debug
-
-When I try to use the *++debug* option I get: ``remote host not responding... connection closed``
--------------------------------------------------------------------------------------------------
-
-First, make sure the program at least starts to run properly without
-*++debug* (i.e. charmrun is working and there are no problems with the
-program startup phase). You need to make sure that gdb or dbx, and xterm
-are installed on all the machines you are using (not the one that is
-running ``charmrun``). If you are working from a Windows machine, you
-need an X-win application such as exceed. You need to set this up to
-give the right permissions for X windows. You need to make sure the
-DISPLAY environment variable on the remote machine is set correctly to
-your local machine. I recommend ssh and putty, because it will take care
-of the DISPLAY environment automatically, and you can set up ssh to use
-tunnels so that it even works from a private subnet(e.g. 192.168.0.8).
-Since the xterm is displayed from the node machines, you have to make
-sure they have the correct DISPLAY set. Again, setting up ssh in the
-nodelist file to spawn node programs should take care of that.
+   $ lcrun -n 2 xterm -e gdb --args ./myprogram +pe 2
 
 My debugging printouts seem to be out of order. How can I prevent this?
 -----------------------------------------------------------------------
@@ -1162,10 +1147,9 @@ Though you might expect this code to always print "cause, effect", you
 may get "effect, cause". This can only happen when the cause and effect
 execute on different processors, so cause’s output is delayed.
 
-If you pass the extra command-line parameter *+syncprint*, then CkPrintf
-actually blocks until the output is queued, so your printouts should at
-least happen in causal order. Note that this does dramatically slow down
-output.
+To see the order of events across PEs, prefix each line with
+``CkMyPe()`` and a timestamp from ``CkWallTimer()`` and sort the output
+afterwards.
 
 Is there a way to flush the print buffers in Charm++ (like ``fflush()``)?
 -------------------------------------------------------------------------
@@ -1187,7 +1171,7 @@ Everything works fine on one processor, but when I run on multiple processors it
 -----------------------------------------------------------------------------------------
 
 It’s very convenient to do your testing on one processor (i.e., with
-*+p1*); but there are several things that only happen on multiple
+*+pe 1*); but there are several things that only happen on multiple
 processors.
 
 A single processor has just one set of global variables, but multiple
@@ -1209,7 +1193,7 @@ I get the error: "``Group ID is zero-- invalid!``". What does this mean?
 
 The *group* it is referring to is the chare group. This error is often
 due to using an uninitialized proxy or handle; but it’s possible this
-indicates severe corruption. Run with *++debug* and check it you just
+indicates severe corruption. Run under gdb and check if you just
 sent a message via an uninitialized proxy.
 
 I get the error: ``Null-Method Called. Program may have Unregistered Module!!`` What does this mean?
@@ -1236,7 +1220,7 @@ When I run my program, it gives this error:
    Charmrun: error on request socket-{}-
    Socket closed before recv.
 
-This means that the node program died without informing ``charmrun``
+This error comes from ``charmrun`` (classic branch only). It means that the node program died without informing ``charmrun``
 about it, which typically means a segmentation fault while in the
 interrupt handler or other critical communications code. This indicates
 severe corruption in Charm++’s data structures, which is likely the
@@ -1248,7 +1232,7 @@ When I run my program, sometimes I get a ``Hangup``, and sometimes ``Bus Error``
 
 ``Bus Error`` and ``Hangup`` both are indications that your program is
 terminating abnormally, i.e. with an uncaught signal (SEGV or SIGBUS).
-You should definitely run the program with gdb, or use *++debug*. Bus
+You should definitely run the program with gdb. Bus
 Errors often mean there is an alignment problem, check if your compiler
 or environment offers support for detection of these.
 
@@ -1258,19 +1242,20 @@ Versions and Ports
 Has Charm++ been ported to use MPI underneath? What about OpenMP?
 -----------------------------------------------------------------
 
-Charm++ supports MPI and can use it as the underlying communication
-library. We have tested on MPICH, OpenMPI, and also most vendor MPI
-variants. Charm++ also has explicit support for SMP nodes in MPI
-version. Charm++ hasn’t been ported to use OpenMP, but OpenMP can be
+Charm++ 9 communicates through LCI by default; on systems LCI does not
+support, the LCW backend (``+backend lcw``) runs over MPI. The mpi-
+machine layers are on the classic branch only (Charm++ 8.1). Charm++ code can still be called from an MPI program: see the
+section on Charm-MPI interoperation (:ref:`sec:mpiinterop`) in the
+Charm++ manual. Charm++ hasn’t been ported to use OpenMP, but OpenMP can be
 used from Charm++.
 
 How complicated is porting Charm++/Converse?
 --------------------------------------------
 
 Depends. Hopefully, the porting only involves fixing compiler
-compatibility issues. The LRTS abstraction layer was designed to
-simplify this process and has been used for the MPI, Verbs, uGNI, PAMI
-and OFI layers. User level threads and Isomalloc support may require
+compatibility issues. Communication goes through reconverse's
+communication backend interface (``contrib/reconverse/src/comm_backend``),
+which has LCI and LCW implementations. User level threads and Isomalloc support may require
 special platform specific support. Otherwise Charm++ is generally
 platform independent.
 
@@ -1281,7 +1266,8 @@ The source is always available, and you’re welcome to make it run
 anywhere. Any kind of UNIX, Windows, and MacOS machine should be
 straightforward: just a few modifications to
 ``charm/src/arch/.../conv-mach.h`` (for compiler issues) and possibly a
-new *machine.c* (if there’s a new communication system involved).
+new reconverse communication backend (if there’s a new communication
+system involved).
 However, porting to embedded hardware with a proprietary OS may be
 fairly difficult.
 
@@ -1580,13 +1566,9 @@ How do I use Charm++ on Xeon Phi?
 ---------------------------------
 
 In general, no changes are required to use Charm++ on Xeon Phis. To
-compile code for Knights Landing, no special flags are required. To
-compile code for Knights Corner, one should build Charm++ with the
-``mic`` option. In terms of network layers, we currently recommend
-building the MPI layer (``mpi-linux-x86_64``) except for machines with
-custom network layers, such as Cray systems, on which we recommend
-building for the custom layer (``gni-crayxc`` for Cray XC machines, for
-example). To enable AVX-512 vector instructions, Charm++ can be built
+compile code for Knights Landing, no special flags are required; build
+``reconverse-linux-x86_64``. Knights Corner (the ``mic`` option) is
+supported on the classic branch only. To enable AVX-512 vector instructions, Charm++ can be built
 with ``-xMIC-AVX512`` on Intel compilers or
 ``-mavx512f -mavx512er -mavx512cd -mavx512pf`` for GNU compilers.
 
@@ -1648,11 +1630,10 @@ overlap. A better generator would be required to “do it right” (See Park
 What should I use to get a proper random number generator?
 ----------------------------------------------------------
 
-Converse provides a 64-bit pseudorandom number generator based on the
-SPRNG package originally written by Ashok Shrinivasan at NCSA. For
-detailed documentation, please take a look at the Converse Extensions
-Manual on the Charm++ website. In short, you can use *CrnDrand()*
-function instead of the unportable *drand48()* in Charm++.
+Converse provides a pseudorandom number generator per PE (``CrnSrand``,
+``CrnRand``, ``CrnDrand``), described in the Converse manual. In short,
+you can use *CrnDrand()* function instead of the unportable *drand48()*
+in Charm++.
 
 Charm++ and Converse Internals
 ==============================
