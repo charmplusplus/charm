@@ -345,8 +345,7 @@ static int registerClass(const CkDynClassDesc *desc, int *first_ep) {
 extern "C" int CkDynRegisterClass(const CkDynClassDesc *desc, int *first_ep) {
   if (CkMyRank() != 0) CkAbort("CkDyn: CkDynRegisterClass must run on rank 0 of each process");
   /* after start-up only through CkDynRegisterClassLate, which checks that every
-     PE of the process sees the class (a CMK_CHARM4PY build would accept the
-     registration silently: its Ext API registers late) */
+     PE of the process sees the class */
   if (_registerIsDone())
     CkAbort("CkDyn: CkDynRegisterClass for class %s after start-up; register it with CkDynRegisterClassLate "
             "(after CkDynAllowLateRegistration)", desc->name ? desc->name : "?");

@@ -84,11 +84,6 @@ waits for the migrant contributions to straggle in.
 #endif
 
 extern bool _inrestart;
-#if CMK_CHARM4PY
-//define a global instance of CkReductionTypesExt for external access
-CkReductionTypesExt charm_reducers;
-extern int (*PyReductionExt)(char**, int*, int, char**);
-#endif
 
 Group::Group():thisIndex(CkMyPe())
 {
@@ -1684,31 +1679,6 @@ CkReductionMsg* CkReduction::tupleReduction_fn(int num_messages, CkReductionMsg*
 }
 
 
-#if CMK_CHARM4PY
-/////////////// external Python reducer ////////////////
-static CkReductionMsg *external_py(int nMsgs, CkReductionMsg **msg)
-{
-    //CkPrintf("Reached external_py reducer, %d\n", nMsgs);
-    std::vector<char*> msg_data(nMsgs);
-    std::vector<int> msg_sizes(nMsgs);
-
-    for (int i = 0; i < nMsgs; i++)
-    {
-        msg_data[i] = (char*)(msg[i]->getData());
-        msg_sizes[i] = msg[i]->getSize();
-        //CkPrintf("[msg %d] size: %d data: %s\n", i, msg_sizes[i], msg_data[i]);
-    }
-
-    // send msg_data to Charm4py to perform reduction with Python reducer
-    // expected : pickle([reducer.__name__, result])
-    char* reduction_result;
-    int reduction_result_size = PyReductionExt(msg_data.data(), msg_sizes.data(), nMsgs, &reduction_result);
-    //CkPrintf("[charm side] Recvd reduction result: %s, size: %d\n", reduction_result, reduction_result_size);
-
-    return CkReductionMsg::buildNew(reduction_result_size, reduction_result);
-}
-#endif
-
 /////////////////// Reduction Function Table /////////////////////
 CkReduction::CkReduction() {} //Dummy private constructor
 
@@ -1847,11 +1817,6 @@ std::vector<CkReduction::reducerStruct> CkReduction::initReducerTable()
   // Allows multiple reductions to be done in the same message
   vec.emplace_back(CkReduction::tupleReduction_fn, false, "CkReduction::tuple");
 
-#if CMK_CHARM4PY
-  // Perform reduction using an external reducer defined in Python
-  vec.emplace_back(CkReduction::reducerStruct(::external_py, false, "CkReduction::custom_python"));
-#endif
-
   return vec;
 }
 
@@ -1862,116 +1827,6 @@ std::vector<CkReduction::reducerStruct>& CkReduction::reducerTable()
   static std::vector<CkReduction::reducerStruct> table = initReducerTable();
   return table;
 }
-
-#if CMK_CHARM4PY
-
-// Enum to detect type of contributors in a reduction
-typedef enum : uint8_t {
-    array=0,
-    group,
-    nodegroup
-} extContributorType;
-
-// Structure to store contribute parameters from external clients (e.g. Charm4py)
-struct CkExtContributeInfo
-{
-    int cbEpIdx;
-    int fid; // future ID (if reduction target is future)
-    void* data;
-    int numelems;
-    int dataSize;
-    CkReduction::reducerType redtype;
-    int id;                                 // arrayId or groupId
-    int *idx;                               // this is contributor index (PE for groups)
-    int ndims;                              // ensured to be 1 for groups
-    extContributorType contributorType;     // type of contributors
-};
-
-template <typename T>
-T* getExtContributor(CkExtContributeInfo* contribute_params);
-
-template <>
-ArrayElement* getExtContributor<ArrayElement>(CkExtContributeInfo* contribute_params)
-{
-    CkGroupID gId;
-    gId.idx = contribute_params->id;
-    CkArrayIndex arrIndex(contribute_params->ndims, contribute_params->idx);
-    CProxyElement_ArrayBase meProxy = CProxyElement_ArrayBase(gId, arrIndex);
-    return meProxy.ckLocal();
-}
-
-template <>
-Group* getExtContributor<Group>(CkExtContributeInfo* contribute_params)
-{
-    CkGroupID gId;
-    gId.idx = contribute_params->id;
-    return (Group*)CkLocalBranch(gId);
-}
-
-// Functions to perform reduction over contributors from external clients (e.g. Charm4py)
-
-extern "C" {
-void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr);
-void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims);
-void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe);
-void CkExtContributeToSection(CkExtContributeInfo* contribute_params, int sid_pe, int sid_cnt, int rootPE);
-}
-
-// Generic function to extract CkExtContributeInfo and perform reduction
-template <class T>
-void CkExtContribute(CkExtContributeInfo* contribute_params, CkCallback& cb)
-{
-    T* me = getExtContributor<T>(contribute_params);
-
-    if (contribute_params->redtype == CkReduction::nop) {
-        contribute_params->dataSize = 0;
-        contribute_params->data = NULL;
-    }
-
-    me->contribute(contribute_params->dataSize, contribute_params->data, contribute_params->redtype, cb);
-}
-
-void CkExtContributeTo(CkExtContributeInfo* contribute_params, CkCallback& cb)
-{
-    switch (contribute_params->contributorType) {
-        case extContributorType::array:
-            CkExtContribute<ArrayElement>(contribute_params, cb);
-            break;
-        case extContributorType::group:
-            CkExtContribute<Group>(contribute_params, cb);
-            break;
-        default : CkAbort("Invalid external contributor type!\n");
-    }
-}
-
-// When a reduction contributes to a singleton chare
-void CkExtContributeToChare(CkExtContributeInfo* contribute_params, int onPE, void* objPtr)
-{
-    CkCallback cb(onPE, objPtr, contribute_params->cbEpIdx, (CMK_REFNUM_TYPE)contribute_params->fid);
-    CkExtContributeTo(contribute_params, cb);
-}
-
-// When a reduction contributes to an array element or broadcasts result to an array
-void CkExtContributeToArray(CkExtContributeInfo* contribute_params, int aid, int* idx, int ndims)
-{
-    CkCallback cb(aid, idx, ndims, contribute_params->cbEpIdx, (CMK_REFNUM_TYPE)contribute_params->fid);
-    CkExtContributeTo(contribute_params, cb);
-}
-
-// When a reduction contributes to a group chare element or broadcasts result to group
-void CkExtContributeToGroup(CkExtContributeInfo* contribute_params, int gid, int pe)
-{
-    CkCallback cb(gid, pe, contribute_params->cbEpIdx, (CMK_REFNUM_TYPE)contribute_params->fid);
-    CkExtContributeTo(contribute_params, cb);
-}
-
-void CkExtContributeToSection(CkExtContributeInfo* contribute_params, int sid_pe, int sid_cnt, int rootPE)
-{
-    CkCallback cb(sid_pe, sid_cnt, rootPE, contribute_params->cbEpIdx);
-    CkExtContributeTo(contribute_params, cb);
-}
-
-#endif
 
 /********** Code added by Sayantan *********************/
 /** Locking is a big problem in the nodegroup code for smp.

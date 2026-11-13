@@ -123,14 +123,6 @@ private:
 		CMK_REFNUM_TYPE refnum; // Reference number to set on the message
 		bool hasRefnum;
 	} array;
-#if CMK_CHARM4PY
-	struct s_section {
-		int sid_pe; // section ID
-		int sid_cnt; // section ID
-		int rootPE; // PE where the root of the section's multicast tree is located
-		int ep; // Entry point to call in section elements
-	} section;
-#else
 	struct s_section {
 		CkArrayIndex *_elems;
 		int *pelist;
@@ -141,7 +133,6 @@ private:
 		CMK_REFNUM_TYPE refnum; // Reference number to set on the message
 		bool hasRefnum;
 	} section;
-#endif
 
 	struct s_ccsReply {
 		CcsDelayedReply reply;
@@ -153,9 +144,6 @@ private:
 public:
 	callbackType type;
 	callbackData d;
-#if CMK_CHARM4PY
-	bool isExtCallback = false;
-#endif
 
 	bool operator==(CkCallback & other){
 	  if(type != other.type)
@@ -208,12 +196,6 @@ public:
 		  d.cfn.onPE == other.d.cfn.onPE &&
 		  d.cfn.param == other.d.cfn.param);
 	    case bcastSection:
-#if CMK_CHARM4PY
-	      return (d.section.sid_pe == other.d.section.sid_pe &&
-		d.section.sid_cnt == other.d.section.sid_cnt &&
-		d.section.rootPE == other.d.section.rootPE &&
-		d.section.ep == other.d.section.ep);
-#else
 	      return (d.section.sinfo == other.d.section.sinfo &&
 		d.section.ep == other.d.section.ep &&
 		d.section._nElems == other.d.section._nElems &&
@@ -224,7 +206,6 @@ public:
 			   other.d.section.pelist) &&
 		d.section.hasRefnum == other.d.section.hasRefnum &&
 		(!d.section.hasRefnum || d.section.refnum == other.d.section.refnum));
-#endif
 	    case ignore:
 	    case ckExit:
 	    case invalid:
@@ -370,11 +351,9 @@ public:
     // Bcast to array
 	CkCallback(int ep,const CProxyElement_ArrayBase &arrElt,bool forceInline=false);
 	
-#if !CMK_CHARM4PY
 	//Bcast to section
 	CkCallback(int ep,CProxySection_ArrayBase &sectElt,bool forceInline=false);
 	CkCallback(int ep, CkSectionID &sid);
-#endif
 	
 	// Send to chare
 	CkCallback(Chare *p, int ep, bool forceInline=false);
@@ -395,63 +374,6 @@ public:
       type=replyCCS;
 	  d.ccsReply.reply=reply;
 	}
-
-#if CMK_CHARM4PY
-
-  CkCallback(int onPE, void* objPtr, int ep, CMK_REFNUM_TYPE fid) {
-    CkChareID id;
-    id.onPE = onPE;
-    id.objPtr = objPtr;
-    type = sendChare;
-    d.chare.ep = ep;
-    d.chare.id = id;
-    d.chare.hasRefnum = (fid > 0);
-    d.chare.refnum = fid;
-    isExtCallback = true;
-  }
-
-  CkCallback(int gid, int pe, int ep, CMK_REFNUM_TYPE fid) {
-    CkGroupID id;
-    id.idx = gid;
-    if (pe == -1) {
-      type = bcastGroup;
-    } else {
-      type = sendGroup;
-      d.group.onPE = pe;
-    }
-    d.group.ep = ep;
-    d.group.id = id;
-    d.group.hasRefnum = (fid > 0);
-    d.group.refnum = fid;
-    isExtCallback = true;
-  }
-
-  CkCallback(int aid, int* idx, int ndims, int ep, CMK_REFNUM_TYPE fid) {
-    CkGroupID id;
-    id.idx = aid;
-    if (ndims > 0) {
-      type = sendArray;
-      d.array.idx = CkArrayIndex(ndims, idx);
-    } else {
-      type = bcastArray;
-    }
-    d.array.ep = ep;
-    d.array.id = CkArrayID(id);
-    d.array.hasRefnum = (fid > 0);
-    d.array.refnum = fid;
-    isExtCallback = true;
-  }
-
-  CkCallback(int sid_pe, int sid_cnt, int rootPE, int ep) {
-    type = bcastSection;
-    d.section.sid_pe = sid_pe;
-    d.section.sid_cnt = sid_cnt;
-    d.section.rootPE = rootPE;
-    d.section.ep = ep;
-    isExtCallback = true;
-  }
-
-#endif
 
 	~CkCallback() {
 	  thread_destroy();
@@ -525,12 +447,10 @@ public:
                   d.array.refnum = refnum;
                   break;
 
-#if !CMK_CHARM4PY
                 case bcastSection:
                   d.section.hasRefnum = true;
                   d.section.refnum = refnum;
                   break;
-#endif
 
                 default:
                   CkAbort("Tried to set a refnum on a callback not directed at an entry method");
