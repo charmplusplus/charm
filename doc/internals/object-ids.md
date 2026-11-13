@@ -57,6 +57,16 @@ have built the location manager yet when an asynchronous creation request
 arrives (#4174). Only a location manager set directly with
 `setLocationManager` is read from its branch on PE 0.
 
+The elements of one index in all the arrays bound together share one location
+record and migrate in one message. `CkLocMgr::pupElementsFor` writes, for a
+migration, the number of elements and then each element's array id and chare
+type before the element data; the receiving PE creates each element in the
+array named by its id, and `CkLocMgr::immigrate` holds the message until every
+named array has a manager there (`hasManagersFor`). The order of the
+`managers` map is not used: it differs between PEs when bound arrays are
+created from several PEs at once, as AMPI's communicators are. A checkpoint
+keeps the older layout, one chare type per manager in map order (see section 5).
+
 **Payload.** What the payload means is decided per array, by its `CkLocMgr`,
 from whether the array has bounds:
 
@@ -191,6 +201,13 @@ from the restored elements, not restored: each element registers at its home,
 which the new process count defines. With PR 1d, each `CkLocMgr` and `CkArray`
 pups its collection number and kind, and PE 0 moves its counters past every
 restored number before any new array is created.
+
+The array data of a checkpoint is written per location record in the older
+layout: one chare type per array manager, in the
+order of the writing PE's `managers` map, read back in the restoring PE's
+order. Programs that create bound arrays from several PEs at once can register
+them in different orders, which this layout does not detect; naming each
+element by its array id, as migrations do, needs a new checkpoint format.
 
 ## 6. Limits and their diagnostics
 

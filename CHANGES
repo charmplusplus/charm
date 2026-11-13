@@ -213,6 +213,19 @@ Object ids and element location:
   another array (bindTo) no longer aborts when PE 0 lacks the other
   array's branch (#4174, #4227).
 
+- A migrating element now carries each bound sibling's array id,
+  and the receiving PE creates each sibling in that array. The
+  siblings were matched by position in each PE's unordered map of
+  array managers, whose order differs between PEs when bound arrays
+  are created from several PEs at once: AMPI ranks with many
+  communicators, moved between processes by a load balancer, aborted
+  with "AMPIParent cannot find its thread!" or "AMPI can't find its
+  parent!", or put a rank's communicator element into another
+  communicator's array. An element arriving before one of its arrays'
+  managers is now held instead of aborting with "Array element
+  arrived from location with fewer managers!". Checkpoints keep their
+  format. New test objid_boundmany.
+
 - A send to an array element from a PE that has not yet processed
   the array manager's creation is held until the manager exists, as
   receives already were (#4088, #4089).
@@ -226,7 +239,8 @@ Object ids and element location:
 
 - New tests: objid_bound, objid_home, objid_insert, objid_sections,
   objid_tranche, objid_wide, objid_loctable, objid_migrate6,
-  objid_recreate, objid_boundrecreate, objid_detour, objid_bindasync.
+  objid_recreate, objid_boundrecreate, objid_detour, objid_bindasync,
+  objid_boundmany.
 
 Arrays, reductions, multicast and load balancing:
 
