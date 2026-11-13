@@ -2237,11 +2237,11 @@ deliveries are present.
 
 A callback can also be waited for without an inbox entry of its own. A
 member of type ``ck::coro::future`` receives the deliveries of the
-callback that ``CK_FUTURE_ALL(f)`` or ``CK_FUTURE(f)`` returns.
-``CK_FUTURE_ALL(f)`` makes a callback that is delivered to every element
+callback that ``CK_CORO_FUTURE_ALL(f)`` or ``CK_CORO_FUTURE(f)`` returns.
+``CK_CORO_FUTURE_ALL(f)`` makes a callback that is delivered to every element
 of the chare's array, group or nodegroup: the one to pass to
 ``contribute`` and to anything else that every element waits for.
-``CK_FUTURE(f)`` makes one delivered to this element only, for example
+``CK_CORO_FUTURE(f)`` makes one delivered to this element only, for example
 to hand to another chare for a reply. The future is waited for as an
 inbox entry is: ``CK_WHEN(f, msg)`` stores the message into a member
 that is a pointer to the message type, ``CK_WHEN(f)`` discards it,
@@ -2255,13 +2255,13 @@ a wait, pupped with ``p | f``.
    ck::coro::future reduced, quiet;   // members
    CkReductionMsg *result;
    ...
-   contribute(sizeof(double), &change, CkReduction::max_double, CK_FUTURE_ALL(reduced));
+   contribute(sizeof(double), &change, CkReduction::max_double, CK_CORO_FUTURE_ALL(reduced));
    CK_WHEN(reduced, result);
    maxChange = *(double *)result->getData();
    delete result;
    ...
    {
-     CkCallback cb = CK_FUTURE_ALL(quiet);
+     CkCallback cb = CK_CORO_FUTURE_ALL(quiet);
      if (thisIndex == 0) CkStartQD(cb);   // every element waits for quiescence
    }
    CK_WHEN(quiet);
@@ -2269,9 +2269,9 @@ a wait, pupped with ``p | f``.
 The callbacks reach the chare through an ``[inbox]`` entry,
 ``_coro_callback(CkMessage *)``, that charmxi adds to every chare with a
 ``[coroutine]`` entry, with the future's id as the reference number.
-Each ``CK_FUTURE_ALL`` takes the next id of a counter that every element
+Each ``CK_CORO_FUTURE_ALL`` takes the next id of a counter that every element
 keeps, so the elements agree on the id when they make the same
-``CK_FUTURE_ALL`` calls in the same order, as they make the same
+``CK_CORO_FUTURE_ALL`` calls in the same order, as they make the same
 ``contribute`` calls.
 
 The reference number of the callback belongs to the future: a message
@@ -2279,7 +2279,7 @@ sent through it arrives with the future's id as its reference number,
 whatever it carried, and the callback cannot carry a reference number of
 its own. Use a new future to tell iterations apart, and put any other tag
 in the message's data. The ids wrap after 32768 futures of each kind
-(``CK_FUTURE`` and ``CK_FUTURE_ALL``) with the default 16-bit reference
+(``CK_CORO_FUTURE`` and ``CK_CORO_FUTURE_ALL``) with the default 16-bit reference
 number (``--with-refnum-type`` widens it), so every message sent to a
 future should be taken by a wait: making a future whose id is still held
 by an unclaimed message aborts.

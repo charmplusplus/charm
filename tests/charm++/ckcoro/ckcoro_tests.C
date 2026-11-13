@@ -923,9 +923,9 @@ public:
   }
 };
 
-// Callbacks awaited directly: each round a sum reduction (CK_FUTURE_ALL, a
+// Callbacks awaited directly: each round a sum reduction (CK_CORO_FUTURE_ALL, a
 // callback to every element); a sum and a max awaited together; a callback
-// to this element (CK_FUTURE) handed to the left neighbour, which sends a
+// to this element (CK_CORO_FUTURE) handed to the left neighbour, which sends a
 // CkDataMsg to it; and a reduction inside a CK_CALL task. At the end every
 // element awaits the quiescence that element 0 starts. An own future's id
 // comes round again after kOwnFuture futures, which is fine once the
@@ -950,7 +950,7 @@ class FutureTest : public CBase_FutureTest {
   // A task that waits on a future of its own and returns the reduced sum.
   ck::coro::task<int> allSum(int v) {
     CK_MIGRATABLE {
-      contribute(sizeof(int), &v, CkReduction::sum_int, CK_FUTURE_ALL(ftask));
+      contribute(sizeof(int), &v, CkReduction::sum_int, CK_CORO_FUTURE_ALL(ftask));
       CK_WHEN(ftask, red);
       {
         int s = *(int*)red->getData();
@@ -975,7 +975,7 @@ public:
       for (round = 0; round < rounds; round++) {
         {
           int v = thisIndex + round;
-          contribute(sizeof(int), &v, CkReduction::sum_int, CK_FUTURE_ALL(fsum));
+          contribute(sizeof(int), &v, CkReduction::sum_int, CK_CORO_FUTURE_ALL(fsum));
         }
         CK_WHEN(fsum, red);
         CK_LABEL("checkSum") {
@@ -986,8 +986,8 @@ public:
         // Two reductions in flight, awaited together.
         {
           int v = thisIndex + round;
-          contribute(sizeof(int), &v, CkReduction::sum_int, CK_FUTURE_ALL(fa));
-          contribute(sizeof(int), &v, CkReduction::max_int, CK_FUTURE_ALL(fb));
+          contribute(sizeof(int), &v, CkReduction::sum_int, CK_CORO_FUTURE_ALL(fa));
+          contribute(sizeof(int), &v, CkReduction::max_int, CK_CORO_FUTURE_ALL(fb));
         }
         CK_WHEN_ALL(CK_ALT(fa, red), CK_ALT(fb, red2));
         check(*(int*)red->getData() == sumOver(round), "sum awaited with a max");
@@ -996,7 +996,7 @@ public:
         delete red2;
 
         // A callback handed to another element; the block form.
-        thisProxy[left()].ask(CK_FUTURE(fpeer), 100 * round + thisIndex);
+        thisProxy[left()].ask(CK_CORO_FUTURE(fpeer), 100 * round + thisIndex);
         CK_WHEN_BLOCK(fpeer, m) {
           CkDataMsg* d = static_cast<CkDataMsg*>(m);
           check(*(int*)d->getData() == 100 * round + thisIndex, "value sent to a future's callback");
@@ -1008,16 +1008,16 @@ public:
       }
       // The id of an own future comes round again (with a 16-bit refnum).
       {
-        CkCallback cb = CK_FUTURE(fwrap);
+        CkCallback cb = CK_CORO_FUTURE(fwrap);
         wrapId = fwrap.id;
         cb.send();
       }
       CK_WHEN(fwrap);
       if (ck::coro::state::kOwnFuture <= (1ul << 16)) {
         for (unsigned long i = 1; i < (unsigned long)ck::coro::state::kOwnFuture; i++)
-          (void)CK_FUTURE(fwrap);
+          (void)CK_CORO_FUTURE(fwrap);
         {
-          CkCallback cb = CK_FUTURE(fwrap);
+          CkCallback cb = CK_CORO_FUTURE(fwrap);
           check(fwrap.id == wrapId, "own future ids wrap");
           cb.send();
         }
@@ -1026,7 +1026,7 @@ public:
       // Quiescence awaited by every element, its message discarded: each
       // makes the future, element 0 starts the detection with it.
       {
-        CkCallback qd = CK_FUTURE_ALL(fqd);
+        CkCallback qd = CK_CORO_FUTURE_ALL(fqd);
         if (thisIndex == 0) CkStartQD(qd);
       }
       CK_WHEN(fqd);

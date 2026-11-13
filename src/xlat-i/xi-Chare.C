@@ -237,8 +237,9 @@ void Chare::preprocess() {
       list->push_back(e);
     }
     // A chare with a [coroutine] entry gets the inbox entry that the
-    // callbacks of ck::coro::future are sent to (CK_FUTURE, CK_AWAIT in
-    // ckcoro.h); the future's id is the reference number.
+    // callbacks of ck::coro::future are sent to (CK_CORO_FUTURE and
+    // CK_CORO_FUTURE_ALL in ckcoro.h); the future's id is the reference
+    // number.
     if (list->hasCoroutineEntry()) {
       Entry* e = new Entry(line, new Attribute(SINBOX), new BuiltinType("void"),
                            strdup("_coro_callback"),

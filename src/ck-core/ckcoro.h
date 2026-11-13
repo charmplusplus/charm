@@ -146,7 +146,7 @@ inline CkCallback self_target(int ep, IrrGroup *g) {
 inline CkCallback self_target(int ep, Chare *c) { return CkCallback(ep, c->ckGetChareID()); }
 
 // The callback that broadcasts to every element of the owner's collection
-// (CK_FUTURE_ALL): the array, the group or nodegroup; a chare is its own.
+// (CK_CORO_FUTURE_ALL): the array, the group or nodegroup; a chare is its own.
 inline CkCallback all_target(int ep, ArrayElement *e) { return CkCallback(ep, e->ckGetArrayID()); }
 inline CkCallback all_target(int ep, NodeGroup *g) { return CkCallback(ep, g->ckGetGroupID(), true); }
 inline CkCallback all_target(int ep, IrrGroup *g) { return CkCallback(ep, g->ckGetGroupID()); }
@@ -376,15 +376,15 @@ template <class P> using out_t = typename out_of<P>::type;
 // A future receives the deliveries of a callback to the chare's
 // _coro_callback entry (an [inbox] entry charmxi adds to a chare with a
 // [coroutine] entry), whose reference number is the future's id; CK_WHEN(f,
-// msg) waits for one delivery. CK_FUTURE(f) makes a callback to this element
-// only. CK_FUTURE_ALL(f) makes one that broadcasts to every element of the
+// msg) waits for one delivery. CK_CORO_FUTURE(f) makes a callback to this element
+// only. CK_CORO_FUTURE_ALL(f) makes one that broadcasts to every element of the
 // collection, for a reduction or anything every element awaits: its id
-// counts the element's CK_FUTURE_ALL calls, so the elements agree on it when
+// counts the element's CK_CORO_FUTURE_ALL calls, so the elements agree on it when
 // each makes the same calls, as with contribute. The top bit of the id tells
 // the two kinds apart. A future waited for across a migration is a pupped
 // member, as any value live across a wait.
 struct future {
-  int ep = -1;            // the _coro_callback entry; -1 until CK_FUTURE
+  int ep = -1;            // the _coro_callback entry; -1 until CK_CORO_FUTURE
   CMK_REFNUM_TYPE id = 0;
   void pup(PUP::er &p) { p | ep; p | id; }
 };
@@ -627,7 +627,7 @@ class state {
   when_awaiter<P, Outs...> when(want_t<P> w, Outs &...outs) noexcept {
     return when_awaiter<P, Outs...>(*this, w, outs...);
   }
-  // A future's delivery (CK_FUTURE): into one message pointer, or discarded.
+  // A future's delivery (CK_CORO_FUTURE): into one message pointer, or discarded.
   template <class... Outs>
   when_awaiter<future_msg, Outs...> when(const future &f, Outs &...outs) {
     return when_awaiter<future_msg, Outs...>(*this, future_want(f), outs...);
@@ -641,8 +641,8 @@ class state {
   tuple_awaiter<CkMessage *> when_block(const future &f) {
     return tuple_awaiter<CkMessage *>(*this, future_want(f));
   }
-  // A new future id of this element (CK_FUTURE), or of its collection
-  // (CK_FUTURE_ALL, counted alike on every element).
+  // A new future id of this element (CK_CORO_FUTURE), or of its collection
+  // (CK_CORO_FUTURE_ALL, counted alike on every element).
   static constexpr CMK_REFNUM_TYPE kOwnFuture = (CMK_REFNUM_TYPE)1 << (8 * sizeof(CMK_REFNUM_TYPE) - 1);
   CMK_REFNUM_TYPE new_future_id(bool all) noexcept {
     if (all) return (CMK_REFNUM_TYPE)(nextAllFuture_++ & (kOwnFuture - 1));
@@ -1046,11 +1046,12 @@ inline void state::trace_resume(const record *rec) {
 }
 
 inline want state::future_want(const future &f) const {
-  if (f.ep < 0) CkAbort("ck::coro: a when on a future that CK_FUTURE has not given a callback");
+  if (f.ep < 0)
+    CkAbort("ck::coro: a when on a future that CK_CORO_FUTURE has not given a callback");
   return want(f.ep, f.id);
 }
 
-// CK_FUTURE, CK_FUTURE_ALL: a new id for f and the callback that delivers to it.
+// CK_CORO_FUTURE, CK_CORO_FUTURE_ALL: a new id for f and the callback that delivers to it.
 template <class Owner>
 inline CkCallback make_future(state &s, Owner *owner, future &f, int ep, bool all) {
   f.ep = ep;
@@ -1061,7 +1062,7 @@ inline CkCallback make_future(state &s, Owner *owner, future &f, int ep, bool al
     CkAbort("ck::coro: %s future id %lu came round again while a message sent to the earlier "
             "future with that id is still unclaimed; take every future's messages (ids wrap "
             "after %lu, or build with --with-refnum-type=int)",
-            all ? "a CK_FUTURE_ALL" : "a CK_FUTURE", (unsigned long)f.id,
+            all ? "a CK_CORO_FUTURE_ALL" : "a CK_CORO_FUTURE", (unsigned long)f.id,
             (unsigned long)state::kOwnFuture);
   CkCallback cb = all ? all_target(ep, owner) : self_target(ep, owner);
   cb.setRefnum(f.id);
@@ -1644,15 +1645,15 @@ using coroutine = coro::coroutine;
 // stores the index of the alternative (a when or a when-all) that matched in idx.
 #define CK_ALT(...) ::ck::coro::current_state().when(__VA_ARGS__)
 
-// CK_FUTURE(f): a new id for the ck::coro::future member f and a callback to
+// CK_CORO_FUTURE(f): a new id for the ck::coro::future member f and a callback to
 // this element that delivers to it, to pass to any API taking a CkCallback;
-// CK_FUTURE_ALL(f): the same with a callback to every element of the
+// CK_CORO_FUTURE_ALL(f): the same with a callback to every element of the
 // collection, for contribute and other results every element awaits.
 // CK_WHEN(f, msg), CK_WHEN(f), CK_ALT(f, ...) and CK_WHEN_BLOCK(f, m) wait
 // for a delivery. Needs X_CORO_CODE (the chare's _coro_callback entry).
-#define CK_FUTURE(f_) \
+#define CK_CORO_FUTURE(f_) \
   ::ck::coro::make_future(__coro, this, (f_), inbox::_coro_callback().ep, false)
-#define CK_FUTURE_ALL(f_) \
+#define CK_CORO_FUTURE_ALL(f_) \
   ::ck::coro::make_future(__coro, this, (f_), inbox::_coro_callback().ep, true)
 #define CK_ALL(...) ::ck::coro::current_state().all(__VA_ARGS__)
 #define CK_WHEN_ALL(...)                                                      \

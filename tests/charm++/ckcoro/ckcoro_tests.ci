@@ -37,7 +37,7 @@ mainmodule ckcoro_tests {
     entry [inbox] void chareDone(int sum);
   }
 
-  // Callbacks awaited through futures (CK_FUTURE): reductions, a callback
+  // Callbacks awaited through futures (CK_CORO_FUTURE): reductions, a callback
   // sent to another element, quiescence, and a future inside a task.
   array [1D] FutureTest {
     entry FutureTest();

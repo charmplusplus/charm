@@ -45,7 +45,7 @@ public:
         CK_LABEL("work") {
           for (int i = 1; i <= 1000; i++) sum += 1.0 / i;
         }
-        contribute(CK_FUTURE_ALL(step));
+        contribute(CK_CORO_FUTURE_ALL(step));
         CK_WHEN(step);
       }
       contribute(CkCallback(CkReductionTarget(TraceMain, done), traceMain));

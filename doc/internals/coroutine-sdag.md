@@ -59,7 +59,7 @@ header's opening comment and the manual section "Coroutine Entry Methods".
   another coroutine of the element is on the stack, done by the
   outermost `finish_run`.
 - `state::nextFuture_`, `nextAllFuture_` (pupped): the counters behind
-  the ids of `CK_FUTURE` and `CK_FUTURE_ALL`. The top bit of a
+  the ids of `CK_CORO_FUTURE` and `CK_CORO_FUTURE_ALL`. The top bit of a
   `CMK_REFNUM_TYPE` marks an element's own futures, so the two id ranges
   do not meet.
 - `state::owner_`, `ownerIdx_`, `migrate_`, `migrating_` (not pupped):
@@ -231,7 +231,7 @@ restarts as after any migration.
 **Futures.** `Chare::preprocess` in charmxi adds to every chare with a
 `[coroutine]` entry an `[inbox]` entry `_coro_callback(CkMessage *m)`, so
 `X_CORO_CODE` has its inbox body and `inbox::_coro_callback()` want.
-`CK_FUTURE(f)` / `CK_FUTURE_ALL(f)` call `make_future`, which sets `f.ep`
+`CK_CORO_FUTURE(f)` / `CK_CORO_FUTURE_ALL(f)` call `make_future`, which sets `f.ep`
 to that entry and `f.id` to a new id, and returns `self_target` or
 `all_target` (a broadcast to the array, group or nodegroup) with the id
 as the callback's reference number; `CkCallback::send` puts it on the
