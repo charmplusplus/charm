@@ -1316,21 +1316,24 @@ void CProxySection_ArrayBase::ckSend(CkArrayMessage* msg, int ep, int opts)
                                       opts);
   else
   {
-    // send through all
-    for (int k = 0; k < _sid.size(); ++k)
+    // Every element gets a copy except the last one sent to, which gets msg;
+    // msg is freed when no section ID has an element.
+    int lastK = -1;
+    for (int k = 0; k < (int)_sid.size(); ++k)
+      if (!_sid[k]._elems.empty()) lastK = k;
+    if (lastK < 0)
     {
-      for (int i = 0; i < _sid[k]._elems.size() - 1; i++)
+      CkFreeMsg(msg);
+      return;
+    }
+    for (int k = 0; k <= lastK; ++k)
+    {
+      const int n = (int)_sid[k]._elems.size();
+      for (int i = 0; i < n; i++)
       {
+        void* m = (k == lastK && i == n - 1) ? (void*)msg : CkCopyMsg((void**)&msg);
         CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(), _sid[k]._elems[i]);
-        void* newMsg = CkCopyMsg((void**)&msg);
-        ap.ckSend((CkArrayMessage*)newMsg, ep, opts);
-      }
-      if (!_sid[k]._elems.empty())
-      {
-        void* newMsg = (k < _sid.size() - 1) ? CkCopyMsg((void**)&msg) : msg;
-        CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(),
-                                   _sid[k]._elems[_sid[k]._elems.size() - 1]);
-        ap.ckSend((CkArrayMessage*)newMsg, ep, opts);
+        ap.ckSend((CkArrayMessage*)m, ep, opts);
       }
     }
   }

@@ -15,7 +15,8 @@
  *
  * Kinds: chare, group element, group broadcast, nodegroup element, nodegroup
  * broadcast, array element, array broadcast, array section (also sent
- * directly from PE 0), each through every
+ * directly from PE 0, and as a proxy of several section IDs, some of them empty,
+ * with and without CkMulticastMgr delegation), each through every
  * constructor that makes it (including the inline forms and the Chare*,
  * Group*, NodeGroup* and ArrayElement* constructors, built inside the
  * target), C function (callCFn, forwarded back to PE 0), call1Fn (runs where
@@ -481,6 +482,68 @@ void callbackkinds_driver::sectionCases(void)
     }
 }
 
+// Sends one message through a proxy of several section IDs over the array (one
+// per entry of secs); every listed element must get exactly one copy per
+// listing. Not delegated, ckSend sends to each element itself; delegated, the
+// array's CkMulticastMgr does. When no element is listed, nothing is
+// delivered: a stray copy would fail the next case's value check.
+void callbackkinds_driver::multiSectionSend(const char* name,
+                                            const std::vector<std::vector<int> >& secs, int val,
+                                            bool delegated)
+{
+  const int n = (int)secs.size();
+  std::vector<CkArrayID> aids(n, array.ckGetArrayID());
+  std::vector<std::vector<CkArrayIndex> > idx(n);
+  std::vector<const CkArrayIndex*> elems(n);
+  std::vector<int> nElems(n);
+  std::vector<int> where(nArr, 0);
+  for (int k = 0; k < n; k++)
+  {
+    for (int i : secs[k])
+    {
+      idx[k].push_back(CkArrayIndex1D(i));
+      where[i]++;
+    }
+    elems[k] = idx[k].data();
+    nElems[k] = (int)idx[k].size();
+  }
+  CProxySection_callbackkinds_array sec(n, aids.data(), elems.data(), nElems.data(),
+                                        (CkDelegateMgr*)NULL, (CkDelegateData*)NULL);
+  if (delegated) sec.ckAutoDelegate();
+  if (sec.ckIsDelegated() != delegated)
+    CkAbort("callbackkinds: %s: section proxy is %sdelegated\n", name, delegated ? "not " : "");
+  what = name;
+  expect(CBK_ARRAY, val, -1, where);
+  sec.accept(new callbackkinds_msg(val));
+  waitFor(0);
+}
+
+void callbackkinds_driver::multiSectionCases(void)
+{
+  const int last = nArr - 1;
+  for (int d = 0; d < 2; d++)
+  {
+    const bool del = d == 1;
+    const int v = 2250 + 10 * d;
+    multiSectionSend(del ? "multi-section, delegated" : "multi-section",
+                     {{0, 1}, {2}, {last}}, v, del);
+    multiSectionSend(del ? "multi-section, one element twice, delegated"
+                         : "multi-section, one element twice",
+                     {{0, last}, {last}}, v + 1, del);
+    multiSectionSend(del ? "multi-section, middle one empty, delegated"
+                         : "multi-section, middle one empty",
+                     {{0, 1}, {}, {last}}, v + 2, del);
+    multiSectionSend(del ? "multi-section, last one empty, delegated"
+                         : "multi-section, last one empty",
+                     {{0, 1}, {last}, {}}, v + 3, del);
+    multiSectionSend(del ? "multi-section, all empty, delegated" : "multi-section, all empty",
+                     {{}, {}}, v + 4, del);
+    multiSectionSend(del ? "multi-section, after all empty, delegated"
+                         : "multi-section, after all empty",
+                     {{last}, {0}}, v + 5, del);
+  }
+}
+
 void callbackkinds_driver::functionCases(void)
 {
   const int P = CkNumPes();
@@ -636,6 +699,7 @@ void callbackkinds_driver::run(void)
 {
   entryCases();
   sectionCases();
+  multiSectionCases();
   functionCases();
   threadCases();
   futureCases();

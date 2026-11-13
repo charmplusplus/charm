@@ -929,14 +929,17 @@ void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, i
   DEBUGF(("[%d] SimpleSend: nElems: %zu\n", CkMyPe(), sid._elems.size()));
     // set an invalid cookie since we don't have it
   ((multicastGrpMsg *)m)->_cookie = CkSectionInfo(-1, NULL, 0, a);
-  for (int i=0; i< sid._elems.size()-1; i++) {
-     CProxyElement_ArrayBase ap(a, sid._elems[i]);
-     void *newMsg=CkCopyMsg((void **)&m);
-     ap.ckSend((CkArrayMessage *)newMsg,ep,opts|CK_MSG_LB_NOTRACE);
+  // Every element gets a copy except the last one, which gets m; m is freed
+  // when the section has no element.
+  const int n = (int)sid._elems.size();
+  if (n == 0) {
+     CkFreeMsg(m);
+     return;
   }
-  if (!sid._elems.empty()) {
-     CProxyElement_ArrayBase ap(a, sid._elems[sid._elems.size()-1]);
-     ap.ckSend((CkArrayMessage *)m,ep,opts|CK_MSG_LB_NOTRACE);
+  for (int i=0; i<n; i++) {
+     CProxyElement_ArrayBase ap(a, sid._elems[i]);
+     void *newMsg = (i == n-1) ? m : CkCopyMsg((void **)&m);
+     ap.ckSend((CkArrayMessage *)newMsg,ep,opts|CK_MSG_LB_NOTRACE);
   }
 }
 
