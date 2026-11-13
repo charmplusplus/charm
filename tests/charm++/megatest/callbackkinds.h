@@ -4,76 +4,6 @@
 #include <vector>
 #include "megatest.h"
 
-// CALLBACKKINDS_PUP_SECTION=0 sends the array-section callback from PE 0
-// directly instead of marshalling it: CkCallback::pup has no bcastSection
-// case and aborts with "Inconsistent CkCallback type" (ckcallback.C, pup
-// default case). Set to 1 to marshal it once pup handles sections.
-#ifndef CALLBACKKINDS_PUP_SECTION
-#define CALLBACKKINDS_PUP_SECTION 0
-#endif
-
-// CALLBACKKINDS_SECTION_EQ=0 skips checking that an array-section callback
-// equals itself or a copy: for bcastSection, CkCallback::operator==
-// (ckcallback.h) requires a non-null pelist on both sides, and an array
-// section's CkSectionID has an empty pelist, so the result is always false;
-// it also requires hasRefnum on both sides. Set to 1 once fixed.
-#ifndef CALLBACKKINDS_SECTION_EQ
-#define CALLBACKKINDS_SECTION_EQ 0
-#endif
-
-// CALLBACKKINDS_SECTION_PROXY=0 skips CkCallback(ep, CProxySection_ArrayBase&):
-// the constructor copies the section ID into a local (ckcallback.C:188,
-// "CkSectionID secID=sectElt.ckGetSectionID(0);") and keeps pointers to that
-// copy's element and PE vectors, which are freed when it returns. A send then
-// reads freed memory (seen: every copy delivered to element 0). The
-// CkCallback(ep, CkSectionID&) form keeps pointers into the proxy and works.
-// Set to 1 once fixed.
-#ifndef CALLBACKKINDS_SECTION_PROXY
-#define CALLBACKKINDS_SECTION_PROXY 0
-#endif
-
-// CALLBACKKINDS_SECTION_IFNOTTHERE=0 makes the section sends from a message
-// built here with CkSetMsgArrayIfNotThere(m, CkArray_IfNotThere_buffer).
-// CkCallback::send's bcastSection case (ckcallback.C:431) and
-// CkBroadcastMsgSection / CProxySection_ArrayBase::ckSend (ckarray.C:1272)
-// never set the envelope's ifNotThere, and envelope::alloc does not initialize
-// it (envelope.h, memset only under CMK_REPLAYSYSTEM), so it holds whatever
-// the reused buffer held. sendArray and bcastArray set it
-// (CkSetMsgArrayIfNotThere). When the sending PE does not know the element's
-// id and the stale byte is not CkArray_IfNotThere_buffer, CkArray::handleUnknown
-// (ckarray.C:2239) takes the demand-creation path and aborts in
-// bufferForCreation: "Can't demand create an element with no default ctor".
-// Seen in CI (linux, lcrun -n 2 +pe 4). Set to 1 once fixed.
-#ifndef CALLBACKKINDS_SECTION_IFNOTTHERE
-#define CALLBACKKINDS_SECTION_IFNOTTHERE 0
-#endif
-
-// CALLBACKKINDS_FUTURE_NOMSG=0 skips send() with no message on a callback to
-// a future: CkCallback::send passes the NULL straight to CkSendToFuture, which
-// dereferences it (CkSendToFutureID: UsrToEnv(m)->setRef); every other kind
-// that targets an entry method substitutes CkAllocSysMsg(). Set to 1 once fixed.
-#ifndef CALLBACKKINDS_FUTURE_NOMSG
-#define CALLBACKKINDS_FUTURE_NOMSG 0
-#endif
-
-// CALLBACKKINDS_INLINE_LOCAL_CHARE=0 keeps the Chare* callback built by a chare
-// from being forceInline when the PE sending it is the chare's own PE.
-// CkSendMsgInline (ck.C:1841) then calls the entry method on pCid->objPtr,
-// which without CMK_CHARE_USE_PTR is an index into chare_objs, not the object:
-// SIGSEGV in CkCallstackPush. Set to 1 once fixed.
-#ifndef CALLBACKKINDS_INLINE_LOCAL_CHARE
-#define CALLBACKKINDS_INLINE_LOCAL_CHARE 0
-#endif
-
-// CALLBACKKINDS_FUTURE_CONTAINSPTR=0 skips containsPointer() on a callback to
-// a future: the switch in CkCallback::containsPointer has no sendFuture case
-// and aborts with "Asked about an unknown CkCallback type" (ckcallback.C:564),
-// so CkStartCheckpoint (ckcheckpoint.C:816) aborts on such a callback. Set to
-// 1 once fixed (a future is a PE and an id, so the answer should be false).
-#ifndef CALLBACKKINDS_FUTURE_CONTAINSPTR
-#define CALLBACKKINDS_FUTURE_CONTAINSPTR 0
-#endif
-
 #include "callbackkinds.decl.h"
 
 // How the reflector sends the callback it receives.
@@ -159,7 +89,7 @@ int callbackkinds_ep(int mode)
   return Index::data((CkDataMsg*)NULL);
 }
 
-#define CALLBACKKINDS_TARGET(cls, kind, whereExpr, isChare)                                  \
+#define CALLBACKKINDS_TARGET(cls, kind, whereExpr)                                   \
   class cls : public CBase_##cls                                                     \
   {                                                                                  \
     CProxy_callbackkinds_driver driver;                                              \
@@ -174,8 +104,7 @@ int callbackkinds_ep(int mode)
     /* NodeGroup* and ArrayElement* constructors) and has it reflected.      */      \
     void bounce(CProxy_callbackkinds_reflector r, int reflectPe, int mode, int val)  \
     {                                                                                \
-      bool inl = mode == CBK_NOMSG &&                                                \
-                 (!isChare || CALLBACKKINDS_INLINE_LOCAL_CHARE || reflectPe != CkMyPe()); \
+      bool inl = mode == CBK_NOMSG;                                                  \
       CkCallback cb(this, callbackkinds_ep<CkIndex_##cls>(mode), inl);               \
       r[reflectPe].reflect(cb, mode, val);                                           \
     }                                                                                \
@@ -183,9 +112,9 @@ int callbackkinds_ep(int mode)
 
 enum { CBK_CHARE = 1, CBK_GROUP, CBK_NODEGROUP, CBK_ARRAY, CBK_CFN, CBK_C1FN };
 
-CALLBACKKINDS_TARGET(callbackkinds_chare, CBK_CHARE, CkMyPe(), true)
-CALLBACKKINDS_TARGET(callbackkinds_group, CBK_GROUP, CkMyPe(), false)
-CALLBACKKINDS_TARGET(callbackkinds_nodegroup, CBK_NODEGROUP, CkMyNode(), false)
-CALLBACKKINDS_TARGET(callbackkinds_array, CBK_ARRAY, thisIndex, false)
+CALLBACKKINDS_TARGET(callbackkinds_chare, CBK_CHARE, CkMyPe())
+CALLBACKKINDS_TARGET(callbackkinds_group, CBK_GROUP, CkMyPe())
+CALLBACKKINDS_TARGET(callbackkinds_nodegroup, CBK_NODEGROUP, CkMyNode())
+CALLBACKKINDS_TARGET(callbackkinds_array, CBK_ARRAY, thisIndex)
 
 #endif

@@ -39,4 +39,31 @@ module arraymaps {
     entry void ping(void);
     entry void destroy(void);
   };
+
+  array [4D] arraymaps_4d {
+    entry arraymaps_4d(CProxy_arraymaps_driver driver, int caseId, bool initial,
+                       std::vector<int> expected);
+    entry void migrate(void);
+    entry void afterMigrate(void);
+    entry void ping(void);
+    entry void destroy(void);
+  };
+
+  array [5D] arraymaps_5d {
+    entry arraymaps_5d(CProxy_arraymaps_driver driver, int caseId, bool initial,
+                       std::vector<int> expected);
+    entry void migrate(void);
+    entry void afterMigrate(void);
+    entry void ping(void);
+    entry void destroy(void);
+  };
+
+  array [6D] arraymaps_6d {
+    entry arraymaps_6d(CProxy_arraymaps_driver driver, int caseId, bool initial,
+                       std::vector<int> expected);
+    entry void migrate(void);
+    entry void afterMigrate(void);
+    entry void ping(void);
+    entry void destroy(void);
+  };
 };

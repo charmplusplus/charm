@@ -13,7 +13,7 @@
  *   - testWaitAny: CkWaitAnyID with one future ready, and with none ready.
  *   - testTyped: ck::future<int>: get, wait_all, wait_any, release,
  *     operator==, pup (passed as an entry method parameter); testWaitSome:
- *     wait_some (with some futures ready only if FUTURES_WAITALL_READY).
+ *     wait_some (with none and with some futures ready).
  *   - testCollectiveValues (PE 0): futures filled through a CkCallback with a
  *     CkDataMsg, a CkReductionMsg and a CkArrayCreatedMsg (the other cases
  *     of CkGetMsgBuffer).
@@ -31,19 +31,6 @@
 #include "futures.h"
 
 #define FUTURES_POLL_LIMIT 30.0  // seconds before a poll loop gives up
-
-// FUTURES_WAITALL_READY=0 leaves out CkWaitAllIDs on futures that all hold a
-// value already, and ck::wait_some with some futures ready (it makes that
-// call). CkWaitAllIDs then reaches MultiToThread::fulfill itself, which calls
-// CthAwaken on the running thread (ckfutures.C:69) and queues a stale resume.
-// That resume ends the thread's next CthSuspend early; CkWaitAllIDs suspends
-// only once (ckfutures.C:336), so a later CkWaitAllIDs returns NULL entries.
-// If the thread finishes first, the queued resume token is freed with the
-// thread (CthSuspend already decremented "scheduled", threads.cpp) and later
-// run: SIGBUS at a garbage address under +randomized_msgq. Set to 1 once fixed.
-#ifndef FUTURES_WAITALL_READY
-#define FUTURES_WAITALL_READY 0
-#endif
 
 static void futures_check(int got, int want, const char* what)
 {
@@ -146,7 +133,6 @@ void futures_worker::testIds(void)
   for (int i = 1; i < 4; i++) CkReleaseFutureID(f[i].id);
   futures_check(CkProbeFutureID(f[1].id), 0, "probe after release");
 
-#if FUTURES_WAITALL_READY
   // CkWaitAllIDs with every value present: no suspension.
   helper[q1].fill(f[4], base + 4);
   helper[q2].fill(f[5], base + 5);
@@ -168,10 +154,6 @@ void futures_worker::testIds(void)
                 "CkWaitAllIDs after an all-ready call");
   CkFreeMsg(vals[0]);
   CkReleaseFuture(w);
-#else
-  CkReleaseFuture(f[4]);
-  CkReleaseFuture(f[5]);
-#endif
 
   // Released ids are reused. CkWaitFuture suspends until the value arrives;
   // CkWaitReleaseFuture waits and releases.
@@ -307,9 +289,8 @@ void futures_worker::testWaitSome(void)
   auto none = ck::wait_some(some.begin(), some.end());
   futures_check((int)(none.second - some.begin()), 0, "wait_some with none ready");
   futures_check((int)none.first.size(), 0, "wait_some values with none ready");
-#if FUTURES_WAITALL_READY
-  // Two of four ready: wait_some returns those and leaves the others. It calls
-  // CkWaitAllIDs on the ready ones, hence the switch.
+  // Two of four ready: wait_some returns those and leaves the others (it calls
+  // CkWaitAllIDs on the ready ones).
   helper[q1].fillTyped(some[1], base + 61);
   helper[q2].fillTyped(some[3], base + 63);
   futures_pollUntil([&] { return some[1].is_ready() && some[3].is_ready(); }, "wait_some pre-fill");
@@ -324,11 +305,6 @@ void futures_worker::testWaitSome(void)
   }
   std::vector<int> late = ck::wait_all(part.second, some.end());
   for (int x : late) futures_check(x, base + 70, "wait_some remainder");
-#else
-  for (auto& f : some) helper[q1].fillTyped(f, base + 70);
-  std::vector<int> late = ck::wait_all(some.begin(), some.end());
-  for (int x : late) futures_check(x, base + 70, "wait_all after wait_some");
-#endif
   for (auto& f : some) f.release();
 }
 

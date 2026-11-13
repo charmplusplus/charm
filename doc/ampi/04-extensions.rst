@@ -517,10 +517,10 @@ as ``co_await`` expressions, so every function that calls one, directly or
 through another function, must itself be a coroutine returning
 ``campi::task<T>`` and be awaited; the compiler rejects a blocking call from
 an ordinary function. Blocking routines campi does not provide yet fail to
-compile by name: the topology and intercommunicator constructors,
-``MPI_Comm_split_type``, ``MPI_Comm_create_group``, ``MPI_Comm_idup``, the
-neighbor collectives, ``MPI_Ireduce_scatter`` and
-``MPI_Ireduce_scatter_block``, and the one-sided routines. Unlike thread AMPI, ``MPI_Finalize`` does not end the
+compile by name: these are the one-sided routines. As in thread AMPI,
+``MPI_Comm_idup``, ``MPI_Ireduce_scatter`` and ``MPI_Ireduce_scatter_block``
+complete before they return and set the request to ``MPI_REQUEST_NULL``;
+in campi they are therefore awaited like blocking calls. Unlike thread AMPI, ``MPI_Finalize`` does not end the
 rank: the process exit code is the value main ``co_return``\ s.
 
 A campi rank migrates and is checkpointed only at ``AMPI_Migrate``, and it
