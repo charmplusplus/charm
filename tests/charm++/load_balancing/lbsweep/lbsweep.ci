@@ -5,10 +5,14 @@ mainmodule lbsweep {
   readonly int numIters;
   readonly int profile;
   readonly int nonmigEvery;
+  readonly int manualLB;
+
+  initproc void lbsweepInitProc(void);
 
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry [reductiontarget] void stepDone(int n, double v[n]);
+    entry [reductiontarget] void readyForLB();
   };
 
   group PackedMap : CkArrayMap {
@@ -28,7 +32,11 @@ mainmodule lbsweep {
               serial { checkGhost(ref, from, v); }
           }
         }
-        serial { prevPE = CkMyPe(); AtSync(); }
+        serial {
+          prevPE = CkMyPe();
+          AtSync();
+          if (manualLB) contribute(CkCallback(CkReductionTarget(Main, readyForLB), mainProxy));
+        }
         when ResumeFromSync() serial { report(); }
       }
     };
