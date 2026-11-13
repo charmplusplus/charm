@@ -1,6 +1,7 @@
 DIRS = \
   creduce \
   Cjacobi3D \
+  lbimbalance \
 
 TESTDIRS = $(DIRS)
 
