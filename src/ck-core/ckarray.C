@@ -798,12 +798,12 @@ void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage* m, int ctor, int proposedPe,
   }
 
   int hostPe = ca->findInitialHostPe(idx, proposedPe);
-  // CldMap's procNum is CLD_ANYWHERE; FastArrayMap names PEs past the last one
-  // for indices well beyond its initial range.
+  // CldMap's procNum is CLD_ANYWHERE; other maps return -1 for an index outside
+  // the range they were configured for.
   if (hostPe < 0 || hostPe >= CkNumPes())
     CkAbort("ckInsert without a PE is not supported with this array map (CldMap, or "
-            "FastArrayMap beyond its initial range): the map gave PE %d; pass a PE to "
-            "insert()\n", hostPe);
+            "an index outside the range the map was configured for): the map gave PE "
+            "%d; pass a PE to insert()\n", hostPe);
 
   int listenerData[CK_ARRAYLISTENER_MAXLEN];
   ca->prepareCtorMsg(m, listenerData);

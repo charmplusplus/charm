@@ -1512,12 +1512,15 @@ void arrInfo::distrib(int* speeds)
   }
 }
 
+// -1 (no PE) for a 1D index past the initial size and for any index of an array
+// created empty.
 int arrInfo::getMap(const CkArrayIndex& i)
 {
+  const int n = (int)_map.size();
   if (i.dimension == 1)
-    return _map[i.data()[0]];
-  else
-    return _map[((i.hash() + 739) % 1280107) % _nelems.getCombinedCount()];
+    return (i.data()[0] >= 0 && i.data()[0] < n) ? _map[i.data()[0]] : -1;
+  if (n == 0) return -1;
+  return _map[((i.hash() + 739) % 1280107) % n];
 }
 
 // Speeds maps processor number to "speed" (some sort of iterations per second counter)
