@@ -1268,65 +1268,20 @@ task<int> Dist_graph_create_adjacent(MPI_Comm comm_old, int indegree, const int 
   co_return MPI_SUCCESS;
 }
 
-// MPI_Dist_graph_create, as in ampi.C: each rank sends every rank the edges
-// it gives that rank (a list ending in 1 for incoming, -1 for outgoing).
+// MPI_Dist_graph_create, as in ampi.C (ampiDistGraphExchange)
 task<int> Dist_graph_create(MPI_Comm comm_old, int n, const int *sources, const int *degrees,
                             const int *destinations, const int *weights, MPI_Info info,
                             int reorder, MPI_Comm *comm_dist_graph) {
   ampiParent *pp = getAmpiParent();
   std::vector<int> vec = pp->group2vec(pp->comm2group(comm_old));
   *comm_dist_graph = co_await comm_create(comm_old, vec, COMM_DIST_GRAPH);
-  const int p = getAmpiParent()->getCommStruct(*comm_dist_graph).getSize();
-  std::vector<std::vector<int>> in(p), out(p);
-  for (int i = 0, e = 0; i < n; i++)
-    for (int j = 0; j < degrees[i]; j++, e++) {
-      out[sources[i]].push_back(destinations[e]);
-      in[destinations[e]].push_back(sources[i]);
-    }
-  // how many lists of each kind every rank receives
-  std::vector<int> edgeCount(2 * p), totalcount(2);
-  for (int i = 0; i < p; i++) {
-    edgeCount[2 * i] = !in[i].empty();
-    edgeCount[2 * i + 1] = !out[i].empty();
-  }
-  co_await Reduce_scatter_block(edgeCount.data(), totalcount.data(), 2, MPI_INT, MPI_SUM, comm_old);
-  std::vector<MPI_Request> requests;
-  for (int i = 0; i < p; i++) {
-    if (!in[i].empty()) {
-      in[i].push_back(1);
-      requests.emplace_back();
-      MPI_Isend(in[i].data(), (int)in[i].size(), MPI_INT, i, 0, comm_old, &requests.back());
-    }
-    if (!out[i].empty()) {
-      out[i].push_back(-1);
-      requests.emplace_back();
-      MPI_Isend(out[i].data(), (int)out[i].size(), MPI_INT, i, 0, comm_old, &requests.back());
-    }
-  }
-  std::vector<int> saveSources, saveDestinations;
-  for (int j = 0; j < totalcount[0] + totalcount[1]; j++) {
-    MPI_Status status;
-    int numEdges;
-    co_await Probe(MPI_ANY_SOURCE, 0, comm_old, &status);
-    MPI_Get_count(&status, MPI_INT, &numEdges);
-    std::vector<int> edges(numEdges);
-    co_await Recv(edges.data(), numEdges, MPI_INT, status.MPI_SOURCE, 0, comm_old, MPI_STATUS_IGNORE);
-    std::vector<int> &save = edges[numEdges - 1] > 0 ? saveSources : saveDestinations;
-    save.insert(save.end(), edges.begin(), edges.end() - 1);
-  }
-  ampiTopology *topo = getAmpiParent()->getCommStruct(*comm_dist_graph).getTopology();
-  topo->setDestinations(saveDestinations);
-  topo->setSources(saveSources);
-  topo->setOutDegree(saveDestinations.size());
-  topo->setInDegree(saveSources.size());
-  topo->setAreSourcesWeighted(weights != MPI_UNWEIGHTED);
-  topo->setAreDestsWeighted(weights != MPI_UNWEIGHTED);
-  if (topo->areSourcesWeighted()) {
-    std::vector<int> w(weights, weights + n);
-    topo->setSourceWeights(w);
-    topo->setDestWeights(w);
-  }
-  co_await Waitall((int)requests.size(), requests.data(), MPI_STATUSES_IGNORE);
+  ampiDistGraphExchange x((int)vec.size(), n, sources, degrees, destinations, weights);
+  co_await Alltoall(x.sendCounts2.data(), 2, MPI_INT, x.recvCounts2.data(), 2, MPI_INT, comm_old);
+  x.sizeReceive();
+  co_await Alltoallv(x.sendBuf.data(), x.sendCounts.data(), x.sendDispls.data(), MPI_INT,
+                     x.recvBuf.data(), x.recvCounts.data(), x.recvDispls.data(), MPI_INT, comm_old);
+  x.setTopology(getAmpiParent()->getCommStruct(*comm_dist_graph).getTopology(),
+                weights != MPI_UNWEIGHTED);
   co_return MPI_SUCCESS;
 }
 

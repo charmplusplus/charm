@@ -11102,12 +11102,14 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int so
       return ampiErrhandler("AMPI_Dist_graph_create", MPI_ERR_TOPOLOGY);
     }
     int counter = 0;
+    const int commSize = getAmpiInstance(comm_old)->getSize();
     for (int i=0; i<n; i++) {
-      if ((sources[i] < 0) || (degrees[i] < 0)) {
+      if ((sources[i] < 0) || (sources[i] >= commSize) || (degrees[i] < 0)) {
         return ampiErrhandler("AMPI_Dist_graph_create", MPI_ERR_TOPOLOGY);
       }
       for (int j=0; j<degrees[i]; j++) {
-        if ((destinations[counter] < 0) || (weights != MPI_UNWEIGHTED && weights[counter] < 0)) {
+        if ((destinations[counter] < 0) || (destinations[counter] >= commSize) ||
+            (weights != MPI_UNWEIGHTED && weights[counter] < 0)) {
           return ampiErrhandler("AMPI_Dist_graph_create", MPI_ERR_TOPOLOGY);
         }
         counter++;
@@ -11118,116 +11120,71 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int so
   ampiParent *ptr = getAmpiParent();
   std::vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
   *comm_dist_graph = getAmpiInstance(comm_old)->commCreate(vec, COMM_DIST_GRAPH);
-  ampiCommStruct &c = getAmpiParent()->getCommStruct(*comm_dist_graph);
-  ampiTopology *topo = c.getTopology();
+  ampiTopology *topo = getAmpiParent()->getCommStruct(*comm_dist_graph).getTopology();
+  const int p = vec.size();
 
-  int p = c.getSize();
-
-  std::vector<int> edgeListIn(p, 0);
-  std::vector<int> edgeListOut(p, 0);
-  std::vector<std::vector<int> > edgeMatrixIn(p);
-  std::vector<std::vector<int> > edgeMatrixOut(p);
-
-  for (int i=0; i<p; i++) {
-    std::vector<int> tmpVector(p, 0);
-    edgeMatrixIn[i] = tmpVector;
-    edgeMatrixOut[i] = tmpVector;
-  }
-
-  int index = 0;
-  for (int i=0; i<n; i++) {
-    for (int j=0; j<degrees[i]; j++) {
-      edgeMatrixOut[ sources[i] ][ edgeListOut[sources[i]]++ ] = destinations[index];
-      edgeMatrixIn[ destinations[index] ][ edgeListIn[destinations[index]]++ ] = sources[i];
-      index++;
-    }
-  }
-
-  std::vector<int> edgeCount(2*p);
-  std::vector<int> totalcount(2);
-  int sends = 0;
-  for (int i=0; i<p; i++) {
-    if (edgeListIn[i] > 0) {
-      edgeCount[2*i] = 1;
-      sends++;
-    }
-    else {
-      edgeCount[2*i] = 0;
-    }
-    if (edgeListOut[i] > 0) {
-      edgeCount[2*i+1] = 1;
-      sends++;
-    }
-    else {
-      edgeCount[2*i+1] = 0;
-    }
-  }
-
-  // Compute total number of ranks with incoming or outgoing edges for each rank
-  MPI_Reduce_scatter_block(edgeCount.data(), totalcount.data(), 2, MPI_INT, MPI_SUM, comm_old);
-
-  std::vector<MPI_Request> requests(sends, MPI_REQUEST_NULL);
-  int count = 0;
-  for (int i=0; i<p; i++) {
-    if (edgeListIn[i] > 0) {
-      if (edgeListIn[i] == p) {
-        edgeMatrixIn[i].push_back(1);
-      }
-      else {
-        edgeMatrixIn[i][edgeListIn[i]] = 1;
-      }
-      MPI_Isend(edgeMatrixIn[i].data(), edgeListIn[i]+1, MPI_INT, i, 0, comm_old, &requests[count++]);
-    }
-    if (edgeListOut[i] > 0) {
-      if (edgeListOut[i] == p) {
-        edgeMatrixOut[i].push_back(-1);
-      }
-      else {
-        edgeMatrixOut[i][edgeListOut[i]] = -1;
-      }
-      MPI_Isend(edgeMatrixOut[i].data(), edgeListOut[i]+1, MPI_INT, i, 0, comm_old, &requests[count++]);
-    }
-  }
-
-  // Receive all non-local incoming and outgoing edges
-  int numEdges;
-  MPI_Status status;
-  std::vector<int> saveSources, saveDestinations;
-  for (int i=0; i<2; i++) {
-    for (int j=0; j<totalcount[i]; j++) {
-      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, comm_old, &status);
-      MPI_Get_count(&status, MPI_INT, &numEdges);
-      std::vector<int> saveEdges(numEdges);
-      MPI_Recv(saveEdges.data(), numEdges, MPI_INT, status.MPI_SOURCE, 0, comm_old, MPI_STATUS_IGNORE);
-
-      if (saveEdges[numEdges-1] > 0) {
-        for (int k=0; k<numEdges-1; k++) {
-          saveSources.push_back(saveEdges[k]);
-        }
-      }
-      else {
-        for (int k=0; k<numEdges-1; k++) {
-          saveDestinations.push_back(saveEdges[k]);
-        }
-      }
-    }
-  }
-
-  topo->setDestinations(saveDestinations);
-  topo->setSources(saveSources);
-  topo->setOutDegree(saveDestinations.size());
-  topo->setInDegree(saveSources.size());
-
-  topo->setAreSourcesWeighted(weights != MPI_UNWEIGHTED);
-  topo->setAreDestsWeighted(weights != MPI_UNWEIGHTED);
-  if (topo->areSourcesWeighted()) {
-    std::vector<int> tmpWeights(weights, weights+n);
-    topo->setSourceWeights(tmpWeights);
-    topo->setDestWeights(tmpWeights);
-  }
-
-  ptr = ptr->waitall(sends, requests.data());
+  ampiDistGraphExchange x(p, n, sources, degrees, destinations, weights);
+  MPI_Alltoall(x.sendCounts2.data(), 2, MPI_INT, x.recvCounts2.data(), 2, MPI_INT, comm_old);
+  x.sizeReceive();
+  MPI_Alltoallv(x.sendBuf.data(), x.sendCounts.data(), x.sendDispls.data(), MPI_INT,
+                x.recvBuf.data(), x.recvCounts.data(), x.recvDispls.data(), MPI_INT, comm_old);
+  x.setTopology(topo, weights != MPI_UNWEIGHTED);
   return MPI_SUCCESS;
+}
+
+ampiDistGraphExchange::ampiDistGraphExchange(int p, int n, const int sources[], const int degrees[],
+                                             const int destinations[], const int weights[]) noexcept
+  : sendCounts2(2*p, 0), recvCounts2(2*p, 0), sendCounts(p), sendDispls(p),
+    recvCounts(p), recvDispls(p)
+{
+  std::vector<std::vector<int>> in(p), out(p); // per peer: (neighbor, weight) pairs
+  for (int i=0, e=0; i<n; i++) {
+    for (int j=0; j<degrees[i]; j++, e++) {
+      const int w = (weights == MPI_UNWEIGHTED) ? 1 : weights[e];
+      in[destinations[e]].insert(in[destinations[e]].end(), {sources[i], w});
+      out[sources[i]].insert(out[sources[i]].end(), {destinations[e], w});
+    }
+  }
+  for (int i=0; i<p; i++) {
+    sendCounts2[2*i] = in[i].size();
+    sendCounts2[2*i+1] = out[i].size();
+    sendCounts[i] = in[i].size() + out[i].size();
+    sendDispls[i] = sendBuf.size();
+    sendBuf.insert(sendBuf.end(), in[i].begin(), in[i].end());
+    sendBuf.insert(sendBuf.end(), out[i].begin(), out[i].end());
+  }
+}
+
+void ampiDistGraphExchange::sizeReceive() noexcept
+{
+  int total = 0;
+  for (int j=0; j<(int)recvCounts.size(); j++) {
+    recvCounts[j] = recvCounts2[2*j] + recvCounts2[2*j+1];
+    recvDispls[j] = total;
+    total += recvCounts[j];
+  }
+  recvBuf.resize(total);
+}
+
+void ampiDistGraphExchange::setTopology(ampiTopology *topo, bool weighted) const noexcept
+{
+  std::vector<int> srcs, srcWeights, dsts, dstWeights;
+  for (int j=0; j<(int)recvCounts.size(); j++) {
+    const int *b = recvBuf.data() + recvDispls[j];
+    for (int k=0; k<recvCounts2[2*j]; k+=2) { srcs.push_back(b[k]); srcWeights.push_back(b[k+1]); }
+    b += recvCounts2[2*j];
+    for (int k=0; k<recvCounts2[2*j+1]; k+=2) { dsts.push_back(b[k]); dstWeights.push_back(b[k+1]); }
+  }
+  topo->setSources(srcs);
+  topo->setDestinations(dsts);
+  topo->setInDegree(srcs.size());
+  topo->setOutDegree(dsts.size());
+  topo->setAreSourcesWeighted(weighted);
+  topo->setAreDestsWeighted(weighted);
+  if (weighted) {
+    topo->setSourceWeights(srcWeights);
+    topo->setDestWeights(dstWeights);
+  }
 }
 
 AMPI_API_IMPL(int, MPI_Topo_test, MPI_Comm comm, int *status)
