@@ -64,6 +64,7 @@ DIRS = \
   section_migrate \
   xarray_section_reduction \
   bcast_zcpup \
+  arraymap_insert_abort \
 
 FTDIRS = \
   jacobi3d \
@@ -92,6 +93,7 @@ NONSCALEDIRS = \
   sparse-coro \
   charmxi_parsing \
   anytime_migration \
+  arraymap_insert_abort \
 
 TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
 

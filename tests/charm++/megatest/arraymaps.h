@@ -27,9 +27,11 @@ class arraymaps_driver : public CBase_arraymaps_driver
   arraymaps_driver(CkMigrateMessage* m) {}
   void phaseDone(int n, int* v);
   void inserted(int flat, int pe);
+  void emptyCreated(void) { afterCreate(); }
+  void decoyReady(void);
 
  private:
-  enum Phase { CREATE, INSERT, MIGRATE, PING, DESTROY };
+  enum Phase { CREATE, INSERT, SHARECHECK, MIGRATE, PING, DESTROY };
   int caseId;
   Phase phase;
   int nInserted;
@@ -37,10 +39,14 @@ class arraymaps_driver : public CBase_arraymaps_driver
   std::vector<int> expected;  // expected PE per flat index, -1 when not known
   CProxy_arraymaps_inserter inserter;
   CkArrayID arr;
+  CkGroupID mapId;
+  CkArrayID decoy;  // the SHARE case's second array, destroyed with the case
 
   void startCase(void);
+  void afterCreate(void);
   void nextCase(void);
   void startMigrate(void);
+  void pingByIndex(int flat);
   void checkPhase(int n, const int* v, bool withInserted);
 };
 
@@ -103,6 +109,12 @@ class arraymaps_elt : public Base
   }
   void afterMigrate(void) { checkPe("after migration"); report(); }
   void ping(void) { checkPe("on broadcast"); report(); }
+  // Before any migration: the element's home must still be where it was built.
+  void checkHome(void)
+  {
+    checkPlacement(true);
+    report();
+  }
   void destroy(void)
   {
     report();
@@ -165,6 +177,14 @@ class arraymaps_6d : public arraymaps_elt<CBase_arraymaps_6d>
   arraymaps_6d(CProxy_arraymaps_driver d, int c, bool initial, std::vector<int> e)
       : arraymaps_elt<CBase_arraymaps_6d>(d, c, initial, e) {}
   arraymaps_6d(CkMigrateMessage* m) : arraymaps_elt<CBase_arraymaps_6d>(m) {}
+};
+
+class arraymaps_decoy : public CBase_arraymaps_decoy
+{
+ public:
+  arraymaps_decoy(void) {}
+  arraymaps_decoy(CkMigrateMessage* m) {}
+  void destroy(void) { ckDestroy(); }
 };
 
 #endif

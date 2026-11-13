@@ -1,0 +1,15 @@
+mainmodule insert_abort {
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry void created(void);
+    entry void done(void);
+  };
+
+  array [1D] Elem1 {
+    entry Elem1(void);
+  };
+
+  array [2D] Elem2 {
+    entry Elem2(void);
+  };
+};

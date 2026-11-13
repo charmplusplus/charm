@@ -70,6 +70,8 @@ env:
   # ckpt_restart: disk checkpoint and restart on other PE and process counts
   # (2 -> 1 and 1 -> 2 processes in the plain pass), with ids of an unbounded
   # array, groups, a plain chare and the mainchare checked after the restart.
+  # arraymap_insert_abort: insertion without a PE of an index the array map
+  # names no PE for must abort with the runtime's message (#4222).
   TEST_DIRS: >-
     tests/charm++/megatest
     tests/charm++/simplearrayhello
@@ -103,6 +105,7 @@ env:
     tests/charm++/ckcoro
     tests/charm++/sparse-coro
     tests/charm++/ckpt_restart
+    tests/charm++/arraymap_insert_abort
     tests/charm++/qd
     tests/charm++/within_node_bcast
     tests/charm++/zerocopy/zerocopy_with_qd
