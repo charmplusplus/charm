@@ -519,6 +519,15 @@ typedef struct CkDynRedData {
  * reducer the data is a CkDyn payload (header + slots + tail) whose user_id is
  * the binding's reducer id; hooks.reduce combines them. */
 void CkDynContribute(const CkDynTarget *me, const CkDynRedData *d, const CkDynCallback *cb);
+/* CkDynContribute of data with a shape (added within version 2): the elements
+ * are C-ordered with shape[0..ndim-1]. With ndim 2 or more and a built-in
+ * reducer on a numeric element kind, the result BUFFER slot (REDRESULT view,
+ * or the section message of a SECTION callback) has that ndim and shape;
+ * every contribution must have the same shape (CkDyn aborts otherwise). With
+ * ndim 0 or 1, a foreign reducer, nop, or a NONE or BYTE kind it is
+ * CkDynContribute (the result slot is flat, ndim 0). */
+void CkDynContributeShaped(const CkDynTarget *me, const CkDynRedData *d, const CkDynCallback *cb,
+                           int ndim, const int64_t *shape);
 
 /* ------------------------------------------------------------------------ */
 /* Sections (doc/internals/ckdyn.md, "Sections")                            */
@@ -538,6 +547,9 @@ void CkDynSectionDelete(const CkDynSectionID *sid);
 int  CkDynSectionRedNo(const CkDynTarget *me, const CkDynSectionID *sid);
 void CkDynContributeSection(const CkDynTarget *me, const CkDynSectionID *sid, const CkDynRedData *d,
                             const CkDynCallback *cb);
+/* CkDynContributeSection with a shape, as CkDynContributeShaped (added within version 2). */
+void CkDynContributeSectionShaped(const CkDynTarget *me, const CkDynSectionID *sid, const CkDynRedData *d,
+                                  const CkDynCallback *cb, int ndim, const int64_t *shape);
 
 /* ------------------------------------------------------------------------ */
 /* Checkpoint, quiescence, load balancing, tracing                           */

@@ -1291,7 +1291,10 @@ This call contributes nBytes bytes starting at data to the reduction
 type (see Section :numref:`builtin_reduction`). Unlike sending a
 message, you may use data after the call to contribute. All members of
 the chare array or group must call contribute, and all of them must use
-the same reduction type.
+the same reduction type: the runtime aborts with "contributions to one
+reduction use different reducers" when two contributions it combines name
+different reducers (contributions with ``CkReduction::nop``, which carry no
+data, may join any reduction).
 
 For example, if we want to sum each array/group member’s single integer
 myInt, we would use:

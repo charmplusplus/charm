@@ -27,7 +27,8 @@ clean:
 # section id from before +restart (the restart of the +p1 checkpoint), a
 # section of a charmxi array, a SECTION callback as checkpoint callback,
 # deleting a combined section that a combine waits on, and the reduction
-# number of a deleted section, and a CkDynRegisterClass call after start-up.
+# number of a deleted section, a CkDynRegisterClass call after start-up, and
+# shaped contributions of two shapes to one reduction.
 test: all
 	$(call run, ./ckdyntest +p4 +balancer RotateLB +randomized_msgq -skip priority -requiremoves )
 	$(call run, ./ckdyntest +p4 +balancer RotateLB -requiremoves )
@@ -50,6 +51,8 @@ test: all
 	grep -q "CkDynCheckpoint: the done callback is a SECTION callback" ckptsection.log
 	! ./ckdyntest +pe 2 -deletewaiting -skip pingpong -skip pingpong_inline > deletewaiting.log 2>&1
 	grep -q "combine(s) named it as a part" deletewaiting.log
+	! ./ckdyntest +pe 2 -mixedshape -skip pingpong -skip pingpong_inline > mixedshape.log 2>&1
+	grep -qE "contributions to one reduction have different shapes, \((2, 3|3, 2)\) and \((2, 3|3, 2)\)" mixedshape.log
 
 testp: all
 	$(call run, ./ckdyntest +p$(P) +balancer RotateLB )

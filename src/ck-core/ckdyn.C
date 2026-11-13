@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <cstring>
 #include <cstdlib>
+#include <climits>
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -76,6 +77,7 @@ static bool g_lateAllowed = false;
 static std::unordered_map<int, ClassRec *> g_classes;   /* chareIdx -> record */
 static std::vector<EpRec> g_eps;                        /* indexed by Charm++ ep */
 static CkReduction::reducerType g_foreignType = CkReduction::invalid;
+static CkReduction::reducerType g_shapedType = CkReduction::invalid;   /* CkDyn::shaped, CkDynContributeShaped */
 
 static inline ClassRec *classOf(int chareIdx) {
   auto it = g_classes.find(chareIdx);
@@ -746,6 +748,8 @@ static void viewPayload(CkDynMsgView &v, const char *buf, void *msg, CkDynMsgKin
 }
 
 static uint8_t elemOfReducer(int type);
+struct ShapedParts { int inner; uint32_t ndim; const int64_t *shape; const char *elems; size_t elen; };
+static bool shapedSplit(const void *data, size_t len, int reducer, ShapedParts &out);
 
 /* The envelope's reference number as a future id: 0 when none. A reduction
  * result carries the reduction's user flag, -1 by default (ckreduction.C
@@ -766,9 +770,18 @@ static void viewReduction(CkDynMsgView &v, CkDynSlot *tmp, CkReductionMsg *rm) {
   }
   memset(tmp, 0, 2 * sizeof(CkDynSlot));
   tmp[0].type = CKDYN_SLOT_BUFFER;
-  tmp[0].elem = elemOfReducer(rm->getReducer());
-  tmp[0].len = rm->getSize();
-  tmp[0].v.off = 0;
+  ShapedParts sp;
+  if (shapedSplit(rm->getData(), rm->getSize(), rm->getReducer(), sp)) {
+    /* the shape and the elements follow the 8-byte ShapedHdr in place, the layout of a BUFFER slot */
+    tmp[0].elem = elemOfReducer(sp.inner);
+    tmp[0].ndim = (uint8_t)sp.ndim;
+    tmp[0].len = (uint32_t)sp.elen;
+    tmp[0].v.off = (const char *)sp.shape - (const char *)rm->getData();
+  } else {
+    tmp[0].elem = elemOfReducer(rm->getReducer());
+    tmp[0].len = rm->getSize();
+    tmp[0].v.off = 0;
+  }
   int n = 1;
   uint32_t ref = refOf(rm);
   if (ref) { tmp[1].type = CKDYN_SLOT_FUTURE; tmp[1].v.u64 = ((uint64_t)(uint32_t)CkMyPe() << 32) | ref; n = 2; }
@@ -1805,6 +1818,13 @@ static uint8_t elemOfReducer(int type) {
   return CKDYN_ELEM_BYTE;
 }
 
+/* The name CkDyn gives a reducer (g_reducerTable), for error messages. */
+static std::string reducerName(int type) {
+  for (int i = 0; i < g_numReducers; i++) if (g_reducerTable[i].type == type) return g_reducerTable[i].name;
+  if (type == g_shapedType) return "CkDyn::shaped (arrays of ndim >= 2)";
+  return "reducer " + std::to_string(type);
+}
+
 extern "C" int CkDynReducers(const CkDynReducerInfo **out) { *out = g_reducerTable; return g_numReducers; }
 extern "C" int CkDynForeignReducerType(void) { return (int)g_foreignType; }
 
@@ -1832,6 +1852,151 @@ static CkReductionMsg *ckdynForeignReduce(int n, CkReductionMsg **msgs) {
   return CkReductionMsg::buildNew((int)out.size(), out.data(), g_foreignType);
 }
 
+/* The CkReductionMsg fields and reducer table the tagged and shaped reducers need (ckreduction.h makes it a friend). */
+struct CkDynReduceAccess {
+  static CkReduction::reducerFn fn(int type) { return CkReduction::reducerTable()[type].fn; }
+  static void copyCounts(CkReductionMsg *to, const CkReductionMsg *from, int sourceFlag) {
+    to->sourceFlag = sourceFlag; to->gcount = from->gcount; to->userFlag = from->userFlag;
+  }
+  static void setSingle(CkReductionMsg *m) { m->sourceFlag = -1; }
+  static int sourceFlag(const CkReductionMsg *m) { return m->sourceFlag; }
+};
+
+/* ---- shaped contributions (CkDynContributeShaped) -----------------------
+ * The built-in reducers combine flat element arrays. A contribution with a
+ * shape of 2 or more dimensions is contributed with the reducer CkDyn::shaped
+ * instead: the data is a ShapedHdr (the built-in reducer the binding gave and
+ * the dimension count), the shape (ndim int64), then the elements. The shaped
+ * reducer checks that every contribution has the same inner reducer and shape,
+ * combines the elements with the inner reducer and keeps the header of the
+ * first contribution. A result is viewed as a BUFFER slot with that shape: the
+ * header is 8 bytes, so the shape and elements after it have the layout of a
+ * BUFFER slot's data (doc/internals/ckdyn.md, "Reductions", shaped contributions). */
+struct ShapedHdr {
+  int32_t  inner;     /* the built-in reducer the binding gave */
+  uint32_t ndim;      /* 2 .. CKDYN_MAX_BUF_DIMS */
+};
+static_assert(sizeof(ShapedHdr) == 8, "ShapedHdr layout changed");
+
+static bool shapedSplit(const void *data, size_t len, int reducer, ShapedParts &out) {
+  if (g_shapedType == CkReduction::invalid || reducer != g_shapedType) return false;
+  if (len == 0) return false;   /* a reduction of empty messages only: viewed as an empty result */
+  ShapedHdr h;
+  if (len < sizeof h) CkAbort("CkDyn: a shaped reduction message without its header (%zu bytes)", len);
+  memcpy(&h, data, sizeof h);
+  if (h.ndim > CKDYN_MAX_BUF_DIMS || len < sizeof h + 8 * (size_t)h.ndim)
+    CkAbort("CkDyn: a shaped reduction message with a bad header (ndim %u, %zu bytes)", h.ndim, len);
+  out.inner = h.inner;
+  out.ndim = h.ndim;
+  out.shape = (const int64_t *)((const char *)data + sizeof h);
+  out.elems = (const char *)data + sizeof h + 8 * h.ndim;
+  out.elen = len - sizeof h - 8 * h.ndim;
+  return true;
+}
+
+static std::string shapeStr(uint32_t ndim, const int64_t *shape) {
+  std::string s = "(";
+  for (uint32_t i = 0; i < ndim; i++) { if (i) s += ", "; s += std::to_string((long long)shape[i]); }
+  return s + ")";
+}
+
+/* Whether a contribution with a shape is wrapped (ndim 2 or more, a built-in
+   reducer on a numeric element kind, some data); sets the header if so. The
+   accepted reducers are those shapedCombine implements: CkDyn labels every
+   reducer of a numeric element kind (g_reducerTable). */
+static bool shapedWrap(const char *what, int type, int len, int ndim, const int64_t *shape, ShapedHdr &h) {
+  if (ndim < 0 || ndim > CKDYN_MAX_BUF_DIMS) CkAbort("CkDyn: %s: shape with %d dimensions", what, ndim);
+  if (ndim <= 1 || type == CkReduction::nop || len == 0) return false;
+  if (g_foreignType != CkReduction::invalid && type == g_foreignType) return false;
+  uint8_t elem = elemOfReducer(type);
+  if (elem == CKDYN_ELEM_NONE || elem == CKDYN_ELEM_BYTE) return false;
+  bool known = false;
+  for (int i = 0; i < g_numReducers; i++) if (g_reducerTable[i].type == type) known = true;
+  if (!known) return false;   /* a reducer CkDyn does not label (not reachable through CkDynReducers) */
+  if (shape == nullptr) CkAbort("CkDyn: %s: ndim %d with a NULL shape", what, ndim);
+  int64_t n = 1;
+  for (int i = 0; i < ndim; i++) {
+    if (shape[i] < 0) CkAbort("CkDyn: %s: negative extent in shape %s", what, shapeStr(ndim, shape).c_str());
+    n *= shape[i];
+  }
+  if ((uint64_t)n * elemSize(elem) != (uint64_t)len)
+    CkAbort("CkDyn: %s: shape %s of %d-byte elements does not match the %d bytes contributed", what,
+            shapeStr(ndim, shape).c_str(), (int)elemSize(elem), len);
+  h.inner = type;
+  h.ndim = (uint32_t)ndim;
+  return true;
+}
+
+/* The data and reducer to contribute for a section contribution with a shape:
+   the wrapped form (in out) when shapedWrap says so; otherwise unchanged. */
+static void shapedContribution(const char *what, int &type, int &len, const void *&data, int ndim,
+                               const int64_t *shape, std::vector<char> &out) {
+  ShapedHdr h;
+  if (!shapedWrap(what, type, len, ndim, shape, h)) return;
+  out.resize(sizeof h + 8 * (size_t)ndim + len);
+  memcpy(out.data(), &h, sizeof h);
+  memcpy(out.data() + sizeof h, shape, 8 * (size_t)ndim);
+  memcpy(out.data() + sizeof h + 8 * (size_t)ndim, data, len);
+  data = out.data(); len = (int)out.size(); type = g_shapedType;
+}
+
+/* ret[i] = ret[i] op v[i] over elen bytes of elements, for the inner reducer;
+   each case is the loop body of the matching built-in reducer (ckreduction.C). */
+static void shapedCombine(int inner, char *ret, const char *v, size_t elen) {
+#define C(red, T, body) \
+  case CkReduction::red: { \
+    T *r = (T *)ret; const T *x = (const T *)v; \
+    for (size_t i = 0, k = elen / sizeof(T); i < k; i++) { body; } \
+    return; }
+#define FAM(op, body) \
+  C(op##_char, char, body) C(op##_short, short, body) C(op##_int, int, body) C(op##_long, long, body) \
+  C(op##_long_long, long long, body) C(op##_uchar, unsigned char, body) C(op##_ushort, unsigned short, body) \
+  C(op##_uint, unsigned int, body) C(op##_ulong, unsigned long, body) \
+  C(op##_ulong_long, unsigned long long, body) C(op##_float, float, body) C(op##_double, double, body)
+  switch (inner) {
+    FAM(sum, r[i] += x[i]) FAM(product, r[i] *= x[i])
+    FAM(max, if (r[i] < x[i]) r[i] = x[i]) FAM(min, if (r[i] > x[i]) r[i] = x[i])
+    C(logical_and, int, if (x[i] == 0) r[i] = 0; r[i] = !!r[i]) C(logical_and_int, int, if (x[i] == 0) r[i] = 0; r[i] = !!r[i])
+    C(logical_and_bool, bool, if (!x[i]) r[i] = false)
+    C(logical_or, int, if (x[i] != 0) r[i] = 1; r[i] = !!r[i]) C(logical_or_int, int, if (x[i] != 0) r[i] = 1; r[i] = !!r[i])
+    C(logical_or_bool, bool, if (x[i]) r[i] = true)
+    C(logical_xor_int, int, r[i] = (!r[i] != !x[i])) C(logical_xor_bool, bool, r[i] = (r[i] != x[i]))
+    C(bitvec_and, int, r[i] &= x[i]) C(bitvec_and_int, int, r[i] &= x[i]) C(bitvec_and_bool, bool, r[i] &= x[i])
+    C(bitvec_or, int, r[i] |= x[i]) C(bitvec_or_int, int, r[i] |= x[i]) C(bitvec_or_bool, bool, r[i] |= x[i])
+    C(bitvec_xor, int, r[i] ^= x[i]) C(bitvec_xor_int, int, r[i] ^= x[i]) C(bitvec_xor_bool, bool, r[i] ^= x[i])
+    default: CkAbort("CkDyn: a shaped reduction with inner reducer %d, which has no elementwise form", inner);
+  }
+#undef FAM
+#undef C
+}
+
+/* Combines the elements in place in the first message with data and returns
+   it, as the built-in reducers do: no copy of the inputs or of the result. */
+static CkReductionMsg *ckdynShapedReduce(int n, CkReductionMsg **msgs) {
+  ShapedParts p0;
+  int first = -1;
+  for (int i = 0; i < n; i++) {
+    if (msgs[i]->getSize() == 0) continue;   /* an empty contribution that keeps the counts */
+    if (msgs[i]->getReducer() != g_shapedType)
+      CkAbort("CkDyn: contributions to one reduction mix shaped and flat forms (an array of 2 or more dimensions "
+              "and a 1-D array or a scalar with %s); every contribution must have the same shape",
+              reducerName(msgs[i]->getReducer()).c_str());
+    ShapedParts p;
+    shapedSplit(msgs[i]->getData(), msgs[i]->getSize(), g_shapedType, p);
+    if (first < 0) { p0 = p; first = i; continue; }
+    if (p.inner != p0.inner)
+      CkAbort("CkDyn: contributions to one reduction use reducers %s and %s", reducerName(p0.inner).c_str(),
+              reducerName(p.inner).c_str());
+    if (p.ndim != p0.ndim || memcmp(p.shape, p0.shape, 8 * (size_t)p.ndim) != 0)
+      CkAbort("CkDyn: contributions to one reduction have different shapes, %s and %s (a reduction of "
+              "arrays needs one shape on every contributor)", shapeStr(p0.ndim, p0.shape).c_str(),
+              shapeStr(p.ndim, p.shape).c_str());
+    shapedCombine(p0.inner, (char *)p0.elems, p.elems, p.elen);
+  }
+  if (first < 0) return CkReductionMsg::buildNew(0, nullptr, g_shapedType);   /* only empty messages */
+  return CkReductionMsg::buildNew(msgs[first]->getSize(), nullptr, g_shapedType, msgs[first]);
+}
+
 /* ---- section callbacks of CkDynContribute -------------------------------
  * A reduction's callback must be the same on every contributing PE, so a
  * SECTION callback cannot become a per-PE relay slot here. CkDynContribute
@@ -1857,15 +2022,6 @@ static CkReduction::reducerType g_secTaggedType = CkReduction::invalid;
    the reducer, which turns a contribution into a partial result unconverted.
    Their contributions are therefore converted when contributed (preReduce),
    and every message the tagged reducer hands them is a partial result. */
-/* The CkReductionMsg fields and reducer table the tagged reducer needs (ckreduction.h makes it a friend). */
-struct CkDynReduceAccess {
-  static CkReduction::reducerFn fn(int type) { return CkReduction::reducerTable()[type].fn; }
-  static void copyCounts(CkReductionMsg *to, const CkReductionMsg *from, int sourceFlag) {
-    to->sourceFlag = sourceFlag; to->gcount = from->gcount; to->userFlag = from->userFlag;
-  }
-  static void setSingle(CkReductionMsg *m) { m->sourceFlag = -1; }
-  static int sourceFlag(const CkReductionMsg *m) { return m->sourceFlag; }
-};
 
 static bool needsPreReduce(int type) { return type == CkReduction::set || type == CkReduction::tuple; }
 
@@ -1890,6 +2046,10 @@ static CkReductionMsg *ckdynSectionTaggedReduce(int n, CkReductionMsg **msgs) {
               t0->ep, t0->refnum, t->sid.root_pe, t->sid.idx, t->ep, t->refnum);
     if (t->inner == CkReduction::nop) continue;   /* an empty contribution that keeps the counts, as Charm++ treats nop */
     if (inner == CkReduction::nop) inner = t->inner;
+    else if (t->inner != inner && (inner == g_shapedType || t->inner == g_shapedType))
+      CkAbort("CkDyn: contributions to one reduction mix shaped and flat forms (an array of 2 or more dimensions "
+              "and a 1-D array or a scalar with %s); every contribution must have the same shape",
+              reducerName(inner == g_shapedType ? t->inner : inner).c_str());
     else if (t->inner != inner)
       CkAbort("CkDyn: contributions to one reduction use reducers %d and %d", inner, t->inner);
   }
@@ -1933,38 +2093,61 @@ static bool unwrapSectionTagged(void *msg) {
   return true;
 }
 
-extern "C" void CkDynContribute(const CkDynTarget *me, const CkDynRedData *d, const CkDynCallback *cb) {
+static void contributeImpl(const CkDynTarget *me, const CkDynRedData *d, const CkDynCallback *cb, int ndim,
+                           const int64_t *shape) {
   Chare *c = localChare(me);
   if (c == nullptr) CkAbort("CkDyn: contribute from an object that is not local");
   int len = (int)d->len;
   const void *data = d->data;
   int type = d->type;
   if (type == CkReduction::nop) { len = 0; data = nullptr; }
+  /* The message is assembled from its parts, [SecTag][ShapedHdr shape][data],
+     so the data is copied once, into the message. */
+  ShapedHdr sh;
+  bool wrap = shapedWrap("CkDynContributeShaped", type, len, ndim, shape, sh);
+  size_t hl = wrap ? sizeof sh + 8 * (size_t)ndim : 0;
+  int outType = wrap ? g_shapedType : type;
   CkCallback ck;
-  std::vector<char> tagged;
+  bool tag = false;
+  SecTag t;
+  std::vector<char> pre;
   if (cb->kind == CKDYN_CB_SECTION) {
     if (cb->sid.root_pe < 0 || cb->sid.root_pe >= CkNumPes())
       CkAbort("CkDyn: contribute to a SECTION callback whose section has root PE %d", cb->sid.root_pe);
     epRec(cb->ep);
-    SecTag t;
     memset(&t, 0, sizeof t);
-    t.sid = cb->sid; t.ep = cb->ep; t.refnum = refnumOrZero(cb->refnum); t.inner = type;
-    std::vector<char> pre;
+    t.sid = cb->sid; t.ep = cb->ep; t.refnum = refnumOrZero(cb->refnum); t.inner = outType;
+    /* set and tuple have element kind BYTE, so they are never wrapped */
     if (needsPreReduce(type)) { preReduce(type, data, len, pre); data = pre.data(); len = (int)pre.size(); }
-    tagged.resize(sizeof t + len);
-    memcpy(tagged.data(), &t, sizeof t);
-    if (len) memcpy(tagged.data() + sizeof t, data, len);
-    data = tagged.data(); len = (int)tagged.size(); type = g_secTaggedType;
+    tag = true;
+    outType = g_secTaggedType;
     ck = CkCallback(CkIndex_CkDynMgr::relay(0), cb->sid.root_pe, _ckdynMgrGID);   /* the same on every PE */
   } else {
     ck = CkDynMakeCallback(cb);
   }
+  size_t total = (tag ? sizeof t : 0) + hl + (size_t)len;
+  if (total > (size_t)INT_MAX) CkAbort("CkDyn: contribute: %zu bytes is more than a reduction message holds", total);
+  CkReductionMsg *m = CkReductionMsg::buildNew((int)total, nullptr, (CkReduction::reducerType)outType);
+  char *p = (char *)m->getData();
+  if (tag) { memcpy(p, &t, sizeof t); p += sizeof t; }
+  if (wrap) { memcpy(p, &sh, sizeof sh); memcpy(p + sizeof sh, shape, 8 * (size_t)ndim); p += hl; }
+  if (len) memcpy(p, data, len);
+  m->setCallback(ck);
   switch (me->kind) {
-    case CKDYN_GROUP:     ((Group *)c)->contribute(len, data, (CkReduction::reducerType)type, ck); break;
-    case CKDYN_NODEGROUP: ((NodeGroup *)c)->contribute(len, data, (CkReduction::reducerType)type, ck); break;
-    case CKDYN_ARRAY:     ((ArrayElement *)c)->contribute(len, data, (CkReduction::reducerType)type, ck); break;
-    default: CkAbort("CkDyn: contribute from a kind without reductions");
+    case CKDYN_GROUP:     ((Group *)c)->contribute(m); break;
+    case CKDYN_NODEGROUP: ((NodeGroup *)c)->contribute(m); break;
+    case CKDYN_ARRAY:     ((ArrayElement *)c)->contribute(m); break;
+    default: delete m; CkAbort("CkDyn: contribute from a kind without reductions");
   }
+}
+
+extern "C" void CkDynContribute(const CkDynTarget *me, const CkDynRedData *d, const CkDynCallback *cb) {
+  contributeImpl(me, d, cb, 1, nullptr);
+}
+
+extern "C" void CkDynContributeShaped(const CkDynTarget *me, const CkDynRedData *d, const CkDynCallback *cb,
+                                      int ndim, const int64_t *shape) {
+  contributeImpl(me, d, cb, ndim, shape);
 }
 
 /* ====================================================================== */
@@ -2019,6 +2202,13 @@ static CkDynMcastMsg *mcastFromReduction(const void *data, size_t len, int reduc
   CkDynMsgBuilder *b = CkDynMsgBegin(1, 0, 0, 0, -1);
   CkDynBufDesc d;
   memset(&d, 0, sizeof d);
+  ShapedParts sp;
+  if (shapedSplit(data, len, reducer, sp)) {   /* a shaped result keeps its shape */
+    d.ptr = sp.elems; d.len = sp.elen; d.elem = elemOfReducer(sp.inner);
+    d.ndim = (uint8_t)sp.ndim; d.shape = sp.shape;
+    CkDynMsgAddBuffer(b, &d);
+    return CkDynMsgFinishMcast(b, 0);
+  }
   d.ptr = data; d.len = len; d.elem = elemOfReducer(reducer);
   CkDynMsgAddBuffer(b, &d);
   return CkDynMsgFinishMcast(b, 0);
@@ -2387,9 +2577,12 @@ static CkSectionInfo &cookieOf(const CkDynTarget *me, const CkDynSectionID *sid,
 
 /* userData becomes the result's reference number (3.7 of the design): the
    callback's own refnum, or the future id of a FUTURE callback, never -1 */
-static void sectionContribute(CkSectionInfo &ck, int len, const void *data, int type, const CkDynCallback *cb) {
+static void sectionContribute(CkSectionInfo &ck, int len, const void *data, int type, const CkDynCallback *cb,
+                              int ndim = 1, const int64_t *shape = nullptr) {
   uint32_t ud = cb->kind == CKDYN_CB_FUTURE ? cb->id : cb->refnum;
   if (type == CkReduction::nop) { len = 0; data = nullptr; }
+  std::vector<char> shaped;
+  shapedContribution("CkDynContributeSectionShaped", type, len, data, ndim, shape, shaped);
   mcastMgr()->contribute(len, (void *)data, (CkReduction::reducerType)type, ck, CkDynMakeCallback(cb), (int)ud);
 }
 
@@ -2442,6 +2635,12 @@ extern "C" void CkDynContributeSection(const CkDynTarget *me, const CkDynSection
                                        const CkDynCallback *cb) {
   CkSectionInfo &ck = cookieOf(me, sid, "CkDynContributeSection");
   sectionContribute(ck, (int)d->len, d->data, d->type, cb);
+}
+
+extern "C" void CkDynContributeSectionShaped(const CkDynTarget *me, const CkDynSectionID *sid, const CkDynRedData *d,
+                                             const CkDynCallback *cb, int ndim, const int64_t *shape) {
+  CkSectionInfo &ck = cookieOf(me, sid, "CkDynContributeSectionShaped");
+  sectionContribute(ck, (int)d->len, d->data, d->type, cb, ndim, shape);
 }
 
 /* ====================================================================== */
@@ -3386,6 +3585,7 @@ extern "C" void CkDynStart(int argc, char **argv) {
 void _ckdynInitNode(void) {
   g_foreignType = CkReduction::addReducer(ckdynForeignReduce, false, "CkDyn::foreign");
   g_secTaggedType = CkReduction::addReducer(ckdynSectionTaggedReduce, false, "CkDyn::sectionTagged");
+  g_shapedType = CkReduction::addReducer(ckdynShapedReduce, false, "CkDyn::shaped (arrays of ndim >= 2)");
   /* a section's creation multicast: one entry for array members and one for
      group members, whatever the class, because CkMulticast sends one entry
      index to every sub-section of a combined section */
