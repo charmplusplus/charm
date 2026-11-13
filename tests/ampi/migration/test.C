@@ -1,6 +1,7 @@
 /**
  * AMPI Migration Test:
- * Migrate AMPI rank 1 from PE to PE in order.
+ * Migrate AMPI rank 1 from PE to PE in order. Its MPI_Wtime must not go
+ * backwards across a migration (nor jump by an hour).
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -82,7 +83,13 @@ int main(int argc, char **argv)
       if (rank == 1) {
         int dest_pe = (my_pe + 1) % num_pes;
         printf("Trying to migrate rank %d from PE %d to %d\n", rank, my_pe, dest_pe);
+        double before = MPI_Wtime();
         AMPI_Migrate_to_pe(dest_pe);
+        double after = MPI_Wtime();
+        if (!(after >= before && after < before + 3600)) {
+          printf("Rank %d: MPI_Wtime was %g before migrating and %g after!\n", rank, before, after);
+          MPI_Abort(MPI_COMM_WORLD, 1);
+        }
         my_pe = get_my_pe();
         if (my_pe != dest_pe) {
           printf("Rank %d is on PE %d but should have migrated to PE %d!\n", rank, my_pe, dest_pe);
