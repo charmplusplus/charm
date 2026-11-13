@@ -21,10 +21,13 @@ header's opening comment and the manual section "Coroutine Entry Methods".
 - `record`: the coroutine entry's index `ep`, a `CkCallback target` to the
   owner (`self_target`, one overload per chare kind: an array element by
   index, a group branch by PE, a nodegroup branch by node, a chare or
-  mainchare by handle), the entry's message `msg` (a copy, for message entries; null for
-  void entries), `pending` (a restart message is on its way; pupped), the
-  restart `chain`, the frame handles `root` (the entry's frame) and `h`
-  (the innermost suspended frame), and the wait state: `waiting`, `atSite`,
+  mainchare by handle), the entry's message `msg` for restarts (a message
+  entry's is a packed copy; a marshalled entry's is the `CkMarshallMsg`
+  its parameters point into; null for void entries), `pending` (a restart
+  message is on its way; pupped), the restart `chain`, the frame handles
+  `root` (the entry's frame) and `h` (the innermost suspended frame),
+  `frameMsg` and `frameMsgDel` (a message entry's: the message the frame
+  received and its typed delete, not pupped), and the wait state: `waiting`, `atSite`,
   `rebuilt` (restarted and not yet past the recorded site), `wants` (the
   entry and reference number pairs it waits for, each tagged with the
   `arm` of a when_any it belongs to), and the delivered `readyBufs` (one
@@ -67,10 +70,11 @@ header's opening comment and the manual section "Coroutine Entry Methods".
   so that the record learns its frame handle.
 - `CkpvAccess(_ckCurrentMsg)`, `CkpvAccess(_ckCurrentEp)` (ck.C; set and
   restored by `CkEntryScope`, charm++.h, which the generated wrappers of
-  coroutine and inbox entries declare around the call, in `_call_`,
-  `_callmarshall_` and the reduction wrapper): the message and entry
-  index being delivered, read as `CkCurrentMessage()` and
-  `CkCurrentEntry()`; null and -1 in other entry methods.
+  coroutine and inbox entries declare around the call, in `_call_` and
+  the reduction wrapper, whose scope names the target entry's own index):
+  the message and entry index being delivered, read as
+  `CkCurrentMessage()` and `CkCurrentEntry()`; null and -1 in other entry
+  methods, and after `deliver` has taken its delivery.
 - The generated `X_CORO_CODE` macro (`Chare::genCoroCode`,
   `Entry::genCoroCode` in src/xlat-i): `ck::coro::state __coro`,
   `_coro_pup(p)` (`__coro.pup(p, this)`, called by `recursive_pup_impl`
@@ -87,15 +91,24 @@ header's opening comment and the manual section "Coroutine Entry Methods".
 
 **Start.** The generated entry wrapper calls the user's method, which is a
 coroutine with `initial_suspend` = never. Its promise is constructed with
-the chare (`*this`) when the chare has `X_CORO_CODE`, and
-`get_return_object` calls `state::begin(elt, isEntry)` before the body
-starts: `ep` comes from `CkCurrentEntry()` and `msg` from
-`CkCurrentMessage()` (null for a void entry's system message), after
+the chare (`*this`) and the frame's copies of the parameters when the
+chare has `X_CORO_CODE`; it notes the message parameter's address in the
+frame and a typed delete (`entry_msg`). `get_return_object` calls
+`state::begin(elt, isEntry, em)` before the body starts: `ep` comes from
+`CkCurrentEntry()` and `msg` from `CkCurrentMessage()` (null for a void
+entry's system message), after
 checking `__coro_is_entry(ep)` so that a direct C++ call of the method
 aborts instead of recording the caller's
 entry. `begin` adopts a restarting record of the same entry if there is
 one, else creates a record (aborting if an active record of that entry
-exists), stores the frame handle and sets `current_`. The `frame_guard` that follows opens the switch
+exists), stores the frame handle and sets `current_`. For a new record of
+a message entry it packs the frame's message in place, copies the packed
+bytes into `msg` and unpacks it again (`packed_copy`); a custom pack
+replaces the message, so the frame's parameter (`em.slot`) and
+`CkCurrentMessage()` are pointed at the new one. The frame's message is
+the record's `frameMsg`, deleted with the frame (`destroy_frames`), so a
+message lost with a migrated frame is not leaked and the body does not
+delete it. The `frame_guard` that follows opens the switch
 at `chain.sites[0]` when restarting, else at 0. When the body first
 suspends or finishes, the wrapper's discarded `ck::coroutine` object is
 destroyed and `~coroutine` calls `state::finish_run`, which clears
@@ -108,12 +121,15 @@ the generated wrapper of a marshalled inbox entry, buffers the
 `CkMarshallMsg` unopened (reference number: the first parameter if
 arithmetic, read with `PUP::fromMem`, else the envelope's); the entry is
 not `nokeep`, so the state owns the message. `state::deliver(ep,
-args...)` (reference number: the first arithmetic argument, else the
-envelope's), the generated body reached through a reduction wrapper or a
-direct call, or a hand-written inbox body, keeps the message being
-delivered when `CkCurrentEntry() == ep` and it is a `CkMarshallMsg`
-(`CkReferenceMsg`), and otherwise packs `args` into a new `CkMarshallMsg`
-in charmxi's layout: each scalar pupped in order, an `array_arg<T>` as
+args...)`, the generated body of a void entry or of a marshalled entry
+reached through a reduction wrapper or a direct call, or a hand-written
+inbox body, takes the reference number from the first arithmetic
+argument, else from the entry's own message when `CkCurrentEntry() == ep`
+(the scope its wrapper set: a void entry's system message, or a reduction
+target's `CkReductionMsg`, whose reference number wins over the first
+argument). It then clears the scope, so that a coroutine resumed by this
+delivery and calling an inbox entry directly is not taken for it, and
+packs `args` into a new `CkMarshallMsg` in charmxi's layout: each scalar pupped in order, an `array_arg<T>` as
 its offset (aligned to `sizeof(T)`) and byte count, then the arrays from
 `CK_ALIGN(scalar size, 16)`. A void entry buffers no message. Then
 `push`. `push` looks for a waiting record
@@ -172,8 +188,10 @@ condition).
 **Unpack and restart.** `state::pup` reads the same and calls
 `send_restart` for each record: unless a restart message is already
 `pending` (sent before the element moved again; the location manager
-forwards it), a copy of the record's message (or a fresh system message for
-a void entry) is sent through `target` and `pending` is set, so the entry
+forwards it), an unpacked copy of the record's message (`restart_copy`:
+a packed copy is copied as bytes and only the copy unpacked; a
+`CkMarshallMsg` goes through `CkCopyMsg`), or a fresh system message for
+a void entry, is sent through `target` and `pending` is set, so the entry
 is invoked again by the runtime after the unpack completes. `pup(p,
 owner)`, the form the generated `_coro_pup` calls, rebuilds `target`
 from the owner before sending (`self_target`), so a chare restored from

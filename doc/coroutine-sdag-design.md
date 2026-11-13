@@ -223,8 +223,8 @@ the review of PR #4231 `CkInvokeEP` set them for every entry method, which
 cost about 3 ns per entry method in every program. An inbox entry's
 generated body is the one-liner the programmer wrote before. Validation: both attributes work on any chare
 kind (chare, group, nodegroup, array element) and need a void return and
-none of threaded, sync, local, inline, whenidle, iget, python, aggregate
-or nokeep; `[inbox]` takes marshalled parameters, arrays included, or a
+none of threaded, sync, local, inline, whenidle, iget, python, aggregate,
+immediate, expedited or nokeep; `[inbox]` takes marshalled parameters, arrays included, or a
 message; `[coroutine]` takes marshalled parameters (by value in the C++
 definition) or a message and is not a reduction target; both reject
 conditional and nocopy parameters. The whole translator change is the two

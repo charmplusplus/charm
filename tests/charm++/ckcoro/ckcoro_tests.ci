@@ -21,6 +21,7 @@ mainmodule ckcoro_tests {
     entry [reductiontarget] void migrationTestDone();
     entry void doMarshallTest();
     entry [reductiontarget] void marshallTestDone();
+    entry void marshallLeakCheck();
     entry void doOverlapTest();
     entry [reductiontarget] void overlapTestDone();
     // The mainchare as a coroutine owner, driving the owners module.
@@ -44,6 +45,9 @@ mainmodule ckcoro_tests {
     entry [inbox] void item(int tag, int v);   // tag = round * items + i
   }
 
+  // A custom pack and unpack (the unpacked message holds a heap array).
+  message PackMsg;
+
   // Marshalled inbox entries: the parameters stay in the message being
   // delivered, which the inbox keeps (and pups under +ck_fakemigrate).
   array [1D] MarshallTest {
@@ -57,5 +61,12 @@ mainmodule ckcoro_tests {
     entry [inbox, reductiontarget] void total(int sum);
     entry [inbox] void arr(int iter, int n, double data[n], std::vector<int> tail);
     entry [inbox, reductiontarget] void arrTotal(int n, double sums[n]);
+    // Called directly from the coroutine, inside the delivery of a reduction.
+    entry [inbox] void tick(int it, double v);
+    // A coroutine entry taking a message with a custom pack: the state owns
+    // the message, which stays valid across waits and restarts.
+    entry [inbox, reductiontarget] void runsDone();
+    entry [coroutine] void packRun(PackMsg* m);
+    entry [inbox] void step(int it);
   }
 }

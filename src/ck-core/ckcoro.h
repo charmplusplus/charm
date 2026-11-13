@@ -45,9 +45,11 @@
  * below). inbox::name(ref) matches the reference number:
  * the envelope's for a message entry, the first arithmetic parameter for a
  * marshalled entry; inbox::name() matches any. Deliveries that no coroutine
- * is waiting for are buffered as messages (the marshalled parameters stay
- * in the message being delivered, see CkCurrentMessage) and move with the
- * element. CK_WHEN_ALL(CK_ALT(...), ...) waits for all of several (an SDAG
+ * is waiting for are buffered as messages (a marshalled entry's as it
+ * arrived) and move with the element. The message of a [coroutine] entry
+ * belongs to the state, as the message holding its marshalled parameters
+ * does: the body reads it until the coroutine ends and does not delete
+ * it. CK_WHEN_ALL(CK_ALT(...), ...) waits for all of several (an SDAG
  * when a(), b()); CK_WHEN_ANY(idx, CK_ALT(...), CK_ALL(...), ...) waits for
  * the first of several alternatives, each a when or a conjunction (an SDAG
  * case). Through a reduction wrapper the reference number is the
@@ -145,6 +147,29 @@ inline CkCallback self_target(int ep, Chare *c) { return CkCallback(ep, c->ckGet
 // The frame handle of a coroutine entry just created, picked up by state::begin.
 inline thread_local std::coroutine_handle<> pending_root_ = {};
 
+template <class T>
+inline constexpr bool is_message_ptr_v =
+    std::is_pointer_v<T> && std::is_base_of_v<CkMessage, std::remove_pointer_t<T>>;
+
+// The message parameter of a coroutine entry's frame: where the frame holds
+// it, so that it can be pointed at the message that survives a pack (a
+// custom pack replaces the message), and how to delete it (with its
+// destructor, which frees what a custom unpack allocated).
+struct entry_msg {
+  void **slot = nullptr;
+  void (*del)(void *) = nullptr;
+};
+template <class Msg> void delete_msg(void *m) { delete static_cast<Msg *>(m); }
+template <class A> inline void note_entry_msg(entry_msg &em, A &a) noexcept {
+  using P = std::remove_cvref_t<A>;
+  if constexpr (is_message_ptr_v<P>) {
+    static_assert(!std::is_const_v<std::remove_reference_t<A>>,
+                  "the message parameter of a coroutine entry method is not const");
+    em.slot = reinterpret_cast<void **>(const_cast<std::remove_cv_t<std::remove_pointer_t<P>> **>(&a));
+    em.del = &delete_msg<std::remove_cv_t<std::remove_pointer_t<P>>>;
+  }
+}
+
 /* ---------------- coroutine: the entry method type ---------------- */
 
 // The return type of a coroutine entry method. The body starts at once (the
@@ -163,16 +188,20 @@ class coroutine {
     // GCC deduces Owner as a reference type (Jacobi&) from *this, clang as
     // the class; owner_t strips it, or GCC's constraint fails and the
     // promise is default-constructed without registering (CI, 2026-11-11).
+    // The arguments are the frame's copies of the parameters, so the
+    // message parameter's slot is the one the body reads.
     template <class T> using owner_t = std::remove_cv_t<std::remove_reference_t<T>>;
     template <class Owner, class... Args>
       requires requires(owner_t<Owner> &o) { o.__coro; owner_t<Owner>::__coro_is_entry(0); }
-    promise_type(Owner &self, Args &...) noexcept
-        : owner_(&self), begin_(&begin_for<owner_t<Owner>>) {}
+    promise_type(Owner &self, Args &...args) noexcept
+        : owner_(&self), begin_(&begin_for<owner_t<Owner>>) {
+      (note_entry_msg(msg_, args), ...);
+    }
     promise_type() noexcept = default;
     coroutine get_return_object() {
       auto h = std::coroutine_handle<promise_type>::from_promise(*this);
       pending_root_ = h;
-      if (begin_) begin_(owner_);
+      if (begin_) begin_(owner_, msg_);
       return coroutine(h);
     }
     std::suspend_never initial_suspend() const noexcept { return {}; }
@@ -181,12 +210,13 @@ class coroutine {
     void unhandled_exception() const noexcept { abort_unhandled_exception(); }
 
    private:
-    template <class Owner> static void begin_for(void *o) {
+    template <class Owner> static void begin_for(void *o, entry_msg em) {
       Owner *self = static_cast<Owner *>(o);
-      self->__coro.begin(self, Owner::__coro_is_entry(::CkCurrentEntry()));
+      self->__coro.begin(self, Owner::__coro_is_entry(::CkCurrentEntry()), em);
     }
     void *owner_ = nullptr;
-    void (*begin_)(void *) = nullptr;
+    void (*begin_)(void *, entry_msg) = nullptr;
+    entry_msg msg_;
   };
   explicit coroutine(std::coroutine_handle<> h) noexcept : h_(h) {}
   coroutine(const coroutine &) = delete;
@@ -216,10 +246,6 @@ namespace ck {
 namespace coro {
 
 /* ---------------- the inbox ---------------- */
-
-template <class T>
-inline constexpr bool is_message_ptr_v =
-    std::is_pointer_v<T> && std::is_base_of_v<CkMessage, std::remove_pointer_t<T>>;
 
 // True for the message that carries an entry's marshalled parameters.
 inline bool is_marshall_msg(const void *m) noexcept {
@@ -311,9 +337,13 @@ struct record {
   state *owner = nullptr;
   int ep = -1;                   // the coroutine entry; pupped
   CkCallback target;             // the owner (self_target); pupped, rebuilt by state::pup(p, owner)
-  void *msg = nullptr;           // the entry's message, for a restart; pupped (null: a void entry)
+  void *msg = nullptr;           // the entry's message, for a restart; pupped (null: a void entry).
+                                 // A message entry's is a packed copy, a marshalled entry's
+                                 // the message its parameters point into
   chain ch;                      // restart sites; its sites pupped
   std::coroutine_handle<> root;  // the entry's frame
+  void *frameMsg = nullptr;      // a message entry's: the message the frame received, deleted
+  void (*frameMsgDel)(void *) = nullptr; // with the frame
   std::coroutine_handle<> h;     // the innermost suspended frame
   record *prev = nullptr;        // current_ before this record ran
   chain *prevChain = nullptr;    // current_chain_ before this record ran
@@ -491,12 +521,13 @@ class state {
   ~state();
 
   // Inbox entry bodies (generated by [inbox], or written by hand): hand the
-  // delivery to the state. A message entry hands over its message. A
-  // marshalled or void entry passes its arguments: the reference number is
-  // the first arithmetic argument, else the envelope's; the arguments
-  // themselves stay in the message being delivered (CkCurrentMessage), which
-  // the state keeps, unless the entry was reached some other way (a reduction
-  // target, a direct call), in which case they are packed into a new message.
+  // delivery to the state. A message entry hands over its message. A void
+  // entry, or a marshalled entry reached other than through its proxy (a
+  // reduction target, a direct call), passes its arguments, packed into a
+  // new message; the reference number is the first arithmetic argument, else
+  // that of the entry's own message being delivered (a reduction target's is
+  // the reduction message's). Through its proxy a marshalled entry's message
+  // goes to deliver_message as it arrived.
   template <class Msg, std::enable_if_t<is_message_ptr_v<Msg *>, int> = 0>
   void deliver(int ep, Msg *m);
   template <class... Args, std::enable_if_t<!(sizeof...(Args) == 1 && (is_message_ptr_v<std::decay_t<Args>> && ...)), int> = 0>
@@ -551,12 +582,13 @@ class state {
   }
 
   // Internal.
-  template <class Owner> record &begin(Owner *owner, int ep, void *msg, bool own = false) {
-    return begin_record(ep, msg, own, [](int ep_, void *o) {
+  template <class Owner>
+  record &begin(Owner *owner, int ep, void *msg, bool own = false, entry_msg em = {}) {
+    return begin_record(ep, msg, own, em, [](int ep_, void *o) {
       return self_target(ep_, static_cast<Owner *>(o));
     }, owner);
   }
-  template <class Owner> record &begin(Owner *owner, bool isEntry);
+  template <class Owner> record &begin(Owner *owner, bool isEntry, entry_msg em);
   void finish_run(record *rec);
   void run(record *rec);
   bool take(const want &w, buffer &out);
@@ -567,7 +599,7 @@ class state {
 
  private:
   using target_fn = CkCallback (*)(int ep, void *owner);
-  record &begin_record(int ep, void *msg, bool own, target_fn mk, void *owner);
+  record &begin_record(int ep, void *msg, bool own, entry_msg em, target_fn mk, void *owner);
   void pup_impl(PUP::er &p, target_fn mk, void *owner);
   void destroy_frames(record &rec);
   void send_restart(record &rec);
@@ -589,11 +621,14 @@ class state {
 // creates or adopts the record.
 class root_guard {
  public:
-  template <class Owner> root_guard(state &s, Owner *owner, int ep, void *msg) {
-    s.begin(owner, ep, msg);
+  template <class Owner> root_guard(state &s, Owner *owner, int ep, std::nullptr_t) {
+    s.begin(owner, ep, nullptr);
   }
-  template <class Owner> root_guard(state &s, Owner *owner, bool isEntry) {
-    s.begin(owner, isEntry);
+  // msg is the body's message parameter (the frame's slot).
+  template <class Owner, class Msg> root_guard(state &s, Owner *owner, int ep, Msg *&msg) {
+    entry_msg em;
+    note_entry_msg(em, msg);
+    s.begin(owner, ep, msg, false, em);
   }
   ~root_guard() = default;
   root_guard(const root_guard &) = delete;
@@ -652,6 +687,12 @@ inline void state::destroy_frames(record &rec) {
   }
   rec.root = {};
   rec.h = {};
+  if (rec.frameMsg) {
+    if (rec.frameMsgDel) rec.frameMsgDel(rec.frameMsg);
+    else CkFreeMsg(rec.frameMsg);
+  }
+  rec.frameMsg = nullptr;
+  rec.frameMsgDel = nullptr;
   rec.ch.depth = 0;
   rec.ch.linked.clear();
   rec.ch.noted = false;
@@ -662,7 +703,39 @@ inline void state::destroy_frames(record &rec) {
   rec.clear_ready();
 }
 
-inline record &state::begin_record(int ep, void *msg, bool own, target_fn mk, void *owner) {
+// A packed copy of the message at *pm. Packing it in place may replace it
+// (a custom pack frees its input), so *pm is set to the unpacked message.
+inline void *packed_copy(void **pm) {
+  envelope *env = UsrToEnv(*pm);
+  const bool wasPacked = env->isPacked();
+  if (!wasPacked) CkPackMessage(&env);
+  const int size = env->getTotalsize();
+  envelope *c = (envelope *)CmiAlloc(size);
+  std::memcpy(c, env, size);
+  setMemoryTypeMessage(c);
+  if (!wasPacked) CkUnpackMessage(&env);
+  *pm = EnvToUsr(env);
+  return EnvToUsr(c);
+}
+
+// An unpacked copy of a message the state holds at *pm. A packed one (a
+// message entry's restart copy) is copied as bytes and only the copy is
+// unpacked: CkCopyMsg would unpack the source too. An unpacked one (a
+// marshalled entry's, varsize: its pointer must become an offset before a
+// byte copy) goes through CkCopyMsg, which packs and unpacks it in place.
+inline void *restart_copy(void **pm) {
+  envelope *env = UsrToEnv(*pm);
+  if (!env->isPacked()) return CkCopyMsg(pm);
+  const int size = env->getTotalsize();
+  envelope *c = (envelope *)CmiAlloc(size);
+  std::memcpy(c, env, size);
+  setMemoryTypeMessage(c);
+  CkUnpackMessage(&c);
+  return EnvToUsr(c);
+}
+
+inline record &state::begin_record(int ep, void *msg, bool own, entry_msg em, target_fn mk,
+                                   void *owner) {
   std::coroutine_handle<> root = std::exchange(pending_root_, {});
   if (!root) CkAbort("ck::coro: CK_COROUTINE_STATE in a function that does not return ck::coroutine");
   record *rec = nullptr;
@@ -680,7 +753,16 @@ inline record &state::begin_record(int ep, void *msg, bool own, target_fn mk, vo
     rec->ep = ep;
     rec->target = mk(ep, owner);
     if (msg && own) rec->msg = msg;
-    else if (msg) { void *m = msg; rec->msg = CkCopyMsg(&m); }
+    else if (msg) {
+      // A message entry: the restart copy is made by packing the frame's
+      // message, which may replace it; the frame's parameter and the
+      // current message follow.
+      void *m = msg;
+      rec->msg = packed_copy(&m);
+      if (em.slot) *em.slot = m;
+      if (CkpvAccess(_ckCurrentMsg) == msg) CkpvAccess(_ckCurrentMsg) = m;
+      msg = m;
+    }
   } else {
     rec->ch.restarting = !rec->ch.sites.empty();
     rec->pending = false;
@@ -692,6 +774,12 @@ inline record &state::begin_record(int ep, void *msg, bool own, target_fn mk, vo
       if (rec->msg) CkFreeMsg(rec->msg);
       rec->msg = msg;
     }
+  }
+  // A message entry's message belongs to the state while the frame lives
+  // (a restart gives the new frame a copy of its own).
+  if (msg && !own) {
+    rec->frameMsg = msg;
+    rec->frameMsgDel = em.del;
   }
   rec->root = root;
   rec->h = root;
@@ -706,7 +794,7 @@ inline record &state::begin_record(int ep, void *msg, bool own, target_fn mk, vo
 // are the ones being delivered (the generated __coro_is_entry says whether
 // the running entry is one of the chare's [coroutine] entries). A void
 // entry's system message is not kept.
-template <class Owner> inline record &state::begin(Owner *owner, bool isEntry) {
+template <class Owner> inline record &state::begin(Owner *owner, bool isEntry, entry_msg em) {
   if (!isEntry) {
     // CkCurrentEntry is set only in [coroutine] and [inbox] entries.
     int ep = CkCurrentEntry();
@@ -720,7 +808,11 @@ template <class Owner> inline record &state::begin(Owner *owner, bool isEntry) {
   if (m && UsrToEnv(m)->getMsgIdx() == 0) m = nullptr;
   // A marshalled [coroutine] entry is not nokeep: the state owns its
   // message, so array parameters stay valid while the coroutine lives.
-  return begin(owner, CkCurrentEntry(), m, m != nullptr && is_marshall_msg(m));
+  const bool marshalled = m != nullptr && is_marshall_msg(m);
+  if (m && !marshalled && (em.slot == nullptr || *em.slot != m))
+    CkAbort("ck::coro: the message of entry %s is not the coroutine's message parameter",
+            _entryTable[CkCurrentEntry()]->name);
+  return begin(owner, CkCurrentEntry(), m, marshalled, marshalled ? entry_msg{} : em);
 }
 
 // After the body ran (first run or a resume) and suspended or finished.
@@ -876,7 +968,16 @@ template <class... Args, std::enable_if_t<!(sizeof...(Args) == 1 && (is_message_
 inline void state::deliver(int ep, const Args &...args) {
   buffer b;
   b.ep = ep;
-  void *cur = CkCurrentMessage();
+  // The entry's own message, when this is the delivery its wrapper set up
+  // (a void entry's system message, a reduction target's reduction
+  // message); not when a coroutine resumed by that delivery calls an inbox
+  // entry directly, so the delivery is taken out of the scope before it
+  // can resume one.
+  void *own = CkCurrentEntry() == ep ? CkCurrentMessage() : nullptr;
+  if (own) {
+    CkpvAccess(_ckCurrentMsg) = nullptr;
+    CkpvAccess(_ckCurrentEp) = -1;
+  }
   bool hasRef = false;
   if constexpr (sizeof...(Args) > 0) {
     using First = std::tuple_element_t<0, std::tuple<Args...>>;
@@ -887,16 +988,11 @@ inline void state::deliver(int ep, const Args &...args) {
   }
   // Through a reduction wrapper the reference number is the reduction
   // message's (set on the callback), as SDAG does.
-  if (cur && UsrToEnv(cur)->getMsgIdx() == CMessage_CkReductionMsg::__idx) hasRef = false;
-  if (!hasRef && cur) b.ref = CkGetRefNum(cur);
-  if (CkCurrentEntry() == ep && is_marshall_msg(cur)) {
-    // The entry's own marshalled parameters: keep the message.
-    CkReferenceMsg(cur);
-    b.msg = cur;
-  } else if constexpr (sizeof...(Args) > 0) {
-    // Reached otherwise (a reduction target, a direct call): pack the
-    // arguments in the layout the marshalled message would have: the
-    // scalars in order, an array as its offset and byte count, then the
+  if (own && UsrToEnv(own)->getMsgIdx() == CMessage_CkReductionMsg::__idx) hasRef = false;
+  if (!hasRef && own) b.ref = CkGetRefNum(own);
+  if constexpr (sizeof...(Args) > 0) {
+    // Pack the arguments in the layout the marshalled message would have:
+    // the scalars in order, an array as its offset and byte count, then the
     // arrays from a 16-byte aligned start.
     constexpr size_t N = sizeof...(Args);
     int offs[N] = {}, cnts[N] = {};
@@ -961,10 +1057,7 @@ template <class P> inline void state::deliver_message(int ep, CkMarshallMsg *m) 
 inline void state::send_restart(record &rec) {
   if (rec.pending) return;
   rec.pending = true;
-  void *m;
-  if (rec.msg) { void *c = rec.msg; m = CkCopyMsg(&c); }
-  else m = CkAllocSysMsg();
-  rec.target.send(m);
+  rec.target.send(rec.msg ? restart_copy(&rec.msg) : CkAllocSysMsg());
 }
 
 // +ck_fakemigrate: what a migration does to the element's coroutines, without
@@ -1294,8 +1387,9 @@ using coroutine = coro::coroutine;
 
 // The hand-written form (no X_CORO_CODE): the first statement of a coroutine
 // entry's body names the chare's ck::coro::state member and the entry's
-// index (CkIndex_X::name(...)); the _MSG form passes the entry's message,
-// which is copied for restarts. With X_CORO_CODE the promise registers the
+// index (CkIndex_X::name(...)); the _MSG form names the entry's message
+// parameter, which then belongs to the state (as with [coroutine]: not
+// deleted by the body). With X_CORO_CODE the promise registers the
 // coroutine and the body starts with CK_MIGRATABLE.
 #define CK_COROUTINE_STATE_MSG(co_, ep_, msg_)                                \
   ::ck::coro::root_guard ck_root_((co_), this, (ep_), (msg_))

@@ -6,7 +6,10 @@
 // messages is a check that
 // the inbox is empty when the coroutine ends. The marshall test checks
 // marshalled inbox entries: matched by the first argument, delivered by
-// broadcast, and reached through a reduction.
+// broadcast, reached through a reduction, and called directly from inside
+// a reduction's delivery; and a coroutine entry taking a message with a
+// custom pack.
+#include <atomic>
 #include <numeric>
 #include <random>
 #include "ckcoro_tests.decl.h"
@@ -18,6 +21,7 @@
 #define FOR_ITERATIONS 16
 #define MARSHALL_ELEMS 8
 #define MARSHALL_ITERS 10
+#define PACK_N 5
 #define OVERLAP_ELEMS 6
 #define OVERLAP_ROUNDS 4
 #define OVERLAP_ITEMS 5
@@ -28,6 +32,34 @@
 /* readonly */ CProxy_MigrationTest migrationTestProxy;
 /* readonly */ CProxy_BasicTest basicTestProxy;
 /* readonly */ CProxy_RefnumTest refnumTestProxy;
+
+// A message with a custom pack and unpack, in the manual's form: the unpacked
+// message owns a heap array, pack frees the message and unpack builds a new
+// one. live counts unpacked messages in the process, to check that the
+// coroutine state deletes the entry's message (with its destructor) once.
+class PackMsg : public CMessage_PackMsg {
+public:
+  static std::atomic<int> live;
+  int n;
+  int* data;
+  explicit PackMsg(int n_) : n(n_), data(new int[n_]) { live++; }
+  ~PackMsg() { delete[] data; live--; }
+  static void* pack(PackMsg* m) {
+    int* buf = (int*)CkAllocBuffer(m, (m->n + 1) * sizeof(int));
+    buf[0] = m->n;
+    std::copy(m->data, m->data + m->n, buf + 1);
+    delete m;
+    return buf;
+  }
+  static PackMsg* unpack(void* in) {
+    int* buf = (int*)in;
+    PackMsg* m = new (CkAllocBuffer(in, sizeof(PackMsg))) PackMsg(buf[0]);
+    std::copy(buf + 1, buf + 1 + buf[0], m->data);
+    CkFreeMsg(in);
+    return m;
+  }
+};
+std::atomic<int> PackMsg::live{0};
 
 class Main : public CBase_Main {
   Main_CORO_CODE
@@ -107,6 +139,15 @@ public:
   }
 
   void marshallTestDone() {
+    CkStartQD(CkCallback(CkIndex_Main::marshallLeakCheck(), thisProxy));
+  }
+
+  void marshallLeakCheck() {
+    // Every packRun() coroutine has ended and the state deleted its message
+    // with the destructor: none is alive in this process.
+    if (CkNumNodes() == 1 && PackMsg::live != 0)
+      ::CkAbort("ckcoro marshall test: %d PackMsg message(s) leaked or freed without the destructor",
+                (int)PackMsg::live);
     CkPrintf("Marshalled inbox tests complete\n");
     thisProxy.doOverlapTest();
   }
@@ -626,10 +667,13 @@ public:
 // Marshalled inbox entries. Each element sends its right neighbour one
 // message per iteration, tagged with the iteration, and waits for its own;
 // the broadcast tag() arrived before run() and waits in the inbox; the
-// reduction total() reaches the inbox through the reduction wrapper.
+// reduction total() reaches the inbox through the reduction wrapper. Then
+// each element sends its right neighbour a PackMsg, whose coroutine reads
+// it across three waits.
 class MarshallTest : public CBase_MarshallTest {
   MarshallTest_CORO_CODE
   int iter;
+  int pIter;   // the packRun() coroutine's, which may overlap the end of run()
   // Scratch, assigned at sites and used after them: a when stores every
   // parameter of the entry, in order, the reference number included.
   int t, i;
@@ -647,13 +691,15 @@ class MarshallTest : public CBase_MarshallTest {
   static void check(bool ok, const char* what) {
     if (!ok) ::CkAbort("ckcoro marshall test: %s", what);
   }
+  int left() const { return (thisIndex + MARSHALL_ELEMS - 1) % MARSHALL_ELEMS; }
 
 public:
-  MarshallTest() : iter(0), t(0), i(0), x(0), sum(0) {}
+  MarshallTest() : iter(0), pIter(0), t(0), i(0), x(0), sum(0) {}
   MarshallTest(CkMigrateMessage* m) : CBase_MarshallTest(m) {}
 
   void pup(PUP::er& p) {
     p | iter;
+    p | pIter;
     if (p.isUnpacking()) { values.clear(); t = i = 0; x = 0; sum = 0; n = 0; darr = nullptr; dvec.clear(); tail.clear(); }
   }
 
@@ -679,6 +725,23 @@ public:
                  CkCallback(CkReductionTarget(MarshallTest, total), thisProxy));
       CK_WHEN(inbox::total(), sum);
       check(sum == MARSHALL_ELEMS * (MARSHALL_ELEMS - 1) / 2, "total: wrong reduction result");
+
+      // Inbox entries called directly while the coroutine runs inside a
+      // reduction's delivery are matched by their first argument, not by
+      // the reduction's reference number. From the second iteration on,
+      // the first call is inside the previous reduction's delivery (both
+      // tick waits are met from the inbox without suspending).
+      for (iter = 0; iter < 3; iter++) {
+        tick(2 * iter, 0.5 * iter);
+        contribute(sizeof(int), &thisIndex, CkReduction::sum_int,
+                   CkCallback(CkReductionTarget(MarshallTest, total), thisProxy));
+        CK_WHEN(inbox::total(), sum);
+        tick(2 * iter + 1, 0.5 * iter + 0.25);
+        CK_WHEN(inbox::tick(2 * iter + 1), ck::coro::skip, x);
+        check(x == 0.5 * iter + 0.25, "tick: wrong value inside the reduction's delivery");
+        CK_WHEN(inbox::tick(2 * iter), ck::coro::skip, x);
+        check(x == 0.5 * iter, "tick: wrong value");
+      }
 
       // Array parameters, five rounds sent ahead of time (round r, iteration
       // k has reference number 100 r + k): received into a pointer, into a
@@ -736,6 +799,28 @@ public:
         check(t9 == 9 && x9 == 4.5, "tag block: wrong values");
       }
       check(__coro.num_buffered() == 0, "messages left in the inbox");
+      // Every run() has checked its inbox before any packRun() sends.
+      contribute(CkCallback(CkReductionTarget(MarshallTest, runsDone), thisProxy));
+      CK_WHEN(inbox::runsDone());
+      {  // crosses to another PE when there is one: packed and unpacked
+        PackMsg* pm = new PackMsg(PACK_N);
+        for (int k = 0; k < PACK_N; k++) pm->data[k] = thisIndex * 1000 + k;
+        thisProxy[(thisIndex + 1) % MARSHALL_ELEMS].packRun(pm);
+      }
+    }
+  }
+
+  // The entry's message belongs to the coroutine state: it is read after
+  // every wait (after a restart it is a copy) and never deleted here.
+  ck::coroutine packRun(PackMsg* m) {
+    CK_MIGRATABLE {
+      check(m->n == PACK_N && m->data[PACK_N - 1] == left() * 1000 + PACK_N - 1, "packed: wrong message");
+      for (pIter = 0; pIter < 3; pIter++) {
+        thisProxy[(thisIndex + 1) % MARSHALL_ELEMS].step(pIter);
+        CK_WHEN(inbox::step(pIter), ck::coro::skip);
+        check(m->n == PACK_N && m->data[0] == left() * 1000 && m->data[PACK_N - 1] == left() * 1000 + PACK_N - 1,
+              "packed: the entry's message changed across a wait");
+      }
       contribute(CkCallback(CkReductionTarget(Main, marshallTestDone), mainProxy));
     }
   }

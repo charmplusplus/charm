@@ -2284,9 +2284,13 @@ two sites. This gives the rules:
    which is gone after the first wait). They are supplied again when the
    body runs again after a migration. An array parameter points into the
    entry's message, which lives as long as the coroutine. A coroutine
-   entry that takes a message type has the message copied once per
-   invocation by the coroutine state, so a large message is better sent
-   to an inbox entry and waited for, or passed as marshalled parameters.
+   entry that takes a message type receives a message that belongs to
+   the coroutine state: the body may read it after any wait and does
+   not delete it; the state deletes it (with its destructor) when the
+   coroutine ends, and after a migration the body receives a copy. The
+   state keeps a packed copy for that, made once per invocation, so a
+   large message is better sent to an inbox entry and waited for, or
+   passed as marshalled parameters.
 
 A function that itself waits is a coroutine task: a function returning
 ``ck::coro::task<T>`` whose body is a ``CK_MIGRATABLE`` block of its own,
