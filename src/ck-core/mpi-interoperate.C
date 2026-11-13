@@ -243,7 +243,11 @@ void CharmLibExit() {
   } else { 
     CsdScheduler(-1);
     CmiNodeAllBarrier();
-    if (CmiInteropReturnOnExit)
+    if (CmiInteropReturnOnExit) {
       ConverseInteropFinalize();
+      // The program may call MPI_Finalize next: CharmLibInit's abort hook
+      // must not call MPI_Abort after that.
+      CmiSetAbortHook(nullptr);
+    }
   }
 }

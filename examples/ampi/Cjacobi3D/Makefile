@@ -128,6 +128,28 @@ ifneq ($(RECONVERSE_VA_RANDOMIZED),1)
 endif
 endif
 
+# In-memory checkpoint after iteration 12 of 30 and rollback after 18 (needs
+# the syncft build option): the final line must be that of a run without
+# them. Load balancing runs at iteration 5, before the checkpoint, and at 25,
+# after the rollback; it is skipped at 15. The runs with RotateLB move ranks,
+# so they are left out when ranks cannot migrate between processes (above).
+testmemckpt: ampi
+ifeq ($(CMK_MEM_CHECKPOINT),1)
+	$(call run, +p4 ./jacobi 2 2 2 30 +vp8 ) 2>&1 | tee memckpt-ref.log
+	$(call run, +p4 ./jacobi 2 2 2 30 -memckpt 12 -rollback 18 +vp8 ) 2>&1 | tee memckpt.log
+	grep "rolling back to iteration 12" memckpt.log
+	grep "after the in-memory checkpoint, rollbacks 1" memckpt.log
+	$(call check_restart,memckpt.log,memckpt-ref.log)
+	$(call run, +p2 ./jacobi.pup 2 2 2 30 -memckpt 12 -rollback 18 +vp8 ) 2>&1 | tee memckpt.pup.log
+	$(call check_restart,memckpt.pup.log,memckpt-ref.log)
+ifneq ($(NO_CHKPT_RUNS),1)
+	$(call run, +p4 ./jacobi 2 2 2 30 -memckpt 12 -rollback 18 +vp8 +balancer RotateLB ) 2>&1 | tee memckpt.lb.log
+	$(call check_restart,memckpt.lb.log,memckpt-ref.log)
+endif
+else
+	@echo "testmemckpt: needs a build with the syncft option; skipped"
+endif
+
 testp: ampi
 	$(call run, +p$(P) ./jacobi.pup $(P) 1 1 40 +vp$(P) +balancer RotateLB +LBDebug 1 )
 	$(call run, +p$(P) ./jacobi.pup $(P) 2 1 40 +vp$$(( $(P) * 2 )) +balancer RotateLB +LBDebug 1 )
@@ -153,5 +175,5 @@ endif
 
 clean:
 	rm -f *.o jacobi jacobi.pup *~ moduleinit.C charmrun conv-host jacobi-cpp jacobi.iso jacobi-get jacobi.tls ampirun
-	rm -f chkpt.log chkpt.pup.log restart*.log
+	rm -f chkpt.log chkpt.pup.log restart*.log memckpt*.log
 	rm -rf 40 80 120 log log.pup

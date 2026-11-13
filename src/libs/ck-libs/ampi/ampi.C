@@ -1788,6 +1788,15 @@ void ampiParent::ResumeThread() noexcept {
   thread->resume();
 }
 
+// Called after a barrier over MPI_COMM_WORLD. The rollback starts at
+// quiescence, so the barrier's last messages are delivered before any
+// element is destroyed; the blocked thread is destroyed with its element.
+void ampiParent::startRollback() noexcept {
+  if (thisIndex == 0) CkRollbackMemCheckpoint();
+  ampiParent* unused = block();
+  CkAbort("AMPI> rank %d resumed after AMPI_Migrate(ampi_checkpoint=rollback)\n", unused->thisIndex);
+}
+
 MPI_User_function* ampiParent::op2User_function(MPI_Op op) const noexcept {
   if (opIsPredefined(op)) {
     return predefinedOps[op];
@@ -11929,6 +11938,9 @@ int ampiParseMigrateInfo(MPI_Info hints, AmpiMigrateAction *out, int max) noexce
       else if (strncmp(value, "in_memory", MPI_MAX_INFO_VAL) == 0) {
         add(AmpiMigrateKind::CKPT_IN_MEMORY, nullptr);
       }
+      else if (strncmp(value, "rollback", MPI_MAX_INFO_VAL) == 0) {
+        add(AmpiMigrateKind::CKPT_ROLLBACK, nullptr);
+      }
       else if (strncmp(value, "message_logging", MPI_MAX_INFO_VAL) == 0) {
         add(AmpiMigrateKind::CKPT_MESSAGE_LOGGING, nullptr);
       }
@@ -11991,6 +12003,22 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
 #endif
         break;
       }
+      // The rollback destroys every rank and restores it from the last
+      // in-memory checkpoint, whose thread was suspended inside the
+      // AMPI_Migrate(in_memory) call that took the checkpoint. The checkpoint's
+      // callback is delivered again, so that earlier call returns a second
+      // time, and this call never returns. The core refuses a rollback with no
+      // completed checkpoint or after a migration since the checkpoint.
+      case AmpiMigrateKind::CKPT_ROLLBACK: {
+#if CMK_MEM_CHECKPOINT
+        ampi * ptr = getAmpiInstance(MPI_COMM_WORLD)->barrier();
+        ptr->getParent()->startRollback();
+#else
+        CkPrintf("AMPI> Error: In-memory checkpoint/restart is not enabled!\n");
+        CkAbort("AMPI> Error: Recompile Charm++/AMPI with CMK_MEM_CHECKPOINT.\n");
+#endif
+        break;
+      }
       case AmpiMigrateKind::CKPT_MESSAGE_LOGGING:
         CkPrintf("AMPI> Error: Message logging is not enabled!\n");
         CkAbort("AMPI> Error: Recompile Charm++/AMPI with CMK_MESSAGE_LOGGING.\n");
@@ -11998,6 +12026,16 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
     }
   }
 
+  return MPI_SUCCESS;
+}
+
+// The number of rollbacks to the last in-memory checkpoint; the count is kept
+// by the runtime, outside the ranks, so a rollback does not reset it.
+CLINKAGE
+int AMPI_Rollback_count(int *count)
+{
+  AMPI_API("AMPI_Rollback_count", count);
+  *count = CkMemCheckpointRollbacks();
   return MPI_SUCCESS;
 }
 

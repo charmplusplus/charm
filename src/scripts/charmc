@@ -76,6 +76,8 @@ OPTS_LD=''
 # Additional options specified by the user
 ARG_OPTS=()
 ARG_OPTS_CPP=()
+# -M* dependency options; -host C++ compiles take these but not ARG_OPTS
+ARG_OPTS_DEPS=()
 ARG_OPTS_LDRO=()
 ARG_OPTS_CC=()
 ARG_OPTS_CXX=()
@@ -661,11 +663,17 @@ do
 	"-M" | "-MM" | "-MMD" | "-MG" | "-MD")
 		SKIPLINK="yes"
 		ARG_OPTS+=("$arg")
+		ARG_OPTS_DEPS+=("$arg")
 		GENDEPENDS="yes"
 		;;
-	"-MF" | "-MT" | "-MQ")	#-MP will pass through automatically
+	"-MF" | "-MT" | "-MQ")
 		ARG_OPTS+=("$arg" "$1")
+		ARG_OPTS_DEPS+=("$arg" "$1")
 		shift
+		;;
+	"-MP")
+		ARG_OPTS+=("$arg")
+		ARG_OPTS_DEPS+=("$arg")
 		;;
 #--------------------------------------
     "-count-tokens")
@@ -1942,7 +1950,7 @@ do
 	*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu)
                 if [[ -n "$NATIVE" ]]
                 then
-                    runCmd $CMK_NATIVE_CXX $CMK_NATIVE_CXX_FLAGS "-I$CHARMINC" $CMK_SYSINC "${OPTS_CPP_INTERNAL[@]}" "${OPTS_CPP[@]}" -c "$FILE" "${DESTO[@]}"
+                    runCmd $CMK_NATIVE_CXX $CMK_NATIVE_CXX_FLAGS "-I$CHARMINC" $CMK_SYSINC "${OPTS_CPP_INTERNAL[@]}" "${OPTS_CPP[@]}" "${ARG_OPTS_DEPS[@]}" -c "$FILE" "${DESTO[@]}"
                 else
                     runCmd $CHARM_CXX "${CHARM_CXX_FLAGS[@]}" -c "$FILE" "${DESTO[@]}"
                 fi
