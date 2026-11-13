@@ -81,8 +81,15 @@ class Main : public CBase_Main {
   }
 
   void testBegin(size_t size) {
+    // Both blocks must know the size before the ping starts: PE 1 replies
+    // with a put of its own size, and the receive callback of a put carries
+    // no length.
+    block_proxy.setSize(size);
+  }
+
+  void sizeSet() {
     // Start ping
-    block_proxy[0].send(size);
+    block_proxy[0].send(cur_size);
   }
 
   void testEnd() {
@@ -121,6 +128,7 @@ public:
   CkDevicePersistent peer_recv_buf;
 
   Block() {
+    size = 0;
     memory_allocated = false;
     stream_created = false;
   }
@@ -184,6 +192,11 @@ public:
 
     // Reduce back to main
     contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
+  }
+
+  void setSize(size_t size) {
+    this->size = size;
+    contribute(CkCallback(CkReductionTarget(Main, sizeSet), main_proxy));
   }
 
   void send(size_t size) {
