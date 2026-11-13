@@ -31,5 +31,8 @@ test: all
 	sleep 3; ./client localhost 12345 32; status=$$?; wait $$pid; exit $$status
 endif
 
+# SMP builds run `make smptest` after `test`; nothing extra to run here.
+smptest: all
+
 clean:
 	rm -f *.decl.h *.def.h *.o objloads client charmrun *.log *.sts *.util.sts

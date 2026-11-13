@@ -6,10 +6,13 @@
 
 #include "arraymaps.decl.h"
 
-// Flat (row-major) index of an element, for the 1D, 2D and 3D shapes used here.
+// Flat (row-major) index of an element, for the 1D to 6D shapes used here.
 int arraymaps_flat(int caseId, int i);
 int arraymaps_flat(int caseId, const CkIndex2D& i);
 int arraymaps_flat(int caseId, const CkIndex3D& i);
+int arraymaps_flat(int caseId, const CkIndex4D& i);
+int arraymaps_flat(int caseId, const CkIndex5D& i);
+int arraymaps_flat(int caseId, const CkIndex6D& i);
 // Number of index slots a case reports on (initial plus inserted elements).
 int arraymaps_slots(int caseId);
 // Whether an element of this case must sit on its homePe.
@@ -50,7 +53,7 @@ class arraymaps_inserter : public CBase_arraymaps_inserter
               int first, int n, std::vector<int> expected);
 };
 
-// Element logic shared by the 1D, 2D and 3D arrays.
+// Element logic shared by the 1D to 6D arrays.
 template <class Base>
 class arraymaps_elt : public Base
 {
@@ -138,6 +141,30 @@ class arraymaps_3d : public arraymaps_elt<CBase_arraymaps_3d>
   arraymaps_3d(CProxy_arraymaps_driver d, int c, bool initial, std::vector<int> e)
       : arraymaps_elt<CBase_arraymaps_3d>(d, c, initial, e) {}
   arraymaps_3d(CkMigrateMessage* m) : arraymaps_elt<CBase_arraymaps_3d>(m) {}
+};
+
+class arraymaps_4d : public arraymaps_elt<CBase_arraymaps_4d>
+{
+ public:
+  arraymaps_4d(CProxy_arraymaps_driver d, int c, bool initial, std::vector<int> e)
+      : arraymaps_elt<CBase_arraymaps_4d>(d, c, initial, e) {}
+  arraymaps_4d(CkMigrateMessage* m) : arraymaps_elt<CBase_arraymaps_4d>(m) {}
+};
+
+class arraymaps_5d : public arraymaps_elt<CBase_arraymaps_5d>
+{
+ public:
+  arraymaps_5d(CProxy_arraymaps_driver d, int c, bool initial, std::vector<int> e)
+      : arraymaps_elt<CBase_arraymaps_5d>(d, c, initial, e) {}
+  arraymaps_5d(CkMigrateMessage* m) : arraymaps_elt<CBase_arraymaps_5d>(m) {}
+};
+
+class arraymaps_6d : public arraymaps_elt<CBase_arraymaps_6d>
+{
+ public:
+  arraymaps_6d(CProxy_arraymaps_driver d, int c, bool initial, std::vector<int> e)
+      : arraymaps_elt<CBase_arraymaps_6d>(d, c, initial, e) {}
+  arraymaps_6d(CkMigrateMessage* m) : arraymaps_elt<CBase_arraymaps_6d>(m) {}
 };
 
 #endif
