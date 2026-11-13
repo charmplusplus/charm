@@ -100,6 +100,7 @@ env:
     tests/charm++/section_migrate
     tests/charm++/load_balancing/migrate_then_atsync
     tests/charm++/load_balancing/lbsweep
+    tests/charm++/load_balancing/meta_lb_test
     tests/charm++/xarray_section_reduction
     tests/charm++/jacobi3d-coro
     tests/charm++/ckcoro
