@@ -13,5 +13,6 @@ mainmodule phaselib {
   array [1D] PhaseElem {
     entry PhaseElem();
     entry void work(int iter);
+    entry void abortHere();
   };
 };

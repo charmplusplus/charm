@@ -192,6 +192,7 @@
        integer, parameter :: AMPI_INFO_LB_SYNC         = 1
        integer, parameter :: AMPI_INFO_LB_ASYNC        = 2
        integer, parameter :: AMPI_INFO_CHKPT_IN_MEMORY = 3
+       integer, parameter :: AMPI_INFO_CHKPT_ROLLBACK  = 4
 
        double precision, external :: MPI_WTIME
        double precision, external :: MPI_WTICK

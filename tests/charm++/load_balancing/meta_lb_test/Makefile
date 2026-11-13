@@ -1,6 +1,10 @@
 -include ../../../common.mk
 CHARMC	= ../../../../bin/charmc $(OPTS)
 
+RF_MODEL = ../../../../src/ck-ldb/rf_model
+# The model reader needs zlib; builds without it (Windows) skip the model run.
+HAVE_ZLIB := $(shell grep -c '^\#define CMK_USE_ZLIB 1' ../../../../include/conv-autoconfig.h 2>/dev/null)
+
 all: period_selection
 
 period_selection: period_selection.decl.h period_selection.C
@@ -9,10 +13,17 @@ period_selection: period_selection.decl.h period_selection.C
 period_selection.decl.h: period_selection.ci
 	$(CHARMC) period_selection.ci
 
+# The model line has MetaBalancer pick the strategy with its random forest
+# model (src/ck-ldb/rf_model).
 test: period_selection
 	$(call run, +p1 ./period_selection +balancer RotateLB +MetaLB +LBObjOnly)
 	$(call run, +p2 ./period_selection +balancer RotateLB +MetaLB +LBObjOnly)
 	$(call run, +p4 ./period_selection +balancer RotateLB +MetaLB +LBObjOnly)
+ifeq ($(HAVE_ZLIB),1)
+	$(call run, +p4 ./period_selection -anylb +MetaLB +MetaLBModelDir $(RF_MODEL) +LBObjOnly)
+else
+	@echo "meta_lb_test: skipping the random forest model run: Charm++ was built without zlib"
+endif
 
 testp: period_selection
 	$(call run, +p$(P) ./period_selection +balancer RotateLB +MetaLB +LBObjOnly)

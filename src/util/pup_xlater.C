@@ -281,9 +281,9 @@ PUP::xlater::xlater(const PUP::machineInfo &src,PUP::er &fromData)
 	
 	//Finish out the size table (integer portion is done by setConverterInt)
 #ifdef CMK_PUP_LONG_LONG
-	convertSize[Tlonglong]=convertSize[Tlonglong]=sizeof(CMK_PUP_LONG_LONG);
+	convertSize[Tlonglong]=convertSize[Tulonglong]=sizeof(CMK_PUP_LONG_LONG);
 #else
-	convertSize[Tlonglong]=convertSize[Tlonglong]=8;
+	convertSize[Tlonglong]=convertSize[Tulonglong]=8;
 #endif
 	convertSize[Tfloat]=src.floatBytes;
 	convertSize[Tdouble]=src.doubleBytes;

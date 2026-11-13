@@ -1,10 +1,13 @@
 // MPI program that uses Charm++ as a library: MPI phases alternate with
 // Charm++ phases, then CharmLibExit returns and MPI continues until
 // MPI_Finalize. Usage: mpi_interop <processes started by the launcher>
-// [Charm++ args]; the test fails if MPI or Charm++ sees a different count.
+// [abort] [Charm++ args]; the test fails if MPI or Charm++ sees a different
+// count. With "abort", the first Charm++ phase calls CkAbort on the last PE,
+// which must end every process through MPI_Abort (Makefile: testabort).
 #include <mpi.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "mpi-interoperate.h"
 #include "phaselib.h"
 
@@ -17,10 +20,16 @@ static void check(bool ok, int rank, const char *what, long got, long want) {
 }
 
 int main(int argc, char **argv) {
-  MPI_Init(&argc, &argv);
+  // SERIALIZED: with several PEs per process, an abort calls MPI_Abort from a
+  // PE thread that MPI did not create (see CharmLibInit).
+  int provided = MPI_THREAD_SINGLE;
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
   int rank, size;
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &size);
+  if (provided < MPI_THREAD_SERIALIZED && rank == 0)
+    fprintf(stderr, "Warning: MPI provides thread level %d, below "
+            "MPI_THREAD_SERIALIZED\n", provided);
 
   int expected = argc > 1 ? atoi(argv[1]) : 0;
   if (expected <= 0) {
@@ -36,15 +45,31 @@ int main(int argc, char **argv) {
     fflush(stderr);
     MPI_Abort(MPI_COMM_WORLD, 1);
   }
-  // Drop the count so Charm++ sees only its own arguments.
-  for (int i = 1; i < argc; i++) argv[i] = argv[i + 1];
-  argc--;
+  // Drop the count and the mode so Charm++ sees only its own arguments.
+  bool abortMode = argc > 2 && strcmp(argv[2], "abort") == 0;
+  int drop = abortMode ? 2 : 1;
+  for (int i = 1; i + drop <= argc; i++) argv[i] = argv[i + drop];
+  argc -= drop;
 
   CharmLibInit(MPI_COMM_WORLD, argc, argv);
   check(CkNumNodes() == size, rank, "Charm++ processes", CkNumNodes(), size);
   if (rank == 0)
     printf("CharmLibInit done: %d MPI ranks, %d Charm++ processes, %d PEs\n",
            size, CmiNumNodes(), CkNumPes());
+
+  if (abortMode) {
+    // For a comparison run: without CharmLibInit's hook, only the aborting
+    // process ends (reconverse #321).
+    if (getenv("MPI_INTEROP_NO_ABORT_HOOK")) CmiSetAbortHook(NULL);
+    if (rank == 0) {
+      printf("abort phase: the last PE calls CkAbort\n");
+      fflush(stdout);
+    }
+    PhaseAbort();
+    printf("FAIL: rank %d returned from the abort phase\n", rank);
+    fflush(stdout);
+    return 1;
+  }
 
   for (int iter = 1; iter <= 3; iter++) {
     long mine = rank + iter, sum = 0;

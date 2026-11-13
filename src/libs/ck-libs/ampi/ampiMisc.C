@@ -296,7 +296,7 @@ void ampiParent::defineInfoEnv(int nRanks_) noexcept {
 }
 
 void ampiParent::defineInfoMigration() noexcept {
-  MPI_Info lb_sync_info, lb_async_info, chkpt_mem_info, chkpt_msg_log_info;
+  MPI_Info lb_sync_info, lb_async_info, chkpt_mem_info, chkpt_rollback_info;
 
   // info object for AMPI_INFO_LB_SYNC
   createInfo(&lb_sync_info);
@@ -312,6 +312,11 @@ void ampiParent::defineInfoMigration() noexcept {
   createInfo(&chkpt_mem_info);
   CkAssert(chkpt_mem_info == AMPI_INFO_CHKPT_IN_MEMORY);
   setInfo(chkpt_mem_info, "ampi_checkpoint", "in_memory");
+
+  // info object for AMPI_INFO_CHKPT_ROLLBACK
+  createInfo(&chkpt_rollback_info);
+  CkAssert(chkpt_rollback_info == AMPI_INFO_CHKPT_ROLLBACK);
+  setInfo(chkpt_rollback_info, "ampi_checkpoint", "rollback");
 }
 
 AMPI_API_IMPL(int, MPI_Info_create, MPI_Info *info)
