@@ -868,6 +868,8 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
     }
   }
 
+  CkReduction::checkSameReducer(nMsgs, msgArr.data());
+
   if (nMsgs==0||r==CkReduction::invalid)
   //No valid reducer in the whole vector
     ret=CkReductionMsg::buildNew(0,NULL);
@@ -1722,6 +1724,26 @@ CkReduction::reducerType CkReduction::addReducer(reducerFn fn, bool streamable, 
   return index;
 }
 
+
+void CkReduction::checkSameReducer(int n, CkReductionMsg *const *msgs)
+{
+  // A reducer reads every message with its own layout, so one message of
+  // another reducer is read wrongly (and possibly out of bounds).
+  int first = -1;
+  for (int i = 0; i < n; i++) {
+    reducerType t = msgs[i]->getReducer();
+    if (t == nop || t == invalid) continue;
+    if (first < 0) { first = i; continue; }
+    reducerType t0 = msgs[first]->getReducer();
+    if (t != t0) {
+      std::vector<reducerStruct> &tab = reducerTable();
+      const char *n0 = (size_t)t0 < tab.size() && tab[t0].name ? tab[t0].name : "an unregistered reducer";
+      const char *n1 = (size_t)t < tab.size() && tab[t].name ? tab[t].name : "an unregistered reducer";
+      CkAbort("Reduction: contributions to one reduction use different reducers (%s [%d] and %s [%d]); "
+              "every contribution must use the same reducer", n0, (int)t0, n1, (int)t);
+    }
+  }
+}
 
 /*Reducer table: maps reducerTypes to reducerStructs.
 It's indexed by reducerType, so the order in this table

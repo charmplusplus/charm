@@ -1462,6 +1462,7 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
     int userFlag = rmsgs[0]->userFlag;
 
     // Figure out (from one of the msg fragments) which reducer function to use
+    CkReduction::checkSameReducer((int)rmsgs.size(), rmsgs.data());
     CkReduction::reducerType reducer = rmsgs[0]->reducer;
     CkReduction::reducerFn f= CkReduction::reducerTable()[reducer].fn;
     CkAssert(NULL != f);
@@ -1656,6 +1657,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     // If reduceFragment is not being called now, check if partialReduction is possible (streamable)
     if (!currentTreeUp && !mixTreeUp && redInfo.msgs[index].size() > 1 && CkReduction::reducerTable()[msg->reducer].streamable) {
       reductionMsgs& rmsgs = redInfo.msgs[index];
+      CkReduction::checkSameReducer((int)rmsgs.size(), rmsgs.data());
       CkReduction::reducerType reducer = rmsgs[0]->reducer;
       CkReduction::reducerFn f= CkReduction::reducerTable()[msg->reducer].fn;
       CkAssert(f != NULL);

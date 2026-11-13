@@ -238,19 +238,19 @@ public:
   struct reducerStruct {
     reducerFn fn;
     bool streamable;
-#if CMK_ERROR_CHECKING
-    const char *name; // aids in debugging conflicts between multiple overlapping reductions
-#endif
-    reducerStruct(reducerFn f=NULL, bool s=false, const char *n=NULL) : fn(f), streamable(s)
-#if CMK_ERROR_CHECKING
-                  ,name(n)
-#endif
+    const char *name; // names the reducer in error messages (mismatched reducers or callbacks)
+    reducerStruct(reducerFn f=NULL, bool s=false, const char *n=NULL) : fn(f), streamable(s), name(n)
     {}
   };
 
 	//Add the given reducer to the list.  Returns the new reducer's
 	// reducerType.  Must be called in the same order on every node.
 	static reducerType addReducer(reducerFn fn, bool streamable=false, const char* name=NULL);
+
+	//Abort unless every message in msgs[0..n) that carries data uses the same
+	// reducer (messages with nop or invalid are skipped: they only keep the
+	// counts). Called wherever a reducer is chosen for a batch of messages.
+	static void checkSameReducer(int n, CkReductionMsg *const *msgs);
 
 private:
 	friend class CkReductionMgr;
