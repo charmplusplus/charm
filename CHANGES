@@ -1,208 +1,129 @@
 This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 ================================================================================
-What's new in Charm++ 9.0.0-alpha1
+What's new in Charm++ 9.0.0-beta1
 ================================================================================
-
-First pre-release of the 9.0 line. Alpha tags are cut from the
-'recharm' branch as work lands; the gaps listed at the end of this
-section close in later alphas and the beta.
 
 Charm++ 9.0 runs on reconverse, a new implementation of Converse,
 included as the contrib/reconverse submodule (#3944, #3969). The
 classic Converse line ends with 8.1.0 and continues as the branch
 'classic', for bug fixes only; this line is the branch 'recharm'.
-The classic machine layers are still in this tree as a fallback and
-are removed before the 9.0 release.
+Two pre-releases preceded this beta, v9.0.0-alpha1 (2026-10-16) and
+v9.0.0-alpha2 (2026-10-19), with per-tag notes on the GitHub releases
+page. This section covers everything since 8.1.0, by topic.
 
-Runtime:
+Runtime (reconverse):
 
 - Reconverse uses LCI2 as its network layer (LCW over MPI as a
   fallback). Build with the reconverse-<os>-<arch> targets, for
-  example reconverse-linux-x86_64.
+  example reconverse-linux-x86_64. The classic machine layers are
+  gone from this tree (see Removed below).
 
 - Programs start without charmrun: './app +pe N' runs N PEs in one
   process; multi-process runs use lcrun (or srun / mpirun), with +pe
   giving the total PE count. The build puts LCI's lcrun in
-  <build>/bin, next to charmc. There is no communication thread, so
-  every core can run a worker PE. The manual's Running chapter
-  describes the reconverse launch options (#4043).
+  <build>/bin, next to charmc, and testrun and ampirun look for it
+  there (#4169). There is no communication thread, so every core can
+  run a worker PE. The manual's Running chapter has the options
+  (#4043).
+
+- Scheduler order: a PE takes node-level work before its own queued
+  work, the order classic used; +node_queue_max N bounds the run of
+  node-level messages taken in a row (default 16), and +old-scheduler
+  gets the same bound plus +thread_queue_max for its thread queue
+  (reconverse #268, #274, #311). An idle PE polls the network once
+  per idle sweep instead of about forty times, so quiescence
+  detection across two processes settles in 0.4 ms instead of 10 ms
+  on the libfabric TCP provider (reconverse #290).
+
+- Shared-memory IPC between the processes of a host: +ipc sends
+  messages up to ++ipccutoff bytes (32 KiB by default) through a pool
+  of shared memory (++ipcpoolsize, 8 MiB per process) instead of the
+  network; +ipcmode picks POSIX shared memory or xpmem. The pool has
+  one receive queue per PE and per-sender return lists, so senders
+  and receivers do not wait on each other's locks (reconverse #246,
+  #319). Off by default.
+
+- Memory: +glibc_tuned_malloc, opt-in glibc malloc tuning, Linux
+  only (reconverse #275); opt-in jemalloc, CMake option
+  RECONVERSE_USE_JEMALLOC (reconverse #272); a PE frees another PE's
+  pool blocks without that PE's lock, off with
+  +nomempool_remote_free (reconverse #307); the CmiMemoryUsage family
+  is implemented (reconverse #310, #4127).
+
+- CmiAbort and CkAbort print the reason at its full length and a
+  demangled stack trace; a fatal signal prints one too, and
+  +truecrash leaves those handlers uninstalled for a debugger
+  (reconverse #294, #301, #309, #312; -rdynamic on Linux, #4067). A
+  rank's abort ends the whole job under lcrun and under srun with
+  pmi2 or pmix (reconverse #303). ++quiet suppresses CmiPrintf
+  output and the startup banners (reconverse #289).
+
+- +setcpuaffinity without +pemap places the processes of a host on
+  disjoint cores (reconverse #291). Node reductions reach the parent
+  node, so startup no longer hangs with six or more processes and
+  several PEs each (reconverse #313).
+
+- Zero-copy over LCI: with +lci_ndevices > 1 a buffer is registered
+  only on the devices its transfers use (reconverse #315, #317); an
+  unregistered remote buffer is registered on its owner, so the
+  zerocopy unreg examples run across processes (reconverse #323,
+  #4146); with +backend_poll_thread the first thread of each device
+  always polls (reconverse #306).
+
+- Slingshot (libfabric cxi): FI_MR_CACHE_MONITOR and
+  FI_CXI_RX_MATCH_MODE no longer need to be set in the environment
+  (reconverse #281); native psm2 on Omni-Path works (reconverse #308).
+
+- Converse API: the C-callable declarations of converse.h have C
+  linkage, so Converse programs written in C link (reconverse #302);
+  Converse futures (Cfuture) are provided (reconverse #295);
+  CcdCallOnCondition handles are ids, so cancelling one callback
+  leaves the others valid (reconverse #324); CMake installs
+  libreconverse with its headers (reconverse #299).
 
 - CCS: the server, handler registry and request forwarding live in
   reconverse (reconverse #280); charm keeps the CCS builtins, liveViz
-  and PythonCCS on top of them (#4037, #4042).
+  and PythonCCS on top of them (#4037, #4042). The CCS handler
+  LBObjLoads returns every PE's per-object load snapshot without
+  switching the LB instrumentation on (#4071, #4104).
 
-- +glibc_tuned_malloc: opt-in glibc malloc tuning for processes with
-  many PEs, Linux only (reconverse #275).
+- Windows: the target reconverse-win-x86_64 builds Charm++ on
+  reconverse for one process with several PEs (reconverse #304,
+  #316; #4087).
 
-- Scheduler order: a PE takes node-level work before its own queued
-  work, the order classic used (reconverse #268, #274).
+- Interoperation with MPI programs (#4130, reconverse #318): an MPI
+  program calls CharmLibInit(MPI_COMM_WORLD, ...) after MPI_Init,
+  runs Charm++ libraries in phases, and keeps using MPI after
+  CharmLibExit, which returns. The Charm++ build needs no MPI. World
+  communicator only; not on Windows. Launch with the launcher the
+  MPI library requires (Cray MPICH under Slurm: srun
+  --mpi=cray_shasta). User-driven interop (CharmBeginInit,
+  CharmInit, StartCharmScheduler, CharmLibExit) from a program's own
+  main also works (#4055, reconverse #288).
+
+- Tracing: with tracing compiled out, [local] and [inline] calls no
+  longer evaluate trace arguments, which crashed hello/local and
+  liveViz on reconverse (#4065); [inline] group and nodegroup calls
+  are traced with the right entry (#4108); trace-utilization works
+  in production builds with several PEs per process (#4068, #4107)
+  and answers the CkPerfObjLoads CCS request with per-object
+  execution times (#4104).
 
 - GPU support on reconverse: portable HAPI core (#3951),
   device-to-device communication (#3955), device zerocopy with
-  register-once buffers (#3960, #3961), GPU-aware load balancer (#3968).
+  register-once buffers (#3960, #3961), GPU-aware load balancer
+  (#3968). CkDevicePersistent, persistent device-to-device transfers
+  opened once and reused, works between any pair of PEs: within a
+  host over IPC or a device copy, between hosts over RDMA; a buffer
+  may start inside an allocation, +gpushm is not required, and each
+  transfer moves the object's current count (#4228).
 
-New on this line since the split from classic:
+- charmxi: a [threaded, reductiontarget] entry method runs on its
+  own thread (#4079, #4082); charmxi no longer crashes on serial
+  blocks when run without -orig-file (#4027).
 
-- 64-bit object ids, groundwork: the location manager aborts on
-  per-PE element id overflow instead of reusing ids (#4016); design
-  documents in doc/ (#4015).
-
-- 64-bit object ids, part 1 (#4015: #4017, #4028, #4021, #4039). An
-  element id no longer stores a home PE. Arrays with bounds pack
-  their index into 49 bits (was 16), so a bounded array of any size
-  up to 2^49 elements is addressed by id; arrays without bounds get
-  ids from per-process tranches with refills from an allocator on
-  PE 0, replacing the per-PE counter that aborted at 65,535
-  elements. Delivery by id never needs the index on the sender's
-  PE. Ids are stable across checkpoint and restart, including
-  restart with a different process count. New tests objid_bound,
-  objid_home, objid_insert, objid_sections, objid_tranche and
-  unbounded_restart. A checkpoint written before this change cannot
-  be restored after it: the id layout and the checkpoint format
-  changed, and the restart aborts with a layout mismatch message.
-
-- 64-bit object ids, part 1d: the wide-collection layout. A chare
-  array created with CkArrayOptions::setWideCollection() gets element
-  ids with 24 collection bits (16.7 million arrays) and a 37-bit
-  packed index, for programs that create many small arrays (AMPI:
-  one per communicator); such an array must have bounds. The
-  collection field of every id now counts arrays, not groups, so the
-  standard layout names 4,095 arrays instead of about 1,300; at 2,048
-  the runtime suggests setWideCollection once, and at the limit it
-  aborts naming it. A checkpoint records both field widths and a
-  build with different widths refuses to restore it.
-
-- 64-bit object ids, part 3: process-level location and index tables
-  (#4123). The id -> location table, the index -> id table and the
-  retired-id table are shared by the PEs of a process (lock-free:
-  atomic loads on the lookup path, single-word compare-and-swap
-  writes, growth by chained segments). One location request per
-  process per unknown element instead of one per PE; a move or a
-  creation is written once per process touched. Deletion and
-  re-creation under the same id follow five rules checked with a
-  TLA+ model (doc/internals/tla/process-location, which also records
-  eight orderings the model found and one the review found); the
-  protocol is described for maintainers in
-  doc/internals/process-location-cache.md. No change to the id layout
-  or to the checkpoint format. New tests objid_loctable,
-  objid_migrate6 and objid_recreate.
-
-- The process-level index table hung when two distinct indices had the
-  same 64-bit key hash (#4164): the insertion loop took any slot with
-  its hash for its own key in flight and waited for it. It now compares
-  the key words, as lookups always did, and probes past another key.
-  objid_loctable binds such a pair.
-
-- A group creation's dependence (CkEntryOptions::setGroupDepID) now
-  holds on the creating PE as well: its branch waits for the groups it
-  depends on, as the other PEs' branches did (#4150). Arrays are created
-  on PE 0 for every caller, so an array whose elements use a group
-  created elsewhere no longer runs its constructors on PE 0 before that
-  group's branch exists there. ckLocalBranch() of a group created with
-  a dependence may be null right after ckNew on that PE. New test
-  tests/charm++/groupdep_creator. The test also found that a PE
-  finishing its startup ran its buffered messages before marking the
-  startup phase over, so a group created from one of them (on PE 1,
-  say) was broadcast as a startup-time creation and a PE still starting
-  up indexed its startup table by that group's negative id and threw
-  (2 processes, seen with few CPUs); the phase now ends first.
-
-- CkIO creates a chare array per write session and per read session,
-  and collection numbers are not reused, so a program that ran more
-  than 4,095 sessions aborted (#4149; classic allowed about 500,000: 21
-  bits counting group ids, four groups per array). The session arrays
-  use the wide-collection layout (16.7 million numbers). New test
-  tests/charm++/io_sessions: 4,200 sessions next to two standard arrays,
-  file contents and memory growth checked. The test found three more
-  defects, fixed here: CkIO on Windows opened the output file in text
-  mode, so every newline written became two bytes; a read session left
-  its array manager and its ReadAssembler group behind, and a read could
-  reach a PE before that PE's ReadAssembler existed; and destroying any
-  chare array left its CkLocCache group and index compressor allocated.
-  Every session now has its own number, so read sessions on different
-  files can be in progress at the same time, and a write session of
-  0 bytes is ready and complete at once instead of never becoming ready.
-
-- Re-creating a destroyed array element by [createhere] from a PE whose
-  process still held the dead element's location created it on the PE
-  the element died on (#4031, defect 1; predates the redesign). A
-  demand creation the home approved no longer follows the requester's
-  entry (the approval means no element of the id is alive, for bound
-  arrays too), and an explicit insertion follows it only for bound
-  arrays, where the entry is a live sibling's. objid_insert phase 6
-  re-creates half of the destroyed elements this way; the new test
-  objid_boundrecreate covers a bound array over two processes.
-
-- A process that had sent to an array element before it was destroyed
-  kept sending to the PE the element died on after the element was
-  created again elsewhere, every message taking a detour through that
-  PE, for the rest of the run (#4031, defect 2). The new life starts at
-  epoch 0 and its location repairs lost to the old entry's epoch. A
-  repair or reply that disagrees with the entry and loses the compare
-  now clears it, and the next send asks the home. An insertion through
-  the proxy from such a process also stopped following that entry (it
-  aborted with "hostPe for a bound element disagrees with an explicit
-  proposedPe" when given a PE). New test objid_detour, two to four
-  processes.
-
-- An array created asynchronously from a PE other than 0 and bound to
-  another (bindTo) aborted with "the location manager ... this array
-  binds to has no branch on PE 0 yet" when its request reached PE 0
-  while the other array's location manager was still held there,
-  waiting for a custom map created elsewhere (#4174). bindTo now records
-  the other array's id layout in the options on the calling PE, so PE 0
-  no longer needs that branch. New test objid_bindasync.
-
-- Broadcasts and [nokeep] entry methods: fixes for message reuse and
-  copies (#4000-#4012). Checkpoint restart no longer hangs with more
-  than one process and more than one PE per process (#4019). The
-  location manager initializes its destruction flag, so deleting an
-  array element no longer leaves a stale entry at its home (#4044).
-
-- CkTreeCacheManager, a process-shared tree store with CkCache's
-  protocol (#4013, #4014).
-
-- Summary tracing records message bytes per entry method per interval
-  (#3937, #4020).
-
-- Randomized message queue at run time: +randomized_msgq (and
-  +randomized_seed <N> to repeat a run) (reconverse #269). The classic
-  build option --enable-randomized-msgq is rejected at configure time
-  on reconverse builds (#4029).
-
-- Per-PE queue counter and opt-in jemalloc allocator, CMake option
-  RECONVERSE_USE_JEMALLOC (reconverse #272).
-
-- charmxi no longer crashes on serial blocks when run without
-  -orig-file (#4027).
-
-- MPI interoperation on reconverse (#4130, reconverse #318): an MPI
-  program calls CharmLibInit(MPI_COMM_WORLD, ...) after MPI_Init, runs
-  Charm++ libraries in phases, and keeps using MPI after CharmLibExit,
-  which now returns. The Charm++ build needs no MPI: LCI starts over
-  its tcp bootstrap with the rendezvous passed by MPI_Bcast. World
-  communicator only; not on Windows. Launch with the launcher the MPI
-  library requires (Cray MPICH under Slurm: srun --mpi=cray_shasta).
-
-- CkDyn: a C API for language bindings that define chare classes at
-  run time instead of in a .ci file (#4193). A class is registered
-  with a table of entry methods and reached through a table of
-  function pointers the binding supplies; every entry method receives
-  one message type with typed slots. Dynamic classes get what charmxi
-  classes get: groups (also constrained to a PE list), nodegroups,
-  arrays of one to six dimensions, array maps, sections over
-  CkMulticast, reductions with built-in and binding-defined reducers,
-  migration, load balancing, checkpoint and restart, quiescence
-  detection, zero-copy host and device buffers, persistent device
-  buffers, and class and method names in Projections. charm4py's new
-  binding (charm4py#316) is built on it. The manual for binding
-  authors is doc/ckdyn/manual.rst, the mechanism is described in
-  doc/internals/ckdyn.md, and tests/charm++/ckdyn is the acceptance
-  test. For every program, [nokeep] and [expedited] array broadcasts
-  no longer record a separate Projections event for the array
-  manager, as plain broadcasts already did not; each element's
-  invocation is still traced.
+Programming model and language bindings:
 
 - Coroutine entry methods (#4231): an entry method tagged [coroutine]
   is a C++20 coroutine that waits for [inbox] entry methods with
@@ -227,100 +148,406 @@ New on this line since the split from classic:
   attributes only inside the [...] of an entry method and stay names
   everywhere else.
 
+- CkDyn: a C API for language bindings that define chare classes at
+  run time instead of in a .ci file (#4193). A class is registered
+  with a table of entry methods and reached through a table of
+  function pointers the binding supplies; every entry method receives
+  one message type with typed slots. Dynamic classes get what charmxi
+  classes get: groups (also constrained to a PE list), nodegroups,
+  arrays of one to six dimensions, array maps, sections over
+  CkMulticast, reductions with built-in and binding-defined reducers,
+  migration, load balancing, checkpoint and restart, quiescence
+  detection, zero-copy host and device buffers, persistent device
+  buffers, and class and method names in Projections. charm4py's new
+  binding (charm4py#316) is built on it. The manual for binding
+  authors is doc/ckdyn/manual.rst, the mechanism is described in
+  doc/internals/ckdyn.md, and tests/charm++/ckdyn is the acceptance
+  test. For every program, [nokeep] and [expedited] array broadcasts
+  no longer record a separate Projections event for the array
+  manager, as plain broadcasts already did not; each element's
+  invocation is still traced.
+
+- CkDyn shaped reductions: CkDynContributeShaped and
+  CkDynContributeSectionShaped keep the contributors' array shape
+  through a reduction, and the shaped reducer combines the
+  contributions in place (#4249).
+
+Object ids and element location:
+
+- 64-bit object ids (#3994; #4015, #4016, #4017, #4028, #4021, #4039,
+  #4057, #4058, #4060). An element id no longer stores a home PE.
+  Arrays with bounds pack their index into 49 bits (was 16), so a
+  bounded array of any size up to 2^49 elements is addressed by id;
+  arrays without bounds get ids from per-process tranches with
+  refills from an allocator on PE 0, replacing the per-PE counter
+  that aborted at 65,535 elements. Delivery by id never needs the
+  index on the sender's PE, and a message sent to the old id of a
+  deleted index re-created elsewhere is re-addressed at its home.
+  Ids are stable across checkpoint and restart, including restart
+  with a different process count.
+
+- The wide-collection layout: a chare array created with
+  CkArrayOptions::setWideCollection() gets element ids with 24
+  collection bits (16.7 million arrays) and a 37-bit packed index,
+  for programs that create many small arrays (AMPI: one per
+  communicator); such an array must have bounds. The collection
+  field of every id counts arrays, not groups, so the standard
+  layout names 4,095 arrays instead of about 1,300, and the runtime
+  suggests setWideCollection at 2,048.
+
+- Process-level location and index tables (#4123, #4165, #4166):
+  the id -> location table, the index -> id table and the retired-id
+  table are shared by the PEs of a process, lock-free. One location
+  request per process per unknown element instead of one per PE; a
+  move or a creation is written once per process touched. The
+  protocol, and the TLA+ model that checks its deletion and
+  re-creation rules, are in doc/internals/process-location-cache.md.
+  Two distinct indices with the same 64-bit key hash no longer hang
+  the index table (#4164).
+
+- Deletion and re-creation (#4031; #4138, #4205): a destroyed
+  element re-created by [createhere] is created where asked, not on
+  the PE it died on, and a process that had sent to the dead element
+  no longer routes every message to the new one through that PE. An
+  array created asynchronously from a PE other than 0 and bound to
+  another array (bindTo) no longer aborts when PE 0 lacks the other
+  array's branch (#4174, #4227).
+
+- A send to an array element from a PE that has not yet processed
+  the array manager's creation is held until the manager exists, as
+  receives already were (#4088, #4089).
+
+- Checkpoint compatibility: the id layout is final. A checkpoint
+  written by v9.0.0-alpha2 or later restores on this release with
+  any process count. A checkpoint written by 8.x or by v9.0.0-alpha1
+  has no current layout record, and the restart aborts with a
+  message saying so; a build with different field widths
+  (-DCMK_OBJID_COLLECTION_BITS) refuses it the same way.
+
+- New tests: objid_bound, objid_home, objid_insert, objid_sections,
+  objid_tranche, objid_wide, objid_loctable, objid_migrate6,
+  objid_recreate, objid_boundrecreate, objid_detour, objid_bindasync.
+
+Arrays, reductions, multicast and load balancing:
+
+- Array broadcasts are stored and checked by epoch for every array,
+  including arrays with setStaticInsertion(true) and
+  setAnytimeMigration(false) (TCharm, AMPI, CkIO), so a broadcast
+  reaches an element that moves at a load balancing step exactly
+  once and broadcasts arrive in order (#4092, #4093). A broadcast
+  waits for an element still reading its zero-copy pup buffers
+  after a migration (#4148).
+
+- Reductions: a reduction no longer hangs when elements migrate in
+  after contributing to later rounds on their old PE (#4145, #4151),
+  when a PE empties, fills and empties again (#4191, #4192), or when
+  an empty PE sends contributions left behind by migration (#4234).
+  New tests reduction_migrate_ahead and reduction_empty_kid.
+  Contributions to one reduction that use different reducers abort
+  with both reducer names instead of being read with the wrong layout
+  (#4249).
+
+- CkMulticast, when a section's root element migrates: the old tree
+  is retired and its reduction number read in one message (#4032,
+  #4131); the new tree learns the number when contributions were in
+  flight (#4181); a root retired while its tree is being built stays
+  retired (#4185); a root that moves twice in a row answers the next
+  root later (#4188); a replaced tree is freed only after its last
+  message has arrived (#4206). Cross-array section reductions keep
+  the reducer type, user flag and callback (#4199). New test
+  section_migrate.
+
+- Section sends with an empty section ID no longer read past the
+  element list, and the message is freed when no section has
+  elements (#4244).
+
+- A group creation's dependence (CkEntryOptions::setGroupDepID)
+  holds on the creating PE as well as on the others (#4150, #4172);
+  ckLocalBranch() of a group created with a dependence may be null
+  right after ckNew on that PE. A PE ends its startup phase before
+  running the messages buffered during startup, so a group created
+  from one of them is not taken for a startup-time group (#4176).
+  New test groupdep_creator.
+
+- Array maps and insertion (#4218-#4221, #4226): an inserted element
+  no longer takes a plain chare's object slot; insertion into a
+  CldMap array without an explicit PE aborts with a message;
+  ConfigurableRRMap reads its configuration in production builds;
+  HilbertArrayMap places n elements at 0..n-1 for any extents.
+
+- Array maps, second round (#4245, fixes #4222): inserting an index
+  outside the extents an array was created with needs a PE on every
+  map (PropMap, FastArrayMap and HilbertArrayMap join CldMap); with a
+  PE it works. PropMap no longer reads past its table or divides by
+  zero for an empty array. HilbertArrayMap keeps per-array block
+  boundaries instead of a table with an entry per element on every
+  PE, orders every PE rather than one per process, and survives
+  checkpoint restart. New test arraymap_insert_abort.
+
+- Futures and callbacks (#4225): CkWaitAllIDs with every value
+  present, CkSendMsgInline to a chare on another PE, section
+  callbacks (construction, pup, comparison), future callbacks with
+  no message, and the system message pool (#4211-#4216, #4224).
+
+- Zero-copy: the ZC-pup pending entry is registered before its Rgets
+  are issued (#4086); a completed zero-copy message is enqueued, not
+  run inside the send that completed it (#4167); the allGather
+  library keeps its shared source buffer registered (#4182).
+
+- Load balancing: balancers are told only about the arrivals they
+  ordered, so an element that calls migrateMe() between or during
+  AtSync steps no longer corrupts TreeLB's count (#4195, #4196).
+  Deleting an array element no longer leaves a stale entry at its
+  home (#4044). Restart no longer hangs with more than one process
+  and more than one PE per process (#4019). MetisLB and RecBipartLB
+  no longer move elements that called setMigratable(false), and
+  MetisLB subtracts the non-migratable load from each PE's target
+  share; the new test load_balancing/lbsweep runs every usable
+  balancer on a modelled imbalanced load (#4250).
+
+- CkIO: session arrays use the wide-collection layout, so a program
+  may run more than 4,095 read and write sessions (#4149, #4152);
+  read sessions on different files can be in progress at the same
+  time, a 0-byte write session completes at once, a read session
+  frees its array and group, and the output file is opened in binary
+  mode on Windows (#4153). New test io_sessions.
+
+Checkpoint and fault tolerance:
+
+- Checkpoint to disk and restart on the same, fewer or more PEs or
+  processes, with element ids kept (see Object ids above). The
+  ckpt_restart test restarts with a changed process count (#4202).
+
+- In-memory checkpoint: the syncft build option is back (memft is a
+  synonym), and CkRollbackMemCheckpoint() restores every array
+  element from the last completed in-memory checkpoint on the same
+  PEs and delivers the checkpoint's callback again (#4186). A
+  rollback after elements were inserted since the checkpoint, bound
+  arrays included, is refused with a message (#4209). Off by
+  default. Protocol in doc/internals/memckpt.md; new test
+  memckpt_rollback, run by a syncft CI job.
+
+- Isomalloc (migratable threads, AMPI): the address region is rounded
+  to a stable unit, recorded in disk checkpoints and honored on
+  restart, so a checkpoint restarts in a process with a different
+  mapping (#4109); a thread unpacked where the program's code is
+  loaded at another address aborts with a message instead of
+  crashing (#4112).
+
 AMPI (Adaptive MPI):
 
-- AMPI and TCharm run on reconverse (#4051, #4064): the ranks are
-  migratable user-level threads with Isomalloc heaps, as on classic.
-  Build with './build AMPI reconverse-<os>-<arch>'; ampicc, ampicxx and
-  ampif90 are unchanged. './app +pe N +vp R' runs R ranks on N PEs in
-  one process, 'lcrun -n P ./app +pe N +vp R' across P processes, and
-  'ampirun -np R --procs P ./app' does the same through lcrun (#4113).
-  A rank that moves to another process or is restored from a
-  checkpoint needs address space randomization off: on Linux, ampirun
-  and testrun add 'setarch $(uname -m) -R' themselves, and under srun
-  or mpirun it goes inside the launch. A thread unpacked in a process
-  whose code is loaded elsewhere now aborts with a message naming the
-  cause instead of crashing (#4112).
+- AMPI and TCharm run on reconverse (#4051, #4064; reconverse #298):
+  the ranks are migratable user-level threads with Isomalloc heaps,
+  as on classic. Build with './build AMPI reconverse-<os>-<arch>';
+  ampicc, ampicxx and ampif90 are unchanged. './app +pe N +vp R' runs
+  R ranks on N PEs in one process, 'lcrun -n P ./app +pe N +vp R'
+  across P processes, and 'ampirun -np R --procs P ./app' does the
+  same through lcrun (#4113). A rank that moves to another process
+  or is restored from a checkpoint needs address space randomization
+  off: on Linux, ampirun and testrun add 'setarch $(uname -m) -R'
+  themselves, and under srun or mpirun it goes inside the launch.
 
 - Load balancing migrates ranks between PEs and between processes.
-  Non-blocking collectives may be outstanding across AMPI_Migrate only
-  with '+ampiMigrateWithCollectives' (or '+ampiEnableMigrateToPe');
-  without it, AMPI_Migrate aborts with a message naming the request
-  (#4093). One-sided windows migrate with their rank (#4124). Start-up
-  creates the ranks' arrays after the groups they use (#4137, #4147).
+  Non-blocking collectives may be outstanding across AMPI_Migrate
+  only with '+ampiMigrateWithCollectives' (or
+  '+ampiEnableMigrateToPe'); without it, AMPI_Migrate aborts naming
+  the request (#4093). One-sided windows migrate with their rank
+  (#4124). Start-up creates the ranks' arrays after the groups they
+  use, with any rank mapping (#4137, #4147, #4177).
 
 - Checkpoint to disk and restart on the same, fewer or more PEs or
   processes (#4109, #4133, #4142): AMPI_Migrate with the
-  'ampi_checkpoint' key set to 'to_file=DIR' writes the checkpoint and
-  '+restart DIR' resumes it, also after load balancing steps.
-  examples/ampi/Cjacobi3D demonstrates it with '-chkpt ITER DIR', and
-  the manual has the recipe (#4134).
+  'ampi_checkpoint' key set to 'to_file=DIR' writes the checkpoint
+  and '+restart DIR' resumes it, also after load balancing steps;
+  examples/ampi/Cjacobi3D demonstrates it with '-chkpt' (#4134).
+
+- Exit status: MPI_Finalize returns, and the largest value main
+  returns over the ranks becomes the program's exit status (#4102,
+  #4170). MPI_Abort ends the program with its error code as the exit
+  status (low 8 bits) instead of status 134 (#4180).
 
 - Standard coverage: the run of the 2018 MPICH pass list recorded on
-  #4103 (2026-10-30) passed 181 of 185 tests with one rank per
-  process; of the other four, comm/ctxalloc, rma/locknull and
-  rma/acc-loc are fixed since (#4118, #4171), and init/timeout needs
-  the launcher to enforce a time limit. Fixed since classic 8.1.0:
-  MPI_Intercomm_merge deadlock (#4076); MPI_Group_free on a group
-  from MPI_Comm_group (#4077); MPI_Bsend waiting for the receiver
-  (#4078); MPI_Ibarrier hang (#4074); non-blocking collective results
-  matched to the wrong request or waking the wrong waiter (#4075,
-  #4084); MPI_Waitall/Waitany/Waitsome over MPI_Ialltoall (#4105);
-  MPI_Compare_and_swap (#4083); MPI_Exscan on non-power-of-two sizes,
-  and MPI_Iscan/MPI_Iexscan now non-blocking (#4085); MPI_ANY_TAG
-  matching internal messages (#4090); send offsets of non-contiguous
-  types in intercommunicator scatters and neighbor alltoalls (#4125);
-  the abort after 4,095 MPI_Comm_dup/MPI_Comm_free pairs, by giving
-  communicator arrays the wide-collection layout (#4118); one-sided
-  bounds with disp_unit, MPI_PROC_NULL targets and non-contiguous
-  targets (#4106); window locks that wait, with shared and exclusive
-  semantics, and the MPI_Win_flush family (#4171); predefined
-  reductions that used the wrong reducer for most type and operation
-  pairs, and MAXLOC/MINLOC on the pair types (#4173). MPI_Finalize now
-  returns, and the largest value main returns over the ranks becomes
-  the program's exit status (#4170). MPI_Abort ends the program with
-  its error code as the exit status (low 8 bits; a nonzero code whose
-  low 8 bits are 0 exits with 1) instead of status 134 (#4180). Core
-  fixes found by AMPI: a reduction no longer hangs when elements
-  migrate in after contributing to later rounds (#4151); a broadcast
-  waits for an element still reading its zero-copy pup buffers
-  (#4148).
+  #4103 (2026-10-30) passed 181 of 185 tests; three of the other
+  four are fixed since (#4118, #4171).
 
-- campi, experimental: AMPI ranks as C++20 coroutines in the same
-  library, with no thread per rank (#4073, #4136). A campi program is
-  C++20 using the CAMPI_MAIN, CAMPI_MIGRATABLE and CAMPI_MIGRATE macros
-  of campi.h; blocking calls are awaited, and after a migration or a
-  restart a rank runs its main again to the recorded site, with its
-  state in one pupped object. campi migration and restart need
-  neither Isomalloc nor address randomization off, so they work on
-  macOS. Blocking calls campi does not yet provide are compile errors.
-  tests/campi has the tests.
+- Point-to-point and requests, fixed since 8.1.0: MPI_Bsend and
+  MPI_Ibsend no longer wait for the receiver (#4078); MPI_ANY_TAG no
+  longer matches internal messages (#4090); MPI_Waitall, Waitany
+  and Waitsome over the MPI_Ialltoall family (#4105);
+  MPI_Sendrecv_replace with a non-contiguous datatype, MPI_Ialltoallw
+  with MPI_Wait, and MPI_IN_PLACE in MPI_Ialltoall(v,w) (#4230).
 
-- Privatization: pieglobals, pipglobals and fsglobals work on Linux;
-  tlsglobals is not supported on reconverse.
+- Collectives, fixed since 8.1.0: MPI_Ibarrier hang (#4074);
+  non-blocking collective results matched to the wrong request or
+  waking the wrong waiter (#4075, #4084); MPI_Exscan on
+  non-power-of-two sizes, and MPI_Iscan/MPI_Iexscan now non-blocking
+  (#4085); send offsets of non-contiguous types in intercommunicator
+  scatters and neighbor alltoalls (#4125); predefined reductions
+  with the wrong reducer, and MAXLOC/MINLOC on the pair types
+  (#4156, #4173); the neighbor collectives (MPI_Neighbor_* and
+  MPI_Ineighbor_*) exchanged blocks with the wrong neighbors on
+  Cartesian and graph topologies and exchanged nothing on
+  distributed graphs (#4238).
 
-Known gaps in the alpha:
+- Communicators and groups: MPI_Intercomm_merge deadlock and an
+  MPI_Intercomm_create race (#4076); MPI_Group_free on a group from
+  MPI_Comm_group (#4077); the abort after 4,095
+  MPI_Comm_dup/MPI_Comm_free pairs, by giving communicator arrays the
+  wide-collection layout (#4117, #4118). MPI_Comm_create_group by a
+  subset of ranks returns, and concurrent MPI_Intercomm_create calls
+  between different pairs of groups no longer pair one creation's
+  group with another's (#4236).
 
-- AMPI: Not yet fixed: dup and split of
-  an intercommunicator, concurrent MPI_Intercomm_create, and
-  MPI_Comm_create_group by a subset of ranks (#4099); CkDDT_Struct lower bounds and negative
-  extents (#4100); the neighbor order of Cart and Dist_graph
-  topologies (#4101); three request-completion items of #4097
-  (same-root Ibcasts, MPI_Op_free during a non-blocking reduction,
-  sequence number wraparound). pieglobals with Fortran aborts at exit
-  on Linux after the program has finished (#4157). On macOS a rank
-  cannot move to another process or restart from a checkpoint (no
-  way to turn address randomization off); campi can. In-memory
-  checkpoint and shrink/expand are not in this release, and ROMIO is
-  not built by default.
+- One-sided: MPI_Compare_and_swap (#4083); bounds with disp_unit,
+  MPI_PROC_NULL targets and non-contiguous targets (#4106); window
+  locks that wait, with shared and exclusive semantics, and the
+  MPI_Win_flush family (#4098, #4171).
 
-- Windows multicore is not yet available.
+- Privatization: pieglobals and fsglobals on Linux (pipglobals
+  builds where the PiP runtime is installed); tlsglobals is not
+  supported on reconverse. tests/ampi runs in CI in one and two
+  processes (#4116, #4095, #4144).
+
+campi (coroutine AMPI, experimental):
+
+- AMPI ranks as C++20 coroutines in the same library, with no thread
+  per rank (#4073). A campi program is C++20 using the CAMPI_MAIN,
+  CAMPI_MIGRATABLE and CAMPI_MIGRATE macros of campi.h; blocking
+  calls are awaited, and everything else is AMPI's code. A
+  CAMPI_MIGRATABLE { ... } block replaces the CAMPI_RESUMABLE() and
+  CAMPI_END() pair of earlier versions (#4242).
+
+- Migration under a load balancer, checkpoint to a directory and
+  restart (#4136): the rank's state lives in one pupped object
+  (CAMPI_MAIN_STATE), and after a migration or a restart the rank
+  runs its main again to the recorded site. This needs neither
+  Isomalloc nor address randomization off, so it works on macOS and
+  across processes with randomization on (#4162). The manual
+  section "Coroutine Ranks (campi)" describes the contract.
+
+- Blocking calls provided as awaitables: the point-to-point and
+  collective calls of #4073, plus MPI_Probe, MPI_Mprobe, MPI_Mrecv,
+  MPI_Waitany, MPI_Waitsome, MPI_Bsend, MPI_Rsend,
+  MPI_Sendrecv_replace, MPI_Reduce_scatter, MPI_Reduce_scatter_block
+  and MPI_Alltoallw (#4229); the communicator constructors
+  MPI_Comm_split_type, MPI_Cart_create, MPI_Cart_sub,
+  MPI_Graph_create, MPI_Dist_graph_create(_adjacent),
+  MPI_Intercomm_create, MPI_Intercomm_merge and
+  MPI_Comm_create_group, the five MPI_Neighbor_* collectives,
+  MPI_Ireduce_scatter(_block) and MPI_Comm_idup(_with_info) (#4243).
+  The one-sided calls are the only MPI routines that remain compile
+  errors in a campi program. tests/campi has the tests.
+
+- A communicator creation completes on its own wake-up, identified
+  by a per-communicator count, so an unrelated wake-up such as
+  AMPI_Resume no longer ends MPI_Comm_split or MPI_Comm_dup before
+  the new communicator exists (#4235).
+
+Tests, CI and tooling:
+
+- CI runs the TEST_DIRS list of .github/workflows/reconverse-ci.yaml
+  on Linux x86_64 and arm64 and macOS arm64 in one and two
+  processes, and on Windows in one; every example in examples/charm++
+  runs in one and two processes (#4182, #4163); tests/ampi,
+  examples/ampi and tests/campi run in the AMPI job; further jobs
+  cover syncft (#4186), MPI interop under mpirun (#4130), stress
+  runs on an error-checking build, and objloads on a tracing build
+  (#4160, #4182).
+
+- Randomized message queue at run time: +randomized_msgq, and
+  +randomized_seed <N> to repeat a run (reconverse #269). The
+  classic build option --enable-randomized-msgq is rejected at
+  configure time on reconverse builds (#4029).
+
+- megatest gained the modules futures, callbackkinds (#4208) and
+  arraymaps (#4202), which found the fixes of #4225 and #4226; a
+  quiescence stress test (#4208); smptest targets in three more
+  directories (#4135); ten stale tests build again (#4048). The
+  futures and callbackkinds cases that waited for those fixes run
+  unconditionally, arraymaps covers 4D to 6D arrays, and
+  ckpt_restart runs and restarts on 1 PE again (#4233).
+
+- The mini-applications are the submodule miniapps/
+  (charmplusplus/miniapps): 'git submodule update --init miniapps',
+  then 'make -C <build>/tmp test-miniapps' (#4184, #4198).
+
+- Coverage: './build ... --coverage' builds with clang source-based
+  coverage of Charm++ and reconverse, coverage/run.sh runs the test
+  tiers, and a weekly CI run publishes the report at
+  https://charmplusplus.org/charm-coverage/ (#4094, #4111); a weekly
+  job drafts tests for uncovered runtime code (#4120).
+
+- The hunt workflow (.github/workflows/hunt.yaml) repeats one test
+  many times on a chosen runner, optionally under AddressSanitizer,
+  for failures CI sees once (#4207).
+
+- Documentation for maintainers: doc/internals/ has one chapter per
+  subsystem (object ids, process-level location, array send order,
+  array broadcasts and migration, section trees, in-memory
+  checkpoint; #4052, #4058, #4123, #4089, #4093, #4206, #4186);
+  reconverse has its own doc/internals/ and an architecture note
+  comparing Converse and reconverse (reconverse #322, #293).
+  AGENTS.md says where the knowledge is for an AI coding agent and
+  the conventions for comments (#4114, #4141).
+
+- Manuals updated for reconverse: launch, debugging, the Converse
+  API (#4240).
+
+Build and packaging:
+
+- Targets are reconverse-<os>-<arch>: reconverse-linux-x86_64,
+  reconverse-linux-arm8, reconverse-darwin-arm8, reconverse-win-x86_64
+  and the others under src/arch. The build words nolb, tsan,
+  perftools and craype set the matching CMake options (#4067).
+
+- --with-production passes CMK_OPTIMIZE to every object, including
+  reconverse, so CmiAssert is compiled out of the whole production
+  build (#4190).
+
+- A direct 'cmake -S . -B build' configures: NETWORK defaults to
+  reconverse and is set before its first use (#4241).
+
+- The charm4py target builds and loads on reconverse: libcharm links
+  reconverse, which is built with CMK_CHARM4PY (#4063).
+
+Removed:
+
+- Classic Converse and the classic machine layers (#4056, #4061),
+  with the classic-or-reconverse guards collapsed (#4067). Classic
+  Charm++ continues on the branch 'classic'.
+
+- pose and mblock: libraries, examples and manuals (#4070).
+
+- The classic-only queue, queueperf, megacon and commlib tests
+  (#4048); the TRAM tests, which are ported to htram; the
+  CmiMemoryUsage stubs of conv-core (#4127); the unbuilt lci1
+  backend of reconverse (reconverse #300).
+
+Known gaps in the beta:
+
+- AMPI: dup and split of an intercommunicator (#4099); CkDDT_Struct
+  lower bounds and negative extents (#4100); the neighbor order of
+  Cart and Dist_graph topologies (#4101); three request-completion
+  items of #4097 (same-root Ibcasts, MPI_Op_free during a non-blocking
+  reduction, sequence number wraparound). pieglobals with Fortran
+  aborts at exit on Linux after the program has finished (#4157,
+  #4189). On macOS a rank cannot move to another process or restart
+  from a checkpoint (no way to turn address randomization off); campi
+  can. No shrink/expand; ROMIO is not built by default.
 
 - CharmDebug is not available.
 
-- Checkpoint files written by 9.0 alpha may not be readable by later
-  9.0 pre-releases, because the object id layout may change before
-  the beta. Trace logs and load balancer dumps are not affected.
+- --build-shared does not link on reconverse (#4049).
+
+- In MPI-interop mode, CmiAbort on one rank does not end the other
+  ranks (reconverse #321).
+
+- Large scale: under heavy traffic at 8 to 32 nodes, exhaustion of
+  LCI's receive packet pool can hang a run (reconverse #257). Three
+  one-process tests hang on Stampede3 SKX (reconverse #320).
+
+- Checkpoints written by 8.x or by v9.0.0-alpha1 cannot be restored;
+  checkpoints from v9.0.0-alpha2 and later can.
 
 ================================================================================
 What's new in Charm++ 8.1.0
