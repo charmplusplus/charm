@@ -2492,8 +2492,9 @@ class ampiParent final : public CBase_ampiParent {
 
   // Intercommunicator creation:
   // ExchangeProxy: the first group's new array of each MPI_Intercomm_create in
-  // progress, by the larger of the two leaders' world ranks
-  std::map<int, CProxy_ampi> pendingRProxies;
+  // progress, and that group's creation id, by the larger of the two leaders'
+  // world ranks
+  std::map<int, std::pair<CProxy_ampi, int>> pendingRProxies;
 
   int myHomePE;
 
@@ -2567,18 +2568,19 @@ class ampiParent final : public CBase_ampiParent {
   // exchange proxy info between two ampi proxies. Sent by both groups' leaders
   // to the parent of the smaller leader's world rank; key is the larger one, so
   // concurrent MPI_Intercomm_creates between other leaders are kept apart.
-  void ExchangeProxy(CProxy_ampi rproxy, int key) noexcept {
+  // creationId: the id of the MPI_Intercomm_create in the sending group
+  void ExchangeProxy(CProxy_ampi rproxy, int key, int creationId) noexcept {
     auto it = pendingRProxies.find(key);
     if (it == pendingRProxies.end()) {
-      pendingRProxies.emplace(key, rproxy);
+      pendingRProxies.emplace(key, std::make_pair(rproxy, creationId));
       return;
     }
     // Both groups' new intercommunicator arrays are fully registered:
     // give each its remote proxy, and only then resume its ranks.
-    CProxy_ampi first = it->second;
+    auto [firstProxy, firstId] = it->second;
     pendingRProxies.erase(it);
-    first.setRemoteProxyAndUnblock(rproxy);
-    rproxy.setRemoteProxyAndUnblock(first);
+    firstProxy.setRemoteProxyAndUnblock(rproxy, firstId);
+    rproxy.setRemoteProxyAndUnblock(firstProxy, creationId);
   }
 
   //Grab the next available split/group communicator
@@ -3169,12 +3171,21 @@ class ampi final : public CBase_ampi {
   void split(int color,int key,MPI_Comm *dest, AmpiCommType type) noexcept;
   void splitPost(int color,int key, AmpiCommType type) noexcept;
   void splitFinish(MPI_Comm *dest) noexcept;
+  // Each creation below is split into a Post half, which starts it, and a
+  // wait for unblockCreation (or setRemoteProxyAndUnblock), for campi; the
+  // new communicator is then newestComm().
+  MPI_Comm newestComm() const noexcept { return parent->getNextComm() - 1; }
+  bool commCreatePost(const std::vector<int>& vec, AmpiCommType type) noexcept;
   MPI_Comm commCreate(const std::vector<int>& vec, AmpiCommType type) noexcept;
+  bool cartCreate0DPost() noexcept;
+  static void cartCreate0DFinish(MPI_Comm newComm) noexcept;
   MPI_Comm cartCreate0D() noexcept;
   MPI_Comm cartCreate(std::vector<int>& vec, int ndims, const int* dims) noexcept;
+  void intercommCreatePost(const std::vector<int>& rvec, int root, int remoteRoot) noexcept;
   MPI_Comm intercommCreate(const std::vector<int>& rvec, int root, int remoteRoot) noexcept;
 
   inline bool isInter() const noexcept { return myComm->isinter(); }
+  void intercommMergePost(int first) noexcept;
   void intercommMerge(int first, MPI_Comm *ncomm) noexcept;
 
   inline ampiParent* getParent() const noexcept { return parent; }
@@ -3191,7 +3202,10 @@ class ampi final : public CBase_ampi {
   inline const CProxy_ampi &getRemoteProxy() const noexcept {return remoteProxy;}
   inline void setRemoteProxy(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; }
   // Matches the block() in ampi::intercommCreate
-  inline void setRemoteProxyAndUnblock(CProxy_ampi rproxy) noexcept { remoteProxy = rproxy; thread->resume(); }
+  inline void setRemoteProxyAndUnblock(CProxy_ampi rproxy, int creationId) noexcept {
+    remoteProxy = rproxy;
+    unblockCreation(creationId);
+  }
   inline int getIndexForRank(int r) const noexcept {return myComm->getIndexForRank(r);}
   inline int getIndexForRemoteRank(int r) const noexcept {return myComm->getIndexForRemoteRank(r);}
   void getNeighborLists(std::vector<int>& srcs, std::vector<int>& dsts) const noexcept;
