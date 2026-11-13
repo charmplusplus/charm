@@ -24,6 +24,8 @@ mainmodule ckcoro_tests {
     entry void marshallLeakCheck();
     entry void doOverlapTest();
     entry [reductiontarget] void overlapTestDone();
+    entry void doFutureTest();
+    entry [reductiontarget] void futureTestDone();
     // The mainchare as a coroutine owner, driving the owners module.
     entry [coroutine] void runOwners(int rounds);
     entry [inbox, reductiontarget] void groupReady();
@@ -33,6 +35,15 @@ mainmodule ckcoro_tests {
     entry [inbox, reductiontarget] void groupDone(int sum);
     entry [inbox, reductiontarget] void nodeGroupDone(int sum);
     entry [inbox] void chareDone(int sum);
+  }
+
+  // Callbacks awaited through futures (CK_FUTURE): reductions, a callback
+  // sent to another element, quiescence, and a future inside a task.
+  array [1D] FutureTest {
+    entry FutureTest();
+    entry [coroutine] void run(int rounds);
+    // Plain entry: send a value to the callback the caller passed.
+    entry void ask(CkCallback cb, int value);
   }
 
   // Overlap and forall as child coroutines, and a coroutine entry with

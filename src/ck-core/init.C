@@ -377,6 +377,8 @@ static inline void _parseCommandLineOpts(char **argv)
       ck::objid::_objidTableLog2 = 16;
   ck::objid::_objidDiag = CmiGetArgFlagDesc(argv, "+objid_diag",
                         "Count location-table events and print them per process at exit");
+  _ckCoroFakeMigratePup = CmiGetArgFlagDesc(argv, "+ck_fakemigrate_pup",
+                        "ckcoro: at every wait an array element migrates to the next PE (see ckcoro.h)");
   _ckCoroFakeMigrate = CmiGetArgFlagDesc(argv, "+ck_fakemigrate",
                         "ckcoro: every wait rebuilds the chare's coroutines in place (see ckcoro.h)");
 

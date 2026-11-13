@@ -27,6 +27,8 @@
 #define OVERLAP_ITEMS 5
 #define OWNER_ROUNDS 3
 #define OWNER_ITEMS 7
+#define FUTURE_ELEMS 6
+#define FUTURE_ROUNDS 4
 
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ CProxy_MigrationTest migrationTestProxy;
@@ -113,7 +115,10 @@ public:
 
   void doMigrationTest() {
     CkPrintf("Running coroutine migration tests\n");
-    if (CkNumPes() > 1) {
+    // Under +ck_fakemigrate_pup the elements migrate at every wait, and this
+    // test counts its own migrations in ckJustMigrated: skipped.
+    if (_ckCoroFakeMigratePup) CkPrintf("(skipped under +ck_fakemigrate_pup)\n");
+    if (CkNumPes() > 1 && !_ckCoroFakeMigratePup) {
       migrationTestProxy.call1();
       for (int i = 0; i < MIGRATION_ELEMS; i++) {
         migrationTestProxy[i].call2();
@@ -164,6 +169,17 @@ public:
 
   void overlapTestDone() {
     CkPrintf("Overlap tests complete\n");
+    thisProxy.doFutureTest();
+  }
+
+  void doFutureTest() {
+    CkPrintf("Running future tests\n");
+    CProxy_FutureTest a = CProxy_FutureTest::ckNew(FUTURE_ELEMS);
+    a.run(FUTURE_ROUNDS);
+  }
+
+  void futureTestDone() {
+    CkPrintf("Future tests complete\n");
     thisProxy.runOwners(OWNER_ROUNDS);
   }
 
@@ -700,7 +716,8 @@ public:
   void pup(PUP::er& p) {
     p | iter;
     p | pIter;
-    if (p.isUnpacking()) { values.clear(); t = i = 0; x = 0; sum = 0; n = 0; darr = nullptr; dvec.clear(); tail.clear(); }
+    p | sum;   // checked again at arrTotal, several waits later
+    if (p.isUnpacking()) { values.clear(); t = i = 0; x = 0; n = 0; darr = nullptr; dvec.clear(); tail.clear(); }
   }
 
   ck::coroutine run() {
@@ -902,6 +919,96 @@ public:
       check((int)order.size() == 2 * rounds, "overlap: a child ran twice or not at all");
       check(__coro.num_buffered() == 0, "overlap: messages left in the inbox");
       contribute(CkCallback(CkReductionTarget(Main, overlapTestDone), mainProxy));
+    }
+  }
+};
+
+// Callbacks awaited directly: each round a sum reduction (CK_FUTURE_ALL, a
+// callback to every element); a sum and a max awaited together; a callback
+// to this element (CK_FUTURE) handed to the left neighbour, which sends a
+// CkDataMsg to it; and a reduction inside a CK_CALL task. At the end every
+// element awaits the quiescence that element 0 starts. The futures and
+// the round are pupped members: the waits survive +ck_fakemigrate, the pup
+// mode, and the restart that follows.
+class FutureTest : public CBase_FutureTest {
+  FutureTest_CORO_CODE
+  int round;
+  ck::coro::future fsum, fa, fb, fpeer, fqd, ftask;
+  CkReductionMsg* red;   // received at a wait and deleted before the next
+  CkReductionMsg* red2;
+  int total;
+
+  static void check(bool ok, const char* what) {
+    if (!ok) ::CkAbort("ckcoro future test: %s", what);
+  }
+  int left() const { return (thisIndex + FUTURE_ELEMS - 1) % FUTURE_ELEMS; }
+  static int sumOver(int r) { return FUTURE_ELEMS * (FUTURE_ELEMS - 1) / 2 + FUTURE_ELEMS * r; }
+
+  // A task that waits on a future of its own and returns the reduced sum.
+  ck::coro::task<int> allSum(int v) {
+    CK_MIGRATABLE {
+      contribute(sizeof(int), &v, CkReduction::sum_int, CK_FUTURE_ALL(ftask));
+      CK_WHEN(ftask, red);
+      {
+        int s = *(int*)red->getData();
+        delete red;
+        co_return s;
+      }
+    }
+  }
+
+public:
+  FutureTest() : round(0), red(nullptr), red2(nullptr), total(0) {}
+  FutureTest(CkMigrateMessage* m) : CBase_FutureTest(m), red(nullptr), red2(nullptr) {}
+  void pup(PUP::er& p) {
+    p | round; p | fsum; p | fa; p | fb; p | fpeer; p | fqd; p | ftask; p | total;
+  }
+
+  void ask(CkCallback cb, int value) { cb.send(CkDataMsg::buildNew(sizeof(int), &value)); }
+
+  ck::coroutine run(int rounds) {
+    CK_MIGRATABLE {
+      for (round = 0; round < rounds; round++) {
+        {
+          int v = thisIndex + round;
+          contribute(sizeof(int), &v, CkReduction::sum_int, CK_FUTURE_ALL(fsum));
+        }
+        CK_WHEN(fsum, red);
+        check(*(int*)red->getData() == sumOver(round), "sum awaited through a future");
+        delete red;
+
+        // Two reductions in flight, awaited together.
+        {
+          int v = thisIndex + round;
+          contribute(sizeof(int), &v, CkReduction::sum_int, CK_FUTURE_ALL(fa));
+          contribute(sizeof(int), &v, CkReduction::max_int, CK_FUTURE_ALL(fb));
+        }
+        CK_WHEN_ALL(CK_ALT(fa, red), CK_ALT(fb, red2));
+        check(*(int*)red->getData() == sumOver(round), "sum awaited with a max");
+        check(*(int*)red2->getData() == FUTURE_ELEMS - 1 + round, "max awaited with a sum");
+        delete red;
+        delete red2;
+
+        // A callback handed to another element; the block form.
+        thisProxy[left()].ask(CK_FUTURE(fpeer), 100 * round + thisIndex);
+        CK_WHEN_BLOCK(fpeer, m) {
+          CkDataMsg* d = static_cast<CkDataMsg*>(m);
+          check(*(int*)d->getData() == 100 * round + thisIndex, "value sent to a future's callback");
+          delete d;
+        }
+
+        CK_CALL_TO(total, allSum(thisIndex * round));
+        check(total == round * FUTURE_ELEMS * (FUTURE_ELEMS - 1) / 2, "sum returned by a task");
+      }
+      // Quiescence awaited by every element, its message discarded: each
+      // makes the future, element 0 starts the detection with it.
+      {
+        CkCallback qd = CK_FUTURE_ALL(fqd);
+        if (thisIndex == 0) CkStartQD(qd);
+      }
+      CK_WHEN(fqd);
+      check(__coro.num_buffered() == 0, "deliveries left in the inbox");
+      contribute(CkCallback(CkReductionTarget(Main, futureTestDone), mainProxy));
     }
   }
 };

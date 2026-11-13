@@ -36,6 +36,7 @@ CkpvDeclare(int, currentChareIdx);
 CkpvDeclare(void *, _ckCurrentMsg);  // see CkCurrentMessage (charm++.h)
 CkpvDeclare(int, _ckCurrentEp);
 bool _ckCoroFakeMigrate = false;     // +ck_fakemigrate (parsed in init.C), read by ckcoro.h
+bool _ckCoroFakeMigratePup = false;  // +ck_fakemigrate_pup (parsed in init.C), read by ckcoro.h
 
 // ckDestroyLater: a Converse message to this PE whose handler destroys the
 // chare, so the destruction follows the return of whatever is running on

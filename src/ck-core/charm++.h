@@ -308,6 +308,7 @@ Chare *CkAllocateChare(int objId);
 CkpvExtern(void *, _ckCurrentMsg);
 CkpvExtern(int, _ckCurrentEp);
 extern bool _ckCoroFakeMigrate;   // +ck_fakemigrate (init.C), read by ckcoro.h
+extern bool _ckCoroFakeMigratePup; // +ck_fakemigrate_pup (init.C), read by ckcoro.h
 static inline void *CkCurrentMessage(void) { return CkpvAccess(_ckCurrentMsg); }
 static inline int CkCurrentEntry(void) { return CkpvAccess(_ckCurrentEp); }
 struct CkEntryScope {
