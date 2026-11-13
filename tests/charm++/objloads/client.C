@@ -5,7 +5,8 @@
 //     elements were created (nothing merged, nothing split);
 //   - each element's time agrees between the two, including the elements
 //     whose time arrives in resumed thread segments;
-//   - per PE, elapsed - idle is close to the sum of the object times;
+//   - per PE, elapsed - idle is close to the sum of the object times (PE 0
+//     only in a one-PE run: it also serves CCS and trace collection);
 //   - a second trace snapshot a second later has not gone backwards.
 //
 //   ./client <host> <port> <expected number of elements, or 0 to skip that check>
@@ -91,9 +92,15 @@ int main(int argc, char **argv) {
       CHECK(t.objs.count(o.first), "PE %d: database id %d/%llx not in the trace", pe, o.first.first, o.first.second);
     double busy = t.total - t.idle, sum = 0;
     for (auto &o : t.objs) sum += o.second.wall;
-    CHECK(busy >= 0 && sum <= busy + 0.1 * t.total + 0.05 && sum >= busy - 0.1 * t.total - 0.05,
+    // PE 0 also serves the CCS requests and runs the trace-summary collection:
+    // busy time outside any object. Check it only when it is the only PE.
+    double slack = 0.1 * t.total + 0.05;
+    if (pe == 0) slack = 0.2 * t.total + 0.1;
+    bool checked = pe != 0 || npes == 1;
+    CHECK(busy >= 0 && sum <= busy + slack && (!checked || sum >= busy - slack),
           "PE %d: elapsed %.3f - idle %.3f = %.3f busy, but objects sum to %.3f", pe, t.total, t.idle, busy, sum);
-    printf("PE %d: %zu objects, elapsed %.2f s, idle %.2f s, objects %.2f s\n", pe, t.objs.size(), t.total, t.idle, sum);
+    printf("PE %d: %zu objects, elapsed %.3f - idle %.3f = %.3f busy, objects sum to %.3f, margin %.3f s%s\n",
+           pe, t.objs.size(), t.total, t.idle, busy, sum, sum - (busy - slack), checked ? "" : " (not checked)");
   }
   if (expected > 0)
     CHECK((int)all.size() == expected, "%zu distinct ids, %d elements created", all.size(), expected);
