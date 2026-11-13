@@ -185,6 +185,29 @@ New on this line since the split from classic:
   communicator only; not on Windows. Launch with the launcher the MPI
   library requires (Cray MPICH under Slurm: srun --mpi=cray_shasta).
 
+- Coroutine entry methods (#4231): an entry method tagged [coroutine]
+  is a C++20 coroutine that waits for [inbox] entry methods with
+  CK_WHEN, CK_WHEN_ANY, CK_WHEN_ALL and CK_OVERLAP, and calls helper
+  coroutines (ck::coro::task) with CK_CALL, in plain C++ control flow
+  where SDAG uses when and serial. SDAG is unchanged; the two coexist.
+  The owner may be an array element, a group or nodegroup branch, a
+  singleton chare or the mainchare. A chare waiting in a coroutine
+  migrates and is checkpointed: the body is a CK_MIGRATABLE block that
+  is invoked again and jumps to the recorded wait, so the values live
+  across a wait are pupped members; +ck_fakemigrate rebuilds the
+  coroutines at every wait to check this on one PE. Manual section
+  "Structured Control Flow: Coroutine Entry Methods", design in
+  doc/coroutine-sdag-design.md, internals in
+  doc/internals/coroutine-sdag.md; tests/charm++/ckcoro,
+  jacobi3d-coro and sparse-coro, four examples/charm++/*-coro programs
+  and benchmarks/charm++/coro_pingpong. For every program: the
+  reduction wrapper of an [exclusive] nodegroup entry method now takes
+  the node lock, as a direct delivery does; Chare::ckDestroy() is
+  virtual, and Chare::ckDestroyLater() destroys a chare after the call
+  running on it returns. In a .ci file, "inbox" and "coroutine" are
+  attributes only inside the [...] of an entry method and stay names
+  everywhere else.
+
 AMPI (Adaptive MPI):
 
 - AMPI and TCharm run on reconverse (#4051, #4064): the ranks are

@@ -79,10 +79,8 @@
  * be inside a switch of the user's own; two sites must not share a line. A
  * function awaited from a coroutine that contains a site returns
  * ck::coro::task<T>, has its own CK_MIGRATABLE block (co_return inside it)
- * and is awaited with CK_CALL or CK_CALL_TO. A chare that never migrates or
- * checkpoints while a coroutine waits may leave CK_MIGRATABLE out and
- * co_await the state's when awaitables directly; packing it while it waits
- * there aborts.
+ * and is awaited with CK_CALL or CK_CALL_TO. Every coroutine body is a
+ * CK_MIGRATABLE block, since each site is a case of the switch it opens.
  *
  * The owner is a chare of any kind: an array element, a group or nodegroup
  * branch (its inbox and coroutine entries are exclusive, added by charmxi),
@@ -709,9 +707,15 @@ inline record &state::begin_record(int ep, void *msg, bool own, target_fn mk, vo
 // the running entry is one of the chare's [coroutine] entries). A void
 // entry's system message is not kept.
 template <class Owner> inline record &state::begin(Owner *owner, bool isEntry) {
-  if (!isEntry)
-    CkAbort("ck::coro: a ck::coroutine member function is not running as a [coroutine] entry "
-            "method (entry %d is being delivered)", CkCurrentEntry());
+  if (!isEntry) {
+    // CkCurrentEntry is set only in [coroutine] and [inbox] entries.
+    int ep = CkCurrentEntry();
+    if (ep < 0)
+      CkAbort("ck::coro: a ck::coroutine member function was called directly; a [coroutine] "
+              "entry method is invoked through its proxy");
+    CkAbort("ck::coro: a ck::coroutine member function was called directly from entry %s; a "
+            "[coroutine] entry method is invoked through its proxy", _entryTable[ep]->name);
+  }
   void *m = CkCurrentMessage();
   if (m && UsrToEnv(m)->getMsgIdx() == 0) m = nullptr;
   // A marshalled [coroutine] entry is not nokeep: the state owns its
