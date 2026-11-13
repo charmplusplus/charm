@@ -1172,7 +1172,7 @@ void TurnManualLBOff()
   }
   else
   {
-    LBManager::manualOn = true;
+    LBManager::manualOn = false;
   }
 #endif
 }
