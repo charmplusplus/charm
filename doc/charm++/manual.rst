@@ -6477,7 +6477,10 @@ function. Some other mappings such as round-robin (RRMap) also exist,
 which can be used similar to custom ones described below.
 CldMap names no PE for an element (its procNum returns ``CLD_ANYWHERE``),
 so ``insert()`` into an array that uses it must be given a PE; without one
-the program aborts.
+the program aborts. FastArrayMap, HilbertArrayMap and PropMap (1D, or an
+array created with no elements) likewise name no PE for an index outside
+the range the array was created with, so ``insert()`` of such an index must
+be given a PE.
 
 A custom map object is implemented as a group which inherits from
 CkArrayMap and defines these virtual methods:
@@ -6521,7 +6524,8 @@ in the procNum function.
 
 Note that the first argument to the procNum method exists for reasons
 internal to the runtime system and is not used in the calculation of
-processor numbers.
+processor numbers. procNum may return -1 for an index the map has no PE
+for; ``insert()`` of such an index must then be given a PE.
 
 Once you’ve instantiated a custom map object, you can use it to control
 the location of a new array’s elements using the setMap method of the
