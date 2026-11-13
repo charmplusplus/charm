@@ -1,5 +1,5 @@
 #include "matmul.decl.h"
-#include "rand48_replacement.h"
+#include <random>
 
 CProxy_Main mainProxy;
 
@@ -43,10 +43,11 @@ public:
     c.pdgemmRun(1.0, CkCallback(CkReductionTarget(Main, done), thisProxy));
   }
 
-  void done() {
+  void done(double checksum) {
     double endTime = CkWallTimer();
     CkPrintf("Matrix multiply of %u blocks with %u elements each (%u^2) finished in %f seconds\n", 
              numBlocks, blockSize, numBlocks*blockSize, endTime - startTime);
+    CkPrintf("matmul: checksum %.6f\n", checksum);
     CkExit();
   }
 };
@@ -61,10 +62,15 @@ class Block : public CBase_Block {
   {
     unsigned int elems = blockSize * blockSize;
     data = new double[elems];
-    if(randomInit)
+    // Random input that depends only on the element's index, so a run's
+    // checksum does not depend on the number of PEs or on the order in
+    // which the elements are constructed.
+    if(randomInit) {
+      std::minstd_rand gen(thisIndex.x * numBlocks + thisIndex.y + 1);
+      std::uniform_real_distribution<double> uniform(0.0, 1.0);
       for (int i = 0; i < elems; ++i)
-        data[i] = drand48();
-    else
+        data[i] = uniform(gen);
+    } else
       for (int i = 0; i < elems; ++i)
         data[i] = 0;
 

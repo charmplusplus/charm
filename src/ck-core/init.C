@@ -71,6 +71,7 @@ never be excluded...
 #include "CkCheckpoint.decl.h"
 #include "ckmulticast.h"
 #include <sstream>
+#include <unordered_set>
 #include <limits.h>
 #include "spanningTree.h"
 #include "CkSyncBarrier.decl.h"
@@ -171,6 +172,9 @@ int   _roRestartHandlerIdx;
 int   _shrinkExpandRestartHandlerIdx;
 int   _bocHandlerIdx;
 int   _qdHandlerIdx;
+extern int _ckDestroyLaterHandlerIdx;          // ck.C
+extern void _ckDestroyLaterHandler(void *m);   // ck.C
+CkpvExtern(std::unordered_set<Chare *>, _ckDestroyLaterPending);   // ck.C
 int   _qdCommHandlerIdx;
 int   _triggerHandlerIdx;
 
@@ -373,6 +377,8 @@ static inline void _parseCommandLineOpts(char **argv)
       ck::objid::_objidTableLog2 = 16;
   ck::objid::_objidDiag = CmiGetArgFlagDesc(argv, "+objid_diag",
                         "Count location-table events and print them per process at exit");
+  _ckCoroFakeMigrate = CmiGetArgFlagDesc(argv, "+ck_fakemigrate",
+                        "ckcoro: every wait rebuilds the chare's coroutines in place (see ckcoro.h)");
 
   if(CmiGetArgString(argv,"+restart",&_restartDir))
       faultFunc = CkRestartMain;
@@ -1283,6 +1289,7 @@ void initQd(char **argv)
 #endif
 	}
 	CmiAssignOnce(&_qdHandlerIdx, CmiRegisterHandler((CmiHandler)_qdHandler));
+	CmiAssignOnce(&_ckDestroyLaterHandlerIdx, CmiRegisterHandler((CmiHandler)_ckDestroyLaterHandler));
 	CmiAssignOnce(&_qdCommHandlerIdx, CmiRegisterHandler((CmiHandler)_qdCommHandler));
         if (CmiGetArgIntDesc(argv,"+qd",&_dummy_dq, "QD time in seconds")) {
           if (CmiMyPe()==0)
@@ -1405,6 +1412,11 @@ void _initCharm(int unused_argc, char **argv)
 #endif
 
 	CkpvInitialize(size_t *, _offsets);
+	CkpvInitialize(void *, _ckCurrentMsg);
+	CkpvAccess(_ckCurrentMsg) = NULL;
+	CkpvInitialize(int, _ckCurrentEp);
+	CkpvAccess(_ckCurrentEp) = -1;
+	CkpvInitialize(std::unordered_set<Chare *>, _ckDestroyLaterPending);
 #if CMK_ERROR_CHECKING
 	CkpvInitialize(void *, _nokeepMsgInFlight);
 	CkpvAccess(_nokeepMsgInFlight) = NULL;

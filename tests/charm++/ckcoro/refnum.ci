@@ -1,0 +1,15 @@
+// The coroutine version of tests/charm++/sdag/refnum.ci: forall (both
+// strides) and the three ways a reference number is set: the first integer
+// of a marshalled entry, the reference number of the callback of a reduction,
+// and the reference number of the data message of a callback.
+
+module refnum {
+  array [1D] RefnumTest {
+    entry RefnumTest(int s);
+
+    entry [inbox, reductiontarget] void recvNum(int n);
+    entry [inbox] void recvData(CkDataMsg* m);
+
+    entry [coroutine] void run(int messages);
+  }
+}

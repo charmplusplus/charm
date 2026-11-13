@@ -1,0 +1,42 @@
+mainmodule pingpong {
+  readonly CProxy_Main mainProxy;
+  readonly int niter;
+  readonly int payload;
+
+  message PingMsg {
+    char data[];
+  };
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void done(double t);
+  };
+
+  // Plain entry methods: the message is handled on arrival.
+  array [1D] Plain {
+    entry Plain();
+    entry void start();
+    entry void recv(PingMsg *m);
+  };
+
+  // SDAG: each message is matched by a when with the iteration as refnum.
+  array [1D] Sdag {
+    entry Sdag();
+    entry void recv(PingMsg *m);
+    entry void run() {
+      serial { begin(); }
+      for (iter = 0; iter < niter; iter++) {
+        when recv[iter](PingMsg *m) serial { bounce(m); }
+      }
+      serial { finish(); }
+    };
+  };
+
+  // Coroutine entry: each message is matched by a CK_WHEN site with the
+  // iteration as refnum.
+  array [1D] Coro {
+    entry Coro();
+    entry void recv(PingMsg *m);
+    entry void run();
+  };
+};

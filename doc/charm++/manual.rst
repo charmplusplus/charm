@@ -1593,6 +1593,22 @@ different from the one on which the array element resides. You must
 ensure that no messages are sent to a deleted element. After destroying
 an element, you may insert a new element at its index.
 
+A chare that decides inside one of its own entry methods that it is
+finished can call ``ckDestroyLater()``, defined for every chare: the
+chare is destroyed (deleted, or for an array element detached from the
+array first, as ``ckDestroy()`` does) by a message to the same PE,
+handled after whatever is running on the chare has returned: the entry
+method, or a direct call such as the load balancer's call of
+``ResumeFromSync``. The chare must not migrate before then, so the call
+belongs at the end of the body. Calling it again before then has no
+further effect, and a chare destroyed in another way in the meantime is
+not destroyed a second time. This is the way to destroy a chare when
+something of it is still on the stack, for example a coroutine entry
+method (section :numref:`sec:ckcoro`) that has not finished yet; a
+singleton chare's entry method may instead ``delete this`` as its last
+action. Group and nodegroup branches are not destroyed one at a time;
+calling either method on one aborts.
+
 .. _sec:sdag:
 
 Structured Control Flow: Structured Dagger
@@ -1796,7 +1812,11 @@ The use of ``when`` substantially simplifies the example from above:
 Like an ``if`` or ``while`` in C code, each ``when`` clause has a body
 made up of the statement or block following it. The variables declared
 as arguments to the entry method triggering the when are available in
-the scope of the body. By using the sequenced execution of SDAG code and
+the scope of the body, including inside any ``when`` nested in it: the
+generated code keeps them with the element, and they migrate with it.
+All other state that lives across a ``when`` is a member of the chare,
+pupped as usual; a local variable of a surrounding C++ method does not
+exist inside SDAG code. By using the sequenced execution of SDAG code and
 the availability of parameters to when-defined entry methods in their
 bodies, the counter ``expectedMessageCount`` and the intermediate copies
 of the received input are eliminated. Note that the entry methods
@@ -2095,6 +2115,335 @@ SDAG entry method ``startStep`` directly as ``startStep();`` because it
 contains when clauses. It has to be only called using the proxy i.e.
 ``computeObj.startStep();`` , where ``computeObj`` is the proxy to
 ``ComputeObject``.
+
+.. _sec:ckcoro:
+
+Structured Control Flow: Coroutine Entry Methods
+------------------------------------------------
+
+An entry method of a chare of any kind (an array element, a group or
+nodegroup branch, a singleton chare, the mainchare) can be written as a
+C++20 coroutine that waits in the middle of its body for other entry
+methods of the same chare, as an SDAG entry waits with ``when``. The
+control flow is plain C++ (``if``, loops, calls), the interface file
+keeps only the declarations, and the chare can migrate or be
+checkpointed while the coroutine waits. The header is ``ckcoro.h``; the programs must be compiled
+with ``-std=c++20``. This feature is experimental in this release.
+Readers who know SDAG: the two treat the parameters of a waited-for
+entry method differently; the subsection *Differences from SDAG* at the
+end of this section collects what changes.
+
+The entry methods involved are declared with two attributes: the
+coroutine entry is ``[coroutine]`` and the entries it waits for are
+``[inbox]``; both return void and take a message or marshalled
+parameters (conditional and nocopy parameters excepted). The
+chare puts the generated macro ``ClassName_CORO_CODE`` in its class,
+which defines the coroutine state (the active coroutines and the
+buffered deliveries, packed with the chare), the bodies of the inbox
+entries, and ``inbox::name()`` and ``inbox::name(ref)``, which name an
+inbox entry at a wait. A coroutine entry is invoked like any other entry
+method (``strips.run()`` below); the invocation returns when the body
+finishes or first waits, and the body continues inside the inbox entries
+that deliver what it waits for. The strips of the heat diffusion in
+``examples/charm++/heat1d-coro``, which exchange boundary cells around a
+ring every iteration:
+
+.. code-block:: none
+
+   array [1D] Strip {
+     entry Strip();
+     entry [coroutine] void run();
+     entry [inbox] void fromLeft(int iter, double value);
+     entry [inbox] void fromRight(int iter, double value);
+     entry [inbox] void ResumeFromSync();
+   };
+
+.. code-block:: c++
+
+   class Strip : public CBase_Strip {
+     Strip_CORO_CODE
+     std::vector<double> t;         // the cells, with a ghost at each end
+     int iter;                      // live across waits: a member, pupped
+     double leftGhost, rightGhost;  // received at the wait: members, pupped
+     ...
+     ck::coroutine run() {
+       CK_MIGRATABLE {
+         for (iter = 1; iter <= maxIter; iter++) {
+           if (lbFreq > 0 && iter % lbFreq == 0) {
+             AtSync();                    // the element may migrate while it waits here
+             CK_WHEN(inbox::ResumeFromSync());
+           }
+           thisProxy[(thisIndex + numStrips - 1) % numStrips].fromRight(iter, t[1]);
+           thisProxy[(thisIndex + 1) % numStrips].fromLeft(iter, t[cellsPerStrip]);
+           // when fromLeft[iter](int i, double v), fromRight[iter](int i, double v)
+           CK_WHEN_ALL(CK_ALT(inbox::fromLeft(iter), ck::coro::skip, leftGhost),
+                       CK_ALT(inbox::fromRight(iter), ck::coro::skip, rightGhost));
+           update();
+           if (iter % reportFreq == 0)
+             contribute(sizeof(double), &maxChange, CkReduction::max_double,
+                        CkCallback(CkReductionTarget(Main, report), mainProxy));
+         }
+       }
+     }
+   };
+
+``CK_MIGRATABLE { ... }`` encloses the body: the part that can be rebuilt
+after a migration or a checkpoint (how is explained below). Every wait
+is written inside it.
+
+The mainchare of the same program waits for the reports in its own
+coroutine, with the block form of a wait:
+
+.. code-block:: c++
+
+   ck::coroutine run() {                    // entry [coroutine] void run();
+     CK_MIGRATABLE {
+       for (reports = 1; reports <= maxIter / reportFreq; reports++) {
+         CK_WHEN_BLOCK(inbox::report(), maxChange) {   // entry [inbox, reductiontarget] void report(double maxChange);
+           CkPrintf("iteration %d: largest change %.6e\n", reports * reportFreq, maxChange);
+         }
+       }
+       ...
+     }
+   }
+
+A wait has two forms. ``CK_WHEN_BLOCK(want, name...) { ... }`` waits
+until a delivery to the named entry arrives and declares the entry's
+parameters, in order, as variables of the block that follows: the message
+pointer, or every marshalled parameter; the block is their scope and may
+not contain another wait (the compiler rejects one: the restart described
+below would jump past the declarations). ``CK_WHEN(want, out...)`` waits
+the same way and stores the delivery into members of the chare that
+follow, again the message pointer or every marshalled parameter in order,
+a parameter used only for matching included (``ck::coro::skip`` in place
+of a member discards one). A received value that is needed after a later
+wait goes through a member, because a member is pupped with the chare
+and a variable of the coroutine is not (see the rules below). The
+coroutine owns a received message: it deletes it before the next wait,
+or pups the member with ``CkPupMessage``. An array parameter
+(``double data[n]``) is received as a pointer into the message, valid
+until the next wait, or copied into a container member such as a
+``std::vector<double>`` when the member has that type.
+``inbox::name(ref)`` matches the reference number, which is the
+envelope's for a message entry and the first arithmetic parameter for a
+marshalled entry (a reduction target reached through its reduction uses
+the reduction message's, set on the callback, as SDAG does);
+``inbox::name()`` matches any. A delivery that no coroutine is waiting
+for is buffered in the chare, in arrival order, and moves with the
+chare. ``CK_WHEN_ALL(CK_ALT(want, out...), ...)`` waits until every
+alternative has a delivery and takes them together, as an SDAG
+``when a(), b()``. ``CK_WHEN_ANY(idx, CK_ALT(want, out...), ...)`` waits for the
+first of several alternatives and stores the index of the one that
+matched in the ``int`` variable ``idx`` (a member if it is read after a
+later wait), as an SDAG ``case``; an alternative may be a conjunction,
+``CK_ALL(CK_ALT(...), CK_ALT(...))``, which is taken only when all its
+deliveries are present.
+
+A coroutine frame is never packed. When the chare migrates or is
+checkpointed, the coroutine state records which wait each active coroutine
+is suspended at, and after unpacking the entry is invoked again: its body
+runs again from the top and jumps to the recorded wait. The jump is what
+``CK_MIGRATABLE`` provides: it expands to a frame guard and
+``switch (site) case 0: if (false) default: abort(); else`` followed by
+the block, and each wait is a ``case`` of that switch labelled with its
+source line, so a fresh start enters the block from the top, a restart
+enters it at the recorded wait, and a recorded wait that is not in the
+block aborts before any of the block runs. Because the restart sites are
+source line numbers, a checkpoint can be restarted only by a binary built
+from the same source layout of the coroutine bodies: a line added above a
+wait, even a comment, makes ``+restart`` abort with a message naming the
+two sites. This gives the rules:
+
+-  Any value that is live across a wait is a member of the chare, pupped
+   as usual: the variables of a ``CK_WHEN_BLOCK`` end with its block, and
+   a local survives neither the jump nor the migration (C++ rejects a jump
+   past a local with an initializer, and a local declared before
+   ``CK_MIGRATABLE`` is silently re-initialized when the body runs
+   again). A pointer to an array parameter is valid until the next wait.
+   Compiling with ``-Wall`` is recommended: clang reports a scalar local
+   used across a wait without an initializer as
+   ``-Wsometimes-uninitialized`` ("variable 'x' is used uninitialized
+   whenever switch case is taken"), and under ``+ck_fakemigrate`` such a
+   variable holds an unspecified value after the rebuild.
+-  Code inside ``CK_MIGRATABLE`` before the recorded wait is skipped
+   after a migration, so its results must be members; code before
+   ``CK_MIGRATABLE`` runs again every time the body is rebuilt, so it
+   must not have side effects that cannot be repeated.
+-  The chare migrates or is checkpointed only while every active
+   coroutine of it is suspended at a ``CK_WHEN``, ``CK_WHEN_ANY`` or
+   ``CK_CALL``; packing it while suspended at another ``co_await`` aborts.
+   ``AtSync()`` and ``migrateMe()`` may be called from the body: the move
+   happens while the body waits at the next ``CK_WHEN``.
+-  A wait is one statement and may be the body of an ``if`` or a loop; it
+   must not be inside a ``switch`` of the program's own, and two waits
+   must not share a source line.
+-  At most one coroutine per entry method is active in a chare at a
+   time.
+-  The parameters of a coroutine entry are taken by value in its C++
+   definition (a reference would bind to the generated wrapper's local,
+   which is gone after the first wait). They are supplied again when the
+   body runs again after a migration. An array parameter points into the
+   entry's message, which lives as long as the coroutine. A coroutine
+   entry that takes a message type receives a message that belongs to
+   the coroutine state: the body may read it after any wait and does
+   not delete it; the state deletes it (with its destructor) when the
+   coroutine ends, and after a migration the body receives a copy. The
+   state keeps a packed copy for that, made once per invocation, so a
+   large message is better sent to an inbox entry and waited for, or
+   passed as marshalled parameters.
+
+A function that itself waits is a coroutine task: a function returning
+``ck::coro::task<T>`` whose body is a ``CK_MIGRATABLE`` block of its own,
+and is awaited with ``CK_CALL(expr)`` or ``CK_CALL_TO(lhs, expr)``; a
+value is returned with ``co_return`` inside the block:
+
+.. code-block:: c++
+
+   ck::coro::task<int> receive(int idx) {     // waits inside a called function
+     CK_MIGRATABLE {
+       CK_WHEN(inbox::recvNum(idx), n);       // n: a member
+       co_return n;
+     }
+   }
+   ...
+   CK_CALL_TO(total, receive(i));             // total: a member if used after a later wait
+
+Several waits can be in progress at once, as with an SDAG ``overlap``:
+``CK_OVERLAP(task...)`` runs the ``ck::coro::task<void>`` coroutine tasks given to
+it as child coroutines of the current one, each waiting at its own sites,
+and continues when all of them have finished;
+``CK_FORALL(i, lo, hi, expr)`` does the same with one coroutine task per value of
+``i`` in ``[lo, hi)``,
+and ``CK_FORALL_STRIDE(i, start, end, stride, expr)`` for ``i`` from
+``start`` to ``end`` inclusive in steps of ``stride`` of either sign, as
+an SDAG ``forall``. The children are started in order and run until
+their first wait, a delivery resumes whichever child waits for it, and
+the parent resumes after the last child finishes. Each ``when`` clause
+of an SDAG ``overlap`` becomes a coroutine task:
+
+.. code-block:: c++
+
+   ck::coro::task<void> waitA() {
+     CK_MIGRATABLE {
+       CK_WHEN(inbox::a(round), ck::coro::skip, gotA);   // overlap { when a[round](int r, int gotA) {...}
+     }
+   }
+   ck::coro::task<void> waitItem(int i) {
+     CK_MIGRATABLE {
+       CK_WHEN_BLOCK(inbox::item(i), tag, v) { sum += v; } // forall [i] (0:n-1,1) { when item[i](int tag, int v) {...} }
+     }
+   }
+   ...
+   CK_OVERLAP(waitA(), waitB());
+   CK_FORALL(i, 0, n, waitItem(i));
+
+The element may migrate while the children wait: the parent's record
+packs each child's wait, and after the restart the parent reaches the
+``CK_OVERLAP`` again and starts only the children that had not finished.
+A finished child is not run again, so what it computed must be in
+pupped members, like any value that is live across a wait. A coroutine task's
+parameters are supplied again by the restart, so they may be the
+``forall`` index and values derived from members.
+
+The command line option ``+ck_fakemigrate`` makes every wait pack and
+unpack the chare's coroutines in place the first time a coroutine
+suspends there, so that a program can check the rules above on one
+processor without a load balancer. The flag checks the restart of the
+coroutine bodies only, not the chare's own pup (a member left out of
+``pup()`` keeps its value under the flag), so a run on two or more PEs
+with a load balancer, or a checkpoint and ``+restart``, is still needed
+to check the pup.
+
+The chare kinds differ only in how a suspended coroutine is invoked
+again after a migration or a restart from a checkpoint: the coroutine
+state sends the entry's message to the chare's own handle, index or
+branch, so a group's or a singleton chare's coroutine resumes on the PE
+it was checkpointed on. On a nodegroup the ``[inbox]`` and
+``[coroutine]`` entries are made ``exclusive`` by charmxi, as SDAG's
+entries of a nodegroup are, so that deliveries from different PEs of
+the node and the coroutine body never run at the same time; the node
+lock is released whenever the coroutine suspends, because the entry
+method returns there. These entries must not be tagged ``exclusive``
+by hand.
+
+Inside a ``[coroutine]`` or ``[inbox]`` entry method, ``CkCurrentMessage()``
+returns the message being delivered (for marshalled parameters, the
+message that carries them) and ``CkCurrentEntry()`` the index of the entry
+method; their generated wrappers set them, so both are null (-1) in every
+other entry method and outside entry methods, and an ``[inline]`` or
+``[local]`` call made from such an entry sees the caller's delivery. The
+coroutine entries use them to register the body with its message, and the
+inbox entries to keep marshalled parameters in the message they arrived in
+instead of copying them.
+
+Programs in the distribution that use coroutine entry methods:
+``examples/charm++/heat1d-coro`` (the program above, with migration
+under a load balancer and a checksum checked by its ``make test``); then,
+each next to the SDAG program it was written from and printing the same
+result, ``examples/charm++/leanmd-coro`` (the molecular dynamics
+miniapp: a mainchare, a 3D and a 6D array, waits with reference numbers,
+an array parameter, a container parameter and a message held across a
+wait), ``examples/charm++/fib-coro`` (singleton chares, nested waits),
+``examples/charm++/matmul-coro`` (a ``forall`` over a conjunction of two
+array parameters), ``tests/charm++/sparse-coro`` (a mainchare's chain of
+waits in block form), ``tests/charm++/jacobi3d-coro`` (the 3D Jacobi of
+``tests/charm++/jacobi3d-sdag``, with load balancing, checkpoint and
+restart in its ``make test``), ``tests/charm++/ckcoro`` (the ``basic``,
+``refnum`` and ``migration`` modules of ``tests/charm++/sdag`` written
+as coroutines, with every construct of this section, plus modules for
+marshalled inbox entries, arrays and overlap under migration, and for
+a group, a nodegroup, a singleton chare and the mainchare as owners,
+checkpointed and restarted while their coroutines wait), and
+``benchmarks/charm++/coro_pingpong`` (one ping-pong written three ways,
+plain entry methods, SDAG and a coroutine, in one file).
+
+Differences from SDAG
+~~~~~~~~~~~~~~~~~~~~~
+
+-  A ``when`` body is a block of the coroutine, not a separate function.
+   ``when e(int x, Y y) { body }`` is
+   ``CK_WHEN_BLOCK(inbox::e(), x, y) { body }`` as long as the body
+   contains no wait. If it does (a nested ``when``), the outer parameters
+   are received into members with ``CK_WHEN(inbox::e(), x, y)`` and the
+   body follows, with the nested wait inside it. SDAG keeps a when's
+   parameters across nested whens in a closure that it packs with the
+   element; here the member is that closure and the chare pups it.
+-  A wait names every parameter of the entry, including one used only for
+   matching (``ck::coro::skip`` discards it); SDAG's ``when e[ref](...)``
+   and ``when e(int ref, ...)`` both become ``inbox::e(ref)`` with the
+   reference number parameter listed.
+-  A pointer to an array parameter is valid until the next wait, not
+   across nested whens; a container member copies it.
+-  ``when a(), b()`` is ``CK_WHEN_ALL``; ``case`` is ``CK_WHEN_ANY`` with
+   ``CK_ALL`` for an arm that is a conjunction; the arm's body is the code
+   after the wait, selected on the stored index with ``if``, not with a
+   ``switch`` (a wait may not be inside a ``switch``). Loops and
+   conditionals are the C++ ones, with the loop variable a member in
+   both; ``forall [i] (start:end, stride)`` is ``CK_FORALL_STRIDE``.
+-  After a migration or restart, the coroutine's body is invoked again
+   and jumps to the recorded wait: the code inside ``CK_MIGRATABLE``
+   before that wait is skipped, so its results must be members, and the
+   code before ``CK_MIGRATABLE`` runs again; SDAG resumes without
+   re-running anything.
+-  Each ``when`` clause of an ``overlap`` is a named coroutine task
+   (``ck::coro::task<void>``) passed to ``CK_OVERLAP``; the body of a
+   ``forall`` is one coroutine task
+   that takes the index. SDAG's inline clause bodies have no equivalent
+   (a lambda coroutine would outlive its closure).
+-  A coroutine entry is invoked only through its proxy; a direct C++
+   call of the member function aborts. SDAG's
+   ``ResumeFromSync() { doStep(); }`` becomes
+   ``thisProxy[thisIndex].doStep()`` or an inbox wait on
+   ``ResumeFromSync``.
+-  A coroutine body must not delete its own chare (``delete this``
+   inside a ``when`` body is allowed in SDAG): it calls
+   ``ckDestroyLater()``, and the chare is destroyed by a message handled
+   after the call running on it returns, as ``examples/charm++/fib-coro``
+   does.
+-  Not available: several active invocations of one entry per chare.
+-  Available only here: waits inside called functions (``CK_CALL``),
+   plain C++ control flow and calls, parameters on the coroutine entry,
+   and no bodies in the ``.ci`` file.
 
 .. _sec:pup:
 
@@ -4357,7 +4706,8 @@ follows:
 
 Charm++ currently offers the following attributes that one may assign to
 an entry method: threaded, sync, exclusive, nokeep, notrace, appwork,
-immediate, expedited, inline, local, python, reductiontarget, aggregate.
+immediate, expedited, inline, local, python, reductiontarget, aggregate,
+inbox, coroutine.
 
 threaded
    entry methods run in their own non-preemptible threads. These entry
@@ -4419,6 +4769,18 @@ nokeep
    ``nokeep`` message is also an error, which the runtime does not
    detect. An example can be found in
    ``examples/charm++/histogram_group``.
+
+inbox
+   entry methods of a chare of any kind deliver to the chare's coroutine
+   state (section :numref:`sec:ckcoro`): their bodies are generated. They
+   take a message or marshalled parameters (conditional and nocopy
+   parameters excepted).
+
+coroutine
+   entry methods of a chare of any kind are defined in C++ as coroutines
+   returning ``ck::coroutine`` (section :numref:`sec:ckcoro`). They take
+   a message or marshalled parameters (conditional and nocopy parameters
+   excepted) and return void.
 
 notrace
    entry methods will not be traced during execution. As a result, they
@@ -4599,6 +4961,12 @@ When the message with opts1 arrives at its destination, it will be
 pushed onto the end of the message queue as usual. However, when the
 message with opts2 arrives, it will be pushed onto the *front* of the
 message queue.
+
+Inside the entry method, ``CkCurrentMessage()`` (section
+:numref:`sec:ckcoro`) returns the message that carries the marshalled
+parameters, so the receiver can read the priority, the reference number
+set with ``setRef`` and the other envelope fields, or keep the message
+with ``CkReferenceMsg`` for later use.
 
 .. _messages-1:
 

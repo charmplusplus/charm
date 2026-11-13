@@ -1,0 +1,14 @@
+Heat diffusion on a ring of 1D strips, written with coroutine entry
+methods ([coroutine] and [inbox] in heat1d.ci, ckcoro.h). It is the
+example of the manual section "Structured Control Flow: Coroutine Entry
+Methods".
+
+  ./heat1d [strips [cells [iterations [reportFreq [lbFreq]]]]] +pN [+balancer RotateLB]
+
+Each strip sends its boundary cells to both neighbours every iteration and
+waits for both neighbours' values (CK_WHEN_ALL) before it updates; every
+reportFreq iterations the strips reduce the largest change to Main, whose
+own coroutine waits for the reports (CK_WHEN_BLOCK); with lbFreq > 0 the
+elements call AtSync and migrate while suspended at the next wait. The
+final line is an integer checksum, the same on any number of PEs, with
+migration, and under +ck_fakemigrate; `make test` checks that.

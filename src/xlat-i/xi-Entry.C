@@ -95,6 +95,40 @@ void Entry::check() {
   if (isExclusive() && !container->isNodeGroup())
     XLAT_ERROR_NOCOL("only nodegroup methods can be 'exclusive'", first_line_);
 
+    if (isInbox() || isCoroutine()) {
+      if (isInbox() && isCoroutine())
+        XLAT_ERROR_NOCOL("an entry method is 'inbox' or 'coroutine', not both", first_line_);
+      if (container->isNodeGroup()) {
+        // Serialized with each other as SDAG entries of a nodegroup are: the
+        // coroutine state has no lock of its own. The lock is released when
+        // the coroutine suspends, because the entry returns there.
+        if (isExclusive())
+          XLAT_ERROR_NOCOL("an 'inbox' or 'coroutine' entry method of a nodegroup is exclusive "
+                           "by itself; do not tag it 'exclusive'", first_line_);
+        addAttribute(SLOCKED);
+      }
+      if (isConstructor() || isThreaded() || isSync() || isLocal() || isInline() ||
+          isWhenIdle() || isIget() || isPython() || isTramTarget() || isImmediate() ||
+          isSkipscheduler())
+        XLAT_ERROR_NOCOL("an 'inbox' or 'coroutine' entry method is a plain asynchronous "
+                         "entry method (not threaded, sync, local, inline, whenidle, iget, "
+                         "python, aggregate, immediate or expedited)", first_line_);
+      if (retType && !retType->isVoid())
+        XLAT_ERROR_NOCOL("an 'inbox' or 'coroutine' entry method returns void", first_line_);
+      if (isNoKeep())
+        XLAT_ERROR_NOCOL("an 'inbox' or 'coroutine' entry method is not 'nokeep': the coroutine "
+                         "state keeps the message", first_line_);
+      if (isCoroutine() && isReductionTarget())
+        XLAT_ERROR_NOCOL("a 'coroutine' entry method is not a reduction target: make the "
+                         "target an 'inbox' entry and wait for it", first_line_);
+      for (ParamList* pl = param; pl != NULL; pl = pl->next) {
+        Parameter* sv = pl->param;
+        if (sv->isConditional() || sv->isRdma())
+          XLAT_ERROR_NOCOL("an 'inbox' or 'coroutine' entry method takes a message or marshalled "
+                           "parameters without conditional or nocopy parameters", first_line_);
+      }
+    }
+
   // (?) Check that every when statement has a corresponding entry method
   // declaration. Otherwise, print all candidates tested (as in clang, gcc.)
   if (isSdag()) {
@@ -177,7 +211,11 @@ Entry::Entry(int l, Attribute* a, Type* r, const char* n, ParamList* p, Value* s
   entryCount = -1;
   isWhenEntry = 0;
   containsWhenConstruct = false;
-  if (param && param->isMarshalled() && !isThreaded()) addAttribute(SNOKEEP);
+  // The wrapper of a marshalled inbox entry hands the message to the
+  // coroutine state unopened, and the state owns a coroutine entry's
+  // message (its array parameters point into it), so neither is nokeep.
+  if (param && param->isMarshalled() && !isThreaded() && !isInbox() && !isCoroutine())
+    addAttribute(SNOKEEP);
   if (isPython()) pythonDoc = python_doc;
   ParamList* plist = p;
   while (plist != NULL) {
@@ -242,6 +280,10 @@ void Entry::setChare(Chare* c) {
 
   if (isWhenIdle()) {
     container->setWhenIdle(1);
+  }
+
+  if (isInbox() || isCoroutine()) {
+    container->setCoro(1);
   }
 }
 
@@ -2123,9 +2165,24 @@ void Entry::genDefs(XStr& str) {
       // on that thread and deletes it when the thread ends. The wrapper owns
       // the message, so it takes no extra reference.
       if (isThreaded()) str << callThread(epStr(true), 0, false);
+      // The scope names the target entry itself: deliver() takes the
+      // reduction message's reference number for that entry only.
+      if (isInbox())
+        str << "  CkEntryScope impl_entry(impl_msg, " << epIdx(1) << ");\n";
+      if (isExclusive()) {
+        // The reduction wrapper of an exclusive entry takes the node lock as
+        // the direct call does, resending the reduction message when the
+        // lock is busy.
+        str << "  if(CmiTryLock(impl_obj->__nodelock)) {\n"
+            << "    CkSendMsgNodeBranch(" << epIdx(1, true)
+            << ",impl_msg,CkMyNode(),impl_obj->CkGetNodeGroupID());\n"
+            << "    return;\n"
+            << "  }\n";
+      }
       str << "  char* impl_buf = (char*)((CkReductionMsg*)impl_msg)->getData();\n";
       XStr precall;
       genCall(str, precall, true, false);
+      if (isExclusive()) str << "  CmiUnlock(impl_obj->__nodelock);\n";
       if (!(sdagCon || isWhenEntry))
         str << "  delete (CkReductionMsg*)impl_msg;\n}\n\n";
       else
@@ -2198,8 +2255,10 @@ void Entry::genDefs(XStr& str) {
     // An exclusive method
     preMarshall
         << "  if(CmiTryLock(impl_obj->__nodelock)) {\n"; /*Resend msg. if lock busy*/
-    /******* DANGER-- RESEND CODE UNTESTED **********/
-    if (param->isMarshalled()) {
+    // The original is freed after the call when the entry is nokeep (every
+    // marshalled entry but inbox, coroutine and threaded ones), so the resend
+    // takes a copy; otherwise the original is resent.
+    if (param->isMarshalled() && isNoKeep()) {
       preMarshall << "    impl_msg = CkCopyMsg(&impl_msg);\n";
     }
     preMarshall << "    CkSendMsgNodeBranch(" << epIdx()
@@ -2309,8 +2368,20 @@ void Entry::genDefs(XStr& str) {
     str << "  " << container->baseName() << "* impl_obj = static_cast<"
         << container->baseName() << "*>(impl_obj_void);\n";
   }
-  if (!isLocal()) {
+  if (isInbox() && param->isMarshalled()) {
+    // A marshalled inbox entry: the message goes to the coroutine state as
+    // it is; a when unmarshals it when it matches. On a nodegroup, under the
+    // node lock (preMarshall and postCall are the exclusive wrapper).
+    str << preMarshall;
+    str << "  impl_obj->__coro.deliver_message<" << container->baseName() << "::inbox::" << name
+        << "_params>(" << epIdx(1) << ", (CkMarshallMsg *)impl_msg);\n";
+    str << postCall;
+  } else if (!isLocal()) {
     if (isThreaded()) str << callThread(epStr());
+    // The body of a coroutine entry, and the inbox stub reached by a local
+    // delivery, read the message and the entry index being delivered.
+    if (isInbox() || isCoroutine())
+      str << "  CkEntryScope impl_entry(impl_msg, " << epIdx(1) << ");\n";
     str << preMarshall;
     if (param->isMarshalled()) {
       if (param->hasConditional())
@@ -2620,9 +2691,77 @@ int Entry::isAccel(void) { return (hasAttribute(SACCEL)); }
 
 int Entry::isMemCritical(void) { return (hasAttribute(SMEM)); }
 int Entry::isReductionTarget(void) { return (hasAttribute(SREDUCE)); }
+int Entry::isInbox(void) { return (hasAttribute(SINBOX)); }
+int Entry::isCoroutine(void) { return (hasAttribute(SCOROUTINE)); }
 
 char* Entry::getEntryName() { return name; }
 int Entry::getLine() { return line; }
 Chare* Entry::getContainer(void) const { return container; }
+
+// One entry's lines of the X_CORO_CODE macro (Chare::genCoroCode).
+void Entry::genCoroCode(CoroGen& g) {
+  XStr& str = *g.str;
+  if (g.pass == CoroGen::isEntry) {
+    if (isCoroutine()) str << " || ep == " << epIdx(1);
+    return;
+  }
+  if (!isInbox()) return;
+  if (g.pass == CoroGen::stub) {
+    // The entry's body, reached through a reduction wrapper or a direct call
+    // (its own marshalled message is handed over by the generated _call_
+    // wrapper without unmarshalling): hand the message, or the arguments,
+    // to the state. An array argument carries its byte count.
+    str << "  void " << name << "(" << paramType(0, 0) << ") { __coro.deliver(" << epIdx(1);
+    if (param->isMessage()) {
+      str << ", " << param->param->name;
+    } else {
+      for (ParamList* pl = param; pl != NULL; pl = pl->next) {
+        Parameter* sv = pl->param;
+        if (sv->getType()->isVoid()) continue;
+        if (sv->isArray()) {
+          str << ", ::ck::coro::array_arg<";
+          sv->getType()->print(str);
+          str << ">{" << sv->name << ", sizeof(";
+          sv->getType()->print(str);
+          str << ")*(" << sv->getArrayLen() << ")}";
+        } else {
+          str << ", " << sv->name;
+        }
+      }
+    }
+    str << "); }\n";
+  } else if (g.pass == CoroGen::want) {
+    // inbox::name_params lists the entry's parameter types; inbox::name()
+    // waits for any delivery, inbox::name(ref) for one with that reference
+    // number.
+    str << "    using " << name << "_params = ::ck::coro::params<";
+    if (param->isMessage()) {
+      param->param->getType()->print(str);
+    } else {
+      bool first = true;
+      for (ParamList* pl = param; pl != NULL; pl = pl->next) {
+        Parameter* sv = pl->param;
+        if (sv->getType()->isVoid()) continue;
+        if (!first) str << ", ";
+        first = false;
+        if (sv->isArray()) {
+          str << "::ck::coro::array_param<";
+          sv->getType()->print(str);
+          str << ">";
+        } else {
+          str << "::ck::coro::value_t<";
+          sv->getType()->print(str);
+          str << ">";
+        }
+      }
+    }
+    str << ">;\n";
+    str << "    static ::ck::coro::want_t<" << name << "_params> " << name
+        << "() { return ::ck::coro::want_t<" << name << "_params>(" << epIdx(1) << "); }\n"
+        << "    static ::ck::coro::want_t<" << name << "_params> " << name
+        << "(CMK_REFNUM_TYPE ref) { return ::ck::coro::want_t<" << name << "_params>("
+        << epIdx(1) << ", ref); }\n";
+  }
+}
 
 }  // namespace xi

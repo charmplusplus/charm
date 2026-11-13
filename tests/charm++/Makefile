@@ -21,11 +21,14 @@ DIRS = \
   io_sessions \
   groupdep_creator \
   sparse \
+  sparse-coro \
   reductionTesting \
   partitions \
   charmxi_parsing \
   jacobi3d \
   jacobi3d-sdag \
+  jacobi3d-coro \
+  ckcoro \
   zerocopy \
   within_node_bcast \
   longIdle \
@@ -86,6 +89,7 @@ NONSCALEDIRS = \
   migratable_threads \
   sdag \
   sparse \
+  sparse-coro \
   charmxi_parsing \
   anytime_migration \
 

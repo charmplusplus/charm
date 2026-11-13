@@ -1,0 +1,29 @@
+// Heat diffusion on a ring of 1D strips, written with coroutine entry
+// methods (ckcoro.h). The example of the manual section Structured
+// Control Flow: Coroutine Entry Methods.
+mainmodule heat1d {
+  readonly CProxy_Main mainProxy;
+  readonly int numStrips;      // array elements
+  readonly int cellsPerStrip;  // cells per element
+  readonly int maxIter;
+  readonly int reportFreq;     // iterations between reports to Main
+  readonly int lbFreq;         // iterations between load balancing (0: none)
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    // The driver: waits for each report and for the final checksum.
+    entry [coroutine] void run();
+    entry [inbox, reductiontarget] void report(double maxChange);
+    entry [inbox, reductiontarget] void done(long long checksum);
+  };
+
+  array [1D] Strip {
+    entry Strip();
+    // One iteration per loop: exchange boundary cells with both neighbours,
+    // then update; every lbFreq iterations the element may migrate.
+    entry [coroutine] void run();
+    entry [inbox] void fromLeft(int iter, double value);
+    entry [inbox] void fromRight(int iter, double value);
+    entry [inbox] void ResumeFromSync();
+  };
+}
