@@ -8,12 +8,13 @@
 //
 // Phase 7 checks that MPI_Probe/MPI_Iprobe with MPI_ANY_TAG skip a queued
 // internal (scatter) message. Phase 8 checks MPI_Ineighbor_alltoall on its
-// own (its sends and receives must use the same internal tag).
+// own (its sends and receives must use the same internal tag). Phases 9 and
+// 10 check that MPI_Dist_graph_create's own exchange neither takes a queued
+// user message nor is taken by a pending wildcard receive (issue #4101).
 //
 // Usage: ./wildcard [phase]   (no argument runs every phase)
 #include <stdio.h>
 #include <stdlib.h>
-#include <algorithm>
 #include "mpi.h"
 
 // AMPI ranks are threads in one process, so no mutable globals: every rank
@@ -64,20 +65,47 @@ static void ringCart(MPI_Comm *cart)
   MPI_Cart_create(MPI_COMM_WORLD, 1, dims, periods, 0, cart);
 }
 
-// Each rank sends its rank to both ring neighbors; the received pair, sorted,
-// must be the sorted pair of neighbor ranks (AMPI orders neighbors by
-// locality, so only the multiset is checked).
+// Each rank sends 2r to its left neighbor and 2r+1 to its right one (MPI 3.1
+// section 7.6: the -1 neighbor's block first), so it receives 2*left+1 from
+// the left and 2*right from the right, in that order.
+static void nborSend(MPI_Comm cart, int sbuf[2])
+{
+  int r;
+  MPI_Comm_rank(cart, &r);
+  sbuf[0] = 2 * r;
+  sbuf[1] = 2 * r + 1;
+}
+
 static void checkNbor(Ctx &c, MPI_Comm cart, int phase, const int rbuf[2])
 {
   int r, n;
   MPI_Comm_rank(cart, &r);
   MPI_Comm_size(cart, &n);
-  int exp[2] = { (r - 1 + n) % n, (r + 1) % n };
-  int got[2] = { rbuf[0], rbuf[1] };
-  std::sort(exp, exp + 2);
-  std::sort(got, got + 2);
-  CHECK(got[0] == exp[0] && got[1] == exp[1], "phase %d: neighbor alltoall got {%d,%d}, expected {%d,%d}",
-        phase, got[0], got[1], exp[0], exp[1]);
+  int exp[2] = { 2 * ((r - 1 + n) % n) + 1, 2 * ((r + 1) % n) };
+  CHECK(rbuf[0] == exp[0] && rbuf[1] == exp[1], "phase %d: neighbor alltoall got {%d,%d}, expected {%d,%d}",
+        phase, rbuf[0], rbuf[1], exp[0], exp[1]);
+}
+
+// Every rank specifies the one edge (r+1) -> (r+2) with weight r, so rank q
+// has source q-1 (weight q-2) and destination q+1 (weight q-1).
+static void distGraphRing(Ctx &c, int phase, MPI_Comm *dg)
+{
+  int r, n;
+  MPI_Comm_rank(MPI_COMM_WORLD, &r);
+  MPI_Comm_size(MPI_COMM_WORLD, &n);
+  int src = (r + 1) % n, deg = 1, dst = (r + 2) % n, w = r;
+  MPI_Dist_graph_create(MPI_COMM_WORLD, 1, &src, &deg, &dst, &w, MPI_INFO_NULL, 0, dg);
+  int indeg = -1, outdeg = -1, weighted = 0;
+  MPI_Dist_graph_neighbors_count(*dg, &indeg, &outdeg, &weighted);
+  CHECK(indeg == 1 && outdeg == 1 && weighted, "phase %d: dist graph degrees %d/%d weighted %d, expected 1/1 1",
+        phase, indeg, outdeg, weighted);
+  if (indeg != 1 || outdeg != 1) return;
+  int s = -1, sw = -1, d = -1, dw = -1;
+  MPI_Dist_graph_neighbors(*dg, 1, &s, &sw, 1, &d, &dw);
+  int es = (r - 1 + n) % n, esw = (r - 2 + 2 * n) % n, ed = (r + 1) % n, edw = es;
+  CHECK(s == es && sw == esw && d == ed && dw == edw,
+        "phase %d: dist graph source %d (w %d) dest %d (w %d), expected %d (w %d) %d (w %d)",
+        phase, s, sw, d, dw, es, esw, ed, edw);
 }
 
 static void runPhase(Ctx &c, int phase)
@@ -137,9 +165,8 @@ static void runPhase(Ctx &c, int phase)
   case 6: { // MPI_Neighbor_alltoall on a Cart communicator
     MPI_Comm cart;
     ringCart(&cart);
-    int cr;
-    MPI_Comm_rank(cart, &cr);
-    int sbuf[2] = { cr, cr }, rbuf[2] = { -1, -1 };
+    int sbuf[2], rbuf[2] = { -1, -1 };
+    nborSend(cart, sbuf);
     postWild(c, cart, &wreq);
     MPI_Neighbor_alltoall(sbuf, 1, MPI_INT, rbuf, 1, MPI_INT, cart);
     checkNbor(c, cart, phase, rbuf);
@@ -182,13 +209,31 @@ static void runPhase(Ctx &c, int phase)
   case 8: { // MPI_Ineighbor_alltoall + MPI_Wait on a Cart communicator
     MPI_Comm cart;
     ringCart(&cart);
-    int cr;
-    MPI_Comm_rank(cart, &cr);
-    int sbuf[2] = { cr, cr }, rbuf[2] = { -1, -1 };
+    int sbuf[2], rbuf[2] = { -1, -1 };
+    nborSend(cart, sbuf);
     MPI_Ineighbor_alltoall(sbuf, 1, MPI_INT, rbuf, 1, MPI_INT, cart, &req);
     MPI_Wait(&req, MPI_STATUS_IGNORE);
     checkNbor(c, cart, phase, rbuf);
     MPI_Comm_free(&cart);
+    break;
+  }
+  case 9: { // MPI_Dist_graph_create with a user message (tag 0) queued on its communicator
+    int u = 9000 + r, got = -1;
+    MPI_Send(&u, 1, MPI_INT, (r + 1) % n, 0, MPI_COMM_WORLD);
+    MPI_Comm dg;
+    distGraphRing(c, phase, &dg);
+    MPI_Recv(&got, 1, MPI_INT, (r - 1 + n) % n, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+    CHECK(got == 9000 + (r - 1 + n) % n, "phase 9: user message got %d, expected %d", got,
+          9000 + (r - 1 + n) % n);
+    MPI_Comm_free(&dg);
+    break;
+  }
+  case 10: { // MPI_Dist_graph_create with a wildcard receive pending on its communicator
+    MPI_Comm dg;
+    postWild(c, MPI_COMM_WORLD, &wreq);
+    distGraphRing(c, phase, &dg);
+    finishWild(c, MPI_COMM_WORLD, phase, &wreq);
+    MPI_Comm_free(&dg);
     break;
   }
   }
@@ -206,7 +251,7 @@ int main(int argc, char **argv)
   int n;
   MPI_Comm_size(MPI_COMM_WORLD, &n);
 
-  const int nphases = 8;
+  const int nphases = 10;
   int only = (argc > 1) ? atoi(argv[1]) : 0;
   if (n < 2) {
     if (wrank == 0) printf("wildcard: needs at least 2 ranks, skipping\n");

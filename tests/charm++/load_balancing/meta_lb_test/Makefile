@@ -1,7 +1,9 @@
 -include ../../../common.mk
 CHARMC	= ../../../../bin/charmc $(OPTS)
 
-RF_MODEL = ../../../../src/ck-ldb/rf_model
+# Found from this Makefile's real location, so a build directory's copy (a
+# symlink into the source tree) finds the model files too.
+RF_MODEL ?= $(dir $(realpath $(firstword $(MAKEFILE_LIST))))../../../../src/ck-ldb/rf_model
 # The model reader needs zlib; builds without it (Windows) skip the model run.
 HAVE_ZLIB := $(shell grep -c '^\#define CMK_USE_ZLIB 1' ../../../../include/conv-autoconfig.h 2>/dev/null)
 

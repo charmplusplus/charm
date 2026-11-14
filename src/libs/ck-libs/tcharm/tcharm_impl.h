@@ -119,7 +119,11 @@ class TCharm: public CBase_TCharm
 	ThreadInfo threadInfo;
 
 	TCharmInitMsg *initMsg; //Thread initialization data
-	double timeOffset; //Value to add to CkWallTimer to get my clock
+	// Value to add to CkWallTimer to get my clock (TCHARM_Wall_timer, and so
+	// MPI_Wtime). Zero unless the element arrived in a process whose clock
+	// reads earlier than the time at which it was packed: then just enough to
+	// keep the element's clock from going backwards (pupClock).
+	double timeOffset;
 
 	void *campiRank; // campi mode: this element's rank record (campi.C); pupped by tcharm_campi_pup_fn
 
@@ -168,6 +172,7 @@ class TCharm: public CBase_TCharm
 	UserData ud[maxUserData];
 
 	void pupThread(PUP::er &p);
+	void pupClock(PUP::er &p);
 	void ResumeFromSync();
 
  public:

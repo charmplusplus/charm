@@ -761,6 +761,26 @@ class ampiDistGraphTopology final : public ampiTopology {
   inline void setDestWeights(const std::vector<int> &dw) noexcept {destWeights = dw; destWeights.shrink_to_fit();}
 };
 
+// MPI_Dist_graph_create's exchange: every rank tells each rank the edges it
+// specified that end or start there, with an alltoall of the counts and an
+// alltoallv of (neighbor, weight) pairs, so the exchange uses AMPI's collective
+// tags and cannot take a user message. Used by ampi.C and campi.C:
+//   x(...); alltoall(x.sendCounts2, 2, x.recvCounts2, 2); x.sizeReceive();
+//   alltoallv(x.sendBuf, x.sendCounts, x.sendDispls, x.recvBuf, ...);
+//   x.setTopology(topo, weighted);
+struct ampiDistGraphExchange {
+  // per peer: the ints for its sources, then the ints for its destinations
+  std::vector<int> sendCounts2, recvCounts2;
+  std::vector<int> sendBuf, sendCounts, sendDispls;
+  std::vector<int> recvBuf, recvCounts, recvDispls;
+  ampiDistGraphExchange(int p, int n, const int sources[], const int degrees[],
+                        const int destinations[], const int weights[]) noexcept;
+  void sizeReceive() noexcept;
+  // Sources and destinations in the order of the sending rank, then of its
+  // specification.
+  void setTopology(ampiTopology *topo, bool weighted) const noexcept;
+};
+
 /* KeyValue class for attribute caching. The copy and delete functions are
  * kept in the stored form of ampiStoreFunction; call them through copyFn()
  * and deleteFn(). extra_state is the user's value, passed back unchanged. */
