@@ -100,13 +100,12 @@ class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessag
 {
 public:
   CkArrayElementMigrateMessage(CkArrayIndex idx_, CmiUInt8 id_, bool ignoreArrival_,
-                               int length_, int nManagers_, int epoch_, CmiUInt8 life_,
+                               int length_, int epoch_, CmiUInt8 life_,
                                bool hasGPUMsg_ = false)
       : idx(idx_),
         id(id_),
         ignoreArrival(ignoreArrival_),
         length(length_),
-        nManagers(nManagers_),
         epoch(epoch_),
         life(life_),
         hasGPUMsg(hasGPUMsg_)
@@ -117,7 +116,6 @@ public:
   CmiUInt8 id;         // ID of the elements with this index in this collection
   bool ignoreArrival;  // if to inform LB of arrival
   int length;          // Size in bytes of the packed data
-  int nManagers;       // Number of associated array managers
   int epoch;
   CmiUInt8 life;       // the element's life tag (CkLocEntry::life)
   // Whether a device payload travels alongside this message, on its own
@@ -569,7 +567,7 @@ private:
   // The entry is empty but another life of the element is known: install it.
   void homeReinstall(const CkArrayIndex& idx, CmiUInt8 id);
 
-  // Immigration messages which are waiting for all array managers to be ready
+  // Immigration messages waiting for the managers of the arrays they name
   std::list<CkArrayElementMigrateMessage*> pendingImmigrate;
 
 #if CMK_CUDA

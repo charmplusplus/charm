@@ -221,10 +221,11 @@ Object ids and element location:
   communicators, moved between processes by a load balancer, aborted
   with "AMPIParent cannot find its thread!" or "AMPI can't find its
   parent!", or put a rank's communicator element into another
-  communicator's array. An element arriving before one of its arrays'
-  managers is now held instead of aborting with "Array element
-  arrived from location with fewer managers!". Checkpoints keep their
-  format. New test objid_boundmany.
+  communicator's array. An element arriving from a PE that lacks one
+  of the receiving PE's arrays no longer aborts with "Array element
+  arrived from location with fewer managers!"; one arriving before
+  the manager of an array it names is held, as before. Checkpoints
+  keep their format. New test objid_boundmany.
 
 - A send to an array element from a PE that has not yet processed
   the array manager's creation is held until the manager exists, as

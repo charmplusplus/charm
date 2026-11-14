@@ -3728,7 +3728,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #else
                                                     false,
 #endif
-                                                    bufSize, managers.size(),
+                                                    bufSize,
                                                     newEpoch, life, gpuBufSize > 0);
 
   {
@@ -3883,8 +3883,6 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
         "ERROR! Array element claimed it was %d bytes to a"
         "packing PUP::er, but %zu bytes in the unpacking PUP::er!\n",
         msg->length, p.size());
-    CkError("(I have %zu managers; it claims %d managers)\n", managers.size(),
-            msg->nManagers);
 
     CkAbort("Array element's pup routine has a direction mismatch.\n");
   }
