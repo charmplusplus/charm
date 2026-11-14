@@ -308,6 +308,12 @@ Chare *CkAllocateChare(int objId);
 CkpvExtern(void *, _ckCurrentMsg);
 CkpvExtern(int, _ckCurrentEp);
 extern bool _ckCoroFakeMigrate;   // +ck_fakemigrate (init.C), read by ckcoro.h
+extern bool _ckCoroFakeMigratePup; // +ck_fakemigrate_pup (init.C), read by ckcoro.h
+// CK_LABEL (ckcoro.h): a label recorded before main, its entry index once
+// _ckCoroRegisterLabels (called by _initCharm) has registered it (ck.C).
+int _ckCoroAddLabel(const char *name, int (*chareIdx)());
+int _ckCoroLabelEp(int label);
+void _ckCoroRegisterLabels();
 static inline void *CkCurrentMessage(void) { return CkpvAccess(_ckCurrentMsg); }
 static inline int CkCurrentEntry(void) { return CkpvAccess(_ckCurrentEp); }
 struct CkEntryScope {

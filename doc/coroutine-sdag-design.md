@@ -425,6 +425,72 @@ checkpoint and restart is the real test. CAMPI can adopt the same block
 in its own PR; the core change (the destructor check) is compatible with
 its `default:` closer.
 
+### 4.9 Futures, tracing and the pup mode (2026-11-12, after #4231)
+
+The first review of #4231 listed three follow-ups; Kale asked for them in
+one pull request.
+
+**Awaiting a callback.** A reduction result or quiescence needed an
+`[inbox, reductiontarget]` entry in the `.ci` file for every wait.
+charmxi now adds one `[inbox]` entry, `_coro_callback(CkMessage *)`, to
+every chare with a `[coroutine]` entry, and a `ck::coro::future` names
+the deliveries to it that carry its id as the reference number. Two
+kinds of callback were needed, which the first test showed: a reduction
+delivers its result once, to the callback its contributions carry, so a
+callback to each element reached only one of them. `CK_CORO_FUTURE_ALL(f)` is
+a broadcast to the array, group or nodegroup, whose id every element
+computes alike by counting its calls (the same discipline as
+`contribute`); `CK_CORO_FUTURE(f)` is a callback to the element itself, for a
+reply, with its own counter and the top bit of the id set so the two
+never meet. The wait is the existing `CK_WHEN` with a future in place of
+a want, not a new macro: `CK_WHEN(f, msg)`, `CK_WHEN(f)`,
+`CK_WHEN_BLOCK(f, m)`, `CK_ALT(f, ...)`. Rejected: per-call ids chosen
+by the user (as SDAG reference numbers), which reintroduce collisions
+between independent uses; and awaiting `CkFuture`, which completes by
+waking a thread and has no hook a coroutine could use. The macros say
+`CORO` (Kale, 2026-11-13) because in Charm++ "future" already names
+`CkFuture` and `ck::future<T>`, which differ on three counts: they live
+in the table of the PE that created them, hold one value, and block a
+thread; a coroutine's future is two numbers in a member of the chare,
+migrates with it, takes any number of messages, and only a coroutine
+waits on it. `CK_` stays as the prefix of every ckcoro macro.
+
+**Projections.** The code after a wait ran inside whichever entry
+delivered the message that resumed it, so a trace showed it under that
+inbox entry (or under the load balancer's `ResumeFromSync`). The state
+now traces each resume as an execution of the coroutine entry itself,
+nested in the delivery, as SDAG's generated code traces a `serial` block.
+No entry points are registered for this: SDAG names each `serial`, but a
+coroutine's segments have no names, and the entry's own name is what the
+review asked for.
+
+A block is named with `CK_LABEL("name") { ... }`, the counterpart of
+`serial "name"`: an entry `name` of the chare, nested in the execution
+around it. SDAG's labels are registered by charmxi, which reads the
+`serial` in the `.ci` file; a coroutine body is in the `.C` file, which
+charmxi never reads. Two ways were weighed: the name only in the `.C`
+file, recorded before `main` through a C++20 string template argument and
+registered by `_initCharm` after the modules' entries; or the labels also
+declared in the `.ci` file, for charmxi to register as SDAG's are, which
+needed a grammar change and the name written twice. Kale chose the first
+(2026-11-13). The order of static initialization is the same in every
+process of one binary, which is what the entry indices need. A wait
+inside the block is a compile error under `CK_MIGRATABLE` and an abort
+otherwise, as a `serial` cannot contain a `when`.
+
+**`+ck_fakemigrate_pup`.** `+ck_fakemigrate` rebuilds the coroutines in
+place and so never runs the chare's own pup. The new flag makes an array
+element migrate to the next PE (`migrateMe`) wherever `+ck_fakemigrate`
+would rebuild, so the pup runs; it found a member that the ckcoro
+marshall test used across waits without pupping. Two limits: the
+location manager refuses a migration to the element's own PE, so the
+mode needs two or more PEs (a one-PE version would need a change there);
+and an element that uses AtSync is rebuilt in place, because an element
+that migrates itself while waiting at the load balancer's barrier
+leaves the barrier waiting for it (jacobi3d-coro with `lbFreq` 4 hung
+this way). Groups, nodegroups and chares never migrate and are rebuilt
+in place.
+
 ## 5. SDAG, CAMPI, coroutine entries
 
 | | SDAG | CAMPI | coroutine entries (this) |
@@ -617,7 +683,7 @@ them in one table each so that a reviewer can check what was weighed.
 | `delete this` inside a body (allowed in an SDAG `when` body) | replaced by `Chare::ckDestroyLater()` | The coroutine body is still on the stack when it would delete the chare, and the chare's state member is touched when the body ends; `fib-coro` first used a separate destroy entry, and Kale asked for a facility in the base class instead (2026-11-11). The chare is destroyed by the handler of a message `ckDestroyLater` sends to its own PE, after the call running on the chare returns (an entry method or a direct call such as the load balancer's `ResumeFromSync`). |
 | `exclusive` written by hand on a nodegroup's coroutine or inbox entries | rejected, charmxi adds it | SDAG's rule: the entries are exclusive, the node lock is released at every wait because the entry method returns there, and a hand-written tag is an error so that the generated code is the only place the lock is taken. (Kale 2026-11-11.) |
 | `CK_END` closing `CK_COROUTINE()`, and `CK_TASK` for a coroutine task | renamed, then replaced | First matched pairs with no synonyms (`CK_COROUTINE`/`CK_COROUTINE_END`, `CK_CORO_TASK`/`CK_CORO_TASK_END`; `CK_TASK` would collide with Charm++'s stealable tasks), then the pairs themselves were replaced by one block, `CK_MIGRATABLE { ... }`, with the registration moved into the promise. (Kale 2026-11-11; section 4.8.) |
-| An awaitable future | not in this PR | Sketched as a callback-entry awaitable; no program in the corpus needed it. |
+| An awaitable future | added after #4231 (section 4.9) | `ck::coro::future` with `CK_CORO_FUTURE` / `CK_CORO_FUTURE_ALL`, through an inbox entry charmxi adds; the first review asked to await a reduction result or quiescence without an `[inbox, reductiontarget]` entry. |
 
 ### SDAG features not carried over
 
@@ -631,7 +697,7 @@ them in one table each so that a reviewer can check what was weighed.
 | `delete this` in a `when` body | `ckDestroyLater()` | See the table above. |
 | `atomic`/`serial` blocks | plain code | Nothing to carry: every statement of the body is serial code. |
 | State variables declared in the class but used as if local | the same rule, visible | SDAG's surprise ("state variables must be declared in the class") remains the rule here; the difference is that the body is C++ and the reader sees the member. |
-| A Projections entry per named `serial` block (`_TRACE_BEGIN_EXECUTE_DETAILED` around the generated method) | none | There is no generated method to wrap; the code between two waits is the user's. A site could emit an event for the code that follows it, open item. The entry methods themselves are traced as usual. |
+| A Projections entry per named `serial` block (`_TRACE_BEGIN_EXECUTE_DETAILED` around the generated method) | an event per resumed segment, under the coroutine entry; `CK_LABEL("name") { ... }` for a named block (section 4.9) | There is no generated method to name; the code between two waits is the user's. The state traces each resume as an execution of the coroutine entry, nested in the delivery that resumed it, and a labelled block as an entry of its own, registered at startup from the `.C` file. |
 | C++11 | C++20 for the files that include `ckcoro.h` | Coroutines are a C++20 feature; the rest of the program and the runtime stay at their standard. |
 
 ## 10. Open items
@@ -639,7 +705,18 @@ them in one table each so that a reviewer can check what was weighed.
 - Several active invocations of one coroutine entry per chare (an error;
   stays so unless a program needs it, Kale 2026-11-11).
 - Inline bodies for `overlap` clauses (see 9a).
-- Projections events for the code between waits, as SDAG's named `serial` blocks have (see 9a).
+- Under `+ck_fakemigrate_pup`, array elements that use AtSync are rebuilt
+  in place (section 4.9): moving them would need the load balancer's
+  barrier to accept a migration the element starts while at the barrier.
+- Retiring `CkFuture` as a user API for chare code (Kale asked,
+  2026-11-13). The mechanism stays: AMPI's blocking calls, `[sync]`
+  entries and `CkWaitQD` block threads with it. The user API
+  (`ck::future<T>`, `[sync]` in chare code) could be marked legacy once
+  coroutines have a typed value (a marshalled send that `CK_WHEN(f,
+  value)` unmarshals) and a form that awaits a remote entry's return
+  value, as `[sync]` gives a thread.
+- `CK_CORO_FUTURE_ALL` ids are counted per element: an element inserted after
+  others have made collective futures starts its count at zero.
 - The copy of the entry's message that the coroutine state makes for a
   coroutine entry that takes a message type: paid once per invocation
   (a restart sends a second copy), measured only for small messages

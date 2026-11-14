@@ -73,6 +73,7 @@ class AstChildren : public virtual AstNode {
   void genGlobalCode(XStr scope, XStr& decls, XStr& defs);
 
   bool isTramTarget();
+  bool hasCoroutineEntry();
   void genTramTypes();
   void genTramRegs(XStr& str);
   void genTramPups(XStr& scope, XStr& decls, XStr& defs);
@@ -301,6 +302,13 @@ bool AstChildren<Child>::isTramTarget() {
        ++i)
     if ((*i)->isTramTarget()) return true;
 
+  return false;
+}
+
+template <typename Child>
+bool AstChildren<Child>::hasCoroutineEntry() {
+  for (Child* c : children)
+    if (c->isCoroutineEntry()) return true;
   return false;
 }
 

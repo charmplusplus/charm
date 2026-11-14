@@ -144,6 +144,62 @@ inline CkCallback self_target(int ep, IrrGroup *g) {
   return CkCallback(ep, CkMyPe(), g->ckGetGroupID());
 }
 inline CkCallback self_target(int ep, Chare *c) { return CkCallback(ep, c->ckGetChareID()); }
+
+// The callback that broadcasts to every element of the owner's collection
+// (CK_CORO_FUTURE_ALL): the array, the group or nodegroup; a chare is its own.
+inline CkCallback all_target(int ep, ArrayElement *e) { return CkCallback(ep, e->ckGetArrayID()); }
+inline CkCallback all_target(int ep, NodeGroup *g) { return CkCallback(ep, g->ckGetGroupID(), true); }
+inline CkCallback all_target(int ep, IrrGroup *g) { return CkCallback(ep, g->ckGetGroupID()); }
+inline CkCallback all_target(int ep, Chare *c) { return CkCallback(ep, c->ckGetChareID()); }
+
+// CK_LABEL: a block traced as an entry of the chare named by the label.
+// label<Owner, "name">::slot is an inline variable of a class template, so
+// its initializer runs before main and records the label (_ckCoroAddLabel):
+// in the same order in every process of the binary, as entry indices need.
+// _initCharm registers the recorded labels after the modules' entries.
+template <std::size_t N> struct label_text {
+  char s[N];
+  constexpr label_text(const char (&a)[N]) noexcept {
+    for (std::size_t i = 0; i < N; i++) s[i] = a[i];
+  }
+};
+template <class Owner, label_text L> struct label {
+  static int chare() { return Owner::index_t::__idx; }
+  static inline const int slot = _ckCoroAddLabel(L.s, &chare);
+};
+// Open CK_LABEL blocks on this PE thread; a segment ends with as many open
+// as it began with, or a wait was inside a block (state::finish_run).
+inline thread_local int label_depth_ = 0;
+class label_scope {
+ public:
+  template <class Owner> label_scope(int slot, const Owner *o) noexcept {
+    label_depth_++;
+#if CMK_TRACE_ENABLED
+    CmiObjId *idx = nullptr;
+    if constexpr (std::is_base_of_v<ArrayElement, Owner>) {
+      id_ = o->ckGetArrayIndex().getProjectionID();
+      idx = &id_;
+    }
+    _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, _ckCoroLabelEp(slot), CkMyPe(), 0, idx,
+                                  const_cast<void *>(static_cast<const void *>(o)));
+#else
+    (void)slot;
+    (void)o;
+#endif
+  }
+  ~label_scope() {
+    _TRACE_END_EXECUTE();
+    label_depth_--;
+  }
+  label_scope(const label_scope &) = delete;
+  label_scope &operator=(const label_scope &) = delete;
+
+ private:
+#if CMK_TRACE_ENABLED
+  CmiObjId id_;
+#endif
+};
+
 // The frame handle of a coroutine entry just created, picked up by state::begin.
 inline thread_local std::coroutine_handle<> pending_root_ = {};
 
@@ -317,6 +373,25 @@ template <class P> struct out_of { using type = P; };
 template <class T> struct out_of<array_param<T>> { using type = T *; };
 template <class P> using out_t = typename out_of<P>::type;
 
+// A future receives the deliveries of a callback to the chare's
+// _coro_callback entry (an [inbox] entry charmxi adds to a chare with a
+// [coroutine] entry), whose reference number is the future's id; CK_WHEN(f,
+// msg) waits for one delivery. CK_CORO_FUTURE(f) makes a callback to this element
+// only. CK_CORO_FUTURE_ALL(f) makes one that broadcasts to every element of the
+// collection, for a reduction or anything every element awaits: its id
+// counts the element's CK_CORO_FUTURE_ALL calls, so the elements agree on it when
+// each makes the same calls, as with contribute. The top bit of the id tells
+// the two kinds apart. A future waited for across a migration is a pupped
+// member, as any value live across a wait.
+struct future {
+  int ep = -1;            // the _coro_callback entry; -1 until CK_CORO_FUTURE
+  CMK_REFNUM_TYPE id = 0;
+  void pup(PUP::er &p) { p | ep; p | id; }
+};
+// The schema of a future's delivery: a message, stored into one message
+// pointer out, or discarded when the when has no out.
+struct future_msg {};
+
 // An array argument handed to deliver() by a generated inbox body reached
 // otherwise than through its own message (a reduction target, a direct
 // call): the pointer and the byte count, packed in charmxi's layout.
@@ -349,6 +424,7 @@ struct record {
   chain *prevChain = nullptr;    // current_chain_ before this record ran
   bool waiting = false;          // suspended in a when awaitable
   bool atSite = false;           // ... reached through CK_WHEN
+  int labelDepth = 0;            // label_depth_ when the running segment began
   std::vector<want> wants;       // what it waits for, grouped by arm (when_any alternatives)
   bool ready = false;            // delivered: which arm and its buffers
   int readyIndex = -1;
@@ -551,11 +627,33 @@ class state {
   when_awaiter<P, Outs...> when(want_t<P> w, Outs &...outs) noexcept {
     return when_awaiter<P, Outs...>(*this, w, outs...);
   }
-  // The block form: the awaited value is a tuple of the entry's parameters.
+  // A future's delivery (CK_CORO_FUTURE): into one message pointer, or discarded.
+  template <class... Outs>
+  when_awaiter<future_msg, Outs...> when(const future &f, Outs &...outs) {
+    return when_awaiter<future_msg, Outs...>(*this, future_want(f), outs...);
+  }
+  // The block form: the awaited value is a tuple of the entry's parameters
+  // (for a future, its message as CkMessage *).
   template <class... Ps>
   tuple_awaiter<Ps...> when_block(want_t<params<Ps...>> w) noexcept {
     return tuple_awaiter<Ps...>(*this, w);
   }
+  tuple_awaiter<CkMessage *> when_block(const future &f) {
+    return tuple_awaiter<CkMessage *>(*this, future_want(f));
+  }
+  // A new future id of this element (CK_CORO_FUTURE), or of its collection
+  // (CK_CORO_FUTURE_ALL, counted alike on every element).
+  // The top bit of the refnum, computed unsigned (the refnum type may be
+  // signed: --with-refnum-type=int); also the number of ids of each kind.
+  using refnum_bits = std::make_unsigned_t<CMK_REFNUM_TYPE>;
+  static constexpr refnum_bits kOwnFuture = refnum_bits(1) << (8 * sizeof(CMK_REFNUM_TYPE) - 1);
+  CMK_REFNUM_TYPE new_future_id(bool all) noexcept {
+    if (all) return (CMK_REFNUM_TYPE)(refnum_bits)(nextAllFuture_++ & (kOwnFuture - 1));
+    return (CMK_REFNUM_TYPE)(refnum_bits)(kOwnFuture | (nextFuture_++ & (kOwnFuture - 1)));
+  }
+  // Whether the CK_CORO_FUTURE_ALL id just made has been made before: the
+  // counters are wider than the ids.
+  bool all_future_reused() const noexcept { return nextAllFuture_ > kOwnFuture; }
   // The generated wrapper of a marshalled inbox entry: the message is handed
   // over unmarshalled; the reference number is its first parameter if that
   // is arithmetic, else the envelope's.
@@ -578,23 +676,30 @@ class state {
   // where the owner is an array element whose index does not change).
   void pup(PUP::er &p) { pup_impl(p, nullptr, nullptr); }
   template <class Owner> void pup(PUP::er &p, Owner *owner) {
+    note_owner(owner);
     pup_impl(p, [](int ep, void *o) { return self_target(ep, static_cast<Owner *>(o)); }, owner);
   }
 
   // Internal.
   template <class Owner>
   record &begin(Owner *owner, int ep, void *msg, bool own = false, entry_msg em = {}) {
+    note_owner(owner);
     return begin_record(ep, msg, own, em, [](int ep_, void *o) {
       return self_target(ep_, static_cast<Owner *>(o));
     }, owner);
   }
   template <class Owner> record &begin(Owner *owner, bool isEntry, entry_msg em);
   void finish_run(record *rec);
-  void run(record *rec);
+  void run(record *rec, bool traced = true);
   bool take(const want &w, buffer &out);
   bool try_arm(const want *ws, size_t n, std::vector<buffer> &out);
   void rebuild();
   size_t num_buffered() const noexcept { return inbox_.size(); }
+  bool has_buffered(const want &w) const noexcept {
+    for (const buffer &b : inbox_)
+      if (w.matches(b)) return true;
+    return false;
+  }
   size_t num_active() const noexcept { return recs_.size(); }
 
  private:
@@ -604,6 +709,29 @@ class state {
   void destroy_frames(record &rec);
   void send_restart(record &rec);
   void push(buffer &&b);
+  want future_want(const future &f) const;
+  void trace_resume(const record *rec);
+  void fake_migrate();
+  // The owner, for the trace event of a resumed segment and for
+  // +ck_fakemigrate_pup; set whenever a coroutine begins or the state is
+  // pupped with its owner.
+  // An array element that uses AtSync is not moved: a migration it starts
+  // while waiting at the load balancer's barrier would leave the barrier
+  // waiting for it; the hand-written form (no X_CORO_CODE) is not moved.
+  template <class Owner> void note_owner(Owner *o) noexcept {
+    owner_ = o;
+    if constexpr (std::is_base_of_v<ArrayElement, Owner>) {
+      ownerIdx_ = o->ckGetArrayIndex().getProjectionID();
+      ownerHasIdx_ = true;
+      if constexpr (requires(const Owner &x) { x._coro_uses_at_sync(); })
+        migrate_ = [](void *p, int pe) {
+          Owner *e = static_cast<Owner *>(p);
+          if (e->_coro_uses_at_sync()) return false;
+          e->migrateMe(pe);
+          return true;
+        };
+    }
+  }
 
   template <class F> static bool visit(std::list<record> &recs, F &&f) {
     for (record &rec : recs) {
@@ -615,6 +743,13 @@ class state {
   std::list<record> recs_;
   std::vector<buffer> inbox_;
   bool pendingRebuild_ = false;
+  CmiUInt8 nextFuture_ = 0;     // pupped
+  CmiUInt8 nextAllFuture_ = 0;  // pupped
+  void *owner_ = nullptr;
+  CmiObjId ownerIdx_;
+  bool ownerHasIdx_ = false;
+  bool (*migrate_)(void *owner, int pe) = nullptr;  // an array element's migrateMe, if it may move
+  bool migrating_ = false;          // +ck_fakemigrate_pup: a migration is on its way
 };
 
 // The registration of a hand-written coroutine entry (CK_COROUTINE_STATE):
@@ -637,12 +772,27 @@ class root_guard {
 
 /* ======================= inline implementation ======================= */
 
+// +ck_fakemigrate_pup: an array element migrates to the next PE instead of
+// rebuilding in place, so that its own pup runs (other owners never migrate
+// and rebuild in place; one PE has nowhere to go).
+inline bool fake_migrate_pup_enabled() noexcept {
+  return _ckCoroFakeMigratePup && CkNumPes() > 1;
+}
+
 inline bool fake_migrate_enabled() noexcept {
   static thread_local int v = -1;
   if (v < 0) {
-    v = _ckCoroFakeMigrate ? 1 : 0; // the flag is parsed in init.C
-    if (v && CkMyPe() == 0)
-      CkPrintf("ck::coro> +ck_fakemigrate: every when site rebuilds the chare's coroutines in place\n");
+    v = (_ckCoroFakeMigrate || _ckCoroFakeMigratePup) ? 1 : 0; // the flags are parsed in init.C
+    if (v && CkMyPe() == 0) {
+      if (fake_migrate_pup_enabled())
+        CkPrintf("ck::coro> +ck_fakemigrate_pup: at every when site an array element migrates "
+                 "to the next PE, other chares rebuild their coroutines in place\n");
+      else if (_ckCoroFakeMigratePup)
+        CkPrintf("ck::coro> +ck_fakemigrate_pup needs two or more PEs: every when site "
+                 "rebuilds the chare's coroutines in place\n");
+      else
+        CkPrintf("ck::coro> +ck_fakemigrate: every when site rebuilds the chare's coroutines in place\n");
+    }
   }
   return v == 1;
 }
@@ -785,6 +935,7 @@ inline record &state::begin_record(int ep, void *msg, bool own, entry_msg em, ta
   rec->h = root;
   rec->prev = current_;
   rec->prevChain = current_chain_;
+  rec->labelDepth = label_depth_;
   current_ = rec;
   current_chain_ = &rec->ch;
   return *rec;
@@ -817,6 +968,12 @@ template <class Owner> inline record &state::begin(Owner *owner, bool isEntry, e
 
 // After the body ran (first run or a resume) and suspended or finished.
 inline void state::finish_run(record *rec) {
+  if (label_depth_ != rec->labelDepth) {
+    const record *root = rec;
+    while (root->parent) root = root->parent;
+    CkAbort("ck::coro: a coroutine of entry %s waited inside a CK_LABEL block",
+            _entryTable[root->ep]->name);
+  }
   current_ = rec->prev;
   current_chain_ = rec->prevChain;
   rec->prev = nullptr;
@@ -848,19 +1005,90 @@ inline void state::finish_run(record *rec) {
   // element is on the stack (a child suspending inside its parent's start).
   if (current_ == nullptr && pendingRebuild_) {
     pendingRebuild_ = false;
-    rebuild();
+    fake_migrate();
   }
 }
 
-// Resume rec (its innermost suspended frame) as the running coroutine.
-inline void state::run(record *rec) {
+// What +ck_fakemigrate does once no coroutine of the chare is on the stack:
+// rebuild in place, or under +ck_fakemigrate_pup move an array element to
+// the next PE (migrateMe sends the element a message; it moves when that is
+// handled, suspended at whichever site it has reached by then).
+inline void state::fake_migrate() {
+  if (migrating_) return;
+  if (migrate_ && fake_migrate_pup_enabled() && migrate_(owner_, (CkMyPe() + 1) % CkNumPes())) {
+    migrating_ = true;
+    if (debug_enabled())
+      CkPrintf("[%d] ck::coro: migrating to PE %d (+ck_fakemigrate_pup)\n", CkMyPe(),
+               (CkMyPe() + 1) % CkNumPes());
+    return;
+  }
+  rebuild();
+}
+
+// Resume rec (its innermost suspended frame) as the running coroutine. The
+// first run of a CK_OVERLAP or CK_FORALL task is part of its parent's
+// segment and is not traced as a resume.
+inline void state::run(record *rec, bool traced) {
   rec->prev = current_;
   rec->prevChain = current_chain_;
+  rec->labelDepth = label_depth_;
   current_ = rec;
   current_chain_ = &rec->ch;
   std::coroutine_handle<> h = std::exchange(rec->h, {});
+  if (traced) trace_resume(rec);
   h.resume();
+  if (traced) _TRACE_END_EXECUTE();
   finish_run(rec);
+}
+
+// A resumed segment is traced as an execution of the coroutine entry,
+// nested in the delivery that resumed it, as SDAG traces a serial block.
+inline void state::trace_resume(const record *rec) {
+#if CMK_TRACE_ENABLED
+  while (rec->parent) rec = rec->parent;
+  _TRACE_BEGIN_EXECUTE_DETAILED(-1, -1, rec->ep, CkMyPe(), 0, ownerHasIdx_ ? &ownerIdx_ : nullptr,
+                                owner_);
+#else
+  (void)rec;
+#endif
+}
+
+inline want state::future_want(const future &f) const {
+  if (f.ep < 0)
+    CkAbort("ck::coro: a when on a future that CK_CORO_FUTURE has not given a callback");
+  return want(f.ep, f.id);
+}
+
+// CK_CORO_FUTURE, CK_CORO_FUTURE_ALL: a new id for f and the callback that delivers to it.
+template <class Owner>
+inline CkCallback make_future(state &s, Owner *owner, future &f, int ep, bool all) {
+  f.ep = ep;
+  f.id = s.new_future_id(all);
+  // The ids wrap after kOwnFuture of each kind (2^15 with the default 16-bit
+  // refnum): a message still in the inbox under the id would be taken by the
+  // new future. Nothing reaches a CK_CORO_FUTURE id before its callback
+  // exists, so a message there is left from an earlier future. A
+  // CK_CORO_FUTURE_ALL message can arrive before this element makes the
+  // future (another element sent it first), so that kind is checked only
+  // once its id is reused, when the two cases look the same.
+  if ((!all || s.all_future_reused()) && s.has_buffered(want(ep, f.id))) {
+    const unsigned long id = (unsigned long)(state::refnum_bits)f.id;
+    const unsigned long n = (unsigned long)state::kOwnFuture;
+    if (!all)
+      CkAbort("ck::coro: CK_CORO_FUTURE id %lu came round again while a message sent to the "
+              "earlier future with that id is still in the inbox; every future's messages must "
+              "be taken (ids wrap after %lu, or build with --with-refnum-type=int)",
+              id, n);
+    CkAbort("ck::coro: CK_CORO_FUTURE_ALL id %lu came round again with a message in the inbox "
+            "under it: either a message sent to the earlier future with that id was never "
+            "taken, or a message for this future arrived before this element made it, which "
+            "cannot be told apart once ids are reused (ids wrap after %lu; build with "
+            "--with-refnum-type=int)",
+            id, n);
+  }
+  CkCallback cb = all ? all_target(ep, owner) : self_target(ep, owner);
+  cb.setRefnum(f.id);
+  return cb;
 }
 
 // Remove and return the first buffered delivery matching w, keeping the order
@@ -1087,6 +1315,8 @@ inline void state::pup_impl(PUP::er &p, target_fn mk, void *owner) {
   size_t nbuf = inbox_.size(), nrec = recs_.size();
   p | nbuf;
   p | nrec;
+  p | nextFuture_;
+  p | nextAllFuture_;
   if (p.isUnpacking()) {
     inbox_.resize(nbuf);
     recs_.resize(nrec);
@@ -1154,6 +1384,11 @@ inline void when_awaiter<Schema, Outs...>::unpack(buffer &b, record *rec) {
               w_.ep);
     std::get<0>(outs_) = static_cast<std::tuple_element_t<0, std::tuple<Outs...>>>(b.msg);
     b.msg = nullptr; // the coroutine owns the message now
+  } else if constexpr (std::is_same_v<Schema, future_msg>) {
+    static_assert(sizeof...(Outs) == 0,
+                  "a when on a future stores its message into one message pointer, or has no out");
+    if (b.msg) CkFreeMsg(b.msg);
+    b.msg = nullptr;
   } else if constexpr (std::is_void_v<Schema>) {
     if constexpr (sizeof...(Outs) > 0) {
       static_assert(!(std::is_same_v<Outs, skip_t> || ...),
@@ -1338,7 +1573,7 @@ inline bool overlap_awaiter::await_ready() {
     if (kid.done || kid.root) continue; // finished before a restart: not run again
     kid.root = kid.h = t.release();
     kid.ch.restarting = !kid.ch.sites.empty();
-    s_.run(&kid);                       // to its first site, or to its end
+    s_.run(&kid, false);                // to its first site, or to its end
   }
   return rec->kidsRunning == 0;
 }
@@ -1409,18 +1644,42 @@ using coroutine = coro::coroutine;
 // array as a pointer into the message, valid in the block). The block
 // cannot contain a site: the restart jump would bypass the declarations,
 // which the compiler rejects. The want must come from the generated inbox
-// struct. Being an if statement, it cannot be followed by an else.
+// struct, or be a future (its message as CkMessage *). Being an if
+// statement, it cannot be followed by an else.
 #define CK_WHEN_BLOCK(want_, ...)                                             \
   case __LINE__:                                                              \
     if (auto [__VA_ARGS__] = (::ck::coro::note_site(ck_frame_, __LINE__),     \
                               co_await ::ck::coro::current_state().when_block(want_)); \
         true)
 
+// CK_LABEL("name") { ... }: the block is traced in Projections as an entry
+// "name" of the chare, as SDAG's serial "name" { ... }; in any member
+// function of a chare. A wait inside the block aborts (under CK_MIGRATABLE
+// the compiler rejects it: the restart jump would bypass the declaration).
+// The block is the else branch of the macro's if, so an else after the
+// block binds to an enclosing if.
+#define CK_LABEL(name_)                                                       \
+  if (::ck::coro::label_scope ck_label_{                                      \
+          ::ck::coro::label<std::remove_cvref_t<decltype(*this)>, name_>::slot, this}; \
+      false) {                                                                \
+  } else
+
 // A when-all site (SDAG when a(), b()): CK_WHEN_ALL(CK_ALT(...), CK_ALT(...))
 // waits until every alternative has a delivery and takes them together.
 // A when-any site (SDAG case): CK_WHEN_ANY(idx, CK_ALT(...), CK_ALL(CK_ALT(...), ...), ...)
 // stores the index of the alternative (a when or a when-all) that matched in idx.
 #define CK_ALT(...) ::ck::coro::current_state().when(__VA_ARGS__)
+
+// CK_CORO_FUTURE(f): a new id for the ck::coro::future member f and a callback to
+// this element that delivers to it, to pass to any API taking a CkCallback;
+// CK_CORO_FUTURE_ALL(f): the same with a callback to every element of the
+// collection, for contribute and other results every element awaits.
+// CK_WHEN(f, msg), CK_WHEN(f), CK_ALT(f, ...) and CK_WHEN_BLOCK(f, m) wait
+// for a delivery. Needs X_CORO_CODE (the chare's _coro_callback entry).
+#define CK_CORO_FUTURE(f_) \
+  ::ck::coro::make_future(__coro, this, (f_), inbox::_coro_callback().ep, false)
+#define CK_CORO_FUTURE_ALL(f_) \
+  ::ck::coro::make_future(__coro, this, (f_), inbox::_coro_callback().ep, true)
 #define CK_ALL(...) ::ck::coro::current_state().all(__VA_ARGS__)
 #define CK_WHEN_ALL(...)                                                      \
   case __LINE__:                                                              \

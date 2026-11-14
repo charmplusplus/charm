@@ -2235,6 +2235,61 @@ later wait), as an SDAG ``case``; an alternative may be a conjunction,
 ``CK_ALL(CK_ALT(...), CK_ALT(...))``, which is taken only when all its
 deliveries are present.
 
+A callback can also be waited for without an inbox entry of its own. A
+member of type ``ck::coro::future`` receives the deliveries of the
+callback that ``CK_CORO_FUTURE_ALL(f)`` or ``CK_CORO_FUTURE(f)`` returns.
+``CK_CORO_FUTURE_ALL(f)`` makes a callback that is delivered to every element
+of the chare's array, group or nodegroup: the one to pass to
+``contribute`` and to anything else that every element waits for.
+``CK_CORO_FUTURE(f)`` makes one delivered to this element only, for example
+to hand to another chare for a reply. The future is waited for as an
+inbox entry is: ``CK_WHEN(f, msg)`` stores the message into a member
+that is a pointer to the message type, ``CK_WHEN(f)`` discards it,
+``CK_WHEN_BLOCK(f, m)`` declares it as a ``CkMessage *``, and
+``CK_ALT(f, ...)`` makes it an alternative of ``CK_WHEN_ALL`` or
+``CK_WHEN_ANY``. A future is a member like any value that is used after
+a wait, pupped with ``p | f``.
+
+.. code-block:: c++
+
+   ck::coro::future reduced, quiet;   // members
+   CkReductionMsg *result;
+   ...
+   contribute(sizeof(double), &change, CkReduction::max_double, CK_CORO_FUTURE_ALL(reduced));
+   CK_WHEN(reduced, result);
+   maxChange = *(double *)result->getData();
+   delete result;
+   ...
+   {
+     CkCallback cb = CK_CORO_FUTURE_ALL(quiet);
+     if (thisIndex == 0) CkStartQD(cb);   // every element waits for quiescence
+   }
+   CK_WHEN(quiet);
+
+The callbacks reach the chare through an ``[inbox]`` entry,
+``_coro_callback(CkMessage *)``, that charmxi adds to every chare with a
+``[coroutine]`` entry, with the future's id as the reference number.
+Each ``CK_CORO_FUTURE_ALL`` takes the next id of a counter that every element
+keeps, so the elements agree on the id when they make the same
+``CK_CORO_FUTURE_ALL`` calls in the same order, as they make the same
+``contribute`` calls.
+
+The reference number of the callback belongs to the future: a message
+sent through it arrives with the future's id as its reference number,
+whatever it carried, and the callback cannot carry a reference number of
+its own. Use a new future to tell iterations apart, and put any other tag
+in the message's data. A message for a ``CK_CORO_FUTURE_ALL`` future may
+reach an element before that element has made the future (another element
+sent it first); it waits in the inbox for the element's ``CK_WHEN``. The
+ids wrap after 32768 futures of each kind (``CK_CORO_FUTURE`` and
+``CK_CORO_FUTURE_ALL``) with the default 16-bit reference number
+(``--with-refnum-type=int`` widens it to 2^31), so every message sent to
+a future should be taken by a wait. Making a ``CK_CORO_FUTURE`` whose id
+is still held by a message in the inbox aborts; for
+``CK_CORO_FUTURE_ALL`` the check starts once its ids are reused, since
+before that a message under the id is one that arrived early, and after
+that an early message and one left over look the same.
+
 A coroutine frame is never packed. When the chare migrates or is
 checkpointed, the coroutine state records which wait each active coroutine
 is suspended at, and after unpacking the entry is invoked again: its body
@@ -2345,10 +2400,41 @@ The command line option ``+ck_fakemigrate`` makes every wait pack and
 unpack the chare's coroutines in place the first time a coroutine
 suspends there, so that a program can check the rules above on one
 processor without a load balancer. The flag checks the restart of the
-coroutine bodies only, not the chare's own pup (a member left out of
-``pup()`` keeps its value under the flag), so a run on two or more PEs
-with a load balancer, or a checkpoint and ``+restart``, is still needed
-to check the pup.
+coroutine bodies only, not the chare's own pup: a member left out of
+``pup()`` keeps its value under the flag.
+
+``+ck_fakemigrate_pup`` checks the pup too. On two or more PEs, at every
+wait where ``+ck_fakemigrate`` would rebuild, an array element migrates
+to the next PE (``migrateMe``), so its own ``pup()`` runs and a member
+left out of it loses its value. Because the element really migrates,
+``ckJustMigrated`` and the other migration hooks run at every wait. An
+element that uses ``AtSync`` is rebuilt in place instead, as are groups,
+nodegroups and chares, which do not migrate: a migration that the
+element starts while it waits at the load balancer's barrier would leave
+the barrier waiting for it. The pup of such an element is checked by a
+load balancer that moves it (for example ``+balancer RotateLB`` on two
+or more PEs) or by a checkpoint and ``+restart``.
+
+In a Projections trace, each segment of a coroutine that runs after a
+wait is an execution of the coroutine entry method, nested in the
+execution of the entry method whose delivery resumed it, as SDAG traces
+each ``serial`` block.
+
+``CK_LABEL`` traces a block under a name of its own, as SDAG's
+``serial "name"`` does:
+
+.. code-block:: c++
+
+   CK_LABEL("update") { update(); }
+
+In the trace the block is an execution of an entry method ``update`` of
+the chare, nested in the execution around it. The name is a string
+literal, written only in the ``.C`` file; the labels are registered at
+startup after the modules' entry methods, and one name used twice in a
+chare is one entry method. ``CK_LABEL`` works in any member function of
+a chare, not only in a coroutine. The block cannot contain a wait: inside
+``CK_MIGRATABLE`` the compiler rejects one, and elsewhere the program
+aborts when the coroutine suspends inside the block.
 
 The chare kinds differ only in how a suspended coroutine is invoked
 again after a migration or a restart from a checkpoint: the coroutine

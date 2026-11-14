@@ -236,6 +236,18 @@ void Chare::preprocess() {
       e->setChare(this);
       list->push_back(e);
     }
+    // A chare with a [coroutine] entry gets the inbox entry that the
+    // callbacks of ck::coro::future are sent to (CK_CORO_FUTURE and
+    // CK_CORO_FUTURE_ALL in ckcoro.h); the future's id is the reference
+    // number.
+    if (list->hasCoroutineEntry()) {
+      Entry* e = new Entry(line, new Attribute(SINBOX), new BuiltinType("void"),
+                           strdup("_coro_callback"),
+                           new ParamList(new Parameter(line,
+                               new PtrType(new NamedType("CkMessage")), "m")), 0, 0, 0);
+      e->setChare(this);
+      list->push_back(e);
+    }
   }
 
   if (bases == NULL)  // Always add Chare as a base class
@@ -1762,6 +1774,8 @@ void Chare::genCoroCode(XStr& str) {
        << "public:\n"
        << "  ::ck::coro::state __coro;\n"
        << "  void _coro_pup(PUP::er &p) { __coro.pup(p, this); }\n";
+  // +ck_fakemigrate_pup moves only array elements that do not use AtSync.
+  if (isArray()) body << "  bool _coro_uses_at_sync() const { return usesAtSync; }\n";
   CoroGen g;
   g.str = &body;
   g.pass = CoroGen::isEntry;
