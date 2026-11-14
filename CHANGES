@@ -148,6 +148,19 @@ Programming model and language bindings:
   attributes only inside the [...] of an entry method and stay names
   everywhere else.
 
+- Coroutine entry methods, follow-ups: a coroutine waits for a callback
+  directly through a ck::coro::future (CK_CORO_FUTURE_ALL for a reduction or
+  anything every element waits for, CK_CORO_FUTURE for a reply to this
+  element), with no [inbox, reductiontarget] entry in the .ci file;
+  charmxi adds an [inbox] entry, _coro_callback(CkMessage*), to every
+  chare with a [coroutine] entry. In a Projections trace each segment
+  that runs after a wait is an execution of the coroutine entry, and
+  CK_LABEL("name") { ... } traces a block as an entry of its own, as
+  SDAG's serial "name" does.
+  +ck_fakemigrate_pup moves an array element to the next PE at every
+  wait, so that its own pup runs (two or more PEs; elements that use
+  AtSync, groups and chares are rebuilt in place).
+
 - CkDyn: a C API for language bindings that define chare classes at
   run time instead of in a .ci file (#4193). A class is registered
   with a table of entry methods and reached through a table of

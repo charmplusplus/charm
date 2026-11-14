@@ -305,6 +305,7 @@ class Entry : public Member {
   int isNoKeep(void);
   int isSdag(void);
   bool isTramTarget(void);
+  bool isCoroutineEntry() { return isCoroutine() != 0; }
   int isWhenIdle(void);
 
   // DMK - Accel support

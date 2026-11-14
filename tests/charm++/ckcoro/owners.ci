@@ -27,6 +27,8 @@ module owners {
     entry [coroutine] void run(int rounds, CProxy_NodeGroupTest ng);
     entry [inbox] void token(int round, int from);
     entry [inbox] void resume();
+    // Answers through the callback of the future of the asking branch.
+    entry void ask(CkCallback cb, int v);
   }
 
   // Items sent in reverse order before run(), received in index order.

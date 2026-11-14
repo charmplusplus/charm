@@ -58,6 +58,14 @@ header's opening comment and the manual section "Coroutine Entry Methods".
 - `state::pendingRebuild_`: a `+ck_fakemigrate` rebuild requested while
   another coroutine of the element is on the stack, done by the
   outermost `finish_run`.
+- `state::nextFuture_`, `nextAllFuture_` (pupped): the counters behind
+  the ids of `CK_CORO_FUTURE` and `CK_CORO_FUTURE_ALL`. The top bit of a
+  `CMK_REFNUM_TYPE` marks an element's own futures, so the two id ranges
+  do not meet.
+- `state::owner_`, `ownerIdx_`, `migrate_`, `migrating_` (not pupped):
+  the owner, its Projections id and, for an array element of a chare with
+  `X_CORO_CODE`, a function that calls `migrateMe` unless the element uses
+  AtSync; set by `note_owner` from `begin` and from `pup(p, owner)`.
 - `thread_local record *current_`: the record of the coroutine running on
   this PE thread; set by `state::begin` and `state::push` around a run,
   read by the awaitables.
@@ -209,9 +217,71 @@ its site).
 Deliveries that arrive before the restart message are buffered as usual.
 
 **Rebuild (`+ck_fakemigrate`).** After a body suspends at a site it did
-not just restart to, `finish_run` calls `state::rebuild`: the state is
-packed into memory, every frame destroyed, the records and inbox cleared,
-and the state unpacked from memory, which sends the restarts.
+not just restart to, `finish_run` calls `state::fake_migrate`, which
+calls `state::rebuild`: the state is packed into memory, every frame
+destroyed, the records and inbox cleared, and the state unpacked from
+memory, which sends the restarts. Under `+ck_fakemigrate_pup` (two or
+more PEs) `fake_migrate` instead calls `migrate_` when it is set and
+returns true: the element sends itself `ckEmigrate` to the next PE, and
+`migrating_` keeps further sites from asking again before it moves. The
+real migration packs the element with its own pup, deletes it (and its
+frames), and unpacks it on the next PE, where the state sends the
+restarts as after any migration.
+
+**Futures.** `Chare::preprocess` in charmxi adds to every chare with a
+`[coroutine]` entry an `[inbox]` entry `_coro_callback(CkMessage *m)`, so
+`X_CORO_CODE` has its inbox body and `inbox::_coro_callback()` want.
+`CK_CORO_FUTURE(f)` / `CK_CORO_FUTURE_ALL(f)` call `make_future`, which sets `f.ep`
+to that entry and `f.id` to a new id, and returns `self_target` or
+`all_target` (a broadcast to the array, group or nodegroup) with the id
+as the callback's reference number; `CkCallback::send` puts it on the
+message (a reduction's result included). The delivery is buffered and
+matched as any message inbox delivery. `state::when(const future &,
+outs...)` makes a `when_awaiter<future_msg, ...>` on `want(f.ep, f.id)`:
+one message-pointer out takes the message, no out frees it.
+`when_block(const future &)` makes a `tuple_awaiter<CkMessage *>`. The
+ids wrap after `kOwnFuture` of each kind (2^15 with the default 16-bit
+refnum); `kOwnFuture` and the masks are computed in the unsigned refnum
+type, since `--with-refnum-type=int` makes the refnum signed. The
+counters are 64-bit, so the state knows when an id is reused.
+`make_future` aborts when the inbox holds a message under the new id
+(`state::has_buffered`), which the new future would otherwise take: for a
+`CK_CORO_FUTURE` always, since nothing can be sent to its id before its
+callback exists; for a `CK_CORO_FUTURE_ALL` only once the id is reused
+(`all_future_reused`), since another element may send to a collective
+future before this element makes it, and that message waits in the inbox
+under the id. After a reuse an early message and a stale one look the
+same, and the abort says so. A message still in flight is not detected.
+
+**Tracing.** `state::run`, which resumes a suspended coroutine, wraps the
+resume in `_TRACE_BEGIN_EXECUTE_DETAILED` / `_TRACE_END_EXECUTE` under the
+entry index of the root record (`trace_resume`), with the owner and its
+Projections id, as SDAG's generated code does for a `serial` block. The
+first run of a body is inside the coroutine entry's own execution and
+needs no event, and so is the first run of a `CK_OVERLAP` or `CK_FORALL`
+task, which `overlap_awaiter::await_ready` starts inside its parent's
+segment with `run(&kid, false)`. In a build without tracing
+(`CMK_TRACE_ENABLED` 0) both are empty.
+
+**Labels.** `CK_LABEL("name") { ... }` declares a `label_scope` in the
+condition of `if (...; false) {} else`, whose else branch is the user's
+block (so an `else` after the block binds to an enclosing `if`): its
+constructor begins an execution of the label's entry, with the owner and
+its Projections id, and its destructor ends it. The entry
+comes from `label<Owner, "name">::slot`, an inline static member of a
+class template: its initializer runs before `main` and records the name
+and a function returning `Owner::index_t::__idx` (`_ckCoroAddLabel`,
+`ck.C`). `_initCharm` calls `_ckCoroRegisterLabels` on rank 0 after
+`_registerExternalModules`, which registers each label with
+`CkRegisterEp(name, NULL, 0, chareIdx, 0)`, as charmxi registers a named
+`serial`. Static initialization records the labels in the same order in
+every process of the binary, so every process gives a label the index
+the `.sts` file written by PE 0 names. `label_depth_` counts the open
+blocks on the PE thread; a record notes it when a segment begins
+(`begin`, `run`), and `finish_run` aborts when a segment ends with a
+different count, that is, after a wait inside a block. Under
+`CK_MIGRATABLE` the compiler rejects such a wait already: the `case`
+label inside the block would jump past the scope's declaration.
 
 **Helpers.** A `ck::coro::task<T>` helper awaited with `CK_CALL` has its
 own `CK_MIGRATABLE` block and therefore its own depth in the chain;
@@ -272,10 +342,13 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
 - `src/ck-core/CMakeLists.txt`: installs the headers.
 - `src/ck-core/charm++.h` (`CkEntryScope`, `CkCurrentMessage`,
   `CkCurrentEntry`, `ckDestroyLater`, `recursive_pup_impl`), `ck.C`,
-  `init.C`: the accessors, the destroy message and the `_coro_pup` hook.
+  `init.C`: the accessors, the destroy message, the `_coro_pup` hook, the
+  flags, and the recorded labels and their registration.
 - `src/xlat-i/xi-scan.l`, `xi-grammar.y` (and the regenerated `xi-scan.C`,
   `xi-grammar.tab.C/h`), `xi-Entry.{h,C}`, `xi-Chare.{h,C}`, `xi-Member.h`:
-  the two attributes, their checks, and `X_CORO_CODE`. The scanner returns
+  the two attributes, their checks, and `X_CORO_CODE`; `Chare::preprocess`
+  adds `_coro_callback`, and `genCoroCode` adds `_coro_uses_at_sync` to an
+  array's `X_CORO_CODE`. The scanner returns
   `INBOX` and `COROUTINE` only inside the `[...]` that follows `entry`
   (`search` and `punct` in xi-scan.l), and `IDENT` everywhere else, so the
   words stay names (`tests/charm++/ckcoro/names.ci`).
@@ -285,9 +358,13 @@ that the helper was entered through it (`chain.linked`), as in CAMPI.
   (synchronized and anytime migration while suspended, `CK_WHEN_ANY`) and
   the marshalled inbox test (matching by the first parameter, a broadcast,
   a reduction target, under `+ck_fakemigrate`), the SDAG basic and
-  refnum tests, overlap under migration, and the owners module (a group,
-  a nodegroup, a singleton chare and the mainchare, checkpointed and
-  restarted while suspended).
+  refnum tests, overlap under migration, futures (reductions, a callback
+  sent to another element, quiescence, a future inside a task), and the
+  owners module (a group, a nodegroup, a singleton chare and the
+  mainchare, checkpointed and restarted while suspended); `make test` also
+  runs it under `+ck_fakemigrate_pup`, and on a build with tracing runs
+  `tracetest`, which counts the Projections events of resumed segments
+  and of two labelled blocks (one in a coroutine, one in a constructor).
 - `benchmarks/charm++/coro_pingpong/`: plain, SDAG and coroutine ping-pong.
 - `src/libs/ck-libs/ampi/campi_core.h`, `campi.C`: CAMPI, the other user
   of the shared core.

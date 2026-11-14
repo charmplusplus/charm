@@ -17,7 +17,8 @@ matmul.decl.h: matmul.ci
 
 # The input depends only on the element index (the same code as in
 # ../matmul), so every run prints the same checksum, which ../matmul prints
-# too; +ck_fakemigrate rebuilds the coroutine state at every wait.
+# too; +ck_fakemigrate rebuilds the coroutine state at every wait, and
+# +ck_fakemigrate_pup moves each element to the next PE there instead.
 test: $(BINARY)
 	$(call run, ./matmul +p4 50 5 ) 2>&1 | tee p4.log
 	grep "matmul: checksum 3915152.233307" p4.log
@@ -25,9 +26,11 @@ test: $(BINARY)
 	grep "matmul: checksum 3915152.233307" p1.log
 	$(call run, ./matmul +p4 50 5 +ck_fakemigrate ) 2>&1 | tee fake.log
 	grep "matmul: checksum 3915152.233307" fake.log
+	$(call run, ./matmul +p4 50 5 +ck_fakemigrate_pup ) 2>&1 | tee pup.log
+	grep "matmul: checksum 3915152.233307" pup.log
 
 testp: $(BINARY)
 	$(call run, +p$(P) ./matmul $$(( $(P) * 10 ))  5 )
 
 clean:
-	rm -f *.o *.decl.h *.def.h $(BINARY) charmrun p4.log p1.log fake.log
+	rm -f *.o *.decl.h *.def.h $(BINARY) charmrun p4.log p1.log fake.log pup.log
