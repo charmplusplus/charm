@@ -6,12 +6,15 @@
 // made just before the wait. (A message from a neighbour can arrive before
 // run() starts, and the wait for it then returns without suspending.)
 // The labelled blocks are entries "work" (once a round) and "setup" (in the
-// constructor, outside any coroutine).
+// constructor, outside any coroutine). fan() runs FAN_TASKS tasks that never
+// wait: their runs are part of fan()'s one execution, so the logs hold
+// exactly TRACE_ELEMS begin events for fan().
 #include "tracetest.decl.h"
 #include "ckcoro.h"
 
 #define TRACE_ELEMS 4
 #define TRACE_ROUNDS 10
+#define FAN_TASKS 100
 
 /* readonly */ CProxy_TraceMain traceMain;
 
@@ -21,6 +24,7 @@ public:
     delete m;
     traceMain = thisProxy;
     CProxy_Stepper a = CProxy_Stepper::ckNew(TRACE_ELEMS);
+    a.fan();
     a.run();
   }
   void done() { CkExit(); }
@@ -38,6 +42,18 @@ public:
   }
   Stepper(CkMigrateMessage* m) : CBase_Stepper(m) {}
   void pup(PUP::er& p) { p | round; p | sum; p | step; }
+
+  ck::coroutine fan() {
+    CK_MIGRATABLE {
+      CK_FORALL(i, 0, FAN_TASKS, part(i));
+    }
+  }
+  ck::coro::task<void> part(int i) {
+    CK_MIGRATABLE {
+      sum += i;
+      co_return;
+    }
+  }
 
   ck::coroutine run() {
     CK_MIGRATABLE {

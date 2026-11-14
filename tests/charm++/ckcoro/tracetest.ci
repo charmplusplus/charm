@@ -9,5 +9,6 @@ mainmodule tracetest {
   array [1D] Stepper {
     entry Stepper();
     entry [coroutine] void run();
+    entry [coroutine] void fan();
   };
 };

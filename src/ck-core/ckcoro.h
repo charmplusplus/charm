@@ -643,11 +643,17 @@ class state {
   }
   // A new future id of this element (CK_CORO_FUTURE), or of its collection
   // (CK_CORO_FUTURE_ALL, counted alike on every element).
-  static constexpr CMK_REFNUM_TYPE kOwnFuture = (CMK_REFNUM_TYPE)1 << (8 * sizeof(CMK_REFNUM_TYPE) - 1);
+  // The top bit of the refnum, computed unsigned (the refnum type may be
+  // signed: --with-refnum-type=int); also the number of ids of each kind.
+  using refnum_bits = std::make_unsigned_t<CMK_REFNUM_TYPE>;
+  static constexpr refnum_bits kOwnFuture = refnum_bits(1) << (8 * sizeof(CMK_REFNUM_TYPE) - 1);
   CMK_REFNUM_TYPE new_future_id(bool all) noexcept {
-    if (all) return (CMK_REFNUM_TYPE)(nextAllFuture_++ & (kOwnFuture - 1));
-    return (CMK_REFNUM_TYPE)(kOwnFuture | (nextFuture_++ & (kOwnFuture - 1)));
+    if (all) return (CMK_REFNUM_TYPE)(refnum_bits)(nextAllFuture_++ & (kOwnFuture - 1));
+    return (CMK_REFNUM_TYPE)(refnum_bits)(kOwnFuture | (nextFuture_++ & (kOwnFuture - 1)));
   }
+  // Whether the CK_CORO_FUTURE_ALL id just made has been made before: the
+  // counters are wider than the ids.
+  bool all_future_reused() const noexcept { return nextAllFuture_ > kOwnFuture; }
   // The generated wrapper of a marshalled inbox entry: the message is handed
   // over unmarshalled; the reference number is its first parameter if that
   // is arithmetic, else the envelope's.
@@ -684,7 +690,7 @@ class state {
   }
   template <class Owner> record &begin(Owner *owner, bool isEntry, entry_msg em);
   void finish_run(record *rec);
-  void run(record *rec);
+  void run(record *rec, bool traced = true);
   bool take(const want &w, buffer &out);
   bool try_arm(const want *ws, size_t n, std::vector<buffer> &out);
   void rebuild();
@@ -737,8 +743,8 @@ class state {
   std::list<record> recs_;
   std::vector<buffer> inbox_;
   bool pendingRebuild_ = false;
-  CMK_REFNUM_TYPE nextFuture_ = 0;     // pupped
-  CMK_REFNUM_TYPE nextAllFuture_ = 0;  // pupped
+  CmiUInt8 nextFuture_ = 0;     // pupped
+  CmiUInt8 nextAllFuture_ = 0;  // pupped
   void *owner_ = nullptr;
   CmiObjId ownerIdx_;
   bool ownerHasIdx_ = false;
@@ -1019,17 +1025,19 @@ inline void state::fake_migrate() {
   rebuild();
 }
 
-// Resume rec (its innermost suspended frame) as the running coroutine.
-inline void state::run(record *rec) {
+// Resume rec (its innermost suspended frame) as the running coroutine. The
+// first run of a CK_OVERLAP or CK_FORALL task is part of its parent's
+// segment and is not traced as a resume.
+inline void state::run(record *rec, bool traced) {
   rec->prev = current_;
   rec->prevChain = current_chain_;
   rec->labelDepth = label_depth_;
   current_ = rec;
   current_chain_ = &rec->ch;
   std::coroutine_handle<> h = std::exchange(rec->h, {});
-  trace_resume(rec);
+  if (traced) trace_resume(rec);
   h.resume();
-  _TRACE_END_EXECUTE();
+  if (traced) _TRACE_END_EXECUTE();
   finish_run(rec);
 }
 
@@ -1056,14 +1064,28 @@ template <class Owner>
 inline CkCallback make_future(state &s, Owner *owner, future &f, int ep, bool all) {
   f.ep = ep;
   f.id = s.new_future_id(all);
-  // The ids wrap (2^15 of each kind with the default 16-bit refnum): a
-  // message still unclaimed under the id would be taken by the new future.
-  if (s.has_buffered(want(ep, f.id)))
-    CkAbort("ck::coro: %s future id %lu came round again while a message sent to the earlier "
-            "future with that id is still unclaimed; take every future's messages (ids wrap "
-            "after %lu, or build with --with-refnum-type=int)",
-            all ? "a CK_CORO_FUTURE_ALL" : "a CK_CORO_FUTURE", (unsigned long)f.id,
-            (unsigned long)state::kOwnFuture);
+  // The ids wrap after kOwnFuture of each kind (2^15 with the default 16-bit
+  // refnum): a message still in the inbox under the id would be taken by the
+  // new future. Nothing reaches a CK_CORO_FUTURE id before its callback
+  // exists, so a message there is left from an earlier future. A
+  // CK_CORO_FUTURE_ALL message can arrive before this element makes the
+  // future (another element sent it first), so that kind is checked only
+  // once its id is reused, when the two cases look the same.
+  if ((!all || s.all_future_reused()) && s.has_buffered(want(ep, f.id))) {
+    const unsigned long id = (unsigned long)(state::refnum_bits)f.id;
+    const unsigned long n = (unsigned long)state::kOwnFuture;
+    if (!all)
+      CkAbort("ck::coro: CK_CORO_FUTURE id %lu came round again while a message sent to the "
+              "earlier future with that id is still in the inbox; every future's messages must "
+              "be taken (ids wrap after %lu, or build with --with-refnum-type=int)",
+              id, n);
+    CkAbort("ck::coro: CK_CORO_FUTURE_ALL id %lu came round again with a message in the inbox "
+            "under it: either a message sent to the earlier future with that id was never "
+            "taken, or a message for this future arrived before this element made it, which "
+            "cannot be told apart once ids are reused (ids wrap after %lu; build with "
+            "--with-refnum-type=int)",
+            id, n);
+  }
   CkCallback cb = all ? all_target(ep, owner) : self_target(ep, owner);
   cb.setRefnum(f.id);
   return cb;
@@ -1551,7 +1573,7 @@ inline bool overlap_awaiter::await_ready() {
     if (kid.done || kid.root) continue; // finished before a restart: not run again
     kid.root = kid.h = t.release();
     kid.ch.restarting = !kid.ch.sites.empty();
-    s_.run(&kid);                       // to its first site, or to its end
+    s_.run(&kid, false);                // to its first site, or to its end
   }
   return rec->kidsRunning == 0;
 }
@@ -1634,10 +1656,13 @@ using coroutine = coro::coroutine;
 // "name" of the chare, as SDAG's serial "name" { ... }; in any member
 // function of a chare. A wait inside the block aborts (under CK_MIGRATABLE
 // the compiler rejects it: the restart jump would bypass the declaration).
+// The block is the else branch of the macro's if, so an else after the
+// block binds to an enclosing if.
 #define CK_LABEL(name_)                                                       \
   if (::ck::coro::label_scope ck_label_{                                      \
           ::ck::coro::label<std::remove_cvref_t<decltype(*this)>, name_>::slot, this}; \
-      true)
+      false) {                                                                \
+  } else
 
 // A when-all site (SDAG when a(), b()): CK_WHEN_ALL(CK_ALT(...), CK_ALT(...))
 // waits until every alternative has a delivery and takes them together.

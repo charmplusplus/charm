@@ -237,6 +237,9 @@ public:
 class GroupTest : public CBase_GroupTest {
   GroupTest_CORO_CODE
   int round, from, sum;
+  ck::coro::future total, reply;
+  CkReductionMsg* red = nullptr;   // received at a wait and deleted before the next
+  CkDataMsg* data = nullptr;
   static void check(bool ok, const char* what) {
     if (!ok) ::CkAbort("ckcoro owner test (group): %s", what);
   }
@@ -244,7 +247,9 @@ class GroupTest : public CBase_GroupTest {
 public:
   GroupTest() : round(0), from(-1), sum(0) {}
   GroupTest(CkMigrateMessage* m) : CBase_GroupTest(m) {}
-  void pup(PUP::er& p) { p | round; p | from; p | sum; }
+  void pup(PUP::er& p) { p | round; p | from; p | sum; p | total; p | reply; }
+
+  void ask(CkCallback cb, int v) { cb.send(CkDataMsg::buildNew(sizeof(int), &v)); }
 
   ck::coroutine run(int rounds, CProxy_NodeGroupTest ng) {
     CK_MIGRATABLE {
@@ -255,6 +260,17 @@ public:
         check(from == (CkMyPe() + CkNumPes() - 1) % CkNumPes(), "token from the wrong PE");
         sum += from;
       }
+      // Futures on a group: a reduction over the branches that every branch
+      // waits for, and an answer from the next PE's branch.
+      contribute(sizeof(int), &sum, CkReduction::sum_int, CK_CORO_FUTURE_ALL(total));
+      CK_WHEN(total, red);
+      check(*(int*)red->getData() == rounds * CkNumPes() * (CkNumPes() - 1) / 2,
+            "group sum through a future");
+      delete red;
+      thisProxy[(CkMyPe() + 1) % CkNumPes()].ask(CK_CORO_FUTURE(reply), 10 * CkMyPe());
+      CK_WHEN(reply, data);
+      check(*(int*)data->getData() == 10 * CkMyPe(), "answer through a future");
+      delete data;
       contribute(sizeof(int), &sum, CkReduction::sum_int,
                  CkCallback(CkReductionTarget(NodeGroupTest, groupSum), ng));
       contribute(CkCallback(CkReductionTarget(Main, groupReady), mainProxy));
@@ -268,6 +284,9 @@ public:
 class NodeGroupTest : public CBase_NodeGroupTest {
   NodeGroupTest_CORO_CODE
   int round, count, from, sum, groupTotal;
+  ck::coro::future total, own;
+  CkReductionMsg* red = nullptr;   // received at a wait and deleted before the next
+  CkDataMsg* data = nullptr;
   static void check(bool ok, const char* what) {
     if (!ok) ::CkAbort("ckcoro owner test (nodegroup): %s", what);
   }
@@ -275,7 +294,9 @@ class NodeGroupTest : public CBase_NodeGroupTest {
 public:
   NodeGroupTest() : round(0), count(0), from(-1), sum(0), groupTotal(-1) {}
   NodeGroupTest(CkMigrateMessage* m) : CBase_NodeGroupTest(m) {}
-  void pup(PUP::er& p) { p | round; p | count; p | from; p | sum; p | groupTotal; }
+  void pup(PUP::er& p) {
+    p | round; p | count; p | from; p | sum; p | groupTotal; p | total; p | own;
+  }
 
   ck::coroutine run(int rounds) {
     CK_MIGRATABLE {
@@ -289,6 +310,20 @@ public:
       // wrapper of a nodegroup inbox entry (under the node lock).
       CK_WHEN(inbox::groupSum(), groupTotal);
       check(groupTotal == rounds * CkNumPes() * (CkNumPes() - 1) / 2, "group sum by reduction");
+      // Futures on a nodegroup: a reduction over the nodes that every branch
+      // waits for, and a value sent to the branch's own future.
+      contribute(sizeof(int), &sum, CkReduction::sum_int, CK_CORO_FUTURE_ALL(total));
+      CK_WHEN(total, red);
+      check(*(int*)red->getData() == rounds * CkNumPes() * (CkNumPes() - 1) / 2,
+            "nodegroup sum through a future");
+      delete red;
+      {
+        int v = 100 + CkMyNode();
+        CK_CORO_FUTURE(own).send(CkDataMsg::buildNew(sizeof(int), &v));
+      }
+      CK_WHEN(own, data);
+      check(*(int*)data->getData() == 100 + CkMyNode(), "value through a nodegroup's future");
+      delete data;
       contribute(CkCallback(CkReductionTarget(Main, nodeGroupReady), mainProxy));
       CK_WHEN(inbox::resume());
       contribute(sizeof(int), &sum, CkReduction::sum_int,
@@ -300,11 +335,17 @@ public:
 class ChareTest : public CBase_ChareTest {
   ChareTest_CORO_CODE
   int n, i, v, sum;
+  ck::coro::future own, all;
+  CkDataMsg* data = nullptr;   // received at a wait and deleted before the next
+  CkDataMsg* data2 = nullptr;
+  static void check(bool ok, const char* what) {
+    if (!ok) ::CkAbort("ckcoro owner test (chare): %s", what);
+  }
 
 public:
   ChareTest(int n_) : n(n_), i(0), v(0), sum(0) {}
   ChareTest(CkMigrateMessage* m) : CBase_ChareTest(m) {}
-  void pup(PUP::er& p) { p | n; p | i; p | v; p | sum; }
+  void pup(PUP::er& p) { p | n; p | i; p | v; p | sum; p | own; p | all; }
 
   ck::coroutine run() {
     CK_MIGRATABLE {
@@ -312,6 +353,14 @@ public:
         CK_WHEN(inbox::item(i), ck::coro::skip, v);
         sum += v;
       }
+      // Futures on a singleton chare: both kinds call the chare itself.
+      CK_CORO_FUTURE(own).send(CkDataMsg::buildNew(sizeof(int), &sum));
+      CK_CORO_FUTURE_ALL(all).send(CkDataMsg::buildNew(sizeof(int), &n));
+      CK_WHEN_ALL(CK_ALT(own, data), CK_ALT(all, data2));
+      check(*(int*)data->getData() == sum && *(int*)data2->getData() == n,
+            "values through a chare's futures");
+      delete data;
+      delete data2;
       mainProxy.chareReady();
       CK_WHEN(inbox::resume());
       mainProxy.chareDone(sum);
@@ -935,7 +984,7 @@ public:
 class FutureTest : public CBase_FutureTest {
   FutureTest_CORO_CODE
   int round;
-  ck::coro::future fsum, fa, fb, fpeer, fqd, ftask, fwrap;
+  ck::coro::future fsum, fa, fb, fpeer, fqd, ftask, fwrap, fquiet, fgo;
   CMK_REFNUM_TYPE wrapId = 0;
   CkReductionMsg* red;   // received at a wait and deleted before the next
   CkReductionMsg* red2;
@@ -965,6 +1014,7 @@ public:
   FutureTest(CkMigrateMessage* m) : CBase_FutureTest(m), red(nullptr), red2(nullptr) {}
   void pup(PUP::er& p) {
     p | round; p | fsum; p | fa; p | fb; p | fpeer; p | fqd; p | ftask; p | fwrap; p | wrapId;
+    p | fquiet; p | fgo;
     p | total;
   }
 
@@ -1023,6 +1073,19 @@ public:
         }
         CK_WHEN(fwrap);
       }
+      // A CK_CORO_FUTURE_ALL message that arrives before the element makes
+      // the future: element 0 sends on its callback at once, and the last
+      // element makes the future only after quiescence, when the message is
+      // already in its inbox under the id.
+      if (thisIndex == FUTURE_ELEMS - 1) {
+        CkStartQD(CK_CORO_FUTURE(fquiet));
+        CK_WHEN(fquiet);
+      }
+      {
+        CkCallback go = CK_CORO_FUTURE_ALL(fgo);
+        if (thisIndex == 0) go.send();
+      }
+      CK_WHEN(fgo);
       // Quiescence awaited by every element, its message discarded: each
       // makes the future, element 0 starts the detection with it.
       {

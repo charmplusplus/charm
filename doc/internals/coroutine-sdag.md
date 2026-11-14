@@ -241,21 +241,33 @@ outs...)` makes a `when_awaiter<future_msg, ...>` on `want(f.ep, f.id)`:
 one message-pointer out takes the message, no out frees it.
 `when_block(const future &)` makes a `tuple_awaiter<CkMessage *>`. The
 ids wrap after `kOwnFuture` of each kind (2^15 with the default 16-bit
-refnum); `make_future` aborts when the inbox still holds a message under
-the new id (`state::has_buffered`), which the new future would otherwise
-take. A message still in flight under that id is not detected.
+refnum); `kOwnFuture` and the masks are computed in the unsigned refnum
+type, since `--with-refnum-type=int` makes the refnum signed. The
+counters are 64-bit, so the state knows when an id is reused.
+`make_future` aborts when the inbox holds a message under the new id
+(`state::has_buffered`), which the new future would otherwise take: for a
+`CK_CORO_FUTURE` always, since nothing can be sent to its id before its
+callback exists; for a `CK_CORO_FUTURE_ALL` only once the id is reused
+(`all_future_reused`), since another element may send to a collective
+future before this element makes it, and that message waits in the inbox
+under the id. After a reuse an early message and a stale one look the
+same, and the abort says so. A message still in flight is not detected.
 
 **Tracing.** `state::run`, which resumes a suspended coroutine, wraps the
 resume in `_TRACE_BEGIN_EXECUTE_DETAILED` / `_TRACE_END_EXECUTE` under the
 entry index of the root record (`trace_resume`), with the owner and its
 Projections id, as SDAG's generated code does for a `serial` block. The
 first run of a body is inside the coroutine entry's own execution and
-needs no event. In a build without tracing (`CMK_TRACE_ENABLED` 0) both
-are empty.
+needs no event, and so is the first run of a `CK_OVERLAP` or `CK_FORALL`
+task, which `overlap_awaiter::await_ready` starts inside its parent's
+segment with `run(&kid, false)`. In a build without tracing
+(`CMK_TRACE_ENABLED` 0) both are empty.
 
-**Labels.** `CK_LABEL("name") { ... }` declares a `label_scope` in an `if`
-condition: its constructor begins an execution of the label's entry, with
-the owner and its Projections id, and its destructor ends it. The entry
+**Labels.** `CK_LABEL("name") { ... }` declares a `label_scope` in the
+condition of `if (...; false) {} else`, whose else branch is the user's
+block (so an `else` after the block binds to an enclosing `if`): its
+constructor begins an execution of the label's entry, with the owner and
+its Projections id, and its destructor ends it. The entry
 comes from `label<Owner, "name">::slot`, an inline static member of a
 class template: its initializer runs before `main` and records the name
 and a function returning `Owner::index_t::__idx` (`_ckCoroAddLabel`,

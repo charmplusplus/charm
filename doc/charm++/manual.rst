@@ -2278,11 +2278,17 @@ The reference number of the callback belongs to the future: a message
 sent through it arrives with the future's id as its reference number,
 whatever it carried, and the callback cannot carry a reference number of
 its own. Use a new future to tell iterations apart, and put any other tag
-in the message's data. The ids wrap after 32768 futures of each kind
-(``CK_CORO_FUTURE`` and ``CK_CORO_FUTURE_ALL``) with the default 16-bit reference
-number (``--with-refnum-type`` widens it), so every message sent to a
-future should be taken by a wait: making a future whose id is still held
-by an unclaimed message aborts.
+in the message's data. A message for a ``CK_CORO_FUTURE_ALL`` future may
+reach an element before that element has made the future (another element
+sent it first); it waits in the inbox for the element's ``CK_WHEN``. The
+ids wrap after 32768 futures of each kind (``CK_CORO_FUTURE`` and
+``CK_CORO_FUTURE_ALL``) with the default 16-bit reference number
+(``--with-refnum-type=int`` widens it to 2^31), so every message sent to
+a future should be taken by a wait. Making a ``CK_CORO_FUTURE`` whose id
+is still held by a message in the inbox aborts; for
+``CK_CORO_FUTURE_ALL`` the check starts once its ids are reused, since
+before that a message under the id is one that arrived early, and after
+that an early message and one left over look the same.
 
 A coroutine frame is never packed. When the chare migrates or is
 checkpointed, the coroutine state records which wait each active coroutine
