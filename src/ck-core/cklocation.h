@@ -883,6 +883,7 @@ public:
   // Interface used by array manager and proxies
   /// Add a new local array manager to our list.
   void addManager(CkArrayID aid, CkArray* mgr);
+  bool hasManagersFor(CkArrayElementMigrateMessage* msg) const;
   void deleteManager(CkArrayID aid, CkArray* mgr);
 
   // Deliver buffered msgs that were buffered because of active rdma gets

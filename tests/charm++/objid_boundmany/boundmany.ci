@@ -1,0 +1,28 @@
+mainmodule boundmany {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Creator creators;
+  readonly CProxy_A aProxy;
+  readonly int numArrays;
+  readonly int numElements;
+  readonly int rounds;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry void made(CkArrayCreatedMsg* m);
+    entry [reductiontarget] void checked(int n);
+  };
+
+  group Creator {
+    entry Creator();
+    entry void make(int k);
+  };
+
+  array [1D] A {
+    entry A();
+  };
+
+  array [1D] B {
+    entry B(int tag);
+    entry void step(int round);
+  };
+};

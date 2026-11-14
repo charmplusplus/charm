@@ -2938,6 +2938,24 @@ void CkLocMgr::pup(PUP::er& p)
   }
 }
 
+/// Whether every array named in a migrating element's data has a manager here
+/// (the list pupElementsFor writes first).
+bool CkLocMgr::hasManagersFor(CkArrayElementMigrateMessage* msg) const
+{
+  PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
+  int n = 0;
+  p | n;
+  for (int i = 0; i < n; i++)
+  {
+    CkArrayID aid;
+    int elCType;
+    p | aid;
+    p | elCType;
+    if (managers.find(aid) == managers.end()) return false;
+  }
+  return true;
+}
+
 /// Add a new local array manager to our list.
 void CkLocMgr::addManager(CkArrayID id, CkArray* mgr)
 {
@@ -2948,7 +2966,7 @@ void CkLocMgr::addManager(CkArrayID id, CkArray* mgr)
   while (i != pendingImmigrate.end())
   {
     auto msg = *i;
-    if (msg->nManagers <= managers.size())
+    if (hasManagersFor(msg))
     {
       i = pendingImmigrate.erase(i);
       immigrate(msg);
@@ -3507,23 +3525,48 @@ void CkLocMgr::pupElementsFor(PUP::er& p, CkLocRec* rec, CkElementCreation_t typ
 {
   p.comment("-------- Array Location --------");
 
+  // The elements, in the order their data follows. A migration names each
+  // element by its array's id: the order of managers differs between PEs when
+  // bound arrays are created from several PEs at once. A checkpoint keeps the
+  // older format, one type per manager in map order.
+  std::vector<std::pair<CkArrayID, CkArray*>> present;
+  int n = 0;
+  if (!p.isUnpacking() || !p.isMigration())
+  {
+    for (auto& m : managers)
+      if (!p.isMigration() || m.second->getEltFromArrMgr(rec->getID()))
+        present.emplace_back(m.first, m.second);
+    n = (int)present.size();
+  }
+  if (p.isMigration()) p | n;
+
   // First pup the element types
   // (A separate loop so ckLocal works even in element pup routines)
-  for (auto itr = managers.begin(); itr != managers.end(); ++itr)
+  if (p.isUnpacking() && p.isMigration()) present.resize(n);
+  for (int i = 0; i < n; i++)
   {
-    int elCType;
-    CkArray* arr = itr->second;
+    int elCType = -1;
     if (!p.isUnpacking())
-    {  // Need to find the element's existing type
-      CkMigratable* elt = arr->getEltFromArrMgr(rec->getID());
-      if (elt)
-        elCType = elt->ckGetChareType();
-      else
-        elCType = -1;  // Element hasn't been created
+    {
+      CkMigratable* elt = present[i].second->getEltFromArrMgr(rec->getID());
+      if (elt) elCType = elt->ckGetChareType();
     }
-    p(elCType);
+    if (p.isMigration())
+    {
+      p | present[i].first;
+      if (p.isUnpacking())
+      {
+        auto m = managers.find(present[i].first);
+        if (m == managers.end())
+          CkAbort("Array element arrives with an element of array %d, which has no"
+                  " manager on PE %d\n", ((CkGroupID)present[i].first).idx, CkMyPe());
+        present[i].second = m->second;
+      }
+    }
+    p | elCType;
     if (p.isUnpacking() && elCType != -1)
     {
+      CkArray* arr = present[i].second;
       // Create the element
       CkMigratable* elt = arr->allocateMigrated(elCType, type);
       int migCtorIdx = _chareTable[elCType]->getMigCtor();
@@ -3538,9 +3581,9 @@ void CkLocMgr::pupElementsFor(PUP::er& p, CkLocRec* rec, CkElementCreation_t typ
     }
   }
   // Next pup the element data
-  for (auto itr = managers.begin(); itr != managers.end(); ++itr)
+  for (auto& m : present)
   {
-    CkMigratable* elt = itr->second->getEltFromArrMgr(rec->getID());
+    CkMigratable* elt = m.second->getEltFromArrMgr(rec->getID());
     if (elt != NULL)
     {
       elt->virtual_pup(p);
@@ -3777,9 +3820,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 {
   const CkArrayIndex& idx = msg->idx;
 
-  if (msg->nManagers < managers.size())
-    CkAbort("Array element arrived from location with fewer managers!\n");
-  if (msg->nManagers > managers.size())
+  if (!hasManagersFor(msg))
   {
     // Some array managers haven't registered yet -- buffer the message
     DEBM((AA "Buffering %s immigrate msg waiting for array registration\n" AB,
