@@ -558,7 +558,12 @@ Tests, CI and tooling:
   coverage of Charm++ and reconverse, coverage/run.sh runs the test
   tiers, and a weekly CI run publishes the report at
   https://charmplusplus.org/charm-coverage/ (#4094, #4111); a weekly
-  job drafts tests for uncovered runtime code (#4120).
+  job drafts tests for uncovered runtime code (#4120). A run that
+  ends in CkAbort or CmiAbort writes its coverage profile, so tests
+  that expect an abort count toward coverage: reconverse gains
+  CmiRegisterAbortFlush, a list of functions CmiAbort runs once
+  before the abort hook (#4263, reconverse #328). The report counts
+  only runs whose 'make test' passed.
 
 - The hunt workflow (.github/workflows/hunt.yaml) repeats one test
   many times on a chosen runner, optionally under AddressSanitizer,
