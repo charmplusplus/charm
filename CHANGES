@@ -73,7 +73,10 @@ Runtime (reconverse):
 
 - Slingshot (libfabric cxi): FI_MR_CACHE_MONITOR and
   FI_CXI_RX_MATCH_MODE no longer need to be set in the environment
-  (reconverse #281); native psm2 on Omni-Path works (reconverse #308).
+  (reconverse #281); native psm2 on Omni-Path works (reconverse #308),
+  and opening psm2 no longer binds every PE thread of a process to
+  one core: the main thread's CPU mask is restored after the network
+  is opened (reconverse #327).
 
 - Converse API: the C-callable declarations of converse.h have C
   linkage, so Converse programs written in C link (reconverse #302);
@@ -86,7 +89,9 @@ Runtime (reconverse):
   reconverse (reconverse #280); charm keeps the CCS builtins, liveViz
   and PythonCCS on top of them (#4037, #4042). The CCS handler
   LBObjLoads returns every PE's per-object load snapshot without
-  switching the LB instrumentation on (#4071, #4104).
+  switching the LB instrumentation on (#4071, #4104). In the charm4py
+  build, a handler registered with CcsRegisterHandlerFn is called
+  instead of crashing PE 0 (reconverse #325).
 
 - Windows: the target reconverse-win-x86_64 builds Charm++ on
   reconverse for one process with several PEs (reconverse #304,
@@ -100,7 +105,9 @@ Runtime (reconverse):
   MPI library requires (Cray MPICH under Slurm: srun
   --mpi=cray_shasta). User-driven interop (CharmBeginInit,
   CharmInit, StartCharmScheduler, CharmLibExit) from a program's own
-  main also works (#4055, reconverse #288).
+  main also works (#4055, reconverse #288). A CkAbort or CmiAbort in
+  any process ends the whole MPI job through MPI_Abort (#4254,
+  reconverse #326).
 
 - Tracing: with tracing compiled out, [local] and [inline] calls no
   longer evaluate trace arguments, which crashed hello/local and
@@ -159,7 +166,7 @@ Programming model and language bindings:
   SDAG's serial "name" does.
   +ck_fakemigrate_pup moves an array element to the next PE at every
   wait, so that its own pup runs (two or more PEs; elements that use
-  AtSync, groups and chares are rebuilt in place).
+  AtSync, groups and chares are rebuilt in place) (#4253).
 
 - CkDyn: a C API for language bindings that define chare classes at
   run time instead of in a .ci file (#4193). A class is registered
@@ -274,7 +281,7 @@ Arrays, reductions, multicast and load balancing:
   receive the copy meant for the second: that PE ran the decision
   twice and aborted with "LBDB::Migrate: Handle 0 no longer
   registered" (AMPI Jacobi, 8 processes x 2 PEs, every run). Each
-  child in another process now gets its own copy.
+  child in another process now gets its own copy (#4260).
 
 - Array broadcasts are stored and checked by epoch for every array,
   including arrays with setStaticInsertion(true) and
@@ -351,6 +358,15 @@ Arrays, reductions, multicast and load balancing:
   share; the new test load_balancing/lbsweep runs every usable
   balancer on a modelled imbalanced load (#4250).
 
+- Load balancing under TurnManualLBOn: AtSync no longer starts a step
+  of its own, so a CkStartLB step runs once. +LBSim reads the files
+  +LBDump writes (the unsigned 64-bit size was missing from
+  PUP::xlater). MetaBalancer's model-based switch builds a TreeLB
+  configuration that TreeLB accepts, and its random forest model runs
+  on builds with error checking (#4258). lbsweep covers manual LB and
+  +LBDump/+LBSim, meta_lb_test runs the model in CI, and megatest has
+  a nodegroup reduction test with early contributions (#4257).
+
 - CkIO: session arrays use the wide-collection layout, so a program
   may run more than 4,095 read and write sessions (#4149, #4152);
   read sessions on different files can be in progress at the same
@@ -413,7 +429,8 @@ AMPI (Adaptive MPI):
   that checkpoint without any process failing; AMPI_Rollback_count
   tells the two returns from the checkpoint call apart. Works on macOS
   and in one process; Cjacobi3D demonstrates it with '-memckpt ITER
-  -rollback ITER2'. Restart after a process failure is not available.
+  -rollback ITER2'. Restart after a process failure is not available
+  (#4201).
 
 - Exit status: MPI_Finalize returns, and the largest value main
   returns over the ranks becomes the program's exit status (#4102,
@@ -492,6 +509,18 @@ campi (coroutine AMPI, experimental):
   The one-sided calls are the only MPI routines that remain compile
   errors in a campi program. tests/campi has the tests.
 
+- MPI_Dist_graph_create exchanges the edge lists with collectives, so
+  a user message or a pending MPI_ANY_TAG receive on the communicator
+  is no longer taken for an edge list, and each edge keeps its own
+  weight (#4246). MPI_UNWEIGHTED is no longer NULL, MPI_WEIGHTS_EMPTY
+  is defined, and MPI_UNWEIGHTED from Fortran gives an unweighted
+  graph (#4247).
+
+- MPI_Wtime does not go backwards when a rank migrates, moves to
+  another process or restarts from a checkpoint, and the time spent
+  moving is counted; a campi rank's clock is set after it migrates
+  (#4259).
+
 - A communicator creation completes on its own wake-up, identified
   by a per-communicator count, so an unrelated wake-up such as
   AMPI_Resume no longer ends MPI_Comm_split or MPI_Comm_dup before
@@ -561,6 +590,11 @@ Build and packaging:
 - A direct 'cmake -S . -B build' configures: NETWORK defaults to
   reconverse and is set before its first use (#4241).
 
+- An incremental build recompiles charmxi after a change to its
+  headers: charmc passes the -M dependency options on -host compiles.
+  An existing build directory gets the dependency files after a
+  rebuild with --force (#4256).
+
 - The charm4py target builds and loads on reconverse: libcharm links
   reconverse, which is built with CMK_CHARM4PY (#4063).
 
@@ -580,8 +614,7 @@ Removed:
 Known gaps in the beta:
 
 - AMPI: dup and split of an intercommunicator (#4099); CkDDT_Struct
-  lower bounds and negative extents (#4100); the neighbor order of
-  Cart and Dist_graph topologies (#4101); three request-completion
+  lower bounds and negative extents (#4100); three request-completion
   items of #4097 (same-root Ibcasts, MPI_Op_free during a non-blocking
   reduction, sequence number wraparound). pieglobals with Fortran
   aborts at exit on Linux after the program has finished (#4157,
