@@ -491,6 +491,10 @@ endif()
 if(BUILD_HIP)
   set(RECONVERSE_ENABLE_HIP ON CACHE BOOL "Enable HIP support in reconverse" FORCE)
 endif()
+# CmiAbort then writes reconverse's coverage profile before it aborts.
+if(CMK_COVERAGE)
+  set(RECONVERSE_COVERAGE ON CACHE BOOL "Write the coverage profile on CmiAbort" FORCE)
+endif()
 # Coverage flags go into CMAKE_<LANG>_FLAGS, the only flags that reach
 # reconverse (cmake/reconverse clears the directory compile options), so they
 # must be set before the subdirectory is added. charmc adds the same flags for
@@ -1078,6 +1082,11 @@ endforeach(l)
 # Use #undef before #define so this overrides converse.h's #ifndef default
 # regardless of include order, without triggering a redefinition warning.
 file(APPEND ${optfile_h} "#undef CMK_OPTIMIZE\n#define CMK_OPTIMIZE ${CMK_OPTIMIZE}\n")
+if(CMK_COVERAGE)
+  file(APPEND ${optfile_h} "#define CMK_COVERAGE 1\n")
+else()
+  file(APPEND ${optfile_h} "#define CMK_COVERAGE 0\n")
+endif()
 
 if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-cray")
     file(APPEND ${optfile_h} "#include \"cc-${CMK_COMPILER}.h\"\n")

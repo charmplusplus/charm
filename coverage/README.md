@@ -180,8 +180,12 @@ line when it is fixed.
 - **Denominators move.** Which binaries were built, header instantiations
   and build options all change the totals. Compare percentages loosely, and
   covered-line counts of one file where it matters.
-- A test that aborts, segfaults or times out writes no profile; its partial
-  run is not counted.
+- A test that ends in `CkAbort`/`CmiAbort` writes the profiles of the
+  executable and of libreconverse before it aborts (`CmiRegisterAbortFlush`),
+  so the lines up to the abort are counted; the lines after the write in
+  `CmiAbort` and LCI's libraries are not. In a multi-process run the peers
+  the launcher kills write nothing. A test that segfaults or times out writes
+  no profile; its partial run is not counted.
 - `bin/charmxi` is built uninstrumented, so `src/xlat-i` is not measured.
 - Headers reach the profile under several paths (`src/`, the build's
   `include/` copies, the `include/` symlink). The report attributes each copy
