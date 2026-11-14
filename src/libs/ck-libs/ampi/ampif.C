@@ -1455,12 +1455,16 @@ void mpi_graph_create(int* comm_old, int* nnodes, int *index, int *edges,
   *ierr = MPI_Graph_create(*comm_old, *nnodes, index, edges, *reorder, comm_graph);
 }
 
+// Fortran's MPI_UNWEIGHTED is a null pointer (ampif.h), as MPI_IN_PLACE is.
+static inline int* weights_f(int* w) noexcept { return w ? w : MPI_UNWEIGHTED; }
+
 void mpi_dist_graph_create_adjacent(int* comm_old, int* indegree, int* sources, int* sourceweights,
                                     int* outdegree, int* destinations, int* destweights, int* info,
                                     int* reorder, int* comm_dist_graph, int* ierr) noexcept
 {
-  *ierr = MPI_Dist_graph_create_adjacent(*comm_old, *indegree, sources, sourceweights, *outdegree,
-                                         destinations, destweights, *info, *reorder, comm_dist_graph);
+  *ierr = MPI_Dist_graph_create_adjacent(*comm_old, *indegree, sources, weights_f(sourceweights),
+                                         *outdegree, destinations, weights_f(destweights), *info,
+                                         *reorder, comm_dist_graph);
 }
 
 void mpi_dist_graph_create(int* comm_old, int* n, int* sources, int* degrees,
@@ -1468,7 +1472,7 @@ void mpi_dist_graph_create(int* comm_old, int* n, int* sources, int* degrees,
                            int* comm_dist_graph, int* ierr) noexcept
 {
   *ierr = MPI_Dist_graph_create(*comm_old, *n, sources, degrees, destinations,
-                                weights, *info, *reorder, comm_dist_graph);
+                                weights_f(weights), *info, *reorder, comm_dist_graph);
 }
 
 void mpi_topo_test(int* comm, int *status, int* ierr) noexcept
@@ -1548,7 +1552,8 @@ void mpi_dist_graph_neighbors(int* comm_dist_graph, int* maxindegree, int* sourc
                               int* destinations, int* destweights, int* ierr) noexcept
 {
   *ierr = MPI_Dist_graph_neighbors(*comm_dist_graph, *maxindegree, sources,
-                                   sourceweights, *maxoutdegree, destinations, destweights);
+                                   weights_f(sourceweights), *maxoutdegree, destinations,
+                                   weights_f(destweights));
 }
 
 void mpi_dims_create(int *nnodes, int *ndims, int *dims, int* ierr) noexcept
