@@ -6,6 +6,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #include "tcharm_impl.h"
 #include "tcharm.h"
 #include <ctype.h>
+#include <algorithm>
 #include "memory-isomalloc.h"
 
 CtvDeclare(TCharm *,_curTCharm);
@@ -251,6 +252,7 @@ TCharm::TCharm(CkMigrateMessage *msg)
 {
   initMsg=NULL;
   tid=NULL;
+  timeOffset=0.0;
   campiRank=nullptr;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
 }
@@ -263,6 +265,19 @@ void checkPupMismatch(PUP::er &p,int expected,const char *where)
 		CkError("FATAL ERROR> Mismatch %s pup routine\n",where);
 		CkAbort("FATAL ERROR: Pup direction mismatch");
 	}
+}
+
+// The element's clock moves with it: packing records its time, and on
+// arrival the offset is the smallest one (zero if possible) that keeps the
+// clock from reading earlier than that time. So the clock never goes
+// backwards, the time spent moving is counted, and the clocks of elements in
+// one process agree with each other and with CkWallTimer, except after a move
+// to a process whose clock is behind.
+void TCharm::pupClock(PUP::er &p) {
+  double packTime=CkWallTimer()+timeOffset;
+  p(packTime);
+  if (p.isUnpacking())
+    timeOffset=std::max(0.0, packTime-CkWallTimer());
 }
 
 void TCharm::pup(PUP::er &p) {
@@ -282,6 +297,7 @@ void TCharm::pup(PUP::er &p) {
     if (p.isUnpacking()) tid = CthSelf();
     checkPupMismatch(p,5136,"before campi rank");
     tcharm_campi_pup_fn(this, p);
+    pupClock(p);
     checkPupMismatch(p,5140,"after TCHARM");
     return;
   }
@@ -303,10 +319,7 @@ void TCharm::pup(PUP::er &p) {
   {//In this case, unpack the thread & heap before the user data
     s.seek(1);
     pupThread(p);
-    //Restart our clock: set it up so packTime==CkWallTimer+timeOffset
-    double packTime;
-    p(packTime);
-    timeOffset=packTime-CkWallTimer();
+    pupClock(p);
   }
   
 //Pack all user data
@@ -343,9 +356,7 @@ void TCharm::pup(PUP::er &p) {
   {//In this case, pack the thread & heap after the user data
     s.seek(1);
     pupThread(p);
-    //Stop our clock:
-    double packTime=CkWallTimer()+timeOffset;
-    p(packTime);
+    pupClock(p);
   }
   
   s.endBlock(); //End of seeking block
