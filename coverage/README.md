@@ -57,7 +57,9 @@ libreconverse, and merges a tier only if it was run against the build being
 measured: `run.sh` records the build's libraries in `stamp-<tier>.txt`
 (`coverage/buildstamp.sh`), and `report.sh` stops if a tier's stamp no
 longer matches, so rerun that tier after a rebuild or remove its
-`profraw/<tier>`.
+`profraw/<tier>`. Only passing runs count: `run.sh` moves the profiles of a
+run whose `make test` failed to `profraw-failed/<tier>`, which `report.sh`
+does not read, and the failure stays in `results-<tier>.tsv`.
 `.github/workflows/coverage.yaml` runs all of this weekly on ubuntu-latest
 and on demand, and uploads the output.
 
