@@ -152,9 +152,12 @@
        integer, parameter :: AMPI_COMM_TYPE_PROCESS = 3
        integer, parameter :: AMPI_COMM_TYPE_WTH     = 4
 
-       integer, parameter :: MPI_UNWEIGHTED = 0
-       integer, parameter :: MPI_GRAPH = 1
-       integer, parameter :: MPI_CART  = 2
+       integer, pointer   :: MPI_UNWEIGHTED => null()
+       ! Any array that is not MPI_UNWEIGHTED: a weighted graph whose
+       ! weights are empty, which is what C's MPI_WEIGHTS_EMPTY means
+       integer            :: MPI_WEIGHTS_EMPTY(1)
+       integer, parameter :: MPI_CART  = 1
+       integer, parameter :: MPI_GRAPH = 2
        integer, parameter :: MPI_DIST_GRAPH = 3
 
        integer, parameter :: MPI_TAG_UB            = -2

@@ -11109,6 +11109,7 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int so
       }
       for (int j=0; j<degrees[i]; j++) {
         if ((destinations[counter] < 0) || (destinations[counter] >= commSize) ||
+            weights == MPI_WEIGHTS_EMPTY ||
             (weights != MPI_UNWEIGHTED && weights[counter] < 0)) {
           return ampiErrhandler("AMPI_Dist_graph_create", MPI_ERR_TOPOLOGY);
         }
@@ -11524,7 +11525,7 @@ AMPI_API_IMPL(int, MPI_Dist_graph_neighbors, MPI_Comm comm, int maxindegree, int
     destinations[i] = tmpDestinations[i];
   }
 
-  if (topo->areSourcesWeighted()) {
+  if (topo->areSourcesWeighted() && sourceweights != MPI_UNWEIGHTED && destweights != MPI_UNWEIGHTED) {
     for (int i=0; i<maxindegree; i++) {
       sourceweights[i] = tmpSourceWeights[i];
     }

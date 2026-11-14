@@ -299,7 +299,11 @@ typedef void (MPI_User_function)(void *invec, void *inoutvec,
  * you may need to change AMPI_MAX_PREDEFINED_TYPE
  */
 
-#define MPI_UNWEIGHTED 0
+// Distinct from NULL and from each other: a rank with no edges may pass NULL
+// (or MPI_WEIGHTS_EMPTY) for a weighted graph (MPI 3.1 section 7.5.4).
+#define MPI_UNWEIGHTED    ((int *)2)
+#define MPI_WEIGHTS_EMPTY ((int *)3)
+
 #define MPI_CART       1
 #define MPI_GRAPH      2
 #define MPI_DIST_GRAPH 3
