@@ -230,6 +230,15 @@ Object ids and element location:
 
 Arrays, reductions, multicast and load balancing:
 
+- TreeLB sent one copy of a decision to all of a PE's children in
+  another process. The send writes the destination PE into the
+  message header and the network layer reads the buffer after the
+  send returns, so two children in the same process could both
+  receive the copy meant for the second: that PE ran the decision
+  twice and aborted with "LBDB::Migrate: Handle 0 no longer
+  registered" (AMPI Jacobi, 8 processes x 2 PEs, every run). Each
+  child in another process now gets its own copy.
+
 - Array broadcasts are stored and checked by epoch for every array,
   including arrays with setStaticInsertion(true) and
   setAnytimeMigration(false) (TCharm, AMPI, CkIO), so a broadcast
