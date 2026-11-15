@@ -347,6 +347,12 @@ Arrays, reductions, multicast and load balancing:
   run inside the send that completed it (#4167); the allGather
   library keeps its shared source buffer registered (#4182).
 
+- Zero-copy broadcasts no longer hang with two or more hosts of two or
+  more processes each, or with six or more processes in all: Charm++
+  sends the broadcast along the spanning tree its acknowledgements are
+  counted on, as classic Converse did, instead of through the runtime
+  broadcast (#4273, fixes #4269).
+
 - Load balancing: balancers are told only about the arrivals they
   ordered, so an element that calls migrateMe() between or during
   AtSync steps no longer corrupts TreeLB's count (#4195, #4196).
@@ -626,6 +632,9 @@ Known gaps in the beta:
   #4189). On macOS a rank cannot move to another process or restart
   from a checkpoint (no way to turn address randomization off); campi
   can. No shrink/expand; ROMIO is not built by default.
+
+- MetisLB makes the load imbalance worse on more than 4 PEs (#4271);
+  use TreeLB, GreedyRefineLB or DistributedLB.
 
 - CharmDebug is not available.
 
