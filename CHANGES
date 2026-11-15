@@ -632,8 +632,10 @@ Known gaps in the beta:
 - --build-shared does not link on reconverse (#4049).
 
 - Large scale: under heavy traffic at 8 to 32 nodes, exhaustion of
-  LCI's receive packet pool can hang a run (reconverse #257). Three
-  one-process tests hang on Stampede3 SKX (reconverse #320).
+  LCI's receive packet pool can hang a run (reconverse #257). A
+  one-process program started directly (without srun) inside a Slurm
+  allocation waits in LCI's bootstrap for the job's other tasks; start
+  it with 'srun -n 1' or set LCT_PMI_BACKEND=local (reconverse #320).
 
 - Checkpoints written by 8.x or by v9.0.0-alpha1 cannot be restored;
   checkpoints from v9.0.0-alpha2 and later can.
