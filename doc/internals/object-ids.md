@@ -64,8 +64,8 @@ type before the element data; the receiving PE creates each element in the
 array named by its id, and `CkLocMgr::immigrate` holds the message until every
 named array has a manager there (`hasManagersFor`). The order of the
 `managers` map is not used: it differs between PEs when bound arrays are
-created from several PEs at once, as AMPI's communicators are. A checkpoint
-keeps the older layout, one chare type per manager in map order (see section 5).
+created from several PEs at once, as AMPI's communicators are. Checkpoints use
+the same layout after a marker (see section 5).
 
 **Payload.** What the payload means is decided per array, by its `CkLocMgr`,
 from whether the array has bounds:
@@ -202,12 +202,16 @@ which the new process count defines. With PR 1d, each `CkLocMgr` and `CkArray`
 pups its collection number and kind, and PE 0 moves its counters past every
 restored number before any new array is created.
 
-The array data of a checkpoint is written per location record in the older
-layout: one chare type per array manager, in the
-order of the writing PE's `managers` map, read back in the restoring PE's
-order. Programs that create bound arrays from several PEs at once can register
-them in different orders, which this layout does not detect; naming each
-element by its array id, as migrations do, needs a new checkpoint format.
+The array data of a checkpoint is written per location record in the
+migration layout (section 1), after the marker -2, which is not a chare type.
+The order of the `managers` map differs between the writing PE and the
+restoring PE when bound arrays were created from several PEs at once, and
+restoring on fewer PEs reads one PE's records in another's order. A checkpoint
+without the marker was written in the older layout, one chare type per manager
+in the writing PE's map order; it is still read that way, by position in the
+restoring PE's order, and can put an element's data into another bound array
+in such programs. In-memory checkpoints and the swap file use the same code
+and so the same layout.
 
 ## 6. Limits and their diagnostics
 

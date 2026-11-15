@@ -237,8 +237,16 @@ Object ids and element location:
   communicator's array. An element arriving from a PE that lacks one
   of the receiving PE's arrays no longer aborts with "Array element
   arrived from location with fewer managers!"; one arriving before
-  the manager of an array it names is held, as before. Checkpoints
-  keep their format. New test objid_boundmany.
+  the manager of an array it names is held, as before. New test
+  objid_boundmany (#4261).
+
+- Checkpoints name each bound element by its array id too, after a
+  marker. A restart, on fewer PEs in particular, put an element's
+  data into another bound array of the same index when the bound
+  arrays had been created from several PEs at once; nothing
+  reported it. Checkpoints written without the marker are read as
+  before. objid_boundmany checkpoints and restarts on other PE
+  counts.
 
 - A send to an array element from a PE that has not yet processed
   the array manager's creation is held until the manager exists, as

@@ -6,6 +6,10 @@
 // checks that its partner in A came along. A round that makes no progress for
 // 30 s fails the test (an element whose data went to another array never
 // contributes).
+//
+// With -ckpt-at R the run checkpoints to log/ before round R and exits; a run
+// with +restart log finishes the rounds. The restoring PE must put each
+// element's data in its own array, whatever order the writing PE had.
 #include "boundmany.decl.h"
 #include <vector>
 
@@ -20,6 +24,8 @@ class Main : public CBase_Main {
   std::vector<CkArrayID> bound;
   int round = 0;
   int arraysChecked = 0;
+  int ckptAt = -1;
+  bool restarted = false;
   long progress = 0, progressSeen = -1;
 
   static void watchdog(void* self, double) {
@@ -40,6 +46,7 @@ public:
     rounds = 7;
     CmiGetArgInt(m->argv, "-a", &numArrays);
     CmiGetArgInt(m->argv, "-r", &rounds);
+    CmiGetArgInt(m->argv, "-ckpt-at", &ckptAt);
     delete m;
     numElements = 4 * CkNumPes();
     mainProxy = thisProxy;
@@ -50,6 +57,16 @@ public:
     CcdCallFnAfter(watchdog, this, 30000);
   }
 
+  Main(CkMigrateMessage* m) : CBase_Main(m), restarted(true) {}
+
+  void pup(PUP::er& p) {
+    p | bound;
+    p | round;
+    p | arraysChecked;
+    p | ckptAt;
+    p | progress;
+  }
+
   void made(CkArrayCreatedMsg* m) {
     bound.push_back(m->aid);
     delete m;
@@ -58,14 +75,32 @@ public:
   }
 
   void next() {
+    if (round == ckptAt && !restarted) {
+      CkStartCheckpoint("log", CkCallback(CkIndex_Main::resumed(), thisProxy));
+      return;
+    }
     if (round == rounds) {
       CkPrintf("objid_boundmany PASS: %d bound arrays, %d elements each, %d rounds, %d PEs\n",
                numArrays, numElements, rounds, CkNumPes());
       CkExit();
       return;
     }
-    for (auto& aid : bound) CProxy_B(aid).step(round);
+    for (auto& aid : bound) CProxy_B(aid).step(round, aid);
     round++;
+  }
+
+  void resumed() {
+    if (!restarted) {
+      CkPrintf("objid_boundmany: checkpoint written before round %d on %d PEs\n", round,
+               CkNumPes());
+      CkExit();
+      return;
+    }
+    CkPrintf("objid_boundmany: restarted on %d PEs before round %d\n", CkNumPes(), round);
+    ckptAt = -1;
+    progressSeen = -1;
+    CcdCallFnAfter(watchdog, this, 30000);
+    next();
   }
 
   // One reduction per bound array.
@@ -81,6 +116,7 @@ public:
 class Creator : public CBase_Creator {
 public:
   Creator() {}
+  Creator(CkMigrateMessage* m) : CBase_Creator(m) {}
   void make(int k) {
     CkArrayOptions opts(numElements);
     opts.bindTo(aProxy);
@@ -125,8 +161,20 @@ public:
   // array's step moves the whole bound set. Round 0 does not move: once its
   // reductions are done, every bound array's manager exists on every PE, as
   // bound arrays require before their elements migrate.
-  void step(int round) {
+  // sentTo is the array the broadcast went to. The element's own fields come
+  // from its data, so an element holding another array's data names that
+  // array in all of them.
+  void step(int round, CkArrayID sentTo) {
     CkEnforce(lastRound == round - 1);
+    if (!(myArray == sentTo) || !(thisArrayID == sentTo) ||
+        aProxy[thisIndex].ckLocal() == nullptr) {
+      CkPrintf("objid_boundmany FAIL: element %d of bound array %d on PE %d in round %d "
+               "received a broadcast to array group %d but holds the data of group %d, "
+               "partner in A %s\n",
+               thisIndex, tag, CkMyPe(), round, ((CkGroupID)sentTo).idx,
+               ((CkGroupID)myArray).idx, aProxy[thisIndex].ckLocal() ? "here" : "missing");
+      CkAbort("bound element holds another array's data");
+    }
     lastRound = round;
     int one = 1;
     contribute(sizeof(int), &one, CkReduction::sum_int,

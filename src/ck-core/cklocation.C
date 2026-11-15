@@ -3525,24 +3525,32 @@ void CkLocMgr::pupElementsFor(PUP::er& p, CkLocRec* rec, CkElementCreation_t typ
 {
   p.comment("-------- Array Location --------");
 
-  // The elements, in the order their data follows. A migration names each
-  // element by its array's id: the order of managers differs between PEs when
-  // bound arrays are created from several PEs at once. A checkpoint keeps the
-  // older format, one type per manager in map order.
+  // The elements, in the order their data follows, each named by its array's
+  // id: the order of managers differs between PEs when bound arrays are
+  // created from several PEs at once. A checkpoint starts with a marker; one
+  // written before the marker existed has one type per manager in map order.
+  const int idLayout = -2;  // not a chare type
+  bool ids = p.isMigration();
+  int first = idLayout;
+  if (!p.isMigration())
+  {
+    p | first;
+    ids = !p.isUnpacking() || first == idLayout;
+  }
   std::vector<std::pair<CkArrayID, CkArray*>> present;
   int n = 0;
-  if (!p.isUnpacking() || !p.isMigration())
+  if (!p.isUnpacking() || !ids)
   {
     for (auto& m : managers)
-      if (!p.isMigration() || m.second->getEltFromArrMgr(rec->getID()))
+      if (!ids || m.second->getEltFromArrMgr(rec->getID()))
         present.emplace_back(m.first, m.second);
     n = (int)present.size();
   }
-  if (p.isMigration()) p | n;
+  if (ids) p | n;
 
   // First pup the element types
   // (A separate loop so ckLocal works even in element pup routines)
-  if (p.isUnpacking() && p.isMigration()) present.resize(n);
+  if (p.isUnpacking() && ids) present.resize(n);
   for (int i = 0; i < n; i++)
   {
     int elCType = -1;
@@ -3551,19 +3559,22 @@ void CkLocMgr::pupElementsFor(PUP::er& p, CkLocRec* rec, CkElementCreation_t typ
       CkMigratable* elt = present[i].second->getEltFromArrMgr(rec->getID());
       if (elt) elCType = elt->ckGetChareType();
     }
-    if (p.isMigration())
+    if (ids)
     {
       p | present[i].first;
       if (p.isUnpacking())
       {
         auto m = managers.find(present[i].first);
         if (m == managers.end())
-          CkAbort("Array element arrives with an element of array %d, which has no"
-                  " manager on PE %d\n", ((CkGroupID)present[i].first).idx, CkMyPe());
+          CkAbort("Array element names array %d, which has no manager on PE %d\n",
+                  ((CkGroupID)present[i].first).idx, CkMyPe());
         present[i].second = m->second;
       }
     }
-    p | elCType;
+    if (!ids && i == 0)
+      elCType = first;
+    else
+      p | elCType;
     if (p.isUnpacking() && elCType != -1)
     {
       CkArray* arr = present[i].second;
