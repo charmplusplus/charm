@@ -245,7 +245,8 @@ Object ids and element location:
   data into another bound array of the same index when the bound
   arrays had been created from several PEs at once; nothing
   reported it. Checkpoints written without the marker are read as
-  before. objid_boundmany checkpoints and restarts on other PE
+  before; a checkpoint written by this version cannot be restarted by
+  an older one. objid_boundmany checkpoints and restarts on other PE
   counts.
 
 - A send to an array element from a PE that has not yet processed

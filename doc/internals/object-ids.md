@@ -210,8 +210,9 @@ restoring on fewer PEs reads one PE's records in another's order. A checkpoint
 without the marker was written in the older layout, one chare type per manager
 in the writing PE's map order; it is still read that way, by position in the
 restoring PE's order, and can put an element's data into another bound array
-in such programs. In-memory checkpoints and the swap file use the same code
-and so the same layout.
+in such programs. In-memory checkpoints, including the on-disk copy kept by
+`CkDiskCheckPTInfo`, use the same code and so the same layout; the out-of-core
+swap file pups each element directly and does not reach it.
 
 ## 6. Limits and their diagnostics
 
