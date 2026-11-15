@@ -6,13 +6,14 @@ mainmodule boundmany {
   readonly int numElements;
   readonly int rounds;
 
-  mainchare Main {
+  mainchare [migratable] Main {
     entry Main(CkArgMsg* m);
     entry void made(CkArrayCreatedMsg* m);
     entry [reductiontarget] void checked(int n);
+    entry void resumed();
   };
 
-  group Creator {
+  group [migratable] Creator {
     entry Creator();
     entry void make(int k);
   };
@@ -23,6 +24,6 @@ mainmodule boundmany {
 
   array [1D] B {
     entry B(int tag);
-    entry void step(int round);
+    entry void step(int round, CkArrayID sentTo);
   };
 };

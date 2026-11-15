@@ -19,8 +19,17 @@ test: boundmany
 	$(call run, ./boundmany +p8 +randomized_msgq +randomized_seed 3)
 	$(call run, ./boundmany +p8 +randomized_msgq +randomized_seed 4)
 
+	# Checkpoint before round 3, restart on fewer and on the same PEs. Without
+	# the array ids in the checkpoint, restarts on 4 PEs failed every seed.
+	-rm -rf log
+	$(call run, ./boundmany +p8 -ckpt-at 3 +randomized_msgq +randomized_seed 1)
+	-sync
+	$(call run, ./boundmany +p4 +restart log)
+	$(call run, ./boundmany +p8 +restart log)
+	-rm -rf log
+
 smptest: boundmany
 	$(call run, ./boundmany +p8 +randomized_msgq +randomized_seed 1)
 
 clean:
-	rm -f *.decl.h *.def.h *.o boundmany charmrun
+	rm -rf *.decl.h *.def.h *.o boundmany charmrun log
