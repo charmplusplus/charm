@@ -151,6 +151,10 @@ void Side::begin(int method_, int size_, int role_, int myPe_, int peerPe_, bool
   }
   c = makeCase(*this);
   c->setup();
+  if (CmiIpcEnabled()) {
+    if (!auxNote.empty()) auxNote += ",";
+    auxNote += std::string("\"ipc_reaches\":") + (CmiIpcReaches(CmiNodeOf(peerPe)) ? "true" : "false");
+  }
   setupDone = true;
   maybeReady();
 }

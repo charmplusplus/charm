@@ -9,7 +9,8 @@
 //               (CmiCreateReceiverPersistent; the PersistentReq travels to the
 //               sender in a message, which calls CmiRegisterReceivePersistent).
 //               A channel within one process forwards to the plain send path.
-//               The record's aux.persistent_path says which path carried it.
+//               The record's aux.persistent_path says which path carried it:
+//               local_forward, rma_put or inline_message.
 //   rget, rput: CmiNcpyBuffer rdmaGet / rdmaPut between buffers registered at
 //               setup, with the same two steps per half as get and put in
 //               cases/direct.C.
@@ -89,9 +90,14 @@ void ConvCase::setup() {
   switch (familyOf(s.method)) {
     case F_PERSIST_SEND:
     case F_PERSIST_RECV: {
-      bool local = CmiNodeOf(s.peerPe) == CmiMyNode();
-      s.auxNote = std::string("\"persistent_path\":\"") +
-                  (local ? "local_forward" : CmiUseCopyBasedRDMA ? "message" : "rma_put") + "\"";
+      // As persist-comm.cpp chooses per send: a peer process reached by the
+      // IPC pool, or a backend without RMA, gets the payload inline in a
+      // message instead of a put.
+      int node = CmiNodeOf(s.peerPe);
+      const char *path = node == CmiMyNode() ? "local_forward"
+                         : (CmiUseCopyBasedRDMA || CmiIpcReaches(node)) ? "inline_message"
+                                                                        : "rma_put";
+      s.auxNote = std::string("\"persistent_path\":\"") + path + "\"";
       if (familyOf(s.method) == F_PERSIST_SEND) {
         ph = CmiCreatePersistent(s.peerPe, kHdr + s.size);
       } else {
