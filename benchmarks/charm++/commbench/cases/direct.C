@@ -87,7 +87,12 @@ class DirectCase : public Case {
 
   void onGetDone() override { s.halfArrived(s.recvBuf, s.size); }
 
+  // Local completion of the put: the source buffer is free, but the data may
+  // not have landed. The notify must travel behind the put on the network;
+  // with +ipc a peer process on this host would otherwise get it through the
+  // shared-memory pool, ahead of the data (conv-rdma.cpp, CommRputLocalHandler).
   void onPutDone() override {
+    CmiIpcBeginNetworkOnly();
     if (dereg()) {
       recvH = handle(s.recvBuf, ignore());
       recvOutstanding = true;
@@ -95,6 +100,7 @@ class DirectCase : public Case {
     } else {
       s.link->sendNotify(++seq, s.size);
     }
+    CmiIpcEndNetworkOnly();
   }
 
   void teardown() override {
