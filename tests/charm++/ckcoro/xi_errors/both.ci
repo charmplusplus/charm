@@ -1,0 +1,7 @@
+// error: an entry method is 'inbox' or 'coroutine', not both
+module xe_both {
+  array [1D] A {
+    entry A();
+    entry [inbox, coroutine] void f();
+  };
+};

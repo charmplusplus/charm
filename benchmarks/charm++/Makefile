@@ -1,5 +1,6 @@
 DIRS = \
   pingpong \
+  coro_pingpong \
   xcastredn \
   migrate \
   taskSpawn \
@@ -12,6 +13,7 @@ TESTDIRS = $(DIRS)
 
 NONSCALEDIRS = \
   pingpong \
+  coro_pingpong \
   migrate \
 
 TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))

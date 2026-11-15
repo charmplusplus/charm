@@ -44,11 +44,24 @@ trace-test: tracetest
 	  test -n "$$ep" && test "$$n" -ge "$$2" && { test -z "$$3" || test "$$n" -le "$$3"; } || exit 1; \
 	done
 
+# Misuses of [inbox] and [coroutine] that charmxi rejects: the first line of
+# each file in xi_errors gives part of the error charmxi must print.
+xi-errors:
+	@for f in xi_errors/*.ci; do \
+	  want=$$(sed -n '1s|^// error: ||p' $$f); \
+	  out=$$($(CHARMC) $$f 2>&1); \
+	  if [ $$? -eq 0 ]; then echo "$$f: charmxi accepted it"; exit 1; fi; \
+	  case "$$out" in \
+	    *"$$want"*) echo "$$f: rejected as expected" ;; \
+	    *) echo "$$f: expected \"$$want\"; charmxi printed:"; echo "$$out"; exit 1 ;; \
+	  esac; \
+	done
+
 clean:
 	rm -f *.decl.h *.def.h *.o ckcoro_tests tracetest charmrun
 	rm -rf log trc
 
-test: all
+test: all xi-errors
 	$(call run, ./ckcoro_tests +p1)
 	$(call run, ./ckcoro_tests +p4)
 	$(call run, ./ckcoro_tests +p4 +ck_fakemigrate)
@@ -62,4 +75,4 @@ ifneq ($(TRACELIB),)
 	$(MAKE) trace-test
 endif
 
-.PHONY: all clean test trace-test
+.PHONY: all clean test trace-test xi-errors

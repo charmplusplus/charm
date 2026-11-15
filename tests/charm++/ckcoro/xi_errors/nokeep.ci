@@ -1,0 +1,8 @@
+// error: is not 'nokeep'
+module xe_nokeep {
+  message M;
+  array [1D] A {
+    entry A();
+    entry [inbox, nokeep] void f(M *m);
+  };
+};
