@@ -631,9 +631,6 @@ Known gaps in the beta:
 
 - --build-shared does not link on reconverse (#4049).
 
-- In MPI-interop mode, CmiAbort on one rank does not end the other
-  ranks (reconverse #321).
-
 - Large scale: under heavy traffic at 8 to 32 nodes, exhaustion of
   LCI's receive packet pool can hang a run (reconverse #257). Three
   one-process tests hang on Stampede3 SKX (reconverse #320).
