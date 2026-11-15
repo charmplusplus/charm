@@ -46,7 +46,7 @@ Charm++ entities (`chare`, `group`, `nodegroup`, `array`) run these methods:
 | `nocopy.{reg,unreg,prereg}` | `entry recvNocopy(int n, nocopy char d[n])`, `CkSendBuffer(buf, mode)` on every send |
 | `post.{reg,unreg,prereg}` | `nocopypost`; the post entry sets `regMode`, calls `CkMatchBuffer` and `CkPostBuffer` |
 | `get.{reg,unreg,prereg}.{nodereg,dereg}` | a 16 B notify, then the receiver's `CkNcpyBuffer::get`; ends when the get completes (`notify+get`) |
-| `put.{reg,unreg,prereg}.{nodereg,dereg}` | `CkNcpyBuffer::put`, then a 16 B notify from its local completion (`put+notify`) |
+| `put.{reg,unreg,prereg}.{nodereg,dereg}` | `CkNcpyBuffer::put`, then a 16 B notify from its local completion, kept off the `+ipc` pool so it cannot overtake the data (`put+notify`) |
 
 For `get` and `put`, `nodereg` handles are created and exchanged once at
 setup. A `dereg` handle is good for one transfer (the runtime deregisters it
