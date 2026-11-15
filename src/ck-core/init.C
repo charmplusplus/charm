@@ -1369,6 +1369,17 @@ void _sendReadonlies() {
   _initDone();
 }
 
+#if CMK_COVERAGE
+/* abort() skips the profile runtime's write at exit. Each image linked with
+   the profile runtime has its own copy of it, and reconverse writes only its
+   own, so this image registers its writer with CmiAbort, at static
+   initialization so that every abort is covered. */
+extern "C" int __llvm_profile_write_file(void);
+static struct CkCoverageAbortFlush {
+  CkCoverageAbortFlush() { CmiRegisterAbortFlush(__llvm_profile_write_file); }
+} _ckCoverageAbortFlush;
+#endif
+
 /**
   This is the main charm setup routine.  It's called
   on all processors after Converse initialization.

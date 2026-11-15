@@ -15,7 +15,9 @@
 # prints the directory lists without building or running anything.
 #
 # Output in <out> (default coverage/out):
-#   profraw/<tier>/      raw profiles (LLVM_PROFILE_FILE=%p-%m)
+#   profraw/<tier>/      raw profiles of passing runs, one directory per run
+#                        (LLVM_PROFILE_FILE=%p-%m)
+#   profraw-failed/<tier>/  the same for runs that failed; not reported
 #   results-<tier>.tsv   dir, step, outcome, seconds, note
 #   vacuous-<tier>.tsv   passing runs that wrote no profile (ran nothing)
 #   programs-<tier>.txt  the programs built, which report.sh measures
@@ -234,7 +236,7 @@ first_error() {
 }
 
 run_dir() {
-  local t=$1 d=$2 mode=$3 tag log s rc e p o note nprof marker
+  local t=$1 d=$2 mode=$3 tag log s rc e p o note nprof pdir
   local -a extra=()
   [[ $mode == mixed ]] && extra=(DIRS= TESTDIRS=)
   tag=$(echo "$d" | tr / _)
@@ -266,19 +268,25 @@ run_dir() {
       # run that died mid-bootstrap leaves it behind and the next launch hangs.
       rm -rf "$HOME/.tmp/lct_pmi_file-"*
     fi
-    marker=$out/.marker
-    touch "$marker"
+    # Each run writes its own directory; a failed run's profiles are moved to
+    # profraw-failed/, which report.sh does not read.
+    pdir=$out/profraw/$t/${d//\//_}.run$p
+    rm -rf "$pdir"
+    mkdir -p "$pdir"
     s=$(date +%s)
-    TESTRUN_PROCS=$p LLVM_PROFILE_FILE="$out/profraw/$t/%p-%m.profraw" \
+    TESTRUN_PROCS=$p LLVM_PROFILE_FILE="$pdir/%p-%m.profraw" \
       bounded "$run_tmo" make -C "$B/$d" "${extra[@]}" test > "$log.run$p.log" 2>&1
     rc=$?
     e=$(( $(date +%s) - s ))
-    nprof=$(find "$out/profraw/$t" -name '*.profraw' -newer "$marker" | wc -l | tr -d ' ')
+    nprof=$(find "$pdir" -name '*.profraw' | wc -l | tr -d ' ')
     note=""
     o=$(outcome "$rc" "$e" "$run_tmo")
     if [[ $rc -ne 0 ]]; then
       note=$(first_error "$log.run$p.log" 'error|abort|fatal|assert|fail|signal|segment')
       kill_strays "$d"
+      mkdir -p "$out/profraw-failed/$t"
+      rm -rf "$out/profraw-failed/$t/${pdir##*/}"
+      mv "$pdir" "$out/profraw-failed/$t/"
     elif [[ $nprof -eq 0 ]]; then
       if grep -q 'Skipping the test' "$log.run$p.log"; then
         note="ran nothing: testrun skipped every run (PEs not divisible by $p)"
@@ -325,7 +333,7 @@ for t in $tiers; do
   results=$out/results-$t.tsv
   vacuous=$out/vacuous-$t.tsv
   programs=$out/programs-$t.txt
-  rm -rf "$out/profraw/$t" "$out/logs/$t"
+  rm -rf "$out/profraw/$t" "$out/profraw-failed/$t" "$out/logs/$t"
   mkdir -p "$out/profraw/$t" "$out/logs/$t"
   : > "$results"
   : > "$vacuous"

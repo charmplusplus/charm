@@ -1,0 +1,7 @@
+// error: without conditional or nocopy parameters
+module xe_nocopy {
+  array [1D] A {
+    entry A();
+    entry [inbox] void f(int n, nocopy double data[n]);
+  };
+};

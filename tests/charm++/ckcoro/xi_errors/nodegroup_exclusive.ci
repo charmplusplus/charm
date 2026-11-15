@@ -1,0 +1,7 @@
+// error: of a nodegroup is exclusive by itself
+module xe_nodegroup_exclusive {
+  nodegroup N {
+    entry N();
+    entry [coroutine, exclusive] void run();
+  };
+};
