@@ -27,7 +27,7 @@ $(NAME).o: $(NAME).C cifiles
 
 # With six processes the node spanning tree (at most four children per node)
 # has an intermediate node, which forwards the zerocopy broadcast to its
-# children. Left out where RUN_PROCS is empty (the Windows job sets RUN_PROCS=).
+# children. Not run where RUN_PROCS is empty (the Windows job sets RUN_PROCS=).
 ifeq ($(CMK_GDIR),reconverse)
 RUN_PROCS = TESTRUN_PROCS=6
 endif
@@ -35,7 +35,9 @@ endif
 test: all
 	$(call run, ./large_bcast +p4 200000 10)
 	$(call run, ./large_bcast +p6 200000 10)
+ifneq ($(RUN_PROCS),)
 	$(RUN_PROCS) $(call run, ./large_bcast +p6 200000 10)
+endif
 ifeq ($(CMK_USE_CMA),1)
 	$(call run, ./large_bcast +p4 200000 10 +noCMAForZC)
 	$(call run, ./large_bcast +p6 200000 10 +noCMAForZC)
