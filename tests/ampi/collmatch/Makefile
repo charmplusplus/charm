@@ -24,8 +24,8 @@ test: collmatch
 	$(call run, ./collmatch +p2 +vp7 +balancer RandCentLB +ampiMigrateWithCollectives)
 
 testp: collmatch
-	$(call run, ./collmatch +p$(P) +vp$(P) )
-	$(call run, ./collmatch +p$(P) +vp$$(( $(P) * 2 )) )
+	$(call run, ./collmatch +p$(P) +vp$(P) +ampiMigrateWithCollectives )
+	$(call run, ./collmatch +p$(P) +vp$$(( $(P) * 2 )) +ampiMigrateWithCollectives )
 
 clean:
 	rm -f *.o *.mod collmatch *~ conv-host charmrun ampirun collmatch.exe collmatch.pdb collmatch.ilk

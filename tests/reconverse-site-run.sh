@@ -12,7 +12,8 @@
 #
 # Environment:
 #   SITE        anvil | delta | frontier | generic  (module loads and launcher flags)
-#   CHARM_BUILD the build directory (has bin/charmc, bin/testrun)
+#   CHARM_BUILD the build directory (has bin/charmc, bin/testrun); the
+#               tree's bin link must point at its bin (checked below)
 #   NODES       nodes for the multi-process pass (default 2; 1 = two
 #               processes on one node)
 #   PROCS       processes for the multi-process pass (default 2)
@@ -117,12 +118,21 @@ else
 fi
 [[ ${#DIRS[@]} -gt 0 ]] || { echo "no test directories" >&2; exit 2; }
 
+# The test Makefiles find charmc, ampicxx, ampicc and testrun in the tree's
+# bin by relative path, so that bin must be CHARM_BUILD's. (A CHARMC on the
+# make command line would replace the AMPI Makefiles' ampicxx and ampicc.)
+build_bin=$(cd "$CHARM_BUILD/bin" 2>/dev/null && pwd -P)
+if [[ -z "$build_bin" || "$(cd bin 2>/dev/null && pwd -P)" != "$build_bin" ]]; then
+  echo "$PWD/bin is not $CHARM_BUILD/bin; run 'make -C $CHARM_BUILD create_symlinks' first" >&2
+  exit 2
+fi
+
 LAUNCHER=${LAUNCHER:-$SITE_LAUNCHER}
 echo "SITE=$SITE NODES=$NODES PROCS=$PROCS LAUNCHER=\"$LAUNCHER\" CHARM_BUILD=$CHARM_BUILD"
 echo "JOB=${SLURM_JOB_ID:-none} NODELIST=${SLURM_JOB_NODELIST:-none} DATE=$(date)"
 fail=0
 for d in "${DIRS[@]}"; do
-  if ! make -C "$d" CHARMC="$CHARM_BUILD/bin/charmc" > "$d/site-build.out" 2>&1; then
+  if ! make -C "$d" > "$d/site-build.out" 2>&1; then
     echo "RESULT $d build exit=BUILD-FAIL"; fail=1; continue
   fi
   # single process: testrun appends -n 1 to the launcher

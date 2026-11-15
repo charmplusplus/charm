@@ -6,7 +6,9 @@
 // (called by the group's members only). Each new communicator is used for an
 // MPI_Allreduce, which checks its membership.
 #include <cstdio>
+#include <cstring>
 #include <vector>
+#include <unistd.h>
 #include "mpi.h"
 #include "campi.h"
 
@@ -36,11 +38,20 @@ CAMPI_MAIN(argc, argv)
   };
   const int all = size * (size - 1) / 2;
 
-  // 1. MPI_Comm_split_type: every rank of this test shares one host
+  // 1. MPI_Comm_split_type: the members are the ranks whose gethostname()
+  // matches this rank's (all ranks on one host; the ranks of each host when
+  // the processes span hosts)
   {
+    constexpr int hostLen = 256;
+    std::vector<char> host(hostLen, 0), hosts(size * hostLen);
+    gethostname(host.data(), hostLen - 1);
+    MPI_Allgather(host.data(), hostLen, MPI_CHAR, hosts.data(), hostLen, MPI_CHAR, MPI_COMM_WORLD);
+    int hostSize = 0, hostSum = 0;
+    for (int r = 0; r < size; r++)
+      if (strncmp(&hosts[r * hostLen], host.data(), hostLen) == 0) { hostSize++; hostSum += r; }
     MPI_Comm c;
     MPI_Comm_split_type(MPI_COMM_WORLD, MPI_COMM_TYPE_SHARED, rank, MPI_INFO_NULL, &c);
-    co_await check_members(c, size, all, __LINE__);
+    co_await check_members(c, hostSize, hostSum, __LINE__);
     MPI_Comm_free(&c);
   }
 
