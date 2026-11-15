@@ -14,5 +14,9 @@ test: commdup
 	$(call run, ./commdup +p1 +vp4)
 	$(call run, ./commdup +p2 +vp4)
 
+testp: commdup
+	$(call run, ./commdup +p$(P) +vp$(P) )
+	$(call run, ./commdup +p$(P) +vp$$(( $(P) * 2 )) )
+
 clean:
 	rm -f *.o *.mod commdup *~ conv-host charmrun charmrun.exe commdup.exe commdup.pdb commdup.ilk ampirun
