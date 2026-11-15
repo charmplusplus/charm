@@ -1,0 +1,12 @@
+mainmodule chare_post {
+  readonly CProxy_Main mainProxy;
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void sourceDone(CkDataMsg *m);
+    entry void received(int which);
+  };
+  chare Receiver {
+    entry Receiver();
+    entry void recv(int which, nocopypost char d[n], int n);
+  };
+};

@@ -117,6 +117,7 @@ env:
     tests/charm++/zerocopy/dereg_and_nodereg
     tests/charm++/zerocopy/zc_post_async
     tests/charm++/zerocopy/pup_buffer
+    tests/charm++/zerocopy/chare_post
     tests/charm++/bcast_zcpup
     examples/charm++/user-driven-interop
     examples/charm++/hello/local
