@@ -57,7 +57,9 @@ libreconverse, and merges a tier only if it was run against the build being
 measured: `run.sh` records the build's libraries in `stamp-<tier>.txt`
 (`coverage/buildstamp.sh`), and `report.sh` stops if a tier's stamp no
 longer matches, so rerun that tier after a rebuild or remove its
-`profraw/<tier>`.
+`profraw/<tier>`. Only passing runs count: `run.sh` moves the profiles of a
+run whose `make test` failed to `profraw-failed/<tier>`, which `report.sh`
+does not read, and the failure stays in `results-<tier>.tsv`.
 `.github/workflows/coverage.yaml` runs all of this weekly on ubuntu-latest
 and on demand, and uploads the output.
 
@@ -180,8 +182,12 @@ line when it is fixed.
 - **Denominators move.** Which binaries were built, header instantiations
   and build options all change the totals. Compare percentages loosely, and
   covered-line counts of one file where it matters.
-- A test that aborts, segfaults or times out writes no profile; its partial
-  run is not counted.
+- A test that ends in `CkAbort`/`CmiAbort` writes the profiles of the
+  executable and of libreconverse before it aborts (`CmiRegisterAbortFlush`),
+  so the lines up to the abort are counted; the lines after the write in
+  `CmiAbort` and LCI's libraries are not. In a multi-process run the peers
+  the launcher kills write nothing. A test that segfaults or times out writes
+  no profile; its partial run is not counted.
 - `bin/charmxi` is built uninstrumented, so `src/xlat-i` is not measured.
 - Headers reach the profile under several paths (`src/`, the build's
   `include/` copies, the `include/` symlink). The report attributes each copy
