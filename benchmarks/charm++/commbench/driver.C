@@ -31,8 +31,10 @@ const char *const kUsage =
     "         [--sample-time SEC] [--pairs auto|A:B,C:D] [--seed N] [--out FILE]\n"
     "         [--no-validate] [--list] [--progress] [--run-id ID] [--machine NAME]\n"
     "  entities: handler chare group nodegroup array (or all)\n"
-    "  methods:  marshal msg nocopy[.reg|.unreg|.prereg] post[.reg|.unreg|.prereg]\n"
-    "            get put sync node rget rput persistent (or all)\n"
+    "  methods:  marshal msg nocopy.{reg,unreg,prereg} post.{reg,unreg,prereg}\n"
+    "            get.{reg,unreg,prereg}.{nodereg,dereg} put.{reg,unreg,prereg}.{nodereg,dereg}\n"
+    "            sync node rget rput persistent.{send,recv} (or all); a prefix\n"
+    "            selects every method below it, e.g. nocopy, get, get.reg\n"
     "  sizes accept k and m suffixes (powers of 1024).\n";
 
 [[noreturn]] void usageError(const char *fmt, const char *arg) {
@@ -227,8 +229,12 @@ class Driver : public CBase_Driver {
   Driver(CkArgMsg *m) {
     char **argv = m->argv;
     for (int i = 1; i < m->argc; i++) argvCopy.push_back(argv[i]);
-    parseArgs(argv);
+    bool help = !parseArgs(argv);
     delete m;
+    if (help) {
+      CkExit();
+      return;
+    }
 
     g_maxSize = *std::max_element(sizes.begin(), sizes.end());
     makePairs();
@@ -249,11 +255,12 @@ class Driver : public CBase_Driver {
     thisProxy.go();
   }
 
-  void parseArgs(char **argv) {
+  // Returns false for --help.
+  bool parseArgs(char **argv) {
     char *s = nullptr;
     if (CmiGetArgFlagDesc(argv, "--help", "print usage")) {
       fprintf(stderr, "%s", kUsage);
-      CkExit();
+      return false;
     }
     entities.assign(E_COUNT, true);
     methods.assign(kNumMethods, true);
@@ -284,6 +291,7 @@ class Driver : public CBase_Driver {
     listOnly = CmiGetArgFlagDesc(argv, "--list", "print the case list and exit");
     progress = CmiGetArgFlagDesc(argv, "--progress", "report each step on stderr");
     if (CmiGetArgc(argv) > 1) usageError("unknown argument '%s'", argv[1]);
+    return true;
   }
 
   void makePairs() {

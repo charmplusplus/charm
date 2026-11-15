@@ -49,9 +49,10 @@ zerocopy.o: cases/zerocopy.C $(HEADERS)
 direct.o: cases/direct.C $(HEADERS)
 	$(CHARMC) -I. -c cases/direct.C -o direct.o
 
-# A short smoke run: every case, two sizes, one repeat.
+# A short smoke run: every case, two sizes, one repeat. (No commas inside
+# $(call run, ...): make would split the argument there.)
 test: all
-	$(call run, ./commbench +pe 2 --sizes 8,8097 --reps 1 --sample-time 0.001 --out test-run.jsonl)
+	$(call run, ./commbench +p2 --sizes 8 --extra-sizes 8097 --reps 1 --sample-time 0.001 --out test-run.jsonl)
 
 clean:
 	rm -f *.decl.h *.def.h *.o commbench charmrun build_info.h build_info.h.tmp test-run.jsonl
