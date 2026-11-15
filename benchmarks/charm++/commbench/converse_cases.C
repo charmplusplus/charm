@@ -12,8 +12,9 @@
 //               The record's aux.persistent_path says which path carried it:
 //               local_forward, rma_put or inline_message.
 //   rget, rput: CmiNcpyBuffer rdmaGet / rdmaPut between buffers registered at
-//               setup, with the same two steps per half as get and put in
-//               cases/direct.C.
+//               setup. rget: a notify, then the peer's get. rput: the put,
+//               then a notify sent from the initiator's ack handler; Converse
+//               has no destination callback.
 // Every message carries a 16 B commbench header after the Converse header;
 // the size of a case counts only the payload after it.
 #include <mutex>

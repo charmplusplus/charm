@@ -50,7 +50,7 @@ const char *protocolOf(int m, bool sameNode) {
     case F_NOCOPY: return "rendezvous-api";
     case F_POST: return "rendezvous-post-match";
     case F_GET: return dereg ? "notify(handle)+get" : "notify+get";
-    case F_PUT: return dereg ? "put+notify(handle)" : "put+notify";
+    case F_PUT: return dereg ? "put+destcb+handle" : "put+destcb";
     case F_SYNC: return "sync-send-reuse";
     case F_NODE: return "node-send-reuse";
     case F_RGET: return "notify+rget";

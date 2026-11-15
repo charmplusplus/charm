@@ -2,16 +2,18 @@
 // API, <reg> in {reg, unreg, prereg}, <dereg> in {dereg, nodereg}. Each half
 // round trip has two steps:
 //   get: a notify to the peer, then the peer's get; the half ends when the get
-//        completes on the peer (its destination callback).
-//   put: a put to the peer; its local completion (source callback) sends a
-//        notify, and the half ends when the notify arrives.
+//        completes on the peer (its receive handle's callback).
+//   put: a put to the peer; the half ends when the runtime's destination
+//        acknowledgement runs the peer's receive handle callback.
 // nodereg: both sides create their send and receive handles at setup and
-// exchange them once; the notify is 16 B.
+// exchange them once; the get notify is 16 B.
 // dereg: a handle is good for one transfer, since the runtime deregisters
-// both buffers when it completes. Every notify therefore carries a handle
-// created for the next transfer: the sender's send buffer (get), or its
-// receive buffer for the peer's next put (put). A's first put uses B's
-// receive handle, sent at setup.
+// both buffers when it completes.
+//   get: each notify carries a handle created for that get.
+//   put: the receive handles are exchanged at setup; when a put has landed,
+//        the receiver sends the sender a new receive handle in a message of
+//        its own (the put's data path cannot carry it), and the half ends
+//        when both the data and the peer's new handle are in.
 #include "../commbench.h"
 
 namespace {
@@ -19,7 +21,10 @@ namespace {
 class DirectCase : public Case {
   CkNcpyBuffer sendH, recvH;
   CmiInt8 seq = 0;
-  bool recvOutstanding = false;  // put.*.dereg: recvH was sent and not yet used
+  // put.*.dereg
+  bool recvOutstanding = false;  // recvH was sent to the peer and not yet used
+  bool dataIn = false;           // a put into recvH has landed
+  bool peerHandleFresh = false;  // s.peerRecv has not been used yet
 
   bool isGet() const { return familyOf(s.method) == F_GET; }
   bool dereg() const { return kMethods[s.method].deregMode == CK_BUFFER_DEREG; }
@@ -28,26 +33,34 @@ class DirectCase : public Case {
   }
   static CkCallback ignore() { return CkCallback(CkCallback::ignore); }
 
+  void newRecvHandle() {
+    recvH = handle(s.recvBuf, s.link->destDoneCallback());
+    recvOutstanding = true;
+  }
+  // put.*.dereg: the half is complete once the data and the peer's next
+  // receive handle have both arrived.
+  void putHalfIfReady() {
+    if (!dataIn || !peerHandleFresh) return;
+    dataIn = false;
+    s.halfArrived(s.recvBuf, s.size);
+  }
+
  public:
   using Case::Case;
   bool needsHandles() const override { return !(isGet() && dereg()); }
 
   void setup() override {
     s.auxNote = rdmaPathNote(s.peerPe);
-    if (!dereg()) {
-      sendH = handle(s.sendBuf, isGet() ? ignore() : s.link->putDoneCallback());
-      recvH = handle(s.recvBuf, isGet() ? s.link->getDoneCallback() : ignore());
-      s.link->sendHandles(sendH, recvH);
-    } else if (!isGet()) {
-      // Only B's receive handle is needed: A puts first, and its notify
-      // carries the handle for B's put. A sends empty handles so that both
-      // sides wait for each other's setup.
-      if (s.role == ROLE_B) {
-        recvH = handle(s.recvBuf, ignore());
-        recvOutstanding = true;
-      }
-      s.link->sendHandles(CkNcpyBuffer(), s.role == ROLE_B ? recvH : CkNcpyBuffer());
+    if (isGet() && dereg()) return;
+    if (isGet()) {
+      sendH = handle(s.sendBuf, ignore());
+      recvH = handle(s.recvBuf, s.link->destDoneCallback());
+    } else {
+      if (!dereg()) sendH = handle(s.sendBuf, ignore());
+      newRecvHandle();
+      peerHandleFresh = true;  // the peer's receive handle, exchanged below
     }
+    s.link->sendHandles(sendH, recvH);
   }
 
   void ping() override {
@@ -58,49 +71,47 @@ class DirectCase : public Case {
       } else {
         s.link->sendNotify(++seq, s.size);
       }
-    } else {
-      if (dereg()) sendH = handle(s.sendBuf, s.link->putDoneCallback());
-      sendH.put(s.peerRecv);
+      return;
     }
+    if (dereg()) {
+      if (!peerHandleFresh) CkAbort("commbench put.dereg: no fresh handle from the peer\n");
+      peerHandleFresh = false;
+      sendH = handle(s.sendBuf, ignore());
+    }
+    sendH.put(s.peerRecv);
   }
 
   void onNotify(CmiInt8, CmiInt8 n) override {
     checkSize(n);
-    if (isGet())
-      recvH.get(s.peerSend);
-    else
-      s.halfArrived(s.recvBuf, n);
+    if (!isGet()) unexpected("notify");
+    recvH.get(s.peerSend);
   }
 
   void onNotifyHandle(CmiInt8, CmiInt8 n, CkNcpyBuffer &h) override {
     checkSize(n);
     if (isGet()) {
       s.peerSend = h;
-      recvH = handle(s.recvBuf, s.link->getDoneCallback());
+      recvH = handle(s.recvBuf, s.link->destDoneCallback());
       recvH.get(s.peerSend);
     } else {
       s.peerRecv = h;
-      recvOutstanding = false;  // the peer's put into our recvH has completed
-      s.halfArrived(s.recvBuf, n);
+      peerHandleFresh = true;
+      putHalfIfReady();
     }
   }
 
-  void onGetDone() override { s.halfArrived(s.recvBuf, s.size); }
-
-  // Local completion of the put: the source buffer is free, but the data may
-  // not have landed. The notify must travel behind the put on the network;
-  // with +ipc a peer process on this host would otherwise get it through the
-  // shared-memory pool, ahead of the data (conv-rdma.cpp, CommRputLocalHandler).
-  void onPutDone() override {
-    CmiIpcBeginNetworkOnly();
-    if (dereg()) {
-      recvH = handle(s.recvBuf, ignore());
-      recvOutstanding = true;
-      s.link->sendNotifyHandle(++seq, s.size, recvH);
-    } else {
-      s.link->sendNotify(++seq, s.size);
+  void onDestDone() override {
+    if (isGet() || !dereg()) {
+      s.halfArrived(s.recvBuf, s.size);
+      return;
     }
-    CmiIpcEndNetworkOnly();
+    // The peer's put used recvH; hand it the next one before looking at the
+    // data, so that its following put is not held up.
+    recvOutstanding = false;
+    newRecvHandle();
+    s.link->sendNotifyHandle(++seq, s.size, recvH);
+    dataIn = true;
+    putHalfIfReady();
   }
 
   void teardown() override {

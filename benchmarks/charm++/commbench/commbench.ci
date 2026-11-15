@@ -32,8 +32,7 @@ mainmodule commbench {
     entry void recvPost(int n, nocopypost char d[n]);
     entry void notify(CmiInt8 seq, CmiInt8 n);
     entry void notifyHandle(CmiInt8 seq, CmiInt8 n, CkNcpyBuffer h);
-    entry void getDone(CkDataMsg *m);
-    entry void putDone(CkDataMsg *m);
+    entry void destDone(CkDataMsg *m);
   };
 
   group GroupEP {
@@ -48,8 +47,7 @@ mainmodule commbench {
     entry void recvPost(int n, nocopypost char d[n]);
     entry void notify(CmiInt8 seq, CmiInt8 n);
     entry void notifyHandle(CmiInt8 seq, CmiInt8 n, CkNcpyBuffer h);
-    entry void getDone(CkDataMsg *m);
-    entry void putDone(CkDataMsg *m);
+    entry void destDone(CkDataMsg *m);
   };
 
   nodegroup NodeGroupEP {
@@ -64,8 +62,7 @@ mainmodule commbench {
     entry void recvPost(int n, nocopypost char d[n]);
     entry void notify(CmiInt8 seq, CmiInt8 n);
     entry void notifyHandle(CmiInt8 seq, CmiInt8 n, CkNcpyBuffer h);
-    entry void getDone(CkDataMsg *m);
-    entry void putDone(CkDataMsg *m);
+    entry void destDone(CkDataMsg *m);
   };
 
   array [1D] ArrayEP {
@@ -80,8 +77,7 @@ mainmodule commbench {
     entry void recvPost(int n, nocopypost char d[n]);
     entry void notify(CmiInt8 seq, CmiInt8 n);
     entry void notifyHandle(CmiInt8 seq, CmiInt8 n, CkNcpyBuffer h);
-    entry void getDone(CkDataMsg *m);
-    entry void putDone(CkDataMsg *m);
+    entry void destDone(CkDataMsg *m);
   };
 
   // Hosts the Converse-level cases: setup, run and teardown arrive as entry
@@ -98,7 +94,6 @@ mainmodule commbench {
     entry void recvPost(int n, nocopypost char d[n]);
     entry void notify(CmiInt8 seq, CmiInt8 n);
     entry void notifyHandle(CmiInt8 seq, CmiInt8 n, CkNcpyBuffer h);
-    entry void getDone(CkDataMsg *m);
-    entry void putDone(CkDataMsg *m);
+    entry void destDone(CkDataMsg *m);
   };
 };

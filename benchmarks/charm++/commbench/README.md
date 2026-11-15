@@ -46,12 +46,15 @@ Charm++ entities (`chare`, `group`, `nodegroup`, `array`) run these methods:
 | `nocopy.{reg,unreg,prereg}` | `entry recvNocopy(int n, nocopy char d[n])`, `CkSendBuffer(buf, mode)` on every send |
 | `post.{reg,unreg,prereg}` | `nocopypost`; the post entry sets `regMode`, calls `CkMatchBuffer` and `CkPostBuffer` |
 | `get.{reg,unreg,prereg}.{nodereg,dereg}` | a 16 B notify, then the receiver's `CkNcpyBuffer::get`; ends when the get completes (`notify+get`) |
-| `put.{reg,unreg,prereg}.{nodereg,dereg}` | `CkNcpyBuffer::put`, then a 16 B notify from its local completion, kept off the `+ipc` pool so it cannot overtake the data (`put+notify`) |
+| `put.{reg,unreg,prereg}.{nodereg,dereg}` | `CkNcpyBuffer::put`; the half ends when the runtime's destination acknowledgement runs the receiver's handle callback (`put+destcb`) |
 
 For `get` and `put`, `nodereg` handles are created and exchanged once at
 setup. A `dereg` handle is good for one transfer (the runtime deregisters it
-when the transfer completes), so each notify carries a new handle for the next
-transfer (`notify(handle)+get`, `put+notify(handle)`). `prereg` buffers come
+when the transfer completes). For `get` each notify carries a new handle
+(`notify(handle)+get`). For `put` the receiver sends the sender a new receive
+handle in a separate message once the data has landed, and the half ends when
+both the data and the peer's handle are in (`put+destcb+handle`); the put's
+data path cannot carry the handle. `prereg` buffers come
 from `CkRdmaAlloc` on both sides.
 
 The `handler` entity runs Converse-level methods; setup arrives through a
@@ -61,7 +64,7 @@ group, the timed traffic uses Converse handlers only:
 |---|---|
 | `sync` | `CmiSyncSendAndFree`, the message sent back |
 | `node` | `CmiSyncNodeSendAndFree` to the peer's node; `aux.recv_pes_*` lists the PEs that ran the handler |
-| `rget`, `rput` | `CmiNcpyBuffer` `rdmaGet` / `rdmaPut` between buffers registered at setup, with the get/put protocol above |
+| `rget`, `rput` | `CmiNcpyBuffer` `rdmaGet` / `rdmaPut` between buffers registered at setup: `notify+rget`, and `rput+notify`, the notify sent from the initiator's ack handler, which the runtime runs off the `+ipc` pool |
 | `persistent.send` | `CmiCreatePersistent` at the sender, sends inside `CmiUsePersistentHandle` |
 | `persistent.recv` | `CmiCreateReceiverPersistent` at the receiver; the `PersistentReq` travels to the sender, which calls `CmiRegisterReceivePersistent` |
 

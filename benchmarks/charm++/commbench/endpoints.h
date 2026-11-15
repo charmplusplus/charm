@@ -33,13 +33,9 @@ class EP : public CBase, public Link {
   void recvPost(int n, char *d) { side.c->onPost(n, d); }
   void notify(CmiInt8 seq, CmiInt8 n) { side.c->onNotify(seq, n); }
   void notifyHandle(CmiInt8 seq, CmiInt8 n, CkNcpyBuffer h) { side.c->onNotifyHandle(seq, n, h); }
-  void getDone(CkDataMsg *m) {
+  void destDone(CkDataMsg *m) {
     delete m;
-    side.c->onGetDone();
-  }
-  void putDone(CkDataMsg *m) {
-    delete m;
-    side.c->onPutDone();
+    side.c->onDestDone();
   }
 
   void sendMarshal(int n, const char *d) override { peer.recvMarshal(n, d); }
@@ -53,11 +49,8 @@ class EP : public CBase, public Link {
   void sendHandles(const CkNcpyBuffer &s, const CkNcpyBuffer &r) override {
     peer.recvHandles(s, r);
   }
-  CkCallback getDoneCallback() override {
-    return CkCallback(this, Index::getDone((CkDataMsg *)nullptr));
-  }
-  CkCallback putDoneCallback() override {
-    return CkCallback(this, Index::putDone((CkDataMsg *)nullptr));
+  CkCallback destDoneCallback() override {
+    return CkCallback(this, Index::destDone((CkDataMsg *)nullptr));
   }
 };
 

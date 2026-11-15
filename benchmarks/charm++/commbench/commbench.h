@@ -104,11 +104,13 @@ struct Link {
   virtual void sendNocopy(int n, const CkNcpyBuffer &b) = 0;
   virtual void sendPost(int n, const CkNcpyBuffer &b) = 0;
   virtual void sendNotify(CmiInt8 seq, CmiInt8 n) = 0;
-  // A notify that carries a fresh handle (get and put with CK_BUFFER_DEREG).
+  // A notify that carries a fresh handle (get.*.dereg), or the handle alone
+  // (put.*.dereg).
   virtual void sendNotifyHandle(CmiInt8 seq, CmiInt8 n, const CkNcpyBuffer &h) = 0;
   virtual void sendHandles(const CkNcpyBuffer &s, const CkNcpyBuffer &r) = 0;
-  virtual CkCallback getDoneCallback() = 0;  // to this endpoint
-  virtual CkCallback putDoneCallback() = 0;
+  // To this endpoint, for a receive handle: the runtime runs it when a get or
+  // put into the handle's buffer has completed.
+  virtual CkCallback destDoneCallback() = 0;
 };
 
 // One end of the running case. An endpoint takes part in one case at a time.
@@ -168,8 +170,7 @@ class Case {
   virtual void onPost(int, char *) { unexpected("post"); }
   virtual void onNotify(CmiInt8, CmiInt8) { unexpected("notify"); }
   virtual void onNotifyHandle(CmiInt8, CmiInt8, CkNcpyBuffer &) { unexpected("notifyHandle"); }
-  virtual void onGetDone() { unexpected("getDone"); }
-  virtual void onPutDone() { unexpected("putDone"); }
+  virtual void onDestDone() { unexpected("destDone"); }
 
  protected:
   Side &s;
