@@ -1317,16 +1317,22 @@ void CkRdmaEMBcastAckHandler(void *ack) {
   }
 }
 
+// Sends a packed zerocopy bcast message to my children in the tree rooted at
+// rootNode. Acks are counted along this tree (getSpanningTreeInfo), so the
+// message must travel along it rather than the runtime's broadcast tree.
+void CkRdmaSendBcastMsgToChildNodes(envelope *env, int rootNode) {
+  CmiSpanningTreeInfo *t = getSpanningTreeInfo(rootNode);
+  for (int i = 0; i < t->child_count; i++)
+    CmiSyncNodeSend(t->children[i], env->getTotalsize(), (char *)env);
+}
+
 // Called only on intermediate nodes
 // Method forwards a message to all the children
 void forwardMessageToChildNodes(envelope *myChildrenMsg, UChar msgType) {
-#if CMK_SMP && CMK_NODE_QUEUE_AVAILABLE
-  // Node level forwarding for nodegroup bcasts
-  CmiForwardNodeBcastMsg(myChildrenMsg->getTotalsize(), (char *)myChildrenMsg);
-#else
-  // Proc level forwarding
-  CmiForwardProcBcastMsg(myChildrenMsg->getTotalsize(), (char *)myChildrenMsg);
-#endif
+  CkUnpackMessage(&myChildrenMsg);
+  int rootNode = getRootNode(myChildrenMsg);
+  CkPackMessage(&myChildrenMsg);
+  CkRdmaSendBcastMsgToChildNodes(myChildrenMsg, rootNode);
 }
 
 // Method forwards a message to all the peer nodes

@@ -21,6 +21,8 @@
 // Flag that tells the system if we are replaying using Record/Replay
 extern int _replaySystem;
 
+void _noCldNodeEnqueue(int node, envelope *env);
+
 #if CMK_CHARMDEBUG
 int ConverseDeliver(int pe);
 inline void _CldEnqueue(int pe, void *msg, int infofn) {
@@ -56,6 +58,10 @@ inline void _CldEnqueueGroup(CmiGroup grp, void *msg, int infofn) {
   CldEnqueueGroup(grp, msg, infofn);
 }
 inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
+  if (CMI_IS_ZC_BCAST(msg) && node < 0) {
+    _noCldNodeEnqueue(node, (envelope *)msg);
+    return;
+  }
   if (!ConverseDeliver(node)) {
     CmiFree(msg);
     return;
@@ -171,6 +177,11 @@ inline void _CldEnqueue(int pe, void *msg, int infofn) {
 
 inline void _CldNodeEnqueue(int node, void *msg, int infofn) {
   envelope *env = (envelope *)msg;
+  // A zerocopy bcast travels along its ack tree (_nodeBroadcastAndFree, ck.C).
+  if (CMI_IS_ZC_BCAST(msg) && node < 0) {
+    _noCldNodeEnqueue(node, env);
+    return;
+  }
   // Store source information to handle acknowledgements on completion
   if(CMI_IS_ZC(msg))
     CkRdmaPrepareZCMsg(env, node);
