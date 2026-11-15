@@ -20,6 +20,15 @@
 #   OUT_DIR      results directory (default: ./commbench-results)
 #   COMMBENCH    the binary (default: ../commbench next to this script)
 #   LAUNCHER     replace the site's launcher (e.g. "srun --mpi=pmix")
+#   PEMAP        the +pemap list (default 0 for P1, 0,1 for the others)
+#   CPU_BIND     the srun --cpu-bind value for every placement (default:
+#                none for P2, P2i and P3; Slurm's own binding for P0 and P1)
+#   P0_CPUS      CPUs of the P0 step (default 2). srun -c implies --exact,
+#                so the step's cpuset holds only those CPUs and a +pemap
+#                outside them aborts with "CmiSetCPUAffinity failed"; with
+#                PEMAP on a whole node, pass the node's core count.
+#   TIMEOUT      bound the run with GNU timeout (e.g. 45m); the sidecar is
+#                still written, with exit_status 124 when the limit hit
 #
 # Writes OUT_DIR/<site>-<YYYYmmddTHHMMSS>-<charm commit>-<placement>.jsonl and
 # the same name with .sidecar.json; prints the launch line first.
@@ -43,8 +52,14 @@ SINGLE_NODE_FLAGS=()
 case "$SITE" in
   mac) ;;
   anvil)
-    module load python/3.9.5 hwloc
-    export LD_LIBRARY_PATH=${RCAC_HWLOC_ROOT:?}/lib:${LD_LIBRARY_PATH:-}
+    # The hwloc module (1.11, libhwloc.so.5) is needed only by a build
+    # configured against it. A build against Open MPI's hwloc 2.5.0
+    # (libhwloc.so.15, found through RPATH) must not load it.
+    module load python/3.9.5
+    if ldd "$CHARM_BUILD/lib/libreconverse.so" 2>/dev/null | grep -q 'libhwloc\.so\.5'; then
+      module load hwloc
+      export LD_LIBRARY_PATH=${RCAC_HWLOC_ROOT:?}/lib:${LD_LIBRARY_PATH:-}
+    fi
     ;;
   delta)
     export FI_PROVIDER=cxi LCI_NETWORK_BACKENDS=ofi
@@ -75,10 +90,19 @@ if [[ $SITE == mac ]]; then
   esac
 else
   case "$PLACEMENT" in
-    P0) CMD=("${LAUNCH[@]}" -N1 -n1 -c2 ${SINGLE_NODE_FLAGS[@]+"${SINGLE_NODE_FLAGS[@]}"} "$COMMBENCH" +pe 2 +pemap 0,1) ;;
-    P1) CMD=("${LAUNCH[@]}" -N2 -n2 --ntasks-per-node=1 "$COMMBENCH" +pe 2 +pemap 0) ;;
-    P2|P2i) CMD=("${LAUNCH[@]}" -N1 -n2 --cpu-bind=none ${SINGLE_NODE_FLAGS[@]+"${SINGLE_NODE_FLAGS[@]}"} "$COMMBENCH" +pe 2 +pemap 0,1 ${IPC[@]+"${IPC[@]}"}) ;;
-    P3) CMD=("${LAUNCH[@]}" -N2 -n4 --ntasks-per-node=2 --cpu-bind=none "$COMMBENCH" +pe 4 +pemap 0,1) ;;
+    P1) PM=${PEMAP:-0} ;;
+    *)  PM=${PEMAP:-0,1} ;;
+  esac
+  BIND=()
+  [[ -n ${CPU_BIND:-} ]] && BIND=(--cpu-bind="$CPU_BIND")
+  case "$PLACEMENT" in
+    P2|P2i|P3) [[ -z ${CPU_BIND:-} ]] && BIND=(--cpu-bind=none) ;;
+  esac
+  case "$PLACEMENT" in
+    P0) CMD=("${LAUNCH[@]}" -N1 -n1 -c"${P0_CPUS:-2}" ${BIND[@]+"${BIND[@]}"} ${SINGLE_NODE_FLAGS[@]+"${SINGLE_NODE_FLAGS[@]}"} "$COMMBENCH" +pe 2 +pemap "$PM") ;;
+    P1) CMD=("${LAUNCH[@]}" -N2 -n2 --ntasks-per-node=1 ${BIND[@]+"${BIND[@]}"} "$COMMBENCH" +pe 2 +pemap "$PM") ;;
+    P2|P2i) CMD=("${LAUNCH[@]}" -N1 -n2 ${BIND[@]+"${BIND[@]}"} ${SINGLE_NODE_FLAGS[@]+"${SINGLE_NODE_FLAGS[@]}"} "$COMMBENCH" +pe 2 +pemap "$PM" ${IPC[@]+"${IPC[@]}"}) ;;
+    P3) CMD=("${LAUNCH[@]}" -N2 -n4 --ntasks-per-node=2 ${BIND[@]+"${BIND[@]}"} "$COMMBENCH" +pe 4 +pemap "$PM") ;;
     *) echo "unknown PLACEMENT=$PLACEMENT" >&2; exit 2 ;;
   esac
 fi
@@ -93,7 +117,11 @@ CMD+=(+showcpuaffinity ${EXTRA[@]+"${EXTRA[@]}"} --run-id "$RUN_ID" --machine "$
 LAUNCH_LINE=$(printf '%q ' "${CMD[@]}")
 echo "$LAUNCH_LINE"
 STARTED=$(date +%Y-%m-%dT%H:%M:%S%z)
-"${CMD[@]}"
+if [[ -n ${TIMEOUT:-} ]]; then
+  timeout -k 30 "$TIMEOUT" "${CMD[@]}"
+else
+  "${CMD[@]}"
+fi
 STATUS=$?
 
 MODULES=""
@@ -129,6 +157,7 @@ side = {
     "launch": env["LAUNCH_LINE"].strip(),
     "started": env["STARTED"],
     "exit_status": int(env["STATUS"]),
+    "timeout": env.get("TIMEOUT") or None,
     "env": {k: v for k, v in sorted(env.items()) if k.startswith(prefixes)},
     "modules": [m for m in env["MODULES"].split("\n") if m and not m.endswith(":")],
     "job_id": env.get("SLURM_JOB_ID"),

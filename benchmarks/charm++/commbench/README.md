@@ -114,7 +114,19 @@ CMakeCache values `LCI_USE_REG_CACHE`, `LCI_NETWORK_BACKENDS`,
 `LCI_PACKET_SIZE_DEFAULT`, `RECONVERSE_ENABLE_CPU_AFFINITY`, `CMK_USE_SHMEM`,
 `CMAKE_BUILD_TYPE`). SITE is `mac`, `anvil`, `delta`, `frontier` or
 `generic`; extra ARGS (runtime options such as `++ipccutoff 65536` and
-commbench options) are passed through.
+commbench options) are passed through. Environment: `PEMAP` replaces the
+`+pemap` list, `CPU_BIND` the srun `--cpu-bind` value, `P0_CPUS` the `-c` of
+the P0 step (srun `-c` implies `--exact`, so a `+pemap` outside the step's
+CPUs aborts with `CmiSetCPUAffinity failed`), `LAUNCHER` the launcher, and
+`TIMEOUT` bounds the run with GNU `timeout` (the sidecar is still written,
+with `exit_status` 124). Pinned to the cores next to the NIC on Anvil
+(mlx5_0 is on NUMA node 2):
+
+```
+PEMAP=32 CPU_BIND=map_cpu:32 run/commbench-run.sh anvil P1 --reps 5
+PEMAP=32,33 CPU_BIND=map_cpu:32,33 run/commbench-run.sh anvil P2 --reps 5
+PEMAP=32,33 CPU_BIND=none P0_CPUS=128 run/commbench-run.sh anvil P0 --reps 5
+```
 
 | placement | meaning |
 |---|---|
