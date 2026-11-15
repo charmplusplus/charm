@@ -254,7 +254,7 @@ Object ids and element location:
   reported it. Checkpoints written without the marker are read as
   before; a checkpoint written by this version cannot be restarted by
   an older one. objid_boundmany checkpoints and restarts on other PE
-  counts.
+  counts (#4267).
 
 - A send to an array element from a PE that has not yet processed
   the array manager's creation is held until the manager exists, as
