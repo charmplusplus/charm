@@ -17,11 +17,21 @@ cifiles: bcast_nonzero_root.ci
 bcast_nonzero_root.o: bcast_nonzero_root.C cifiles
 	$(CHARMC) -c bcast_nonzero_root.C
 
+# With six processes the node spanning tree (at most four children per node)
+# has an intermediate node, which forwards the zerocopy broadcast to its
+# children. Not run where RUN_PROCS is empty (the Windows job sets RUN_PROCS=).
+ifeq ($(CMK_GDIR),reconverse)
+RUN_PROCS = TESTRUN_PROCS=6
+endif
+
 test: all
 	$(call run, +p1 ./bcast_nonzero_root)
 	$(call run, +p2 ./bcast_nonzero_root)
 	$(call run, +p4 ./bcast_nonzero_root)
 	$(call run, +p6 ./bcast_nonzero_root)
+ifneq ($(RUN_PROCS),)
+	$(RUN_PROCS) $(call run, +p6 ./bcast_nonzero_root)
+endif
 ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p2 ./bcast_nonzero_root +noCMAForZC)
 	$(call run, +p4 ./bcast_nonzero_root +noCMAForZC)

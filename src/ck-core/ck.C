@@ -1652,6 +1652,23 @@ void _skipCldHandler(void *converseMsg)
 #endif
 }
 
+// Node-level broadcast of a packed message. A zerocopy bcast goes to the
+// children of this node's spanning tree, along which its acks are counted.
+static void _nodeBroadcastAndFree(int len, envelope *env, bool includeSelf)
+{
+  if (CMI_IS_ZC_BCAST(env)) {
+    CkRdmaSendBcastMsgToChildNodes(env, CkMyNode());
+    if (includeSelf)
+      CmiSyncNodeSendAndFree(CkMyNode(), len, (char *)env);
+    else
+      CmiFree(env);
+  } else if (includeSelf) {
+    CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
+  } else {
+    CmiSyncNodeBroadcastAndFree(len, (char *)env);
+  }
+}
+
 //static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 // Made non-static to be used by ckmessagelogging
 void _skipCldEnqueue(int pe,envelope *env, int infoFn)
@@ -1697,9 +1714,9 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #endif
     CmiSetInfo(env,infoFn);
     if (pe==CLD_BROADCAST) {
-      CmiSyncNodeBroadcastAndFree(len, (char *)env);
+      _nodeBroadcastAndFree(len, env, false);
     } else if (pe==CLD_BROADCAST_ALL) {
-      CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
+      _nodeBroadcastAndFree(len, env, true);
     } else {
 #if CMK_USE_SHMEM
       if (!_tryIpcSend<false, false>(pe, env, infoFn))
@@ -1744,8 +1761,8 @@ static void _noCldEnqueue(int pe, envelope *env)
 
   CkPackMessage(&env);
   int len=env->getTotalsize();
-  if (pe==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)env); }
-  else if (pe==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
+  if (pe==CLD_BROADCAST) { _nodeBroadcastAndFree(len, env, false); }
+  else if (pe==CLD_BROADCAST_ALL) { _nodeBroadcastAndFree(len, env, true); }
   else 
 #if CMK_USE_SHMEM
     if (!_tryIpcSend<false, false>(pe, env, 0x0))
@@ -1775,13 +1792,12 @@ void _noCldNodeEnqueue(int node, envelope *env)
 
   CkPackMessage(&env);
   int len=env->getTotalsize();
-  if (node==CLD_BROADCAST) { 
-	CmiSyncNodeBroadcastAndFree(len, (char *)env); 
-}
-  else if (node==CLD_BROADCAST_ALL) { 
-		CmiSyncNodeBroadcastAllAndFree(len, (char *)env); 
-
-}
+  if (node==CLD_BROADCAST) {
+    _nodeBroadcastAndFree(len, env, false);
+  }
+  else if (node==CLD_BROADCAST_ALL) {
+    _nodeBroadcastAndFree(len, env, true);
+  }
   else {
 #if CMK_USE_SHMEM
     if (!_tryIpcSend<true, false>(node, env, 0x0))

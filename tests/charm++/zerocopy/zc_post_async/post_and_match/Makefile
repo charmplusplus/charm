@@ -27,6 +27,13 @@ post_and_match_sync: post_and_match_sync.o
 post_and_match_sync.o: post_and_match.C cifiles
 	$(CHARMC) -DSYNC_POST=1 -c post_and_match.C -o post_and_match_sync.o
 
+# With six processes the node spanning tree (at most four children per node)
+# has an intermediate node, which forwards the zerocopy broadcast to its
+# children. Not run where RUN_PROCS is empty (the Windows job sets RUN_PROCS=).
+ifeq ($(CMK_GDIR),reconverse)
+RUN_PROCS = TESTRUN_PROCS=6
+endif
+
 test: all
 	$(call run, +p1 ./post_and_match_delayed)
 	$(call run, +p4 ./post_and_match_delayed)
@@ -37,6 +44,9 @@ test: all
 	$(call run, +p1 ./post_and_match_sync)
 	$(call run, +p4 ./post_and_match_sync)
 	$(call run, +p6 ./post_and_match_sync)
+ifneq ($(RUN_PROCS),)
+	$(RUN_PROCS) $(call run, +p6 ./post_and_match_sync)
+endif
 ifeq ($(CMK_USE_CMA),1)
 	$(call run, +p4 ./post_and_match_delayed +noCMAForZC)
 	$(call run, +p6 ./post_and_match_delayed +noCMAForZC)
