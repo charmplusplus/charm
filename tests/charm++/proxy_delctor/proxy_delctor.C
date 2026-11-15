@@ -12,14 +12,18 @@
 // during the pack and aborts. Each PE then sends the proxy as a marshalled
 // parameter to the next PE, which uses it to send back.
 
-#include <cstring>
 #include <new>
 #include "proxy_delctor.decl.h"
 
 /*readonly*/ CProxy_Main mainProxy;
 
-// Keeps the compiler from dropping stores to *p or assuming its contents.
-static inline void touchMemory(void *p) { asm volatile("" : : "r"(p) : "memory"); }
+// Fills the buffer with volatile stores, which the compiler must keep: a plain
+// memset before the placement new below is a dead store to GCC (-flifetime-dse,
+// on by default), and inline asm does not compile with MSVC.
+static void fillBytes(unsigned char *p, size_t n, unsigned char v) {
+  volatile unsigned char *vp = p;
+  for (size_t i = 0; i < n; i++) vp[i] = v;
+}
 
 class Main : public CBase_Main {
 public:
@@ -45,10 +49,8 @@ public:
     thisProxy[CkMyPe()].watchdog();
 
     alignas(CProxyElement_Target) unsigned char buf[sizeof(CProxyElement_Target)];
-    memset(buf, 0xA5, sizeof(buf));
-    touchMemory(buf);
+    fillBytes(buf, sizeof(buf), 0xA5);
     CProxyElement_Target *p = new (buf) CProxyElement_Target(thisgroup, CkMyPe(), NULL, NULL);
-    touchMemory(buf);
 
     packing = true;
     size_t n = PUP::size(*p);
