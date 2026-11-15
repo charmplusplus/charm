@@ -634,7 +634,7 @@ Known gaps in the beta:
   can. No shrink/expand; ROMIO is not built by default.
 
 - MetisLB makes the load imbalance worse on more than 4 PEs (#4271);
-  use TreeLB, GreedyRefineLB or DistributedLB.
+  use TreeLB, GreedyLB or DistributedLB.
 
 - CharmDebug is not available.
 
