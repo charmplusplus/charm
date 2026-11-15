@@ -66,6 +66,7 @@ DIRS = \
   xarray_section_reduction \
   bcast_zcpup \
   arraymap_insert_abort \
+  proxy_delctor \
 
 FTDIRS = \
   jacobi3d \
