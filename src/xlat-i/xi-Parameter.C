@@ -256,7 +256,8 @@ void ParamList::size(XStr& str)
   bool hasrecvrdma = hasRecvRdma();
 
   Chare* container = entry->getContainer();
-  bool isP2P = (container->isChare() || container->isForElement());
+  // A mainchare has CMAINCHARE, not CCHARE; its sends are point-to-point too.
+  bool isP2P = (container->isChare() || container->isMainChare() || container->isForElement());
 
   // Generate device-related code only when this condition is met
   bool deviceRdmaSupported = (hasDevice() && isP2P);
@@ -268,7 +269,7 @@ void ParamList::size(XStr& str)
       str << "  int impl_num_device_rdma_fields = " << entry->numRdmaDeviceParams
           << ";\n";
       str << "  int dest_pe;\n";
-      if (container->isChare())
+      if (container->isChare() || container->isMainChare())
       {
         // TODO: Following code doesn't work, don't support singleton chares for now
         // str << "  dest_pe = CkRdmaGetDestPEChare(ckGetChareID().onPE,
@@ -373,7 +374,8 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     bool hasrecvrdma = hasRecvRdma();
 
     Chare *container = entry->getContainer();
-    bool isP2P = (container->isChare() || container->isForElement());
+    // A mainchare has CMAINCHARE, not CCHARE; its sends are point-to-point too.
+    bool isP2P = (container->isChare() || container->isMainChare() || container->isForElement());
 
     // Generate device-related code only when this condition is met
     bool deviceRdmaSupported = (hasDevice() && isP2P);

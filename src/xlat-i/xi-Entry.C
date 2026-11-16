@@ -1942,8 +1942,10 @@ void Entry::genCall(XStr& str, const XStr& preCall, bool redn_wrapper, bool uses
     if(param->hasRecvRdma()) {
       if(getContainer()->isArray())
         str << "  CmiUInt8 myIndex = static_cast<CkMigratable *>(impl_obj)->ckGetID();\n";
-      else
+      else if(getContainer()->isGroup())  // groups and nodegroups
         str << "  CmiUInt8 myIndex = impl_obj->thisIndex;\n";
+      else  // a singleton chare has no index; the runtime reads it only for arrays
+        str << "  CmiUInt8 myIndex = 0;\n";
       str << "  if(CMI_IS_ZC_RECV(env)) { // Message that executes Post EM on primary element\n";
       str << "    CkRdmaAsyncPostPreprocess(env, ";
       if(isSDAGGen)
