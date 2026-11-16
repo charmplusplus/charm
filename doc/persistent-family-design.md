@@ -825,7 +825,8 @@ is libfabric's own cxi rendezvous threshold, confirmed on Delta (job 24046124):
 - With `FI_CXI_RDZV_THRESHOLD=131072` the step disappears, and every eager size above 16 KiB is
   2.6-2.7 us faster. For example, 32512 B goes from 10.04 to 7.35 us.
 - So reconverse should raise that threshold, at least to the LCI packet size, whenever it raises the eager
-  limit on cxi, as it already sets the cxi receive-matching mode itself (reconverse #281).
+  limit on cxi, as it already sets the cxi receive-matching mode itself (reconverse #281). Filed as
+  reconverse #334: set it to max(16384, packet size), with overwrite off so that a user's value wins.
 
 **Per-pair ring** (MPI's middle protocol), for network pairs only (host pairs
 already use the IPC pool).
@@ -894,7 +895,7 @@ one version reconciled with his, and it needs the LCI zero-length-message fix to
 |---|---|
 | plain send, marshalled params | unchanged |
 | `nocopy`, `nocopydevice` | `send(..., hold)` |
-| `nocopypost` | kept for receivers that can choose a buffer only after seeing the message |
+| `nocopypost` | kept for receivers that can choose a buffer only after seeing the message. The runtime registers the posted buffer for each message and releases it after (#4285), so `deregMode` has no effect there; one registration kept across messages is a region. |
 | direct API (`CkNcpyBuffer` get/put) | region + import + `CkPut`/`CkGet` with N = 1 counters; kept as a thin compatibility layer |
 | `CkDevicePersistent` | device region + `CkPut` + N = 1 counter; its IPC import code moves under the import |
 | reconverse persistent | removed; NAMD moves to the persistent family (12.3) |
@@ -1130,7 +1131,7 @@ Three observations:
 ## 18. Draft manual section: which call to use when
 
 The text below is meant for the Charm++ manual, as a section "Choosing how to communicate".
-- The advice on today's calls can go into the manual now.
+- The advice on today's calls is in the manual PR #4287 (section "Choosing How to Communicate").
 - The advice on regions and counters goes in with phase 4 (section 15).
 - The numbers are one-way latencies between two nodes, one process each, measured on two networks:
   Anvil (HDR100 InfiniBand, 2026-11-15) and Delta (Slingshot-11, 2026-11-16, job 24046124). They apply to
@@ -1148,7 +1149,7 @@ The text below is meant for the Charm++ manual, as a section "Choosing how to co
 | Data that must start and end in your own buffers, repeated with the same partners | today: **Zero Copy Direct API** put or get (`CkNcpyBuffer`), with the handles exchanged once; after phase 4: **a region and a counter** | Against messages plus your own copies, a put is faster from 16 KiB on Delta (1.45x at 16 KiB, 2.31x at 1 MiB, 3.46x at 16 MiB) and from 64 KiB on Anvil (1.33x, 1.69x at 1 MiB, 2.30x at 16 MiB). At 4 KiB and below, plain messages still win (8 B: put 7.4 against 3.8 us on Delta); put with signal (phase 1) removes the acknowledgement behind that. Get and put cost about the same: a get is 2-6% faster on Delta from 4 KiB to 256 KiB, and a put is up to 7% faster on Anvil. |
 | Many senders filling one buffer, with one action when all have arrived (halo faces, FFT transposes) | after phase 4: **one counter with N contributions** (put and decrement); today: messages, counted by hand | One scheduler entry for the whole round instead of one per message, and no copies. Every application surveyed in section 17 counts arrivals by hand today. |
 | GPU buffers, one transfer | **`nocopydevice`** (`CkDeviceBuffer`) | Device-to-device without staging through the host where the hardware allows it. |
-| GPU buffers, repeated with the same partners | today: **`CkDevicePersistent`**; after phase 6: **a device region and a counter** | The handles are opened once; Appendix A measured 3-10 us less per message than `nocopydevice`. |
+| GPU buffers, repeated with the same partners | today: **`CkDevicePersistent`**; after phase 6: **a device region and a counter** | The handles are opened once. No measurement against `nocopydevice` yet; the unmerged device channels (Appendix A), which add a fixed buffer and a release credit, measured 3-10 us less per message. |
 
 ### Rules that apply whichever call you use
 
