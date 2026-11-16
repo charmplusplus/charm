@@ -1,0 +1,14 @@
+mainmodule proxy_delctor {
+  readonly CProxy_Main mainProxy;
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void done();
+  };
+  group Target {
+    entry Target();
+    entry void run();
+    entry void watchdog();
+    entry void use(CProxyElement_Target p, int fromPe);
+    entry void hit(int fromPe);
+  };
+};

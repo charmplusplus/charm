@@ -750,9 +750,10 @@ class CProxy {
 /// Delegation constructor: used when building 
 ///   an element proxy from a collective proxy, like in "aProxy[i]".
     CProxy(CK_DELCTOR_PARAM)
-	:delegatedMgr(dTo)
+	:delegatedMgr(dTo), isNodeGroup(false)
         {
             delegatedPtr = NULL;
+            delegatedGroupId.setZero();  // pup reads it even when not delegated
             if(delegatedMgr != NULL && dPtr != NULL) {
                 delegatedPtr = delegatedMgr->ckCopyDelegateData(dPtr);            
 		delegatedGroupId = delegatedMgr->CkGetGroupID();
