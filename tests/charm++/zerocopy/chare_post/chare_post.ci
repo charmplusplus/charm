@@ -4,9 +4,21 @@ mainmodule chare_post {
     entry Main(CkArgMsg *m);
     entry void sourceDone(CkDataMsg *m);
     entry void received(int which);
+    entry void mainRecv(int which, nocopypost char d[n], int n);
+    entry void mainRecvNocopy(int which, nocopy char d[n], int n);
   };
   chare Receiver {
     entry Receiver();
     entry void recv(int which, nocopypost char d[n], int n);
+    entry void sdagRecv(int which, nocopypost char d[n], int n);
+    entry void sendToMain();
+    entry void run() {
+      for (k = 0; k < 2; k++) {
+        when sdagRecv(int which, nocopypost char d[n], int n) serial {
+          check(which, d, n);
+          mainProxy.received(which);
+        }
+      }
+    };
   };
 };
