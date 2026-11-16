@@ -5565,6 +5565,15 @@ This mode is specified when the user doesn't want the RTS to de-register the buf
 completion of the zero copy operation. It is beneficial when the user wants to reuse the same buffer
 (and reuse the ``CkNcpyBuffer`` object) by avoiding the cost of de-registration and registration.
 
+With ``CK_BUFFER_NODEREG``, the registration stays with the ``CkNcpyBuffer`` object that transfers
+are issued from, until ``deregisterMem()`` is called on that object. A ``CK_BUFFER_UNREG`` buffer is
+registered by its first network transfer and stays registered for later ones. Release the
+registration through that same object: the ``CkNcpyBuffer`` a completion callback receives is a
+copy, and calling ``deregisterMem()`` on the copy releases the registration but leaves the original
+object marked as registered, so a later transfer from the original would use the released
+registration. When the other side's buffer is ``CK_BUFFER_UNREG``, the RTS registers it on its
+owner for each transfer and releases that registration itself.
+
 
 Important Methods
 '''''''''''''''''
@@ -5581,7 +5590,7 @@ the ``deregisterMem()`` method on the CkNcpyBuffer object.
 .. code-block:: c++
 
    // de-register previously registered buffer
-   dest.registerMem();
+   dest.deregisterMem();
 
 In addition to ``deregisterMem()``, there are other methods in a
 CkNcpyBuffer object that offer other utilities. The
