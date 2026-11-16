@@ -836,6 +836,28 @@ gap remains. The design as it would be built:
   waiting. No credit message is ever sent.
 - Signal: the ring's `rcomp` with the pair's ring index.
 
+**Receiving in place for `nokeep` entries (proposed; open question 8).** An entry method marked `nokeep`
+does not own its message. The runtime frees the message when the method returns, and the method may not
+keep a pointer into it, modify it or free it (manual, section "Entry Method Attributes"). Every entry
+method with marshalled parameters is `nokeep` automatically, except threaded, inbox and coroutine entries
+(src/xlat-i/xi-Entry.C:214-218). So `nokeep` covers most of the traffic of the applications in section
+17.
+
+For these deliveries, rule M1 (17.2) does not apply, and the runtime may deliver straight from the memory
+the data arrived in, then reclaim it when the entry returns. That memory can be an eager packet, a ring
+slot, an IPC pool block or a rendezvous landing buffer, and in each case the receive-side copy is saved.
+- **Saving.** A message of 64 KiB, copied out of a packet at about 33 GB/s, costs about 2 us, the same
+  order as the network time saved by raising the eager limit.
+- **Ring slots.** The ring may hand its slots to `nokeep` entries without copying, and copy out only
+  for entries that own their message.
+- **References.** Code that keeps a reference past the return (SDAG buffering a message for a later
+  `when`, or an explicit `CmiReference`) leaves the reference count above one when the entry returns. The
+  runtime then copies the message into a `CmiAlloc` block and releases the transport memory, so a kept
+  message never holds a packet or a slot.
+- **Cost.** A delivery held in transport memory occupies it until the entry runs, which includes the
+  wait in the scheduler queue. With fewer, larger packets (12.2, eager limit), the runtime falls back to
+  copying out when free packets run low.
+
 ### 12.3 The reconverse persistent API
 
 Replaced, with no compatibility layer. It is recent (reconverse #192, 2026-07-30;
@@ -960,6 +982,8 @@ Each phase is a PR with tests; measurements gate the next phase.
 6. Shrink and expand (10.3): are process ranks renumbered?
 7. Defer the per-pair ring (12.2) until the eager-limit change has been measured, and build strided
    cross-host puts only if commbench `halo3d` shows a gain over messages (7.3)?
+8. Receiving in place for `nokeep` entries (12.2): worth the bookkeeping? Measure the copy saved against
+   the packets held while a message waits in the scheduler queue, at the raised eager limit.
 
 ## 17. Existing applications (G6)
 
@@ -997,7 +1021,9 @@ G6 then depends only on the message family staying invisible. The rules below ma
 ### 17.2 Rules the message family keeps
 
 - **M1. A delivered message is an ordinary `CmiAlloc` block,** with the standard header and reference count,
-  and the application owns it. It may be:
+  and the application owns it. This applies to entry methods that own their message. A `nokeep` entry
+  method, which includes every non-threaded entry with marshalled parameters, may be given transport
+  memory instead (12.2), as long as anything that is still referenced at return is copied then. It may be:
   - kept indefinitely;
   - written into;
   - given references with `CmiReference`;
