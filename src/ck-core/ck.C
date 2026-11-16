@@ -1468,14 +1468,17 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
     // Determine mode depending on the message
     ncpyEmApiMode mode = (CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG) ? ncpyEmApiMode::BCAST_SEND : ncpyEmApiMode::P2P_SEND;
 
-    env = CkRdmaIssueRgets(env, mode, prevEnv);
+    // CkRdmaIssueRgets copies prevEnv into a new message that receives the
+    // payload. Only a broadcast keeps prevEnv past the call: an intermediate
+    // node of the spanning tree forwards it to its children on completion.
+    const bool keepPrevEnv = (mode == ncpyEmApiMode::BCAST_SEND);
+    env = CkRdmaIssueRgets(env, mode, keepPrevEnv ? prevEnv : NULL);
 
-    if(env) {
-      // memcpyGet or cmaGet completed, env contains the payload and will be enqueued
-
-      // Free prevEnv
+    // memcpyGet or cmaGet completed (env is the new message, enqueued below),
+    // or a P2P rget is in flight: prevEnv is not needed either way.
+    if(env || !keepPrevEnv)
       CkFreeMsg(EnvToUsr(prevEnv));
-    } else {
+    if(!env) {
       // async rdma call in place, asynchronous return and ack handling
       return;
     }
