@@ -118,6 +118,7 @@ env:
     tests/charm++/zerocopy/zc_post_async
     tests/charm++/zerocopy/pup_buffer
     tests/charm++/bcast_zcpup
+    tests/charm++/proxy_delctor
     examples/charm++/user-driven-interop
     examples/charm++/hello/local
 
