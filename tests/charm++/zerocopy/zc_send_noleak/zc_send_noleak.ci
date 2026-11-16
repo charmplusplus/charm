@@ -1,0 +1,17 @@
+mainmodule zc_send_noleak {
+
+  readonly CProxy_Main mainProxy;
+  readonly int numIters;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void p2pDone(long growth);
+  };
+
+  group Peer {
+    entry Peer();
+    entry void startP2p();
+    entry void p2p(int iter, nocopy char buf[n], int n, char pad[padSize], int padSize);
+    entry void reportP2p();
+  };
+};
