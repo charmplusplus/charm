@@ -20,8 +20,8 @@ runtime services); 5 the counter (atomicity
 across shared memory and network); 6 host data paths by locality; 7 strided layouts; 8 device memory;
 9 sender side and batched notifications; 10 lifetime, teardown, migration; 11 error checking;
 12 messages (eager, per-pair ring, rendezvous); 13 what happens to today's APIs; 14 tests and
-measurements; 15 implementation phases; 16 open questions; 17 existing applications (G6);
-Appendix A, device channels on branch rate-aware-gpu-lb; Appendix B, application surveys.
+measurements; 15 implementation phases; 16 open questions; 17 existing applications (G6); 18 draft
+manual section, which call to use when; Appendix A, device channels on branch rate-aware-gpu-lb; Appendix B, application surveys.
 
 ---------------------------------------------------------------------------------------------------
 
@@ -1109,6 +1109,44 @@ Three observations:
   Enzo-E and Quinoa change partners at AMR. So the guard of 10.3 and the measured rebuild cost S decide
   whether these codes can adopt the persistent family. A pattern like NAMD's, with fixed partners, does not
   test this.
+
+## 18. Draft manual section: which call to use when
+
+The text below is meant for the Charm++ manual, as a section "Choosing how to communicate".
+- The advice on today's calls can go into the manual now.
+- The advice on regions and counters goes in with phase 4 (section 15).
+- The numbers are from Anvil (HDR100 InfiniBand, two nodes, one process each, 2026-11-15), and the
+  small-message ones will change with the eager-limit work of section 12.
+
+### Start from the data and its destination
+
+| your situation | use | why, and what it costs |
+|---|---|---|
+| Small or medium data, sent once or with changing partners | **marshalled parameters** (plain entry methods) | The cheapest path below about 64 KB: 3.0 us one way at 8 B between hosts, 0.5 us within a process (a pointer is passed, no copy). It is also the right choice for pointer-based or variable data, through PUP. |
+| You want to keep, modify or forward the received data without copying it | **a message** (`CMessage_` class) | You own a received message: keep it, write into it, re-send it, or free it. Marshalled parameters are owned by the runtime (below). |
+| A large source buffer (about 64 KB or more) that you can leave untouched until told | **Zero Copy Entry Method Send API** (`nocopy` parameter, `CkSendBuffer(ptr, callback)`) | It saves the sender's copy into a message. It costs a callback and an extra round trip, so it is slower than a plain send below 64 KB (10.2 against 3.4 us at 8 B) and on par above. Within one process it copies once where a plain send passes a pointer. |
+| The receiver can choose where the data goes only after seeing the message (its size or destination depends on the content) | **Zero Copy Entry Method Post API** (`nocopypost`, `CkPostBuffer` / `CkMatchBuffer`) | The data lands in the receiver's buffer, at the cost of a round trip for the metadata. |
+| Data that must start and end in your own buffers, repeated with the same partners | today: **Zero Copy Direct API** put (`CkNcpyBuffer`), with the handles exchanged once; after phase 4: **a region and a counter** | Against messages plus your own copies: 1.33x faster at 64 KB, 1.69x at 1 MB, 2.30x at 16 MB. Below 8 KB plain messages still win today (5.1 against 3.2 us at 8 B); put with signal (phase 1) removes the acknowledgement behind that. |
+| Many senders filling one buffer, with one action when all have arrived (halo faces, FFT transposes) | after phase 4: **one counter with N contributions** (put and decrement); today: messages, counted by hand | One scheduler entry for the whole round instead of one per message, and no copies. Every application surveyed in section 17 counts arrivals by hand today. |
+| GPU buffers, one transfer | **`nocopydevice`** (`CkDeviceBuffer`) | Device-to-device without staging through the host where the hardware allows it. |
+| GPU buffers, repeated with the same partners | today: **`CkDevicePersistent`**; after phase 6: **a device region and a counter** | The handles are opened once; Appendix A measured 3-10 us less per message than `nocopydevice`. |
+
+### Rules that apply whichever call you use
+
+- **Do not modify or keep marshalled parameters.** Entry methods with marshalled parameters are
+  `nokeep`: the runtime owns the buffer, frees it when the method returns, and for a broadcast hands
+  the same buffer to every receiver in the process. Copy what you need to keep. Use a message if you
+  need to own the data.
+- **The kind of chare does not matter for speed.** Chares, groups, node groups and arrays differ by
+  3% or less; choose by design.
+- **Between processes on one host, run with `+ipc`.** Small messages are about 3 times faster (group
+  message at 8 B: 3.08 to 1.00 us). The zero-copy APIs do not benefit.
+- **For regions, readiness is yours.** A put lands whenever it arrives. Use one of the three patterns
+  of section 4.9: a reduction between iterations, two buffers by parity, or a release credit.
+  Error-checking builds detect most violations (section 11).
+- **For regions, migration is yours too.** Use them for objects that stay in place for many rounds
+  between collective load-balancing points. Tear down before an object moves and set up again after
+  it arrives (section 10.5). Use messages for objects that migrate at arbitrary times.
 
 ---------------------------------------------------------------------------------------------------
 
