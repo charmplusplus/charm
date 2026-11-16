@@ -23,6 +23,8 @@ build_info.h: FORCE
 	  echo '#define COMMBENCH_RECONVERSE_COMMIT "'$$(git -C $(CHARMDIR)/contrib/reconverse rev-parse --short=7 HEAD 2>/dev/null || echo unknown)'"'; \
 	  echo '#define COMMBENCH_LCI_COMMIT "'$$(git -C $(BUILDDIR)/_deps/lci-src rev-parse --short=8 HEAD 2>/dev/null || echo unknown)'"'; \
 	  echo '#define COMMBENCH_BUILD_TARGET "'$(notdir $(BUILDDIR))'"'; \
+	  echo '#define COMMBENCH_LCI_PACKET_SIZE '$$(sed -n 's/^LCI_PACKET_SIZE_DEFAULT:STRING=//p' $(BUILDDIR)/CMakeCache.txt 2>/dev/null | grep . || echo 0); \
+	  echo '#define COMMBENCH_LCI_WITH_SHM '$$(sed -n 's/^LCI_WITH_SHM:BOOL=//p' $(BUILDDIR)/CMakeCache.txt 2>/dev/null | grep -qix on && echo 1 || echo 0); \
 	} > build_info.h.tmp
 	@cmp -s build_info.h.tmp build_info.h || mv build_info.h.tmp build_info.h
 	@rm -f build_info.h.tmp
@@ -34,7 +36,7 @@ HEADERS = commbench.h commbench.decl.h
 driver.o: driver.C endpoints.h build_info.h commbench.def.h $(HEADERS)
 	$(CHARMC) -c driver.C
 
-side.o: side.C $(HEADERS)
+side.o: side.C build_info.h $(HEADERS)
 	$(CHARMC) -c side.C
 
 converse_cases.o: converse_cases.C $(HEADERS)

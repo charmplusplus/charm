@@ -17,6 +17,7 @@
 //               has no destination callback.
 // Every message carries a 16 B commbench header after the Converse header;
 // the size of a case counts only the payload after it.
+#include <cstring>
 #include <mutex>
 
 #include "commbench.h"
@@ -99,6 +100,11 @@ void ConvCase::setup() {
                          : (CmiUseCopyBasedRDMA || CmiIpcReaches(node)) ? "inline_message"
                                                                         : "rma_put";
       s.auxNote = std::string("\"persistent_path\":\"") + path + "\"";
+      s.persistentPath = path;
+      // inline_message: the notification carries the whole message
+      // (PersistentDataMsg in persist-comm.cpp: header, two handles, 4 ints).
+      if (!strcmp(path, "inline_message"))
+        s.msgBytes = CmiMsgHeaderSizeBytes + 2 * sizeof(void *) + 4 * sizeof(int) + kHdr + s.size;
       if (familyOf(s.method) == F_PERSIST_SEND) {
         ph = CmiCreatePersistent(s.peerPe, kHdr + s.size);
       } else {
@@ -112,6 +118,7 @@ void ConvCase::setup() {
       // fall through
     case F_SYNC:
     case F_NODE:
+      if (s.msgBytes < 0) s.msgBytes = kHdr + s.size;
       if (s.role == ROLE_A) held = newMsg(CpvAccess(hData), s.peerPe, s.size, s.size);
       break;
     case F_RGET:
@@ -142,7 +149,7 @@ void ConvCase::ping() {
       if (!m) CmiAbort("commbench %s: ping without the message\n", kMethods[s.method].name);
       CvHdr *h = (CvHdr *)m;
       h->sidePe = s.peerPe;
-      if (s.validate) fillPattern(m + kHdr, s.size, s.role, s.size);
+      s.fillOutgoing(m + kHdr);
       if (familyOf(s.method) == F_NODE) {
         CmiSyncNodeSendAndFree(CmiNodeOf(s.peerPe), kHdr + s.size, m);
       } else if (familyOf(s.method) != F_SYNC) {

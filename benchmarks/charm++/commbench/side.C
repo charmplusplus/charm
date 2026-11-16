@@ -1,8 +1,11 @@
 // The run loop of one end of a case, payload patterns and per-PE buffers.
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <mutex>
+#include <strings.h>
 
+#include "build_info.h"
 #include "commbench.h"
 
 const char *const kEntityName[E_COUNT] = {"handler", "chare", "group", "nodegroup",
@@ -61,6 +64,17 @@ const char *protocolOf(int m, bool sameNode) {
   return "?";
 }
 
+void programCopies(int m, int *sender, int *receiver) {
+  int f = familyOf(m);
+  // Methods whose payload travels in a message the runtime allocates: the
+  // sender fills it, the receiver finds the payload inside it.
+  bool inMsg = f == F_MSG || f == F_SYNC || f == F_NODE || f == F_PERSIST_SEND || f == F_PERSIST_RECV;
+  // marshal packs from sendBuf itself; nocopy lands in a fresh message.
+  bool landsInMsg = inMsg || f == F_MARSHAL || f == F_NOCOPY;
+  *sender = g_sourceUser && inMsg ? 1 : 0;
+  *receiver = g_deliverUser && landsInMsg ? 1 : 0;
+}
+
 void fillPattern(char *buf, size_t n, int role, size_t size) {
   for (size_t i = 0; i < n; i++) buf[i] = (char)patternByte(i, role, size);
 }
@@ -82,6 +96,12 @@ char *allocPlain() {
     CkAbort("commbench: cannot allocate %d bytes\n", g_maxSize);
   return (char *)p;
 }
+
+// Writes every page, so that no timed copy into the buffer takes page faults.
+char *touched(char *p) {
+  memset(p, 0, (size_t)g_maxSize);
+  return p;
+}
 }  // namespace
 
 void sideInitNode() { g_bufs = new std::vector<PeBuf>(CkMyNodeSize()); }
@@ -91,15 +111,15 @@ void peBuffers(int pe, bool prereg, char **send, char **recv) {
   PeBuf &b = (*g_bufs)[CmiRankOf(pe)];
   if (prereg) {
     if (!b.psend) {
-      b.psend = (char *)CkRdmaAlloc(g_maxSize);
-      b.precv = (char *)CkRdmaAlloc(g_maxSize);
+      b.psend = touched((char *)CkRdmaAlloc(g_maxSize));
+      b.precv = touched((char *)CkRdmaAlloc(g_maxSize));
     }
     *send = b.psend;
     *recv = b.precv;
   } else {
     if (!b.send) {
-      b.send = allocPlain();
-      b.recv = allocPlain();
+      b.send = touched(allocPlain());
+      b.recv = touched(allocPlain());
     }
     *send = b.send;
     *recv = b.recv;
@@ -144,6 +164,9 @@ void Side::begin(int method_, int size_, int role_, int myPe_, int peerPe_, bool
   error.clear();
   recvPes.clear();
   auxNote.clear();
+  pings = arrivals = sendCopies = recvCopies = 0;
+  msgBytes = -1;
+  persistentPath = nullptr;
   peBuffers(myPe, isPreregMethod(method), &sendBuf, &recvBuf);
   if (validate) {
     fillPattern(sendBuf, size, role, size);
@@ -155,6 +178,8 @@ void Side::begin(int method_, int size_, int role_, int myPe_, int peerPe_, bool
     if (!auxNote.empty()) auxNote += ",";
     auxNote += std::string("\"ipc_reaches\":") + (CmiIpcReaches(CmiNodeOf(peerPe)) ? "true" : "false");
   }
+  if (!auxNote.empty()) auxNote += ",";
+  auxNote += copiesNote();
   setupDone = true;
   maybeReady();
 }
@@ -183,14 +208,34 @@ void Side::startRun(int iters_, int warmup_, CkFuture f) {
   done = 0;
   runDone = f;
   t0 = CmiWallTimer();
+  ping();
+}
+
+void Side::ping() {
+  pings++;
   c->ping();
+}
+
+void Side::fillOutgoing(char *dst) {
+  if (g_sourceUser) {
+    memcpy(dst, sendBuf, (size_t)size);
+    sendCopies++;
+  } else if (validate) {
+    fillPattern(dst, size, role, size);
+  }
 }
 
 void Side::halfArrived(const char *d, CmiInt8 n) {
   if (trackPes) recvPes.insert(CkMyPe());
+  arrivals++;
+  if (g_deliverUser && d != recvBuf) {
+    memcpy(recvBuf, d, (size_t)std::min<CmiInt8>(n, g_maxSize));
+    recvCopies++;
+    d = recvBuf;
+  }
   if (validate) check(d, n);
   if (role == ROLE_B) {
-    c->ping();
+    ping();
     return;
   }
   ++done;
@@ -200,7 +245,7 @@ void Side::halfArrived(const char *d, CmiInt8 n) {
     r->elapsed = CmiWallTimer() - t0;
     CkSendToFuture(runDone, r);
   } else {
-    c->ping();
+    ping();
   }
 }
 
@@ -232,6 +277,15 @@ void Side::end(CkFuture f) {
   c = nullptr;
   setupDone = false;
   haveHandles = false;
+  int wantSend, wantRecv;
+  programCopies(method, &wantSend, &wantRecv);
+  if (sendCopies != wantSend * pings || recvCopies != wantRecv * arrivals) {
+    char buf[160];
+    snprintf(buf, sizeof buf, "%scopy count: %lld sends with %lld copies, %lld arrivals with %lld copies",
+             error.empty() ? "" : "; ", (long long)pings, (long long)sendCopies, (long long)arrivals,
+             (long long)recvCopies);
+    error += buf;
+  }
   ResultMsg *r = new ResultMsg;
   r->checked = checked;
   r->mismatches = mismatches;
@@ -251,4 +305,79 @@ void Side::end(CkFuture f) {
     r->pes[r->npes++] = pe;
   }
   CkSendToFuture(f, r);
+}
+
+// The runtime's own payload copies per one-way message, estimated from
+// reading the code; README.md, "Copies", gives the reasoning and citations.
+namespace {
+struct RtCopies {
+  int n;             // -1: unknown
+  std::string path;  // which path the estimate assumes
+};
+
+// Largest Converse message LCI sends eagerly: the packet payload (packet size
+// less a 64 B cache line) less the 12 B of tag and remote completion.
+long lciEagerMax() {
+  long pkt = COMMBENCH_LCI_PACKET_SIZE;
+  if (const char *e = getenv("LCI_ATTR_PACKET_SIZE")) pkt = atol(e);
+  return pkt > 0 ? pkt - 64 - 12 : -1;
+}
+
+bool envTrue(const char *name) {
+  const char *e = getenv(name);
+  return e && (!strcmp(e, "1") || !strcasecmp(e, "true") || !strcasecmp(e, "on"));
+}
+
+// A message of `bytes` (headers included) from this PE to peerPe.
+RtCopies messageCopies(int peerPe, CmiInt8 bytes) {
+  int node = CmiNodeOf(peerPe);
+  if (node == CmiMyNode()) return {0, "local_pointer"};
+  if (CmiIpcReaches(node) && bytes <= (CmiInt8)CmiRecommendedIpcBlockCutoff()) return {1, "ipc_pool"};
+  if (COMMBENCH_LCI_WITH_SHM && CmiPhysicalNodeID(peerPe) == CmiPhysicalNodeID(CmiMyPe()))
+    return {-1, "lci_shm"};
+  long eager = lciEagerMax();
+  if (eager < 0) return {-1, "unknown_backend"};
+  if (bytes <= eager) return {envTrue("LCI_ATTR_ZERO_COPY_AM") ? 0 : 1, "lci_eager"};
+  return {0, "lci_rendezvous"};
+}
+
+// A zerocopy transfer (nocopy, post, get, put, rget, rput) to or from peerPe.
+RtCopies zerocopyCopies(int peerPe) {
+  if (CmiNodeOf(peerPe) == CmiMyNode()) return {1, "memcpy"};
+  if (CmiUseCopyBasedRDMA) return {-1, "copy_based_rdma"};
+  return {0, "rdma"};
+}
+}  // namespace
+
+std::string Side::copiesNote() const {
+  int snd, rcv;
+  programCopies(method, &snd, &rcv);
+  RtCopies rt{-1, "?"};
+  switch (familyOf(method)) {
+    case F_MARSHAL:
+      rt = messageCopies(peerPe, msgBytes);
+      rt.path = "pack+" + rt.path;
+      if (rt.n >= 0) rt.n += 1;
+      break;
+    case F_MSG:
+    case F_SYNC:
+    case F_NODE: rt = messageCopies(peerPe, msgBytes); break;
+    case F_PERSIST_SEND:
+    case F_PERSIST_RECV:
+      if (persistentPath && !strcmp(persistentPath, "rma_put")) {
+        rt = {0, "rma_put"};
+      } else if (persistentPath && !strcmp(persistentPath, "inline_message")) {
+        rt = messageCopies(peerPe, msgBytes);  // the notification message
+        rt.path = "inline_message+" + rt.path;
+        if (rt.n >= 0) rt.n += 2;
+      } else {
+        rt = messageCopies(peerPe, msgBytes);
+      }
+      break;
+    default: rt = zerocopyCopies(peerPe); break;
+  }
+  return "\"copies_sender\":" + std::to_string(snd) + ",\"copies_receiver\":" + std::to_string(rcv) +
+         ",\"copies_runtime_est\":" + (rt.n < 0 ? std::string("null") : std::to_string(rt.n)) +
+         ",\"copies_runtime_path\":\"" + rt.path + "\"" +
+         (msgBytes >= 0 ? ",\"msg_bytes\":" + std::to_string(msgBytes) : std::string());
 }

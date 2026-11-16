@@ -11,6 +11,9 @@
 #include "commbench.decl.h"
 
 extern int g_maxSize;  // largest size of the run; buffers are this big
+// --deliver user: the received payload must end in the receiver's recvBuf.
+// --source user: the payload starts in the sender's sendBuf.
+extern int g_deliverUser, g_sourceUser;
 
 enum Entity { E_HANDLER, E_CHARE, E_GROUP, E_NODEGROUP, E_ARRAY, E_COUNT };
 
@@ -46,6 +49,9 @@ inline bool isConverseMethod(int m) { return familyOf(m) >= F_SYNC; }
 inline bool isPreregMethod(int m) { return kMethods[m].regMode == CK_BUFFER_PREREG; }
 // The protocol string written into each sample record.
 const char *protocolOf(int m, bool sameNode);
+// Payload memcpys this program does per one-way message, on the sending and
+// on the receiving side, under the current --source and --deliver.
+void programCopies(int m, int *sender, int *receiver);
 
 // Roles: A starts each round trip and times it, B answers.
 enum { ROLE_A = 0, ROLE_B = 1 };
@@ -67,7 +73,7 @@ class ResultMsg : public CMessage_ResultMsg {
   int pes[32];
   CkChareID cid;         // ChareEP creation only
   char error[256] = {0};
-  char aux[128] = {0};   // Side::auxNote
+  char aux[512] = {0};   // Side::auxNote
 };
 
 // Payload pattern: depends on the byte offset, the sending role and the size,
@@ -84,9 +90,10 @@ void fillPattern(char *buf, size_t n, int role, size_t size);
 // Fills with the complement of the pattern, so every byte must be rewritten.
 void fillInverse(char *buf, size_t n, int role, size_t size);
 
-// Send and receive buffers of one PE, g_maxSize bytes each, allocated on first
-// use and kept for the whole run. Plain ones come from posix_memalign; the
-// PREREG ones from CkRdmaAlloc.
+// Send and receive buffers of one PE, g_maxSize bytes each, allocated and
+// every page written on first use, and kept for the whole run. They are the
+// application's own buffers of --source user and --deliver user. Plain ones
+// come from posix_memalign; the PREREG ones from CkRdmaAlloc.
 void peBuffers(int pe, bool prereg, char **send, char **recv);
 void sideInitNode();
 // aux note naming the transfer path between this PE and peerPe for the
@@ -129,6 +136,14 @@ struct Side {
   double t0 = 0;
   CkFuture runDone;
 
+  // Payload memcpys this program does: into a message from sendBuf
+  // (fillOutgoing), and out of a message into recvBuf (halfArrived).
+  CmiInt8 pings = 0, arrivals = 0, sendCopies = 0, recvCopies = 0;
+  // Bytes of the message that carries the payload, for the runtime copy
+  // estimate; -1 when the payload does not travel in a message.
+  CmiInt8 msgBytes = -1;
+  const char *persistentPath = nullptr;  // persistent.*: local_forward, rma_put, inline_message
+
   CmiInt8 checked = 0, mismatches = 0, firstBad = -1;
   int badExpected = 0, badGot = 0;
   std::string error;
@@ -142,13 +157,20 @@ struct Side {
   // Extra fields for the sample's aux object, e.g. "\"persistent_path\":\"rma_put\"".
   std::string auxNote;
   void startRun(int iters, int warmup, CkFuture f);
-  // A half round trip has delivered n bytes at d on this side.
+  // Writes the outgoing payload into a message: a memcpy from sendBuf under
+  // --source user, else the validation pattern when validating.
+  void fillOutgoing(char *dst);
+  // A half round trip has delivered n bytes at d on this side. Under
+  // --deliver user, d outside recvBuf is copied into recvBuf first, and the
+  // check and the reply come after the copy.
   void halfArrived(const char *d, CmiInt8 n);
   void end(CkFuture f);
 
  private:
   void maybeReady();
+  void ping();
   void check(const char *d, CmiInt8 n);
+  std::string copiesNote() const;
 };
 
 // A method family. The driver reaches it only through Side: setup, the run

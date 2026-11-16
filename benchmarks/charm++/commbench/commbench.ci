@@ -1,6 +1,8 @@
 mainmodule commbench {
 
   readonly int g_maxSize;
+  readonly int g_deliverUser;
+  readonly int g_sourceUser;
 
   message CommMsg { char data[]; };
   message ResultMsg;

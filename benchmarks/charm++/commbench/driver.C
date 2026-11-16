@@ -15,6 +15,7 @@
 #include "persistent.h"
 
 int g_maxSize;
+int g_deliverUser, g_sourceUser;
 extern char **Cmi_argvcopy;  // reconverse: argv as launched, for tracing
 
 void commbenchInitNode() {
@@ -29,13 +30,16 @@ const char *const kUsage =
     "Usage: commbench [charm options] [--entities LIST] [--methods LIST]\n"
     "         [--sizes LIST|MIN:MAX:FACTOR] [--extra-sizes LIST] [--reps N]\n"
     "         [--sample-time SEC] [--pairs auto|A:B,C:D] [--seed N] [--out FILE]\n"
+    "         [--deliver message|user] [--source message|user]\n"
     "         [--no-validate] [--list] [--progress] [--run-id ID] [--machine NAME]\n"
     "  entities: handler chare group nodegroup array (or all)\n"
     "  methods:  marshal msg nocopy.{reg,unreg,prereg} post.{reg,unreg,prereg}\n"
     "            get.{reg,unreg,prereg}.{nodereg,dereg} put.{reg,unreg,prereg}.{nodereg,dereg}\n"
     "            sync node rget rput persistent.{send,recv} (or all); a prefix\n"
     "            selects every method below it, e.g. nocopy, get, get.reg\n"
-    "  sizes accept k and m suffixes (powers of 1024).\n";
+    "  sizes accept k and m suffixes (powers of 1024).\n"
+    "  --deliver user: received data must end in the receiver's own buffer;\n"
+    "  --source user: sent data starts in the sender's own buffer.\n";
 
 [[noreturn]] void usageError(const char *fmt, const char *arg) {
   fprintf(stderr, "commbench: ");
@@ -287,11 +291,21 @@ class Driver : public CBase_Driver {
     if (CmiGetArgStringDesc(argv, "--out", &s, "output file")) outPath = s;
     if (CmiGetArgStringDesc(argv, "--run-id", &s, "run id")) runId = s;
     if (CmiGetArgStringDesc(argv, "--machine", &s, "machine name")) machine = s;
+    g_deliverUser = g_sourceUser = 0;
+    if (CmiGetArgStringDesc(argv, "--deliver", &s, "message or user")) g_deliverUser = parseMode("--deliver", s);
+    if (CmiGetArgStringDesc(argv, "--source", &s, "message or user")) g_sourceUser = parseMode("--source", s);
     validate = !CmiGetArgFlagDesc(argv, "--no-validate", "skip validation");
     listOnly = CmiGetArgFlagDesc(argv, "--list", "print the case list and exit");
     progress = CmiGetArgFlagDesc(argv, "--progress", "report each step on stderr");
     if (CmiGetArgc(argv) > 1) usageError("unknown argument '%s'", argv[1]);
     return true;
+  }
+
+  static int parseMode(const char *opt, const std::string &v) {
+    if (v == "message") return 0;
+    if (v == "user") return 1;
+    std::string m = std::string(opt) + " must be message or user, not '%s'";
+    usageError(m.c_str(), v.c_str());
   }
 
   void makePairs() {
@@ -630,7 +644,10 @@ class Driver : public CBase_Driver {
                     ",\"ipc_active\":" + (active ? "true" : "false") + ",\"ipc_impl\":" + jstr(CmiIpcImplName()) +
                     ",\"ipc_peers\":" + std::to_string(CmiIpcNumPeers());
     if (active) o += ",\"ipc_cutoff_effective\":" + std::to_string(CmiRecommendedIpcBlockCutoff());
-    return o + ",\"copy_based_rdma\":" + (CmiUseCopyBasedRDMA ? "true" : "false") + "}";
+    return o + ",\"copy_based_rdma\":" + (CmiUseCopyBasedRDMA ? "true" : "false") + ",\"deliver\":" +
+           (g_deliverUser ? "\"user\"" : "\"message\"") + ",\"source\":" +
+           (g_sourceUser ? "\"user\"" : "\"message\"") +
+           ",\"lci_packet_size\":" + std::to_string(COMMBENCH_LCI_PACKET_SIZE) + "}";
   }
 
   void writeRunRecord() {
