@@ -145,6 +145,8 @@ int        CmiPut(CmiImport dst, int piece, size_t offset,
 int        CmiGet(void *dst, size_t bytes, const CmiLayout *dstLayout,
                   CmiImport src, int piece, size_t offset,
                   CmiCounter local, void *stream);
+int        CmiSignal(const CmiCounterHandle *remote);   /* a contribution with no data: decrements
+                                                     the remote counter only (4.9, pattern 3) */
 ```
 
 `CmiCounterAction` is one of: a Converse handler index with a preallocated message (the runtime
@@ -182,7 +184,9 @@ CkPut(dst, face, 0, src, bytes, counterHandle, &localCounter /* or nullptr */, s
 ```
 
 The action may be an entry method, so an SDAG `when halosDone()` waits for a round. A convenience
-`CkTarget` bundles one region, one counter and its pieces for the common case.
+`CkTarget` bundles one region, one counter and its pieces for the common case, and `CkChannel` bundles a
+one-piece region, its counter and a release credit (4.9, pattern 3; section 13). `CkSignal(counterHandle)`
+is the C++ form of `CmiSignal`.
 
 ## 4. Semantics
 
@@ -266,7 +270,8 @@ while readers fetch on demand; puts serve everything iterative.
 
 ### 4.8 Quiescence detection
 
-- **Created count.** A put increments it on the contributor's PE when it is issued.
+- **Created count.** A put, or a signal (`CmiSignal`), increments it on the contributor's PE when it is
+  issued.
 - **Processed count.** It is raised in bulk on the owner PE when the round's action runs from the
   scheduler. The amount is the round's N: with manual re-arm, the N that round was armed with. The
   poll-time handler and the other-process contributors of case (b) never touch QD counters.
@@ -304,6 +309,21 @@ message: it lands when it arrives, whatever the owner is executing.
      iteration i+2's boundary. That boundary needs B's iteration i+1 data, and B sends it only after its
      last read of the iteration i data that A put. So the region is free when the put lands.
    - Rule for users: send your next round only after your last read of the round before.
+3. **A release credit**, opt-in, for producer-consumer streams whose logic gives no such guarantee (a
+   producer may run ahead of its consumer, as in a stream of MoE tokens). It is the credit of the
+   unmerged `CkDeviceChannel` (Appendix A.1), built from the objects of this design.
+   - Setup: the producer creates a credit counter with N = 1 and sends its handle to the consumer along
+     with the region's handle.
+   - When the consumer has finished with a round's data, it re-arms its own counter and calls
+     `CmiSignal` on the producer's credit counter. `CmiSignal` is a contribution with no data.
+   - The producer issues its next put only after its credit counter fires. Until then it keeps the data
+     itself. `CkChannel` (section 13) does this queuing for the application.
+   - The application still decides when the buffer is free, so W1 holds. The runtime only carries the
+     signal and holds no put of its own accord.
+   - Cost: one small transfer per round. The release credit of the device channels measured 0.5 us to
+     another host and 2.2 us within a host, with the libfabric registration cache on (Appendix A.4.5).
+   - Rule for users: release when you are done with the data, and use this pattern when neither of the
+     first two patterns applies.
 
 Applied to the two uses the design claims:
 
@@ -509,7 +529,7 @@ block or a contiguous staging area at the receiver plus a scatter. Proposal:
   cxi without requested ordering, so it is not assumed.
 - **No scatter at poll time.** It would run the copy under the device trylock (W7). Scattering on the owner
   costs one extra scheduler entry per strided piece with remote contributors.
-- **Gate (proposed; open question 8).** Gather, put and scatter make the same two copies as a message's pack and
+- **Gate (proposed; open question 7).** Gather, put and scatter make the same two copies as a message's pack and
   unpack. So phase 5 goes ahead only if commbench `halo3d` shows strided puts beating messages, with the
   eager limit raised (12.2).
 
@@ -683,12 +703,13 @@ time and persistent communication, and the manual says so (10.5). There are thre
    - Where: `migrateMe` (Enzo-E uses it), balancers without AtSync (Aditya's `+LBAsync`), Quinoa's
      non-blocking load-balancing mode, evacuation.
    - It is incompatible with owning a region: a put through a stale handle corrupts memory silently.
-   - **Proposed guard (open question 6).** An object that owns a live region or counter
+   - **Proposed guard (open question 5).** An object that owns a live region or counter
      cannot migrate. The attempt aborts in all builds, with a message naming the region.
    - A migrating contributor that owns nothing only has to wait for its own puts to complete and import
      again after it arrives.
-   - The alternative, deferred, is a runtime hold on puts to a moving owner (Aditya's resolve/closing
-     protocol).
+   - The alternative, deferred, is a runtime hold on puts to a moving owner. The candidate is the
+     resolve/closing/epoch protocol of the unmerged device channels (Appendix A.4.4, A.4.9), whose
+     message-ordering holes have been found and fixed. It is kept for this purpose (section 13).
 3. **Events that invalidate every handle**, i.e. disk checkpoint followed by restart.
    - The per-object release protocol cannot run after a restart.
    - The user tears down before checkpointing. Whether a restart on the same number of nodes could
@@ -700,7 +721,7 @@ time and persistent communication, and the manual says so (10.5). There are thre
 Two further items:
 - **Shrink and expand.** A new implementation (Aditya's, expected in about two weeks) readjusts runtime
   structures in memory without checkpoint and restart. What regions need depends on whether process
-  ranks are renumbered (open question 7):
+  ranks are renumbered (open question 6):
   - handles name the owner by process rank and counter index;
   - if surviving processes keep their ranks, only moved objects rebuild; otherwise every object does;
   - on expand, new processes and their host peers must map each other's IPC segments before same-host
@@ -793,7 +814,7 @@ the same pool) and the same sweep on Delta.
 **Per-pair ring** (MPI's middle protocol), for network pairs only (host pairs
 already use the IPC pool).
 
-**Deferred (proposed; open question 8).** With 64 KiB packets and eager faster than rendezvous up to about 115-120 KiB,
+**Deferred (proposed; open question 7).** With 64 KiB packets and eager faster than rendezvous up to about 115-120 KiB,
 the ring's range would be 64-120 KiB. Rule M1 (17.2) also forces the ring to copy out, so it saves only
 the rendezvous round trips in that range. It is built only if the eager change has been measured and a
 gap remains. The design as it would be built:
@@ -840,6 +861,7 @@ one version reconciled with his, and it needs the LCI zero-length-message fix to
 | reconverse persistent | removed; NAMD moves to the persistent family (12.3) |
 | CkDirect (removed 2018) | region + `CkPut` + N = 1 counter |
 | `+ipc`, `+gpushm` | transport choices made by the runtime; options stay for tuning |
+| `CkDeviceChannel` (unmerged, branch rate-aware-gpu-lb) | not added as a separate API; see below |
 
 G5 holds only after phase 8. Until then the API surface grows: the persistent family is added,
 while `nocopypost`, the direct API and `CkDevicePersistent` remain. The intended deprecation order is:
@@ -847,6 +869,24 @@ while `nocopypost`, the direct API and `CkDevicePersistent` remain. The intended
 2. the direct API and `CkDevicePersistent`, deprecated once their compatibility layers over regions
    pass their tests, and removed a release later;
 3. `nocopy` / `nocopydevice` as spellings of `send(..., hold)`, kept as aliases.
+
+**The device channels** (Appendix A) are not added as a second API with a transport of their own. A
+channel is a region with one piece plus a counter with N = 1, and its measured gains come from removing
+per-message host work, which the persistent family removes as well. Two APIs for device put and notify
+would undo G5. What is kept:
+- **A convenience class**, `CkChannel`, of about a hundred lines over a region, a counter and a release
+  credit (4.9, pattern 3). The examples on that branch (leanmd, jacobi3d, sph3d, moe) can port with
+  little change.
+- **The release credit**, as readiness pattern 3 (4.9).
+- **The runtime-managed migration protocol**, as the candidate runtime hold for owners that move at any
+  time (10.3, case 2; open question 5).
+- **Its mechanisms**, already part of this design:
+  - the cross-host verb chosen per machine (8.2);
+  - same-host device puts batched with one completion flag (8.2);
+  - control messages through the urgent queue (10.2);
+  - same-host credits through shared memory (5.3, case b);
+  - load-balancer edges keyed by the owner's manager (4.10);
+  - the hardware-queue preset (Appendix A.4.10).
 
 ## 14. Tests and measurements
 
@@ -914,14 +954,11 @@ Each phase is a PR with tests; measurements gate the next phase.
 3. The ROCm equivalent of the GPUDirect flush (8.4).
 4. Names inside the persistent family: region, counter, import and put, or other terms (target, handle,
    contribute)? A C++ namespace (`ck::persistent::Region`) or prefixed names (`CkPersistentRegion`)?
-5. The unmerged `CkDeviceChannel` (Appendix A) is the device case of G1, with a
-   credit and runtime-managed migration. Should the persistent family absorb it, or should it land first
-   and be rebased onto regions and counters later?
-6. Migration at any time (10.3, case 2). The proposed guard: an object that owns a live region or counter
+5. Migration at any time (10.3, case 2). The proposed guard: an object that owns a live region or counter
    cannot migrate, and the attempt aborts in all builds. Is that acceptable, including under the
    asynchronous GPU-aware balancer if it is merged? Or should the runtime hold puts to a moving owner?
-7. Shrink and expand (10.3): are process ranks renumbered?
-8. Defer the per-pair ring (12.2) until the eager-limit change has been measured, and build strided
+6. Shrink and expand (10.3): are process ranks renumbered?
+7. Defer the per-pair ring (12.2) until the eager-limit change has been measured, and build strided
    cross-host puts only if commbench `halo3d` shows a gain over messages (7.3)?
 
 ## 17. Existing applications (G6)
