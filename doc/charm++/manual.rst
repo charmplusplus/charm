@@ -4309,6 +4309,98 @@ Advanced Programming Techniques
 Optimizing Entry Method Invocation
 ----------------------------------
 
+.. _choosingcomm:
+
+Choosing How to Communicate
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Charm++ offers several ways to move data between objects. Which one is
+fastest depends on the size of the data, on whether the data must start or
+end in a buffer of your own, and on whether the same transfer repeats between
+the same partners. Start from the data and where it has to go.
+
+Many of the thresholds below are set by the *eager limit*. A message up to
+that size is sent in one step and lands in a receive buffer that the runtime
+system already holds. A larger message pays a rendezvous: a handshake between
+the two sides before the data moves. On reconverse builds with LCI, the eager
+limit is the LCI packet size less 76 bytes, which is 8116 bytes by default.
+
+The times quoted are one-way latencies between two nodes, one process on
+each, measured in November 2026 on two clusters with reconverse and LCI:
+Anvil (HDR100 InfiniBand) and Delta (HPE Slingshot-11). Other machines give
+other numbers. The choices below were the same on both clusters, except where
+a threshold is given for each.
+
+Data up to the eager limit, data sent once, or partners that change
+   Use **marshalled parameters**, that is, plain entry methods. An 8-byte
+   message takes 3.0 us on Anvil and 3.8 us on Delta, and 0.5 us between
+   PEs of one process, where a pointer is passed and nothing is copied.
+   Marshalled parameters also carry pointer-based and variable-length data,
+   through PUP (:numref:`sec:pup`). Above the eager limit a plain send pays
+   the rendezvous: a 16 KiB message takes 9.9 us on Anvil and 17.6 us on
+   Delta.
+
+Data you want to keep, modify or forward after it arrives
+   Use **a message** (a ``CMessage_`` class, :numref:`messages`). The
+   receiver owns a message: it can keep it, write into it, send it on, or
+   free it. Marshalled parameters belong to the runtime system (see the
+   rules below).
+
+A source buffer above the eager limit that you can leave untouched until the runtime system is done with it
+   Use the **Zero Copy Entry Method Send API**: a ``nocopy`` parameter,
+   passed as ``CkSendBuffer(ptr, callback)`` (:numref:`nocopyapi`). It
+   saves the sender's copy into a message, at the cost of a callback and a
+   round trip. Below the eager limit it is 3 to 4 times slower than a plain
+   send (8 B: 10.2 us on Anvil, 13.4 us on Delta).
+   Above it, it takes 0.84 to 0.96 times as long as a plain send on Delta
+   from 16 KiB to 1 MiB, where a rendezvous costs more, and 1.06 to 1.22
+   times as long on Anvil. Between PEs of one process it copies the data
+   once, where a plain send passes a pointer.
+
+The receiver can choose where the data goes only after seeing the message
+   Use the **Zero Copy Entry Method Post API**: a ``nocopypost``
+   parameter, with ``CkPostBuffer`` and ``CkMatchBuffer`` or a post entry
+   method (:numref:`nocopyapi`). The data lands in the receiver's buffer, at
+   the cost of a round trip for the metadata. It costs about what the Send
+   API costs.
+
+Data that must start and end in buffers of your own, sent repeatedly between the same partners
+   Use the **Zero Copy Direct API**: ``CkNcpyBuffer`` objects with ``get``
+   or ``put`` (:numref:`nocopyapi`), with the buffer handles exchanged once.
+   Against sending a message and copying the data out of it, a put is
+   faster from 16 KiB on Delta (1.45 times at 16 KiB, 2.31 times at 1 MiB,
+   3.46 times at 16 MiB) and from 64 KiB on Anvil (1.33 times at 64 KiB,
+   1.69 times at 1 MiB, 2.30 times at 16 MiB). At 4 KiB and below a message
+   is faster (8 B: a put takes 7.4 us against 3.8 us for a message on
+   Delta), because the receiver learns of a put only through an
+   acknowledgement that follows it. Get and put cost about the same.
+
+GPU buffers
+   For a single transfer, use a ``nocopydevice`` parameter with
+   ``CkDeviceBuffer`` (:numref:`sec-gpu`). It moves the data from device to
+   device without staging it through host memory where the hardware allows.
+   For transfers repeated between the same partners, use
+   ``CkDevicePersistent`` (:numref:`persistentgpu`), which opens the handles
+   once instead of for every transfer.
+
+The following rules apply whichever call you use.
+
+- **Do not modify or keep marshalled parameters.** Entry methods with
+  marshalled parameters are ``nokeep`` (:numref:`attributes`): the runtime
+  system owns the buffer, frees it when the method returns, and for a
+  broadcast hands the same buffer to every receiver in the process. Copy
+  what you need to keep, or use a message if you need to own the data.
+- **The kind of chare does not matter for speed.** Sends to chares, groups,
+  node groups and array elements differ by 3% or less. Choose the kind by
+  design.
+- **Between processes on one host, run with** ``+ipc`` (:numref:`shmem`).
+  Messages up to the IPC cutoff (32 KiB by default, set with
+  ``++ipccutoff``) are 3 to 9 times faster: 8 B goes from 3.08 to 1.00 us on
+  Anvil, and 16 KiB from 15.2 to 1.9 us on Delta. A larger message goes
+  through the network card (64 KiB takes 17.4 us on Delta). The zero copy
+  APIs gain less from ``+ipc``.
+
+
 .. _messages:
 
 Messages
@@ -10254,6 +10346,8 @@ corrected (issue #3963) and should not be copied as a model for buffer reuse
 until they are. Follow the rule above instead: pass the callback, or
 double-buffer.
 
+.. _persistentgpu:
+
 Persistent GPU Communication
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -12070,6 +12164,8 @@ superclass to do the final delivery after you’ve sent your messages.
 
 Experimental Features
 =====================
+
+.. _shmem:
 
 SHMEM
 ---------
