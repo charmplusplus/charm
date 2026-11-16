@@ -895,7 +895,7 @@ one version reconciled with his, and it needs the LCI zero-length-message fix to
 |---|---|
 | plain send, marshalled params | unchanged |
 | `nocopy`, `nocopydevice` | `send(..., hold)` |
-| `nocopypost` | kept for receivers that can choose a buffer only after seeing the message. The runtime registers the posted buffer for each message and releases it after (#4285), so `deregMode` has no effect there; one registration kept across messages is a region. |
+| `nocopypost` | kept for receivers that can choose a buffer only after seeing the message. Once #4285 is merged (approved 2026-11-16), the runtime registers the posted buffer for each message and releases it after, so `deregMode` has no effect there; one registration kept across messages is a region. |
 | direct API (`CkNcpyBuffer` get/put) | region + import + `CkPut`/`CkGet` with N = 1 counters; kept as a thin compatibility layer |
 | `CkDevicePersistent` | device region + `CkPut` + N = 1 counter; its IPC import code moves under the import |
 | reconverse persistent | removed; NAMD moves to the persistent family (12.3) |
@@ -1590,7 +1590,7 @@ its own numbered categories.
 2. **SPH cache with writeback.** The fills are as in item 1. `flushSmoothParticles` sends bucket data back to the owner, which combines it there: a put-with-combine. One bucket of particles per message.
 3. **Remote moments at every tree build.** Fixed-size records (MultipoleMoments, 2 OrientedBox<double>, ints) to the few SFC neighbors that share boundary nodes. The partners stay the same across substeps until the next domain decomposition.
 4. **Boundary keys:** `recvBoundary(Key, dir)` to exactly the ±1 SFC neighbors (TreePiece.cpp:2696-2749). Tiny, fixed size.
-5. **Domain decomposition shuffle (ParticleShuffleMsg).** Many-to-few, mostly to SFC neighbors. Sizes are bounded by the particles that leave a piece. The alltoall branch already makes it one nocopypost transfer per node pair, which fits per-node-pair regions with put plus a counter (many puts, one scheduler trip).
+5. **Domain decomposition shuffle (ParticleShuffleMsg).** Many-to-few, mostly to SFC neighbors. Sizes are bounded by the particles that leave a piece. The alltoall branch already makes it one nocopypost transfer per node pair. Moving it to per-node-pair regions with put plus a counter would need each region sized for the largest shuffle and set up again after each decomposition, so section 17.4 leaves it on messages.
 6. **Output gathers** (Writer `receive`, `oneNode*` to rank 0). Infrequent; low priority.
 
 #### Unmerged branches
@@ -1608,7 +1608,7 @@ Read-only git was used. Local origin/master is `39fc62a7` (2026-09-29). Neither 
   - `lockShuffle` CmiCreateLock/CmiLock (:51 and others); CkMyNode and CkNumNodes bins.
   - configure.ac: `MINIMUM_CHARM_VERSION=70001` for the zero-copy post API.
   - New parameter `bNodeShuffle` (default 1) and NodeShuffle.h (`PUPbytes(ShuffleBin)`).
-- **Exposure:** nocopypost (kept), plus CkPostBuffer, CkMatchBuffer and a CkSendBuffer completion callback. These belong to the zerocopy direct API that will be reimplemented on the persistent family. This branch is ChaNGa's best candidate for persistent regions plus counters.
+- **Exposure:** nocopypost with CkPostBuffer and CkMatchBuffer (the Post API, kept unchanged, section 13), and a CkSendBuffer completion callback that reads the `CkNcpyBuffer` from `CkDataMsg::data` (the Send API's sender side; section 13 does not yet say whether that callback keeps its form when `nocopy` becomes `send(..., hold)`). The branch needs no change under the redesign.
 
 ##### Branch treecache-nodecache (the research group's clone)
 - **HEAD:** `b59fb571` (2026-09-26). Merge base `2b45e2f0`.
