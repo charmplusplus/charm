@@ -809,12 +809,26 @@ rendezvous up to about 115-120 KiB by extrapolation.
 
 **Eager limit (proposed).** Make 32 or 64 KiB packets the reconverse default, after a many-to-one and
 message-rate test (each small message occupies a whole packet; 64 KiB packets leave 8192 packets in
-the same pool) and the same sweep on Delta.
+the same pool).
+
+The same sweep on Delta (Slingshot, cxi; job 24045055, 2026-11-16) gives three results:
+- **Where the jump falls.** The eager limit is again the packet size minus 76 B.
+- **Rendezvous costs far more on cxi.** The step from eager to rendezvous is 10.0 / 9.7 / 7.1 / 6.8 us at
+  8 / 16 / 32 / 64 KiB packets, against 3.9 / 3.6 / 3.0 / 1.9 us on Anvil. So raising the limit gains more
+  there: 16 KiB goes from 15.1 to 5.5 us one way, 32 KiB from 15.8 to 9.1 us.
+- **64 KiB packets have a cost on cxi.** They are 0.4 us slower at small sizes (8 B: 3.50 against
+  3.10 us) and 1.1 us slower at rendezvous sizes, which Anvil does not show. On Delta, 32 KiB packets give
+  most of the gain without that cost.
+
+So the default may need to differ by fabric. A second step inside eager, between 16 and 24 KiB on Delta,
+may be libfabric's own cxi rendezvous threshold (`FI_CXI_RDZV_THRESHOLD`, 16384 by default); this is to be
+tested.
 
 **Per-pair ring** (MPI's middle protocol), for network pairs only (host pairs
 already use the IPC pool).
 
-**Deferred (proposed; open question 7).** With 64 KiB packets and eager faster than rendezvous up to about 115-120 KiB,
+**Deferred (proposed; open question 7).** On cxi, rendezvous costs about 10 us more than eager (above), so the
+ring would gain more there than on Anvil; the deferral should be decided per fabric. On Anvil, with 64 KiB packets and eager faster than rendezvous up to about 115-120 KiB,
 the ring's range would be 64-120 KiB. Rule M1 (17.2) also forces the ring to copy out, so it saves only
 the rendezvous round trips in that range. It is built only if the eager change has been measured and a
 gap remains. The design as it would be built:
