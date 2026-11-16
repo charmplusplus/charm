@@ -821,8 +821,11 @@ The same sweep on Delta (Slingshot, cxi; job 24045055, 2026-11-16) gives three r
   most of the gain without that cost.
 
 So the default may need to differ by fabric. A second step inside eager, between 16 and 24 KiB on Delta,
-may be libfabric's own cxi rendezvous threshold (`FI_CXI_RDZV_THRESHOLD`, 16384 by default); this is to be
-tested.
+is libfabric's own cxi rendezvous threshold, confirmed on Delta (job 24046124):
+- With `FI_CXI_RDZV_THRESHOLD=131072` the step disappears, and every eager size above 16 KiB is
+  2.6-2.7 us faster. For example, 32512 B goes from 10.04 to 7.35 us.
+- So reconverse should raise that threshold, at least to the LCI packet size, whenever it raises the eager
+  limit on cxi, as it already sets the cxi receive-matching mode itself (reconverse #281).
 
 **Per-pair ring** (MPI's middle protocol), for network pairs only (host pairs
 already use the IPC pool).
@@ -1129,18 +1132,20 @@ Three observations:
 The text below is meant for the Charm++ manual, as a section "Choosing how to communicate".
 - The advice on today's calls can go into the manual now.
 - The advice on regions and counters goes in with phase 4 (section 15).
-- The numbers are from Anvil (HDR100 InfiniBand, two nodes, one process each, 2026-11-15), and the
-  small-message ones will change with the eager-limit work of section 12.
+- The numbers are one-way latencies between two nodes, one process each, measured on two networks:
+  Anvil (HDR100 InfiniBand, 2026-11-15) and Delta (Slingshot-11, 2026-11-16, job 24046124). They apply to
+  today's default eager limit of 8 KiB. When the limit is raised (12.2), the thresholds of the first three
+  rows move up with it.
 
 ### Start from the data and its destination
 
 | your situation | use | why, and what it costs |
 |---|---|---|
-| Small or medium data, sent once or with changing partners | **marshalled parameters** (plain entry methods) | The cheapest path below about 64 KB: 3.0 us one way at 8 B between hosts, 0.5 us within a process (a pointer is passed, no copy). It is also the right choice for pointer-based or variable data, through PUP. |
+| Data up to the eager limit (8 KiB today), or sent once, or with changing partners | **marshalled parameters** (plain entry methods) | At 8 B: 3.0 us one way on Anvil, 3.8 us on Delta, and 0.5 us within a process (a pointer is passed, no copy). It is also the right choice for pointer-based or variable data, through PUP. Above the eager limit a plain send pays the network layer's rendezvous: at 16 KiB, 9.9 us on Anvil and 17.6 us on Delta. |
 | You want to keep, modify or forward the received data without copying it | **a message** (`CMessage_` class) | You own a received message: keep it, write into it, re-send it, or free it. Marshalled parameters are owned by the runtime (below). |
-| A large source buffer (about 64 KB or more) that you can leave untouched until told | **Zero Copy Entry Method Send API** (`nocopy` parameter, `CkSendBuffer(ptr, callback)`) | It saves the sender's copy into a message. It costs a callback and an extra round trip, so it is slower than a plain send below 64 KB (10.2 against 3.4 us at 8 B) and on par above. Within one process it copies once where a plain send passes a pointer. |
-| The receiver can choose where the data goes only after seeing the message (its size or destination depends on the content) | **Zero Copy Entry Method Post API** (`nocopypost`, `CkPostBuffer` / `CkMatchBuffer`) | The data lands in the receiver's buffer, at the cost of a round trip for the metadata. |
-| Data that must start and end in your own buffers, repeated with the same partners | today: **Zero Copy Direct API** put (`CkNcpyBuffer`), with the handles exchanged once; after phase 4: **a region and a counter** | Against messages plus your own copies: 1.33x faster at 64 KB, 1.69x at 1 MB, 2.30x at 16 MB. Below 8 KB plain messages still win today (5.1 against 3.2 us at 8 B); put with signal (phase 1) removes the acknowledgement behind that. |
+| A source buffer above the eager limit that you can leave untouched until told | **Zero Copy Entry Method Send API** (`nocopy` parameter, `CkSendBuffer(ptr, callback)`) | It saves the sender's copy into a message, at the cost of a callback and a round trip. Below the eager limit it is 3-4 times slower than a plain send (8 B: 10.2 against 3.4 us on Anvil, 13.4 against 3.8 us on Delta). Above it, it is 0.84-0.96x a plain send on Delta (16 KiB to 1 MiB), where rendezvous is costly, and 1.06-1.22x on Anvil. Within one process it copies once where a plain send passes a pointer. |
+| The receiver can choose where the data goes only after seeing the message (its size or destination depends on the content) | **Zero Copy Entry Method Post API** (`nocopypost`, `CkPostBuffer` / `CkMatchBuffer`) | The data lands in the receiver's buffer, at the cost of a round trip for the metadata. It costs about what the Send API costs. |
+| Data that must start and end in your own buffers, repeated with the same partners | today: **Zero Copy Direct API** put or get (`CkNcpyBuffer`), with the handles exchanged once; after phase 4: **a region and a counter** | Against messages plus your own copies, a put is faster from 16 KiB on Delta (1.45x at 16 KiB, 2.31x at 1 MiB, 3.46x at 16 MiB) and from 64 KiB on Anvil (1.33x, 1.69x at 1 MiB, 2.30x at 16 MiB). At 4 KiB and below, plain messages still win (8 B: put 7.4 against 3.8 us on Delta); put with signal (phase 1) removes the acknowledgement behind that. Get and put cost about the same: a get is 2-6% faster on Delta from 4 KiB to 256 KiB, and a put is up to 7% faster on Anvil. |
 | Many senders filling one buffer, with one action when all have arrived (halo faces, FFT transposes) | after phase 4: **one counter with N contributions** (put and decrement); today: messages, counted by hand | One scheduler entry for the whole round instead of one per message, and no copies. Every application surveyed in section 17 counts arrivals by hand today. |
 | GPU buffers, one transfer | **`nocopydevice`** (`CkDeviceBuffer`) | Device-to-device without staging through the host where the hardware allows it. |
 | GPU buffers, repeated with the same partners | today: **`CkDevicePersistent`**; after phase 6: **a device region and a counter** | The handles are opened once; Appendix A measured 3-10 us less per message than `nocopydevice`. |
@@ -1153,8 +1158,11 @@ The text below is meant for the Charm++ manual, as a section "Choosing how to co
   need to own the data.
 - **The kind of chare does not matter for speed.** Chares, groups, node groups and arrays differ by
   3% or less; choose by design.
-- **Between processes on one host, run with `+ipc`.** Small messages are about 3 times faster (group
-  message at 8 B: 3.08 to 1.00 us). The zero-copy APIs do not benefit.
+- **Between processes on one host, run with `+ipc`.**
+  - Messages up to the IPC cutoff (32 KiB by default) are 3-9 times faster: 8 B goes from 3.08 to 1.00 us
+    on Anvil, and 16 KiB from 15.2 to 1.9 us on Delta.
+  - Above the cutoff a message goes through the network card: 64 KiB takes 17.4 us on Delta.
+  - The zero-copy APIs gain less.
 - **For regions, readiness is yours.** A put lands whenever it arrives. Use one of the three patterns
   of section 4.9: a reduction between iterations, two buffers by parity, or a release credit.
   Error-checking builds detect most violations (section 11).
