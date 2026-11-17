@@ -106,10 +106,21 @@ already fits the name and becomes the device case of the family.
 | layout | a strided description of a piece of a region (section 7) | inside a region | inside the region handle |
 | import | a contributor's prepared view of a handle (rkeys, xpmem attachment, IPC mapping) | the contributor's process | not sent |
 
-A region may have several pieces (for example the 6 ghost faces of a block); each piece has an offset
-and either a byte length (contiguous) or a layout. A counter is independent of regions: one counter may
+The **owner** of a region or a counter is the receiver: the PE (in Charm++, the object on that PE) that
+creates them, receives the data and runs the counter's action. A **contributor** is a sender: it puts
+data into an owner's region and decrements the owner's counter.
+
+A **piece** is a part of a region that puts write into, numbered from 0 in the order the owner declares
+the pieces. Each piece is an offset in the region plus either a byte length (one contiguous range) or a
+layout (a strided set of ranges, section 7). Pieces let one region, registered once and sent as one
+handle, receive several contributions at different places. For example, a block's ghost buffer is one
+region and each of its 6 ghost faces is a piece. A put names the piece by its number, plus an offset
+within the piece. A counter is independent of regions: one counter may
 count contributions into several regions, and a region may be paired with two counters (double
-buffering by parity uses two regions and two counters).
+buffering by parity uses two regions and two counters). The pairing is made by each put, not when the
+region or the counter is created: `CmiPut` names the destination region (through its import), the
+piece and the counter to decrement. So the owner sends each contributor a region handle, a piece and a
+counter handle, and the contributor names all three in every put (example in 3.3).
 
 ### 3.2 Converse API (C, reconverse)
 
@@ -124,8 +135,9 @@ void       CmiRegionDestroy(CmiRegion r);
 void       CmiRegionGetHandle(CmiRegion r, CmiRegionHandle *h);     /* POD up to 8 pieces; see below */
 
 /* Counters */
-CmiCounter CmiCounterCreate(int64_t n, CmiCounterAction action, int flags); /* re-arm is explicit;
-                                                   CMI_COUNTER_AUTO_REARM opts in (4.2) */
+CmiCounter CmiCounterCreate(int64_t n, CmiCounterAction action, int flags);
+                     /* flags 0: this counter is re-armed explicitly; CMI_COUNTER_AUTO_REARM:
+                        this counter re-arms itself before its action runs (4.2) */
 void       CmiCounterRearm(CmiCounter c, int64_t n);  /* where the round's data is no longer used */
 int64_t    CmiCounterValue(CmiCounter c);
 void       CmiCounterDestroy(CmiCounter c);
@@ -171,19 +183,29 @@ more pieces gets a variable-size handle, which is PUP'd the same way.
 
 ### 3.3 Charm++ API (C++)
 
+A block that receives its 6 ghost faces from 6 neighbors:
+
 ```c++
-CkRegion  r(ptr, bytes, CkMem::Host);              // or CkRegion::alloc(bytes, CkMem::Device, dev)
-int face  = r.addPiece(offset, CkLayout::box3d(...));
-CkCounter c(6, CkCallback(CkIndex_Block::halosDone(), thisProxy[thisIndex]));
-// ... in the code that last reads the ghost data, or where it contributes (4.9): c.rearm(6);
-// handles are PUP-able values:
-neighbor.takeHandles(r.handle(), c.handle());
-// contributor, after importing once:
-CkImport dst(regionHandle);
-CkPut(dst, face, 0, src, bytes, counterHandle, &localCounter /* or nullptr */, stream /* device */);
+// Owner (the receiving block): one ghost region with a piece per face, and one counter for 6 faces.
+CkRegion ghosts(ghostBuf, ghostBytes, CkMem::Host);  // or CkRegion::alloc(bytes, CkMem::Device, dev)
+int piece[6];
+for (int f = 0; f < 6; f++)
+  piece[f] = ghosts.addPiece(faceOffset[f], CkLayout::box3d(...));
+CkCounter halos(6, CkCallback(CkIndex_Block::halosDone(), thisProxy[thisIndex]));
+                // a third argument CkCounter::AutoRearm makes this counter re-arm itself (4.2)
+// Tell the neighbor on each face where its data goes. Handles are PUP-able values.
+for (int f = 0; f < 6; f++)
+  neighborProxy[f].takeHandles(ghosts.handle(), piece[f], halos.handle());
+// ... in the code that last reads the ghost data, or where it contributes (4.9): halos.rearm(6);
+
+// Contributor (a neighbor), once, in takeHandles(regionHandle, piece, counterHandle):
+dst = CkImport(regionHandle);  myPiece = piece;  ownerCounter = counterHandle;
+// Contributor, every iteration: put its face into its piece and decrement the owner's counter.
+CkPut(dst, myPiece, 0, src, bytes, ownerCounter, &localCounter /* or nullptr */, stream /* device */);
 ```
 
-The action may be an entry method, so an SDAG `when halosDone()` waits for a round. A convenience
+Six separate regions, one per face, work the same way: each neighbor gets its own region's handle and
+the same counter handle. The action may be an entry method, so an SDAG `when halosDone()` waits for a round. A convenience
 `CkTarget` bundles one region, one counter and its pieces for the common case, and `CkChannel` bundles a
 one-piece region, its counter and a release credit (4.9, pattern 3; section 13). `CkSignal(counterHandle)`
 is the C++ form of `CmiSignal`.
@@ -217,8 +239,9 @@ has a weight k: 1 for a put, k for a batch of k same-host device puts (8.2).
 - **Re-arm is legal only after that round's action has started**. Before that, a second
   firing would push the counter's one preallocated action message while it is still queued (5.3). In
   case (b) that corrupts the owner's intrusive IPC receive stack. Error-checking builds check it.
-- **Automatic re-arm** (`CMI_COUNTER_AUTO_REARM`) is opt-in. The runtime re-arms just before running the
-  action. It is safe only when both hold:
+- **Automatic re-arm** is opt-in for each counter: the flag `CMI_COUNTER_AUTO_REARM` in
+  `CmiCounterCreate` (C++ `CkCounter::AutoRearm`). It is not a build option; counters with and without
+  it coexist. The runtime re-arms the counter just before running its action. It is safe only when both hold:
   - the action is the last use of the data, i.e. it copies or consumes the data before returning;
   - no contributor can issue the next round's put before the action has run.
 
@@ -406,7 +429,9 @@ The contribution that took the word to zero fires:
   drains every scheduler iteration (cmishmem.cpp:111-135). For that, the action message must already be
   an IPC block in the owner's own segment: the owner allocates it when the counter is created. Today
   `CmiAllocIpcBlock` refuses the caller's own segment (cmishmem.cpp:290-292); it needs a variant that
-  allocates from it.
+  allocates from it. The push needs a variant too: `CmiPushIpcBlock` asserts that the pushing process
+  allocated the block (`meta->mine == block->sender_proc`, cmishmem.cpp:273), and here the owner
+  allocated it and a contributor pushes it.
 - On the same PE the firing contribution also queues (never calls the action inline), so an action never
   runs inside a put call.
 - One preallocated action message per counter is enough: the counter cannot fire again until the owner
@@ -428,13 +453,17 @@ The contribution that took the word to zero fires:
   - **InfiniBand RC (ibv, Anvil).** RDMA write with immediate is one operation. Its completion at the
     target is generated only after the write's data is placed in memory, and the CQ poll has the needed
     read barrier. The handler then decrements with release as above.
-  - **Slingshot (cxi, Delta and Frontier).** It has no RMA write with immediate: CXI 2.3.1 refuses
-    `FI_REMOTE_CQ_DATA` (Appendix A.4.2). LCI emulates the signal as the write, followed,
+  - **Slingshot (cxi, Delta and Frontier).** CXI 2.3.1 has no RMA write with immediate: it refuses
+    `FI_REMOTE_CQ_DATA` (Appendix A.4.2). The LCI that reconverse pins (a8127fa) uses native
+    `fi_writedata` on cxi when `FI_CXI_ENABLE_WRITEDATA=1` and libfabric is 2.5 or later
+    (backend_ofi.cpp:75-79, 220-227); then the signal is one operation, as on ibv, untested so far.
+    Otherwise LCI emulates the signal as the write, followed,
     after the write's *local* completion, by a zero-length message carrying the signal. Local completion
     of a write does not by itself mean the bytes are visible at the target (8.1;
     charm_best_practices.md, "A notification after a one-sided put must take the same channel as the
     put"). So the decrement in that message's handler is correct only if one of these holds:
-    - the write's local completion is delivery-complete (`FI_DELIVERY_COMPLETE`), or
+    - the write's local completion is delivery-complete (`FI_DELIVERY_COMPLETE`; LCI's emulated write
+      already requests it, backend_ofi_inline.hpp:307, but whether cxi honours it is not established), or
     - the provider orders the send after the write on the same endpoint (send-after-write ordering,
       `FI_ORDER_SAW`), and the signal goes on the same LCI device as the write.
 
@@ -443,7 +472,7 @@ The contribution that took the word to zero fires:
     equivalent misrouting on Delta in 2026-09.
   - Establishing which condition holds on cxi, or making LCI request one of them, is an exit condition of
     phase 1 (section 15). Until then, phases 2-3 are built and tested on ibv.
-  - On cxi, G1's "one put and one notification" is two network operations, so the Anvil prototype's
+  - On cxi without native `fi_writedata`, G1's "one put and one notification" is two network operations, so the Anvil prototype's
     numbers (FINDINGS.md) do not carry over to cxi. They are measured there in phase 1.
   - For device memory, see 8.4.
 
@@ -454,7 +483,8 @@ On the network the 16-bit signal is the counter's table index. The remote-comple
 `rcomp` (lci src/core/progress.cpp:21-22). One `rcomp` per owner PE and per kind makes the 65536 limit a
 per-PE limit, not a per-process one. Per process it would be tight: 64 PEs with
 over-decomposition and several counters per object. Proposed `rcomp`s: counter decrement; strided staging slot
-(section 7.3); per-pair message ring (section 12.2); persistent channel (existing). Generation numbers
+(section 7.3); per-pair message ring (section 12.2). Reconverse registers one `rcomp` today, for active
+messages (comm_backend_lci.cpp:49-53, 273-274). Generation numbers
 do not fit in the signal; section 10 makes reuse of an index safe without them.
 
 ## 6. Host data paths by locality
@@ -581,7 +611,7 @@ Three rules from Aditya's channel measurements (Appendix A.4.1, A.4.2, A.4.6):
   16.1 and 12.5 GB/s for a read on A100 nodes over Slingshot; Frontier runs every verb at 24 GB/s. The choice
   comes from a startup probe or a machine table. The API does not change. With announce-then-read the source
   stays in use until the owner's get completes, so the local counter fires later.
-- **On cxi a put with signal is two network operations.** LCI emulates it as the write, then after the
+- **On cxi a put with signal is two network operations, unless native `fi_writedata` is enabled (5.4).** LCI emulates it as the write, then after the
   write's local completion a zero-length message carrying the 16-bit signal. Whether the data is visible
   when that message's handler decrements depends on the conditions of 5.4, which are not yet established.
 - **Same-host device puts are batched.** A contributor's puts on one producing stream go into one
@@ -967,8 +997,9 @@ Each phase is a PR with tests; measurements gate the next phase.
    - a test that detects a signal arriving before its data, not just payload checks: under many
      concurrent puts and `+lci_ndevices 2`, each payload ends in a sequence number that the handler
      checks when the signal arrives;
-   - put-and-notify latency measured on cxi, where it is two network operations, before phases 2-3
-     rely on the Anvil numbers.
+   - put-and-notify latency measured on cxi, both emulated (two network operations) and with
+     `FI_CXI_ENABLE_WRITEDATA=1` where libfabric is 2.5 or later, before phases 2-3 rely on the Anvil
+     numbers.
 2. **reconverse: counters and contiguous host regions, network and same-process paths.** Counter table,
    firing, re-arm, error checks, `CmiPut`/`CmiGet`, imports without IPC.
 3. **reconverse: same-host paths.** Counter table and `CmiRegionAlloc` in the IPC segment, IPC-block
@@ -1291,9 +1322,12 @@ With CXI 2.3.1:
 - forcing `fi_writemsg(FI_REMOTE_CQ_DATA)` returns "Flags not supported";
 - putting `FI_REMOTE_CQ_DATA` in the hints returns ENODATA.
 
-LCI turns `support_putimm` off for cxi (backend_ofi.cpp). It emulates a put with remote completion as the write,
+By default LCI turns `support_putimm` off for cxi. It emulates a put with remote completion as the write,
 followed after its local completion by a zero-length message that carries the immediate data. So on Delta,
 Frontier and Perlmutter-class machines, put with signal costs a message after the write completes, not one operation.
+The LCI that reconverse pins (a8127fa) turns it on when `FI_CXI_ENABLE_WRITEDATA=1` is set and libfabric
+is 2.5 or later (backend_ofi.cpp:75-79, 220-227). The libfabric versions on Delta and Frontier have not
+been checked, and the native path has not been tested.
 
 #### A.4.3 A defect on that path affects our step 1 prototype
 
