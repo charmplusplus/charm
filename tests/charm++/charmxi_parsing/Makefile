@@ -7,6 +7,7 @@ TARGETS = \
   std_array \
   ParameterPack \
   ArrayIndexTemplate \
+  MigrateCtorEntry \
 
 all: $(TARGETS)
 
