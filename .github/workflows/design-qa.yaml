@@ -1,15 +1,17 @@
 # Answers questions about a design document in a pull request, and records
-# feedback on it, with Claude (anthropics/claude-code-action).
+# feedback on it, with Claude.
 #
 # It runs only on pull requests labelled design-qa, only for comments that
 # contain /design-qa, and only for people with write access to this repository.
 # A comment can be on the conversation tab or on a line of the diff.
 #
-# The bot reads the pull request's branch, the reconverse submodule, the LCI
-# sources that reconverse pins, charm-notes, and issues and pull requests through
-# gh. It has no tool that edits files, and its token cannot push. Its
-# instructions are .claude/design-qa/instructions.md; the action restores
-# .claude/ from the base branch, so a pull request cannot change them.
+# .github/design-qa/answer.py calls the Messages API directly with read-only
+# tools over the pull request's branch, the reconverse submodule, the LCI
+# sources that reconverse pins, charm-notes, and gh issue and pull request
+# reads. It does not use Claude Code: the API refuses Claude Code's requests on
+# an organization that has only promotional credit. The script and its
+# instructions (.github/design-qa/instructions.md) come from the default branch,
+# and nothing from the pull request's branch is run.
 #
 # It needs the repository secret ANTHROPIC_API_KEY_DESIGN_QA.
 name: design-qa
@@ -41,32 +43,45 @@ jobs:
         contains(github.event.pull_request.labels.*.name, 'design-qa')))
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      PR: ${{ github.event.issue.number || github.event.pull_request.number }}
     steps:
-      - uses: actions/checkout@v5
+      - name: Check out the bot from the default branch
+        uses: actions/checkout@v5
         with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: bot
+          sparse-checkout: .github/design-qa
+          persist-credentials: false
+
+      - name: Check out the pull request's branch
+        uses: actions/checkout@v5
+        with:
+          ref: refs/pull/${{ env.PR }}/head
+          path: charm
           submodules: true
+          fetch-depth: 50
+          persist-credentials: false
 
       - name: Fetch the LCI sources reconverse pins, and charm-notes
         run: |
-          tag=$(grep -A2 'set(RECONVERSE_AUTOFETCH_LCI2_TAG' contrib/reconverse/CMakeLists.txt | grep -o -m1 '[0-9a-f]\{40\}')
+          tag=$(grep -A2 'set(RECONVERSE_AUTOFETCH_LCI2_TAG' charm/contrib/reconverse/CMakeLists.txt | grep -o -m1 '[0-9a-f]\{40\}')
           echo "LCI $tag"
           git init -q "$RUNNER_TEMP/lci"
           git -C "$RUNNER_TEMP/lci" fetch -q --depth 1 https://github.com/uiuc-hpc/lci.git "$tag"
           git -C "$RUNNER_TEMP/lci" checkout -q FETCH_HEAD
           git clone -q --depth 1 https://github.com/charmplusplus/charm-notes.git "$RUNNER_TEMP/charm-notes"
 
-      - uses: anthropics/claude-code-action@d535f5172dec02b204866b393d6b20b9b2aaf98d # v1.0.266
+      - name: Install the Anthropic SDK
+        run: |
+          python3 -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/pip" install -q anthropic==2.9.0
+
+      - name: Answer
         env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY_DESIGN_QA }}
           GH_TOKEN: ${{ github.token }}
-        with:
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY_DESIGN_QA }}
-          github_token: ${{ github.token }}
-          trigger_phrase: /design-qa
-          claude_args: |
-            --model claude-opus-5-5
-            --effort high
-            --max-turns 40
-            --append-system-prompt-file ${{ github.workspace }}/.claude/design-qa/instructions.md
-            --add-dir ${{ runner.temp }}/lci ${{ runner.temp }}/charm-notes
-            --allowedTools "Bash(gh issue view:*)" "Bash(gh issue list:*)" "Bash(gh pr view:*)" "Bash(gh pr list:*)" "Bash(gh pr diff:*)" "Bash(gh search issues:*)" "Bash(gh search prs:*)" "Bash(git log:*)" "Bash(git show:*)" "Bash(git grep:*)" "Bash(git blame:*)"
-            --disallowedTools Edit Write NotebookEdit
+          CHARM_DIR: ${{ github.workspace }}/charm
+          LCI_DIR: ${{ runner.temp }}/lci
+          NOTES_DIR: ${{ runner.temp }}/charm-notes
+        run: '"$RUNNER_TEMP/venv/bin/python" -I bot/.github/design-qa/answer.py'

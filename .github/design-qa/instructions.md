@@ -8,28 +8,25 @@ runtime developers and developers of applications that use Charm++.
 
 ## What you have
 
-- The pull request's branch, checked out in the working directory. The design
-  document is the Markdown file under `doc/` that the pull request adds or
-  changes; `gh pr view <number> --json files` lists them. On pull request
-  #4284 it is `doc/persistent-family-design.md`.
-- `contrib/reconverse`: reconverse at the commit the base branch pins.
-- The LCI sources that reconverse pins, and a clone of charm-notes (dated
-  practitioner notes, an LCI reference). Both are in the additional working
-  directories.
-- `gh`, for reading issues and pull requests in charmplusplus/charm,
-  charmplusplus/reconverse and uiuc-hpc/lci: `gh issue view`, `gh issue list`,
-  `gh pr view`, `gh pr list`, `gh pr diff`, `gh search issues`,
-  `gh search prs`. Use `-R owner/repo` for repositories other than this one.
-- Read-only git: `git log`, `git show`, `git grep`, `git blame`. The history is
-  shallow.
+The first message gives the pull request, the design document's path and the
+comment. Your tools read three checkouts, each named by a root:
 
-You cannot edit files, commit or push, and you should not try. You cannot build
-or run anything.
+- `charm`: the pull request's branch. The design document is the Markdown file
+  under `doc/` that the pull request adds or changes. `contrib/reconverse` is
+  reconverse at the commit the branch pins.
+- `lci`: the LCI sources that reconverse pins.
+- `charm-notes`: dated practitioner notes and an LCI reference.
+
+The tools are `read_file`, `list_files`, `grep` (git grep), `git` (log, show and
+blame; the history is shallow) and `github` (gh issue and pull request reads in
+charmplusplus/charm, charmplusplus/reconverse and uiuc-hpc/lci).
+
+You cannot edit files, commit or push, and you cannot build or run anything.
 
 ## How to answer
 
 1. Read the parts of the design document that bear on the question before
-   anything else. The document is long: find the sections with Grep, then read
+   anything else. The document is long: find the sections with `grep`, then read
    each one whole. Section 16 lists the open questions. Section 17 and
    Appendix B cover the existing applications.
 2. Check claims about how the code behaves today against the code. Check claims
@@ -54,8 +51,13 @@ or run anything.
 
 ## Feedback
 
-A comment is feedback when it proposes a change, disagrees with the document,
-reports an error, or asks for something the document should cover. Then:
+A comment is feedback when it proposes a change to the document, disagrees with
+it, or reports an error in it, or when it says that it is feedback. A question
+is not feedback, even when the document does not answer it; then say in the
+answer that the document does not address it. If a comment says not to record
+it (for example "not feedback" or "don't record"), it is not feedback.
+
+For feedback:
 
 - Check it against the document and the code, and say what you found,
   including where the document already covers it.
@@ -66,7 +68,7 @@ reports an error, or asks for something the document should cover. Then:
 
   `Feedback for the design document: <one-sentence summary> (<section>)`
 
-A plain question gets no such line.
+Any other reply has no such line.
 
 ## Limits
 
