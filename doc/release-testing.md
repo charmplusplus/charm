@@ -55,6 +55,10 @@ releases change code generation for C++20 coroutines, turn on library
 assertions and default to newer language standards; arm64 does not stand in
 for x86_64 here.
 
+Record the compiler's exact version: the coroutine tests (`ckcoro`,
+`jacobi3d-coro`, `sparse-coro`) behave differently under GCC 14.2, 14.3 and
+15.2, and GCC 14.2 does not compile them.
+
 ## 5. Release tarball
 
 Download the release asset, check its `sha256sum`, and build `LIBS` from it
