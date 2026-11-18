@@ -5928,7 +5928,10 @@ parameters present inside each array element of the ``CkNcpyBufferPost`` array. 
 registration mode is unassigned by the user, the default ``CK_BUFFER_REG`` regMode is used. Similarly, when
 the de-registration mode is unassigned by the user, the default ``CK_BUFFER_DEREG`` deregMode is used.
 It is important to ensure that the ``CkMatchBuffer`` call is made after setting the ``regMode`` and/or ``deregMode``
-parameters.
+parameters. A posted buffer is registered for each message it receives, in a handle that the runtime
+system keeps to itself, and the RTS releases that registration once the message has arrived, whatever the
+``deregMode``: no handle exists through which a registration kept with ``CK_BUFFER_NODEREG`` could
+be reused or released.
 
 For the entry method ``foo`` specified with a nocopypost specifier, the resulting post entry method defined
 in the .C file will be:

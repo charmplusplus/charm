@@ -464,19 +464,14 @@ void CkRdmaEMAckHandler(int destPe, void *ack) {
 
   NcpyOperationInfo *ncpyOpInfo = &(emBuffInfo->ncpyOpInfo);
 
-  if(ncpyEmInfo->mode == ncpyEmApiMode::P2P_SEND ||
-     (ncpyEmInfo->mode == ncpyEmApiMode::BCAST_SEND && t->child_count == 0)) {  // EM P2P Send API or EM BCAST Send API
-
-    // De-register the destination buffer
+  // De-register the destination on a node with no children to rget from it.
+  // The Send API allocated it; the Post API registered the posted buffer for
+  // this message, in a handle the user never sees, so it is released
+  // whatever the posted deregMode says.
+  if(ncpyEmInfo->mode == ncpyEmApiMode::P2P_SEND || ncpyEmInfo->mode == ncpyEmApiMode::P2P_RECV ||
+     ((ncpyEmInfo->mode == ncpyEmApiMode::BCAST_SEND || ncpyEmInfo->mode == ncpyEmApiMode::BCAST_RECV) &&
+      t->child_count == 0)) {
     deregisterDestBuffer(ncpyOpInfo);
-
-  } else if(ncpyEmInfo->mode == ncpyEmApiMode::P2P_RECV ||
-           (ncpyEmInfo->mode == ncpyEmApiMode::BCAST_RECV && t->child_count == 0)) {  // EM P2P Post API or EM BCAST Post API
-
-    // De-register only if destDeregMode is CK_BUFFER_DEREG
-    if(ncpyOpInfo->destDeregMode == CK_BUFFER_DEREG) {
-      deregisterDestBuffer(ncpyOpInfo);
-    }
   }
 #endif
 
@@ -516,8 +511,8 @@ void performEmApiMemcpy(CkNcpyBuffer &source, CkNcpyBuffer &dest, ncpyEmApiMode 
     if(isDeregReady(source))
       deregisterBuffer(source);
 
-    // De-register destination for p2p Post API
-    if(emMode == ncpyEmApiMode::P2P_RECV && isDeregReady(dest))
+    // De-register the posted buffer if its handle registered it (any deregMode)
+    if(emMode == ncpyEmApiMode::P2P_RECV && dest.isRegistered)
       deregisterBuffer(dest);
 
     // Invoke source callback
@@ -525,8 +520,8 @@ void performEmApiMemcpy(CkNcpyBuffer &source, CkNcpyBuffer &dest, ncpyEmApiMode 
 
   } // send a message to the parent to indicate completion
   else if (emMode == ncpyEmApiMode::BCAST_SEND || emMode == ncpyEmApiMode::BCAST_RECV) {
-    // De-register dest if it has been registered
-    if(emMode == ncpyEmApiMode::BCAST_RECV && isDeregReady(dest))
+    // De-register the posted buffer if its handle registered it (any deregMode)
+    if(emMode == ncpyEmApiMode::BCAST_RECV && dest.isRegistered)
       deregisterBuffer(dest);
   }
 }
@@ -537,8 +532,8 @@ void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, CmiSpanni
 
   if(emMode == ncpyEmApiMode::P2P_SEND || emMode == ncpyEmApiMode::P2P_RECV) {
 
-    // De-register destination for p2p Post API
-    if(emMode == ncpyEmApiMode::P2P_RECV && isDeregReady(dest))
+    // De-register the posted buffer if its handle registered it (any deregMode)
+    if(emMode == ncpyEmApiMode::P2P_RECV && dest.isRegistered)
       deregisterBuffer(dest);
 
     if(source.refAckInfo == NULL) { // Not a part of a de-registration group
@@ -555,8 +550,8 @@ void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, CmiSpanni
       }
       // Buffers on intermediate nodes are left registered to have their child nodes rget from them
     } else {
-      // De-register dest on child nodes if it has been registered
-      if(emMode == ncpyEmApiMode::BCAST_RECV && isDeregReady(dest))
+      // De-register the posted buffer on child nodes if its handle registered it
+      if(emMode == ncpyEmApiMode::BCAST_RECV && dest.isRegistered)
         deregisterBuffer(dest);
     }
   }
@@ -1426,9 +1421,10 @@ void deregisterMemFromMsg(envelope *env, bool isRecv) {
   for(int i=0; i<numops; i++){
     up|dest;
 
-    // De-register the destination buffer when isRecv is false (i.e. using ZC Bcast Send API) or
-    // when isRecv is true, respect deregMode and de-register
-    if( (!isRecv) || (isRecv && dest.deregMode == CMK_BUFFER_DEREG) )
+    // De-register the destination: with the ZC Bcast Send API (isRecv false)
+    // the runtime allocated it; with the Post API it is the posted buffer,
+    // registered for this message whatever its deregMode
+    if(!isRecv || dest.isRegistered)
       deregisterBuffer(dest);
 
     p|dest;

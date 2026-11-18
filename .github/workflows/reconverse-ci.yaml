@@ -74,6 +74,9 @@ env:
   # names no PE for must abort with the runtime's message (#4222).
   # zc_send_noleak: nocopy round trips between PEs in different processes must
   # not grow the memory in use; the 2-process step is the one that reaches it.
+  # zc_post_noleak: Post API messages leave no memory registration for the
+  # posted buffers in any reg/dereg mode; the count is checked once
+  # contrib/reconverse has CmiRegisteredBuffers (reconverse#332).
   TEST_DIRS: >-
     tests/charm++/megatest
     tests/charm++/simplearrayhello
@@ -121,6 +124,7 @@ env:
     tests/charm++/zerocopy/pup_buffer
     tests/charm++/zerocopy/chare_post
     tests/charm++/zerocopy/zc_send_noleak
+    tests/charm++/zerocopy/zc_post_noleak
     tests/charm++/bcast_zcpup
     tests/charm++/proxy_delctor
     examples/charm++/user-driven-interop
