@@ -138,8 +138,6 @@ class mCastEntry
         arrayIndexList allElem;
         /// List of all tree member PE's (Only useful on the tree root (for group sections))
         groupPeList allGrpElem;
-        /// Only useful on root for LB
-        ObjKeyList     allObjKeys;
         /// List of array elements on local PE
         arrayIndexList localElem;
         /// List of group elements on local PE(either 0 or 1 elems)
@@ -301,9 +299,6 @@ mCastEntry::mCastEntry (mCastEntry *old):
   parentGrp = old->parentGrp;
   allElem = old->allElem;
   allGrpElem = old->allGrpElem;
-#if CMK_LBDB_ON
-  allObjKeys = old->allObjKeys;
-#endif
   pe = old->pe;
   red.storedCallback = old->red.storedCallback;
   red.storedClient = old->red.storedClient;
@@ -327,16 +322,9 @@ void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndex 
     mCastEntry *entry = new mCastEntry(aid);
     // Push all the section member indices into the entry
     entry->allElem.resize(n);
-    entry->allObjKeys.reserve(n);
     for (int i=0; i<n; i++) {
         entry->allElem[i] = al[i];
-#if CMK_LBDB_ON
-        CmiUInt8 _key;
-        if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
-            entry->allObjKeys.push_back(_key);
-#endif
     }
-    entry->allObjKeys.shrink_to_fit();
     entry->bfactor = factor;
     //  entry->aid = aid;
     _id.get_aid() = aid;
@@ -366,16 +354,9 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
 
   const CkArrayIndex *al = proxy.ckGetArrayElements();
   entry->allElem.resize(proxy.ckGetNumElements());
-  entry->allObjKeys.reserve(proxy.ckGetNumElements());
   for (int i=0; i<proxy.ckGetNumElements(); i++) {
     entry->allElem[i] = al[i];
-#if CMK_LBDB_ON
-    CmiUInt8 _key;
-    if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
-      entry->allObjKeys.push_back(_key);
-#endif
   }
-  entry->allObjKeys.shrink_to_fit();
   if(proxy.ckGetBfactor() == USE_DEFAULT_BRANCH_FACTOR)
     entry->bfactor = dfactor;
   else
@@ -421,16 +402,9 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayBase &proxy)
 void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndex *al, int count, CkArrayID aid)
 {
   entry->allElem.resize(count);
-  entry->allObjKeys.reserve(count);
   for (int i=0; i<count; i++) {
     entry->allElem[i] = al[i];
-#if CMK_LBDB_ON
-    CmiUInt8 _key;
-    if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
-      entry->allObjKeys.push_back(_key);
-#endif
   }
-  entry->allObjKeys.shrink_to_fit();
   if(sid.bfactor == USE_DEFAULT_BRANCH_FACTOR)
     entry->bfactor = dfactor;
   else
@@ -992,8 +966,15 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
     if(!entry->isGrpSec()){
       // fixme: running obj?
       envelope *env = UsrToEnv(msg);
-      const LDOMHandle &om = CProxy_ArrayBase(s.get_aid()).ckLocMgr()->getOMHandle();
-      LBManagerObj()->MulticastSend(om,entry->allObjKeys.data(),entry->allObjKeys.size(),env->getTotalsize());
+      CkLocMgr *mgr = CProxy_ArrayBase(s.get_aid()).ckLocMgr();
+      // The members' ids as far as this process knows them now.
+      ObjKeyList keys;
+      if (LBManagerObj()->CollectingCommStats()) {
+        CmiUInt8 key;
+        for (const CkArrayIndex &idx : entry->allElem)
+          if (mgr->lookupID(idx, key)) keys.push_back(key);
+      }
+      LBManagerObj()->MulticastSend(mgr->getOMHandle(),keys.data(),keys.size(),env->getTotalsize());
     }
 #endif
 
