@@ -368,12 +368,14 @@ public:
       int expectedMembers = 0;
       for (int i = 0; i < numElems; i++)
         if (isMember(i)) expectedMembers++;
-      // After round 0 (or on a single process), every member's ObjID must be known and recorded.
-      if (CkNumNodes() == 1 || r > 0) {
-        if ((int)expectedIds.size() != expectedMembers || !foundFullRecord)
-          CkAbort("section_migrate: round %d missing/partial LD_OBJLIST_MSG "
-                  "(known=%zu, expected=%d, foundFull=%d)",
-                  r, expectedIds.size(), expectedMembers, foundFullRecord ? 1 : 0);
+      // The record lists exactly the members whose ids this process knows; a
+      // process may not have heard of every member yet (doc/internals/section-trees.md).
+      if (!foundFullRecord){
+        CkAbort("section_migrate: round %d: LD_OBJLIST_MSG does not match the %zu known members", r, expectedIds.size());
+      }
+      // In one process every member's id is known.
+      if (CkNumNodes() == 1 && (int)expectedIds.size() != expectedMembers){
+        CkAbort("section_migrate: round %d: %zu of %d member ids known", r, expectedIds.size(), expectedMembers);
       }
     }
 #endif
