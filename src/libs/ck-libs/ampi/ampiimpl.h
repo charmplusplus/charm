@@ -2550,9 +2550,10 @@ class ampiParent final : public CBase_ampiParent {
     }
     CkAssert(message >= 0 && message < matchedMsgs.size());
     AmpiMsg* msg = matchedMsgs[message];
-    // Mark this matchedMsg index NULL and free from back of vector:
+    // Mark this matchedMsg index NULL and free from back of vector (which is
+    // empty once the last matched message is taken):
     matchedMsgs[message] = NULL;
-    while (matchedMsgs.back() == NULL) {
+    while (!matchedMsgs.empty() && matchedMsgs.back() == NULL) {
       matchedMsgs.pop_back();
     }
     return msg;

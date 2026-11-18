@@ -408,7 +408,8 @@ def main():
         title, docs = pr_context(pr)
         answer, usage = ask(build_question(pr, title, docs, author, body, review, thread))
         reply = (defuse_mentions(answer)
-                 + f"\n\n<sub>design-qa bot ({MODEL}). {run_link}</sub>")
+                 + f"\n\n<sub>design-qa bot ({MODEL}). This answer cost about ${usage['cost']:.2f}, "
+                 f"paid from a budget set aside for these questions. {run_link}</sub>")
         print(f"done: {usage['turns']} turns, ${usage['cost']:.2f}", flush=True)
     except anthropic.APIStatusError as e:
         reply = (f"The design-qa bot could not answer: API error {e.status_code}: {e.message} "

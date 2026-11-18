@@ -134,7 +134,15 @@ jobs:
 
   reconverse-linux-x86_64:
     timeout-minutes: 90
-    runs-on: ubuntu-latest
+    # ubuntu-24.04 (GCC 13), not ubuntu-latest. Since ubuntu-latest became
+    # ubuntu-26.04 (GCC 15.2) on 2026-11-17, tests/charm++/ckcoro with
+    # +ck_fakemigrate in 2 processes aborts with a double free when the
+    # rebuild destroys MarshallTest::run's coroutine frame (the frame's destroy
+    # frees the vector in the values of its CK_WHEN_BLOCK on arr a second
+    # time). The same test file compiled with GCC 13 or 14 does not fail. Go
+    # back to ubuntu-latest once that is fixed. The other x86_64 jobs stay on
+    # ubuntu-latest, so GCC 15 still builds and tests Charm++ and AMPI there.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:
