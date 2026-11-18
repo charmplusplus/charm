@@ -1,0 +1,24 @@
+mainmodule zc_post_noleak {
+
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Peer peers;
+  readonly int numMsgs;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void p2pDone();
+    entry [reductiontarget] void bcastRoundDone();
+    entry void bcastSourceDone(CkDataMsg *m);
+    entry void count(int node, long registered);
+  };
+
+  group Peer {
+    entry Peer();
+    entry void startP2p(int variant);
+    entry void p2p(nocopypost char data[n], int n, int from, int variant, int round);
+    entry void p2pAck();
+    entry void sourceDone(CkDataMsg *m);
+    entry void bcast(nocopypost char data[n], int n, int variant, int round);
+    entry void report();
+  };
+};
