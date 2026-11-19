@@ -1386,7 +1386,7 @@ Each phase is a PR with tests; measurements gate the next phase.
      numbers.
 2. **reconverse: counters and contiguous host regions, network and same-process paths.** Counter table,
    *firing*, *re-arm*, error checks, `CmiPut`/`CmiGet`, imports without IPC.
-3. **reconverse: same-host paths.** Counter table and `CmiRegionAlloc` in the IPC segment, IPC-block
+3. **reconverse: same-host paths.** Counter table in its own shared area (5.1), `CmiRegionAlloc` in the IPC segment, IPC-block
    action messages in the owner's own segment, xpmem import of user regions; xpmem confirmed on Anvil,
    Delta and Frontier. The mixed-locality test.
 4. **charm: `CkRegion`, `CkCounter`, targets, `CkImport`, `CkPut`, `CkGet`**, PUP of handles, SDAG use, QD (4.8),
@@ -1394,7 +1394,8 @@ Each phase is a PR with tests; measurements gate the next phase.
    rebuild cost S of 10.3, including the batch import and release.
 5. **strided layouts** (both sides), staging slots, scatter on the owner PE, per-block *puts*; commbench
    `halo3d` with all faces. Gated on `halo3d` beating messages with the raised eager limit (7.3).
-6. **device memory** after the three checks of 8.5.
+6. **device memory** after the three checks of 8.5, and after finding out whether the slow GPUDirect
+   write on A100 nodes is a node configuration problem (8.2).
 7. **messages:** eager default change (after the many-to-one and rate tests); per-pair rings only if a
    gap remains (12.2).
 8. **NAMD's PME on the persistent family, then remove the reconverse persistent API;** compatibility
