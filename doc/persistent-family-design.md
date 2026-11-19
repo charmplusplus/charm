@@ -13,6 +13,12 @@ Revised 2026-11-19: the brief summary below; a one-line form for one buffer and 
 (`CkRegion(buf, bytes, callback)`, 3.3); the Post API's delayed posting and its tags (13); later the same day, `CkTarget`
 in place of `CkTargetHandle`, and gets from a strided piece (7.4).
 
+Revised 2026-11-19 after review on #4284: the counter's preallocated message is a runtime trampoline
+that never reaches user code (5.3); announce-then-read is used only for large *puts* and costs a release
+back (8.2, 9); quiescence detection counts *puts* without a counter when the data is visible, and local
+counters' actions (4.8); the counter table is its own shared area with per-PE slices (5.1); setup and
+teardown no longer depend on message order (10.1); and smaller fixes in 3.3, 4.6, 4.9 and 10.3.
+
 ## In brief: the calls added, kept and removed
 
 The receiver registers a buffer once (a **region**) and an atomic count with an action (a **counter**),
@@ -32,8 +38,8 @@ yet (section 15).
 | `CkCounter c(n, cb [, CkCounter::AutoRearm])`, `c.rearm(n)` | counts the contributions still expected; `cb` runs when the count reaches 0; `rearm` allows the next round |
 | `CkTarget t = r.target(p, c)`; also `r.target(c)`, `r.target()` | a target, a PUP-able value sent to one sender: piece `p` with counter `c`; the whole region with `c` (separate buffers sharing one counter, or one buffer with explicit *re-arm*); the simple form's own |
 | `CkImport dst(t)` | the sender's prepared view of a target, made once |
-| `CkPut(dst, src, bytes [, &localCounter, stream])` | writes into the target's piece and *decrements* its counter; `localCounter` says when `src` may be reused |
-| `CkGet(buf, bytes, dst [, &localCounter, stream])` | reads the target's piece into local memory |
+| `CkPut(dst, src, bytes [, CkPutOpts().offset(o).srcLayout(l).local(&c).stream(s)])` | writes into the target's piece and *decrements* its counter; the options give an offset within the piece, a strided source, a local counter that says when `src` may be reused, and a device stream |
+| `CkGet(buf, bytes, dst [, CkPutOpts()...])` | reads the target's piece into local memory, with the same options |
 | `CkSignal(dst)` | *decrements* the target's counter with no data |
 | `CkChannel` | a one-buffer target plus a release credit, for a sender that may run ahead of its receiver (4.9) |
 
@@ -95,7 +101,9 @@ manual section, which call to use when; Appendix A, device channels on branch ra
 Goals:
 
 - **G1 put and notify.** A repeated transfer into a buffer the receiver named once costs one *put* and one
-  notification, with no handshake, no copy and no runtime readiness protocol.
+  notification, with no handshake, no copy and no runtime readiness protocol. The exception is a large
+  *put* across hosts on machines where the runtime reads instead of writing (8.2), which costs an
+  announce, a read and a release.
 - **G2 put and decrement.** Contributions from many senders into one or more receiver buffers
   (contiguous or strided) produce one scheduler entry on the receiver when all have arrived. The
   receiver's **counter** holds the number of contributions still expected; each contribution *decrements*
@@ -280,7 +288,7 @@ sender.take(in.target());
 
 // Sender, once:
 dst = CkImport(t);
-// Sender, every round:
+// Sender, each round, once the program's logic says the receiver is done with buf (W1):
 CkPut(dst, src, bytes);
 ```
 
@@ -294,9 +302,15 @@ sender.take(in.target(got));   // no piece: the whole region
 ```
 
 The constructors are told apart by the type of the third argument (`CkMem` or `CkCallback`); a device
-buffer is `CkRegion(buf, bytes, CkMem::Device, dev, cb)`. The automatic *re-arm* is safe because the
-application guarantees readiness (W1). Error-checking builds still abort on a *put* that lands while the
-previous notification is waiting in the queue. Several senders, pieces or strides use the general form.
+buffer is `CkRegion(buf, bytes, CkMem::Device, dev, cb)`.
+
+This form *re-arms* automatically by design, although 4.2 does not make automatic *re-arm* the default.
+A persistent *put*, in either form, requires the sender to know from the program's logic that the
+receiver's buffer may be overwritten (W1); the runtime does not check it in production builds. What
+automatic *re-arm* gives up is one check of error-checking builds: a *put* that lands while the callback
+still reads the buffer passes. (A *put* that lands while the previous notification is still queued is
+still caught.) Code that wants the check uses the general form with explicit *re-arm*. Several senders,
+pieces or strides also use the general form.
 
 A block that receives its 6 ghost faces from 6 neighbors:
 
@@ -316,8 +330,13 @@ for (int f = 0; f < 6; f++) {
 // Contributor (a neighbor), once, in takeTarget(CkTarget t):
 dst = CkImport(t);
 // Contributor, every iteration: put its face into the owner's piece and decrement the owner's counter.
-CkPut(dst, src, bytes, &localCounter /* or nullptr */, stream /* device */);
+CkPut(dst, src, bytes, CkPutOpts().local(&localCounter).stream(stream));
 ```
+
+`CkPutOpts` carries what `CmiPut` takes beyond the target, source and size: `.offset(o)` within the piece,
+`.srcLayout(l)` for a strided source (7.1), `.local(&c)` for source completion (4.5) and `.stream(s)` for
+device data. It is a chain of setters rather than designated initializers, which need C++20 (charm
+#4298). `CkGet` takes the same options.
 
 Six separate regions, one per face, work the same way: each neighbor gets a target of its own region,
 with the same counter. The action may be an entry method, so an SDAG `when halosDone()` waits for a
@@ -350,8 +369,8 @@ has a weight k: 1 for a *put*, k for a batch of k same-host device *puts* (8.2).
     the counter *fires* again.
   - Manual *re-arm* allows a different N per round, for adaptive codes whose neighbor counts change.
     In production builds it is the same single atomic as automatic *re-arm*, and no message is added.
-- **Re-arm is legal only after that round's action has started**. Before that, a second
-  *firing* would push the counter's one preallocated action message while it is still queued (5.3). In
+- **Re-arm is legal only after that round's action has started** (its trampoline has run, 5.3). Before
+  that, a second *firing* would push the counter's one preallocated message while it is still queued. In
   case (b) that corrupts the owner's intrusive IPC receive stack. Error-checking builds check it.
 - **Automatic re-arm** is opt-in for each counter: the flag `CMI_COUNTER_AUTO_REARM` in
   `CmiCounterCreate` (C++ `CkCounter::AutoRearm`). It is not a build option; counters with and without
@@ -380,7 +399,8 @@ most one counter.
 ### 4.5 Source completion
 
 The local counter given to `CmiPut` is *decremented* when the source buffer may be reused. Local
-completion never sends a message (section 9). A *put* with no local counter must not have its source
+completion sends no message (section 9), except under announce-then-read (8.2), where the owner's release
+tells the contributor. A *put* with no local counter must not have its source
 modified until something else tells the application it is safe (for example the next round's data
 from the same neighbor, the double-buffering argument in charm-notes, charm_best_practices.md:2198).
 
@@ -396,7 +416,11 @@ has no room for it (16 bits name the counter), so the length travels with the da
 `CMI_PIECE_VARSIZE` reserves an 8-byte length word just before its data. The 8 bytes must belong to the
 region: a piece allocated by `CmiRegionAlloc`, or a user piece declared with its own header space. They
 cannot be taken from inside a user array, and import checks refuse it. The runtime writes
-`[length | data]` as one transfer, so the length is visible whenever the data is. The action reads
+`[length | data]` as one transfer, so the length is visible whenever the data is. Within a host the
+contributor copies the data, then writes the length word, then *decrements*, so both are visible when
+the counter *fires* (5.4). Across hosts the length word and the data go in one write with a two-entry
+gather list on the source side (the length word, then the data); where LCI or the provider cannot take a
+gather list (to be checked, as in 7.3), the runtime first copies both into a registered staging buffer. The action reads
 `CmiRegionPieceLength(r, piece)`. A *put* larger than the capacity is refused at the contributor (it knows
 the capacity from the target) with an error; growing a piece is a teardown and rebuild (section 10).
 
@@ -415,14 +439,25 @@ does for messages (13).
   issued.
 - **Processed count.** It is raised in bulk on the owner PE when the round's action runs from the
   scheduler. The amount is the round's N: with manual *re-arm*, the N that round was armed with. The
-  poll-time handler and the other-process contributors of case (b) never touch QD counters.
+  other-process contributors of case (b) never touch QD counters. The poll-time handler touches only
+  the QD counters of the PE it runs on, for *puts* without a counter (below); that is safe because the
+  handler runs on that PE's own thread, and QD sums the counts over all PEs.
 - **The action message** is not counted separately; the bulk step stands for it. Between the *firing* and
   the action, the created count exceeds the processed count, so QD waits for the action, as it should.
 - **A partly filled round** holds quiescence off, because work is outstanding. A counter destroyed in
   mid-round adds the contributions it has received (N minus the remaining count) to the processed
   count; otherwise QD would never complete.
-- **No remote counter.** A *put* without one is counted processed at its local completion on the
-  contributor.
+- **No remote counter.** A *put* without one is counted processed when its data is visible at the
+  owner, not at its local completion: on cxi's emulated path local completion comes before the bytes are
+  visible (5.4), and QD could finish before they land. Within a host the contributor counts it after its
+  copy. Across hosts the *put* carries a signal anyway, with a QD-only `rcomp` (5.5), and the poll-time
+  handler counts it on its PE.
+- **Local counters.** A *put* that names a local counter with an action also counts one created on the
+  contributor's PE when it is issued, and the local counter's action raises the processed count in bulk
+  by its N when it runs, as a remote counter's does. Counting the action only when the local counter
+  *fires* would be too late: the remote side can be processed before the local completion arrives, and
+  QD could finish in between, before an action that may start new work. A local counter without an
+  action adds nothing.
 - **Gets.** A *get* is created at issue and processed at its completion, both on the reader.
 
 SpECTRE, Enzo-E and ChaNGa start phases with `CkStartQD` or `CkWaitQD` (section 17), so this is required
@@ -449,7 +484,9 @@ message: it lands when it arrives, whatever the owner is executing.
    - Argument: A *puts* its iteration i+2 data into the region that held iteration i only after computing
      iteration i+2's boundary. That boundary needs B's iteration i+1 data, and B sends it only after its
      last read of the iteration i data that A *put*. So the region is free when the *put* lands.
-   - Rule for users: send your next round only after your last read of the round before.
+   - Rule for users: send your next round only after your last read of the round before, and *re-arm*
+     that round's counter before you send. *Re-arming* after the send lets a correct *put* of round i+2
+     arrive before the *re-arm*; counting stays right (4.2), but error-checking builds report it.
 3. **A release credit**, opt-in, for producer-consumer streams whose logic gives no such guarantee (a
    producer may run ahead of its consumer, as in a stream of MoE tokens). It is the credit of the
    unmerged `CkDeviceChannel` (Appendix A.1), built from the objects of this design.
@@ -505,15 +542,20 @@ Applied to the two uses the design claims:
 
 Each process has a counter table of fixed-size entries (one 64-byte line each, to avoid false sharing
 between counters): the atomic word, the owner PE, the *re-arm* count, the action, a generation number and
-the preallocated action message reference.
+the preallocated action message reference. The table has one slice per PE of the process, and a PE's
+slice holds up to 65536 entries, the limit the 16-bit signal sets per PE (5.5). A target carries its
+counter's slice and index, so a contributor needs no fixed formula to find the entry.
 
-- With IPC on, the table lives in the process's own IPC segment: a new fixed area after the
-  `ipc_shared_` header (cmi-shmem-common.h:97-115), so every host peer reaches entry `i` at
-  `segment_base(owner) + table_offset + 64*i` through its existing mapping.
+- With IPC on, the table is a shared-memory area of its own, not part of the IPC message segment: that
+  segment defaults to 8 MiB and already fills (3.2). Host peers map the area at their first import from
+  that process. The area reserves address space for every slice at its limit (4 MiB per PE) but uses
+  memory only for the entries touched: on Linux a tmpfs-backed shared mapping allocates a page when it is
+  first written, so a PE with 100 counters uses two pages.
 - With IPC off, the table is ordinary process memory, and host peers in other processes contribute
   over the network path (5.2 c), so no other process ever touches the word.
 
-Default size 4096 entries (256 KiB); `+counter_table N` up to 65536 per owner PE (5.5).
+`+counter_table N` lowers the per-PE limit, for machines where reserving 4 MiB of address space per PE
+matters.
 
 **Width.** The word is a signed 32-bit integer. A round usually counts a handful of contributions (6 or
 26 for a halo exchange), but two things need more than 8 or 16 bits:
@@ -563,13 +605,25 @@ The contribution that took the word to zero *fires*:
   allocated it and a contributor pushes it.
 - On the same PE the *firing* contribution also queues (never calls the action inline), so an action never
   runs inside a *put* call.
-- One preallocated action message per counter is enough: the counter cannot *fire* again until the owner
-  has taken that message off its queue, because *re-arm* (4.2) is legal only once the action has started.
-  The message is runtime-internal (a trampoline handler reads the counter index, *re-arms* if automatic,
-  and calls the user's action), so the user never owns or frees it.
-- For an entry-method action, the preallocated message is the final Charm++ envelope, with the target
-  and priority of the action's callback. It is not a Converse message that then queues a second Charm++
-  message, which would cost two scheduler entries and lose the priority (charm #4022).
+- **The preallocated message never reaches user code.** It is a runtime Converse message (a
+  trampoline), queued with the priority of the action's callback. Its handler runs on the owner PE from
+  the scheduler: it *re-arms* the counter if the counter is automatic, then runs the action.
+  - An entry method on the owner PE is invoked directly from the handler, with a message allocated there
+    (an empty one for a method without parameters), as an inline callback is. That costs one scheduler
+    entry and keeps the priority; queueing a second Charm++ message would cost two and lose the priority
+    (charm #4022).
+  - Any other callback (an entry method on another PE, a main chare, a function) is sent from the handler
+    as usual.
+  - The entry method's message is then an ordinary message: Charm++ frees it when the method returns,
+    and SDAG keeps it until a `when` uses it. Neither touches the counter's message.
+- So one preallocated message per counter is enough: the counter cannot *fire* again until its trampoline
+  has started, because *re-arm* is legal only from then on (4.2), and from then on the message is off the
+  queue. *Firing*, at poll time or in a contributor's thread, never allocates; the action's message is
+  allocated on the owner PE, in the scheduler.
+- An earlier version of this design delivered the preallocated message itself to the entry method. Then
+  Charm++ freed it when the method returned while a later round could already have queued it again
+  (a *re-arm* inside the method followed by a full round), and a callback to another PE took it away
+  altogether (review of #4284).
 
 ### 5.4 Why the owner sees the data (memory ordering)
 
@@ -612,7 +666,7 @@ On the network the 16-bit signal is the counter's table index. The remote-comple
 `rcomp` (lci src/core/progress.cpp:21-22). One `rcomp` per owner PE and per kind makes the 65536 limit a
 per-PE limit, not a per-process one. Per process it would be tight: 64 PEs with
 over-decomposition and several counters per object. Proposed `rcomp`s: counter *decrement*; strided staging slot
-(section 7.3); per-pair message ring (section 12.2). Reconverse registers one `rcomp` today, for active
+(section 7.3); per-pair message ring (section 12.2); a *put* without a counter, counted only for QD (4.8). Reconverse registers one `rcomp` today, for active
 messages (comm_backend_lci.cpp:49-53, 273-274). Generation numbers
 do not fit in the signal; section 10 makes reuse of an index safe without them.
 
@@ -771,6 +825,13 @@ Three rules from Aditya's channel measurements (Appendix A.4.1, A.4.2, A.4.6):
   16.1 and 12.5 GB/s for a read on A100 nodes over Slingshot; Frontier runs every verb at 24 GB/s. The choice
   comes from a startup probe or a machine table. The API does not change. With announce-then-read the source
   stays in use until the owner's get completes, so the local counter *fires* later.
+- **Announce-then-read costs messages both ways.** A read's completion is reported only to the reader,
+  the owner; the contributor learns that its source may be reused only from a release the owner sends
+  back. So a *put* carried out this way is an announce, a read and a release, not G1's one *put* and one
+  notification, and the release is the one message that goes back to a sender (9.1, 9.2). It is used only
+  above a size where the read's bandwidth repays that: at 10.9 against 16.1 GB/s a read saves about
+  0.03 ns per byte, so about 130 KiB covers 4 us of extra messages (an estimate, to be measured in phase 6).
+  Below that size the runtime writes, even on those machines. The size comes from the same probe or table.
 - **On cxi a put with signal is two network operations, unless native `fi_writedata` is enabled (5.4).** LCI emulates it as the write, then after the
   write's local completion a zero-length message carrying the 16-bit signal. Whether the data is visible
   when that message's handler *decrements* depends on the conditions of 5.4, which are not yet established.
@@ -815,7 +876,8 @@ a flush today (survey).
 Source completion of a *put* is local: LCI reports it to the sender, the runtime *decrements* the local
 counter. A neighbor that *puts* 6 faces uses one local counter with N = 6 and gets one notification,
 which also gives #3966's one-callback-per-send result for free. No message goes back to the sender in
-any locality.
+any locality, with one exception: a large *put* across hosts on a machine that uses announce-then-read
+(8.2), where the owner's release goes back for every *put*.
 
 ### 9.2 Where a message must go back, batch it with the #3961 rule
 
@@ -830,7 +892,9 @@ In this design the cases that need a message back are:
 
 1. a *get* whose source owner asked to be told (release-only: deferred; with a callback: immediate);
 2. per-pair ring credits (section 12.2), which are release-only and need not be messages at all;
-3. teardown acknowledgements (section 10).
+3. teardown acknowledgements (section 10);
+4. the release of an announce-then-read *put* (8.2): release-only, and deferred, when the contributor gave
+   no local counter or one without an action; sent at once when the local counter has an action.
 
 The host zerocopy path's per-buffer acknowledgement messages (#3964, open) are outside this design but
 the same id-block code would serve them.
@@ -850,6 +914,15 @@ the same id-block code would serve them.
   The owner keeps the list of importing processes for each region. Targets may still be forwarded
   freely, but every process that imports one registers, so the owner always knows who may *put*. That is
   one message per importing process per region at setup, which W2 allows.
+- **No reliance on message order** (Appendix A.4.4). Registration and release are separate messages and
+  may arrive in either order. The owner keeps, per region and per importing process, a balance:
+  registrations minus releases. Both messages carry the region's generation.
+  - A release that arrives before its registration leaves the balance at -1 until the registration
+    arrives.
+  - `CmiRegionDestroy` completes when every balance it knows of is zero (10.2).
+  - A registration or release for a generation already destroyed is dropped. An importer the owner had
+    not heard of at destroy time has *put* nothing since the last round (10.2, step 1), so freeing the
+    region then is safe, and its late messages are dropped.
 - **Caching.** Imports are cached keyed by (owner process, region id, generation), so the targets of one
   region imported in one process share one registration and one mapping.
 - **Batch forms.** `CmiImportTargets` and `CmiReleaseImports` take a whole neighbor set and send one
@@ -861,7 +934,8 @@ the same id-block code would serve them.
 2. Each importing process calls `CmiReleaseImport` (or the batch form). The call waits for that process's
    own *puts* into the region to complete locally, detaches the mappings, and sends one release notice
    to the owner. The notice is release-only, so it is carried per 9.2 when possible.
-3. `CmiRegionDestroy` and `CmiCounterDestroy` complete when every registered import has been released.
+3. `CmiRegionDestroy` and `CmiCounterDestroy` complete when every importing process's balance is zero
+   (10.1), whatever order its registration and release arrived in.
    The runtime then deregisters the memory, frees runtime-allocated memory, and returns the counter
    index to the free list. Indices are reused least recently freed first, and only after the releases.
    A stray late signal can therefore hit a reused index only if step 1 was broken, which checking builds
@@ -896,8 +970,10 @@ time and persistent communication, and the manual says so (10.5). There are thre
    - Where: `migrateMe` (Enzo-E uses it), balancers without AtSync (Aditya's `+LBAsync`), Quinoa's
      non-blocking load-balancing mode, evacuation.
    - It is incompatible with owning a region: a *put* through a stale target corrupts memory silently.
-   - **Proposed guard (open question 5).** An object that owns a live region or counter
-     cannot migrate. The attempt aborts in all builds, with a message naming the region.
+   - **Proposed guard (open question 5).** An object cannot migrate while it owns a live region, or a
+     counter that some target names, or a local counter with *puts* still in flight. The attempt aborts
+     in all builds, with a message naming the region or counter. A local counter with nothing pending
+     moves with the object: its value and action are PUP'd.
    - A migrating contributor that owns nothing only has to wait for its own *puts* to complete and import
      again after it arrives.
    - The alternative, deferred, is a runtime hold on *puts* to a moving owner. The candidate is the
@@ -1311,15 +1387,16 @@ Each phase is a PR with tests; measurements gate the next phase.
 
 ## 16. Open questions
 
-1. Counter table: 4096 entries per PE by default, at most 65536 per PE (5.5). Is that enough for
-   NAMD-scale pencil decompositions?
+1. Counter table: at most 65536 counters per PE (5.1, 5.5). Is that enough for NAMD-scale pencil
+   decompositions?
 2. The per-block *put* threshold `B_put` (working value 4 KiB, 7.3) is to be measured. Is it a reasonable
    default until then?
 3. The ROCm equivalent of the GPUDirect flush (8.4).
 4. Names inside the persistent family: region, counter, target, import and *put*, or other terms (handle,
    contribute)? A C++ namespace (`ck::persistent::Region`) or prefixed names (`CkPersistentRegion`)?
-5. Migration at any time (10.3, case 2). The proposed guard: an object that owns a live region or counter
-   cannot migrate, and the attempt aborts in all builds. Is that acceptable, including under the
+5. Migration at any time (10.3, case 2). The proposed guard: an object that owns a live region, a counter
+   some target names, or a local counter with *puts* in flight cannot migrate, and the attempt aborts in
+   all builds. Is that acceptable, including under the
    asynchronous GPU-aware balancer if it is merged? Or should the runtime hold *puts* to a moving owner?
 6. Shrink and expand (10.3): are process ranks renumbered?
 7. Defer the per-pair ring (12.2) until the eager-limit change has been measured, and build strided
