@@ -830,10 +830,23 @@ Three rules from Aditya's channel measurements (Appendix A.4.1, A.4.2, A.4.6):
 - **Announce-then-read costs messages both ways.** A read's completion is reported only to the reader,
   the owner; the contributor learns that its source may be reused only from a release the owner sends
   back. So a *put* carried out this way is an announce, a read and a release, not G1's one *put* and one
-  notification, and the release is the one message that goes back to a sender (9.1, 9.2). It is used only
-  above a size where the read's bandwidth repays that: at 10.9 against 16.1 GB/s a read saves about
-  0.03 ns per byte, so about 130 KiB covers 4 us of extra messages (an estimate, to be measured in phase 6).
-  Below that size the runtime writes, even on those machines. The size comes from the same probe or table.
+  notification, and the release is the one message that goes back to a sender (9.1, 9.2). The release
+  delays only the sender's reuse of its buffer, not the owner's notification.
+  - It is used only above a size where the read's bandwidth repays the announce, which adds about one
+    small-message latency before the read starts (3.8 us one way for 8 B on Delta). Below that size the
+    runtime writes, even on those machines.
+  - The size depends on the traffic. With one host sending, a read saves 1/10.9 - 1/16.1 GB/s, about
+    0.03 ns per byte, which repays 4 us at about 130 KiB. With both hosts sending at once, as in a halo
+    exchange, it saves 1/3.7 - 1/12.5 GB/s, about 0.19 ns per byte, which repays 4 us at about 20 KiB.
+    Both figures are estimates. The startup probe measures the threshold for one-way and two-way traffic
+    separately, and the runtime uses the one that matches.
+  - The estimates also assume the owner issues the read promptly. If the read has to wait for the owner
+    PE's scheduler (W7 limits poll-time work to bookkeeping), a busy owner delays it further.
+  - **First, find out why the write is slow.** 3.7 GB/s for GPUDirect writes is far below the link rate,
+    while reads into the same memory reach 12.5. A gap like that can come from the node's PCIe
+    configuration (for example, whether the GPU accepts the NIC's writes with relaxed ordering), not from
+    the hardware. If configuring the nodes fixes the write, announce-then-read is not needed on them. This
+    is checked in phase 6, before announce-then-read is built.
 - **On cxi a put with signal is two network operations, unless native `fi_writedata` is enabled (5.4).** LCI emulates it as the write, then after the
   write's local completion a zero-length message carrying the 16-bit signal. Whether the data is visible
   when that message's handler *decrements* depends on the conditions of 5.4, which are not yet established.
