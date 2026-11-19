@@ -970,11 +970,12 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
       // The members' ids as far as this process knows them now.
       ObjKeyList keys;
       if (LBManagerObj()->CollectingCommStats()) {
+        keys.reserve(entry->allElem.size());
         CmiUInt8 key;
         for (const CkArrayIndex &idx : entry->allElem)
           if (mgr->lookupID(idx, key)) keys.push_back(key);
+        LBManagerObj()->MulticastSend(mgr->getOMHandle(),keys.data(),keys.size(),env->getTotalsize());
       }
-      LBManagerObj()->MulticastSend(mgr->getOMHandle(),keys.data(),keys.size(),env->getTotalsize());
     }
 #endif
 
