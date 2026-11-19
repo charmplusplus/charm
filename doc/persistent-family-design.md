@@ -13,8 +13,8 @@ Revised 2026-11-19: the brief summary below; a one-line form for one buffer and 
 (`CkRegion(buf, bytes, callback)`, 3.3); the Post API's delayed posting and its tags (13); later the same day, `CkTarget`
 in place of `CkTargetHandle`, and gets from a strided piece (7.4).
 
-Revised 2026-11-19 after review on #4284: the counter's preallocated message is a runtime trampoline
-that never reaches user code (5.3); announce-then-read is used only for large *puts* and costs a release
+Revised 2026-11-19 after review on #4284: the counter's preallocated message is a runtime message whose
+handler runs the action, and it never reaches user code (5.3); announce-then-read is used only for large *puts* and costs a release
 back (8.2, 9); quiescence detection counts *puts* without a counter when the data is visible, and local
 counters' actions (4.8); the counter table is its own shared area with per-PE slices (5.1); setup and
 teardown no longer depend on message order (10.1); and smaller fixes in 3.3, 4.6, 4.9 and 10.3.
@@ -369,7 +369,7 @@ has a weight k: 1 for a *put*, k for a batch of k same-host device *puts* (8.2).
     the counter *fires* again.
   - Manual *re-arm* allows a different N per round, for adaptive codes whose neighbor counts change.
     In production builds it is the same single atomic as automatic *re-arm*, and no message is added.
-- **Re-arm is legal only after that round's action has started** (its trampoline has run, 5.3). Before
+- **Re-arm is legal only after that round's action has started** (the counter's handler has run, 5.3). Before
   that, a second *firing* would push the counter's one preallocated message while it is still queued. In
   case (b) that corrupts the owner's intrusive IPC receive stack. Error-checking builds check it.
 - **Automatic re-arm** is opt-in for each counter: the flag `CMI_COUNTER_AUTO_REARM` in
@@ -605,9 +605,11 @@ The contribution that took the word to zero *fires*:
   allocated it and a contributor pushes it.
 - On the same PE the *firing* contribution also queues (never calls the action inline), so an action never
   runs inside a *put* call.
-- **The preallocated message never reaches user code.** It is a runtime Converse message (a
-  trampoline), queued with the priority of the action's callback. Its handler runs on the owner PE from
-  the scheduler: it *re-arms* the counter if the counter is automatic, then runs the action.
+- **The preallocated message never reaches user code.** It is a small Converse message owned by the
+  runtime, which carries the counter's index and is queued with the priority of the action's callback.
+  Its handler, a runtime function (the counter's handler), runs on the owner PE when the scheduler
+  takes the message off the queue: it reads the counter index, *re-arms* the counter if the counter is
+  automatic, then runs the action.
   - An entry method on the owner PE is invoked directly from the handler, with a message allocated there
     (an empty one for a method without parameters), as an inline callback is. That costs one scheduler
     entry and keeps the priority; queueing a second Charm++ message would cost two and lose the priority
@@ -616,7 +618,7 @@ The contribution that took the word to zero *fires*:
     as usual.
   - The entry method's message is then an ordinary message: Charm++ frees it when the method returns,
     and SDAG keeps it until a `when` uses it. Neither touches the counter's message.
-- So one preallocated message per counter is enough: the counter cannot *fire* again until its trampoline
+- So one preallocated message per counter is enough: the counter cannot *fire* again until its handler
   has started, because *re-arm* is legal only from then on (4.2), and from then on the message is off the
   queue. *Firing*, at poll time or in a contributor's thread, never allocates; the action's message is
   allocated on the owner PE, in the scheduler.
