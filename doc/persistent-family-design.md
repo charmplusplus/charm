@@ -10,7 +10,8 @@ lending an array for update (the boomerang array). Operations (*put*, *get*, *de
 *fire*) are in italics.
 
 Revised 2026-11-19: the brief summary below; a one-line form for one buffer and one notification
-(`CkRegion(buf, bytes, callback)`, 3.3); the Post API's delayed posting and its tags (13).
+(`CkRegion(buf, bytes, callback)`, 3.3); the Post API's delayed posting and its tags (13); later the same day, `CkTarget`
+in place of `CkTargetHandle`, and gets from a strided piece (7.4).
 
 ## In brief: the calls added, kept and removed
 
@@ -29,8 +30,8 @@ yet (section 15).
 | `CkRegion r(buf, bytes [, CkMem::Device, dev])`, `CkRegion::alloc(bytes, kind, dev)` | registers memory once: the application's own, or memory the runtime allocates |
 | `int p = r.addPiece(offset, bytes)` or `r.addPiece(offset, CkLayout::box3d(...))` | a part of the region that one sender *puts* into, contiguous or strided |
 | `CkCounter c(n, cb [, CkCounter::AutoRearm])`, `c.rearm(n)` | counts the contributions still expected; `cb` runs when the count reaches 0; `rearm` allows the next round |
-| `r.target(p, c)`, `r.target(c)`, `r.target()` | a target handle (a PUP-able value) to send to one sender: piece `p` with counter `c`; the whole region with `c`; the simple form's own |
-| `dst = CkImport(t)` | the sender's prepared view of a target, made once |
+| `CkTarget t = r.target(p, c)`; also `r.target(c)`, `r.target()` | a target, a PUP-able value sent to one sender: piece `p` with counter `c`; the whole region with `c` (separate buffers sharing one counter, or one buffer with explicit *re-arm*); the simple form's own |
+| `CkImport dst(t)` | the sender's prepared view of a target, made once |
 | `CkPut(dst, src, bytes [, &localCounter, stream])` | writes into the target's piece and *decrements* its counter; `localCounter` says when `src` may be reused |
 | `CkGet(buf, bytes, dst [, &localCounter, stream])` | reads the target's piece into local memory |
 | `CkSignal(dst)` | *decrements* the target's counter with no data |
@@ -121,9 +122,9 @@ collective operations; fault tolerance; pointer-based data (it stays with messag
   logic guarantees the receiver no longer needs the region's previous contents.
   The runtime does not check this in production builds; error-checking builds detect the violations
   that are detectable (section 11).
-- **W2 iteration.** Regions, counters and their handles are set up once and used for many rounds. Setup
+- **W2 iteration.** Regions, counters and targets are set up once and used for many rounds. Setup
   may cost round trips; a round may not.
-- **W3 handles travel in ordinary messages.** A handle is a small value that can be PUP'd into any entry
+- **W3 targets travel in ordinary messages.** A target is a small value that can be PUP'd into any entry
   method. Setup needs no special protocol beyond that.
 - **W4 migration tears down and rebuilds**. No forwarding of *puts* to a migrated owner.
 - **W5 strided arrays use layout descriptors; PUP-style packing is for pointer-based data**.
@@ -172,11 +173,11 @@ already fits the name and becomes the device case of the family.
 
 | object | what it is | owned by | travels as |
 |---|---|---|---|
-| region | memory registered once: base, bytes, memory kind, optional pieces with layouts | one PE | inside target handles |
-| counter | an atomic count, an action, a *re-arm* mode | one PE | inside target handles |
-| layout | a strided description of a piece of a region (section 7) | inside a region | inside the target handle of that piece |
-| target | one piece of a region paired with one counter: where a contributor's data goes and which counter it *decrements* | a value made by the owner, with no state of its own | target handle |
-| import | a contributor's prepared view of a target handle (rkeys, xpmem attachment, IPC mapping) | the contributor's process | not sent |
+| region | memory registered once: base, bytes, memory kind, optional pieces with layouts | one PE | inside targets |
+| counter | an atomic count, an action, a *re-arm* mode | one PE | inside targets |
+| layout | a strided description of a piece of a region (section 7) | inside a region | inside the target of that piece |
+| target | one piece of a region paired with one counter: where a contributor's data goes and which counter it *decrements* | a value made by the owner, with no state of its own | itself (`CkTarget`, a PUP-able value) |
+| import | a contributor's prepared view of a target (rkeys, xpmem attachment, IPC mapping) | the contributor's process | not sent |
 
 The **owner** of a region or a counter is the receiver: the PE (in Charm++, the object on that PE) that
 creates them, receives the data and runs the counter's action. A **contributor** is a sender: it *puts*
@@ -190,7 +191,7 @@ region and each of its 6 ghost faces is a piece.
 
 A **target** is one piece of a region paired with one counter. It is what a contributor holds: where its
 data goes, and which counter its contribution *decrements*. The owner makes a target for each contributor
-and sends it the target's handle; the contributor imports the handle once and names the import in every
+and sends it the target; the contributor imports the target once and names the import in every
 *put*, which writes into the target's piece (at an offset within the piece, 0 by default) and *decrements*
 the target's counter (example in 3.3). A counter is independent of regions, and targets allow every
 combination:
@@ -223,16 +224,16 @@ int32_t    CmiCounterValue(CmiCounter c);
 void       CmiCounterDestroy(CmiCounter c);
 
 /* Targets, made by the owner: one piece of a region and one counter */
-void       CmiTargetMake(CmiRegion r, int piece, CmiCounter c, CmiTargetHandle *h);
-                     /* POD, fixed size; piece may be CMI_PIECE_ALL (the whole region);
+CmiTarget  CmiTargetMake(CmiRegion r, int piece, CmiCounter c);
+                     /* a POD of fixed size; piece may be CMI_PIECE_ALL (the whole region);
                         r may be NULL (a counter alone, for CmiSignal),
                         c may be NULL (puts into this target are not counted) */
 
 /* Contributors */
-CmiImport  CmiImportTarget(const CmiTargetHandle *h);   /* once per handle; registers with the owner
+CmiImport  CmiImportTarget(const CmiTarget *t);         /* once per target; registers with the owner
                                                      once per region per process (10.1) */
 void       CmiReleaseImport(CmiImport imp);
-int        CmiImportTargets(const CmiTargetHandle *h, int n, CmiImport *out);  /* batch forms: one   */
+int        CmiImportTargets(const CmiTarget *t, int n, CmiImport *out);        /* batch forms: one   */
 void       CmiReleaseImports(CmiImport *imps, int n);                         /* message per owner */
 int        CmiPut(CmiImport dst, size_t offset,         /* offset within the target's piece */
                   const void *src, size_t bytes, const CmiLayout *srcLayout,
@@ -263,7 +264,7 @@ arrays (17.4). So in practice regions are user memory. The same-host direct path
 xpmem, which becomes a requirement for that path (6); `CmiRegionAlloc` from the segment is for small
 regions.
 
-A target handle is a fixed-size POD: the region's identity, owner and remote keys, the one piece with
+A target is a fixed-size POD: the region's identity, owner and remote keys, the one piece with
 its layout, and the counter's owner and table index. It carries only its own piece, so a region may
 have any number of pieces, and a contributor never receives the descriptions of other contributors'
 pieces.
@@ -305,14 +306,14 @@ CkRegion ghosts(ghostBuf, ghostBytes, CkMem::Host);  // or CkRegion::alloc(bytes
 CkCounter halos(6, CkCallback(CkIndex_Block::halosDone(), thisProxy[thisIndex]));
                 // a third argument CkCounter::AutoRearm makes this counter re-arm itself (4.2)
 // Give the neighbor on each face a target: its face's piece and the counter.
-// A target handle is a PUP-able value.
+// A target is a PUP-able value.
 for (int f = 0; f < 6; f++) {
   int piece = ghosts.addPiece(faceOffset[f], CkLayout::box3d(...));
   neighborProxy[f].takeTarget(ghosts.target(piece, halos));
 }
 // ... in the code that last reads the ghost data, or where it contributes (4.9): halos.rearm(6);
 
-// Contributor (a neighbor), once, in takeTarget(CkTargetHandle t):
+// Contributor (a neighbor), once, in takeTarget(CkTarget t):
 dst = CkImport(t);
 // Contributor, every iteration: put its face into the owner's piece and decrement the owner's counter.
 CkPut(dst, src, bytes, &localCounter /* or nullptr */, stream /* device */);
@@ -397,7 +398,7 @@ region: a piece allocated by `CmiRegionAlloc`, or a user piece declared with its
 cannot be taken from inside a user array, and import checks refuse it. The runtime writes
 `[length | data]` as one transfer, so the length is visible whenever the data is. The action reads
 `CmiRegionPieceLength(r, piece)`. A *put* larger than the capacity is refused at the contributor (it knows
-the capacity from the handle) with an error; growing a piece is a teardown and rebuild (section 10).
+the capacity from the target) with an error; growing a piece is a teardown and rebuild (section 10).
 
 ### 4.7 Get
 
@@ -691,6 +692,37 @@ block or a contiguous staging area at the receiver plus a scatter. Proposal:
   unpack. So phase 5 goes ahead only if commbench `halo3d` shows strided *puts* beating messages, with the
   eager limit raised (12.2).
 
+### 7.4 Gets from a strided piece (proposed; open question 12)
+
+The API already allows one: `CmiGet` takes the reader's own layout, and the target's piece has its
+layout. How it is carried out depends on the locality.
+- **Within a host** (one process, or xpmem): the reader copies from its mapping of the owner's region,
+  layout to layout, as in 7.2, and *decrements* its local counter. It is one-sided and needs no staging;
+  device regions use `cudaMemcpy3DPeerAsync` through the IPC mapping.
+- **Across hosts** it is harder than a strided *put*. For a *put* the strided side is the sender's own
+  memory, which the sender can gather locally (7.3). For a *get* the strided side is remote, and an RDMA
+  read covers one contiguous remote range. Two ways:
+  - one RDMA read per block, counted at the reader, when blocks are at least a threshold (the mirror of
+    `B_put`). In the 66^3 example of 7.1 an i-face is one read and a j-face 64 reads of 512 B, but a
+    k-face would be 4096 reads of 8 B;
+  - otherwise a gather by the owner: the *get* becomes a request to the owner PE, which gathers the
+    piece into a staging slot from its scheduler (not at poll time, W7) and *puts* it to the reader. That
+    is a request and a reply plus the wait for the owner PE, no better than an entry-method message. It
+    does read data between two of the owner's entry methods, never half-updated, which raw RDMA reads do
+    not guarantee.
+
+  NIC strided memory keys (one read for a strided range) exist as vendor extensions on Mellanox, but
+  neither LCI nor libfabric exposes them and cxi has none. MPI implementations face the same choice for
+  `MPI_Get` with a strided target datatype: one RDMA operation per segment, or packing at the target
+  through active messages.
+
+Use: reading stable data on demand, where the reader decides when and what (a patch of a distributed
+array, as in Global Arrays; an analysis chare pulling a slice; AMR reading a coarse parent's patch). Not
+for iterative halo exchange: a *get* needs two synchronizations per round (the data is ready; the reader
+is done), a *put* one. None of the applications surveyed uses a zero-copy *get* today (section 17).
+Proposed: strided *gets* within a host in phase 5, with the strided *puts* (the same copy code);
+across hosts, only when an application needs them.
+
 ## 8. Device memory
 
 ### 8.1 Today (survey)
@@ -807,7 +839,7 @@ the same id-block code would serve them.
 
 ### 10.1 Setup
 
-- The owner creates regions and counters, makes targets of them, and sends the target handles in entry
+- The owner creates regions and counters, makes targets of them, and sends the targets in entry
   methods (W3).
 - **Imports register with the owner**. `CmiImportTarget` does three things:
   - records the remote keys;
@@ -815,7 +847,7 @@ the same id-block code would serve them.
   - sends one registration message to the owner process, the first time this process imports a target
     of that region (or of that counter, for a target with no region).
 
-  The owner keeps the list of importing processes for each region. Target handles may still be forwarded
+  The owner keeps the list of importing processes for each region. Targets may still be forwarded
   freely, but every process that imports one registers, so the owner always knows who may *put*. That is
   one message per importing process per region at setup, which W2 allows.
 - **Caching.** Imports are cached keyed by (owner process, region id, generation), so the targets of one
@@ -842,7 +874,7 @@ Two rules from Aditya's channels (Appendix A.4.4, A.4.8):
   queue (`CmiSyncSendAndFreeUrgent`). In leanmd, ordinary messages waited 50-400 ms per hop behind deep
   scheduler queues.
 
-### 10.3 Migration and other events that invalidate handles
+### 10.3 Migration and other events that invalidate targets
 
 Any migration is accompanied by teardown and setup of persistent communication, and that is the user's
 responsibility; automation is a later question (10.4). There is a real tension between migration at any
@@ -852,10 +884,10 @@ time and persistent communication, and the manual says so (10.5). There are thre
    - Where: AtSync, plus the rebuild points where the application knows no *put* is in flight. Partners
      also change at AMR (Enzo-E at every adapt phase, SpECTRE, Quinoa's `resizePostAMR`) and at ChaNGa's
      domain decomposition.
-   - Procedure: the object tears down before it moves, sets up after it arrives, and sends new handles.
+   - Procedure: the object tears down before it moves, sets up after it arrives, and sends new targets.
      Its contributors release their imports and import again.
    - Cost: each migrated owner makes each of its importers release and re-register, about two messages
-     per importer plus the handle delivery, done in parallel across neighbors.
+     per importer plus the target delivery, done in parallel across neighbors.
    - Break-even: if a round saves s per contribution and a rebuild costs S per neighbor pair, the
      persistent family pays when objects stay in place for more than S/s rounds. For s, Aditya measured
      3-10 us for device puts against `nocopydevice`. S is to be measured in phase 4; tens of microseconds
@@ -863,7 +895,7 @@ time and persistent communication, and the manual says so (10.5). There are thre
 2. **Migration at any time.**
    - Where: `migrateMe` (Enzo-E uses it), balancers without AtSync (Aditya's `+LBAsync`), Quinoa's
      non-blocking load-balancing mode, evacuation.
-   - It is incompatible with owning a region: a *put* through a stale handle corrupts memory silently.
+   - It is incompatible with owning a region: a *put* through a stale target corrupts memory silently.
    - **Proposed guard (open question 5).** An object that owns a live region or counter
      cannot migrate. The attempt aborts in all builds, with a message naming the region.
    - A migrating contributor that owns nothing only has to wait for its own *puts* to complete and import
@@ -871,24 +903,24 @@ time and persistent communication, and the manual says so (10.5). There are thre
    - The alternative, deferred, is a runtime hold on *puts* to a moving owner. The candidate is the
      resolve/closing/epoch protocol of the unmerged device channels (Appendix A.4.4, A.4.9), whose
      message-ordering holes have been found and fixed. It is kept for this purpose (section 13).
-3. **Events that invalidate every handle**, i.e. disk checkpoint followed by restart.
+3. **Events that invalidate every target**, i.e. disk checkpoint followed by restart.
    - The per-object release protocol cannot run after a restart.
    - The user tears down before checkpointing. Whether a restart on the same number of nodes could
-     keep handles is deferred.
-   - Option for later: write handles into the checkpoint as an "invalid" marker. A program
+     keep targets is deferred.
+   - Option for later: write targets into the checkpoint as an "invalid" marker. A program
      that continues after the checkpoint keeps its regions; a restarted one must run setup again, and a
-     *put* through an invalid handle aborts.
+     *put* through an invalid target aborts.
 
 Two further items:
 - **Shrink and expand.** A new implementation (Aditya's, expected in about two weeks) readjusts runtime
   structures in memory without checkpoint and restart. What regions need depends on whether process
   ranks are renumbered (open question 6):
-  - handles name the owner by process rank and counter index;
+  - targets name the owner by process rank and counter index;
   - if surviving processes keep their ranks, only moved objects rebuild; otherwise every object does;
   - on expand, new processes and their host peers must map each other's IPC segments before same-host
     *puts* work.
 - **One hook for all cases** (proposed). Each object has a generation number that increases whenever
-  its handles become invalid. The runtime tells the application which objects are affected: the
+  its targets become invalid. The runtime tells the application which objects are affected: the
   migrated ones after migration, all of them after a restart or a shrink or expand. The application then
   re-runs setup for those objects.
 
@@ -897,7 +929,7 @@ Two further items:
 What can be automated:
 - owner-side destroy and re-create through PUP of `CkRegion` and `CkCounter`. This is clean only for
   runtime-allocated memory; user memory must be re-bound;
-- delivery of the new handles to the registered importers.
+- delivery of the new targets to the registered importers.
 
 What cannot:
 - knowing that no *puts* are in flight;
@@ -920,8 +952,8 @@ Readiness stays the user's responsibility (W1). The runtime's job is to detect v
 in checking builds and print an error that tells the user to use a message send there.
 
 Production builds check only what is free:
-- a *put* beyond a piece's capacity returns an error (the contributor knows the capacity from the handle);
-- a *put* through a handle marked invalid (10.3, case 3) aborts;
+- a *put* beyond a piece's capacity returns an error (the contributor knows the capacity from the target);
+- a *put* through a target marked invalid (10.3, case 3) aborts;
 - the migration guard (10.3, case 2), if adopted.
 
 Error-checking builds add the following:
@@ -933,7 +965,7 @@ Error-checking builds add the following:
     the generation and the round number.
   - It catches two errors: a *put* from a later iteration counted in place of a missing one from the
     current iteration (the count stays positive, so the count check misses it), and *puts* through stale
-    handles after teardown or migration (by the generation).
+    targets after teardown or migration (by the generation).
   - One message per contribution is acceptable only in these builds; the signal itself has no room for
     the generation.
 - **Not caught by either check:** a *put* that lands after an automatic *re-arm* while the owner still uses
@@ -1301,6 +1333,8 @@ Each phase is a PR with tests; measurements gate the next phase.
     PE of the same process.
 11. Post API tickets (13): replace tags for posting later, and keep tags, from a per-PE allocator, only for
     posting before the data arrives? The current calls would stay for existing code.
+12. Strided *gets* across hosts (7.4): per-block reads above a threshold and an owner-side gather below
+    it, or none until an application needs them?
 
 ## 17. Existing applications (G6)
 
