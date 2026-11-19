@@ -9,6 +9,64 @@ sender's buffer) from `nokeep` (the receiving method) and proposes an in-process
 lending an array for update (the boomerang array). Operations (*put*, *get*, *decrement*, *re-arm*,
 *fire*) are in italics.
 
+Revised 2026-11-19: the brief summary below; a one-line form for one buffer and one notification
+(`CkRegion(buf, bytes, callback)`, 3.3); the Post API's delayed posting and its tags (13).
+
+## In brief: the calls added, kept and removed
+
+The receiver registers a buffer once (a **region**) and an atomic count with an action (a **counter**),
+and gives each sender a **target**: the part of the buffer its data goes to, and the counter its data
+counts toward. A sender's *put* lands in the receiver's buffer with no copy, no handshake and no message,
+and *decrements* the counter; when the count reaches zero, the receiver's callback runs, once. The code is
+the same whether sender and receiver share a PE, a process, a host, or nothing. None of it is implemented
+yet (section 15).
+
+**Added, Charm++** (sections 3.3, 4 and 7):
+
+| call | what it does |
+|---|---|
+| `CkRegion r(buf, bytes, cb)` | the simple form: one buffer, and `cb` runs once per *put*. Shorthand for a region, a counter of 1 that *re-arms* itself, and the target of the whole region (3.3) |
+| `CkRegion r(buf, bytes [, CkMem::Device, dev])`, `CkRegion::alloc(bytes, kind, dev)` | registers memory once: the application's own, or memory the runtime allocates |
+| `int p = r.addPiece(offset, bytes)` or `r.addPiece(offset, CkLayout::box3d(...))` | a part of the region that one sender *puts* into, contiguous or strided |
+| `CkCounter c(n, cb [, CkCounter::AutoRearm])`, `c.rearm(n)` | counts the contributions still expected; `cb` runs when the count reaches 0; `rearm` allows the next round |
+| `r.target(p, c)`, `r.target(c)`, `r.target()` | a target handle (a PUP-able value) to send to one sender: piece `p` with counter `c`; the whole region with `c`; the simple form's own |
+| `dst = CkImport(t)` | the sender's prepared view of a target, made once |
+| `CkPut(dst, src, bytes [, &localCounter, stream])` | writes into the target's piece and *decrements* its counter; `localCounter` says when `src` may be reused |
+| `CkGet(buf, bytes, dst [, &localCounter, stream])` | reads the target's piece into local memory |
+| `CkSignal(dst)` | *decrements* the target's counter with no data |
+| `CkChannel` | a one-buffer target plus a release credit, for a sender that may run ahead of its receiver (4.9) |
+
+**Added, Converse** (3.2): the same objects in C: `CmiRegionCreate`, `CmiRegionAlloc`, `CmiRegionAddPiece`,
+`CmiRegionDestroy`; `CmiCounterCreate`, `CmiCounterRearm`, `CmiCounterValue`, `CmiCounterDestroy`;
+`CmiTargetMake`; `CmiImportTarget(s)`, `CmiReleaseImport(s)`; `CmiPut`, `CmiGet`, `CmiSignal`; the flags
+`CMI_COUNTER_AUTO_REARM` and `CMI_PIECE_VARSIZE` (with `CmiRegionPieceLength`, 4.6); the option
+`+counter_table N` (5.1).
+
+**Changed, without new calls** (proposed, section 12):
+- a `nocopy` send below the eager limit is copied by the runtime, which removes its 3-4x penalty for small
+  data (12.1);
+- within one process, a `nocopy` array is handed to a receiver that takes it as a pointer to const, with
+  no copy (12.1);
+- the Post API's `CkMatchBuffer` returns a ticket that `CkPostBuffer` takes, so posting a buffer later
+  needs no tag (13).
+
+**Kept, removed and deprecated** (section 13):
+
+| today | becomes |
+|---|---|
+| marshalled parameters, messages | unchanged |
+| `nocopy`, `nocopydevice` (Zero Copy Send API) | unchanged, with the two changes above |
+| `nocopypost` (Zero Copy Post API) | kept, with tickets |
+| Zero Copy Direct API (`CkNcpyBuffer` get and put) | deprecated: a thin layer over regions, removed one release after that layer passes its tests |
+| `CkDevicePersistent` | deprecated the same way; it becomes a device region |
+| the reconverse persistent API | removed, once NAMD's PME moves to regions (phase 8) |
+| `CkDeviceChannel` (unmerged) | not added; `CkChannel` serves its use |
+| `+ipc`, `+gpushm` | kept, as tuning options |
+
+Postponed to a later pull request: lending an array for update, the boomerang array (12.4).
+
+## Reading this document
+
 Facts carry file references. Working assumptions are marked W (section 2). Points that are proposed but
 not settled say so where they appear, and are listed in section 16.
 
@@ -166,7 +224,8 @@ void       CmiCounterDestroy(CmiCounter c);
 
 /* Targets, made by the owner: one piece of a region and one counter */
 void       CmiTargetMake(CmiRegion r, int piece, CmiCounter c, CmiTargetHandle *h);
-                     /* POD, fixed size; r may be NULL (a counter alone, for CmiSignal),
+                     /* POD, fixed size; piece may be CMI_PIECE_ALL (the whole region);
+                        r may be NULL (a counter alone, for CmiSignal),
                         c may be NULL (puts into this target are not counted) */
 
 /* Contributors */
@@ -210,6 +269,33 @@ have any number of pieces, and a contributor never receives the descriptions of 
 pieces.
 
 ### 3.3 Charm++ API (C++)
+
+The simplest case, one buffer and one notification per *put*:
+
+```c++
+// Owner: the callback runs once per put, with the data in buf.
+CkRegion in(buf, bytes, CkCallback(CkIndex_Block::arrived(), thisProxy[thisIndex]));
+sender.take(in.target());
+
+// Sender, once:
+dst = CkImport(t);
+// Sender, every round:
+CkPut(dst, src, bytes);
+```
+
+The constructor that takes a callback is shorthand for the general objects: a region, a counter of 1
+that *re-arms* itself and runs the callback, and the target of the whole region with that counter.
+
+```c++
+CkRegion in(buf, bytes);
+CkCounter got(1, cb, CkCounter::AutoRearm);
+sender.take(in.target(got));   // no piece: the whole region
+```
+
+The constructors are told apart by the type of the third argument (`CkMem` or `CkCallback`); a device
+buffer is `CkRegion(buf, bytes, CkMem::Device, dev, cb)`. The automatic *re-arm* is safe because the
+application guarantees readiness (W1). Error-checking builds still abort on a *put* that lands while the
+previous notification is waiting in the queue. Several senders, pieces or strides use the general form.
 
 A block that receives its 6 ghost faces from 6 neighbors:
 
@@ -317,7 +403,10 @@ the capacity from the handle) with an error; growing a piece is a teardown and r
 
 `CmiGet` reads a piece of a remote region into local memory and *decrements* a local counter when the
 bytes are in place. The owner is not told unless it asks (section 9.2). *Gets* serve data that stays valid
-while readers fetch on demand; *puts* serve everything iterative.
+while readers fetch on demand; *puts* serve everything iterative. A *get* also serves a receiver that can
+take the data only when it is ready (its buffer is in use, or memory is short): the sender exposes the
+data as a region, and the receiver *gets* it when it has room, which is what the Post API's delayed post
+does for messages (13).
 
 ### 4.8 Quiescence detection
 
@@ -1078,7 +1167,7 @@ or are removed; as they stand they do not compile.
 |---|---|
 | plain send, marshalled params | unchanged |
 | `nocopy`, `nocopydevice` | unchanged (the Send API, 12.1). The users in charm: AMPI sends every contiguous message of 100 KiB or more (`AMPI_RDMA_THRESHOLD_DEFAULT`, ampiimpl.h) through `genericRdma(nocopy ...)` (ampi.ci:56, ampi.C:3459-3461), so every AMPI program with large messages uses it; the device half of a migration uses `nocopydevice` (cklocation.ci:25). None of the surveyed applications (section 17) uses either. |
-| `nocopypost` | kept for receivers that can choose a buffer only after seeing the message. Once #4285 is merged (approved 2026-11-16), the runtime registers the posted buffer for each message and releases it after, so `deregMode` has no effect there; one registration kept across messages is a region. |
+| `nocopypost` | kept, for receivers that can choose a buffer only after seeing the message, or that can take the data only later (the buffer is in use, or memory is short). Since #4285 (merged 2026-11-18) the runtime registers the posted buffer for each message and releases it after, so `deregMode` has no effect there; one registration kept across messages is a region. Tickets are proposed below. |
 | direct API (`CkNcpyBuffer` get/put) | region + import + `CkPut`/`CkGet` with N = 1 counters; kept as a thin compatibility layer |
 | `CkDevicePersistent` | device region + `CkPut` + N = 1 counter; its IPC import code moves under the import |
 | reconverse persistent | removed; NAMD moves to the persistent family (12.3) |
@@ -1091,6 +1180,26 @@ while `nocopypost`, the direct API and `CkDevicePersistent` remain. The intended
 1. the reconverse persistent API, removed once NAMD moves (phase 8);
 2. the direct API and `CkDevicePersistent`, deprecated once their compatibility layers over regions
    pass their tests, and removed a release later.
+
+**The Post API's tags.** The post entry method names an incoming array with `CkMatchBuffer(post, i,
+tag)`, and the receiver supplies the buffer with `CkPostBuffer(buf, size, tag)`, then or later, from
+anywhere on the same PE (tested on reconverse by tests/charm++/zerocopy/zc_post_async, which posts both
+from a later entry method and before the data arrives). Meanwhile the data waits at the sender: its
+buffer stays in use, and its completion callback waits too.
+- The runtime keeps the matched requests and the posted buffers in two tables per PE, keyed by the
+  integer tag alone (ckrdma.C:2059-2150). A tag must therefore be unique among all Post API users on the
+  PE with a transfer in flight: every chare there, and libraries.
+- A second match or a second post with a tag already in its table aborts. A match by one chare and a post
+  by another with the same tag pair up silently, and the data lands in the other chare's buffer.
+- Existing code picks tags in ways that collide: the tests use `k * NUM_ARR_ELEMENTS + thisIndex`,
+  CkIO a per-PE counter from 0 (ckio.C:433, 464), and the manual's example the constant 22.
+- When the receiver posts later, the tag never leaves it: it is chosen in the post entry method and used
+  again in `CkPostBuffer`. So, proposed: `CkMatchBuffer(post, i)` returns a ticket and
+  `CkPostBuffer(buf, size, ticket)` takes it; no tag is needed. Tags remain only for posting before the data
+  arrives (CkIO's pattern: the receiver puts the tag in its request, and the data message brings it
+  back). Those tags come from a per-PE allocator, `CkNewPostTag()`, which CkIO uses too.
+  Error-checking builds record which chare matched or posted each tag, and abort on a pairing across
+  chares.
 
 **The device channels** (Appendix A) are not added as a second API with a transport of their own. A
 channel is a region with one piece plus a counter with N = 1, and its measured gains come from removing
@@ -1187,9 +1296,11 @@ Each phase is a PR with tests; measurements gate the next phase.
    the packets held while a message waits in the scheduler queue, at the raised eager limit.
 9. The in-process `nocopy` hand-off (12.1) is chosen by a pointer-to-const parameter in the receiving
    method. Is that an acceptable way to opt in, or should the .ci declaration say it?
-10. Lend for update (12.4): which applications would use it? Candidates are recursive divide and conquer
+10. Lend for update (12.4, postponed to a later pull request): which applications would use it? Candidates are recursive divide and conquer
     (quicksort, its motivating case), a helper that updates a block for its owner, and offload to another
     PE of the same process.
+11. Post API tickets (13): replace tags for posting later, and keep tags, from a per-PE allocator, only for
+    posting before the data arrives? The current calls would stay for existing code.
 
 ## 17. Existing applications (G6)
 
@@ -1333,8 +1444,8 @@ The text below is meant for the Charm++ manual, as a section "Choosing how to co
 | Data up to the eager limit (8 KiB today), or sent once, or with changing partners | **marshalled parameters** (plain entry methods) | At 8 B: 3.0 us one way on Anvil, 3.8 us on Delta, and 0.5 us within a process (a pointer is passed, no copy). It is also the right choice for pointer-based or variable data, through PUP. Above the eager limit a plain send pays the network layer's rendezvous: at 16 KiB, 9.9 us on Anvil and 17.6 us on Delta. |
 | You want to keep, modify or forward the received data without copying it | **a message** (`CMessage_` class) | You own a received message: keep it, write into it, re-send it, or free it. Marshalled parameters are owned by the runtime (below). |
 | A large array, well above the eager limit; or memory pressure; or a buffer you leave untouched anyway until told (you wait for a reply, output data, read-only fields, a large broadcast) | **Zero Copy Entry Method Send API** (`nocopy` parameter, `CkSendBuffer(ptr, callback)`); it works like `MPI_Isend`, with the callback in place of `MPI_Wait` | It saves the sender's copy into a message, at the cost of a callback and a round trip. At 16 MiB on Anvil it took about 1.47 ms, against 2.0-5.5 ms for the same array as a marshalled parameter, which allocates and fills a 16 MiB message every time. While the data is in flight it exists once on the sender, not twice. Below the eager limit it is 3-4 times slower than a plain send (8 B: 10.2 against 3.4 us on Anvil, 13.4 against 3.8 us on Delta). Above it, it is 0.84-0.96x a plain send on Delta (16 KiB to 1 MiB), where rendezvous is costly, and 1.06-1.22x on Anvil. Within one process it copies once where a plain send passes a pointer. |
-| The receiver can choose where the data goes only after seeing the message (its size or destination depends on the content) | **Zero Copy Entry Method Post API** (`nocopypost`, `CkPostBuffer` / `CkMatchBuffer`) | The data lands in the receiver's buffer, at the cost of a round trip for the metadata. It costs about what the Send API costs. |
-| Data that must start and end in your own buffers, repeated with the same partners | today: **Zero Copy Direct API** put or get (`CkNcpyBuffer`), with the handles exchanged once; after phase 4: **a region and a counter** | Against messages plus your own copies, a put is faster from 16 KiB on Delta (1.45x at 16 KiB, 2.31x at 1 MiB, 3.46x at 16 MiB) and from 64 KiB on Anvil (1.33x, 1.69x at 1 MiB, 2.30x at 16 MiB). At 4 KiB and below, plain messages still win (8 B: put 7.4 against 3.8 us on Delta); put with signal (phase 1) removes the acknowledgement behind that. Get and put cost about the same: a get is 2-6% faster on Delta from 4 KiB to 256 KiB, and a put is up to 7% faster on Anvil. |
+| The receiver can choose where the data goes only after seeing the message (its size or destination depends on the content), or can take the data only later (the buffer is in use, or memory is short) | **Zero Copy Entry Method Post API** (`nocopypost`, `CkMatchBuffer` in the post entry method, `CkPostBuffer` then or later) | The data lands in the receiver's buffer, at the cost of a round trip for the metadata. It costs about what the Send API costs. Until the receiver posts, the data waits at the sender, whose buffer stays in use. Choose tags no other chare on the PE can use (13). |
+| Data that must start and end in your own buffers, repeated with the same partners | today: **Zero Copy Direct API** put or get (`CkNcpyBuffer`), with the handles exchanged once; after phase 4: **a region with a callback** (`CkRegion(buf, bytes, cb)`) for one sender, **a region with pieces and a counter** for several | Against messages plus your own copies, a put is faster from 16 KiB on Delta (1.45x at 16 KiB, 2.31x at 1 MiB, 3.46x at 16 MiB) and from 64 KiB on Anvil (1.33x, 1.69x at 1 MiB, 2.30x at 16 MiB). At 4 KiB and below, plain messages still win (8 B: put 7.4 against 3.8 us on Delta); put with signal (phase 1) removes the acknowledgement behind that. Get and put cost about the same: a get is 2-6% faster on Delta from 4 KiB to 256 KiB, and a put is up to 7% faster on Anvil. |
 | Many senders filling one buffer, with one action when all have arrived (halo faces, FFT transposes) | after phase 4: **one counter with N contributions** (put and decrement); today: messages, counted by hand | One scheduler entry for the whole round instead of one per message, and no copies. Every application surveyed in section 17 counts arrivals by hand today. |
 | GPU buffers, one transfer | **`nocopydevice`** (`CkDeviceBuffer`) | Device-to-device without staging through the host where the hardware allows it. |
 | GPU buffers, repeated with the same partners | today: **`CkDevicePersistent`**; after phase 6: **a device region and a counter** | The handles are opened once. No measurement against `nocopydevice` yet; the unmerged device channels (Appendix A), which add a fixed buffer and a release credit, measured 3-10 us less per message. |
