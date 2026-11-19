@@ -39,6 +39,8 @@
 //              back to back), before its new tree can finish setting up
 //   -every     with -inflight, every round migrates in flight
 //   -auto      use the array's automatic section delegation
+//   -unbounded create an unbounded array (hashed object IDs) placed off PE 0
+//   -early     with -unbounded, build the section before inserting remote elements
 //   -r R       rounds (default 12)     -n N   elements (default 24)
 //
 // At the end each element checks how many work messages it received (rounds
@@ -47,9 +49,11 @@
 
 #include "section_migrate.decl.h"
 #include "ckmulticast.h"
+#include "LBManager.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unordered_set>
 #include <vector>
 
 /*readonly*/ CProxy_Main mainProxy;
@@ -88,6 +92,8 @@ class Main : public CBase_Main {
   bool every = false;
   bool rootInFlight = false;
   bool stillRoot = false;
+  bool unbounded = false;
+  bool earlySection = false;
   int round = 0;
   int redSeen = 0;      // bit k: reduction 2*round+k arrived
   bool migDone = false;
@@ -130,6 +136,8 @@ public:
       else if (!strcmp(m->argv[i], "-root")) rootInFlight = true;
       else if (!strcmp(m->argv[i], "-stillroot")) stillRoot = true;
       else if (!strcmp(m->argv[i], "-auto")) autoDelegate = 1;
+      else if (!strcmp(m->argv[i], "-unbounded")) unbounded = true;
+      else if (!strcmp(m->argv[i], "-early")) earlySection = true;
       else if (!strcmp(m->argv[i], "-r") && i + 1 < m->argc) numRounds = atoi(m->argv[++i]);
       else if (!strcmp(m->argv[i], "-n") && i + 1 < m->argc) numElems = atoi(m->argv[++i]);
       else CkAbort("section_migrate: unknown argument %s", m->argv[i]);
@@ -138,15 +146,29 @@ public:
     for (int i = 0; i < numElems; i++)
       if (isMember(i)) { memberCount++; sumIdx += i; maxIdx = i; }
     CkPrintf("section_migrate: %d PEs, %d processes, %d elements (%d members), "
-             "%d rounds, %s%s%s%s, %s delegation\n", CkNumPes(), CkNumNodes(),
+             "%d rounds, %s%s%s%s, %s delegation%s%s\n", CkNumPes(), CkNumNodes(),
              numElems, memberCount, numRounds, useLB ? "AtSync LB" : "migrateMe",
              inflight ? (every ? ", in flight every round" : ", in flight in odd rounds") : "",
              rootInFlight ? " including the root" : stillRoot ? ", root stays" : "",
              rootHops == 2 ? ", root hops twice" : "",
-             autoDelegate ? "automatic" : "manual");
+             autoDelegate ? "automatic" : "manual",
+             unbounded ? ", unbounded" : "",
+             earlySection ? ", early section" : "");
     mainProxy = thisProxy;
     mcastGid = CProxy_CkMulticastMgr::ckNew(2);
-    elemProxy = CProxy_Elem::ckNew(numElems);
+    if (unbounded) {
+      elemProxy = CProxy_Elem::ckNew(CkArrayOptions());
+      elemProxy[0].insert(0);
+      if (!earlySection) {
+        for (int i = 1; i < numElems; i++) {
+          int pe = (CkNumPes() > 1) ? 1 + ((i - 1) % (CkNumPes() - 1)) : 0;
+          elemProxy[i].insert(pe);
+        }
+        elemProxy.doneInserting();
+      }
+    } else {
+      elemProxy = CProxy_Elem::ckNew(numElems);
+    }
     progress();
     CcdCallFnAfter(watchdogFire, NULL, 1000);
     CkStartQD(CkCallback(CkIndex_Main::setup(), thisProxy));
@@ -154,7 +176,19 @@ public:
 
   void setup() { elemProxy[0].makeSection(); }
 
-  void sectionReady() { round = 0; startRound(); }
+  void sectionReady() {
+    round = 0;
+    if (unbounded && earlySection) {
+      for (int i = 1; i < numElems; i++) {
+        int pe = (CkNumPes() > 1) ? 1 + ((i - 1) % (CkNumPes() - 1)) : 0;
+        elemProxy[i].insert(pe);
+      }
+      elemProxy.doneInserting();
+      CkStartQD(CkCallback(CkIndex_Main::startRound(), thisProxy));
+      return;
+    }
+    startRound();
+  }
 
   void startRound() {
     progress();
@@ -230,7 +264,8 @@ static CkMulticastMgr* mcastMgr(const CkArrayID& aid) {
 }
 
 class Elem : public CBase_Elem {
-  CProxySection_Elem sec;   // element 0 only
+  CProxySection_Elem sec;       // element 0 only
+  CProxySection_Elem emptySec;  // element 0 only
   bool hasSection = false;
   CkSectionInfo cookie;
   int nextRound = 0;
@@ -250,15 +285,17 @@ public:
   Elem(CkMigrateMessage* m) : CBase_Elem(m) {}
 
   void pup(PUP::er& p) {
-    p | sec; p | hasSection; p | cookie;
+    p | sec; p | emptySec; p | hasSection; p | cookie;
     p | nextRound; p | worksReceived; p | hopsLeft; p | hopRound;
     if (p.isUnpacking() && hasSection) {
       if (autoDelegate) {
         sec.resetSection();
+        emptySec.resetSection();
         sec.setReductionClient(newClient());
       } else {
         CkMulticastMgr* mg = mcastMgr(sec.ckGetArrayID());
         mg->resetSection(sec);
+        mg->resetSection(emptySec);
         mg->setReductionClient(sec, newClient());
       }
     }
@@ -266,21 +303,83 @@ public:
 
   void makeSection() {
     std::vector<CkArrayIndex> members;
+    std::vector<CkArrayIndex> emptyMembers;
     for (int i = 0; i < numElems; i++)
       if (isMember(i)) members.emplace_back(CkArrayIndex1D(i));
     sec = CProxySection_Elem::ckNew(thisProxy.ckGetArrayID(), members);
+    emptySec = CProxySection_Elem::ckNew(thisProxy.ckGetArrayID(), emptyMembers);
     if (autoDelegate) {
       sec.setReductionClient(newClient());
     } else {
       CkMulticastMgr* mg = mcastMgr(thisProxy.ckGetArrayID());
       sec.ckSectionDelegate(mg);
+      emptySec.ckSectionDelegate(mg);
       mg->setReductionClient(sec, newClient());
     }
     hasSection = true;
     mainProxy.sectionReady();
   }
 
-  void send(int r) { sec.work(new WorkMsg(r)); }
+  void send(int r) {
+    // Multicasting to a genuinely empty section with comm tracing active must be safe.
+    emptySec.work(new WorkMsg(r));
+    sec.work(new WorkMsg(r));
+#if CMK_LBDB_ON
+    LBManager* lbmgr = LBManagerObj();
+    if (lbmgr && lbmgr->CollectingCommStats()) {
+      CkLocMgr* locMgr = CProxy_ArrayBase(thisArrayID).ckLocMgr();
+      const LDOMHandle& om = locMgr->getOMHandle();
+      CmiUInt8 myLbId = 0;
+      if (!locMgr->lookupID(CkArrayIndex1D(thisIndex), myLbId))
+        CkAbort("section_migrate: lookupID failed for local root element %d", thisIndex);
+      std::unordered_set<CmiUInt8> expectedIds;
+      for (int i = 0; i < numElems; i++) {
+        if (!isMember(i)) continue;
+        CmiUInt8 memberId = 0;
+        if (locMgr->lookupID(CkArrayIndex1D(i), memberId)) {
+          expectedIds.insert(memberId);
+        }
+      }
+      int sz = lbmgr->GetCommDataSz();
+      std::vector<LDCommData> comm(sz);
+      if (sz > 0) lbmgr->GetCommData(comm.data());
+      bool foundFullRecord = false;
+      for (auto& c : comm) {
+        if (c.recv_type() == LD_OBJLIST_MSG) {
+          int len = 0;
+          const LDObjKey* dests = c.receiver.get_destObjs(len);
+          if (len <= 0)
+            CkAbort("section_migrate: round %d recorded empty LD_OBJLIST_MSG (len=%d)", r, len);
+          if (!c.from_proc() && c.sender.omID() == om.id && c.sender.objID() == myLbId) {
+            std::unordered_set<CmiUInt8> recorded;
+            for (int k = 0; k < len; k++) {
+              if (dests[k].omID() != om.id)
+                CkAbort("section_migrate: round %d wrong dest omID", r);
+              if (!recorded.insert(dests[k].objID()).second)
+                CkAbort("section_migrate: round %d duplicate ObjID in LD_OBJLIST_MSG", r);
+              if (expectedIds.find(dests[k].objID()) == expectedIds.end())
+                CkAbort("section_migrate: round %d unexpected ObjID in LD_OBJLIST_MSG", r);
+            }
+            if ((size_t)len == expectedIds.size()) foundFullRecord = true;
+          }
+          delete[] c.receiver.dest.destObjs.objs;
+        }
+      }
+      int expectedMembers = 0;
+      for (int i = 0; i < numElems; i++)
+        if (isMember(i)) expectedMembers++;
+      // The record lists exactly the members whose ids this process knows; a
+      // process may not have heard of every member yet (doc/internals/section-trees.md).
+      if (!foundFullRecord){
+        CkAbort("section_migrate: round %d: LD_OBJLIST_MSG does not match the %zu known members", r, expectedIds.size());
+      }
+      // In one process every member's id is known.
+      if (CkNumNodes() == 1 && (int)expectedIds.size() != expectedMembers){
+        CkAbort("section_migrate: round %d: %zu of %d member ids known", r, expectedIds.size(), expectedMembers);
+      }
+    }
+#endif
+  }
 
   void work(WorkMsg* m) {
     int r = m->round;
