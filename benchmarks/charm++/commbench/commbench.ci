@@ -1,0 +1,99 @@
+mainmodule commbench {
+
+  readonly int g_maxSize;
+
+  message CommMsg { char data[]; };
+  message ResultMsg;
+
+  initnode void commbenchInitNode(void);
+  initproc void commbenchInitProc(void);
+
+  mainchare Driver {
+    entry Driver(CkArgMsg *m);
+    entry [threaded] void go();
+  };
+
+  group PeMap : CkArrayMap {
+    entry PeMap();
+  };
+
+  // The five endpoint kinds declare the same entry methods; endpoints.h
+  // implements them once, as a template.
+
+  chare ChareEP {
+    entry ChareEP(CkFuture created);
+    entry void setup(int method, int size, int role, int myPe, int peerPe, bool validate, CProxy_ChareEP peer, CkFuture ready);
+    entry void run(int iters, int warmup, CkFuture done);
+    entry void teardown(CkFuture done);
+    entry void recvHandles(CkNcpyBuffer s, CkNcpyBuffer r);
+    entry void recvMarshal(int n, char d[n]);
+    entry void recvMsg(CommMsg *m);
+    entry void recvNocopy(int n, nocopy char d[n]);
+    entry void recvPost(int n, nocopypost char d[n]);
+    entry void notify(CmiInt8 seq, CmiInt8 n);
+    entry void notifyHandle(CmiInt8 seq, CmiInt8 n, CkNcpyBuffer h);
+    entry void destDone(CkDataMsg *m);
+  };
+
+  group GroupEP {
+    entry GroupEP();
+    entry void setup(int method, int size, int role, int myPe, int peerPe, bool validate, CProxyElement_GroupEP peer, CkFuture ready);
+    entry void run(int iters, int warmup, CkFuture done);
+    entry void teardown(CkFuture done);
+    entry void recvHandles(CkNcpyBuffer s, CkNcpyBuffer r);
+    entry void recvMarshal(int n, char d[n]);
+    entry void recvMsg(CommMsg *m);
+    entry void recvNocopy(int n, nocopy char d[n]);
+    entry void recvPost(int n, nocopypost char d[n]);
+    entry void notify(CmiInt8 seq, CmiInt8 n);
+    entry void notifyHandle(CmiInt8 seq, CmiInt8 n, CkNcpyBuffer h);
+    entry void destDone(CkDataMsg *m);
+  };
+
+  nodegroup NodeGroupEP {
+    entry NodeGroupEP();
+    entry void setup(int method, int size, int role, int myPe, int peerPe, bool validate, CProxyElement_NodeGroupEP peer, CkFuture ready);
+    entry void run(int iters, int warmup, CkFuture done);
+    entry void teardown(CkFuture done);
+    entry void recvHandles(CkNcpyBuffer s, CkNcpyBuffer r);
+    entry void recvMarshal(int n, char d[n]);
+    entry void recvMsg(CommMsg *m);
+    entry void recvNocopy(int n, nocopy char d[n]);
+    entry void recvPost(int n, nocopypost char d[n]);
+    entry void notify(CmiInt8 seq, CmiInt8 n);
+    entry void notifyHandle(CmiInt8 seq, CmiInt8 n, CkNcpyBuffer h);
+    entry void destDone(CkDataMsg *m);
+  };
+
+  array [1D] ArrayEP {
+    entry ArrayEP();
+    entry void setup(int method, int size, int role, int myPe, int peerPe, bool validate, CProxyElement_ArrayEP peer, CkFuture ready);
+    entry void run(int iters, int warmup, CkFuture done);
+    entry void teardown(CkFuture done);
+    entry void recvHandles(CkNcpyBuffer s, CkNcpyBuffer r);
+    entry void recvMarshal(int n, char d[n]);
+    entry void recvMsg(CommMsg *m);
+    entry void recvNocopy(int n, nocopy char d[n]);
+    entry void recvPost(int n, nocopypost char d[n]);
+    entry void notify(CmiInt8 seq, CmiInt8 n);
+    entry void notifyHandle(CmiInt8 seq, CmiInt8 n, CkNcpyBuffer h);
+    entry void destDone(CkDataMsg *m);
+  };
+
+  // Hosts the Converse-level cases: setup, run and teardown arrive as entry
+  // methods, the timed traffic uses Converse handlers (converse_cases.C).
+  group HandlerEP {
+    entry HandlerEP();
+    entry void setup(int method, int size, int role, int myPe, int peerPe, bool validate, CProxyElement_HandlerEP peer, CkFuture ready);
+    entry void run(int iters, int warmup, CkFuture done);
+    entry void teardown(CkFuture done);
+    entry void recvHandles(CkNcpyBuffer s, CkNcpyBuffer r);
+    entry void recvMarshal(int n, char d[n]);
+    entry void recvMsg(CommMsg *m);
+    entry void recvNocopy(int n, nocopy char d[n]);
+    entry void recvPost(int n, nocopypost char d[n]);
+    entry void notify(CmiInt8 seq, CmiInt8 n);
+    entry void notifyHandle(CmiInt8 seq, CmiInt8 n, CkNcpyBuffer h);
+    entry void destDone(CkDataMsg *m);
+  };
+};
