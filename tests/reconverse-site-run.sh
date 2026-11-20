@@ -23,6 +23,16 @@
 #   LAUNCHER_ARGS_SINGLE / LAUNCHER_ARGS_MULTI
 #               launcher flags for the two passes (defaults are srun's
 #               node/cpu flags; set both empty to use lcrun on a workstation)
+#   CHECK       1 = checking run: the tests are compiled with
+#               AddressSanitizer and libstdc++'s assertions (CHECK_OPTS
+#               below) and CHARM_BUILD must be a build made with the same
+#               flags:
+#                 S="-fsanitize=address -fno-omit-frame-pointer -D_GLIBCXX_ASSERTIONS"
+#                 CFLAGS="$S" CXXFLAGS="$S" LDFLAGS=-fsanitize=address \
+#                   ./build charm++ <arch> -j8 -g -O1 $S
+#               It finds out-of-bounds accesses, use after free and double
+#               frees that a production build runs through silently. Run it
+#               once per release, and with the newest compiler the site has.
 # Arguments: test directories; default is the TEST_DIRS list of
 # .github/workflows/reconverse-ci.yaml, so the site run and CI stay in step.
 #
@@ -104,12 +114,39 @@ case "$SITE" in
   *) echo "unknown SITE=$SITE" >&2; exit 2 ;;
 esac
 export LD_LIBRARY_PATH=$CHARM_BUILD/lib:${LD_LIBRARY_PATH:-}
+CHECK=${CHECK:-0}
+CHECK_OPTS="-g -O1 -fsanitize=address -fno-omit-frame-pointer -D_GLIBCXX_ASSERTIONS"
+MAKE_OPTS=()
+if [[ $CHECK == 1 ]]; then
+  if ! grep -qs -- '-fsanitize=address' "$CHARM_BUILD/CMakeCache.txt"; then
+    echo "CHECK=1 needs a CHARM_BUILD built with AddressSanitizer (see the header)" >&2
+    exit 2
+  fi
+  # OPTS reaches every compile and link through the Makefiles'
+  # "CHARMC = .../charmc $(OPTS)" line; charmc adds no sanitizer flags itself,
+  # so the test targets get it too, for what they compile.
+  MAKE_OPTS=("OPTS=$CHECK_OPTS")
+  # A library preloaded by the site (XALT on Anvil) makes every sanitized
+  # program abort at startup: the sanitizer's runtime must be loaded first.
+  unset LD_PRELOAD
+  # detect_leaks=0: the runtime does not free everything at exit.
+  export ASAN_OPTIONS=${ASAN_OPTIONS:-abort_on_error=1:detect_leaks=0}
+fi
 # GNU timeout is `timeout` on Linux, `gtimeout` from coreutils on macOS.
 TIMEOUT=$(command -v timeout || command -v gtimeout || true)
 # reason <exit> <out-file>: why a failed run aborted, with a leading space so
 # the RESULT line can carry it: the runtime's "Reason:" line (CmiAbort), or the
-# C++ exception text when the network layer threw instead.
-reason() { [[ $1 -ne 0 ]] && grep -m1 -oE 'Reason:.*|what\(\):.*' "$2" 2>/dev/null | cut -c1-200 | sed 's/^/ /'; return 0; }
+# C++ exception text when the network layer threw instead, or the sanitizer's
+# or libstdc++'s report in a checking run.
+reason() { [[ $1 -ne 0 ]] && grep -m1 -oE "Reason:.*|what\(\):.*|ERROR: AddressSanitizer.*|Assertion '.*' failed.*" "$2" 2>/dev/null | cut -c1-200 | sed 's/^/ /'; return 0; }
+# ok <exit> <out-file>: whether a run counts as passed. In a checking run a
+# test that fails only on its own memory-growth limit does: the sanitizer
+# keeps freed blocks for a while, so the memory in use grows without a leak.
+ok() {
+  [[ $1 -eq 0 ]] && return 0
+  [[ $CHECK == 1 ]] && ! grep -q 'ERROR: AddressSanitizer' "$2" &&
+    grep -qE 'Reason:.*memory (in use grew|growth)' "$2"
+}
 
 if [[ $# -gt 0 ]]; then
   DIRS=("$@")
@@ -128,21 +165,21 @@ if [[ -z "$build_bin" || "$(cd bin 2>/dev/null && pwd -P)" != "$build_bin" ]]; t
 fi
 
 LAUNCHER=${LAUNCHER:-$SITE_LAUNCHER}
-echo "SITE=$SITE NODES=$NODES PROCS=$PROCS LAUNCHER=\"$LAUNCHER\" CHARM_BUILD=$CHARM_BUILD"
+echo "SITE=$SITE CHECK=$CHECK NODES=$NODES PROCS=$PROCS LAUNCHER=\"$LAUNCHER\" CHARM_BUILD=$CHARM_BUILD"
 echo "JOB=${SLURM_JOB_ID:-none} NODELIST=${SLURM_JOB_NODELIST:-none} DATE=$(date)"
 fail=0
 for d in "${DIRS[@]}"; do
-  if ! make -C "$d" > "$d/site-build.out" 2>&1; then
+  if ! make -C "$d" ${MAKE_OPTS[@]+"${MAKE_OPTS[@]}"} > "$d/site-build.out" 2>&1; then
     echo "RESULT $d build exit=BUILD-FAIL"; fail=1; continue
   fi
   # single process: testrun appends -n 1 to the launcher
   TESTRUN_LAUNCHER="$LAUNCHER $LAUNCHER_ARGS_SINGLE" TESTRUN_PROCS=1 \
-    ${TIMEOUT:+$TIMEOUT 600} make -C "$d" test > "$d/site-1proc.out" 2>&1; e1=$?
+    ${TIMEOUT:+$TIMEOUT 600} make -C "$d" test ${MAKE_OPTS[@]+"${MAKE_OPTS[@]}"} > "$d/site-1proc.out" 2>&1; e1=$?
   echo "RESULT $d 1proc exit=$e1$(reason "$e1" "$d/site-1proc.out")"
   TESTRUN_LAUNCHER="$LAUNCHER $LAUNCHER_ARGS_MULTI" TESTRUN_PROCS=$PROCS \
-    ${TIMEOUT:+$TIMEOUT 600} make -C "$d" test > "$d/site-$MULTI_SHAPE.out" 2>&1; e2=$?
+    ${TIMEOUT:+$TIMEOUT 600} make -C "$d" test ${MAKE_OPTS[@]+"${MAKE_OPTS[@]}"} > "$d/site-$MULTI_SHAPE.out" 2>&1; e2=$?
   echo "RESULT $d $MULTI_SHAPE exit=$e2$(reason "$e2" "$d/site-$MULTI_SHAPE.out")"
-  [[ $e1 -eq 0 && $e2 -eq 0 ]] || fail=1
+  ok "$e1" "$d/site-1proc.out" && ok "$e2" "$d/site-$MULTI_SHAPE.out" || fail=1
 done
 echo "SUMMARY: $([[ $fail -eq 0 ]] && echo ALL PASSED || echo FAILURES ABOVE) $(date)"
 exit $fail

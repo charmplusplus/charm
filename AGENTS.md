@@ -26,6 +26,8 @@ how to code.
 - Every pull request runs the directories listed in `TEST_DIRS` of
   `.github/workflows/reconverse-ci.yaml`. A change to the runtime is
   expected to come with a test that reaches it.
+- `doc/release-testing.md` lists the runs a release needs beyond CI: site
+  runs on real networks, a memory-checking run and the newest compilers.
 - How much of `src/` and reconverse the tests reach is measured weekly at
   <https://charmplusplus.org/charm-coverage/>; `coverage/README.md` has
   the recipe for measuring locally and the traps in reading the numbers.
