@@ -43,6 +43,12 @@
 //   6. Chare arrays, groups and nodegroups, which reach the device path
 //      through different proxy machinery.
 //
+//   7. A dynamically inserted chare array, whose elements are put on chosen
+//      PEs. A sender's first message to such an element is sent before the
+//      sending PE has a location for it, and the home PE of the index (a hash)
+//      is not where the element lives: the sender must not prepare the buffers
+//      for the home's process.
+//
 // Flags:  -s <doubles per buffer, default 1024>   -i <iterations, default 20>
 //         -e <ring elements, default 2*PEs>       -v (verbose)
 //
@@ -73,6 +79,7 @@ extern hapiError_t invokeFillKernel(double* d, int n, double base, int period,
 
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ CProxy_Ring ringProxy;
+/* readonly */ CProxy_Ring insertedProxy;
 /* readonly */ CProxy_RingGroup groupProxy;
 /* readonly */ CProxy_RingNodeGroup nodegroupProxy;
 /* readonly */ int blockSize;
@@ -89,8 +96,14 @@ enum {
   T_IPC,          // sends that took the same-physical-node path
   T_RDMA,         // sends that took the inter-node path
   T_REPORTERS,
+  T_UNKNOWN,      // sends to an element the sending PE had no location for
   T_WIDTH
 };
+
+// Where element e of the dynamically inserted ring is put: the ring order
+// reversed over the PEs, so that neighbours are on different PEs and the
+// placement has nothing to do with the hash of the index.
+static inline int insertedPe(int e) { return CkNumPes() - 1 - (e % CkNumPes()); }
 
 // Distinct, exactly representable value for (id, iter, buf, j).
 static inline double d2dBase(int id, int iter, int buf) {
@@ -169,9 +182,11 @@ struct Endpoint {
 // ---------------------------------------------------------------------------
 class Ring : public CBase_Ring {
   Endpoint* ep;
+  bool inserted;   // an element of insertedProxy, created by insert() on a chosen PE
 
 public:
-  Ring() : ep(new Endpoint()) {}
+  Ring() : ep(new Endpoint()), inserted(false) {}
+  Ring(int inserted_) : ep(new Endpoint()), inserted(inserted_ != 0) {}
   ~Ring() { delete ep; }
 
   void send(int iter) {
@@ -182,12 +197,23 @@ public:
     // the message really takes. Nothing here migrates, so the cached location
     // and the home PE agree; fall back to the home PE before the cache is
     // populated.
-    CkLocMgr* locMgr = ringProxy.ckLocMgr();
+    //
+    // In the inserted ring the home PE of an element is a hash of its index,
+    // not where it lives, and the first send to a neighbour finds no location
+    // for it. The runtime then registers the buffers for a receiver in any
+    // process (CK_DEVICE_DEST_UNKNOWN); the tally counts the path the layout
+    // implies for the PE the element was inserted on.
+    CkLocMgr* locMgr = thisProxy.ckLocMgr();
     const CkArrayIndex1D dstIdx(dst);
     int dstPe = locMgr->whichPe(dstIdx);
-    if (dstPe < 0) dstPe = locMgr->homePe(dstIdx);
+    if (inserted) {
+      if (dstPe < 0) ep->tally[T_UNKNOWN]++;
+      dstPe = insertedPe(dst);
+    } else if (dstPe < 0) {
+      dstPe = locMgr->homePe(dstIdx);
+    }
     ep->countMode(dstPe);
-    ringProxy[dst].recv(thisIndex, iter, blockSize,
+    thisProxy[dst].recv(thisIndex, iter, blockSize,
         CkDeviceBuffer(ep->d_send[0],
           CkCallback(CkIndex_Ring::reuse(), thisProxy[thisIndex]), ep->stream),
         CkDeviceBuffer(ep->d_send[1],
@@ -348,9 +374,12 @@ public:
              CkNumPes(), CkNumNodes(), CmiNumPhysicalNodes(),
              nElems, blockSize, nIters);
 
-    ringProxy = CProxy_Ring::ckNew(nElems);
+    ringProxy = CProxy_Ring::ckNew(CkArrayOptions(nElems));
     groupProxy = CProxy_RingGroup::ckNew();
     nodegroupProxy = CProxy_RingNodeGroup::ckNew();
+    insertedProxy = CProxy_Ring::ckNew();
+    for (int e = 0; e < nElems; e++) insertedProxy[e].insert(1, insertedPe(e));
+    insertedProxy.doneInserting();
 
     thisProxy.run();
   }
@@ -446,10 +475,25 @@ public:
       CkPrintf("[d2dtest] nodegroup skipped: single process\n");
     }
 
+    // ---- 4. dynamically inserted chare array ----
+    // The elements were inserted on chosen PEs, so a sender's first message to
+    // its neighbour is sent without a location for it (see Ring::send).
+    for (int it = 0; it < nIters; it++) {
+      for (int e = 0; e < nElems; e++) insertedProxy[e].send(it);
+      CkWaitQD();
+    }
+    startTally();
+    insertedProxy.collect();
+    awaitTally();
+    checkPhase("inserted", nElems, 2);
+    const int insertedValues = total[T_VALUES];
+    CkPrintf("[d2dtest] inserted  %d sends had no location for the destination\n",
+             total[T_UNKNOWN]);
+
     CkPrintf("d2dtest PASS: %d PEs, %d processes, %d physical nodes, "
              "%lld doubles verified, %.3f s\n",
              CkNumPes(), CkNumNodes(), CmiNumPhysicalNodes(),
-             (long long)arrayValues + groupValues + nodeValues,
+             (long long)arrayValues + groupValues + nodeValues + insertedValues,
              CkWallTimer() - startTime);
     CkExit();
   }

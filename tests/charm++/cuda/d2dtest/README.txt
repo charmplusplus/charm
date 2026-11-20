@@ -50,6 +50,15 @@ What it checks
      process, node and PE numbering coincide and a whole class of confusion
      between the two is invisible.
 
+  7. A dynamically inserted chare array. Its elements are inserted on chosen
+     PEs, so the home PE of an index (a hash of it) is not where the element
+     lives, and a sender's first message to a neighbour is sent before the
+     sending PE has a location for it. The sender must not prepare the buffers
+     for the home's process: it registers them for a receiver in any process,
+     and a receiver in the sender's own process copies on the device. The line
+     "inserted  N sends had no location for the destination" says how many
+     sends took this route.
+
 Building
 --------
   make GPU=hip  CHARM_DIR=<build>          # AMD/ROCm; HIP_ARCH defaults to gfx90a

@@ -1,6 +1,7 @@
 mainmodule d2dtest {
   readonly CProxy_Main mainProxy;
   readonly CProxy_Ring ringProxy;
+  readonly CProxy_Ring insertedProxy;
   readonly CProxy_RingGroup groupProxy;
   readonly CProxy_RingNodeGroup nodegroupProxy;
   readonly int blockSize;
@@ -18,6 +19,7 @@ mainmodule d2dtest {
   // exercised rather than just the single-buffer case.
   array [1D] Ring {
     entry Ring();
+    entry Ring(int inserted);
     entry void send(int iter);
     entry void recv(int srcIdx, int iter, int size,
                     nocopydevice double a[size], nocopydevice double b[size]);

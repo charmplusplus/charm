@@ -592,6 +592,18 @@ void CkRdmaDeviceRecvHandler(void* data, void* msg)
   }
 }
 
+// Completion of a device copy from a buffer its sender registered for a
+// destination it could not name (CK_DEVICE_DEST_UNKNOWN) and that turned out
+// to be in this process. The sender's record for the ack id is in this
+// process's table: release the registration and send the source callback
+// here, then finish as any intra-node transfer.
+static void deviceUnknownDestCopied(void* data, void* msg)
+{
+  DeviceRdmaOp* op = (DeviceRdmaOp*)data;
+  if (op->tag != 0) deviceResolveAck(op->tag);
+  CkRdmaDeviceRecvHandler(data, msg);
+}
+
 /****************************** Recv Entry Method API ******************************/
 
 // Invoked after post entry method
@@ -639,7 +651,7 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
   // Find which mode of transfer should be used
-  CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
+  const CkNcpyModeDevice pair_mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
 
   // Allocate and fill in metadata for this zerocopy operation
   void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * numops);
@@ -682,7 +694,16 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // processes. A stricter PE-equality test would reject every nodegroup
     // message that lands on a PE other than the one the sender named.
     // TODO: Handle a genuinely migrated object instead of aborting.
-    if (CmiNodeOf(source.dest_pe) != CmiMyNode()) {
+    //
+    // A sender that had no location for the element (CK_DEVICE_DEST_UNKNOWN)
+    // named no process: it registered the buffer, which is right for every
+    // receiver outside its own process, whether or not this pair could have
+    // used the shared-memory IPC path. Inside its process the pointer is valid
+    // here, so copy on the device and release the registration afterwards.
+    const bool unknown_dest = (source.dest_pe == CK_DEVICE_DEST_UNKNOWN);
+    CkNcpyModeDevice mode = pair_mode;
+    if (unknown_dest && mode == CkNcpyModeDevice::IPC) mode = CkNcpyModeDevice::RDMA;
+    if (!unknown_dest && CmiNodeOf(source.dest_pe) != CmiMyNode()) {
       CmiPrintf("PE %d (process %d) received a device buffer the sender (PE %d) "
                 "addressed to PE %d (process %d)\n",
           CkMyPe(), CmiMyNode(), env->getSrcPe(), source.dest_pe,
@@ -700,6 +721,14 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
       // so the source pointer is valid here: copy straight across.
       hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt,
             hapiMemcpyDeviceToDevice, postStructs[i].hapi_stream));
+      if (unknown_dest) {
+        // As on the RDMA path: with an ack id the sender's record holds the
+        // source callback, and resolving the id sends it.
+        save_op.tag = source.ack_id;
+        if (save_op.tag != 0 && save_op.src_cb) { delete (CkCallback*)save_op.src_cb; save_op.src_cb = nullptr; }
+        hapiAddCallback(postStructs[i].hapi_stream, CkCallback(deviceUnknownDestCopied, &save_op));
+        continue;
+      }
     } else if (mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
       // Inter-process, same physical node: read out of the sender's device
       // communication buffer through its IPC handle.
@@ -810,11 +839,22 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   // TODO: Need to handle the case where the destination PE could be wrong
   //       (due to migration, etc.). Currently the code relies on a global
   //       location update after migration (with CMK_GLOBAL_LOCATION_UPDATE).
-  CkNcpyModeDevice transfer_mode = findTransferModeDevice(CkMyPe(), dest_pe);
+  //
+  // An array element this PE has no location for arrives as
+  // CK_DEVICE_DEST_UNKNOWN: the message goes through the element's home, and
+  // the receiver may be in any process. With one process it is this one.
+  // Otherwise register the buffers (the RDMA preparation below): a receiver in
+  // another process reads them over the network, on this host or another, and
+  // a receiver in this process copies on the device and releases the
+  // registration (CkRdmaDeviceIssueRgets).
+  if (dest_pe == CK_DEVICE_DEST_UNKNOWN && CkNumNodes() == 1) dest_pe = CkMyPe();
+  const bool unknown_dest = (dest_pe == CK_DEVICE_DEST_UNKNOWN);
+  CkNcpyModeDevice transfer_mode = unknown_dest ? CkNcpyModeDevice::RDMA
+                                                : findTransferModeDevice(CkMyPe(), dest_pe);
 
   for (int i = 0; i < numops; i++) {
     buffers[i]->dest_pe = dest_pe;
-    buffers[i]->dest_mpi_rank = CmiNodeOf(dest_pe);
+    buffers[i]->dest_mpi_rank = unknown_dest ? -1 : CmiNodeOf(dest_pe);
     buffers[i]->src_pe = CmiMyPe();
     buffers[i]->src_mpi_rank = CmiNodeOf(CmiMyPe());
   }
@@ -830,7 +870,7 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
   int cpv_my_device_id = CpvAccess(my_device_id);
 
-  if (transfer_mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
+  if (!unknown_dest && transfer_mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
     // Stage each buffer into this device's communication buffer, which the
     // receiving process can reach through the IPC handle exchanged at startup.
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
@@ -886,8 +926,12 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
       buffers[i]->ack_id = deviceMintAck(buffers[i]->lci_ncpy_buffer, buffers[i]->cb);
     }
   }
-  // Whatever this PE owes the destination rides on the first buffer.
-  if (numops > 0) deviceDrainAcksInto(dest_pe, buffers[0]);
+  // Whatever this PE owes the destination rides on the first buffer; nothing
+  // when the destination PE is not known.
+  if (numops > 0) {
+    if (unknown_dest) buffers[0]->ack_count = 0;
+    else deviceDrainAcksInto(dest_pe, buffers[0]);
+  }
 }
 
 #endif // (CMK_CUDA || CMK_HIP)

@@ -16,6 +16,14 @@
 
 #define CK_DEVICE_ACK_CAP 8
 
+// Destination PE of a device send to an array element whose location the
+// sending PE does not have (CkLocMgr::whichPe is -1): the message is routed
+// through the element's home, so the sender cannot tell which process will
+// receive it. CkRdmaDeviceOnSender then registers the buffers with the
+// network, which a receiver in any other process can read, and the receiver
+// copies on the device instead if it turns out to be in the sender's process.
+#define CK_DEVICE_DEST_UNKNOWN (-2)
+
 struct CkDeviceBufferPost {
   // CUDA stream for device transfers
   hapiStream_t hapi_stream;

@@ -143,11 +143,17 @@ void ArrayElemDyn::fillTarget(CkDynTarget *t) const {
   fillIndex(thisIndexMax, t->u.array.index, &t->u.array.ndims);
 }
 
-/* The PE an array element was last known on, or -1 before the array has a
-   branch on this PE (the device send path then aborts with its own message). */
+/* The PE of an array element for a device send: -1 before the array has a
+   branch on this PE (the device send path then aborts with its own message),
+   CKDYN_DEVICE_DEST_UNKNOWN (CK_DEVICE_DEST_UNKNOWN) when this PE has no
+   location for the element. Not lastKnown(), which then names the home PE: a
+   hash of the index for a dynamically inserted element, not where it lives. */
+#define CKDYN_DEVICE_DEST_UNKNOWN (-2)
 static int lastKnownPe(int aid, const CkArrayIndex &ix) {
   CkArray *a = CkArrayID(gidOf(aid)).ckLocalBranch();
-  return a ? a->lastKnown(ix) : -1;
+  if (!a) return -1;
+  const int pe = a->getLocMgr()->whichPe(ix);
+  return pe < 0 ? CKDYN_DEVICE_DEST_UNKNOWN : pe;
 }
 
 static ArrayElement *localArrayElem(int aid, int ndims, const int *index) {
@@ -2917,7 +2923,9 @@ static bool dpUseShm();
    acknowledgement ids), and the descriptors re-pupped in place. */
 static void zcDevicePrepare(CkDynMsg *m, int destPe) {
 #if CMK_CUDA || CMK_HIP
-  if (destPe < 0 || destPe >= CkNumPes())
+  static_assert(CKDYN_DEVICE_DEST_UNKNOWN == CK_DEVICE_DEST_UNKNOWN, "CkDyn: unknown-destination value");
+  const bool unknownDest = (destPe == CK_DEVICE_DEST_UNKNOWN);
+  if (!unknownDest && (destPe < 0 || destPe >= CkNumPes()))
     CkAbort("CkDyn: a message with DEVICE slots needs a destination PE known at send time (got %d)", destPe);
   char *buf = m->buf;
   int n;
@@ -2940,7 +2948,8 @@ static void zcDevicePrepare(CkDynMsg *m, int destPe) {
     }
   std::vector<CkDeviceBuffer *> bp(n);
   for (int i = 0; i < n; i++) bp[i] = &dbs[i];
-  dpAnnounce("DEVICE slots", CmiNodeOf(destPe) == CkMyNode() ? DP_MEMCPY
+  dpAnnounce("DEVICE slots", unknownDest ? (CkNumNodes() == 1 ? DP_MEMCPY : DP_RDMA)
+             : CmiNodeOf(destPe) == CkMyNode() ? DP_MEMCPY
              : (CmiPeOnSamePhysicalNode(destPe, CkMyPe()) && dpUseShm()) ? DP_MODE_IPC : DP_RDMA);
   CkRdmaDeviceOnSender(destPe, n, bp.data());
   PUP::toMem pm(buf);
