@@ -104,6 +104,7 @@ env:
     tests/charm++/reduction_migrate_ahead
     tests/charm++/reduction_empty_kid
     tests/charm++/section_migrate
+    tests/charm++/mcast_remote
     tests/charm++/load_balancing/migrate_then_atsync
     tests/charm++/load_balancing/lbsweep
     tests/charm++/load_balancing/meta_lb_test

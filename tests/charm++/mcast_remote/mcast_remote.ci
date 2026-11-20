@@ -1,0 +1,16 @@
+mainmodule mcast_remote {
+  readonly CProxy_Main mainProxy;
+  readonly int numElems;
+  message WorkMsg;
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void checked();
+    entry void done();
+  };
+  array [1D] Elem {
+    entry Elem();
+    entry void start();
+    entry void takeSection(CProxySection_Elem sec);
+    entry void work(WorkMsg *m);
+  };
+};
