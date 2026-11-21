@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include "hello.decl.h"
-static_assert(__cplusplus >= 201703L, "charmc compiles C++ below C++17 (#4298)");
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int nElements;

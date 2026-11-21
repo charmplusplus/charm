@@ -506,7 +506,7 @@ in place.
 | disjunction / conjunction | `case`, `when a(), b()` | n/a | `CK_WHEN_ANY` with `CK_ALL` arms, `CK_WHEN_ALL` |
 | independent progress | `overlap`, `forall` | n/a | `CK_OVERLAP`, `CK_FORALL` (child coroutines) |
 | self-check without a balancer | none | `+campi_fakemigrate` | `+ck_fakemigrate` |
-| compiler requirement | C++11 | C++20 | C++20 for the files that include `ckcoro.h` |
+| compiler requirement | C++17 | C++20 | C++20 for the files that include `ckcoro.h` |
 
 ## 6. Measurements
 
@@ -698,7 +698,7 @@ them in one table each so that a reviewer can check what was weighed.
 | `atomic`/`serial` blocks | plain code | Nothing to carry: every statement of the body is serial code. |
 | State variables declared in the class but used as if local | the same rule, visible | SDAG's surprise ("state variables must be declared in the class") remains the rule here; the difference is that the body is C++ and the reader sees the member. |
 | A Projections entry per named `serial` block (`_TRACE_BEGIN_EXECUTE_DETAILED` around the generated method) | an event per resumed segment, under the coroutine entry; `CK_LABEL("name") { ... }` for a named block (section 4.9) | There is no generated method to name; the code between two waits is the user's. The state traces each resume as an execution of the coroutine entry, nested in the delivery that resumed it, and a labelled block as an entry of its own, registered at startup from the `.C` file. |
-| C++11 | C++20 for the files that include `ckcoro.h` | Coroutines are a C++20 feature; the rest of the program and the runtime stay at their standard. |
+| C++17 | C++20 for the files that include `ckcoro.h` | Coroutines are a C++20 feature; the rest of the program and the runtime stay at their standard. |
 
 ## 10. Open items
 
