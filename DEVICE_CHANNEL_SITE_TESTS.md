@@ -218,7 +218,7 @@ run() {
 # count <name>: the protocol lines of a CHARM_DEBUG_CHANNEL step that name the path taken
 count() {
   local f=$OUT/$1.log
-  echo "    shm credits $(grep -c 'shm credit' $f), RDMA reads $(grep -c 'CHAN-READ.*RDMA' $f)," \
+  echo "    shm credits $(grep -c 'CHAN-CREDIT .*via shm' $f), RDMA reads $(grep -c 'CHAN-READ.*RDMA' $f)," \
        "staged puts $(grep -c 'CHAN-STAGED' $f), IPC failures $(grep -c 'IPC open of PE' $f)," \
        "closings acked $(grep -c 'CHAN-CLOSE.*ack from' $f)" >> $S
 }
