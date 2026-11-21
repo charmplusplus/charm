@@ -1093,9 +1093,11 @@ device (CuPy, PyTorch, Numba) use the PE's device by default.
 
 ### Persistent device buffers
 
-The implementation is Charm++'s `CkDevicePersistent` (ckrdmadevice.h/.C);
-CkDyn's functions wrap it. `open()` takes a CUDA/HIP IPC handle of the
-allocation holding the buffer and the buffer's offset in it (the base from
+The transport is the endpoint of Charm++'s device channels,
+`CkDeviceChannelEndpoint` (ckdevicechannel.h/.C), with the endpoint transfers
+`CkDeviceEndpointGet`, `CkDeviceEndpointPut` and `CkDeviceEndpointForget`
+written for CkDyn. `open()` takes a CUDA/HIP IPC handle of the allocation
+holding the buffer and the buffer's offset in it (the base from
 `cuMemGetAddressRange` through `dlsym`, or `hipMemGetAddressRange`): cupy,
 torch and pool allocators hand out pieces of larger allocations, and an IPC
 handle maps the whole allocation. `open()` also gives the buffer an `id`,
@@ -1103,60 +1105,57 @@ node (20 bits) | run token (16 bits) | counter (28 bits), and enters it in its
 process's registration table; the memory is registered (`CmiNcpyBuffer::init`,
 `CMK_BUFFER_REG`, `CMK_BUFFER_NODEREG`) the first time a transfer needs RDMA,
 and a PE of another process fetches that registration once
-(`persist_reg_req_handler`/`persist_reg_rep_handler`) and keeps it by id. The
-run token differs between a run and its restart, so an object restored from a
-checkpoint does not name a buffer of the new run. The object that called
-`open()` owns the entry (copies and pupped objects never own; a move transfers
-ownership); its `close()` or destructor deregisters and removes it. The pup
-carries the pointer, length, PE, process, host, the IPC handle and offset, and
-the id.
+(`device_endpoint_reg_req_handler`/`device_endpoint_reg_rep_handler`) and keeps
+it by id. The run token differs between a run and its restart, so an endpoint
+restored from a checkpoint does not name a buffer of the new run. `close()`
+deregisters and removes the entry. The pup carries the pointer, length, PE,
+process, host, the IPC handle and offset, and the id.
 
-Mode (`CkDevicePersistent::mode`), for a get into a local buffer or a put from
-one:
+Mode (`CkDeviceChannelEndpoint::mode`, from the issuing PE to the peer's
+buffer), for a get into a local buffer or a put from one:
 
 - same process: `hapiMemcpyAsync` device to device on the local buffer's
-  stream; `hapiAddCallback` on that stream sends each buffer's callback;
+  stream; `hapiAddCallback` on that stream sends `done`;
 - another process on the same host, when the remote buffer has an IPC
   handle and it opens in this process (`+gpushm` is not needed: it concerns
   `DEVICE` slots): the handle is opened once per process (a table keyed by
-  the handle's bytes, shared by every copy of the peer's buffer and reference
-  counted: a copy takes a reference on its first transfer and releases it in
-  `close()`; the last release synchronizes the device and closes the mapping),
-  and the copy goes through the mapping as above. If opening fails (the peer's
-  GPU is not visible to this process, as with one GPU per task), `mode()`
-  reports RDMA and the transfer uses it;
+  the handle's bytes, shared by every holder of the peer's buffer, channels
+  included, and reference counted: a holder takes a reference on its first
+  transfer and releases it when it forgets the peer; CkDyn's release
+  synchronizes the device before the last one closes the mapping), and the
+  copy goes through the mapping as above. If opening fails (the peer's GPU is
+  not visible to this process, as with one GPU per task), `mode()` reports
+  RDMA and the transfer uses it;
 - otherwise RDMA on the registered memory. A get is `CmiNcpyBuffer::rdmaGet`
-  with the Direct API acknowledgement, whose destination callback is a
-  `callCFn` on the issuing PE that sends both buffers' callbacks. A put is
-  carried out as a get by the destination's PE: the issuer sends both
-  buffers in a Converse message (`persist_put_handler`), that PE gets, and
-  its completion sends `persist_ack_handler` back to the issuer, which sends
-  the callbacks. A true RDMA put completes on the source before the data is
-  visible at the destination (CommRputLocalHandler in reconverse), so its
-  callbacks could not mean "arrived". Before an RDMA transfer the local
-  buffer's stream is synchronized.
+  with the Direct API acknowledgement, whose destination callback is `done`,
+  a `callCFn` on the issuing PE. A put is carried out as a get by the
+  destination's PE: the issuer sends its registration and the destination
+  endpoint in a Converse message (`device_endpoint_put_handler`), that PE
+  gets, and its completion sends `device_endpoint_ack_handler` back to the
+  issuer, which sends `done`. A true RDMA put completes on the source before
+  the data is visible at the destination (CommRputLocalHandler in
+  reconverse), so its completion could not mean "arrived". Before an RDMA
+  transfer the local buffer's stream is synchronized.
 
-In every mode both buffers' callbacks are sent from the issuing PE when the
-bytes are in the destination, each with its `cb_msg` (`set_msg`), as the
-manual describes. With `+gpupersistverbose` the first use of each mode and
-operation in a process prints a line (`[pe] CkDevicePersistent> get: ...`).
+With `+gpupersistverbose` the first use of each mode and operation in a
+process prints a line (`[pe] CkDyn> persistent get: ...`).
 
-CkDyn's `CkDynDevPersist` holds an opened `CkDevicePersistent`; the handle is
-that object pupped with an ignore callback, in a fixed 512-byte record
-(`CkDynDevPersistHandleSize()`), so a transfer never sends the remote side's
-callback. Each get or put sets the local object's callback to a `callCFn` on
-the issuing PE that sends `done` an empty message: for a `FUTURE` callback the
-call's refnum is the future id, for any other kind it is the callback's
-refnum. The send of a `DEVICE` message (`zcDevicePrepare`) prints the mode of
-`DEVICE` slots once per process (`[pe] CkDyn> DEVICE slots: ...`), which is
-how a run shows whether `+gpushm` took the IPC path. `CkDynDevPersistMode`
-returns `CkDevicePersistent::mode`. A `CkDynDevPersist` keeps the copies of
-peer buffers its transfers used, by id (`peers`), so that the IPC reference and
-the fetched registration a copy takes are taken once per peer buffer; a handle
-with a new id for the same peer PE and pointer (a reopen) replaces the older
-copy, which is closed after the new transfer is issued, and Close closes all of
-them before closing its own buffer. Close aborts while a transfer is
-outstanding. In a build without CUDA or HIP every CkDyn function aborts.
+CkDyn's `CkDynDevPersist` holds an opened endpoint and the stream its
+transfers are ordered on; the handle is the endpoint pupped, in a fixed
+512-byte record (`CkDynDevPersistHandleSize()`). Each get or put passes `done`
+a `callCFn` on the issuing PE that sends the binding's callback an empty
+message: for a `FUTURE` callback the call's refnum is the future id, for any
+other kind it is the callback's refnum. The send of a `DEVICE` message
+(`zcDevicePrepare`) prints the mode of `DEVICE` slots once per process
+(`[pe] CkDyn> DEVICE slots: ...`), which is how a run shows whether `+gpushm`
+took the IPC path. `CkDynDevPersistMode` returns the peer endpoint's `mode()`.
+A `CkDynDevPersist` keeps the copies of peer endpoints its transfers used, by
+id (`peers`), so that the IPC reference and the fetched registration a copy
+takes are taken once per peer buffer; a handle with a new id for the same peer
+PE and pointer (a reopen) replaces the older copy, which is forgotten after the
+new transfer is issued, and Close forgets all of them before closing its own
+buffer. Close aborts while a transfer is outstanding. In a build without CUDA
+or HIP every CkDyn function aborts.
 
 ### HAPI callbacks
 

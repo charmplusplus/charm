@@ -44,7 +44,7 @@ endif
 
 HAPI_FLAGS = -c -std=c++11 $(HAPI_FAST_MATH) $(OPTS)
 
-TARGET = persistent
+TARGET = chantest
 all: $(TARGET)
 
 OBJS = $(TARGET).o $(TARGET)CUDA.o
@@ -65,6 +65,7 @@ $(TARGET)CUDA.o: $(TARGET).cu
 
 test: all
 	$(call run, ./$(TARGET) +p2)
+	$(call run, ./$(TARGET) +p2 -l)
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o $(TARGET) charmrun

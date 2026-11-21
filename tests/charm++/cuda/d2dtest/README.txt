@@ -79,6 +79,5 @@ Known coverage gaps
     process other than the one the sender addressed, which is what happens when
     an object migrates without CMK_GLOBAL_LOCATION_UPDATE. Nothing here
     migrates, so that path is not exercised.
-  - CkDevicePersistent (the Direct/persistent device API) is not covered here;
-    it has no inter-node implementation yet (both get() and put() abort for
-    CkNcpyModeDevice::RDMA).
+  - Device channels (CkDeviceChannel) are not covered here; see
+    examples/charm++/cuda/gpudirect/chantest.

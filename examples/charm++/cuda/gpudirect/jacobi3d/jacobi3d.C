@@ -37,7 +37,7 @@
 /* readonly */ int n_iters;
 /* readonly */ int warmup_iters;
 /* readonly */ bool use_zerocopy;
-/* readonly */ bool use_persistent;
+/* readonly */ bool use_channels;
 /* readonly */ bool print_elements;
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
@@ -55,12 +55,18 @@ extern void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost,
     int dir, int block_width, int block_height, int block_depth,
     hapiStream_t stream);
 
-class PersistentMsg : public CMessage_PersistentMsg {
-public:
-  int dir;
-
-  PersistentMsg(int dir_) : dir(dir_) {}
-};
+// The source callback of a channel put: re-issued to the block as
+// sendDone(iter) with the iteration as the message's reference number, which
+// the SDAG `when` matches.
+struct SendDoneCtx { CkArrayID aid; CkArrayIndex3D idx; int iter; };
+static void sendDoneFn(void* param, void* msg) {
+  SendDoneCtx* c = (SendDoneCtx*)param;
+  CkDataMsg* m = CkDataMsg::buildNew((int)sizeof(int), &c->iter);
+  CkSetRefNum(m, (CMK_REFNUM_TYPE)c->iter);
+  CProxy_Block(c->aid)(c->idx.index[0], c->idx.index[1], c->idx.index[2]).sendDone(m);
+  if (msg) CkFreeMsg(msg);
+  delete c;
+}
 
 class Main : public CBase_Main {
   int my_iter;
@@ -78,14 +84,14 @@ public:
     n_iters = 100;
     warmup_iters = 10;
     use_zerocopy = false;
-    use_persistent = false;
+    use_channels = false;
     print_elements = false;
     my_iter = 0;
 
     // Process arguments
     int c;
     bool dims[3] = {false, false, false};
-    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:dsp")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "c:x:y:z:i:w:dkp")) != -1) {
       switch (c) {
         case 'c':
           num_chares = atoi(optarg);
@@ -111,8 +117,8 @@ public:
         case 'd':
           use_zerocopy = true;
           break;
-        case 's':
-          use_persistent = true;
+        case 'k':
+          use_channels = true;
           break;
         case 'p':
           print_elements = true;
@@ -121,16 +127,16 @@ public:
           CkPrintf(
               "Usage: %s -x [grid width] -y [grid height] -z [grid depth] "
               "-c [number of chares] -i [iterations] -w [warmup iterations] "
-              "-d (use GPU zerocopy) -s (use persistent) -p (print blocks)\n",
+              "-d (use GPU zerocopy) -k (use device channels) -p (print blocks)\n",
               m->argv[0]);
           CkExit();
       }
     }
     delete m;
 
-    // Zerocopy and persistent cannot be used together
-    if (use_zerocopy && use_persistent) {
-      CkPrintf("Zerocopy and persistent cannot be used together!\n");
+    // Zerocopy and channels cannot be used together
+    if (use_zerocopy && use_channels) {
+      CkPrintf("Zerocopy and channels cannot be used together!\n");
       CkExit(-1);
     }
 
@@ -191,10 +197,10 @@ public:
     // Print configuration
     CkPrintf("\n[GPU 3D Jacobi example]\n");
     CkPrintf("Grid: %d x %d x %d, Block: %d x %d x %d, Chares: %d x %d x %d, "
-        "Iterations: %d, Warm-up: %d, Zerocopy: %d, Persistent: %d, Print: %d\n\n",
+        "Iterations: %d, Warm-up: %d, Zerocopy: %d, Channels: %d, Print: %d\n\n",
         grid_width, grid_height, grid_depth, block_width, block_height, block_depth,
         n_chares_x, n_chares_y, n_chares_z, n_iters, warmup_iters, use_zerocopy,
-        use_persistent, print_elements);
+        use_channels, print_elements);
 
     // Create blocks and start iteration
     block_proxy = CProxy_Block::ckNew(n_chares_x, n_chares_y, n_chares_z);
@@ -218,10 +224,13 @@ public:
     startIter();
   }
 
-  void allDone() {
+  void allDone(double checksum) {
     double total_time = CkWallTimer() - start_time;
     CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf us\n",
         total_time, (total_time / n_iters) * 1e6);
+    // The sum of every block's interior after the last iteration: identical
+    // across the transfer modes when the exchange is correct.
+    CkPrintf("Checksum: %.12e\n", checksum);
     CkExit();
   }
 };
@@ -229,9 +238,10 @@ public:
 class Block : public CBase_Block {
   Block_SDAG_CODE
 
-  std::vector<CkDevicePersistent> p_send_bufs;
-  std::vector<CkDevicePersistent> p_recv_bufs;
-  std::vector<CkDevicePersistent> p_neighbor_bufs;
+  // -k: one channel per neighbour and iteration parity. Mine are opened on my
+  // receive buffers; the neighbours' are the ones my faces are put into.
+  CkDeviceChannel ch_recv[2][DIR_COUNT];
+  CkDeviceChannel ch_send[2][DIR_COUNT];
 
  public:
   int my_iter;
@@ -245,16 +255,16 @@ class Block : public CBase_Block {
 
   DataType* h_ghosts[DIR_COUNT];
   DataType* d_ghosts[DIR_COUNT];
-  /* Two send-buffer sets, selected per iteration by curSendGhosts(). Only the
-   * zerocopy path allocates the second set; the persistent path registers its
-   * buffers once at init and so always uses set 0. */
+  /* Two send-buffer sets, selected per iteration by curSendGhosts(), in both
+   * the zerocopy and the channel paths. */
   DataType* d_send_ghosts[2][DIR_COUNT];
-  /* Receive side, same shape and same reason. The post entry method runs when
-   * a message is delivered to this object, before the SDAG when-clause matches
+  /* Receive side, same shape. Zerocopy: the post entry method runs when a
+   * message is delivered to this object, before the SDAG when-clause matches
    * it, so a neighbour's iteration i+1 ghost can be fetched into a receive
-   * buffer while iteration i's contents are still waiting to be unpacked. The
-   * zerocopy path selects a set by the message's iteration parity; the
-   * persistent path posts fixed addresses once and uses set 0. */
+   * buffer while iteration i's contents are still waiting to be unpacked; the
+   * set is selected by the message's iteration parity. Channels: one channel
+   * per set, so a neighbour can put iteration i+1 while this block still reads
+   * iteration i. */
   DataType* d_recv_ghosts[2][DIR_COUNT];
 
   hapiStream_t compute_stream;
@@ -273,9 +283,12 @@ class Block : public CBase_Block {
    * sends its own iteration i+1 ghost after that get has completed and it has
    * finished iteration i. We cannot start packing iteration i+2 -- the next
    * use of this same set -- until that i+1 message has arrived, so by then
-   * every neighbour has finished reading the set. */
+   * every neighbour has finished reading the set. A channel put read by its
+   * receiver (another host) is read outside every stream, so the channel path
+   * also waits for the iteration-i puts' source callbacks before packing i+2
+   * (run()). */
   DataType** curSendGhosts() {
-    return d_send_ghosts[use_zerocopy ? (my_iter & 1) : 0];
+    return d_send_ghosts[my_iter & 1];
   }
 
   Block() {}
@@ -284,13 +297,12 @@ class Block : public CBase_Block {
     hapiCheck(hapiFreeHost(h_temperature));
     hapiCheck(hapiFree(d_temperature));
     hapiCheck(hapiFree(d_new_temperature));
-    if (use_zerocopy || use_persistent) {
-      for (int i = 0; i < DIR_COUNT; i++) {
-        hapiCheck(hapiFree(d_send_ghosts[0][i]));
-        hapiCheck(hapiFree(d_recv_ghosts[0][i]));
-        if (use_zerocopy) {
-          hapiCheck(hapiFree(d_send_ghosts[1][i]));
-          hapiCheck(hapiFree(d_recv_ghosts[1][i]));
+    if (use_zerocopy || use_channels) {
+      for (int p = 0; p < 2; p++) {
+        for (int i = 0; i < DIR_COUNT; i++) {
+          if (use_channels && !bounds[i]) ch_recv[p][i].close();
+          hapiCheck(hapiFree(d_send_ghosts[p][i]));
+          hapiCheck(hapiFree(d_recv_ghosts[p][i]));
         }
       }
     } else {
@@ -340,13 +352,11 @@ class Block : public CBase_Block {
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
     std::vector<size_t> ghost_sizes = {x_surf_size, x_surf_size, y_surf_size,
       y_surf_size, z_surf_size, z_surf_size};
-    if (use_zerocopy || use_persistent) {
-      for (int i = 0; i < DIR_COUNT; i++) {
-        hapiCheck(hapiMalloc((void**)&d_send_ghosts[0][i], ghost_sizes[i]));
-        hapiCheck(hapiMalloc((void**)&d_recv_ghosts[0][i], ghost_sizes[i]));
-        if (use_zerocopy) {
-          hapiCheck(hapiMalloc((void**)&d_send_ghosts[1][i], ghost_sizes[i]));
-          hapiCheck(hapiMalloc((void**)&d_recv_ghosts[1][i], ghost_sizes[i]));
+    if (use_zerocopy || use_channels) {
+      for (int p = 0; p < 2; p++) {
+        for (int i = 0; i < DIR_COUNT; i++) {
+          hapiCheck(hapiMalloc((void**)&d_send_ghosts[p][i], ghost_sizes[i]));
+          hapiCheck(hapiMalloc((void**)&d_recv_ghosts[p][i], ghost_sizes[i]));
         }
       }
     } else {
@@ -363,31 +373,23 @@ class Block : public CBase_Block {
     hapiCheck(hapiEventCreateWithFlags(&compute_event, hapiEventDisableTiming));
     hapiCheck(hapiEventCreateWithFlags(&comm_event, hapiEventDisableTiming));
 
-    // Create persistent buffers
-    if (use_persistent) {
-      CkCallback recv_cb = CkCallback(CkIndex_Block::recvGhostP(nullptr), thisProxy[thisIndex]);
-
-      p_send_bufs.reserve(DIR_COUNT);
-      p_recv_bufs.reserve(DIR_COUNT);
-      p_neighbor_bufs.resize(DIR_COUNT);
-
-      for (int i = 0; i < DIR_COUNT; i++) {
-        p_send_bufs.emplace_back(d_send_ghosts[0][i], ghost_sizes[i], CkCallback::ignore, comm_stream);
-        p_recv_bufs.emplace_back(d_recv_ghosts[0][i], ghost_sizes[i], recv_cb, comm_stream);
-
-        // Open the buffers sent to neighbors, and the send buffers too: a put
-        // between hosts registers both buffers for RDMA, which needs both opened
-        p_recv_bufs[i].open();
-        p_send_bufs[i].open();
+    // Device channels: one per neighbour and parity, opened on my receive
+    // buffers and sent to the neighbour that puts into them.
+    if (use_channels) {
+      CkCallback arrived(CkIndex_Block::recvGhostCh(nullptr), thisProxy[thisIndex]);
+      for (int p = 0; p < 2; p++) {
+        for (int i = 0; i < DIR_COUNT; i++) {
+          if (bounds[i]) continue;
+          ch_recv[p][i] = CkDeviceChannel(d_recv_ghosts[p][i], ghost_sizes[i], arrived);
+          ch_recv[p][i].open();
+        }
+        if (!bounds[LEFT])   thisProxy(x-1, y, z).initRecvCh(p, RIGHT, ch_recv[p][LEFT]);
+        if (!bounds[RIGHT])  thisProxy(x+1, y, z).initRecvCh(p, LEFT, ch_recv[p][RIGHT]);
+        if (!bounds[TOP])    thisProxy(x, y-1, z).initRecvCh(p, BOTTOM, ch_recv[p][TOP]);
+        if (!bounds[BOTTOM]) thisProxy(x, y+1, z).initRecvCh(p, TOP, ch_recv[p][BOTTOM]);
+        if (!bounds[FRONT])  thisProxy(x, y, z-1).initRecvCh(p, BACK, ch_recv[p][FRONT]);
+        if (!bounds[BACK])   thisProxy(x, y, z+1).initRecvCh(p, FRONT, ch_recv[p][BACK]);
       }
-
-      // Send persistent buffer info to neighbors
-      if (!bounds[LEFT])   thisProxy(x-1, y, z).initRecv(RIGHT, p_recv_bufs[LEFT]);
-      if (!bounds[RIGHT])  thisProxy(x+1, y, z).initRecv(LEFT, p_recv_bufs[RIGHT]);
-      if (!bounds[TOP])    thisProxy(x, y-1, z).initRecv(BOTTOM, p_recv_bufs[TOP]);
-      if (!bounds[BOTTOM]) thisProxy(x, y+1, z).initRecv(TOP, p_recv_bufs[BOTTOM]);
-      if (!bounds[FRONT])  thisProxy(x, y, z-1).initRecv(BACK, p_recv_bufs[FRONT]);
-      if (!bounds[BACK])   thisProxy(x, y, z+1).initRecv(FRONT, p_recv_bufs[BACK]);
     }
 
     // Initialize temperature data
@@ -397,25 +399,16 @@ class Block : public CBase_Block {
     // Initialize ghost data
     std::vector<int> ghost_counts = {x_surf_count, x_surf_count, y_surf_count,
       y_surf_count, z_surf_count, z_surf_count};
-    if (use_zerocopy || use_persistent) {
-      std::vector<DataType*> send_ghosts;
-      std::vector<DataType*> recv_ghosts;
-      for (int i = 0; i < DIR_COUNT; i++) {
-        send_ghosts.push_back(d_send_ghosts[0][i]);
-        recv_ghosts.push_back(d_recv_ghosts[0][i]);
-      }
-      invokeGhostInitKernels(send_ghosts, ghost_counts, compute_stream);
-      invokeGhostInitKernels(recv_ghosts, ghost_counts, compute_stream);
-
-      if (use_zerocopy) {
-        std::vector<DataType*> send_ghosts_odd;
-        std::vector<DataType*> recv_ghosts_odd;
+    if (use_zerocopy || use_channels) {
+      for (int p = 0; p < 2; p++) {
+        std::vector<DataType*> send_ghosts;
+        std::vector<DataType*> recv_ghosts;
         for (int i = 0; i < DIR_COUNT; i++) {
-          send_ghosts_odd.push_back(d_send_ghosts[1][i]);
-          recv_ghosts_odd.push_back(d_recv_ghosts[1][i]);
+          send_ghosts.push_back(d_send_ghosts[p][i]);
+          recv_ghosts.push_back(d_recv_ghosts[p][i]);
         }
-        invokeGhostInitKernels(send_ghosts_odd, ghost_counts, compute_stream);
-        invokeGhostInitKernels(recv_ghosts_odd, ghost_counts, compute_stream);
+        invokeGhostInitKernels(send_ghosts, ghost_counts, compute_stream);
+        invokeGhostInitKernels(recv_ghosts, ghost_counts, compute_stream);
       }
     } else {
       std::vector<DataType*> ghosts;
@@ -449,7 +442,7 @@ class Block : public CBase_Block {
   }
 
   void packGhosts() {
-    if (use_persistent || use_zerocopy) {
+    if (use_channels || use_zerocopy) {
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
       invokePackingKernels(d_temperature, curSendGhosts(), bounds,
           block_width, block_height, block_depth, comm_stream);
@@ -469,7 +462,8 @@ class Block : public CBase_Block {
       }
     }
 
-    if (use_persistent) {
+    if (use_channels) {
+      // A put is ordered behind the packing kernels on comm_stream by the runtime.
       thisProxy[thisIndex].packGhostsDone();
     } else {
 #if GPU_SYNC
@@ -484,20 +478,23 @@ class Block : public CBase_Block {
     }
   }
 
+  // One source callback per put, carrying this iteration (see sendDoneFn).
+  CkCallback srcDone() {
+    return CkCallback(sendDoneFn, (void*)new SendDoneCtx{thisProxy.ckGetArrayID(), thisIndex, my_iter});
+  }
+
   void sendGhosts() {
     // Send ghosts to neighboring chares
-    if (use_persistent) {
-      // PersistentMsg is used to store the direction
-      PersistentMsg* msg;
-      for (int dir = 0; dir < DIR_COUNT; dir++) {
-        int rev_dir = (dir % 2 == 0) ? (dir+1) : (dir-1);
-        if (!bounds[dir]) {
-          msg = new PersistentMsg(rev_dir);
-          p_neighbor_bufs[dir].set_msg(msg);
-          p_neighbor_bufs[dir].cb.setRefNum(my_iter);
-          p_send_bufs[dir].put(p_neighbor_bufs[dir]);
-        }
-      }
+    if (use_channels) {
+      // Into this iteration's parity channel of each neighbour; the event the
+      // neighbour receives carries my_iter as its reference number.
+      const int p = my_iter & 1;
+      DataType** d_send = curSendGhosts();
+      std::vector<size_t> ghost_sizes = {x_surf_size, x_surf_size, y_surf_size,
+        y_surf_size, z_surf_size, z_surf_size};
+      for (int dir = 0; dir < DIR_COUNT; dir++)
+        if (!bounds[dir])
+          ch_send[p][dir].put(d_send[dir], ghost_sizes[dir], comm_stream, srcDone(), (uint64_t)my_iter);
     } else if (use_zerocopy) {
       // Same set packGhosts() just filled -- see curSendGhosts() for why
       // alternating it by parity keeps a neighbour's get from racing the
@@ -568,15 +565,29 @@ class Block : public CBase_Block {
         block_width, block_height, block_depth, comm_stream);
   }
 
-  void processGhostP(PersistentMsg* msg) {
-    int dir = msg->dir;
-    CkAssert(dir >= 0 && dir < DIR_COUNT);
-    DataType* d_ghost = d_recv_ghosts[0][dir];
-
-    invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
+  // A neighbour's face is in one of my channel buffers: the event names the
+  // channel, which names the buffer to unpack from.
+  void processGhostCh(CkDataMsg* m) {
+    const CkDeviceChannelEvent* peek = (const CkDeviceChannelEvent*)m->getData();
+    int p = -1, dir = -1;
+    for (int q = 0; q < 2 && p < 0; q++)
+      for (int d = 0; d < DIR_COUNT; d++)
+        if (!bounds[d] && ch_recv[q][d].id() == peek->channel) { p = q; dir = d; break; }
+    if (p < 0) CkAbort("jacobi3d: a channel event for a channel that is not mine\n");
+    const CkDeviceChannelEvent* e = ch_recv[p][dir].event(m);
+    delete m;
+    if (e == NULL) CkAbort("jacobi3d: a control event reached recvGhostCh\n");
+    invokeUnpackingKernel(d_temperature, d_recv_ghosts[p][dir], dir, block_width, block_height,
         block_depth, comm_stream);
+  }
 
-    delete msg;
+  // After the update: the unpacking kernels that read this iteration's
+  // buffers have completed (the update waited on comm_stream), so the
+  // neighbours may put into them again.
+  void releaseGhosts() {
+    const int p = my_iter & 1;
+    for (int dir = 0; dir < DIR_COUNT; dir++)
+      if (!bounds[dir]) ch_recv[p][dir].release();
   }
 
   void processGhostReg(int dir, int size, DataType* gh) {
@@ -615,7 +626,15 @@ class Block : public CBase_Block {
       if (my_iter < warmup_iters + n_iters) {
         thisProxy[thisIndex].run();
       } else {
-        contribute(CkCallback(CkReductionTarget(Main, allDone), main_proxy));
+        // The interior summed on the host, at the end only (not timed).
+        const size_t n = (size_t)(block_width+2) * (block_height+2) * (block_depth+2);
+        hapiCheck(hapiMemcpy(h_temperature, d_temperature, sizeof(DataType) * n, hapiMemcpyDeviceToHost));
+        double sum = 0.0;
+        for (int k = 1; k <= block_depth; k++)
+          for (int j = 1; j <= block_height; j++)
+            for (int i = 1; i <= block_width; i++) sum += (double)h_temperature[IDX(i,j,k)];
+        contribute(sizeof(double), &sum, CkReduction::sum_double,
+                   CkCallback(CkReductionTarget(Main, allDone), main_proxy));
       }
     }
   }
