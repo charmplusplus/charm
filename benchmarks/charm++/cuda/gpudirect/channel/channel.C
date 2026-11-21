@@ -134,6 +134,9 @@ class Block : public CBase_Block {
   int mode;
   size_t size;
   int iter, n_sent, received;
+  int outstanding;   // sends whose sent() has not fired yet
+  bool finished;     // element 0: this mode's measurement is complete
+  double r_us, r_issue, r_recv;
   double t0, t_issue, t_recv;
   std::vector<double> times;
 
@@ -143,7 +146,7 @@ class Block : public CBase_Block {
 public:
   bool participant() const { return thisIndex == 0 || thisIndex == CkNumPes() - 1; }
 
-  Block() : d_send(nullptr), d_recv(nullptr) {
+  Block() : d_send(nullptr), d_recv(nullptr), outstanding(0), finished(false) {
     peer = (thisIndex == 0) ? CkNumPes() - 1 : 0;
     if (CkMyPe() != thisIndex) CkAbort("channel: element %d is on PE %d; the array map must place element i on PE i\n", thisIndex, CkMyPe());
   }
@@ -170,22 +173,45 @@ public:
     contribute(CkCallback(CkReductionTarget(Main, ready), main_proxy));
   }
 
+  // Every element sets the mode before element 0 sends its first message
+  // (go): a message of the new mode may not reach an element that has not
+  // run start() yet.
   void start(int mode_, size_t size_) {
-    if (!participant()) return;
-    mode = mode_;
-    size = size_;
-    iter = n_sent = received = 0;
-    t_issue = t_recv = 0.0;
-    times.clear();
-    if (thisIndex != 0) return;
+    if (participant()) {
+      mode = mode_;
+      size = size_;
+      iter = n_sent = received = 0;
+      t_issue = t_recv = 0.0;
+      times.clear();
+      finished = false;
+    }
+    contribute(CkCallback(CkReductionTarget(Block, go), thisProxy[0]));
+  }
+
+  void go() {
     t0 = CkWallTimer();
     if (mode == 0 || mode == 2) sendZC();
     else sendCh();
   }
 
+  // Element 0 reports a mode once its measurement is complete and every
+  // source-done of the mode has fired: a sent() left over from one mode would
+  // otherwise count as a send of the next.
+  void report(double us, double issue_us, double recv_us) {
+    r_us = us; r_issue = issue_us; r_recv = recv_us;
+    finished = true;
+    reportIfDrained();
+  }
+  void reportIfDrained() {
+    if (!finished || outstanding != 0) return;
+    finished = false;
+    main_proxy.result(mode, size, r_us, r_issue, r_recv);
+  }
+
   // One zero-copy entry-method send of `size` bytes; the source may be reused
   // when sent() fires.
   void sendZC() {
+    outstanding++;
     double t = CkWallTimer();
     thisProxy[peer].recvZC(size, CkDeviceBuffer(d_send, size,
         CkCallback(CkIndex_Block::sent(), thisProxy[thisIndex]), stream));
@@ -195,6 +221,7 @@ public:
   // One channel put of `size` bytes; queues behind the credit if the previous
   // put was not yet released by the receiver.
   void sendCh() {
+    outstanding++;
     double t = CkWallTimer();
     peer_ch.put(d_send, size, stream, CkCallback(CkIndex_Block::sent(), thisProxy[thisIndex]));
     t_issue += CkWallTimer() - t;
@@ -240,18 +267,22 @@ public:
       for (double x : times) sum += x;
       const double mean = sum / times.size();
       const int n = iter;
-      main_proxy.result(mode, size, mean * 1e6, t_issue / n * 1e6, t_recv / n * 1e6);
+      report(mean * 1e6, t_issue / n * 1e6, t_recv / n * 1e6);
     }
   }
 
   // Sender-side completion: the source may be reused, so the next message of a
   // rate test leaves now (a put may queue behind the credit).
   void sent() {
-    if (thisIndex != 0 || (mode != 2 && mode != 3)) return;
-    n_sent++;
-    if (n_sent < rateFor(size)) {
-      if (mode == 2) sendZC(); else sendCh();
+    outstanding--;
+    if (thisIndex != 0) return;
+    if (mode == 2 || mode == 3) {
+      n_sent++;
+      if (n_sent < rateFor(size)) {
+        if (mode == 2) sendZC(); else sendCh();
+      }
     }
+    reportIfDrained();
   }
 
   void rateStep() {
@@ -265,7 +296,7 @@ public:
   void rateDone(double recv_us) {
     const double elapsed = CkWallTimer() - t0;
     const int n = rateFor(size);
-    main_proxy.result(mode, size, n / elapsed, t_issue / n * 1e6, recv_us);
+    report(n / elapsed, t_issue / n * 1e6, recv_us);
   }
 };
 
