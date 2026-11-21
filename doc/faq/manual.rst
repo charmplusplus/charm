@@ -1351,9 +1351,11 @@ version is relied upon in runtime system code and what features get used
 to ensure maximum portability across the broad range of HPC systems and
 the compilers used on them. Through version 6.8.x, the system code
 requires only limited support for C++11 features, specifically variadic
-templates and R-value references. From version 6.9 onwards, the system
-will require a compiler and standard library with at least full C++11
-support.
+templates and R-value references. Versions 6.9 through 8.x require a
+compiler and standard library with full C++11 support. From version 9.0
+(Charm++ on Reconverse), the system requires C++17 support, and
+``charmc`` compiles C++ code as C++17 unless you pass your own ``-std``
+option.
 
 A good reference for which compiler versions provide what level of
 standard support can be found at
