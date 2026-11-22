@@ -30,6 +30,7 @@ mainmodule jacobi3d {
     entry [reductiontarget] void initDone();
     entry void startIter();
     entry [reductiontarget] void warmupDone();
+    entry [reductiontarget] void itersDone();
     entry [reductiontarget] void allDone(double checksum);
   };
 

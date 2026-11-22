@@ -224,8 +224,15 @@ public:
     startIter();
   }
 
-  void allDone(double checksum) {
-    double total_time = CkWallTimer() - start_time;
+  // The timed region ends at itersDone, which every block contributes to after
+  // its last iteration and before the checksum (a copy and a sum on the host).
+  double end_time = 0.0, checksum_ = 0.0;
+  bool iters_done = false, all_done = false;
+  void itersDone() { end_time = CkWallTimer(); iters_done = true; if (all_done) finish(); }
+  void allDone(double checksum) { checksum_ = checksum; all_done = true; if (iters_done) finish(); }
+  void finish() {
+    double checksum = checksum_;
+    double total_time = end_time - start_time;
     CkPrintf("Total time: %.3lf s\nAverage iteration time: %.3lf us\n",
         total_time, (total_time / n_iters) * 1e6);
     // The sum of every block's interior after the last iteration: identical
@@ -626,6 +633,7 @@ class Block : public CBase_Block {
       if (my_iter < warmup_iters + n_iters) {
         thisProxy[thisIndex].run();
       } else {
+        contribute(CkCallback(CkReductionTarget(Main, itersDone), main_proxy));
         // The interior summed on the host, at the end only (not timed).
         const size_t n = (size_t)(block_width+2) * (block_height+2) * (block_depth+2);
         hapiCheck(hapiMemcpy(h_temperature, d_temperature, sizeof(DataType) * n, hapiMemcpyDeviceToHost));
