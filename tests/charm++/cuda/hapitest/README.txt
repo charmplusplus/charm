@@ -52,6 +52,14 @@ What it checks
      the work is still in flight, so QD reached early -- the QdCreate/QdProcess
      bracketing in hapiAddCallback going wrong -- is also a failure.
 
+  6. Streams report completions independently: on every PE a kernel on one
+     stream spins until the host releases it, and the callback of a memset on
+     a second stream does the releasing. It must arrive while the kernel still
+     spins; a runtime reporting completions in order across streams holds it
+     behind the kernel's, which ends only at a 2 s timeout, and the test
+     aborts with that diagnosis. Run it with +gpueventquery as well, to cover
+     both ways the runtime detects completion.
+
 Building
 --------
 This directory is not in tests/charm++/Makefile's DIRS, matching how the CUDA
