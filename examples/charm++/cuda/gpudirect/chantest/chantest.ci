@@ -3,12 +3,15 @@ mainmodule chantest {
   readonly CProxy_Elem elem_proxy;
   readonly int block_size;
   readonly int n_iters;
+  readonly bool async_moves;
+  readonly int lb_period;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
     entry [reductiontarget] void ready();
     entry [reductiontarget] void iterDone(int migrated);
     entry [reductiontarget] void lbDone(int migrated);
+    entry [reductiontarget] void asyncDone(int migrated);
   };
 
   array [1D] Elem {
@@ -18,5 +21,7 @@ mainmodule chantest {
     entry void step(int iter);
     entry void arrived(CkDataMsg* m);
     entry void doLB();
+    entry void runAsync();
+    entry void sent();
   };
 };
