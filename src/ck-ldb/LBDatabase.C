@@ -168,8 +168,11 @@ void LBDatabase::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destIDs, int 
 
       LBCommData item(runObj, destOM.id, destIDs, nDests);
       item_ptr = commTable->HashInsertUnique(item);
-      item_ptr->addMessage(bytes, nMsgs);
+    } else {
+      LBCommData item(CkMyPe(), destOM.id, destIDs, nDests);
+      item_ptr = commTable->HashInsertUnique(item);
     }
+    item_ptr->addMessage(bytes, nMsgs);
   }
 #endif
 }
