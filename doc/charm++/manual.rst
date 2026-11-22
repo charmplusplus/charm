@@ -10387,14 +10387,17 @@ without the per-message descriptor, lookup and acknowledgement of a
    struct CkDeviceChannelEvent {
      uint64_t seq;     // the put's sequence number on this channel
      size_t bytes;     // how many bytes it wrote
-     uint64_t tag;     // the sender's tag, also the message's reference number
+     uint64_t tag;     // the sender's tag (all 64 bits); the message's reference number keeps its low 16
      ...
    };
 
 **Setup.** The receiver constructs a channel on its buffer, with the entry
 method that learns of each put, calls ``open`` inside one of its entry methods,
 and sends the channel to the sender as an entry method parameter. The sender
-keeps its copy (for example ``peer = ch;``) and calls ``put`` on it.
+keeps its copy (for example ``peer = ch;``) and calls ``put`` on it. A
+channel has one sender: a second array element that puts into it while the
+first one's puts may still follow aborts, naming both elements. Give each
+sender its own channel.
 
 **A put.** ``put`` writes ``bytes`` (at most the capacity) of ``src``, as the
 work queued on ``stream`` produces them, into the receiver's buffer, and never
@@ -10404,7 +10407,13 @@ buffer, with a ``CkDataMsg``; it passes the message to ``event``, which returns
 the put's description, or ``NULL`` for an event the runtime system handled
 itself (the entry method then just deletes the message). ``tag`` is set as the
 message's reference number, so an SDAG ``when arrived[iter](CkDataMsg* m)``
-matches puts by iteration:
+matches puts by iteration. The reference number is ``CMK_REFNUM_TYPE``, 16
+bits unless Charm++ was built with a wider ``REFNUM_TYPE``, and keeps the
+tag's low bits. SDAG cuts the ``when``'s expression to the same type, so a
+``when`` for iteration 65541 matches a put tagged 5: matching stays exact as
+long as the puts that can wait for one ``when`` at once are fewer than 65536
+iterations apart, which one put per channel at a time ensures.
+``event()->tag`` carries all 64 bits:
 
 .. code-block:: c++
 

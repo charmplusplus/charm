@@ -763,6 +763,7 @@ struct ChanShmArea {
   ChanShmCredit credit[CHAN_SHM_CREDITS];
   std::atomic<uint64_t> note_head;  // producers' ticket counter
   std::atomic<uint64_t> note_tail;  // consumer's progress, published for the producers' overflow check
+  std::atomic<uint64_t> credit_qd;  // credits granted to this PE's senders since its last poll (any owner's slots)
   char pad[64];
   ChanShmNote note[CHAN_SHM_NOTES];
 };
@@ -847,6 +848,9 @@ void deviceChannelShmNoteFn(void* param, void*) {
   const uint64_t head = a.note_head.load(std::memory_order_relaxed);
   const uint64_t tail = a.note_tail.load(std::memory_order_acquire);
   if (head - tail < (uint64_t)(CHAN_SHM_NOTES - CHAN_SHM_NOTE_MARGIN)) {
+    // Work for quiescence until the owner's poll takes it, as the message it
+    // replaces would be until handled.
+    QdCreate(1);
     const uint64_t ticket = a.note_head.fetch_add(1, std::memory_order_acq_rel);
     ChanShmNote& e = a.note[ticket % CHAN_SHM_NOTES];
     e.ev = d->ev;
@@ -862,9 +866,18 @@ void deviceChannelShmNoteFn(void* param, void*) {
 
 // This PE's scheduler-loop poll: notes other PEs wrote for it, and credits
 // its queued puts wait for.
+//
+// Quiescence. A note is counted created by its writer and processed here when
+// taken. A credit is counted created by the owner that grants it and processed
+// here at the first poll after (credit_qd), whether or not a put waits for it:
+// a put that does is issued in this same call, below, and a credit no put
+// waits for is not work. A credit read only at the sender's next put would
+// otherwise keep quiescence from ever being reached.
 void deviceChannelShmPoll(void*) {
   if (chan_shm_base == nullptr) return;
   ChanShmArea& a = chanShmArea(chanShmIndexOf(CkMyPe()));
+  if (a.credit_qd.load(std::memory_order_relaxed) != 0)
+    QdProcess((int)a.credit_qd.exchange(0, std::memory_order_acquire));
   uint64_t tail = a.note_tail.load(std::memory_order_relaxed);
   if (tail != a.note_head.load(std::memory_order_acquire)) {
     int taken = 0;
@@ -881,6 +894,7 @@ void deviceChannelShmPoll(void*) {
       cb.send(note);
       taken++;
     }
+    if (taken > 0) QdProcess(taken);
   }
   std::vector<CkDeviceChannel*>& w = *CkpvAccess(device_channel_shm_waiters);
   if (w.empty()) return;
@@ -912,6 +926,7 @@ struct DeviceChannelProbeCtx { int pe; uint64_t token, epoch, seq; };
 static thread_local DeviceChannelProbeCtx* device_channel_probe_ctx = nullptr;
 
 extern "C" void* device_channel_probe_bridge(void* arg) {
+  QdProcess(1);
   auto* m = (DeviceChannelProbe*)arg;
   DeviceChannelProbeCtx ctx{m->pe, m->token, m->epoch, m->seq};
   device_channel_probe_ctx = &ctx;
@@ -1325,7 +1340,7 @@ CkDeviceChannel::CkDeviceChannel()
     is_owner(false), owner_id(0), owner_known(false), busy(false), taken_seq(0),
     credit_slot_pe(-1), credit_slot(-1), credit_shm_pe(-1), credit_shm_slot(-1), credits_seen(0), shm_waiting(false),
     landed_unseen(0), landed_seq(0), last_put_bytes(0), last_direct_seq(0), sender_pe(-1), sender_token(0),
-    sender_known(false), closing_gen(0), closing_sent(false), sender_closed(false), pulling(false),
+    sender_known(false), sender_mgr(0), sender_elem(0), closing_gen(0), closing_sent(false), sender_closed(false), pulling(false),
     resolved_during_closing(false), epoch(0), closing_rec(NULL), have_last(false),
     resolved(false), resolving(false), send_seq(0), credits(0), uncredited(0), pull_mode(false), tier(0),
     closed_epoch(0), in_flight(0), staged_outstanding(0), acct_seq(0), occupant_credit_due(false),
@@ -1372,7 +1387,8 @@ CkDeviceChannel::CkDeviceChannel(const CkDeviceChannel& o)
     credit_shm_slot(o.credit_shm_slot), credits_seen(o.credits_seen), shm_waiting(false),
     landed_unseen(o.landed_unseen), landed_seq(o.landed_seq), last_put_bytes(o.last_put_bytes),
     last_direct_seq(o.last_direct_seq), sender_pe(o.sender_pe), sender_token(o.sender_token),
-    sender_known(o.sender_known), closing_gen(o.closing_gen), closing_sent(o.closing_sent),
+    sender_known(o.sender_known), sender_mgr(o.sender_mgr), sender_elem(o.sender_elem),
+    closing_gen(o.closing_gen), closing_sent(o.closing_sent),
     sender_closed(o.sender_closed), pulls(o.pulls), pulling(o.pulling), pull_ev(o.pull_ev), pull_src(o.pull_src),
     resolved_during_closing(o.resolved_during_closing), epoch(o.epoch), closing_rec(o.closing_rec),
     waiting(o.waiting), last(o.last), have_last(o.have_last), resolved(o.resolved), resolving(o.resolving),
@@ -1396,6 +1412,7 @@ CkDeviceChannel& CkDeviceChannel::operator=(const CkDeviceChannel& o) {
   landed_unseen = o.landed_unseen; landed_seq = o.landed_seq; last_put_bytes = o.last_put_bytes;
   last_direct_seq = o.last_direct_seq;
   sender_pe = o.sender_pe; sender_token = o.sender_token; sender_known = o.sender_known;
+  sender_mgr = o.sender_mgr; sender_elem = o.sender_elem;
   closing_gen = o.closing_gen; closing_sent = o.closing_sent; sender_closed = o.sender_closed;
   pulls = o.pulls; pulling = o.pulling; pull_ev = o.pull_ev; pull_src = o.pull_src;
   resolved_during_closing = o.resolved_during_closing; epoch = o.epoch; closing_rec = o.closing_rec;
@@ -1508,7 +1525,10 @@ void CkDeviceChannel::reopen(void* new_dst) {
   // Senders that asked while the element was on its way.
   std::vector<Waiting> w;
   w.swap(waiting);
-  for (const Waiting& x : w) replyResolve(x.pe, x.token);
+  for (const Waiting& x : w) {
+    checkOneSender(x.pe, x.mgr, x.elem);
+    replyResolve(x.pe, x.token, x.mgr, x.elem);
+  }
   // Announces that travelled with the element: read into the new buffer.
   if (!busy && !pulling) startPull();
 }
@@ -1545,7 +1565,7 @@ const CkDeviceChannelEvent* CkDeviceChannel::event(CkDataMsg* m) {
   if (ev.kind == CkDeviceChannelEvent::RESOLVE) {
     if (!is_owner) {
       // Packed and on the way to another PE: answered after reopen there.
-      Waiting w; w.pe = ev.sender_pe; w.token = ev.sender_token;
+      Waiting w; w.pe = ev.sender_pe; w.token = ev.sender_token; w.mgr = ev.sender_mgr; w.elem = ev.sender_elem;
       waiting.push_back(w);
       return NULL;
     }
@@ -1553,7 +1573,8 @@ const CkDeviceChannelEvent* CkDeviceChannel::event(CkDataMsg* m) {
     // pack, and holding the sender would hold the element's own step, which is
     // what it must finish before it can move. The sender is then closed at
     // once, so the stand-down covers its puts too; it re-resolves after the move.
-    replyResolve(ev.sender_pe, ev.sender_token);
+    checkOneSender(ev.sender_pe, ev.sender_mgr, ev.sender_elem);
+    replyResolve(ev.sender_pe, ev.sender_token, ev.sender_mgr, ev.sender_elem);
     if (closing_gen == generation && closing_rec != NULL) closingForMigration(closing_rec);
     return NULL;
   }
@@ -1571,14 +1592,32 @@ const CkDeviceChannelEvent* CkDeviceChannel::event(CkDataMsg* m) {
   return &last;
 }
 
+// One sender per channel. A resolve from another element while the current
+// sender's resolution is open would take the credits and the closings from
+// it, and both would write the buffer: refused. A resolve from the same
+// element (its copy moved, or it holds a second copy) replaces the resolution,
+// and so does any resolve once the current one is closed. An element is
+// (location manager, id); a sender outside an array element is not checked.
+void CkDeviceChannel::checkOneSender(int pe, int mgr, CmiUInt8 elem) const {
+  if (!sender_known || sender_closed || mgr == 0 || sender_mgr == 0) return;
+  if (mgr == sender_mgr && elem == sender_elem) return;
+  CkAbort("CkDeviceChannel: channel %llx has a second sender: element %llu of location manager %d (pe %d) "
+          "resolved it while element %llu of location manager %d (pe %d) still sends to it. One sender per "
+          "channel: open a channel for each sender\n",
+          (unsigned long long)channel_id, (unsigned long long)elem, mgr, pe, (unsigned long long)sender_elem,
+          sender_mgr, sender_pe);
+}
+
 // The current endpoint to a sender; that sender is the one credits and the
 // closing go to from now on.
-void CkDeviceChannel::replyResolve(int pe, uint64_t token) {
+void CkDeviceChannel::replyResolve(int pe, uint64_t token, int mgr, CmiUInt8 elem) {
   deviceChannelProgress();
   deviceChannelLateInit();
   sender_pe = pe;
   sender_token = token;
   sender_known = true;
+  sender_mgr = mgr;
+  sender_elem = elem;
   sender_closed = false;
   // A closing on its way to the previous resolution may be acked after this
   // reply is out (the sender's request crossed its ack): the ack then closes
@@ -1688,7 +1727,11 @@ void CkDeviceChannel::release() {
               (unsigned long long)epoch, credit_slot >= 0 ? "shm" : "msg");
   if (credit_slot >= 0) {
     // Same host, other process: one shared-memory increment, no message.
+    // Counted for quiescence until the sender's PE polls (deviceChannelShmPoll);
+    // the word is written first, so that poll sees the credit it counts.
     chanShmArea(credit_slot_pe).credit[credit_slot].count.fetch_add(1, std::memory_order_acq_rel);
+    QdCreate(1);
+    chanShmArea(chanShmIndexOf(sender_pe)).credit_qd.fetch_add(1, std::memory_order_release);
     return;
   }
   auto* m = deviceChannelMsg<DeviceChannelCredit>(device_channel_credit_handler);
@@ -1937,6 +1980,10 @@ void CkDeviceChannel::resolve() {
 }
 
 void CkDeviceChannel::requestResolve() {
+  // Credits granted to this PE through shared memory are counted processed by
+  // its poll (deviceChannelShmPoll), which must therefore run before the owner
+  // can grant the first one.
+  deviceChannelLateInit();
   if (my_token == 0) {
     my_token = deviceChannelToken();
     (*CkpvAccess(device_channel_senders))[my_token] = this;
@@ -1949,6 +1996,13 @@ void CkDeviceChannel::requestResolve() {
   ev.channel = channel_id;
   ev.sender_pe = CkMyPe();
   ev.sender_token = my_token;
+  // The sending element, for the owner's one-sender check: the one charged
+  // with this copy's puts (none yet -- resolve() before the first put, or puts
+  // made outside an array element -- and this resolution is not checked).
+  if (holder_known) {
+    ev.sender_mgr = holder_mgr.idx;
+    ev.sender_elem = holder_elem;
+  }
   control.send(CkDataMsg::buildNew((int)sizeof(ev), &ev));
 }
 
@@ -2548,6 +2602,8 @@ void CkDeviceChannel::pup(PUP::er& p) {
   p|sender_known;
   p|sender_pe;
   p|sender_token;
+  p|sender_mgr;
+  p|sender_elem;
   // A receiver may move between event() and release(): the taken event goes
   // with it, so the release at the new home finds it (the credit then goes
   // nowhere, and the sender learns the buffer is free when it re-resolves).
@@ -2568,7 +2624,7 @@ void CkDeviceChannel::pup(PUP::er& p) {
   int nw = (int)waiting.size();
   p|nw;
   if (p.isUnpacking()) waiting.resize(nw);
-  for (int i = 0; i < nw; i++) { p|waiting[i].pe; p|waiting[i].token; }
+  for (int i = 0; i < nw; i++) { p|waiting[i].pe; p|waiting[i].token; p|waiting[i].mgr; p|waiting[i].elem; }
   if (p.isUnpacking()) {
     // A copy, whichever side it lands on, starts unresolved and unregistered:
     // the receiver re-opens it (reopen) and senders re-resolve.

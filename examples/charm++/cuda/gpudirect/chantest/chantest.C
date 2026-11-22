@@ -10,6 +10,17 @@
 // peer keeps putting -- the puts a sender makes between acking a closing and
 // learning the receiver's new home are staged.
 //
+// Every run ends by quiescence detection: PASS is printed once the runtime
+// finds nothing left in flight, so the channel's protocol messages and the
+// notes and credits it passes through shared memory must all be counted.
+// With -q every iteration ends that way, and each element then checks it has
+// taken the iteration's put: quiescence reached with an arrival not yet
+// delivered fails. With -w S element 0 keeps the first put it receives for S
+// seconds before releasing it, so the peer's next put waits for the credit
+// long enough for the watchdog to probe its owner (two quiet 10 s ticks;
+// S >= 35). With -x element 0 also writes into its own channel through a
+// second copy, which must abort: one sender per channel.
+//
 // Run with 2 PEs: +p2 in one process (copies on the device), or two processes
 // on one host (copies through the IPC mapping), or two hosts (the receiver
 // reads with RDMA).
@@ -24,6 +35,9 @@
 /* readonly */ int n_iters;
 /* readonly */ bool async_moves;
 /* readonly */ int lb_period;
+/* readonly */ bool qd_steps;
+/* readonly */ int hold_secs;
+/* readonly */ bool two_senders;
 
 extern void invokeFillKernel(double*, int, double, hapiStream_t);
 
@@ -84,6 +98,7 @@ class Main : public CBase_Main {
   int migrations;
   bool lb_test;
   double start_time;
+  char pass_line[256];
 
 public:
   Main(CkArgMsg* m) {
@@ -93,19 +108,28 @@ public:
     lb_period = 3;
     lb_test = false;
     async_moves = false;
+    qd_steps = false;
+    hold_secs = 0;
+    two_senders = false;
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:i:lp:a")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:i:lp:aqw:x")) != -1) {
       switch (c) {
         case 's': block_size = atoi(optarg); break;
         case 'i': n_iters = atoi(optarg); break;
         case 'l': lb_test = true; break;
         case 'p': lb_period = atoi(optarg); break;
         case 'a': async_moves = true; lb_test = true; break;
-        default: CkAbort("usage: chantest [-s block] [-i iters] [-l] [-p lb_period] [-a]");
+        case 'q': qd_steps = true; break;
+        case 'w': hold_secs = atoi(optarg); break;
+        case 'x': two_senders = true; break;
+        default: CkAbort("usage: chantest [-s block] [-i iters] [-l] [-p lb_period] [-a] [-q] [-w secs] [-x]");
       }
     }
     delete m;
     if (CkNumPes() != 2) CkAbort("chantest: run with 2 PEs");
+    if ((qd_steps || hold_secs > 0 || two_senders) && lb_test)
+      CkAbort("chantest: -q, -w and -x run without migration (no -l or -a)");
+    if (two_senders) CkPrintf("[chantest] -x: element 0 writes into its own channel too; expect the abort naming two senders\n");
     CkPrintf("[chantest] block %d doubles, %d iterations, migration %s (every %d), %d process(es), %d host(s)\n",
              block_size, n_iters, async_moves ? "async" : lb_test ? "on" : "off", lb_period, CkNumNodes(), CmiNumPhysicalNodes());
     elem_proxy = CProxy_Elem::ckNew(2);
@@ -117,14 +141,29 @@ public:
 
   void ready() {
     if (async_moves) elem_proxy.runAsync();
-    else elem_proxy.step(iter);
+    else startStep();
+  }
+
+  void startStep() {
+    elem_proxy.step(iter);
+    if (qd_steps) CkStartQD(CkCallback(CkIndex_Main::stepQuiet(), thisProxy));
+  }
+
+  // -q: nothing is in flight, so every put of this iteration has been taken.
+  void stepQuiet() { elem_proxy.checkStep(iter); }
+
+  // PASS once quiescence is reached after the last put.
+  void finish() { CkStartQD(CkCallback(CkIndex_Main::quiet(), thisProxy)); }
+  void quiet() {
+    CkPrintf("%s, quiescence reached\n", pass_line);
+    CkExit();
   }
 
   void asyncDone(int migrated) {
     if (migrated == 0) CkAbort("[chantest] FAIL: -a given, but no element migrated");
-    CkPrintf("[chantest] PASS: %d puts each way verified, %d element migrations (async), %.3f s\n",
+    snprintf(pass_line, sizeof(pass_line), "[chantest] PASS: %d puts each way verified, %d element migrations (async), %.3f s",
              n_iters, migrated, CkWallTimer() - start_time);
-    CkExit();
+    finish();
   }
 
   void iterDone(int migrated) {
@@ -132,18 +171,18 @@ public:
     iter++;
     if (iter >= n_iters) {
       if (lb_test && migrations == 0) CkAbort("[chantest] FAIL: -l given, but no element migrated");
-      CkPrintf("[chantest] PASS: %d iterations verified, %d element migrations, %.3f s\n",
-               n_iters, migrations, CkWallTimer() - start_time);
-      CkExit();
+      snprintf(pass_line, sizeof(pass_line), "[chantest] PASS: %d iterations verified%s, %d element migrations, %.3f s",
+               n_iters, qd_steps ? " (each ended by quiescence)" : "", migrations, CkWallTimer() - start_time);
+      finish();
       return;
     }
     if (lb_test && (iter % lb_period) == 0) elem_proxy.doLB();
-    else elem_proxy.step(iter);
+    else startStep();
   }
 
   void lbDone(int migrated) {
     migrations += migrated;
-    elem_proxy.step(iter);
+    startStep();
   }
 };
 
@@ -151,6 +190,9 @@ class Elem : public CBase_Elem {
   Container container;
   CkDeviceChannel my_ch;     // my receive buffer, opened for the peer
   CkDeviceChannel peer_ch;   // the peer's receive buffer, written by my puts
+  CkDeviceChannel own_ch;    // -x, element 0: a second copy of its own channel (never migrates)
+  bool second_sender = false;
+  int takes = 0;
   int peer;
   int home_pe;   // the PE this element was on at the last step: counts migrations
   // -a: puts issued, source-dones seen, puts received, moves made
@@ -182,10 +224,20 @@ public:
                             CkCallback(CkIndex_Elem::arrived(NULL), thisProxy[thisIndex]));
     my_ch.open();
     thisProxy[peer].takeChannel(my_ch);
+    if (two_senders && thisIndex == 0) thisProxy[thisIndex].takeOwnCopy(my_ch);
   }
 
   void takeChannel(CkDeviceChannel ch) {
     peer_ch = ch;
+    took();
+  }
+  void takeOwnCopy(CkDeviceChannel ch) {
+    own_ch = ch;
+    second_sender = true;
+    took();
+  }
+  void took() {
+    if (++takes < ((two_senders && thisIndex == 0) ? 2 : 1)) return;
     contribute(CkCallback(CkReductionTarget(Main, ready), main_proxy));
   }
 
@@ -197,6 +249,26 @@ public:
     // its own step(iter) message, so its counter is not what to verify against.
     peer_ch.put(container.d_local_data, sizeof(double) * block_size, container.stream,
                 CkCallback(CkCallback::ignore), (uint64_t)iter);
+    if (second_sender)
+      own_ch.put(container.d_local_data, sizeof(double) * block_size, container.stream,
+                 CkCallback(CkCallback::ignore), (uint64_t)iter);
+  }
+
+  // -q: quiescence after step(iter): the put of iteration iter must have been taken.
+  void checkStep(int iter) {
+    if (n_recv != iter + 1)
+      CkAbort("[chantest] FAIL: quiescence reached before element %d on PE %d took iteration %d's put (%d taken)\n",
+              thisIndex, CkMyPe(), iter, n_recv);
+    int migrated = 0;
+    contribute(sizeof(int), &migrated, CkReduction::sum_int,
+               CkCallback(CkReductionTarget(Main, iterDone), main_proxy));
+  }
+
+  // -w: the release held back from arrived().
+  static void releaseLater(void* arg, double) { elem_proxy[(int)(intptr_t)arg].lateRelease(); }
+  void lateRelease() {
+    CkPrintf("[chantest] element %d releases the first put after %d s\n", thisIndex, hold_secs);
+    my_ch.release();
   }
 
   void arrived(CkDataMsg* m) {
@@ -210,7 +282,10 @@ public:
       CkAbort("[chantest] element %d on PE %d: iteration %d put %llu (%zu bytes) wrong at index %d: expected %.1f, got %.1f\n",
               thisIndex, CkMyPe(), iter, (unsigned long long)e->seq, e->bytes, bad, want, got);
     }
-    my_ch.release();
+    if (hold_secs > 0 && thisIndex == 0 && n_recv == 0 && !async_moves)
+      CcdCallFnAfter(releaseLater, (void*)(intptr_t)thisIndex, 1000.0 * hold_secs);
+    else
+      my_ch.release();
     if (async_moves) {
       n_recv++;
       if (n_recv == n_iters) { checkDone(); return; }
@@ -218,6 +293,8 @@ public:
       if (n_recv % lb_period == 0) migrateMe(1 - CkMyPe());
       return;
     }
+    n_recv++;
+    if (qd_steps) return;   // the iteration ends by quiescence (checkStep)
     int migrated = (home_pe != CkMyPe()) ? 1 : 0;
     home_pe = CkMyPe();
     contribute(sizeof(int), &migrated, CkReduction::sum_int,

@@ -66,6 +66,7 @@ $(TARGET)CUDA.o: $(TARGET).cu
 test: all
 	$(call run, ./$(TARGET) +p2)
 	$(call run, ./$(TARGET) +p2 -l)
+	$(call run, ./$(TARGET) +p2 -q)
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o $(TARGET) charmrun

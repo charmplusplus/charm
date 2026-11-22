@@ -92,8 +92,11 @@ struct CkDeviceChannelEvent {
   uint64_t seq;
   size_t bytes;
   int sender_pe;
+  int sender_mgr;          // RESOLVE: the sending element's location manager (0: not an array element)
   uint64_t sender_token;
-  uint64_t tag;   // the sender's put() tag; also the message's reference number
+  uint64_t tag;   // the sender's put() tag; also the message's reference number, which keeps
+                  // its low CMK_REFNUM_TYPE bits (16 by default)
+  uint64_t sender_elem;    // RESOLVE: the sending element's id
 };
 
 // A device channel: one fixed destination buffer on the receiver, opened once
@@ -222,7 +225,8 @@ private:
   void creditedPut(uint64_t seq);
   void requestResolve();
   void awaitShmCredit();
-  void replyResolve(int pe, uint64_t token);
+  void replyResolve(int pe, uint64_t token, int mgr, CmiUInt8 elem);
+  void checkOneSender(int pe, int mgr, CmiUInt8 elem) const;
   void retireCreditSlot();
   void startPull();
   void sendCloseAck();
@@ -266,6 +270,8 @@ private:
   int sender_pe;            // the resolved sender: where credits and closings go
   uint64_t sender_token;
   bool sender_known;
+  int sender_mgr;           // the resolved sender's element (location manager, id); mgr 0: not known
+  CmiUInt8 sender_elem;
   uint64_t closing_gen;     // generation under which a migration is pending (closings sent), 0 if none
   bool closing_sent;        // a closing to the current sender is awaiting its ack
   bool sender_closed;       // the current sender acked a closing and has not resolved since
@@ -279,7 +285,7 @@ private:
   uint64_t epoch;           // owner: resolves answered so far; each Resolved, Closing and Credit names the resolution it belongs to.
                             // sender: the resolution the current endpoint came from
   CkLocRec* closing_rec;    // the element standing down for the pending migration
-  struct Waiting { int pe; uint64_t token; };
+  struct Waiting { int pe; uint64_t token; int mgr; CmiUInt8 elem; };
   std::vector<Waiting> waiting;   // resolves received while migrating, answered after reopen
   CkDeviceChannelEvent last;
   bool have_last;

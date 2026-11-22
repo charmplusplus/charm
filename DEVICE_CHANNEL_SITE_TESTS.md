@@ -205,7 +205,7 @@ CH=$SRC/examples/charm++/cuda/gpudirect/chantest
 J3=$SRC/examples/charm++/cuda/gpudirect/jacobi3d
 BM=$SRC/benchmarks/charm++/cuda/gpudirect/channel
 KD=$SRC/tests/charm++/ckdyn
-KEY='Starting Reconverse|HAPI> Config|\[chantest\] (block|PASS)|PASS devpersist|mode (copy|IPC|RDMA)|ALL DONE|Checksum|CHAN-WATCH|wrong at|Reason:|FAIL'
+KEY='Starting Reconverse|HAPI> Config|\[chantest\] (block|PASS)|PASS devpersist|mode (copy|IPC|RDMA)|ALL DONE|Checksum|CHAN-WATCH|wrong at|second sender|Reason:|FAIL'
 
 # run <name> <nodes> <processes> <directory> <program and arguments>; TMO= seconds (120)
 run() {
@@ -232,6 +232,13 @@ for shape in "1p 1 1" "2p1n 1 2" "2p2n 2 2"; do
   run chantest_${s}_4mb   $n $np $CH ./chantest +pe 2 -i 20 -s 524288 -l -p 2
   run chantest_${s}_dbg   $n $np $CH env CHARM_DEBUG_CHANNEL=1 ./chantest +pe 2 -i 12 -l -p 1
   count chantest_${s}_dbg
+  run chantest_${s}_qd    $n $np $CH ./chantest +pe 2 -i 100 -q
+done
+for shape in "1p 1 1" "2p1n 1 2"; do
+  read s n np <<< "$shape"
+  TMO=120 run chantest_${s}_hold $n $np $CH ./chantest +pe 2 -i 5 -w 40
+  echo "    probe lines $(grep -c 'CHAN-PROBE' $OUT/chantest_${s}_hold.log)" >> $S
+  run chantest_${s}_twosend $n $np $CH ./chantest +pe 2 -i 5 -x
 done
 TMO=300 run ckdyn_2p1n      1 2 $KD ./ckdyntest +pe 4 -skip device
 TMO=300 run ckdyn_2p2n      2 2 $KD ./ckdyntest +pe 4 -skip device
@@ -269,11 +276,18 @@ Bring back that step's log.
 
 ### chantest
 
-- **Passing:** exit 0 and one `[chantest] PASS` line.
+- **Passing:** exit 0 and one `[chantest] PASS` line, ending `quiescence reached`: every run
+  ends by quiescence detection, so a protocol message or a shared-memory note or credit left
+  uncounted shows as a timeout here.
 - **Banner:** names the step's processes and hosts, for example `2 process(es), 2 host(s)`
   in `2p2n`.
 - **With `-l`:** the PASS line counts the moves. chantest aborts if there were none.
 - **A wrong value:** aborts with `wrong at index`.
+- **`_qd` (`-q`):** every iteration ends by quiescence. `quiescence reached before` is a
+  failure: an arrival was still on its way.
+- **`_hold` (`-w 40`):** the sender waits 40 s for a credit, so the watchdog probes the owner
+  (the indented line counts `CHAN-PROBE` lines, more than 0) and the run must still pass.
+- **`_twosend` (`-x`):** passes by aborting with `has a second sender`, naming both elements.
 
 ### The `_dbg` steps
 
