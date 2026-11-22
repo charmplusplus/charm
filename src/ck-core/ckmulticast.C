@@ -961,7 +961,12 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
     keys.reserve(sid->_elems.size());
     CmiUInt8 key;
     for (const CkArrayIndex &idx : sid->_elems)
-      if (mgr->lookupID(idx, key)) keys.push_back(key);
+      if (mgr->lookupID(idx, key)) {
+#  if CMK_GLOBAL_LOCATION_UPDATE
+        key = mgr->makeID(key).getID();
+#  endif
+        keys.push_back(key);
+      }
     LBManagerObj()->MulticastSend(mgr->getOMHandle(),keys.data(),keys.size(),UsrToEnv(msg)->getTotalsize());
   }
 #endif
