@@ -15,6 +15,7 @@
 
 #if (CMK_CUDA || CMK_HIP)
 
+#include <algorithm>
 #include <atomic>
 #include <climits>
 #include <cstring>
@@ -2182,7 +2183,18 @@ void CkDeviceChannel::closeSources() {
 void CkDeviceChannel::onAnnounce(const CkDeviceChannelEvent& ev, const CkDeviceChannelEndpoint& src) {
   deviceChannelProgress();
   Queued q; q.ev = ev; q.src = src;
-  pulls.push_back(q);
+  if (deviceChannelDebug() && !pulls.empty() && ev.seq < pulls.back().ev.seq)
+    CmiPrintf("[CHAN-ANNOUNCE-RX %d] channel %llx: put %llu arrived after put %llu (%zu queued, head %llu, "
+              "taken_seq %llu, generation %llu)\n", CkMyPe(), (unsigned long long)channel_id,
+              (unsigned long long)ev.seq, (unsigned long long)pulls.back().ev.seq, pulls.size(),
+              (unsigned long long)pulls.front().ev.seq, (unsigned long long)taken_seq,
+              (unsigned long long)generation);
+  // Announces can arrive out of put order: one sent to the element's old home
+  // is forwarded, and later ones sent to the new home can overtake it. The
+  // queue is kept in put order, so its head is always the next put to read.
+  pulls.insert(std::upper_bound(pulls.begin(), pulls.end(), ev.seq,
+                                [](uint64_t s, const Queued& x) { return s < x.ev.seq; }),
+               q);
   note(23, ev.seq, epoch, ev.sender_pe, -1, (int)pulls.size());
   if (is_owner && !busy && !pulling) startPull();
 }
