@@ -783,8 +783,22 @@ if(BUILD_CUDA OR BUILD_HIP)
     
     # Enable HIP language support
     enable_language(HIP)
-    
-    add_library(hybridapi ${hybridAPI-cxx-sources})
+
+    # The runtime's device kernels (hapi_kernels.cu: the completion-flag
+    # kernel), compiled by hipcc as HIP for every architecture in
+    # CMAKE_HIP_ARCHITECTURES and linked into hybridapi as an object.
+    set(hapi_kernels_src ${CMAKE_SOURCE_DIR}/src/arch/cuda/hybridAPI/hapi_kernels.cu)
+    set(hapi_kernels_obj ${CMAKE_BINARY_DIR}/hapi_kernels.o)
+    set(hapi_hip_arch_flags "")
+    foreach(arch ${CMAKE_HIP_ARCHITECTURES})
+      list(APPEND hapi_hip_arch_flags "--offload-arch=${arch}")
+    endforeach()
+    add_custom_command(OUTPUT ${hapi_kernels_obj}
+      COMMAND ${HIP_HIPCC_EXECUTABLE} -O3 -std=c++17 -fPIC -x hip ${hapi_hip_arch_flags} -c ${hapi_kernels_src} -o ${hapi_kernels_obj}
+      DEPENDS ${hapi_kernels_src}
+      COMMENT "hipcc hapi_kernels.cu")
+    set_source_files_properties(${hapi_kernels_obj} PROPERTIES EXTERNAL_OBJECT TRUE GENERATED TRUE)
+    add_library(hybridapi ${hybridAPI-cxx-sources} ${hapi_kernels_obj})
     add_dependencies(hybridapi ci-generated)
     target_include_directories(hybridapi PRIVATE "${ROCM_PATH}/include")
 
