@@ -57,8 +57,8 @@ What it checks
      a second stream does the releasing. It must arrive while the kernel still
      spins; a runtime reporting completions in order across streams holds it
      behind the kernel's, which ends only at a 2 s timeout, and the test
-     aborts with that diagnosis. Run it with +gpueventquery as well, to cover
-     both ways the runtime detects completion.
+     aborts with that diagnosis. Run it with +gpuflags and with
+     +gpueventquery, to cover both ways the runtime detects completion.
 
 Building
 --------

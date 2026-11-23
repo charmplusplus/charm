@@ -144,11 +144,14 @@ typedef std::deque<std::pair<hapiStream_t, std::queue<hapiEvent>>> hapiEventQueu
 CpvDeclare(hapiEventQueues, hapi_event_queue);
 CpvDeclare(std::queue<hapiEvent_t>, hapi_event_pool);
 
-// Completion by pinned flag, the default (+gpueventquery selects event
-// queries). A completion is a stream-ordered write of a per-PE sequence
-// number into a slot of a mapped pinned ring, and the poll is a plain load:
-// no driver call per poll, where event queries from several PE threads on one
-// context serialise on the driver's lock and delay every real launch.
+// Completion by pinned flag, the default on CUDA (+gpueventquery selects an
+// event query on the head entry of each stream's queue, the default on HIP).
+// A completion is a stream-ordered write of a per-PE sequence number into a
+// slot of a mapped pinned ring, and the poll is a plain load: no driver call
+// per poll, where event queries cost one driver call per stream with work
+// pending, and from several PE threads on one context serialise on the
+// driver's lock. The write adds 4-6 us to the completion itself (CUDA, copy
+// engine); with many streams per PE the polls cost more than that.
 //
 // CUDA writes the flag with cuMemsetD32Async, on the copy engine, which runs
 // each stream's work independently. Never with the front end's stream memop
@@ -456,9 +459,18 @@ bool hapiCuptiTracingActive() { return false; }
 // this PE's ring. Runs on every PE after hapiSetDevice, so the ring's pages
 // and their device alias belong to the PE's device. A PE whose ring is not
 // set up (hapi_flag_busy NULL) uses events.
+// HIP's flag kernel (hapi_kernels.cu) has not run on Frontier from this code:
+// event queries are its default until it has.
+#if CMK_HIP
+static const bool hapi_flags_default = false;
+#else
+static const bool hapi_flags_default = true;
+#endif
 static void hapiFlagInit(char** argv) {
+  const bool want_flags = CmiGetArgFlagDesc(argv, "+gpuflags",
+      "detect GPU completion by pinned-flag writes (the default on CUDA)");
   const bool want_event_query = CmiGetArgFlagDesc(argv, "+gpueventquery",
-      "detect GPU completion by querying events instead of by pinned-flag writes");
+      "detect GPU completion by event queries (the default on HIP)");
   const bool want_stream_write = CmiGetArgFlagDesc(argv, "+gpustreamwrite",
       "write completion flags with the front end's stream memop (deadlocks under "
       "cross-process IPC; for comparison only)");
@@ -467,10 +479,14 @@ static void hapiFlagInit(char** argv) {
         "write completion flags with an event record and hipMemsetD32Async instead of the flag kernel"))
     hapi_flag_kernel = false;
 #endif
-  if (want_event_query || !HAPI_HAS_STREAM_GET_DEVICE) {
+  if (want_flags && want_event_query) CmiAbort("HAPI> +gpuflags and +gpueventquery exclude each other\n");
+  const bool use_flags = want_flags || (hapi_flags_default && !want_event_query);
+  if (!use_flags || !HAPI_HAS_STREAM_GET_DEVICE) {
     if (CmiMyPe() == 0)
       CmiPrintf("HAPI> Completion detection: event queries%s\n",
-                want_event_query ? " (+gpueventquery)" : " (this runtime cannot name a stream's device)");
+                want_event_query ? " (+gpueventquery)"
+                : !use_flags     ? " (the default here; +gpuflags for pinned flags)"
+                                 : " (this runtime cannot name a stream's device)");
     return;
   }
 #if CMK_HIP
