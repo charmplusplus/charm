@@ -32,12 +32,13 @@ mainmodule jacobi3d {
     entry [reductiontarget] void warmupDone();
     entry [reductiontarget] void itersDone();
     entry [reductiontarget] void allDone(double checksum);
+    entry [reductiontarget] void channelsDestroyed();
   };
 
   array [3D] Block {
     entry Block(void);
     entry void init();
-    entry void initRecvCh(int parity, int dir, CkDeviceChannel ch);
+    entry void initRecvCh(int parity, int dir, CkChannel ch);
     entry void packGhostsDone();
     entry void recvGhostZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
     entry void recvGhostCh(CkDataMsg* m);
@@ -45,6 +46,7 @@ mainmodule jacobi3d {
     entry void recvGhostReg(int ref, int dir, int w, DataType gh[w]);
     entry void updateDone();
     entry void print();
+    entry void chanDestroyed();
     entry void printDone();
 
     entry void initDone() {
@@ -52,7 +54,7 @@ mainmodule jacobi3d {
         // Two channels per neighbour, one per iteration parity: a neighbour
         // puts iteration i+1 while this block still reads iteration i.
         for (remote_count = 0; remote_count < 2 * neighbors; remote_count++) {
-          when initRecvCh(int parity, int dir, CkDeviceChannel ch) serial {
+          when initRecvCh(int parity, int dir, CkChannel ch) serial {
             ch_send[parity][dir] = ch;
           }
         }

@@ -1,5 +1,5 @@
 // channel: the per-message device zero-copy path (a nocopydevice entry) against a
-// device channel (CkDeviceChannel) between two PEs, in whichever transport the
+// device channel (CkChannel) between two PEs, in whichever transport the
 // two PEs call for: a device copy in one process (+pe 2), a copy through the IPC
 // mapping across processes on one host, or an RDMA read across hosts.
 //
@@ -128,8 +128,8 @@ class Block : public CBase_Block {
   char* d_send;
   char* d_recv;
   hapiStream_t stream;
-  CkDeviceChannel my_ch;     // my receive buffer, opened for the peer
-  CkDeviceChannel peer_ch;   // the peer's receive buffer, written by my puts
+  CkChannel my_ch;     // my receive buffer, exported for the peer
+  CkChannel peer_ch;   // the peer's receive buffer, written by my puts
 
   int mode;
   size_t size;
@@ -163,12 +163,13 @@ public:
     hapiCheck(hapiMemset(d_recv, 0, max_size));
     hapiCheck(hapiDeviceSynchronize());
 
-    my_ch = CkDeviceChannel(d_recv, max_size, CkCallback(CkIndex_Block::arrived(NULL), thisProxy[thisIndex]));
-    my_ch.open();
+    int dev = 0;
+    hapiCheck(hapiGetDevice(&dev));
+    my_ch = CkChannel(d_recv, max_size, CkMem::Device, dev, CkCallback(CkIndex_Block::arrived(NULL), thisProxy[thisIndex]));
     thisProxy[peer].takeChannel(my_ch);
   }
 
-  void takeChannel(CkDeviceChannel ch) {
+  void takeChannel(CkChannel ch) {
     peer_ch = ch;
     contribute(CkCallback(CkReductionTarget(Main, ready), main_proxy));
   }
@@ -223,7 +224,7 @@ public:
   void sendCh() {
     outstanding++;
     double t = CkWallTimer();
-    peer_ch.put(d_send, size, stream, CkCallback(CkIndex_Block::sent(), thisProxy[thisIndex]));
+    CkPut(peer_ch, d_send, size, CkPutOpts().stream(stream).done(CkCallback(CkIndex_Block::sent(), thisProxy[thisIndex])));
     t_issue += CkWallTimer() - t;
   }
 
@@ -241,9 +242,9 @@ public:
   // Channel receive: the put's event, the credit back, then the step.
   void arrived(CkDataMsg* m) {
     double t = CkWallTimer();
-    const CkDeviceChannelEvent* e = my_ch.event(m);
+    const CkChannelEvent* e = my_ch.event(m);
     delete m;
-    if (e == NULL) return;   // a resolve or an announce, handled by the runtime
+    if (e == NULL) return;   // an attach or an announce, handled by the runtime
     my_ch.release();
     t_recv += CkWallTimer() - t;
     if (mode == 1) pingpongStep();

@@ -67,6 +67,8 @@ test: all
 	$(call run, ./$(TARGET) +p2)
 	$(call run, ./$(TARGET) +p2 -l)
 	$(call run, ./$(TARGET) +p2 -q)
+	$(call run, ./$(TARGET) +p2 -r)
+	$(call run, ./$(TARGET) +p2 -a -i 30 -d 8 -u 200)
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o $(TARGET) charmrun

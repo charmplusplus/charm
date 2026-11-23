@@ -4380,7 +4380,7 @@ GPU buffers
    ``CkDeviceBuffer`` (:numref:`sec-gpu`). It moves the data from device to
    device without staging it through host memory where the hardware allows.
    For transfers repeated between the same partners, use a
-   ``CkDeviceChannel`` (:numref:`gpuchannels`), which sets up the destination
+   ``CkChannel`` (:numref:`gpuchannels`), which sets up the destination
    once instead of for every transfer.
 
 The following rules apply whichever call you use.
@@ -10354,7 +10354,7 @@ double-buffer.
 GPU Channels
 ~~~~~~~~~~~~
 
-A device channel is a fixed device buffer on a receiving chare that one
+A channel is a fixed device buffer on a receiving chare (its owner) that one
 sending chare writes into repeatedly, with no per-message setup. It suits the
 exchanges of iterative applications, where the same buffers pass between the
 same partners every iteration: the receiver names its buffer once, and every
@@ -10364,49 +10364,68 @@ without the per-message descriptor, lookup and acknowledgement of a
 
 .. code-block:: c++
 
-   class CkDeviceChannel {
+   class CkChannel {
     public:
-     // Receiver side
-     CkDeviceChannel(void* dst, size_t capacity, const CkCallback& arrived);
-     void open();                  // in an entry method of the receiving chare
+     // Receiver side, in an entry method of the receiving chare
+     CkChannel(void* dst, size_t capacity, CkMem kind, int device,
+               const CkCallback& arrived);    // kind: CkMem::Device
      void reopen(void* new_dst);   // in the receiver's pup, after it migrated
-     void close();                 // before the receive buffer is freed
-     const CkDeviceChannelEvent* event(CkDataMsg* m);   // in the arrived entry
+     void destroy(const CkCallback& cb);      // cb: the buffer may be freed
+     const CkChannelEvent* event(CkDataMsg* m);   // in the arrived entry
      void release();               // the buffer may be overwritten
 
      // Sender side
-     CkDeviceStatus put(const void* src, size_t bytes, hapiStream_t stream,
-                        const CkCallback& src_done = CkCallback(CkCallback::ignore),
-                        uint64_t tag = 0);
-     void resolve();               // optional: look up the receiver now
+     void attach();                // optional: attach now, not at the first put
 
      size_t unseenBytes() const;   // see "Migration" below
      void pup(PUP::er& p);
    };
 
-   struct CkDeviceChannelEvent {
+   CkDeviceStatus CkPut(CkChannel& ch, const void* src, size_t bytes,
+                        const CkPutOpts& opts = CkPutOpts());
+   // CkPutOpts().stream(s).done(cb).tag(n): the stream that produces src,
+   // the callback invoked when src may be reused, the tag of the event
+
+   struct CkChannelEvent {
      uint64_t seq;     // the put's sequence number on this channel
      size_t bytes;     // how many bytes it wrote
      uint64_t tag;     // the sender's tag (all 64 bits); the message's reference number keeps its low 16
      ...
    };
 
-**Setup.** The receiver constructs a channel on its buffer, with the entry
-method that learns of each put, calls ``open`` inside one of its entry methods,
-and sends the channel to the sender as an entry method parameter. The sender
-keeps its copy (for example ``peer = ch;``) and calls ``put`` on it. A
-channel has one sender: a second array element that puts into it while the
-first one's puts may still follow aborts, naming both elements. Give each
-sender its own channel.
+**Setup.** The receiver constructs a channel on its buffer inside one of its
+entry methods, naming the kind of memory (only ``CkMem::Device`` is
+implemented), the device the buffer is on, and the entry method that learns of
+each put; the constructor exports the buffer. It sends the channel to the
+sender as an entry method parameter. The sender keeps its copy (for example
+``peer = ch;``) and calls ``CkPut`` on it. The first put attaches the sender
+(it looks up the receiver's buffer and how to reach it); ``attach`` does that
+at once instead. A channel has one sender: a second array element that
+attaches while the first one's puts may still follow aborts, naming both
+elements. Give each sender its own channel:
 
-**A put.** ``put`` writes ``bytes`` (at most the capacity) of ``src``, as the
-work queued on ``stream`` produces them, into the receiver's buffer, and never
-blocks the PE. ``src_done`` is invoked when ``src`` may be reused. The
+.. code-block:: c++
+
+   void Block::setup() {
+     int dev;
+     hapiCheck(hapiGetDevice(&dev));
+     recv_ch = CkChannel(d_recv, bytes, CkMem::Device, dev,
+                         CkCallback(CkIndex_Block::arrived(NULL), thisProxy[thisIndex]));
+     thisProxy[peer].takeChannel(recv_ch);
+   }
+   void Block::takeChannel(CkChannel ch) { send_ch = ch; }
+   // every iteration:
+   CkPut(send_ch, d_send, bytes, CkPutOpts().stream(stream).tag(iter));
+
+**A put.** ``CkPut`` writes ``bytes`` (at most the capacity) of ``src``, as
+the work queued on the stream given by ``CkPutOpts().stream(s)`` produces
+them, into the receiver's buffer, and never blocks the PE. The callback given
+by ``.done(cb)`` is invoked when ``src`` may be reused. The
 receiver's ``arrived`` entry method is invoked once the bytes are in its
 buffer, with a ``CkDataMsg``; it passes the message to ``event``, which returns
 the put's description, or ``NULL`` for an event the runtime system handled
-itself (the entry method then just deletes the message). ``tag`` is set as the
-message's reference number, so an SDAG ``when arrived[iter](CkDataMsg* m)``
+itself (the entry method then just deletes the message). The tag given by
+``.tag(n)`` is set as the message's reference number, so an SDAG ``when arrived[iter](CkDataMsg* m)``
 matches puts by iteration. The reference number is ``CMK_REFNUM_TYPE``, 16
 bits unless Charm++ was built with a wider ``REFNUM_TYPE``, and keeps the
 tag's low bits. SDAG cuts the ``when``'s expression to the same type, so a
@@ -10418,7 +10437,7 @@ iterations apart, which one put per channel at a time ensures.
 .. code-block:: c++
 
    void Block::arrived(CkDataMsg* m) {
-     const CkDeviceChannelEvent* e = recv_ch.event(m);
+     const CkChannelEvent* e = recv_ch.event(m);
      delete m;
      if (e == NULL) return;
      // ... launch the kernels that read the buffer ...
@@ -10426,14 +10445,14 @@ iterations apart, which one put per channel at a time ensures.
 
 **Release and flow control.** The receiver calls ``release`` when the buffer
 may be overwritten. A put issued before the receiver released the previous one
-is held, one deep, and issued when the release arrives; a second put issued
+is held by the runtime system, one deep, and issued when the release arrives; a second put issued
 while one is held aborts. Two puts in flight at once therefore need two
 channels on two buffers (for example one per iteration parity). Calling
 ``release`` only after the kernels that read the buffer have *completed*, not
 merely been queued, is the receiver's responsibility: the next put's copy is
 not ordered behind the receiver's streams.
 
-**Transports.** ``put`` chooses per pair of PEs: a device copy on ``stream``
+**Transports.** ``CkPut`` chooses per pair of PEs: a device copy on ``stream``
 when both are in one process (the copies a PE issues on one stream within one
 entry method are batched into one copy operation); a device copy through a
 CUDA/HIP IPC mapping when they are in different processes on one host
@@ -10472,21 +10491,46 @@ RDMA reads abort with a message when the network layer moves RDMA data through
 host memory (the LCW backend, or ``+nordma``), when a buffer is 2 GiB or
 larger, or when the network layer cannot register the device memory.
 
+**Teardown.** The receive buffer may be freed only after the sender has
+stopped writing into it and no longer maps it. ``destroy(cb)`` returns at once
+and starts the teardown: the sender's puts into the buffer complete, the
+sender releases its mapping of the buffer (another process on the same host
+maps it through CUDA/HIP IPC) and tells the receiver, announced puts not yet
+read are dropped, and then the runtime system deregisters the buffer and
+invokes ``cb``. Free the buffer in ``cb``, not before: CUDA leaves freeing an
+allocation that another process still maps undefined. The receiving element
+does not migrate during the teardown. As with every put, the application
+decides when the last put has been made; a put, or an ``attach``, after the
+sender learned of the destroy aborts. Events that arrive after ``destroy``
+reach ``event`` as ``NULL``:
+
+.. code-block:: c++
+
+   void Block::finish() {   // after the last iteration's data was consumed
+     recv_ch.destroy(CkCallback(CkIndex_Block::channelDestroyed(), thisProxy[thisIndex]));
+   }
+   void Block::channelDestroyed() { hapiCheck(hapiFree(d_recv)); /* ... */ }
+
 **Ownership.** The receiver's channel object owns the receive buffer's export
-and registration; ``close`` on it, or its destructor, releases them. Copying an
-owner (assignment or copy construction) moves the ownership, and the runtime
-system's bookkeeping, to the copy: the usual shape is ``ch = param;`` in an
-entry method, after which the parameter is destroyed. Call ``close`` before
-freeing the receive buffer. A channel is not restored from a checkpoint:
-after a restart, construct, open and exchange it again.
+and registration. Copying an owner (assignment or copy construction) moves the
+ownership, and the runtime system's bookkeeping, to the copy: the usual shape
+is ``ch = param;`` in an entry method, after which the parameter is
+destroyed. An owner destroyed without ``destroy`` starts the same teardown,
+with no callback, so nothing says when the buffer may be freed: call
+``destroy``. A channel is not restored from a checkpoint: after a restart,
+construct and exchange it again.
 
 With ``CHARM_DEBUG_CHANNEL`` set, each protocol event prints one line. Without
 it, a PE that handles no channel event for 20 seconds while a channel waits on
-something prints what each waiting channel is waiting for.
+something prints what each waiting channel is waiting for. With
+``CHARM_CHANNEL_STATS`` set, each PE prints at exit how long receivers' moves
+were held for their senders' acknowledgements, how long attaches waited for
+their answers, and how long puts made during a move waited to be read.
 
 Examples using device channels can be found in
 ``examples/charm++/cuda/gpudirect/chantest`` (with ``-l``, the elements swap PEs
-every few iterations without exchanging their channels again),
+every few iterations without exchanging their channels again; every run ends
+with ``destroy``),
 ``examples/charm++/cuda/gpudirect/jacobi3d`` (option ``-k``; one channel per
 neighbour and iteration parity) and ``benchmarks/charm++/cuda/gpudirect/channel``
 (latency and rate against ``nocopydevice`` sends).

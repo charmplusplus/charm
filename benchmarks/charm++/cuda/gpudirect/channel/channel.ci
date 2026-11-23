@@ -17,7 +17,7 @@ mainmodule channel {
   array [1D] Block {
     entry Block();
     entry void init();
-    entry void takeChannel(CkDeviceChannel ch);
+    entry void takeChannel(CkChannel ch);
     entry void start(int mode, size_t size);
     // Element 0, once every element has run start(): the mode's first send.
     entry [reductiontarget] void go();

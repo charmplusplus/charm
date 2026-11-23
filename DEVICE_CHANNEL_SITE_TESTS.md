@@ -1,7 +1,7 @@
 # Device channels on Delta and Frontier: what to run
 
 The `device-channel` branch replaces `CkDevicePersistent` with device channels
-(`CkDeviceChannel`, manual section "GPU Channels"). It is built on `recharm` c40d81714.
+(`CkChannel`, manual section "GPU Channels"). It is built on `recharm` c40d81714.
 Before it is proposed upstream, it needs the runs below on real GPUs and a real network:
 
 - Delta: A40 GPUs, CUDA;
@@ -205,7 +205,7 @@ CH=$SRC/examples/charm++/cuda/gpudirect/chantest
 J3=$SRC/examples/charm++/cuda/gpudirect/jacobi3d
 BM=$SRC/benchmarks/charm++/cuda/gpudirect/channel
 KD=$SRC/tests/charm++/ckdyn
-KEY='Starting Reconverse|HAPI> Config|\[chantest\] (block|PASS)|PASS devpersist|mode (copy|IPC|RDMA)|ALL DONE|Checksum|CHAN-WATCH|wrong at|second sender|Reason:|FAIL'
+KEY='Starting Reconverse|HAPI> Config|\[chantest\] (block|PASS)|PASS devpersist|mode (copy|IPC|RDMA)|ALL DONE|Checksum|CHAN-WATCH|wrong at|second sender|destroyed by its owner|CHAN-STATS|Reason:|FAIL'
 
 # run <name> <nodes> <processes> <directory> <program and arguments>; TMO= seconds (120)
 run() {
@@ -233,12 +233,16 @@ for shape in "1p 1 1" "2p1n 1 2" "2p2n 2 2"; do
   run chantest_${s}_dbg   $n $np $CH env CHARM_DEBUG_CHANNEL=1 ./chantest +pe 2 -i 12 -l -p 1
   count chantest_${s}_dbg
   run chantest_${s}_qd    $n $np $CH ./chantest +pe 2 -i 100 -q
+  run chantest_${s}_attach $n $np $CH ./chantest +pe 2 -i 40 -r
+  run chantest_${s}_aftdestroy $n $np $CH ./chantest +pe 2 -i 10 -e
+  TMO=300 run chantest_${s}_deepq $n $np $CH env CHARM_CHANNEL_STATS=1 ./chantest +pe 2 -a -i 30 -p 3 -d 100
 done
 for shape in "1p 1 1" "2p1n 1 2"; do
   read s n np <<< "$shape"
   TMO=120 run chantest_${s}_hold $n $np $CH ./chantest +pe 2 -i 5 -w 40
   echo "    probe lines $(grep -c 'CHAN-PROBE' $OUT/chantest_${s}_hold.log)" >> $S
   run chantest_${s}_twosend $n $np $CH ./chantest +pe 2 -i 5 -x
+  run chantest_${s}_twoattach $n $np $CH ./chantest +pe 2 -i 5 -x -r
 done
 TMO=300 run ckdyn_2p1n      1 2 $KD ./ckdyntest +pe 4 -skip device
 TMO=300 run ckdyn_2p2n      2 2 $KD ./ckdyntest +pe 4 -skip device
@@ -276,9 +280,10 @@ Bring back that step's log.
 
 ### chantest
 
-- **Passing:** exit 0 and one `[chantest] PASS` line, ending `quiescence reached`: every run
-  ends by quiescence detection, so a protocol message or a shared-memory note or credit left
-  uncounted shows as a timeout here.
+- **Passing:** exit 0, the line `both channels destroyed; no sender holds a resolution`, and one
+  `[chantest] PASS` line ending `quiescence reached`. Every run ends by destroying its
+  channels and then by quiescence detection, so a teardown that does not complete, or a
+  protocol message or shared-memory note or credit left uncounted, shows as a timeout here.
 - **Banner:** names the step's processes and hosts, for example `2 process(es), 2 host(s)`
   in `2p2n`.
 - **With `-l`:** the PASS line counts the moves. chantest aborts if there were none.
@@ -287,7 +292,14 @@ Bring back that step's log.
   failure: an arrival was still on its way.
 - **`_hold` (`-w 40`):** the sender waits 40 s for a credit, so the watchdog probes the owner
   (the indented line counts `CHAN-PROBE` lines, more than 0) and the run must still pass.
-- **`_twosend` (`-x`):** passes by aborting with `has a second sender`, naming both elements.
+- **`_twosend` (`-x`) and `_twoattach` (`-x -r`, the senders attach before their first
+  put):** pass by aborting with `has a second sender`, naming both elements.
+- **`_attach` (`-r`):** passes as a plain run does.
+- **`_aftdestroy` (`-e`):** passes by aborting with `was destroyed by its owner`.
+- **`_deepq` (`-a -d 100`):** 100 busy elements per PE keep the scheduler queue about
+  100 ms deep while the receivers move. Passes as a plain run does; each PE's `CHAN-STATS`
+  line gives how long moves were held for the closing ack, attaches waited for their answer,
+  and puts made during a move waited to be read.
 
 ### The `_dbg` steps
 

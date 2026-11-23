@@ -226,10 +226,13 @@ public:
 
   // The timed region ends at itersDone, which every block contributes to after
   // its last iteration and before the checksum (a copy and a sum on the host).
+  // With -k the run also ends by destroying the channels (not timed).
   double end_time = 0.0, checksum_ = 0.0;
-  bool iters_done = false, all_done = false;
-  void itersDone() { end_time = CkWallTimer(); iters_done = true; if (all_done) finish(); }
-  void allDone(double checksum) { checksum_ = checksum; all_done = true; if (iters_done) finish(); }
+  bool iters_done = false, all_done = false, chans_done = false;
+  void itersDone() { end_time = CkWallTimer(); iters_done = true; tryFinish(); }
+  void allDone(double checksum) { checksum_ = checksum; all_done = true; tryFinish(); }
+  void channelsDestroyed() { chans_done = true; tryFinish(); }
+  void tryFinish() { if (iters_done && all_done && (chans_done || !use_channels)) finish(); }
   void finish() {
     double checksum = checksum_;
     double total_time = end_time - start_time;
@@ -247,8 +250,8 @@ class Block : public CBase_Block {
 
   // -k: one channel per neighbour and iteration parity. Mine are opened on my
   // receive buffers; the neighbours' are the ones my faces are put into.
-  CkDeviceChannel ch_recv[2][DIR_COUNT];
-  CkDeviceChannel ch_send[2][DIR_COUNT];
+  CkChannel ch_recv[2][DIR_COUNT];
+  CkChannel ch_send[2][DIR_COUNT];
 
  public:
   int my_iter;
@@ -307,7 +310,6 @@ class Block : public CBase_Block {
     if (use_zerocopy || use_channels) {
       for (int p = 0; p < 2; p++) {
         for (int i = 0; i < DIR_COUNT; i++) {
-          if (use_channels && !bounds[i]) ch_recv[p][i].close();
           hapiCheck(hapiFree(d_send_ghosts[p][i]));
           hapiCheck(hapiFree(d_recv_ghosts[p][i]));
         }
@@ -384,11 +386,12 @@ class Block : public CBase_Block {
     // buffers and sent to the neighbour that puts into them.
     if (use_channels) {
       CkCallback arrived(CkIndex_Block::recvGhostCh(nullptr), thisProxy[thisIndex]);
+      int dev = 0;
+      hapiCheck(hapiGetDevice(&dev));
       for (int p = 0; p < 2; p++) {
         for (int i = 0; i < DIR_COUNT; i++) {
           if (bounds[i]) continue;
-          ch_recv[p][i] = CkDeviceChannel(d_recv_ghosts[p][i], ghost_sizes[i], arrived);
-          ch_recv[p][i].open();
+          ch_recv[p][i] = CkChannel(d_recv_ghosts[p][i], ghost_sizes[i], CkMem::Device, dev, arrived);
         }
         if (!bounds[LEFT])   thisProxy(x-1, y, z).initRecvCh(p, RIGHT, ch_recv[p][LEFT]);
         if (!bounds[RIGHT])  thisProxy(x+1, y, z).initRecvCh(p, LEFT, ch_recv[p][RIGHT]);
@@ -501,7 +504,8 @@ class Block : public CBase_Block {
         y_surf_size, z_surf_size, z_surf_size};
       for (int dir = 0; dir < DIR_COUNT; dir++)
         if (!bounds[dir])
-          ch_send[p][dir].put(d_send[dir], ghost_sizes[dir], comm_stream, srcDone(), (uint64_t)my_iter);
+          CkPut(ch_send[p][dir], d_send[dir], ghost_sizes[dir],
+                CkPutOpts().stream(comm_stream).done(srcDone()).tag(my_iter));
     } else if (use_zerocopy) {
       // Same set packGhosts() just filled -- see curSendGhosts() for why
       // alternating it by parity keeps a neighbour's get from racing the
@@ -575,13 +579,13 @@ class Block : public CBase_Block {
   // A neighbour's face is in one of my channel buffers: the event names the
   // channel, which names the buffer to unpack from.
   void processGhostCh(CkDataMsg* m) {
-    const CkDeviceChannelEvent* peek = (const CkDeviceChannelEvent*)m->getData();
+    const CkChannelEvent* peek = (const CkChannelEvent*)m->getData();
     int p = -1, dir = -1;
     for (int q = 0; q < 2 && p < 0; q++)
       for (int d = 0; d < DIR_COUNT; d++)
         if (!bounds[d] && ch_recv[q][d].id() == peek->channel) { p = q; dir = d; break; }
     if (p < 0) CkAbort("jacobi3d: a channel event for a channel that is not mine\n");
-    const CkDeviceChannelEvent* e = ch_recv[p][dir].event(m);
+    const CkChannelEvent* e = ch_recv[p][dir].event(m);
     delete m;
     if (e == NULL) CkAbort("jacobi3d: a control event reached recvGhostCh\n");
     invokeUnpackingKernel(d_temperature, d_recv_ghosts[p][dir], dir, block_width, block_height,
@@ -643,8 +647,27 @@ class Block : public CBase_Block {
             for (int i = 1; i <= block_width; i++) sum += (double)h_temperature[IDX(i,j,k)];
         contribute(sizeof(double), &sum, CkReduction::sum_double,
                    CkCallback(CkReductionTarget(Main, allDone), main_proxy));
+        if (use_channels) destroyChannels();
       }
     }
+  }
+
+  // -k, after the last iteration: every neighbour's last put into my buffers
+  // has been taken, so the channels are destroyed; the buffers may be freed
+  // once every callback has run.
+  int chans_to_destroy = 0;
+  void destroyChannels() {
+    for (int p = 0; p < 2; p++)
+      for (int i = 0; i < DIR_COUNT; i++)
+        if (!bounds[i]) chans_to_destroy++;
+    if (chans_to_destroy == 0) { chanDestroyed(); return; }
+    for (int p = 0; p < 2; p++)
+      for (int i = 0; i < DIR_COUNT; i++)
+        if (!bounds[i]) ch_recv[p][i].destroy(CkCallback(CkIndex_Block::chanDestroyed(), thisProxy[thisIndex]));
+  }
+  void chanDestroyed() {
+    if (chans_to_destroy > 0 && --chans_to_destroy > 0) return;
+    contribute(CkCallback(CkReductionTarget(Main, channelsDestroyed), main_proxy));
   }
 
   void print() {

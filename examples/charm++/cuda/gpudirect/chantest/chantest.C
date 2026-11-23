@@ -1,5 +1,5 @@
 // chantest: two array elements exchange a device buffer every iteration through
-// device channels (CkDeviceChannel), each verifying what it received. With -l
+// device channels (CkChannel), each verifying what it received. With -l
 // they swap PEs every lb_period iterations (each element calls migrateMe)
 // WITHOUT exchanging the channels again: the receiver reopens its channel on the
 // new buffer in its pup, and the sender's next put re-resolves.
@@ -19,11 +19,23 @@
 // seconds before releasing it, so the peer's next put waits for the credit
 // long enough for the watchdog to probe its owner (two quiet 10 s ticks;
 // S >= 35). With -x element 0 also writes into its own channel through a
-// second copy, which must abort: one sender per channel.
+// second copy, which must abort: one sender per channel. With -r each sender
+// attaches before its first put (with -x, the attach must abort).
+//
+// Every run ends by destroying the channels: each receiver calls destroy(),
+// and once every callback has run, each sender's copy must know its channel
+// was destroyed. With -e element 0 then puts once more, which must abort.
+//
+// With -d N each PE also hosts N filler elements that keep its scheduler queue
+// deep (each message spins -u microseconds, 1000 by default, and sends the
+// next): the channel protocol's messages wait behind them, as they would
+// behind a busy application. With -a it measures how long moves are held;
+// set CHARM_CHANNEL_STATS=1 for the per-PE wait times at exit.
 //
 // Run with 2 PEs: +p2 in one process (copies on the device), or two processes
 // on one host (copies through the IPC mapping), or two hosts (the receiver
 // reads with RDMA).
+#include <atomic>
 #include "chantest.decl.h"
 #include "hapi.h"
 
@@ -38,6 +50,14 @@
 /* readonly */ bool qd_steps;
 /* readonly */ int hold_secs;
 /* readonly */ bool two_senders;
+/* readonly */ bool attach_first;
+/* readonly */ bool put_after_destroy;
+/* readonly */ int fillers;
+/* readonly */ int fill_us;
+/* readonly */ CProxy_Filler filler_proxy;
+
+// -d: the fillers of this process stop resending once told.
+static std::atomic<int> fill_stop{0};
 
 extern void invokeFillKernel(double*, int, double, hapiStream_t);
 
@@ -111,8 +131,12 @@ public:
     qd_steps = false;
     hold_secs = 0;
     two_senders = false;
+    attach_first = false;
+    put_after_destroy = false;
+    fillers = 0;
+    fill_us = 1000;
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:i:lp:aqw:x")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:i:lp:aqw:xred:u:")) != -1) {
       switch (c) {
         case 's': block_size = atoi(optarg); break;
         case 'i': n_iters = atoi(optarg); break;
@@ -122,16 +146,31 @@ public:
         case 'q': qd_steps = true; break;
         case 'w': hold_secs = atoi(optarg); break;
         case 'x': two_senders = true; break;
-        default: CkAbort("usage: chantest [-s block] [-i iters] [-l] [-p lb_period] [-a] [-q] [-w secs] [-x]");
+        case 'r': attach_first = true; break;
+        case 'e': put_after_destroy = true; break;
+        case 'd': fillers = atoi(optarg); break;
+        case 'u': fill_us = atoi(optarg); break;
+        default: CkAbort("usage: chantest [-s block] [-i iters] [-l] [-p lb_period] [-a] [-q] [-w secs] [-x] [-r] [-e] "
+                         "[-d fillers] [-u us]");
       }
     }
     delete m;
     if (CkNumPes() != 2) CkAbort("chantest: run with 2 PEs");
     if ((qd_steps || hold_secs > 0 || two_senders) && lb_test)
       CkAbort("chantest: -q, -w and -x run without migration (no -l or -a)");
+    if (fillers > 0 && qd_steps) CkAbort("chantest: -q needs quiescence each iteration, which -d's fillers prevent");
     if (two_senders) CkPrintf("[chantest] -x: element 0 writes into its own channel too; expect the abort naming two senders\n");
-    CkPrintf("[chantest] block %d doubles, %d iterations, migration %s (every %d), %d process(es), %d host(s)\n",
-             block_size, n_iters, async_moves ? "async" : lb_test ? "on" : "off", lb_period, CkNumNodes(), CmiNumPhysicalNodes());
+    if (put_after_destroy) CkPrintf("[chantest] -e: element 0 puts after the destroy; expect the abort\n");
+    CkPrintf("[chantest] block %d doubles, %d iterations, migration %s (every %d), %d process(es), %d host(s)%s, "
+             "%d filler(s) per PE of %d us\n",
+             block_size, n_iters, async_moves ? "async" : lb_test ? "on" : "off", lb_period, CkNumNodes(),
+             CmiNumPhysicalNodes(), attach_first ? ", attach first" : "", fillers, fill_us);
+    // Created before the elements, so that the fillers' messages are queued
+    // ahead of the channel's from the start.
+    if (fillers > 0) {
+      filler_proxy = CProxy_Filler::ckNew(fillers * CkNumPes());
+      filler_proxy.work();
+    }
     elem_proxy = CProxy_Elem::ckNew(2);
     iter = 0;
     migrations = 0;
@@ -152,8 +191,25 @@ public:
   // -q: nothing is in flight, so every put of this iteration has been taken.
   void stepQuiet() { elem_proxy.checkStep(iter); }
 
-  // PASS once quiescence is reached after the last put.
-  void finish() { CkStartQD(CkCallback(CkIndex_Main::quiet(), thisProxy)); }
+  // The end: the fillers stop, both receivers destroy their channels, each
+  // sender's copy must then know, and PASS once quiescence is reached.
+  void finish() {
+    if (fillers > 0) filler_proxy.stop();
+    elem_proxy.teardown();
+  }
+  void tornDown() { elem_proxy.checkDetached(); }
+  // Per sender copy: 1 if told of the destroy, 100 if it still holds a
+  // resolution. A copy that moved after its last put holds none (it learns of
+  // the destroy at its next attach); one still holding a resolution after the
+  // callbacks may still map the freed buffer.
+  void detached(int sum) {
+    const int told = sum % 100, held = sum / 100;
+    if (held != 0) CkAbort("[chantest] FAIL: after both destroys, %d sender copies still hold a resolution\n", held);
+    if (!async_moves && told != 2) CkAbort("[chantest] FAIL: after both destroys, %d of 2 senders were told\n", told);
+    CkPrintf("[chantest] both channels destroyed; no sender holds a resolution; %d of 2 senders told\n", told);
+    if (put_after_destroy) { elem_proxy[0].putAfterDestroy(); return; }
+    CkStartQD(CkCallback(CkIndex_Main::quiet(), thisProxy));
+  }
   void quiet() {
     CkPrintf("%s, quiescence reached\n", pass_line);
     CkExit();
@@ -188,9 +244,9 @@ public:
 
 class Elem : public CBase_Elem {
   Container container;
-  CkDeviceChannel my_ch;     // my receive buffer, opened for the peer
-  CkDeviceChannel peer_ch;   // the peer's receive buffer, written by my puts
-  CkDeviceChannel own_ch;    // -x, element 0: a second copy of its own channel (never migrates)
+  CkChannel my_ch;     // my receive buffer, exported for the peer
+  CkChannel peer_ch;   // the peer's receive buffer, written by my puts
+  CkChannel own_ch;    // -x, element 0: a second copy of its own channel (never migrates)
   bool second_sender = false;
   int takes = 0;
   int peer;
@@ -220,20 +276,23 @@ public:
   }
 
   void setup() {
-    my_ch = CkDeviceChannel(container.d_remote_data, sizeof(double) * block_size,
-                            CkCallback(CkIndex_Elem::arrived(NULL), thisProxy[thisIndex]));
-    my_ch.open();
+    int dev = 0;
+    hapiCheck(hapiGetDevice(&dev));
+    my_ch = CkChannel(container.d_remote_data, sizeof(double) * block_size, CkMem::Device, dev,
+                      CkCallback(CkIndex_Elem::arrived(NULL), thisProxy[thisIndex]));
     thisProxy[peer].takeChannel(my_ch);
     if (two_senders && thisIndex == 0) thisProxy[thisIndex].takeOwnCopy(my_ch);
   }
 
-  void takeChannel(CkDeviceChannel ch) {
+  void takeChannel(CkChannel ch) {
     peer_ch = ch;
+    if (attach_first) peer_ch.attach();
     took();
   }
-  void takeOwnCopy(CkDeviceChannel ch) {
+  void takeOwnCopy(CkChannel ch) {
     own_ch = ch;
     second_sender = true;
+    if (attach_first) own_ch.attach();
     took();
   }
   void took() {
@@ -247,11 +306,30 @@ public:
     container.fill(valueOf(iter, thisIndex));
     // The iteration travels as the put's tag: the peer's arrival can run before
     // its own step(iter) message, so its counter is not what to verify against.
-    peer_ch.put(container.d_local_data, sizeof(double) * block_size, container.stream,
-                CkCallback(CkCallback::ignore), (uint64_t)iter);
+    CkPut(peer_ch, container.d_local_data, sizeof(double) * block_size,
+          CkPutOpts().stream(container.stream).tag(iter));
     if (second_sender)
-      own_ch.put(container.d_local_data, sizeof(double) * block_size, container.stream,
-                 CkCallback(CkCallback::ignore), (uint64_t)iter);
+      CkPut(own_ch, container.d_local_data, sizeof(double) * block_size,
+            CkPutOpts().stream(container.stream).tag(iter));
+  }
+
+  // The end of every run: destroy my channel; the buffer stays until the callback.
+  void teardown() {
+    my_ch.destroy(CkCallback(CkIndex_Elem::destroyed(), thisProxy[thisIndex]));
+  }
+  void destroyed() {
+    contribute(CkCallback(CkReductionTarget(Main, tornDown), main_proxy));
+  }
+  // Every destroy's callback has run: my copy of the peer's channel must have
+  // been told (the destroy closes the sender's resolution before completing).
+  void checkDetached() {
+    int v = (peer_ch.isDestroyed() ? 1 : 0) + (peer_ch.isAttached() ? 100 : 0);
+    contribute(sizeof(int), &v, CkReduction::sum_int, CkCallback(CkReductionTarget(Main, detached), main_proxy));
+  }
+  // -e: must abort.
+  void putAfterDestroy() {
+    CkPut(peer_ch, container.d_local_data, sizeof(double) * block_size, CkPutOpts().stream(container.stream));
+    CkAbort("[chantest] FAIL: a put after the destroy did not abort\n");
   }
 
   // -q: quiescence after step(iter): the put of iteration iter must have been taken.
@@ -272,9 +350,9 @@ public:
   }
 
   void arrived(CkDataMsg* m) {
-    const CkDeviceChannelEvent* e = my_ch.event(m);
+    const CkChannelEvent* e = my_ch.event(m);
     delete m;
-    if (e == NULL) return;   // a resolve or an announce, handled by the runtime
+    if (e == NULL) return;   // an attach or an announce, handled by the runtime
     int bad = -1; double got = 0.0;
     const int iter = (int)e->tag;
     const double want = valueOf(iter, peer);
@@ -312,8 +390,8 @@ public:
   void putNext() {
     n_put++;
     container.fill(valueOf(n_put, thisIndex));
-    peer_ch.put(container.d_local_data, sizeof(double) * block_size, container.stream,
-                CkCallback(CkIndex_Elem::sent(), thisProxy[thisIndex]), (uint64_t)n_put);
+    CkPut(peer_ch, container.d_local_data, sizeof(double) * block_size,
+          CkPutOpts().stream(container.stream).done(CkCallback(CkIndex_Elem::sent(), thisProxy[thisIndex])).tag(n_put));
   }
   // The source of the previous put is done: the next put may refill it.
   void sent() {
@@ -336,6 +414,20 @@ public:
     contribute(sizeof(int), &migrated, CkReduction::sum_int,
                CkCallback(CkReductionTarget(Main, lbDone), main_proxy));
   }
+};
+
+// -d: keeps its PE's scheduler queue deep. One message per filler is in the
+// queue at any time, each spinning fill_us microseconds.
+class Filler : public CBase_Filler {
+public:
+  Filler() {}
+  Filler(CkMigrateMessage* m) {}
+  void work() {
+    const double until = CkWallTimer() + 1e-6 * fill_us;
+    while (CkWallTimer() < until) {}
+    if (!fill_stop.load(std::memory_order_relaxed)) thisProxy[thisIndex].work();
+  }
+  void stop() { fill_stop.store(1, std::memory_order_relaxed); }
 };
 
 #include "chantest.def.h"

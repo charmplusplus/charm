@@ -1,11 +1,11 @@
 /*
- * Device channels: see CkDeviceChannel in ckdevicechannel.h and the manual,
+ * Device channels: see CkChannel in ckdevicechannel.h and the manual,
  * "GPU Channels".
  *
  * Sections: the endpoint transport (IPC mappings, the per-process
  * registration table, the receiver's read); the protocol messages and per-PE
  * tables; same-host signalling through shared memory; the watchdog; the
- * Converse handlers; batched device copies; CkDeviceChannel itself; the
+ * Converse handlers; batched device copies; CkChannel itself; the
  * migration hooks called from CkLocMgr::emigrate.
  */
 #include "charm++.h"
@@ -30,6 +30,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "hapi.h"
@@ -55,7 +56,32 @@ static std::atomic<bool> channel_exiting{false};   // set once a PE's exit seque
 // Called on each PE when its exit sequence reaches ConverseExit (init.C):
 // after it the network layer is gone, and an endpoint closed at process exit
 // drops its entry without deregistering.
-void CkRdmaDeviceExit() { channel_exiting = true; }
+// CHARM_CHANNEL_STATS: per PE, printed at exit, how long the protocol's waits
+// lasted: a receiving element's move held for its sender's closing ack, a
+// sender's attach waiting for its answer, and a staged put waiting until the
+// receiver read it at its new home. Collected always; printed on request.
+static bool deviceChannelStats() {
+  static const bool on = (getenv("CHARM_CHANNEL_STATS") != NULL);
+  return on;
+}
+struct ChanWaitStat {
+  long n = 0;
+  double sum = 0.0, max = 0.0;
+  void add(double s) { n++; sum += s; if (s > max) max = s; }
+};
+static thread_local ChanWaitStat chan_stat_close, chan_stat_attach, chan_stat_staged;
+
+void CkRdmaDeviceExit() {
+  channel_exiting = true;
+  if (!deviceChannelStats()) return;
+  const ChanWaitStat* s[3] = {&chan_stat_close, &chan_stat_attach, &chan_stat_staged};
+  double mean[3];
+  for (int i = 0; i < 3; i++) mean[i] = s[i]->n ? 1e3 * s[i]->sum / s[i]->n : 0.0;
+  CmiPrintf("[CHAN-STATS %d] move held for the closing ack: %ld, mean %.2f ms, max %.2f ms; "
+            "attach answered: %ld, mean %.2f ms, max %.2f ms; staged put read: %ld, mean %.2f ms, max %.2f ms\n",
+            CkMyPe(), s[0]->n, mean[0], 1e3 * s[0]->max, s[1]->n, mean[1], 1e3 * s[1]->max, s[2]->n, mean[2],
+            1e3 * s[2]->max);
+}
 
 // The base of the allocation holding ptr: what an IPC handle maps in the other
 // process (pool allocators, cupy and torch hand out pieces of allocations).
@@ -84,6 +110,20 @@ static bool chanAllocBase(const void* ptr, uintptr_t* base) {
   if (fn(&b, &sz, (unsigned long long)(uintptr_t)ptr) != 0) return false;
   *base = (uintptr_t)b;
   return true;
+#endif
+}
+
+// The device a buffer lives on, as this process numbers its devices, or -1
+// when it is not device memory.
+static int chanPointerDevice(const void* ptr) {
+#if CMK_HIP
+  hipPointerAttribute_t a;
+  if (hipPointerGetAttributes(&a, ptr) != hipSuccess) { (void)hipGetLastError(); return -1; }
+  return a.device;
+#else
+  cudaPointerAttributes a;
+  if (cudaPointerGetAttributes(&a, ptr) != cudaSuccess) { (void)cudaGetLastError(); return -1; }
+  return (a.type == cudaMemoryTypeDevice || a.type == cudaMemoryTypeManaged) ? a.device : -1;
 #endif
 }
 
@@ -116,7 +156,7 @@ void* CkDeviceChannelEndpoint::view() const {
   } else {
     if (hapiIpcOpenMemHandle(&base, ipc_handle, hapiIpcMemLazyEnablePeerAccess) != hapiSuccess) {
       (void)hapiGetLastError();
-      CmiPrintf("[%d] CkDeviceChannel> IPC open of PE %d's buffer failed; RDMA is used for it\n", CkMyPe(), pe);
+      CmiPrintf("[%d] CkChannel> IPC open of PE %d's buffer failed; RDMA is used for it\n", CkMyPe(), pe);
       base = nullptr;
     }
     chan_ipc[key] = ChanIpcMap{ base, base ? 1 : 0 };
@@ -205,7 +245,7 @@ static void chanRegisterLocked(ChanReg& r) {
 }
 
 void CkDeviceChannelEndpoint::open() {
-  if (pe != CkMyPe()) CkAbort("CkDeviceChannel: a buffer of PE %d opened on PE %d", pe, CkMyPe());
+  if (pe != CkMyPe()) CkAbort("CkChannel: a buffer of PE %d opened on PE %d", pe, CkMyPe());
   if (id != 0) close();
   uintptr_t base = 0;
   if (chanAllocBase(ptr, &base) && hapiIpcGetMemHandle(&ipc_handle, (void*)ptr) == hapiSuccess) {
@@ -283,7 +323,7 @@ void CkDeviceChannelEndpoint::pup(PUP::er& p) {
 
 static void chanCheckRdmaUsable() {
   if (CmiUseCopyBasedRDMA)
-    CkAbort("CkDeviceChannel: a put between PEs on different hosts, or whose IPC handle did not open, is "
+    CkAbort("CkChannel: a put between PEs on different hosts, or whose IPC handle did not open, is "
             "read with RDMA, but this run moves RDMA data through host memory (the LCW backend, or "
             "+nordma), which cannot read or write device memory");
 }
@@ -306,14 +346,14 @@ static void chanRead(const CkDeviceChannelEndpoint& dst, const CkDeviceChannelEn
   if (m == 2) {
     chanCheckRdmaUsable();
     if (!src.rdma_valid)
-      CkAbort("CkDeviceChannel: PE %d reads a put from PE %d with RDMA (another host, or an IPC handle that "
+      CkAbort("CkChannel: PE %d reads a put from PE %d with RDMA (another host, or an IPC handle that "
               "did not open), and the source could not be registered with the network\n", CkMyPe(), src.pe);
     CmiNcpyBuffer d;
     const char* why = "";
     CkDeviceChannelEndpoint dd = dst;
     dd.cnt = bytes;
     if (!dd.registration(&d, &why))
-      CkAbort("CkDeviceChannel: the receive buffer on PE %d cannot be registered with the network: %s\n",
+      CkAbort("CkChannel: the receive buffer on PE %d cannot be registered with the network: %s\n",
               CkMyPe(), why);
     CmiNcpyBuffer s = src.rdma;
     s.cnt = bytes;
@@ -621,6 +661,11 @@ struct DeviceChannelClosing {
   uint64_t generation;
   uint64_t epoch;   // the resolution being closed
   int owner_pe;
+  int flags;        // CHAN_CLOSING_*
+};
+enum {
+  CHAN_CLOSING_DESTROYED = 1,   // the owner destroyed the channel: no put may follow
+  CHAN_CLOSING_NOACK = 2        // the answer to an attach made after the destroy: nothing to acknowledge
 };
 struct DeviceChannelCloseAck {
   char core[CmiMsgHeaderSizeBytes];
@@ -669,9 +714,12 @@ static thread_local char device_channel_last_resolved_dropped[200];
 static thread_local long device_channel_closing_acked_blind = 0;
 static thread_local char device_channel_last_closing_blind[200];
 
-typedef std::unordered_map<uint64_t, CkDeviceChannel*> DeviceChannelTable;
+typedef std::unordered_map<uint64_t, CkChannel*> DeviceChannelTable;
 CkpvStaticDeclare(DeviceChannelTable*, device_channel_senders);
 CkpvStaticDeclare(DeviceChannelTable*, device_channel_owners);
+// Channels destroyed here whose owner object is gone: a late attach or
+// announce still learns of the destroy.
+CkpvStaticDeclare(std::unordered_set<uint64_t>*, device_channel_destroyed);
 CkpvStaticDeclare(uint64_t, device_channel_counter);
 // Credits that arrived ahead of the resolution they belong to, by sender
 // token: the owner replies to a resolve and releases the buffer afterwards,
@@ -691,6 +739,7 @@ struct DeviceChannelStaged {
   CkGroupID holder_mgr;
   CmiUInt8 holder_elem;
   bool holder_known;
+  double t0;                    // when the put was staged (CHARM_CHANNEL_STATS)
 };
 typedef std::map<std::pair<uint64_t, uint64_t>, DeviceChannelStaged> DeviceChannelStagedTable;
 CkpvStaticDeclare(DeviceChannelStagedTable*, device_channel_staged);
@@ -756,7 +805,7 @@ struct ChanShmCredit {
 };
 struct ChanShmNote {
   std::atomic<uint64_t> ready;     // ticket + 1 once the entry is complete
-  CkDeviceChannelEvent ev;
+  CkChannelEvent ev;
   alignas(8) char cb[sizeof(CkCallback)];   // the owner's arrival callback, as the sender's copy holds it
 };
 struct ChanShmArea {
@@ -786,11 +835,11 @@ void chanShmMap() {
                   (step ? "-" + std::string(step) : std::string());
   const size_t bytes = sizeof(ChanShmArea) * (size_t)chan_shm_areas;
   int fd = shm_open(chan_shm_name.c_str(), O_CREAT | O_RDWR, S_IRUSR | S_IWUSR);
-  if (fd < 0) CkAbort("CkDeviceChannel: shm_open(%s) failed: %s\n", chan_shm_name.c_str(), strerror(errno));
-  if (ftruncate(fd, (off_t)bytes) != 0) CkAbort("CkDeviceChannel: ftruncate(%s, %zu) failed: %s\n", chan_shm_name.c_str(), bytes, strerror(errno));
+  if (fd < 0) CkAbort("CkChannel: shm_open(%s) failed: %s\n", chan_shm_name.c_str(), strerror(errno));
+  if (ftruncate(fd, (off_t)bytes) != 0) CkAbort("CkChannel: ftruncate(%s, %zu) failed: %s\n", chan_shm_name.c_str(), bytes, strerror(errno));
   void* p = mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   ::close(fd);
-  if (p == MAP_FAILED) CkAbort("CkDeviceChannel: mmap(%s, %zu) failed: %s\n", chan_shm_name.c_str(), bytes, strerror(errno));
+  if (p == MAP_FAILED) CkAbort("CkChannel: mmap(%s, %zu) failed: %s\n", chan_shm_name.c_str(), bytes, strerror(errno));
   chan_shm_base = (ChanShmArea*)p;
   atexit(chanShmUnlink);
 }
@@ -833,13 +882,13 @@ long chanShmReadCredit(int area_pe, int slot, uint64_t channel, uint64_t epoch) 
 }
 
 // Senders of this PE with a put queued behind a shared-memory credit.
-CkpvStaticDeclare(std::vector<CkDeviceChannel*>*, device_channel_shm_waiters);
+CkpvStaticDeclare(std::vector<CkChannel*>*, device_channel_shm_waiters);
 
 // The note a put's completion writes into the owner PE's ring, or sends as a
 // message when the ring is full.
 struct DeviceChannelShmNote {
   int area_pe;
-  CkDeviceChannelEvent ev;
+  CkChannelEvent ev;
   CkCallback arrived;
 };
 void deviceChannelShmNoteFn(void* param, void*) {
@@ -884,7 +933,7 @@ void deviceChannelShmPoll(void*) {
     while (taken < 64) {
       ChanShmNote& e = a.note[tail % CHAN_SHM_NOTES];
       if (e.ready.load(std::memory_order_acquire) != tail + 1) break;   // not written yet
-      CkDeviceChannelEvent ev = e.ev;
+      CkChannelEvent ev = e.ev;
       CkCallback cb;
       memcpy(&cb, e.cb, sizeof(CkCallback));
       tail++;
@@ -896,18 +945,18 @@ void deviceChannelShmPoll(void*) {
     }
     if (taken > 0) QdProcess(taken);
   }
-  std::vector<CkDeviceChannel*>& w = *CkpvAccess(device_channel_shm_waiters);
+  std::vector<CkChannel*>& w = *CkpvAccess(device_channel_shm_waiters);
   if (w.empty()) return;
   // pollShmCredit may issue the queued put, and issue() unlists the copy
   // (swap with the back, pop): walk a copy, then drop what no longer waits.
-  std::vector<CkDeviceChannel*> walk(w);
-  for (CkDeviceChannel* c : walk) c->pollShmCredit();
+  std::vector<CkChannel*> walk(w);
+  for (CkChannel* c : walk) c->pollShmCredit();
   for (size_t i = 0; i < w.size();) {
     if (!w[i]->putQueued()) { w[i] = w.back(); w.pop_back(); } else i++;
   }
 }
-void deviceChannelShmUnlist(CkDeviceChannel* c) {
-  std::vector<CkDeviceChannel*>& w = *CkpvAccess(device_channel_shm_waiters);
+void deviceChannelShmUnlist(CkChannel* c) {
+  std::vector<CkChannel*>& w = *CkpvAccess(device_channel_shm_waiters);
   for (size_t i = 0; i < w.size(); i++) if (w[i] == c) { w[i] = w.back(); w.pop_back(); return; }
 }
 }  // namespace
@@ -921,7 +970,7 @@ struct DeviceChannelWatchTally {
   int o_waiting = 0, o_closing = 0, o_pulls = 0, shown = 0;
 };
 static thread_local DeviceChannelWatchTally* device_channel_watch_tally = nullptr;
-static CkDeviceChannel* deviceChannelOwner(uint64_t channel);
+static CkChannel* deviceChannelOwner(uint64_t channel);
 struct DeviceChannelProbeCtx { int pe; uint64_t token, epoch, seq; };
 static thread_local DeviceChannelProbeCtx* device_channel_probe_ctx = nullptr;
 
@@ -930,7 +979,7 @@ extern "C" void* device_channel_probe_bridge(void* arg) {
   auto* m = (DeviceChannelProbe*)arg;
   DeviceChannelProbeCtx ctx{m->pe, m->token, m->epoch, m->seq};
   device_channel_probe_ctx = &ctx;
-  CkDeviceChannel* c = deviceChannelOwner(m->channel);
+  CkChannel* c = deviceChannelOwner(m->channel);
   if (c) c->describeStall("owner");
   int copies = 0;
   for (auto& kv : *CkpvAccess(device_channel_senders))
@@ -1022,6 +1071,8 @@ void CkDeviceChannelInit(char** argv) {
   CkpvAccess(device_channel_senders) = new DeviceChannelTable();
   CkpvInitialize(DeviceChannelTable*, device_channel_owners);
   CkpvAccess(device_channel_owners) = new DeviceChannelTable();
+  CkpvInitialize(std::unordered_set<uint64_t>*, device_channel_destroyed);
+  CkpvAccess(device_channel_destroyed) = new std::unordered_set<uint64_t>();
   CkpvInitialize(uint64_t, device_channel_counter);
   CkpvAccess(device_channel_counter) = 0;
   CkpvInitialize(DeviceChannelEarlyCredits*, device_channel_early_credits);
@@ -1042,8 +1093,8 @@ void CkDeviceChannelInit(char** argv) {
   CkpvAccess(device_channel_quiet_ticks) = 0;
   if (deviceChannelDebug()) CcdCallOnConditionKeep(CcdPERIODIC_10seconds, deviceChannelStallScan, NULL);
   CcdCallOnConditionKeep(CcdPERIODIC_10seconds, deviceChannelWatch, NULL);
-  CkpvInitialize(std::vector<CkDeviceChannel*>*, device_channel_shm_waiters);
-  CkpvAccess(device_channel_shm_waiters) = new std::vector<CkDeviceChannel*>();
+  CkpvInitialize(std::vector<CkChannel*>*, device_channel_shm_waiters);
+  CkpvAccess(device_channel_shm_waiters) = new std::vector<CkChannel*>();
   CkpvInitialize(bool, device_channel_late_init_done);
   CkpvAccess(device_channel_late_init_done) = false;
   // The host topology (which PEs share a host) is computed after this runs
@@ -1070,13 +1121,13 @@ static uint64_t deviceChannelToken() {
   return ((uint64_t)CkMyPe() << 40) | (++CkpvAccess(device_channel_counter));
 }
 
-static CkDeviceChannel* deviceChannelSender(uint64_t token) {
+static CkChannel* deviceChannelSender(uint64_t token) {
   DeviceChannelTable& tab = *CkpvAccess(device_channel_senders);
   auto it = tab.find(token);
   return it == tab.end() ? NULL : it->second;
 }
 
-static CkDeviceChannel* deviceChannelOwner(uint64_t channel) {
+static CkChannel* deviceChannelOwner(uint64_t channel) {
   DeviceChannelTable& tab = *CkpvAccess(device_channel_owners);
   auto it = tab.find(channel);
   return it == tab.end() ? NULL : it->second;
@@ -1102,7 +1153,7 @@ extern "C" void* device_channel_credit_bridge(void* arg) {
     CmiPrintf("[CHAN-MISDELIVERED %d] credit for channel %llx token %llx epoch %llu from pe %d was addressed to pe %d\n",
               CkMyPe(), (unsigned long long)m->channel, (unsigned long long)m->token, (unsigned long long)m->epoch,
               m->src_pe, m->dst_pe);
-  CkDeviceChannel* c = deviceChannelSender(m->token);
+  CkChannel* c = deviceChannelSender(m->token);
   // A copy that left this PE re-resolves before its next put and learns the
   // buffer's state then, so a credit that finds nobody is simply dropped.
   if (c) c->onCredit(m->seq, m->epoch);
@@ -1114,10 +1165,10 @@ extern "C" void* device_channel_credit_bridge(void* arg) {
 extern "C" void* device_channel_closing_bridge(void* arg) {
   QdProcess(1);
   auto* m = (DeviceChannelClosing*)arg;
-  CkDeviceChannel* c = deviceChannelSender(m->token);
+  CkChannel* c = deviceChannelSender(m->token);
   if (c) {
-    c->onClosing(m->generation, m->owner_pe, m->epoch);
-  } else {
+    c->onClosing(m->generation, m->owner_pe, m->epoch, m->flags);
+  } else if (!(m->flags & CHAN_CLOSING_NOACK)) {
     // The holder left this PE (its chare migrated or died), so nothing of it is
     // in flight from here: acknowledge for it, or the receiver never moves.
     auto* a = deviceChannelMsg<DeviceChannelCloseAck>(device_channel_closeack_handler);
@@ -1140,7 +1191,7 @@ extern "C" void* device_channel_closing_bridge(void* arg) {
 extern "C" void* device_channel_closeack_bridge(void* arg) {
   QdProcess(1);
   auto* m = (DeviceChannelCloseAck*)arg;
-  CkDeviceChannel* c = deviceChannelOwner(m->channel);
+  CkChannel* c = deviceChannelOwner(m->channel);
   if (c) c->onCloseAck(m->pe, m->token, m->last_seq, m->last_bytes);
   CmiFree(m);
   return NULL;
@@ -1156,6 +1207,7 @@ extern "C" void* device_channel_done_bridge(void* arg) {
     // longer held by it, and its channel copy (if still here) rebalances.
     DeviceChannelStaged d = it->second;
     st.erase(it);
+    chan_stat_staged.add(CkWallTimer() - d.t0);
     d.ep.close();
     if (d.buf) CkDeviceFree(d.buf);
     if (d.holder_known) {
@@ -1163,10 +1215,10 @@ extern "C" void* device_channel_done_bridge(void* arg) {
       CkLocRec* rec = mgr ? mgr->localRecord(d.holder_elem) : NULL;
       if (rec) rec->noteChannelWorkDone();
     }
-    CkDeviceChannel* c = deviceChannelSender(m->token);
+    CkChannel* c = deviceChannelSender(m->token);
     if (c) c->onStagedDone(m->seq);
   } else {
-    CkDeviceChannel* c = deviceChannelSender(m->token);
+    CkChannel* c = deviceChannelSender(m->token);
     if (c) c->onDone(m->seq);
   }
   CmiFree(m);
@@ -1185,7 +1237,7 @@ struct DeviceChannelPulled { uint64_t channel; };
 static void deviceChannelPulledFn(void* param, void* msg) {
   if (msg) CkFreeMsg(msg);
   auto* d = (DeviceChannelPulled*)param;
-  CkDeviceChannel* c = deviceChannelOwner(d->channel);
+  CkChannel* c = deviceChannelOwner(d->channel);
   if (c) c->onPulled();
   else CmiPrintf("[CHAN %d] a read completed for channel %llx, which is no longer open here\n", CkMyPe(), (unsigned long long)d->channel);
   delete d;
@@ -1198,7 +1250,7 @@ extern "C" void* device_channel_resolved_bridge(void* arg) {
     CmiPrintf("[CHAN-MISDELIVERED %d] resolution %llu of channel %llx token %llx from pe %d was addressed to pe %d\n",
               CkMyPe(), (unsigned long long)m->epoch, (unsigned long long)m->channel, (unsigned long long)m->token,
               m->src_pe, m->dst_pe);
-  CkDeviceChannel* c = deviceChannelSender(m->token);
+  CkChannel* c = deviceChannelSender(m->token);
   if (c) {
     CkDeviceChannelEndpoint ep;
     PUP::fromMem p((char*)m + sizeof(DeviceChannelResolved));
@@ -1249,7 +1301,7 @@ struct DeviceChannelSrcDone {
 
 static void deviceChannelSrcDoneFn(void* param, void* msg) {
   auto* d = (DeviceChannelSrcDone*)param;
-  CkDeviceChannel* c = deviceChannelSender(d->token);
+  CkChannel* c = deviceChannelSender(d->token);
   if (c) c->onSrcDone(d->seq);
   if (d->user.type != CkCallback::ignore) d->user.send(msg);
   delete d;
@@ -1265,7 +1317,7 @@ static void deviceChannelSrcDoneFn(void* param, void* msg) {
 static void deviceChannelBatchDoneFn(void* param, void* msg) {
   auto* b = (DeviceChannelBatch*)param;
   for (const DeviceChannelBatchEntry& e : b->entries) {
-    CkDeviceChannel* c = deviceChannelSender(e.token);
+    CkChannel* c = deviceChannelSender(e.token);
     if (c) c->onSrcDone(e.seq);
     if (e.user.type != CkCallback::ignore) e.user.send(msg);
     e.note.send(e.note_msg);
@@ -1332,9 +1384,9 @@ void CkDeviceChannelBatchFlush() {
   if (cur != nullptr && cur->in_entry) deviceChannelBatchFlush();
 }
 
-/****************************** CkDeviceChannel ******************************/
+/****************************** CkChannel ******************************/
 
-CkDeviceChannel::CkDeviceChannel()
+CkChannel::CkChannel()
   : arrived(CkCallback(CkCallback::ignore)), control(CkCallback(CkCallback::ignore)),
     channel_id(0), generation(0), cap(0),
     is_owner(false), owner_id(0), owner_known(false), busy(false), taken_seq(0),
@@ -1345,28 +1397,45 @@ CkDeviceChannel::CkDeviceChannel()
     resolved(false), resolving(false), send_seq(0), credits(0), uncredited(0), pull_mode(false), tier(0),
     closed_epoch(0), in_flight(0), staged_outstanding(0), acct_seq(0), occupant_credit_due(false),
     close_ack_due(false), close_ack_pe(-1), my_token(0), sender_rec(NULL), holder_elem(0), holder_known(false),
-    src_ep_last(0) {
+    destroying(false), destroyed(false), destroy_hold(false), self_owned(false), closing_held(false),
+    destroy_cb(CkCallback::ignore), closing_t0(0.0), resolve_t0(0.0), src_ep_last(0) {
   pending.valid = false;
   memset(&last, 0, sizeof(last));
   memset(&pull_ev, 0, sizeof(pull_ev));
 }
 
-CkDeviceChannel::CkDeviceChannel(void* dst_, size_t capacity, const CkCallback& arrived_)
-  : CkDeviceChannel() {
+CkChannel::CkChannel(void* dst_, size_t capacity, CkMem kind, int device, const CkCallback& arrived_)
+  : CkChannel() {
+  if (kind != CkMem::Device) {
+    CkAbort("CkChannel: only device memory (CkMem::Device) is implemented\n");
+  }
+  const int on = chanPointerDevice(dst_);
+  if (on < 0) CkAbort("CkChannel: the buffer %p is not device memory\n", dst_);
+  if (on != device) CkAbort("CkChannel: the buffer %p is on device %d, not on device %d\n", dst_, on, device);
   dst = CkDeviceChannelEndpoint(dst_, capacity);
   arrived = arrived_;
   cap = capacity;
+  open();
 }
 
 // A copy takes over the original's table entries, its ownership of the
 // receive buffer, and the runtime resources it holds (IPC views, registered
 // sources): the usual shape is `peer = param;` in an entry method, after which
 // the parameter dies.
-void CkDeviceChannel::takeOver(const CkDeviceChannel& c) {
-  CkDeviceChannel& o = const_cast<CkDeviceChannel&>(c);
+void CkChannel::takeOver(const CkChannel& c) {
+  CkChannel& o = const_cast<CkChannel&>(c);
   memcpy(hist, o.hist, sizeof(hist)); hist_n = o.hist_n;
   if (o.my_token != 0) (*CkpvAccess(device_channel_senders))[o.my_token] = this;
-  if (o.is_owner && o.channel_id != 0) (*CkpvAccess(device_channel_owners))[o.channel_id] = this;
+  if (o.channel_id != 0) {
+    // The owners table also lists a destroyed owner (late events find it) and
+    // an owner that arrived and is not reopened yet.
+    DeviceChannelTable& owners = *CkpvAccess(device_channel_owners);
+    auto it = owners.find(o.channel_id);
+    if (it != owners.end() && it->second == &o) it->second = this;
+  }
+  // A teardown in progress moves with the ownership.
+  o.destroying = false; o.destroy_hold = false; o.closing_held = false;
+  o.destroy_cb = CkCallback(CkCallback::ignore);
   o.is_owner = false;
   dst.takeView(o.dst);
   pull_src.takeView(o.pull_src);
@@ -1379,7 +1448,7 @@ void CkDeviceChannel::takeOver(const CkDeviceChannel& c) {
   o.stale_views.clear();
 }
 
-CkDeviceChannel::CkDeviceChannel(const CkDeviceChannel& o)
+CkChannel::CkChannel(const CkChannel& o)
   : dst(o.dst), arrived(o.arrived), control(o.control), channel_id(o.channel_id), generation(o.generation),
     cap(o.cap), is_owner(o.is_owner), owner_id(o.owner_id), owner_known(o.owner_known), owner_mgr(o.owner_mgr),
     busy(o.busy), taken_seq(o.taken_seq),
@@ -1397,11 +1466,13 @@ CkDeviceChannel::CkDeviceChannel(const CkDeviceChannel& o)
     staged_outstanding(o.staged_outstanding), acct_seq(o.acct_seq), occupant_credit_due(o.occupant_credit_due),
     direct_issued(o.direct_issued), dones_seen(o.dones_seen), close_ack_due(o.close_ack_due),
     close_ack_pe(o.close_ack_pe), my_token(o.my_token), sender_rec(o.sender_rec), holder_elem(o.holder_elem),
-    holder_mgr(o.holder_mgr), holder_known(o.holder_known), pending(o.pending), src_ep_last(o.src_ep_last) {
+    holder_mgr(o.holder_mgr), holder_known(o.holder_known), destroying(o.destroying), destroyed(o.destroyed),
+    destroy_hold(o.destroy_hold), self_owned(false), closing_held(o.closing_held), destroy_cb(o.destroy_cb),
+    closing_t0(o.closing_t0), resolve_t0(o.resolve_t0), pending(o.pending), src_ep_last(o.src_ep_last) {
   takeOver(o);
 }
 
-CkDeviceChannel& CkDeviceChannel::operator=(const CkDeviceChannel& o) {
+CkChannel& CkChannel::operator=(const CkChannel& o) {
   if (this == &o) return *this;
   retire();   // what this object held goes first, as its destructor would release it
   dst = o.dst; arrived = o.arrived; control = o.control; channel_id = o.channel_id; generation = o.generation;
@@ -1424,16 +1495,30 @@ CkDeviceChannel& CkDeviceChannel::operator=(const CkDeviceChannel& o) {
   dones_seen = o.dones_seen; close_ack_due = o.close_ack_due; close_ack_pe = o.close_ack_pe;
   my_token = o.my_token; sender_rec = o.sender_rec;
   holder_elem = o.holder_elem; holder_mgr = o.holder_mgr; holder_known = o.holder_known;
+  destroying = o.destroying; destroyed = o.destroyed; destroy_hold = o.destroy_hold; closing_held = o.closing_held;
+  destroy_cb = o.destroy_cb; closing_t0 = o.closing_t0; resolve_t0 = o.resolve_t0;
   pending = o.pending; src_ep_last = o.src_ep_last;
   takeOver(o);
   return *this;
 }
 
-CkDeviceChannel::~CkDeviceChannel() { retire(); }
+// An owner destroyed without destroy() starts the same teardown, with no
+// callback: a copy on the heap takes over the export and the tables, finishes
+// the teardown and deletes itself. So does an owner destroyed while its
+// teardown is in progress (the copy invokes destroy()'s callback).
+CkChannel::~CkChannel() {
+  if (is_owner && channel_id != 0 && !destroyed && !channel_exiting) {
+    CkChannel* t = new CkChannel(*this);
+    t->self_owned = true;
+    if (t->destroying) t->destroyCheck();
+    else t->startDestroy(CkCallback(CkCallback::ignore), false);
+  }
+  retire();
+}
 
 // What this object holds of the runtime: its table entries, the owner's
 // export and registration, its IPC views and registered sources.
-void CkDeviceChannel::retire() {
+void CkChannel::retire() {
   if (shm_waiting) { deviceChannelShmUnlist(this); shm_waiting = false; }
   if (is_owner) retireCreditSlot();
   if (my_token != 0) {
@@ -1443,9 +1528,13 @@ void CkDeviceChannel::retire() {
     CkpvAccess(device_channel_early_credits)->erase(my_token);
     my_token = 0;
   }
-  if (is_owner && channel_id != 0) {
-    unregisterOwner();
-    dst.close();   // the owner's export and registration go with it
+  // An owner, a destroyed owner (kept listed for late events) or one that
+  // arrived and is not reopened yet leaves the owners table.
+  if (channel_id != 0) unregisterOwner();
+  if (is_owner && channel_id != 0) dst.close();   // the owner's export and registration go with it
+  if (destroyed && channel_id != 0 && !channel_exiting) {
+    // Only the owner side's ids matter; a sender's copy adds a harmless entry.
+    CkpvAccess(device_channel_destroyed)->insert(channel_id);
   }
   is_owner = false;
   // A view or a source still in use by a copy in flight is left as it is:
@@ -1459,22 +1548,22 @@ void CkDeviceChannel::retire() {
   closeSources();
 }
 
-void CkDeviceChannel::registerOwner() {
+void CkChannel::registerOwner() {
   (*CkpvAccess(device_channel_owners))[channel_id] = this;
 }
 
-void CkDeviceChannel::unregisterOwner() {
+void CkChannel::unregisterOwner() {
   DeviceChannelTable* tab = CkpvAccess(device_channel_owners);
   auto it = tab->find(channel_id);
   if (it != tab->end() && it->second == this) tab->erase(it);
 }
 
-void CkDeviceChannel::open() {
+void CkChannel::open() {
   if (dst.ptr == nullptr || dst.cnt == 0) {
-    CkAbort("CkDeviceChannel::open: no destination buffer; construct the channel with one\n");
+    CkAbort("CkChannel::open: no destination buffer; construct the channel with one\n");
   }
   if (arrived.type == CkCallback::ignore) {
-    CkAbort("CkDeviceChannel::open: no arrival callback; a channel needs an entry that learns of "
+    CkAbort("CkChannel::open: no arrival callback; a channel needs an entry that learns of "
             "each put\n");
   }
   if (channel_id == 0) channel_id = deviceChannelToken();
@@ -1506,9 +1595,10 @@ void CkDeviceChannel::open() {
   registerOwner();
 }
 
-void CkDeviceChannel::reopen(void* new_dst) {
+void CkChannel::reopen(void* new_dst) {
+  if (destroyed) return;   // destroyed before the move: nothing to export
   if (channel_id == 0 || cap == 0) {
-    CkAbort("CkDeviceChannel::reopen: the channel was never open()ed\n");
+    CkAbort("CkChannel::reopen: the channel was never constructed on a buffer\n");
   }
   dst = CkDeviceChannelEndpoint(new_dst, cap);
   generation++;
@@ -1533,25 +1623,131 @@ void CkDeviceChannel::reopen(void* new_dst) {
   if (!busy && !pulling) startPull();
 }
 
-void CkDeviceChannel::close() {
-  if (!is_owner) return;
-  retireCreditSlot();
-  dst.close();
-  unregisterOwner();
-  is_owner = false;
+void CkChannel::destroy(const CkCallback& cb) {
+  deviceChannelProgress();
+  if (destroying || destroyed) {
+    CkAbort("CkChannel::destroy: channel %llx is already destroyed\n", (unsigned long long)channel_id);
+  }
+  if (!is_owner) {
+    CkAbort("CkChannel::destroy: called on a copy that does not own channel %llx; the receiver's own "
+            "object (reopened after a move) owns it\n", (unsigned long long)channel_id);
+  }
+  startDestroy(cb, true);
 }
 
-const CkDeviceChannelEvent* CkDeviceChannel::event(CkDataMsg* m) {
-  if (m == NULL || m->getLength() < (int)sizeof(CkDeviceChannelEvent)) {
-    CkAbort("CkDeviceChannel::event: the message is not a channel event (%d bytes, %zu expected)\n",
-            m ? m->getLength() : -1, sizeof(CkDeviceChannelEvent));
+// The owner's teardown: no read is started from now on, the announced puts
+// not yet read are dropped (their sources go back to their senders), and the
+// resolved sender is sent the closing of its resolution, marked as a destroy.
+// The teardown completes (destroyCheck) once that closing is acknowledged --
+// the sender's puts into the buffer have completed and its IPC view is gone
+// -- and a read in progress has completed. hold: keep the element in place
+// until then (not when the owner object itself is going away).
+void CkChannel::startDestroy(const CkCallback& cb, bool hold) {
+  destroying = true;
+  destroy_cb = cb;
+  note(24, taken_seq, epoch, sender_pe, -1, (int)sender_known);
+  if (deviceChannelDebug())
+    CmiPrintf("[CHAN-DESTROY %d] channel %llx gen %llu: sender %s (pe %d), closing in flight %d, reading %d, "
+              "announces dropped %zu\n", CkMyPe(), (unsigned long long)channel_id, (unsigned long long)generation,
+              sender_known && !sender_closed ? "attached" : "detached", sender_pe, (int)closing_sent, (int)pulling,
+              pulls.size());
+  if (hold && owner_known) {
+    CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(owner_mgr);
+    CkLocRec* rec = mgr ? mgr->localRecord(owner_id) : NULL;
+    if (rec) { rec->noteChannelWorkPosted(); destroy_hold = true; }
   }
-  CkDeviceChannelEvent ev;
+  for (const Queued& q : pulls) dropAnnounce(q.ev);
+  pulls.clear();
+  // A closing already out (a migration's) is acknowledged first; the sender is
+  // then detached, and learns of the destroy at its next attach.
+  if (sender_known && !sender_closed && !closing_sent) sendClosing(NULL);
+  destroyCheck();
+}
+
+// The teardown completes once nothing is awaited: the export and the
+// registration go, the element may move again, and the callback runs. The
+// object stays listed as an owner, so that a late attach or announce finds
+// it and the sender learns of the destroy. A heap copy finishing the
+// teardown of an owner destroyed without the call deletes itself here.
+void CkChannel::destroyCheck() {
+  if (!destroying || closing_sent || pulling) return;
+  destroying = false;
+  destroyed = true;
+  note(25, taken_seq, epoch, sender_pe);
+  retireCreditSlot();
+  dst.close();
+  is_owner = false;
+  sender_known = false;
+  if (deviceChannelDebug())
+    CmiPrintf("[CHAN-DESTROY %d] channel %llx: torn down; the buffer may be freed\n", CkMyPe(),
+              (unsigned long long)channel_id);
+  if (destroy_hold) {
+    destroy_hold = false;
+    CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(owner_mgr);
+    CkLocRec* rec = mgr ? mgr->localRecord(owner_id) : NULL;
+    if (rec) rec->noteChannelWorkDone();
+  }
+  CkCallback cb = destroy_cb;
+  destroy_cb = CkCallback(CkCallback::ignore);
+  if (cb.type != CkCallback::ignore) cb.send();
+  if (self_owned) delete this;
+}
+
+// An attach made after the destroy began: no endpoint, only the news. The
+// sender has nothing of this channel in flight, so no acknowledgement.
+static void chanSendDestroyed(uint64_t channel, int pe, uint64_t token) {
+  auto* m = deviceChannelMsg<DeviceChannelClosing>(device_channel_closing_handler);
+  m->token = token;
+  m->channel = channel;
+  m->generation = 0;
+  m->epoch = 0;
+  m->owner_pe = CkMyPe();
+  m->flags = CHAN_CLOSING_DESTROYED | CHAN_CLOSING_NOACK;
+  chanSendControl(pe, sizeof(DeviceChannelClosing), m);
+}
+void CkChannel::sendDestroyed(int pe, uint64_t token) { chanSendDestroyed(channel_id, pe, token); }
+
+// An announced put the destroyed owner will not read: its DONE hands the
+// source (or the staging buffer) back to the sender.
+static void chanDropAnnounce(uint64_t channel, const CkChannelEvent& ev) {
+  auto* d = deviceChannelMsg<DeviceChannelDone>(device_channel_done_handler);
+  d->token = ev.sender_token;
+  d->channel = channel;
+  d->seq = ev.seq;
+  chanSendControl(ev.sender_pe, sizeof(DeviceChannelDone), d);
+}
+void CkChannel::dropAnnounce(const CkChannelEvent& ev) { chanDropAnnounce(channel_id, ev); }
+
+// The closing of the current resolution to its sender; hold_rec, if any, is
+// held in place until the ack.
+void CkChannel::sendClosing(CkLocRec* hold_rec) {
+  closing_sent = true;
+  resolved_during_closing = false;
+  closing_held = (hold_rec != NULL);
+  if (hold_rec) hold_rec->noteChannelWorkPosted();
+  closing_t0 = CkWallTimer();
+  auto* m = deviceChannelMsg<DeviceChannelClosing>(device_channel_closing_handler);
+  m->token = sender_token;
+  m->channel = channel_id;
+  m->generation = generation;
+  m->epoch = epoch;
+  m->owner_pe = CkMyPe();
+  m->flags = destroying ? CHAN_CLOSING_DESTROYED : 0;
+  chanSendControl(sender_pe, sizeof(DeviceChannelClosing), m);
+}
+
+const CkChannelEvent* CkChannel::event(CkDataMsg* m) {
+  if (m == NULL || m->getLength() < (int)sizeof(CkChannelEvent)) {
+    CkAbort("CkChannel::event: the message is not a channel event (%d bytes, %zu expected)\n",
+            m ? m->getLength() : -1, sizeof(CkChannelEvent));
+  }
+  CkChannelEvent ev;
   memcpy(&ev, m->getData(), sizeof(ev));
-  if (ev.kind == CkDeviceChannelEvent::ANNOUNCE) {
+  if (ev.kind == CkChannelEvent::ANNOUNCE) {
     // The sender's source follows the event; this side reads it when the
     // buffer is free. The announce followed the element here if it moved, and
     // the source stays valid until this side says DONE.
+    if (destroying || destroyed) { dropAnnounce(ev); return NULL; }
     CkDeviceChannelEndpoint src;
     PUP::fromMem p((const char*)m->getData() + sizeof(ev));
     p | src;
@@ -1559,10 +1755,11 @@ const CkDeviceChannelEvent* CkDeviceChannel::event(CkDataMsg* m) {
     return NULL;
   }
   if (ev.channel != channel_id) {
-    CkAbort("CkDeviceChannel::event: event for channel %llx taken on channel %llx\n",
+    CkAbort("CkChannel::event: event for channel %llx taken on channel %llx\n",
             (unsigned long long)ev.channel, (unsigned long long)channel_id);
   }
-  if (ev.kind == CkDeviceChannelEvent::RESOLVE) {
+  if (ev.kind == CkChannelEvent::RESOLVE) {
+    if (destroying || destroyed) { sendDestroyed(ev.sender_pe, ev.sender_token); return NULL; }
     if (!is_owner) {
       // Packed and on the way to another PE: answered after reopen there.
       Waiting w; w.pe = ev.sender_pe; w.token = ev.sender_token; w.mgr = ev.sender_mgr; w.elem = ev.sender_elem;
@@ -1578,6 +1775,8 @@ const CkDeviceChannelEvent* CkDeviceChannel::event(CkDataMsg* m) {
     if (closing_gen == generation && closing_rec != NULL) closingForMigration(closing_rec);
     return NULL;
   }
+  // A put whose note arrives after the destroy: nobody takes it.
+  if (destroying || destroyed) return NULL;
   if (ev.generation != generation && deviceChannelDebug())
     CmiPrintf("[CHAN-STALE %d] channel %llx: put %llu into generation %llu taken at generation %llu (its bytes came with the pup)\n",
               CkMyPe(), (unsigned long long)channel_id, (unsigned long long)ev.seq,
@@ -1598,19 +1797,19 @@ const CkDeviceChannelEvent* CkDeviceChannel::event(CkDataMsg* m) {
 // element (its copy moved, or it holds a second copy) replaces the resolution,
 // and so does any resolve once the current one is closed. An element is
 // (location manager, id); a sender outside an array element is not checked.
-void CkDeviceChannel::checkOneSender(int pe, int mgr, CmiUInt8 elem) const {
+void CkChannel::checkOneSender(int pe, int mgr, CmiUInt8 elem) const {
   if (!sender_known || sender_closed || mgr == 0 || sender_mgr == 0) return;
   if (mgr == sender_mgr && elem == sender_elem) return;
-  CkAbort("CkDeviceChannel: channel %llx has a second sender: element %llu of location manager %d (pe %d) "
-          "resolved it while element %llu of location manager %d (pe %d) still sends to it. One sender per "
-          "channel: open a channel for each sender\n",
+  CkAbort("CkChannel: channel %llx has a second sender: element %llu of location manager %d (pe %d) "
+          "attached to it while element %llu of location manager %d (pe %d) still sends to it. One sender per "
+          "channel: construct a channel for each sender\n",
           (unsigned long long)channel_id, (unsigned long long)elem, mgr, pe, (unsigned long long)sender_elem,
           sender_mgr, sender_pe);
 }
 
 // The current endpoint to a sender; that sender is the one credits and the
 // closing go to from now on.
-void CkDeviceChannel::replyResolve(int pe, uint64_t token, int mgr, CmiUInt8 elem) {
+void CkChannel::replyResolve(int pe, uint64_t token, int mgr, CmiUInt8 elem) {
   deviceChannelProgress();
   deviceChannelLateInit();
   sender_pe = pe;
@@ -1667,7 +1866,7 @@ void CkDeviceChannel::replyResolve(int pe, uint64_t token, int mgr, CmiUInt8 ele
   chanSendControl(pe, (int)(sizeof(DeviceChannelResolved) + n), m);
 }
 
-void CkDeviceChannel::retireCreditSlot() {
+void CkChannel::retireCreditSlot() {
   if (credit_slot < 0) return;
   ChanShmCredit& c = chanShmArea(credit_slot_pe).credit[credit_slot];
   c.epoch.store(0, std::memory_order_release);
@@ -1678,7 +1877,7 @@ void CkDeviceChannel::retireCreditSlot() {
 
 // Sender: credits granted through shared memory since the last look. A put
 // queued behind one is issued here.
-void CkDeviceChannel::pollShmCredit() {
+void CkChannel::pollShmCredit() {
   if (credit_shm_slot < 0 || !resolved) return;
   const long n = chanShmReadCredit(credit_shm_pe, credit_shm_slot, channel_id, epoch);
   if (n < 0 || (uint32_t)n <= credits_seen) return;
@@ -1704,14 +1903,15 @@ void CkDeviceChannel::pollShmCredit() {
   }
 }
 
-void CkDeviceChannel::release() {
+void CkChannel::release() {
   deviceChannelProgress();
   if (!have_last) {
     printHist(is_owner ? "owner" : "copy");
-    CkAbort("CkDeviceChannel::release: nothing to release; event() records the put first\n");
+    CkAbort("CkChannel::release: nothing to release; event() records the put first\n");
   }
   have_last = false;
   busy = false;
+  if (destroying || destroyed) return;   // no sender to credit, no read to start
   // The next announced put, if one waits and is next in order.
   if (!pulls.empty()) startPull();
   // Every release credits the current sender, after a read put as after a
@@ -1747,8 +1947,8 @@ void CkDeviceChannel::release() {
 // Migration of the receiving element (from CkLocMgr::emigrate): the resolved
 // sender is told the channel is closing and the element is held by one unit
 // of channel work until the ack. Once per generation.
-void CkDeviceChannel::closingForMigration(CkLocRec* rec) {
-  if (!is_owner) return;
+void CkChannel::closingForMigration(CkLocRec* rec) {
+  if (!is_owner || destroying) return;   // a teardown holds the element until it completes
   note(13, taken_seq, epoch, sender_pe, -1, (int)sender_known);
   // The pending migration is noted on every owned channel, resolved sender or
   // not: a sender that resolves while the element stands down (for another
@@ -1757,23 +1957,14 @@ void CkDeviceChannel::closingForMigration(CkLocRec* rec) {
   closing_gen = generation;
   closing_rec = rec;
   if (!sender_known || sender_closed || closing_sent) return;
-  closing_sent = true;
-  resolved_during_closing = false;
-  rec->noteChannelWorkPosted();
+  sendClosing(rec);
   if (deviceChannelDebug())
     CmiPrintf("[CHAN-CLOSE %d] channel %llx gen %llu: closing resolution %llu sent to pe %d token %llx; element %llu work now %d\n",
               CkMyPe(), (unsigned long long)channel_id, (unsigned long long)generation, (unsigned long long)epoch, sender_pe,
               (unsigned long long)sender_token, (unsigned long long)rec->getID(), rec->outstandingChannelWork);
-  auto* m = deviceChannelMsg<DeviceChannelClosing>(device_channel_closing_handler);
-  m->token = sender_token;
-  m->channel = channel_id;
-  m->generation = generation;
-  m->epoch = epoch;
-  m->owner_pe = CkMyPe();
-  chanSendControl(sender_pe, sizeof(DeviceChannelClosing), m);
 }
 
-void CkDeviceChannel::onCloseAck(int pe, uint64_t token, uint64_t last_seq, uint64_t last_bytes) {
+void CkChannel::onCloseAck(int pe, uint64_t token, uint64_t last_seq, uint64_t last_bytes) {
   deviceChannelProgress();
   note(14, last_seq, epoch, pe, -1, (int)last_bytes);
   // What the sender put last against what this side has taken: a put that
@@ -1788,31 +1979,36 @@ void CkDeviceChannel::onCloseAck(int pe, uint64_t token, uint64_t last_seq, uint
               (unsigned long long)closing_gen, (unsigned long long)generation, (int)closing_sent, (int)sender_closed);
   if (!is_owner || !closing_sent) return;
   closing_sent = false;
+  if (closing_t0 > 0.0) { chan_stat_close.add(CkWallTimer() - closing_t0); closing_t0 = 0.0; }
   retireCreditSlot();
-  CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(owner_mgr);
+  CkLocMgr* mgr = owner_known ? (CkLocMgr*)CkLocalBranch(owner_mgr) : NULL;
   CkLocRec* rec = mgr ? mgr->localRecord(owner_id) : NULL;
+  const bool held = closing_held;
+  closing_held = false;
   const bool reclose = resolved_during_closing;
   resolved_during_closing = false;
   // The sender resolved again while that closing was out (its request crossed
   // the ack): that resolution is closed too, posted before this ack's count-down
   // so the element's count never touches zero in between.
-  if (reclose && rec) closingForMigration(rec);
+  if (reclose && destroying) sendClosing(NULL);
+  else if (reclose && rec) closingForMigration(rec);
   else sender_closed = true;
-  if (rec) rec->noteChannelWorkDone();
-  else if (deviceChannelDebug())
+  if (held && rec) rec->noteChannelWorkDone();
+  else if (held && deviceChannelDebug())
     CmiPrintf("[CHAN-CLOSE %d] channel %llx: ack but element %llu not found here\n", CkMyPe(),
               (unsigned long long)channel_id, (unsigned long long)owner_id);
+  if (destroying) destroyCheck();   // last: a heap copy finishing a teardown deletes itself
 }
 
 static const char* const chan_hist_names[] = {
   "put", "pend", "staged", "resolve-req", "resolved", "credit-msg", "credit-shm", "closing-rx", "closeack-tx",
   "srcdone", "taken", "release", "reply", "closing-tx", "closeack-rx", "-", "-", "pack",
-  "unpack", "done-rx", "early-credit", "stale-credit", "pulled", "announce-rx"};
-void CkDeviceChannel::note(uint8_t kind, uint64_t seq, uint64_t epoch_, int pe, int slot, int n) {
+  "unpack", "done-rx", "early-credit", "stale-credit", "pulled", "announce-rx", "destroy", "destroyed"};
+void CkChannel::note(uint8_t kind, uint64_t seq, uint64_t epoch_, int pe, int slot, int n) {
   Hist& h = hist[hist_n++ % HIST_N];
   h.kind = kind; h.pe = pe; h.slot = slot; h.n = n; h.seq = seq; h.epoch = epoch_; h.t = CkWallTimer();
 }
-void CkDeviceChannel::printHist(const char* role) const {
+void CkChannel::printHist(const char* role) const {
   char buf[2600]; int off = 0;
   buf[0] = '\0';
   const uint32_t n = hist_n < (uint32_t)HIST_N ? hist_n : (uint32_t)HIST_N;
@@ -1830,7 +2026,7 @@ void CkDeviceChannel::printHist(const char* role) const {
             credits_seen, credits, n, buf);
 }
 
-void CkDeviceChannel::describeStall(const char* role) const {
+void CkChannel::describeStall(const char* role) const {
   if (const DeviceChannelProbeCtx* pc = device_channel_probe_ctx) {
     CmiPrintf("[CHAN-PROBE %d] %s channel %llx gen %llu, asked by pe %d token %llx (its epoch %llu, seq %llu): "
               "is_owner=%d busy=%d have_last=%d last(seq %llu tag %llu kind %d from pe %d token %llx) epoch=%llu "
@@ -1847,7 +2043,7 @@ void CkDeviceChannel::describeStall(const char* role) const {
     return;
   }
   const bool sender_stuck = pending.valid || resolving || in_flight > 0 || close_ack_due || staged_outstanding > 0;
-  const bool owner_stuck = is_owner && (!waiting.empty() || closing_sent || !pulls.empty());
+  const bool owner_stuck = is_owner && (!waiting.empty() || closing_sent || !pulls.empty() || destroying);
   if (!sender_stuck && !owner_stuck) return;
   if (device_channel_watch_tally && !is_owner && pending.valid && resolved && credits == 0 && in_flight == 0) {
     // Waiting for a credit that is not coming: ask the owner what it thinks.
@@ -1882,6 +2078,9 @@ void CkDeviceChannel::describeStall(const char* role) const {
             (unsigned long long)closed_epoch, (int)is_owner, (int)busy, pulls.size(), (int)pulling,
             (int)sender_known, sender_pe, (unsigned long long)sender_token, (unsigned long long)closing_gen,
             (int)closing_sent, (int)sender_closed, waiting.size(), (int)have_last);
+  if (destroying)
+    CmiPrintf("[CHAN-STALL %d]   destroying: the sender's closing ack awaited %d, a read in progress %d\n",
+              CkMyPe(), (int)closing_sent, (int)pulling);
   if (staged_outstanding > 0 || !pulls.empty())
     CmiPrintf("[CHAN-STALL %d]   staged puts outstanding %d; queued announces %zu, head seq %llu, taken_seq %llu\n",
               CkMyPe(), staged_outstanding, pulls.size(),
@@ -1890,7 +2089,7 @@ void CkDeviceChannel::describeStall(const char* role) const {
 }
 
 // Past the stand-down, before the pack: the buffer is about to go.
-void CkDeviceChannel::packForMigration() {
+void CkChannel::packForMigration() {
   if (!is_owner) return;
   note(17, taken_seq, epoch, sender_pe, credit_slot, (int)busy);
   retireCreditSlot();
@@ -1904,24 +2103,21 @@ void CkDeviceChannel::packForMigration() {
   closing_rec = NULL;
 }
 
-CkDeviceStatus CkDeviceChannel::put(const void* src, size_t bytes, hapiStream_t stream,
+CkDeviceStatus CkChannel::put(const void* src, size_t bytes, hapiStream_t stream,
                                     const CkCallback& src_done, uint64_t tag) {
   deviceChannelProgress();
   deviceChannelLateInit();
   if (channel_id == 0) {
-    CkAbort("CkDeviceChannel::put: the channel was never open()ed by its receiver\n");
+    CkAbort("CkPut: the channel was never constructed by its receiver\n");
+  }
+  if (destroyed) {
+    CkAbort("CkPut: channel %llx was destroyed by its owner; no put may follow the destroy\n",
+            (unsigned long long)channel_id);
   }
   if (bytes > cap) {
-    CkAbort("CkDeviceChannel::put: %zu bytes into a channel of %zu\n", bytes, cap);
+    CkAbort("CkPut: %zu bytes into a channel of %zu\n", bytes, cap);
   }
-  if (sender_rec == NULL) {
-    sender_rec = chanActiveRec();
-    if (sender_rec) {
-      holder_elem = sender_rec->getID();
-      holder_mgr = sender_rec->getLocMgr()->ckGetGroupID();
-      holder_known = true;
-    }
-  }
+  noteHolder();
   // The put holds the sending element in place from now until its source is
   // done, queued or not: the element does not migrate with a put of its
   // buffers in flight or waiting.
@@ -1958,7 +2154,7 @@ CkDeviceStatus CkDeviceChannel::put(const void* src, size_t bytes, hapiStream_t 
     }
     if (!resolved && !resolving) requestResolve();
   } else {
-    CkAbort("CkDeviceChannel::put: a put is already queued behind the credit for put %llu on "
+    CkAbort("CkPut: a put is already queued behind the credit for put %llu on "
             "channel %llx; the receiver's release() frees the buffer, a second channel overlaps\n",
             (unsigned long long)send_seq, (unsigned long long)channel_id);
   }
@@ -1970,16 +2166,37 @@ CkDeviceStatus CkDeviceChannel::put(const void* src, size_t bytes, hapiStream_t 
 // resolve or an announce reaching the element first is queued here, not
 // refused. A copy unpacked as an entry-method parameter must not call it (the
 // parameter is a temporary; a table entry for it would dangle).
-void CkDeviceChannel::arriving() {
+void CkChannel::arriving() {
   if (channel_id != 0 && !is_owner) registerOwner();
 }
 
-void CkDeviceChannel::resolve() {
-  if (channel_id == 0 || resolved || resolving) return;
+// The sending element: charged with this copy's puts, held in place while one
+// is in flight, and named in the attach for the one-sender check.
+void CkChannel::noteHolder() {
+  if (sender_rec != NULL) return;
+  sender_rec = chanActiveRec();
+  if (sender_rec) {
+    holder_elem = sender_rec->getID();
+    holder_mgr = sender_rec->getLocMgr()->ckGetGroupID();
+    holder_known = true;
+  }
+}
+
+void CkChannel::attach() {
+  if (channel_id == 0) CkAbort("CkChannel::attach: the channel was never constructed by its receiver\n");
+  if (destroyed) {
+    CkAbort("CkChannel::attach: channel %llx was destroyed by its owner\n", (unsigned long long)channel_id);
+  }
+  noteHolder();
+  if (resolved || resolving) return;
   requestResolve();
 }
 
-void CkDeviceChannel::requestResolve() {
+CkDeviceStatus CkPut(CkChannel& ch, const void* src, size_t bytes, const CkPutOpts& opts) {
+  return ch.put(src, bytes, opts.stream_, opts.done_, opts.tag_);
+}
+
+void CkChannel::requestResolve() {
   // Credits granted to this PE through shared memory are counted processed by
   // its poll (deviceChannelShmPoll), which must therefore run before the owner
   // can grant the first one.
@@ -1989,16 +2206,17 @@ void CkDeviceChannel::requestResolve() {
     (*CkpvAccess(device_channel_senders))[my_token] = this;
   }
   resolving = true;
+  resolve_t0 = CkWallTimer();
   note(3, send_seq, epoch, dst.pe, -1, credits);
-  CkDeviceChannelEvent ev;
+  CkChannelEvent ev;
   memset(&ev, 0, sizeof(ev));
-  ev.kind = CkDeviceChannelEvent::RESOLVE;
+  ev.kind = CkChannelEvent::RESOLVE;
   ev.channel = channel_id;
   ev.sender_pe = CkMyPe();
   ev.sender_token = my_token;
   // The sending element, for the owner's one-sender check: the one charged
-  // with this copy's puts (none yet -- resolve() before the first put, or puts
-  // made outside an array element -- and this resolution is not checked).
+  // with this copy's puts, recorded at the first attach or put (none for puts
+  // made outside an array element, whose resolutions are not checked).
   if (holder_known) {
     ev.sender_mgr = holder_mgr.idx;
     ev.sender_elem = holder_elem;
@@ -2008,14 +2226,14 @@ void CkDeviceChannel::requestResolve() {
 
 // The view of an endpoint this copy no longer uses: released now if nothing of
 // this copy is in flight, else when the last put completes (onSrcDone).
-void CkDeviceChannel::releaseDstView() {
+void CkChannel::releaseDstView() {
   if (!dst.ipc_open) return;
   if (in_flight == 0) { dst.releaseView(); return; }
   stale_views.push_back(dst);
   stale_views.back().takeView(dst);
 }
 
-void CkDeviceChannel::onResolved(const CkDeviceChannelEndpoint& ep, uint64_t gen_, int owner_pe,
+void CkChannel::onResolved(const CkDeviceChannelEndpoint& ep, uint64_t gen_, int owner_pe,
                                  bool free, uint64_t epoch_, int credit_pe, int credit_slot_,
                                  uint64_t taken_seq_) {
   deviceChannelProgress();
@@ -2052,6 +2270,7 @@ void CkDeviceChannel::onResolved(const CkDeviceChannelEndpoint& ep, uint64_t gen
   // otherwise; a release under this resolution that overtook it (an early
   // credit) is +1 when it frees a put taken after the reply, or the put held
   // at it. Everything up to taken_seq_ is the free flag's.
+  if (resolve_t0 > 0.0) { chan_stat_attach.add(CkWallTimer() - resolve_t0); resolve_t0 = 0.0; }
   acct_seq = taken_seq_;
   int c = free ? 1 : 0;
   occupant_credit_due = !free;
@@ -2125,7 +2344,7 @@ void CkDeviceChannel::onResolved(const CkDeviceChannelEndpoint& ep, uint64_t gen
 
 // A put is queued behind a credit that comes through shared memory: list this
 // copy for the per-PE poll and read the word once now.
-void CkDeviceChannel::awaitShmCredit() {
+void CkChannel::awaitShmCredit() {
   if (!pending.valid || !resolved || pull_mode || credit_shm_slot < 0) return;
   if (!shm_waiting) {
     shm_waiting = true;
@@ -2134,9 +2353,30 @@ void CkDeviceChannel::awaitShmCredit() {
   pollShmCredit();
 }
 
-void CkDeviceChannel::onClosing(uint64_t gen_, int owner_pe, uint64_t epoch_) {
+void CkChannel::onClosing(uint64_t gen_, int owner_pe, uint64_t epoch_, int flags) {
   deviceChannelProgress();
   (void)gen_;
+  if (flags & CHAN_CLOSING_DESTROYED) {
+    destroyed = true;
+    if (pending.valid) {
+      CkAbort("CkPut: a put (tag %llu) waits on channel %llx, which its owner destroyed; no put may follow "
+              "the destroy\n", (unsigned long long)pending.tag, (unsigned long long)channel_id);
+    }
+    if (deviceChannelDebug())
+      CmiPrintf("[CHAN-DESTROY %d] channel %llx token %llx: the owner destroyed it (in_flight %d, ack %s)\n",
+                CkMyPe(), (unsigned long long)channel_id, (unsigned long long)my_token, in_flight,
+                (flags & CHAN_CLOSING_NOACK) ? "none" : "after the puts in flight");
+  }
+  if (flags & CHAN_CLOSING_NOACK) {
+    // The answer to an attach made after the destroy: nothing of this copy
+    // reaches the buffer.
+    resolved = false;
+    resolving = false;
+    credit_shm_slot = -1; credit_shm_pe = -1;
+    if (shm_waiting) { deviceChannelShmUnlist(this); shm_waiting = false; }
+    releaseDstView();
+    return;
+  }
   if (deviceChannelDebug())
     CmiPrintf("[CHAN-CLOSE %d] channel %llx: closing of resolution %llu received (current %llu resolved %d in_flight %d pending %d)\n",
               CkMyPe(), (unsigned long long)channel_id, (unsigned long long)epoch_, (unsigned long long)epoch,
@@ -2168,7 +2408,7 @@ void CkDeviceChannel::onClosing(uint64_t gen_, int owner_pe, uint64_t epoch_) {
   }
 }
 
-void CkDeviceChannel::sendCloseAck() {
+void CkChannel::sendCloseAck() {
   close_ack_due = false;
   note(8, last_direct_seq, epoch, close_ack_pe, -1, in_flight);
   auto* m = deviceChannelMsg<DeviceChannelCloseAck>(device_channel_closeack_handler);
@@ -2183,7 +2423,7 @@ void CkDeviceChannel::sendCloseAck() {
   chanSendControl(close_ack_pe, sizeof(DeviceChannelCloseAck), m);
 }
 
-void CkDeviceChannel::onSrcDone(uint64_t seq) {
+void CkChannel::onSrcDone(uint64_t seq) {
   deviceChannelProgress();
   if (in_flight > 0) in_flight--;
   note(9, seq, epoch, -1, -1, in_flight);
@@ -2196,7 +2436,7 @@ void CkDeviceChannel::onSrcDone(uint64_t seq) {
 }
 
 // The receiver has read announced put `seq`: the source may be reused.
-void CkDeviceChannel::onDone(uint64_t seq) {
+void CkChannel::onDone(uint64_t seq) {
   CkCallback cb(CkCallback::ignore);
   auto it = done_cbs.find(seq);
   if (it != done_cbs.end()) { cb = it->second; done_cbs.erase(it); }
@@ -2214,7 +2454,7 @@ void CkDeviceChannel::onDone(uint64_t seq) {
 
 // The registered source of pull mode is replaced: closed now if every put
 // announced from it has been read, else once the last one has (onDone).
-void CkDeviceChannel::retireSource(uint64_t through_seq) {
+void CkChannel::retireSource(uint64_t through_seq) {
   if (src_ep.id == 0) return;
   const bool outstanding = !done_cbs.empty() && done_cbs.begin()->first <= through_seq;
   if (outstanding) retired_srcs.push_back(Retired{src_ep, through_seq});
@@ -2225,7 +2465,7 @@ void CkDeviceChannel::retireSource(uint64_t through_seq) {
 // This copy's registered sources, at its end: closed unless a read of one may
 // still be in flight (deregistering memory under a transfer is worse than
 // keeping a registration).
-void CkDeviceChannel::closeSources() {
+void CkChannel::closeSources() {
   if (!done_cbs.empty()) return;
   src_ep.close();
   src_ep = CkDeviceChannelEndpoint();
@@ -2234,7 +2474,7 @@ void CkDeviceChannel::closeSources() {
 }
 
 // An announced put: read it now if the buffer is free, else after release().
-void CkDeviceChannel::onAnnounce(const CkDeviceChannelEvent& ev, const CkDeviceChannelEndpoint& src) {
+void CkChannel::onAnnounce(const CkChannelEvent& ev, const CkDeviceChannelEndpoint& src) {
   deviceChannelProgress();
   Queued q; q.ev = ev; q.src = src;
   if (deviceChannelDebug() && !pulls.empty() && ev.seq < pulls.back().ev.seq)
@@ -2253,8 +2493,8 @@ void CkDeviceChannel::onAnnounce(const CkDeviceChannelEvent& ev, const CkDeviceC
   if (is_owner && !busy && !pulling) startPull();
 }
 
-void CkDeviceChannel::startPull() {
-  if (!is_owner || busy || pulling || pulls.empty()) return;
+void CkChannel::startPull() {
+  if (!is_owner || destroying || busy || pulling || pulls.empty()) return;
   // Puts are read in the order they were made: a direct put whose note is
   // still on its way is taken and released before an announced put that
   // followed it is read over the buffer.
@@ -2266,7 +2506,7 @@ void CkDeviceChannel::startPull() {
   pull_src = q.src;
   pull_src.cnt = q.ev.bytes;
   if (pull_src.cnt > cap) {
-    CkAbort("CkDeviceChannel: announced put of %zu bytes into a channel of %zu\n", pull_src.cnt, cap);
+    CkAbort("CkChannel: announced put of %zu bytes into a channel of %zu\n", pull_src.cnt, cap);
   }
   // The read writes this buffer outside every stream the element uses: the
   // element must not leave with it in flight.
@@ -2284,7 +2524,7 @@ void CkDeviceChannel::startPull() {
 }
 
 // The read completed: the application's DATA event, and DONE to the sender.
-void CkDeviceChannel::onPulled() {
+void CkChannel::onPulled() {
   deviceChannelProgress();
   pulling = false;
   pull_src.releaseView();
@@ -2308,14 +2548,15 @@ void CkDeviceChannel::onPulled() {
   d->channel = channel_id;
   d->seq = pull_ev.seq;
   chanSendControl(pull_ev.sender_pe, sizeof(DeviceChannelDone), d);
-  CkDeviceChannelEvent ev = pull_ev;
-  ev.kind = CkDeviceChannelEvent::DATA;
+  if (destroying) { destroyCheck(); return; }   // read before the destroy; nobody takes it
+  CkChannelEvent ev = pull_ev;
+  ev.kind = CkChannelEvent::DATA;
   CkDataMsg* note = CkDataMsg::buildNew((int)sizeof(ev), &ev);
   CkSetRefNum(note, (CMK_REFNUM_TYPE)ev.tag);
   arrived.send(note);
 }
 
-void CkDeviceChannel::issue(const void* src, size_t bytes, hapiStream_t stream,
+void CkChannel::issue(const void* src, size_t bytes, hapiStream_t stream,
                             const CkCallback& src_done, uint64_t tag) {
   const uint64_t seq = ++send_seq;
   note(0, seq, epoch, dst.pe, credit_shm_slot, credits);
@@ -2334,9 +2575,9 @@ void CkDeviceChannel::issue(const void* src, size_t bytes, hapiStream_t stream,
     my_token = deviceChannelToken();
     (*CkpvAccess(device_channel_senders))[my_token] = this;
   }
-  CkDeviceChannelEvent ev;
+  CkChannelEvent ev;
   memset(&ev, 0, sizeof(ev));
-  ev.kind = CkDeviceChannelEvent::DATA;
+  ev.kind = CkChannelEvent::DATA;
   ev.channel = channel_id;
   ev.generation = generation;
   ev.seq = seq;
@@ -2374,7 +2615,7 @@ void CkDeviceChannel::issue(const void* src, size_t bytes, hapiStream_t stream,
     }
     done_cbs[seq] = src_done;
     in_flight++;
-    ev.kind = CkDeviceChannelEvent::ANNOUNCE;
+    ev.kind = CkChannelEvent::ANNOUNCE;
     CkDeviceChannelEndpoint a = src_ep;
     a.cnt = bytes;
     if (a.rdma_valid) a.rdma.cnt = bytes;
@@ -2403,7 +2644,7 @@ void CkDeviceChannel::issue(const void* src, size_t bytes, hapiStream_t stream,
   }
   void* dptr = (tier == 0) ? (void*)dst.ptr : dst.view();
   if (dptr == nullptr)
-    CkAbort("CkDeviceChannel::put: channel %llx has no mapping of PE %d's buffer\n",
+    CkAbort("CkChannel::put: channel %llx has no mapping of PE %d's buffer\n",
             (unsigned long long)channel_id, dst.pe);
   in_flight++;
   deviceChannelBatchAdd(stream, dptr, src, bytes, DeviceChannelBatchEntry{my_token, seq, src_done, note_cb, note_msg});
@@ -2428,7 +2669,7 @@ static void deviceChannelStagedCopiedFn(void* param, void* msg) {
   delete d;
 }
 
-void CkDeviceChannel::issueStaged(const void* src, size_t bytes, hapiStream_t stream,
+void CkChannel::issueStaged(const void* src, size_t bytes, hapiStream_t stream,
                                   const CkCallback& src_done, uint64_t tag) {
   note(2, send_seq, epoch, dst.pe, -1, staged_outstanding);
   if (my_token == 0) {
@@ -2443,7 +2684,7 @@ void CkDeviceChannel::issueStaged(const void* src, size_t bytes, hapiStream_t st
       // is issued directly once resolved and credited, and only behind the
       // staged ones (onStagedDone).
       if (pending.valid) {
-        CkAbort("CkDeviceChannel::put: a put is already queued on channel %llx while its receiver migrates, "
+        CkAbort("CkChannel::put: a put is already queued on channel %llx while its receiver migrates, "
                 "and there is no device memory (%zu bytes) to stage another\n", (unsigned long long)channel_id, bytes);
       }
       pending.src = src; pending.bytes = bytes; pending.stream = stream; pending.done = src_done; pending.tag = tag;
@@ -2464,9 +2705,9 @@ void CkDeviceChannel::issueStaged(const void* src, size_t bytes, hapiStream_t st
   }
   // The application's source is free once the copy has read it.
   hapiAddCallback(stream, CkCallback(deviceChannelStagedCopiedFn, (void*)new DeviceChannelStagedCopied{src_done}));
-  CkDeviceChannelEvent ev;
+  CkChannelEvent ev;
   memset(&ev, 0, sizeof(ev));
-  ev.kind = CkDeviceChannelEvent::ANNOUNCE;
+  ev.kind = CkChannelEvent::ANNOUNCE;
   ev.channel = channel_id;
   ev.generation = generation;
   ev.seq = seq;
@@ -2482,7 +2723,7 @@ void CkDeviceChannel::issueStaged(const void* src, size_t bytes, hapiStream_t st
   tm | sep;
   CkDataMsg* ann = CkDataMsg::buildNew((int)buf.size(), buf.data());
   (*CkpvAccess(device_channel_staged))[std::make_pair(my_token, seq)] =
-      DeviceChannelStaged{stage, sep, holder_mgr, holder_elem, holder_known};
+      DeviceChannelStaged{stage, sep, holder_mgr, holder_elem, holder_known, CkWallTimer()};
   staged_outstanding++;
   if (deviceChannelDebug())
     CmiPrintf("[CHAN-STAGED %d] channel %llx token %llx: put %llu (%zu bytes, tag %llu) staged at %p; %d outstanding\n",
@@ -2497,7 +2738,7 @@ void CkDeviceChannel::issueStaged(const void* src, size_t bytes, hapiStream_t st
 // The receiver read a staged put (its DONE; the staging buffer is already
 // freed by the handler): the read took the buffer as a direct put would, and
 // the receiver's release of it will credit, so one credit is debited here.
-void CkDeviceChannel::onStagedDone(uint64_t seq) {
+void CkChannel::onStagedDone(uint64_t seq) {
   deviceChannelProgress();
   note(19, seq, epoch, -1, -1, staged_outstanding);
   if (deviceChannelDebug())
@@ -2526,7 +2767,7 @@ void CkDeviceChannel::onStagedDone(uint64_t seq) {
 // reply first (not in direct_issued, which the reply's reconciliation pruned),
 // then the oldest direct put. seq names it when the credit came as a message;
 // 0 (shared memory) takes the put order.
-void CkDeviceChannel::creditedPut(uint64_t seq) {
+void CkChannel::creditedPut(uint64_t seq) {
   if (occupant_credit_due && (seq == 0 || seq <= acct_seq)) { occupant_credit_due = false; return; }
   occupant_credit_due = false;
   if (direct_issued.empty()) return;
@@ -2538,7 +2779,7 @@ void CkDeviceChannel::creditedPut(uint64_t seq) {
   direct_issued.erase(direct_issued.begin());
 }
 
-void CkDeviceChannel::onCredit(uint64_t seq, uint64_t epoch_) {
+void CkChannel::onCredit(uint64_t seq, uint64_t epoch_) {
   deviceChannelProgress();
   note(5, seq, epoch_, -1, -1, credits);
   if (deviceChannelDebug())
@@ -2587,7 +2828,7 @@ void CkDeviceChannel::onCredit(uint64_t seq, uint64_t epoch_) {
   issue(p.src, p.bytes, p.stream, p.done, p.tag);
 }
 
-void CkDeviceChannel::pup(PUP::er& p) {
+void CkChannel::pup(PUP::er& p) {
   p|dst;
   p|arrived;
   p|control;
@@ -2604,6 +2845,7 @@ void CkDeviceChannel::pup(PUP::er& p) {
   p|sender_token;
   p|sender_mgr;
   p|sender_elem;
+  p|destroyed;
   // A receiver may move between event() and release(): the taken event goes
   // with it, so the release at the new home finds it (the credit then goes
   // nowhere, and the sender learns the buffer is free when it re-resolves).
@@ -2662,6 +2904,9 @@ void CkDeviceChannel::pup(PUP::er& p) {
     src_ep_last = 0;
     retired_srcs.clear();
     stale_views.clear();
+    destroying = false; destroy_hold = false; self_owned = false; closing_held = false;
+    destroy_cb = CkCallback(CkCallback::ignore);
+    closing_t0 = 0.0; resolve_t0 = 0.0;
   }
 }
 
@@ -2671,14 +2916,21 @@ void CkDeviceChannel::pup(PUP::er& p) {
 // of this element's channels, delivered where the element lives.
 void CkDeviceChannelControl(void* msg) {
   CkDataMsg* m = (CkDataMsg*)msg;
-  if (m->getLength() < (int)sizeof(CkDeviceChannelEvent)) {
+  if (m->getLength() < (int)sizeof(CkChannelEvent)) {
     CkAbort("CkDeviceChannelControl: not a channel event (%d bytes)\n", m->getLength());
   }
-  CkDeviceChannelEvent ev;
+  CkChannelEvent ev;
   memcpy(&ev, m->getData(), sizeof(ev));
-  CkDeviceChannel* c = deviceChannelOwner(ev.channel);
+  CkChannel* c = deviceChannelOwner(ev.channel);
+  if (c == NULL && CkpvAccess(device_channel_destroyed)->count(ev.channel)) {
+    // Destroyed here, and its owner object is gone.
+    if (ev.kind == CkChannelEvent::RESOLVE) chanSendDestroyed(ev.channel, ev.sender_pe, ev.sender_token);
+    else if (ev.kind == CkChannelEvent::ANNOUNCE) chanDropAnnounce(ev.channel, ev);
+    delete m;
+    return;
+  }
   if (c == NULL) {
-    CkAbort("CkDeviceChannel: a control event for channel %llx reached PE %d, where its element "
+    CkAbort("CkChannel: a control event for channel %llx reached PE %d, where its element "
             "holds no channel of that id; an element's pup must carry its channels, call arriving() on "
             "unpack and reopen() them on the new buffers\n", (unsigned long long)ev.channel, CkMyPe());
   }
@@ -2692,10 +2944,10 @@ void CkDeviceChannelsBeforeMigrate(CkLocRec* rec) {
   if (tab.empty()) return;
   const CmiUInt8 id = rec->getID();
   const int mgr = rec->getLocMgr()->ckGetGroupID().idx;
-  std::vector<CkDeviceChannel*> owned;
+  std::vector<CkChannel*> owned;
   for (auto& kv : tab)
     if (kv.second->ownedBy(mgr, id)) owned.push_back(kv.second);
-  for (CkDeviceChannel* c : owned) c->closingForMigration(rec);
+  for (CkChannel* c : owned) c->closingForMigration(rec);
 }
 
 void CkDeviceChannelsPack(CkLocRec* rec) {
@@ -2704,10 +2956,10 @@ void CkDeviceChannelsPack(CkLocRec* rec) {
   if (tab.empty()) return;
   const CmiUInt8 id = rec->getID();
   const int mgr = rec->getLocMgr()->ckGetGroupID().idx;
-  std::vector<CkDeviceChannel*> owned;
+  std::vector<CkChannel*> owned;
   for (auto& kv : tab)
     if (kv.second->ownedBy(mgr, id)) owned.push_back(kv.second);
-  for (CkDeviceChannel* c : owned) c->packForMigration();
+  for (CkChannel* c : owned) c->packForMigration();
 }
 
 #endif // (CMK_CUDA || CMK_HIP)

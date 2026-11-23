@@ -13,7 +13,7 @@ class CkLocRec;
 // One device buffer as the channel runtime names it: where it lives (PE,
 // process, host), the CUDA/HIP IPC handle of its allocation, and, once its
 // owner has opened it, its entry in the owning process's registration table.
-// Not an application interface: CkDeviceChannel builds and moves these.
+// Not an application interface: CkChannel builds and moves these.
 //
 // A holder in another process on the same host reaches the buffer through an
 // IPC mapping shared by the whole process and reference counted; the holder's
@@ -79,12 +79,12 @@ private:
 
 // What the receiver's `arrived` entry gets as the payload of a CkDataMsg. A DATA
 // event is a put: which channel, which put, how many bytes. A RESOLVE event is a
-// sender asking for the channel's current endpoint; CkDeviceChannel::event()
+// sender asking for the channel's current endpoint; CkChannel::event()
 // answers it and hands the application nothing. An ANNOUNCE event is a put the
 // receiver reads itself (a sender on another host, or one whose receiver was
 // migrating); event() queues it and the application sees a DATA event once the
 // bytes are in the buffer.
-struct CkDeviceChannelEvent {
+struct CkChannelEvent {
   enum Kind : int { DATA = 1, RESOLVE = 2, ANNOUNCE = 3 };
   int kind;
   uint64_t channel;
@@ -99,16 +99,34 @@ struct CkDeviceChannelEvent {
   uint64_t sender_elem;    // RESOLVE: the sending element's id
 };
 
-// A device channel: one fixed destination buffer on the receiver, opened once
-// by open(). The receiver keeps its object; copies reach the senders by pup, as
-// an entry-method argument. A sender writes with put(), which carries nothing
-// but the bytes, a sequence number and a tag, in whichever transport the two
-// PEs call for: a batched device copy within a process, a device copy through
-// the IPC mapping between processes on one host, and between hosts (or where
-// the IPC handle does not open) an announce the receiver answers by reading the
-// bytes with RDMA. The receiver's `arrived` callback fires once the bytes are
-// in place -- a CkCallback to a chare, so it follows the receiver wherever it
-// lives -- with a CkDataMsg holding a CkDeviceChannelEvent.
+// The kind of memory a channel's buffer is. Only device memory is implemented.
+enum class CkMem : int { Host = 0, Device = 1 };
+
+// What CkPut takes beyond the channel, the source and the size: the stream that
+// produces the source (device data), the callback invoked when the source may
+// be reused, and the tag the receiver's event carries.
+class CkPutOpts {
+public:
+  CkPutOpts() : stream_(0), done_(CkCallback::ignore), tag_(0) {}
+  CkPutOpts& stream(hapiStream_t s) { stream_ = s; return *this; }
+  CkPutOpts& done(const CkCallback& cb) { done_ = cb; return *this; }
+  CkPutOpts& tag(uint64_t t) { tag_ = t; return *this; }
+  hapiStream_t stream_;
+  CkCallback done_;
+  uint64_t tag_;
+};
+
+// A channel: one fixed destination buffer on the receiver (its owner),
+// exported once by the constructor. The receiver keeps its object; copies
+// reach the senders by pup, as an entry-method argument. A sender writes with
+// CkPut, which carries nothing but the bytes, a sequence number and a tag, in
+// whichever transport the two PEs call for: a batched device copy within a
+// process, a device copy through the IPC mapping between processes on one
+// host, and between hosts (or where the IPC handle does not open) an announce
+// the receiver answers by reading the bytes with RDMA. The receiver's
+// `arrived` callback fires once the bytes are in place -- a CkCallback to a
+// chare, so it follows the receiver wherever it lives -- with a CkDataMsg
+// holding a CkChannelEvent.
 //
 // The sender must not overwrite the buffer while the receiver may still read
 // it. The receiver calls release() after consuming a put, which credits the
@@ -140,44 +158,59 @@ struct CkDeviceChannelEvent {
 // reopened buffer in put order. Every put behind it goes the same way until
 // the receiver has read the last staged one, so a direct put never races a
 // read. No step of the protocol relies on two messages arriving in order.
-class CkDeviceChannel {
+//
+// Teardown. destroy(cb) returns at once and asks the resolved sender to
+// detach: the sender waits for its puts into the buffer to complete, releases
+// its IPC view of it and acknowledges (the closing and ack of a migration,
+// marked as a destroy). An announced put not yet read is dropped and its
+// source handed back. Then the owner deregisters the buffer and invokes cb,
+// after which the buffer may be freed. An owner object destroyed without the
+// call starts the same teardown, with no callback. A sender learns of the
+// destroy from that closing, or from the answer to its next attach; a put
+// after it aborts.
+class CkChannel;
+// Sender side: write bytes of src into the channel's buffer.
+CkDeviceStatus CkPut(CkChannel& ch, const void* src, size_t bytes, const CkPutOpts& opts = CkPutOpts());
+
+class CkChannel {
 public:
-  CkDeviceChannel();
-  // Receiver side: the destination buffer, its capacity, and the entry that
-  // learns of each put. The entry takes a CkDataMsg*, hands it to event() and
-  // deletes it. Open the channel inside an entry method or constructor of the
-  // receiving element.
-  CkDeviceChannel(void* dst, size_t capacity, const CkCallback& arrived);
+  CkChannel();
+  // Receiver side: the destination buffer, its capacity, the kind of memory
+  // and its device, and the entry that learns of each put. The entry takes a
+  // CkDataMsg*, hands it to event() and deletes it. Construct the channel
+  // inside an entry method or constructor of the receiving element: it exports
+  // the buffer then.
+  CkChannel(void* dst, size_t capacity, CkMem kind, int device, const CkCallback& arrived);
   // A copy takes over the original's registrations with the runtime: the
   // usual shape is `peer = param;` in an entry method, after which the
   // parameter dies.
-  CkDeviceChannel(const CkDeviceChannel& o);
-  CkDeviceChannel& operator=(const CkDeviceChannel& o);
-  ~CkDeviceChannel();
+  CkChannel(const CkChannel& o);
+  CkChannel& operator=(const CkChannel& o);
+  ~CkChannel();
 
   // Receiver side.
-  void open();                 // export the buffer; assign the channel id
   void reopen(void* new_dst);  // after migration: the same channel on the new buffer
-  void close();                // retire the export and registration, before the buffer goes
+  // Teardown (see above): cb is invoked once the buffer may be freed.
+  void destroy(const CkCallback& cb = CkCallback(CkCallback::ignore));
   // The put described by the message `arrived` delivered (the message stays the
-  // caller's), or NULL for an event the runtime consumed (a resolve, an announce).
-  const CkDeviceChannelEvent* event(CkDataMsg* m);
+  // caller's), or NULL for an event the runtime consumed (an attach, an
+  // announce, or any event once the channel is destroyed).
+  const CkChannelEvent* event(CkDataMsg* m);
   // The buffer may be overwritten: credit the sender.
   void release();
-  // A holder copy: ask for the receiver's current endpoint now (e.g. right after
-  // the holding element migrated), instead of at the next put.
-  void resolve();
+  // A sender's copy: attach now (look up the receiver's current endpoint, and
+  // check the one-sender rule), e.g. at setup or right after the holding
+  // element migrated, instead of at the next put.
+  void attach();
   // The owning element's pup, on unpack: the channel arrived and reopens later.
   void arriving();
 
-  // Sender side: write bytes of src, produced on stream, into the buffer.
-  // src_done fires when src may be reused. tag travels in the event and is set
-  // as the reference number of the message `arrived` receives, so an SDAG
-  // `when arrived[step](CkDataMsg* m)` matches puts by step.
-  CkDeviceStatus put(const void* src, size_t bytes, hapiStream_t stream,
-                     const CkCallback& src_done = CkCallback(CkCallback::ignore),
-                     uint64_t tag = 0);
   bool putQueued() const { return pending.valid; }
+  bool isDestroyed() const { return destroyed; }
+  // A sender's copy: it holds a resolution (the buffer's endpoint, and through
+  // it possibly an IPC view of the buffer). False for a copy that has not
+  // attached since it was made or moved, and once told of a destroy.
+  bool isAttached() const { return resolved; }
 
   uint64_t id() const { return channel_id; }
   uint64_t gen() const { return generation; }
@@ -192,7 +225,7 @@ public:
 
   // Runtime side (the Converse handlers and migration hooks in ckdevicechannel.C).
   void onCredit(uint64_t seq, uint64_t epoch_);
-  void onClosing(uint64_t gen_, int owner_pe, uint64_t epoch_);
+  void onClosing(uint64_t gen_, int owner_pe, uint64_t epoch_, int flags);
   void onResolved(const CkDeviceChannelEndpoint& ep, uint64_t gen_, int owner_pe, bool free,
                   uint64_t epoch_, int credit_pe, int credit_slot_, uint64_t taken_seq_);
   void onCloseAck(int pe, uint64_t token, uint64_t last_seq, uint64_t last_bytes);
@@ -218,6 +251,20 @@ public:
   enum { HIST_N = 24 };
 
 private:
+  friend CkDeviceStatus CkPut(CkChannel& ch, const void* src, size_t bytes, const CkPutOpts& opts);
+  // Sender side: write bytes of src, produced on stream, into the buffer.
+  // src_done fires when src may be reused. tag travels in the event and is set
+  // as the reference number of the message `arrived` receives, so an SDAG
+  // `when arrived[step](CkDataMsg* m)` matches puts by step.
+  CkDeviceStatus put(const void* src, size_t bytes, hapiStream_t stream, const CkCallback& src_done,
+                     uint64_t tag);
+  void open();                 // export the buffer; assign the channel id
+  void noteHolder();           // the sending element, at the first put or attach
+  void startDestroy(const CkCallback& cb, bool hold);
+  void destroyCheck();
+  void sendDestroyed(int pe, uint64_t token);   // an attach after the destroy: the sender learns of it
+  void dropAnnounce(const CkChannelEvent& ev); // an announced put the destroyed owner will not read
+  void sendClosing(CkLocRec* hold_rec);
   void issue(const void* src, size_t bytes, hapiStream_t stream, const CkCallback& src_done,
              uint64_t tag);
   void issueStaged(const void* src, size_t bytes, hapiStream_t stream, const CkCallback& src_done,
@@ -230,8 +277,8 @@ private:
   void retireCreditSlot();
   void startPull();
   void sendCloseAck();
-  void onAnnounce(const CkDeviceChannelEvent& ev, const CkDeviceChannelEndpoint& src);
-  void takeOver(const CkDeviceChannel& o);
+  void onAnnounce(const CkChannelEvent& ev, const CkDeviceChannelEndpoint& src);
+  void takeOver(const CkChannel& o);
   void retire();
   void registerOwner();
   void unregisterOwner();
@@ -276,10 +323,10 @@ private:
   bool closing_sent;        // a closing to the current sender is awaiting its ack
   bool sender_closed;       // the current sender acked a closing and has not resolved since
   // Announces waiting for the buffer, the read in progress, and its source.
-  struct Queued { CkDeviceChannelEvent ev; CkDeviceChannelEndpoint src; };
+  struct Queued { CkChannelEvent ev; CkDeviceChannelEndpoint src; };
   std::vector<Queued> pulls;
   bool pulling;
-  CkDeviceChannelEvent pull_ev;
+  CkChannelEvent pull_ev;
   CkDeviceChannelEndpoint pull_src;
   bool resolved_during_closing;   // a resolve was answered while that closing was in flight: close the new resolution on the ack
   uint64_t epoch;           // owner: resolves answered so far; each Resolved, Closing and Credit names the resolution it belongs to.
@@ -287,7 +334,7 @@ private:
   CkLocRec* closing_rec;    // the element standing down for the pending migration
   struct Waiting { int pe; uint64_t token; int mgr; CmiUInt8 elem; };
   std::vector<Waiting> waiting;   // resolves received while migrating, answered after reopen
-  CkDeviceChannelEvent last;
+  CkChannelEvent last;
   bool have_last;
   // Sender (holder) side.
   bool resolved, resolving;
@@ -312,6 +359,16 @@ private:
   CmiUInt8 holder_elem;     // that element's id and location manager: a staged put's DONE
   CkGroupID holder_mgr;     //   releases the element's hold even if this copy is gone
   bool holder_known;
+  // Teardown (destroy()).
+  bool destroying;          // owner: destroy() called; the sender's detach (its closing ack) or a read awaited
+  bool destroyed;           // owner: torn down; a sender's copy: told the owner destroyed the channel
+  bool destroy_hold;        // owner: the element is held in place until the teardown completes
+  bool self_owned;          // a heap copy that finishes the teardown of an owner destroyed without the call
+  bool closing_held;        // owner: the closing out holds the element in place (a migration's)
+  CkCallback destroy_cb;
+  // CHARM_CHANNEL_STATS: when the pending closing went out (owner), when the attach was asked (sender).
+  double closing_t0;
+  double resolve_t0;
   struct Pending {
     const void* src;
     size_t bytes;

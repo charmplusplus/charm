@@ -89,7 +89,7 @@ Fixed since these examples were first run, and required by them:
     (charmplusplus/reconverse#212); this tree pins it.
 
   - The persistent device API (CkDevicePersistent) has been replaced by device
-    channels (CkDeviceChannel; manual, "GPU Channels"). Between hosts a
+    channels (CkChannel; manual, "GPU Channels"). Between hosts a
     channel's receiver reads each put with RDMA on device memory.
 
 Reusing a send buffer
@@ -144,9 +144,12 @@ sdag          The same transfer driven from structured dagger, mixing a
               entry method.
 
 chantest      Two elements exchange a device buffer every iteration through
-              device channels (CkDeviceChannel), set up once, and verify what
+              device channels (CkChannel), set up once, and verify what
               they receive. -l swaps their PEs every few iterations without
-              exchanging the channels again.
+              exchanging the channels again; -a moves the receivers while
+              puts continue, and -d N keeps N busy elements per PE so that
+              the moves wait behind deep scheduler queues. Every run ends by
+              destroying the channels.
 
 jacobi2d      2D 5-point Jacobi stencil over a 2D chare array, exchanging halo
               rows and columns each iteration. -z selects the GPU-direct path;

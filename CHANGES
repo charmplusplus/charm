@@ -120,14 +120,15 @@ Runtime (reconverse):
 - GPU support on reconverse: portable HAPI core (#3951),
   device-to-device communication (#3955), device zerocopy with
   register-once buffers (#3960, #3961), GPU-aware load balancer
-  (#3968). Device channels (CkDeviceChannel) replace
+  (#3968). Device channels (CkChannel) replace
   CkDevicePersistent: a receiver opens a device buffer once and one
   sender puts into it repeatedly, with a notification per put that
   carries its size and tag, a release credit, and no per-message
   setup; within a process the puts are batched device copies, within
   a host copies through IPC with credits in shared memory, and
   between hosts the receiver reads each put with RDMA. Channels
-  survive migration of either side without being exchanged again.
+  survive migration of either side without being exchanged again,
+  and destroy(cb) detaches the sender before the buffer may be freed.
   CkDyn's persistent device buffers run on the channels' transport.
   Manual: "GPU Channels".
 
@@ -623,7 +624,7 @@ Removed:
 - pose and mblock: libraries, examples and manuals (#4070).
 
 - CkDevicePersistent, its example and the latency-persistent
-  benchmark, replaced by device channels (CkDeviceChannel), the
+  benchmark, replaced by device channels (CkChannel), the
   chantest example and the channel benchmark; jacobi3d's -s option
   becomes -k. +gpupersistverbose now reports CkDyn's persistent
   device transfers.

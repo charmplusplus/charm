@@ -79,5 +79,5 @@ Known coverage gaps
     process other than the one the sender addressed, which is what happens when
     an object migrates without CMK_GLOBAL_LOCATION_UPDATE. Nothing here
     migrates, so that path is not exercised.
-  - Device channels (CkDeviceChannel) are not covered here; see
+  - Device channels (CkChannel) are not covered here; see
     examples/charm++/cuda/gpudirect/chantest.
