@@ -278,7 +278,9 @@ public:
     int bad = -1; double got = 0.0;
     const int iter = (int)e->tag;
     const double want = valueOf(iter, peer);
-    if (!container.verify(want, bad, got)) {
+    // -x: both senders write this buffer, so its contents say nothing; the
+    // runtime must abort at the second sender's resolve.
+    if (!two_senders && !container.verify(want, bad, got)) {
       CkAbort("[chantest] element %d on PE %d: iteration %d put %llu (%zu bytes) wrong at index %d: expected %.1f, got %.1f\n",
               thisIndex, CkMyPe(), iter, (unsigned long long)e->seq, e->bytes, bad, want, got);
     }
