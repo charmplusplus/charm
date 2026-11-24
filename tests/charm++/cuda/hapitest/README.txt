@@ -53,12 +53,16 @@ What it checks
      bracketing in hapiAddCallback going wrong -- is also a failure.
 
   6. Streams report completions independently: on every PE a kernel on one
-     stream spins until the host releases it, and the callback of a memset on
-     a second stream does the releasing. It must arrive while the kernel still
-     spins; a runtime reporting completions in order across streams holds it
-     behind the kernel's, which ends only at a 2 s timeout, and the test
-     aborts with that diagnosis. Run it with +gpuflags and with
-     +gpueventquery, to cover both ways the runtime detects completion.
+     stream spins until the host releases it, while a chain of 4200 memsets on
+     a second stream runs, each issued by the previous one's callback; the
+     last callback does the releasing. Each must arrive while the kernel still
+     spins; a runtime reporting completions in order across streams holds the
+     first behind the kernel's, which ends only at a 20 s timeout, and the
+     test aborts with that diagnosis. Run it with +gpuflags and with
+     +gpueventquery, to cover both ways the runtime detects completion. The
+     chain is longer than the runtime's ring of 4096 completion flags, so its
+     sequence passes the slot the held kernel's completion keeps: with
+     +gpuflags the run must print no "pinned-flag ring" line.
 
 Building
 --------
