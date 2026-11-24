@@ -32,7 +32,7 @@ assertions and run the same tier with `CHECK=1`:
 
     S="-fsanitize=address -fno-omit-frame-pointer -D_GLIBCXX_ASSERTIONS"
     CFLAGS="$S" CXXFLAGS="$S" LDFLAGS=-fsanitize=address ASAN_OPTIONS=detect_leaks=0 \
-      ./build charm++ reconverse-linux-x86_64 -j8 -g -O1 $S
+      env -u LD_PRELOAD ./build charm++ reconverse-linux-x86_64 -j8 -g -O1 $S
     SITE=<site> CHECK=1 CHARM_BUILD=$PWD/reconverse-linux-x86_64 tests/reconverse-site-run.sh
 
 Every sanitizer or assertion report is a defect to fix or to file before the
@@ -57,7 +57,8 @@ for x86_64 here.
 
 Record the compiler's exact version: the coroutine tests (`ckcoro`,
 `jacobi3d-coro`, `sparse-coro`) behave differently under GCC 14.2, 14.3 and
-15.2, and GCC 14.2 does not compile them.
+15.2. GCC 14.2 stops on them with an internal compiler error at `-O0` and
+crashes on them at `-O1`.
 
 ## 5. Release tarball
 

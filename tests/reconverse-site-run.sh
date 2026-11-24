@@ -28,8 +28,8 @@
 #               below) and CHARM_BUILD must be a build made with the same
 #               flags:
 #                 S="-fsanitize=address -fno-omit-frame-pointer -D_GLIBCXX_ASSERTIONS"
-#                 CFLAGS="$S" CXXFLAGS="$S" LDFLAGS=-fsanitize=address \
-#                   ./build charm++ <arch> -j8 -g -O1 $S
+#                 CFLAGS="$S" CXXFLAGS="$S" LDFLAGS=-fsanitize=address ASAN_OPTIONS=detect_leaks=0 \
+#                   env -u LD_PRELOAD ./build charm++ <arch> -j8 -g -O1 $S
 #               It finds out-of-bounds accesses, use after free and double
 #               frees that a production build runs through silently. Run it
 #               once per release, and with the newest compiler the site has.
@@ -115,11 +115,16 @@ case "$SITE" in
 esac
 export LD_LIBRARY_PATH=$CHARM_BUILD/lib:${LD_LIBRARY_PATH:-}
 CHECK=${CHECK:-0}
+case "$CHECK" in
+  0|1) ;;
+  *) echo "CHECK must be 0 or 1, not $CHECK" >&2; exit 2 ;;
+esac
 CHECK_OPTS="-g -O1 -fsanitize=address -fno-omit-frame-pointer -D_GLIBCXX_ASSERTIONS"
 MAKE_OPTS=()
 if [[ $CHECK == 1 ]]; then
-  if ! grep -qs -- '-fsanitize=address' "$CHARM_BUILD/CMakeCache.txt"; then
-    echo "CHECK=1 needs a CHARM_BUILD built with AddressSanitizer (see the header)" >&2
+  if ! grep -qs -- '-fsanitize=address' "$CHARM_BUILD/CMakeCache.txt" ||
+     ! grep -qs -- '-D_GLIBCXX_ASSERTIONS' "$CHARM_BUILD/CMakeCache.txt"; then
+    echo "CHECK=1 needs a CHARM_BUILD built with AddressSanitizer and _GLIBCXX_ASSERTIONS (see the header)" >&2
     exit 2
   fi
   # OPTS reaches every compile and link through the Makefiles'
@@ -130,7 +135,7 @@ if [[ $CHECK == 1 ]]; then
   # program abort at startup: the sanitizer's runtime must be loaded first.
   unset LD_PRELOAD
   # detect_leaks=0: the runtime does not free everything at exit.
-  export ASAN_OPTIONS=${ASAN_OPTIONS:-abort_on_error=1:detect_leaks=0}
+  export ASAN_OPTIONS="abort_on_error=1:detect_leaks=0${ASAN_OPTIONS:+:$ASAN_OPTIONS}"
 fi
 # GNU timeout is `timeout` on Linux, `gtimeout` from coreutils on macOS.
 TIMEOUT=$(command -v timeout || command -v gtimeout || true)
