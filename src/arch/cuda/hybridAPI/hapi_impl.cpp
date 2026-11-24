@@ -159,6 +159,14 @@ CpvDeclare(std::queue<hapiEvent_t>, hapi_event_pool);
 // runs all its memops through one front-end channel, so a flag write queued
 // behind a cross-process cudaStreamWaitEvent stops every later flag write in
 // the process, and two processes waiting on each other's IPC events deadlock.
+// The memset promises stream order only: it starts once the stream's earlier
+// work has completed. CUDA does not document that its write to host memory is
+// ordered at system scope after that work's writes, so that another process
+// (through IPC) or the NIC finds them in device memory once the host has seen
+// the flag: that release is observed, not documented. CUDA documents it for an
+// event's completion (+gpueventquery), and for cuStreamWriteValue32 without
+// CU_STREAM_WRITE_VALUE_NO_MEMORY_BARRIER, which fences before its write
+// (cuda.h, CUstreamWriteValue_flags).
 // HIP writes it with a one-thread kernel whose system-scope fence releases the
 // work before it (hapi_kernels.cu). hipMemsetD32Async releases only its own
 // write, so a peer reading on the flag could see stale data; +gpuflagmemset
