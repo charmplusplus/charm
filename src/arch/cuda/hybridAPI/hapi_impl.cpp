@@ -167,10 +167,13 @@ CpvDeclare(std::queue<hapiEvent_t>, hapi_event_pool);
 //
 // A slot is reassigned only once its own entry has drained (hapi_flag_busy):
 // entries drain per stream, so a stream whose head is blocked keeps its slots
-// while the sequence runs on. A completion on a stream of another device, or
-// with no free slot, is an event as before.
+// while the sequence runs on. A completion takes the next sequence number
+// whose slot is free, skipping held ones, within HAPI_FLAG_PROBE slots. A
+// completion on a stream of another device, or with no free slot among those,
+// is an event as before.
 #define HAPI_FLAG_SLOTS 4096   // power of two: flag entries in flight per PE, 256 KB of pinned memory
 #define HAPI_FLAG_STRIDE 16    // uint32s per slot: one cache line each
+#define HAPI_FLAG_PROBE 64     // slots tried per completion before it falls back to an event
 static bool hapi_flag_use_memset = true;
 typedef hapiDrvResult (*hapiStreamWriteValue32Fn)(hapiDrvStream, uintptr_t, uint32_t, unsigned int);
 typedef hapiDrvResult (*hapiMemsetD32AsyncFn)(uintptr_t, unsigned int, size_t, hapiDrvStream);
@@ -1475,11 +1478,22 @@ void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
   // belongs to it) and a free slot. Sequence number 0 is a slot never written.
   unsigned char* busy = CpvAccess(hapi_flag_busy);
   if (busy != NULL) {
-    uint32_t seq = CpvAccess(hapi_flag_seq) + 1;
-    if (seq == 0) seq = 1;
-    const uint32_t idx = seq & (HAPI_FLAG_SLOTS - 1);
     const int dev = hapiStreamDevice(stream);
-    if (!busy[idx] && dev == CpvAccess(my_device)) {
+    // The next sequence number whose slot is free. A slot still held by an
+    // entry behind a blocked stream head is skipped, so that one such entry
+    // does not turn flags off for the PE. The sequence advances past the slots
+    // tried even when none is free, so the next completion tries the next ones.
+    uint32_t seq = CpvAccess(hapi_flag_seq);
+    bool free_slot = false;
+    if (dev == CpvAccess(my_device)) {
+      for (int k = 0; k < HAPI_FLAG_PROBE && !free_slot; k++) {
+        if (++seq == 0) seq = 1;   // 0 is a slot never written
+        free_slot = !busy[seq & (HAPI_FLAG_SLOTS - 1)];
+      }
+      CpvAccess(hapi_flag_seq) = seq;
+    }
+    const uint32_t idx = seq & (HAPI_FLAG_SLOTS - 1);
+    if (free_slot) {
       uint32_t* slot_dev = (uint32_t*)CpvAccess(hapi_flag_slots_dev) + (size_t)idx * HAPI_FLAG_STRIDE;
       // Runs after all the work queued on the stream before it: the slot
       // reaching seq means that work is complete.
@@ -1490,7 +1504,6 @@ void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
       if (res != hapiDrvSuccess)
         CmiAbort("HAPI> the completion flag write failed (%d); +gpueventquery detects completion by events\n",
                  (int)res);
-      CpvAccess(hapi_flag_seq) = seq;
       busy[idx] = 1;
       CpvAccess(hapi_flag_inflight)++;
       hapiEvent hev(NULL, cb, cb_msg, wr);
@@ -1510,8 +1523,13 @@ void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
       }
     } else if (!warned_ring) {
       warned_ring = true;
-      CmiPrintf("HAPI[pe=%d]: the pinned-flag ring is full (%d in flight): completion by event until it "
-                "drains (reported once)\n", CmiMyPe(), CpvAccess(hapi_flag_inflight));
+      const int inflight = CpvAccess(hapi_flag_inflight);
+      if (inflight >= HAPI_FLAG_SLOTS)
+        CmiPrintf("HAPI[pe=%d]: the pinned-flag ring is full (%d in flight): completion by event until it "
+                  "drains (reported once)\n", CmiMyPe(), inflight);
+      else
+        CmiPrintf("HAPI[pe=%d]: no free slot among %d of the pinned-flag ring (%d of %d in flight): this "
+                  "completion by event (reported once)\n", CmiMyPe(), HAPI_FLAG_PROBE, inflight, HAPI_FLAG_SLOTS);
     }
   }
 
