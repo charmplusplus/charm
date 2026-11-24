@@ -42,9 +42,9 @@ from a production run:
 - The script unsets `LD_PRELOAD`: a library the site preloads (XALT on Anvil)
   makes a sanitized program abort at startup. Unset it for the build as well,
   because the build runs the sanitized `charmxi`.
-- Tests that fail only on their own memory-growth limit (`io_sessions`,
-  `zc_send_noleak`) are reported but not counted: the sanitizer keeps freed
-  blocks for a while, so the memory in use grows without a leak.
+- The two tests with a memory-growth limit (`io_sessions`, `zc_send_noleak`)
+  skip it when compiled with the sanitizer, which keeps freed blocks for a
+  while, so the memory in use grows without a leak. The rest of each test runs.
 
 ## 4. Newest compilers
 

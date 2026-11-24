@@ -139,14 +139,6 @@ TIMEOUT=$(command -v timeout || command -v gtimeout || true)
 # C++ exception text when the network layer threw instead, or the sanitizer's
 # or libstdc++'s report in a checking run.
 reason() { [[ $1 -ne 0 ]] && grep -m1 -oE "Reason:.*|what\(\):.*|ERROR: AddressSanitizer.*|Assertion '.*' failed.*" "$2" 2>/dev/null | cut -c1-200 | sed 's/^/ /'; return 0; }
-# ok <exit> <out-file>: whether a run counts as passed. In a checking run a
-# test that fails only on its own memory-growth limit does: the sanitizer
-# keeps freed blocks for a while, so the memory in use grows without a leak.
-ok() {
-  [[ $1 -eq 0 ]] && return 0
-  [[ $CHECK == 1 ]] && ! grep -q 'ERROR: AddressSanitizer' "$2" &&
-    grep -qE 'Reason:.*memory (in use grew|growth)' "$2"
-}
 
 if [[ $# -gt 0 ]]; then
   DIRS=("$@")
@@ -179,7 +171,7 @@ for d in "${DIRS[@]}"; do
   TESTRUN_LAUNCHER="$LAUNCHER $LAUNCHER_ARGS_MULTI" TESTRUN_PROCS=$PROCS \
     ${TIMEOUT:+$TIMEOUT 600} make -C "$d" test ${MAKE_OPTS[@]+"${MAKE_OPTS[@]}"} > "$d/site-$MULTI_SHAPE.out" 2>&1; e2=$?
   echo "RESULT $d $MULTI_SHAPE exit=$e2$(reason "$e2" "$d/site-$MULTI_SHAPE.out")"
-  ok "$e1" "$d/site-1proc.out" && ok "$e2" "$d/site-$MULTI_SHAPE.out" || fail=1
+  [[ $e1 -eq 0 && $e2 -eq 0 ]] || fail=1
 done
 echo "SUMMARY: $([[ $fail -eq 0 ]] && echo ALL PASSED || echo FAILURES ABOVE) $(date)"
 exit $fail

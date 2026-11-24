@@ -27,7 +27,8 @@
 // of the last write session. The memory in use by PE 0's process (CmiMemoryUsage) is
 // sampled at session 1000 and at the end: a session must leave less than M KB
 // behind (-m M, default
-// 4), since each one creates and destroys an array. About 1 KB per session stays
+// 4; 0, no limit, under AddressSanitizer, which keeps freed blocks for a
+// while), since each one creates and destroys an array. About 1 KB per session stays
 // by design: broadcast copies kept until the periodic spring cleaning, and the
 // per-id slots of the group table, the load balancer and the array map, which
 // are not reused. Options: -s S sessions
@@ -38,6 +39,17 @@
 #include <string>
 #include "ckio.h"
 #include "iosessions.decl.h"
+
+#if defined(__SANITIZE_ADDRESS__)
+#define ASAN_BUILD 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define ASAN_BUILD 1
+#endif
+#endif
+#ifndef ASAN_BUILD
+#define ASAN_BUILD 0
+#endif
 
 /* readonly */ CProxy_Main mainProxy;
 /* readonly */ int K;
@@ -68,7 +80,7 @@ class Main : public CBase_Main {
   CProxy_Hash hash;
   double lastAdvance;
   int wdSecs = 60;
-  double maxKB = 4.0;             // -m: allowed growth per session
+  double maxKB = ASAN_BUILD ? 0 : 4.0;  // -m: allowed growth per session
   static const int MEM_ITER = 1000;
   CmiUInt8 memAtStart = 0;
 
