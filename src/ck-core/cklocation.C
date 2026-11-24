@@ -11,6 +11,12 @@
 #include "TopoManager.h"
 #include "charm++.h"
 #include "ck.h"
+#if CMK_CUDA
+// For the staged device migration payload: hapiMalloc/hapiFree hold it, and
+// CkDeviceBuffer hands it to the device zerocopy layer.
+#include "hapi.h"
+#include "ckrdmadevice.h"
+#endif
 #include "cksyncbarrier.h"
 #include "hilbert.h"
 #include "partitioning_strategies.h"
@@ -19,6 +25,7 @@
 #include "trace.h"
 #include <algorithm>
 #include <limits>
+#include <numeric>
 #include <sstream>
 #include <stdarg.h>
 #include <vector>
@@ -81,17 +88,20 @@ int _messageBufferingThreshold;
 #if CMK_LBDB_ON
 
 #  if CMK_GLOBAL_LOCATION_UPDATE
+// Called by the load balancer on every PE but the source, for each migration it
+// decided, before the move is acted on (CentralLB::ReceiveMigration): from here on
+// this PE addresses the element at its destination, so no message takes an extra
+// hop (which CkLocMgr::multiHop asserts against in this mode). Keyed by id: the
+// index is not recoverable on a PE that has never seen a hashed-kind element, and
+// is not needed.
 void UpdateLocation(MigrateInfo& migData)
 {
-  CkGroupID locMgrGid = ck::ObjID(migData.obj.id).getCollectionID();
-  if (locMgrGid.idx == 0)
-  {
+  // The record's object manager is the element's CkLocMgr (initLB registers thisgroup).
+  CkLocMgr* mgr = static_cast<CkLocMgr*>(CkLocalBranch(migData.obj.omID().id));
+  if (mgr == nullptr)
     return;
-  }
-
-  CkLocMgr* localLocMgr = (CkLocMgr*)CkLocalBranch(locMgrGid);
-  // CkLocMgr only uses element IDs, so extract just that part from the ObjID
-  localLocMgr->updateLocation(ck::ObjID(migData.obj.id).getElementID(), migData.to_pe);
+  const ck::ObjID oid(migData.obj.id);
+  mgr->updateLocationFromLB(oid.getElementID(), migData.to_pe);
 }
 #  endif
 
@@ -471,6 +481,21 @@ public:
   }
 };
 
+// True when every component of i lies within the extents n an array was created
+// with. Maps that have no PE for other indices return -1 from procNum, so
+// ckInsert without a PE aborts (CProxy_ArrayBase::ckInsertIdx).
+static bool indexWithinExtents(const CkArrayIndex& n, const CkArrayIndex& i)
+{
+  if (i.dimension != n.dimension) return false;
+  for (int d = 0; d < i.dimension; d++)
+  {
+    const int x = i.dimension > 3 ? i.shortData()[d] : i.data()[d];
+    const int extent = n.dimension > 3 ? n.shortData()[d] : n.data()[d];
+    if (x < 0 || x >= extent) return false;
+  }
+  return true;
+}
+
 /**
  * The default map object -- This does blocked mapping in the general case and
  * calls the round-robin procNum for the dynamic insertion case -- ASB
@@ -654,6 +679,7 @@ public:
     {
       return RRMap::procNum(arrayHdl, i);
     }
+    if (!indexWithinExtents(amaps[arrayHdl]->_nelems, i)) return -1;
 
     if (i.dimension == 1)
     {
@@ -722,29 +748,73 @@ public:
 
 /* *
  * Hilbert map object -- This does hilbert mapping.
- * Convert array indices into 1D fashion according to their Hilbert filling curve
+ * Elements of a 2D..6D array are ordered by their position on a Hilbert curve
+ * through the array's extents; consecutive runs of _binSizeCeil elements in that
+ * order go to consecutive PEs of procList. 1D arrays are blocked by index.
  */
-
-typedef struct
-{
-  int intIndex;
-  std::vector<int> coords;
-} hilbert_pair;
-
-bool operator==(hilbert_pair p1, hilbert_pair p2) { return p1.intIndex == p2.intIndex; }
-
-bool myCompare(hilbert_pair p1, hilbert_pair p2) { return p1.intIndex < p2.intIndex; }
-
 class HilbertArrayMap : public DefaultArrayMap
 {
-  std::vector<int> allpairs;
+  // Per registered array: bounds[k] is the curve position of the first element
+  // of block k + 1 (at most CkNumPes() - 1 entries; empty for 1D arrays).
+  std::vector<std::vector<int>> bounds;
+  // The PEs in curve order: getHilbertList orders the processes, and each
+  // process contributes its PEs in rank order.
   std::vector<int> procList;
+
+  void buildProcList()
+  {
+    std::vector<int> nodeList(CkNumNodes());
+    getHilbertList(nodeList.data());
+    procList.clear();
+    for (int node : nodeList)
+      for (int pe = CkNodeFirst(node); pe < CkNodeFirst(node) + CkNodeSize(node); pe++)
+        procList.push_back(pe);
+  }
+
+  // The coordinates of index i; indices of more than three dimensions are shorts.
+  static void indexCoords(const CkArrayIndex& i, std::vector<int>& coords)
+  {
+    coords.resize(i.dimension);
+    for (int d = 0; d < i.dimension; d++)
+      coords[d] = i.dimension > 3 ? i.shortData()[d] : i.data()[d];
+  }
+
+  // Sorts the curve positions of every element of array idx and keeps the
+  // position that starts each block after the first.
+  void buildBounds(int idx)
+  {
+    if (idx >= (int)bounds.size()) bounds.resize(idx + 1);
+    std::vector<int>& b = bounds[idx];
+    b.clear();
+    if (!amaps[idx]) return;
+    const CkArrayIndex& n = amaps[idx]->_nelems;
+    const int dims = n.dimension;
+    if (dims < 2) return;
+    std::vector<int> extent;
+    indexCoords(n, extent);
+    size_t count = 1;
+    for (int e : extent) count *= (size_t)e;
+    if (count == 0) return;
+
+    std::vector<int> positions;
+    positions.reserve(count);
+    std::vector<int> coords(dims, 0);
+    for (size_t e = 0; e < count; e++)
+    {
+      positions.push_back(Hilbert_to_int(coords, dims));
+      for (int d = dims - 1; d >= 0 && ++coords[d] == extent[d]; d--) coords[d] = 0;
+    }
+    std::sort(positions.begin(), positions.end());
+
+    const size_t binSize = amaps[idx]->_binSizeCeil;
+    for (size_t first = binSize; first < count; first += binSize)
+      b.push_back(positions[first]);
+  }
 
 public:
   HilbertArrayMap(void)
   {
-    procList.resize(CkNumPes());
-    getHilbertList(procList.data());
+    buildProcList();
     DEBC((AA "Creating HilbertArrayMap\n" AB));
   }
 
@@ -754,262 +824,60 @@ public:
 
   int registerArray(const CkArrayIndex& i, CkArrayID aid)
   {
-    int idx;
-    idx = DefaultArrayMap::registerArray(i, aid);
-
-    if (i.dimension == 1)
-    {
-      // CkPrintf("1D %d\n", amaps[idx]->_nelems.data()[0]);
-    }
-    else if (i.dimension == 2)
-    {
-      // CkPrintf("2D %d:%d\n", amaps[idx]->_nelems.data()[0],
-      // amaps[idx]->_nelems.data()[1]);
-      const int dims = 2;
-      int nDim0 = amaps[idx]->_nelems.data()[0];
-      int nDim1 = amaps[idx]->_nelems.data()[1];
-      int index;
-      int counter = 0;
-      std::vector<int> coords;
-      allpairs.resize((size_t)nDim0 * nDim1);
-      coords.resize(dims);
-      for (int i = 0; i < nDim0; i++)
-        for (int j = 0; j < nDim1; j++)
-        {
-          coords[0] = i;
-          coords[1] = j;
-          index = Hilbert_to_int(coords, dims);
-          // CkPrintf("(%d:%d)----------> %d \n", i, j, index);
-          allpairs[counter] = index;
-          counter++;
-        }
-    }
-    else if (i.dimension == 3)
-    {
-      // CkPrintf("3D %d:%d:%d\n", amaps[idx]->_nelems.data()[0],
-      // amaps[idx]->_nelems.data()[1],
-      //        amaps[idx]->_nelems.data()[2]);
-      const int dims = 3;
-      int nDim0 = amaps[idx]->_nelems.data()[0];
-      int nDim1 = amaps[idx]->_nelems.data()[1];
-      int nDim2 = amaps[idx]->_nelems.data()[2];
-      int index;
-      int counter = 0;
-      std::vector<int> coords;
-      allpairs.resize((size_t)nDim0 * nDim1 * nDim2);
-      coords.resize(dims);
-      for (int i = 0; i < nDim0; i++)
-        for (int j = 0; j < nDim1; j++)
-          for (int k = 0; k < nDim2; k++)
-          {
-            coords[0] = i;
-            coords[1] = j;
-            coords[2] = k;
-            index = Hilbert_to_int(coords, dims);
-            allpairs[counter] = index;
-            counter++;
-          }
-    }
-    else if (i.dimension == 4)
-    {
-      // CkPrintf("4D %hd:%hd:%hd:%hd\n", ((short int*)amaps[idx]->_nelems.data())[0],
-      //        ((short int*)amaps[idx]->_nelems.data())[1], ((short
-      //        int*)amaps[idx]->_nelems.data())[2],
-      //        ((short int*)amaps[idx]->_nelems.data())[3]);
-      const int dims = 4;
-      int nDim[dims];
-      for (int k = 0; k < dims; k++)
-      {
-        nDim[k] = (int)((short int*)amaps[idx]->_nelems.data())[k];
-      }
-      int index;
-      int counter = 0;
-      std::vector<int> coords;
-      allpairs.resize((size_t)nDim[0] * nDim[1] * nDim[2] * nDim[3]);
-      coords.resize(dims);
-      for (int i = 0; i < nDim[0]; i++)
-        for (int j = 0; j < nDim[1]; j++)
-          for (int k = 0; k < nDim[2]; k++)
-            for (int x = 0; x < nDim[3]; x++)
-            {
-              coords[0] = i;
-              coords[1] = j;
-              coords[2] = k;
-              coords[3] = x;
-              index = Hilbert_to_int(coords, dims);
-              allpairs[counter] = index;
-              counter++;
-            }
-    }
-    else if (i.dimension == 5)
-    {
-      // CkPrintf("5D %hd:%hd:%hd:%hd:%hd\n", ((short int*)amaps[idx]->_nelems.data())[0],
-      //        ((short int*)amaps[idx]->_nelems.data())[1], ((short
-      //        int*)amaps[idx]->_nelems.data())[2],
-      //        ((short int*)amaps[idx]->_nelems.data())[3], ((short
-      //        int*)amaps[idx]->_nelems.data())[4]);
-      const int dims = 5;
-      int nDim[dims];
-      for (int k = 0; k < dims; k++)
-      {
-        nDim[k] = (int)((short int*)amaps[idx]->_nelems.data())[k];
-      }
-      int index;
-      int counter = 0;
-      std::vector<int> coords;
-      allpairs.resize((size_t)nDim[0] * nDim[1] * nDim[2] * nDim[3] * nDim[4]);
-      coords.resize(dims);
-      for (int i = 0; i < nDim[0]; i++)
-        for (int j = 0; j < nDim[1]; j++)
-          for (int k = 0; k < nDim[2]; k++)
-            for (int x = 0; x < nDim[3]; x++)
-              for (int y = 0; y < nDim[4]; y++)
-              {
-                coords[0] = i;
-                coords[1] = j;
-                coords[2] = k;
-                coords[3] = x;
-                coords[4] = y;
-                index = Hilbert_to_int(coords, dims);
-                allpairs[counter] = index;
-                counter++;
-              }
-    }
-    else if (i.dimension == 6)
-    {
-      // CkPrintf("6D %hd:%hd:%hd:%hd:%hd:%hd\n", ((short
-      // int*)amaps[idx]->_nelems.data())[0],
-      //        ((short int*)amaps[idx]->_nelems.data())[1], ((short
-      //        int*)amaps[idx]->_nelems.data())[2],
-      //        ((short int*)amaps[idx]->_nelems.data())[3], ((short
-      //        int*)amaps[idx]->_nelems.data())[4],
-      //        ((short int*)amaps[idx]->_nelems.data())[5]);
-      const int dims = 6;
-      int nDim[dims];
-      for (int k = 0; k < dims; k++)
-      {
-        nDim[k] = (int)((short int*)amaps[idx]->_nelems.data())[k];
-      }
-      int index;
-      int counter = 0;
-      std::vector<int> coords;
-      allpairs.resize((size_t)nDim[0] * nDim[1] * nDim[2] * nDim[3] * nDim[4] * nDim[5]);
-      coords.resize(dims);
-      for (int i = 0; i < nDim[0]; i++)
-        for (int j = 0; j < nDim[1]; j++)
-          for (int k = 0; k < nDim[2]; k++)
-            for (int x = 0; x < nDim[3]; x++)
-              for (int y = 0; y < nDim[4]; y++)
-                for (int z = 0; z < nDim[5]; z++)
-                {
-                  coords[0] = i;
-                  coords[1] = j;
-                  coords[2] = k;
-                  coords[3] = x;
-                  coords[4] = y;
-                  coords[5] = y;
-                  index = Hilbert_to_int(coords, dims);
-                  allpairs[counter] = index;
-                  counter++;
-                }
-    }
+    int idx = DefaultArrayMap::registerArray(i, aid);
+    buildBounds(idx);
     return idx;
+  }
+
+  void unregisterArray(int idx)
+  {
+    DefaultArrayMap::unregisterArray(idx);
+    bounds[idx].clear();
   }
 
   int procNum(int arrayHdl, const CkArrayIndex& i)
   {
-    int flati = 0;
-    int myInt;
-    if (amaps[arrayHdl]->_nelems.dimension == 0)
+    auto& info = amaps[arrayHdl];
+    if (info->_nelems.dimension == 0)
     {
       return RRMap::procNum(arrayHdl, i);
     }
-    if (i.dimension == 1)
-    {
-      flati = i.data()[0];
-    }
-    else if (i.dimension == 2)
-    {
-      int nDim1 = amaps[arrayHdl]->_nelems.data()[1];
-      myInt = i.data()[0] * nDim1 + i.data()[1];
-      flati = allpairs[myInt];
-    }
-    else if (i.dimension == 3)
-    {
-      hilbert_pair mypair;
-      mypair.coords.resize(3);
-      int nDim[2];
-      for (int j = 0; j < 2; j++)
-      {
-        nDim[j] = amaps[arrayHdl]->_nelems.data()[j + 1];
-      }
-      myInt = i.data()[0] * nDim[0] * nDim[1] + i.data()[1] * nDim[1] + i.data()[2];
-      flati = allpairs[myInt];
-    }
-    else if (i.dimension == 4)
-    {
-      hilbert_pair mypair;
-      mypair.coords.resize(4);
-      short int nDim[3];
-      for (int j = 0; j < 3; j++)
-      {
-        nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j + 1];
-      }
-      myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] +
-                    ((short int*)i.data())[1] * nDim[1] * nDim[2] +
-                    ((short int*)i.data())[2] * nDim[2] + ((short int*)i.data())[3]);
-      flati = allpairs[myInt];
-    }
-    else if (i.dimension == 5)
-    {
-      hilbert_pair mypair;
-      mypair.coords.resize(5);
-      short int nDim[4];
-      for (int j = 0; j < 4; j++)
-      {
-        nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j + 1];
-      }
-      myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] * nDim[3] +
-                    ((short int*)i.data())[1] * nDim[1] * nDim[2] * nDim[3] +
-                    ((short int*)i.data())[2] * nDim[2] * nDim[3] +
-                    ((short int*)i.data())[3] * nDim[3] + ((short int*)i.data())[4]);
-      flati = allpairs[myInt];
-    }
-    else if (i.dimension == 6)
-    {
-      hilbert_pair mypair;
-      mypair.coords.resize(6);
-      short int nDim[5];
-      for (int j = 0; j < 5; j++)
-      {
-        nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j + 1];
-      }
-      myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] * nDim[3] *
-                        nDim[4] +
-                    ((short int*)i.data())[1] * nDim[1] * nDim[2] * nDim[3] * nDim[4] +
-                    ((short int*)i.data())[2] * nDim[2] * nDim[3] * nDim[4] +
-                    ((short int*)i.data())[3] * nDim[3] * nDim[4] +
-                    ((short int*)i.data())[4] * nDim[4] + ((short int*)i.data())[5]);
-      flati = allpairs[myInt];
-    }
+    if (!indexWithinExtents(info->_nelems, i)) return -1;
 #if CMK_ERROR_CHECKING
-    else
-    {
-      CkAbort("CkArrayIndex has more than 6 dimensions!");
-    }
+    if (i.dimension > 6) CkAbort("CkArrayIndex has more than 6 dimensions!");
 #endif
 
-    /** binSize used in DefaultArrayMap is the floor of numChares/numPes
-     *  but for this FastArrayMap, we need the ceiling */
-    int block = flati / amaps[arrayHdl]->_binSizeCeil;
-    // for(int i=0; i<CkNumPes(); i++)
-    //    CkPrintf("(%d:%d) ", i, procList[i]);
-    // CkPrintf("\n");
-    // CkPrintf("block [%d:%d]\n", block, procList[block]);
+    int block;
+    if (i.dimension == 1)
+    {
+      // _binSizeCeil, not DefaultArrayMap's floor, so there are at most
+      // CkNumPes() blocks.
+      block = i.data()[0] / info->_binSizeCeil;
+    }
+    else
+    {
+      std::vector<int> coords;
+      indexCoords(i, coords);
+      const int pos = Hilbert_to_int(coords, i.dimension);
+      const std::vector<int>& b = bounds[arrayHdl];
+      block = std::upper_bound(b.begin(), b.end(), pos) - b.begin();
+    }
     return procList[block];
   }
 
-  void pup(PUP::er& p) { DefaultArrayMap::pup(p); }
+  void pup(PUP::er& p)
+  {
+    DefaultArrayMap::pup(p);
+    p | bounds;
+    p | procList;
+    // On a restart with a different PE count, DefaultArrayMap::pup has already
+    // recomputed _binSizeCeil; the blocks and the PE order follow from it.
+    if (p.isUnpacking() && (int)procList.size() != CkNumPes())
+    {
+      buildProcList();
+      for (int idx = 0; idx < (int)amaps.size(); idx++) buildBounds(idx);
+    }
+  }
 };
 
 /**
@@ -1315,10 +1183,13 @@ public:
     if (state == not_loaded)
     {
       DEBUG(("[%d] loading ConfigurableRRMap configuration\n", CkMyPe()));
+      // Read without removing: the flag is read after the main chare got argv
+      // (CkArgMsg shares the array), so removing it would shift the program's argv.
       char** argv = CkGetArgv();
       char* configuration = NULL;
-      bool found = CmiGetArgString(argv, "+ConfigurableRRMap", &configuration);
-      if (!found)
+      for (int a = 0; argv[a] != NULL && argv[a + 1] != NULL; a++)
+        if (strcmp(argv[a], "+ConfigurableRRMap") == 0) configuration = argv[a + 1];
+      if (configuration == NULL)
       {
         DEBUG(("Couldn't find +ConfigurableRRMap command line argument\n"));
         state = loaded_not_found;
@@ -1385,14 +1256,15 @@ public:
   void populateInitial(int arrayHdl, CkArrayOptions& options, void* ctorMsg, CkArray* mgr)
   {
     CkArrayIndex end = options.getEnd();
-    // Try to load the configuration from command line argument
-    CkAssert(haveConfigurableRRMap());
-    ConfigurableRRMapLoader& loader = CkpvAccess(myConfigRRMapState);
     if (end.dimension == 0)
     {
       CkFreeMsg(ctorMsg);
       return;
     }
+    if (!haveConfigurableRRMap())
+      CkAbort("ConfigurableRRMap needs the option +ConfigurableRRMap \"<objects per "
+              "block> <PEs per block> <PE of each object within its block>\"\n");
+    ConfigurableRRMapLoader& loader = CkpvAccess(myConfigRRMapState);
     int thisPe = CkMyPe();
     int maxIndex = end.data()[0];
     DEBUG(("[%d] ConfigurableRRMap: index=%d,%d,%d\n", CkMyPe(), (int)end.data()[0],
@@ -1490,12 +1362,15 @@ void arrInfo::distrib(int* speeds)
   }
 }
 
+// -1 (no PE) for a 1D index past the initial size and for any index of an array
+// created empty.
 int arrInfo::getMap(const CkArrayIndex& i)
 {
+  const int n = (int)_map.size();
   if (i.dimension == 1)
-    return _map[i.data()[0]];
-  else
-    return _map[((i.hash() + 739) % 1280107) % _nelems.getCombinedCount()];
+    return (i.data()[0] >= 0 && i.data()[0] < n) ? _map[i.data()[0]] : -1;
+  if (n == 0) return -1;
+  return _map[((i.hash() + 739) % 1280107) % n];
 }
 
 // Speeds maps processor number to "speed" (some sort of iterations per second counter)
@@ -1826,6 +1701,8 @@ void CkMigratable::UserSetLBLoad()
 // user can call this helper function to set obj load (for model-based lb)
 void CkMigratable::setObjTime(double cputime) { myRec->setObjTime(cputime); }
 double CkMigratable::getObjTime() { return myRec->getObjTime(); }
+void CkMigratable::setObjGPUTime(double gputime) { myRec->setObjGPUTime(gputime); }
+double CkMigratable::getObjGPUTime() { return myRec->getObjGPUTime(); }
 
 #  if CMK_LB_USER_DATA
 /**
@@ -1893,7 +1770,7 @@ void CkMigratable::recvLBPeriod(void* data)
 void CkMigratable::metaLBCallLB()
 {
   if (usesAtSync)
-    myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
+    myRec->getLBMgr()->AtLocalBarrier(ldBarrierHandle);
 }
 
 void CkMigratable::ckFinishConstruction(int epoch)
@@ -1942,13 +1819,19 @@ void CkMigratable::AtSync(int waitForMigration)
     this->virtual_pup(ps);
     if (_lb_psizer_on)
       setPupSize(ps.size());
+#if CMK_CUDA
+    // Device bytes are reported separately and exactly: a balancer weighing a
+    // migration against free device memory needs the real figure, and pupSize
+    // is an encoded approximation tuned for host state.
+    setGPUPupSize(ps.gpu_size());
+#endif
     if (_lb_args.metaLbOn())
       myRec->getMetaBalancer()->SetCharePupSize(ps.size());
   }
 
   if (!_lb_args.metaLbOn())
   {
-    myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
+    myRec->getLBMgr()->AtLocalBarrier(ldBarrierHandle);
     return;
   }
 
@@ -2040,6 +1923,13 @@ void CkMigratable::setMigratable(int migratable) { myRec->setMigratable(migratab
 
 void CkMigratable::setPupSize(size_t obj_pup_size) { myRec->setPupSize(obj_pup_size); }
 
+void CkMigratable::setGPUPupSize(size_t obj_gpu_pup_size)
+{
+#if CMK_CUDA
+  myRec->setGPUPupSize(obj_gpu_pup_size);
+#endif
+}
+
 void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg)
 {
   Chare::CkAddThreadListeners(tid, msg);  // for trace
@@ -2049,6 +1939,8 @@ void CkMigratable::CkAddThreadListeners(CthThread tid, void* msg)
 #else
 void CkMigratable::setObjTime(double cputime) {}
 double CkMigratable::getObjTime() { return 0.0; }
+void CkMigratable::setObjGPUTime(double gputime) {}
+double CkMigratable::getObjGPUTime() { return 0.0; }
 
 #  if CMK_LB_USER_DATA
 void* CkMigratable::getObjUserData(int idx) { return NULL; }
@@ -2067,12 +1959,13 @@ represented array elements.
 */
 CkLocRec::CkLocRec(CkLocMgr* mgr, bool fromMigration, bool ignoreArrival,
                    const CkArrayIndex& idx_, CmiUInt8 id_)
-    : myLocMgr(mgr), idx(idx_), id(id_), deletedMarker(NULL), running(false)
+    : myLocMgr(mgr), idx(idx_), id(id_), life(0), deletedMarker(NULL), running(false)
 {
 #if CMK_LBDB_ON
   DEBL((AA "Registering element %s with load balancer\n" AB, idx2str(idx)));
   nextPe = -1;
   asyncMigrate = false;
+  lbOrderedMigrate = false;
   readyMigrate = true;
   enable_measure = true;
   syncBarrier = CkSyncBarrier::object();
@@ -2080,7 +1973,7 @@ CkLocRec::CkLocRec(CkLocMgr* mgr, bool fromMigration, bool ignoreArrival,
   if (_lb_args.metaLbOn())
     the_metalb = mgr->getMetaBalancer();
 #  if CMK_GLOBAL_LOCATION_UPDATE
-  id_ = ck::ObjID(mgr->getGroupID(), id_).getID();
+  id_ = mgr->makeID(id_).getID();
 #  endif
   ldHandle = lbmgr->RegisterObj(mgr->getOMHandle(), id_, (void*)this, 1);
   if (fromMigration)
@@ -2136,6 +2029,22 @@ double CkLocRec::getObjTime()
   lbmgr->GetObjLoad(ldHandle, walltime, cputime);
   return walltime;
 }
+void CkLocRec::setObjGPUTime(double gputime)
+{
+#if CMK_CUDA
+  lbmgr->EstObjGPULoad(ldHandle, gputime);
+#endif
+}
+double CkLocRec::getObjGPUTime()
+{
+#if CMK_CUDA
+  LBRealType gputime;
+  lbmgr->GetObjGPULoad(ldHandle, gputime);
+  return gputime;
+#else
+  return 0.0;
+#endif
+}
 #  if CMK_LB_USER_DATA
 void* CkLocRec::getObjUserData(int idx) { return lbmgr->GetDBObjUserData(ldHandle, idx); }
 #  endif
@@ -2162,6 +2071,7 @@ bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
     if (_entryTable[epIdx]->traceEnabled)
     {
       CmiObjId projID = idx.getProjectionID();
+      _TRACE_SET_OBJECT(myLocMgr->ckGetGroupID().idx, id);
       _TRACE_BEGIN_EXECUTE_DETAILED(env->getEvent(), ForChareMsg, epIdx, env->getSrcPe(),
                                     env->getTotalsize(), &projID, obj);
       if (_entryTable[epIdx]->appWork)
@@ -2183,6 +2093,7 @@ bool CkLocRec::invokeEntry(CkMigratable* obj, void* msg, int epIdx, bool doFree)
       if (_entryTable[epIdx]->appWork)
         _TRACE_END_APPWORK();
       _TRACE_END_EXECUTE();
+      _TRACE_CLEAR_OBJECT();
     }
   }
 #endif
@@ -2221,6 +2132,7 @@ void CkLocRec::staticMigrate(LDObjHandle h, int dest)
 
 void CkLocRec::recvMigrate(int toPe)
 {
+  lbOrderedMigrate = true;  // only these arrivals count towards the balancer's step
   // we are in the mode of delaying actual migration
   // till readyMigrate()
   if (readyMigrate)
@@ -2273,6 +2185,13 @@ void CkLocRec::setPupSize(size_t obj_pup_size)
   lbmgr->setPupSize(ldHandle, obj_pup_size);
 }
 
+void CkLocRec::setGPUPupSize(size_t obj_gpu_pup_size)
+{
+#if CMK_CUDA
+  lbmgr->setGPUPupSize(ldHandle, obj_gpu_pup_size);
+#endif
+}
+
 #endif
 
 // Call ckDestroy for each record, which deletes the record, and ~CkLocRec()
@@ -2289,122 +2208,571 @@ void CkLocMgr::flushLocalRecs(void)
 // All records are local records after the 64bit ID update
 void CkLocMgr::flushAllRecs(void) { flushLocalRecs(); }
 
+/*************************** Object id layout and tranches **************************/
+// One copy per process; written by rank 0 at startup and by the checkpoint restore,
+// read by every PE after the node barriers that follow both.
+CksvDeclare(ck::objid::Layout, _objidLayout);
+
+namespace ck {
+namespace objid {
+
+static int ceilLog2(CmiUInt8 n)
+{
+  int b = 0;
+  while (((CmiUInt8)1 << b) < n) ++b;
+  return b;
+}
+
+const Layout& getLayout() { return CksvAccess(_objidLayout); }
+
+// Precedes the layout in a checkpoint, so that a checkpoint written without one
+// (by a build before the 64-bit object id redesign) or with an older record
+// ("OBJ1", part 1, without the collection widths) fails here, not by misreading
+// what follows.
+static const int LAYOUT_MARKER = 0x4F424A32;  // "OBJ2"
+
+void pupLayout(PUP::er& p)
+{
+  int marker = LAYOUT_MARKER;
+  p | marker;
+  if (p.isUnpacking() && marker != LAYOUT_MARKER)
+    CkAbort("Checkpoint has no current object id layout record (written by a Charm++"
+            " build before the 64-bit object id redesign or its part 2, or corrupt);"
+            " this build cannot restore it.\n");
+  // The field widths of both layouts: ids restored from the checkpoint were cut
+  // with them, so a build with other widths must not misdecode them.
+  int collectionBits = ObjID::bits::COLLECTION_BITS;
+  int wideCollectionBits = ObjID::bits::WIDE_COLLECTION_BITS;
+  p | collectionBits;
+  p | wideCollectionBits;
+  if (p.isUnpacking() && (collectionBits != ObjID::bits::COLLECTION_BITS ||
+                          wideCollectionBits != ObjID::bits::WIDE_COLLECTION_BITS))
+    CkAbort("Checkpoint was written by a Charm++ build with %d collection bits in"
+            " element ids (%d wide); this build has %d (%d wide). Restore it with a"
+            " build of the same -DCMK_OBJID_COLLECTION_BITS.\n",
+            collectionBits, wideCollectionBits, (int)ObjID::bits::COLLECTION_BITS,
+            (int)ObjID::bits::WIDE_COLLECTION_BITS);
+  if (p.isUnpacking())
+  {
+    Layout restored;
+    restored.pup(p);
+    CmiLock(CksvAccess(_nodeLock));
+    CksvAccess(_objidLayout) = restored;
+    CmiUnlock(CksvAccess(_nodeLock));
+  }
+  else
+  {
+    Layout current = getLayout();
+    current.pup(p);
+  }
+}
+
+void initLayout(int expandFactor, int trancheLog2Cap)
+{
+  CksvInitialize(Layout, _objidLayout);
+  Layout& l = CksvAccess(_objidLayout);
+  if (expandFactor < 1) expandFactor = 1;
+  l.expandFactor = expandFactor;
+  l.trancheLog2Cap = trancheLog2Cap > 0 ? trancheLog2Cap : 0;
+  l.nodesAtLaunch = CkNumNodes();
+  int keyBits = ceilLog2((CmiUInt8)CkNumNodes() * (CmiUInt8)expandFactor);
+  if (keyBits < 1) keyBits = 1;
+  if (keyBits > 24) keyBits = 24;
+  l.keyBits = keyBits;
+  l.uniqueBits = ObjID::bits::PAYLOAD_BITS - keyBits;
+  // A layout too narrow for hashed ids is rejected when the first hashed-kind array
+  // asks for a tranche (CkLocMgr::getTranche), not here: a run with only packed
+  // arrays never needs the unique bits.
+}
+
+static inline CmiUInt8 mix64(CmiUInt8 z)
+{
+  // splitmix64 finalizer
+  z += 0x9e3779b97f4a7c15ULL;
+  z = (z ^ (z >> 30)) * 0xbf58476d1ce4e5b9ULL;
+  z = (z ^ (z >> 27)) * 0x94d049bb133111ebULL;
+  return z ^ (z >> 31);
+}
+
+CmiUInt8 indexHashKey(const CkArrayIndex& idx)
+{
+  CmiUInt8 h = 0x243f6a8885a308d3ULL ^ ((CmiUInt8)idx.nInts << 8) ^ (CmiUInt8)idx.dimension;
+  for (int i = 0; i < idx.nInts; ++i)
+    h = mix64(h ^ (CmiUInt8)(unsigned int)idx.index[i]);
+  h = mix64(h);
+  const int keyBits = CksvAccess(_objidLayout).keyBits;
+  return h >> (64 - keyBits);
+}
+
+// Collection numbers are handed out on PE 0 only (CkCreateArray runs there), so
+// plain statics suffice; a restart bumps them past every restored number.
+static CmiUInt8 _nextStandardCollection = 1;
+static CmiUInt8 _nextWideCollection = ObjID::limits::WIDE_FIRST;
+static bool _wideSuggestionPrinted = false;
+
+CmiUInt8 nextCollectionNumber(bool wide)
+{
+  CkAssert(CkMyPe() == 0);
+  if (wide)
+  {
+    if (_nextWideCollection >= ObjID::limits::WIDE_LIMIT)
+      CkAbort("Charm++ ran out of wide-collection numbers: %" PRIu64 " chare arrays with"
+              " setWideCollection() have been created (the limit with %d collection"
+              " bits; numbers are not reused when an array is destroyed).\n",
+              (CmiUInt8)ObjID::limits::WIDE_LIMIT - ObjID::limits::WIDE_FIRST,
+              (int)ObjID::bits::WIDE_COLLECTION_BITS);
+    return _nextWideCollection++;
+  }
+  // The wide layout is the way out only where it has the larger range (not in a
+  // -DCMK_OBJID_COLLECTION_BITS=29 build).
+  const bool wideHasMore = (CmiUInt8)ObjID::limits::WIDE_LIMIT - ObjID::limits::WIDE_FIRST >
+                           (CmiUInt8)ObjID::limits::STANDARD_LIMIT - 1;
+  if (_nextStandardCollection >= ObjID::limits::STANDARD_LIMIT)
+    CkAbort("Charm++ ran out of collection numbers: %" PRIu64 " chare arrays have been"
+            " created (the limit with %d collection bits; numbers are not reused when an"
+            " array is destroyed). %sRebuild with -DCMK_OBJID_COLLECTION_BITS=N.\n",
+            (CmiUInt8)ObjID::limits::STANDARD_LIMIT - 1, (int)ObjID::bits::COLLECTION_BITS,
+            wideHasMore ? "Create small bounded arrays with CkArrayOptions::setWideCollection(), or " : "");
+  if (wideHasMore && !_wideSuggestionPrinted &&
+      _nextStandardCollection >= ObjID::limits::STANDARD_LIMIT / 2)
+  {
+    _wideSuggestionPrinted = true;
+    CkPrintf("Charm++> %" PRIu64 " chare arrays created, half of the %" PRIu64 " that element"
+             " ids can name with %d collection bits. A program that creates many small"
+             " bounded arrays can create them with CkArrayOptions::setWideCollection()"
+             " (%" PRIu64 " collections) instead of rebuilding with"
+             " -DCMK_OBJID_COLLECTION_BITS.\n",
+             _nextStandardCollection, (CmiUInt8)ObjID::limits::STANDARD_LIMIT - 1,
+             (int)ObjID::bits::COLLECTION_BITS,
+             (CmiUInt8)ObjID::limits::WIDE_LIMIT - ObjID::limits::WIDE_FIRST);
+  }
+  return _nextStandardCollection++;
+}
+
+void noteRestoredCollection(CmiUInt8 number, bool wide)
+{
+  if (CkMyPe() != 0) return;
+  CmiUInt8& next = wide ? _nextWideCollection : _nextStandardCollection;
+  if (number >= next) next = number + 1;
+}
+
+}  // namespace objid
+}  // namespace ck
+
+// One tranche per process per location manager, shared by the process's PEs.
+using TrancheTable = std::unordered_map<int, ck::objid::Tranche*>;
+CksvDeclare(TrancheTable*, _objidTranches);
+
+static int floorLog2(CmiUInt8 n)
+{
+  int b = -1;
+  while (n) { ++b; n >>= 1; }
+  return b < 0 ? 0 : b;
+}
+
+// Size of a process's initial tranche: the lower half of the unique space split
+// evenly among the processes present at launch. The upper half is the allocator's
+// pool for refills and for every process after a restart. Divided by the current
+// process count, not the launch count: an array created after an expand splits its
+// (untouched) initial region among the processes that exist now, and a larger launch
+// share would run into the allocator's half. +objid_tranche_log2 caps it (and every
+// grant) for tests that need to see refills.
+static CmiUInt8 initialTrancheSize(const ck::objid::Layout& l)
+{
+  int shareBits = l.uniqueBits - 1 - ck::objid::ceilLog2((CmiUInt8)CkNumNodes());
+  if (l.trancheLog2Cap > 0 && shareBits > l.trancheLog2Cap) shareBits = l.trancheLog2Cap;
+  return shareBits > 0 ? ((CmiUInt8)1 << shareBits) : 1;
+}
+
+ck::objid::Tranche* CkLocMgr::getTranche()
+{
+  if (tranche) return tranche;
+  CmiLock(CksvAccess(_nodeLock));
+  TrancheTable*& table = CksvAccess(_objidTranches);
+  if (table == nullptr) table = new TrancheTable();
+  auto itr = table->find(thisgroup.idx);
+  if (itr == table->end())
+  {
+    const ck::objid::Layout& l = ck::objid::getLayout();
+    if (l.uniqueBits < 16)
+      CkAbort("Object id layout: %d processes x expand factor %d need %d home key bits,"
+              " leaving %d unique bits of the %d-bit payload (minimum 16) for chare"
+              " array %d, whose index is not packed into ids. Lower +objid_expand,"
+              " give the array bounds, or rebuild with fewer"
+              " -DCMK_OBJID_COLLECTION_BITS.\n",
+              l.nodesAtLaunch, l.expandFactor, l.keyBits, l.uniqueBits,
+              (int)ck::ObjID::bits::PAYLOAD_BITS, thisgroup.idx);
+    ck::objid::Tranche* t = new ck::objid::Tranche();
+    if (!restoredFromCheckpoint)
+    {
+      // A new array: this process's share of the initial region, no message needed.
+      const CmiUInt8 size = initialTrancheSize(l);
+      const CmiUInt8 begin = (CmiUInt8)CkMyNode() * size;
+      t->len = size;
+      t->cursor.store(begin, std::memory_order_relaxed);
+      t->end.store(begin + size, std::memory_order_release);
+      t->refillAt.store(begin + size / 2, std::memory_order_relaxed);
+    }
+    // Restored from a checkpoint: the initial region is spent (the restored ids came
+    // from it). Start empty; the first insertion on this process asks the allocator
+    // (mintUnique) and is deferred until the grant arrives. Asking here, for every
+    // process at every restart, would spend a grant per process per restart whether
+    // or not anything is ever inserted.
+    itr = table->emplace(thisgroup.idx, t).first;
+  }
+  tranche = itr->second;
+  CmiUnlock(CksvAccess(_nodeLock));
+  return tranche;
+}
+
+void CkLocMgr::requestTrancheFromAllocator(int wantLog2)
+{
+  thisProxy[0].requestTranche(CkMyNode(), wantLog2);
+}
+
+bool CkLocMgr::mintUnique(CmiUInt8& u)
+{
+  ck::objid::Tranche* t = getTranche();
+  CmiNodeLock lock = CksvAccess(_nodeLock);
+  for (;;)
+  {
+    // Read end before bumping the cursor: a tranche is installed by storing the
+    // cursor first and the end (release) second, so a number taken after an end we
+    // saw is in that tranche, and a number from an older cursor fails the test and
+    // is merely wasted, never reused.
+    const CmiUInt8 e = t->end.load(std::memory_order_acquire);
+    u = t->cursor.fetch_add(1, std::memory_order_relaxed);
+    if (u < e)
+    {
+      if (u >= t->refillAt.load(std::memory_order_relaxed))
+      {
+        // Half of the tranche is used: ask for the next one, once.
+        bool send = false;
+        int want = 0;
+        CmiLock(lock);
+        if (!t->haveNext && !t->requested)
+        {
+          t->requested = true;
+          send = true;
+          want = floorLog2(t->len) + 1;
+        }
+        t->refillAt.store(~(CmiUInt8)0, std::memory_order_relaxed);
+        CmiUnlock(lock);
+        if (send) requestTrancheFromAllocator(want);
+      }
+      return true;
+    }
+    // Exhausted. Under the lock: swap in the spare if it is here, else make sure a
+    // request is in flight and register this PE to be woken by the grant.
+    CmiLock(lock);
+    if (t->cursor.load(std::memory_order_relaxed) < t->end.load(std::memory_order_relaxed))
+    {
+      CmiUnlock(lock);  // another PE installed the spare meanwhile
+      continue;
+    }
+    if (t->haveNext)
+    {
+      t->len = t->nextLen;
+      t->haveNext = false;
+      t->cursor.store(t->nextBase, std::memory_order_relaxed);
+      t->end.store(t->nextBase + t->nextLen, std::memory_order_release);
+      t->refillAt.store(t->nextBase + t->nextLen / 2, std::memory_order_relaxed);
+      CmiUnlock(lock);
+      continue;
+    }
+    bool send = false;
+    int want = 0;
+    if (!t->requested)
+    {
+      t->requested = true;
+      send = true;
+      // Twice the current tranche; a process with none yet (after a restart) asks
+      // for 0, which the allocator reads as "the first grant", whose size it sets
+      // from the pool and the process count (requestTranche), and doubles from there.
+      want = t->len ? floorLog2(t->len) + 1 : 0;
+    }
+    if (std::find(t->waitingPes.begin(), t->waitingPes.end(), CkMyPe()) == t->waitingPes.end())
+      t->waitingPes.push_back(CkMyPe());
+    mintFailedWithoutTranche = (t->len == 0);
+    CmiUnlock(lock);
+    if (send) requestTrancheFromAllocator(want);
+    return false;
+  }
+}
+
+// PE 0: hand out the next tranche. Sizes are powers of two: what the requester asks
+// for (twice its current tranche), at least a floor and at most a cap that leaves
+// every process several more grants. The floor is the first grant after a restart
+// (the requester asks for 0): 2^FIRST_GRANT_LOG2, or 1/64 of the cap when that is
+// smaller, so that a restart on which every process inserts costs the pool at most
+// 1/512 of itself (processes x cap/64 = region / 512) however many processes there
+// are. The floor must stay well below the cap, or the doubling never takes effect
+// and every grant is a fixed fraction of the pool: with the launch share as the
+// floor a restart cost 1/8 of the pool and the ninth restart in a chain aborted;
+// with a flat 2^16 the same happened from 8192 processes up, where the cap is 2^16
+// (Aditya's reviews of #4021). +objid_tranche_log2 caps both for tests.
+void CkLocMgr::requestTranche(int node, int wantLog2)
+{
+  CkAssert(CkMyPe() == 0);
+  const ck::objid::Layout& l = ck::objid::getLayout();
+  const CmiUInt8 region = (CmiUInt8)1 << (l.uniqueBits - 1);
+  int capLog2 = floorLog2(region / (8 * (CmiUInt8)CkNumNodes()));
+  if (capLog2 < 0) capLog2 = 0;
+  int minLog2 = ck::objid::FIRST_GRANT_LOG2;
+  if (minLog2 > capLog2 - 6) minLog2 = capLog2 - 6;
+  if (minLog2 < 0) minLog2 = 0;
+  if (l.trancheLog2Cap > 0 && capLog2 > l.trancheLog2Cap) capLog2 = l.trancheLog2Cap;
+  if (minLog2 > capLog2) minLog2 = capLog2;
+  int log2 = wantLog2;
+  if (log2 < minLog2) log2 = minLog2;
+  if (log2 > capLog2) log2 = capLog2;
+  CmiUInt8 len = (CmiUInt8)1 << log2;
+  if (allocNext + len > allocEnd) len = allocEnd - allocNext;
+  const CmiUInt8 base = allocNext;
+  allocNext += len;
+  thisProxy[CkNodeFirst(node)].grantTranche(base, len);
+}
+
+// Rank 0 of the requesting process: install the spare and wake the PEs that
+// deferred insertions while waiting for it.
+void CkLocMgr::grantTranche(CmiUInt8 base, CmiUInt8 len)
+{
+  ck::objid::Tranche* t = getTranche();
+  CmiNodeLock lock = CksvAccess(_nodeLock);
+  CmiLock(lock);
+  if (len == 0)
+  {
+    CmiUnlock(lock);
+    const ck::objid::Layout& l = ck::objid::getLayout();
+    CkAbort("Chare array (location manager %d) has used all 2^%d unique element ids"
+            " available to it in this run (its index is not packed into ids). Give the"
+            " array bounds (CkArrayOptions::setBounds), lower +objid_expand, or rebuild"
+            " with fewer -DCMK_OBJID_COLLECTION_BITS.\n",
+            thisgroup.idx, l.uniqueBits);
+  }
+  CkAssert(!t->haveNext);
+  CkAssert(base >= t->end.load(std::memory_order_relaxed));
+  t->nextBase = base;
+  t->nextLen = len;
+  t->haveNext = true;
+  t->requested = false;
+  std::vector<int> wake;
+  wake.swap(t->waitingPes);
+  CmiUnlock(lock);
+  for (int pe : wake) thisProxy[pe].resumeDeferredInsertions();
+}
+
+void CkLocMgr::deferInsertion(CkArray* mgr, CkArrayMessage* msg, const CkArrayIndex& idx,
+                              const int listenerData[CK_ARRAYLISTENER_MAXLEN])
+{
+  // Once per process (a static shared by its PEs); informational.
+  static std::atomic<bool> warned{false};
+  if (!warned.exchange(true))
+  {
+    // From the failed mint, not the tranche now: another PE may have installed the
+    // grant since.
+    const ck::objid::Layout& l = ck::objid::getLayout();
+    if (mintFailedWithoutTranche)
+      CkPrintf("Charm++> Note: PE %d deferred an insertion into chare array (location"
+               " manager %d): this process's first tranche of element ids after the"
+               " restart has not arrived yet. The element is created when it does;"
+               " until then ckLocal() is null even for a local insert.\n",
+               CkMyPe(), thisgroup.idx);
+    else
+      CkPrintf("Charm++> Note: PE %d deferred an insertion into chare array (location"
+               " manager %d): this process used its tranche of element ids before the"
+               " next one arrived. The element is created when it does; until then"
+               " ckLocal() is null even for a local insert. Lower +objid_expand (%d) for"
+               " larger tranches (initial tranche: %" PRIu64 " ids).\n",
+               CkMyPe(), thisgroup.idx, l.expandFactor, initialTrancheSize(l));
+  }
+  DeferredInsertion d;
+  d.mgr = mgr->ckGetGroupID();
+  d.msg = msg;
+  d.idx = idx;
+  for (int i = 0; i < CK_ARRAYLISTENER_MAXLEN; ++i) d.listenerData[i] = listenerData[i];
+  deferredInsertions.push_back(d);
+}
+
+void CkLocMgr::resumeDeferredInsertions()
+{
+  std::vector<DeferredInsertion> work;
+  work.swap(deferredInsertions);
+  for (DeferredInsertion& d : work)
+  {
+    CkArray* mgr = static_cast<CkArray*>(CkLocalBranch(d.mgr));
+    if (mgr == nullptr)
+    {
+      // The array was destroyed while the insertion waited for a tranche.
+      CkFreeMsg(d.msg);
+      continue;
+    }
+    mgr->insertElement(d.msg, d.idx, d.listenerData);
+  }
+}
+
 /*************************** LocCache **************************/
 const CkLocEntry CkLocEntry::nullEntry = CkLocEntry();
 void CkLocCache::pup(PUP::er& p)
 {
-#if __FAULT__
-  if (!p.isUnpacking())
-  {
-    /**
-     * pack the indexes of elements which have their homes on this processor
-     * but dont exist on it.. needed for broadcast after a restart
-     * indexes of local elements dont need to be packed since they will be
-     * recreated later anyway
-     */
-    std::vector<CkLocEntry> entries;
-    for (const auto& itr : locMap)
-    {
-      if (homePe(itr.first) == CmiMyPe() && itr.second.pe != CmiMyPe())
-      {
-        entries.push_back(itr.second);
-      }
-    }
-
-    int count = entries.size();
-    p | count;
-    for (int i = 0; i < count; i++)
-    {
-      p | entries[i];
-    }
-  }
-  else
-  {
-    int count;
-    p | count;
-    for (int i = 0; i < count; i++)
-    {
-      CkLocEntry e;
-      p | e;
-      e.epoch = 0;
-      updateLocation(e);
-      if (homePe(e.id) != CkMyPe())
-      {
-        thisProxy[homePe(e.id)].updateLocation(e);
-      }
-      CkAssert(getPe(e.id) == e.pe);
-    }
-  }
-#endif
+  // Nothing to checkpoint: every location entry is rebuilt after a restart by the
+  // restored elements registering with their homes (CkLocMgr::restore/resume), and
+  // the manager back-pointer is re-set by CkLocMgr::pup. (The former __FAULT__
+  // branch shipped the home's remote entries, encoded against the old PE count.)
 }
 
-void CkLocCache::requestLocation(CmiUInt8 id)
+int CkLocCache::requestLocation(CmiUInt8 id)
 {
-  int home = homePe(id);
-  if (home != CkMyPe())
+  ck::objid::LocTable& t = ck::objid::locTable();
+  const CmiUInt8 k = key(id);
+  // Register before re-reading: a write that lands between this PE's miss and its
+  // registration is seen by the re-read; one that lands after takes the bit and
+  // wakes this PE. Either way the message is not stranded (section 3.3). A bit left
+  // here by a rank that found the location costs it one wake with nothing to do.
+  t.registerWaiter(k, CkMyRank());
+  const int pe = t.pe(k);
+  if (pe != -1) return pe;
+  // Whether a request is out is a flag of its own, set by the rank whose re-read
+  // found nothing and cleared by the fill. The waiter word cannot tell: a fill
+  // between a miss and the registration takes no bits, and the rank that registered
+  // first may then find the location and send, leaving the others with their bits
+  // set and no request out (section 3.3, found in review).
+  if (!t.claimRequest(k))
   {
+    if (ck::objid::_objidDiag) t.counters().requestsSkipped++;
+    return -1;  // a request of this process is out; its reply wakes every waiter
+  }
+  const int home = homePe(id);
+  // The home's table is this table when the home is in this process: it has no
+  // location either, and the write that gives it one wakes the waiters here.
+  if (CkNodeOf(home) != CkMyNode())
+  {
+    if (ck::objid::_objidDiag) t.counters().requestsSent++;
     thisProxy[home].requestLocation(id, CkMyPe());
   }
+  return -1;
 }
 
 void CkLocCache::requestLocation(CmiUInt8 id, const int peToTell)
 {
-  if (peToTell == CkMyPe()) return;
+  if (CkNodeOf(peToTell) == CkMyNode()) return;  // it reads the same table
 
-  LocationMap::const_iterator itr = locMap.find(id);
-  // TODO: If the location is not found, we probably need to buffer this request. Should
-  // only effect very weird corner cases at the moment, and is a problem that already
-  // existed, but should be addressed in the upcoming delivery/buffering cleanup.
-  if (itr != locMap.end())
+  const CkLocEntry e = getLocationEntry(id);
+  if (e.pe != -1)
   {
-    thisProxy[peToTell].updateLocation(itr->second);
+    thisProxy[peToTell].updateLocation(e);
+    return;
   }
+  // No location: the element died or was re-created under a newer id. Answer by
+  // index where the index is recoverable (always at the home); else drop, as before.
+  CkArrayIndex idx;
+  if (mgr && mgr->recoverIndex(id, idx))
+    mgr->requestLocation(idx, peToTell);
 }
 
 void CkLocCache::updateLocation(const CkLocEntry& newEntry)
 {
+  if (CkNodeOf(homePe(newEntry.id)) == CkMyNode()) return;
+  applyLocation(newEntry, true);
+}
+
+void CkLocCache::applyLocation(const CkLocEntry& newEntry, bool byId)
+{
   CkAssert(newEntry.pe != -1);
-  CkLocEntry& oldEntry = locMap[newEntry.id];
-  if (newEntry.epoch > oldEntry.epoch)
+  bool written = false;
+  // A received update (W4, received = true) never replaces what a PE of this process
+  // wrote about itself. One by id that disagrees with the entry and loses the epoch
+  // compare clears it, so the next send asks the home (section 3.5).
+  const CmiUInt8 waiters = ck::objid::locTable().update(
+      key(newEntry.id), newEntry.pe, newEntry.epoch, false, &written, true, byId);
+  if (written)
   {
-    oldEntry = newEntry;
     notifyListeners(newEntry.id, newEntry.pe);
+    wakeRanks(waiters, newEntry.id);
   }
 }
 
-void CkLocCache::recordEmigration(CmiUInt8 id, int pe)
+void CkLocCache::wake(CmiUInt8 id)
 {
-  LocationMap::iterator itr = locMap.find(id);
-
-  CkAssert(itr != locMap.end());
-  CkAssert(itr->second.pe == CkMyPe());
-
-  itr->second.pe = pe;
-  itr->second.epoch++;
+  const int pe = getPe(id);
+  if (pe != -1)
+  {
+    notifyListeners(id, pe);
+    return;
+  }
+  if (mgr == nullptr) return;
+  if (mgr->releaseRetired(id)) return;  // a retired id: re-addressed
+  // The location was cleared again (the element died) before this wake ran, and the
+  // fill took this rank's bit and cleared the request flag. Register again while
+  // messages are held, and send the request if no rank has since: a re-creation in
+  // another process is learned only through the home.
+  if (mgr->hasBufferedMsgs(id))
+  {
+    const int now = requestLocation(id);
+    if (now != -1) notifyListeners(id, now);
+  }
 }
 
+void CkLocCache::notifyRetired(CmiUInt8 id)
+{
+  wakeRanks(ck::objid::locTable().takeWaiters(key(id)), id);
+}
+
+void CkLocCache::wakeRanks(CmiUInt8 bits, CmiUInt8 id)
+{
+  if (bits == 0) return;
+  const int first = CkNodeFirst(CkMyNode());
+  const int size = CkMyNodeSize();
+  for (int r = 0; r < 64 && r < size; ++r)
+  {
+    if (!(bits & (1ull << r))) continue;
+    // Bit r stands for ranks r, r+64, ...; a wake to a rank with nothing buffered is
+    // a no-op. The writer's own rank was notified directly.
+    for (int rank = r; rank < size; rank += 64)
+    {
+      const int pe = first + rank;
+      if (pe == CkMyPe()) continue;
+      if (ck::objid::_objidDiag) ck::objid::locTable().counters().wakesSent++;
+      thisProxy[pe].wake(id);
+    }
+  }
+}
+
+int CkLocCache::recordEmigration(CmiUInt8 id, int pe)
+{
+  return ck::objid::locTable().recordEmigration(key(id), CkMyPe(), pe);
+}
 
 void CkLocCache::insert(CmiUInt8 id, int epoch)
 {
-  CkLocEntry& e = locMap[id];
-  // TODO: This should be > probably, but demand creation needs some fixing up
-  CkAssert(epoch >= e.epoch);
-  e.id = id;
-  e.pe = CkMyPe();
-  e.epoch = epoch;
-  notifyListeners(e.id, e.pe);
+  // The writer holds the element: the store is unconditional (W1, W3). The epoch
+  // may be lower than the entry's: a re-created element starts at 0 while the table
+  // may still hold the epoch of its earlier life (section 3.5).
+  ck::objid::LocTable& t = ck::objid::locTable();
+  const CmiUInt8 k = key(id);
+  const CmiUInt8 waiters = t.store(k, CkMyPe(), epoch);
+  notifyListeners(id, CkMyPe());
+  wakeRanks(waiters, id);
 }
 
 /*************************** LocMgr: CREATION *****************************/
 CkLocMgr::CkLocMgr(CkArrayOptions opts)
     : bounds(opts.getBounds()),
-      idCounter(1),
+      wideCollection(opts.isWideCollection()),
+      collectionNumber(opts.getCollectionNumber()),
+      payloadBits(opts.isWideCollection() ? (int)ck::ObjID::bits::WIDE_PAYLOAD_BITS
+                                          : (int)ck::ObjID::bits::PAYLOAD_BITS),
+      tranche(nullptr),
+      restoredFromCheckpoint(false),
+      allocNext(0),
+      allocEnd(0),
       thisProxy(thisgroup),
       thislocalproxy(thisgroup, CkMyPe())
 {
   DEBC((AA "Creating new location manager %d\n" AB, thisgroup.idx));
 
   duringMigration = false;
+  duringDestruction = false;
 
   // Register with the map object
   mapID = opts.getMap();
@@ -2418,9 +2786,57 @@ CkLocMgr::CkLocMgr(CkArrayOptions opts)
   cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
   if (cache == nullptr)
     CkAbort("ERROR! Local branch of location cache is NULL!\n");
+  cache->setManager(this);
 
   // Figure out the mapping from indices to object IDs if one is possible
-  compressor = ck::FixedArrayIndexCompressor::make(bounds);
+  compressor = ck::FixedArrayIndexCompressor::make(bounds, payloadBits);
+  if (wideCollection && compressor == nullptr)
+  {
+    // The wide layout's 37-bit payload is too narrow for hashed ids at scale
+    // (design 12.2), so a wide array must pack its index.
+    const unsigned int need = ck::FixedArrayIndexCompressor::bitsNeeded(bounds);
+    if (need == 0)
+      CkAbort("Chare array (location manager %d) has setWideCollection() but no bounds."
+              " A wide-collection array packs its index into element ids, so it needs"
+              " CkArrayOptions::setBounds(...) with its full index space.\n",
+              thisgroup.idx);
+    // The standard layout is the alternative only where its payload is wider
+    // (not in a -DCMK_OBJID_COLLECTION_BITS=29 build).
+    CkAbort("Chare array (location manager %d) has setWideCollection() and bounds that"
+            " need %u bits to pack its index, but a wide-collection id holds %d. Use"
+            " smaller bounds%s.\n",
+            thisgroup.idx, need, payloadBits,
+            (int)ck::ObjID::bits::PAYLOAD_BITS > payloadBits
+                ? ", or the standard layout (wider payload) without setWideCollection()"
+                : "");
+  }
+  if (compressor == nullptr)
+  {
+    // The allocator's pool: the upper half of the unique space. Only PE 0's branch
+    // hands it out, but every branch starts with the same value so a shrink/expand
+    // restart, which restores PE 0's copy everywhere, changes nothing.
+    const int U = ck::objid::getLayout().uniqueBits;
+    allocNext = (CmiUInt8)1 << (U - 1);
+    allocEnd = (CmiUInt8)1 << U;
+  }
+  if (compressor == nullptr && CkMyPe() == 0)
+  {
+    // Say so once: without a compressor the array pays for an index<->id map and
+    // hashed ids handed out in tranches. The sized CkArrayOptions constructors set
+    // bounds, but setNumInitial/setEnd do not, so this is easy to get by accident.
+    const unsigned int need = ck::FixedArrayIndexCompressor::bitsNeeded(bounds);
+    if (need > 0)
+      CkPrintf("Charm++> Note: chare array (location manager %d) has bounds that need %u"
+               " bits to pack its index, but element ids hold %d; elements use hashed"
+               " ids and an index map.\n",
+               thisgroup.idx, need, payloadBits);
+    else if (opts.getNumInitial().dimension > 0 || opts.getEnd().dimension > 0)
+      CkPrintf("Charm++> Note: chare array (location manager %d) was given an initial"
+               " size but no bounds, so its index is not packed into element ids;"
+               " elements use hashed ids and an index map. Call"
+               " CkArrayOptions::setBounds(...) if the index space is fixed.\n",
+               thisgroup.idx);
+  }
 
   // Find and register with the load balancer
 #if CMK_LBDB_ON
@@ -2434,6 +2850,9 @@ CkLocMgr::CkLocMgr(CkMigrateMessage* m)
     : IrrGroup(m), thisProxy(thisgroup), thislocalproxy(thisgroup, CkMyPe())
 {
   duringMigration = false;
+  duringDestruction = false;
+  wideCollection = false;  // set by pup
+  collectionNumber = 0;
 }
 
 CkLocMgr::~CkLocMgr()
@@ -2444,6 +2863,8 @@ CkLocMgr::~CkLocMgr()
   lbmgr->UnregisterOM(myLBHandle);
 #endif
   map->unregisterArray(mapHandle);
+  delete compressor;
+  delete cache;  // the CkLocCache branch CkCreateArray made for this manager
 }
 
 void CkLocMgr::pup(PUP::er& p)
@@ -2459,7 +2880,20 @@ void CkLocMgr::pup(PUP::er& p)
   p | mapHandle;
   p | cacheID;
   p | bounds;
-  p | idCounter;
+  p | wideCollection;
+  p | collectionNumber;
+  p | payloadBits;
+  // The allocator's state (meaningful on PE 0, whose copy every PE restores after a
+  // shrink/expand). Per-process tranches are not checkpointed: after any restart a
+  // process starts empty and takes its first tranche from the allocator, so ids
+  // minted after the checkpoint can never collide with ids minted after the restart.
+  p | allocNext;
+  p | allocEnd;
+  if (p.isPacking() && !deferredInsertions.empty())
+    CkAbort("Checkpointing chare array (location manager %d) on PE %d while %d insertions"
+            " are waiting for a tranche of element ids; they would be lost. Checkpoint"
+            " after the insertions complete (quiescence), or lower +objid_expand.\n",
+            thisgroup.idx, CkMyPe(), (int)deferredInsertions.size());
   if (p.isUnpacking())
   {
     thisProxy = thisgroup;
@@ -2475,8 +2909,14 @@ void CkLocMgr::pup(PUP::er& p)
     cache = static_cast<CkLocCache*>(CkLocalBranch(cacheID));
     if (cache == nullptr)
       CkAbort("ERROR! Local branch of location cache is NULL!");
+    cache->setManager(this);
 
-    compressor = ck::FixedArrayIndexCompressor::make(bounds);
+    compressor = ck::FixedArrayIndexCompressor::make(bounds, payloadBits);
+    ck::objid::noteRestoredCollection(collectionNumber, wideCollection);
+    tranche = nullptr;
+    // A location manager is only ever unpacked at a restart. The process's first
+    // tranche is requested by the first insertion that needs one (getTranche).
+    restoredFromCheckpoint = true;
   }
 
 #if CMK_LBDB_ON
@@ -2488,12 +2928,32 @@ void CkLocMgr::pup(PUP::er& p)
   }
 #endif
 
-  // Delay doneInserting when it is unpacking during restart to prevent load balancing
-  // from kicking in.
-  if (p.isUnpacking() && !CkInRestarting())
+  // Delay doneInserting when it is unpacking during an in-memory restart to prevent
+  // load balancing from kicking in. A restart from disk (_inrestart) calls it here: a PE
+  // that reads no array file, on a restart with more PEs, has no other call to it, and
+  // its sync barrier would stay off.
+  if (p.isUnpacking() && (!CkInRestarting() || _inrestart))
   {
     doneInserting();
   }
+}
+
+/// Whether every array named in a migrating element's data has a manager here
+/// (the list pupElementsFor writes first).
+bool CkLocMgr::hasManagersFor(CkArrayElementMigrateMessage* msg) const
+{
+  PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
+  int n = 0;
+  p | n;
+  for (int i = 0; i < n; i++)
+  {
+    CkArrayID aid;
+    int elCType;
+    p | aid;
+    p | elCType;
+    if (managers.find(aid) == managers.end()) return false;
+  }
+  return true;
 }
 
 /// Add a new local array manager to our list.
@@ -2506,7 +2966,7 @@ void CkLocMgr::addManager(CkArrayID id, CkArray* mgr)
   while (i != pendingImmigrate.end())
   {
     auto msg = *i;
-    if (msg->nManagers <= managers.size())
+    if (hasManagersFor(msg))
     {
       i = pendingImmigrate.erase(i);
       immigrate(msg);
@@ -2526,35 +2986,45 @@ void CkLocMgr::deleteManager(CkArrayID id, CkArray* mgr)
     delete this;
 }
 
-// Tell this element's home processor it now lives "there"
-void CkLocMgr::informHome(const CkArrayIndex& idx, int nowOnPe)
+void CkLocMgr::informHome(const CkArrayIndex& idx, const CkLocEntry& e)
 {
-  int home = homePe(idx);
-  // TODO: If home == CkMyPe() should we call update locally?
-  if (home != CkMyPe() && home != nowOnPe)
-  {
-    // TODO: This may not need to be an idx update. Pretty sure the home will always
-    // know the idx to id mapping.
-    CmiUInt8 id = lookupID(idx);
-    thisProxy[home].updateLocation(idx, cache->getLocationEntry(id));
-  }
+  const int home = homePe(idx);
+  if (home == CkMyPe())
+    homeNoteLocation(idx, e);  // a move away from the home: recorded here, no message
+  else if (home != e.pe)
+    thisProxy[home].updateLocation(idx, e);
 }
 
+// Life tags (section 3.5): unique per creation in the run, so the home can tell a
+// re-created element's messages from a dead life's. Process number above a
+// process-wide count; CkMyNode() is below 2^24.
+static std::atomic<CmiUInt8> lifeCounter{0};
+static CmiUInt8 newLife() { return ((CmiUInt8)CkMyNode() << 40) | ++lifeCounter; }
+
 CkLocRec* CkLocMgr::createLocal(const CkArrayIndex& idx, bool forMigration,
-                                bool ignoreArrival, bool notifyHome, int epoch)
+                                bool ignoreArrival, bool notifyHome, int epoch,
+                                CmiUInt8 life)
 {
   DEBC((AA "Adding new record for element %s\n" AB, idx2str(idx)));
   CmiUInt8 id = lookupID(idx);
+  if (life == 0) life = newLife();  // a creation; a landing brings the element's tag
+#if CMK_MEM_CHECKPOINT
+  if (!forMigration && !CkInRestarting())
+    CkMemCheckPTNoteInsertion();  // a rollback is refused after an insertion
+#endif
 
   CkLocRec* rec = new CkLocRec(this, forMigration, ignoreArrival, idx, id);
+  rec->setLife(life);
   insertRec(rec, id);
   cache->insert(id, epoch);
-  updateLocation(idx, cache->getLocationEntry(id));
+  CkLocEntry e;
+  e.id = id;
+  e.pe = CkMyPe();
+  e.epoch = epoch;
+  e.life = life;
+  updateLocation(idx, e);
 
-  if (notifyHome)
-  {
-    informHome(idx, CkMyPe());
-  }
+  if (notifyHome) informHome(idx, e);
   return rec;
 }
 
@@ -2586,26 +3056,41 @@ void CkLocMgr::processAfterActiveRgetsCompleted(CmiUInt8 id)
   }
 }
 
-CmiUInt8 CkLocMgr::getNewObjectID(const CkArrayIndex& idx)
+bool CkLocMgr::tryNewObjectID(const CkArrayIndex& idx, CmiUInt8& id)
 {
-  CmiUInt8 id;
   if (!lookupID(idx, id))
   {
-    id = idCounter++ + ((CmiUInt8)CkMyPe() << CMK_OBJID_ELEMENT_BITS);
+    // Hashed kind: the top bits are the index's hash key (so the home is
+    // computable from the id), the low bits a number unique within the array,
+    // taken from this process's tranche.
+    CmiUInt8 u;
+    if (!mintUnique(u)) return false;
+    const ck::objid::Layout& l = ck::objid::getLayout();
+    id = (ck::objid::indexHashKey(idx) << l.uniqueBits) | u;
     insertID(idx, id);
   }
-  return id;
+  return true;
 }
 
 CkLocRec* CkLocMgr::registerNewElement(const CkArrayIndex& idx)
 {
-  CmiUInt8 id = getNewObjectID(idx);
+  CmiUInt8 id;
+  if (!tryNewObjectID(idx, id)) return nullptr;
   CkLocRec* rec = elementNrec(id);
   if (rec == nullptr)
   {
     // TODO: This is going to end up needlessly calling getNewObjectID(...) again
     rec = createLocal(idx, false, false, true);
   }
+#if CMK_MEM_CHECKPOINT
+  else if (!CkInRestarting())
+  {
+    // An element of an array bound to another (bindTo) joins the record its
+    // siblings already have, so createLocal does not count it. Count it here: a
+    // rollback restores each record from the checkpoint, which lacks this element.
+    CkMemCheckPTNoteInsertion();
+  }
+#endif
 
   return rec;
 }
@@ -2650,27 +3135,19 @@ bool CkLocMgr::addElementToRec(CkLocRec* rec, CkArray* mgr, CkMigratable* elt,
   return true;
 }
 
-// TODO: This might be not needed
-void CkLocMgr::requestLocation(CmiUInt8 id)
+int CkLocMgr::requestLocation(CmiUInt8 id)
 {
-  cache->requestLocation(id);
+  return cache->requestLocation(id);
 }
 
 void CkLocMgr::requestLocation(const CkArrayIndex& idx)
 {
-  CmiUInt8 id;
-  if (lookupID(idx, id))
-  {
-    requestLocation(id);
-  }
-  else
-  {
-    int home = homePe(idx);
-    if (home != CkMyPe())
-    {
-      thisProxy[home].requestLocation(idx, CkMyPe());
-    }
-  }
+  // The caller found no id for idx in this process and holds the message by index;
+  // the home's reply (updateLocation by index) releases it. An index with an id is
+  // held under the id instead (CkArray::bufferForLocation), where the waiter bits
+  // apply.
+  const int home = homePe(idx);
+  if (home != CkMyPe()) thisProxy[home].requestLocation(idx, CkMyPe());
 }
 
 bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
@@ -2680,27 +3157,84 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
   CmiUInt8 id;
   if (lookupID(idx, id))
   {
-    // We found the ID so update the location for peToTell
-    thisProxy[peToTell].updateLocation(idx, cache->getLocationEntry(id));
+    const CkLocEntry e = cache->getLocationEntry(id);  // read once: it can change
+    if (e.pe != -1)
+    {
+      // We know the id and where it lives: answer now.
+      thisProxy[peToTell].updateLocation(idx, e);
+      return true;
+    }
+  }
+  // Either the index has no id yet (hashed kind: the element was never created), or
+  // the id is known but its location is not (packed kind, whose ids exist before
+  // the element does; or an element deleted since, whose idx -> id binding is
+  // kept). Answering with the null entry would teach peToTell a location of -1 and
+  // an id of 0, so hold the request: updateLocation answers it once the element
+  // registers here.
+  DEBN(("%d Buffering ID/location req for %s\n", CkMyPe(), idx2str(idx)));
+  bufferedLocationRequests[idx].push_back(peToTell);
+  return false;
+}
+
+bool CkLocMgr::recoverIndex(CmiUInt8 id, CkArrayIndex& idx) const
+{
+  if (compressor)
+  {
+    idx = compressor->decompress(id);
     return true;
   }
-  else
+  if (CkLocRec* rec = elementNrec(id))
   {
-    // We don't know the ID so buffer the location request
-    DEBN(("%d Buffering ID/location req for %s\n", CkMyPe(), idx2str(idx)));
-    bufferedLocationRequests[idx].push_back(peToTell);
-    return false;
+    idx = rec->getIndex();
+    return true;
   }
+  // Hashed kind: an id that died or was rebound in this process (retiredIds).
+  return ck::objid::retiredIds().find(makeID(id).getID(), idx);
 }
+
+#if CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
+void CkLocMgr::updateLocationFromLB(CmiUInt8 id, int pe)
+{
+  // The table is the process's: one rank writes it, and the write wakes the other
+  // ranks' waiters. In the source's process the emigrating PE records the move
+  // itself (recordEmigration), and an earlier write here would make its entry name
+  // the destination already.
+  if (CkMyRank() != 0) return;
+  const int cur = cache->getPe(id);
+  if (cur != -1 && CkNodeOf(cur) == CkMyNode()) return;
+  CkLocEntry e;
+  e.id = id;
+  e.pe = pe;
+  // The balancer's decision does not carry the element's epoch. Count this
+  // migration from what this PE last heard (a bystander that never heard of the
+  // element starts at 0): that is at most the element's true epoch after the move
+  // (design section 4.2a), so the destination's insert and the emigrating PE's
+  // broadcast, which carry the true epoch, still apply over this entry.
+  e.epoch = cache->getEpoch(id) + 1;
+  CkArrayIndex idx;
+  if (recoverIndex(id, idx))
+    updateLocation(idx, e);  // also binds idx -> id and fires the index listeners
+  else
+    cache->applyLocation(e);
+}
+#endif
 
 void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
 {
   CkAssert(e.pe != -1);
-  // Set the mapping from idx to id
-  insertID(idx, e.id);
+  // At the home the life tag tells the lives of a re-created element apart
+  // (section 3.5): an update of a life known dead is dropped here.
+  if (e.life != 0 && homePe(idx) == CkMyPe() && !homeNoteLocation(idx, e)) return;
+  // Set the mapping from idx to id, noting an older id this process had bound to it
+  CmiUInt8 retired = 0;
+  const bool hasRetired = insertID(idx, e.id, &retired);
 
   // Update the location information
-  cache->updateLocation(e);
+  cache->applyLocation(e);
+
+  // Messages held under the retired id: re-address to e.id here, where both are known.
+  if (hasRetired)
+    for (auto& m : managers) m.second->releaseRetiredMsgs(retired, e.id, e.pe);
 
   // Any location requests that we had to buffer because we didn't know how the index
   // mapped to the id can now be replied to.
@@ -2731,36 +3265,167 @@ void CkLocMgr::reclaim(CkLocRec* rec)
     if (itr->second->lookup(rec->getID()))
       return;
   }
+  const int epoch = cache->getEpoch(rec->getID());  // before removeFromTable clears it
   removeFromTable(rec->getID());
 
   DEBC((AA "Destroying record for element %s\n" AB, idx2str(rec->getIndex())));
   if (!duringMigration)
   {  // This is a local element dying a natural death
-    int home = homePe(rec->getIndex());
-    if (home != CkMyPe())
 #if CMK_MEM_CHECKPOINT
-      if (!CkInRestarting())  // all array elements are removed anyway
+    // A rollback destroys every element and restores it on the same PE under the
+    // same epoch and life (CkMemCheckPT::recoverAll), so the home's records and
+    // other processes' tables stay as they are: no notice to a remote home, and
+    // none to a local one, where homeNoteDeath would mark the life dead and the
+    // restored element's location would then be dropped as stale.
+    if (CkInRestarting())
+    {
+      delete rec;
+      return;
+    }
+    CkMemCheckPTNoteDeletion();  // a rollback is refused after a deletion
 #endif
-        if (!duringDestruction)
-          thisProxy[home].reclaimRemote(rec->getIndex(), CkMyPe());
+    int home = homePe(rec->getIndex());
+    if (home == CkMyPe())
+    {
+      noteDead(rec->getIndex(), rec->getID());
+      CkLocEntry died;
+      died.id = rec->getID();
+      died.pe = CkMyPe();
+      died.epoch = epoch;
+      died.life = rec->getLife();
+      homeNoteDeath(rec->getIndex(), died);
+    }
+    else if (!duringDestruction)
+      thisProxy[home].reclaimRemote(rec->getIndex(), rec->getID(), CkMyPe(), epoch,
+                                    rec->getLife());
   }
   delete rec;
 }
 
+// Home, hashed kind: an element of ours died (here, or on deletedOnPe). Record
+// id -> idx so recoverIndex needs no scan; the idx -> id binding itself is kept.
+void CkLocMgr::noteDead(const CkArrayIndex& idx, CmiUInt8 id)
+{
+  if (!compressor) ck::objid::retiredIds().note(makeID(id).getID(), idx);
+}
+
+// The home and the lives of a re-created element (section 3.5). The table entry
+// carries no life, so the home keeps, per id, the latest location it saw for each
+// life not known dead, and the set of dead lives. A late death notice clears only
+// what that life wrote; a stale update of a dead life is dropped and clears what
+// it wrote; when the entry is empty and another life is known, it is installed.
+
+bool CkLocMgr::homeNoteLocation(const CkArrayIndex& idx, const CkLocEntry& e)
+{
+  bool stale = deadLives.count(e.life) != 0;
+  if (!stale)
+  {
+    std::vector<CkLocEntry>& lives = homeLives[e.id];
+    size_t i = 0;
+    for (; i < lives.size() && lives[i].life != e.life; ++i) {}
+    if (i == lives.size()) lives.push_back(e);
+    else if (e.epoch > lives[i].epoch) lives[i] = e;
+    else stale = e.epoch < lives[i].epoch;  // older than what the home saw of this life
+  }
+  if (!stale) return true;
+  // A dead life's update, or one from before the location the home recorded for the
+  // life: not applied, since it would revive a cleared entry. What such an update
+  // wrote earlier (the home missed it when the notice came) is cleared now.
+  cache->erase(e.id, e.pe, e.epoch, true);
+  homeReinstall(idx, e.id);
+  return false;
+}
+
+void CkLocMgr::homeNoteDeath(const CkArrayIndex& idx, const CkLocEntry& died)
+{
+  if (died.life != 0) deadLives.insert(died.life);
+  // Clear the entry while it names where the life died, or any location the home
+  // recorded for it, unless a PE of this process wrote it about itself (its W5 and
+  // stores are the truth): a later life's entry (same id, epoch 0 again) stays.
+  cache->erase(died.id, died.pe, died.epoch, true);
+  auto it = homeLives.find(died.id);
+  if (it != homeLives.end())
+  {
+    std::vector<CkLocEntry>& lives = it->second;
+    for (size_t i = 0; i < lives.size(); ++i)
+      if (lives[i].life == died.life)
+      {
+        cache->erase(died.id, lives[i].pe, lives[i].epoch, true);
+        lives.erase(lives.begin() + i);
+        break;
+      }
+    if (lives.empty()) homeLives.erase(it);
+  }
+  homeReinstall(idx, died.id);
+}
+
+void CkLocMgr::homeReinstall(const CkArrayIndex& idx, CmiUInt8 id)
+{
+  auto it = homeLives.find(id);
+  if (it == homeLives.end() || cache->getPe(id) != -1) return;
+  // The element lives on in a life whose update was rejected while a dead life's
+  // entry stood (an epoch of 0 against a higher one). Install it: the update's
+  // whole path, so held messages and requests move. With several candidates, all
+  // but one are dead and their notices are on the way; each clears its own.
+  updateLocation(idx, it->second.front());
+}
+
+void CkLocMgr::retireId(CmiUInt8 oldId, const CkArrayIndex& idx)
+{
+  ck::objid::retiredIds().note(makeID(oldId).getID(), idx);
+  // Ranks waiting on the old id will never see a location for it; wake them so they
+  // re-address what they hold (releaseRetired). This PE's own queues are handled
+  // by the caller (updateLocation) or hold nothing it addressed under the old id.
+  cache->notifyRetired(oldId);
+  releaseRetired(oldId);
+}
+
+bool CkLocMgr::releaseRetired(CmiUInt8 oldId)
+{
+  CkArrayIndex idx;
+  CmiUInt8 cur;
+  if (!recoverIndex(oldId, idx) || !lookupID(idx, cur) || cur == oldId) return false;
+  int pe = cache->getPe(cur);
+  if (pe != -1)
+  {
+    for (auto& m : managers) m.second->releaseRetiredMsgs(oldId, cur, pe);
+    return true;
+  }
+  // The new id has no location yet (its writer rebinds before it writes, section
+  // 3.5). Hold the messages under the new id and wait on it; the fill wakes this
+  // rank (or finds the location now).
+  for (auto& m : managers) m.second->releaseRetiredMsgs(oldId, cur, -1);
+  if (!hasBufferedMsgs(cur)) return true;
+  pe = cache->requestLocation(cur);
+  if (pe != -1) cache->notifyListeners(cur, pe);
+  return true;
+}
+
+bool CkLocMgr::hasBufferedMsgs(CmiUInt8 id) const
+{
+  for (const auto& m : managers)
+    if (m.second->hasBufferedMsgs(id)) return true;
+  return false;
+}
+
 // TODO: Rename to something more basic. This is just clearing entries from the
 // cache. Will be called by reclaim remote, but maybe other things as well.
-void CkLocMgr::reclaimRemote(const CkArrayIndex& idx, int deletedOnPe)
+void CkLocMgr::reclaimRemote(const CkArrayIndex& idx, CmiUInt8 id, int deletedOnPe,
+                             int epoch, CmiUInt8 life)
 {
   DEBC((AA "Our element %s died on PE %d\n" AB, idx2str(idx), deletedOnPe));
 
-  CmiUInt8 id;
-  if (!lookupID(idx, id))
-    CkAbort("Cannot find ID for the given index\n");
-
-  // Delete the ID from location caching. Do not delete the idx to id mapping because
-  // that remains constant and we don't want messages to end up stranded because they
-  // can't figure out their index.
-  cache->erase(id);
+  // Forget the location of the life that died. The notice names the id that died:
+  // the index may have been re-created since, under the same id (packed kind, or
+  // hashed with the id reused in this process) or a new one, and the entry is the
+  // process's. The idx -> id binding stays so messages can recover their index.
+  noteDead(idx, id);
+  CkLocEntry died;
+  died.id = id;
+  died.pe = deletedOnPe;
+  died.epoch = epoch;
+  died.life = life;
+  homeNoteDeath(idx, died);
 }
 
 void CkLocMgr::removeFromTable(const CmiUInt8 id)
@@ -2773,8 +3438,7 @@ void CkLocMgr::removeFromTable(const CmiUInt8 id)
   hash.erase(id);
   // Don't erase this during migration because the entry will be updated to reflect
   // the new location by calling recordEmigration
-  if (!duringMigration)
-    cache->erase(id);
+  if (!duringMigration) cache->erase(id, CkMyPe());
 #if CMK_ERROR_CHECKING
   // Make sure it's really gone
   if (NULL != elementNrec(id))
@@ -2794,6 +3458,19 @@ void CkLocMgr::multiHop(CkArrayMessage* msg)
   {  // Send a routing message letting original sender know new element location
     DEBS((AA "Sending update back to %d for element %" PRIu64 "\n" AB, srcPe,
           msg->array_element_id()));
+    // Under CMK_GLOBAL_LOCATION_UPDATE a forward is routine, not a chain to assert
+    // on: a cold send through the home (for an element that does not live at its
+    // home), a demand creation, a send that raced an announced move, or a stale entry
+    // after a move. Only balancers derived from CentralLB announce a move to every
+    // PE before acting on it (UpdateLocation); the TreeLB-based ones (GreedyLB,
+    // RefineLB, RotateLB, ...) are announced by the emigrate broadcast, which can
+    // land after the program has resumed. All of these are repaired the same way.
+    // A sender in this process reads the table this PE's landing wrote: no repair.
+    if (CkNodeOf(srcPe) == CkMyNode())
+    {
+      if (ck::objid::_objidDiag) ck::objid::locTable().counters().repairsSkipped++;
+      return;
+    }
     cache->requestLocation(msg->array_element_id(), srcPe);
   }
 }
@@ -2848,23 +3525,59 @@ void CkLocMgr::pupElementsFor(PUP::er& p, CkLocRec* rec, CkElementCreation_t typ
 {
   p.comment("-------- Array Location --------");
 
+  // The elements, in the order their data follows, each named by its array's
+  // id: the order of managers differs between PEs when bound arrays are
+  // created from several PEs at once. A checkpoint starts with a marker; one
+  // written before the marker existed has one type per manager in map order.
+  const int idLayout = -2;  // not a chare type
+  bool ids = p.isMigration();
+  int first = idLayout;
+  if (!p.isMigration())
+  {
+    p | first;
+    ids = !p.isUnpacking() || first == idLayout;
+  }
+  std::vector<std::pair<CkArrayID, CkArray*>> present;
+  int n = 0;
+  if (!p.isUnpacking() || !ids)
+  {
+    for (auto& m : managers)
+      if (!ids || m.second->getEltFromArrMgr(rec->getID()))
+        present.emplace_back(m.first, m.second);
+    n = (int)present.size();
+  }
+  if (ids) p | n;
+
   // First pup the element types
   // (A separate loop so ckLocal works even in element pup routines)
-  for (auto itr = managers.begin(); itr != managers.end(); ++itr)
+  if (p.isUnpacking() && ids) present.resize(n);
+  for (int i = 0; i < n; i++)
   {
-    int elCType;
-    CkArray* arr = itr->second;
+    int elCType = -1;
     if (!p.isUnpacking())
-    {  // Need to find the element's existing type
-      CkMigratable* elt = arr->getEltFromArrMgr(rec->getID());
-      if (elt)
-        elCType = elt->ckGetChareType();
-      else
-        elCType = -1;  // Element hasn't been created
+    {
+      CkMigratable* elt = present[i].second->getEltFromArrMgr(rec->getID());
+      if (elt) elCType = elt->ckGetChareType();
     }
-    p(elCType);
+    if (ids)
+    {
+      p | present[i].first;
+      if (p.isUnpacking())
+      {
+        auto m = managers.find(present[i].first);
+        if (m == managers.end())
+          CkAbort("Array element names array %d, which has no manager on PE %d\n",
+                  ((CkGroupID)present[i].first).idx, CkMyPe());
+        present[i].second = m->second;
+      }
+    }
+    if (!ids && i == 0)
+      elCType = first;
+    else
+      p | elCType;
     if (p.isUnpacking() && elCType != -1)
     {
+      CkArray* arr = present[i].second;
       // Create the element
       CkMigratable* elt = arr->allocateMigrated(elCType, type);
       int migCtorIdx = _chareTable[elCType]->getMigCtor();
@@ -2879,9 +3592,9 @@ void CkLocMgr::pupElementsFor(PUP::er& p, CkLocRec* rec, CkElementCreation_t typ
     }
   }
   // Next pup the element data
-  for (auto itr = managers.begin(); itr != managers.end(); ++itr)
+  for (auto& m : present)
   {
-    CkMigratable* elt = itr->second->getEltFromArrMgr(rec->getID());
+    CkMigratable* elt = m.second->getEltFromArrMgr(rec->getID());
     if (elt != NULL)
     {
       elt->virtual_pup(p);
@@ -2909,6 +3622,7 @@ void CkLocMgr::pupElementsFor(PUP::er& p, CkLocRec* rec, CkElementCreation_t typ
         if (c)
           c->redNo = 0;
       }
+      ((ArrayElement*)list[l])->thisArray->restampBroadcast((ArrayElement*)list[l]);
     }
   }
 #endif
@@ -2956,6 +3670,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   CkArrayIndex idx = rec->getIndex();
   CmiUInt8 id = rec->getID();
+  const CmiUInt8 life = rec->getLife();  // rec is gone by the time the home is told
 
 #if CMK_OUT_OF_CORE
   /* Load in any elements that are out-of-core */
@@ -2970,13 +3685,25 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   // Let all the elements know we're leaving
   callMethod(rec, &CkMigratable::ckAboutToMigrate);
+#if CMK_MEM_CHECKPOINT
+  CkMemCheckPTNoteMigration();  // a rollback is refused after a migration
+#endif
+
+  // Record the move in the process's table before the migration message exists: a
+  // destination in this process can land the element, and write its own entry,
+  // before this PE gets back from the send (W2 before W3, section 3.1).
+  const int newEpoch = cache->recordEmigration(id, toPe);
 
   // First pass: find size of migration message
   size_t bufSize;
+  size_t gpuBufSize = 0;
   {
     PUP::sizer p(PUP::er::IS_MIGRATION);
     pupElementsFor(p, rec, CkElementCreation_migrate);
     bufSize = p.size();
+#if CMK_CUDA
+    gpuBufSize = p.gpu_size();
+#endif
   }
 #if CMK_ERROR_CHECKING
   if (bufSize > std::numeric_limits<int>::max())
@@ -2986,19 +3713,37 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   }
 #endif
 
+  void* gpuMsg = nullptr;
+#if CMK_CUDA
+  if (gpuBufSize > 0)
+  {
+    if (gpuBufSize > (size_t)std::numeric_limits<int>::max())
+      CkAbort("Cannot migrate an object with more than %d bytes of device "
+              "state!\n", std::numeric_limits<int>::max());
+    // A staging copy, deliberately: with the element's device state copied
+    // out, the element can be destroyed as soon as the pack below finishes,
+    // and only this buffer has to survive until the destination has read it.
+    // Handing the destination the element's own buffers instead would mean
+    // keeping the element alive across the transfer.
+    hapiCheck(hapiMalloc(&gpuMsg, gpuBufSize));
+  }
+#endif
+
   // Allocate and pack into message
   CkArrayElementMigrateMessage* msg =
       new (bufSize, 0) CkArrayElementMigrateMessage(idx, id,
 #if CMK_LBDB_ON
-                                                    rec->isAsyncMigrate(),
+                                                    // The balancer counts the arrivals it ordered;
+                                                    // a migrateMe is not one of them.
+                                                    rec->isAsyncMigrate() || !rec->isLBOrderedMigrate(),
 #else
                                                     false,
 #endif
-                                                    bufSize, managers.size(),
-                                                    cache->getEpoch(id) + 1);
+                                                    bufSize,
+                                                    newEpoch, life, gpuBufSize > 0);
 
   {
-    PUP::toMem p(msg->packData, PUP::er::IS_MIGRATION);
+    PUP::toMem p(msg->packData, gpuMsg, PUP::er::IS_MIGRATION);
     p.becomeDeleting();
     pupElementsFor(p, rec, CkElementCreation_migrate);
     if (p.size() != bufSize)
@@ -3009,11 +3754,35 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
           bufSize, p.size());
       CkAbort("Array element's pup routine has a direction mismatch.\n");
     }
+#if CMK_CUDA
+    if (p.gpu_size() != gpuBufSize)
+    {
+      CkError(
+          "ERROR! Array element claimed it was %zu device bytes to a "
+          "sizing PUP::er, but copied %zu device bytes into the packing "
+          "PUP::er!\n",
+          gpuBufSize, p.gpu_size());
+      CkAbort("Array element's pup routine has a device direction mismatch.\n");
+    }
+#endif
   }
 
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
 
   thisProxy[toPe].immigrate(msg);
+
+#if CMK_CUDA
+  if (gpuBufSize > 0)
+  {
+    // Dispatch the device payload from a fresh entry method rather than
+    // sending it here: the element this migration is tearing down is still
+    // the running one at this point, and the payload belongs to the runtime
+    // rather than to it. sendGPUMsg runs once this call has returned and the
+    // element is gone.
+    sendGPUBuffers[id] = GPUMigrateData(toPe, gpuBufSize, gpuMsg);
+    thisProxy[CkMyPe()].sendGPUMsg(id);
+  }
+#endif
 
   duringMigration = true;
   for (auto itr = managers.begin(); itr != managers.end(); ++itr)
@@ -3022,14 +3791,22 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   }
   duringMigration = false;
 
-  cache->recordEmigration(id, toPe);
-  informHome(idx, toPe);
+  CkLocEntry moved;
+  moved.id = id;
+  moved.pe = toPe;
+  moved.epoch = newEpoch;
+  moved.life = life;
+  informHome(idx, moved);
 
-#if !CMK_LBDB_ON && CMK_GLOBAL_LOCATION_UPDATE
-  DEBM((AA "Global location update. idx %s "
-           "assigned to %d \n" AB,
-        idx2str(idx), toPe));
-  thisProxy.updateLocation(id, toPe);
+#if CMK_GLOBAL_LOCATION_UPDATE
+  // Other processes recorded this move before it was acted on (UpdateLocation, from
+  // the balancer's decision), with an epoch counted from their own entry. This
+  // broadcast carries the element's true epoch, so a process whose count fell short
+  // cannot have the entry overwritten by an older reply still in flight. The home
+  // was told above and ignores the duplicate by epoch. Cost: one group broadcast
+  // per migration, in this build mode only.
+  DEBM((AA "Global location update. idx %s assigned to %d \n" AB, idx2str(idx), toPe));
+  thisProxy.updateLocation(idx, moved);
 #endif
 
   CK_MAGICNUMBER_CHECK
@@ -3054,11 +3831,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 {
   const CkArrayIndex& idx = msg->idx;
 
-  PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
-
-  if (msg->nManagers < managers.size())
-    CkAbort("Array element arrived from location with fewer managers!\n");
-  if (msg->nManagers > managers.size())
+  if (!hasManagersFor(msg))
   {
     // Some array managers haven't registered yet -- buffer the message
     DEBM((AA "Buffering %s immigrate msg waiting for array registration\n" AB,
@@ -3067,11 +3840,40 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
     return;
   }
 
+#if CMK_CUDA
+  // The device payload is a separate send and may not be here yet. Hold the
+  // host message until it lands; immigrateGPU resumes from the other side.
+  if (msg->hasGPUMsg && receivedDeviceMsgs.find(msg->id) == receivedDeviceMsgs.end())
+  {
+    bufferedHostMigrateMsgs[msg->id] = msg;
+    return;
+  }
+  immigrateWithDevice(msg);
+}
+
+/// Both halves of the migration are in hand: unpack the element, reading its
+/// device state out of the landed payload.
+void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
+{
+  const CkArrayIndex& idx = msg->idx;
+  void* gpuData = nullptr;
+  if (msg->hasGPUMsg)
+  {
+    auto it = receivedDeviceMsgs.find(msg->id);
+    CmiAssert(it != receivedDeviceMsgs.end());
+    gpuData = it->second;
+    receivedDeviceMsgs.erase(it);
+  }
+  PUP::fromMem p(msg->packData, gpuData, PUP::er::IS_MIGRATION);
+#else
+  PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
+#endif
+
   insertID(idx, msg->id);
 
   // Create a record for this element
-  CkLocRec* rec =
-      createLocal(idx, true, msg->ignoreArrival, false /* home told on departure */, msg->epoch);
+  CkLocRec* rec = createLocal(idx, true, msg->ignoreArrival,
+                              false /* home told on departure */, msg->epoch, msg->life);
 
   CmiAssert(CpvAccess(newZCPupGets).empty());  // Ensure that vector is empty
   // Create the new elements as we unpack the message
@@ -3092,11 +3894,19 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
         "ERROR! Array element claimed it was %d bytes to a"
         "packing PUP::er, but %zu bytes in the unpacking PUP::er!\n",
         msg->length, p.size());
-    CkError("(I have %zu managers; it claims %d managers)\n", managers.size(),
-            msg->nManagers);
 
     CkAbort("Array element's pup routine has a direction mismatch.\n");
   }
+
+#if CMK_CUDA
+  if (msg->hasGPUMsg)
+  {
+    // The element's own device buffers now hold copies of everything in the
+    // landed payload, so the landing buffer is finished with. The sender's
+    // staged copy is not this side's concern: its source callback releases it.
+    hapiCheck(hapiFree(gpuData));
+  }
+#endif
 
   if (!zcRgetsActive)
   {
@@ -3107,11 +3917,82 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
   delete msg;
 }
 
+#if CMK_CUDA
+/// Source callback for a migration payload: the transport has finished reading
+/// the staged copy, so it goes back to the device allocator.
+///
+/// CkCallback(CkCallbackFn, param) records the PE that built it and routes back
+/// there however far the buffer travelled, so this runs on the sending PE --
+/// the same context the old finishGPUSend entry method ran in. `param` is the
+/// staged pointer itself, which is why nothing has to be looked up here.
+static void gpuMigrateStagedFree(void* param, void* msg)
+{
+  hapiCheck(hapiFree(param));
+}
+
+void CkLocMgr::sendGPUMsg(CmiUInt8 id)
+{
+  auto it = sendGPUBuffers.find(id);
+  CmiAssert(it != sendGPUBuffers.end());
+  const GPUMigrateData gpuData = it->second;  // by value: the entry goes now
+  sendGPUBuffers.erase(it);
+
+  // The staged block has to outlive this send -- the transport may still be
+  // reading it -- but the zerocopy layer already reports exactly that, through
+  // the buffer's source callback. Hand it ownership rather than keeping the
+  // entry alive and waiting for the destination to send an ack back.
+  thisProxy[gpuData.toPe].immigrateGPU(
+      id, (int)gpuData.size,
+      CkDeviceBuffer(gpuData.data, CkCallback(gpuMigrateStagedFree, gpuData.data)));
+}
+
+/// Post variant: supply the device buffer the payload should land in. The
+/// transport writes into it and then runs the delivery variant below.
+///
+/// The buffer is recorded here under the element's id rather than recovered
+/// from the delivery variant's `data` argument: for a non-SDAG entry method
+/// the generated dispatch passes the posted pointer only on the zerocopy leg,
+/// and the delivery leg -- the one that runs once the transfer has landed --
+/// sees a null. Keying off the id is also what an application would do, since
+/// it is the one that knows where it posted.
+void CkLocMgr::immigrateGPU(CmiUInt8& id, int& size, char*& data,
+                            CkDeviceBufferPost* post)
+{
+  void* landing = nullptr;
+  hapiCheck(hapiMalloc(&landing, (size_t)size));
+  data = (char*)landing;
+  postedDeviceBuffers[id] = landing;
+}
+
+void CkLocMgr::immigrateGPU(CmiUInt8 id, int size, char* data)
+{
+  // Only now has the transfer landed. The buffer moves from posted to
+  // received here and not in the post method above, because immigrate() reads
+  // receivedDeviceMsgs to decide whether the device half is ready -- seeing a
+  // merely posted buffer there would let it unpack from memory the transport
+  // has not written yet.
+  auto posted = postedDeviceBuffers.find(id);
+  CmiAssert(posted != postedDeviceBuffers.end());
+  receivedDeviceMsgs[id] = posted->second;
+  postedDeviceBuffers.erase(posted);
+
+  // If the host message beat us here it is parked; this was the missing half.
+  auto host = bufferedHostMigrateMsgs.find(id);
+  if (host != bufferedHostMigrateMsgs.end())
+  {
+    CkArrayElementMigrateMessage* msg = host->second;
+    bufferedHostMigrateMsgs.erase(host);
+    immigrateWithDevice(msg);
+  }
+}
+#endif
+
 void CkLocMgr::restore(const CkArrayIndex& idx, CmiUInt8 id, PUP::er& p)
 {
   insertID(idx, id);
 
-  CkLocRec* rec = createLocal(idx, false, false, false);
+  // Directories are rebuilt from the restored elements, so tell the home.
+  CkLocRec* rec = createLocal(idx, false, false, true);
 
   // Create the new elements as we unpack the message
   pupElementsFor(p, rec, CkElementCreation_restore);
@@ -3121,11 +4002,12 @@ void CkLocMgr::restore(const CkArrayIndex& idx, CmiUInt8 id, PUP::er& p)
 
 /// Insert and unpack this array element from this checkpoint (e.g., from CkLocation::pup)
 void CkLocMgr::resume(const CkArrayIndex& idx, CmiUInt8 id, PUP::er& p, bool notify,
-                      bool rebuild)
+                      bool rebuild, int epoch, CmiUInt8 life)
 {
   insertID(idx, id);
 
-  CkLocRec* rec = createLocal(idx, false, false, notify /* home doesn't know yet */);
+  CkLocRec* rec = createLocal(idx, false, false, notify /* home doesn't know yet */,
+                              epoch, life);
 
   // Create the new elements as we unpack the message
   pupElementsFor(p, rec, CkElementCreation_resume, rebuild);

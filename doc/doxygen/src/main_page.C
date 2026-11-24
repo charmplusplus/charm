@@ -57,7 +57,7 @@
 \section section_lib Libraries:
  - Communication: Barrier, commlib, multicast, sparseReducer, sparseContiguousReducer
  - Languages: ARMCI, AMPI, TCharm, taskGraph, search
- - Frameworks: \ref ParFUM "ParFUM", IFEM, IDXL, Collide, MBlock, AMR
+ - Frameworks: \ref ParFUM "ParFUM", IFEM, IDXL, Collide, AMR
  - Visualization: liveViz, liveViz3d, netFEM
 </td></tr>
  

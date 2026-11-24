@@ -1,0 +1,17 @@
+// "inbox" and "coroutine" are entry attributes only inside the [...] of an
+// entry method and names everywhere else in a .ci file. This module uses
+// them as names in each position the grammar has; it is translated and
+// compiled by "make", not run.
+module names {
+  readonly int coroutine;
+  message inbox;
+  array [1D] Names {
+    entry Names();
+    entry void take(inbox *m);
+    entry void coroutine(int n);
+    entry void put(int inbox);
+    entry void run() {
+      when coroutine(int n) serial { CkPrintf("%d\n", n); }
+    };
+  };
+};

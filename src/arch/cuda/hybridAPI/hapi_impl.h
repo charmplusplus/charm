@@ -13,6 +13,7 @@ extern "C" {
 // Scale the amount of memory each node pins.
 #define HAPI_MEMPOOL_SCALE 1.0
 
+
 // HAPI init & exit functions
 void hapiInit(char** argv);
 void hapiExit();

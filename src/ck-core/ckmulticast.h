@@ -71,8 +71,10 @@ class CkMulticastMgr: public CkDelegateMgr
         void teardown(CkSectionInfo s);
         /// entry Same as teardown, but also resets the root section info
         void retire(CkSectionInfo s, CkSectionInfo root);
-        /// entry Actually frees the old spanning tree. Propagates the call to children
-        void freeup(CkSectionInfo s);
+        /// entry Frees the old spanning tree once all its multicasts have arrived. Propagates the call to children
+        void freeup(CkSectionInfo s, int expected);
+        void tryFree(mCastEntry *sect);
+        void delivered(mCastEntry *entry);
         // ------------------------- Section Cookie Management ------------------------
         /// entry 
         void retrieveCookie(CkSectionInfo s, CkSectionInfo srcInfo);
@@ -81,6 +83,9 @@ class CkMulticastMgr: public CkDelegateMgr
         // ------------------------- Multicasts ------------------------
         /// entry
         void recvMsg(multicastGrpMsg *m);
+        /// entry A multicast sent through a section proxy copy on another PE; the root counts it and sends it on
+        void recvFromRemote(multicastGrpMsg *m);
+        void sendFromRoot(multicastGrpMsg *m);
         /// entry
         void sendToLocal(multicastGrpMsg *m);
         /// entry

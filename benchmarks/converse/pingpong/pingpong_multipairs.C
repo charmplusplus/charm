@@ -59,6 +59,7 @@ void reduceHandlerFunc(char *msg)
     size_t msgSizeDiff = CpvAccess(msgSize)-CmiMsgHeaderSizeBytes;
     CmiPrintf("%zu\t\t  %.2lf   %.2f\n",
         msgSizeDiff, us_time, msgSizeDiff/us_time);
+    CpvAccess(sumTime) = 0;
     CpvAccess(recvNum) = 0;
 
     if (CpvAccess(msgSize) < maxMsgSize)

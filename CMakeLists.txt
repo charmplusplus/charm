@@ -10,7 +10,7 @@
 # - the buildcmake script
 # - files in cmake/
 
-cmake_minimum_required(VERSION 3.4...3.5)
+cmake_minimum_required(VERSION 3.12)
 
 # Print warning
 message("##################################################################")
@@ -18,22 +18,22 @@ message("# The CMake build system may not support advanced build options. #")
 message("# Please let us know if you experience any problems by opening   #")
 message("# an issue on our GitHub (https://github.com/charmplusplus/charm)#")
 message("# with the below configuration information.                      #")
-message("# You can run './buildold' to use the previous build system.     #")
 message("##################################################################")
 
-if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
-  cmake_policy(SET CMP0075 NEW)
+cmake_policy(SET CMP0075 NEW)
 
-  if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.17)
-    cmake_policy(SET CMP0102 NEW)
-  endif()
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.17)
+  cmake_policy(SET CMP0102 NEW)
 endif()
 
 # Fortran is optional, so don't include it in LANGUAGES here
-project(Charm++ LANGUAGES CXX C ASM VERSION 8.0.1)
+project(Charm++ LANGUAGES CXX C ASM VERSION 9.0.0)
 
 find_package(Threads)
 find_package(OpenMP) # Do this before Fortran, in case we don't have a Fortran compiler
+
+# Set before its first use below; ./build passes -DNETWORK, a bare cmake run does not.
+set(NETWORK "reconverse" CACHE STRING "Target network layer: reconverse (the classic layers mpi, netlrts, ... are on the branch classic)")
 
 set(CMK_BUILD_MPI 0)
 set(CMK_BUILD_ON_MPI 0)
@@ -44,8 +44,8 @@ if(${NETWORK} STREQUAL "mpi")
   find_package(MPI REQUIRED)
 endif()
 
-# We need C++11 for (almost) all targets
-set(CMAKE_CXX_STANDARD 11)
+# We need C++17 for (almost) all targets, as reconverse does
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
@@ -109,8 +109,7 @@ else()
 endif()
 
 # Build options
-set(NETWORK "netlrts" CACHE STRING "Target network layer, can be one of mpi,multicore,netlrts,gni,ofi,pami,pamilrts,ucx,verbs")
-set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,charm4py,ChaNGa,everylb,all-test")
+set(TARGET "charm++" CACHE STRING "Target build type, can be one of charm++,AMPI,LIBS,ChaNGa,everylb")
 set(ARCH "" CACHE STRING "Target architecture, can be one of i386,x86_64,arm7,arm8,ppc64le") # By default, detect arch we are running on.
 
 function(charm_determine_arch output input)
@@ -160,6 +159,10 @@ option(CXI "Enable CXI (Cassini/Slingshot-11) extensions to OFI" OFF)
 
 # Advanced options:
 option(OOC "Compile with out of core support" OFF)
+option(NOLB "Build without the load balancing framework (conv-mach-nolb)" OFF)
+option(TSAN "Build with ThreadSanitizer (conv-mach-tsan)" OFF)
+option(PERFTOOLS "Build for Cray perftools (conv-mach-perftools)" OFF)
+option(CRAYPE "Cray programming environment flags (conv-mach-craype)" OFF)
 option(SYNCFT "Compile with Charm++ fault tolerance support" OFF)
 option(PAPI "Compile with PAPI performance counter support" OFF)
 
@@ -187,7 +190,8 @@ option(ZLIB                "Enable zlib support" ON)
 option(AMPI_MPICH_TESTS    "Enable mpich tests for AMPI" OFF)
 option(DRONE_MODE          "Enable drone mode" OFF)
 option(TASK_QUEUE          "Enable task queue" OFF)
-
+option(RECONVERSE          "Use the Reconverse communication layer" OFF)
+option(CMK_COVERAGE        "Instrument for clang source-based coverage (see coverage/README.md)" OFF)
 
 if(TRACING STREQUAL "")
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -210,6 +214,7 @@ option(BUILD_SHARED        "Build Charm++ dynamic libraries" OFF)
 
 # Other options
 option(BUILD_CUDA          "Build with CUDA support" OFF)
+option(BUILD_HIP           "Build with HIP support" OFF)
 option(PXSHM               "Build with PXSHM" OFF)
 
 # LRTS PMI options
@@ -247,6 +252,12 @@ else()
   set(BUILD_CHANGA 0)
 endif()
 
+# The GPU-aware load balancers store each object's device allocation size in LB
+# user data (registered by CentralLB::initLB), so GPU builds imply LBUSERDATA.
+if(BUILD_CUDA OR BUILD_HIP)
+  set(LBUSERDATA 1)
+endif()
+
 if(${TARGET} STREQUAL "everylb")
   set(TARGET "LIBS")
 endif()
@@ -268,6 +279,16 @@ else()
   set(CMK_TASKQUEUE 0)
 endif()
 
+# Keyed on NETWORK, not the RECONVERSE option: -DRECONVERSE=ON with a classic
+# network would otherwise get through and fail later on a missing src/arch dir.
+if(NOT NETWORK STREQUAL "reconverse")
+  message(FATAL_ERROR "This tree builds only on reconverse (classic Converse was removed in charm #4061); use the classic branch for netlrts/mpi/ucx/verbs/ofi/gni/pami/multicore builds.")
+endif()
+set(CMK_RECONVERSE 1)
+
+if(RANDOMIZED_MSGQ)
+  message(FATAL_ERROR "--enable-randomized-msgq is a classic Converse build option and does nothing on reconverse. Reconverse randomizes at run time instead: run the program with +randomized_msgq (and +randomized_seed <N> to repeat the draws).")
+endif()
 
 if(${AMPI_MPICH_TESTS})
   add_definitions(-DAMPI_ERRHANDLER_RETURN=1)
@@ -287,12 +308,10 @@ else()
   set(CMK_SMP 0)
 endif()
 
-if(${NETWORK} STREQUAL "multicore")
+if(${NETWORK} STREQUAL "multicore" OR ${NETWORK} STREQUAL "reconverse")
   set(CMK_SMP 1)
-  set(CMK_MULTICORE 1)
-else()
-  set(CMK_MULTICORE 0)
 endif()
+set(CMK_MULTICORE 0)
 
 if(NOT ${CMK_COMPILER} STREQUAL "msvc")
   set(CMK_USE_ZLIB ${ZLIB})
@@ -324,11 +343,7 @@ IF(JPEG_FOUND)
   set(CMK_USE_LIBJPEG 1)
 ENDIF()
 
-if(NETWORK STREQUAL "pami")
-  set(CMK_USE_LRTS 0)
-else()
-  set(CMK_USE_LRTS 1)
-endif()
+set(CMK_USE_LRTS 0)
 
 # Check for Python
 # PythonCCS requires Python v2.x and is the only target that uses this
@@ -336,19 +351,10 @@ set(CMK_HAS_PYTHON 0)
 set(CMK_PYTHON_VERSION "")
 set(CMK_BUILD_PYTHON "")
 
-if(CMAKE_VERSION VERSION_GREATER 3.12 OR CMAKE_VERSION VERSION_EQUAL 3.12)
-  find_package(Python2 COMPONENTS Interpreter)
-  if(Python2_FOUND)
-    set(CMK_PYTHON_VERSION_MAJOR ${Python2_VERSION_MAJOR})
-    set(CMK_PYTHON_VERSION_MINOR ${Python2_VERSION_MINOR})
-  endif()
-else()
-  set(Python_ADDITIONAL_VERSIONS 2)
-  find_package(PythonInterp)
-  if(PYTHONINTERP_FOUND)
-    set(CMK_PYTHON_VERSION_MAJOR ${PYTHON_VERSION_MAJOR})
-    set(CMK_PYTHON_VERSION_MINOR ${PYTHON_VERSION_MINOR})
-  endif()
+find_package(Python2 COMPONENTS Interpreter)
+if(Python2_FOUND)
+  set(CMK_PYTHON_VERSION_MAJOR ${Python2_VERSION_MAJOR})
+  set(CMK_PYTHON_VERSION_MINOR ${Python2_VERSION_MINOR})
 endif()
 
 if(CMK_PYTHON_VERSION_MAJOR)
@@ -460,7 +466,11 @@ file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/bin/)
 file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/cklibs)
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
+if(BUILD_SHARED)
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
+else()
+  set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+endif()
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 
 if (NOT CMAKE_INSTALL_PREFIX)
@@ -472,8 +482,37 @@ if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-if (NOT CMK_MEMPOOL_CUTOFFNUM)
-  set(CMK_MEMPOOL_CUTOFFNUM 28)
+# Reconverse has to be built with the same GPU support as Charm++, so that
+# its GPU-aware loopback copies and LCI's GPUDirect registration are enabled.
+# These must be set before the subdirectory is added.
+if(BUILD_CUDA)
+  set(RECONVERSE_ENABLE_CUDA ON CACHE BOOL "Enable CUDA support in reconverse" FORCE)
+endif()
+if(BUILD_HIP)
+  set(RECONVERSE_ENABLE_HIP ON CACHE BOOL "Enable HIP support in reconverse" FORCE)
+endif()
+# CmiAbort then writes reconverse's coverage profile before it aborts.
+if(CMK_COVERAGE)
+  set(RECONVERSE_COVERAGE ON CACHE BOOL "Write the coverage profile on CmiAbort" FORCE)
+endif()
+# Coverage flags go into CMAKE_<LANG>_FLAGS, the only flags that reach
+# reconverse (cmake/reconverse clears the directory compile options), so they
+# must be set before the subdirectory is added. charmc adds the same flags for
+# programs built against this build (CMK_COVERAGE in conv-mach-opt.sh).
+if(CMK_COVERAGE)
+  if(NOT CMAKE_C_COMPILER_ID MATCHES "Clang" OR NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR
+        "--coverage uses clang source-based coverage and needs a clang-family "
+        "compiler; this build has C=${CMAKE_C_COMPILER_ID}, "
+        "C++=${CMAKE_CXX_COMPILER_ID}. Set CC=clang CXX=clang++ or pass 'clang'.")
+  endif()
+  set(_cov_compile "-fprofile-instr-generate -fcoverage-mapping")
+  string(APPEND CMAKE_C_FLAGS " ${_cov_compile}")
+  string(APPEND CMAKE_CXX_FLAGS " ${_cov_compile}")
+  string(APPEND CMAKE_SHARED_LINKER_FLAGS " -fprofile-instr-generate")
+  # Executables are linked by charmc, which adds the link flag itself except
+  # for host tools (charmxi is linked -host, with a compiler that may not be
+  # clang), so it is not put in CMAKE_EXE_LINKER_FLAGS.
 endif()
 
 set(CMK_OPTIMIZE 0)
@@ -483,6 +522,17 @@ if(CMAKE_BUILD_TYPE MATCHES "Release" OR CMAKE_BUILD_TYPE MATCHES "RelWithDebInf
     set(BUILDOPTS "${BUILDOPTS} -optimize -production")
     set(OPTS "${OPTS} -optimize -production")
     set(OPTSATBUILDTIME "${OPTSATBUILDTIME} -optimize -production")
+endif()
+# Every object in this build and in reconverse sees the same CMK_OPTIMIZE,
+# whether or not it includes conv-mach-opt.h before converse.h.
+add_compile_definitions(CMK_OPTIMIZE=${CMK_OPTIMIZE})
+
+# This needs to be include before we set charmc as the linker
+# but after CMAKE_LIBRARY_OUTPUT_DIRECTORY has been set
+add_subdirectory(cmake/reconverse)
+
+if (NOT CMK_MEMPOOL_CUTOFFNUM)
+  set(CMK_MEMPOOL_CUTOFFNUM 28)
 endif()
 
 set(CMK_CHARM4PY 0)
@@ -505,65 +555,16 @@ endif()
 # Identify arch/network-specific paths
 if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/gdir_link)
   file(STRINGS src/arch/${NETWORK}/gdir_link GDIR)
-elseif(${NETWORK} MATCHES "gni-")
-  set(GDIR "gni")
-elseif(${NETWORK} MATCHES "mpi-cray")
-  set(GDIR "mpi")
-elseif(${NETWORK} MATCHES "ofi-cray")
-  set(GDIR "ofi")
 else()
   set(GDIR ${NETWORK})
 endif()
 
 set(VDIR ${CHARM_PLATFORM})
 
-# Identify whether charmrun will be built
-set(CMK_BUILD_CHARMRUN 0)
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${NETWORK}/charmrun)
-  set(CHARMRUN_DIR src/arch/${NETWORK})
-elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/charmrun)
-  set(CHARMRUN_DIR src/arch/${GDIR})
-elseif(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/charmrun)
-  set(CHARMRUN_DIR src/arch/${VDIR})
-else()
-  set(CMK_BUILD_CHARMRUN 1)
-endif()
-
 include(cmake/detect-features.cmake)
 include(cmake/ci-files.cmake)
+add_custom_target(ci-generated DEPENDS ${all-ci-outputs})
 
-
-if(${TARGET} STREQUAL "all-test")
-  add_custom_target(all-test ALL COMMAND $(MAKE) -C ${CMAKE_BINARY_DIR}/tmp all-test
-        COMMENT "Building all-test. This will take several minutes.")
-  add_dependencies(all-test moduleampi ampi-compat ck modulecompletion
-        ampi_funcptr_shim ampi_funcptr_shim_main
-        ampi_funcptr_loader ampi_funcptr_loader_stub
-        converse conv-static ldb-rand
-        memory-os-isomalloc memory-default threads-default ckmain moduletcharmmain
-        ckqt tcharm-compat moduleNDMeshStreamer
-        create_symlinks moduleCkCache trace-converse moduleCommonLBs
-        moduleTreeLB moduleCkMulticast moduleCkIO conv-cpm memory-os-wrapper
-        threads-default-tls ldb-neighbor ldb-workstealing
-        modulecollidecharm modulecollide memory-os memory-os-isomalloc)
-  if(CMK_HAS_MMAP)
-    add_dependencies(all-test memory-gnu-isomalloc)
-  endif()
-  if(CMK_CAN_LINK_FORTRAN)
-    add_dependencies(all-test moduleampif conv-utilf ckmainf
-        ampi_funcptr_shim_fortran ampi_funcptr_shim_fmpimain)
-  endif()
-  if(CMK_SUPPORTS_FSGLOBALS)
-    add_dependencies(all-test ampi_globals_fs)
-  endif()
-  if(CMK_SUPPORTS_PIPGLOBALS)
-    add_dependencies(all-test ampi_globals_pip)
-  endif()
-  if(CMK_SUPPORTS_PIEGLOBALS)
-    add_dependencies(all-test ampi_globals_pie)
-  endif()
-  set(TARGET "LIBS")
-endif()
 
 configure_file(${CMAKE_SOURCE_DIR}/src/scripts/charmc ${CMAKE_BINARY_DIR}/bin @ONLY)
 
@@ -596,21 +597,19 @@ if(NOT CMK_AMPI_ONLY)
   set(CMK_AMPI_ONLY 0)
 endif()
 
+#disable ROMIO due to GCC 14 cascade of failures
 if(NOT DEFINED CMK_AMPI_WITH_ROMIO)
-  set(CMK_AMPI_WITH_ROMIO 1)
+  set(CMK_AMPI_WITH_ROMIO 0)
 endif()
-
 set(CMK_ENABLE_C11   ${CMAKE_C11_EXTENSION_COMPILE_OPTION})
 
-# Use -std=gnu++11 if available
-if(NOT "${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}" STREQUAL "")
-  string(REPLACE ";" " " MY_CMAKE_CXX11_EXTENSION_COMPILE_OPTION "${CMAKE_CXX11_EXTENSION_COMPILE_OPTION}")
-  set(OPTS_CXX "${OPTS_CXX} ${MY_CMAKE_CXX11_EXTENSION_COMPILE_OPTION}")
-  set(CMK_ENABLE_CPP11 ${MY_CMAKE_CXX11_EXTENSION_COMPILE_OPTION})
+# Use -std=gnu++17 if available
+if(NOT "${CMAKE_CXX17_EXTENSION_COMPILE_OPTION}" STREQUAL "")
+  string(REPLACE ";" " " MY_CMAKE_CXX17_EXTENSION_COMPILE_OPTION "${CMAKE_CXX17_EXTENSION_COMPILE_OPTION}")
+  set(OPTS_CXX "${OPTS_CXX} ${MY_CMAKE_CXX17_EXTENSION_COMPILE_OPTION}")
 else()
-  string(REPLACE ";" " " MY_CMAKE_CXX11_STANDARD_COMPILE_OPTION "${CMAKE_CXX11_STANDARD_COMPILE_OPTION}")
-  set(OPTS_CXX "${OPTS_CXX} ${MY_CMAKE_CXX11_STANDARD_COMPILE_OPTION}")
-  set(CMK_ENABLE_CPP11 ${MY_CMAKE_CXX11_STANDARD_COMPILE_OPTION})
+  string(REPLACE ";" " " MY_CMAKE_CXX17_STANDARD_COMPILE_OPTION "${CMAKE_CXX17_STANDARD_COMPILE_OPTION}")
+  set(OPTS_CXX "${OPTS_CXX} ${MY_CMAKE_CXX17_STANDARD_COMPILE_OPTION}")
 endif()
 
 set(CMK_CC ${CMAKE_C_COMPILER})
@@ -650,12 +649,13 @@ configure_file(src/arch/common/cc-iccstatic.sh               include/ COPYONLY)
 configure_file(src/arch/common/cc-iccstatic.h                include/ COPYONLY)
 configure_file(src/arch/common/cc-gcc.sh                     include/ COPYONLY)
 configure_file(src/arch/common/cc-gcc.h                      include/ COPYONLY)
-configure_file(src/arch/common/cc-mpiopts.sh                 include/ COPYONLY)
 configure_file(src/arch/common/cc-msvc.h                     include/ COPYONLY)
 configure_file(src/arch/common/cc-msvc.sh                    include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-craype.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.sh             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-cuda.h              include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-hip.sh              include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-hip.h               include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-darwin.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-flang.h             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-flang.sh            include/ COPYONLY)
@@ -675,134 +675,132 @@ configure_file(src/arch/common/conv-mach-papi.sh             include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-papi.h              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-perftools.sh        include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-perftools.h         include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-syncft.h            include/ COPYONLY)
+configure_file(src/arch/common/conv-mach-syncft.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-persistent.sh       include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-persistent.h        include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-pgf90.sh            include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-pgf90.h             include/ COPYONLY)
-configure_file(src/arch/common/conv-mach-syncft.sh           include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-tsan.h              include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-tsan.sh             include/ COPYONLY)
 configure_file(src/scripts/conv-config.sh                    include/ COPYONLY)
 configure_file(src/arch/${VDIR}/conv-mach.sh                 include/ COPYONLY)
 
+# MSVC is driven through these Unix-style wrappers (cc-msvc.sh); unistd.h is a
+# stand-in for the flex-generated charmxi scanner, which includes it.
+if(CMK_COMPILER STREQUAL "msvc")
+  configure_file(src/arch/win/unix2nt_cc                     bin/ COPYONLY)
+  configure_file(src/arch/win/unix2nt_ar                     bin/ COPYONLY)
+  configure_file(src/arch/win/unistd.h                       include/ COPYONLY)
+endif()
+
 set(CUDA_DIR "")
-if(BUILD_CUDA)
-  
+set(HIP_DIR "")
+if(BUILD_CUDA OR BUILD_HIP)
+
   file(GLOB_RECURSE hybridAPI-h-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.h)
   file(GLOB_RECURSE hybridAPI-cxx-sources ${CMAKE_SOURCE_DIR}/src/arch/cuda/*.cpp)
   foreach(file ${hybridAPI-h-sources})
     configure_file(${file} include/ COPYONLY)
   endforeach()
 
-  if(CMAKE_VERSION VERSION_GREATER 3.17 OR CMAKE_VERSION VERSION_EQUAL 3.17)
-    find_package(CUDAToolkit REQUIRED)
-    set(CMAKE_CUDA_COMPILER "${CUDAToolkit_NVCC_EXECUTABLE}")
-    enable_language(CUDA)
-    set(CUDA_DIR "${CUDAToolkit_TARGET_DIR}")
-  else()
-    find_package(CUDA REQUIRED)
-    set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
+  if (BUILD_CUDA)
+    if(CMAKE_VERSION VERSION_GREATER 3.17 OR CMAKE_VERSION VERSION_EQUAL 3.17)
+      find_package(CUDAToolkit REQUIRED)
+      set(CMAKE_CUDA_COMPILER "${CUDAToolkit_NVCC_EXECUTABLE}")
+      enable_language(CUDA)
+      set(CUDA_DIR "${CUDAToolkit_TARGET_DIR}")
+    else()
+      find_package(CUDA REQUIRED)
+      set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
+    endif()
+
+    # Find CUPTI library and include directory
+    find_library(CUPTI_LIBRARY cupti
+      HINTS "${CUDA_DIR}/extras/CUPTI/lib64"
+            "${CUDA_DIR}/lib64"
+    )
+    set(CUPTI_INCLUDE_DIR "${CUDA_DIR}/extras/CUPTI/include")
+    if(NOT CUPTI_LIBRARY)
+      message(WARNING "CUPTI library not found. GPU load balancing will not be available.")
+    else()
+      message(STATUS "Found CUPTI: ${CUPTI_LIBRARY}")
+      # Global, not per-target: the GPU load fields live in LDObjData, which
+      # ck-core, ck-ldb and hybridapi all see. A per-target definition would
+      # give them different layouts for the same struct.
+      add_compile_definitions(HAPI_CUPTI_LB)
+      set(HAPI_CUPTI_LB ON)
+    endif()
+
+    add_library(hybridapi ${hybridAPI-cxx-sources})
+    add_dependencies(hybridapi ci-generated)
+
+    if(CUPTI_LIBRARY)
+      target_include_directories(hybridapi PRIVATE "${CUPTI_INCLUDE_DIR}")
+      target_link_libraries(hybridapi ${CUPTI_LIBRARY})
+    endif()
+
+    if(TRACING)
+      target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
+    endif()
   endif()
-  add_library(cudahybridapi ${hybridAPI-cxx-sources})
-  if(TRACING)
-    target_compile_definitions(cudahybridapi PRIVATE HAPI_TRACE)
+
+  if (BUILD_HIP)
+    add_compile_definitions(__HIP_PLATFORM_AMD__)
+    # Modern ROCm/HIP detection
+    if(NOT DEFINED ROCM_PATH)
+      if(NOT DEFINED ENV{ROCM_PATH})
+        set(ROCM_PATH "/opt/rocm" CACHE PATH "Path to ROCm installation")
+      else()
+        set(ROCM_PATH $ENV{ROCM_PATH} CACHE PATH "Path to ROCm installation")
+      endif()
+    endif()
+    
+    # Find hipcc wrapper for reference
+    find_program(HIP_HIPCC_EXECUTABLE
+      NAMES hipcc
+      PATHS "${ROCM_PATH}/bin" "${ROCM_PATH}/hip/bin"
+      NO_DEFAULT_PATH
+    )
+    
+    if(NOT HIP_HIPCC_EXECUTABLE)
+      message(FATAL_ERROR "Could not find hipcc. Please set ROCM_PATH to your ROCm installation directory.")
+    endif()
+    
+    # Find the actual clang compiler used by ROCm (required by CMake)
+    find_program(CMAKE_HIP_COMPILER
+      NAMES clang++
+      PATHS "${ROCM_PATH}/llvm/bin" "${ROCM_PATH}/bin"
+      NO_DEFAULT_PATH
+    )
+    
+    if(NOT CMAKE_HIP_COMPILER)
+      message(FATAL_ERROR "Could not find ROCm clang++ compiler in ${ROCM_PATH}")
+    endif()
+    
+    set(HIP_DIR "${ROCM_PATH}")
+    set(CMAKE_HIP_ARCHITECTURES "gfx803;gfx900;gfx906;gfx908;gfx90a;gfx1030;gfx1100" CACHE STRING "HIP architectures")
+    
+    # Enable HIP language support
+    enable_language(HIP)
+    
+    add_library(hybridapi ${hybridAPI-cxx-sources})
+    add_dependencies(hybridapi ci-generated)
+    target_include_directories(hybridapi PRIVATE "${ROCM_PATH}/include")
+
+    if(TRACING)
+      target_compile_definitions(hybridapi PRIVATE HAPI_TRACE)
+    endif()
   endif()
-endif()
 
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-cxi.sh)
-  configure_file(src/arch/${VDIR}/conv-mach-cxi.sh         include/ COPYONLY)
-  configure_file(src/arch/${VDIR}/conv-mach-cxi.h          include/ COPYONLY)
-endif()
 
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-slurmpmi2cray.sh)
-  configure_file(src/arch/${VDIR}/conv-mach-slurmpmi2cray.sh         include/ COPYONLY)
-  configure_file(src/arch/${VDIR}/conv-mach-slurmpmi2cray.h          include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-pxshm.sh)
-  configure_file(src/arch/${VDIR}/conv-mach-pxshm.sh         include/ COPYONLY)
-  configure_file(src/arch/${VDIR}/conv-mach-pxshm.h          include/ COPYONLY)
-endif()
-
-if(${CMK_USE_SHMEM})
-  if (EXISTS ${CMAKE_SOURCE_DIR}/src/conv-core/cmishmem.h)
-    configure_file(src/conv-core/cmishmem.h                  include/ COPYONLY)
-  endif()
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-sysvshm.sh)
-  configure_file(src/arch/${VDIR}/conv-mach-sysvshm.sh       include/ COPYONLY)
-  configure_file(src/arch/${VDIR}/conv-mach-sysvshm.h        include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-pxshm.sh)
-  configure_file(src/arch/${GDIR}/conv-mach-pxshm.sh         include/ COPYONLY)
-  configure_file(src/arch/${GDIR}/conv-mach-pxshm.h          include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-hugepages.sh)
-  configure_file(src/arch/${GDIR}/conv-mach-hugepages.sh         include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${VDIR}/conv-mach-smp.sh)
-  configure_file(src/arch/${VDIR}/conv-mach-smp.sh           include/ COPYONLY)
-  configure_file(src/arch/${VDIR}/conv-mach-smp.h            include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-smp.sh)
-  configure_file(src/arch/${GDIR}/conv-mach-smp.sh           include/ COPYONLY)
-  configure_file(src/arch/${GDIR}/conv-mach-smp.h            include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-tcp.sh)
-  configure_file(src/arch/${GDIR}/conv-mach-tcp.sh           include/ COPYONLY)
-  configure_file(src/arch/${GDIR}/conv-mach-tcp.h            include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-local.sh)
-  configure_file(src/arch/${GDIR}/conv-mach-local.sh           include/ COPYONLY)
-  configure_file(src/arch/${GDIR}/conv-mach-local.h            include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-syncft.h)
-  configure_file(src/arch/${GDIR}/conv-mach-syncft.h            include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/machine-persistent.h)
-  configure_file(src/arch/${GDIR}/machine-persistent.h          include/ COPYONLY)
-endif()
-
-if(EXISTS ${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/machine-persistent.C)
-  configure_file(src/arch/${GDIR}/machine-persistent.C          include/ COPYONLY)
-endif()
-
-if(LRTS_PMI)
-  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-${LRTS_PMI}.sh include/ COPYONLY)
-  configure_file(${CMAKE_SOURCE_DIR}/src/arch/${GDIR}/conv-mach-${LRTS_PMI}.h include/ COPYONLY)
-endif()
-
-if(CMK_COMPILER STREQUAL "msvc")
-  configure_file(src/arch/win/unix2nt_cc                      bin/ COPYONLY)
-  configure_file(src/arch/win/unix2nt_ar                      bin/ COPYONLY)
-  configure_file(${CMAKE_SOURCE_DIR}/src/arch/win/unistd.h    include/ COPYONLY)
 endif()
 
 # Header files
-configure_file(src/arch/${GDIR}/conv-common.h                include/ COPYONLY)
-if(EXISTS src/arch/${GDIR}/conv-common.sh)
-  configure_file(src/arch/${GDIR}/conv-common.sh               include/ COPYONLY)
-endif()
 configure_file(src/arch/${VDIR}/conv-mach.h                  include/ COPYONLY)
 configure_file(src/arch/common/conv-mach-common.h            include/ COPYONLY)
 configure_file(src/arch/util/lrts-common.h                   include/ COPYONLY)
-configure_file(src/arch/util/cmiqueue.h                      include/ COPYONLY)
-configure_file(src/arch/util/lrtslock.h                      include/ COPYONLY)
 configure_file(src/arch/util/mempool.h                       include/ COPYONLY)
-configure_file(src/arch/util/machine.h                       include/ COPYONLY)
-configure_file(src/arch/util/machine-lrts.h                  include/ COPYONLY)
-configure_file(src/arch/util/machine-rdma.h                  include/ COPYONLY)
-configure_file(src/arch/util/machine-smp.h                   include/ COPYONLY)
-configure_file(src/arch/util/pcqueue.h                       include/ COPYONLY)
 configure_file(src/util/pup_c_functions.h                    include/ COPYONLY)
 
 set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
@@ -817,13 +815,12 @@ set(src-util-h-sources src/util/SSE-Double.h src/util/SSE-Float.h
     src/util/pup_cmialloc.h src/util/pup_mpi.h src/util/pup_paged.h
     src/util/pup_stl.h src/util/pup_toNetwork.h src/util/pup_toNetwork4.h
     src/util/rand48_replacement.h src/util/random_sequence.h
-    src/util/simd.h src/util/sockRoutines.h src/util/spanningTree.h
+    src/util/simd.h src/util/spanningTree.h
     src/util/spanningTreeStrategy.h src/util/spanningTreeVertex.h
     src/util/strided_sequence.h src/util/treeStrategy_3dTorus_minBytesHops.h
     src/util/treeStrategy_3dTorus_minHops.h
     src/util/treeStrategy_nodeAware_minBytes.h
-    src/util/treeStrategy_nodeAware_minGens.h src/util/treeStrategy_topoUnaware.h
-    src/util/uFcontext.h src/util/uJcontext.h src/util/valgrind.h
+    src/util/treeStrategy_nodeAware_minGens.h src/util/treeStrategy_topoUnaware.h src/util/valgrind.h
     src/util/vector2d.h)
 
 if(CMK_CAN_LINK_FORTRAN)
@@ -838,53 +835,19 @@ foreach(filename ${src-util-h-sources})
 endforeach()
 
 
-# proc_management
-if(${NETWORK} MATCHES "ucx" OR ${NETWORK} MATCHES "ofi")
-  # file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/include/proc_management/simple_pmi)
-
-  set(proc_management-sources
-  src/arch/util/proc_management/runtime-craypmi2.C
-  src/arch/util/proc_management/runtime-craypmi.C
-  src/arch/util/proc_management/runtime-pmi.C
-  src/arch/util/proc_management/runtime-pmix.C
-  src/arch/util/proc_management/runtime-codec.h
-  src/arch/util/proc_management/runtime-pmi2.C
-  src/arch/util/proc_management/runtime.h
-  )
-
-  set(proc_management-simple_pmi-sources
-  src/arch/util/proc_management/simple_pmi/pmi.h
-  src/arch/util/proc_management/simple_pmi/mpl.h
-  src/arch/util/proc_management/simple_pmi/simple_pmi.C
-  src/arch/util/proc_management/simple_pmi/simple_pmiutil.C
-  src/arch/util/proc_management/simple_pmi/simple_pmiutil.h
-  )
-
-  # FIXME: this should be in include/proc_management/
-  foreach(filename ${proc_management-sources})
-      configure_file(${filename} include/ COPYONLY)
-  endforeach()
-
-  if(${LRTS_PMI} MATCHES "simplepmi")
-    # FIXME: this should be in include/proc_management/simple_pmi
-    foreach(filename ${proc_management-simple_pmi-sources})
-      configure_file(${filename} include/ COPYONLY)
-    endforeach()
-  endif()
-endif()
-
 # Charmxi
 add_subdirectory(src/xlat-i)
 add_dependencies(charmxi create_symlinks)
 
-# Hwloc
-include(cmake/hwloc.cmake)
+# Hwloc. Nothing in a reconverse build includes this embedded copy (reconverse
+# finds its own hwloc), and on Windows its autotools configure would have to
+# run through the MSVC wrapper, so it is skipped there.
+if(NOT CMK_WINDOWS)
+  include(cmake/hwloc.cmake)
+endif()
 
 # Converse
 include(cmake/converse.cmake)
-add_subdirectory(src/QuickThreads)
-add_subdirectory(src/util/boost-context)
-add_subdirectory(src/conv-core)
 
 # LIBS
 if(${TARGET} STREQUAL "LIBS")
@@ -907,13 +870,7 @@ add_library(modulecompletion ${modulecompletion-cxx-sources} ${modulecompletion-
 configure_file(src/libs/ck-libs/completion/completion.h include/ COPYONLY)
 add_dependencies(modulecompletion ck)
 
-# Charmrun + testrun
-if(${CMK_BUILD_CHARMRUN})
-  add_subdirectory(src/util/charmrun-src)
-  add_dependencies(charmrun create_symlinks)
-else()
-  configure_file(${CHARMRUN_DIR}/charmrun ${CMAKE_BINARY_DIR}/bin COPYONLY)
-endif()
+# testrun
 configure_file(src/scripts/testrun bin/ COPYONLY)
 
 # Charm++ libraries
@@ -928,15 +885,18 @@ foreach(file ${ckloop-h-files})
   configure_file(${file} ${CMAKE_BINARY_DIR}/include COPYONLY)
 endforeach(file)
 
+# allGather
+configure_file(src/libs/ck-libs/allGather/allGather.h  ${CMAKE_BINARY_DIR}/include COPYONLY)
+add_library(moduleallGather src/libs/ck-libs/allGather/allGather.C src/libs/ck-libs/allGather/allGather.h)
+add_dependencies(moduleallGather ck)
+
 # NDMeshStreamer
 file(GLOB moduleNDMeshStreamer-h-sources src/libs/ck-libs/NDMeshStreamer/*.h)
 set(moduleNDMeshStreamer-cxx-sources src/libs/ck-libs/NDMeshStreamer/NDMeshStreamer.C)
 add_library(moduleNDMeshStreamer ${moduleNDMeshStreamer-cxx-sources}
     ${moduleNDMeshStreamer-h-sources}
     ${CMAKE_BINARY_DIR}/include/NDMeshStreamer.decl.h)
-target_include_directories(moduleNDMeshStreamer PUBLIC .
-    ../../../util/topomanager ../../../ck-ldb ../../../ck-perf ../../../ck-cp
-    ../completion)
+target_include_directories(moduleNDMeshStreamer PUBLIC .)
 
 add_dependencies(moduleNDMeshStreamer ck)
 
@@ -947,7 +907,10 @@ endforeach()
 configure_file(src/libs/ck-libs/NDMeshStreamer/libmoduleNDMeshStreamer.dep ${CMAKE_BINARY_DIR}/lib/ COPYONLY)
 
 
-# TCharm
+# TCharm. Migratable threads come from reconverse and isomalloc from
+# libisomalloc (cmake/converse.cmake); src/libs/ck-libs/tcharm/reconverse-compat
+# declares the few classic Converse functions reconverse defines but does not
+# declare.
 file(GLOB tcharm-c-sources src/libs/ck-libs/tcharm/*.c)
 set(tcharm-h-sources
     src/libs/ck-libs/tcharm/tcharm.h
@@ -960,7 +923,8 @@ if(CMK_CAN_LINK_FORTRAN)
         src/libs/ck-libs/tcharm/tcharmf.h
     )
 endif()
-add_library(moduletcharm src/libs/ck-libs/tcharm/tcharm.C ${tcharm-h-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h)
+set(tcharm-cxx-sources src/libs/ck-libs/tcharm/tcharm.C)
+add_library(moduletcharm ${tcharm-cxx-sources} ${tcharm-h-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h)
 add_library(moduletcharmmain src/libs/ck-libs/tcharm/tcharmmain.C ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
 add_library(tcharm-compat ${tcharm-c-sources} ${CMAKE_BINARY_DIR}/include/tcharm.decl.h ${CMAKE_BINARY_DIR}/include/tcharmmain.decl.h)
 
@@ -970,6 +934,7 @@ configure_file(src/libs/ck-libs/tcharm/libmoduletcharmmain.dep ${CMAKE_BINARY_DI
 foreach(f ${tcharm-h-sources})
     configure_file(${f} ${CMAKE_BINARY_DIR}/include COPYONLY)
 endforeach(f)
+
 
 add_dependencies(moduletcharmmain ck)
 add_dependencies(moduletcharm ck)
@@ -987,24 +952,48 @@ if(${TARGET} STREQUAL "charm4py")
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
   add_library(charm SHARED empty.cpp)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib_so)
+  # `converse` is an aggregation (UTILITY) target on Reconverse builds and
+  # cannot be linked: libreconverse is the Converse layer (CCS core
+  # included), charm_cxx_utils holds charm's utilities, TopoManager and
+  # the CCS builtins, and isomalloc the init hook StartCharmExt registers
+  # (-standalone means charmc adds none of these itself).
+  set(CHARM4PY_RUNTIME_TARGETS reconverse charm_cxx_utils isomalloc)
   if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-    target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -all_load -c++stl -shared")
+    target_link_libraries(charm ck ${CHARM4PY_RUNTIME_TARGETS} "-Llib/ -standalone -all_load -c++stl -shared")
   else()
-    target_link_libraries(charm ck converse memory-default threads-default ldb-rand "-Llib/ -standalone -whole-archive -c++stl -shared")
+    target_link_libraries(charm ck ${CHARM4PY_RUNTIME_TARGETS} "-Llib/ -standalone -whole-archive -c++stl -shared")
   endif()
 
   if (${BUILD_CUDA})
-    target_link_libraries(charm cudart cudahybridapi)
+    target_link_libraries(charm cudart hybridapi)
   endif()
 
-  add_dependencies(charm hwloc)
-endif()
+  if (${BUILD_HIP})
+    target_link_libraries(charm hiprtc hybridapi)
+  endif()
 
-# Check that we are able to build and link an executable
-add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
-add_dependencies(ckhello ck ldb-rand memory-default threads-default conv-static
-  converse ckmain ckqt
-  moduleNDMeshStreamer modulecompletion)
+  if(${TRACING})
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+      target_link_libraries(charm trace-summary trace-projections "-Llib/ -standalone -all_load -c++stl -shared")
+    else()
+      target_link_libraries(charm trace-summary trace-projections "-Llib/ -standalone -whole-archive -c++stl -shared")
+    endif()
+  endif()
+
+  if(TARGET hwloc)
+    add_dependencies(charm hwloc)
+  endif()
+
+else()
+  # Check that we are able to build and link an executable
+  add_executable(ckhello ${CMAKE_SOURCE_DIR}/tests/charm++/simplearrayhello/hello.C)
+  target_link_libraries(ckhello PRIVATE reconverse)
+  set(ckhello_deps ck converse ckmain moduleNDMeshStreamer modulecompletion)
+  if(BUILD_CUDA OR BUILD_HIP)
+    list(APPEND ckhello_deps hybridapi)
+  endif()
+  add_dependencies(ckhello ${ckhello_deps})
+endif()
 
 # Create conv-mach-opt.sh
 set(optfile_sh ${CMAKE_BINARY_DIR}/include/conv-mach-opt.sh)
@@ -1017,6 +1006,19 @@ file(APPEND  ${optfile_sh} "CMK_COMPILER_SUFFIX=${CMK_COMPILER_SUFFIX}\n")
 
 if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-cray")
     file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/cc-${CMK_COMPILER}.sh\n")
+    # The cc-*.sh compiler files add -lckqt to CMK_LIBS, a library this
+    # build does not produce. This file is sourced last by
+    # conv-config.sh (after conv-mach.sh has already sourced the compiler
+    # file once), so stripping here is authoritative.
+    file(APPEND ${optfile_sh} "CMK_LIBS=\"\${CMK_LIBS//-lckqt/}\"\n")
+    if(BUILD_CUDA)
+        # liblci.so uses the CUDA driver API directly, so every charmc-linked
+        # binary needs -lcuda under reconverse+CUDA. Link against the toolkit
+        # stub (standard NVIDIA practice for non-GPU build nodes); the real
+        # driver resolves at runtime on GPU nodes. Classic never links LCI
+        # and its link line is untouched.
+        file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -L${CUDA_DIR}/lib64/stubs -lcuda\"\n")
+    endif()
 endif()
 
 if(${BUILD_SHARED})
@@ -1049,7 +1051,8 @@ foreach(l BUILDOPTS CMK_AMPI_WITH_ROMIO CMK_BUILD_PYTHON CMK_CAN_LINK_FORTRAN
         CXX_NO_AS_NEEDED LDXX_WHOLE_ARCHIVE_PRE LDXX_WHOLE_ARCHIVE_POST
         CMK_MACOSX CMK_POST_EXE CMK_SHARED_SUF CMK_USER_SUFFIX OPTS_LD
         CMK_COMPILER_KNOWS_FVISIBILITY CMK_LINKER_KNOWS_UNDEFINED
-        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR CMK_USER_DISABLED_TLS CMK_CXI)
+        CMK_SUPPORTS_MEMORY_ISOMALLOC CUDA_DIR HIP_DIR CMK_USER_DISABLED_TLS CMK_CXI
+        CMK_RECONVERSE)
     file(APPEND ${optfile_sh} "${l}=\"${${l}}\"\n" )
 endforeach(l)
 
@@ -1061,45 +1064,60 @@ if (NOT CMK_WINDOWS)
   file(APPEND ${optfile_sh} "CMK_LIBS=\"$CMK_LIBS -lz ${DL_LIB}\"\n")
 endif()
 
-if(LRTS_PMI)
-  file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${LRTS_PMI}.sh\n")
+if(CMK_COVERAGE)
+  file(APPEND ${optfile_sh} "CMK_COVERAGE=1\n")
 endif()
+
 
 # Create conv-mach-opt.h
 set(optfile_h ${CMAKE_BINARY_DIR}/include/conv-mach-opt.h)
 
 file(WRITE  ${optfile_h} "/* Build-time options header, automatically generated by cmake. */\n")
-foreach(l CMK_AMPI_WITH_ROMIO CMK_OPTIMIZE CMK_AMPI_ONLY CMK_POST_EXE CMK_SHARED_SUF
+foreach(l CMK_AMPI_WITH_ROMIO CMK_AMPI_ONLY CMK_POST_EXE CMK_SHARED_SUF
         CMK_USER_SUFFIX CMK_CXI)
     file(APPEND ${optfile_h} "#define ${l} ${${l}}\n")
 endforeach(l)
+# Use #undef before #define so this overrides converse.h's #ifndef default
+# regardless of include order, without triggering a redefinition warning.
+file(APPEND ${optfile_h} "#undef CMK_OPTIMIZE\n#define CMK_OPTIMIZE ${CMK_OPTIMIZE}\n")
+if(CMK_COVERAGE)
+  file(APPEND ${optfile_h} "#define CMK_COVERAGE 1\n")
+else()
+  file(APPEND ${optfile_h} "#define CMK_COVERAGE 0\n")
+endif()
 
 if(NOT ${NETWORK} STREQUAL "mpi" AND NOT ${NETWORK} MATCHES "gni-" AND NOT ${NETWORK} MATCHES "-cray")
     file(APPEND ${optfile_h} "#include \"cc-${CMK_COMPILER}.h\"\n")
 endif()
 
-if(LRTS_PMI)
-  file(APPEND ${optfile_h} "#include \"conv-mach-${LRTS_PMI}.h\"\n")
+
+# CMK_MEM_CHECKPOINT reaches Makefiles through conv-mach-opt.mak (tests skip
+# the in-memory checkpoint tests without it); C code gets it from conv-mach-syncft.h.
+if(SYNCFT)
+  set(CMK_MEM_CHECKPOINT 1)
+else()
+  set(CMK_MEM_CHECKPOINT 0)
 endif()
 
 # Create conv-mach-opt.mak
 set(optfile_mak ${CMAKE_BINARY_DIR}/include/conv-mach-opt.mak)
 
 file(WRITE  ${optfile_mak} "# Build-time options header for Makefiles, automatically generated by cmake.\n")
-foreach(l CUDA_DIR BUILD_CUDA CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BUILD_PYTHON
+foreach(l CUDA_DIR HIP_DIR BUILD_CUDA BUILD_HIP CMK_AMPI_WITH_ROMIO CMK_MACOSX CMK_BUILD_PYTHON
         CMK_CHARMDEBUG CMK_COMPILER CMK_GDIR CMK_HAS_MALLOC_HOOK CMK_HAS_MMAP CMK_LIBJPEG
         CMK_LUSTREAPI CMK_MULTICORE CMK_NO_BUILD_SHARED CMK_NO_PARTITIONS CMK_SHARED_SUF
         CMK_SMP CMK_SUPPORTS_FSGLOBALS CMK_SUPPORTS_PIPGLOBALS CMK_SUPPORTS_PIEGLOBALS
         CMK_SUPPORTS_SWAPGLOBALS CMK_SUPPORTS_TLSGLOBALS CMK_HAS_OPENMP
         CMK_TRACE_ENABLED CMK_USE_LRTS CMK_VDIR OPTSATBUILDTIME CMK_AMPI_ONLY CMK_WINDOWS
         CMK_USE_CMA CMK_USER_SUFFIX CMK_CAN_LINK_FORTRAN CMK_SUPPORTS_MEMORY_ISOMALLOC
-	CMK_CXI)
+	CMK_CXI CMK_MEM_CHECKPOINT)
     file(APPEND ${optfile_mak} "${l}:=${${l}}\n" )
 endforeach(l)
 
 # Add options
 set(CUDA ${BUILD_CUDA}) # need CUDA to match conv-mach file name
-foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA PAPI CXI)
+set(HIP ${BUILD_HIP})   # need HIP to match conv-mach file name
+foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA HIP PAPI CXI NOLB TSAN PERFTOOLS)
     if(${opt})
         string(TOLOWER ${opt} optl)
         file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-${optl}.sh\n")
@@ -1107,6 +1125,10 @@ foreach(opt SMP OMP TCP PTHREADS SYNCFT PXSHM PERSISTENT OOC CUDA PAPI CXI)
         set(opts_enabled "${opts_enabled}${opt} ")
     endif()
 endforeach()
+if(CRAYPE)   # conv-mach-craype has only a .sh file
+    file(APPEND ${optfile_sh} ". ${CMAKE_BINARY_DIR}/include/conv-mach-craype.sh\n")
+    set(opts_enabled "${opts_enabled}CRAYPE ")
+endif()
 # Options that need no .h/.sh additions
 foreach(opt TRACING TRACING_COMMTHREAD ERROR_CHECKING LBUSERDATA QLOGIC
   BUILD_SHARED TASK_QUEUE DRONE_MODE LOCKLESS_QUEUE CHARMDEBUG CCS CONTROLPOINT
@@ -1212,6 +1234,8 @@ add_custom_target(create_symlinks ALL
                   COMMAND test -d ${CMAKE_BINARY_DIR}/benchmarks || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/benchmarks ${CMAKE_BINARY_DIR}/benchmarks && true
                   COMMAND test -d ${CMAKE_BINARY_DIR}/examples || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/examples ${CMAKE_BINARY_DIR}/examples && true
                   COMMAND test -d ${CMAKE_BINARY_DIR}/tests || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/tests ${CMAKE_BINARY_DIR}/tests && true
+                  # miniapps/ is a submodule a plain clone leaves empty: mirror it on the first make after it is checked out.
+                  COMMAND test -f ${CMAKE_BINARY_DIR}/miniapps/Makefile || env SYSTEMLN=${SYSTEMLN} ${CMAKE_SOURCE_DIR}/src/scripts/gathertree ${CMAKE_SOURCE_DIR}/miniapps ${CMAKE_BINARY_DIR}/miniapps && true
                   VERBATIM
                  )
 
@@ -1241,13 +1265,9 @@ configure_package_config_file(
   "${CMAKE_BINARY_DIR}/lib/cmake/Charm/CharmConfig.cmake"
   INSTALL_DESTINATION ${CMAKE_INSTALL_PREFIX}/lib/cmake/Charm/CharmConfig.cmake
   )
-# We want the `SameMinorVersion` compatibility mode, but it isn't available
-# before CMake v3.11
-if(CMAKE_VERSION VERSION_GREATER 3.11 OR CMAKE_VERSION VERSION_EQUAL 3.11)
-  set(VERSION_COMPATIBILITY_MODE SameMinorVersion)
-else()
-  set(VERSION_COMPATIBILITY_MODE ExactVersion)
-endif()
+
+set(VERSION_COMPATIBILITY_MODE SameMinorVersion)
+
 write_basic_package_version_file(
   ${CMAKE_BINARY_DIR}/lib/cmake/Charm/CharmConfigVersion.cmake
   COMPATIBILITY ${VERSION_COMPATIBILITY_MODE})

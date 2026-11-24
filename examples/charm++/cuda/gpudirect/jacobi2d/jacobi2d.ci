@@ -14,6 +14,8 @@ mainmodule jacobi2d {
   readonly bool sync_ver;
   readonly bool use_zerocopy;
   readonly bool print_elements;
+  readonly int lb_freq;
+  readonly int first_lb;
 
   mainchare Main {
     entry Main(CkArgMsg* m);
@@ -35,6 +37,17 @@ mainmodule jacobi2d {
     entry void packGhostsDone();
     entry void receiveGhostsZC(int ref, int dir, int w, nocopydevice DataType gh[w]);
     entry void receiveGhostsReg(int ref, int dir, int w, DataType gh[w]);
+
+    entry void iterate();
+
+    // Send-side completion of each zerocopy ghost. exchangeGhosts waits on
+    // these before it starts the next iteration, so packGhosts cannot
+    // overwrite a d_send_*_ghost buffer while its transfer is still in
+    // flight. No C++ body: they exist only to be awaited below.
+    entry void d_send_left_ghost_done();
+    entry void d_send_right_ghost_done();
+    entry void d_send_top_ghost_done();
+    entry void d_send_bottom_ghost_done();
 
     entry void exchangeGhosts() {
       serial {
@@ -68,12 +81,29 @@ mainmodule jacobi2d {
         }
       }
 
+      // Only the zerocopy path attaches a completion callback to its sends,
+      // so only it has anything to wait for here.
+      if (use_zerocopy) {
+        if (!left_bound) {
+          when d_send_left_ghost_done() {}
+        }
+        if (!right_bound) {
+          when d_send_right_ghost_done() {}
+        }
+        if (!top_bound) {
+          when d_send_top_ghost_done() {}
+        }
+        if (!bottom_bound) {
+          when d_send_bottom_ghost_done() {}
+        }
+      }
+
       serial {
         if (sync_ver || my_iter <= warmup_iters) {
           contribute(CkCallback(CkReductionTarget(Main, commDone), main_proxy));
         } else {
           if (my_iter < warmup_iters + n_iters) {
-            thisProxy[thisIndex].exchangeGhosts();
+            thisProxy[thisIndex].iterate();
           } else {
             contribute(CkCallback(CkReductionTarget(Main, allDone), main_proxy));
           }

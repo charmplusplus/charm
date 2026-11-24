@@ -1,7 +1,7 @@
 #ifndef __DEVICEMANAGER_H_
 #define __DEVICEMANAGER_H_
 
-#include <cuda_runtime.h>
+#include <hapi_portable.h>
 #include "converse.h"
 #include "buddy_allocator.h"
 
@@ -19,8 +19,23 @@ struct DeviceManager {
   // Buddy allocator for communication buffer
   buddy::allocator* comm_buffer;
 
+  // Device properties needed to estimate how many SMs a kernel occupies while
+  // it runs, which is what turns a raw kernel timeline into a load. Filled
+  // lazily by hapiPopulateDeviceProps, because device_managers is not
+  // populated yet when a DeviceManager is constructed.
+  int multi_processor_count;
+  int max_threads_per_sm;
+  int max_blocks_per_sm;
+  int max_registers_per_sm;
+  int max_shared_mem_per_sm;
+  int warp_size;
+  bool props_initialized;
+
   DeviceManager(int local_index_, int global_index_) :
-    local_index(local_index_), global_index(global_index_), comm_buffer(nullptr) {
+    local_index(local_index_), global_index(global_index_), comm_buffer(nullptr),
+    multi_processor_count(0), max_threads_per_sm(0), max_blocks_per_sm(0),
+    max_registers_per_sm(0), max_shared_mem_per_sm(0), warp_size(0),
+    props_initialized(false) {
 #if CMK_SMP
     lock = CmiCreateLock();
 #endif
@@ -37,13 +52,13 @@ struct DeviceManager {
     return comm_buffer;
   }
 
-  void create_comm_buffer(size_t size) {
+  void create_comm_buffer(size_t total_size, size_t comm_size) {
     if (comm_buffer == nullptr)
-      comm_buffer = new buddy::allocator(size);
+      comm_buffer = new buddy::allocator(total_size, comm_size);
   }
 
-  void* alloc_comm_buffer(size_t size) {
-    return comm_buffer->malloc(size);
+  void* alloc_comm_buffer(size_t size, bool is_comm = true) {
+    return comm_buffer->malloc(size, is_comm);
   }
 
   void free_comm_buffer(size_t offset) {
@@ -52,6 +67,10 @@ struct DeviceManager {
 
   size_t get_comm_buffer_free_size() {
     return comm_buffer->get_free_size();
+  }
+
+  size_t get_lb_buffer_free_size() {
+    return comm_buffer->get_lb_free_size();
   }
 
   void destroy_comm_buffer() {

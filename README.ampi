@@ -7,17 +7,19 @@ such as overdecomposition (processor virtualization), dynamic load balancing,
 automatic fault tolerance, and overlap of computation and communication. For
 more information on all topics related to AMPI, consult the AMPI manual here:
 
-    http://charm.cs.illinois.edu/manuals/html/ampi/manual.html
+    https://charm.readthedocs.io/en/latest/ampi/manual.html
 
 
 Building AMPI
 -------------
-AMPI has its own target in the build system. You can run the top-level
-build script interactively using "./build", or you can specify your
-architecture, operating system, compilers, and other options directly.
-For example:
+AMPI has its own target in the build system. Give the build script the
+target, the version, and any other options. For example:
 
-    ./build AMPI netlrts-linux-x86_64 gfortran gcc --with-production
+    ./build AMPI reconverse-linux-x86_64 --with-production -j8
+
+The Fortran wrappers (ampif77, ampif90) are built when CMake finds a
+Fortran compiler; a compiler word such as "gfortran" selects one, and
+"--disable-fortran" leaves them out.
 
 
 Compiling and Linking AMPI Programs
@@ -36,16 +38,42 @@ via the $PATH environment variable.
 
 Running AMPI Programs
 ---------------------
-AMPI programs can be run with charmrun like any other Charm++ program. In
-addition to the number of processes, specified with "+p n", AMPI programs
-also take the total number of virtual processors (VPs) to run with as "+vp n".
-For example, to run an AMPI program 'pgm' on 4 processors using 32 ranks, do:
+An AMPI program is an ordinary executable, like any other Charm++
+program. The number of PEs is given with "+pe N", the total across all
+processes, and the number of AMPI ranks (virtual processors, VPs) with
+"+vp R". For example, to run an AMPI program 'pgm' with 32 ranks on 4 PEs
+in one process, do:
 
-    ./charmrun +p 4 ./pgm +vp 32
+    ./pgm +pe 4 +vp 32
 
 To run with dynamic load balancing, add "+balancer <LB>":
 
-    ./charmrun +p 4 ./pgm +vp 32 +balancer RefineLB
+    ./pgm +pe 4 +vp 32 +balancer RefineLB
+
+To run several processes on one machine, use LCI's lcrun launcher, which
+the build puts in bin/:
+
+    lcrun -n 2 ./pgm +pe 4 +vp 32
+
+The ampirun script, copied next to the program by ampicc, takes
+MPI-style options. "ampirun -np R ./pgm" runs R ranks as one process
+with one PE per rank, and "--procs P" runs P processes through lcrun:
+
+    ./ampirun -np 16 --procs 4 ./pgm      # runs lcrun -n 4 ./pgm +pe 16
+
+Under a batch system, use the site launcher (srun, mpirun) and give the
+program its total number of PEs with "+pe".
+
+A rank that migrates to another process, or is restored from a
+checkpoint by a new process, needs the program loaded at the same address
+in every process, so address space randomization must be off. On Linux,
+ampirun runs the program under "setarch $(uname -m) -R" to do this; with
+a site launcher, put the prefix inside the launch:
+
+    srun -n 4 setarch $(uname -m) -R ./pgm +pe 16 +vp 64
+
+macOS has no setarch, so there ranks migrate only between the PEs of
+one process. The AMPI manual has the details.
 
 
 Porting to AMPI
@@ -56,7 +84,9 @@ implemented as user-level threads, which may share a process with other ranks
 Therefore, to run with more than 1 VP per processor, all globals and statics
 that are non-readonly and whose value does not depend on rank must be modified
 to use local storage. Consult the AMPI manual for more information on global
-variable privatization and automated approaches to privatization.
+variable privatization and automated approaches to privatization. Of the
+automated approaches, -pieglobals and -fsglobals are supported; -tlsglobals
+is not supported on reconverse.
 
 AMPI programs must have the following main function signatures, so that AMPI
 can bootstrap before invoking the user's main function:
@@ -88,9 +118,14 @@ prefixed with AMPI_:
     * AMPI_Migrate_to_pe migrates the calling rank to the given PE.
     * AMPI_Set_migratable sets the migratability of the calling rank.
     * AMPI_Command_argument_count returns the number of command line arguments
-      given to a Fortran AMPI program excluding charmrun and AMPI parameters.
+      given to a Fortran AMPI program excluding runtime and AMPI parameters.
     * AMPI_Get_command_argument returns an argument from the command line
       to a Fortran AMPI program.
+
+MPI-IO support is available via our port of the ROMIO library. However:
+    * ROMIO is not built by default due to the fact that the current port is
+      incompatible with GCC 14 and beyond.  Add --with-romio to your
+      build line to enable MPI-IO support via ROMIO.
 
 Note that AMPI defines a preprocessor symbol "AMPI" so that user codes can
 check for AMPI's presence at compile time using "#ifdef AMPI".

@@ -61,6 +61,8 @@ static int warned = 0;
 #define DEBUGF(x)          // CmiPrintf x
 
 CkpvDeclare(TraceArray*, _traces);		// lists of all trace modules
+CkpvDeclare(int, _traceObjColl);	// see trace.h
+CkpvDeclare(CmiUInt8, _traceObjId);
 
 CkpvDeclare(bool,   dumpData);
 CkpvDeclare(double, traceInitTime);
@@ -101,6 +103,10 @@ static void traceCommonInit(char **argv)
   DEBUGF(("[%d] in traceCommonInit.\n", CkMyPe()));
   CkpvInitialize(double, traceInitTime);
   CkpvAccess(traceInitTime) = CmiStartTimer();
+  CkpvInitialize(int, _traceObjColl);
+  CkpvAccess(_traceObjColl) = -1;
+  CkpvInitialize(CmiUInt8, _traceObjId);
+  CkpvAccess(_traceObjId) = 0;
   CkpvInitialize(bool, dumpData);
   CkpvAccess(dumpData) = true;
   CkpvInitialize(double, traceInitCpuTime);
@@ -296,8 +302,8 @@ void traceWriteSTS(FILE *stsfp,int nUserEvents) {
   for(i=0;i<_chareTable.size();i++)
     fprintf(stsfp, "CHARE %d \"%s\" %d\n", (int)i, _chareTable[i]->name, _chareTable[i]->ndims);
   for(i=0;i<_entryTable.size();i++)
-    fprintf(stsfp, "ENTRY CHARE %d \"%s\" %d %d\n", (int)i, _entryTable[i]->name,
-                 (int)_entryTable[i]->chareIdx, (int)_entryTable[i]->msgIdx);
+      fprintf(stsfp, "ENTRY CHARE %d \"%s\" %d %d\n", (int)i, _entryTable[i]->name,
+              (int)_entryTable[i]->chareIdx, (int)_entryTable[i]->msgIdx);
   for(i=0;i<_msgTable.size();i++)
     fprintf(stsfp, "MESSAGE %d %u\n", (int)i, (int)_msgTable[i]->size);
 }
@@ -352,9 +358,6 @@ void TraceArray::traceEndOnCommThread() {
 #endif
 }
 
-#if CMK_MULTICORE
-extern int Cmi_commthread;
-#endif
 
 /*Install the beginIdle/endIdle condition handlers.*/
 void traceBegin(void) {
@@ -363,9 +366,6 @@ void traceBegin(void) {
   
 #if CMK_SMP_TRACE_COMMTHREAD
   //the first core of this node controls the condition of comm thread
-#if CMK_MULTICORE
-  if (Cmi_commthread)
-#endif
   if(CmiMyRank()==0){
 	if(CpvAccessOther(traceOn, CmiMyNodeSize())!=1){
 		CkpvAccessOther(_traces, CmiMyNodeSize())->traceBeginOnCommThread();		
@@ -386,9 +386,6 @@ void traceEnd(void) {
 
 #if CMK_SMP_TRACE_COMMTHREAD
 //the first core of this node controls the condition of comm thread
-#if CMK_MULTICORE
-  if (Cmi_commthread)
-#endif
   if(CmiMyRank()==0){
 	if(CkpvAccessOther(traceOn, CmiMyNodeSize())!=0){
 		CkpvAccessOther(_traces, CmiMyNodeSize())->traceEndOnCommThread();
@@ -409,9 +406,6 @@ void traceEnd(void) {
 
 void traceBeginComm(void) {
 #if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
-#if CMK_MULTICORE
-  if (Cmi_commthread)
-#endif
     if (CmiMyRank() == 0) {
       if (CkpvAccessOther(traceOn, CmiMyNodeSize()) != 1) {
         CkpvAccessOther(_traces, CmiMyNodeSize())->traceBeginOnCommThread();
@@ -423,9 +417,6 @@ void traceBeginComm(void) {
 
 void traceEndComm(void) {
 #if CMK_TRACE_ENABLED && CMK_SMP_TRACE_COMMTHREAD
-#if CMK_MULTICORE
-  if (Cmi_commthread)
-#endif
     if (CmiMyRank() == 0) {
       if (CkpvAccessOther(traceOn, CmiMyNodeSize()) != 0) {
         CkpvAccessOther(_traces, CmiMyNodeSize())->traceEndOnCommThread();
@@ -487,10 +478,8 @@ static inline void _traceInit(char **argv)
   // check if trace is turned on/off for this pe
   CkpvAccess(traceOnPe) = checkTraceOnPe(argv);
 
-#if !CMK_CHARM4PY
   // defined in moduleInit.C
   _createTraces(argv);
-#endif
 
   // Now setup the control point tracing module if desired. It is always compiled/linked in, but is not always enabled
   // FIXME: make sure it is safe to use argv in SMP version 
@@ -835,6 +824,7 @@ struct TraceThreadListener {
   int srcPe;
   int ml;
   CmiObjId idx;
+  int coll; CmiUInt8 obj;  // the owning array element (coll -1 if none), see _TRACE_SET_OBJECT
 };
 
 static void traceThreadListener_suspend(struct CthThreadListener *l)
@@ -842,6 +832,7 @@ static void traceThreadListener_suspend(struct CthThreadListener *l)
   /* here, we activate the appropriate trace codes for the appropriate
      registered modules */
   traceSuspend();
+  _TRACE_CLEAR_OBJECT();
 }
 
 static void traceThreadListener_resume(struct CthThreadListener *l)
@@ -849,6 +840,7 @@ static void traceThreadListener_resume(struct CthThreadListener *l)
   TraceThreadListener *a=(TraceThreadListener *)l;
   /* here, we activate the appropriate trace codes for the appropriate
      registered modules */
+  _TRACE_SET_OBJECT(a->coll, a->obj);
   _TRACE_BEGIN_EXECUTE_DETAILED(a->event,a->msgType,a->ep,a->srcPe,a->ml,
 				CthGetThreadID(a->base.thread), NULL);
   a->event=-1;
@@ -876,6 +868,9 @@ void traceAddThreadListeners(CthThread tid, envelope *e)
   a->ep=e->getEpIdx();
   a->srcPe=e->getSrcPe();
   a->ml=e->getTotalsize();
+  // created inside the owning element's entry, so this is that element
+  a->coll=_TRACE_OBJECT_COLL();
+  a->obj=_TRACE_OBJECT_ID();
 
   CthAddListener(tid, (CthThreadListener *)a);
 #endif
@@ -892,7 +887,7 @@ int CkIsCharmMessage(char *msg)
 {
 //CmiPrintf("[%d] CkIsCharmMessage: %d %p %d %p\n", CkMyPe(),CmiGetHandler(msg), CmiGetHandlerFunction(msg), _charmHandlerIdx, _processHandler);
   if ((CmiGetHandler(msg) == _charmHandlerIdx) &&
-         (CmiGetHandlerFunction(msg) == (CmiHandlerEx)_processHandler))
+         ((CmiHandlerEx) CmiGetHandlerFunction(msg) == (CmiHandlerEx)_processHandler))
     return 1;
   if (CmiGetXHandler(msg) == _charmHandlerIdx) return isCharmEnvelope(msg);
   return 0;

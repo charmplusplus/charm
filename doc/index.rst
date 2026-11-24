@@ -19,6 +19,7 @@ Charm++ Documentation
    ampi/manual
    f90charm/manual
    libraries/manual
+   ckdyn/manual
    faq/manual
 
 .. toctree::
@@ -27,8 +28,6 @@ Charm++ Documentation
    :numbered:
 
    tcharm/manual
-   mblock/manual
-   pose/manual
 
 .. toctree::
    :maxdepth: 1

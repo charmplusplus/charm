@@ -36,12 +36,12 @@ mainmodule pupDisk {
     entry void write();
     entry void read();
     entry void verify();    
-    entry void acceptData(someData &inData);
+    entry void acceptData(const someData &inData);
   };
 
   array [1D] pupDisk{
     entry pupDisk(int howbig, int numElements, int maxFiles);
-    entry void write(int sender, someData &data);
+    entry void write(int sender, const someData &data);
     entry void read(int sender);
   };
 

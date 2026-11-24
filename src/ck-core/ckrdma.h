@@ -8,9 +8,11 @@
 #include "envelope.h"
 #include "ckcallback.h"
 #include "conv-rdma.h"
+#include <atomic>
 #include <vector>
 
-/*********************************** Zerocopy Direct API **********************************/
+/*********************************** Zerocopy Direct API
+ * **********************************/
 
 #define CK_BUFFER_REG     CMK_BUFFER_REG
 #define CK_BUFFER_UNREG   CMK_BUFFER_UNREG
@@ -139,10 +141,21 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
   // callback to be invoked on the sender/receiver
   CkCallback cb;
 
-  CkNcpyBuffer() : CmiNcpyBuffer() {}
+  /* reconverse's CmiNcpyBuffer sets deviceRdmaOpInfo only in the two explicit
+   * constructors; the default constructor, init() and pup() all leave it
+   * alone, and Charm++ reaches CmiNcpyBuffer exclusively through those three.
+   * CkRdmaDirectAckHandler uses a non-null deviceRdmaOpInfo to tell a device
+   * (D2D) completion from a host one, so a host-side buffer must carry a
+   * definite null there rather than whatever was on the stack. */
+  void clearDeviceRdmaOpInfo() {
+    deviceRdmaOpInfo = nullptr;
+  }
+
+  CkNcpyBuffer() : CmiNcpyBuffer() { clearDeviceRdmaOpInfo(); }
 
   explicit CkNcpyBuffer(const void *ptr_, size_t cnt_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
     cb = CkCallback(CkCallback::ignore);
+    clearDeviceRdmaOpInfo();
     CmiNcpyBuffer::init(ptr_, cnt_, regMode_, deregMode_);
   }
 
@@ -156,6 +169,7 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
 
   void init(const void *ptr_, size_t cnt_, CkCallback &cb_, unsigned short int regMode_=CK_BUFFER_REG, unsigned short int deregMode_=CK_BUFFER_DEREG) {
     cb   = cb_;
+    clearDeviceRdmaOpInfo();
     CmiNcpyBuffer::init(ptr_, cnt_, regMode_, deregMode_);
   }
 
@@ -166,6 +180,9 @@ class CkNcpyBuffer : public CmiNcpyBuffer {
     CmiNcpyBuffer::pup(p);
     p|cb;
     p((char *)&ncpyEmInfo, sizeof(NcpyEmInfo));
+    // Not a transmitted field: it names a local operation, so an unpacked
+    // buffer must not inherit the sender's value (or uninitialised memory).
+    if (p.isUnpacking()) clearDeviceRdmaOpInfo();
   }
 
   friend void CkRdmaDirectAckHandler(void *ack);
@@ -350,6 +367,8 @@ const void *getParentBcastAckInfo(void *msg, int &srcPe);
 
 // Allocate a NcpyBcastInterimAckInfo and return the pointer
 NcpyBcastInterimAckInfo *allocateInterimNodeAckObj(envelope *myEnv, envelope *myChildEnv, int pe);
+
+void CkRdmaSendBcastMsgToChildNodes(envelope *env, int rootNode);
 
 void forwardMessageToChildNodes(envelope *myChildrenMsg, UChar msgType);
 

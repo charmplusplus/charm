@@ -226,6 +226,7 @@ class TreeLB : public CBase_TreeLB
   }
 
   void lb_done();
+  void abortUnorderedArrival();
 
   uint8_t numLevels = 0;  // total number of tree levels (this chare won't necessarily
                           // participate in all levels)
@@ -242,6 +243,9 @@ class TreeLB : public CBase_TreeLB
   std::vector<int> load_received;
   // std::vector<int> notify_after_transfer;
   std::vector<bool> awaitingLB;
+  // The level-0 decision of the current step has arrived, so expected_incoming[0]
+  // is final and arrivals beyond it can be recognized.
+  bool decision_received = false;
 
   double startTime;
   uint8_t mcast_bfactor = 4;

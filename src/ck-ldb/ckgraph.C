@@ -87,7 +87,7 @@ ObjGraph::ObjGraph(BaseLB::LDStats *stats) {
 
 void ObjGraph::convertDecisions(BaseLB::LDStats *stats) {
   for(const auto& vertex : vertices) {
-    if(vertex.newPe != -1) {
+    if(vertex.newPe != -1 && vertex.isMigratable()) {
       stats->to_proc[vertex.id] = vertex.newPe;
     }
   }

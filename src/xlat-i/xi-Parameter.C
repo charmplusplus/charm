@@ -256,7 +256,8 @@ void ParamList::size(XStr& str)
   bool hasrecvrdma = hasRecvRdma();
 
   Chare* container = entry->getContainer();
-  bool isP2P = (container->isChare() || container->isForElement());
+  // A mainchare has CMAINCHARE, not CCHARE; its sends are point-to-point too.
+  bool isP2P = (container->isChare() || container->isMainChare() || container->isForElement());
 
   // Generate device-related code only when this condition is met
   bool deviceRdmaSupported = (hasDevice() && isP2P);
@@ -268,7 +269,7 @@ void ParamList::size(XStr& str)
       str << "  int impl_num_device_rdma_fields = " << entry->numRdmaDeviceParams
           << ";\n";
       str << "  int dest_pe;\n";
-      if (container->isChare())
+      if (container->isChare() || container->isMainChare())
       {
         // TODO: Following code doesn't work, don't support singleton chares for now
         // str << "  dest_pe = CkRdmaGetDestPEChare(ckGetChareID().onPE,
@@ -279,7 +280,20 @@ void ParamList::size(XStr& str)
       {
         str << "  dest_pe = ckLocalBranch()->lastKnown(ckGetIndex());\n";
       }
-      else if (container->isGroup() || container->isNodeGroup())
+      else if (container->isNodeGroup())
+      {
+        // Must come before the isGroup() arm: a nodegroup carries both CGROUP
+        // and CNODEGROUP. CProxyElement_NodeGroup::ckGetGroupPe() returns the
+        // *node* index, not a PE (see charm++.h, where it reads _onNode), and
+        // CkRdmaDeviceOnSender needs a PE: it decides between the same-process,
+        // same-host and inter-host transfer paths with
+        // findTransferModeDevice(CkMyPe(), dest_pe). Feeding it a node index
+        // picks the wrong path on any run with more than one PE per process --
+        // it happens to be right when node and PE numbering coincide, which is
+        // exactly the 1-PE-per-process shape these tests used to run in.
+        str << "  dest_pe = CmiNodeFirst(ckGetGroupPe());\n";
+      }
+      else if (container->isGroup())
       {
         str << "  dest_pe = ckGetGroupPe();\n";
       }
@@ -360,7 +374,8 @@ void ParamList::marshall(XStr& str, XStr& entry_str) {
     bool hasrecvrdma = hasRecvRdma();
 
     Chare *container = entry->getContainer();
-    bool isP2P = (container->isChare() || container->isForElement());
+    // A mainchare has CMAINCHARE, not CCHARE; its sends are point-to-point too.
+    bool isP2P = (container->isChare() || container->isMainChare() || container->isForElement());
 
     // Generate device-related code only when this condition is met
     bool deviceRdmaSupported = (hasDevice() && isP2P);

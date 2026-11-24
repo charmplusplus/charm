@@ -52,6 +52,8 @@ public:
   void summaryDataCollected(double *recvData, int numBins);
 
   void traceSummaryParallelShutdown(int pe);
+  void closeSummaryOnPe();
+  void closeSummaryDone();
   void maxBinSize(double _maxBinSize);
   void shrink(double _maxBinSize);
 

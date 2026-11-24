@@ -103,6 +103,7 @@ void run_MATMUL_KERNEL(hapiWorkRequest* wr, cudaStream_t kernel_stream,
       (float*)devBuffers[wr->getBufferID(A_INDEX)],
       (float*)devBuffers[wr->getBufferID(B_INDEX)], *((int*)wr->getUserData()),
       *((int*)wr->getUserData()));
+  hapiCheck(cudaPeekAtLastError());
 }
 
 void run_BLAS_KERNEL(hapiWorkRequest* wr, cudaStream_t kernel_stream,

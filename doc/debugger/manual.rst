@@ -4,6 +4,11 @@
 Charm++ Debugger
 ================
 
+.. note::
+
+   CharmDebug is not available on reconverse in Charm++ 9. This manual
+   describes CharmDebug on the classic branch (Charm++ 8.1).
+
 .. contents::
    :depth: 3
 

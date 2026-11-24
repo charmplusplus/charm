@@ -6,8 +6,8 @@ OPTS += $(OPTSATBUILDTIME)
 DIRS = \
   util \
   charm++ \
-  converse \
   ampi \
+  campi \
 
 FTDIRS = \
   charm++ \

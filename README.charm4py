@@ -2,20 +2,24 @@
 Building Charm++ shared library for Charm4py
 ============================================
 
-- Build libcharm for non-SMP mode using 'charm4py' build target.
+- Build libcharm using the 'charm4py' build target.
   For example, on a regular Linux machine:
-  ./build charm4py netlrts-linux-x86_64 -j8 --with-production
+  ./build charm4py reconverse-linux-x86_64 -j8 --with-production
 
-  NOTE: We are currently requiring non-smp mode because in the most common Python implementation
-  (CPython), multiple threads cannot run Python code concurrently due to the Global Interpreter Lock
-  (GIL).
+  On macOS, use the version reconverse-darwin-arm8.
+
+  NOTE: Reconverse builds always run in SMP mode, with the PEs as threads of
+  one process. In the most common Python implementation (CPython), multiple
+  threads cannot run Python code concurrently due to the Global Interpreter
+  Lock (GIL).
 
 Adding modules (e.g. load balancers) to libcharm.so
 ---------------------------------------------------
 
 Currently, modules need to be manually registered (there is a section in
-init.C with #if CMK_CHARM4PY where this can be done), and the LIBCHARM_LIBS variable in the Makefile
-needs to be modified to include the module.
+init.C with #if CMK_CHARM4PY where this can be done), and the module's library
+needs to be added to the target_link_libraries lines of the 'charm' library in
+the charm4py section of CMakeLists.txt.
 
 Developer documentation
 =======================

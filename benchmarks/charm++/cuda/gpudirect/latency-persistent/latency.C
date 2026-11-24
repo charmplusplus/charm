@@ -81,8 +81,15 @@ class Main : public CBase_Main {
   }
 
   void testBegin(size_t size) {
+    // Both blocks must know the size before the ping starts: PE 1 replies
+    // with a put of its own size, and the receive callback of a put carries
+    // no length.
+    block_proxy.setSize(size);
+  }
+
+  void sizeSet() {
     // Start ping
-    block_proxy[0].send(size);
+    block_proxy[0].send(cur_size);
   }
 
   void testEnd() {
@@ -112,7 +119,7 @@ public:
   char* d_remote_data;
   bool memory_allocated;
 
-  cudaStream_t stream;
+  hapiStream_t stream;
   bool stream_created;
 
   CkDevicePersistent my_send_buf;
@@ -121,6 +128,7 @@ public:
   CkDevicePersistent peer_recv_buf;
 
   Block() {
+    size = 0;
     memory_allocated = false;
     stream_created = false;
   }
@@ -128,13 +136,13 @@ public:
   ~Block() {
     if (memory_allocated) {
       if (CkMyPe() == 0) free(times);
-      hapiCheck(cudaFreeHost(h_local_data));
-      hapiCheck(cudaFreeHost(h_remote_data));
-      hapiCheck(cudaFree(d_local_data));
-      hapiCheck(cudaFree(d_remote_data));
+      hapiCheck(hapiFreeHost(h_local_data));
+      hapiCheck(hapiFreeHost(h_remote_data));
+      hapiCheck(hapiFree(d_local_data));
+      hapiCheck(hapiFree(d_remote_data));
     }
 
-    if (stream_created) cudaStreamDestroy(stream);
+    if (stream_created) hapiStreamDestroy(stream);
   }
 
   void init() {
@@ -152,20 +160,20 @@ public:
 
     // Allocate memory
     if (memory_allocated) {
-      hapiCheck(cudaFreeHost(h_local_data));
-      hapiCheck(cudaFreeHost(h_remote_data));
-      hapiCheck(cudaFree(d_local_data));
-      hapiCheck(cudaFree(d_remote_data));
+      hapiCheck(hapiFreeHost(h_local_data));
+      hapiCheck(hapiFreeHost(h_remote_data));
+      hapiCheck(hapiFree(d_local_data));
+      hapiCheck(hapiFree(d_remote_data));
     }
-    hapiCheck(cudaMallocHost(&h_local_data, max_size));
-    hapiCheck(cudaMallocHost(&h_remote_data, max_size));
-    hapiCheck(cudaMalloc(&d_local_data, max_size));
-    hapiCheck(cudaMalloc(&d_remote_data, max_size));
+    hapiCheck(hapiMallocHost(&h_local_data, max_size));
+    hapiCheck(hapiMallocHost(&h_remote_data, max_size));
+    hapiCheck(hapiMalloc(&d_local_data, max_size));
+    hapiCheck(hapiMalloc(&d_remote_data, max_size));
     memory_allocated = true;
 
-    // Create CUDA stream
+    // Create GPU stream
     if (!stream_created) {
-      cudaStreamCreate(&stream);
+      hapiStreamCreate(&stream);
       stream_created = true;
     }
 
@@ -184,6 +192,11 @@ public:
 
     // Reduce back to main
     contribute(CkCallback(CkReductionTarget(Main, initDone), main_proxy));
+  }
+
+  void setSize(size_t size) {
+    this->size = size;
+    contribute(CkCallback(CkReductionTarget(Main, sizeSet), main_proxy));
   }
 
   void send(size_t size) {

@@ -72,7 +72,8 @@ void gaussj(double **a, double *b, int n) {
 #endif
 }
 
-void Marquardt_coefficients(double *x, double *y, double *param, double **alpha, double *beta, double &chisq, LBPredictorFunction *predict) {
+// x and y hold ndata points.
+void Marquardt_coefficients(double *x, double *y, int ndata, double *param, double **alpha, double *beta, double &chisq, LBPredictorFunction *predict) {
 #if CMK_LBDB_ON
   int i,j,k,l,m;
   double ymod, dy;
@@ -85,7 +86,7 @@ void Marquardt_coefficients(double *x, double *y, double *param, double **alpha,
   chisq = 0;
 
   // summation loop over all data
-  for (i=0; i<predict->num_params; ++i) {
+  for (i=0; i<ndata; ++i) {
     predict->function(x[i], param, ymod, dyda);
     dy = y[i] - ymod;
     for (j=0, l=0; l<predict->num_params; ++l) {
@@ -108,6 +109,11 @@ void Marquardt_coefficients(double *x, double *y, double *param, double **alpha,
 
 bool Marquardt_solver(CentralLB::FutureModel *mod, int object) {
 #if CMK_LBDB_ON
+  // One data point per pair of consecutive statistics: an object's time in
+  // one balancing step (x) and in the next (y).
+  const int ndata = mod->cur_stats-1;
+  if (ndata < 1) return false;
+
   double chisq, ochisq;
   double lambda = 0.001;
   int i,j;
@@ -120,8 +126,8 @@ bool Marquardt_solver(CentralLB::FutureModel *mod, int object) {
   double *da = new double[mod->predictor->num_params];
   double **covar = new double*[mod->predictor->num_params];
   double **alpha = new double*[mod->predictor->num_params];
-  double *x = new double[mod->cur_stats-1];
-  double *y = new double[mod->cur_stats-1];
+  double *x = new double[ndata];
+  double *y = new double[ndata];
   double **temp = new double*[mod->predictor->num_params];
 
   for (i=0; i<mod->predictor->num_params; ++i) {
@@ -130,12 +136,16 @@ bool Marquardt_solver(CentralLB::FutureModel *mod, int object) {
     temp[i] = new double[mod->predictor->num_params];
     atry[i] = mod->parameters[object][i];
   }
-  for (i=0; i<mod->cur_stats-2; ++i) {
-    x[i] = mod->collection[i].objData[object].wallTime;
-    y[i] = mod->collection[i+1].objData[object].wallTime;
+  // collection is a circular buffer once it is full; start_stats is then the
+  // oldest entry.
+  const int size = mod->collection.size();
+  const int oldest = (mod->cur_stats < size) ? 0 : mod->start_stats % size;
+  for (i=0; i<ndata; ++i) {
+    x[i] = mod->collection[(oldest+i) % size].objData[object].wallTime;
+    y[i] = mod->collection[(oldest+i+1) % size].objData[object].wallTime;
   }
 
-  Marquardt_coefficients(x,y,mod->parameters[object].data(),alpha,beta,chisq,mod->predictor);
+  Marquardt_coefficients(x,y,ndata,mod->parameters[object].data(),alpha,beta,chisq,mod->predictor);
   ochisq = chisq;
 
   while (chisq > 0.01 || !allow_stop) {
@@ -160,7 +170,7 @@ bool Marquardt_solver(CentralLB::FutureModel *mod, int object) {
 
     // did the trial succeed?
     for (i=0, j=0; j<mod->predictor->num_params; ++j) atry[j] = mod->parameters[object][j] + da[i++];
-    Marquardt_coefficients(x,y,atry,covar,da,chisq,mod->predictor);
+    Marquardt_coefficients(x,y,ndata,atry,covar,da,chisq,mod->predictor);
     if (chisq < ochisq) {  // success, accept the new solution
       lambda *= 0.1;
       allow_stop = true;
@@ -277,7 +287,7 @@ void CentralLB::FuturePredictor(BaseLB::LDStats* stats) {
 	  // model wrong, rebuild it now
 	  predicted_model->predictor->initialize_params(predicted_model->parameters[i].data());
 	  model_done = Marquardt_solver(predicted_model, i);
-	  CkPrintf("LB: Updated model for object %d %s",i,model_done?"success":"failed. ");
+	  CkPrintf("LB: Updated model for object %d %s\n",i,model_done?"success":"failed");
 	  predicted_model->predictor->print(predicted_model->parameters[i].data());
 	}
 	if (fabs(error_model[i]) < fabs(error_default[i])) predicted_model->model_valid[i] = true;

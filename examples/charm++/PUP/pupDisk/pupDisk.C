@@ -9,6 +9,8 @@
 //
 ////////////////////////////////////
 
+#include <sys/types.h>
+#include <sys/stat.h>
 #include "pupDisk.h"
 CkCallback icb, rcb, wcb, vcb;
 CProxy_userData userDataProxy;
@@ -114,7 +116,7 @@ void userData::read()
   pupDiskProxy[fileNum].read(thisIndex);
 }
 
-void userData::acceptData(someData &inData){
+void userData::acceptData(const someData &inData){
   for(int i=0; i<howBig; ++i) myData->data[i]=inData.data[i];
   contribute(sizeof(int), &thisIndex, CkReduction::sum_int, rcb);
 }
@@ -195,7 +197,7 @@ bool pupDisk::diskRead(int sender)
   return doneRead;
 }
 
-void pupDisk::write(int sender, someData &inData)
+void pupDisk::write(int sender, const someData &inData)
 {
   //  CkPrintf("[%d] pupDisk write for sender %d with count %d of elementsToWrite %d\n",thisIndex, sender, count, elementsToWrite);
   lookupIdx[sender]=nextSlot;

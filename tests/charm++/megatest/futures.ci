@@ -1,0 +1,50 @@
+module futures {
+  message futures_msg;
+
+  // Creates the objects below and collects one contribution per PE (on PE 0).
+  chare futures_driver {
+    entry futures_driver(void);
+    entry [reductiontarget] void done(int nPes);
+  };
+
+  // Fills futures and signals semaphores from other PEs; [sync] targets.
+  group futures_helper {
+    entry futures_helper(void);
+    entry void fill(CkFuture f, int val);
+    entry void fillId(CkFutureID id, int pe, int val);
+    entry void fillVoid(CkFuture f);
+    entry void fillTyped(ck::future<int> f, int val);
+    entry void fillData(CkCallback cb, int val);
+    entry void signal(CkSemaID s, int val);
+    entry void reduceTo(ck::future<int> f, int val);
+    entry [sync] futures_msg* twice(futures_msg* m);
+    entry [sync] int add(int a, int b);
+  };
+
+  nodegroup futures_nodehelper {
+    entry futures_nodehelper(void);
+    entry [sync] futures_msg* twice(futures_msg* m);
+    entry [sync] int add(int a, int b);
+  };
+
+  chare futures_chare {
+    entry futures_chare(void);
+    entry [sync] futures_msg* twice(futures_msg* m);
+    entry [sync] int add(int a, int b);
+  };
+
+  array [1D] futures_arr {
+    entry futures_arr(void);
+    entry [sync] futures_msg* twice(futures_msg* m);
+    entry [iget] futures_msg* igetTwice(futures_msg* m);
+    entry [iget] void igetVoid(int x);
+  };
+
+  // One test thread per PE.
+  group futures_worker {
+    entry futures_worker(CProxy_futures_driver driver, CProxy_futures_helper helper,
+                         CProxy_futures_nodehelper nodehelper, CProxy_futures_arr arr,
+                         int nArr);
+    entry [threaded] void run(void);
+  };
+};

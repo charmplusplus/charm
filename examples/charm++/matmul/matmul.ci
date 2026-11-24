@@ -2,7 +2,7 @@ mainmodule matmul {
   readonly CProxy_Main mainProxy;
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry [reductiontarget] void done();
+    entry [reductiontarget] void done(double checksum);
   };
 
   array [2D] Block {
@@ -44,7 +44,9 @@ mainmodule matmul {
         }
       }
       serial {
-        contribute(done);
+        double sum = 0.0;
+        for (unsigned int i = 0; i < blockSize*blockSize; ++i) sum += data[i];
+        contribute(sizeof(double), &sum, CkReduction::sum_double, done);
       }
     };
     entry void inputA(int blockIdA, double blockA[M*KA], unsigned int M, unsigned int KA);

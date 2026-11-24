@@ -1,6 +1,16 @@
 #include "latency.decl.h"
 #include "hapi.h"
 
+/* CkDeviceBufferPost names its stream field hapi_stream on the reconverse line
+ * and cuda_stream on the classic one (ckrdmadevice.h splits at CMK_RECONVERSE),
+ * so a single copy of this example has to spell it both ways until the classic
+ * line is removed. Same shim as tests/charm++/cuda/d2dtest. */
+#if CMK_RECONVERSE
+#define POST_STREAM(p) ((p).hapi_stream)
+#else
+#define POST_STREAM(p) ((p).cuda_stream)
+#endif
+
 #define MAX_ITERS 1000000
 #define LARGE_MESSAGE_SIZE 8192
 
@@ -133,7 +143,7 @@ public:
   char* d_remote_data;
   bool memory_allocated;
 
-  cudaStream_t stream;
+  hapiStream_t stream;
   bool stream_created;
 
   CkDeviceBuffer send_buffer;
@@ -146,13 +156,13 @@ public:
   ~Block() {
     if (memory_allocated) {
       if (CkMyPe() == 0) free(times);
-      hapiCheck(cudaFreeHost(h_local_data));
-      hapiCheck(cudaFreeHost(h_remote_data));
-      hapiCheck(cudaFree(d_local_data));
-      hapiCheck(cudaFree(d_remote_data));
+      hapiCheck(hapiFreeHost(h_local_data));
+      hapiCheck(hapiFreeHost(h_remote_data));
+      hapiCheck(hapiFree(d_local_data));
+      hapiCheck(hapiFree(d_remote_data));
     }
 
-    if (stream_created) cudaStreamDestroy(stream);
+    if (stream_created) hapiStreamDestroy(stream);
   }
 
   void init() {
@@ -170,20 +180,20 @@ public:
 
     // Allocate memory
     if (memory_allocated) {
-      hapiCheck(cudaFreeHost(h_local_data));
-      hapiCheck(cudaFreeHost(h_remote_data));
-      hapiCheck(cudaFree(d_local_data));
-      hapiCheck(cudaFree(d_remote_data));
+      hapiCheck(hapiFreeHost(h_local_data));
+      hapiCheck(hapiFreeHost(h_remote_data));
+      hapiCheck(hapiFree(d_local_data));
+      hapiCheck(hapiFree(d_remote_data));
     }
-    hapiCheck(cudaMallocHost(&h_local_data, max_size));
-    hapiCheck(cudaMallocHost(&h_remote_data, max_size));
-    hapiCheck(cudaMalloc(&d_local_data, max_size));
-    hapiCheck(cudaMalloc(&d_remote_data, max_size));
+    hapiCheck(hapiMallocHost(&h_local_data, max_size));
+    hapiCheck(hapiMallocHost(&h_remote_data, max_size));
+    hapiCheck(hapiMalloc(&d_local_data, max_size));
+    hapiCheck(hapiMalloc(&d_remote_data, max_size));
     memory_allocated = true;
 
-    // Create CUDA stream
+    // Create GPU stream
     if (!stream_created) {
-      cudaStreamCreate(&stream);
+      hapiStreamCreate(&stream);
       stream_created = true;
     }
 
@@ -195,8 +205,8 @@ public:
   }
 
   void memset(size_t size) {
-    hapiCheck(cudaMemset(d_local_data, 'a', size));
-    hapiCheck(cudaMemset(d_remote_data, 'b', size));
+    hapiCheck(hapiMemset(d_local_data, 'a', size));
+    hapiCheck(hapiMemset(d_remote_data, 'b', size));
 
     // Reduce back to main
     contribute(CkCallback(CkReductionTarget(Main, testStart), main_proxy));
@@ -206,9 +216,9 @@ public:
     if (CkMyPe() == 0) start_time = CkWallTimer();
 
     if (!zerocopy) {
-      hapiCheck(cudaMemcpyAsync(h_local_data, d_local_data, size,
-            cudaMemcpyDeviceToHost, stream));
-      cudaStreamSynchronize(stream);
+      hapiCheck(hapiMemcpyAsync(h_local_data, d_local_data, size,
+            hapiMemcpyDeviceToHost, stream));
+      hapiStreamSynchronize(stream);
       thisProxy[peer].receiveReg(size, h_local_data);
     } else {
       thisProxy[peer].receiveZC(size, send_buffer);
@@ -216,11 +226,11 @@ public:
   }
 
   void receiveReg(size_t size, char* data) {
-    // XXX: Do cudaMemcpy straight from data? It won't be pinned memory though
+    // XXX: Do hapiMemcpy straight from data? It won't be pinned memory though
     memcpy(h_remote_data, data, size);
-    hapiCheck(cudaMemcpyAsync(d_remote_data, h_remote_data, size,
-          cudaMemcpyHostToDevice, stream));
-    cudaStreamSynchronize(stream);
+    hapiCheck(hapiMemcpyAsync(d_remote_data, h_remote_data, size,
+          hapiMemcpyHostToDevice, stream));
+    hapiStreamSynchronize(stream);
 
     afterReceive(size, false);
   }
@@ -228,9 +238,9 @@ public:
   // First receive (post entry method), user should set the destination buffer
   void receiveZC(size_t& size, char*& data, CkDeviceBufferPost* devicePost) {
     // Inform the runtime where the incoming data should be stored
-    // and which CUDA stream should be used for the transfer
+    // and which GPU stream should be used for the transfer
     data = d_remote_data;
-    devicePost[0].cuda_stream = stream; // Not used with UCX
+    POST_STREAM(devicePost[0]) = stream; // Not used with UCX
   }
 
   // Second receive (regular entry method), invoked once the data transfers complete

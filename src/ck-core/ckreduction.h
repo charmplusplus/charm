@@ -103,6 +103,7 @@ PUPbytes(countAdjustment)
  * delegated cross-array reductions are implemented more optimally
  */
 namespace ck { namespace impl { class XArraySectionReducer; } }
+struct CkDynReduceAccess;   // ckdyn.C: the section-tagged reducer runs an inner reducer
 
 //CkReduction is just a "namespace class" for the user-visible
 // parts of the reduction system.
@@ -237,13 +238,8 @@ public:
   struct reducerStruct {
     reducerFn fn;
     bool streamable;
-#if CMK_ERROR_CHECKING
-    const char *name; // aids in debugging conflicts between multiple overlapping reductions
-#endif
-    reducerStruct(reducerFn f=NULL, bool s=false, const char *n=NULL) : fn(f), streamable(s)
-#if CMK_ERROR_CHECKING
-                  ,name(n)
-#endif
+    const char *name; // names the reducer in error messages (mismatched reducers or callbacks)
+    reducerStruct(reducerFn f=NULL, bool s=false, const char *n=NULL) : fn(f), streamable(s), name(n)
     {}
   };
 
@@ -251,11 +247,17 @@ public:
 	// reducerType.  Must be called in the same order on every node.
 	static reducerType addReducer(reducerFn fn, bool streamable=false, const char* name=NULL);
 
+	//Abort unless every message in msgs[0..n) that carries data uses the same
+	// reducer (messages with nop or invalid are skipped: they only keep the
+	// counts). Called wherever a reducer is chosen for a batch of messages.
+	static void checkSameReducer(int n, CkReductionMsg *const *msgs);
+
 private:
 	friend class CkReductionMgr;
  	friend class CkNodeReductionMgr;
 	friend class CkMulticastMgr;
     friend class ck::impl::XArraySectionReducer;
+    friend struct CkDynReduceAccess;
 //System-level interface
 
 	//Reducer table: maps reducerTypes to reducerFns.
@@ -362,6 +364,7 @@ class CkReductionMsg : public CMessage_CkReductionMsg
 	friend class AllreduceMgr;
 #endif
 	friend class ck::impl::XArraySectionReducer;
+	friend struct CkDynReduceAccess;
 public:
 
 //Publically-accessible fields:
@@ -702,6 +705,7 @@ private:
 	void startReduction(int number,int srcPE);
 	void addContribution(CkReductionMsg *m);
 	void finishReduction(void);
+  void maybeCompleteObligationFreeRound();
   void checkIsActive();
   void informParentInactive();
   void checkAndAddToInactiveList(int id, int red_no);

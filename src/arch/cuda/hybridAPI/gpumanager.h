@@ -1,15 +1,44 @@
 #ifndef __GPUMANAGER_H_
 #define __GPUMANAGER_H_
 
-#include <cuda_runtime.h>
 #include <vector>
 #include <string>
 #include <unordered_map>
 
+#include "hapi_portable.h"
 #include "converse.h"
 #include "hapi.h"
 #include "hapi_impl.h"
 #include "devicemanager.h"
+
+#include <unordered_map>
+#include <queue>
+#include <mutex>
+#include <atomic>
+
+#if CMK_CUDA && CMK_LBDB_ON
+#include "lbdb.h"  // for LBKernelRecord, LDObjKey and GpuObjectTokenTable
+#endif
+
+// Local rank of the logical node (process) that the given PE belongs to,
+// within its physical node: the logical node index modulo the number of
+// logical nodes per physical node.
+//
+// This lives here rather than in either caller because the device comm buffer
+// and the IPC event pools are both indexed by it, and hapi_impl.cpp and
+// ckrdmadevice.C index them from opposite sides of the same transfer. Two
+// copies that drift apart would not present as a mapping bug -- they would
+// present as corrupted payloads.
+//
+// Cached rather than recomputed: the transfer path reads it per buffer, while
+// the topology query behind it is O(PEs on the physical node). It is a
+// property of the job's node set, so anything that changes that set
+// (shrink/expand) must call hapiRefreshTopologyCache() on every PE before the
+// next device operation, and rebuild the per-host structures indexed by it.
+CpvExtern(int, my_node_rank_local);
+void hapiRefreshTopologyCache();
+
+inline int CmiMyNodeRankLocal() { return CpvAccess(my_node_rank_local); }
 
 // Initial size of the user-addressed portion of host/device buffer arrays;
 // the system-addressed portion of host/device buffer arrays (used when there
@@ -24,19 +53,26 @@
 // CUDA IPC Event related struct, stored in host-wide shared memory.
 // One object is used for each interaction/message between sender and receiver.
 // The number of these objects per device will be equal to the CUDA IPC event pool size.
-struct cuda_ipc_event_shared {
-  cudaIpcEventHandle_t src_event_handle;
-  cudaIpcEventHandle_t dst_event_handle;
+struct hapi_ipc_event_shared {
+  hapiIpcEventHandle_t src_event_handle;
+  hapiIpcEventHandle_t dst_event_handle;
   bool src_flag; // Unused for now
   bool dst_flag;
   pthread_mutex_t lock;
 };
 
+#if CMK_CUDA && CMK_LBDB_ON
+struct CuptiBufferItem {
+  uint8_t* buffer;
+  size_t validSize;
+};
+#endif
+
 // Per-device struct containing data for CUDA IPC.
 // Use SMP lock in DeviceManager if needed.
-struct cuda_ipc_device_info {
-  std::vector<cudaEvent_t> src_event_pool;
-  std::vector<cudaEvent_t> dst_event_pool;
+struct hapi_ipc_device_info {
+  std::vector<hapiEvent_t> src_event_pool;
+  std::vector<hapiEvent_t> dst_event_pool;
   // Flag per event pair (0: free, 1: used)
   std::vector<int> event_pool_flags;
   // Offset in device comm buffer (per event)
@@ -87,7 +123,7 @@ struct GPUManager {
   // specifies an invalid buffer ID.
   int next_buffer_;
 
-  cudaStream_t *streams_;
+  hapiStream_t *streams_;
   int n_streams_;
   int last_stream_id_;
 
@@ -121,9 +157,6 @@ struct GPUManager {
   CmiNodeLock device_mapping_lock;
 #endif
 
-#ifdef HAPI_CUDA_CALLBACK
-#endif
-
   int device_count; // GPU devices usable by this process (could be less than the number of visible devices)
   int device_count_on_physical_node;
   int pes_per_device;
@@ -134,8 +167,12 @@ struct GPUManager {
   // Device communication buffer
   size_t comm_buffer_size;
 
+  // Device load-balancing buffer
+  size_t lb_buffer_size;
+
   // POSIX shared memory for sharing CUDA IPC handles between processes on the same host
   bool use_shm;
+  bool test_field;
   void* shm_ptr;
   std::string shm_name;
   int shm_file;
@@ -144,12 +181,98 @@ struct GPUManager {
   void* shm_my_ptr;
 
   // CUDA IPC event pool
-  int cuda_ipc_event_pool_size_pe;
-  int cuda_ipc_event_pool_size_total;
+  int hapi_ipc_event_pool_size_pe;
+  int hapi_ipc_event_pool_size_total;
 
   // CUDA IPC handles opened for processes on the same node
   // Vector size is equal to the number of devices on the physical node
-  std::vector<cuda_ipc_device_info> cuda_ipc_device_infos;
+  std::vector<hapi_ipc_device_info> hapi_ipc_device_infos;
+
+  //CUPTI load balancing
+#if CMK_CUDA && CMK_LBDB_ON
+  // Runtime correlation ID -> process-local full-object token.
+  std::unordered_map<uint32_t, uint64_t> cupti_object_correlation_db_;
+
+  GpuObjectTokenTable cupti_object_tokens_;
+  std::mutex cupti_object_token_lock_;
+
+  // Full LB object identity -> attributed kernel records.
+  std::unordered_map<LDObjKey, std::vector<LBKernelRecord>, LDObjKeyHash>
+      cupti_obj_kernel_records_;
+
+  // Kernels that could not be attributed to any object (launched outside a
+  // migratable entry method, or with no correlation record). They occupy SMs
+  // and so take part in the sweep-line as contention, but receive no load.
+  // Kept separate rather than under a sentinel object ID, because 0 is a
+  // perfectly valid chare element ID.
+  std::vector<LBKernelRecord> cupti_unattributed_kernels_;
+
+  // Full object identity -> SM-utilization-normalized GPU load in seconds.
+  std::unordered_map<LDObjKey, double, LDObjKeyHash> cupti_obj_norm_load_;
+
+  // Previous round's count of kernels whose correlations had not been parsed
+  // yet, used to size the parked vector.
+  uint32_t cupti_pending_hint_ = 0;
+
+  // Written by CUPTI's buffer-completed callback, which may run on a
+  // CUPTI-owned thread. That thread exists in non-SMP builds too, where the
+  // Converse locks compile out, so this needs a real mutex rather than a
+  // CmiNodeLock.
+  std::queue<CuptiBufferItem> cupti_buffer_queue_;
+  std::mutex cupti_queue_lock_;
+
+  bool cupti_initialized_;
+  // Whether activity tracing is currently running. Separate from
+  // cupti_initialized_: the buffer callbacks are registered once, but tracing
+  // itself is switched on and off as the application asks for it.
+  //
+  // Atomic because the entry-method hooks read it on every invocation from
+  // every PE thread while another thread may be switching tracing on or off.
+  std::atomic<bool> cupti_tracing_active_{false};
+  // Serializes hapiCuptiStartTracing/hapiCuptiStopTracing. This state lives in
+  // the node-wide GPUManager, but the switch is reached per-PE through
+  // LBDatabase::TurnStatsOn/Off, so every PE thread calls in. Without this,
+  // several threads enable or disable the same CUPTI activity kinds and flush
+  // concurrently, which corrupts CUPTI's internal buffer bookkeeping and shows
+  // up later as heap corruption in an unrelated allocation. Must NOT be the
+  // same mutex as cupti_queue_lock_: the flush in the stop path invokes the
+  // buffer-completed callback, which takes that one.
+  std::mutex cupti_tracing_lock_;
+  // PEs of this process whose instrumentation is currently on. Tracing runs
+  // while this is non-zero; see hapiCuptiStartTracing.
+  int cupti_tracing_users_ = 0;
+  // Bumped every time CUPTI is detached. Detaching clears CUPTI's
+  // external-correlation stack for every PE, but the counters that keep the
+  // entry-method push/pop hooks paired are per-PE, and only the PE that ran the
+  // detach could reset its own. Each PE compares this against the generation it
+  // last saw and zeroes its counter when they differ.
+  uint64_t cupti_generation_ = 0;
+  // Serializes turning this round's raw CUPTI records into cupti_obj_norm_load_,
+  // and makes that work happen exactly once per LB round no matter how many PE
+  // threads ask for it. Doing it with "rank 0 works between two CmiNodeBarrier
+  // calls" does not hold: both barriers sit behind #if CMK_SMP, which is 0 in
+  // the multicore build even though a process really does run many PE threads,
+  // so the barriers vanish and the other ranks read cupti_obj_norm_load_ while
+  // rank 0 is rebuilding it. A lock also cannot deadlock the way a spin barrier
+  // can: a PE waiting here waits on a PE that is running, not on one that has
+  // yet to arrive.
+  std::mutex cupti_prepare_lock_;
+  // Set once this round's loads are built; cleared by hapiClearCuptiData.
+  bool cupti_loads_ready_ = false;
+  // Epoch the built loads correspond to, so a second caller in the same round
+  // reads what the first built instead of rebuilding it.
+  uint64_t cupti_loads_epoch_ = 0;
+  // Arrival gate for the per-round load build; see hapiCuptiArrive. A load
+  // balancer's per-PE barrier fires when THAT PE's objects are at AtSync, and
+  // the first PE to fire would otherwise flush, drain and clear the
+  // process-wide CUPTI records on the spot. Any PE whose objects were still
+  // finishing kernels at that instant has them dropped from the round --
+  // consistently the last PE of the process, whose objects then read as zero
+  // GPU load every step.
+  std::mutex cupti_arrive_lock_;
+  uint64_t cupti_arrive_epoch_ = 0;
+  int cupti_arrive_count_ = 0;
+#endif
 
   void init() {
     next_buffer_ = NUM_BUFFERS;
@@ -189,8 +312,17 @@ struct GPUManager {
     shm_my_ptr = NULL;
 
     // Number of CUDA IPC events per PE
-    cuda_ipc_event_pool_size_pe = -1;
-    cuda_ipc_event_pool_size_total = -1;
+    hapi_ipc_event_pool_size_pe = -1;
+    hapi_ipc_event_pool_size_total = -1;
+
+#if CMK_CUDA && CMK_LBDB_ON
+    // CUPTI load balancing
+    cupti_initialized_ = false;
+    cupti_tracing_active_.store(false, std::memory_order_relaxed);
+    cupti_generation_ = 0;
+    cupti_loads_ready_ = false;
+    cupti_loads_epoch_ = 0;
+#endif
 
     // Allocate host/device buffers array (both user and system-addressed)
     host_buffers_ = new void*[NUM_BUFFERS*2];
@@ -245,7 +377,7 @@ struct GPUManager {
     // Destroy streams
     if (streams_) {
       for (int i = 0; i < n_streams_; i++) {
-        hapiCheck(cudaStreamDestroy(streams_[i]));
+        hapiCheck(hapiStreamDestroy(streams_[i]));
       }
     }
 
@@ -277,9 +409,9 @@ struct GPUManager {
   // Returns the number of created streams.
   int createStreams() {
     int device;
-    cudaDeviceProp device_prop;
-    hapiCheck(cudaGetDevice(&device));
-    hapiCheck(cudaGetDeviceProperties(&device_prop, device));
+    hapiDeviceProp device_prop;
+    hapiCheck(hapiGetDevice(&device));
+    hapiCheck(hapiGetDeviceProperties(&device_prop, device));
 
     int new_n_streams = 0;
 
@@ -311,7 +443,7 @@ struct GPUManager {
     // Allocate total physical streams between GPU managers sharing a device...
     // i.e. PEs / num devices
     int device_count;
-    hapiCheck(cudaGetDeviceCount(&device_count));
+    hapiCheck(hapiGetDeviceCount(&device_count));
     int pes_per_device = CmiNumPesOnPhysicalNode(0) / device_count;
     pes_per_device = pes_per_device > 0 ? pes_per_device : 1;
     new_n_streams =  (new_n_streams + pes_per_device - 1) / pes_per_device;
@@ -327,9 +459,9 @@ struct GPUManager {
       return n_streams_;
     }
 
-    cudaStream_t* old_streams = streams_;
+    hapiStream_t* old_streams = streams_;
 
-    streams_ = new cudaStream_t[new_n_streams];
+    streams_ = new hapiStream_t[new_n_streams];
 
     int i = 0;
     // Copy old streams
@@ -340,7 +472,7 @@ struct GPUManager {
 
     // Create new streams
     for (; i < new_n_streams; i++) {
-      hapiCheck(cudaStreamCreate(&streams_[i]));
+      hapiCheck(hapiStreamCreate(&streams_[i]));
     }
 
     // Update
@@ -350,7 +482,7 @@ struct GPUManager {
     return n_streams_;
   }
 
-  cudaStream_t getNextStream() {
+  hapiStream_t getNextStream() {
     if (streams_ == NULL)
       return NULL;
 
@@ -358,7 +490,7 @@ struct GPUManager {
     return streams_[last_stream_id_];
   }
 
-  cudaStream_t getStream(int i) {
+  hapiStream_t getStream(int i) {
     if (streams_ == NULL)
       return NULL;
 
@@ -418,7 +550,7 @@ struct GPUManager {
 
       if (device_buffers_[index] == NULL) {
         // allocate device memory
-        hapiCheck(cudaMalloc((void **)&device_buffers_[index], size));
+        hapiCheck(hapiMalloc((void **)&device_buffers_[index], size));
 
 #ifdef HAPI_DEBUG
         CmiPrintf("[HAPI] allocated buffer %d at %p, time: %.2f, size: %zu\n",
@@ -438,8 +570,8 @@ struct GPUManager {
       host_buffers_[index] = bi.host_buffer;
 
       if (bi.transfer_to_device) {
-        hapiCheck(cudaMemcpyAsync(device_buffers_[index], host_buffers_[index], size,
-                                  cudaMemcpyHostToDevice, wr->stream));
+        hapiCheck(hapiMemcpyAsync(device_buffers_[index], host_buffers_[index], size,
+                                  hapiMemcpyHostToDevice, wr->stream));
 
 #ifdef HAPI_DEBUG
         CmiPrintf("[HAPI] transferring buffer %d from host to device, time: %.2f, "
@@ -457,8 +589,8 @@ struct GPUManager {
       size_t size = bi.size;
 
       if (bi.transfer_to_host) {
-        hapiCheck(cudaMemcpyAsync(host_buffers_[index], device_buffers_[index], size,
-                                  cudaMemcpyDeviceToHost, wr->stream));
+        hapiCheck(hapiMemcpyAsync(host_buffers_[index], device_buffers_[index], size,
+                                  hapiMemcpyDeviceToHost, wr->stream));
 
 #ifdef HAPI_DEBUG
         CmiPrintf("[HAPI] transferring buffer %d from device to host, time %.2f, "
@@ -475,7 +607,7 @@ struct GPUManager {
       int index = bi.id;
 
       if (bi.need_free) {
-        hapiCheck(cudaFree(device_buffers_[index]));
+        hapiCheck(hapiFree(device_buffers_[index]));
         device_buffers_[index] = NULL;
 
 #ifdef HAPI_DEBUG

@@ -58,7 +58,7 @@ void TreeModel::treeTest(const DataMatrix& X, std::vector<double>& Ysoft) const 
     } else {
       int select_cols[1];
       select_cols[0] = n - 1;
-      DataMatrix dataix_array(dataix, N, D);
+      DataMatrix dataix_array(dataix, N, nd);
       DataMatrix reld_resp(dataix_array.num_rows, 1);
       dataix_array.subset_cols(select_cols, 1, reld_resp);
       reld = new DataMatrix(reld_resp.num_rows, reld_resp.num_cols);
@@ -91,7 +91,7 @@ void TreeModel::treeTest(const DataMatrix& X, std::vector<double>& Ysoft) const 
   }
 
   // Go over leafs and assign class probabilities
-  for (int n = ((nd + 1) / 2); n < nd; n++) {
+  for (int n = ((nd + 1) / 2); n <= nd; n++) {
     int select_cols[1];
     select_cols[0] = n - 1;
 

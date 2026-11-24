@@ -451,9 +451,9 @@ The Projections Performance Visualization Tool
 ==============================================
 
 The Projections Java-based visualization tool (henceforth referred to as
-simply Projections) can be downloaded from the Charm++ website at
-https://charm.cs.illinois.edu/software. The directory which you download
-will henceforth be referred to as ``PROJECTIONS_LOCATION``.
+simply Projections) is distributed from its GitHub repository,
+https://github.com/charmplusplus/projections. The directory you clone
+it into will henceforth be referred to as ``PROJECTIONS_LOCATION``.
 
 Building Projections
 --------------------

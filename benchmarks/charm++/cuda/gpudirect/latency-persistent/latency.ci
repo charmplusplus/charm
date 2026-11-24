@@ -11,6 +11,7 @@ mainmodule latency {
     entry Main(CkArgMsg* m);
     entry [reductiontarget] void initDone();
     entry void testBegin(size_t size);
+    entry [reductiontarget] void sizeSet();
     entry void testEnd();
   };
 
@@ -18,6 +19,7 @@ mainmodule latency {
     entry Block();
     entry void init();
     entry void initRecv(CkDevicePersistent send_buf, CkDevicePersistent recv_buf);
+    entry void setSize(size_t size);
     entry void send(size_t size);
     entry void recv();
   };

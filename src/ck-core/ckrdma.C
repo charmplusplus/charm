@@ -2,10 +2,10 @@
  * Charm Onesided API Utility Functions
  */
 
-#include "charm++.h"
-#include "ck.h"
 #include "converse.h"
 #include "cmirdmautils.h"
+#include "charm++.h"
+#include "ck.h"
 #include "spanningTree.h"
 #include <algorithm>
 #include "ckarray.h"
@@ -293,6 +293,27 @@ void handleDirectApiCompletion(NcpyOperationInfo *info) {
 // Ack handler function which invokes the callback
 void CkRdmaDirectAckHandler(void *ack) {
 
+#if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
+  /* Inter-node device (D2D) transfers ride this same ack path, but their
+   * completion bookkeeping is entirely different -- see ckrdmadevice.C. They
+   * are recognised by the deviceRdmaOpInfo the device path attaches to the
+   * destination buffer; every host-side buffer leaves it null.
+   *
+   * Dispatching here is deliberate. The obvious alternative -- having the
+   * device path call CmiSetDirectNcpyAckHandler(CkRdmaDeviceRecvHandler) when
+   * it posts a get -- swaps a process-wide function pointer, so from the first
+   * inter-node D2D message onward every host-side Direct-API and nocopy
+   * entry-method ack would also be delivered to the device handler and
+   * dereference a null deviceRdmaOpInfo.
+   *
+   * The device handler does its own QD accounting, so return before the
+   * QdProcess below rather than after it. */
+  if (((NcpyOperationInfo *)ack)->deviceRdmaOpInfo != nullptr) {
+    CkRdmaDeviceRecvHandler(ack);
+    return;
+  }
+#endif
+
   // Process QD to mark completion of the outstanding RDMA operation
   QdProcess(1);
 
@@ -355,17 +376,9 @@ void invokeCallback(void *cb, int pe, CkNcpyBuffer &buff) {
 }
 
 void enqueueNcpyMessage(int destPe, void *msg){
-  // invoke the charm message handler to enqueue the messsage
-#if CMK_SMP && !CMK_ENABLE_ASYNC_PROGRES
-  if(destPe == CkMyPe()) // invoked from the same worker thread, call message handler directly
-    CmiHandleMessage(msg);
-  else                   // invoked from the comm thread, so send message to the worker thread
-    CmiPushPE(CmiRankOf(destPe), msg);
-#else
-  // invoked from the same logical node (process), call message handler directly
-  // or invoked from the same worker thread, call message handler directly
-  CmiHandleMessage(msg);
-#endif
+  // Always through the scheduler: a completion can run inside progress() called
+  // from a send, e.g. in the middle of CkLocMgr::emigrate.
+  CmiPushPE(CmiRankOf(destPe), msg);
 }
 
 inline void zcQdIncrement() {
@@ -451,19 +464,14 @@ void CkRdmaEMAckHandler(int destPe, void *ack) {
 
   NcpyOperationInfo *ncpyOpInfo = &(emBuffInfo->ncpyOpInfo);
 
-  if(ncpyEmInfo->mode == ncpyEmApiMode::P2P_SEND ||
-     (ncpyEmInfo->mode == ncpyEmApiMode::BCAST_SEND && t->child_count == 0)) {  // EM P2P Send API or EM BCAST Send API
-
-    // De-register the destination buffer
+  // De-register the destination on a node with no children to rget from it.
+  // The Send API allocated it; the Post API registered the posted buffer for
+  // this message, in a handle the user never sees, so it is released
+  // whatever the posted deregMode says.
+  if(ncpyEmInfo->mode == ncpyEmApiMode::P2P_SEND || ncpyEmInfo->mode == ncpyEmApiMode::P2P_RECV ||
+     ((ncpyEmInfo->mode == ncpyEmApiMode::BCAST_SEND || ncpyEmInfo->mode == ncpyEmApiMode::BCAST_RECV) &&
+      t->child_count == 0)) {
     deregisterDestBuffer(ncpyOpInfo);
-
-  } else if(ncpyEmInfo->mode == ncpyEmApiMode::P2P_RECV ||
-           (ncpyEmInfo->mode == ncpyEmApiMode::BCAST_RECV && t->child_count == 0)) {  // EM P2P Post API or EM BCAST Post API
-
-    // De-register only if destDeregMode is CK_BUFFER_DEREG
-    if(ncpyOpInfo->destDeregMode == CK_BUFFER_DEREG) {
-      deregisterDestBuffer(ncpyOpInfo);
-    }
   }
 #endif
 
@@ -503,8 +511,8 @@ void performEmApiMemcpy(CkNcpyBuffer &source, CkNcpyBuffer &dest, ncpyEmApiMode 
     if(isDeregReady(source))
       deregisterBuffer(source);
 
-    // De-register destination for p2p Post API
-    if(emMode == ncpyEmApiMode::P2P_RECV && isDeregReady(dest))
+    // De-register the posted buffer if its handle registered it (any deregMode)
+    if(emMode == ncpyEmApiMode::P2P_RECV && dest.isRegistered)
       deregisterBuffer(dest);
 
     // Invoke source callback
@@ -512,8 +520,8 @@ void performEmApiMemcpy(CkNcpyBuffer &source, CkNcpyBuffer &dest, ncpyEmApiMode 
 
   } // send a message to the parent to indicate completion
   else if (emMode == ncpyEmApiMode::BCAST_SEND || emMode == ncpyEmApiMode::BCAST_RECV) {
-    // De-register dest if it has been registered
-    if(emMode == ncpyEmApiMode::BCAST_RECV && isDeregReady(dest))
+    // De-register the posted buffer if its handle registered it (any deregMode)
+    if(emMode == ncpyEmApiMode::BCAST_RECV && dest.isRegistered)
       deregisterBuffer(dest);
   }
 }
@@ -524,8 +532,8 @@ void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, CmiSpanni
 
   if(emMode == ncpyEmApiMode::P2P_SEND || emMode == ncpyEmApiMode::P2P_RECV) {
 
-    // De-register destination for p2p Post API
-    if(emMode == ncpyEmApiMode::P2P_RECV && isDeregReady(dest))
+    // De-register the posted buffer if its handle registered it (any deregMode)
+    if(emMode == ncpyEmApiMode::P2P_RECV && dest.isRegistered)
       deregisterBuffer(dest);
 
     if(source.refAckInfo == NULL) { // Not a part of a de-registration group
@@ -542,8 +550,8 @@ void performEmApiCmaTransfer(CkNcpyBuffer &source, CkNcpyBuffer &dest, CmiSpanni
       }
       // Buffers on intermediate nodes are left registered to have their child nodes rget from them
     } else {
-      // De-register dest on child nodes if it has been registered
-      if(emMode == ncpyEmApiMode::BCAST_RECV && isDeregReady(dest))
+      // De-register the posted buffer on child nodes if its handle registered it
+      if(emMode == ncpyEmApiMode::BCAST_RECV && dest.isRegistered)
         deregisterBuffer(dest);
     }
   }
@@ -587,7 +595,15 @@ void performEmApiRget(CkNcpyBuffer &source, CkNcpyBuffer &dest, int opIndex, Ncp
                 dest.pe,
                 (char *)(ncpyEmBufferInfo), // destRef
                 rootNode,
-                ncpyOpInfo);
+                ncpyOpInfo
+                // reconverse's setNcpyOpInfo takes one more argument than
+                // classic's: the device RDMA op info. This is a host-side
+                // operation, so it carries none. Leaving the argument off
+                // compiled and linked (extern "C"), and the callee then read
+                // stack garbage into deviceRdmaOpInfo, which CUDA builds use
+                // to route acks to the device handler.
+                , nullptr
+                );
 
   // set opMode
   if(emMode == ncpyEmApiMode::BCAST_SEND || emMode == ncpyEmApiMode::BCAST_RECV)
@@ -952,8 +968,9 @@ void CkRdmaIssueRgets(envelope *env, void **arrPtrs, int *arrSizes, int arrayInd
   for(int i=0; i<numops; i++){
     up|source;
 
-    if(source.cnt < arrSizes[i])
-      CkAbort("CkRdmaIssueRgets: Size of the posted buffer > Size of the source buffer\n");
+    if((size_t)arrSizes[i] > source.cnt)
+      CkAbort("CkPostBuffer: posted buffer of %zu bytes is larger than the %zu-byte source (operation %d); the posted size must be <= the source size",
+              (size_t)arrSizes[i], source.cnt, i);
 
 #if CMK_USE_CMA && CMK_REG_REQUIRED
     if(!sendBackToSourceForDereg && ncpyMode == CkNcpyMode::CMA && source.refAckInfo != NULL)
@@ -1295,16 +1312,22 @@ void CkRdmaEMBcastAckHandler(void *ack) {
   }
 }
 
+// Sends a packed zerocopy bcast message to my children in the tree rooted at
+// rootNode. Acks are counted along this tree (getSpanningTreeInfo), so the
+// message must travel along it rather than the runtime's broadcast tree.
+void CkRdmaSendBcastMsgToChildNodes(envelope *env, int rootNode) {
+  CmiSpanningTreeInfo *t = getSpanningTreeInfo(rootNode);
+  for (int i = 0; i < t->child_count; i++)
+    CmiSyncNodeSend(t->children[i], env->getTotalsize(), (char *)env);
+}
+
 // Called only on intermediate nodes
 // Method forwards a message to all the children
 void forwardMessageToChildNodes(envelope *myChildrenMsg, UChar msgType) {
-#if CMK_SMP && CMK_NODE_QUEUE_AVAILABLE
-  // Node level forwarding for nodegroup bcasts
-  CmiForwardNodeBcastMsg(myChildrenMsg->getTotalsize(), (char *)myChildrenMsg);
-#else
-  // Proc level forwarding
-  CmiForwardProcBcastMsg(myChildrenMsg->getTotalsize(), (char *)myChildrenMsg);
-#endif
+  CkUnpackMessage(&myChildrenMsg);
+  int rootNode = getRootNode(myChildrenMsg);
+  CkPackMessage(&myChildrenMsg);
+  CkRdmaSendBcastMsgToChildNodes(myChildrenMsg, rootNode);
 }
 
 // Method forwards a message to all the peer nodes
@@ -1398,9 +1421,10 @@ void deregisterMemFromMsg(envelope *env, bool isRecv) {
   for(int i=0; i<numops; i++){
     up|dest;
 
-    // De-register the destination buffer when isRecv is false (i.e. using ZC Bcast Send API) or
-    // when isRecv is true, respect deregMode and de-register
-    if( (!isRecv) || (isRecv && dest.deregMode == CMK_BUFFER_DEREG) )
+    // De-register the destination: with the ZC Bcast Send API (isRecv false)
+    // the runtime allocated it; with the Post API it is the posted buffer,
+    // registered for this message whatever its deregMode
+    if(!isRecv || dest.isRegistered)
       deregisterBuffer(dest);
 
     p|dest;
@@ -1955,19 +1979,19 @@ void zcPupGetCompleted(NcpyOperationInfo *info) {
   if(info->ackMode == CMK_SRC_DEST_ACK || info->ackMode == CMK_DEST_ACK) {
     zcPupPendingRgetsMsg *ref = (zcPupPendingRgetsMsg *)(info->destRef);
 
+    // pendingZCOps is shared by the node's PEs, and on reconverse any PE
+    // thread runs this completion while another issues gets (zcPupIssueRgets),
+    // so the lookup is under the same lock as the insert and the erase.
+    CmiLock(CksvAccess(_nodeZCPendingLock));
     auto iter = CksvAccess(pendingZCOps).find(ref->id);
     if(iter != CksvAccess(pendingZCOps).end()) { // Entry found in pendingZCOps
 
-      CmiLock(CksvAccess(_nodeZCPendingLock));
       int counter = --iter->second;
+      if(counter == 0) // All Rgets have completed: remove this entry from the map
+        CksvAccess(pendingZCOps).erase(iter);
       CmiUnlock(CksvAccess(_nodeZCPendingLock));
 
-      if(counter == 0) { // All Rgets have completed
-
-        CmiLock(CksvAccess(_nodeZCPendingLock));
-        // remove this entry from the map
-        CksvAccess(pendingZCOps).erase(iter);
-        CmiUnlock(CksvAccess(_nodeZCPendingLock));
+      if(counter == 0) {
 
 #if CMK_SMP
         // Send a message to all PEs on this node to handle all buffered messages
@@ -1982,6 +2006,7 @@ void zcPupGetCompleted(NcpyOperationInfo *info) {
         CmiFree(ref);
       }
     } else {
+      CmiUnlock(CksvAccess(_nodeZCPendingLock));
       CmiAbort("zcPupGetCompleted: object not found\n");
     }
     if(info->ackMode == CMK_SRC_DEST_ACK) {
@@ -2011,20 +2036,19 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
   ref->pe = CmiMyPe();
 #endif
 
+  // Both entries exist before the first Rget is issued: CmiIssueRget may run
+  // the completion (zcPupGetCompleted) inline, and it looks them up.
+  CmiLock(CksvAccess(_nodeZCPendingLock));
+  CksvAccess(pendingZCOps).emplace(id, (CmiUInt1)CpvAccess(newZCPupGets).size());
+  CmiUnlock(CksvAccess(_nodeZCPendingLock));
+  locMgr->bufferedActiveRgetMsgs.emplace(id, std::vector<CkArrayMessage *>()); // owned by locMgr, no lock
+
   for(std::vector<NcpyOperationInfo *>::iterator it = CpvAccess(newZCPupGets).begin();
         it != CpvAccess(newZCPupGets).end(); ++it) {
     (*it)->destRef = (char *)ref;
     zcQdIncrement();
     CmiIssueRget(*it); // Issue the Rget
   }
-
-  // Create an entry for the unordered map with idx as the index and the vector size as the value
-  CmiLock(CksvAccess(_nodeZCPendingLock));
-  CksvAccess(pendingZCOps).emplace(id, (CmiUInt1)CpvAccess(newZCPupGets).size());
-  CmiUnlock(CksvAccess(_nodeZCPendingLock));
-
-  // Create an entry for the unordered map with idx as the index and vector of messages as the value
-  locMgr->bufferedActiveRgetMsgs.emplace(id, std::vector<CkArrayMessage *>()); // does not require locking as it is owned by locMgr
 }
 /***************************** End of Zerocopy PUP Support ****************************/
 
@@ -2396,8 +2420,9 @@ int CkPerformRget(CkNcpyBufferPost &post, void *destBuffer, int destSize) {
 
       if(i == destIndex) {
 
-        if(source.cnt < destSize)
-          CkAbort("CkRdmaIssueRgets: Size of the posted buffer > Size of the source buffer\n");
+        if((size_t)destSize > source.cnt)
+          CkAbort("CkPostBuffer: posted buffer of %zu bytes is larger than the %zu-byte source (tag %zu); the posted size must be <= the source size",
+                  (size_t)destSize, source.cnt, post.tag);
 
 #if CMK_USE_CMA && CMK_REG_REQUIRED
         if(!sendBackToSourceForDereg && ncpyMode == CkNcpyMode::CMA && source.refAckInfo != NULL)
@@ -2496,6 +2521,12 @@ int CkPerformRget(CkNcpyBufferPost &post, void *destBuffer, int destSize) {
     return true;
 
   } else if(CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_RECV_DONE_MSG) {
+
+    // The node-level receive already completed, so the source size is the one
+    // recorded in the post structure rather than one unpacked from the message.
+    if((size_t)destSize > post.srcSize)
+      CkAbort("CkPostBuffer: posted buffer of %zu bytes is larger than the %zu-byte source (tag %zu); the posted size must be <= the source size",
+              (size_t)destSize, post.srcSize, post.tag);
 
     memcpy(destBuffer, post.srcBuffer, post.srcSize);
 

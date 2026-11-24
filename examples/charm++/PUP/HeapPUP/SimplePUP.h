@@ -30,7 +30,7 @@ class SimpleArray : public CBase_SimpleArray {
     CkExit();
   }
 
-  void acceptData(HeapObject &inData) {
+  void acceptData(const HeapObject &inData) {
     // do something to the object
     localCopy = inData;
     localCopy.doWork();

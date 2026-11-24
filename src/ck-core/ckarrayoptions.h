@@ -84,6 +84,12 @@ class CkArrayOptions {
   bool disableNotifyChildInRed;  // Child elements are not notified when reduction starts
   bool broadcastViaScheduler;    // broadcast inline or through scheduler
   bool sectionAutoDelegate;      // Create a mCastMgr and auto-delegate all sections
+  bool wideCollection;           // Element ids use the wide-collection layout (objid.h)
+  // The bound-to location manager's layout, as bindTo read it on the calling PE:
+  // 1 wide, 0 not, -1 unknown (no bindTo). CkCreateArray uses it, so PE 0 does not
+  // need that location manager's branch (#4174).
+  signed char boundWideCollection;
+  CmiUInt8 collectionNumber;     // Assigned on PE 0 by CkCreateArray; 0 until then
 
   enum class InsertionType : char {
     UNSET,
@@ -219,6 +225,7 @@ class CkArrayOptions {
   /// Use this location manager
   CkArrayOptions& setLocationManager(const CkGroupID& l) {
     locMgr = l;
+    boundWideCollection = -1;  // bindTo sets it after this call
     return *this;
   }
 
@@ -268,6 +275,14 @@ class CkArrayOptions {
     sectionAutoDelegate = b;
     return *this;
   }
+  /// Element ids use the wide-collection layout: 24 collection bits (16.7 million
+  /// arrays) and a 37-bit payload, for programs that create many small arrays. The
+  /// array must have bounds that pack into 37 bits (setBounds); creation aborts
+  /// otherwise. An array bound to another (bindTo) takes that array's layout.
+  CkArrayOptions& setWideCollection(bool b = true) {
+    wideCollection = b;
+    return *this;
+  }
   CkArrayOptions& setReductionClient(CkCallback cb) {
     reductionClient = cb;
     return *this;
@@ -288,6 +303,15 @@ class CkArrayOptions {
   const CkGroupID& getMcastManager(void) const { return mCastMgr; }
   const CkGroupID& getLocationCache(void) const { return locCache; }
   bool isSectionAutoDelegated(void) const { return sectionAutoDelegate; }
+  bool isWideCollection(void) const { return wideCollection; }
+  /// 1 or 0: the bound-to location manager's layout, recorded by bindTo; -1: unknown
+  int getBoundWideCollection(void) const { return boundWideCollection; }
+  CmiUInt8 getCollectionNumber(void) const { return collectionNumber; }
+  // Used by CkCreateArray (PE 0) once the number is assigned and the kind settled
+  void setCollection(CmiUInt8 number, bool wide) {
+    collectionNumber = number;
+    wideCollection = wide;
+  }
   const CkCallback &getInitCallback(void) const {return initCallback;}
   int getListeners(void) const { return arrayListeners.size(); }
   CkArrayListener* getListener(int listenerNum) {

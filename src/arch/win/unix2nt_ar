@@ -71,7 +71,16 @@ Abort() {
 
 out="$(cygpath -w "$1")"
 shift
-args=("-out:$out" "$@")
+args=("-out:$out")
+# Inputs may be Cygwin paths (CMake passes absolute ones for objects that
+# belong to another target); LIB.EXE needs Windows ones.
+for in in "$@"
+do
+	case "$in" in
+	-*) args+=("$in") ;;
+	*) args+=("$(cygpath -w "$in")") ;;
+	esac
+done
 
 "$LIB_CMD" "${LIB_OPTS[@]}" "${args[@]}"
 

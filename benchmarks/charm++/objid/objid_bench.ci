@@ -1,0 +1,27 @@
+mainmodule objid_bench {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Sender senderProxy;
+
+  array [1D] Elem {
+    entry Elem();
+    entry void recv(int round);
+    entry void doMigrate();
+    entry void ping();
+  };
+
+  group Sender {
+    entry Sender();
+    entry void insertAll(CProxy_Elem a, int n);
+    entry void sendAll(CProxy_Elem a, int n, int round);
+  };
+
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry [reductiontarget] void insertedAll();
+    entry void insertQD();
+    entry [reductiontarget] void roundDone(int sum);
+    entry void migrateQD();
+    entry [reductiontarget] void bcastDone();
+    entry void checkProgress();
+  };
+}

@@ -17,7 +17,7 @@ mainmodule SimplePUP {
 
   array [1D] SimpleArray{
     entry SimpleArray();
-    entry void acceptData(HeapObject &inData);
+    entry void acceptData(const HeapObject &inData);
   };
 
 };

@@ -6,6 +6,6 @@ mainmodule seek_block {
 
   array [1D] SimpleArray{
     entry SimpleArray();
-    entry void acceptData(C& inData);
+    entry void acceptData(const C &inData);
   };
 };

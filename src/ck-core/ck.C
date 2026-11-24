@@ -8,7 +8,6 @@ clients, including the rest of Charm++, are actually C++.
 */
 #include "ck.h"
 #include "trace.h"
-#include "queueing.h"
 
 #include "pathHistory.h"
 
@@ -16,9 +15,15 @@ clients, including the rest of Charm++, are actually C++.
 #include "LBManager.h"
 #endif // CMK_LBDB_ON
 
+#include <unordered_set>
+
 #ifndef CMK_CHARE_USE_PTR
 #include <map>
 CkpvDeclare(std::vector<void *>, chare_objs);
+#if CMK_ERROR_CHECKING
+CkpvExtern(void *, _nokeepMsgInFlight);  // see CkFreeMsg (msgalloc.C)
+CkpvExtern(int, _nokeepEpInFlight);
+#endif
 CkpvDeclare(std::vector<int>, chare_types);
 CkpvDeclare(std::vector<VidBlock *>, vidblocks);
 CksvExtern(ObjNumRdmaOpsMap, pendingZCOps);
@@ -27,6 +32,64 @@ typedef std::map<int, CkChareID>  Vidblockmap;
 CkpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
 CkpvDeclare(int, currentChareIdx);
 #endif
+
+CkpvDeclare(void *, _ckCurrentMsg);  // see CkCurrentMessage (charm++.h)
+CkpvDeclare(int, _ckCurrentEp);
+bool _ckCoroFakeMigrate = false;     // +ck_fakemigrate (parsed in init.C), read by ckcoro.h
+bool _ckCoroFakeMigratePup = false;  // +ck_fakemigrate_pup (parsed in init.C), read by ckcoro.h
+
+// CK_LABEL labels, in the order the program's static initialization recorded
+// them, registered as entries of their chares on rank 0 of each process.
+namespace {
+struct CoroLabel {
+  const char *name;
+  int (*chareIdx)();
+  int ep;
+};
+std::vector<CoroLabel> &coroLabels() {
+  static std::vector<CoroLabel> labels;
+  return labels;
+}
+}
+int _ckCoroAddLabel(const char *name, int (*chareIdx)()) {
+  coroLabels().push_back(CoroLabel{name, chareIdx, -1});
+  return (int)coroLabels().size() - 1;
+}
+int _ckCoroLabelEp(int label) { return coroLabels()[label].ep; }
+void _ckCoroRegisterLabels() {
+  for (CoroLabel &l : coroLabels()) l.ep = CkRegisterEp(l.name, NULL, 0, l.chareIdx(), 0);
+}
+
+// ckDestroyLater: a Converse message to this PE whose handler destroys the
+// chare, so the destruction follows the return of whatever is running on
+// the chare now (an entry method, or a direct call that resumed a
+// coroutine), and several chares may ask on one PE. The chares that asked
+// and still exist are in _ckDestroyLaterPending: a second call sends
+// nothing, and a chare destroyed another way first leaves the set in
+// ~Chare, so its message finds nothing to destroy.
+CkpvDeclare(std::unordered_set<Chare *>, _ckDestroyLaterPending);
+int _ckDestroyLaterHandlerIdx;
+struct CkDestroyLaterMsg {
+  char core[CmiMsgHeaderSizeBytes];
+  Chare *obj;
+};
+void _ckDestroyLaterHandler(void *m) {
+  Chare *obj = ((CkDestroyLaterMsg *)m)->obj;
+  CmiFree(m);
+  if (CkpvAccess(_ckDestroyLaterPending).erase(obj) == 0) return;
+  obj->ckDestroy();
+}
+void Chare::ckDestroy(void) { delete this; }
+void Chare::ckDestroyLater(void) {
+  if (!CkpvAccess(_ckDestroyLaterPending).insert(this).second) return;
+  CkDestroyLaterMsg *m = (CkDestroyLaterMsg *)CmiAlloc(sizeof(CkDestroyLaterMsg));
+  m->obj = this;
+  CmiSetHandler(m, _ckDestroyLaterHandlerIdx);
+  CmiSyncSendAndFree(CkMyPe(), sizeof(CkDestroyLaterMsg), (char *)m);
+}
+void IrrGroup::ckDestroy(void) {
+  CkAbort("ckDestroy/ckDestroyLater on a group or nodegroup branch: groups are not destroyed one branch at a time");
+}
 
 // Map of array IDs to array elements for fast message delivery
 CkpvDeclare(ArrayObjMap, array_objs);
@@ -105,6 +168,9 @@ void Chare::CkEnableObjQ()
 
 Chare::~Chare() {
   CkCallstackUnwind(this);
+  // A ckDestroyLater message still on its way finds nothing to destroy.
+  if (CkpvInitialized(_ckDestroyLaterPending) && !CkpvAccess(_ckDestroyLaterPending).empty())
+    CkpvAccess(_ckDestroyLaterPending).erase(this);
 
 #ifndef CMK_CHARE_USE_PTR
 /*
@@ -175,6 +241,7 @@ static void CkChareThreadListener_suspend(CkThreadListener *l) {
 }
 
 static void CkChareThreadListener_resume(CkThreadListener *l) {
+  // printf("[PE %d] CkChareThreadListener_resume: obj=%p\n", CkMyPe(), ((CkChareThreadListener*)l)->obj);
   CkCallstackPush(((CkChareThreadListener *)l)->obj);
 }
 
@@ -470,7 +537,7 @@ void CkSectionID::pup(PUP::er &p) {
 
 /**** Tiny random API routines */
 
-#if CMK_CUDA
+#if CMK_CUDA || CMK_HIP
 void CUDACallbackManager(void *fn, void *msg) {
   if (fn) {
     ((CkCallback*)fn)->send(msg);
@@ -574,6 +641,7 @@ int CkGetArgc(void) {
 }
 
 Chare *CkActiveObj(void) {
+  // printf("[PE %d] getting active: stack size now %zu\n", CkMyPe(), CkpvAccess(runningObjs).size());
   auto &objs = *(&CkpvAccess(runningObjs));
   if (objs.empty()) {
     return nullptr;
@@ -584,10 +652,12 @@ Chare *CkActiveObj(void) {
 
 inline void _pushObj(Chare *obj) {
   CkpvAccess(runningObjs).emplace_back(obj);
+  // printf("[PE %d] pushObj: stack size now %zu\n", CkMyPe(), CkpvAccess(runningObjs).size());
 }
 
 inline Chare *_popObj(void) {
   auto &objs = *(&CkpvAccess(runningObjs));
+  // printf("[PE %d] popobj: stack size now %zu\n", CkMyPe(), CkpvAccess(runningObjs).size());
   if (objs.empty()) {
     return nullptr;
   } else {
@@ -596,6 +666,15 @@ inline Chare *_popObj(void) {
     return obj;
   }
 }
+
+#if CMK_LBDB_ON && CMK_CUDA
+// Declared in hapi.h; forward-declared here to avoid pulling the full HAPI
+// header into ck.C. These bracket the entry-method body so that CUPTI kernel
+// records can be correlated back to the active migratable object, however the
+// application happens to launch its kernels.
+extern uint64_t hapiCuptiPushObjCorrelation();
+extern void     hapiCuptiPopObjCorrelation();
+#endif
 
 inline void _ckStartTiming(void) {
 #if CMK_LBDB_ON
@@ -616,14 +695,27 @@ void CkCallstackPush(Chare *obj) {
   _ckStopTiming();    // suspend timing of the previous obj
   _pushObj(obj);      // push the current object onto the stack
   _ckStartTiming();   // start timing the current obj
+#if CMK_LBDB_ON && CMK_CUDA
+  // After _pushObj, `obj` is the active chare. Push a CUPTI external
+  // correlation ID -- a token for its full LB key, or a sentinel when there is
+  // no migratable owner -- so every kernel launched until the matching pop is
+  // attributed to this chare. Structurally paired 1:1 with CkCallstackPop.
+  hapiCuptiPushObjCorrelation();
+#endif
 }
 
 // removes all instances of ( obj ) from the stack
 void CkCallstackUnwind(Chare *obj) {
+  // printf("[%d] removing all instances of obj %p\n",CkMyPe(), obj);
+
   CkAssertMsg(obj != nullptr, "expected a valid object!");
   auto &objs = *(&CkpvAccess(runningObjs));
   auto start = std::begin(objs);
   auto end = std::end(objs);
+  //   for(auto it=start;it!=end;it++)
+  // {
+  //   printf("objects still in the stack are %p\n", *it);
+  // }
   // ensures that all copies of the object are null'd
   while (end != (start = std::find(start, end, obj))) {
     *start = nullptr;
@@ -634,6 +726,10 @@ void CkCallstackUnwind(Chare *obj) {
 
 // pops ( obj ) from the stack (and manages timing)
 void CkCallstackPop(Chare *obj) {
+#if CMK_LBDB_ON && CMK_CUDA
+  // Paired 1:1 with the push in CkCallstackPush.
+  hapiCuptiPopObjCorrelation();
+#endif
   _ckStopTiming();        // stop timing the current obj
   auto *popd = _popObj(); // pop it from the stack
   CkAssertMsg(!popd || popd == obj, "object tracking mismatch");
@@ -654,11 +750,33 @@ CkLocRec *CkActiveLocRec(void) {
 /******************** Basic support *****************/
 void CkDeliverMessageFree(int epIdx,void *msg,void *obj)
 {
+  if (msg != NULL && UsrToEnv(msg)->isPacked())
+  { /* A stored array broadcast is kept packed (CkArray::recvBroadcast) */
+    envelope *env = UsrToEnv(msg);
+    CkUnpackMessage(&env);
+    msg = EnvToUsr(env);
+  }
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, msg);
 #endif    
   const auto msgtype = (msg == NULL) ? LAST_CK_ENVELOPE_TYPE : UsrToEnv(msg)->getMsgtype();
+#if CMK_ERROR_CHECKING
+  void *prevNokeepMsg = CkpvAccess(_nokeepMsgInFlight);
+  int prevNokeepEp = CkpvAccess(_nokeepEpInFlight);
+  // Excluded: zerocopy messages (the generated code and ckrdma.C free them
+  // themselves as part of the protocol), and the runtime's own CkMessage*
+  // entries (msgIdx == -1: CkArray::recvNoKeep*Broadcast forwards the message
+  // to the elements and frees it on the last delivery, see recvBroadcast).
+  if (_entryTable[epIdx]->noKeep && msg != NULL &&
+      _entryTable[epIdx]->msgIdx != -1 &&
+      CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_REG_NO_ZC_MSG)
+  { CkpvAccess(_nokeepMsgInFlight) = msg; CkpvAccess(_nokeepEpInFlight) = epIdx; }
+#endif
   CkInvokeEP((Chare*)obj, epIdx, msg);
+#if CMK_ERROR_CHECKING
+  CkpvAccess(_nokeepMsgInFlight) = prevNokeepMsg;
+  CkpvAccess(_nokeepEpInFlight) = prevNokeepEp;
+#endif
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -682,17 +800,33 @@ void CkDeliverMessageReadonly(int epIdx,const void *msg,void *obj)
     deliverMsg=(void *)msg;
   } else
   { /* Method needs a copy of the message to keep/delete */
-    void *oldMsg=(void *)msg;
-    deliverMsg=CkCopyMsg(&oldMsg);
+    if (UsrToEnv(msg)->isPacked())
+    { /* Copy the bytes and unpack only the copy; the source stays packed */
+      deliverMsg=CkCopyPackedMsg(msg);
+    } else {
+      void *oldMsg=(void *)msg;
+      deliverMsg=CkCopyMsg(&oldMsg);
 #if CMK_ERROR_CHECKING
-    if (oldMsg!=msg)
-      CkAbort("CkDeliverMessageReadonly: message pack/unpack changed message pointer!");
+      if (oldMsg!=msg)
+        CkAbort("CkDeliverMessageReadonly: message pack/unpack changed message pointer!");
 #endif
+    }
   }
 #if CMK_CHARMDEBUG
   CpdBeforeEp(epIdx, obj, (void*)msg);
 #endif
+#if CMK_ERROR_CHECKING
+  void *prevNokeepMsg = CkpvAccess(_nokeepMsgInFlight);
+  int prevNokeepEp = CkpvAccess(_nokeepEpInFlight);
+  if (_entryTable[epIdx]->noKeep && _entryTable[epIdx]->msgIdx != -1 &&
+      CMI_ZC_MSGTYPE(UsrToEnv(deliverMsg)) == CMK_REG_NO_ZC_MSG)
+  { CkpvAccess(_nokeepMsgInFlight) = deliverMsg; CkpvAccess(_nokeepEpInFlight) = epIdx; }
+#endif
   CkInvokeEP((Chare*)obj, epIdx, deliverMsg);
+#if CMK_ERROR_CHECKING
+  CkpvAccess(_nokeepMsgInFlight) = prevNokeepMsg;
+  CkpvAccess(_nokeepEpInFlight) = prevNokeepEp;
+#endif
 #if CMK_CHARMDEBUG
   CpdAfterEp(epIdx);
 #endif
@@ -821,6 +955,9 @@ void CkCreateLocalGroup(CkGroupID groupID, int epIdx, envelope *env)
   CkReadyEntry(CkpvAccess(_groupTable)->find(groupID), false);
   CmiImmediateUnlock(CkpvAccess(_groupTableImmLock));
 
+  // Array sends this PE held while this group (an array manager) did not exist.
+  _ckArrayFlushDeferredSends(groupID);
+
   _STATS_RECORD_PROCESS_GROUP_1();
 }
 
@@ -865,6 +1002,8 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   _STATS_RECORD_PROCESS_NODE_GROUP_1();
 }
 
+inline bool isGroupDepUnsatisfied(const CkCoreState *ck, const envelope *env);
+
 void _createGroup(CkGroupID groupID, envelope *env)
 {
   _CHECK_USED(env);
@@ -883,6 +1022,14 @@ void _createGroup(CkGroupID groupID, envelope *env)
     CkUnpackMessage(&env);
   }
   _STATS_RECORD_CREATE_GROUP_1();
+  // The creating PE's branch waits for the groups this creation depends on, as the
+  // other PEs' branches do in _processBocInitMsg, which also processes the held
+  // copy later (and counts it for quiescence).
+  if (isGroupDepUnsatisfied(CkpvAccess(_coreState), env)) {
+    CmiSetHandler(env, _bocHandlerIdx);
+    CpvAccess(_qd)->create();
+    return;
+  }
   CkCreateLocalGroup(groupID, epIdx, env);
 }
 
@@ -904,6 +1051,11 @@ void _createNodeGroup(CkGroupID groupID, envelope *env)
     CkUnpackMessage(&env);
   }
   _STATS_RECORD_CREATE_NODE_GROUP_1();
+  if (isGroupDepUnsatisfied(CkpvAccess(_coreState), env)) {  // as in _createGroup
+    CmiSetHandler(env, _bocHandlerIdx);
+    CpvAccess(_qd)->create();
+    return;
+  }
   CkCreateLocalNodeGroup(groupID, epIdx, env);
 }
 
@@ -1079,28 +1231,31 @@ static void _processNewVChareMsg(CkCoreState *ck,envelope *env)
 
 /************** Receive: Chares *************/
 
+// The object on this PE that a chare message for entry epIdx is delivered
+// to; objPtr is the objPtr of its CkChareID (an index into chare_objs for a
+// plain chare unless CMK_CHARE_USE_PTR). NULL if the chare was deleted.
+static inline void *_localPlainChareObj(int epIdx, void *objPtr)
+{
+  int chareIdx = _entryTable[epIdx]->chareIdx;
+  int mainIdx = _chareTable[chareIdx]->mainChareType();
+  if (mainIdx != -1) {           // mainchare
+    CmiAssert(CkMyPe()==0);
+    return _mainTable[mainIdx]->getObj();
+  }
+#ifndef CMK_CHARE_USE_PTR
+  if (_chareTable[chareIdx]->chareType == TypeChare)
+    return CkpvAccess(chare_objs)[(CmiIntPtr)objPtr];
+#endif
+  return objPtr;
+}
+
 static inline void _processForPlainChareMsg(CkCoreState *ck,envelope *env)
 {
   if(isGroupDepUnsatisfied(ck, env))
     return;
   ck->process(); // ck->process() updates mProcessed count used in QD
   int epIdx = env->getEpIdx();
-  int mainIdx = _chareTable[_entryTable[epIdx]->chareIdx]->mainChareType();
-  void *obj;
-  if (mainIdx != -1)  {           // mainchare
-    CmiAssert(CkMyPe()==0);
-    obj = _mainTable[mainIdx]->getObj();
-  }
-  else {
-#ifndef CMK_CHARE_USE_PTR
-    if (_chareTable[_entryTable[epIdx]->chareIdx]->chareType == TypeChare)
-      obj = CkpvAccess(chare_objs)[(CmiIntPtr)env->getObjPtr()];
-    else
-      obj = env->getObjPtr();
-#else
-    obj = env->getObjPtr();
-#endif
-  }
+  void *obj = _localPlainChareObj(epIdx, env->getObjPtr());
   _invokeEntry(epIdx,env,obj);
   _STATS_RECORD_PROCESS_MSG_1();
 }
@@ -1200,7 +1355,6 @@ IrrGroup* _getCkLocalBranchFromGroupID(CkGroupID &gID) {
 
 static inline void _deliverForNodeBocMsg(CkCoreState *ck,int epIdx, envelope *env,void *obj)
 {
-  env->setEpIdx(epIdx);
   _invokeEntry(epIdx,env,obj);
   _STATS_RECORD_PROCESS_NODE_BRANCH_1();
 }
@@ -1273,7 +1427,10 @@ static void _processArrayEltMsg(CkCoreState *ck,envelope *env) {
     // First see if we already have a direct pointer to the object
     _SET_USED(env, 0);
     ck->process(); // ck->process() updates mProcessed count used in QD
-    if (msg->array_hops()>1) {
+    // recvMsg counts a hop each time a PE forwards; a direct delivery arrives with
+    // 0. Any forwarded message (through the home or a stale location) teaches the
+    // sender where the element is, so later sends go direct.
+    if (msg->array_hops() >= 1) {
       CProxy_ArrayBase(env->getArrayMgr()).ckLocMgr()->multiHop(msg);
     }
     bool doFree = true;
@@ -1311,14 +1468,17 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
     // Determine mode depending on the message
     ncpyEmApiMode mode = (CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG) ? ncpyEmApiMode::BCAST_SEND : ncpyEmApiMode::P2P_SEND;
 
-    env = CkRdmaIssueRgets(env, mode, prevEnv);
+    // CkRdmaIssueRgets copies prevEnv into a new message that receives the
+    // payload. Only a broadcast keeps prevEnv past the call: an intermediate
+    // node of the spanning tree forwards it to its children on completion.
+    const bool keepPrevEnv = (mode == ncpyEmApiMode::BCAST_SEND);
+    env = CkRdmaIssueRgets(env, mode, keepPrevEnv ? prevEnv : NULL);
 
-    if(env) {
-      // memcpyGet or cmaGet completed, env contains the payload and will be enqueued
-
-      // Free prevEnv
+    // memcpyGet or cmaGet completed (env is the new message, enqueued below),
+    // or a P2P rget is in flight: prevEnv is not needed either way.
+    if(env || !keepPrevEnv)
       CkFreeMsg(EnvToUsr(prevEnv));
-    } else {
+    if(!env) {
       // async rdma call in place, asynchronous return and ack handling
       return;
     }
@@ -1472,7 +1632,6 @@ void CkUnpackMessage(envelope **pEnv)
 #if CMK_OBJECT_QUEUE_AVAILABLE
 static int index_objectQHandler;
 #endif
-int index_tokenHandler;
 int index_skipCldHandler;
 
 void _skipCldHandler(void *converseMsg)
@@ -1494,6 +1653,23 @@ void _skipCldHandler(void *converseMsg)
   	env, env->getQueueing(),env->getPriobits(),
   	(unsigned int *)env->getPrioPtr());
 #endif
+}
+
+// Node-level broadcast of a packed message. A zerocopy bcast goes to the
+// children of this node's spanning tree, along which its acks are counted.
+static void _nodeBroadcastAndFree(int len, envelope *env, bool includeSelf)
+{
+  if (CMI_IS_ZC_BCAST(env)) {
+    CkRdmaSendBcastMsgToChildNodes(env, CkMyNode());
+    if (includeSelf)
+      CmiSyncNodeSendAndFree(CkMyNode(), len, (char *)env);
+    else
+      CmiFree(env);
+  } else if (includeSelf) {
+    CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
+  } else {
+    CmiSyncNodeBroadcastAndFree(len, (char *)env);
+  }
 }
 
 //static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
@@ -1541,9 +1717,9 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #endif
     CmiSetInfo(env,infoFn);
     if (pe==CLD_BROADCAST) {
-      CmiSyncNodeBroadcastAndFree(len, (char *)env);
+      _nodeBroadcastAndFree(len, env, false);
     } else if (pe==CLD_BROADCAST_ALL) {
-      CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
+      _nodeBroadcastAndFree(len, env, true);
     } else {
 #if CMK_USE_SHMEM
       if (!_tryIpcSend<false, false>(pe, env, infoFn))
@@ -1588,8 +1764,8 @@ static void _noCldEnqueue(int pe, envelope *env)
 
   CkPackMessage(&env);
   int len=env->getTotalsize();
-  if (pe==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)env); }
-  else if (pe==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
+  if (pe==CLD_BROADCAST) { _nodeBroadcastAndFree(len, env, false); }
+  else if (pe==CLD_BROADCAST_ALL) { _nodeBroadcastAndFree(len, env, true); }
   else 
 #if CMK_USE_SHMEM
     if (!_tryIpcSend<false, false>(pe, env, 0x0))
@@ -1619,13 +1795,12 @@ void _noCldNodeEnqueue(int node, envelope *env)
 
   CkPackMessage(&env);
   int len=env->getTotalsize();
-  if (node==CLD_BROADCAST) { 
-	CmiSyncNodeBroadcastAndFree(len, (char *)env); 
-}
-  else if (node==CLD_BROADCAST_ALL) { 
-		CmiSyncNodeBroadcastAllAndFree(len, (char *)env); 
-
-}
+  if (node==CLD_BROADCAST) {
+    _nodeBroadcastAndFree(len, env, false);
+  }
+  else if (node==CLD_BROADCAST_ALL) {
+    _nodeBroadcastAndFree(len, env, true);
+  }
   else {
 #if CMK_USE_SHMEM
     if (!_tryIpcSend<true, false>(node, env, 0x0))
@@ -1738,7 +1913,8 @@ void CkSendMsg(int entryIdx, void *msg,const CkChareID *pCid, int opts)
 
 void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
 {
-  if (pCid->onPE==CkMyPe())
+  void *obj = (pCid->onPE == CkMyPe()) ? _localPlainChareObj(entryIndex, pCid->objPtr) : NULL;
+  if (obj != NULL)
   {
 #if CMK_CHARMDEBUG
     //Just in case we need to breakpoint or use the envelope in some way
@@ -1748,10 +1924,10 @@ void CkSendMsgInline(int entryIndex, void *msg, const CkChareID *pCid, int opts)
     envelope *env = UsrToEnv(msg);
     if (env->isPacked()) CkUnpackMessage(&env);
     _STATS_RECORD_PROCESS_MSG_1();
-    _invokeEntryNoTrace(entryIndex,env,pCid->objPtr);
+    _invokeEntryNoTrace(entryIndex,env,obj);
   }
   else {
-    //No way to inline a cross-processor message:
+    //Not on this PE (or a virtual chare ID): send it normally
     CkSendMsg(entryIndex, msg, pCid, opts & (~CK_MSG_INLINE));
   }
 }
@@ -1892,12 +2068,13 @@ void CkSendMsgBranchInline(int eIdx, void *msg, int destPE, CkGroupID gID, int o
   {
     IrrGroup *obj=(IrrGroup *)_localBranch(gID);
     if (obj!=NULL)
-    { //Just directly call the group:
-#if CMK_ERROR_CHECKING
+    { //Just directly call the group. Prepare the envelope and trace the
+      //creation as a send does: tracing reads the entry index, source PE and
+      //event from the envelope, and without them a production build traced
+      //the call with whatever the message buffer last held.
       envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForBocMsg);
-#else
-      envelope *env=UsrToEnv(msg);
-#endif
+      _TRACE_CREATION_1(env);
+      _TRACE_CREATION_DONE(1);
       _deliverForBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
       return;
     }
@@ -2050,12 +2227,10 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
       void *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();
       CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
       if (obj!=NULL)
-      { //Just directly call the group:
-#if CMK_ERROR_CHECKING
+      { //Just directly call the nodegroup; see CkSendMsgBranchInline.
         envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
-#else
-        envelope *env=UsrToEnv(msg);
-#endif
+        _TRACE_CREATION_1(env);
+        _TRACE_CREATION_DONE(1);
         _deliverForNodeBocMsg(CkpvAccess(_coreState),eIdx,env,obj);
         return;
       }
@@ -2125,9 +2300,6 @@ void _ckModuleInit(void) {
 #if CMK_OBJECT_QUEUE_AVAILABLE
 	CmiAssignOnce(&index_objectQHandler, CkRegisterHandler(_ObjectQHandler));
 #endif
-	CmiAssignOnce(&index_tokenHandler, CkRegisterHandler(_TokenHandler));
-	CkpvInitialize(TokenPool*, _tokenPool);
-	CkpvAccess(_tokenPool) = new TokenPool;
 }
 
 
@@ -2244,6 +2416,10 @@ void StartCharmExt(int argc, char **argv) {
     strcpy(ext_args[i].data(), argv[i]);
     ext_argv[i] = ext_args[i].data();
   }
+  /* Same hand-off as charm_main: the trace and Isomalloc init hooks that
+     reconverse's ConverseInit invokes. */
+  extern void _registerConverseInitHooks();
+  _registerConverseInitHooks();
   ConverseInit(argc, ext_argv.data(), _initCharm, 0, 0);
 }
 
@@ -2637,7 +2813,41 @@ void CkArrayExtSend_multi(int aid, int *idx, int ndims, int epIdx, int num_bufs,
   }
 }
 
+
+// HAPI support
+#if CMK_CUDA
+#include "hapi.h"
 #endif
+
+void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid)
+{
+  #if CMK_CUDA
+  cudaStream_t stream_ptr = (cudaStream_t)stream;
+  CkCallback callback(cb, (void *) fid);
+  
+  hapiAddCallback(stream_ptr, callback, NULL);
+  #else
+  // function must be defined regardless for cython compilation
+  CkAbort("CkHapiAddCallback> Charm++ was not built with CUDA support");
+  #endif
+}
+
+int CkTraceRegisterUserEvent(char *EventDesc, int eventNum)
+{
+  return traceRegisterUserEvent(EventDesc, eventNum);
+}
+
+void CkTraceBeginUserBracketEvent(int eventID)
+{
+  traceBeginUserBracketEvent(eventID);
+}
+
+void CkTraceEndUserBracketEvent(int eventID)
+{
+  traceEndUserBracketEvent(eventID);
+}
+
+#endif // CMK_CHARM4PY
 
 //------------------- Message Watcher (record/replay) ----------------
 
@@ -2695,12 +2905,20 @@ private:
   void flushLog(int verbose=1) {
     if (verbose) CkPrintf("[%d] flushing log\n", CkMyPe());
     fprintf(f, "%s", buffer.data());
+    fflush(f);  // make records survive a killed/hung run (the main use case)
     curpos=0;
   }
   virtual bool process(envelope **envptr,CkCoreState *ck) {
     if ((*envptr)->getEvent()) {
+      // Pack only when a CRC/checksum over the packed bytes is required.
+      // The logged header fields are all valid on an unpacked envelope, and
+      // the pack/unpack round trip swaps the envelope out from under senders
+      // that retain a pointer to it -- CkArrayBroadcaster keeps the broadcast
+      // envelope for multi-element delivery, so packing here segfaulted any
+      // program using array broadcasts under +record (issue #3940).
+      const bool needPacked = _recplay_crc || _recplay_checksum;
       bool wasPacked = (*envptr)->isPacked();
-      if (!wasPacked) CkPackMessage(envptr);
+      if (needPacked && !wasPacked) CkPackMessage(envptr);
       envelope *env = *envptr;
       unsigned int crc1=0, crc2=0;
       if (_recplay_crc) {
@@ -2712,8 +2930,11 @@ private:
         crc2 = checksum_initial(((unsigned char*)env)+sizeof(*env), env->getTotalsize()-sizeof(*env));
       }
       curpos+=snprintf(&buffer[curpos],buffer.size() - curpos,"%d %d %d %d %x %x %d\n",env->getSrcPe(),env->getTotalsize(),env->getEvent(), env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg, crc1, crc2, env->getEpIdx());
-      if (curpos > _recplay_logsize-128) flushLog();
-      if (!wasPacked) CkUnpackMessage(envptr);
+      // Quiet flush: with a small +recplay-logsize (continuous flushing, for
+      // recording runs that will be killed at a hang) the per-flush banner
+      // would flood the output.
+      if (curpos > _recplay_logsize-128) flushLog(0);
+      if (needPacked && !wasPacked) CkUnpackMessage(envptr);
     }
     return true;
   }
@@ -2773,11 +2994,22 @@ class CkMessageReplay : public CkMessageWatcher {
 	FILE *lbFile;
 	/// Read the next message we need from the file:
 	void getNext(void) {
-	  if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) CkAbort("CkMessageReplay> Syntax error reading replay file");
+	  // A truncated log (recorder killed mid-run -- the normal case when
+	  // recording a hang) is treated like the "-1 -1 -1" end sentinel: this
+	  // PE holds all further messages at the recorded frontier instead of
+	  // aborting the whole replay. An empty log (e.g. an SMP comm thread
+	  // that recorded nothing before being killed) is the same case.
+	  if (3!=fscanf(f,"%d%d%d", &nextPE,&nextSize,&nextEvent)) {
+	    CkPrintf("[%d] CkMessageReplay> log ended without sentinel (truncated record?); holding all further messages\n", CkMyPe());
+	    nextPE=nextSize=nextEvent=-1;
+	    return;
+	  }
 	  if (nextSize > 0) {
 	    // We are reading a regular message
 	    if (4!=fscanf(f,"%d%x%x%d", &nexttype,&crc1,&crc2,&nextEP)) {
-	      CkAbort("CkMessageReplay> Syntax error reading replay file");
+	      CkPrintf("[%d] CkMessageReplay> log ended mid-record (truncated record?); holding all further messages\n", CkMyPe());
+	      nextPE=nextSize=nextEvent=-1;
+	      return;
 	    }
             REPLAYDEBUG("getNext: "<<nextPE<<" " << nextSize << " " << nextEvent)
 	  } else if (nextSize == -2) {
@@ -2897,8 +3129,13 @@ public:
 
 private:
 	virtual bool process(envelope **envptr,CkCoreState *ck) {
+          // Same rule as CkMessageRecorder::process (#3940): pack only when a
+          // CRC/checksum over packed bytes will be computed. The swap
+          // corrupts envelopes that other code retains a pointer to
+          // (CkArrayBroadcaster), and matching needs no packing.
+          const bool needPacked = _recplay_crc || _recplay_checksum;
           bool wasPacked = (*envptr)->isPacked();
-          if (!wasPacked) CkPackMessage(envptr);
+          if (needPacked && !wasPacked) CkPackMessage(envptr);
           envelope *env = *envptr;
 	  //CkAssert(*(int*)env == 0x34567890);
 	  REPLAYDEBUG("ProcessMessage message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent() <<" " <<env->getMsgtype() <<" " <<env->getMsgIdx() << " ep:" << env->getEpIdx());
@@ -2907,13 +3144,22 @@ private:
 			REPLAYDEBUG("Executing message: "<<env->getSrcPe()<<" "<<env->getTotalsize()<<" "<<env->getEvent())
 			getNext(); /* Advance over this message */
 			flush(); /* try to process queued-up stuff */
-    			if (!wasPacked) CkUnpackMessage(envptr);
+    			if (needPacked && !wasPacked) CkUnpackMessage(envptr);
 			return true;
 		}
 #if CMK_SMP
-                else if (env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg) {
+                else if (env->getMsgtype()==NodeBocInitMsg || env->getMsgtype()==ForNodeBocMsg
+                         || env->getMsgtype()==BocBcastMsg || env->getMsgtype()==ArrayBcastMsg) {
                          // try next rank, we can't just buffer the msg and left
-                         // we need to keep unprocessed msg on the fly
+                         // we need to keep unprocessed msg on the fly.
+                         // BocBcastMsg/ArrayBcastMsg belong here too (#3940): they ride
+                         // the node queue and are claimed by an arbitrary rank, which
+                         // then performs the within-node fan-out with its own
+                         // srcPe/event stamps (_processBocBcastMsg ->
+                         // _sendMsgBranchWithinNode). Buffering one at the wrong rank
+                         // both strands the original and suppresses the fan-out the
+                         // other ranks' logs expect -- the replay stalls with no
+                         // diagnostic. Bouncing lets the recorded winner claim it.
                         int nextpe = CkMyPe()+1;
                         if (nextpe == CkNodeFirst(CkMyNode())+CkMyNodeSize())
                         nextpe = CkNodeFirst(CkMyNode());

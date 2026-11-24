@@ -348,12 +348,34 @@ void CkReductionMgr::contributorDied(contributorInfo *ci)
   for (r=redNo;r<ci->redNo;r++)
     adj(r).lcount++;//He'll be contributing to r here
 
-  // Check whether the death of this contributor made this pe go barren at this
-  // redNo
-  if (ci->redNo <= redNo) {
-    checkIsActive();
-  }
+  checkIsActive();
   finishReduction();
+  maybeCompleteObligationFreeRound();  // same hole as migration (see below)
+}
+
+/* Anytime migration can leave this PE POPULATED BUT OBLIGATION-FREE for
+the current reduction: every local element that owed redNo migrated away
+before contributing, while every arrival already contributed to redNo
+elsewhere (each such arrival decrements adj(redNo).lcount, balancing its
+lcount++). Such a PE never starts the reduction on its own -- it gets no
+local contribution (addContribution is what normally calls
+startReduction), it may have no tree kids, and the parent's
+sendReductionStartingToKids pokes only kids on the inactiveList, which
+this PE never joined because lcount never reached 0. The subtree then
+never reports and the whole reduction hangs (issue #3939). When a
+migration event makes the current round's local requirement already
+satisfied, eagerly start and finish it (shipping the empty result up);
+a migrant that later owes this round contributes through the existing
+LateMigrantMsg path. lcount>0 keeps the barren case on the established
+inactive-list path. */
+void CkReductionMgr::maybeCompleteObligationFreeRound()
+{
+  if (!inProgress && !creating && lcount > 0 &&
+      nContrib >= lcount + adj(redNo).lcount) {
+    DEBR((AA "Migration left this PE obligation-free for #%d; completing it eagerly\n" AB,redNo));
+    startReduction(redNo, CkMyPe());
+    finishReduction();
+  }
 }
 
 //Migrating away (note that global count doesn't change)
@@ -365,11 +387,11 @@ void CkReductionMgr::contributorLeaving(contributorInfo *ci)
   for (int r=redNo;r<ci->redNo;r++)
     adj(r).lcount++;//He'll be contributing to r here
 
-  // Check whether this made this pe go barren at redNo
-  if (ci->redNo <= redNo) {
-    checkIsActive();
-  }
+  // Unconditionally: is_inactive must follow lcount whatever round the
+  // element is at, or a PE that empties again never re-informs its parent.
+  checkIsActive();
   finishReduction();
+  maybeCompleteObligationFreeRound();
 }
 
 //Migrating in (note that global count doesn't change)
@@ -386,10 +408,8 @@ void CkReductionMgr::contributorArriving(contributorInfo *ci)
   for (int r=redNo;r<ci->redNo;r++)
     adj(r).lcount--;//He won't be contributing to r here
 
-  // Check if the arrival of a new contributor makes this PE become active again
-  if (ci->redNo == redNo) {
-    checkIsActive();
-  }
+  checkIsActive();
+  maybeCompleteObligationFreeRound();
 }
 
 //Contribute-- the given msg can contain any data.  The reducerType
@@ -649,6 +669,7 @@ void CkReductionMgr::finishReduction(void)
   CkReductionMsg *result=reduceMessages(msgs);
   result->fromPE = CkMyPe();
   result->redNo=redNo;
+  const bool sendsContributions = result->nSources() > 0;
   DEBR((AA "Reduced gcount=%d; sourceFlag=%d\n" AB,result->gcount,result->sourceFlag));
 
   if (partialReduction) {
@@ -690,6 +711,10 @@ void CkReductionMgr::finishReduction(void)
 
   //House Keeping Operations will have to check later what needs to be changed
   redNo++;
+  // The parent drops a kid whose message carries contributions from its
+  // inactive list. A kid that sent contributions left behind by migrated
+  // elements and still has no element must inform it again.
+  if (sendsContributions) is_inactive = false;
   // Check after every reduction contribution whether this makes the PE inactive
   // starting this redNo
   checkIsActive();
@@ -723,8 +748,11 @@ void CkReductionMgr::finishReduction(void)
 	  startReduction(redNo,CkMyPe());
 	  finishReduction();
   }
- 
 
+  // Arrivals that already contributed to several later reductions elsewhere
+  // leave this PE obligation-free for those rounds too (adj(r).lcount is
+  // negative for each of them); nothing else starts them here (issue #4145).
+  maybeCompleteObligationFreeRound();
 }
 
 //Sent up the reduction tree with reduced data
@@ -797,7 +825,8 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
   // Copy message queue into msgArr, skipping placeholders:
   while (NULL!=(m=msgs.deq()))
   {
-    DEBR((AA "***** gcount=%d; sourceFlag=%d ismigratable %d \n" AB,m->gcount,m->nSources(),m->isMigratableContributor()));
+    // (static fn: AA/AB member context unavailable to DEBR)
+    DEBR(("Red PE%d> ***** gcount=%d; sourceFlag=%d ismigratable %d \n",CkMyPe(),m->gcount,m->nSources(),m->isMigratableContributor()));
     msgs_gcount+=m->gcount;
     if (m->sourceFlag!=0)
     { //This is a real message from an element, not just a placeholder
@@ -838,6 +867,8 @@ CkReductionMsg *CkReductionMgr::reduceMessages(CkMsgQ<CkReductionMsg> &msgs)
       delete m;
     }
   }
+
+  CkReduction::checkSameReducer(nMsgs, msgArr.data());
 
   if (nMsgs==0||r==CkReduction::invalid)
   //No valid reducer in the whole vector
@@ -1693,6 +1724,26 @@ CkReduction::reducerType CkReduction::addReducer(reducerFn fn, bool streamable, 
   return index;
 }
 
+
+void CkReduction::checkSameReducer(int n, CkReductionMsg *const *msgs)
+{
+  // A reducer reads every message with its own layout, so one message of
+  // another reducer is read wrongly (and possibly out of bounds).
+  int first = -1;
+  for (int i = 0; i < n; i++) {
+    reducerType t = msgs[i]->getReducer();
+    if (t == nop || t == invalid) continue;
+    if (first < 0) { first = i; continue; }
+    reducerType t0 = msgs[first]->getReducer();
+    if (t != t0) {
+      std::vector<reducerStruct> &tab = reducerTable();
+      const char *n0 = (size_t)t0 < tab.size() && tab[t0].name ? tab[t0].name : "an unregistered reducer";
+      const char *n1 = (size_t)t < tab.size() && tab[t].name ? tab[t].name : "an unregistered reducer";
+      CkAbort("Reduction: contributions to one reduction use different reducers (%s [%d] and %s [%d]); "
+              "every contribution must use the same reducer", n0, (int)t0, n1, (int)t);
+    }
+  }
+}
 
 /*Reducer table: maps reducerTypes to reducerStructs.
 It's indexed by reducerType, so the order in this table

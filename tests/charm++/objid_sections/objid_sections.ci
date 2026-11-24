@@ -1,0 +1,22 @@
+mainmodule objid_sections {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Elem elemProxy;
+  readonly CkGroupID mcastGid;
+
+  message WorkMsg;
+
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry void setup();
+    entry void startRound();
+    entry [reductiontarget] void evenDone(int n, int vals[n]);
+    entry [reductiontarget] void lowDone(int n, int vals[n]);
+    entry void checkProgress();
+  };
+
+  array [1D] Elem {
+    entry Elem();
+    entry void work(WorkMsg* m);
+    entry void migrateNow(int r);
+  };
+}

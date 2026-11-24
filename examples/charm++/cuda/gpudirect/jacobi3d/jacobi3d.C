@@ -4,7 +4,17 @@
 #include <utility>
 #include <sstream>
 
-#define CUDA_SYNC 0
+/* CkDeviceBufferPost names its stream field hapi_stream on the reconverse line
+ * and cuda_stream on the classic one (ckrdmadevice.h splits at CMK_RECONVERSE),
+ * so a single copy of this example has to spell it both ways until the classic
+ * line is removed. Same shim as tests/charm++/cuda/d2dtest. */
+#if CMK_RECONVERSE
+#define POST_STREAM(p) ((p).hapi_stream)
+#else
+#define POST_STREAM(p) ((p).cuda_stream)
+#endif
+
+#define GPU_SYNC 0
 
 /* readonly */ CProxy_Main main_proxy;
 /* readonly */ CProxy_Block block_proxy;
@@ -31,19 +41,19 @@
 /* readonly */ bool print_elements;
 
 extern void invokeInitKernel(DataType* d_temperature, int block_width,
-    int block_height, int block_depth, cudaStream_t stream);
+    int block_height, int block_depth, hapiStream_t stream);
 extern void invokeGhostInitKernels(const std::vector<DataType*>& ghosts,
-    const std::vector<int>& ghost_counts, cudaStream_t stream);
+    const std::vector<int>& ghost_counts, hapiStream_t stream);
 extern void invokeBoundaryKernels(DataType* d_temperature, int block_width,
-    int block_height, int block_depth, bool bounds[], cudaStream_t stream);
+    int block_height, int block_depth, bool bounds[], hapiStream_t stream);
 extern void invokeJacobiKernel(DataType* d_temperature, DataType* d_new_temperature,
-    int block_width, int block_height, int block_depth, cudaStream_t stream);
+    int block_width, int block_height, int block_depth, hapiStream_t stream);
 extern void invokePackingKernels(DataType* d_temperature, DataType* d_ghosts[],
     bool bounds[], int block_width, int block_height, int block_depth,
-    cudaStream_t stream);
+    hapiStream_t stream);
 extern void invokeUnpackingKernel(DataType* d_temperature, DataType* d_ghost,
     int dir, int block_width, int block_height, int block_depth,
-    cudaStream_t stream);
+    hapiStream_t stream);
 
 class PersistentMsg : public CMessage_PersistentMsg {
 public:
@@ -179,7 +189,7 @@ public:
     z_surf_size = z_surf_count * sizeof(DataType);
 
     // Print configuration
-    CkPrintf("\n[CUDA 3D Jacobi example]\n");
+    CkPrintf("\n[GPU 3D Jacobi example]\n");
     CkPrintf("Grid: %d x %d x %d, Block: %d x %d x %d, Chares: %d x %d x %d, "
         "Iterations: %d, Warm-up: %d, Zerocopy: %d, Persistent: %d, Print: %d\n\n",
         grid_width, grid_height, grid_depth, block_width, block_height, block_depth,
@@ -235,40 +245,66 @@ class Block : public CBase_Block {
 
   DataType* h_ghosts[DIR_COUNT];
   DataType* d_ghosts[DIR_COUNT];
-  DataType* d_send_ghosts[DIR_COUNT];
-  DataType* d_recv_ghosts[DIR_COUNT];
+  /* Two send-buffer sets, selected per iteration by curSendGhosts(). Only the
+   * zerocopy path allocates the second set; the persistent path registers its
+   * buffers once at init and so always uses set 0. */
+  DataType* d_send_ghosts[2][DIR_COUNT];
+  /* Receive side, same shape and same reason. The post entry method runs when
+   * a message is delivered to this object, before the SDAG when-clause matches
+   * it, so a neighbour's iteration i+1 ghost can be fetched into a receive
+   * buffer while iteration i's contents are still waiting to be unpacked. The
+   * zerocopy path selects a set by the message's iteration parity; the
+   * persistent path posts fixed addresses once and uses set 0. */
+  DataType* d_recv_ghosts[2][DIR_COUNT];
 
-  cudaStream_t compute_stream;
-  cudaStream_t comm_stream;
+  hapiStream_t compute_stream;
+  hapiStream_t comm_stream;
 
-  cudaEvent_t compute_event;
-  cudaEvent_t comm_event;
+  hapiEvent_t compute_event;
+  hapiEvent_t comm_event;
 
   bool bounds[DIR_COUNT];
+
+  /* The send-buffer set this iteration packs into and sends from.
+   *
+   * Alternating by iteration parity is sufficient on its own, with no
+   * acknowledgement from the receiver: a neighbour issues its get of our
+   * iteration i buffer while processing our iteration i metadata, and it only
+   * sends its own iteration i+1 ghost after that get has completed and it has
+   * finished iteration i. We cannot start packing iteration i+2 -- the next
+   * use of this same set -- until that i+1 message has arrived, so by then
+   * every neighbour has finished reading the set. */
+  DataType** curSendGhosts() {
+    return d_send_ghosts[use_zerocopy ? (my_iter & 1) : 0];
+  }
 
   Block() {}
 
   ~Block() {
-    hapiCheck(cudaFreeHost(h_temperature));
-    hapiCheck(cudaFree(d_temperature));
-    hapiCheck(cudaFree(d_new_temperature));
+    hapiCheck(hapiFreeHost(h_temperature));
+    hapiCheck(hapiFree(d_temperature));
+    hapiCheck(hapiFree(d_new_temperature));
     if (use_zerocopy || use_persistent) {
       for (int i = 0; i < DIR_COUNT; i++) {
-        hapiCheck(cudaFree(d_send_ghosts[i]));
-        hapiCheck(cudaFree(d_recv_ghosts[i]));
+        hapiCheck(hapiFree(d_send_ghosts[0][i]));
+        hapiCheck(hapiFree(d_recv_ghosts[0][i]));
+        if (use_zerocopy) {
+          hapiCheck(hapiFree(d_send_ghosts[1][i]));
+          hapiCheck(hapiFree(d_recv_ghosts[1][i]));
+        }
       }
     } else {
       for (int i = 0; i < DIR_COUNT; i++) {
-        hapiCheck(cudaFreeHost(h_ghosts[i]));
-        hapiCheck(cudaFree(d_ghosts[i]));
+        hapiCheck(hapiFreeHost(h_ghosts[i]));
+        hapiCheck(hapiFree(d_ghosts[i]));
       }
     }
 
-    hapiCheck(cudaStreamDestroy(compute_stream));
-    hapiCheck(cudaStreamDestroy(comm_stream));
+    hapiCheck(hapiStreamDestroy(compute_stream));
+    hapiCheck(hapiStreamDestroy(comm_stream));
 
-    hapiCheck(cudaEventDestroy(compute_event));
-    hapiCheck(cudaEventDestroy(comm_event));
+    hapiCheck(hapiEventDestroy(compute_event));
+    hapiCheck(hapiEventDestroy(comm_event));
   }
 
   void init() {
@@ -295,33 +331,37 @@ class Block : public CBase_Block {
     if (z == n_chares_z-1) bounds[BACK] = true;
     else                   neighbors++;
 
-    // Allocate memory and create CUDA entities
-    hapiCheck(cudaMallocHost((void**)&h_temperature,
+    // Allocate memory and create GPU entities
+    hapiCheck(hapiMallocHost((void**)&h_temperature,
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
-    hapiCheck(cudaMalloc((void**)&d_temperature,
+    hapiCheck(hapiMalloc((void**)&d_temperature,
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
-    hapiCheck(cudaMalloc((void**)&d_new_temperature,
+    hapiCheck(hapiMalloc((void**)&d_new_temperature,
           sizeof(DataType) * (block_width+2) * (block_height+2) * (block_depth+2)));
     std::vector<size_t> ghost_sizes = {x_surf_size, x_surf_size, y_surf_size,
       y_surf_size, z_surf_size, z_surf_size};
     if (use_zerocopy || use_persistent) {
       for (int i = 0; i < DIR_COUNT; i++) {
-        hapiCheck(cudaMalloc((void**)&d_send_ghosts[i], ghost_sizes[i]));
-        hapiCheck(cudaMalloc((void**)&d_recv_ghosts[i], ghost_sizes[i]));
+        hapiCheck(hapiMalloc((void**)&d_send_ghosts[0][i], ghost_sizes[i]));
+        hapiCheck(hapiMalloc((void**)&d_recv_ghosts[0][i], ghost_sizes[i]));
+        if (use_zerocopy) {
+          hapiCheck(hapiMalloc((void**)&d_send_ghosts[1][i], ghost_sizes[i]));
+          hapiCheck(hapiMalloc((void**)&d_recv_ghosts[1][i], ghost_sizes[i]));
+        }
       }
     } else {
       for (int i = 0; i < DIR_COUNT; i++) {
-        hapiCheck(cudaMallocHost((void**)&h_ghosts[i], ghost_sizes[i]));
-        hapiCheck(cudaMalloc((void**)&d_ghosts[i], ghost_sizes[i]));
+        hapiCheck(hapiMallocHost((void**)&h_ghosts[i], ghost_sizes[i]));
+        hapiCheck(hapiMalloc((void**)&d_ghosts[i], ghost_sizes[i]));
       }
     }
 
-    // Create CUDA streams and events
-    hapiCheck(cudaStreamCreateWithPriority(&compute_stream, cudaStreamDefault, 0));
-    hapiCheck(cudaStreamCreateWithPriority(&comm_stream, cudaStreamDefault, -1));
+    // Create GPU streams and events
+    hapiCheck(hapiStreamCreateWithPriority(&compute_stream, hapiStreamDefault, 0));
+    hapiCheck(hapiStreamCreateWithPriority(&comm_stream, hapiStreamDefault, -1));
 
-    hapiCheck(cudaEventCreateWithFlags(&compute_event, cudaEventDisableTiming));
-    hapiCheck(cudaEventCreateWithFlags(&comm_event, cudaEventDisableTiming));
+    hapiCheck(hapiEventCreateWithFlags(&compute_event, hapiEventDisableTiming));
+    hapiCheck(hapiEventCreateWithFlags(&comm_event, hapiEventDisableTiming));
 
     // Create persistent buffers
     if (use_persistent) {
@@ -332,11 +372,13 @@ class Block : public CBase_Block {
       p_neighbor_bufs.resize(DIR_COUNT);
 
       for (int i = 0; i < DIR_COUNT; i++) {
-        p_send_bufs.emplace_back(d_send_ghosts[i], ghost_sizes[i], CkCallback::ignore, comm_stream);
-        p_recv_bufs.emplace_back(d_recv_ghosts[i], ghost_sizes[i], recv_cb, comm_stream);
+        p_send_bufs.emplace_back(d_send_ghosts[0][i], ghost_sizes[i], CkCallback::ignore, comm_stream);
+        p_recv_bufs.emplace_back(d_recv_ghosts[0][i], ghost_sizes[i], recv_cb, comm_stream);
 
-        // Open buffers that will be sent to neighbors
+        // Open the buffers sent to neighbors, and the send buffers too: a put
+        // between hosts registers both buffers for RDMA, which needs both opened
         p_recv_bufs[i].open();
+        p_send_bufs[i].open();
       }
 
       // Send persistent buffer info to neighbors
@@ -359,11 +401,22 @@ class Block : public CBase_Block {
       std::vector<DataType*> send_ghosts;
       std::vector<DataType*> recv_ghosts;
       for (int i = 0; i < DIR_COUNT; i++) {
-        send_ghosts.push_back(d_send_ghosts[i]);
-        recv_ghosts.push_back(d_recv_ghosts[i]);
+        send_ghosts.push_back(d_send_ghosts[0][i]);
+        recv_ghosts.push_back(d_recv_ghosts[0][i]);
       }
       invokeGhostInitKernels(send_ghosts, ghost_counts, compute_stream);
       invokeGhostInitKernels(recv_ghosts, ghost_counts, compute_stream);
+
+      if (use_zerocopy) {
+        std::vector<DataType*> send_ghosts_odd;
+        std::vector<DataType*> recv_ghosts_odd;
+        for (int i = 0; i < DIR_COUNT; i++) {
+          send_ghosts_odd.push_back(d_send_ghosts[1][i]);
+          recv_ghosts_odd.push_back(d_recv_ghosts[1][i]);
+        }
+        invokeGhostInitKernels(send_ghosts_odd, ghost_counts, compute_stream);
+        invokeGhostInitKernels(recv_ghosts_odd, ghost_counts, compute_stream);
+      }
     } else {
       std::vector<DataType*> ghosts;
       for (int i = 0; i < DIR_COUNT; i++) {
@@ -385,8 +438,8 @@ class Block : public CBase_Block {
     invokeBoundaryKernels(d_new_temperature, block_width, block_height, block_depth,
         bounds, compute_stream);
 
-#if CUDA_SYNC
-    cudaStreamSynchronize(compute_stream);
+#if GPU_SYNC
+    hapiStreamSynchronize(compute_stream);
     thisProxy[thisIndex].initDone();
 #else
     // TODO: Support reduction callback in hapiAddCallback
@@ -398,7 +451,7 @@ class Block : public CBase_Block {
   void packGhosts() {
     if (use_persistent || use_zerocopy) {
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
-      invokePackingKernels(d_temperature, d_send_ghosts, bounds,
+      invokePackingKernels(d_temperature, curSendGhosts(), bounds,
           block_width, block_height, block_depth, comm_stream);
     } else {
       // Pack non-contiguous ghosts to temporary contiguous buffers on device
@@ -410,8 +463,8 @@ class Block : public CBase_Block {
         y_surf_size, z_surf_size, z_surf_size};
       for (int i = 0; i < DIR_COUNT; i++) {
         if (!bounds[i]) {
-          hapiCheck(cudaMemcpyAsync(h_ghosts[i], d_ghosts[i], ghost_sizes[i],
-                cudaMemcpyDeviceToHost, comm_stream));
+          hapiCheck(hapiMemcpyAsync(h_ghosts[i], d_ghosts[i], ghost_sizes[i],
+                hapiMemcpyDeviceToHost, comm_stream));
         }
       }
     }
@@ -419,8 +472,8 @@ class Block : public CBase_Block {
     if (use_persistent) {
       thisProxy[thisIndex].packGhostsDone();
     } else {
-#if CUDA_SYNC
-      cudaStreamSynchronize(comm_stream);
+#if GPU_SYNC
+      hapiStreamSynchronize(comm_stream);
       thisProxy[thisIndex].packGhostsDone();
 #else
       // Add asynchronous callback to be invoked when packing kernels and
@@ -446,24 +499,29 @@ class Block : public CBase_Block {
         }
       }
     } else if (use_zerocopy) {
+      // Same set packGhosts() just filled -- see curSendGhosts() for why
+      // alternating it by parity keeps a neighbour's get from racing the
+      // repack two iterations later.
+      DataType** d_send = curSendGhosts();
+
       if (!bounds[LEFT])
         thisProxy(x-1, y, z).recvGhostZC(my_iter, RIGHT, x_surf_count,
-            CkDeviceBuffer(d_send_ghosts[LEFT], x_surf_count, comm_stream));
+            CkDeviceBuffer(d_send[LEFT], x_surf_count, comm_stream));
       if (!bounds[RIGHT])
         thisProxy(x+1, y, z).recvGhostZC(my_iter, LEFT, x_surf_count,
-            CkDeviceBuffer(d_send_ghosts[RIGHT], x_surf_count, comm_stream));
+            CkDeviceBuffer(d_send[RIGHT], x_surf_count, comm_stream));
       if (!bounds[TOP])
         thisProxy(x, y-1, z).recvGhostZC(my_iter, BOTTOM, y_surf_count,
-            CkDeviceBuffer(d_send_ghosts[TOP], y_surf_count, comm_stream));
+            CkDeviceBuffer(d_send[TOP], y_surf_count, comm_stream));
       if (!bounds[BOTTOM])
         thisProxy(x, y+1, z).recvGhostZC(my_iter, TOP, y_surf_count,
-            CkDeviceBuffer(d_send_ghosts[BOTTOM], y_surf_count, comm_stream));
+            CkDeviceBuffer(d_send[BOTTOM], y_surf_count, comm_stream));
       if (!bounds[FRONT])
         thisProxy(x, y, z-1).recvGhostZC(my_iter, BACK, z_surf_count,
-            CkDeviceBuffer(d_send_ghosts[FRONT], z_surf_count, comm_stream));
+            CkDeviceBuffer(d_send[FRONT], z_surf_count, comm_stream));
       if (!bounds[BACK])
         thisProxy(x, y, z+1).recvGhostZC(my_iter, FRONT, z_surf_count,
-            CkDeviceBuffer(d_send_ghosts[BACK], z_surf_count, comm_stream));
+            CkDeviceBuffer(d_send[BACK], z_surf_count, comm_stream));
     } else {
       if (!bounds[LEFT])
         thisProxy(x-1, y, z).recvGhostReg(my_iter, RIGHT,
@@ -490,23 +548,30 @@ class Block : public CBase_Block {
   // SDAG entry method in the .ci file
   void recvGhostZC(int ref, int dir, int &count, DataType *&buf, CkDeviceBufferPost *devicePost) {
     CkAssert(dir >= 0 && dir < DIR_COUNT);
-    buf = d_recv_ghosts[dir];
+    // ref is the sender's iteration; it equals my_iter for the message the
+    // SDAG loop is waiting on and my_iter+1 for one that arrived early.
+    buf = d_recv_ghosts[ref & 1][dir];
     if (dir == LEFT || dir == RIGHT) count = x_surf_count;
     else if (dir == TOP || dir == BOTTOM) count = y_surf_count;
     else if (dir == FRONT || dir == BACK) count = z_surf_count;
-    devicePost[0].cuda_stream = comm_stream;
+    POST_STREAM(devicePost[0]) = comm_stream;
   }
 
-  void processGhostZC(int dir, int count, DataType* gh) {
-    // FIXME: d_recv_ghosts[dir] should be used instead of gh
-    invokeUnpackingKernel(d_temperature, d_recv_ghosts[dir], dir, block_width, block_height,
-        block_depth, comm_stream);
+  void processGhostZC(int ref, int dir, int count, DataType* gh) {
+    // Do not unpack from gh. On the inter-process (RDMA) path the pointer
+    // delivered with the regular entry method is the SENDER's device address,
+    // copied out of the metadata message, not the buffer we posted; reading it
+    // faults the kernel and the context, and the run hangs with no message.
+    // Index our own receive set by the message's iteration, exactly as the
+    // post entry method did when it handed the buffer out.
+    invokeUnpackingKernel(d_temperature, d_recv_ghosts[ref & 1][dir], dir,
+        block_width, block_height, block_depth, comm_stream);
   }
 
   void processGhostP(PersistentMsg* msg) {
     int dir = msg->dir;
     CkAssert(dir >= 0 && dir < DIR_COUNT);
-    DataType* d_ghost = d_recv_ghosts[dir];
+    DataType* d_ghost = d_recv_ghosts[0][dir];
 
     invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
         block_depth, comm_stream);
@@ -521,8 +586,8 @@ class Block : public CBase_Block {
     d_ghost = d_ghosts[dir];
 
     memcpy(h_ghost, gh, size * sizeof(DataType));
-    hapiCheck(cudaMemcpyAsync(d_ghost, h_ghost, size * sizeof(DataType),
-          cudaMemcpyHostToDevice, comm_stream));
+    hapiCheck(hapiMemcpyAsync(d_ghost, h_ghost, size * sizeof(DataType),
+          hapiMemcpyHostToDevice, comm_stream));
     invokeUnpackingKernel(d_temperature, d_ghost, dir, block_width, block_height,
         block_depth, comm_stream);
   }
@@ -530,8 +595,8 @@ class Block : public CBase_Block {
   void update() {
     // Operations in compute stream should only be executed when
     // operations in communication stream (transfers and unpacking) complete
-    hapiCheck(cudaEventRecord(comm_event, comm_stream));
-    hapiCheck(cudaStreamWaitEvent(compute_stream, comm_event, 0));
+    hapiCheck(hapiEventRecord(comm_event, comm_stream));
+    hapiCheck(hapiStreamWaitEvent(compute_stream, comm_event, 0));
 
     // Invoke GPU kernel for Jacobi computation
     invokeJacobiKernel(d_temperature, d_new_temperature, block_width, block_height,
@@ -556,10 +621,10 @@ class Block : public CBase_Block {
   }
 
   void print() {
-    hapiCheck(cudaMemcpyAsync(h_temperature, d_temperature,
+    hapiCheck(hapiMemcpyAsync(h_temperature, d_temperature,
           sizeof(DataType) * (block_width+2)*(block_height+2)*(block_depth+2),
-          cudaMemcpyDeviceToHost, comm_stream));
-    cudaStreamSynchronize(comm_stream);
+          hapiMemcpyDeviceToHost, comm_stream));
+    hapiStreamSynchronize(comm_stream);
 
     CkPrintf("[%d,%d,%d]\n", x, y, z);
     for (int k = 0; k < block_depth+2; k++) {

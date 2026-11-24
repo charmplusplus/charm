@@ -7,6 +7,9 @@ DIRS = \
   bcast_nonzero_root \
   pup_buffer \
   zc_post_async \
+  chare_post \
+  zc_send_noleak \
+  zc_post_noleak \
 #  large_p2p \ # not running as a part of make test since test requires over 4 GB of memory which causes failures during CI
 
 NONSCALEDIRS = \

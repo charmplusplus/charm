@@ -106,6 +106,9 @@ void CkArrayOptions::init() {
   disableNotifyChildInRed = !_isNotifyChildInRed;
   broadcastViaScheduler = false;
   sectionAutoDelegate = true;
+  wideCollection = false;
+  boundWideCollection = -1;
+  collectionNumber = 0;
 }
 
 CkArrayOptions& CkArrayOptions::setStaticInsertion(bool b) {
@@ -122,7 +125,11 @@ CkArrayOptions& CkArrayOptions::bindTo(const CkArrayID& b) {
   // setNumInitial(arr->getNumInitial());
   setMap(mgr->getMap());
   setLocationCache(mgr->getLocationCache());
-  return setLocationManager(mgr->getGroupID());
+  setLocationManager(mgr->getGroupID());
+  // Read the layout here, where the branch exists: PE 0 may not have built it yet
+  // when an asynchronous creation request from this PE arrives there (#4174).
+  boundWideCollection = mgr->isWideCollection() ? 1 : 0;
+  return *this;
 }
 
 CkArrayOptions& CkArrayOptions::addListener(CkArrayListener* listener) {
@@ -199,6 +206,9 @@ void CkArrayOptions::pup(PUP::er& p) {
   p | insertionType;
   p | broadcastViaScheduler;
   p | sectionAutoDelegate;
+  p | wideCollection;
+  p | boundWideCollection;
+  p | collectionNumber;
 }
 
 CkArrayListener::CkArrayListener(int nInts_) : nInts(nInts_) { dataOffset = -1; }

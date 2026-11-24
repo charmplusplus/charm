@@ -64,6 +64,9 @@ class sectionRedInfo {
         void *storedClientParam;
         /// Reduction sequence number
         int redNo;
+        /// Root only: a fragment of this reduction was completed by
+        /// contributions that did not all come through this tree
+        int8_t mixed;
         /// Messages for this reduction
         reductionMsgs  msgs [MAXFRAGS];
         /// Messages of future reductions
@@ -73,7 +76,7 @@ class sectionRedInfo {
         sectionRedInfo(): npProcessed(0),
                          storedCallback(NULL),
                          storedClientParam(NULL),
-                         redNo(0) {
+                         redNo(0), mixed(0) {
             for (int8_t i=0; i<MAXFRAGS; i++)
                 lcount [i] = ccount [i] = gcount [i] = 0;
         }
@@ -135,8 +138,6 @@ class mCastEntry
         arrayIndexList allElem;
         /// List of all tree member PE's (Only useful on the tree root (for group sections))
         groupPeList allGrpElem;
-        /// Only useful on root for LB
-        ObjKeyList     allObjKeys;
         /// List of array elements on local PE
         arrayIndexList localElem;
         /// List of group elements on local PE(either 0 or 1 elems)
@@ -155,20 +156,35 @@ class mCastEntry
         mCastEntry *oldc, *newc;
         /// Old spanning tree
         SectionLocation   oldtree;
+        /// Root only: the reduction number has been requested from the old
+        /// tree and has not arrived yet
+        char redNoPending;
+        /// Root only: a retrieveCookie received while redNoPending; its
+        /// requester (the next root), answered when the number arrives
+        CkSectionInfo pendingRetrieve;
         // for reduction
         sectionRedInfo red;
         //
         char needRebuild;
+        /// Multicasts delivered through this entry, handed to it as a root,
+        /// and forwarded to each child (same order as children). An old
+        /// tree is freed only when every message sent to it has arrived.
+        int received, injected;
+        std::vector<int> sentToChild;
+        /// Messages this entry will have received when it may be freed;
+        /// -1 until freeup sets it
+        int expected;
+        char freeRequested;
     private:
         char flag;
 	char grpSec;
     public:
         mCastEntry(CkArrayID _aid): aid(_aid), numChild(0), localGrpElem(0), asm_msg(NULL),
-                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0),
-                   flag(COOKIE_NOTREADY), grpSec(0) {}
+                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0), received(0), injected(0),
+                   expected(-1), freeRequested(0), redNoPending(0), flag(COOKIE_NOTREADY), grpSec(0) {}
         mCastEntry(CkGroupID _gid): aid(_gid), numChild(0), localGrpElem(0), asm_msg(NULL),
-                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0),
-                   flag(COOKIE_NOTREADY), grpSec(1) {}
+                   asm_fill(0), oldc(NULL), newc(NULL), needRebuild(0), received(0), injected(0),
+                   expected(-1), freeRequested(0), redNoPending(0), flag(COOKIE_NOTREADY), grpSec(1) {}
         mCastEntry(mCastEntry *);
         /// Check if this tree is only a branch and has a parent
         inline int hasParent() { return parentGrp.get_val()?1:0; }
@@ -276,15 +292,13 @@ void _ckMulticastInit(void)
 
 
 mCastEntry::mCastEntry (mCastEntry *old): 
-  numChild(0), oldc(NULL), newc(NULL), flag(COOKIE_NOTREADY), grpSec(old->isGrpSec())
+  numChild(0), oldc(NULL), newc(NULL), received(0), injected(0), expected(-1), freeRequested(0),
+  redNoPending(0), flag(COOKIE_NOTREADY), grpSec(old->isGrpSec())
 {
   aid = old->aid;
   parentGrp = old->parentGrp;
   allElem = old->allElem;
   allGrpElem = old->allGrpElem;
-#if CMK_LBDB_ON
-  allObjKeys = old->allObjKeys;
-#endif
   pe = old->pe;
   red.storedCallback = old->red.storedCallback;
   red.storedClient = old->red.storedClient;
@@ -308,16 +322,9 @@ void CkMulticastMgr::setSection(CkSectionInfo &_id, CkArrayID aid, CkArrayIndex 
     mCastEntry *entry = new mCastEntry(aid);
     // Push all the section member indices into the entry
     entry->allElem.resize(n);
-    entry->allObjKeys.reserve(n);
     for (int i=0; i<n; i++) {
         entry->allElem[i] = al[i];
-#if CMK_LBDB_ON
-        CmiUInt8 _key;
-        if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
-            entry->allObjKeys.push_back(_key);
-#endif
     }
-    entry->allObjKeys.shrink_to_fit();
     entry->bfactor = factor;
     //  entry->aid = aid;
     _id.get_aid() = aid;
@@ -347,16 +354,9 @@ void CkMulticastMgr::setSection(CProxySection_ArrayElement &proxy)
 
   const CkArrayIndex *al = proxy.ckGetArrayElements();
   entry->allElem.resize(proxy.ckGetNumElements());
-  entry->allObjKeys.reserve(proxy.ckGetNumElements());
   for (int i=0; i<proxy.ckGetNumElements(); i++) {
     entry->allElem[i] = al[i];
-#if CMK_LBDB_ON
-    CmiUInt8 _key;
-    if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
-      entry->allObjKeys.push_back(_key);
-#endif
   }
-  entry->allObjKeys.shrink_to_fit();
   if(proxy.ckGetBfactor() == USE_DEFAULT_BRANCH_FACTOR)
     entry->bfactor = dfactor;
   else
@@ -392,10 +392,8 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayBase &proxy)
     // store old tree info
   entry->oldtree.set(oldentry, oldpe);
 
-    // obsolete old tree
-  mCastGrp[oldpe].retire(CkSectionInfo(oldpe, oldentry, 0, entry->getAid()), info);
-
-  // find reduction number
+  // retire the old tree and fetch its reduction number, in one message
+  entry->redNoPending = 1;
   mCastGrp[oldpe].retrieveCookie(CkSectionInfo(oldpe, oldentry, 0, aid), info);
 }
 
@@ -404,16 +402,9 @@ void CkMulticastMgr::resetSection(CProxySection_ArrayBase &proxy)
 void CkMulticastMgr::prepareCookie(mCastEntry *entry, CkSectionID &sid, const CkArrayIndex *al, int count, CkArrayID aid)
 {
   entry->allElem.resize(count);
-  entry->allObjKeys.reserve(count);
   for (int i=0; i<count; i++) {
     entry->allElem[i] = al[i];
-#if CMK_LBDB_ON
-    CmiUInt8 _key;
-    if(CProxy_ArrayBase(aid).ckLocMgr()->lookupID(al[i], _key))
-      entry->allObjKeys.push_back(_key);
-#endif
   }
-  entry->allObjKeys.shrink_to_fit();
   if(sid.bfactor == USE_DEFAULT_BRANCH_FACTOR)
     entry->bfactor = dfactor;
   else
@@ -508,6 +499,15 @@ void CkMulticastMgr::initGrpDelegateMgr(CProxySection_Group *proxy, int opts)
 void CkMulticastMgr::retrieveCookie(CkSectionInfo s, CkSectionInfo srcInfo)
 {
   mCastEntry *entry = (mCastEntry *)s.get_val();
+  if (entry->redNoPending) {
+    // The root moved again before this entry learned its own number:
+    // answer from recvCookieInfo.
+    entry->pendingRetrieve = srcInfo;
+    return;
+  }
+  // Retire first: an obsolete root forwards contributions to the new root,
+  // so its redNo no longer advances and the value sent below is final.
+  retire(s, srcInfo);
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   mCastGrp[srcInfo.get_pe()].recvCookieInfo(srcInfo, entry->red.redNo);
 }
@@ -518,7 +518,12 @@ void CkMulticastMgr::recvCookieInfo(CkSectionInfo s, int red)
 {
   mCastEntry *entry = (mCastEntry *)s.get_val();
   entry->red.redNo = red;
+  entry->redNoPending = 0;
+  if (entry->pendingRetrieve.get_val())
+    retrieveCookie(s, entry->pendingRetrieve);
 
+  // Still build the tree when retired: childrenReady releases the
+  // multicasts buffered here through it.
   initCookie(s);
 
   // TODO delete old tree
@@ -628,22 +633,36 @@ void CkMulticastMgr::retire(CkSectionInfo cookie, CkSectionInfo newroot)
 
 
 
-void CkMulticastMgr::freeup(CkSectionInfo cookie)
+/// expected is the number of multicasts the parent forwarded to this entry,
+/// or -1 for a root, which counted the messages handed to it itself. The
+/// entry, and the chain of older roots behind it on this PE, are freed once
+/// that many have arrived (tryFree).
+void CkMulticastMgr::freeup(CkSectionInfo cookie, int expected)
 {
   mCastEntry *sect = (mCastEntry *)cookie.get_val();
-  CProxy_CkMulticastMgr mp(thisgroup);
-  // Parse through all the section members on this PE and...
-  while (sect) 
+  while (sect)
   {
-      // Free their children
-      for (int i=0; i<sect->children.size(); i++)
-          mp[ sect->children[i].get_pe() ].freeup(sect->children[i]);
-      // Free the cookie itself
-      DEBUGF(("[%d] Free up on %p\n", CkMyPe(), sect));
-      mCastEntry *oldc= sect->oldc;
-      delete sect;
+      mCastEntry *oldc = sect->oldc;
+      sect->expected = expected < 0 ? sect->injected : expected;
+      sect->freeRequested = 1;
+      tryFree(sect);
       sect = oldc;
   }
+}
+
+/// Free an old entry when nothing more will arrive for it: multicasts in
+/// flight inside the old tree are not ordered with respect to teardown and
+/// freeup, so the count, not the freeup message, decides. The children get
+/// their counts only now, when this entry's forwarding is complete.
+void CkMulticastMgr::tryFree(mCastEntry *sect)
+{
+  if (sect->received < sect->expected) return;
+  CkAssert(sect->received == sect->expected);
+  CProxy_CkMulticastMgr mp(thisgroup);
+  for (int i=0; i<sect->children.size(); i++)
+      mp[ sect->children[i].get_pe() ].freeup(sect->children[i], sect->sentToChild[i]);
+  DEBUGF(("[%d] Free up on %p\n", CkMyPe(), sect));
+  delete sect;
 }
 
 
@@ -663,7 +682,8 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
     } 
     entry->aid = aid;
     entry->pe = CkMyPe();
-    entry->rootSid = msg->rootSid;
+    /// A root retired before its own setup arrives keeps the new root as rootSid
+    if (!entry->isObsolete()) entry->rootSid = msg->rootSid;
     entry->parentGrp = msg->parent;
     int factor = entry->bfactor = msg->bfactor;
 
@@ -783,9 +803,16 @@ void CkMulticastMgr::setup(multicastSetupMsg *msg)
 
 void CkMulticastMgr::childrenReady(mCastEntry *entry)
 {
-    // Mark this entry as ready
-    entry->setReady();
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
+    if (entry->isObsolete()) {
+        /// Retired while the tree was still being built: retire found no
+        /// children to tear down, so tear them down now. The entry stays
+        /// obsolete; the messages released below still go down this tree.
+        for (size_t i=0; i<entry->children.size(); i++)
+            mCastGrp[entry->children[i].get_pe()].teardown(entry->children[i]);
+    }
+    else
+        entry->setReady();
 
     DEBUGF(("[%d] childrenReady entry %p groupsection?: %d,  Arrayelems: %zu, GroupElems: %zu, redNo: %d\n", CkMyPe(), entry, entry->isGrpSec(), entry->allElem.size(), entry->allGrpElem.size(), entry->red.redNo));
 
@@ -820,6 +847,7 @@ void CkMulticastMgr::recvCookie(CkSectionInfo sid, CkSectionInfo child)
 {
   mCastEntry *entry = (mCastEntry *)sid.get_val();
   entry->children.push_back(child);
+  entry->sentToChild.push_back(0);
   if (entry->children.size() == entry->numChild) {
     childrenReady(entry);
   }
@@ -875,14 +903,17 @@ void CkMulticastMgr::SimpleSend(int ep,void *m, CkArrayID a, CkSectionID &sid, i
   DEBUGF(("[%d] SimpleSend: nElems: %zu\n", CkMyPe(), sid._elems.size()));
     // set an invalid cookie since we don't have it
   ((multicastGrpMsg *)m)->_cookie = CkSectionInfo(-1, NULL, 0, a);
-  for (int i=0; i< sid._elems.size()-1; i++) {
-     CProxyElement_ArrayBase ap(a, sid._elems[i]);
-     void *newMsg=CkCopyMsg((void **)&m);
-     ap.ckSend((CkArrayMessage *)newMsg,ep,opts|CK_MSG_LB_NOTRACE);
+  // Every element gets a copy except the last one, which gets m; m is freed
+  // when the section has no element.
+  const int n = (int)sid._elems.size();
+  if (n == 0) {
+     CkFreeMsg(m);
+     return;
   }
-  if (!sid._elems.empty()) {
-     CProxyElement_ArrayBase ap(a, sid._elems[sid._elems.size()-1]);
-     ap.ckSend((CkArrayMessage *)m,ep,opts|CK_MSG_LB_NOTRACE);
+  for (int i=0; i<n; i++) {
+     CProxyElement_ArrayBase ap(a, sid._elems[i]);
+     void *newMsg = (i == n-1) ? m : CkCopyMsg((void **)&m);
+     ap.ckSend((CkArrayMessage *)newMsg,ep,opts|CK_MSG_LB_NOTRACE);
   }
 }
 
@@ -935,8 +966,16 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
     if(!entry->isGrpSec()){
       // fixme: running obj?
       envelope *env = UsrToEnv(msg);
-      const LDOMHandle &om = CProxy_ArrayBase(s.get_aid()).ckLocMgr()->getOMHandle();
-      LBManagerObj()->MulticastSend(om,entry->allObjKeys.data(),entry->allObjKeys.size(),env->getTotalsize());
+      CkLocMgr *mgr = CProxy_ArrayBase(s.get_aid()).ckLocMgr();
+      // The members' ids as far as this process knows them now.
+      ObjKeyList keys;
+      if (LBManagerObj()->CollectingCommStats()) {
+        keys.reserve(entry->allElem.size());
+        CmiUInt8 key;
+        for (const CkArrayIndex &idx : entry->allElem)
+          if (mgr->lookupID(idx, key)) keys.push_back(key);
+        LBManagerObj()->MulticastSend(mgr->getOMHandle(),keys.data(),keys.size(),env->getTotalsize());
+      }
     }
 #endif
 
@@ -954,14 +993,36 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
   else {
     // fixme - in this case, not recorded in LB
     CmiPrintf("Warning: Multicast not optimized after multicast root migrated. \n");
+    // Only the root can count this multicast toward freeing its tree, so the
+    // whole message goes to the root, which sends it on (recvFromRemote).
+    msg->_cookie = s;
+    CProxy_CkMulticastMgr(thisgroup)[s.get_pe()].recvFromRemote(msg);
+    return;
   }
 
   // update cookie
   msg->_cookie = s;
+  ((mCastEntry *)s.get_val())->injected++;
+  sendFromRoot(msg);
+}
 
+/// A multicast sent through a copy of the section proxy on another PE: count
+/// it at the root entry it is addressed to, then send it down the tree as if
+/// it had been sent here.
+void CkMulticastMgr::recvFromRemote(multicastGrpMsg *msg)
+{
+  ((mCastEntry *)msg->_cookie.get_val())->injected++;
+  sendFromRoot(msg);
+}
+
+/// Hand a multicast, already counted in injected, to its root entry on this
+/// PE: whole, or as packets when it is at least split_threshold bytes.
+void CkMulticastMgr::sendFromRoot(multicastGrpMsg *msg)
+{
 #if SPLIT_MULTICAST
+  CkSectionInfo s = msg->_cookie;   // a copy: packing may move the message
   // split multicast msg into SPLIT_NUM copies
-  envelope *env = UsrToEnv(m);
+  envelope *env = UsrToEnv(msg);
   CkPackMessage(&env);
   int totalsize = env->getTotalsize();
   int packetSize = 0;
@@ -981,18 +1042,10 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
   int sizesofar = 0;
   char *data = (char*) env;
   if (totalcount == 1) {
-    // If the root of this section's tree is on this PE, then just propagate msg
-    if (s.get_pe() == CkMyPe()) {
-      CkUnpackMessage(&env);
-      msg = (multicastGrpMsg *)EnvToUsr(env);
-      recvMsg(msg);
-    }
-    // else send msg to root of section's spanning tree
-    else {
-      CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-      msg = (multicastGrpMsg *)EnvToUsr(env);
-      mCastGrp[s.get_pe()].recvMsg(msg);
-    }
+    // the root of this section's tree is on this PE: just propagate msg
+    CkUnpackMessage(&env);
+    msg = (multicastGrpMsg *)EnvToUsr(env);
+    recvMsg(msg);
     return;
   }
   for (int i=0; i<totalcount; i++) {
@@ -1001,20 +1054,14 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
       mysize = totalsize-sizesofar;
     }
     //CmiPrintf("[%d] send to %d : mysize: %d total: %d \n", CkMyPe(), s.get_pe(), mysize, totalsize);
-    mCastGrp[s.get_pe()].recvPacket(s, sizesofar, mysize, data, i, totalcount, totalsize, 0);
+    mCastGrp[CkMyPe()].recvPacket(s, sizesofar, mysize, data, i, totalcount, totalsize, 0);
     sizesofar += mysize;
     data += mysize;
   }
   CmiFree(env);
 #else
-  if (s.get_pe() == CkMyPe()) {
-    DEBUGF((CkPrintf("sendToSection, msg-used :%d\n", UsrToEnv(msg)->isUsed()));
-    recvMsg(msg);
-  }
-  else {
-    CProxy_CkMulticastMgr  mCastGrp(thisgroup);
-    mCastGrp[s.get_pe()].recvMsg(msg);
-  }
+  DEBUGF((CkPrintf("sendToSection, msg-used :%d\n", UsrToEnv(msg)->isUsed()));
+  recvMsg(msg);
 #endif
 }
 
@@ -1036,6 +1083,7 @@ void CkMulticastMgr::recvPacket(CkSectionInfo &&_cookie, int offset, int n, char
   // can not optimize using list send because the difference in cookie
   CProxy_CkMulticastMgr  mCastGrp(thisgroup);
   for (i=0; i<entry->children.size(); i++) {
+    if (seqno == 0) entry->sentToChild[i]++;
     mCastGrp[entry->children[i].get_pe()].recvPacket(entry->children[i], offset, n, data, seqno, count, totalsize, 0);
   }
 
@@ -1046,13 +1094,16 @@ void CkMulticastMgr::recvPacket(CkSectionInfo &&_cookie, int offset, int n, char
   memcpy(entry->asm_msg+offset, data, n);
   entry->asm_fill += n;
   if (entry->asm_fill == totalsize) {
-    CkUnpackMessage((envelope **)&entry->asm_msg);
-    multicastGrpMsg *msg = (multicastGrpMsg *)EnvToUsr((envelope*)entry->asm_msg);
+    // Reset the assembly before sendToLocal: delivering this message may
+    // complete an old entry's count and free the entry (tryFree).
+    char *asm_msg = entry->asm_msg;
+    entry->asm_msg = NULL;
+    entry->asm_fill = 0;
+    CkUnpackMessage((envelope **)&asm_msg);
+    multicastGrpMsg *msg = (multicastGrpMsg *)EnvToUsr((envelope*)asm_msg);
     msg->_cookie = _cookie;
 //    mCastGrp[CkMyPe()].recvMsg(msg);
     sendToLocal(msg);
-    entry->asm_msg = NULL;
-    entry->asm_fill = 0;
   }
 //  if (fromBuffer) delete [] data;
 }
@@ -1076,6 +1127,7 @@ void CkMulticastMgr::recvMsg(multicastGrpMsg *msg)
   for (i=0; i<entry->children.size(); i++) {
     multicastGrpMsg *newmsg = (multicastGrpMsg *)CkCopyMsg((void **)&msg);
     newmsg->_cookie = entry->children[i];
+    entry->sentToChild[i]++;
     mCastGrp[entry->children[i].get_pe()].recvMsg(newmsg);
   }
 
@@ -1111,6 +1163,7 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
           CkSendMsgBranch(msg->ep, msg, CkMyPe(), aid,0);
       }
     }
+    delivered(entry);
     return;
   }
 
@@ -1127,9 +1180,18 @@ void CkMulticastMgr::sendToLocal(multicastGrpMsg *msg)
     ap.ckSend((CkArrayMessage *)msg, msg->ep, CK_MSG_LB_NOTRACE);
   }
   else {
-    CkAssert (entry->rootSid.get_pe() == CkMyPe());
+    CkAssert(!entry->hasParent());   // only a root, current or retired, has no local members
     delete msg;
   }
+  delivered(entry);
+}
+
+/// One multicast has passed through entry; an old entry whose count is
+/// complete is freed here (see tryFree).
+void CkMulticastMgr::delivered(mCastEntry *entry)
+{
+  entry->received++;
+  if (entry->freeRequested) tryFree(entry);
 }
 
 
@@ -1385,6 +1447,7 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
     int userFlag = rmsgs[0]->userFlag;
 
     // Figure out (from one of the msg fragments) which reducer function to use
+    CkReduction::checkSameReducer((int)rmsgs.size(), rmsgs.data());
     CkReduction::reducerType reducer = rmsgs[0]->reducer;
     CkReduction::reducerFn f= CkReduction::reducerTable()[reducer].fn;
     CkAssert(NULL != f);
@@ -1426,6 +1489,9 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
         mCastGrp[entry->parentGrp.get_pe()].recvRedMsg(newmsg);
     } else {
         newmsg->sid = id;
+        // A reducer that builds a new message leaves its callback unset; the
+        // cross-array reducer (XArraySectionReducer) reads it from here
+        newmsg->callback = msg_cb;
         // Buffer the reduced fragment
         rmsgs.push_back (newmsg);
         // If all the fragments have been reduced
@@ -1451,13 +1517,13 @@ void CkMulticastMgr::reduceFragment (int index, CkSectionInfo& id,
             if (currentTreeUp) {
                 if (entry->oldc) {
                     // free old tree on same processor;
-                    mCastGrp[CkMyPe()].freeup(CkSectionInfo(id.get_pe(), entry->oldc, 0, entry->getAid()));
+                    mCastGrp[CkMyPe()].freeup(CkSectionInfo(id.get_pe(), entry->oldc, 0, entry->getAid()), -1);
                     entry->oldc = NULL;
                 }
                 if (entry->hasOldtree()) {
                     // free old tree on old processor
                     int oldpe = entry->oldtree.pe;
-                    mCastGrp[oldpe].freeup(CkSectionInfo(oldpe, entry->oldtree.entry, 0, entry->getAid()));
+                    mCastGrp[oldpe].freeup(CkSectionInfo(oldpe, entry->oldtree.entry, 0, entry->getAid()), -1);
                     entry->oldtree.clear();
                 }
             }
@@ -1488,8 +1554,6 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
 
     CProxy_CkMulticastMgr  mCastGrp(thisgroup);
 
-    int updateReduceNo = 0;
-
     //-------------------------------------------------------------------------
     /// If this cookie is obsolete
     if (entry->isObsolete()) {
@@ -1508,8 +1572,6 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
         if (!entry->hasParent() && !entry->isObsolete()) {
             /// Indicate it is not on old spanning tree
             msg->sourceFlag = 0;
-            /// Flag the redn as coming from an old tree and that the new entry cookie needs to know the new redn num.
-            updateReduceNo  = 1;
         }
         /// If I am not the root or this latest cookie is also obsolete
         else {
@@ -1580,6 +1642,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
     // If reduceFragment is not being called now, check if partialReduction is possible (streamable)
     if (!currentTreeUp && !mixTreeUp && redInfo.msgs[index].size() > 1 && CkReduction::reducerTable()[msg->reducer].streamable) {
       reductionMsgs& rmsgs = redInfo.msgs[index];
+      CkReduction::checkSameReducer((int)rmsgs.size(), rmsgs.data());
       CkReduction::reducerType reducer = rmsgs[0]->reducer;
       CkReduction::reducerFn f= CkReduction::reducerTable()[msg->reducer].fn;
       CkAssert(f != NULL);
@@ -1618,11 +1681,7 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
         const int8_t nFrags = msg->nFrags;
         /// Reduce this fragment
         reduceFragment (index, id, entry, redInfo, currentTreeUp);
-
-        // If migration happened, and my sub-tree reconstructed itself,
-        // share the current reduction number with myself and all my children
-        if (updateReduceNo)
-            mCastGrp[CkMyPe()].updateRedNo(entry, redInfo.redNo);
+        if (!currentTreeUp) redInfo.mixed = 1;
 
         /// If all the fragments for the current reduction have been processed
         if (redInfo.npProcessed == nFrags) {
@@ -1637,6 +1696,14 @@ void CkMulticastMgr::recvRedMsg(CkReductionMsg *msg)
                 redInfo.gcount [i] = 0;
             }
             redInfo.npProcessed = 0;
+            /// A child that did not carry every fragment still has the number
+            /// this tree was built with (contributions were in flight in the
+            /// old tree) and would hold the next reduction as a future one.
+            if (redInfo.mixed) {
+                redInfo.mixed = 0;
+                for (size_t c=0; c<entry->children.size(); c++)
+                    mCastGrp[entry->children[c].get_pe()].updateRedNo((mCastEntry *)entry->children[c].get_val(), redInfo.redNo);
+            }
             /// Now that, the current redn is done, release any pending msgs from future redns
             releaseFutureReduceMsgs(entry);
         }

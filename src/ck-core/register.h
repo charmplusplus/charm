@@ -210,7 +210,7 @@ class ChareInfo {
     ChareType  chareType;
     int mainChareIdx;
 
-    /// Number of dimensions for chare arrays (-1 if not an array, 0 is invalid)
+    /// Number of dimensions for chare arrays (-1 if not an array; 0 for a CkDyn array class whose creations choose it)
     int ndims;
 
     /// For groups -- true if the group is Irreducible
@@ -219,12 +219,17 @@ class ChareInfo {
     /// true if this EP is charm internal functions
     bool inCharm;
 
+    /// true for a class registered through CkDyn (ckdyn.h): its array
+    /// broadcasts are delivered with one call per PE (ckarray.C)
+    bool isDynamic;
+
     ChareInfo(const char *n, size_t s, ChareType t) : name(n), size(s) {
       defCtor=migCtor=-1;
       isIrr = false;
       numbases = 0;
       chareType = t;
       inCharm = false;
+      isDynamic = false;
       mainChareIdx = -1;
       ndims = -1;
     }
@@ -356,6 +361,12 @@ extern CkRegisteredInfo<ReadonlyMsgInfo> _readonlyMsgs;
 
 extern void _registerInit(void);
 extern void _registerDone(void);
+/* Bracket a registration made after _registerDone (CkDynRegisterClassLate);
+ * see doc/internals/ckdyn.md, Registration. */
+extern void _registerLateBegin(void);
+extern void _registerLateEnd(void);
+/* True after _registerDone: start-up registration is over. */
+extern int _registerIsDone(void);
 
 extern int CkGetChareIdx(const char *name);
 

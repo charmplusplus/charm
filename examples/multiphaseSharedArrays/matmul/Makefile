@@ -13,12 +13,12 @@ include ../Makefile_common
 all: opt
 
 tt: opt
-	$(call run, ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 1 1)
-	$(call run, ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 4 1)
+	$(call run, +p1 ./t2d 1 200000000 2000 5000 300 1 1)
+	$(call run, +p1 ./t2d 1 200000000 2000 5000 300 4 1)
 
 t: opt
 	w
-	$(call run, ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 4 1)
+	$(call run, +p1 ./t2d 1 200000000 2000 5000 300 4 1)
 
 lem: opt
 	prun -n1 ./t2d 1 200000000 2000 5000 300 4 1
@@ -45,7 +45,7 @@ tung816:
 t1:
 	#make OPTS="-DOLD" c opt
 	w
-	$(call run, ++nodegroup one +p1 t2d 1 200000000 2000 5000 300 1 1)
+	$(call run, +p1 ./t2d 1 200000000 2000 5000 300 1 1)
 
 # quick test on 1 cpu
 test: opt
@@ -68,8 +68,6 @@ test2: opt
 #bigtest
 bt: opt
 	$(call run, +p1 $(PGM) 1 200000000 2000 5000 300)
-#	 ./charmrun +p1 t2d 1 200000000 2000 5000 300 1 1
-#opteron	 ./charmrun ++local +p1 t2d 1 200000000 2000 5000 300 4 1
 
 bt2d: opt
 	$(call run, +p1 $(PGM) 1 200000000 2000 5000 300 2)

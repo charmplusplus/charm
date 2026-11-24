@@ -42,6 +42,9 @@ typedef struct CMK_MSG_HEADER_EXT   CmiMsgHeaderExt;
 
 #ifndef CmiReservedHeaderSize
 #  define CmiReservedHeaderSize   CmiExtHeaderSizeBytes
+
+int getCmiReservedHeaderSize(void);
+
 #endif
 
 #endif

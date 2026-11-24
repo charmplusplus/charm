@@ -1,4 +1,5 @@
 DIRS = \
+  1darray \
   multicast \
 
 TESTDIRS = $(DIRS)

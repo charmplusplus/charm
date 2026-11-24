@@ -6,6 +6,7 @@ Orion Sky Lawlor, olawlor@acm.org, 11/19/2001
 #include "tcharm_impl.h"
 #include "tcharm.h"
 #include <ctype.h>
+#include <algorithm>
 #include "memory-isomalloc.h"
 
 CtvDeclare(TCharm *,_curTCharm);
@@ -44,7 +45,13 @@ public:
 };
 static TCharmTraceLibList tcharm_tracelibs;
 static bool tcharm_nomig=false;
+static bool tcharm_nomigWarned=false;
 bool tcharm_nothreads=false;
+bool tcharm_campi=false;
+TCharmCampiStartFn tcharm_campi_start_fn=nullptr;
+TCharmCampiResumeFn tcharm_campi_resume_fn=nullptr;
+TCharmCampiPupFn tcharm_campi_pup_fn=nullptr;
+TCharmCampiDestroyFn tcharm_campi_destroy_fn=nullptr;
 #ifndef TCHARM_STACKSIZE_DEFAULT
 #define TCHARM_STACKSIZE_DEFAULT 1048576 /*Default stack size is 1MB*/
 #endif
@@ -107,6 +114,13 @@ void TCharm::procInit()
   tcharm_nomig=CmiGetArgFlagDesc(argv,"+tcharm_nomig","Disable migration support (debugging)");
   tcharm_nothreads=CmiGetArgFlagDesc(argv,"+tcharm_nothread","Disable thread support (debugging)");
   tcharm_nothreads=(CmiGetArgFlagDesc(argv,"+tcharm_nothreads",NULL)) ? true : tcharm_nothreads;
+  // campi mode: the application registered a coroutine main (campi.h), which
+  // installed the start hook during static initialization. No thread exists;
+  // the elements stay migratable (a rank migrates by being rebuilt, campi.C).
+  tcharm_campi = (tcharm_campi_start_fn != nullptr);
+  if (tcharm_campi) {
+    tcharm_nothreads = true;
+  }
   char *traceLibName=NULL;
   while (CmiGetArgStringDesc(argv,"+tcharm_trace",&traceLibName,"Print each call to this library"))
       tcharm_tracelibs.addTracing(traceLibName);
@@ -133,8 +147,9 @@ void TCharm::procInit()
     CmiGetArgIntDesc(argv, "+vp", &ignored, nullptr);
   }
   if (CkMyPe()==0) { // Echo various debugging options:
-    if (tcharm_nomig) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
-    if (tcharm_nothreads) CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
+    if (tcharm_nomig && !tcharm_campi) CmiPrintf("TCHARM> Disabling migration support, for debugging\n");
+    if (tcharm_campi) CmiPrintf("TCHARM> campi: ranks run as C++20 coroutines\n");
+    else if (tcharm_nothreads) CmiPrintf("TCHARM> Disabling thread support, for debugging\n");
   }
   if (!CkpvAccess(mapCreated)) {
     if (0!=CmiGetArgString(argv, "+mapping", &mapping)){
@@ -178,10 +193,11 @@ static void startTCharmThread(TCharmInitMsg *msg)
 {
 	DBGX("thread started");
 	TCharm::activateThread();
-       TCHARM_Thread_data_start_fn threadFn = getTCharmThreadFunction(msg->threadFn);
+	TCharm::get()->traceSegmentBegin();
+	TCHARM_Thread_data_start_fn threadFn = getTCharmThreadFunction(msg->threadFn);
 	threadFn(msg->data);
 	TCharm::deactivateThread();
-	TCharm::getNULL()->done(0);
+	TCharm::getNULL()->done(0);  // its stop() ends the trace segment
 }
 
 TCharm::TCharm(TCharmInitMsg *initMsg_)
@@ -189,6 +205,7 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   initMsg=initMsg_;
   initMsg->opts.sanityCheck();
   timeOffset=0.0;
+  campiRank=nullptr;
   if (tcharm_nothreads)
   { //Don't even make a new thread-- just use main thread
     tid=CthSelf();
@@ -207,7 +224,10 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
         CmiIsomallocContextEnableRandomAccess(heapContext);
     }
   }
-  CtvAccessOther(tid,_curTCharm)=this;
+  // campi: tid is the scheduler's thread, shared by every rank on this PE;
+  // the rank's context is installed at each coroutine resume instead.
+  if (!tcharm_campi)
+    CtvAccessOther(tid,_curTCharm)=this;
   asyncMigrate = false;
   isStopped=true;
   exitWhenDone=initMsg->opts.exitWhenDone;
@@ -217,6 +237,13 @@ TCharm::TCharm(TCharmInitMsg *initMsg_)
   threadInfo.numElements=initMsg->numElements;
   nUd=0;
   usesAtSync=true;
+#if CMK_LBDB_ON
+  // Without migratable threads the element cannot be packed (see pup), so
+  // no balancer may select it, whatever path triggers the balancing step
+  // (AtSync from migrate(), async_migrate(), or a user AtSync). This also
+  // covers the arrays bound to this one: they share the location record.
+  if (tcharm_nomig) CkMigratable::setMigratable(0);
+#endif
   run();
 }
 
@@ -225,6 +252,8 @@ TCharm::TCharm(CkMigrateMessage *msg)
 {
   initMsg=NULL;
   tid=NULL;
+  timeOffset=0.0;
+  campiRank=nullptr;
   threadInfo.tProxy=CProxy_TCharm(thisArrayID);
 }
 
@@ -238,6 +267,19 @@ void checkPupMismatch(PUP::er &p,int expected,const char *where)
 	}
 }
 
+// The element's clock moves with it: packing records its time, and on
+// arrival the offset is the smallest one (zero if possible) that keeps the
+// clock from reading earlier than that time. So the clock never goes
+// backwards, the time spent moving is counted, and the clocks of elements in
+// one process agree with each other and with CkWallTimer, except after a move
+// to a process whose clock is behind.
+void TCharm::pupClock(PUP::er &p) {
+  double packTime=CkWallTimer()+timeOffset;
+  p(packTime);
+  if (p.isUnpacking())
+    timeOffset=std::max(0.0, packTime-CkWallTimer());
+}
+
 void TCharm::pup(PUP::er &p) {
   checkPupMismatch(p,5134,"before TCHARM");
   p(isStopped); p(exitWhenDone); p(isSelfDone); p(asyncMigrate);
@@ -247,6 +289,17 @@ void TCharm::pup(PUP::er &p) {
 
   if (sema.size()>0){
   	CkAbort("TCharm::pup> Cannot migrate with unconsumed semaphores!\n");
+  }
+
+  if (tcharm_campi) {
+    // No thread, user data or globals: campi packs the rank's state object
+    // and restart sites, and on unpacking builds the rank anew.
+    if (p.isUnpacking()) tid = CthSelf();
+    checkPupMismatch(p,5136,"before campi rank");
+    tcharm_campi_pup_fn(this, p);
+    pupClock(p);
+    checkPupMismatch(p,5140,"after TCHARM");
+    return;
   }
 
   DBG("Packing thread");
@@ -266,10 +319,7 @@ void TCharm::pup(PUP::er &p) {
   {//In this case, unpack the thread & heap before the user data
     s.seek(1);
     pupThread(p);
-    //Restart our clock: set it up so packTime==CkWallTimer+timeOffset
-    double packTime;
-    p(packTime);
-    timeOffset=packTime-CkWallTimer();
+    pupClock(p);
   }
   
 //Pack all user data
@@ -306,9 +356,7 @@ void TCharm::pup(PUP::er &p) {
   {//In this case, pack the thread & heap after the user data
     s.seek(1);
     pupThread(p);
-    //Stop our clock:
-    double packTime=CkWallTimer()+timeOffset;
-    p(packTime);
+    pupClock(p);
   }
   
   s.endBlock(); //End of seeking block
@@ -361,14 +409,37 @@ void TCharm::UserData::pup(PUP::er &p)
 
 TCharm::~TCharm()
 {
-  CthFree(tid);
+  if (tcharm_campi) {
+    // tid is the scheduler's thread; the rank's coroutine frames and state
+    // object are campi's.
+    if (campiRank != nullptr) tcharm_campi_destroy_fn(campiRank);
+  } else {
+    // CthFree may keep the thread, and with it the Isomalloc memory, until
+    // the next thread is freed. A rollback from an in-memory checkpoint
+    // restores this rank's memory at the same addresses right after this
+    // destructor, so unmap it now (never under the running thread).
+    if (tid != NULL && tid != CthSelf())
+      CmiIsomallocContextRelease(CmiIsomallocGetThreadContext(tid));
+    CthFree(tid);
+  }
   delete initMsg;
+}
+
+// Called when a thread asks to migrate and the build has no migratable
+// threads. PE 0 prints the warning the first time this happens on it, so a
+// run prints it at most once.
+static void warnNoMigration()
+{
+	if (CkMyPe()==0 && !tcharm_nomigWarned) {
+		tcharm_nomigWarned = true;
+		CkPrintf("Warning> thread migration is not supported in this build; ranks will not migrate.\n");
+	}
 }
 
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrateTo(int destPE) noexcept {
 	if (destPE==CkMyPe()) return this;
 	if (CthMigratable() == 0) {
-	    CkPrintf("Warning> thread migration is not supported!\n");
+	    warnNoMigration();
             return this;
         }
 	asyncMigrate = true;
@@ -378,6 +449,17 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrateTo(int destPE) noexcept {
 }
 void TCharm::ckJustMigrated() {
 	ArrayElement::ckJustMigrated();
+	// Arrival is the point at which the thread's Isomalloc context needs its
+	// page protections put back: unpacking maps the region read-write, so a
+	// context holding executable pages -- which is every rank under
+	// pieglobals, whose code segment lives in the context -- comes back
+	// non-executable, and the first instruction the resumed thread runs
+	// faults. Doing it here rather than in ResumeFromSync covers the
+	// asynchronous path too (TCHARM_Migrate_to / AMPI_Migrate_to_pe resume
+	// from right below, never passing through the sync barrier).
+	// A campi rank has no thread of its own (tid is the scheduler's thread).
+	if (!tcharm_campi)
+		CmiIsomallocContextJustMigrated(CmiIsomallocGetThreadContext(getThread()));
     if (asyncMigrate) {
         asyncMigrate = false;
         resume();
@@ -386,6 +468,10 @@ void TCharm::ckJustMigrated() {
 
 void TCharm::ckJustRestored() {
 	ArrayElement::ckJustRestored();
+	// Restored from an in-memory checkpoint: the context was unpacked again,
+	// so its page protections need the same replay as on migration arrival.
+	if (!tcharm_campi)
+		CmiIsomallocContextJustMigrated(CmiIsomallocGetThreadContext(getThread()));
 }
 
 // If a Tcharm object is about to migrate it should be suspended first
@@ -397,13 +483,16 @@ void TCharm::ckAboutToMigrate(){
 // clear the data before restarting from disk
 void TCharm::clear()
 {
-  CthFree(tid);
+  if (!tcharm_campi) CthFree(tid); // campi: tid is the scheduler's thread
   delete initMsg;
 }
 
 //Register user data to be packed with the thread
 int TCharm::add(const TCharm::UserData &d) noexcept
 {
+  if (tcharm_campi)
+    CkAbort("campi: TCHARM_Register and AMPI_Register_pup are not supported; "
+            "keep the data in the rank's state object (CAMPI_MAIN_STATE)\n");
   if (nUd>=maxUserData)
     CkAbort("TCharm: Registered too many user data fields!\n");
 
@@ -427,6 +516,10 @@ void *TCharm::lookupUserData(int i) noexcept {
 void TCharm::run() noexcept
 {
   DBG("TCharm::run()");
+  if (tcharm_campi) { // campi.C builds the rank record and schedules its coroutine
+	  tcharm_campi_start_fn(this);
+	  return;
+  }
   if (tcharm_nothreads) {/*Call user routine directly*/
 	  startTCharmThread(initMsg);
   } 
@@ -434,10 +527,23 @@ void TCharm::run() noexcept
   	  start();
 }
 
+// Hides CkMigratable::setMigratable (not virtual; callers hold a TCharm*):
+// a client such as AMPI_Set_migratable(1) must not re-enable migration of an
+// element whose thread cannot be packed.
+void TCharm::setMigratable(int mig) noexcept
+{
+  if (tcharm_nomig) mig = 0;
+  CkMigratable::setMigratable(mig);
+}
+
 //Go to sync, block, possibly migrate, and then resume
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrate() noexcept
 {
 #if CMK_LBDB_ON
+  if (CthMigratable() == 0) {
+    warnNoMigration();
+    return this;
+  }
   DBG("going to sync");
   AtSync();
   return stop();
@@ -451,6 +557,10 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrate() noexcept
 CMI_WARN_UNUSED_RESULT TCharm * TCharm::async_migrate() noexcept
 {
 #if CMK_LBDB_ON
+  if (CthMigratable() == 0) {
+    warnNoMigration();
+    return this;
+  }
   DBG("going to sync at async mode");
   ReadyMigrate(false);
   asyncMigrate = true;
@@ -484,9 +594,8 @@ void TCharm::ResumeFromSync()
 {
   DBG("thread resuming from sync");
 
-  CthThread th = getThread();
-  auto ctx = CmiIsomallocGetThreadContext(th);
-  CmiIsomallocContextJustMigrated(ctx);
+  // Page protections are restored on arrival (ckJustMigrated, ckJustRestored),
+  // which covers both the synchronous and asynchronous migration paths.
 
   if (resumeAfterMigrationCallback.isInvalid())
     start();
@@ -540,6 +649,7 @@ void TCharm::done(int exitcode) noexcept {
 		contribute(exitmsg);
 	}
 	isSelfDone = true;
+	if (tcharm_campi) return; // no thread to stop: the rank's coroutine has finished
 	TCharm * unused = stop();
 }
 //Called when all threads are done running
@@ -685,6 +795,12 @@ static CProxy_TCharm TCHARM_Build_threads(TCharmInitMsg *msg)
   opts.setStaticInsertion(true);
   opts.setAnytimeMigration(false);
   opts.setSectionAutoDelegate(false);
+  // Arrays bound to this one (AMPI's ampiParent and one ampi array per
+  // communicator) share its location manager and take its id layout, so the
+  // wide-collection layout set here gives each of them a number from the
+  // 24-bit wide range instead of the 12-bit standard range. The bounds the
+  // wide layout requires are the element count, set by the constructor above.
+  opts.setWideCollection();
   return CProxy_TCharm::ckNew(msg,opts);
 }
 
@@ -790,11 +906,6 @@ CLINKAGE void *TCHARM_Get_global(int globalID)
 CLINKAGE void TCHARM_Migrate()
 {
 	TCHARMAPI("TCHARM_Migrate");
-	if (CthMigratable() == 0) {
-	  if(CkMyPe() == 0)
-	    CkPrintf("Warning> thread migration is not supported!\n");
-          return;
-        }
 	TCharm * unused = TCharm::get()->migrate();
 }
 FORTRAN_AS_C(TCHARM_MIGRATE,TCHARM_Migrate,tcharm_migrate,(void),())

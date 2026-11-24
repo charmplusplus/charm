@@ -1,0 +1,58 @@
+# Charm++ internals
+
+How the runtime works inside, one chapter per subsystem, written as a
+description of the code as it stands. This is the place to start when you
+join the group and will work on the runtime rather than on an application.
+
+What belongs here and what does not:
+
+- Each chapter describes the current design: the data structures, the
+  protocols between PEs and processes, the invariants, and where in
+  `src/` each piece lives. A reader should be able to open the named files
+  and recognize what the chapter describes.
+- Alternatives considered, measurements, and the history of decisions do
+  not belong here. They live in the design documents under `doc/` (for
+  example `doc/objid64-design.md` and its companions), which each chapter
+  links to. When a design document and a chapter disagree, the chapter is
+  wrong or stale: fix the chapter.
+- User-facing behavior (what an application programmer calls, what the
+  options mean) belongs in the manuals under `doc/charm++/` and
+  `doc/converse/`, not here.
+
+Chapters are markdown files in this directory, rendered by GitHub. They are
+not yet in the Sphinx tree that builds charm.readthedocs.io; adding them
+there needs the `myst-parser` extension in `doc/conf.py` and a toctree
+entry, and is planned once there is more than one chapter.
+
+## Chapters
+
+| chapter | status |
+|---|---|
+| [Object ids and element location](object-ids.md) | written 2026-10-17 (64-bit id redesign, charm #3994) |
+| [Routing a send to an array element](array-send-order.md) | written 2026-10-24 (send before the array manager exists, charm #4088) |
+| [Array broadcasts and migrating elements](array-broadcast-migration.md) | written 2026-10-25 (broadcast epochs, stored broadcasts, when `stableLocations` applies; AMPI collective hang, charm #4072) |
+| [The process-level location table](process-location-cache.md) | one lock-free location table and one index table per process, shared by all PEs and arrays; one location request per process; what the first version leaves out (objid PR 3) |
+| [CkDyn: dynamic chares for language bindings](ckdyn.md) | written 2026-11-07, updated 2026-11-08: registration, messages, delivery, callbacks and futures, reductions, sections, zero-copy (host and device slots, posts, HAPI callbacks), pup, start-up; the Python binding (charm4py 2, branch `thin`) is described in the charm4py repository |
+| Message path: envelope, scheduler, entry method dispatch | not yet written |
+| Chare arrays: creation, insertion, migration, sections | not yet written |
+| [Section multicast trees: build, rebuild, retire, free](section-trees.md) | written 2026-11-09 (counted free of a replaced tree, charm #4132 item 2) |
+| Groups and nodegroups | not yet written |
+| Load balancing: the LB framework and TreeLB | not yet written |
+| [Checkpoint, restart, shrink/expand](memckpt.md) | first section written 2026-11-06: the double in-memory checkpoint and its rollback (syncft option); disk checkpoint and shrink/expand not yet written |
+| The reconverse layer: what Charm++ asks of the machine layer | not yet written |
+| [Coroutine entry methods (ckcoro)](coroutine-sdag.md) | written 2026-11-09 with the prototype: entry methods as C++20 coroutines, the inbox, the restart protocol (design in `doc/coroutine-sdag-design.md`) |
+
+## Models
+
+`tla/` holds TLA+ models of protocols described in the chapters, with the TLC
+configurations that were run and the counterexamples they produced:
+[`tla/process-location/`](tla/process-location/README.md) for the
+process-level location table (chapter above; checked for PR #4123). A model
+is kept when it found something or when the protocol is likely to change
+again; its README says what is modeled, what is not, and how to rerun it.
+
+To add a chapter, copy the shape of an existing one: a one-paragraph
+summary, a diagram where the structure has one, the data structures, the
+protocols, the limits and their diagnostics, and a closing "where in the
+source" list. Keep it to the current state, and link the design document
+that holds the reasons.

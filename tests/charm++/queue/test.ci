@@ -1,7 +1,0 @@
-mainmodule main
-{
-	mainchare main
-	{
-		entry main(CkArgMsg *);
-	}
-}

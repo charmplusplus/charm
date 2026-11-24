@@ -1,3 +1,4 @@
+-include ../../../common.mk
 # modify the path of CHARMC
 CHARMC=../../../../bin/charmc $(OPTS)
 
@@ -15,8 +16,8 @@ simplering.o : simplering.C simplering.def.h
 simplering.decl.h simplering.def.h: simplering.ci
 	$(CHARMC)  simplering.ci
 
-test:
-	make; ./charmrun ++local +p4 ./simplering
+test: simplering
+	$(call run, ./simplering +p4 )
 
 clean:
 	rm -f simplering simplering_prof *.o conv-host *.decl.h *.def.h *~ charmrun *.log *.sts core charmrun.exe simplering.exe simplering.pdb simplering.ilk

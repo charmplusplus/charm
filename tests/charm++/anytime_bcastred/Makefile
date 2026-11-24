@@ -1,0 +1,39 @@
+-include ../../common.mk
+CHARMC=../../../bin/charmc $(OPTS)
+
+all: bcastred
+
+bcastred: bcastred.decl.h bcastred.C
+	$(CHARMC) bcastred.C -o bcastred
+
+bcastred.decl.h: bcastred.ci
+	$(CHARMC) bcastred.ci
+
+# The program comes first in every recipe below, which the MPI layer requires:
+# src/arch/mpi/charmrun consumes +p entirely but re-emits ++ppn as "+ppn N" at
+# the position it appears, then runs `mpirun -np N <args>`. With ++ppn ahead of
+# the program, mpirun takes "+ppn" as the executable and dies with
+# "execvp error on file +ppn". netlrts' charmrun does not care, so this is only
+# visible on mpi-* builds.
+test: bcastred
+	$(call run, ./bcastred +p2)
+	$(call run, ./bcastred +p2 -n 8 -i 200 -m 1 -c 8 )
+	$(call run, ./bcastred +p2 -n 8 -i 200 -m 1 -c 8 -u )
+
+# Scaling run. The ring is sized by -n, independently of the PE count, so any
+# P works; the migration targets are what actually vary with P.
+testp: bcastred
+	$(call run, ./bcastred +p$(P))
+	$(call run, ./bcastred +p$(P) -n 8 -i 200 -m 1 -c 8 )
+	$(call run, ./bcastred +p$(P) -n 8 -i 200 -m 1 -c 8 -u )
+
+# The interesting case for an anytime-migration test: with more than one PE
+# per process, elements migrate within a process as well as between them.
+# +p2 ++ppn 2 is one process, +p4 ++ppn 2 is two.
+smptest: bcastred
+	$(call run, ./bcastred +p2 ++ppn 2)
+	$(call run, ./bcastred +p4 ++ppn 2 -n 8 -i 200 -m 1 -c 8 )
+	$(call run, ./bcastred +p4 ++ppn 2 -n 8 -i 200 -m 1 -c 8 -u )
+
+clean:
+	rm -rf *.decl.h *.def.h bcastred charmrun

@@ -5,7 +5,10 @@ migratable heap allocation to arbitrary clients.
 #define CMK_MEMORY_ISOMALLOC_H
 
 #include <stddef.h>
-#include "conv-config.h"
+/* converse.h supplies CthThread and CmiIsomallocContext, and reconverse's
+   thread layer declares CthMigratable and CthCreateMigratable there. */
+#include "converse.h"
+#include "pup_c.h"
 
 #ifdef __cplusplus
 #include <vector>
@@ -19,10 +22,6 @@ int CmiIsomallocEnabled(void);
 
 int CmiIsomallocInRange(void * addr);
 
-typedef struct CmiIsomallocContext {
-  void * opaque;
-} CmiIsomallocContext;
-
 typedef struct CmiIsomallocRegion {
   void * start, * end;
 } CmiIsomallocRegion;
@@ -32,6 +31,8 @@ typedef struct CmiIsomallocRegion {
  * No use case for this currently exists. */
 CmiIsomallocContext CmiIsomallocContextCreate(int myunit, int numunits);
 void CmiIsomallocContextDelete(CmiIsomallocContext ctx);
+/* Unmap the context's memory now; the context itself is deleted later. */
+void CmiIsomallocContextRelease(CmiIsomallocContext ctx);
 void CmiIsomallocContextPup(pup_er p, CmiIsomallocContext * ctxptr);
 void CmiIsomallocContextEnableRandomAccess(CmiIsomallocContext ctx);
 void CmiIsomallocContextJustMigrated(CmiIsomallocContext ctx);
@@ -52,6 +53,11 @@ void * CmiIsomallocContextPermanentAllocAlign(CmiIsomallocContext ctx, size_t al
 
 CmiIsomallocContext CmiIsomallocGetThreadContext(CthThread th);
 
+/* Record the managed address range in this file, for a restart from the
+   checkpoint that holds it (a disk checkpoint calls this on PE 0). Returns 0
+   when the file could not be written. */
+int CmiIsomallocWriteRegion(const char * path);
+
 void CmiIsomallocContextEnableRecording(CmiIsomallocContext ctx, int enable); /* internal use only */
 #ifdef __cplusplus
 void CmiIsomallocGetRecordedHeap(CmiIsomallocContext ctx,
@@ -60,9 +66,7 @@ void CmiIsomallocGetRecordedHeap(CmiIsomallocContext ctx,
 
 /****** Converse Thread functionality that depends on Isomalloc ********/
 
-int CthMigratable(void);
 CthThread CthPup(pup_er, CthThread);
-CthThread CthCreateMigratable(CthVoidFn fn, void * arg, int size, CmiIsomallocContext ctx);
 
 /****** Memory-Isomalloc: malloc wrappers for Isomalloc ********/
 

@@ -5,7 +5,10 @@
 #ifndef CHARM_H
 #define CHARM_H
 
+#include "charm-config.h"
+#include "conv-mach-opt.h" /* defines CMK_OPTIMIZE (and CMK_CUDA) before converse.h */
 #include "converse.h"
+#include "conv-autoconfig.h" /* guarded; safe to include early on both runtimes */
 #include <sys/types.h> /* for size_t */
 
 #ifdef __cplusplus
@@ -112,6 +115,7 @@ extern void  CkFreeSysMsg(void *msg);
 extern void* CkAllocBuffer(void *msg, int bufsize);
 extern void  CkFreeMsg(void *msg);
 extern void* CkCopyMsg(void **pMsg);
+extern void* CkCopyPackedMsg(const void *packedMsg);
 extern void* CkReferenceMsg(void *msg);
 extern void  CkSetQueueing(void *msg, int strategy);
 extern void* CkPriorityPtr(void *msg);
@@ -148,6 +152,9 @@ extern void CkStartQDExt_ArrayCallback(int aid, int* idx, int ndims, int epIdx, 
 extern void CkStartQDExt_SectionCallback(int sid_pe, int sid_cnt, int rootPE, int ep);
 extern void registerCreateCallbackMsgExtCallback(void (*cb)(void*, int, int, int, int *, char**, int*));
 extern void registerPyReductionExtCallback(int (*cb)(char**, int*, int, char**));
+extern int CkTraceRegisterUserEvent(char *EventDesc, int eventID);
+extern void CkTraceBeginUserBracketEvent(int eventID);
+extern void CkTraceEndUserBracketEvent(int eventID);
 
 #endif
 /*********************************************************/
@@ -226,11 +233,12 @@ extern void CkRegisterBase(int derivedIdx, int baseIdx);
 /** Sets the ifNotThere policy of an EP **/
 extern void CkRegisterIfNotThere(int epIdx, CkArray_IfNotThere policy);
 #if CMK_CHARM4PY
-extern void CkRegisterMainChareExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
-extern void CkRegisterGroupExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
-extern void CkRegisterSectionManagerExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
-extern void CkRegisterArrayMapExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
-extern void CkRegisterArrayExt(const char *s, int numEntryMethods, int *chareIdx, int *startEpIdx);
+void CkRegisterMainChareExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterGroupExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterGroupExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterSectionManagerExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterArrayMapExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx);
+extern void CkRegisterArrayExt(const char *s, const char **emNames, int emNamesStart, int numEntryMethods, int *chareIdx, int *startEpIdx);
 extern void CkRegisterReadonlyExt(const char *name, const char *type, size_t msgSize, char *msg);
 #endif
 
@@ -509,6 +517,11 @@ extern void CkSummary_StartPhase(int);
 extern int CkDisableTracing(int epIdx);
 extern void CkEnableTracing(int epIdx);
 extern void CkCallWhenIdle(int epIdx, void* obj);
+
+
+#if CMK_CHARM4PY
+extern void CkHapiAddCallback(long stream, void (*cb)(void*, void*), int fid);
+#endif
 
 #ifdef __cplusplus
 }

@@ -15,11 +15,13 @@ private:
   CkLocMgr *myLocMgr;
   CkArrayIndex idx;/// Element's array index
   CmiUInt8 id;
+  CmiUInt8 life; /// CkLocEntry::life of the element held here
   bool *deletedMarker; /// Set this if we're deleted during processing
   bool running; /// True when inside a startTiming/stopTiming pair
 #if CMK_LBDB_ON
   bool  asyncMigrate;  /// if readyMove is inited
   bool  readyMigrate;    /// status whether it is ready to migrate
+  bool  lbOrderedMigrate; /// the pending departure was ordered by the load balancer
   bool  enable_measure;
   int  nextPe;              /// next migration dest processor
   CkSyncBarrier* syncBarrier;
@@ -49,6 +51,8 @@ public:
   void stopTiming(int ignore_running=0);
   void setObjTime(double cputime);
   double getObjTime();
+  void setObjGPUTime(double gputime);
+  double getObjGPUTime();
   void *getObjUserData(int idx);
 #else
   inline void startTiming(int ignore_running=0) {  }
@@ -56,11 +60,13 @@ public:
 #endif
   inline const CkArrayIndex &getIndex(void) const {return idx;}
   inline CmiUInt8 getID() const { return id; }
+  inline CmiUInt8 getLife() const { return life; }
+  inline void setLife(CmiUInt8 l) { life = l; }
   inline CkLocMgr *getLocMgr() const {return myLocMgr; }
-  inline CkSyncBarrier* getSyncBarrier() const { return syncBarrier; }
 
 #if CMK_LBDB_ON
 public:
+  inline CkSyncBarrier* getSyncBarrier() const { return syncBarrier; }
   inline LBManager *getLBMgr(void) const {return lbmgr;}
   inline MetaBalancer *getMetaBalancer(void) const {return the_metalb;}
   inline const LDObjHandle& getLdHandle() const{ return ldHandle; }
@@ -70,8 +76,10 @@ public:
   void recvMigrate(int dest);
   void setMigratable(int migratable);	/// set migratable
   void setPupSize(size_t obj_pup_size);
+  void setGPUPupSize(size_t obj_gpu_pup_size);
   void AsyncMigrate(bool use);
   bool isAsyncMigrate()   { return asyncMigrate; }
+  bool isLBOrderedMigrate() { return lbOrderedMigrate; }
   void ReadyMigrate(bool ready) { readyMigrate = ready; } ///called from user
   bool isReadyMigrate()	{ return readyMigrate; }
   bool checkBufferedMigration();	// check and execute pending migration

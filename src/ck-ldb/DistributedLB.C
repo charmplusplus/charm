@@ -61,7 +61,7 @@ void DistributedLB::Strategy(const DistBaseLB::LDStats* const stats) {
   // successfully
   kMaxTrials = CkNumPes();
   // Max gossip messages sent from each PE
-  kMaxGossipMsgCount = 2 * CmiLog2(CkNumPes());
+  kMaxGossipMsgCount = 2 * log(CkNumPes())/log(2);
 
   // Reset member variables for this LB iteration
   phase_number = 0;

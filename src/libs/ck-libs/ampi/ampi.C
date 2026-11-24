@@ -7,6 +7,11 @@
 
 #include "ampiimpl.h"
 #include "tcharm.h"
+#if defined(__APPLE__)
+#include <mach-o/dyld.h>
+#elif defined(__linux__)
+#include <link.h>
+#endif
 
 
 #if CMK_TRACE_ENABLED
@@ -204,6 +209,7 @@ switch (*datatype) { \
   case MPI_UNSIGNED_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned long); } break; \
   case MPI_FLOAT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(float); } break; \
   case MPI_DOUBLE: for(i=0;i<(*len);i++) { MPI_OP_IMPL(double); } break; \
+  case MPI_LONG_DOUBLE: for(i=0;i<(*len);i++) { MPI_OP_IMPL(long double); } break; \
   case MPI_LONG_LONG_INT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed long long); } break; \
   case MPI_SIGNED_CHAR: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed char); } break; \
   case MPI_UNSIGNED_LONG_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned long long); } break; \
@@ -236,6 +242,7 @@ switch (*datatype) { \
   case MPI_UNSIGNED_LONG: for(i=0;i<(*len);i++) { MPI_OP_IMPL(unsigned long); } break; \
   case MPI_FLOAT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(float); } break; \
   case MPI_DOUBLE: for(i=0;i<(*len);i++) { MPI_OP_IMPL(double); } break; \
+  case MPI_LONG_DOUBLE: for(i=0;i<(*len);i++) { MPI_OP_IMPL(long double); } break; \
   case MPI_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(std::complex<float>); } break; \
   case MPI_DOUBLE_COMPLEX: for(i=0;i<(*len);i++) { MPI_OP_IMPL(std::complex<double>); } break; \
   case MPI_LONG_LONG_INT: for(i=0;i<(*len);i++) { MPI_OP_IMPL(signed long long); } break; \
@@ -560,6 +567,9 @@ class ampiPeMgr : public CBase_ampiPeMgr {
     ampiPeMgrProxy = thisgroup;
   }
   ampiPeMgr(CkMigrateMessage *m) noexcept : CBase_ampiPeMgr(m) {}
+  // Runs on PE 0, so code is the one the exit handler passes to ConverseExit in
+  // PE 0's process, which is the status the launcher reports (MPI_Abort).
+  void exitWithCode(int code) noexcept { CkExit(code); }
   void pup(PUP::er &p) noexcept {
     // Do nothing, localAmpiParents will be repopulated as ranks are reconstructed
   }
@@ -595,10 +605,32 @@ class ampiPeMgr : public CBase_ampiPeMgr {
       }
     }
     else {
-      return funcOffset;
+      return ampiStoredFunction(funcOffset); // an offset from the program's load address
     }
   }
 };
+
+#if defined(__linux__)
+static int ampiFirstObjectAddress(struct dl_phdr_info *info, size_t, void *data) noexcept {
+  *(uintptr_t *)data = (uintptr_t)info->dlpi_addr;
+  return 1; // the first object visited is the main program; stop there
+}
+#endif
+
+uintptr_t ampiProgramLoadAddress() noexcept {
+  static const uintptr_t addr = []() noexcept -> uintptr_t {
+#if defined(__APPLE__)
+    return (uintptr_t)_dyld_get_image_vmaddr_slide(0); // image 0 is the main program
+#elif defined(__linux__)
+    uintptr_t a = 0;
+    dl_iterate_phdr(ampiFirstObjectAddress, &a);
+    return a;
+#else
+    return 0;
+#endif
+  }();
+  return addr;
+}
 
 /*
  * AMPI's generic reducer type, AmpiReducer, is used only
@@ -619,10 +651,13 @@ class ampiPeMgr : public CBase_ampiPeMgr {
  */
 CkReduction::reducerType AmpiReducer;
 
+static MPI_User_function* ampiPredefinedOpFunction(MPI_Op op) noexcept; // defined with the table below
+
 // every msg contains a AmpiOpHeader structure before user data
 CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs) noexcept {
   AmpiOpHeader *hdr = (AmpiOpHeader *)msgs[0]->getData();
-  MPI_User_function* func = ampiPeMgrProxy.ckLocalBranch()->getUserFunction(hdr->func);
+  MPI_User_function* func = (hdr->op != MPI_OP_NULL) ? ampiPredefinedOpFunction(hdr->op)
+                            : ampiPeMgrProxy.ckLocalBranch()->getUserFunction(hdr->func);
   MPI_Datatype dtype = hdr->dtype;
   int szdata = hdr->szdata;
   int len = hdr->len;
@@ -638,6 +673,9 @@ CkReductionMsg *AmpiReducerFunc(int nMsg, CkReductionMsg **msgs) noexcept {
 
 static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op op) noexcept
 {
+  // A pair with no built-in reducer returns invalid, and makeRednMsg then
+  // reduces with the op's MPI function (AmpiReducer). The size checks fall
+  // through on purpose to the C type of the same width.
   switch (type) {
     case MPI_INT32_T:
       if (getDDT()->getSize(MPI_INT32_T) != getDDT()->getSize(MPI_INT)) break;
@@ -656,6 +694,7 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_BXOR: return CkReduction::bitvec_xor_int;
         default:       break;
       }
+      break;
     case MPI_FLOAT:
       switch (op) {
         case MPI_MAX:  return CkReduction::max_float;
@@ -664,6 +703,7 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_float;
         default:       break;
       }
+      break;
     case MPI_DOUBLE:
       switch (op) {
         case MPI_MAX:  return CkReduction::max_double;
@@ -672,6 +712,7 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_double;
         default:       break;
       }
+      break;
     case MPI_INT8_T:
       if (getDDT()->getSize(MPI_INT8_T) != getDDT()->getSize(MPI_CHAR)) break;
       // else: fall thru to MPI_CHAR
@@ -683,6 +724,7 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_char;
         default:       break;
       }
+      break;
     case MPI_INT16_T:
       if (getDDT()->getSize(MPI_INT16_T) != getDDT()->getSize(MPI_SHORT)) break;
       // else: fall thru to MPI_SHORT
@@ -694,6 +736,7 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_short;
         default:       break;
       }
+      break;
     case MPI_LONG:
       switch (op) {
         case MPI_MAX:  return CkReduction::max_long;
@@ -702,6 +745,7 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_long;
         default:       break;
       }
+      break;
     case MPI_INT64_T:
       if (getDDT()->getSize(MPI_INT64_T) != getDDT()->getSize(MPI_LONG_LONG)) break;
       // else: fall thru to MPI_LONG_LONG
@@ -713,6 +757,7 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_long_long;
         default:       break;
       }
+      break;
     case MPI_UINT8_T:
       if (getDDT()->getSize(MPI_UINT8_T) != getDDT()->getSize(MPI_UNSIGNED_CHAR)) break;
       // else: fall thru to MPI_UNSIGNED_CHAR
@@ -724,6 +769,7 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_uchar;
         default:       break;
       }
+      break;
     case MPI_UINT16_T:
       if (getDDT()->getSize(MPI_UINT16_T) != getDDT()->getSize(MPI_UNSIGNED_SHORT)) break;
       // else: fall thru to MPI_UNSIGNED_SHORT
@@ -735,6 +781,7 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_ushort;
         default:       break;
       }
+      break;
     case MPI_UINT32_T:
       if (getDDT()->getSize(MPI_UINT32_T) != getDDT()->getSize(MPI_UNSIGNED)) break;
       // else: fall thru to MPI_UNSIGNED
@@ -746,6 +793,7 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_uint;
         default:       break;
       }
+      break;
     case MPI_UNSIGNED_LONG:
       switch (op) {
         case MPI_MAX:  return CkReduction::max_ulong;
@@ -754,6 +802,7 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_ulong;
         default:       break;
       }
+      break;
     case MPI_UINT64_T:
       if (getDDT()->getSize(MPI_UINT64_T) != getDDT()->getSize(MPI_UNSIGNED_LONG_LONG)) break;
       // else: fall thru to MPI_UNSIGNED_LONG_LONG
@@ -765,6 +814,7 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_PROD: return CkReduction::product_ulong_long;
         default:       break;
       }
+      break;
     case MPI_C_BOOL:
       switch (op) {
         case MPI_LAND: return CkReduction::logical_and_bool;
@@ -772,6 +822,7 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_LXOR: return CkReduction::logical_xor_bool;
         default:       break;
       }
+      break;
     case MPI_LOGICAL:
       switch (op) {
         case MPI_LAND: return CkReduction::logical_and_int;
@@ -779,13 +830,9 @@ static CkReduction::reducerType getBuiltinReducerType(MPI_Datatype type, MPI_Op 
         case MPI_LXOR: return CkReduction::logical_xor_int;
         default:       break;
       }
-    case MPI_BYTE:
-      switch (op) {
-        case MPI_BAND: return CkReduction::bitvec_and_bool;
-        case MPI_BOR:  return CkReduction::bitvec_or_bool;
-        case MPI_BXOR: return CkReduction::bitvec_xor_bool;
-        default:       break;
-      }
+      break;
+    // No case for MPI_BYTE: the bool reducers store each byte as 0 or 1 under
+    // some compilers, so bytes go through the op's MPI function instead.
     default:
       break;
   }
@@ -836,6 +883,7 @@ CtvDeclare(bool, ampiInitDone);
 CtvDeclare(void*,stackBottom);
 CtvDeclare(bool, ampiFinalized);
 CkpvDeclare(bool, isMigrateToPeEnabled);
+CkpvDeclare(bool, isMigrateWithCollsEnabled);
 CkpvDeclare(Builtin_kvs, bikvs);
 CkpvDeclare(int, ampiThreadLevel);
 CkpvDeclare(AmpiMsgPool, msgPool);
@@ -885,6 +933,10 @@ static constexpr std::array<MPI_User_function*, AMPI_MAX_PREDEFINED_OP+1> ampiPr
   MPI_REPLACE_USER_FN,
   MPI_NO_OP_USER_FN
 }};
+
+static MPI_User_function* ampiPredefinedOpFunction(MPI_Op op) noexcept {
+  return ampiPredefinedOps[op];
+}
 
 #if defined _WIN32
 # ifndef WIN32_LEAN_AND_MEAN
@@ -973,6 +1025,13 @@ static void getAmpiBinaryPath() noexcept
 
 static void ampiNodeInit() noexcept
 {
+  /* Make this idempotent: on some reconverse paths the initnode calls can run
+     a second time, and the one-shot work below must not repeat (the
+     AMPI_threadstart_idx assertion would fire and a second AmpiReducer would
+     be registered, so PEs could disagree about reducer indices). */
+  if (ampi_nodeinit_has_been_called)
+    return;
+
   getAmpiBinaryPath();
 
 #if CMK_TRACE_ENABLED
@@ -1080,11 +1139,17 @@ static void ampiProcInit() noexcept {
   CtvInitialize(bool,ampiFinalized);
   CtvInitialize(void*,stackBottom);
 
+  // campi registers its handlers here, on every PE, so that handler indices
+  // agree across PEs whether or not a PE hosts a rank.
+  campi_proc_init();
+
   /* AMPI_Migrate_to_pe requires enabling Charm++ anytime migration, so
    * we leave support for it off by default. Users must run with this command
    * line option in order to enable calling it. */
   CkpvInitialize(bool,isMigrateToPeEnabled);
   CkpvAccess(isMigrateToPeEnabled) = false;
+  CkpvInitialize(bool,isMigrateWithCollsEnabled);
+  CkpvAccess(isMigrateWithCollsEnabled) = false;
 
   CkpvInitialize(int, ampiThreadLevel);
   CkpvAccess(ampiThreadLevel) = MPI_THREAD_SINGLE;
@@ -1096,6 +1161,16 @@ static void ampiProcInit() noexcept {
   CkpvAccess(msgPool) = AmpiMsgPool(AMPI_MSG_POOL_SIZE, AMPI_POOLED_MSG_SIZE);
 
   CkpvAccess(isMigrateToPeEnabled) = (bool)CmiGetArgFlag(CkGetArgv(), "+ampiEnableMigrateToPe");
+  /* A collective outstanding across a migration needs the array broadcaster
+   * to store broadcasts for the moving rank (anytime migration), which costs
+   * memory; off by default. AMPI_Migrate_to_pe moves a rank at any point, so
+   * it needs the same. */
+  // Parse the flag unconditionally so that it is removed from argv and its
+  // description registered even when +ampiEnableMigrateToPe already implies it.
+  bool migrateWithColls =
+    (bool)CmiGetArgFlagDesc(CkGetArgv(), "+ampiMigrateWithCollectives",
+                            "Allow non-blocking collectives to be outstanding across AMPI_Migrate");
+  CkpvAccess(isMigrateWithCollsEnabled) = migrateWithColls || CkpvAccess(isMigrateToPeEnabled);
 
 #if AMPIMSGLOG
   char **argv=CkGetArgv();
@@ -1116,7 +1191,6 @@ static void ampiProcInit() noexcept {
 
 #if AMPI_PRINT_MSG_SIZES
   // Only record and print message sizes if this option is given, and only for those ranks.
-  // Running with the '+syncprint' option is recommended if printing from multiple ranks.
   char *ranks = NULL;
   CkpvInitialize(CkListString, msgSizesRanks);
   if (CmiGetArgStringDesc(CkGetArgv(), "+msgSizesRanks", &ranks,
@@ -1156,9 +1230,8 @@ void AMPI_threadstart(void *data)
   AMPI_Exit(ret);
 }
 
-/* TCharm Semaphore ID's for AMPI startup */
-#define AMPI_TCHARM_SEMAID 0x00A34100 /* __AMPI__ */
-#define AMPI_BARRIER_SEMAID 0x00A34200 /* __AMPI__ */
+/* TCharm Semaphore ID's for AMPI startup: AMPI_TCHARM_SEMAID and
+   AMPI_BARRIER_SEMAID are defined in ampiimpl.h (shared with campi.C). */
 
 // Create MPI_COMM_SELF from MPI_COMM_WORLD
 static void createCommSelf() noexcept {
@@ -1170,6 +1243,8 @@ static void createCommSelf() noexcept {
   MPI_Comm_group(MPI_COMM_WORLD, &worldGroup);
   MPI_Group_incl(worldGroup, 1, ranks, &selfGroup);
   MPI_Comm_create(MPI_COMM_WORLD, selfGroup, &selfComm);
+  MPI_Group_free(&selfGroup);
+  MPI_Group_free(&worldGroup);
   MPI_Comm_set_name(selfComm, "MPI_COMM_SELF");
 
   CkAssert(selfComm == MPI_COMM_SELF);
@@ -1183,12 +1258,69 @@ CkpvExtern(ArrayObjMap, array_objs);
 // We remove objects from array_objs whose performance we don't really care about
 // (TCharm, ampiParent, MPI_COMM_SELF) in order to keep it smaller and faster
 // for those we do care about (MPI_COMM_WORLD and other communicators).
-static void removeUnimportantArrayObjsfromPeCache() noexcept {
+void removeUnimportantArrayObjsfromPeCache() noexcept {
   ampiParent* pptr = getAmpiParent();
   ArrayObjMap& arrayObjs = CkpvAccess(array_objs);
   arrayObjs.erase(pptr->getThread()->ckGetID().getID());
   arrayObjs.erase(pptr->ckGetID().getID());
-  arrayObjs.erase(getAmpiInstance(MPI_COMM_SELF)->ckGetID().getID());
+  /* MPI_COMM_SELF resolves through ckLocal(), which answers null when that
+     element is not on this PE. AMPI_Migrate calls this the moment the rank
+     resumes on a new PE, and the element bound to it need not have arrived
+     yet. Nothing is lost by skipping it: this whole function is cache pruning,
+     and an element that is not here has nothing in this PE's cache to prune.
+     The lookup calls comm2ampi directly because getAmpiInstance aborts on a
+     null result in a checked build, before the test below could run. */
+  ampi* self = pptr->comm2ampi(MPI_COMM_SELF);
+  if (self != NULL) arrayObjs.erase(self->ckGetID().getID());
+}
+
+/*
+   The non-blocking steps of ampiInit, shared with campi::Init (campi.C),
+   which runs them with awaits in place of the blocking waits below.
+ */
+// Element 0 only: create the ampiPeMgr group and return the array options
+// for the ampiParent and MPI_COMM_WORLD ampi arrays.
+CkArrayOptions ampiInitRootArrayOptions(CkArrayID *threads, int *nchunks) noexcept
+{
+  STARTUP_DEBUG("ampiInit> creating ampiPeMgr group")
+  ampiPeMgrProxy = CProxy_ampiPeMgr::ckNew();
+
+  STARTUP_DEBUG("ampiInit> creating arrays")
+
+  // FIXME: Need to serialize global communicator allocation in one place.
+  //Allocate the next communicator
+  //Create and attach the ampiParent array
+  CkArrayOptions opts=TCHARM_Attach_start(threads,nchunks);
+  opts.setSectionAutoDelegate(false);
+  opts.setStaticInsertion(true);
+  opts.setAnytimeMigration(CkpvAccess(isMigrateWithCollsEnabled));
+  return opts;
+}
+
+// The group the ampiParent array manager's creation depends on (element 0 only).
+CkGroupID ampiPeMgrGroupID() noexcept
+{
+  return ampiPeMgrProxy.ckGetGroupID();
+}
+
+// Every rank, once its MPI_COMM_WORLD ampi object exists: mark init done and
+// contribute to the allInitDone reduction (which sets ampiInitCallDone).
+ampiParent *ampiInitWorldLocal(ampi *ptr, int nchunks) noexcept
+{
+  CtvAccess(ampiInitDone)=true;
+  CtvAccess(ampiFinalized)=false;
+  STARTUP_DEBUG("ampiInit> complete")
+
+  ampiParent* pptr = getAmpiParent();
+  CkpvAccess(bikvs).universe_size = nchunks;
+  ptr->setCommName("MPI_COMM_WORLD");
+
+  pptr->ampiInitCallDone = 0;
+
+  CProxy_ampi cbproxy = ptr->getProxy();
+  CkCallback cb(CkReductionTarget(ampi, allInitDone), cbproxy[0]);
+  ptr->contribute(cb);
+  return pptr;
 }
 
 /*
@@ -1207,23 +1339,16 @@ static ampi *ampiInit(char **argv) noexcept
   CProxy_ampiParent parent;
   if (TCHARM_Element()==0) //the rank of a tcharm object
   { /* I'm responsible for building the arrays: */
-    STARTUP_DEBUG("ampiInit> creating ampiPeMgr group")
-    ampiPeMgrProxy = CProxy_ampiPeMgr::ckNew();
-
-    STARTUP_DEBUG("ampiInit> creating arrays")
-
-    // FIXME: Need to serialize global communicator allocation in one place.
-    //Allocate the next communicator
-    //Create and attach the ampiParent array
     CkArrayID threads;
-    opts=TCHARM_Attach_start(&threads,&_nchunks);
-    opts.setSectionAutoDelegate(false);
-    opts.setStaticInsertion(true);
-    opts.setAnytimeMigration(CkpvAccess(isMigrateToPeEnabled));
+    opts=ampiInitRootArrayOptions(&threads,&_nchunks);
 
     ck::future<CkArrayID> newAmpiFuture;
     CkCallback cb(newAmpiFuture.handle());
-    CProxy_ampiParent::ckNew(threads, _nchunks, opts, cb);
+    // ampiParent::init() uses this PE's ampiPeMgr branch, so the ampiParent
+    // array manager's creation on every PE waits for that PE's ampiPeMgr branch.
+    CkEntryOptions parentOpts;
+    parentOpts.setGroupDepID(ampiPeMgrGroupID());
+    CProxy_ampiParent::ckNew(threads, _nchunks, opts, cb, &parentOpts);
     parent = newAmpiFuture.get();
     newAmpiFuture.release();
 
@@ -1239,7 +1364,11 @@ static ampi *ampiInit(char **argv) noexcept
 
     ck::future<CkArrayID> newAmpiFuture;
     CkCallback cb(newAmpiFuture.handle());
-    CProxy_ampi::ckNew(parent, worldComm, opts, cb);
+    // ampi's constructor uses this PE's ampiParent element, so on every PE the
+    // array manager's creation waits for the ampiParent array manager's.
+    CkEntryOptions worldOpts;
+    worldOpts.setGroupDepID(parent.ckGetArrayID());
+    CProxy_ampi::ckNew(parent, worldComm, opts, cb, &worldOpts);
     /* CProxy_ampi arr = */ newAmpiFuture.get();
     newAmpiFuture.release();
 
@@ -1248,19 +1377,7 @@ static ampi *ampiInit(char **argv) noexcept
 
   // Find our ampi object:
   ampi *ptr=(ampi *)TCharm::get()->semaGet(AMPI_TCHARM_SEMAID);
-  CtvAccess(ampiInitDone)=true;
-  CtvAccess(ampiFinalized)=false;
-  STARTUP_DEBUG("ampiInit> complete")
-
-  ampiParent* pptr = getAmpiParent();
-  CkpvAccess(bikvs).universe_size = _nchunks;
-  ptr->setCommName("MPI_COMM_WORLD");
-
-  pptr->ampiInitCallDone = 0;
-
-  CProxy_ampi cbproxy = ptr->getProxy();
-  CkCallback cb(CkReductionTarget(ampi, allInitDone), cbproxy[0]);
-  ptr->contribute(cb);
+  ampiParent* pptr = ampiInitWorldLocal(ptr, _nchunks);
 
   while (pptr->ampiInitCallDone != 1) {
     pptr = pptr->block();
@@ -1277,7 +1394,7 @@ static ampi *ampiInit(char **argv) noexcept
 //-------------------- ampiParent -------------------------
 ampiParent::ampiParent(CProxy_TCharm threads_,int nRanks_) noexcept
   : threads(threads_), ampiReqs(64, &reqPool), myDDT(ampiPredefinedTypes),
-    predefinedOps(ampiPredefinedOps), isTmpRProxySet(false)
+    predefinedOps(ampiPredefinedOps)
 {
   int barrier = 0x1234;
   STARTUP_DEBUG("ampiParent> starting up")
@@ -1375,8 +1492,7 @@ void ampiParent::pup(PUP::er &p) noexcept {
   ampiReqs.pup(p, &reqPool);
 
   p|kvlist;
-  p|isTmpRProxySet;
-  p|tmpRProxy;
+  p|pendingRProxies;
 
   p|userAboutToMigrateFn;
   p|userJustMigratedFn;
@@ -1430,6 +1546,9 @@ void ampiParent::pup(PUP::er &p) noexcept {
         case AMPI_G_REQ:
           blockingReq = new GReq;
           break;
+        case AMPI_SCAN_REQ:
+          blockingReq = new ScanReq;
+          break;
 #if CMK_CUDA
         case AMPI_GPU_REQ:
           CkAbort("AMPI> error trying to PUP a non-migratable GPU request!");
@@ -1456,7 +1575,13 @@ void ampiParent::pup(PUP::er &p) noexcept {
 void ampiParent::prepareCtv() noexcept {
   thread=threads[thisIndex].ckLocal();
   if (thread==NULL) CkAbort("AMPIParent cannot find its thread!\n");
-  CtvAccessOther(thread->getThread(),ampiPtr) = this;
+  if (tcharm_campi) {
+    // No thread: every rank on this PE shares the scheduler thread's Ctvs,
+    // so record the parent in the rank record; campi installs it at resume.
+    campi_parent_attached(thread, this);
+  } else {
+    CtvAccessOther(thread->getThread(),ampiPtr) = this;
+  }
   STARTUP_DEBUG("ampiParent> found TCharm")
 }
 
@@ -1526,6 +1651,10 @@ void ampiParent::setUserJustMigratedFn(MPI_MigrateFn f) noexcept {
 }
 
 void ampiParent::ckAboutToMigrate() noexcept {
+  /* Tells the array's listeners the element is leaving; without it the
+     reduction manager on this PE keeps counting the element and a later
+     reduction over the ampiParent array (a checkpoint) never completes. */
+  ArrayElement1D::ckAboutToMigrate();
   if (userAboutToMigrateFn) {
     const auto oldTCharm = CtvAccess(_curTCharm);
     const auto oldAMPI = CtvAccess(ampiPtr);
@@ -1559,6 +1688,7 @@ void ampiParent::resumeAfterMigration() noexcept {
     CtvAccess(ampiPtr) = oldAMPI;
   }
 
+  if (tcharm_campi) campi_migrate_resumed(thread);
   thread->start();
 }
 
@@ -1594,17 +1724,22 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,const ampiCommStruct &s,bool forMigra
     worldPtr=ptr;
   }
 
-  if (forMigration) { //Restore AmpiRequest*'s in postedReqs:
-    AmmEntry<AmpiRequest *> *e = ptr->postedReqs.first;
-    while (e) {
-      // AmmPupPostedReqs() packed these as MPI_Requests
-      MPI_Request reqIdx = (MPI_Request)(intptr_t)e->msg;
-      CkAssert(reqIdx != MPI_REQUEST_NULL);
-      AmpiRequest* req = ampiReqs[reqIdx];
-      CkAssert(req);
-      e->msg = req;
-      e = e->next;
-    }
+  if (forMigration) { //Restore AmpiRequest*'s in postedReqs and postedBcastReqs:
+    // AmmPupPostedReqs() packed these as MPI_Requests. A posted broadcast
+    // receive (MPI_Ibcast outstanding across the migration) left as an index
+    // would be dereferenced by inorderBcast when the broadcast arrives.
+    auto restore = [this](AmmEntry<AmpiRequest *> *e) {
+      while (e) {
+        MPI_Request reqIdx = (MPI_Request)(intptr_t)e->msg;
+        CkAssert(reqIdx != MPI_REQUEST_NULL);
+        AmpiRequest* req = ampiReqs[reqIdx];
+        CkAssert(req);
+        e->msg = req;
+        e = e->next;
+      }
+    };
+    restore(ptr->postedReqs.first);
+    restore(ptr->postedBcastReqs.first);
   }
   else { //Register the new communicator:
     MPI_Comm comm = s.getComm();
@@ -1620,52 +1755,46 @@ TCharm *ampiParent::registerAmpi(ampi *ptr,const ampiCommStruct &s,bool forMigra
   return thread;
 }
 
-// reduction client data - preparation for checkpointing
-class ckptClientStruct {
- public:
-  const char *dname;
-  ampiParent *ampiPtr;
-  ckptClientStruct(const char *s, ampiParent *a) noexcept : dname(s), ampiPtr(a) {}
-};
-
-static void checkpointClient(void *param,void *msg) noexcept
-{
-  ckptClientStruct *client = (ckptClientStruct*)param;
-  const char *dname = client->dname;
-  ampiParent *ampiPtr = client->ampiPtr;
-  ampiPtr->Checkpoint(strlen(dname), dname);
-  delete client;
+/* The ranks reach a checkpoint through a reduction whose callback is an entry
+   method of rank 0, wherever rank 0 sits: a reduction client set on rank 0's
+   PE (the earlier code) is never run once a load balancing step has moved
+   rank 0 off PE 0, where the reduction completes, and the ranks blocked
+   forever. The call is collective with one directory name, so rank 0's own
+   copy is the one used. */
+void ampiParent::postCheckpoint(const char* dname) noexcept {
+  ckptDirName = dname;
+  contribute(CkCallback(CkIndex_ampiParent::checkpointAfterBarrier(), thisProxy[0]));
 }
 
 void ampiParent::startCheckpoint(const char* dname) noexcept {
-  if (thisIndex==0) {
-    ckptClientStruct *clientData = new ckptClientStruct(dname, this);
-    CkCallback *cb = new CkCallback(checkpointClient, clientData);
-    thisProxy.ckSetReductionClient(cb);
-  }
-  contribute();
-
+  postCheckpoint(dname);
   ampiParent* unused = block();
-
 }
 
-void ampiParent::Checkpoint(int len, const char* dname) noexcept {
-  if (len == 0) {
-    // memory checkpoint
-    CkCallback cb(CkIndex_ampiParent::ResumeThread(),thisArrayID);
+/* An empty directory name selects an in-memory checkpoint. The name goes to
+   CkStartCheckpoint as it is, so it may be as long as an MPI_Info value. */
+void ampiParent::checkpointAfterBarrier() noexcept {
+  CkCallback cb(CkIndex_ampiParent::ResumeThread(),thisArrayID);
+  if (ckptDirName.empty()) {
     CkStartMemCheckpoint(cb);
   }
   else {
-    char dirname[256];
-    strncpy(dirname,dname,len);
-    dirname[len]='\0';
-    CkCallback cb(CkIndex_ampiParent::ResumeThread(),thisArrayID);
-    CkStartCheckpoint(dirname,cb);
+    CkStartCheckpoint(ckptDirName.c_str(),cb);
   }
 }
 
 void ampiParent::ResumeThread() noexcept {
+  if (tcharm_campi) campi_migrate_resumed(thread);
   thread->resume();
+}
+
+// Called after a barrier over MPI_COMM_WORLD. The rollback starts at
+// quiescence, so the barrier's last messages are delivered before any
+// element is destroyed; the blocked thread is destroyed with its element.
+void ampiParent::startRollback() noexcept {
+  if (thisIndex == 0) CkRollbackMemCheckpoint();
+  ampiParent* unused = block();
+  CkAbort("AMPI> rank %d resumed after AMPI_Migrate(ampi_checkpoint=rollback)\n", unused->thisIndex);
 }
 
 MPI_User_function* ampiParent::op2User_function(MPI_Op op) const noexcept {
@@ -1677,6 +1806,24 @@ MPI_User_function* ampiParent::op2User_function(MPI_Op op) const noexcept {
     CkAssert(opIdx < userOps.size());
     return ampiPeMgrProxy.ckLocalBranch()->getUserFunction(userOps[opIdx].func);
   }
+}
+
+MPI_User_function* ampiParent::op2StoredFunction(MPI_Op op, bool* isUser) const noexcept {
+  if (opIsPredefined(op)) {
+    *isUser = false;
+    return predefinedOps[op];
+  }
+  int opIdx = op - 1 - AMPI_MAX_PREDEFINED_OP;
+  CkAssert(opIdx < userOps.size());
+  *isUser = true;
+  return userOps[opIdx].func;
+}
+
+void ScanReq::applyOp(const void* in, void* inout) noexcept {
+  MPI_User_function* f = userFunc ? ampiPeMgrProxy.ckLocalBranch()->getUserFunction(func) : func;
+  int n = count;
+  MPI_Datatype t = type;
+  (*f)(const_cast<void*>(in), inout, &n, &t);
 }
 
 int ampiParent::createKeyval(MPI_Comm_copy_attr_function *copy_fn, MPI_Comm_delete_attr_function *delete_fn,
@@ -1699,7 +1846,7 @@ int ampiParent::setUserAttribute(int context, std::unordered_map<int, uintptr_t>
   auto iter = attributes.find(keyval);
   if (iter != attributes.end()) {
     void * val = (void *)iter->second;
-    int ret = (*kv.delete_fn)(context, keyval, val, kv.extra_state);
+    int ret = (*kv.deleteFn())(context, keyval, val, kv.extra_state);
     if (ret != MPI_SUCCESS) {
       return ret;
     }
@@ -1799,7 +1946,7 @@ int ampiParent::dupUserAttributes(int old_context, std::unordered_map<int, uintp
     if (isValid) {
       // Call the user's copy_fn
       KeyvalNode& kv = *kvlist[keyval];
-      int ret = (*kv.copy_fn)(old_context, keyval, kv.extra_state, val_in, &val_out, &flag);
+      int ret = (*kv.copyFn())(old_context, keyval, kv.extra_state, val_in, &val_out, &flag);
       if (ret != MPI_SUCCESS) {
         return ret;
       }
@@ -1817,7 +1964,7 @@ int ampiParent::freeUserAttributes(int context, std::unordered_map<int, uintptr_
     int keyval = attr.first;
     KeyvalNode & kv = *kvlist[keyval];
     void * val = (void *)attr.second;
-    int ret = (*kv.delete_fn)(context, keyval, val, kv.extra_state);
+    int ret = (*kv.deleteFn())(context, keyval, val, kv.extra_state);
     if (ret != MPI_SUCCESS)
       return ret;
 
@@ -1904,7 +2051,7 @@ int ampiParent::deleteAttr(int context, std::unordered_map<int, uintptr_t> & att
 
   KeyvalNode & kv = *kvlist[keyval];
   void * val = (void *)iter->second;
-  int ret = (*kv.delete_fn)(context, keyval, val, kv.extra_state);
+  int ret = (*kv.deleteFn())(context, keyval, val, kv.extra_state);
   if (ret != MPI_SUCCESS)
     return ret;
 
@@ -1942,15 +2089,19 @@ void Amm<T, N>::freeAll() noexcept
   }
 }
 
-/* free all msgs */
+/* free all msgs. This drains the queue directly rather than through
+ * get(MPI_ANY_TAG, MPI_ANY_SOURCE), because MPI_ANY_TAG does not match
+ * AMPI's internal tags (see match()). */
 template<typename T, size_t N>
 void Amm<T, N>::flushMsgs() noexcept
 {
-  T msg = get(MPI_ANY_TAG, MPI_ANY_SOURCE);
-  while (msg) {
-    delete msg;
-    msg = get(MPI_ANY_TAG, MPI_ANY_SOURCE);
+  while (first) {
+    AmmEntry<T>* ent = first;
+    first = ent->next;
+    delete ent->msg;
+    deleteEntry(ent);
   }
+  lasth = &first;
 }
 
 template<typename T, size_t N>
@@ -1969,29 +2120,24 @@ void Amm<T, N>::put(int tag, int src, T msg) noexcept
   lasth = &e->next;
 }
 
+// MPI_ANY_TAG matches only user tags (0..MPI_TAG_UB_VALUE), never the
+// internal tags above MPI_TAG_UB_VALUE that AMPI's collectives send on the
+// same communicator. Otherwise a user's MPI_ANY_TAG receive or probe could
+// take a collective's message, leaving the collective waiting forever.
+static inline bool ammTagMatch(int t1, int t2) noexcept
+{
+  if (t1 == t2) return true;
+  if (t1 == MPI_ANY_TAG) return (t2 >= 0 && t2 <= MPI_TAG_UB_VALUE);
+  if (t2 == MPI_ANY_TAG) return (t1 >= 0 && t1 <= MPI_TAG_UB_VALUE);
+  return false;
+}
+
 template<typename T, size_t N>
 bool Amm<T, N>::match(const int tags1[AMM_NTAGS], const int tags2[AMM_NTAGS]) const noexcept
 {
-  if (tags1[AMM_TAG]==tags2[AMM_TAG] && tags1[AMM_SRC]==tags2[AMM_SRC]) {
-    // tag and src match
-    return true;
-  }
-  else if (tags1[AMM_TAG]==tags2[AMM_TAG] && (tags1[AMM_SRC]==MPI_ANY_SOURCE || tags2[AMM_SRC]==MPI_ANY_SOURCE)) {
-    // tag matches, src is MPI_ANY_SOURCE
-    return true;
-  }
-  else if (tags1[AMM_SRC]==tags2[AMM_SRC] && (tags1[AMM_TAG]==MPI_ANY_TAG || tags2[AMM_TAG]==MPI_ANY_TAG)) {
-    // src matches, tag is MPI_ANY_TAG
-    return true;
-  }
-  else if ((tags1[AMM_SRC]==MPI_ANY_SOURCE || tags2[AMM_SRC]==MPI_ANY_SOURCE) && (tags1[AMM_TAG]==MPI_ANY_TAG || tags2[AMM_TAG]==MPI_ANY_TAG)) {
-    // src and tag are MPI_ANY
-    return true;
-  }
-  else {
-    // no match
-    return false;
-  }
+  bool srcMatch = (tags1[AMM_SRC] == tags2[AMM_SRC] ||
+                   tags1[AMM_SRC] == MPI_ANY_SOURCE || tags2[AMM_SRC] == MPI_ANY_SOURCE);
+  return srcMatch && ammTagMatch(tags1[AMM_TAG], tags2[AMM_TAG]);
 }
 
 template<typename T, size_t N>
@@ -2017,6 +2163,24 @@ T Amm<T, N>::get(int tag, int src, int* rtags) noexcept
     }
     enth = &ent->next;
   }
+}
+
+template<typename T, size_t N>
+T Amm<T, N>::getExact(int tag, int src) noexcept
+{
+  AmmEntry<T> **enth = &first;
+  while (AmmEntry<T> *ent = *enth) {
+    if (ent->tags[AMM_TAG] == tag && ent->tags[AMM_SRC] == src) {
+      T msg = ent->msg;
+      AmmEntry<T>* next = ent->next;
+      *enth = next;
+      if (!next) lasth = enth;
+      deleteEntry(ent);
+      return msg;
+    }
+    enth = &ent->next;
+  }
+  return NULL;
 }
 
 template<typename T, size_t N>
@@ -2190,12 +2354,14 @@ void ampi::pup(PUP::er &p) noexcept
   p|comm;
   p|tmpVec;
   p|remoteProxy;
+  p|numCommCreations;
   unexpectedMsgs.pup(p, AmmPupUnexpectedMsgs);
   postedReqs.pup(p, AmmPupPostedReqs);
   unexpectedBcastMsgs.pup(p, AmmPupUnexpectedMsgs);
   postedBcastReqs.pup(p, AmmPupPostedReqs);
   p|greq_classes;
   p|oorder;
+  p|winObjects; // the windows created on this communicator (ampiParent packs the WinStructs)
   // Do not PUP myComm here, since ampiParent owns it.
   // We update the pointer to it in findParentAfterMigration()
 }
@@ -2227,6 +2393,29 @@ class ampiSplitKey {
 /* "type" may indicate whether call is for a cartesian topology etc. */
 void ampi::split(int color,int key,MPI_Comm *dest, AmpiCommType type) noexcept
 {
+  splitPost(color, key, type);
+  ampi * dis = block(); //Resumed by ampi::registrationFinish
+  dis->splitFinish(dest);
+}
+
+// The two halves of split around its suspension (campi awaits in between)
+// Called by every member at the start of a call that creates a communicator.
+int ampi::beginCommCreation() noexcept
+{
+  creationId = ++numCommCreations;
+  if (tcharm_campi) campi_creation_begun(thread, creationId);
+  return creationId;
+}
+
+void ampi::unblockCreation(int id) noexcept
+{
+  if (tcharm_campi) campi_creation_done(thread, id);
+  thread->resume();
+}
+
+void ampi::splitPost(int color,int key, AmpiCommType type) noexcept
+{
+  beginCommCreation();
   MPI_Comm nextComm = parent->getNextComm();
   ampiSplitKey splitKey(nextComm,color,key,myRank,type);
   int rootIdx=myComm->getIndexForRank(0);
@@ -2238,10 +2427,11 @@ void ampi::split(int color,int key,MPI_Comm *dest, AmpiCommType type) noexcept
     CkCallback cb(CkIndex_ampi::splitPhase1(0),CkArrayIndex1D(rootIdx),myComm->getProxy());
     contribute(sizeof(splitKey),&splitKey,CkReduction::concat,cb);
   }
+}
 
-  ampi * dis = block(); //Resumed by ampi::registrationFinish
-  nextComm = dis->parent->getNextComm()-1;
-  *dest=nextComm;
+void ampi::splitFinish(MPI_Comm *dest) noexcept
+{
+  *dest = parent->getNextComm()-1;
 }
 
 CLINKAGE
@@ -2256,11 +2446,14 @@ int compareAmpiSplitKey(const void *a_, const void *b_) {
 // Caller needs to eventually call newAmpi.doneInserting()
 CProxy_ampi ampi::createNewChildAmpiSync() noexcept {
   CkArrayOptions opts;
+  // Bound to the TCharm array: the location manager, its bounds (the world
+  // size; elements are indexed by world rank) and the wide-collection id
+  // layout all come from TCHARM_Build_threads, so none are set here.
   opts.bindTo(parentProxy);
   opts.setSectionAutoDelegate(false);
   opts.setNumInitial(0);
   opts.setStaticInsertion(false);
-  opts.setAnytimeMigration(CkpvAccess(isMigrateToPeEnabled));
+  opts.setAnytimeMigration(CkpvAccess(isMigrateWithCollsEnabled));
   CkCallback initCB(CkIndex_ampi::registrationFinish(), thisProxy[thisIndex]);
   opts.setInitCallback(initCB);
 
@@ -2356,8 +2549,25 @@ void ampi::splitPhase1(CkReductionMsg *msg) noexcept
 void ampi::registrationFinish() noexcept
 {
   CkAssert(numCommCreationsInProgress > 0);
-  if (--numCommCreationsInProgress == 0)
-    thisProxy.unblock(); //Matches suspends at end of ampi::commCreate, split, etc.
+  if (--numCommCreationsInProgress == 0) {
+    if (exchangeProxyOnFinish) {
+      // MPI_Intercomm_create: the ranks are resumed by
+      // ampi::setRemoteProxyAndUnblock once both groups' arrays exist.
+      exchangeProxyOnFinish = false;
+      parentProxy[std::min(thisIndex, remoteRootIdx)].ExchangeProxy(newChildProxy,
+                                                    std::max(thisIndex, remoteRootIdx), creationId);
+    }
+    else if (resumeNewArrayOnFinish) {
+      // commCreate, cartCreate0D, intercommMerge: the new array's elements are
+      // exactly the blocked ranks (both groups, for a merge); ranks of the old
+      // communicator that are not members did not block.
+      resumeNewArrayOnFinish = false;
+      newChildProxy.unblockCreation(creationId);
+    }
+    else {
+      thisProxy.unblockCreation(creationId); //split: every rank of the old communicator blocked in ampi::split
+    }
+  }
 }
 
 void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
@@ -2433,16 +2643,21 @@ void ampi::splitPhaseInter(CkReductionMsg *msg) noexcept
 //   1. reduction to make sure all members have called
 //   2. the root in the old communicator create the new array
 //   3. ampiParent::register is called to register new array as new comm
-MPI_Comm ampi::commCreate(const std::vector<int>& vec, AmpiCommType type) noexcept {
+// Returns whether this rank is in vec, and so waits for the new communicator.
+bool ampi::commCreatePost(const std::vector<int>& vec, AmpiCommType type) noexcept {
+  beginCommCreation();
   int rootIdx = vec[0];
   tmpVec = vec;
-  CkCallback cb(CkReductionTarget(ampi, commCreatePhase1), CkArrayIndex1D(rootIdx), myComm->getProxy());
+  CkCallback cb(CkIndex_ampi::commCreateReduced(NULL), CkArrayIndex1D(rootIdx), myComm->getProxy());
   int data[2] = { parent->getNextComm(), (int)type };
   contribute(sizeof(data), data, CkReduction::max_int, cb);
+  return getPosOp(thisIndex, vec) >= 0;
+}
 
-  if (getPosOp(thisIndex, vec) >= 0) {
+MPI_Comm ampi::commCreate(const std::vector<int>& vec, AmpiCommType type) noexcept {
+  if (commCreatePost(vec, type)) {
     ampi * dis = block(); //Resumed by ampi::registrationFinish
-    return dis->parent->getNextComm() - 1;
+    return dis->newestComm();
   } else {
     return MPI_COMM_NULL;
   }
@@ -2456,36 +2671,43 @@ void ampi::insertNewChildAmpiElements(MPI_Comm nextComm, CProxy_ampi newAmpi, Am
   newAmpi.doneInserting(); // will call ampi::registrationFinish
 }
 
+void ampi::commCreateReduced(CkReductionMsg *msg) noexcept {
+  const int *data = (const int *)msg->getData();
+  const int nextComm = data[0], commType = data[1];
+  delete msg;
+  commCreatePhase1(nextComm, commType);
+}
+
 void ampi::commCreatePhase1(int nextComm, int commType) noexcept {
   setNumCommCreationsInProgress(1);
   CProxy_ampi newAmpi = createNewChildAmpiSync();
+  resumeNewArrayOnFinish = true;
+  newChildProxy = newAmpi;
   insertNewChildAmpiElements((MPI_Comm)nextComm, newAmpi, (AmpiCommType)commType);
 }
 
 /* Virtual topology communicator creation */
-void ampiTopology::sortnbors(CProxy_ampi arrProxy, std::vector<int> &nbors_) noexcept {
-  if (nbors_.size() > 1) {
-    // Sort neighbors so that non-PE-local ranks are before PE-local ranks, so that
-    // we can overlap non-local messages with local ones which happen inline
-    std::partition(nbors_.begin(), nbors_.end(), [&](int idx) { return !arrProxy[idx].ckLocal(); } );
-  }
+// 0-dimensional cart comm: rank 0 creates a dup of COMM_SELF with topo info.
+// Returns whether this rank (rank 0) waits for the new communicator.
+bool ampi::cartCreate0DPost() noexcept {
+  beginCommCreation();
+  if (getRank() != 0) return false;
+  tmpVec.clear();
+  tmpVec.push_back(0);
+  commCreatePhase1(parent->getNextComm(), COMM_CART);
+  return true;
 }
 
-// 0-dimensional cart comm: rank 0 creates a dup of COMM_SELF with topo info.
+void ampi::cartCreate0DFinish(MPI_Comm newComm) noexcept {
+  getAmpiParent()->getCommStruct(newComm).getTopology()->setndims(0);
+}
+
 MPI_Comm ampi::cartCreate0D() noexcept {
-  if (getRank() == 0) {
-    tmpVec.clear();
-    tmpVec.push_back(0);
-    commCreatePhase1(parent->getNextComm(), COMM_CART);
-    MPI_Comm newComm = parent->getNextComm()-1;
-    ampiCommStruct &newCommStruct = parent->getCommStruct(newComm);
-    ampiTopology *newTopo = newCommStruct.getTopology();
-    newTopo->setndims(0);
-    return newComm;
-  }
-  else {
-    return MPI_COMM_NULL;
-  }
+  if (!cartCreate0DPost()) return MPI_COMM_NULL;
+  ampi * dis = block(); //Resumed by ampi::registrationFinish
+  MPI_Comm newComm = dis->newestComm();
+  cartCreate0DFinish(newComm);
+  return newComm;
 }
 
 MPI_Comm ampi::cartCreate(std::vector<int>& vec, int ndims, const int* dims) noexcept {
@@ -2505,20 +2727,32 @@ MPI_Comm ampi::cartCreate(std::vector<int>& vec, int ndims, const int* dims) noe
   return commCreate(vec, COMM_CART);
 }
 
-MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root, MPI_Comm tcomm) noexcept {
+// remoteRoot: the other group's leader (its world rank), valid at the root only
+void ampi::intercommCreatePost(const std::vector<int>& remoteVec, const int root, int remoteRoot) noexcept {
+  beginCommCreation();
   if (thisIndex==root) { // not everybody gets the valid rvec
     tmpVec = remoteVec;
+    remoteRootIdx = remoteRoot;
   }
-  CkCallback cb(CkReductionTarget(ampi, intercommCreatePhase1),CkArrayIndex1D(root),myComm->getProxy());
+  CkCallback cb(CkIndex_ampi::intercommCreateReduced(NULL),CkArrayIndex1D(root),myComm->getProxy());
   MPI_Comm nextinter = parent->getNextComm();
   contribute(sizeof(nextinter), &nextinter,CkReduction::max_int,cb);
-  ampi * dis = block(); //Resumed by ampi::registrationFinish
-  return dis->parent->getNextComm() - 1;
 }
 
-void ampi::intercommCreatePhase1(MPI_Comm nextInterComm) noexcept {
+MPI_Comm ampi::intercommCreate(const std::vector<int>& remoteVec, const int root, int remoteRoot) noexcept {
+  intercommCreatePost(remoteVec, root, remoteRoot);
+  ampi * dis = block(); //Resumed by ampi::setRemoteProxyAndUnblock
+  return dis->newestComm();
+}
+
+void ampi::intercommCreateReduced(CkReductionMsg *msg) noexcept {
+  const MPI_Comm nextInterComm = *(const MPI_Comm *)msg->getData();
+  delete msg;
+
   setNumCommCreationsInProgress(1);
   CProxy_ampi newAmpi = createNewChildAmpiSync();
+  exchangeProxyOnFinish = true;
+  newChildProxy = newAmpi;
   const std::vector<int>& lgroup = myComm->getIndices();
   const ampiCommStruct newCommstruct = ampiCommStruct(nextInterComm,newAmpi,lgroup,tmpVec);
   for(int i=0;i<lgroup.size();i++){
@@ -2526,11 +2760,10 @@ void ampi::intercommCreatePhase1(MPI_Comm nextInterComm) noexcept {
     newAmpi[newIdx].insert(parentProxy,newCommstruct);
   }
   newAmpi.doneInserting(); // will call ampi::registrationFinish
-
-  parentProxy[0].ExchangeProxy(newAmpi);
 }
 
-void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid only at local root
+void ampi::intercommMergePost(int first) noexcept { // first valid only at local root
+  beginCommCreation();
   if(myRank == 0 && first == 1){ // first (lower) group creates the intracommunicator for the higher group
     const std::vector<int>& lvec = myComm->getIndices();
     const std::vector<int>& rvec = myComm->getRemoteIndices();
@@ -2544,28 +2777,59 @@ void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept { // first valid 
   }
 
   int rootIdx=myComm->getIndexForRank(0);
-  CkCallback cb(CkReductionTarget(ampi, intercommMergePhase1),CkArrayIndex1D(rootIdx),myComm->getProxy());
+  CkCallback cb(CkIndex_ampi::intercommMergeReduced(NULL),CkArrayIndex1D(rootIdx),myComm->getProxy());
   MPI_Comm nextintra = parent->getNextComm();
   contribute(sizeof(nextintra), &nextintra,CkReduction::max_int,cb);
-
-  ampi * dis = block(); //Resumed by ampi::registrationFinish
-  MPI_Comm newcomm = dis->parent->getNextComm()-1;
-  *ncomm=newcomm;
 }
 
-void ampi::intercommMergePhase1(MPI_Comm nextIntraComm) noexcept {
-  // gets called on two roots, first root creates the comm
-  if(tmpVec.size()==0) return;
+void ampi::intercommMerge(int first, MPI_Comm *ncomm) noexcept {
+  intercommMergePost(first);
+  ampi * dis = block(); //Resumed by ampi::registrationFinish
+  *ncomm = dis->newestComm();
+}
+
+void ampi::intercommMergeReduced(CkReductionMsg *msg) noexcept {
+  // Called on both roots once every rank of that root's group has contributed.
+  // The root of the group that goes first (the only one with a non-empty
+  // tmpVec) creates the merged communicator; the other root tells it that its
+  // group has arrived, so that the creating root can resume both groups.
+  const MPI_Comm nextIntraComm = *(const MPI_Comm *)msg->getData();
+  delete msg;
+  if (tmpVec.size() == 0) {
+    remoteProxy[myComm->getIndexForRemoteRank(0)].intercommMergeGroupArrived(nextIntraComm);
+    return;
+  }
+  intercommMergeGroupArrived(nextIntraComm);
+}
+
+// Entry method (from the other group's root) and local call (from
+// intercommMergeReduced) on the root of the group that goes first.
+void ampi::intercommMergeGroupArrived(MPI_Comm nextIntraComm) noexcept {
+  // The two arrivals (local reduction, remote root's message) can come in
+  // either order. Only create the merged array, and so only resume any rank,
+  // after both groups' ranks are blocked in ampi::intercommMerge.
+  if (nextIntraComm > mergeNextComm) mergeNextComm = nextIntraComm;
+  if (++numMergeGroupsArrived < 2) return;
+  const MPI_Comm nextComm = mergeNextComm;
+  numMergeGroupsArrived = 0;
+  mergeNextComm = 0;
 
   setNumCommCreationsInProgress(1);
   CProxy_ampi newAmpi = createNewChildAmpiSync();
-  insertNewChildAmpiElements(nextIntraComm, newAmpi, COMM_INTRA);
+  resumeNewArrayOnFinish = true;
+  newChildProxy = newAmpi;
+  insertNewChildAmpiElements(nextComm, newAmpi, COMM_INTRA);
 }
 
 void ampi::topoDup(int topoType, int rank, MPI_Comm comm, MPI_Comm *newComm) noexcept
 {
   split(0, rank, newComm, parent->getCommStruct(comm).getType());
+  topoDupFinish(topoType, comm, newComm);
+}
 
+// The part of topoDup after the split (shared with campi::Comm_dup)
+void ampi::topoDupFinish(int topoType, MPI_Comm comm, MPI_Comm *newComm) noexcept
+{
   if (topoType != MPI_UNDEFINED) {
     ampiParent *disParent = getAmpiParent();
     ampiTopology *topo = disParent->getCommStruct(comm).getTopology();
@@ -2582,6 +2846,10 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::block() noexcept {
   return disParent;
 }
 CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::yield() noexcept {
+  // campi: no thread to reschedule. The test and probe routines that yield
+  // after a miss are awaitables there (campi.h), which suspend the rank's
+  // coroutine after the call returns.
+  if (tcharm_campi) return this;
   TCharm * disThread = thread->schedule();
   ampiParent* disParent = getAmpiParent();
   disParent->thread = disThread;
@@ -2653,10 +2921,20 @@ void ampi::generic(AmpiMsg* msg) noexcept
   if(msg->getSeq() != 0) {
     int seqIdx = msg->getSeqIdx();
     int n=oorder.put(seqIdx,msg);
-    if (n>0 && inorder(msg)) { // This message was in-order, and is not an incomplete sync message
-      for (int i=1; i<n; i++) { // It enables other, previously out-of-order messages
+    if (n>0) { // In order: deliver it, then the messages stashed behind it
+      // inorder returns false for a sync message whose data is still being
+      // fetched (a rendezvous with another process). That message has been
+      // matched and taken off postedReqs, and its request completes through
+      // completedRecv, so the messages behind it are delivered now; nothing
+      // would deliver them later, since only an in-order arrival looks at the
+      // stash and every later arrival in this sequence is behind them. (The
+      // stop that used to be here was for the first rendezvous protocol, which
+      // re-posted the request to wait for a data message.)
+      inorder(msg);
+      for (int i=1; i<n; i++) {
         msg = oorder.getOutOfOrder(seqIdx);
-        if (!msg || !inorder(msg)) break; // Returns false if msg is an incomplete sync message
+        if (!msg) break;
+        inorder(msg);
       }
     }
   } else { //Cross-world or system messages are unordered
@@ -2778,13 +3056,14 @@ void ampi::genericRdma(char* buf, int size, CMK_REFNUM_TYPE seq, int tag, int sr
   )
 
   if (seq != 0) {
-    int seqIdx = srcRank;
+    int seqIdx = ampiSeqIdx(tag, srcRank); // the sequence AmpiMsg::getSeqIdx would use
     int n = oorder.putIfInOrder(seqIdx, seq);
     if (n > 0) { // This message was in-order
       inorderRdma(buf, size, seq, tag, srcRank);
-      for (int i=1; i<n; i++) { // It enables other, previously out-of-order messages
+      for (int i=1; i<n; i++) { // Deliver the messages stashed behind it (see ampi::generic)
         AmpiMsg* msg = oorder.getOutOfOrder(seqIdx);
-        if (!msg || !inorder(msg)) break; // Returns false if msg is an incomplete sync message
+        if (!msg) break;
+        inorder(msg);
       }
     } else { // This message was out-of-order: stash it (as an AmpiMsg)
       AmpiMsg *msg = rdma2AmpiMsg(buf, size, seq, tag, srcRank);
@@ -3012,7 +3291,8 @@ AmpiMsg *ampi::makeAmpiMsg(int destRank,int t,int sRank,const void *buf,int coun
 
 void ampi::waitOnBlockingSend(MPI_Request* req, AmpiSendType sendType) noexcept
 {
-  if (*req != MPI_REQUEST_NULL && (sendType == BLOCKING_SEND || sendType == BLOCKING_SSEND)) {
+  if (*req != MPI_REQUEST_NULL && (sendType == BLOCKING_SEND || sendType == BLOCKING_SSEND ||
+                                   sendType == BLOCKING_BSEND)) {
     AmpiRequestList& reqList = getReqs();
     AmpiRequest& sreq = *reqList[*req];
     parent = sreq.wait(parent, MPI_STATUS_IGNORE);
@@ -3050,12 +3330,9 @@ void ampi::sendraw(int t, int sRank, void* buf, int len, CkArrayID aid, int idx)
 }
 
 CMK_REFNUM_TYPE ampi::getSeqNo(int destRank, MPI_Comm destcomm, int tag) noexcept {
-  int seqIdx = (tag >= MPI_BCAST_TAG) ? COLL_SEQ_IDX : destRank;
-  CMK_REFNUM_TYPE seq = 0;
-  if (tag<=MPI_BCAST_TAG) {
-    seq = oorder.nextOutgoing(seqIdx);
-  }
-  return seq;
+  // ampiTagIsSequenced / ampiSeqIdx (ampiimpl.h) hold the rule
+  if (!ampiTagIsSequenced(tag)) return 0;
+  return oorder.nextOutgoing(ampiSeqIdx(tag, destRank));
 }
 
 MPI_Request ampi::sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_Datatype type, int destIdx,
@@ -3073,41 +3350,11 @@ MPI_Request ampi::sendRdmaMsg(int t, int sRank, const void* buf, int size, MPI_D
   return reqIdx;
 }
 
-// Local version of ampi::generic but assumes msg is in-order & ireq is the matching recv req
-void ampi::localInorder(char* buf, int size, int seqIdx, CMK_REFNUM_TYPE seq, int tag,
-                        int srcRank, IReq* ireq) noexcept
-{
-  MSG_ORDER_DEBUG(
-    CkPrintf("[%d] in ampi::localInorder on index %d, size=%d, seq=%d, srcRank=%d, tag=%d, comm=%d\n",
-             CkMyPe(), getIndexForRank(getRank()), size, seq, srcRank, tag, getComm());
-  )
-
-  if (seq != 0) {
-    int n = oorder.putIfInOrder(seqIdx, seq);
-    CkAssert(n > 0); // This message must be in-order
-    handleBlockedReq(ireq);
-    ireq->receiveRdma(this, buf, size, srcRank);
-    if (n > 1) { // It enables other, previously out-of-order messages
-      AmpiMsg *msg = nullptr;
-      while ((msg = oorder.getOutOfOrder(seqIdx)) != nullptr) {
-        if (!inorder(msg)) break; // Returns false if msg is an incomplete sync message
-      }
-    }
-  } else { // Cross-world or system messages are unordered
-    handleBlockedReq(ireq);
-    ireq->receiveRdma(this, buf, size, srcRank);
-  }
-
-  resumeThreadIfReady();
-}
-
 // Call genericRdma inline on the local destination object
 MPI_Request ampi::sendLocalMsg(int tag, int srcRank, const void* buf, int size, MPI_Datatype type,
                                int count, int destRank, MPI_Comm destComm, CMK_REFNUM_TYPE seq,
                                ampi* destPtr, AmpiSendType sendType, MPI_Request reqIdx) noexcept
 {
-  int seqIdx = srcRank;
-
   if (size >= AMPI_PE_LOCAL_THRESHOLD || (sendType == BLOCKING_SSEND || sendType == I_SSEND)) {
     // Block on the matching request to avoid making an intermediate copy
     MSG_ORDER_DEBUG(
@@ -3181,41 +3428,57 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
   CkDDT_DataType *ddt = getDDT()->getType(type);
   int size = ddt->getSize(count);
   ampi *destPtr = arrProxy[destIdx].ckLocal();
+  const bool buffered = (sendType == BLOCKING_BSEND || sendType == I_BSEND);
 #if AMPI_PE_LOCAL_IMPL
   if (destPtr != nullptr && destPtr->parent != nullptr) {
+    if (buffered) {
+      // Copy into a message and deliver it inline, whatever its size
+      destPtr->generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, seq));
+      return completedSendReq(buf, count, type, rank, t, destcomm, reqIdx);
+    }
     // Complete message inline to PE-local destination VP
     return sendLocalMsg(t, sRank, buf, size, type, count, rank, destcomm,
                         seq, destPtr, sendType, reqIdx);
   }
 #endif
-  if (
+  // A buffered send must not wait for the receiver: it skips the synchronous
+  // and zero-copy paths below and sends a copy eagerly.
+  if (!buffered && (
 #if AMPI_NODE_LOCAL_IMPL
       (size >= AMPI_NODE_LOCAL_THRESHOLD && destLikelyWithinProcess(arrProxy, destIdx, destPtr)) ||
 #endif
-      (sendType == BLOCKING_SSEND || sendType == I_SSEND))
+      (sendType == BLOCKING_SSEND || sendType == I_SSEND)))
   {
     // Avoid sender- and receiver-side copies via zero copy direct API
     // (optimized for within-process transfers)
     return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm,
                        seq, arrProxy, destIdx, sendType, reqIdx, destPtr);
   }
+  if (!buffered) {
 #if AMPI_RDMA_IMPL
-  if (ddt->isContig() && size >= AMPI_RDMA_THRESHOLD) {
-    // Avoid sender-side copy via zero copy entry method API
-    return sendRdmaMsg(t, sRank, buf, size, type, destIdx,
-                       rank, destcomm, seq, arrProxy, reqIdx);
-  }
+    if (ddt->isContig() && size >= AMPI_RDMA_THRESHOLD) {
+      // Avoid sender-side copy via zero copy entry method API
+      return sendRdmaMsg(t, sRank, buf, size, type, destIdx,
+                         rank, destcomm, seq, arrProxy, reqIdx);
+    }
 #endif
-  if (size >= AMPI_SSEND_THRESHOLD) {
-    // Avoid sender- and receiver-side copies via zero copy direct API
-    return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm,
-                       seq, arrProxy, destIdx, sendType, reqIdx, destPtr);
+    if (size >= AMPI_SSEND_THRESHOLD) {
+      // Avoid sender- and receiver-side copies via zero copy direct API
+      return sendSyncMsg(t, sRank, buf, type, count, rank, destcomm,
+                         seq, arrProxy, destIdx, sendType, reqIdx, destPtr);
+    }
   }
 
   // Send via normal Charm++ message with copies on both sender- and receiver-sides
   arrProxy[destIdx].generic(makeAmpiMsg(rank, t, sRank, buf, count, type, destcomm, seq));
+  return completedSendReq(buf, count, type, rank, t, destcomm, reqIdx);
+}
 
-  if (reqIdx == MPI_REQUEST_NULL) { // Sends via generic() get a pre-completed send request
+// Sends via generic() get a pre-completed send request
+MPI_Request ampi::completedSendReq(const void* buf, int count, MPI_Datatype type, int rank,
+                                   int t, MPI_Comm destcomm, MPI_Request reqIdx) noexcept
+{
+  if (reqIdx == MPI_REQUEST_NULL) {
     reqIdx = postReq(parent->reqPool.newReq<SendReq>((void*)buf, count, type, rank, t, destcomm,
                                                      getDDT(), AMPI_REQ_COMPLETED));
   }
@@ -3225,7 +3488,6 @@ MPI_Request ampi::delesend(int t, int sRank, const void* buf, int count, MPI_Dat
     CkAssert(sreq.isPersistent());
     sreq.complete = true;
   }
-
   return reqIdx;
 }
 
@@ -3447,13 +3709,14 @@ void ampi::processNoncommutativeRednMsg(CkReductionMsg *msg, void* buf, MPI_Data
   else {
     int contributionExtent = ddt->getExtent() * count;
 
-    // Deserialize rank 0's contribution into buf first
-    ddt->serialize((char*)contributionData[0], (char*)buf, count, contributionExtent, UNPACK);
+    // Deserialize rank 0's contribution into buf first (serialize copies
+    // from its second argument into its first when unpacking)
+    ddt->serialize((char*)buf, (char*)contributionData[0], count, contributionSize, UNPACK);
 
     // Invoke the MPI_User_function on the deserialized contributions in 'rank' order
     std::vector<char> deserializedBuf(contributionExtent);
     for (int i=1; i<commSize; i++) {
-      ddt->serialize((char*)contributionData[i], deserializedBuf.data(), count, contributionExtent, UNPACK);
+      ddt->serialize(deserializedBuf.data(), (char*)contributionData[i], count, contributionSize, UNPACK);
       (*func)(deserializedBuf.data(), buf, &count, &type);
     }
   }
@@ -3793,10 +4056,12 @@ int ampi::intercomm_scatter(int root, const void *sendbuf, int sendcount, MPI_Da
   if (root == MPI_ROOT) {
     int remote_size = getRemoteIndices().size();
 
+    // Block i starts i*sendcount*extent bytes in (MPI 3.1 5.6); the type's
+    // size is less than its extent for a non-contiguous type.
     CkDDT_DataType* dttype = getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize(sendcount) ;
+    int itemextent = dttype->getExtent() * sendcount;
     for(int i = 0; i < remote_size; i++) {
-        send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemsize*i),
+        send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemextent*i),
              sendcount, sendtype, i, intercomm);
     }
   }
@@ -3817,11 +4082,11 @@ int ampi::intercomm_iscatter(int root, const void *sendbuf, int sendcount, MPI_D
     int remote_size = getRemoteIndices().size();
 
     CkDDT_DataType* dttype = getDDT()->getType(sendtype) ;
-    int itemsize = dttype->getSize(sendcount) ;
+    int itemextent = dttype->getExtent() * sendcount; // see intercomm_scatter
     // use an ATAReq to non-block the caller and get a request ptr
     ATAReq *newreq = new ATAReq(remote_size);
     for(int i = 0; i < remote_size; i++) {
-      newreq->reqs[i] = send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemsize*i),
+      newreq->reqs[i] = send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemextent*i),
                              sendcount, sendtype, i, intercomm, I_SEND);
     }
     *request = postReq(newreq);
@@ -3843,9 +4108,9 @@ int ampi::intercomm_scatterv(int root, const void* sendbuf, const int* sendcount
     int remote_size = getRemoteIndices().size();
 
     CkDDT_DataType* dttype = getDDT()->getType(sendtype);
-    int itemsize = dttype->getSize();
+    int itemextent = dttype->getExtent(); // displs count elements, each one extent apart
     for (int i = 0; i < remote_size; i++) {
-        send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemsize*displs[i]),
+        send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemextent*displs[i]),
              sendcounts[i], sendtype, i, intercomm);
     }
   }
@@ -3866,11 +4131,11 @@ int ampi::intercomm_iscatterv(int root, const void* sendbuf, const int* sendcoun
     int remote_size = getRemoteIndices().size();
 
     CkDDT_DataType* dttype = getDDT()->getType(sendtype);
-    int itemsize = dttype->getSize();
+    int itemextent = dttype->getExtent(); // displs count elements, each one extent apart
     // use an ATAReq to non-block the caller and get a request ptr
     ATAReq *newreq = new ATAReq(remote_size);
     for (int i = 0; i < remote_size; i++) {
-      newreq->reqs[i] = send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemsize*displs[i]),
+      newreq->reqs[i] = send(MPI_SCATTER_TAG, getRank(), ((char*)sendbuf)+(itemextent*displs[i]),
                              sendcounts[i], sendtype, i, intercomm, I_SEND);
     }
     *request = postReq(newreq);
@@ -3989,6 +4254,12 @@ void GReq::print() const noexcept {
   CkPrintf("In GReq: this=%p\n", (void *)this);
 }
 
+void ScanReq::print() const noexcept {
+  AmpiRequest::print();
+  CkPrintf("In ScanReq: this=%p, exclusive=%d, rank=%d, size=%d, mask=%d\n",
+           (void *)this, (int)exclusive, rank, size, mask);
+}
+
 void SendReq::print() const noexcept {
   AmpiRequest::print();
   CkPrintf("In SendReq: this=%p, persistent=%d\n", (void *)this, (int)persistent);
@@ -4054,6 +4325,9 @@ void AmpiRequestList::pup(PUP::er &p, AmpiRequestPool* pool) noexcept {
             break;
           case AMPI_G_REQ:
             reqs[i] = new GReq;
+            break;
+          case AMPI_SCAN_REQ:
+            reqs[i] = new ScanReq;
             break;
 #if CMK_CUDA
           case AMPI_GPU_REQ:
@@ -4342,11 +4616,14 @@ void FTN_NAME(MPI_EXIT,mpi_exit)(int *exitCode)
   AMPI_Exit(*exitCode);
 }
 
-AMPI_API_IMPL(int, MPI_Finalize, void)
+// The work of MPI_Finalize, shared with campi::Finalize. MPI_Finalize returns
+// to the caller; the rank ends when main returns, and AMPI_threadstart (or, in
+// campi, the coroutine's completion handler) passes main's return value to
+// AMPI_Exit, whose TCharm exit reduction takes the maximum over the ranks as
+// the process exit status.
+int ampiFinalizeBody() noexcept
 {
-  { // This brace is necessary here to make sure the object created on the stack
-    // by the AMPI_API call gets destroyed before the call to AMPI_Exit(), since
-    // AMPI_Exit() never returns.
+  {
   AMPI_API("AMPI_Finalize", "");
 
   ampiParent* parent = getAmpiParent();
@@ -4366,9 +4643,12 @@ AMPI_API_IMPL(int, MPI_Finalize, void)
 #endif
 
   }
-
-  AMPI_Exit(0); // Never returns
   return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Finalize, void)
+{
+  return ampiFinalizeBody();
 }
 
 MPI_Request ampi::postReq(AmpiRequest* newreq) noexcept
@@ -4380,6 +4660,20 @@ MPI_Request ampi::postReq(AmpiRequest* newreq) noexcept
   // not by (tag, src, comm), so they should not be inserted either.
   if (newreq->isUnmatched()) {
     postedReqs.put(newreq);
+  }
+  return request;
+}
+
+MPI_Request ampi::postCollReq(AmpiRequest* newreq, bool resultByBcast) noexcept
+{
+  newreq->resultByBcast = resultByBcast;
+  MPI_Request request = getReqs().insert(newreq);
+  // Keyed by the reduction number of this rank's next contribution rather than
+  // by the request's (tag, src), so that irednResult matches each result to its
+  // own request whatever the arrival order, and so that a wildcard receive can
+  // never take it.
+  if (newreq->isUnmatched()) {
+    postedReqs.put(MPI_NBCOLL_TAG, getRedNo(), newreq);
   }
   return request;
 }
@@ -4414,9 +4708,28 @@ AMPI_API_IMPL(int, MPI_Bsend, const void *buf, int count, MPI_Datatype datatype,
                               int dest, int tag, MPI_Comm comm)
 {
   AMPI_API("AMPI_Bsend", buf, count, datatype, dest, tag, comm);
-  // FIXME: we don't actually use the buffer set in MPI_Buffer_attach
-  //        for buffering of messages sent via MPI_Bsend
-  return MPI_Send(buf, count, datatype, dest, tag, comm);
+
+  handle_MPI_BOTTOM((void*&)buf, datatype);
+
+#if AMPI_ERROR_CHECKING
+  int ret = errorCheck("AMPI_Bsend", comm, 1, count, 1, datatype, 1, tag, 1, dest, 1, buf, 1);
+  if(ret != MPI_SUCCESS)
+    return ret;
+#endif
+
+#if AMPIMSGLOG
+  if(msgLogRead){
+    return MPI_SUCCESS;
+  }
+#endif
+
+  // NOTE: the data is copied into a message allocated by the runtime, not
+  //       into the buffer given to MPI_Buffer_attach (which is only tracked
+  //       so that MPI_Buffer_detach can return it), so a Bsend never fails
+  //       for lack of attached buffer space.
+  ampi *ptr = getAmpiInstance(comm);
+  ptr->send(tag, ptr->getRank(), buf, count, datatype, dest, comm, BLOCKING_BSEND);
+  return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Buffer_attach, void *buffer, int size)
@@ -4796,8 +5109,9 @@ void ampi::sendrecv_replace(void* buf, int count, MPI_Datatype datatype,
   MPI_Request reqs[2];
   irecv(buf, count, datatype, source, recvtag, comm, &reqs[0]);
 
+  // tmpBuf holds the packed bytes, so it is sent as bytes, not with datatype's layout.
   // FIXME: this send may do a copy internally! If we knew now that it would, we could avoid double copying:
-  reqs[1] = send(sendtag, getRank(), tmpBuf.data(), count, datatype, dest, comm, I_SEND);
+  reqs[1] = send(sendtag, getRank(), tmpBuf.data(), (int)tmpBuf.size(), MPI_BYTE, dest, comm, I_SEND);
 
   if (status == MPI_STATUS_IGNORE) {
     parent = parent->waitall(2, reqs);
@@ -4901,15 +5215,16 @@ AMPI_API_IMPL(int, MPI_Barrier, MPI_Comm comm)
 
 void ampi::ibarrier(MPI_Request *request) noexcept
 {
-  *request = postReq(parent->reqPool.newReq<IReq>(nullptr, 0, MPI_INT, AMPI_COLL_SOURCE, MPI_ATA_TAG, myComm->getComm(), getDDT()));
-  CkCallback ibarrierCB(CkReductionTarget(ampi, ibarrierResult), getProxy());
+  // Completed through irednResult under the reduction-number key, like the
+  // other non-blocking collectives. It used to complete through a self-message
+  // keyed (MPI_ATA_TAG, AMPI_COLL_SOURCE), which a block of an (I)alltoall from
+  // rank 0 could stand in for (completing the barrier early and feeding the
+  // barrier's empty message to the alltoall), and which a pending wildcard
+  // receive could take (hanging the barrier).
+  *request = postCollReq(parent->reqPool.newReq<IReq>(nullptr, 0, MPI_INT, AMPI_COLL_SOURCE, MPI_ATA_TAG, myComm->getComm(), getDDT()),
+                         /*resultByBcast=*/true);
+  CkCallback ibarrierCB(CkIndex_ampi::irednResult(0), getProxy());
   contribute(ibarrierCB);
-}
-
-void ampi::ibarrierResult() noexcept
-{
-  MSG_ORDER_DEBUG(CkPrintf("[%d] ibarrierResult called\n", thisIndex));
-  ampi::sendraw(MPI_ATA_TAG, AMPI_COLL_SOURCE, NULL, 0, thisArrayID, thisIndex);
 }
 
 AMPI_API_IMPL(int, MPI_Ibarrier, MPI_Comm comm, MPI_Request *request)
@@ -5065,12 +5380,14 @@ void ampi::rednResult(CkReductionMsg *msg) noexcept
   // [nokeep] entry method, so do not delete msg
 }
 
-// This routine is called with the results of an I(all)reduce or I(all)gather(v)
+// This routine is called with the results of an I(all)reduce, I(all)gather(v) or Ibarrier
 void ampi::irednResult(CkReductionMsg *msg) noexcept
 {
   MSG_ORDER_DEBUG(CkPrintf("[%d] irednResult called on comm %d\n", thisIndex, myComm->getComm()));
 
-  AmpiRequest* req = postedReqs.get(MPI_REDN_TAG, AMPI_COLL_SOURCE);
+  // The result carries the reduction number its contributions had, which is
+  // the key postCollReq used on every rank.
+  AmpiRequest* req = postedReqs.getExact(MPI_NBCOLL_TAG, msg->getRedNo());
   if (req == NULL)
     CkAbort("AMPI> recv'ed a non-blocking reduction unexpectedly!\n");
 
@@ -5090,7 +5407,24 @@ void ampi::irednResult(CkReductionMsg *msg) noexcept
   }
 #endif
 
-  if (parent->resumeOnColl && parent->numBlockedReqs==0) {
+  /* Resume only if this completion is one the thread is actually waiting for.
+     Two ways to get that wrong, and both were live:
+
+     A thread parked inside a *blocking* collective of its own sets
+     resumeOnColl and leaves numBlockedReqs at zero, so the old test fired for
+     any unrelated non-blocking collective that happened to finish first. It
+     resumed the thread, and the blocking collective returned without ever
+     writing its result. Its own completion arrives at rednResult; that is what
+     should wake it. parent->blockingReq is what distinguishes the two -- it is
+     set only while a blocking collective is outstanding.
+
+     And a thread parked in MPI_Waitall blocks through blockOnRecv, which sets
+     resumeOnRecv rather than resumeOnColl, so the old test never fired for it
+     at all and a Waitall on non-blocking collectives hung. MPI_Wait happened to
+     work only because RednReq::wait goes through blockOnColl instead. */
+  const bool waitingOnRequests =
+      (parent->resumeOnRecv || parent->resumeOnColl) && parent->blockingReq == NULL;
+  if (waitingOnRequests && parent->numBlockedReqs==0) {
     thread->resume();
   }
   // [nokeep] entry method, so do not delete msg
@@ -5257,6 +5591,28 @@ static void handle_MPI_IN_PLACE_alltoallw(void* &sendbuf, void* recvbuf, int* &s
   CkAssert(recvbuf != MPI_IN_PLACE);
 }
 
+// For MPI_IN_PLACE in a nonblocking alltoall: widens [lo, hi) to the bytes that
+// count elements of type at byte offset disp in the receive buffer cover.
+static void inPlaceSpan(MPI_Aint &lo, MPI_Aint &hi, MPI_Aint disp, int count,
+                        MPI_Datatype type) noexcept
+{
+  if (count == 0) return;
+  CkDDT_DataType *ddt = getDDT()->getType(type);
+  MPI_Aint b = disp + ddt->getTrueLB();
+  MPI_Aint e = b + (MPI_Aint)(count - 1) * ddt->getExtent() + ddt->getTrueExtent();
+  if (lo == hi || b < lo) lo = b;
+  if (lo == hi || e > hi) hi = e;
+}
+
+// Copies bytes [lo, hi) of recvbuf into copy and returns the address that
+// stands for recvbuf in the copy, so the send displacements are unchanged.
+static char *inPlaceCopy(std::vector<char> &copy, const void *recvbuf,
+                         MPI_Aint lo, MPI_Aint hi) noexcept
+{
+  copy.assign((const char *)recvbuf + lo, (const char *)recvbuf + hi);
+  return copy.data() - lo;
+}
+
 #define AMPI_SYNC_REDUCE 0
 
 AMPI_API_IMPL(int, MPI_Reduce, const void *inbuf, void *outbuf, int count, MPI_Datatype type,
@@ -5419,7 +5775,7 @@ AMPI_API_IMPL(int, MPI_Iallreduce, const void *inbuf, void *outbuf, int count, M
     return copyDatatype(type,count,type,count,inbuf,outbuf);
   }
 
-  *request = ptr->postReq(new RednReq(outbuf,count,type,comm,op,getDDT()));
+  *request = ptr->postCollReq(new RednReq(outbuf,count,type,comm,op,getDDT()), /*resultByBcast=*/true);
 
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),inbuf,count,type,rank,size,op);
   CkCallback allreduceCB(CkIndex_ampi::irednResult(0),ptr->getProxy());
@@ -5543,53 +5899,161 @@ AMPI_API_IMPL(int, MPI_Ireduce_scatter, const void* sendbuf, void* recvbuf, cons
   return ret;
 }
 
-AMPI_API_IMPL(int, MPI_Scan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
-                             MPI_Op op, MPI_Comm comm)
-{
-  AMPI_API("AMPI_Scan", sendbuf, recvbuf, count, datatype, op, comm);
+/* Run scan rounds until one needs a message that has not arrived yet.
 
+   msg, if not null, is the partner's message for req's current round (the
+   request was posted for it and has just been matched). Fold it in, then for
+   each following round: send this rank's partial result to the partner, and
+   take the partner's message from unexpectedMsgs if it is already there;
+   otherwise post the request for it and return. The mask advances every
+   round, also when the partner rank^mask does not exist (size not a power of
+   two).
+
+   Called from the rank's thread when the scan starts, and from ampi::generic
+   (an entry method) when a posted round is matched.
+
+   Each round's message is a packed copy sent through the array proxy, not
+   through delesend, which would pick a faster path by size and locality:
+   - PE-local inline delivery would run the partner's progressScan, and in
+     turn other ranks', inside this call. While this request is between
+     rounds it is not posted, so a reply delivered inline would be matched by
+     another outstanding scan posted for the same tag and partner.
+   - The zero-copy paths (sync sends at AMPI_SSEND_THRESHOLD, node-local at
+     AMPI_NODE_LOCAL_THRESHOLD, RDMA at AMPI_RDMA_THRESHOLD) leave the send
+     buffer in use until a completion callback, but partial changes in the
+     next round; and their receive side goes through the sync-message and
+     receiveRdma paths, which ScanReq does not implement.
+   Measured on one PE with 8 ranks, MPI_Scan costs about 1.5-2.5 us more per
+   call for 4 doubles and is within noise for 20000 doubles. */
+void ampi::progressScan(ScanReq* req, AmpiMsg* msg, bool deleteMsg) noexcept
+{
+  while (true) {
+    if (msg) {
+      int partner = req->rank ^ req->mask;
+      CkAssert(msg->getSrcRank() == partner);
+      processAmpiMsg(msg, req->tmpBuf(), req->type, req->count, MPI_REQUEST_NULL);
+      if (req->rank > partner && req->exclusive && !req->haveResult) {
+        // first value for an exclusive scan's result: unpack it into recvbuf
+        // as well (element by element, so gaps in recvbuf are left alone)
+        processAmpiMsg(msg, req->buf, req->type, req->count, MPI_REQUEST_NULL);
+      }
+      if (deleteMsg) {
+        CkpvAccess(msgPool).deleteAmpiMsg(msg);
+      }
+      if (req->rank > partner) {
+        // tmp covers ranks below this rank's subtree: it comes first
+        req->applyOp(req->tmpBuf(), req->partialBuf());
+        if (!req->exclusive || req->haveResult) {
+          req->applyOp(req->tmpBuf(), req->buf);
+        }
+        req->haveResult = true;
+      } else {
+        // tmp covers ranks above: partial = partial op tmp
+        req->applyOp(req->partialBuf(), req->tmpBuf());
+        std::swap(req->partial, req->tmp);
+      }
+      req->mask <<= 1;
+      msg = nullptr;
+      deleteMsg = true; // anything taken from unexpectedMsgs below is ours to free
+    }
+
+    // Skip rounds without a partner
+    while (req->mask < req->size && (req->rank ^ req->mask) >= req->size) {
+      req->mask <<= 1;
+    }
+    if (req->mask >= req->size) break;
+
+    int partner = req->rank ^ req->mask;
+    const ampiCommStruct &dest = comm2CommStruct(req->comm);
+    CMK_REFNUM_TYPE seq = getSeqNo(partner, req->comm, req->tag);
+    dest.getProxy()[dest.getIndexForRank(partner)].generic(
+        makeAmpiMsg(partner, req->tag, req->rank, req->partialBuf(), req->count,
+                    req->type, req->comm, seq));
+
+    req->src = partner;
+    msg = unexpectedMsgs.get(req->tag, partner);
+    if (!msg) {
+      postedReqs.put(req); // matched in ampi::inorder, which calls back here
+      return;
+    }
+  }
+
+  req->complete = true;
+  if (req->isBlocked() && parent->numBlockedReqs != 0) {
+    parent->numBlockedReqs--;
+  }
+  // The caller (ampi::generic, or the thread itself) resumes the thread if
+  // this was the last request it was waiting for.
+}
+
+/* Start a scan (exclusive: MPI_Exscan semantics) and return its request. */
+static int ampiStartScan(const char* name, const void* sendbuf, void* recvbuf, int count,
+                         MPI_Datatype datatype, MPI_Op op, MPI_Comm comm, bool exclusive,
+                         MPI_Request* request) noexcept
+{
   handle_MPI_BOTTOM((void*&)sendbuf, datatype, recvbuf, datatype);
   handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
 
 #if AMPI_ERROR_CHECKING
-  if(op == MPI_OP_NULL)
-    return ampiErrhandler("AMPI_Scan", MPI_ERR_OP);
-  int ret = errorCheck("AMPI_Scan", comm, 1, count, 1, datatype, 1, 0, 0, 0, 0, sendbuf, 1, recvbuf, 1);
-  if(ret != MPI_SUCCESS)
+  if(op == MPI_OP_NULL) {
+    *request = MPI_REQUEST_NULL;
+    return ampiErrhandler(name, MPI_ERR_OP);
+  }
+  int ret = errorCheck(name, comm, 1, count, 1, datatype, 1, 0, 0, 0, 0, sendbuf, 1, recvbuf, 1);
+  if(ret != MPI_SUCCESS) {
+    *request = MPI_REQUEST_NULL;
     return ret;
+  }
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
+  ampiParent* pptr = getAmpiParent();
+  if (ptr->isInter())
+    CkAbort("AMPI does not implement MPI_Scan, MPI_Exscan, MPI_Iscan or MPI_Iexscan for Inter-communicators!");
   int size = ptr->getSize();
-
-  if (size == 1 && !getAmpiParent()->isInter(comm))
-    return copyDatatype(datatype, count, datatype, count, sendbuf, recvbuf);
-
-  int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
   int rank = ptr->getRank();
-  int mask = 0x1;
-  int dst;
-  std::vector<char> tmp_buf(blklen);
-  std::vector<char> partial_scan(blklen);
 
-  memcpy(recvbuf, sendbuf, blklen);
-  memcpy(partial_scan.data(), sendbuf, blklen);
-  while(mask < size){
-    dst = rank^mask;
-    if(dst < size){
-      ptr->sendrecv(partial_scan.data(), count, datatype, dst, MPI_SCAN_TAG,
-                    tmp_buf.data(), count, datatype, dst, MPI_SCAN_TAG, comm, MPI_STATUS_IGNORE);
-      if(rank > dst){
-        getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), partial_scan.data());
-        getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), recvbuf);
-      }else {
-        getAmpiParent()->applyOp(datatype, op, count, partial_scan.data(), tmp_buf.data());
-        memcpy(partial_scan.data(), tmp_buf.data(), blklen);
-      }
-    }
-    mask <<= 1;
+  if (size == 1) {
+    // Nothing to exchange: an inclusive scan is a copy (through the datatype,
+    // so non-contiguous types work), an exclusive one leaves recvbuf alone.
+    int ret = MPI_SUCCESS;
+    if (!exclusive && sendbuf != recvbuf)
+      ret = copyDatatype(datatype, count, datatype, count, sendbuf, recvbuf);
+    *request = pptr->getReqs().insert(new ScanReq(recvbuf, count, datatype, op, comm, rank, size,
+                                                  exclusive, 0, 0, ptr->getDDT(), AMPI_REQ_COMPLETED));
+    return ret;
   }
 
+  // Partial results are kept in the datatype's layout (see ScanReq), so
+  // non-contiguous types work. Ops may assign whole elements including
+  // trailing padding (AMPI's MAXLOC/MINLOC copy padded structs), so give
+  // every element, the last one too, max(extent, trueExtent) bytes, as
+  // MPICH does.
+  CkDDT_DataType* ddt = ptr->getDDT()->getType(datatype);
+  MPI_Aint span = count * std::max(ddt->getExtent(), ddt->getTrueExtent());
+
+  ScanReq* req = new ScanReq(recvbuf, count, datatype, op, comm, rank, size, exclusive,
+                             span, ddt->getTrueLB(), ptr->getDDT());
+  // Resolve the op now: MPI_Op_free while the scan is outstanding must not
+  // affect it (MPI-3.1 sec. 5.9.5), and freeOp drops the op's table entry.
+  req->func = pptr->op2StoredFunction(op, &req->userFunc);
+  copyDatatype(datatype, count, datatype, count, sendbuf, req->partialBuf());
+  if (!exclusive) {
+    copyDatatype(datatype, count, datatype, count, sendbuf, recvbuf); // no-op if in place
+  }
+  *request = pptr->getReqs().insert(req);
+  ptr->progressScan(req, nullptr, true);
+  return MPI_SUCCESS;
+}
+
+AMPI_API_IMPL(int, MPI_Scan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
+                             MPI_Op op, MPI_Comm comm)
+{
+  AMPI_API("AMPI_Scan", sendbuf, recvbuf, count, datatype, op, comm);
+  MPI_Request req;
+  int ret = ampiStartScan("AMPI_Scan", sendbuf, recvbuf, count, datatype, op, comm, false, &req);
+  if (ret != MPI_SUCCESS) return ret;
+  ampiParent* unused = getAmpiParent()->wait(&req, MPI_STATUS_IGNORE);
   return MPI_SUCCESS;
 }
 
@@ -5597,70 +6061,17 @@ AMPI_API_IMPL(int, MPI_Iscan, const void* sendbuf, void* recvbuf, int count, MPI
                               MPI_Op op, MPI_Comm comm, MPI_Request* request)
 {
   AMPI_API("AMPI_Iscan", sendbuf, recvbuf, count, datatype, op, comm, request);
-  // FIXME: implement non-blocking scan
-  int ret = MPI_Scan(sendbuf, recvbuf, count, datatype, op, comm);
-  *request = MPI_REQUEST_NULL;
-  return ret;
+  return ampiStartScan("AMPI_Iscan", sendbuf, recvbuf, count, datatype, op, comm, false, request);
 }
 
 AMPI_API_IMPL(int, MPI_Exscan, const void* sendbuf, void* recvbuf, int count, MPI_Datatype datatype,
                                MPI_Op op, MPI_Comm comm)
 {
   AMPI_API("AMPI_Exscan", sendbuf, recvbuf, count, datatype, op, comm);
-
-  handle_MPI_BOTTOM((void*&)sendbuf, datatype, recvbuf, datatype);
-  handle_MPI_IN_PLACE((void*&)sendbuf,recvbuf);
-
-#if AMPI_ERROR_CHECKING
-  if(op == MPI_OP_NULL)
-    return ampiErrhandler("AMPI_Exscan", MPI_ERR_OP);
-  int ret = errorCheck("AMPI_Excan", comm, 1, count, 1, datatype, 1, 0, 0, 0, 0, sendbuf, 1, recvbuf, 1);
-  if(ret != MPI_SUCCESS)
-    return ret;
-#endif
-
-  ampi *ptr = getAmpiInstance(comm);
-  int size = ptr->getSize();
-
-  if (size == 1 && !getAmpiParent()->isInter(comm))
-    return MPI_SUCCESS;
-
-  int blklen = ptr->getDDT()->getType(datatype)->getSize(count);
-  int rank = ptr->getRank();
-  int mask = 0x1;
-  int dst, flag;
-  std::vector<char> tmp_buf(blklen);
-  std::vector<char> partial_scan(blklen);
-
-  if (rank > 0) memcpy(recvbuf, sendbuf, blklen);
-  memcpy(partial_scan.data(), sendbuf, blklen);
-  flag = 0;
-  mask = 0x1;
-  while(mask < size){
-    dst = rank^mask;
-    if(dst < size){
-      ptr->sendrecv(partial_scan.data(), count, datatype, dst, MPI_EXSCAN_TAG,
-                    tmp_buf.data(), count, datatype, dst, MPI_EXSCAN_TAG, comm, MPI_STATUS_IGNORE);
-      if(rank > dst){
-        getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), partial_scan.data());
-        if(rank != 0){
-          if(flag == 0){
-            memcpy(recvbuf, tmp_buf.data(), blklen);
-            flag = 1;
-          }
-          else{
-            getAmpiParent()->applyOp(datatype, op, count, tmp_buf.data(), recvbuf);
-          }
-        }
-      }
-      else{
-        getAmpiParent()->applyOp(datatype, op, count, partial_scan.data(), tmp_buf.data());
-        memcpy(partial_scan.data(), tmp_buf.data(), blklen);
-      }
-      mask <<= 1;
-    }
-  }
-
+  MPI_Request req;
+  int ret = ampiStartScan("AMPI_Exscan", sendbuf, recvbuf, count, datatype, op, comm, true, &req);
+  if (ret != MPI_SUCCESS) return ret;
+  ampiParent* unused = getAmpiParent()->wait(&req, MPI_STATUS_IGNORE);
   return MPI_SUCCESS;
 }
 
@@ -5668,10 +6079,7 @@ AMPI_API_IMPL(int, MPI_Iexscan, const void* sendbuf, void* recvbuf, int count, M
                                 MPI_Op op, MPI_Comm comm, MPI_Request* request)
 {
   AMPI_API("AMPI_Iexscan", sendbuf, recvbuf, count, datatype, op, comm, request);
-  // FIXME: implement non-blocking exscan
-  int ret = MPI_Exscan(sendbuf, recvbuf, count, datatype, op, comm);
-  *request = MPI_REQUEST_NULL;
-  return ret;
+  return ampiStartScan("AMPI_Iexscan", sendbuf, recvbuf, count, datatype, op, comm, true, request);
 }
 
 AMPI_API_IMPL(int, MPI_Op_create, MPI_User_function *function, int commute, MPI_Op *op)
@@ -5780,6 +6188,31 @@ void SsendReq::start(MPI_Request reqIdx) noexcept {
   ptr->send(tag, ptr->getRank(), buf, count, type, src /*really, the destination*/, comm, I_SSEND, reqIdx);
 }
 
+CMI_WARN_UNUSED_RESULT ampiParent* AmpiRequest::blockUntilComplete(ampiParent* parent) noexcept {
+  bool viaColl = false;
+  int n = beginBlocking(parent, viaColl);
+  parent->numBlockedReqs = n;
+  parent = viaColl ? parent->blockOnColl() : parent->blockOnRecv();
+  endBlocking(parent);
+  return parent;
+}
+
+// An ATAReq receives nothing itself; its blocks do. Mark the ATAReq and every
+// block (ATAReq::setBlocked) and count the incomplete blocks, each of which
+// counts down numBlockedReqs when it completes. The default endBlocking
+// unmarks them all the same way. Used by MPI_Waitall and by campi's
+// request_awaiter; ATAReq::wait calls waitall on the blocks directly.
+int ATAReq::beginBlocking(ampiParent* parent, bool& viaColl) noexcept {
+  viaColl = false;
+  AmpiRequestList& reqList = parent->getReqs();
+  int n = 0;
+  for (MPI_Request ri : reqs) {
+    if (ri != MPI_REQUEST_NULL && !reqList[ri]->test(MPI_STATUS_IGNORE)) n++;
+  }
+  setBlocked(true);
+  return n;
+}
+
 CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
 
   if (cancelled) {
@@ -5789,10 +6222,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *st
   }
 
   if (!complete) {
-    parent->numBlockedReqs = 1;
-    setBlocked(true);
-    parent = parent->blockOnRecv(); // parent is updated in case an ampi thread is migrated while waiting for a message
-    setBlocked(false);
+    parent = blockUntilComplete(parent); // parent is updated in case an ampi thread is migrated while waiting for a message
   }
 
   AMPI_DEBUG("IReq::wait has resumed\n");
@@ -5811,10 +6241,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* IReq::wait(ampiParent* parent, MPI_Status *st
 
 CMI_WARN_UNUSED_RESULT ampiParent* RednReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
   if (!complete) {
-    parent->numBlockedReqs = 1;
-    setBlocked(true);
-    parent = parent->blockOnColl();
-    setBlocked(false);
+    parent = blockUntilComplete(parent);
   }
   AMPI_DEBUG("RednReq::wait has resumed\n");
   if (sts != MPI_STATUS_IGNORE) {
@@ -5826,10 +6253,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* RednReq::wait(ampiParent* parent, MPI_Status 
 
 CMI_WARN_UNUSED_RESULT ampiParent* GatherReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
   if (!complete) {
-    parent->numBlockedReqs = 1;
-    setBlocked(true);
-    parent = parent->blockOnColl();
-    setBlocked(false);
+    parent = blockUntilComplete(parent);
   }
   AMPI_DEBUG("GatherReq::wait has resumed\n");
   if (sts != MPI_STATUS_IGNORE) {
@@ -5841,10 +6265,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* GatherReq::wait(ampiParent* parent, MPI_Statu
 
 CMI_WARN_UNUSED_RESULT ampiParent* GathervReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
   if (!complete) {
-    parent->numBlockedReqs = 1;
-    setBlocked(true);
-    parent = parent->blockOnColl();
-    setBlocked(false);
+    parent = blockUntilComplete(parent);
   }
   AMPI_DEBUG("GathervReq::wait has resumed\n");
   if (sts != MPI_STATUS_IGNORE) {
@@ -5856,10 +6277,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* GathervReq::wait(ampiParent* parent, MPI_Stat
 
 CMI_WARN_UNUSED_RESULT ampiParent* SendReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
   if (!complete) {
-    parent->numBlockedReqs = 1;
-    setBlocked(true);
-    parent = parent->blockOnRecv();
-    setBlocked(false);
+    parent = blockUntilComplete(parent);
   }
   AMPI_DEBUG("SendReq::wait has resumed\n");
   if (sts != MPI_STATUS_IGNORE) {
@@ -5871,10 +6289,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* SendReq::wait(ampiParent* parent, MPI_Status 
 
 CMI_WARN_UNUSED_RESULT ampiParent* SsendReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
   if (!complete) {
-    parent->numBlockedReqs = 1;
-    setBlocked(true);
-    parent = parent->blockOnRecv();
-    setBlocked(false);
+    parent = blockUntilComplete(parent);
   }
   AMPI_DEBUG("SsendReq::wait has resumed\n");
   if (sts != MPI_STATUS_IGNORE) {
@@ -5900,6 +6315,19 @@ CMI_WARN_UNUSED_RESULT ampiParent* GReq::wait(ampiParent* parent, MPI_Status *st
   return parent;
 }
 
+CMI_WARN_UNUSED_RESULT ampiParent* ScanReq::wait(ampiParent* parent, MPI_Status *sts) noexcept {
+  if (!complete) {
+    // Rounds complete in ampi::progressScan, called from message arrival;
+    // it resumes this thread after the last one.
+    parent = blockUntilComplete(parent);
+  }
+  if (sts != MPI_STATUS_IGNORE) {
+    sts->MPI_COMM = comm;
+    sts->MPI_CANCEL = 0;
+  }
+  return parent;
+}
+
 AMPI_API_IMPL(int, MPI_Wait, MPI_Request *request, MPI_Status *sts)
 {
   AMPI_API("AMPI_Wait", request, sts);
@@ -5915,12 +6343,12 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::wait(MPI_Request *request, MPI_St
   }
   checkRequest(*request);
   ampiParent* pptr = this;
-  AmpiRequestList& reqs = getReqs();
+  AmpiRequestList* reqs = &getReqs();
 
 #if AMPIMSGLOG
   if(msgLogRead){
     (*fromPUPer)|pupBytes;
-    PUParray(*fromPUPer, (char *)reqs[*request]->buf, pupBytes);
+    PUParray(*fromPUPer, (char *)(*reqs)[*request]->buf, pupBytes);
     PUParray(*fromPUPer, (char *)sts, sizeof(MPI_Status));
     return MPI_SUCCESS;
   }
@@ -5928,27 +6356,27 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::wait(MPI_Request *request, MPI_St
 
 
   AMPI_DEBUG("AMPI_Wait request=%d reqs[*request]=%p reqs[*request]->tag=%d &reqs=%p\n",
-             *request, reqs[*request], (int)(reqs[*request]->tag), &reqs);
+             *request, (*reqs)[*request], (int)((*reqs)[*request]->tag), reqs);
   CkAssert(pptr->numBlockedReqs == 0);
 
-  AmpiRequest& waitReq = *reqs[*request];
+  AmpiRequest& waitReq = *(*reqs)[*request];
   pptr = waitReq.wait(pptr, sts);
-  reqs = pptr->getReqs();
+  reqs = &pptr->getReqs();
 
   CkAssert(pptr->numBlockedReqs == 0);
   AMPI_DEBUG("AMPI_Wait after calling wait, request=%d reqs[*request]=%p reqs[*request]->tag=%d\n",
-             *request, reqs[*request], (int)(reqs[*request]->tag));
+             *request, (*reqs)[*request], (int)((*reqs)[*request]->tag));
 
 #if AMPIMSGLOG
   if(msgLogWrite && record_msglog(pptr->thisIndex)){
-    (pptr->pupBytes) = getDDT()->getSize(reqs[*request]->type) * (reqs[*request]->count);
+    (pptr->pupBytes) = getDDT()->getSize((*reqs)[*request]->type) * ((*reqs)[*request]->count);
     (*(pptr->toPUPer))|(pptr->pupBytes);
-    PUParray(*(pptr->toPUPer), (char *)(reqs[*request]->buf), (pptr->pupBytes));
+    PUParray(*(pptr->toPUPer), (char *)((*reqs)[*request]->buf), (pptr->pupBytes));
     PUParray(*(pptr->toPUPer), (char *)sts, sizeof(MPI_Status));
   }
 #endif
 
-  reqs.freeNonPersReq(pptr, *request);
+  reqs->freeNonPersReq(pptr, *request);
 
   return MPI_SUCCESS;
 }
@@ -5958,7 +6386,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
   if (count == 0) return this;
 
   ampiParent* pptr = this;
-  AmpiRequestList& reqs = getReqs();
+  AmpiRequestList* reqs = &getReqs();
   CkAssert(numBlockedReqs == 0);
 
 #if AMPIMSGLOG
@@ -5968,7 +6396,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
         clearStatus(sts, i);
         continue;
       }
-      AmpiRequest *waitReq = reqs[request[i]];
+      AmpiRequest *waitReq = (*reqs)[request[i]];
       (*fromPUPer)|pupBytes;
       PUParray(*fromPUPer, (char *)(waitReq->buf), pupBytes);
       PUParray(*fromPUPer, (char *)(&sts[i]), sizeof(MPI_Status));
@@ -5983,7 +6411,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
       clearStatus(sts, i);
       continue;
     }
-    AmpiRequest& req = *reqs[request[i]];
+    AmpiRequest& req = *(*reqs)[request[i]];
     if (req.test((sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i])) {
 #if AMPIMSGLOG
       if(msgLogWrite && record_msglog(thisIndex)){
@@ -5993,7 +6421,13 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
         PUParray(*toPUPer, (char *)(&sts[i]), sizeof(MPI_Status));
       }
 #endif
-      reqs.freeNonPersReq(this, request[i]);
+      reqs->freeNonPersReq(this, request[i]);
+    }
+    else if (req.getType() == AMPI_ATA_REQ) {
+      // Marks its blocks and counts the incomplete ones; each of them
+      // decrements numBlockedReqs when it completes.
+      bool viaColl = false;
+      numBlockedReqs += req.beginBlocking(pptr, viaColl);
     }
     else {
       req.setBlocked(true);
@@ -6006,13 +6440,13 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
   // If any requests are incomplete, block until all have been completed
   if (numBlockedReqs > 0) {
     pptr = pptr->blockOnRecv();
-    reqs = pptr->getReqs(); //update pointer in case of migration while suspended
+    reqs = &pptr->getReqs(); //update pointer in case of migration while suspended
 
     for (int i=0; i<count; i++) {
       if (request[i] == MPI_REQUEST_NULL) {
         continue;
       }
-      AmpiRequest& req = *reqs[request[i]];
+      AmpiRequest& req = *(*reqs)[request[i]];
       if (!req.test((sts == MPI_STATUSES_IGNORE) ? MPI_STATUS_IGNORE : &sts[i])) {
         CkAbort("In AMPI_Waitall, all requests should have completed by now!");
       }
@@ -6024,7 +6458,7 @@ CMI_WARN_UNUSED_RESULT ampiParent* ampiParent::waitall(int count, MPI_Request re
         PUParray(*(pptr->toPUPer), (char *)(&sts[i]), sizeof(MPI_Status));
       }
 #endif
-      reqs.freeNonPersReq(pptr, request[i]);
+      reqs->freeNonPersReq(pptr, request[i]);
     }
   }
 
@@ -6053,7 +6487,7 @@ AMPI_API_IMPL(int, MPI_Waitany, int count, MPI_Request *request, int *idx, MPI_S
 
   ampiParent* pptr = getAmpiParent();
   CkAssert(pptr->numBlockedReqs == 0);
-  AmpiRequestList& reqs = pptr->getReqs();
+  AmpiRequestList* reqs = &pptr->getReqs();
   int nullReqs = 0;
 
   // First check for an already complete request
@@ -6062,10 +6496,10 @@ AMPI_API_IMPL(int, MPI_Waitany, int count, MPI_Request *request, int *idx, MPI_S
       nullReqs++;
       continue;
     }
-    AmpiRequest& req = *reqs[request[i]];
+    AmpiRequest& req = *(*reqs)[request[i]];
     if (req.test(sts)) {
-      reqs.unblockReqs(&request[0], i);
-      reqs.freeNonPersReq(pptr, request[i]);
+      reqs->unblockReqs(&request[0], i);
+      reqs->freeNonPersReq(pptr, request[i]);
       *idx = i;
       CkAssert(pptr->numBlockedReqs == 0);
       return MPI_SUCCESS;
@@ -6081,30 +6515,38 @@ AMPI_API_IMPL(int, MPI_Waitany, int count, MPI_Request *request, int *idx, MPI_S
     return MPI_SUCCESS;
   }
 
-  // block until one of the requests is completed
-  pptr->numBlockedReqs = 1;
-  pptr = pptr->blockOnRecv();
-  reqs = pptr->getReqs(); // update pointer in case of migration while suspended
+  // Block until one of the requests is completed. The thread is resumed when
+  // any blocked request completes; for an ATAReq that is any one of its
+  // blocks, which need not complete the ATAReq, so block again until a
+  // request in the list is complete.
+  while (true) {
+    pptr->numBlockedReqs = 1;
+    pptr = pptr->blockOnRecv();
+    reqs = &pptr->getReqs(); // update pointer in case of migration while suspended
 
-  for (int i=0; i<count; i++) {
-    if (request[i] == MPI_REQUEST_NULL) {
-      continue;
+    bool hasATAReq = false;
+    for (int i=0; i<count; i++) {
+      if (request[i] == MPI_REQUEST_NULL) {
+        continue;
+      }
+      AmpiRequest& req = *(*reqs)[request[i]];
+      if (req.test(sts)) {
+        reqs->unblockReqs(&request[0], count);
+        reqs->freeNonPersReq(pptr, request[i]);
+        *idx = i;
+        CkAssert(pptr->numBlockedReqs == 0);
+        return MPI_SUCCESS;
+      }
+      if (req.getType() == AMPI_ATA_REQ) hasATAReq = true;
     }
-    AmpiRequest& req = *reqs[request[i]];
-    if (req.test(sts)) {
-      reqs.unblockReqs(&request[i], count-i);
-      reqs.freeNonPersReq(pptr, request[i]);
-      *idx = i;
-      CkAssert(pptr->numBlockedReqs == 0);
+    if (!hasATAReq) {
+#if CMK_ERROR_CHECKING
+      CkAbort("In AMPI_Waitany, a request should have completed by now!");
+#endif
+      reqs->unblockReqs(&request[0], count);
       return MPI_SUCCESS;
     }
-
-    req.setBlocked(false);
   }
-#if CMK_ERROR_CHECKING
-  CkAbort("In AMPI_Waitany, a request should have completed by now!");
-#endif
-  return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, int *outcount,
@@ -6120,7 +6562,7 @@ AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, in
 
   ampiParent* pptr = getAmpiParent();
   CkAssert(pptr->numBlockedReqs == 0);
-  AmpiRequestList& reqs = pptr->getReqs();
+  AmpiRequestList* reqs = &pptr->getReqs();
   MPI_Status sts;
   int nullReqs = 0;
   *outcount = 0;
@@ -6131,12 +6573,12 @@ AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, in
       nullReqs++;
       continue;
     }
-    AmpiRequest& req = *reqs[array_of_requests[i]];
+    AmpiRequest& req = *(*reqs)[array_of_requests[i]];
     if (req.test(&sts)) {
       array_of_indices[(*outcount)] = i;
       if (array_of_statuses != MPI_STATUSES_IGNORE)
         array_of_statuses[(*outcount)] = sts;
-      reqs.freeNonPersReq(pptr, array_of_requests[i]);
+      reqs->freeNonPersReq(pptr, array_of_requests[i]);
       (*outcount)++;
     }
     else {
@@ -6145,7 +6587,7 @@ AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, in
   }
 
   if (*outcount > 0) {
-    reqs.unblockReqs(&array_of_requests[0], incount);
+    reqs->unblockReqs(&array_of_requests[0], incount);
     CkAssert(pptr->numBlockedReqs == 0);
     return MPI_SUCCESS;
   }
@@ -6154,34 +6596,41 @@ AMPI_API_IMPL(int, MPI_Waitsome, int incount, MPI_Request *array_of_requests, in
     CkAssert(pptr->numBlockedReqs == 0);
     return MPI_SUCCESS;
   }
-  else { // block until one of the requests is completed
-    pptr->numBlockedReqs = 1;
-    pptr = pptr->blockOnRecv();
-    reqs = pptr->getReqs(); // update pointer in case of migration while suspended
+  else {
+    // Block until one of the requests is completed; as in MPI_Waitany, the
+    // completion of one block of an ATAReq resumes the thread without
+    // completing the ATAReq, so block again until a request is complete.
+    while (true) {
+      pptr->numBlockedReqs = 1;
+      pptr = pptr->blockOnRecv();
+      reqs = &pptr->getReqs(); // update pointer in case of migration while suspended
 
-    for (int i=0; i<incount; i++) {
-      if (array_of_requests[i] == MPI_REQUEST_NULL) {
-        continue;
+      bool hasATAReq = false;
+      for (int i=0; i<incount; i++) {
+        if (array_of_requests[i] == MPI_REQUEST_NULL) {
+          continue;
+        }
+        AmpiRequest& req = *(*reqs)[array_of_requests[i]];
+        if (req.test(&sts)) {
+          array_of_indices[(*outcount)] = i;
+          if (array_of_statuses != MPI_STATUSES_IGNORE)
+            array_of_statuses[(*outcount)] = sts;
+          reqs->unblockReqs(&array_of_requests[0], incount);
+          reqs->freeNonPersReq(pptr, array_of_requests[i]);
+          *outcount = 1;
+          CkAssert(pptr->numBlockedReqs == 0);
+          return MPI_SUCCESS;
+        }
+        if (req.getType() == AMPI_ATA_REQ) hasATAReq = true;
       }
-      AmpiRequest& req = *reqs[array_of_requests[i]];
-      if (req.test(&sts)) {
-        array_of_indices[(*outcount)] = i;
-        if (array_of_statuses != MPI_STATUSES_IGNORE)
-          array_of_statuses[(*outcount)] = sts;
-        reqs.unblockReqs(&array_of_requests[i], incount-i);
-        reqs.freeNonPersReq(pptr, array_of_requests[i]);
-        *outcount = 1;
-        CkAssert(pptr->numBlockedReqs == 0);
+      if (!hasATAReq) {
+#if CMK_ERROR_CHECKING
+        CkAbort("In AMPI_Waitsome, a request should have completed by now!");
+#endif
+        reqs->unblockReqs(&array_of_requests[0], incount);
         return MPI_SUCCESS;
       }
-      else {
-        req.setBlocked(false);
-      }
     }
-#if CMK_ERROR_CHECKING
-    CkAbort("In AMPI_Waitsome, a request should have completed by now!");
-#endif
-    return MPI_SUCCESS;
   }
 }
 
@@ -6253,6 +6702,20 @@ bool GReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
   return complete;
 }
 
+bool ScanReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
+  if (sts != MPI_STATUS_IGNORE) {
+    sts->MPI_COMM = comm;
+    sts->MPI_CANCEL = 0;
+  }
+  return complete;
+}
+
+bool ScanReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
+{
+  ptr->progressScan(this, msg, deleteMsg);
+  return true;
+}
+
 bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
   ampiParent* pptr = getAmpiParent();
   AmpiRequestList& reqList = pptr->getReqs();
@@ -6274,6 +6737,14 @@ bool ATAReq::test(MPI_Status *sts/*=MPI_STATUS_IGNORE*/) noexcept {
   }
   complete = reqs.empty();
   return complete;
+}
+
+void ATAReq::setBlocked(bool b) noexcept {
+  AmpiRequest::setBlocked(b);
+  AmpiRequestList& reqList = getAmpiParent()->getReqs();
+  for (MPI_Request r : reqs) {
+    if (r != MPI_REQUEST_NULL) reqList[r]->setBlocked(b);
+  }
 }
 
 bool IReq::receive(ampi *ptr, AmpiMsg *msg, bool deleteMsg/*=true*/) noexcept
@@ -7511,7 +7982,35 @@ AMPI_API_IMPL(int, MPI_Ibsend, const void *buf, int count, MPI_Datatype type, in
                                int tag, MPI_Comm comm, MPI_Request *request)
 {
   AMPI_API("AMPI_Ibsend", buf, count, type, dest, tag, comm, request);
-  return MPI_Isend(buf, count, type, dest, tag, comm, request);
+
+  handle_MPI_BOTTOM((void*&)buf, type);
+
+#if AMPI_ERROR_CHECKING
+  int ret = errorCheck("AMPI_Ibsend", comm, 1, count, 1, type, 1, tag, 1, dest, 1, buf, 1);
+  if(ret != MPI_SUCCESS){
+    *request = MPI_REQUEST_NULL;
+    return ret;
+  }
+#endif
+
+#if AMPIMSGLOG
+  if(msgLogRead){
+    PUParray(*(getAmpiParent()->fromPUPer), (char *)request, sizeof(MPI_Request));
+    return MPI_SUCCESS;
+  }
+#endif
+
+  // The data is copied at once, so the request is already complete
+  ampi *ptr = getAmpiInstance(comm);
+  *request = ptr->send(tag, ptr->getRank(), buf, count, type, dest, comm, I_BSEND);
+
+#if AMPIMSGLOG
+  if(msgLogWrite && record_msglog(getAmpiParent()->thisIndex)){
+    PUParray(*(getAmpiParent()->toPUPer), (char *)request, sizeof(MPI_Request));
+  }
+#endif
+
+  return MPI_SUCCESS;
 }
 
 AMPI_API_IMPL(int, MPI_Irsend, const void *buf, int count, MPI_Datatype type, int dest,
@@ -7529,6 +8028,7 @@ void ampi::irecvBcast(void *buf, int count, MPI_Datatype type, int src,
   }
   AmpiRequestList& reqs = getReqs();
   IReq *newreq = parent->reqPool.newReq<IReq>(buf, count, type, src, MPI_BCAST_TAG, comm, getDDT());
+  newreq->resultByBcast = true; // the root sends the data with thisProxy.bcastResult
   *request = reqs.insert(newreq);
 
   AmpiMsg* msg = unexpectedBcastMsgs.get(MPI_BCAST_TAG, src);
@@ -7635,10 +8135,10 @@ AMPI_API_IMPL(int, MPI_Ireduce, const void *sendbuf, void *recvbuf, int count,
   }
 
   if (rank == root){
-    *request = ptr->postReq(new RednReq(recvbuf,count,type,comm,op,getDDT()));
+    *request = ptr->postCollReq(new RednReq(recvbuf,count,type,comm,op,getDDT()));
   }
   else {
-    *request = ptr->postReq(new RednReq(recvbuf,count,type,comm,op,getDDT(),AMPI_REQ_COMPLETED));
+    *request = ptr->postCollReq(new RednReq(recvbuf,count,type,comm,op,getDDT(),AMPI_REQ_COMPLETED));
   }
 
   CkReductionMsg *msg=makeRednMsg(ptr->getDDT()->getType(type),sendbuf,count,type,rank,size,op);
@@ -7791,7 +8291,7 @@ AMPI_API_IMPL(int, MPI_Iallgather, const void *sendbuf, int sendcount, MPI_Datat
     return copyDatatype(sendtype,sendcount,recvtype,recvcount,sendbuf,recvbuf);
   }
 
-  *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
+  *request = ptr->postCollReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()), /*resultByBcast=*/true);
 
   CkReductionMsg* msg = makeGatherMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback allgatherCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
@@ -7884,8 +8384,9 @@ AMPI_API_IMPL(int, MPI_Iallgatherv, const void *sendbuf, int sendcount, MPI_Data
     return copyDatatype(sendtype,sendcount,recvtype,recvcounts[0],sendbuf,recvbuf);
   }
 
-  *request = ptr->postReq(new GathervReq(recvbuf, size, recvtype, comm,
-                                         recvcounts, displs, getDDT()));
+  *request = ptr->postCollReq(new GathervReq(recvbuf, size, recvtype, comm,
+                                             recvcounts, displs, getDDT()),
+                              /*resultByBcast=*/true);
 
   CkReductionMsg* msg = makeGathervMsg(sendbuf, sendcount, sendtype, rank, size);
   CkCallback allgathervCB(CkIndex_ampi::irednResult(0), ptr->getProxy());
@@ -8016,10 +8517,10 @@ AMPI_API_IMPL(int, MPI_Igather, const void *sendbuf, int sendcount, MPI_Datatype
 #endif
 
   if (rank == root) {
-    *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
+    *request = ptr->postCollReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT()));
   }
   else {
-    *request = ptr->postReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT(), AMPI_REQ_COMPLETED));
+    *request = ptr->postCollReq(new GatherReq(recvbuf, recvcount, recvtype, comm, getDDT(), AMPI_REQ_COMPLETED));
   }
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
@@ -8173,12 +8674,14 @@ AMPI_API_IMPL(int, MPI_Igatherv, const void *sendbuf, int sendcount, MPI_Datatyp
 #endif
 
   if (rank == root) {
-    *request = ptr->postReq(new GathervReq(recvbuf, size, recvtype, comm,
-                                           recvcounts, displs, getDDT()));
+    *request = ptr->postCollReq(new GathervReq(recvbuf, size, recvtype, comm,
+                                               recvcounts, displs, getDDT()));
   }
   else {
-    *request = ptr->postReq(new GathervReq(recvbuf, size, recvtype, comm,
-                                           recvcounts, displs, getDDT(), AMPI_REQ_COMPLETED));
+    // recvcounts and displs are significant only at the root and may be NULL
+    // elsewhere, so a non-root's (already complete) request copies none.
+    *request = ptr->postCollReq(new GathervReq(recvbuf, 0, recvtype, comm,
+                                               nullptr, nullptr, getDDT(), AMPI_REQ_COMPLETED));
   }
 
   int rootIdx = ptr->comm2CommStruct(comm).getIndexForRank(root);
@@ -8673,18 +9176,27 @@ AMPI_API_IMPL(int, MPI_Ialltoall, const void *sendbuf, int sendcount, MPI_Dataty
   }
 
   int rank = ptr->getRank();
-  int itemsize = getDDT()->getSize(sendtype) * sendcount;
+  // Block j of either buffer starts j*count*extent bytes in (MPI 3.1 5.8);
+  // the send side used the type's size, which is less than its extent for a
+  // non-contiguous type, so such blocks were sent from the wrong offsets.
+  int itemextent = getDDT()->getExtent(sendtype) * sendcount;
   int extent = getDDT()->getExtent(recvtype) * recvcount;
 
   // use an ATAReq to non-block the caller and get a request ptr
   ATAReq *newreq = new ATAReq(size*2);
+  if (sendbuf == recvbuf) { // MPI_IN_PLACE: send from a copy, since receives land in recvbuf
+    MPI_Aint lo = 0, hi = 0;
+    for (int i=0; i<size; i++)
+      inPlaceSpan(lo, hi, extent*i, recvcount, recvtype);
+    sendbuf = inPlaceCopy(newreq->sendCopy, recvbuf, lo, hi);
+  }
   for (int i=0; i<size; i++) {
     ptr->irecv((char*)recvbuf+(extent*i), recvcount, recvtype, i, MPI_ATA_TAG, comm, &newreq->reqs[i]);
   }
 
   for (int i=0; i<size; i++) {
     int dst = (rank+i) % size;
-    newreq->reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemsize*dst), sendcount,
+    newreq->reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, ((char*)sendbuf)+(itemextent*dst), sendcount,
                                      sendtype, dst, comm, I_SEND);
   }
   *request = ptr->postReq(newreq);
@@ -8823,6 +9335,12 @@ AMPI_API_IMPL(int, MPI_Ialltoallv, void *sendbuf, int *sendcounts, int *sdispls,
 
   // use an ATAReq to non-block the caller and get a request ptr
   ATAReq *newreq = new ATAReq(size*2);
+  if (sendbuf == recvbuf) { // MPI_IN_PLACE: send from a copy, since receives land in recvbuf
+    MPI_Aint lo = 0, hi = 0;
+    for (int i=0; i<size; i++)
+      inPlaceSpan(lo, hi, (MPI_Aint)extent*rdispls[i], recvcounts[i], recvtype);
+    sendbuf = inPlaceCopy(newreq->sendCopy, recvbuf, lo, hi);
+  }
   for (int i=0; i<size; i++) {
     ptr->irecv((char*)recvbuf+(extent*rdispls[i]), recvcounts[i],
                recvtype, i, MPI_ATA_TAG, comm, &newreq->reqs[i]);
@@ -8978,6 +9496,12 @@ AMPI_API_IMPL(int, MPI_Ialltoallw, const void *sendbuf, const int *sendcounts, c
 
   // use an ATAReq to non-block the caller and get a request ptr
   ATAReq *newreq = new ATAReq(size*2);
+  if (sendbuf == recvbuf) { // MPI_IN_PLACE: send from a copy, since receives land in recvbuf
+    MPI_Aint lo = 0, hi = 0;
+    for (int i=0; i<size; i++)
+      inPlaceSpan(lo, hi, rdispls[i], recvcounts[i], recvtypes[i]);
+    sendbuf = inPlaceCopy(newreq->sendCopy, recvbuf, lo, hi);
+  }
   for (int i=0; i<size; i++) {
     ptr->irecv((char*)recvbuf+rdispls[i], recvcounts[i], recvtypes[i],
                i, MPI_ATA_TAG, comm, &newreq->reqs[i]);
@@ -8985,12 +9509,45 @@ AMPI_API_IMPL(int, MPI_Ialltoallw, const void *sendbuf, const int *sendcounts, c
 
   for (int i=0; i<size; i++) {
     int dst = (rank+i) % size;
-    newreq->reqs[i] = ptr->send(MPI_ATA_TAG, rank, (char*)sendbuf+sdispls[dst],
-                                sendcounts[dst], sendtypes[dst], dst, comm, I_SEND);
+    newreq->reqs[size+i] = ptr->send(MPI_ATA_TAG, rank, (char*)sendbuf+sdispls[dst],
+                                     sendcounts[dst], sendtypes[dst], dst, comm, I_SEND);
   }
   *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
+}
+
+/* One block of a neighbor collective's buffers. */
+struct NborBlock {
+  const void *buf;
+  int count;
+  MPI_Datatype type;
+};
+
+/* Posts a neighbor collective's receives and sends on ptr's communicator,
+   adding their requests to reqs: block j of the receive buffer, recvBlock(j),
+   comes from the j-th source and block i of the send buffer, sendBlock(i),
+   goes to the i-th destination (ampi::getNeighborLists). An MPI_PROC_NULL
+   neighbor's block is skipped. */
+template <class RecvBlock, class SendBlock>
+static void postNeighborExchange(ampi *ptr, RecvBlock recvBlock, SendBlock sendBlock,
+                                 std::vector<MPI_Request> &reqs) noexcept
+{
+  std::vector<int> srcs, dsts;
+  ptr->getNeighborLists(srcs, dsts);
+  MPI_Comm comm = ptr->getComm();
+  int rank = ptr->getRank();
+  for (int j = 0; j < (int)srcs.size(); j++) {
+    if (srcs[j] == MPI_PROC_NULL) continue;
+    NborBlock b = recvBlock(j);
+    MPI_Request req;
+    ptr->irecv(const_cast<void*>(b.buf), b.count, b.type, srcs[j], MPI_NBOR_TAG, comm, &req);
+    reqs.push_back(req);
+  }
+  for (int i : ptr->neighborSendOrder(dsts)) {
+    NborBlock b = sendBlock(i);
+    reqs.push_back(ptr->send(MPI_NBOR_TAG, rank, b.buf, b.count, b.type, dsts[i], comm, I_SEND));
+  }
 }
 
 AMPI_API_IMPL(int, MPI_Neighbor_alltoall, const void* sendbuf, int sendcount, MPI_Datatype sendtype,
@@ -9017,28 +9574,15 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoall, const void* sendbuf, int sendcount, MP
 
   ampiParent *pptr = getAmpiParent();
   ampi *ptr = pptr->comm2ampi(comm);
-  int rank_in_comm = ptr->getRank();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint sextent = getDDT()->getExtent(sendtype) * sendcount; // block i at i*sendcount*extent (MPI 3.1 7.7)
+  MPI_Aint rextent = getDDT()->getExtent(recvtype) * recvcount;
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*j, recvcount, recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf + sextent*i, sendcount, sendtype}; };
 
-  if (ptr->getSize() == 1)
-    return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
-  int itemsize = getDDT()->getSize(sendtype) * sendcount;
-  int extent = getDDT()->getExtent(recvtype) * recvcount;
-
-  std::vector<MPI_Request> reqs(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv(((char*)recvbuf)+(extent*j), recvcount, recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*i)),
-                                      sendcount, sendtype, neighbors[i], comm, I_SEND);
-  }
-
+  std::vector<MPI_Request> reqs;
+  postNeighborExchange(ptr, recvBlock, sendBlock, reqs);
   pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
@@ -9070,31 +9614,16 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoall, const void* sendbuf, int sendcount, M
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank();
-
-  if (ptr->getSize() == 1) {
-    *request = ptr->postReq(getAmpiParent()->reqPool.newReq<IReq>(recvbuf,recvcount,recvtype,rank_in_comm,MPI_NBOR_TAG,comm,
-                            getDDT(), AMPI_REQ_COMPLETED));
-    return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
-  }
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
-  int itemsize = getDDT()->getSize(sendtype) * sendcount;
-  int extent = getDDT()->getExtent(recvtype) * recvcount;
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint sextent = getDDT()->getExtent(sendtype) * sendcount; // block i at i*sendcount*extent (MPI 3.1 7.7)
+  MPI_Aint rextent = getDDT()->getExtent(recvtype) * recvcount;
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*j, recvcount, recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf + sextent*i, sendcount, sendtype}; };
 
   // use an ATAReq to non-block the caller and get a request ptr
-  ATAReq *newreq = new ATAReq(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv((char*)recvbuf+(extent*j), recvcount, recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    newreq->reqs[num_neighbors+i] = ptr->send(MPI_ATA_TAG, rank_in_comm, ((char*)sendbuf)+(i*itemsize),
-                                              sendcount, sendtype, neighbors[i], comm, I_SEND);
-  }
+  ATAReq *newreq = new ATAReq();
+  postNeighborExchange(ptr, recvBlock, sendBlock, newreq->reqs);
   *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
@@ -9124,28 +9653,15 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallv, const void* sendbuf, const int *sendc
 
   ampiParent *pptr = getAmpiParent();
   ampi *ptr = pptr->comm2ampi(comm);
-  int rank_in_comm = ptr->getRank();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint sextent = getDDT()->getExtent(sendtype); // displacements count elements
+  MPI_Aint rextent = getDDT()->getExtent(recvtype);
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*rdispls[j], recvcounts[j], recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf + sextent*sdispls[i], sendcounts[i], sendtype}; };
 
-  if (ptr->getSize() == 1)
-    return copyDatatype(sendtype, sendcounts[0], recvtype, recvcounts[0], sendbuf, recvbuf);
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
-  int itemsize = getDDT()->getSize(sendtype);
-  int extent = getDDT()->getExtent(recvtype);
-
-  std::vector<MPI_Request> reqs(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv(((char*)recvbuf)+(extent*rdispls[j]), recvcounts[j], recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+(itemsize*sdispls[i])),
-                                      sendcounts[i], sendtype, neighbors[i], comm, I_SEND);
-  }
-
+  std::vector<MPI_Request> reqs;
+  postNeighborExchange(ptr, recvBlock, sendBlock, reqs);
   pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
@@ -9178,31 +9694,16 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoallv, const void* sendbuf, const int *send
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank();
-
-  if (ptr->getSize() == 1) {
-    *request = ptr->postReq(getAmpiParent()->reqPool.newReq<IReq>(recvbuf,recvcounts[0],recvtype,rank_in_comm,MPI_NBOR_TAG,comm,
-                            getDDT(), AMPI_REQ_COMPLETED));
-    return copyDatatype(sendtype, sendcounts[0], recvtype, recvcounts[0], sendbuf, recvbuf);
-  }
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
-  int itemsize = getDDT()->getSize(sendtype);
-  int extent = getDDT()->getExtent(recvtype);
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint sextent = getDDT()->getExtent(sendtype); // displacements count elements
+  MPI_Aint rextent = getDDT()->getExtent(recvtype);
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*rdispls[j], recvcounts[j], recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf + sextent*sdispls[i], sendcounts[i], sendtype}; };
 
   // use an ATAReq to non-block the caller and get a request ptr
-  ATAReq *newreq = new ATAReq(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv((char*)recvbuf+(extent*rdispls[j]), recvcounts[j], recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (char*)sendbuf+(itemsize*sdispls[i]),
-                                              sendcounts[i], sendtype, neighbors[i], comm, I_SEND);
-  }
+  ATAReq *newreq = new ATAReq();
+  postNeighborExchange(ptr, recvBlock, sendBlock, newreq->reqs);
   *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
@@ -9232,26 +9733,13 @@ AMPI_API_IMPL(int, MPI_Neighbor_alltoallw, const void* sendbuf, const int *sendc
 
   ampiParent *pptr = getAmpiParent();
   ampi *ptr = pptr->comm2ampi(comm);
-  int rank_in_comm = ptr->getRank();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rdispls[j], recvcounts[j], recvtypes[j]}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf + sdispls[i], sendcounts[i], sendtypes[i]}; };
 
-  if (ptr->getSize() == 1)
-    return copyDatatype(sendtypes[0], sendcounts[0], recvtypes[0], recvcounts[0], sendbuf, recvbuf);
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
-
-  std::vector<MPI_Request> reqs(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv(((char*)recvbuf)+rdispls[j], recvcounts[j], recvtypes[j],
-               neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
-                                      sendcounts[i], sendtypes[i], neighbors[i], comm, I_SEND);
-  }
-
+  std::vector<MPI_Request> reqs;
+  postNeighborExchange(ptr, recvBlock, sendBlock, reqs);
   pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
@@ -9284,29 +9772,14 @@ AMPI_API_IMPL(int, MPI_Ineighbor_alltoallw, const void* sendbuf, const int *send
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank();
-
-  if (ptr->getSize() == 1) {
-    *request = ptr->postReq(getAmpiParent()->reqPool.newReq<IReq>(recvbuf,recvcounts[0],recvtypes[0],rank_in_comm,MPI_NBOR_TAG,comm,
-                            getDDT(), AMPI_REQ_COMPLETED));
-    return copyDatatype(sendtypes[0], sendcounts[0], recvtypes[0], recvcounts[0], sendbuf, recvbuf);
-  }
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rdispls[j], recvcounts[j], recvtypes[j]}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf + sdispls[i], sendcounts[i], sendtypes[i]}; };
 
   // use an ATAReq to non-block the caller and get a request ptr
-  ATAReq *newreq = new ATAReq(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv((char*)recvbuf+rdispls[j], recvcounts[j], recvtypes[j],
-               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, (void*)((char*)sendbuf+sdispls[i]),
-                                              sendcounts[i], sendtypes[i], neighbors[i], comm, I_SEND);
-  }
+  ATAReq *newreq = new ATAReq();
+  postNeighborExchange(ptr, recvBlock, sendBlock, newreq->reqs);
   *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
@@ -9336,27 +9809,14 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgather, const void* sendbuf, int sendcount, M
 
   ampiParent *pptr = getAmpiParent();
   ampi *ptr = pptr->comm2ampi(comm);
-  int rank_in_comm = ptr->getRank();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint rextent = getDDT()->getExtent(recvtype) * recvcount;
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*j, recvcount, recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf, sendcount, sendtype}; };
 
-  if (ptr->getSize() == 1)
-    return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
-
-  int extent = getDDT()->getExtent(recvtype) * recvcount;
-  std::vector<MPI_Request> reqs(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv(((char*)recvbuf)+(extent*j), recvcount, recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount,
-                                      sendtype, neighbors[i], comm, I_SEND);
-  }
-
+  std::vector<MPI_Request> reqs;
+  postNeighborExchange(ptr, recvBlock, sendBlock, reqs);
   pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
@@ -9388,30 +9848,15 @@ AMPI_API_IMPL(int, MPI_Ineighbor_allgather, const void* sendbuf, int sendcount, 
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank();
-
-  if (ptr->getSize() == 1) {
-    *request = ptr->postReq(getAmpiParent()->reqPool.newReq<IReq>(recvbuf,recvcount,recvtype,rank_in_comm,MPI_NBOR_TAG,comm,
-                            getDDT(), AMPI_REQ_COMPLETED));
-    return copyDatatype(sendtype, sendcount, recvtype, recvcount, sendbuf, recvbuf);
-  }
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint rextent = getDDT()->getExtent(recvtype) * recvcount;
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*j, recvcount, recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf, sendcount, sendtype}; };
 
   // use an ATAReq to non-block the caller and get a request ptr
-  ATAReq *newreq = new ATAReq(num_neighbors*2);
-  int extent = getDDT()->getExtent(recvtype) * recvcount;
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv((char*)recvbuf+(extent*j), recvcount, recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount,
-                                              sendtype, neighbors[i], comm, I_SEND);
-  }
+  ATAReq *newreq = new ATAReq();
+  postNeighborExchange(ptr, recvBlock, sendBlock, newreq->reqs);
   *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
@@ -9441,25 +9886,14 @@ AMPI_API_IMPL(int, MPI_Neighbor_allgatherv, const void* sendbuf, int sendcount, 
 
   ampiParent *pptr = getAmpiParent();
   ampi *ptr = pptr->comm2ampi(comm);
-  int rank_in_comm = ptr->getRank();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint rextent = getDDT()->getExtent(recvtype);
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*displs[j], recvcounts[j], recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf, sendcount, sendtype}; };
 
-  if (ptr->getSize() == 1)
-    return copyDatatype(sendtype, sendcount, recvtype, recvcounts[0], sendbuf, recvbuf);
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
-  int extent = getDDT()->getExtent(recvtype);
-  std::vector<MPI_Request> reqs(num_neighbors*2);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv(((char*)recvbuf)+(extent*displs[j]), recvcounts[j], recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &reqs[j]);
-  }
-  for (int i=0; i<num_neighbors; i++) {
-    reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount,
-                                      sendtype, neighbors[i], comm, I_SEND);
-  }
-
+  std::vector<MPI_Request> reqs;
+  postNeighborExchange(ptr, recvBlock, sendBlock, reqs);
   pptr = pptr->waitall(reqs.size(), reqs.data());
   return MPI_SUCCESS;
 }
@@ -9491,30 +9925,15 @@ AMPI_API_IMPL(int, MPI_Ineighbor_allgatherv, const void* sendbuf, int sendcount,
 #endif
 
   ampi *ptr = getAmpiInstance(comm);
-  int rank_in_comm = ptr->getRank();
-
-  if (ptr->getSize() == 1) {
-    *request = ptr->postReq(getAmpiParent()->reqPool.newReq<IReq>(recvbuf,recvcounts[0],recvtype,rank_in_comm,MPI_NBOR_TAG,comm,
-                            getDDT(), AMPI_REQ_COMPLETED));
-    return copyDatatype(sendtype, sendcount, recvtype, recvcounts[0], sendbuf, recvbuf);
-  }
-
-  std::vector<int>& neighbors = ptr->getNeighbors();
-  ptr->sortNeighborsByLocality(neighbors);
-  int num_neighbors = neighbors.size();
+  const char *sbuf = (const char*)sendbuf;
+  char *rbuf = (char*)recvbuf;
+  MPI_Aint rextent = getDDT()->getExtent(recvtype);
+  auto recvBlock = [&](int j) -> NborBlock { return {rbuf + rextent*displs[j], recvcounts[j], recvtype}; };
+  auto sendBlock = [&](int i) -> NborBlock { return {sbuf, sendcount, sendtype}; };
 
   // use an ATAReq to non-block the caller and get a request ptr
-  ATAReq *newreq = new ATAReq(num_neighbors*2);
-  int extent = getDDT()->getExtent(recvtype);
-  for (int j=0; j<num_neighbors; j++) {
-    ptr->irecv((char*)recvbuf+(extent*displs[j]), recvcounts[j], recvtype,
-               neighbors[j], MPI_NBOR_TAG, comm, &newreq->reqs[j]);
-  }
-
-  for (int i=0; i<num_neighbors; i++) {
-    newreq->reqs[num_neighbors+i] = ptr->send(MPI_NBOR_TAG, rank_in_comm, sendbuf, sendcount,
-                                              sendtype, neighbors[i], comm, I_SEND);
-  }
+  ATAReq *newreq = new ATAReq();
+  postNeighborExchange(ptr, recvBlock, sendBlock, newreq->reqs);
   *request = ptr->postReq(newreq);
 
   return MPI_SUCCESS;
@@ -9700,7 +10119,8 @@ AMPI_API_IMPL(int, MPI_Intercomm_create, MPI_Comm localComm, int localLeader, MP
     }
   }
 
-  *newintercomm = localPtr->intercommCreate(remoteVec,rootIndex,localComm);
+  int remoteRootIndex = (localRank == localLeader) ? peerPtr->getIndexForRank(remoteLeader) : -1;
+  *newintercomm = localPtr->intercommCreate(remoteVec,rootIndex,remoteRootIndex);
 
   return MPI_SUCCESS;
 }
@@ -9739,10 +10159,33 @@ AMPI_API_IMPL(int, MPI_Intercomm_merge, MPI_Comm intercomm, int high, MPI_Comm *
   return MPI_SUCCESS;
 }
 
+// MPI_Abort ends the whole program with errorcode as its exit status: PE 0
+// calls CkExit(errorcode), and the calling rank never returns to user code.
+// A nonzero errorcode whose low 8 bits are 0 exits with status 1.
 AMPI_API_IMPL(int, MPI_Abort, MPI_Comm comm, int errorcode)
 {
   AMPI_API_INIT("AMPI_Abort", comm, errorcode);
-  CkAbort("AMPI: Application called MPI_Abort()!\n");
+  if (!CtvAccess(ampiInitDone)) {
+    CkAbort("AMPI: Application called MPI_Abort() with error code %d before MPI_Init\n",
+            errorcode);
+    return errorcode;
+  }
+  ampiParent *ptr = getAmpiParent();
+  CkError("AMPI: Application called MPI_Abort() on rank %d of MPI_COMM_WORLD with error code %d\n",
+          ptr->thisIndex, errorcode);
+  // Only the low 8 bits reach the exit status; keep a nonzero code nonzero.
+  int exitCode = (errorcode != 0 && (errorcode & 0xff) == 0) ? 1 : errorcode;
+  ampiPeMgrProxy[0].exitWithCode(exitCode);
+  if (tcharm_campi) {
+    // campi: no thread; this runs on the scheduler's stack inside the rank's
+    // coroutine. The scheduler processes the exit messages here and the
+    // process exits from inside ConverseExit, so this call does not return.
+    CsdScheduler(-1);
+  } else {
+    // Suspend the rank for good; the PE's scheduler carries out the exit. The
+    // loop keeps a spurious wake-up from returning into user code.
+    while (true) ptr = ptr->block();
+  }
   return errorcode;
 }
 
@@ -10160,7 +10603,7 @@ AMPI_API_IMPL(int, MPI_Error_string, int errorcode, char *errorstring, int *resu
 AMPI_API_IMPL(int, MPI_Comm_group, MPI_Comm comm, MPI_Group *group)
 {
   AMPI_API("AMPI_Comm_Group", comm, group);
-  *group = getAmpiParent()->comm2group(comm);
+  *group = getAmpiParent()->commGroupHandle(comm);
   return MPI_SUCCESS;
 }
 
@@ -10289,7 +10732,8 @@ AMPI_API_IMPL(int, MPI_Group_free, MPI_Group *group)
   AMPI_API("AMPI_Group_free", group, *group);
   ampiParent *ptr = getAmpiParent();
   if (*group != MPI_GROUP_EMPTY && *group != MPI_GROUP_NULL) {
-    ptr->freeGroupStruct(*group);
+    if (!ptr->freeGroupStruct(*group))
+      return ampiErrhandler("AMPI_Group_free", MPI_ERR_GROUP);
   }
   *group = MPI_GROUP_NULL;
   return MPI_SUCCESS;
@@ -10324,7 +10768,7 @@ AMPI_API_IMPL(int, MPI_Comm_create, MPI_Comm comm, MPI_Group group, MPI_Comm* ne
     else{
       /* use rank in 'comm' of the 0th rank in 'group'
        * as identical 'color' of all ranks in 'group' */
-      MPI_Comm_group(comm, &group_of_comm);
+      group_of_comm = getAmpiParent()->comm2group(comm); // internal: no reference to free
       zero = 0;
       MPI_Group_translate_ranks(group, 1, &zero, group_of_comm, &color);
       key = rank_in_group;
@@ -10372,26 +10816,19 @@ AMPI_API_IMPL(int, MPI_Comm_create_group, MPI_Comm comm, MPI_Group group, int ta
   MPI_Group_translate_ranks(group, groupSize, groupPids.data(), parentGroup, pids.data());
   MPI_Group_free(&parentGroup);
 
-  MPI_Comm commOld, tmpInter;
-  for (int i=0; i<groupSize; i*=2) {
-    int groupId = (i == 0) ? groupRank : groupRank/i;
-    commOld = *newcomm;
-
-    if (groupId % 2 == 0) {
-      if ((groupId+1)*i < groupSize) {
-        MPI_Intercomm_create(*newcomm, 0, comm, pids[(groupId+1)*i], tag, &tmpInter);
-        MPI_Intercomm_merge(tmpInter, 0, newcomm);
-      }
-    }
-    else {
-      MPI_Intercomm_create(*newcomm, 0, comm, pids[(groupId+1)*i], tag, &tmpInter);
-      MPI_Intercomm_merge(tmpInter, 1, newcomm);
-    }
-
-    if (*newcomm != commOld) {
-      MPI_Comm_free(&tmpInter);
-      MPI_Comm_free(&commOld);
-    }
+  // Blocks of 1, 2, 4, ... group ranks merge pairwise: at each step the even
+  // block's leader and the odd block's leader create an intercommunicator
+  // over comm, and the two blocks merge it (the even block first).
+  for (int step = 1; step < groupSize; step *= 2) {
+    const int block = groupRank / step;
+    const int partner = (block % 2 == 0) ? block + 1 : block - 1;
+    if (partner * step >= groupSize) continue; // the last block has no partner at this step
+    MPI_Comm inter, merged;
+    MPI_Intercomm_create(*newcomm, 0, comm, pids[partner * step], tag, &inter);
+    MPI_Intercomm_merge(inter, block % 2, &merged);
+    MPI_Comm_free(&inter);
+    MPI_Comm_free(newcomm);
+    *newcomm = merged;
   }
 
   return MPI_SUCCESS;
@@ -10563,11 +11000,9 @@ AMPI_API_IMPL(int, MPI_Cart_create, MPI_Comm comm_old, int ndims, const int *dim
     ampiCommStruct &c = getAmpiParent()->getCommStruct(*comm_cart);
     ampiTopology *topo = c.getTopology();
     topo->setndims(ndims);
-    std::vector<int> dimsv(dims, dims+ndims), periodsv(periods, periods+ndims), nborsv;
+    std::vector<int> dimsv(dims, dims+ndims), periodsv(periods, periods+ndims);
     topo->setdims(dimsv);
     topo->setperiods(periodsv);
-    getAmpiInstance(*comm_cart)->findNeighbors(*comm_cart, newrank, nborsv);
-    topo->setnbors(nborsv);
   }
 
   return MPI_SUCCESS;
@@ -10592,16 +11027,13 @@ AMPI_API_IMPL(int, MPI_Graph_create, MPI_Comm comm_old, int nnodes, const int *i
   *comm_graph = getAmpiInstance(comm_old)->commCreate(vec, COMM_GRAPH);
   ampiTopology &topo = *getAmpiParent()->getCommStruct(*comm_graph).getTopology();
 
-  std::vector<int> index_(index, index+nnodes), edges_, nborsv;
+  std::vector<int> index_(index, index+nnodes), edges_;
   topo.setnvertices(nnodes);
   topo.setindex(index_);
 
   for (int i = 0; i < index[nnodes - 1]; i++)
     edges_.push_back(edges[i]);
   topo.setedges(edges_);
-
-  getAmpiInstance(*comm_graph)->findNeighbors(*comm_graph, newrank, nborsv);
-  topo.setnbors(nborsv);
 
   return MPI_SUCCESS;
 }
@@ -10670,12 +11102,15 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int so
       return ampiErrhandler("AMPI_Dist_graph_create", MPI_ERR_TOPOLOGY);
     }
     int counter = 0;
+    const int commSize = getAmpiInstance(comm_old)->getSize();
     for (int i=0; i<n; i++) {
-      if ((sources[i] < 0) || (degrees[i] < 0)) {
+      if ((sources[i] < 0) || (sources[i] >= commSize) || (degrees[i] < 0)) {
         return ampiErrhandler("AMPI_Dist_graph_create", MPI_ERR_TOPOLOGY);
       }
       for (int j=0; j<degrees[i]; j++) {
-        if ((destinations[counter] < 0) || (weights != MPI_UNWEIGHTED && weights[counter] < 0)) {
+        if ((destinations[counter] < 0) || (destinations[counter] >= commSize) ||
+            weights == MPI_WEIGHTS_EMPTY ||
+            (weights != MPI_UNWEIGHTED && weights[counter] < 0)) {
           return ampiErrhandler("AMPI_Dist_graph_create", MPI_ERR_TOPOLOGY);
         }
         counter++;
@@ -10686,116 +11121,71 @@ AMPI_API_IMPL(int, MPI_Dist_graph_create, MPI_Comm comm_old, int n, const int so
   ampiParent *ptr = getAmpiParent();
   std::vector<int> vec = ptr->group2vec(ptr->comm2group(comm_old));
   *comm_dist_graph = getAmpiInstance(comm_old)->commCreate(vec, COMM_DIST_GRAPH);
-  ampiCommStruct &c = getAmpiParent()->getCommStruct(*comm_dist_graph);
-  ampiTopology *topo = c.getTopology();
+  ampiTopology *topo = getAmpiParent()->getCommStruct(*comm_dist_graph).getTopology();
+  const int p = vec.size();
 
-  int p = c.getSize();
-
-  std::vector<int> edgeListIn(p, 0);
-  std::vector<int> edgeListOut(p, 0);
-  std::vector<std::vector<int> > edgeMatrixIn(p);
-  std::vector<std::vector<int> > edgeMatrixOut(p);
-
-  for (int i=0; i<p; i++) {
-    std::vector<int> tmpVector(p, 0);
-    edgeMatrixIn[i] = tmpVector;
-    edgeMatrixOut[i] = tmpVector;
-  }
-
-  int index = 0;
-  for (int i=0; i<n; i++) {
-    for (int j=0; j<degrees[i]; j++) {
-      edgeMatrixOut[ sources[i] ][ edgeListOut[sources[i]]++ ] = destinations[index];
-      edgeMatrixIn[ destinations[index] ][ edgeListIn[destinations[index]]++ ] = sources[i];
-      index++;
-    }
-  }
-
-  std::vector<int> edgeCount(2*p);
-  std::vector<int> totalcount(2);
-  int sends = 0;
-  for (int i=0; i<p; i++) {
-    if (edgeListIn[i] > 0) {
-      edgeCount[2*i] = 1;
-      sends++;
-    }
-    else {
-      edgeCount[2*i] = 0;
-    }
-    if (edgeListOut[i] > 0) {
-      edgeCount[2*i+1] = 1;
-      sends++;
-    }
-    else {
-      edgeCount[2*i+1] = 0;
-    }
-  }
-
-  // Compute total number of ranks with incoming or outgoing edges for each rank
-  MPI_Reduce_scatter_block(edgeCount.data(), totalcount.data(), 2, MPI_INT, MPI_SUM, comm_old);
-
-  std::vector<MPI_Request> requests(sends, MPI_REQUEST_NULL);
-  int count = 0;
-  for (int i=0; i<p; i++) {
-    if (edgeListIn[i] > 0) {
-      if (edgeListIn[i] == p) {
-        edgeMatrixIn[i].push_back(1);
-      }
-      else {
-        edgeMatrixIn[i][edgeListIn[i]] = 1;
-      }
-      MPI_Isend(edgeMatrixIn[i].data(), edgeListIn[i]+1, MPI_INT, i, 0, comm_old, &requests[count++]);
-    }
-    if (edgeListOut[i] > 0) {
-      if (edgeListOut[i] == p) {
-        edgeMatrixOut[i].push_back(-1);
-      }
-      else {
-        edgeMatrixOut[i][edgeListOut[i]] = -1;
-      }
-      MPI_Isend(edgeMatrixOut[i].data(), edgeListOut[i]+1, MPI_INT, i, 0, comm_old, &requests[count++]);
-    }
-  }
-
-  // Receive all non-local incoming and outgoing edges
-  int numEdges;
-  MPI_Status status;
-  std::vector<int> saveSources, saveDestinations;
-  for (int i=0; i<2; i++) {
-    for (int j=0; j<totalcount[i]; j++) {
-      MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, comm_old, &status);
-      MPI_Get_count(&status, MPI_INT, &numEdges);
-      std::vector<int> saveEdges(numEdges);
-      MPI_Recv(saveEdges.data(), numEdges, MPI_INT, status.MPI_SOURCE, 0, comm_old, MPI_STATUS_IGNORE);
-
-      if (saveEdges[numEdges-1] > 0) {
-        for (int k=0; k<numEdges-1; k++) {
-          saveSources.push_back(saveEdges[k]);
-        }
-      }
-      else {
-        for (int k=0; k<numEdges-1; k++) {
-          saveDestinations.push_back(saveEdges[k]);
-        }
-      }
-    }
-  }
-
-  topo->setDestinations(saveDestinations);
-  topo->setSources(saveSources);
-  topo->setOutDegree(saveDestinations.size());
-  topo->setInDegree(saveSources.size());
-
-  topo->setAreSourcesWeighted(weights != MPI_UNWEIGHTED);
-  topo->setAreDestsWeighted(weights != MPI_UNWEIGHTED);
-  if (topo->areSourcesWeighted()) {
-    std::vector<int> tmpWeights(weights, weights+n);
-    topo->setSourceWeights(tmpWeights);
-    topo->setDestWeights(tmpWeights);
-  }
-
-  ptr = ptr->waitall(sends, requests.data());
+  ampiDistGraphExchange x(p, n, sources, degrees, destinations, weights);
+  MPI_Alltoall(x.sendCounts2.data(), 2, MPI_INT, x.recvCounts2.data(), 2, MPI_INT, comm_old);
+  x.sizeReceive();
+  MPI_Alltoallv(x.sendBuf.data(), x.sendCounts.data(), x.sendDispls.data(), MPI_INT,
+                x.recvBuf.data(), x.recvCounts.data(), x.recvDispls.data(), MPI_INT, comm_old);
+  x.setTopology(topo, weights != MPI_UNWEIGHTED);
   return MPI_SUCCESS;
+}
+
+ampiDistGraphExchange::ampiDistGraphExchange(int p, int n, const int sources[], const int degrees[],
+                                             const int destinations[], const int weights[]) noexcept
+  : sendCounts2(2*p, 0), recvCounts2(2*p, 0), sendCounts(p), sendDispls(p),
+    recvCounts(p), recvDispls(p)
+{
+  std::vector<std::vector<int>> in(p), out(p); // per peer: (neighbor, weight) pairs
+  for (int i=0, e=0; i<n; i++) {
+    for (int j=0; j<degrees[i]; j++, e++) {
+      const int w = (weights == MPI_UNWEIGHTED) ? 1 : weights[e];
+      in[destinations[e]].insert(in[destinations[e]].end(), {sources[i], w});
+      out[sources[i]].insert(out[sources[i]].end(), {destinations[e], w});
+    }
+  }
+  for (int i=0; i<p; i++) {
+    sendCounts2[2*i] = in[i].size();
+    sendCounts2[2*i+1] = out[i].size();
+    sendCounts[i] = in[i].size() + out[i].size();
+    sendDispls[i] = sendBuf.size();
+    sendBuf.insert(sendBuf.end(), in[i].begin(), in[i].end());
+    sendBuf.insert(sendBuf.end(), out[i].begin(), out[i].end());
+  }
+}
+
+void ampiDistGraphExchange::sizeReceive() noexcept
+{
+  int total = 0;
+  for (int j=0; j<(int)recvCounts.size(); j++) {
+    recvCounts[j] = recvCounts2[2*j] + recvCounts2[2*j+1];
+    recvDispls[j] = total;
+    total += recvCounts[j];
+  }
+  recvBuf.resize(total);
+}
+
+void ampiDistGraphExchange::setTopology(ampiTopology *topo, bool weighted) const noexcept
+{
+  std::vector<int> srcs, srcWeights, dsts, dstWeights;
+  for (int j=0; j<(int)recvCounts.size(); j++) {
+    const int *b = recvBuf.data() + recvDispls[j];
+    for (int k=0; k<recvCounts2[2*j]; k+=2) { srcs.push_back(b[k]); srcWeights.push_back(b[k+1]); }
+    b += recvCounts2[2*j];
+    for (int k=0; k<recvCounts2[2*j+1]; k+=2) { dsts.push_back(b[k]); dstWeights.push_back(b[k+1]); }
+  }
+  topo->setSources(srcs);
+  topo->setDestinations(dsts);
+  topo->setInDegree(srcs.size());
+  topo->setOutDegree(dsts.size());
+  topo->setAreSourcesWeighted(weighted);
+  topo->setAreDestsWeighted(weighted);
+  if (weighted) {
+    topo->setSourceWeights(srcWeights);
+    topo->setDestWeights(dstWeights);
+  }
 }
 
 AMPI_API_IMPL(int, MPI_Topo_test, MPI_Comm comm, int *status)
@@ -11135,7 +11525,7 @@ AMPI_API_IMPL(int, MPI_Dist_graph_neighbors, MPI_Comm comm, int maxindegree, int
     destinations[i] = tmpDestinations[i];
   }
 
-  if (topo->areSourcesWeighted()) {
+  if (topo->areSourcesWeighted() && sourceweights != MPI_UNWEIGHTED && destweights != MPI_UNWEIGHTED) {
     for (int i=0; i<maxindegree; i++) {
       sourceweights[i] = tmpSourceWeights[i];
     }
@@ -11151,26 +11541,58 @@ AMPI_API_IMPL(int, MPI_Dist_graph_neighbors, MPI_Comm comm, int maxindegree, int
   return MPI_SUCCESS;
 }
 
-/* Used by MPI_Cart_create & MPI_Graph_create */
-void ampi::findNeighbors(MPI_Comm comm, int rank, std::vector<int>& neighbors) const noexcept {
-  int max_neighbors = 0;
-  ampiParent *ptr = getAmpiParent();
-  if (ptr->isGraph(comm)) {
-    MPI_Graph_neighbors_count(comm, rank, &max_neighbors);
-    neighbors.resize(max_neighbors);
-    MPI_Graph_neighbors(comm, rank, max_neighbors, &neighbors[0]);
-  }
-  else if (ptr->isCart(comm)) {
-    int num_dims;
-    MPI_Cartdim_get(comm, &num_dims);
-    max_neighbors = 2*num_dims;
-    for (int i=0; i<max_neighbors; i++) {
-      int src, dest;
-      MPI_Cart_shift(comm, i/2, (i%2==0)?1:-1, &src, &dest);
-      if (dest != MPI_PROC_NULL)
-        neighbors.push_back(dest);
+/* This rank's neighbors in its communicator's topology, in the order of MPI
+   3.1 section 7.6: block j of a neighbor collective's receive buffer comes
+   from srcs[j], block i of its send buffer goes to dsts[i]. A Cartesian
+   topology lists, for each dimension, the neighbor at -1 and then the one at
+   +1, including MPI_PROC_NULL at the edge of a non-periodic dimension. */
+void ampi::getNeighborLists(std::vector<int>& srcs, std::vector<int>& dsts) const noexcept {
+  ampiParent *pptr = getAmpiParent();
+  MPI_Comm comm = getComm();
+  const ampiTopology *topo = myComm->getTopology();
+  if (pptr->isCart(comm)) {
+    int ndims = topo->getndims();
+    for (int d = 0; d < ndims; d++) {
+      int lo, hi;
+      MPI_Cart_shift(comm, d, 1, &lo, &hi);
+      srcs.push_back(lo);
+      srcs.push_back(hi);
     }
+    dsts = srcs;
   }
+  else if (pptr->isGraph(comm)) {
+    int n;
+    MPI_Graph_neighbors_count(comm, getRank(), &n);
+    srcs.resize(n);
+    MPI_Graph_neighbors(comm, getRank(), n, srcs.data());
+    dsts = srcs;
+  }
+  else if (pptr->isDistGraph(comm)) {
+    srcs = topo->getSources();
+    dsts = topo->getDestinations();
+  }
+  else {
+    CkAbort("AMPI> a neighbor collective needs a communicator with a topology");
+  }
+}
+
+/* The indices into dsts in the order to send. Sends to one rank keep their
+   order, which is the order in which that rank posts the matching receives:
+   in a Cartesian topology the block for the +1 neighbor goes before the one
+   for -1, since the receiver posts its receive from -1 first, and the two
+   neighbors are the same rank in a periodic dimension of size 1 or 2. Ranks
+   on other PEs go first, so that their messages overlap with the PE-local
+   ones, which are delivered inline. */
+std::vector<int> ampi::neighborSendOrder(const std::vector<int>& dsts) noexcept {
+  std::vector<int> order;
+  bool cart = getAmpiParent()->isCart(getComm());
+  for (int i = 0; i < (int)dsts.size(); i++) {
+    int k = cart ? (i ^ 1) : i;
+    if (dsts[k] != MPI_PROC_NULL) order.push_back(k);
+  }
+  std::stable_partition(order.begin(), order.end(),
+                        [&](int k) { return !thisProxy[dsts[k]].ckLocal(); });
+  return order;
 }
 
 /* Factorization code by Orion. Idea thrashed out by Orion and Prakash */
@@ -11326,10 +11748,6 @@ AMPI_API_IMPL(int, MPI_Cart_sub, MPI_Comm comm, const int *remain_dims, MPI_Comm
   newtopo->setdims(dimsv);
   newtopo->setperiods(periodsv);
 
-  std::vector<int> nborsv;
-  getAmpiInstance(*newcomm)->findNeighbors(*newcomm, getAmpiParent()->getRank(*newcomm), nborsv);
-  newtopo->setnbors(nborsv);
-
   return MPI_SUCCESS;
 }
 
@@ -11388,11 +11806,52 @@ CLINKAGE int AMPI_Get_argc()
   return CkGetArgc();
 }
 
-CLINKAGE int AMPI_Migrate(MPI_Info hints)
+// Without +ampiMigrateWithCollectives, MPI_COMM_WORLD's array is created with
+// static insertion and anytime migration off (stable locations), so the
+// runtime keeps no copy of a broadcast to it for a rank that is moving
+// (doc/internals/array-broadcast-migration.md). The only results at risk are
+// those delivered as a broadcast to that array: MPI_Iallreduce,
+// MPI_Iallgather(v), MPI_Ibarrier and MPI_Ibcast on MPI_COMM_WORLD. Results
+// sent to the rank's own element (MPI_Ireduce and MPI_Igather(v) at the root,
+// MPI_Iscatter, MPI_Ialltoall*, MPI_Ineighbor_*, MPI_Iscan) follow a migrating
+// element through the location manager, and every other communicator lives
+// on a child array (ampi::createNewChildAmpiSync, dynamic insertion) whose
+// broadcasts the runtime stores; neither is checked.
+void ampiCheckNoCollectiveOutstanding() noexcept
 {
-  AMPI_API("AMPI_Migrate", hints);
+  if (CkpvAccess(isMigrateWithCollsEnabled)) return;
+  ampiParent *parent = getAmpiParent();
+  AmpiRequestList &reqs = parent->getReqs();
+  for (int i = 0; i < reqs.size(); i++) {
+    AmpiRequest *req = reqs[i];
+    if (req == NULL || req->complete || !req->resultByBcast) continue;
+    if (req->comm != MPI_COMM_WORLD) continue;
+    CkAbort("AMPI> rank %d called AMPI_Migrate with a non-blocking collective outstanding "
+            "(MPI_Request %d). Complete it first, or run with +ampiMigrateWithCollectives.\n",
+            parent->thisIndex, i);
+  }
+}
+
+int ampiParseMigrateInfo(MPI_Info hints, AmpiMigrateAction *out, int max) noexcept
+{
+  int n = 0;
+  auto add = [&](AmpiMigrateKind kind, const char *dir) {
+    if (n == max)
+      CkAbort("AMPI> Error: AMPI_Migrate info asks for more than %d actions\n", max);
+    out[n].kind = kind;
+    out[n].dir[0] = '\0';
+    if (dir != nullptr) {
+      strncpy(out[n].dir, dir, sizeof(out[n].dir) - 1);
+      out[n].dir[sizeof(out[n].dir) - 1] = '\0';
+    }
+    n++;
+  };
   int nkeys, exists;
-  char key[MPI_MAX_INFO_KEY], value[MPI_MAX_INFO_VAL];
+  // One byte more than the limits: MPI_Info_get copies MPI_MAX_INFO_VAL
+  // bytes without a terminator and the terminator is written after them;
+  // MPI_Info_get_nthkey writes a MPI_MAX_INFO_KEY-character key plus its
+  // terminator.
+  char key[MPI_MAX_INFO_KEY + 1], value[MPI_MAX_INFO_VAL + 1];
 
   MPI_Info_get_nkeys(hints, &nkeys);
 
@@ -11405,18 +11864,10 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
     else if (strncmp(key, "ampi_load_balance", MPI_MAX_INFO_KEY) == 0) {
 
       if (strncmp(value, "sync", MPI_MAX_INFO_VAL) == 0) {
-        int oldPe = CkMyPe();
-        TCHARM_Migrate();
-        if (oldPe != CkMyPe()) {
-          removeUnimportantArrayObjsfromPeCache();
-        }
+        add(AmpiMigrateKind::LB_SYNC, nullptr);
       }
       else if (strncmp(value, "async", MPI_MAX_INFO_VAL) == 0) {
-        int oldPe = CkMyPe();
-        TCHARM_Async_Migrate();
-        if (oldPe != CkMyPe()) {
-          removeUnimportantArrayObjsfromPeCache();
-        }
+        add(AmpiMigrateKind::LB_ASYNC, nullptr);
       }
       else if (strncmp(value, "false", MPI_MAX_INFO_VAL) == 0) {
         /* do nothing */
@@ -11440,21 +11891,16 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
         else {
           CkAbort("AMPI> Error: No checkpoint directory name given to AMPI_Migrate\n");
         }
-        ampi * ptr = getAmpiInstance(MPI_COMM_WORLD)->barrier();
-        ptr->getParent()->startCheckpoint(&value[offset]);
+        add(AmpiMigrateKind::CKPT_TO_FILE, &value[offset]);
       }
       else if (strncmp(value, "in_memory", MPI_MAX_INFO_VAL) == 0) {
-#if CMK_MEM_CHECKPOINT
-        ampi * ptr = getAmpiInstance(MPI_COMM_WORLD)->barrier();
-        ptr->getParent()->startCheckpoint("");
-#else
-        CkPrintf("AMPI> Error: In-memory checkpoint/restart is not enabled!\n");
-        CkAbort("AMPI> Error: Recompile Charm++/AMPI with CMK_MEM_CHECKPOINT.\n");
-#endif
+        add(AmpiMigrateKind::CKPT_IN_MEMORY, nullptr);
+      }
+      else if (strncmp(value, "rollback", MPI_MAX_INFO_VAL) == 0) {
+        add(AmpiMigrateKind::CKPT_ROLLBACK, nullptr);
       }
       else if (strncmp(value, "message_logging", MPI_MAX_INFO_VAL) == 0) {
-        CkPrintf("AMPI> Error: Message logging is not enabled!\n");
-        CkAbort("AMPI> Error: Recompile Charm++/AMPI with CMK_MESSAGE_LOGGING.\n");
+        add(AmpiMigrateKind::CKPT_MESSAGE_LOGGING, nullptr);
       }
       else if (strncmp(value, "false", MPI_MAX_INFO_VAL) == 0) {
         /* do nothing */
@@ -11467,8 +11913,87 @@ CLINKAGE int AMPI_Migrate(MPI_Info hints)
       CkPrintf("WARNING: Unknown MPI_Info key given to AMPI_Migrate: %s\n", key);
     }
   }
+  return n;
+}
 
+CLINKAGE int AMPI_Migrate(MPI_Info hints)
+{
+  AMPI_API("AMPI_Migrate", hints);
 
+  // Plain data on the rank's stack: the stack moves with the thread across
+  // TCHARM_Migrate and a restart from a checkpoint, a process-heap block
+  // (std::vector, std::string) does not.
+  AmpiMigrateAction actions[AMPI_MIGRATE_MAX_ACTIONS];
+  const int nactions = ampiParseMigrateInfo(hints, actions, AMPI_MIGRATE_MAX_ACTIONS);
+  for (int i = 0; i < nactions; i++) {
+    const AmpiMigrateAction &a = actions[i];
+    switch (a.kind) {
+      case AmpiMigrateKind::LB_SYNC: {
+        ampiCheckNoCollectiveOutstanding();
+        int oldPe = CkMyPe();
+        TCHARM_Migrate();
+        if (oldPe != CkMyPe()) {
+          removeUnimportantArrayObjsfromPeCache();
+        }
+        break;
+      }
+      case AmpiMigrateKind::LB_ASYNC: {
+        ampiCheckNoCollectiveOutstanding();
+        int oldPe = CkMyPe();
+        TCHARM_Async_Migrate();
+        if (oldPe != CkMyPe()) {
+          removeUnimportantArrayObjsfromPeCache();
+        }
+        break;
+      }
+      case AmpiMigrateKind::CKPT_TO_FILE: {
+        ampi * ptr = getAmpiInstance(MPI_COMM_WORLD)->barrier();
+        ptr->getParent()->startCheckpoint(a.dir);
+        break;
+      }
+      case AmpiMigrateKind::CKPT_IN_MEMORY: {
+#if CMK_MEM_CHECKPOINT
+        ampi * ptr = getAmpiInstance(MPI_COMM_WORLD)->barrier();
+        ptr->getParent()->startCheckpoint("");
+#else
+        CkPrintf("AMPI> Error: In-memory checkpoint/restart is not enabled!\n");
+        CkAbort("AMPI> Error: Recompile Charm++/AMPI with CMK_MEM_CHECKPOINT.\n");
+#endif
+        break;
+      }
+      // The rollback destroys every rank and restores it from the last
+      // in-memory checkpoint, whose thread was suspended inside the
+      // AMPI_Migrate(in_memory) call that took the checkpoint. The checkpoint's
+      // callback is delivered again, so that earlier call returns a second
+      // time, and this call never returns. The core refuses a rollback with no
+      // completed checkpoint or after a migration since the checkpoint.
+      case AmpiMigrateKind::CKPT_ROLLBACK: {
+#if CMK_MEM_CHECKPOINT
+        ampi * ptr = getAmpiInstance(MPI_COMM_WORLD)->barrier();
+        ptr->getParent()->startRollback();
+#else
+        CkPrintf("AMPI> Error: In-memory checkpoint/restart is not enabled!\n");
+        CkAbort("AMPI> Error: Recompile Charm++/AMPI with CMK_MEM_CHECKPOINT.\n");
+#endif
+        break;
+      }
+      case AmpiMigrateKind::CKPT_MESSAGE_LOGGING:
+        CkPrintf("AMPI> Error: Message logging is not enabled!\n");
+        CkAbort("AMPI> Error: Recompile Charm++/AMPI with CMK_MESSAGE_LOGGING.\n");
+        break;
+    }
+  }
+
+  return MPI_SUCCESS;
+}
+
+// The number of rollbacks to the last in-memory checkpoint; the count is kept
+// by the runtime, outside the ranks, so a rollback does not reset it.
+CLINKAGE
+int AMPI_Rollback_count(int *count)
+{
+  AMPI_API("AMPI_Rollback_count", count);
+  *count = CkMemCheckpointRollbacks();
   return MPI_SUCCESS;
 }
 

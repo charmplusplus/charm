@@ -159,7 +159,7 @@ void LBDatabase::Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned
 void LBDatabase::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destIDs, int nDests, unsigned int bytes, int nMsgs)
 {
 #if CMK_LBDB_ON
-  if (StatsOn() && _lb_args.traceComm()) {
+  if (nDests > 0 && StatsOn() && _lb_args.traceComm()) {
     LBCommData* item_ptr;
 
     auto *activeRec = CkActiveLocRec();
@@ -260,6 +260,9 @@ void LBDatabase::ClearLoads(void)
 #if CMK_LB_CPUTIMER
       obj->data.cpuTime = 0.0;
 #endif
+#if CMK_CUDA
+      obj->data.gpuTime = 0.0;
+#endif
     }
   }
   delete commTable;
@@ -326,5 +329,17 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 
   CmiAssert(obj != NULL);
   obj->setTiming(cputime);
+#endif
+}
+
+void LBDatabase::EstObjGPULoad(const LDObjHandle &_h, double gputime)
+{
+#if CMK_CUDA && CMK_LBDB_ON
+  LBObj *const obj = LbObj(_h);
+
+  CmiAssert(obj != NULL);
+  obj->setGPUTiming(gputime);
+#else
+  CmiAbort("LBDatabase::EstObjGPULoad called but CMK_CUDA is not set");
 #endif
 }

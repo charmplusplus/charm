@@ -19,6 +19,7 @@ using std::ostringstream;
 #include "charm++.h"
 #include "ck.h"
 #include "ckcheckpoint.h"
+#include "memory-isomalloc.h"
 #include "CkCheckpoint.decl.h"
 
 void noopit(const char*, ...)
@@ -425,6 +426,11 @@ void CkPupROData(PUP::er &p)
 	    CkAbort("You cannot add readonlies and restore from checkpoint...");
 	}
 	for(int i=0;i<_numReadonlies;i++) _readonlyTable[i]->pupData(p);
+
+	// The element id layout of the launch that wrote the checkpoint: hash keys of
+	// that width live inside the ids being restored, so it replaces the one
+	// computed at this startup.
+	ck::objid::pupLayout(p);
 	if (!p.isUnpacking()) _numReadonlyMsgs=_readonlyMsgs.size();
         p|_numReadonlyMsgs;
 	for(int i=0;i<_numReadonlyMsgs; i++){
@@ -555,12 +561,6 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
     numGroups = idTable->size();
   }
   p|numGroups;
-  if (p.isUnpacking()) {
-    if(CkMyPe()==0)  
-      numObjects = numGroups+1; 
-    else 
-      numObjects = 1;
-  }
   DEBCHK("[%d] CkPupPerPlaceData %s: numGroups = %d\n", CkMyPe(),p.typeString(),numGroups);
 
   std::vector<GroupInfo> tmpInfo(numGroups);
@@ -580,6 +580,7 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
   }
   p|tmpInfo;
 
+  int maxGroup = 0;
   for (i = 0; i < numGroups; i++) 
   {
     if (!tmpInfo[i].present)
@@ -599,6 +600,8 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
       {
         creationFn(gID, eIdx, env);
       }
+      if(gID.idx > maxGroup)
+          maxGroup = gID.idx;
 
       CkFreeSysMsg(m);
     }   // end of unPacking
@@ -607,6 +610,13 @@ static void CkPupPerPlaceData(PUP::er &p, GroupIDTable *idTable, GroupTable *obj
 
     // if using migration constructor, you'd better have a pup
     gobj->virtual_pup(p);
+  }
+
+  if (p.isUnpacking()) {
+    if(CkMyPe()==0)
+      numObjects = maxGroup+1;
+    else
+      numObjects = 1;
   }
 }
 
@@ -678,7 +688,8 @@ void CkPupArrayElementsData(PUP::er &p, int notifyListeners)
 	}
 }
 
-#if __FAULT__
+// also used by the in-memory checkpoint, which does not need __FAULT__
+#if __FAULT__ || CMK_MEM_CHECKPOINT
 int  CkCountArrayElements(){
     int numGroups = CkpvAccess(_groupIDTable)->size();
     int i;
@@ -738,6 +749,14 @@ static bool checkpointOne(const char* dirname, CkCallback& cb, bool requestStatu
 	}
 
 	if(CmiFclose(fRO)!=0)
+	{
+	  return false;
+	}
+
+	// The address range Isomalloc managed, so that a restart with another
+	// process count unpacks the checkpointed thread stacks and heaps at the
+	// same addresses (CmiIsomallocInitExtent reads it from +restart's directory).
+	if (!CmiIsomallocWriteRegion(getCheckpointFileName(dirname, "Isomalloc").c_str()))
 	{
 	  return false;
 	}
@@ -902,10 +921,24 @@ void CkRestartMain(const char* dirname, CkArgMsg *args){
             }
 	  }
 
-        _inrestart = false;
+	// _inrestart is one flag per process, and CkLocMgr::pup reads it while a PE
+	// restores its groups (CkPupGroupData above): clear it only once every PE of
+	// the process is past that, as it was set before the barrier after the
+	// readonlys. It is cleared before _initDone, not after: _initDone runs the
+	// messages buffered during startup, and one creating a group (sent by the
+	// program once PE 0 has delivered the restart callback) would abort in
+	// Group::Group while _inrestart is set (ckreduction.C).
+	CmiNodeBarrier();
+	if (CmiMyRank() == 0) _inrestart = false;
 
-   	if (CmiMyRank()==0) _initDone();  // this rank will trigger other ranks
-   	//_initDone();
+	// Every PE finishes its own initialization here, as the shrink/expand restart
+	// path already does. The other ranks of a process used to rely on the readonly
+	// broadcast from PE 0 (bdcastRO -> _roRestartHandler) to reach _initDone. On
+	// reconverse that broadcast is relayed to the ranks of a remote process by the
+	// process's rank 0, inside a handler, and rank 0 was already blocked in the first
+	// node barrier of its own _initDone waiting for those very ranks: a deadlock
+	// whenever a process had more than one PE (charm #4018).
+	_initDone();
 	CkMemCheckPT::inRestarting = false;
 	if(CkMyPe()==0) {
 		CmiPrintf("[%d]CkRestartMain done. sending out callback.\n",CkMyPe());

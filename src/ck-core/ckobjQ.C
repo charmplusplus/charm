@@ -18,6 +18,7 @@
 #include "envelope.h"
 #include "queueing.h"
 #include "ckobjQ.h"
+#include "conv-lists.h"
 
 CkpvDeclare(TokenPool*, _tokenPool);
 

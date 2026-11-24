@@ -40,8 +40,8 @@ void check_test(int argc, char** argv) {
   CmiUInt2 uint2;
   CmiUInt4 uint4;
   CmiUInt8 uint8;
-  CmiFloat4 float4;
-  CmiFloat8 float8;
+  float float4;
+  double float8;
 
   if (CmiMyPe()!=0) return;
 
@@ -79,11 +79,11 @@ void check_test(int argc, char** argv) {
   }
 
   if (sizeof(float4) != 4) {
-    CmiPrintf("Error: sizeof(CmiFloat4) is %zu!\n",sizeof(float4));
+    CmiPrintf("Error: sizeof(float) is %zu!\n",sizeof(float4));
     exit(1);
   }
   if (sizeof(float8) != 8) {
-    CmiPrintf("Error: sizeof(CmiFloat8) is %zu!\n",sizeof(float8));
+    CmiPrintf("Error: sizeof(double) is %zu!\n",sizeof(float8));
     exit(1);
   }
 

@@ -30,8 +30,8 @@ server.o: server.C server.decl.h server.h
 	$(CHARMC) -c $<
 
 test: all
-	$(call run, ./server ++remote-shell ssh ++server ++server-port 1234 +p2 $(OPTS) &)
+	$(call run, ./server ++server ++server-port 1234 +p2 $(OPTS) &)
 	./client localhost 1234 4 1 0 <python.code
 	sleep 2
-	$(call run, ./server ++remote-shell ssh ++server ++server-port 1234 +p2 $(OPTS) &)
+	$(call run, ./server ++server ++server-port 1234 +p2 $(OPTS) &)
 	./client localhost 1234 4 0 0 <python.code

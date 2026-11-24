@@ -35,7 +35,11 @@ OBJS=megatest.o \
      inlineem.o \
      completion_test.o \
      groupdependence.o \
-     listsend.o
+     listsend.o \
+     arraymaps.o \
+     futures.o \
+     callbackkinds.o \
+     nodereduction.o
 
 CIFILES =  \
       arrayring.def.h  immediatering.def.h  nodering.def.h   rotest.def.h  \
@@ -45,7 +49,8 @@ CIFILES =  \
       groupcast.def.h  migration.def.h      queens.def.h     varraystest.def.h\
       groupring.def.h  nodecast.def.h       reduction.def.h  varsizetest.def.h\
       groupsectiontest.def.h multisectiontest.def.h inlineem.def.h varsizetest2.def.h\
-      groupmulti.def.h completion_test.def.h groupdependence.def.h listsend.def.h
+      groupmulti.def.h completion_test.def.h groupdependence.def.h listsend.def.h\
+      arraymaps.def.h futures.def.h callbackkinds.def.h nodereduction.def.h
 
 .SUFFIXES:
 .SUFFIXES: .o .C .def.h .decl.h .ci .h
@@ -68,11 +73,14 @@ include $(DEPENDFILE)
 clean:
 	rm -r -f conv-host megatest megatest.exe megatest.pdb megatest.ilk *.o *.decl.h *.def.h *.log *.sts *~ *.bak charmrun SunWS_cache
 
+# The arraymaps line adds the ConfigurableRRMap case and DefaultArrayMap's
+# per-process block placement (see arraymaps.C).
 test: megatest
 	$(call run, ./megatest +p1 )
 	$(call run, ./megatest +p2 )
 	$(call run, ./megatest +p3 )
 	$(call run, ./megatest +p4 )
+	$(call run, ./megatest +p4 -only -arraymaps +useNodeBlkMapping +ConfigurableRRMap "4 2 0 1 1 0" )
 
 testp: megatest
 	$(call run, ./megatest +p$(P) )

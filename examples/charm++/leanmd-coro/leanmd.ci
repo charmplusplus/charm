@@ -1,0 +1,49 @@
+mainmodule leanmd {
+
+  readonly CProxy_Main mainProxy;       //central controller
+  readonly CProxy_Cell cellArray;     //array that houses atoms
+  readonly CProxy_Compute computeArray; //computational kernels
+
+  readonly int cellArrayDimX;		// X dimension of the Cell array
+  readonly int cellArrayDimY;		// Y dimension of the Cell array
+  readonly int cellArrayDimZ;		// Y dimension of the Cell array
+  readonly int finalStepCount;		// number of steps in the simulaion
+
+  // The run() entries are coroutines (ck::coroutine X::run() in Main.h,
+  // Cell.C and Compute.C); they wait at CK_WHEN sites for the [inbox]
+  // entries, whose bodies are generated.
+
+  //central controller chare
+  mainchare [migratable] Main {
+    entry Main(CkArgMsg* msg);
+    entry [inbox, reductiontarget] void computesCreated(); //called when computes have been created
+    entry [inbox, reductiontarget] void done(long long sum); //called when all cells are done, with the particle checksum
+
+    //this get called after the main constructor has called cell array constructor
+    entry [coroutine] void run();
+  };
+
+  //message used to convey particle to computes
+  message ParticleDataMsg{
+    vec3 part[];
+  };
+
+  //chares to house atoms
+  array [3D] Cell {
+    entry Cell();  
+    entry void createComputes();    //call to insert computes that I need  
+    entry [inbox] void receiveParticles(CkVec<Particle> updates);   //receive atoms that have migrated to neighboring cells to me
+    entry [inbox] void receiveForces(int iter, vec3 forces[n], int n);   //receives forces from my computes on my atoms
+
+    //function to perform iterations for Cells
+    entry [coroutine] void run();
+  };
+
+  //chares that do force computations for pair of cells
+  array [6D] Compute {
+    entry Compute();
+    entry [inbox] void calculateForces(ParticleDataMsg *msg);
+
+    entry [coroutine] void run();
+  };
+};

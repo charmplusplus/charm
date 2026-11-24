@@ -11,7 +11,7 @@ are only available in Fortran.
 .. code-block:: none
 
    AMPI_Migrate          AMPI_Register_pup            AMPI_Get_pup_data
-   AMPI_Migrate_to_pe    AMPI_Set_migratable
+   AMPI_Migrate_to_pe    AMPI_Set_migratable          AMPI_Rollback_count
    AMPI_Load_set_value   AMPI_Load_start_measure      AMPI_Load_stop_measure
    AMPI_Iget             AMPI_Iget_wait               AMPI_Iget_data
    AMPI_Iget_free        AMPI_Type_is_contiguous
@@ -73,7 +73,10 @@ Once the AMPI runtime system decides which ranks to send to which
 processors, it calls the specified pack subroutine for that rank, with
 the rank-specific data that was registered with the system using
 ``AMPI_Register_pup``. If an AMPI application uses Isomalloc, then the
-system will define the Pack/Unpack routines for the user. This section
+system will define the Pack/Unpack routines for the user. The memory of
+an ``MPI_Win`` has to keep its address when the rank moves: leave a
+window's buffer to Isomalloc, which moves it at the same address, and do
+not free and reallocate it in a pack subroutine. This section
 explains how a subroutine should be written for performing explicit
 pack/unpack.
 
@@ -345,6 +348,32 @@ Calling ``AMPI_Migrate`` on a rank with pending send requests (i.e. from
 MPI_Isend) is currently not supported, therefore users should always
 wait on any outstanding send requests before calling ``AMPI_Migrate``.
 
+Some non-blocking collectives must also be complete when ``AMPI_Migrate`` is
+called, unless the program runs with ``+ampiMigrateWithCollectives``: those
+whose result the runtime delivers as a broadcast to all the ranks of
+``MPI_COMM_WORLD``, namely ``MPI_Iallreduce``, ``MPI_Iallgather``,
+``MPI_Iallgatherv``, ``MPI_Ibarrier`` and ``MPI_Ibcast`` on ``MPI_COMM_WORLD``.
+Collectives whose results travel as messages to each rank (``MPI_Ialltoall``
+and its variants, ``MPI_Iscatter``, ``MPI_Iscan``, the neighborhood
+collectives, and ``MPI_Ireduce`` and ``MPI_Igather`` at their root) and every
+collective on a communicator other than ``MPI_COMM_WORLD`` may be outstanding
+across ``AMPI_Migrate`` in either mode. AMPI offers two modes:
+
+- By default, AMPI tells the Charm++ runtime that the ranks of
+  ``MPI_COMM_WORLD`` move only at ``AMPI_Migrate`` and with no such collective
+  outstanding, so the runtime keeps no copy of a broadcast to them for a rank
+  that is migrating. A rank that calls ``AMPI_Migrate`` with one of the
+  collectives above outstanding aborts with a message naming the option, since
+  its result could otherwise be lost.
+- With ``+ampiMigrateWithCollectives``, the runtime keeps each broadcast to the
+  AMPI arrays for one to two minutes, so a migrating rank can still receive it,
+  which costs memory, and ranks may call ``AMPI_Migrate`` with any non-blocking
+  collective outstanding; the results are delivered after the migration.
+
+The choice is memory against the freedom to balance load without first
+completing collectives; a program that already synchronizes before
+``AMPI_Migrate`` loses nothing with the default.
+
 .. code-block:: c++
 
    // Main time-stepping loop
@@ -356,12 +385,13 @@ wait on any outstanding send requests before calling ``AMPI_Migrate``.
        AMPI_Migrate(AMPI_INFO_LB_SYNC);
    }
 
-``AMPI_Migrate_to_pe`` migrates the calling rank to the specified PE. 
-``AMPI_Migrate`` is preferred to users calling ``AMPI_Migrate_to_pe`` directly,
-because ``AMPI_Migrate_to_pe`` requires Charm++ support for anytime migration.
-Anytime migration requires the runtime system to buffer Charm++ broadcasts,
-which has a memory overhead. Consequently, users are required to run with
-``+ampiEnableMigrateToPe`` in order to call this extension routine.
+``AMPI_Migrate_to_pe`` migrates the calling rank to the specified PE, outside
+of any load balancing step. ``AMPI_Migrate`` is preferred to users calling
+``AMPI_Migrate_to_pe`` directly, because ``AMPI_Migrate_to_pe`` requires
+Charm++ support for anytime migration, which makes the runtime buffer Charm++
+broadcasts at a memory cost. Consequently, users are required to run with
+``+ampiEnableMigrateToPe`` in order to call this extension routine; that
+option implies ``+ampiMigrateWithCollectives``.
 
 Note that migrating ranks around the cores and nodes of a system can
 change which ranks share physical resources, such as memory. A
@@ -399,9 +429,10 @@ call to ``int AMPI_Migrate(MPI_Info hints)`` with an ``MPI_Info`` object
 that specifies how you would like to checkpoint. Checkpointing can be
 thought of as migrating AMPI ranks to storage. Users set the
 checkpointing policy on an ``MPI_Info`` object’s ``"ampi_checkpoint"``
-key to one of the following values: ``"to_file=directory_name"`` or
-``"false"``. To perform checkpointing in memory a built-in MPI_Info
-object called ``AMPI_INFO_CHKPT_IN_MEMORY`` is provided.
+key to one of the following values: ``"to_file=directory_name"``,
+``"in_memory"``, ``"rollback"`` or ``"false"``. The built-in MPI_Info
+objects ``AMPI_INFO_CHKPT_IN_MEMORY`` and ``AMPI_INFO_CHKPT_ROLLBACK``
+carry the values ``"in_memory"`` and ``"rollback"``.
 
 Checkpointing to file tells the runtime system to save checkpoints in a
 given directory. (Typically, in an iterative program, the iteration
@@ -410,7 +441,38 @@ directory name.) This directory is created, and the entire state of the
 program is checkpointed to this directory. One can restart the program
 from the checkpointed state (using the same, more, or fewer physical
 processors than were checkpointed with) by specifying
-``"+restart directory_name"`` on the command-line.
+``"+restart directory_name"`` on the command-line. The ranks' stacks and
+heaps return to the addresses they had, and the restart checks that the
+program is loaded at the same addresses as in the run that wrote the
+checkpoint, so both that run and the restart need address space layout
+randomization off: on Linux, run each of them under
+``setarch $(uname -m) -R``, placed in front of the program, which with
+``srun`` or ``mpirun`` means inside the launch (``srun ... setarch
+$(uname -m) -R ./pgm +restart dir``). The restart must also run under
+the same stack size limit (``ulimit -s``) as the checkpoint; see the
+restarting section of the Charm++ manual.
+
+The example ``examples/ampi/Cjacobi3D`` shows this. The run
+
+.. code-block:: bash
+
+   $ setarch $(uname -m) -R ./jacobi 2 2 2 40 -chkpt 20 log +vp8 +pe 3
+
+writes a checkpoint of all eight ranks to the directory ``log`` after
+iteration 20 and runs on to iteration 40, and
+
+.. code-block:: bash
+
+   $ setarch $(uname -m) -R ./jacobi 2 2 2 40 -chkpt 20 log +vp8 +pe 4 +restart log
+
+resumes the eight ranks from that checkpoint on four PEs, inside the
+``AMPI_Migrate`` call that wrote it, and runs iterations 21 to 40, ending
+with the same ``final maxerr`` line as the uninterrupted run. The
+program's own arguments are not read again on a restart, because the
+ranks resume with their saved stacks, but ``+vp`` must name the same
+number of ranks. The example's ``make test`` restarts the checkpoint on
+the same, fewer and more PEs, and with ``TESTRUN_PROCS=2`` on two
+processes.
 
 Checkpointing in memory allows applications to transparently tolerate
 failures online. The checkpointing scheme used here is a double
@@ -435,6 +497,100 @@ illustrated in the code snippet below.
        AMPI_Migrate(AMPI_INFO_CHKPT_IN_MEMORY);
    }
 
+In-memory checkpointing needs Charm++ built with the ``syncft`` option
+(for example ``./build AMPI reconverse-linux-x86_64 syncft``); without it,
+``AMPI_Migrate`` with ``"in_memory"`` or ``"rollback"`` aborts. On
+reconverse builds a process failure still ends the job: the runtime does
+not detect failures or replace processes yet, so the online restart
+described above does not happen. What works is rolling back to the last
+in-memory checkpoint without any failure, for example after the program
+detects an error in its own data.
+
+Rollback to an in-memory checkpoint
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``AMPI_Migrate`` with ``"ampi_checkpoint"`` set to ``"rollback"`` (or the
+built-in object ``AMPI_INFO_CHKPT_ROLLBACK``) returns every rank to the
+last completed in-memory checkpoint. Like the other values it is
+collective over ``MPI_COMM_WORLD``. The runtime destroys every rank and
+restores it from the checkpoint: its stack, its heap and its MPI state
+(datatypes, info objects, and the communicators that existed at the
+checkpoint, including any freed since) are as they were when the
+checkpoint was taken; a communicator created after the checkpoint makes
+the rollback fail (see the restrictions below). Each rank's thread was
+suspended inside the ``AMPI_Migrate(in_memory)`` call that took the
+checkpoint, so that call returns a second time, and the program continues
+from there. The call that asked for the rollback never returns.
+
+Since everything in the rank is restored, a counter kept in the rank's
+own variables cannot tell the first return from the return after a
+rollback: the checkpoint was taken before the first return, so every
+rollback restores the counter to its value before any increment. The
+runtime keeps the count outside the ranks:
+
+.. code-block:: c++
+
+   int AMPI_Rollback_count(int *count);
+
+sets ``count`` to the number of rollbacks to the last completed in-memory
+checkpoint, 0 until the first one; the count starts again from 0 when the
+next checkpoint completes. A program that rolls back once after an error
+found at a later step looks like this:
+
+.. code-block:: c++
+
+   int rollbacks = 0;
+   for (int iter = 1; iter <= max_iters; iter++) {
+
+     // Time step work ...
+
+     if (iter == chkpt_iter) {
+       AMPI_Migrate(AMPI_INFO_CHKPT_IN_MEMORY);
+       AMPI_Rollback_count(&rollbacks);  // 0, then 1 after the rollback
+     }
+     if (error_found && rollbacks == 0)  // every rank must take this branch
+       AMPI_Migrate(AMPI_INFO_CHKPT_ROLLBACK);
+   }
+
+Restrictions and notes:
+
+- A checkpoint must have completed. A rollback before any in-memory
+  checkpoint aborts the program.
+- No rank may migrate between the checkpoint and the rollback, so no load
+  balancing may run in that interval: the rollback restores each rank on
+  the PE that held it at the checkpoint. A rollback after an
+  ``AMPI_Migrate`` with ``"ampi_load_balance"`` that moved a rank is
+  refused by the runtime, which aborts with ``CharmFT> rollback refused:
+  N array elements migrated on PE p since the last in-memory
+  checkpoint``.
+- No new communicators may be created between a checkpoint and its
+  rollback (``MPI_Comm_dup``, ``MPI_Comm_split``, ``MPI_Comm_create``,
+  intercommunicator and topology constructors): each new communicator's
+  ranks are new Charm++ array elements, which the checkpoint does not
+  contain. The runtime refuses such a rollback and aborts with
+  ``CharmFT> rollback refused: N array elements inserted on PE p since the
+  last in-memory checkpoint``. Communicators created before the checkpoint
+  can be used after the rollback, and freeing a communicator between the
+  checkpoint and the rollback is allowed (the rollback restores it).
+- Only the ranks are restored. Nothing outside them is: readonly
+  variables, Charm++ groups, and files the program wrote keep their
+  current state. In a program whose global variables are not privatized,
+  the globals are shared by the process and are not restored either.
+- The same checkpoint can be rolled back to more than once, and a new
+  checkpoint can be taken after a rollback.
+- With a single process, both copies of each checkpoint are kept in that
+  process and PE 0 prints ``CharmFT> one node: a process failure cannot
+  be survived; checkpoint and rollback work``. Checkpoint and rollback
+  work normally there.
+- A rollback never moves a rank between processes, so it works on macOS,
+  where ranks cannot migrate between processes, in one process and in
+  several.
+- campi programs cannot use in-memory checkpoints or rollback.
+
+``tests/ampi/memckpt`` checks a rollback, and the example
+``examples/ampi/Cjacobi3D`` shows one with ``-memckpt`` and
+``-rollback`` (see its header comment).
+
 A value of ``"false"`` results in no checkpoint being done that step.
 Note that ``AMPI_Migrate`` is a collective function, meaning every
 virtual processor in the program needs to call this subroutine with the
@@ -442,6 +598,132 @@ same MPI_Info object. The checkpointing capabilities of AMPI are powered
 by the Charm++ runtime system. For more information about
 checkpoint/restart mechanisms please refer to the Charm++
 manual: :numref:`sec:checkpoint`.
+
+Coroutine Ranks (campi)
+-----------------------
+
+campi runs each AMPI rank as a C++20 coroutine instead of a user-level
+thread. A program selects it by including ``campi.h`` after ``mpi.h`` and
+defining its main with ``CAMPI_MAIN`` or ``CAMPI_MAIN_STATE``, and is
+compiled with ``-std=c++20``; it links the same AMPI library as a
+thread-based program. ``campi.h`` redefines the blocking MPI routines
+(``MPI_Send``, ``MPI_Recv``, ``MPI_Wait``, the blocking collectives, ...)
+as ``co_await`` expressions, so every function that calls one, directly or
+through another function, must itself be a coroutine returning
+``campi::task<T>`` and be awaited; the compiler rejects a blocking call from
+an ordinary function. Blocking routines campi does not provide yet fail to
+compile by name: these are the one-sided routines. As in thread AMPI,
+``MPI_Comm_idup``, ``MPI_Ireduce_scatter`` and ``MPI_Ireduce_scatter_block``
+complete before they return and set the request to ``MPI_REQUEST_NULL``;
+in campi they are therefore awaited like blocking calls. Unlike thread AMPI, ``MPI_Finalize`` does not end the
+rank: the process exit code is the value main ``co_return``\ s.
+
+A campi rank migrates and is checkpointed only at ``AMPI_Migrate``, and it
+does not carry its coroutine frames with it. Its state across a migration
+point is a state object that campi creates, passes to main by reference,
+and serializes with the rank through the object's ``pup`` routine (see
+Serialization above). When the rank arrives on another PE, restarts from a
+checkpoint, or is rebuilt by the validator below, its main is called again
+from the top, and a ``switch`` at the top of each resumable function jumps
+to the migration point the rank was at, where ``AMPI_Migrate`` returns:
+
+.. code-block:: c++
+
+   #include "mpi.h"
+   #include "campi.h"
+
+   struct State {
+     int step, nsteps;
+     std::vector<double> u;
+     void pup(PUP::er &p) { p | step; p | nsteps; p | u; }
+   };
+
+   CAMPI_MAIN_STATE(State, argc, argv, s) {
+     CAMPI_MIGRATABLE {                    // jump to the recorded site
+       MPI_Init(&argc, &argv);             // skipped when the rank restarts
+       s.nsteps = 100;
+       s.u.assign(1000, 0.0);
+       for (s.step = 0; s.step < s.nsteps; s.step++) {
+         // ... computation and MPI calls; locals here are fine ...
+         CAMPI_MIGRATE(AMPI_INFO_LB_SYNC); // a migration point
+       }
+       MPI_Finalize();
+     }
+     co_return 0;
+   }
+
+The macros:
+
+- ``CAMPI_MAIN_STATE(State, argc, argv, s)`` declares main with a state
+  object ``s`` of type ``State``, which must be default constructible and
+  have a ``pup`` routine. ``CAMPI_MAIN(argc, argv)`` is main without one.
+- ``CAMPI_MIGRATABLE { ... }`` marks the body of a resumable function:
+  when the rank restarts, it jumps to the recorded migration point in the
+  block, and aborts if the block has no such point. Every function on the
+  path from main to a migration point has its own block.
+- ``CAMPI_MIGRATE(info)`` is ``AMPI_Migrate(info)`` at a migration point.
+  A bare ``AMPI_Migrate`` aborts at run time.
+- ``CAMPI_CALL(f(...))`` awaits a resumable function that contains a
+  migration point, directly or in a function it awaits;
+  ``CAMPI_CALL_TO(x, f(...))`` does the same and assigns the result to
+  ``x``.
+
+A migration point is identified by its source line, so two of them must
+not share a line, and none may be inside a ``switch`` statement of the
+program's own. Each of the three site macros is one statement, so a
+migration point may be the body of an ``if`` or a loop without braces, as
+in ``if (s.step % 10 == 9) CAMPI_MIGRATE(AMPI_INFO_LB_SYNC);``. Three rules
+follow from the restart:
+
+1. Values carried across a migration point live in the state object, not in
+   local variables. The compiler rejects a jump past the declaration of a
+   local with an initializer or with a non-trivial type, which catches most
+   violations; a scalar declared without an initializer is not caught.
+2. No request is outstanding at a migration point (``AMPI_Migrate`` aborts
+   otherwise): its buffers would not survive the move.
+3. Code before a migration point in a resumable function is skipped when
+   the rank restarts, so its results, such as parsed arguments, allocated
+   arrays and created ``MPI_Info`` objects, are kept in the state object.
+
+``AMPI_Register_pup``, ``AMPI_Get_pup_data``,
+``AMPI_Register_about_to_migrate``, ``AMPI_Register_just_migrated`` and
+``TCHARM_Register`` are compile errors in a campi program: the state object
+replaces them, and code that must run after each arrival goes after the
+migration point. The supported ``AMPI_Migrate`` hints are
+``"ampi_load_balance"`` set to ``"sync"`` and ``"ampi_checkpoint"`` set to
+``"to_file=directory_name"``, one action per call; ``"async"``,
+``"in_memory"`` and ``"message_logging"`` abort.
+
+Running a program with ``+campi_fakemigrate`` makes every migration point
+rebuild the rank in place, whatever its hints: the state object is packed
+and unpacked into a new object, the coroutine frames are destroyed, and
+main runs again to the migration point. This is the same code path a
+migrated or restarted rank takes, on one PE and without a load balancer, so
+a program that keeps a needed value in a local across a migration point
+gives a different result or fails in the first iteration.
+
+Because a restarted campi rank holds no code or data address, migration
+between processes and restart from a checkpoint need neither address space
+layout randomization off nor Isomalloc. Functions a program registers with
+AMPI (the function of ``MPI_Op_create`` and the copy and delete functions of a
+keyval) are stored as offsets from the program's load address, so they must
+be defined in the program itself, not in a shared library that may be loaded
+at another address. A keyval's ``extra_state`` is passed back unchanged, so a
+program that migrates between processes or restarts from a checkpoint passes
+an ``extra_state`` that is not an address, or a null pointer.
+``tests/campi/jacobi3d`` is a worked
+example: the program of ``examples/ampi/Cjacobi3D`` with its iteration
+state in a ``State``, a load balancing point every ten iterations and a
+checkpoint point. The checkpoint run and a restart from it, on a different
+number of PEs, are:
+
+.. code-block:: bash
+
+   $ ./jacobi 2 2 2 40 -chkpt 20 log +vp8 +pe 4 +balancer RotateLB
+   $ ./jacobi 2 2 2 40 -chkpt 20 log +vp8 +pe 2 +balancer RotateLB +restart log
+
+Both print the same final line, ``jacobi: 40 iterations, final maxerr
+447.52236056642141``, which is also the thread-based program's.
 
 Memory Efficiency
 -----------------
@@ -459,7 +741,10 @@ requested data arrives and runtime system takes care to allocate space,
 do appropriate unpacking based on data type, and return.
 ``AMPI_Iget_free`` lets the runtime system free the resources being used
 for this get request including the data buffer. Finally,
-``AMPI_Iget_data`` is the routine used to access the data.
+``AMPI_Iget_data`` is the routine used to access the data: it stores the
+address of the received data in ``*(void **)data``, so its first argument
+is the address of a pointer variable, not a buffer; the data stays valid
+until ``AMPI_Iget_free``.
 
 .. code-block:: c++
 
@@ -558,7 +843,7 @@ compressed log file.)
 
 .. code-block:: bash
 
-   $ ./build AMPI netlrts-linux-x86_64 -DAMPIMSGLOG
+   $ ./build AMPI reconverse-linux-x86_64 -DAMPIMSGLOG
 
 The feature is used in two phases: writing (logging) the environment and
 repeating the run. The first logging phase is invoked by a parallel run
@@ -566,15 +851,15 @@ of the AMPI program with some additional command line options.
 
 .. code-block:: bash
 
-   $ ./charmrun ./pgm +p4 +vp4 +msgLogWrite +msgLogRank 2 +msgLogFilename "msg2.log"
+   $ ./pgm +pe 4 +vp4 +msgLogWrite +msgLogRank 2 +msgLogFilename "msg2.log"
 
 In the above example, a parallel run with 4 worker threads and 4 AMPI
 ranks will be executed, and the changes in the MPI environment of worker
 thread 2 (also rank 2, starting from 0) will get logged into diskfile
 "msg2.log".
 
-Unlike the first run, the re-run is a sequential program, so it is not
-invoked by charmrun (and omitting charmrun options like +p4 and +vp4),
+Unlike the first run, the re-run is a sequential program, so it runs on
+one PE (omitting options like +pe 4 and +vp4),
 and additional command line options are required as well.
 
 .. code-block:: bash
@@ -600,7 +885,7 @@ Round Robin
 
    .. code-block:: bash
 
-      $ ./charmrun ./hello +p2 +vp8 +mapping RR_MAP
+      $ ./hello +pe 2 +vp8 +mapping RR_MAP
 
 Block Mapping
    This mapping scheme maps virtual processors to physical processor in
@@ -611,7 +896,7 @@ Block Mapping
 
    .. code-block:: bash
 
-      $ ./charmrun ./hello +p2 +vp8 +mapping BLOCK_MAP
+      $ ./hello +pe 2 +vp8 +mapping BLOCK_MAP
 
 Proportional Mapping
    This scheme takes the processing capability of physical processors
@@ -624,8 +909,8 @@ Proportional Mapping
 
    .. code-block:: bash
 
-      $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP
-      $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP +balancer GreedyLB +LBTestPESpeed
+      $ ./hello +pe 2 +vp8 +mapping PROP_MAP
+      $ ./hello +pe 2 +vp8 +mapping PROP_MAP +balancer GreedyLB +LBTestPESpeed
 
 Custom Mapping
    To define your own mapping scheme, create a file named "mapfile"
@@ -648,7 +933,7 @@ Custom Mapping
 
    .. code-block:: bash
 
-      $ ./charmrun ./hello +p2 +vp8 +mapping MAPFILE
+      $ ./hello +pe 2 +vp8 +mapping MAPFILE
 
    Note that users can find the current mapping of ranks to PEs (after
    dynamic load balancing) by calling ``AMPI_Comm_get_attr`` on

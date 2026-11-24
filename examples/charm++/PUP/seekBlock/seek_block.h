@@ -40,7 +40,7 @@ class SimpleArray : public CBase_SimpleArray {
 		CkExit();
 	}
 
-	void acceptData(C& inData){
+	void acceptData(const C &inData){
 		//do something to the object
 		c=inData;
         c.a.x++;

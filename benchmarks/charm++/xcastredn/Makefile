@@ -24,9 +24,6 @@ CXXFLAGS += -language charm++ $(OPTS)
 CPPFLAGS +=
 LDFLAGS  += -module CkMulticast
 EXECFLAGS = +p$(NP)
-ifdef $(NODELIST)
-  EXECFLAGS += ++nodelist $(NODELIST)
-endif
 
 
 ########### This stuff should be able take care of itself ############

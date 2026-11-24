@@ -1,0 +1,7 @@
+mainmodule migthread {
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void threadSuspended();
+    entry void threadFinished();
+  };
+};

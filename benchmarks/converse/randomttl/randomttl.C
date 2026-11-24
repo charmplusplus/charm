@@ -164,14 +164,13 @@ CmiStartFn mymain(int argc, char *argv[])
       CmiAbort("Usage: ./randomttl <k> <ttl>\n");
   }
 
-  std::srand (unsigned(std::time(0)) + CmiMyPe());
+  std::mt19937 shuffleGen(unsigned(std::time(0)) + CmiMyPe());
 
   // set values to Pes
   CpvAccess(peVector).resize(CmiNumPes());
   std::iota(CpvAccess(peVector).begin(), CpvAccess(peVector).end(), 0);
 
-  // using built-in random generator
-  std::random_shuffle(CpvAccess(peVector).begin(), CpvAccess(peVector).end());
+  std::shuffle(CpvAccess(peVector).begin(), CpvAccess(peVector).end(), shuffleGen);
 
   if(CmiMyPe() == 0) {
     if(CpvAccess(k) > CmiNumPes())

@@ -1,0 +1,13 @@
+mainmodule migrate_then_atsync {
+  readonly CProxy_Main mainProxy;
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry [reductiontarget] void migDone();
+    entry [reductiontarget] void syncDone();
+  };
+  array [1D] Elem {
+    entry Elem();
+    entry void mig(int which);
+    entry void dosync();
+  };
+};

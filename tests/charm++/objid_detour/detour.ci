@@ -1,0 +1,25 @@
+mainmodule detour {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Elem arrProxy;
+  readonly CProxy_Sender senderProxy;
+  readonly int N;
+  readonly bool verbose;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void step();
+    entry void report(int round, std::vector<int> stale, int checked);
+  };
+
+  array [1D] Elem {
+    entry Elem();
+    entry void ping(int round);
+    entry void die();
+  };
+
+  group Sender {
+    entry Sender();
+    entry void ping(int round);
+    entry void check(int round, int expectPe);
+  };
+};

@@ -40,6 +40,8 @@ public:
   void Clear(void);
 
   void IncrementTime(LBRealType walltime, LBRealType cputime);
+  void IncrementGPUTime(LBRealType gputime);
+
   inline void StartTimer(void) {
 	startWTime = CkWallTimer();
 #if CMK_LB_CPUTIMER
@@ -79,11 +81,36 @@ public:
 #endif
   }
 
+  inline void getGPUTime(LBRealType *w)
+  {
+#if CMK_CUDA
+    *w = data.gpuTime;
+#else
+    CmiAbort("LBObj::getGPUTime called but CMK_CUDA is not set");
+#endif
+  }
+
+  inline void setGPUTiming(LBRealType gputime)
+  {
+#if CMK_CUDA
+    data.gpuTime = gputime;
+#else
+    CmiAbort("LBObj::setGPUTiming called but CMK_CUDA is not set");
+#endif
+  }
+
   inline LDOMHandle &parentOM() { return data.handle.omhandle; }
   inline const LDObjHandle &GetLDObjHandle() const { return data.handle; }
   inline void SetMigratable(bool mig) { data.migratable = mig; }
   inline void setPupSize(size_t obj_pup_size) {
     data.pupSize = pup_encodeSize(obj_pup_size);
+  }
+  inline void setGPUPupSize(size_t obj_gpu_pup_size) {
+#if CMK_CUDA
+    data.gpuPupSize = obj_gpu_pup_size;
+#else
+    CmiAbort("LBObj::setGPUPupSize called but CMK_CUDA is not set");
+#endif
   }
   inline void UseAsyncMigrate(bool async) { data.asyncArrival = async; }
   inline LDObjData &ObjData() { return data; };

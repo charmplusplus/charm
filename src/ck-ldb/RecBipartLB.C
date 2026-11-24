@@ -208,7 +208,7 @@ void RecursiveBiPart(ObjGraph* ogr, vector<CkVertex*>& pvertices, int parent, in
     double totalLoad = 0;
     for (CkVertex* vertex : pvertices)
     {
-      vertex->setNewPe(peno);
+      if (vertex->isMigratable()) vertex->setNewPe(peno);
       totalLoad += vertex->getVertexLoad();
     }
     parray->procs[peno].setTotalLoad(totalLoad);

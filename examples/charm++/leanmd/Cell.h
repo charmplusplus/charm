@@ -37,6 +37,7 @@ class Cell : public CBase_Cell {
     int inbrs;        //number of interacting neighbors
     int updateCount;
 	int forceCount;
+    long long forceChecksum;   // integer checksum of every force array received (see addForces)
 
     void migrateToCell(Particle p, int &px, int &py, int &pz);
     void updateProperties();	//updates properties after receiving forces from computes
@@ -53,6 +54,7 @@ class Cell : public CBase_Cell {
     void migrateParticles();
     void sendPositions();
 	void addForces(vec3* forces);
+    void contributeChecksum();
 };
 
 #endif

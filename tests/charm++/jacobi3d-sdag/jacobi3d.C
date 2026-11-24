@@ -208,7 +208,9 @@ class Main : public CBase_Main {
   }
 
     // Each worker reports back to here when it completes an iteration
-	void report() {
+	// Every ckptFreq iterations each element contributes an order-independent
+	// checksum of its interior cells; the last one is printed.
+	void report(long long sum) {
 		iterations += ckptFreq;
 		if (iterations < maxIter) {
 #ifdef CMK_MEM_CHECKPOINT
@@ -221,6 +223,7 @@ class Main : public CBase_Main {
 			CkPrintf("Completed %d iterations\n", maxIter-1);
 			endTime = CmiWallTimer();
 			CkPrintf("Time elapsed per iteration: %f\n", (endTime - startTime)/(maxIter-1-WARM_ITER));
+			CkPrintf("jacobi3d: %d iterations, checksum %lld\n", maxIter, sum);
 			CkExit();
 		}
 	}
@@ -420,15 +423,21 @@ class Jacobi: public CBase_Jacobi {
 		constrainBC();
 
 		if (iterations % ckptFreq == 0 || iterations > maxIter){
+			long long sum = 0;
+			for(int i=1; i<blockDimX+1; ++i)
+				for(int j=1; j<blockDimY+1; ++j)
+					for(int k=1; k<blockDimZ+1; ++k)
+						sum += llround(temperature[index(i, j, k)] * 1e6);
+			CkCallback cb(CkReductionTarget(Main, report), mainProxy);
 #ifdef CMK_MEM_CHECKPOINT
-			contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
+			contribute(sizeof(long long), &sum, CkReduction::sum_long_long, cb);
 #elif CMK_MESSAGE_LOGGING
 			if(iterations > maxIter)
-				contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
+				contribute(sizeof(long long), &sum, CkReduction::sum_long_long, cb);
 			else
 				AtSync();
 #else
-            contribute(0, 0, CkReduction::concat, CkCallback(CkIndex_Main::report(), mainProxy));
+			contribute(sizeof(long long), &sum, CkReduction::sum_long_long, cb);
 #endif
 		} else {
 			thisProxy(thisIndex.x, thisIndex.y, thisIndex.z).doStep();

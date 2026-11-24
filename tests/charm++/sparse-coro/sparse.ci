@@ -1,0 +1,34 @@
+mainmodule sparse {
+  readonly bool verbose;
+  readonly CProxy_Main main_proxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry [inbox, reductiontarget] void testDone(int result);
+    entry [coroutine] void run_tests();
+  };
+  array [1D] Array1D {
+    entry Array1D();
+    entry void ping();
+  };
+  array [2D] Array2D {
+    entry Array2D();
+    entry void ping();
+  };
+  array [3D] Array3D {
+    entry Array3D();
+    entry void ping();
+  };
+  array [4D] Array4D {
+    entry Array4D();
+    entry void ping();
+  };
+  array [5D] Array5D {
+    entry Array5D();
+    entry void ping();
+  };
+  array [6D] Array6D {
+    entry Array6D();
+    entry void ping();
+  };
+};

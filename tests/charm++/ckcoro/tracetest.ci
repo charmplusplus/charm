@@ -1,0 +1,14 @@
+// Projections events of resumed coroutine segments: built and run only on
+// a build with tracing (see the Makefile).
+mainmodule tracetest {
+  readonly CProxy_TraceMain traceMain;
+  mainchare TraceMain {
+    entry TraceMain(CkArgMsg* m);
+    entry [reductiontarget] void done();
+  };
+  array [1D] Stepper {
+    entry Stepper();
+    entry [coroutine] void run();
+    entry [coroutine] void fan();
+  };
+};

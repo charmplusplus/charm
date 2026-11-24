@@ -1,0 +1,7 @@
+// error: is a plain asynchronous entry method
+module xe_local {
+  array [1D] A {
+    entry A();
+    entry [inbox, local] void f(int x);
+  };
+};

@@ -290,7 +290,9 @@ int main()
 }
 " CMK_HAS_NUMACTRL)
 
-set(tmp ${CMAKE_REQUIRED_LIBRARIES})
+set(tmp0 ${CMAKE_REQUIRED_INCLUDES})
+set(tmp1 ${CMAKE_REQUIRED_LIBRARIES})
+set(CMAKE_REQUIRED_INCLUDES $ENV{CRAY_PMI_PREFIX}/include)
 set(CMAKE_REQUIRED_LIBRARIES $ENV{CRAY_PMI_POST_LINK_OPTS} -lpmi)
 check_c_source_compiles("
 #include <pmi.h>
@@ -301,7 +303,8 @@ int main() {
     return 0;
 }
 " CMK_HAS_PMI_GET_NID)
-set(CMAKE_REQUIRED_LIBRARIES ${tmp})
+set(CMAKE_REQUIRED_INCLUDES ${tmp0})
+set(CMAKE_REQUIRED_LIBRARIES ${tmp1})
 
 check_c_source_compiles("
 #include <rca_lib.h>

@@ -1,0 +1,20 @@
+mainmodule xarray_section_reduction {
+  readonly CProxy_Main mainProxy;
+
+  message WorkMsg;
+
+  initnode void registerSumCount(void);
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void maxResultA(CkReductionMsg *m);
+    entry void maxResultB(CkReductionMsg *m);
+    entry void sumCountResult(CkReductionMsg *m);
+    entry void checkProgress();
+  };
+
+  array [1D] Elem {
+    entry Elem(int arrayNum);
+    entry void work(WorkMsg *m);
+  };
+};

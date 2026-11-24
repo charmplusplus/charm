@@ -1,7 +1,10 @@
 DIRS = \
   lb_test \
   meta_lb_test \
-  periodic_lb_broadcast_test
+  periodic_lb_broadcast_test \
+  lb_userdata_test \
+  migrate_then_atsync \
+  lbsweep \
 
 TESTDIRS = $(DIRS)
 

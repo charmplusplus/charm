@@ -70,6 +70,7 @@
 #  define getpid _getpid
 #endif
 #include "converse.h"
+#include "conv-autoconfig.h"   /* CMK_HAS_* feature tests */
 #include "charm-api.h"
 
 /* Wrap a CmiMemLock around this code */
@@ -98,6 +99,16 @@ int cpdInSystem=1; /*Start inside the system (until we start executing user code
 #if CMK_MEMORY_BUILD_OS_WRAPPED
 #define CMK_MEMORY_BUILD_OS 1
 #endif
+
+/* Spellings Reconverse has under a different name, or not at all. */
+#ifndef CMK_THREADLOCAL
+#define CMK_THREADLOCAL thread_local
+#endif
+/* The charm-debug interfaces below are stubbed out either way; under
+   Reconverse their argument types have no declaration to be found, and an
+   incomplete type is all a stub needs. */
+struct CpdListItemsRequest;
+struct LeakSearchInfo;
 #if CMK_MEMORY_BUILD_GNU_HOOKS
 /*While in general on could build hooks on the GNU we have, for now the hooks
  * are setup to work only with OS memory libraries --Filippo*/
@@ -277,12 +288,11 @@ CMK_TYPEDEF_UINT8 _memory_allocated_max = 0; /* High-Water Mark */
 CMK_TYPEDEF_UINT8 _memory_allocated_min = 0; /* Low-Water Mark */
 
 /* By default, there are no flags */
-static int CmiMemoryIs_flag=0;
-
-int CmiMemoryIs(int flag)
-{
-	return (CmiMemoryIs_flag&flag)==flag;
-}
+/* Reconverse already owns CmiMemoryIs and the flag word behind it. A second
+   copy here would answer differently depending on which of the two a caller
+   happened to reach, so record this module's character through Reconverse's
+   setter and leave the query to it. */
+#define CmiMemorySetIs(f) CmiMemoryIsSetFlag(f)
 
 /**
  * memory_lifeRaft is a very small heap-allocated region.
@@ -537,220 +547,16 @@ CLINKAGE void *pvalloc(size_t size) CMK_THROW { return meta_pvalloc(size); }
 
 #endif /* CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS */
 
-static int skip_mallinfo = 0;
-
 void CmiMemoryInit(char ** argv)
 {
-  if(CmiMyRank() == 0)   CmiMemoryIs_flag |= CMI_MEMORY_IS_OS;
+  if(CmiMyRank() == 0)   CmiMemorySetIs(CMI_MEMORY_IS_OS);
 #if CMK_MEMORY_BUILD_OS_WRAPPED || CMK_MEMORY_BUILD_GNU_HOOKS
   CmiArgGroup("Converse","Memory module");
   meta_init(argv);
   CmiNodeAllBarrier();
 #endif
   CmiOutOfMemoryInit();
-  if (getenv("MEMORYUSAGE_NO_MALLINFO"))  skip_mallinfo = 1;
 }
-
-/******Start of a general way to get memory usage information*****/
-/*CMK_TYPEDEF_UINT8 CmiMemoryUsage() { return 0; }*/
-
-#if ! CMK_HAS_SBRK
-namespace {
-  int sbrk(int s) { return 0; }
-}
-#endif
-
-#if CMK_C_INLINE
-#define INLINE inline
-#else
-#define INLINE
-#endif
-
-
-#if CMK_HAS_MSTATS
-#include <malloc/malloc.h>
-INLINE static CMK_TYPEDEF_UINT8 MemusageMstats(void){
-	struct mstats ms = mstats();
-	CMK_TYPEDEF_UINT8 memtotal = ms.bytes_used;
-	return memtotal;
-}
-#else
-INLINE static CMK_TYPEDEF_UINT8 MemusageMstats(void) { return 0; }
-#endif
-
-static int MemusageInited = 0;
-static uintptr_t MemusageInitSbrkval = 0;
-INLINE static CMK_TYPEDEF_UINT8 MemusageSbrk(void){
-	uintptr_t newval;
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-	if(MemusageInited==0){
-		MemusageInitSbrkval = (uintptr_t)sbrk(0);
-		MemusageInited = 1;
-	}
-	newval = (uintptr_t)sbrk(0);
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
-	return (newval - MemusageInitSbrkval);
-}
-
-INLINE static CMK_TYPEDEF_UINT8 MemusageProcSelfStat(void){
-    FILE *f;
-    int i, ret;
-    static int failed_once = 0;
-    CMK_TYPEDEF_UINT8 vsz = 0; /* should remain 0 on failure */
-
-    if(failed_once) return 0; /* no point in retrying */
-    
-    f = fopen("/proc/self/stat", "r");
-    if(!f) { failed_once = 1; return 0; }
-    for(i=0; i<22; i++) ret = fscanf(f, "%*s");
-    ret = fscanf(f, "%" PRIu64, &vsz);
-    fclose(f);
-    if(!vsz) failed_once=1;
-    return vsz;
-}
-
-#if ! CMK_HAS_MALLINFO
-INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(void){ return 0;}
-#else
-#if CMK_HAS_MALLOC_H
-#include <malloc.h>
-#endif
-INLINE static CMK_TYPEDEF_UINT8 MemusageMallinfo(void){
-    /* IA64 seems to ignore mi.uordblks, but updates mi.hblkhd correctly */
-    if (skip_mallinfo) return 0;
-    else {
-    struct mallinfo mi;
-#if CMK_MEMORY_BUILD_OS_WRAPPED && !CMK_MEMORY_BUILD_GNU_HOOKS
-    if (mm_impl_mallinfo == NULL)
-      initialize_memory_wrapper();
-    mi = (*mm_impl_mallinfo)();
-#else
-#ifdef __GNUC__
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-#endif
-#ifdef __INTEL_COMPILER
-#pragma warning push
-#pragma warning disable 1478
-#endif
-    mi = mallinfo();
-#ifdef __GNUC__
-#pragma GCC diagnostic pop
-#endif
-#ifdef __INTEL_COMPILER
-#pragma warning pop
-#endif
-#endif
-    CMK_TYPEDEF_UINT8 memtotal = (CMK_TYPEDEF_UINT8) mi.uordblks;   /* malloc */
-    CMK_TYPEDEF_UINT8 memtotal2 = (CMK_TYPEDEF_UINT8) mi.usmblks;   /* unused */
-    memtotal2 += (CMK_TYPEDEF_UINT8) mi.hblkhd;               /* mmap */
-    /* printf("%lld %lld %lld %lld %lld\n", mi.uordblks, mi.usmblks,mi.hblkhd,mi.arena,mi.keepcost); */
-#if !CMK_CRAYXE && !CMK_CRAYXC
-    if(memtotal2 > memtotal) memtotal = memtotal2;
-#endif
-    return memtotal;
-    }
-}
-#endif
-
-INLINE static CMK_TYPEDEF_UINT8 MemusagePS(void){
-#if ! CMK_HAS_POPEN
-    return 0;
-#else	
-    char pscmd[100];
-    CMK_TYPEDEF_UINT8 vsz=0;
-    FILE *p;
-    int ret;
-    snprintf(pscmd, sizeof(pscmd), "/bin/ps -o vsz= -p %d", getpid());
-    p = popen(pscmd, "r");
-    if(p){
-	ret = fscanf(p, "%" PRIu64, &vsz);
-	pclose(p);
-    }
-    return (vsz * (CMK_TYPEDEF_UINT8)1024);
-#endif	
-}
-
-#if defined(_WIN32)
-#include <windows.h>
-#include <psapi.h>
-
-INLINE static CMK_TYPEDEF_UINT8 MemusageWindows(void){
-    PROCESS_MEMORY_COUNTERS pmc;
-    if ( GetProcessMemoryInfo( GetCurrentProcess(), &pmc, sizeof(pmc)) )
-    {
-      /* return pmc.WorkingSetSize; */ 
-      return pmc.PagefileUsage;    /* total vm size, possibly not in memory */
-    }
-    return 0;
-}
-#else
-static CMK_TYPEDEF_UINT8 MemusageWindows(void){
-    return 0;
-}
-#endif
-
-typedef CMK_TYPEDEF_UINT8 (*CmiMemUsageFn)(void);
-
-/* this structure defines the order of testing for memory usage functions */
-struct CmiMemUsageStruct {
-    CmiMemUsageFn  fn;
-    const char *name;
-} memtest_order[] = {
-    {MemusageWindows, "Windows"},
-    {MemusageMstats, "Mstats"},
-    {MemusageMallinfo, "Mallinfo"},
-    {MemusageProcSelfStat, "/proc/self/stat"},
-    {MemusageSbrk, "sbrk"},
-    {MemusagePS, "ps"},
-};
-
-CMK_TYPEDEF_UINT8 CmiMemoryUsage(void){
-    int i;
-    CMK_TYPEDEF_UINT8 memtotal = 0;
-    for (i=0; i<sizeof(memtest_order)/sizeof(struct CmiMemUsageStruct); i++) {
-        memtotal = memtest_order[i].fn();
-        if (memtotal) break;
-    }
-    return memtotal;
-}
-
-const char *CmiMemoryUsageReporter(void){
-    int i;
-    CMK_TYPEDEF_UINT8 memtotal = 0;
-    const char *reporter = NULL;
-    for (i=0; i<sizeof(memtest_order)/sizeof(struct CmiMemUsageStruct); i++) {
-        memtotal = memtest_order[i].fn();
-        reporter = memtest_order[i].name;
-        if (memtotal) break;
-    }
-    return reporter;
-}
-
-/******End of a general way to get memory usage information*****/
-
-#if CMK_HAS_RUSAGE_THREAD
-#include <sys/resource.h>
-CMK_TYPEDEF_UINT8 CmiMaxMemoryUsageR(void) {
-  struct rusage usage;
-  getrusage(RUSAGE_SELF, &usage);
-  return usage.ru_maxrss;
-}
-#else
-CMK_TYPEDEF_UINT8 CmiMaxMemoryUsageR(void) {
-  return 0;
-}
-#endif
-
-CMK_TYPEDEF_UINT8 CmiMaxMemoryUsage(void) { return 0; }
-void CmiResetMaxMemory(void) {}
-CMK_TYPEDEF_UINT8 CmiMinMemoryUsage(void) { return 0; }
-void CmiResetMinMemory(void) {}
 
 #else /* CMK_MEMORY_BUILD_OS */
 
@@ -832,7 +638,7 @@ static inline void *mm_pvalloc(size_t size)
 #define meta_pvalloc  mm_pvalloc
 
 static void meta_init(char **argv) {
-  if (CmiMyRank()==0) CmiMemoryIs_flag |= CMI_MEMORY_IS_GNU;
+  if (CmiMyRank()==0) CmiMemorySetIs(CMI_MEMORY_IS_GNU);
 }
 #endif /* CMK_MEMORY_BUILD_GNU */
 

@@ -23,7 +23,7 @@ mainmodule jacobi3d {
   mainchare Main {
     entry Main(CkArgMsg *m);
     entry void start();
-    entry void report();
+    entry [reductiontarget] void report(long long sum);
   };
 
   array [3D] Jacobi {

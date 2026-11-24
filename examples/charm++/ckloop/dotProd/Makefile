@@ -19,19 +19,19 @@ dotProd: dotProd.o
 #-DPAPI_PROFILING -DCKL_HYBRID
 
 test1: dotProd
-	./charmrun +p4 dotProd 800 2 0.7 5 ++ppn 2 ++local
+	$(call run, ./dotProd +p4 800 2 0.7 5)
 
 test2: dotProd
-	./charmrun +p4 dotProd 800 2 0.7 5 ++ppn 2 ++local
+	$(call run, ./dotProd +p4 800 2 0.7 5)
 
 test3: dotProd
-	./charmrun +p4 dotProd 800 2 0.7 5 ++ppn 2 ++local
+	$(call run, ./dotProd +p4 800 2 0.7 5)
 
 test4: dotProd
-	./charmrun +p4 dotProd 800 4 0.7 5 ++ppn 2 ++local
+	$(call run, ./dotProd +p4 800 4 0.7 5)
 
 test5: dotProd
-	./charmrun +p6 dotProd 800 2 0.7 5 ++ppn 2 ++local
+	$(call run, ./dotProd +p6 800 2 0.7 5)
 
 dotProd_withomp: dotProd_withomp.o
 	$(CHARMC) -language charm++ -o dotProd_withomp dotProd_withomp.o -fopenmp

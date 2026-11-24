@@ -1,0 +1,13 @@
+mainmodule reduction_empty_kid {
+  readonly CProxy_Main mainProxy;
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void done(int n);
+  };
+  array [1D] Elem {
+    entry Elem();
+    entry void burst(int n);
+    entry void leave(int toPe);
+    entry void hit();
+  };
+};

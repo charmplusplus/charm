@@ -117,6 +117,8 @@ class WhenStatementEChecker;
 #define SAPPWORK 0x80000  // <- reduction target
 #define SAGGREGATE 0x100000
 #define SWHENIDLE 0x200000 // implies SLOCAL as well
+#define SINBOX 0x400000     // <- delivered to the chare's ck::coro::state (ckcoro.h)
+#define SCOROUTINE 0x800000 // <- defined as a ck::coroutine (ckcoro.h)
 
 /* An entry construct */
 class Entry : public Member {
@@ -202,7 +204,7 @@ class Entry : public Member {
   XStr syncPreCall(void);
   XStr syncPostCall(void);
   XStr marshallMsg(void);
-  XStr callThread(const XStr& procName, int prependEntryName = 0);
+  XStr callThread(const XStr& procName, int prependEntryName = 0, bool referenceNoKeep = true);
 
   // SDAG support
   std::list<CStateVar*> estateVars;
@@ -303,6 +305,7 @@ class Entry : public Member {
   int isNoKeep(void);
   int isSdag(void);
   bool isTramTarget(void);
+  bool isCoroutineEntry() { return isCoroutine() != 0; }
   int isWhenIdle(void);
 
   // DMK - Accel support
@@ -310,6 +313,9 @@ class Entry : public Member {
 
   int isMemCritical(void);
   int isReductionTarget(void);
+  int isInbox(void);
+  int isCoroutine(void);
+  void genCoroCode(CoroGen& g);
 
   void print(XStr& str);
   void check();

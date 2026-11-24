@@ -1,0 +1,313 @@
+/*
+ * campi (coroutine AMPI), core header: the rank task type and the awaitable
+ * replacements for AMPI's blocking calls. Requires C++20 (<coroutine>).
+ *
+ * An AMPI rank in campi mode is a C++20 coroutine instead of a user-level
+ * thread. Every call that would block a thread-based rank is awaited with
+ * co_await here: it posts AMPI's nonblocking variant and suspends until
+ * AMPI's delivery code wakes the rank (TCharm::resume, which campi redirects
+ * from CthAwaken to a coroutine resume). The simple calls return a
+ * request_awaiter (no coroutine frame); calls with internal awaited loops
+ * (Init, Finalize, tests and probes, communicator creation) are tasks. The
+ * task type and the restart-site chain are ck::coro's (ckcoro_core.h).
+ *
+ * Applications normally include campi.h (this header plus macros that
+ * redirect the blocking MPI names to co_await expressions) and define their
+ * main with CAMPI_MAIN. campi.C includes only this core header.
+ */
+#ifndef CAMPI_CORE_H
+#define CAMPI_CORE_H
+
+#if !defined(__cplusplus) || __cplusplus < 202002L
+#error "campi requires C++20: compile with -std=c++20"
+#endif
+
+#include <coroutine>
+#include <type_traits>
+#include <utility>
+#include "mpi.h"
+#include "pup.h"
+#include "ckcoro_core.h"
+
+namespace campi {
+
+struct Rank; // per-rank record, defined in campi.C
+
+// Record h as the frame to resume when the running rank is next woken.
+void set_resume_point(std::coroutine_handle<> h) noexcept;
+class request_awaiter;
+// Same, for a rank blocked in a request_awaiter: on each wake-up campi first
+// calls w->poll() and resumes h only once w's requests are complete.
+void set_resume_point(std::coroutine_handle<> h, request_awaiter *w) noexcept;
+
+/* ---------------- the shared coroutine core (ckcoro_core.h) ---------------- */
+
+// task<T>: the rank's coroutine type; frame_guard, note_site, abort_no_site:
+// the restart sites of resumable functions (CAMPI_MIGRATABLE, campi.h).
+template <class T = void> using task = ::ck::coro::task<T>;
+using frame_guard = ::ck::coro::frame_guard;
+using ::ck::coro::note_site;
+using ::ck::coro::abort_no_site;
+
+/* ---------------- rank main and its state object ---------------- */
+
+// The rank's state object: everything that must survive a migrate site
+// (CAMPI_MIGRATE). campi creates one per rank before main starts, passes it
+// to main by reference, packs it with the rank (PUP) when the rank migrates
+// or is checkpointed, and unpacks it into a new object on arrival or restart.
+// state_ops is the type-erased table for one State type (CAMPI_MAIN_STATE).
+struct state_ops {
+  void *(*create)();
+  void (*destroy)(void *state);
+  void (*pup)(PUP::er &p, void *state);
+};
+
+template <class S> struct state_ops_for {
+  static void *create() { return new S(); }
+  static void destroy(void *s) { delete static_cast<S *>(s); }
+  static void pup(PUP::er &p, void *s) { p | *static_cast<S *>(s); }
+  static constexpr state_ops ops{&create, &destroy, &pup};
+};
+
+// The state type of a program written with CAMPI_MAIN: no state.
+struct no_state {
+  void pup(PUP::er &) {}
+};
+
+using main_fn = task<int> (*)(int argc, char **argv, void *state);
+extern main_fn registered_main; // non-null selects campi mode
+void register_main(main_fn f, const state_ops *ops) noexcept;
+struct main_registrar {
+  main_registrar(main_fn f, const state_ops *ops) noexcept { register_main(f, ops); }
+};
+
+/* ---------------- suspension primitive ---------------- */
+
+// Return to the scheduler until something wakes this rank. Wake-ups may be
+// spurious, so always use it in a loop that re-checks the condition:
+//   while (!pred()) co_await campi::suspend();
+struct suspend_awaiter {
+  bool await_ready() const noexcept { return false; }
+  void await_suspend(std::coroutine_handle<> h) const noexcept { set_resume_point(h); }
+  void await_resume() const noexcept {}
+};
+inline suspend_awaiter suspend() noexcept { return {}; }
+
+// Like suspend(), but also schedules a wake-up of this rank, so the rank runs
+// again after the messages already queued on this PE (cf. AMPI_Yield).
+task<void> yield();
+
+// An awaitable that is already complete with an int result.
+struct ready_int {
+  int v;
+  bool await_ready() const noexcept { return true; }
+  void await_suspend(std::coroutine_handle<>) const noexcept {}
+  int await_resume() const noexcept { return v; }
+};
+
+/* ---------------- request completion ---------------- */
+
+// The awaitable for every blocking call that is "post the nonblocking
+// variant, wait for its request(s), finish": Send, Recv, Wait, Waitall,
+// Sendrecv and the plain collectives. It is a plain object, not a coroutine,
+// so a call allocates no coroutine frame; it lives in the awaiting
+// coroutine's frame while the rank is suspended.
+//  - The factory function (Send, Recv, ...) posts the request(s).
+//  - await_ready: true if posting failed or the requests are complete.
+//  - await_suspend: marks the requests blocked (as their wait() does before
+//    it suspends a thread) and records the resume point with this object.
+//  - On each wake-up campi_resume calls poll(), which clears the blocked
+//    bookkeeping and, if the requests are still incomplete, marks them
+//    blocked again and leaves the rank suspended (wake-ups may be spurious).
+//  - await_resume: MPI_Wait/MPI_Waitall on the completed request(s).
+// The object holds no pointers into itself, so it may be copied freely
+// before it is awaited.
+class [[nodiscard]] request_awaiter {
+ public:
+  enum kind : unsigned char { WAIT_ONE, WAIT_ALL, SENDRECV };
+
+  // Wait on n requests: own_ (ext == nullptr) or the caller's array ext.
+  request_awaiter(kind k, int n, MPI_Request *ext, MPI_Status *sts) noexcept
+      : ext_(ext), sts_(sts), n_(n), kind_(k) {
+    own_[0] = own_[1] = MPI_REQUEST_NULL;
+  }
+  // Posting failed with error code e: complete at once with result e.
+  static request_awaiter failed(int e) noexcept {
+    request_awaiter w(WAIT_ONE, 0, nullptr, nullptr);
+    w.err_ = e;
+    return w;
+  }
+
+  MPI_Request *own() noexcept { return own_; }
+  void set_error(int e) noexcept { err_ = e; }
+
+  bool await_ready() noexcept;
+  void await_suspend(std::coroutine_handle<> h) noexcept;
+  int await_resume() noexcept;
+  bool poll() noexcept; // called by campi_resume on a wake-up; true: complete
+
+ private:
+  MPI_Request *reqs() noexcept { return ext_ ? ext_ : own_; }
+  bool done() noexcept;
+  void block() noexcept;
+  void unblock() noexcept;
+
+  MPI_Request own_[2];
+  MPI_Request *ext_;
+  MPI_Status *sts_;
+  int n_;
+  int err_ = MPI_SUCCESS;
+  kind kind_;
+};
+
+request_awaiter Wait(MPI_Request *req, MPI_Status *sts);
+request_awaiter Waitall(int n, MPI_Request *reqs, MPI_Status *sts);
+inline request_awaiter wait(MPI_Request *req, MPI_Status *sts) { return Wait(req, sts); }
+inline request_awaiter waitall(int n, MPI_Request *reqs, MPI_Status *sts) {
+  return Waitall(n, reqs, sts);
+}
+
+/* ---------------- blocking point-to-point ---------------- */
+
+request_awaiter Send(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                     MPI_Comm comm);
+request_awaiter Ssend(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                      MPI_Comm comm);
+request_awaiter Recv(void *buf, int count, MPI_Datatype type, int src, int tag, MPI_Comm comm,
+                     MPI_Status *sts);
+request_awaiter Sendrecv(const void *sbuf, int scount, MPI_Datatype stype, int dest, int stag,
+                         void *rbuf, int rcount, MPI_Datatype rtype, int src, int rtag,
+                         MPI_Comm comm, MPI_Status *sts);
+request_awaiter Bsend(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                      MPI_Comm comm);
+request_awaiter Rsend(const void *buf, int count, MPI_Datatype type, int dest, int tag,
+                      MPI_Comm comm);
+request_awaiter Mrecv(void *buf, int count, MPI_Datatype type, MPI_Message *msg,
+                      MPI_Status *sts);
+task<int> Sendrecv_replace(void *buf, int count, MPI_Datatype type, int dest, int stag, int src,
+                           int rtag, MPI_Comm comm, MPI_Status *sts);
+// Block until a matching message has arrived (MPI_Probe), and take it (MPI_Mprobe).
+task<int> Probe(int src, int tag, MPI_Comm comm, MPI_Status *sts);
+task<int> Mprobe(int src, int tag, MPI_Comm comm, MPI_Message *msg, MPI_Status *sts);
+// Block until at least one of the requests is complete.
+task<int> Waitany(int n, MPI_Request *reqs, int *index, MPI_Status *sts);
+task<int> Waitsome(int n, MPI_Request *reqs, int *outcount, int *indices, MPI_Status *sts);
+
+/* ---------------- blocking collectives ---------------- */
+
+request_awaiter Barrier(MPI_Comm comm);
+request_awaiter Bcast(void *buf, int count, MPI_Datatype type, int root, MPI_Comm comm);
+request_awaiter Reduce(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
+                       int root, MPI_Comm comm);
+request_awaiter Allreduce(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
+                          MPI_Comm comm);
+request_awaiter Gather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf, int rcount,
+                       MPI_Datatype rtype, int root, MPI_Comm comm);
+request_awaiter Gatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                        const int *rcounts, const int *displs, MPI_Datatype rtype, int root,
+                        MPI_Comm comm);
+request_awaiter Allgather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                          int rcount, MPI_Datatype rtype, MPI_Comm comm);
+request_awaiter Allgatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                           const int *rcounts, const int *displs, MPI_Datatype rtype,
+                           MPI_Comm comm);
+request_awaiter Scatter(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                        int rcount, MPI_Datatype rtype, int root, MPI_Comm comm);
+request_awaiter Scatterv(const void *sbuf, const int *scounts, const int *displs,
+                         MPI_Datatype stype, void *rbuf, int rcount, MPI_Datatype rtype,
+                         int root, MPI_Comm comm);
+request_awaiter Alltoall(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                         int rcount, MPI_Datatype rtype, MPI_Comm comm);
+request_awaiter Alltoallv(const void *sbuf, const int *scounts, const int *sdispls,
+                          MPI_Datatype stype, void *rbuf, const int *rcounts,
+                          const int *rdispls, MPI_Datatype rtype, MPI_Comm comm);
+request_awaiter Scan(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
+                     MPI_Comm comm);
+request_awaiter Exscan(const void *sbuf, void *rbuf, int count, MPI_Datatype type, MPI_Op op,
+                       MPI_Comm comm);
+// A reduction to rank 0, then a scatter, each awaited (as in ampi.C).
+task<int> Reduce_scatter_block(const void *sbuf, void *rbuf, int count, MPI_Datatype type,
+                               MPI_Op op, MPI_Comm comm);
+task<int> Reduce_scatter(const void *sbuf, void *rbuf, const int *rcounts, MPI_Datatype type,
+                         MPI_Op op, MPI_Comm comm);
+// Complete before returning, with *request = MPI_REQUEST_NULL, as in ampi.C.
+task<int> Ireduce_scatter_block(const void *sbuf, void *rbuf, int count, MPI_Datatype type,
+                                MPI_Op op, MPI_Comm comm, MPI_Request *request);
+task<int> Ireduce_scatter(const void *sbuf, void *rbuf, const int *rcounts, MPI_Datatype type,
+                          MPI_Op op, MPI_Comm comm, MPI_Request *request);
+// One receive and one send per rank, awaited together; displacements in bytes.
+task<int> Alltoallw(const void *sbuf, const int *scounts, const int *sdispls,
+                    const MPI_Datatype *stypes, void *rbuf, const int *rcounts,
+                    const int *rdispls, const MPI_Datatype *rtypes, MPI_Comm comm);
+request_awaiter Neighbor_allgather(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                                   int rcount, MPI_Datatype rtype, MPI_Comm comm);
+request_awaiter Neighbor_allgatherv(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                                    const int *rcounts, const int *displs, MPI_Datatype rtype,
+                                    MPI_Comm comm);
+request_awaiter Neighbor_alltoall(const void *sbuf, int scount, MPI_Datatype stype, void *rbuf,
+                                  int rcount, MPI_Datatype rtype, MPI_Comm comm);
+request_awaiter Neighbor_alltoallv(const void *sbuf, const int *scounts, const int *sdispls,
+                                   MPI_Datatype stype, void *rbuf, const int *rcounts,
+                                   const int *rdispls, MPI_Datatype rtype, MPI_Comm comm);
+request_awaiter Neighbor_alltoallw(const void *sbuf, const int *scounts, const MPI_Aint *sdispls,
+                                   const MPI_Datatype *stypes, void *rbuf, const int *rcounts,
+                                   const MPI_Aint *rdispls, const MPI_Datatype *rtypes,
+                                   MPI_Comm comm);
+
+/* ---------------- tests and probes ---------------- */
+
+// A failed test or probe is a scheduling point in thread AMPI (it yields the
+// thread so that messages can arrive); a coroutine must suspend instead, so
+// these are awaitables: the AMPI routine, then a yield after a miss.
+task<int> Test(MPI_Request *req, int *flag, MPI_Status *sts);
+task<int> Testany(int n, MPI_Request *reqs, int *index, int *flag, MPI_Status *sts);
+task<int> Testall(int n, MPI_Request *reqs, int *flag, MPI_Status *sts);
+task<int> Testsome(int n, MPI_Request *reqs, int *outcount, int *indices, MPI_Status *sts);
+task<int> Request_get_status(MPI_Request req, int *flag, MPI_Status *sts);
+task<int> Iprobe(int src, int tag, MPI_Comm comm, int *flag, MPI_Status *sts);
+task<int> Improbe(int src, int tag, MPI_Comm comm, int *flag, MPI_Message *msg,
+                  MPI_Status *sts);
+
+/* ---------------- communicator creation ---------------- */
+
+task<int> Comm_split(MPI_Comm comm, int color, int key, MPI_Comm *newcomm);
+task<int> Comm_dup(MPI_Comm comm, MPI_Comm *newcomm);
+task<int> Comm_dup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm *newcomm);
+// Complete before returning, with *request = MPI_REQUEST_NULL, as in ampi.C.
+task<int> Comm_idup(MPI_Comm comm, MPI_Comm *newcomm, MPI_Request *request);
+task<int> Comm_idup_with_info(MPI_Comm comm, MPI_Info info, MPI_Comm *newcomm,
+                              MPI_Request *request);
+task<int> Comm_create(MPI_Comm comm, MPI_Group group, MPI_Comm *newcomm);
+task<int> Comm_split_type(MPI_Comm comm, int split_type, int key, MPI_Info info, MPI_Comm *newcomm);
+task<int> Comm_create_group(MPI_Comm comm, MPI_Group group, int tag, MPI_Comm *newcomm);
+task<int> Cart_create(MPI_Comm comm_old, int ndims, const int *dims, const int *periods,
+                      int reorder, MPI_Comm *comm_cart);
+task<int> Cart_sub(MPI_Comm comm, const int *remain_dims, MPI_Comm *newcomm);
+task<int> Graph_create(MPI_Comm comm_old, int nnodes, const int *index, const int *edges,
+                       int reorder, MPI_Comm *comm_graph);
+task<int> Dist_graph_create(MPI_Comm comm_old, int n, const int *sources, const int *degrees,
+                            const int *destinations, const int *weights, MPI_Info info,
+                            int reorder, MPI_Comm *comm_dist_graph);
+task<int> Dist_graph_create_adjacent(MPI_Comm comm_old, int indegree, const int *sources,
+                                     const int *sourceweights, int outdegree,
+                                     const int *destinations, const int *destweights,
+                                     MPI_Info info, int reorder, MPI_Comm *comm_dist_graph);
+task<int> Intercomm_create(MPI_Comm localComm, int localLeader, MPI_Comm peerComm,
+                           int remoteLeader, int tag, MPI_Comm *newintercomm);
+task<int> Intercomm_merge(MPI_Comm intercomm, int high, MPI_Comm *newintracomm);
+
+/* ---------------- startup, shutdown, migration ---------------- */
+
+task<int> Init(int *argc, char ***argv);
+task<int> Init_thread(int *argc, char ***argv, int required, int *provided);
+task<int> Finalize();
+// AMPI_Migrate: load balancing (ampi_load_balance=sync) or a checkpoint to
+// files (ampi_checkpoint=to_file=DIR). Must be reached through CAMPI_MIGRATE
+// (campi.h) inside a CAMPI_MIGRATABLE block. A rank that moves, or restarts
+// from the checkpoint, does not return from here: its frame is destroyed and
+// main runs again from the top to this site, where Migrate returns at once.
+task<int> Migrate(MPI_Info hints);
+
+} // namespace campi
+
+#endif // CAMPI_CORE_H

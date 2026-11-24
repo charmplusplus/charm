@@ -10,7 +10,6 @@
 #endif
 
 #include "converse.h"
-#include "debug-conv++.h"
 #include "pup.h"
 #include "cklists.h"
 #include <vector>

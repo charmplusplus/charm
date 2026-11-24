@@ -23,9 +23,6 @@ CXXFLAGS += -language charm++ $(OPTS)
 CPPFLAGS += $(OPTS)
 LDFLAGS  +=
 EXECFLAGS = +p$(NP)
-ifdef $(NODELIST)
-  EXECFLAGS += ++nodelist $(NODELIST)
-endif
 
 
 ########### This stuff should be able take care of itself ############

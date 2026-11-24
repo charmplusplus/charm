@@ -1,0 +1,127 @@
+# Repeat one test many times on a CI runner, optionally under AddressSanitizer,
+# to catch an intermittent failure seen in CI. Run it from the Actions tab
+# (workflow_dispatch) with the test, arguments and run count; it also runs with
+# the defaults below on a pull request that changes this file (2000 runs, seed varied per run).
+# Failing runs' outputs are uploaded as the artifact "hunt-failures".
+name: hunt
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: runner (the failing CI job's)
+        type: choice
+        default: ubuntu-24.04-arm
+        options: [ubuntu-24.04-arm, ubuntu-latest]
+      test_dir:
+        description: test directory
+        default: tests/charm++/section_migrate
+      binary:
+        description: executable in that directory
+        default: section_migrate
+      args:
+        description: arguments of the failing line
+        default: "+pe 4 -lb -auto +balancer RotateLB +randomized_msgq +randomized_seed 2"
+      vary_seed:
+        description: append +randomized_seed <run number> to args
+        type: boolean
+        default: false
+      runs:
+        description: number of runs
+        default: "200"
+      sanitizer:
+        description: address = AddressSanitizer build; none = built and launched as the runner's CI job does, with glibc heap checks (MALLOC_CHECK_=3)
+        type: choice
+        default: address
+        options: [address, none]
+      run_timeout:
+        description: seconds per run before it counts as a hang
+        default: "120"
+  pull_request:
+    paths: ['.github/workflows/hunt.yaml']
+
+jobs:
+  hunt:
+    timeout-minutes: 330
+    runs-on: ${{ inputs.runner || 'ubuntu-24.04-arm' }}
+    env:
+      TEST_DIR: ${{ inputs.test_dir || 'tests/charm++/section_migrate' }}
+      BINARY: ${{ inputs.binary || 'section_migrate' }}
+      ARGS: ${{ inputs.args || '+pe 4 -lb -auto +balancer RotateLB +randomized_msgq +randomized_seed 2' }}
+      # inputs.vary_seed is a boolean, so "inputs.vary_seed || 'true'" would be
+      # true even when it is unchecked; a pull request run varies the seed.
+      VARY_SEED: ${{ github.event_name == 'pull_request' || inputs.vary_seed }}
+      RUNS: ${{ inputs.runs || '2000' }}
+      SANITIZER: ${{ inputs.sanitizer || 'address' }}
+      RUN_TIMEOUT: ${{ inputs.run_timeout || '120' }}
+      # detect_leaks=0: the instrumented charmxi would otherwise fail the build.
+      ASAN_OPTIONS: abort_on_error=1:detect_leaks=0
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: true
+      - name: install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libfabric-dev
+      - name: build
+        # The sanitizer flags go in CFLAGS/CXXFLAGS/LDFLAGS as well as the
+        # build options: the reconverse CMake tree takes only the former.
+        # CIOPTS are the build options of this runner's job in reconverse-ci.yaml.
+        run: |
+          set -e
+          case "$(uname -m)" in
+            aarch64) ARCH=reconverse-linux-arm8; CIOPTS="-Werror=vla --enable-tracing";;
+            *) ARCH=reconverse-linux-x86_64; CIOPTS="";;
+          esac
+          echo "ARCH=$ARCH" >> $GITHUB_ENV
+          if [ "$SANITIZER" = address ]; then
+            SAN="-fsanitize=address -fno-omit-frame-pointer"
+            echo "OPTS=-g -O1 $SAN" >> $GITHUB_ENV
+            CFLAGS="$SAN" CXXFLAGS="$SAN" LDFLAGS="-fsanitize=address" ./build charm++ $ARCH -j4 -g -O1 $SAN
+          else
+            echo "OPTS=-g" >> $GITHUB_ENV
+            ./build charm++ $ARCH -j4 -g $CIOPTS
+          fi
+      - name: build test
+        # OPTS goes inside CHARMC: a CHARMC on the command line replaces the
+        # Makefile's "CHARMC = .../charmc $(OPTS)" line.
+        run: make -C $TEST_DIR CHARMC="$PWD/$ARCH/bin/charmc $OPTS"
+      - name: run
+        run: |
+          mkdir -p hunt-failures
+          cd $TEST_DIR
+          # none: launch as CI's test steps do (testrun runs every test under
+          # setarch -R, address randomization off), with glibc's heap checks.
+          # Since glibc 2.34, MALLOC_CHECK_ works only with libc_malloc_debug
+          # preloaded; env applies both to the test alone.
+          launch=""
+          if [ "$SANITIZER" = none ]; then
+            setarch "$(uname -m)" -R true || { echo "setarch -R is not permitted on this runner"; exit 1; }
+            dbg=$(ls /usr/lib/*/libc_malloc_debug.so.0)
+            launch="setarch $(uname -m) -R env MALLOC_CHECK_=3 LD_PRELOAD=$dbg"
+          fi
+          fails=0; hangs=0
+          for i in $(seq 1 $RUNS); do
+            a="$ARGS"
+            # a seed in ARGS is replaced, not repeated: the second copy would reach the program
+            [ "$VARY_SEED" = true ] && a="$(echo "$ARGS" | sed -E 's/\+randomized_seed +[0-9]+//') +randomized_seed $i"
+            rc=0
+            timeout $RUN_TIMEOUT $launch ./$BINARY $a > out.txt 2>&1 || rc=$?
+            [ $rc = 0 ] && continue
+            fails=$((fails+1)); [ $rc = 124 ] && hangs=$((hangs+1))
+            { echo "ARGS: $a"; echo "EXIT: $rc"; cat out.txt; } > $GITHUB_WORKSPACE/hunt-failures/run$i-rc$rc.txt
+            echo "run $i failed (rc $rc)"
+            [ $fails -ge 20 ] && { echo "stopping after 20 failures"; RUNS=$i; break; }
+          done
+          echo "## hunt: $TEST_DIR/$BINARY $ARGS" >> $GITHUB_STEP_SUMMARY
+          echo "runs: $RUNS, failures: $fails (hangs: $hangs), sanitizer: $SANITIZER, runner: $(uname -m)${launch:+, launched with: $launch}" >> $GITHUB_STEP_SUMMARY
+          for f in $GITHUB_WORKSPACE/hunt-failures/*.txt; do
+            [ -e "$f" ] || break
+            echo '```' >> $GITHUB_STEP_SUMMARY; grep -m3 'ERROR: AddressSanitizer\|malloc\|Abort\|Assert\|EXIT' "$f" >> $GITHUB_STEP_SUMMARY; echo '```' >> $GITHUB_STEP_SUMMARY
+          done
+          [ $fails = 0 ]
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: hunt-failures
+          path: hunt-failures
+          if-no-files-found: ignore

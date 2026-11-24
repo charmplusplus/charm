@@ -50,29 +50,508 @@
 #include "ck.h"
 #include "ckrdmadevice.h"
 
-#if CMK_CUDA
+/* Stage 9.1 boundary: this file is the classic D2D implementation, written
+ * against the classic half of ckrdmadevice.h (cuda_* fields, 4-param
+ * CmiSendDevice). The reconverse D2D implementation arrives with stage 9.2
+ * (see doc/reconverse-migration-ledger.README.md); until then reconverse
+ * CUDA builds compile this file empty, and device-RDMA entry parameters
+ * fail at link with these symbols missing. */
+
+/* ==========================================================================
+ * Reconverse D2D  --  GPU migration plan stage 9.2
+ *
+ * The classic half above is left byte-for-byte alone; this is the same design
+ * expressed against the reconverse interfaces. Three differences are worth
+ * knowing before reading:
+ *
+ *  - findTransferModeDevice() is defined here rather than in
+ *    conv-core/conv-rdmadevice.C, because that file belongs to Converse and is
+ *    not compiled at all in a reconverse build (reconverse replaces the
+ *    machine layer wholesale). Everything the D2D path needs therefore has to
+ *    live on the ck-core side.
+ *
+ *  - The inter-node leg is a real RDMA get through reconverse's ncpy Direct
+ *    API (CmiNcpyBuffer::rdmaGet), not the host-staged device-to-host /
+ *    host-to-device round trip the classic half falls back to. CMK_GPU_COMM is
+ *    unconditionally 1 for reconverse (see conv-rdmadevice.h), so the
+ *    host-staged branches are omitted here instead of being carried as dead
+ *    #if arms; the classic half above still has them if a non-RDMA reconverse
+ *    backend ever needs one.
+ *
+ *  - Completions arrive on whichever PE in the process the backend happened to
+ *    progress, which need not be the destination PE. loopback_bridge bounces
+ *    them to the right PE; see CkRdmaDeviceRecvHandler.
+ * ========================================================================== */
+#if (CMK_CUDA || CMK_HIP)
 
 #include "hapi.h"
 #include "gpumanager.h"
 
 CsvExtern(GPUManager, gpu_manager);
+CpvExtern(int, my_device_id);
 
-// Invoked when a GPU buffer arrives on the receiver
-#if !CMK_GPU_COMM
-void CkRdmaDeviceRecvHandler(void* data, void* msg)
-#else
+CmiNcpyModeDevice findTransferModeDevice(int srcPe, int dstPe) {
+  CmiEnforce((srcPe >= 0) && (srcPe <= CmiNumPes()));
+  CmiEnforce((dstPe >= 0) && (dstPe <= CmiNumPes()));
+
+  if (CmiNodeOf(srcPe) == CmiNodeOf(dstPe)) {
+    // Same logical node
+    return CmiNcpyModeDevice::MEMCPY;
+  } else if (CmiPeOnSamePhysicalNode(srcPe, dstPe)) {
+    // Different logical nodes, same physical node
+    return CmiNcpyModeDevice::IPC;
+  } else {
+    // Different physical nodes, requires GPUDirect RDMA
+    return CmiNcpyModeDevice::RDMA;
+  }
+}
+
+// Carrier for bouncing a completion to the destination PE within this process.
+struct LoopBackMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  void* msg;
+};
+
+extern "C" {
+  void* loopback_bridge(void* arg) {
+    LoopBackMsg* recv_msg = (LoopBackMsg*)arg;
+    void* op_info_copy = recv_msg->msg;
+    QdProcess(1);  // matches the QdCreate in CkRdmaDeviceRecvHandler
+    CkRdmaDeviceRecvHandler(op_info_copy);
+    // This NcpyOperationInfo is our own copy -- reconverse frees the original
+    // as soon as the ack handler returns -- so it is ours to release. (Not to
+    // be confused with the DeviceRdmaInfo the handler may free; separate
+    // allocation.)
+    CmiFree(op_info_copy);
+    CmiFree(recv_msg);
+    return NULL;
+  }
+
+  int loopback_handler;
+}
+
+/* Registration release for the inter-node (RDMA) device path
+ * (charmplusplus/charm#3960).  Both ends of every device get are registered
+ * per message -- the sender in CkRdmaDeviceOnSender (CmiNcpyBuffer ctor), the
+ * receiver in CkRdmaDeviceIssueRgets -- and, before this, neither was ever
+ * released: the completion returns from CkRdmaDirectAckHandler before the
+ * host path's deregistration, and CkRdmaDeviceRecvHandler had none of its
+ * own.  With LCI's registration cache off that exhausts the NIC's
+ * registration table (ENOSPC in fi_mr_regattr) after ~1e5 messages per
+ * rank; with the cache on it pins every region at a refcount that never
+ * returns to zero.
+ *
+ * The destination registration belongs to this process, so it is released
+ * in place when the get completes.  The source registration belongs to the
+ * sender's process; the sender is told with a DeviceDeregMsg carrying only
+ * what CmiDeregisterMem needs.  PE 0 prints once that releases are in
+ * force, so a run states its own configuration. */
+struct DeviceDeregMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  const void* ptr;
+  int pe;
+  unsigned short regMode;
+  char mr[CMK_NOCOPY_DIRECT_BYTES];  // the layer's memory-region handle
+};
+
+extern "C" {
+  void* device_dereg_bridge(void* arg) {
+    DeviceDeregMsg* m = (DeviceDeregMsg*)arg;
+    QdProcess(1);  // matches the QdCreate in releaseDeviceRegistrations
+    CmiDeregisterMem(m->ptr, m->mr, m->pe, m->regMode);
+    CmiFree(m);
+    return NULL;
+  }
+  int device_dereg_handler;
+}
+
+/* The registered device pool.
+ *
+ * An ordinary device buffer is registered per message and released when the
+ * get completes (fix (a) above): that is the only behaviour the runtime
+ * offers, and holding a registration across messages for a buffer whose
+ * lifetime the runtime does not own is the network layer's job -- LCI's
+ * registration cache -- not this file's.
+ *
+ * The one exception is memory the runtime does own.  CkDeviceMalloc(size) /
+ * CkDeviceFree(ptr) hand out device buffers from arenas (buddy allocator
+ * over one large device allocation each, grown on demand).  An arena is
+ * registered LAZILY, whole, on the first send or receive post that lands in
+ * it, so arenas that never cross the network are never pinned; the pool owns
+ * the arena's lifetime, which is what makes that registration safe without
+ * allocator hooks.  Registered arenas live in one interval map per process:
+ * [start, end) with the layer's memory-region handle.
+ *
+ * The send path (CkRdmaDeviceOnSender) and the receive path
+ * (CkRdmaDeviceIssueRgets) look a buffer up by range containment; a hit
+ * reuses the arena's handle and marks the buffer NODEREG so the
+ * completion-time release above leaves it alone; a miss -- any buffer not
+ * from the pool -- takes the per-message registration that fix (a)
+ * releases.  Sweeping idle arenas is deliberately not done here (idle-time /
+ * load-balancing-time work, later). */
+#include <mutex>
+#include <map>
+#include <vector>
+#include "buddy_allocator.h"
+
+struct DeviceRegion { uintptr_t end; char layerInfo[CMK_NOCOPY_DIRECT_BYTES]; };
+struct DeviceArena { buddy::allocator* alloc; uintptr_t start, end; bool registered; int device; };
+static std::map<uintptr_t, DeviceRegion> device_regions;   // start -> registered arena
+static std::vector<DeviceArena> device_arenas;
+static std::mutex device_reg_mutex;
+
+// Under device_reg_mutex.  Registers the arena on first use.
+static const DeviceRegion* deviceRegionFind(uintptr_t p, size_t cnt) {
+  auto it = device_regions.upper_bound(p);
+  if (it != device_regions.begin()) {
+    --it;
+    if (p >= it->first && p + cnt <= it->second.end) return &it->second;
+  }
+  for (auto& ar : device_arenas) {
+    if (p >= ar.start && p + cnt <= ar.end) {
+      if (!ar.registered) {
+        DeviceRegion r; r.end = ar.end;
+        CmiSetRdmaBufferInfo(r.layerInfo, (const void*)ar.start, ar.end - ar.start, CMK_BUFFER_REG);
+        ar.registered = true;
+        if (CkMyPe() == 0)
+          CmiPrintf("CkRdmaDevice> device pool arena at %p (%zu MB) registered on first use\n",
+                    (void*)ar.start, (size_t)((ar.end - ar.start) >> 20));
+        return &device_regions.emplace(ar.start, r).first->second;
+      }
+      return nullptr;  // registered arena is in the map; containment failed, so the range straddles
+    }
+  }
+  return nullptr;
+}
+
+static size_t deviceArenaBytes() {
+  static size_t bytes = 0;
+  if (!bytes) {
+    const char* e = getenv("CK_GPU_ARENA_MB");
+    bytes = (size_t)(e ? atol(e) : 256) << 20;
+  }
+  return bytes;
+}
+
+void* CkDeviceMalloc(size_t size) {
+  // Arenas are per device: a process driving several GPUs gets one arena
+  // set per device, and a request is served only from arenas on the
+  // calling PE's current device (the device hapiMalloc would allocate on).
+  int dev = 0;
+  hapiCheck(hapiGetDevice(&dev));
+  std::lock_guard<std::mutex> g(device_reg_mutex);
+  for (auto& ar : device_arenas) {
+    if (ar.device != dev) continue;
+    void* q = ar.alloc->malloc(size, true);
+    if (q) return q;
+  }
+  size_t bytes = deviceArenaBytes();
+  while (bytes < size * 2) bytes <<= 1;
+  DeviceArena ar;
+  ar.alloc = new buddy::allocator(bytes, bytes);
+  ar.start = (uintptr_t)ar.alloc->base_ptr; ar.end = ar.start + bytes; ar.registered = false;
+  ar.device = dev;
+  device_arenas.push_back(ar);
+  if (CkMyPe() == 0)
+    CmiPrintf("CkRdmaDevice> device pool: arena %zu of %zu MB at %p on device %d (CK_GPU_ARENA_MB)\n",
+              device_arenas.size(), bytes >> 20, (void*)ar.start, dev);
+  void* q = ar.alloc->malloc(size, true);
+  if (!q) CkAbort("CkDeviceMalloc: request larger than a fresh arena");
+  return q;
+}
+
+void CkDeviceFree(void* ptr) {
+  uintptr_t p = (uintptr_t)ptr;
+  std::lock_guard<std::mutex> g(device_reg_mutex);
+  for (auto& ar : device_arenas)
+    if (p >= ar.start && p < ar.end) { ar.alloc->free(ptr); return; }
+  CkAbort("CkDeviceFree: pointer is not from the device pool");
+}
+
+// Initialise 'b' for ptr/cnt: from the pool arena that covers it, if any
+// (kept handle, never released per message), else registered per message
+// and released on completion.
+static void deviceNcpyBufferInit(CmiNcpyBuffer& b, const void* ptr, size_t cnt, void* opinfo) {
+  b.deviceRdmaOpInfo = opinfo;
+  {
+    std::lock_guard<std::mutex> g(device_reg_mutex);
+    const DeviceRegion* r = deviceRegionFind((uintptr_t)ptr, cnt);
+    if (r) {
+      b.init(ptr, cnt, CMK_BUFFER_UNREG, CMK_BUFFER_NODEREG);  // common info only, no registration
+      memcpy(b.layerInfo + CmiGetRdmaCommonInfoSize(), r->layerInfo, CMK_NOCOPY_DIRECT_BYTES);
+      b.regMode = CMK_BUFFER_REG;   // rdmaGet must not register it again
+      b.isRegistered = true;
+      return;
+    }
+  }
+  b.init(ptr, cnt, CMK_BUFFER_REG, CMK_BUFFER_DEREG);  // per message; released on completion
+}
+
+/* Piggybacked acknowledgements for the RDMA path.
+ *
+ * Two things the sender needs to learn after a get completes on the far
+ * side: that a per-message registration may be released (fix (a)), and,
+ * if it asked, that the source buffer may be reused (the source callback).
+ * Both used to cost one message per buffer.  Now the sender mints an 8-byte
+ * id per buffer that needs either, keeps the work in a per-process table,
+ * and the receiver hands the id back inside the next device message it
+ * sends to that PE (CkDeviceBuffer::acks, capacity CK_DEVICE_ACK_CAP, on the
+ * first buffer of the message).  Ids that find no such message go out in a
+ * standalone DeviceAckMsg when the block fills, and at idle.  A stencil
+ * therefore sends no standalone acks at all in steady state.
+ *
+ * The two are not equally urgent, so they are not treated alike.  A release
+ * that waits costs only a registration held longer than necessary, which
+ * nothing observes.  A source callback that waits is the application waiting:
+ * it is the only signal that the send buffer may be written again, and
+ * holding it behind the receiver's own outgoing traffic can stall a sender
+ * behind a receiver's compute phase -- indefinitely, if the receiver neither
+ * sends to that PE nor goes idle.  So an id carrying a callback is flushed
+ * the moment the get completes and is never aggregated, and only
+ * release-only ids ride the piggyback.  The receiver cannot see inside an id
+ * (the record is the sender's), so the sender marks it: DEVICE_ACK_URGENT.
+ * The flush takes the whole block, so any release-only ids owed to that PE
+ * go out in the same message for free.
+ *
+ * CK_GPU_ACK_NOPIGGY in the environment flushes every id at once, for
+ * measurement of what the piggyback saves. */
+#include <vector>
+
+struct DevicePendingAck {
+  const void* ptr; size_t cnt;
+  unsigned char needs_dereg; unsigned char has_cb;
+  char mr[CMK_NOCOPY_DIRECT_BYTES];
+  CkCallback cb;
+};
+struct DeviceAckMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  int count;
+  uint64_t ids[CK_DEVICE_ACK_CAP];
+};
+static std::unordered_map<uint64_t, DevicePendingAck> device_pending;
+static std::unordered_map<int, std::vector<uint64_t>> device_ack_acc;  // dest PE -> ids owed
+static std::mutex device_ack_mutex;
+static uint64_t device_ack_seq = 0;
+static int device_ack_nopiggy = -1;
+
+// Top bit of an ack id: this one carries a source callback, so the receiver
+// must not sit on it.  Set at mint time and left in the key device_pending is
+// looked up by, so resolution needs no masking; 63 bits of sequence remain.
+static const uint64_t DEVICE_ACK_URGENT = (uint64_t)1 << 63;
+
+static void deviceResolveAck(uint64_t id) {
+  DevicePendingAck rec;
+  {
+    std::lock_guard<std::mutex> g(device_ack_mutex);
+    auto it = device_pending.find(id);
+    if (it == device_pending.end()) {
+      CmiPrintf("[%d] CkRdmaDevice> WARNING: ack for unknown id %llu\n", CmiMyPe(), (unsigned long long)id);
+      return;
+    }
+    rec = it->second;
+    device_pending.erase(it);
+  }
+  if (rec.needs_dereg) CmiDeregisterMem(rec.ptr, rec.mr, CkMyPe(), CMK_BUFFER_REG);
+  if (rec.has_cb) rec.cb.send();
+}
+
+extern "C" {
+  void* device_ack_bridge(void* arg) {
+    DeviceAckMsg* m = (DeviceAckMsg*)arg;
+    QdProcess(1);
+    for (int i = 0; i < m->count; i++) deviceResolveAck(m->ids[i]);
+    CmiFree(m);
+    return NULL;
+  }
+  int device_ack_handler;
+}
+
+static void deviceSendAcks(int pe, const uint64_t* ids, int n) {
+  for (int off = 0; off < n; off += CK_DEVICE_ACK_CAP) {
+    int k = std::min(n - off, (int)CK_DEVICE_ACK_CAP);
+    DeviceAckMsg* m = (DeviceAckMsg*)CmiAlloc(sizeof(DeviceAckMsg));
+    m->count = k;
+    memcpy(m->ids, ids + off, k * sizeof(uint64_t));
+    CmiSetHandler(m, device_ack_handler);
+    QdCreate(1);
+    CmiSyncSendAndFree(pe, sizeof(DeviceAckMsg), m);
+  }
+}
+
+static void deviceFlushAcks(int pe) {
+  std::vector<uint64_t> ids;
+  {
+    std::lock_guard<std::mutex> g(device_ack_mutex);
+    auto it = device_ack_acc.find(pe);
+    if (it == device_ack_acc.end()) return;
+    ids.swap(it->second);
+    device_ack_acc.erase(it);
+  }
+  QdProcess((int)ids.size());
+  deviceSendAcks(pe, ids.data(), (int)ids.size());
+}
+
+static void deviceFlushAllAcks(void*) {
+  std::vector<int> pes;
+  {
+    std::lock_guard<std::mutex> g(device_ack_mutex);
+    if (device_ack_acc.empty()) return;
+    for (auto& kv : device_ack_acc) pes.push_back(kv.first);
+  }
+  for (int pe : pes) deviceFlushAcks(pe);
+}
+
+static int persist_verbose = 0;                   // +gpupersistverbose
+static std::atomic<bool> persist_exiting{false};  // set once a PE's exit sequence reaches ConverseExit
+
+void CkRdmaDeviceInit(char** argv) {
+  CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE, (CcdCondFn)deviceFlushAllAcks, NULL);
+  if (CmiGetArgFlagDesc(argv, "+gpupersistverbose",
+                        "print the mode of CkDevicePersistent transfers, once per process and mode"))
+    persist_verbose = 1;
+}
+
+// The receiver owes 'id' to 'pe'.  Held for the next device message to that
+// PE; sent now if it carries a source callback (the application is waiting on
+// it), if the block is full, or if piggybacking is disabled.
+static void deviceQueueAck(int pe, uint64_t id) {
+  if (device_ack_nopiggy < 0) {
+    device_ack_nopiggy = (getenv("CK_GPU_ACK_NOPIGGY") != nullptr) ? 1 : 0;
+    if (device_ack_nopiggy && CkMyPe() == 0)
+      CmiPrintf("CkRdmaDevice> acks sent standalone, one per buffer (CK_GPU_ACK_NOPIGGY)\n");
+  }
+  size_t n;
+  {
+    std::lock_guard<std::mutex> g(device_ack_mutex);
+    auto& v = device_ack_acc[pe];
+    v.push_back(id);
+    n = v.size();
+  }
+  QdCreate(1);
+  // The flush takes the whole block, so release-only ids already owed to this
+  // PE leave with the urgent one rather than costing a message of their own.
+  if (device_ack_nopiggy || (id & DEVICE_ACK_URGENT) || n >= CK_DEVICE_ACK_CAP)
+    deviceFlushAcks(pe);
+}
+
+// Sender side: drain what this PE owes 'pe' into the first buffer of the
+// message about to go there.
+static void deviceDrainAcksInto(int pe, CkDeviceBuffer* b) {
+  b->ack_count = 0;
+  int n = 0;
+  {
+    std::lock_guard<std::mutex> g(device_ack_mutex);
+    auto it = device_ack_acc.find(pe);
+    if (it == device_ack_acc.end()) return;
+    auto& v = it->second;
+    n = std::min((int)v.size(), (int)CK_DEVICE_ACK_CAP);
+    memcpy(b->acks, v.data(), n * sizeof(uint64_t));
+    v.erase(v.begin(), v.begin() + n);
+    if (v.empty()) device_ack_acc.erase(it);
+  }
+  b->ack_count = (unsigned char)n;
+  QdProcess(n);
+}
+
+// Sender side: mint an id for a buffer that will need a release and/or a
+// source callback when the far side's get completes.  0 if neither.  An id
+// with a callback is marked urgent, so the receiver returns it at once
+// instead of holding it for the piggyback.
+static uint64_t deviceMintAck(CmiNcpyBuffer& nb, CkCallback& cb) {
+  DevicePendingAck rec;
+  rec.ptr = nb.ptr; rec.cnt = nb.cnt;
+  rec.needs_dereg = (nb.isRegistered && nb.deregMode == CMK_BUFFER_DEREG) ? 1 : 0;
+  rec.has_cb = (cb.type != CkCallback::ignore) ? 1 : 0;
+  if (!rec.needs_dereg && !rec.has_cb) return 0;
+  if (rec.needs_dereg) memcpy(rec.mr, nb.layerInfo + CmiGetRdmaCommonInfoSize(), CMK_NOCOPY_DIRECT_BYTES);
+  if (rec.has_cb) { rec.cb = cb; cb = CkCallback(CkCallback::ignore); }  // the sender fires it, not the receiver
+  uint64_t id;
+  {
+    std::lock_guard<std::mutex> g(device_ack_mutex);
+    id = ++device_ack_seq;
+    if (rec.has_cb) id |= DEVICE_ACK_URGENT;
+    device_pending.emplace(id, rec);
+  }
+  return id;
+}
+
+static void deviceDeregAnnounce() {
+  static bool done = false;
+  if (!done) {
+    done = true;
+    if (CkMyPe() == 0)
+      CmiPrintf("CkRdmaDevice> device RDMA registrations released on completion\n");
+  }
+}
+
+static void releaseDeviceRegistrations(NcpyOperationInfo* info, uint64_t ack_id) {
+  deviceDeregAnnounce();
+  if (info->isDestRegistered && info->destDeregMode == CMK_BUFFER_DEREG) {
+    CmiDeregisterMem(info->destPtr,
+                     info->destLayerInfo + CmiGetRdmaCommonInfoSize(),
+                     info->destPe, info->destRegMode);
+    info->isDestRegistered = 0;
+  }
+  if (ack_id != 0) {
+    // The sender minted an id: it releases its own registration and fires
+    // its own callback when the id comes back, piggybacked or flushed.
+    deviceQueueAck(info->srcPe, ack_id);
+    info->isSrcRegistered = 0;
+    return;
+  }
+  if (info->isSrcRegistered && info->srcDeregMode == CMK_BUFFER_DEREG) {
+    DeviceDeregMsg* m = (DeviceDeregMsg*)CmiAlloc(sizeof(DeviceDeregMsg));
+    m->ptr = info->srcPtr;
+    m->pe = info->srcPe;
+    m->regMode = info->srcRegMode;
+    memcpy(m->mr, info->srcLayerInfo + CmiGetRdmaCommonInfoSize(),
+           CMK_NOCOPY_DIRECT_BYTES);
+    CmiSetHandler(m, device_dereg_handler);
+    QdCreate(1);  // matched in device_dereg_bridge
+    CmiSyncSendAndFree(info->srcPe, sizeof(DeviceDeregMsg), m);
+    info->isSrcRegistered = 0;
+  }
+}
+
+// Completion of an inter-node (RDMA) device transfer. Reached through
+// CkRdmaDirectAckHandler, which routes any NcpyOperationInfo carrying a
+// deviceRdmaOpInfo here; 'data' is that NcpyOperationInfo.
 void CkRdmaDeviceRecvHandler(void* data)
-#endif
 {
-#if CMK_GPU_COMM
-  // Process QD to mark completion of buffer transfer
-  QdProcess(1);
-#endif
+  NcpyOperationInfo* ncpy_op_info = (NcpyOperationInfo*)data;
+  DeviceRdmaOp* op = (DeviceRdmaOp*)(ncpy_op_info->deviceRdmaOpInfo);
 
-  DeviceRdmaOp* op = (DeviceRdmaOp*)data;
+  // The get is complete: release both registrations now, before any bounce.
+  // This runs on the PE the backend raised the completion on, and the
+  // registrations are process-level state, so no hand-off is needed; the
+  // flags it clears keep the loopback copy below from releasing them twice.
+  releaseDeviceRegistrations(ncpy_op_info, op->tag);
+
+  // The backend raises the completion on whichever PE of this process was
+  // progressing the network, which is not necessarily the PE that posted the
+  // get. rdma_info below is per-destination-PE bookkeeping, so hand the
+  // completion to the destination PE before touching it.
+  if (op->dest_pe != CmiMyPe()) {
+    int infoSize = ncpy_op_info->ncpyOpInfoSize;
+    NcpyOperationInfo* copy = (NcpyOperationInfo*)CmiAlloc(infoSize);
+    memcpy(copy, ncpy_op_info, infoSize);
+
+    LoopBackMsg* conv_msg = (LoopBackMsg*)CmiAlloc(sizeof(LoopBackMsg));
+    conv_msg->msg = copy;
+
+    QdCreate(1);
+    CmiSetHandler(conv_msg, loopback_handler);
+    CmiPushPE(CmiRankOf(op->dest_pe), conv_msg);
+    return;
+  }
+
+  // Matches the QdCreate issued when the get was posted in
+  // CkRdmaDeviceIssueRgets.
+  QdProcess(1);
+
   DeviceRdmaInfo* info = op->info;
 
-  // Invoke source callbacks
+  // Invoke source callback
   if (op->src_cb) {
     CkCallback* cb = (CkCallback*)op->src_cb;
     cb->send();
@@ -82,35 +561,501 @@ void CkRdmaDeviceRecvHandler(void* data)
   // Update counter (there may be multiple buffers in transit)
   info->counter++;
 
-  // Check if all buffers have been received
-  // If so, invoke regular entry method
+  // Once every buffer has landed, run the real entry method. The counter is
+  // safe to touch unguarded because both completion routes -- the stream
+  // callback and, via loopback_bridge, the network ack -- run on this PE.
   if (info->counter == info->n_ops) {
     QdCreate(1);
-
     enqueueNcpyMessage(op->dest_pe, info->msg);
+    // 'info' is the whole rdma_data block CkRdmaDeviceIssueRgets allocated,
+    // save_op included; the last completion is the last reader of it, so this
+    // is where it goes. (The source branch leaves this free commented out and
+    // leaks the block once per message.)
+    CmiFree(info);
+  }
+}
 
-    // Free RDMA metadata
+// Completion of an intra-node device transfer (MEMCPY or IPC). Invoked from
+// the HAPI stream-completion poll, so 'data' is the DeviceRdmaOp directly.
+void CkRdmaDeviceRecvHandler(void* data, void* msg)
+{
+  DeviceRdmaOp* op = (DeviceRdmaOp*)data;
+  DeviceRdmaInfo* info = op->info;
+
+  // Invoke source callback
+  if (op->src_cb) {
+    CkCallback* cb = (CkCallback*)op->src_cb;
+    cb->send();
+    delete cb;
+  }
+
+  info->counter++;
+
+  if (info->counter == info->n_ops) {
+    QdCreate(1);
+    enqueueNcpyMessage(op->dest_pe, info->msg);
     CmiFree(info);
   }
 }
 
 /****************************** Direct (Persistent) API ******************************/
 
+/* Persistent device buffers: see CkDevicePersistent in ckrdmadevice.h and the manual, "Persistent GPU Communication". */
+
+#include <dlfcn.h>
+#include <set>
+#include <string>
+#include <atomic>
+#include <climits>
+#include <ctime>
+#include <unistd.h>
+
+// With +gpupersistverbose: one line per process, mode and operation the first
+// time it is used, so that a run states which path it took.
+static void persistAnnounce(const char* what, int mode) {
+  if (!persist_verbose) return;
+  static std::mutex lock;
+  static std::set<std::pair<std::string, int> > said;
+  {
+    std::lock_guard<std::mutex> g(lock);
+    if (!said.insert(std::make_pair(std::string(what), mode)).second) return;
+  }
+  static const char* names[3] = {
+    "copy on the device (one process)",
+    "CUDA/HIP IPC between processes on one host",
+    "RDMA on registered device memory" };
+  CmiPrintf("[%d] CkDevicePersistent> %s: %s\n", CkMyPe(), what, names[mode]);
+}
+
+// The base of the allocation holding ptr: what an IPC handle maps in the other
+// process (cupy, torch and pool allocators hand out pieces of allocations).
+static bool persistAllocBase(const void* ptr, uintptr_t* base) {
+#if CMK_HIP
+  void* b = nullptr; size_t sz = 0;
+  if (hipMemGetAddressRange(&b, &sz, (void*)ptr) != hipSuccess) { (void)hipGetLastError(); return false; }
+  *base = (uintptr_t)b;
+  return true;
+#else
+  typedef int (*RangeFn)(unsigned long long*, size_t*, unsigned long long);
+  static RangeFn fn = nullptr;
+  static bool looked = false;
+  if (!looked) {
+    void* s = dlsym(RTLD_DEFAULT, "cuMemGetAddressRange_v2");
+    if (!s) {
+      void* lib = dlopen("libcuda.so.1", RTLD_NOW | RTLD_NOLOAD);
+      if (!lib) lib = dlopen("libcuda.so.1", RTLD_NOW);
+      if (lib) s = dlsym(lib, "cuMemGetAddressRange_v2");
+    }
+    fn = (RangeFn)s;
+    looked = true;
+  }
+  if (!fn) return false;
+  unsigned long long b = 0; size_t sz = 0;
+  if (fn(&b, &sz, (unsigned long long)(uintptr_t)ptr) != 0) return false;
+  *base = (uintptr_t)b;
+  return true;
+#endif
+}
+
+// IPC mappings of other processes' allocations, one per process, shared by
+// the copies of the peer's buffer on all PEs of the process and reference
+// counted: a copy takes a reference the first time it transfers through the
+// mapping and releases it in its close(); the mapping is closed with the last
+// reference. A handle that did not open is kept with base null and no
+// references, so that the failure is reported once. The tables of this
+// section are never destroyed, so that the destructor of a static
+// CkDevicePersistent can still use them at exit.
+struct PersistIpcMap { void* base; int refs; };
+static std::mutex& persist_ipc_lock = *new std::mutex;
+static std::map<std::string, PersistIpcMap>& persist_ipc = *new std::map<std::string, PersistIpcMap>;
+
+// r's buffer as mapped in this process, or null when r's handle does not open
+// here. The first call on a copy finds or opens the mapping and takes a
+// reference; the copy keeps the answer (ipc_open, ipc_ptr), so later calls
+// touch neither the table nor its lock.
+static void* persistIpcPtr(const CkDevicePersistent& r) {
+  if (r.ipc_open) return r.ipc_ptr;
+  std::string key((const char*)&r.hapi_ipc_handle, sizeof(hapiIpcMemHandle_t));
+  std::lock_guard<std::mutex> g(persist_ipc_lock);
+  auto it = persist_ipc.find(key);
+  void* base = nullptr;
+  if (it != persist_ipc.end()) {
+    base = it->second.base;
+    if (base) it->second.refs++;
+  } else {
+    if (hapiIpcOpenMemHandle(&base, r.hapi_ipc_handle, hapiIpcMemLazyEnablePeerAccess) != hapiSuccess) {
+      (void)hapiGetLastError();
+      CmiPrintf("[%d] CkDevicePersistent> IPC open of PE %d's buffer failed; using RDMA\n", CkMyPe(), r.pe);
+      base = nullptr;
+    }
+    persist_ipc[key] = PersistIpcMap{ base, base ? 1 : 0 };
+  }
+  r.ipc_open = true;
+  r.ipc_ptr = base ? (char*)base + r.ipc_offset : nullptr;
+  return r.ipc_ptr;
+}
+
+// Releases the reference a copy holds on its peer's mapping, closing the
+// mapping with the last one, after a device synchronize so that no copy
+// through it is still running.
+static void persistIpcRelease(CkDevicePersistent& r) {
+  if (!r.ipc_open) return;
+  r.ipc_open = false;
+  void* p = r.ipc_ptr;
+  r.ipc_ptr = nullptr;
+  if (!p) return;
+  std::string key((const char*)&r.hapi_ipc_handle, sizeof(hapiIpcMemHandle_t));
+  std::lock_guard<std::mutex> g(persist_ipc_lock);
+  auto it = persist_ipc.find(key);
+  if (it == persist_ipc.end() || --it->second.refs > 0) return;
+  hapiCheck(hapiDeviceSynchronize());
+  hapiCheck(hapiIpcCloseMemHandle(it->second.base));
+  persist_ipc.erase(it);
+}
+
+
+// The two buffers' callbacks, sent from the issuing PE when a transfer is done.
+struct PersistDone {
+  CkCallback a, b;
+  void *amsg, *bmsg;
+  void fire() {
+    if (a.type != CkCallback::ignore) a.send(amsg);
+    if (b.type != CkCallback::ignore) b.send(bmsg);
+  }
+};
+
+static void persistOnStream(hapiStream_t st, const CkDevicePersistent& x, const CkDevicePersistent& y) {
+  if (x.cb.type != CkCallback::ignore) hapiAddCallback(st, x.cb, x.cb_msg);
+  if (y.cb.type != CkCallback::ignore) hapiAddCallback(st, y.cb, y.cb_msg);
+}
+
+// A callCFn callback on the issuing PE: the RDMA transfer finished.
+static void persistRdmaDone(void* param, void* msg) {
+  if (msg) CkFreeMsg(msg);
+  PersistDone* d = (PersistDone*)param;
+  d->fire();
+  delete d;
+}
+
+// Network registrations of opened buffers, one table per process. open() adds
+// an entry and the owner's close() removes it; the memory is registered the
+// first time a transfer needs RDMA, so a run that never needs it (one process,
+// or IPC on one host) never registers device memory with the network.
+struct PersistReg {
+  const void* ptr;
+  size_t cnt;              // the length registered (cnt at open())
+  int state = 0;           // 0 not yet registered, 1 registered, -1 cannot be registered
+  const char* why = "";    // the reason for state -1
+  CmiNcpyBuffer ncpy;
+};
+static std::mutex& persist_reg_lock = *new std::mutex;
+static std::map<uint64_t, PersistReg>& persist_reg =          // this process's opened buffers
+    *new std::map<uint64_t, PersistReg>;
+static std::map<uint64_t, CmiNcpyBuffer>& persist_remote =    // other processes' registrations, by id
+    *new std::map<uint64_t, CmiNcpyBuffer>;
+static std::atomic<uint64_t> persist_next_id{1};
+
+// An id is node (20 bits) | run token (16 bits) | counter (28 bits). The token
+// differs between a run and its restart from a checkpoint, so an object
+// restored from the checkpoint does not name a buffer opened in the new run.
+static uint64_t persistRunToken() {
+  static const uint64_t token = ((uint64_t)time(nullptr) ^ ((uint64_t)getpid() << 5)) & 0xffff;
+  return token;
+}
+
+static void persistCheckRdmaUsable() {
+  if (CmiUseCopyBasedRDMA)
+    CkAbort("CkDevicePersistent: a transfer between PEs on different hosts, or whose IPC handle did not "
+            "open, needs RDMA, but this run moves RDMA data through host memory (the LCW backend, or "
+            "+nordma), which cannot read or write device memory");
+}
+
+// Registers r once; called with persist_reg_lock held.
+static void persistRegisterLocked(PersistReg& r) {
+  if (r.state != 0) return;
+  if (r.cnt > (size_t)INT_MAX) {
+    r.state = -1;
+    r.why = "the buffer is 2 GiB or larger, and the network registration takes an int length";
+    return;
+  }
+  r.ncpy.deviceRdmaOpInfo = nullptr;
+  memset(r.ncpy.layerInfo, 0, sizeof(r.ncpy.layerInfo));   // stays zero if nothing is registered
+  r.ncpy.init(r.ptr, r.cnt, CMK_BUFFER_REG, CMK_BUFFER_NODEREG);   // released by close()
+  // The memory region handle is the first field of the layer information
+  // (CmiSetRdmaBufferInfo); the backend leaves it null when it registered nothing.
+  void* mr = nullptr;
+  memcpy(&mr, r.ncpy.layerInfo + CmiGetRdmaCommonInfoSize(), sizeof(mr));
+  if (!r.ncpy.isRegistered || mr == nullptr) {
+    r.state = -1;
+    r.why = "the network layer did not register the device memory";
+    return;
+  }
+  r.state = 1;
+}
+
+static void persistNoRdma(const CkDevicePersistent& b, const PersistReg& r) {
+  CkAbort("CkDevicePersistent: a transfer needs RDMA on PE %d's buffer of %zu bytes, but it cannot be "
+          "registered with the network: %s", b.pe, r.cnt, r.why);
+}
+
+static void persistNotOpened(const CkDevicePersistent& b) {
+  CkAbort("CkDevicePersistent: a transfer between PEs on different hosts, or whose IPC handle did not "
+          "open, needs RDMA, and PE %d's buffer was not opened (call open() on both buffers before "
+          "exchanging them)", b.pe);
+}
+
+// The registration of b, a buffer opened in this process, registering it now
+// if needed, with cnt set to b's current cnt.
+static CmiNcpyBuffer persistLocalNcpy(const CkDevicePersistent& b) {
+  if (b.id == 0) persistNotOpened(b);
+  if (b.node != CkMyNode())
+    CkAbort("CkDevicePersistent: an RDMA transfer on PE %d into or out of PE %d's buffer must be issued "
+            "on a PE of that buffer's process", CkMyPe(), b.pe);
+  CmiNcpyBuffer n;
+  {
+    std::lock_guard<std::mutex> g(persist_reg_lock);
+    auto it = persist_reg.find(b.id);
+    if (it == persist_reg.end())
+      CkAbort("CkDevicePersistent: a transfer on PE %d's buffer after its owner called close()", b.pe);
+    persistRegisterLocked(it->second);
+    if (it->second.state != 1) persistNoRdma(b, it->second);
+    n = it->second.ncpy;
+  }
+  if (b.cnt > n.cnt)
+    CkAbort("CkDevicePersistent: a transfer of %zu bytes on PE %d's buffer exceeds the %zu bytes it had "
+            "at open(); open() again after enlarging cnt", b.cnt, b.pe, n.cnt);
+  n.cnt = b.cnt;
+  n.deviceRdmaOpInfo = nullptr;
+  return n;
+}
+
+static void persistIssueGet(CmiNcpyBuffer d, CmiNcpyBuffer s, const CkCallback& done) {
+  d.deviceRdmaOpInfo = nullptr;
+  s.deviceRdmaOpInfo = nullptr;
+  CkCallback srcAck(CkCallback::ignore), dstAck(done);
+  QdCreate(1);   // matched in CkRdmaDirectAckHandler
+  d.rdmaGet(s, sizeof(CkCallback), (char*)&srcAck, (char*)&dstAck);
+}
+
+// A get waiting for the registration of its source (persist_reg_req/rep).
+struct PersistPending {
+  CmiNcpyBuffer d;
+  size_t src_cnt;
+  int src_pe;
+  CkCallback done;
+};
+struct PersistRegReqMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  int issuer;
+  uint64_t id;
+  uint64_t pending;
+};
+struct PersistRegRepMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  uint64_t id;
+  uint64_t pending;
+  int ok;
+  size_t cnt;
+  char why[128];
+  CmiNcpyBuffer ncpy;
+};
+
+// An RDMA get into dst (opened in this process) from src. The lengths are the
+// objects' current cnt, as in the IPC and copy modes. The source's
+// registration is asked of its process the first time and kept here.
+static void persistRdmaGet(const CkDevicePersistent& dst, const CkDevicePersistent& src, const CkCallback& done) {
+  persistCheckRdmaUsable();
+  if (src.id == 0) persistNotOpened(src);
+  CmiNcpyBuffer d = persistLocalNcpy(dst);
+  CmiNcpyBuffer s;
+  bool have = false;
+  {
+    std::lock_guard<std::mutex> g(persist_reg_lock);
+    auto it = persist_remote.find(src.id);
+    if (it != persist_remote.end()) { s = it->second; have = true; }
+  }
+  if (have) {
+    if (src.cnt > s.cnt)
+      CkAbort("CkDevicePersistent: a transfer of %zu bytes from PE %d's buffer exceeds the %zu bytes it "
+              "had at open(); open() again after enlarging cnt", src.cnt, src.pe, s.cnt);
+    s.cnt = src.cnt;
+    persistIssueGet(d, s, done);
+    return;
+  }
+  PersistRegReqMsg* m = (PersistRegReqMsg*)CmiAlloc(sizeof(PersistRegReqMsg));
+  m->issuer = CkMyPe();
+  m->id = src.id;
+  m->pending = (uint64_t)(uintptr_t)new PersistPending{ d, src.cnt, src.pe, done };
+  CmiSetHandler(m, persist_reg_req_handler);
+  QdCreate(1);
+  CmiSyncSendAndFree(src.pe, sizeof(PersistRegReqMsg), m);
+}
+
+// A put between hosts is a get issued by the destination's PE, so that the
+// callbacks are sent only once the bytes are there (a true RDMA put completes
+// on the source before they are visible at the destination). The source's
+// registration travels with the request.
+struct PersistPutMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  int issuer;
+  int len;
+  uint64_t rec;
+  CmiNcpyBuffer src;
+  // then the pupped destination buffer
+};
+struct PersistAckMsg {
+  char header[CmiMsgHeaderSizeBytes];
+  uint64_t rec;
+};
+struct PersistPutAck { int issuer; uint64_t rec; };
+
+static void persistPutGot(void* param, void* msg) {
+  if (msg) CkFreeMsg(msg);
+  PersistPutAck* a = (PersistPutAck*)param;
+  PersistAckMsg* m = (PersistAckMsg*)CmiAlloc(sizeof(PersistAckMsg));
+  m->rec = a->rec;
+  CmiSetHandler(m, persist_ack_handler);
+  QdCreate(1);
+  CmiSyncSendAndFree(a->issuer, sizeof(PersistAckMsg), m);
+  delete a;
+}
+
+extern "C" {
+  void* persist_put_bridge(void* arg) {
+    PersistPutMsg* m = (PersistPutMsg*)arg;
+    QdProcess(1);
+    CkDevicePersistent dst;
+    PUP::fromMem up((char*)m + sizeof(PersistPutMsg));
+    up | dst;
+    persistIssueGet(persistLocalNcpy(dst), m->src, CkCallback(persistPutGot, new PersistPutAck{ m->issuer, m->rec }));
+    CmiFree(m);
+    return NULL;
+  }
+  int persist_put_handler;
+
+  void* persist_ack_bridge(void* arg) {
+    PersistAckMsg* m = (PersistAckMsg*)arg;
+    QdProcess(1);
+    persistRdmaDone((void*)(uintptr_t)m->rec, nullptr);
+    CmiFree(m);
+    return NULL;
+  }
+  int persist_ack_handler;
+
+  // On the source's process: register the buffer if needed and reply.
+  void* persist_reg_req_bridge(void* arg) {
+    PersistRegReqMsg* m = (PersistRegReqMsg*)arg;
+    QdProcess(1);
+    PersistRegRepMsg* r = (PersistRegRepMsg*)CmiAlloc(sizeof(PersistRegRepMsg));
+    r->id = m->id;
+    r->pending = m->pending;
+    r->ok = 0;
+    r->cnt = 0;
+    r->why[0] = '\0';
+    {
+      std::lock_guard<std::mutex> g(persist_reg_lock);
+      auto it = persist_reg.find(m->id);
+      if (it == persist_reg.end()) {
+        snprintf(r->why, sizeof(r->why), "the buffer's owner called close()");
+      } else {
+        persistRegisterLocked(it->second);
+        r->cnt = it->second.cnt;
+        if (it->second.state == 1) { r->ok = 1; r->ncpy = it->second.ncpy; }
+        else snprintf(r->why, sizeof(r->why), "%s", it->second.why);
+      }
+    }
+    CmiSetHandler(r, persist_reg_rep_handler);
+    QdCreate(1);
+    CmiSyncSendAndFree(m->issuer, sizeof(PersistRegRepMsg), r);
+    CmiFree(m);
+    return NULL;
+  }
+  int persist_reg_req_handler;
+
+  // On the issuing PE: keep the source's registration and issue the get.
+  void* persist_reg_rep_bridge(void* arg) {
+    PersistRegRepMsg* r = (PersistRegRepMsg*)arg;
+    QdProcess(1);
+    PersistPending* p = (PersistPending*)(uintptr_t)r->pending;
+    if (!r->ok)
+      CkAbort("CkDevicePersistent: a transfer needs RDMA on PE %d's buffer of %zu bytes, but it cannot be "
+              "registered with the network: %s", p->src_pe, r->cnt, r->why);
+    CmiNcpyBuffer s = r->ncpy;
+    s.deviceRdmaOpInfo = nullptr;
+    {
+      std::lock_guard<std::mutex> g(persist_reg_lock);
+      persist_remote[r->id] = s;
+    }
+    if (p->src_cnt > s.cnt)
+      CkAbort("CkDevicePersistent: a transfer of %zu bytes from PE %d's buffer exceeds the %zu bytes it "
+              "had at open(); open() again after enlarging cnt", p->src_cnt, p->src_pe, s.cnt);
+    s.cnt = p->src_cnt;
+    persistIssueGet(p->d, s, p->done);
+    delete p;
+    CmiFree(r);
+    return NULL;
+  }
+  int persist_reg_rep_handler;
+}
+
 void CkDevicePersistent::init() {
   pe = CkMyPe();
+  node = CkMyNode();
+  phys_node = CmiPhysicalNodeID(CkMyPe());
   cb_msg = nullptr;
   ipc_ptr = nullptr;
   ipc_open = false;
 }
 
 void CkDevicePersistent::open() {
-  // Create a CUDA IPC handle for inter-process communication
-  hapiCheck(cudaIpcGetMemHandle(&cuda_ipc_handle, (void*)ptr));
+  if (pe != CkMyPe()) CkAbort("CkDevicePersistent::open on PE %d of a buffer created on PE %d", CkMyPe(), pe);
+  if (owner) close();
+  uintptr_t base = 0;
+  if (persistAllocBase(ptr, &base) && hapiIpcGetMemHandle(&hapi_ipc_handle, (void*)ptr) == hapiSuccess) {
+    ipc_offset = (size_t)((uintptr_t)ptr - base);
+    ipc_valid = true;
+  } else {
+    (void)hapiGetLastError();
+    ipc_valid = false;
+  }
+  id = ((uint64_t)CkMyNode() << 44) | (persistRunToken() << 28) | (persist_next_id++ & 0xfffffff);
+  PersistReg r;
+  r.ptr = ptr;
+  r.cnt = cnt;
+  {
+    std::lock_guard<std::mutex> g(persist_reg_lock);
+    persist_reg.emplace(id, r);
+  }
+  owner = true;
 }
 
 void CkDevicePersistent::close() {
-  // Close the CUDA IPC handle if it was opened
-  hapiCheck(cudaIpcCloseMemHandle(ipc_ptr));
+  if (owner) {
+    std::lock_guard<std::mutex> g(persist_reg_lock);
+    auto it = persist_reg.find(id);
+    if (it != persist_reg.end()) {
+      // After ConverseExit the network layer is gone: a static owner destroyed
+      // at process exit drops its entry without deregistering.
+      if (it->second.state == 1 && !persist_exiting) it->second.ncpy.deregisterMem();
+      persist_reg.erase(it);
+    }
+    owner = false;
+    id = 0;
+    return;
+  }
+  // A copy of another process's buffer: release this copy's reference on the
+  // IPC mapping and the kept registration. A later transfer takes them again.
+  if (node == CkMyNode()) return;
+  {
+    std::lock_guard<std::mutex> g(persist_reg_lock);
+    persist_remote.erase(id);
+  }
+  persistIpcRelease(*this);
+}
+
+// Called on each PE when its exit sequence reaches ConverseExit (init.C).
+void CkRdmaDeviceExit() {
+  persist_exiting = true;
 }
 
 void CkDevicePersistent::set_msg(void* msg) {
@@ -122,72 +1067,80 @@ void CkDevicePersistent::pup(PUP::er& p) {
   p|cnt;
   p|pe;
   p|cb;
-  p((char*)&cuda_ipc_handle, sizeof(cuda_ipc_handle));
+  p((char*)&hapi_ipc_handle, sizeof(hapi_ipc_handle));
+  p|ipc_offset;
+  p|ipc_valid;
+  p|node;
+  p|phys_node;
+  p|id;
+  if (p.isUnpacking()) {
+    owner = false;
+    cb_msg = nullptr;
+    ipc_ptr = nullptr;
+    ipc_open = false;
+  }
+}
+
+int CkDevicePersistent::mode(const CkDevicePersistent& other) const {
+  if (other.node == CkMyNode()) return 0;
+  // IPC whenever the peer's handle opens here (with or without +gpushm, which
+  // concerns DEVICE-slot messages); RDMA when it does not (the peer's GPU is
+  // not visible to this process, for example with one GPU per task)
+  if (other.phys_node == CmiPhysicalNodeID(CkMyPe()) && other.ipc_valid && persistIpcPtr(other) != nullptr) return 1;
+  return 2;
 }
 
 CkDeviceStatus CkDevicePersistent::get(CkDevicePersistent& src) {
-  // Check that the source buffer fits into the destination buffer
   if (cnt < src.cnt) {
     CkAbort("CkDevicePersistent::get: Destination buffer is smaller than source buffer\n");
   }
-
-  CkNcpyModeDevice mode = findTransferModeDevice(src.pe, CkMyPe());
-
-  // Perform get
-  if (mode == CkNcpyModeDevice::MEMCPY) {
-    cudaMemcpyAsync((void*)ptr, src.ptr, cnt, cudaMemcpyDeviceToDevice, cuda_stream);
-  } else if (mode == CkNcpyModeDevice::IPC) {
-    if (!src.ipc_open) {
-      hapiCheck(cudaIpcOpenMemHandle(&src.ipc_ptr, src.cuda_ipc_handle,
-            cudaIpcMemLazyEnablePeerAccess));
-      src.ipc_open = true;
-    }
-    cudaMemcpyAsync((void*)ptr, src.ipc_ptr, cnt, cudaMemcpyDeviceToDevice, cuda_stream);
-  } else {
-    CkAbort("Persistant GPU messaging is currently not supported for inter-node messages");
+  int m = mode(src);
+  void* from = m == 1 ? persistIpcPtr(src) : nullptr;
+  persistAnnounce("get", m);
+  if (m == 2) {
+    hapiCheck(hapiStreamSynchronize(hapi_stream));   // earlier work on the destination is done
+    persistRdmaGet(*this, src, CkCallback(persistRdmaDone, new PersistDone{ src.cb, cb, src.cb_msg, cb_msg }));
+    return CkDeviceStatus::incomplete;
   }
-
-  // Set callbacks to be invoked once get is complete
-  if (src.cb.type != CkCallback::ignore) {
-    hapiAddCallback(cuda_stream, src.cb, src.cb_msg);
-  }
-  if (cb.type != CkCallback::ignore) {
-    hapiAddCallback(cuda_stream, cb, cb_msg);
-  }
-
+  if (m == 0) from = (void*)src.ptr;
+  hapiCheck(hapiMemcpyAsync((void*)ptr, from, src.cnt, hapiMemcpyDeviceToDevice, hapi_stream));
+  persistOnStream(hapi_stream, src, *this);
   return CkDeviceStatus::incomplete;
 }
 
 CkDeviceStatus CkDevicePersistent::put(CkDevicePersistent& dst) {
-  // Check that the source buffer fits into the destination buffer
   if (dst.cnt < cnt) {
     CkAbort("CkDevicePersistent::put: Destination buffer is smaller than source buffer\n");
   }
-
-  CkNcpyModeDevice mode = findTransferModeDevice(CkMyPe(), dst.pe);
-
-  // Perform put
-  if (mode == CkNcpyModeDevice::MEMCPY) {
-    cudaMemcpyAsync((void*)dst.ptr, ptr, cnt, cudaMemcpyDeviceToDevice, cuda_stream);
-  } else if (mode == CkNcpyModeDevice::IPC) {
-    if (!dst.ipc_open) {
-      hapiCheck(cudaIpcOpenMemHandle(&dst.ipc_ptr, dst.cuda_ipc_handle,
-            cudaIpcMemLazyEnablePeerAccess));
-      dst.ipc_open = true;
-    }
-    cudaMemcpyAsync(dst.ipc_ptr, ptr, cnt, cudaMemcpyDeviceToDevice, cuda_stream);
-  } else {
-    CkAbort("Persistant GPU messaging is not yet supported for inter-node messages");
+  int m = mode(dst);
+  void* to = m == 1 ? persistIpcPtr(dst) : nullptr;
+  persistAnnounce("put", m);
+  if (m == 2) {
+    persistCheckRdmaUsable();
+    if (dst.id == 0) persistNotOpened(dst);
+    CmiNcpyBuffer s = persistLocalNcpy(*this);
+    hapiCheck(hapiStreamSynchronize(hapi_stream));   // the source's data is complete
+    PersistDone* d = new PersistDone{ cb, dst.cb, cb_msg, dst.cb_msg };
+    CkDevicePersistent dcopy = dst;
+    dcopy.cb = CkCallback(CkCallback::ignore);   // fired here, from d
+    PUP::sizer ps;
+    ps | dcopy;
+    int len = (int)ps.size();
+    PersistPutMsg* msg = (PersistPutMsg*)CmiAlloc(sizeof(PersistPutMsg) + len);
+    msg->issuer = CkMyPe();
+    msg->len = len;
+    msg->rec = (uint64_t)(uintptr_t)d;
+    msg->src = s;
+    PUP::toMem pm((char*)msg + sizeof(PersistPutMsg));
+    pm | dcopy;
+    CmiSetHandler(msg, persist_put_handler);
+    QdCreate(1);
+    CmiSyncSendAndFree(dst.pe, sizeof(PersistPutMsg) + len, msg);
+    return CkDeviceStatus::incomplete;
   }
-
-  // Set callbacks to be invoked once get is complete
-  if (cb.type != CkCallback::ignore) {
-    hapiAddCallback(cuda_stream, cb, cb_msg);
-  }
-  if (dst.cb.type != CkCallback::ignore) {
-    hapiAddCallback(cuda_stream, dst.cb, dst.cb_msg);
-  }
-
+  if (m == 0) to = (void*)dst.ptr;
+  hapiCheck(hapiMemcpyAsync(to, ptr, cnt, hapiMemcpyDeviceToDevice, hapi_stream));
+  persistOnStream(hapi_stream, *this, dst);
   return CkDeviceStatus::incomplete;
 }
 
@@ -203,6 +1156,30 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   void* old_msg = EnvToUsr(env);
   envelope* new_env = UsrToEnv(CkCopyMsg(&old_msg));
 
+  // Retarget the copied message's device buffers to the buffers this receiver
+  // posted. The transfers below land in arrPtrs[], but the copy still carries
+  // the SENDER's CkDeviceBuffer::ptr, and the entry method delivered from it
+  // reads that pointer as its data. Within one process the sender's pointer is
+  // a valid local address holding the same bytes, so this went unnoticed;
+  // across processes it names memory in another address space and the first
+  // kernel touching it faults. Rewriting in place is safe because re-pupping a
+  // CkDeviceBuffer writes exactly the bytes the walk just read: its width
+  // varies only with ack_count, and only ptr changes value here.
+  {
+    char* new_buf = ((CkMarshallMsg*)EnvToUsr(new_env))->msgBuf;
+    PUP::fromMem walk(new_buf);
+    int copy_numops;
+    walk | copy_numops;
+    for (int i = 0; i < numops && i < copy_numops; i++) {
+      const size_t field_off = walk.size();
+      CkDeviceBuffer db;
+      walk | db;
+      db.ptr = arrPtrs[i];
+      PUP::toMem patch(new_buf + field_off);
+      patch | db;
+    }
+  }
+
   // Start unpacking marshalled message
   PUP::fromMem up((void *)((CkMarshallMsg *)EnvToUsr(env))->msgBuf);
   int received_numops;
@@ -211,13 +1188,10 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
 
   CkDeviceBuffer source;
 
-#if !CMK_GPU_COMM
-  // Machine layer does not support GPU-aware communication
   GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
 
   // Find which mode of transfer should be used
   CkNcpyModeDevice mode = findTransferModeDevice(env->getSrcPe(), CkMyPe());
-#endif
 
   // Allocate and fill in metadata for this zerocopy operation
   void* rdma_data = CmiAlloc(sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * numops);
@@ -230,6 +1204,9 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
   for (int i = 0; i < numops; i++) {
     // Unpack source buffer from sender
     up|source;
+    // Acks the sender owes THIS PE ride on its first buffer: resolve them.
+    if (i == 0)
+      for (int k = 0; k < source.ack_count; k++) deviceResolveAck(source.acks[k]);
 
     if (arrSizes[i] > source.cnt) {
       CkAbort("CkRdmaDeviceIssueRgets: posted data size is larger than source data size!");
@@ -238,19 +1215,31 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
     // Store information about this buffer
     DeviceRdmaOp& save_op = *(DeviceRdmaOp*)((char*)rdma_data
         + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
-    save_op.dest_pe = CkMyPe();
+    // The completion has to re-enqueue the message on the PE that posted these
+    // gets -- this one -- which is not always the PE the sender addressed. A
+    // nodegroup entry method runs on whichever PE of the destination process
+    // picks the message up, so the sender can only ever name the process.
+    save_op.dest_pe  = CkMyPe();
     save_op.dest_ptr = arrPtrs[i];
     save_op.size = (size_t)arrSizes[i];
     save_op.info = rdma_info;
     save_op.src_cb = (source.cb.type != CkCallback::ignore) ? new CkCallback(source.cb) : nullptr;
     save_op.dst_cb = nullptr;
+    save_op.tag = 0;
 
-#if !CMK_GPU_COMM
-    // Machine layer does not support GPU-aware communication
-    // Check if destination PE is correct
-    // TODO: Handle this case instead of aborting
-    if (source.dest_pe != CkMyPe()) {
-      CkAbort("Current PE does not match the destination PE determined by the sender. "
+    // What has to hold is that the sender picked the same transfer mode we are
+    // about to use, and mode is a property of the process pair, not the PE
+    // pair: MEMCPY means "sender's pointer is valid in this address space", IPC
+    // means "reachable through this process's IPC handles". So compare
+    // processes. A stricter PE-equality test would reject every nodegroup
+    // message that lands on a PE other than the one the sender named.
+    // TODO: Handle a genuinely migrated object instead of aborting.
+    if (CmiNodeOf(source.dest_pe) != CmiMyNode()) {
+      CmiPrintf("PE %d (process %d) received a device buffer the sender (PE %d) "
+                "addressed to PE %d (process %d)\n",
+          CkMyPe(), CmiMyNode(), env->getSrcPe(), source.dest_pe,
+          CmiNodeOf(source.dest_pe));
+      CkAbort("Destination process does not match the one the sender determined. "
           "Please enable CMK_GLOBAL_LOCATION_UPDATE.");
     }
 
@@ -259,143 +1248,102 @@ void CkRdmaDeviceIssueRgets(envelope *env, int numops, void **arrPtrs, int *arrS
 
     // Perform data transfers
     if (mode == CkNcpyModeDevice::MEMCPY) {
-      // Source and destination PEs are in the same process (logical node)
-      // Directly invoke memcpy from source buffer to destination buffer
-      hapiCheck(cudaMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt,
-            cudaMemcpyDeviceToDevice, postStructs[i].cuda_stream));
+      // Source and destination PEs are in the same process (logical node),
+      // so the source pointer is valid here: copy straight across.
+      hapiCheck(hapiMemcpyAsync((void*)dest.ptr, source.ptr, dest.cnt,
+            hapiMemcpyDeviceToDevice, postStructs[i].hapi_stream));
     } else if (mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
-      // Inter-process using shared memory optimizations
-      // Use optimiziations with POSIX shared memory
-      cuda_ipc_device_info& device_info =
-        csv_gpu_manager.cuda_ipc_device_infos[source.device_idx];
+      // Inter-process, same physical node: read out of the sender's device
+      // communication buffer through its IPC handle.
+      hapi_ipc_device_info& device_info =
+        csv_gpu_manager.hapi_ipc_device_infos[source.device_idx];
 
-      // 1. Make user-provided stream wait for IPC event using cudaStreamWaitEvent
-      //    (source buffer to device comm buffer on source)
-      hapiCheck(cudaStreamWaitEvent(postStructs[i].cuda_stream,
+      // 1. Make the user-provided stream wait on the sender's IPC event
+      //    (source buffer -> device comm buffer, recorded on the sender)
+      hapiCheck(hapiStreamWaitEvent(postStructs[i].hapi_stream,
             device_info.src_event_pool[source.event_idx], 0));
 
-      // 2. Invoke cudaMemcpyAsync (from source device comm buffer to destination buffer)
-      hapiCheck(cudaMemcpyAsync((void*)dest.ptr,
+      // 2. Copy from the sender's device comm buffer to the destination buffer
+      hapiCheck(hapiMemcpyAsync((void*)dest.ptr,
             (void*)((char*)device_info.buffer + source.comm_offset),
-            dest.cnt, cudaMemcpyDeviceToDevice, postStructs[i].cuda_stream));
+            dest.cnt, hapiMemcpyDeviceToDevice, postStructs[i].hapi_stream));
 
-      // 3. Record IPC event so that the sender can query it for freeing
-      //    device comm buffer and corresponding pair of CUDA IPC events
-      hapiCheck(cudaEventRecord(device_info.dst_event_pool[source.event_idx],
-            postStructs[i].cuda_stream));
+      // 3. Record the IPC event the sender polls to decide when the block in
+      //    its device comm buffer (and the event pair) can be released
+      hapiCheck(hapiEventRecord(device_info.dst_event_pool[source.event_idx],
+            postStructs[i].hapi_stream));
 
-      // 4. Set flag in shared memory so that the sender can start querying
-      //    completion of the IPC event
-      cuda_ipc_event_shared* shm_event_shared =
-        (cuda_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
+      // 4. Tell the sender, through shared memory, that step 3 has been issued
+      //    and the event is now worth querying
+      hapi_ipc_event_shared* shm_event_shared =
+        (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
             + csv_gpu_manager.shm_chunk_size * source.device_idx
-            + sizeof(cudaIpcMemHandle_t)) + source.event_idx;
-      pthread_mutex_lock(&shm_event_shared->lock);
-      shm_event_shared->dst_flag = true;
-      pthread_mutex_unlock(&shm_event_shared->lock);
+            + sizeof(hapiIpcMemHandle_t)) + source.event_idx;
+      __atomic_store_n(&shm_event_shared->dst_flag, 1, __ATOMIC_RELEASE);
     } else {
-      // Handle all other cases (basic inter-process and inter-node)
-      // Transfer the received/unpacked data on host to the destination device buffer
-      // FIXME: Print warning that this is slow?
-      CkAssert(source.data_stored);
-      hapiCheck(cudaMemcpyAsync((void*)dest.ptr, source.data, dest.cnt,
-            cudaMemcpyHostToDevice, postStructs[i].cuda_stream));
+      // Inter-node (or intra-node without the shared-memory IPC path): pull the
+      // source buffer over the network with a device-to-device RDMA get.
+      // Completion arrives at CkRdmaDeviceRecvHandler(void*) by way of
+      // CkRdmaDirectAckHandler, which recognises the operation as a device one
+      // from the deviceRdmaOpInfo we attach to the destination buffer here.
+      QdCreate(1);
+      // With an ack id the SENDER fires its source callback (on ack), not us.
+      save_op.tag = source.ack_id;
+      if (save_op.tag != 0 && save_op.src_cb) { delete (CkCallback*)save_op.src_cb; save_op.src_cb = nullptr; }
+      CmiNcpyBuffer lci_dest_ncpy_buffer;
+      deviceNcpyBufferInit(lci_dest_ncpy_buffer, arrPtrs[i], (size_t)arrSizes[i], (void*)(&save_op));
+      lci_dest_ncpy_buffer.rdmaGet(source.lci_ncpy_buffer, 0, nullptr, nullptr);
+      continue;  // no stream callback: the network, not the GPU, completes this
     }
 
-    // Add source callback for polling, so that it can be invoked once the transfer is complete
-    hapiAddCallback(postStructs[i].cuda_stream, CkCallback(CkRdmaDeviceRecvHandler, &save_op));
-#else
-    // Machine layer supports GPU-aware communication
-    save_op.tag = source.tag;
-#endif // CMK_GPU_COMM
+    // Intra-node transfers finish on the stream, so hang the completion off it
+    hapiAddCallback(postStructs[i].hapi_stream, CkCallback(CkRdmaDeviceRecvHandler, &save_op));
   }
-
-#if CMK_GPU_COMM
-  // Post ucp_tag_recv_nb's to receive GPU data
-  for (int i = 0; i < numops; i++) {
-    DeviceRdmaOp* save_op = (DeviceRdmaOp*)((char*)rdma_data
-        + sizeof(DeviceRdmaInfo) + sizeof(DeviceRdmaOp) * i);
-    QdCreate(1);
-    CmiRecvDevice(save_op, DEVICE_RECV_TYPE_CHARM);
-  }
-#endif
 }
 
-// Unused, left for future reference
-/*
-int CkRdmaGetDestPEChare(int dest_pe, void* obj_ptr) {
-  // Mechanism extracted from _prepareMsg() in ck.C
-  if (dest_pe < 0) {
-    int pe = -(dest_pe+1);
-    if (pe == CkMyPe()) {
-      VidBlock* vblk = CkpvAccess(vidblocks)[(CmiIntPtr)obj_ptr];
-      void *objPtr = vblk->getLocalChare();
-      dest_pe = objPtr ? pe : vblk->getActualID().onPE;
-    } else {
-      dest_pe = pe;
-    }
-  }
-
-  return dest_pe;
-}
-*/
-
-static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset) {
-  int pool_size = CsvAccess(gpu_manager).cuda_ipc_event_pool_size_pe;
+// Reclaims IPC events whose transfers have completed, then hands out a free
+// one. Two events are used per message:
+//   1) recorded by the sender after 'source buffer -> device comm buffer'.
+//      The receiver waits on it before starting its own copy.
+//   2) recorded by the receiver after 'device comm buffer -> dest buffer'.
+//      The sender polls it to know when the comm-buffer block is reusable.
+// Returns -1 when the pool is exhausted.
+static int findFreeIpcEvent(DeviceManager* dm, const size_t comm_offset, int cpv_my_device_id) {
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  int pool_size = csv_gpu_manager.hapi_ipc_event_pool_size_pe;
   int pool_start = CkMyRank() * pool_size;
-  int device_index = dm->global_index;
-  cuda_ipc_device_info& my_device_info = CsvAccess(gpu_manager).cuda_ipc_device_infos[device_index];
+  const int my_device_index =
+    csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id;
+  hapi_ipc_device_info& my_device_info =
+    csv_gpu_manager.hapi_ipc_device_infos[my_device_index];
 
   // Free IPC events that are complete
   // TODO: Don't do this every time but only when the event pool is somewhat empty
   for (int i = pool_start; i < pool_start + pool_size; i++) {
     int& event_flag = my_device_info.event_pool_flags[i];
-    cudaEvent_t& ev = my_device_info.dst_event_pool[i];
+    hapiEvent_t& ev = my_device_info.dst_event_pool[i];
     size_t& buff_offset = my_device_info.event_pool_buff_offsets[i];
-    // For a used event, check if it's complete and mark as free if so
-    if (event_flag != 0) {
-      // Check in shared memory if receiver has invoked the memcpy from
-      // the device comm buffer on sender to destination buffer
-      cuda_ipc_event_shared* shm_event_shared =
-        (cuda_ipc_event_shared*)((char*)CsvAccess(gpu_manager).shm_ptr
-            + CsvAccess(gpu_manager).shm_chunk_size * device_index
-            + sizeof(cudaIpcMemHandle_t)) + i;
-      bool can_query = false;
-      pthread_mutex_lock(&shm_event_shared->lock);
-      if (shm_event_shared->dst_flag == true) {
-        shm_event_shared->dst_flag = false;
-        can_query = true;
-      }
-      pthread_mutex_unlock(&shm_event_shared->lock);
+    if (event_flag == 0) continue;
 
-      // If the receiver has invoked the memcpy,
-      // the sender can query the event for completion
-      if (can_query) {
-        if (cudaEventQuery(ev) == cudaSuccess) {
-          // Event completion means that the transfer from source device comm buffer
-          // to dest buffer is complete, so free the allocated block
-          if (event_flag == 1) {
-            dm->free_comm_buffer(buff_offset);
-          } else {
-            CkAbort("Retrieved cudaSuccess for a free IPC event");
-          }
+    // Only worth querying once the receiver says it has issued its copy
+    hapi_ipc_event_shared* shm_event_shared =
+      (hapi_ipc_event_shared*)((char*)csv_gpu_manager.shm_ptr
+          + csv_gpu_manager.shm_chunk_size * my_device_index
+          + sizeof(hapiIpcMemHandle_t)) + i;
+    if (!__atomic_load_n(&shm_event_shared->dst_flag, __ATOMIC_ACQUIRE)) continue;
 
-          // Mark event as free
-          event_flag = 0;
-        }
+    if (hapiEventQuery(ev) == hapiSuccess) {
+      // The receiver is done reading, so the block can go back to the allocator
+      if (event_flag != 1) {
+        CkAbort("Retrieved hapiSuccess for a free IPC event");
       }
+      dm->free_comm_buffer(buff_offset);
+
+      event_flag = 0;
+      __atomic_store_n(&shm_event_shared->dst_flag, 0, __ATOMIC_RELEASE);
     }
   }
 
-  // Allocate CUDA IPC events from the pool
-  // Two events are used per message:
-  // 1) Recorded by the sender after 'source buffer -> device comm buffer' cudaMemcpy.
-  //    Can be used by the sender to determine if the sender buffer is free for reuse.
-  //    It is also used by the receiver to create a dependency for the second cudaMemcpy
-  //    ('device comm buffer -> dest buffer')
-  // 2) Recorded by the receiver after 'device comm buffer -> dest buffer' cudaMemcpy.
-  //    It is used by the sender to determine when the allocated block on
-  //    device comm buffer and IPC events can be freed.
   for (int i = pool_start; i < pool_start + pool_size; i++) {
     int& event_flag = my_device_info.event_pool_flags[i];
     size_t& buff_offset = my_device_info.event_pool_buff_offsets[i];
@@ -414,78 +1362,84 @@ void CkRdmaDeviceOnSender(int dest_pe, int numops, CkDeviceBuffer** buffers) {
   // TODO: Need to handle the case where the destination PE could be wrong
   //       (due to migration, etc.). Currently the code relies on a global
   //       location update after migration (with CMK_GLOBAL_LOCATION_UPDATE).
-#if !CMK_GPU_COMM
-  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
-
-  // Determine transfer mode (intra-process, inter-process, inter-node)
   CkNcpyModeDevice transfer_mode = findTransferModeDevice(CkMyPe(), dest_pe);
 
-  // Store destination PE in the metadata message
-  // FIXME: Not necessary? save_op.dest_pe is set to CkMyPe() on the receiver
   for (int i = 0; i < numops; i++) {
     buffers[i]->dest_pe = dest_pe;
+    buffers[i]->dest_mpi_rank = CmiNodeOf(dest_pe);
+    buffers[i]->src_pe = CmiMyPe();
+    buffers[i]->src_mpi_rank = CmiNodeOf(CmiMyPe());
   }
 
   if (transfer_mode == CkNcpyModeDevice::MEMCPY) {
-    // Don't need to do anything for intra-process
+    // The receiver dereferences buffers[i]->ptr directly, so the producing
+    // kernel/copy has to have retired before the metadata message goes out.
+    for (int i = 0; i < numops; i++)
+      hapiCheck(hapiStreamSynchronize(buffers[i]->hapi_stream));
     return;
-  } else if (transfer_mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
-    // Use optimizations with POSIX shaerd memory
-    // Allocate blocks on device comm buffer
+  }
+
+  GPUManager& csv_gpu_manager = CsvAccess(gpu_manager);
+  int cpv_my_device_id = CpvAccess(my_device_id);
+
+  if (transfer_mode == CkNcpyModeDevice::IPC && csv_gpu_manager.use_shm) {
+    // Stage each buffer into this device's communication buffer, which the
+    // receiving process can reach through the IPC handle exchanged at startup.
     DeviceManager* dm = csv_gpu_manager.device_map[CkMyPe()];
 
     for (int i = 0; i < numops; i++) {
+      // A buffer that already lives inside the comm buffer (the LB region)
+      // needs no staging copy -- it is already visible through the handle.
+      bool is_lb_buffer = ((size_t)((char*)(buffers[i]->ptr)
+            - (char*)(dm->comm_buffer->base_ptr)) < dm->comm_buffer->total_size);
 #if CMK_SMP
       CmiLock(dm->lock);
 #endif
-      void* alloc_comm_buffer = dm->alloc_comm_buffer(buffers[i]->cnt);
-      if (alloc_comm_buffer == nullptr) {
-        CkAbort("PE %d, device %d: Not enough memory on device communication buffer (%zu free)",
-            CkMyPe(), dm->global_index, dm->get_comm_buffer_free_size());
+      void* alloc_comm_buffer;
+      if (is_lb_buffer) {
+        alloc_comm_buffer = const_cast<void*>(buffers[i]->ptr);
+      } else {
+        alloc_comm_buffer = dm->alloc_comm_buffer(buffers[i]->cnt);
+        if (alloc_comm_buffer == nullptr) {
+          CkAbort("PE %d, device %d: Not enough memory on device communication buffer (%zu free)",
+              CkMyPe(), dm->global_index, dm->get_comm_buffer_free_size());
+        }
       }
       buffers[i]->comm_offset = (char*)alloc_comm_buffer - (char*)dm->comm_buffer->base_ptr;
-      buffers[i]->device_idx = dm->global_index;
-      buffers[i]->event_idx = findFreeIpcEvent(dm, buffers[i]->comm_offset);
-      // Abort if no free IPC event was found
-      // FIXME: Instead of aborting, we can maybe create IPC events on demand
-      // (although they probably cannot be shared through the shared memory
-      // allocated and shared between processes at init time)
+      buffers[i]->device_idx = csv_gpu_manager.device_count * CmiMyNodeRankLocal() + cpv_my_device_id;
+      buffers[i]->event_idx = findFreeIpcEvent(dm, buffers[i]->comm_offset, cpv_my_device_id);
+      // FIXME: Instead of aborting, we could create IPC events on demand
+      // (though they cannot then be shared through the shared memory region
+      // allocated at init time)
       if (buffers[i]->event_idx == -1) {
-        CkAbort("CUDA IPC event pool empty");
+        CkAbort("GPU IPC event pool empty");
       }
 #if CMK_SMP
       CmiUnlock(dm->lock);
 #endif
 
-      // Initiate transfer from source buffer to device comm buffer
-      hapiCheck(cudaMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
-            cudaMemcpyDeviceToDevice, buffers[i]->cuda_stream));
+      if (!is_lb_buffer) {
+        hapiCheck(hapiMemcpyAsync(alloc_comm_buffer, buffers[i]->ptr, buffers[i]->cnt,
+              hapiMemcpyDeviceToDevice, buffers[i]->hapi_stream));
+      }
 
-      // Record event
-      cuda_ipc_device_info& my_device_info = csv_gpu_manager.cuda_ipc_device_infos[dm->global_index];
-      hapiCheck(cudaEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx], buffers[i]->cuda_stream));
+      hapi_ipc_device_info& my_device_info =
+        csv_gpu_manager.hapi_ipc_device_infos[buffers[i]->device_idx];
+      hapiCheck(hapiEventRecord(my_device_info.src_event_pool[buffers[i]->event_idx],
+            buffers[i]->hapi_stream));
     }
   } else {
-    // Use a naive host-staged mechanism
-    // Allocate temporary host buffers and copy source buffers
+    // Inter-node: expose the source buffer for the receiver's RDMA get. The
+    // registration travels to the receiver inside lci_ncpy_buffer when the
+    // CkDeviceBuffer is PUP'd into the metadata message.
     for (int i = 0; i < numops; i++) {
-      buffers[i]->data_stored = true;
-      hapiCheck(cudaMallocHost(&buffers[i]->data, buffers[i]->cnt));
-      hapiCheck(cudaMemcpyAsync(buffers[i]->data, buffers[i]->ptr, buffers[i]->cnt,
-            cudaMemcpyDeviceToHost, buffers[i]->cuda_stream));
-    }
-
-    // Wait for the copies to finish
-    for (int i = 0; i < numops; i++) {
-      hapiCheck(cudaStreamSynchronize(buffers[i]->cuda_stream));
+      hapiCheck(hapiStreamSynchronize(buffers[i]->hapi_stream));
+      deviceNcpyBufferInit(buffers[i]->lci_ncpy_buffer, buffers[i]->ptr, buffers[i]->cnt, nullptr);
+      buffers[i]->ack_id = deviceMintAck(buffers[i]->lci_ncpy_buffer, buffers[i]->cb);
     }
   }
-#else
-  // Post ucp_tag_send_nb's to send GPU data. When receiver receives the metadata,
-  // it should post ucp_tag_recv_nb's to receive the GPU data.
-  for (int i = 0; i < numops; i++) {
-    CmiSendDevice(dest_pe, buffers[i]->ptr, buffers[i]->cnt, buffers[i]->tag);
-  }
-#endif // CMK_GPU_COMM
+  // Whatever this PE owes the destination rides on the first buffer.
+  if (numops > 0) deviceDrainAcksInto(dest_pe, buffers[0]);
 }
-#endif // CMK_CUDA
+
+#endif // (CMK_CUDA || CMK_HIP)

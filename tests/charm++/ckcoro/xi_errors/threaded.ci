@@ -1,0 +1,7 @@
+// error: is a plain asynchronous entry method
+module xe_threaded {
+  array [1D] A {
+    entry A();
+    entry [coroutine, threaded] void run();
+  };
+};

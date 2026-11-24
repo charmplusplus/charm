@@ -21,9 +21,6 @@ CXX       = $(CHARMBIN)/charmc
 CHARMC    = $(CHARMBIN)/charmc $(OPTS)
 CXXFLAGS += -language charm++ $(OPTS)
 EXECFLAGS = +p$(NP)
-ifdef $(NODELIST)
-  EXECFLAGS += ++nodelist $(NODELIST)
-endif
 
 
 ########### This stuff should be able take care of itself ############

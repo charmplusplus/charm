@@ -581,7 +581,7 @@ void getNodeTopoTreeEdges(int node, int rootNode, int *nodes, int numnodes, unsi
     if (rootNode != nodes[0]) CkAbort("getNodeTopoTreeEdges: root must be in first position of nodes");
   }
 
-  CmiSpanningTreeInfo t;
+  CmiSpanningTreeInfo t = {};   /* children stays NULL on a leaf */
   getNeighborsTopoTree_R(nodes, nodes + numnodes, node, -1, true, bfactor, t);
   *parent      = t.parent;
   *child_count = t.child_count;
@@ -607,7 +607,7 @@ void getPETopoTreeEdges(int pe, int rootPE, int *pes, int numpes, unsigned int b
     if (rootPE != pes[0]) CkAbort("getPETopoTreeEdges: root must be in first position of pes");
   }
 
-  CmiSpanningTreeInfo t;
+  CmiSpanningTreeInfo t = {};   /* children stays NULL on a leaf */
   getNeighborsTopoTree_R(pes, pes + numpes, pe, -1, false, bfactor, t);
   *parent      = t.parent;
   *child_count = t.child_count;

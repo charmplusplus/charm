@@ -253,11 +253,7 @@ public:
   }
 
   inline int determineMsgType(int dimension) {
-#if CMK_MULTICORE
-    return !isMessagePersonalized(dimension);
-#else
     return dimension;
-#endif
   }
 
   inline bool isBufferInUse(int dimension, int index) {

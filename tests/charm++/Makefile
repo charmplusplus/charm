@@ -4,11 +4,13 @@ DIRS = \
   megatest \
   alignment \
   simplearrayhello \
+  cxx_standard \
+  ckdyn \
+  migratable_threads \
   provisioning \
   load_balancing \
-  chkpt \
+  ckpt_restart \
   delegation \
-  queue \
   sdag \
   ckAllocSysMsgTest \
   method_templates \
@@ -17,12 +19,17 @@ DIRS = \
   topology \
   io \
   io_read \
+  io_sessions \
+  groupdep_creator \
   sparse \
+  sparse-coro \
   reductionTesting \
   partitions \
   charmxi_parsing \
   jacobi3d \
   jacobi3d-sdag \
+  jacobi3d-coro \
+  ckcoro \
   zerocopy \
   within_node_bcast \
   longIdle \
@@ -34,20 +41,62 @@ DIRS = \
   amr_1d_random \
   amr_1d_simple \
   anytime_migration \
+  unbounded_migration \
+  anytime_bcastred \
+  atsync_reduction \
+  threaded_redn \
+  objid_home \
+  objid_insert \
+  objid_sections \
+  objid_bound \
+  objid_tranche \
+  objid_wide \
+  objid_migrate6 \
+  objid_loctable \
+  objid_recreate \
+  objid_boundrecreate \
+  objid_detour \
+  objid_bindasync \
+  objid_boundmany \
+  collide \
+  objloads \
+  qd \
+  reduction_migrate_ahead \
+  reduction_empty_kid \
+  section_migrate \
+  xarray_section_reduction \
+  bcast_zcpup \
+  arraymap_insert_abort \
+  proxy_delctor \
 
 FTDIRS = \
   jacobi3d \
   jacobi3d-sdag \
 
-TESTDIRS = $(filter-out $(FTDIRS),$(DIRS))
+# Needs a build with the syncft (memft) option.
+ifeq ($(CMK_MEM_CHECKPOINT),1)
+DIRS += memckpt_rollback
+endif
+
+# Not applicable on reconverse: longIdle needs CcdCallOnConditionOnPE, which
+# reconverse does not provide.
+ifeq ($(CMK_GDIR),reconverse)
+RECONVERSE_NA = \
+  longIdle \
+
+endif
+
+TESTDIRS = $(filter-out $(FTDIRS) $(RECONVERSE_NA),$(DIRS))
 
 NONSCALEDIRS = \
   alignment \
-  queue \
+  migratable_threads \
   sdag \
   sparse \
+  sparse-coro \
   charmxi_parsing \
   anytime_migration \
+  arraymap_insert_abort \
 
 TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
 
@@ -55,9 +104,7 @@ all: $(foreach i,$(DIRS),build-$i)
 
 test: $(foreach i,$(TESTDIRS),test-$i)
 ifeq ($(CMK_SMP),1)
-ifneq ($(CMK_MULTICORE),1)
 	make smptest
-endif
 endif
 
 testp: $(foreach i,$(TESTPDIRS),testp-$i)

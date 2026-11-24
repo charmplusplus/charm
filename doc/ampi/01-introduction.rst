@@ -204,8 +204,12 @@ MPI Standards Compliance
 
 Currently AMPI supports the MPI-2.2 standard, with preliminary support
 for most MPI-3.1 features and a collection of extensions explained in
-detail in this manual. One-sided communication calls in MPI-2 and MPI-3
-are implemented, but they do not yet take advantage of RMA features.
-Non-blocking collectives have been defined in AMPI since before
-MPI-3.0’s adoption of them. ROMIO (http://www-unix.mcs.anl.gov/romio/) has been integrated into
-AMPI to support parallel I/O features.
+detail in this manual. One-sided communication calls in MPI-2 and
+MPI-3 are implemented, but they do not yet take advantage of RMA
+features.  Non-blocking collectives have been defined in AMPI since
+before MPI-3.0’s adoption of them. ROMIO
+(http://www-unix.mcs.anl.gov/romio/) has been integrated into AMPI to
+support parallel I/O features.  However, ROMIO is not enabled by
+default due to incompatibility with the strict requirements of GCC 14
+(and above).  Add --with-romio to the build line and use a more
+permissive compiler than GCC 14 to enable the ROMIO based I/O features.

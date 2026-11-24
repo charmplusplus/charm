@@ -60,7 +60,6 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
   state->propagate(msg);
   msg->setPhase(1);
   DEBUGP(("[%d] _bcastQD1: State: getCreated:%lld getProcessed:%lld\n", CmiMyPe(), state->getCreated(), state->getProcessed()));
-#if !CMK_MULTICORE
 /*
   QdState *comm_state;
   static int comm_create=0, comm_process=0;
@@ -77,7 +76,6 @@ static inline void _bcastQD1(QdState* state, QdMsg *msg)
     comm_process = new_process;
   }
 */
-#endif
   msg->setCreated(state->getCreated());
   msg->setProcessed(state->getProcessed());
   envelope *env = UsrToEnv((void*)msg);
@@ -246,11 +244,7 @@ void _qdCommHandler(envelope *env)
 void QdState::sendCount(bool isCreated, int count)
 {
   if (_dummy_dq == 0) {
-#if CMK_NET_VERSION && ! CMK_SMP && ! defined(CMK_CPV_IS_SMP)
-        if (CmiImmIsRunning())
-#else
         if (CmiMyRank() == CmiMyNodeSize())
-#endif
         {
           QdCommMsg *msg = (QdCommMsg*) CkAllocMsg(0,sizeof(QdCommMsg),0);
           msg->isCreated = isCreated;
@@ -269,7 +263,8 @@ void CkStartQD(const CkCallback& cb)
   msg->setCb(cb);
   envelope *env = UsrToEnv((void *)msg);
   CmiSetHandler(env, _qdHandlerIdx);
-#if CMK_MEM_CHECKPOINT
+// The restart phase exists in the message header only in __FAULT__ builds.
+#if CMK_MEM_CHECKPOINT && __FAULT__
   CmiGetRestartPhase(env) = 9999;        // make sure it is always executed
 #endif
   _CldEnqueue(0, env, _infoIdx);

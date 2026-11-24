@@ -13,11 +13,18 @@
 // NOTE: This test must be run with RotateLB to ensure that when MetaBalancer
 // triggers LB, every chare is migrated, and the number of chares per PE remains
 // constant.
+//
+// With -anylb (for +MetaLBModelDir, where MetaBalancer's random forest model
+// picks the strategy and +balancer is ignored) migrations are not counted:
+// the strategy may move only some elements. The run then checks that all
+// MAX_ITER iterations complete.
 
+#include <string.h>
 #include "period_selection.decl.h"
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ CProxy_TestArray arrayProxy;
+/*readonly*/ bool countMigrations;
 
 #define MAX_ITER 100
 #define ITER_MOD 10
@@ -30,6 +37,9 @@ private:
   int migrations;
 public:
   Main(CkArgMsg* msg) : iteration(0), migrations(0) {
+    countMigrations = true;
+    for (int a = 1; a < msg->argc; a++)
+      if (!strcmp(msg->argv[a], "-anylb")) countMigrations = false;
     delete msg;
     // Test currently requires an equal number of objects on every PE
     // TODO: Make a test that works with some empty PEs
@@ -53,7 +63,9 @@ public:
       if (CkNumPes() == 1) {
         expected_migrations = 0;
       }
-      if (migrations != expected_migrations) {
+      if (!countMigrations) {
+        CkPrintf("Completed %d iterations\n", iteration);
+      } else if (migrations != expected_migrations) {
         CkAbort("Did not do expected number of migrations!\n");
       }
       CkExit();
@@ -107,7 +119,8 @@ public:
       // load becomes imbalanced.
       resetLoad();
       // Inform main that a migration occured
-      contribute(CkCallback(CkReductionTarget(Main, migrated), mainProxy));
+      if (countMigrations)
+        contribute(CkCallback(CkReductionTarget(Main, migrated), mainProxy));
     }
   }
 };

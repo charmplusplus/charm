@@ -39,6 +39,7 @@ Chare::Chare(int ln, attrib_t Nattr, NamedType* t, TypeList* b, AstChildren<Memb
   setTemplate(0);
   hasSdagEntry = 0;
   hasWhenIdleEntry = 0;
+  hasCoroEntry = 0;
 }
 
 void Chare::check() {
@@ -96,6 +97,10 @@ void Chare::genRegisterMethodDef(XStr& str) {
   if (hasSdagEntry) {
     str << "  " << baseName() << "::__sdag_register(); // Potentially missing "
         << baseName() << "_SDAG_CODE in your class definition?\n";
+  }
+  if (hasCoroEntry) {
+    str << "  (void)&" << baseName() << "::__coro_is_entry; // Potentially missing "
+        << baseName() << "_CORO_CODE in your class definition?\n";
   }
   str << "}\n";
   templateGuardEnd(str);
@@ -202,6 +207,7 @@ void Chare::genDecls(XStr& str) {
     } else {
       str << "#define " << baseName(0) << "_SDAG_CODE \n";
     }
+    if (hasCoroEntry) genCoroCode(str);
   }
 
   // Create CBase_Whatever convenience type so that chare implementations can
@@ -227,6 +233,18 @@ void Chare::preprocess() {
                           (char *)type->getBaseName(),
                           new ParamList(new Parameter(line,
                               new PtrType(new NamedType("CkMigrateMessage")))), 0, 0, 0);
+      e->setChare(this);
+      list->push_back(e);
+    }
+    // A chare with a [coroutine] entry gets the inbox entry that the
+    // callbacks of ck::coro::future are sent to (CK_CORO_FUTURE and
+    // CK_CORO_FUTURE_ALL in ckcoro.h); the future's id is the reference
+    // number.
+    if (list->hasCoroutineEntry()) {
+      Entry* e = new Entry(line, new Attribute(SINBOX), new BuiltinType("void"),
+                           strdup("_coro_callback"),
+                           new ParamList(new Parameter(line,
+                               new PtrType(new NamedType("CkMessage")), "m")), 0, 0, 0);
       e->setChare(this);
       list->push_back(e);
     }
@@ -278,6 +296,7 @@ void Chare::genRecursivePup(XStr& scopedName, XStr templateSpec, XStr& decls,
   rec_pup_impl_body << rec_pup_impl_sig << " {"
                     << "\n    obj->parent_pup(p);";
   if (hasSdagEntry) rec_pup_impl_body << "\n    obj->_sdag_pup(p);";
+  if (hasCoroEntry) rec_pup_impl_body << "\n    obj->_coro_pup(p);";
   rec_pup_impl_body << "\n    obj->" << scopedName << "::pup(p);"
                     << "\n}\n";
 
@@ -884,6 +903,7 @@ void Chare::genDefs(XStr& str) {
     // PUP-related methods
     str << "\n  void pup(PUP::er &p) { }"
         << "\n  void _sdag_pup(PUP::er &p) { }"
+        << "\n  void _coro_pup(PUP::er &p) { }"
         << "\n  void " << virtualPupDef(baseName(true))
         << "\n  void parent_pup(PUP::er &p) {";
     for (TypeList* t = b; t; t = t->next) {
@@ -1743,6 +1763,33 @@ static XStr indexSuffix2object(const XStr& indexSuffix) {
     return "CkIndexMax";
   else
     return indexSuffix;
+}
+
+// The X_CORO_CODE macro (ckcoro.h): the chare's ck::coro::state, its pup, the
+// test used by the promise of ck::coroutine, the bodies of the [inbox] entries, and the
+// inbox struct whose functions name the entries at CK_WHEN sites.
+void Chare::genCoroCode(XStr& str) {
+  XStr body;
+  body << "#define " << baseName(0) << "_CORO_CODE \n"
+       << "public:\n"
+       << "  ::ck::coro::state __coro;\n"
+       << "  void _coro_pup(PUP::er &p) { __coro.pup(p, this); }\n";
+  // +ck_fakemigrate_pup moves only array elements that do not use AtSync.
+  if (isArray()) body << "  bool _coro_uses_at_sync() const { return usesAtSync; }\n";
+  CoroGen g;
+  g.str = &body;
+  g.pass = CoroGen::isEntry;
+  body << "  static bool __coro_is_entry(int ep) { return false";
+  if (list) list->recurse<CoroGen&>(g, &Member::genCoroCode);
+  body << "; }\n";
+  g.pass = CoroGen::stub;
+  if (list) list->recurse<CoroGen&>(g, &Member::genCoroCode);
+  body << "  struct inbox {\n";
+  g.pass = CoroGen::want;
+  if (list) list->recurse<CoroGen&>(g, &Member::genCoroCode);
+  body << "  };\n";
+  body.line_append_padding('\\');
+  str << body << "\n";
 }
 
 }  // namespace xi
