@@ -132,6 +132,16 @@ Runtime (reconverse):
   CkDyn's persistent device buffers run on the channels' transport.
   Manual: "GPU Channels".
 
+- HAPI reports completions per stream: a callback given to
+  hapiAddCallback runs once its own stream's work completes, no
+  longer after every callback added before it on any stream, so
+  callbacks on different streams run in completion order (#4315).
+  A completion is detected by a pinned flag (the default on CUDA)
+  or by an event query (the default on HIP). +gpueventquery,
+  +gpuflags, +gpuflagpolls N (a choice per completion),
+  +gpuflagmemset and +gpuflagkernel override it; the manual's
+  "Completion order and detection" has the costs.
+
 - charmxi: a [threaded, reductiontarget] entry method runs on its
   own thread (#4079, #4082); charmxi no longer crashes on serial
   blocks when run without -orig-file (#4027).

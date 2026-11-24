@@ -10087,6 +10087,68 @@ Examples using CUDA and HAPI can be found under
 ``examples/charm++/cuda``. Codes under ``#ifdef USE_WR`` use the
 ``hapiWorkRequest`` scheme, which is now deprecated.
 
+Completion order and detection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A callback given to ``hapiAddCallback`` runs once all the work queued on its
+stream before the call has completed. Callbacks on one stream run in the
+order they were added. Callbacks on different streams run in the order their
+work completes, not in the order they were added: a callback does not wait
+for a long kernel on another stream. Earlier versions ran a PE's callbacks in
+the order they were added, across all its streams.
+
+The runtime detects a completion in one of two ways:
+
+- **an event query**: an event is recorded on the stream, and the scheduler
+  queries it in each pass, one driver call for each stream with work pending;
+- **a pinned flag**: the stream writes a sequence number into pinned host
+  memory, and the scheduler reads it with no driver call. The write adds 5-6
+  microseconds to the completion (NVIDIA A40).
+
+Event queries cost when the PE has other work while completions are pending,
+as in an over-decomposed application: each query in the scheduler's poll
+delays that work. A flag costs when the PE only waits for the completion,
+since its write is then on the critical path. On CUDA the runtime uses flags,
+for the over-decomposed case; on HIP it uses event queries. With
+``+gpuflagpolls N`` it chooses per completion, from how often the PE has been
+polling: a flag while it made fewer than ``N`` polls per completion over its
+last 64 completions (it had other work), an event query otherwise. These
+options change the detection:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Option
+     - Effect
+   * - ``+gpueventquery``
+     - An event query for every completion (the default on HIP).
+   * - ``+gpuflags``
+     - A pinned flag for every completion (the default on CUDA).
+   * - ``+gpuflagpolls N``
+     - Choose per completion: a pinned flag while the PE makes fewer than
+       ``N`` polls per completion, an event query otherwise.
+   * - ``+gpuflagmemset``
+     - Write the flag with a memset (the default on CUDA; on HIP, after an
+       event record).
+   * - ``+gpuflagkernel``
+     - Write the flag with a one-thread kernel that stores it after a
+       system-scope fence (the default on HIP).
+   * - ``+gpustreamwrite``
+     - Write the flag with the driver's stream memory operation. For
+       comparison only: it can deadlock when processes wait on each other's
+       IPC events.
+   * - ``+gpucompletionstats``
+     - Print, per PE at exit, how many completions were detected each way.
+
+When the callback runs, another process or the network may read what the
+stream's work wrote. With an event query the callback runs once CUDA reports
+the work complete. For a CUDA flag written by a memset, CUDA documents only
+stream order: that a reader in another process or on the network then finds
+the work's writes is observed, by Charm++'s device-channel tests, not
+documented. The flag kernel's fence is documented for its own thread's
+writes, and the stream orders the earlier work before the kernel.
+
 Streams: create your own, non-blocking
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
