@@ -10,6 +10,7 @@ mainmodule chantest {
   readonly bool two_senders;
   readonly bool attach_first;
   readonly bool put_after_destroy;
+  readonly bool copy_sender;
   readonly int fillers;
   readonly int fill_us;
   readonly CProxy_Filler filler_proxy;
@@ -42,6 +43,7 @@ mainmodule chantest {
     entry void destroyed();
     entry void checkDetached();
     entry void putAfterDestroy();
+    entry void putOnOriginal();
   };
 
   array [1D] Filler {

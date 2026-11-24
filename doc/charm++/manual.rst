@@ -10512,10 +10512,13 @@ reach ``event`` as ``NULL``:
    void Block::channelDestroyed() { hapiCheck(hapiFree(d_recv)); /* ... */ }
 
 **Ownership.** The receiver's channel object owns the receive buffer's export
-and registration. Copying an owner (assignment or copy construction) moves the
-ownership, and the runtime system's bookkeeping, to the copy: the usual shape
-is ``ch = param;`` in an entry method, after which the parameter is
-destroyed. An owner destroyed without ``destroy`` starts the same teardown,
+and registration. Copying a channel object (assignment or copy construction)
+moves the ownership, and the runtime system's bookkeeping, to the copy: the
+usual shape is ``ch = param;`` in an entry method, after which the parameter
+is destroyed. This holds for a sender's copy as it does for the owner: after
+``v.push_back(send_ch)``, put through ``v.back()``. A put, attach, event,
+release, reopen or destroy on the original aborts, saying that the copy holds
+the channel. An owner destroyed without ``destroy`` starts the same teardown,
 with no callback, so nothing says when the buffer may be freed: call
 ``destroy``. A channel is not restored from a checkpoint: after a restart,
 construct and exchange it again.

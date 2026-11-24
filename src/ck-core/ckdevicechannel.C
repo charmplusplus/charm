@@ -119,7 +119,7 @@ static int chanPointerDevice(const void* ptr) {
 #if CMK_HIP
   hipPointerAttribute_t a;
   if (hipPointerGetAttributes(&a, ptr) != hipSuccess) { (void)hipGetLastError(); return -1; }
-  return a.device;
+  return (a.type == hipMemoryTypeDevice || a.type == hipMemoryTypeManaged || a.isManaged) ? a.device : -1;
 #else
   cudaPointerAttributes a;
   if (cudaPointerGetAttributes(&a, ptr) != cudaSuccess) { (void)cudaGetLastError(); return -1; }
@@ -1446,6 +1446,38 @@ void CkChannel::takeOver(const CkChannel& c) {
     stale_views.back().takeView(v);
   }
   o.stale_views.clear();
+  // A put queued for a shared-memory credit is polled on this copy.
+  if (o.shm_waiting) {
+    deviceChannelShmUnlist(&o);
+    o.shm_waiting = false;
+    if (pending.valid && !shm_waiting) {
+      shm_waiting = true;
+      CkpvAccess(device_channel_shm_waiters)->push_back(this);
+    }
+  }
+  // The original is left holding nothing. A put on it would otherwise go out
+  // with this copy's token, so that its credit, DONE and closing reached this
+  // copy while the original's own count of puts in flight never came down.
+  // Every call on it but the queries aborts (checkLive); its destructor and
+  // pup touch nothing of this copy's.
+  moved_from = o.moved_from;
+  if (o.channel_id != 0) o.moved_from = o.channel_id;
+  o.channel_id = 0; o.my_token = 0;
+  o.resolved = o.resolving = false;
+  o.credits = 0; o.uncredited = 0; o.in_flight = 0; o.staged_outstanding = 0;
+  o.pending.valid = false;
+  o.done_cbs.clear(); o.direct_issued.clear(); o.dones_seen.clear();
+  o.close_ack_due = false; o.sender_rec = NULL; o.holder_known = false;
+  o.busy = false; o.have_last = false; o.waiting.clear(); o.pulls.clear(); o.pulling = false;
+  o.closing_rec = NULL; o.closing_gen = 0; o.closing_sent = false;
+}
+
+void CkChannel::checkLive(const char* call) const {
+  if (moved_from != 0) {
+    CkAbort("CkChannel::%s: this object was copied, and the copy holds channel %llx now (a copy takes "
+            "over the original's registrations); call it on the copy\n", call,
+            (unsigned long long)moved_from);
+  }
 }
 
 CkChannel::CkChannel(const CkChannel& o)
@@ -1596,6 +1628,7 @@ void CkChannel::open() {
 }
 
 void CkChannel::reopen(void* new_dst) {
+  checkLive("reopen");
   if (destroyed) return;   // destroyed before the move: nothing to export
   if (channel_id == 0 || cap == 0) {
     CkAbort("CkChannel::reopen: the channel was never constructed on a buffer\n");
@@ -1624,6 +1657,7 @@ void CkChannel::reopen(void* new_dst) {
 }
 
 void CkChannel::destroy(const CkCallback& cb) {
+  checkLive("destroy");
   deviceChannelProgress();
   if (destroying || destroyed) {
     CkAbort("CkChannel::destroy: channel %llx is already destroyed\n", (unsigned long long)channel_id);
@@ -1737,6 +1771,7 @@ void CkChannel::sendClosing(CkLocRec* hold_rec) {
 }
 
 const CkChannelEvent* CkChannel::event(CkDataMsg* m) {
+  checkLive("event");
   if (m == NULL || m->getLength() < (int)sizeof(CkChannelEvent)) {
     CkAbort("CkChannel::event: the message is not a channel event (%d bytes, %zu expected)\n",
             m ? m->getLength() : -1, sizeof(CkChannelEvent));
@@ -1904,6 +1939,7 @@ void CkChannel::pollShmCredit() {
 }
 
 void CkChannel::release() {
+  checkLive("release");
   deviceChannelProgress();
   if (!have_last) {
     printHist(is_owner ? "owner" : "copy");
@@ -2105,6 +2141,7 @@ void CkChannel::packForMigration() {
 
 CkDeviceStatus CkChannel::put(const void* src, size_t bytes, hapiStream_t stream,
                                     const CkCallback& src_done, uint64_t tag) {
+  checkLive("put (CkPut)");
   deviceChannelProgress();
   deviceChannelLateInit();
   if (channel_id == 0) {
@@ -2183,6 +2220,7 @@ void CkChannel::noteHolder() {
 }
 
 void CkChannel::attach() {
+  checkLive("attach");
   if (channel_id == 0) CkAbort("CkChannel::attach: the channel was never constructed by its receiver\n");
   if (destroyed) {
     CkAbort("CkChannel::attach: channel %llx was destroyed by its owner\n", (unsigned long long)channel_id);
@@ -2829,6 +2867,8 @@ void CkChannel::onCredit(uint64_t seq, uint64_t epoch_) {
 }
 
 void CkChannel::pup(PUP::er& p) {
+  p|moved_from;
+  if (moved_from != 0) return;   // an original left by a copy carries nothing else
   p|dst;
   p|arrived;
   p|control;

@@ -183,7 +183,8 @@ public:
   CkChannel(void* dst, size_t capacity, CkMem kind, int device, const CkCallback& arrived);
   // A copy takes over the original's registrations with the runtime: the
   // usual shape is `peer = param;` in an entry method, after which the
-  // parameter dies.
+  // parameter dies. The original is left holding nothing, for an owner and a
+  // sender's copy alike: every call on it but the queries below aborts.
   CkChannel(const CkChannel& o);
   CkChannel& operator=(const CkChannel& o);
   ~CkChannel();
@@ -279,6 +280,7 @@ private:
   void sendCloseAck();
   void onAnnounce(const CkChannelEvent& ev, const CkDeviceChannelEndpoint& src);
   void takeOver(const CkChannel& o);
+  void checkLive(const char* call) const;   // aborts on an original left by a copy
   void retire();
   void registerOwner();
   void unregisterOwner();
@@ -387,6 +389,7 @@ private:
   std::vector<CkDeviceChannelEndpoint> stale_views;   // views of replaced endpoints, released once nothing is in flight
   Hist hist[HIST_N];
   uint32_t hist_n = 0;
+  uint64_t moved_from = 0;  // nonzero: this object was copied and the copy holds this channel id
 };
 
 // Transfers between two endpoints with no channel around them, for CkDyn's

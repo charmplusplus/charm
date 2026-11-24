@@ -25,6 +25,9 @@
 // Every run ends by destroying the channels: each receiver calls destroy(),
 // and once every callback has run, each sender's copy must know its channel
 // was destroyed. With -e element 0 then puts once more, which must abort.
+// With -c element 0 copies its sender's channel into a vector at setup and
+// puts through the copy; at the end it puts through the original, which must
+// abort: the copy took the channel over.
 //
 // With -d N each PE also hosts N filler elements that keep its scheduler queue
 // deep (each message spins -u microseconds, 1000 by default, and sends the
@@ -36,6 +39,7 @@
 // on one host (copies through the IPC mapping), or two hosts (the receiver
 // reads with RDMA).
 #include <atomic>
+#include <vector>
 #include "chantest.decl.h"
 #include "hapi.h"
 
@@ -52,6 +56,7 @@
 /* readonly */ bool two_senders;
 /* readonly */ bool attach_first;
 /* readonly */ bool put_after_destroy;
+/* readonly */ bool copy_sender;
 /* readonly */ int fillers;
 /* readonly */ int fill_us;
 /* readonly */ CProxy_Filler filler_proxy;
@@ -133,10 +138,11 @@ public:
     two_senders = false;
     attach_first = false;
     put_after_destroy = false;
+    copy_sender = false;
     fillers = 0;
     fill_us = 1000;
     int c;
-    while ((c = getopt(m->argc, m->argv, "s:i:lp:aqw:xred:u:")) != -1) {
+    while ((c = getopt(m->argc, m->argv, "s:i:lp:aqw:xrecd:u:")) != -1) {
       switch (c) {
         case 's': block_size = atoi(optarg); break;
         case 'i': n_iters = atoi(optarg); break;
@@ -148,19 +154,24 @@ public:
         case 'x': two_senders = true; break;
         case 'r': attach_first = true; break;
         case 'e': put_after_destroy = true; break;
+        case 'c': copy_sender = true; break;
         case 'd': fillers = atoi(optarg); break;
         case 'u': fill_us = atoi(optarg); break;
-        default: CkAbort("usage: chantest [-s block] [-i iters] [-l] [-p lb_period] [-a] [-q] [-w secs] [-x] [-r] [-e] "
+        default: CkAbort("usage: chantest [-s block] [-i iters] [-l] [-p lb_period] [-a] [-q] [-w secs] [-x] [-r] [-e] [-c] "
                          "[-d fillers] [-u us]");
       }
     }
     delete m;
     if (CkNumPes() != 2) CkAbort("chantest: run with 2 PEs");
-    if ((qd_steps || hold_secs > 0 || two_senders) && lb_test)
-      CkAbort("chantest: -q, -w and -x run without migration (no -l or -a)");
+    if ((qd_steps || hold_secs > 0 || two_senders || copy_sender) && lb_test)
+      CkAbort("chantest: -q, -w, -x and -c run without migration (no -l or -a)");
+    if (copy_sender && put_after_destroy) CkAbort("chantest: -c and -e each end with their own abort");
     if (fillers > 0 && qd_steps) CkAbort("chantest: -q needs quiescence each iteration, which -d's fillers prevent");
     if (two_senders) CkPrintf("[chantest] -x: element 0 writes into its own channel too; expect the abort naming two senders\n");
     if (put_after_destroy) CkPrintf("[chantest] -e: element 0 puts after the destroy; expect the abort\n");
+    if (copy_sender)
+      CkPrintf("[chantest] -c: element 0 puts through a copy of its sender's channel, then through the original; "
+               "expect the abort saying the copy holds the channel\n");
     CkPrintf("[chantest] block %d doubles, %d iterations, migration %s (every %d), %d process(es), %d host(s)%s, "
              "%d filler(s) per PE of %d us\n",
              block_size, n_iters, async_moves ? "async" : lb_test ? "on" : "off", lb_period, CkNumNodes(),
@@ -208,6 +219,7 @@ public:
     if (!async_moves && told != 2) CkAbort("[chantest] FAIL: after both destroys, %d of 2 senders were told\n", told);
     CkPrintf("[chantest] both channels destroyed; no sender holds a resolution; %d of 2 senders told\n", told);
     if (put_after_destroy) { elem_proxy[0].putAfterDestroy(); return; }
+    if (copy_sender) { elem_proxy[0].putOnOriginal(); return; }
     CkStartQD(CkCallback(CkIndex_Main::quiet(), thisProxy));
   }
   void quiet() {
@@ -247,6 +259,7 @@ class Elem : public CBase_Elem {
   CkChannel my_ch;     // my receive buffer, exported for the peer
   CkChannel peer_ch;   // the peer's receive buffer, written by my puts
   CkChannel own_ch;    // -x, element 0: a second copy of its own channel (never migrates)
+  std::vector<CkChannel> kept;   // -c, element 0: holds the copy of peer_ch that puts (never migrates)
   bool second_sender = false;
   int takes = 0;
   int peer;
@@ -287,6 +300,7 @@ public:
   void takeChannel(CkChannel ch) {
     peer_ch = ch;
     if (attach_first) peer_ch.attach();
+    if (copy_sender && thisIndex == 0) kept.push_back(peer_ch);   // the copy takes the channel over
     took();
   }
   void takeOwnCopy(CkChannel ch) {
@@ -301,12 +315,14 @@ public:
   }
 
   static double valueOf(int iter, int from) { return 1000.0 * (from + 1) + iter; }
+  // The copy that holds the peer's channel: -c's, or peer_ch.
+  CkChannel& sendCh() { return kept.empty() ? peer_ch : kept.back(); }
 
   void step(int iter) {
     container.fill(valueOf(iter, thisIndex));
     // The iteration travels as the put's tag: the peer's arrival can run before
     // its own step(iter) message, so its counter is not what to verify against.
-    CkPut(peer_ch, container.d_local_data, sizeof(double) * block_size,
+    CkPut(sendCh(), container.d_local_data, sizeof(double) * block_size,
           CkPutOpts().stream(container.stream).tag(iter));
     if (second_sender)
       CkPut(own_ch, container.d_local_data, sizeof(double) * block_size,
@@ -323,13 +339,18 @@ public:
   // Every destroy's callback has run: my copy of the peer's channel must have
   // been told (the destroy closes the sender's resolution before completing).
   void checkDetached() {
-    int v = (peer_ch.isDestroyed() ? 1 : 0) + (peer_ch.isAttached() ? 100 : 0);
+    int v = (sendCh().isDestroyed() ? 1 : 0) + (sendCh().isAttached() ? 100 : 0);
     contribute(sizeof(int), &v, CkReduction::sum_int, CkCallback(CkReductionTarget(Main, detached), main_proxy));
   }
   // -e: must abort.
   void putAfterDestroy() {
     CkPut(peer_ch, container.d_local_data, sizeof(double) * block_size, CkPutOpts().stream(container.stream));
     CkAbort("[chantest] FAIL: a put after the destroy did not abort\n");
+  }
+  // -c: peer_ch was copied into kept; a put on it must abort.
+  void putOnOriginal() {
+    CkPut(peer_ch, container.d_local_data, sizeof(double) * block_size, CkPutOpts().stream(container.stream));
+    CkAbort("[chantest] FAIL: a put on a copied channel's original did not abort\n");
   }
 
   // -q: quiescence after step(iter): the put of iteration iter must have been taken.
