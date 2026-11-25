@@ -1068,6 +1068,27 @@ the same id-block code would serve them.
      2-3).
    - A counter used only in targets of regions has no attachments of its own, so its destroy
      completes after the destroys of the regions it was paired with.
+   - **A counter shared with another region.** The landed count is exact when the counter is paired
+     with the one region being destroyed: every contribution to it came through that region. When the
+     counter also serves another region still in use, or a target with no region (a signal without
+     data), their contributions land in the same count and can make up for a *put* of this region
+     that is still in flight. So the rule for that case: **destroy such a region only after the counter
+     has *fired* the last round that a *put* into the region counted toward.** That round's firing
+     means every contribution to it, this region's among them, has landed.
+     - A stencil whose 6 ghost faces are pieces of one allocation (3.3) has one region and is not
+       affected; its destroy may be called at any time after step 1.
+     - A stencil whose 6 ghost faces are separately allocated buffers has 6 regions sharing one
+       counter with N = 6. When one neighbor changes at a refinement, the owner destroys that face's
+       region in the code that runs after the step's 6 faces have arrived. Destroying it right after
+       sending its own faces, while that step's counter has not fired, breaks the rule: the other 5
+       faces' contributions bring the landed count past what the old neighbor reported, the destroy
+       completes, and the old neighbor's last face can land in memory the application has freed.
+     - The same holds for per-neighbor buffers in adaptive codes (one buffer per neighbor at each
+       level, one counter per step) and per-partner receive buffers that change at domain
+       decomposition.
+     - Exact accounting per region and counter would need each signal to name its region, and holding
+       a region's destroy until its shared counters are destroyed would keep its memory as long as the
+       counter lives. Neither is done until an application needs to destroy a region in mid-round.
 
    The runtime then deregisters the memory, frees runtime-allocated memory, and returns the counter
    index to the free list. Indices are reused least recently freed first. A late signal can then hit a
