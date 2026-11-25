@@ -3,7 +3,7 @@
 Status: a design for discussion. There is no code yet; implementation would follow the phases of
 section 15.
 
-Revised 2026-11-18, after a first read: a contributor now holds one target (a piece and a counter,
+Revised 2026-11-18, after a first read: an origin now holds one target (a piece and a counter,
 3.1) instead of three handles; the counter is a 32-bit word (5.1); 12.1 separates `nocopy` (the
 sender's buffer) from `nokeep` (the receiving method) and proposes an in-process hand-off; 12.4 proposes
 lending an array for update (the boomerang array). Operations (*put*, *get*, *decrement*, *re-arm*,
@@ -19,13 +19,21 @@ back (8.2, 9); quiescence detection counts *puts* without a counter when the dat
 counters' actions (4.8); the counter table is its own shared area with per-PE slices (5.1); setup and
 teardown no longer depend on message order (10.1); and smaller fixes in 3.3, 4.6, 4.9 and 10.3.
 
+Revised 2026-11-21: the words follow MPI's (3.1). The PE that calls *put*, *get* or *signal* is the
+**origin** (was "contributor" or "sender"), the PE whose region and counter a target names is the
+**owner**, and *source* and *destination* name only data buffers. In Charm++ an origin names the target
+itself in `CkPut`, `CkGet` and `CkSignal`: its first use *attaches* the origin's process (was an explicit
+import), and the owner's `destroy` *detaches* every attached process (3.3, 10.1-10.3). Converse keeps an
+explicit, counted `CmiAttachment` (3.2).
+
 ## In brief: the calls added, kept and removed
 
-The receiver registers a buffer once (a **region**) and an atomic count with an action (a **counter**),
-and gives each sender a **target**: the part of the buffer its data goes to, and the counter its data
-counts toward. A sender's *put* lands in the receiver's buffer with no copy, no handshake and no message,
-and *decrements* the counter; when the count reaches zero, the receiver's callback runs, once. The code is
-the same whether sender and receiver share a PE, a process, a host, or nothing. None of it is implemented
+The receiver, called the **owner**, registers a buffer once (a **region**) and an atomic count with an
+action (a **counter**), and gives each sender, called an **origin**, a **target**: the part of the buffer
+its data goes to, and the counter its data counts toward. An origin's *put* lands in the owner's buffer
+with no copy, no handshake and no message, and *decrements* the counter; when the count reaches zero, the
+owner's callback runs, once. The code is the same whether origin and owner share a PE, a process, a host,
+or nothing. None of it is implemented
 yet (section 15).
 
 **Added, Charm++** (sections 3.3, 4 and 7):
@@ -34,18 +42,19 @@ yet (section 15).
 |---|---|
 | `CkRegion r(buf, bytes, cb)` | the simple form: one buffer, and `cb` runs once per *put*. Shorthand for a region, a counter of 1 that *re-arms* itself, and the target of the whole region (3.3) |
 | `CkRegion r(buf, bytes [, CkMem::Device, dev])`, `CkRegion::alloc(bytes, kind, dev)` | registers memory once: the application's own, or memory the runtime allocates |
-| `int p = r.addPiece(offset, bytes)` or `r.addPiece(offset, CkLayout::box3d(...))` | a part of the region that one sender *puts* into, contiguous or strided |
+| `int p = r.addPiece(offset, bytes)` or `r.addPiece(offset, CkLayout::box3d(...))` | a part of the region that one origin *puts* into, contiguous or strided |
 | `CkCounter c(n, cb [, CkCounter::AutoRearm])`, `c.rearm(n)` | counts the contributions still expected; `cb` runs when the count reaches 0; `rearm` allows the next round |
-| `CkTarget t = r.target(p, c)`; also `r.target(c)`, `r.target()` | a target, a PUP-able value sent to one sender: piece `p` with counter `c`; the whole region with `c` (separate buffers sharing one counter, or one buffer with explicit *re-arm*); the simple form's own |
-| `CkImport dst(t)` | the sender's prepared view of a target, made once |
-| `CkPut(dst, src, bytes [, CkPutOpts().offset(o).srcLayout(l).local(&c).stream(s)])` | writes into the target's piece and *decrements* its counter; the options give an offset within the piece, a strided source, a local counter that says when `src` may be reused, and a device stream |
-| `CkGet(buf, bytes, dst [, CkPutOpts()...])` | reads the target's piece into local memory, with the same options |
-| `CkSignal(dst)` | *decrements* the target's counter with no data |
-| `CkChannel` | a one-buffer target plus a release credit, for a sender that may run ahead of its receiver (4.9) |
+| `CkTarget t = r.target(p, c)`; also `r.target(c)`, `r.target()` | a target, a PUP-able value sent to one origin: piece `p` with counter `c`; the whole region with `c` (separate buffers sharing one counter, or one buffer with explicit *re-arm*); the simple form's own |
+| `CkPut(t, src, bytes [, CkPutOpts().offset(o).srcLayout(l).local(&c).stream(s)])` | writes `src` into the target's piece and *decrements* its counter; the first use *attaches* the origin's process (3.3); the options give an offset within the piece, a strided source, a local counter that says when `src` may be reused, and a device stream |
+| `CkGet(dst, bytes, t [, CkPutOpts()...])` | reads the target's piece into `dst`, with the same options |
+| `CkSignal(t)` | *decrements* the target's counter with no data |
+| `t.attach()`, `CkAttach(ts, n)` | optional: *attaches* now rather than at the first use, so that setup errors appear early; the batch form sends one message per owner process (3.3, 10.1) |
+| `r.destroy(cb)`, `c.destroy(cb)` | teardown: *detaches* every attached process; `cb` runs when the application may free the memory (10.2) |
+| `CkChannel` | a one-buffer target plus a release credit, for an origin that may run ahead of its owner (4.9) |
 
 **Added, Converse** (3.2): the same objects in C: `CmiRegionCreate`, `CmiRegionAlloc`, `CmiRegionAddPiece`,
 `CmiRegionDestroy`; `CmiCounterCreate`, `CmiCounterRearm`, `CmiCounterValue`, `CmiCounterDestroy`;
-`CmiTargetMake`; `CmiImportTarget(s)`, `CmiReleaseImport(s)`; `CmiPut`, `CmiGet`, `CmiSignal`; the flags
+`CmiTargetMake`; `CmiAttachTarget(s)`, `CmiDetachTarget(s)`; `CmiPut`, `CmiGet`, `CmiSignal`; the flags
 `CMI_COUNTER_AUTO_REARM` and `CMI_PIECE_VARSIZE` (with `CmiRegionPieceLength`, 4.6); the option
 `+counter_table N` (5.1).
 
@@ -89,7 +98,7 @@ this repository; the numbers this document uses are quoted where they are cited.
 Contents: 1 goals; 2 working assumptions; 3 objects and API; 4 semantics (4.9 readiness patterns, 4.10 other
 runtime services); 5 the counter (atomicity
 across shared memory and network); 6 host data paths by locality; 7 strided layouts; 8 device memory;
-9 sender side and batched notifications; 10 lifetime, teardown, migration; 11 error checking;
+9 origin side and batched notifications; 10 lifetime, teardown, migration; 11 error checking;
 12 messages (the zero-copy keywords, eager, per-pair ring, rendezvous, lend for update); 13 what happens to today's APIs; 14 tests and
 measurements; 15 implementation phases; 16 open questions; 17 existing applications (G6); 18 draft
 manual section, which call to use when; Appendix A, device channels on branch rate-aware-gpu-lb; Appendix B, application surveys.
@@ -100,15 +109,15 @@ manual section, which call to use when; Appendix A, device channels on branch ra
 
 Goals:
 
-- **G1 put and notify.** A repeated transfer into a buffer the receiver named once costs one *put* and one
+- **G1 put and notify.** A repeated transfer into a buffer the owner named once costs one *put* and one
   notification, with no handshake, no copy and no runtime readiness protocol. The exception is a large
   *put* across hosts on machines where the runtime reads instead of writing (8.2), which costs an
   announce, a read and a release.
-- **G2 put and decrement.** Contributions from many senders into one or more receiver buffers
-  (contiguous or strided) produce one scheduler entry on the receiver when all have arrived. The
-  receiver's **counter** holds the number of contributions still expected; each contribution *decrements*
-  it, and the one that takes it to zero queues the receiver's action (section 4.2).
-- **G3 one mechanism in every locality.** The sender and receiver can be on the same PE, on two PEs of
+- **G2 put and decrement.** Contributions from many origins into one or more of an owner's buffers
+  (contiguous or strided) produce one scheduler entry on the owner when all have arrived. The
+  owner's **counter** holds the number of contributions still expected; each contribution *decrements*
+  it, and the one that takes it to zero queues the owner's action (section 4.2).
+- **G3 one mechanism in every locality.** The origin and owner can be on the same PE, on two PEs of
   one process, in two processes on one host, or on two different hosts. The application code is the
   same; the runtime picks the data path per pair.
 - **G4 host and device memory** with the same regions, counters, and *put* and *get* calls. Whether a region
@@ -126,8 +135,8 @@ collective operations; fault tolerance; pointer-based data (it stays with messag
 
 ## 2. Working assumptions
 
-- **W1 receiver readiness is the application's responsibility.** A contributor *puts* into a region only when the application's
-  logic guarantees the receiver no longer needs the region's previous contents.
+- **W1 the owner's readiness is the application's responsibility.** An origin *puts* into a region only when the application's
+  logic guarantees the owner no longer needs the region's previous contents.
   The runtime does not check this in production builds; error-checking builds detect the violations
   that are detectable (section 11).
 - **W2 iteration.** Regions, counters and targets are set up once and used for many rounds. Setup
@@ -137,7 +146,7 @@ collective operations; fault tolerance; pointer-based data (it stays with messag
 - **W4 migration tears down and rebuilds**. No forwarding of *puts* to a migrated owner.
 - **W5 strided arrays use layout descriptors; PUP-style packing is for pointer-based data**.
   Variable-size contributions are a special case to support (section 4.6).
-- **W6 the counter of G2 is one atomic 32-bit word** that contributors in every locality update (section
+- **W6 the counter of G2 is one atomic 32-bit word** that origins in every locality update (section
   5 shows that shared-memory and network contributions work together on it; 5.1 gives the reason for the
   width).
 - **W7 only the counter's bookkeeping runs at network poll time.** Bookkeeping means the *decrement* and,
@@ -181,15 +190,29 @@ already fits the name and becomes the device case of the family.
 
 | object | what it is | owned by | travels as |
 |---|---|---|---|
-| region | memory registered once: base, bytes, memory kind, optional pieces with layouts | one PE | inside targets |
-| counter | an atomic count, an action, a *re-arm* mode | one PE | inside targets |
+| region | memory registered once: base, bytes, memory kind, optional pieces with layouts | one PE, its owner | inside targets |
+| counter | an atomic count, an action, a *re-arm* mode | one PE, its owner | inside targets |
 | layout | a strided description of a piece of a region (section 7) | inside a region | inside the target of that piece |
-| target | one piece of a region paired with one counter: where a contributor's data goes and which counter it *decrements* | a value made by the owner, with no state of its own | itself (`CkTarget`, a PUP-able value) |
-| import | a contributor's prepared view of a target (rkeys, xpmem attachment, IPC mapping) | the contributor's process | not sent |
+| target | one piece of a region paired with one counter: where an origin's data goes and which counter it *decrements* | a value made by the owner, with no state of its own | itself (`CkTarget`, a PUP-able value) |
+| attachment | an origin process's prepared access to a region and a counter: remote keys, xpmem attachment or IPC mapping, registration with the owner | the origin's process, shared by its PEs | not sent |
 
-The **owner** of a region or a counter is the receiver: the PE (in Charm++, the object on that PE) that
-creates them, receives the data and runs the counter's action. A **contributor** is a sender: it *puts*
-data into an owner's region and *decrements* the owner's counter.
+The **owner** of a region or a counter is the PE (in Charm++, the object on that PE) that creates them
+and runs the counter's action: MPI's target process. An **origin** is a PE that calls *put*, *get* or
+*signal* with a target: MPI's origin process. For a *put* the owner receives the data; for a *get* it
+supplies them. **Source** and **destination** name only data buffers: a *put* copies the origin's source
+into the owner's piece, and a *get* copies the owner's piece into the origin's destination.
+
+The words against MPI's one-sided communication:
+
+| this design | MPI | note |
+|---|---|---|
+| origin | origin process | calls *put*, *get* or *signal* |
+| owner | target process | its region and counter are named; its program takes no part in a transfer |
+| region | window | created by one PE, not by all processes together |
+| target | a window, a target rank and a displacement | one piece and one counter, sent to one origin |
+| counter | none in MPI's one-sided communication (OpenSHMEM: the signal of put-with-signal) | counts contributions and runs an action |
+| *attach*, *detach* | none: all processes create a window together | the origin process's setup and teardown. `MPI_Win_attach` means something else: there the memory's owner adds memory to a dynamic window |
+| source, destination | origin buffer, target buffer | named by the direction the data moves |
 
 A **piece** is a part of a region that *puts* write into, numbered from 0 in the order the owner declares
 the pieces. Each piece is an offset in the region plus either a byte length (one contiguous range) or a
@@ -197,15 +220,15 @@ layout (a strided set of ranges, section 7). Pieces let one region, registered o
 contributions at different places. For example, a block's ghost buffer is one
 region and each of its 6 ghost faces is a piece.
 
-A **target** is one piece of a region paired with one counter. It is what a contributor holds: where its
-data goes, and which counter its contribution *decrements*. The owner makes a target for each contributor
-and sends it the target; the contributor imports the target once and names the import in every
-*put*, which writes into the target's piece (at an offset within the piece, 0 by default) and *decrements*
-the target's counter (example in 3.3). A counter is independent of regions, and targets allow every
-combination:
+A **target** is one piece of a region paired with one counter. It is what an origin holds: where its
+data goes, and which counter its contribution *decrements*. The owner makes a target for each origin
+and sends it the target; the origin names the target in every *put*, which writes into the target's
+piece (at an offset within the piece, 0 by default) and *decrements* the target's counter (example in
+3.3). The first use of a target in a process *attaches* that process (3.3, 10.1). A counter is
+independent of regions, and targets allow every combination:
 - one counter in targets of several regions;
 - the same piece in two targets with two different counters;
-- double buffering by parity: two regions, two counters, and two targets per contributor, used
+- double buffering by parity: two regions, two counters, and two targets per origin, used
   alternately.
 
 A target may have no counter (its *puts* are not counted, and *gets* ignore the counter anyway), or no region
@@ -237,23 +260,28 @@ CmiTarget  CmiTargetMake(CmiRegion r, int piece, CmiCounter c);
                         r may be NULL (a counter alone, for CmiSignal),
                         c may be NULL (puts into this target are not counted) */
 
-/* Contributors */
-CmiImport  CmiImportTarget(const CmiTarget *t);         /* once per target; registers with the owner
-                                                     once per region per process (10.1) */
-void       CmiReleaseImport(CmiImport imp);
-int        CmiImportTargets(const CmiTarget *t, int n, CmiImport *out);        /* batch forms: one   */
-void       CmiReleaseImports(CmiImport *imps, int n);                         /* message per owner */
-int        CmiPut(CmiImport dst, size_t offset,         /* offset within the target's piece */
+/* Origins */
+CmiAttachment CmiAttachTarget(const CmiTarget *t);  /* a counted reference to this process's attachment;
+                                                       registers with the owner once per region per
+                                                       process (10.1) */
+void       CmiDetachTarget(CmiAttachment a);        /* the last reference detaches (10.2) */
+int        CmiAttachTargets(const CmiTarget *t, int n, CmiAttachment *out);  /* batch forms: one   */
+void       CmiDetachTargets(CmiAttachment *a, int n);                       /* message per owner */
+int        CmiPut(CmiAttachment t, size_t offset,   /* offset within the target's piece */
                   const void *src, size_t bytes, const CmiLayout *srcLayout,
                   CmiCounter local,                     /* may be NULL */
                   void *stream);                        /* device: the producer's stream, else NULL */
                      /* decrements the target's counter, if it has one */
 int        CmiGet(void *dst, size_t bytes, const CmiLayout *dstLayout,
-                  CmiImport src, size_t offset,         /* the target's counter is not touched */
+                  CmiAttachment t, size_t offset,     /* the target's counter is not touched */
                   CmiCounter local, void *stream);
-int        CmiSignal(CmiImport dst);                    /* a contribution with no data: decrements
+int        CmiSignal(CmiAttachment t);                /* a contribution with no data: decrements
                                                      the target's counter only (4.9, pattern 3) */
 ```
+
+Converse keeps the attachment explicit, for runtime and library code that manages its own setup. Each
+`CmiAttachTarget` returns a counted reference to the process's attachment, and the last
+`CmiDetachTarget` in the process *detaches* it. Charm++ hides the attachment (3.3).
 
 `CmiCounterAction` is one of: a Converse handler index with a preallocated message (the runtime
 allocates it when the counter is created, so *firing* never allocates); a C function and argument run on
@@ -274,8 +302,9 @@ regions.
 
 A target is a fixed-size POD: the region's identity, owner and remote keys, the one piece with
 its layout, and the counter's owner and table index. It carries only its own piece, so a region may
-have any number of pieces, and a contributor never receives the descriptions of other contributors'
-pieces.
+have any number of pieces, and an origin never receives the descriptions of other origins'
+pieces. In Charm++, `CkTarget` also holds a pointer to the attachment of the process that uses
+it (3.3); PUP does not pack it.
 
 ### 3.3 Charm++ API (C++)
 
@@ -284,12 +313,11 @@ The simplest case, one buffer and one notification per *put*:
 ```c++
 // Owner: the callback runs once per put, with the data in buf.
 CkRegion in(buf, bytes, CkCallback(CkIndex_Block::arrived(), thisProxy[thisIndex]));
-sender.take(in.target());
+peer.take(in.target());
 
-// Sender, once:
-dst = CkImport(t);
-// Sender, each round, once the program's logic says the receiver is done with buf (W1):
-CkPut(dst, src, bytes);
+// Origin, in take(CkTarget t): keep t.
+// Origin, each round, once the program's logic says the owner is done with buf (W1):
+CkPut(t, src, bytes);
 ```
 
 The constructor that takes a callback is shorthand for the general objects: a region, a counter of 1
@@ -298,18 +326,18 @@ that *re-arms* itself and runs the callback, and the target of the whole region 
 ```c++
 CkRegion in(buf, bytes);
 CkCounter got(1, cb, CkCounter::AutoRearm);
-sender.take(in.target(got));   // no piece: the whole region
+peer.take(in.target(got));     // no piece: the whole region
 ```
 
 The constructors are told apart by the type of the third argument (`CkMem` or `CkCallback`); a device
 buffer is `CkRegion(buf, bytes, CkMem::Device, dev, cb)`.
 
 This form *re-arms* automatically by design, although 4.2 does not make automatic *re-arm* the default.
-A persistent *put*, in either form, requires the sender to know from the program's logic that the
-receiver's buffer may be overwritten (W1); the runtime does not check it in production builds. What
+A persistent *put*, in either form, requires the origin to know from the program's logic that the
+owner's buffer may be overwritten (W1); the runtime does not check it in production builds. What
 automatic *re-arm* gives up is one check of error-checking builds: a *put* that lands while the callback
 still reads the buffer passes. (A *put* that lands while the previous notification is still queued is
-still caught.) Code that wants the check uses the general form with explicit *re-arm*. Several senders,
+still caught.) Code that wants the check uses the general form with explicit *re-arm*. Several origins,
 pieces or strides also use the general form.
 
 A block that receives its 6 ghost faces from 6 neighbors:
@@ -327,21 +355,34 @@ for (int f = 0; f < 6; f++) {
 }
 // ... in the code that last reads the ghost data, or where it contributes (4.9): halos.rearm(6);
 
-// Contributor (a neighbor), once, in takeTarget(CkTarget t):
-dst = CkImport(t);
-// Contributor, every iteration: put its face into the owner's piece and decrement the owner's counter.
-CkPut(dst, src, bytes, CkPutOpts().local(&localCounter).stream(stream));
+// Origin (a neighbor), once, in takeTarget(CkTarget t): keep t.
+// Origin, every iteration: put its face into the owner's piece and decrement the owner's counter.
+CkPut(t, src, bytes, CkPutOpts().local(&localCounter).stream(stream));
 ```
 
 `CkPutOpts` carries what `CmiPut` takes beyond the target, source and size: `.offset(o)` within the piece,
 `.srcLayout(l)` for a strided source (7.1), `.local(&c)` for source completion (4.5) and `.stream(s)` for
-device data. It is a chain of setters rather than designated initializers, which need C++20 (charm
-#4298). `CkGet` takes the same options.
+device data. It is a chain of setters rather than designated initializers, which need C++20 (user code is
+compiled as C++17 since #4306). `CkGet` takes the same options.
+
+**Attaching.** An origin names the target itself. The first *put*, *get* or *signal* through a target in a
+process *attaches* that process to the target's region and counter (10.1): it records the remote keys,
+maps the owner's memory when the owner is on the same host, and registers the process with the owner.
+The target then keeps a pointer to the attachment, so each later *put* costs one comparison before it
+goes to the mapping or the NIC. PUP does not pack the pointer, and the comparison checks the process, so
+a target sent or copied to another process *attaches* again there. `t.attach()` does the same at once,
+so that the first round does not pay for it and errors appear at setup; `CkAttach(ts, n)` *attaches* a
+set of targets with one message per owner process, as after an AMR rebuild.
+
+There is no detach call in Charm++. All the objects of a process that use a region share one
+attachment, so one object cannot know that the others are done with it. The runtime *detaches* every
+attached process when the owner destroys the region with `r.destroy(cb)` (10.2). Until then a process
+that no longer *puts* keeps its mapping and its registration (open question 13).
 
 Six separate regions, one per face, work the same way: each neighbor gets a target of its own region,
 with the same counter. The action may be an entry method, so an SDAG `when halosDone()` waits for a
 round. `CkChannel` bundles a target of a one-piece region with a release credit (4.9, pattern 3;
-section 13). `CkSignal(dst)` is the C++ form of `CmiSignal`.
+section 13). `CkSignal(t)` is the C++ form of `CmiSignal`.
 
 ## 4. Semantics
 
@@ -376,13 +417,13 @@ has a weight k: 1 for a *put*, k for a batch of k same-host device *puts* (8.2).
   `CmiCounterCreate` (C++ `CkCounter::AutoRearm`). It is not a build option; counters with and without
   it coexist. The runtime *re-arms* the counter just before running its action. It is safe only when both hold:
   - the action is the last use of the data, i.e. it copies or consumes the data before returning;
-  - no contributor can issue the next round's *put* before the action has run.
+  - no origin can issue the next round's *put* before the action has run.
 
   It is not the default because a *put* that lands after an automatic *re-arm*, while the owner still uses
   the data, passes every check of section 11.
 - A contribution that arrives between *firing* and *re-arm* takes the word below zero. It does not *fire*,
   and after the *re-arm* it counts toward the next round, so counting stays correct even then. Such an
-  arrival means the contributor did not wait for readiness (W1), so error-checking builds abort on it.
+  arrival means the origin did not wait for readiness (W1), so error-checking builds abort on it.
 
 The rule that whoever moves the word to exactly zero *fires* covers both the last contribution and an
 early round. A round *fires* exactly once.
@@ -400,7 +441,7 @@ most one counter.
 
 The local counter given to `CmiPut` is *decremented* when the source buffer may be reused. Local
 completion sends no message (section 9), except under announce-then-read (8.2), where the owner's release
-tells the contributor. A *put* with no local counter must not have its source
+tells the origin. A *put* with no local counter must not have its source
 modified until something else tells the application it is safe (for example the next round's data
 from the same neighbor, the double-buffering argument in charm-notes, charm_best_practices.md:2198).
 
@@ -415,31 +456,31 @@ A piece has a capacity. A *put* of fewer bytes is allowed; its length must reach
 has no room for it (16 bits name the counter), so the length travels with the data: each piece declared
 `CMI_PIECE_VARSIZE` reserves an 8-byte length word just before its data. The 8 bytes must belong to the
 region: a piece allocated by `CmiRegionAlloc`, or a user piece declared with its own header space. They
-cannot be taken from inside a user array, and import checks refuse it. The runtime writes
+cannot be taken from inside a user array, and attach checks refuse it. The runtime writes
 `[length | data]` as one transfer, so the length is visible whenever the data is. Within a host the
-contributor copies the data, then writes the length word, then *decrements*, so both are visible when
+origin copies the data, then writes the length word, then *decrements*, so both are visible when
 the counter *fires* (5.4). Across hosts the length word and the data go in one write with a two-entry
 gather list on the source side (the length word, then the data); where LCI or the provider cannot take a
 gather list (to be checked, as in 7.3), the runtime first copies both into a registered staging buffer. The action reads
-`CmiRegionPieceLength(r, piece)`. A *put* larger than the capacity is refused at the contributor (it knows
+`CmiRegionPieceLength(r, piece)`. A *put* larger than the capacity is refused at the origin (it knows
 the capacity from the target) with an error; growing a piece is a teardown and rebuild (section 10).
 
 ### 4.7 Get
 
 `CmiGet` reads a piece of a remote region into local memory and *decrements* a local counter when the
 bytes are in place. The owner is not told unless it asks (section 9.2). *Gets* serve data that stays valid
-while readers fetch on demand; *puts* serve everything iterative. A *get* also serves a receiver that can
-take the data only when it is ready (its buffer is in use, or memory is short): the sender exposes the
-data as a region, and the receiver *gets* it when it has room, which is what the Post API's delayed post
-does for messages (13).
+while readers fetch on demand; *puts* serve everything iterative. A *get* also serves a PE that can
+take data only when it is ready (its buffer is in use, or memory is short): the PE that has the data
+exposes it as a region, as its owner, and the other *gets* it when it has room, as the origin. That is
+what the Post API's delayed post does for messages (13).
 
 ### 4.8 Quiescence detection
 
-- **Created count.** A *put*, or a signal (`CmiSignal`), increments it on the contributor's PE when it is
+- **Created count.** A *put*, or a signal (`CmiSignal`), increments it on the origin's PE when it is
   issued.
 - **Processed count.** It is raised in bulk on the owner PE when the round's action runs from the
   scheduler. The amount is the round's N: with manual *re-arm*, the N that round was armed with. The
-  other-process contributors of case (b) never touch QD counters. The poll-time handler touches only
+  other-process origins of case (b) never touch QD counters. The poll-time handler touches only
   the QD counters of the PE it runs on, for *puts* without a counter (below); that is safe because the
   handler runs on that PE's own thread, and QD sums the counts over all PEs.
 - **The action message** is not counted separately; the bulk step stands for it. Between the *firing* and
@@ -449,11 +490,11 @@ does for messages (13).
   count; otherwise QD would never complete.
 - **No remote counter.** A *put* without one is counted processed when its data is visible at the
   owner, not at its local completion: on cxi's emulated path local completion comes before the bytes are
-  visible (5.4), and QD could finish before they land. Within a host the contributor counts it after its
+  visible (5.4), and QD could finish before they land. Within a host the origin counts it after its
   copy. Across hosts the *put* carries a signal anyway, with a QD-only `rcomp` (5.5), and the poll-time
   handler counts it on its PE.
 - **Local counters.** A *put* that names a local counter with an action also counts one created on the
-  contributor's PE when it is issued, and the local counter's action raises the processed count in bulk
+  origin's PE when it is issued, and the local counter's action raises the processed count in bulk
   by its N when it runs, as a remote counter's does. Counting the action only when the local counter
   *fires* would be too late: the remote side can be processed before the local completion arrives, and
   QD could finish in between, before an action that may start new work. A local counter without an
@@ -511,7 +552,7 @@ Applied to the two uses the design claims:
   - With neither, *putting* faces straight into the ghost layer of the live array is the jacobi3d bug
     fixed in #3980.
 - **FFT transpose** (NAMD's PME, G2).
-  - A contributor sends its step s+1 data to a pencil only after it has received that pencil's step s
+  - An origin sends its step s+1 data to a pencil only after it has received that pencil's step s
     result in the backward transpose.
   - The pencil sends that result only after its last read of its step s buffer, because its forward FFT
     and onward send come first.
@@ -521,19 +562,19 @@ Applied to the two uses the design claims:
 ### 4.10 Other runtime services
 
 - **Load-balancer communication records.**
-  - A *put* records its bytes on the contributor's edge to the owner object when it is issued, as a
+  - A *put* records its bytes on the origin's edge to the owner object when it is issued, as a
     message send does, so comm-aware balancers see the traffic.
   - The edge must be keyed by the owner's own array manager. Aditya's channels first recorded the edge
-    under the sender's manager with the owner's element id, which pointed it at the wrong object
+    under the origin's manager with the owner's element id, which pointed it at the wrong object
     (Appendix A; PERSISTENT_COMM_PLAN.md, 2026-10-18 10:25).
-- **Projections.** Two events: *put* issued (contributor) and round *fired* (owner, when the action runs).
+- **Projections.** Two events: *put* issued (origin) and round *fired* (owner, when the action runs).
 - **Record-replay.** Out of scope for the first version. Which contribution completes a round varies
   between runs, and region contents are not recorded. A `+record` run that creates a region prints a
   warning.
 - **`CkExit` with puts in flight.** Treated like messages in flight at exit. The runtime does not wait for
   them, skips release notices, and deregisters memory only after the network is shut down, so a late
   completion cannot touch freed memory.
-- **Attribution of copies.** Same-host copies run in the contributor's entry method and are charged to
+- **Attribution of copies.** Same-host copies run in the origin's entry method and are charged to
   it. Scatters run on the owner PE (W7), charged to the owner. Poll-time work is only that bookkeeping (W7).
 
 ## 5. The counter: one atomic word for every locality
@@ -544,11 +585,11 @@ Each process has a counter table of fixed-size entries (one 64-byte line each, t
 between counters): the atomic word, the owner PE, the *re-arm* count, the action, a generation number and
 the preallocated action message reference. The table has one slice per PE of the process, and a PE's
 slice holds up to 65536 entries, the limit the 16-bit signal sets per PE (5.5). A target carries its
-counter's slice and index, so a contributor needs no fixed formula to find the entry.
+counter's slice and index, so an origin needs no fixed formula to find the entry.
 
 - With IPC on, the table is a shared-memory area of its own, not part of the IPC message segment: that
-  segment defaults to 8 MiB and already fills (3.2). Host peers map the area at their first import from
-  that process. The area reserves address space for every slice at its limit (4 MiB per PE) but uses
+  segment defaults to 8 MiB and already fills (3.2). Host peers map the area when they first *attach* to
+  a target of that process. The area reserves address space for every slice at its limit (4 MiB per PE) but uses
   memory only for the entries touched: on Linux a tmpfs-backed shared mapping allocates a page when it is
   first written, so a PE with 100 counters uses two pages.
 - With IPC off, the table is ordinary process memory, and host peers in other processes contribute
@@ -562,7 +603,7 @@ matters.
 - the word goes below zero when the next round's contributions arrive before the *re-arm* (4.2), down to
   -N if the whole next round arrives first, so it must hold -N to N;
 - transposes and gathers count every PE of a row or of the job: a pencil FFT row can have thousands of
-  contributors, and a gather to one PE on Frontier about 527,000 (about 9,400 nodes of 56 PEs).
+  origins, and a gather to one PE on Frontier about 527,000 (about 9,400 nodes of 56 PEs).
 
 A narrower word would save nothing: each entry already takes a 64-byte line, an atomic add costs one
 instruction at every width on x86-64 and aarch64, and the network signal carries the counter's index,
@@ -570,14 +611,14 @@ not its value (5.5).
 
 ### 5.2 Who updates the word
 
-| contributor | who executes the *decrement* | how it reaches the word |
+| origin | who executes the *decrement* | how it reaches the word |
 |---|---|---|
-| (a) same process (same or other PE) | the contributor's thread, after its copy | process address |
-| (b) other process, same host | the contributor's thread, after its copy | its mapping of the owner's segment |
+| (a) same process (same or other PE) | the origin's thread, after its copy | process address |
+| (b) other process, same host | the origin's thread, after its copy | its mapping of the owner's segment |
 | (c) other host (or same host without IPC) | the LCI remote-completion handler in the owner process, on whichever PE thread is polling that device | process address |
 
 All three are CPU atomic read-modify-write operations on the same 32-bit word, from cache-coherent cores
-of one host. They are therefore linearizable with respect to each other, whatever mix of contributors a
+of one host. They are therefore linearizable with respect to each other, whatever mix of origins a
 round has. This answers whether shared-memory and network contributions can be combined on one counter:
 they can, because both end in a CPU atomic on the owner's host; what cannot be combined is a CPU atomic
 with a NIC atomic, which this design never uses (W10).
@@ -602,7 +643,7 @@ The contribution that took the word to zero *fires*:
   `CmiAllocIpcBlock` refuses the caller's own segment (cmishmem.cpp:290-292); it needs a variant that
   allocates from it. The push needs a variant too: `CmiPushIpcBlock` asserts that the pushing process
   allocated the block (`meta->mine == block->sender_proc`, cmishmem.cpp:273), and here the owner
-  allocated it and a contributor pushes it.
+  allocated it and an origin pushes it.
 - On the same PE the *firing* contribution also queues (never calls the action inline), so an action never
   runs inside a *put* call.
 - **The preallocated message never reaches user code.** It is a small Converse message owned by the
@@ -620,7 +661,7 @@ The contribution that took the word to zero *fires*:
     and SDAG keeps it until a `when` uses it. Neither touches the counter's message.
 - So one preallocated message per counter is enough: the counter cannot *fire* again until its handler
   has started, because *re-arm* is legal only from then on (4.2), and from then on the message is off the
-  queue. *Firing*, at poll time or in a contributor's thread, never allocates; the action's message is
+  queue. *Firing*, at poll time or in an origin's thread, never allocates; the action's message is
   allocated on the owner PE, in the scheduler.
 - An earlier version of this design delivered the preallocated message itself to the entry method. Then
   Charm++ freed it when the method returned while a later round could already have queued it again
@@ -629,10 +670,10 @@ The contribution that took the word to zero *fires*:
 
 ### 5.4 Why the owner sees the data (memory ordering)
 
-- Shared memory, (a) and (b): each contributor copies, then `fetch_sub` with release. All *decrements* are
+- Shared memory, (a) and (b): each origin copies, then `fetch_sub` with release. All *decrements* are
   read-modify-write operations on one atomic, so each later *decrement* continues the release sequence of
   every earlier one; the *firing* *decrement* is acq_rel, so it synchronizes with every earlier
-  contributor. The push to the owner's queue (release) and the owner's pop (acquire) carry that to the
+  origin. The push to the owner's queue (release) and the owner's pop (acquire) carry that to the
   owner PE. Cross-process, this holds because the atomics are address-free (5.2).
 - Network, (c). This is the one place the design states the argument for each provider.
   - **InfiniBand RC (ibv, Anvil).** RDMA write with immediate is one operation. Its completion at the
@@ -677,8 +718,8 @@ do not fit in the signal; section 10 makes reuse of an index safe without them.
 | locality | region from `CmiRegionAlloc` | region from `CmiRegionCreate` (user memory) | *decrement* |
 |---|---|---|---|
 | same PE | memcpy by the caller | same | (a) |
-| same process, other PE | memcpy by the contributor's thread | same | (a) |
-| same host, other process, xpmem | memcpy through the mapping | memcpy through an xpmem attachment made at import (the address space is already exported) | (b) |
+| same process, other PE | memcpy by the origin's thread | same | (a) |
+| same host, other process, xpmem | memcpy through the mapping | memcpy through an xpmem attachment made when the origin's process *attaches* (the address space is already exported) | (b) |
 | same host, other process, shm mode | memcpy through the owner's segment (the region is in it; small regions only, 3.2) | *put* through the NIC (loopback RDMA; the region is NIC-registered) | (b) / (c) |
 | same host, IPC off | *put* through the NIC | *put* through the NIC | (c) |
 | other host | RDMA write with immediate data into the region | same | (c) |
@@ -687,7 +728,7 @@ Notes:
 
 - Within a process there is no message at all: one memcpy and one atomic. Today's zerocopy APIs memcpy
   and also send messages in this case.
-- Across processes on a host, the copy is done once, by the contributor, straight into the destination.
+- Across processes on a host, the copy is done once, by the origin, straight into the destination.
   Today `+ipc` copies a message into the receiver's pool and the application then copies it again.
 - CMA (`process_vm_writev`) would serve user memory in shm mode, but it is compiled out of reconverse
   and depends on ptrace permissions; not assumed (W8).
@@ -712,27 +753,27 @@ a byte stride. Example, a 64^3 array of doubles with one ghost layer stored in a
 - the two j-faces are 64 runs of 64 doubles (b = 512 B, stride 66*66*8);
 - the two k-faces are 64*64 single doubles (b = 8 B, strides 66*8 and 66*66*8).
 
-A contributor may also pass a source layout, so neither side packs by hand.
+An origin may also pass a source layout, so neither side packs by hand.
 
 *Putting* faces straight into the ghost layer of the live array, with one counter, is safe only under one
 of the readiness patterns of 4.9. With neither, it is the jacobi3d bug fixed in #3980.
 
 ### 7.2 Within a host
 
-The contributor copies source layout to destination layout directly (a strided copy; device regions use
+The origin copies source layout to destination layout directly (a strided copy; device regions use
 `cudaMemcpy3DPeerAsync` / `hipMemcpy3DPeerAsync`, section 8), then *decrements* once for the piece. No
 staging, no packing.
 
 ### 7.3 Across hosts
 
 An RDMA write targets one contiguous remote range, so a strided destination needs either one write per
-block or a contiguous staging area at the receiver plus a scatter. Proposal:
+block or a contiguous staging area at the owner plus a scatter. Proposal:
 
-- **Default: gather, one put, scatter** (the staging slot doubles the receiver memory for strided pieces
-  that have remote contributors). The runtime gathers the source into a registered contiguous
+- **Default: gather, one put, scatter** (the staging slot doubles the owner's memory for strided pieces
+  that have remote origins). The runtime gathers the source into a registered contiguous
   buffer (or posts the write with a scatter-gather list on the source side when the block count is at
-  most the device's limit, removing the sender copy; whether LCI exposes this is to be checked), *puts*
-  it into a per-piece staging slot at the receiver (allocated when the piece is declared, registered
+  most the device's limit, removing the origin's copy; whether LCI exposes this is to be checked), *puts*
+  it into a per-piece staging slot at the owner (allocated when the piece is declared, registered
   once) with the staging `rcomp` and the slot index as signal. The handler only queues a scatter task on
   the owner PE (W7). The owner scatters from the slot into the piece using the layout, then *decrements*
   the counter once. This is layout-driven by the runtime, not application pack/unpack (W5).
@@ -743,7 +784,7 @@ block or a contiguous staging area at the receiver plus a scatter. Proposal:
   the last write only) holds for InfiniBand RC on one queue pair but not with several LCI devices or on
   cxi without requested ordering, so it is not assumed.
 - **No scatter at poll time.** It would run the copy under the device trylock (W7). Scattering on the owner
-  costs one extra scheduler entry per strided piece with remote contributors.
+  costs one extra scheduler entry per strided piece with remote origins.
 - **Gate (proposed; open question 7).** Gather, *put* and scatter make the same two copies as a message's pack and
   unpack. So phase 5 goes ahead only if commbench `halo3d` shows strided *puts* beating messages, with the
   eager limit raised (12.2).
@@ -755,8 +796,8 @@ layout. How it is carried out depends on the locality.
 - **Within a host** (one process, or xpmem): the reader copies from its mapping of the owner's region,
   layout to layout, as in 7.2, and *decrements* its local counter. It is one-sided and needs no staging;
   device regions use `cudaMemcpy3DPeerAsync` through the IPC mapping.
-- **Across hosts** it is harder than a strided *put*. For a *put* the strided side is the sender's own
-  memory, which the sender can gather locally (7.3). For a *get* the strided side is remote, and an RDMA
+- **Across hosts** it is harder than a strided *put*. For a *put* the strided side is the origin's own
+  memory, which the origin can gather locally (7.3). For a *get* the strided side is remote, and an RDMA
   read covers one contiguous remote range. Two ways:
   - one RDMA read per block, counted at the reader, when blocks are at least a threshold (the mirror of
     `B_put`). In the 66^3 example of 7.1 an i-face is one read and a j-face 64 reads of 512 B, but a
@@ -807,10 +848,10 @@ The counter is always the host word of section 5; the action always runs on the 
 
 | locality | data movement | when the *decrement* happens |
 |---|---|---|
-| same process (same or other GPU) | `hapiMemcpyAsync` D2D (3D variant for strided) on a runtime stream of the contributor, ordered after the producer's stream with an event | when the copy's event completes (hapi event polling), by the contributor's PE: (a) |
-| same host, other process | CUDA/HIP IPC handle of the destination opened once at import (ref-counted per process, as `persistIpcPtr` does, ckrdmadevice.C:676-715); D2D copy straight into the mapped region | when the copy's event completes, by the contributor's PE, on the shared word: (b) |
+| same process (same or other GPU) | `hapiMemcpyAsync` D2D (3D variant for strided) on a runtime stream of the origin, ordered after the producer's stream with an event | when the copy's event completes (hapi event polling), by the origin's PE: (a) |
+| same host, other process | CUDA/HIP IPC handle of the destination opened once when the origin's process *attaches* (ref-counted per process, as `persistIpcPtr` does, ckrdmadevice.C:676-715); D2D copy straight into the mapped region | when the copy's event completes, by the origin's PE, on the shared word: (b) |
 | other host, GPUDirect available | RDMA write with immediate data from device memory to device memory | in the remote-completion handler: (c) |
-| other host, no GPUDirect | device to pinned host staging, host *put* with signal into a pinned staging slot at the receiver, host to device copy issued by the owner PE (W7), *decrement* after that copy's event | (c), deferred to the event |
+| other host, no GPUDirect | device to pinned host staging, host *put* with signal into a pinned staging slot at the owner, host to device copy issued by the owner PE (W7), *decrement* after that copy's event | (c), deferred to the event |
 
 The source side never blocks: the *put* waits for the producer's stream through an event that the
 poller checks (the fix #4232 proposes for CkDevicePersistent).
@@ -819,7 +860,7 @@ Three rules from Aditya's channel measurements (Appendix A.4.1, A.4.2, A.4.6):
 
 - **The cross-host verb is chosen per machine.** `CmiPut` across hosts is carried out either as a
   write with signal or as announce-then-read:
-  1. the contributor sends a small announce message carrying its source registration;
+  1. the origin sends a small announce message carrying its source registration;
   2. the owner's poller issues a get into the region;
   3. the *decrement* happens at the get's local completion on the owner's side.
 
@@ -828,10 +869,10 @@ Three rules from Aditya's channel measurements (Appendix A.4.1, A.4.2, A.4.6):
   comes from a startup probe or a machine table. The API does not change. With announce-then-read the source
   stays in use until the owner's get completes, so the local counter *fires* later.
 - **Announce-then-read costs messages both ways.** A read's completion is reported only to the reader,
-  the owner; the contributor learns that its source may be reused only from a release the owner sends
+  the owner; the origin learns that its source may be reused only from a release the owner sends
   back. So a *put* carried out this way is an announce, a read and a release, not G1's one *put* and one
-  notification, and the release is the one message that goes back to a sender (9.1, 9.2). The release
-  delays only the sender's reuse of its buffer, not the owner's notification.
+  notification, and the release is the one message that goes back to an origin (9.1, 9.2). The release
+  delays only the origin's reuse of its buffer, not the owner's notification.
   - It is used only above a size where the read's bandwidth repays the announce, which adds about one
     small-message latency before the read starts (3.8 us one way for 8 B on Delta). Below that size the
     runtime writes, even on those machines.
@@ -850,17 +891,17 @@ Three rules from Aditya's channel measurements (Appendix A.4.1, A.4.2, A.4.6):
 - **On cxi a put with signal is two network operations, unless native `fi_writedata` is enabled (5.4).** LCI emulates it as the write, then after the
   write's local completion a zero-length message carrying the 16-bit signal. Whether the data is visible
   when that message's handler *decrements* depends on the conditions of 5.4, which are not yet established.
-- **Same-host device puts are batched.** A contributor's *puts* on one producing stream go into one
+- **Same-host device puts are batched.** An origin's *puts* on one producing stream go into one
   `cudaMemcpyBatchAsync` with one completion event. The batch is flushed when the stream changes, at 256
-  *puts*, when the entry method returns, and at idle. The contributor then *decrements* each counter once by
+  *puts*, when the entry method returns, and at idle. The origin then *decrements* each counter once by
   the number of its *puts* in the batch. With one event per *put*, leanmd's copy engine ran 41 ms per step
   longer than with the batched zero-copy path.
 
 ### 8.3 Strided device data
 
-Within a host, 3D peer copies handle the layout. Across hosts, a gather kernel on the sender's stream
-into a registered device staging buffer, one *put*, and a scatter kernel launched by the owner PE at the
-receiver (W7); the *decrement* waits for the scatter kernel's event.
+Within a host, 3D peer copies handle the layout. Across hosts, a gather kernel on the origin's stream
+into a registered device staging buffer, one *put*, and a scatter kernel launched by the owner PE
+(W7); the *decrement* waits for the scatter kernel's event.
 
 ### 8.4 Visibility of GPUDirect writes
 
@@ -882,15 +923,15 @@ a flush today (survey).
      and would hit this on cxi.
 2. Cost of the flush per *firing*.
 3. CUDA IPC handles on Delta with one GPU visible per task fail (`+gpushm` abort in `hapiInit`,
-   #4228's one failing step); the import must fall back to the NIC path, not abort.
+   #4228's one failing step); *attaching* must fall back to the NIC path, not abort.
 
-## 9. Sender side and batched notifications
+## 9. Origin side and batched notifications
 
 ### 9.1 Puts need no acknowledgements
 
-Source completion of a *put* is local: LCI reports it to the sender, the runtime *decrements* the local
+Source completion of a *put* is local: LCI reports it to the origin, the runtime *decrements* the local
 counter. A neighbor that *puts* 6 faces uses one local counter with N = 6 and gets one notification,
-which also gives #3966's one-callback-per-send result for free. No message goes back to the sender in
+which also gives #3966's one-callback-per-send result for free. No message goes back to the origin in
 any locality, with one exception: a large *put* across hosts on a machine that uses announce-then-read
 (8.2), where the owner's release goes back for every *put*.
 
@@ -908,7 +949,7 @@ In this design the cases that need a message back are:
 1. a *get* whose source owner asked to be told (release-only: deferred; with a callback: immediate);
 2. per-pair ring credits (section 12.2), which are release-only and need not be messages at all;
 3. teardown acknowledgements (section 10);
-4. the release of an announce-then-read *put* (8.2): release-only, and deferred, when the contributor gave
+4. the release of an announce-then-read *put* (8.2): release-only, and deferred, when the origin gave
    no local counter or one without an action; sent at once when the local counter has an action.
 
 The host zerocopy path's per-buffer acknowledgement messages (#3964, open) are outside this design but
@@ -920,46 +961,62 @@ the same id-block code would serve them.
 
 - The owner creates regions and counters, makes targets of them, and sends the targets in entry
   methods (W3).
-- **Imports register with the owner**. `CmiImportTarget` does three things:
+- **Attaching registers with the owner.** *Attaching* a process to a target does three things:
   - records the remote keys;
   - attaches with xpmem, or opens the CUDA/HIP IPC handle, when the owner is on the same host;
-  - sends one registration message to the owner process, the first time this process imports a target
-    of that region (or of that counter, for a target with no region).
+  - sends one registration message to the owner process, the first time this process *attaches* to a
+    target of that region (or of that counter, for a target with no region).
 
-  The owner keeps the list of importing processes for each region. Targets may still be forwarded
-  freely, but every process that imports one registers, so the owner always knows who may *put*. That is
-  one message per importing process per region at setup, which W2 allows.
-- **No reliance on message order** (Appendix A.4.4). Registration and release are separate messages and
-  may arrive in either order. The owner keeps, per region and per importing process, a balance:
-  registrations minus releases. Both messages carry the region's generation.
-  - A release that arrives before its registration leaves the balance at -1 until the registration
+  In Converse the origin calls `CmiAttachTarget`; in Charm++ the first `CkPut`, `CkGet` or `CkSignal`
+  through a target does it, or `t.attach()` earlier (3.3). The owner keeps the list of attached processes
+  for each region. Targets may still be forwarded freely, but every process that *puts* through one
+  *attaches* first, so the owner always knows who may *put*. That is one message per attached process per
+  region at setup, which W2 allows.
+- **No reliance on message order** (Appendix A.4.4). Registration and detach notice are separate messages
+  and may arrive in either order. The owner keeps, per region and per attached process, a balance:
+  registrations minus detach notices. Both messages carry the region's generation.
+  - A detach notice that arrives before its registration leaves the balance at -1 until the registration
     arrives.
   - `CmiRegionDestroy` completes when every balance it knows of is zero (10.2).
-  - A registration or release for a generation already destroyed is dropped. An importer the owner had
-    not heard of at destroy time has *put* nothing since the last round (10.2, step 1), so freeing the
-    region then is safe, and its late messages are dropped.
-- **Caching.** Imports are cached keyed by (owner process, region id, generation), so the targets of one
-  region imported in one process share one registration and one mapping.
-- **Batch forms.** `CmiImportTargets` and `CmiReleaseImports` take a whole neighbor set and send one
-  message per owner process. A rebuild after AMR touches every neighbor at once.
+  - A detach notice for a generation already destroyed is dropped. A registration for one is answered
+    with a detach request, so a process that *attached* late does not keep its mapping. An attached
+    process the owner had not heard of at destroy time has *put* nothing since the last round (10.2,
+    step 1), so freeing the region then is safe.
+- **Sharing.** Attachments are kept per process, keyed by (owner process, region id, generation), so the
+  targets of one region used in one process share one registration and one mapping. In Converse each
+  `CmiAttachTarget` returns a counted reference, and the last `CmiDetachTarget` in the process *detaches*
+  it. In Charm++ the runtime holds one reference per region for the process, until the owner destroys
+  the region.
+- **Batch forms.** `CmiAttachTargets` and `CmiDetachTargets`, and `CkAttach(ts, n)` in Charm++, take a
+  whole neighbor set and send one message per owner process. A rebuild after AMR touches every neighbor
+  at once.
 
 ### 10.2 Teardown
 
 1. The application stops *putting* into the region; its logic knows the last round.
-2. Each importing process calls `CmiReleaseImport` (or the batch form). The call waits for that process's
-   own *puts* into the region to complete locally, detaches the mappings, and sends one release notice
-   to the owner. The notice is release-only, so it is carried per 9.2 when possible.
-3. `CmiRegionDestroy` and `CmiCounterDestroy` complete when every importing process's balance is zero
-   (10.1), whatever order its registration and release arrived in.
+2. Every attached process *detaches*. *Detaching* waits for that process's own *puts* into the region to
+   complete locally, removes its mappings, and sends one detach notice to the owner. The notice needs no
+   reply, so it is carried per 9.2 when possible.
+   - In Converse each origin calls `CmiDetachTarget` (or the batch form) for each of its references; the
+     last one in the process *detaches* it.
+   - In Charm++ the owner calls `r.destroy(cb)`, and `c.destroy(cb)` for a counter. The owner's process
+     sends a detach request to every attached process, from the list of 10.1, and each *detaches* when the
+     request arrives. That is a request and a notice per attached process, where Converse's explicit
+     detach costs the notice alone; teardown is rare (W2). An object destroyed without `destroy` starts
+     the same teardown, with no callback.
+3. `CmiRegionDestroy` and `CmiCounterDestroy` complete when every attached process's balance is zero
+   (10.1), whatever order its registration and detach notice arrived in.
    The runtime then deregisters the memory, frees runtime-allocated memory, and returns the counter
-   index to the free list. Indices are reused least recently freed first, and only after the releases.
-   A stray late signal can therefore hit a reused index only if step 1 was broken, which checking builds
-   detect (section 11).
+   index to the free list. Indices are reused least recently freed first, and only after the detach
+   notices. A stray late signal can therefore hit a reused index only if step 1 was broken, which
+   checking builds detect (section 11).
+   In Charm++, `cb` runs after this, and the application may then free its own memory. It must not free
+   it earlier: CUDA leaves freeing an allocation that another process still has mapped undefined.
 
 Two rules from Aditya's channels (Appendix A.4.4, A.4.8):
 - **No message order.** No step of setup or teardown may rely on two messages arriving in order. His
   migration protocol had six such holes, and each one hung leanmd.
-- **Urgent queue.** Setup, teardown, registration and release messages go through reconverse's urgent
+- **Urgent queue.** Setup, teardown, registration, detach request and detach notice messages go through reconverse's urgent
   queue (`CmiSyncSendAndFreeUrgent`). In leanmd, ordinary messages waited 50-400 ms per hop behind deep
   scheduler queues.
 
@@ -973,10 +1030,12 @@ time and persistent communication, and the manual says so (10.5). There are thre
    - Where: AtSync, plus the rebuild points where the application knows no *put* is in flight. Partners
      also change at AMR (Enzo-E at every adapt phase, SpECTRE, Quinoa's `resizePostAMR`) and at ChaNGa's
      domain decomposition.
-   - Procedure: the object tears down before it moves, sets up after it arrives, and sends new targets.
-     Its contributors release their imports and import again.
-   - Cost: each migrated owner makes each of its importers release and re-register, about two messages
-     per importer plus the target delivery, done in parallel across neighbors.
+   - Procedure: the object tears down before it moves, which *detaches* its origins (10.2), sets up after
+     it arrives, and sends new targets. Its origins *attach* again at their first *put* through a new
+     target.
+   - Cost: each migrated owner costs each attached process a detach request, a detach notice and a new
+     registration, about three messages per attached process plus the target delivery, done in parallel
+     across neighbors.
    - Break-even: if a round saves s per contribution and a rebuild costs S per neighbor pair, the
      persistent family pays when objects stay in place for more than S/s rounds. For s, Aditya measured
      3-10 us for device puts against `nocopydevice`. S is to be measured in phase 4; tens of microseconds
@@ -989,11 +1048,14 @@ time and persistent communication, and the manual says so (10.5). There are thre
      counter that some target names, or a local counter with *puts* still in flight. The attempt aborts
      in all builds, with a message naming the region or counter. A local counter with nothing pending
      moves with the object: its value and action are PUP'd.
-   - A migrating contributor that owns nothing only has to wait for its own *puts* to complete and import
-     again after it arrives.
+   - A migrating origin that owns nothing only has to wait for its own *puts* to complete. It carries its
+     targets and *attaches* again at its first *put* after it arrives. Its old process stays attached
+     until the owner destroys the region.
    - The alternative, deferred, is a runtime hold on *puts* to a moving owner. The candidate is the
      resolve/closing/epoch protocol of the unmerged device channels (Appendix A.4.4, A.4.9), whose
-     message-ordering holes have been found and fixed. It is kept for this purpose (section 13).
+     message-ordering holes have been found and fixed. It is kept for this purpose (section 13). Aditya's
+     branch device-channel (2026-11-21) implements it on recharm for one origin per channel, with the
+     *puts* made during a move staged and read at the new home.
 3. **Events that invalidate every target**, i.e. disk checkpoint followed by restart.
    - The per-object release protocol cannot run after a restart.
    - The user tears down before checkpointing. Whether a restart on the same number of nodes could
@@ -1020,11 +1082,11 @@ Two further items:
 What can be automated:
 - owner-side destroy and re-create through PUP of `CkRegion` and `CkCounter`. This is clean only for
   runtime-allocated memory; user memory must be re-bound;
-- delivery of the new targets to the registered importers.
+- delivery of the new targets to the attached processes.
 
 What cannot:
 - knowing that no *puts* are in flight;
-- pausing contributors. The balancer's resume would have to wait until the re-imports are acknowledged.
+- pausing origins. The balancer's resume would have to wait until the re-attachments are acknowledged.
 
 The first version is therefore user-managed plus the guards. A helper comes after one or two
 applications have done it by hand. Aditya's runtime-managed channels needed six ordering fixes, which
@@ -1043,7 +1105,7 @@ Readiness stays the user's responsibility (W1). The runtime's job is to detect v
 in checking builds and print an error that tells the user to use a message send there.
 
 Production builds check only what is free:
-- a *put* beyond a piece's capacity returns an error (the contributor knows the capacity from the target);
+- a *put* beyond a piece's capacity returns an error (the origin knows the capacity from the target);
 - a *put* through a target marked invalid (10.3, case 3) aborts;
 - the migration guard (10.3, case 2), if adopted.
 
@@ -1051,7 +1113,7 @@ Error-checking builds add the following:
 - **Count check.** Abort when a *decrement* finds `old < k` (4.2). It catches a *put* that arrives after its
   round *fired* and before the owner *re-armed*.
 - **Round check.**
-  - Each contributor numbers its own *puts* per counter.
+  - Each origin numbers its own *puts* per counter.
   - Each contribution is followed by a small check message to the owner, carrying the counter index,
     the generation and the round number.
   - It catches two errors: a *put* from a later iteration counted in place of a missing one from the
@@ -1062,7 +1124,7 @@ Error-checking builds add the following:
 - **Not caught by either check:** a *put* that lands after an automatic *re-arm* while the owner still uses
   the data. That is why *re-arm* is explicit by default (4.2).
 - **Re-arm legality.** *Re-arm* before the round's action has started aborts (4.2).
-- **Import checks.**
+- **Attach checks**, at a target's first use or at `t.attach()`.
   - The source's memory kind matches the declared kind.
   - The layout fits inside the region.
   - `CMI_PIECE_VARSIZE` is accepted only on pieces with their own header space (4.6).
@@ -1291,12 +1353,12 @@ or are removed; as they stand they do not compile.
 | plain send, marshalled params | unchanged |
 | `nocopy`, `nocopydevice` | unchanged (the Send API, 12.1). The users in charm: AMPI sends every contiguous message of 100 KiB or more (`AMPI_RDMA_THRESHOLD_DEFAULT`, ampiimpl.h) through `genericRdma(nocopy ...)` (ampi.ci:56, ampi.C:3459-3461), so every AMPI program with large messages uses it; the device half of a migration uses `nocopydevice` (cklocation.ci:25). None of the surveyed applications (section 17) uses either. |
 | `nocopypost` | kept, for receivers that can choose a buffer only after seeing the message, or that can take the data only later (the buffer is in use, or memory is short). Since #4285 (merged 2026-11-18) the runtime registers the posted buffer for each message and releases it after, so `deregMode` has no effect there; one registration kept across messages is a region. Tickets are proposed below. |
-| direct API (`CkNcpyBuffer` get/put) | region + import + `CkPut`/`CkGet` with N = 1 counters; kept as a thin compatibility layer |
-| `CkDevicePersistent` | device region + `CkPut` + N = 1 counter; its IPC import code moves under the import |
+| direct API (`CkNcpyBuffer` get/put) | region + `CkPut`/`CkGet` with N = 1 counters; kept as a thin compatibility layer |
+| `CkDevicePersistent` | device region + `CkPut` + N = 1 counter; its IPC handle code moves into *attach* |
 | reconverse persistent | removed; NAMD moves to the persistent family (12.3) |
 | CkDirect (removed 2018) | region + `CkPut` + N = 1 counter |
 | `+ipc`, `+gpushm` | transport choices made by the runtime; options stay for tuning |
-| `CkDeviceChannel` (unmerged, branch rate-aware-gpu-lb) | not added as a separate API; see below |
+| `CkDeviceChannel` (unmerged; branches rate-aware-gpu-lb and device-channel) | not added as a separate API; see below |
 
 G5 holds only after phase 8. Until then the API surface grows: the persistent family is added,
 while `nocopypost`, the direct API and `CkDevicePersistent` remain. The intended deprecation order is:
@@ -1342,6 +1404,9 @@ would undo G5. What is kept:
   - load-balancer edges keyed by the owner's manager (4.10);
   - the hardware-queue preset (Appendix A.4.10).
 
+Aditya's branch device-channel (2026-11-21) carries the channels to recharm as `CkDeviceChannel` and
+removes `CkDevicePersistent`. How it becomes `CkChannel` is being worked out with him.
+
 ## 14. Tests and measurements
 
 Reconverse tests (CTest, 1 and 2 processes, `+ipc` on and off):
@@ -1362,10 +1427,10 @@ commbench additions (patterns, with JSON output as today):
 
 - `halo3d`: 6 faces (2 contiguous, 2 row-strided, 2 element-strided), host and device, sizes from 16^3
   to 256^3 per block; compares *put*+counter against marshalled messages and against today's direct API.
-- `transpose`: P contributors into one pencil buffer (NAMD's FFT case), P from 4 to 256.
+- `transpose`: P origins into one pencil buffer (NAMD's FFT case), P from 4 to 256.
 - `manytoone` and `rate`: for the eager-limit decision.
 
-Metrics: time from the first contributor's *put* to the owner's action, per round (median of at least 5
+Metrics: time from the first origin's *put* to the owner's action, per round (median of at least 5
 interleaved repeats); scheduler entries per round on the owner; bytes copied (recorded, as commbench
 already does for copies).
 
@@ -1385,13 +1450,13 @@ Each phase is a PR with tests; measurements gate the next phase.
      `FI_CXI_ENABLE_WRITEDATA=1` where libfabric is 2.5 or later, before phases 2-3 rely on the Anvil
      numbers.
 2. **reconverse: counters and contiguous host regions, network and same-process paths.** Counter table,
-   *firing*, *re-arm*, error checks, `CmiPut`/`CmiGet`, imports without IPC.
+   *firing*, *re-arm*, error checks, `CmiPut`/`CmiGet`, *attach* without IPC.
 3. **reconverse: same-host paths.** Counter table in its own shared area (5.1), `CmiRegionAlloc` in the IPC segment, IPC-block
-   action messages in the owner's own segment, xpmem import of user regions; xpmem confirmed on Anvil,
+   action messages in the owner's own segment, xpmem *attach* of user regions; xpmem confirmed on Anvil,
    Delta and Frontier. The mixed-locality test.
-4. **charm: `CkRegion`, `CkCounter`, targets, `CkImport`, `CkPut`, `CkGet`**, PUP of handles, SDAG use, QD (4.8),
+4. **charm: `CkRegion`, `CkCounter`, targets, `CkPut`, `CkGet`, implicit *attach*, `destroy`**, PUP of handles, SDAG use, QD (4.8),
    LB records (4.10), tests in TEST_DIRS; commbench `halo3d` (contiguous faces) and `transpose`; the
-   rebuild cost S of 10.3, including the batch import and release.
+   rebuild cost S of 10.3, including the batch *attach* and the detach requests.
 5. **strided layouts** (both sides), staging slots, scatter on the owner PE, per-block *puts*; commbench
    `halo3d` with all faces. Gated on `halo3d` beating messages with the raised eager limit (7.3).
 6. **device memory** after the three checks of 8.5, and after finding out whether the slow GPUDirect
@@ -1408,8 +1473,9 @@ Each phase is a PR with tests; measurements gate the next phase.
 2. The per-block *put* threshold `B_put` (working value 4 KiB, 7.3) is to be measured. Is it a reasonable
    default until then?
 3. The ROCm equivalent of the GPUDirect flush (8.4).
-4. Names inside the persistent family: region, counter, target, import and *put*, or other terms (handle,
-   contribute)? A C++ namespace (`ck::persistent::Region`) or prefixed names (`CkPersistentRegion`)?
+4. Names inside the persistent family. Settled: region, counter, target, origin, owner, *attach* and *put*
+   (3.1). Open: the owner's teardown call (`destroy(cb)` proposed; `close(cb)` or `free(cb)` are the
+   alternatives), and a C++ namespace (`ck::persistent::Region`) or prefixed names (`CkPersistentRegion`)?
 5. Migration at any time (10.3, case 2). The proposed guard: an object that owns a live region, a counter
    some target names, or a local counter with *puts* in flight cannot migrate, and the attempt aborts in
    all builds. Is that acceptable, including under the
@@ -1428,6 +1494,9 @@ Each phase is a PR with tests; measurements gate the next phase.
     posting before the data arrives? The current calls would stay for existing code.
 12. Strided *gets* across hosts (7.4): per-block reads above a threshold and an owner-side gather below
     it, or none until an application needs them?
+13. Charm++ has no detach call (3.3): a process stays attached to a region until its owner destroys it.
+    Is that acceptable where origins change while regions live on, as after AMR? Each stale attachment
+    keeps a mapping and a registration until then.
 
 ## 17. Existing applications (G6)
 
@@ -1769,7 +1838,7 @@ The batch is flushed:
 - when the entry method returns (from `CkCallstackPop`, so that the balancer charges the copies to the right object);
 - at idle.
 
-For section 8.2: batch same-host device *puts* the same way. A contributor whose batch holds k *puts* to one counter then *decrements* it once by k.
+For section 8.2: batch same-host device *puts* the same way. An origin whose batch holds k *puts* to one counter then *decrements* it once by k.
 
 #### A.4.7 Same host: a shared-memory word instead of messages
 
@@ -1788,7 +1857,7 @@ Ordinary messages sat behind scheduler queues 50-400 ms deep (448 objects per PE
 migration protocol cost that much: the sender held a put for 305 ms on average, and up to 3.5 s.
 
 Sending closing, ack, resolution and DONE with `CmiSyncSendAndFreeUrgent` fixed this; reconverse serves its urgent
-queue first in every scheduler iteration (488c57e). Our setup, teardown and import messages should be urgent for the same reason.
+queue first in every scheduler iteration (488c57e). Our setup, teardown and attach messages should be urgent for the same reason.
 
 #### A.4.9 Migration while other objects run
 
