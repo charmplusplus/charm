@@ -1,7 +1,7 @@
 # The persistent family: regions, counters and put (design, 2026-11-16)
 
-Status: a design for discussion. There is no code yet; implementation would follow the phases of
-section 15.
+Status: a design for discussion. One piece is implemented: `CkChannel` for device memory (#4312),
+which also carries the migration protocol of 10.3. The rest would follow the phases of section 15.
 
 Revised 2026-11-18, after a first read: an origin now holds one target (a piece and a counter,
 3.1) instead of three handles; the counter is a 32-bit word (5.1); 12.1 separates `nocopy` (the
@@ -26,6 +26,13 @@ itself in `CkPut`, `CkGet` and `CkSignal`: its first use *attaches* the origin's
 import), and the owner's `destroy` *detaches* every attached process (3.3, 10.1-10.3). Converse keeps an
 explicit, counted `CmiAttachment` (3.2).
 
+Revised 2026-11-25, after the device channels merged as `CkChannel` (#4312): an owner that migrates,
+at load balancing or at any other time, holds its origins' *puts* with the channels' protocol, so the
+application no longer tears down and sets up for a migration, and the abort guard is dropped (W4,
+10.3-10.5, 11). The owner's teardown call is `destroy(cb)` (16, question 4). Both cross-host paths are
+kept, with the A40 measurements of #4312 (8.2). Sections 8.1, 13, 15, 17.4, 18 and Appendix A say what
+merged: `CkChannel`, per-stream HAPI completions (#4315) and reconverse's urgent queue (reconverse#339).
+
 ## In brief: the calls added, kept and removed
 
 The receiver, called the **owner**, registers a buffer once (a **region**) and an atomic count with an
@@ -33,8 +40,8 @@ action (a **counter**), and gives each sender, called an **origin**, a **target*
 its data goes to, and the counter its data counts toward. An origin's *put* lands in the owner's buffer
 with no copy, no handshake and no message, and *decrements* the counter; when the count reaches zero, the
 owner's callback runs, once. The code is the same whether origin and owner share a PE, a process, a host,
-or nothing. None of it is implemented
-yet (section 15).
+or nothing. Of the calls below, only `CkChannel` (device memory), `CkPut` through a channel,
+`CkPutOpts` and `CkMem` are implemented (#4312); the rest follows section 15.
 
 **Added, Charm++** (sections 3.3, 4 and 7):
 
@@ -50,7 +57,7 @@ yet (section 15).
 | `CkSignal(t)` | *decrements* the target's counter with no data |
 | `t.attach()`, `CkAttach(ts, n)` | optional: *attaches* now rather than at the first use, so that setup errors appear early; the batch form sends one message per owner process (3.3, 10.1) |
 | `r.destroy(cb)`, `c.destroy(cb)` | teardown: *detaches* every attached process; `cb` runs when the application may free the memory (10.2) |
-| `CkChannel` | a one-buffer target plus a release credit, for an origin that may run ahead of its owner (4.9) |
+| `CkChannel` | a one-buffer target plus a release credit, for an origin that may run ahead of its owner (4.9); implemented for device memory (#4312), on its own transport until phase 4 rebuilds it on regions and counters (13) |
 
 **Added, Converse** (3.2): the same objects in C: `CmiRegionCreate`, `CmiRegionAlloc`, `CmiRegionAddPiece`,
 `CmiRegionDestroy`; `CmiCounterCreate`, `CmiCounterRearm`, `CmiCounterValue`, `CmiCounterDestroy`;
@@ -74,9 +81,9 @@ yet (section 15).
 | `nocopy`, `nocopydevice` (Zero Copy Send API) | unchanged, with the two changes above |
 | `nocopypost` (Zero Copy Post API) | kept, with tickets |
 | Zero Copy Direct API (`CkNcpyBuffer` get and put) | deprecated: a thin layer over regions, removed one release after that layer passes its tests |
-| `CkDevicePersistent` | deprecated the same way; it becomes a device region |
+| `CkDevicePersistent` | removed by #4312; `CkChannel` replaces it |
 | the reconverse persistent API | removed, once NAMD's PME moves to regions (phase 8) |
-| `CkDeviceChannel` (unmerged) | not added; `CkChannel` serves its use |
+| `CkDeviceChannel` (the branches' name) | merged as `CkChannel` (#4312) |
 | `+ipc`, `+gpushm` | kept, as tuning options |
 
 Postponed to a later pull request: lending an array for update, the boomerang array (12.4).
@@ -87,8 +94,8 @@ Facts carry file references. Working assumptions are marked W (section 2). Point
 not settled say so where they appear, and are listed in section 16.
 
 Two appendices hold the evidence, to read only to check a claim:
-- Appendix A (behind sections 8 and 10): the unmerged `CkDeviceChannel` on branch rate-aware-gpu-lb,
-  and its measurements;
+- Appendix A (behind sections 8 and 10): the device channels as built on branch rate-aware-gpu-lb,
+  and their measurements; they merged as `CkChannel` (#4312);
 - Appendix B (behind section 17): the communication calls of ChaNGa, SpECTRE, Quinoa and Enzo-E, with
   file:line references.
 
@@ -123,8 +130,9 @@ Goals:
 - **G4 host and device memory** with the same regions, counters, and *put* and *get* calls. Whether a region
   is in host or device memory is set when the region is created (its memory kind, section 3.2); every
   call that uses the region is the same for both.
-- **G5 a smaller API surface.** Replace the direct API, CkDevicePersistent, the user-facing reconverse
-  persistent API and CkDirect with one set of objects (section 13).
+- **G5 a smaller API surface.** Replace the direct API, the user-facing reconverse persistent API and
+  CkDirect with one set of objects (section 13). `CkDevicePersistent` is already replaced, by `CkChannel`
+  (#4312).
 - **G6 no source change in existing applications**. ChaNGa, SpECTRE, Quinoa, Enzo-E
   and the other production codes keep compiling and running unchanged. They change code only to adopt
   the persistent family deliberately. The exception is NAMD, which uses the reconverse persistent API;
@@ -143,7 +151,11 @@ collective operations; fault tolerance; pointer-based data (it stays with messag
   may cost round trips; a round may not.
 - **W3 targets travel in ordinary messages.** A target is a small value that can be PUP'd into any entry
   method. Setup needs no special protocol beyond that.
-- **W4 migration tears down and rebuilds**. No forwarding of *puts* to a migrated owner.
+- **W4 the runtime holds *puts* to an owner that migrates.** Before an owner moves, every attached
+  process acknowledges a closing, and a *put* made during the move waits at its origin until the owner
+  reads it at its new home (10.3). This holds at load balancing and at any other time, and the
+  application exchanges nothing again. No *put* is forwarded through the old home. Restart after a disk
+  checkpoint, and a change of partners, remain the application's to handle (10.3).
 - **W5 strided arrays use layout descriptors; PUP-style packing is for pointer-based data**.
   Variable-size contributions are a special case to support (section 4.6).
 - **W6 the counter of G2 is one atomic 32-bit word** that origins in every locality update (section
@@ -183,8 +195,8 @@ collective operations; fault tolerance; pointer-based data (it stays with messag
 Naming: regions, counters and *put*/*get* form the **persistent family**. Everything in it is
 set up once, used for many rounds and torn down (W2), which is what "persistent" means here, close to
 MPI's persistent requests. Family 1 (section 12) is the **message family**. Consequences: the existing
-reconverse persistent API is replaced, not kept (12.3), so the word keeps one meaning; `CkDevicePersistent`
-already fits the name and becomes the device case of the family.
+reconverse persistent API is replaced, not kept (12.3), so the word keeps one meaning; `CkChannel`,
+which replaced `CkDevicePersistent` (#4312), is the family's device case so far.
 
 ### 3.1 Objects
 
@@ -362,7 +374,8 @@ CkPut(t, src, bytes, CkPutOpts().local(&localCounter).stream(stream));
 
 `CkPutOpts` carries what `CmiPut` takes beyond the target, source and size: `.offset(o)` within the piece,
 `.srcLayout(l)` for a strided source (7.1), `.local(&c)` for source completion (4.5) and `.stream(s)` for
-device data. It is a chain of setters rather than designated initializers, which need C++20 (user code is
+device data. `CkChannel` (#4312) has `.stream(s)` and two of its own: `.done(cb)`, a callback when the
+source may be reused (the one-*put* form of `.local(&c)`), and `.tag(n)`, a value its event carries. It is a chain of setters rather than designated initializers, which need C++20 (user code is
 compiled as C++17 since #4306). `CkGet` takes the same options.
 
 **Attaching.** An origin names the target itself. The first *put*, *get* or *signal* through a target in a
@@ -529,8 +542,8 @@ message: it lands when it arrives, whatever the owner is executing.
      that round's counter before you send. *Re-arming* after the send lets a correct *put* of round i+2
      arrive before the *re-arm*; counting stays right (4.2), but error-checking builds report it.
 3. **A release credit**, opt-in, for producer-consumer streams whose logic gives no such guarantee (a
-   producer may run ahead of its consumer, as in a stream of MoE tokens). It is the credit of the
-   unmerged `CkDeviceChannel` (Appendix A.1), built from the objects of this design.
+   producer may run ahead of its consumer, as in a stream of MoE tokens). It is the credit of
+   `CkChannel` (#4312; Appendix A.1), built from the objects of this design.
    - Setup: the consumer gives the producer a target for its region, as for any *put*. The producer creates
      a credit counter with N = 1 and gives the consumer a target with that counter and no region.
    - When the consumer has finished with a round's data, it *re-arms* its own counter and calls
@@ -827,18 +840,22 @@ across hosts, only when an application needs them.
 - nocopydevice: same process D2D copy; same host D2D through a staging comm buffer only with `+gpushm`
   (two copies, two events; measured 13-46% slower than RDMA get at 2-16 KB, #3960), otherwise silently
   through the NIC; other hosts GPUDirect RDMA get. Completion through hapi event polling or an ack.
-- CkDevicePersistent (#4228): same process D2D; same host CUDA/HIP IPC handle opened once, copy straight
-  into the mapped buffer, no staging; other hosts a get, and a put is emulated as a message plus a
-  destination-issued get plus an ack, because local completion of a put does not make the data visible
-  at the destination (charm_best_practices.md:2968-2985). RDMA paths block the PE in
-  `hapiStreamSynchronize` (#4232).
+- `CkChannel` (#4312, which removed `CkDevicePersistent`): one fixed device buffer per channel, one
+  sender, and a release credit. Same process: a D2D copy on the sender's stream, a PE's copies on one
+  stream within one entry method batched into one copy operation. Same host: a copy through a CUDA/HIP
+  IPC mapping opened once per process, with credits and arrival notes in shared memory. Other hosts, or
+  where the IPC handle does not open: the sender announces the *put* and the receiver reads it with RDMA.
+  Migration of either side needs no new exchange (10.3). The *put* waits for the producing stream without
+  blocking the PE.
+- HAPI reports completions per stream (#4315): a callback runs once its own stream's work completes, and
+  a completion is detected by a pinned flag (the default on CUDA) or an event query (the default on
+  HIP).
 - No remote-completion signal anywhere on recharm; no GPUDirect flush anywhere; LCI forces zero-copy for
   device memory registrations and turns a put with remote completion into `post_putImm`
   (communicate.cpp:171-176, 488-505), untested on device memory over ibv. On cxi, LCI has no hardware
   put-with-immediate and emulates it as the write plus a zero-length message (next item).
-- Unmerged: Aditya's `CkDeviceChannel` (charm branch rate-aware-gpu-lb; Appendix A).
-  - It is a device put-and-notify with one fixed buffer per channel, a release credit, and migration handled by the runtime.
-  - Against `nocopydevice` it is 3-10 us faster per message (27.1 to 17.5 us one way between two processes on one A40 node).
+- The channels as first built on charm branch rate-aware-gpu-lb (Appendix A):
+  - Against `nocopydevice` they were 3-10 us faster per message (27.1 to 17.5 us one way between two processes on one A40 node).
     jacobi3d at 128 KB faces is 38% faster per iteration (1162 to 704-720 us, 8 A40s); the gain is 1-5% at 512 KB and 2 MB, and nothing in leanmd.
   - The measured gain is the removed per-message host work: descriptor, lookup, landing decision, ack. It is not bandwidth.
 
@@ -853,8 +870,8 @@ The counter is always the host word of section 5; the action always runs on the 
 | other host, GPUDirect available | RDMA write with immediate data from device memory to device memory | in the remote-completion handler: (c) |
 | other host, no GPUDirect | device to pinned host staging, host *put* with signal into a pinned staging slot at the owner, host to device copy issued by the owner PE (W7), *decrement* after that copy's event | (c), deferred to the event |
 
-The source side never blocks: the *put* waits for the producer's stream through an event that the
-poller checks (the fix #4232 proposes for CkDevicePersistent).
+The source side never blocks: the *put* waits for the producer's stream through a completion that the
+poller checks, as `CkChannel` does (#4312).
 
 Three rules from Aditya's channel measurements (Appendix A.4.1, A.4.2, A.4.6):
 
@@ -865,9 +882,15 @@ Three rules from Aditya's channel measurements (Appendix A.4.1, A.4.2, A.4.6):
   3. the *decrement* happens at the get's local completion on the owner's side.
 
   The write into device memory measured 10.9 GB/s (3.7 GB/s per direction with both hosts writing) against
-  16.1 and 12.5 GB/s for a read on A100 nodes over Slingshot; Frontier runs every verb at 24 GB/s. The choice
-  comes from a startup probe or a machine table. The API does not change. With announce-then-read the source
-  stays in use until the owner's get completes, so the local counter *fires* later.
+  16.1 and 12.5 GB/s for a read on A100 nodes over Slingshot; Frontier runs every verb at 24 GB/s. On Delta's
+  A40 nodes, through the whole channel path with both hosts sending, the owner's read reached 14.2 GB/s
+  between hosts against 4.9 GB/s for the write with a signal; within a host both reached 24.1 GB/s (#4312).
+  Both paths are kept. Where reads and writes have the same bandwidth (Frontier), the origin writes with a
+  signal. Where reads are faster (Delta's A100 and A40 nodes), the owner reads above the size the startup
+  probe measures. The choice comes from that probe or a machine table, and the API does not change.
+  `CkChannel` reads across hosts at every size, which suits Delta; the write with a signal comes with phase 6.
+  With announce-then-read the source stays in use until the owner's get completes, so the local counter
+  *fires* later.
 - **Announce-then-read costs messages both ways.** A read's completion is reported only to the reader,
   the owner; the origin learns that its source may be reused only from a release the owner sends
   back. So a *put* carried out this way is an announce, a read and a release, not G1's one *put* and one
@@ -886,8 +909,10 @@ Three rules from Aditya's channel measurements (Appendix A.4.1, A.4.2, A.4.6):
   - **First, find out why the write is slow.** 3.7 GB/s for GPUDirect writes is far below the link rate,
     while reads into the same memory reach 12.5. A gap like that can come from the node's PCIe
     configuration (for example, whether the GPU accepts the NIC's writes with relaxed ordering), not from
-    the hardware. If configuring the nodes fixes the write, announce-then-read is not needed on them. This
-    is checked in phase 6, before announce-then-read is built.
+    the hardware. On the A40 nodes, relaxed ordering is off in the NVIDIA driver
+    (`EnablePCIERelaxedOrderingMode` 0) and in the cxi driver's settings (`acxt_*_ro` all N); whether the
+    NIC's writes use it is not known. If configuring the nodes fixes the write, announce-then-read is not
+    needed on them. This is checked in phase 6.
 - **On cxi a put with signal is two network operations, unless native `fi_writedata` is enabled (5.4).** LCI emulates it as the write, then after the
   write's local completion a zero-length message carrying the 16-bit signal. Whether the data is visible
   when that message's handler *decrements* depends on the conditions of 5.4, which are not yet established.
@@ -1017,47 +1042,85 @@ Two rules from Aditya's channels (Appendix A.4.4, A.4.8):
 - **No message order.** No step of setup or teardown may rely on two messages arriving in order. His
   migration protocol had six such holes, and each one hung leanmd.
 - **Urgent queue.** Setup, teardown, registration, detach request and detach notice messages go through reconverse's urgent
-  queue (`CmiSyncSendAndFreeUrgent`). In leanmd, ordinary messages waited 50-400 ms per hop behind deep
-  scheduler queues.
+  queue (`CmiSyncSendAndFreeUrgent`, reconverse#339), and so do the migration messages of 10.3. In leanmd,
+  ordinary messages waited 50-400 ms per hop behind deep scheduler queues. The urgent queue helps only a
+  Converse message with its own handler: a message for an entry method, taken from the urgent queue, is
+  still queued behind the entry methods already waiting on its PE.
 
 ### 10.3 Migration and other events that invalidate targets
 
-Any migration is accompanied by teardown and setup of persistent communication, and that is the user's
-responsibility; automation is a later question (10.4). There is a real tension between migration at any
-time and persistent communication, and the manual says so (10.5). There are three cases.
+The runtime holds the *puts* to an owner that migrates, with the protocol of the device channels
+(`CkChannel`, #4312; Appendix A.4.9), so a migration needs no teardown or setup by the application (W4).
+The protocol was built for one origin per channel with a release credit. A region has no credit (W1) and
+a counter may have many origins, so three parts of it change for the family: what the acknowledgement
+carries (step 2), how messages reach the owner (step 5), and which processes are closed (step 1).
 
-1. **Migration at a collective point.**
-   - Where: AtSync, plus the rebuild points where the application knows no *put* is in flight. Partners
-     also change at AMR (Enzo-E at every adapt phase, SpECTRE, Quinoa's `resizePostAMR`) and at ChaNGa's
-     domain decomposition.
-   - Procedure: the object tears down before it moves, which *detaches* its origins (10.2), sets up after
-     it arrives, and sends new targets. Its origins *attach* again at their first *put* through a new
-     target.
-   - Cost: each migrated owner costs each attached process a detach request, a detach notice and a new
-     registration, about three messages per attached process plus the target delivery, done in parallel
-     across neighbors.
-   - Break-even: if a round saves s per contribution and a rebuild costs S per neighbor pair, the
-     persistent family pays when objects stay in place for more than S/s rounds. For s, Aditya measured
-     3-10 us for device puts against `nocopydevice`. S is to be measured in phase 4; tens of microseconds
-     are expected.
-2. **Migration at any time.**
-   - Where: `migrateMe` (Enzo-E uses it), balancers without AtSync (Aditya's `+LBAsync`), Quinoa's
-     non-blocking load-balancing mode, evacuation.
-   - It is incompatible with owning a region: a *put* through a stale target corrupts memory silently.
-   - **Proposed guard (open question 5).** An object cannot migrate while it owns a live region, or a
-     counter that some target names, or a local counter with *puts* still in flight. The attempt aborts
-     in all builds, with a message naming the region or counter. A local counter with nothing pending
-     moves with the object: its value and action are PUP'd.
-   - A migrating origin that owns nothing only has to wait for its own *puts* to complete. It carries its
-     targets and *attaches* again at its first *put* after it arrives. Its old process stays attached
-     until the owner destroys the region.
-   - The alternative, deferred, is a runtime hold on *puts* to a moving owner. The candidate is the
-     resolve/closing/epoch protocol of the unmerged device channels (Appendix A.4.4, A.4.9), whose
-     message-ordering holes have been found and fixed. It is kept for this purpose (section 13). Aditya's
-     branch device-channel (2026-11-21) implements it on recharm for one origin per channel, with the
-     *puts* made during a move staged and read at the new home.
+**The protocol.**
+
+1. **Closing.** Before an owner object leaves, its process sends a closing for each region it owns to
+   every process on that region's attachment list (10.1), not only to one origin. Each of those processes
+   may hold *puts* from several origin objects.
+2. **Acknowledgement.** Each closed process acknowledges once none of its *puts* into the region, and none
+   of its *gets* from it, is in flight. The acknowledgement carries the number of *puts* the process has
+   sent into the region since it *attached*. `CkChannel`'s acknowledgement names the sender's last *put*
+   by its sequence number instead, which works only because the credit allows one *put* in flight per
+   channel.
+3. **The move.** The owner keeps a count of the *puts* that have landed in each region, and moves once
+   every attached process has acknowledged and that count has reached the sum of the acknowledged counts.
+   Data that landed in a round that has not *fired* yet is in the region's memory, and the counter's
+   value and action travel with the object's PUP. `CkChannel::unseenBytes()` tells the owner's PUP how
+   much of the buffer such data occupies, so the PUP can carry only that.
+4. **Puts during the move.** A *put* made in a closed process does not go to the old home. The origin's
+   process copies the source into a staging buffer on the producing stream, releases the source once that
+   copy has read it, and announces the staged *put* to the owner object at once. The location manager
+   holds the announcement until the owner arrives, and the owner reads the staged *puts* at its new home,
+   in order (announce-then-read, 8.2), before later *puts* go to it directly. The origin object does not
+   move until its staged *puts* have been read.
+5. **Reaching the new home.** A target names its owner by process rank and counter index, which a move
+   makes stale. So the attachment also records the owner's object id, and the messages that must find
+   the owner (the *attach* and the staged announcements) are sent to that object through the location
+   manager. In `CkChannel` they go to the element's entry method `ckDeviceChannelControl`; the closing,
+   its acknowledgement, the resolution, the credit and the read's completion are Converse messages to a
+   known PE.
+6. **At the new home.** The owner's PUP registers each region again on its new memory (as
+   `CkChannel::reopen(new_dst)` does), and each origin's next *put* or *attach* finds it there.
+
+No step may depend on the order in which two messages arrive (Appendix A.4.4); `CkChannel` numbers its
+closings and resolutions with epochs and generations for this. The messages go through the urgent queue
+(10.2, Appendix A.4.8). In #4312 they use ordinary sends, because charm's reconverse pin does not yet
+include reconverse#339. The *attach* and the staged announcements reach an entry method, so they would
+still wait behind the queued entry methods (open question 14).
+
+**An origin that migrates** does not move while one of its *puts* is in flight, as in `CkChannel`. It
+carries its targets and *attaches* again at its first *put* after it arrives. Its old process stays
+attached until the owner destroys the region (open question 13). A local counter moves with the object:
+its value and action are PUP'd, and since no *put* is in flight, none of its contributions is pending.
+
+**Cost.**
+- *With nothing moving.* `CkChannel`'s *put* tests the channel's state twice, raises and lowers the
+  sending object's hold count, and records a sequence number: tens of nanoseconds against a *put* of
+  1-3 us. leanmd 16x8x8 without load balancing ran 2571.6 ms per step with channels against 2587.5 with
+  zero copy (one pair of runs, 2026-10-20; to be repeated, section 14).
+- *Per move.* A closing and an acknowledgement per attached process, and an *attach* at each origin's
+  next *put*: about three messages per attached process, done in parallel across neighbors, plus a copy
+  and a read for each *put* staged during the move. A teardown and setup by hand cost about the same.
+- *Break-even.* If a round saves s per contribution and a move costs S per attached process, the
+  persistent family pays when objects stay in place for more than S/s rounds. For s, Aditya measured
+  3-10 us for device *puts* against `nocopydevice`. S is measured in phase 4; `CkChannel` with
+  `CHARM_CHANNEL_STATS` already reports how long moves were held.
+
+**The cases.**
+
+1. **Migration at a collective point** (AtSync) and 2. **migration at any time** (`migrateMe`, which
+   Enzo-E uses; balancers without AtSync, such as Aditya's `+LBAsync`; Quinoa's non-blocking
+   load-balancing mode; evacuation) both use the protocol above. There is no guard: an object may migrate
+   while it owns live regions and counters.
+   - **A change of partners is not a migration.** At AMR (Enzo-E at every adapt phase, SpECTRE, Quinoa's
+     `resizePostAMR`) and at ChaNGa's domain decomposition, the application destroys the regions and
+     counters it no longer needs (10.2), creates new ones and sends new targets. The batch *attach* (10.1)
+     keeps that to one message per owner process.
 3. **Events that invalidate every target**, i.e. disk checkpoint followed by restart.
-   - The per-object release protocol cannot run after a restart.
+   - The protocol cannot run after a restart.
    - The user tears down before checkpointing. Whether a restart on the same number of nodes could
      keep targets is deferred.
    - Option for later: write targets into the checkpoint as an "invalid" marker. A program
@@ -1065,39 +1128,34 @@ time and persistent communication, and the manual says so (10.5). There are thre
      *put* through an invalid target aborts.
 
 Two further items:
-- **Shrink and expand.** A new implementation (Aditya's, expected in about two weeks) readjusts runtime
-  structures in memory without checkpoint and restart. What regions need depends on whether process
-  ranks are renumbered (open question 6):
-  - targets name the owner by process rank and counter index;
-  - if surviving processes keep their ranks, only moved objects rebuild; otherwise every object does;
+- **Shrink and expand.** A new implementation (Aditya's) readjusts runtime structures in memory without
+  checkpoint and restart. What regions need depends on whether process ranks are renumbered (open
+  question 6):
+  - targets and attachments name the owner's process by rank;
+  - if surviving processes keep their ranks, the objects that move are migrations, which the protocol
+    covers; otherwise every target must be made again;
   - on expand, new processes and their host peers must map each other's IPC segments before same-host
     *puts* work.
-- **One hook for all cases** (proposed). Each object has a generation number that increases whenever
-  its targets become invalid. The runtime tells the application which objects are affected: the
-  migrated ones after migration, all of them after a restart or a shrink or expand. The application then
+- **One hook for the remaining cases** (proposed). Each object has a generation number that increases
+  whenever its targets become invalid. The runtime tells the application which objects are affected:
+  all of them after a restart, or after a shrink or expand that renumbers processes. The application then
   re-runs setup for those objects.
 
 ### 10.4 Automation, later
 
-What can be automated:
-- owner-side destroy and re-create through PUP of `CkRegion` and `CkCounter`. This is clean only for
-  runtime-allocated memory; user memory must be re-bound;
-- delivery of the new targets to the attached processes.
-
-What cannot:
-- knowing that no *puts* are in flight;
-- pausing origins. The balancer's resume would have to wait until the re-attachments are acknowledged.
-
-The first version is therefore user-managed plus the guards. A helper comes after one or two
-applications have done it by hand. Aditya's runtime-managed channels needed six ordering fixes, which
-argues for this order.
+The runtime handles migration (10.3). What is left to the application:
+- a change of partners: destroy, create and send new targets. A helper comes after one or two
+  applications have done it by hand;
+- restart (10.3, case 3). Re-creating regions and counters through PUP of `CkRegion` and `CkCounter` is
+  clean only for runtime-allocated memory; user memory must be bound again.
 
 ### 10.5 Advice for the manual
 
-"Use the persistent family when objects stay in place for many rounds between collective
-load-balancing points. Use message sends for objects that migrate at arbitrary times, or when most
-objects move at every load-balancing step. Readiness is your responsibility: follow one of the patterns
-in 4.9."
+"Use the persistent family when an object exchanges data with the same partners for many rounds.
+Migration needs nothing from you: the runtime holds *puts* to an object while it moves, at load balancing
+or at any other time. A move costs a few messages per partner process, so objects that move at nearly
+every step gain less. When partners change, as after mesh refinement, destroy the old regions and send
+new targets. Readiness is your responsibility: follow one of the patterns in 4.9."
 
 ## 11. Error checking
 
@@ -1106,8 +1164,7 @@ in checking builds and print an error that tells the user to use a message send 
 
 Production builds check only what is free:
 - a *put* beyond a piece's capacity returns an error (the origin knows the capacity from the target);
-- a *put* through a target marked invalid (10.3, case 3) aborts;
-- the migration guard (10.3, case 2), if adopted.
+- a *put* through a target marked invalid (10.3, case 3) aborts.
 
 Error-checking builds add the following:
 - **Count check.** Abort when a *decrement* finds `old < k` (4.2). It catches a *put* that arrives after its
@@ -1118,7 +1175,7 @@ Error-checking builds add the following:
     the generation and the round number.
   - It catches two errors: a *put* from a later iteration counted in place of a missing one from the
     current iteration (the count stays positive, so the count check misses it), and *puts* through stale
-    targets after teardown or migration (by the generation).
+    targets after teardown (by the generation). A migration does not make targets stale (10.3).
   - One message per contribution is acceptable only in these builds; the signal itself has no room for
     the generation.
 - **Not caught by either check:** a *put* that lands after an automatic *re-arm* while the owner still uses
@@ -1354,17 +1411,17 @@ or are removed; as they stand they do not compile.
 | `nocopy`, `nocopydevice` | unchanged (the Send API, 12.1). The users in charm: AMPI sends every contiguous message of 100 KiB or more (`AMPI_RDMA_THRESHOLD_DEFAULT`, ampiimpl.h) through `genericRdma(nocopy ...)` (ampi.ci:56, ampi.C:3459-3461), so every AMPI program with large messages uses it; the device half of a migration uses `nocopydevice` (cklocation.ci:25). None of the surveyed applications (section 17) uses either. |
 | `nocopypost` | kept, for receivers that can choose a buffer only after seeing the message, or that can take the data only later (the buffer is in use, or memory is short). Since #4285 (merged 2026-11-18) the runtime registers the posted buffer for each message and releases it after, so `deregMode` has no effect there; one registration kept across messages is a region. Tickets are proposed below. |
 | direct API (`CkNcpyBuffer` get/put) | region + `CkPut`/`CkGet` with N = 1 counters; kept as a thin compatibility layer |
-| `CkDevicePersistent` | device region + `CkPut` + N = 1 counter; its IPC handle code moves into *attach* |
+| `CkDevicePersistent` | removed by #4312, with no compatibility layer; `CkChannel` replaces it, and CkDyn's persistent device buffers run on the channels' transport |
 | reconverse persistent | removed; NAMD moves to the persistent family (12.3) |
 | CkDirect (removed 2018) | region + `CkPut` + N = 1 counter |
 | `+ipc`, `+gpushm` | transport choices made by the runtime; options stay for tuning |
-| `CkDeviceChannel` (unmerged; branches rate-aware-gpu-lb and device-channel) | not added as a separate API; see below |
+| `CkChannel` (#4312, device memory) | kept; rebuilt on a region, a counter and a release credit in phase 4, with no change for its users; see below |
 
 G5 holds only after phase 8. Until then the API surface grows: the persistent family is added,
-while `nocopypost`, the direct API and `CkDevicePersistent` remain. The intended deprecation order is:
+while `nocopypost` and the direct API remain. The intended deprecation order is:
 1. the reconverse persistent API, removed once NAMD moves (phase 8);
-2. the direct API and `CkDevicePersistent`, deprecated once their compatibility layers over regions
-   pass their tests, and removed a release later.
+2. the direct API, deprecated once its compatibility layer over regions passes its tests, and removed a
+   release later.
 
 **The Post API's tags.** The post entry method names an incoming array with `CkMatchBuffer(post, i,
 tag)`, and the receiver supplies the buffer with `CkPostBuffer(buf, size, tag)`, then or later, from
@@ -1386,26 +1443,27 @@ buffer stays in use, and its completion callback waits too.
   Error-checking builds record which chare matched or posted each tag, and abort on a pairing across
   chares.
 
-**The device channels** (Appendix A) are not added as a second API with a transport of their own. A
-channel is a region with one piece plus a counter with N = 1, and its measured gains come from removing
-per-message host work, which the persistent family removes as well. Two APIs for device put and notify
-would undo G5. What is kept:
-- **A convenience class**, `CkChannel`, of about a hundred lines over a region, a counter and a release
-  credit (4.9, pattern 3). The examples on that branch (leanmd, jacobi3d, sph3d, moe) can port with
-  little change.
+**The device channels** (Appendix A) merged first, as `CkChannel` (#4312, 2026-11-25), with this
+design's names: `CkChannel`, `CkPut` with `CkPutOpts`, `CkMem`, `attach()` and `destroy(cb)`. They have a
+transport of their own for now. A channel is a region with one piece plus a counter with N = 1 and a
+release credit, and its measured gains come from removing per-message host work, which the persistent
+family removes as well. Two transports for device put and notify would undo G5, so phase 4 rebuilds
+`CkChannel` on a region, a counter and a release credit, with no change for its users. What carries over:
+- **The class itself**, as the convenience form of readiness pattern 3 (4.9). The examples (chantest,
+  jacobi3d `-k`, the channel benchmark) keep working.
 - **The release credit**, as readiness pattern 3 (4.9).
-- **The runtime-managed migration protocol**, as the candidate runtime hold for owners that move at any
-  time (10.3, case 2; open question 5).
+- **The migration protocol**, which becomes the family's for every owner that moves (10.3).
 - **Its mechanisms**, already part of this design:
   - the cross-host verb chosen per machine (8.2);
   - same-host device *puts* batched with one completion flag (8.2);
   - control messages through the urgent queue (10.2);
   - same-host credits through shared memory (5.3, case b);
   - load-balancer edges keyed by the owner's manager (4.10);
-  - the hardware-queue preset (Appendix A.4.10).
+  - the hardware-queue preset (Appendix A.4.10);
+  - its IPC mapping table, which becomes *attach* for device regions;
+  - its read path, which becomes announce-then-read (8.2).
 
-Aditya's branch device-channel (2026-11-21) carries the channels to recharm as `CkDeviceChannel` and
-removes `CkDevicePersistent`. How it becomes `CkChannel` is being worked out with him.
+The rebuild is ours to write and Aditya's to review.
 
 ## 14. Tests and measurements
 
@@ -1422,6 +1480,13 @@ Reconverse tests (CTest, 1 and 2 processes, `+ipc` on and off):
   (4.8).
 - `region_strided`: the three face kinds of 7.1 in every locality.
 - device variants of the first two on Delta.
+
+Migration (10.3), in Charm++, extending chantest's `-l` and `-a` modes:
+- several origins in several processes *putting* to one owner while it moves, with staged *puts*, and
+  every byte checked;
+- an owner that moves while a round is partly filled, so that the counter's value travels with it;
+- the cost with nothing moving: leanmd 16x8x8 without load balancing, channels against zero copy,
+  repeated in several interleaved pairs (one pair so far, 10.3).
 
 commbench additions (patterns, with JSON output as today):
 
@@ -1456,11 +1521,14 @@ Each phase is a PR with tests; measurements gate the next phase.
    Delta and Frontier. The mixed-locality test.
 4. **charm: `CkRegion`, `CkCounter`, targets, `CkPut`, `CkGet`, implicit *attach*, `destroy`**, PUP of handles, SDAG use, QD (4.8),
    LB records (4.10), tests in TEST_DIRS; commbench `halo3d` (contiguous faces) and `transpose`; the
-   rebuild cost S of 10.3, including the batch *attach* and the detach requests.
+   migration protocol of 10.3 for regions and counters, and the cost S of a move; `CkChannel` rebuilt
+   on these objects (13). The channel's control messages become urgent sends once charm's reconverse pin
+   includes reconverse#339.
 5. **strided layouts** (both sides), staging slots, scatter on the owner PE, per-block *puts*; commbench
    `halo3d` with all faces. Gated on `halo3d` beating messages with the raised eager limit (7.3).
 6. **device memory** after the three checks of 8.5, and after finding out whether the slow GPUDirect
-   write on A100 nodes is a node configuration problem (8.2).
+   write on A100 and A40 nodes is a node configuration problem (8.2). `CkChannel`'s device paths become
+   the family's (13), and the cross-host write with a signal is added beside its read.
 7. **messages:** eager default change (after the many-to-one and rate tests); per-pair rings only if a
    gap remains (12.2).
 8. **NAMD's PME on the persistent family, then remove the reconverse persistent API;** compatibility
@@ -1473,13 +1541,12 @@ Each phase is a PR with tests; measurements gate the next phase.
 2. The per-block *put* threshold `B_put` (working value 4 KiB, 7.3) is to be measured. Is it a reasonable
    default until then?
 3. The ROCm equivalent of the GPUDirect flush (8.4).
-4. Names inside the persistent family. Settled: region, counter, target, origin, owner, *attach* and *put*
-   (3.1). Open: the owner's teardown call (`destroy(cb)` proposed; `close(cb)` or `free(cb)` are the
-   alternatives), and a C++ namespace (`ck::persistent::Region`) or prefixed names (`CkPersistentRegion`)?
-5. Migration at any time (10.3, case 2). The proposed guard: an object that owns a live region, a counter
-   some target names, or a local counter with *puts* in flight cannot migrate, and the attempt aborts in
-   all builds. Is that acceptable, including under the
-   asynchronous GPU-aware balancer if it is merged? Or should the runtime hold *puts* to a moving owner?
+4. Names inside the persistent family. Settled: region, counter, target, origin, owner, *attach*, *put*,
+   and `destroy(cb)` for the owner's teardown call (3.1, 10.2). `CkChannel`, `CkPut`, `CkPutOpts` and
+   `CkMem` merged with the `Ck` prefix (#4312). Open: should the rest take the prefix too (`CkRegion`,
+   `CkCounter`, `CkTarget`, as this document writes them), or a C++ namespace (`ck::persistent::Region`)?
+5. Migration at any time (10.3, case 2). Settled: the runtime holds *puts* to an owner that moves, at any
+   time, with the protocol of 10.3, and there is no guard.
 6. Shrink and expand (10.3): are process ranks renumbered?
 7. Defer the per-pair ring (12.2) until the eager-limit change has been measured, and build strided
    cross-host *puts* only if commbench `halo3d` shows a gain over messages (7.3)?
@@ -1497,6 +1564,14 @@ Each phase is a PR with tests; measurements gate the next phase.
 13. Charm++ has no detach call (3.3): a process stays attached to a region until its owner destroys it.
     Is that acceptable where origins change while regions live on, as after AMR? Each stale attachment
     keeps a mapping and a registration until then.
+14. Messages that must find a moving owner (10.3, step 5): the *attach* and the staged announcements go
+    to an entry method of the owner so that the location manager can forward them, and the urgent queue
+    does not move an entry method's message ahead of the entry methods already queued (10.2). Three
+    choices: (a) send them as Converse messages to the PE where the location manager last saw the owner,
+    which forwards them if the owner has left; (b) give Charm++ entry-method messages an urgent path;
+    (c) accept one queue's wait, which arises only around a move. Measure first: with reconverse#339 in
+    charm's pin, how long do attaches and staged *puts* wait (`CHARM_CHANNEL_STATS`) in the deep-queue
+    test (chantest `-d 100` and `-d 400`)?
 
 ## 17. Existing applications (G6)
 
@@ -1619,9 +1694,9 @@ Three observations:
 - **Partner sets change at AMR and domain decomposition,** not only at load balancing, so rebuilds must be
   cheap (section 10).
 - **Migration decides adoption, not just static patterns**. Enzo-E uses `migrateMe`, and SpECTRE,
-  Enzo-E and Quinoa change partners at AMR. So the guard of 10.3 and the measured rebuild cost S decide
-  whether these codes can adopt the persistent family. A pattern like NAMD's, with fixed partners, does not
-  test this.
+  Enzo-E and Quinoa change partners at AMR. The protocol of 10.3 lets their objects move at any time; the
+  measured cost S of a move, and the cost of a change of partners, decide whether these codes gain from
+  the persistent family. A pattern like NAMD's, with fixed partners, does not test this.
 
 ## 18. Draft manual section: which call to use when
 
@@ -1644,7 +1719,7 @@ The text below is meant for the Charm++ manual, as a section "Choosing how to co
 | Data that must start and end in your own buffers, repeated with the same partners | today: **Zero Copy Direct API** put or get (`CkNcpyBuffer`), with the handles exchanged once; after phase 4: **a region with a callback** (`CkRegion(buf, bytes, cb)`) for one sender, **a region with pieces and a counter** for several | Against messages plus your own copies, a put is faster from 16 KiB on Delta (1.45x at 16 KiB, 2.31x at 1 MiB, 3.46x at 16 MiB) and from 64 KiB on Anvil (1.33x, 1.69x at 1 MiB, 2.30x at 16 MiB). At 4 KiB and below, plain messages still win (8 B: put 7.4 against 3.8 us on Delta); put with signal (phase 1) removes the acknowledgement behind that. Get and put cost about the same: a get is 2-6% faster on Delta from 4 KiB to 256 KiB, and a put is up to 7% faster on Anvil. |
 | Many senders filling one buffer, with one action when all have arrived (halo faces, FFT transposes) | after phase 4: **one counter with N contributions** (put and decrement); today: messages, counted by hand | One scheduler entry for the whole round instead of one per message, and no copies. Every application surveyed in section 17 counts arrivals by hand today. |
 | GPU buffers, one transfer | **`nocopydevice`** (`CkDeviceBuffer`) | Device-to-device without staging through the host where the hardware allows it. |
-| GPU buffers, repeated with the same partners | today: **`CkDevicePersistent`**; after phase 6: **a device region and a counter** | The handles are opened once. No measurement against `nocopydevice` yet; the unmerged device channels (Appendix A), which add a fixed buffer and a release credit, measured 3-10 us less per message. |
+| GPU buffers, repeated with the same partners | today: **`CkChannel`**, one sender per buffer, with a release credit; after phase 6, for several senders: **a device region and a counter** | The buffer is exported once, and neither side exchanges anything again after a migration. On the branch they came from (Appendix A), the channels measured 3-10 us less per message than `nocopydevice`. |
 
 ### Rules that apply whichever call you use
 
@@ -1672,7 +1747,9 @@ The text below is meant for the Charm++ manual, as a section "Choosing how to co
 
 ### Sources
 
-None of this is merged, and there is no PR for it.
+This appendix describes the branch as read on 2026-11-16. The channels were later rebuilt on recharm and merged
+as `CkChannel` (#4312, 2026-11-25), together with per-stream HAPI completions (#4315) and the urgent queue
+(reconverse#339); sections 8.1 and 13 say what merged.
 
 - **Charm++ branch** `rate-aware-gpu-lb` in charmplusplus/charm.
   - 358 commits by Aditya that are not on `recharm` or `classic`.
@@ -1695,7 +1772,8 @@ None of this is merged, and there is no PR for it.
    - It works across hosts through `CmiIssueRput` / `CmiIssueRget`, with a new opMode `CMK_DEVICE_PERSISTENT_OP`.
    - All 7 arms passed.
    - Charm #4228 (merged 2026-11-12) later did the cross-host part independently on recharm.
-2. **A new object, `CkDeviceChannel`** (src/ck-core/ckrdmadevice.{h,C} on the branch).
+2. **A new object, `CkDeviceChannel`** (src/ck-core/ckrdmadevice.{h,C} on the branch; merged as `CkChannel`,
+   src/ck-core/ckdevicechannel.{h,C}).
    - The receiver owns one fixed destination buffer per channel.
    - The sender calls `put(src, bytes, stream)`.
    - The receiver's entry method gets `{seq, bytes}`, then calls `release()`, which gives the sender a credit for its next put.
@@ -1857,19 +1935,21 @@ Ordinary messages sat behind scheduler queues 50-400 ms deep (448 objects per PE
 migration protocol cost that much: the sender held a put for 305 ms on average, and up to 3.5 s.
 
 Sending closing, ack, resolution and DONE with `CmiSyncSendAndFreeUrgent` fixed this; reconverse serves its urgent
-queue first in every scheduler iteration (488c57e). Our setup, teardown and attach messages should be urgent for the same reason.
+queue first in every scheduler iteration (488c57e on the branch, merged as reconverse#339). Our setup, teardown, attach
+and migration messages should be urgent for the same reason (10.2). In #4312 the channel's control messages are still
+ordinary sends, because charm's reconverse pin does not include reconverse#339 yet.
 
 #### A.4.9 Migration while other objects run
 
-His runtime-managed migration caused most of the bugs and, until fixed, a 1-6% loss in leanmd 16x8x8. Kale's W4
-(tear down and rebuild at AtSync) avoids that protocol. However, the GPU-aware asynchronous balancer on the same
-branch (`+LBAsync`) moves elements while their neighbors keep stepping, with no AtSync.
+His runtime-managed migration caused most of the bugs and, until fixed, a 1-6% loss in leanmd 16x8x8. The design's
+first W4 (tear down and rebuild at AtSync) avoided that protocol. However, the GPU-aware asynchronous balancer on the
+same branch (`+LBAsync`) moves elements while their neighbors keep stepping, with no AtSync, and regions owned by
+those elements need a hold on *puts* that the application cannot provide without runtime help.
 
-If that balancer is merged, regions owned by migrating elements need one of two things:
-- a hold on *puts* to the moving element, which the application cannot provide without runtime help;
-- a version of his resolve/closing protocol.
-
-This is a decision for later, recorded here so the design does not assume AtSync everywhere.
+The family now adopts his protocol, with three changes, for every migration (W4, 10.3). In a program with nothing
+moving it costs tens of nanoseconds per *put*. With *puts* batched (A.4.6), leanmd 16x8x8 without load balancing ran
+2571.6 ms per step with channels against 2587.5 with zero copy (one pair of runs); the earlier gap there came from the
+unbatched copies, not from the protocol. Its ordering holes are fixed in the merged `CkChannel` (#4312).
 
 #### A.4.10 Two smaller items
 
@@ -1889,8 +1969,8 @@ This is a decision for later, recorded here so the design does not assume AtSync
   - Both use a 16-bit tag.
   - The step 1 reconverse PR should be one PR that reconciles the two, made with Aditya. His version reports the
     size; ours lets a caller find out whether the backend supports the signal.
-- **`CkDeviceChannel` is the device case of G1** (put and notify, N = 1), with credit flow control and
-  runtime-managed migration added. The persistent family generalizes it to a counter with N contributions, host
+- **The device channel (`CkChannel` since #4312) is the device case of G1** (put and notify, N = 1), with credit
+  flow control and runtime-managed migration added. The persistent family generalizes it to a counter with N contributions, host
   and device memory, and every locality, and drops the credit by W1. His measurements are the evidence that G1
   pays on devices at small and mid sizes.
 
