@@ -59,6 +59,11 @@ endif
 	$(call run, ./ckpt_restart +p4 +restart log -expect-check ref.chk )
 	$(call run, ./ckpt_restart +p1 +restart log -expect-check ref.chk )
 	-rm -rf log
+	# One checkpoint writer per process: the other PEs write in turn.
+	$(call run, $(CKPT) +p4 -writers 1 -expect-check ref.chk )
+	-sync
+	$(call run, ./ckpt_restart +p4 +restart log -expect-check ref.chk )
+	-rm -rf log
 	# A chain of three restarts, each from the checkpoint the previous one wrote (-c).
 	$(call run, $(CKPT) +p4 +balancer RotateLB -expect-check ref.chk )
 	$(call run, ./ckpt_restart +p4 +restart log -c -expect-check ref.chk )

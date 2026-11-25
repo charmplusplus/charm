@@ -227,7 +227,7 @@ private:
   int index = 0;
   bool inProgress = false;
 
-  const char* dirname;
+  std::string dirname;  // the message holding the parameter is freed after Checkpoint
   CkCallback cb;
   bool requestStatus;
 
@@ -262,7 +262,7 @@ public:
     // If there's another PE to kick off, do so
     if (index < firstPE + nodeSize)
     {
-      CProxy_CkCheckpointMgr(_sysChkptMgr)[index].Checkpoint(dirname, cb, requestStatus);
+      CProxy_CkCheckpointMgr(_sysChkptMgr)[index].Checkpoint(dirname.c_str(), cb, requestStatus);
       index++;
     }
     // If there isn't, then check if all the PEs are finished
