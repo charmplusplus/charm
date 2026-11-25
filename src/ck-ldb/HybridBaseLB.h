@@ -312,8 +312,8 @@ public:
   // Migrated-element callback
   void Migrated(int waitBarrier);
 
-  void ObjMigrated(LDObjData data, LDCommData *cdata, int n, int level);
-  void ObjsMigrated(std::vector<LDObjData>&& data, int m, LDCommData *cdata, int n, int level);
+  void ObjMigrated(LDObjData data, std::vector<LDCommData>&& cdata, int n, int level);
+  void ObjsMigrated(std::vector<LDObjData>&& data, int m, std::vector<LDCommData>&& cdata, int n, int level);
   void VectorDone(int atlevel);
   void MigrationDone(int balancing);  // Call when migration is complete
   void StatsDone(int level);  // Call when LDStats migration is complete

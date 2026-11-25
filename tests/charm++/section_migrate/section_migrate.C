@@ -378,7 +378,6 @@ public:
             }
             if ((size_t)len == expectedIds.size()) foundFullRecord = true;
           }
-          delete[] c.receiver.dest.destObjs.objs;
         }
       }
       int expectedMembers = 0;

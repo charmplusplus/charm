@@ -7,10 +7,10 @@
 # still carries a `test` rule for running it by hand.
 
 DIRS = \
+  chantest \
   jacobi2d \
   jacobi2d-imbalance \
   jacobi3d \
-  persistent \
   sdag \
   verify \
 
