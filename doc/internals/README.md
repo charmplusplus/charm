@@ -38,7 +38,7 @@ entry, and is planned once there is more than one chapter.
 | [Section multicast trees: build, rebuild, retire, free](section-trees.md) | written 2026-11-09 (counted free of a replaced tree, charm #4132 item 2) |
 | Groups and nodegroups | not yet written |
 | Load balancing: the LB framework and TreeLB | not yet written |
-| [Checkpoint, restart, shrink/expand](memckpt.md) | first section written 2026-11-06: the double in-memory checkpoint and its rollback (syncft option); disk checkpoint and shrink/expand not yet written |
+| [Checkpoint, restart, shrink/expand](memckpt.md) | first section written 2026-11-06: the double in-memory checkpoint and its rollback (syncft option); of the disk checkpoint, how it waits for migrations; the rest of the disk checkpoint and shrink/expand not yet written |
 | The reconverse layer: what Charm++ asks of the machine layer | not yet written |
 | [Coroutine entry methods (ckcoro)](coroutine-sdag.md) | written 2026-11-09 with the prototype: entry methods as C++20 coroutines, the inbox, the restart protocol (design in `doc/coroutine-sdag-design.md`) |
 

@@ -376,6 +376,7 @@ public:
     {
       CkPrintf("Charm++> WARNING: Attempted anytime migration is disabled.\n");
     }
+    CkMigrationFinished();
     ckMigrate(toPe);
   }
 

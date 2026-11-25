@@ -493,6 +493,10 @@ void recursive_pup(T *obj, PUP::er &p) {
 
 class CProxy_ArrayBase;
 
+// Counted so that a disk checkpoint waits for migrations in progress.
+void CkMigrationStarted();
+void CkMigrationFinished();
+
 // CBaseX::pup must be an empty override, so that the recursive PUPing
 // doesn't call an implementation multiple times up the inheritance
 // hierarchy, and old-style calls to CBase_foo::pup actually produce
@@ -504,6 +508,7 @@ class CProxy_ArrayBase;
   typedef typename CProxy_Derived::element_t element_t;       \
   template <typename T = proxy_t>                             \
   typename std::enable_if<std::is_base_of<CProxy_ArrayBase, T>::value>::type migrateMe(int toPe) { \
+    CkMigrationStarted();                                     \
     this->thisProxy[this->thisIndex].ckEmigrate(toPe);        \
   }                                                           \
   CProxy_Derived thisProxy;                                   \

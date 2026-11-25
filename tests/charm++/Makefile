@@ -10,6 +10,7 @@ DIRS = \
   provisioning \
   load_balancing \
   ckpt_restart \
+  ckpt_inflight \
   delegation \
   sdag \
   ckAllocSysMsgTest \

@@ -113,6 +113,7 @@ env:
     tests/charm++/ckcoro
     tests/charm++/sparse-coro
     tests/charm++/ckpt_restart
+    tests/charm++/ckpt_inflight
     tests/charm++/arraymap_insert_abort
     tests/charm++/qd
     tests/charm++/within_node_bcast
