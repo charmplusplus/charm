@@ -1,0 +1,54 @@
+mainmodule chantest {
+  readonly CProxy_Main main_proxy;
+  readonly CProxy_Elem elem_proxy;
+  readonly int block_size;
+  readonly int n_iters;
+  readonly bool async_moves;
+  readonly int lb_period;
+  readonly bool qd_steps;
+  readonly int hold_secs;
+  readonly bool two_senders;
+  readonly bool attach_first;
+  readonly bool put_after_destroy;
+  readonly bool copy_sender;
+  readonly int fillers;
+  readonly int fill_us;
+  readonly CProxy_Filler filler_proxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void ready();
+    entry [reductiontarget] void iterDone(int migrated);
+    entry [reductiontarget] void lbDone(int migrated);
+    entry [reductiontarget] void asyncDone(int migrated);
+    entry void stepQuiet();
+    entry void quiet();
+    entry [reductiontarget] void tornDown();
+    entry [reductiontarget] void detached(int sum);
+  };
+
+  array [1D] Elem {
+    entry Elem();
+    entry void setup();
+    entry void takeChannel(CkChannel ch);
+    entry void takeOwnCopy(CkChannel ch);
+    entry void checkStep(int iter);
+    entry void lateRelease();
+    entry void step(int iter);
+    entry void arrived(CkDataMsg* m);
+    entry void doLB();
+    entry void runAsync();
+    entry void sent();
+    entry void teardown();
+    entry void destroyed();
+    entry void checkDetached();
+    entry void putAfterDestroy();
+    entry void putOnOriginal();
+  };
+
+  array [1D] Filler {
+    entry Filler();
+    entry void work();
+    entry void stop();
+  };
+};
