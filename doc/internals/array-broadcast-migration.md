@@ -52,6 +52,18 @@ seen yet, because a broadcast still on its way may be older than a stored one
 up to the newest epoch seen at the previous pass under that rule, so a
 broadcast is kept for one to two minutes after it arrived.
 
+Epochs are 32-bit sequence numbers that wrap around. They are never compared
+with `<`: `ck::bcastEpoch::diff(a, b)` (ckarray.h) gives the signed distance
+from `b` to `a`, and `next` and `later` are built on it. That is right as long
+as the epochs in use at one time (from the store's head to the newest
+broadcast sent) span less than 2^31, which the cleaning above guarantees for
+any realistic broadcast rate. The testing option `+bcastEpochBits N` makes the
+epochs wrap at 2^N, so that a short run crosses the wrap many times
+(`tests/charm++/bcast_epoch_wrap` uses 16); because a minute of broadcasts can
+exceed such a small range, the store then also runs the cleaning pass every
+2^(N-3) broadcasts. A broadcast that arrives more than half the range away
+from the head aborts with "arrived after the broadcast store released it".
+
 A checkpoint saves the head and the newest epoch seen, not the messages
 (`BcastQueue::pup`). On restart the head starts past the newest epoch seen,
 because the epochs below it do not arrive again and a head waiting for one of

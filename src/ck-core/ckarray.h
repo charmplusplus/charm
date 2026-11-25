@@ -944,6 +944,30 @@ typedef CkArray CkArrMgr;
 
 /*@}*/
 
+// Broadcast epochs are sequence numbers that wrap around: they are compared
+// by their difference, which is right while the epochs in use at one time
+// span less than half the range (doc/internals/array-broadcast-migration.md).
+// _ckBcastEpochSpareBits is 0 except under the testing option
+// +bcastEpochBits N, which makes epochs wrap at 2^N.
+extern int _ckBcastEpochSpareBits;
+namespace ck
+{
+namespace bcastEpoch
+{
+// a - b as a signed distance: negative when a is the earlier epoch
+inline int diff(const int a, const int b)
+{
+  const unsigned int d = ((unsigned int)a - (unsigned int)b) << _ckBcastEpochSpareBits;
+  return (int)d >> _ckBcastEpochSpareBits;
+}
+inline int next(const int e)
+{
+  return (int)(((unsigned int)e + 1u) & (~0u >> _ckBcastEpochSpareBits));
+}
+inline int later(const int a, const int b) { return diff(a, b) > 0 ? a : b; }
+}  // namespace bcastEpoch
+}  // namespace ck
+
 /// This arrayListener is in charge of delivering broadcasts to the array.
 class CkArrayBroadcaster : public CkArrayListener
 {
@@ -957,7 +981,7 @@ public:
 
   // When a new array element is inserted, it should only receive future broadcasts, so
   // set the object's epoch to 1 more than the max epoch we've seen so far
-  virtual void ckElementStamp(int* eltInfo) { *eltInfo = storedBcasts.getMaxEpoch() + 1; }
+  virtual void ckElementStamp(int* eltInfo) { *eltInfo = ck::bcastEpoch::next(storedBcasts.getMaxEpoch()); }
 
   /// Element was just created on this processor
   /// Return false if the element migrated away or deleted itself.
@@ -1035,8 +1059,9 @@ private:
     size_t mask = 0x0F;
     int curMaxEpoch = -1;
     int oldMaxEpoch = -1;  // Max epoch at last spring cleaning
+    int sinceCleaning = 0;  // inserts since the last pass (+bcastEpochBits only)
 
-    int getOffset(const int epoch) const { return epoch - headEpoch; }
+    int getOffset(const int epoch) const { return ck::bcastEpoch::diff(epoch, headEpoch); }
     bool inRange(const int epoch) const
     {
       const int offset = getOffset(epoch);
@@ -1092,7 +1117,13 @@ private:
       s.msg = msg;
       s.seen = true;
 
-      curMaxEpoch = std::max(epoch, curMaxEpoch);
+      curMaxEpoch = ck::bcastEpoch::later(epoch, curMaxEpoch);
+
+      // +bcastEpochBits: a minute of broadcasts can exceed the small range, so
+      // also run the cleaning pass every 1/8 of the range
+      if (_ckBcastEpochSpareBits != 0 &&
+          ++sinceCleaning >= (1 << (29 - _ckBcastEpochSpareBits)))
+        springCleaning();
     }
 
     bool hasBcast(const int epoch) const
@@ -1130,7 +1161,7 @@ private:
     // stored one) or still held by a zero-copy transfer
     void releaseBelow(const int epoch)
     {
-      while (headEpoch < epoch)
+      while (ck::bcastEpoch::diff(headEpoch, epoch) < 0)
       {
         Slot& s = slot(headEpoch);  // offset 0: always within storage
         if (!s.seen || s.held)
@@ -1139,7 +1170,7 @@ private:
           delete s.msg;
         s = Slot();
         headIndex = (headIndex + 1) & mask;
-        headEpoch++;
+        headEpoch = ck::bcastEpoch::next(headEpoch);
       }
     }
 
@@ -1147,7 +1178,8 @@ private:
     void springCleaning()
     {
       releaseBelow(oldMaxEpoch);
-      oldMaxEpoch = std::max(oldMaxEpoch, curMaxEpoch);
+      oldMaxEpoch = ck::bcastEpoch::later(oldMaxEpoch, curMaxEpoch);
+      sinceCleaning = 0;
     }
 
     void clear()
@@ -1160,7 +1192,7 @@ private:
       headIndex = 0;
       mask = 0x0F;
       // the epoch count continues: the next broadcast to arrive is curMaxEpoch + 1
-      headEpoch = curMaxEpoch + 1;
+      headEpoch = ck::bcastEpoch::next(curMaxEpoch);
       oldMaxEpoch = curMaxEpoch;
     }
 
@@ -1172,7 +1204,7 @@ private:
       {
         // The messages are not saved, and the epochs below the newest one
         // seen do not arrive again after a restart: start the head past them
-        headEpoch = std::max(headEpoch, curMaxEpoch + 1);
+        headEpoch = ck::bcastEpoch::later(headEpoch, ck::bcastEpoch::next(curMaxEpoch));
         oldMaxEpoch = curMaxEpoch;
       }
     }
@@ -1189,7 +1221,12 @@ private:
   bool bringUpToDate(ArrayElement* el);
 
 public:
-  int incBcastSendEpoch() { return bcastSendEpoch++; }
+  int incBcastSendEpoch()
+  {
+    const int epoch = bcastSendEpoch;
+    bcastSendEpoch = ck::bcastEpoch::next(epoch);
+    return epoch;
+  }
 };
 
 #endif

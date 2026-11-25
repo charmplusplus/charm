@@ -301,6 +301,10 @@ Arrays, reductions, multicast and load balancing:
   waits for an element still reading its zero-copy pup buffers
   after a migration (#4148).
 
+- More than 2^31 broadcasts to one array no longer make the broadcast
+  store keep every later broadcast: the 32-bit broadcast epoch now
+  wraps around safely (#3860).
+
 - Reductions: a reduction no longer hangs when elements migrate in
   after contributing to later rounds on their old PE (#4145, #4151),
   when a PE empties, fills and empties again (#4191, #4192), or when
