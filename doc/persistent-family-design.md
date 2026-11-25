@@ -183,10 +183,10 @@ collective operations; fault tolerance; pointer-based data (it stays with messag
     pool today; CMA is compiled out (conv-rdma.cpp under `CMK_USE_CMA`, never defined for reconverse);
   - zerocopy get/put between two processes on one host goes through LCI RDMA, i.e. the NIC
     (conv-rdma.cpp:403-413);
-  - no backend call yet carries a remote-completion signal on a put (comm_backend.h:72-80); the
-    prototype branch persist-put-signal adds `issueRputSignal` (LCI `post_put_x(...).remote_comp(rcomp)
-    .tag(signal)`: ibv RDMA write with immediate, ofi `fi_writedata`), with a 16-bit signal
-    (`max_imm_tag` 65535).
+  - at 09725a5 no backend call carries a remote-completion signal on a put (comm_backend.h:72-80);
+    phase 1 adds `issueRputSignal` (LCI `post_put_x(...).remote_comp(rcomp).tag(signal)`: ibv RDMA
+    write with immediate, ofi `fi_writedata`, or LCI's emulation, 5.4), with a 16-bit signal
+    (`max_imm_tag` 65535) and one `rcomp` per signal kind and local rank.
 - **W9 machines.** Anvil (HDR100 InfiniBand, LCI ibv; GPU partition A100 with CUDA 11.4, whose missing
   dmabuf API breaks LCI's CUDA backend, anvil.md:810-816), Delta (Slingshot-11 cxi, A100 and A40),
   Frontier (Slingshot-11 cxi, MI250X). The Mac (ofi over TCP) is for development only.
@@ -719,22 +719,41 @@ The contribution that took the word to zero *fires*:
     `fi_writedata` on cxi when `FI_CXI_ENABLE_WRITEDATA=1` and libfabric is 2.5 or later
     (backend_ofi.cpp:75-79, 220-227); then the signal is one operation, as on ibv, untested so far.
     Otherwise LCI emulates the signal as the write, followed,
-    after the write's *local* completion, by a zero-length message carrying the signal. Local completion
+    after the write's completion, by a zero-length message carrying the signal. Local completion
     of a write does not by itself mean the bytes are visible at the target (8.1;
     charm_best_practices.md, "A notification after a one-sided put must take the same channel as the
-    put"). So the *decrement* in that message's handler is correct only if one of these holds:
-    - the write's local completion is delivery-complete (`FI_DELIVERY_COMPLETE`; LCI's emulated write
-      already requests it, backend_ofi_inline.hpp:307, but whether cxi honours it is not established), or
-    - the provider orders the send after the write on the same endpoint (send-after-write ordering,
-      `FI_ORDER_SAW`), and the signal goes on the same LCI device as the write.
+    put"). So the *decrement* in that message's handler is correct only if the write's completion is
+    delivery-complete (`FI_DELIVERY_COMPLETE`), or if the provider orders the send after the write
+    (`FI_ORDER_SAW`) and the signal goes on the same LCI device as the write.
 
-    With `+lci_ndevices 2` (used on Delta) there are several routes. Neither condition has been
-    established. Aditya's checksums on Delta passed, but payload checks alone did not catch the
-    equivalent misrouting on Delta in 2026-09.
-  - Establishing which condition holds on cxi, or making LCI request one of them, is an exit condition of
-    phase 1 (section 15). Until then, phases 2-3 are built and tested on ibv.
-  - On cxi without native `fi_writedata`, G1's "one *put* and one notification" is two network operations, so the Anvil prototype's
-    numbers (FINDINGS.md) do not carry over to cxi. They are measured there in phase 1.
+    Phase 1 established on Delta (libfabric 2.3.1, so the emulation; jobs of 2026-11-25):
+    - cxi does not offer send-after-write ordering (`fi_info` lists no `FI_ORDER_SAW`), so the signal is
+      correct only after delivery completion. LCI's emulated write requests it
+      (backend_ofi_inline.hpp:307), and cxi honours it.
+    - LCI sends a write of up to 64 bytes inline and reports its completion at once, before the data
+      has reached the target, and then sends the signal. A stress test of 20,000 *puts* per pair with
+      `+lci_ndevices 2`, in which each handler checks a sequence number at both ends of the payload,
+      caught signals that arrived before their data, on one node and on two. The 2,000-*put* runs
+      passed, as Aditya's checksums had.
+    - So reconverse asks LCI for network completion (`comp_semantic(network)`) on every emulated put
+      with signal. LCI then does not send the write inline, and sends the signal only after the write's
+      delivery completion, at every size. The same stress tests pass.
+  - On cxi without native `fi_writedata`, G1's "one *put* and one notification" is two network
+    operations. Median one-way latency on Delta, two nodes, Release build:
+
+    | size | put with signal (emulated) | message |
+    |---|---|---|
+    | 8 B | 8.8 us | 3.5 us |
+    | 1 KiB | 9.1 us | 3.9 us |
+    | 8 KiB | 9.6 us | 9.7 us |
+    | 64 KiB | 10.9 us | 11.2 us |
+
+    A message wins by about 5 us up to 1 KiB; from 8 KiB, where the message leaves LCI's eager
+    protocol, the two are level. So a *put* of at most `+put_message_max_bytes` travels as one message
+    that carries its data and its signal, and the owner's handler copies the data into the piece. The
+    default is LCI's eager limit (about 8 KiB) where LCI emulates the signal, and 0 where the network
+    writes with immediate data. On Anvil's ibv the native put with signal was level with a message at
+    8 bytes and faster above (4.75 against 4.62 us at 8 B, 5.67 against 7.82 us at 8 KiB, Debug build).
   - For device memory, see 8.4.
 
 ### 5.5 Signal encoding
@@ -967,9 +986,9 @@ a flush today (survey).
 1. A device-to-device put with immediate data on Delta (cxi, A100) and Frontier (cxi, MI250X); on Anvil
    the CUDA 11.4 dmabuf gap must be checked first.
    - Aditya ran it on Delta A40s over cxi (2026-10-19), using LCI's emulation.
-   - First LCI must stop passing the zero-length signal message to `CmiAlloc(0)`, which returns NULL.
-     He patched this locally; it is not upstream. Our put-with-signal prototype has run only on Anvil's ibv
-     and would hit this on cxi.
+   - LCI passed the zero-length signal message to `CmiAlloc(0)`, which returns NULL. He patched this
+     locally; phase 1 fixes it in reconverse's allocator for LCI (Appendix A.4.3), and its host-memory
+     puts with signal pass on Delta's cxi. Device memory on cxi has not been run with it.
 2. Cost of the flush per *firing*.
 3. CUDA IPC handles on Delta with one GPU visible per task fail (`+gpushm` abort in `hapiInit`,
    #4228's one failing step); *attaching* must fall back to the NIC path, not abort.
@@ -1072,8 +1091,8 @@ the same id-block code would serve them.
      with the one region being destroyed: every contribution to it came through that region. When the
      counter also serves another region still in use, or a target with no region (a signal without
      data), their contributions land in the same count and can make up for a *put* of this region
-     that is still in flight. So the rule for that case: **destroy such a region only after the counter
-     has *fired* the last round that a *put* into the region counted toward.** That round's firing
+     that is still in flight. So the **shared-counter rule**: **destroy such a region only after the
+     counter has *fired* the last round that a *put* into the region counted toward.** That round's firing
      means every contribution to it, this region's among them, has landed.
      - A stencil whose 6 ghost faces are pieces of one allocation (3.3) has one region and is not
        affected; its destroy may be called at any time after step 1.
@@ -1578,7 +1597,7 @@ already does for copies).
 
 Each phase is a PR with tests; measurements gate the next phase.
 
-1. **reconverse: put with signal in the backend.** The network part of branch persist-put-signal:
+1. **reconverse: put with signal in the backend.** The network part of the prototype branch persist-put-signal:
    `issueRputSignal`, the signal handler registry, `isPutSignalCapable`. It is reconciled with Aditya's
    b7b5139 (12.3). Test on Anvil (ibv) and Delta (cxi). Exit conditions:
    - the ordering condition of 5.4 is established for cxi, or LCI is made to request it;
@@ -1589,6 +1608,10 @@ Each phase is a PR with tests; measurements gate the next phase.
    - put-and-notify latency measured on cxi, both emulated (two network operations) and with
      `FI_CXI_ENABLE_WRITEDATA=1` where libfabric is 2.5 or later, before phases 2-3 rely on the Anvil
      numbers.
+
+   Status (2026-11-25): implemented in reconverse#342. On Delta the first three conditions are
+   met, and the emulated latency is measured (5.4). The native `fi_writedata` path could not be measured,
+   since Delta's libfabric is 2.3.1.
 2. **reconverse: counters and contiguous host regions, network and same-process paths.** Counter table,
    *firing*, *re-arm*, error checks, `CmiPut`/`CmiGet`, *attach* without IPC, the destroy accounting of
    10.2. First within a process, then across processes on phase 1's put with signal, or a message that
@@ -1944,8 +1967,11 @@ By default LCI turns `support_putimm` off for cxi. It emulates a put with remote
 followed after its local completion by a zero-length message that carries the immediate data. So on Delta,
 Frontier and Perlmutter-class machines, put with signal costs a message after the write completes, not one operation.
 The LCI that reconverse pins (a8127fa) turns it on when `FI_CXI_ENABLE_WRITEDATA=1` is set and libfabric
-is 2.5 or later (backend_ofi.cpp:75-79, 220-227). The libfabric versions on Delta and Frontier have not
-been checked, and the native path has not been tested.
+is 2.5 or later (backend_ofi.cpp:75-79, 220-227). Delta has libfabric 2.3.1, so it uses the emulation;
+Frontier's version has not been checked, and the native path has not been tested.
+
+The emulation sends a write of up to 64 bytes inline and signals it at once, before the data has landed.
+Phase 1 caught this on Delta and asks LCI for network completion on emulated puts with signal (5.4).
 
 #### A.4.3 A defect on that path affects our step 1 prototype
 
@@ -1955,8 +1981,8 @@ segfaults and handlers run with the wrong index.
 
 Aditya patched LCI on Delta. The patched build is under his home directory there; the branch shows no upstream LCI change.
 
-Our prototype (reconverse 2d674d3, local branch persist-put-signal) has only run on Anvil's InfiniBand, where write with immediate is
-native. On Slingshot it would hit this unless LCI or `CmiAlloc` is fixed first.
+Phase 1 fixes it in reconverse: LCI's allocator returns a shared empty buffer for 0 bytes
+(`AllocatorLCI::allocate`, comm_backend_lci.h). No "CmiAlloc: size <= 0" appeared in its Delta runs.
 
 #### A.4.4 Messages between two PEs are not delivered in order
 
