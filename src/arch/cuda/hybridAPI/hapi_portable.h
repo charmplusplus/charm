@@ -143,6 +143,26 @@ static inline cudaError_t hapiFreeHost(void* ptr) {
 #define hapiSuccess cudaSuccess
 #define hapiError_t cudaError_t
 
+/* Pinned-flag completion (hapi_impl.cpp): a mapped pinned host ring, written
+ * from a stream by a driver-level call (looked up at startup, so libcuda need
+ * not be on the link line), and the device a stream belongs to. */
+#define hapiDrvResult CUresult
+#define hapiDrvStream CUstream
+#define hapiDrvSuccess CUDA_SUCCESS
+#define hapiStreamWriteValueDefault CU_STREAM_WRITE_VALUE_DEFAULT
+#define hapiHostAllocPortable cudaHostAllocPortable
+#define hapiHostAllocMapped cudaHostAllocMapped
+#define hapiHostAlloc(ptr, size, flags) cudaHostAlloc(ptr, size, flags)
+#define hapiHostGetDevicePointer(devPtr, hostPtr, flags) \
+    cudaHostGetDevicePointer(devPtr, hostPtr, flags)
+#define hapiStreamCreateWithFlags cudaStreamCreateWithFlags
+#if CUDART_VERSION >= 12080
+#define HAPI_HAS_STREAM_GET_DEVICE 1
+#define hapiStreamGetDevice(stream, dev) cudaStreamGetDevice(stream, dev)
+#else
+#define HAPI_HAS_STREAM_GET_DEVICE 0
+#endif
+
 #define hapiMemcpyKind cudaMemcpyKind
 #define hapiMemcpyHostToHost cudaMemcpyHostToHost
 #define hapiMemcpyHostToDevice cudaMemcpyHostToDevice
@@ -306,6 +326,22 @@ static inline hipError_t hapiFreeHost(void* ptr) {
 #define hapiMemset(ptr, value, count) hipMemset(ptr, value, count)
 #define hapiMemsetAsync(ptr, value, count, stream) \
     hipMemsetAsync(ptr, value, count, stream)
+
+/* Pinned-flag completion (hapi_impl.cpp): a mapped pinned host ring, written
+ * from a stream by a driver-level call, and the device a stream belongs to.
+ * HIP has the writers as plain runtime calls. */
+#define hapiDrvResult hipError_t
+#define hapiDrvStream hipStream_t
+#define hapiDrvSuccess hipSuccess
+#define hapiStreamWriteValueDefault 0u
+#define hapiHostAllocPortable hipHostMallocPortable
+#define hapiHostAllocMapped hipHostMallocMapped
+#define hapiHostAlloc(ptr, size, flags) hipHostMalloc((void**)(ptr), size, flags)
+#define hapiHostGetDevicePointer(devPtr, hostPtr, flags) \
+    hipHostGetDevicePointer(devPtr, hostPtr, flags)
+#define hapiStreamCreateWithFlags hipStreamCreateWithFlags
+#define HAPI_HAS_STREAM_GET_DEVICE 1
+#define hapiStreamGetDevice(stream, dev) hipStreamGetDevice(stream, dev)
 
 #endif // CMK_HIP
 

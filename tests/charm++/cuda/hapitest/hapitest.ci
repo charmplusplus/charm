@@ -14,12 +14,16 @@ mainmodule hapitest {
     entry void peReport(CkReductionMsg* m);
     entry [reductiontarget] void workDone(long long completions);
     entry void quiesced();
+    entry [reductiontarget] void streamsIndependent();
   };
 
   group PeCheck {
     entry PeCheck();
     entry void createStreams();
     entry void check();
+    entry void independent();
+    entry void otherReported();
+    entry void heldReported();
   };
 
   array [1D] Worker {
