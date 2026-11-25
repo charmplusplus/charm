@@ -19,8 +19,8 @@ group [migratable] HybridBaseLB: BaseLB {
   entry void ReceiveMigration(LBMigrateMsg*);	
   entry void ReceiveVectorMigration(LBVectorMigrateMsg*);	
   entry void TotalObjMigrated(int count, int level);
-  entry void ObjMigrated(LDObjData data, LDCommData cdata[n], int n, int level);
-  entry void ObjsMigrated(std::vector<LDObjData>& data, int m, LDCommData cdata[n], int n, int level);
+  entry void ObjMigrated(LDObjData data, std::vector<LDCommData>& cdata, int n, int level);
+  entry void ObjsMigrated(std::vector<LDObjData>& data, int m, std::vector<LDCommData>& cdata, int n, int level);
   entry void Loadbalancing(int level);	
   entry void NotifyObjectMigrationDone(int);	
   entry void StartCollectInfo(DummyMsg *);
