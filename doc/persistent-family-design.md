@@ -32,6 +32,10 @@ application no longer tears down and sets up for a migration, and the abort guar
 10.3-10.5, 11). The owner's teardown call is `destroy(cb)` (16, question 4). Both cross-host paths are
 kept, with the A40 measurements of #4312 (8.2). Sections 8.1, 13, 15, 17.4, 18 and Appendix A say what
 merged: `CkChannel`, per-stream HAPI completions (#4315) and reconverse's urgent queue (reconverse#339).
+Later the same day, from planning phase 2's code: a destroy also waits until every contribution has
+landed, since a detach notice can overtake the last signal (10.2); the round check is kept within a
+process and deferred across processes, and two cheap checks run in production builds (11); the Converse
+destroy calls take a callback and `CmiAttachTarget` returns a handle per target (3.2).
 
 ## In brief: the calls added, kept and removed
 
@@ -163,19 +167,19 @@ collective operations; fault tolerance; pointer-based data (it stays with messag
   width).
 - **W7 only the counter's bookkeeping runs at network poll time.** Bookkeeping means the *decrement* and,
   when that *decrement* *fires*, the push of the action message onto the owner PE's queue (5.3). Completion handlers run inside `lci::progress_x` while the PE holds that device's trylock, with
-  `g_in_progress_callback` set (comm_backend_lci.cpp:463-478). So a copy at poll time would stop every
+  `g_in_progress_callback` set (comm_backend_lci.cpp:592-611). So a copy at poll time would stop every
   other PE from polling the device, and sends from that context are restricted. Copies and scatters run
   on the owner PE instead, which also puts the data in the owner's cache and NUMA domain.
   The application's action always runs on the owner PE through its scheduler.
-- **W8 reconverse facts** (survey of bbb92e1):
+- **W8 reconverse facts** (survey of bbb92e1; the line numbers rechecked at 09725a5):
   - no comm thread; each PE polls the network from its scheduler loop, and a completion handler runs on
     whichever PE thread of that LCI device won the device trylock, not necessarily the owner
-    (scheduler_registered.cpp:98-113, comm_backend_lci.cpp:328-334, 462-480);
+    (scheduler_registered.cpp:97-119, comm_backend_lci.cpp:399-408, 592-611);
   - `CmiPushPE` onto another PE's queue is safe from any thread (moodycamel MPSC, queue.h:66-70);
   - every process on a host maps every peer's IPC segment (shm or xpmem), at different addresses, so
     links are offsets (doc/internals/shared-memory-ipc.md:10-18); each PE drains its own lock-free
     receive stack `rq[rank]` in the owner's segment once per scheduler iteration (scheduler.cpp:74-80);
-  - xpmem mode exports each process's whole address space (cmixpmem.cpp:87-88) but attaches only the
+  - xpmem mode exports each process's whole address space (cmixpmem.cpp:114) but attaches only the
     pool today; CMA is compiled out (conv-rdma.cpp under `CMK_USE_CMA`, never defined for reconverse);
   - zerocopy get/put between two processes on one host goes through LCI RDMA, i.e. the NIC
     (conv-rdma.cpp:403-413);
@@ -255,8 +259,10 @@ typedef enum { CMI_MEM_HOST, CMI_MEM_DEVICE } CmiMemKind;
 /* Regions */
 CmiRegion  CmiRegionCreate(void *base, size_t bytes, CmiMemKind kind, int devId, int flags);
 void      *CmiRegionAlloc(size_t bytes, CmiMemKind kind, int devId, int flags, CmiRegion *out);
-int        CmiRegionAddPiece(CmiRegion r, size_t offset, size_t bytes, const CmiLayout *layout);
-void       CmiRegionDestroy(CmiRegion r);
+int        CmiRegionAddPiece(CmiRegion r, size_t offset, size_t bytes, const CmiLayout *layout,
+                             int flags);              /* CMI_PIECE_VARSIZE (4.6) */
+void       CmiRegionDestroy(CmiRegion r, CmiDoneFn done, void *arg);
+                     /* done(arg) runs on the owner PE once the memory may be freed (10.2) */
 
 /* Counters */
 CmiCounter CmiCounterCreate(int32_t n, CmiCounterAction action, int flags);
@@ -264,21 +270,23 @@ CmiCounter CmiCounterCreate(int32_t n, CmiCounterAction action, int flags);
                         this counter re-arms itself before its action runs (4.2) */
 void       CmiCounterRearm(CmiCounter c, int32_t n);  /* where the round's data is no longer used */
 int32_t    CmiCounterValue(CmiCounter c);
-void       CmiCounterDestroy(CmiCounter c);
+void       CmiCounterDestroy(CmiCounter c, CmiDoneFn done, void *arg);
 
 /* Targets, made by the owner: one piece of a region and one counter */
 CmiTarget  CmiTargetMake(CmiRegion r, int piece, CmiCounter c);
                      /* a POD of fixed size; piece may be CMI_PIECE_ALL (the whole region);
                         r may be NULL (a counter alone, for CmiSignal),
-                        c may be NULL (puts into this target are not counted) */
+                        c may be NULL (puts into this target are not counted);
+                        r and c have the same owner PE */
 
 /* Origins */
-CmiAttachment CmiAttachTarget(const CmiTarget *t);  /* a counted reference to this process's attachment;
-                                                       registers with the owner once per region per
-                                                       process (10.1) */
+CmiAttachment CmiAttachTarget(const CmiTarget *t);  /* a handle for this target, holding a counted
+                                                       reference to the process's attachment; registers
+                                                       with the owner once per region per process (10.1) */
 void       CmiDetachTarget(CmiAttachment a);        /* the last reference detaches (10.2) */
-int        CmiAttachTargets(const CmiTarget *t, int n, CmiAttachment *out);  /* batch forms: one   */
-void       CmiDetachTargets(CmiAttachment *a, int n);                       /* message per owner */
+int        CmiAttachTargets(const CmiTarget *t, int n, CmiAttachment *out);  /* batch forms: one  */
+void       CmiDetachTargets(CmiAttachment *a, int n);                       /* message per owner
+                                                                               process */
 int        CmiPut(CmiAttachment t, size_t offset,   /* offset within the target's piece */
                   const void *src, size_t bytes, const CmiLayout *srcLayout,
                   CmiCounter local,                     /* may be NULL */
@@ -292,12 +300,23 @@ int        CmiSignal(CmiAttachment t);                /* a contribution with no 
 ```
 
 Converse keeps the attachment explicit, for runtime and library code that manages its own setup. Each
-`CmiAttachTarget` returns a counted reference to the process's attachment, and the last
-`CmiDetachTarget` in the process *detaches* it. Charm++ hides the attachment (3.3).
+`CmiAttachTarget` returns a handle for one target, since `CmiPut` needs that target's piece and counter.
+The handles for the targets of one region in a process share one counted attachment, which registers
+with the owner once, and the last `CmiDetachTarget` in the process *detaches* it. Charm++ hides the
+attachment (3.3). The destroy calls take a callback because a Converse owner, like a Charm++ one,
+may free its memory only after every attached process has *detached* (10.2).
 
-`CmiCounterAction` is one of: a Converse handler index with a preallocated message (the runtime
-allocates it when the counter is created, so *firing* never allocates); a C function and argument run on
-the owner PE from the scheduler; or none (the owner tests `CmiCounterValue`).
+A target pairs a region and a counter of the same owner PE: a signal lands in the process that owns
+the region, and registration and destroy are simpler with one owner.
+
+`CmiCounterAction` is one of: a Converse handler index; a C function and argument run on the owner PE
+from the scheduler; or none (the owner tests `CmiCounterValue`). The runtime allocates one message per
+counter when the counter is created, so *firing* never allocates; that message carries the *firing* to
+the owner PE and never reaches user code. A handler action receives a message allocated on the owner PE
+when the action runs (5.3).
+
+A `CmiSignal` to another process carries no data and so needs no remote key: it is a small active
+message whose handler *decrements* the counter at poll time (5.5).
 
 `CmiRegionAlloc` lets the runtime choose memory that every locality can reach without per-pair work:
 host regions come from the owner's IPC segment when IPC is on (so host peers can write them in shm mode)
@@ -661,6 +680,9 @@ The contribution that took the word to zero *fires*:
   runs inside a *put* call.
 - **The preallocated message never reaches user code.** It is a small Converse message owned by the
   runtime, which carries the counter's index and is queued with the priority of the action's callback.
+  (`CmiPushPE` reaches the owner's first-in-first-out thread queue, not its priority queue, so phase 2
+  queues the action without a priority; whether a priority takes a second hop, as Charm++'s messages
+  take through `_skipCldHandler`, or a priority-aware push is decided in phase 4.)
   Its handler, a runtime function (the counter's handler), runs on the owner PE when the scheduler
   takes the message off the queue: it reads the counter index, *re-arms* the counter if the counter is
   automatic, then runs the action.
@@ -723,8 +745,10 @@ On the network the 16-bit signal is the counter's table index. The remote-comple
 per-PE limit, not a per-process one. Per process it would be tight: 64 PEs with
 over-decomposition and several counters per object. Proposed `rcomp`s: counter *decrement*; strided staging slot
 (section 7.3); per-pair message ring (section 12.2); a *put* without a counter, counted only for QD (4.8). Reconverse registers one `rcomp` today, for active
-messages (comm_backend_lci.cpp:49-53, 273-274). Generation numbers
-do not fit in the signal; section 10 makes reuse of an index safe without them.
+messages (comm_backend_lci.cpp:57-61, 307-309). LCI gives a handler completion no context pointer, so
+the backend keeps one completion object, with its own callback, per owner PE and kind (phase 1). A
+`CmiSignal` with no data is an active message instead (3.2). Generation numbers do not fit in the
+signal; the destroy accounting of 10.2 makes reuse of an index safe without them.
 
 ## 6. Host data paths by locality
 
@@ -1030,12 +1054,25 @@ the same id-block code would serve them.
      detach costs the notice alone; teardown is rare (W2). An object destroyed without `destroy` starts
      the same teardown, with no callback.
 3. `CmiRegionDestroy` and `CmiCounterDestroy` complete when every attached process's balance is zero
-   (10.1), whatever order its registration and detach notice arrived in.
+   (10.1), whatever order its registration and detach notice arrived in, **and every contribution
+   those processes made has landed**.
+   - Balances alone are not enough. *Detaching* waits only for local completion, and the detach notice
+     travels on another channel than the process's last signal (an urgent message, the IPC pool,
+     another LCI device), so it can arrive first. Freeing the index then would let that signal
+     *decrement* the index's next counter, and the program could free the memory under a *put*.
+   - So each detach notice carries, per counter, the number of contributions the process made
+     through targets of the region, and the owner waits until that many have reached the counter.
+     The owner derives the landed count from the counter itself: the sum of N over the rounds armed,
+     minus the word. No contribution pays for it. *Puts* without a counter are counted per region
+     through their QD-kind signal (5.5). This is the accounting of the migration protocol (10.3, steps
+     2-3).
+   - A counter used only in targets of regions has no attachments of its own, so its destroy
+     completes after the destroys of the regions it was paired with.
+
    The runtime then deregisters the memory, frees runtime-allocated memory, and returns the counter
-   index to the free list. Indices are reused least recently freed first, and only after the detach
-   notices. A stray late signal can therefore hit a reused index only if step 1 was broken, which
-   checking builds detect (section 11).
-   In Charm++, `cb` runs after this, and the application may then free its own memory. It must not free
+   index to the free list. Indices are reused least recently freed first. A late signal can then hit a
+   reused index only if step 1 was broken.
+   In Converse, `done(arg)` runs after this. In Charm++, `cb` runs after this, and the application may then free its own memory. It must not free
    it earlier: CUDA leaves freeing an allocation that another process still has mapped undefined.
 
 Two rules from Aditya's channels (Appendix A.4.4, A.4.8):
@@ -1170,23 +1207,30 @@ in checking builds and print an error that tells the user to use a message send 
 
 Production builds check only what is free:
 - a *put* beyond a piece's capacity returns an error (the origin knows the capacity from the target);
-- a *put* through a target marked invalid (10.3, case 3) aborts.
+- a *put* through a target marked invalid (10.3, case 3) aborts;
+- **re-arm legality**: *re-arm* before the round's action has started aborts (4.2). It compares two
+  integers that only the owner touches, and a premature *re-arm* would push the counter's one message
+  while it is still queued, which corrupts the owner's queue;
+- within a process, a *put* through a target whose counter has been destroyed aborts: the generation
+  is on the line the *decrement* writes next.
 
 Error-checking builds add the following:
 - **Count check.** Abort when a *decrement* finds `old < k` (4.2). It catches a *put* that arrives after its
   round *fired* and before the owner *re-armed*.
-- **Round check.**
-  - Each origin numbers its own *puts* per counter.
-  - Each contribution is followed by a small check message to the owner, carrying the counter index,
-    the generation and the round number.
-  - It catches two errors: a *put* from a later iteration counted in place of a missing one from the
-    current iteration (the count stays positive, so the count check misses it), and *puts* through stale
-    targets after teardown (by the generation). A migration does not make targets stale (10.3).
-  - One message per contribution is acceptable only in these builds; the signal itself has no room for
-    the generation.
+- **Round check**, opt-in per counter (`CMI_COUNTER_CHECK_ROUNDS`), within a process.
+  - Each origin numbers its own *puts* per counter and, before it copies, compares the number with the
+    rounds the owner has armed.
+  - It catches a *put* from a later iteration counted in place of a missing one from the current
+    iteration (the count stays positive, so the count check misses it).
+  - Opt-in, because numbering per origin equals the round only if each target is used once per round;
+    an origin that *puts* twice through one target per round, or a round with a smaller N, would abort.
+  - **Across processes it is deferred.** A check message per contribution cannot be made reliable: the
+    check messages and the *puts* are not ordered (A.4.4), and the signal does not name its origin, so
+    the owner cannot tell in which round a *put* was counted. *Puts* through stale targets after
+    teardown are therefore detected within a process (above) but not across processes. A migration
+    does not make targets stale (10.3).
 - **Not caught by either check:** a *put* that lands after an automatic *re-arm* while the owner still uses
   the data. That is why *re-arm* is explicit by default (4.2).
-- **Re-arm legality.** *Re-arm* before the round's action has started aborts (4.2).
 - **Attach checks**, at a target's first use or at `t.attach()`.
   - The source's memory kind matches the declared kind.
   - The layout fits inside the region.
@@ -1194,6 +1238,10 @@ Error-checking builds add the following:
 
 Every abort names the counter, the owner PE and the round. The message reads: "if the application's
 logic cannot guarantee this transfer's readiness, use a message send here".
+
+Reconverse does not see Charm++'s `CMK_ERROR_CHECKING`. Its checks are compiled when `CMI_REGION_CHECKS`
+is set, from a reconverse build option that is on by default when `CMK_OPTIMIZE` is 0; Charm++ sets the
+option from its own error-checking flag (phase 4).
 
 ## 12. Messages: runtime-owned destination
 
@@ -1521,7 +1569,9 @@ Each phase is a PR with tests; measurements gate the next phase.
      `FI_CXI_ENABLE_WRITEDATA=1` where libfabric is 2.5 or later, before phases 2-3 rely on the Anvil
      numbers.
 2. **reconverse: counters and contiguous host regions, network and same-process paths.** Counter table,
-   *firing*, *re-arm*, error checks, `CmiPut`/`CmiGet`, *attach* without IPC.
+   *firing*, *re-arm*, error checks, `CmiPut`/`CmiGet`, *attach* without IPC, the destroy accounting of
+   10.2. First within a process, then across processes on phase 1's put with signal, or a message that
+   carries the data where the network has no put with signal. Variable-size pieces (4.6) come after.
 3. **reconverse: same-host paths.** Counter table in its own shared area (5.1), `CmiRegionAlloc` in the IPC segment, IPC-block
    action messages in the owner's own segment, xpmem *attach* of user regions; xpmem confirmed on Anvil,
    Delta and Frontier. The mixed-locality test.
