@@ -1043,9 +1043,13 @@ Two rules from Aditya's channels (Appendix A.4.4, A.4.8):
   migration protocol had six such holes, and each one hung leanmd.
 - **Urgent queue.** Setup, teardown, registration, detach request and detach notice messages go through reconverse's urgent
   queue (`CmiSyncSendAndFreeUrgent`, reconverse#339), and so do the migration messages of 10.3. In leanmd,
-  ordinary messages waited 50-400 ms per hop behind deep scheduler queues. The urgent queue helps only a
-  Converse message with its own handler: a message for an entry method, taken from the urgent queue, is
-  still queued behind the entry methods already waiting on its PE.
+  ordinary messages waited 50-400 ms per hop behind deep scheduler queues. A message for an entry method
+  avoids that queue only if the entry method is `[expedited]`. An ordinary entry method's message passes
+  through `_skipCldHandler` into `CsdSchedQueue`, behind the entry methods already waiting there, even
+  when it was taken from the urgent queue. An expedited one keeps the entry method's own handler, and
+  reconverse's default scheduler drains its thread queue at every iteration before it takes the next message
+  from `CsdSchedQueue`, so the message waits only for the entry method that is running. The location
+  manager's own messages (`requestLocation`, `updateLocation`, `immigrate`) are expedited for this reason.
 
 ### 10.3 Migration and other events that invalidate targets
 
@@ -1088,8 +1092,10 @@ carries (step 2), how messages reach the owner (step 5), and which processes are
 No step may depend on the order in which two messages arrive (Appendix A.4.4); `CkChannel` numbers its
 closings and resolutions with epochs and generations for this. The messages go through the urgent queue
 (10.2, Appendix A.4.8). In #4312 they use ordinary sends, because charm's reconverse pin does not yet
-include reconverse#339. The *attach* and the staged announcements reach an entry method, so they would
-still wait behind the queued entry methods (open question 14).
+include reconverse#339. The *attach* and the staged announcements go to the element's entry method
+`ckDeviceChannelControl`, which is not `[expedited]` (ckarray.ci), and the channel sends to it through a
+callback with no options, so they wait behind the queued entry methods. Declaring that entry method
+`[expedited]` and sending with `CK_MSG_EXPEDITED` removes the wait (open question 14).
 
 **An origin that migrates** does not move while one of its *puts* is in flight, as in `CkChannel`. It
 carries its targets and *attaches* again at its first *put* after it arrives. Its old process stays
@@ -1565,13 +1571,12 @@ Each phase is a PR with tests; measurements gate the next phase.
     Is that acceptable where origins change while regions live on, as after AMR? Each stale attachment
     keeps a mapping and a registration until then.
 14. Messages that must find a moving owner (10.3, step 5): the *attach* and the staged announcements go
-    to an entry method of the owner so that the location manager can forward them, and the urgent queue
-    does not move an entry method's message ahead of the entry methods already queued (10.2). Three
-    choices: (a) send them as Converse messages to the PE where the location manager last saw the owner,
-    which forwards them if the owner has left; (b) give Charm++ entry-method messages an urgent path;
-    (c) accept one queue's wait, which arises only around a move. Measure first: with reconverse#339 in
-    charm's pin, how long do attaches and staged *puts* wait (`CHARM_CHANNEL_STATS`) in the deep-queue
-    test (chantest `-d 100` and `-d 400`)?
+    to an entry method of the owner so that the location manager can forward them. Proposed: make that
+    entry method `[expedited]` and send with `CK_MSG_EXPEDITED` (10.2), which needs no new mechanism.
+    To check: the envelope does not record the option, so when the location manager forwards such a
+    message to the owner's new PE, does the forwarded hop stay expedited? Measure with the deep-queue
+    test (chantest `-d 100` and `-d 400`, `CHARM_CHANNEL_STATS`): how long attaches and staged *puts*
+    wait, before and after.
 
 ## 17. Existing applications (G6)
 
