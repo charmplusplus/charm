@@ -4379,8 +4379,8 @@ GPU buffers
    For a single transfer, use a ``nocopydevice`` parameter with
    ``CkDeviceBuffer`` (:numref:`sec-gpu`). It moves the data from device to
    device without staging it through host memory where the hardware allows.
-   For transfers repeated between the same partners, use
-   ``CkDevicePersistent`` (:numref:`persistentgpu`), which opens the handles
+   For transfers repeated between the same partners, use a
+   ``CkChannel`` (:numref:`gpuchannels`), which sets up the destination
    once instead of for every transfer.
 
 The following rules apply whichever call you use.
@@ -10087,6 +10087,68 @@ Examples using CUDA and HAPI can be found under
 ``examples/charm++/cuda``. Codes under ``#ifdef USE_WR`` use the
 ``hapiWorkRequest`` scheme, which is now deprecated.
 
+Completion order and detection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A callback given to ``hapiAddCallback`` runs once all the work queued on its
+stream before the call has completed. Callbacks on one stream run in the
+order they were added. Callbacks on different streams run in the order their
+work completes, not in the order they were added: a callback does not wait
+for a long kernel on another stream. Earlier versions ran a PE's callbacks in
+the order they were added, across all its streams.
+
+The runtime detects a completion in one of two ways:
+
+- **an event query**: an event is recorded on the stream, and the scheduler
+  queries it in each pass, one driver call for each stream with work pending;
+- **a pinned flag**: the stream writes a sequence number into pinned host
+  memory, and the scheduler reads it with no driver call. The write adds 5-6
+  microseconds to the completion (NVIDIA A40).
+
+Event queries cost when the PE has other work while completions are pending,
+as in an over-decomposed application: each query in the scheduler's poll
+delays that work. A flag costs when the PE only waits for the completion,
+since its write is then on the critical path. On CUDA the runtime uses flags,
+for the over-decomposed case; on HIP it uses event queries. With
+``+gpuflagpolls N`` it chooses per completion, from how often the PE has been
+polling: a flag while it made fewer than ``N`` polls per completion over its
+last 64 completions (it had other work), an event query otherwise. These
+options change the detection:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Option
+     - Effect
+   * - ``+gpueventquery``
+     - An event query for every completion (the default on HIP).
+   * - ``+gpuflags``
+     - A pinned flag for every completion (the default on CUDA).
+   * - ``+gpuflagpolls N``
+     - Choose per completion: a pinned flag while the PE makes fewer than
+       ``N`` polls per completion, an event query otherwise.
+   * - ``+gpuflagmemset``
+     - Write the flag with a memset (the default on CUDA; on HIP, after an
+       event record).
+   * - ``+gpuflagkernel``
+     - Write the flag with a one-thread kernel that stores it after a
+       system-scope fence (the default on HIP).
+   * - ``+gpustreamwrite``
+     - Write the flag with the driver's stream memory operation. For
+       comparison only: it can deadlock when processes wait on each other's
+       IPC events.
+   * - ``+gpucompletionstats``
+     - Print, per PE at exit, how many completions were detected each way.
+
+When the callback runs, another process or the network may read what the
+stream's work wrote. With an event query the callback runs once CUDA reports
+the work complete. For a CUDA flag written by a memset, CUDA documents only
+stream order: that a reader in another process or on the network then finds
+the work's writes is observed, by Charm++'s device-channel tests, not
+documented. The flag kernel's fence is documented for its own thread's
+writes, and the stream orders the earlier work before the kernel.
+
 Streams: create your own, non-blocking
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -10349,124 +10411,194 @@ corrected (issue #3963) and should not be copied as a model for buffer reuse
 until they are. Follow the rule above instead: pass the callback, or
 double-buffer.
 
-.. _persistentgpu:
+.. _gpuchannels:
 
-Persistent GPU Communication
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+GPU Channels
+~~~~~~~~~~~~
 
-Persistent GPU communication is a feature designed to take advantage of the fact
-that the address and size of the source/destination buffers do not change in
-persistent communication. Such patterns are found in many applications, including
-iterative applications that exchange the same set of buffers between neighbors/peers
-at every iteration. This allows us to reduce the overheads involved with
-with direct GPU messaging, including the nature of the multi-hop mechanism and
-CUDA IPC setup, and directly issue ``cudaMemcpy`` calls at the message send sites
-(for a ``put`` type operation; a ``get`` type operation is also supported).
-
-Setup and communication routines are supported through ``CkDevicePersistent``:
+A channel is a fixed device buffer on a receiving chare (its owner) that one
+sending chare writes into repeatedly, with no per-message setup. It suits the
+exchanges of iterative applications, where the same buffers pass between the
+same partners every iteration: the receiver names its buffer once, and every
+later transfer costs one device copy (or one RDMA read) and one notification,
+without the per-message descriptor, lookup and acknowledgement of a
+``nocopydevice`` send.
 
 .. code-block:: c++
 
-   struct CkDevicePersistent {
-     // Constructors
-     CkDevicePersistent(const void* ptr, size_t size);
-     CkDevicePersistent(const void* ptr, size_t size, const CkCallback& cb);
-     CkDevicePersistent(const void* ptr, size_t size, cudaStream_t stream);
-     CkDevicePersistent(const void* ptr, size_t size, const CkCallback& cb, cudaStream_t stream);
+   class CkChannel {
+    public:
+     // Receiver side, in an entry method of the receiving chare
+     CkChannel(void* dst, size_t capacity, CkMem kind, int device,
+               const CkCallback& arrived);    // kind: CkMem::Device
+     void reopen(void* new_dst);   // in the receiver's pup, after it migrated
+     void destroy(const CkCallback& cb);      // cb: the buffer may be freed
+     const CkChannelEvent* event(CkDataMsg* m);   // in the arrived entry
+     void release();               // the buffer may be overwritten
 
-     void open(); // Takes the IPC handle and records the buffer for RDMA
-     void close(); // Releases what open() set up (see "Ownership" below)
-     void set_msg(void* msg); // Ties a Charm++ message to the stored callback
-     int mode(const CkDevicePersistent& other) const; // How get/put with other moves the bytes
-     void get(CkDevicePersistent& src); // Initiates transfer from the specified source buffer
-     void put(CkDevicePersistent& dst); // Initiates transfer to the specified destination buffer
+     // Sender side
+     void attach();                // optional: attach now, not at the first put
+
+     size_t unseenBytes() const;   // see "Migration" below
+     void pup(PUP::er& p);
    };
 
-``CkDevicePersistent`` objects should be created on both the sender and receiver chares,
-with the respective source and destination buffer addresses and sizes. The optional
-Charm++ callback object will be invoked once the communication using that persistent
-buffer is complete. For instance, if both sender and receiver ``CkDevicePersistent``
-objects have callbacks associated with them, the sender's callback will be invoked
-once the send operation is complete and when the user can reuse/free the associated buffer,
-and the receiver's callback will be invoked once the received data is available.
-Both callbacks are sent from the PE that called ``get`` or ``put``.
-The associated CUDA stream will be used in the ``cudaMemcpyAsync`` calls to asynchronously
-invoke the underlying data transfers, which are tracked to invoke the subsequent callbacks, if any.
+   CkDeviceStatus CkPut(CkChannel& ch, const void* src, size_t bytes,
+                        const CkPutOpts& opts = CkPutOpts());
+   // CkPutOpts().stream(s).done(cb).tag(n): the stream that produces src,
+   // the callback invoked when src may be reused, the tag of the event
 
-``open`` should be called after the creation of the ``CkDevicePersistent`` object, on
-the PE that created it, and before sending it to a communication peer. Once the
-objects are created and ``open`` ed, they should be exchanged between the
-communication peers. After this setup stage, the objects' ``get`` and ``put``
-methods can be invoked freely to perform the desired communication. A transfer
-moves ``cnt`` bytes of the source as the object holds it at the time of the call;
-``cnt`` may be lowered between transfers, but not raised above its value at
-``open`` (call ``open`` again for that).
+   struct CkChannelEvent {
+     uint64_t seq;     // the put's sequence number on this channel
+     size_t bytes;     // how many bytes it wrote
+     uint64_t tag;     // the sender's tag (all 64 bits); the message's reference number keeps its low 16
+     ...
+   };
 
-**Transfer modes.** ``get`` and ``put`` choose one of three modes for each pair of
-buffers; ``mode(other)`` returns it (0, 1 or 2), and with ``+gpupersistverbose``
-each process prints one line the first time it uses a mode:
+**Setup.** The receiver constructs a channel on its buffer inside one of its
+entry methods, naming the kind of memory (only ``CkMem::Device`` is
+implemented), the device the buffer is on, and the entry method that learns of
+each put; the constructor exports the buffer. It sends the channel to the
+sender as an entry method parameter. The sender keeps its copy (for example
+``peer = ch;``) and calls ``CkPut`` on it. The first put attaches the sender
+(it looks up the receiver's buffer and how to reach it); ``attach`` does that
+at once instead. A channel has one sender: a second array element that
+attaches while the first one's puts may still follow aborts, naming both
+elements. Give each sender its own channel:
 
-- 0, a device copy (``cudaMemcpyAsync``): both buffers belong to PEs of one process.
-  Neither buffer needs to be opened.
-- 1, CUDA/HIP IPC: the buffers belong to processes on one host, and the peer's IPC
-  handle (taken by ``open``) opens in this process. A process opens a peer
-  buffer's handle once; the mapping is shared by the copies of that buffer on
-  all PEs of the process and reference counted. A copy takes a reference the
-  first time it transfers through the mapping and keeps the mapped address, so
-  later transfers from that copy cost no lookup; ``close`` on the copy releases
-  the reference, and the mapping is closed with the last one. ``close`` on one
-  copy therefore never unmaps a buffer that a copy on another PE is using.
-  ``+gpushm`` is not needed; it concerns the shared communication buffer of
-  other device messages and does not select this mode. ``mode`` opens the
-  handle to answer, so it reports the mode that runs.
-- 2, RDMA on device memory: the buffers belong to different hosts, or the peer's
-  IPC handle does not open in this process (for example when each process sees
-  only its own GPU). **Both** buffers must have been opened, the source as well
-  as the destination. The memory is registered with the network the first time
-  a transfer needs it, and stays registered until the owner's ``close``. A ``put``
-  is carried out as a get issued by the destination's PE, so that the callbacks
-  mean the data has arrived; the first ``get`` from a source asks the source's
-  process for its registration, one round trip. RDMA mode aborts with a message
-  when the network layer moves RDMA data through host memory (the LCW backend,
-  or ``+nordma``), when a buffer is 2 GiB or larger, or when the network layer
-  cannot register the device memory.
+.. code-block:: c++
 
-**Ownership.** The object on which ``open`` was called owns the buffer's setup;
-``close`` on it, or its destructor, releases it, including the network
-registration. Copies never own: copy construction, copy assignment, and sending
-the object (as a marshalled parameter or through ``pup``) all make non-owning
-copies. Moving an object (assigning a temporary, as in
-``buf = CkDevicePersistent(...)``, or a ``std::vector`` reallocating) transfers
-ownership. Assigning over an owner, or calling ``open`` again, releases the old
-setup first. A copy cannot be used for an RDMA transfer once its owner has
-released it, so keep the owner alive (for example as a chare member) while peers
-use the buffer. ``close`` on a received copy of another process's buffer
-releases its reference on this process's IPC mapping of the buffer (the
-mapping is closed with the last reference, after synchronizing the device) and
-the registration it kept; call it when the peer's buffer will no longer be
-used, or before migration, and only once the callbacks of the transfers made
-through the copy have been invoked (the device synchronize when the mapping
-closes covers only the GPU of the PE that closes it). Assigning over a copy
-releases its reference the same way; a copy destroyed without ``close`` keeps
-its reference, so the mapping stays open for the rest of the run. Before the
-owner's program frees the device memory, close the copies of the buffer in
-the other processes on its host: CUDA documents freeing an allocation before
-the other processes close their IPC mappings of it as undefined behavior. An
-owner that is a static or global object is released at process exit without
-deregistering, since the network layer is gone by then; call ``close`` on it
-before ``CkExit`` to deregister. Persistent objects are not migrated and not
-restored from a checkpoint: after a chare migrates, or a run restarts, create,
-open and exchange them again. In RDMA mode an object from a previous run is
-refused, since its id carries a token of the run that opened it. The
-device-copy and IPC modes do not check the id, so they do not detect a stale
-object, whether it is from a previous run or a copy whose owner has released
-the buffer.
+   void Block::setup() {
+     int dev;
+     hapiCheck(hapiGetDevice(&dev));
+     recv_ch = CkChannel(d_recv, bytes, CkMem::Device, dev,
+                         CkCallback(CkIndex_Block::arrived(NULL), thisProxy[thisIndex]));
+     thisProxy[peer].takeChannel(recv_ch);
+   }
+   void Block::takeChannel(CkChannel ch) { send_ch = ch; }
+   // every iteration:
+   CkPut(send_ch, d_send, bytes, CkPutOpts().stream(stream).tag(iter));
 
-Examples using persistent GPU communication can be found in
-``examples/charm++/cuda/gpudirect/persistent``,
-``examples/charm++/cuda/gpudirect/jacobi3d`` (option ``-s``; it opens both its
-send and receive buffers, so it also runs between hosts) and
-``benchmarks/charm++/cuda/gpudirect/latency-persistent``.
+**A put.** ``CkPut`` writes ``bytes`` (at most the capacity) of ``src``, as
+the work queued on the stream given by ``CkPutOpts().stream(s)`` produces
+them, into the receiver's buffer, and never blocks the PE. The callback given
+by ``.done(cb)`` is invoked when ``src`` may be reused. The
+receiver's ``arrived`` entry method is invoked once the bytes are in its
+buffer, with a ``CkDataMsg``; it passes the message to ``event``, which returns
+the put's description, or ``NULL`` for an event the runtime system handled
+itself (the entry method then just deletes the message). The tag given by
+``.tag(n)`` is set as the message's reference number, so an SDAG ``when arrived[iter](CkDataMsg* m)``
+matches puts by iteration. The reference number is ``CMK_REFNUM_TYPE``, 16
+bits unless Charm++ was built with a wider ``REFNUM_TYPE``, and keeps the
+tag's low bits. SDAG cuts the ``when``'s expression to the same type, so a
+``when`` for iteration 65541 matches a put tagged 5: matching stays exact as
+long as the puts that can wait for one ``when`` at once are fewer than 65536
+iterations apart, which one put per channel at a time ensures.
+``event()->tag`` carries all 64 bits:
+
+.. code-block:: c++
+
+   void Block::arrived(CkDataMsg* m) {
+     const CkChannelEvent* e = recv_ch.event(m);
+     delete m;
+     if (e == NULL) return;
+     // ... launch the kernels that read the buffer ...
+   }
+
+**Release and flow control.** The receiver calls ``release`` when the buffer
+may be overwritten. A put issued before the receiver released the previous one
+is held by the runtime system, one deep, and issued when the release arrives; a second put issued
+while one is held aborts. Two puts in flight at once therefore need two
+channels on two buffers (for example one per iteration parity). Calling
+``release`` only after the kernels that read the buffer have *completed*, not
+merely been queued, is the receiver's responsibility: the next put's copy is
+not ordered behind the receiver's streams.
+
+**Transports.** ``CkPut`` chooses per pair of PEs: a device copy on ``stream``
+when both are in one process (the copies a PE issues on one stream within one
+entry method are batched into one copy operation); a device copy through a
+CUDA/HIP IPC mapping when they are in different processes on one host
+(credits and arrival notes then go through shared memory rather than
+messages); and otherwise, between hosts or where the IPC handle does not open,
+the sender announces the put and the receiver reads it with RDMA, which needs
+no credit. Device memory is registered with the network the first time a
+transfer needs it.
+
+**Migration.** Neither side has to exchange the channel again after a
+migration. A receiving element that is chosen to migrate does not move until
+its channels' senders have acknowledged that the channel is closing, which
+each does once none of its puts is in flight; a put made meanwhile is copied to
+a staging buffer and read by the receiver at its new home, in order. A sending
+element does not move while one of its puts is in flight. The receiver's
+``pup`` carries its channel and, on unpack, reopens it on the new buffer; the
+sender's next put finds the receiver again:
+
+.. code-block:: c++
+
+   void Block::pup(PUP::er& p) {
+     // ... pup the receive buffer's contents with the other device state ...
+     p | recv_ch;
+     p | send_ch;
+     if (p.isUnpacking()) recv_ch.reopen(d_recv);
+   }
+
+The receive buffer is application state: a put whose bytes arrived before the
+pack, and whose ``arrived`` event has not been taken yet, is in the buffer the
+element packs. ``unseenBytes()`` says how many bytes of it are such a put, so
+a ``pup`` can carry only what is needed; it is ``SIZE_MAX`` when that is not
+known and the whole buffer must go. Channels work in elements of chare arrays;
+a channel opened in a group or a singleton chare has no element to follow.
+
+RDMA reads abort with a message when the network layer moves RDMA data through
+host memory (the LCW backend, or ``+nordma``), when a buffer is 2 GiB or
+larger, or when the network layer cannot register the device memory.
+
+**Teardown.** The receive buffer may be freed only after the sender has
+stopped writing into it and no longer maps it. ``destroy(cb)`` returns at once
+and starts the teardown: the sender's puts into the buffer complete, the
+sender releases its mapping of the buffer (another process on the same host
+maps it through CUDA/HIP IPC) and tells the receiver, announced puts not yet
+read are dropped, and then the runtime system deregisters the buffer and
+invokes ``cb``. Free the buffer in ``cb``, not before: CUDA leaves freeing an
+allocation that another process still maps undefined. The receiving element
+does not migrate during the teardown. As with every put, the application
+decides when the last put has been made; a put, or an ``attach``, after the
+sender learned of the destroy aborts. Events that arrive after ``destroy``
+reach ``event`` as ``NULL``:
+
+.. code-block:: c++
+
+   void Block::finish() {   // after the last iteration's data was consumed
+     recv_ch.destroy(CkCallback(CkIndex_Block::channelDestroyed(), thisProxy[thisIndex]));
+   }
+   void Block::channelDestroyed() { hapiCheck(hapiFree(d_recv)); /* ... */ }
+
+**Ownership.** The receiver's channel object owns the receive buffer's export
+and registration. Copying a channel object (assignment or copy construction)
+moves the ownership, and the runtime system's bookkeeping, to the copy: the
+usual shape is ``ch = param;`` in an entry method, after which the parameter
+is destroyed. This holds for a sender's copy as it does for the owner: after
+``v.push_back(send_ch)``, put through ``v.back()``. A put, attach, event,
+release, reopen or destroy on the original aborts, saying that the copy holds
+the channel. An owner destroyed without ``destroy`` starts the same teardown,
+with no callback, so nothing says when the buffer may be freed: call
+``destroy``. A channel is not restored from a checkpoint: after a restart,
+construct and exchange it again.
+
+With ``CHARM_DEBUG_CHANNEL`` set, each protocol event prints one line. Without
+it, a PE that handles no channel event for 20 seconds while a channel waits on
+something prints what each waiting channel is waiting for. With
+``CHARM_CHANNEL_STATS`` set, each PE prints at exit how long receivers' moves
+were held for their senders' acknowledgements, how long attaches waited for
+their answers, and how long puts made during a move waited to be read.
+
+Examples using device channels can be found in
+``examples/charm++/cuda/gpudirect/chantest`` (with ``-l``, the elements swap PEs
+every few iterations without exchanging their channels again; every run ends
+with ``destroy``),
+``examples/charm++/cuda/gpudirect/jacobi3d`` (option ``-k``; one channel per
+neighbour and iteration parity) and ``benchmarks/charm++/cuda/gpudirect/channel``
+(latency and rate against ``nocopydevice`` sends).
 
 .. _sec:mpiinterop:
 
