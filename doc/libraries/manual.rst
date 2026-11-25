@@ -1007,7 +1007,8 @@ Quiescence detection (``CkStartQD``) counts messages, not the items in
 tramlib's buffers. A plain ``CkStartQD`` can therefore invoke its callback
 while items are still buffered, unless timed flushing is enabled or every PE
 has flushed. To end a phase, call ``htramQuiesce(cb)``, an entry method, on
-one element of the ``HTram`` group instead. It waits for quiescence, so it
+the ``HTram`` group's element on PE 0 instead (``tram[0].htramQuiesce(cb)``);
+the callback is stored and invoked there. It waits for quiescence, so it
 flushes nothing while items are still being generated. It then flushes every
 PE, waits for quiescence again, and counts the items left in buffers and in
 the priority hold. It repeats these steps until the count is zero, and then
