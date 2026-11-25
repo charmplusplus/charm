@@ -726,6 +726,11 @@ void CkCallstackUnwind(Chare *obj) {
 
 // pops ( obj ) from the stack (and manages timing)
 void CkCallstackPop(Chare *obj) {
+#if CMK_CUDA || CMK_HIP
+  // The device channels' puts this entry method batched go out while it is
+  // still the running object (ckdevicechannel.C).
+  CkDeviceChannelBatchFlush();
+#endif
 #if CMK_LBDB_ON && CMK_CUDA
   // Paired 1:1 with the push in CkCallstackPush.
   hapiCuptiPopObjCorrelation();

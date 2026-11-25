@@ -379,6 +379,10 @@ public:
     ckMigrate(toPe);
   }
 
+  // A device channel's control event (ckdevicechannel.C), addressed to this
+  // element so it follows it through migration.
+  void ckDeviceChannelControl(CkMessage* m);
+
 #ifdef _PIPELINED_ALLREDUCE_
   void contribute2(CkArrayIndex myIndex, int dataSize, const void* data,
                    CkReduction::reducerType type, const CkCallback& cb,

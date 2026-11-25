@@ -38,6 +38,21 @@ public:
   void destroy(void); //User called destructor
   ~CkLocRec();
 
+#if CMK_CUDA || CMK_HIP
+  // Device-channel work that keeps this element in place (ckdevicechannel.C):
+  // its puts whose sources the runtime has not finished reading, reads into
+  // its receive buffers, and closings of its channels that their senders have
+  // not acknowledged. CkLocMgr::emigrate defers a move while it is nonzero
+  // (pendingMigrateTo) and the move is driven again when it returns to zero.
+  int outstandingChannelWork = 0;
+  int pendingMigrateTo = -1;
+  void noteChannelWorkPosted() { outstandingChannelWork++; }
+  void noteChannelWorkDone();
+  // The deferred move, from the scheduler: taken now if the element may
+  // migrate, else left for its next safe point, as recvMigrate does.
+  void resumeDeferredMigration(int toPe);
+#endif
+
   /** Invoke the given entry method on this element.
    *   Returns false if the element died during the receive.
    *   If doFree is true, the message is freed after send;

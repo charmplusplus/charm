@@ -88,12 +88,9 @@ Fixed since these examples were first run, and required by them:
     GPU-specific: ckhello hung identically. Fixed in reconverse 2c50813e7
     (charmplusplus/reconverse#212); this tree pins it.
 
-  - CkDevicePersistent used to abort between hosts ("Persistent GPU messaging
-    is currently not supported for inter-node messages"), so the persistent
-    example and the latency-persistent benchmark ran on one host only.
-    Transfers between hosts now use RDMA on device memory
-    (charmplusplus/charm#4228). That mode needs both buffers opened, which
-    both programs do.
+  - The persistent device API (CkDevicePersistent) has been replaced by device
+    channels (CkChannel; manual, "GPU Channels"). Between hosts a
+    channel's receiver reads each put with RDMA on device memory.
 
 Reusing a send buffer
 ---------------------
@@ -146,8 +143,13 @@ sdag          The same transfer driven from structured dagger, mixing a
               nocopydevice parameter and an ordinary array parameter in one
               entry method.
 
-persistent    Uses CkDevicePersistent to set up a channel once and reuse it,
-              rather than re-establishing the transfer per message.
+chantest      Two elements exchange a device buffer every iteration through
+              device channels (CkChannel), set up once, and verify what
+              they receive. -l swaps their PEs every few iterations without
+              exchanging the channels again; -a moves the receivers while
+              puts continue, and -d N keeps N busy elements per PE so that
+              the moves wait behind deep scheduler queues. Every run ends by
+              destroying the channels.
 
 jacobi2d      2D 5-point Jacobi stencil over a 2D chare array, exchanging halo
               rows and columns each iteration. -z selects the GPU-direct path;
@@ -173,12 +175,15 @@ jacobi2d-imbalance
                   ./jacobi2d +pe 8 -z -i 40 -f 10 -l 10 +balancer GreedyRefineLB
 
 jacobi3d      The 3D counterpart of jacobi2d, exchanging six faces. -d selects
-              the GPU-direct path and -s the persistent one. The -d path
-              double-buffers its send faces; see "Reusing a send buffer".
+              the GPU-direct path and -k device channels (one per neighbour and
+              iteration parity). Both double-buffer their send faces; see
+              "Reusing a send buffer". The run ends with a checksum of the
+              grid, the same in every mode when the exchange is correct.
 
 
 Related benchmarks
 ------------------
 
-benchmarks/charm++/cuda/gpudirect holds the latency, bandwidth and
-latency-persistent microbenchmarks for the same transfer path.
+benchmarks/charm++/cuda/gpudirect holds the latency and bandwidth
+microbenchmarks for the same transfer path, and channel, which measures
+device channels against nocopydevice sends.
