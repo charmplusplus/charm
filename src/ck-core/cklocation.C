@@ -2005,6 +2005,63 @@ void CkLocRec::migrateMe(int toPe)  // Leaving this processor
   myLocMgr->emigrate(this, toPe);
 }
 
+#if CMK_CUDA || CMK_HIP
+// A move deferred because of device-channel work, driven again once the work
+// is done (CkLocRec::noteChannelWorkDone).
+struct ChannelMigrateKickMsg
+{
+  char header[CmiMsgHeaderSizeBytes];
+  CkGroupID mgrGid;
+  CmiUInt8 id;
+  int toPe;
+};
+int _channelMigrateKickHandlerIdx;
+
+extern "C" void _channelMigrateKickHandler(void* arg)
+{
+  ChannelMigrateKickMsg* m = (ChannelMigrateKickMsg*)arg;
+  CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(m->mgrGid);
+  CkLocRec* rec = mgr ? mgr->localRecord(m->id) : NULL;
+  // An element that moved or died since the kick was posted makes it moot.
+  if (rec != NULL) rec->resumeDeferredMigration(m->toPe);
+  CmiFree(m);
+}
+
+void CkLocRec::noteChannelWorkDone()
+{
+  if (outstandingChannelWork > 0) outstandingChannelWork--;
+  if (outstandingChannelWork == 0 && pendingMigrateTo != -1)
+  {
+    const int toPe = pendingMigrateTo;
+    pendingMigrateTo = -1;
+    // Posted to this PE's queue, never taken inline: the completion that
+    // brought the count to zero can run inside the handler that has just
+    // queued this element's notification, and migrating here would pack the
+    // element before that message is delivered.
+    ChannelMigrateKickMsg* m = (ChannelMigrateKickMsg*)CmiAlloc(sizeof(ChannelMigrateKickMsg));
+    m->mgrGid = myLocMgr->ckGetGroupID();
+    m->id = getID();
+    m->toPe = toPe;
+    CmiSetHandler(m, _channelMigrateKickHandlerIdx);
+    CmiPushPE(CmiMyRank(), m);
+  }
+}
+
+void CkLocRec::resumeDeferredMigration(int toPe)
+{
+#if CMK_LBDB_ON
+  // The application's window for migration still governs: outside it the move
+  // waits for its next safe point, as one ordered by the load balancer does.
+  if (!readyMigrate)
+  {
+    nextPe = toPe;
+    return;
+  }
+#endif
+  myLocMgr->emigrate(this, toPe);  // defers again if new channel work started meanwhile
+}
+#endif
+
 #if CMK_LBDB_ON
 void CkLocRec::startTiming(int ignore_running)
 {
@@ -3668,6 +3725,21 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   if (toPe == CkMyPe())
     return;  // You're already there!
 
+#if CMK_CUDA || CMK_HIP
+  // Device channels this element receives on: their senders are told the
+  // channel is closing, and each awaited acknowledgement is channel work of
+  // the element. While any is outstanding -- or a put of the element's, or a
+  // read into its buffers, is in flight -- the move waits, so nothing lands in
+  // or reads from a buffer the pack is about to free; the last completion
+  // drives it again (CkLocRec::noteChannelWorkDone).
+  CkDeviceChannelsBeforeMigrate(rec);
+  if (rec->outstandingChannelWork > 0)
+  {
+    rec->pendingMigrateTo = toPe;
+    return;
+  }
+#endif
+
   CkArrayIndex idx = rec->getIndex();
   CmiUInt8 id = rec->getID();
   const CmiUInt8 life = rec->getLife();  // rec is gone by the time the home is told
@@ -3687,6 +3759,12 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   callMethod(rec, &CkMigratable::ckAboutToMigrate);
 #if CMK_MEM_CHECKPOINT
   CkMemCheckPTNoteMigration();  // a rollback is refused after a migration
+#endif
+
+#if CMK_CUDA || CMK_HIP
+  // The channels' exports and registrations go with the buffers the pack is
+  // about to free; the element reopens them on its new buffers in its pup.
+  CkDeviceChannelsPack(rec);
 #endif
 
   // Record the move in the process's table before the migration message exists: a

@@ -922,7 +922,7 @@ class CProxy_Group : public CProxy {
 /*    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}*/
 
-    bool operator==(const CProxy_Group& other) {
+    bool operator==(const CProxy_Group& other) const {
       return ckGetGroupID() == other.ckGetGroupID();
     }
 
@@ -965,7 +965,7 @@ class CProxyElement_Group : public CProxy_Group {
     /*CProxyElement_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy_Group(g), _onPE(CkMyPe()) {}*/
 
-    bool operator==(const CProxyElement_Group& other) {
+    bool operator==(const CProxyElement_Group& other) const {
       return ckGetGroupID() == other.ckGetGroupID() &&
              ckGetGroupPe() == other.ckGetGroupPe();
     }
@@ -1071,7 +1071,7 @@ class CProxy_NodeGroup : public CProxy{
 /*    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}*/
 
-    bool operator==(const CProxy_NodeGroup& other) {
+    bool operator==(const CProxy_NodeGroup& other) const {
       return ckGetGroupID() == other.ckGetGroupID();
     }
 

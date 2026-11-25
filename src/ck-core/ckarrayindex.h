@@ -58,7 +58,7 @@ struct CkArrayIndexBase
             p((char *)this, sizeof(CkArrayIndexBase));
         }
 
-        bool operator==(CkArrayIndexBase &other) {
+        bool operator==(const CkArrayIndexBase &other) const {
           if(nInts != other.nInts) return false;
           if(dimension != other.dimension) return false;
           for (int i=0;i<nInts;i++) {

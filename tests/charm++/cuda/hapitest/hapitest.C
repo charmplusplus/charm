@@ -1,8 +1,9 @@
 // Acceptance test for the HAPI portable core -- GPU migration plan stage 9.1.
 //
 // Self-checking (bcastred house style: every check is a CkEnforce, success is
-// one PASS line, any failure aborts). Nothing here is timing- or
-// hardware-specific, so the same binary is the acceptance run on an NVIDIA and
+// one PASS line, any failure aborts). Nothing here is hardware-specific, and
+// the one bound on time (check 6's 20 s) is two orders of magnitude above
+// what it bounds, so the same binary is the acceptance run on an NVIDIA and
 // on an AMD machine; the point of stage 9.1 is that those two produce the same
 // verdict from one source.
 //
@@ -52,6 +53,18 @@
 //      work is still outstanding: hapiAddCallback brackets each chain with
 //      QdCreate/QdProcess, so QD firing before the last callback is caught.
 //
+//   6. Streams report their completions independently. On every PE a kernel
+//      on one stream spins until the host releases it, while a chain of
+//      kOtherChain memsets on a second stream runs, each issued by the
+//      previous one's callback; the last callback does the releasing. Every
+//      callback must arrive while the kernel still spins: a runtime that
+//      reported completions in registration order across streams would hold
+//      the first behind the kernel's, which ends only at its 20 s timeout, and
+//      the test aborts saying so. The chain is longer than HAPI's ring of
+//      completion flags, so its sequence passes the slot the held kernel's
+//      completion keeps: with flags, the run prints no "pinned-flag ring"
+//      line (the slot is skipped, flags stay in use).
+//
 // Flags:  -c <chares, default 2*PEs>   -k <chains per chare, default 8>
 //         -n <doubles per chain, default 1024>   -v (verbose)
 //         -M (skip the exact device-mapping formula -- use this when running
@@ -83,6 +96,13 @@
 
 extern void hapitestLaunch(hapiStream_t stream, const double* in, double* out,
                            int n, double addend);
+extern void hapitestHold(hapiStream_t stream, unsigned int* hold_dev, int timeout_ms);
+
+// Check 6: how long the held kernel spins before it ends itself, and how many
+// completions the other stream reports meanwhile (more than HAPI's 4096
+// completion-flag slots).
+static const int kHoldTimeoutMs = 20000;
+static const int kOtherChain = 4200;
 
 // Size of the process-wide stream pool, published by the rank that created it.
 // A plain static is process-scoped, which is exactly the scope of the pool.
@@ -360,6 +380,59 @@ public:
     contribute(sizeof(report), report, CkReduction::concat,
                CkCallback(CkIndex_Main::peReport(NULL), mainProxy));
   }
+
+  // ---- 6. streams report their completions independently ----
+  // A kernel on heldStream spins until the host releases it (hold[0]); a
+  // memset on otherStream has nothing to wait for. otherStream's completion
+  // must be reported while the kernel still spins, and its callback is what
+  // releases the kernel. Reported in order across streams, it would arrive
+  // only after the kernel's timeout ended it, behind heldStream's.
+  hapiStream_t heldStream = NULL, otherStream = NULL;
+  unsigned int* hold = NULL;   // mapped pinned host memory: [0] release, [1] outcome
+  void* holdDev = NULL;
+  void* scratch = NULL;
+  bool otherDone = false;
+  int otherLeft = 0;   // completions still to chain on otherStream
+
+  void independent() {
+    hapiCheck(hapiHostAlloc((void**)&hold, 2 * sizeof(unsigned int), hapiHostAllocPortable | hapiHostAllocMapped));
+    hold[0] = 0;
+    hold[1] = 0;
+    hapiCheck(hapiHostGetDevicePointer(&holdDev, (void*)hold, 0));
+    hapiCheck(hapiStreamCreate(&heldStream));
+    hapiCheck(hapiStreamCreate(&otherStream));
+    hapiCheck(hapiMalloc(&scratch, 4096));
+    hapitestHold(heldStream, (unsigned int*)holdDev, kHoldTimeoutMs);
+    hapiAddCallback(heldStream, CkCallback(CkIndex_PeCheck::heldReported(), thisProxy[CkMyPe()]));
+    otherLeft = kOtherChain;
+    chainOther();
+  }
+
+  void chainOther() {
+    hapiCheck(hapiMemsetAsync(scratch, 0, 4096, otherStream));
+    hapiAddCallback(otherStream, CkCallback(CkIndex_PeCheck::otherReported(), thisProxy[CkMyPe()]));
+  }
+
+  void otherReported() {
+    if (__atomic_load_n(&hold[1], __ATOMIC_ACQUIRE) != 0)
+      CkAbort("hapitest: PE %d: a completion on one stream was reported only after a kernel on another stream "
+              "had ended (%d of %d chained)\n", CkMyPe(), kOtherChain - otherLeft, kOtherChain);
+    if (--otherLeft > 0) { chainOther(); return; }
+    otherDone = true;
+    __atomic_store_n(&hold[0], 1u, __ATOMIC_RELEASE);
+  }
+
+  void heldReported() {
+    if (!otherDone)
+      CkAbort("hapitest: PE %d: a completion on one stream was held behind a kernel on another stream "
+              "(reported after it, when that kernel's %d ms timeout ended it)\n", CkMyPe(), kHoldTimeoutMs);
+    CkEnforce(__atomic_load_n(&hold[1], __ATOMIC_ACQUIRE) == 1);   // released by the host, not timed out
+    hapiCheck(hapiStreamDestroy(heldStream));
+    hapiCheck(hapiStreamDestroy(otherStream));
+    hapiCheck(hapiFree(scratch));
+    hapiCheck(hapiFreeHost((void*)hold));
+    contribute(CkCallback(CkReductionTarget(Main, streamsIndependent), mainProxy));
+  }
 };
 
 // ---------------------------------------------------------------------------
@@ -573,6 +646,10 @@ public:
   void quiesced() {
     CkEnforce(workReported);
     CkEnforce(totalCompletions == (long long)nChares * (long long)nKernels);
+    peCheckProxy.independent();
+  }
+
+  void streamsIndependent() {
     CkPrintf("hapitest PASS: %d PEs, %lld per-PE checks, %lld GPU callbacks, "
              "%.3f s\n",
              CkNumPes(), totalChecks, totalCompletions,

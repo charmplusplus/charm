@@ -25,7 +25,7 @@ else
   $(error GPU must be one of "cuda" or "hip", got "$(GPU)")
 endif
 
-TARGET = latency
+TARGET = channel
 all: $(TARGET)
 
 OBJS = $(TARGET).o
@@ -42,7 +42,7 @@ $(TARGET).o: $(TARGET).C $(TARGET).decl.h $(TARGET).def.h
 	$(CHARMC) $(GPU_FLAGS) -c $<
 
 test: all
-	$(call run, +p2 ./latency +gpumap block +gpushm)
+	$(call run, +p2 ./channel -x 65536 -i 20 -r 40)
 
 clean:
 	rm -f *.decl.h *.def.h conv-host *.o $(TARGET) charmrun
