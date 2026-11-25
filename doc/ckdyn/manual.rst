@@ -1762,11 +1762,11 @@ host and the peer's IPC handle opens in this process (``+gpushm`` is not
 needed; it concerns DEVICE slots); 2, RDMA on the registered memory
 otherwise. Between hosts a put is carried out as a get issued by the
 destination's PE, so that ``done`` means the data has arrived. RDMA needs a
-machine layer that can register device memory; the underlying
-``CkDevicePersistent`` aborts an RDMA transfer whose buffer cannot be
-registered, or whose buffer's owner has closed it. With ``+gpupersistverbose``
-the first use of each mode and operation in a process prints one line
-(``[pe] CkDevicePersistent> get: ...``).
+machine layer that can register device memory; the underlying transport (the
+endpoints of Charm++'s device channels) aborts an RDMA transfer whose buffer
+cannot be registered, or whose buffer's owner has closed it. With
+``+gpupersistverbose`` the first use of each mode and operation in a process
+prints one line (``[pe] CkDyn> persistent get: ...``).
 
 The local buffer keeps what a transfer with a peer's handle set up: its
 reference on this process's IPC mapping of the peer's allocation and the
