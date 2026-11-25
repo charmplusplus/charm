@@ -1033,6 +1033,7 @@ public:
   bool performDeliveryDyn(CkArrayMessage* bcast, const std::vector<CkArrayIndex>& elements, bool batch);
 
   void springCleaning(void);
+  void cleanIfDue() { if (storedBcasts.cleaningDue()) storedBcasts.springCleaning(); }
 
   void flushState();
 
@@ -1119,11 +1120,9 @@ private:
 
       curMaxEpoch = ck::bcastEpoch::later(epoch, curMaxEpoch);
 
-      // +bcastEpochBits: a minute of broadcasts can exceed the small range, so
-      // also run the cleaning pass every 1/8 of the range
-      if (_ckBcastEpochSpareBits != 0 &&
-          ++sinceCleaning >= (1 << (29 - _ckBcastEpochSpareBits)))
-        springCleaning();
+      // +bcastEpochBits: counted here; the pass runs after delivery
+      // (CkArrayBroadcaster::releaseDelivered)
+      if (_ckBcastEpochSpareBits != 0) ++sinceCleaning;
     }
 
     bool hasBcast(const int epoch) const
@@ -1138,6 +1137,11 @@ private:
     }
 
     int getMaxEpoch() const { return curMaxEpoch; }
+    bool cleaningDue() const
+    {
+      return _ckBcastEpochSpareBits != 0 &&
+             sinceCleaning >= (1 << (29 - _ckBcastEpochSpareBits));
+    }
     int getHeadEpoch() const { return headEpoch; }
 
     // The message is in use by a zero-copy transfer: keep it until consumed

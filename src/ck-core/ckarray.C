@@ -1702,6 +1702,8 @@ void CkArrayBroadcaster::springCleaning(void) { storedBcasts.springCleaning(); }
 // element has received, so free those now instead of at spring cleaning.
 void CkArrayBroadcaster::releaseDelivered()
 {
+  // +bcastEpochBits: the extra cleaning pass, once this broadcast has been delivered
+  cleanIfDue();
   if (!stableLocations)
     return;
   // With no local element, everything received so far can go

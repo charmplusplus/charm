@@ -7,11 +7,14 @@
 //      broadcast is freed once every local element has it);
 //   1: one element added with insert() (broadcasts are stored and freed by
 //      the cleaning pass), the shape of charm issue #3860;
-//   2: elements added with insert(), two per PE.
+//   2: elements added with insert(), two per PE; each moves to the next PE
+//      every 997 broadcasts (third argument; 0 for never), so elements catch up on stored broadcasts
+//      across the wrap.
 // Every element checks that the broadcasts arrive in order, none missing.
 #include "bcast_epoch_wrap.decl.h"
 
 /* readonly */ CProxy_Main mainProxy;
+/* readonly */ int migratePeriod;  // broadcasts between moves of an array 2 element; 0: never
 
 static constexpr int numArrays = 3;
 
@@ -29,6 +32,7 @@ public:
   {
     if (m->argc > 1) total = atoi(m->argv[1]);
     if (m->argc > 2) burst = atoi(m->argv[2]);
+    migratePeriod = m->argc > 3 ? atoi(m->argv[3]) : 997;
     delete m;
     mainProxy = thisProxy;
 
@@ -83,12 +87,18 @@ public:
 
 class Receiver : public CBase_Receiver
 {
-  int which;
+  int which = 0;
   int received = 0;
 
 public:
   Receiver(int which_) : which(which_) {}
   Receiver(CkMigrateMessage*) {}
+
+  void pup(PUP::er& p)
+  {
+    p | which;
+    p | received;
+  }
 
   void hit(int seq)
   {
@@ -96,6 +106,8 @@ public:
       CkAbort("bcast_epoch_wrap: array %d element %d got broadcast %d, expected %d",
               which, thisIndex, seq, received);
     received++;
+    if (which == 2 && CkNumPes() > 1 && migratePeriod > 0 && received % migratePeriod == 0)
+      migrateMe((CkMyPe() + 1) % CkNumPes());
   }
 
   void report()

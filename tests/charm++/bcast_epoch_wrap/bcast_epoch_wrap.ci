@@ -1,5 +1,6 @@
 mainmodule bcast_epoch_wrap {
   readonly CProxy_Main mainProxy;
+  readonly int migratePeriod;
   mainchare Main {
     entry Main(CkArgMsg*);
     entry void start();

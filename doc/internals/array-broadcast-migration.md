@@ -61,7 +61,10 @@ any realistic broadcast rate. The testing option `+bcastEpochBits N` makes the
 epochs wrap at 2^N, so that a short run crosses the wrap many times
 (`tests/charm++/bcast_epoch_wrap` uses 16); because a minute of broadcasts can
 exceed such a small range, the store then also runs the cleaning pass every
-2^(N-3) broadcasts. A broadcast that arrives more than half the range away
+2^(N-3) broadcasts, after the broadcast that reaches the count has been
+delivered. The option is therefore valid only while every migrating element
+arrives within 2^(N-3) broadcasts, where a normal run allows one to two
+minutes. A broadcast that arrives more than half the range away
 from the head aborts with "arrived after the broadcast store released it".
 
 A checkpoint saves the head and the newest epoch seen, not the messages
