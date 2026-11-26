@@ -17,7 +17,8 @@ public:
     exitNumElems = 4 * CkNumPes();
     exitMain = thisProxy;
     exitGroup = CProxy_ExitGroup::ckNew();
-    CProxy_ExitElem::ckNew(exitNumElems).work();
+    CProxy_ExitElem elems = CProxy_ExitElem::ckNew(exitNumElems);
+    elems.work();
   }
   void done(long sum) {
     long want = (long)exitNumElems * (exitNumElems + 1) / 2;
