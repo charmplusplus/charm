@@ -9,7 +9,7 @@ module collidecharm {
     entry void reductionDone(CkReductionMsg *m);
   };
 
-  group distributedCollideClient : collideClient {
+  group [migratable] distributedCollideClient : collideClient {
     entry distributedCollideClient(CkCallback clientCb_);
   };
 
