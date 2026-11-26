@@ -737,6 +737,7 @@ static void _exitHandler(envelope *env)
       env = _allocEnv(ReqStatMsg, sizeof(int));
       *(int *)EnvToUsr(env) = _exitcode.load();
       _exitCodeSent = true;
+      CmiSetHandler(env, _exitHandlerIdx);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
       if (_ringexit){
