@@ -8,6 +8,11 @@ mainmodule collide_test {
     entry [reductiontarget] void migrated();
   };
 
+  group Collector {
+    entry Collector();
+    entry void colls(CkDataMsg *m);
+  };
+
   array [1D] Chunk {
     entry Chunk(CollideHandle collide);
     entry void doStep(int step);

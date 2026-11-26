@@ -19,6 +19,8 @@ module collidecharm {
         CkArrayID cells);
     entry void voxelMessageRecvd(void);
     entry void determineNumVoxels();
+    entry void stepStarted(int step);
+    entry void prod(int step);
     entry [reductiontarget] void reductionFinished();
   };
 

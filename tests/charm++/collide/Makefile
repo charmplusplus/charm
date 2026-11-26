@@ -17,9 +17,13 @@ collide_test: collide_test.decl.h collide_test.C
 collide_test.decl.h: collide_test.ci
 	$(CHARMC) collide_test.ci
 
+# "2" runs fewer chunks than PEs, so some PEs have no contributor in a step.
 test: collide_test
 	$(call run, ./collide_test +p4)
 	$(call run, ./collide_test +p4 +objid_tranche_log2 2)
+	$(call run, ./collide_test 2 +p4)
+	$(call run, ./collide_test dist +p4)
+	$(call run, ./collide_test 2 dist +p4)
 
 smptest: test
 endif
