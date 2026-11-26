@@ -19,9 +19,20 @@
 int _libExitHandlerIdx;
 int _libStopSchedulerHandlerIdx;
 static bool _libExitStarted = false;
+// Set when CharmLibExit has torn the runtime down and returned (MPI interop).
+static bool _libExitReturned = false;
+
+// The runtime is torn down, so CmiAbort cannot be used.
+static void _libOncePerProcess(const char *what)
+{
+  fprintf(stderr, "%s after CharmLibExit has returned: CharmLibInit and "
+          "CharmLibExit can be called once per process.\n", what);
+  fflush(stderr);
+  abort();
+}
 
 extern int _ckExitCode();
-extern bool _ckExitComplete();
+extern bool _ckExitSequenceDone();
 
 extern std::atomic<int> ckExitComplete;
 extern std::atomic<int> _cleanUp;
@@ -160,6 +171,7 @@ void CharmInit(int argc, char** argv) {
 // and CharmLibExit returns, so the program can keep using MPI afterwards.
 // No MPI call is made here; libck does not depend on MPI.
 void CharmLibInitWorld(int argc, char **argv) {
+  if (_libExitReturned) _libOncePerProcess("CharmLibInit called");
   CmiInteropReturnOnExit = 1;
   CharmLibInterOperate = true;
   _registerConverseInitHooks();
@@ -240,7 +252,8 @@ void CharmLibInitWorldTcp(int rank, int size, int local_rank, int local_size,
 // CharmLibExit is called for both forms of interop when the application is
 // done with Charm. After CharmLibInit (MPI interop) it tears the runtime down
 // and returns the exit code the application gave to CkExit (0 if it never
-// called the real CkExit), leaving MPI to the caller. After CharmInit
+// called the real CkExit), leaving MPI to the caller; CharmLibInit and
+// CharmLibExit can then not be called again in this process. After CharmInit
 // (user-driven) the process exits inside it.
 //
 // If a mainchare program already ran the exit sequence inside CharmLibInit
@@ -250,9 +263,10 @@ void CharmLibInitWorldTcp(int rank, int size, int local_rank, int local_size,
 #undef CkExit
 #define CkExit CKEXIT_0 // CKEXIT_0 and other CkExit macros defined in charm.h
 int CharmLibExit() {
+  if (_libExitReturned) _libOncePerProcess("CharmLibExit called again");
   _cleanUp = 1;
   CmiNodeAllBarrier();
-  if (_ckExitComplete()) {
+  if (_ckExitSequenceDone()) {
     for (int r = 0; r < CmiMyNodeSize(); r++) {
       char *msg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
       CmiSetHandler(msg, _libStopSchedulerHandlerIdx);
@@ -271,6 +285,7 @@ int CharmLibExit() {
       // The program may call MPI_Finalize next: CharmLibInit's abort hook
       // must not call MPI_Abort after that.
       CmiSetAbortHook(nullptr);
+      _libExitReturned = true;
     }
   }
   return _ckExitCode();

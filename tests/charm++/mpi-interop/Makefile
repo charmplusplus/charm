@@ -6,6 +6,8 @@ MPICXX ?= mpicxx
 NP ?= 2
 LAUNCH ?= mpirun -np $(NP)
 PES ?= 2
+# Bounds each testexit run where the timeout command exists.
+TIMEOUT ?= $(shell command -v timeout >/dev/null 2>&1 && echo "timeout 120")
 
 all: mpi_interop mpi_exitcode
 
@@ -60,11 +62,14 @@ testabort: all
 
 # A mainchare program that runs inside CharmLibInit and calls CkExit(code) on
 # the last PE: every rank must get code from CharmLibExit and the launcher
-# must exit with it, for code 0 and for a nonzero code.
+# must exit with it, for code 0 and for a nonzero code. The defect this
+# guards against is a hang in CharmLibExit, hence TIMEOUT (exit status 124).
 testexit: mpi_exitcode
 	@for code in 0 3; do \
-	  $(LAUNCH) ./mpi_exitcode $$code +pe $(PES) > exit.out 2>&1; rc=$$?; \
+	  $(TIMEOUT) $(LAUNCH) ./mpi_exitcode $$code +pe $(PES) > exit.out 2>&1; rc=$$?; \
 	  cat exit.out; \
+	  if [ -n "$(TIMEOUT)" ] && [ $$rc -eq 124 ]; then \
+	    echo "testexit: the run with code $$code did not end within the time limit ($(TIMEOUT))"; exit 1; fi; \
 	  if [ $$rc -ne $$code ]; then \
 	    echo "testexit: launcher exit status $$rc, expected $$code"; exit 1; fi; \
 	  n=`grep -c "^rank [0-9]* exit code $$code$$" exit.out`; \

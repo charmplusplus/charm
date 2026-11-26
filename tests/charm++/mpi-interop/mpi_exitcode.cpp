@@ -15,11 +15,16 @@ int main(int argc, char **argv) {
   CharmLibInit(MPI_COMM_WORLD, argc, argv);
   int code = CharmLibExit();
 
-  // MPI still works after CharmLibExit.
-  int maxCode = -1;
+  // MPI still works after CharmLibExit, and every rank has the same code.
+  int minCode = 0, maxCode = 0;
+  MPI_Allreduce(&code, &minCode, 1, MPI_INT, MPI_MIN, MPI_COMM_WORLD);
   MPI_Allreduce(&code, &maxCode, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
   printf("rank %d exit code %d\n", rank, code);
+  bool same = minCode == code && maxCode == code;
+  if (!same)
+    printf("FAIL: rank %d has exit code %d, but the codes of all ranks range "
+           "from %d to %d\n", rank, code, minCode, maxCode);
   fflush(stdout);
   MPI_Finalize();
-  return code;
+  return same ? code : 99;
 }

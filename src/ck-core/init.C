@@ -262,11 +262,12 @@ static bool   _exitStarted = false;
 static std::atomic<int> _exitcode{0};
 // Set on PE 0 once the ReqStatMsg, which carries _exitcode, has been sent.
 static bool _exitCodeSent = false;
-// Set when a PE of this process has returned from ConverseExit (MPI interop).
-static std::atomic<bool> _exitComplete{false};
+// Set when a PE of this process has finished the Charm++ exit sequence and
+// returned from ConverseExit (MPI interop).
+static std::atomic<bool> _exitSequenceDone{false};
 
 int _ckExitCode() { return _exitcode.load(); }
-bool _ckExitComplete() { return _exitComplete.load(); }
+bool _ckExitSequenceDone() { return _exitSequenceDone.load(); }
 
 // Asks PE 0 to start the exit sequence with the given exit code.
 static void _sendStartExit(int exitcode)
@@ -698,7 +699,7 @@ static void _converseExit()
 #endif
   ConverseExit(_exitcode.load());
   // Reached only when ConverseExit returns (MPI interop through CharmLibInit).
-  _exitComplete.store(true);
+  _exitSequenceDone.store(true);
 }
 
 static void _exitHandler(envelope *env)

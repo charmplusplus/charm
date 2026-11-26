@@ -10723,7 +10723,10 @@ interface functions. One may look at
 on the way interfaces are defined, a library can be invoked multiple
 times. In the end, one should call ``CharmLibExit`` to free resources
 reserved by Charm++. ``CharmLibExit`` returns; the program can continue to
-use MPI afterwards and must call ``MPI_Finalize`` itself.
+use MPI afterwards and must call ``MPI_Finalize`` itself. Call
+``CharmLibInit`` and ``CharmLibExit`` once per process: Charm++ cannot be
+started again after ``CharmLibExit``, and a second call to either one
+prints a message and aborts.
 
 A complete Charm++ program with a mainchare can also run under an MPI
 ``main``: link its main module without ``-nomain-module`` and do not
