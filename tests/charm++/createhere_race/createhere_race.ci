@@ -1,0 +1,24 @@
+mainmodule createhere_race {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Sender senderProxy;
+  readonly CProxy_Elem unboundedProxy;
+  readonly CProxy_Elem boundedProxy;
+  readonly int numIndices;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry void quiet();
+    entry [reductiontarget] void done(int n, int counts[n]);
+  };
+
+  group Sender {
+    entry Sender();
+    entry void go(int phase);
+    entry void report();
+  };
+
+  array [1D] Elem {
+    entry Elem();
+    entry [createhere] void ping(int src);
+  };
+};

@@ -694,6 +694,13 @@ public:
   void requestLocation(CmiUInt8 id);
   void requestLocation(const CkArrayIndex& idx);
   bool requestLocation(const CkArrayIndex& idx, int peToTell);
+  /// Ask the home of idx for its location by index, whether or not this PE already
+  /// holds an id for it. The home holds the request until the element exists.
+  void requestLocationAtHome(const CkArrayIndex& idx)
+  {
+    const int home = homePe(idx);
+    if (home != CkMyPe()) thisProxy[home].requestLocation(idx, CkMyPe());
+  }
   void updateLocation(const CkArrayIndex& idx, const CkLocEntry& e);
   void reclaimRemote(const CkArrayIndex& idx, int deletedOnPe);
   void dummyAtSync(void);

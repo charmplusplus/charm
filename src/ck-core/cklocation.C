@@ -2687,17 +2687,20 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
   CmiUInt8 id;
   if (lookupID(idx, id))
   {
-    // We found the ID so update the location for peToTell
-    thisProxy[peToTell].updateLocation(idx, cache->getLocationEntry(id));
-    return true;
+    const CkLocEntry e = cache->getLocationEntry(id);
+    if (e.pe != -1)
+    {
+      // We know the id and where it lives: answer now.
+      thisProxy[peToTell].updateLocation(idx, e);
+      return true;
+    }
   }
-  else
-  {
-    // We don't know the ID so buffer the location request
-    DEBN(("%d Buffering ID/location req for %s\n", CkMyPe(), idx2str(idx)));
-    bufferedLocationRequests[idx].push_back(peToTell);
-    return false;
-  }
+  // Either the index has no id yet, or the id is known but its location is not (a
+  // bounded array computes ids from indices before the element exists). Hold the
+  // request: updateLocation answers it once the element registers here.
+  DEBN(("%d Buffering ID/location req for %s\n", CkMyPe(), idx2str(idx)));
+  bufferedLocationRequests[idx].push_back(peToTell);
+  return false;
 }
 
 void CkLocMgr::updateLocation(const CkArrayIndex& idx, const CkLocEntry& e)
