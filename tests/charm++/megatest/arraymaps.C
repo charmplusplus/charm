@@ -547,8 +547,8 @@ void arraymaps_driver::pingByIndex(int flat)
   switch (cases[caseId].dims)
   {
     case 1: CProxy_arraymaps_1d(arr)[x[0]].ping(); break;
-    case 2: CProxy_arraymaps_2d(arr)(x[0], x[1]).ping(); break;
-    default: CProxy_arraymaps_3d(arr)(x[0], x[1], x[2]).ping();
+    case 2: (CProxy_arraymaps_2d(arr))(x[0], x[1]).ping(); break;
+    default: (CProxy_arraymaps_3d(arr))(x[0], x[1], x[2]).ping();
   }
 }
 
