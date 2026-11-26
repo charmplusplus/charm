@@ -36,4 +36,4 @@ smptest: collide_test
 endif
 
 clean:
-	rm -rf *.decl.h *.def.h *.o collide_test charmrun
+	rm -rf *.decl.h *.def.h *.o collide_test charmrun log

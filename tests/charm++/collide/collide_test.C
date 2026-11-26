@@ -24,7 +24,12 @@
  checks the same complete list either way; the reduction completes only if
  every PE received exactly one list in the step.
 
- Usage: ./collide_test [nChunks] [dist]   (default 32 chunks, serial client)
+ With "ckpt" the run writes a disk checkpoint to log/ after step 2 and
+ exits; a run with "+restart log" (on the same or another number of PEs)
+ continues from there with steps 3 and 4, with the collider, its client and
+ the voxels restored from the checkpoint.
+
+ Usage: ./collide_test [nChunks] [dist] [ckpt]   (default 32 chunks, serial)
  Needs the collidecharm module, which only a `./build LIBS ...` (or
  `./build charm++ ... ` followed by building ck-libs) provides; the Makefile
  skips the test when the module is missing.
@@ -36,6 +41,7 @@
 #include <algorithm>
 #include <tuple>
 #include "collidecharm.h"
+#include "ckcheckpoint.h"
 #include "collide_test.decl.h"
 
 CProxy_Main mainProxy;
@@ -44,6 +50,7 @@ int nChunks;
 static const int nSteps = 4;
 static const int domain = 8;      // voxels per axis, voxel size 1.0
 static const int stepShift = 2;   // voxels the block moves along x per step
+static const int ckptStep = 2;    // "ckpt": checkpoint after this step
 
 // Deterministic generator shared by the contributors and the checker.
 struct Rng {
@@ -91,15 +98,18 @@ class Main : public CBase_Main {
   CollideGrid3d grid;
   int step;
   int nPassed;
+  bool ckpt;
   CProxy_Chunk chunks;
  public:
   Main(CkArgMsg *m)
-    : grid(CkVector3d(0, 0, 0), CkVector3d(1, 1, 1)), step(0), nPassed(0)
+    : grid(CkVector3d(0, 0, 0), CkVector3d(1, 1, 1)), step(0), nPassed(0),
+      ckpt(false)
   {
     nChunks = 32;
     bool dist = false;
     for (int i = 1; i < m->argc; i++) {
       if (strcmp(m->argv[i], "dist") == 0) dist = true;
+      else if (strcmp(m->argv[i], "ckpt") == 0) ckpt = true;
       else if (m->argv[i][0] != '+') nChunks = atoi(m->argv[i]);
     }
     delete m;
@@ -118,6 +128,31 @@ class Main : public CBase_Main {
     chunks = CProxy_Chunk::ckNew(collide, nChunks);
     step = 1;
     chunks.doStep(step);
+  }
+
+  Main(CkMigrateMessage *m)
+    : CBase_Main(m), grid(CkVector3d(0, 0, 0), CkVector3d(1, 1, 1)),
+      step(0), nPassed(0), ckpt(false)
+  {
+    mainProxy = thisProxy;
+  }
+
+  void pup(PUP::er &p)
+  {
+    p | step; p | nPassed; p | ckpt; p | chunks;
+  }
+
+  // Called after the checkpoint is written, and again after a restart.
+  void checkpointed()
+  {
+    if (!_restarted) {
+      CkPrintf("collide_test: checkpoint written after step %d\n", step);
+      CkExit();
+      return;
+    }
+    CkPrintf("collide_test: restarted after step %d on %d PEs\n", step,
+             CkNumPes());
+    chunks.migrateAway(step);
   }
 
   void expected(std::vector<Pair> &out, int &nVox, int &nBoxes)
@@ -188,6 +223,10 @@ class Main : public CBase_Main {
       CkExit();
       return;
     }
+    if (ckpt && step == ckptStep) {
+      CkStartCheckpoint("log", CkCallback(CkIndex_Main::checkpointed(), thisProxy));
+      return;
+    }
     chunks.migrateAway(step);
   }
 
@@ -201,6 +240,7 @@ class Main : public CBase_Main {
 class Collector : public CBase_Collector {
  public:
   Collector() {}
+  Collector(CkMigrateMessage *m) : CBase_Collector(m) {}
   void colls(CkDataMsg *m)
   {
     contribute(m->getSize(), m->getData(), CkReduction::concat,

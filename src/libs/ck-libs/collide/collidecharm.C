@@ -685,8 +685,9 @@ void serialCollideClient::reductionDone(CkReductionMsg *msg)
 }
 
 /********************** distributedCollideClient *****************/
-distributedCollideClient::distributedCollideClient(CkCallback clientCb_) {
-  clientCb = clientCb_;
+distributedCollideClient::distributedCollideClient(CkCallback clientCb_)
+  : userCb(clientCb_), clientCb(clientCb_)
+{
   clientCb.transformBcastToLocalElem();
 }
 
