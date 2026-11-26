@@ -32,7 +32,8 @@ element's id only if it created or holds the element, is its home, or has
 addressed it by index ([object-ids.md](object-ids.md)), so the list leaves out
 members the sending process has not heard of yet, for example when the section
 is built before they exist. A send with no known member is not recorded
-(`LBDatabase::MulticastSend`).
+(`LBDatabase::MulticastSend`). A multicast sent while no array element is
+running is recorded as sent by the PE.
 
 ## Replacing a tree
 

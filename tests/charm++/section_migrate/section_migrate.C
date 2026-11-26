@@ -174,7 +174,23 @@ public:
     CkStartQD(CkCallback(CkIndex_Main::setup(), thisProxy));
   }
 
-  void setup() { elemProxy[0].makeSection(); }
+  void setup() {
+#if CMK_LBDB_ON
+    LBManager* lbmgr = LBManagerObj();
+    if (lbmgr && lbmgr->CollectingCommStats()) {
+      CProxySection_Elem s = CProxySection_Elem::ckNew(elemProxy.ckGetArrayID(), 0, 0, 1);
+      s.ping(new WorkMsg(0));
+      std::vector<LDCommData> comm(lbmgr->GetCommDataSz());
+      lbmgr->GetCommData(comm.data());
+      int fromPe = 0;
+      for (const LDCommData& c : comm)
+        fromPe += c.recv_type() == LD_OBJLIST_MSG && c.from_proc() && c.src_proc == CkMyPe();
+      if (fromPe != 1)
+        CkAbort("section_migrate: main's multicast recorded %d times as sent by PE %d", fromPe, CkMyPe());
+    }
+#endif
+    elemProxy[0].makeSection();
+  }
 
   void sectionReady() {
     round = 0;
@@ -396,6 +412,8 @@ public:
     int x[2] = { thisIndex, r };
     mg->contribute(sizeof(x), x, CkReduction::max_int, cookie);
   }
+
+  void ping(WorkMsg* m) { delete m; }
 
   // Element 0 hops rootHops times in a row, the others once.
   void hop(int r, bool skipRoot) {

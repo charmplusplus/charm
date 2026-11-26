@@ -44,6 +44,14 @@ public:
     mykey = compute_key();
   };
 
+  LBCommData(int _src_proc, LDOMid _destOM, CmiUInt8 *_destObjs, int _nobjs) {
+    src_proc = _src_proc;
+    destObj.init_mcastmsg(_destOM, _destObjs, _nobjs);
+    n_messages = 0;
+    n_bytes = 0;
+    mykey = compute_key();
+  };
+
   LBCommData(const LBCommData& d) {
     src_proc = d.src_proc;
     if (!from_proc()) {
