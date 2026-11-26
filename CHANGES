@@ -625,6 +625,10 @@ Build and packaging:
 - The charm4py target builds and loads on reconverse: libcharm links
   reconverse, which is built with CMK_CHARM4PY (#4063).
 
+- --build-shared links on reconverse: charmc searches lib_so/, where
+  libreconverse and LCI's libraries are, and records it as an RPATH,
+  with or without -charm-shared (#4049).
+
 Removed:
 
 - Classic Converse and the classic machine layers (#4056, #4061),
@@ -659,8 +663,6 @@ Known gaps in the beta:
   use GreedyRefineLB, TreeLB or DistributedLB.
 
 - CharmDebug is not available.
-
-- --build-shared does not link on reconverse (#4049).
 
 - Large scale: under heavy traffic at 8 to 32 nodes, exhaustion of
   LCI's receive packet pool can hang a run (reconverse #257). A
