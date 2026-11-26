@@ -1,0 +1,20 @@
+mainmodule exitcode {
+  readonly CProxy_ExitMain exitMain;
+  readonly CProxy_ExitGroup exitGroup;
+  readonly int exitNumElems;
+
+  mainchare ExitMain {
+    entry ExitMain(CkArgMsg *m);
+    entry [reductiontarget] void done(long sum);
+  };
+
+  array [1D] ExitElem {
+    entry ExitElem();
+    entry void work();
+  };
+
+  group ExitGroup {
+    entry ExitGroup();
+    entry void finish(int code);
+  };
+};

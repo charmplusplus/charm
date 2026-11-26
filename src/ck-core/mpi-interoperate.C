@@ -17,7 +17,11 @@
 #endif
 
 int _libExitHandlerIdx;
+int _libStopSchedulerHandlerIdx;
 static bool _libExitStarted = false;
+
+extern int _ckExitCode();
+extern bool _ckExitComplete();
 
 extern std::atomic<int> ckExitComplete;
 extern std::atomic<int> _cleanUp;
@@ -109,6 +113,13 @@ void _libExitHandler(envelope *env)
     default:
       CmiAbort("Internal Error(_libExitHandler): Unknown-msg-type. Contact Developers.\n");
   }
+}
+
+// Ends the scheduler pass of the PE that receives it (see CharmLibExit).
+void _libStopSchedulerHandler(void *msg)
+{
+  CmiFree(msg);
+  CsdExitScheduler();
 }
 
 // CharmBeginInit calls sets interop flags then calls ConverseInit. This
@@ -228,14 +239,26 @@ void CharmLibInitWorldTcp(int rank, int size, int local_rank, int local_size,
 
 // CharmLibExit is called for both forms of interop when the application is
 // done with Charm. After CharmLibInit (MPI interop) it tears the runtime down
-// and returns, leaving MPI to the caller. After CharmInit (user-driven) the
-// process exits inside it.
+// and returns the exit code the application gave to CkExit (0 if it never
+// called the real CkExit), leaving MPI to the caller. After CharmInit
+// (user-driven) the process exits inside it.
+//
+// If a mainchare program already ran the exit sequence inside CharmLibInit
+// (its CkExit(code) reached ConverseExit on every PE), the sequence is not
+// run again: each PE of this process only needs to leave its final scheduler
+// pass, so rank 0 sends each of them a stop message.
 #undef CkExit
 #define CkExit CKEXIT_0 // CKEXIT_0 and other CkExit macros defined in charm.h
-void CharmLibExit() {
+int CharmLibExit() {
   _cleanUp = 1;
   CmiNodeAllBarrier();
-  if(CkMyPe() == 0) {
+  if (_ckExitComplete()) {
+    for (int r = 0; r < CmiMyNodeSize(); r++) {
+      char *msg = (char *)CmiAlloc(CmiMsgHeaderSizeBytes);
+      CmiSetHandler(msg, _libStopSchedulerHandlerIdx);
+      CmiSyncSendAndFree(CmiNodeFirst(CmiMyNode()) + r, CmiMsgHeaderSizeBytes, msg);
+    }
+  } else if(CkMyPe() == 0) {
     CkExit();
   }
   if (CmiMyRank() == CmiMyNodeSize()) {
@@ -250,4 +273,5 @@ void CharmLibExit() {
       CmiSetAbortHook(nullptr);
     }
   }
+  return _ckExitCode();
 }

@@ -30,7 +30,9 @@ void CharmBeginInit(int argc, char** argv);
 void CharmFinishInit();
 void CharmInit(int argc, char** argv);
 
-void CharmLibExit();
+// Returns the exit code the application gave to CkExit, the same on every
+// process; 0 if the exit was started by CharmLibExit itself.
+int CharmLibExit();
 
 void LibCkExit(void);
 

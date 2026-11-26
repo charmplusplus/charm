@@ -10725,6 +10725,30 @@ times. In the end, one should call ``CharmLibExit`` to free resources
 reserved by Charm++. ``CharmLibExit`` returns; the program can continue to
 use MPI afterwards and must call ``MPI_Finalize`` itself.
 
+A complete Charm++ program with a mainchare can also run under an MPI
+``main``: link its main module without ``-nomain-module`` and do not
+include ``mpi-interoperate.h`` in its Charm++ source files, so that
+``CkExit`` keeps its ordinary meaning. The program then runs inside
+``CharmLibInit`` from the mainchare's constructor until it calls
+``CkExit(code)``, which ends Charm++ for good; ``CkExit`` returns to its
+caller in this mode. ``CharmLibExit`` returns ``int``: the code given to
+``CkExit``, the same value on every process, or 0 if the program never
+called the ordinary ``CkExit``. ``main`` can return it after
+``MPI_Finalize``:
+
+.. code-block:: c++
+
+   int main(int argc, char **argv) {
+     int provided;
+     MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided);
+     CharmLibInit(MPI_COMM_WORLD, argc, argv); // runs until CkExit(code)
+     int code = CharmLibExit();
+     MPI_Finalize();
+     return code;
+   }
+
+``tests/charm++/mpi-interop/mpi_exitcode.cpp`` is a working example.
+
 Charm++ makes no progress while control is in MPI. Messages still queued
 when ``CkExit`` returns control to MPI stay queued and are delivered when
 Charm++ is next entered (``StartCharmScheduler`` in the next interface
