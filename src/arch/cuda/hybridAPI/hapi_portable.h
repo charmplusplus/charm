@@ -73,6 +73,7 @@ extern "C++" {
     cudaStreamWaitEvent(stream, event, flags)
 
 #define hapiStreamSynchronize(stream) cudaStreamSynchronize(stream)
+#define hapiStreamQuery(stream) cudaStreamQuery(stream)
 #define hapiDeviceSynchronize cudaDeviceSynchronize
 #define hapiEventElapsedTime(a, b, c) cudaEventElapsedTime(a, b, c)
 #define hapiMemGetInfo(a, b) cudaMemGetInfo(a, b)
@@ -140,6 +141,8 @@ static inline cudaError_t hapiFreeHost(void* ptr) {
 #define hapiErrorMemoryAllocation cudaErrorMemoryAllocation
 #define hapiErrorInitializationError cudaErrorInitializationError
 #define hapiErrorNotReady cudaErrorNotReady
+#define hapiErrorNotSupported cudaErrorNotSupported
+#define hapiGetErrorName cudaGetErrorName
 #define hapiSuccess cudaSuccess
 #define hapiError_t cudaError_t
 
@@ -168,6 +171,7 @@ static inline cudaError_t hapiFreeHost(void* ptr) {
 #define hapiMemcpyHostToDevice cudaMemcpyHostToDevice
 #define hapiMemcpyDeviceToHost cudaMemcpyDeviceToHost
 #define hapiMemcpyDeviceToDevice cudaMemcpyDeviceToDevice
+#define hapiMemcpyDefault cudaMemcpyDefault
 #define hapiMemcpy(dst, src, count, kind) cudaMemcpy(dst, src, count, kind)
 #define hapiMemcpy2D(dst, dpitch, src, spitch, width, height, kind) \
     cudaMemcpy2D(dst, dpitch, src, spitch, width, height, kind)
@@ -231,6 +235,7 @@ static inline cudaError_t hapiFreeHost(void* ptr) {
     hipStreamWaitEvent(stream, event, flags)
 
 #define hapiStreamSynchronize(stream) hipStreamSynchronize(stream)
+#define hapiStreamQuery(stream) hipStreamQuery(stream)
 #define hapiDeviceSynchronize hipDeviceSynchronize
 #define hapiEventElapsedTime(a, b, c) hipEventElapsedTime(a, b, c)
 #define hapiMemGetInfo(a, b) hipMemGetInfo(a, b)
@@ -300,6 +305,8 @@ static inline hipError_t hapiFreeHost(void* ptr) {
 #define hapiErrorMemoryAllocation hipErrorMemoryAllocation
 #define hapiErrorInitializationError hipErrorInitializationError
 #define hapiErrorNotReady hipErrorNotReady
+#define hapiErrorNotSupported hipErrorNotSupported
+#define hapiGetErrorName hipGetErrorName
 #define hapiSuccess hipSuccess
 #define hapiError_t hipError_t
 #define hapiStreamDestroy hipStreamDestroy
@@ -311,6 +318,7 @@ static inline hipError_t hapiFreeHost(void* ptr) {
 #define hapiMemcpyHostToDevice hipMemcpyHostToDevice
 #define hapiMemcpyDeviceToHost hipMemcpyDeviceToHost
 #define hapiMemcpyDeviceToDevice hipMemcpyDeviceToDevice
+#define hapiMemcpyDefault hipMemcpyDefault
 #define hapiMemcpy(dst, src, count, kind) hipMemcpy(dst, src, count, kind)
 #define hapiMemcpy2D(dst, dpitch, src, spitch, width, height, kind) \
     hipMemcpy2D(dst, dpitch, src, spitch, width, height, kind)

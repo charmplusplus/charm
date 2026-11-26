@@ -293,6 +293,15 @@ void ArrayElement::ckJustRestored(void)
   // empty for out-of-core emulation
 }
 
+void ArrayElement::ckDeviceChannelControl(CkMessage* m)
+{
+#if CMK_CUDA || CMK_HIP
+  CkDeviceChannelControl((void*)m);
+#else
+  CkFreeMsg(m);
+#endif
+}
+
 #ifdef _PIPELINED_ALLREDUCE_
 void ArrayElement::contribute2(int dataSize, const void* data,
                                CkReduction::reducerType type, CMK_REFNUM_TYPE userFlag)

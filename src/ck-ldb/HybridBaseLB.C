@@ -497,7 +497,7 @@ void HybridBaseLB::Loadbalancing(int atlevel)
         // comm data
         std::vector<LDCommData> comms;
 //        collectCommData(i, comms, atlevel);
-        thisProxy[tope].ObjMigrated(statsData->objData[i], comms.data(), comms.size(), atlevel-1);
+        thisProxy[tope].ObjMigrated(statsData->objData[i], comms, comms.size(), atlevel-1);
       }
     }
   }
@@ -567,7 +567,7 @@ void HybridBaseLB::ReceiveMigration(LBMigrateMsg *msg)
             collectCommData(obj, comms, atlevel);
 	    if (move.to_pe != -1) {
               // this object migrates to another PE of the parent domain
-              thisProxy[move.to_pe].ObjMigrated(statsData->objData[obj], comms.data(), comms.size(), atlevel);
+              thisProxy[move.to_pe].ObjMigrated(statsData->objData[obj], comms, comms.size(), atlevel);
             }
             lData->outObjs.push_back(MigrationRecord(move.obj, lData->children[statsData->from_proc[obj]], -1));
             statsData->removeObject(obj);
@@ -650,7 +650,7 @@ void HybridBaseLB::ReceiveVectorMigration(LBVectorMigrateMsg *msg)
       if (_lb_args.debug()>1)
         CkPrintf("[%d] sending %d objects to %d at %f.\n", CkMyPe(), count, toPe, CkWallTimer());
       if (objs.size() > 0)
-        thisProxy[toPe].ObjsMigrated(objs, objs.size(), comms.data(), comms.size(), atlevel);
+        thisProxy[toPe].ObjsMigrated(objs, objs.size(), comms, comms.size(), atlevel);
       thisProxy[toPe].TotalObjMigrated(count, atlevel);
     }
     else if (move.to_pe == CkMyPe()) {
@@ -703,7 +703,7 @@ void HybridBaseLB::CreateMigrationOutObjs(int atlevel, LDStats* stats,
 
 // objects arrives with only objdata
 void HybridBaseLB::ObjsMigrated(std::vector<LDObjData>&& datas, int m,
-    LDCommData *cdata, int n, int atlevel)
+    std::vector<LDCommData>&& cdata, int n, int atlevel)
 {
   int i;
   LevelData *lData = levelData[atlevel];
@@ -724,7 +724,7 @@ void HybridBaseLB::ObjsMigrated(std::vector<LDObjData>&& datas, int m,
 
     // copy into comm data
     if (n) {
-      statsData->commData.insert(statsData->commData.end(), cdata, cdata + n);
+      statsData->commData.insert(statsData->commData.end(), cdata.begin(), cdata.end());
       statsData->deleteCommHash();
     }
   }
@@ -804,7 +804,7 @@ void HybridBaseLB::collectCommData(int objIdx, std::vector<LDCommData> &comms, i
 }
 
 // an object arrives with only objdata
-void HybridBaseLB::ObjMigrated(LDObjData data, LDCommData *cdata, int n, int atlevel)
+void HybridBaseLB::ObjMigrated(LDObjData data, std::vector<LDCommData>&& cdata, int n, int atlevel)
 {
   LevelData *lData = levelData[atlevel];
   LDStats *statsData = lData->statsData;
@@ -820,7 +820,7 @@ void HybridBaseLB::ObjMigrated(LDObjData data, LDCommData *cdata, int n, int atl
 
     // copy into comm data
     if (n) {
-      statsData->commData.insert(statsData->commData.end(), cdata, cdata + n);
+      statsData->commData.insert(statsData->commData.end(), cdata.begin(), cdata.end());
       statsData->deleteCommHash();
     }
   }
