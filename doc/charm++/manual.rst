@@ -10617,6 +10617,38 @@ selects a different LCI bootstrap backend instead. An example program to demonst
 ``examples/charm++/mpi-coexist``. In the following text, we will refer to
 this example program for the ease of understanding.
 
+There are two modes:
+
+.. list-table::
+   :header-rows: 1
+
+   * -
+     - Library mode
+     - Main mode
+   * - Use
+     - An MPI program calls Charm++ libraries in phases
+     - A Charm++ program with a mainchare runs inside an MPI job and
+       calls MPI from its entry methods
+   * - Start
+     - ``main`` calls ``MPI_Init_thread``, then ``CharmLibInit``
+     - ``main`` is ``return CharmMpiMain(argc, argv);``, or is supplied
+       by ``charmc -mpi-main``; MPI is initialized there
+   * - ``CkExit``
+     - Returns to its caller; ends a phase (``mpi-interoperate.h``), or
+       ends Charm++ and gives ``CharmLibExit`` its code
+     - As in an ordinary run: does not return to its caller, and its
+       code is the exit status of every process
+   * - End
+     - ``CharmLibExit`` returns; the program calls ``MPI_Finalize``
+     - Charm++ calls ``MPI_Finalize`` on each process just before the
+       process exits
+
+The sections that follow describe library mode;
+:ref:`sec:mpiinterop_main` describes main mode. In both modes a
+``CkAbort`` ends the whole MPI job through ``MPI_Abort``, and both need
+MPI initialized with ``MPI_THREAD_SERIALIZED`` when a process has
+several PEs.
+
 Control Flow and Memory Structure
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -10801,6 +10833,58 @@ On HPE Slingshot (the CXI libfabric provider), export
 ``FI_CXI_RX_MATCH_MODE=hybrid`` in the job script. Reconverse sets it
 before LCI starts, but in an MPI program ``MPI_Init`` has already
 initialized libfabric, so that setting may come too late.
+
+.. _sec:mpiinterop_main:
+
+Main Mode: an Ordinary Charm++ Run inside an MPI Job
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A Charm++ program with a mainchare that calls MPI from its entry methods
+(directly or through an MPI-based library) can run unchanged inside an
+MPI job. Its ``main`` is
+
+.. code-block:: c++
+
+   #include <mpi.h>
+   #include "mpi-interoperate.h"
+
+   int main(int argc, char **argv) { return CharmMpiMain(argc, argv); }
+
+or the program has no ``main`` at all and is linked with
+``charmc -ld++ mpicxx -mpi-main``, which compiles this ``main`` at link
+time with the MPI compiler given to ``charmc`` (the Charm++ build itself
+has no MPI). With a ``main`` of its own, link with ``-nomain``.
+
+**int CharmMpiMain(int argc, char \**argv)**
+
+``CharmMpiMain`` calls ``MPI_Init_thread`` requesting
+``MPI_THREAD_SERIALIZED`` (if MPI is already initialized it keeps that
+initialization), starts Charm++ on every rank of ``MPI_COMM_WORLD`` as
+``CharmLibInit`` does, with Charm++ process *i* on rank *i*, and then
+runs the program as an ordinary Charm++ run. It does not return.
+``CkExit(code)`` behaves as in any Charm++ program: it does not return to
+its caller, and every process exits with ``code`` after Charm++ has
+called ``MPI_Finalize`` on the thread that called ``CharmMpiMain``. The
+Charm++ source files need no change; in particular they do not include
+``mpi-interoperate.h``.
+
+If a process has several PEs and MPI provides a thread level below
+``MPI_THREAD_SERIALIZED``, the run aborts at startup. With
+``MPI_THREAD_SERIALIZED``, at most one PE of a process may be inside an
+MPI call at a time; this holds, for example, when the MPI calls are made
+from entry methods of a nodegroup declared ``[exclusive]`` or of a
+single chare per process.
+
+While a PE is blocked in an MPI call it makes no Charm++ communication
+progress, and with one PE per process the whole process makes none. An
+MPI collective called from an entry method must therefore not depend on
+Charm++ messages that the blocked PEs still have to send or receive:
+the collective completes only when every process has entered it, and a
+process cannot enter it if the message that tells it to is still held
+by a PE that is already blocked.
+
+``tests/charm++/mpi-interop`` has a working example (``exitcode.C`` with
+``mpi_main.cpp``, and the same program linked with ``-mpi-main``).
 
 User Driven Mode
 ~~~~~~~~~~~~~~~~
