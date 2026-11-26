@@ -32,6 +32,7 @@ DIRS = \
   varTRAM \
   dynamic_insertion \
   dynamic_insertion_deletion \
+  insert_chareidx \
   amr_1d_random \
   amr_1d_simple \
   anytime_migration \
