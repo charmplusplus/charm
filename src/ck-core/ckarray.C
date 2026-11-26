@@ -2116,6 +2116,10 @@ void CkArray::bufferForCreation(CkArrayMessage* msg, const CkArrayIndex& idx)
 
     // Send the request to the target PE
     thisProxy[home].requestDemandCreation(idx, ctor, pe);
+    // Only an approved request creates the element, so also ask the home for the
+    // location by index. It holds that request until the element exists, and its
+    // answer is what flushes bufferedCreationMsgs here.
+    locMgr->requestLocationAtHome(idx);
   }
   bufferedCreationMsgs[idx].push_back(msg);
 }
@@ -2132,7 +2136,10 @@ void CkArray::requestDemandCreation(const CkArrayIndex& idx, int ctor, int pe)
   if (!locMgr->lookupID(idx, id) || locMgr->whichPe(id) == -1)
   {
     // We (the home PE) do not know the elements location, therefore it (and its siblings)
-    // do not exist. So we can approve the demand creation request.
+    // do not exist. Approve the request once: until the element registers here, further
+    // requests would create it again. Their senders also asked for the location and are
+    // told when the element exists.
+    if (!pendingDemandCreations.insert(idx).second) return;
     if (pe == CkMyPe())
     {
       // Directly create the element
@@ -2170,6 +2177,7 @@ void CkArray::sendBufferedMsgs(CmiUInt8 id, int pe)
 
 void CkArray::sendBufferedMsgs(const CkArrayIndex& idx, CmiUInt8 id, int pe)
 {
+  pendingDemandCreations.erase(idx);  // the element exists and has registered
   // TODO: This shouldn't be needed
   sendBufferedMsgs(id, pe);
   for (CkArrayMessage* msg : bufferedIndexMsgs[idx])
