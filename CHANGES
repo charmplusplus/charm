@@ -415,6 +415,13 @@ Checkpoint and fault tolerance:
   default. Protocol in doc/internals/memckpt.md; new test
   memckpt_rollback, run by a syncft CI job.
 
+- A restart keeps the manual load balancing mode the program had at
+  the checkpoint; a TurnManualLBOff() after an initproc's
+  TurnManualLBOn() was lost, and every AtSync() after the restart
+  waited forever. The checkpoint format changed with it: a checkpoint
+  written by v9.0.0-alpha2 to v9.0.0-beta1 is refused at restart with
+  a message saying so (#4336). New test restart_manual_lb.
+
 - Isomalloc (migratable threads, AMPI): the address region is rounded
   to a stable unit, recorded in disk checkpoints and honored on
   restart, so a checkpoint restarts in a process with a different

@@ -3478,6 +3478,19 @@ The detailed APIs of these two methods are described as follows:
    barrier at load balancing time (see example here
    :numref:`lbexample`).
 
+   A program can also decide when a step starts. ``TurnManualLBOn()``
+   puts the calling PE in manual mode and ``TurnManualLBOff()`` takes it
+   out; called from an initproc, before the load balancing manager
+   exists, they set the mode every PE starts in. In manual mode
+   ``AtSync()`` does not start a load balancing step: the element waits,
+   and no ``ResumeFromSync()`` comes until the program calls
+   ``CkStartLB()``. With TreeLB and the centralized balancers one call on
+   any PE starts a step on every PE, and when it ends every element with
+   ``usesAtSync`` set gets ``ResumeFromSync()``. ``CkStartLB()`` aborts
+   when no load balancer in use supports it. A disk checkpoint records
+   the mode, so a restarted program is in the mode it had when it wrote
+   the checkpoint.
+
    .. note:: In AtSync mode, Applications that use dynamic insertion or
 	     deletion of array elements must not be doing so when any element
 	     calls ``AtSync()``. This is because AtSync mode requires an
