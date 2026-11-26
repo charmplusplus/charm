@@ -1,0 +1,23 @@
+mainmodule insert_chareidx {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Elem elemProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg* m);
+    entry void inserted();
+    entry void constructed();
+    entry void left();
+    entry void pong(int count);
+  };
+
+  chare Driver {
+    entry Driver();
+    entry void insertSome(int k);
+    entry void ping();
+  };
+
+  array [1D] Elem {
+    entry Elem(int insertPe);
+    entry void leave();
+  };
+};
