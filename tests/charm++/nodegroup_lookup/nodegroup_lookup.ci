@@ -1,0 +1,17 @@
+mainmodule nodegroup_lookup {
+  readonly CProxy_Main mainProxy;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void done(long sum);
+  };
+
+  nodegroup Tagged {
+    entry Tagged(int tag);
+  };
+
+  group Reader {
+    entry Reader();
+    entry void lookup(std::vector<CkGroupID> ids, int rounds, int count);
+  };
+};

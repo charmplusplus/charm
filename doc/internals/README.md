@@ -36,7 +36,8 @@ entry, and is planned once there is more than one chapter.
 | Message path: envelope, scheduler, entry method dispatch | not yet written |
 | Chare arrays: creation, insertion, migration, sections | not yet written |
 | [Section multicast trees: build, rebuild, retire, free](section-trees.md) | written 2026-11-09 (counted free of a replaced tree, charm #4132 item 2) |
-| Groups and nodegroups | not yet written |
+| [Nodegroup lookup](nodegroup-lookup.md) | written 2026-11-25: the lock-free table of ready nodegroups read by `CkLocalNodeBranch` and nodegroup message delivery |
+| Groups and nodegroups: creation, dependencies, delivery | not yet written |
 | Load balancing: the LB framework and TreeLB | not yet written |
 | [Checkpoint, restart, shrink/expand](memckpt.md) | first section written 2026-11-06: the double in-memory checkpoint and its rollback (syncft option); disk checkpoint and shrink/expand not yet written |
 | The reconverse layer: what Charm++ asks of the machine layer | not yet written |

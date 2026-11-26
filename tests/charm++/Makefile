@@ -32,6 +32,7 @@ DIRS = \
   ckcoro \
   zerocopy \
   within_node_bcast \
+  nodegroup_lookup \
   longIdle \
   periodic \
   bombard \
