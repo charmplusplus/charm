@@ -917,6 +917,7 @@ void LBManager::pup(PUP::er& p)
     p | avail_vector;
   }
   p | mystep;
+  p | useBarrier;  // init() sets it from the initproc-time manualOn; restore the run's value
   if (p.isUnpacking())
   {
     if (_lb_args.metaLbOn())

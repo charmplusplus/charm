@@ -1,0 +1,27 @@
+mainmodule restart_manual_lb {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Elem elemProxy;
+  readonly int numElems;
+  readonly int numSteps;
+  readonly int ckptStep;
+
+  initproc void manualLBOn(void);
+
+  mainchare [migratable] Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void switchedOff();
+    entry [reductiontarget] void atCheckpoint();
+    entry void resumed();
+    entry [reductiontarget] void done(int stepSum);
+    entry void quiescence();
+  };
+
+  group [migratable] LBSwitch {
+    entry LBSwitch();
+  };
+
+  array [1D] Elem {
+    entry Elem();
+    entry void step();
+  };
+};
