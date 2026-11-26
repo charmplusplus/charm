@@ -20,6 +20,7 @@ DIRS = \
   io \
   io_read \
   io_sessions \
+  io_post_tag \
   groupdep_creator \
   sparse \
   sparse-coro \
