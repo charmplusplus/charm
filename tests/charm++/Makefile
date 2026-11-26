@@ -35,6 +35,7 @@ DIRS = \
   amr_1d_simple \
   anytime_migration \
   anytime_bcastred \
+  collide \
 
 FTDIRS = \
   jacobi3d \

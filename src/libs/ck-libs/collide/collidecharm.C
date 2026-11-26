@@ -349,7 +349,7 @@ collideMgr::collideMgr(const CollideGrid3d &gridMap_,
   contribCount=0;
   msgsSent=msgsRecvd=0;
   totalLocalVoxels = -1;
-  collisionStarted = false;
+  prodStep = 0;
 }
 
 collideMgr::collideMgr(CkMigrateMessage* m) :
@@ -362,7 +362,7 @@ collideMgr::collideMgr(CkMigrateMessage* m) :
   contribCount=0;
   msgsSent=msgsRecvd=0;
   totalLocalVoxels = -1;
-  collisionStarted = false;
+  prodStep = 0;
 }
 
 // Reinitialize collideClient's state on restart
@@ -390,6 +390,10 @@ void collideMgr::addBoxes(int chunkNo, int n, const bbox3d* boxes, const int* pr
 {
   //printf("[%d] Receiving contribution from %d\n",CkMyPe(), chunkNo);
   CM_STATUS("collideMgr::addBoxes "<<n<<" boxes from "<<chunkNo);
+  if (contribCount==0) { //First boxes of step steps+1 on this PE
+    CProxy_collideMgr proxy(ckGetGroupID());
+    proxy[0].stepStarted(steps+1);
+  }
   aggregator.aggregate(CkMyPe(),chunkNo,n,boxes,prio);
   aggregator.send(); //Deliver all outgoing messages
   if (++contribCount==nContrib) { //That's everybody
@@ -434,11 +438,21 @@ void collideMgr::voxelMessageRecvd(void)
   tryAdvance();
 }
 
-//Check if we're barren-- if so, advance now
-void collideMgr::pleaseAdvance(void)
+void collideMgr::stepStarted(int step)
 {
-  CM_STATUS("collideMgr::pleaseAdvance");
-  tryAdvance();
+  if (step > prodStep) {
+    prodStep = step;
+    CProxy_collideMgr proxy(ckGetGroupID());
+    proxy.prod(step);
+  }
+}
+
+//A PE with no contributors never calls addBoxes, so it joins each step's
+//reduction here, catching up if prods arrive out of order.
+void collideMgr::prod(int step)
+{
+  CM_STATUS("collideMgr::prod "<<step);
+  while (nContrib==0 && steps<step) tryAdvance();
 }
 
 //Attempt to finish the voxel send/recv step
@@ -466,36 +480,26 @@ void collideMgr::reductionFinished(void)
 }
 
 void collideMgr::checkRegistrationComplete() {
-  if(myVoxels.size() == totalLocalVoxels && collisionStarted == false) {
-    collisionStarted = true;
-    //CmiPrintf("[%d][%d][%d][%d] all voxels registered totalvox=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, totalLocalVoxels);
-    //fflush(stdout);
-    CollisionList colls;
-    for(int i =0 ; i<myVoxels.size(); i++) {
-      myVoxels[i]->startCollision(steps, gridMap, client, colls);
-    }
-    client.ckLocalBranch()->collisions(steps,colls);
-    collisionStarted = false;
-    myVoxels.clear();
+  if (totalLocalVoxels < 0 || myVoxels.size() != (size_t)totalLocalVoxels)
+    return;
+  CollisionList colls;
+  for (size_t i = 0; i < myVoxels.size(); i++) {
+    myVoxels[i]->startCollision(steps, gridMap, client, colls);
   }
+  //Reset before the client sees the list: it may start the next step.
+  myVoxels.clear();
+  totalLocalVoxels = -1;
+  client.ckLocalBranch()->collisions(steps,colls);
 }
 
+//Every voxel on this PE, including those created during this step, receives
+//this step's initiateCollision broadcast, so the count is taken every step.
 void collideMgr::determineNumVoxels() {
-  if(totalLocalVoxels == -1 ) {
-    CkArray *array = voxelProxy.ckLocalBranch();
-    totalLocalVoxels = array->getNumLocalElems();
-  }
-  //CmiPrintf("[%d][%d][%d][%d] determineNumVoxels totalLocalVoxels=%d\n", CmiMyPe(), CmiMyNode(), CmiMyRank(), thisIndex, totalLocalVoxels);
-  //fflush(stdout);
+  totalLocalVoxels = voxelProxy.ckLocalBranch()->getNumLocalElems();
   checkRegistrationComplete();
 }
 
 void collideMgr::registerVoxel(collideVoxel *vox) {
-  if(totalLocalVoxels == -1 ) {
-    CkArrayID arrID = vox->ckGetArrayID();
-    CkArray *array = (CkArray *)CkLocalBranch(arrID);
-    totalLocalVoxels = array->getNumLocalElems();
-  }
   myVoxels.push_back(vox);
   checkRegistrationComplete();
 }
