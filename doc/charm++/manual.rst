@@ -10736,7 +10736,11 @@ include ``mpi-interoperate.h`` in its Charm++ source files, so that
 ``CkExit(code)``, which ends Charm++ for good; ``CkExit`` returns to its
 caller in this mode. ``CharmLibExit`` returns ``int``: the code given to
 ``CkExit``, the same value on every process, or 0 if the program never
-called the ordinary ``CkExit``. ``main`` can return it after
+called the ordinary ``CkExit``. After ``CkExit`` in this mode, entry
+methods are discarded, but Converse-level work that is already scheduled
+(a thread that yields, timer callbacks) can still run until
+``CharmLibExit`` returns. A thread suspended waiting for a message or a
+future is not resumed. ``main`` can return the code after
 ``MPI_Finalize``:
 
 .. code-block:: c++
