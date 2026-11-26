@@ -37,6 +37,12 @@ landed, since a detach notice can overtake the last signal (10.2); the round che
 process and deferred across processes, and two cheap checks run in production builds (11); the Converse
 destroy calls take a callback and `CmiAttachTarget` returns a handle per target (3.2).
 
+Revised 2026-11-26, from phase 3's code and runs: `CmiRegionAlloc` takes memory from a region arena of
+its own, not from the IPC segment (3.2, 6); a host peer that *fires* a counter pushes the counter's
+index onto the owner PE's fired list in the counter area, not an IPC block onto its receive queue (5.3);
+same-host measurements and where xpmem exists (6); phase 2's measurement of source buffers whose
+addresses change, which finds no need for a source-region option (6); phase 3's status (15).
+
 ## In brief: the calls added, kept and removed
 
 The receiver, called the **owner**, registers a buffer once (a **region**) and an atomic count with an
@@ -319,17 +325,25 @@ A `CmiSignal` to another process carries no data and so needs no remote key: it 
 message whose handler *decrements* the counter at poll time (5.5).
 
 `CmiRegionAlloc` lets the runtime choose memory that every locality can reach without per-pair work:
-host regions come from the owner's IPC segment when IPC is on (so host peers can write them in shm mode)
-and are NIC-registered once; device regions come from the registered device arena (CkDeviceMalloc's
-pool, ckrdmadevice.C:204-270). `CmiRegionCreate` accepts any user memory (section 6 says what that
+host regions come from the owner's region arena when IPC is on and the process has host peers (so host
+peers can write them in shm mode), and are NIC-registered like any region; device regions come from the
+registered device arena (CkDeviceMalloc's pool, ckrdmadevice.C:204-270). `CmiRegionCreate` accepts any user memory (section 6 says what that
 costs in each locality).
 
 The IPC segment does not scale to application data. It defaults to 8 MiB
 (`kDefaultSegmentSize`, cmi-shmem-common.h:24), and FINDINGS.md already records it filling. Ghost layers
 and pencil buffers live inside application arrays, and the first adopters' faces are parts of their own
 arrays (17.4). So in practice regions are user memory. The same-host direct path for user memory is
-xpmem, which becomes a requirement for that path (6); `CmiRegionAlloc` from the segment is for small
-regions.
+xpmem, which becomes a requirement for that path (6).
+
+For the same reason the region arena is not the IPC segment but a shared-memory object of its own
+(phase 3: `/cmi<pid>r`), of `+region_arena_bytes` of address space, 256 MiB by default. As with the
+counter area (5.1), pages take memory only when first written. Allocation is first fit from a free list,
+with freed neighbours merged, and memory returns when the region's destroy completes. An allocation that
+does not fit is ordinary memory, which host peers reach through the network. A peer maps the arena the
+first time it *attaches* to a target in it, and finds a piece at the same offset from the arena's start
+as in the owner. An earlier version of this design allocated these regions from the IPC segment, which
+limited them to small ones.
 
 A target is a fixed-size POD: the region's identity, owner and remote keys, the one piece with
 its layout, and the counter's owner and table index. It carries only its own piece, so a region may
@@ -623,7 +637,9 @@ counter's slice and index, so an origin needs no fixed formula to find the entry
   segment defaults to 8 MiB and already fills (3.2). Host peers map the area when they first *attach* to
   a target of that process. The area reserves address space for every slice at its limit (4 MiB per PE) but uses
   memory only for the entries touched: on Linux a tmpfs-backed shared mapping allocates a page when it is
-  first written, so a PE with 100 counters uses two pages.
+  first written, so a PE with 100 counters uses two pages. In phase 3 the area is the POSIX
+  shared-memory object `/cmi<pid>c`, made at the process's first `CmiCounterCreate` or `CmiRegionCreate`
+  when it has host peers; it also holds each PE's fired list (5.3).
 - With IPC off, the table is ordinary process memory, and host peers in other processes contribute
   over the network path (5.2 c), so no other process ever touches the word.
 
@@ -646,7 +662,7 @@ not its value (5.5).
 | origin | who executes the *decrement* | how it reaches the word |
 |---|---|---|
 | (a) same process (same or other PE) | the origin's thread, after its copy | process address |
-| (b) other process, same host | the origin's thread, after its copy | its mapping of the owner's segment |
+| (b) other process, same host | the origin's thread, after its copy | its mapping of the owner's counter area (5.1) |
 | (c) other host (or same host without IPC) | the LCI remote-completion handler in the owner process, on whichever PE thread is polling that device | process address |
 
 All three are CPU atomic read-modify-write operations on the same 32-bit word, from cache-coherent cores
@@ -668,14 +684,22 @@ The contribution that took the word to zero *fires*:
 
 - (a) and (c): `CmiPushPE(owner, actionMsg)`. In (c) this runs at poll time, on the polling PE: the step 1
   prototype already pushes from the same place.
-- (b): the *firing* thread is in another process, so it cannot use `CmiPushPE`. It pushes the action
-  message onto the owner PE's IPC receive stack `rq[ownerRank]` in the owner's segment, which the owner
-  drains every scheduler iteration (cmishmem.cpp:111-135). For that, the action message must already be
-  an IPC block in the owner's own segment: the owner allocates it when the counter is created. Today
-  `CmiAllocIpcBlock` refuses the caller's own segment (cmishmem.cpp:290-292); it needs a variant that
-  allocates from it. The push needs a variant too: `CmiPushIpcBlock` asserts that the pushing process
-  allocated the block (`meta->mine == block->sender_proc`, cmishmem.cpp:273), and here the owner
-  allocated it and an origin pushes it.
+- (b): the *firing* thread is in another process, so it cannot use `CmiPushPE`. It pushes the counter's
+  index onto the owner PE's *fired list*: a lock-free stack in the counter area (5.1), whose head is one
+  cache line in the area's header and whose links are a field of each counter's line. The owner PE takes
+  its whole list with one exchange once per scheduler iteration, where it already takes its IPC receive
+  queue (`CmiSchedulerPollIpc`), and pushes each counter's preallocated message with `CmiPushPE`. An
+  empty list costs that iteration one load. The list is pushed one element at a time and only taken
+  whole, the rule that makes the IPC pool's lists safe without a lock. A counter is on the list at most
+  once, since it *fires* again only after a *re-arm*, which is legal only once its handler has started.
+  - An earlier version of this design pushed the preallocated message itself onto the owner's IPC
+    receive stack `rq[ownerRank]`, as an IPC block in the owner's own segment. Phase 3 does not: one
+    block per counter would take space from the owner's 8 MiB message pool for the whole run (blocks never
+    return to the pool's heap), and it would need variants of `CmiAllocIpcBlock` and `CmiPushIpcBlock`.
+  - A destroy can complete between a peer's *firing* *decrement* and its push. It must not return the
+    index to the free list (10.2) while the push is pending, so it keeps the index of any counter that
+    has *fired* and whose handler has not started, and the handler returns the index when it finds the
+    counter gone. The same rule covers a message already queued.
 - On the same PE the *firing* contribution also queues (never calls the action inline), so an action never
   runs inside a *put* call.
 - **The preallocated message never reaches user code.** It is a small Converse message owned by the
@@ -708,8 +732,8 @@ The contribution that took the word to zero *fires*:
 - Shared memory, (a) and (b): each origin copies, then `fetch_sub` with release. All *decrements* are
   read-modify-write operations on one atomic, so each later *decrement* continues the release sequence of
   every earlier one; the *firing* *decrement* is acq_rel, so it synchronizes with every earlier
-  origin. The push to the owner's queue (release) and the owner's pop (acquire) carry that to the
-  owner PE. Cross-process, this holds because the atomics are address-free (5.2).
+  origin. The push onto the owner's queue or fired list (release) and the owner's take (acquire) carry
+  that to the owner PE. Cross-process, this holds because the atomics are address-free (5.2).
 - Network, (c). This is the one place the design states the argument for each provider.
   - **InfiniBand RC (ibv, Anvil).** RDMA write with immediate is one operation. Its completion at the
     target is generated only after the write's data is placed in memory, and the CQ poll has the needed
@@ -775,8 +799,8 @@ signal; the destroy accounting of 10.2 makes reuse of an index safe without them
 |---|---|---|---|
 | same PE | memcpy by the caller | same | (a) |
 | same process, other PE | memcpy by the origin's thread | same | (a) |
-| same host, other process, xpmem | memcpy through the mapping | memcpy through an xpmem attachment made when the origin's process *attaches* (the address space is already exported) | (b) |
-| same host, other process, shm mode | memcpy through the owner's segment (the region is in it; small regions only, 3.2) | *put* through the NIC (loopback RDMA; the region is NIC-registered) | (b) / (c) |
+| same host, other process, xpmem | memcpy through the origin's mapping of the region arena (3.2) | memcpy through an xpmem attachment made when the origin's process *attaches* (the address space is already exported) | (b) |
+| same host, other process, shm mode | memcpy through the origin's mapping of the region arena (3.2) | *put* through the NIC (loopback RDMA; the region is NIC-registered) | (b) / (c) |
 | same host, IPC off | *put* through the NIC | *put* through the NIC | (c) |
 | other host | RDMA write with immediate data into the region | same | (c) |
 
@@ -788,14 +812,38 @@ Notes:
   Today `+ipc` copies a message into the receiver's pool and the application then copies it again.
 - CMA (`process_vm_writev`) would serve user memory in shm mode, but it is compiled out of reconverse
   and depends on ptrace permissions; not assumed (W8).
-- **xpmem is the requirement** for direct same-host writes into user memory. It must be
-  confirmed on Anvil, Delta and Frontier in phase 3. Without it, same-host *puts* into user memory go
-  through the NIC.
+- **xpmem is the requirement** for direct same-host writes into user memory. Without it, same-host
+  *puts* into user memory go through the NIC. Phase 3 found `/dev/xpmem` on Anvil's compute nodes, where
+  its xpmem paths pass. Delta's compute nodes have no device (an `/opt/xpmem` install exists), so there
+  user memory takes the NIC. Frontier is still to check.
+- **Measured in phase 3**: round trip in us, two processes with one PE each, bound to their own cores,
+  Release build. Same-host rows are on one node.
+
+  | path | Anvil 8 B | Anvil 64 KiB | Delta 8 B | Delta 64 KiB |
+  |---|---|---|---|---|
+  | `CmiPut` into an arena region | 1.3-1.45 | 4.3 | 1.2-1.3 | 4.1-4.3 |
+  | `CmiPut` into user memory through xpmem | 1.9-2.0 | 5.2-5.3 | - | - |
+  | message through the `+ipc` pool | 2.4 | 30.8 | 2.3-2.5 | 40-41 |
+  | `CmiPut` across nodes | 3.8 | 18.1 | 7.1-7.2 | 24.4 |
+
+  A 64 KiB message through the pool is no faster than one through the network, even with
+  `++ipccutoff` raised past it: the benchmark's message mode copies the data three times (`CmiSyncSend`,
+  into the pool block, and in the handler into the destination buffer).
 - **Not verified, to check in phase 2**:
   - on ibv, an RDMA write with immediate consumes a pre-posted receive that is shared with eager
     traffic, which matters when there are many *puts*;
   - one memory registration per user region runs against cxi registration limits and the kdreg2 cost
-    seen on Frontier. One arena registration serves `CmiRegionAlloc`, but user regions each need their own.
+    seen on Frontier. One registration of the whole arena could serve `CmiRegionAlloc`; phases 2 and 3
+    register each region on its own, as for user memory.
+- **Source buffers are not registered in advance (measured in phase 2, Delta, cxi).** `CmiPut` takes
+  any source memory, and LCI registers a source larger than its copy limit for that one *put*;
+  reconverse turns LCI's own registration cache off on OFI and relies on libfabric's. With that cache
+  on (the default; cxi caps it at 4096 entries), a source reused every round, and sources rotated among
+  64 or 1024 buffers of up to 4 MiB, cost the same. With the cache off, every *put* pays a registration,
+  about 30 us at 16 KiB and 200 us at 4 MiB. Memory mapped afresh for each *put* pays the registration
+  each time, since the unmap drops the cached entry; from 256 KiB, writing the new pages costs more than
+  that. So phase 4 adds no source-region option to `CkPut`, unless an application with more distinct
+  source buffers than the cache holds shows the cost. Anvil (ibv) was not measured.
 - Large contributions within a host: a single-thread memcpy of 16 MB took 501 us on Anvil (33 GB/s), more
   than the NIC's 12.5 GB/s; the direct copy stays the default at every size until measured otherwise.
 
@@ -1616,9 +1664,15 @@ Each phase is a PR with tests; measurements gate the next phase.
    *firing*, *re-arm*, error checks, `CmiPut`/`CmiGet`, *attach* without IPC, the destroy accounting of
    10.2. First within a process, then across processes on phase 1's put with signal, or a message that
    carries the data where the network has no put with signal. Variable-size pieces (4.6) come after.
-3. **reconverse: same-host paths.** Counter table in its own shared area (5.1), `CmiRegionAlloc` in the IPC segment, IPC-block
-   action messages in the owner's own segment, xpmem *attach* of user regions; xpmem confirmed on Anvil,
-   Delta and Frontier. The mixed-locality test.
+3. **reconverse: same-host paths.** Counter table in its own shared area (5.1), `CmiRegionAlloc` from a
+   region arena of its own (3.2), a fired list per owner PE for *firing* from host peers (5.3), xpmem
+   *attach* of user regions; xpmem confirmed on Anvil, Delta and Frontier. The mixed-locality test.
+
+   Status (2026-11-26): implemented on a branch stacked on phase 2, to open as a PR once phase 2 merges.
+   Every test passes on Anvil (155 runs, xpmem included) and Delta (133; its compute nodes have no
+   xpmem), with each PE bound to its own core. In the four-process runs one counter takes contributions
+   from its own PE, another PE of its process, the other process on its node and the other node in the
+   same round. Frontier is not checked yet.
 4. **charm: `CkRegion`, `CkCounter`, targets, `CkPut`, `CkGet`, implicit *attach*, `destroy`**, PUP of handles, SDAG use, QD (4.8),
    LB records (4.10), tests in TEST_DIRS; commbench `halo3d` (contiguous faces) and `transpose`; the
    migration protocol of 10.3 for regions and counters, and the cost S of a move; `CkChannel` rebuilt
