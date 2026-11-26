@@ -13,6 +13,7 @@ DIRS = \
   ckAllocSysMsgTest \
   method_templates \
   demand_creation \
+  createhere_race \
   startupTest \
   topology \
   io \
