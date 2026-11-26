@@ -1240,9 +1240,6 @@ class MsgAggregator : public LevelLogic
     const int myNode = CkMyNode();
     std::vector<TreeLBMessage*> decisions(children.size() + 1);
 
-    // Avoid allocating a new message until we get to a non-local child
-    TreeLBMessage* remoteMsg = nullptr;
-
     // The first element is always for the local PE, the caller must delete it manually if
     // it is not used
     decisions[0] = decision;
@@ -1253,19 +1250,12 @@ class MsgAggregator : public LevelLogic
         CkReferenceMsg(decision);
         decisions[i] = decision;
       }
-      // Use separate message for messages outside the process because it will get packed
-      // and mess up local uses of the message
+      // Each child in another process gets its own copy: the send packs the message
+      // and writes the destination into its header, and the transport may still be
+      // reading the buffer after the send returns.
       else
       {
-        if (remoteMsg == nullptr)
-        {
-          remoteMsg = (TreeLBMessage*)CkCopyMsg((void**)&decision);
-        }
-        else
-        {
-          CkReferenceMsg(remoteMsg);
-        }
-        decisions[i] = remoteMsg;
+        decisions[i] = (TreeLBMessage*)CkCopyMsg((void**)&decision);
       }
     }
 

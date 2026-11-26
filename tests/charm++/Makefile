@@ -4,6 +4,7 @@ DIRS = \
   megatest \
   alignment \
   simplearrayhello \
+  cxx_standard \
   ckdyn \
   migratable_threads \
   provisioning \
@@ -21,11 +22,14 @@ DIRS = \
   io_sessions \
   groupdep_creator \
   sparse \
+  sparse-coro \
   reductionTesting \
   partitions \
   charmxi_parsing \
   jacobi3d \
   jacobi3d-sdag \
+  jacobi3d-coro \
+  ckcoro \
   zerocopy \
   within_node_bcast \
   longIdle \
@@ -53,14 +57,19 @@ DIRS = \
   objid_boundrecreate \
   objid_detour \
   objid_bindasync \
+  objid_boundmany \
   collide \
   objloads \
   qd \
   reduction_migrate_ahead \
   reduction_empty_kid \
+  bcast_epoch_wrap \
   section_migrate \
+  mcast_remote \
   xarray_section_reduction \
   bcast_zcpup \
+  arraymap_insert_abort \
+  proxy_delctor \
 
 FTDIRS = \
   jacobi3d \
@@ -86,8 +95,10 @@ NONSCALEDIRS = \
   migratable_threads \
   sdag \
   sparse \
+  sparse-coro \
   charmxi_parsing \
   anytime_migration \
+  arraymap_insert_abort \
 
 TESTPDIRS = $(filter-out $(NONSCALEDIRS),$(TESTDIRS))
 

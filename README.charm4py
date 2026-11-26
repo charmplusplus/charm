@@ -4,8 +4,6 @@ Building Charm++ shared library for Charm4py
 
 - Build libcharm using the 'charm4py' build target.
   For example, on a regular Linux machine:
-  ./build charm4py netlrts-linux-x86_64 -j8 --with-production
-  or, on the reconverse runtime:
   ./build charm4py reconverse-linux-x86_64 -j8 --with-production
 
   The target builds Charm++ as a shared library (libcharm) and defines
@@ -14,9 +12,12 @@ Building Charm++ shared library for Charm4py
   (src/ck-core/ckdyn.h; developer documentation in doc/internals/ckdyn.md,
   user documentation in doc/ckdyn/manual.rst).
 
-  NOTE: We are currently requiring non-smp mode because in the most common Python implementation
-  (CPython), multiple threads cannot run Python code concurrently due to the Global Interpreter Lock
-  (GIL).
+  On macOS, use the version reconverse-darwin-arm8.
+
+  NOTE: Reconverse builds always run in SMP mode, with the PEs as threads of
+  one process. In the most common Python implementation (CPython), multiple
+  threads cannot run Python code concurrently due to the Global Interpreter
+  Lock (GIL).
 
 Adding modules (e.g. load balancers) to libcharm
 ------------------------------------------------
@@ -30,8 +31,9 @@ _createTraces. A shared libcharm has no such executable, so:
   traces in a CMK_LIBCHARM_SHARED build with tracing enabled);
 - init.C registers TreeLB and the traces itself in a CMK_LIBCHARM_SHARED
   build (the section of _initCharm under #if CMK_LIBCHARM_SHARED); a module
-  added to libcharm needs its _register call added there, and the
-  LIBCHARM_LIBS variable in the Makefile needs to include the module;
+  added to libcharm needs its _register call added there, and the module's
+  library needs to be added to the target_link_libraries lines of the
+  'charm' library in the charm4py section of CMakeLists.txt;
 - in place of CkRegisterMainModule, the binding registers its classes through
   the CkDyn hook table (CkDynInit before CkDynStart).
 

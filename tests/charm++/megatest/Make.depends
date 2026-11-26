@@ -237,3 +237,9 @@ callbackkinds.o: \
 	megatest.h \
 	callbackkinds.def.h
 	$(CHARMC) -o callbackkinds.o -c callbackkinds.C
+nodereduction.o: \
+	nodereduction.C \
+	nodereduction.decl.h \
+	megatest.h \
+	nodereduction.def.h
+	$(CHARMC) -o nodereduction.o -c nodereduction.C

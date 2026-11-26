@@ -38,6 +38,7 @@ class XArraySectionReducer
             msgMap[redNo].push_back(msg);
             // Check if partialReduction is possible (streamable) across subsections
             if (msgMap[redNo].size() > 1 && CkReduction::reducerTable()[msg->reducer].streamable) {
+              CkReduction::checkSameReducer((int)msgMap[redNo].size(), msgMap[redNo].data());
               CkReduction::reducerFn f = CkReduction::reducerTable()[msg->reducer].fn;
               CkReductionMsg *intermediateReducedMsg = (*f)(msgMap[redNo].size(), msgMap[redNo].data());
               msgMap[redNo].pop_back();
@@ -58,6 +59,7 @@ class XArraySectionReducer
         void finalReducer(int redNo)
         {
             // Get a handle on the reduction function for this message
+            CkReduction::checkSameReducer((int)msgMap[redNo].size(), msgMap[redNo].data());
             CkReductionMsg *first = msgMap[redNo][0];
             CkReduction::reducerType reducer = first->reducer;
             int userFlag = first->userFlag;

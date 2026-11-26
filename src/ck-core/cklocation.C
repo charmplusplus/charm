@@ -481,6 +481,21 @@ public:
   }
 };
 
+// True when every component of i lies within the extents n an array was created
+// with. Maps that have no PE for other indices return -1 from procNum, so
+// ckInsert without a PE aborts (CProxy_ArrayBase::ckInsertIdx).
+static bool indexWithinExtents(const CkArrayIndex& n, const CkArrayIndex& i)
+{
+  if (i.dimension != n.dimension) return false;
+  for (int d = 0; d < i.dimension; d++)
+  {
+    const int x = i.dimension > 3 ? i.shortData()[d] : i.data()[d];
+    const int extent = n.dimension > 3 ? n.shortData()[d] : n.data()[d];
+    if (x < 0 || x >= extent) return false;
+  }
+  return true;
+}
+
 /**
  * The default map object -- This does blocked mapping in the general case and
  * calls the round-robin procNum for the dynamic insertion case -- ASB
@@ -664,6 +679,7 @@ public:
     {
       return RRMap::procNum(arrayHdl, i);
     }
+    if (!indexWithinExtents(amaps[arrayHdl]->_nelems, i)) return -1;
 
     if (i.dimension == 1)
     {
@@ -732,29 +748,73 @@ public:
 
 /* *
  * Hilbert map object -- This does hilbert mapping.
- * Convert array indices into 1D fashion according to their Hilbert filling curve
+ * Elements of a 2D..6D array are ordered by their position on a Hilbert curve
+ * through the array's extents; consecutive runs of _binSizeCeil elements in that
+ * order go to consecutive PEs of procList. 1D arrays are blocked by index.
  */
-
-typedef struct
-{
-  int intIndex;
-  std::vector<int> coords;
-} hilbert_pair;
-
-bool operator==(hilbert_pair p1, hilbert_pair p2) { return p1.intIndex == p2.intIndex; }
-
-bool myCompare(hilbert_pair p1, hilbert_pair p2) { return p1.intIndex < p2.intIndex; }
-
 class HilbertArrayMap : public DefaultArrayMap
 {
-  std::vector<int> allpairs;
+  // Per registered array: bounds[k] is the curve position of the first element
+  // of block k + 1 (at most CkNumPes() - 1 entries; empty for 1D arrays).
+  std::vector<std::vector<int>> bounds;
+  // The PEs in curve order: getHilbertList orders the processes, and each
+  // process contributes its PEs in rank order.
   std::vector<int> procList;
+
+  void buildProcList()
+  {
+    std::vector<int> nodeList(CkNumNodes());
+    getHilbertList(nodeList.data());
+    procList.clear();
+    for (int node : nodeList)
+      for (int pe = CkNodeFirst(node); pe < CkNodeFirst(node) + CkNodeSize(node); pe++)
+        procList.push_back(pe);
+  }
+
+  // The coordinates of index i; indices of more than three dimensions are shorts.
+  static void indexCoords(const CkArrayIndex& i, std::vector<int>& coords)
+  {
+    coords.resize(i.dimension);
+    for (int d = 0; d < i.dimension; d++)
+      coords[d] = i.dimension > 3 ? i.shortData()[d] : i.data()[d];
+  }
+
+  // Sorts the curve positions of every element of array idx and keeps the
+  // position that starts each block after the first.
+  void buildBounds(int idx)
+  {
+    if (idx >= (int)bounds.size()) bounds.resize(idx + 1);
+    std::vector<int>& b = bounds[idx];
+    b.clear();
+    if (!amaps[idx]) return;
+    const CkArrayIndex& n = amaps[idx]->_nelems;
+    const int dims = n.dimension;
+    if (dims < 2) return;
+    std::vector<int> extent;
+    indexCoords(n, extent);
+    size_t count = 1;
+    for (int e : extent) count *= (size_t)e;
+    if (count == 0) return;
+
+    std::vector<int> positions;
+    positions.reserve(count);
+    std::vector<int> coords(dims, 0);
+    for (size_t e = 0; e < count; e++)
+    {
+      positions.push_back(Hilbert_to_int(coords, dims));
+      for (int d = dims - 1; d >= 0 && ++coords[d] == extent[d]; d--) coords[d] = 0;
+    }
+    std::sort(positions.begin(), positions.end());
+
+    const size_t binSize = amaps[idx]->_binSizeCeil;
+    for (size_t first = binSize; first < count; first += binSize)
+      b.push_back(positions[first]);
+  }
 
 public:
   HilbertArrayMap(void)
   {
-    procList.resize(CkNumPes());
-    getHilbertList(procList.data());
+    buildProcList();
     DEBC((AA "Creating HilbertArrayMap\n" AB));
   }
 
@@ -764,270 +824,60 @@ public:
 
   int registerArray(const CkArrayIndex& i, CkArrayID aid)
   {
-    int idx;
-    idx = DefaultArrayMap::registerArray(i, aid);
-
-    if (i.dimension == 1)
-    {
-      // CkPrintf("1D %d\n", amaps[idx]->_nelems.data()[0]);
-    }
-    else if (i.dimension == 2)
-    {
-      // CkPrintf("2D %d:%d\n", amaps[idx]->_nelems.data()[0],
-      // amaps[idx]->_nelems.data()[1]);
-      const int dims = 2;
-      int nDim0 = amaps[idx]->_nelems.data()[0];
-      int nDim1 = amaps[idx]->_nelems.data()[1];
-      int index;
-      int counter = 0;
-      std::vector<int> coords;
-      allpairs.resize((size_t)nDim0 * nDim1);
-      coords.resize(dims);
-      for (int i = 0; i < nDim0; i++)
-        for (int j = 0; j < nDim1; j++)
-        {
-          coords[0] = i;
-          coords[1] = j;
-          index = Hilbert_to_int(coords, dims);
-          // CkPrintf("(%d:%d)----------> %d \n", i, j, index);
-          allpairs[counter] = index;
-          counter++;
-        }
-    }
-    else if (i.dimension == 3)
-    {
-      // CkPrintf("3D %d:%d:%d\n", amaps[idx]->_nelems.data()[0],
-      // amaps[idx]->_nelems.data()[1],
-      //        amaps[idx]->_nelems.data()[2]);
-      const int dims = 3;
-      int nDim0 = amaps[idx]->_nelems.data()[0];
-      int nDim1 = amaps[idx]->_nelems.data()[1];
-      int nDim2 = amaps[idx]->_nelems.data()[2];
-      int index;
-      int counter = 0;
-      std::vector<int> coords;
-      allpairs.resize((size_t)nDim0 * nDim1 * nDim2);
-      coords.resize(dims);
-      for (int i = 0; i < nDim0; i++)
-        for (int j = 0; j < nDim1; j++)
-          for (int k = 0; k < nDim2; k++)
-          {
-            coords[0] = i;
-            coords[1] = j;
-            coords[2] = k;
-            index = Hilbert_to_int(coords, dims);
-            allpairs[counter] = index;
-            counter++;
-          }
-    }
-    else if (i.dimension == 4)
-    {
-      // CkPrintf("4D %hd:%hd:%hd:%hd\n", ((short int*)amaps[idx]->_nelems.data())[0],
-      //        ((short int*)amaps[idx]->_nelems.data())[1], ((short
-      //        int*)amaps[idx]->_nelems.data())[2],
-      //        ((short int*)amaps[idx]->_nelems.data())[3]);
-      const int dims = 4;
-      int nDim[dims];
-      for (int k = 0; k < dims; k++)
-      {
-        nDim[k] = (int)((short int*)amaps[idx]->_nelems.data())[k];
-      }
-      int index;
-      int counter = 0;
-      std::vector<int> coords;
-      allpairs.resize((size_t)nDim[0] * nDim[1] * nDim[2] * nDim[3]);
-      coords.resize(dims);
-      for (int i = 0; i < nDim[0]; i++)
-        for (int j = 0; j < nDim[1]; j++)
-          for (int k = 0; k < nDim[2]; k++)
-            for (int x = 0; x < nDim[3]; x++)
-            {
-              coords[0] = i;
-              coords[1] = j;
-              coords[2] = k;
-              coords[3] = x;
-              index = Hilbert_to_int(coords, dims);
-              allpairs[counter] = index;
-              counter++;
-            }
-    }
-    else if (i.dimension == 5)
-    {
-      // CkPrintf("5D %hd:%hd:%hd:%hd:%hd\n", ((short int*)amaps[idx]->_nelems.data())[0],
-      //        ((short int*)amaps[idx]->_nelems.data())[1], ((short
-      //        int*)amaps[idx]->_nelems.data())[2],
-      //        ((short int*)amaps[idx]->_nelems.data())[3], ((short
-      //        int*)amaps[idx]->_nelems.data())[4]);
-      const int dims = 5;
-      int nDim[dims];
-      for (int k = 0; k < dims; k++)
-      {
-        nDim[k] = (int)((short int*)amaps[idx]->_nelems.data())[k];
-      }
-      int index;
-      int counter = 0;
-      std::vector<int> coords;
-      allpairs.resize((size_t)nDim[0] * nDim[1] * nDim[2] * nDim[3] * nDim[4]);
-      coords.resize(dims);
-      for (int i = 0; i < nDim[0]; i++)
-        for (int j = 0; j < nDim[1]; j++)
-          for (int k = 0; k < nDim[2]; k++)
-            for (int x = 0; x < nDim[3]; x++)
-              for (int y = 0; y < nDim[4]; y++)
-              {
-                coords[0] = i;
-                coords[1] = j;
-                coords[2] = k;
-                coords[3] = x;
-                coords[4] = y;
-                index = Hilbert_to_int(coords, dims);
-                allpairs[counter] = index;
-                counter++;
-              }
-    }
-    else if (i.dimension == 6)
-    {
-      // CkPrintf("6D %hd:%hd:%hd:%hd:%hd:%hd\n", ((short
-      // int*)amaps[idx]->_nelems.data())[0],
-      //        ((short int*)amaps[idx]->_nelems.data())[1], ((short
-      //        int*)amaps[idx]->_nelems.data())[2],
-      //        ((short int*)amaps[idx]->_nelems.data())[3], ((short
-      //        int*)amaps[idx]->_nelems.data())[4],
-      //        ((short int*)amaps[idx]->_nelems.data())[5]);
-      const int dims = 6;
-      int nDim[dims];
-      for (int k = 0; k < dims; k++)
-      {
-        nDim[k] = (int)((short int*)amaps[idx]->_nelems.data())[k];
-      }
-      int index;
-      int counter = 0;
-      std::vector<int> coords;
-      allpairs.resize((size_t)nDim[0] * nDim[1] * nDim[2] * nDim[3] * nDim[4] * nDim[5]);
-      coords.resize(dims);
-      for (int i = 0; i < nDim[0]; i++)
-        for (int j = 0; j < nDim[1]; j++)
-          for (int k = 0; k < nDim[2]; k++)
-            for (int x = 0; x < nDim[3]; x++)
-              for (int y = 0; y < nDim[4]; y++)
-                for (int z = 0; z < nDim[5]; z++)
-                {
-                  coords[0] = i;
-                  coords[1] = j;
-                  coords[2] = k;
-                  coords[3] = x;
-                  coords[4] = y;
-                  coords[5] = z;
-                  index = Hilbert_to_int(coords, dims);
-                  allpairs[counter] = index;
-                  counter++;
-                }
-    }
-    // procNum cuts allpairs values into blocks of _binSizeCeil, so they must be
-    // 0..n-1; curve positions are not when an extent is not a power of two.
-    // Replace each position by its rank along the curve.
-    std::vector<int> order(allpairs.size());
-    std::iota(order.begin(), order.end(), 0);
-    std::stable_sort(order.begin(), order.end(),
-                     [&](int a, int b) { return allpairs[a] < allpairs[b]; });
-    for (size_t r = 0; r < order.size(); r++) allpairs[order[r]] = (int)r;
+    int idx = DefaultArrayMap::registerArray(i, aid);
+    buildBounds(idx);
     return idx;
+  }
+
+  void unregisterArray(int idx)
+  {
+    DefaultArrayMap::unregisterArray(idx);
+    bounds[idx].clear();
   }
 
   int procNum(int arrayHdl, const CkArrayIndex& i)
   {
-    int flati = 0;
-    int myInt;
-    if (amaps[arrayHdl]->_nelems.dimension == 0)
+    auto& info = amaps[arrayHdl];
+    if (info->_nelems.dimension == 0)
     {
       return RRMap::procNum(arrayHdl, i);
     }
-    if (i.dimension == 1)
-    {
-      flati = i.data()[0];
-    }
-    else if (i.dimension == 2)
-    {
-      int nDim1 = amaps[arrayHdl]->_nelems.data()[1];
-      myInt = i.data()[0] * nDim1 + i.data()[1];
-      flati = allpairs[myInt];
-    }
-    else if (i.dimension == 3)
-    {
-      hilbert_pair mypair;
-      mypair.coords.resize(3);
-      int nDim[2];
-      for (int j = 0; j < 2; j++)
-      {
-        nDim[j] = amaps[arrayHdl]->_nelems.data()[j + 1];
-      }
-      myInt = i.data()[0] * nDim[0] * nDim[1] + i.data()[1] * nDim[1] + i.data()[2];
-      flati = allpairs[myInt];
-    }
-    else if (i.dimension == 4)
-    {
-      hilbert_pair mypair;
-      mypair.coords.resize(4);
-      short int nDim[3];
-      for (int j = 0; j < 3; j++)
-      {
-        nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j + 1];
-      }
-      myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] +
-                    ((short int*)i.data())[1] * nDim[1] * nDim[2] +
-                    ((short int*)i.data())[2] * nDim[2] + ((short int*)i.data())[3]);
-      flati = allpairs[myInt];
-    }
-    else if (i.dimension == 5)
-    {
-      hilbert_pair mypair;
-      mypair.coords.resize(5);
-      short int nDim[4];
-      for (int j = 0; j < 4; j++)
-      {
-        nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j + 1];
-      }
-      myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] * nDim[3] +
-                    ((short int*)i.data())[1] * nDim[1] * nDim[2] * nDim[3] +
-                    ((short int*)i.data())[2] * nDim[2] * nDim[3] +
-                    ((short int*)i.data())[3] * nDim[3] + ((short int*)i.data())[4]);
-      flati = allpairs[myInt];
-    }
-    else if (i.dimension == 6)
-    {
-      hilbert_pair mypair;
-      mypair.coords.resize(6);
-      short int nDim[5];
-      for (int j = 0; j < 5; j++)
-      {
-        nDim[j] = ((short int*)amaps[arrayHdl]->_nelems.data())[j + 1];
-      }
-      myInt = (int)(((short int*)i.data())[0] * nDim[0] * nDim[1] * nDim[2] * nDim[3] *
-                        nDim[4] +
-                    ((short int*)i.data())[1] * nDim[1] * nDim[2] * nDim[3] * nDim[4] +
-                    ((short int*)i.data())[2] * nDim[2] * nDim[3] * nDim[4] +
-                    ((short int*)i.data())[3] * nDim[3] * nDim[4] +
-                    ((short int*)i.data())[4] * nDim[4] + ((short int*)i.data())[5]);
-      flati = allpairs[myInt];
-    }
+    if (!indexWithinExtents(info->_nelems, i)) return -1;
 #if CMK_ERROR_CHECKING
-    else
-    {
-      CkAbort("CkArrayIndex has more than 6 dimensions!");
-    }
+    if (i.dimension > 6) CkAbort("CkArrayIndex has more than 6 dimensions!");
 #endif
 
-    /** binSize used in DefaultArrayMap is the floor of numChares/numPes
-     *  but for this FastArrayMap, we need the ceiling */
-    int block = flati / amaps[arrayHdl]->_binSizeCeil;
-    // for(int i=0; i<CkNumPes(); i++)
-    //    CkPrintf("(%d:%d) ", i, procList[i]);
-    // CkPrintf("\n");
-    // CkPrintf("block [%d:%d]\n", block, procList[block]);
+    int block;
+    if (i.dimension == 1)
+    {
+      // _binSizeCeil, not DefaultArrayMap's floor, so there are at most
+      // CkNumPes() blocks.
+      block = i.data()[0] / info->_binSizeCeil;
+    }
+    else
+    {
+      std::vector<int> coords;
+      indexCoords(i, coords);
+      const int pos = Hilbert_to_int(coords, i.dimension);
+      const std::vector<int>& b = bounds[arrayHdl];
+      block = std::upper_bound(b.begin(), b.end(), pos) - b.begin();
+    }
     return procList[block];
   }
 
-  void pup(PUP::er& p) { DefaultArrayMap::pup(p); }
+  void pup(PUP::er& p)
+  {
+    DefaultArrayMap::pup(p);
+    p | bounds;
+    p | procList;
+    // On a restart with a different PE count, DefaultArrayMap::pup has already
+    // recomputed _binSizeCeil; the blocks and the PE order follow from it.
+    if (p.isUnpacking() && (int)procList.size() != CkNumPes())
+    {
+      buildProcList();
+      for (int idx = 0; idx < (int)amaps.size(); idx++) buildBounds(idx);
+    }
+  }
 };
 
 /**
@@ -1512,12 +1362,15 @@ void arrInfo::distrib(int* speeds)
   }
 }
 
+// -1 (no PE) for a 1D index past the initial size and for any index of an array
+// created empty.
 int arrInfo::getMap(const CkArrayIndex& i)
 {
+  const int n = (int)_map.size();
   if (i.dimension == 1)
-    return _map[i.data()[0]];
-  else
-    return _map[((i.hash() + 739) % 1280107) % _nelems.getCombinedCount()];
+    return (i.data()[0] >= 0 && i.data()[0] < n) ? _map[i.data()[0]] : -1;
+  if (n == 0) return -1;
+  return _map[((i.hash() + 739) % 1280107) % n];
 }
 
 // Speeds maps processor number to "speed" (some sort of iterations per second counter)
@@ -1917,7 +1770,7 @@ void CkMigratable::recvLBPeriod(void* data)
 void CkMigratable::metaLBCallLB()
 {
   if (usesAtSync)
-    myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
+    myRec->getLBMgr()->AtLocalBarrier(ldBarrierHandle);
 }
 
 void CkMigratable::ckFinishConstruction(int epoch)
@@ -1978,7 +1831,7 @@ void CkMigratable::AtSync(int waitForMigration)
 
   if (!_lb_args.metaLbOn())
   {
-    myRec->getSyncBarrier()->atBarrier(ldBarrierHandle);
+    myRec->getLBMgr()->AtLocalBarrier(ldBarrierHandle);
     return;
   }
 
@@ -2151,6 +2004,63 @@ void CkLocRec::migrateMe(int toPe)  // Leaving this processor
   //	printf("[%d] migrating migrateMe to %d \n",CkMyPe(),toPe);
   myLocMgr->emigrate(this, toPe);
 }
+
+#if CMK_CUDA || CMK_HIP
+// A move deferred because of device-channel work, driven again once the work
+// is done (CkLocRec::noteChannelWorkDone).
+struct ChannelMigrateKickMsg
+{
+  char header[CmiMsgHeaderSizeBytes];
+  CkGroupID mgrGid;
+  CmiUInt8 id;
+  int toPe;
+};
+int _channelMigrateKickHandlerIdx;
+
+extern "C" void _channelMigrateKickHandler(void* arg)
+{
+  ChannelMigrateKickMsg* m = (ChannelMigrateKickMsg*)arg;
+  CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(m->mgrGid);
+  CkLocRec* rec = mgr ? mgr->localRecord(m->id) : NULL;
+  // An element that moved or died since the kick was posted makes it moot.
+  if (rec != NULL) rec->resumeDeferredMigration(m->toPe);
+  CmiFree(m);
+}
+
+void CkLocRec::noteChannelWorkDone()
+{
+  if (outstandingChannelWork > 0) outstandingChannelWork--;
+  if (outstandingChannelWork == 0 && pendingMigrateTo != -1)
+  {
+    const int toPe = pendingMigrateTo;
+    pendingMigrateTo = -1;
+    // Posted to this PE's queue, never taken inline: the completion that
+    // brought the count to zero can run inside the handler that has just
+    // queued this element's notification, and migrating here would pack the
+    // element before that message is delivered.
+    ChannelMigrateKickMsg* m = (ChannelMigrateKickMsg*)CmiAlloc(sizeof(ChannelMigrateKickMsg));
+    m->mgrGid = myLocMgr->ckGetGroupID();
+    m->id = getID();
+    m->toPe = toPe;
+    CmiSetHandler(m, _channelMigrateKickHandlerIdx);
+    CmiPushPE(CmiMyRank(), m);
+  }
+}
+
+void CkLocRec::resumeDeferredMigration(int toPe)
+{
+#if CMK_LBDB_ON
+  // The application's window for migration still governs: outside it the move
+  // waits for its next safe point, as one ordered by the load balancer does.
+  if (!readyMigrate)
+  {
+    nextPe = toPe;
+    return;
+  }
+#endif
+  myLocMgr->emigrate(this, toPe);  // defers again if new channel work started meanwhile
+}
+#endif
 
 #if CMK_LBDB_ON
 void CkLocRec::startTiming(int ignore_running)
@@ -3085,6 +2995,24 @@ void CkLocMgr::pup(PUP::er& p)
   }
 }
 
+/// Whether every array named in a migrating element's data has a manager here
+/// (the list pupElementsFor writes first).
+bool CkLocMgr::hasManagersFor(CkArrayElementMigrateMessage* msg) const
+{
+  PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
+  int n = 0;
+  p | n;
+  for (int i = 0; i < n; i++)
+  {
+    CkArrayID aid;
+    int elCType;
+    p | aid;
+    p | elCType;
+    if (managers.find(aid) == managers.end()) return false;
+  }
+  return true;
+}
+
 /// Add a new local array manager to our list.
 void CkLocMgr::addManager(CkArrayID id, CkArray* mgr)
 {
@@ -3095,7 +3023,7 @@ void CkLocMgr::addManager(CkArrayID id, CkArray* mgr)
   while (i != pendingImmigrate.end())
   {
     auto msg = *i;
-    if (msg->nManagers <= managers.size())
+    if (hasManagersFor(msg))
     {
       i = pendingImmigrate.erase(i);
       immigrate(msg);
@@ -3654,23 +3582,59 @@ void CkLocMgr::pupElementsFor(PUP::er& p, CkLocRec* rec, CkElementCreation_t typ
 {
   p.comment("-------- Array Location --------");
 
+  // The elements, in the order their data follows, each named by its array's
+  // id: the order of managers differs between PEs when bound arrays are
+  // created from several PEs at once. A checkpoint starts with a marker; one
+  // written before the marker existed has one type per manager in map order.
+  const int idLayout = -2;  // not a chare type
+  bool ids = p.isMigration();
+  int first = idLayout;
+  if (!p.isMigration())
+  {
+    p | first;
+    ids = !p.isUnpacking() || first == idLayout;
+  }
+  std::vector<std::pair<CkArrayID, CkArray*>> present;
+  int n = 0;
+  if (!p.isUnpacking() || !ids)
+  {
+    for (auto& m : managers)
+      if (!ids || m.second->getEltFromArrMgr(rec->getID()))
+        present.emplace_back(m.first, m.second);
+    n = (int)present.size();
+  }
+  if (ids) p | n;
+
   // First pup the element types
   // (A separate loop so ckLocal works even in element pup routines)
-  for (auto itr = managers.begin(); itr != managers.end(); ++itr)
+  if (p.isUnpacking() && ids) present.resize(n);
+  for (int i = 0; i < n; i++)
   {
-    int elCType;
-    CkArray* arr = itr->second;
+    int elCType = -1;
     if (!p.isUnpacking())
-    {  // Need to find the element's existing type
-      CkMigratable* elt = arr->getEltFromArrMgr(rec->getID());
-      if (elt)
-        elCType = elt->ckGetChareType();
-      else
-        elCType = -1;  // Element hasn't been created
+    {
+      CkMigratable* elt = present[i].second->getEltFromArrMgr(rec->getID());
+      if (elt) elCType = elt->ckGetChareType();
     }
-    p(elCType);
+    if (ids)
+    {
+      p | present[i].first;
+      if (p.isUnpacking())
+      {
+        auto m = managers.find(present[i].first);
+        if (m == managers.end())
+          CkAbort("Array element names array %d, which has no manager on PE %d\n",
+                  ((CkGroupID)present[i].first).idx, CkMyPe());
+        present[i].second = m->second;
+      }
+    }
+    if (!ids && i == 0)
+      elCType = first;
+    else
+      p | elCType;
     if (p.isUnpacking() && elCType != -1)
     {
+      CkArray* arr = present[i].second;
       // Create the element
       CkMigratable* elt = arr->allocateMigrated(elCType, type);
       int migCtorIdx = _chareTable[elCType]->getMigCtor();
@@ -3685,9 +3649,9 @@ void CkLocMgr::pupElementsFor(PUP::er& p, CkLocRec* rec, CkElementCreation_t typ
     }
   }
   // Next pup the element data
-  for (auto itr = managers.begin(); itr != managers.end(); ++itr)
+  for (auto& m : present)
   {
-    CkMigratable* elt = itr->second->getEltFromArrMgr(rec->getID());
+    CkMigratable* elt = m.second->getEltFromArrMgr(rec->getID());
     if (elt != NULL)
     {
       elt->virtual_pup(p);
@@ -3761,6 +3725,21 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   if (toPe == CkMyPe())
     return;  // You're already there!
 
+#if CMK_CUDA || CMK_HIP
+  // Device channels this element receives on: their senders are told the
+  // channel is closing, and each awaited acknowledgement is channel work of
+  // the element. While any is outstanding -- or a put of the element's, or a
+  // read into its buffers, is in flight -- the move waits, so nothing lands in
+  // or reads from a buffer the pack is about to free; the last completion
+  // drives it again (CkLocRec::noteChannelWorkDone).
+  CkDeviceChannelsBeforeMigrate(rec);
+  if (rec->outstandingChannelWork > 0)
+  {
+    rec->pendingMigrateTo = toPe;
+    return;
+  }
+#endif
+
   CkArrayIndex idx = rec->getIndex();
   CmiUInt8 id = rec->getID();
   const CmiUInt8 life = rec->getLife();  // rec is gone by the time the home is told
@@ -3780,6 +3759,12 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   callMethod(rec, &CkMigratable::ckAboutToMigrate);
 #if CMK_MEM_CHECKPOINT
   CkMemCheckPTNoteMigration();  // a rollback is refused after a migration
+#endif
+
+#if CMK_CUDA || CMK_HIP
+  // The channels' exports and registrations go with the buffers the pack is
+  // about to free; the element reopens them on its new buffers in its pup.
+  CkDeviceChannelsPack(rec);
 #endif
 
   // Record the move in the process's table before the migration message exists: a
@@ -3832,7 +3817,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 #else
                                                     false,
 #endif
-                                                    bufSize, managers.size(),
+                                                    bufSize,
                                                     newEpoch, life, gpuBufSize > 0);
 
   {
@@ -3924,9 +3909,7 @@ void CkLocMgr::immigrate(CkArrayElementMigrateMessage* msg)
 {
   const CkArrayIndex& idx = msg->idx;
 
-  if (msg->nManagers < managers.size())
-    CkAbort("Array element arrived from location with fewer managers!\n");
-  if (msg->nManagers > managers.size())
+  if (!hasManagersFor(msg))
   {
     // Some array managers haven't registered yet -- buffer the message
     DEBM((AA "Buffering %s immigrate msg waiting for array registration\n" AB,
@@ -3989,8 +3972,6 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
         "ERROR! Array element claimed it was %d bytes to a"
         "packing PUP::er, but %zu bytes in the unpacking PUP::er!\n",
         msg->length, p.size());
-    CkError("(I have %zu managers; it claims %d managers)\n", managers.size(),
-            msg->nManagers);
 
     CkAbort("Array element's pup routine has a direction mismatch.\n");
   }

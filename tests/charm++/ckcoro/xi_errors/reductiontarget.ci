@@ -1,0 +1,7 @@
+// error: is not a reduction target
+module xe_reductiontarget {
+  array [1D] A {
+    entry A();
+    entry [coroutine, reductiontarget] void run(int sum);
+  };
+};

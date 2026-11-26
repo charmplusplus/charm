@@ -22,34 +22,56 @@ clean:
 	rm -rf ckdyntest.ckpt
 
 # The randomized scheduler queue ignores priorities, so that run skips the
-# priority phase. Each `!` run must abort with the CkDyn message its grep
-# names: a send to a deleted section, a broadcast with an NCPY slot, a
+# priority phase. Each expect_abort run must abort with the CkDyn message in
+# ABORT_<name>: a send to a deleted section, a broadcast with an NCPY slot, a
 # section id from before +restart (the restart of the +p1 checkpoint), a
 # section of a charmxi array, a SECTION callback as checkpoint callback,
 # deleting a combined section that a combine waits on, and the reduction
-# number of a deleted section, and a CkDynRegisterClass call after start-up.
+# number of a deleted section, a CkDynRegisterClass call after start-up, and
+# shaped contributions of two shapes to one reduction.
+ABORT_stalerestart = CkDynSendSection: stale section id from before restart
+ABORT_stalesend = send to a deleted section .*stale generation
+ABORT_staleredno = CkDynSectionRedNo: .*was deleted
+ABORT_zcbcast = slot 2 is an NCPY slot; a message with zero-copy slots is sent point to point only, not as an array broadcast
+ABORT_badlatereg = CkDynRegisterClass for class Late after start-up; register it with CkDynRegisterClassLate
+ABORT_xisection = a member is an element of class Plain, which is not a dynamic class
+ABORT_ckptsection = CkDynCheckpoint: the done callback is a SECTION callback
+ABORT_deletewaiting = combine\(s\) named it as a part
+ABORT_mixedshape = contributions to one reduction have different shapes, \((2, 3|3, 2)\) and \((2, 3|3, 2)\)
+
+# The run goes through testrun, so a batch launcher starts it like the other
+# runs. It must exit nonzero and its output must match ABORT_$(1) (an
+# extended regular expression). testrun skips (exit 0, "Skipping the test")
+# when the process count does not divide the PE count; that counts as a pass.
+# $(1): the case name, $(2): testrun and program options
+define expect_abort
+	@$(call run, $(2) ) > $(1).log 2>&1; rc=$$?; \
+	if grep -q "Skipping the test" $(1).log; then \
+	  echo "ckdyn $(1) skipped"; \
+	elif [ $$rc -eq 0 ]; then \
+	  cat $(1).log; echo "ckdyn $(1): expected a nonzero exit"; exit 1; \
+	elif ! grep -qE "$(ABORT_$(1))" $(1).log; then \
+	  cat $(1).log; echo "ckdyn $(1): abort message missing"; exit 1; \
+	else \
+	  echo "ckdyn $(1) passed (exit $$rc)"; \
+	fi
+endef
+
 test: all
 	$(call run, ./ckdyntest +p4 +balancer RotateLB +randomized_msgq -skip priority -requiremoves )
 	$(call run, ./ckdyntest +p4 +balancer RotateLB -requiremoves )
 	$(call run, ./ckdyntest +p4 +restart ckdyntest.ckpt )
 	$(call run, ./ckdyntest +p1 )
 	$(call run, ./ckdyntest +p1 +restart ckdyntest.ckpt )
-	! ./ckdyntest +pe 1 +restart ckdyntest.ckpt -stalerestart > stalerestart.log 2>&1
-	grep -q "CkDynSendSection: stale section id from before restart" stalerestart.log
-	! ./ckdyntest +pe 1 -stalesend -skip pingpong -skip pingpong_inline > stalesend.log 2>&1
-	grep -q "send to a deleted section .*stale generation" stalesend.log
-	! ./ckdyntest +pe 2 -staleredno -skip pingpong -skip pingpong_inline > staleredno.log 2>&1
-	grep -q "CkDynSectionRedNo: .*was deleted" staleredno.log
-	! ./ckdyntest +pe 1 -zcbcast -skip pingpong -skip pingpong_inline > zcbcast.log 2>&1
-	grep -q "slot 2 is an NCPY slot; a message with zero-copy slots is sent point to point only, not as an array broadcast" zcbcast.log
-	! ./ckdyntest +pe 1 -badlatereg > badlatereg.log 2>&1
-	grep -q "CkDynRegisterClass for class Late after start-up; register it with CkDynRegisterClassLate" badlatereg.log
-	! ./ckdyntest +pe 2 -xisection > xisection.log 2>&1
-	grep -q "a member is an element of class Plain, which is not a dynamic class" xisection.log
-	! ./ckdyntest +pe 1 -ckptsection -skip sections -skip pingpong -skip pingpong_inline > ckptsection.log 2>&1
-	grep -q "CkDynCheckpoint: the done callback is a SECTION callback" ckptsection.log
-	! ./ckdyntest +pe 2 -deletewaiting -skip pingpong -skip pingpong_inline > deletewaiting.log 2>&1
-	grep -q "combine(s) named it as a part" deletewaiting.log
+	$(call expect_abort,stalerestart,./ckdyntest +p1 +restart ckdyntest.ckpt -stalerestart)
+	$(call expect_abort,stalesend,./ckdyntest +p1 -stalesend -skip pingpong -skip pingpong_inline)
+	$(call expect_abort,staleredno,./ckdyntest +p2 -staleredno -skip pingpong -skip pingpong_inline)
+	$(call expect_abort,zcbcast,./ckdyntest +p1 -zcbcast -skip pingpong -skip pingpong_inline)
+	$(call expect_abort,badlatereg,./ckdyntest +p1 -badlatereg)
+	$(call expect_abort,xisection,./ckdyntest +p2 -xisection)
+	$(call expect_abort,ckptsection,./ckdyntest +p1 -ckptsection -skip sections -skip pingpong -skip pingpong_inline)
+	$(call expect_abort,deletewaiting,./ckdyntest +p2 -deletewaiting -skip pingpong -skip pingpong_inline)
+	$(call expect_abort,mixedshape,./ckdyntest +p2 -mixedshape -skip pingpong -skip pingpong_inline)
 
 testp: all
 	$(call run, ./ckdyntest +p$(P) +balancer RotateLB )

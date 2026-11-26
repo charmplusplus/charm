@@ -4,6 +4,8 @@ module arraymaps {
     entry arraymaps_driver(void);
     entry [reductiontarget] void phaseDone(int n, int v[n]);
     entry void inserted(int flat, int pe);
+    entry void emptyCreated(void);
+    entry void decoyReady(void);
   };
 
   // Inserts elements from a PE other than 0 when there is one.
@@ -19,6 +21,7 @@ module arraymaps {
     entry void migrate(void);
     entry void afterMigrate(void);
     entry void ping(void);
+    entry void checkHome(void);
     entry void destroy(void);
   };
 
@@ -28,6 +31,7 @@ module arraymaps {
     entry void migrate(void);
     entry void afterMigrate(void);
     entry void ping(void);
+    entry void checkHome(void);
     entry void destroy(void);
   };
 
@@ -37,6 +41,7 @@ module arraymaps {
     entry void migrate(void);
     entry void afterMigrate(void);
     entry void ping(void);
+    entry void checkHome(void);
     entry void destroy(void);
   };
 
@@ -46,6 +51,7 @@ module arraymaps {
     entry void migrate(void);
     entry void afterMigrate(void);
     entry void ping(void);
+    entry void checkHome(void);
     entry void destroy(void);
   };
 
@@ -55,6 +61,7 @@ module arraymaps {
     entry void migrate(void);
     entry void afterMigrate(void);
     entry void ping(void);
+    entry void checkHome(void);
     entry void destroy(void);
   };
 
@@ -64,6 +71,13 @@ module arraymaps {
     entry void migrate(void);
     entry void afterMigrate(void);
     entry void ping(void);
+    entry void checkHome(void);
+    entry void destroy(void);
+  };
+
+  // A second array registered with the map group of the array of a case.
+  array [2D] arraymaps_decoy {
+    entry arraymaps_decoy(void);
     entry void destroy(void);
   };
 };

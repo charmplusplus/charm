@@ -159,6 +159,8 @@ list (SORT _variableNames)
 list(REMOVE_ITEM _variableNames CMK_USE_CMA)
 # CMK_OPTIMIZE belongs in conv-mach-opt.h (build-time options), not conv-autoconfig.h
 list(REMOVE_ITEM _variableNames CMK_OPTIMIZE)
+# CMK_COVERAGE too, as 0 or 1 whatever spelling the option was given
+list(REMOVE_ITEM _variableNames CMK_COVERAGE)
 
 set(optfile ${CMAKE_BINARY_DIR}/include/conv-autoconfig.h)
 file(REMOVE ${optfile})

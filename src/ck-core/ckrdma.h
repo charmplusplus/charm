@@ -368,6 +368,8 @@ const void *getParentBcastAckInfo(void *msg, int &srcPe);
 // Allocate a NcpyBcastInterimAckInfo and return the pointer
 NcpyBcastInterimAckInfo *allocateInterimNodeAckObj(envelope *myEnv, envelope *myChildEnv, int pe);
 
+void CkRdmaSendBcastMsgToChildNodes(envelope *env, int rootNode);
+
 void forwardMessageToChildNodes(envelope *myChildrenMsg, UChar msgType);
 
 void forwardMessageToPeerNodes(envelope *myMsg, UChar msgType);

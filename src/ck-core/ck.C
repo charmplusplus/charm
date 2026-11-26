@@ -15,6 +15,8 @@ clients, including the rest of Charm++, are actually C++.
 #include "LBManager.h"
 #endif // CMK_LBDB_ON
 
+#include <unordered_set>
+
 #ifndef CMK_CHARE_USE_PTR
 #include <map>
 CkpvDeclare(std::vector<void *>, chare_objs);
@@ -30,6 +32,64 @@ typedef std::map<int, CkChareID>  Vidblockmap;
 CkpvDeclare(Vidblockmap, vmap);      // remote VidBlock to notify upon deletion
 CkpvDeclare(int, currentChareIdx);
 #endif
+
+CkpvDeclare(void *, _ckCurrentMsg);  // see CkCurrentMessage (charm++.h)
+CkpvDeclare(int, _ckCurrentEp);
+bool _ckCoroFakeMigrate = false;     // +ck_fakemigrate (parsed in init.C), read by ckcoro.h
+bool _ckCoroFakeMigratePup = false;  // +ck_fakemigrate_pup (parsed in init.C), read by ckcoro.h
+
+// CK_LABEL labels, in the order the program's static initialization recorded
+// them, registered as entries of their chares on rank 0 of each process.
+namespace {
+struct CoroLabel {
+  const char *name;
+  int (*chareIdx)();
+  int ep;
+};
+std::vector<CoroLabel> &coroLabels() {
+  static std::vector<CoroLabel> labels;
+  return labels;
+}
+}
+int _ckCoroAddLabel(const char *name, int (*chareIdx)()) {
+  coroLabels().push_back(CoroLabel{name, chareIdx, -1});
+  return (int)coroLabels().size() - 1;
+}
+int _ckCoroLabelEp(int label) { return coroLabels()[label].ep; }
+void _ckCoroRegisterLabels() {
+  for (CoroLabel &l : coroLabels()) l.ep = CkRegisterEp(l.name, NULL, 0, l.chareIdx(), 0);
+}
+
+// ckDestroyLater: a Converse message to this PE whose handler destroys the
+// chare, so the destruction follows the return of whatever is running on
+// the chare now (an entry method, or a direct call that resumed a
+// coroutine), and several chares may ask on one PE. The chares that asked
+// and still exist are in _ckDestroyLaterPending: a second call sends
+// nothing, and a chare destroyed another way first leaves the set in
+// ~Chare, so its message finds nothing to destroy.
+CkpvDeclare(std::unordered_set<Chare *>, _ckDestroyLaterPending);
+int _ckDestroyLaterHandlerIdx;
+struct CkDestroyLaterMsg {
+  char core[CmiMsgHeaderSizeBytes];
+  Chare *obj;
+};
+void _ckDestroyLaterHandler(void *m) {
+  Chare *obj = ((CkDestroyLaterMsg *)m)->obj;
+  CmiFree(m);
+  if (CkpvAccess(_ckDestroyLaterPending).erase(obj) == 0) return;
+  obj->ckDestroy();
+}
+void Chare::ckDestroy(void) { delete this; }
+void Chare::ckDestroyLater(void) {
+  if (!CkpvAccess(_ckDestroyLaterPending).insert(this).second) return;
+  CkDestroyLaterMsg *m = (CkDestroyLaterMsg *)CmiAlloc(sizeof(CkDestroyLaterMsg));
+  m->obj = this;
+  CmiSetHandler(m, _ckDestroyLaterHandlerIdx);
+  CmiSyncSendAndFree(CkMyPe(), sizeof(CkDestroyLaterMsg), (char *)m);
+}
+void IrrGroup::ckDestroy(void) {
+  CkAbort("ckDestroy/ckDestroyLater on a group or nodegroup branch: groups are not destroyed one branch at a time");
+}
 
 // Map of array IDs to array elements for fast message delivery
 CkpvDeclare(ArrayObjMap, array_objs);
@@ -108,6 +168,9 @@ void Chare::CkEnableObjQ()
 
 Chare::~Chare() {
   CkCallstackUnwind(this);
+  // A ckDestroyLater message still on its way finds nothing to destroy.
+  if (CkpvInitialized(_ckDestroyLaterPending) && !CkpvAccess(_ckDestroyLaterPending).empty())
+    CkpvAccess(_ckDestroyLaterPending).erase(this);
 
 #ifndef CMK_CHARE_USE_PTR
 /*
@@ -663,6 +726,11 @@ void CkCallstackUnwind(Chare *obj) {
 
 // pops ( obj ) from the stack (and manages timing)
 void CkCallstackPop(Chare *obj) {
+#if CMK_CUDA || CMK_HIP
+  // The device channels' puts this entry method batched go out while it is
+  // still the running object (ckdevicechannel.C).
+  CkDeviceChannelBatchFlush();
+#endif
 #if CMK_LBDB_ON && CMK_CUDA
   // Paired 1:1 with the push in CkCallstackPush.
   hapiCuptiPopObjCorrelation();
@@ -1405,14 +1473,17 @@ void _processHandler(void *converseMsg,CkCoreState *ck)
     // Determine mode depending on the message
     ncpyEmApiMode mode = (CMI_ZC_MSGTYPE(env) == CMK_ZC_BCAST_SEND_MSG) ? ncpyEmApiMode::BCAST_SEND : ncpyEmApiMode::P2P_SEND;
 
-    env = CkRdmaIssueRgets(env, mode, prevEnv);
+    // CkRdmaIssueRgets copies prevEnv into a new message that receives the
+    // payload. Only a broadcast keeps prevEnv past the call: an intermediate
+    // node of the spanning tree forwards it to its children on completion.
+    const bool keepPrevEnv = (mode == ncpyEmApiMode::BCAST_SEND);
+    env = CkRdmaIssueRgets(env, mode, keepPrevEnv ? prevEnv : NULL);
 
-    if(env) {
-      // memcpyGet or cmaGet completed, env contains the payload and will be enqueued
-
-      // Free prevEnv
+    // memcpyGet or cmaGet completed (env is the new message, enqueued below),
+    // or a P2P rget is in flight: prevEnv is not needed either way.
+    if(env || !keepPrevEnv)
       CkFreeMsg(EnvToUsr(prevEnv));
-    } else {
+    if(!env) {
       // async rdma call in place, asynchronous return and ack handling
       return;
     }
@@ -1589,6 +1660,23 @@ void _skipCldHandler(void *converseMsg)
 #endif
 }
 
+// Node-level broadcast of a packed message. A zerocopy bcast goes to the
+// children of this node's spanning tree, along which its acks are counted.
+static void _nodeBroadcastAndFree(int len, envelope *env, bool includeSelf)
+{
+  if (CMI_IS_ZC_BCAST(env)) {
+    CkRdmaSendBcastMsgToChildNodes(env, CkMyNode());
+    if (includeSelf)
+      CmiSyncNodeSendAndFree(CkMyNode(), len, (char *)env);
+    else
+      CmiFree(env);
+  } else if (includeSelf) {
+    CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
+  } else {
+    CmiSyncNodeBroadcastAndFree(len, (char *)env);
+  }
+}
+
 //static void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 // Made non-static to be used by ckmessagelogging
 void _skipCldEnqueue(int pe,envelope *env, int infoFn)
@@ -1634,9 +1722,9 @@ void _skipCldEnqueue(int pe,envelope *env, int infoFn)
 #endif
     CmiSetInfo(env,infoFn);
     if (pe==CLD_BROADCAST) {
-      CmiSyncNodeBroadcastAndFree(len, (char *)env);
+      _nodeBroadcastAndFree(len, env, false);
     } else if (pe==CLD_BROADCAST_ALL) {
-      CmiSyncNodeBroadcastAllAndFree(len, (char *)env);
+      _nodeBroadcastAndFree(len, env, true);
     } else {
 #if CMK_USE_SHMEM
       if (!_tryIpcSend<false, false>(pe, env, infoFn))
@@ -1681,8 +1769,8 @@ static void _noCldEnqueue(int pe, envelope *env)
 
   CkPackMessage(&env);
   int len=env->getTotalsize();
-  if (pe==CLD_BROADCAST) { CmiSyncNodeBroadcastAndFree(len, (char *)env); }
-  else if (pe==CLD_BROADCAST_ALL) { CmiSyncNodeBroadcastAllAndFree(len, (char *)env); }
+  if (pe==CLD_BROADCAST) { _nodeBroadcastAndFree(len, env, false); }
+  else if (pe==CLD_BROADCAST_ALL) { _nodeBroadcastAndFree(len, env, true); }
   else 
 #if CMK_USE_SHMEM
     if (!_tryIpcSend<false, false>(pe, env, 0x0))
@@ -1712,13 +1800,12 @@ void _noCldNodeEnqueue(int node, envelope *env)
 
   CkPackMessage(&env);
   int len=env->getTotalsize();
-  if (node==CLD_BROADCAST) { 
-	CmiSyncNodeBroadcastAndFree(len, (char *)env); 
-}
-  else if (node==CLD_BROADCAST_ALL) { 
-		CmiSyncNodeBroadcastAllAndFree(len, (char *)env); 
-
-}
+  if (node==CLD_BROADCAST) {
+    _nodeBroadcastAndFree(len, env, false);
+  }
+  else if (node==CLD_BROADCAST_ALL) {
+    _nodeBroadcastAndFree(len, env, true);
+  }
   else {
 #if CMK_USE_SHMEM
     if (!_tryIpcSend<true, false>(node, env, 0x0))

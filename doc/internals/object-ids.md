@@ -57,6 +57,16 @@ have built the location manager yet when an asynchronous creation request
 arrives (#4174). Only a location manager set directly with
 `setLocationManager` is read from its branch on PE 0.
 
+The elements of one index in all the arrays bound together share one location
+record and migrate in one message. `CkLocMgr::pupElementsFor` writes, for a
+migration, the number of elements and then each element's array id and chare
+type before the element data; the receiving PE creates each element in the
+array named by its id, and `CkLocMgr::immigrate` holds the message until every
+named array has a manager there (`hasManagersFor`). The order of the
+`managers` map is not used: it differs between PEs when bound arrays are
+created from several PEs at once, as AMPI's communicators are. Checkpoints use
+the same layout after a marker (see section 5).
+
 **Payload.** What the payload means is decided per array, by its `CkLocMgr`,
 from whether the array has bounds:
 
@@ -191,6 +201,18 @@ from the restored elements, not restored: each element registers at its home,
 which the new process count defines. With PR 1d, each `CkLocMgr` and `CkArray`
 pups its collection number and kind, and PE 0 moves its counters past every
 restored number before any new array is created.
+
+The array data of a checkpoint is written per location record in the
+migration layout (section 1), after the marker -2, which is not a chare type.
+The order of the `managers` map differs between the writing PE and the
+restoring PE when bound arrays were created from several PEs at once, and
+restoring on fewer PEs reads one PE's records in another's order. A checkpoint
+without the marker was written in the older layout, one chare type per manager
+in the writing PE's map order; it is still read that way, by position in the
+restoring PE's order, and can put an element's data into another bound array
+in such programs. In-memory checkpoints, including the on-disk copy kept by
+`CkDiskCheckPTInfo`, use the same code and so the same layout; the out-of-core
+swap file pups each element directly and does not reach it.
 
 ## 6. Limits and their diagnostics
 

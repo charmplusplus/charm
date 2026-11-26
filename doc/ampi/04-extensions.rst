@@ -11,7 +11,7 @@ are only available in Fortran.
 .. code-block:: none
 
    AMPI_Migrate          AMPI_Register_pup            AMPI_Get_pup_data
-   AMPI_Migrate_to_pe    AMPI_Set_migratable
+   AMPI_Migrate_to_pe    AMPI_Set_migratable          AMPI_Rollback_count
    AMPI_Load_set_value   AMPI_Load_start_measure      AMPI_Load_stop_measure
    AMPI_Iget             AMPI_Iget_wait               AMPI_Iget_data
    AMPI_Iget_free        AMPI_Type_is_contiguous
@@ -429,9 +429,10 @@ call to ``int AMPI_Migrate(MPI_Info hints)`` with an ``MPI_Info`` object
 that specifies how you would like to checkpoint. Checkpointing can be
 thought of as migrating AMPI ranks to storage. Users set the
 checkpointing policy on an ``MPI_Info`` object’s ``"ampi_checkpoint"``
-key to one of the following values: ``"to_file=directory_name"`` or
-``"false"``. To perform checkpointing in memory a built-in MPI_Info
-object called ``AMPI_INFO_CHKPT_IN_MEMORY`` is provided.
+key to one of the following values: ``"to_file=directory_name"``,
+``"in_memory"``, ``"rollback"`` or ``"false"``. The built-in MPI_Info
+objects ``AMPI_INFO_CHKPT_IN_MEMORY`` and ``AMPI_INFO_CHKPT_ROLLBACK``
+carry the values ``"in_memory"`` and ``"rollback"``.
 
 Checkpointing to file tells the runtime system to save checkpoints in a
 given directory. (Typically, in an iterative program, the iteration
@@ -495,6 +496,100 @@ illustrated in the code snippet below.
      if (iter % chkpt_freq == 0)
        AMPI_Migrate(AMPI_INFO_CHKPT_IN_MEMORY);
    }
+
+In-memory checkpointing needs Charm++ built with the ``syncft`` option
+(for example ``./build AMPI reconverse-linux-x86_64 syncft``); without it,
+``AMPI_Migrate`` with ``"in_memory"`` or ``"rollback"`` aborts. On
+reconverse builds a process failure still ends the job: the runtime does
+not detect failures or replace processes yet, so the online restart
+described above does not happen. What works is rolling back to the last
+in-memory checkpoint without any failure, for example after the program
+detects an error in its own data.
+
+Rollback to an in-memory checkpoint
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+``AMPI_Migrate`` with ``"ampi_checkpoint"`` set to ``"rollback"`` (or the
+built-in object ``AMPI_INFO_CHKPT_ROLLBACK``) returns every rank to the
+last completed in-memory checkpoint. Like the other values it is
+collective over ``MPI_COMM_WORLD``. The runtime destroys every rank and
+restores it from the checkpoint: its stack, its heap and its MPI state
+(datatypes, info objects, and the communicators that existed at the
+checkpoint, including any freed since) are as they were when the
+checkpoint was taken; a communicator created after the checkpoint makes
+the rollback fail (see the restrictions below). Each rank's thread was
+suspended inside the ``AMPI_Migrate(in_memory)`` call that took the
+checkpoint, so that call returns a second time, and the program continues
+from there. The call that asked for the rollback never returns.
+
+Since everything in the rank is restored, a counter kept in the rank's
+own variables cannot tell the first return from the return after a
+rollback: the checkpoint was taken before the first return, so every
+rollback restores the counter to its value before any increment. The
+runtime keeps the count outside the ranks:
+
+.. code-block:: c++
+
+   int AMPI_Rollback_count(int *count);
+
+sets ``count`` to the number of rollbacks to the last completed in-memory
+checkpoint, 0 until the first one; the count starts again from 0 when the
+next checkpoint completes. A program that rolls back once after an error
+found at a later step looks like this:
+
+.. code-block:: c++
+
+   int rollbacks = 0;
+   for (int iter = 1; iter <= max_iters; iter++) {
+
+     // Time step work ...
+
+     if (iter == chkpt_iter) {
+       AMPI_Migrate(AMPI_INFO_CHKPT_IN_MEMORY);
+       AMPI_Rollback_count(&rollbacks);  // 0, then 1 after the rollback
+     }
+     if (error_found && rollbacks == 0)  // every rank must take this branch
+       AMPI_Migrate(AMPI_INFO_CHKPT_ROLLBACK);
+   }
+
+Restrictions and notes:
+
+- A checkpoint must have completed. A rollback before any in-memory
+  checkpoint aborts the program.
+- No rank may migrate between the checkpoint and the rollback, so no load
+  balancing may run in that interval: the rollback restores each rank on
+  the PE that held it at the checkpoint. A rollback after an
+  ``AMPI_Migrate`` with ``"ampi_load_balance"`` that moved a rank is
+  refused by the runtime, which aborts with ``CharmFT> rollback refused:
+  N array elements migrated on PE p since the last in-memory
+  checkpoint``.
+- No new communicators may be created between a checkpoint and its
+  rollback (``MPI_Comm_dup``, ``MPI_Comm_split``, ``MPI_Comm_create``,
+  intercommunicator and topology constructors): each new communicator's
+  ranks are new Charm++ array elements, which the checkpoint does not
+  contain. The runtime refuses such a rollback and aborts with
+  ``CharmFT> rollback refused: N array elements inserted on PE p since the
+  last in-memory checkpoint``. Communicators created before the checkpoint
+  can be used after the rollback, and freeing a communicator between the
+  checkpoint and the rollback is allowed (the rollback restores it).
+- Only the ranks are restored. Nothing outside them is: readonly
+  variables, Charm++ groups, and files the program wrote keep their
+  current state. In a program whose global variables are not privatized,
+  the globals are shared by the process and are not restored either.
+- The same checkpoint can be rolled back to more than once, and a new
+  checkpoint can be taken after a rollback.
+- With a single process, both copies of each checkpoint are kept in that
+  process and PE 0 prints ``CharmFT> one node: a process failure cannot
+  be survived; checkpoint and rollback work``. Checkpoint and rollback
+  work normally there.
+- A rollback never moves a rank between processes, so it works on macOS,
+  where ranks cannot migrate between processes, in one process and in
+  several.
+- campi programs cannot use in-memory checkpoints or rollback.
+
+``tests/ampi/memckpt`` checks a rollback, and the example
+``examples/ampi/Cjacobi3D`` shows one with ``-memckpt`` and
+``-rollback`` (see its header comment).
 
 A value of ``"false"`` results in no checkpoint being done that step.
 Note that ``AMPI_Migrate`` is a collective function, meaning every
@@ -748,7 +843,7 @@ compressed log file.)
 
 .. code-block:: bash
 
-   $ ./build AMPI netlrts-linux-x86_64 -DAMPIMSGLOG
+   $ ./build AMPI reconverse-linux-x86_64 -DAMPIMSGLOG
 
 The feature is used in two phases: writing (logging) the environment and
 repeating the run. The first logging phase is invoked by a parallel run
@@ -756,15 +851,15 @@ of the AMPI program with some additional command line options.
 
 .. code-block:: bash
 
-   $ ./charmrun ./pgm +p4 +vp4 +msgLogWrite +msgLogRank 2 +msgLogFilename "msg2.log"
+   $ ./pgm +pe 4 +vp4 +msgLogWrite +msgLogRank 2 +msgLogFilename "msg2.log"
 
 In the above example, a parallel run with 4 worker threads and 4 AMPI
 ranks will be executed, and the changes in the MPI environment of worker
 thread 2 (also rank 2, starting from 0) will get logged into diskfile
 "msg2.log".
 
-Unlike the first run, the re-run is a sequential program, so it is not
-invoked by charmrun (and omitting charmrun options like +p4 and +vp4),
+Unlike the first run, the re-run is a sequential program, so it runs on
+one PE (omitting options like +pe 4 and +vp4),
 and additional command line options are required as well.
 
 .. code-block:: bash
@@ -790,7 +885,7 @@ Round Robin
 
    .. code-block:: bash
 
-      $ ./charmrun ./hello +p2 +vp8 +mapping RR_MAP
+      $ ./hello +pe 2 +vp8 +mapping RR_MAP
 
 Block Mapping
    This mapping scheme maps virtual processors to physical processor in
@@ -801,7 +896,7 @@ Block Mapping
 
    .. code-block:: bash
 
-      $ ./charmrun ./hello +p2 +vp8 +mapping BLOCK_MAP
+      $ ./hello +pe 2 +vp8 +mapping BLOCK_MAP
 
 Proportional Mapping
    This scheme takes the processing capability of physical processors
@@ -814,8 +909,8 @@ Proportional Mapping
 
    .. code-block:: bash
 
-      $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP
-      $ ./charmrun ./hello +p2 +vp8 +mapping PROP_MAP +balancer GreedyLB +LBTestPESpeed
+      $ ./hello +pe 2 +vp8 +mapping PROP_MAP
+      $ ./hello +pe 2 +vp8 +mapping PROP_MAP +balancer GreedyLB +LBTestPESpeed
 
 Custom Mapping
    To define your own mapping scheme, create a file named "mapfile"
@@ -838,7 +933,7 @@ Custom Mapping
 
    .. code-block:: bash
 
-      $ ./charmrun ./hello +p2 +vp8 +mapping MAPFILE
+      $ ./hello +pe 2 +vp8 +mapping MAPFILE
 
    Note that users can find the current mapping of ranks to PEs (after
    dynamic load balancing) by calling ``AMPI_Comm_get_attr`` on

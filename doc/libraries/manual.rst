@@ -11,7 +11,8 @@ Introduction
 This manual describes Charm++ and Converse libraries. This is a work in
 progress towards a standard library for parallel programming on top of
 the Converse and Charm++ system. All of these libraries are included in
-the source and binary distributions of Charm++/Converse.
+the source and binary distributions of Charm++/Converse, except
+:ref:`tramlib <tramlib>`, which has its own repository.
 
 liveViz Library
 ===============
@@ -36,7 +37,7 @@ client is a small Java program. A typical use of this is:
 
    	cd charm/examples/charm++/wave2d
    	make
-   	./charmrun ./wave2d +p2 ++server ++server-port 1234
+   	./wave2d +pe 2 ++server ++server-port 1234
    	~/ccs_tools/bin/liveViz localhost 1234
 
 Use git to obtain a copy of ccs_tools (prior to using liveViz) and build
@@ -330,9 +331,9 @@ calculations are required to access data.
 
 To use MSA in a Charm++ program:
 
--  build Charm++ for your architecture, e.g. ``netlrts-linux-x86_64``.
+-  build Charm++ for your architecture, e.g. ``reconverse-linux-x86_64``.
 
--  ``cd charm/netlrts-linux-x86_64/tmp/libs/ck-libs/multiphaseSharedArrays/; make``
+-  ``cd charm/reconverse-linux-x86_64/tmp/libs/ck-libs/multiphaseSharedArrays/; make``
 
 -  ``#include “msa/msa.h”`` in your header file.
 
@@ -787,6 +788,398 @@ Example
 
 For example code showing how to use TRAM, see ``examples/charm++/TRAM`` and
 ``benchmarks/charm++/streamingAllToAll`` in the Charm++ repository.
+
+
+.. _tramlib:
+
+tramlib (HTram)
+===============
+
+Overview
+--------
+
+tramlib is a message-aggregation library for Charm++ programs that send very
+many small data items, such as graph algorithms, particle codes and
+discrete-event simulations. The application hands the library one item and a
+destination PE at a time. The library collects items in buffers, sends each
+full buffer as a single Charm++ message, and on the receiving side calls a
+function that the application registered, once per item or once per batch of
+items.
+
+tramlib differs from TRAM, described in the previous section, in three ways:
+
+- The application *deposits items* into the library and receives them
+  through a callback. TRAM instead aggregates invocations of entry methods
+  marked ``[aggregate]``.
+- tramlib does not route items through intermediate PEs. An item crosses
+  the network once, in a buffer addressed to the destination process or the
+  destination PE.
+- tramlib is built for multi-PE processes. Depending on the aggregation
+  mode, the PEs of a process share buffers, and a buffer that arrives at a
+  process is divided among that process's PEs.
+
+tramlib is not part of the Charm++ distribution. Its repository is
+https://github.com/charmplusplus/htram. The repository, the classes
+(``HTram``, ``HTramRecv``, ``HTramNodeGrp``), the module (``htram_group``) and
+the archives (``libhtram_group_*.a``) still carry the library's earlier name,
+HTram; this section uses those names wherever it shows code or commands.
+
+Item types and library flavours
+-------------------------------
+
+The item type is fixed when the library is compiled; it is not a template
+parameter. The header ``htram_group.h`` defines the type ``datatype`` from a
+preprocessor flag, and one executable can therefore contain the library for
+one item type only. The library and every source file that includes
+``htram_group.h`` must be compiled with the same set of flags.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 18 42 40
+
+   * - Flag
+     - Item type (``datatype``)
+     - Make target
+   * - ``-DHISTO``
+     - ``int``
+     - ``libhtram_group_histo.a``
+   * - ``-DIG``
+     - ``packet1``: three 64-bit integers (``packet.h``)
+     - ``libhtram_group_ig.a``
+   * - ``-DUNIONFIND``
+     - ``findBossData``: five 64-bit integers (``types.h``)
+     - ``libhtram_group_unionfind.a``
+   * - ``-DGRAPH``
+     - ``Update``, defined by the application in the header that
+       ``HTRAM_GRAPH_TYPES_HEADER`` names
+     - ``libhtram_group_graph.a``, which also sets ``-DBUCKETS_BY_DEST
+       -DADD_FILLERS``
+   * - ``-DPDES``
+     - ``PdesItem``: the header of a discrete event and a payload of
+       ``PDES_PAYLOAD_BYTES`` bytes (default 16)
+     - ``libhtram_group_pdes.a``, which also sets ``-DBUCKETS_BY_DEST``
+   * - ``-DPHOLD``
+     - ``double``
+     - ``libhtram_group_phold.a``
+
+An application whose items are of a new type uses the ``GRAPH`` flavour. It
+defines a trivially copyable type named ``Update`` in a header of its own and
+compiles the library with ``-DGRAPH`` and
+``-DHTRAM_GRAPH_TYPES_HEADER=\"/absolute/path/to/that/header.h\"``. With only
+those two flags the library does not read the fields of ``Update``. An
+application that needs several kinds of item in one executable defines
+``Update`` as a fixed-size record with a field that tells the kinds apart.
+
+Further compile-time flags:
+
+``-DBUCKETS_BY_DEST``
+   Adds the priority hold described under :ref:`tramlib-priority` and selects
+   the ``WPs`` aggregation mode. Without this flag the default mode is ``WsP``.
+
+``-DHTRAM_COMPACT_WIRE`` (with ``-DGRAPH``)
+   Sends each item as an 8-byte ``WireUpdate`` that the application's header
+   packs and unpacks (``wire_pack``, ``wire_unpack``), and computes the
+   destination PE from the item on arrival. Only the ``WPs`` mode supports it.
+   Without this flag each item is sent as its destination PE (an ``int``)
+   followed by the item itself.
+
+``-DPDES_PAYLOAD_BYTES=n``, ``-DPDES_TIMED`` (with ``-DPDES``)
+   The size of the payload slot of ``PdesItem``, and an optional send time
+   and sending PE in each item.
+
+``-DBUFSIZE=n``
+   The largest buffer size, in items, that a run may ask for (default 16384).
+
+``-DIDLE_FLUSH``
+   Makes an idle PE flush the buffers that are more than one fifth full.
+
+Building
+--------
+
+The library needs a Charm++ build with more than one PE per process, which
+every Reconverse-based build is. The location of ``charmc`` is taken from the
+variable ``CHARMC_SMP``, set on the ``make`` command line or in a file
+``config.mk`` next to the makefiles:
+
+.. code-block:: bash
+
+   $ git clone https://github.com/charmplusplus/htram
+   $ cd htram
+   $ echo 'CHARMC_SMP = /path/to/charm/bin/charmc' > config.mk
+   $ make libhtram_group_histo.a
+   $ make libhtram_group_graph.a GRAPH_INCLUDE=/path/to/application
+
+The ``libhtram_group_graph.a`` target expects the application's item header
+to be ``$(GRAPH_INCLUDE)/weighted_node_struct.h``; ``HTRAM_EXTRA`` adds flags
+to the ``graph`` and ``pdes`` targets. All targets compile the same object
+file, ``htram_group.o``, so build one archive at a time and do not use
+``make -j`` in this directory.
+
+An application that needs a set of flags for which there is no target
+compiles ``htram_group.ci`` and ``htram_group.C`` itself, with its own flags,
+into its own build directory:
+
+.. code-block:: bash
+
+   $ FLAGS='-DGRAPH -DHTRAM_GRAPH_TYPES_HEADER=\"/path/to/app/item.h\"'
+   $ charmc /path/to/htram/htram_group.ci
+   $ charmc -c -O3 $FLAGS -I. -I/path/to/htram /path/to/htram/htram_group.C
+
+The application's own sources are compiled with the same ``$FLAGS`` and
+``-I/path/to/htram``, and linked with the archive or object file.
+
+Setting up
+----------
+
+The interface file of the application names the module:
+
+.. code-block:: charmci
+
+   extern module htram_group;
+
+The main chare creates two node groups and the ``HTram`` group, which has
+one member on every PE:
+
+.. code-block:: c++
+
+   #include "htram_group.h"
+
+   CProxy_HTramRecv    recv = CProxy_HTramRecv::ckNew();
+   CProxy_HTramNodeGrp src  = CProxy_HTramNodeGrp::ckNew();
+   CkCallback started(CkReductionTarget(Main, tramReady), mainProxy);
+   CProxy_HTram tram = CProxy_HTram::ckNew(
+       recv.ckGetGroupID(), src.ckGetGroupID(),
+       buffer_size,      // items per buffer, from 1 to BUFSIZE
+       timed_flushing,   // bool: flush every buffer periodically
+       flush_period,     // double: the period, in milliseconds
+       per_item,         // bool: true = per-item callback, false = per-batch
+       false,            // not used at present
+       started);
+
+``started`` is the target of a reduction to which every member of the group
+contributes when it has been constructed. The application must not send
+items before that callback has been invoked and before every PE has
+registered its receiving function. A program may create several ``HTram``
+groups, each with its own pair of node groups; all of them carry the same
+item type.
+
+Each PE registers the function that receives its items, with an argument
+that the library passes back, usually a pointer to a group member or chare
+on that PE:
+
+.. code-block:: c++
+
+   HTram *t = tram.ckLocalBranch();
+
+   // per item (the constructor's per_item argument was true)
+   t->set_func_ptr(deliver_one, this);       // void deliver_one(void*, datatype)
+
+   // per batch (per_item was false)
+   t->set_func_ptr_retarr(deliver_batch, this);
+                                 // void deliver_batch(void*, datatype*, int)
+
+   // per batch, for the priority hold (BUCKETS_BY_DEST)
+   t->set_func_ptr_retarr(deliver_batch, // void (void*, datatype*, int)
+                          dest_pe_of,    // int  (void*, datatype)
+                          batch_done,    // void (void*), may be null
+                          this);
+
+The array passed to ``deliver_batch`` belongs to the library and is valid
+only during the call.
+
+Sending and flushing
+--------------------
+
+.. code-block:: c++
+
+   t->insertValue(item, dest_pe);   // deposit one item
+   t->tflush();                     // send every buffer of this PE
+
+``insertValue`` copies the item into a buffer and returns. The buffer is sent
+when it holds ``buffer_size`` items. An item whose destination is the sending
+PE itself is handled like any other. ``tflush()`` sends this PE's partly
+filled buffers; it is both a C++ member function and an entry method, so
+``tram.tflush()`` on the group proxy flushes every PE. An application normally
+calls ``tflush()`` when it has finished generating a batch of work, or
+enables timed flushing in the constructor.
+
+tramlib sends ordinary Charm++ messages and delivers items from entry
+methods, so quiescence detection (``CkStartQD``) works as usual once every PE
+has flushed. ``htramQuiesce(cb)``, an entry method, does this for the
+application: it waits for quiescence, flushes every PE, waits again, and
+invokes ``cb`` when no item is left in a buffer.
+
+A second set of calls has the same meaning in every aggregation mode. It is
+intended for applications that select the mode at run time:
+
+``insert(item, dest_pe)``
+   Deposits one item.
+
+``insert(item, dest_pe, key)``
+   Deposits one item and records ``key``, for example a timestamp, toward the
+   smallest key buffered for that destination.
+
+``flushDue(horizon)``
+   Sends the buffers of every destination whose smallest key is at most
+   ``horizon``.
+
+``flushTo(dest_pe)``, ``insertUrgent(item, dest_pe)``
+   Sends what this PE has buffered toward one destination; deposits an item
+   and sends its buffer at once.
+
+``flushPending()``
+   Sends every buffer of this PE that holds at least one item.
+
+``setBufferSize(n)``
+   Changes the buffer size, in items, on the PE on which it is called. It is
+   also an entry method.
+
+Aggregation modes
+-----------------
+
+The mode decides which buffers a PE fills and where items are sorted by
+destination PE.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 10 45 45
+
+   * - Mode
+     - Buffers at the sender
+     - Delivery
+   * - ``WPs``
+     - Each PE has one buffer per destination process.
+     - The receiving process sorts the items of a buffer by destination PE
+       and hands each of its PEs its share.
+   * - ``WsP``
+     - Each PE has one buffer per destination process, kept sorted by
+       destination PE as it is filled.
+     - Each PE of the receiving process takes its share; nothing is sorted
+       on arrival.
+   * - ``PP``
+     - The PEs of a process share one buffer per destination process. Each
+       PE first collects a few items privately (16 by default).
+     - As ``WPs``.
+   * - ``WW``
+     - Each PE has one buffer per destination PE.
+     - The buffer is delivered to the destination PE directly.
+
+The default is ``WsP``, or ``WPs`` when the library is compiled with
+``-DBUCKETS_BY_DEST``. ``setAggregationMode(mode)`` selects another mode. Call
+it on every PE before the first item is sent. Under ``PP`` the buffer size
+must be a multiple of 16.
+
+``WPs``, ``WsP`` and ``PP`` send one message per destination process, so their
+buffers fill faster than those of ``WW`` when a process has many PEs, and they
+need memory in proportion to the number of processes, not the number of PEs.
+``WW`` avoids all work at the receiving process other than the delivery
+itself.
+
+.. _tramlib-priority:
+
+Priority hold
+-------------
+
+With ``-DBUCKETS_BY_DEST`` an application can give each item a priority
+bucket, a small integer, and have the library hold back items of low
+priority:
+
+.. code-block:: c++
+
+   t->setHistoBucketCount(2048);   // the number of buckets; must be 2048
+   t->changeThreshold(direct_threshold, tram_threshold, selectivity);
+   t->sendItemPrioDeferredDest(item, bucket);            // or
+   t->sendItemPrioDeferredDest(item, bucket, dest_pe);
+
+An item whose bucket is at most the current threshold goes to a buffer as
+with ``insertValue``. Other items wait in a queue for their destination and
+bucket until ``changeThreshold`` admits the bucket. ``tflush()`` sends the
+admitted items only: an item that is still held leaves after a later
+``changeThreshold`` has admitted its bucket. (``flush_everything()`` is at
+present the same as ``tflush()``.) ``flushStale()`` sends only the
+destinations whose buffers did not fill since the previous call, and
+``flushIdle()`` sends every destination that holds admitted items, for a PE
+that has no other work.
+``enableCombining(ops, client)`` replaces the queues with a table that keeps
+one item per key, as defined by the functions in ``ops`` (``htram_combine.h``).
+
+Settings for delivery within a process
+--------------------------------------
+
+Under ``WPs`` and ``PP``, a buffer that arrives at a process is by default
+announced to every PE of that process with one message each, including the
+PEs for which it holds no item. Two settings change this. Both are off by
+default.
+
+``setSkipEmptyDeliveries(true)``
+   Sends that message only to the PEs for which the buffer holds items.
+
+``setInputBufferDelivery(true)``
+   Places each PE's share in an input buffer of that PE and sends no message.
+   The application must then call ``drainInputBuffer()`` regularly on every
+   PE, and must detect completion by counting items: quiescence detection
+   does not see an item that waits in an input buffer.
+
+The following global variables are set once per process, before the groups
+are created or before the first item is sent, as the header describes for
+each.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Variable (default)
+     - Meaning
+   * - ``htram_input_buffer_mode`` (0)
+     - Input buffers: 0 = one mutex-protected buffer per PE; 1 = the same,
+       each on its own cache lines; 2 = lock-free rings, one per pair of
+       sending and receiving PE.
+   * - ``htram_flush_order`` (0)
+     - The order in which a flush visits destination processes: 0 = by
+       index; 1 = by index, starting one later on each pass; 2 = smallest
+       buffered key first.
+   * - ``htram_pp_local_size`` (16)
+     - ``PP``: the number of items a PE collects privately before it copies
+       them into the shared buffer: 16, 8, 4, 2 or 1.
+   * - ``htram_pp_alloc_limit`` (0)
+     - ``PP``: 1 = allocate each shared buffer at the buffer size in use
+       rather than at ``BUFSIZE``.
+   * - ``htram_pp_pad`` (0)
+     - ``PP``: the memory layout of the counters that the PEs of a process
+       share: 0 = packed; 1 = each counter on its own cache line; 2 = the
+       counters of one destination together on one cache line.
+   * - ``htram_time_sends``, ``htram_time_receives`` (false)
+     - Collect per-PE timings of the parts of a send and of a receive.
+
+Examples
+--------
+
+The repository contains two example programs and a unit test.
+
+- ``histo.C`` (``make histo_smp``) increments random entries of a
+  distributed table, with ``int`` items and the per-item callback.
+- ``smp_ig.C`` (``make ig_smp``) reads random entries of a distributed table
+  with two ``HTram`` groups, one for requests and one for replies.
+- ``make test_combine`` checks the combining table against a model and needs
+  no Charm++.
+
+Both programs check their results and print ``(passed)``:
+
+.. code-block:: bash
+
+   $ ./histo_smp +pe 8 -n 1000000 -T 10000
+   $ ./ig_smp +pe 8 -n 1000000
+
+Limitations
+-----------
+
+- One item type per executable; all items have the same fixed size.
+- Items are delivered to PEs. An application that addresses chare array
+  elements keeps its own table from element to PE, and that table must be
+  correct whenever items are in transit.
+- The buffers are allocated for the numbers of PEs and processes at the time
+  the groups are created, and every process is assumed to have the same
+  number of PEs.
 
 
 CkIO

@@ -249,8 +249,7 @@ Charm++ recognizes two logical entities: a PE (processing element) and a
 logical node, or simply “node”. In a Charm++ program, a PE is a unit of
 mapping and scheduling: each PE has a scheduler with an associated pool
 of messages. Each chare is assumed to reside on one PE at a time. A
-logical node is implemented as an OS process. In non-SMP mode there is
-no distinction between a PE and a logical node. Otherwise, a PE takes
+logical node is implemented as an OS process. A PE takes
 the form of an OS thread, and a logical node may contain one or more
 PEs. Physical nodes may be partitioned into one or more logical nodes.
 Since PEs within a logical node share the same memory address space, the
@@ -260,19 +259,13 @@ may optionally be associated with a subset of cores or hardware threads.
 
 A Charm++ program can be launched with one or more (logical) nodes per
 physical node. For example, on a machine with a four-core processor,
-where each core has two hardware threads, common configurations in
-non-SMP mode would be one node per core (four nodes/PEs total) or one
-node per hardware thread (eight nodes/PEs total). In SMP mode, the most
-common choice to fully subscribe the physical node would be one logical
-node containing *seven* PEs-one OS thread is set aside per process for
-network communications. (When built in the “multicore” mode that lacks
-network support, a comm thread is unnecessary, and eight PEs can be used
-in this case. A comm thread is also omitted when using some
-high-performance network layers such as PAMI.) Alternatively, one can
+where each core has two hardware threads, the most common choice to
+fully subscribe the physical node would be one logical node containing
+four or eight PEs; no OS thread is set aside for network communication.
+Alternatively, one can
 choose to partition the physical node into multiple logical nodes, each
-containing multiple PEs. One example would be *three* PEs per logical
-node and two logical nodes per physical node, again reserving a comm
-thread per logical node.
+containing multiple PEs. One example would be *four* PEs per logical
+node and two logical nodes per physical node.
 
 It is not a general practice in Charm++ to oversubscribe the underlying
 physical cores or hardware threads on each node. In other words, a
@@ -1298,7 +1291,10 @@ This call contributes nBytes bytes starting at data to the reduction
 type (see Section :numref:`builtin_reduction`). Unlike sending a
 message, you may use data after the call to contribute. All members of
 the chare array or group must call contribute, and all of them must use
-the same reduction type.
+the same reduction type: the runtime aborts with "contributions to one
+reduction use different reducers" when two contributions it combines name
+different reducers (contributions with ``CkReduction::nop``, which carry no
+data, may join any reduction).
 
 For example, if we want to sum each array/group member’s single integer
 myInt, we would use:
@@ -1593,6 +1589,22 @@ different from the one on which the array element resides. You must
 ensure that no messages are sent to a deleted element. After destroying
 an element, you may insert a new element at its index.
 
+A chare that decides inside one of its own entry methods that it is
+finished can call ``ckDestroyLater()``, defined for every chare: the
+chare is destroyed (deleted, or for an array element detached from the
+array first, as ``ckDestroy()`` does) by a message to the same PE,
+handled after whatever is running on the chare has returned: the entry
+method, or a direct call such as the load balancer's call of
+``ResumeFromSync``. The chare must not migrate before then, so the call
+belongs at the end of the body. Calling it again before then has no
+further effect, and a chare destroyed in another way in the meantime is
+not destroyed a second time. This is the way to destroy a chare when
+something of it is still on the stack, for example a coroutine entry
+method (section :numref:`sec:ckcoro`) that has not finished yet; a
+singleton chare's entry method may instead ``delete this`` as its last
+action. Group and nodegroup branches are not destroyed one at a time;
+calling either method on one aborts.
+
 .. _sec:sdag:
 
 Structured Control Flow: Structured Dagger
@@ -1796,7 +1808,11 @@ The use of ``when`` substantially simplifies the example from above:
 Like an ``if`` or ``while`` in C code, each ``when`` clause has a body
 made up of the statement or block following it. The variables declared
 as arguments to the entry method triggering the when are available in
-the scope of the body. By using the sequenced execution of SDAG code and
+the scope of the body, including inside any ``when`` nested in it: the
+generated code keeps them with the element, and they migrate with it.
+All other state that lives across a ``when`` is a member of the chare,
+pupped as usual; a local variable of a surrounding C++ method does not
+exist inside SDAG code. By using the sequenced execution of SDAG code and
 the availability of parameters to when-defined entry methods in their
 bodies, the counter ``expectedMessageCount`` and the intermediate copies
 of the received input are eliminated. Note that the entry methods
@@ -2095,6 +2111,421 @@ SDAG entry method ``startStep`` directly as ``startStep();`` because it
 contains when clauses. It has to be only called using the proxy i.e.
 ``computeObj.startStep();`` , where ``computeObj`` is the proxy to
 ``ComputeObject``.
+
+.. _sec:ckcoro:
+
+Structured Control Flow: Coroutine Entry Methods
+------------------------------------------------
+
+An entry method of a chare of any kind (an array element, a group or
+nodegroup branch, a singleton chare, the mainchare) can be written as a
+C++20 coroutine that waits in the middle of its body for other entry
+methods of the same chare, as an SDAG entry waits with ``when``. The
+control flow is plain C++ (``if``, loops, calls), the interface file
+keeps only the declarations, and the chare can migrate or be
+checkpointed while the coroutine waits. The header is ``ckcoro.h``; the programs must be compiled
+with ``-std=c++20``. This feature is experimental in this release.
+Readers who know SDAG: the two treat the parameters of a waited-for
+entry method differently; the subsection *Differences from SDAG* at the
+end of this section collects what changes.
+
+The entry methods involved are declared with two attributes: the
+coroutine entry is ``[coroutine]`` and the entries it waits for are
+``[inbox]``; both return void and take a message or marshalled
+parameters (conditional and nocopy parameters excepted). The
+chare puts the generated macro ``ClassName_CORO_CODE`` in its class,
+which defines the coroutine state (the active coroutines and the
+buffered deliveries, packed with the chare), the bodies of the inbox
+entries, and ``inbox::name()`` and ``inbox::name(ref)``, which name an
+inbox entry at a wait. A coroutine entry is invoked like any other entry
+method (``strips.run()`` below); the invocation returns when the body
+finishes or first waits, and the body continues inside the inbox entries
+that deliver what it waits for. The strips of the heat diffusion in
+``examples/charm++/heat1d-coro``, which exchange boundary cells around a
+ring every iteration:
+
+.. code-block:: none
+
+   array [1D] Strip {
+     entry Strip();
+     entry [coroutine] void run();
+     entry [inbox] void fromLeft(int iter, double value);
+     entry [inbox] void fromRight(int iter, double value);
+     entry [inbox] void ResumeFromSync();
+   };
+
+.. code-block:: c++
+
+   class Strip : public CBase_Strip {
+     Strip_CORO_CODE
+     std::vector<double> t;         // the cells, with a ghost at each end
+     int iter;                      // live across waits: a member, pupped
+     double leftGhost, rightGhost;  // received at the wait: members, pupped
+     ...
+     ck::coroutine run() {
+       CK_MIGRATABLE {
+         for (iter = 1; iter <= maxIter; iter++) {
+           if (lbFreq > 0 && iter % lbFreq == 0) {
+             AtSync();                    // the element may migrate while it waits here
+             CK_WHEN(inbox::ResumeFromSync());
+           }
+           thisProxy[(thisIndex + numStrips - 1) % numStrips].fromRight(iter, t[1]);
+           thisProxy[(thisIndex + 1) % numStrips].fromLeft(iter, t[cellsPerStrip]);
+           // when fromLeft[iter](int i, double v), fromRight[iter](int i, double v)
+           CK_WHEN_ALL(CK_ALT(inbox::fromLeft(iter), ck::coro::skip, leftGhost),
+                       CK_ALT(inbox::fromRight(iter), ck::coro::skip, rightGhost));
+           update();
+           if (iter % reportFreq == 0)
+             contribute(sizeof(double), &maxChange, CkReduction::max_double,
+                        CkCallback(CkReductionTarget(Main, report), mainProxy));
+         }
+       }
+     }
+   };
+
+``CK_MIGRATABLE { ... }`` encloses the body: the part that can be rebuilt
+after a migration or a checkpoint (how is explained below). Every wait
+is written inside it.
+
+The mainchare of the same program waits for the reports in its own
+coroutine, with the block form of a wait:
+
+.. code-block:: c++
+
+   ck::coroutine run() {                    // entry [coroutine] void run();
+     CK_MIGRATABLE {
+       for (reports = 1; reports <= maxIter / reportFreq; reports++) {
+         CK_WHEN_BLOCK(inbox::report(), maxChange) {   // entry [inbox, reductiontarget] void report(double maxChange);
+           CkPrintf("iteration %d: largest change %.6e\n", reports * reportFreq, maxChange);
+         }
+       }
+       ...
+     }
+   }
+
+A wait has two forms. ``CK_WHEN_BLOCK(want, name...) { ... }`` waits
+until a delivery to the named entry arrives and declares the entry's
+parameters, in order, as variables of the block that follows: the message
+pointer, or every marshalled parameter; the block is their scope and may
+not contain another wait (the compiler rejects one: the restart described
+below would jump past the declarations). ``CK_WHEN(want, out...)`` waits
+the same way and stores the delivery into members of the chare that
+follow, again the message pointer or every marshalled parameter in order,
+a parameter used only for matching included (``ck::coro::skip`` in place
+of a member discards one). A received value that is needed after a later
+wait goes through a member, because a member is pupped with the chare
+and a variable of the coroutine is not (see the rules below). The
+coroutine owns a received message: it deletes it before the next wait,
+or pups the member with ``CkPupMessage``. An array parameter
+(``double data[n]``) is received as a pointer into the message, valid
+until the next wait, or copied into a container member such as a
+``std::vector<double>`` when the member has that type.
+``inbox::name(ref)`` matches the reference number, which is the
+envelope's for a message entry and the first arithmetic parameter for a
+marshalled entry (a reduction target reached through its reduction uses
+the reduction message's, set on the callback, as SDAG does);
+``inbox::name()`` matches any. A delivery that no coroutine is waiting
+for is buffered in the chare, in arrival order, and moves with the
+chare. ``CK_WHEN_ALL(CK_ALT(want, out...), ...)`` waits until every
+alternative has a delivery and takes them together, as an SDAG
+``when a(), b()``. ``CK_WHEN_ANY(idx, CK_ALT(want, out...), ...)`` waits for the
+first of several alternatives and stores the index of the one that
+matched in the ``int`` variable ``idx`` (a member if it is read after a
+later wait), as an SDAG ``case``; an alternative may be a conjunction,
+``CK_ALL(CK_ALT(...), CK_ALT(...))``, which is taken only when all its
+deliveries are present.
+
+A callback can also be waited for without an inbox entry of its own. A
+member of type ``ck::coro::future`` receives the deliveries of the
+callback that ``CK_CORO_FUTURE_ALL(f)`` or ``CK_CORO_FUTURE(f)`` returns.
+``CK_CORO_FUTURE_ALL(f)`` makes a callback that is delivered to every element
+of the chare's array, group or nodegroup: the one to pass to
+``contribute`` and to anything else that every element waits for.
+``CK_CORO_FUTURE(f)`` makes one delivered to this element only, for example
+to hand to another chare for a reply. The future is waited for as an
+inbox entry is: ``CK_WHEN(f, msg)`` stores the message into a member
+that is a pointer to the message type, ``CK_WHEN(f)`` discards it,
+``CK_WHEN_BLOCK(f, m)`` declares it as a ``CkMessage *``, and
+``CK_ALT(f, ...)`` makes it an alternative of ``CK_WHEN_ALL`` or
+``CK_WHEN_ANY``. A future is a member like any value that is used after
+a wait, pupped with ``p | f``.
+
+.. code-block:: c++
+
+   ck::coro::future reduced, quiet;   // members
+   CkReductionMsg *result;
+   ...
+   contribute(sizeof(double), &change, CkReduction::max_double, CK_CORO_FUTURE_ALL(reduced));
+   CK_WHEN(reduced, result);
+   maxChange = *(double *)result->getData();
+   delete result;
+   ...
+   {
+     CkCallback cb = CK_CORO_FUTURE_ALL(quiet);
+     if (thisIndex == 0) CkStartQD(cb);   // every element waits for quiescence
+   }
+   CK_WHEN(quiet);
+
+The callbacks reach the chare through an ``[inbox]`` entry,
+``_coro_callback(CkMessage *)``, that charmxi adds to every chare with a
+``[coroutine]`` entry, with the future's id as the reference number.
+Each ``CK_CORO_FUTURE_ALL`` takes the next id of a counter that every element
+keeps, so the elements agree on the id when they make the same
+``CK_CORO_FUTURE_ALL`` calls in the same order, as they make the same
+``contribute`` calls.
+
+The reference number of the callback belongs to the future: a message
+sent through it arrives with the future's id as its reference number,
+whatever it carried, and the callback cannot carry a reference number of
+its own. Use a new future to tell iterations apart, and put any other tag
+in the message's data. A message for a ``CK_CORO_FUTURE_ALL`` future may
+reach an element before that element has made the future (another element
+sent it first); it waits in the inbox for the element's ``CK_WHEN``. The
+ids wrap after 32768 futures of each kind (``CK_CORO_FUTURE`` and
+``CK_CORO_FUTURE_ALL``) with the default 16-bit reference number
+(``--with-refnum-type=int`` widens it to 2^31), so every message sent to
+a future should be taken by a wait. Making a ``CK_CORO_FUTURE`` whose id
+is still held by a message in the inbox aborts; for
+``CK_CORO_FUTURE_ALL`` the check starts once its ids are reused, since
+before that a message under the id is one that arrived early, and after
+that an early message and one left over look the same.
+
+A coroutine frame is never packed. When the chare migrates or is
+checkpointed, the coroutine state records which wait each active coroutine
+is suspended at, and after unpacking the entry is invoked again: its body
+runs again from the top and jumps to the recorded wait. The jump is what
+``CK_MIGRATABLE`` provides: it expands to a frame guard and
+``switch (site) case 0: if (false) default: abort(); else`` followed by
+the block, and each wait is a ``case`` of that switch labelled with its
+source line, so a fresh start enters the block from the top, a restart
+enters it at the recorded wait, and a recorded wait that is not in the
+block aborts before any of the block runs. Because the restart sites are
+source line numbers, a checkpoint can be restarted only by a binary built
+from the same source layout of the coroutine bodies: a line added above a
+wait, even a comment, makes ``+restart`` abort with a message naming the
+two sites. This gives the rules:
+
+-  Any value that is live across a wait is a member of the chare, pupped
+   as usual: the variables of a ``CK_WHEN_BLOCK`` end with its block, and
+   a local survives neither the jump nor the migration (C++ rejects a jump
+   past a local with an initializer, and a local declared before
+   ``CK_MIGRATABLE`` is silently re-initialized when the body runs
+   again). A pointer to an array parameter is valid until the next wait.
+   Compiling with ``-Wall`` is recommended: clang reports a scalar local
+   used across a wait without an initializer as
+   ``-Wsometimes-uninitialized`` ("variable 'x' is used uninitialized
+   whenever switch case is taken"), and under ``+ck_fakemigrate`` such a
+   variable holds an unspecified value after the rebuild.
+-  Code inside ``CK_MIGRATABLE`` before the recorded wait is skipped
+   after a migration, so its results must be members; code before
+   ``CK_MIGRATABLE`` runs again every time the body is rebuilt, so it
+   must not have side effects that cannot be repeated.
+-  The chare migrates or is checkpointed only while every active
+   coroutine of it is suspended at a ``CK_WHEN``, ``CK_WHEN_ANY`` or
+   ``CK_CALL``; packing it while suspended at another ``co_await`` aborts.
+   ``AtSync()`` and ``migrateMe()`` may be called from the body: the move
+   happens while the body waits at the next ``CK_WHEN``.
+-  A wait is one statement and may be the body of an ``if`` or a loop; it
+   must not be inside a ``switch`` of the program's own, and two waits
+   must not share a source line.
+-  At most one coroutine per entry method is active in a chare at a
+   time.
+-  The parameters of a coroutine entry are taken by value in its C++
+   definition (a reference would bind to the generated wrapper's local,
+   which is gone after the first wait). They are supplied again when the
+   body runs again after a migration. An array parameter points into the
+   entry's message, which lives as long as the coroutine. A coroutine
+   entry that takes a message type receives a message that belongs to
+   the coroutine state: the body may read it after any wait and does
+   not delete it; the state deletes it (with its destructor) when the
+   coroutine ends, and after a migration the body receives a copy. The
+   state keeps a packed copy for that, made once per invocation, so a
+   large message is better sent to an inbox entry and waited for, or
+   passed as marshalled parameters.
+
+A function that itself waits is a coroutine task: a function returning
+``ck::coro::task<T>`` whose body is a ``CK_MIGRATABLE`` block of its own,
+and is awaited with ``CK_CALL(expr)`` or ``CK_CALL_TO(lhs, expr)``; a
+value is returned with ``co_return`` inside the block:
+
+.. code-block:: c++
+
+   ck::coro::task<int> receive(int idx) {     // waits inside a called function
+     CK_MIGRATABLE {
+       CK_WHEN(inbox::recvNum(idx), n);       // n: a member
+       co_return n;
+     }
+   }
+   ...
+   CK_CALL_TO(total, receive(i));             // total: a member if used after a later wait
+
+Several waits can be in progress at once, as with an SDAG ``overlap``:
+``CK_OVERLAP(task...)`` runs the ``ck::coro::task<void>`` coroutine tasks given to
+it as child coroutines of the current one, each waiting at its own sites,
+and continues when all of them have finished;
+``CK_FORALL(i, lo, hi, expr)`` does the same with one coroutine task per value of
+``i`` in ``[lo, hi)``,
+and ``CK_FORALL_STRIDE(i, start, end, stride, expr)`` for ``i`` from
+``start`` to ``end`` inclusive in steps of ``stride`` of either sign, as
+an SDAG ``forall``. The children are started in order and run until
+their first wait, a delivery resumes whichever child waits for it, and
+the parent resumes after the last child finishes. Each ``when`` clause
+of an SDAG ``overlap`` becomes a coroutine task:
+
+.. code-block:: c++
+
+   ck::coro::task<void> waitA() {
+     CK_MIGRATABLE {
+       CK_WHEN(inbox::a(round), ck::coro::skip, gotA);   // overlap { when a[round](int r, int gotA) {...}
+     }
+   }
+   ck::coro::task<void> waitItem(int i) {
+     CK_MIGRATABLE {
+       CK_WHEN_BLOCK(inbox::item(i), tag, v) { sum += v; } // forall [i] (0:n-1,1) { when item[i](int tag, int v) {...} }
+     }
+   }
+   ...
+   CK_OVERLAP(waitA(), waitB());
+   CK_FORALL(i, 0, n, waitItem(i));
+
+The element may migrate while the children wait: the parent's record
+packs each child's wait, and after the restart the parent reaches the
+``CK_OVERLAP`` again and starts only the children that had not finished.
+A finished child is not run again, so what it computed must be in
+pupped members, like any value that is live across a wait. A coroutine task's
+parameters are supplied again by the restart, so they may be the
+``forall`` index and values derived from members.
+
+The command line option ``+ck_fakemigrate`` makes every wait pack and
+unpack the chare's coroutines in place the first time a coroutine
+suspends there, so that a program can check the rules above on one
+processor without a load balancer. The flag checks the restart of the
+coroutine bodies only, not the chare's own pup: a member left out of
+``pup()`` keeps its value under the flag.
+
+``+ck_fakemigrate_pup`` checks the pup too. On two or more PEs, at every
+wait where ``+ck_fakemigrate`` would rebuild, an array element migrates
+to the next PE (``migrateMe``), so its own ``pup()`` runs and a member
+left out of it loses its value. Because the element really migrates,
+``ckJustMigrated`` and the other migration hooks run at every wait. An
+element that uses ``AtSync`` is rebuilt in place instead, as are groups,
+nodegroups and chares, which do not migrate: a migration that the
+element starts while it waits at the load balancer's barrier would leave
+the barrier waiting for it. The pup of such an element is checked by a
+load balancer that moves it (for example ``+balancer RotateLB`` on two
+or more PEs) or by a checkpoint and ``+restart``.
+
+In a Projections trace, each segment of a coroutine that runs after a
+wait is an execution of the coroutine entry method, nested in the
+execution of the entry method whose delivery resumed it, as SDAG traces
+each ``serial`` block.
+
+``CK_LABEL`` traces a block under a name of its own, as SDAG's
+``serial "name"`` does:
+
+.. code-block:: c++
+
+   CK_LABEL("update") { update(); }
+
+In the trace the block is an execution of an entry method ``update`` of
+the chare, nested in the execution around it. The name is a string
+literal, written only in the ``.C`` file; the labels are registered at
+startup after the modules' entry methods, and one name used twice in a
+chare is one entry method. ``CK_LABEL`` works in any member function of
+a chare, not only in a coroutine. The block cannot contain a wait: inside
+``CK_MIGRATABLE`` the compiler rejects one, and elsewhere the program
+aborts when the coroutine suspends inside the block.
+
+The chare kinds differ only in how a suspended coroutine is invoked
+again after a migration or a restart from a checkpoint: the coroutine
+state sends the entry's message to the chare's own handle, index or
+branch, so a group's or a singleton chare's coroutine resumes on the PE
+it was checkpointed on. On a nodegroup the ``[inbox]`` and
+``[coroutine]`` entries are made ``exclusive`` by charmxi, as SDAG's
+entries of a nodegroup are, so that deliveries from different PEs of
+the node and the coroutine body never run at the same time; the node
+lock is released whenever the coroutine suspends, because the entry
+method returns there. These entries must not be tagged ``exclusive``
+by hand.
+
+Inside a ``[coroutine]`` or ``[inbox]`` entry method, ``CkCurrentMessage()``
+returns the message being delivered (for marshalled parameters, the
+message that carries them) and ``CkCurrentEntry()`` the index of the entry
+method; their generated wrappers set them, so both are null (-1) in every
+other entry method and outside entry methods, and an ``[inline]`` or
+``[local]`` call made from such an entry sees the caller's delivery. The
+coroutine entries use them to register the body with its message, and the
+inbox entries to keep marshalled parameters in the message they arrived in
+instead of copying them.
+
+Programs in the distribution that use coroutine entry methods:
+``examples/charm++/heat1d-coro`` (the program above, with migration
+under a load balancer and a checksum checked by its ``make test``); then,
+each next to the SDAG program it was written from and printing the same
+result, ``examples/charm++/leanmd-coro`` (the molecular dynamics
+miniapp: a mainchare, a 3D and a 6D array, waits with reference numbers,
+an array parameter, a container parameter and a message held across a
+wait), ``examples/charm++/fib-coro`` (singleton chares, nested waits),
+``examples/charm++/matmul-coro`` (a ``forall`` over a conjunction of two
+array parameters), ``tests/charm++/sparse-coro`` (a mainchare's chain of
+waits in block form), ``tests/charm++/jacobi3d-coro`` (the 3D Jacobi of
+``tests/charm++/jacobi3d-sdag``, with load balancing, checkpoint and
+restart in its ``make test``), ``tests/charm++/ckcoro`` (the ``basic``,
+``refnum`` and ``migration`` modules of ``tests/charm++/sdag`` written
+as coroutines, with every construct of this section, plus modules for
+marshalled inbox entries, arrays and overlap under migration, and for
+a group, a nodegroup, a singleton chare and the mainchare as owners,
+checkpointed and restarted while their coroutines wait), and
+``benchmarks/charm++/coro_pingpong`` (one ping-pong written three ways,
+plain entry methods, SDAG and a coroutine, in one file).
+
+Differences from SDAG
+~~~~~~~~~~~~~~~~~~~~~
+
+-  A ``when`` body is a block of the coroutine, not a separate function.
+   ``when e(int x, Y y) { body }`` is
+   ``CK_WHEN_BLOCK(inbox::e(), x, y) { body }`` as long as the body
+   contains no wait. If it does (a nested ``when``), the outer parameters
+   are received into members with ``CK_WHEN(inbox::e(), x, y)`` and the
+   body follows, with the nested wait inside it. SDAG keeps a when's
+   parameters across nested whens in a closure that it packs with the
+   element; here the member is that closure and the chare pups it.
+-  A wait names every parameter of the entry, including one used only for
+   matching (``ck::coro::skip`` discards it); SDAG's ``when e[ref](...)``
+   and ``when e(int ref, ...)`` both become ``inbox::e(ref)`` with the
+   reference number parameter listed.
+-  A pointer to an array parameter is valid until the next wait, not
+   across nested whens; a container member copies it.
+-  ``when a(), b()`` is ``CK_WHEN_ALL``; ``case`` is ``CK_WHEN_ANY`` with
+   ``CK_ALL`` for an arm that is a conjunction; the arm's body is the code
+   after the wait, selected on the stored index with ``if``, not with a
+   ``switch`` (a wait may not be inside a ``switch``). Loops and
+   conditionals are the C++ ones, with the loop variable a member in
+   both; ``forall [i] (start:end, stride)`` is ``CK_FORALL_STRIDE``.
+-  After a migration or restart, the coroutine's body is invoked again
+   and jumps to the recorded wait: the code inside ``CK_MIGRATABLE``
+   before that wait is skipped, so its results must be members, and the
+   code before ``CK_MIGRATABLE`` runs again; SDAG resumes without
+   re-running anything.
+-  Each ``when`` clause of an ``overlap`` is a named coroutine task
+   (``ck::coro::task<void>``) passed to ``CK_OVERLAP``; the body of a
+   ``forall`` is one coroutine task
+   that takes the index. SDAG's inline clause bodies have no equivalent
+   (a lambda coroutine would outlive its closure).
+-  A coroutine entry is invoked only through its proxy; a direct C++
+   call of the member function aborts. SDAG's
+   ``ResumeFromSync() { doStep(); }`` becomes
+   ``thisProxy[thisIndex].doStep()`` or an inbox wait on
+   ``ResumeFromSync``.
+-  A coroutine body must not delete its own chare (``delete this``
+   inside a ``when`` body is allowed in SDAG): it calls
+   ``ckDestroyLater()``, and the chare is destroyed by a message handled
+   after the call running on it returns, as ``examples/charm++/fib-coro``
+   does.
+-  Not available: several active invocations of one entry per chare.
+-  Available only here: waits inside called functions (``CK_CALL``),
+   plain C++ control flow and calls, parameters on the coroutine entry,
+   and no bodies in the ``.ci`` file.
 
 .. _sec:pup:
 
@@ -2695,7 +3126,7 @@ infrastructure:
   above link in order to use this load balancer. Because of this
   dependence, ScotchLB is not built by default; it can be built by
   running ``make ScotchLB`` in the Charm++ build folder
-  (e.g. ``netlrts-linux-x86_64-smp/``). If SCOTCH is installed in a
+  (e.g. ``reconverse-linux-x86_64/``). If SCOTCH is installed in a
   non-standard location, use the *-incdir* and *-libdir* build time
   options to point to the include and library directories used,
   respectively. (``+balancer ScotchLB``)
@@ -3878,6 +4309,98 @@ Advanced Programming Techniques
 Optimizing Entry Method Invocation
 ----------------------------------
 
+.. _choosingcomm:
+
+Choosing How to Communicate
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Charm++ offers several ways to move data between objects. Which one is
+fastest depends on the size of the data, on whether the data must start or
+end in a buffer of your own, and on whether the same transfer repeats between
+the same partners. Start from the data and where it has to go.
+
+Many of the thresholds below are set by the *eager limit*. A message up to
+that size is sent in one step and lands in a receive buffer that the runtime
+system already holds. A larger message pays a rendezvous: a handshake between
+the two sides before the data moves. On reconverse builds with LCI, the eager
+limit is the LCI packet size less 76 bytes, which is 8116 bytes by default.
+
+The times quoted are one-way latencies between two nodes, one process on
+each, measured in November 2026 on two clusters with reconverse and LCI:
+Anvil (HDR100 InfiniBand) and Delta (HPE Slingshot-11). Other machines give
+other numbers. The choices below were the same on both clusters, except where
+a threshold is given for each.
+
+Data up to the eager limit, data sent once, or partners that change
+   Use **marshalled parameters**, that is, plain entry methods. An 8-byte
+   message takes 3.0 us on Anvil and 3.8 us on Delta, and 0.5 us between
+   PEs of one process, where a pointer is passed and nothing is copied.
+   Marshalled parameters also carry pointer-based and variable-length data,
+   through PUP (:numref:`sec:pup`). Above the eager limit a plain send pays
+   the rendezvous: a 16 KiB message takes 9.9 us on Anvil and 17.6 us on
+   Delta.
+
+Data you want to keep, modify or forward after it arrives
+   Use **a message** (a ``CMessage_`` class, :numref:`messages`). The
+   receiver owns a message: it can keep it, write into it, send it on, or
+   free it. Marshalled parameters belong to the runtime system (see the
+   rules below).
+
+A source buffer above the eager limit that you can leave untouched until the runtime system is done with it
+   Use the **Zero Copy Entry Method Send API**: a ``nocopy`` parameter,
+   passed as ``CkSendBuffer(ptr, callback)`` (:numref:`nocopyapi`). It
+   saves the sender's copy into a message, at the cost of a callback and a
+   round trip. Below the eager limit it is 3 to 4 times slower than a plain
+   send (8 B: 10.2 us on Anvil, 13.4 us on Delta).
+   Above it, it takes 0.84 to 0.96 times as long as a plain send on Delta
+   from 16 KiB to 1 MiB, where a rendezvous costs more, and 1.06 to 1.22
+   times as long on Anvil. Between PEs of one process it copies the data
+   once, where a plain send passes a pointer.
+
+The receiver can choose where the data goes only after seeing the message
+   Use the **Zero Copy Entry Method Post API**: a ``nocopypost``
+   parameter, with ``CkPostBuffer`` and ``CkMatchBuffer`` or a post entry
+   method (:numref:`nocopyapi`). The data lands in the receiver's buffer, at
+   the cost of a round trip for the metadata. It costs about what the Send
+   API costs.
+
+Data that must start and end in buffers of your own, sent repeatedly between the same partners
+   Use the **Zero Copy Direct API**: ``CkNcpyBuffer`` objects with ``get``
+   or ``put`` (:numref:`nocopyapi`), with the buffer handles exchanged once.
+   Against sending a message and copying the data out of it, a put is
+   faster from 16 KiB on Delta (1.45 times at 16 KiB, 2.31 times at 1 MiB,
+   3.46 times at 16 MiB) and from 64 KiB on Anvil (1.33 times at 64 KiB,
+   1.69 times at 1 MiB, 2.30 times at 16 MiB). At 4 KiB and below a message
+   is faster (8 B: a put takes 7.4 us against 3.8 us for a message on
+   Delta), because the receiver learns of a put only through an
+   acknowledgement that follows it. Get and put cost about the same.
+
+GPU buffers
+   For a single transfer, use a ``nocopydevice`` parameter with
+   ``CkDeviceBuffer`` (:numref:`sec-gpu`). It moves the data from device to
+   device without staging it through host memory where the hardware allows.
+   For transfers repeated between the same partners, use a
+   ``CkChannel`` (:numref:`gpuchannels`), which sets up the destination
+   once instead of for every transfer.
+
+The following rules apply whichever call you use.
+
+- **Do not modify or keep marshalled parameters.** Entry methods with
+  marshalled parameters are ``nokeep`` (:numref:`attributes`): the runtime
+  system owns the buffer, frees it when the method returns, and for a
+  broadcast hands the same buffer to every receiver in the process. Copy
+  what you need to keep, or use a message if you need to own the data.
+- **The kind of chare does not matter for speed.** Sends to chares, groups,
+  node groups and array elements differ by 3% or less. Choose the kind by
+  design.
+- **Between processes on one host, run with** ``+ipc`` (:numref:`shmem`).
+  Messages up to the IPC cutoff (32 KiB by default, set with
+  ``++ipccutoff``) are 3 to 9 times faster: 8 B goes from 3.08 to 1.00 us on
+  Anvil, and 16 KiB from 15.2 to 1.9 us on Delta. A larger message goes
+  through the network card (64 KiB takes 17.4 us on Delta). The zero copy
+  APIs gain less from ``+ipc``.
+
+
 .. _messages:
 
 Messages
@@ -4357,7 +4880,8 @@ follows:
 
 Charm++ currently offers the following attributes that one may assign to
 an entry method: threaded, sync, exclusive, nokeep, notrace, appwork,
-immediate, expedited, inline, local, python, reductiontarget, aggregate.
+immediate, expedited, inline, local, python, reductiontarget, aggregate,
+inbox, coroutine.
 
 threaded
    entry methods run in their own non-preemptible threads. These entry
@@ -4420,6 +4944,18 @@ nokeep
    detect. An example can be found in
    ``examples/charm++/histogram_group``.
 
+inbox
+   entry methods of a chare of any kind deliver to the chare's coroutine
+   state (section :numref:`sec:ckcoro`): their bodies are generated. They
+   take a message or marshalled parameters (conditional and nocopy
+   parameters excepted).
+
+coroutine
+   entry methods of a chare of any kind are defined in C++ as coroutines
+   returning ``ck::coroutine`` (section :numref:`sec:ckcoro`). They take
+   a message or marshalled parameters (conditional and nocopy parameters
+   excepted) and return void.
+
 notrace
    entry methods will not be traced during execution. As a result, they
    will not be considered and displayed in Projections for performance
@@ -4437,13 +4973,12 @@ immediate
    otherwise a compilation error will result. If the destination of such
    entry method is on the local node, then the method will be executed
    in the context of the regular PE regardless the execution mode of
-   Charm++ runtime. However, in the SMP mode, if the destination of the
-   method is on the remote node, then the method will be executed in the
-   context of the communication thread. For that reason, immediate entry
-   methods should be used for code that is performance critical and does
-   not take too long in terms of execution time because long running
-   entry methods can delay communication by occupying the communication
-   thread for entry method execution rather than remote communication.
+   Charm++ runtime. On a remote node, there is no communication thread,
+   and the method is delivered as an ordinary message to a PE of that
+   node. (On the classic branch only, in SMP mode, a remote immediate
+   method runs in the context of the communication thread; there,
+   immediate entry methods should be short, because long running entry
+   methods delay communication by occupying the communication thread.)
 
    Such entry methods can be useful for implementing
    multicasts/reductions as well as data lookup when such operations are
@@ -4599,6 +5134,12 @@ When the message with opts1 arrives at its destination, it will be
 pushed onto the end of the message queue as usual. However, when the
 message with opts2 arrives, it will be pushed onto the *front* of the
 message queue.
+
+Inside the entry method, ``CkCurrentMessage()`` (section
+:numref:`sec:ckcoro`) returns the message that carries the marshalled
+parameters, so the receiver can read the priority, the reference number
+set with ``setRef`` and the other envelope fields, or keep the message
+with ``CkReferenceMsg`` for later use.
 
 .. _messages-1:
 
@@ -5026,11 +5567,11 @@ Memory Registration and Registration Modes
 
 There are four modes of memory registration for the Zero Copy API. These
 registration modes act as control switches on networks that require memory
-registration like GNI, OFI, UCX and Verbs, in order to perform RDMA
+registration, such as the networks LCI drives, in order to perform RDMA
 operations . They dictate the functioning of the API providing flexible
 options based on user requirement. On other networks, where network
-memory management is not necessary (Netlrts) or is internally handled by
-the lower layer networking API (PAMI, MPI), these switches are still
+memory management is not necessary or is internally handled by
+the lower layer networking API, these switches are still
 supported to maintain API consistency by all behaving in the similar
 default mode of operation.
 
@@ -5063,9 +5604,9 @@ to register and perform the RDMA operation. This mode is demonstrated in
 
 
 This mode is only beneficial by implementations that use
-pre-registered memory pools. In Charm++, GNI and Verbs machine layers
-use pre-registered memory pools for avoiding registration costs. On
-other machine layers, this mode is supported, but it behaves similar to
+pre-registered memory pools. On the classic branch, the GNI and Verbs
+machine layers use pre-registered memory pools for avoiding registration
+costs. On reconverse, this mode is supported, but it behaves similar to
 ``CK_BUFFER_REG``. A custom allocator, ``CkRdmaAlloc`` can be used to
 allocate a buffer from a pool of pre-registered memory to avoid the
 expensive malloc and memory registration costs. For a buffer allocated
@@ -5407,13 +5948,13 @@ behaves like a regular entry method that copies its arguments.
 
 Table :numref:`tab:rdmathreshold` displays the
 message size thresholds for the Zero Copy Entry Method Send API on
-popular systems and build architectures. These results were obtained by
+popular systems and build architectures of the classic branch (Charm++
+8.1); thresholds for reconverse builds have not been tabulated. These
+results were obtained by
 running ``benchmarks/charm++/zerocopy/entry_method_api/pingpong`` in
 non-SMP mode on production builds. For message sizes greater than or
 equal to the displayed thresholds, the Zero Copy API is found to perform
-better than the regular message send API. For network layers that are
-not pamilrts, gni, verbs, ofi or mpi, the generic implementation is
-used.
+better than the regular message send API.
 
 .. table:: Message Size Thresholds for which Zero Copy Entry API performs better than Regular API
    :name: tab:rdmathreshold
@@ -5479,7 +6020,10 @@ parameters present inside each array element of the ``CkNcpyBufferPost`` array. 
 registration mode is unassigned by the user, the default ``CK_BUFFER_REG`` regMode is used. Similarly, when
 the de-registration mode is unassigned by the user, the default ``CK_BUFFER_DEREG`` deregMode is used.
 It is important to ensure that the ``CkMatchBuffer`` call is made after setting the ``regMode`` and/or ``deregMode``
-parameters.
+parameters. A posted buffer is registered for each message it receives, in a handle that the runtime
+system keeps to itself, and the RTS releases that registration once the message has arrived, whatever the
+``deregMode``: no handle exists through which a registration kept with ``CK_BUFFER_NODEREG`` could
+be reused or released.
 
 For the entry method ``foo`` specified with a nocopypost specifier, the resulting post entry method defined
 in the .C file will be:
@@ -6477,7 +7021,10 @@ function. Some other mappings such as round-robin (RRMap) also exist,
 which can be used similar to custom ones described below.
 CldMap names no PE for an element (its procNum returns ``CLD_ANYWHERE``),
 so ``insert()`` into an array that uses it must be given a PE; without one
-the program aborts.
+the program aborts. FastArrayMap, HilbertArrayMap and PropMap (1D, or an
+array created with no elements) likewise name no PE for an index outside
+the range the array was created with, so ``insert()`` of such an index must
+be given a PE.
 
 A custom map object is implemented as a group which inherits from
 CkArrayMap and defines these virtual methods:
@@ -6521,7 +7068,8 @@ in the procNum function.
 
 Note that the first argument to the procNum method exists for reasons
 internal to the runtime system and is not used in the calculation of
-processor numbers.
+processor numbers. procNum may return -1 for an index the map has no PE
+for; ``insert()`` of such an index must then be given a PE.
 
 Once you’ve instantiated a custom map object, you can use it to control
 the location of a new array’s elements using the setMap method of the
@@ -8341,8 +8889,7 @@ Querying Network Topology
 
 The following calls provide information about the machine upon which the
 parallel program is executed. A processing element (PE) is a unit of
-mapping and scheduling, which takes the form of an OS thread in SMP mode
-and an OS process in non-SMP mode. A node (specifically, a logical node)
+mapping and scheduling, which takes the form of an OS thread. A node (specifically, a logical node)
 refers to an OS process: a set of one or more PEs that share memory
 (i.e. an address space). PEs and nodes are ranked separately starting
 from zero: PEs are ranked from ``0`` to ``CmiNumPes()``, and nodes are ranked
@@ -8391,8 +8938,7 @@ Physical Node API
 
 The following calls provide information about the division and mapping
 of physical hardware in Charm++. A processing element (PE) is a unit of
-mapping and scheduling, which takes the form of an OS thread in SMP mode
-and an OS process in non-SMP mode. A logical node (often shortened to
+mapping and scheduling, which takes the form of an OS thread. A logical node (often shortened to
 *node*) refers to an OS process: a set of one or more PEs that share
 memory (i.e. an address space). A physical node refers to an individual
 hardware machine (or, more precisely, an operating system instance on
@@ -8656,7 +9202,7 @@ After a failure, the system may contain fewer or more processors. Once
 the failed components have been repaired, some processors may become
 available again. Therefore, the user may need the flexibility to restart
 on a different number of processors than in the checkpointing phase.
-This is allowable by giving a different ``+pN`` option at runtime. One
+This is allowable by giving a different ``+pe N`` option at runtime. One
 thing to note is that the new load distribution might differ from the
 previous one at checkpoint time, so running a load balancer (see
 Section :numref:`loadbalancing`) after restart is suggested.
@@ -9027,9 +9573,11 @@ source code. The interface functions of this library are as follows:
 -  CProxy_FuncCkLoop **CkLoop_Init**\ (int numThreads=0): This function
    initializes the CkLoop library, and it only needs to be called once
    on a single PE during the initialization phase of the application.
-   The argument ``numThreads`` is only used in non-SMP mode, specifying
+   The argument ``numThreads`` is only used in non-SMP mode (classic
+   branch only), specifying
    the number of threads to be created for the single-node shared-memory
-   parallelism. It will be ignored in SMP mode.
+   parallelism. It will be ignored in SMP mode, which every reconverse
+   build uses.
 
 -  void **CkLoop_SetSchedPolicy**\ (CkLoop_sched
    schedPolicy=CKLOOP_NODE_QUEUE) : This function sets the scheduling
@@ -9042,7 +9590,7 @@ source code. The interface functions of this library are as follows:
    ``CKLOOP_LIST`` uses list to deliver the messages.
 
 -  void **CkLoop_Exit**\ (CProxy_FuncCkLoop ckLoop): This function is
-   intended to be used in non-SMP mode, as it frees the resources (e.g.
+   intended to be used in non-SMP mode (classic branch only), as it frees the resources (e.g.
    terminating the spawned threads) used by the CkLoop library. It
    should be called on just one PE.
 
@@ -9167,14 +9715,13 @@ Instructions to build and use the integrated OpenMP library
 Instructions to build
 '''''''''''''''''''''
 
-The OpenMP library can be built with ``omp`` keyword on any smp version
-of Charm++ including multicore build when you build Charm++ or AMPI,
+The OpenMP library can be built with ``omp`` keyword
+when you build Charm++ or AMPI,
 for example:
 
 .. code-block:: bash
 
-   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 omp
-   $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp
+   $ $CHARM_DIR/build charm++ reconverse-linux-x86_64 omp
 
 This library is based on the LLVM OpenMP runtime library. So it supports
 the ABI used by clang, intel and gcc compilers.
@@ -9213,7 +9760,7 @@ to avoid the error:
    $ sudo ln -svT /usr/bin/clang-3.8 /usr/bin/clang
    $ sudo ln -svT /usr/bin/clang++-3.8 /usr/bin/clang
 
-   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 clang omp --with-production -j8
+   $ $CHARM_DIR/build charm++ reconverse-linux-x86_64 clang omp --with-production -j8
    $ echo '!<arch>' > $(CHARM_DIR)/lib/libomp.a  # Dummy library. This will make you avoid the error message.
 
 On Mac, the Apple-provided clang installed in default doesn’t have
@@ -9227,8 +9774,7 @@ to the invocation of the Charm++ build script. For example:
 
 .. code-block:: bash
 
-   $ $CHARM_DIR/build charm++ multicore-linux-x86_64 omp gcc-7
-   $ $CHARM_DIR/build charm++ netlrts-linux-x86_64 smp omp gcc-7
+   $ $CHARM_DIR/build charm++ reconverse-darwin-arm8 omp gcc-7
 
 If this does not work, you should set environment variables so that the
 Charm++ build script uses the normal gcc installed from Homebrew or
@@ -9469,7 +10015,7 @@ with GPU support (or configure CMake with ``-D CUDA=ON``), e.g.
 
 .. code-block:: bash
 
-   $ ./build charm++ netlrts-linux-x86_64 cuda -j8 --with-production
+   $ ./build charm++ reconverse-linux-x86_64 cuda -j8 --with-production
 
 Building with GPU support requires an installation of the CUDA Toolkit on the
 system, which is automatically found by the build script. If the script fails
@@ -9541,6 +10087,68 @@ Examples using CUDA and HAPI can be found under
 ``examples/charm++/cuda``. Codes under ``#ifdef USE_WR`` use the
 ``hapiWorkRequest`` scheme, which is now deprecated.
 
+Completion order and detection
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A callback given to ``hapiAddCallback`` runs once all the work queued on its
+stream before the call has completed. Callbacks on one stream run in the
+order they were added. Callbacks on different streams run in the order their
+work completes, not in the order they were added: a callback does not wait
+for a long kernel on another stream. Earlier versions ran a PE's callbacks in
+the order they were added, across all its streams.
+
+The runtime detects a completion in one of two ways:
+
+- **an event query**: an event is recorded on the stream, and the scheduler
+  queries it in each pass, one driver call for each stream with work pending;
+- **a pinned flag**: the stream writes a sequence number into pinned host
+  memory, and the scheduler reads it with no driver call. The write adds 5-6
+  microseconds to the completion (NVIDIA A40).
+
+Event queries cost when the PE has other work while completions are pending,
+as in an over-decomposed application: each query in the scheduler's poll
+delays that work. A flag costs when the PE only waits for the completion,
+since its write is then on the critical path. On CUDA the runtime uses flags,
+for the over-decomposed case; on HIP it uses event queries. With
+``+gpuflagpolls N`` it chooses per completion, from how often the PE has been
+polling: a flag while it made fewer than ``N`` polls per completion over its
+last 64 completions (it had other work), an event query otherwise. These
+options change the detection:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 30 70
+
+   * - Option
+     - Effect
+   * - ``+gpueventquery``
+     - An event query for every completion (the default on HIP).
+   * - ``+gpuflags``
+     - A pinned flag for every completion (the default on CUDA).
+   * - ``+gpuflagpolls N``
+     - Choose per completion: a pinned flag while the PE makes fewer than
+       ``N`` polls per completion, an event query otherwise.
+   * - ``+gpuflagmemset``
+     - Write the flag with a memset (the default on CUDA; on HIP, after an
+       event record).
+   * - ``+gpuflagkernel``
+     - Write the flag with a one-thread kernel that stores it after a
+       system-scope fence (the default on HIP).
+   * - ``+gpustreamwrite``
+     - Write the flag with the driver's stream memory operation. For
+       comparison only: it can deadlock when processes wait on each other's
+       IPC events.
+   * - ``+gpucompletionstats``
+     - Print, per PE at exit, how many completions were detected each way.
+
+When the callback runs, another process or the network may read what the
+stream's work wrote. With an event query the callback runs once CUDA reports
+the work complete. For a CUDA flag written by a memset, CUDA documents only
+stream order: that a reader in another process or on the network then finds
+the work's writes is observed, by Charm++'s device-channel tests, not
+documented. The flag kernel's fence is documented for its own thread's
+writes, and the stream orders the earlier work before the kernel.
+
 Streams: create your own, non-blocking
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -9602,15 +10210,14 @@ buffer to the destination buffer (also on the GPU).
 There are currently two implementations for direct GPU messaging:
 (1) CUDA memcpy and IPC based mechanism for intra-node communication
 (inter-node communication reverts back to a host-staging mechanism),
-and (2) UCX-based mechanism that supports both intra-node and inter-node
-communication. When Charm++ is built with the UCX machine layer
-and CUDA support (e.g., ucx-linux-x86_64-cuda), it will automatically use
-the UCX-based mechanism with the direct GPU messaging API.
-Other CUDA-enabled builds will only support
-the first mechanism and limit the use of direct GPU-GPU transfers within
-a single physical node. For inter-node messages, the runtime system will
-revert back to a host-staging mechanism where the GPU buffer is moved to
-host memory before being sent.
+and (2) a network-based mechanism that supports both intra-node and
+inter-node communication. Reconverse builds with GPU support (e.g.,
+``reconverse-linux-x86_64-cuda``) use the network-based mechanism, a
+device-to-device RDMA get through the network backend, described below.
+On the classic branch only, the UCX machine layer provides it, and other
+classic CUDA-enabled builds revert back to a host-staging mechanism for
+inter-node messages, where the GPU buffer is moved to host memory before
+being sent.
 The user APIs for both implementations remain the same, however, as detailed
 in the following.
 
@@ -9804,122 +10411,194 @@ corrected (issue #3963) and should not be copied as a model for buffer reuse
 until they are. Follow the rule above instead: pass the callback, or
 double-buffer.
 
-Persistent GPU Communication
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _gpuchannels:
 
-Persistent GPU communication is a feature designed to take advantage of the fact
-that the address and size of the source/destination buffers do not change in
-persistent communication. Such patterns are found in many applications, including
-iterative applications that exchange the same set of buffers between neighbors/peers
-at every iteration. This allows us to reduce the overheads involved with
-with direct GPU messaging, including the nature of the multi-hop mechanism and
-CUDA IPC setup, and directly issue ``cudaMemcpy`` calls at the message send sites
-(for a ``put`` type operation; a ``get`` type operation is also supported).
+GPU Channels
+~~~~~~~~~~~~
 
-Setup and communication routines are supported through ``CkDevicePersistent``:
+A channel is a fixed device buffer on a receiving chare (its owner) that one
+sending chare writes into repeatedly, with no per-message setup. It suits the
+exchanges of iterative applications, where the same buffers pass between the
+same partners every iteration: the receiver names its buffer once, and every
+later transfer costs one device copy (or one RDMA read) and one notification,
+without the per-message descriptor, lookup and acknowledgement of a
+``nocopydevice`` send.
 
 .. code-block:: c++
 
-   struct CkDevicePersistent {
-     // Constructors
-     CkDevicePersistent(const void* ptr, size_t size);
-     CkDevicePersistent(const void* ptr, size_t size, const CkCallback& cb);
-     CkDevicePersistent(const void* ptr, size_t size, cudaStream_t stream);
-     CkDevicePersistent(const void* ptr, size_t size, const CkCallback& cb, cudaStream_t stream);
+   class CkChannel {
+    public:
+     // Receiver side, in an entry method of the receiving chare
+     CkChannel(void* dst, size_t capacity, CkMem kind, int device,
+               const CkCallback& arrived);    // kind: CkMem::Device
+     void reopen(void* new_dst);   // in the receiver's pup, after it migrated
+     void destroy(const CkCallback& cb);      // cb: the buffer may be freed
+     const CkChannelEvent* event(CkDataMsg* m);   // in the arrived entry
+     void release();               // the buffer may be overwritten
 
-     void open(); // Takes the IPC handle and records the buffer for RDMA
-     void close(); // Releases what open() set up (see "Ownership" below)
-     void set_msg(void* msg); // Ties a Charm++ message to the stored callback
-     int mode(const CkDevicePersistent& other) const; // How get/put with other moves the bytes
-     void get(CkDevicePersistent& src); // Initiates transfer from the specified source buffer
-     void put(CkDevicePersistent& dst); // Initiates transfer to the specified destination buffer
+     // Sender side
+     void attach();                // optional: attach now, not at the first put
+
+     size_t unseenBytes() const;   // see "Migration" below
+     void pup(PUP::er& p);
    };
 
-``CkDevicePersistent`` objects should be created on both the sender and receiver chares,
-with the respective source and destination buffer addresses and sizes. The optional
-Charm++ callback object will be invoked once the communication using that persistent
-buffer is complete. For instance, if both sender and receiver ``CkDevicePersistent``
-objects have callbacks associated with them, the sender's callback will be invoked
-once the send operation is complete and when the user can reuse/free the associated buffer,
-and the receiver's callback will be invoked once the received data is available.
-Both callbacks are sent from the PE that called ``get`` or ``put``.
-The associated CUDA stream will be used in the ``cudaMemcpyAsync`` calls to asynchronously
-invoke the underlying data transfers, which are tracked to invoke the subsequent callbacks, if any.
+   CkDeviceStatus CkPut(CkChannel& ch, const void* src, size_t bytes,
+                        const CkPutOpts& opts = CkPutOpts());
+   // CkPutOpts().stream(s).done(cb).tag(n): the stream that produces src,
+   // the callback invoked when src may be reused, the tag of the event
 
-``open`` should be called after the creation of the ``CkDevicePersistent`` object, on
-the PE that created it, and before sending it to a communication peer. Once the
-objects are created and ``open`` ed, they should be exchanged between the
-communication peers. After this setup stage, the objects' ``get`` and ``put``
-methods can be invoked freely to perform the desired communication. A transfer
-moves ``cnt`` bytes of the source as the object holds it at the time of the call;
-``cnt`` may be lowered between transfers, but not raised above its value at
-``open`` (call ``open`` again for that).
+   struct CkChannelEvent {
+     uint64_t seq;     // the put's sequence number on this channel
+     size_t bytes;     // how many bytes it wrote
+     uint64_t tag;     // the sender's tag (all 64 bits); the message's reference number keeps its low 16
+     ...
+   };
 
-**Transfer modes.** ``get`` and ``put`` choose one of three modes for each pair of
-buffers; ``mode(other)`` returns it (0, 1 or 2), and with ``+gpupersistverbose``
-each process prints one line the first time it uses a mode:
+**Setup.** The receiver constructs a channel on its buffer inside one of its
+entry methods, naming the kind of memory (only ``CkMem::Device`` is
+implemented), the device the buffer is on, and the entry method that learns of
+each put; the constructor exports the buffer. It sends the channel to the
+sender as an entry method parameter. The sender keeps its copy (for example
+``peer = ch;``) and calls ``CkPut`` on it. The first put attaches the sender
+(it looks up the receiver's buffer and how to reach it); ``attach`` does that
+at once instead. A channel has one sender: a second array element that
+attaches while the first one's puts may still follow aborts, naming both
+elements. Give each sender its own channel:
 
-- 0, a device copy (``cudaMemcpyAsync``): both buffers belong to PEs of one process.
-  Neither buffer needs to be opened.
-- 1, CUDA/HIP IPC: the buffers belong to processes on one host, and the peer's IPC
-  handle (taken by ``open``) opens in this process. A process opens a peer
-  buffer's handle once; the mapping is shared by the copies of that buffer on
-  all PEs of the process and reference counted. A copy takes a reference the
-  first time it transfers through the mapping and keeps the mapped address, so
-  later transfers from that copy cost no lookup; ``close`` on the copy releases
-  the reference, and the mapping is closed with the last one. ``close`` on one
-  copy therefore never unmaps a buffer that a copy on another PE is using.
-  ``+gpushm`` is not needed; it concerns the shared communication buffer of
-  other device messages and does not select this mode. ``mode`` opens the
-  handle to answer, so it reports the mode that runs.
-- 2, RDMA on device memory: the buffers belong to different hosts, or the peer's
-  IPC handle does not open in this process (for example when each process sees
-  only its own GPU). **Both** buffers must have been opened, the source as well
-  as the destination. The memory is registered with the network the first time
-  a transfer needs it, and stays registered until the owner's ``close``. A ``put``
-  is carried out as a get issued by the destination's PE, so that the callbacks
-  mean the data has arrived; the first ``get`` from a source asks the source's
-  process for its registration, one round trip. RDMA mode aborts with a message
-  when the network layer moves RDMA data through host memory (the LCW backend,
-  or ``+nordma``), when a buffer is 2 GiB or larger, or when the network layer
-  cannot register the device memory.
+.. code-block:: c++
 
-**Ownership.** The object on which ``open`` was called owns the buffer's setup;
-``close`` on it, or its destructor, releases it, including the network
-registration. Copies never own: copy construction, copy assignment, and sending
-the object (as a marshalled parameter or through ``pup``) all make non-owning
-copies. Moving an object (assigning a temporary, as in
-``buf = CkDevicePersistent(...)``, or a ``std::vector`` reallocating) transfers
-ownership. Assigning over an owner, or calling ``open`` again, releases the old
-setup first. A copy cannot be used for an RDMA transfer once its owner has
-released it, so keep the owner alive (for example as a chare member) while peers
-use the buffer. ``close`` on a received copy of another process's buffer
-releases its reference on this process's IPC mapping of the buffer (the
-mapping is closed with the last reference, after synchronizing the device) and
-the registration it kept; call it when the peer's buffer will no longer be
-used, or before migration, and only once the callbacks of the transfers made
-through the copy have been invoked (the device synchronize when the mapping
-closes covers only the GPU of the PE that closes it). Assigning over a copy
-releases its reference the same way; a copy destroyed without ``close`` keeps
-its reference, so the mapping stays open for the rest of the run. Before the
-owner's program frees the device memory, close the copies of the buffer in
-the other processes on its host: CUDA documents freeing an allocation before
-the other processes close their IPC mappings of it as undefined behavior. An
-owner that is a static or global object is released at process exit without
-deregistering, since the network layer is gone by then; call ``close`` on it
-before ``CkExit`` to deregister. Persistent objects are not migrated and not
-restored from a checkpoint: after a chare migrates, or a run restarts, create,
-open and exchange them again. In RDMA mode an object from a previous run is
-refused, since its id carries a token of the run that opened it. The
-device-copy and IPC modes do not check the id, so they do not detect a stale
-object, whether it is from a previous run or a copy whose owner has released
-the buffer.
+   void Block::setup() {
+     int dev;
+     hapiCheck(hapiGetDevice(&dev));
+     recv_ch = CkChannel(d_recv, bytes, CkMem::Device, dev,
+                         CkCallback(CkIndex_Block::arrived(NULL), thisProxy[thisIndex]));
+     thisProxy[peer].takeChannel(recv_ch);
+   }
+   void Block::takeChannel(CkChannel ch) { send_ch = ch; }
+   // every iteration:
+   CkPut(send_ch, d_send, bytes, CkPutOpts().stream(stream).tag(iter));
 
-Examples using persistent GPU communication can be found in
-``examples/charm++/cuda/gpudirect/persistent``,
-``examples/charm++/cuda/gpudirect/jacobi3d`` (option ``-s``; it opens both its
-send and receive buffers, so it also runs between hosts) and
-``benchmarks/charm++/cuda/gpudirect/latency-persistent``.
+**A put.** ``CkPut`` writes ``bytes`` (at most the capacity) of ``src``, as
+the work queued on the stream given by ``CkPutOpts().stream(s)`` produces
+them, into the receiver's buffer, and never blocks the PE. The callback given
+by ``.done(cb)`` is invoked when ``src`` may be reused. The
+receiver's ``arrived`` entry method is invoked once the bytes are in its
+buffer, with a ``CkDataMsg``; it passes the message to ``event``, which returns
+the put's description, or ``NULL`` for an event the runtime system handled
+itself (the entry method then just deletes the message). The tag given by
+``.tag(n)`` is set as the message's reference number, so an SDAG ``when arrived[iter](CkDataMsg* m)``
+matches puts by iteration. The reference number is ``CMK_REFNUM_TYPE``, 16
+bits unless Charm++ was built with a wider ``REFNUM_TYPE``, and keeps the
+tag's low bits. SDAG cuts the ``when``'s expression to the same type, so a
+``when`` for iteration 65541 matches a put tagged 5: matching stays exact as
+long as the puts that can wait for one ``when`` at once are fewer than 65536
+iterations apart, which one put per channel at a time ensures.
+``event()->tag`` carries all 64 bits:
+
+.. code-block:: c++
+
+   void Block::arrived(CkDataMsg* m) {
+     const CkChannelEvent* e = recv_ch.event(m);
+     delete m;
+     if (e == NULL) return;
+     // ... launch the kernels that read the buffer ...
+   }
+
+**Release and flow control.** The receiver calls ``release`` when the buffer
+may be overwritten. A put issued before the receiver released the previous one
+is held by the runtime system, one deep, and issued when the release arrives; a second put issued
+while one is held aborts. Two puts in flight at once therefore need two
+channels on two buffers (for example one per iteration parity). Calling
+``release`` only after the kernels that read the buffer have *completed*, not
+merely been queued, is the receiver's responsibility: the next put's copy is
+not ordered behind the receiver's streams.
+
+**Transports.** ``CkPut`` chooses per pair of PEs: a device copy on ``stream``
+when both are in one process (the copies a PE issues on one stream within one
+entry method are batched into one copy operation); a device copy through a
+CUDA/HIP IPC mapping when they are in different processes on one host
+(credits and arrival notes then go through shared memory rather than
+messages); and otherwise, between hosts or where the IPC handle does not open,
+the sender announces the put and the receiver reads it with RDMA, which needs
+no credit. Device memory is registered with the network the first time a
+transfer needs it.
+
+**Migration.** Neither side has to exchange the channel again after a
+migration. A receiving element that is chosen to migrate does not move until
+its channels' senders have acknowledged that the channel is closing, which
+each does once none of its puts is in flight; a put made meanwhile is copied to
+a staging buffer and read by the receiver at its new home, in order. A sending
+element does not move while one of its puts is in flight. The receiver's
+``pup`` carries its channel and, on unpack, reopens it on the new buffer; the
+sender's next put finds the receiver again:
+
+.. code-block:: c++
+
+   void Block::pup(PUP::er& p) {
+     // ... pup the receive buffer's contents with the other device state ...
+     p | recv_ch;
+     p | send_ch;
+     if (p.isUnpacking()) recv_ch.reopen(d_recv);
+   }
+
+The receive buffer is application state: a put whose bytes arrived before the
+pack, and whose ``arrived`` event has not been taken yet, is in the buffer the
+element packs. ``unseenBytes()`` says how many bytes of it are such a put, so
+a ``pup`` can carry only what is needed; it is ``SIZE_MAX`` when that is not
+known and the whole buffer must go. Channels work in elements of chare arrays;
+a channel opened in a group or a singleton chare has no element to follow.
+
+RDMA reads abort with a message when the network layer moves RDMA data through
+host memory (the LCW backend, or ``+nordma``), when a buffer is 2 GiB or
+larger, or when the network layer cannot register the device memory.
+
+**Teardown.** The receive buffer may be freed only after the sender has
+stopped writing into it and no longer maps it. ``destroy(cb)`` returns at once
+and starts the teardown: the sender's puts into the buffer complete, the
+sender releases its mapping of the buffer (another process on the same host
+maps it through CUDA/HIP IPC) and tells the receiver, announced puts not yet
+read are dropped, and then the runtime system deregisters the buffer and
+invokes ``cb``. Free the buffer in ``cb``, not before: CUDA leaves freeing an
+allocation that another process still maps undefined. The receiving element
+does not migrate during the teardown. As with every put, the application
+decides when the last put has been made; a put, or an ``attach``, after the
+sender learned of the destroy aborts. Events that arrive after ``destroy``
+reach ``event`` as ``NULL``:
+
+.. code-block:: c++
+
+   void Block::finish() {   // after the last iteration's data was consumed
+     recv_ch.destroy(CkCallback(CkIndex_Block::channelDestroyed(), thisProxy[thisIndex]));
+   }
+   void Block::channelDestroyed() { hapiCheck(hapiFree(d_recv)); /* ... */ }
+
+**Ownership.** The receiver's channel object owns the receive buffer's export
+and registration. Copying a channel object (assignment or copy construction)
+moves the ownership, and the runtime system's bookkeeping, to the copy: the
+usual shape is ``ch = param;`` in an entry method, after which the parameter
+is destroyed. This holds for a sender's copy as it does for the owner: after
+``v.push_back(send_ch)``, put through ``v.back()``. A put, attach, event,
+release, reopen or destroy on the original aborts, saying that the copy holds
+the channel. An owner destroyed without ``destroy`` starts the same teardown,
+with no callback, so nothing says when the buffer may be freed: call
+``destroy``. A channel is not restored from a checkpoint: after a restart,
+construct and exchange it again.
+
+With ``CHARM_DEBUG_CHANNEL`` set, each protocol event prints one line. Without
+it, a PE that handles no channel event for 20 seconds while a channel waits on
+something prints what each waiting channel is waiting for. With
+``CHARM_CHANNEL_STATS`` set, each PE prints at exit how long receivers' moves
+were held for their senders' acknowledgements, how long attaches waited for
+their answers, and how long puts made during a move waited to be read.
+
+Examples using device channels can be found in
+``examples/charm++/cuda/gpudirect/chantest`` (with ``-l``, the elements swap PEs
+every few iterations without exchanging their channels again; every run ends
+with ``destroy``),
+``examples/charm++/cuda/gpudirect/jacobi3d`` (option ``-k``; one channel per
+neighbour and iteration parity) and ``benchmarks/charm++/cuda/gpudirect/channel``
+(latency and rate against ``nocopydevice`` sends).
 
 .. _sec:mpiinterop:
 
@@ -10075,9 +10754,17 @@ launcher that does not match the MPI library, each process becomes its
 own one-rank MPI job; ``CharmLibInit`` prints a warning when it detects
 this.
 
-Under ``srun``, add ``--kill-on-bad-exit``: an abort in one process does
-not yet end the other processes of an interop job, and without the option
-they wait until the job's time limit.
+A ``CkAbort`` (or ``CmiAbort``) in any process ends the whole job:
+``CharmLibInit`` registers an abort hook (``CmiSetAbortHook``) that calls
+``MPI_Abort``, and ``CharmLibExit`` removes it. With several PEs per
+process, the PE that aborts calls ``MPI_Abort`` from a thread MPI did not
+create, so initialize MPI with
+``MPI_Init_thread(&argc, &argv, MPI_THREAD_SERIALIZED, &provided)``
+instead of ``MPI_Init``; while Charm++ runs, the main thread makes no MPI
+call. A process that dies of a signal, such as a segmentation fault, does
+not reach ``CmiAbort`` or the hook, so under ``srun`` add
+``--kill-on-bad-exit`` as well; without it, after such a crash the other
+processes wait until the job's time limit.
 
 On HPE Slingshot (the CXI libfabric provider), export
 ``FI_CXI_RX_MATCH_MODE=hybrid`` in the job script. Reconverse sets it
@@ -10872,7 +11559,7 @@ The database data structure named LDStats is defined in *CentralLB.h*:
 #. *LBRealType* is the data type for load balancer measured time. It is
    "double" by default. User can specify the type to float at Charm++
    compile time if want. For example, ./build charm++
-   netlrts-linux-x86_64 --with-lbtime-type=float;
+   reconverse-linux-x86_64 --with-lbtime-type=float;
 
 #. *procs* array defines processor attributes and usage data for each
    processor;
@@ -11613,6 +12300,8 @@ superclass to do the final delivery after you’ve sent your messages.
 Experimental Features
 =====================
 
+.. _shmem:
+
 SHMEM
 ---------
 Charm++ SHMEM is an experimental module that aims to add
@@ -11627,9 +12316,9 @@ is used to access a physical address; however, this is not guaranteed.
 In practice, most modern compilers comply with this suggestion, but please
 alert us if you encounter synchronization issues!
 
-To build with SHMEM, pass ``--enable-shmem`` (to use PXSHM) or
-``--enable-xpmem`` (to use XPMEM) as command-line options to a Charm++ build;
-only CMake builds are supported at this time. Charm++ currently has a cutoff
+On reconverse builds the shared-memory pool is always built, and it is
+turned on at run time with ``+ipc`` (``+ipcmode {auto,shm,xpmem}`` chooses
+the mechanism; XPMEM needs a build with ``--enable-xpmem``). Charm++ currently has a cutoff
 for using SHMEM, after which it falls back to conventional messaging. This
 decision accommodates SHMEM's bounded pool, and potentially more efficient
 IPC mechanisms exist for "large" messages (e.g., the ZeroCopy API). One can
@@ -11637,7 +12326,7 @@ alter these behaviors with the command line options ``++ipcpoolsize`` and
 ``++ipccutoff``, which change the size of the shared pool of memory and
 message size cutoff (in bytes), respectively. For example, this command
 will run ``a.out`` with a 128MB IPC pool size and a 256KB message cutoff:
-``./charmrun ++local ++auto-provision ./a.out ++ipcpoolsize $((128*1024*1024)) ++ipccutoff $((256*1024))``
+``lcrun -n 2 ./a.out +pe 2 +ipc ++ipcpoolsize $((128*1024*1024)) ++ipccutoff $((256*1024))``
 
 Note, Charm++ maintains and polls its own SHMEM IPC manager. Libraries can
 instantiate their own IPC manager if they require custom IPC behaviors. For
@@ -11831,6 +12520,10 @@ subsequent production runs.
 Malleability: Shrink/Expand Number of Processors
 ------------------------------------------------
 
+Shrink/expand is available on the classic branch only (Charm++ 8.1): it
+uses ``charmrun`` to start the processes of the new configuration, and
+reconverse builds do not support ``--enable-shrinkexpand``.
+
 This feature enables a Charm++ application to dynamically shrink and
 expand the number of processors that it is running on during the
 execution. It internally uses three other features of Charm++: CCS
@@ -11867,7 +12560,7 @@ used, and a port number to listen the shrink/expand commands:
 
 .. code-block:: bash
 
-   	$ ./jacobi2d 200 20 +pe 4 +balancer GreedyLB ++server ++server-port 1234
+   	$ ./charmrun +p4 ./jacobi2d 200 20 +balancer GreedyLB ++nodelist ./mynodelistfile ++server ++server-port 1234
 
 The CCS client to send shrink/expand commands needs to specify the
 hostname, port number, the old(current) number of processor and the
@@ -11977,17 +12670,17 @@ where,
    *reconverse-linux-x86_64*, *reconverse-darwin-arm8* etc.
 
 ``OPTIONS``
-   are additional options to the build process, e.g. *smp* is used to
-   build a shared memory version, *-j8* is given to build in parallel
-   etc.
+   are additional options to the build process, e.g. *-j8* is given to
+   build in parallel etc. (Reconverse builds are always SMP, so *smp*
+   is not needed.)
 
 In Table :numref:`tab:buildlist`, a list of build
 commands is provided for some of the commonly used systems. Note that,
-in general, options such as *smp*, ``--with-production``, compiler
+in general, options such as ``--with-production``, compiler
 specifiers etc can be used with all targets. It is advisable to build
 with ``--with-production`` to obtain the best performance. If one
 desires to perform trace collection (for Projections),
-``--enable-tracing --enable-tracing-commthread`` should also be passed
+``--enable-tracing`` should also be passed
 to the build command.
 
 Details on all the available alternatives for each of the above
@@ -12036,7 +12729,9 @@ A basic command to install Charm++ through Spack is the following:
 
    	$ spack install charmpp
 
-By default, the netlrts network backend with SMP support is built. You
+The Spack package currently builds Charm++ 8.1 (classic branch), and the
+options below apply to it. By default, the netlrts network backend with
+SMP support is built. You
 can specify other backends by providing the ``backend`` parameter to
 spack. It is also possible to specify other options, as listed in
 Section :numref:`sec:manualinstall`, by adding them to the Spack
@@ -12081,24 +12776,23 @@ After downloading and unpacking Charm++, it can be installed in the following wa
    $ cd charm
    $ mkdir build-cmake
    $ cd build-cmake
-   $ cmake ..
+   $ cmake .. -DNETWORK=reconverse
    $ make -j4
 
 
-By default, CMake builds the netlrts version.
 Other configuration options can be specified in the cmake command above.
-For example, to build Charm++ and AMPI on top of the MPI layer with SMP, the following command can be used:
+For example, to build Charm++ and AMPI, the following command can be used:
 
 .. code-block:: bash
 
-   $ cmake .. -DNETWORK=mpi -DSMP=on -DTARGET=AMPI
+   $ cmake .. -DNETWORK=reconverse -DTARGET=AMPI
 
 Alternatively, one could also specify other ``cmake`` configuration options via the 
 ``../build`` command, for example, by replacing the above ``cmake ..`` command with
 
 .. code-block:: bash
 
-   $ ../build AMPI mpi-linux-x86_64 smp
+   $ ../build AMPI reconverse-linux-x86_64
 
 Charm++ installation directories
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -13264,8 +13958,9 @@ CharmDebug
 
 The CharmDebug interactive debugging tool can be used to inspect the
 messages in the scheduling queue of each processing element, and to
-manipulate the order in which they’re delivered. More details on how to
-use CharmDebug can be found in its manual.
+manipulate the order in which they’re delivered. CharmDebug is not
+available on reconverse in Charm++ 9 (classic branch only). More details
+on how to use CharmDebug can be found in its manual.
 
 Deterministic Record-Replay
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^

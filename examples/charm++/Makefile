@@ -8,7 +8,9 @@ DIRS = \
   cksequence \
   completion \
   fib \
+  fib-coro \
   groupsection \
+  heat1d-coro \
   hello \
   immediateEntryMethod \
   integrate \
@@ -19,9 +21,11 @@ DIRS = \
   jacobi3d-2d-decomposition \
   kmeans \
   leanmd \
+  leanmd-coro \
   load_balancing \
   manyToMany \
   matmul \
+  matmul-coro \
   namespace \
   piArray \
   PUP \

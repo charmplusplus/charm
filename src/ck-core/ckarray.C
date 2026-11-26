@@ -293,6 +293,15 @@ void ArrayElement::ckJustRestored(void)
   // empty for out-of-core emulation
 }
 
+void ArrayElement::ckDeviceChannelControl(CkMessage* m)
+{
+#if CMK_CUDA || CMK_HIP
+  CkDeviceChannelControl((void*)m);
+#else
+  CkFreeMsg(m);
+#endif
+}
+
 #ifdef _PIPELINED_ALLREDUCE_
 void ArrayElement::contribute2(int dataSize, const void* data,
                                CkReduction::reducerType type, CMK_REFNUM_TYPE userFlag)
@@ -775,12 +784,12 @@ void CProxy_ArrayBase::ckInsertIdx(CkArrayMessage* m, int ctor, int proposedPe,
   }
 
   int hostPe = ca->findInitialHostPe(idx, proposedPe);
-  // CldMap's procNum is CLD_ANYWHERE; FastArrayMap names PEs past the last one
-  // for indices well beyond its initial range.
+  // CldMap's procNum is CLD_ANYWHERE; other maps return -1 for an index outside
+  // the range they were configured for.
   if (hostPe < 0 || hostPe >= CkNumPes())
     CkAbort("ckInsert without a PE is not supported with this array map (CldMap, or "
-            "FastArrayMap beyond its initial range): the map gave PE %d; pass a PE to "
-            "insert()\n", hostPe);
+            "an index outside the range the map was configured for): the map gave PE "
+            "%d; pass a PE to insert()\n", hostPe);
 
   int listenerData[CK_ARRAYLISTENER_MAXLEN];
   ca->prepareCtorMsg(m, listenerData);
@@ -1292,21 +1301,24 @@ void CProxySection_ArrayBase::ckSend(CkArrayMessage* msg, int ep, int opts)
                                       opts);
   else
   {
-    // send through all
-    for (int k = 0; k < _sid.size(); ++k)
+    // Every element gets a copy except the last one sent to, which gets msg;
+    // msg is freed when no section ID has an element.
+    int lastK = -1;
+    for (int k = 0; k < (int)_sid.size(); ++k)
+      if (!_sid[k]._elems.empty()) lastK = k;
+    if (lastK < 0)
     {
-      for (int i = 0; i < _sid[k]._elems.size() - 1; i++)
+      CkFreeMsg(msg);
+      return;
+    }
+    for (int k = 0; k <= lastK; ++k)
+    {
+      const int n = (int)_sid[k]._elems.size();
+      for (int i = 0; i < n; i++)
       {
+        void* m = (k == lastK && i == n - 1) ? (void*)msg : CkCopyMsg((void**)&msg);
         CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(), _sid[k]._elems[i]);
-        void* newMsg = CkCopyMsg((void**)&msg);
-        ap.ckSend((CkArrayMessage*)newMsg, ep, opts);
-      }
-      if (!_sid[k]._elems.empty())
-      {
-        void* newMsg = (k < _sid.size() - 1) ? CkCopyMsg((void**)&msg) : msg;
-        CProxyElement_ArrayBase ap(_sid[k]._cookie.get_aid(),
-                                   _sid[k]._elems[_sid[k]._elems.size() - 1]);
-        ap.ckSend((CkArrayMessage*)newMsg, ep, opts);
+        ap.ckSend((CkArrayMessage*)m, ep, opts);
       }
     }
   }
@@ -1404,6 +1416,8 @@ void CkArrayBroadcaster::pup(PUP::er& p)
   p | storedBcasts;
 }
 
+int _ckBcastEpochSpareBits = 0;
+
 // Processes the incoming broadcast message and buffers it for future delivery
 void CkArrayBroadcaster::ingestIncoming(CkArrayMessage* msg)
 {
@@ -1445,7 +1459,7 @@ bool CkArrayBroadcaster::attemptDelivery(CkArrayMessage* bcast, ArrayElement* el
   // now at the last part of the ZC delivery, so don't increment the elBcastNo
   if (CMI_ZC_MSGTYPE(UsrToEnv(bcast)) == CMK_ZC_BCAST_RECV_ALL_DONE_MSG)
   {
-    CkAssert(elBcastNo > bcastEpoch);
+    CkAssert(ck::bcastEpoch::diff(elBcastNo, bcastEpoch) > 0);
   }
   else
   {
@@ -1454,7 +1468,7 @@ bool CkArrayBroadcaster::attemptDelivery(CkArrayMessage* bcast, ArrayElement* el
     // it for now, it'll be delivered when it catches up
     if (elBcastNo != bcastEpoch)
       return false;
-    elBcastNo++;
+    elBcastNo = ck::bcastEpoch::next(elBcastNo);
   }
 
   if (!performDelivery(bcast, el, doFree))
@@ -1470,7 +1484,7 @@ bool CkArrayBroadcaster::bringUpToDate(ArrayElement* el)
   // A stable-locations array frees a broadcast once every local element has it,
   // on the promise that no element moves while a broadcast is in flight
   // (doc/internals/array-broadcast-migration.md)
-  if (stableLocations && elBcastNo < storedBcasts.getHeadEpoch())
+  if (stableLocations && ck::bcastEpoch::diff(elBcastNo, storedBcasts.getHeadEpoch()) < 0)
     CkAbort("Array element %s arrived on PE %d expecting broadcast %d, which this PE "
             "freed (next kept: %d). An element of an array with static insertion and "
             "setAnytimeMigration(false) moved while a broadcast to the array was in "
@@ -1480,7 +1494,7 @@ bool CkArrayBroadcaster::bringUpToDate(ArrayElement* el)
   while (storedBcasts.hasBcast(elBcastNo))
   {
     CkArrayMessage* curBcast = storedBcasts.getBcast(elBcastNo);
-    elBcastNo++;
+    elBcastNo = ck::bcastEpoch::next(elBcastNo);
     const bool curDoFree =
         CMI_ZC_MSGTYPE(UsrToEnv(curBcast)) == CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
     const bool curStatus = performDelivery(curBcast, el, curDoFree);
@@ -1523,8 +1537,8 @@ bool CkArrayBroadcaster::performDelivery(CkArrayMessage* bcast, ArrayElement* el
   }
 }
 
-// CkDyn elements (ckdyn-impl.h): the same epoch bookkeeping as the charm4py
-// path above, with the delivery handed to CkDynDeliverBroadcast. A handler
+// CkDyn elements (ckdyn-impl.h): the same epoch bookkeeping as attemptDelivery
+// above, with the delivery handed to CkDynDeliverBroadcast. A handler
 // may migrate or destroy other local elements, so the elements are named by
 // index and looked up again before each delivery.
 void CkArrayBroadcaster::deliverAndUpdateDyn(CkArrayMessage* bcast,
@@ -1539,11 +1553,11 @@ void CkArrayBroadcaster::deliverAndUpdateDyn(CkArrayMessage* bcast,
   bool success = performDeliveryDyn(bcast, idx, batch);
   if (success)
   {
-    int bcastEpoch = UsrToEnv(bcast)->getGroupEpoch() + 1;
+    int bcastEpoch = ck::bcastEpoch::next(UsrToEnv(bcast)->getGroupEpoch());
     while (storedBcasts.hasBcast(bcastEpoch))
     {
       success = performDeliveryDyn(storedBcasts.getBcast(bcastEpoch), idx, batch);
-      bcastEpoch++;
+      bcastEpoch = ck::bcastEpoch::next(bcastEpoch);
     }
   }
 }
@@ -1572,7 +1586,7 @@ bool CkArrayBroadcaster::performDeliveryDyn(CkArrayMessage* bcast,
     // waits for the stored broadcast until ckElementArriving
     if (owner->getLocMgr()->bufferedActiveRgetMsgs.count(el->CkMigratable::ckGetID()) != 0)
       continue;
-    elBcastNo++;
+    elBcastNo = ck::bcastEpoch::next(elBcastNo);
     ArrayElemDyn* d = static_cast<ArrayElemDyn*>(el);
     if (batch)
       ready.push_back(d);
@@ -1596,11 +1610,18 @@ void CkArrayBroadcaster::springCleaning(void) { storedBcasts.springCleaning(); }
 // element has received, so free those now instead of at spring cleaning.
 void CkArrayBroadcaster::releaseDelivered()
 {
+  // +bcastEpochBits: the extra cleaning pass, once this broadcast has been delivered
+  cleanIfDue();
   if (!stableLocations)
     return;
-  int below = INT_MAX;
+  // With no local element, everything received so far can go
+  int below = ck::bcastEpoch::next(storedBcasts.getMaxEpoch());
   for (CkMigratable* m : owner->localElemVec)
-    below = std::min(below, getData((ArrayElement*)m));
+  {
+    const int expects = getData((ArrayElement*)m);
+    if (ck::bcastEpoch::diff(expects, below) < 0)
+      below = expects;
+  }
   storedBcasts.releaseBelow(below);
 }
 
@@ -1610,7 +1631,7 @@ bool CkArrayBroadcaster::isFinalRecipient(const std::vector<CkMigratable*>& elem
   if (getData(el) != epoch)
     return false;
   for (CkMigratable* m : elements)
-    if (m != el && getData((ArrayElement*)m) <= epoch)
+    if (m != el && ck::bcastEpoch::diff(getData((ArrayElement*)m), epoch) <= 0)
       return false;
   return true;
 }

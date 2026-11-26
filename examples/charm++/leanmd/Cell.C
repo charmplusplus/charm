@@ -2,7 +2,6 @@
 #include "defs.h"
 #include "leanmd.decl.h"
 #include "Cell.h"
-#include "rand48_replacement.h"
 
 extern /* readonly */ CProxy_Main mainProxy;
 extern /* readonly */ CProxy_Cell cellArray;
@@ -13,6 +12,18 @@ extern /* readonly */ int cellArrayDimX;
 extern /* readonly */ int cellArrayDimY;
 extern /* readonly */ int cellArrayDimZ;
 extern /* readonly */ int finalStepCount; 
+
+// The drand48 sequence of srand48(seed), with the state in the caller:
+// srand48/drand48 share one state among the PEs of a process, so Cells
+// constructed concurrently on different PEs would interleave their draws.
+struct CellRand48 {
+  unsigned long long x;
+  explicit CellRand48(long seed) : x(((unsigned long long)(seed & 0xffffffffL) << 16) | 0x330E) {}
+  double next() {
+    x = (0x5DEECE66DULL * x + 0xB) & ((1ULL << 48) - 1);
+    return (double)x / (double)(1ULL << 48);
+  }
+};
 
 //default constructor
 Cell::Cell() {
@@ -25,7 +36,7 @@ Cell::Cell() {
   myNumParts = PARTICLES_PER_CELL_START + (myid*(PARTICLES_PER_CELL_END-PARTICLES_PER_CELL_START))/(cellArrayDimX*cellArrayDimY*cellArrayDimZ);
 
   // starting random generator
-  srand48(thisIndex.x+cellArrayDimX*(thisIndex.y+thisIndex.z*cellArrayDimY));
+  CellRand48 rng(thisIndex.x+cellArrayDimX*(thisIndex.y+thisIndex.z*cellArrayDimY));
 
   // Particle initialization
   for(i=0; i < myNumParts; i++) {
@@ -33,12 +44,12 @@ Cell::Cell() {
     particles[i].mass = HYDROGEN_MASS;
 
     //give random values for position and velocity
-    particles[i].pos.x = drand48() * CELL_SIZE_X + thisIndex.x * CELL_SIZE_X;
-    particles[i].pos.y = drand48() * CELL_SIZE_Y + thisIndex.y * CELL_SIZE_Y;
-    particles[i].pos.z = drand48() * CELL_SIZE_Z + thisIndex.z * CELL_SIZE_Z;
-    particles[i].vel.x = (drand48() - 0.5) * .2 * MAX_VELOCITY;
-    particles[i].vel.y = (drand48() - 0.5) * .2 * MAX_VELOCITY;
-    particles[i].vel.z = (drand48() - 0.5) * .2 * MAX_VELOCITY;
+    particles[i].pos.x = rng.next() * CELL_SIZE_X + thisIndex.x * CELL_SIZE_X;
+    particles[i].pos.y = rng.next() * CELL_SIZE_Y + thisIndex.y * CELL_SIZE_Y;
+    particles[i].pos.z = rng.next() * CELL_SIZE_Z + thisIndex.z * CELL_SIZE_Z;
+    particles[i].vel.x = (rng.next() - 0.5) * .2 * MAX_VELOCITY;
+    particles[i].vel.y = (rng.next() - 0.5) * .2 * MAX_VELOCITY;
+    particles[i].vel.z = (rng.next() - 0.5) * .2 * MAX_VELOCITY;
 	particles[i].force.x = 0.0;
 	particles[i].force.y = 0.0;
 	particles[i].force.z = 0.0;
@@ -47,6 +58,7 @@ Cell::Cell() {
   stepCount = 1;
   updateCount = 0;
   forceCount = 0;
+  forceChecksum = 0;
 }
 
 //constructor for chare object migration
@@ -218,10 +230,30 @@ void Cell::updateProperties() {
   forceCount = 0;
 }
 
+// Integer checksum of the particle positions and of every force received,
+// summed over all cells: integer sums do not depend on the reduction order
+// or the PE count.
+void Cell::contributeChecksum() {
+  long long sum = 0;
+  for (int i = 0; i < particles.length(); i++) {
+    sum += (long long)(particles[i].pos.x * 1e6) + (long long)(particles[i].pos.y * 1e6)
+         + (long long)(particles[i].pos.z * 1e6);
+  }
+  sum += forceChecksum;
+  contribute(sizeof(sum), &sum, CkReduction::sum_long_long,
+             CkCallback(CkReductionTarget(Main,done),mainProxy));
+}
+
 void Cell::addForces(vec3 *forces){
 	// updating force information
 	for(int i = 0; i < particles.length(); i++){
 		particles[i].force += forces[i];
+		// Each force array is computed by one Compute from the same
+		// positions in every run, so truncating its elements to integers
+		// (forces are around 1e-14 in these units) and adding gives an
+		// order-independent checksum of the forces.
+		forceChecksum += (long long)(forces[i].x * 1e18) + (long long)(forces[i].y * 1e18)
+		               + (long long)(forces[i].z * 1e18);
 	}
 }
 
@@ -261,6 +293,7 @@ void Cell::pup(PUP::er &p) {
   p | updateCount;
   p | inbrs;
   p | forceCount;
+  p | forceChecksum;
 
   if (p.isUnpacking()){
     computesList = new int*[inbrs];

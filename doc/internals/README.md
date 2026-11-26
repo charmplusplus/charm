@@ -40,6 +40,7 @@ entry, and is planned once there is more than one chapter.
 | Load balancing: the LB framework and TreeLB | not yet written |
 | [Checkpoint, restart, shrink/expand](memckpt.md) | first section written 2026-11-06: the double in-memory checkpoint and its rollback (syncft option); disk checkpoint and shrink/expand not yet written |
 | The reconverse layer: what Charm++ asks of the machine layer | not yet written |
+| [Coroutine entry methods (ckcoro)](coroutine-sdag.md) | written 2026-11-09 with the prototype: entry methods as C++20 coroutines, the inbox, the restart protocol (design in `doc/coroutine-sdag-design.md`) |
 
 ## Models
 

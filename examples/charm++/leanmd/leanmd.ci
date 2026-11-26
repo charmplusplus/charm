@@ -13,7 +13,7 @@ mainmodule leanmd {
   mainchare [migratable] Main {
     entry Main(CkArgMsg* msg);
     entry [reductiontarget] void computesCreated(); //called when computes have been created
-    entry [reductiontarget] void done(); //called when computes have been created
+    entry [reductiontarget] void done(long long sum); //called when all cells are done, with the particle checksum
 
     //this get called after the main constructor has called cell array constructor
     entry void run() {
@@ -25,7 +25,8 @@ mainmodule leanmd {
         computeArray.run();
       }
       //when all chares are done
-      when done() serial {
+      when done(long long sum) serial {
+        CkPrintf("leanmd: %d steps, checksum %lld\n", finalStepCount, sum);
         CkPrintf("Simulation completed\n");
         CkExit();
       }
@@ -72,8 +73,8 @@ mainmodule leanmd {
           }
         }
       }
-      //everything done, reduction on kinetic energy
-      serial { contribute(0,NULL,CkReduction::nop,CkCallback(CkReductionTarget(Main,done),mainProxy)); }
+      //everything done, reduction of the integer checksum of positions and forces
+      serial { contributeChecksum(); }
     };
   };
 

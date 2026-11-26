@@ -2,6 +2,7 @@ mainmodule period_selection {
 
   readonly CProxy_Main mainProxy;
   readonly CProxy_TestArray arrayProxy;
+  readonly bool countMigrations;
 
   mainchare Main {
     entry Main(CkArgMsg* msg);

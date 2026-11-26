@@ -20,7 +20,7 @@ set(ck-cxx-sources
     ../ck-perf/trace-common.C ../ck-perf/trace-controlPoints.C
     ../ck-perf/tracec.C ../ck-perf/tracef.C ../conv-perf/charmProjections.C
     ../util/ckbitvector.C ../util/ckregex.C
-    ck.C ckarray.C ckarrayoptions.C ckcallback.C ckdyn.C
+    ck.C ckarray.C ckarrayoptions.C ckcallback.C ckdevicechannel.C ckdyn.C
     ckcheckpoint.C ckfutures.C ckIgetControl.C
     cklocation.C cklocnode.C ckmemcheckpoint.C ckmulticast.C
     ckrdma.C ckrdmadevice.C ckreduction.C cksyncbarrier.C debug-charm.C
@@ -30,13 +30,13 @@ set(ck-cxx-sources
 
 set(ck-h-sources XArraySectionReducer.h charm++.h charm++_type_traits.h
     charm-api.h charm.h ck.h ckIgetControl.h ckarray.h ckarrayindex.h
-    ckarrayoptions.h ckcallback-ccs.h ckcallback.h ckcheckpoint.h ckdyn.h ckdyn-impl.h
+    ckarrayoptions.h ckcallback-ccs.h ckcallback.h ckcheckpoint.h ckdevicechannel.h ckdyn.h ckdyn-impl.h
     ckmarshall.h ckfutures.h cklocation.h cklocnode.h cklocrec.h
     ckmemcheckpoint.h ckmessage.h ckmigratable.h ckmulticast.h
     ckobjQ.h ckrdma.h ckrdmadevice.h ckreduction.h cksection.h
     ckstream.h cksyncbarrier.h debug-charm.h envelope-path.h envelope.h init.h
     middle-conv.h middle.h mpi-interoperate.h objid.h qd.h
-    readonly.h register.h sdag.h stats.h waitqd.h ../ck-ldb/CentralLB.h
+    readonly.h register.h sdag.h ckcoro.h ckcoro_core.h stats.h waitqd.h ../ck-ldb/CentralLB.h
     ../ck-cp/arrayRedistributor.h ../ck-cp/controlPoints.h ../ck-cp/pathHistory.h ../ck-cp/API-generator/cp_effects.h)
 
 if(CMK_CAN_LINK_FORTRAN)

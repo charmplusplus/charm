@@ -32,6 +32,11 @@ test: section_migrate
 	$(call run, ./section_migrate +p4 -double)
 	$(call run, ./section_migrate +p4 -double +randomized_msgq +randomized_seed 2)
 	$(call run, ./section_migrate +p3 -double -lb -inflight -every +balancer RotateLB +randomized_msgq +randomized_seed 2)
+	$(call run, ./section_migrate +p4 -lb +balancer RotateLB +LBCommOn)
+	$(call run, ./section_migrate +p4 -lb +balancer MetisLB +LBCommOn)
+	$(call run, ./section_migrate +p4 -unbounded -lb +balancer RotateLB +LBCommOn)
+	$(call run, ./section_migrate +p4 -unbounded -early -lb +balancer RotateLB +LBCommOn)
+	$(call run, ./section_migrate +p4 -unbounded -lb -auto -inflight -every +balancer RotateLB +LBCommOn +randomized_msgq +randomized_seed 11)
 
 test-known-failures: section_migrate
 

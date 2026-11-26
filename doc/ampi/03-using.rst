@@ -70,8 +70,8 @@ Global Variable Privatization
 -----------------------------
 
 In AMPI, ranks are implemented as user-level threads that coexist
-within OS processes or OS threads, depending on how the Charm++
-runtime was built. Traditional MPI
+within the worker threads of an OS process (Charm++ builds always run
+several worker threads per process). Traditional MPI
 programs assume that each rank has an entire OS process to itself,
 and that only one thread of control exists within its address space.
 This allows them to safely use global and static variables in their
@@ -376,7 +376,10 @@ overhead. AMPI provides runtime support for privatizing thread-local
 variables to user-level threads by changing the TLS segment register
 when context switching between user-level threads. The runtime overhead
 is that of changing a single pointer per user-level thread context
-switch. Currently, Charm++ supports it for x86/x86_64 platforms when
+switch. TLSglobals is not available on reconverse builds of Charm++ 9,
+because the runtime does not switch the TLS segment between user-level
+threads, and the toolchain rejects ``-tlsglobals``. On the classic
+branch only (Charm++ 8.1), it is supported for x86/x86_64 platforms when
 using GNU or LLVM compilers, as well as macOS on all supported
 architectures.
 
@@ -544,6 +547,8 @@ it does not handle static variables, has a context switching overhead
 that grows with the number of global variables, and is incompatible with
 SMP builds of AMPI, where multiple virtual ranks can execute
 simultaneously on different scheduler threads within an OS process.
+Reconverse builds are always SMP, so swapglobals is available on the
+classic branch only.
 
 Currently, this feature only works on x86 and x86_64 platforms that
 fully support ELF, and it requires ld version 2.23 or older, or else a
@@ -576,15 +581,15 @@ Table :numref:`tab:portability` shows portability of
 different schemes.
 
 .. _tab:portability:
-.. table:: Portability of current implementations of three privatization schemes. "Yes" means we have implemented this technique. "Maybe" indicates there are no theoretical problems, but no implementation exists. "No" indicates the technique is impossible on this platform.
+.. table:: Portability of current implementations of privatization schemes on reconverse builds. "Yes" means we have implemented this technique. "No" indicates the technique is not available on this platform. TLSglobals and Swapglobals are available on the classic branch only.
 
-   ==================== ===== ====== ======= === ====== ===== =====
-   Privatization Scheme Linux Mac OS Windows x86 x86_64 PPC   ARM7
-   ==================== ===== ====== ======= === ====== ===== =====
-   Manual Code Editing  Yes   Yes    Yes     Yes Yes    Yes   Yes
-   PIEglobals           Yes   No     No      Yes Yes    Yes   Yes
-   TLSglobals           Yes   Yes    Maybe   Yes Yes    Maybe Maybe
-   PiPglobals           Yes   No     No      Yes Yes    Yes   Yes
-   FSglobals            Yes   Yes    Yes     Yes Yes    Yes   Yes
-   Swapglobals          Yes   No     No      Yes Yes    Yes   Yes
-   ==================== ===== ====== ======= === ====== ===== =====
+   ==================== ===== ====== ======= ====== =====
+   Privatization Scheme Linux Mac OS Windows x86_64 ARM64
+   ==================== ===== ====== ======= ====== =====
+   Manual Code Editing  Yes   Yes    Yes     Yes    Yes
+   PIEglobals           Yes   No     No      Yes    Yes
+   TLSglobals           No    No     No      No     No
+   PiPglobals           Yes   No     No      Yes    Yes
+   FSglobals            Yes   Yes    Yes     Yes    Yes
+   Swapglobals          No    No     No      No     No
+   ==================== ===== ====== ======= ====== =====

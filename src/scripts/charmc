@@ -76,6 +76,8 @@ OPTS_LD=''
 # Additional options specified by the user
 ARG_OPTS=()
 ARG_OPTS_CPP=()
+# -M* dependency options; -host C++ compiles take these but not ARG_OPTS
+ARG_OPTS_DEPS=()
 ARG_OPTS_LDRO=()
 ARG_OPTS_CC=()
 ARG_OPTS_CXX=()
@@ -661,11 +663,17 @@ do
 	"-M" | "-MM" | "-MMD" | "-MG" | "-MD")
 		SKIPLINK="yes"
 		ARG_OPTS+=("$arg")
+		ARG_OPTS_DEPS+=("$arg")
 		GENDEPENDS="yes"
 		;;
-	"-MF" | "-MT" | "-MQ")	#-MP will pass through automatically
+	"-MF" | "-MT" | "-MQ")
 		ARG_OPTS+=("$arg" "$1")
+		ARG_OPTS_DEPS+=("$arg" "$1")
 		shift
+		;;
+	"-MP")
+		ARG_OPTS+=("$arg")
+		ARG_OPTS_DEPS+=("$arg")
 		;;
 #--------------------------------------
     "-count-tokens")
@@ -1682,21 +1690,16 @@ then
   LANG_LIBS+=("-L$CHARMRECONV")
 fi
 
-# libreconverse is a shared library linked by SONAME/install_name
-# (@rpath/libreconverse.<suf>), so -L above only satisfies the link step: at run
-# time the loader still has to be told where the library lives. Without this,
-# every charmc-built binary needs (DY)LD_LIBRARY_PATH set by hand before it will
-# start, while cmake-built ones (bin/ckhello) run bare because cmake stamps a
-# build RPATH of its own. Record the directory it was linked from as an RPATH
-# instead. That also covers libreconverse's own dependencies (liblci, liblct,
-# liblcw), which sit in the same directory and which the loader resolves against
-# the main executable's RPATHs.
-#
-# Classic builds have no libreconverse to find, so the readability test below
-# leaves their link line untouched.
+# libreconverse is always a shared library, linked by SONAME/install_name
+# (@rpath/libreconverse.<suf>). A default build puts it in lib/; a
+# --build-shared build puts it in lib_so/ and keeps the static Charm++
+# libraries in lib/. Search the directory that holds it, and record that
+# directory as an RPATH so the binary runs without (DY)LD_LIBRARY_PATH; the
+# RPATH also finds libreconverse's dependencies (liblci, liblct) beside it.
 for dir in "$CHARMLIBSO" "$CHARMLIB" "$CHARMRECONV"
 do
 	[[ -n "$dir" && -r "$dir/libreconverse.${CMK_SHARED_SUF:-so}" ]] || continue
+	[[ " ${LANG_LIBS[*]} " = *" -L$dir "* ]] || LANG_LIBS+=("-L$dir")
 	LANG_LIBS+=("-Wl,-rpath,$dir")
 done
 
@@ -1757,14 +1760,22 @@ then
 fi
 
 # Coverage builds instrument every program compiled and linked with charmc.
-# Host tools (-seq, -host) are left alone: they are not measured, and their
-# compiler may not be clang.
-if [[ "$CMK_COVERAGE" = '1' && -z "$SEQUENTIAL" && -z "$NATIVE" ]]
+# -seq programs are not instrumented, but they get the profile runtime at link
+# time, since the libraries they link (libccs-client) are instrumented.
+# Host tools (-host) are left alone: their compiler may not be clang.
+if [[ "$CMK_COVERAGE" = '1' && -z "$NATIVE" ]]
 then
-    CMK_CC_FLAGS+=" -fprofile-instr-generate -fcoverage-mapping"
-    CMK_CXX_FLAGS+=" -fprofile-instr-generate -fcoverage-mapping"
-    CMK_LD_FLAGS+=" -fprofile-instr-generate"
-    CMK_LDXX_FLAGS+=" -fprofile-instr-generate"
+    if [[ -z "$SEQUENTIAL" ]]
+    then
+        CMK_CC_FLAGS+=" -fprofile-instr-generate -fcoverage-mapping"
+        CMK_CXX_FLAGS+=" -fprofile-instr-generate -fcoverage-mapping"
+        CMK_LD_FLAGS+=" -fprofile-instr-generate"
+        CMK_LDXX_FLAGS+=" -fprofile-instr-generate"
+    else
+        # The -seq link lines read the CMK_SEQ_* flags directly.
+        CMK_SEQ_LD_FLAGS+=" -fprofile-instr-generate"
+        CMK_SEQ_LDXX_FLAGS+=" -fprofile-instr-generate"
+    fi
 fi
 
 ########################################################################
@@ -1942,7 +1953,7 @@ do
 	*.C|*.cc|*.cxx|*.cpp|*.c++|*.cu)
                 if [[ -n "$NATIVE" ]]
                 then
-                    runCmd $CMK_NATIVE_CXX $CMK_NATIVE_CXX_FLAGS "-I$CHARMINC" $CMK_SYSINC "${OPTS_CPP_INTERNAL[@]}" "${OPTS_CPP[@]}" -c "$FILE" "${DESTO[@]}"
+                    runCmd $CMK_NATIVE_CXX $CMK_NATIVE_CXX_FLAGS "-I$CHARMINC" $CMK_SYSINC "${OPTS_CPP_INTERNAL[@]}" "${OPTS_CPP[@]}" "${ARG_OPTS_DEPS[@]}" -c "$FILE" "${DESTO[@]}"
                 else
                     runCmd $CHARM_CXX "${CHARM_CXX_FLAGS[@]}" -c "$FILE" "${DESTO[@]}"
                 fi

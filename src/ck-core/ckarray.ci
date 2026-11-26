@@ -52,6 +52,9 @@ module CkArray {
     entry void defrag(CkReductionMsg*);
     // Called by migrateMe
     entry void ckEmigrate(int toPe);
+    // Runtime control events of the device channels this element receives on
+    // (a sender's resolve, an announced put), delivered wherever the element lives.
+    entry void ckDeviceChannelControl(CkMessage *);
   };
 
   message CkCreateArrayAsyncMsg {

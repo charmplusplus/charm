@@ -2,6 +2,8 @@ mainmodule ckpt_restart {
   readonly CProxy_Main mainProxy;
   readonly CProxy_Ring ringProxy;
   readonly CProxy_UbElem ubProxy;
+  readonly CProxy_MapElem mapProxy;
+  readonly CProxy_MapElem hilbertProxy;
   readonly CProxy_PlainChare chareProxy;
   readonly CProxy_PeGroup groupProxy;
   readonly CProxy_NodeData nodeGroupProxy;
@@ -21,6 +23,7 @@ mainmodule ckpt_restart {
     entry void ringReported(CkReductionMsg *m);
     entry void tagged(CkReductionMsg *m);
     entry void groupsChecked(CkReductionMsg *m);
+    entry void mapPong(int flat, int pe, int home);
     entry void resumed();
   };
 
@@ -36,6 +39,11 @@ mainmodule ckpt_restart {
     entry void ping();
     entry void census();
     entry void die();
+  };
+
+  array [2D] MapElem {
+    entry MapElem();
+    entry void ping();
   };
 
   chare [migratable] PlainChare {

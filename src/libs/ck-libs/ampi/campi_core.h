@@ -8,7 +8,8 @@
  * AMPI's delivery code wakes the rank (TCharm::resume, which campi redirects
  * from CthAwaken to a coroutine resume). The simple calls return a
  * request_awaiter (no coroutine frame); calls with internal awaited loops
- * (Init, Finalize, tests and probes, communicator creation) are tasks.
+ * (Init, Finalize, tests and probes, communicator creation) are tasks. The
+ * task type and the restart-site chain are ck::coro's (ckcoro_core.h).
  *
  * Applications normally include campi.h (this header plus macros that
  * redirect the blocking MPI names to co_await expressions) and define their
@@ -26,13 +27,12 @@
 #include <utility>
 #include "mpi.h"
 #include "pup.h"
+#include "ckcoro_core.h"
 
 namespace campi {
 
 struct Rank; // per-rank record, defined in campi.C
 
-// Called by campi's coroutine machinery; defined in campi.C.
-[[noreturn]] void abort_unhandled_exception() noexcept;
 // Record h as the frame to resume when the running rank is next woken.
 void set_resume_point(std::coroutine_handle<> h) noexcept;
 class request_awaiter;
@@ -40,87 +40,14 @@ class request_awaiter;
 // calls w->poll() and resumes h only once w's requests are complete.
 void set_resume_point(std::coroutine_handle<> h, request_awaiter *w) noexcept;
 
-/* ---------------- task<T>: the rank's coroutine type ---------------- */
+/* ---------------- the shared coroutine core (ckcoro_core.h) ---------------- */
 
-template <class T> class task;
-
-namespace detail {
-
-struct promise_base {
-  std::coroutine_handle<> continuation; // the awaiting coroutine, if nested
-
-  std::suspend_always initial_suspend() const noexcept { return {}; }
-
-  struct final_awaiter {
-    bool await_ready() const noexcept { return false; }
-    template <class P>
-    std::coroutine_handle<> await_suspend(std::coroutine_handle<P> h) const noexcept {
-      // A nested task resumes the task that awaited it (symmetric transfer);
-      // the outermost task returns control to campi's resume loop.
-      std::coroutine_handle<> c = h.promise().continuation;
-      return c ? c : std::noop_coroutine();
-    }
-    void await_resume() const noexcept {}
-  };
-  final_awaiter final_suspend() const noexcept { return {}; }
-
-  void unhandled_exception() const noexcept { abort_unhandled_exception(); }
-};
-
-template <class T> struct promise : promise_base {
-  T value{};
-  task<T> get_return_object() noexcept;
-  template <class U> void return_value(U &&v) { value = std::forward<U>(v); }
-};
-
-template <> struct promise<void> : promise_base {
-  task<void> get_return_object() noexcept;
-  void return_void() const noexcept {}
-};
-
-} // namespace detail
-
-template <class T = void> class [[nodiscard]] task {
- public:
-  using promise_type = detail::promise<T>;
-  using handle_type = std::coroutine_handle<promise_type>;
-
-  task() noexcept = default;
-  explicit task(handle_type h) noexcept : h_(h) {}
-  task(task &&o) noexcept : h_(std::exchange(o.h_, {})) {}
-  task &operator=(task &&o) noexcept {
-    if (this != &o) { if (h_) h_.destroy(); h_ = std::exchange(o.h_, {}); }
-    return *this;
-  }
-  task(const task &) = delete;
-  task &operator=(const task &) = delete;
-  ~task() { if (h_) h_.destroy(); }
-
-  // Awaiting a task starts it; it resumes the awaiter when it finishes.
-  bool await_ready() const noexcept { return !h_ || h_.done(); }
-  std::coroutine_handle<> await_suspend(std::coroutine_handle<> awaiting) noexcept {
-    h_.promise().continuation = awaiting;
-    return h_;
-  }
-  T await_resume() {
-    if constexpr (!std::is_void_v<T>) return std::move(h_.promise().value);
-  }
-
-  // For campi's rank start: take ownership of the coroutine frame.
-  handle_type release() noexcept { return std::exchange(h_, {}); }
-
- private:
-  handle_type h_{};
-};
-
-namespace detail {
-template <class T> task<T> promise<T>::get_return_object() noexcept {
-  return task<T>(std::coroutine_handle<promise<T>>::from_promise(*this));
-}
-inline task<void> promise<void>::get_return_object() noexcept {
-  return task<void>(std::coroutine_handle<promise<void>>::from_promise(*this));
-}
-} // namespace detail
+// task<T>: the rank's coroutine type; frame_guard, note_site, abort_no_site:
+// the restart sites of resumable functions (CAMPI_MIGRATABLE, campi.h).
+template <class T = void> using task = ::ck::coro::task<T>;
+using frame_guard = ::ck::coro::frame_guard;
+using ::ck::coro::note_site;
+using ::ck::coro::abort_no_site;
 
 /* ---------------- rank main and its state object ---------------- */
 
@@ -152,42 +79,6 @@ extern main_fn registered_main; // non-null selects campi mode
 void register_main(main_fn f, const state_ops *ops) noexcept;
 struct main_registrar {
   main_registrar(main_fn f, const state_ops *ops) noexcept { register_main(f, ops); }
-};
-
-/* ---------------- restart sites ---------------- */
-
-// One per resumable function (CAMPI_MIGRATABLE). The rank keeps a chain of
-// site ids, one per active frame_guard depth: entry d is the last site
-// (CAMPI_MIGRATE or CAMPI_CALL, both identified by __LINE__) noted by the
-// function at depth d. A restarted rank (after migration, restart from a
-// checkpoint, or +campi_fakemigrate) runs main again from the top, and each
-// function on the recorded path switches to its recorded site: site()
-// returns it while the rank is restarting, and 0 (the function's start)
-// otherwise.
-class frame_guard;
-
-// Record line as the site of g's function: a migrate site (call == false,
-// followed by co_await Migrate) or a call site (call == true, followed by
-// co_await of a resumable function). On a restarting rank it checks that
-// line is the recorded site instead.
-void note_site(frame_guard &g, int line, bool call = false) noexcept;
-// The recorded site of a restarting rank is not a case in g's function.
-[[noreturn]] void abort_no_site(const frame_guard &g) noexcept;
-
-class frame_guard {
- public:
-  frame_guard() noexcept;
-  ~frame_guard();
-  frame_guard(const frame_guard &) = delete;
-  frame_guard &operator=(const frame_guard &) = delete;
-  int site() const noexcept { return site_; }
-
- private:
-  friend void note_site(frame_guard &g, int line, bool call) noexcept;
-  friend void abort_no_site(const frame_guard &g) noexcept;
-  Rank *r_;
-  unsigned depth_;
-  int site_;
 };
 
 /* ---------------- suspension primitive ---------------- */

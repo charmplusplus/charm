@@ -328,7 +328,9 @@ tmp, msg)` builds it and returns the entry index:
   (`viewPayload`, which aborts when the magic is wrong); the entry index is
   the header's `ep`.
 - `CkReductionMsg`: kind `REDRESULT`, one synthesized `BUFFER` slot over
-  `getData()` (no copy) whose `elem` comes from the reducer table, plus a
+  `getData()` (no copy) whose `elem` comes from the reducer table (for a
+  result of the shaped reducer, the slot starts after the 8-byte header,
+  with that header's dimension count and shape: Reductions), plus a
   `FUTURE` slot `(CkMyPe(), ref)` when the envelope's reference number is not
   zero. A result of the foreign reducer is itself a CkDyn payload and is
   viewed as kind `DYN` over `getData()`. The entry index is
@@ -635,6 +637,47 @@ gives `elem` of the `BUFFER` slot in a reduction result view.
 `Group`, `NodeGroup` or `ArrayElement`. A `nop` contribution is sent with no
 data. A SECTION callback is the exception: the contribution goes through the
 section-tagged reducer (Sections, Reductions).
+
+**Shaped contributions.** `CkDynContributeShaped(me, data, cb, ndim, shape)`
+and `CkDynContributeSectionShaped` (added within API version 2) carry the
+contributors' array shape to the result (charm4py issue #321). The built-in
+reducers combine flat element arrays and cannot be changed, so with `ndim`
+2 or more and a reducer of the `CkDynReducers` table on a numeric element
+kind (not `NONE`, not `BYTE`), `shapedContribution` wraps the data for a
+third reducer that `_ckdynInitNode` registers, `CkDyn::shaped`: an 8-byte
+`ShapedHdr` (`int32 inner`, the reducer the binding gave; `uint32 ndim`),
+`int64 shape[ndim]`, then the elements. It checks that the shape's element
+count times the element size equals the length. Anything else (`ndim` 0 or
+1, `nop`, the foreign reducer, a `BYTE` or `NONE` kind) is contributed
+unchanged, so `CkDynContribute(me, data, cb)` is
+`contributeImpl(me, data, cb, 1, NULL)` and behaves as before.
+`contributeImpl` builds the `CkReductionMsg` itself from its parts
+(`SecTag` for a SECTION callback, `ShapedHdr` and shape, data), so the data
+is copied once. `ckdynShapedReduce` skips empty messages, checks that every
+other message has the reducer `CkDyn::shaped` ("mix shaped and flat forms"
+otherwise), the same inner reducer and the same shape ("contributions to one
+reduction have different shapes, (2, 3) and (3, 2)"), and combines the
+elements in place in the first message with data (`shapedCombine`, one loop
+per built-in reducer with the loop body of `ckreduction.C`'s reducer), which
+it returns as the result, as the built-in reducers return `msg[0]`: no input
+or result is copied. One contributor is passed on unreduced, which is
+already the result's layout. A reduction that mixes shaped and flat
+contributions reaches Charm++ with two reducers; `CkReduction::checkSameReducer`
+(called by `reduceMessages`, `CkMulticastMgr` and `XArraySectionReducer`)
+aborts it before either reducer reads the other's messages. Through a
+SECTION callback both are `CkDyn::sectionTagged`, and
+`ckdynSectionTaggedReduce` aborts on the inner reducers. Because the header is 8 bytes, the shape and elements
+after it are laid out as a `BUFFER` slot's data (shape, then bytes), so
+`viewReduction` synthesizes the slot over the message without a copy:
+`v.off` 8, `ndim` from the header, `elem` from the inner reducer, `len` the
+element bytes (`shapedSplit` parses the header). `mcastFromReduction`, which
+turns a built-in result into a section message for a SECTION callback, adds
+a `BUFFER` slot with that shape. Composition with the other wrappers: a
+`CkDynContribute` to a SECTION callback tags the shaped data (the `SecTag`'s
+inner reducer is `CkDyn::shaped`), and `unwrapSectionTagged` hands the inner
+data to `mcastFromReduction`; a `CkDynContributeSectionShaped` passes the
+shaped data and reducer to `CkMulticastMgr::contribute`, which calls the
+registered reducer function like any other.
 
 **The foreign reducer.** `_ckdynInitNode` registers one reducer,
 `CkDyn::foreign` (`CkReduction::addReducer`), on every process in module
@@ -1048,9 +1091,11 @@ device (CuPy, PyTorch, Numba) use the PE's device by default.
 
 ### Persistent device buffers
 
-The implementation is Charm++'s `CkDevicePersistent` (ckrdmadevice.h/.C);
-CkDyn's functions wrap it. `open()` takes a CUDA/HIP IPC handle of the
-allocation holding the buffer and the buffer's offset in it (the base from
+The transport is the endpoint of Charm++'s device channels,
+`CkDeviceChannelEndpoint` (ckdevicechannel.h/.C), with the endpoint transfers
+`CkDeviceEndpointGet`, `CkDeviceEndpointPut` and `CkDeviceEndpointForget`
+written for CkDyn. `open()` takes a CUDA/HIP IPC handle of the allocation
+holding the buffer and the buffer's offset in it (the base from
 `cuMemGetAddressRange` through `dlsym`, or `hipMemGetAddressRange`): cupy,
 torch and pool allocators hand out pieces of larger allocations, and an IPC
 handle maps the whole allocation. `open()` also gives the buffer an `id`,
@@ -1058,60 +1103,57 @@ node (20 bits) | run token (16 bits) | counter (28 bits), and enters it in its
 process's registration table; the memory is registered (`CmiNcpyBuffer::init`,
 `CMK_BUFFER_REG`, `CMK_BUFFER_NODEREG`) the first time a transfer needs RDMA,
 and a PE of another process fetches that registration once
-(`persist_reg_req_handler`/`persist_reg_rep_handler`) and keeps it by id. The
-run token differs between a run and its restart, so an object restored from a
-checkpoint does not name a buffer of the new run. The object that called
-`open()` owns the entry (copies and pupped objects never own; a move transfers
-ownership); its `close()` or destructor deregisters and removes it. The pup
-carries the pointer, length, PE, process, host, the IPC handle and offset, and
-the id.
+(`device_endpoint_reg_req_handler`/`device_endpoint_reg_rep_handler`) and keeps
+it by id. The run token differs between a run and its restart, so an endpoint
+restored from a checkpoint does not name a buffer of the new run. `close()`
+deregisters and removes the entry. The pup carries the pointer, length, PE,
+process, host, the IPC handle and offset, and the id.
 
-Mode (`CkDevicePersistent::mode`), for a get into a local buffer or a put from
-one:
+Mode (`CkDeviceChannelEndpoint::mode`, from the issuing PE to the peer's
+buffer), for a get into a local buffer or a put from one:
 
 - same process: `hapiMemcpyAsync` device to device on the local buffer's
-  stream; `hapiAddCallback` on that stream sends each buffer's callback;
+  stream; `hapiAddCallback` on that stream sends `done`;
 - another process on the same host, when the remote buffer has an IPC
   handle and it opens in this process (`+gpushm` is not needed: it concerns
   `DEVICE` slots): the handle is opened once per process (a table keyed by
-  the handle's bytes, shared by every copy of the peer's buffer and reference
-  counted: a copy takes a reference on its first transfer and releases it in
-  `close()`; the last release synchronizes the device and closes the mapping),
-  and the copy goes through the mapping as above. If opening fails (the peer's
-  GPU is not visible to this process, as with one GPU per task), `mode()`
-  reports RDMA and the transfer uses it;
+  the handle's bytes, shared by every holder of the peer's buffer, channels
+  included, and reference counted: a holder takes a reference on its first
+  transfer and releases it when it forgets the peer; CkDyn's release
+  synchronizes the device before the last one closes the mapping), and the
+  copy goes through the mapping as above. If opening fails (the peer's GPU is
+  not visible to this process, as with one GPU per task), `mode()` reports
+  RDMA and the transfer uses it;
 - otherwise RDMA on the registered memory. A get is `CmiNcpyBuffer::rdmaGet`
-  with the Direct API acknowledgement, whose destination callback is a
-  `callCFn` on the issuing PE that sends both buffers' callbacks. A put is
-  carried out as a get by the destination's PE: the issuer sends both
-  buffers in a Converse message (`persist_put_handler`), that PE gets, and
-  its completion sends `persist_ack_handler` back to the issuer, which sends
-  the callbacks. A true RDMA put completes on the source before the data is
-  visible at the destination (CommRputLocalHandler in reconverse), so its
-  callbacks could not mean "arrived". Before an RDMA transfer the local
-  buffer's stream is synchronized.
+  with the Direct API acknowledgement, whose destination callback is `done`,
+  a `callCFn` on the issuing PE. A put is carried out as a get by the
+  destination's PE: the issuer sends its registration and the destination
+  endpoint in a Converse message (`device_endpoint_put_handler`), that PE
+  gets, and its completion sends `device_endpoint_ack_handler` back to the
+  issuer, which sends `done`. A true RDMA put completes on the source before
+  the data is visible at the destination (CommRputLocalHandler in
+  reconverse), so its completion could not mean "arrived". Before an RDMA
+  transfer the local buffer's stream is synchronized.
 
-In every mode both buffers' callbacks are sent from the issuing PE when the
-bytes are in the destination, each with its `cb_msg` (`set_msg`), as the
-manual describes. With `+gpupersistverbose` the first use of each mode and
-operation in a process prints a line (`[pe] CkDevicePersistent> get: ...`).
+With `+gpupersistverbose` the first use of each mode and operation in a
+process prints a line (`[pe] CkDyn> persistent get: ...`).
 
-CkDyn's `CkDynDevPersist` holds an opened `CkDevicePersistent`; the handle is
-that object pupped with an ignore callback, in a fixed 512-byte record
-(`CkDynDevPersistHandleSize()`), so a transfer never sends the remote side's
-callback. Each get or put sets the local object's callback to a `callCFn` on
-the issuing PE that sends `done` an empty message: for a `FUTURE` callback the
-call's refnum is the future id, for any other kind it is the callback's
-refnum. The send of a `DEVICE` message (`zcDevicePrepare`) prints the mode of
-`DEVICE` slots once per process (`[pe] CkDyn> DEVICE slots: ...`), which is
-how a run shows whether `+gpushm` took the IPC path. `CkDynDevPersistMode`
-returns `CkDevicePersistent::mode`. A `CkDynDevPersist` keeps the copies of
-peer buffers its transfers used, by id (`peers`), so that the IPC reference and
-the fetched registration a copy takes are taken once per peer buffer; a handle
-with a new id for the same peer PE and pointer (a reopen) replaces the older
-copy, which is closed after the new transfer is issued, and Close closes all of
-them before closing its own buffer. Close aborts while a transfer is
-outstanding. In a build without CUDA or HIP every CkDyn function aborts.
+CkDyn's `CkDynDevPersist` holds an opened endpoint and the stream its
+transfers are ordered on; the handle is the endpoint pupped, in a fixed
+512-byte record (`CkDynDevPersistHandleSize()`). Each get or put passes `done`
+a `callCFn` on the issuing PE that sends the binding's callback an empty
+message: for a `FUTURE` callback the call's refnum is the future id, for any
+other kind it is the callback's refnum. The send of a `DEVICE` message
+(`zcDevicePrepare`) prints the mode of `DEVICE` slots once per process
+(`[pe] CkDyn> DEVICE slots: ...`), which is how a run shows whether `+gpushm`
+took the IPC path. `CkDynDevPersistMode` returns the peer endpoint's `mode()`.
+A `CkDynDevPersist` keeps the copies of peer endpoints its transfers used, by
+id (`peers`), so that the IPC reference and the fetched registration a copy
+takes are taken once per peer buffer; a handle with a new id for the same peer
+PE and pointer (a reopen) replaces the older copy, which is forgotten after the
+new transfer is issued, and Close forgets all of them before closing its own
+buffer. Close aborts while a transfer is outstanding. In a build without CUDA
+or HIP every CkDyn function aborts.
 
 ### HAPI callbacks
 
@@ -1204,8 +1246,8 @@ A shared-library binding:
    `_initCharm` aborts. In any other build it runs
    after `CkRegisterMainModule`, so a program with a charmxi main module that
    starts through `CkDynStart` gets both.
-5. The init calls run: `_ckdynInitNode` (rank 0) registers the foreign
-   reducer and the two section init entries; `_ckdynInitProc` (every PE)
+5. The init calls run: `_ckdynInitNode` (rank 0) registers the foreign,
+   section-tagged and shaped reducers and the two section init entries; `_ckdynInitProc` (every PE)
    initializes the builder Ckpv.
 6. `_registerDone`; PE 0 constructs the main chare. `MainchareDyn` creates
    `CkDynMgr` and the `CkMulticastMgr` before calling `hooks.mainchare`, so

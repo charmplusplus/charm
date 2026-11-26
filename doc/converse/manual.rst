@@ -53,8 +53,7 @@ for messages. In user-calls-scheduler mode, however, it is assumed that
 the user-supplied start-function will perform the *entire computation*,
 including polling for messages. Thus, ``ConverseInit`` will not
 automatically call ``CsdScheduler`` for you. When the user-supplied
-start-function ends, Converse shuts down. This mode is not supported on
-the sim version. This mode can be combined with ConverseInit-returns
+start-function ends, Converse shuts down. This mode can be combined with ConverseInit-returns
 mode below.
 
 ConverseInit-returns Mode: ``schedmode=1, initret=1``
@@ -70,8 +69,7 @@ automatically invoke ``main`` call ConverseExit, and when the other
 processors return from ``fn``. The optional exit code is returned to the
 calling shell. If no value is specified, an exit code of zero is
 returned. In this mode, all polling for messages must be done manually
-(probably using CsdScheduler explicitly). This option is not supported
-by the sim version.
+(probably using CsdScheduler explicitly).
 
 .. code-block:: c++
 
@@ -161,44 +159,16 @@ being registered.
 
 .. code-block:: c++
 
-  int CmiRegisterHandlerGlobal(CmiHandler h)
-
-This represents a second registration technique. The Converse user
-registers his functions on processor zero, using
-CmiRegisterHandlerGlobal. The Converse user is then responsible for
-broadcasting those handler numbers to other processors, and installing
-them using CmiNumberHandler below. The user should take care not to
-invoke those handlers until they are fully installed.
-
-.. code-block:: c++
-
-  int CmiRegisterHandlerLocal(CmiHandler h)
-
-This function is used when one wishes to register functions in a manner
-that is not consistent across processors. This function chooses a
-locally-meaningful number for the function, and records it locally. No
-attempt is made to ensure consistency across processors.
-
-.. code-block:: c++
-
   void CmiNumberHandler(int n, CmiHandler h)
 
 Forces the system to associate the specified handler number n with the
 specified handler function h. If the function number n was previously
 mapped to some other function, that old mapping is forgotten. The
 mapping that this function creates is local to the current processor.
-CmiNumberHandler can be useful in combination with
-CmiRegisterGlobalHandler. It can also be used to implement user-defined
+CmiNumberHandler can be used to implement user-defined
 numbering schemes: such schemes should keep in mind that the size of the
 table that holds the mapping is proportional to the largest handler
 number — do not use big numbers!
-
-(**Note:** Of the three registration methods, the CmiRegisterHandler
-method is by far the simplest, and is strongly encouraged. The others
-are primarily to ease the porting of systems that already use similar
-registration techniques. One may use all three registration methods in a
-program. The system guarantees that no numbering conflicts will occur as
-a result of this combination.)
 
 .. _handler2:
 
@@ -386,100 +356,6 @@ message buffer has been freed using CmiFree.
 Sends msg of size size bytes to node destNode. When it returns, the
 message buffer has been freed using CmiFree.
 
-.. code-block:: c++
-
-  CmiCommHandle CmiAsyncSend(unsigned int destPE, unsigned int size, void *msg)
-
-Sends msg of size size bytes to processor destPE. It returns a
-communication handle which can be tested using CmiAsyncMsgSent: when
-this returns true, you may reuse the message buffer. If the returned
-communication handle is 0, message buffer can be reused immediately,
-thus saving a call to CmiAsyncMsgSent.
-
-.. code-block:: c++
-
-  CmiCommHandle CmiAsyncNodeSend(unsigned int destNode, unsigned int size, void *msg)
-
-Sends msg of size size bytes to node destNode. It returns a
-communication handle which can be tested using CmiAsyncMsgSent: when
-this returns true, you may reuse the message buffer. If the returned
-communication handle is 0, message buffer can be reused immediately,
-thus saving a call to CmiAsyncMsgSent.
-
-.. code-block:: c++
-
-  void CmiSyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])
-
-Concatenates several pieces of data and sends them to
-processor destPE. The data consists of len pieces residing in different
-areas of memory, which are logically concatenated. The msgComps array
-contains pointers to the pieces; the size of msgComps[i] is taken from
-sizes[i]. When it returns, sizes, msgComps and the message components
-specified in msgComps can be immediately reused.
-
-.. code-block:: c++
-
-  void CmiSyncVectorSendAndFree(int destPE, int len, int sizes[], char *msgComps[])
-
-Concatenates several pieces of data and sends them to
-processor destPE. The data consists of len pieces residing in different
-areas of memory, which are logically concatenated. The msgComps array
-contains pointers to the pieces; the size of msgComps[i] is taken from
-sizes[i]. The message components specified in msgComps are CmiFreed by
-this function therefore, they should be dynamically allocated using
-CmiAlloc. However, the sizes and msgComps array themselves are not
-freed.
-
-.. code-block:: c++
-
-  CmiCommHandle CmiAsyncVectorSend(int destPE, int len, int sizes[], char *msgComps[])
-
-Concatenates several pieces of data and sends them to
-processor destPE. The data consists of len pieces residing in different
-areas of memory, which are logically concatenated. The msgComps array
-contains pointers to the pieces; the size of msgComps[i] is taken from
-sizes[i]. The individual pieces of data as well as the arrays sizes and
-msgComps should not be overwritten or freed before the communication is
-complete. This function returns a communication handle which can be
-tested using CmiAsyncMsgSent: when this returns true, the input
-parameters can be reused. If the returned communication handle is 0,
-message buffer can be reused immediately, thus saving a call to
-CmiAsyncMsgSent.
-
-.. code-block:: c++
-
-  int CmiAsyncMsgSent(CmiCommHandle handle)
-
-Returns true if the communication specified by the given CmiCommHandle
-has proceeded to the point where the message buffer can be reused.
-
-.. code-block:: c++
-
-  void CmiReleaseCommHandle(CmiCommHandle handle)
-
-Releases the communication handle handle and associated resources. It
-does not free the message buffer.
-
-.. code-block:: c++
-
-  void CmiMultipleSend(unsigned int destPE, int len, int sizes[], char *msgComps[])
-
-This function allows the user to send multiple messages that may be
-destined for the SAME PE in one go. This is more efficient than sending
-each message to the destination node separately. This function assumes
-that the handlers that are to receive this message have already been
-set. If this is not done, the behavior of the function is undefined.
-
-In the function, The destPE parameter identifies the destination
-processor. The len argument identifies the *number* of messages that are
-to be sent in one go. The sizes[] array is an array of sizes of each of
-these messages. The msgComps[] array is the array of the messages. The
-indexing in each array is from 0 to len - 1. (**Note:** Before calling
-this function, the program needs to initialize the system to be able to
-provide this service. This is done by calling the function
-CmiInitMultipleSendRoutine. Unless this function is called, the system
-will not be able to provide the service to the user.)
-
 Broadcasting Messages
 ---------------------
 
@@ -564,54 +440,6 @@ The caller's buffer is consumed either way, since it is delivered to the
 calling PE, so msg must point to a buffer allocated with CmiAlloc and the
 caller must not reuse or free it after the call.
 
-.. code-block:: c++
-
-  CmiCommHandle CmiAsyncBroadcast(unsigned int size, void *msg)
-
-Initiates asynchronous broadcast of message msg of length size bytes to
-all processors excluding the processor on which the caller resides. It
-returns a communication handle which could be used to check the status
-of this send using CmiAsyncMsgSent. If the returned communication handle
-is 0, message buffer can be reused immediately, thus saving a call to
-CmiAsyncMsgSent. msg should not be overwritten or freed before the
-communication is complete.
-
-.. code-block:: c++
-
-  CmiCommHandle CmiAsyncNodeBroadcast(unsigned int size, void *msg)
-
-Initiates asynchronous broadcast of message msg of length size bytes to
-all nodes excluding the node on which the caller resides. It returns a
-communication handle which could be used to check the status of this
-send using CmiAsyncMsgSent. If the returned communication handle is 0,
-message buffer can be reused immediately, thus saving a call to
-CmiAsyncMsgSent. msg should not be overwritten or freed before the
-communication is complete.
-
-.. code-block:: c++
-
-  CmiCommHandle CmiAsyncBroadcastAll(unsigned int size, void *msg)
-
-Initiates asynchronous broadcast of message msg of length size bytes to
-all processors including the processor on which the caller resides. It
-returns a communication handle which could be used to check the status
-of this send using CmiAsyncMsgSent. If the returned communication handle
-is 0, message buffer can be reused immediately, thus saving a call to
-CmiAsyncMsgSent. msg should not be overwritten or freed before the
-communication is complete.
-
-.. code-block:: c++
-
-  CmiCommHandle CmiAsyncNodeBroadcastAll(unsigned int size, void *msg)
-
-Initiates asynchronous broadcast of message msg of length size bytes to
-all nodes including the node on which the caller resides. It returns a
-communication handle which could be used to check the status of this
-send using CmiAsyncMsgSent. If the returned communication handle is 0,
-message buffer can be reused immediately, thus saving a call to
-CmiAsyncMsgSent. msg should not be overwritten or freed before the
-communication is complete.
-
 .. _sec:multicast:
 
 Multicasting Messages
@@ -655,19 +483,6 @@ Group IDs are created using CmiEstablishGroup.
 
 .. code-block:: c++
 
-  CmiCommHandle CmiAsyncMulticast(CmiGroup grp, unsigned int size, void *msg)
-
-(Note: Not yet implemented.) Initiates asynchronous broadcast of message
-msg of length size bytes to all members of the specified group. It
-returns a communication handle which could be used to check the status
-of this send using CmiAsyncMsgSent. If the returned communication handle
-is 0, message buffer can be reused immediately, thus saving a call to
-CmiAsyncMsgSent. msg should not be overwritten or freed before the
-communication is complete. Group IDs are created using
-CmiEstablishGroup.
-
-.. code-block:: c++
-
   void CmiSyncListSend(int npes, int *pes, unsigned int size, void *msg)
 
 Sends msg of length size bytes to npes processors in the array pes. On
@@ -684,115 +499,36 @@ CmiFree to deallocate the message buffer for msg when the multicast
 completes. Therefore, msg must point to a buffer allocated with
 CmiAlloc.
 
-.. code-block:: c++
-
-  CmiCommHandle CmiAsyncListSend(int npes, int *pes, unsigned int size, void *msg)
-
-Initiates asynchronous multicast of message msg of length size bytes to
-npes processors in the array pes. It returns a communication handle
-which could be used to check the status of this send using
-CmiAsyncMsgSent. If the returned communication handle is 0, message
-buffer can be reused immediately, thus saving a call to CmiAsyncMsgSent.
-msg should not be overwritten or freed before the communication is
-complete.
-
 .. _reduce:
 
 Reducing Messaging
 ------------------
 
-Reductions are operations for which a message (or user data structure)
-is contributed by each participant processor. All these contributions
-are merged according to a merge-function provided by the user. A
-Converse handler is then invoked with the resulting message. Reductions
-can be on the entire set of processors, or on a subset of the whole.
+Reductions are operations for which a message is contributed by each
+participant processor. All these contributions are merged according to a
+merge-function provided by the user. A Converse handler is then invoked
+with the resulting message. Reductions can be on the entire set of
+processors, on every node, or on a subset of the processors.
 
-There are eight functions used to deposit a message into the system,
-summarized in Table :numref:`table:reductions`. Half
-of them receive as contribution a Converse message (with a Converse
-header at its beginning). This message must have already been set for
-delivery to the desired handler. The other half (ending with “Struct”)
-receives a pointer to a data structure allocated by the user. This
-second version may allow the user to write a simpler merging function.
-For instance, the data structure could be a tree that can be easily
-expanded by adding more nodes.
-
-.. _table:reductions:
-.. table:: Reductions functions in Converse
-
-   =========== =============== ================== =================== ====================
-   \           **global**      **global with ID** **processor set**   **CmiGroup**
-   =========== =============== ================== =================== ====================
-   **message** CmiReduce       CmiReduceID        CmiListReduce       CmiGroupReduce
-   **data**    CmiReduceStruct CmiReduceStructID  CmiListReduceStruct CmiGroupReduceStruct
-   =========== =============== ================== =================== ====================
-
-The signatures for the functions in
-Table :numref:`table:reductions` are:
+There are three functions used to deposit a message into the system:
+CmiReduce (all PEs), CmiNodeReduce (one contribution per node) and
+CmiListReduce (a list of PEs). Each receives as contribution a Converse
+message (with a Converse header at its beginning). This message must
+have already been set for delivery to the desired handler.
 
 .. code-block:: c++
 
   void CmiReduce(void *msg, int size, CmiReduceMergeFn mergeFn);
 
-  void CmiReduceStruct(void *data, CmiReducePupFn pupFn,
-  CmiReduceMergeFn mergeFn, CmiHandler dest, CmiReduceDeleteFn deleteFn);
-
-  void CmiReduceID(void *msg, int size, CmiReduceMergeFn mergeFn,
-  CmiReductionID id);
-
-  void CmiReduceStructID(void *data, CmiReducePupFn pupFn, CmiReduceMergeFn mergeFn,
-  CmiHandler dest, CmiReduceDeleteFn deleteFn, CmiReductionID id);
-
-  void CmiListReduce(int npes, int *pes, void *msg, int size,
-  CmiReduceMergeFn mergeFn, CmiReductionID id);
-
-  void CmiListReduceStruct(int npes, int *pes, void *data, CmiReducePupFn
-  pupFn, CmiReduceMergeFn mergeFn, CmiHandler dest, CmiReduceDeleteFn
-  deleteFn, CmiReductionID id);
-
-  void CmiGroupReduce(CmiGroup grp, void *msg, int size,
-  CmiReduceMergeFn mergeFn, CmiReductionID id);
-
-  void CmiGroupReduceStruct(CmiGroup grp, void *data, CmiReducePupFn pupFn,
-  CmiReduceMergeFn mergeFn, CmiHandler dest, CmiReduceDeleteFn deleteFn,
-  CmiReductionID id);
-
-Additionally, there are variations of the global reduction functions
-that operate on a per-node basis, instead of per-PE.
-
-.. _table:nodereductions:
-.. table:: Node reductions functions in Converse
-
-   =========== =================== ======================
-   \           **global**          **global with ID**
-   =========== =================== ======================
-   **message** CmiNodeReduce       CmiNodeReduceID
-   **data**    CmiNodeReduceStruct CmiNodeReduceStructID
-   =========== =================== ======================
-
-The signatures for the functions in
-Table :numref:`table:nodereductions` are:
-
-.. code-block:: c++
-
   void CmiNodeReduce(void *msg, int size, CmiReduceMergeFn mergeFn);
 
-  void CmiNodeReduceStruct(void *data, CmiReducePupFn pupFn,
-  CmiReduceMergeFn mergeFn, CmiHandler dest, CmiReduceDeleteFn deleteFn);
-
-  void CmiNodeReduceID(void *msg, int size, CmiReduceMergeFn mergeFn,
-  CmiReductionID id);
-
-  void CmiNodeReduceStructID(void *data, CmiReducePupFn pupFn, CmiReduceMergeFn mergeFn,
-  CmiHandler dest, CmiReduceDeleteFn deleteFn, CmiReductionID id);
+  void CmiListReduce(int npes, const int *pes, void *msg, int size,
+  CmiReduceMergeFn mergeFn, CmiReductionID id);
 
 In all the above, msg is the Converse message deposited by the local
-processor, size is the size of the message msg, and data is a pointer to
-the user-allocated data structure deposited by the local processor. dest
-is the CmiHandler where the final message shall be delivered. It is
-explicitly passed in “Struct” functions only, since for the message
-versions it is taken from the header of msg. Moreover there are several
-other function pointers passed in by the user:
+processor, and size is the size of the message msg. The handler that
+receives the final message is taken from the header of msg. The merge
+function is passed in by the user:
 
 .. code-block:: c++
 
@@ -800,72 +536,33 @@ other function pointers passed in by the user:
 
 Prototype for a CmiReduceMergeFn function pointer argument. This
 function is used in all the CmiReduce forms to merge the local
-message/data structure deposited on a processor with all the messages
+message deposited on a processor with all the messages
 incoming from the children processors of the reduction spanning tree.
-The input parameters are in the order: the size of the local data for
-message reductions (always zero for struct reductions); the local data
-itself (the exact same pointer passed in as first parameter of CmiReduce
-and similar); a pointer to an array of incoming messages; the number of
-elements in the second parameter. The function returns a pointer to a
-freshly allocated message (or data structure for the Struct forms)
-corresponding to the merge of all the messages. When performing message
-reductions, this function is also responsible to updating the integer
-pointed by size to the new size of the returned message. All the
-messages in the remote array are deleted by the system; the data pointed
-by the first parameter should be deleted by this function. If the data
-can be merged “in-place” by modifying or augmenting local, the function
-can return the same pointer to local which can be considered freshly
-allocated. Each element in remote is the complete incoming message
-(including the converse header) for message reductions, and the data as
-it has been packed by the pup function (without any additional header)
-for struct reductions.
+The input parameters are in the order: the size of the local message;
+the local message itself (the exact same pointer passed in as first
+parameter of CmiReduce and similar); a pointer to an array of incoming
+messages; the number of elements in the third parameter. The function
+returns a pointer to a freshly allocated message corresponding to the
+merge of all the messages. This function is also responsible for
+updating the integer pointed by size to the new size of the returned
+message. All the messages in the remote array are deleted by the
+system; the data pointed by the second parameter should be deleted by
+this function. If the data can be merged “in-place” by modifying or
+augmenting local, the function can return the same pointer to local
+which can be considered freshly allocated. Each element in remote is the
+complete incoming message (including the converse header).
 
-.. code-block:: c++
+CmiReduce is the simplest reduction function, and it reduces the
+deposited message across all the processors in the system. Each
+processor must call this function exactly once. Multiple reductions can
+be invoked without waiting for previous ones to finish, but the user is
+responsible to call CmiReduce in the same order on every processor.
+CmiNodeReduce is the same, but for nodes instead of PEs.
 
-  void (*pupFn)(pup_er p, void *data)
-
-Prototype for a CmiReducePupFn function pointer argument.
-This function will use the PUP framework to
-pup the data passed in into a message for sending across the network.
-The data can be either the same data passed in as first parameter of any
-“Struct” function, or the return of the merge function. It will be
-called for sizing and packing. (Note: It will not be called for
-unpacking.)
-
-.. code-block:: c++
-
-  void (*deleteFn)(void *ptr)
-
-Prototype for a CmiReduceDeleteFn function pointer argument.
-This function is used to delete either the data
-structure passed in as first parameter of any “Struct” function, or the
-return of the merge function. It can be as simple as “free” or as
-complicated as needed to delete complex structures. If this function is
-NULL, the data structure will not be deleted, and the program can
-continue to use it. Note: even if this function is NULL, the input data
-structure may still be modified by the merge function.
-
-CmiReduce and CmiReduceStruct are the simplest reduction function, and
-they reduce the deposited message/data across all the processors in the
-system. Each processor must to call this function exactly once. Multiple
-reductions can be invoked without waiting for previous ones to finish,
-but the user is responsible to call CmiReduce/CmiReduceStruct in the
-same order on every processor. (**Note:** CmiReduce and CmiReduceStruct
-are not interchangeable. Either every processor calls CmiReduce or every
-processor calls CmiReduceStruct).
-
-In situations where it is not possible to guarantee the order of
-reductions, the user may use CmiReduceID or CmiReduceStructID. These
-functions have an additional parameter of type CmiReductionID which will
-uniquely identify the reduction, and match them correctly. (**Note:** No
-two reductions can be active at the same time with the same
-CmiReductionID. It is up to the user to guarantee this.)
-
-CmiNodeReduce, CmiNodeReduceStruct, CmiNodeReduceID, and
-CmiNodeReduceStructID are the same, but for nodes instead of PEs.
-
-A CmiReductionID can be obtained by the user in three ways, using one of
-the following functions:
+CmiListReduce is used for reductions over a subset of processors, given
+as a processor list (pes) of size npes; pes[0] receives the result. Every
+processor in the list calls it with the same list. It requires a
+CmiReductionID, obtained with the following function:
 
 .. code-block:: c++
 
@@ -874,48 +571,8 @@ the following functions:
 This function must be called on
 every processor, and in the same order if called multiple times. This
 would generally be inside initialization code, that can set aside some
-CmiReductionIDs for later use.
-
-.. code-block:: c++
-
-  CmiReductionID CmiGetDynamicReduction()
-
-This function may be called only
-on processor zero. It returns a unique ID, and it is up to the user to
-distribute this ID to any processor that needs it.
-
-.. code-block:: c++
-
-  void CmiGetDynamicReductionRemote(int handlerIdx, int pe, int dataSize, void *data)
-
-This function may be called on any processor. The produced
-CmiReductionID is returned on the specified pe by sending a message to
-the specified handlerIdx. If pe is -1, then all processors will receive
-the notification message. data can be any data structure that the user
-wants to receive on the specified handler (for example to differentiate
-between requests). dataSize is the size in bytes of data. If dataSize is
-zero, data is ignored. The message received by handlerIdx consists of
-the standard Converse header, followed by the requested CmiReductionID
-(represented as a 4 bytes integer the user can cast to a CmiReductionID,
-a 4 byte integer containing dataSize, and the data itself.
-
-.. code-block:: c++
-
-  CmiReductionID CmiGetGlobalNodeReduction()
-  CmiReductionID CmiGetDynamicNodeReduction()
-  void CmiGetDynamicNodeReductionRemote(int handlerIdx, int node, int dataSize, void *data)
-
-Same as above, but for nodes instead of PEs.
-
-The other four functions (CmiListReduce, CmiListReduceStruct,
-CmiGroupReduce, CmiGroupReduceStruct) are used for reductions over
-subsets of processors. They all require a CmiReductionID that the user
-must obtain in one of the ways described above. The user is also
-responsible that no two reductions use the same CmiReductionID
-simultaneously. The first two functions receive the subset description
-as processor list (pes) of size npes. The last two receive the subset
-description as a previously established CmiGroup
-(see :numref:`sec:multicast`).
+CmiReductionIDs for later use. The user is responsible that no two
+reductions use the same CmiReductionID simultaneously.
 
 .. _schedqueue:
 
@@ -1049,42 +706,6 @@ provided here for backward compatibility.
 
 .. code-block:: c++
 
-  void CsdNodeEnqueue(void *Message)
-
-This macro is a shorthand for
-
-.. code-block:: c++
-
-   CsdNodeEnqueueGeneral(Message, CQS_QUEUEING_FIFO,0, NULL)
-
-provided here for backward compatibility.
-
-.. code-block:: c++
-
-  void CsdEnqueueFifo(void *Message)
-
-This macro is a shorthand for
-
-.. code-block:: c++
-
-   CsdEnqueueGeneral(Message, CQS_QUEUEING_FIFO,0, NULL)
-
-provided here for backward compatibility.
-
-.. code-block:: c++
-
-  void CsdNodeEnqueueFifo(void *Message)
-
-This macro is a shorthand for
-
-.. code-block:: c++
-
-   CsdNodeEnqueueGeneral(Message, CQS_QUEUEING_FIFO,0, NULL)
-
-provided here for backward compatibility.
-
-.. code-block:: c++
-
   void CsdEnqueueLifo(void *Message)
 
 This macro is a shorthand for
@@ -1094,32 +715,6 @@ This macro is a shorthand for
    CsdEnqueueGeneral(Message, CQS_QUEUEING_LIFO,0, NULL)
 
 provided here for backward compatibility.
-
-.. code-block:: c++
-
-  void CsdNodeEnqueueLifo(void *Message)
-
-This macro is a shorthand for
-
-.. code-block:: c++
-
-   CsdNodeEnqueueGeneral(Message, CQS_QUEUEING_LIFO,0, NULL)
-
-provided here for backward compatibility.
-
-.. code-block:: c++
-
-  int CsdEmpty()
-
-This function returns non-zero integer when the scheduler’s
-processor-level queue is empty, zero otherwise.
-
-.. code-block:: c++
-
-  int CsdNodeEmpty()
-
-This function returns non-zero integer when the scheduler’s node-level
-queue is empty, zero otherwise.
 
 .. _polling:
 
@@ -1139,30 +734,10 @@ messages. (In particular, it ignores messages in the scheduler queue).
 You can save a tiny amount of overhead by using the lower-level
 function. We recommend the use of CsdScheduler for all applications
 except those that are using only the lowest level of Converse, the CMI.
-A third polling function, CmiDeliverSpecificMsg, is used when you know
-the exact event you want to wait for: it does not allow any other event
-to occur.
 
 In each iteration, a scheduler first looks for any message that has
 arrived from another processor, and delivers it. If there isn’t any, it
 selects a message from the locally enqueued messages, and delivers it.
-
-.. code-block:: c++
-
-  void CsdScheduleForever(void)
-
-Extract and deliver messages until the
-scheduler is stopped. Raises the idle handling converse signals. This is
-the scheduler to use in most Converse programs.
-
-.. code-block:: c++
-
-  int CsdScheduleCount(int n)
-
-Extract and deliver messages until :math:`n`
-messages have been delivered, then return 0. If the scheduler is stopped
-early, return :math:`n` minus the number of messages delivered so far.
-Raises the idle handling converse signals.
 
 .. code-block:: c++
 
@@ -1174,11 +749,12 @@ non-networking code when the networking code has nothing to do.
 
 .. code-block:: c++
 
-  void CsdScheduler(int n)
+  int CsdScheduler(int n)
 
-If :math:`n` is zero, call CsdSchedulePoll. If :math:`n` is negative,
-call CsdScheduleForever. If :math:`n` is positive, call
-CsdScheduleCount(\ :math:`n`).
+If :math:`n` is negative, extract and deliver messages until the
+scheduler is stopped with CsdExitScheduler, raising the idle handling
+converse signals; this is the scheduler to use in most Converse
+programs. Otherwise, call CsdSchedulePoll. Returns 0.
 
 .. code-block:: c++
 
@@ -1190,15 +766,6 @@ returns after either the network message queue becomes empty or after
 MaxMsgs messages have been retrieved and their handlers called. It
 returns the difference between total messages delivered and MaxMsgs. The
 handler is given a pointer to the message as its parameter.
-
-.. code-block:: c++
-
-  void CmiDeliverSpecificMsg(int HandlerId)
-
-Retrieves messages from the network queue and delivers the first message
-with its handler field equal to HandlerId. This functions leaves alone
-all other messages. It returns after the invoked handler function
-returns.
 
 .. code-block:: c++
 
@@ -1225,7 +792,7 @@ Processor Ids
 
 .. code-block:: c++
 
-  int CmiNumPe(void)
+  int CmiNumPes(void)
 
 Returns the total number of processors on which the parallel program is
 being run.
@@ -1235,7 +802,7 @@ being run.
   int CmiMyPe(void)
 
 Returns the logical processor identifier of processor on which the
-caller resides. A processor Id is between ``0`` and ``CmiNumPe()-1``.
+caller resides. A processor Id is between ``0`` and ``CmiNumPes()-1``.
 
 Also see the calls in Section :numref:`utility`.
 
@@ -1259,10 +826,9 @@ like C global and static variables, except that you have explicit
 control over the degree of sharing.
 
 In this section we use the terms Node, PE, and User-level thread as they
-are used in Charm++, to refer to an OS process, a worker/communication
-thread, and a user-level thread, respectively. In the SMP mode of
-Charm++ all three of these are separate entities, whereas in non-SMP
-mode Node and PE have the same scope.
+are used in Charm++, to refer to an OS process, a worker thread, and a
+user-level thread, respectively. All three of these are separate
+entities.
 
 Converse PseudoGlobals
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -1818,15 +1384,6 @@ control temporarily, but ensures that control will eventually return.
 
 .. code-block:: c++
 
-  void CthYieldPrio(int strategy, int priobits, int *prio)
-
-This function is part of the scheduler-interface. It simply executes
-``{CthAwakenPrio(CthSelf(),strategy,priobits,prio);CthSuspend();}``
-This combination gives up control temporarily, but ensures that control
-will eventually return.
-
-.. code-block:: c++
-
   CthThread CthGetNext(CthThread t)
 
 Each thread contains space for the user to store a “next” field (the
@@ -2000,9 +1557,8 @@ CcdPROCESSOR_STILL_IDLE
 CcdPROCESSOR_LONG_IDLE
    This is an extension of CcdPROCESSOR_STILL_IDLE for a relatively longer
    period of time. It is raised when the scheduler finds that it doesn't
-   have any messages to execute for a long period of time. The default
-   LONG_IDLE time is 10 seconds. However, it is customizable using a user
-   passed runtime flag ``+longIdleThresh <long idle time in seconds>``.
+   have any messages to execute for a long period of time. The
+   LONG_IDLE time is 10 seconds.
    This feature is useful for debugging hangs in applications. It can allow
    the user to add a user defined function as a hook to execute when the program
    goes into a long idle state, typically seen during hangs. The test program
@@ -2124,39 +1680,6 @@ which differs from ``CcdCondFn``, because the runtime system internally
 calls a timer in order to invoke periodic callbacks. It passes that
 time into the user callback as well to avoid the need for extra timer calls.
 
-.. code-block:: c++
-
-  double CcdSetResolution(double newResolution)
-
-This call sets the polling resolution for completion of timed
-callbacks. ``newResolution`` is the updated time in seconds. The
-default polling resolution for timed callbacks is 5 ms. The resolution
-cannot be any longer than this but it can be set arbitrarily short.
-Shorter resolution times can result in a performance decrease due to
-more time being spent polling for callbacks but may be preferred in
-cases where these need to be triggered quickly and/or are on the
-critical path of an application. This function also returns the old
-resolution in seconds in case it needs to be reset to a non-default
-value.
-
-.. code-block:: c++
-
-  double CcdResetResolution()
-
-This call returns the time based callback polling resolution to its
-default, 5 milliseconds. It returns the previously set resolution in
-seconds.
-
-.. code-block:: c++
-
-  double CcdIncreaseResolution(double newResolution)
-
-This is a “safe” version of ``CcdSetResolution`` that only ever sets
-the resolution to a shorter time. The same caveats about short polling
-times affecting performance still apply, This function returns the
-previous (and potentially current, if it was shorter than
-``newResolution``,) resolution in seconds.
-
 .. _converse_client_server:
 
 Converse Client-Server Interface
@@ -2173,8 +1696,7 @@ describe both these parts.
 
 A CCS client accesses a running Converse program by talking to a
 ``server-host``, which receives the CCS requests and relays them to the
-appropriate processor. The ``server-host`` is charmrun for netlrts-
-versions, and is the first processor for all other versions.
+appropriate processor. The ``server-host`` is the first processor.
 
 CCS: Starting a Server
 ----------------------
@@ -2183,9 +1705,9 @@ A Converse program is started using
 
 .. code-block:: bash
 
-   $ charmrun pgmname +pN charmrun-opts pgm-opts
+   $ ./pgmname +pe N ++server pgm-opts
 
-charmrun also accepts the CCS options:
+The program accepts the CCS options:
 
 ``++server``: open a CCS server on any TCP port number
 
@@ -2307,20 +1829,16 @@ is passed as a newly-allocated message, and the actual user data begins
 CmiMsgHeaderSizeBytes into the message. The handler is responsible for
 CmiFree’ing the passed-in message.
 
-The interface for the server side of CCS is included in “converse.h”; if
-CCS is disabled (in conv-mach.h), all CCS routines become macros
-returning 0.
+The interface for the server side of CCS is included in “converse.h”.
 
 The handler registration interface is:
 
 .. code-block:: c++
 
-  void CcsUseHandler(char *id, int hdlr);
-
   int CcsRegisterHandler(char *id, CmiHandler fn);
 
 Associate this handler ID string with this function.
-hdlr is a Converse handler index; fn is a function pointer.
+fn is a function pointer.
 The ID string cannot be more than 32 characters, including the
 terminating NULL.
 
@@ -2341,8 +1859,8 @@ These calls can be used from within a CCS handler:
 
   int CcsEnabled(void);
 
-Return 1 if CCS routines are available (from
-conv-mach.h). This routine does not determine if a CCS server port is
+Return 1 if CCS routines are available (always the case
+on reconverse builds). This routine does not determine if a CCS server port is
 actually open.
 
 .. code-block:: c++
@@ -2460,172 +1978,26 @@ randomly generated key. All other security levels are disallowed.
 Converse One Sided Communication Interface
 ==========================================
 
-This chapter deals with one sided communication support in converse. It
-is imperative to provide a one-sided communication interface to take
-advantage of the hardware RDMA facilities provided by a lot of NIC
-cards. Drivers for these hardware provide or promise to soon provide
-capabilities to use this feature.
-
-Converse provides an implementation which wraps the functionality
-provided by different hardware and presents them as a uniform interface
-to the programmer. For machines which do not have a one-sided hardware
-at their disposal, these operations are emulated through converse
-messages.
-
-Converse provides the following types of operations to support one-sided
-communication.
-
-Registering / Unregistering Memory for RDMA
--------------------------------------------
-
-The interface provides functions to register(pin) and unregister(unpin)
-memory on the NIC hardware. The emulated version of these operations do
-not do anything.
-
-.. code-block:: c++
-
-  int CmiRegisterMemory(void *addr, unsigned int size);
-
-This function takes an allocated memory at starting address addr of
-length size and registers it with the hardware NIC, thus making this
-memory DMAable. This is also called pinning memory on the NIC hardware,
-making remote DMA operations on this memory possible. This directly
-calls the hardware driver function for registering the memory region and
-is usually an expensive operation, so should be used sparingly.
-
-.. code-block:: c++
-
-  int CmiUnRegisterMemory(void *addr, unsigned int size);
-
-This function unregisters the memory at starting address addr of length
-size, making it no longer DMAable. This operation corresponds to
-unpinning memory from the NIC hardware. This is also an expensive
-operation and should be sparingly used.
-
-For certain machine layers which support a DMA, we support the function
-``void *CmiDMAAlloc(int size);``
-
-This operation allocates a memory region of length size from the DMAable
-region on the NIC hardware. The memory region returned is pinned to the
-NIC hardware. This is an alternative to CmiRegisterMemory and is
-implemented only for hardwares that support this.
-
-RDMA operations (Get / Put)
----------------------------
-
-This section presents functions that provide the actual RDMA operations.
-For hardware architectures that support these operations these functions
-provide a standard interface to the operations, while for NIC
-architectures that do not support RDMA operations, we provide an
-emulated implementation. There are three types of NIC architectures
-based on how much support they provide for RDMA operations:
-
--  Hardware support for both *Get* and *Put* operations.
-
--  Hardware support for one of the two operations, mostly for *Put*. For
-   these the other RDMA operation is emulated by using the operation
-   that is implemented in hardware and extra messages.
-
--  No hardware support for any RDMA operation. For these, both the RDMA
-   operations are emulated through messages.
-
-There are two different sets of RDMA operations
-
--  The first set of RDMA operations return an opaque handle to the
-   programmer, which can only be used to verify if the operation is
-   complete. This suits AMPI better and closely follows the idea of
-   separating communication from synchronization. So, the user program
-   needs to keep track of synchronization.
-
--  The second set of RDMA operations do not return anything, instead
-   they provide a callback when the operation completes. This suits
-   nicely the charm++ framework of sending asynchronous messages. The
-   handler(callback) will be automatically invoked when the operation
-   completes.
-
-**For machine layer developer:** Internally, every machine layer is free
-to create a suitable data structure for this purpose. This is the reason
-this has been kept opaque from the programmer.
-
-.. code-block:: c++
-
-  void *CmiPut(unsigned int sourceId, unsigned int targetId, void
-  *Saddr, void *Taadr, unsigned int size);
-
-This function is pretty self explanatory. It puts the memory location at
-Saddr on the machine specified by sourceId to Taddr on the machine
-specified by targetId. The memory region being RDMA’ed is of length size
-bytes.
-
-.. code-block:: c++
-
-  void *CmiGet(unsigned int sourceId, unsigned int targetId, void
-  *Saddr, void *Taadr, unsigned int size);
-
-Similar to CmiPut except the direction of the data transfer is opposite;
-from target to source.
-
-.. code-block:: c++
-
-  void CmiPutCb(unsigned int sourceId, unsigned int targetId, void
-  *Saddr, void *Taddr, unsigned int size, CmiRdmaCallbackFn fn, void
-  *param);
-
-Similar to CmiPut except a callback is called when the operation
-completes.
-
-.. code-block:: c++
-
-  void CmiGetCb(unsigned int sourceId, unsigned int targetId, void
-  *Saddr, void *Taddr, unsigned int size, CmiRdmaCallbackFn fn, void
-  *param);
-
-Similar to CmiGet except a callback is called when the operation
-completes.
-
-Completion of RDMA operation
-----------------------------
-
-This section presents functions that are used to check for completion of
-an RDMA operation. The one sided communication operations are
-asynchronous, thus there needs to be a mechanism to verify for
-completion. One mechanism is for the programmer to check for completion.
-The other mechanism is through callback functions registered during the
-RDMA operations.
-
-.. code-block:: c++
-
-  int CmiWaitTest(void *obj);
-
-This function takes this RDMA handle and verifies if the operation
-corresponding to this handle has completed.
-
-A typical usage of this function would be in AMPI when there is a call
-to AMPIWait. The implementation should call the CmiWaitTest for all
-pending RDMA operations in that window.
+Converse provides one-sided (RDMA) communication through the zero copy
+interface declared in ``conv-rdma.h``: ``CmiIssueRget`` and
+``CmiIssueRput`` start an RDMA read or write described by an
+``NcpyOperationInfo``, using the hardware RDMA of the network layer.
+Charm++ programs use it through the Zero Copy Messaging API
+(:ref:`nocopyapi`) of the Charm++ manual.
 
 Random Number Generation
 ========================
 
-Converse includes support for random number generation using a 64-bit
-Linear Congruential Generator (LCG). The user can choose between using a
-supplied default stream shared amongst all chares on the processor, or
-creating a private stream. Note that there is a limit on the number of
-private streams, which at the time of writing was 15,613.
-
-.. code-block:: c++
-
-  struct CrnStream;
-
-This structure contains the current state of a random number stream. The
-user is responsible for allocating the memory for this structure.
+Converse includes support for random number generation using a Linear
+Congruential Generator (LCG), with one default stream per processor
+shared amongst all chares on that processor.
 
 Default Stream Calls
 --------------------
 
 .. code-block:: c++
 
-  void CrnSrand(int seed);
+  void CrnSrand(unsigned int seed);
 
 Seeds the default random number generator with ``seed``.
 
@@ -2637,42 +2009,9 @@ Returns the next random number in the default stream as an integer.
 
 .. code-block:: c++
 
-  int CrnDrand(void);
+  double CrnDrand(void);
 
 Returns the next random number in the default stream as a double.
-
-Private Stream Calls
---------------------
-
-.. code-block:: c++
-
-  void CrnInitStream(CrnStream *dest, int seed, int type);
-
-Initializes a new stream with its initial state stored in ``dest``. The
-user must supply a seed in ``seed``, as well as the ``type`` of the
-stream, where the ``type`` can be 0, 1, or 2.
-
-.. code-block:: c++
-
-  double CrnDouble(CrnStream *genptr);
-
-Returns the next random number in the stream whose state is given by
-``genptr``; the number is returned as a double.
-
-.. code-block:: c++
-
-  double CrnInt(CrnStream *genptr);
-
-Returns the next random number in the stream whose state is given by
-``genptr``; the number is returned as an integer.
-
-.. code-block:: c++
-
-  double CrnFloat(CrnStream *genptr);
-
-Returns the next random number in the stream whose state is given by
-``genptr``; the number is returned as a float. (Note: This function is
-exactly equivalent to ``(float) CrnDouble(genptr);``.)
 
 Converse Persistent Communication Interface
 ===========================================

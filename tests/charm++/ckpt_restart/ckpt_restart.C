@@ -34,6 +34,10 @@
 // - New: elements destroyed before the checkpoint do not exist after the restart
 //   (a broadcast census returns exactly the live set, with matching ids).
 // - New: the checkpoint is written by 1 or 2 processes and restarted in 2 or 1.
+// - New: two 5x7 arrays, each placed by a map group the program created
+//   (FastArrayMap and HilbertArrayMap), get a message from PE 0 at every
+//   element after the checkpoint and after the restart, and each element's
+//   homePe must name an existing PE.
 //
 // Options: -steps N (default 16); -ckpt-at K: checkpoint to log/ after step K
 // (without it the 16 insertions of step K happen after step 6); -c;
@@ -52,6 +56,8 @@
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ CProxy_Ring ringProxy;
 /*readonly*/ CProxy_UbElem ubProxy;
+/*readonly*/ CProxy_MapElem mapProxy;
+/*readonly*/ CProxy_MapElem hilbertProxy;
 /*readonly*/ CProxy_PlainChare chareProxy;
 /*readonly*/ CProxy_PeGroup groupProxy;
 /*readonly*/ CProxy_NodeData nodeGroupProxy;
@@ -64,6 +70,7 @@ static const int nBase = 24;        // unbounded elements inserted at the start
 static const int nNew = 16;         // inserted at step K, or after a restart
 static const int newBaseStep = 100;  // generation g inserts [100 g, 100 g + 16)
 static const int chareValue = 7;
+static const int mapX = 5, mapY = 7;  // extents of both MapElem arrays
 
 void unbufferStdout(void) { setvbuf(stdout, NULL, _IONBF, 0); }
 
@@ -99,6 +106,7 @@ class Main : public CBase_Main
   bool chain = false;
   std::string writeCheck, expectCheck;
   int waitCount = 0;
+  int mapWait = 0;
   enum Phase { BASE_INSERT, BASE_DESTROY, BASE_CENSUS, NEW_INSERT, NEW_PINGS,
                NEW_CENSUS, FINAL_CENSUS, RESTART_CENSUS } phase = BASE_INSERT;
 
@@ -129,6 +137,12 @@ public:
     vals.assign(ringSize, 0.0);
     ringProxy = CProxy_Ring::ckNew(ringSize);
     ubProxy = CProxy_UbElem::ckNew(CkArrayOptions());  // no bounds: hashed ids
+    CkArrayOptions mapOpts(mapX, mapY);
+    mapOpts.setMap(CProxy_FastArrayMap::ckNew());
+    mapProxy = CProxy_MapElem::ckNew(mapOpts);
+    CkArrayOptions hilbertOpts(mapX, mapY);
+    hilbertOpts.setMap(CProxy_HilbertArrayMap::ckNew());
+    hilbertProxy = CProxy_MapElem::ckNew(hilbertOpts);
     groupProxy = CProxy_PeGroup::ckNew();
     nodeGroupProxy = CProxy_NodeData::ckNew();
     chareProxy = CProxy_PlainChare::ckNew(0);
@@ -377,8 +391,29 @@ public:
     checkGroups();
   }
 
-  // Group and nodegroup branches (and the readonlies, on every PE).
+  // Every element of both MapElem arrays, by index from PE 0, then the groups.
   void checkGroups()
+  {
+    mapWait = 2 * mapX * mapY;
+    for (int x = 0; x < mapX; x++)
+      for (int y = 0; y < mapY; y++)
+      {
+        mapProxy(x, y).ping();
+        hilbertProxy(x, y).ping();
+      }
+  }
+
+  void mapPong(int flat, int pe, int home)
+  {
+    if (home < 0 || home >= CkNumPes())
+      CkAbort("MapElem %d on PE %d: homePe %d is not a PE\n", flat, pe, home);
+    if (--mapWait) return;
+    CkPrintf("All %d MapElem elements reached by index\n", 2 * mapX * mapY);
+    checkGroupData();
+  }
+
+  // Group and nodegroup branches (and the readonlies, on every PE).
+  void checkGroupData()
   {
     const bool otherPes = _restarted && CkNumPes() != ckptPes;
     const bool otherNodes = _restarted && CkNumNodes() != ckptNodes;
@@ -579,6 +614,18 @@ public:
     ckDestroy();
   }
   void pup(PUP::er& p) { CBase_UbElem::pup(p); }
+};
+
+class MapElem : public CBase_MapElem
+{
+public:
+  MapElem() {}
+  MapElem(CkMigrateMessage* m) : CBase_MapElem(m) {}
+  void ping()
+  {
+    mainProxy.mapPong(thisIndex.x * mapY + thisIndex.y, CkMyPe(),
+                      thisProxy.ckLocMgr()->homePe(thisIndexMax));
+  }
 };
 
 class PlainChare : public CBase_PlainChare

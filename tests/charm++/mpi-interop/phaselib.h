@@ -7,4 +7,7 @@ void PhaseRun(int iter);
 long PhaseResult();
 // The result PhaseRun(iter) must produce.
 long PhaseExpected(int iter);
+// Called by every rank: the array's last element, which is on the last PE,
+// calls CkAbort. Does not return.
+void PhaseAbort();
 #endif

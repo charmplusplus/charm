@@ -2,6 +2,7 @@
 #define SIZE 2000
 #define NUM_ELEMENTS_PER_PE 10
 #define CONSTANT 188
+#define NUM_ARR_ELEMENTS (CkNumPes() * NUM_ELEMENTS_PER_PE)
 
 CProxy_arr arrProxy;
 CProxy_grp grpProxy;
@@ -102,7 +103,7 @@ class arr : public CBase_arr {
     arr() {
       destBuffer = new int[SIZE];
       assignValuesToIndex(destBuffer, SIZE); // Initial values
-      tag = 100 + thisIndex;
+      tag = 1 * NUM_ARR_ELEMENTS + thisIndex;
 #if EARLY_POST
       // Post buffer for p2p send
       if(thisIndex == CkNumPes() * NUM_ELEMENTS_PER_PE - 1)
@@ -156,11 +157,11 @@ class grp : public CBase_grp {
     grp() {
       destBuffer1 = new int[SIZE];
       assignValuesToIndex(destBuffer1, SIZE);
-      tag1 = 200 + thisIndex;
+      tag1 = 2 * NUM_ARR_ELEMENTS + thisIndex;
 
       destBuffer2 = new int[SIZE];
       assignValuesToIndex(destBuffer2, SIZE);
-      tag2 = 300 + thisIndex;
+      tag2 = 3 * NUM_ARR_ELEMENTS + thisIndex;
 #if EARLY_POST
       // Post buffer for p2p send
       if(thisIndex == CkNumPes() - 1)
@@ -217,7 +218,7 @@ class nodegrp : public CBase_nodegrp {
     nodegrp() {
       destBuffer = new int[SIZE];
       assignValuesToIndex(destBuffer, SIZE);
-      tag = 400 + thisIndex;
+      tag = 4 * NUM_ARR_ELEMENTS + thisIndex;
 #if EARLY_POST
       // Post buffer for p2p send
       if(thisIndex == CkNumNodes() - 1)

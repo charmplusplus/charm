@@ -8,7 +8,9 @@
  * a rank that migrates (+balancer), is rebuilt in place (+campi_fakemigrate)
  * or restarts from a checkpoint (-chkpt DIR, written at the second site of
  * main at step CHKPT_STEP; later run with +restart DIR) ends with the same
- * per-rank checksum, which each rank compares with its closed form.
+ * per-rank checksum, which each rank compares with its closed form. Its
+ * MPI_Wtime must not go backwards (nor jump by an hour) across the sites of
+ * main, including across a move to another process and a restart.
  *
  * Before the first site, main also creates a reduction op (MPI_Op_create)
  * and a communicator keyval with copy and delete functions, and sets the
@@ -68,13 +70,15 @@ struct State {
   MPI_Op op = MPI_OP_NULL; // sum_plus_one
   int keyval = MPI_KEYVAL_INVALID;
   int fnErrors = 0;        // wrong results of the op, copy or delete function
+  double lastTime = 0.0;   // MPI_Wtime after the latest site of main
+  int clockErrors = 0;     // MPI_Wtime earlier than lastTime, or an hour later
   std::string chkpt_dir;
   MPI_Info chkpt_info = MPI_INFO_NULL;
   MPI_Info noop_info = MPI_INFO_NULL;
 
   void pup(PUP::er &p) {
     p | rank; p | size; p | step; p | acc; p | recvd; p | phaseGot; p | tallied;
-    p | extra; p | op; p | keyval; p | fnErrors;
+    p | extra; p | op; p | keyval; p | fnErrors; p | lastTime; p | clockErrors;
     p | chkpt_dir; p | chkpt_info; p | noop_info;
   }
 };
@@ -100,6 +104,18 @@ static campi::task<int> tally(State &s)
     CAMPI_MIGRATE(s.noop_info);
   }
   co_return 2 * s.step + 1;
+}
+
+// Reads MPI_Wtime after a site of main and compares it with the previous
+// reading, which is in the State.
+static void checkClock(State &s)
+{
+  double t = MPI_Wtime();
+  if (!(t >= s.lastTime && t < s.lastTime + 3600)) {
+    printf("migrate: rank %d: MPI_Wtime %g after %g\n", s.rank, t, s.lastTime);
+    s.clockErrors++;
+  }
+  s.lastTime = t;
 }
 
 static long long expected(int rank, int size)
@@ -132,12 +148,14 @@ CAMPI_MAIN_STATE(State, argc, argv, s)
     MPI_Op_create(sum_plus_one, 1, &s.op);
     MPI_Comm_create_keyval(kv_copy, kv_delete, &s.keyval, KV_EXTRA);
     MPI_Comm_set_attr(MPI_COMM_WORLD, s.keyval, (void *)(intptr_t)(s.rank + 1));
+    s.lastTime = MPI_Wtime();
 
     for (s.step = 0; s.step < NSTEPS; s.step++) {
       token = s.rank * 1000 + s.step;
       MPI_Sendrecv(&token, 1, MPI_INT, (s.rank + 1) % s.size, 0, &s.recvd, 1, MPI_INT,
                    (s.rank + s.size - 1) % s.size, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
       CAMPI_MIGRATE(AMPI_INFO_LB_SYNC);
+      checkClock(s);
       s.acc += (long long)s.recvd * (s.step + 1);
       {
         int v = s.rank + s.step, got = 0, flag = 0, before;
@@ -157,10 +175,12 @@ CAMPI_MAIN_STATE(State, argc, argv, s)
         printf("migrate: step %d: checkpoint to %s\n", s.step, s.chkpt_dir.c_str());
       CAMPI_MIGRATE(s.step == CHKPT_STEP && !s.chkpt_dir.empty() ? s.chkpt_info
                                                                   : AMPI_INFO_LB_SYNC);
+      checkClock(s);
       CAMPI_CALL_TO(s.tallied, tally(s));
       s.acc += s.tallied;
       s.extra = 5 * s.step;
       if (s.step % 2 == 1) CAMPI_MIGRATE(AMPI_INFO_LB_SYNC);
+      checkClock(s);
       s.acc += s.extra;
     }
 
@@ -169,7 +189,7 @@ CAMPI_MAIN_STATE(State, argc, argv, s)
     if (s.fnErrors)
       printf("migrate: rank %d: %d wrong results of the user op or keyval functions\n",
              s.rank, s.fnErrors);
-    errors = (s.acc != expected(s.rank, s.size)) + s.fnErrors;
+    errors = (s.acc != expected(s.rank, s.size)) + s.fnErrors + s.clockErrors;
     MPI_Allreduce(MPI_IN_PLACE, &errors, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     sum = s.acc;
     MPI_Allreduce(MPI_IN_PLACE, &sum, 1, MPI_LONG_LONG, MPI_SUM, MPI_COMM_WORLD);

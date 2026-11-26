@@ -87,9 +87,28 @@ endif
 endif
 
 # The final line of a restarted run must be the final line of the
-# uninterrupted run that wrote the checkpoint.
+# uninterrupted run that wrote the checkpoint. testrun skips a run (exit 0,
+# "Skipping the test") when the process count does not divide the PE count;
+# a skipped run, or a skipped reference run, counts as a pass.
 define check_restart
-	grep "^jacobi: " $(1) && test "$$(grep '^jacobi: ' $(1))" = "$$(grep '^jacobi: ' $(2))"
+	if grep -q "Skipping the test" $(1) $(2); then echo "$(1): skipped"; \
+	else grep "^jacobi: " $(1) && test "$$(grep '^jacobi: ' $(1))" = "$$(grep '^jacobi: ' $(2))"; fi
+endef
+
+# A checkpoint run must complete all 40 iterations, unless testrun skipped it.
+# $(1): its log
+define check_chkpt
+	grep -q "Skipping the test" $(1) || grep "^jacobi: 40 iterations" $(1)
+endef
+
+# Restart on $(1) PEs of program $(2) from checkpoint directory $(3), written
+# by the run logged in $(4); the restart is logged in $(5). When testrun
+# skipped the checkpoint run there is nothing to restart from, so the
+# restart is skipped too.
+define restart
+	if grep -q "Skipping the test" $(4); then echo "Skipping the test: $(4) wrote no checkpoint" > $(5); \
+	else $(call run, +p$(1) ./$(2) 2 2 2 40 -chkpt 20 $(3) +vp8 +balancer RotateLB +restart $(3) ) 2>&1 | tee $(5); fi
+	$(call check_restart,$(5),$(4))
 endef
 
 test: ampi
@@ -104,28 +123,45 @@ ifeq (1,$(CMK_SUPPORTS_MEMORY_ISOMALLOC))
 endif
 	# Checkpoint after iteration 20 of 40 to log/ (the load balancer keeps
 	# moving ranks at iterations 5, 15, 25, 35), then restart from it on the
-	# same, fewer and more PEs; with TESTRUN_PROCS=2 the runs use two
-	# processes, so the PE counts are even (testrun skips a PE count the
-	# process count does not divide). The Isomalloc build (jacobi) restores
-	# the stack and heap, the -memory default build (jacobi.pup) restores the
-	# chunk with chunk_pup.
+	# same, fewer and more PEs. With TESTRUN_PROCS set, testrun skips a PE
+	# count the process count does not divide, and the checks above accept
+	# the skip. The Isomalloc build (jacobi) restores the stack and heap, the
+	# -memory default build (jacobi.pup) restores the chunk with chunk_pup.
 ifneq ($(NO_CHKPT_RUNS),1)
 	rm -rf log log.pup
 	$(call run, +p4 ./jacobi 2 2 2 40 -chkpt 20 log +vp8 +balancer RotateLB ) 2>&1 | tee chkpt.log
-	grep "^jacobi: 40 iterations" chkpt.log
+	$(call check_chkpt,chkpt.log)
 	$(call run, +p4 ./jacobi.pup 2 2 2 40 -chkpt 20 log.pup +vp8 +balancer RotateLB ) 2>&1 | tee chkpt.pup.log
-	grep "^jacobi: 40 iterations" chkpt.pup.log
+	$(call check_chkpt,chkpt.pup.log)
 ifneq ($(RECONVERSE_VA_RANDOMIZED),1)
 	-sync
-	$(call run, +p4 ./jacobi 2 2 2 40 -chkpt 20 log +vp8 +balancer RotateLB +restart log ) 2>&1 | tee restart4.log
-	$(call check_restart,restart4.log,chkpt.log)
-	$(call run, +p2 ./jacobi 2 2 2 40 -chkpt 20 log +vp8 +balancer RotateLB +restart log ) 2>&1 | tee restart2.log
-	$(call check_restart,restart2.log,chkpt.log)
-	$(call run, +p6 ./jacobi 2 2 2 40 -chkpt 20 log +vp8 +balancer RotateLB +restart log ) 2>&1 | tee restart6.log
-	$(call check_restart,restart6.log,chkpt.log)
-	$(call run, +p6 ./jacobi.pup 2 2 2 40 -chkpt 20 log.pup +vp8 +balancer RotateLB +restart log.pup ) 2>&1 | tee restart6.pup.log
-	$(call check_restart,restart6.pup.log,chkpt.pup.log)
+	$(call restart,4,jacobi,log,chkpt.log,restart4.log)
+	$(call restart,2,jacobi,log,chkpt.log,restart2.log)
+	$(call restart,6,jacobi,log,chkpt.log,restart6.log)
+	$(call restart,6,jacobi.pup,log.pup,chkpt.pup.log,restart6.pup.log)
 endif
+endif
+
+# In-memory checkpoint after iteration 12 of 30 and rollback after 18 (needs
+# the syncft build option): the final line must be that of a run without
+# them. Load balancing runs at iteration 5, before the checkpoint, and at 25,
+# after the rollback; it is skipped at 15. The runs with RotateLB move ranks,
+# so they are left out when ranks cannot migrate between processes (above).
+testmemckpt: ampi
+ifeq ($(CMK_MEM_CHECKPOINT),1)
+	$(call run, +p4 ./jacobi 2 2 2 30 +vp8 ) 2>&1 | tee memckpt-ref.log
+	$(call run, +p4 ./jacobi 2 2 2 30 -memckpt 12 -rollback 18 +vp8 ) 2>&1 | tee memckpt.log
+	grep "rolling back to iteration 12" memckpt.log
+	grep "after the in-memory checkpoint, rollbacks 1" memckpt.log
+	$(call check_restart,memckpt.log,memckpt-ref.log)
+	$(call run, +p2 ./jacobi.pup 2 2 2 30 -memckpt 12 -rollback 18 +vp8 ) 2>&1 | tee memckpt.pup.log
+	$(call check_restart,memckpt.pup.log,memckpt-ref.log)
+ifneq ($(NO_CHKPT_RUNS),1)
+	$(call run, +p4 ./jacobi 2 2 2 30 -memckpt 12 -rollback 18 +vp8 +balancer RotateLB ) 2>&1 | tee memckpt.lb.log
+	$(call check_restart,memckpt.lb.log,memckpt-ref.log)
+endif
+else
+	@echo "testmemckpt: needs a build with the syncft option; skipped"
 endif
 
 testp: ampi
@@ -153,5 +189,5 @@ endif
 
 clean:
 	rm -f *.o jacobi jacobi.pup *~ moduleinit.C charmrun conv-host jacobi-cpp jacobi.iso jacobi-get jacobi.tls ampirun
-	rm -f chkpt.log chkpt.pup.log restart*.log
+	rm -f chkpt.log chkpt.pup.log restart*.log memckpt*.log
 	rm -rf 40 80 120 log log.pup

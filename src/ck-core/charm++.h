@@ -252,6 +252,19 @@ class Chare {
 
     inline const CkChareID &ckGetChareID(void) const {return thishandle;}
     inline void CkGetChareID(CkChareID *dest) const {*dest=thishandle;}
+    /// Destroy this chare now: delete it (an array element detaches from
+    /// its array first; a group branch cannot be destroyed).
+    virtual void ckDestroy(void);
+    /// Destroy this chare after the entry method now running on it has
+    /// returned (ckDestroy from inside the call, which is the usual
+    /// "delete this" in an entry method, is not possible when something of
+    /// the chare is still on the stack: a coroutine body, for example).
+    /// The destruction is a message to this PE, handled after the current
+    /// call returns, whether it came through an entry method or a direct
+    /// call; the chare must not migrate before then. A second call before
+    /// then does nothing more, and a chare destroyed another way first is
+    /// not destroyed again.
+    void ckDestroyLater(void);
     // object message queue
     void  CkEnableObjQ();
 #if CMK_OBJECT_QUEUE_AVAILABLE
@@ -287,6 +300,35 @@ void CkCallstackUnwind(Chare *obj);
 
 Chare *CkActiveObj(void);
 Chare *CkAllocateChare(int objId);
+
+// The message and the entry index being delivered to a running [coroutine]
+// or [inbox] entry method, set by their generated wrappers (CkEntryScope):
+// null and -1 elsewhere. An [inline] or [local] call made from such an
+// entry sees the caller's delivery. Read by ckcoro.h.
+CkpvExtern(void *, _ckCurrentMsg);
+CkpvExtern(int, _ckCurrentEp);
+extern bool _ckCoroFakeMigrate;   // +ck_fakemigrate (init.C), read by ckcoro.h
+extern bool _ckCoroFakeMigratePup; // +ck_fakemigrate_pup (init.C), read by ckcoro.h
+// CK_LABEL (ckcoro.h): a label recorded before main, its entry index once
+// _ckCoroRegisterLabels (called by _initCharm) has registered it (ck.C).
+int _ckCoroAddLabel(const char *name, int (*chareIdx)());
+int _ckCoroLabelEp(int label);
+void _ckCoroRegisterLabels();
+static inline void *CkCurrentMessage(void) { return CkpvAccess(_ckCurrentMsg); }
+static inline int CkCurrentEntry(void) { return CkpvAccess(_ckCurrentEp); }
+struct CkEntryScope {
+  void *prevMsg;
+  int prevEp;
+  CkEntryScope(void *msg, int ep)
+      : prevMsg(CkpvAccess(_ckCurrentMsg)), prevEp(CkpvAccess(_ckCurrentEp)) {
+    CkpvAccess(_ckCurrentMsg) = msg;
+    CkpvAccess(_ckCurrentEp) = ep;
+  }
+  ~CkEntryScope() {
+    CkpvAccess(_ckCurrentMsg) = prevMsg;
+    CkpvAccess(_ckCurrentEp) = prevEp;
+  }
+};
 
 static inline void CkInvokeEP(Chare *obj, const int &epIdx, void *msg) {
   CkCallstackPush(obj);
@@ -351,6 +393,7 @@ class IrrGroup : public Chare {
     virtual ~IrrGroup(); //<- needed for *any* child to have a virtual destructor
 
     virtual void pup(PUP::er &p);//<- pack/unpack routine
+    virtual void ckDestroy(void);   // aborts: a group is not destroyed one branch at a time
     virtual void ckJustMigrated(void);
     // TODO: We don't need three versions of this (undocumented) function
     inline const CkGroupID &getGroupID(void) const {return thisgroup;}
@@ -390,6 +433,7 @@ struct recursive_pup_impl<T, true> {
   void operator()(T *obj, PUP::er &p) {
     obj->parent_pup(p);
     obj->_sdag_pup(p);
+    obj->_coro_pup(p);
     obj->T::pup(p);
   }
 };
@@ -423,6 +467,7 @@ class CProxy_ArrayBase;
   CProxy_Derived thisProxy;                                   \
   void pup(PUP::er &p) { (void)p; }                           \
   inline void _sdag_pup(PUP::er &p) { (void)p; }              \
+  inline void _coro_pup(PUP::er &p) { (void)p; }              \
   void virtual_pup(PUP::er &p)
 
 /*Templated implementation of CBase_* classes.*/
@@ -663,9 +708,10 @@ class CProxy {
 /// Delegation constructor: used when building 
 ///   an element proxy from a collective proxy, like in "aProxy[i]".
     CProxy(CK_DELCTOR_PARAM)
-	:delegatedMgr(dTo)
+	:delegatedMgr(dTo), isNodeGroup(false)
         {
             delegatedPtr = NULL;
+            delegatedGroupId.setZero();  // pup reads it even when not delegated
             if(delegatedMgr != NULL && dPtr != NULL) {
                 delegatedPtr = delegatedMgr->ckCopyDelegateData(dPtr);            
 		delegatedGroupId = delegatedMgr->CkGetGroupID();
@@ -834,7 +880,7 @@ class CProxy_Group : public CProxy {
 /*    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}*/
 
-    bool operator==(const CProxy_Group& other) {
+    bool operator==(const CProxy_Group& other) const {
       return ckGetGroupID() == other.ckGetGroupID();
     }
 
@@ -877,7 +923,7 @@ class CProxyElement_Group : public CProxy_Group {
     /*CProxyElement_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy_Group(g), _onPE(CkMyPe()) {}*/
 
-    bool operator==(const CProxyElement_Group& other) {
+    bool operator==(const CProxyElement_Group& other) const {
       return ckGetGroupID() == other.ckGetGroupID() &&
              ckGetGroupPe() == other.ckGetGroupPe();
     }
@@ -983,7 +1029,7 @@ class CProxy_NodeGroup : public CProxy{
 /*    CProxy_Group(const NodeGroup *g)  //<- for compatability with NodeGroups
         :CProxy(), _ck_gid(g->ckGetGroupID()) {}*/
 
-    bool operator==(const CProxy_NodeGroup& other) {
+    bool operator==(const CProxy_NodeGroup& other) const {
       return ckGetGroupID() == other.ckGetGroupID();
     }
 

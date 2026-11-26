@@ -145,7 +145,7 @@ public:
 	callbackType type;
 	callbackData d;
 
-	bool operator==(CkCallback & other){
+	bool operator==(const CkCallback & other) const {
 	  if(type != other.type)
 	    return false;
 	  switch (type) {

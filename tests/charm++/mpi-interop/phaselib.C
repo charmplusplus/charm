@@ -45,10 +45,19 @@ public:
     contribute(sizeof(v), &v, CkReduction::sum_long,
                CkCallback(CkReductionTarget(PhaseMain, done), phaseMain));
   }
+  void abortHere() {
+    CkAbort("mpi_interop: deliberate abort on PE %d (process %d of %d)", CkMyPe(),
+            CkMyNode(), CkNumNodes());
+  }
 };
 
 void PhaseRun(int iter) {
   if (CkMyPe() == 0) phaseMain.run(iter);
+  StartCharmScheduler();
+}
+
+void PhaseAbort() {
+  if (CkMyPe() == 0) phaseArray[phaseNumElems - 1].abortHere();
   StartCharmScheduler();
 }
 

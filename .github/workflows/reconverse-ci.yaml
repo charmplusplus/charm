@@ -61,6 +61,8 @@ env:
   # reductions on their old PE (#4145).
   # reduction_empty_kid: a PE left with no element and the contributions its
   # migrated elements left behind must stay on its parent's inactive list.
+  # bcast_epoch_wrap: array broadcasts across the wraparound of the broadcast
+  # epoch, made to wrap at 2^16 (#3860).
   # bcast_zcpup: broadcasts to elements that migrate to another process with
   # pup_buffer data; the 2-process step is the one that reaches the case.
   # section_migrate: CkMulticast section multicasts and reductions while the
@@ -70,9 +72,17 @@ env:
   # ckpt_restart: disk checkpoint and restart on other PE and process counts
   # (2 -> 1 and 1 -> 2 processes in the plain pass), with ids of an unbounded
   # array, groups, a plain chare and the mainchare checked after the restart.
+  # arraymap_insert_abort: insertion without a PE of an index the array map
+  # names no PE for must abort with the runtime's message (#4222).
+  # zc_send_noleak: nocopy round trips between PEs in different processes must
+  # not grow the memory in use; the 2-process step is the one that reaches it.
+  # zc_post_noleak: Post API messages leave no memory registration for the
+  # posted buffers in any reg/dereg mode; the count is checked once
+  # contrib/reconverse has CmiRegisteredBuffers (reconverse#332).
   TEST_DIRS: >-
     tests/charm++/megatest
     tests/charm++/simplearrayhello
+    tests/charm++/cxx_standard
     tests/charm++/ckdyn
     tests/charm++/anytime_migration
     tests/charm++/amr_1d_simple
@@ -85,6 +95,7 @@ env:
     tests/charm++/objid_recreate
     tests/charm++/objid_detour
     tests/charm++/objid_bindasync
+    tests/charm++/objid_boundmany
     tests/charm++/io_sessions
     tests/charm++/groupdep_creator
     tests/charm++/objid_boundrecreate
@@ -95,10 +106,18 @@ env:
     tests/charm++/threaded_redn
     tests/charm++/reduction_migrate_ahead
     tests/charm++/reduction_empty_kid
+    tests/charm++/bcast_epoch_wrap
     tests/charm++/section_migrate
+    tests/charm++/mcast_remote
     tests/charm++/load_balancing/migrate_then_atsync
+    tests/charm++/load_balancing/lbsweep
+    tests/charm++/load_balancing/meta_lb_test
     tests/charm++/xarray_section_reduction
+    tests/charm++/jacobi3d-coro
+    tests/charm++/ckcoro
+    tests/charm++/sparse-coro
     tests/charm++/ckpt_restart
+    tests/charm++/arraymap_insert_abort
     tests/charm++/qd
     tests/charm++/within_node_bcast
     tests/charm++/zerocopy/zerocopy_with_qd
@@ -108,7 +127,11 @@ env:
     tests/charm++/zerocopy/dereg_and_nodereg
     tests/charm++/zerocopy/zc_post_async
     tests/charm++/zerocopy/pup_buffer
+    tests/charm++/zerocopy/chare_post
+    tests/charm++/zerocopy/zc_send_noleak
+    tests/charm++/zerocopy/zc_post_noleak
     tests/charm++/bcast_zcpup
+    tests/charm++/proxy_delctor
     examples/charm++/user-driven-interop
     examples/charm++/hello/local
 
@@ -116,7 +139,15 @@ jobs:
 
   reconverse-linux-x86_64:
     timeout-minutes: 90
-    runs-on: ubuntu-latest
+    # ubuntu-24.04 (GCC 13), not ubuntu-latest. Since ubuntu-latest became
+    # ubuntu-26.04 (GCC 15.2) on 2026-11-17, tests/charm++/ckcoro with
+    # +ck_fakemigrate in 2 processes aborts with a double free when the
+    # rebuild destroys MarshallTest::run's coroutine frame (the frame's destroy
+    # frees the vector in the values of its CK_WHEN_BLOCK on arr a second
+    # time). The same test file compiled with GCC 13 or 14 does not fail. Go
+    # back to ubuntu-latest once that is fixed. The other x86_64 jobs stay on
+    # ubuntu-latest, so GCC 15 still builds and tests Charm++ and AMPI there.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v5
         with:
@@ -155,12 +186,13 @@ jobs:
         run: TESTRUN_PROCS=2 TESTRUN_VA_RANDOMIZATION=1 timeout 1800 make -C examples/charm++ test
 
   # The syncft (in-memory checkpoint) build option: checkpoint, rollback and
-  # the migration, insertion and deletion refusals, in one and two processes.
-  # A job of its own because the option changes code every program runs (see
-  # doc/internals/memckpt.md). tests/campi/jacobi3d restarts from a disk
-  # checkpoint onto more PEs, which under syncft goes through the doneInserting
-  # condition in CkLocMgr's pup; as in ampi-linux-x86_64, its two-process run
-  # leaves address randomization on (a campi rank holds no code or data address).
+  # the migration, insertion and deletion refusals, for Charm++ and AMPI, in
+  # one and two processes. A job of its own because the option changes code
+  # every program runs (see doc/internals/memckpt.md). tests/campi/jacobi3d
+  # restarts from a disk checkpoint onto more PEs, which under syncft goes
+  # through the doneInserting condition in CkLocMgr's pup; as in
+  # ampi-linux-x86_64, its two-process run leaves address randomization on (a
+  # campi rank holds no code or data address).
   reconverse-linux-x86_64-syncft:
     timeout-minutes: 60
     runs-on: ubuntu-latest
@@ -180,6 +212,10 @@ jobs:
         run: timeout 900 make -C tests/campi/jacobi3d test
       - name: tests/campi/jacobi3d (2 processes, lcrun, randomization on)
         run: TESTRUN_PROCS=2 TESTRUN_VA_RANDOMIZATION=1 timeout 900 make -C tests/campi/jacobi3d test
+      - name: AMPI test (single process)
+        run: timeout 900 make -C tests/ampi/memckpt test
+      - name: AMPI test (2 processes, lcrun)
+        run: TESTRUN_PROCS=2 timeout 900 make -C tests/ampi/memckpt test
 
   # MPI interop (CharmLibInit/CharmLibExit) in an Open MPI program. A job of
   # its own so that the MPI packages stay out of the other builds.
@@ -203,6 +239,40 @@ jobs:
         env:
           LCI_ATTR_BACKEND: ofi
         run: timeout 600 make -C tests/charm++/mpi-interop test NP=2 LAUNCH="mpirun --oversubscribe -n 2"
+      - name: testabort (2 MPI ranks of 2 PEs, mpirun)
+        # The abort is on a PE thread that MPI did not create. --bind-to none:
+        # mpirun binds each rank to one core, and Charm++'s affinity check
+        # would abort first on two PEs sharing it.
+        env:
+          LCI_ATTR_BACKEND: ofi
+        run: timeout 300 make -C tests/charm++/mpi-interop testabort NP=2 PES=4 LAUNCH="mpirun --oversubscribe --bind-to none -n 2"
+
+  # --build-shared: libreconverse and LCI's libraries are in lib_so/. Links one
+  # program against the static Charm++ libraries and once with -charm-shared,
+  # and runs both without LD_LIBRARY_PATH.
+  reconverse-linux-x86_64-shared:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # reconverse is the contrib/reconverse submodule.
+          submodules: true
+      - name: install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libfabric-dev
+      - name: build
+        run: ./build charm++ reconverse-linux-x86_64 -j4 -g --build-shared
+      - name: pingpong (static Charm++ libraries; 1 and 2 processes)
+        run: |
+          make -C benchmarks/charm++/pingpong
+          TESTRUN_VA_RANDOMIZATION=1 timeout 600 make -C benchmarks/charm++/pingpong test
+          TESTRUN_PROCS=2 TESTRUN_VA_RANDOMIZATION=1 timeout 600 make -C benchmarks/charm++/pingpong test
+      - name: pingpong (-charm-shared)
+        run: |
+          make -C benchmarks/charm++/pingpong clean
+          make -C benchmarks/charm++/pingpong OPTS=-charm-shared
+          ldd benchmarks/charm++/pingpong/pingpong | grep -E 'libck\.so.*lib_so'
+          TESTRUN_VA_RANDOMIZATION=1 timeout 600 make -C benchmarks/charm++/pingpong test OPTS=-charm-shared
 
   # ARM64 Linux (Grace-class systems). Replaces the coverage CircleCI's
   # arm.medium jobs provided on the classic line; -Werror=vla carried over

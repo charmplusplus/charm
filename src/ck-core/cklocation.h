@@ -100,13 +100,12 @@ class CkArrayElementMigrateMessage : public CMessage_CkArrayElementMigrateMessag
 {
 public:
   CkArrayElementMigrateMessage(CkArrayIndex idx_, CmiUInt8 id_, bool ignoreArrival_,
-                               int length_, int nManagers_, int epoch_, CmiUInt8 life_,
+                               int length_, int epoch_, CmiUInt8 life_,
                                bool hasGPUMsg_ = false)
       : idx(idx_),
         id(id_),
         ignoreArrival(ignoreArrival_),
         length(length_),
-        nManagers(nManagers_),
         epoch(epoch_),
         life(life_),
         hasGPUMsg(hasGPUMsg_)
@@ -117,7 +116,6 @@ public:
   CmiUInt8 id;         // ID of the elements with this index in this collection
   bool ignoreArrival;  // if to inform LB of arrival
   int length;          // Size in bytes of the packed data
-  int nManagers;       // Number of associated array managers
   int epoch;
   CmiUInt8 life;       // the element's life tag (CkLocEntry::life)
   // Whether a device payload travels alongside this message, on its own
@@ -156,9 +154,12 @@ public:
   virtual void populateInitial(int arrayHdl, CkArrayOptions& options, void* ctorMsg,
                                CkArray* mgr);
   virtual int procNum(int arrayHdl, const CkArrayIndex& element) = 0;
+  // An index the map names no PE for (procNum -1, e.g. one outside the range the
+  // map was configured for, inserted with an explicit PE) gets a hashed home.
   virtual int homePe(int arrayHdl, const CkArrayIndex& element)
   {
-    return procNum(arrayHdl, element);
+    const int pe = procNum(arrayHdl, element);
+    return pe >= 0 ? pe : (int)(element.hash() % (CkHashCode)CkNumPes());
   }
 
   virtual void pup(PUP::er& p);
@@ -525,7 +526,7 @@ private:
   // The entry is empty but another life of the element is known: install it.
   void homeReinstall(const CkArrayIndex& idx, CmiUInt8 id);
 
-  // Immigration messages which are waiting for all array managers to be ready
+  // Immigration messages waiting for the managers of the arrays they name
   std::list<CkArrayElementMigrateMessage*> pendingImmigrate;
 
 #if CMK_CUDA
@@ -681,6 +682,11 @@ public:
   ck::ObjID makeID(CmiUInt8 eid) const { return ck::ObjID(collectionNumber, eid, wideCollection); }
 
   CkLocRec* registerNewElement(const CkArrayIndex& idx);
+
+  /// The record of local element id, or NULL if it is not on this PE: for runtime
+  /// work that finds an element again after an asynchronous event (a device
+  /// channel's completion, a migration deferred for it).
+  CkLocRec* localRecord(CmiUInt8 id) const { return elementNrec(id); }
 
   // Interface used by external users:
   /// Home mapping. One home per element, computable from the index or from the id
@@ -839,6 +845,7 @@ public:
   // Interface used by array manager and proxies
   /// Add a new local array manager to our list.
   void addManager(CkArrayID aid, CkArray* mgr);
+  bool hasManagersFor(CkArrayElementMigrateMessage* msg) const;
   void deleteManager(CkArrayID aid, CkArray* mgr);
 
   // Deliver buffered msgs that were buffered because of active rdma gets

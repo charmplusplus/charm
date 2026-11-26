@@ -2,9 +2,9 @@ include(CheckCXXSymbolExists)
 include(CheckCXXSourceCompiles)
 include(CheckCXXCompilerFlag)
 
-# Workaround for CMake bug when calling check_include_file_cxx() with C++11:
+# Workaround for CMake bug when calling check_include_file_cxx() with C++17:
 # https://stackoverflow.com/uestions/47213356/cmake-using-corrext-c-standard-when-checking-for-header-files
-set(CMAKE_REQUIRED_FLAGS "-std=c++11")
+set(CMAKE_REQUIRED_FLAGS "-std=c++17")
 
 
 # C++ type sizes

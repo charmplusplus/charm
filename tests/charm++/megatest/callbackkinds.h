@@ -9,7 +9,9 @@
 // How the reflector sends the callback it receives.
 enum { CBK_MSG = 0, CBK_NOMSG = 1, CBK_DATA = 2, CBK_ECHO = 3 };
 
-class callbackkinds_msg : public CMessage_callbackkinds_msg
+// CkMcastBaseMsg: the message is also sent through a CkMulticastMgr-delegated
+// section proxy, which writes its header.
+class callbackkinds_msg : public CkMcastBaseMsg, public CMessage_callbackkinds_msg
 {
  public:
   int val;
@@ -54,6 +56,9 @@ class callbackkinds_driver : public CBase_callbackkinds_driver
 
   void entryCases(void);
   void sectionCases(void);
+  void multiSectionCases(void);
+  void multiSectionSend(const char* name, const std::vector<std::vector<int> >& secs, int val,
+                        bool delegated);
   void functionCases(void);
   void threadCases(void);
   void futureCases(void);

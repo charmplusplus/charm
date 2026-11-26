@@ -159,7 +159,7 @@ void LBDatabase::Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned
 void LBDatabase::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destIDs, int nDests, unsigned int bytes, int nMsgs)
 {
 #if CMK_LBDB_ON
-  if (StatsOn() && _lb_args.traceComm()) {
+  if (nDests > 0 && StatsOn() && _lb_args.traceComm()) {
     LBCommData* item_ptr;
 
     auto *activeRec = CkActiveLocRec();
@@ -168,8 +168,11 @@ void LBDatabase::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destIDs, int 
 
       LBCommData item(runObj, destOM.id, destIDs, nDests);
       item_ptr = commTable->HashInsertUnique(item);
-      item_ptr->addMessage(bytes, nMsgs);
+    } else {
+      LBCommData item(CkMyPe(), destOM.id, destIDs, nDests);
+      item_ptr = commTable->HashInsertUnique(item);
     }
+    item_ptr->addMessage(bytes, nMsgs);
   }
 #endif
 }

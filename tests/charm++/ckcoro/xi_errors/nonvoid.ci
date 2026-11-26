@@ -1,0 +1,7 @@
+// error: returns void
+module xe_nonvoid {
+  array [1D] A {
+    entry A();
+    entry [inbox] int f();
+  };
+};

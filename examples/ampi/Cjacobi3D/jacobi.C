@@ -2,7 +2,8 @@
  * 3D Jacobi relaxation on AMPI: the program that shows AMPI's migration
  * based capabilities, each on the same code.
  *
- *   ./jacobi X Y Z [nIter] [-chkpt ITER DIR] +vpN [+pe P] [+balancer LB]
+ *   ./jacobi X Y Z [nIter] [-chkpt ITER DIR] [-memckpt ITER [-rollback ITER2]]
+ *            +vpN [+pe P] [+balancer LB]
  *
  * X*Y*Z ranks, each owning a DIMX x DIMY x DIMZ block with a one-cell halo,
  * exchange halos with their six neighbours and relax for nIter iterations
@@ -33,6 +34,21 @@
  *
  *   setarch $(uname -m) -R ./jacobi 2 2 2 40 -chkpt 20 log +vp8 +pe 3
  *   setarch $(uname -m) -R ./jacobi 2 2 2 40 -chkpt 20 log +vp8 +pe 4 +restart log
+ *
+ * In-memory checkpoint and rollback (needs Charm++ built with the syncft
+ * option): "-memckpt ITER" makes the ranks call
+ * AMPI_Migrate(AMPI_INFO_CHKPT_IN_MEMORY) after iteration ITER, and
+ * "-rollback ITER2" (ITER2 > ITER) makes them call
+ * AMPI_Migrate(AMPI_INFO_CHKPT_ROLLBACK) after iteration ITER2, the first
+ * time only. The rollback returns every rank, with its stack and heap as
+ * they were, into the AMPI_Migrate call of iteration ITER, and iterations
+ * ITER+1 to ITER2 run a second time; AMPI_Rollback_count tells the second
+ * return from the first, since a counter in the rank's own memory would be
+ * restored too. Load balancing is skipped between ITER and ITER2, because a
+ * rank that migrated since the checkpoint cannot be rolled back. The final
+ * line is the same as that of a run without these options. For example:
+ *
+ *   ./jacobi 2 2 2 30 -memckpt 12 -rollback 18 +vp8 +pe 4
  *
  * Three links of the same source are built: jacobi (Isomalloc heap and the
  * chunk_pup routine), jacobi.pup (-memory default: the chunk travels only
@@ -149,6 +165,8 @@ int main(int ac, char** av)
   int chkpt_iter = 0;
   const char *chkpt_dir = NULL;
   MPI_Info chkpt_info = MPI_INFO_NULL;
+  int memckpt_iter = 0, rollback_iter = 0;
+  int rollbacks = 0; /* AMPI_Rollback_count after the in-memory checkpoint */
 
   MPI_Init(&ac, &av);
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
@@ -156,7 +174,7 @@ int main(int ac, char** av)
 
   if (ac < 4) {
     if (rank == 0)
-      printf("Usage: jacobi X Y Z [nIter] [-chkpt ITER DIR]\n");
+      printf("Usage: jacobi X Y Z [nIter] [-chkpt ITER DIR] [-memckpt ITER [-rollback ITER2]]\n");
     MPI_Finalize();
     return 1;
   }
@@ -175,6 +193,10 @@ int main(int ac, char** av)
       chkpt_iter = atoi(av[i+1]);
       chkpt_dir = av[i+2];
       i += 2;
+    } else if (strcmp(av[i], "-memckpt") == 0 && i + 1 < ac) {
+      memckpt_iter = atoi(av[++i]);
+    } else if (strcmp(av[i], "-rollback") == 0 && i + 1 < ac) {
+      rollback_iter = atoi(av[++i]);
     } else if (av[i][0] != '+' && av[i][0] != '-') {
       niter = atoi(av[i]);
     }
@@ -279,7 +301,21 @@ int main(int ac, char** av)
         MPI_Get_processor_name(where, &len);
         printf("iter %d: continuing after the checkpoint; rank 0 is %s\n", iter, where);
       }
-    } else if (iter%10 == 5) {
+    } else if (memckpt_iter > 0 && iter == memckpt_iter) {
+      /* In-memory checkpoint. After a rollback the ranks return from this
+         call again, with iter == memckpt_iter, and the count is 1. */
+      if (rank == 0)
+        printf("iter %d: in-memory checkpoint\n", iter);
+      AMPI_Migrate(AMPI_INFO_CHKPT_IN_MEMORY);
+      AMPI_Rollback_count(&rollbacks);
+      if (rank == 0)
+        printf("iter %d: continuing after the in-memory checkpoint, rollbacks %d\n", iter, rollbacks);
+    } else if (memckpt_iter > 0 && iter == rollback_iter && rollbacks == 0) {
+      if (rank == 0)
+        printf("iter %d: rolling back to iteration %d\n", iter, memckpt_iter);
+      AMPI_Migrate(AMPI_INFO_CHKPT_ROLLBACK); /* does not return */
+    } else if (iter%10 == 5 &&
+               !(memckpt_iter > 0 && memckpt_iter < iter && iter < rollback_iter)) {
       AMPI_Migrate(AMPI_INFO_LB_SYNC);
     }
 #endif
