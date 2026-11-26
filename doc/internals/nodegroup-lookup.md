@@ -54,20 +54,25 @@ first and take the lock only on null:
 A lookup from inside the nodegroup's own constructor does not use either
 table: `CkLocalNodeBranch` returns `_currentNodeGroupObj`.
 
-A pointer returned by a lookup stays valid only while the nodegroup exists;
-this was also the case when every lookup took the lock, which was released
-before the pointer was used.
+A pointer returned by a lookup stays valid only while the nodegroup exists.
 
-## Why it matters
-
-With one lock per process, an application that looks up a nodegroup in
-every entry method serializes all PEs of the process on it. SpECTRE reaches
-its `GlobalCache` nodegroup this way; at 64 PEs in one process most worker
-threads were found waiting on this lock (measurements in the pull request
-that added the published table).
+Lookups of a ready nodegroup with a positive id take no lock, so PEs of one
+process that look up a nodegroup in every entry method do not serialize on
+`_nodeGroupTableImmLock`.
 
 ## Test
 
-`tests/charm++/nodegroup_lookup`: every PE looks up 600 nodegroups (three
-blocks) repeatedly while they are being created, and checks that each lookup
-returns the object built with that nodegroup's tag.
+`tests/charm++/nodegroup_lookup` creates nodegroups after start-up, in
+batches of 8, one batch per message: 800 from PE 0 (four blocks) and, with
+two or more processes, 200 negative ids from the first PE of process 1. Ids
+are handed out in sequence on each node, so their values are known before
+they are created. Meanwhile a group element on every PE runs rounds, one
+message each: it sends a message to a target nodegroup on its own node
+(which may not exist yet, so the message is held in its `TableEntry`),
+looks up the target (often not created yet, sometimes in a block that is not
+allocated yet, so the lookup waits in the scheduler) and then up to 16
+earlier ids, and checks each returned object's tag. Each creator also looks
+up every nodegroup right after its `ckNew` and sends it a message on every
+node. After quiescence each process checks that every nodegroup received
+each message sent to it exactly once, and the program checks the total
+numbers of lookups and messages.

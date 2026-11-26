@@ -16,6 +16,7 @@ clean:
 test: all
 	$(call run, ./nodegroup_lookup +p1)
 	$(call run, ./nodegroup_lookup +p4)
+	$(call run, ./nodegroup_lookup +p8)
 
 testp: all
 	$(call run, ./nodegroup_lookup +p$(P))
@@ -23,3 +24,4 @@ testp: all
 smptest: all
 	$(call run, ./nodegroup_lookup +p2 ++ppn 2)
 	$(call run, ./nodegroup_lookup +p4 ++ppn 2)
+	$(call run, ./nodegroup_lookup +p8 ++ppn 4)

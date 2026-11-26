@@ -1,17 +1,32 @@
 mainmodule nodegroup_lookup {
   readonly CProxy_Main mainProxy;
+  readonly CProxy_Worker workers;
+  readonly int nPos;
+  readonly int nNeg;
+  readonly int rounds;
 
   mainchare Main {
     entry Main(CkArgMsg *m);
-    entry [reductiontarget] void done(long sum);
+    entry void start();
+    entry void go(int negFirst);
+    entry void batch(int first);
+    entry void doneOne();
+    entry [reductiontarget] void readersDone(long lookups);
+    entry void quiet();
+    entry [reductiontarget] void finish(long hits);
   };
 
   nodegroup Tagged {
     entry Tagged(int tag);
+    entry void hit(int tag);
   };
 
-  group Reader {
-    entry Reader();
-    entry void lookup(std::vector<CkGroupID> ids, int rounds, int count);
+  group Worker {
+    entry Worker();
+    entry void createFirstNeg();
+    entry void createNeg(int first);
+    entry void startReading(int posFirst, int negFirst);
+    entry void round(int r);
+    entry void check();
   };
 };
