@@ -950,6 +950,22 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
   CkSectionInfo &s = sid->_cookie;
   mCastEntry *entry;
 
+#if CMK_LBDB_ON
+  // Recorded on the sending PE, root or not. A group section has no _elems; off
+  // the root's PE the array may not have been created yet.
+  if (LBManagerObj()->CollectingCommStats() && !sid->_elems.empty() && CkLocalBranch(s.get_aid())) {
+    // fixme: running obj?
+    CkLocMgr *mgr = CProxy_ArrayBase(s.get_aid()).ckLocMgr();
+    // The members' ids as far as this process knows them now.
+    ObjKeyList keys;
+    keys.reserve(sid->_elems.size());
+    CmiUInt8 key;
+    for (const CkArrayIndex &idx : sid->_elems)
+      if (mgr->lookupID(idx, key)) keys.push_back(key);
+    LBManagerObj()->MulticastSend(mgr->getOMHandle(),keys.data(),keys.size(),UsrToEnv(msg)->getTotalsize());
+  }
+#endif
+
   // If this section is rooted at this PE
   if (s.get_pe() == CkMyPe()) {
     entry = (mCastEntry *)s.get_val();   
@@ -961,23 +977,6 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
       do { entry=entry->newc; } while (entry->newc);
       s.get_val() = entry;
     }
-
-#if CMK_LBDB_ON
-    if(!entry->isGrpSec()){
-      // fixme: running obj?
-      envelope *env = UsrToEnv(msg);
-      CkLocMgr *mgr = CProxy_ArrayBase(s.get_aid()).ckLocMgr();
-      // The members' ids as far as this process knows them now.
-      ObjKeyList keys;
-      if (LBManagerObj()->CollectingCommStats()) {
-        keys.reserve(entry->allElem.size());
-        CmiUInt8 key;
-        for (const CkArrayIndex &idx : entry->allElem)
-          if (mgr->lookupID(idx, key)) keys.push_back(key);
-        LBManagerObj()->MulticastSend(mgr->getOMHandle(),keys.data(),keys.size(),env->getTotalsize());
-      }
-    }
-#endif
 
     // The first time we need to rebuild the spanning tree, we do p2p sends to refresh lastKnown
     if (entry->needRebuild == 1) {
@@ -991,7 +990,6 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
   }
   // else, if the root has migrated, we have a sub-optimal mcast
   else {
-    // fixme - in this case, not recorded in LB
     CmiPrintf("Warning: Multicast not optimized after multicast root migrated. \n");
     // Only the root can count this multicast toward freeing its tree, so the
     // whole message goes to the root, which sends it on (recvFromRemote).

@@ -64,6 +64,7 @@ DIRS = \
   reduction_migrate_ahead \
   reduction_empty_kid \
   section_migrate \
+  mcast_remote \
   xarray_section_reduction \
   bcast_zcpup \
   arraymap_insert_abort \
