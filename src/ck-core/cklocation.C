@@ -2295,9 +2295,9 @@ void pupLayout(PUP::er& p)
   int marker = LAYOUT_MARKER;
   p | marker;
   if (p.isUnpacking() && marker == LAYOUT_MARKER_OBJ2)
-    CkAbort("Checkpoint was written by an older Charm++ 9 build (9.0.0-alpha2 to"
-            " 9.0.0-beta1), whose group records this build cannot read; rewrite the"
-            " checkpoint with this build.\n");
+    CkAbort("Checkpoint was written by an older Charm++ 9 build (9.0.0-beta1 or an"
+            " earlier development build), whose group records this build cannot read;"
+            " rewrite the checkpoint with this build.\n");
   if (p.isUnpacking() && marker != LAYOUT_MARKER)
     CkAbort("Checkpoint has no current object id layout record (written by a Charm++"
             " build before the 64-bit object id redesign or its part 2, or corrupt);"

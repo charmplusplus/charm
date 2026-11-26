@@ -3480,16 +3480,24 @@ The detailed APIs of these two methods are described as follows:
 
    A program can also decide when a step starts. ``TurnManualLBOn()``
    puts the calling PE in manual mode and ``TurnManualLBOff()`` takes it
-   out; called from an initproc, before the load balancing manager
-   exists, they set the mode every PE starts in. In manual mode
-   ``AtSync()`` does not start a load balancing step: the element waits,
-   and no ``ResumeFromSync()`` comes until the program calls
-   ``CkStartLB()``. With TreeLB and the centralized balancers one call on
-   any PE starts a step on every PE, and when it ends every element with
-   ``usesAtSync`` set gets ``ResumeFromSync()``. ``CkStartLB()`` aborts
-   when no load balancer in use supports it. A disk checkpoint records
-   the mode, so a restarted program is in the mode it had when it wrote
-   the checkpoint.
+   out; the mode is per PE, and called from an initproc, before the load
+   balancing manager exists, they set the mode the PEs start in. In
+   manual mode ``AtSync()`` does not start a step: the element waits
+   until the program calls ``CkStartLB()``. With TreeLB and the
+   centralized balancers one call on any PE starts a step on every PE;
+   a distributed balancer (DistBaseLB) acts on the calling PE only, so
+   every PE must call it. When the step ends, every element with
+   ``usesAtSync`` set is resumed, including one that has not called
+   ``AtSync()`` yet, whose later ``AtSync()`` then waits for the next
+   ``CkStartLB()``; call ``CkStartLB()`` only after every element has
+   reached ``AtSync()``, for example from a reduction. ``CkStartLB()``
+   aborts when no balancer is loaded or the loaded one does not support
+   it, and does nothing while the balancer's start is turned off. With
+   *+MetaLB*, ``AtSync()`` resumes the element directly while
+   MetaBalancer decides no step is due, whatever the mode. A disk
+   checkpoint records each PE's mode and a restart restores it; a
+   restart on a different number of PEs gives every PE the mode PE 0
+   had.
 
    .. note:: In AtSync mode, Applications that use dynamic insertion or
 	     deletion of array elements must not be doing so when any element
