@@ -999,6 +999,13 @@ if(${TARGET} STREQUAL "charm4py")
 
   if (${BUILD_CUDA})
     target_link_libraries(charm cudart hybridapi)
+    # No CUDA runtime from CMake (#4327): with CUDA objects in hybridapi it
+    # adds -lcudadevrt -lcudart_static, which charmc's -whole-archive pulls in
+    # whole, leaving __cudaRegisterLinkedBinary_* undefined. hapi_kernels is
+    # not separably compiled and needs neither; cudart above is the runtime.
+    if(hapi_kernels_lang)
+      set_target_properties(charm PROPERTIES CUDA_RUNTIME_LIBRARY None)
+    endif()
   endif()
 
   if (${BUILD_HIP})
