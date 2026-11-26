@@ -1007,17 +1007,19 @@ Quiescence detection (``CkStartQD``) counts messages, not the items in
 tramlib's buffers. A plain ``CkStartQD`` can therefore invoke its callback
 while items are still buffered, even with timed flushing enabled, because a
 pending timer is not a message. It is safe only once every PE has flushed
-after inserting its last item. To end a phase, call ``htramQuiesce(cb)``, an entry method, on
-the ``HTram`` group's element on PE 0 instead (``tram[0].htramQuiesce(cb)``);
-the callback is stored and invoked there. It waits for quiescence, so it
-flushes nothing while items are still being generated. It then flushes every
-PE, waits for quiescence again, and counts the items left in buffers and in
-the priority hold. It repeats these steps until the count is zero, and then
-invokes ``cb``. Items in the priority hold are sent only after
-``changeThreshold`` admits them, so while any item is held the steps repeat
-and ``cb`` is not invoked. With ``setInputBufferDelivery(true)``,
-``htramQuiesce`` does not see items waiting in input buffers either; count
-items as described under "Settings for delivery within a process".
+after inserting its last item. To end a phase, call ``htramQuiesce(cb)``, an
+entry method, on the ``HTram`` group's element on PE 0 instead
+(``tram[0].htramQuiesce(cb)``); the callback is stored and invoked there. It
+waits for quiescence, so it flushes nothing while items are still being
+generated. It then flushes every PE, waits for quiescence again, and counts
+the items left in buffers, including items that the priority hold has
+admitted but not yet sent. It repeats these steps until the count is zero,
+and then invokes ``cb``. Items that the priority hold still holds back are
+not counted, so ``cb`` can be invoked while items are held; they are sent
+after a later ``changeThreshold`` admits them. With
+``setInputBufferDelivery(true)``, ``htramQuiesce`` does not see items waiting
+in input buffers either; count items as described under "Settings for
+delivery within a process".
 
 A second set of calls has the same meaning in every aggregation mode. It is
 intended for applications that select the mode at run time:
