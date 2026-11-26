@@ -378,6 +378,14 @@ static inline void _parseCommandLineOpts(char **argv)
                         "Initial size (log2 slots) of the process-level location table"
                         " (default 16)"))
       ck::objid::_objidTableLog2 = 16;
+  {
+    int epochBits = 32;
+    if (CmiGetArgIntDesc(argv, "+bcastEpochBits", &epochBits,
+                         "Testing: array broadcast epochs wrap at 2^N (8 to 32)") &&
+        (epochBits < 8 || epochBits > 32))
+      CmiAbort("+bcastEpochBits must be between 8 and 32");
+    _ckBcastEpochSpareBits = 32 - epochBits;
+  }
   ck::objid::_objidDiag = CmiGetArgFlagDesc(argv, "+objid_diag",
                         "Count location-table events and print them per process at exit");
   _ckCoroFakeMigratePup = CmiGetArgFlagDesc(argv, "+ck_fakemigrate_pup",

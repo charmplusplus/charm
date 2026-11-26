@@ -63,6 +63,7 @@ DIRS = \
   qd \
   reduction_migrate_ahead \
   reduction_empty_kid \
+  bcast_epoch_wrap \
   section_migrate \
   mcast_remote \
   xarray_section_reduction \

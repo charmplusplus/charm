@@ -1,0 +1,16 @@
+mainmodule bcast_epoch_wrap {
+  readonly CProxy_Main mainProxy;
+  readonly int migratePeriod;
+  mainchare Main {
+    entry Main(CkArgMsg*);
+    entry void start();
+    entry [reductiontarget] void counted0(long total);
+    entry [reductiontarget] void counted1(long total);
+    entry [reductiontarget] void counted2(long total);
+  };
+  array [1D] Receiver {
+    entry Receiver(int which);
+    entry void hit(int seq);
+    entry void report();
+  };
+};

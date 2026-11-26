@@ -61,6 +61,8 @@ env:
   # reductions on their old PE (#4145).
   # reduction_empty_kid: a PE left with no element and the contributions its
   # migrated elements left behind must stay on its parent's inactive list.
+  # bcast_epoch_wrap: array broadcasts across the wraparound of the broadcast
+  # epoch, made to wrap at 2^16 (#3860).
   # bcast_zcpup: broadcasts to elements that migrate to another process with
   # pup_buffer data; the 2-process step is the one that reaches the case.
   # section_migrate: CkMulticast section multicasts and reductions while the
@@ -104,6 +106,7 @@ env:
     tests/charm++/threaded_redn
     tests/charm++/reduction_migrate_ahead
     tests/charm++/reduction_empty_kid
+    tests/charm++/bcast_epoch_wrap
     tests/charm++/section_migrate
     tests/charm++/mcast_remote
     tests/charm++/load_balancing/migrate_then_atsync

@@ -1440,6 +1440,8 @@ void CkArrayBroadcaster::pup(PUP::er& p)
   p | storedBcasts;
 }
 
+int _ckBcastEpochSpareBits = 0;
+
 // Processes the incoming broadcast message and buffers it for future delivery
 void CkArrayBroadcaster::ingestIncoming(CkArrayMessage* msg)
 {
@@ -1481,7 +1483,7 @@ bool CkArrayBroadcaster::attemptDelivery(CkArrayMessage* bcast, ArrayElement* el
   // now at the last part of the ZC delivery, so don't increment the elBcastNo
   if (CMI_ZC_MSGTYPE(UsrToEnv(bcast)) == CMK_ZC_BCAST_RECV_ALL_DONE_MSG)
   {
-    CkAssert(elBcastNo > bcastEpoch);
+    CkAssert(ck::bcastEpoch::diff(elBcastNo, bcastEpoch) > 0);
   }
   else
   {
@@ -1490,7 +1492,7 @@ bool CkArrayBroadcaster::attemptDelivery(CkArrayMessage* bcast, ArrayElement* el
     // it for now, it'll be delivered when it catches up
     if (elBcastNo != bcastEpoch)
       return false;
-    elBcastNo++;
+    elBcastNo = ck::bcastEpoch::next(elBcastNo);
   }
 
   if (!performDelivery(bcast, el, doFree))
@@ -1506,7 +1508,7 @@ bool CkArrayBroadcaster::bringUpToDate(ArrayElement* el)
   // A stable-locations array frees a broadcast once every local element has it,
   // on the promise that no element moves while a broadcast is in flight
   // (doc/internals/array-broadcast-migration.md)
-  if (stableLocations && elBcastNo < storedBcasts.getHeadEpoch())
+  if (stableLocations && ck::bcastEpoch::diff(elBcastNo, storedBcasts.getHeadEpoch()) < 0)
     CkAbort("Array element %s arrived on PE %d expecting broadcast %d, which this PE "
             "freed (next kept: %d). An element of an array with static insertion and "
             "setAnytimeMigration(false) moved while a broadcast to the array was in "
@@ -1516,7 +1518,7 @@ bool CkArrayBroadcaster::bringUpToDate(ArrayElement* el)
   while (storedBcasts.hasBcast(elBcastNo))
   {
     CkArrayMessage* curBcast = storedBcasts.getBcast(elBcastNo);
-    elBcastNo++;
+    elBcastNo = ck::bcastEpoch::next(elBcastNo);
     const bool curDoFree =
         CMI_ZC_MSGTYPE(UsrToEnv(curBcast)) == CMK_ZC_BCAST_RECV_ALL_DONE_MSG;
     const bool curStatus = performDelivery(curBcast, el, curDoFree);
@@ -1574,11 +1576,11 @@ void CkArrayBroadcaster::deliverAndUpdate(CkArrayMessage* bcast,
 
   if (success)
   {
-    int bcastEpoch = UsrToEnv(bcast)->getGroupEpoch() + 1;
+    int bcastEpoch = ck::bcastEpoch::next(UsrToEnv(bcast)->getGroupEpoch());
     while (storedBcasts.hasBcast(bcastEpoch))
     {
       success = performDelivery(storedBcasts.getBcast(bcastEpoch), elements, arrayId);
-      bcastEpoch++;
+      bcastEpoch = ck::bcastEpoch::next(bcastEpoch);
     }
   }
 }
@@ -1609,7 +1611,7 @@ bool CkArrayBroadcaster::performDelivery(CkArrayMessage* bcast,
     // it for now, it'll be delivered when it catches up
     if (elBcastNo != bcastEpoch)
       continue;
-    elBcastNo++;
+    elBcastNo = ck::bcastEpoch::next(elBcastNo);
     DEBB((AA "Delivering broadcast %d to element %s\n" AB, bcastEpoch, idx2str(el)));
     int* index = el->thisIndexMax.data();
     for (int i = 0; i < numInts; i++) validIndexes[j++] = index[i];
@@ -1652,11 +1654,11 @@ void CkArrayBroadcaster::deliverAndUpdateDyn(CkArrayMessage* bcast,
   bool success = performDeliveryDyn(bcast, idx, batch);
   if (success)
   {
-    int bcastEpoch = UsrToEnv(bcast)->getGroupEpoch() + 1;
+    int bcastEpoch = ck::bcastEpoch::next(UsrToEnv(bcast)->getGroupEpoch());
     while (storedBcasts.hasBcast(bcastEpoch))
     {
       success = performDeliveryDyn(storedBcasts.getBcast(bcastEpoch), idx, batch);
-      bcastEpoch++;
+      bcastEpoch = ck::bcastEpoch::next(bcastEpoch);
     }
   }
 }
@@ -1685,7 +1687,7 @@ bool CkArrayBroadcaster::performDeliveryDyn(CkArrayMessage* bcast,
     // waits for the stored broadcast until ckElementArriving
     if (owner->getLocMgr()->bufferedActiveRgetMsgs.count(el->CkMigratable::ckGetID()) != 0)
       continue;
-    elBcastNo++;
+    elBcastNo = ck::bcastEpoch::next(elBcastNo);
     ArrayElemDyn* d = static_cast<ArrayElemDyn*>(el);
     if (batch)
       ready.push_back(d);
@@ -1709,11 +1711,18 @@ void CkArrayBroadcaster::springCleaning(void) { storedBcasts.springCleaning(); }
 // element has received, so free those now instead of at spring cleaning.
 void CkArrayBroadcaster::releaseDelivered()
 {
+  // +bcastEpochBits: the extra cleaning pass, once this broadcast has been delivered
+  cleanIfDue();
   if (!stableLocations)
     return;
-  int below = INT_MAX;
+  // With no local element, everything received so far can go
+  int below = ck::bcastEpoch::next(storedBcasts.getMaxEpoch());
   for (CkMigratable* m : owner->localElemVec)
-    below = std::min(below, getData((ArrayElement*)m));
+  {
+    const int expects = getData((ArrayElement*)m);
+    if (ck::bcastEpoch::diff(expects, below) < 0)
+      below = expects;
+  }
   storedBcasts.releaseBelow(below);
 }
 
@@ -1723,7 +1732,7 @@ bool CkArrayBroadcaster::isFinalRecipient(const std::vector<CkMigratable*>& elem
   if (getData(el) != epoch)
     return false;
   for (CkMigratable* m : elements)
-    if (m != el && getData((ArrayElement*)m) <= epoch)
+    if (m != el && ck::bcastEpoch::diff(getData((ArrayElement*)m), epoch) <= 0)
       return false;
   return true;
 }
