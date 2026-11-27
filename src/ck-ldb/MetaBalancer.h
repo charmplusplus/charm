@@ -121,6 +121,7 @@ public:
   void LoadBalanceDecisionFinal(int, int);
   void MetaLBCallLBOnChares();
   void MetaLBSetLBOnChares(int switchFrom, int switchTo);
+  void MetaLBSwitchDone();
   void ReceiveIterationNo(int); // Receives the current iter no
   static void periodicCall(void *ad);
   static void checkForNoObj(void *ad);
@@ -175,6 +176,7 @@ private:
   double pe_ld_skewness;
   int total_ovld_pes;
   int current_balancer;
+  int switch_acks; // PE 0: PEs that have switched strategy for the coming step
   ForestModel* rFmodel;
 
   struct AdaptiveData {
