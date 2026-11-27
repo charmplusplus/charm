@@ -17,12 +17,27 @@ collide_test: collide_test.decl.h collide_test.C
 collide_test.decl.h: collide_test.ci
 	$(CHARMC) collide_test.ci
 
+# "2" runs fewer chunks than PEs, so some PEs have no contributor in a step.
 test: collide_test
 	$(call run, ./collide_test +p4)
 	$(call run, ./collide_test +p4 +objid_tranche_log2 2)
+	$(call run, ./collide_test 2 +p4)
+	$(call run, ./collide_test dist +p4)
+	$(call run, ./collide_test 2 dist +p4)
+	# Checkpoint after step 2, then restart on the same and on fewer PEs.
+	-rm -rf log
+	$(call run, ./collide_test ckpt +p4)
+	-sync
+	$(call run, ./collide_test +p4 +restart log)
+	$(call run, ./collide_test +p2 +restart log)
+	-rm -rf log
+	$(call run, ./collide_test dist ckpt +p4)
+	-sync
+	$(call run, ./collide_test +p3 +restart log)
+	-rm -rf log
 
 smptest: test
 endif
 
 clean:
-	rm -rf *.decl.h *.def.h *.o collide_test charmrun
+	rm -rf *.decl.h *.def.h *.o collide_test charmrun log

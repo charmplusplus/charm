@@ -704,12 +704,25 @@ if(BUILD_CUDA OR BUILD_HIP)
     configure_file(${file} include/ COPYONLY)
   endforeach()
 
+  # The runtime's device kernels (hapi_kernels.cu: the completion-flag
+  # kernel), an object library linked into hybridapi. The CUDA or HIP compiler
+  # builds it directly, for the build's architectures: not through charmc (the
+  # global compile launcher) and without charmc's options.
+  set(hapi_kernels_src ${CMAKE_SOURCE_DIR}/src/arch/cuda/hybridAPI/hapi_kernels.cu)
+  macro(hapi_add_kernels lang)
+    set_source_files_properties(${hapi_kernels_src} PROPERTIES LANGUAGE ${lang})
+    add_library(hapi_kernels OBJECT ${hapi_kernels_src})
+    set_target_properties(hapi_kernels PROPERTIES RULE_LAUNCH_COMPILE "" COMPILE_OPTIONS ""
+                          POSITION_INDEPENDENT_CODE ON)
+  endmacro()
+
   if (BUILD_CUDA)
     if(CMAKE_VERSION VERSION_GREATER 3.17 OR CMAKE_VERSION VERSION_EQUAL 3.17)
       find_package(CUDAToolkit REQUIRED)
       set(CMAKE_CUDA_COMPILER "${CUDAToolkit_NVCC_EXECUTABLE}")
       enable_language(CUDA)
       set(CUDA_DIR "${CUDAToolkit_TARGET_DIR}")
+      set(hapi_kernels_lang CUDA)
     else()
       find_package(CUDA REQUIRED)
       set(CUDA_DIR "${CUDA_TOOLKIT_ROOT_DIR}")
@@ -732,7 +745,16 @@ if(BUILD_CUDA OR BUILD_HIP)
       set(HAPI_CUPTI_LB ON)
     endif()
 
-    add_library(hybridapi ${hybridAPI-cxx-sources})
+    if(hapi_kernels_lang)
+      hapi_add_kernels(CUDA)
+      if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.23)
+        set_target_properties(hapi_kernels PROPERTIES CUDA_ARCHITECTURES all)
+      endif()
+      add_library(hybridapi ${hybridAPI-cxx-sources} $<TARGET_OBJECTS:hapi_kernels>)
+      target_compile_definitions(hybridapi PRIVATE HAPI_FLAG_KERNEL=1)
+    else()
+      add_library(hybridapi ${hybridAPI-cxx-sources})
+    endif()
     add_dependencies(hybridapi ci-generated)
 
     if(CUPTI_LIBRARY)
@@ -779,12 +801,23 @@ if(BUILD_CUDA OR BUILD_HIP)
     endif()
     
     set(HIP_DIR "${ROCM_PATH}")
-    set(CMAKE_HIP_ARCHITECTURES "gfx803;gfx900;gfx906;gfx908;gfx90a;gfx1030;gfx1100" CACHE STRING "HIP architectures")
+    set(hapi_hip_archs_default "gfx803;gfx900;gfx906;gfx908;gfx90a;gfx942;gfx1030;gfx1100")
+    set(CMAKE_HIP_ARCHITECTURES "${hapi_hip_archs_default}" CACHE STRING "HIP architectures")
     
     # Enable HIP language support
     enable_language(HIP)
-    
-    add_library(hybridapi ${hybridAPI-cxx-sources})
+
+    # The flag kernel, for the architectures above and the build's. LCI's own
+    # build, when reconverse fetches it, enables HIP before this file does, so
+    # CMAKE_HIP_ARCHITECTURES may be cached before the line above runs: the
+    # build host's GPUs, or the compiler's default (gfx906) on a host without
+    # one, such as a login node.
+    hapi_add_kernels(HIP)
+    set(hapi_kernels_archs ${hapi_hip_archs_default} ${CMAKE_HIP_ARCHITECTURES})
+    list(REMOVE_DUPLICATES hapi_kernels_archs)
+    set_target_properties(hapi_kernels PROPERTIES HIP_ARCHITECTURES "${hapi_kernels_archs}")
+    add_library(hybridapi ${hybridAPI-cxx-sources} $<TARGET_OBJECTS:hapi_kernels>)
+    target_compile_definitions(hybridapi PRIVATE HAPI_FLAG_KERNEL=1)
     add_dependencies(hybridapi ci-generated)
     target_include_directories(hybridapi PRIVATE "${ROCM_PATH}/include")
 

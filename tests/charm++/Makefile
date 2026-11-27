@@ -15,6 +15,7 @@ DIRS = \
   ckAllocSysMsgTest \
   method_templates \
   demand_creation \
+  createhere_race \
   startupTest \
   topology \
   io \
@@ -63,7 +64,9 @@ DIRS = \
   qd \
   reduction_migrate_ahead \
   reduction_empty_kid \
+  bcast_epoch_wrap \
   section_migrate \
+  mcast_remote \
   xarray_section_reduction \
   bcast_zcpup \
   arraymap_insert_abort \

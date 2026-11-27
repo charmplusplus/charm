@@ -237,10 +237,11 @@ option links an application against them:
 
      $ charmc -o pgm pgm.o -charm-shared
 
-On reconverse versions this option does not work yet: the link fails
-because `libreconverse` is placed in `lib_so/` while `charmc` looks for
-it in `lib/` (issue #4049). The `charm4py` target builds its own
-shared library and does not use this option.
+`libreconverse` and LCI's libraries are shared in every build; with
+`--build-shared` they are in `lib_so/`, and `charmc` links them from
+there, with an RPATH, whether or not `-charm-shared` is given. The
+`charm4py` target builds its own shared library and does not use this
+option.
 
 
 ## Contributing

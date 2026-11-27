@@ -120,11 +120,27 @@ Runtime (reconverse):
 - GPU support on reconverse: portable HAPI core (#3951),
   device-to-device communication (#3955), device zerocopy with
   register-once buffers (#3960, #3961), GPU-aware load balancer
-  (#3968). CkDevicePersistent, persistent device-to-device transfers
-  opened once and reused, works between any pair of PEs: within a
-  host over IPC or a device copy, between hosts over RDMA; a buffer
-  may start inside an allocation, +gpushm is not required, and each
-  transfer moves the object's current count (#4228).
+  (#3968). Device channels (CkChannel) replace
+  CkDevicePersistent: a receiver opens a device buffer once and one
+  sender puts into it repeatedly, with a notification per put that
+  carries its size and tag, a release credit, and no per-message
+  setup; within a process the puts are batched device copies, within
+  a host copies through IPC with credits in shared memory, and
+  between hosts the receiver reads each put with RDMA. Channels
+  survive migration of either side without being exchanged again,
+  and destroy(cb) detaches the sender before the buffer may be freed.
+  CkDyn's persistent device buffers run on the channels' transport.
+  Manual: "GPU Channels".
+
+- HAPI reports completions per stream: a callback given to
+  hapiAddCallback runs once its own stream's work completes, no
+  longer after every callback added before it on any stream, so
+  callbacks on different streams run in completion order (#4315).
+  A completion is detected by a pinned flag (the default on CUDA)
+  or by an event query (the default on HIP). +gpueventquery,
+  +gpuflags, +gpuflagpolls N (a choice per completion),
+  +gpuflagmemset and +gpuflagkernel override it; the manual's
+  "Completion order and detection" has the costs.
 
 - charmxi: a [threaded, reductiontarget] entry method runs on its
   own thread (#4079, #4082); charmxi no longer crashes on serial
@@ -290,6 +306,10 @@ Arrays, reductions, multicast and load balancing:
   once and broadcasts arrive in order (#4092, #4093). A broadcast
   waits for an element still reading its zero-copy pup buffers
   after a migration (#4148).
+
+- More than 2^31 broadcasts to one array no longer make the broadcast
+  store keep every later broadcast: the 32-bit broadcast epoch now
+  wraps around safely (#3860).
 
 - Reductions: a reduction no longer hangs when elements migrate in
   after contributing to later rounds on their old PE (#4145, #4151),
@@ -609,6 +629,10 @@ Build and packaging:
 - The charm4py target builds and loads on reconverse: libcharm links
   reconverse, which is built with CMK_CHARM4PY (#4063).
 
+- --build-shared links on reconverse: charmc searches lib_so/, where
+  libreconverse and LCI's libraries are, and records it as an RPATH,
+  with or without -charm-shared (#4049).
+
 Removed:
 
 - Classic Converse and the classic machine layers (#4056, #4061),
@@ -616,6 +640,12 @@ Removed:
   Charm++ continues on the branch 'classic'.
 
 - pose and mblock: libraries, examples and manuals (#4070).
+
+- CkDevicePersistent, its example and the latency-persistent
+  benchmark, replaced by device channels (CkChannel), the
+  chantest example and the channel benchmark; jacobi3d's -s option
+  becomes -k. +gpupersistverbose now reports CkDyn's persistent
+  device transfers.
 
 - The classic-only queue, queueperf, megacon and commlib tests
   (#4048); the TRAM tests, which are ported to htram; the
@@ -637,8 +667,6 @@ Known gaps in the beta:
   use GreedyRefineLB, TreeLB or DistributedLB.
 
 - CharmDebug is not available.
-
-- --build-shared does not link on reconverse (#4049).
 
 - Large scale: under heavy traffic at 8 to 32 nodes, exhaustion of
   LCI's receive packet pool can hang a run (reconverse #257). A

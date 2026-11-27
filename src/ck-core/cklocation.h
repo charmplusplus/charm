@@ -724,6 +724,11 @@ public:
 
   CkLocRec* registerNewElement(const CkArrayIndex& idx);
 
+  /// The record of local element id, or NULL if it is not on this PE: for runtime
+  /// work that finds an element again after an asynchronous event (a device
+  /// channel's completion, a migration deferred for it).
+  CkLocRec* localRecord(CmiUInt8 id) const { return elementNrec(id); }
+
   // Interface used by external users:
   /// Home mapping. One home per element, computable from the index or from the id
   /// alike, on any PE, under the current process count. Packed-index arrays use the

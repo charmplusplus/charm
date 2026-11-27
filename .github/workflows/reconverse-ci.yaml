@@ -61,6 +61,8 @@ env:
   # reductions on their old PE (#4145).
   # reduction_empty_kid: a PE left with no element and the contributions its
   # migrated elements left behind must stay on its parent's inactive list.
+  # bcast_epoch_wrap: array broadcasts across the wraparound of the broadcast
+  # epoch, made to wrap at 2^16 (#3860).
   # bcast_zcpup: broadcasts to elements that migrate to another process with
   # pup_buffer data; the 2-process step is the one that reaches the case.
   # section_migrate: CkMulticast section multicasts and reductions while the
@@ -104,7 +106,9 @@ env:
     tests/charm++/threaded_redn
     tests/charm++/reduction_migrate_ahead
     tests/charm++/reduction_empty_kid
+    tests/charm++/bcast_epoch_wrap
     tests/charm++/section_migrate
+    tests/charm++/mcast_remote
     tests/charm++/load_balancing/migrate_then_atsync
     tests/charm++/load_balancing/lbsweep
     tests/charm++/load_balancing/meta_lb_test
@@ -242,6 +246,33 @@ jobs:
         env:
           LCI_ATTR_BACKEND: ofi
         run: timeout 300 make -C tests/charm++/mpi-interop testabort NP=2 PES=4 LAUNCH="mpirun --oversubscribe --bind-to none -n 2"
+
+  # --build-shared: libreconverse and LCI's libraries are in lib_so/. Links one
+  # program against the static Charm++ libraries and once with -charm-shared,
+  # and runs both without LD_LIBRARY_PATH.
+  reconverse-linux-x86_64-shared:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          # reconverse is the contrib/reconverse submodule.
+          submodules: true
+      - name: install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake libfabric-dev
+      - name: build
+        run: ./build charm++ reconverse-linux-x86_64 -j4 -g --build-shared
+      - name: pingpong (static Charm++ libraries; 1 and 2 processes)
+        run: |
+          make -C benchmarks/charm++/pingpong
+          TESTRUN_VA_RANDOMIZATION=1 timeout 600 make -C benchmarks/charm++/pingpong test
+          TESTRUN_PROCS=2 TESTRUN_VA_RANDOMIZATION=1 timeout 600 make -C benchmarks/charm++/pingpong test
+      - name: pingpong (-charm-shared)
+        run: |
+          make -C benchmarks/charm++/pingpong clean
+          make -C benchmarks/charm++/pingpong OPTS=-charm-shared
+          ldd benchmarks/charm++/pingpong/pingpong | grep -E 'libck\.so.*lib_so'
+          TESTRUN_VA_RANDOMIZATION=1 timeout 600 make -C benchmarks/charm++/pingpong test OPTS=-charm-shared
 
   # ARM64 Linux (Grace-class systems). Replaces the coverage CircleCI's
   # arm.medium jobs provided on the classic line; -Werror=vla carried over
