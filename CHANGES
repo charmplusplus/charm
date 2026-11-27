@@ -277,11 +277,12 @@ Object ids and element location:
   receives already were (#4088, #4089).
 
 - Checkpoint compatibility: the id layout is final. A checkpoint
-  written by v9.0.0-alpha2 or later restores on this release with
-  any process count. A checkpoint written by 8.x or by v9.0.0-alpha1
-  has no current layout record, and the restart aborts with a
-  message saying so; a build with different field widths
-  (-DCMK_OBJID_COLLECTION_BITS) refuses it the same way.
+  written by this build restores with any process count. A checkpoint
+  written by 9.0.0-beta1 or earlier (8.x, alpha1, alpha2, beta1)
+  cannot be restored: the restart stops with a message that says why
+  (see the manual load balancing entry under Checkpoint and fault
+  tolerance); a build with different field widths
+  (-DCMK_OBJID_COLLECTION_BITS) refuses a checkpoint the same way.
 
 - New tests: objid_bound, objid_home, objid_insert, objid_sections,
   objid_tranche, objid_wide, objid_loctable, objid_migrate6,
@@ -414,6 +415,15 @@ Checkpoint and fault tolerance:
   arrays included, is refused with a message (#4209). Off by
   default. Protocol in doc/internals/memckpt.md; new test
   memckpt_rollback, run by a syncft CI job.
+
+- Since 9.0.0-beta1: a restart keeps the manual load balancing mode
+  the program had at the checkpoint; a TurnManualLBOff() after an
+  initproc's TurnManualLBOn() was lost, and every AtSync() after the
+  restart waited forever. The checkpoint format changed with it: a
+  checkpoint written by 9.0.0-beta1 or an earlier build is refused at
+  restart with a message saying so. An AtSync() in manual mode
+  prints a warning once per process (#4336). New test
+  restart_manual_lb.
 
 - Isomalloc (migratable threads, AMPI): the address region is rounded
   to a stable unit, recorded in disk checkpoints and honored on
@@ -674,8 +684,8 @@ Known gaps in the beta:
   allocation waits in LCI's bootstrap for the job's other tasks; start
   it with 'srun -n 1' or set LCT_PMI_BACKEND=local (reconverse #320).
 
-- Checkpoints written by 8.x or by v9.0.0-alpha1 cannot be restored;
-  checkpoints from v9.0.0-alpha2 and later can.
+- Checkpoints written by 9.0.0-beta1 or earlier, 8.x included, cannot
+  be restored; the restart stops with a message that says why.
 
 ================================================================================
 What's new in Charm++ 8.1.0
