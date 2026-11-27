@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <ctime>
+#include <iomanip>
+#include <sstream>
 
 #include "build_info.h"
 #include "endpoints.h"
@@ -142,27 +144,26 @@ const char *localityOf(int a, int b) {
 }
 
 std::string jstr(const std::string &s) {
-  std::string o = "\"";
+  std::ostringstream o;
+  o << '"';
   for (char ch : s) {
     unsigned char c = (unsigned char)ch;
-    if (c == '"' || c == '\\') {
-      o += '\\';
-      o += ch;
-    } else if (c < 0x20) {
-      char b[8];
-      snprintf(b, sizeof b, "\\u%04x", c);
-      o += b;
-    } else {
-      o += ch;
-    }
+    if (c == '"' || c == '\\')
+      o << '\\' << ch;
+    else if (c < 0x20)
+      o << "\\u" << std::hex << std::setfill('0') << std::setw(4) << (int)c << std::dec;
+    else
+      o << ch;
   }
-  return o + "\"";
+  o << '"';
+  return o.str();
 }
 
+// as printf's %.7g
 std::string jnum(double v) {
-  char b[32];
-  snprintf(b, sizeof b, "%.7g", v);
-  return b;
+  std::ostringstream o;
+  o << std::setprecision(7) << v;
+  return o.str();
 }
 
 template <class T>

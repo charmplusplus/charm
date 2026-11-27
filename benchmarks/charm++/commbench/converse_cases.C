@@ -19,6 +19,7 @@
 // the size of a case counts only the payload after it.
 #include <cstring>
 #include <mutex>
+#include <sstream>
 
 #include "commbench.h"
 #include "persistent.h"
@@ -99,7 +100,9 @@ void ConvCase::setup() {
       const char *path = node == CmiMyNode() ? "local_forward"
                          : (CmiUseCopyBasedRDMA || CmiIpcReaches(node)) ? "inline_message"
                                                                         : "rma_put";
-      s.auxNote = std::string("\"persistent_path\":\"") + path + "\"";
+      std::ostringstream note;
+      note << "\"persistent_path\":\"" << path << '"';
+      s.auxNote = note.str();
       s.persistentPath = path;
       // inline_message: the notification carries the whole message
       // (PersistentDataMsg in persist-comm.cpp: header, two handles, 4 ints).

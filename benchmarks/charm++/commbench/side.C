@@ -2,7 +2,9 @@
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <iomanip>
 #include <mutex>
+#include <sstream>
 #include <strings.h>
 
 #include "build_info.h"
@@ -128,7 +130,17 @@ void peBuffers(int pe, bool prereg, char **send, char **recv) {
 
 std::string rdmaPathNote(int peerPe) {
   const char *p = CmiNodeOf(peerPe) == CmiMyNode() ? "local" : CmiUseCopyBasedRDMA ? "message" : "rma";
-  return std::string("\"rdma_path\":\"") + p + "\"";
+  std::ostringstream o;
+  o << "\"rdma_path\":\"" << p << '"';
+  return o.str();
+}
+
+// A string into a fixed-size field of a message, cut to fit.
+template <size_t N>
+static void copyField(char (&dst)[N], const std::string &s) {
+  size_t n = std::min(s.size(), N - 1);
+  memcpy(dst, s.data(), n);
+  dst[n] = '\0';
 }
 
 void Case::unexpected(const char *what) {
@@ -174,12 +186,13 @@ void Side::begin(int method_, int size_, int role_, int myPe_, int peerPe_, bool
   }
   c = makeCase(*this);
   c->setup();
-  if (CmiIpcEnabled()) {
-    if (!auxNote.empty()) auxNote += ",";
-    auxNote += std::string("\"ipc_reaches\":") + (CmiIpcReaches(CmiNodeOf(peerPe)) ? "true" : "false");
-  }
-  if (!auxNote.empty()) auxNote += ",";
-  auxNote += copiesNote();
+  std::ostringstream aux;
+  aux << auxNote;
+  if (CmiIpcEnabled())
+    aux << (auxNote.empty() ? "" : ",") << "\"ipc_reaches\":"
+        << (CmiIpcReaches(CmiNodeOf(peerPe)) ? "true" : "false");
+  aux << (aux.tellp() > 0 ? "," : "") << copiesNote();
+  auxNote = aux.str();
   setupDone = true;
   maybeReady();
 }
@@ -280,26 +293,23 @@ void Side::end(CkFuture f) {
   int wantSend, wantRecv;
   programCopies(method, &wantSend, &wantRecv);
   if (sendCopies != wantSend * pings || recvCopies != wantRecv * arrivals) {
-    char buf[160];
-    snprintf(buf, sizeof buf, "%scopy count: %lld sends with %lld copies, %lld arrivals with %lld copies",
-             error.empty() ? "" : "; ", (long long)pings, (long long)sendCopies, (long long)arrivals,
-             (long long)recvCopies);
-    error += buf;
+    std::ostringstream o;
+    o << (error.empty() ? "" : "; ") << "copy count: " << pings << " sends with " << sendCopies
+      << " copies, " << arrivals << " arrivals with " << recvCopies << " copies";
+    error += o.str();
   }
   ResultMsg *r = new ResultMsg;
   r->checked = checked;
   r->mismatches = mismatches;
   r->ok = (mismatches == 0 && error.empty());
-  std::string e = error;
-  if (firstBad >= 0) {
-    char buf[160];
-    snprintf(buf, sizeof buf, "%s%lld bad bytes, first at offset %lld: expected 0x%02x got 0x%02x",
-             e.empty() ? "" : "; ", (long long)mismatches, (long long)firstBad, badExpected,
-             badGot);
-    e += buf;
-  }
-  snprintf(r->error, sizeof r->error, "%s", e.c_str());
-  snprintf(r->aux, sizeof r->aux, "%s", auxNote.c_str());
+  std::ostringstream e;
+  e << error;
+  if (firstBad >= 0)
+    e << (error.empty() ? "" : "; ") << mismatches << " bad bytes, first at offset " << firstBad
+      << ": expected 0x" << std::hex << std::setfill('0') << std::setw(2) << badExpected
+      << " got 0x" << std::setw(2) << badGot;
+  copyField(r->error, e.str());
+  copyField(r->aux, auxNote);
   for (int pe : recvPes) {
     if (r->npes == 32) break;
     r->pes[r->npes++] = pe;
@@ -376,8 +386,13 @@ std::string Side::copiesNote() const {
       break;
     default: rt = zerocopyCopies(peerPe); break;
   }
-  return "\"copies_sender\":" + std::to_string(snd) + ",\"copies_receiver\":" + std::to_string(rcv) +
-         ",\"copies_runtime_est\":" + (rt.n < 0 ? std::string("null") : std::to_string(rt.n)) +
-         ",\"copies_runtime_path\":\"" + rt.path + "\"" +
-         (msgBytes >= 0 ? ",\"msg_bytes\":" + std::to_string(msgBytes) : std::string());
+  std::ostringstream o;
+  o << "\"copies_sender\":" << snd << ",\"copies_receiver\":" << rcv << ",\"copies_runtime_est\":";
+  if (rt.n < 0)
+    o << "null";
+  else
+    o << rt.n;
+  o << ",\"copies_runtime_path\":\"" << rt.path << '"';
+  if (msgBytes >= 0) o << ",\"msg_bytes\":" << msgBytes;
+  return o.str();
 }
