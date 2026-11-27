@@ -1,0 +1,42 @@
+{
+  "_about": [
+    "Per-site settings for commbench-run.sh, one entry per SITE argument.",
+    "launcher: the command that starts a multi-process run; 'lcrun' means one host, no Slurm",
+    "  (commbench-run.sh then runs P0 directly and P2/P2i through the build's lcrun).",
+    "env: variables exported before the run. env_default: exported only if not already set.",
+    "modules: environment modules loaded before the run.",
+    "modules_if_linked: modules loaded only if libreconverse links a library matching",
+    "  'pattern' (ldd); lib_dir_var names a variable the module sets, whose lib/ goes first",
+    "  in LD_LIBRARY_PATH.",
+    "single_node_flags: launcher flags for the placements that use one host (P0, P2, P2i).",
+    "Use SITES_FILE=path to read another file; add a machine by adding an entry."
+  ],
+  "mac": {
+    "launcher": "lcrun"
+  },
+  "anvil": {
+    "launcher": "srun --mpi=pmi2",
+    "modules": ["python/3.9.5"],
+    "modules_if_linked": [
+      {
+        "_why": "a build configured against the hwloc 1.11 module (libhwloc.so.5) needs it; a build against Open MPI's hwloc 2.5.0 (libhwloc.so.15, found through RPATH) must not load it",
+        "pattern": "libhwloc\\.so\\.5",
+        "modules": ["hwloc"],
+        "lib_dir_var": "RCAC_HWLOC_ROOT"
+      }
+    ]
+  },
+  "delta": {
+    "launcher": "srun --mpi=pmix",
+    "env": {"FI_PROVIDER": "cxi", "LCI_NETWORK_BACKENDS": "ofi"}
+  },
+  "frontier": {
+    "launcher": "srun",
+    "env": {"FI_PROVIDER": "cxi", "LCI_NETWORK_BACKENDS": "ofi"},
+    "env_default": {"PMI_MAX_KVS_ENTRIES": "1000"},
+    "single_node_flags": ["--network=single_node_vni"]
+  },
+  "generic": {
+    "launcher": "srun --mpi=pmi2"
+  }
+}
