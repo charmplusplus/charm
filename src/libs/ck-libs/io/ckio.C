@@ -374,7 +374,7 @@ public:
     // the entire read falls in the "extra" bytes that the last BufferChares owns
     if (start_idx == num_readers)
     {
-      int tag = getRDMATag();
+      int tag = CkNewPostTag();
       CkPostBuffer(info.data, bytes, tag);
       CProxy_BufferChares(_session.sessionID)[start_idx - 1].sendData(
           read_tag, tag, read_offset, bytes, thisProxy, CkMyPe());
@@ -416,7 +416,7 @@ public:
         }
       }
       // do the CkPost call
-      int tag = getRDMATag();
+      int tag = CkNewPostTag();
       CkPostBuffer(info.data + data_idx, data_len, tag);
       CProxy_BufferChares(_session.sessionID)[i].sendData(
           read_tag, tag, read_offset, read_bytes, thisProxy, CkMyPe());
@@ -430,7 +430,6 @@ class Manager : public CBase_Manager
   std::unordered_map<Session, CProxy_ReadAssembler>
       _session_to_read_assembler;  // map used to get the read assembler for a specific
                                    // session
-  int _curr_tag = 0;
 
 public:
   Manager() : opnum(0)
@@ -460,8 +459,6 @@ public:
     delete it->second.ckLocalBranch();
     _session_to_read_assembler.erase(it);
   }
-
-  int getTag() { return _curr_tag++; }
 
   void pup(PUP::er& p)
   {
@@ -587,11 +584,6 @@ private:
     return opts.basePE + (opts.activePEs - 1) * opts.skipPEs;
   }
 };
-
-int getRDMATag()
-{  // function to allow ReadAssembler to get the current RDMA tag on the PE
-  return CkpvAccess(manager)->getTag();
-}
 
 ReadAssembler::ReadAssembler(Session session, int refnum) : _session(session)
 {

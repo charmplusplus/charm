@@ -2279,16 +2279,22 @@ static int ceilLog2(CmiUInt8 n)
 
 const Layout& getLayout() { return CksvAccess(_objidLayout); }
 
-// Precedes the layout in a checkpoint, so that a checkpoint written without one
-// (by a build before the 64-bit object id redesign) or with an older record
-// ("OBJ1", part 1, without the collection widths) fails here, not by misreading
+// Precedes the layout in a checkpoint and also marks the format of the group
+// records read after it, so that a checkpoint written without one (by a build
+// before the 64-bit object id redesign), with "OBJ1" (no collection widths) or
+// with "OBJ2" (LBManager record without useBarrier) fails here, not by misreading
 // what follows.
-static const int LAYOUT_MARKER = 0x4F424A32;  // "OBJ2"
+static const int LAYOUT_MARKER = 0x4F424A33;  // "OBJ3"
+static const int LAYOUT_MARKER_OBJ2 = 0x4F424A32;
 
 void pupLayout(PUP::er& p)
 {
   int marker = LAYOUT_MARKER;
   p | marker;
+  if (p.isUnpacking() && marker == LAYOUT_MARKER_OBJ2)
+    CkAbort("Checkpoint was written by an older Charm++ 9 build (9.0.0-beta1 or an"
+            " earlier development build), whose group records this build cannot read;"
+            " rewrite the checkpoint with this build.\n");
   if (p.isUnpacking() && marker != LAYOUT_MARKER)
     CkAbort("Checkpoint has no current object id layout record (written by a Charm++"
             " build before the 64-bit object id redesign or its part 2, or corrupt);"

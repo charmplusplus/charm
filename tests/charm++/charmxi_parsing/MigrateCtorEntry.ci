@@ -1,0 +1,17 @@
+mainmodule MigrateCtorEntry
+{
+  readonly CProxy_Main mainProxy;
+
+  mainchare Main
+  {
+    entry Main(CkArgMsg *m);
+    entry [reductiontarget] void done();
+  };
+
+  array [1D] Cell
+  {
+    entry Cell();
+    entry Cell(CkMigrateMessage *m);
+    entry void work();
+  };
+};

@@ -8,6 +8,7 @@
 #include "ck.h"
 #include "spanningTree.h"
 #include <algorithm>
+#include <climits>
 #include "ckarray.h"
 #include "cklocation.h"
 
@@ -23,6 +24,7 @@ static int ncpy_handler_idx;
 
 CkpvExtern(ReqTagPostMap, ncpyPostedReqMap);
 CkpvExtern(ReqTagBufferMap, ncpyPostedBufferMap);
+CkpvExtern(int, ncpyPostNextTag);
 CpvExtern(std::vector<NcpyOperationInfo *>, newZCPupGets);
 CksvExtern(ObjNumRdmaOpsMap, pendingZCOps);
 CksvExtern(CmiNodeLock, _nodeZCPendingLock);
@@ -2054,6 +2056,14 @@ void zcPupIssueRgets(CmiUInt8 id, CkLocMgr *locMgr) {
 
 
 /**************************** Zerocopy Post API Async Support **************************/
+
+// Hands out INT_MIN..-2 in turn; -1 marks an unposted buffer in a broadcast's tagArray.
+int CkNewPostTag() {
+  int &next = CkpvAccess(ncpyPostNextTag);
+  int tag = next;
+  next = (tag == -2) ? INT_MIN : tag + 1;
+  return tag;
+}
 
 // PE-level Post method
 void CkPostBufferInternal(void *destBuffer, size_t destSize, int tag) {

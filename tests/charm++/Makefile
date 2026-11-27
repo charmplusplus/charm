@@ -10,6 +10,7 @@ DIRS = \
   provisioning \
   load_balancing \
   ckpt_restart \
+  restart_manual_lb \
   delegation \
   sdag \
   ckAllocSysMsgTest \
@@ -21,6 +22,7 @@ DIRS = \
   io \
   io_read \
   io_sessions \
+  io_post_tag \
   groupdep_creator \
   sparse \
   sparse-coro \
@@ -33,6 +35,7 @@ DIRS = \
   ckcoro \
   zerocopy \
   within_node_bcast \
+  nodegroup_lookup \
   longIdle \
   periodic \
   bombard \
