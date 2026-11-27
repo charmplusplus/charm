@@ -348,12 +348,13 @@ public:
       CmiUInt8 myLbId = 0;
       if (!locMgr->lookupID(CkArrayIndex1D(thisIndex), myLbId))
         CkAbort("section_migrate: lookupID failed for local root element %d", thisIndex);
+      myLbId = locMgr->lbObjID(myLbId);
       std::unordered_set<CmiUInt8> expectedIds;
       for (int i = 0; i < numElems; i++) {
         if (!isMember(i)) continue;
         CmiUInt8 memberId = 0;
         if (locMgr->lookupID(CkArrayIndex1D(i), memberId)) {
-          expectedIds.insert(memberId);
+          expectedIds.insert(locMgr->lbObjID(memberId));
         }
       }
       int sz = lbmgr->GetCommDataSz();

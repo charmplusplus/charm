@@ -553,6 +553,8 @@ void handleGroupMsgOnChildPostCompletionForRecvBcast(envelope *env, NcpyEmInfo *
 
 void handleNGMsgOnChildPostCompletionForRecvBcast(envelope *env, NcpyEmInfo *ncpyEmInfo);
 
+int CkNewPostTag();
+
 void CkMatchBuffer(CkNcpyBufferPost *post, int index, int tag);
 
 void CkMatchNodeBuffer(CkNcpyBufferPost *post, int index, int tag);

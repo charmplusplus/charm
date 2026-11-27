@@ -1972,10 +1972,7 @@ CkLocRec::CkLocRec(CkLocMgr* mgr, bool fromMigration, bool ignoreArrival,
   lbmgr = mgr->getLBMgr();
   if (_lb_args.metaLbOn())
     the_metalb = mgr->getMetaBalancer();
-#  if CMK_GLOBAL_LOCATION_UPDATE
-  id_ = mgr->makeID(id_).getID();
-#  endif
-  ldHandle = lbmgr->RegisterObj(mgr->getOMHandle(), id_, (void*)this, 1);
+  ldHandle = lbmgr->RegisterObj(mgr->getOMHandle(), mgr->lbObjID(id_), (void*)this, 1);
   if (fromMigration)
   {
     DEBL((AA "Element %s migrated in\n" AB, idx2str(idx)));
@@ -2282,16 +2279,22 @@ static int ceilLog2(CmiUInt8 n)
 
 const Layout& getLayout() { return CksvAccess(_objidLayout); }
 
-// Precedes the layout in a checkpoint, so that a checkpoint written without one
-// (by a build before the 64-bit object id redesign) or with an older record
-// ("OBJ1", part 1, without the collection widths) fails here, not by misreading
+// Precedes the layout in a checkpoint and also marks the format of the group
+// records read after it, so that a checkpoint written without one (by a build
+// before the 64-bit object id redesign), with "OBJ1" (no collection widths) or
+// with "OBJ2" (LBManager record without useBarrier) fails here, not by misreading
 // what follows.
-static const int LAYOUT_MARKER = 0x4F424A32;  // "OBJ2"
+static const int LAYOUT_MARKER = 0x4F424A33;  // "OBJ3"
+static const int LAYOUT_MARKER_OBJ2 = 0x4F424A32;
 
 void pupLayout(PUP::er& p)
 {
   int marker = LAYOUT_MARKER;
   p | marker;
+  if (p.isUnpacking() && marker == LAYOUT_MARKER_OBJ2)
+    CkAbort("Checkpoint was written by an older Charm++ 9 build (9.0.0-beta1 or an"
+            " earlier development build), whose group records this build cannot read;"
+            " rewrite the checkpoint with this build.\n");
   if (p.isUnpacking() && marker != LAYOUT_MARKER)
     CkAbort("Checkpoint has no current object id layout record (written by a Charm++"
             " build before the 64-bit object id redesign or its part 2, or corrupt);"
@@ -3231,6 +3234,15 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
   DEBN(("%d Buffering ID/location req for %s\n", CkMyPe(), idx2str(idx)));
   bufferedLocationRequests[idx].push_back(peToTell);
   return false;
+}
+
+CmiUInt8 CkLocMgr::lbObjID(CmiUInt8 eid) const
+{
+#if CMK_GLOBAL_LOCATION_UPDATE
+  return makeID(eid).getID();
+#else
+  return eid;
+#endif
 }
 
 bool CkLocMgr::recoverIndex(CmiUInt8 id, CkArrayIndex& idx) const

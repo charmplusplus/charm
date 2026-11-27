@@ -157,7 +157,6 @@ public:
 namespace impl
 {
 class Manager;
-int getRDMATag();
 class Director;  // forward declare Director class as impl
 class ReadAssembler;
 }  // namespace impl

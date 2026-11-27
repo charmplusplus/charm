@@ -146,6 +146,11 @@ balancer's global update path (`CMK_GLOBAL_LOCATION_UPDATE`, off in every build)
 finds the location manager from the migration record's object-manager id, which
 is the manager's group id, and the element from the id's payload.
 
+Load balancer ids: elements register with the balancer, and its communication
+records name them, by `CkLocMgr::lbObjID`: the element id, or the full id with
+the collection bits (`makeID`) under `CMK_GLOBAL_LOCATION_UPDATE`. It is defined
+in `cklocation.C` because user code is compiled without that macro.
+
 Deletion: the home drops the directory entry but keeps the index-to-id binding
 and records the dead id in `retiredIds` (`CkLocMgr::noteDead`, from `reclaim` when
 the element died on the home and from `reclaimRemote` otherwise); a message that
