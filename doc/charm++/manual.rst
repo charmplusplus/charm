@@ -10847,9 +10847,13 @@ blocking MPI call right after sending or broadcasting messages
 this one, can therefore stall the job: for example, an MPI collective
 never completes if the broadcast that tells the other processes to enter
 it has not left the process that is already blocked in it. With several
-PEs per process, the other PEs keep making progress. Work to complete
-sends without further progress in this situation is under way; until
-then, do not rely on it.
+PEs per process, the other PEs keep the blocked PE's messages moving only
+if they poll the same LCI device. With the default ``+lci_ndevices 1``
+they do. With ``+lci_ndevices`` equal to the number of PEs per process,
+each PE polls only its own device, so a PE blocked in an MPI call can
+stall the job just as with one PE per process. Work to complete sends
+without further progress in this situation is under way; until then, do
+not rely on it.
 
 Compilation and Execution
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -10943,9 +10947,13 @@ blocking MPI call right after sending or broadcasting messages
 this one, can therefore stall the job: for example, an MPI collective
 never completes if the broadcast that tells the other processes to enter
 it has not left the process that is already blocked in it. With several
-PEs per process, the other PEs keep making progress. Work to complete
-sends without further progress in this situation is under way; until
-then, do not rely on it.
+PEs per process, the other PEs keep the blocked PE's messages moving only
+if they poll the same LCI device. With the default ``+lci_ndevices 1``
+they do. With ``+lci_ndevices`` equal to the number of PEs per process,
+each PE polls only its own device, so a PE blocked in an MPI call can
+stall the job just as with one PE per process. Work to complete sends
+without further progress in this situation is under way; until then, do
+not rely on it.
 
 ``tests/charm++/mpi-interop`` has a working example (``exitcode.C`` with
 ``mpi_main.cpp``, and the same program linked with ``-mpi-main``).
