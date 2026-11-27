@@ -44,8 +44,8 @@ same-host measurements and where xpmem exists (6); phase 2's measurement of sour
 addresses change, which finds no need for a source-region option (6); phase 3's status (15).
 
 Revised 2026-11-27, after review of reconverse#343: a destroy is safe once a round that every
-origin's *puts* counted toward has *fired*; for *puts* without a counter the API gives no safe point yet
-(10.1, 10.2).
+origin's *puts* counted toward has *fired*; for *puts* without a counter, origins detach with a completion
+callback and send the owner their message from it (3.2, 10.1, 10.2).
 
 ## In brief: the calls added, kept and removed
 
@@ -293,10 +293,12 @@ CmiTarget  CmiTargetMake(CmiRegion r, int piece, CmiCounter c);
 CmiAttachment CmiAttachTarget(const CmiTarget *t);  /* a handle for this target, holding a counted
                                                        reference to the process's attachment; registers
                                                        with the owner once per region per process (10.1) */
-void       CmiDetachTarget(CmiAttachment a);        /* the last reference detaches (10.2) */
+void       CmiDetachTarget(CmiAttachment a,         /* the last reference detaches (10.2); done, */
+                           CmiDoneFn done, void *arg);  /* if not NULL, runs once the owner has
+                                                       applied the detach notice */
 int        CmiAttachTargets(const CmiTarget *t, int n, CmiAttachment *out);  /* batch forms: one  */
-void       CmiDetachTargets(CmiAttachment *a, int n);                       /* message per owner
-                                                                               process */
+void       CmiDetachTargets(CmiAttachment *a, int n,                         /* message per owner */
+                            CmiDoneFn done, void *arg);                     /* process */
 int        CmiPut(CmiAttachment t, size_t offset,   /* offset within the target's piece */
                   const void *src, size_t bytes, const CmiLayout *srcLayout,
                   CmiCounter local,                     /* may be NULL */
@@ -1105,7 +1107,8 @@ the same id-block code would serve them.
     *puts* counted toward (10.2, step 1): every contribution to that round has landed, registered or
     not. It does not hold for *puts* without a counter, or for a counter destroyed before its last round
     *fired*. There a registration can still be on its way when the destroy completes, since no message
-    order is guaranteed, and a *put* can land after the memory is freed (review of reconverse#343).
+    order is guaranteed, and a *put* can land after the memory is freed (review of reconverse#343),
+    unless the origins tell the owner they are done from the detach's completion callback (10.2).
 - **Sharing.** Attachments are kept per process, keyed by (owner process, region id, generation), so the
   targets of one region used in one process share one registration and one mapping. In Converse each
   `CmiAttachTarget` returns a counted reference, and the last `CmiDetachTarget` in the process *detaches*
@@ -1121,12 +1124,16 @@ the same id-block code would serve them.
    destroy only after that round has *fired*, so that every origin's contributions have landed.
    *Puts* without a counter have no *firing* to wait for. For them the application needs a sign that
    every origin's *puts* have landed, and an application message from the origin is not one, since
-   it can overtake the origin's registration. The current API gives no such sign; an optional
-   completion callback on detach, run once the owner has applied the notice, would (a possible
-   follow-up).
+   it can overtake the origin's registration. The sign is the detach's completion callback: it runs on
+   the origin once the owner has applied the detach notice, and from then on the owner's destroy waits
+   for every *put* that notice reports. An origin sends its message from the callback, and the owner
+   destroys once it has every origin's message. The same holds for a counter destroyed before its last
+   round *fired*. The callback costs one reply message per origin process at teardown, and nothing when
+   it is not used; no *put* pays for it.
 2. Every attached process *detaches*. *Detaching* waits for that process's own *puts* into the region to
    complete locally, removes its mappings, and sends one detach notice to the owner. The notice needs no
-   reply, so it is carried per 9.2 when possible.
+   reply unless the origin passed a completion callback (step 1), so it is carried per 9.2 when
+   possible.
    - In Converse each origin calls `CmiDetachTarget` (or the batch form) for each of its references; the
      last one in the process *detaches* it.
    - In Charm++ the owner calls `r.destroy(cb)`, and `c.destroy(cb)` for a counter. The owner's process
