@@ -5,7 +5,20 @@
 // 128 KB of message pool, and 1000 round trips would leak over 100 MB per
 // process. The check guards the receiver of an RDMA transfer, which needs the
 // two PEs in different processes; within one process the transfer is a memcpy.
+// Under AddressSanitizer, which keeps freed blocks for a while, the growth is
+// printed but not checked.
 #include "zc_send_noleak.decl.h"
+
+#if defined(__SANITIZE_ADDRESS__)
+#define ASAN_BUILD 1
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define ASAN_BUILD 1
+#endif
+#endif
+#ifndef ASAN_BUILD
+#define ASAN_BUILD 0
+#endif
 
 CProxy_Main mainProxy;
 int numIters;
@@ -34,7 +47,7 @@ public:
   void check(const char *what, long growth) {
     CkPrintf("zc_send_noleak: %s: memory in use grew by %ld KB over %d messages\n",
              what, growth / 1024, numIters - warmupIters);
-    if (growth > maxGrowth)
+    if (growth > maxGrowth && !ASAN_BUILD)
       CkAbort("zc_send_noleak: %s: memory in use grew by %ld KB (limit %ld KB); "
               "zerocopy messages are not freed\n", what, growth / 1024, maxGrowth / 1024);
   }

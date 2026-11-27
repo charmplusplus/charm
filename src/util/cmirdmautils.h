@@ -19,8 +19,7 @@
 #if CMK_CUDA || CMK_HIP
 enum DeviceRecvType {
   DEVICE_RECV_TYPE_CHARM,
-  DEVICE_RECV_TYPE_AMPI,
-  DEVICE_RECV_TYPE_CHARM4PY
+  DEVICE_RECV_TYPE_AMPI
 };
 
 typedef struct DeviceRdmaInfo_ {

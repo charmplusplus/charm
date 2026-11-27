@@ -2,40 +2,55 @@
  Collide library correctness test.
 
  nChunks contributors (a 1D array) each submit a deterministic set of boxes
- to one collider (CollideCreate with a serial callback client).  The voxel
- array inside the library is created without bounds, so its 3D voxel
- elements use hashed object ids, and the voxels are demand-created through
- the [createhere] entry collideVoxel::add.
+ to one collider in every step.  The voxel array inside the library is
+ created without bounds, so its 3D voxel elements use hashed object ids, and
+ the voxels are demand-created through the [createhere] entry
+ collideVoxel::add.
 
- Three collision steps are run, each with a different box set.  Between
- steps every contributor migrates to another PE (re-registering with the
- collider on arrival).  For each step the list of collisions reported by the
- library is compared, pair by pair, with a brute-force O(N^2) overlap test
- computed here on the same boxes.
+ Four collision steps are run.  Step s places its boxes in the 8x8x8 block of
+ voxels that starts at x = 2*(s-1), so every step after the first sends boxes
+ to voxels that did not exist before; collideMgr must count its local voxels
+ again in each step.  Between steps every contributor migrates to another PE
+ (re-registering with the collider on arrival).  With fewer chunks than PEs,
+ some PEs have no registered contributor in a step and must still take part
+ in the step.  For each step the list of collisions reported by the library
+ is compared, pair by pair, with a brute-force O(N^2) overlap test computed
+ here on the same boxes.
 
- Step 1 also adds one tiny box at the centre of every voxel of the 8x8x8
- domain, so all 512 voxels are created in step 1; steps 2 and 3 stay inside
- that domain.  (collideMgr counts its local voxels once, in the first step,
- so later steps must not create voxels that did not exist in step 1.)
+ By default the collider has a serial client, which delivers all collisions
+ to Main in one reduction.  With "dist" it has a distributed client: each PE
+ receives the collisions found in its own voxels, at the local branch of the
+ Collector group, which forwards them to Main in a concat reduction.  Main
+ checks the same complete list either way; the reduction completes only if
+ every PE received exactly one list in the step.
 
- Usage: ./collide_test [nChunks]   (default 32)
+ With "ckpt" the run writes a disk checkpoint to log/ after step 2 and
+ exits; a run with "+restart log" (on the same or another number of PEs)
+ continues from there with steps 3 and 4, with the collider, its client and
+ the voxels restored from the checkpoint.
+
+ Usage: ./collide_test [nChunks] [dist] [ckpt]   (default 32 chunks, serial)
  Needs the collidecharm module, which only a `./build LIBS ...` (or
- `./build charm++ ... ` followed by building ck-libs) provides; the regular
- tests/charm++ DIRS list does not include this directory for that reason.
+ `./build charm++ ... ` followed by building ck-libs) provides; the Makefile
+ skips the test when the module is missing.
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <vector>
 #include <algorithm>
 #include <tuple>
 #include "collidecharm.h"
+#include "ckcheckpoint.h"
 #include "collide_test.decl.h"
 
 CProxy_Main mainProxy;
 int nChunks;
 
-static const int nSteps = 3;
+static const int nSteps = 4;
 static const int domain = 8;      // voxels per axis, voxel size 1.0
+static const int stepShift = 2;   // voxels the block moves along x per step
+static const int ckptStep = 2;    // "ckpt": checkpoint after this step
 
 // Deterministic generator shared by the contributors and the checker.
 struct Rng {
@@ -54,25 +69,18 @@ static void makeBoxes(int step, int chunk, std::vector<bbox3d> &boxes)
   boxes.clear();
   Rng r(1000ULL * step + chunk);
   int n = 40 + (chunk * 7 + step * 13) % 30;
-  double maxSz = (step == 1) ? 0.5 : (step == 2 ? 0.8 : 0.3);
+  double maxSz = (step % 3 == 1) ? 0.5 : (step % 3 == 2 ? 0.8 : 0.3);
+  double origin[3] = {double(stepShift * (step - 1)), 0.0, 0.0};
   for (int i = 0; i < n; i++) {
     double lo[3], sz[3];
     for (int a = 0; a < 3; a++) {
       sz[a] = r.uniform(0.05, maxSz);
-      lo[a] = r.uniform(0.0, domain - sz[a]);
+      lo[a] = origin[a] + r.uniform(0.0, domain - sz[a]);
     }
     bbox3d b; b.empty();
     b.add(CkVector3d(lo[0], lo[1], lo[2]));
     b.add(CkVector3d(lo[0] + sz[0], lo[1] + sz[1], lo[2] + sz[2]));
     boxes.push_back(b);
-  }
-  if (step == 1) {  // cover every voxel, spread across chunks
-    for (int v = chunk; v < domain * domain * domain; v += nChunks) {
-      int x = v % domain, y = (v / domain) % domain, z = v / (domain * domain);
-      CkVector3d c(x + 0.5, y + 0.5, z + 0.5), d(0.004, 0.004, 0.004);
-      bbox3d b; b.empty(); b.add(c - d); b.add(c + d);
-      boxes.push_back(b);
-    }
   }
 }
 
@@ -90,25 +98,62 @@ class Main : public CBase_Main {
   CollideGrid3d grid;
   int step;
   int nPassed;
+  bool ckpt;
+  CProxy_Chunk chunks;
  public:
   Main(CkArgMsg *m)
-    : grid(CkVector3d(0, 0, 0), CkVector3d(1, 1, 1)), step(0), nPassed(0)
+    : grid(CkVector3d(0, 0, 0), CkVector3d(1, 1, 1)), step(0), nPassed(0),
+      ckpt(false)
   {
     nChunks = 32;
-    if (m->argc > 1) nChunks = atoi(m->argv[1]);
+    bool dist = false;
+    for (int i = 1; i < m->argc; i++) {
+      if (strcmp(m->argv[i], "dist") == 0) dist = true;
+      else if (strcmp(m->argv[i], "ckpt") == 0) ckpt = true;
+      else if (m->argv[i][0] != '+') nChunks = atoi(m->argv[i]);
+    }
     delete m;
     mainProxy = thisProxy;
-    CkPrintf("collide_test: %d chunks, %d steps on %d PEs\n",
-             nChunks, nSteps, CkNumPes());
-    CollideHandle collide = CollideCreate(grid,
-        CollideSerialClient(CkCallback(CkIndex_Main::collisions(NULL), thisProxy)));
-    CProxy_Chunk arr = CProxy_Chunk::ckNew(collide, nChunks);
-    chunks = arr;
+    CkPrintf("collide_test: %d chunks, %d steps on %d PEs, %s client\n",
+             nChunks, nSteps, CkNumPes(), dist ? "distributed" : "serial");
+    CollideHandle collide;
+    if (dist) {
+      CProxy_Collector coll = CProxy_Collector::ckNew();
+      collide = CollideCreate(grid, CollideDistributedClient(
+          CkCallback(CkIndex_Collector::colls(NULL), coll)));
+    } else {
+      collide = CollideCreate(grid, CollideSerialClient(
+          CkCallback(CkIndex_Main::collisions(NULL), thisProxy)));
+    }
+    chunks = CProxy_Chunk::ckNew(collide, nChunks);
     step = 1;
-    arr.doStep(step);
+    chunks.doStep(step);
   }
 
-  CProxy_Chunk chunks;
+  Main(CkMigrateMessage *m)
+    : CBase_Main(m), grid(CkVector3d(0, 0, 0), CkVector3d(1, 1, 1)),
+      step(0), nPassed(0), ckpt(false)
+  {
+    mainProxy = thisProxy;
+  }
+
+  void pup(PUP::er &p)
+  {
+    p | step; p | nPassed; p | ckpt; p | chunks;
+  }
+
+  // Called after the checkpoint is written, and again after a restart.
+  void checkpointed()
+  {
+    if (!_restarted) {
+      CkPrintf("collide_test: checkpoint written after step %d\n", step);
+      CkExit();
+      return;
+    }
+    CkPrintf("collide_test: restarted after step %d on %d PEs\n", step,
+             CkNumPes());
+    chunks.migrateAway(step);
+  }
 
   void expected(std::vector<Pair> &out, int &nVox, int &nBoxes)
   {
@@ -178,6 +223,10 @@ class Main : public CBase_Main {
       CkExit();
       return;
     }
+    if (ckpt && step == ckptStep) {
+      CkStartCheckpoint("log", CkCallback(CkIndex_Main::checkpointed(), thisProxy));
+      return;
+    }
     chunks.migrateAway(step);
   }
 
@@ -185,6 +234,18 @@ class Main : public CBase_Main {
   {
     step++;
     chunks.doStep(step);
+  }
+};
+
+class Collector : public CBase_Collector {
+ public:
+  Collector() {}
+  Collector(CkMigrateMessage *m) : CBase_Collector(m) {}
+  void colls(CkDataMsg *m)
+  {
+    contribute(m->getSize(), m->getData(), CkReduction::concat,
+               CkCallback(CkIndex_Main::collisions(NULL), mainProxy));
+    delete m;
   }
 };
 

@@ -18,6 +18,7 @@ void LBObjLoadsCcsHandler(char* msg);
 #include "topology.h"
 
 #include "json.hpp"
+#include <atomic>
 
 CkGroupID _lbmgr;
 
@@ -917,6 +918,7 @@ void LBManager::pup(PUP::er& p)
     p | avail_vector;
   }
   p | mystep;
+  p | useBarrier;  // init() sets it from the initproc-time manualOn; restore the run's value
   if (p.isUnpacking())
   {
     if (_lb_args.metaLbOn())
@@ -1070,7 +1072,16 @@ void LBManager::RemoveLocalBarrierReceiver(LDBarrierReceiver h)
 
 void LBManager::AtLocalBarrier(LDBarrierClient _n_c)
 {
-  if (useBarrier) CkSyncBarrier::object()->atBarrier(_n_c);
+  if (useBarrier)
+  {
+    CkSyncBarrier::object()->atBarrier(_n_c);
+    return;
+  }
+  // Manual mode: the element waits for CkStartLB. Said once per process.
+  static std::atomic<bool> warned{false};
+  if (!quietModeRequested && !warned.exchange(true))
+    CmiPrintf("Charm++> Warning: AtSync() called while manual load balancing is on"
+              " (TurnManualLBOn); elements resume only after CkStartLB().\n");
 }
 
 void LBManager::TurnOnBarrierReceiver(LDBarrierReceiver h)

@@ -299,6 +299,9 @@ struct LDCommDesc {
       int len;
     } destObjs;			/* 3:   one to many message     */
   } dest;
+  LDCommDesc() : type(0) {}
+  LDCommDesc(const LDCommDesc &c) : type(0) { *this = c; }
+  ~LDCommDesc() { if (type == LD_OBJLIST_MSG) delete [] dest.destObjs.objs; }
   char &get_type() { return type; }
   char get_type() const { return type; }
   int proc() const { return type==LD_PROC_MSG?dest.destProc:-1; }
@@ -462,6 +465,8 @@ inline bool LDCommDesc::operator==(const LDCommDesc &obj) const {
     return false;
 }
 inline LDCommDesc & LDCommDesc::operator=(const LDCommDesc &c) {
+    if (&c == this) return *this;
+    if (type == LD_OBJLIST_MSG) delete [] dest.destObjs.objs;
     type = c.type;
     switch (type) {
     case LD_PROC_MSG: dest.destProc = c.dest.destProc; break;

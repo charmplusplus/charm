@@ -3,8 +3,12 @@
 #include <cmath>
 #include <algorithm>
 #include <queue>
+#include <deque>
+#include <unordered_map>
+#include <utility>
 #include <atomic>
 #include <vector>
+#include <cstring>
 #include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -114,17 +118,179 @@ struct hapiCallbackMessage {
 
 #ifndef HAPI_CUDA_CALLBACK
 typedef struct hapiEvent {
-  hapiEvent_t event;
+  hapiEvent_t event;   // NULL marks a pinned-flag entry (see flag_seq)
   CkCallback cb;
   void* cb_msg;
   hapiWorkRequest* wr; // if this is not NULL, buffers and request itself are deallocated
+  uint32_t flag_seq;   // pinned-flag entries: the value the slot must reach
 
   hapiEvent(hapiEvent_t event_, const CkCallback& cb_, void* cb_msg_, hapiWorkRequest* wr_ = NULL)
-            : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_) {}
+            : event(event_), cb(cb_), cb_msg(cb_msg_), wr(wr_), flag_seq(0) {}
 } hapiEvent;
 
-CpvDeclare(std::queue<hapiEvent>, hapi_event_queue);
+// Pending completions, one FIFO per stream. Work on one stream completes in
+// the order it was queued, so a stream's queue is popped from its head and
+// left at its first incomplete entry. Streams complete independently of each
+// other, and no entry waits behind another stream's: a completion queued
+// after a long kernel's on another stream is reported when it happens, not
+// when that kernel ends. A stream's queue stays once created; a destroyed and
+// re-created handle reuses it.
+//
+// Both costs follow the work pending, not the number of streams the PE has
+// used: a stream's queue is found by hash (index), and the poll walks only the
+// queues listed in `active`, which holds every queue with entries (and a
+// drained one until the end of the poll that drained it).
+//
+// `queues` is a deque, walked by index: hapiPollEvents fires callbacks during
+// its walk, and a callback that queues the first completion on a new stream
+// appends a queue. push_back keeps references to the existing elements valid,
+// but not iterators (the deque's node map may be reallocated), so nothing
+// holds an iterator into it across a callback.
+#define HAPI_DEVICE_UNKNOWN (-2)   // not looked up since the queue was last empty
+struct hapiStreamQueue {
+  hapiStream_t stream;
+  size_t self;     // this queue's index in hapiCompletionQueues::queues
+  int device;      // the stream's device, looked up once per busy period (a
+                   // destroyed handle may come back on another device)
+  bool listed;     // in hapiCompletionQueues::active
+  std::queue<hapiEvent> q;
+  hapiStreamQueue(hapiStream_t s, size_t i) : stream(s), self(i), device(HAPI_DEVICE_UNKNOWN), listed(false) {}
+};
+struct hapiCompletionQueues {
+  std::deque<hapiStreamQueue> queues;
+  std::unordered_map<hapiStream_t, size_t> index;   // stream -> its queue
+  std::vector<size_t> active;   // the queues hapiPollEvents walks
+  int busy_streams = 0;         // queues with entries
+  int poll_depth = 0;           // hapiPollEvents calls running (a callback may run the scheduler)
+  // +gpucompletionstats: completions queued each way; polls that found entries
+  // and the event queries they made; at each completion queued, the busy
+  // streams (its own included) and the completions already pending, summed.
+  unsigned long long by_flag = 0, by_event = 0, polls = 0, queries = 0, at_busy = 0, at_pending = 0;
+  int max_busy = 0;
+  // +gpuflagpolls: polls with entries per completion drained, over the last
+  // window of HAPI_POLL_WINDOW completions (none yet: event queries).
+  unsigned int window_polls = 0, window_done = 0;
+  double polls_per_completion = 1e30;
+};
+#define HAPI_POLL_WINDOW 64
+CpvDeclare(hapiCompletionQueues, hapi_event_queue);
 CpvDeclare(std::queue<hapiEvent_t>, hapi_event_pool);
+static bool hapi_completion_stats = false;
+
+// Completion by pinned flag. A completion is a stream-ordered write of a
+// per-PE sequence number into a slot of a mapped pinned ring, and the poll is
+// a plain load: no driver call per poll, where an event query costs one
+// driver call per stream with work pending, in every poll, and from several
+// PE threads on one context serialises on the driver's lock. The write adds
+// 4-6 us to the completion itself (CUDA, copy engine); with many streams per
+// PE the queries cost more than that.
+//
+// Which detection. Flags for every completion are the default on CUDA
+// (+gpuflags), event queries on HIP until the flag kernel has run on Frontier
+// (+gpueventquery). +gpuflagpolls N chooses per completion: a flag while the
+// PE made fewer than N polls per completion over its last HAPI_POLL_WINDOW
+// completions, which it does when it has other work while completions are
+// pending (each poll's query would delay that work, and the flag's write is
+// off the critical path); an event query otherwise (the PE is waiting, its
+// queries cost nothing, and the write would be on the path).
+//
+// The writer. CUDA writes the flag with cuMemsetD32Async, on the copy engine,
+// which runs each stream's work independently. HIP, and CUDA with
+// +gpuflagkernel, write it with a one-thread kernel that stores it after a
+// system-scope fence (hapi_kernels.cu); HIP with +gpuflagmemset, with an
+// event record and hipMemsetD32Async. Never with the front end's stream memop
+// (cuStreamWriteValue32, +gpustreamwrite, for comparison only): a context
+// runs all its memops through one front-end channel, so a flag write queued
+// behind a cross-process cudaStreamWaitEvent stops every later flag write in
+// the process, and two processes waiting on each other's IPC events deadlock.
+//
+// What the flag's release of the stream's earlier work rests on. A reader
+// told of the completion (another process through IPC, the NIC, a peer
+// device) must find that work's writes in device memory. CUDA documents this
+// for an event's completion, and for cuStreamWriteValue32 without
+// CU_STREAM_WRITE_VALUE_NO_MEMORY_BARRIER, which fences before its write
+// (cuda.h, CUstreamWriteValue_flags). For cuMemsetD32Async it documents stream
+// order only: the memset starts once the earlier work has completed. So on
+// CUDA the memset's release is observed, not documented. The device-channel
+// tests' data checks observe it (examples/charm++/cuda/gpudirect/chantest, two
+// processes on one host and on two hosts): their puts are read by a peer
+// process and by the NIC once the host has seen this flag, and every element
+// is checked. Those checks cannot see a lag shorter than the hop from the flag
+// to the read. The flag kernel's fence is documented for its own thread's
+// writes; the stream orders the earlier work before the kernel.
+// hipMemsetD32Async releases only its own write, so a peer reading on the
+// flag could see stale data; the event record ahead of it carries the
+// release.
+//
+// A slot is reassigned only once its own entry has drained (hapi_flag_busy):
+// entries drain per stream, so a stream whose head is blocked keeps its slots
+// while the sequence runs on. A completion takes the next sequence number
+// whose slot is free, skipping held ones, within HAPI_FLAG_PROBE slots. A
+// completion on a stream of another device, or with no free slot among those,
+// is an event as before.
+#define HAPI_FLAG_SLOTS 4096   // power of two: flag entries in flight per PE, 256 KB of pinned memory
+#define HAPI_FLAG_STRIDE 16    // uint32s per slot: one cache line each
+#define HAPI_FLAG_PROBE 64     // slots tried per completion before it falls back to an event
+static int hapi_flag_max_polls = 0;        // +gpuflagpolls N: a flag below N polls per completion (0: every one)
+static bool hapi_flag_use_memset = true;   // hapi_memset_d32_async (memset or kernel), not the memop
+static bool hapi_flag_kernel = false;      // hapi_memset_d32_async writes with the flag kernel
+typedef hapiDrvResult (*hapiStreamWriteValue32Fn)(hapiDrvStream, uintptr_t, uint32_t, unsigned int);
+typedef hapiDrvResult (*hapiMemsetD32AsyncFn)(uintptr_t, unsigned int, size_t, hapiDrvStream);
+static hapiStreamWriteValue32Fn hapi_stream_write_value32 = nullptr;
+static hapiMemsetD32AsyncFn hapi_memset_d32_async = nullptr;
+CpvDeclare(uint32_t*, hapi_flag_slots);   // pinned host ring
+CpvDeclare(void*, hapi_flag_slots_dev);   // its device alias
+CpvDeclare(uint32_t, hapi_flag_seq);      // last sequence number issued
+CpvDeclare(int, hapi_flag_inflight);      // flag entries not yet drained
+CpvDeclare(unsigned char*, hapi_flag_busy);   // per slot: holds an entry not yet drained
+
+#if HAPI_FLAG_KERNEL
+extern "C" int hapiFlagKernelImpl(void* p, unsigned int v, void* stream);   // hapi_kernels.cu
+#endif
+#if CMK_HIP
+static hipError_t hapiHipStreamWriteValue32(hipStream_t s, uintptr_t p, uint32_t v, unsigned int flags) {
+  return hipStreamWriteValue32(s, (void*)p, v, flags);
+}
+// The flag kernel, or (+gpuflagmemset) an event record ahead of the memset:
+// the record carries the system-scope release the memset lacks. One event
+// per device and thread, recorded and never queried.
+static hipError_t hapiHipMemsetD32Async(uintptr_t p, unsigned int v, size_t n, hipStream_t s) {
+#if HAPI_FLAG_KERNEL
+  if (hapi_flag_kernel) return (hipError_t)hapiFlagKernelImpl((void*)p, v, (void*)s);
+#endif
+  thread_local std::vector<hipEvent_t> fence;
+  hipDevice_t dev = 0;
+  hipError_t r = hipStreamGetDevice(s, &dev);
+  if (r != hipSuccess) return r;
+  if ((size_t)dev >= fence.size()) fence.resize(dev + 1, nullptr);
+  if (fence[dev] == nullptr) {
+    int saved = 0;
+    (void)hipGetDevice(&saved);
+    (void)hipSetDevice(dev);
+    r = hipEventCreateWithFlags(&fence[dev], hipEventDisableTiming);
+    (void)hipSetDevice(saved);
+    if (r != hipSuccess) { fence[dev] = nullptr; return r; }
+  }
+  r = hipEventRecord(fence[dev], s);
+  if (r != hipSuccess) return r;
+  return hipMemsetD32Async((hipDeviceptr_t)p, (int)v, n, s);
+}
+#elif HAPI_FLAG_KERNEL
+// CUDA with +gpuflagkernel: the flag kernel in place of cuMemsetD32Async (its
+// cudaError_t, 0 on success like CUDA_SUCCESS).
+static hapiDrvResult hapiCudaFlagKernel(uintptr_t p, unsigned int v, size_t, hapiDrvStream s) {
+  return (hapiDrvResult)hapiFlagKernelImpl((void*)p, v, (void*)s);
+}
+#endif
+
+// While flag entries are pending and the scheduler finds nothing to do, give
+// the core away for a slice: a PE polling a flag never enters the driver, so
+// it would otherwise keep its core from the threads that share it (the
+// network's progress thread, CUPTI's worker). It comes straight back when
+// nothing else is runnable.
+static void hapiIdleYield(void*) {
+  if (CpvAccess(hapi_flag_inflight) > 0) sched_yield();
+}
 #endif // HAPI_CUDA_CALLBACK
 CpvDeclare(int, n_hapi_events);
 
@@ -359,6 +525,144 @@ bool hapiCuptiTracingActive() { return false; }
 #if CSD_NO_SCHEDLOOP
 #  error please disable CSD_NO_SCHEDLOOP to use HAPI
 #endif
+
+// Pinned-flag completion (see HAPI_FLAG_SLOTS): picks the detection and the
+// writer, and maps this PE's ring. Runs on every PE after hapiSetDevice, so
+// the ring's pages and their device alias belong to the PE's device. A PE
+// whose ring is not set up (hapi_flag_busy NULL) uses events.
+// HIP's flag kernel (hapi_kernels.cu) has not run on Frontier from this code:
+// event queries are its default until it has.
+#if CMK_HIP
+static const bool hapi_flags_default = false;
+#else
+static const bool hapi_flags_default = true;
+#endif
+static void hapiFlagInit(char** argv) {
+  hapi_completion_stats = CmiGetArgFlagDesc(argv, "+gpucompletionstats",
+      "print, per PE at exit, how many GPU completions were detected by pinned flag and by event query");
+  const bool want_flags = CmiGetArgFlagDesc(argv, "+gpuflags",
+      "detect every GPU completion by a pinned-flag write (the default on CUDA)");
+  const bool want_event_query = CmiGetArgFlagDesc(argv, "+gpueventquery",
+      "detect every GPU completion by an event query (the default on HIP)");
+  int max_polls = 0;
+  const bool want_polls = CmiGetArgIntDesc(argv, "+gpuflagpolls", &max_polls,
+      "choose per GPU completion: a pinned flag while the PE makes fewer than N polls per completion (it has "
+      "other work while completions are pending), an event query otherwise");
+  const bool want_stream_write = CmiGetArgFlagDesc(argv, "+gpustreamwrite",
+      "write completion flags with the front end's stream memop (deadlocks under "
+      "cross-process IPC; for comparison only)");
+  const bool want_kernel = CmiGetArgFlagDesc(argv, "+gpuflagkernel",
+      "write completion flags with a one-thread kernel after a system-scope fence (the default on HIP)");
+  const bool want_memset = CmiGetArgFlagDesc(argv, "+gpuflagmemset",
+      "write completion flags with a memset (the default on CUDA; on HIP after an event record)");
+  if ((int)want_flags + (int)want_event_query + (int)want_polls > 1)
+    CmiAbort("HAPI> +gpuflags, +gpueventquery and +gpuflagpolls exclude each other\n");
+  if (want_polls && max_polls < 1) CmiAbort("HAPI> +gpuflagpolls needs a count of at least 1\n");
+  hapi_flag_max_polls = want_polls ? max_polls : 0;
+  if (want_kernel && want_memset) CmiAbort("HAPI> +gpuflagkernel and +gpuflagmemset exclude each other\n");
+#if !HAPI_FLAG_KERNEL
+  if (want_kernel) CmiAbort("HAPI> +gpuflagkernel: this build has no flag kernel (hapi_kernels.cu)\n");
+#endif
+#if CMK_HIP && HAPI_FLAG_KERNEL
+  hapi_flag_kernel = !want_memset;
+#else
+  hapi_flag_kernel = want_kernel;
+#endif
+  const bool use_flags = want_flags || want_polls || (hapi_flags_default && !want_event_query);
+  if (!use_flags || !HAPI_HAS_STREAM_GET_DEVICE) {
+    if (CmiMyPe() == 0)
+      CmiPrintf("HAPI> Completion detection: event queries%s\n",
+                want_event_query ? " (+gpueventquery)"
+                : !use_flags     ? " (the default here; +gpuflags or +gpuflagpolls for pinned flags)"
+                                 : " (this runtime cannot name a stream's device)");
+    return;
+  }
+#if CMK_HIP
+  hapi_memset_d32_async = hapiHipMemsetD32Async;
+  hapi_stream_write_value32 = hapiHipStreamWriteValue32;
+#elif HAPI_HAS_STREAM_GET_DEVICE
+  {
+    void* fn = nullptr;
+    cudaDriverEntryPointQueryResult st = cudaDriverEntryPointSymbolNotFound;
+    if (cudaGetDriverEntryPointByVersion("cuMemsetD32Async", &fn, 12000, cudaEnableDefault, &st) == cudaSuccess &&
+        st == cudaDriverEntryPointSuccess && fn != nullptr)
+      hapi_memset_d32_async = (hapiMemsetD32AsyncFn)fn;
+    else
+      (void)hapiGetLastError();
+    fn = nullptr;
+    st = cudaDriverEntryPointSymbolNotFound;
+    if (cudaGetDriverEntryPointByVersion("cuStreamWriteValue32", &fn, 12000, cudaEnableDefault, &st) == cudaSuccess &&
+        st == cudaDriverEntryPointSuccess && fn != nullptr)
+      hapi_stream_write_value32 = (hapiStreamWriteValue32Fn)fn;
+    else
+      (void)hapiGetLastError();
+  }
+#if HAPI_FLAG_KERNEL
+  if (hapi_flag_kernel) hapi_memset_d32_async = hapiCudaFlagKernel;
+#endif
+#endif
+  if (hapi_memset_d32_async == nullptr && hapi_stream_write_value32 == nullptr) {
+    if (CmiMyPe() == 0) CmiPrintf("HAPI> Completion detection: event queries (no flag writer in this driver)\n");
+    return;
+  }
+
+  uint32_t*& slots = CpvAccess(hapi_flag_slots);
+  const size_t bytes = (size_t)HAPI_FLAG_SLOTS * HAPI_FLAG_STRIDE * sizeof(uint32_t);
+  hapiCheck(hapiHostAlloc((void**)&slots, bytes, hapiHostAllocPortable | hapiHostAllocMapped));
+  memset((void*)slots, 0, bytes);
+  hapiCheck(hapiHostGetDevicePointer(&CpvAccess(hapi_flag_slots_dev), (void*)slots, 0));
+
+  // One synchronous write through the memset or kernel writer: a driver that
+  // will not write mapped host memory this way, or a flag kernel not built for
+  // this device, is caught here, not as a silent stall.
+  bool memset_ok = false;
+  if (hapi_memset_d32_async != nullptr) {
+    hapiStream_t ts;
+    hapiCheck(hapiStreamCreateWithFlags(&ts, hapiStreamNonBlocking));
+    const hapiDrvResult r = hapi_memset_d32_async((uintptr_t)CpvAccess(hapi_flag_slots_dev), 0x5A5A0001u, 1,
+                                                  (hapiDrvStream)ts);
+    if (r == hapiDrvSuccess && hapiStreamSynchronize(ts) == hapiSuccess &&
+        ((volatile uint32_t*)slots)[0] == 0x5A5A0001u)
+      memset_ok = true;
+    (void)hapiGetLastError();
+    ((volatile uint32_t*)slots)[0] = 0;
+    (void)hapiStreamDestroy(ts);
+  }
+  if (want_stream_write && hapi_stream_write_value32 != nullptr) {
+    hapi_flag_use_memset = false;
+  } else if (memset_ok) {
+    hapi_flag_use_memset = true;
+  } else if (want_kernel || want_memset) {
+    CmiAbort("HAPI> the flag writer named by %s failed its test on PE %d\n",
+             want_kernel ? "+gpuflagkernel" : "+gpuflagmemset", CmiMyPe());
+  } else {
+    // Not the memop in its place (see above): event queries.
+    (void)hapiFreeHost((void*)slots);
+    slots = NULL;
+    CpvAccess(hapi_flag_slots_dev) = NULL;
+    if (CmiMyPe() == 0) CmiPrintf("HAPI> Completion detection: event queries (the flag writer failed its test)\n");
+    return;
+  }
+  CpvAccess(hapi_flag_busy) = (unsigned char*)calloc(HAPI_FLAG_SLOTS, 1);
+  if (CmiMyPe() == 0) {
+#if CMK_HIP
+    const char* writer = !hapi_flag_use_memset ? "hipStreamWriteValue32 (front-end memop)"
+                         : hapi_flag_kernel    ? "a flag kernel"
+                                               : "an event record and hipMemsetD32Async";
+#else
+    const char* writer = !hapi_flag_use_memset ? "cuStreamWriteValue32 (front-end memop; deadlock-prone under IPC)"
+                         : hapi_flag_kernel    ? "a flag kernel (compute engine)"
+                                               : "cuMemsetD32Async (copy engine)";
+#endif
+    if (hapi_flag_max_polls > 0)
+      CmiPrintf("HAPI> Completion detection: per completion, a pinned flag while a PE makes fewer than %d polls "
+                "per completion, an event query otherwise (%d slots per PE; flags written by %s)\n",
+                hapi_flag_max_polls, HAPI_FLAG_SLOTS, writer);
+    else
+      CmiPrintf("HAPI> Completion detection: pinned flags (%d slots per PE), written by %s\n", HAPI_FLAG_SLOTS,
+                writer);
+  }
+}
 #endif
 
 // Called by all PEs in Charm++ layer init
@@ -382,8 +686,11 @@ void hapiInit(char** argv) {
     hapiCheck(hapiSetDevice(cpv_my_device));
 
 #ifndef HAPI_CUDA_CALLBACK
+    hapiFlagInit(argv);
     // Register polling function to be invoked at every scheduler loop
     CcdCallOnConditionKeep(CcdSCHEDLOOP, (CcdCondFn)hapiPollEvents, NULL);
+    if (CpvAccess(hapi_flag_busy) != NULL)
+      CcdCallOnConditionKeep(CcdPROCESSOR_STILL_IDLE, (CcdCondFn)hapiIdleYield, NULL);
 #endif
   }
 
@@ -403,6 +710,22 @@ void hapiInit(char** argv) {
 void hapiExit() {
   // Ensure all PEs have finished GPU work
   CmiNodeBarrier();
+
+#ifndef HAPI_CUDA_CALLBACK
+  if (!CmiInCommThread() && hapi_completion_stats) {
+    const hapiCompletionQueues& cq = CpvAccess(hapi_event_queue);
+    const unsigned long long n = cq.by_flag + cq.by_event;
+    CmiPrintf("HAPI[pe=%d]> completions: %llu by pinned flag, %llu by event query; %llu polls with entries, "
+              "%llu event queries; at each completion queued, %.2f streams busy on average (at most %d) and "
+              "%.2f completions pending\n", CmiMyPe(), cq.by_flag, cq.by_event, cq.polls, cq.queries,
+              n ? (double)cq.at_busy / n : 0.0, cq.max_busy, n ? (double)cq.at_pending / n : 0.0);
+  }
+  if (!CmiInCommThread() && CpvAccess(hapi_flag_slots) != NULL) {
+    (void)hapiFreeHost((void*)CpvAccess(hapi_flag_slots));
+    CpvAccess(hapi_flag_slots) = NULL;
+    CpvAccess(hapi_flag_slots_dev) = NULL;
+  }
+#endif
 
   /* GPU checkpoint/restart (memory daemon) path removed here; returns
    * with the shrink/expand series (plan item 10) if not superseded. */
@@ -910,8 +1233,18 @@ bool hapiCuptiArrive(uint64_t epoch, int expected) {
 static void hapiInitCpv() {
   // HAPI event-related
 #ifndef HAPI_CUDA_CALLBACK
-  CpvInitialize(std::queue<hapiEvent>, hapi_event_queue);
+  CpvInitialize(hapiCompletionQueues, hapi_event_queue);
   CpvInitialize(std::queue<hapiEvent_t>, hapi_event_pool);
+  CpvInitialize(uint32_t*, hapi_flag_slots);
+  CpvInitialize(void*, hapi_flag_slots_dev);
+  CpvInitialize(uint32_t, hapi_flag_seq);
+  CpvInitialize(int, hapi_flag_inflight);
+  CpvInitialize(unsigned char*, hapi_flag_busy);
+  CpvAccess(hapi_flag_slots) = NULL;
+  CpvAccess(hapi_flag_slots_dev) = NULL;
+  CpvAccess(hapi_flag_seq) = 0;
+  CpvAccess(hapi_flag_inflight) = 0;
+  CpvAccess(hapi_flag_busy) = NULL;
   // for(int i = 0; i < 8; i++) {
   //   hapiEvent_t ev;
   //   hapiEventCreateWithFlags(&ev, hapiEventDisableTiming);
@@ -1219,7 +1552,120 @@ static void hapiMapping(char** argv) {
 }
 
 #ifndef HAPI_CUDA_CALLBACK
+// The pending-completion queue for `stream`, created on first use and kept
+// (see hapi_event_queue).
+static hapiStreamQueue& hapiQueueFor(hapiStream_t stream) {
+  hapiCompletionQueues& cq = CpvAccess(hapi_event_queue);
+  auto it = cq.index.find(stream);
+  if (it != cq.index.end()) return cq.queues[it->second];
+  const size_t i = cq.queues.size();
+  cq.queues.emplace_back(stream, i);
+  cq.index.emplace(stream, i);
+  return cq.queues.back();
+}
+
+// Queues `hev` on `sq`; a queue that was empty becomes busy and is listed for
+// the poll.
+static void hapiQueuePush(hapiStreamQueue& sq, const hapiEvent& hev) {
+  hapiCompletionQueues& cq = CpvAccess(hapi_event_queue);
+  if (sq.q.empty()) {
+    cq.busy_streams++;
+    if (!sq.listed) {
+      sq.listed = true;
+      cq.active.push_back(sq.self);
+    }
+  }
+  sq.q.push(hev);
+  CpvAccess(n_hapi_events)++;
+}
+
+// The device `stream` belongs to (the default streams: the current device),
+// or -1 if the runtime cannot say.
+static int hapiStreamDevice(hapiStream_t stream) {
+#if HAPI_HAS_STREAM_GET_DEVICE
+  int dev = -1;
+  if (hapiStreamGetDevice(stream, &dev) != hapiSuccess) {
+    (void)hapiGetLastError();
+    return -1;
+  }
+  return (int)dev;
+#else
+  (void)stream;
+  return -1;
+#endif
+}
+
 void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWorkRequest* wr = NULL) {
+  hapiCompletionQueues& cq = CpvAccess(hapi_event_queue);
+  hapiStreamQueue& sq = hapiQueueFor(stream);
+  // A new busy period: the handle may name another stream than in the last one.
+  if (sq.q.empty()) sq.device = HAPI_DEVICE_UNKNOWN;
+  // Pinned flag: chosen (see hapi_flag_max_polls), a stream of this PE's
+  // device (the ring's device alias belongs to it) and a free slot. Sequence
+  // number 0 is a slot never written.
+  unsigned char* busy = CpvAccess(hapi_flag_busy);
+  const int pending_streams = cq.busy_streams + (sq.q.empty() ? 1 : 0);
+  cq.at_busy += pending_streams;
+  cq.at_pending += CpvAccess(n_hapi_events);
+  if (pending_streams > cq.max_busy) cq.max_busy = pending_streams;
+  const bool want_flag = hapi_flag_max_polls == 0 || cq.polls_per_completion < hapi_flag_max_polls;
+  if (busy != NULL && want_flag) {
+    if (sq.device == HAPI_DEVICE_UNKNOWN) sq.device = hapiStreamDevice(stream);
+    const int dev = sq.device;
+    // The next sequence number whose slot is free. A slot still held by an
+    // entry behind a blocked stream head is skipped, so that one such entry
+    // does not turn flags off for the PE. The sequence advances past the slots
+    // tried even when none is free, so the next completion tries the next ones.
+    uint32_t seq = CpvAccess(hapi_flag_seq);
+    bool free_slot = false;
+    if (dev == CpvAccess(my_device)) {
+      for (int k = 0; k < HAPI_FLAG_PROBE && !free_slot; k++) {
+        if (++seq == 0) seq = 1;   // 0 is a slot never written
+        free_slot = !busy[seq & (HAPI_FLAG_SLOTS - 1)];
+      }
+      CpvAccess(hapi_flag_seq) = seq;
+    }
+    const uint32_t idx = seq & (HAPI_FLAG_SLOTS - 1);
+    if (free_slot) {
+      uint32_t* slot_dev = (uint32_t*)CpvAccess(hapi_flag_slots_dev) + (size_t)idx * HAPI_FLAG_STRIDE;
+      // Runs after all the work queued on the stream before it: the slot
+      // reaching seq means that work is complete.
+      const hapiDrvResult res = hapi_flag_use_memset
+          ? hapi_memset_d32_async((uintptr_t)slot_dev, seq, 1, (hapiDrvStream)stream)
+          : hapi_stream_write_value32((hapiDrvStream)stream, (uintptr_t)slot_dev, seq,
+                                      hapiStreamWriteValueDefault);
+      if (res != hapiDrvSuccess)
+        CmiAbort("HAPI> the completion flag write failed (%d); +gpueventquery detects completion by events\n",
+                 (int)res);
+      busy[idx] = 1;
+      CpvAccess(hapi_flag_inflight)++;
+      hapiEvent hev(NULL, cb, cb_msg, wr);
+      hev.flag_seq = seq;
+      cq.by_flag++;
+      hapiQueuePush(sq, hev);
+      return;
+    }
+    // Said once per PE: such a completion costs an event record and a driver
+    // query on every scheduler loop until it completes.
+    static thread_local bool warned_ring = false, warned_dev = false;
+    if (dev != CpvAccess(my_device)) {
+      if (!warned_dev) {
+        warned_dev = true;
+        CmiPrintf("HAPI[pe=%d]: a callback on a stream of device %d, not this PE's %d: completion by event "
+                  "(reported once)\n", CmiMyPe(), dev, CpvAccess(my_device));
+      }
+    } else if (!warned_ring) {
+      warned_ring = true;
+      const int inflight = CpvAccess(hapi_flag_inflight);
+      if (inflight >= HAPI_FLAG_SLOTS)
+        CmiPrintf("HAPI[pe=%d]: the pinned-flag ring is full (%d in flight): completion by event until it "
+                  "drains (reported once)\n", CmiMyPe(), inflight);
+      else
+        CmiPrintf("HAPI[pe=%d]: no free slot among %d of the pinned-flag ring (%d of %d in flight): this "
+                  "completion by event (reported once)\n", CmiMyPe(), HAPI_FLAG_PROBE, inflight, HAPI_FLAG_SLOTS);
+    }
+  }
+
   // create hapi event / get hapi event from the pool and insert into stream
   hapiEvent_t ev;
   auto& hapi_event_pool_local = CpvAccess(hapi_event_pool);
@@ -1233,11 +1679,9 @@ void recordEvent(hapiStream_t stream, const CkCallback& cb, void* cb_msg, hapiWo
 
   hapiEvent hev(ev, cb, cb_msg, wr);
 
-  // push event information in queue
-  CpvAccess(hapi_event_queue).push(hev);
-
-  // increase count so that scheduler can poll the queue
-  CpvAccess(n_hapi_events)++;
+  // push event information in this stream's queue; the scheduler polls it
+  cq.by_event++;
+  hapiQueuePush(sq, hev);
 }
 #endif
 
@@ -2178,20 +2622,50 @@ void hapiClearInstrument() {
 }
 #endif // HAPI_INSTRUMENT_WRS
 
-// Poll HAPI events stored in the PE's queue. Current strategy is to process
-// all successive completed events in the queue starting from the front.
-// TODO Maybe we should make one pass of all events in the queue instead,
-// since there might be completed events later in the queue.
+// Poll the PE's pending completions: every listed stream's queue, each from
+// its head to its first incomplete entry (see hapi_event_queue).
 void hapiPollEvents(void* param) {
 #ifndef HAPI_CUDA_CALLBACK
   if (CpvAccess(n_hapi_events) <= 0) return;
 
-  std::queue<hapiEvent>& queue = CpvAccess(hapi_event_queue);
-  while (!queue.empty()) {
-    hapiEvent hev = queue.front();
-    hapiError_t retCode = hapiEventQuery(hev.event);
-    if (retCode == hapiSuccess) {
+  hapiCompletionQueues& cq = CpvAccess(hapi_event_queue);
+  cq.poll_depth++;
+  cq.polls++;
+  cq.window_polls++;
+  // By index, never by iterator: a callback fired below can append a queue
+  // and list it. Queues listed during the walk are visited too.
+  for (size_t ai = 0; ai < cq.active.size(); ai++) {
+    std::queue<hapiEvent>& queue = cq.queues[cq.active[ai]].q;
+    while (!queue.empty()) {
+      hapiEvent hev = queue.front();
+      if (hev.event == NULL) {
+        // A pinned flag: a plain load. Short of its value, nothing behind it
+        // on this stream is complete either.
+        volatile uint32_t* slot = CpvAccess(hapi_flag_slots) +
+            (size_t)(hev.flag_seq & (HAPI_FLAG_SLOTS - 1)) * HAPI_FLAG_STRIDE;
+        if (*slot != hev.flag_seq) break;
+      } else {
+        cq.queries++;
+        hapiError_t retCode = hapiEventQuery(hev.event);
+        if (retCode == hapiErrorNotReady) {
+          // The query's own answer, recorded as this thread's last error:
+          // cleared, or the application's next error check reports it.
+          (void)hapiGetLastError();
+          break;
+        }
+        if (retCode != hapiSuccess) {
+          CmiPrintf("%d %d: Fatal GPU Error %s: %d.\n", CmiMyNode(), CmiMyPe(),
+                    hapiGetErrorString(retCode), retCode);
+          CmiAbort("%d: hapiPollEvents: bad GPU event\n", CmiMyPe());
+        }
+      }
+
       queue.pop(); // TODO: investigate possible race condition with charm4py futures - temporarily resolved by popping here
+      if (queue.empty()) cq.busy_streams--;
+      if (++cq.window_done == HAPI_POLL_WINDOW) {
+        cq.polls_per_completion = (double)cq.window_polls / cq.window_done;
+        cq.window_polls = cq.window_done = 0;
+      }
 
       // invoke Charm++ callback if one was given
       hev.cb.send(hev.cb_msg);
@@ -2200,22 +2674,30 @@ void hapiPollEvents(void* param) {
       if (hev.wr) {
         hapiWorkRequestCleanup(hev.wr);
       }
-      CpvAccess(hapi_event_pool).push(hev.event);
+      if (hev.event == NULL) {
+        CpvAccess(hapi_flag_inflight)--;
+        CpvAccess(hapi_flag_busy)[hev.flag_seq & (HAPI_FLAG_SLOTS - 1)] = 0;
+      } else {
+        CpvAccess(hapi_event_pool).push(hev.event);
+      }
       CpvAccess(n_hapi_events)--;
 
       // inform QD that an event was processed
       CmiAssert(hapiQdProcess);
       hapiQdProcess(1);
     }
-    else {
-      if (retCode != hapiErrorNotReady) {
-        CmiPrintf("%d %d: Fatal GPU Error %s: %d.\n", CmiMyNode(), CmiMyPe(),
-                  hapiGetErrorString(retCode), retCode);
-        CmiAbort("%d: hapiPollEvents: bad GPU event\n", CmiMyPe());
-      }
-      // stop going through the queue once we encounter a non-successful event
-      break;
+  }
+  // Unlist the drained queues, once the outermost poll is done with the list.
+  if (--cq.poll_depth == 0) {
+    size_t kept = 0;
+    for (size_t ai = 0; ai < cq.active.size(); ai++) {
+      hapiStreamQueue& sq = cq.queues[cq.active[ai]];
+      if (sq.q.empty())
+        sq.listed = false;
+      else
+        cq.active[kept++] = cq.active[ai];
     }
+    cq.active.resize(kept);
   }
 #endif
 }

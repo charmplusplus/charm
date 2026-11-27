@@ -347,8 +347,7 @@ static int registerClass(const CkDynClassDesc *desc, int *first_ep) {
 extern "C" int CkDynRegisterClass(const CkDynClassDesc *desc, int *first_ep) {
   if (CkMyRank() != 0) CkAbort("CkDyn: CkDynRegisterClass must run on rank 0 of each process");
   /* after start-up only through CkDynRegisterClassLate, which checks that every
-     PE of the process sees the class (a CMK_CHARM4PY build would accept the
-     registration silently: its Ext API registers late) */
+     PE of the process sees the class */
   if (_registerIsDone())
     CkAbort("CkDyn: CkDynRegisterClass for class %s after start-up; register it with CkDynRegisterClassLate "
             "(after CkDynAllowLateRegistration)", desc->name ? desc->name : "?");
@@ -3193,14 +3192,14 @@ extern "C" void CkDynPostDeviceBuffer(const CkDynTarget *t, int ep, int slot, co
 
 /* ---- persistent device buffers ------------------------------------------ */
 
-/* Thin wrappers of Charm++'s CkDevicePersistent (ckrdmadevice.h; mechanism:
+/* Endpoints of the device channels' transport (ckdevicechannel.h; mechanism:
    doc/internals/ckdyn.md, "Persistent device buffers"). The handle is the
-   pupped CkDevicePersistent with an ignore callback, in a fixed-size record,
-   so only the issuing side's done runs. A copy of a peer buffer takes a
-   reference on the process's IPC mapping of it, and keeps the peer's RDMA
-   registration once fetched, until its close(); so each open buffer keeps its
-   copies of peer buffers, by id, and closes them in CkDynDevPersistClose (or
-   when a handle of the same peer buffer with a new id, a reopen, replaces one). */
+   pupped endpoint, in a fixed-size record; only the issuing side's done runs.
+   A copy of a peer buffer takes a reference on the process's IPC mapping of
+   it, and keeps the peer's RDMA registration once fetched, until it is
+   forgotten; so each open buffer keeps its copies of peer buffers, by id, and
+   forgets them in CkDynDevPersistClose (or when a handle of the same peer
+   buffer with a new id, a reopen, replaces one). */
 
 #if CMK_CUDA || CMK_HIP
 #include "gpumanager.h"
@@ -3210,17 +3209,18 @@ CsvExtern(GPUManager, gpu_manager);
 static const uint32_t DP_MAGIC = 0xD9E5B002u;
 struct DpHandle {
   uint32_t magic, len;
-  unsigned char bytes[504];   /* the pupped CkDevicePersistent */
+  unsigned char bytes[504];   /* the pupped CkDeviceChannelEndpoint */
 };
 
 struct CkDynDevPersist {
-  CkDevicePersistent dp;   /* the owner of the opened buffer */
+  CkDeviceChannelEndpoint ep;   /* the opened buffer */
+  hapiStream_t stream;          /* the stream its transfers are ordered on */
   CkDynCallback done;
   int busy = 0;            /* transfers issued, not completed */
   DpHandle h;
-  /* copies of peer buffers named by handles, by CkDevicePersistent::id */
-  mutable std::map<uint64_t, CkDevicePersistent> peers;
-  CkDynDevPersist(const void *ptr, size_t len, hapiStream_t s) : dp(ptr, len, s) {}
+  /* copies of peer buffers named by handles, by CkDeviceChannelEndpoint::id */
+  mutable std::map<uint64_t, CkDeviceChannelEndpoint> peers;
+  CkDynDevPersist(const void *ptr, size_t len, hapiStream_t s) : ep(ptr, len), stream(s) {}
 };
 
 struct DpOp { CkDynDevPersist *p; uint32_t refnum; };
@@ -3242,7 +3242,7 @@ static void dpAnnounce(const char *what, int mode) {
   CmiPrintf("[%d] CkDyn> %s: %s\n", CkMyPe(), what, names[mode]);
 }
 
-static void dpUnpack(const void *handle, CkDevicePersistent &out) {
+static void dpUnpack(const void *handle, CkDeviceChannelEndpoint &out) {
   DpHandle h;
   memcpy(&h, handle, sizeof h);
   if (h.magic != DP_MAGIC || h.len > sizeof h.bytes)
@@ -3255,14 +3255,14 @@ static void dpUnpack(const void *handle, CkDevicePersistent &out) {
    same peer buffer (pe, ptr) under another id are superseded handles (the peer
    reopened); their ids go to *stale, for dpDropStale after the transfer, so
    that the new copy holds its IPC reference before the old one is released. */
-static CkDevicePersistent &dpPeer(const CkDynDevPersist *p, const void *handle, std::vector<uint64_t> *stale) {
-  CkDevicePersistent t;
+static CkDeviceChannelEndpoint &dpPeer(const CkDynDevPersist *p, const void *handle, std::vector<uint64_t> *stale) {
+  CkDeviceChannelEndpoint t;
   dpUnpack(handle, t);
   auto it = p->peers.find(t.id);
   if (it != p->peers.end()) return it->second;
   for (auto &kv : p->peers)
     if (kv.second.pe == t.pe && kv.second.ptr == t.ptr) stale->push_back(kv.first);
-  CkDevicePersistent &c = p->peers[t.id];   /* default-constructed, filled by pup */
+  CkDeviceChannelEndpoint &c = p->peers[t.id];   /* default-constructed, filled by pup */
   dpUnpack(handle, c);
   return c;
 }
@@ -3271,7 +3271,7 @@ static void dpDropStale(const CkDynDevPersist *p, const std::vector<uint64_t> &s
   for (uint64_t id : stale) {
     auto it = p->peers.find(id);
     if (it == p->peers.end()) continue;
-    it->second.close();
+    CkDeviceEndpointForget(it->second);
     p->peers.erase(it);
   }
 }
@@ -3295,20 +3295,20 @@ static void dpDoneFn(void *param, void *msg) {
 
 static void dpLocal(const CkDynDevPersist *p, const char *what) {
   if (p == nullptr) CkAbort("CkDyn: %s of a null persistent device buffer", what);
-  if (p->dp.pe != CkMyPe()) CkAbort("CkDyn: %s of a persistent device buffer opened on PE %d, called on PE %d", what, p->dp.pe, CkMyPe());
+  if (p->ep.pe != CkMyPe()) CkAbort("CkDyn: %s of a persistent device buffer opened on PE %d, called on PE %d", what, p->ep.pe, CkMyPe());
 }
 
 extern "C" CkDynDevPersist *CkDynDevPersistOpen(const CkDynDevDesc *d, const CkDynCallback *done) {
   CkDynDevPersist *p = new CkDynDevPersist(d->ptr, (size_t)d->len, (hapiStream_t)(uintptr_t)d->stream);
-  p->dp.open();
+  p->ep.open();
   p->done = *done;
   memset(&p->h, 0, sizeof p->h);
   p->h.magic = DP_MAGIC;
   PUP::sizer ps;
-  ps | p->dp;
-  if (ps.size() > sizeof p->h.bytes) CkAbort("CkDyn: a CkDevicePersistent pups %zu bytes, the handle holds %zu", ps.size(), sizeof p->h.bytes);
+  ps | p->ep;
+  if (ps.size() > sizeof p->h.bytes) CkAbort("CkDyn: a device endpoint pups %zu bytes, the handle holds %zu", ps.size(), sizeof p->h.bytes);
   PUP::toMem pm(p->h.bytes);
-  pm | p->dp;
+  pm | p->ep;
   p->h.len = (uint32_t)ps.size();
   return p;
 }
@@ -3316,9 +3316,9 @@ extern "C" CkDynDevPersist *CkDynDevPersistOpen(const CkDynDevDesc *d, const CkD
 extern "C" void CkDynDevPersistClose(CkDynDevPersist *p) {
   dpLocal(p, "close");
   if (p->busy) CkAbort("CkDyn: close of a persistent device buffer with %d transfer(s) outstanding", p->busy);
-  for (auto &kv : p->peers) kv.second.close();   /* IPC references, kept registrations */
+  for (auto &kv : p->peers) CkDeviceEndpointForget(kv.second);   /* IPC references, kept registrations */
   p->peers.clear();
-  p->dp.close();
+  p->ep.close();
   delete p;
 }
 
@@ -3332,7 +3332,7 @@ extern "C" void CkDynDevPersistHandle(const CkDynDevPersist *p, void *out) {
 extern "C" int CkDynDevPersistMode(const CkDynDevPersist *p, const void *handle) {
   dpLocal(p, "mode");
   std::vector<uint64_t> stale;
-  int m = p->dp.mode(dpPeer(p, handle, &stale));
+  int m = dpPeer(p, handle, &stale).mode();
   dpDropStale(p, stale);
   return m;
 }
@@ -3340,24 +3340,22 @@ extern "C" int CkDynDevPersistMode(const CkDynDevPersist *p, const void *handle)
 extern "C" void CkDynDevPersistGet(CkDynDevPersist *dst, const void *src_handle, uint32_t refnum) {
   dpLocal(dst, "get");
   std::vector<uint64_t> stale;
-  CkDevicePersistent &src = dpPeer(dst, src_handle, &stale);
-  if (dst->dp.cnt < src.cnt)
-    CkAbort("CkDyn: persistent get of %zu bytes into a %zu-byte buffer", src.cnt, dst->dp.cnt);
+  CkDeviceChannelEndpoint &src = dpPeer(dst, src_handle, &stale);
+  if (dst->ep.cnt < src.cnt)
+    CkAbort("CkDyn: persistent get of %zu bytes into a %zu-byte buffer", src.cnt, dst->ep.cnt);
   dst->busy++;
-  dst->dp.cb = CkCallback(dpDoneFn, new DpOp{ dst, refnum });
-  dst->dp.get(src);
+  CkDeviceEndpointGet(dst->ep, src, src.cnt, dst->stream, CkCallback(dpDoneFn, new DpOp{ dst, refnum }));
   dpDropStale(dst, stale);
 }
 
 extern "C" void CkDynDevPersistPut(const void *dst_handle, CkDynDevPersist *src, uint32_t refnum) {
   dpLocal(src, "put");
   std::vector<uint64_t> stale;
-  CkDevicePersistent &dst = dpPeer(src, dst_handle, &stale);
-  if (dst.cnt < src->dp.cnt)
-    CkAbort("CkDyn: persistent put of %zu bytes into a %zu-byte buffer", src->dp.cnt, dst.cnt);
+  CkDeviceChannelEndpoint &dst = dpPeer(src, dst_handle, &stale);
+  if (dst.cnt < src->ep.cnt)
+    CkAbort("CkDyn: persistent put of %zu bytes into a %zu-byte buffer", src->ep.cnt, dst.cnt);
   src->busy++;
-  src->dp.cb = CkCallback(dpDoneFn, new DpOp{ src, refnum });
-  src->dp.put(dst);
+  CkDeviceEndpointPut(dst, src->ep, src->ep.cnt, src->stream, CkCallback(dpDoneFn, new DpOp{ src, refnum }));
   dpDropStale(src, stale);
 }
 

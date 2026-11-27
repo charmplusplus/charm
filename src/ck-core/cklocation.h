@@ -168,47 +168,6 @@ public:
   std::unordered_map<int, bool> dynamicIns;
 };
 
-#if CMK_CHARM4PY
-
-extern int (*ArrayMapProcNumExtCallback)(int, int, const int*);
-
-class ArrayMapExt : public CkArrayMap
-{
-public:
-  ArrayMapExt(void* impl_msg);
-
-  static void __ArrayMapExt(void* impl_msg, void* impl_obj_void)
-  {
-    new (impl_obj_void) ArrayMapExt(impl_msg);
-  }
-
-  static void __entryMethod(void* impl_msg, void* impl_obj_void)
-  {
-    // fprintf(stderr, "ArrayMapExt:: entry method invoked\n");
-    ArrayMapExt* obj = static_cast<ArrayMapExt*>(impl_obj_void);
-    CkMarshallMsg* impl_msg_typed = (CkMarshallMsg*)impl_msg;
-    char* impl_buf = impl_msg_typed->msgBuf;
-    PUP::fromMem implP(impl_buf);
-    int msgSize;
-    implP | msgSize;
-    int ep;
-    implP | ep;
-    int dcopy_start;
-    implP | dcopy_start;
-    GroupMsgRecvExtCallback(obj->thisgroup.idx, ep, msgSize, impl_buf + (3 * sizeof(int)),
-                            dcopy_start);
-  }
-
-  int procNum(int arrayHdl, const CkArrayIndex& element)
-  {
-    return ArrayMapProcNumExtCallback(thisgroup.idx, element.getDimension(),
-                                      element.data());
-    // fprintf(stderr, "[%d] ArrayMapExt - procNum is %d\n", CkMyPe(), pe);
-  }
-};
-
-#endif
-
 /*@}*/
 
 /**
@@ -721,8 +680,15 @@ public:
   /// The id of an element of this manager's primary array, from its payload (used
   /// for load balancer object ids; CkArray::makeID gives the per-array id).
   ck::ObjID makeID(CmiUInt8 eid) const { return ck::ObjID(collectionNumber, eid, wideCollection); }
+  /// The load balancer's id for an element (out of line: user code is compiled without CMK_GLOBAL_LOCATION_UPDATE).
+  CmiUInt8 lbObjID(CmiUInt8 eid) const;
 
   CkLocRec* registerNewElement(const CkArrayIndex& idx);
+
+  /// The record of local element id, or NULL if it is not on this PE: for runtime
+  /// work that finds an element again after an asynchronous event (a device
+  /// channel's completion, a migration deferred for it).
+  CkLocRec* localRecord(CmiUInt8 id) const { return elementNrec(id); }
 
   // Interface used by external users:
   /// Home mapping. One home per element, computable from the index or from the id

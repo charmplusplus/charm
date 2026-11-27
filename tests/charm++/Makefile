@@ -11,16 +11,19 @@ DIRS = \
   load_balancing \
   ckpt_restart \
   ckpt_inflight \
+  restart_manual_lb \
   delegation \
   sdag \
   ckAllocSysMsgTest \
   method_templates \
   demand_creation \
+  createhere_race \
   startupTest \
   topology \
   io \
   io_read \
   io_sessions \
+  io_post_tag \
   groupdep_creator \
   sparse \
   sparse-coro \
@@ -33,6 +36,7 @@ DIRS = \
   ckcoro \
   zerocopy \
   within_node_bcast \
+  nodegroup_lookup \
   longIdle \
   periodic \
   bombard \
@@ -64,7 +68,9 @@ DIRS = \
   qd \
   reduction_migrate_ahead \
   reduction_empty_kid \
+  bcast_epoch_wrap \
   section_migrate \
+  mcast_remote \
   xarray_section_reduction \
   bcast_zcpup \
   arraymap_insert_abort \

@@ -1972,10 +1972,7 @@ CkLocRec::CkLocRec(CkLocMgr* mgr, bool fromMigration, bool ignoreArrival,
   lbmgr = mgr->getLBMgr();
   if (_lb_args.metaLbOn())
     the_metalb = mgr->getMetaBalancer();
-#  if CMK_GLOBAL_LOCATION_UPDATE
-  id_ = mgr->makeID(id_).getID();
-#  endif
-  ldHandle = lbmgr->RegisterObj(mgr->getOMHandle(), id_, (void*)this, 1);
+  ldHandle = lbmgr->RegisterObj(mgr->getOMHandle(), mgr->lbObjID(id_), (void*)this, 1);
   if (fromMigration)
   {
     DEBL((AA "Element %s migrated in\n" AB, idx2str(idx)));
@@ -2004,6 +2001,63 @@ void CkLocRec::migrateMe(int toPe)  // Leaving this processor
   //	printf("[%d] migrating migrateMe to %d \n",CkMyPe(),toPe);
   myLocMgr->emigrate(this, toPe);
 }
+
+#if CMK_CUDA || CMK_HIP
+// A move deferred because of device-channel work, driven again once the work
+// is done (CkLocRec::noteChannelWorkDone).
+struct ChannelMigrateKickMsg
+{
+  char header[CmiMsgHeaderSizeBytes];
+  CkGroupID mgrGid;
+  CmiUInt8 id;
+  int toPe;
+};
+int _channelMigrateKickHandlerIdx;
+
+extern "C" void _channelMigrateKickHandler(void* arg)
+{
+  ChannelMigrateKickMsg* m = (ChannelMigrateKickMsg*)arg;
+  CkLocMgr* mgr = (CkLocMgr*)CkLocalBranch(m->mgrGid);
+  CkLocRec* rec = mgr ? mgr->localRecord(m->id) : NULL;
+  // An element that moved or died since the kick was posted makes it moot.
+  if (rec != NULL) rec->resumeDeferredMigration(m->toPe);
+  CmiFree(m);
+}
+
+void CkLocRec::noteChannelWorkDone()
+{
+  if (outstandingChannelWork > 0) outstandingChannelWork--;
+  if (outstandingChannelWork == 0 && pendingMigrateTo != -1)
+  {
+    const int toPe = pendingMigrateTo;
+    pendingMigrateTo = -1;
+    // Posted to this PE's queue, never taken inline: the completion that
+    // brought the count to zero can run inside the handler that has just
+    // queued this element's notification, and migrating here would pack the
+    // element before that message is delivered.
+    ChannelMigrateKickMsg* m = (ChannelMigrateKickMsg*)CmiAlloc(sizeof(ChannelMigrateKickMsg));
+    m->mgrGid = myLocMgr->ckGetGroupID();
+    m->id = getID();
+    m->toPe = toPe;
+    CmiSetHandler(m, _channelMigrateKickHandlerIdx);
+    CmiPushPE(CmiMyRank(), m);
+  }
+}
+
+void CkLocRec::resumeDeferredMigration(int toPe)
+{
+#if CMK_LBDB_ON
+  // The application's window for migration still governs: outside it the move
+  // waits for its next safe point, as one ordered by the load balancer does.
+  if (!readyMigrate)
+  {
+    nextPe = toPe;
+    return;
+  }
+#endif
+  myLocMgr->emigrate(this, toPe);  // defers again if new channel work started meanwhile
+}
+#endif
 
 #if CMK_LBDB_ON
 void CkLocRec::startTiming(int ignore_running)
@@ -2225,16 +2279,22 @@ static int ceilLog2(CmiUInt8 n)
 
 const Layout& getLayout() { return CksvAccess(_objidLayout); }
 
-// Precedes the layout in a checkpoint, so that a checkpoint written without one
-// (by a build before the 64-bit object id redesign) or with an older record
-// ("OBJ1", part 1, without the collection widths) fails here, not by misreading
+// Precedes the layout in a checkpoint and also marks the format of the group
+// records read after it, so that a checkpoint written without one (by a build
+// before the 64-bit object id redesign), with "OBJ1" (no collection widths) or
+// with "OBJ2" (LBManager record without useBarrier) fails here, not by misreading
 // what follows.
-static const int LAYOUT_MARKER = 0x4F424A32;  // "OBJ2"
+static const int LAYOUT_MARKER = 0x4F424A33;  // "OBJ3"
+static const int LAYOUT_MARKER_OBJ2 = 0x4F424A32;
 
 void pupLayout(PUP::er& p)
 {
   int marker = LAYOUT_MARKER;
   p | marker;
+  if (p.isUnpacking() && marker == LAYOUT_MARKER_OBJ2)
+    CkAbort("Checkpoint was written by an older Charm++ 9 build (9.0.0-beta1 or an"
+            " earlier development build), whose group records this build cannot read;"
+            " rewrite the checkpoint with this build.\n");
   if (p.isUnpacking() && marker != LAYOUT_MARKER)
     CkAbort("Checkpoint has no current object id layout record (written by a Charm++"
             " build before the 64-bit object id redesign or its part 2, or corrupt);"
@@ -3176,6 +3236,15 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
   return false;
 }
 
+CmiUInt8 CkLocMgr::lbObjID(CmiUInt8 eid) const
+{
+#if CMK_GLOBAL_LOCATION_UPDATE
+  return makeID(eid).getID();
+#else
+  return eid;
+#endif
+}
+
 bool CkLocMgr::recoverIndex(CmiUInt8 id, CkArrayIndex& idx) const
 {
   if (compressor)
@@ -3668,6 +3737,21 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   if (toPe == CkMyPe())
     return;  // You're already there!
 
+#if CMK_CUDA || CMK_HIP
+  // Device channels this element receives on: their senders are told the
+  // channel is closing, and each awaited acknowledgement is channel work of
+  // the element. While any is outstanding -- or a put of the element's, or a
+  // read into its buffers, is in flight -- the move waits, so nothing lands in
+  // or reads from a buffer the pack is about to free; the last completion
+  // drives it again (CkLocRec::noteChannelWorkDone).
+  CkDeviceChannelsBeforeMigrate(rec);
+  if (rec->outstandingChannelWork > 0)
+  {
+    rec->pendingMigrateTo = toPe;
+    return;
+  }
+#endif
+
   CkArrayIndex idx = rec->getIndex();
   CmiUInt8 id = rec->getID();
   const CmiUInt8 life = rec->getLife();  // rec is gone by the time the home is told
@@ -3687,6 +3771,12 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
   callMethod(rec, &CkMigratable::ckAboutToMigrate);
 #if CMK_MEM_CHECKPOINT
   CkMemCheckPTNoteMigration();  // a rollback is refused after a migration
+#endif
+
+#if CMK_CUDA || CMK_HIP
+  // The channels' exports and registrations go with the buffers the pack is
+  // about to free; the element reopens them on its new buffers in its pup.
+  CkDeviceChannelsPack(rec);
 #endif
 
   // Record the move in the process's table before the migration message exists: a
