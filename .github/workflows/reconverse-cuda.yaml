@@ -97,7 +97,8 @@ jobs:
   # `./build charm++`, not `LIBS`: AMPI rides on TCharm, and CMakeLists.txt
   # excludes TCharm from reconverse builds ("not yet ported to reconverse
   # builds"), so there is no examples/ampi/cuda to compile. When TCharm lands,
-  # add the AMPI target and examples/ampi/cuda here and drop this note.
+  # add the AMPI target and examples/ampi/cuda here and drop this note. The
+  # last step also builds `./build charm4py` and checks libcharm.so's link line.
   #
   # x86_64 and arm8 are one matrix because they differ only in runner, target
   # and where the CUDA toolkit comes from; -Werror=vla on arm8 carries over
@@ -262,3 +263,19 @@ jobs:
         run: |
           make -j4 -C ${{ matrix.target }}-cuda/tests/charm++/cuda/gpumigrate \
             OPTS="-g"
+      - name: charm4py libcharm.so link line
+        # charmc links libcharm.so under -whole-archive, so a static CUDA
+        # runtime on its link line leaves the library unloadable.
+        run: |
+          d=${{ matrix.target }}-cuda-charm4py
+          ./build charm4py ${{ matrix.target }} cuda -j4 -g --suffix=charm4py ${{ matrix.build_opts }}
+          test -s $d/lib/libcharm.so && test -s $d/CMakeFiles/charm.dir/link.txt ||
+            { echo "::error::$d has no libcharm.so or no CMakeFiles/charm.dir/link.txt"; exit 1; }
+          if grep -oE '[^ ]*(cudadevrt|cudart_static)[^ ]*' $d/CMakeFiles/charm.dir/link.txt; then
+            echo "::error::libcharm.so links the static CUDA runtime; see CUDA_RUNTIME_LIBRARY in the charm4py block of CMakeLists.txt"
+            exit 1
+          fi
+          if nm -D --undefined-only $d/lib/libcharm.so | grep __cudaRegisterLinkedBinary; then
+            echo "::error::libcharm.so has an undefined CUDA device-runtime symbol and cannot be loaded"
+            exit 1
+          fi
