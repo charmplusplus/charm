@@ -1690,21 +1690,16 @@ then
   LANG_LIBS+=("-L$CHARMRECONV")
 fi
 
-# libreconverse is a shared library linked by SONAME/install_name
-# (@rpath/libreconverse.<suf>), so -L above only satisfies the link step: at run
-# time the loader still has to be told where the library lives. Without this,
-# every charmc-built binary needs (DY)LD_LIBRARY_PATH set by hand before it will
-# start, while cmake-built ones (bin/ckhello) run bare because cmake stamps a
-# build RPATH of its own. Record the directory it was linked from as an RPATH
-# instead. That also covers libreconverse's own dependencies (liblci, liblct,
-# liblcw), which sit in the same directory and which the loader resolves against
-# the main executable's RPATHs.
-#
-# Classic builds have no libreconverse to find, so the readability test below
-# leaves their link line untouched.
+# libreconverse is always a shared library, linked by SONAME/install_name
+# (@rpath/libreconverse.<suf>). A default build puts it in lib/; a
+# --build-shared build puts it in lib_so/ and keeps the static Charm++
+# libraries in lib/. Search the directory that holds it, and record that
+# directory as an RPATH so the binary runs without (DY)LD_LIBRARY_PATH; the
+# RPATH also finds libreconverse's dependencies (liblci, liblct) beside it.
 for dir in "$CHARMLIBSO" "$CHARMLIB" "$CHARMRECONV"
 do
 	[[ -n "$dir" && -r "$dir/libreconverse.${CMK_SHARED_SUF:-so}" ]] || continue
+	[[ " ${LANG_LIBS[*]} " = *" -L$dir "* ]] || LANG_LIBS+=("-L$dir")
 	LANG_LIBS+=("-Wl,-rpath,$dir")
 done
 

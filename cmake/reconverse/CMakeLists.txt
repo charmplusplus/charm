@@ -93,12 +93,6 @@ add_subdirectory(${_reconverse_src} ${CMAKE_BINARY_DIR}/reconverse)
 
 set(BUILD_SHARED_LIBS ${_save_BUILD_SHARED_LIBS} CACHE INTERNAL "")
 
-# Charm4py's extension registers CCS handlers through CcsRegisterHandlerExt,
-# which libreconverse compiles only when CMK_CHARM4PY is defined; reconverse
-# is its own project and does not see Charm++'s configuration macros.
-if("${TARGET}" STREQUAL "charm4py")
-  target_compile_definitions(reconverse PRIVATE CMK_CHARM4PY=1)
-endif()
 # The directory properties cleared above drop Charm++'s CMK_OPTIMIZE, and
 # reconverse only sets its own when it is the root project.
 target_compile_definitions(reconverse PRIVATE CMK_OPTIMIZE=${CMK_OPTIMIZE})

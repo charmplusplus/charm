@@ -1596,13 +1596,16 @@ buffer stays in use, and its completion callback waits too.
   PE with a transfer in flight: every chare there, and libraries.
 - A second match or a second post with a tag already in its table aborts. A match by one chare and a post
   by another with the same tag pair up silently, and the data lands in the other chare's buffer.
-- Existing code picks tags in ways that collide: the tests use `k * NUM_ARR_ELEMENTS + thisIndex`,
-  CkIO a per-PE counter from 0 (ckio.C:433, 464), and the manual's example the constant 22.
+- Existing code picks tags in ways that collide: the tests use `k * NUM_ARR_ELEMENTS + thisIndex`.
+  Until #4304 the manual's examples used constants (22, 60, 61) and CkIO counted its tags from 0 on
+  each PE; both now take their tags from `CkNewPostTag()` (below).
 - When the receiver posts later, the tag never leaves it: it is chosen in the post entry method and used
   again in `CkPostBuffer`. So, proposed: `CkMatchBuffer(post, i)` returns a ticket and
   `CkPostBuffer(buf, size, ticket)` takes it; no tag is needed. Tags remain only for posting before the data
   arrives (CkIO's pattern: the receiver puts the tag in its request, and the data message brings it
-  back). Those tags come from a per-PE allocator, `CkNewPostTag()`, which CkIO uses too.
+  back). Those tags come from a per-PE allocator, `CkNewPostTag()`, which CkIO uses too. The allocator
+  exists since #4304 (ckrdma.C): it hands out the negative tags in turn and leaves 0 and up to
+  applications that pick their own.
   Error-checking builds record which chare matched or posted each tag, and abort on a pairing across
   chares.
 

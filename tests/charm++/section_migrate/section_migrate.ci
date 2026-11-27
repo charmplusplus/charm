@@ -26,6 +26,7 @@ mainmodule section_migrate {
     entry void makeSection();
     entry void send(int round);
     entry void work(WorkMsg *m);
+    entry void ping(WorkMsg *m);
     entry void hop(int round, bool skipRoot);
     entry void hopAgain();
     entry void doSync();

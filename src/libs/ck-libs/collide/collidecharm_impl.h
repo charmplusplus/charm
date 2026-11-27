@@ -85,6 +85,9 @@ class CollisionAggregator {
 
   //Delete all cached aggregators
   void compact(void);
+
+  //Replace the grid; only while no objects are aggregated
+  void setGrid(const CollideGrid3d &g) { gridMap = g; }
 };
 
 /*********************** collideMgr **********************
@@ -115,17 +118,15 @@ class collideMgr : public CBase_collideMgr
   int nContrib;//Number of registered contributors
   int contribCount;//Number of contribute calls given this step
 
+  // Voxels on this PE in the step being collided, counted when
+  // determineNumVoxels arrives; -1 until then.
   int totalLocalVoxels;
-
-  bool collisionStarted;
+  int prodStep; // On PE 0: last step announced by prod()
 
   CollisionAggregator aggregator;
   int msgsSent;//Messages sent out to voxels
   int msgsRecvd;//Return-receipt messages received from voxels
   void tryAdvance(void);
-  protected:
-  //Check if we're barren-- if so, advance now
-  virtual void pleaseAdvance(void);
   public:
   collideMgr(const CollideGrid3d &gridMap,
       const CProxy_collideClient &client,
@@ -139,6 +140,8 @@ class collideMgr : public CBase_collideMgr
     p | voxelProxy;
     p | gridMap;
     p | client;
+    // The migrate constructor built the aggregator on a placeholder grid
+    if (p.isUnpacking()) aggregator.setGrid(gridMap);
   }
 
   //Maintain contributor registration count
@@ -161,6 +164,11 @@ class collideMgr : public CBase_collideMgr
   void voxelMessageRecvd(void);
 
   void registerVoxel(collideVoxel *vox);
+
+  // On PE 0: some PE received its first boxes of this step
+  void stepStarted(int step);
+  // Lets a PE with no registered contributors join this step's reduction
+  void prod(int step);
 
   void checkRegistrationComplete();
   void determineNumVoxels(void);
@@ -214,6 +222,7 @@ class serialCollideClient : public collideClient {
     // state restored by Group::pup(), including thisgroup and thisProxy.
     Group::pup(p);
     p | useCb;
+    p | clientCb;
   }
 
   /// Call this client function on processor 0:
@@ -231,9 +240,20 @@ class serialCollideClient : public collideClient {
   Invokes the callback passed on every PE with the collision list
   */
 class distributedCollideClient : public collideClient {
-  CkCallback clientCb;
+  CkCallback userCb;   // as given: a broadcast to a group or nodegroup
+  CkCallback clientCb; // userCb sent to this PE's (or node's) branch only
   public:
   distributedCollideClient(CkCallback clientCb_);
+  distributedCollideClient(CkMigrateMessage *m) : collideClient(m) {}
+  void pup(PUP::er &p) {
+    Group::pup(p);
+    p | userCb;
+    // After a restart this branch may be on a different PE
+    if (p.isUnpacking()) {
+      clientCb = userCb;
+      clientCb.transformBcastToLocalElem();
+    }
+  }
 
   /// Called by voxel array on each processor:
   virtual void collisions(int step,CollisionList &colls);

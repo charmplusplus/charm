@@ -300,7 +300,7 @@ template <typename Child>
 bool AstChildren<Child>::isTramTarget() {
   for (typename std::list<Child*>::iterator i = children.begin(); i != children.end();
        ++i)
-    if ((*i)->isTramTarget()) return true;
+    if (*i && (*i)->isTramTarget()) return true;
 
   return false;
 }
@@ -308,7 +308,7 @@ bool AstChildren<Child>::isTramTarget() {
 template <typename Child>
 bool AstChildren<Child>::hasCoroutineEntry() {
   for (Child* c : children)
-    if (c->isCoroutineEntry()) return true;
+    if (c && c->isCoroutineEntry()) return true;
   return false;
 }
 
