@@ -1,6 +1,9 @@
 // Every element contributes and then calls migrateMe, and the reduction starts
 // a checkpoint at once, while elements are still migrating. A restart checks
 // that all elements came back.
+// With -direct, every element first moves once by sending itself ckEmigrate,
+// as a program may, and the checkpoint starts after quiescence. Such a move
+// counts no start, so it must not leave the checkpoint waiting forever.
 #include "ckpt_inflight.decl.h"
 
 /* readonly */ CProxy_Main mainProxy;
@@ -12,17 +15,28 @@ class Main : public CBase_Main {
 
 public:
   Main(CkArgMsg* m) {
+    const bool direct = CmiGetArgFlag(m->argv, "-direct");
     delete m;
     mainProxy = thisProxy;
     arr = CProxy_E::ckNew(numElements);
-    arr.hop();
+    if (direct) {
+      arr.leap();
+      CkStartQD(CkCallback(CkIndex_Main::settled(), thisProxy));
+    } else {
+      arr.hop();
+    }
   }
+  void settled() { arr.hop(); }
   Main(CkMigrateMessage* m) : CBase_Main(m), restarted(true) {}
   void pup(PUP::er& p) { p | arr; }
 
   void moved(int n) {
     CkEnforce(n == numElements);
     if (!restarted) {
+      // A checkpoint that waits for a migration that never finishes hangs.
+      CcdCallFnAfter([](void*, double) {
+        CkAbort("ckpt_inflight: the checkpoint was not written within 60 s");
+      }, nullptr, 60000);
       CkStartCheckpoint("log", CkCallback(CkIndex_Main::written(), thisProxy));
       return;
     }
@@ -47,6 +61,7 @@ public:
                CkCallback(CkReductionTarget(Main, moved), mainProxy));
     migrateMe((CkMyPe() + 1) % CkNumPes());
   }
+  void leap() { thisProxy[thisIndex].ckEmigrate((CkMyPe() + 1) % CkNumPes()); }
 };
 
 #include "ckpt_inflight.def.h"

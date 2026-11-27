@@ -467,7 +467,7 @@ void CkMigrationFinished();
   template <typename T = proxy_t>                             \
   typename std::enable_if<std::is_base_of<CProxy_ArrayBase, T>::value>::type migrateMe(int toPe) { \
     CkMigrationStarted();                                     \
-    this->thisProxy[this->thisIndex].ckEmigrate(toPe);        \
+    this->thisProxy[this->thisIndex].ckEmigrateCounted(toPe); \
   }                                                           \
   CProxy_Derived thisProxy;                                   \
   void pup(PUP::er &p) { (void)p; }                           \

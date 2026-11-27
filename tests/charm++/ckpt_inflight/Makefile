@@ -9,7 +9,8 @@ ckpt_inflight: ckpt_inflight.decl.h ckpt_inflight.C
 ckpt_inflight.decl.h: ckpt_inflight.ci
 	$(CHARMC) ckpt_inflight.ci
 
-# Checkpoint while every element is migrating, then restart, for three seeds.
+# Checkpoint while every element is migrating, then restart, for three seeds;
+# then once more after every element has moved by a direct ckEmigrate.
 test: ckpt_inflight
 	for s in 1 2 3; do \
 	  rm -rf log; \
@@ -17,6 +18,10 @@ test: ckpt_inflight
 	  sync; \
 	  $(call run, ./ckpt_inflight +p4 +restart log ) || exit 1; \
 	done
+	rm -rf log
+	$(call run, ./ckpt_inflight +p8 -direct )
+	sync
+	$(call run, ./ckpt_inflight +p4 +restart log )
 	-rm -rf log
 
 smptest: all
