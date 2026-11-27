@@ -205,6 +205,7 @@ CkpvDeclare(UInt, _numGroups);
 
 CkpvDeclare(ReqTagPostMap, ncpyPostedReqMap);
 CkpvDeclare(ReqTagBufferMap, ncpyPostedBufferMap);
+CkpvDeclare(int, ncpyPostNextTag);
 CkpvDeclare(CkCoreState *, _coreState);
 
 CksvDeclare(UInt, _numNodeGroups);
@@ -1500,6 +1501,8 @@ void _initCharm(int unused_argc, char **argv)
 	CkpvInitialize(CkCoreState *, _coreState);
 	CkpvInitialize(ReqTagPostMap, ncpyPostedReqMap);
 	CkpvInitialize(ReqTagBufferMap, ncpyPostedBufferMap);
+	CkpvInitialize(int, ncpyPostNextTag);
+	CkpvAccess(ncpyPostNextTag) = INT_MIN;
 
 	_initChareTables();            // for checkpointable plain chares
 
