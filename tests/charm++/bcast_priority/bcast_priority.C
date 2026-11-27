@@ -2,27 +2,19 @@
 //
 // Part 1, priority order. Every PE runs G::hold, which keeps the PE busy for
 // a while. The sending PE issues K broadcasts from inside its hold, the least
-// urgent first, so that on every PE all K are queued by the time hold returns;
+// urgent first, so that they are all queued on it by the time hold returns;
 // they must then run most urgent first. Kinds: a group broadcast with
 // marshalled parameters (a nokeep message, which the PEs of a process share),
 // a group broadcast of a message (each PE gets a copy), a nodegroup
 // broadcast, and group broadcasts with LIFO queueing and no priority, which
-// must run in the reverse of the order they were issued in. A PE whose hold ended before the broadcasts reached it sees them
-// in arrival order; the round is then repeated with a longer hold, and the
-// test fails only if the longest hold still shows a wrong order.
-// The order is checked only on a PE that is alone in its process. In a
-// process with several PEs a broadcast waits in the node queue until a PE
-// has finished its hold, and that PE hands the K broadcasts to the others one
-// at a time, so a PE can run the first before the second has reached it.
-// (There, the PEs also share one marshalled message and may run it as it
-// arrives, without queueing it by priority.) For a nodegroup the sender's
-// process is the only one checked: a nodegroup message from another process
-// is queued without its priority.
-// On a process other than the sender's, the K broadcasts wait in the node
-// queue while the PE holds. The check there relies on the scheduler taking
-// node queue messages ahead of the PE's own queued work, up to node_queue_max
-// (default 16) in a row, so that all K are in CsdSchedQueue before the first
-// runs; K is below that limit.
+// must run in the reverse of the order they were issued in. After a wrong
+// order the round is repeated with a longer hold, and the test fails only if
+// the longest hold still shows one.
+// The order is checked only in the sender's process, and only when that
+// process has one PE: messages from another process arrive in no defined
+// order, and in a process with several PEs one PE hands the broadcasts to the
+// others one at a time, so a PE can run the first before the second arrives.
+// Every PE still runs all K broadcasts and replies after the last.
 // Bit-vector priorities are not tested: reconverse queues them at priority 0.
 //
 // Part 2, quiescence. One PE issues a burst of group, nodegroup and array
@@ -39,7 +31,7 @@ CProxy_G gProxy;
 CProxy_NG ngProxy;
 CProxy_A aProxy;
 
-static const int K = 8;        // broadcasts per round; keep below node_queue_max
+static const int K = 8;  // broadcasts per round
 static const int NKINDS = 4;
 static const int MAXTRIES = 6;
 static const int BURST = 200;
@@ -49,7 +41,7 @@ static const char *kindName[NKINDS] = {"group, marshalled", "group, message", "n
 CkpvDeclare(long, arrayCount);
 
 struct PMsg : public CMessage_PMsg {
-  int p;
+  int p, sender;
 };
 
 static bool inOrder(const std::vector<int> &seq) {
@@ -147,12 +139,12 @@ class NG : public CBase_NG {
 class G : public CBase_G {
   std::vector<int> seq;
   long counted = 0;
-  bool checkOrder = true;
 
-  void record(int p) {
+  void record(int p, int sender) {
     seq.push_back(p);
     if ((int)seq.size() < K) return;
-    mainProxy.roundReply(!checkOrder || inOrder(seq));
+    bool check = CkMyNodeSize() == 1 && CkNodeOf(sender) == CkMyNode();
+    mainProxy.roundReply(!check || inOrder(seq));
     seq.clear();
   }
 
@@ -161,17 +153,17 @@ class G : public CBase_G {
 
   void hold(int kind, int sender, double secs) {
     double start = CkWallTimer();
-    checkOrder = CkMyNodeSize() == 1;
     if (CkMyPe() == sender) {
       // a larger integer is a less urgent priority; all are behind the default 0
       for (int p = K; p >= 1; p--) {
         CkEntryOptions opts;
         opts.setPriority(p);
         if (kind == 0) {
-          thisProxy.prio(p, &opts);
+          thisProxy.prio(p, sender, &opts);
         } else if (kind == 1) {
           PMsg *m = new (8 * sizeof(int)) PMsg;
           m->p = p;
+          m->sender = sender;
           *(int *)CkPriorityPtr(m) = p;
           CkSetQueueing(m, CK_QUEUEING_IFIFO);
           thisProxy.prioMsg(m);
@@ -183,17 +175,17 @@ class G : public CBase_G {
         for (int p = 1; p <= K; p++) {
           CkEntryOptions opts;
           opts.setQueueing(CK_QUEUEING_LIFO);
-          thisProxy.lifo(p, &opts);
+          thisProxy.lifo(p, sender, &opts);
         }
       }
     }
     while (CkWallTimer() - start < secs) {
     }
   }
-  void prio(int p) { record(p); }
-  void lifo(int p) { record(-p); }  // issued 1..K, expected K..1
+  void prio(int p, int sender) { record(p, sender); }
+  void lifo(int p, int sender) { record(-p, sender); }  // issued 1..K, expected K..1
   void prioMsg(PMsg *m) {
-    record(m->p);
+    record(m->p, m->sender);
     delete m;
   }
 
