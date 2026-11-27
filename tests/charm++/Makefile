@@ -71,6 +71,7 @@ DIRS = \
   bcast_zcpup \
   arraymap_insert_abort \
   proxy_delctor \
+  bcast_priority \
 
 FTDIRS = \
   jacobi3d \

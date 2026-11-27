@@ -132,6 +132,7 @@ env:
     tests/charm++/zerocopy/zc_post_noleak
     tests/charm++/bcast_zcpup
     tests/charm++/proxy_delctor
+    tests/charm++/bcast_priority
     examples/charm++/user-driven-interop
     examples/charm++/hello/local
 

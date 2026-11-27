@@ -1,0 +1,35 @@
+mainmodule bcast_priority {
+  initproc void initPe();
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_G gProxy;
+  readonly CProxy_NG ngProxy;
+  readonly CProxy_A aProxy;
+
+  message PMsg;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void startRound();
+    entry void roundReply(bool ok);
+    entry void quiet();
+    entry void counts(long g, long ng, long a);
+  };
+  group G {
+    entry G();
+    entry void hold(int kind, int sender, double secs);
+    entry void prio(int p);
+    entry void prioMsg(PMsg *m);
+    entry void burst(int n);
+    entry void count();
+    entry void report();
+  };
+  nodegroup NG {
+    entry NG();
+    entry void prio(int sender, int p);
+    entry void count();
+  };
+  array [1D] A {
+    entry A();
+    entry void count();
+  };
+};

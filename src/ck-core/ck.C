@@ -583,6 +583,7 @@ void *CkLocalBranchOther(CkGroupID gID, int rank) {
   return _localBranchOther(gID, rank);
 }
 static inline void _processBocBcastMsg(CkCoreState* ck, envelope* env);
+static inline void _sendMsgBranchWithinNode(int eIdx, void *msg, CkGroupID gID);
 
 static
 void *_ckLocalNodeBranch(CkGroupID groupID) {
@@ -1639,10 +1640,87 @@ static int index_objectQHandler;
 #endif
 int index_skipCldHandler;
 
+// The broadcast paths below are for messages that are not part of a zerocopy
+// transfer, in a run without a message watcher (record/replay): ckrdma.C's
+// protocol and the watcher's logs follow the node message and the Cld
+// handlers of the general path.
+static inline bool _directBcastOk(const envelope *env)
+{
+  return CMI_ZC_MSGTYPE(env) == CMK_REG_NO_ZC_MSG && CkpvAccess(_coreState)->watcher == NULL;
+}
+
+static inline bool _isBcastType(const envelope *env)
+{
+  return env->getMsgtype() == BocBcastMsg || env->getMsgtype() == ArrayBcastMsg;
+}
+
+// Deliver env to every PE of this process; consumes env. A PE that is alone
+// in its process queues the message in its CsdSchedQueue. Otherwise the
+// seed balancer's within-node broadcast gives every PE a copy (or a
+// reference, for a nokeep message), which CldHandler queues on that PE.
+static void _enqueueWithinNode(envelope *env)
+{
+  if (CmiMyNodeSize() > 1 || !_directBcastOk(env)) {
+    _CldEnqueueWithinNode(env, _infoIdx);
+    return;
+  }
+#if CMK_CHARMDEBUG
+  if (!ConverseDeliver(-1)) {
+    CmiFree(env);
+    return;
+  }
+#endif
+  CqsEnqueueGeneral((Queue)CpvAccess(CsdSchedQueue), env, env->getQueueing(),
+                    env->getPriobits(), (unsigned int *)env->getPrioPtr());
+}
+
+// A group or array broadcast issued on a PE that is alone in its process:
+// send it to the other processes as a node message and return true; the
+// caller then queues this PE's copy itself (_sendMsgBranchWithinNode). In a
+// process with several PEs the broadcast goes to the node queue of this
+// process too, and whichever PE takes it serves the PEs; so does any
+// broadcast for which _directBcastOk is false. Those return false.
+static bool _bcastToOtherNodes(envelope *&env)
+{
+  if (CmiMyNodeSize() > 1 || !_isBcastType(env) || !_directBcastOk(env)) return false;
+#if CMK_CHARMDEBUG
+  if (!ConverseDeliver(CLD_BROADCAST_ALL)) return false;
+#endif
+  if (CkNumNodes() > 1) {
+    CkPackMessage(&env);
+    CmiSetXHandler(env, CmiGetHandler(env));
+    CmiSetHandler(env, index_skipCldHandler);
+    CmiSetInfo(env, _infoIdx);
+    CmiSyncNodeBroadcast(env->getTotalsize(), (char *)env);
+  }
+  return true;
+}
+
+// Nodegroup broadcast issued on this PE: the other processes get a packed
+// copy, and this process's copy goes into its node queue as a send to
+// CkMyNode() does.
+static void _nodeBroadcastAll(envelope *env)
+{
+  if (CkNumNodes() > 1) {
+    CkPackMessage(&env);
+    const int len = env->getTotalsize();
+    envelope *copy = (envelope *)CmiAlloc(len);
+    memcpy(copy, env, len);
+    _CldNodeEnqueue(CLD_BROADCAST, copy, _infoIdx);
+  }
+  _CldNodeEnqueue(CkMyNode(), env, _infoIdx);
+}
+
 void _skipCldHandler(void *converseMsg)
 {
   envelope *env = (envelope *)(converseMsg);
   CmiSetHandler(converseMsg, CmiGetXHandler(converseMsg));
+  // A broadcast for this process: forward it to the PEs now. Each PE
+  // schedules its own copy, so the forwarding step is not queued.
+  if (_isBcastType(env) && _directBcastOk(env)) {
+    CmiHandleMessage(converseMsg);
+    return;
+  }
 #if CMK_GRID_QUEUE_AVAILABLE
   if (CmiGridQueueLookupMsg ((char *) converseMsg)) {
     CqsEnqueueGeneral ((Queue) CpvAccess (CsdGridQueue),
@@ -2005,11 +2083,18 @@ static inline void _sendMsgBranch(int eIdx, void *msg, CkGroupID gID,
 
   _TRACE_ONLY(numPes = (pe==CLD_BROADCAST_ALL?CkNumPes():1));
   _TRACE_CREATION_N(env, numPes);
+  bool withinNodeHere = false;
   if (opts & CK_MSG_SKIP_OR_IMM)
     _noCldEnqueue(pe, env);
+  else if (pe == CLD_BROADCAST_ALL && _bcastToOtherNodes(env))
+    withinNodeHere = true;
   else
     _skipCldEnqueue(pe, env, _infoIdx);
   _TRACE_CREATION_DONE(1);
+  if (withinNodeHere) {
+    _SET_USED(env, 0);
+    _sendMsgBranchWithinNode(eIdx, EnvToUsr(env), gID);
+  }
 }
 
 static inline void _sendMsgBranchWithinNode(int eIdx, void *msg, CkGroupID gID)
@@ -2025,7 +2110,7 @@ static inline void _sendMsgBranchWithinNode(int eIdx, void *msg, CkGroupID gID)
     CkAbort("Bad message type %i\n", UsrToEnv(msg)->getMsgtype());
   }
   _TRACE_CREATION_N(env, CmiMyNodeSize());
-  _CldEnqueueWithinNode(env, _infoIdx);
+  _enqueueWithinNode(env);
   _TRACE_CREATION_DONE(1);  // since it only creates one creation event.
 }
 
@@ -2183,6 +2268,8 @@ static inline void _sendMsgNodeBranch(int eIdx, void *msg, CkGroupID gID,
   if (opts & CK_MSG_SKIP_OR_IMM) {
     _noCldNodeEnqueue(node, env);
   }
+  else if (node == CLD_BROADCAST_ALL && _directBcastOk(env))
+    _nodeBroadcastAll(env);
   else
     _CldNodeEnqueue(node, env, _infoIdx);
   _TRACE_CREATION_DONE(1);

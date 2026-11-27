@@ -1,0 +1,27 @@
+mainmodule bcast {
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_G gProxy;
+  readonly CProxy_NG ngProxy;
+  readonly CProxy_A aProxy;
+  readonly int batch;
+
+  mainchare Main {
+    entry Main(CkArgMsg *m);
+    entry void start();
+    entry [reductiontarget] void batchDone();
+    entry void pingDone();
+  };
+  group G {
+    entry G();
+    entry void seq(int i);
+    entry void ping(int left);
+  };
+  nodegroup NG {
+    entry NG();
+    entry void ping(int left);
+  };
+  array [1D] A {
+    entry A();
+    entry void ping(int left);
+  };
+};

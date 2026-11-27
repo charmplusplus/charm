@@ -7,6 +7,7 @@ DIRS = \
   taskSpawnRecursive \
   kNeighbor \
   zerocopy \
+  bcast \
 
 #streamingAllToAll benchmark must be rewritten with the [aggregate] API before it can be added back
 TESTDIRS = $(DIRS)
