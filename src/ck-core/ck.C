@@ -16,6 +16,7 @@ clients, including the rest of Charm++, are actually C++.
 #endif // CMK_LBDB_ON
 
 #include <unordered_set>
+#include <atomic>
 
 #ifndef CMK_CHARE_USE_PTR
 #include <map>
@@ -273,11 +274,14 @@ IrrGroup::IrrGroup(void) {
   thisgroup = CkpvAccess(_currentGroup);
 }
 
+static void _publishNodeGroup(CkGroupID groupID, IrrGroup *obj);
+
 IrrGroup::~IrrGroup() {
   // remove the object pointer
   if (CkpvAccess(_destroyingNodeGroup)) {
     CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
     CksvAccess(_nodeGroupTable)->find(thisgroup).setObj(NULL);
+    _publishNodeGroup(thisgroup, nullptr);
     CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
     CkpvAccess(_destroyingNodeGroup) = false;
   } else {
@@ -585,8 +589,41 @@ void *CkLocalBranchOther(CkGroupID gID, int rank) {
 static inline void _processBocBcastMsg(CkCoreState* ck, envelope* env);
 static inline void _sendMsgBranchWithinNode(int eIdx, void *msg, CkGroupID gID);
 
+// Ready nodegroup objects of this process by id, readable without
+// _nodeGroupTableImmLock (doc/internals/nodegroup-lookup.md). Covers ids
+// 1..NG_PUB_MAX-1, the ones created on node 0; blocks never move or shrink.
+enum { NG_PUB_BLOCK_BITS = 8, NG_PUB_BLOCK = 1 << NG_PUB_BLOCK_BITS,
+       NG_PUB_BLOCKS = 1 << 12, NG_PUB_MAX = NG_PUB_BLOCK * NG_PUB_BLOCKS };
+typedef std::atomic<IrrGroup *> NodeGroupSlot;
+static std::atomic<NodeGroupSlot *> _nodeGroupPublished[NG_PUB_BLOCKS];
+
+// Writers hold _nodeGroupTableImmLock.
+static void _publishNodeGroup(CkGroupID groupID, IrrGroup *obj) {
+  const int idx = groupID.idx;
+  if (idx <= 0 || idx >= NG_PUB_MAX) return;
+  auto &top = _nodeGroupPublished[idx >> NG_PUB_BLOCK_BITS];
+  NodeGroupSlot *block = top.load(std::memory_order_relaxed);
+  if (block == nullptr) {
+    if (obj == nullptr) return;
+    block = new NodeGroupSlot[NG_PUB_BLOCK]();
+    top.store(block, std::memory_order_release);
+  }
+  block[idx & (NG_PUB_BLOCK - 1)].store(obj, std::memory_order_release);
+}
+
+// nullptr: not ready, or an id the published table does not cover.
+static inline IrrGroup *_publishedNodeGroup(CkGroupID groupID) {
+  const int idx = groupID.idx;
+  if (idx <= 0 || idx >= NG_PUB_MAX) return nullptr;
+  NodeGroupSlot *block =
+      _nodeGroupPublished[idx >> NG_PUB_BLOCK_BITS].load(std::memory_order_acquire);
+  if (block == nullptr) return nullptr;
+  return block[idx & (NG_PUB_BLOCK - 1)].load(std::memory_order_acquire);
+}
+
 static
 void *_ckLocalNodeBranch(CkGroupID groupID) {
+  if (void *obj = _publishedNodeGroup(groupID)) return obj;
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
   auto &entry = CksvAccess(_nodeGroupTable)->find(groupID);
   void *retval = entry.isReady() ? entry.getObj() : nullptr;
@@ -1003,6 +1040,7 @@ void CkCreateLocalNodeGroup(CkGroupID groupID, int epIdx, envelope *env)
   CksvAccess(_nodeGroupTable)->find(groupID).setcIdx(gIdx);
   CksvAccess(_nodeGroupIDTable).push_back(groupID);
   CkReadyEntry(CksvAccess(_nodeGroupTable)->find(groupID), true);
+  _publishNodeGroup(groupID, static_cast<IrrGroup *>(obj));
   CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
 
   _STATS_RECORD_PROCESS_NODE_GROUP_1();
@@ -1370,7 +1408,13 @@ static inline void _processForNodeBocMsg(CkCoreState *ck,envelope *env)
   if(isGroupDepUnsatisfied(ck, env))
     return;
   CkGroupID groupID = env->getGroupNum();
-  void *obj;
+  void *obj = _publishedNodeGroup(groupID);
+  if (obj) {
+    ck->process(); // ck->process() updates mProcessed count used in QD
+    _invokeEntry(env->getEpIdx(),env,obj);
+    _STATS_RECORD_PROCESS_NODE_BRANCH_1();
+    return;
+  }
 
   CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
   obj = CksvAccess(_nodeGroupTable)->find(groupID).getObj();
@@ -2315,9 +2359,12 @@ void CkSendMsgNodeBranchInline(int eIdx, void *msg, int node, CkGroupID gID, int
   if (node==CkMyNode()) {
     if (CMI_ZC_MSGTYPE(UsrToEnv(msg)) == CMK_REG_NO_ZC_MSG)
     {
-      CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
-      void *obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();
-      CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
+      void *obj = _publishedNodeGroup(gID);
+      if (obj == NULL) {
+        CmiImmediateLock(CksvAccess(_nodeGroupTableImmLock));
+        obj = CksvAccess(_nodeGroupTable)->find(gID).getObj();
+        CmiImmediateUnlock(CksvAccess(_nodeGroupTableImmLock));
+      }
       if (obj!=NULL)
       { //Just directly call the nodegroup; see CkSendMsgBranchInline.
         envelope *env=_prepareMsgBranch(eIdx,msg,gID,ForNodeBocMsg);
