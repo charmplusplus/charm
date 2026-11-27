@@ -3483,7 +3483,8 @@ The detailed APIs of these two methods are described as follows:
    out; the mode is per PE, and called from an initproc, before the load
    balancing manager exists, they set the mode the PEs start in. In
    manual mode ``AtSync()`` does not start a step: the element waits
-   until the program calls ``CkStartLB()``. With TreeLB and the
+   until the program calls ``CkStartLB()``, and the first such
+   ``AtSync()`` in a process prints a warning saying so. With TreeLB and the
    centralized balancers one call on any PE starts a step on every PE;
    a distributed balancer (DistBaseLB) acts on the calling PE only, so
    every PE must call it. When the step ends, every element with
