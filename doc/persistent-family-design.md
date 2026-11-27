@@ -43,6 +43,10 @@ index onto the owner PE's fired list in the counter area, not an IPC block onto 
 same-host measurements and where xpmem exists (6); phase 2's measurement of source buffers whose
 addresses change, which finds no need for a source-region option (6); phase 3's status (15).
 
+Revised 2026-11-27, after review of reconverse#343: a destroy is safe once a round that every
+origin's *puts* counted toward has *fired*; for *puts* without a counter the API gives no safe point yet
+(10.1, 10.2).
+
 ## In brief: the calls added, kept and removed
 
 The receiver, called the **owner**, registers a buffer once (a **region**) and an atomic count with an
@@ -1095,9 +1099,13 @@ the same id-block code would serve them.
     arrives.
   - `CmiRegionDestroy` completes when every balance it knows of is zero (10.2).
   - A detach notice for a generation already destroyed is dropped. A registration for one is answered
-    with a detach request, so a process that *attached* late does not keep its mapping. An attached
-    process the owner had not heard of at destroy time has *put* nothing since the last round (10.2,
-    step 1), so freeing the region then is safe.
+    with a detach request, so a process that *attached* late does not keep its mapping.
+  - An attached process the owner had not heard of at destroy time can be ignored only if nothing of
+    it is in flight. That holds when the destroy follows the *firing* of a round that every origin's
+    *puts* counted toward (10.2, step 1): every contribution to that round has landed, registered or
+    not. It does not hold for *puts* without a counter, or for a counter destroyed before its last round
+    *fired*. There a registration can still be on its way when the destroy completes, since no message
+    order is guaranteed, and a *put* can land after the memory is freed (review of reconverse#343).
 - **Sharing.** Attachments are kept per process, keyed by (owner process, region id, generation), so the
   targets of one region used in one process share one registration and one mapping. In Converse each
   `CmiAttachTarget` returns a counted reference, and the last `CmiDetachTarget` in the process *detaches*
@@ -1109,7 +1117,13 @@ the same id-block code would serve them.
 
 ### 10.2 Teardown
 
-1. The application stops *putting* into the region; its logic knows the last round.
+1. The application stops *putting* into the region; its logic knows the last round. The owner calls
+   destroy only after that round has *fired*, so that every origin's contributions have landed.
+   *Puts* without a counter have no *firing* to wait for. For them the application needs a sign that
+   every origin's *puts* have landed, and an application message from the origin is not one, since
+   it can overtake the origin's registration. The current API gives no such sign; an optional
+   completion callback on detach, run once the owner has applied the notice, would (a possible
+   follow-up).
 2. Every attached process *detaches*. *Detaching* waits for that process's own *puts* into the region to
    complete locally, removes its mappings, and sends one detach notice to the owner. The notice needs no
    reply, so it is carried per 9.2 when possible.
