@@ -999,6 +999,7 @@ if(${TARGET} STREQUAL "charm4py")
 
   if (${BUILD_CUDA})
     target_link_libraries(charm cudart hybridapi)
+    set_target_properties(charm PROPERTIES CUDA_RUNTIME_LIBRARY None)
   endif()
 
   if (${BUILD_HIP})
