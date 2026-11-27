@@ -1,0 +1,37 @@
+mainmodule iopost
+{
+  include "ckio.h";
+
+  readonly CProxy_Main mainProxy;
+  readonly CProxy_Recv recvProxy;
+  readonly CProxy_Sender senderProxy;
+
+  mainchare Main
+  {
+    entry Main(CkArgMsg* m);
+    entry void fileReady(Ck::IO::FileReadyMsg* m);
+    entry void sessionReady(Ck::IO::SessionReadyMsg* m);
+    entry void matched();
+    entry void posted();
+    entry void readDone(Ck::IO::ReadCompleteMsg* m);
+    entry void received();
+  };
+
+  group PeZeroMap : CkArrayMap
+  {
+    entry PeZeroMap();
+  };
+
+  group Sender
+  {
+    entry Sender();
+    entry void send(int to, char fill);
+  };
+
+  array[1D] Recv
+  {
+    entry Recv();
+    entry void recv(nocopypost char data[n], size_t n);
+    entry void post();
+  };
+}

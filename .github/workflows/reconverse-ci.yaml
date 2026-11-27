@@ -99,6 +99,7 @@ env:
     tests/charm++/objid_bindasync
     tests/charm++/objid_boundmany
     tests/charm++/io_sessions
+    tests/charm++/io_post_tag
     tests/charm++/groupdep_creator
     tests/charm++/objid_boundrecreate
     tests/charm++/anytime_bcastred

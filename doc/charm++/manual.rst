@@ -6058,10 +6058,13 @@ in the .C file will be:
 
      ncpyPost[0].deregMode = CK_BUFFER_DEREG; // specify the deregMode for the 0th pointer
 
-     CkMatchBuffer(ncpyPost, 0, 22);
+     myTag = CkNewPostTag(); // myTag is a member of the chare
+
+     CkMatchBuffer(ncpyPost, 0, myTag);
    }
 
-As seen in the above example, the ``CkMatchBuffer`` call associates the 0th source buffer with tag 22.
+As seen in the above example, the ``CkMatchBuffer`` call associates the 0th source buffer with the tag ``myTag``,
+which ``CkNewPostTag`` (described below) returned.
 It has the following signature:
 
 .. code-block:: c++
@@ -6075,18 +6078,18 @@ Post Entry Method. The second parameter is the index of the nocopypost buffer am
 in the entry method, starting with 0. For example, for 1 nocopypost buffer sent in the entry method, the index will
 always be 0. For 2 nocopypost buffers, the index will be 0 for the first buffer and 1 for the second buffer. For n
 buffers, it will be 0 for the first buffer, 1 for the second buffer, 2 for the third buffer up to (n-1) for the nth buffer.
-The third parameter is a user provided integer tag (22 in this case), used to associate the 0th source buffer of this
-entry method with tag 22.
+The third parameter is an integer tag (``myTag`` in this case), used to associate the 0th source buffer of this
+entry method with that tag.
 
-In order to post a buffer when ready, the user has to also call ``CkPostBuffer`` with the same tag (22) to associate
-the tag (22) with a receiver or destination buffer. As mentioned earlier, this function can be called at any time the user
+In order to post a buffer when ready, the user has to also call ``CkPostBuffer`` with the same tag (``myTag``) to associate
+the tag with a receiver or destination buffer. As mentioned earlier, this function can be called at any time the user
 is ready to post a buffer. The following code illustrates the usage of ``CkPostBuffer``, which is called in a function
 when the user is ready to supply a destination buffer.
 
 .. code-block:: c++
 
    void readyToPost() {
-     CkPostBuffer(myBuffer, mySize, 22);
+     CkPostBuffer(myBuffer, mySize, myTag);
    }
 
 As seen in the above example, the ``CkPostBuffer`` call has the following signature:
@@ -6101,12 +6104,27 @@ The first parameter is the destination buffer pointer where the user wants the s
 is the size of the destination buffer. This size must be smaller than or equal to the size of the source buffer; a larger posted
 size aborts the run. When it is smaller, only that many bytes are transferred, and the size argument of the regular entry method
 still carries the sender's size, so the receiver must use its own record of what it posted (see issue #3989).
-The third parameter is the same user provided integer tag (22 in this case) that was used in the corresponding ``CkMatchBuffer``
+The third parameter is the same integer tag (``myTag`` in this case) that was used in the corresponding ``CkMatchBuffer``
 call inside the Post Entry Method.
 
-It is important to associate a unique tag with the ``CkMatchBuffer`` and ``CkPostBuffer`` calls for a single buffer on that PE.
-Using the same tag on the PE when the RDMA transfer is in progress triggers an abort from the runtime system because
-the same tag cannot be used to denote two different buffers in the internal PE-level data structures.
+The runtime system keeps the tags in tables per PE that every chare and library on the PE shares, so a tag must be
+unique among all of them while its transfer is in progress. A second ``CkMatchBuffer``, or a second ``CkPostBuffer``,
+with a tag that is in use aborts the run. A ``CkMatchBuffer`` and a ``CkPostBuffer`` with the same tag are paired even
+when they come from different chares, and the data then lands in the other chare's buffer. A constant tag is therefore
+safe only while one chare on the PE uses it.
+
+``CkNewPostTag`` returns a tag that no earlier call on the PE has returned:
+
+.. code-block:: c++
+
+   int CkNewPostTag();
+
+It hands out the negative tags in turn, CkIO takes its tags from it too, and a tag comes back only after about two
+billion calls on the PE. The chare keeps the tag, as ``myTag`` above, until it has made both calls with it, and needs
+one tag for each buffer in transfer. When the buffer is posted before the data arrives, the chare takes the tag before
+``CkPostBuffer`` and passes the same tag to ``CkMatchBuffer`` in the Post Entry Method. A tag that the application
+picks itself must be 0 or more and unique on the PE, for example a separate offset for each collection plus the
+element's index.
 
 After the execution of the Post Entry Method with the ``CkMatchBuffer`` calls and corresponding ``CkPostBuffer`` calls,
 the regular entry method is executed to signal the completion of all zero copy transfers into the posted receiver buffers.
@@ -6137,21 +6155,23 @@ In the .C file, we define a post entry method and a regular entry method:
 
     ncpyPost[0].regMode = CK_BUFFER_UNREG;
     ncpyPost[0].deregMode = CK_BUFFER_DEREG;
-    CkMatchBuffer(ncpyPost, 0, 60);
+    myTag1 = CkNewPostTag();
+    CkMatchBuffer(ncpyPost, 0, myTag1);
 
     ncpyPost[1].regMode = CK_BUFFER_PREREG; // myBuffer2 is allocated using CkRdmaAlloc
     ncpyPost[1].deregMode = CK_BUFFER_NODEREG;
-    CkMatchBuffer(ncpyPost, 1, 61);
+    myTag2 = CkNewPostTag();
+    CkMatchBuffer(ncpyPost, 1, myTag2);
   }
 
   void otherFn1() {
     // somewhere else in the code
-    CkPostBuffer(myBuffer1, mySize1, 60);
+    CkPostBuffer(myBuffer1, mySize1, myTag1);
   }
 
   void otherFn2() {
     // somewhere else in the code
-    CkPostBuffer(myBuffer2, mySize2, 61);
+    CkPostBuffer(myBuffer2, mySize2, myTag2);
   }
 
   // regular entry method
@@ -6178,7 +6198,8 @@ Similar to the PE-level API, it is important to associate a unique tag with the
 ``CkMatchNodeBuffer`` and ``CkPostNodeBuffer`` calls for a single buffer on that node.
 Using the same tag on the node when the RDMA transfer is in progress triggers an abort
 from the runtime system because the same tag cannot be used to denote two different buffers
-in the internal node-level data structures.
+in the internal node-level data structures. ``CkNewPostTag`` keeps tags unique only on a PE,
+so it is not for the node-level calls.
 
 Similar to the Zero Copy Entry Method Send API, it should be noted that calls to
 entry methods with nocopypost specified parameters are currently supported for
