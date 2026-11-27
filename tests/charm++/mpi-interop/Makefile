@@ -97,8 +97,9 @@ testexit: mpi_exitcode
 # from a nodegroup entry method, then the last PE calls CkExit(code). Every
 # process must exit with code (exitstatus.sh prints each one's status; after
 # a nonzero status mpirun may end the other processes' scripts before they
-# print, so then at least one line is required), and CkExit must not return
-# to its caller. A process that exits with status 0
+# print, so then at least one line is required; srun does not end them, so
+# with a LAUNCH that starts with srun all NP lines are required), and CkExit
+# must not return to its caller. A process that exits with status 0
 # without MPI_Finalize makes mpirun fail the code 0 run.
 testmain: mpi_main_exit mpi_main_exit_charmc
 	@for prog in mpi_main_exit mpi_main_exit_charmc; do for code in 0 3; do \
@@ -110,7 +111,8 @@ testmain: mpi_main_exit mpi_main_exit_charmc
 	    echo "testmain: $$prog: launcher exit status $$rc, expected $$code"; exit 1; fi; \
 	  n=`grep -c "^process exit status $$code$$" main.out`; \
 	  all=`grep -c "^process exit status" main.out`; \
-	  if [ $$n -ne $$all ] || [ $$n -eq 0 ] || { [ $$code -eq 0 ] && [ $$n -ne $(NP) ]; }; then \
+	  strict=no; case "$(LAUNCH)" in srun*) strict=yes;; esac; \
+	  if [ $$n -ne $$all ] || [ $$n -eq 0 ] || { { [ $$code -eq 0 ] || [ $$strict = yes ]; } && [ $$n -ne $(NP) ]; }; then \
 	    echo "testmain: $$prog: $$n of $$all reported processes ($(NP) started) exited with status $$code"; exit 1; fi; \
 	  if ! grep -q "exitcode: MPI_Allreduce sum $(NP) correct" main.out; then \
 	    echo "testmain: $$prog: no MPI_Allreduce result"; exit 1; fi; \

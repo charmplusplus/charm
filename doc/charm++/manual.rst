@@ -10794,6 +10794,20 @@ Charm++ is next entered (``StartCharmScheduler`` in the next interface
 function call). For a clean boundary between phases, end a Charm++ phase
 with ``CkStartQD`` and call ``CkExit`` from the quiescence callback.
 
+The same holds for a blocking MPI call made from Charm++ code, such as
+an entry method, during a Charm++ phase. A Charm++ send or broadcast that has returned may still need
+communication progress, on the sending process and on the receiving
+processes, before the message is delivered. A PE blocked inside an MPI
+call makes no such progress. With one PE per process, entering a
+blocking MPI call right after sending or broadcasting messages
+(especially large ones), or while other processes are still sending to
+this one, can therefore stall the job: for example, an MPI collective
+never completes if the broadcast that tells the other processes to enter
+it has not left the process that is already blocked in it. With several
+PEs per process, the other PEs keep making progress. Work to complete
+sends without further progress in this situation is under way; until
+then, do not rely on it.
+
 Compilation and Execution
 ~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -10865,23 +10879,30 @@ runs the program as an ordinary Charm++ run. It does not return.
 ``CkExit(code)`` behaves as in any Charm++ program: it does not return to
 its caller, and every process exits with ``code`` after Charm++ has
 called ``MPI_Finalize`` on the thread that called ``CharmMpiMain``. The
-Charm++ source files need no change; in particular they do not include
-``mpi-interoperate.h``.
+Charm++ source files need no change. The source files of chares must not
+include ``mpi-interoperate.h``: it redefines ``CkExit`` to the library
+mode function that returns to its caller. Only the file with ``main``
+includes it.
 
 If a process has several PEs and MPI provides a thread level below
 ``MPI_THREAD_SERIALIZED``, the run aborts at startup. With
 ``MPI_THREAD_SERIALIZED``, at most one PE of a process may be inside an
 MPI call at a time; this holds, for example, when the MPI calls are made
-from entry methods of a nodegroup declared ``[exclusive]`` or of a
-single chare per process.
+from nodegroup entry methods that carry the ``[exclusive]`` attribute,
+or from the entry methods of a single chare per process.
 
-While a PE is blocked in an MPI call it makes no Charm++ communication
-progress, and with one PE per process the whole process makes none. An
-MPI collective called from an entry method must therefore not depend on
-Charm++ messages that the blocked PEs still have to send or receive:
-the collective completes only when every process has entered it, and a
-process cannot enter it if the message that tells it to is still held
-by a PE that is already blocked.
+A Charm++ send or broadcast that has returned may still need
+communication progress, on the sending process and on the receiving
+processes, before the message is delivered. A PE blocked inside an MPI
+call makes no such progress. With one PE per process, entering a
+blocking MPI call right after sending or broadcasting messages
+(especially large ones), or while other processes are still sending to
+this one, can therefore stall the job: for example, an MPI collective
+never completes if the broadcast that tells the other processes to enter
+it has not left the process that is already blocked in it. With several
+PEs per process, the other PEs keep making progress. Work to complete
+sends without further progress in this situation is under way; until
+then, do not rely on it.
 
 ``tests/charm++/mpi-interop`` has a working example (``exitcode.C`` with
 ``mpi_main.cpp``, and the same program linked with ``-mpi-main``).

@@ -204,6 +204,10 @@ End() {
 	then
 	    DoNoErrCheck $RM "$modInitSrc" "$modInitObj" > /dev/null 2>&1
 	fi
+	if [[ -n "$MPI_MAIN" && -n "$mpiMainObj" ]]
+	then
+	    DoNoErrCheck $RM "$mpiMainObj" > /dev/null 2>&1
+	fi
     fi
     exit $1
 }
@@ -2287,7 +2291,8 @@ fi
 # the link compiler, which must be the MPI C++ compiler (-ld++ mpicxx).
 if [[ -n "$MPI_MAIN" ]]
 then
-    runCmd $CHARM_LDXX "${CHARM_CXX_FLAGS[@]}" -c "$CHARMINC/mpi-main.C" -o "$mpiMainObj"
+    DoNoErrCheck $CHARM_LDXX "${CHARM_CXX_FLAGS[@]}" -c "$CHARMINC/mpi-main.C" -o "$mpiMainObj" \
+        || Abort "-mpi-main: the link compiler ($CHARM_LDXX) could not compile $CHARMINC/mpi-main.C, which includes mpi.h. The link compiler must be an MPI C++ compiler wrapper: give one with -ld++, for example -ld++ mpicxx."
 fi
 
 ###############################################################################
