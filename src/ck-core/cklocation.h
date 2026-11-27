@@ -680,6 +680,8 @@ public:
   /// The id of an element of this manager's primary array, from its payload (used
   /// for load balancer object ids; CkArray::makeID gives the per-array id).
   ck::ObjID makeID(CmiUInt8 eid) const { return ck::ObjID(collectionNumber, eid, wideCollection); }
+  /// The load balancer's id for an element (out of line: user code is compiled without CMK_GLOBAL_LOCATION_UPDATE).
+  CmiUInt8 lbObjID(CmiUInt8 eid) const;
 
   CkLocRec* registerNewElement(const CkArrayIndex& idx);
 

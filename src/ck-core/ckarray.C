@@ -2030,16 +2030,7 @@ void CkArray::recordSend(const CmiUInt8 id, const unsigned int bytes, int pe, co
 #if CMK_LBDB_ON
   if (!(opts & CK_MSG_LB_NOTRACE) && locMgr->getLBMgr()->CollectingCommStats())
   {
-    // LB deals in IDs with collection information only when CMK_GLOBAL_LOCATION_UPDATE
-    // is enabled, so add the group information if so.
-#  if CMK_GLOBAL_LOCATION_UPDATE
-    // The id the element registered with the LB (CkLocRec): the manager's, which
-    // differs from this array's for a bound array.
-    const CmiUInt8 lbObjId = locMgr->makeID(id).getID();
-#  else
-    const CmiUInt8 lbObjId = id;
-#  endif
-    locMgr->getLBMgr()->Send(locMgr->getOMHandle(), lbObjId, bytes, pe, 1);
+    locMgr->getLBMgr()->Send(locMgr->getOMHandle(), locMgr->lbObjID(id), bytes, pe, 1);
   }
 #endif
 }

@@ -70,6 +70,7 @@ never be excluded...
 #include "ckrdma.h"
 #include "CkCheckpoint.decl.h"
 #include "ckmulticast.h"
+#include <atomic>
 #include <sstream>
 #include <unordered_set>
 #include <limits.h>
@@ -240,6 +241,8 @@ CkpvStaticDeclare(PtrVec*, _bocInitVec);
 extern int userDrivenMode;
 extern void _libExitHandler(envelope *env);
 extern int _libExitHandlerIdx;
+extern void _libStopSchedulerHandler(void *msg);
+extern int _libStopSchedulerHandlerIdx;
 CpvCExtern(int,interopExitFlag);
 void StopInteropScheduler();
 
@@ -255,7 +258,27 @@ int    _exitHandlerIdx;
 static Stats** _allStats = 0;
 #endif
 static bool   _exitStarted = false;
-static int _exitcode;
+// Exit code of the run. PE 0 records it from the exit request; the other
+// processes take it from the ReqStatMsg.
+static std::atomic<int> _exitcode{0};
+// Set on PE 0 once the ReqStatMsg, which carries _exitcode, has been sent.
+static bool _exitCodeSent = false;
+// Set when a PE of this process has finished the Charm++ exit sequence and
+// returned from ConverseExit (MPI interop).
+static std::atomic<bool> _exitSequenceDone{false};
+
+int _ckExitCode() { return _exitcode.load(); }
+bool _ckExitSequenceDone() { return _exitSequenceDone.load(); }
+
+// Asks PE 0 to start the exit sequence with the given exit code.
+static void _sendStartExit(int exitcode)
+{
+  envelope *env = _allocEnv(StartExitMsg, sizeof(int));
+  *(int *)EnvToUsr(env) = exitcode;
+  env->setSrcPe(CkMyPe());
+  CmiSetHandler(env, _exitHandlerIdx);
+  CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
+}
 
 static InitCallTable _initCallTable;
 
@@ -675,7 +698,9 @@ static void _converseExit()
 #if (CMK_CUDA || CMK_HIP) && CMK_GPU_COMM
   CkRdmaDeviceExit();
 #endif
-  ConverseExit(_exitcode);
+  ConverseExit(_exitcode.load());
+  // Reached only when ConverseExit returns (MPI interop through CharmLibInit).
+  _exitSequenceDone.store(true);
 }
 
 static void _exitHandler(envelope *env)
@@ -684,6 +709,13 @@ static void _exitHandler(envelope *env)
   switch(env->getMsgtype()) {
     case StartExitMsg: // Exit sequence trigger message
       CkAssert(CkMyPe()==0);
+      {
+        // The first request sets the exit code. A later request can change it
+        // only from 0 to nonzero, and only until the code has been sent out.
+        const int code = *(int *)EnvToUsr(env);
+        if (!_exitStarted || (code != 0 && _exitcode.load() == 0 && !_exitCodeSent))
+          _exitcode.store(code);
+      }
       if(_exitStarted) {
         CmiFree(env);
         return;
@@ -702,7 +734,12 @@ static void _exitHandler(envelope *env)
 
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
-      env->setMsgtype(ReqStatMsg);
+      // The ReqStatMsg carries the exit code to every PE.
+      CmiFree(env);
+      env = _allocEnv(ReqStatMsg, sizeof(int));
+      *(int *)EnvToUsr(env) = _exitcode.load();
+      _exitCodeSent = true;
+      CmiSetHandler(env, _exitHandlerIdx);
       env->setSrcPe(CkMyPe());
       // if exit in ring, instead of broadcasting, send in ring
       if (_ringexit){
@@ -720,6 +757,7 @@ static void _exitHandler(envelope *env)
       break;
     case ReqStatMsg: // Request stats and warnings message
       DEBUGF(("ReqStatMsg on %d\n", CkMyPe()));
+      _exitcode.store(*(int *)EnvToUsr(env));
       CkNumberHandler(_charmHandlerIdx,_discardHandler);
       CkNumberHandler(_bocHandlerIdx, _discardHandler);
       {
@@ -1181,11 +1219,7 @@ static void _initHandler(void *msg, CkCoreState *ck)
 #if CMK_SHRINK_EXPAND
 void CkCleanup()
 {
-	// always send to PE 0
-	envelope *env = _allocEnv(StartExitMsg);
-	env->setSrcPe(CkMyPe());
-	CmiSetHandler(env, _exitHandlerIdx);
-	CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
+	_sendStartExit(0);
 }
 #endif
 
@@ -1193,19 +1227,14 @@ CkQ<CkExitFn> _CkExitFnVec;
 
 // Trigger exit on PE 0,
 // which traverses _CkExitFnVec to call every registered user exit function.
-// Every user exit function should end with CkExit() to continue the chain.
+// Every user exit function should end with CkContinueExit() to continue the
+// chain. The exit code goes to PE 0 with the request, and from there to every
+// process, which passes it to ConverseExit.
 // When compiled, #defines in charm.h rename this function to "realCkExit".
 void CkExit(int exitcode)
 {
   DEBUGF(("[%d] CkExit called \n",CkMyPe()));
-    // always send to PE 0
-
-  // Store exit code for use in ConverseExit
-  _exitcode = exitcode;
-  envelope *env = _allocEnv(StartExitMsg);
-  env->setSrcPe(CkMyPe());
-  CmiSetHandler(env, _exitHandlerIdx);
-  CmiSyncSendAndFree(0, env->getTotalsize(), (char *)env);
+  _sendStartExit(exitcode);
 
   _TRACE_END_EXECUTE();
   //Wait for stats, which will call ConverseExit when finished:
@@ -1550,6 +1579,7 @@ void _initCharm(int unused_argc, char **argv)
 	CmiAssignOnce(&_exitHandlerIdx, CkRegisterHandler(_exitHandler));
 	//added for interoperabilitY
 	CmiAssignOnce(&_libExitHandlerIdx, CkRegisterHandler(_libExitHandler));
+	CmiAssignOnce(&_libStopSchedulerHandlerIdx, CkRegisterHandler(_libStopSchedulerHandler));
 	CmiAssignOnce(&_bocHandlerIdx, CkRegisterHandlerEx(_initHandler, CkpvAccess(_coreState)));
 #if CMK_SHRINK_EXPAND
 	// for shrink expand cleanup
