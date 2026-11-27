@@ -28,8 +28,7 @@ While communication statistics are being collected, `sendToSection` records
 each multicast for the load balancer on the PE that sends it, root or not,
 with the ids of the section's members, looked up from their indices (`_elems`
 of the section ID) when it sends, in the form the elements registered with the
-balancer (with the collection bits under `CMK_GLOBAL_LOCATION_UPDATE`). A
-process knows an
+balancer (`CkLocMgr::lbObjID`). A process knows an
 element's id only if it created or holds the element, is its home, or has
 addressed it by index ([object-ids.md](object-ids.md)), so the list leaves out
 members the sending process has not heard of yet, for example when the section

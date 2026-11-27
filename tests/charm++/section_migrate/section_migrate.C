@@ -348,14 +348,13 @@ public:
       CmiUInt8 myLbId = 0;
       if (!locMgr->lookupID(CkArrayIndex1D(thisIndex), myLbId))
         CkAbort("section_migrate: lookupID failed for local root element %d", thisIndex);
-      const CmiUInt8 myWideId = locMgr->makeID(myLbId).getID();
-      std::unordered_set<CmiUInt8> expectedIds, expectedWideIds;
+      myLbId = locMgr->lbObjID(myLbId);
+      std::unordered_set<CmiUInt8> expectedIds;
       for (int i = 0; i < numElems; i++) {
         if (!isMember(i)) continue;
         CmiUInt8 memberId = 0;
         if (locMgr->lookupID(CkArrayIndex1D(i), memberId)) {
-          expectedIds.insert(memberId);
-          expectedWideIds.insert(locMgr->makeID(memberId).getID());
+          expectedIds.insert(locMgr->lbObjID(memberId));
         }
       }
       int sz = lbmgr->GetCommDataSz();
@@ -368,16 +367,14 @@ public:
           const LDObjKey* dests = c.receiver.get_destObjs(len);
           if (len <= 0)
             CkAbort("section_migrate: round %d recorded empty LD_OBJLIST_MSG (len=%d)", r, len);
-          if (!c.from_proc() && c.sender.omID() == om.id &&
-              (c.sender.objID() == myLbId || c.sender.objID() == myWideId)) {
-            const auto& expected = c.sender.objID() == myLbId ? expectedIds : expectedWideIds;
+          if (!c.from_proc() && c.sender.omID() == om.id && c.sender.objID() == myLbId) {
             std::unordered_set<CmiUInt8> recorded;
             for (int k = 0; k < len; k++) {
               if (dests[k].omID() != om.id)
                 CkAbort("section_migrate: round %d wrong dest omID", r);
               if (!recorded.insert(dests[k].objID()).second)
                 CkAbort("section_migrate: round %d duplicate ObjID in LD_OBJLIST_MSG", r);
-              if (expected.find(dests[k].objID()) == expected.end())
+              if (expectedIds.find(dests[k].objID()) == expectedIds.end())
                 CkAbort("section_migrate: round %d unexpected ObjID in LD_OBJLIST_MSG", r);
             }
             if ((size_t)len == expectedIds.size()) foundFullRecord = true;

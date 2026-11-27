@@ -40,7 +40,8 @@ class Elem : public CBase_Elem {
 #if CMK_LBDB_ON
     LBManager *lb = LBManagerObj();
     if (!lb->CollectingCommStats()) CkAbort("mcast_remote: run with +balancer <LB> +LBCommOn");
-    CmiUInt8 me = CProxy_ArrayBase(thisArrayID).ckLocMgr()->lookupID(CkArrayIndex1D(thisIndex));
+    CkLocMgr *mgr = CProxy_ArrayBase(thisArrayID).ckLocMgr();
+    CmiUInt8 me = mgr->lbObjID(mgr->lookupID(CkArrayIndex1D(thisIndex)));
     std::vector<LDCommData> comm(lb->GetCommDataSz());
     lb->GetCommData(comm.data());
     int found = 0;
