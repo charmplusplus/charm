@@ -1281,12 +1281,7 @@ static void deviceChannelRecordSend(CkLocRec* rec, size_t bytes, int dest_pe, bo
   if (rec == NULL || !owner_known) return;
   CkLocMgr* ownerMgr = (CkLocMgr*)CkLocalBranch(owner_mgr);
   if (ownerMgr == NULL || ownerMgr->getLBMgr() == NULL || !ownerMgr->getLBMgr()->CollectingCommStats()) return;
-#  if CMK_GLOBAL_LOCATION_UPDATE
-  const CmiUInt8 lbObjId = ownerMgr->makeID(dest_elem).getID();
-#  else
-  const CmiUInt8 lbObjId = dest_elem;
-#  endif
-  ownerMgr->getLBMgr()->Send(ownerMgr->getOMHandle(), lbObjId, (unsigned int)bytes, dest_pe, 1);
+  ownerMgr->getLBMgr()->Send(ownerMgr->getOMHandle(), ownerMgr->lbObjID(dest_elem), (unsigned int)bytes, dest_pe, 1);
 #endif
 }
 
