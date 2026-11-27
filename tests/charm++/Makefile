@@ -10,6 +10,7 @@ DIRS = \
   provisioning \
   load_balancing \
   ckpt_restart \
+  ckpt_inflight \
   restart_manual_lb \
   delegation \
   sdag \

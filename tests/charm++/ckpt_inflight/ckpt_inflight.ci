@@ -1,0 +1,14 @@
+mainmodule ckpt_inflight {
+  readonly CProxy_Main mainProxy;
+  mainchare [migratable] Main {
+    entry Main(CkArgMsg* m);
+    entry [reductiontarget] void moved(int n);
+    entry void settled();
+    entry void written();
+  };
+  array [1D] E {
+    entry E();
+    entry void hop();
+    entry void leap();
+  };
+};

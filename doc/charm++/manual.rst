@@ -9108,7 +9108,9 @@ The API to checkpoint the application is:
 The string ``dirname`` is the destination directory where the checkpoint
 files will be stored, and ``cb`` is the callback function which will be
 invoked after the checkpoint is done, as well as when the restart is
-complete. If ``CkStartCheckpoint`` is called again before ``cb`` has
+complete. The checkpoint is written once no array element is migrating,
+so an element that called ``migrateMe`` before ``CkStartCheckpoint`` is
+written on its new PE. If ``CkStartCheckpoint`` is called again before ``cb`` has
 been called, the new request may be silently dropped. When the
 optional parameter ``requestStatus`` is true, the callback ``cb`` is
 sent a message of type ``CkCheckpointStatusMsg`` which includes an
