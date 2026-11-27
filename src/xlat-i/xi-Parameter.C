@@ -279,12 +279,11 @@ void ParamList::size(XStr& str)
       else if (container->isArray())
       {
         // Not lastKnown(): for an element this PE has no location for, it
-        // returns the home PE, and the home of a dynamically inserted element
-        // is a hash of its index, not where the element lives. The sender
-        // would prepare the buffers for the wrong process. An unknown location
-        // is passed on as such, and CkRdmaDeviceOnSender prepares the buffers
-        // so that any process can read them.
-        str << "  dest_pe = ckLocMgr()->whichPe(ckGetIndex());\n";
+        // returns the home PE, which is not where an inserted or migrated
+        // element lives. An unknown location is passed on as such, and
+        // CkRdmaDeviceOnSender prepares the buffers so that any process can
+        // read them; the lookup asks the home, so later sends know the PE.
+        str << "  dest_pe = ckLocMgr()->whichPeOrRequest(ckGetIndex());\n";
         str << "  if (dest_pe < 0) dest_pe = CK_DEVICE_DEST_UNKNOWN;\n";
       }
       else if (container->isNodeGroup())

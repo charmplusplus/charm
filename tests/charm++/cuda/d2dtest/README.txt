@@ -55,9 +55,11 @@ What it checks
      lives, and a sender's first message to a neighbour is sent before the
      sending PE has a location for it. The sender must not prepare the buffers
      for the home's process: it registers them for a receiver in any process,
-     and a receiver in the sender's own process copies on the device. The line
-     "inserted  N sends had no location for the destination" says how many
-     sends took this route.
+     and a receiver in the sender's own process copies on the device. The
+     lines "array     N sends had no location for the destination" and
+     "inserted  N sends ..." say how many sends took this route. Only a
+     sender's first message may: the sender then asks the home for the
+     location, so N is at most the number of senders in either ring.
 
 Building
 --------

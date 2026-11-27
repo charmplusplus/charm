@@ -198,16 +198,20 @@ public:
     // and the home PE agree; fall back to the home PE before the cache is
     // populated.
     //
-    // In the inserted ring the home PE of an element is a hash of its index,
-    // not where it lives, and the first send to a neighbour finds no location
-    // for it. The runtime then registers the buffers for a receiver in any
-    // process (CK_DEVICE_DEST_UNKNOWN); the tally counts the path the layout
-    // implies for the PE the element was inserted on.
+    // A send to a neighbour this PE has no location for (the first one, in
+    // either ring, when the neighbour is in another process) registers the
+    // buffers for a receiver in any process (CK_DEVICE_DEST_UNKNOWN) and asks
+    // the home, so later sends know the PE. In the inserted ring the home PE
+    // of an element is a hash of its index, not where it lives; the tally
+    // counts the path the layout implies for the PE it was inserted on.
     CkLocMgr* locMgr = thisProxy.ckLocMgr();
     const CkArrayIndex1D dstIdx(dst);
     int dstPe = locMgr->whichPe(dstIdx);
+    if (dstPe < 0) {
+      ep->tally[T_UNKNOWN]++;
+      CkEnforce(ep->tally[T_UNKNOWN] <= 1);
+    }
     if (inserted) {
-      if (dstPe < 0) ep->tally[T_UNKNOWN]++;
       dstPe = insertedPe(dst);
     } else if (dstPe < 0) {
       dstPe = locMgr->homePe(dstIdx);
@@ -413,6 +417,8 @@ public:
 
     const int modes = total[T_MEMCPY] + total[T_IPC] + total[T_RDMA];
     CkEnforce(modes == msgs);
+    // Only a sender's first message can lack the destination's location.
+    CkEnforce(total[T_UNKNOWN] <= nsenders);
 
     // The modes actually taken have to match what the job layout allows.
     if (CkNumNodes() == 1) {
@@ -447,6 +453,8 @@ public:
     awaitTally();
     checkPhase("array", nElems, 2);
     const int arrayValues = total[T_VALUES];
+    CkPrintf("[d2dtest] array     %d sends had no location for the destination\n",
+             total[T_UNKNOWN]);
 
     // ---- 2. group ----
     for (int it = 0; it < nIters; it++) {

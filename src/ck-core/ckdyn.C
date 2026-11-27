@@ -146,13 +146,14 @@ void ArrayElemDyn::fillTarget(CkDynTarget *t) const {
 /* The PE of an array element for a device send: -1 before the array has a
    branch on this PE (the device send path then aborts with its own message),
    CKDYN_DEVICE_DEST_UNKNOWN (CK_DEVICE_DEST_UNKNOWN) when this PE has no
-   location for the element. Not lastKnown(), which then names the home PE: a
-   hash of the index for a dynamically inserted element, not where it lives. */
+   location for the element (the lookup then asks the home, so a later send
+   knows it). Not lastKnown(), which then names the home PE: not where an
+   inserted or migrated element lives. */
 #define CKDYN_DEVICE_DEST_UNKNOWN (-2)
 static int lastKnownPe(int aid, const CkArrayIndex &ix) {
   CkArray *a = CkArrayID(gidOf(aid)).ckLocalBranch();
   if (!a) return -1;
-  const int pe = a->getLocMgr()->whichPe(ix);
+  const int pe = a->getLocMgr()->whichPeOrRequest(ix);
   return pe < 0 ? CKDYN_DEVICE_DEST_UNKNOWN : pe;
 }
 
