@@ -5,7 +5,9 @@
 # sidecar into the run record.
 #
 # Usage: commbench-run.sh SITE PLACEMENT [ARGS...]
-#   SITE       mac | anvil | delta | frontier | generic
+#   SITE       an entry of sites.json next to this script (mac, anvil, delta,
+#              frontier, generic), which gives the launcher, environment and
+#              modules
 #   PLACEMENT  P0  1 process, 2 PEs
 #              P1  2 hosts x 1 process
 #              P2  1 host x 2 processes
@@ -16,6 +18,7 @@
 #              (--methods get,put --sizes 8:1m:4 ...).
 #
 # Run inside a Slurm allocation on the clusters. Environment:
+#   SITES_FILE   the per-site settings (default: sites.json next to this script)
 #   CHARM_BUILD  build directory (default: where the tree's bin link points)
 #   OUT_DIR      results directory (default: ./commbench-results)
 #   COMMBENCH    the binary (default: ../commbench next to this script)
@@ -46,47 +49,54 @@ OUT_DIR=${OUT_DIR:-$PWD/commbench-results}
 [[ -x $COMMBENCH ]] || { echo "no commbench binary at $COMMBENCH; run make first" >&2; exit 2; }
 mkdir -p "$OUT_DIR" || exit 2
 
-# Site settings, as in tests/reconverse-site-run.sh (see its comments for why).
-SRUN="srun --mpi=pmi2"
-SINGLE_NODE_FLAGS=()
-case "$SITE" in
-  mac) ;;
-  anvil)
-    # The hwloc module (1.11, libhwloc.so.5) is needed only by a build
-    # configured against it. A build against Open MPI's hwloc 2.5.0
-    # (libhwloc.so.15, found through RPATH) must not load it.
-    module load python/3.9.5
-    if ldd "$CHARM_BUILD/lib/libreconverse.so" 2>/dev/null | grep -q 'libhwloc\.so\.5'; then
-      module load hwloc
-      export LD_LIBRARY_PATH=${RCAC_HWLOC_ROOT:?}/lib:${LD_LIBRARY_PATH:-}
-    fi
-    ;;
-  delta)
-    export FI_PROVIDER=cxi LCI_NETWORK_BACKENDS=ofi
-    SRUN="srun --mpi=pmix"
-    ;;
-  frontier)
-    export FI_PROVIDER=cxi LCI_NETWORK_BACKENDS=ofi
-    export PMI_MAX_KVS_ENTRIES=${PMI_MAX_KVS_ENTRIES:-1000}
-    SRUN="srun"
-    SINGLE_NODE_FLAGS=(--network=single_node_vni)
-    ;;
-  generic) ;;
-  *) echo "unknown SITE=$SITE" >&2; exit 2 ;;
-esac
+# Site settings from SITES_FILE (see the "_about" entry there). python3 turns
+# the site's entry into shell commands; the module loads and exports must run
+# in this shell.
+SITES_FILE=${SITES_FILE:-$HERE/sites.json}
+SITE_SH=$(python3 - "$SITES_FILE" "$SITE" <<'EOF'
+import json, shlex, sys
+path, site = sys.argv[1], sys.argv[2]
+try:
+    sites = json.load(open(path))
+except (OSError, ValueError) as e:
+    sys.exit("cannot read %s: %s" % (path, e))
+if site.startswith("_") or site not in sites:
+    names = ", ".join(k for k in sites if not k.startswith("_"))
+    sys.exit("unknown SITE=%s; %s has: %s" % (site, path, names))
+s = sites[site]
+q = shlex.quote
+out = ["SITE_LAUNCHER=" + q(s.get("launcher", "srun --mpi=pmi2"))]
+for m in s.get("modules", []):
+    out.append("module load " + q(m))
+for c in s.get("modules_if_linked", []):
+    body = ["module load " + q(m) for m in c.get("modules", [])]
+    if c.get("lib_dir_var"):
+        v = c["lib_dir_var"]
+        body.append('export LD_LIBRARY_PATH="${%s:?}/lib:${LD_LIBRARY_PATH:-}"' % v)
+    out.append('if ldd "$CHARM_BUILD/lib/libreconverse.so" 2>/dev/null | grep -q %s; then %s; fi'
+               % (q(c["pattern"]), "; ".join(body) or ":"))
+for k, v in s.get("env", {}).items():
+    out.append("export %s=%s" % (k, q(str(v))))
+for k, v in s.get("env_default", {}).items():
+    out.append('if [ -z "${%s:-}" ]; then export %s=%s; else export %s; fi' % (k, k, q(str(v)), k))
+out.append("SINGLE_NODE_FLAGS=(" + " ".join(q(f) for f in s.get("single_node_flags", [])) + ")")
+print("\n".join(out))
+EOF
+) || exit 2
+eval "$SITE_SH"
 export LD_LIBRARY_PATH=$CHARM_BUILD/lib:${LD_LIBRARY_PATH:-}
-read -r -a LAUNCH <<< "${LAUNCHER:-$SRUN}"
+read -r -a LAUNCH <<< "${LAUNCHER:-$SITE_LAUNCHER}"
 
 IPC=()
 [[ $PLACEMENT == P2i ]] && IPC=(+ipc)
-if [[ $SITE == mac ]]; then
-  # No affinity on macOS. Multi-process runs go through lcrun, one at a time
-  # per machine.
+if [[ $SITE_LAUNCHER == lcrun ]]; then
+  # One host, no Slurm (the Mac: no affinity either). Multi-process runs go
+  # through the build's lcrun, one at a time per machine.
   LCRUN=$CHARM_BUILD/_deps/lci-src/lcrun
   case "$PLACEMENT" in
     P0) CMD=("$COMMBENCH" +pe 2) ;;
     P2|P2i) CMD=("$LCRUN" -n 2 "$COMMBENCH" +pe 2 ${IPC[@]+"${IPC[@]}"}) ;;
-    *) echo "placement $PLACEMENT needs two hosts; the mac has one" >&2; exit 2 ;;
+    *) echo "placement $PLACEMENT needs two hosts; SITE=$SITE has one" >&2; exit 2 ;;
   esac
 else
   case "$PLACEMENT" in
