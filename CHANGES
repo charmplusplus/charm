@@ -639,7 +639,7 @@ Build and packaging:
   rebuild with --force (#4256).
 
 - The charm4py target builds and loads on reconverse: libcharm links
-  reconverse, which is built with CMK_CHARM4PY (#4063).
+  reconverse (#4063).
 
 - --build-shared links on reconverse: charmc searches lib_so/, where
   libreconverse and LCI's libraries are, and records it as an RPATH,

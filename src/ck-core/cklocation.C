@@ -1972,10 +1972,7 @@ CkLocRec::CkLocRec(CkLocMgr* mgr, bool fromMigration, bool ignoreArrival,
   lbmgr = mgr->getLBMgr();
   if (_lb_args.metaLbOn())
     the_metalb = mgr->getMetaBalancer();
-#  if CMK_GLOBAL_LOCATION_UPDATE
-  id_ = mgr->makeID(id_).getID();
-#  endif
-  ldHandle = lbmgr->RegisterObj(mgr->getOMHandle(), id_, (void*)this, 1);
+  ldHandle = lbmgr->RegisterObj(mgr->getOMHandle(), mgr->lbObjID(id_), (void*)this, 1);
   if (fromMigration)
   {
     DEBL((AA "Element %s migrated in\n" AB, idx2str(idx)));
@@ -3239,6 +3236,15 @@ bool CkLocMgr::requestLocation(const CkArrayIndex& idx, const int peToTell)
   return false;
 }
 
+CmiUInt8 CkLocMgr::lbObjID(CmiUInt8 eid) const
+{
+#if CMK_GLOBAL_LOCATION_UPDATE
+  return makeID(eid).getID();
+#else
+  return eid;
+#endif
+}
+
 bool CkLocMgr::recoverIndex(CmiUInt8 id, CkArrayIndex& idx) const
 {
   if (compressor)
@@ -3853,6 +3859,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
 
+  CkMigrationStarted();
   thisProxy[toPe].immigrate(msg);
 
 #if CMK_CUDA
@@ -3953,6 +3960,7 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
   PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
 #endif
 
+  CkMigrationFinished();
   insertID(idx, msg->id);
 
   // Create a record for this element

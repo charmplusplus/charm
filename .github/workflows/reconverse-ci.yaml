@@ -120,6 +120,7 @@ env:
     tests/charm++/ckcoro
     tests/charm++/sparse-coro
     tests/charm++/ckpt_restart
+    tests/charm++/ckpt_inflight
     tests/charm++/restart_manual_lb
     tests/charm++/arraymap_insert_abort
     tests/charm++/qd

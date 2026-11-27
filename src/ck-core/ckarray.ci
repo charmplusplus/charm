@@ -50,7 +50,10 @@ module CkArray {
     entry void inmem_checkpoint(CkArrayCheckPTReqMessage *);
     // _PIPELINED_ALLREDUCE_
     entry void defrag(CkReductionMsg*);
-    // Called by migrateMe
+    // Sent by migrateMe, which counts the migration as started; counts it
+    // as finished, so that a disk checkpoint waits for it.
+    entry void ckEmigrateCounted(int toPe);
+    // The same move, uncounted, for a program that sends it directly.
     entry void ckEmigrate(int toPe);
     // Runtime control events of the device channels this element receives on
     // (a sender's resolve, an announced put), delivered wherever the element lives.

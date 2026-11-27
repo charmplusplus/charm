@@ -960,8 +960,9 @@ void CkMulticastMgr::sendToSection(CkDelegateData *pd,int ep,void *m, CkSectionI
     ObjKeyList keys;
     keys.reserve(sid->_elems.size());
     CmiUInt8 key;
-    for (const CkArrayIndex &idx : sid->_elems)
-      if (mgr->lookupID(idx, key)) keys.push_back(key);
+    for (const CkArrayIndex &idx : sid->_elems) {
+      if (mgr->lookupID(idx, key)) keys.push_back(mgr->lbObjID(key));
+    }
     LBManagerObj()->MulticastSend(mgr->getOMHandle(),keys.data(),keys.size(),UsrToEnv(msg)->getTotalsize());
   }
 #endif
