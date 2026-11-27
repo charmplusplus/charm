@@ -687,6 +687,10 @@ Known gaps in the beta:
 - Checkpoints written by 9.0.0-beta1 or earlier, 8.x included, cannot
   be restored; the restart stops with a message that says why.
 
+- Bit-vector message priorities (CK_QUEUEING_BFIFO, CK_QUEUEING_BLIFO)
+  are not supported: such messages are queued at priority 0, with no
+  warning. Integer priorities work.
+
 ================================================================================
 What's new in Charm++ 8.1.0
 ================================================================================
