@@ -1003,11 +1003,23 @@ filled buffers; it is both a C++ member function and an entry method, so
 calls ``tflush()`` when it has finished generating a batch of work, or
 enables timed flushing in the constructor.
 
-tramlib sends ordinary Charm++ messages and delivers items from entry
-methods, so quiescence detection (``CkStartQD``) works as usual once every PE
-has flushed. ``htramQuiesce(cb)``, an entry method, does this for the
-application: it waits for quiescence, flushes every PE, waits again, and
-invokes ``cb`` when no item is left in a buffer.
+Quiescence detection (``CkStartQD``) counts messages, not the items in
+tramlib's buffers. A plain ``CkStartQD`` can therefore invoke its callback
+while items are still buffered, even with timed flushing enabled, because a
+pending timer is not a message. It is safe only once every PE has flushed
+after inserting its last item. To end a phase, call ``htramQuiesce(cb)``, an
+entry method, on the ``HTram`` group's element on PE 0 instead
+(``tram[0].htramQuiesce(cb)``); the callback is stored and invoked there. It
+waits for quiescence, so it flushes nothing while items are still being
+generated. It then flushes every PE, waits for quiescence again, and counts
+the items left in buffers, including items that the priority hold has
+admitted but not yet sent. It repeats these steps until the count is zero,
+and then invokes ``cb``. Items that the priority hold still holds back are
+not counted, so ``cb`` can be invoked while items are held; they are sent
+after a later ``changeThreshold`` admits them. With
+``setInputBufferDelivery(true)``, ``htramQuiesce`` does not see items waiting
+in input buffers either; count items as described under "Settings for
+delivery within a process".
 
 A second set of calls has the same meaning in every aggregation mode. It is
 intended for applications that select the mode at run time:
