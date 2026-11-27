@@ -123,6 +123,7 @@ env:
     tests/charm++/arraymap_insert_abort
     tests/charm++/qd
     tests/charm++/within_node_bcast
+    tests/charm++/nodegroup_lookup
     tests/charm++/zerocopy/zerocopy_with_qd
     tests/charm++/zerocopy/direct_api
     tests/charm++/zerocopy/large_bcast
