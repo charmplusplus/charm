@@ -107,7 +107,7 @@ Runtime (reconverse):
   CharmInit, StartCharmScheduler, CharmLibExit) from a program's own
   main also works (#4055, reconverse #288). A CkAbort or CmiAbort in
   any process ends the whole MPI job through MPI_Abort (#4254,
-  reconverse #326).
+  reconverse #326). CharmLibExit returns the code given to CkExit.
 
 - Tracing: with tracing compiled out, [local] and [inline] calls no
   longer evaluate trace arguments, which crashed hello/local and
