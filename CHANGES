@@ -1,6 +1,45 @@
 This file describes the most significant changes. For more detail, use
 'git log' on a clone of the charm repository.
 ================================================================================
+What's new in Charm++ 8.1.1
+================================================================================
+
+A bug-fix release of the classic Converse line. It fixes three
+regressions from 8.0.0 (in array element creation, in array element
+destruction and in Collide), a startup abort on multi-process runs, and
+hangs and crashes at exit on the MPI machine layer.
+
+Bug fixes:
+
+- [createhere] messages sent at the same time from several PEs to the
+  same new array index construct the element once; before, each sending
+  PE constructed its own copy of the element (regression from 8.0.0,
+  #4328).
+
+- Destroying or migrating an array element no longer clears the slot
+  of a plain chare created earlier on the PE where the element was
+  inserted; the next message to that chare crashed with a segmentation
+  fault, or failed the assertion in ~Chare in builds with error
+  checking (regression from 8.0.0, #4331).
+
+- Collide: collisions are no longer missed in steps that create new
+  voxels, and steps no longer hang when some PEs have no contributors
+  (both regressions from 8.0.0); the collision grid and the serial and
+  distributed client callbacks now survive checkpoint/restart (#4330).
+
+- Multi-process runs no longer abort at startup with "Unhandled C++
+  exception in user code: vector::_M_default_append" when a group or
+  node group is created early in the run from an entry method on a PE
+  other than 0 (#4179).
+
+- MPI machine layer, SMP builds: multi-node runs no longer hang at
+  exit with messages in flight, and CkAbort from a worker PE or from a
+  signal handler ends the job instead of crashing or spinning in
+  MPI_Abort (#4194).
+
+- Charm++ compiles with the nolb build option (CMK_LBDB_ON=0) (#3904).
+
+================================================================================
 What's new in Charm++ 8.1.0
 ================================================================================
 
