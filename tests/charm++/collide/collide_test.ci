@@ -2,10 +2,16 @@ mainmodule collide_test {
   readonly CProxy_Main mainProxy;
   readonly int nChunks;
 
-  mainchare Main {
+  mainchare [migratable] Main {
     entry Main(CkArgMsg *m);
     entry void collisions(CkReductionMsg *m);
     entry [reductiontarget] void migrated();
+    entry void checkpointed();
+  };
+
+  group [migratable] Collector {
+    entry Collector();
+    entry void colls(CkDataMsg *m);
   };
 
   array [1D] Chunk {
