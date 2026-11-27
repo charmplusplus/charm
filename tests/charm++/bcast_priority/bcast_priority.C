@@ -5,8 +5,9 @@
 // urgent first, so that on every PE all K are queued by the time hold returns;
 // they must then run most urgent first. Kinds: a group broadcast with
 // marshalled parameters (a nokeep message, which the PEs of a process share),
-// a group broadcast of a message (each PE gets a copy), and a nodegroup
-// broadcast. A PE whose hold ended before the broadcasts reached it sees them
+// a group broadcast of a message (each PE gets a copy), a nodegroup
+// broadcast, and group broadcasts with LIFO queueing and no priority, which
+// must run in the reverse of the order they were issued in. A PE whose hold ended before the broadcasts reached it sees them
 // in arrival order; the round is then repeated with a longer hold, and the
 // test fails only if the longest hold still shows a wrong order.
 // The order is checked only on a PE that is alone in its process. In a
@@ -17,6 +18,12 @@
 // arrives, without queueing it by priority.) For a nodegroup the sender's
 // process is the only one checked: a nodegroup message from another process
 // is queued without its priority.
+// On a process other than the sender's, the K broadcasts wait in the node
+// queue while the PE holds. The check there relies on the scheduler taking
+// node queue messages ahead of the PE's own queued work, up to node_queue_max
+// (default 16) in a row, so that all K are in CsdSchedQueue before the first
+// runs; K is below that limit.
+// Bit-vector priorities are not tested: reconverse queues them at priority 0.
 //
 // Part 2, quiescence. One PE issues a burst of group, nodegroup and array
 // broadcasts, some with priorities. Quiescence must be detected, and only
@@ -32,11 +39,12 @@ CProxy_G gProxy;
 CProxy_NG ngProxy;
 CProxy_A aProxy;
 
-static const int K = 8;        // prioritized broadcasts per round
-static const int NKINDS = 3;   // group marshalled, group message, nodegroup
+static const int K = 8;        // broadcasts per round; keep below node_queue_max
+static const int NKINDS = 4;
 static const int MAXTRIES = 6;
 static const int BURST = 200;
-static const char *kindName[NKINDS] = {"group, marshalled", "group, message", "nodegroup"};
+static const char *kindName[NKINDS] = {"group, marshalled", "group, message", "nodegroup",
+                                       "group, LIFO"};
 
 CkpvDeclare(long, arrayCount);
 
@@ -167,8 +175,15 @@ class G : public CBase_G {
           *(int *)CkPriorityPtr(m) = p;
           CkSetQueueing(m, CK_QUEUEING_IFIFO);
           thisProxy.prioMsg(m);
-        } else {
+        } else if (kind == 2) {
           ngProxy.prio(sender, p, &opts);
+        }
+      }
+      if (kind == 3) {
+        for (int p = 1; p <= K; p++) {
+          CkEntryOptions opts;
+          opts.setQueueing(CK_QUEUEING_LIFO);
+          thisProxy.lifo(p, &opts);
         }
       }
     }
@@ -176,6 +191,7 @@ class G : public CBase_G {
     }
   }
   void prio(int p) { record(p); }
+  void lifo(int p) { record(-p); }  // issued 1..K, expected K..1
   void prioMsg(PMsg *m) {
     record(m->p);
     delete m;

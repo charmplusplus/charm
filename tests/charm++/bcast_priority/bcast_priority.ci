@@ -18,6 +18,7 @@ mainmodule bcast_priority {
     entry G();
     entry void hold(int kind, int sender, double secs);
     entry void prio(int p);
+    entry void lifo(int p);
     entry void prioMsg(PMsg *m);
     entry void burst(int n);
     entry void count();
