@@ -134,6 +134,8 @@ endif()
 foreach(filename ${ck-h-sources} ${ldb-h-sources})
     configure_file(${filename} ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 endforeach()
+# main() for charmc -mpi-main; charmc compiles it at link time.
+configure_file(mpi-main.C ${CMAKE_BINARY_DIR}/include/ COPYONLY)
 
 target_include_directories(ck PRIVATE . ../ck-ldb ../ck-perf ../ck-cp ../util/topomanager ../conv-perf)
 if(HAPI_CUPTI_LB AND BUILD_CUDA AND CUPTI_LIBRARY)

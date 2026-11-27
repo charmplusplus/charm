@@ -258,6 +258,13 @@ jobs:
         run: |
           timeout 300 make -C tests/charm++/mpi-interop testexit NP=2 PES=4 LAUNCH="mpirun --oversubscribe --bind-to none -n 2"
           timeout 300 make -C tests/charm++/mpi-interop testexit NP=1 PES=4 LAUNCH="mpirun --oversubscribe --bind-to none -n 1"
+      - name: testmain, testmainabort (main mode, CharmMpiMain; 2 ranks of 2 PEs, 2 ranks of 1 PE, 1 rank of 4 PEs, mpirun)
+        env:
+          LCI_ATTR_BACKEND: ofi
+        run: |
+          timeout 300 make -C tests/charm++/mpi-interop testmain testmainabort NP=2 PES=4 LAUNCH="mpirun --oversubscribe --bind-to none -n 2"
+          timeout 300 make -C tests/charm++/mpi-interop testmain NP=2 PES=2 LAUNCH="mpirun --oversubscribe --bind-to none -n 2"
+          timeout 300 make -C tests/charm++/mpi-interop testmain NP=1 PES=4 LAUNCH="mpirun --oversubscribe --bind-to none -n 1"
 
   # --build-shared: libreconverse and LCI's libraries are in lib_so/. Links one
   # program against the static Charm++ libraries and once with -charm-shared,
