@@ -208,11 +208,15 @@ class Main : public CBase_Main
   int localFreq = 1;
   int stepsDone = 0;
   int failures = 0;
+  // The step summaries and failures again, for the abort message: the abort
+  // can end the process before its earlier output is flushed.
+  std::string stepText, failText;
 
   void fail(const char* what)
   {
     CkPrintf("lbsweep: FAIL step %d: %s\n", stepsDone, what);
     failures++;
+    failText += "\n  step " + std::to_string(stepsDone) + ": " + what;
   }
 
   // Lower bound over the PEs [lo, hi): average, largest movable load,
@@ -334,9 +338,13 @@ class Main : public CBase_Main
       for (int node = 0; node < CkNumNodes(); node++)
         lb = std::max(lb, bound(before, fixed, CkNodeFirst(node),
                                 CkNodeFirst(node) + CkNodeSize(node)));
-    CkPrintf("lbsweep: step %d (%s): max/avg %.3f -> %.3f, %s bound %.3f, migrations %ld of %ld\n",
+    char line[256];
+    snprintf(line, sizeof(line),
+             "step %d (%s): max/avg %.3f -> %.3f, %s bound %.3f, migrations %ld of %ld",
              stepsDone, expect.c_str(), maxB / avg, maxA / avg, local ? "process" : "global",
              lb / avg, moved, migratable);
+    CkPrintf("lbsweep: %s\n", line);
+    stepText += std::string("\n  ") + line;
 
     if (expect == "improve")
     {
@@ -371,7 +379,9 @@ class Main : public CBase_Main
 
     if (++stepsDone == numSteps)
     {
-      if (failures) CkAbort("lbsweep: %d check(s) failed\n", failures);
+      if (failures)
+        CkAbort("lbsweep: %d check(s) failed:%s\n  --%s\n", failures, failText.c_str(),
+                stepText.c_str());
       CkPrintf("lbsweep: PASS\n");
       CkExit(0);
     }
