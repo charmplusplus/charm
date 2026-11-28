@@ -1739,7 +1739,7 @@ void _initCharm(int unused_argc, char **argv)
 		// the binding registers its classes through its CkDyn hook table
 		// (CkDynInit, ckdyn.h).
 		if (!CkDynCallRegisterHook())
-			CkAbort("No CkDyn registration hook: call CkDynInit before CkDynStart");
+			CkAbort("No CkDyn registration hook: a binding calls CkDynInit before CkDynStart; a C++ program needs a charm++ build, not the charm4py target");
 #endif
 
 		/**
