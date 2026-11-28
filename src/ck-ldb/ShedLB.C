@@ -138,9 +138,12 @@ void ShedLB::work(LDStats* stats)
   // output puts: 0.5 to 2.4 ms a step on the A100 nodes), and a PE's step is
   // bound by the larger of its device load and its host time. Packing ten
   // experts on one PE by device load alone gave it 10 ms of host time a
-  // step and the serving step (job 23612682). So no move or copy may raise
-  // a host above the device target, or above the hosts' own mean with the
-  // same slack where that is higher.
+  // step and the serving step (job 23612682). So when the bins are on
+  // device time, no move or copy may raise a host above the device target,
+  // or above the hosts' own mean with the same slack where that is higher.
+  // On host time the bins' loads are the host times and T bounds them; a
+  // second cap there would refuse every copy of an object above T, since a
+  // copy's share lands on a PE that already carries its own load.
   double hostMean = 0.0;
   {
     int np = 0;
@@ -148,7 +151,8 @@ void ShedLB::work(LDStats* stats)
       if (stats->procs[pe].available && peToBin[pe] >= 0) { hostMean += peCpu[pe]; np++; }
     if (np > 0) hostMean /= np;
   }
-  const double hostCap = std::max(T, hostMean * (1.0 + eps));
+  const double hostCap = useGpu ? std::max(T, hostMean * (1.0 + eps))
+                                : std::numeric_limits<double>::max();
   int hostRefusals = 0;
 
   double maxLoad = 0.0;

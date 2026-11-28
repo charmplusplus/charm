@@ -154,7 +154,9 @@ loads, `k` their count and `K` the declared maximum: the target is
   device load, a PE's step is bound by the larger of the two, and a round
   that packed ten experts on one PE by device load alone gave its host 10 ms
   a step and the serving step (job 23612682). The same cap applies to every
-  move of the shed loop. Every copy is priced as its share `L_g / k*` plus its
+  move of the shed loop. The cap is for bins on device time only; on host
+  time a bin's load is its PE's host time, `T` already bounds it, and a cap
+  would refuse every copy of an object above `T`. Every copy is priced as its share `L_g / k*` plus its
   exchanges: for each other copy, the declared `replicaCostNode` or
   `replicaCostRemote` by whether the two sit on the same node (`CkNodeOf`).
   The measured loads leave the exchange out, so the group pass first adds
