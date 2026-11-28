@@ -330,6 +330,10 @@ void MetisLB::work(LDStats* stats)
   int slackIdx = -1;
   double slackUbvec = 1.1;
   double slackAlpha = 0.0;
+  // Per-object host weight: measured wallTime, or (+LBMetisHostByMsgs) the
+  // message count scaled to it once the comm graph is merged below.
+  std::vector<double> hostW(numVertices);
+  for (int i = 0; i < numVertices; i++) hostW[i] = (double)stats->objData[i].wallTime;
 #if CMK_GPU
   {
     const LBCriticality crit = lbCriticalityOf(stats);
@@ -344,10 +348,6 @@ void MetisLB::work(LDStats* stats)
                  CkMyPe(), lbLoadDimName(!ogr->deviceDim), slackIdx, slackUbvec, slackAlpha);
     }
   }
-  // Per-object host weight: measured wallTime, or (+LBMetisHostByMsgs) the
-  // message count scaled to it once the comm graph is merged below.
-  std::vector<double> hostW(numVertices);
-  for (int i = 0; i < numVertices; i++) hostW[i] = (double)stats->objData[i].wallTime;
   auto slackOf = [&](int i) {
     return ogr->deviceDim ? hostW[i]
                           : lbObjGroupLoad(stats->objData[i]);
