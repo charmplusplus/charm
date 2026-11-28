@@ -2,8 +2,9 @@
 
 This chapter will cover the three ways the runtime saves and restores the
 state of a program: the double in-memory checkpoint, the disk checkpoint
-(`CkStartCheckpoint`, `+restart`), and shrink/expand. Only the first is
-written so far.
+(`CkStartCheckpoint`, `+restart`), and shrink/expand. The first is
+written so far, and of the disk checkpoint only how it waits for
+migrations.
 
 ## The double in-memory checkpoint
 
@@ -283,3 +284,31 @@ only with `__FAULT__`.
   (`-lbfirst`), a `pup_buffer` array restored by the rollback, and the
   migration, insertion and deletion refusals, the insertion also by an
   array bound to the workers after the checkpoint (`testrestriction`).
+
+## The disk checkpoint
+
+### Waiting for migrations
+
+Each PE writes the array elements it holds, so an element inside a
+migration message would be written by no PE. `migrateMe` only sends the
+element a `ckEmigrateCounted` message, and the element leaves when that
+message is handled, which can fall between two PEs' writes. `CkCheckpointWriteMgr`
+therefore starts the writes (`Write`) only once no migration is in
+progress. Each PE counts migrations started (`migrateMe`,
+`CkLocMgr::emigrate`) and finished (`ArrayElement::ckEmigrateCounted`,
+`CkLocMgr::immigrate`). `TCharm::migrateTo` (`AMPI_Migrate_to_pe`,
+`TCHARM_Migrate_to`) calls `migrateMe`. A program that sends
+`ckEmigrate` itself counts no start, so `ckEmigrate` counts no finish: a
+checkpoint does not wait for that message, and the totals stay
+balanced. When a node has the request, and again whenever
+node 0 asks, every PE contributes its two counts to node 0
+(`CkCheckpointMgr::CountMigrations`, `MigrationCounts`). A PE counts in
+its own scheduler, after any entry method it is running, so a
+`migrateMe` called after the `contribute` that led to the checkpoint is
+included; counts kept per process and read by another PE could miss an
+element being packed. A finished total never exceeds the started total
+and every count of a round is taken after the round before ends, so when
+the started total of a round equals the finished total of the round
+before, nothing was in progress between them (the four-counter method).
+Quiescence detection would also work, but it would deliver the program's
+own `CkStartQD` callbacks at the checkpoint.

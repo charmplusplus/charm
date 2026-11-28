@@ -3859,6 +3859,7 @@ void CkLocMgr::emigrate(CkLocRec* rec, int toPe)
 
   DEBM((AA "Migrated index size %s to %d \n" AB, idx2str(idx), toPe));
 
+  CkMigrationStarted();
   thisProxy[toPe].immigrate(msg);
 
 #if CMK_CUDA
@@ -3959,6 +3960,7 @@ void CkLocMgr::immigrateWithDevice(CkArrayElementMigrateMessage* msg)
   PUP::fromMem p(msg->packData, PUP::er::IS_MIGRATION);
 #endif
 
+  CkMigrationFinished();
   insertID(idx, msg->id);
 
   // Create a record for this element

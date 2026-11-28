@@ -104,6 +104,7 @@ class Main : public CBase_Main
   bool pendingCkpt = false;
   bool reckptDone = false;
   bool chain = false;
+  int writers = 0;
   std::string writeCheck, expectCheck;
   int waitCount = 0;
   int mapWait = 0;
@@ -113,6 +114,7 @@ class Main : public CBase_Main
   void parseRunArgs(char** argv)
   {
     chain = CmiGetArgFlagDesc(argv, "-c", "checkpoint again after a restart") != 0;
+    CmiGetArgIntDesc(argv, "-writers", &writers, "checkpoint writers per process");
     char* s = nullptr;
     if (CmiGetArgStringDesc(argv, "-write-check", &s, "write the summary")) writeCheck = s;
     s = nullptr;
@@ -348,7 +350,7 @@ public:
     ckptPes = CkNumPes();
     ckptNodes = CkNumNodes();
     pendingCkpt = true;
-    CkStartCheckpoint("log", CkCallback(CkIndex_Main::resumed(), thisProxy));
+    CkStartCheckpoint("log", CkCallback(CkIndex_Main::resumed(), thisProxy), false, writers);
   }
 
   // The checkpoint's callback: after this run's checkpoint, and as the first

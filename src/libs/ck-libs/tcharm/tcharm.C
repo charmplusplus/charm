@@ -443,8 +443,9 @@ CMI_WARN_UNUSED_RESULT TCharm * TCharm::migrateTo(int destPE) noexcept {
             return this;
         }
 	asyncMigrate = true;
-	// Make sure migrateMe gets called *after* we suspend:
-	thisProxy[thisIndex].ckEmigrate(destPE);
+	// migrateMe sends this element a message, so the move happens after we
+	// suspend; it is counted, so a disk checkpoint waits for it.
+	migrateMe(destPE);
 	return suspend();
 }
 void TCharm::ckJustMigrated() {

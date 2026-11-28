@@ -242,6 +242,7 @@ extern int userDrivenMode;
 extern void _libExitHandler(envelope *env);
 extern int _libExitHandlerIdx;
 extern void _libStopSchedulerHandler(void *msg);
+extern void _interopCheckStart();
 extern int _libStopSchedulerHandlerIdx;
 CpvCExtern(int,interopExitFlag);
 void StopInteropScheduler();
@@ -1435,6 +1436,8 @@ void _initCharm(int unused_argc, char **argv)
 { 
   int inCommThread = (CmiMyRank() == CmiMyNodeSize());
 
+  if (CmiMyRank() == 0) _interopCheckStart();
+
   DEBUGF(("[%d,%.6lf ] _initCharm started\n",CmiMyPe(),CmiWallTimer()));
   std::set_terminate([](){
     std::exception_ptr exptr = std::current_exception();
@@ -1736,7 +1739,7 @@ void _initCharm(int unused_argc, char **argv)
 		// the binding registers its classes through its CkDyn hook table
 		// (CkDynInit, ckdyn.h).
 		if (!CkDynCallRegisterHook())
-			CkAbort("No CkDyn registration hook: call CkDynInit before CkDynStart");
+			CkAbort("No CkDyn registration hook: a binding calls CkDynInit before CkDynStart; a C++ program needs a charm++ build, not the charm4py target");
 #endif
 
 		/**
