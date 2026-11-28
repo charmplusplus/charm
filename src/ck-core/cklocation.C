@@ -1590,6 +1590,7 @@ void CkMigratable::commonInit(void)
   lbStepPending = false;
   waitParked = false;
   lbWaitEpoch = 0;
+  lbMeasurementClosed = false;
 
 #if CMK_LBDB_ON
   if (_lb_args.metaLbOn())
@@ -1645,10 +1646,28 @@ void CkMigratable::pup(PUP::er& p)
     p | lbStepPending;
     p | waitParked;
     p | lbWaitEpoch;
+    p | lbMeasurementClosed;
+    if (p.isUnpacking()) lbSetMeasurementClosed(lbMeasurementClosed);
   }
 
   if (p.isUnpacking())
     ckFinishConstruction(epoch);
+}
+
+void CkMigratable::lbSetMeasurementClosed(bool closed)
+{
+  lbMeasurementClosed = closed;
+#if CMK_LBDB_ON
+  myRec->getLBMgr()->SetObjJoinedStep(myRec->getLdHandle(), closed);
+#if CMK_CUDA
+  // PE-local: an arrival must overwrite both a missing exclusion on its new PE
+  // and a stale one on a PE it is returning to.
+  if (closed)
+    hapiCuptiObjectJoinedStep(myRec->getLdHandle());
+  else
+    hapiCuptiObjectResumed(myRec->getLdHandle());
+#endif
+#endif
 }
 
 void CkMigratable::ckDestroy(void) {}
@@ -1984,6 +2003,16 @@ void CkMigratable::lbJoinStep(int waitForMigration)
   DEBL((AA "Element %s joining LB step\n" AB, idx2str(thisIndexMax)));
   recordLBSizes();
 
+  // Under +LBAsync this element's measurement window closes here, at its own
+  // join -- not at the barrier, and not PE-wide. It keeps running until the
+  // step is handed back to it, and that work belongs to the next round:
+  // billing it here would inflate the measured load of whichever elements
+  // joined earliest, so the strategy would see a different imbalance than a
+  // synchronous run of the same work. Reopened when the step is handed back.
+  // Under the barrier a joined element waits, and its measurement is left as
+  // it always was.
+  if (_lb_args.lbAsync()) lbSetMeasurementClosed(true);
+
   local_state = LOAD_BALANCE;
   can_reset = true;
   lbStepPending = true;
@@ -2002,7 +2031,9 @@ void CkMigratable::AtSyncWait()
         "AtSyncWait!\n");
   if (!lbStepPending)
   {
-    // No step joined, or the step is already over: hand the element back now.
+    // No step joined, or the step is already over: hand the element back now,
+    // and the element's measurement window opens again here.
+    lbSetMeasurementClosed(false);
     ResumeFromSync();
     return;
   }
@@ -2034,6 +2065,7 @@ void CkMigratable::lbCheckWaitRelease()
   waitParked = false;
   DEBL((AA "Element %s released after migrating into a resumed PE\n" AB,
         idx2str(thisIndexMax)));
+  lbSetMeasurementClosed(false);
   ResumeFromSync();
 }
 
@@ -2067,6 +2099,9 @@ void CkMigratable::ResumeFromSyncHelper()
   }
   // Otherwise the element was stopped without AtSyncWait(): MetaBalancer's
   // path, where AtSyncStart() returned Blocked and metaLBCallLB() joined.
+
+  // Handed back: this element's measurement window opens again.
+  lbSetMeasurementClosed(false);
 
   CkLocMgr* localLocMgr = myRec->getLocMgr();
   auto iter = localLocMgr->bufferedActiveRgetMsgs.find(ckGetID());

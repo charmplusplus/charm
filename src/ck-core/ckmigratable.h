@@ -24,6 +24,12 @@ private:
   bool lbStepPending;
   bool waitParked;
   int lbWaitEpoch;
+  // This element's measurement window is closed: from its join until the
+  // step is handed back to it, its work is not billed to it (LBObj::
+  // setJoinedStep, hapiCuptiObjectJoinedStep). Pupped across migration, since
+  // the destination's database starts the element with its window open.
+  bool lbMeasurementClosed;
+  void lbSetMeasurementClosed(bool closed);
 protected:
   bool usesAtSync;//You must set this in the constructor to use AtSync().
   bool usesAutoMeasure; //You must set this to use auto lb instrumentation.

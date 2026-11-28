@@ -17,7 +17,9 @@
 #include "json_fwd.hpp"
 using json = nlohmann::json;
 
-#define LB_FORMAT_VERSION 3
+// 6 adds LDObjData::windowTime. (4 and 5 belong to fields this tree does not
+// carry; a dump of one of those versions is not readable here.)
+#define LB_FORMAT_VERSION 6
 
 #define LB_MANAGER_VERSION 1
 
@@ -462,6 +464,11 @@ class LBManager : public CBase_LBManager
   void EstObjGPULoad(const LDObjHandle& h, double gpuload)
   {
     lbdb_obj->EstObjGPULoad(h, gpuload);
+  }
+  // The object joined (true) or left (false) the current balancing step.
+  void SetObjJoinedStep(const LDObjHandle& h, bool joined)
+  {
+    lbdb_obj->SetObjJoinedStep(h, joined);
   }
   void BackgroundLoad(LBRealType* walltime, LBRealType* cputime)
   {

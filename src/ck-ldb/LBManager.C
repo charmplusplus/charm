@@ -20,6 +20,10 @@ void LBObjLoadsCcsHandler(char* msg);
 #include "json.hpp"
 #include <atomic>
 
+#if CMK_CUDA && CMK_LBDB_ON
+#include "hapi.h"
+#endif
+
 CkGroupID _lbmgr;
 // CkLBSetAsync called before the LBManager group exists (see LBMgrInit):
 // remembered here and broadcast once it does.
@@ -600,6 +604,9 @@ void LBManager::init(void)
   if (manualOn) TurnManualLBOn();
   // Move-ledger stall report; costs two loads per second while no step drains.
   CcdCallOnConditionKeep(CcdPERIODIC_1second, (CcdCondFn)ledgerWatch, this);
+#if CMK_CUDA
+  hapiCuptiSetAsyncLB(_lb_args.lbAsync());
+#endif
 #endif
   objLoadsCollecting = false;
   // Registered through the C-level table, which exists since ConverseInit:
@@ -983,6 +990,9 @@ static void lbApplyAsync(bool on)
     _lb_args.syncResume() = true;
     if (getenv("CHARM_LB_ASYNC_NO_PEER_DECISION") == NULL) _lb_args.lbPeerDecision() = true;
   }
+#if CMK_CUDA && CMK_LBDB_ON
+  hapiCuptiSetAsyncLB(on);
+#endif
 }
 
 void LBManager::setAsyncMode(bool on) { lbApplyAsync(on); }

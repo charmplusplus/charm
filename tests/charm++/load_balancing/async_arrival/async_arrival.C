@@ -22,6 +22,9 @@
 // merely permutes equal loads leaves the mapping optimal and nothing migrates.
 
 #include "async_arrival.decl.h"
+#include "cklocrec.h"
+#include "LBManager.h"
+#include "LBDatabase.h"
 
 /*readonly*/ CProxy_Main mainProxy;
 /*readonly*/ int num_elements;
@@ -90,6 +93,15 @@ class Blk : public CBase_Blk
   int split, wait;
   int stamp;  // must survive migration unchanged
   int resumes;
+  bool joined = false;  // this step's AtSyncStart joined a step
+
+  // The element's measurement window, as the load database sees it: closed
+  // from its join until the step is handed back to it.
+  bool windowClosed()
+  {
+    CkLocRec* rec = getCkLocRec();
+    return rec->getLBMgr()->getLBDB()->LbObj(rec->getLdHandle())->hasJoinedStep();
+  }
 
 public:
   Blk(int split_, int wait_) : split(split_), wait(wait_), stamp(thisIndex * 7 + 3), resumes(0)
@@ -106,7 +118,9 @@ public:
       AtSync(wait);
       return;
     }
-    if (AtSyncStart(wait) == AtSyncStatus::Blocked) return;
+    const AtSyncStatus s = AtSyncStart(wait);
+    if (s == AtSyncStatus::Blocked) return;
+    joined = (s == AtSyncStatus::Started);
     thisProxy[thisIndex].waitForStep();
   }
 
@@ -119,7 +133,22 @@ public:
                      new CkCallback(CkIndex_Blk::waitForStep(), thisProxy[thisIndex]), 1);
       return;
     }
+    // Under +LBAsync, the step is over but not yet handed back: the window stays
+    // closed until AtSyncWait. (Under the barrier it is never closed.)
+    if (joined && _lb_args.lbAsync() && !windowClosed())
+      CkAbort("async_arrival: a finished step reopened the measurement window before AtSyncWait");
     AtSyncWait();
+  }
+
+  void ckJustMigrated() override
+  {
+    CBase_Blk::ckJustMigrated();
+    // Under +LBAsync the element joined (and closed its window) before the
+    // balancer moved it.
+    // The destination's database starts every element with its window open,
+    // so the closed state must have come across with it.
+    if (_lb_args.lbAsync() && !windowClosed())
+      CkAbort("async_arrival: migration reopened the measurement window");
   }
 
   void UserSetLBLoad() override
@@ -132,6 +161,8 @@ public:
   {
     if (stamp != thisIndex * 7 + 3)
       CkAbort("async_arrival: element %d state corrupted across migration", thisIndex);
+    if (windowClosed())
+      CkAbort("async_arrival: the resume left the measurement window closed");
     resumes++;
     int r[2] = {resumes, -resumes};
     contribute(2 * sizeof(int), r, CkReduction::max_int,
@@ -145,6 +176,7 @@ public:
     p | wait;
     p | stamp;
     p | resumes;
+    p | joined;
   }
 };
 

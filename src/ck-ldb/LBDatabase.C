@@ -137,6 +137,12 @@ void LBDatabase::Send(const LDOMHandle &destOM, const CmiUInt8 &destID, unsigned
     if (activeRec) {
       const LDObjHandle &runObj = activeRec->getLdHandle();
 
+      // An object keeps sending after its measurement window closes at its
+      // join (+LBAsync). Its traffic uses the same window as its load,
+      // including force=1 array sends: force bypasses the PE-wide switch, not
+      // the object's window.
+      if (LbObj(runObj)->hasJoinedStep()) return;
+
       // Don't record self-messages from an object to an object
       if (runObj.omhandle.id == destOM.id
           && runObj.id == destID )
@@ -166,6 +172,8 @@ void LBDatabase::MulticastSend(const LDOMHandle &destOM, CmiUInt8 *destIDs, int 
     if (activeRec) {
       const LDObjHandle &runObj = activeRec->getLdHandle();
 
+      if (LbObj(runObj)->hasJoinedStep()) return;
+
       LBCommData item(runObj, destOM.id, destIDs, nDests);
       item_ptr = commTable->HashInsertUnique(item);
     } else {
@@ -193,21 +201,78 @@ int LBDatabase::GetObjDataSz()
   return nitems;
 }
 
+// A strategy holds these loads against the interval, the wall time since
+// ClearLoads. Under +LBAsync an object is measured over less of it: from its
+// reopen, once the step's migrations are over, until its own join, while it
+// keeps computing through the step. Held against the interval unscaled, such a
+// load reads the object as idle for the part of the interval its window was
+// closed. The window stays as it is -- an object's rate depends on where it
+// runs, so the move must not be measured -- and the host load leaves here
+// scaled to the span the object was active (LBObj::activeSpan), its traffic
+// (GetCommData) by the same factor per sender, so load and traffic keep a
+// common horizon. Under the barrier the span is the window itself and nothing
+// changes. The device load is not scaled: it is the kernels an object launched
+// while its window was open, the same number of steps for every object, and a
+// per-object wall-clock factor would put a different error on each.
 void LBDatabase::GetObjData(LDObjData *dp)
 {
-  if (_lb_args.migObjOnly()) {
-    for (int i = 0; i < objs.size(); i++) {
-      LBObj* obj = objs[i].obj;
-      if (obj && obj->data.migratable)
-        *dp++ = obj->ObjData();
+  const bool migOnly = _lb_args.migObjOnly();
+  int scaled = 0, counted = 0, lateDeclared = 0;
+  double maxScale = 1.0, sumScale = 0.0;
+  for (int i = 0; i < objs.size(); i++) {
+    LBObj* obj = objs[i].obj;
+    if (!obj || (migOnly && !obj->data.migratable)) continue;
+    if (obj->declaredWhileJoined) lateDeclared++;
+    LDObjData d = obj->ObjData();
+    d.windowTime = obj->windowTime();
+    const double f = obj->sampleScale();
+    if (f != 1.0) {
+      d.wallTime *= f;
+#if CMK_LB_CPUTIMER
+      d.cpuTime *= f;
+#endif
     }
-  } else {
-    for (int i = 0; i < objs.size(); i++) {
-      LBObj* obj = objs[i].obj;
-      if (obj)
-        *dp++ = obj->ObjData();
+    if (obj->data.migratable) {
+      counted++;
+      sumScale += f;
+      if (f > maxScale) maxScale = f;
+      if (f != 1.0) scaled++;
     }
+    *dp++ = d;
   }
+  if (_lb_args.debug() > 0) {
+    // Once per interval (the stats are read more than once per step); the
+    // interval clock tells the reads of one step from those of the next.
+    LBRealType period = 0, cpu = 0;
+    TotalTime(&period, &cpu);
+    static thread_local double lastReported = -1.0;
+    const bool newInterval =
+        (lastReported < 0.0 || period < lastReported || period - lastReported > 0.5);
+    if (newInterval && scaled > 0 && CkMyPe() == 0)
+      CmiPrintf("[%d] LBDB: %d of %d migratable objects were measured over less of the "
+                "%.3f s interval than they were active; loads and traffic scaled by "
+                "%.2fx on average, %.2fx at most\n",
+                CkMyPe(), scaled, counted, (double)period, sumScale / counted, maxScale);
+    if (newInterval && lateDeclared > 0)
+      CmiPrintf("[%d] LBDB: %d of %d objects declared a device load after joining the "
+                "step; this round reads their declaration from before the join\n",
+                CkMyPe(), lateDeclared, (int)objs.size());
+    if (newInterval) lastReported = period;
+  }
+}
+
+// Traffic recorded while the sender's window was open, scaled by the sender's
+// factor (see GetObjData). A record whose sender is gone, or whose handle now
+// names another object, is handed out as recorded.
+void LBDatabase::GetCommData(LDCommData *data)
+{
+  if (!commTable) return;
+  commTable->GetCommData(data, [this](const LDObjHandle& h) -> double {
+    if (h.handle < 0 || (size_t)h.handle >= objs.size()) return 1.0;
+    LBObj* obj = objs[h.handle].obj;
+    if (obj == NULL || obj->data.handle.id != h.id) return 1.0;
+    return obj->sampleScale();
+  });
 }
 
 void LBDatabase::BackgroundLoad(LBRealType* walltime, LBRealType* cputime)
@@ -249,10 +314,12 @@ void LBDatabase::GetTime(LBRealType *total_walltime, LBRealType *total_cputime,
 void LBDatabase::ClearLoads(void)
 {
   int i;
+  const double now = CkWallTimer();
   for (i = 0; i < objs.size(); i++) {
     LBObj *obj = objs[i].obj;
     if (obj)
     {
+      obj->clearWindow(now);
       if (obj->data.wallTime > 0.0) {
         obj->lastWallTime = obj->data.wallTime;
 #if CMK_LB_CPUTIMER
@@ -339,12 +406,28 @@ void LBDatabase::EstObjLoad(const LDObjHandle &_h, double cputime)
 #endif
 }
 
+void LBDatabase::SetObjJoinedStep(const LDObjHandle &_h, bool joined)
+{
+#if CMK_LBDB_ON
+  LBObj *const obj = LbObj(_h);
+  if (obj != NULL) obj->setJoinedStep(joined);
+#endif
+}
+
 void LBDatabase::EstObjGPULoad(const LDObjHandle &_h, double gputime)
 {
 #if CMK_CUDA && CMK_LBDB_ON
   LBObj *const obj = LbObj(_h);
 
   CmiAssert(obj != NULL);
+  // The window is closed from the join to the resume, and a declaration made
+  // in it is about work the round must not see, as a launch is: under
+  // +LBAsync the elements keep stepping while the round's stats are built, and
+  // a later step's declaration would replace the one the round stands for.
+  if (obj->hasJoinedStep()) {
+    obj->declaredWhileJoined = true;
+    return;
+  }
   obj->setGPUTiming(gputime);
 #else
   CmiAbort("LBDatabase::EstObjGPULoad called but CMK_CUDA is not set");
